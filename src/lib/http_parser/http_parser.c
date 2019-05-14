@@ -40,6 +40,16 @@
  * adaptation from nginx http parser module
  */
 
+void http_parser_create(struct http_parser *parser)
+{
+ parser->hdr_value_start = NULL;
+ parser->hdr_value_end = NULL;
+ parser->http_major = -1;
+ parser->http_minor = -1;
+ parser->hdr_name = NULL;
+ parser->hdr_name_idx = 0;
+}
+
 /**
  * Utility function used in headers parsing
  */

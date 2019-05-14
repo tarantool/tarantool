@@ -206,7 +206,7 @@ sql_value_bytes(sql_value * pVal)
 double
 sql_value_double(sql_value * pVal)
 {
-	double v;
+	double v = 0.0;
 	sqlVdbeRealValue((Mem *) pVal, &v);
 	return v;
 }
@@ -214,7 +214,7 @@ sql_value_double(sql_value * pVal)
 int
 sql_value_int(sql_value * pVal)
 {
-	int64_t i;
+	int64_t i = 0;
 	sqlVdbeIntValue((Mem *) pVal, &i);
 	return (int)i;
 }
@@ -222,7 +222,7 @@ sql_value_int(sql_value * pVal)
 sql_int64
 sql_value_int64(sql_value * pVal)
 {
-	int64_t i;
+	int64_t i = 0;
 	sqlVdbeIntValue((Mem *) pVal, &i);
 	return i;
 }
