@@ -2002,6 +2002,7 @@ swim_quit(struct swim *swim)
 	assert(rc == 2);
 	mp_encode_map(header, rc);
 	swim_quit_step_complete(task, &swim->scheduler, 0);
+	swim->self->status = MEMBER_LEFT;
 }
 
 struct swim_member *

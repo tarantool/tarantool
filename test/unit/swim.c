@@ -502,14 +502,20 @@ swim_test_undead(void)
 static void
 swim_test_quit(void)
 {
-	swim_start_test(9);
+	swim_start_test(10);
 	int size = 3;
 	struct swim_cluster *cluster = swim_cluster_new(size);
 	for (int i = 0; i < size; ++i) {
 		for (int j = 0; j < size; ++j)
 			swim_cluster_add_link(cluster, i, j);
 	}
+	struct swim *s0 = swim_cluster_member(cluster, 0);
+	struct swim_member *s0_self = swim_self(s0);
+	swim_member_ref(s0_self);
 	swim_cluster_quit_node(cluster, 0);
+	is(swim_member_status(s0_self), MEMBER_LEFT,
+	   "'self' is 'left' immediately after quit");
+	swim_member_unref(s0_self);
 	is(swim_cluster_wait_status_everywhere(cluster, 0, MEMBER_LEFT, 0),
 	   0, "'quit' is sent to all the members without delays between "\
 	   "dispatches")
@@ -528,7 +534,7 @@ swim_test_quit(void)
 	 * received the 'quit' message with the same UUID. Of
 	 * course, it should be refuted.
 	 */
-	struct swim *s0 = swim_cluster_member(cluster, 0);
+	s0 = swim_cluster_member(cluster, 0);
 	struct tt_uuid s0_uuid = *swim_member_uuid(swim_self(s0));
 	struct swim *s1 = swim_cluster_member(cluster, 1);
 	swim_remove_member(s1, &s0_uuid);

@@ -122,16 +122,17 @@ ok 11 - subtests
 ok 12 - subtests
 	*** swim_test_packet_loss: done ***
 	*** swim_test_quit ***
-    1..9
-    ok 1 - 'quit' is sent to all the members without delays between dispatches
-    ok 2 - quited member S1 has returned and refuted the old status
-    ok 3 - another member S2 has taken the quited UUID
-    ok 4 - S3 did not add S1 back when received its 'quit'
-    ok 5 - S2 finally got 'quit' message from S1, but with its 'own' UUID - refute it
-    ok 6 - S3 sees S1 as left
-    ok 7 - S2 does not see S1 at all
-    ok 8 - after more time S1 is dropped from S3
-    ok 9 - and still is not added to S2 - left members can not be added
+    1..10
+    ok 1 - 'self' is 'left' immediately after quit
+    ok 2 - 'quit' is sent to all the members without delays between dispatches
+    ok 3 - quited member S1 has returned and refuted the old status
+    ok 4 - another member S2 has taken the quited UUID
+    ok 5 - S3 did not add S1 back when received its 'quit'
+    ok 6 - S2 finally got 'quit' message from S1, but with its 'own' UUID - refute it
+    ok 7 - S3 sees S1 as left
+    ok 8 - S2 does not see S1 at all
+    ok 9 - after more time S1 is dropped from S3
+    ok 10 - and still is not added to S2 - left members can not be added
 ok 13 - subtests
 	*** swim_test_quit: done ***
 	*** swim_test_uri_update ***
