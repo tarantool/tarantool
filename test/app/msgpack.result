@@ -237,3 +237,18 @@ size = msgpack.encode({c = 3, d = 4}, buf)
 ---
 - {'c': 3, 'd': 4}
 ...
+-- Decode should accept both 'char *' and 'const char *'.
+buf:reset()
+---
+...
+size = msgpack.encode(100, buf)
+---
+...
+(msgpack.decode(ffi.cast('char *', buf.rpos), size))
+---
+- 100
+...
+(msgpack.decode(ffi.cast('const char *', buf.rpos), size))
+---
+- 100
+...
