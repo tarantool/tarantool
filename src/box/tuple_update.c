@@ -1011,7 +1011,7 @@ update_read_ops(struct tuple_update *update, const char *expr,
 				 "field id must be a number");
 			return -1;
 		}
-		int32_t field_no;
+		int32_t field_no = 0;
 		if (mp_read_i32(update->index_base, op, &expr, &field_no))
 			return -1;
 		if (field_no - update->index_base >= 0) {

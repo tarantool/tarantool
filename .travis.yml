@@ -37,10 +37,16 @@ jobs:
         if: branch = "master"
       # Special targets (only LTO for now).
       - name: "LTO build + test (Linux, gcc)"
-        env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
+        env: >
+          TARGET=test
+          CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
+          DOCKER_IMAGE=packpack/packpack:debian-buster
         if: branch = "master"
       - name: "LTO build + test (Linux, clang)"
-        env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
+        env: >
+          TARGET=test
+          CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
+          DOCKER_IMAGE=packpack/packpack:debian-buster
         if: branch = "master"
         compiler: clang
       - name: "LTO build + test (OS X Mojave 10.14)"

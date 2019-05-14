@@ -71,7 +71,7 @@ static inline int
 mp_decode_rect(struct rtree_rect *rect, unsigned dimension,
 	       const char *mp, unsigned count, const char *what)
 {
-	coord_t c;
+	coord_t c = 0;
 	if (count == dimension) { /* point */
 		for (unsigned i = 0; i < dimension; i++) {
 			if (mp_decode_num(&mp, i, &c) < 0)

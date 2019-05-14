@@ -2,7 +2,7 @@
 # Travis CI rules
 #
 
-DOCKER_IMAGE:=packpack/packpack:debian-stretch
+DOCKER_IMAGE?=packpack/packpack:debian-stretch
 
 all: package
 
@@ -27,6 +27,9 @@ docker_%:
 		-e CCACHE_DIR=/cache/ccache \
 		-e COVERALLS_TOKEN=${COVERALLS_TOKEN} \
 		-e TRAVIS_JOB_ID=${TRAVIS_JOB_ID} \
+		-e CMAKE_EXTRA_PARAMS=${CMAKE_EXTRA_PARAMS} \
+		-e CC=${CC} \
+		-e CXX=${CXX} \
 		${DOCKER_IMAGE} \
 		make -f .travis.mk $(subst docker_,,$@)
 
@@ -37,7 +40,7 @@ deps_ubuntu:
 		libcurl4-openssl-dev libunwind-dev libicu-dev \
 		python python-pip python-setuptools python-dev \
 		python-msgpack python-yaml python-argparse python-six python-gevent \
-		lcov ruby
+		lcov ruby clang llvm llvm-dev
 
 test_ubuntu: deps_ubuntu
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
