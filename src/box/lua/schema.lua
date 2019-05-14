@@ -748,6 +748,20 @@ local function simplify_index_parts(parts)
     return new_parts
 end
 
+local function check_sequence_part(parts, sequence_part,
+                                   index_name, space_name)
+    if sequence_part <= 0 or sequence_part > #parts then
+        box.error(box.error.MODIFY_INDEX, index_name, space_name,
+                  "sequence part is out of bounds")
+    end
+    sequence_part = parts[sequence_part]
+    local sequence_part_type = sequence_part.type or sequence_part[2]
+    if sequence_part_type ~= 'integer' and sequence_part_type ~= 'unsigned' then
+        box.error(box.error.MODIFY_INDEX, index_name, space_name,
+                  "sequence cannot be used with a non-integer key")
+    end
+end
+
 -- Historically, some properties of an index
 -- are stored as tuple fields, others in a
 -- single field containing msgpack map.
@@ -773,6 +787,7 @@ local alter_index_template = {
     type = 'string',
     parts = 'table',
     sequence = 'boolean, number, string',
+    sequence_part = 'number',
 }
 for k, v in pairs(index_options) do
     alter_index_template[k] = v
@@ -885,16 +900,18 @@ box.schema.index.create = function(space_id, name, options)
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
     local sequence_is_generated = false
     local sequence = options.sequence or nil -- ignore sequence = false
+    local sequence_part = options.sequence_part
+    if sequence_part ~= nil and sequence == nil then
+        box.error(box.error.MODIFY_INDEX, options.name, space.name,
+                  "sequence part cannot be used without sequence")
+    end
     if sequence ~= nil then
         if iid ~= 0 then
             box.error(box.error.MODIFY_INDEX, name, space.name,
                       "sequence cannot be used with a secondary key")
         end
-        if #parts >= 1 and parts[1].type ~= 'integer' and
-                           parts[1].type ~= 'unsigned' then
-            box.error(box.error.MODIFY_INDEX, name, space.name,
-                      "sequence cannot be used with a non-integer key")
-        end
+        sequence_part = sequence_part or 1
+        check_sequence_part(parts, sequence_part, name, space.name)
         if sequence == true then
             sequence = box.schema.sequence.create(space.name .. '_seq')
             sequence = sequence.id
@@ -912,7 +929,8 @@ box.schema.index.create = function(space_id, name, options)
     end
     _index:insert{space_id, iid, name, options.type, index_opts, parts}
     if sequence ~= nil then
-        _space_sequence:insert{space_id, sequence, sequence_is_generated}
+        _space_sequence:insert{space_id, sequence, sequence_is_generated,
+                               sequence_part - 1}
     end
     return space.index[name]
 end
@@ -1028,32 +1046,45 @@ box.schema.index.alter = function(space_id, index_id, options)
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
     local sequence_is_generated = false
     local sequence = options.sequence
+    local sequence_part = options.sequence_part
     local sequence_tuple
     if index_id ~= 0 then
-        if sequence then
+        if sequence or sequence_part ~= nil then
             box.error(box.error.MODIFY_INDEX, options.name, space.name,
                       "sequence cannot be used with a secondary key")
         end
         -- ignore 'sequence = false' for secondary indexes
         sequence = nil
-    else
+    end
+    if sequence ~= nil or sequence_part ~= nil then
         sequence_tuple = _space_sequence:get(space_id)
-        if (sequence or (sequence ~= false and sequence_tuple ~= nil)) and
-           #parts >= 1 and (parts[1].type or parts[1][2]) ~= 'integer' and
-                           (parts[1].type or parts[1][2]) ~= 'unsigned' then
-            box.error(box.error.MODIFY_INDEX, options.name, space.name,
-                      "sequence cannot be used with a non-integer key")
+        if sequence_tuple ~= nil then
+            -- Inherit omitted options from the attached sequence.
+            if sequence == nil then
+                sequence = sequence_tuple.sequence_id
+                sequence_is_generated = sequence_tuple.is_generated
+            end
+            if sequence and sequence_part == nil then
+                sequence_part = sequence_tuple.sequence_part
+            end
         end
+    end
+    if sequence then
+        sequence_part = sequence_part or 1
+        check_sequence_part(parts, sequence_part, options.name, space.name)
+    elseif sequence_part ~= nil then
+        box.error(box.error.MODIFY_INDEX, options.name, space.name,
+                  "sequence part cannot be used without sequence")
     end
     if sequence == true then
         if sequence_tuple == nil or sequence_tuple.is_generated == false then
             sequence = box.schema.sequence.create(space.name .. '_seq')
             sequence = sequence.id
-            sequence_is_generated = true
         else
             -- Space already has an automatically generated sequence.
-            sequence = nil
+            sequence = sequence_tuple.sequence_id
         end
+        sequence_is_generated = true
     elseif sequence then
         sequence = sequence_resolve(sequence)
         if sequence == nil then
@@ -1065,8 +1096,11 @@ box.schema.index.alter = function(space_id, index_id, options)
     end
     _index:replace{space_id, index_id, options.name, options.type,
                    index_opts, parts}
-    if sequence then
-        _space_sequence:replace{space_id, sequence, sequence_is_generated}
+    if sequence and (sequence_tuple == nil or
+                     sequence_tuple.sequence_id ~= sequence or
+                     sequence_tuple.sequence_part ~= sequence_part) then
+        _space_sequence:replace{space_id, sequence, sequence_is_generated,
+                                sequence_part - 1}
     end
     if sequence ~= nil and sequence_tuple ~= nil and
        sequence_tuple.is_generated == true and

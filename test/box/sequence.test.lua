@@ -196,6 +196,18 @@ s:create_index('pk', {parts = {1, 'string'}, sequence = 'test'}) -- error
 s:create_index('pk', {parts = {1, 'scalar'}, sequence = 'test'}) -- error
 s:create_index('pk', {parts = {1, 'number'}, sequence = 'test'}) -- error
 
+s:create_index('pk', {sequence_part = 1}) -- error
+s:create_index('pk', {sequence = true, sequence_part = 2}) -- error
+s:create_index('pk', {parts = {1, 'unsigned', 2, 'string'}, sequence = true, sequence_part = 2}) -- error
+
+pk = s:create_index('pk', {parts = {1, 'string', 2, 'unsigned'}}) -- ok
+pk:alter{sequence_part = 1} -- error
+pk:alter{sequence = true, sequence_part = 1} -- error
+pk:alter{sequence = true, sequence_part = 2} -- ok
+pk:alter{sequence = false, sequence_part = 2} -- error
+pk:alter{sequence = false} -- ok
+pk:drop()
+
 pk = s:create_index('pk', {parts = {1, 'integer'}, sequence = 'test'}) -- ok
 pk:drop()
 pk = s:create_index('pk', {parts = {1, 'unsigned'}, sequence = 'test'}) -- ok
@@ -204,6 +216,7 @@ pk:drop()
 pk = s:create_index('pk') -- ok
 s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = 'test'}) -- error
 s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = true}) -- error
+s:create_index('secondary', {parts = {2, 'unsigned'}, sequence_part = 1}) -- error
 sk = s:create_index('secondary', {parts = {2, 'unsigned'}}) -- ok
 sk:alter{sequence = 'test'} -- error
 sk:alter{sequence = true} -- error
@@ -227,10 +240,11 @@ box.space._index:delete{s.id, pk.id} -- error
 pk:alter{parts = {1, 'string'}, sequence = false} -- ok
 sk = s:create_index('sk', {parts = {2, 'unsigned'}})
 sk:alter{sequence = 'test'} -- error
-box.space._space_sequence:insert{s.id, sq.id, false} -- error
+box.space._space_sequence:insert{s.id, sq.id, false, 0} -- error
+box.space._space_sequence:insert{s.id, sq.id, false, 2} -- error
 sk:drop()
 pk:drop()
-box.space._space_sequence:insert{s.id, sq.id, false} -- error
+box.space._space_sequence:insert{s.id, sq.id, false, 0} -- error
 
 s:create_index('pk', {sequence = {}}) -- error
 s:create_index('pk', {sequence = 'abc'}) -- error
@@ -358,7 +372,7 @@ s1 = box.schema.space.create('test1')
 _ = s1:create_index('pk', {sequence = true})
 s2 = box.schema.space.create('test2')
 _ = s2:create_index('pk', {sequence = 'test1_seq'}) -- error
-box.space._space_sequence:insert{s2.id, box.sequence.test1_seq.id, false} -- error
+box.space._space_sequence:insert{s2.id, box.sequence.test1_seq.id, false, 0} -- error
 
 s1:drop()
 s2:drop()
@@ -538,9 +552,9 @@ box.schema.user.grant('user', 'read', 'space', '_space_sequence')
 box.session.su('user')
 _ = s2:create_index('pk', {sequence = 'seq1'}) -- error
 s1.index.pk:alter({sequence = 'seq1'}) -- error
-box.space._space_sequence:replace{s1.id, sq1.id, false} -- error
-box.space._space_sequence:replace{s1.id, sq2.id, false} -- error
-box.space._space_sequence:replace{s2.id, sq1.id, false} -- error
+box.space._space_sequence:replace{s1.id, sq1.id, false, 0} -- error
+box.space._space_sequence:replace{s1.id, sq2.id, false, 0} -- error
+box.space._space_sequence:replace{s2.id, sq1.id, false, 0} -- error
 s2.index.pk:alter({sequence = 'seq2'}) -- ok
 box.session.su('admin')
 
@@ -646,4 +660,28 @@ s.index.pk:alter{parts = {1, 'integer'}}
 s.index.pk.parts[1].type
 s.index.pk:alter{sequence = true}
 sequence_id == s.index.pk.sequence_id
+s:drop()
+
+--
+-- gh-4009: setting sequence for an index part other than the first.
+--
+s = box.schema.space.create('test')
+_ = s:create_index('pk', {parts = {1, 'string', 2, 'unsigned', 3, 'unsigned'}, sequence = true, sequence_part = 2})
+sequence_id = s.index.pk.sequence_id
+sequence_id ~= nil
+s.index.pk.sequence_part == 2
+s:insert{'a', box.NULL, 1}
+s:insert{'a', box.NULL, 2}
+s:insert{'b', 10, 10}
+s:insert{'b', box.NULL, 11}
+s.index.pk:alter{sequence_part = 3}
+s.index.pk.sequence_part == 3
+s.index.pk.sequence_id == sequence_id
+s:insert{'c', 100, 100}
+s:insert{'c', 101, box.NULL}
+s.index.pk:alter{sequence = true, sequence_part = 2}
+s.index.pk.sequence_part == 2
+s.index.pk.sequence_id == sequence_id
+s:insert{'d', 1000, 1000}
+s:insert{'d', box.NULL, 1001}
 s:drop()

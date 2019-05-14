@@ -625,8 +625,12 @@ local function upgrade_to_2_1_2()
     update_collation_strength_field()
 end
 
+--------------------------------------------------------------------------------
+-- Tarantool 2.1.3
+--------------------------------------------------------------------------------
+
 -- Add new collations
-local function upgrade_to_2_1_3()
+local function upgrade_collation_to_2_1_3()
     local coll_lst = {
         {name="af", loc_str="af"},  -- Afrikaans
         {name="am", loc_str="am"},  -- Amharic (no character changes, just re-ordering)
@@ -737,6 +741,34 @@ local function upgrade_to_2_1_3()
     end
 end
 
+local function upgrade_to_2_1_3()
+    upgrade_collation_to_2_1_3()
+end
+
+--------------------------------------------------------------------------------
+-- Tarantool 2.2.1
+--------------------------------------------------------------------------------
+
+-- Add sequence part field to _space_sequence table
+local function upgrade_sequence_to_2_2_1()
+    log.info("add key part field to space _space_sequence")
+    local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
+    for _, v in _space_sequence:pairs() do
+        if #v == 3 then
+            _space_sequence:update(v[1], {{'!', 4, 0}})
+        end
+    end
+    local format = _space_sequence:format()
+    format[4] = {name = 'part', type = 'unsigned'}
+    _space_sequence:format(format)
+end
+
+local function upgrade_to_2_2_1()
+    upgrade_sequence_to_2_2_1()
+end
+
+--------------------------------------------------------------------------------
+
 local function get_version()
     local version = box.space._schema:get{'version'}
     if version == nil then
@@ -768,6 +800,7 @@ local function upgrade(options)
         {version = mkversion(2, 1, 1), func = upgrade_to_2_1_1, auto = true},
         {version = mkversion(2, 1, 2), func = upgrade_to_2_1_2, auto = true},
         {version = mkversion(2, 1, 3), func = upgrade_to_2_1_3, auto = true},
+        {version = mkversion(2, 2, 1), func = upgrade_to_2_2_1, auto = true},
     }
 
     for _, handler in ipairs(handlers) do

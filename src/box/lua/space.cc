@@ -309,6 +309,13 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		 */
 		lua_rawset(L, -3);
 
+		lua_pushstring(L, "sequence_part");
+		if (k == 0 && space->sequence != NULL)
+			lua_pushnumber(L, space->sequence_part + 1);
+		else
+			lua_pushnil(L);
+		lua_rawset(L, -3);
+
 		if (space_is_vinyl(space)) {
 			lua_pushstring(L, "options");
 			lua_newtable(L);

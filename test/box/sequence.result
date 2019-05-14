@@ -590,6 +590,48 @@ s:create_index('pk', {parts = {1, 'number'}, sequence = 'test'}) -- error
 - error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
     be used with a non-integer key'
 ...
+s:create_index('pk', {sequence_part = 1}) -- error
+---
+- error: 'Can''t create or modify index ''nil'' in space ''test'': sequence part cannot
+    be used without sequence'
+...
+s:create_index('pk', {sequence = true, sequence_part = 2}) -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence part is
+    out of bounds'
+...
+s:create_index('pk', {parts = {1, 'unsigned', 2, 'string'}, sequence = true, sequence_part = 2}) -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
+    be used with a non-integer key'
+...
+pk = s:create_index('pk', {parts = {1, 'string', 2, 'unsigned'}}) -- ok
+---
+...
+pk:alter{sequence_part = 1} -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence part cannot
+    be used without sequence'
+...
+pk:alter{sequence = true, sequence_part = 1} -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
+    be used with a non-integer key'
+...
+pk:alter{sequence = true, sequence_part = 2} -- ok
+---
+...
+pk:alter{sequence = false, sequence_part = 2} -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence part cannot
+    be used without sequence'
+...
+pk:alter{sequence = false} -- ok
+---
+...
+pk:drop()
+---
+...
 pk = s:create_index('pk', {parts = {1, 'integer'}, sequence = 'test'}) -- ok
 ---
 ...
@@ -614,6 +656,11 @@ s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = true}) -- error
 ---
 - error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
     cannot be used with a secondary key'
+...
+s:create_index('secondary', {parts = {2, 'unsigned'}, sequence_part = 1}) -- error
+---
+- error: 'Can''t create or modify index ''nil'' in space ''test'': sequence part cannot
+    be used without sequence'
 ...
 sk = s:create_index('secondary', {parts = {2, 'unsigned'}}) -- ok
 ---
@@ -700,10 +747,15 @@ sk:alter{sequence = 'test'} -- error
 - error: 'Can''t create or modify index ''sk'' in space ''test'': sequence cannot
     be used with a secondary key'
 ...
-box.space._space_sequence:insert{s.id, sq.id, false} -- error
+box.space._space_sequence:insert{s.id, sq.id, false, 0} -- error
 ---
 - error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
     be used with a non-integer key'
+...
+box.space._space_sequence:insert{s.id, sq.id, false, 2} -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence part is
+    out of bounds'
 ...
 sk:drop()
 ---
@@ -711,7 +763,7 @@ sk:drop()
 pk:drop()
 ---
 ...
-box.space._space_sequence:insert{s.id, sq.id, false} -- error
+box.space._space_sequence:insert{s.id, sq.id, false, 0} -- error
 ---
 - error: 'No index #0 is defined in space ''test'''
 ...
@@ -1121,7 +1173,7 @@ _ = s2:create_index('pk', {sequence = 'test1_seq'}) -- error
 ---
 - error: 'Can''t modify space ''test2'': can not attach generated sequence'
 ...
-box.space._space_sequence:insert{s2.id, box.sequence.test1_seq.id, false} -- error
+box.space._space_sequence:insert{s2.id, box.sequence.test1_seq.id, false, 0} -- error
 ---
 - error: 'Can''t modify space ''test2'': can not attach generated sequence'
 ...
@@ -1612,15 +1664,15 @@ s1.index.pk:alter({sequence = 'seq1'}) -- error
 ---
 - error: Alter access to space 'space1' is denied for user 'user'
 ...
-box.space._space_sequence:replace{s1.id, sq1.id, false} -- error
+box.space._space_sequence:replace{s1.id, sq1.id, false, 0} -- error
 ---
 - error: Read access to sequence 'seq1' is denied for user 'user'
 ...
-box.space._space_sequence:replace{s1.id, sq2.id, false} -- error
+box.space._space_sequence:replace{s1.id, sq2.id, false, 0} -- error
 ---
 - error: Alter access to space 'space1' is denied for user 'user'
 ...
-box.space._space_sequence:replace{s2.id, sq1.id, false} -- error
+box.space._space_sequence:replace{s2.id, sq1.id, false, 0} -- error
 ---
 - error: Read access to sequence 'seq1' is denied for user 'user'
 ...
@@ -1900,6 +1952,83 @@ s.index.pk:alter{sequence = true}
 sequence_id == s.index.pk.sequence_id
 ---
 - true
+...
+s:drop()
+---
+...
+--
+-- gh-4009: setting sequence for an index part other than the first.
+--
+s = box.schema.space.create('test')
+---
+...
+_ = s:create_index('pk', {parts = {1, 'string', 2, 'unsigned', 3, 'unsigned'}, sequence = true, sequence_part = 2})
+---
+...
+sequence_id = s.index.pk.sequence_id
+---
+...
+sequence_id ~= nil
+---
+- true
+...
+s.index.pk.sequence_part == 2
+---
+- true
+...
+s:insert{'a', box.NULL, 1}
+---
+- ['a', 1, 1]
+...
+s:insert{'a', box.NULL, 2}
+---
+- ['a', 2, 2]
+...
+s:insert{'b', 10, 10}
+---
+- ['b', 10, 10]
+...
+s:insert{'b', box.NULL, 11}
+---
+- ['b', 11, 11]
+...
+s.index.pk:alter{sequence_part = 3}
+---
+...
+s.index.pk.sequence_part == 3
+---
+- true
+...
+s.index.pk.sequence_id == sequence_id
+---
+- true
+...
+s:insert{'c', 100, 100}
+---
+- ['c', 100, 100]
+...
+s:insert{'c', 101, box.NULL}
+---
+- ['c', 101, 101]
+...
+s.index.pk:alter{sequence = true, sequence_part = 2}
+---
+...
+s.index.pk.sequence_part == 2
+---
+- true
+...
+s.index.pk.sequence_id == sequence_id
+---
+- true
+...
+s:insert{'d', 1000, 1000}
+---
+- ['d', 1000, 1000]
+...
+s:insert{'d', box.NULL, 1001}
+---
+- ['d', 1001, 1001]
 ...
 s:drop()
 ---

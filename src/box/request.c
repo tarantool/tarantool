@@ -163,7 +163,7 @@ request_handle_sequence(struct request *request, struct space *space)
 	const char *data = request->tuple;
 	const char *data_end = request->tuple_end;
 	int len = mp_decode_array(&data);
-	int fieldno = pk->def->key_def->parts[0].fieldno;
+	int fieldno = pk->def->key_def->parts[space->sequence_part].fieldno;
 	if (unlikely(len < fieldno + 1))
 		return 0;
 
