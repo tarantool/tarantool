@@ -597,31 +597,6 @@ tarantool_lua_utils_init(struct lua_State *L);
 
 #if defined(__cplusplus)
 } /* extern "C" */
-
-#include "exception.h"
-#include <fiber.h>
-
-static inline void
-luaT_call_xc(lua_State *L, int nargs, int nreturns)
-{
-	if (luaT_call(L, nargs, nreturns) != 0)
-		diag_raise();
-}
-
-/**
- * Make a reference to an object on top of the Lua stack and
- * release it at the end of the scope.
- */
-struct LuarefGuard
-{
-	int ref;
-	bool is_active;
-
-	explicit LuarefGuard(int ref_arg) { ref = ref_arg; is_active = true; }
-	explicit LuarefGuard(struct lua_State *L) { ref = luaL_ref(L, LUA_REGISTRYINDEX); is_active = true; }
-	~LuarefGuard() { if (is_active) luaL_unref(tarantool_L, LUA_REGISTRYINDEX, ref); }
-};
-
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_LUA_UTILS_H_INCLUDED */
