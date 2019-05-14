@@ -21,7 +21,7 @@ stack_break_f(char *ptr)
 	 */
 	volatile char sum = 0;
 	memset(block, 0xff, 2048);
-	sum += block[block[4]];
+	sum += block[(unsigned char) block[4]];
 	ptrdiff_t stack_diff = ptr > block ? ptr - block : block - ptr;
 	if (stack_diff < (ptrdiff_t)default_attr.stack_size)
 		sum += stack_break_f(ptr);
