@@ -634,3 +634,16 @@ identifier.run_test(
 	function (identifier) box.schema.sequence.drop(identifier) end
 );
 test_run:cmd("setopt delimiter ''");
+
+--
+-- gh-4214: error while altering an index with attached sequence.
+--
+s = box.schema.space.create('test')
+_ = s:create_index('pk', {sequence = true})
+sequence_id = s.index.pk.sequence_id
+sequence_id ~= nil
+s.index.pk:alter{parts = {1, 'integer'}}
+s.index.pk.parts[1].type
+s.index.pk:alter{sequence = true}
+sequence_id == s.index.pk.sequence_id
+s:drop()
