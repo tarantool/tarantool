@@ -65,6 +65,7 @@ parse_headers(lua_State *L, char *buffer, size_t len,
 	      int max_header_name_len)
 {
 	struct http_parser parser;
+	http_parser_create(&parser);
 	parser.hdr_name = (char *) calloc(max_header_name_len, sizeof(char));
 	if (parser.hdr_name == NULL) {
 		diag_set(OutOfMemory, max_header_name_len * sizeof(char),

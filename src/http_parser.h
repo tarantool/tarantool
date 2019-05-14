@@ -52,7 +52,13 @@ struct http_parser {
 	int hdr_name_idx;
 };
 
-/*
+/**
+ * @brief Initialize an http parser.
+ * @param parser structure to initialize
+ */
+void http_parser_create(struct http_parser *parser);
+
+/**
  * @brief Parse line containing http header info
  * @param parser object
  * @param bufp pointer to buffer with data

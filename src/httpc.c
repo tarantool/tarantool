@@ -263,7 +263,8 @@ httpc_set_low_speed_limit(struct httpc_request *req, long low_speed_limit)
 void
 httpc_set_verbose(struct httpc_request *req, bool curl_verbose)
 {
-	curl_easy_setopt(req->curl_request.easy, CURLOPT_VERBOSE, curl_verbose);
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_VERBOSE,
+			 (long) curl_verbose);
 }
 
 void
