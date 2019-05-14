@@ -24,13 +24,7 @@ _space:insert{_space.id, ADMIN, 'test', 'world', 0, EMPTY_MAP, {}}
 -- There is already a tuple for the system space
 --
 _space:insert{_space.id, ADMIN, '_space', 'memtx', 0, EMPTY_MAP, {}}
-_space:replace{_space.id, ADMIN, '_space', 'memtx', 0, EMPTY_MAP, {}}
 _space:insert{_index.id, ADMIN, '_index', 'memtx', 0, EMPTY_MAP, {}}
-_space:replace{_index.id, ADMIN, '_index', 'memtx', 0, EMPTY_MAP, {}}
---
--- Can't change properties of a space
---
-_space:replace{_space.id, ADMIN, '_space', 'memtx', 0, EMPTY_MAP, {}}
 --
 -- Can't drop a system space
 --

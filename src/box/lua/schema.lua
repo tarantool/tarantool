@@ -155,7 +155,7 @@ local function user_or_role_resolve(user)
     if tuple == nil then
         return nil
     end
-    return tuple[1]
+    return tuple.id
 end
 
 local function role_resolve(name_or_id)
@@ -166,10 +166,10 @@ local function role_resolve(name_or_id)
     elseif type(name_or_id) ~= 'nil' then
         tuple = _vuser:get{name_or_id}
     end
-    if tuple == nil or tuple[4] ~= 'role' then
+    if tuple == nil or tuple.type ~= 'role' then
         return nil
     else
-        return tuple[1]
+        return tuple.id
     end
 end
 
@@ -181,10 +181,10 @@ local function user_resolve(name_or_id)
     elseif type(name_or_id) ~= 'nil' then
         tuple = _vuser:get{name_or_id}
     end
-    if tuple == nil or tuple[4] ~= 'user' then
+    if tuple == nil or tuple.type ~= 'user' then
         return nil
     else
-        return tuple[1]
+        return tuple.id
     end
 end
 
@@ -197,7 +197,7 @@ local function sequence_resolve(name_or_id)
         tuple = _vsequence:get{name_or_id}
     end
     if tuple ~= nil then
-        return tuple[1], tuple
+        return tuple.id, tuple
     else
         return nil
     end
@@ -209,7 +209,7 @@ local function revoke_object_privs(object_type, object_id)
     local _priv = box.space[box.schema.PRIV_ID]
     local privs = _vpriv.index.object:select{object_type, object_id}
     for k, tuple in pairs(privs) do
-        local uid = tuple[2]
+        local uid = tuple.grantee
         _priv:delete{uid, object_type, object_id}
     end
 end
@@ -453,13 +453,13 @@ box.schema.space.create = function(name, options)
         local _schema = box.space._schema
         local max_id = _schema:update({'max_id'}, {{'+', 2, 1}})
         if max_id == nil then
-            id = _space.index.primary:max()[1]
+            id = _space.index.primary:max().id
             if id < box.schema.SYSTEM_ID_MAX then
                 id = box.schema.SYSTEM_ID_MAX
             end
             max_id = _schema:insert{'max_id', id + 1}
         end
-        id = max_id[2]
+        id = max_id.value
     end
     local uid = session.euid()
     if options.user then
@@ -492,7 +492,7 @@ function box.schema.space.format(id, format)
         if tuple == nil then
             box.error(box.error.NO_SUCH_SPACE, '#' .. tostring(id))
         end
-        return tuple[7]
+        return tuple.format
     else
         check_param(format, 'format', 'table')
         format = update_format(format)
@@ -514,9 +514,9 @@ box.schema.space.drop = function(space_id, space_name, opts)
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
     local _fk_constraint = box.space[box.schema.FK_CONSTRAINT_ID]
     local sequence_tuple = _space_sequence:delete{space_id}
-    if sequence_tuple ~= nil and sequence_tuple[3] == true then
+    if sequence_tuple ~= nil and sequence_tuple.is_generated == true then
         -- Delete automatically generated sequence.
-        box.schema.sequence.drop(sequence_tuple[2])
+        box.schema.sequence.drop(sequence_tuple.sequence_id)
     end
     for _, t in _trigger.index.space_id:pairs({space_id}) do
         _trigger:delete({t.name})
@@ -527,7 +527,7 @@ box.schema.space.drop = function(space_id, space_name, opts)
     local keys = _vindex:select(space_id)
     for i = #keys, 1, -1 do
         local v = keys[i]
-        _index:delete{v[1], v[2]}
+        _index:delete{v.id, v.iid}
     end
     revoke_object_privs('space', space_id)
     _truncate:delete{space_id}
@@ -847,9 +847,9 @@ box.schema.index.create = function(space_id, name, options)
         local tuple = _vindex.index[0]
             :select(space_id, { limit = 1, iterator = 'LE' })[1]
         if tuple then
-            local id = tuple[1]
+            local id = tuple.id
             if id == space_id then
-                iid = tuple[2] + 1
+                iid = tuple.iid + 1
             end
         end
     end
@@ -923,9 +923,9 @@ box.schema.index.drop = function(space_id, index_id)
     if index_id == 0 then
         local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
         local sequence_tuple = _space_sequence:delete{space_id}
-        if sequence_tuple ~= nil and sequence_tuple[3] == true then
+        if sequence_tuple ~= nil and sequence_tuple.is_generated == true then
             -- Delete automatically generated sequence.
-            box.schema.sequence.drop(sequence_tuple[2])
+            box.schema.sequence.drop(sequence_tuple.sequence_id)
         end
     end
     local _index = box.space[box.schema.INDEX_ID]
@@ -993,25 +993,23 @@ box.schema.index.alter = function(space_id, index_id, options)
     local tuple = _index:get{space_id, index_id }
     local parts = {}
     local index_opts = {}
-    local OPTS = 5
-    local PARTS = 6
-    if type(tuple[OPTS]) == 'number' then
+    if type(tuple.opts) == 'number' then
         -- old format
-        index_opts.unique = tuple[OPTS] == 1
-        local part_count = tuple[PARTS]
+        index_opts.unique = tuple[5] == 1
+        local part_count = tuple[6]
         for i = 1, part_count do
             table.insert(parts, {tuple[2 * i + 4], tuple[2 * i + 5]});
         end
     else
         -- new format
-        index_opts = tuple[OPTS]
-        parts = tuple[PARTS]
+        index_opts = tuple.opts
+        parts = tuple.parts
     end
     if options.name == nil then
-        options.name = tuple[3]
+        options.name = tuple.name
     end
     if options.type == nil then
-        options.type = tuple[4]
+        options.type = tuple.type
     end
     for k, t in pairs(index_options) do
         if options[k] ~= nil then
@@ -1048,7 +1046,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         end
     end
     if sequence == true then
-        if sequence_tuple == nil or sequence_tuple[3] == false then
+        if sequence_tuple == nil or sequence_tuple.is_generated == false then
             sequence = box.schema.sequence.create(space.name .. '_seq')
             sequence = sequence.id
             sequence_is_generated = true
@@ -1070,10 +1068,10 @@ box.schema.index.alter = function(space_id, index_id, options)
     if sequence then
         _space_sequence:replace{space_id, sequence, sequence_is_generated}
     end
-    if sequence_tuple ~= nil and sequence_tuple[3] == true and
-       sequence_tuple[2] ~= sequence then
+    if sequence_tuple ~= nil and sequence_tuple.is_generated == true and
+       sequence_tuple.sequence_id ~= sequence then
         -- Delete automatically generated sequence.
-        box.schema.sequence.drop(sequence_tuple[2])
+        box.schema.sequence.drop(sequence_tuple.sequence_id)
     end
 end
 
@@ -1662,13 +1660,13 @@ end
 
 local function sequence_on_alter(old_tuple, new_tuple)
     if old_tuple and not new_tuple then
-        local old_name = old_tuple[3]
+        local old_name = old_tuple.name
         box.sequence[old_name] = nil
     elseif not old_tuple and new_tuple then
         local seq = sequence_new(new_tuple)
         box.sequence[seq.name] = seq
     else
-        local old_name = old_tuple[3]
+        local old_name = old_tuple.name
         local seq = box.sequence[old_name]
         if not seq then
             seq = sequence_new(seq, new_tuple)
@@ -1919,7 +1917,7 @@ local function object_resolve(object_type, object_name)
             func = _vfunc:get{object_name}
         end
         if func then
-            return func[1]
+            return func.id
         else
             box.error(box.error.NO_SUCH_FUNCTION, object_name)
         end
@@ -1945,8 +1943,8 @@ local function object_resolve(object_type, object_name)
         else
             role_or_user = _vuser:get{object_name}
         end
-        if role_or_user and role_or_user[4] == object_type then
-            return role_or_user[1]
+        if role_or_user and role_or_user.type == object_type then
+            return role_or_user.id
         elseif object_type == 'role' then
             box.error(box.error.NO_SUCH_ROLE, object_name)
         else
@@ -1973,7 +1971,7 @@ local function object_name(object_type, object_id)
     else
         box.error(box.error.UNKNOWN_SCHEMA_OBJECT, object_type)
     end
-    return space:get{object_id}[3]
+    return space:get{object_id}.name
 end
 
 box.schema.func = {}
@@ -2010,7 +2008,7 @@ box.schema.func.drop = function(name, opts)
         tuple = _vfunc:get{name}
     end
     if tuple then
-        fid = tuple[1]
+        fid = tuple.id
     end
     if fid == nil then
         if not opts.if_exists then
@@ -2096,7 +2094,7 @@ end
 box.internal.collation.id_by_name = function(name)
     local _coll = box.space[box.schema.COLLATION_ID]
     local coll = _coll.index.name:get{name}
-    return coll[1]
+    return coll.id
 end
 
 box.schema.user = {}
@@ -2148,7 +2146,7 @@ box.schema.user.create = function(name, opts)
         auth_mech_list["chap-sha1"] = box.schema.user.password(opts.password)
     end
     local _user = box.space[box.schema.USER_ID]
-    uid = _user:auto_increment{session.euid(), name, 'user', auth_mech_list}[1]
+    uid = _user:auto_increment{session.euid(), name, 'user', auth_mech_list}.id
     -- grant role 'public' to the user
     box.schema.user.grant(uid, 'public')
     -- Grant privilege 'alter' on itself, so that it can
@@ -2201,7 +2199,7 @@ local function grant(uid, name, privilege, object_type,
     local tuple = _vpriv:get{uid, object_type, oid}
     local old_privilege
     if tuple ~= nil then
-        old_privilege = tuple[5]
+        old_privilege = tuple.privilege
     else
         old_privilege = 0
     end
@@ -2255,8 +2253,8 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
                       object_type, object_name)
         end
     end
-    local old_privilege = tuple[5]
-    local grantor = tuple[1]
+    local old_privilege = tuple.privilege
+    local grantor = tuple.grantor
     -- sic:
     -- a user may revoke more than he/she granted
     -- (erroneous user input)
@@ -2282,25 +2280,25 @@ local function drop(uid, opts)
     local _vpriv = box.space[box.schema.VPRIV_ID]
     local spaces = box.space[box.schema.VSPACE_ID].index.owner:select{uid}
     for k, tuple in pairs(spaces) do
-        box.space[tuple[1]]:drop()
+        box.space[tuple.id]:drop()
     end
     local funcs = box.space[box.schema.VFUNC_ID].index.owner:select{uid}
     for k, tuple in pairs(funcs) do
-        box.schema.func.drop(tuple[1])
+        box.schema.func.drop(tuple.id)
     end
     -- if this is a role, revoke this role from whoever it was granted to
     local grants = _vpriv.index.object:select{'role', uid}
     for k, tuple in pairs(grants) do
-        revoke(tuple[2], tuple[2], uid)
+        revoke(tuple.grantee, tuple.grantee, uid)
     end
     local sequences = box.space[box.schema.VSEQUENCE_ID].index.owner:select{uid}
     for k, tuple in pairs(sequences) do
-        box.schema.sequence.drop(tuple[1])
+        box.schema.sequence.drop(tuple.id)
     end
     -- xxx: hack, we have to revoke session and usage privileges
     -- of a user using a setuid function in absence of create/drop
     -- privileges and grant option
-    if box.space._vuser:get{uid}[4] == 'user' then
+    if box.space._vuser:get{uid}.type == 'user' then
         box.session.su('admin', box.schema.user.revoke, uid,
                        'session,usage', 'universe', nil, {if_exists = true})
     end
@@ -2309,7 +2307,8 @@ local function drop(uid, opts)
     for k, tuple in pairs(privs) do
         -- we need an additional box.session.su() here, because of
         -- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
-        box.session.su("admin", revoke, uid, uid, tuple[5], tuple[3], tuple[4])
+        box.session.su("admin", revoke, uid, uid, tuple.privilege,
+                       tuple.object_type, tuple.object_id)
     end
     box.space[box.schema.USER_ID]:delete{uid}
 end
@@ -2369,7 +2368,8 @@ local function info(id)
     for _, v in pairs(_priv:select{id}) do
         table.insert(
             privs,
-            {privilege_name(v[5]), v[3], object_name(v[3], v[4])}
+            {privilege_name(v.privilege), v.object_type,
+             object_name(v.object_type, v.object_id)}
         )
     end
     return privs
