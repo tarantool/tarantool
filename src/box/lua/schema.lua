@@ -1070,8 +1070,8 @@ box.schema.index.alter = function(space_id, index_id, options)
     if sequence then
         _space_sequence:replace{space_id, sequence, sequence_is_generated}
     end
-    if sequence_tuple ~= nil and sequence_tuple[3] == true and
-       sequence_tuple[2] ~= sequence then
+    if sequence ~= nil and sequence_tuple ~= nil and
+       sequence_tuple[3] == true and sequence_tuple[2] ~= sequence then
         -- Delete automatically generated sequence.
         box.schema.sequence.drop(sequence_tuple[2])
     end
