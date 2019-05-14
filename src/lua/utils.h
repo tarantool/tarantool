@@ -569,6 +569,14 @@ luaL_checkfinite(struct lua_State *L, struct luaL_serializer *cfg,
 }
 
 /**
+ * Check if a value on @a L stack by index @a idx is an ibuf
+ * object. Both 'struct ibuf' and 'struct ibuf *' are accepted.
+ * Returns NULL, if can't convert - not an ibuf object.
+ */
+struct ibuf *
+luaL_checkibuf(struct lua_State *L, int idx);
+
+/**
  * @brief A wrapper for lua_newthread() to pass it into luaT_cpcall
  * @param L is a Lua State
  * @sa lua_newthread()

@@ -42,6 +42,9 @@ int luaL_map_metatable_ref = LUA_REFNIL;
 int luaL_array_metatable_ref = LUA_REFNIL;
 static int CTID_CONST_STRUCT_ERROR_REF = 0;
 
+static uint32_t CTID_STRUCT_IBUF;
+static uint32_t CTID_STRUCT_IBUF_PTR;
+
 void *
 luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
 {
@@ -1015,6 +1018,20 @@ luaT_tolstring(lua_State *L, int idx, size_t *len)
 	return lua_tolstring(L, -1, len);
 }
 
+struct ibuf *
+luaL_checkibuf(struct lua_State *L, int idx)
+{
+	if (lua_type(L, idx) != LUA_TCDATA)
+		return NULL;
+	uint32_t cdata_type;
+	void *cdata = luaL_checkcdata(L, idx, &cdata_type);
+	if (cdata_type == CTID_STRUCT_IBUF)
+		return (struct ibuf *) cdata;
+	if (cdata_type == CTID_STRUCT_IBUF_PTR && cdata != NULL)
+		return *(struct ibuf **) cdata;
+	return NULL;
+}
+
 lua_State *
 luaT_state(void)
 {
@@ -1055,6 +1072,14 @@ tarantool_lua_utils_init(struct lua_State *L)
 	luaL_loadstring(L, "setmetatable((...), nil); return rawset(...)");
 	lua_setfield(L, -2, "__newindex");
 	luaL_array_metatable_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+	rc = luaL_cdef(L, "struct ibuf;");
+	assert(rc == 0);
+	(void) rc;
+	CTID_STRUCT_IBUF = luaL_ctypeid(L, "struct ibuf");
+	assert(CTID_STRUCT_IBUF != 0);
+	CTID_STRUCT_IBUF_PTR = luaL_ctypeid(L, "struct ibuf *");
+	assert(CTID_STRUCT_IBUF_PTR != 0);
 
 	return 0;
 }

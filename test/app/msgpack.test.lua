@@ -69,3 +69,12 @@ msgpack.decode(buf.rpos, buf:size() - 1)
 -- is not negative.
 --
 msgpack.decode(ffi.cast('char *', '\x04\x05\x06'), -1)
+
+-- Provide a buffer. Try both 'struct ibuf' and 'struct ibuf *'.
+buf = buffer.IBUF_SHARED
+buf:reset()
+size = msgpack.encode({a = 1, b = 2}, buf)
+(msgpack.decode(buf.rpos, size))
+buf = buffer.ibuf()
+size = msgpack.encode({c = 3, d = 4}, buf)
+(msgpack.decode(buf.rpos, size))
