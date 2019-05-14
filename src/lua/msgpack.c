@@ -50,8 +50,6 @@ luamp_error(void *error_ctx)
 	luaL_error(L, diag_last_error(diag_get())->errmsg);
 }
 
-static uint32_t CTID_CHAR_PTR;
-
 struct luaL_serializer *luaL_msgpack_default = NULL;
 
 static enum mp_type
@@ -332,9 +330,8 @@ lua_msgpack_encode(lua_State *L)
 static int
 lua_msgpack_decode_cdata(lua_State *L, bool check)
 {
-	uint32_t ctypeid;
-	const char *data = *(const char **)luaL_checkcdata(L, 1, &ctypeid);
-	if (ctypeid != CTID_CHAR_PTR) {
+	const char *data;
+	if (luaL_checkconstchar(L, 1, &data) != 0) {
 		return luaL_error(L, "msgpack.decode: "
 				  "a Lua string or 'char *' expected");
 	}
@@ -346,7 +343,7 @@ lua_msgpack_decode_cdata(lua_State *L, bool check)
 	}
 	struct luaL_serializer *cfg = luaL_checkserializer(L);
 	luamp_decode(L, cfg, &data);
-	*(const char **)luaL_pushcdata(L, ctypeid) = data;
+	*(const char **)luaL_pushcdata(L, CTID_CHAR_PTR) = data;
 	return 2;
 }
 
@@ -435,9 +432,8 @@ verify_decode_header_args(lua_State *L, const char *func_name,
 		return luaL_error(L, "Usage: %s(ptr, size)", func_name);
 
 	/* Verify ptr type. */
-	uint32_t ctypeid;
-	const char *data = *(char **) luaL_checkcdata(L, 1, &ctypeid);
-	if (ctypeid != CTID_CHAR_PTR)
+	const char *data;
+	if (luaL_checkconstchar(L, 1, &data) != 0)
 		return luaL_error(L, "%s: 'char *' expected", func_name);
 
 	/* Verify size type and value. */
@@ -525,8 +521,6 @@ lua_msgpack_new(lua_State *L)
 LUALIB_API int
 luaopen_msgpack(lua_State *L)
 {
-	CTID_CHAR_PTR = luaL_ctypeid(L, "char *");
-	assert(CTID_CHAR_PTR != 0);
 	luaL_msgpack_default = luaL_newserializer(L, "msgpack", msgpacklib);
 	return 1;
 }

@@ -1,5 +1,6 @@
 buffer = require 'buffer'
 msgpack = require 'msgpack'
+ffi = require 'ffi'
 
 -- Arguments check.
 buf = buffer.ibuf()
@@ -71,3 +72,9 @@ size = msgpack.encode({a = 1, b = 2}, buf)
 buf = buffer.ibuf()
 size = msgpack.encode({c = 3, d = 4}, buf)
 (msgpack.decode(buf.rpos, size))
+
+-- Decode should accept both 'char *' and 'const char *'.
+buf:reset()
+size = msgpack.encode(100, buf)
+(msgpack.decode(ffi.cast('char *', buf.rpos), size))
+(msgpack.decode(ffi.cast('const char *', buf.rpos), size))

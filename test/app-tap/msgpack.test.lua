@@ -57,6 +57,7 @@ local function test_decode_array_map_header(test, s)
         'of buffer'
     local non_positive_size_err = 'msgpack.decode_[^_]+_header: ' ..
         'non%-positive size'
+    local wrong_type_err = "msgpack.decode_[^_]+_header: 'char %*' expected"
 
     local decode_cases = {
         {
@@ -175,17 +176,17 @@ local function test_decode_array_map_header(test, s)
         {
             'data is nil',
             args = {nil, 1},
-            exp_err = 'expected cdata as 1 argument',
+            exp_err = wrong_type_err,
         },
         {
             'data is not cdata',
             args = {1, 1},
-            exp_err = 'expected cdata as 1 argument',
+            exp_err = wrong_type_err,
         },
         {
             'data with wrong cdata type',
             args = {box.tuple.new(), 1},
-            exp_err = "msgpack.decode_[^_]+_header: 'char %*' expected",
+            exp_err = wrong_type_err,
         },
         {
             'size has wrong type',

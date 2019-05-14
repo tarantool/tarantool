@@ -43,6 +43,8 @@ int luaL_array_metatable_ref = LUA_REFNIL;
 
 static uint32_t CTID_STRUCT_IBUF;
 static uint32_t CTID_STRUCT_IBUF_PTR;
+uint32_t CTID_CHAR_PTR;
+uint32_t CTID_CONST_CHAR_PTR;
 
 void *
 luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
@@ -1076,6 +1078,19 @@ luaL_checkibuf(struct lua_State *L, int idx)
 	return NULL;
 }
 
+int
+luaL_checkconstchar(struct lua_State *L, int idx, const char **res)
+{
+	if (lua_type(L, idx) != LUA_TCDATA)
+		return -1;
+	uint32_t cdata_type;
+	void *cdata = luaL_checkcdata(L, idx, &cdata_type);
+	if (cdata_type != CTID_CHAR_PTR && cdata_type != CTID_CONST_CHAR_PTR)
+		return -1;
+	*res = cdata != NULL ? *(const char **) cdata : NULL;
+	return 0;
+}
+
 lua_State *
 luaT_state(void)
 {
@@ -1209,6 +1224,9 @@ tarantool_lua_utils_init(struct lua_State *L)
 	assert(CTID_STRUCT_IBUF != 0);
 	CTID_STRUCT_IBUF_PTR = luaL_ctypeid(L, "struct ibuf *");
 	assert(CTID_STRUCT_IBUF_PTR != 0);
-
+	CTID_CHAR_PTR = luaL_ctypeid(L, "char *");
+	assert(CTID_CHAR_PTR != 0);
+	CTID_CONST_CHAR_PTR = luaL_ctypeid(L, "const char *");
+	assert(CTID_CONST_CHAR_PTR != 0);
 	return 0;
 }
