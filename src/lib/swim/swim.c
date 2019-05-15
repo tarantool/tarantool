@@ -1797,11 +1797,18 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 	} else {
 		addr = swim->self->addr;
 	}
-	if (swim->round_tick.repeat != heartbeat_rate && heartbeat_rate > 0)
-		swim_ev_timer_set(&swim->round_tick, 0, heartbeat_rate);
-
-	if (swim->wait_ack_tick.repeat != ack_timeout && ack_timeout > 0)
-		swim_ev_timer_set(&swim->wait_ack_tick, 0, ack_timeout);
+	struct ev_timer *t = &swim->round_tick;
+	if (t->repeat != heartbeat_rate && heartbeat_rate > 0) {
+		swim_ev_timer_set(t, 0, heartbeat_rate);
+		if (swim_ev_is_active(t))
+			swim_ev_timer_again(loop(), t);
+	}
+	t = &swim->wait_ack_tick;
+	if (t->repeat != ack_timeout && ack_timeout > 0) {
+		swim_ev_timer_set(t, 0, ack_timeout);
+		if (swim_ev_is_active(t))
+			swim_ev_timer_again(loop(), t);
+	}
 
 	if (new_self != NULL) {
 		swim->self->status = MEMBER_LEFT;
