@@ -1890,6 +1890,10 @@ int
 swim_probe_member(struct swim *swim, const char *uri)
 {
 	assert(swim_is_configured(swim));
+	if (uri == NULL) {
+		diag_set(SwimError, "swim.probe_member: URI is mandatory");
+		return -1;
+	}
 	struct sockaddr_in addr;
 	if (swim_uri_to_addr(uri, &addr, "swim.probe_member:") != 0)
 		return -1;

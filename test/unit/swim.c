@@ -359,12 +359,13 @@ swim_test_basic_gossip(void)
 static void
 swim_test_probe(void)
 {
-	swim_start_test(2);
+	swim_start_test(3);
 	struct swim_cluster *cluster = swim_cluster_new(2);
 
 	struct swim *s1 = swim_cluster_member(cluster, 0);
 	struct swim *s2 = swim_cluster_member(cluster, 1);
 	const char *s2_uri = swim_member_uri(swim_self(s2));
+	is(swim_probe_member(s1, NULL), -1, "probe validates URI");
 	is(swim_probe_member(s1, s2_uri), 0, "send probe");
 	is(swim_cluster_wait_fullmesh(cluster, 0.1), 0,
 	   "receive ACK on probe and get fullmesh")
