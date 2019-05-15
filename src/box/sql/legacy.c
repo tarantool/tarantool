@@ -63,7 +63,6 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 	sql_stmt *pStmt = 0;	/* The current SQL statement */
 	char **azCols = 0;	/* Names of result columns */
 	int callbackIsInit;	/* True if callback data is initialized */
-	struct session *user_session = current_session();
 
 	if (!sqlSafetyCheckOk(db))
 		return SQL_MISUSE;
@@ -94,10 +93,7 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 			int i;
 			rc = sql_step(pStmt);
 			/* Invoke the callback function if required */
-			if (xCallback && (SQL_ROW == rc ||
-					  (SQL_DONE == rc && !callbackIsInit
-					   && user_session->
-					   sql_flags & SQL_NullCallback))) {
+			if (xCallback != NULL && rc == SQL_ROW) {
 				if (!callbackIsInit) {
 					azCols =
 					    sqlDbMallocZero(db,

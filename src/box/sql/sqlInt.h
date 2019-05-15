@@ -1498,8 +1498,6 @@ struct sql {
 #define SQL_CountRows      0x00000080	/* Count rows changed by INSERT, */
 					  /*   DELETE, or UPDATE and return */
 					  /*   the count using a callback. */
-#define SQL_NullCallback   0x00000100	/* Invoke the callback once if the */
-					  /*   result set is empty */
 #define SQL_SqlTrace       0x00000200	/* Debug print SQL as it executes */
 #define SQL_SelectTrace    0x00000800       /* Debug info about select statement */
 #define SQL_WhereTrace     0x00008000       /* Debug info about optimizer's work */
