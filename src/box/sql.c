@@ -1354,7 +1354,7 @@ sql_checks_resolve_space_def_reference(ExprList *expr_list,
 				       struct space_def *def)
 {
 	Parse parser;
-	sql_parser_create(&parser, sql_get());
+	sql_parser_create(&parser, sql_get(), default_flags);
 	parser.parse_only = true;
 
 	sql_resolve_self_reference(&parser, def, NC_IsCheck, NULL, expr_list);

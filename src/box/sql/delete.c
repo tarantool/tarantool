@@ -30,7 +30,6 @@
  */
 
 #include "box/box.h"
-#include "box/session.h"
 #include "box/schema.h"
 #include "sqlInt.h"
 #include "tarantoolInt.h"
@@ -151,7 +150,8 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	struct space *space = sql_lookup_space(parse, tab_list->a);
 	if (space == NULL)
 		goto delete_from_cleanup;
-	trigger_list = sql_triggers_exist(space->def, TK_DELETE, NULL, NULL);
+	trigger_list = sql_triggers_exist(space->def, TK_DELETE,
+					  NULL, parse->sql_flags, NULL);
 	bool is_complex = trigger_list != NULL || fk_constraint_is_required(space, NULL);
 	bool is_view = space->def->opts.is_view;
 
@@ -195,8 +195,8 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	 * if we are counting rows.
 	 */
 	int reg_count = -1;
-	struct session *user_session = current_session();
-	if (user_session->sql_flags & SQL_CountRows) {
+	uint32_t sql_flags = parse->sql_flags;
+	if ((sql_flags & SQL_CountRows) != 0) {
 		reg_count = ++parse->nMem;
 		sqlVdbeAddOp2(v, OP_Integer, 0, reg_count);
 	}
@@ -287,7 +287,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		/* Keep track of the number of rows to be
 		 * deleted.
 		 */
-		if (user_session->sql_flags & SQL_CountRows)
+		if ((sql_flags & SQL_CountRows) != 0)
 			sqlVdbeAddOp2(v, OP_AddImm, reg_count, 1);
 
 		/* Extract the primary key for the current row */
@@ -417,7 +417,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	}
 
 	/* Return the number of rows that were deleted. */
-	if ((user_session->sql_flags & SQL_CountRows) != 0 &&
+	if ((sql_flags & SQL_CountRows) != 0 &&
 	    parse->triggered_space != NULL) {
 		sqlVdbeAddOp2(v, OP_ResultRow, reg_count, 1);
 		sqlVdbeSetNumCols(v, 1);

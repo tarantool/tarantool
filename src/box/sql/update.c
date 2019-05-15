@@ -34,7 +34,6 @@
  * to handle UPDATE statements.
  */
 #include "sqlInt.h"
-#include "box/session.h"
 #include "tarantoolInt.h"
 #include "box/tuple_format.h"
 #include "box/schema.h"
@@ -92,7 +91,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	int hasFK;		/* True if foreign key processing is required */
 	int labelBreak;		/* Jump here to break out of UPDATE loop */
 	int labelContinue;	/* Jump here to continue next step of UPDATE loop */
-	struct session *user_session = current_session();
 
 	bool is_view;		/* True when updating a view (INSTEAD OF trigger) */
 	/* List of triggers on pTab, if required. */
@@ -127,7 +125,8 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	/* Figure out if we have any triggers and if the table being
 	 * updated is a view.
 	 */
-	trigger = sql_triggers_exist(space->def, TK_UPDATE, pChanges, &tmask);
+	trigger = sql_triggers_exist(space->def, TK_UPDATE, pChanges,
+				     pParse->sql_flags, &tmask);
 	is_view = space->def->opts.is_view;
 	assert(trigger != NULL || tmask == 0);
 
@@ -298,8 +297,8 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 
 	/* Initialize the count of updated rows
 	 */
-	if ((user_session->sql_flags & SQL_CountRows)
-	    && pParse->triggered_space == NULL) {
+	if ((pParse->sql_flags & SQL_CountRows) != 0 &&
+	    pParse->triggered_space == NULL) {
 		regRowCount = ++pParse->nMem;
 		sqlVdbeAddOp2(v, OP_Integer, 0, regRowCount);
 	}
@@ -500,8 +499,8 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 
 	/* Increment the row counter
 	 */
-	if ((user_session->sql_flags & SQL_CountRows)
-	    && pParse->triggered_space == NULL) {
+	if ((pParse->sql_flags & SQL_CountRows) != 0 &&
+	     pParse->triggered_space == NULL) {
 		sqlVdbeAddOp2(v, OP_AddImm, regRowCount, 1);
 	}
 
@@ -522,7 +521,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	sqlVdbeResolveLabel(v, labelBreak);
 
 	/* Return the number of rows that were changed. */
-	if (user_session->sql_flags & SQL_CountRows &&
+	if ((pParse->sql_flags & SQL_CountRows) != 0 &&
 	    pParse->triggered_space == NULL) {
 		sqlVdbeAddOp2(v, OP_ResultRow, regRowCount, 1);
 		sqlVdbeSetNumCols(v, 1);

@@ -446,6 +446,8 @@ struct Vdbe {
 	u32 expmask;		/* Binding to these vars invalidates VM */
 	SubProgram *pProgram;	/* Linked list of all sub-programs used by VM */
 	AuxData *pAuxData;	/* Linked list of auxdata allocations */
+	/** Parser flags with which this object was built. */
+	uint32_t sql_flags;
 	/* Anonymous savepoint for aborts only */
 	Savepoint *anonymous_savepoint;
 #ifdef SQL_ENABLE_STMT_SCANSTATUS

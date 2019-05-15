@@ -40,6 +40,7 @@
 #include <unicode/utf8.h>
 #include <unicode/uchar.h>
 
+#include "box/session.h"
 #include "say.h"
 #include "sqlInt.h"
 #include "tarantoolInt.h"
@@ -544,7 +545,7 @@ sql_expr_compile(sql *db, const char *expr, int expr_len)
 	int len = strlen(outer) + expr_len;
 
 	struct Parse parser;
-	sql_parser_create(&parser, db);
+	sql_parser_create(&parser, db, default_flags);
 	parser.parse_only = true;
 
 	struct Expr *expression = NULL;
@@ -569,7 +570,7 @@ struct Select *
 sql_view_compile(struct sql *db, const char *view_stmt)
 {
 	struct Parse parser;
-	sql_parser_create(&parser, db);
+	sql_parser_create(&parser, db, default_flags);
 	parser.parse_only = true;
 
 	struct Select *select = NULL;
@@ -590,7 +591,7 @@ struct sql_trigger *
 sql_trigger_compile(struct sql *db, const char *sql)
 {
 	struct Parse parser;
-	sql_parser_create(&parser, db);
+	sql_parser_create(&parser, db, default_flags);
 	parser.parse_only = true;
 	struct sql_trigger *trigger = NULL;
 	if (sqlRunParser(&parser, sql) == 0 &&

@@ -33,12 +33,11 @@
  * This file contains the implementation for TRIGGERs
  */
 
+#include "box/box.h"
 #include "box/schema.h"
 #include "sqlInt.h"
 #include "tarantoolInt.h"
 #include "vdbeInt.h"
-#include "box/session.h"
-#include "box/box.h"
 
 /* See comment in sqlInt.h */
 int sqlSubProgramsRemaining;
@@ -533,12 +532,12 @@ checkColumnOverlap(IdList * pIdList, ExprList * pEList)
 
 struct sql_trigger *
 sql_triggers_exist(struct space_def *space_def, int op,
-		   struct ExprList *changes_list, int *mask_ptr)
+		   struct ExprList *changes_list, uint32_t sql_flags,
+		   int *mask_ptr)
 {
 	int mask = 0;
 	struct sql_trigger *trigger_list = NULL;
-	struct session *user_session = current_session();
-	if ((user_session->sql_flags & SQL_EnableTrigger) != 0)
+	if ((sql_flags & SQL_EnableTrigger) != 0)
 		trigger_list = space_trigger_list(space_def->id);
 	for (struct sql_trigger *p = trigger_list; p != NULL; p = p->next) {
 		if (p->op == op && checkColumnOverlap(p->pColumns,
@@ -752,7 +751,7 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 	pSubParse = sqlStackAllocZero(db, sizeof(Parse));
 	if (!pSubParse)
 		return 0;
-	sql_parser_create(pSubParse, db);
+	sql_parser_create(pSubParse, db, parser->sql_flags);
 	memset(&sNC, 0, sizeof(sNC));
 	sNC.pParse = pSubParse;
 	pSubParse->triggered_space = space;
@@ -892,9 +891,8 @@ vdbe_code_row_trigger_direct(struct Parse *parser, struct sql_trigger *trigger,
 	if (pPrg == NULL)
 		return;
 
-	struct session *user_session = current_session();
-	bool is_recursive = (trigger->zName && !(user_session->sql_flags &
-						 SQL_RecTriggers));
+	bool is_recursive =
+		trigger->zName && (parser->sql_flags & SQL_RecTriggers) == 0;
 
 	sqlVdbeAddOp4(v, OP_Program, reg, ignore_jump,
 			  ++parser->nMem, (const char *)pPrg->pProgram,

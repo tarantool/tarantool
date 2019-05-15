@@ -40,7 +40,6 @@
 #include "box/box.h"
 #include "box/coll_id_cache.h"
 #include "box/schema.h"
-#include "box/session.h"
 
 /*
  * Trace output macros
@@ -169,8 +168,6 @@ sqlSelectNew(Parse * pParse,	/* Parsing context */
 			pParse->is_aborted = true;
 		pEList = sql_expr_list_append(db, NULL, expr);
 	}
-	struct session MAYBE_UNUSED *user_session;
-	user_session = current_session();
 	pNew->pEList = pEList;
 	pNew->op = TK_SELECT;
 	pNew->selFlags = selFlags;
@@ -178,7 +175,7 @@ sqlSelectNew(Parse * pParse,	/* Parsing context */
 	pNew->iOffset = 0;
 #ifdef SQL_DEBUG
 	pNew->zSelName[0] = 0;
-	if (user_session->sql_flags & SQL_SelectTrace)
+	if ((pParse->sql_flags & SQL_SelectTrace) != 0)
 		sqlSelectTrace = 0xfff;
 	else
 		sqlSelectTrace = 0;
@@ -1733,7 +1730,6 @@ generateColumnNames(Parse * pParse,	/* Parser context */
 	int i, j;
 	sql *db = pParse->db;
 	int fullNames, shortNames;
-	struct session *user_session = current_session();
 	/* If this is an EXPLAIN, skip this step */
 	if (pParse->explain) {
 		return;
@@ -1751,8 +1747,8 @@ generateColumnNames(Parse * pParse,	/* Parser context */
 	}
 	assert(pTabList != 0);
 	pParse->colNamesSet = 1;
-	fullNames = (user_session->sql_flags & SQL_FullColNames) != 0;
-	shortNames = (user_session->sql_flags & SQL_ShortColNames) != 0;
+	fullNames = (pParse->sql_flags & SQL_FullColNames) != 0;
+	shortNames = (pParse->sql_flags & SQL_ShortColNames) != 0;
 	sqlVdbeSetNumCols(v, pEList->nExpr);
 	uint32_t var_count = 0;
 	for (i = 0; i < pEList->nExpr; i++) {
@@ -1994,18 +1990,16 @@ struct space *
 sqlResultSetOfSelect(Parse * pParse, Select * pSelect)
 {
 	sql *db = pParse->db;
-	uint32_t savedFlags;
-	struct session *user_session = current_session();
 
-	savedFlags = user_session->sql_flags;
-	user_session->sql_flags |= ~SQL_FullColNames;
-	user_session->sql_flags &= SQL_ShortColNames;
+	uint32_t saved_flags = pParse->sql_flags;
+	pParse->sql_flags |= ~SQL_FullColNames;
+	pParse->sql_flags &= SQL_ShortColNames;
 	sqlSelectPrep(pParse, pSelect, 0);
 	if (pParse->is_aborted)
 		return NULL;
 	while (pSelect->pPrior)
 		pSelect = pSelect->pPrior;
-	user_session->sql_flags = savedFlags;
+	pParse->sql_flags = saved_flags;
 	struct space *space = sql_ephemeral_space_new(pParse, NULL);
 	if (space == NULL)
 		return NULL;
@@ -2030,6 +2024,7 @@ allocVdbe(Parse * pParse)
 	Vdbe *v = pParse->pVdbe = sqlVdbeCreate(pParse);
 	if (v == NULL)
 		return NULL;
+	v->sql_flags = pParse->sql_flags;
 	sqlVdbeAddOp2(v, OP_Init, 0, 1);
 	if (pParse->pToplevel == 0
 	    && OptimizationEnabled(pParse->db, SQL_FactorOutConst)
@@ -4782,7 +4777,6 @@ selectExpander(Walker * pWalker, Select * p)
 	sql *db = pParse->db;
 	Expr *pE, *pRight, *pExpr;
 	u16 selFlags = p->selFlags;
-	struct session *user_session = current_session();
 
 	p->selFlags |= SF_Expanded;
 	if (db->mallocFailed) {
@@ -4917,7 +4911,7 @@ selectExpander(Walker * pWalker, Select * p)
 		 */
 		struct ExprList_item *a = pEList->a;
 		ExprList *pNew = 0;
-		uint32_t flags = user_session->sql_flags;
+		uint32_t flags = pParse->sql_flags;
 		int longNames = (flags & SQL_FullColNames) != 0
 		    && (flags & SQL_ShortColNames) == 0;
 

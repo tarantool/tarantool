@@ -327,9 +327,10 @@ sql_checks_update_space_def_reference(struct ExprList *expr_list,
  * which is also cleared in the destroy function.
  * @param parser object to initialize.
  * @param db sql object.
+ * @param sql_flags flags to control parser behaviour.
  */
 void
-sql_parser_create(struct Parse *parser, struct sql *db);
+sql_parser_create(struct Parse *parser, struct sql *db, uint32_t sql_flags);
 
 /**
  * Release the parser object resources.

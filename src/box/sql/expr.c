@@ -3456,8 +3456,7 @@ sqlExprCachePush(Parse * pParse)
 	struct session MAYBE_UNUSED *user_session;
 	pParse->iCacheLevel++;
 #ifdef SQL_DEBUG
-	user_session = current_session();
-	if (user_session->sql_flags & SQL_VdbeAddopTrace) {
+	if ((pParse->sql_flags & SQL_VdbeAddopTrace) != 0) {
 		printf("PUSH to %d\n", pParse->iCacheLevel);
 	}
 #endif
@@ -3477,7 +3476,7 @@ sqlExprCachePop(Parse * pParse)
 	assert(pParse->iCacheLevel >= 1);
 	pParse->iCacheLevel--;
 #ifdef SQL_DEBUG
-	if (user_session->sql_flags & SQL_VdbeAddopTrace) {
+	if ((pParse->sql_flags & SQL_VdbeAddopTrace) != 0) {
 		printf("POP  to %d\n", pParse->iCacheLevel);
 	}
 #endif
@@ -3566,7 +3565,7 @@ sqlExprCacheClear(Parse * pParse)
 	user_session = current_session();
 
 #if SQL_DEBUG
-	if (user_session->sql_flags & SQL_VdbeAddopTrace) {
+	if ((pParse->sql_flags & SQL_VdbeAddopTrace) != 0) {
 		printf("CLEAR\n");
 	}
 #endif

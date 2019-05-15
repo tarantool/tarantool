@@ -43,7 +43,6 @@
 #include "vdbeInt.h"
 #include "whereInt.h"
 #include "box/coll_id_cache.h"
-#include "box/session.h"
 #include "box/schema.h"
 
 /* Forward declaration of methods */
@@ -2832,9 +2831,10 @@ tnt_error:
 	/* Automatic indexes */
 	LogEst rSize = pTab->nRowLogEst;
 	LogEst rLogSize = estLog(rSize);
-	struct session *user_session = current_session();
-	if (!pBuilder->pOrSet	/* Not part of an OR optimization */
-	    && (pWInfo->wctrlFlags & WHERE_OR_SUBCLAUSE) == 0 && (user_session->sql_flags & SQL_AutoIndex) != 0 && pSrc->pIBIndex == 0	/* Has no INDEXED BY clause */
+	if (!pBuilder->pOrSet && /* Not pqart of an OR optimization */
+	    (pWInfo->wctrlFlags & WHERE_OR_SUBCLAUSE) == 0 &&
+	    (pWInfo->pParse->sql_flags & SQL_AutoIndex) != 0 &&
+	    pSrc->pIBIndex == 0	/* Has no INDEXED BY clause */
 	    && !pSrc->fg.notIndexed	/* Has no NOT INDEXED clause */
 	    && HasRowid(pTab)	/* Not WITHOUT ROWID table. (FIXME: Why not?) */
 	    &&!pSrc->fg.isCorrelated	/* Not a correlated subquery */
@@ -4241,10 +4241,9 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	sql *db;		/* Database connection */
 	int rc;			/* Return code */
 	u8 bFordelete = 0;	/* OPFLAG_FORDELETE or zero, as appropriate */
-	struct session *user_session = current_session();
 
 #ifdef SQL_DEBUG
-	if (user_session->sql_flags & SQL_WhereTrace)
+	if ((pParse->sql_flags & SQL_WhereTrace) != 0)
 		sqlWhereTrace = 0xfff;
 	else
 		sqlWhereTrace = 0;
@@ -4452,7 +4451,7 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 		}
 	}
 	if (pWInfo->pOrderBy == 0 &&
-	    (user_session->sql_flags & SQL_ReverseOrder) != 0) {
+	    (pParse->sql_flags & SQL_ReverseOrder) != 0) {
 		pWInfo->revMask = ALLBITS;
 	}
 	if (pParse->is_aborted || NEVER(db->mallocFailed)) {

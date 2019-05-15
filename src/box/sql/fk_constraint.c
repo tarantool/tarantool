@@ -37,7 +37,6 @@
 #include "sqlInt.h"
 #include "box/fk_constraint.h"
 #include "box/schema.h"
-#include "box/session.h"
 
 /*
  * Deferred and Immediate FKs
@@ -274,9 +273,8 @@ fk_constraint_lookup_parent(struct Parse *parse_context, struct space *parent,
 		sqlReleaseTempReg(parse_context, rec_reg);
 		sqlReleaseTempRange(parse_context, temp_regs, field_count);
 	}
-	struct session *session = current_session();
 	if (!fk_def->is_deferred &&
-	    (session->sql_flags & SQL_DeferFKs) == 0 &&
+	    (parse_context->sql_flags & SQL_DeferFKs) == 0 &&
 	    parse_context->pToplevel == NULL && !parse_context->isMultiWrite) {
 		/*
 		 * If this is an INSERT statement that will insert
@@ -536,7 +534,6 @@ fk_constraint_emit_check(struct Parse *parser, struct space *space, int reg_old,
 {
 	bool is_update = changed_cols != NULL;
 	struct sql *db = parser->db;
-	struct session *user_session = current_session();
 
 	/*
 	 * Exactly one of reg_old and reg_new should be non-zero.
@@ -600,7 +597,7 @@ fk_constraint_emit_check(struct Parse *parser, struct space *space, int reg_old,
 					       changed_cols))
 			continue;
 		if (!fk_def->is_deferred &&
-		    (user_session->sql_flags & SQL_DeferFKs) == 0 &&
+		    (parser->sql_flags & SQL_DeferFKs) == 0 &&
 		    parser->pToplevel == NULL && !parser->isMultiWrite) {
 			assert(reg_old == 0 && reg_new != 0);
 			/*

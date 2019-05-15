@@ -2694,6 +2694,8 @@ struct Parse {
 	bool parse_only;
 	/** Type of parsed_ast member. */
 	enum ast_type parsed_ast_type;
+	/** SQL options which were used to compile this VDBE. */
+	uint32_t sql_flags;
 	/**
 	 * Members of this union are valid only
 	 * if parse_only is set to true.
@@ -4006,11 +4008,13 @@ vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name,
  *        the triggers.
  * @param op operation one of TK_DELETE, TK_INSERT, TK_UPDATE.
  * @param changes_list Columns that change in an UPDATE statement.
+ * @param sql_flags SQL flags which describe how to parse request.
  * @param[out] pMask Mask of TRIGGER_BEFORE|TRIGGER_AFTER
  */
 struct sql_trigger *
 sql_triggers_exist(struct space_def *space_def, int op,
-		   struct ExprList *changes_list, int *mask_ptr);
+		   struct ExprList *changes_list, uint32_t sql_flags,
+		   int *mask_ptr);
 
 /**
  * This is called to code the required FOR EACH ROW triggers for

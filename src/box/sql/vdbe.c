@@ -43,7 +43,6 @@
 #include "box/error.h"
 #include "box/fk_constraint.h"
 #include "box/txn.h"
-#include "box/session.h"
 #include "sqlInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
@@ -524,10 +523,10 @@ registerTrace(int iReg, Mem *p) {
 #endif
 
 #ifdef SQL_DEBUG
-#  define REGISTER_TRACE(R,M)						\
-	if(user_session->sql_flags&SQL_VdbeTrace) registerTrace(R,M);
+#  define REGISTER_TRACE(P,R,M)					\
+	if(P->sql_flags&SQL_VdbeTrace) registerTrace(R,M);
 #else
-#  define REGISTER_TRACE(R,M)
+#  define REGISTER_TRACE(P,R,M)
 #endif
 
 
@@ -643,7 +642,6 @@ int sqlVdbeExec(Vdbe *p)
 #ifdef VDBE_PROFILE
 	u64 start;                 /* CPU clock count at start of opcode */
 #endif
-	struct session *user_session = current_session();
 	/*** INSERT STACK UNION HERE ***/
 
 	assert(p->magic==VDBE_MAGIC_RUN);  /* sql_step() verifies this */
@@ -669,20 +667,18 @@ int sqlVdbeExec(Vdbe *p)
 #endif
 #ifdef SQL_DEBUG
 	sqlBeginBenignMalloc();
-	if (p->pc==0
-	    && (user_session->sql_flags&
-		(SQL_VdbeListing|SQL_VdbeEQP|SQL_VdbeTrace))!=0
-		) {
+	if (p->pc == 0 &&
+	    (p->sql_flags & (SQL_VdbeListing|SQL_VdbeEQP|SQL_VdbeTrace)) != 0) {
 		int i;
 		int once = 1;
 		sqlVdbePrintSql(p);
-		if (user_session->sql_flags & SQL_VdbeListing) {
+		if ((p->sql_flags & SQL_VdbeListing) != 0) {
 			printf("VDBE Program Listing:\n");
 			for(i=0; i<p->nOp; i++) {
 				sqlVdbePrintOp(stdout, i, &aOp[i]);
 			}
 		}
-		if (user_session->sql_flags & SQL_VdbeEQP) {
+		if ((p->sql_flags & SQL_VdbeEQP) != 0) {
 			for(i=0; i<p->nOp; i++) {
 				if (aOp[i].opcode==OP_Explain) {
 					if (once) printf("VDBE Query Plan:\n");
@@ -691,7 +687,8 @@ int sqlVdbeExec(Vdbe *p)
 				}
 			}
 		}
-		if (user_session->sql_flags & SQL_VdbeTrace)  printf("VDBE Trace:\n");
+		if ((p->sql_flags & SQL_VdbeTrace) != 0)
+			printf("VDBE Trace:\n");
 	}
 	sqlEndBenignMalloc();
 #endif
@@ -713,9 +710,8 @@ int sqlVdbeExec(Vdbe *p)
 		/* Only allow tracing if SQL_DEBUG is defined.
 		 */
 #ifdef SQL_DEBUG
-		if (user_session->sql_flags & SQL_VdbeTrace) {
+		if ((p->sql_flags & SQL_VdbeTrace) != 0)
 			sqlVdbePrintOp(stdout, (int)(pOp - aOp), pOp);
-		}
 #endif
 
 
@@ -728,21 +724,21 @@ int sqlVdbeExec(Vdbe *p)
 				assert(pOp->p1<=(p->nMem+1 - p->nCursor));
 				assert(memIsValid(&aMem[pOp->p1]));
 				assert(sqlVdbeCheckMemInvariants(&aMem[pOp->p1]));
-				REGISTER_TRACE(pOp->p1, &aMem[pOp->p1]);
+				REGISTER_TRACE(p, pOp->p1, &aMem[pOp->p1]);
 			}
 			if ((opProperty & OPFLG_IN2)!=0) {
 				assert(pOp->p2>0);
 				assert(pOp->p2<=(p->nMem+1 - p->nCursor));
 				assert(memIsValid(&aMem[pOp->p2]));
 				assert(sqlVdbeCheckMemInvariants(&aMem[pOp->p2]));
-				REGISTER_TRACE(pOp->p2, &aMem[pOp->p2]);
+				REGISTER_TRACE(p, pOp->p2, &aMem[pOp->p2]);
 			}
 			if ((opProperty & OPFLG_IN3)!=0) {
 				assert(pOp->p3>0);
 				assert(pOp->p3<=(p->nMem+1 - p->nCursor));
 				assert(memIsValid(&aMem[pOp->p3]));
 				assert(sqlVdbeCheckMemInvariants(&aMem[pOp->p3]));
-				REGISTER_TRACE(pOp->p3, &aMem[pOp->p3]);
+				REGISTER_TRACE(p, pOp->p3, &aMem[pOp->p3]);
 			}
 			if ((opProperty & OPFLG_OUT2)!=0) {
 				assert(pOp->p2>0);
@@ -858,7 +854,7 @@ case OP_Gosub: {            /* jump */
 	memAboutToChange(p, pIn1);
 	pIn1->flags = MEM_Int;
 	pIn1->u.i = (int)(pOp-aOp);
-	REGISTER_TRACE(pOp->p1, pIn1);
+	REGISTER_TRACE(p, pOp->p1, pIn1);
 
 	/* Most jump operations do a goto to this spot in order to update
 	 * the pOp pointer.
@@ -945,7 +941,7 @@ case OP_Yield: {            /* in1, jump */
 	pIn1->flags = MEM_Int;
 	pcDest = (int)pIn1->u.i;
 	pIn1->u.i = (int)(pOp - aOp);
-	REGISTER_TRACE(pOp->p1, pIn1);
+	REGISTER_TRACE(p, pOp->p1, pIn1);
 	pOp = &aOp[pcDest];
 	break;
 }
@@ -1312,7 +1308,7 @@ case OP_Move: {
 		}
 #endif
 		Deephemeralize(pOut);
-		REGISTER_TRACE(p2++, pOut);
+		REGISTER_TRACE(p, p2++, pOut);
 		pIn1++;
 		pOut++;
 	}while( --n);
@@ -1340,7 +1336,7 @@ case OP_Copy: {
 #ifdef SQL_DEBUG
 		pOut->pScopyFrom = 0;
 #endif
-		REGISTER_TRACE(pOp->p2+pOp->p3-n, pOut);
+		REGISTER_TRACE(p, pOp->p2+pOp->p3-n, pOut);
 		if ((n--)==0) break;
 		pOut++;
 		pIn1++;
@@ -1422,7 +1418,7 @@ case OP_ResultRow: {
 	 * transaction. It needs to be rolled back.
 	 */
 	if (SQL_OK!=(rc = sqlVdbeCheckFk(p, 0))) {
-		assert(user_session->sql_flags&SQL_CountRows);
+		assert((p->sql_flags & SQL_CountRows) != 0);
 		goto abort_due_to_error;
 	}
 
@@ -1441,7 +1437,7 @@ case OP_ResultRow: {
 	 * The statement transaction is never a top-level transaction.  Hence
 	 * the RELEASE call below can never fail.
 	 */
-	assert(p->iStatement==0 || user_session->sql_flags&SQL_CountRows);
+	assert(p->iStatement == 0 || (p->sql_flags & SQL_CountRows) != 0);
 	rc = sqlVdbeCloseStatement(p, SAVEPOINT_RELEASE);
 	assert(rc==SQL_OK);
 
@@ -1459,7 +1455,7 @@ case OP_ResultRow: {
 		assert((pMem[i].flags & MEM_Ephem)==0
 		       || (pMem[i].flags & (MEM_Str|MEM_Blob))==0);
 		sqlVdbeMemNulTerminate(&pMem[i]);
-		REGISTER_TRACE(pOp->p1+i, &pMem[i]);
+		REGISTER_TRACE(p, pOp->p1+i, &pMem[i]);
 	}
 	if (db->mallocFailed) goto no_mem;
 
@@ -1799,7 +1795,7 @@ case OP_Function: {
 #ifdef SQL_DEBUG
 	for(i=0; i<pCtx->argc; i++) {
 		assert(memIsValid(pCtx->argv[i]));
-		REGISTER_TRACE(pOp->p2+i, pCtx->argv[i]);
+		REGISTER_TRACE(p, pOp->p2+i, pCtx->argv[i]);
 	}
 #endif
 	MemSetTypeFlag(pCtx->pOut, MEM_Null);
@@ -1821,7 +1817,7 @@ case OP_Function: {
 		if (sqlVdbeMemTooBig(pCtx->pOut)) goto too_big;
 	}
 
-	REGISTER_TRACE(pOp->p3, pCtx->pOut);
+	REGISTER_TRACE(p, pOp->p3, pCtx->pOut);
 	UPDATE_MAX_BLOBSIZE(pCtx->pOut);
 	break;
 }
@@ -2133,7 +2129,7 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 				iCompare = 1;    /* Operands are not equal */
 				memAboutToChange(p, pOut);
 				MemSetTypeFlag(pOut, MEM_Null);
-				REGISTER_TRACE(pOp->p2, pOut);
+				REGISTER_TRACE(p, pOp->p2, pOut);
 			} else {
 				VdbeBranchTaken(2,3);
 				if (pOp->p5 & SQL_JUMPIFNULL) {
@@ -2249,7 +2245,7 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 		}
 		memAboutToChange(p, pOut);
 		mem_set_bool(pOut, res2);
-		REGISTER_TRACE(pOp->p2, pOut);
+		REGISTER_TRACE(p, pOp->p2, pOut);
 	} else {
 		VdbeBranchTaken(res!=0, (pOp->p5 & SQL_NULLEQ)?2:3);
 		if (res2) {
@@ -2351,8 +2347,8 @@ case OP_Compare: {
 		idx = aPermute ? aPermute[i] : i;
 		assert(memIsValid(&aMem[p1+idx]));
 		assert(memIsValid(&aMem[p2+idx]));
-		REGISTER_TRACE(p1+idx, &aMem[p1+idx]);
-		REGISTER_TRACE(p2+idx, &aMem[p2+idx]);
+		REGISTER_TRACE(p, p1+idx, &aMem[p1+idx]);
+		REGISTER_TRACE(p, p2+idx, &aMem[p2+idx]);
 		assert(i < (int)def->part_count);
 		struct coll *coll = def->parts[i].coll;
 		bool is_rev = def->parts[i].sort_order == SORT_ORDER_DESC;
@@ -2783,7 +2779,7 @@ case OP_Column: {
 	if (zData!=pC->aRow) sqlVdbeMemRelease(&sMem);
 			op_column_out:
 	UPDATE_MAX_BLOBSIZE(pDest);
-	REGISTER_TRACE(pOp->p3, pDest);
+	REGISTER_TRACE(p, pOp->p3, pDest);
 	break;
 
 			op_column_error:
@@ -2924,7 +2920,7 @@ case OP_MakeRecord: {
 		goto no_mem;
 	assert(sqlVdbeCheckMemInvariants(pOut));
 	assert(pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor));
-	REGISTER_TRACE(pOp->p3, pOut);
+	REGISTER_TRACE(p, pOp->p3, pOut);
 	UPDATE_MAX_BLOBSIZE(pOut);
 	break;
 }
@@ -3740,7 +3736,8 @@ case OP_Found: {        /* jump, in3 */
 		for(ii=0; ii<r.nField; ii++) {
 			assert(memIsValid(&r.aMem[ii]));
 			assert((r.aMem[ii].flags & MEM_Zero)==0 || r.aMem[ii].n==0);
-			if (ii) REGISTER_TRACE(pOp->p3+ii, &r.aMem[ii]);
+			if (ii != 0)
+				REGISTER_TRACE(p, pOp->p3+ii, &r.aMem[ii]);
 		}
 #endif
 		pIdxKey = &r;
@@ -4092,7 +4089,7 @@ case OP_RowData: {
 	rc = sqlCursorPayload(pCrsr, 0, n, pOut->z);
 	if (rc) goto abort_due_to_error;
 	UPDATE_MAX_BLOBSIZE(pOut);
-	REGISTER_TRACE(pOp->p2, pOut);
+	REGISTER_TRACE(p, pOp->p2, pOut);
 	break;
 }
 
@@ -5028,7 +5025,7 @@ case OP_Param: {           /* out2 */
  * statement counter is incremented (immediate foreign key constraints).
  */
 case OP_FkCounter: {
-	if ((user_session->sql_flags & SQL_DeferFKs || pOp->p1 != 0) &&
+	if (((p->sql_flags & SQL_DeferFKs) != 0 || pOp->p1 != 0) &&
 	    !p->auto_commit) {
 		struct txn *txn = in_txn();
 		assert(txn != NULL && txn->psql_txn != NULL);
@@ -5052,7 +5049,7 @@ case OP_FkCounter: {
  * (immediate foreign key constraint violations).
  */
 case OP_FkIfZero: {         /* jump */
-	if ((user_session->sql_flags & SQL_DeferFKs || pOp->p1) &&
+	if (((p->sql_flags & SQL_DeferFKs) != 0 || pOp->p1 != 0) &&
 	    !p->auto_commit) {
 		struct txn *txn = in_txn();
 		assert(txn != NULL && txn->psql_txn != NULL);
@@ -5236,7 +5233,7 @@ case OP_AggStep: {
 #ifdef SQL_DEBUG
 	for(i=0; i<pCtx->argc; i++) {
 		assert(memIsValid(pCtx->argv[i]));
-		REGISTER_TRACE(pOp->p2+i, pCtx->argv[i]);
+		REGISTER_TRACE(p, pOp->p2+i, pCtx->argv[i]);
 	}
 #endif
 
@@ -5367,11 +5364,9 @@ case OP_Init: {          /* jump */
 		}
 	}
 #ifdef SQL_DEBUG
-	if ((user_session->sql_flags & SQL_SqlTrace)!=0
-	    && (zTrace = (pOp->p4.z ? pOp->p4.z : p->zSql))!=0
-		) {
+	if ((p->sql_flags & SQL_SqlTrace) != 0 &&
+	    (zTrace = (pOp->p4.z ? pOp->p4.z : p->zSql)) != 0)
 		sqlDebugPrintf("SQL-trace: %s\n", zTrace);
-	}
 #endif /* SQL_DEBUG */
 #endif /* SQL_OMIT_TRACE */
 	assert(pOp->p2>0);
@@ -5444,7 +5439,7 @@ default: {          /* This is really OP_Noop and OP_Explain */
 		assert(pOp>=&aOp[-1] && pOp<&aOp[p->nOp-1]);
 
 #ifdef SQL_DEBUG
-		if (user_session->sql_flags & SQL_VdbeTrace) {
+		if ((p->sql_flags & SQL_VdbeTrace) != 0) {
 			u8 opProperty = sqlOpcodeProperty[pOrigOp->opcode];
 			if (rc!=0) printf("rc=%d\n",rc);
 			if (opProperty & (OPFLG_OUT2)) {

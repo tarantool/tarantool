@@ -54,7 +54,7 @@ sqlPrepare(sql * db,	/* Database handle. */
 {
 	int rc = SQL_OK;	/* Result code */
 	Parse sParse;		/* Parsing context */
-	sql_parser_create(&sParse, db);
+	sql_parser_create(&sParse, db, current_session()->sql_flags);
 	sParse.pReprepare = pReprepare;
 	assert(ppStmt && *ppStmt == 0);
 	/* assert( !db->mallocFailed ); // not true with SQL_USE_ALLOCA */
@@ -281,10 +281,11 @@ sql_prepare_v2(sql * db,	/* Database handle. */
 }
 
 void
-sql_parser_create(struct Parse *parser, sql *db)
+sql_parser_create(struct Parse *parser, struct sql *db, uint32_t sql_flags)
 {
 	memset(parser, 0, sizeof(struct Parse));
 	parser->db = db;
+	parser->sql_flags = sql_flags;
 	rlist_create(&parser->record_list);
 	region_create(&parser->region, &cord()->slabc);
 }
