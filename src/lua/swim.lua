@@ -422,10 +422,19 @@ local swim_member_mt = {
 -- table-wrapper stores not only a pointer, but also cached
 -- decoded payload.
 --
-local function swim_member_wrap(ptr)
-    capi.swim_member_ref(ptr)
-    ffi.gc(ptr, capi.swim_member_unref)
-    return setmetatable({ptr = ptr}, swim_member_mt)
+local function swim_wrap_member(s, ptr)
+    -- Lua tables can't normally work with cdata keys. Even when
+    -- cdata is a simple number, table can't do search by it.
+    local key = tonumber(ffi.cast('unsigned long', ptr))
+    local cache = s.cache_table
+    local wrapped = cache[key]
+    if wrapped == nil then
+        capi.swim_member_ref(ptr)
+        ffi.gc(ptr, capi.swim_member_unref)
+        wrapped = setmetatable({ptr = ptr}, swim_member_mt)
+        cache[key] = wrapped
+    end
+    return wrapped
 end
 
 --
@@ -560,7 +569,8 @@ end
 -- into the member table.
 --
 local function swim_self(s)
-    return swim_member_wrap(capi.swim_self(swim_check_instance(s, 'swim:self')))
+    local ptr = swim_check_instance(s, 'swim:self')
+    return swim_wrap_member(s, capi.swim_self(ptr))
 end
 
 --
@@ -574,7 +584,7 @@ local function swim_member_by_uuid(s, uuid)
     if m == nil then
         return nil
     end
-    return swim_member_wrap(m)
+    return swim_wrap_member(s, m)
 end
 
 --
@@ -618,13 +628,14 @@ end
 -- member object as a value.
 --
 local function swim_pairs_next(ctx)
-    if ctx.swim.ptr == nil then
+    local s = ctx.swim
+    if s.ptr == nil then
         return swim_error_deleted()
     end
     local iterator = ctx.iterator
     local m = capi.swim_iterator_next(iterator)
     if m ~= nil then
-        m = swim_member_wrap(m)
+        m = swim_wrap_member(s, m)
         return m:uuid(), m
     end
     capi.swim_iterator_close(ffi.gc(iterator, nil))
@@ -760,6 +771,10 @@ local swim_not_configured_mt = {
 local swim_cfg_not_configured_mt = table.deepcopy(swim_cfg_mt)
 swim_cfg_not_configured_mt.__call = swim_cfg_first_call
 
+-- Member cache stores week references so as to do not care about
+-- removed members erasure - GC drops them automatically.
+local cache_table_mt = { __mode = 'v' }
+
 --
 -- Create a new SWIM instance, and configure if @a cfg is
 -- provided.
@@ -772,7 +787,8 @@ local function swim_new(cfg)
     ffi.gc(ptr, capi.swim_delete)
     local s = setmetatable({
         ptr = ptr,
-        cfg = setmetatable({index = {}}, swim_cfg_not_configured_mt)
+        cfg = setmetatable({index = {}}, swim_cfg_not_configured_mt),
+        cache_table = setmetatable({}, cache_table_mt)
     }, swim_not_configured_mt)
     if cfg then
         local ok, err = s:cfg(cfg)

@@ -949,6 +949,77 @@ s1:delete()
 s2:delete()
 ---
 ...
+--
+-- Member table cache in Lua.
+--
+s = swim.new({uuid = uuid(1), uri = uri()})
+---
+...
+self = s:self()
+---
+...
+s:self() == self
+---
+- true
+...
+s:add_member({uuid = uuid(2), uri = 1})
+---
+- true
+...
+s2 = s:member_by_uuid(uuid(2))
+---
+...
+s2
+---
+- uri: 127.0.0.1:<port>
+  status: alive
+  incarnation: 0
+  uuid: 00000000-0000-1000-8000-000000000002
+  payload_size: 0
+...
+-- Next lookups return the same member table.
+s2_old_uri = s2:uri()
+---
+...
+-- Check, that it is impossible to take removed member from the
+-- cached table.
+s:remove_member(uuid(2))
+---
+- true
+...
+s:member_by_uuid(uuid(2))
+---
+- null
+...
+-- GC automatically removes members from the member table.
+self = nil
+---
+...
+s2 = nil
+---
+...
+collectgarbage('collect')
+---
+- 0
+...
+s.cache_table
+---
+- []
+...
+s:add_member({uuid = uuid(2), uri = 2})
+---
+- true
+...
+s2 = s:member_by_uuid(uuid(2))
+---
+...
+s2:uri() ~= s2_old_uri
+---
+- true
+...
+s:delete()
+---
+...
 test_run:cmd("clear filter")
 ---
 - true

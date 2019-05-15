@@ -313,4 +313,33 @@ s1_view:incarnation()
 s1:delete()
 s2:delete()
 
+--
+-- Member table cache in Lua.
+--
+s = swim.new({uuid = uuid(1), uri = uri()})
+self = s:self()
+s:self() == self
+
+s:add_member({uuid = uuid(2), uri = 1})
+s2 = s:member_by_uuid(uuid(2))
+s2
+-- Next lookups return the same member table.
+s2_old_uri = s2:uri()
+
+-- Check, that it is impossible to take removed member from the
+-- cached table.
+s:remove_member(uuid(2))
+s:member_by_uuid(uuid(2))
+
+-- GC automatically removes members from the member table.
+self = nil
+s2 = nil
+collectgarbage('collect')
+s.cache_table
+s:add_member({uuid = uuid(2), uri = 2})
+s2 = s:member_by_uuid(uuid(2))
+s2:uri() ~= s2_old_uri
+
+s:delete()
+
 test_run:cmd("clear filter")
