@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(45)
+test:plan(47)
 
 test:execsql([[
 	CREATE TABLE t0 (i INT PRIMARY KEY, a INT);
@@ -504,6 +504,26 @@ test:do_execsql_test(
 		-- <sql-errors-1.45>
 		0
 		-- </sql-errors-1.45>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.46",
+	[[
+		INSERT INTO not_exist VALUES(1) a;
+	]], {
+		-- <sql-errors-1.46>
+		1, "Space 'NOT_EXIST' does not exist"
+		-- </sql-errors-1.46>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.47",
+	[[
+		DROP TABLE IF EXISTS END;
+	]], {
+		-- <sql-errors-1.47>
+		1, "Keyword 'END' is reserved. Please use double quotes if 'END' is an identifier."
+		-- </sql-errors-1.47>
 	})
 
 test:finish_test()

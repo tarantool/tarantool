@@ -80,6 +80,13 @@
 #define YYMALLOCARGTYPE  u64
 
 /*
+ * Stop the parser if an error occurs. This macro adds an
+ * additional check that allows the parser to be stopped if any
+ * error was noticed.
+ */
+#define PARSER_ERROR_CHECK && ! pParse->is_aborted
+
+/*
 ** An instance of this structure holds information about the
 ** LIMIT clause of a SELECT statement.
 */

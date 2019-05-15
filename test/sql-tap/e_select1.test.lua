@@ -808,7 +808,7 @@ data = {
     {"1.1", "SELECT a, b, c FROM z1 WHERE *",  "Syntax error near '*'"},
     {"1.2", "SELECT a, b, c FROM z1 GROUP BY *", "Syntax error near '*'"},
     {"1.3", "SELECT 1 + * FROM z1",  "Syntax error near '*'"},
-    {"1.4", "SELECT * + 1 FROM z1", "Syntax error near '+'"},
+    {"1.4", "SELECT * + 1 FROM z1", "Failed to expand '*' in SELECT statement without FROM clause"},
     {"2.1", "SELECT *", "Failed to expand '*' in SELECT statement without FROM clause"},
     {"2.2", "SELECT * WHERE 1", "Failed to expand '*' in SELECT statement without FROM clause"},
     {"2.3", "SELECT * WHERE 0", "Failed to expand '*' in SELECT statement without FROM clause"},

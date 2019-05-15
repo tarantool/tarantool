@@ -935,7 +935,8 @@ void Parse(
       yymajor = YYNOCODE;
 #endif
     }
-  }while( yymajor!=YYNOCODE && yypParser->yytos>yypParser->yystack );
+  }while( yymajor!=YYNOCODE && yypParser->yytos>yypParser->yystack
+         PARSER_ERROR_CHECK);
 #ifndef NDEBUG
   if( yyTraceFILE ){
     yyStackEntry *i;

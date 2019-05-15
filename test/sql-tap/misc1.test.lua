@@ -1047,7 +1047,7 @@ test:do_catchsql_test(
         VALUES(0,0x0MATCH#0;
     ]], {
         -- <misc1-21.2>
-        1, [[Syntax error near ';']]
+        1, [[Syntax error near '#0']]
         -- </misc1-21.2>
     })
 
