@@ -647,3 +647,15 @@ s.index.pk.parts[1].type
 s.index.pk:alter{sequence = true}
 sequence_id == s.index.pk.sequence_id
 s:drop()
+
+--
+-- gh-4210: using sequence with a json path key part.
+--
+s = box.schema.space.create('test')
+_ = s:create_index('pk', {parts = {{'[1].a.b[1]', 'unsigned'}}, sequence = true})
+s:replace{} -- error
+s:replace{{c = {}}} -- error
+s:replace{{a = {c = {}}}} -- error
+s:replace{{a = {b = {}}}} -- error
+s:replace{{a = {b = {box.NULL}}}} -- ok
+s:drop()

@@ -161,7 +161,8 @@ request_handle_sequence(struct request *request, struct space *space)
 	const char *data = request->tuple;
 	const char *data_end = request->tuple_end;
 	int len = mp_decode_array(&data);
-	int fieldno = pk->def->key_def->parts[0].fieldno;
+	struct key_part *part = &pk->def->key_def->parts[0];
+	int fieldno = part->fieldno;
 	if (unlikely(len < fieldno + 1))
 		return 0;
 
@@ -170,6 +171,12 @@ request_handle_sequence(struct request *request, struct space *space)
 		do {
 			mp_next(&key);
 		} while (--fieldno > 0);
+	}
+
+	if (part->path != NULL) {
+		tuple_go_to_path(&key, part->path, part->path_len);
+		if (key == NULL)
+			return 0; /* field not found */
 	}
 
 	int64_t value;

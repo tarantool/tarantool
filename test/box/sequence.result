@@ -1904,3 +1904,35 @@ sequence_id == s.index.pk.sequence_id
 s:drop()
 ---
 ...
+--
+-- gh-4210: using sequence with a json path key part.
+--
+s = box.schema.space.create('test')
+---
+...
+_ = s:create_index('pk', {parts = {{'[1].a.b[1]', 'unsigned'}}, sequence = true})
+---
+...
+s:replace{} -- error
+---
+- error: Tuple field [1]["a"]["b"][1] required by space format is missing
+...
+s:replace{{c = {}}} -- error
+---
+- error: Tuple field [1]["a"]["b"][1] required by space format is missing
+...
+s:replace{{a = {c = {}}}} -- error
+---
+- error: Tuple field [1]["a"]["b"][1] required by space format is missing
+...
+s:replace{{a = {b = {}}}} -- error
+---
+- error: Tuple field [1]["a"]["b"][1] required by space format is missing
+...
+s:replace{{a = {b = {box.NULL}}}} -- ok
+---
+- [{'a': {'b': [1]}}]
+...
+s:drop()
+---
+...
