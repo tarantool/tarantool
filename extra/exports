@@ -113,6 +113,7 @@ swim_member_payload
 swim_member_ref
 swim_member_unref
 swim_member_is_dropped
+swim_member_is_payload_up_to_date
 
 # Module API
 

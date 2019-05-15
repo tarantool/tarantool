@@ -268,4 +268,49 @@ s:add_member({uuid = uuid(3), uri = uri()})
 iterate()
 s:delete()
 
+--
+-- Payload caching.
+--
+s1 = swim.new({uuid = uuid(1), uri = uri(listen_port), heartbeat_rate = 0.01})
+s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01})
+s1_self = s1:self()
+s1:add_member({uuid = s2:self():uuid(), uri = s2:self():uri()})
+s2:add_member({uuid = s1_self:uuid(), uri = s1_self:uri()})
+s1:size()
+s2:size()
+s1_view = s2:member_by_uuid(s1_self:uuid())
+
+s1:set_payload({a = 100})
+p = s1_self:payload()
+s1_self:payload() == p
+
+while s1_view:payload() == '' do fiber.sleep(0.01) end
+p = s1_view:payload()
+s1_view:payload() == p
+
+-- Now a complex case. It is possible, that a new member's
+-- incarnation is learned, but new payload is not. Payload cache
+-- should correctly process that.
+
+s1:cfg({heartbeat_rate = 1000})
+s2:cfg({heartbeat_rate = 1000})
+
+s1:set_payload({a = 200})
+-- Via probe() S2 learns new incarnation of S1, but without new
+-- payload.
+s2:probe_member(s1_self:uri())
+s1_view:payload()
+s1_view:incarnation()
+
+s1:cfg({heartbeat_rate = 0.01})
+s2:cfg({heartbeat_rate = 0.01})
+while s1_view:payload().a ~= 200 do fiber.sleep(0.01) end
+p = s1_view:payload()
+s1_view:payload() == p
+p
+s1_view:incarnation()
+
+s1:delete()
+s2:delete()
+
 test_run:cmd("clear filter")

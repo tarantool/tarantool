@@ -96,6 +96,9 @@ ffi.cdef[[
 
     bool
     swim_member_is_dropped(const struct swim_member *member);
+
+    bool
+    swim_member_is_payload_up_to_date(const struct swim_member *member);
 ]]
 
 -- Shortcut to avoid unnecessary lookups in 'ffi' table.
@@ -341,17 +344,36 @@ end
 -- This member method tries to interpret payload as MessagePack,
 -- and if fails, returns the payload as a string.
 --
+-- This function caches its result. It means, that only first call
+-- actually decodes cdata payload. All the next calls return
+-- pointer to the same result, until payload is changed with a new
+-- incarnation.
+--
 local function swim_member_payload(m)
     local ptr = swim_check_member(m, 'member:payload()')
+    -- Two keys are needed. Incarnation is not enough, because a
+    -- new incarnation can be disseminated earlier than a new
+    -- payload. For example, via ACK messages.
+    local key1 = capi.swim_member_incarnation(ptr)
+    local key2 = capi.swim_member_is_payload_up_to_date(ptr)
+    if key1 == m.p_key1 and key2 == m.p_key2 then
+        return m.p
+    end
     local cdata, size = swim_member_payload_raw(ptr)
+    local ok, result
     if size == 0 then
-        return ''
+        result = ''
+    else
+        ok, result = pcall(msgpack.decode, cdata, size)
+        if not ok then
+            result = ffi.string(cdata, size)
+        end
     end
-    local ok, res = pcall(msgpack.decode, cdata, size)
-    if not ok then
-        return ffi.string(cdata, size)
-    end
-    return res
+    -- Member bans new indexes. Only rawset() can be used.
+    rawset(m, 'p', result)
+    rawset(m, 'p_key1', key1)
+    rawset(m, 'p_key2', key2)
+    return result
 end
 
 --
@@ -396,8 +418,9 @@ local swim_member_mt = {
 }
 
 --
--- Wrap a SWIM member into a table with proper metamethods. Also
--- it is going to be used to cache a decoded payload.
+-- Wrap a SWIM member into a table with proper metamethods. The
+-- table-wrapper stores not only a pointer, but also cached
+-- decoded payload.
 --
 local function swim_member_wrap(ptr)
     capi.swim_member_ref(ptr)

@@ -221,6 +221,18 @@ const char *
 swim_member_payload(const struct swim_member *member, int *size);
 
 /**
+ * Check if member's payload is up to its incarnation. Sometimes
+ * it happens, that a member has changed payload, but other
+ * members learned only a new incarnation without the new payload.
+ * Then the payload is considered outdated, and is updated
+ * eventually later. The method is rather internal, and should not
+ * be used by any public API. It is exposed to implement decoded
+ * payload cache in the SWIM Lua module.
+ */
+bool
+swim_member_is_payload_up_to_date(const struct swim_member *member);
+
+/**
  * Reference a member. The member memory will be valid until unref
  * is called.
  */

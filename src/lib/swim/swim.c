@@ -2080,3 +2080,9 @@ swim_member_payload(const struct swim_member *member, int *size)
 	*size = member->payload_size;
 	return member->payload;
 }
+
+bool
+swim_member_is_payload_up_to_date(const struct swim_member *member)
+{
+	return member->is_payload_up_to_date;
+}
