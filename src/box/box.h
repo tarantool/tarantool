@@ -172,9 +172,25 @@ box_reset_stat(void);
 void
 box_process_auth(struct auth_request *request, const char *salt);
 
+/**
+ * Join a replica.
+ *
+ * Register a replica and feed it with data.
+ *
+ * \param io coio watcher (initialized with coio_create())
+ * \param JOIN packet header
+ */
 void
 box_process_join(struct ev_io *io, struct xrow_header *header);
 
+/**
+ * Subscribe a replica.
+ *
+ * Perform necessary checks and start a relay thread.
+ *
+ * \param io coio watcher (initialized with coio_create())
+ * \param SUBSCRIBE packet header
+ */
 void
 box_process_subscribe(struct ev_io *io, struct xrow_header *header);
 

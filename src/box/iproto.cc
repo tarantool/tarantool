@@ -1692,6 +1692,8 @@ tx_process_join_subscribe(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct iproto_connection *con = msg->connection;
+	struct ev_io io;
+	coio_create(&io, con->input.fd);
 	try {
 		switch (msg->header.type) {
 		case IPROTO_JOIN:
@@ -1700,7 +1702,7 @@ tx_process_join_subscribe(struct cmsg *m)
 			 * the lambda in the beginning of the block
 			 * will re-activate the watchers for us.
 			 */
-			box_process_join(&con->input, &msg->header);
+			box_process_join(&io, &msg->header);
 			break;
 		case IPROTO_SUBSCRIBE:
 			/*
@@ -1709,7 +1711,7 @@ tx_process_join_subscribe(struct cmsg *m)
 			 * the write watcher will be re-activated
 			 * the same way as for JOIN.
 			 */
-			box_process_subscribe(&con->input, &msg->header);
+			box_process_subscribe(&io, &msg->header);
 			break;
 		default:
 			unreachable();
