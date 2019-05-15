@@ -813,9 +813,17 @@ local function upgrade_ck_constraint_to_2_2_1()
     end
 end
 
+local function create_vcollation_space()
+    local _collation = box.space._collation
+    local format = _collation:format()
+    create_sysview(box.schema.COLLATION_ID, box.schema.VCOLLATION_ID)
+    box.space[box.schema.VCOLLATION_ID]:format(format)
+end
+
 local function upgrade_to_2_2_1()
     upgrade_sequence_to_2_2_1()
     upgrade_ck_constraint_to_2_2_1()
+    create_vcollation_space()
 end
 
 --------------------------------------------------------------------------------

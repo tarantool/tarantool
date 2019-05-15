@@ -169,6 +169,8 @@ _index:select{}
 - - [272, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
   - [276, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [276, 1, 'name', 'tree', {'unique': true}, [[1, 'string']]]
+  - [277, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [277, 1, 'name', 'tree', {'unique': true}, [[1, 'string']]]
   - [280, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [280, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [280, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]

@@ -603,6 +603,8 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "FUNC_ID");
 	lua_pushnumber(L, BOX_COLLATION_ID);
 	lua_setfield(L, -2, "COLLATION_ID");
+	lua_pushnumber(L, BOX_VCOLLATION_ID);
+	lua_setfield(L, -2, "VCOLLATION_ID");
 	lua_pushnumber(L, BOX_VFUNC_ID);
 	lua_setfield(L, -2, "VFUNC_ID");
 	lua_pushnumber(L, BOX_PRIV_ID);

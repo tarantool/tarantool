@@ -74,6 +74,10 @@ session.su('guest')
 ---
 - true
 ...
+#box.space._vspace.index[2]:select('_vcollation') ~= 0
+---
+- true
+...
 #box.space._vindex:select(box.space._vspace.id) > 0
 ---
 - true
@@ -91,6 +95,10 @@ session.su('guest')
 - true
 ...
 #box.space._vindex:select(box.space._vpriv.id) > 0
+---
+- true
+...
+#box.space._vindex:select(box.space._vcollation.id) > 0
 ---
 - true
 ...
@@ -127,6 +135,10 @@ box.session.su('guest')
 ---
 - error: Read access to space '_vsequence' is denied for user 'guest'
 ...
+#box.space._vcollation:select{}
+---
+- error: Read access to space '_vcollation' is denied for user 'guest'
+...
 box.session.su('admin')
 ---
 ...
@@ -138,11 +150,15 @@ box.session.su('guest')
 ...
 #box.space._vspace:select{}
 ---
-- 8
+- 9
 ...
 #box.space._vindex:select{}
 ---
-- 20
+- 22
+...
+#box.space._vcollation:select{}
+---
+- 277
 ...
 box.session.su('admin')
 ---
@@ -230,11 +246,11 @@ box.session.su('guest')
 ...
 #box.space._vspace:select{}
 ---
-- 23
+- 24
 ...
 #box.space._vindex:select{}
 ---
-- 49
+- 51
 ...
 #box.space._vuser:select{}
 ---
@@ -242,11 +258,15 @@ box.session.su('guest')
 ...
 #box.space._vpriv:select{}
 ---
-- 15
+- 16
 ...
 #box.space._vfunc:select{}
 ---
 - 1
+...
+#box.space._vcollation:select{}
+---
+- 277
 ...
 box.session.su('admin')
 ---
@@ -262,7 +282,7 @@ box.session.su('guest')
 ...
 #box.space._vindex:select{}
 ---
-- 49
+- 51
 ...
 #box.space._vuser:select{}
 ---
@@ -270,7 +290,7 @@ box.session.su('guest')
 ...
 #box.space._vpriv:select{}
 ---
-- 15
+- 16
 ...
 #box.space._vfunc:select{}
 ---
@@ -279,6 +299,10 @@ box.session.su('guest')
 #box.space._vsequence:select{}
 ---
 - 0
+...
+#box.space._vcollation:select{}
+---
+- 277
 ...
 box.session.su('admin')
 ---
@@ -628,6 +652,60 @@ session.su('admin')
 ---
 ...
 seq:drop()
+---
+...
+--
+-- _vcollation
+--
+box.session.su('admin')
+---
+...
+box.internal.collation.create('test', 'ICU', 'ru-RU')
+---
+...
+-- Only admin can create collation.
+coll_cnt = #box.space._collation:select{}
+---
+...
+box.schema.user.grant("guest", "read, write, alter, execute", "space", "_collation")
+---
+...
+box.session.su("guest")
+---
+...
+box.internal.collation.create('guest0', 'ICU', 'ru-RU')
+---
+- error: Create access to collation 'guest0' is denied for user 'guest'
+...
+box.space._vcollation:select{0}
+---
+- - [0, 'none', 1, 'BINARY', '', {}]
+...
+#box.space._vcollation:select{} == coll_cnt
+---
+- true
+...
+box.session.su('admin')
+---
+...
+-- _vcollation is readable anyway.
+box.schema.user.revoke("guest", "read", "space", "_collation")
+---
+...
+box.session.su("guest")
+---
+...
+#box.space._vcollation:select{}
+---
+- 278
+...
+session.su('admin')
+---
+...
+box.internal.collation.drop('test')
+---
+...
+box.internal.collation.drop('guest0')
 ---
 ...
 --

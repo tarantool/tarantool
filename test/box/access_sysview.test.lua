@@ -31,12 +31,14 @@ session.su('guest')
 #box.space._vspace.index[2]:select('_vuser') ~= 0
 #box.space._vspace.index[2]:select('_vfunc') ~= 0
 #box.space._vspace.index[2]:select('_vpriv') ~= 0
+#box.space._vspace.index[2]:select('_vcollation') ~= 0
 
 #box.space._vindex:select(box.space._vspace.id) > 0
 #box.space._vindex:select(box.space._vindex.id) > 0
 #box.space._vindex:select(box.space._vuser.id) > 0
 #box.space._vindex:select(box.space._vfunc.id) > 0
 #box.space._vindex:select(box.space._vpriv.id) > 0
+#box.space._vindex:select(box.space._vcollation.id) > 0
 
 box.session.su('admin')
 box.schema.user.revoke('guest', 'public')
@@ -48,6 +50,7 @@ box.session.su('guest')
 #box.space._vpriv:select{}
 #box.space._vfunc:select{}
 #box.space._vsequence:select{}
+#box.space._vcollation:select{}
 
 box.session.su('admin')
 box.schema.user.grant('guest', 'public')
@@ -55,6 +58,7 @@ box.session.su('guest')
 
 #box.space._vspace:select{}
 #box.space._vindex:select{}
+#box.space._vcollation:select{}
 
 box.session.su('admin')
 s = box.schema.space.create('test')
@@ -96,6 +100,7 @@ box.session.su('guest')
 #box.space._vuser:select{}
 #box.space._vpriv:select{}
 #box.space._vfunc:select{}
+#box.space._vcollation:select{}
 
 box.session.su('admin')
 box.schema.user.revoke('guest', 'read', 'universe')
@@ -107,6 +112,7 @@ box.session.su('guest')
 #box.space._vpriv:select{}
 #box.space._vfunc:select{}
 #box.space._vsequence:select{}
+#box.space._vcollation:select{}
 
 box.session.su('admin')
 box.schema.user.revoke('guest', 'write', 'universe')
@@ -263,6 +269,30 @@ box.session.su("guest")
 #box.space._vsequence:select{} == cnt + 1
 session.su('admin')
 seq:drop()
+
+--
+-- _vcollation
+--
+
+box.session.su('admin')
+box.internal.collation.create('test', 'ICU', 'ru-RU')
+
+-- Only admin can create collation.
+coll_cnt = #box.space._collation:select{}
+box.schema.user.grant("guest", "read, write, alter, execute", "space", "_collation")
+box.session.su("guest")
+box.internal.collation.create('guest0', 'ICU', 'ru-RU')
+box.space._vcollation:select{0}
+#box.space._vcollation:select{} == coll_cnt
+box.session.su('admin')
+
+-- _vcollation is readable anyway.
+box.schema.user.revoke("guest", "read", "space", "_collation")
+box.session.su("guest")
+#box.space._vcollation:select{}
+session.su('admin')
+box.internal.collation.drop('test')
+box.internal.collation.drop('guest0')
 
 --
 -- view:alter() tests

@@ -72,6 +72,8 @@ enum {
 	BOX_SCHEMA_ID = 272,
 	/** Space id of _collation. */
 	BOX_COLLATION_ID = 276,
+	/** Space id of _vcollation. */
+	BOX_VCOLLATION_ID = 277,
 	/** Space id of _space. */
 	BOX_SPACE_ID = 280,
 	/** Space id of _vspace view. */
