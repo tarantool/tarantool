@@ -844,7 +844,7 @@ swim_shuffle_members(struct swim *swim)
  * Shuffle members, build randomly ordered queue of addressees. In
  * other words, do all round preparation work.
  */
-static int
+static void
 swim_new_round(struct swim *swim)
 {
 	int size = mh_size(swim->members);
@@ -852,7 +852,7 @@ swim_new_round(struct swim *swim)
 		assert(swim->self != NULL);
 		say_verbose("SWIM %d: skip a round - no members",
 			    swim_fd(swim));
-		return 0;
+		return;
 	}
 	/* -1 for self. */
 	say_verbose("SWIM %d: start a new round with %d members", swim_fd(swim),
@@ -866,7 +866,6 @@ swim_new_round(struct swim *swim)
 					in_round_queue);
 		}
 	}
-	return 0;
 }
 
 /**
@@ -1078,12 +1077,10 @@ swim_begin_step(struct ev_loop *loop, struct ev_timer *t, int events)
 	(void) events;
 	(void) loop;
 	struct swim *swim = (struct swim *) t->data;
-	if (! rlist_empty(&swim->round_queue)) {
+	if (! rlist_empty(&swim->round_queue))
 		say_verbose("SWIM %d: continue the round", swim_fd(swim));
-	} else if (swim_new_round(swim) != 0) {
-		diag_log();
-		return;
-	}
+	else
+		swim_new_round(swim);
 	/*
 	 * Possibly empty, if no members but self are specified.
 	 */
@@ -1994,11 +1991,7 @@ swim_quit(struct swim *swim)
 	swim_ev_timer_stop(loop(), &swim->wait_ack_tick);
 	swim_scheduler_stop_input(&swim->scheduler);
 	/* Start the last round - quiting. */
-	if (swim_new_round(swim) != 0) {
-		diag_log();
-		swim_delete(swim);
-		return;
-	}
+	swim_new_round(swim);
 	struct swim_task *task = &swim->round_step_task;
 	swim_task_destroy(task);
 	swim_task_create(task, swim_quit_step_complete, swim_task_delete_cb,
