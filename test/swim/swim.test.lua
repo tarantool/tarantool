@@ -160,6 +160,9 @@ s1:member_by_uuid(uuid(1)) ~= nil
 s1:member_by_uuid(50)
 s1:member_by_uuid(uuid(2))
 
+-- UUID can be cdata.
+s1:member_by_uuid(s:uuid())
+
 s1:quit()
 s:status()
 s:is_dropped()

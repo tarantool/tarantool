@@ -194,7 +194,10 @@ local function swim_check_uuid(value, func_name)
         return nil
     end
     if type(value) ~= 'string' then
-        return error(func_name..': expected string UUID')
+        if ffi.istype('struct tt_uuid', value) then
+            return value
+        end
+        return error(func_name..': expected string UUID or struct tt_uuid')
     end
     value = uuid.fromstr(value)
     if not value then

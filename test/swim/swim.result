@@ -45,7 +45,7 @@ swim.new({gc_mode = 0})
 ...
 swim.new({uuid = 123})
 ---
-- error: 'builtin/swim.lua:<line>: swim:cfg: expected string UUID'
+- error: 'builtin/swim.lua:<line>: swim:cfg: expected string UUID or struct tt_uuid'
 ...
 swim.new({uuid = '1234'})
 ---
@@ -256,7 +256,8 @@ s1.remove_member()
 ...
 s1:remove_member(100)
 ---
-- error: 'builtin/swim.lua:<line>: swim:remove_member: expected string UUID'
+- error: 'builtin/swim.lua:<line>: swim:remove_member: expected string UUID or struct
+    tt_uuid'
 ...
 s1:remove_member('1234')
 ---
@@ -484,11 +485,21 @@ s1:member_by_uuid(uuid(1)) ~= nil
 ...
 s1:member_by_uuid(50)
 ---
-- error: 'builtin/swim.lua:<line>: swim:member_by_uuid: expected string UUID'
+- error: 'builtin/swim.lua:<line>: swim:member_by_uuid: expected string UUID or struct
+    tt_uuid'
 ...
 s1:member_by_uuid(uuid(2))
 ---
 - null
+...
+-- UUID can be cdata.
+s1:member_by_uuid(s:uuid())
+---
+- uri: 127.0.0.1:<port>
+  status: alive
+  incarnation: 1
+  uuid: 00000000-0000-1000-8000-000000000001
+  payload_size: 0
 ...
 s1:quit()
 ---
