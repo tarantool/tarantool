@@ -54,7 +54,7 @@ vy_mem_env_create(struct vy_mem_env *env, size_t memory)
 	/* Vinyl memory is limited by vy_quota. */
 	quota_init(&env->quota, QUOTA_MAX);
 	tuple_arena_create(&env->arena, &env->quota, memory,
-			   SLAB_SIZE, "vinyl");
+			   SLAB_SIZE, false, "vinyl");
 	lsregion_create(&env->allocator, &env->arena);
 	env->tree_extent_size = 0;
 }

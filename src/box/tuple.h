@@ -70,7 +70,7 @@ tuple_free(void);
 void
 tuple_arena_create(struct slab_arena *arena, struct quota *quota,
 		   uint64_t arena_max_size, uint32_t slab_size,
-		   const char *arena_name);
+		   bool dontdump, const char *arena_name);
 
 void
 tuple_arena_destroy(struct slab_arena *arena);

@@ -189,7 +189,8 @@ memtx_engine_schedule_gc(struct memtx_engine *memtx,
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size,
-		 uint32_t objsize_min, float alloc_factor);
+		 uint32_t objsize_min, bool dontdump,
+		 float alloc_factor);
 
 int
 memtx_engine_recover_snapshot(struct memtx_engine *memtx,
@@ -257,12 +258,14 @@ memtx_index_def_change_requires_rebuild(struct index *index,
 static inline struct memtx_engine *
 memtx_engine_new_xc(const char *snap_dirname, bool force_recovery,
 		    uint64_t tuple_arena_max_size,
-		    uint32_t objsize_min, float alloc_factor)
+		    uint32_t objsize_min, bool dontdump,
+		    float alloc_factor)
 {
 	struct memtx_engine *memtx;
 	memtx = memtx_engine_new(snap_dirname, force_recovery,
 				 tuple_arena_max_size,
-				 objsize_min, alloc_factor);
+				 objsize_min, dontdump,
+				 alloc_factor);
 	if (memtx == NULL)
 		diag_raise();
 	return memtx;

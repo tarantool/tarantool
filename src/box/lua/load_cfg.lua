@@ -25,6 +25,7 @@ end
 local default_cfg = {
     listen              = nil,
     memtx_memory        = 256 * 1024 *1024,
+    strip_core          = false,
     memtx_min_tuple_size = 16,
     memtx_max_tuple_size = 1024 * 1024,
     slab_alloc_factor   = 1.05,
@@ -88,6 +89,7 @@ local default_cfg = {
 local template_cfg = {
     listen              = 'string, number',
     memtx_memory        = 'number',
+    strip_core          = 'boolean',
     memtx_min_tuple_size  = 'number',
     memtx_max_tuple_size  = 'number',
     slab_alloc_factor   = 'number',

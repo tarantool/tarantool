@@ -323,7 +323,7 @@ tuple_init(field_name_hash_f hash)
 void
 tuple_arena_create(struct slab_arena *arena, struct quota *quota,
 		   uint64_t arena_max_size, uint32_t slab_size,
-		   const char *arena_name)
+		   bool dontdump, const char *arena_name)
 {
 	/*
 	 * Ensure that quota is a multiple of slab_size, to
@@ -331,11 +331,17 @@ tuple_arena_create(struct slab_arena *arena, struct quota *quota,
 	 */
 	size_t prealloc = small_align(arena_max_size, slab_size);
 
+        /*
+         * Skip from coredump if requested.
+         */
+        int flags = SLAB_ARENA_PRIVATE;
+        if (dontdump)
+                flags |= SLAB_ARENA_DONTDUMP;
+
 	say_info("mapping %zu bytes for %s tuple arena...", prealloc,
 		 arena_name);
 
-	if (slab_arena_create(arena, quota, prealloc, slab_size,
-			      MAP_PRIVATE) != 0) {
+	if (slab_arena_create(arena, quota, prealloc, slab_size, flags) != 0) {
 		if (errno == ENOMEM) {
 			panic("failed to preallocate %zu bytes: Cannot "\
 			      "allocate memory, check option '%s_memory' in box.cfg(..)", prealloc,
@@ -345,6 +351,9 @@ tuple_arena_create(struct slab_arena *arena, struct quota *quota,
 				       " tuple arena", prealloc, arena_name);
 		}
 	}
+
+	say_debug("tuple arena %s: addr %p size %zu flags %#x dontdump %d",
+		  arena_name, arena->arena, prealloc, flags, dontdump);
 }
 
 void

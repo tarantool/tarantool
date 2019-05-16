@@ -65,6 +65,7 @@
 #include "lua/init.h"
 #include "box/box.h"
 #include "box/error.h"
+#include "small/features.h"
 #include "scoped_guard.h"
 #include "random.h"
 #include "cfg.h"
@@ -486,6 +487,17 @@ load_cfg()
 			exit(EX_OSERR);
 		}
 #endif
+	}
+
+	/*
+	 * If we're requested to strip coredump
+	 * make sure we can do that, otherwise
+	 * require user to not turn it on.
+	 */
+	if (cfg_geti("strip_core")) {
+		if (!small_test_feature(SMALL_FEATURE_DONTDUMP)) {
+			say_warn("'strip_core' is set but unsupported");
+		}
 	}
 
 	int background = cfg_geti("background");

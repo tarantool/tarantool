@@ -1011,7 +1011,7 @@ memtx_engine_gc_f(va_list va)
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
-		 float alloc_factor)
+		 bool dontdump, float alloc_factor)
 {
 	struct memtx_engine *memtx = calloc(1, sizeof(*memtx));
 	if (memtx == NULL) {
@@ -1066,7 +1066,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	/* Initialize tuple allocator. */
 	quota_init(&memtx->quota, tuple_arena_max_size);
 	tuple_arena_create(&memtx->arena, &memtx->quota, tuple_arena_max_size,
-			   SLAB_SIZE, "memtx");
+			   SLAB_SIZE, dontdump, "memtx");
 	slab_cache_create(&memtx->slab_cache, &memtx->arena);
 	small_alloc_create(&memtx->alloc, &memtx->slab_cache,
 			   objsize_min, alloc_factor);

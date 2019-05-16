@@ -43,7 +43,7 @@ memory_init()
 
 	/* No limit on the runtime memory. */
 	slab_arena_create(&runtime, &runtime_quota, 0,
-			  SLAB_SIZE, MAP_PRIVATE);
+			  SLAB_SIZE, SLAB_ARENA_PRIVATE);
 }
 
 void
