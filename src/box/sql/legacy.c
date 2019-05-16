@@ -64,8 +64,7 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 	char **azCols = 0;	/* Names of result columns */
 	int callbackIsInit;	/* True if callback data is initialized */
 
-	if (!sqlSafetyCheckOk(db))
-		return SQL_MISUSE;
+	assert(db != NULL);
 	if (zSql == 0)
 		zSql = "";
 

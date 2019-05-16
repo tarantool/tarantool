@@ -290,40 +290,6 @@ sqlRollbackAll(Vdbe * pVdbe)
 }
 
 /*
- * Return a static string that describes the kind of error specified in the
- * argument.
- */
-const char *
-sqlErrStr(int rc)
-{
-	static const char *const aMsg[] = {
-		/* SQL_OK          */ "not an error",
-		/* SQL_ERROR       */ "SQL logic error or missing database",
-		/* SQL_PERM        */ "access permission denied",
-		/* SQL_ABORT       */ "callback requested query abort",
-		/* SQL_BUSY        */ "database is locked",
-		/* SQL_LOCKED      */ "database table is locked",
-		/* SQL_NOMEM       */ "out of memory",
-		/* SQL_IOERR       */ "disk I/O error",
-		/* SQL_NOTFOUND    */ "unknown operation",
-		/* SQL_FULL        */ "database or disk is full",
-		/* SQL_CANTOPEN    */ "unable to open database file",
-		/* SQL_SCHEMA      */ "database schema has changed",
-		/* SQL_TOOBIG      */ "string or blob too big",
-		/* SQL_CONSTRAINT  */ "constraint failed",
-		/* SQL_MISUSE      */
-		    "library routine called out of sequence",
-		/* SQL_RANGE       */ "bind or column index out of range",
-		/* SQL_TARANTOOL_ERROR */ "SQL-/Tarantool error",
-	};
-	const char *zErr = "unknown error";
-	rc &= 0xff;
-	if (ALWAYS(rc >= 0) && rc < ArraySize(aMsg) && aMsg[rc] != 0)
-		zErr = aMsg[rc];
-	return zErr;
-}
-
-/*
  * This function is exactly the same as sql_create_function(), except
  * that it is designed to be called by internal code. The difference is
  * that if a malloc() fails in sql_create_function(), an error code

@@ -2727,7 +2727,6 @@ struct sqlConfig {
 	void (*xVdbeBranch) (void *, int iSrcLine, u8 eThis, u8 eMx);	/* Callback */
 	void *pVdbeBranchArg;	/* 1st argument */
 #endif
-	int (*xTestCallback) (int);	/* Invoked by sqlFaultSim() */
 	int bLocaltimeFault;	/* True to fail localtime() calls */
 	int iOnceResetThreshold;	/* When to reset OP_Once counters */
 };
@@ -3163,8 +3162,6 @@ sqlEndTable(struct Parse *parse);
 int
 vdbe_emit_open_cursor(struct Parse *parse, int cursor, int index_id,
 		      struct space *space);
-
-int sqlFaultSim(int);
 
 /**
  * The parser calls this routine in order to create a new VIEW.
@@ -3722,8 +3719,6 @@ FuncDef *sqlFindFunction(sql *, const char *, int, u8);
 void sqlRegisterBuiltinFunctions(void);
 void sqlRegisterDateTimeFunctions(void);
 void sqlRegisterPerConnectionBuiltinFunctions(sql *);
-int sqlSafetyCheckOk(sql *);
-int sqlSafetyCheckSickOrOk(sql *);
 
 /**
  * Evaluate a view and store its result in an ephemeral table.
@@ -4245,8 +4240,6 @@ sql_dec_or_hex_to_i64(const char *z, int64_t *val);
 
 void *sqlHexToBlob(sql *, const char *z, int n);
 u8 sqlHexToInt(int h);
-
-const char *sqlErrStr(int);
 
 /**
  * Return the collation sequence for the expression pExpr. If

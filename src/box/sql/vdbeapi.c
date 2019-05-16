@@ -38,35 +38,6 @@
 #include "vdbeInt.h"
 
 /*
- * Check on a Vdbe to make sure it has not been finalized.  Log
- * an error and return true if it has been finalized (or is otherwise
- * invalid).  Return false if it is ok.
- */
-static int
-vdbeSafety(Vdbe * p)
-{
-	if (p->db == 0) {
-		sql_log(SQL_MISUSE,
-			    "API called with finalized prepared statement");
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-static int
-vdbeSafetyNotNull(Vdbe * p)
-{
-	if (p == 0) {
-		sql_log(SQL_MISUSE,
-			    "API called with NULL prepared statement");
-		return 1;
-	} else {
-		return vdbeSafety(p);
-	}
-}
-
-/*
  * Invoke the profile callback.  This routine is only called if we already
  * know that the profile callback is defined and needs to be invoked.
  */
@@ -116,8 +87,7 @@ sql_finalize(sql_stmt * pStmt)
 	} else {
 		Vdbe *v = (Vdbe *) pStmt;
 		sql *db = v->db;
-		if (vdbeSafety(v))
-			return SQL_MISUSE;
+		assert(db != NULL);
 		checkProfileCallback(db, v);
 		rc = sqlVdbeFinalize(v);
 		rc = sqlApiExit(db, rc);
@@ -521,9 +491,7 @@ sql_step(sql_stmt * pStmt)
 	Vdbe *v = (Vdbe *) pStmt;	/* the prepared statement */
 	int cnt = 0;		/* Counter to prevent infinite loop of reprepares */
 
-	if (vdbeSafetyNotNull(v)) {
-		return SQL_MISUSE;
-	}
+	assert(v != NULL);
 	v->doingRerun = 0;
 	while ((rc = sqlStep(v)) == SQL_SCHEMA
 	       && cnt++ < SQL_MAX_SCHEMA_RETRY) {
@@ -953,9 +921,7 @@ static int
 vdbeUnbind(Vdbe * p, int i)
 {
 	Mem *pVar;
-	if (vdbeSafetyNotNull(p)) {
-		return SQL_MISUSE;
-	}
+	assert(p != NULL);
 	if (p->magic != VDBE_MAGIC_RUN || p->pc >= 0) {
 		sql_log(SQL_MISUSE,
 			    "bind on a busy prepared statement: [%s]", p->zSql);

@@ -193,9 +193,7 @@ sqlLockAndPrepare(sql * db,		/* Database handle. */
 	int rc;
 
 	*ppStmt = 0;
-	if (!sqlSafetyCheckOk(db) || zSql == 0) {
-		return SQL_MISUSE;
-	}
+	assert(zSql != NULL && db != NULL);
 	rc = sqlPrepare(db, zSql, nBytes, saveSqlFlag, pOld, ppStmt,
 			    pzTail);
 	if (rc == SQL_SCHEMA) {

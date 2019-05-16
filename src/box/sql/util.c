@@ -44,24 +44,6 @@
 #include "errinj.h"
 
 /*
- * Give a callback to the test harness that can be used to simulate faults
- * in places where it is difficult or expensive to do so purely by means
- * of inputs.
- *
- * The intent of the integer argument is to let the fault simulator know
- * which of multiple sqlFaultSim() calls has been hit.
- *
- * Return whatever integer value the test callback returns, or return
- * SQL_OK if no test callback is installed.
- */
-int
-   sqlFaultSim(int iTest)
-{
-	int (*xCallback) (int) = sqlGlobalConfig.xTestCallback;
-	return xCallback ? xCallback(iTest) : SQL_OK;
-}
-
-/*
  * Return true if the floating point value is Not a Number (NaN).
  *
  * Use the math library isnan() function if compiled with SQL_HAVE_ISNAN.
@@ -1043,67 +1025,6 @@ sqlHexToBlob(sql * db, const char *z, int n)
 	return zBlob;
 }
 #endif				/* !SQL_OMIT_BLOB_LITERAL || SQL_HAS_CODEC */
-
-/*
- * Log an error that is an API call on a connection pointer that should
- * not have been used.  The "type" of connection pointer is given as the
- * argument.  The zType is a word like "NULL" or "closed" or "invalid".
- */
-static void
-logBadConnection(const char *zType)
-{
-	sql_log(SQL_MISUSE,
-		    "API call with %s database connection pointer", zType);
-}
-
-/*
- * Check to make sure we have a valid db pointer.  This test is not
- * foolproof but it does provide some measure of protection against
- * misuse of the interface such as passing in db pointers that are
- * NULL or which have been previously closed.  If this routine returns
- * 1 it means that the db pointer is valid and 0 if it should not be
- * dereferenced for any reason.  The calling function should invoke
- * SQL_MISUSE immediately.
- *
- * sqlSafetyCheckOk() requires that the db pointer be valid for
- * use.  sqlSafetyCheckSickOrOk() allows a db pointer that failed to
- * open properly and is not fit for general use but which can be
- * used as an argument to sql_errmsg() or sql_close().
- */
-int
-sqlSafetyCheckOk(sql * db)
-{
-	u32 magic;
-	if (db == 0) {
-		logBadConnection("NULL");
-		return 0;
-	}
-	magic = db->magic;
-	if (magic != SQL_MAGIC_OPEN) {
-		if (sqlSafetyCheckSickOrOk(db)) {
-			testcase(sqlGlobalConfig.xLog != 0);
-			logBadConnection("unopened");
-		}
-		return 0;
-	} else {
-		return 1;
-	}
-}
-
-int
-sqlSafetyCheckSickOrOk(sql * db)
-{
-	u32 magic;
-	magic = db->magic;
-	if (magic != SQL_MAGIC_SICK &&
-	    magic != SQL_MAGIC_OPEN && magic != SQL_MAGIC_BUSY) {
-		testcase(sqlGlobalConfig.xLog != 0);
-		logBadConnection("invalid");
-		return 0;
-	} else {
-		return 1;
-	}
-}
 
 /*
  * Attempt to add, substract, or multiply the 64-bit signed value iB against

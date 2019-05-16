@@ -204,7 +204,6 @@ SQL_WSD struct sqlConfig sqlConfig = {
 	0,			/* xVdbeBranch */
 	0,			/* pVbeBranchArg */
 #endif
-	0,			/* xTestCallback */
 	0,			/* bLocaltimeFault */
 	0x7ffffffe		/* iOnceResetThreshold */
 };

@@ -155,13 +155,6 @@ cursor_seek(BtCursor *pCur, int *pRes);
 static int
 cursor_advance(BtCursor *pCur, int *pRes);
 
-const char *tarantoolErrorMessage()
-{
-	if (diag_is_empty(&fiber()->diag))
-		return NULL;
-	return box_error_message(box_error_last());
-}
-
 const void *tarantoolsqlPayloadFetch(BtCursor *pCur, u32 *pAmt)
 {
 	assert(pCur->curFlags & BTCF_TaCursor ||

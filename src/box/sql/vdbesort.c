@@ -643,8 +643,6 @@ vdbePmaReaderSeek(SortSubtask * pTask,	/* Task context */
 
 	assert(pReadr->pIncr == 0 || pReadr->pIncr->bEof == 0);
 
-	if (sqlFaultSim(201))
-		return SQL_IOERR_READ;
 	if (pReadr->aMap) {
 		sqlOsUnfetch(pReadr->pFd, 0, pReadr->aMap);
 		pReadr->aMap = 0;
@@ -922,8 +920,7 @@ vdbeMergeEngineNew(int nReader)
 		N += N;
 	nByte = sizeof(MergeEngine) + N * (sizeof(int) + sizeof(PmaReader));
 
-	pNew =
-	    sqlFaultSim(100) ? 0 : (MergeEngine *) sqlMallocZero(nByte);
+	pNew = (MergeEngine *) sqlMallocZero(nByte);
 	if (pNew) {
 		pNew->nTree = N;
 		pNew->pTask = 0;
@@ -1040,8 +1037,6 @@ vdbeSorterOpenTempFile(sql * db,	/* Database handle doing sort */
 		       sql_file ** ppFd)
 {
 	int rc;
-	if (sqlFaultSim(202))
-		return SQL_IOERR_ACCESS;
 	rc = sqlOsOpenMalloc(db->pVfs, 0, ppFd,
 				 SQL_OPEN_READWRITE | SQL_OPEN_CREATE |
 				 SQL_OPEN_EXCLUSIVE |
@@ -1660,8 +1655,8 @@ vdbeIncrMergerNew(SortSubtask * pTask,	/* The thread that will be using the new 
     )
 {
 	int rc = SQL_OK;
-	IncrMerger *pIncr = *ppOut = (IncrMerger *)
-	    (sqlFaultSim(100) ? 0 : sqlMallocZero(sizeof(*pIncr)));
+	IncrMerger *pIncr = *ppOut =
+		(IncrMerger *) sqlMallocZero(sizeof(*pIncr));
 	if (pIncr) {
 		pIncr->pMerger = pMerger;
 		pIncr->pTask = pTask;
