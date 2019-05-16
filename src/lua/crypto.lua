@@ -366,6 +366,7 @@ hmac_api = setmetatable(hmac_api,
     end })
 
 local crypto_algos = {
+    none = ffi.C.CRYPTO_ALGO_NONE,
     aes128 = ffi.C.CRYPTO_ALGO_AES128,
     aes192 = ffi.C.CRYPTO_ALGO_AES192,
     aes256 = ffi.C.CRYPTO_ALGO_AES256,
@@ -420,8 +421,20 @@ for algo_name, algo_value in pairs(crypto_algos) do
     end
 end
 
-return {
+local public_methods = {
     digest = digest_api,
     hmac   = hmac_api,
     cipher = crypto_api,
 }
+
+local module_mt = {
+    __serialize = function(s)
+        return public_methods
+    end,
+    __index = public_methods
+}
+
+return setmetatable({
+    cipher_algo = crypto_algos,
+    cipher_mode = crypto_modes,
+}, module_mt)

@@ -2,6 +2,7 @@ local ffi = require('ffi')
 local uuid = require('uuid')
 local buffer = require('buffer')
 local msgpack = require('msgpack')
+local crypto = require('crypto')
 
 ffi.cdef[[
     struct swim;
@@ -35,6 +36,10 @@ ffi.cdef[[
 
     int
     swim_set_payload(struct swim *swim, const char *payload, int payload_size);
+
+    int
+    swim_set_codec(struct swim *swim, enum crypto_algo algo,
+                   enum crypto_mode mode, const char *key, int key_size);
 
     void
     swim_delete(struct swim *swim);
@@ -622,6 +627,36 @@ local function swim_set_payload(s, payload)
 end
 
 --
+-- Set encryption algorithm, mode, and a private key.
+--
+local function swim_set_codec(s, cfg)
+    local func_name = 'swim:set_codec'
+    local ptr = swim_check_instance(s, func_name)
+    if type(cfg) ~= 'table' then
+        error(func_name..': expected table codec configuration')
+    end
+    local algo = crypto.cipher_algo[cfg.algo]
+    if algo == nil then
+        error(func_name..': unknown crypto algorithm')
+    end
+    local mode = cfg.mode
+    if mode == nil then
+        mode = crypto.cipher_mode.cbc
+    else
+        mode = crypto.cipher_mode[mode]
+        if mode == nil then
+            error(func_name..': unknown crypto algorithm mode')
+        end
+    end
+    local key, key_size =
+        swim_check_const_char(cfg.key, cfg.key_size, func_name, 'key')
+    if capi.swim_set_codec(ptr, algo, mode, key, key_size) ~= 0 then
+        return nil, box.error.last()
+    end
+    return true
+end
+
+--
 -- Lua pairs() or similar function should return 3 values:
 -- iterator function, iterator object, a key before first. This is
 -- iterator function. On each iteration it returns UUID as a key,
@@ -672,6 +707,7 @@ local swim_mt = {
         member_by_uuid = swim_member_by_uuid,
         set_payload_raw = swim_set_payload_raw,
         set_payload = swim_set_payload,
+        set_codec = swim_set_codec,
         pairs = swim_pairs,
     },
     __serialize = swim_serialize

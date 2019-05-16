@@ -342,4 +342,77 @@ s2:uri() ~= s2_old_uri
 
 s:delete()
 
+--
+-- Encryption.
+--
+s1 = swim.new({uuid = uuid(1), uri = uri()})
+s2 = swim.new({uuid = uuid(2), uri = uri()})
+
+s1.set_codec()
+s1:set_codec(100)
+s1:set_codec({})
+s1:set_codec({algo = 100})
+cfg = {algo = 'aes128', mode = 'unknown'}
+s1:set_codec(cfg)
+cfg.mode = 'cbc'
+s1:set_codec(cfg)
+cfg.key_size = 'str'
+s1:set_codec(cfg)
+cfg.key_size = 200
+cfg.key = true
+s1:set_codec(cfg)
+cfg.key = 'key'
+s1:set_codec(cfg)
+cfg.key = ffi.new('char[?]', 20)
+cfg.key_size = nil
+s1:set_codec(cfg)
+cfg.key_size = 20
+s1:set_codec(cfg)
+
+cfg.key = '1234567812345678'
+cfg.key_size = 16
+s1:set_codec(cfg)
+
+-- S2 does not use encryption and can't decode the ping.
+s1:probe_member(s2:self():uri())
+fiber.sleep(0.01)
+s1:size()
+s2:size()
+
+s2:set_codec(cfg)
+s1:probe_member(s2:self():uri())
+while s1:size() ~= 2 do fiber.sleep(0.01) end
+s2:size()
+
+s1:remove_member(s2:self():uuid()) s2:remove_member(s1:self():uuid())
+
+-- Set different private key - again can't decode.
+cfg.key = '8765432187654321'
+cfg.key_size = nil
+s2:set_codec(cfg)
+
+s1:probe_member(s2:self():uri())
+fiber.sleep(0.01)
+s1:size()
+s2:size()
+
+cfg.key = '12345678'
+cfg.algo = 'des'
+cfg.mode = 'cfb'
+s1:set_codec(cfg)
+
+s1:probe_member(s2:self():uri())
+fiber.sleep(0.01)
+s1:size()
+s2:size()
+
+s1:set_codec({algo = 'none'})
+s2:set_codec({algo = 'none'})
+s1:probe_member(s2:self():uri())
+while s1:size() ~= 2 do fiber.sleep(0.01) end
+s2:size()
+
+s1:delete()
+s2:delete()
+
 test_run:cmd("clear filter")

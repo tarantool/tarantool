@@ -93,6 +93,7 @@ swim_new
 swim_is_configured
 swim_cfg
 swim_set_payload
+swim_set_codec
 swim_delete
 swim_add_member
 swim_remove_member
