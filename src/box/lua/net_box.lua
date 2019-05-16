@@ -31,6 +31,7 @@ local decode_greeting = internal.decode_greeting
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 local VSPACE_ID        = 281
 local VINDEX_ID        = 289
+local VCOLLATION_ID    = 277
 local DEFAULT_CONNECT_TIMEOUT = 10
 
 local IPROTO_STATUS_KEY    = 0x00
@@ -735,11 +736,16 @@ local function create_transport(host, port, user, password, callback,
         end
         local select1_id = new_request_id()
         local select2_id = new_request_id()
+        local select3_id = new_request_id()
         local response = {}
         -- fetch everything from space _vspace, 2 = ITER_ALL
         encode_select(send_buf, select1_id, VSPACE_ID, 0, 2, 0, 0xFFFFFFFF, nil)
         -- fetch everything from space _vindex, 2 = ITER_ALL
         encode_select(send_buf, select2_id, VINDEX_ID, 0, 2, 0, 0xFFFFFFFF, nil)
+        -- fetch everything from space _vcollation, 2 = ITER_ALL
+        encode_select(send_buf, select3_id, VCOLLATION_ID, 0, 2, 0, 0xFFFFFFFF,
+                      nil)
+
         schema_version = nil -- any schema_version will do provided that
                              -- it is consistent across responses
         repeat
@@ -747,7 +753,7 @@ local function create_transport(host, port, user, password, callback,
             if err then return error_sm(err, hdr) end
             dispatch_response_iproto(hdr, body_rpos, body_end)
             local id = hdr[IPROTO_SYNC_KEY]
-            if id == select1_id or id == select2_id then
+            if id == select1_id or id == select2_id or id == select3_id then
                 -- response to a schema query we've submitted
                 local status = hdr[IPROTO_STATUS_KEY]
                 local response_schema_version = hdr[IPROTO_SCHEMA_VERSION_KEY]
@@ -766,9 +772,10 @@ local function create_transport(host, port, user, password, callback,
                 body, body_end = decode(body_rpos)
                 response[id] = body[IPROTO_DATA_KEY]
             end
-        until response[select1_id] and response[select2_id]
-        callback('did_fetch_schema', schema_version,
-                 response[select1_id], response[select2_id])
+        until response[select1_id] and response[select2_id] and
+              response[select3_id]
+        callback('did_fetch_schema', schema_version, response[select1_id],
+                 response[select2_id],response[select3_id])
         set_state('active')
         return iproto_sm(schema_version)
     end
@@ -1190,7 +1197,8 @@ function remote_methods:timeout(timeout)
     return self
 end
 
-function remote_methods:_install_schema(schema_version, spaces, indices)
+function remote_methods:_install_schema(schema_version, spaces, indices,
+                                        collations)
     local sl, space_mt, index_mt = {}, self._space_mt, self._index_mt
     for _, space in pairs(spaces) do
         local name = space[3]
@@ -1258,11 +1266,15 @@ function remote_methods:_install_schema(schema_version, spaces, indices)
                 local pkcollationid = index[PARTS][k].collation
                 local pktype = index[PARTS][k][2] or index[PARTS][k].type
                 local pkfield = index[PARTS][k][1] or index[PARTS][k].field
+                local pkcollation = nil
+                if pkcollationid ~= nil then
+                    pkcollation = collations[pkcollationid + 1][2]
+                end
 
                 local pk = {
                     type = pktype,
                     fieldno = pkfield + 1,
-                    collation_id = pkcollationid,
+                    collation = pkcollation,
                     is_nullable = pknullable
                 }
                 idx.parts[k] = pk

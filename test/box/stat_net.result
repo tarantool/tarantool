@@ -85,7 +85,7 @@ box.stat.net.CONNECTIONS.total
 ...
 box.stat.net.REQUESTS.total
 ---
-- 13
+- 17
 ...
 box.stat.net.CONNECTIONS.current
 ---
@@ -151,7 +151,7 @@ test_run:wait_cond(function() return box.stat.net.REQUESTS.current == 0 end, WAI
 ...
 box.stat.net.REQUESTS.total
 ---
-- 15
+- 19
 ...
 -- reset
 box.stat.reset()

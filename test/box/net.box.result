@@ -2339,14 +2339,14 @@ connected_cnt
 ...
 disconnected_cnt
 ---
-- 1
+- 2
 ...
 conn:close()
 ---
 ...
 disconnected_cnt
 ---
-- 2
+- 3
 ...
 test_run:cmd('stop server connecter')
 ---
@@ -2910,7 +2910,7 @@ c.space.test.index.sk.parts
 ---
 - - type: string
     is_nullable: false
-    collation_id: 277
+    collation: test
     fieldno: 1
 ...
 c:close()
