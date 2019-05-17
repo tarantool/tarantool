@@ -68,6 +68,22 @@ test_call_f(va_list ap)
 	return res;
 }
 
+static void
+test_getaddrinfo(void)
+{
+	header();
+	plan(1);
+	const char *host = "127.0.0.1";
+	const char *port = "3333";
+	struct addrinfo *i;
+	/* NULL hints should work. It is a standard. */
+	int rc = coio_getaddrinfo(host, port, NULL, &i, 1);
+	is(rc, 0, "getaddrinfo");
+	freeaddrinfo(i);
+	check_plan();
+	footer();
+}
+
 static int
 main_f(va_list ap)
 {
@@ -85,6 +101,8 @@ main_f(va_list ap)
 	fiber_wakeup(call_fiber);
 	fiber_cancel(call_fiber);
 	fiber_join(call_fiber);
+
+	test_getaddrinfo();
 
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
