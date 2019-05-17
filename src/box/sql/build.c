@@ -412,7 +412,7 @@ sqlAddColumn(Parse * pParse, Token * pName, struct type_def *type_def)
 	 * As sql_field_retrieve will allocate memory on region
 	 * ensure that def is also temporal and would be dropped.
 	 */
-	assert(def->opts.is_temporary);
+	assert(def->opts.is_ephemeral);
 	if (sql_field_retrieve(pParse, def, def->field_count) == NULL)
 		return;
 	struct region *region = &pParse->region;
@@ -483,7 +483,7 @@ sqlAddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 	sql *db = pParse->db;
 	struct space *p = pParse->create_table_def.new_space;
 	if (p != NULL) {
-		assert(p->def->opts.is_temporary);
+		assert(p->def->opts.is_ephemeral);
 		struct space_def *def = p->def;
 		if (!sqlExprIsConstantOrFunction
 		    (pSpan->pExpr, db->init.busy)) {
@@ -713,7 +713,7 @@ sql_column_collation(struct space_def *def, uint32_t column, uint32_t *coll_id)
 	 * In cases mentioned above collation is fetched by id.
 	 */
 	if (space == NULL) {
-		assert(def->opts.is_temporary);
+		assert(def->opts.is_ephemeral);
 		assert(column < (uint32_t)def->field_count);
 		*coll_id = def->fields[column].coll_id;
 		struct coll_id *collation = coll_by_id(*coll_id);
@@ -1271,7 +1271,7 @@ sql_create_view(struct Parse *parse_context)
 		sqlSelectAddColumnTypeAndCollation(parse_context, space->def,
 						   view_def->select);
 	} else {
-		assert(select_res_space->def->opts.is_temporary);
+		assert(select_res_space->def->opts.is_ephemeral);
 		space->def->fields = select_res_space->def->fields;
 		space->def->field_count = select_res_space->def->field_count;
 		select_res_space->def->fields = NULL;
@@ -2795,14 +2795,14 @@ sqlSrcListDelete(sql * db, SrcList * pList)
 		if (pItem->fg.isTabFunc)
 			sql_expr_list_delete(db, pItem->u1.pFuncArg);
 		/*
-		* Space is either not temporary which means that
-		* it came from space cache; or space is temporary
+		* Space is either not ephemeral which means that
+		* it came from space cache; or space is ephemeral
 		* but has no indexes and check constraints.
 		* The latter proves that it is not the space
 		* which might come from CREATE TABLE routines.
 		*/
 		assert(pItem->space == NULL ||
-			!pItem->space->def->opts.is_temporary ||
+			!pItem->space->def->opts.is_ephemeral ||
 			 (pItem->space->index == NULL &&
 			  pItem->space->def->opts.checks == NULL));
 		sql_select_delete(db, pItem->pSelect);
