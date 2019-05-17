@@ -80,6 +80,24 @@ test_getaddrinfo(void)
 	int rc = coio_getaddrinfo(host, port, NULL, &i, 1);
 	is(rc, 0, "getaddrinfo");
 	freeaddrinfo(i);
+
+	/*
+	 * gh-4209: 0 timeout should not be a special value and
+	 * detach a task. Before a fix it led to segfault
+	 * sometimes. The cycle below runs getaddrinfo multiple
+	 * times to increase segfault probability.
+	 */
+	for (int j = 0; j < 5; ++j) {
+		if (coio_getaddrinfo(host, port, NULL, &i, 0) == 0 && i != NULL)
+			freeaddrinfo(i);
+		/*
+		 * Skip one event loop to check, that the coio
+		 * task destructor will not free the memory second
+		 * time.
+		 */
+		fiber_sleep(0);
+	}
+
 	check_plan();
 	footer();
 }

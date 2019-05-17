@@ -343,7 +343,7 @@ say_logrotate(struct ev_loop *loop, struct ev_signal *w, int revents)
 		coio_task_create(&task->base, logrotate_cb, logrotate_cleanup_cb);
 		task->log = log;
 		task->loop = loop();
-		coio_task_post(&task->base, 0);
+		coio_task_post(&task->base);
 	}
 	errno = saved_errno;
 }
