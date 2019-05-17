@@ -6,3 +6,7 @@
 	*** test_call_f ***
 # call done with res 0
 	*** test_call_f: done ***
+	*** test_getaddrinfo ***
+1..1
+ok 1 - getaddrinfo
+	*** test_getaddrinfo: done ***

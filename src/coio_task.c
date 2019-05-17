@@ -378,12 +378,16 @@ coio_getaddrinfo(const char *host, const char *port,
 	 *
 	 * Based on the workaround in https://bugs.python.org/issue17269
 	 */
+	if (hints != NULL) {
 #if defined(__APPLE__) && defined(AI_NUMERICSERV)
-	if (hints && (hints->ai_flags & AI_NUMERICSERV) &&
-	    (port == NULL || (port[0]=='0' && port[1]=='\0'))) port = "00";
+		if ((hints->ai_flags & AI_NUMERICSERV) != 0 &&
+		    (port == NULL || (port[0]=='0' && port[1]=='\0')))
+			port = "00";
 #endif
-	/* Fill hinting information for use by connect(2) or bind(2). */
-	memcpy(&task->hints, hints, sizeof(task->hints));
+		memcpy(&task->hints, hints, sizeof(task->hints));
+	} else {
+		task->hints.ai_family = AF_UNSPEC;
+	}
 	/* make no difference between empty string and NULL for host */
 	if (host != NULL && *host) {
 		task->host = strdup(host);
