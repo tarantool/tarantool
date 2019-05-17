@@ -1523,16 +1523,17 @@ vy_task_compaction_complete(struct vy_task *task)
 	 * Remove compacted run files that were created after
 	 * the last checkpoint (and hence are not referenced
 	 * by any checkpoint) immediately to save disk space.
+	 *
+	 * Don't bother logging it to avoid a potential race
+	 * with a garbage collection task, which may be cleaning
+	 * up concurrently. The log will be cleaned up on the
+	 * next checkpoint.
 	 */
-	vy_log_tx_begin();
 	rlist_foreach_entry(run, &unused_runs, in_unused) {
-		if (run->dump_lsn > gc_lsn &&
-		    vy_run_remove_files(lsm->env->path, lsm->space_id,
-					lsm->index_id, run->id) == 0) {
-			vy_log_forget_run(run->id);
-		}
+		if (run->dump_lsn > gc_lsn)
+			vy_run_remove_files(lsm->env->path, lsm->space_id,
+					    lsm->index_id, run->id);
 	}
-	vy_log_tx_try_commit();
 
 	/*
 	 * Account the new run if it is not empty,
