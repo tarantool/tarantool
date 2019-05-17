@@ -234,14 +234,6 @@ local function cipher_gc(ctx)
 end
 
 local function cipher_new(cipher, key, iv, direction)
-    if key == nil or key:len() ~= ffi.C.tnt_EVP_CIPHER_key_length(cipher) then
-        return error('Key length should be equal to cipher key length ('
-            .. tostring(ffi.C.tnt_EVP_CIPHER_key_length(cipher)) .. ' bytes)')
-    end
-    if iv == nil or iv:len() ~= ffi.C.tnt_EVP_CIPHER_iv_length(cipher) then
-        return error('Initial vector length should be equal to cipher iv length ('
-            .. tostring(ffi.C.tnt_EVP_CIPHER_iv_length(cipher)) .. ' bytes)')
-    end
     local ctx = ffi.C.EVP_CIPHER_CTX_new()
     if ctx == nil then
         return error('Can\'t create cipher ctx: ' .. openssl_err_str())
@@ -264,11 +256,28 @@ local function cipher_init(self, key, iv)
     if self.ctx == nil then
         return error('Cipher context isn\'t usable')
     end
-    if ffi.C.EVP_CipherInit_ex(self.ctx, self.cipher, nil,
-        key, iv, self.direction) ~= 1 then
-        return error('Can\'t init cipher:' .. openssl_err_str())
+    local cipher = self.cipher
+    key = key or self.key
+    iv = iv or self.iv
+    local needed = ffi.C.tnt_EVP_CIPHER_key_length(cipher)
+    if key ~= nil and key:len() ~= needed then
+        return error('Key length should be equal to cipher key length ('..
+                     tostring(needed)..' bytes)')
     end
-    self.initialized = true
+    needed = ffi.C.tnt_EVP_CIPHER_iv_length(cipher)
+    if iv ~= nil and iv:len() ~= needed then
+        return error('Initial vector length should be equal to cipher iv '..
+                     'length ('..tostring(needed)..' bytes)')
+    end
+    self.key = key
+    self.iv = iv
+    if key and iv then
+        if ffi.C.EVP_CipherInit_ex(self.ctx, cipher, nil, key, iv,
+                                   self.direction) ~= 1 then
+            return error('Can\'t init cipher:'..openssl_err_str())
+        end
+        self.initialized = true
+    end
 end
 
 local function cipher_update(self, input)
@@ -289,12 +298,10 @@ local function cipher_final(self)
     if not self.initialized then
         return error('Cipher not initialized')
     end
-    self.initialized = false
-    local wpos = self.buf:reserve(self.block_size - 1)
+    local wpos = self.buf:reserve(self.block_size)
     if ffi.C.EVP_CipherFinal_ex(self.ctx, wpos, self.outl) ~= 1 then
         return error('Can\'t finalize cipher:' .. openssl_err_str())
     end
-    self.initialized = false
     return ffi.string(wpos, self.outl[0])
 end
 

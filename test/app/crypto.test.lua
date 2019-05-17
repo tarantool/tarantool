@@ -23,10 +23,27 @@ crypto.cipher.aes256.cbc.decrypt('a', '123456', '435')
 crypto.cipher.aes256.cbc.decrypt('a', '12345678876543211234567887654321')
 crypto.cipher.aes256.cbc.decrypt('12', '12345678876543211234567887654321', '12')
 
-crypto.cipher.aes192.cbc.encrypt.new()
 crypto.cipher.aes192.cbc.encrypt.new('123321')
-crypto.cipher.aes192.cbc.decrypt.new('123456788765432112345678')
 crypto.cipher.aes192.cbc.decrypt.new('123456788765432112345678', '12345')
+
+--
+-- It is allowed to fill a cipher gradually.
+--
+c = crypto.cipher.aes128.cbc.encrypt.new()
+c:init('1234567812345678')
+c:update('plain')
+c:init(nil, '1234567812345678')
+c:update('plain')
+c:free()
+
+--
+-- gh-4223: cipher:init() could rewrite previously initialized
+-- key and IV with nil values.
+--
+c = crypto.cipher.aes192.cbc.encrypt.new('123456789012345678901234', '1234567890123456')
+c:init()
+c:result()
+c:free()
 
 crypto.cipher.aes100.efb
 crypto.cipher.aes256.nomode
