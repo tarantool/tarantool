@@ -26,3 +26,12 @@ box.execute('SELECT 1.5;')
 box.execute('SELECT 1.0;')
 box.execute('SELECT \'abc\';')
 box.execute('SELECT X\'4D6564766564\'')
+
+--
+-- gh-4139: assertion when reading a temporary space.
+--
+format = {{name = 'id', type = 'integer'}}
+s = box.schema.space.create('s',{format=format, temporary=true})
+i = s:create_index('i')
+box.execute('select * from "s"')
+s:drop()

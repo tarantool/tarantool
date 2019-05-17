@@ -432,7 +432,7 @@ parser_space_delete(struct sql *db, struct space *space)
 {
 	if (space == NULL || db == NULL || db->pnBytesFreed == 0)
 		return;
-	assert(space->def->opts.is_temporary);
+	assert(space->def->opts.is_ephemeral);
 	for (uint32_t i = 0; i < space->index_count; ++i)
 		index_def_delete(space->index[i]->def);
 }

@@ -1237,7 +1237,7 @@ sql_ephemeral_space_def_new(struct Parse *parser, const char *name)
 	memset(def, 0, size);
 	memcpy(def->name, name, name_len);
 	def->name[name_len] = '\0';
-	def->opts.is_temporary = true;
+	def->opts.is_ephemeral = true;
 	return def;
 }
 
