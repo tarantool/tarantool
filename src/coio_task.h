@@ -63,7 +63,11 @@ typedef int (*coio_task_cb)(struct coio_task *task); /* like eio_req */
  */
 struct coio_task {
 	struct eio_req base; /* eio_task - must be first */
-	/** The calling fiber. */
+	/**
+	 * The calling fiber. When set to NULL, the task is
+	 * detached - its resources are freed eventually, and such
+	 * a task should not be accessed after detachment.
+	 */
 	struct fiber *fiber;
 	/** Callbacks. */
 	union {
@@ -102,7 +106,7 @@ void
 coio_task_destroy(struct coio_task *task);
 
 /**
- * Post coio task to EIO thread pool.
+ * Execute a coio task in a worker thread.
  *
  * @param task coio task.
  * @param timeout timeout in seconds.
@@ -114,7 +118,14 @@ coio_task_destroy(struct coio_task *task);
  *            callback.
  */
 int
-coio_task_post(struct coio_task *task, double timeout);
+coio_task_execute(struct coio_task *task, double timeout);
+
+/**
+ * Post a task in detached state. Its result can't be obtained,
+ * and destructor is called after completion.
+ */
+void
+coio_task_post(struct coio_task *task);
 
 /** \cond public */
 
