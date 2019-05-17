@@ -227,22 +227,22 @@ coio_task_destroy(struct coio_task *task)
 	diag_destroy(&task->diag);
 }
 
+void
+coio_task_post(struct coio_task *task)
+{
+	assert(task->base.type == EIO_CUSTOM);
+	assert(task->fiber == fiber());
+	eio_submit(&task->base);
+	task->fiber = NULL;
+}
+
 int
-coio_task_post(struct coio_task *task, double timeout)
+coio_task_execute(struct coio_task *task, double timeout)
 {
 	assert(task->base.type == EIO_CUSTOM);
 	assert(task->fiber == fiber());
 
 	eio_submit(&task->base);
-	if (timeout == 0) {
-		/*
-		* This is a special case:
-		* we don't wait any response from the task
-		* and just perform just asynchronous post.
-		*/
-		task->fiber = NULL;
-		return 0;
-	}
 	fiber_yield_timeout(timeout);
 	if (!task->complete) {
 		/* timed out or cancelled. */
@@ -409,7 +409,7 @@ coio_getaddrinfo(const char *host, const char *port,
 	}
 
 	/* Post coio task */
-	if (coio_task_post(&task->base, timeout) != 0)
+	if (coio_task_execute(&task->base, timeout) != 0)
 		return -1; /* timed out or cancelled */
 
 	/* Task finished */
