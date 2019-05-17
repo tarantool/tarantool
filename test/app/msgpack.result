@@ -244,3 +244,11 @@ size = msgpack.encode(100, buf)
 ---
 - 100
 ...
+--
+-- gh-4224: msgpack.decode(cdata, size) should check, that size
+-- is not negative.
+--
+msgpack.decode(ffi.cast('char *', '\x04\x05\x06'), -1)
+---
+- error: 'msgpack.decode: size can''t be negative'
+...

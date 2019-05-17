@@ -336,7 +336,11 @@ lua_msgpack_decode_cdata(lua_State *L, bool check)
 				  "a Lua string or 'char *' expected");
 	}
 	if (check) {
-		size_t data_len = luaL_checkinteger(L, 2);
+		ptrdiff_t data_len = luaL_checkinteger(L, 2);
+		if (data_len < 0) {
+			return luaL_error(L, "msgpack.decode: size can't be "\
+					  "negative");
+		}
 		const char *p = data;
 		if (mp_check(&p, data + data_len) != 0)
 			return luaL_error(L, "msgpack.decode: invalid MsgPack");

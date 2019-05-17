@@ -78,3 +78,9 @@ buf:reset()
 size = msgpack.encode(100, buf)
 (msgpack.decode(ffi.cast('char *', buf.rpos), size))
 (msgpack.decode(ffi.cast('const char *', buf.rpos), size))
+
+--
+-- gh-4224: msgpack.decode(cdata, size) should check, that size
+-- is not negative.
+--
+msgpack.decode(ffi.cast('char *', '\x04\x05\x06'), -1)
