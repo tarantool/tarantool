@@ -1,5 +1,6 @@
 buffer = require 'buffer'
 msgpack = require 'msgpack'
+ffi = require 'ffi'
 
 -- Arguments check.
 buf = buffer.ibuf()
@@ -62,3 +63,9 @@ msgpack.decode(s)
 buf = buffer.ibuf()
 msgpack.encode({1, 2, 3}, buf)
 msgpack.decode(buf.rpos, buf:size() - 1)
+
+--
+-- gh-4224: msgpack.decode(cdata, size) should check, that size
+-- is not negative.
+--
+msgpack.decode(ffi.cast('char *', '\x04\x05\x06'), -1)
