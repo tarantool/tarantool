@@ -462,7 +462,7 @@ test:do_catchsql_test(
 		SELECT (1,2,3) == (1,2,3,4);
 	]], {
 		-- <sql-errors-1.41>
-		1,"row value misused"
+		1,"Unequal number of entries in row expression: left side has 3, but right side - 4"
 		-- </sql-errors-1.41>
 	})
 

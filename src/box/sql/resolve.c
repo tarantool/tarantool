@@ -795,15 +795,8 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				nRight = sqlExprVectorSize(pExpr->pRight);
 			}
 			if (nLeft != nRight) {
-				testcase(pExpr->op == TK_EQ);
-				testcase(pExpr->op == TK_NE);
-				testcase(pExpr->op == TK_LT);
-				testcase(pExpr->op == TK_LE);
-				testcase(pExpr->op == TK_GT);
-				testcase(pExpr->op == TK_GE);
-				testcase(pExpr->op == TK_BETWEEN);
-				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
-					 "row value misused");
+				diag_set(ClientError, ER_SQL_COLUMN_COUNT,
+					 nLeft, nRight);
 				pParse->is_aborted = true;
 			}
 			break;

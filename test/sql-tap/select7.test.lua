@@ -130,7 +130,7 @@ test:do_catchsql_test(
         SELECT 5 IN (SELECT a,b FROM t2);
     ]], {
         -- <select7-5.1>
-        1, "sub-select returns 2 columns - expected 1"
+        1, "Unequal number of entries in row expression: left side has 1, but right side - 2"
         -- </select7-5.1>
     })
 
@@ -140,7 +140,7 @@ test:do_catchsql_test(
         SELECT 5 IN (SELECT * FROM t2);
     ]], {
         -- <select7-5.2>
-        1, "sub-select returns 2 columns - expected 1"
+        1, "Unequal number of entries in row expression: left side has 1, but right side - 2"
         -- </select7-5.2>
     })
 
@@ -150,7 +150,7 @@ test:do_catchsql_test(
         SELECT 5 IN (SELECT a,b FROM t2 UNION SELECT b,a FROM t2);
     ]], {
         -- <select7-5.3>
-        1, "sub-select returns 2 columns - expected 1"
+        1, "Unequal number of entries in row expression: left side has 1, but right side - 2"
         -- </select7-5.3>
     })
 
@@ -160,7 +160,7 @@ test:do_catchsql_test(
         SELECT 5 IN (SELECT * FROM t2 UNION SELECT * FROM t2);
     ]], {
         -- <select7-5.4>
-        1, "sub-select returns 2 columns - expected 1"
+        1, "Unequal number of entries in row expression: left side has 1, but right side - 2"
         -- </select7-5.4>
     })
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(16)
+test:plan(32)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -268,6 +268,167 @@ test:do_execsql_test(
         1, 0, 1, 4, 3, 0, 3, 2
         -- </select2-4.7>
     })
+
+test:do_catchsql_test(
+    "select2-5.1",
+    [[
+        SELECT (1,2) IN (1,2,3);
+    ]], {
+        -- <select2-5.1>
+        1, "Unequal number of entries in row expression: left side has 2, but right side - 1"
+        -- </select2-5.1>
+    })
+
+test:do_catchsql_test(
+    "select2-5.2",
+    [[
+        SELECT (1,2) IN (SELECT (1), (2), (3));
+    ]], {
+        -- <select2-5.2>
+        1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+        -- </select2-5.2>
+    })
+
+test:do_catchsql_test(
+    "select2-5.3",
+    [[
+        SELECT (1,2) IN (VALUES (1,2,3), (2,3,4));
+    ]], {
+        -- <select2-5.3>
+        1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+        -- </select2-5.3>
+    })
+
+test:do_catchsql_test(
+    "select2-5.4",
+    [[
+        SELECT (1,2) IN (SELECT * from (VALUES (1,2,3), (2,3,4)));
+    ]], {
+        -- <select2-5.4>
+        1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+        -- </select2-5.4>
+    })
+
+test:do_catchsql_test(
+    "select2-5.5",
+    [[
+        SELECT (1) IN (1,2,3);
+    ]], {
+        -- <select2-5.5>
+        0, {1}
+        -- </select2-5.5>
+    })
+
+test:do_catchsql_test(
+    "select2-5.6",
+    [[
+        SELECT (1,2,3) IN (SELECT (1), (2), (3));
+    ]], {
+        -- <select2-5.6>
+        0, {1}
+        -- </select2-5.6>
+    })
+
+test:do_catchsql_test(
+    "select2-5.7",
+    [[
+        SELECT (1,2,3) IN (VALUES (1,2,3), (2,3,4));
+    ]], {
+        -- <select2-5.7>
+        0, {1}
+        -- </select2-5.7>
+    })
+
+test:do_catchsql_test(
+    "select2-5.8",
+    [[
+        SELECT (1,2,3) IN (SELECT * from (VALUES (1,2,3), (2,3,4)));
+    ]], {
+        -- <select2-5.8>
+        0, {1}
+        -- </select2-5.8>
+    })
+
+test:do_catchsql_test(
+    "select2-5.9",
+    [[
+        SELECT (SELECT * FROM (VALUES (1,2))) IN (1,2,3);
+    ]], {
+        -- <select2-5.9>
+        1, "Unequal number of entries in row expression: left side has 2, but right side - 1"
+        -- </select2-5.9>
+    })
+
+test:do_catchsql_test(
+    "select2-5.10",
+    [[
+        SELECT (SELECT * FROM (VALUES (1,2))) IN (SELECT (1), (2), (3));
+    ]], {
+        -- <select2-5.10>
+        1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+        -- </select2-5.10>
+    })
+
+test:do_catchsql_test(
+    "select2-5.11",
+    [[
+        SELECT (SELECT * FROM (VALUES (1,2))) IN (VALUES (1,2,3), (2,3,4));
+    ]], {
+        -- <select2-5.11>
+        1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+        -- </select2-5.11>
+    })
+
+test:do_catchsql_test(
+    "select2-5.12",
+    [[
+        SELECT (SELECT * FROM (VALUES (1,2))) IN (SELECT * from (VALUES (1,2,3), (2,3,4)));
+    ]], {
+        -- <select2-5.12>
+        1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+        -- </select2-5.12>
+    })
+
+test:do_catchsql_test(
+    "select2-5.13",
+    [[
+        SELECT (1,2,3) = (1,2,3);
+    ]], {
+        -- <select2-5.13>
+        0, {1}
+        -- </select2-5.13>
+    })
+
+test:do_catchsql_test(
+    "select2-5.14",
+    [[
+        SELECT (1,2) = (1,2,3);
+    ]], {
+        -- <select2-5.14>
+        1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+        -- </select2-5.14>
+    })
+
+test:do_catchsql_test(
+    "select2-5.15",
+    [[
+        SELECT (SELECT (1), (2)) = (1,2,3);
+    ]], {
+        -- <select2-5.15>
+        1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+        -- </select2-5.15>
+    })
+
+test:do_catchsql_test(
+    "select2-5.16",
+    [[
+        SELECT (VALUES (1,2)) = (1,2,3);
+    ]], {
+        -- <select2-5.16>
+        1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+        -- </select2-5.16>
+    })
+
 
 test:finish_test()
 
