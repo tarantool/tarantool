@@ -2,6 +2,7 @@
 
 local ffi = require('ffi')
 local buffer = require('buffer')
+local reg = buffer.reg1
 
 ffi.cdef[[
     /* from openssl/err.h */
@@ -102,7 +103,6 @@ local function digest_new(digest)
         digest = digest,
         buf = buffer.ibuf(64),
         initialized = false,
-        outl = ffi.new('int[1]')
     }, digest_mt)
     self:init()
     return self
@@ -132,10 +132,10 @@ local function digest_final(self)
         return error('Digest not initialized')
     end
     self.initialized = false
-    if ffi.C.EVP_DigestFinal_ex(self.ctx, self.buf.wpos, self.outl) ~= 1 then
+    if ffi.C.EVP_DigestFinal_ex(self.ctx, self.buf.wpos, reg.ai) ~= 1 then
         return error('Can\'t finalize digest: ' .. openssl_err_str())
     end
-    return ffi.string(self.buf.wpos, self.outl[0])
+    return ffi.string(self.buf.wpos, reg.ai[0])
 end
 
 local function digest_free(self)
@@ -174,9 +174,7 @@ local function hmac_new(digest, key)
     local self = setmetatable({
         ctx = ctx,
         digest = digest,
-        buf = buffer.ibuf(64),
         initialized = false,
-        outl = ffi.new('int[1]')
     }, hmac_mt)
     self:init(key)
     return self
@@ -206,10 +204,11 @@ local function hmac_final(self)
         return error('HMAC not initialized')
     end
     self.initialized = false
-    if ffi.C.HMAC_Final(self.ctx, self.buf.wpos, self.outl) ~= 1 then
+    local buf = buffer.static_alloc('char', 64)
+    if ffi.C.HMAC_Final(self.ctx, buf, reg.ai) ~= 1 then
         return error('Can\'t finalize HMAC: ' .. openssl_err_str())
     end
-    return ffi.string(self.buf.wpos, self.outl[0])
+    return ffi.string(buf, reg.ai[0])
 end
 
 local function hmac_free(self)

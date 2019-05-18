@@ -21,19 +21,10 @@ float
 mp_decode_float(const char **data);
 double
 mp_decode_double(const char **data);
-union tmpint {
-    uint16_t u16;
-    uint32_t u32;
-    uint64_t u64;
-};
 ]])
 
 local strict_alignment = (jit.arch == 'arm')
-
-local tmpint
-if strict_alignment then
-   tmpint = ffi.new('union tmpint[1]')
-end
+local reg = buffer.reg1
 
 local function bswap_u16(num)
     return bit.rshift(bit.bswap(tonumber(num)), 16)
@@ -70,10 +61,10 @@ end
 local encode_u16
 if strict_alignment then
     encode_u16 = function(buf, code, num)
-        tmpint[0].u16 = bswap_u16(num)
+        reg.u16 = bswap_u16(num)
         local p = buf:alloc(3)
         p[0] = code
-        ffi.copy(p + 1, tmpint, 2)
+        ffi.copy(p + 1, reg, 2)
     end
 else
     encode_u16 = function(buf, code, num)
@@ -86,11 +77,10 @@ end
 local encode_u32
 if strict_alignment then
     encode_u32 = function(buf, code, num)
-        tmpint[0].u32 =
-            ffi.cast('uint32_t', bit.bswap(tonumber(num)))
+        reg.u32 = ffi.cast('uint32_t', bit.bswap(tonumber(num)))
         local p = buf:alloc(5)
         p[0] = code
-        ffi.copy(p + 1, tmpint, 4)
+        ffi.copy(p + 1, reg, 4)
     end
 else
     encode_u32 = function(buf, code, num)
@@ -104,10 +94,10 @@ end
 local encode_u64
 if strict_alignment then
     encode_u64 = function(buf, code, num)
-        tmpint[0].u64 = bit.bswap(ffi.cast('uint64_t', num))
+        reg.u64 = bit.bswap(ffi.cast('uint64_t', num))
         local p = buf:alloc(9)
         p[0] = code
-        ffi.copy(p + 1, tmpint, 8)
+        ffi.copy(p + 1, reg, 8)
     end
 else
     encode_u64 = function(buf, code, num)
@@ -324,9 +314,9 @@ end
 local decode_u16
 if strict_alignment then
     decode_u16 = function(data)
-        ffi.copy(tmpint, data[0], 2)
+        ffi.copy(reg, data[0], 2)
         data[0] = data[0] + 2
-        return tonumber(bswap_u16(tmpint[0].u16))
+        return tonumber(bswap_u16(reg.u16))
     end
 else
     decode_u16 = function(data)
@@ -339,10 +329,10 @@ end
 local decode_u32
 if strict_alignment then
     decode_u32 = function(data)
-        ffi.copy(tmpint, data[0], 4)
+        ffi.copy(reg, data[0], 4)
         data[0] = data[0] + 4
         return tonumber(
-            ffi.cast('uint32_t', bit.bswap(tonumber(tmpint[0].u32))))
+            ffi.cast('uint32_t', bit.bswap(tonumber(reg.u32))))
     end
 else
     decode_u32 = function(data)
@@ -356,9 +346,9 @@ end
 local decode_u64
 if strict_alignment then
     decode_u64 = function(data)
-        ffi.copy(tmpint, data[0], 8);
+        ffi.copy(reg, data[0], 8);
         data[0] = data[0] + 8
-        local num = bit.bswap(tmpint[0].u64)
+        local num = bit.bswap(reg.u64)
         if num <= DBL_INT_MAX then
             return tonumber(num) -- return as 'number'
         end
@@ -385,8 +375,8 @@ end
 local decode_i16
 if strict_alignment then
     decode_i16 = function(data)
-        ffi.copy(tmpint, data[0], 2)
-        local num = bswap_u16(tmpint[0].u16)
+        ffi.copy(reg, data[0], 2)
+        local num = bswap_u16(reg.u16)
         data[0] = data[0] + 2
         -- note: this double cast is actually necessary
         return tonumber(ffi.cast('int16_t', ffi.cast('uint16_t', num)))
@@ -403,8 +393,8 @@ end
 local decode_i32
 if strict_alignment then
     decode_i32 = function(data)
-        ffi.copy(tmpint, data[0], 4)
-        local num = bit.bswap(tonumber(tmpint[0].u32))
+        ffi.copy(reg, data[0], 4)
+        local num = bit.bswap(tonumber(reg.u32))
         data[0] = data[0] + 4
         return num
     end
@@ -419,9 +409,9 @@ end
 local decode_i64
 if strict_alignment then
     decode_i64 = function(data)
-        ffi.copy(tmpint, data[0], 8)
+        ffi.copy(reg, data[0], 8)
         data[0] = data[0] + 8
-        local num = bit.bswap(ffi.cast('int64_t', tmpint[0].u64))
+        local num = bit.bswap(reg.i64)
         if num >= -DBL_INT_MAX and num <= DBL_INT_MAX then
             return tonumber(num) -- return as 'number'
         end
@@ -552,7 +542,7 @@ end
 -- element. It is significally faster on LuaJIT to use double pointer than
 -- return result, newpos.
 --
-local bufp = ffi.new('const unsigned char *[1]');
+local bufp = reg.acucp;
 
 local function check_offset(offset, len)
     if offset == nil then

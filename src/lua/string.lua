@@ -15,8 +15,8 @@ ffi.cdef[[
 ]]
 
 local c_char_ptr     = ffi.typeof('const char *')
-local strip_newstart = ffi.new("unsigned long[1]")
-local strip_newlen   = ffi.new("unsigned long[1]")
+local strip_newstart = buffer.reg1.aul
+local strip_newlen   = buffer.reg2.aul
 
 local memcmp  = ffi.C.memcmp
 local memmem  = ffi.C.memmem
