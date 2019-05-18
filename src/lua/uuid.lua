@@ -1,6 +1,7 @@
 -- uuid.lua (internal file)
 
 local ffi = require("ffi")
+local static_alloc = require('buffer').static_alloc
 local builtin = ffi.C
 
 ffi.cdef[[
@@ -33,7 +34,6 @@ extern const struct tt_uuid uuid_nil;
 local uuid_t = ffi.typeof('struct tt_uuid')
 local UUID_STR_LEN = 36
 local UUID_LEN = ffi.sizeof(uuid_t)
-local uuidbuf = ffi.new(uuid_t)
 
 local uuid_tostring = function(uu)
     if not ffi.istype(uuid_t, uu) then
@@ -69,9 +69,8 @@ local uuid_tobin = function(uu, byteorder)
         return error('Usage: uuid:bin([byteorder])')
     end
     if need_bswap(byteorder) then
-        if uu ~= uuidbuf then
-            ffi.copy(uuidbuf, uu, UUID_LEN)
-        end
+        local uuidbuf = static_alloc('struct tt_uuid')
+        ffi.copy(uuidbuf, uu, UUID_LEN)
         builtin.tt_uuid_bswap(uuidbuf)
         return ffi.string(ffi.cast('char *', uuidbuf), UUID_LEN)
     end
@@ -114,10 +113,12 @@ local uuid_new = function()
 end
 
 local uuid_new_bin = function(byteorder)
+    local uuidbuf = static_alloc('struct tt_uuid')
     builtin.tt_uuid_create(uuidbuf)
     return uuid_tobin(uuidbuf, byteorder)
 end
 local uuid_new_str = function()
+    local uuidbuf = static_alloc('struct tt_uuid')
     builtin.tt_uuid_create(uuidbuf)
     return uuid_tostring(uuidbuf)
 end

@@ -1,6 +1,7 @@
 -- uri.lua (internal file)
 
 local ffi = require('ffi')
+local static_alloc = require('buffer').static_alloc
 
 ffi.cdef[[
 struct uri {
@@ -32,12 +33,11 @@ uri_format(char *str, size_t len, struct uri *uri, bool write_password);
 
 local builtin = ffi.C;
 
-local uribuf = ffi.new('struct uri')
-
 local function parse(str)
     if str == nil then
         error("Usage: uri.parse(string)")
     end
+    local uribuf = static_alloc('struct uri')
     if builtin.uri_parse(uribuf, str) ~= 0 then
         return nil
     end
@@ -59,6 +59,7 @@ local function parse(str)
 end
 
 local function format(uri, write_password)
+    local uribuf = static_alloc('struct uri')
     uribuf.scheme = uri.scheme
     uribuf.scheme_len = string.len(uri.scheme or '')
     uribuf.login = uri.login
@@ -75,7 +76,7 @@ local function format(uri, write_password)
     uribuf.query_len = string.len(uri.query or '')
     uribuf.fragment = uri.fragment
     uribuf.fragment_len = string.len(uri.fragment or '')
-    local str = ffi.new('char[1024]')
+    local str = static_alloc('char', 1024)
     builtin.uri_format(str, 1024, uribuf, write_password and 1 or 0)
     return ffi.string(str)
 end

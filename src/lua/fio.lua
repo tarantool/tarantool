@@ -275,8 +275,12 @@ fio.dirname = function(path)
     if type(path) ~= 'string' then
         error("Usage: fio.dirname(path)")
     end
-    path = ffi.new('char[?]', #path + 1, path)
-    return ffi.string(ffi.C.dirname(path))
+    -- Can't just cast path to char * - on Linux dirname modifies
+    -- its argument.
+    local bsize = #path + 1
+    local cpath = buffer.static_alloc('char', bsize)
+    ffi.copy(cpath, ffi.cast('const char *', path), bsize)
+    return ffi.string(ffi.C.dirname(cpath))
 end
 
 fio.umask = function(umask)

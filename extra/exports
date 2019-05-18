@@ -87,6 +87,8 @@ crypto_stream_append
 crypto_stream_commit
 crypto_stream_delete
 
+lua_static_aligned_alloc
+
 # Module API
 
 _say

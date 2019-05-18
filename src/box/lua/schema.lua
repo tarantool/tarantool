@@ -7,6 +7,7 @@ local fun = require('fun')
 local log = require('log')
 local fio = require('fio')
 local json = require('json')
+local static_alloc = require('buffer').static_alloc
 local session = box.session
 local internal = require('box.internal')
 local function setmap(table)
@@ -2136,7 +2137,7 @@ box.schema.user = {}
 
 box.schema.user.password = function(password)
     local BUF_SIZE = 128
-    local buf = ffi.new("char[?]", BUF_SIZE)
+    local buf = static_alloc('char', BUF_SIZE)
     builtin.password_prepare(password, #password, buf, BUF_SIZE)
     return ffi.string(buf)
 end

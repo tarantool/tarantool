@@ -1,4 +1,6 @@
 local ffi = require('ffi')
+local buffer = require('buffer')
+local static_alloc = buffer.static_alloc
 
 ffi.cdef[[
     const char *
@@ -290,7 +292,7 @@ local function string_hex(inp)
         error(err_string_arg:format(1, 'string.hex', 'string', type(inp)), 2)
     end
     local len = inp:len() * 2
-    local res = ffi.new('char[?]', len + 1)
+    local res = static_alloc('char', len + 1)
 
     local uinp = ffi.cast('const unsigned char *', inp)
     for i = 0, inp:len() - 1 do
@@ -333,7 +335,7 @@ local function string_fromhex(inp)
     end
     local len = inp:len() / 2
     local casted_inp = ffi.cast('const char *', inp)
-    local res = ffi.new('char[?]', len)
+    local res = static_alloc('char', len)
     for i = 0, len - 1 do
         local first = hexadecimals_mapping[casted_inp[i * 2]]
         local second = hexadecimals_mapping[casted_inp[i * 2 + 1]]

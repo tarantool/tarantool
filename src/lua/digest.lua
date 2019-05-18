@@ -3,6 +3,7 @@
 local ffi = require('ffi')
 local crypto = require('crypto')
 local bit = require('bit')
+local static_alloc = require('buffer').static_alloc
 
 ffi.cdef[[
     /* internal implementation */
@@ -179,7 +180,7 @@ local m = {
         end
         local blen = #bin
         local slen = ffi.C.base64_bufsize(blen, mask)
-        local str  = ffi.new('char[?]', slen)
+        local str  = static_alloc('char', slen)
         local len = ffi.C.base64_encode(bin, blen, str, slen, mask)
         return ffi.string(str, len)
     end,
@@ -190,7 +191,7 @@ local m = {
         end
         local slen = #str
         local blen = math.ceil(slen * 3 / 4)
-        local bin  = ffi.new('char[?]', blen)
+        local bin  = static_alloc('char', blen)
         local len = ffi.C.base64_decode(str, slen, bin, blen)
         return ffi.string(bin, len)
     end,
@@ -228,7 +229,7 @@ local m = {
         if n == nil then
             error('Usage: digest.urandom(len)')
         end
-        local buf = ffi.new('char[?]', n)
+        local buf = static_alloc('char', n)
         ffi.C.random_bytes(buf, n)
         return ffi.string(buf, n)
     end,

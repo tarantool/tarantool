@@ -10,6 +10,7 @@ local fiber = require('fiber')
 local fio = require('fio')
 local log = require('log')
 local buffer = require('buffer')
+local static_alloc = buffer.static_alloc
 
 local format = string.format
 
@@ -836,8 +837,7 @@ local function socket_recv(self, size, flags)
     end
 
     self._errno = nil
-    local buf = ffi.new("char[?]", size)
-
+    local buf = static_alloc('char', size)
     local res = ffi.C.recv(fd, buf, size, iflags)
 
     if res == -1 then

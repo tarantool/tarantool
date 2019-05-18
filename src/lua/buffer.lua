@@ -33,6 +33,9 @@ ibuf_reinit(struct ibuf *ibuf);
 
 void *
 ibuf_reserve_slow(struct ibuf *ibuf, size_t size);
+
+void *
+lua_static_aligned_alloc(size_t size, size_t alignment);
 ]]
 
 local builtin = ffi.C
@@ -174,8 +177,37 @@ local function ibuf_new(arg, arg2)
     errorf('Usage: ibuf([size])')
 end
 
+--
+-- NOTE: ffi.new() with inlined size <= 128 works even faster
+--       than this allocator. If your size is a constant <= 128 -
+--       use ffi.new(). This function is faster than malloc,
+--       ffi.new(> 128), and ffi.new() with any size not known in
+--       advance like this:
+--
+--           local size = <any expression>
+--           ffi.new('char[?]', size)
+--
+-- Allocate a chunk of static BSS memory, or use ordinal ffi.new,
+-- when too big size.
+-- @param type C type - a struct, a basic type, etc. Should be a
+--        string: 'int', 'char *', 'struct tuple', etc.
+-- @param size Optional argument, number of elements of @a type to
+--        allocate. 1 by default.
+-- @return Cdata pointer to @a type.
+--
+local function static_alloc(type, size)
+    size = size or 1
+    local bsize = size * ffi.sizeof(type)
+    local ptr = builtin.lua_static_aligned_alloc(bsize, ffi.alignof(type))
+    if ptr ~= nil then
+        return ffi.cast(type..' *', ptr)
+    end
+    return ffi.new(type..'[?]', size)
+end
+
 return {
     ibuf = ibuf_new;
     IBUF_SHARED = ffi.C.tarantool_lua_ibuf;
     READAHEAD = READAHEAD;
+    static_alloc = static_alloc,
 }
