@@ -594,7 +594,7 @@ test:do_catchsql_test(
         SELECT b FROM t1 WHERE a NOT IN tb;
     ]], {
         -- <in-9.4>
-        1, "sub-select returns 2 columns - expected 1"
+        1, "Unequal number of entries in row expression: left side has 1, but right side - 2"
         -- </in-9.4>
     })
 
@@ -677,7 +677,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <in-12.2>
-        1, "sub-select returns 2 columns - expected 1"
+        1, "Unequal number of entries in row expression: left side has 1, but right side - 2"
         -- </in-12.2>
     })
 
@@ -689,7 +689,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <in-12.3>
-        1, "sub-select returns 2 columns - expected 1"
+        1, "Unequal number of entries in row expression: left side has 1, but right side - 2"
         -- </in-12.3>
     })
 
@@ -701,7 +701,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <in-12.4>
-        1, "sub-select returns 2 columns - expected 1"
+        1, "Unequal number of entries in row expression: left side has 1, but right side - 2"
         -- </in-12.4>
     })
 
@@ -713,7 +713,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <in-12.5>
-        1, "sub-select returns 2 columns - expected 1"
+        1, "Unequal number of entries in row expression: left side has 1, but right side - 2"
         -- </in-12.5>
     })
 
@@ -823,7 +823,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <in-12.14>
-        1, "sub-select returns 2 columns - expected 1"
+        1, "Unequal number of entries in row expression: left side has 1, but right side - 2"
         -- </in-12.14>
     })
 
@@ -1058,7 +1058,7 @@ test:do_catchsql_test(
         SELECT 0 WHERE (SELECT 0,0) OR (0 IN (1,2));
     ]], {
         -- <in-13.15>
-        1, "sub-select returns 2 columns - expected 1"
+        1, "Unequal number of entries in row expression: left side has 2, but right side - 1"
         -- </in-13.15>
     })
 

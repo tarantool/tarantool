@@ -3582,12 +3582,10 @@ substExpr(Parse * pParse,	/* Report errors here */
 			assert(pExpr->pLeft == 0 && pExpr->pRight == 0);
 			if (sqlExprIsVector(pCopy)) {
 				assert((pCopy->flags & EP_xIsSelect) != 0);
-				const char *err = "sub-select returns %d "\
-						  "columns - expected 1";
 				int expr_count =
 					pCopy->x.pSelect->pEList->nExpr;
-				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
-					 tt_sprintf(err, expr_count));
+				diag_set(ClientError, ER_SQL_COLUMN_COUNT,
+					 expr_count, 1);
 				pParse->is_aborted = true;
 			} else {
 				pNew = sqlExprDup(db, pCopy, 0);

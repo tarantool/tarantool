@@ -249,6 +249,7 @@ struct errcode_record {
 	/*194 */_(ER_MULTIKEY_INDEX_MISMATCH,	"Field %s is used as multikey in one index and as single key in another") \
 	/*195 */_(ER_CREATE_CK_CONSTRAINT,	"Failed to create check constraint '%s': %s") \
 	/*196 */_(ER_CK_CONSTRAINT_FAILED,	"Check constraint failed '%s': %s") \
+	/*197 */_(ER_SQL_COLUMN_COUNT,		"Unequal number of entries in row expression: left side has %u, but right side - %u") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

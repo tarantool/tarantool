@@ -49,7 +49,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 WHERE a = (SELECT * FROM t1)
     ]], {
         -- <subselect-1.2>
-        1, "row value misused"
+        1, "Unequal number of entries in row expression: left side has 1, but right side - 2"
         -- </subselect-1.2>
     })
 

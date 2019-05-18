@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(47)
+test:plan(63)
 
 test:execsql([[
 	CREATE TABLE t0 (i INT PRIMARY KEY, a INT);
@@ -462,7 +462,7 @@ test:do_catchsql_test(
 		SELECT (1,2,3) == (1,2,3,4);
 	]], {
 		-- <sql-errors-1.41>
-		1,"row value misused"
+		1,"Unequal number of entries in row expression: left side has 3, but right side - 4"
 		-- </sql-errors-1.41>
 	})
 
@@ -524,6 +524,166 @@ test:do_catchsql_test(
 		-- <sql-errors-1.47>
 		1, "Keyword 'END' is reserved. Please use double quotes if 'END' is an identifier."
 		-- </sql-errors-1.47>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.48",
+	[[
+		SELECT (1,2) IN (1,2,3);
+	]], {
+		-- <sql-errors-1.48>
+		1, "Unequal number of entries in row expression: left side has 2, but right side - 1"
+		-- </sql-errors-1.48>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.49",
+	[[
+		SELECT (1,2) IN (SELECT (1), (2), (3));
+	]], {
+		-- <sql-errors-1.49>
+		1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+		-- </sql-errors-1.49>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.50",
+	[[
+		SELECT (1,2) IN (VALUES (1,2,3), (2,3,4));
+	]], {
+		-- <sql-errors-1.50>
+		1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+		-- </sql-errors-1.50>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.51",
+	[[
+		SELECT (1,2) IN (SELECT * from (VALUES (1,2,3), (2,3,4)));
+	]], {
+		-- <sql-errors-1.51>
+		1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+		-- </sql-errors-1.51>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.52",
+	[[
+		SELECT (1) IN (1,2,3);
+	]], {
+		-- <sql-errors-1.52>
+		0, {true}
+		-- </sql-errors-1.52>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.53",
+	[[
+		SELECT (1,2,3) IN (SELECT (1), (2), (3));
+	]], {
+		-- <sql-errors-1.53>
+		0, {true}
+		-- </sql-errors-1.53>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.54",
+	[[
+		SELECT (1,2,3) IN (VALUES (1,2,3), (2,3,4));
+	]], {
+		-- <sql-errors-1.54>
+		0, {true}
+		-- </sql-errors-1.54>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.55",
+	[[
+		SELECT (1,2,3) IN (SELECT * from (VALUES (1,2,3), (2,3,4)));
+	]], {
+		-- <sql-errors-1.55>
+		0, {true}
+		-- </sql-errors-1.55>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.56",
+	[[
+		SELECT (SELECT * FROM (VALUES (1,2))) IN (1,2,3);
+	]], {
+		-- <sql-errors-1.56>
+		1, "Unequal number of entries in row expression: left side has 2, but right side - 1"
+		-- </sql-errors-1.56>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.57",
+	[[
+		SELECT (SELECT * FROM (VALUES (1,2))) IN (SELECT (1), (2), (3));
+	]], {
+		-- <sql-errors-1.57>
+		1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+		-- </sql-errors-1.57>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.58",
+	[[
+		SELECT (SELECT * FROM (VALUES (1,2))) IN (VALUES (1,2,3), (2,3,4));
+	]], {
+		-- <sql-errors-1.58>
+		1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+		-- </sql-errors-1.58>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.59",
+	[[
+		SELECT (SELECT * FROM (VALUES (1,2))) IN (SELECT * from (VALUES (1,2,3), (2,3,4)));
+	]], {
+		-- <sql-errors-1.59>
+		1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+		-- </sql-errors-1.59>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.60",
+	[[
+		SELECT (1,2,3) = (1,2,3);
+	]], {
+		-- <sql-errors-1.60>
+		0, {true}
+		-- </sql-errors-1.60>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.61",
+	[[
+		SELECT (1,2) = (1,2,3);
+	]], {
+		-- <sql-errors-1.61>
+		1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+		-- </sql-errors-1.61>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.62",
+	[[
+		SELECT (SELECT (1), (2)) = (1,2,3);
+	]], {
+		-- <sql-errors-1.62>
+		1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+		-- </sql-errors-1.62>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.63",
+	[[
+		SELECT (VALUES (1,2)) = (1,2,3);
+	]], {
+		-- <sql-errors-1.63>
+		1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
+		-- </sql-errors-1.63>
 	})
 
 test:finish_test()

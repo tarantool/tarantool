@@ -524,6 +524,7 @@ t;
   194: box.error.MULTIKEY_INDEX_MISMATCH
   195: box.error.CREATE_CK_CONSTRAINT
   196: box.error.CK_CONSTRAINT_FAILED
+  197: box.error.SQL_COLUMN_COUNT
 ...
 test_run:cmd("setopt delimiter ''");
 ---
