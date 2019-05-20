@@ -8,8 +8,8 @@ RUN set -x \
         libstdc++ \
         libstdc++-static \
         readline \
-        openssl \
         lz4 \
+        lz4-static \
         binutils \
         ncurses \
         libgomp \
@@ -69,6 +69,19 @@ RUN set -x && \
     ./configure --enable-static --enable-shared && \
     make && make install
 
+RUN set -x && \
+    LD_LIBRARY_PATH=/usr/local/lib64 curl -O -L https://github.com/cyrusimap/cyrus-sasl/releases/download/cyrus-sasl-2.1.27/cyrus-sasl-2.1.27.tar.gz && \
+    tar -xvf cyrus-sasl-2.1.27.tar.gz && \
+    cd cyrus-sasl-2.1.27 && \
+    LD_LIBRARY_PATH=/usr/local/lib64 LIBS=" -lssl -lcrypto -ldl" ./configure --enable-static --enable-shared  --enable-krb4 --prefix /usr && \
+    make && make install
+
+RUN set -x && \
+    LD_LIBRARY_PATH=/usr/local/lib64 curl -O -L https://github.com/facebook/zstd/releases/download/v1.4.0/zstd-1.4.0.tar.gz && \
+    tar -xvf zstd-1.4.0.tar.gz && \
+    cd zstd-1.4.0 && \
+    make && make install
+
 COPY . /tarantool
 
 RUN set -x && \
@@ -81,6 +94,8 @@ RUN set -x \
        cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
              -DENABLE_DIST:BOOL=ON \
              -DBUILD_STATIC=ON \
+             -DENABLE_SASL=ON \
+             -DENABLE_BUNDLED_ZSTD=OFF \
              -DOPENSSL_USE_STATIC_LIBS=ON \
              .) \
     && make -C /tarantool -j

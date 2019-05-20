@@ -312,6 +312,13 @@ else()
 endif()
 
 #
+# LZ4
+#
+
+find_package(LZ4)
+set(LZ4_LIBRARIES ${LZ4_LIBRARY})
+
+#
 # OpenSSL
 #
 find_package(OpenSSL)
@@ -356,6 +363,15 @@ find_package(ICONV)
 
 set(ICU_FIND_REQUIRED ON)
 find_package(ICU)
+
+#
+# Sasl
+#
+
+if(ENABLE_SASL)
+    set(Sasl_FIND_REQUIRED ON)
+    find_package(Sasl)
+endif()
 
 #
 # LuaJIT
