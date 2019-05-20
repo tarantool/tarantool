@@ -786,7 +786,27 @@ box.execute("SELECT CAST(1 AS BOOLEAN);")
 ...
 box.execute("SELECT CAST(1.123 AS BOOLEAN);")
 ---
-- error: 'Type mismatch: can not convert 1.123 to boolean'
+- metadata:
+  - name: CAST(1.123 AS BOOLEAN)
+    type: boolean
+  rows:
+  - [true]
+...
+box.execute("SELECT CAST(0.0 AS BOOLEAN);")
+---
+- metadata:
+  - name: CAST(0.0 AS BOOLEAN)
+    type: boolean
+  rows:
+  - [false]
+...
+box.execute("SELECT CAST(0.00000001 AS BOOLEAN);")
+---
+- metadata:
+  - name: CAST(0.00000001 AS BOOLEAN)
+    type: boolean
+  rows:
+  - [true]
 ...
 box.execute("SELECT CAST('abc' AS BOOLEAN);")
 ---

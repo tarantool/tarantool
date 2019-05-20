@@ -664,6 +664,10 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 			mem_set_bool(pMem, pMem->u.i);
 			return 0;
 		}
+		if ((pMem->flags & MEM_Real) != 0) {
+			mem_set_bool(pMem, pMem->u.r);
+			return 0;
+		}
 		if ((pMem->flags & MEM_Str) != 0) {
 			bool value;
 			if (str_cast_to_boolean(pMem->z, &value) != 0)
