@@ -2600,7 +2600,6 @@ case OP_Column: {
 	u32 *aOffset;      /* aOffset[i] is offset to start of data for i-th column */
 	int i;             /* Loop counter */
 	Mem *pDest;        /* Where to write the extracted value */
-	Mem sMem;          /* For storing the record being decoded */
 	const u8 *zData;   /* Part of the record being decoded */
 	const u8 MAYBE_UNUSED *zEnd;    /* Data end */
 	const u8 *zParse;  /* Next unparsed byte of the row */
@@ -2626,7 +2625,7 @@ case OP_Column: {
 				pReg = &aMem[pC->uc.pseudoTableReg];
 				assert(pReg->flags & MEM_Blob);
 				assert(memIsValid(pReg));
-				pC->payloadSize = pC->szRow = pReg->n;
+				pC->szRow = pReg->n;
 				pC->aRow = (u8*)pReg->z;
 			} else {
 				sqlVdbeMemSetNull(pDest);
@@ -2639,9 +2638,7 @@ case OP_Column: {
 			assert(sqlCursorIsValid(pCrsr));
 			assert(pCrsr->curFlags & BTCF_TaCursor ||
 			       pCrsr->curFlags & BTCF_TEphemCursor);
-			pC->aRow = tarantoolsqlPayloadFetch(pCrsr,
-								&pC->payloadSize);
-			pC->szRow = pC->payloadSize;
+			pC->aRow = tarantoolsqlPayloadFetch(pCrsr, &pC->szRow);
 
 		}
 		pC->cacheStatus = p->cacheCtr;
@@ -2659,22 +2656,8 @@ case OP_Column: {
 		}
 		goto op_column_out;
 	}
-
-	/* Sometimes the data is too large and overflow pages come into play.
-	 * In the later case allocate a buffer and reassamble the row.
-	 * Stock sql utilized several clever techniques to optimize here.
-	 * The techniques we ripped out to simplify the code.
-	 */
-	if (pC->szRow==pC->payloadSize) {
-		zData = pC->aRow;
-		zEnd = zData + pC->payloadSize;
-	} else {
-		memset(&sMem, 0, sizeof(sMem));
-		rc = sqlVdbeMemFromBtree(pC->uc.pCursor, 0, pC->payloadSize, &sMem);
-		if (rc!=SQL_OK) goto abort_due_to_error;
-		zData = (u8*)sMem.z;
-		zEnd = zData + pC->payloadSize;
-	}
+	zData = pC->aRow;
+	zEnd = zData + pC->szRow;
 
 	/*
 	 * Make sure at least the first p2+1 entries of the header
@@ -2767,7 +2750,8 @@ case OP_Column: {
 	if ((pDest->flags & (MEM_Ephem | MEM_Str)) == (MEM_Ephem | MEM_Str)) {
 		int len = pDest->n;
 		if (pDest->szMalloc<len+1) {
-			if (sqlVdbeMemGrow(pDest, len+1, 1)) goto op_column_error;
+			if (sqlVdbeMemGrow(pDest, len+1, 1))
+				goto abort_due_to_error;
 		} else {
 			pDest->z = memcpy(pDest->zMalloc, pDest->z, len);
 			pDest->flags &= ~MEM_Ephem;
@@ -2776,15 +2760,10 @@ case OP_Column: {
 		pDest->flags |= MEM_Term;
 	}
 
-	if (zData!=pC->aRow) sqlVdbeMemRelease(&sMem);
-			op_column_out:
+op_column_out:
 	UPDATE_MAX_BLOBSIZE(pDest);
 	REGISTER_TRACE(p, pOp->p3, pDest);
 	break;
-
-			op_column_error:
-	if (zData!=pC->aRow) sqlVdbeMemRelease(&sMem);
-	goto abort_due_to_error;
 }
 
 /* Opcode: ApplyType P1 P2 * P4 *

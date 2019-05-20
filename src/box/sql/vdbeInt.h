@@ -114,7 +114,6 @@ struct VdbeCursor {
 	i16 nField;		/* Number of fields in the header */
 	u16 nHdrParsed;		/* Number of header fields parsed so far */
 	const u8 *aRow;		/* Data for the current row, if all on one page */
-	u32 payloadSize;	/* Total number of bytes in the record */
 	u32 szRow;		/* Byte available in aRow */
 #ifdef SQL_ENABLE_COLUMN_USED_MASK
 	u64 maskUsed;		/* Mask of columns used by this cursor */
