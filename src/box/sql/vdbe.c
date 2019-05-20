@@ -1929,7 +1929,7 @@ case OP_ShiftRight: {           /* same as TK_RSHIFT, in1, in2, out3 */
 case OP_AddImm: {            /* in1 */
 	pIn1 = &aMem[pOp->p1];
 	memAboutToChange(p, pIn1);
-	sqlVdbeMemIntegerify(pIn1, false);
+	assert((pIn1->flags & MEM_Int) != 0);
 	pIn1->u.i += pOp->p2;
 	break;
 }
