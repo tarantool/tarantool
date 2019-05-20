@@ -14,6 +14,8 @@ include_directories(${CURL_INCLUDE_DIRS})
 include_directories(${ICU_INCLUDE_DIRS})
 include_directories(${ICONV_INCLUDE_DIRS})
 include_directories(${DECNUMBER_INCLUDE_DIR})
+include_directories(${LZ4_INCLUDE_DIR})
+include_directories(${ZSTD_INCLUDE_DIRS})
 
 set(LIBUTIL_FREEBSD_SRC ${CMAKE_SOURCE_DIR}/third_party/libutil_freebsd)
 include_directories(${LIBUTIL_FREEBSD_SRC})
@@ -172,10 +174,24 @@ add_dependencies(server build_bundled_libs)
 target_link_libraries(server core coll http_parser bit uri uuid swim swim_udp
                       swim_ev crypto)
 
+if(BUILD_STATIC)
+    set(Z_STATIC libz.a)
+    set(ZZIP_STATIC libzzip.a)
+endif()
+
+find_library(Z_LIBRARY NAMES ${Z_STATIC} z)
+find_library(ZZIP_LIBRARY NAMES ${ZZIP_STATIC} zzip)
+
 # Rule of thumb: if exporting a symbol from a static library, list the
 # library here.
 set (reexport_libraries server core misc bitset csv swim swim_udp swim_ev
-     ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES})
+     ${LUAJIT_LIBRARIES}
+     ${MSGPUCK_LIBRARIES}
+     ${ICU_LIBRARIES}
+     ${LZ4_STATIC}
+     ${Z_STATIC}
+     ${ZSTD_LIBRARIES}
+    )
 
 set (common_libraries
     ${reexport_libraries}
@@ -217,7 +233,12 @@ if(BUILD_STATIC)
             ${READLINE_LIBRARIES}
             ${CURL_LIBRARIES}
             ${OPENSSL_LIBRARIES}
-            ${ICU_LIBRARIES})
+            ${ICU_LIBRARIES}
+            ${Z_STATIC}
+            ${ZZIP_STATIC}
+            ${LZ4_STATIC}
+            ${ZSTD_LIBRARIES}
+        )
         if (${libstatic} MATCHES "lib[^/]+.a")
             string(REGEX MATCH "lib[^/]+.a" libname ${libstatic})
             string(REGEX REPLACE "\\.a$" "" libname ${libname})

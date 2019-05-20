@@ -312,6 +312,13 @@ else()
 endif()
 
 #
+# LZ4
+#
+
+find_package(LZ4)
+set(LZ4_LIBRARIES ${LZ4_LIBRARY})
+
+#
 # OpenSSL
 #
 find_package(OpenSSL)

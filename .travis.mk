@@ -61,7 +61,7 @@ deps_debian:
 	apt-get update ${APT_EXTRA_FLAGS} && apt-get install -y -f \
 		build-essential cmake coreutils sed \
 		libreadline-dev libncurses5-dev libyaml-dev libssl-dev \
-		libcurl4-openssl-dev libunwind-dev libicu-dev \
+		libcurl4-openssl-dev libunwind-dev libicu-dev liblz4-dev \
 		python python-pip python-setuptools python-dev \
 		python-msgpack python-yaml python-argparse python-six python-gevent \
 		lcov ruby clang llvm llvm-dev zlib1g-dev autoconf automake libtool
@@ -129,7 +129,7 @@ test_asan_debian: deps_debian deps_buster_clang_8 test_asan_debian_no_deps
 
 deps_osx:
 	brew update
-	brew install openssl readline curl icu4c libiconv zlib autoconf automake libtool --force
+	brew install openssl readline curl icu4c lz4 libiconv zlib autoconf automake libtool --force
 	python2 -V || brew install python2 --force
 	curl --silent --show-error --retry 5 https://bootstrap.pypa.io/get-pip.py >get-pip.py
 	python get-pip.py --user
