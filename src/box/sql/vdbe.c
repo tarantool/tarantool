@@ -43,6 +43,7 @@
 #include "box/error.h"
 #include "box/fk_constraint.h"
 #include "box/txn.h"
+#include "box/tuple.h"
 #include "sqlInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
@@ -610,6 +611,121 @@ mem_type_to_str(const struct Mem *p)
 	default:
 		unreachable();
 	}
+}
+
+/**
+ * Try to get a current tuple field using its field map.
+ * @param field_ref The vdbe_field_ref instance to use.
+ * @param fieldno Number of a field to get.
+ * @param[out] field_size Result field size.
+ * @retval not NULL MessagePack field.
+ * @retval NULL Can not use field_map - it does not contain
+ *              offset to @a fieldno.
+ */
+static const void *
+vdbe_field_ref_fast_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
+			  uint32_t *field_size)
+{
+	if (field_ref->tuple == NULL)
+		return NULL;
+	struct tuple_format *format = tuple_format(field_ref->tuple);
+	if (fieldno >= tuple_format_field_count(format) ||
+	    tuple_format_field(format, fieldno)->offset_slot ==
+	    TUPLE_OFFSET_SLOT_NIL)
+		return NULL;
+	const char *field = tuple_field(field_ref->tuple, fieldno);
+	const char *end = field;
+	mp_next(&end);
+	*field_size = end - field;
+	return field;
+}
+
+/**
+ * Fetch field by fieldno using vdbe_field_ref and store result
+ * in dest_mem.
+ * @param field_ref The initialized vdbe_field_ref instance to use.
+ * @param fieldno The id of the field to fetch.
+ * @param[out] dest_mem The memory variable to store result.
+ * @retval SQL_OK Status code in case of success.
+ * @retval sql_ret_code Error code otherwise.
+ */
+static int
+vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
+		     struct Mem *dest_mem)
+{
+	sqlVdbeMemSetNull(dest_mem);
+	uint32_t *slots = field_ref->slots;
+	if (fieldno >= field_ref->field_count) {
+		UPDATE_MAX_BLOBSIZE(dest_mem);
+		return SQL_OK;
+	}
+
+	const char *data;
+	if (field_ref->rightmost_slot <= fieldno) {
+		uint32_t field_sz;
+		data = vdbe_field_ref_fast_fetch(field_ref, fieldno,
+						 &field_sz);
+		if (data != NULL) {
+			/*
+			 * Special case for tarantool spaces: for
+			 * indexed fields a tuple field map can be
+			 * used. Else there is no sense in
+			 * tuple_field usage, because it makes
+			 * foreach field { mp_next(); } to find
+			 * a field. In such a case sql is
+			 * better - it saves offsets to all fields
+			 * visited in mp_next() cycle.
+			 */
+			uint32_t offset = (uint32_t)(data - field_ref->data);
+			slots[fieldno] = offset;
+			slots[fieldno + 1] = offset + field_sz;
+		} else {
+			uint32_t i = field_ref->rightmost_slot;
+			data = field_ref->data + slots[i];
+			do {
+				mp_next(&data);
+				slots[++i] = (uint32_t)(data - field_ref->data);
+			} while (i <= fieldno);
+			field_ref->rightmost_slot = i;
+		}
+	}
+
+	assert(sqlVdbeCheckMemInvariants(dest_mem) != 0);
+	uint32_t dummy;
+	data = field_ref->data + slots[fieldno];
+	if (vdbe_decode_msgpack_into_mem(data, dest_mem, &dummy) != 0)
+		return SQL_TARANTOOL_ERROR;
+
+	/*
+	 * MsgPack map, array or extension (unsupported in sql).
+	 * Wrap it in a blob verbatim.
+	 */
+	if (dest_mem->flags == 0) {
+		dest_mem->n = slots[fieldno + 1] - slots[fieldno];
+		dest_mem->z = (char *) data;
+		dest_mem->flags = MEM_Blob | MEM_Ephem | MEM_Subtype;
+		dest_mem->subtype = SQL_SUBTYPE_MSGPACK;
+	}
+	/*
+	 * Add 0 termination (at most for strings)
+	 * Not sure why do we check MEM_Ephem
+	 */
+	if ((dest_mem->flags & (MEM_Ephem | MEM_Str)) ==
+	    (MEM_Ephem | MEM_Str)) {
+		int len = dest_mem->n;
+		if (dest_mem->szMalloc < len + 1) {
+			if (sqlVdbeMemGrow(dest_mem, len + 1, 1) != 0)
+				return SQL_NOMEM;
+		} else {
+			dest_mem->z =
+				memcpy(dest_mem->zMalloc, dest_mem->z, len);
+			dest_mem->flags &= ~MEM_Ephem;
+		}
+		dest_mem->z[len] = 0;
+		dest_mem->flags |= MEM_Term;
+	}
+	UPDATE_MAX_BLOBSIZE(dest_mem);
+	return SQL_OK;
 }
 
 /*
@@ -2597,12 +2713,7 @@ case OP_Column: {
 	int p2;            /* column number to retrieve */
 	VdbeCursor *pC;    /* The VDBE cursor */
 	BtCursor *pCrsr = NULL; /* The BTree cursor */
-	u32 *aOffset;      /* aOffset[i] is offset to start of data for i-th column */
-	int i;             /* Loop counter */
 	Mem *pDest;        /* Where to write the extracted value */
-	const u8 *zData;   /* Part of the record being decoded */
-	const u8 MAYBE_UNUSED *zEnd;    /* Data end */
-	const u8 *zParse;  /* Next unparsed byte of the row */
 	Mem *pReg;         /* PseudoTable input register */
 
 	pC = p->apCsr[pOp->p1];
@@ -2614,7 +2725,6 @@ case OP_Column: {
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
 	assert(pC!=0);
 	assert(p2<pC->nField);
-	aOffset = pC->aOffset;
 	assert(pC->eCurType!=CURTYPE_PSEUDO || pC->nullRow);
 	assert(pC->eCurType!=CURTYPE_SORTER);
 
@@ -2625,8 +2735,8 @@ case OP_Column: {
 				pReg = &aMem[pC->uc.pseudoTableReg];
 				assert(pReg->flags & MEM_Blob);
 				assert(memIsValid(pReg));
-				pC->szRow = pReg->n;
-				pC->aRow = (u8*)pReg->z;
+				vdbe_field_ref_prepare_data(&pC->field_ref,
+							    pReg->z, pReg->n);
 			} else {
 				sqlVdbeMemSetNull(pDest);
 				goto op_column_out;
@@ -2638,131 +2748,67 @@ case OP_Column: {
 			assert(sqlCursorIsValid(pCrsr));
 			assert(pCrsr->curFlags & BTCF_TaCursor ||
 			       pCrsr->curFlags & BTCF_TEphemCursor);
-			pC->aRow = tarantoolsqlPayloadFetch(pCrsr, &pC->szRow);
-
+			vdbe_field_ref_prepare_tuple(&pC->field_ref,
+						     pCrsr->last_tuple);
 		}
 		pC->cacheStatus = p->cacheCtr;
-		zParse = pC->aRow;
-		pC->nRowField = mp_decode_array((const char **)&zParse); /* # of fields */
-		aOffset[0] = (u32)(zParse - pC->aRow);
-		pC->nHdrParsed = 0;
 	}
-
-	if ( (u32)p2>=pC->nRowField) {
-		if (pOp->p4type==P4_MEM) {
-			sqlVdbeMemShallowCopy(pDest, pOp->p4.pMem, MEM_Static);
-		} else {
-			sqlVdbeMemSetNull(pDest);
-		}
-		goto op_column_out;
-	}
-	zData = pC->aRow;
-	zEnd = zData + pC->szRow;
-
-	/*
-	 * Make sure at least the first p2+1 entries of the header
-	 * have been parsed and valid information is in aOffset[].
-	 * If there is more header available for parsing in the
-	 * record, try to extract additional fields up through the
-	 * p2+1-th field.
-	 */
-	if (pC->nHdrParsed <= p2) {
-		u32 size;
-		if (pC->eCurType == CURTYPE_TARANTOOL &&
-		    pCrsr != NULL && ((pCrsr->curFlags & BTCF_TaCursor) != 0 ||
-		    (pCrsr->curFlags & BTCF_TEphemCursor)) &&
-		    (zParse = tarantoolsqlTupleColumnFast(pCrsr, p2,
-							      &size)) != NULL) {
-			/*
-			 * Special case for tarantool spaces: for
-			 * indexed fields a tuple field map can be
-			 * used. Else there is no sense in
-			 * tuple_field usage, because it makes
-			 * foreach field { mp_next(); } to find
-			 * a field. In such a case sql is
-			 * better - it saves offsets to all fields
-			 * visited in mp_next() cycle.
-			 */
-			aOffset[p2] = zParse - zData;
-			aOffset[p2 + 1] = aOffset[p2] + size;
-		} else {
-			i = pC->nHdrParsed;
-			zParse = zData+aOffset[i];
-
-			/*
-			 * Fill in aOffset[i] values through the
-			 * p2-th field.
-			 */
-			do{
-				mp_next((const char **) &zParse);
-				aOffset[++i] = (u32)(zParse-zData);
-			}while( i<=p2);
-			assert((u32)p2 != pC->nRowField || zParse == zEnd);
-			pC->nHdrParsed = i;
-		}
-	}
-
-	/* Extract the content for the p2+1-th column.  Control can only
-	 * reach this point if aOffset[p2], aOffset[p2+1] are
-	 * all valid.
-	 */
-	assert(rc==SQL_OK);
-	assert(sqlVdbeCheckMemInvariants(pDest));
-	if (VdbeMemDynamic(pDest)) {
-		sqlVdbeMemSetNull(pDest);
-	}
-	uint32_t unused;
-	if (vdbe_decode_msgpack_into_mem((const char *)(zData + aOffset[p2]),
-					 pDest, &unused) != 0) {
-		rc = SQL_TARANTOOL_ERROR;
-		goto abort_due_to_error;
-	}
-	/* MsgPack map, array or extension (unsupported in sql).
-	 * Wrap it in a blob verbatim.
-	 */
-
-	if (pDest->flags == 0) {
-		pDest->n = aOffset[p2+1]-aOffset[p2];
-		pDest->z = (char *)zData+aOffset[p2];
-		pDest->flags = MEM_Blob|MEM_Ephem|MEM_Subtype;
-		pDest->subtype = SQL_SUBTYPE_MSGPACK;
-	}
-	if ((pDest->flags & MEM_Int) != 0 &&
-	    pC->eCurType == CURTYPE_TARANTOOL) {
-		enum field_type f = FIELD_TYPE_ANY;
+	enum field_type field_type = FIELD_TYPE_ANY;
+	if (pC->eCurType == CURTYPE_TARANTOOL) {
 		/*
 		 * Ephemeral spaces feature only one index
 		 * covering all fields, but ephemeral spaces
 		 * lack format. So, we can fetch type from
 		 * key parts.
 		 */
-		if (pC->uc.pCursor->curFlags & BTCF_TEphemCursor)
-			f = pC->uc.pCursor->index->def->key_def->parts[p2].type;
-		else if (pC->uc.pCursor->curFlags & BTCF_TaCursor)
-			f = pC->uc.pCursor->space->def->fields[p2].type;
-		if (f == FIELD_TYPE_NUMBER)
+		if (pC->uc.pCursor->curFlags & BTCF_TEphemCursor) {
+			field_type = pC->uc.pCursor->index->def->
+					key_def->parts[p2].type;
+		} else if (pC->uc.pCursor->curFlags & BTCF_TaCursor) {
+			field_type = pC->uc.pCursor->space->def->
+					fields[p2].type;
+		}
+	}
+	struct Mem *default_val_mem =
+		pOp->p4type == P4_MEM ? pOp->p4.pMem : NULL;
+	rc = vdbe_field_ref_fetch(&pC->field_ref, p2, pDest);
+	if (rc != SQL_OK)
+		goto abort_due_to_error;
+
+	if ((pDest->flags & MEM_Null) &&
+	    (uint32_t) p2  >= pC->field_ref.field_count &&
+	    default_val_mem != NULL) {
+		sqlVdbeMemShallowCopy(pDest, default_val_mem, MEM_Static);
+	}
+	if ((pDest->flags & MEM_Int) != 0) {
+		if (field_type == FIELD_TYPE_NUMBER)
 			sqlVdbeMemSetDouble(pDest, pDest->u.i);
 	}
-	/*
-	 * Add 0 termination (at most for strings)
-	 * Not sure why do we check MEM_Ephem
-	 */
-	if ((pDest->flags & (MEM_Ephem | MEM_Str)) == (MEM_Ephem | MEM_Str)) {
-		int len = pDest->n;
-		if (pDest->szMalloc<len+1) {
-			if (sqlVdbeMemGrow(pDest, len+1, 1))
-				goto abort_due_to_error;
-		} else {
-			pDest->z = memcpy(pDest->zMalloc, pDest->z, len);
-			pDest->flags &= ~MEM_Ephem;
-		}
-		pDest->z[len] = 0;
-		pDest->flags |= MEM_Term;
-	}
-
 op_column_out:
-	UPDATE_MAX_BLOBSIZE(pDest);
 	REGISTER_TRACE(p, pOp->p3, pDest);
+	break;
+}
+
+/* Opcode: Fetch P1 P2 P3 * *
+ * Synopsis: r[P3]=PX
+ *
+ * Interpret data P1 points at as an initialized vdbe_field_ref
+ * object.
+ *
+ * Fetch the P2-th column from its tuple. The value extracted
+ * is stored in register P3. If the column contains fewer than
+ * P2 fields, then extract a NULL.
+ */
+case OP_Fetch: {
+	struct vdbe_field_ref *field_ref =
+		(struct vdbe_field_ref *) p->aMem[pOp->p1].u.p;
+	uint32_t field_idx = pOp->p2;
+	struct Mem *dest_mem = &aMem[pOp->p3];
+	memAboutToChange(p, dest_mem);
+	rc = vdbe_field_ref_fetch(field_ref, field_idx, dest_mem);
+	if (rc != SQL_OK)
+		goto abort_due_to_error;
+	REGISTER_TRACE(p, pOp->p3, dest_mem);
 	break;
 }
 

@@ -181,25 +181,6 @@ const void *tarantoolsqlPayloadFetch(BtCursor *pCur, u32 *pAmt)
 	return tuple_data(pCur->last_tuple);
 }
 
-const void *
-tarantoolsqlTupleColumnFast(BtCursor *pCur, u32 fieldno, u32 *field_size)
-{
-	assert(pCur->curFlags & BTCF_TaCursor ||
-	       pCur->curFlags & BTCF_TEphemCursor);
-	assert(pCur->last_tuple != NULL);
-
-	struct tuple_format *format = tuple_format(pCur->last_tuple);
-	if (fieldno >= tuple_format_field_count(format) ||
-	    tuple_format_field(format, fieldno)->offset_slot ==
-	    TUPLE_OFFSET_SLOT_NIL)
-		return NULL;
-	const char *field = tuple_field(pCur->last_tuple, fieldno);
-	const char *end = field;
-	mp_next(&end);
-	*field_size = end - field;
-	return field;
-}
-
 /*
  * Set cursor to the first tuple in given space.
  * It is a simple wrapper around cursor_seek().
@@ -1361,4 +1342,41 @@ sql_checks_resolve_space_def_reference(ExprList *expr_list,
 	int rc = parser.is_aborted ? -1 : 0;
 	sql_parser_destroy(&parser);
 	return rc;
+}
+
+/**
+ * Initialize a new vdbe_field_ref instance with given tuple
+ * data.
+ * @param field_ref The vdbe_field_ref instance to initialize.
+ * @param tuple The tuple object pointer or NULL when undefined.
+ * @param data The tuple data (is always defined).
+ * @param data_sz The size of tuple data (is always defined).
+ */
+static void
+vdbe_field_ref_create(struct vdbe_field_ref *field_ref, struct tuple *tuple,
+		      const char *data, uint32_t data_sz)
+{
+	field_ref->tuple = tuple;
+	field_ref->data = data;
+	field_ref->data_sz = data_sz;
+
+	const char *field0 = data;
+	field_ref->field_count = mp_decode_array((const char **) &field0);
+	field_ref->slots[0] = (uint32_t)(field0 - data);
+	field_ref->rightmost_slot = 0;
+}
+
+void
+vdbe_field_ref_prepare_data(struct vdbe_field_ref *field_ref, const char *data,
+			    uint32_t data_sz)
+{
+	vdbe_field_ref_create(field_ref, NULL, data, data_sz);
+}
+
+void
+vdbe_field_ref_prepare_tuple(struct vdbe_field_ref *field_ref,
+			     struct tuple *tuple)
+{
+	vdbe_field_ref_create(field_ref, tuple, tuple_data(tuple),
+			      tuple->bsize);
 }

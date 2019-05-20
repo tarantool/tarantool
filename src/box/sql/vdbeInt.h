@@ -112,17 +112,14 @@ struct VdbeCursor {
 	/** Info about keys needed by index cursors. */
 	struct key_def *key_def;
 	i16 nField;		/* Number of fields in the header */
-	u16 nHdrParsed;		/* Number of header fields parsed so far */
-	const u8 *aRow;		/* Data for the current row, if all on one page */
-	u32 szRow;		/* Byte available in aRow */
 #ifdef SQL_ENABLE_COLUMN_USED_MASK
 	u64 maskUsed;		/* Mask of columns used by this cursor */
 #endif
-	u32 nRowField;		/* Number of fields in the current row */
-	/* Offsets for all fields in the record [nField+1]
-	 * Order of fields is the same as it was passes to create table statement
+	/**
+	 * Auxiliary VDBE structure to speed-up tuple data
+	 * field access.
 	 */
-	u32 aOffset[1];
+	struct vdbe_field_ref field_ref;
 };
 
 /*
