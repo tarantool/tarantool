@@ -71,6 +71,15 @@ box.execute("SELECT * FROM t1 WHERE 'int' LIKE 4;")
 box.execute("SELECT NULL LIKE s FROM t1;")
 box.space.T1:drop()
 
+-- gh-4229: allow explicit cast from string to integer for string
+-- values containing quoted floating point literals.
+--
+box.execute("SELECT CAST('1.123' AS INTEGER);")
+box.execute("CREATE TABLE t1 (f TEXT PRIMARY KEY);")
+box.execute("INSERT INTO t1 VALUES('0.0'), ('1.5'), ('3.9312453');")
+box.execute("SELECT CAST(f AS INTEGER) FROM t1;")
+box.space.T1:drop()
+
 -- Test basic capabilities of boolean type.
 --
 box.execute("SELECT true;")
