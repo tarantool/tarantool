@@ -294,3 +294,11 @@ box.execute('DROP TABLE test')
 ---
 - row_count: 1
 ...
+box.execute('SELECT ?', {1, 2})
+---
+- error: 'Failed to execute SQL statement: The number of parameters is too large'
+...
+box.execute('SELECT $2', {1, 2, 3})
+---
+- error: 'Failed to execute SQL statement: The number of parameters is too large'
+...

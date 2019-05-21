@@ -898,11 +898,7 @@ sql_column_decltype(sql_stmt * pStmt, int N)
  */
 /*
  * Unbind the value bound to variable i in virtual machine p. This is the
- * the same as binding a NULL value to the column. If the "i" parameter is
- * out of range, then SQL_RANGE is returned. Othewise 0.
- *
- * The error code stored in database p->db is overwritten with the return
- * value in any case.
+ * the same as binding a NULL value to the column.
  */
 static int
 vdbeUnbind(Vdbe * p, int i)
@@ -910,8 +906,11 @@ vdbeUnbind(Vdbe * p, int i)
 	Mem *pVar;
 	assert(p != NULL);
 	assert(p->magic == VDBE_MAGIC_RUN && p->pc < 0);
-	if (i < 1 || i > p->nVar) {
-		return SQL_RANGE;
+	assert(i > 0);
+	if(i > p->nVar) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "\
+			 "parameters is too large");
+		return -1;
 	}
 	i--;
 	pVar = &p->aVar[i];
@@ -962,19 +961,19 @@ sql_bind_type(struct Vdbe *v, uint32_t position, const char *type)
 {
 	if (v->res_var_count < position)
 		return 0;
-	int rc = sqlVdbeSetColName(v, v->var_pos[position - 1],
-				       COLNAME_DECLTYPE, type,
-				       SQL_TRANSIENT);
+	int rc = 0;
+	if (sqlVdbeSetColName(v, v->var_pos[position - 1], COLNAME_DECLTYPE,
+			      type, SQL_TRANSIENT) != 0)
+		rc = -1;
 	const char *bind_name = v->aColName[position - 1].z;
 	if (strcmp(bind_name, "?") == 0)
 		return rc;
 	for (uint32_t i = position; i < v->res_var_count; ++i) {
 		if (strcmp(bind_name,  v->aColName[i].z) == 0) {
-			rc = sqlVdbeSetColName(v, v->var_pos[i],
-						   COLNAME_DECLTYPE, type,
-						   SQL_TRANSIENT);
-			if (rc != 0)
-				return rc;
+			if (sqlVdbeSetColName(v, v->var_pos[i],
+					      COLNAME_DECLTYPE, type,
+					      SQL_TRANSIENT) != 0)
+				return -1;
 		}
 	}
 	return 0;
@@ -993,21 +992,17 @@ bindText(sql_stmt * pStmt,	/* The statement to bind against */
 {
 	Vdbe *p = (Vdbe *) pStmt;
 	Mem *pVar;
-	int rc;
-
-	rc = vdbeUnbind(p, i);
-	if (rc == 0) {
-		if (zData != 0) {
-			pVar = &p->aVar[i - 1];
-			rc = sqlVdbeMemSetStr(pVar, zData, nData, 1, xDel);
-			if (rc == 0)
-				rc = sql_bind_type(p, i, "TEXT");
-			rc = sqlApiExit(p->db, rc);
-		}
-	} else if (xDel != SQL_STATIC && xDel != SQL_TRANSIENT) {
-		xDel((void *)zData);
+	if (vdbeUnbind(p, i) != 0) {
+		if (xDel != SQL_STATIC && xDel != SQL_TRANSIENT)
+			xDel((void *)zData);
+		return -1;
 	}
-	return rc;
+	if (zData == NULL)
+		return 0;
+	pVar = &p->aVar[i - 1];
+	if (sqlVdbeMemSetStr(pVar, zData, nData, 1, xDel) != 0)
+		return -1;
+	return sql_bind_type(p, i, "TEXT");
 }
 
 /*
@@ -1019,19 +1014,17 @@ sql_bind_blob(sql_stmt * pStmt,
     )
 {
 	struct Vdbe *p = (Vdbe *) pStmt;
-	int rc = vdbeUnbind(p, i);
-	if (rc == 0) {
-		if (zData != 0) {
-			struct Mem *var = &p->aVar[i - 1];
-			rc = sqlVdbeMemSetStr(var, zData, nData, 0, xDel);
-			if (rc == 0)
-				rc = sql_bind_type(p, i, "BLOB");
-			rc = sqlApiExit(p->db, rc);
-		}
-	} else if (xDel != SQL_STATIC && xDel != SQL_TRANSIENT) {
-		xDel((void *)zData);
+	if (vdbeUnbind(p, i) != 0) {
+		if (xDel != SQL_STATIC && xDel != SQL_TRANSIENT)
+			xDel((void *)zData);
+		return -1;
 	}
-	return rc;
+	if (zData == NULL)
+		return 0;
+	struct Mem *var = &p->aVar[i - 1];
+	if (sqlVdbeMemSetStr(var, zData, nData, 0, xDel) != 0)
+		return -1;
+	return sql_bind_type(p, i, "BLOB");
 }
 
 int
@@ -1052,13 +1045,11 @@ sql_bind_blob64(sql_stmt * pStmt,
 int
 sql_bind_double(sql_stmt * pStmt, int i, double rValue)
 {
-	int rc;
 	Vdbe *p = (Vdbe *) pStmt;
-	rc = vdbeUnbind(p, i);
-	if (rc == 0) {
-		rc = sql_bind_type(p, i, "NUMERIC");
-		sqlVdbeMemSetDouble(&p->aVar[i - 1], rValue);
-	}
+	if (vdbeUnbind(p, i) != 0)
+		return -1;
+	int rc = sql_bind_type(p, i, "NUMERIC");
+	sqlVdbeMemSetDouble(&p->aVar[i - 1], rValue);
 	return rc;
 }
 
@@ -1066,11 +1057,10 @@ int
 sql_bind_boolean(struct sql_stmt *stmt, int i, bool value)
 {
 	struct Vdbe *p = (struct Vdbe *) stmt;
-	int rc = vdbeUnbind(p, i);
-	if (rc == 0) {
-		rc = sql_bind_type(p, i, "BOOLEAN");
-		mem_set_bool(&p->aVar[i - 1], value);
-	}
+	if (vdbeUnbind(p, i) != 0)
+		return -1;
+	int rc = sql_bind_type(p, i, "BOOLEAN");
+	mem_set_bool(&p->aVar[i - 1], value);
 	return rc;
 }
 
@@ -1083,25 +1073,21 @@ sql_bind_int(sql_stmt * p, int i, int iValue)
 int
 sql_bind_int64(sql_stmt * pStmt, int i, sql_int64 iValue)
 {
-	int rc;
 	Vdbe *p = (Vdbe *) pStmt;
-	rc = vdbeUnbind(p, i);
-	if (rc == 0) {
-		rc = sql_bind_type(p, i, "INTEGER");
-		sqlVdbeMemSetInt64(&p->aVar[i - 1], iValue);
-	}
+	if (vdbeUnbind(p, i) != 0)
+		return -1;
+	int rc = sql_bind_type(p, i, "INTEGER");
+	sqlVdbeMemSetInt64(&p->aVar[i - 1], iValue);
 	return rc;
 }
 
 int
 sql_bind_null(sql_stmt * pStmt, int i)
 {
-	int rc;
 	Vdbe *p = (Vdbe *) pStmt;
-	rc = vdbeUnbind(p, i);
-	if (rc == 0)
-		rc = sql_bind_type(p, i, "BOOLEAN");
-	return rc;
+	if (vdbeUnbind(p, i) != 0)
+		return -1;
+	return sql_bind_type(p, i, "BOOLEAN");
 }
 
 int
@@ -1142,13 +1128,11 @@ sql_bind_text64(sql_stmt * pStmt,
 int
 sql_bind_zeroblob(sql_stmt * pStmt, int i, int n)
 {
-	int rc;
 	Vdbe *p = (Vdbe *) pStmt;
-	rc = vdbeUnbind(p, i);
-	if (rc == 0) {
-		sqlVdbeMemSetZeroBlob(&p->aVar[i - 1], n);
-	}
-	return rc;
+	if (vdbeUnbind(p, i) != 0)
+		return -1;
+	sqlVdbeMemSetZeroBlob(&p->aVar[i - 1], n);
+	return 0;
 }
 
 int

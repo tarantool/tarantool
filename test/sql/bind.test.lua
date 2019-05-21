@@ -98,3 +98,6 @@ end;
 test_run:cmd("setopt delimiter ''");
 
 box.execute('DROP TABLE test')
+
+box.execute('SELECT ?', {1, 2})
+box.execute('SELECT $2', {1, 2, 3})

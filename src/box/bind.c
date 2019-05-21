@@ -162,7 +162,6 @@ int
 sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 		uint32_t pos)
 {
-	int rc;
 	if (p->name != NULL) {
 		pos = sql_bind_parameter_lindex(stmt, p->name, p->name_len);
 		if (pos == 0) {
@@ -174,15 +173,12 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 	switch (p->type) {
 	case MP_INT:
 	case MP_UINT:
-		rc = sql_bind_int64(stmt, pos, p->i64);
-		break;
+		return sql_bind_int64(stmt, pos, p->i64);
 	case MP_BOOL:
-		rc = sql_bind_boolean(stmt, pos, p->b);
-		break;
+		return sql_bind_boolean(stmt, pos, p->b);
 	case MP_DOUBLE:
 	case MP_FLOAT:
-		rc = sql_bind_double(stmt, pos, p->d);
-		break;
+		return sql_bind_double(stmt, pos, p->d);
 	case MP_STR:
 		/*
 		 * Parameters are allocated within message pack,
@@ -192,31 +188,14 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 		 * there is no need to copy the packet and we can
 		 * use SQL_STATIC.
 		 */
-		rc = sql_bind_text64(stmt, pos, p->s, p->bytes,
-					 SQL_STATIC);
-		break;
+		return sql_bind_text64(stmt, pos, p->s, p->bytes, SQL_STATIC);
 	case MP_NIL:
-		rc = sql_bind_null(stmt, pos);
-		break;
+		return sql_bind_null(stmt, pos);
 	case MP_BIN:
-		rc = sql_bind_blob64(stmt, pos, (const void *) p->s,
-					 p->bytes, SQL_STATIC);
-		break;
+		return sql_bind_blob64(stmt, pos, (const void *) p->s, p->bytes,
+				       SQL_STATIC);
 	default:
 		unreachable();
 	}
-	if (rc == 0)
-		return 0;
-
-	switch (rc) {
-	case SQL_NOMEM:
-		diag_set(OutOfMemory, p->bytes, "vdbe", "bind value");
-		break;
-	case SQL_TOOBIG:
-	default:
-		diag_set(ClientError, ER_SQL_BIND_VALUE, sql_bind_name(p),
-			 mp_type_strs[p->type]);
-		break;
-	}
-	return -1;
+	return 0;
 }

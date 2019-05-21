@@ -339,8 +339,6 @@ enum sql_ret_code {
 	SQL_TOOBIG,
 	/** Abort due to constraint violation. */
 	SQL_CONSTRAINT,
-	/** 2nd parameter to sql_bind out of range. */
-	SQL_RANGE,
 	SQL_TARANTOOL_ERROR,
 	/** sql_step() has another row ready. */
 	SQL_ROW,
