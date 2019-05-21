@@ -284,7 +284,7 @@ s1:set_payload({a = 100})
 p = s1_self:payload()
 s1_self:payload() == p
 
-while s1_view:payload() == '' do fiber.sleep(0.01) end
+while not s1_view:payload() do fiber.sleep(0.01) end
 p = s1_view:payload()
 s1_view:payload() == p
 

@@ -429,11 +429,11 @@ s:payload_cdata()
 ...
 s:payload_str()
 ---
-- 
+- null
 ...
 s:payload()
 ---
-- 
+- null
 ...
 s:is_dropped()
 ---
@@ -536,7 +536,7 @@ s:set_payload()
 ...
 self:payload()
 ---
-- 
+- null
 ...
 s:set_payload({a = 100})
 ---
@@ -603,7 +603,7 @@ s:set_payload()
 ...
 self:payload()
 ---
-- 
+- null
 ...
 s:set_payload(100)
 ---
@@ -619,7 +619,7 @@ s:set_payload_raw()
 ...
 self:payload()
 ---
-- 
+- null
 ...
 -- Raw payload setting can be used when MessagePack is not needed,
 -- or already encoded.
@@ -724,7 +724,7 @@ s1_view = s2:member_by_uuid(uuid(1))
 ...
 s1_view:payload()
 ---
-- 
+- null
 ...
 s1_view:incarnation()
 ---
@@ -878,7 +878,7 @@ s1_self:payload() == p
 ---
 - true
 ...
-while s1_view:payload() == '' do fiber.sleep(0.01) end
+while not s1_view:payload() do fiber.sleep(0.01) end
 ---
 ...
 p = s1_view:payload()
