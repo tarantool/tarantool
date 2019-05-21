@@ -2104,7 +2104,6 @@ sqlVdbeHalt(Vdbe * p)
 	 *
 	 *     SQL_NOMEM
 	 *     SQL_IOERR
-	 *     SQL_FULL
 	 *
 	 * Then the internal cache might have been left in an inconsistent
 	 * state.  We need to rollback the statement transaction, if there is
@@ -2130,8 +2129,7 @@ sqlVdbeHalt(Vdbe * p)
 
 		/* Check for one of the special errors */
 		mrc = p->rc & 0xff;
-		isSpecialError = mrc == SQL_NOMEM || mrc == SQL_IOERR ||
-				 mrc == SQL_FULL;
+		isSpecialError = mrc == SQL_NOMEM || mrc == SQL_IOERR;
 		if (isSpecialError) {
 			/* At least a savepoint transaction must be rolled back
 			 * to restore the database to a consistent state.
@@ -2143,7 +2141,7 @@ sqlVdbeHalt(Vdbe * p)
 			 * pagerStress() in pager.c), the rollback is required to restore
 			 * the pager to a consistent state.
 			 */
-			if ((mrc == SQL_NOMEM || mrc == SQL_FULL)
+			if ((mrc == SQL_NOMEM)
 			    && box_txn()) {
 				eStatementOp = SAVEPOINT_ROLLBACK;
 			} else {

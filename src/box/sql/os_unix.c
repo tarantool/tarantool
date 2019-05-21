@@ -876,7 +876,7 @@ unixWrite(sql_file * id, const void *pBuf, int amt, sql_int64 offset)
 			return SQL_IOERR_WRITE;
 		} else {
 			storeLastErrno(pFile, 0);	/* not a system error */
-			return SQL_FULL;
+			return -1;
 		}
 	}
 
