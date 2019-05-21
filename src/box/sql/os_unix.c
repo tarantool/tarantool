@@ -1047,7 +1047,7 @@ unixFileControl(sql_file * id, int op, void *pArg)
 			return rc;
 		}
 	}
-	return SQL_NOTFOUND;
+	return -1;
 }
 
 /*

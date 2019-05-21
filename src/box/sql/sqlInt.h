@@ -335,8 +335,6 @@ enum sql_ret_code {
 	SQL_NOMEM,
 	/** Some kind of disk I/O error occurred. */
 	SQL_IOERR,
-	/** Unknown opcode in sql_file_control(). */
-	SQL_NOTFOUND,
 	/** Insertion failed because database is full. */
 	SQL_FULL,
 	/** The database schema changed. */

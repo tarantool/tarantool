@@ -1526,22 +1526,14 @@ whereEqualScanEst(Parse * pParse,	/* Parsing & code generating context */
 
 	assert(nEq >= 1);
 	assert(nEq <= (int) p->key_def->part_count);
-	assert(pBuilder->nRecValid < nEq);
-
-	/* If values are not available for all fields of the index to the left
-	 * of this one, no estimate can be made. Return SQL_NOTFOUND.
-	 */
-	if (pBuilder->nRecValid < (nEq - 1)) {
-		return SQL_NOTFOUND;
-	}
+	assert(pBuilder->nRecValid == (nEq - 1));
 
 	rc = sqlStat4ProbeSetValue(pParse, p, &pRec, pExpr, 1, nEq - 1,
 				       &bOk);
 	pBuilder->pRec = pRec;
 	if (rc != 0)
 		return rc;
-	if (bOk == 0)
-		return SQL_NOTFOUND;
+	assert(bOk != 0);
 	pBuilder->nRecValid = nEq;
 
 	whereKeyStats(pParse, p, pRec, 0, a);
@@ -2541,8 +2533,6 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 								    pExpr->x.pList,
 								    &nOut);
 					}
-					if (rc == SQL_NOTFOUND)
-						rc = 0;
 					if (rc != 0)
 						break;	/* Jump out of the pTerm loop */
 					if (nOut) {
