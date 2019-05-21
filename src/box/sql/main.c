@@ -249,7 +249,7 @@ sqlCreateFunc(sql * db,
 
 
 	/* Check if an existing function is being overridden or deleted. If so,
-	 * and there are active VMs, then return SQL_BUSY. If a function
+	 * and there are active VMs, then return an error. If a function
 	 * is being overridden/deleted but there are no active VMs, allow the
 	 * operation to continue but invalidate all precompiled statements.
 	 */

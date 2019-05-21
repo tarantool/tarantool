@@ -1390,8 +1390,7 @@ sqlVdbeList(Vdbe * p)
 
 	assert(p->explain);
 	assert(p->magic == VDBE_MAGIC_RUN);
-	assert(p->rc == 0 || p->rc == SQL_BUSY
-	       || p->rc == SQL_NOMEM);
+	assert(p->rc == 0 || p->rc == SQL_NOMEM);
 
 	/* Even though this opcode does not use dynamic strings for
 	 * the result, result columns may become dynamic if the user calls
@@ -2086,9 +2085,7 @@ sql_savepoint(MAYBE_UNUSED Vdbe *p, const char *zName)
  * SQL_MAGIC_RUN to SQL_MAGIC_HALT.  It is harmless to
  * call this on a VM that is in the SQL_MAGIC_HALT state.
  *
- * Return an error code.  If the commit could not complete because of
- * lock contention, return SQL_BUSY.  If SQL_BUSY is returned, it
- * means the close did not happen and needs to be repeated.
+ * Return an error code.
  */
 int
 sqlVdbeHalt(Vdbe * p)
@@ -2192,10 +2189,7 @@ sqlVdbeHalt(Vdbe * p)
 					     0 : SQL_TARANTOOL_ERROR;
 					closeCursorsAndFree(p);
 				}
-				if (rc == SQL_BUSY && !p->pDelFrame) {
-					closeCursorsAndFree(p);
-					return SQL_BUSY;
-				} else if (rc != 0) {
+				if (rc != 0) {
 					p->rc = rc;
 					box_txn_rollback();
 					closeCursorsAndFree(p);
@@ -2272,7 +2266,7 @@ sqlVdbeHalt(Vdbe * p)
 
 	assert(db->nVdbeActive > 0 || box_txn() ||
 	       p->anonymous_savepoint == NULL);
-	return p->rc == SQL_BUSY ? SQL_BUSY : 0;
+	return 0;
 }
 
 /*

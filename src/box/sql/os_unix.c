@@ -554,9 +554,7 @@ posixUnlock(sql_file * id, int eFileLock, int handleNFSUnlock)
 					/* In theory, the call to unixFileLock() cannot fail because another
 					 * process is holding an incompatible lock. If it does, this
 					 * indicates that the other process is not following the locking
-					 * protocol. If this happens, return SQL_IOERR_RDLOCK. Returning
-					 * SQL_BUSY would confuse the upper layer (in practice it causes
-					 * an assert to fail).
+					 * protocol. If this happens, return SQL_IOERR_RDLOCK.
 					 */
 					rc = SQL_IOERR_RDLOCK;
 					storeLastErrno(pFile, errno);

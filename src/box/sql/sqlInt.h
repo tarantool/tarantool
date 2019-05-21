@@ -327,8 +327,6 @@ struct sql_vfs {
 enum sql_ret_code {
 	/** Common error code. */
 	SQL_ERROR = 1,
-	/** The database file is locked. */
-	SQL_BUSY,
 	/** A malloc() failed. */
 	SQL_NOMEM,
 	/** Some kind of disk I/O error occurred. */

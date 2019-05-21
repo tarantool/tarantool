@@ -752,7 +752,7 @@ int sqlVdbeExec(Vdbe *p)
 		 */
 		goto no_mem;
 	}
-	assert(p->rc == 0 || (p->rc & 0xff) == SQL_BUSY);
+	assert(p->rc == 0);
 	p->rc = 0;
 	p->iCurrentTime = 0;
 	assert(p->explain==0);
@@ -1064,13 +1064,9 @@ case OP_Halt: {
 		assert(! diag_is_empty(diag_get()));
 	}
 	rc = sqlVdbeHalt(p);
-	assert(rc == SQL_BUSY || rc == 0 || rc == SQL_ERROR);
-	if (rc==SQL_BUSY) {
-		p->rc = SQL_BUSY;
-	} else {
-		assert(rc == 0 || (p->rc & 0xff) == SQL_CONSTRAINT);
-		rc = p->rc ? SQL_TARANTOOL_ERROR : SQL_DONE;
-	}
+	assert(rc == 0 || rc == SQL_ERROR);
+	assert(rc == 0 || (p->rc & 0xff) == SQL_CONSTRAINT);
+	rc = p->rc ? SQL_TARANTOOL_ERROR : SQL_DONE;
 	goto vdbe_return;
 }
 
@@ -2879,11 +2875,7 @@ case OP_Savepoint: {
 			if (isTransaction && p1==SAVEPOINT_RELEASE) {
 				if ((rc = sqlVdbeCheckFk(p, 1)) != 0)
 					goto vdbe_return;
-				if (sqlVdbeHalt(p)==SQL_BUSY) {
-					p->pc = (int)(pOp - aOp);
-					p->rc = rc = SQL_BUSY;
-					goto vdbe_return;
-				}
+				sqlVdbeHalt(p);
 				if (p->rc != 0)
 					goto abort_due_to_error;
 			} else {
@@ -5256,7 +5248,7 @@ vdbe_return:
 	assert(rc != 0 || nExtraDelete == 0
 		|| sql_strlike_ci("DELETE%", p->zSql, 0) != 0
 		);
-	assert(rc == 0 || rc == SQL_BUSY || rc == SQL_TARANTOOL_ERROR ||
+	assert(rc == 0 || rc == SQL_TARANTOOL_ERROR ||
 	       rc == SQL_ROW || rc == SQL_DONE);
 	return rc;
 
