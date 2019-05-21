@@ -1269,9 +1269,17 @@ vinyl_index_compact(struct index *index)
  * If the LSM tree is going to be dropped or truncated on WAL
  * recovery, there's no point in replaying statements for it,
  * either.
+ *
+ * Note, although we may skip secondary index update in certain
+ * cases (e.g.  UPDATE that doesn't touch secondary index parts
+ * or DELETE for which generation of secondary index statement
+ * is deferred), a DML request of any kind always updates the
+ * primary index. Also, we always dump the primary index after
+ * secondary indexes. So we may skip recovery of a DML request
+ * if it has been dumped for the primary index.
  */
 static inline bool
-vy_is_committed_one(struct vy_env *env, struct vy_lsm *lsm)
+vy_is_committed(struct vy_env *env, struct vy_lsm *lsm)
 {
 	if (likely(env->status != VINYL_FINAL_RECOVERY_LOCAL))
 		return false;
@@ -1280,23 +1288,6 @@ vy_is_committed_one(struct vy_env *env, struct vy_lsm *lsm)
 	if (vclock_sum(env->recovery_vclock) <= lsm->dump_lsn)
 		return true;
 	return false;
-}
-
-/**
- * Check if a request has already been committed to a space.
- * See also vy_is_committed_one().
- */
-static inline bool
-vy_is_committed(struct vy_env *env, struct space *space)
-{
-	if (likely(env->status != VINYL_FINAL_RECOVERY_LOCAL))
-		return false;
-	for (uint32_t iid = 0; iid < space->index_count; iid++) {
-		struct vy_lsm *lsm = vy_lsm(space->index[iid]);
-		if (!vy_is_committed_one(env, lsm))
-			return false;
-	}
-	return true;
 }
 
 /**
@@ -1693,11 +1684,11 @@ static int
 vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	  struct space *space, struct request *request)
 {
-	if (vy_is_committed(env, space))
-		return 0;
 	struct vy_lsm *pk = vy_lsm_find(space, 0);
 	if (pk == NULL)
 		return -1;
+	if (vy_is_committed(env, pk))
+		return 0;
 	struct vy_lsm *lsm = vy_lsm_find_unique(space, request->index_id);
 	if (lsm == NULL)
 		return -1;
@@ -1728,7 +1719,7 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 			return -1;
 		for (uint32_t i = 0; i < space->index_count; i++) {
 			struct vy_lsm *lsm = vy_lsm(space->index[i]);
-			if (vy_is_committed_one(env, lsm))
+			if (vy_is_committed(env, lsm))
 				continue;
 			rc = vy_tx_set(tx, lsm, delete);
 			if (rc != 0)
@@ -1811,7 +1802,7 @@ vy_perform_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
-		if (vy_is_committed_one(env, lsm))
+		if (vy_is_committed(env, lsm))
 			continue;
 		if (vy_tx_set_with_colmask(tx, lsm, delete,
 					   column_mask) != 0)
@@ -1845,7 +1836,10 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	  struct space *space, struct request *request)
 {
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
-	if (vy_is_committed(env, space))
+	struct vy_lsm *pk = vy_lsm_find(space, 0);
+	if (pk == NULL)
+		return -1;
+	if (vy_is_committed(env, pk))
 		return 0;
 	struct vy_lsm *lsm = vy_lsm_find_unique(space, request->index_id);
 	if (lsm == NULL)
@@ -1863,11 +1857,6 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return 0;
 
 	/* Apply update operations. */
-	struct vy_lsm *pk = vy_lsm(space->index[0]);
-	assert(pk != NULL);
-	assert(pk->index_id == 0);
-	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(env, pk));
 	uint64_t column_mask = 0;
 	const char *new_tuple, *new_tuple_end;
 	uint32_t new_size, old_size;
@@ -2047,7 +2036,10 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	  struct space *space, struct request *request)
 {
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
-	if (vy_is_committed(env, space))
+	struct vy_lsm *pk = vy_lsm_find(space, 0);
+	if (pk == NULL)
+		return -1;
+	if (vy_is_committed(env, pk))
 		return 0;
 	/* Check update operations. */
 	if (tuple_update_check_ops(region_aligned_alloc_cb, &fiber()->gc,
@@ -2064,11 +2056,6 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	const char *tuple_end = request->tuple_end;
 	const char *ops = request->ops;
 	const char *ops_end = request->ops_end;
-	struct vy_lsm *pk = vy_lsm_find(space, 0);
-	if (pk == NULL)
-		return -1;
-	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(env, pk));
 	if (tuple_validate_raw(pk->mem_format, tuple))
 		return -1;
 
@@ -2160,14 +2147,12 @@ static int
 vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	  struct space *space, struct request *request)
 {
-	assert(stmt != NULL);
+	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	struct vy_lsm *pk = vy_lsm_find(space, 0);
 	if (pk == NULL)
-		/* The space hasn't the primary index. */
 		return -1;
-	assert(pk->index_id == 0);
-	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(env, pk));
+	if (vy_is_committed(env, pk))
+		return 0;
 	if (tuple_validate_raw(pk->mem_format, request->tuple))
 		return -1;
 	/* First insert into the primary index. */
@@ -2183,7 +2168,7 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
 		struct vy_lsm *lsm = vy_lsm(space->index[iid]);
-		if (vy_is_committed_one(env, lsm))
+		if (vy_is_committed(env, lsm))
 			continue;
 		if (vy_tx_set(tx, lsm, stmt->new_tuple) != 0)
 			return -1;
@@ -2210,16 +2195,11 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	   struct space *space, struct request *request)
 {
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
-	if (vy_is_committed(env, space))
-		return 0;
-	if (request->type == IPROTO_INSERT)
-		return vy_insert(env, tx, stmt, space, request);
-
 	struct vy_lsm *pk = vy_lsm_find(space, 0);
 	if (pk == NULL)
 		return -1;
-	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(env, pk));
+	if (vy_is_committed(env, pk))
+		return 0;
 
 	/* Validate and create a statement for the new tuple. */
 	if (tuple_validate_raw(pk->mem_format, request->tuple))
@@ -2272,7 +2252,7 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	}
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
-		if (vy_is_committed_one(env, lsm))
+		if (vy_is_committed(env, lsm))
 			continue;
 		if (delete != NULL) {
 			rc = vy_tx_set(tx, lsm, delete);
@@ -2296,7 +2276,12 @@ vinyl_space_execute_replace(struct space *space, struct txn *txn,
 	struct vy_env *env = vy_env(space->engine);
 	struct vy_tx *tx = txn->engine_tx;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	if (vy_replace(env, tx, stmt, space, request))
+	int rc;
+	if (request->type == IPROTO_INSERT)
+		rc = vy_insert(env, tx, stmt, space, request);
+	else
+		rc = vy_replace(env, tx, stmt, space, request);
+	if (rc != 0)
 		return -1;
 	*result = stmt->new_tuple;
 	return 0;
@@ -3214,6 +3199,8 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 	int rc = -1;
 	switch (request->type) {
 	case IPROTO_INSERT:
+		rc = vy_insert(env, tx, &stmt, space, request);
+		break;
 	case IPROTO_REPLACE:
 		rc = vy_replace(env, tx, &stmt, space, request);
 		break;
@@ -4391,7 +4378,7 @@ vy_deferred_delete_on_rollback(struct trigger *trigger, void *event)
  * to restore deferred DELETE statements that haven't been dumped
  * to disk. To skip deferred DELETEs that have been dumped, we
  * use the same technique we employ for normal WAL statements,
- * i.e. we filter them by LSN, see vy_is_committed_one(). To do
+ * i.e. we filter them by LSN, see vy_is_committed(). To do
  * that, we need to account the LSN of a WAL row that generated
  * a deferred DELETE statement to vy_lsm::dump_lsn, so we install
  * an on_commit trigger that propagates the LSN of the WAL row to
@@ -4478,7 +4465,7 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 	const struct tuple *region_stmt = NULL;
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
-		if (vy_is_committed_one(env, lsm))
+		if (vy_is_committed(env, lsm))
 			continue;
 		/*
 		 * As usual, rotate the active in-memory index if
