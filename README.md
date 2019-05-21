@@ -21,11 +21,13 @@ Key features of the application server:
    non-blocking I/O, access to external databases, etc
 
 Key features of the database:
+ * ANSI SQL, including views, joins, referential
+   and check constraints
  * MsgPack data format and MsgPack based
    client-server protocol
  * two data engines: 100% in-memory with
-   optional persistence and a 2-level disk-based
-   B-tree, to use with large data sets
+   optional persistence and an own implementation of LSM-tree, 
+   to use with large data sets
  * multiple index types: HASH, TREE, RTREE, BITSET
  * asynchronous master-master replication
  * authentication and access control
