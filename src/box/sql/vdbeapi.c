@@ -413,21 +413,8 @@ sqlStep(Vdbe * p)
 	int rc;
 
 	assert(p);
-	if (p->magic != VDBE_MAGIC_RUN) {
-		/* We used to require that sql_reset() be called before retrying
-		 * sql_step() after any error or after SQL_DONE.  But beginning
-		 * with version 3.7.0, we changed this so that sql_reset() would
-		 * be called automatically instead of throwing the SQL_MISUSE error.
-		 * This "automatic-reset" change is not technically an incompatibility,
-		 * since any application that receives an SQL_MISUSE is broken by
-		 * definition.
-		 *
-		 * Nevertheless, some published applications that were originally written
-		 * for version 3.6.23 or earlier do in fact depend on SQL_MISUSE
-		 * returns, and those were broken by the automatic-reset change.
-		 */
+	if (p->magic != VDBE_MAGIC_RUN)
 		sql_reset((sql_stmt *) p);
-	}
 
 	/* Check that malloc() has not failed. If it has, return early. */
 	db = p->db;

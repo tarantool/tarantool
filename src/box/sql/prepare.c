@@ -207,11 +207,6 @@ sqlLockAndPrepare(sql * db,		/* Database handle. */
 
 /*
  * Rerun the compilation of a statement after a schema change.
- *
- * If the statement is successfully recompiled, return 0. Otherwise,
- * if the statement cannot be recompiled because another connection has
- * locked the sql_master table, return SQL_LOCKED. If any other error
- * occurs, return SQL_SCHEMA.
  */
 int
 sqlReprepare(Vdbe * p)

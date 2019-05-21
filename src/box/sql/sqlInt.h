@@ -329,8 +329,6 @@ enum sql_ret_code {
 	SQL_ERROR = 1,
 	/** The database file is locked. */
 	SQL_BUSY,
-	/** A table in the database is locked. */
-	SQL_LOCKED,
 	/** A malloc() failed. */
 	SQL_NOMEM,
 	/** Some kind of disk I/O error occurred. */
