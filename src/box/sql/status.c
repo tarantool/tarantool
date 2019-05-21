@@ -125,36 +125,3 @@ sqlStatusHighwater(int op, int X)
 		wsdStat.mxValue[op] = newValue;
 	}
 }
-
-/*
- * Query status information.
- */
-int
-sql_status64(int op,
-		 sql_int64 * pCurrent,
-		 sql_int64 * pHighwater, int resetFlag)
-{
-	wsdStatInit;
-	if (op < 0 || op >= ArraySize(wsdStat.nowValue)) {
-		return SQL_MISUSE;
-	}
-	*pCurrent = wsdStat.nowValue[op];
-	*pHighwater = wsdStat.mxValue[op];
-	if (resetFlag) {
-		wsdStat.mxValue[op] = wsdStat.nowValue[op];
-	}
-	return 0;
-}
-
-int
-sql_status(int op, int *pCurrent, int *pHighwater, int resetFlag)
-{
-	sql_int64 iCur = 0, iHwtr = 0;
-	int rc;
-	rc = sql_status64(op, &iCur, &iHwtr, resetFlag);
-	if (rc == 0) {
-		*pCurrent = (int)iCur;
-		*pHighwater = (int)iHwtr;
-	}
-	return rc;
-}

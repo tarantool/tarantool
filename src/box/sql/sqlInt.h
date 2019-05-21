@@ -339,8 +339,6 @@ enum sql_ret_code {
 	SQL_TOOBIG,
 	/** Abort due to constraint violation. */
 	SQL_CONSTRAINT,
-	/** Library used incorrectly. */
-	SQL_MISUSE,
 	/** 2nd parameter to sql_bind out of range. */
 	SQL_RANGE,
 	SQL_TARANTOOL_ERROR,
@@ -624,9 +622,6 @@ sql_initialize(void);
 #define SQL_STATUS_SCRATCH_SIZE         8
 #define SQL_STATUS_MALLOC_COUNT         9
 
-sql_int64
-sql_memory_used(void);
-
 int
 sql_create_function_v2(sql * db,
 			   const char *zFunctionName,
@@ -656,12 +651,6 @@ sql_create_function_v2(sql * db,
 sql_vfs *
 sql_vfs_find(const char *zVfsName);
 
-int
-sql_status64(int op, sql_int64 * pCurrent,
-		 sql_int64 * pHighwater,
-		 int resetFlag);
-
-
 typedef struct sql_io_methods sql_io_methods;
 struct sql_io_methods {
 	int iVersion;
@@ -690,9 +679,6 @@ struct sql_io_methods {
 
 void
 sql_os_init(void);
-
-sql_int64
-sql_soft_heap_limit64(sql_int64 N);
 
 int
 sql_limit(sql *, int id, int newVal);

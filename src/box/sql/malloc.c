@@ -170,38 +170,6 @@ static SQL_WSD struct Mem0Global {
 
 #define mem0 GLOBAL(struct Mem0Global, mem0)
 
-
-/*
- * Set the soft heap-size limit for the library. Passing a zero or
- * negative value indicates no limit.
- */
-sql_int64
-sql_soft_heap_limit64(sql_int64 n)
-{
-	sql_int64 priorLimit;
-	sql_int64 excess;
-	sql_int64 nUsed;
-	priorLimit = mem0.alarmThreshold;
-	if (n < 0) {
-		return priorLimit;
-	}
-	mem0.alarmThreshold = n;
-	nUsed = sqlStatusValue(SQL_STATUS_MEMORY_USED);
-	mem0.nearlyFull = (n > 0 && n <= nUsed);
-	excess = sql_memory_used() - n;
-	if (excess > 0)
-		sql_release_memory((int)(excess & 0x7fffffff));
-	return priorLimit;
-}
-
-void
-sql_soft_heap_limit(int n)
-{
-	if (n < 0)
-		n = 0;
-	sql_soft_heap_limit64(n);
-}
-
 /*
  * Initialize the memory allocation subsystem.
  */
@@ -247,17 +215,6 @@ int
 sqlHeapNearlyFull(void)
 {
 	return mem0.nearlyFull;
-}
-
-/*
- * Return the amount of memory currently checked out.
- */
-sql_int64
-sql_memory_used(void)
-{
-	sql_int64 res, mx;
-	sql_status64(SQL_STATUS_MEMORY_USED, &res, &mx, 0);
-	return res;
 }
 
 /*

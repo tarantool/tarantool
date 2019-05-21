@@ -909,11 +909,7 @@ vdbeUnbind(Vdbe * p, int i)
 {
 	Mem *pVar;
 	assert(p != NULL);
-	if (p->magic != VDBE_MAGIC_RUN || p->pc >= 0) {
-		sql_log(SQL_MISUSE,
-			    "bind on a busy prepared statement: [%s]", p->zSql);
-		return SQL_MISUSE;
-	}
+	assert(p->magic == VDBE_MAGIC_RUN && p->pc < 0);
 	if (i < 1 || i > p->nVar) {
 		return SQL_RANGE;
 	}
