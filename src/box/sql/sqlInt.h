@@ -923,6 +923,18 @@ int
 sql_bind_zeroblob64(sql_stmt *, int,
 			sql_uint64);
 
+/**
+ * Perform pointer parameter binding for the prepared sql
+ * statement.
+ * @param stmt Prepared statement.
+ * @param i Index of the variable to be binded.
+ * @param ptr Pointer value to use.
+ * @retval 0 On Success.
+ * @retval Not 0 otherwise.
+ */
+int
+sql_bind_ptr(struct sql_stmt *stmt, int i, void *ptr);
+
 int
 sql_stmt_busy(sql_stmt *);
 

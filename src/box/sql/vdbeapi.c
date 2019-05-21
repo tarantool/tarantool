@@ -1393,6 +1393,18 @@ sql_bind_null(sql_stmt * pStmt, int i)
 }
 
 int
+sql_bind_ptr(struct sql_stmt *stmt, int i, void *ptr)
+{
+	struct Vdbe *p = (struct Vdbe *) stmt;
+	int rc = vdbeUnbind(p, i);
+	if (rc == SQL_OK) {
+		rc = sql_bind_type(p, i, "BLOB");
+		mem_set_ptr(&p->aVar[i - 1], ptr);
+	}
+	return rc;
+}
+
+int
 sql_bind_text(sql_stmt * pStmt,
 		  int i, const char *zData, int nData, void (*xDel) (void *)
     )

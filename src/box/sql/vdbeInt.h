@@ -501,6 +501,14 @@ void sqlVdbeMemSetInt64(Mem *, i64);
 void
 mem_set_bool(struct Mem *mem, bool value);
 
+/**
+ * Set VDBE memory register with given pointer as a data.
+ * @param mem VDBE memory register to update.
+ * @param ptr Pointer to use.
+ */
+void
+mem_set_ptr(struct Mem *mem, void *ptr);
+
 void sqlVdbeMemSetDouble(Mem *, double);
 void sqlVdbeMemInit(Mem *, sql *, u32);
 void sqlVdbeMemSetNull(Mem *);

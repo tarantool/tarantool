@@ -755,6 +755,14 @@ sqlValueSetNull(sql_value * p)
 	sqlVdbeMemSetNull((Mem *) p);
 }
 
+void
+mem_set_ptr(struct Mem *mem, void *ptr)
+{
+	sqlVdbeMemRelease(mem);
+	mem->flags = MEM_Ptr;
+	mem->u.p = ptr;
+}
+
 /*
  * Delete any previous value and set the value to be a BLOB of length
  * n containing all zeros.
