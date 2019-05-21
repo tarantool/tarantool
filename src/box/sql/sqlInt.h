@@ -339,8 +339,6 @@ enum sql_ret_code {
 	SQL_NOTFOUND,
 	/** Insertion failed because database is full. */
 	SQL_FULL,
-	/** Unable to open the database file. */
-	SQL_CANTOPEN,
 	/** The database schema changed. */
 	SQL_SCHEMA,
 	/** String or BLOB exceeds size limit. */

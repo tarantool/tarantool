@@ -318,66 +318,6 @@ struct unixInodeInfo {
 static unixInodeInfo *inodeList = 0;
 
 /*
- *
- * This function - unixLogErrorAtLine(), is only ever called via the macro
- * unixLogError().
- *
- * It is invoked after an error occurs in an OS function and errno has been
- * set. It logs a message using sql_log() containing the current value of
- * errno and, if possible, the human-readable equivalent from strerror() or
- * strerror_r().
- *
- * The first argument passed to the macro should be the error code that
- * will be returned to sql (e.g. SQL_IOERR_DELETE, SQL_CANTOPEN).
- * The two subsequent arguments should be the name of the OS function that
- * failed (e.g. "unlink", "open") and the associated file-system path,
- * if any.
- */
-#define unixLogError(a,b,c)     unixLogErrorAtLine(a,b,c,__LINE__)
-static int
-unixLogErrorAtLine(int errcode,	/* sql error code */
-		   const char *zFunc,	/* Name of OS function that failed */
-		   const char *zPath,	/* File path associated with error */
-		   int iLine	/* Source line number where error occurred */
-    )
-{
-	char *zErr;		/* Message from strerror() or equivalent */
-	int iErrno = errno;	/* Saved syscall error number */
-
-	zErr = strerror(iErrno);
-
-	if (zPath == 0)
-		zPath = "";
-	sql_log(errcode,
-		    "os_unix.c:%d: (%d) %s(%s) - %s",
-		    iLine, iErrno, zFunc, zPath, zErr);
-
-	return errcode;
-}
-
-/*
- * Close a file descriptor.
- *
- * We assume that close() almost always works, since it is only in a
- * very sick application or on a very sick platform that it might fail.
- * If it does fail, simply leak the file descriptor, but do log the
- * error.
- *
- * Note that it is not safe to retry close() after EINTR since the
- * file descriptor might have already been reused by another thread.
- * So we don't even try to recover from an EINTR.  Just log the error
- * and move on.
- */
-static void
-robust_close(unixFile * pFile, int h, int lineno)
-{
-	if (close(h) != 0) {
-		unixLogErrorAtLine(SQL_IOERR_CLOSE, "close",
-				   pFile ? pFile->zPath : 0, lineno);
-	}
-}
-
-/*
  * Set the pFile->lastErrno.  Do this in a subroutine as that provides
  * a convenient place to set a breakpoint.
  */
@@ -398,7 +338,7 @@ closePendingFds(unixFile * pFile)
 	UnixUnusedFd *pNext;
 	for (p = pInode->pUnused; p; p = pNext) {
 		pNext = p->pNext;
-		robust_close(pFile, p->fd, __LINE__);
+		close(p->fd);
 		sql_free(p);
 	}
 	pInode->pUnused = 0;
@@ -705,7 +645,7 @@ closeUnixFile(sql_file * id)
 	unixUnmapfile(pFile);
 #endif
 	if (pFile->h >= 0) {
-		robust_close(pFile, pFile->h, __LINE__);
+		close(pFile->h);
 		pFile->h = -1;
 	}
 	sql_free(pFile->pUnused);
@@ -946,8 +886,7 @@ unixWrite(sql_file * id, const void *pBuf, int amt, sql_int64 offset)
 /*
  * Open a file descriptor to the directory containing file zFilename.
  * If successful, *pFd is set to the opened file descriptor and
- * 0 is returned. If an error occurs, either SQL_NOMEM
- * or SQL_CANTOPEN is returned and *pFd is set to an undefined
+ * 0 is returned. If an error occurs, -1 is set to an undefined
  * value.
  *
  * The directory file descriptor is used for only one thing - to
@@ -987,7 +926,7 @@ openDirectory(const char *zFilename, int *pFd)
 	*pFd = fd;
 	if (fd >= 0)
 		return 0;
-	return unixLogError(SQL_CANTOPEN, "openDirectory", zDirname);
+	return -1;
 }
 
 /*
@@ -1032,8 +971,7 @@ fcntlSizeHint(unixFile * pFile, i64 nByte)
 		if (pFile->szChunk <= 0) {
 			if (robust_ftruncate(pFile->h, nByte)) {
 				storeLastErrno(pFile, errno);
-				return unixLogError(SQL_IOERR_TRUNCATE,
-						    "ftruncate", pFile->zPath);
+				return -1;
 			}
 		}
 
@@ -1147,7 +1085,6 @@ unixRemapfile(unixFile * pFd,	/* File descriptor object */
 	      i64 nNew		/* Required mapping size */
     )
 {
-	const char *zErr = "mmap";
 	int h = pFd->h;		/* File descriptor open on db file */
 	u8 *pOrig = (u8 *) pFd->pMapRegion;	/* Pointer to current file mapping */
 	i64 nOrig = pFd->mmapSizeActual;	/* Size of pOrig region in bytes */
@@ -1170,7 +1107,6 @@ unixRemapfile(unixFile * pFd,	/* File descriptor object */
 			munmap(pReq, nOrig - nReuse);
 		#if !defined(__APPLE__) && !defined(__FreeBSD__)
 		pNew = mremap(pOrig, nReuse, nNew, MREMAP_MAYMOVE);
-		zErr = "mremap";
 		#else
 		pNew = mmap(pReq, nNew - nReuse, flags, MAP_SHARED, h, nReuse);
 		if (pNew != MAP_FAILED) {
@@ -1195,7 +1131,6 @@ unixRemapfile(unixFile * pFd,	/* File descriptor object */
 	if (pNew == MAP_FAILED) {
 		pNew = 0;
 		nNew = 0;
-		unixLogError(0, zErr, pFd->zPath);
 
 		/* If the mmap() above failed, assume that all subsequent mmap() calls
 		 * will probably fail too. Fall back to using xRead/xWrite exclusively
@@ -1472,14 +1407,14 @@ fillInUnixFile(sql_vfs * pVfs,	/* Pointer to vfs object */
 			 * implicit assumption here is that if fstat() fails, things are in
 			 * such bad shape that dropping a lock or two doesn't matter much.
 			 */
-			robust_close(pNew, h, __LINE__);
+			close(h);
 			h = -1;
 		}
 	}
 	storeLastErrno(pNew, 0);
 	if (rc != 0) {
 		if (h >= 0)
-			robust_close(pNew, h, __LINE__);
+			close(h);
 	} else {
 		pNew->pMethod = pLockingStyle;
 	}
@@ -1829,7 +1764,7 @@ unixOpen(sql_vfs * pVfs,	/* The VFS for which this is the xOpen method */
 			fd = robust_open(zName, openFlags, openMode);
 		}
 		if (fd < 0) {
-			rc = unixLogError(SQL_CANTOPEN, "open", zName);
+			rc = -1;
 			goto open_finished;
 		}
 		
@@ -1884,7 +1819,7 @@ unixDelete(sql_vfs * NotUsed,	/* VFS containing this as the xDelete method */
 		if (errno == ENOENT) {
 			rc = SQL_IOERR_DELETE_NOENT;
 		} else {
-			rc = unixLogError(SQL_IOERR_DELETE, "unlink", zPath);
+			rc = -1;
 		}
 		return rc;
 	}
@@ -1894,12 +1829,10 @@ unixDelete(sql_vfs * NotUsed,	/* VFS containing this as the xDelete method */
 		if (rc == 0) {
 			struct stat buf;
 			if (fstat(fd, &buf)) {
-				rc = unixLogError(SQL_IOERR_DIR_FSYNC,
-						  "fsync", zPath);
+				rc = -1;
 			}
-			robust_close(0, fd, __LINE__);
+			close(fd);
 		} else {
-			assert(rc == SQL_CANTOPEN);
 			rc = 0;
 		}
 	}
