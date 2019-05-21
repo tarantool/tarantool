@@ -1518,7 +1518,7 @@ load_stat_from_space(struct sql *db, const char *sql_select_prepare,
 		stats[current_idx_count].sample_count++;
 	}
 	rc = sql_finalize(stmt);
-	if (rc == SQL_OK && prev_index != NULL)
+	if (rc == 0 && prev_index != NULL)
 		init_avg_eq(prev_index, &stats[current_idx_count]);
 	assert(current_idx_count <= index_count);
 	for (uint32_t i = 0; i < current_idx_count; ++i) {

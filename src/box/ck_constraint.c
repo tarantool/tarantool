@@ -172,7 +172,7 @@ ck_constraint_program_run(struct ck_constraint *ck_constraint,
 	 * Get VDBE execution state and reset VM to run it
 	 * next time.
 	 */
-	return sql_reset(ck_constraint->stmt) != SQL_OK ? -1 : 0;
+	return sql_reset(ck_constraint->stmt);
 }
 
 void

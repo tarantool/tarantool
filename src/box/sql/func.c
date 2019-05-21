@@ -1181,7 +1181,7 @@ zeroblobFunc(sql_context * context, int argc, sql_value ** argv)
 	n = sql_value_int64(argv[0]);
 	if (n < 0)
 		n = 0;
-	if (sql_result_zeroblob64(context, n) != SQL_OK) {
+	if (sql_result_zeroblob64(context, n) != 0) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
 		context->is_aborted = true;
 	}
@@ -1772,7 +1772,7 @@ static inline int
 sql_overload_function(sql * db, const char *zName,
 			  enum field_type type, int nArg)
 {
-	int rc = SQL_OK;
+	int rc = 0;
 
 	if (sqlFindFunction(db, zName, nArg, 0) == 0) {
 		rc = sqlCreateFunc(db, zName, type, nArg, 0, 0,
@@ -1791,7 +1791,7 @@ void
 sqlRegisterPerConnectionBuiltinFunctions(sql * db)
 {
 	int rc = sql_overload_function(db, "MATCH", FIELD_TYPE_SCALAR, 2);
-	assert(rc == SQL_NOMEM || rc == SQL_OK);
+	assert(rc == SQL_NOMEM || rc == 0);
 	if (rc == SQL_NOMEM) {
 		sqlOomFault(db);
 	}

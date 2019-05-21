@@ -464,7 +464,7 @@ vdbePmaReaderClear(PmaReader * pReadr)
 /*
  * Read the next nByte bytes of data from the PMA p.
  * If successful, set *ppOut to point to a buffer containing the data
- * and return SQL_OK. Otherwise, if an error occurs, return an sql
+ * and return 0. Otherwise, if an error occurs, return an sql
  * error code.
  *
  * The buffer returned in *ppOut is only valid until the
@@ -482,7 +482,7 @@ vdbePmaReadBlob(PmaReader * p,	/* PmaReader from which to take the blob */
 	if (p->aMap) {
 		*ppOut = &p->aMap[p->iReadOff];
 		p->iReadOff += nByte;
-		return SQL_OK;
+		return 0;
 	}
 
 	assert(p->aBuffer);
@@ -507,7 +507,7 @@ vdbePmaReadBlob(PmaReader * p,	/* PmaReader from which to take the blob */
 		/* Readr data from the file. Return early if an error occurs. */
 		rc = sqlOsRead(p->pFd, p->aBuffer, nRead, p->iReadOff);
 		assert(rc != SQL_IOERR_SHORT_READ);
-		if (rc != SQL_OK)
+		if (rc != 0)
 			return rc;
 	}
 	nAvail = p->nBuffer - iBuf;
@@ -558,7 +558,7 @@ vdbePmaReadBlob(PmaReader * p,	/* PmaReader from which to take the blob */
 			if (nRem > p->nBuffer)
 				nCopy = p->nBuffer;
 			rc = vdbePmaReadBlob(p, nCopy, &aNext);
-			if (rc != SQL_OK)
+			if (rc != 0)
 				return rc;
 			assert(aNext != p->aAlloc);
 			memcpy(&p->aAlloc[nByte - nRem], aNext, nCopy);
@@ -568,7 +568,7 @@ vdbePmaReadBlob(PmaReader * p,	/* PmaReader from which to take the blob */
 		*ppOut = p->aAlloc;
 	}
 
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -600,14 +600,14 @@ vdbePmaReadVarint(PmaReader * p, u64 * pnOut)
 		}
 	}
 
-	return SQL_OK;
+	return 0;
 }
 
 /*
  * Attempt to memory map file pFile. If successful, set *pp to point to the
- * new mapping and return SQL_OK. If the mapping is not attempted
+ * new mapping and return 0. If the mapping is not attempted
  * (because the file is too large or the VFS layer is configured not to use
- * mmap), return SQL_OK and set *pp to NULL.
+ * mmap), return 0 and set *pp to NULL.
  *
  * Or, if an error occurs, return an sql error code. The final value of
  * *pp is undefined in this case.
@@ -615,13 +615,13 @@ vdbePmaReadVarint(PmaReader * p, u64 * pnOut)
 static int
 vdbeSorterMapFile(SortSubtask * pTask, SorterFile * pFile, u8 ** pp)
 {
-	int rc = SQL_OK;
+	int rc = 0;
 	if (pFile->iEof <= (i64) (pTask->pSorter->db->nMaxSorterMmap)) {
 		sql_file *pFd = pFile->pFd;
 		if (pFd->pMethods->iVersion >= 3) {
 			rc = sqlOsFetch(pFd, 0, (int)pFile->iEof,
 					    (void **)pp);
-			testcase(rc != SQL_OK);
+			testcase(rc != 0);
 		}
 	}
 	return rc;
@@ -629,7 +629,7 @@ vdbeSorterMapFile(SortSubtask * pTask, SorterFile * pFile, u8 ** pp)
 
 /*
  * Attach PmaReader pReadr to file pFile (if it is not already attached to
- * that file) and seek it to offset iOff within the file.  Return SQL_OK
+ * that file) and seek it to offset iOff within the file.  Return 0
  * if successful, or an sql error code if an error occurs.
  */
 static int
@@ -639,7 +639,7 @@ vdbePmaReaderSeek(SortSubtask * pTask,	/* Task context */
 		  i64 iOff	/* Offset in pFile */
     )
 {
-	int rc = SQL_OK;
+	int rc = 0;
 
 	assert(pReadr->pIncr == 0 || pReadr->pIncr->bEof == 0);
 
@@ -652,7 +652,7 @@ vdbePmaReaderSeek(SortSubtask * pTask,	/* Task context */
 	pReadr->pFd = pFile->pFd;
 
 	rc = vdbeSorterMapFile(pTask, pFile, &pReadr->aMap);
-	if (rc == SQL_OK && pReadr->aMap == 0) {
+	if (rc == 0 && pReadr->aMap == NULL) {
 		int pgsz = pTask->pSorter->pgsz;
 		int iBuf = pReadr->iReadOff % pgsz;
 		if (pReadr->aBuffer == 0) {
@@ -661,14 +661,14 @@ vdbePmaReaderSeek(SortSubtask * pTask,	/* Task context */
 				rc = SQL_NOMEM;
 			pReadr->nBuffer = pgsz;
 		}
-		if (rc == SQL_OK && iBuf) {
+		if (rc == 0 && iBuf != 0) {
 			int nRead = pgsz - iBuf;
 			if ((pReadr->iReadOff + nRead) > pReadr->iEof) {
 				nRead = (int)(pReadr->iEof - pReadr->iReadOff);
 			}
 			rc = sqlOsRead(pReadr->pFd, &pReadr->aBuffer[iBuf],
 					   nRead, pReadr->iReadOff);
-			testcase(rc != SQL_OK);
+			testcase(rc != 0);
 		}
 	}
 
@@ -676,13 +676,13 @@ vdbePmaReaderSeek(SortSubtask * pTask,	/* Task context */
 }
 
 /*
- * Advance PmaReader pReadr to the next key in its PMA. Return SQL_OK if
+ * Advance PmaReader pReadr to the next key in its PMA. Return 0 if
  * no error occurs, or an sql error code if one does.
  */
 static int
 vdbePmaReaderNext(PmaReader * pReadr)
 {
-	int rc = SQL_OK;	/* Return Code */
+	int rc = 0;	/* Return Code */
 	u64 nRec = 0;		/* Size of record in bytes */
 
 	if (pReadr->iReadOff >= pReadr->iEof) {
@@ -690,7 +690,7 @@ vdbePmaReaderNext(PmaReader * pReadr)
 		int bEof = 1;
 		if (pIncr) {
 			rc = vdbeIncrSwap(pIncr);
-			if (rc == SQL_OK && pIncr->bEof == 0) {
+			if (rc == 0 && pIncr->bEof == 0) {
 				rc = vdbePmaReaderSeek(pIncr->pTask, pReadr,
 						       &pIncr->aFile[0],
 						       pIncr->iStartOff);
@@ -701,18 +701,17 @@ vdbePmaReaderNext(PmaReader * pReadr)
 		if (bEof) {
 			/* This is an EOF condition */
 			vdbePmaReaderClear(pReadr);
-			testcase(rc != SQL_OK);
+			testcase(rc != 0);
 			return rc;
 		}
 	}
 
-	if (rc == SQL_OK) {
+	if (rc == 0)
 		rc = vdbePmaReadVarint(pReadr, &nRec);
-	}
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		pReadr->nKey = (int)nRec;
 		rc = vdbePmaReadBlob(pReadr, (int)nRec, &pReadr->aKey);
-		testcase(rc != SQL_OK);
+		testcase(rc != 0);
 	}
 
 	return rc;
@@ -743,16 +742,15 @@ vdbePmaReaderInit(SortSubtask * pTask,	/* Task context */
 	assert(pReadr->aMap == 0);
 
 	rc = vdbePmaReaderSeek(pTask, pReadr, pFile, iStart);
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		u64 nByte = 0;	/* Size of PMA in bytes */
 		rc = vdbePmaReadVarint(pReadr, &nByte);
 		pReadr->iEof = pReadr->iReadOff + nByte;
 		*pnByte += nByte;
 	}
 
-	if (rc == SQL_OK) {
+	if (rc == 0)
 		rc = vdbePmaReaderNext(pReadr);
-	}
 	return rc;
 }
 
@@ -806,7 +804,7 @@ vdbeSorterCompare(struct SortSubtask *task, bool *key2_cached,
  * The sorter can guarantee a stable sort when running in single-threaded
  * mode, but not in multi-threaded mode.
  *
- * SQL_OK is returned if successful, or an sql error code otherwise.
+ * 0 is returned if successful, or an sql error code otherwise.
  */
 int
 sqlVdbeSorterInit(sql * db,	/* Database connection (for malloc()) */
@@ -815,7 +813,7 @@ sqlVdbeSorterInit(sql * db,	/* Database connection (for malloc()) */
 {
 	int pgsz;		/* Page size of main database */
 	VdbeSorter *pSorter;	/* The new sorter */
-	int rc = SQL_OK;
+	int rc = 0;
 
 	assert(pCsr->key_def != NULL);
 	assert(pCsr->eCurType == CURTYPE_SORTER);
@@ -964,7 +962,7 @@ vdbeIncrFree(IncrMerger * pIncr)
 void
 sqlVdbeSorterReset(sql * db, VdbeSorter * pSorter)
 {
-	(void)vdbeSorterJoinAll(pSorter, SQL_OK);
+	(void)vdbeSorterJoinAll(pSorter, 0);
 	assert(pSorter->pReader == 0);
 	vdbeMergeEngineFree(pSorter->pMerger);
 	pSorter->pMerger = 0;
@@ -1028,7 +1026,7 @@ vdbeSorterExtendFile(sql * db, sql_file * pFd, i64 nByte)
 
 /*
  * Allocate space for a file-handle and open a temporary file. If successful,
- * set *ppFd to point to the malloc'd file-handle and return SQL_OK.
+ * set *ppFd to point to the malloc'd file-handle and return 0.
  * Otherwise, set *ppFd to 0 and return an sql error code.
  */
 static int
@@ -1041,7 +1039,7 @@ vdbeSorterOpenTempFile(sql * db,	/* Database handle doing sort */
 				 SQL_OPEN_READWRITE | SQL_OPEN_CREATE |
 				 SQL_OPEN_EXCLUSIVE |
 				 SQL_OPEN_DELETEONCLOSE, &rc);
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		i64 max = SQL_MAX_MMAP_SIZE;
 		sqlOsFileControlHint(*ppFd, SQL_FCNTL_MMAP_SIZE,
 					 (void *)&max);
@@ -1054,7 +1052,7 @@ vdbeSorterOpenTempFile(sql * db,	/* Database handle doing sort */
 
 /*
  * If it has not already been allocated, allocate the UnpackedRecord
- * structure at pTask->pUnpacked. Return SQL_OK if successful (or
+ * structure at pTask->pUnpacked. Return 0 if successful (or
  * if no allocation was required), or SQL_NOMEM otherwise.
  */
 static int
@@ -1069,7 +1067,7 @@ vdbeSortAllocUnpacked(SortSubtask * pTask)
 		pTask->pUnpacked->nField = pTask->pSorter->key_def->part_count;
 		pTask->pUnpacked->errCode = 0;
 	}
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -1127,7 +1125,7 @@ vdbeSorterGetCompare(VdbeSorter * p)
 
 /*
  * Sort the linked list of records headed at pTask->pList. Return
- * SQL_OK if successful, or an sql error code (i.e. SQL_NOMEM) if
+ * 0 if successful, or an sql error code (i.e. SQL_NOMEM) if
  * an error occurs.
  */
 static int
@@ -1139,7 +1137,7 @@ vdbeSorterSort(SortSubtask * pTask, SorterList * pList)
 	int rc;
 
 	rc = vdbeSortAllocUnpacked(pTask);
-	if (rc != SQL_OK)
+	if (rc != 0)
 		return rc;
 
 	p = pList->pList;
@@ -1185,7 +1183,7 @@ vdbeSorterSort(SortSubtask * pTask, SorterList * pList)
 	pList->pList = p;
 
 	sql_free(aSlot);
-	assert(pTask->pUnpacked->errCode == SQL_OK
+	assert(pTask->pUnpacked->errCode == 0
 	       || pTask->pUnpacked->errCode == SQL_NOMEM);
 	return pTask->pUnpacked->errCode;
 }
@@ -1213,7 +1211,7 @@ vdbePmaWriterInit(sql_file * pFd,	/* File handle to write to */
 }
 
 /*
- * Write nData bytes of data to the PMA. Return SQL_OK
+ * Write nData bytes of data to the PMA. Return 0
  * if successful, or an sql error code if an error occurs.
  */
 static void
@@ -1245,7 +1243,7 @@ vdbePmaWriteBlob(PmaWriter * p, u8 * pData, int nData)
 /*
  * Flush any buffered data to disk and clean up the PMA-writer object.
  * The results of using the PMA-writer after this call are undefined.
- * Return SQL_OK if flushing the buffered data succeeds or is not
+ * Return 0 if flushing the buffered data succeeds or is not
  * required. Otherwise, return an sql error code.
  *
  * Before returning, set *piEof to the offset immediately following the
@@ -1270,7 +1268,7 @@ vdbePmaWriterFinish(PmaWriter * p, i64 * piEof)
 
 /*
  * Write value iVal encoded as a varint to the PMA. Return
- * SQL_OK if successful, or an sql error code if an error occurs.
+ * 0 if successful, or an sql error code if an error occurs.
  */
 static void
 vdbePmaWriteVarint(PmaWriter * p, u64 iVal)
@@ -1283,7 +1281,7 @@ vdbePmaWriteVarint(PmaWriter * p, u64 iVal)
 
 /*
  * Write the current contents of in-memory linked-list pList to a level-0
- * PMA in the temp file belonging to sub-task pTask. Return SQL_OK if
+ * PMA in the temp file belonging to sub-task pTask. Return 0 if
  * successful, or an sql error code otherwise.
  *
  * The format of a PMA is:
@@ -1299,7 +1297,7 @@ static int
 vdbeSorterListToPMA(SortSubtask * pTask, SorterList * pList)
 {
 	sql *db = pTask->pSorter->db;
-	int rc = SQL_OK;	/* Return code */
+	int rc = 0;	/* Return code */
 	PmaWriter writer;	/* Object used to write to the file */
 
 #ifdef SQL_DEBUG
@@ -1316,23 +1314,22 @@ vdbeSorterListToPMA(SortSubtask * pTask, SorterList * pList)
 	/* If the first temporary PMA file has not been opened, open it now. */
 	if (pTask->file.pFd == 0) {
 		rc = vdbeSorterOpenTempFile(db, 0, &pTask->file.pFd);
-		assert(rc != SQL_OK || pTask->file.pFd);
+		assert(rc != 0 || pTask->file.pFd);
 		assert(pTask->file.iEof == 0);
 		assert(pTask->nPMA == 0);
 	}
 
 	/* Try to get the file to memory map */
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		vdbeSorterExtendFile(db, pTask->file.pFd,
 				     pTask->file.iEof + pList->szPMA + 9);
 	}
 
 	/* Sort the list */
-	if (rc == SQL_OK) {
+	if (rc == 0)
 		rc = vdbeSorterSort(pTask, pList);
-	}
 
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		SorterRecord *p;
 		SorterRecord *pNext = 0;
 
@@ -1351,8 +1348,8 @@ vdbeSorterListToPMA(SortSubtask * pTask, SorterList * pList)
 		rc = vdbePmaWriterFinish(&writer, &pTask->file.iEof);
 	}
 
-	assert(rc != SQL_OK || pList->pList == 0);
-	assert(rc != SQL_OK || pTask->file.iEof == iSz);
+	assert(rc != 0 || pList->pList == NULL);
+	assert(rc != 0 || pTask->file.iEof == iSz);
 	return rc;
 }
 
@@ -1361,7 +1358,7 @@ vdbeSorterListToPMA(SortSubtask * pTask, SorterList * pList)
  * Set *pbEof to true there is no next entry because
  * the MergeEngine has reached the end of all its inputs.
  *
- * Return SQL_OK if successful or an error code if an error occurs.
+ * Return 0 if successful or an error code if an error occurs.
  */
 static int
 vdbeMergeEngineStep(MergeEngine * pMerger,	/* The merge engine to advance to the next row */
@@ -1376,7 +1373,7 @@ vdbeMergeEngineStep(MergeEngine * pMerger,	/* The merge engine to advance to the
 	rc = vdbePmaReaderNext(&pMerger->aReadr[iPrev]);
 
 	/* Update contents of aTree[] */
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		int i;		/* Index of aTree[] to recalculate */
 		PmaReader *pReadr1;	/* First PmaReader to compare */
 		PmaReader *pReadr2;	/* Second PmaReader to compare */
@@ -1437,7 +1434,7 @@ vdbeMergeEngineStep(MergeEngine * pMerger,	/* The merge engine to advance to the
 		*pbEof = (pMerger->aReadr[pMerger->aTree[1]].pFd == 0);
 	}
 
-	return (rc == SQL_OK ? pTask->pUnpacked->errCode : rc);
+	return rc == 0 ? pTask->pUnpacked->errCode : rc;
 }
 
 /*
@@ -1460,7 +1457,7 @@ sqlVdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
     )
 {
 	VdbeSorter *pSorter;
-	int rc = SQL_OK;	/* Return Code */
+	int rc = 0;	/* Return Code */
 	SorterRecord *pNew;	/* New list element */
 	int bFlush;		/* True to flush contents of memory to PMA */
 	int nReq;		/* Bytes of memory required */
@@ -1512,7 +1509,7 @@ sqlVdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
 			rc = vdbeSorterFlushPMA(pSorter);
 			pSorter->list.szPMA = 0;
 			pSorter->iMemory = 0;
-			assert(rc != SQL_OK || pSorter->list.pList == 0);
+			assert(rc != 0 || pSorter->list.pList == NULL);
 		}
 	}
 
@@ -1575,7 +1572,7 @@ sqlVdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
 static int
 vdbeIncrPopulate(IncrMerger * pIncr)
 {
-	int rc = SQL_OK;
+	int rc = 0;
 	int rc2;
 	i64 iStart = pIncr->iStartOff;
 	SorterFile *pOut = &pIncr->aFile[1];
@@ -1585,7 +1582,7 @@ vdbeIncrPopulate(IncrMerger * pIncr)
 	assert(pIncr->bEof == 0);
 
 	vdbePmaWriterInit(pOut->pFd, &writer, pTask->pSorter->pgsz, iStart);
-	while (rc == SQL_OK) {
+	while (rc == 0) {
 		int dummy;
 		PmaReader *pReader = &pMerger->aReadr[pMerger->aTree[1]];
 		int nKey = pReader->nKey;
@@ -1608,7 +1605,7 @@ vdbeIncrPopulate(IncrMerger * pIncr)
 	}
 
 	rc2 = vdbePmaWriterFinish(&writer, &pOut->iEof);
-	if (rc == SQL_OK)
+	if (rc == 0)
 		rc = rc2;
 	return rc;
 }
@@ -1628,7 +1625,7 @@ vdbeIncrPopulate(IncrMerger * pIncr)
  * been exhausted, this function also launches a new background thread
  * to populate the new aFile[1].
  *
- * SQL_OK is returned on success, or an sql error code otherwise.
+ * 0 is returned on success, or an sql error code otherwise.
  */
 static int
 vdbeIncrSwap(IncrMerger * pIncr)
@@ -1654,7 +1651,7 @@ vdbeIncrMergerNew(SortSubtask * pTask,	/* The thread that will be using the new 
 		  IncrMerger ** ppOut	/* Write the new IncrMerger here */
     )
 {
-	int rc = SQL_OK;
+	int rc = 0;
 	IncrMerger *pIncr = *ppOut =
 		(IncrMerger *) sqlMallocZero(sizeof(*pIncr));
 	if (pIncr) {
@@ -1738,14 +1735,14 @@ static int vdbePmaReaderIncrInit(PmaReader * pReader);
  * vdbePmaReaderIncrMergeInit() to initialize each PmaReader that feeds data
  * to pMerger.
  *
- * SQL_OK is returned if successful, or an sql error code otherwise.
+ * 0 is returned if successful, or an sql error code otherwise.
  */
 static int
 vdbeMergeEngineInit(SortSubtask * pTask,	/* Thread that will run pMerger */
 		    MergeEngine * pMerger 	/* MergeEngine to initialize */
     )
 {
-	int rc = SQL_OK;	/* Return code */
+	int rc = 0;	/* Return code */
 	int i;			/* For looping over PmaReader objects */
 	int nTree = pMerger->nTree;
 
@@ -1755,7 +1752,7 @@ vdbeMergeEngineInit(SortSubtask * pTask,	/* Thread that will run pMerger */
 
 	for (i = 0; i < nTree; i++) {
 		rc = vdbePmaReaderIncrInit(&pMerger->aReadr[i]);
-		if (rc != SQL_OK)
+		if (rc != 0)
 			return rc;
 	}
 
@@ -1776,12 +1773,12 @@ vdbeMergeEngineInit(SortSubtask * pTask,	/* Thread that will run pMerger */
  * loaded into the buffers belonging to pReadr and it is set to point to
  * the first key in its range.
  *
- * SQL_OK is returned if successful, or an sql error code otherwise.
+ * 0 is returned if successful, or an sql error code otherwise.
  */
 static int
 vdbePmaReaderIncrMergeInit(PmaReader * pReadr)
 {
-	int rc = SQL_OK;
+	int rc = 0;
 	IncrMerger *pIncr = pReadr->pIncr;
 	SortSubtask *pTask = pIncr->pTask;
 	sql *db = pTask->pSorter->db;
@@ -1792,7 +1789,7 @@ vdbePmaReaderIncrMergeInit(PmaReader * pReadr)
 	 * requires two temp files to itself, whereas a single-threaded object
 	 * only requires a region of pTask->file2.
 	 */
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		int mxSz = pIncr->mxSz;
 		if (pTask->file2.pFd == 0) {
 			assert(pTask->file2.iEof > 0);
@@ -1801,14 +1798,14 @@ vdbePmaReaderIncrMergeInit(PmaReader * pReadr)
 						    &pTask->file2.pFd);
 			pTask->file2.iEof = 0;
 		}
-		if (rc == SQL_OK) {
+		if (rc == 0) {
 			pIncr->aFile[1].pFd = pTask->file2.pFd;
 			pIncr->iStartOff = pTask->file2.iEof;
 			pTask->file2.iEof += mxSz;
 		}
 	}
 
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		rc = vdbePmaReaderNext(pReadr);
 	}
 
@@ -1830,7 +1827,7 @@ static int
 vdbePmaReaderIncrInit(PmaReader * pReadr)
 {
 	IncrMerger *pIncr = pReadr->pIncr;	/* Incremental merger */
-	int rc = SQL_OK;	/* Return code */
+	int rc = 0;	/* Return code */
 	if (pIncr) {
 		rc = vdbePmaReaderIncrMergeInit(pReadr);
 	}
@@ -1840,7 +1837,7 @@ vdbePmaReaderIncrInit(PmaReader * pReadr)
 /*
  * Allocate a new MergeEngine object to merge the contents of nPMA level-0
  * PMAs from pTask->file. If no error occurs, set *ppOut to point to
- * the new object and return SQL_OK. Or, if an error does occur, set *ppOut
+ * the new object and return 0. Or, if an error does occur, set *ppOut
  * to NULL and return an sql error code.
  *
  * When this function is called, *piOffset is set to the offset of the
@@ -1859,13 +1856,13 @@ vdbeMergeEngineLevel0(SortSubtask * pTask,	/* Sorter task to read from */
 	MergeEngine *pNew;	/* Merge engine to return */
 	i64 iOff = *piOffset;
 	int i;
-	int rc = SQL_OK;
+	int rc = 0;
 
 	*ppOut = pNew = vdbeMergeEngineNew(nPMA);
 	if (pNew == 0)
 		rc = SQL_NOMEM;
 
-	for (i = 0; i < nPMA && rc == SQL_OK; i++) {
+	for (i = 0; i < nPMA && rc == 0; i++) {
 		i64 nDummy = 0;
 		PmaReader *pReadr = &pNew->aReadr[i];
 		rc = vdbePmaReaderInit(pTask, &pTask->file, iOff, pReadr,
@@ -1873,7 +1870,7 @@ vdbeMergeEngineLevel0(SortSubtask * pTask,	/* Sorter task to read from */
 		iOff = pReadr->iEof;
 	}
 
-	if (rc != SQL_OK) {
+	if (rc != 0) {
 		vdbeMergeEngineFree(pNew);
 		*ppOut = 0;
 	}
@@ -1908,7 +1905,7 @@ vdbeSorterTreeDepth(int nPMA)
  * to vdbeSorterTreeDepth()). pLeaf is the iSeq'th leaf to be added to the
  * tree, counting from zero. This function adds pLeaf to the tree.
  *
- * If successful, SQL_OK is returned. If an error occurs, an sql error
+ * If successful, 0 is returned. If an error occurs, an sql error
  * code is returned and pLeaf is freed.
  */
 static int
@@ -1919,7 +1916,7 @@ vdbeSorterAddToTree(SortSubtask * pTask,	/* Task context */
 		    MergeEngine * pLeaf	/* Leaf to add to tree */
     )
 {
-	int rc = SQL_OK;
+	int rc = 0;
 	int nDiv = 1;
 	int i;
 	MergeEngine *p = pRoot;
@@ -1931,7 +1928,7 @@ vdbeSorterAddToTree(SortSubtask * pTask,	/* Task context */
 		nDiv = nDiv * SORTER_MAX_MERGE_COUNT;
 	}
 
-	for (i = 1; i < nDepth && rc == SQL_OK; i++) {
+	for (i = 1; i < nDepth && rc == 0; i++) {
 		int iIter = (iSeq / nDiv) % SORTER_MAX_MERGE_COUNT;
 		PmaReader *pReadr = &p->aReadr[iIter];
 
@@ -1945,13 +1942,13 @@ vdbeSorterAddToTree(SortSubtask * pTask,	/* Task context */
 						       &pReadr->pIncr);
 			}
 		}
-		if (rc == SQL_OK) {
+		if (rc == 0) {
 			p = pReadr->pIncr->pMerger;
 			nDiv = nDiv / SORTER_MAX_MERGE_COUNT;
 		}
 	}
 
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		p->aReadr[iSeq % SORTER_MAX_MERGE_COUNT].pIncr = pIncr;
 	} else {
 		vdbeIncrFree(pIncr);
@@ -1965,7 +1962,7 @@ vdbeSorterAddToTree(SortSubtask * pTask,	/* Task context */
  * files. It builds a tree of MergeEngine/IncrMerger/PmaReader objects that
  * can be used to incrementally merge all PMAs on disk.
  *
- * If successful, SQL_OK is returned and *ppOut set to point to the
+ * If successful, 0 is returned and *ppOut set to point to the
  * MergeEngine object at the root of the tree before returning. Or, if an
  * error occurs, an sql error code is returned and the final value
  * of *ppOut is undefined.
@@ -1976,7 +1973,7 @@ vdbeSorterMergeTreeBuild(VdbeSorter * pSorter,	/* The VDBE cursor that implement
     )
 {
 	MergeEngine *pMain = 0;
-	int rc = SQL_OK;
+	int rc = 0;
 
 	SortSubtask *pTask = &pSorter->aTask;
 	assert(pTask->nPMA > 0);
@@ -1995,7 +1992,7 @@ vdbeSorterMergeTreeBuild(VdbeSorter * pSorter,	/* The VDBE cursor that implement
 			    vdbeMergeEngineNew(SORTER_MAX_MERGE_COUNT);
 			if (pRoot == 0)
 				rc = SQL_NOMEM;
-			for (i = 0; i < pTask->nPMA && rc == SQL_OK;
+			for (i = 0; i < pTask->nPMA && rc == 0;
 			     i += SORTER_MAX_MERGE_COUNT) {
 				MergeEngine *pMerger = 0;	/* New level-0 PMA merger */
 				int nReader;	/* Number of level-0 PMAs to merge */
@@ -2007,7 +2004,7 @@ vdbeSorterMergeTreeBuild(VdbeSorter * pSorter,	/* The VDBE cursor that implement
 							   nReader,
 							   &iReadOff,
 							   &pMerger);
-				if (rc == SQL_OK) {
+				if (rc == 0) {
 					rc = vdbeSorterAddToTree(pTask,
 								 nDepth,
 								 iSeq++,
@@ -2017,7 +2014,7 @@ vdbeSorterMergeTreeBuild(VdbeSorter * pSorter,	/* The VDBE cursor that implement
 			}
 		}
 
-		if (rc == SQL_OK) {
+		if (rc == 0) {
 			assert(pMain == 0);
 			pMain = pRoot;
 		} else {
@@ -2025,7 +2022,7 @@ vdbeSorterMergeTreeBuild(VdbeSorter * pSorter,	/* The VDBE cursor that implement
 		}
 	}
 
-	if (rc != SQL_OK) {
+	if (rc != 0) {
 		vdbeMergeEngineFree(pMain);
 		pMain = 0;
 	}
@@ -2040,7 +2037,7 @@ vdbeSorterMergeTreeBuild(VdbeSorter * pSorter,	/* The VDBE cursor that implement
  * (for multi-threaded sorters) so that it can be used to iterate through
  * all records stored in the sorter.
  *
- * SQL_OK is returned if successful, or an sql error code otherwise.
+ * 0 is returned if successful, or an sql error code otherwise.
  */
 static int
 vdbeSorterSetupMerge(VdbeSorter * pSorter)
@@ -2049,15 +2046,14 @@ vdbeSorterSetupMerge(VdbeSorter * pSorter)
 	MergeEngine *pMain = 0;
 
 	rc = vdbeSorterMergeTreeBuild(pSorter, &pMain);
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		rc = vdbeMergeEngineInit(&pSorter->aTask, pMain);
 		pSorter->pMerger = pMain;
 		pMain = 0;
 	}
 
-	if (rc != SQL_OK) {
+	if (rc != 0)
 		vdbeMergeEngineFree(pMain);
-	}
 	return rc;
 }
 
@@ -2070,7 +2066,7 @@ int
 sqlVdbeSorterRewind(const VdbeCursor * pCsr, int *pbEof)
 {
 	VdbeSorter *pSorter;
-	int rc = SQL_OK;	/* Return code */
+	int rc = 0;	/* Return code */
 
 	assert(pCsr->eCurType == CURTYPE_SORTER);
 	pSorter = pCsr->uc.pSorter;
@@ -2105,7 +2101,7 @@ sqlVdbeSorterRewind(const VdbeCursor * pCsr, int *pbEof)
 	 * incrementally read and merge all remaining PMAs.
 	 */
 	assert(pSorter->pReader == 0);
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		rc = vdbeSorterSetupMerge(pSorter);
 		*pbEof = 0;
 	}
@@ -2138,7 +2134,7 @@ sqlVdbeSorterNext(sql * db, const VdbeCursor * pCsr, int *pbEof)
 		if (pSorter->list.aMemory == 0)
 			vdbeSorterRecordFree(db, pFree);
 		*pbEof = !pSorter->list.pList;
-		rc = SQL_OK;
+		rc = 0;
 	}
 	return rc;
 }
@@ -2189,7 +2185,7 @@ sqlVdbeSorterRowkey(const VdbeCursor * pCsr, Mem * pOut)
 	MemSetTypeFlag(pOut, MEM_Blob);
 	memcpy(pOut->z, pKey, nKey);
 
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -2238,10 +2234,10 @@ sqlVdbeSorterCompare(const VdbeCursor * pCsr,	/* Sorter cursor */
 	for (i = 0; i < nKeyCol; i++) {
 		if (r2->aMem[i].flags & MEM_Null) {
 			*pRes = -1;
-			return SQL_OK;
+			return 0;
 		}
 	}
 
 	*pRes = sqlVdbeRecordCompareMsgpack(pVal->z, r2);
-	return SQL_OK;
+	return 0;
 }

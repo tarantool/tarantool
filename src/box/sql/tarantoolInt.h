@@ -35,7 +35,7 @@ int tarantoolsqlDelete(BtCursor * pCur, u8 flags);
  * @param key Key of record to be deleted.
  * @param key_size Size of key.
  *
- * @retval SQL_OK on success, SQL_TARANTOOL_ERROR otherwise.
+ * @retval 0 on success, SQL_TARANTOOL_ERROR otherwise.
  */
 int
 sql_delete_by_key(struct space *space, uint32_t iid, char *key,
@@ -82,7 +82,7 @@ sql_ephemeral_space_create(uint32_t filed_count, struct sql_key_info *key_info);
  * @param tuple Tuple to be inserted.
  * @param tuple_end End of tuple to be inserted.
  *
- * @retval SQL_OK on success, SQL_TARANTOOL_ERROR otherwise.
+ * @retval 0 on success, SQL_TARANTOOL_ERROR otherwise.
  */
 int tarantoolsqlEphemeralInsert(struct space *space, const char *tuple,
 				    const char *tuple_end);

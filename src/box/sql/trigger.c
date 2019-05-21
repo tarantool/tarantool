@@ -783,7 +783,7 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 		 */
 		if (trigger->pWhen != NULL) {
 			pWhen = sqlExprDup(db, trigger->pWhen, 0);
-			if (SQL_OK == sqlResolveExprNames(&sNC, pWhen)
+			if (0 == sqlResolveExprNames(&sNC, pWhen)
 			    && db->mallocFailed == 0) {
 				iEndTrigger = sqlVdbeMakeLabel(v);
 				sqlExprIfFalse(pSubParse, pWhen,

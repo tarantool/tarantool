@@ -1175,7 +1175,7 @@ whereRangeAdjust(WhereTerm * pTerm, LogEst nNew)
  * is left as is.
  *
  * If an error occurs, an sql error code is returned. Otherwise,
- * SQL_OK.
+ * 0.
  */
 static int
 whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
@@ -1193,7 +1193,7 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 	sql *db = pParse->db;
 	int nLower = -1;
 	int nUpper = index->def->opts.stat->sample_count + 1;
-	int rc = SQL_OK;
+	int rc = 0;
 	enum field_type type = p->key_def->parts[nEq].type;
 
 	sql_value *p1 = 0;	/* Value extracted from pLower */
@@ -1206,7 +1206,7 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 					       type, &p1);
 		nLower = 0;
 	}
-	if (pUpper && rc == SQL_OK) {
+	if (pUpper != NULL && rc == 0) {
 		rc = sqlStat4ValueFromExpr(pParse, pUpper->pExpr->pRight,
 					       type, &p2);
 		nUpper = p2 ? 0 : index->def->opts.stat->sample_count;
@@ -1217,15 +1217,15 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 		int nDiff;
 		struct index_sample *samples = index->def->opts.stat->samples;
 		uint32_t sample_count = index->def->opts.stat->sample_count;
-		for (i = 0; rc == SQL_OK && i < (int) sample_count; i++) {
+		for (i = 0; rc == 0 && i < (int) sample_count; i++) {
 			rc = sql_stat4_column(db, samples[i].sample_key, nEq,
 					      &pVal);
-			if (rc == SQL_OK && p1) {
+			if (rc == 0 && p1 != NULL) {
 				int res = sqlMemCompare(p1, pVal, coll);
 				if (res >= 0)
 					nLower++;
 			}
-			if (rc == SQL_OK && p2) {
+			if (rc == 0 && p2 != NULL) {
 				int res = sqlMemCompare(p2, pVal, coll);
 				if (res >= 0)
 					nUpper++;
@@ -1309,7 +1309,7 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 		  WhereTerm * pUpper,	/* Upper bound on the range. ex: "x<455" Might be NULL */
 		  WhereLoop * pLoop)	/* Modify the .nOut and maybe .rRun fields */
 {
-	int rc = SQL_OK;
+	int rc = 0;
 	int nOut = pLoop->nOut;
 	LogEst nNew;
 
@@ -1399,7 +1399,7 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 				rc = sqlStat4ProbeSetValue(pParse, p, &pRec,
 							       pExpr, nBtm, nEq,
 							       &n);
-				if (rc == SQL_OK && n) {
+				if (rc == 0 && n != 0) {
 					tRowcnt iNew;
 					u16 mask = WO_GT | WO_LE;
 					if (sqlExprVectorSize(pExpr) > n)
@@ -1425,7 +1425,7 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 				rc = sqlStat4ProbeSetValue(pParse, p, &pRec,
 							       pExpr, nTop, nEq,
 							       &n);
-				if (rc == SQL_OK && n) {
+				if (rc == 0 && n != 0) {
 					tRowcnt iNew;
 					u16 mask = WO_GT | WO_LE;
 					if (sqlExprVectorSize(pExpr) > n)
@@ -1445,7 +1445,7 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 			}
 
 			pBuilder->pRec = pRec;
-			if (rc == SQL_OK) {
+			if (rc == 0) {
 				if (iUpper > iLower) {
 					nNew = sqlLogEst(iUpper - iLower);
 					/* TUNING:  If both iUpper and iLower are derived from the same
@@ -1513,7 +1513,7 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
  * for that index.  When pExpr==NULL that means the constraint is
  * "x IS NULL" instead of "x=VALUE".
  *
- * Write the estimated row count into *pnRow and return SQL_OK.
+ * Write the estimated row count into *pnRow and return 0.
  * If unable to make an estimate, leave *pnRow unchanged and return
  * non-zero.
  *
@@ -1548,7 +1548,7 @@ whereEqualScanEst(Parse * pParse,	/* Parsing & code generating context */
 	rc = sqlStat4ProbeSetValue(pParse, p, &pRec, pExpr, 1, nEq - 1,
 				       &bOk);
 	pBuilder->pRec = pRec;
-	if (rc != SQL_OK)
+	if (rc != 0)
 		return rc;
 	if (bOk == 0)
 		return SQL_NOTFOUND;
@@ -1569,7 +1569,7 @@ whereEqualScanEst(Parse * pParse,	/* Parsing & code generating context */
  *
  *        WHERE x IN (1,2,3,4)
  *
- * Write the estimated row count into *pnRow and return SQL_OK.
+ * Write the estimated row count into *pnRow and return 0.
  * If unable to make an estimate, leave *pnRow unchanged and return
  * non-zero.
  *
@@ -1586,12 +1586,12 @@ whereInScanEst(Parse * pParse,	/* Parsing & code generating context */
 	struct index_def *p = pBuilder->pNew->index_def;
 	i64 nRow0 = sqlLogEstToInt(index_field_tuple_est(p, 0));
 	int nRecValid = pBuilder->nRecValid;
-	int rc = SQL_OK;	/* Subfunction return code */
+	int rc = 0;	/* Subfunction return code */
 	tRowcnt nEst;		/* Number of rows for a single term */
 	tRowcnt nRowEst = 0;	/* New estimate of the number of rows */
 	int i;			/* Loop counter */
 
-	for (i = 0; rc == SQL_OK && i < pList->nExpr; i++) {
+	for (i = 0; rc == 0 && i < pList->nExpr; i++) {
 		nEst = nRow0;
 		rc = whereEqualScanEst(pParse, pBuilder, pList->a[i].pExpr,
 				       &nEst);
@@ -1599,7 +1599,7 @@ whereInScanEst(Parse * pParse,	/* Parsing & code generating context */
 		pBuilder->nRecValid = nRecValid;
 	}
 
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		if (nRowEst > nRow0)
 			nRowEst = nRow0;
 		*pnRow = nRowEst;
@@ -1755,7 +1755,7 @@ whereLoopResize(sql * db, WhereLoop * p, int n)
 {
 	WhereTerm **paNew;
 	if (p->nLSlot >= n)
-		return SQL_OK;
+		return 0;
 	n = (n + 7) & ~7;
 	paNew = sqlDbMallocRawNN(db, sizeof(p->aLTerm[0]) * n);
 	if (paNew == 0)
@@ -1765,7 +1765,7 @@ whereLoopResize(sql * db, WhereLoop * p, int n)
 		sqlDbFree(db, p->aLTerm);
 	p->aLTerm = paNew;
 	p->nLSlot = n;
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -1787,7 +1787,7 @@ whereLoopXfer(sql * db, WhereLoop * pTo, WhereLoop * pFrom)
 	       pTo->nLTerm * sizeof(pTo->aLTerm[0]));
 	if ((pFrom->wsFlags & WHERE_AUTO_INDEX) != 0)
 		pFrom->index_def = NULL;
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -2056,7 +2056,7 @@ whereLoopInsert(WhereLoopBuilder * pBuilder, WhereLoop * pTemplate)
 			}
 #endif
 		}
-		return SQL_OK;
+		return 0;
 	}
 
 	/* Look for an existing WhereLoop to replace with pTemplate
@@ -2074,7 +2074,7 @@ whereLoopInsert(WhereLoopBuilder * pBuilder, WhereLoop * pTemplate)
 			whereLoopPrint(pTemplate, pBuilder->pWC);
 		}
 #endif
-		return SQL_OK;
+		return 0;
 	} else {
 		p = *ppPrev;
 	}
@@ -2318,7 +2318,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 	u16 saved_nSkip;	/* Original value of pNew->nSkip */
 	u32 saved_wsFlags;	/* Original value of pNew->wsFlags */
 	LogEst saved_nOut;	/* Original value of pNew->nOut */
-	int rc = SQL_OK;	/* Return code */
+	int rc = 0;	/* Return code */
 	LogEst rSize;		/* Number of rows in the table */
 	LogEst rLogSize;	/* Logarithm of table size */
 	WhereTerm *pTop = 0, *pBtm = 0;	/* Top and bottom range constraints */
@@ -2370,7 +2370,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 	pNew->rSetup = 0;
 	rSize = index_field_tuple_est(probe, 0);
 	rLogSize = estLog(rSize);
-	for (; rc == SQL_OK && pTerm != 0; pTerm = whereScanNext(&scan)) {
+	for (; rc == 0 && pTerm != NULL; pTerm = whereScanNext(&scan)) {
 		u16 eOp = pTerm->eOperator;	/* Shorthand for pTerm->eOperator */
 		LogEst rCostIdx;
 		LogEst nOutUnadjusted;	/* nOut before IN() and WHERE adjustments */
@@ -2552,8 +2552,8 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 								    &nOut);
 					}
 					if (rc == SQL_NOTFOUND)
-						rc = SQL_OK;
-					if (rc != SQL_OK)
+						rc = 0;
+					if (rc != 0)
 						break;	/* Jump out of the pTerm loop */
 					if (nOut) {
 						pNew->nOut =
@@ -2651,7 +2651,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 	    stat->skip_scan_enabled == true &&
 	    /* TUNING: Minimum for skip-scan */
 	    index_field_tuple_est(probe, saved_nEq + 1) >= 42 &&
-	    (rc = whereLoopResize(db, pNew, pNew->nLTerm + 1)) == SQL_OK) {
+	    (rc = whereLoopResize(db, pNew, pNew->nLTerm + 1)) == 0) {
 		LogEst nIter;
 		pNew->nEq++;
 		pNew->nSkip++;
@@ -2760,7 +2760,7 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 	SrcList *pTabList;	/* The FROM clause */
 	struct SrcList_item *pSrc;	/* The FROM clause btree term to add */
 	WhereLoop *pNew;	/* Template WhereLoop object */
-	int rc = SQL_OK;	/* Return code */
+	int rc = 0;	/* Return code */
 	int iSortIdx = 1;	/* Index number */
 	int b;			/* A boolean value */
 	LogEst rSize;		/* number of rows in the table */
@@ -2843,7 +2843,7 @@ tnt_error:
 		/* Generate auto-index WhereLoops */
 		WhereTerm *pTerm;
 		WhereTerm *pWCEnd = pWC->a + pWC->nTerm;
-		for (pTerm = pWC->a; rc == SQL_OK && pTerm < pWCEnd; pTerm++) {
+		for (pTerm = pWC->a; rc == 0 && pTerm < pWCEnd; pTerm++) {
 			if (pTerm->prereqRight & pNew->maskSelf)
 				continue;
 			if (termCanDriveIndex(pTerm, pSrc, 0)) {
@@ -2958,7 +2958,7 @@ whereLoopAddOr(WhereLoopBuilder * pBuilder, Bitmask mPrereq, Bitmask mUnusable)
 	WhereClause *pWC;
 	WhereLoop *pNew;
 	WhereTerm *pTerm, *pWCEnd;
-	int rc = SQL_OK;
+	int rc = 0;
 	int iCur;
 	WhereClause tempWC;
 	WhereLoopBuilder sSubBuild;
@@ -2972,7 +2972,7 @@ whereLoopAddOr(WhereLoopBuilder * pBuilder, Bitmask mPrereq, Bitmask mUnusable)
 	pItem = pWInfo->pTabList->a + pNew->iTab;
 	iCur = pItem->iCursor;
 
-	for (pTerm = pWC->a; pTerm < pWCEnd && rc == SQL_OK; pTerm++) {
+	for (pTerm = pWC->a; pTerm < pWCEnd && rc == 0; pTerm++) {
 		if ((pTerm->eOperator & WO_OR) != 0
 		    && (pTerm->u.pOrInfo->indexable & pNew->maskSelf) != 0) {
 			WhereClause *const pOrWC = &pTerm->u.pOrInfo->wc;
@@ -3015,11 +3015,11 @@ whereLoopAddOr(WhereLoopBuilder * pBuilder, Bitmask mPrereq, Bitmask mUnusable)
 					rc = whereLoopAddBtree(&sSubBuild,
 							       mPrereq);
 				}
-				if (rc == SQL_OK) {
+				if (rc == 0) {
 					rc = whereLoopAddOr(&sSubBuild, mPrereq,
 							    mUnusable);
 				}
-				assert(rc == SQL_OK || sCur.n == 0);
+				assert(rc == 0 || sCur.n == 0);
 				if (sCur.n == 0) {
 					sSum.n = 0;
 					break;
@@ -3052,7 +3052,7 @@ whereLoopAddOr(WhereLoopBuilder * pBuilder, Bitmask mPrereq, Bitmask mUnusable)
 			pNew->nBtm = 0;
 			pNew->nTop = 0;
 			pNew->index_def = NULL;
-			for (i = 0; rc == SQL_OK && i < sSum.n; i++) {
+			for (i = 0; rc == 0 && i < sSum.n; i++) {
 				/* TUNING: Currently sSum.a[i].rRun is set to the sum of the costs
 				 * of all sub-scans required by the OR-scan. However, due to rounding
 				 * errors, it may be that the cost of the OR-scan is equal to its
@@ -3092,7 +3092,7 @@ whereLoopAddAll(WhereLoopBuilder * pBuilder)
 	struct SrcList_item *pItem;
 	struct SrcList_item *pEnd = &pTabList->a[pWInfo->nLevel];
 	sql *db = pWInfo->pParse->db;
-	int rc = SQL_OK;
+	int rc = 0;
 	WhereLoop *pNew;
 	u8 priorJointype = 0;
 
@@ -3115,9 +3115,8 @@ whereLoopAddAll(WhereLoopBuilder * pBuilder)
 		{
 			rc = whereLoopAddBtree(pBuilder, mPrereq);
 		}
-		if (rc == SQL_OK) {
+		if (rc == 0)
 			rc = whereLoopAddOr(pBuilder, mPrereq, mUnusable);
-		}
 		mPrior |= pNew->maskSelf;
 		if (rc || db->mallocFailed)
 			break;
@@ -3566,7 +3565,7 @@ whereSortingCost(WhereInfo * pWInfo, LogEst nRow, int nOrderBy, int nSorted)
  * will be nRowEst (in the 10*log2 representation).  Or, ignore sorting
  * costs if nRowEst==0.
  *
- * Return SQL_OK on success or SQL_NOMEM of a memory allocation
+ * Return 0 on success or SQL_NOMEM of a memory allocation
  * error occurs.
  */
 static int
@@ -4001,7 +4000,7 @@ wherePathSolver(WhereInfo * pWInfo, LogEst nRowEst)
 
 	/* Free temporary memory and return success */
 	sqlDbFree(db, pSpace);
-	return SQL_OK;
+	return 0;
 }
 
 /**

@@ -58,7 +58,7 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
     )
 {
 	(void)pzErrMsg;
-	int rc = SQL_OK;	/* Return code */
+	int rc = 0;	/* Return code */
 	const char *zLeftover;	/* Tail of unprocessed SQL */
 	sql_stmt *pStmt = 0;	/* The current SQL statement */
 	char **azCols = 0;	/* Names of result columns */
@@ -68,16 +68,15 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 	if (zSql == 0)
 		zSql = "";
 
-	while (rc == SQL_OK && zSql[0]) {
+	while (rc == 0 && zSql[0] != 0) {
 		int nCol;
 		char **azVals = 0;
 
 		pStmt = 0;
 		rc = sql_prepare_v2(db, zSql, -1, &pStmt, &zLeftover);
-		assert(rc == SQL_OK || pStmt == 0);
-		if (rc != SQL_OK) {
+		assert(rc == 0 || pStmt == NULL);
+		if (rc != 0)
 			continue;
-		}
 		if (!pStmt) {
 			/* this happens for a comment or white-space */
 			zSql = zLeftover;
@@ -163,7 +162,7 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 	sqlDbFree(db, azCols);
 
 	rc = sqlApiExit(db, rc);
-	assert(rc == SQL_OK);
+	assert(rc == 0);
 	assert((rc & db->errMask) == rc);
 	return rc;
 }

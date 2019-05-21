@@ -205,7 +205,7 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 	default:
 		unreachable();
 	}
-	if (rc == SQL_OK)
+	if (rc == 0)
 		return 0;
 
 	switch (rc) {

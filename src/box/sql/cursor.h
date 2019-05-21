@@ -64,7 +64,8 @@ int sqlCursorMovetoUnpacked(BtCursor *, UnpackedRecord * pUnKey, int *pRes);
 
 int sqlCursorNext(BtCursor *, int *pRes);
 int sqlCursorPrevious(BtCursor *, int *pRes);
-int sqlCursorPayload(BtCursor *, u32 offset, u32 amt, void *);
+void
+sqlCursorPayload(BtCursor *, u32 offset, u32 amt, void *);
 
 /**
  * Release tuple, free iterator, invalidate cursor's state.

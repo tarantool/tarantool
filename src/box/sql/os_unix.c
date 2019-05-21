@@ -486,7 +486,7 @@ findInodeInfo(unixFile * pFile,	/* Unix file with file desc used in the key */
 		pInode->nRef++;
 	}
 	*ppInode = pInode;
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -625,13 +625,13 @@ posixUnlock(sql_file * id, int eFileLock, int handleNFSUnlock)
 	unixFile *pFile = (unixFile *) id;
 	unixInodeInfo *pInode;
 	struct flock lock;
-	int rc = SQL_OK;
+	int rc = 0;
 
 	assert(pFile);
 
 	assert(eFileLock <= SHARED_LOCK);
 	if (pFile->eFileLock <= eFileLock) {
-		return SQL_OK;
+		return 0;
 	}
 	pInode = pFile->pInode;
 	assert(pInode->nShared != 0);
@@ -714,7 +714,7 @@ posixUnlock(sql_file * id, int eFileLock, int handleNFSUnlock)
 	}
 
  end_unlock:
-	if (rc == SQL_OK)
+	if (rc == 0)
 		pFile->eFileLock = eFileLock;
 	return rc;
 }
@@ -755,7 +755,7 @@ closeUnixFile(sql_file * id)
 	}
 	sql_free(pFile->pUnused);
 	memset(pFile, 0, sizeof(unixFile));
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -862,7 +862,7 @@ seekAndRead(unixFile * id, sql_int64 offset, void *pBuf, int cnt)
 }
 
 /*
- * Read data from a file into a buffer.  Return SQL_OK if all
+ * Read data from a file into a buffer.  Return 0 if all
  * bytes were read successfully and SQL_IOERR if anything goes
  * wrong.
  */
@@ -883,7 +883,7 @@ unixRead(sql_file * id, void *pBuf, int amt, sql_int64 offset)
 		if (offset + amt <= pFile->mmapSize) {
 			memcpy(pBuf, &((u8 *) (pFile->pMapRegion))[offset],
 			       amt);
-			return SQL_OK;
+			return 0;
 		} else {
 			int nCopy = pFile->mmapSize - offset;
 			memcpy(pBuf, &((u8 *) (pFile->pMapRegion))[offset],
@@ -897,7 +897,7 @@ unixRead(sql_file * id, void *pBuf, int amt, sql_int64 offset)
 
 	got = seekAndRead(pFile, offset, pBuf, amt);
 	if (got == amt) {
-		return SQL_OK;
+		return 0;
 	} else if (got < 0) {
 		/* lastErrno set by seekAndRead */
 		return SQL_IOERR_READ;
@@ -958,7 +958,7 @@ seekAndWrite(unixFile * id, i64 offset, const void *pBuf, int cnt)
 }
 
 /*
- * Write data from a buffer into a file.  Return SQL_OK on success
+ * Write data from a buffer into a file.  Return 0 on success
  * or some other error code on failure.
  */
 static int
@@ -986,13 +986,13 @@ unixWrite(sql_file * id, const void *pBuf, int amt, sql_int64 offset)
 		}
 	}
 
-	return SQL_OK;
+	return 0;
 }
 
 /*
  * Open a file descriptor to the directory containing file zFilename.
  * If successful, *pFd is set to the opened file descriptor and
- * SQL_OK is returned. If an error occurs, either SQL_NOMEM
+ * 0 is returned. If an error occurs, either SQL_NOMEM
  * or SQL_CANTOPEN is returned and *pFd is set to an undefined
  * value.
  *
@@ -1006,10 +1006,10 @@ unixWrite(sql_file * id, const void *pBuf, int amt, sql_int64 offset)
  * chromium sandbox.  Opening a directory is a security risk (we are
  * told) so making it overrideable allows the chromium sandbox to
  * replace this routine with a harmless no-op.  To make this routine
- * a no-op, replace it with a stub that returns SQL_OK but leaves
+ * a no-op, replace it with a stub that returns 0 but leaves
  * *pFd set to a negative number.
  *
- * If SQL_OK is returned, the caller is responsible for closing
+ * If 0 is returned, the caller is responsible for closing
  * the file descriptor *pFd using close().
  */
 static int
@@ -1032,7 +1032,7 @@ openDirectory(const char *zFilename, int *pFd)
 
 	*pFd = fd;
 	if (fd >= 0)
-		return SQL_OK;
+		return 0;
 	return unixLogError(SQL_CANTOPEN, "openDirectory", zDirname);
 }
 
@@ -1087,7 +1087,7 @@ fcntlSizeHint(unixFile * pFile, i64 nByte)
 		return rc;
 	}
 
-	return SQL_OK;
+	return 0;
 }
 
 /* Forward declaration */
@@ -1103,15 +1103,15 @@ unixFileControl(sql_file * id, int op, void *pArg)
 	switch (op) {
 	case SQL_FCNTL_LOCKSTATE:{
 			*(int *)pArg = pFile->eFileLock;
-			return SQL_OK;
+			return 0;
 		}
 	case SQL_FCNTL_LAST_ERRNO:{
 			*(int *)pArg = pFile->lastErrno;
-			return SQL_OK;
+			return 0;
 		}
 	case SQL_FCNTL_CHUNK_SIZE:{
 			pFile->szChunk = *(int *)pArg;
-			return SQL_OK;
+			return 0;
 		}
 	case SQL_FCNTL_SIZE_HINT:{
 			int rc;
@@ -1121,7 +1121,7 @@ unixFileControl(sql_file * id, int op, void *pArg)
 	case SQL_FCNTL_VFSNAME:{
 			*(char **)pArg =
 			    sql_mprintf("%s", pFile->pVfs->zName);
-			return SQL_OK;
+			return 0;
 		}
 	case SQL_FCNTL_TEMPFILENAME:{
 			char *zTFile =
@@ -1131,15 +1131,15 @@ unixFileControl(sql_file * id, int op, void *pArg)
 						zTFile);
 				*(char **)pArg = zTFile;
 			}
-			return SQL_OK;
+			return 0;
 		}
 	case SQL_FCNTL_HAS_MOVED:{
 			*(int *)pArg = fileHasMoved(pFile);
-			return SQL_OK;
+			return 0;
 		}
 	case SQL_FCNTL_MMAP_SIZE:{
 			i64 newLimit = *(i64 *) pArg;
-			int rc = SQL_OK;
+			int rc = 0;
 			if (newLimit > sqlGlobalConfig.mxMmap) {
 				newLimit = sqlGlobalConfig.mxMmap;
 			}
@@ -1241,7 +1241,7 @@ unixRemapfile(unixFile * pFd,	/* File descriptor object */
 	if (pNew == MAP_FAILED) {
 		pNew = 0;
 		nNew = 0;
-		unixLogError(SQL_OK, zErr, pFd->zPath);
+		unixLogError(0, zErr, pFd->zPath);
 
 		/* If the mmap() above failed, assume that all subsequent mmap() calls
 		 * will probably fail too. Fall back to using xRead/xWrite exclusively
@@ -1265,7 +1265,7 @@ unixRemapfile(unixFile * pFd,	/* File descriptor object */
  * created mapping is either the requested size or the value configured
  * using SQL_FCNTL_MMAP_LIMIT, whichever is smaller.
  *
- * SQL_OK is returned if no error occurs (even if the mapping is not
+ * 0 is returned if no error occurs (even if the mapping is not
  * recreated as a result of outstanding references) or an sql error
  * code otherwise.
  */
@@ -1275,7 +1275,7 @@ unixMapfile(unixFile * pFd, i64 nMap)
 	assert(nMap >= 0 || pFd->nFetchOut == 0);
 	assert(nMap > 0 || (pFd->mmapSize == 0 && pFd->pMapRegion == 0));
 	if (pFd->nFetchOut > 0)
-		return SQL_OK;
+		return 0;
 
 	if (nMap < 0) {
 		struct stat statbuf;	/* Low-level file information */
@@ -1292,15 +1292,15 @@ unixMapfile(unixFile * pFd, i64 nMap)
 		unixRemapfile(pFd, nMap);
 	}
 
-	return SQL_OK;
+	return 0;
 }
 
 /*
  * If possible, return a pointer to a mapping of file fd starting at offset
  * iOff. The mapping must be valid for at least nAmt bytes.
  *
- * If such a pointer can be obtained, store it in *pp and return SQL_OK.
- * Or, if one cannot but no error occurs, set *pp to 0 and return SQL_OK.
+ * If such a pointer can be obtained, store it in *pp and return 0.
+ * Or, if one cannot but no error occurs, set *pp to 0 and return 0.
  * Finally, if an error does occur, return an sql error code. The final
  * value of *pp is undefined in this case.
  *
@@ -1321,7 +1321,7 @@ unixFetch(sql_file * fd MAYBE_UNUSED,
 	if (pFd->mmapSizeMax > 0) {
 		if (pFd->pMapRegion == 0) {
 			int rc = unixMapfile(pFd, -1);
-			if (rc != SQL_OK)
+			if (rc != 0)
 				return rc;
 		}
 		if (pFd->mmapSize >= iOff + nAmt) {
@@ -1330,7 +1330,7 @@ unixFetch(sql_file * fd MAYBE_UNUSED,
 		}
 	}
 #endif
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -1365,7 +1365,7 @@ unixUnfetch(sql_file * fd, i64 iOff, void *p)
 	}
 
 	assert(pFd->nFetchOut >= 0);
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -1466,7 +1466,7 @@ fillInUnixFile(sql_vfs * pVfs,	/* Pointer to vfs object */
 {
 	const sql_io_methods *pLockingStyle;
 	unixFile *pNew = (unixFile *) pId;
-	int rc = SQL_OK;
+	int rc = 0;
 
 	assert(pNew->pInode == NULL);
 
@@ -1499,7 +1499,7 @@ fillInUnixFile(sql_vfs * pVfs,	/* Pointer to vfs object */
 
 	if (pLockingStyle == &posixIoMethods) {
 		rc = findInodeInfo(pNew, &pNew->pInode);
-		if (rc != SQL_OK) {
+		if (rc != 0) {
 			/* If an error occurred in findInodeInfo(), close the file descriptor
 			 * immediately. findInodeInfo() may fail
 			 * in two scenarios:
@@ -1523,7 +1523,7 @@ fillInUnixFile(sql_vfs * pVfs,	/* Pointer to vfs object */
 		}
 	}
 	storeLastErrno(pNew, 0);
-	if (rc != SQL_OK) {
+	if (rc != 0) {
 		if (h >= 0)
 			robust_close(pNew, h, __LINE__);
 	} else {
@@ -1598,7 +1598,7 @@ unixGetTempname(int nBuf, char *zBuf)
 		if (zBuf[nBuf - 2] != 0 || (iLimit++) > 10)
 			return SQL_ERROR;
 	} while (access(zBuf, 0) == 0);
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -1667,7 +1667,7 @@ getFileMode(const char *zFile,	/* File name */
     )
 {
 	struct stat sStat;	/* Output of stat() on database file */
-	int rc = SQL_OK;
+	int rc = 0;
 	if (0 == stat(zFile, &sStat)) {
 		*pMode = sStat.st_mode & 0777;
 		*pUid = sStat.st_uid;
@@ -1680,7 +1680,7 @@ getFileMode(const char *zFile,	/* File name */
 
 /*
  * This function is called by unixOpen() to determine the unix permissions
- * to create new files with. If no error occurs, then SQL_OK is returned
+ * to create new files with. If no error occurs, then 0 is returned
  * and a value suitable for passing as the third argument to open(2) is
  * written to *pMode. If an IO error occurs, an sql error code is
  * returned and the value of *pMode is not modified.
@@ -1702,7 +1702,7 @@ findCreateFileMode(const char *zPath,	/* Path of file (possibly) being created *
 		   gid_t * pGid	/* OUT: gid to set on the file */
     )
 {
-	int rc = SQL_OK;	/* Return Code */
+	int rc = 0;	/* Return Code */
 	*pMode = 0;
 	*pUid = 0;
 	*pGid = 0;
@@ -1827,9 +1827,8 @@ unixOpen(sql_vfs * pVfs,	/* The VFS for which this is the xOpen method */
 		/* If zName is NULL, the upper layer is requesting a temp file. */
 		assert(isDelete);
 		rc = unixGetTempname(pVfs->mxPathname, zTmpname);
-		if (rc != SQL_OK) {
+		if (rc != 0)
 			return rc;
-		}
 		zName = zTmpname;
 
 		/* Generated temporary filenames are always double-zero terminated
@@ -1861,7 +1860,7 @@ unixOpen(sql_vfs * pVfs,	/* The VFS for which this is the xOpen method */
 		uid_t uid;	/* Userid for the file */
 		gid_t gid;	/* Groupid for the file */
 		rc = findCreateFileMode(zName, flags, &openMode, &uid, &gid);
-		if (rc != SQL_OK) {
+		if (rc != 0) {
 			assert(!p->pUnused);
 			return rc;
 		}
@@ -1911,9 +1910,8 @@ unixOpen(sql_vfs * pVfs,	/* The VFS for which this is the xOpen method */
 	rc = fillInUnixFile(pVfs, fd, pFile, zPath, ctrlFlags);
 
  open_finished:
-	if (rc != SQL_OK) {
+	if (rc != 0)
 		sql_free(p->pUnused);
-	}
 	return rc;
 }
 
@@ -1927,7 +1925,7 @@ unixDelete(sql_vfs * NotUsed,	/* VFS containing this as the xDelete method */
 	   int dirSync		/* If true, fsync() directory after deleting file */
     )
 {
-	int rc = SQL_OK;
+	int rc = 0;
 	UNUSED_PARAMETER(NotUsed);
 	if (unlink(zPath) == (-1)) {
 		if (errno == ENOENT) {
@@ -1940,7 +1938,7 @@ unixDelete(sql_vfs * NotUsed,	/* VFS containing this as the xDelete method */
 	if ((dirSync & 1) != 0) {
 		int fd;
 		rc = openDirectory(zPath, &fd);
-		if (rc == SQL_OK) {
+		if (rc == 0) {
 			struct stat buf;
 			if (fstat(fd, &buf)) {
 				rc = unixLogError(SQL_IOERR_DIR_FSYNC,
@@ -1949,7 +1947,7 @@ unixDelete(sql_vfs * NotUsed,	/* VFS containing this as the xDelete method */
 			robust_close(0, fd, __LINE__);
 		} else {
 			assert(rc == SQL_CANTOPEN);
-			rc = SQL_OK;
+			rc = 0;
 		}
 	}
 	return rc;
@@ -1991,15 +1989,13 @@ int sql_current_time = 0;
  * epoch of noon in Greenwich on November 24, 4714 B.C according to the
  * proleptic Gregorian calendar.
  *
- * On success, return SQL_OK.  Return SQL_ERROR if the time and date
- * cannot be found.
+ * Always returns 0.
  */
 static int
 unixCurrentTimeInt64(sql_vfs * NotUsed, sql_int64 * piNow)
 {
 	static const sql_int64 unixEpoch =
 	    24405875 * (sql_int64) 8640000;
-	int rc = SQL_OK;
 	struct timeval sNow;
 	(void)gettimeofday(&sNow, 0);	/* Cannot fail given valid arguments */
 	*piNow =
@@ -2013,7 +2009,7 @@ unixCurrentTimeInt64(sql_vfs * NotUsed, sql_int64 * piNow)
 	}
 #endif
 	UNUSED_PARAMETER(NotUsed);
-	return rc;
+	return 0;
 }
 
 /*
@@ -2047,16 +2043,15 @@ unixCurrentTimeInt64(sql_vfs * NotUsed, sql_int64 * piNow)
  * Initialize the operating system interface.
  *
  * This routine registers all VFS implementations for unix-like operating
- * systems.  This routine, and the sql_os_end() routine that follows,
- * should be the only routines in this file that are visible from other
- * files.
+ * systems.  This routine should be the only one in this file that
+ * are visible from other files.
  *
  * This routine is called once during sql initialization and by a
  * single thread.  The memory allocation subsystem have not
  * necessarily been initialized when this routine \is called, and so they
  * should not be used.
  */
-int
+void
 sql_os_init(void)
 {
 	/*
@@ -2074,18 +2069,4 @@ sql_os_init(void)
 	/* Register all VFSes defined in the aVfs[] array. */
 	for (unsigned int i = 0; i < (sizeof(aVfs) / sizeof(sql_vfs)); i++)
 		sql_vfs_register(&aVfs[i], i == 0);
-	return SQL_OK;
-}
-
-/*
- * Shutdown the operating system interface.
- *
- * Some operating systems might need to do some cleanup in this routine,
- * to release dynamically allocated objects.  But not on unix.
- * This routine is a no-op for unix.
- */
-int
-sql_os_end(void)
-{
-	return SQL_OK;
 }

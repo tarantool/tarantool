@@ -420,11 +420,11 @@ sql_execute(struct sql_stmt *stmt, struct port *port, struct region *region)
 					    port) != 0)
 				return -1;
 		}
-		assert(rc == SQL_DONE || rc != SQL_OK);
+		assert(rc == SQL_DONE || rc != 0);
 	} else {
 		/* No rows. Either DONE or ERROR. */
 		rc = sql_step(stmt);
-		assert(rc != SQL_ROW && rc != SQL_OK);
+		assert(rc != SQL_ROW && rc != 0);
 	}
 	if (rc != SQL_DONE)
 		return -1;
@@ -438,7 +438,7 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 {
 	struct sql_stmt *stmt;
 	struct sql *db = sql_get();
-	if (sql_prepare_v2(db, sql, len, &stmt, NULL) != SQL_OK)
+	if (sql_prepare_v2(db, sql, len, &stmt, NULL) != 0)
 		return -1;
 	assert(stmt != NULL);
 	port_sql_create(port, stmt);

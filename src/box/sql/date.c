@@ -576,7 +576,7 @@ osLocaltime(time_t * t, struct tm *pTm)
 /*
  * Compute the difference (in milliseconds) between localtime and UTC
  * (a.k.a. GMT) for the time value p where p is in UTC. If no error occurs,
- * return this value and set *pRc to SQL_OK.
+ * return this value and set *pRc to 0.
  *
  * Or, if an error does occur, set *pRc to SQL_ERROR. The returned value
  * is undefined in this case.
@@ -584,7 +584,7 @@ osLocaltime(time_t * t, struct tm *pTm)
 static sql_int64
 localtimeOffset(DateTime * p,	/* Date at which to calculate offset */
 		sql_context * pCtx,	/* Write error here if one occurs */
-		int *pRc	/* OUT: Error code. SQL_OK or ERROR */
+		int *pRc	/* OUT: Error code. 0 or ERROR */
     )
 {
 	DateTime x, y;
@@ -635,7 +635,7 @@ localtimeOffset(DateTime * p,	/* Date at which to calculate offset */
 	y.validTZ = 0;
 	y.isError = 0;
 	computeJD(&y);
-	*pRc = SQL_OK;
+	*pRc = 0;
 	return y.iJD - x.iJD;
 }
 #endif				/* SQL_OMIT_LOCALTIME */
@@ -736,7 +736,7 @@ parseModifier(sql_context * pCtx,	/* Function context */
 					sql_int64 c1;
 					computeJD(p);
 					c1 = localtimeOffset(p, pCtx, &rc);
-					if (rc == SQL_OK) {
+					if (rc == 0) {
 						p->iJD -= c1;
 						clearYMD_HMS_TZ(p);
 						p->iJD +=
@@ -746,7 +746,7 @@ parseModifier(sql_context * pCtx,	/* Function context */
 					}
 					p->tzSet = 1;
 				} else {
-					rc = SQL_OK;
+					rc = 0;
 				}
 			}
 #endif

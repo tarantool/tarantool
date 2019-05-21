@@ -52,7 +52,7 @@ sqlPrepare(sql * db,	/* Database handle. */
 	       const char **pzTail	/* OUT: End of parsed string */
     )
 {
-	int rc = SQL_OK;	/* Result code */
+	int rc = 0;	/* Result code */
 	Parse sParse;		/* Parsing context */
 	sql_parser_create(&sParse, db, current_session()->sql_flags);
 	sParse.pReprepare = pReprepare;
@@ -107,7 +107,7 @@ sqlPrepare(sql * db,	/* Database handle. */
 	if (sParse.is_aborted)
 		rc = SQL_TARANTOOL_ERROR;
 
-	if (rc == SQL_OK && sParse.pVdbe && sParse.explain) {
+	if (rc == 0 && sParse.pVdbe != NULL && sParse.explain) {
 		static const char *const azColName[] = {
 			/*  0 */ "addr",
 			/*  1 */ "INTEGER",
@@ -159,7 +159,7 @@ sqlPrepare(sql * db,	/* Database handle. */
 		sqlVdbeSetSql(pVdbe, zSql, (int)(sParse.zTail - zSql),
 				  saveSqlFlag);
 	}
-	if (sParse.pVdbe && (rc != SQL_OK || db->mallocFailed)) {
+	if (sParse.pVdbe != NULL && (rc != 0 || db->mallocFailed)) {
 		sqlVdbeFinalize(sParse.pVdbe);
 		assert(!(*ppStmt));
 	} else {
@@ -201,14 +201,14 @@ sqlLockAndPrepare(sql * db,		/* Database handle. */
 		rc = sqlPrepare(db, zSql, nBytes, saveSqlFlag, pOld, ppStmt,
 				    pzTail);
 	}
-	assert(rc == SQL_OK || *ppStmt == 0);
+	assert(rc == 0 || *ppStmt == NULL);
 	return rc;
 }
 
 /*
  * Rerun the compilation of a statement after a schema change.
  *
- * If the statement is successfully recompiled, return SQL_OK. Otherwise,
+ * If the statement is successfully recompiled, return 0. Otherwise,
  * if the statement cannot be recompiled because another connection has
  * locked the sql_master table, return SQL_LOCKED. If any other error
  * occurs, return SQL_SCHEMA.
@@ -238,7 +238,7 @@ sqlReprepare(Vdbe * p)
 	sqlTransferBindings(pNew, (sql_stmt *) p);
 	sqlVdbeResetStepResult((Vdbe *) pNew);
 	sqlVdbeFinalize((Vdbe *) pNew);
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -258,7 +258,7 @@ sql_prepare(sql * db,		/* Database handle. */
 {
 	int rc;
 	rc = sqlLockAndPrepare(db, zSql, nBytes, 0, 0, ppStmt, pzTail);
-	assert(rc == SQL_OK || ppStmt == 0 || *ppStmt == 0);	/* VERIFY: F13021 */
+	assert(rc == 0 || ppStmt == NULL || *ppStmt == NULL);	/* VERIFY: F13021 */
 	return rc;
 }
 
@@ -272,7 +272,7 @@ sql_prepare_v2(sql * db,	/* Database handle. */
 {
 	int rc;
 	rc = sqlLockAndPrepare(db, zSql, nBytes, 1, 0, ppStmt, pzTail);
-	assert(rc == SQL_OK || ppStmt == 0 || *ppStmt == 0);	/* VERIFY: F13021 */
+	assert(rc == 0 || ppStmt == NULL || *ppStmt == NULL);	/* VERIFY: F13021 */
 	return rc;
 }
 

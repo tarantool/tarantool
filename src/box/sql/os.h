@@ -127,11 +127,6 @@
 #define SHARED_SIZE       510
 
 /*
- * Wrapper around OS specific sql_os_init() function.
- */
-int sqlOsInit(void);
-
-/*
  * Functions for accessing sql_file methods
  */
 void sqlOsClose(sql_file *);

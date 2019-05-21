@@ -247,7 +247,7 @@ allocateCursor(
 		sqlVdbeFreeCursor(p, p->apCsr[iCur]);
 		p->apCsr[iCur] = 0;
 	}
-	if (SQL_OK==sqlVdbeMemClearAndResize(pMem, nByte)) {
+	if (sqlVdbeMemClearAndResize(pMem, nByte) == 0) {
 		p->apCsr[iCur] = pCx = (VdbeCursor*)pMem->z;
 		memset(pCx, 0, offsetof(VdbeCursor,uc));
 		pCx->eCurType = eCurType;
@@ -372,7 +372,7 @@ static u16 SQL_NOINLINE computeNumericType(Mem *pMem)
 	assert((pMem->flags & (MEM_Str|MEM_Blob))!=0);
 	if (sqlAtoF(pMem->z, &pMem->u.r, pMem->n)==0)
 		return 0;
-	if (sql_atoi64(pMem->z, (int64_t *)&pMem->u.i, pMem->n)==SQL_OK)
+	if (sql_atoi64(pMem->z, (int64_t *)&pMem->u.i, pMem->n) == 0)
 		return MEM_Int;
 	return MEM_Real;
 }
@@ -634,7 +634,7 @@ vdbe_field_ref_fast_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
  * @param field_ref The initialized vdbe_field_ref instance to use.
  * @param fieldno The id of the field to fetch.
  * @param[out] dest_mem The memory variable to store result.
- * @retval SQL_OK Status code in case of success.
+ * @retval 0 Status code in case of success.
  * @retval sql_ret_code Error code otherwise.
  */
 static int
@@ -645,7 +645,7 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 	uint32_t *slots = field_ref->slots;
 	if (fieldno >= field_ref->field_count) {
 		UPDATE_MAX_BLOBSIZE(dest_mem);
-		return SQL_OK;
+		return 0;
 	}
 
 	const char *data;
@@ -713,7 +713,7 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 		dest_mem->flags |= MEM_Term;
 	}
 	UPDATE_MAX_BLOBSIZE(dest_mem);
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -730,7 +730,7 @@ int sqlVdbeExec(Vdbe *p)
 #ifdef SQL_DEBUG
 	int nExtraDelete = 0;      /* Verifies FORDELETE and AUXDELETE flags */
 #endif
-	int rc = SQL_OK;        /* Value to return */
+	int rc = 0;        /* Value to return */
 	sql *db = p->db;       /* The database */
 	int iCompare = 0;          /* Result of last comparison */
 	unsigned nVmStep = 0;      /* Number of virtual machine steps */
@@ -752,8 +752,8 @@ int sqlVdbeExec(Vdbe *p)
 		 */
 		goto no_mem;
 	}
-	assert(p->rc==SQL_OK || (p->rc&0xff)==SQL_BUSY);
-	p->rc = SQL_OK;
+	assert(p->rc == 0 || (p->rc & 0xff) == SQL_BUSY);
+	p->rc = 0;
 	p->iCurrentTime = 0;
 	assert(p->explain==0);
 	p->pResultSet = 0;
@@ -788,7 +788,7 @@ int sqlVdbeExec(Vdbe *p)
 		/* Errors are detected by individual opcodes, with an immediate
 		 * jumps to abort_due_to_error.
 		 */
-		assert(rc==SQL_OK);
+		assert(rc == 0);
 
 		assert(pOp>=aOp && pOp<&aOp[p->nOp]);
 #ifdef VDBE_PROFILE
@@ -1032,7 +1032,7 @@ case OP_Halt: {
 	int pcx;
 
 	pcx = (int)(pOp - aOp);
-	if (pOp->p1==SQL_OK && p->pFrame) {
+	if (pOp->p1 == 0 && p->pFrame != NULL) {
 		/* Halt the sub-program. Return control to the parent frame. */
 		pFrame = p->pFrame;
 		p->pFrame = pFrame->pParent;
@@ -1064,11 +1064,11 @@ case OP_Halt: {
 		assert(! diag_is_empty(diag_get()));
 	}
 	rc = sqlVdbeHalt(p);
-	assert(rc==SQL_BUSY || rc==SQL_OK || rc==SQL_ERROR);
+	assert(rc == SQL_BUSY || rc == 0 || rc == SQL_ERROR);
 	if (rc==SQL_BUSY) {
 		p->rc = SQL_BUSY;
 	} else {
-		assert(rc==SQL_OK || (p->rc&0xff)==SQL_CONSTRAINT);
+		assert(rc == 0 || (p->rc & 0xff) == SQL_CONSTRAINT);
 		rc = p->rc ? SQL_TARANTOOL_ERROR : SQL_DONE;
 	}
 	goto vdbe_return;
@@ -1141,7 +1141,7 @@ case OP_String8: {         /* same as TK_STRING, out2 */
 	if (pOp->p1>db->aLimit[SQL_LIMIT_LENGTH]) {
 		goto too_big;
 	}
-	assert(rc==SQL_OK);
+	assert(rc == 0);
 	/* Fall through to the next case, OP_String */
 	FALLTHROUGH;
 }
@@ -1436,7 +1436,7 @@ case OP_ResultRow: {
 	 */
 	assert(p->iStatement == 0 || (p->sql_flags & SQL_CountRows) != 0);
 	rc = sqlVdbeCloseStatement(p, SAVEPOINT_RELEASE);
-	assert(rc==SQL_OK);
+	assert(rc==0);
 
 	/* Invalidate all ephemeral cursor row caches */
 	p->cacheCtr = (p->cacheCtr + 2)|1;
@@ -2624,7 +2624,7 @@ case OP_Column: {
 	struct Mem *default_val_mem =
 		pOp->p4type == P4_MEM ? pOp->p4.pMem : NULL;
 	rc = vdbe_field_ref_fetch(&pC->field_ref, p2, pDest);
-	if (rc != SQL_OK)
+	if (rc != 0)
 		goto abort_due_to_error;
 
 	if ((pDest->flags & MEM_Null) &&
@@ -2658,7 +2658,7 @@ case OP_Fetch: {
 	struct Mem *dest_mem = &aMem[pOp->p3];
 	memAboutToChange(p, dest_mem);
 	rc = vdbe_field_ref_fetch(field_ref, field_idx, dest_mem);
-	if (rc != SQL_OK)
+	if (rc != 0)
 		goto abort_due_to_error;
 	REGISTER_TRACE(p, pOp->p3, dest_mem);
 	break;
@@ -2877,9 +2877,8 @@ case OP_Savepoint: {
 			 */
 			int isTransaction = pSavepoint->pNext == 0;
 			if (isTransaction && p1==SAVEPOINT_RELEASE) {
-				if ((rc = sqlVdbeCheckFk(p, 1))!=SQL_OK) {
+				if ((rc = sqlVdbeCheckFk(p, 1)) != 0)
 					goto vdbe_return;
-				}
 				if (sqlVdbeHalt(p)==SQL_BUSY) {
 					p->pc = (int)(pOp - aOp);
 					p->rc = rc = SQL_BUSY;
@@ -3427,7 +3426,7 @@ case OP_SeekGT: {       /* jump, in3 */
 #endif
 	r.eqSeen = 0;
 	r.opcode = oc;
-	if (sqlCursorMovetoUnpacked(pC->uc.pCursor, &r, &res) != SQL_OK)
+	if (sqlCursorMovetoUnpacked(pC->uc.pCursor, &r, &res) != 0)
 		goto abort_due_to_error;
 	if (eqOnly && r.eqSeen==0) {
 		assert(res!=0);
@@ -3440,7 +3439,7 @@ case OP_SeekGT: {       /* jump, in3 */
 	if (oc>=OP_SeekGE) {  assert(oc==OP_SeekGE || oc==OP_SeekGT);
 		if (res<0 || (res==0 && oc==OP_SeekGT)) {
 			res = 0;
-			if (sqlCursorNext(pC->uc.pCursor, &res) != SQL_OK)
+			if (sqlCursorNext(pC->uc.pCursor, &res) != 0)
 				goto abort_due_to_error;
 		} else {
 			res = 0;
@@ -3449,7 +3448,7 @@ case OP_SeekGT: {       /* jump, in3 */
 		assert(oc==OP_SeekLT || oc==OP_SeekLE);
 		if (res>0 || (res==0 && oc==OP_SeekLT)) {
 			res = 0;
-			if (sqlCursorPrevious(pC->uc.pCursor, &res) != SQL_OK)
+			if (sqlCursorPrevious(pC->uc.pCursor, &res) != 0)
 				goto abort_due_to_error;
 		} else {
 			/* res might be negative because the table is empty.  Check to
@@ -3595,8 +3594,8 @@ case OP_Found: {        /* jump, in3 */
 	rc = sqlCursorMovetoUnpacked(pC->uc.pCursor, pIdxKey, &res);
 	if (pFree != NULL)
 		sqlDbFree(db, pFree);
-	assert(rc == SQL_OK || rc == SQL_TARANTOOL_ERROR);
-	if (rc != SQL_OK)
+	assert(rc == 0 || rc == SQL_TARANTOOL_ERROR);
+	if (rc != 0)
 		goto abort_due_to_error;
 	pC->seekResult = res;
 	alreadyExists = (res==0);
@@ -3907,9 +3906,9 @@ case OP_RowData: {
 	testcase( n==0);
 
 	sqlVdbeMemRelease(pOut);
-	if (sql_vdbe_mem_alloc_region(pOut, n) != 0 ||
-	    sqlCursorPayload(pCrsr, 0, n, pOut->z) != 0)
+	if (sql_vdbe_mem_alloc_region(pOut, n) != 0)
 		goto abort_due_to_error;
+	sqlCursorPayload(pCrsr, 0, n, pOut->z);
 	UPDATE_MAX_BLOBSIZE(pOut);
 	REGISTER_TRACE(p, pOp->p2, pOut);
 	break;
@@ -4256,7 +4255,7 @@ case OP_IdxInsert: {
 
 	if (pOp->p5 & OPFLAG_OE_IGNORE) {
 		/* Ignore any kind of failes and do not raise error message */
-		rc = SQL_OK;
+		rc = 0;
 		/* If we are in trigger, increment ignore raised counter */
 		if (p->pFrame)
 			p->ignoreRaised++;
@@ -4265,7 +4264,7 @@ case OP_IdxInsert: {
 	} else if (pOp->p5 & OPFLAG_OE_ROLLBACK) {
 		p->errorAction = ON_CONFLICT_ACTION_ROLLBACK;
 	}
-	assert(rc == SQL_OK || rc == SQL_TARANTOOL_ERROR);
+	assert(rc == 0 || rc == SQL_TARANTOOL_ERROR);
 	if (rc != 0)
 		goto abort_due_to_error;
 	break;
@@ -4342,7 +4341,7 @@ case OP_Update: {
 		goto abort_due_to_error;
 	}
 
-	assert(rc == SQL_OK);
+	assert(rc == 0);
 	if (box_update(space->def->id, 0, key_mem->z, key_mem->z + key_mem->n,
 		       ops, ops + ops_size, 0, NULL) != 0)
 		rc = SQL_TARANTOOL_ERROR;
@@ -4352,7 +4351,7 @@ case OP_Update: {
 		 * Ignore any kind of fails and do not raise
 		 * error message
 		 */
-		rc = SQL_OK;
+		rc = 0;
 		/*
 		 * If we are in trigger, increment ignore raised
 		 * counter.
@@ -4364,7 +4363,7 @@ case OP_Update: {
 	} else if (pOp->p5 & OPFLAG_OE_ROLLBACK) {
 		p->errorAction = ON_CONFLICT_ACTION_ROLLBACK;
 	}
-	assert(rc == SQL_OK || rc == SQL_TARANTOOL_ERROR);
+	assert(rc == 0 || rc == SQL_TARANTOOL_ERROR);
 	if (rc != 0)
 		goto abort_due_to_error;
 	break;
@@ -5257,10 +5256,10 @@ abort_due_to_error:
 vdbe_return:
 	testcase( nVmStep>0);
 	p->aCounter[SQL_STMTSTATUS_VM_STEP] += (int)nVmStep;
-	assert(rc!=SQL_OK || nExtraDelete==0
+	assert(rc != 0 || nExtraDelete == 0
 		|| sql_strlike_ci("DELETE%", p->zSql, 0) != 0
 		);
-	assert(rc == SQL_OK || rc == SQL_BUSY || rc == SQL_TARANTOOL_ERROR ||
+	assert(rc == 0 || rc == SQL_BUSY || rc == SQL_TARANTOOL_ERROR ||
 	       rc == SQL_ROW || rc == SQL_DONE);
 	return rc;
 

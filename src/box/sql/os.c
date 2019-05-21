@@ -90,7 +90,7 @@ sqlOsFetch(MAYBE_UNUSED sql_file * id,
 	       MAYBE_UNUSED int iAmt, void **pp)
 {
 	*pp = 0;
-	return SQL_OK;
+	return 0;
 }
 
 int
@@ -98,7 +98,7 @@ sqlOsUnfetch(MAYBE_UNUSED sql_file * id,
 		 MAYBE_UNUSED i64 iOff,
 		 MAYBE_UNUSED void *p)
 {
-	return SQL_OK;
+	return 0;
 }
 #endif
 
@@ -118,7 +118,7 @@ sqlOsOpen(sql_vfs * pVfs,
 	 * reaching the VFS.
 	 */
 	rc = pVfs->xOpen(pVfs, zPath, pFile, flags & 0x87f7f, pFlagsOut);
-	assert(rc == SQL_OK || pFile->pMethods == 0);
+	assert(rc == 0 || pFile->pMethods == 0);
 	return rc;
 }
 
@@ -158,7 +158,7 @@ sqlOsOpenMalloc(sql_vfs * pVfs,
 	pFile = (sql_file *) sqlMallocZero(pVfs->szOsFile);
 	if (pFile) {
 		rc = sqlOsOpen(pVfs, zFile, pFile, flags, pOutFlags);
-		if (rc != SQL_OK) {
+		if (rc != 0) {
 			sql_free(pFile);
 		} else {
 			*ppFile = pFile;
@@ -175,22 +175,6 @@ sqlOsCloseFree(sql_file * pFile)
 	assert(pFile);
 	sqlOsClose(pFile);
 	sql_free(pFile);
-}
-
-/*
- * This function is a wrapper around the OS specific implementation of
- * sql_os_init(). The purpose of the wrapper is to provide the
- * ability to simulate a malloc failure, so that the handling of an
- * error in sql_os_init() by the upper layers can be tested.
- */
-int
-sqlOsInit(void)
-{
-	void *p = sql_malloc(10);
-	if (p == 0)
-		return SQL_NOMEM;
-	sql_free(p);
-	return sql_os_init();
 }
 
 /*
@@ -255,5 +239,5 @@ sql_vfs_register(sql_vfs * pVfs, int makeDflt)
 		vfsList->pNext = pVfs;
 	}
 	assert(vfsList);
-	return SQL_OK;
+	return 0;
 }

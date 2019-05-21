@@ -83,7 +83,7 @@ sql_finalize(sql_stmt * pStmt)
 		/* IMPLEMENTATION-OF: R-57228-12904 Invoking sql_finalize() on a NULL
 		 * pointer is a harmless no-op.
 		 */
-		rc = SQL_OK;
+		rc = 0;
 	} else {
 		Vdbe *v = (Vdbe *) pStmt;
 		sql *db = v->db;
@@ -115,7 +115,7 @@ int
 sql_clear_bindings(sql_stmt * pStmt)
 {
 	int i;
-	int rc = SQL_OK;
+	int rc = 0;
 	Vdbe *p = (Vdbe *) pStmt;
 	for (i = 0; i < p->nVar; i++) {
 		sqlVdbeMemRelease(&p->aVar[i]);
@@ -136,7 +136,7 @@ sql_value_blob(sql_value * pVal)
 {
 	Mem *p = (Mem *) pVal;
 	if (p->flags & (MEM_Blob | MEM_Str)) {
-		if (ExpandBlob(p) != SQL_OK) {
+		if (ExpandBlob(p) != 0) {
 			assert(p->flags == MEM_Null && p->z == 0);
 			return 0;
 		}
@@ -235,7 +235,7 @@ sql_value_dup(const sql_value * pOrig)
 	if (pNew->flags & (MEM_Str | MEM_Blob)) {
 		pNew->flags &= ~(MEM_Static | MEM_Dyn);
 		pNew->flags |= MEM_Ephem;
-		if (sqlVdbeMemMakeWriteable(pNew) != SQL_OK) {
+		if (sqlVdbeMemMakeWriteable(pNew) != 0) {
 			sqlValueFree(pNew);
 			pNew = 0;
 		}
@@ -394,7 +394,7 @@ sql_result_zeroblob64(sql_context * pCtx, u64 n)
 		return SQL_TOOBIG;
 	}
 	sqlVdbeMemSetZeroBlob(pCtx->pOut, (int)n);
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -497,7 +497,7 @@ sql_step(sql_stmt * pStmt)
 	       && cnt++ < SQL_MAX_SCHEMA_RETRY) {
 		int savedPc = v->pc;
 		rc = sqlReprepare(v);
-		if (rc != SQL_OK)
+		if (rc != 0)
 			break;
 		sql_reset(pStmt);
 		if (savedPc >= 0)
@@ -912,7 +912,7 @@ sql_column_decltype(sql_stmt * pStmt, int N)
 /*
  * Unbind the value bound to variable i in virtual machine p. This is the
  * the same as binding a NULL value to the column. If the "i" parameter is
- * out of range, then SQL_RANGE is returned. Othewise SQL_OK.
+ * out of range, then SQL_RANGE is returned. Othewise 0.
  *
  * The error code stored in database p->db is overwritten with the return
  * value in any case.
@@ -950,7 +950,7 @@ vdbeUnbind(Vdbe * p, int i)
 	    ) {
 		p->expired = 1;
 	}
-	return SQL_OK;
+	return 0;
 }
 
 /**
@@ -1013,11 +1013,11 @@ bindText(sql_stmt * pStmt,	/* The statement to bind against */
 	int rc;
 
 	rc = vdbeUnbind(p, i);
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		if (zData != 0) {
 			pVar = &p->aVar[i - 1];
 			rc = sqlVdbeMemSetStr(pVar, zData, nData, 1, xDel);
-			if (rc == SQL_OK)
+			if (rc == 0)
 				rc = sql_bind_type(p, i, "TEXT");
 			rc = sqlApiExit(p->db, rc);
 		}
@@ -1037,11 +1037,11 @@ sql_bind_blob(sql_stmt * pStmt,
 {
 	struct Vdbe *p = (Vdbe *) pStmt;
 	int rc = vdbeUnbind(p, i);
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		if (zData != 0) {
 			struct Mem *var = &p->aVar[i - 1];
 			rc = sqlVdbeMemSetStr(var, zData, nData, 0, xDel);
-			if (rc == SQL_OK)
+			if (rc == 0)
 				rc = sql_bind_type(p, i, "BLOB");
 			rc = sqlApiExit(p->db, rc);
 		}
@@ -1072,7 +1072,7 @@ sql_bind_double(sql_stmt * pStmt, int i, double rValue)
 	int rc;
 	Vdbe *p = (Vdbe *) pStmt;
 	rc = vdbeUnbind(p, i);
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		rc = sql_bind_type(p, i, "NUMERIC");
 		sqlVdbeMemSetDouble(&p->aVar[i - 1], rValue);
 	}
@@ -1084,7 +1084,7 @@ sql_bind_boolean(struct sql_stmt *stmt, int i, bool value)
 {
 	struct Vdbe *p = (struct Vdbe *) stmt;
 	int rc = vdbeUnbind(p, i);
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		rc = sql_bind_type(p, i, "BOOLEAN");
 		mem_set_bool(&p->aVar[i - 1], value);
 	}
@@ -1103,7 +1103,7 @@ sql_bind_int64(sql_stmt * pStmt, int i, sql_int64 iValue)
 	int rc;
 	Vdbe *p = (Vdbe *) pStmt;
 	rc = vdbeUnbind(p, i);
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		rc = sql_bind_type(p, i, "INTEGER");
 		sqlVdbeMemSetInt64(&p->aVar[i - 1], iValue);
 	}
@@ -1116,7 +1116,7 @@ sql_bind_null(sql_stmt * pStmt, int i)
 	int rc;
 	Vdbe *p = (Vdbe *) pStmt;
 	rc = vdbeUnbind(p, i);
-	if (rc == SQL_OK)
+	if (rc == 0)
 		rc = sql_bind_type(p, i, "BOOLEAN");
 	return rc;
 }
@@ -1126,7 +1126,7 @@ sql_bind_ptr(struct sql_stmt *stmt, int i, void *ptr)
 {
 	struct Vdbe *p = (struct Vdbe *) stmt;
 	int rc = vdbeUnbind(p, i);
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		rc = sql_bind_type(p, i, "BLOB");
 		mem_set_ptr(&p->aVar[i - 1], ptr);
 	}
@@ -1162,7 +1162,7 @@ sql_bind_zeroblob(sql_stmt * pStmt, int i, int n)
 	int rc;
 	Vdbe *p = (Vdbe *) pStmt;
 	rc = vdbeUnbind(p, i);
-	if (rc == SQL_OK) {
+	if (rc == 0) {
 		sqlVdbeMemSetZeroBlob(&p->aVar[i - 1], n);
 	}
 	return rc;
@@ -1250,7 +1250,7 @@ sqlTransferBindings(sql_stmt * pFromStmt, sql_stmt * pToStmt)
 	for (i = 0; i < pFrom->nVar; i++) {
 		sqlVdbeMemMove(&pTo->aVar[i], &pFrom->aVar[i]);
 	}
-	return SQL_OK;
+	return 0;
 }
 
 /*

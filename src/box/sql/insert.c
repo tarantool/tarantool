@@ -1246,7 +1246,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	sqlReleaseTempReg(pParse, regTupleid);
 	sqlReleaseTempReg(pParse, regData);
 	if (emptyDestTest) {
-		sqlVdbeAddOp2(v, OP_Halt, SQL_OK, 0);
+		sqlVdbeAddOp2(v, OP_Halt, 0, 0);
 		sqlVdbeJumpHere(v, emptyDestTest);
 		sqlVdbeAddOp2(v, OP_Close, iDest, 0);
 		return 0;

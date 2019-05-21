@@ -143,7 +143,7 @@ sql_status64(int op,
 	if (resetFlag) {
 		wsdStat.mxValue[op] = wsdStat.nowValue[op];
 	}
-	return SQL_OK;
+	return 0;
 }
 
 int

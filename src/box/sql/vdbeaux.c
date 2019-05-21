@@ -191,8 +191,9 @@ growOpArray(Vdbe * v, int nOp)
 		p->szOpAlloc = sqlMallocSize(pNew);
 		p->nOpAlloc = p->szOpAlloc / sizeof(Op);
 		v->aOp = pNew;
+		return 0;
 	}
-	return (pNew ? SQL_OK : SQL_NOMEM);
+	return SQL_NOMEM;
 }
 
 #ifdef SQL_DEBUG
@@ -1384,12 +1385,12 @@ sqlVdbeList(Vdbe * p)
 	Mem *pSub = 0;		/* Memory cell hold array of subprogs */
 	sql *db = p->db;	/* The database connection */
 	int i;			/* Loop counter */
-	int rc = SQL_OK;	/* Return code */
+	int rc = 0;	/* Return code */
 	Mem *pMem = &p->aMem[1];	/* First Mem of result set */
 
 	assert(p->explain);
 	assert(p->magic == VDBE_MAGIC_RUN);
-	assert(p->rc == SQL_OK || p->rc == SQL_BUSY
+	assert(p->rc == 0 || p->rc == SQL_BUSY
 	       || p->rc == SQL_NOMEM);
 
 	/* Even though this opcode does not use dynamic strings for
@@ -1439,7 +1440,7 @@ sqlVdbeList(Vdbe * p)
 		i = p->pc++;
 	} while (i < nRow && p->explain == 2 && p->aOp[i].opcode != OP_Explain);
 	if (i >= nRow) {
-		p->rc = SQL_OK;
+		p->rc = 0;
 		rc = SQL_DONE;
 	} else {
 		char *zP4;
@@ -1483,11 +1484,9 @@ sqlVdbeList(Vdbe * p)
 					if (apSub[j] == pOp->p4.pProgram)
 						break;
 				}
-				if (j == nSub
-				    && SQL_OK == sqlVdbeMemGrow(pSub,
-								       nByte,
-								       nSub !=
-								       0)) {
+				if (j == nSub &&
+				    sqlVdbeMemGrow(pSub, nByte,
+						   nSub != 0) == 0) {
 					apSub = (SubProgram **) pSub->z;
 					apSub[nSub++] = pOp->p4.pProgram;
 					pSub->flags |= MEM_Blob;
@@ -1548,7 +1547,7 @@ sqlVdbeList(Vdbe * p)
 
 		p->nResColumn = 8 - 4 * (p->explain - 1);
 		p->pResultSet = &p->aMem[1];
-		p->rc = SQL_OK;
+		p->rc = 0;
 		rc = SQL_ROW;
 	}
 	return rc;
@@ -1648,7 +1647,7 @@ sqlVdbeRewind(Vdbe * p)
 	}
 #endif
 	p->pc = -1;
-	p->rc = SQL_OK;
+	p->rc = 0;
 	p->ignoreRaised = 0;
 	p->errorAction = ON_CONFLICT_ACTION_ABORT;
 	p->nChange = 0;
@@ -1992,12 +1991,12 @@ checkActiveVdbeCnt(sql * db)
  * statement transaction is committed.
  *
  * If an IO error occurs, an SQL_IOERR_XXX error code is returned.
- * Otherwise SQL_OK.
+ * Otherwise 0.
  */
 int
 sqlVdbeCloseStatement(Vdbe * p, int eOp)
 {
-	int rc = SQL_OK;
+	int rc = 0;
 	const Savepoint *savepoint = p->anonymous_savepoint;
 	/*
 	 * If we have an anonymous transaction opened -> perform eOp.
@@ -2012,7 +2011,7 @@ sqlVdbeCloseStatement(Vdbe * p, int eOp)
  * This function is called when a transaction opened by the database
  * handle associated with the VM passed as an argument is about to be
  * committed. If there are outstanding deferred foreign key constraint
- * violations, return SQL_ERROR. Otherwise, SQL_OK.
+ * violations, return SQL_ERROR. Otherwise, 0.
  *
  * If there are outstanding FK violations and this function returns
  * SQL_ERROR, set the result of the VM to SQL_CONSTRAINT_FOREIGNKEY
@@ -2031,7 +2030,7 @@ sqlVdbeCheckFk(Vdbe * p, int deferred)
 			 "failed");
 		return SQL_TARANTOOL_ERROR;
 	}
-	return SQL_OK;
+	return 0;
 }
 
 int
@@ -2117,7 +2116,7 @@ sqlVdbeHalt(Vdbe * p)
 	}
 	closeTopFrameCursors(p);
 	if (p->magic != VDBE_MAGIC_RUN) {
-		return SQL_OK;
+		return 0;
 	}
 	checkActiveVdbeCnt(db);
 
@@ -2160,9 +2159,8 @@ sqlVdbeHalt(Vdbe * p)
 		}
 
 		/* Check for immediate foreign key violations. */
-		if (p->rc == SQL_OK) {
+		if (p->rc == 0)
 			sqlVdbeCheckFk(p, 0);
-		}
 
 		/* If the auto-commit flag is set and this is the only active writer
 		 * VM, then we do either a commit or rollback of the current transaction.
@@ -2171,11 +2169,11 @@ sqlVdbeHalt(Vdbe * p)
 		 * above has occurred.
 		 */
 		if (p->auto_commit) {
-			if (p->rc == SQL_OK
+			if (p->rc == 0
 			    || (p->errorAction == ON_CONFLICT_ACTION_FAIL
 				&& !isSpecialError)) {
 				rc = sqlVdbeCheckFk(p, 1);
-				if (rc != SQL_OK) {
+				if (rc != 0) {
 					/* Close all opened cursors if
 					 * they exist and free all
 					 * VDBE frames.
@@ -2193,13 +2191,13 @@ sqlVdbeHalt(Vdbe * p)
 					 */
 					rc = (in_txn() == NULL ||
 					      txn_commit(in_txn()) == 0) ?
-					     SQL_OK : SQL_TARANTOOL_ERROR;
+					     0 : SQL_TARANTOOL_ERROR;
 					closeCursorsAndFree(p);
 				}
 				if (rc == SQL_BUSY && !p->pDelFrame) {
 					closeCursorsAndFree(p);
 					return SQL_BUSY;
-				} else if (rc != SQL_OK) {
+				} else if (rc != 0) {
 					p->rc = rc;
 					box_txn_rollback();
 					closeCursorsAndFree(p);
@@ -2214,7 +2212,7 @@ sqlVdbeHalt(Vdbe * p)
 			}
 			p->anonymous_savepoint = NULL;
 		} else if (eStatementOp == 0) {
-			if (p->rc == SQL_OK || p->errorAction == ON_CONFLICT_ACTION_FAIL) {
+			if (p->rc == 0 || p->errorAction == ON_CONFLICT_ACTION_FAIL) {
 				eStatementOp = SAVEPOINT_RELEASE;
 			} else if (p->errorAction == ON_CONFLICT_ACTION_ABORT) {
 				eStatementOp = SAVEPOINT_ROLLBACK;
@@ -2230,14 +2228,14 @@ sqlVdbeHalt(Vdbe * p)
 		/* If eStatementOp is non-zero, then a statement transaction needs to
 		 * be committed or rolled back. Call sqlVdbeCloseStatement() to
 		 * do so. If this operation returns an error, and the current statement
-		 * error code is SQL_OK or SQL_CONSTRAINT, then promote the
+		 * error code is 0 or SQL_CONSTRAINT, then promote the
 		 * current statement error code.
 		 */
 		if (eStatementOp) {
 			rc = sqlVdbeCloseStatement(p, eStatementOp);
 			if (rc) {
 				box_txn_rollback();
-				if (p->rc == SQL_OK
+				if (p->rc == 0
 				    || (p->rc & 0xff) == SQL_CONSTRAINT) {
 					p->rc = rc;
 				}
@@ -2276,17 +2274,17 @@ sqlVdbeHalt(Vdbe * p)
 
 	assert(db->nVdbeActive > 0 || box_txn() ||
 	       p->anonymous_savepoint == NULL);
-	return (p->rc == SQL_BUSY ? SQL_BUSY : SQL_OK);
+	return p->rc == SQL_BUSY ? SQL_BUSY : 0;
 }
 
 /*
  * Each VDBE holds the result of the most recent sql_step() call
- * in p->rc.  This routine sets that result back to SQL_OK.
+ * in p->rc.  This routine sets that result back to 0.
  */
 void
 sqlVdbeResetStepResult(Vdbe * p)
 {
-	p->rc = SQL_OK;
+	p->rc = 0;
 }
 
 /*
@@ -2387,7 +2385,7 @@ sqlVdbeReset(Vdbe * p)
 int
 sqlVdbeFinalize(Vdbe * p)
 {
-	int rc = SQL_OK;
+	int rc = 0;
 	if (p->magic == VDBE_MAGIC_RUN || p->magic == VDBE_MAGIC_HALT) {
 		rc = sqlVdbeReset(p);
 		assert((rc & p->db->errMask) == rc);
@@ -2906,7 +2904,7 @@ sql_vdbe_mem_alloc_region(Mem *vdbe_mem, uint32_t size)
 		return SQL_NOMEM;
 	vdbe_mem->flags = MEM_Ephem | MEM_Blob;
 	assert(sqlVdbeCheckMemInvariants(vdbe_mem));
-	return SQL_OK;
+	return 0;
 }
 
 /*

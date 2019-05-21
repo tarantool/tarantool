@@ -325,10 +325,8 @@ struct sql_vfs {
 #define SQL_LIMIT_TRIGGER_DEPTH             9
 
 enum sql_ret_code {
-	/** Result of a routine is ok. */
-	SQL_OK = 0,
 	/** Common error code. */
-	SQL_ERROR,
+	SQL_ERROR = 1,
 	/** Access permission denied. */
 	SQL_PERM,
 	/** Callback routine requested an abort. */
@@ -553,7 +551,7 @@ sql_finalize(sql_stmt * pStmt);
  * it back to its starting state so that it can be reused.
  *
  * @param stmt VDBE program.
- * @retval SQL_OK On success.
+ * @retval 0 On success.
  * @retval sql_ret_code Error code on error.
  */
 int
@@ -625,9 +623,6 @@ sql_column_datatype(sql_stmt *, int N);
 
 int
 sql_initialize(void);
-
-int
-sql_os_end(void);
 
 #define SQL_TRACE_STMT       0x01
 #define SQL_TRACE_PROFILE    0x02
@@ -707,7 +702,7 @@ struct sql_io_methods {
 #define SQL_FCNTL_MMAP_SIZE              16
 #define SQL_FCNTL_HAS_MOVED              18
 
-int
+void
 sql_os_init(void);
 
 sql_int64
@@ -3031,7 +3026,7 @@ sql_space_column_is_in_pk(struct space *space, uint32_t);
  * @param parse Parsing context.
  * @param expr_list  Expr list from which to derive column names.
  * @param space_def Destination space definition.
- * @retval sql_OK on success.
+ * @retval 0 on success.
  * @retval error codef on error.
  */
 int sqlColumnsFromExprList(Parse *parse, ExprList *expr_list,

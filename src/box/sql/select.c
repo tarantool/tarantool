@@ -1812,7 +1812,7 @@ generateColumnNames(Parse * pParse,	/* Parser context */
  * Only the column names are computed.  Column.zType, Column.zColl,
  * and other fields of Column are zeroed.
  *
- * Return SQL_OK on success.  If a memory allocation error occurs,
+ * Return 0 on success.  If a memory allocation error occurs,
  * store NULL in *paCol and 0 in *pnCol and return SQL_NOMEM.
  */
 int
@@ -1916,8 +1916,8 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 	}
 cleanup:
 	sqlHashClear(&ht);
-	int rc = db->mallocFailed ? SQL_NOMEM : SQL_OK;
-	if (rc != SQL_OK) {
+	int rc = db->mallocFailed ? SQL_NOMEM : 0;
+	if (rc != 0) {
 		/*
 		 * pTable->def could be not temporal in
 		 * sqlViewGetColumnNames so we need clean-up.
@@ -2551,7 +2551,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 	    Select * p,		/* The right-most of SELECTs to be coded */
 	    SelectDest * pDest)	/* What to do with query results */
 {
-	int rc = SQL_OK;	/* Success code from a subroutine */
+	int rc = 0;	/* Success code from a subroutine */
 	Select *pPrior;		/* Another SELECT immediately to our left */
 	Vdbe *v;		/* Generate code to this VDBE */
 	SelectDest dest;	/* Alternative data destination */
@@ -2664,7 +2664,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				}
 				iSub2 = pParse->iNextSelectId;
 				rc = sqlSelect(pParse, p, &dest);
-				testcase(rc != SQL_OK);
+				testcase(rc != 0);
 				pDelete = p->pPrior;
 				p->pPrior = pPrior;
 				p->nSelectRow =
@@ -2751,7 +2751,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				uniondest.eDest = op;
 				iSub2 = pParse->iNextSelectId;
 				rc = sqlSelect(pParse, p, &uniondest);
-				testcase(rc != SQL_OK);
+				testcase(rc != 0);
 				/* Query flattening in sqlSelect() might refill p->pOrderBy.
 				 * Be sure to delete p->pOrderBy, therefore, to avoid a memory leak.
 				 */
@@ -2865,7 +2865,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				intersectdest.reg_eph = reg_eph2;
 				iSub2 = pParse->iNextSelectId;
 				rc = sqlSelect(pParse, p, &intersectdest);
-				testcase(rc != SQL_OK);
+				testcase(rc != 0);
 				pDelete = p->pPrior;
 				p->pPrior = pPrior;
 				if (p->nSelectRow > pPrior->nSelectRow)
@@ -4390,7 +4390,7 @@ is_simple_count(struct Select *select, struct AggInfo *agg_info)
  * INDEXED BY clause, then try to locate the specified index. If there
  * was such a clause and the named index cannot be found, return
  * SQL_ERROR and leave an error in pParse. Otherwise, populate
- * pFrom->pIndex and return SQL_OK.
+ * pFrom->pIndex and return 0.
  */
 int
 sqlIndexedByLookup(Parse * pParse, struct SrcList_item *pFrom)
@@ -4414,7 +4414,7 @@ sqlIndexedByLookup(Parse * pParse, struct SrcList_item *pFrom)
 		}
 		pFrom->pIBIndex = idx->def;
 	}
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -4567,9 +4567,9 @@ sqlWithPush(Parse * pParse, With * pWith, u8 bFree)
  * (pFrom->space!=0) to determine whether or not a successful match
  * was found.
  *
- * Whether or not a match is found, SQL_OK is returned if no error
+ * Whether or not a match is found, 0 is returned if no error
  * occurs. If an error does occur, an error message is stored in the
- * parser and some error code other than SQL_OK returned.
+ * parser and some error code other than 0 returned.
  */
 static int
 withExpand(Walker * pWalker, struct SrcList_item *pFrom)
@@ -4687,7 +4687,7 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 		pParse->pWith = pSavedWith;
 	}
 
-	return SQL_OK;
+	return 0;
 }
 
 /*
@@ -6386,7 +6386,7 @@ sqlSelect(Parse * pParse,		/* The parser context */
 
 	/* Identify column names if results of the SELECT are to be output.
 	 */
-	if (rc == SQL_OK && pDest->eDest == SRT_Output) {
+	if (rc == 0 && pDest->eDest == SRT_Output) {
 		generateColumnNames(pParse, pTabList, pEList);
 	}
 

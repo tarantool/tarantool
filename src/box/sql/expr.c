@@ -4340,7 +4340,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		}
 		assert(!ExprHasProperty(pExpr, EP_IntValue));
 		if (pExpr->on_conflict_action == ON_CONFLICT_ACTION_IGNORE) {
-			sqlVdbeAddOp4(v, OP_Halt, SQL_OK,
+			sqlVdbeAddOp4(v, OP_Halt, 0,
 					  ON_CONFLICT_ACTION_IGNORE, 0,
 					  pExpr->u.zToken, 0);
 		} else {
