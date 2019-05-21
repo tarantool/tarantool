@@ -258,7 +258,7 @@ sql_value_free(sql_value * pOld)
  *
  * The setStrOrError() function calls sqlVdbeMemSetStr() to store the
  * result as a string or blob but if the string or blob is too large, it
- * then sets the error code to SQL_TOOBIG
+ * then sets the error code.
  *
  * The invokeValueDestructor(P,X) routine invokes destructor function X()
  * on value P is not going to be used and need to be destroyed.
@@ -270,16 +270,14 @@ setResultStrOrError(sql_context * pCtx,	/* Function context */
 		    void (*xDel) (void *)	/* Destructor function */
     )
 {
-	if (sqlVdbeMemSetStr(pCtx->pOut, z, n,1, xDel) == SQL_TOOBIG) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+	if (sqlVdbeMemSetStr(pCtx->pOut, z, n, 1, xDel) != 0)
 		pCtx->is_aborted = true;
-	}
 }
 
 static int
 invokeValueDestructor(const void *p,	/* Value to destroy */
 		      void (*xDel) (void *),	/* The destructor */
-		      sql_context * pCtx	/* Set a SQL_TOOBIG error if no NULL */
+		      sql_context *pCtx	/* Set an error if no NULL */
     )
 {
 	assert(xDel != SQL_DYNAMIC);
@@ -291,10 +289,11 @@ invokeValueDestructor(const void *p,	/* Value to destroy */
 		xDel((void *)p);
 	}
 	if (pCtx) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob is too "\
+			 "big");
 		pCtx->is_aborted = true;
 	}
-	return SQL_TOOBIG;
+	return SQL_TARANTOOL_ERROR;
 }
 
 void
@@ -303,10 +302,8 @@ sql_result_blob(sql_context * pCtx,
     )
 {
 	assert(n >= 0);
-	if (sqlVdbeMemSetStr(pCtx->pOut, z, n,0, xDel) == SQL_TOOBIG) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+	if (sqlVdbeMemSetStr(pCtx->pOut, z, n, 0, xDel) != 0)
 		pCtx->is_aborted = true;
-	}
 }
 
 void
@@ -391,7 +388,9 @@ sql_result_zeroblob64(sql_context * pCtx, u64 n)
 {
 	Mem *pOut = pCtx->pOut;
 	if (n > (u64) pOut->db->aLimit[SQL_LIMIT_LENGTH]) {
-		return SQL_TOOBIG;
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob is too "\
+			 "big");
+		return SQL_TARANTOOL_ERROR;
 	}
 	sqlVdbeMemSetZeroBlob(pCtx->pOut, (int)n);
 	return 0;
@@ -1124,7 +1123,9 @@ sql_bind_zeroblob64(sql_stmt * pStmt, int i, sql_uint64 n)
 	int rc;
 	Vdbe *p = (Vdbe *) pStmt;
 	if (n > (u64) p->db->aLimit[SQL_LIMIT_LENGTH]) {
-		rc = SQL_TOOBIG;
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob is too "\
+			 "big");
+		rc = SQL_TARANTOOL_ERROR;
 	} else {
 		assert((n & 0x7FFFFFFF) == n);
 		rc = sql_bind_zeroblob(pStmt, i, n);

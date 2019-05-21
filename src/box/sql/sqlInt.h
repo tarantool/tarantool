@@ -333,8 +333,6 @@ enum sql_ret_code {
 	SQL_NOMEM,
 	/** Some kind of disk I/O error occurred. */
 	SQL_IOERR,
-	/** String or BLOB exceeds size limit. */
-	SQL_TOOBIG,
 	/** Abort due to constraint violation. */
 	SQL_CONSTRAINT,
 	SQL_TARANTOOL_ERROR,
