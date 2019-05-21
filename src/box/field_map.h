@@ -152,8 +152,8 @@ field_map_get_offset(const uint32_t *field_map, int32_t offset_slot,
 		     int multikey_idx)
 {
 	uint32_t offset;
-	if (multikey_idx != MULTIKEY_NONE && field_map[offset_slot] > 0) {
-		assert((int32_t)field_map[offset_slot] < 0);
+	if (multikey_idx != MULTIKEY_NONE &&
+	    (int32_t) field_map[offset_slot] < 0) {
 		/**
 		 * The field_map extent has the following
 		 * structure: [size=N|slot1|slot2|..|slotN]

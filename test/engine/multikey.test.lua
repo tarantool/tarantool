@@ -194,3 +194,14 @@ s:replace{2, {{2, 3}}}
 i2 = s:create_index('sk', {parts = {{2, 'unsigned', path = '[1][*]'}}})
 i2:select()
 s:drop()
+
+--
+-- gh-4234: Assert when using indexes containing both multikey
+--          and regular key_parts.
+--
+s = box.schema.space.create('clients', {engine = engine})
+name_idx = s:create_index('name_idx', {parts = {{1, 'string'}}})
+phone_idx = s:create_index('phone_idx', {parts = {{'[2][*]', 'string'}, {3, 'string'}}, unique=false})
+s:insert({"Genadiy", {"911"}, 'b'})
+s:insert({"Jorge", {"911", "89457609234"}, 'a'})
+s:drop()
