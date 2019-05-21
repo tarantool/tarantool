@@ -164,9 +164,6 @@ robust_open(const char *z, int f, mode_t m)
 		if (fd >= SQL_MINIMUM_FILE_DESCRIPTOR)
 			break;
 		close(fd);
-		sql_log(SQL_WARNING,
-			    "attempt to open \"%s\" as file descriptor %d", z,
-			    fd);
 		fd = -1;
 		if (open("/dev/null", f, m) < 0)
 			break;
@@ -502,48 +499,6 @@ fileHasMoved(unixFile * pFile)
 }
 
 /*
- * Check a unixFile that is a database.  Verify the following:
- *
- * (1) There is exactly one hard link on the file
- * (2) The file is not a symbolic link
- * (3) The file has not been renamed or unlinked
- *
- * Issue sql_log(SQL_WARNING,...) messages if anything is not right.
- */
-static void
-verifyDbFile(unixFile * pFile)
-{
-	struct stat buf;
-	int rc;
-
-	/* These verifications occurs for the main database only */
-	if (pFile->ctrlFlags & UNIXFILE_NOLOCK)
-		return;
-
-	rc = fstat(pFile->h, &buf);
-	if (rc != 0) {
-		sql_log(SQL_WARNING, "cannot fstat db file %s",
-			    pFile->zPath);
-		return;
-	}
-	if (buf.st_nlink == 0) {
-		sql_log(SQL_WARNING, "file unlinked while open: %s",
-			    pFile->zPath);
-		return;
-	}
-	if (buf.st_nlink > 1) {
-		sql_log(SQL_WARNING, "multiple links to file: %s",
-			    pFile->zPath);
-		return;
-	}
-	if (fileHasMoved(pFile)) {
-		sql_log(SQL_WARNING, "file renamed while open: %s",
-			    pFile->zPath);
-		return;
-	}
-}
-
-/*
  * Attempt to set a system-lock on the file pFile.  The lock is
  * described by pLock.
  *
@@ -766,7 +721,6 @@ unixClose(sql_file * id)
 {
 	int rc;
 	unixFile *pFile = (unixFile *) id;
-	verifyDbFile(pFile);
 	unixUnlock(id, NO_LOCK);
 
 	/* unixFile.pInode is always valid here. Otherwise, a different close
@@ -1528,7 +1482,6 @@ fillInUnixFile(sql_vfs * pVfs,	/* Pointer to vfs object */
 			robust_close(pNew, h, __LINE__);
 	} else {
 		pNew->pMethod = pLockingStyle;
-		verifyDbFile(pNew);
 	}
 	return rc;
 }

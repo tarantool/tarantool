@@ -327,10 +327,6 @@ struct sql_vfs {
 enum sql_ret_code {
 	/** Common error code. */
 	SQL_ERROR = 1,
-	/** Access permission denied. */
-	SQL_PERM,
-	/** Callback routine requested an abort. */
-	SQL_ABORT,
 	/** The database file is locked. */
 	SQL_BUSY,
 	/** A table in the database is locked. */
@@ -356,8 +352,6 @@ enum sql_ret_code {
 	/** 2nd parameter to sql_bind out of range. */
 	SQL_RANGE,
 	SQL_TARANTOOL_ERROR,
-	/** Warnings from sql_log(). */
-	SQL_WARNING,
 	/** sql_step() has another row ready. */
 	SQL_ROW,
 	/** sql_step() has finished executing. */

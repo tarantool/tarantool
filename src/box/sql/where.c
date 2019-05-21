@@ -741,7 +741,6 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 	char *zNotUsed;		/* Extra space on the end of pIdx */
 	Bitmask idxCols;	/* Bitmap of columns used for indexing */
 	Bitmask extraCols;	/* Bitmap of additional columns */
-	u8 sentWarning = 0;	/* True if a warnning has been issued */
 	int iContinue = 0;	/* Jump here to skip excluded rows */
 	struct SrcList_item *pTabItem;	/* FROM clause term being indexed */
 	int addrCounter = 0;	/* Address where integer counter is initialized */
@@ -768,15 +767,6 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 			int iCol = pTerm->u.leftColumn;
 			Bitmask cMask =
 			    iCol >= BMS ? MASKBIT(BMS - 1) : MASKBIT(iCol);
-			testcase(iCol == BMS);
-			testcase(iCol == BMS - 1);
-			if (!sentWarning) {
-				sql_log(SQL_WARNING_AUTOINDEX,
-					    "automatic index on %s(%s)",
-					    pTable->def->name,
-					    pTable->aCol[iCol].zName);
-				sentWarning = 1;
-			}
 			if ((idxCols & cMask) == 0) {
 				if (whereLoopResize
 				    (pParse->db, pLoop, nKeyCol + 1)) {

@@ -133,9 +133,9 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 				if (xCallback(pArg, nCol, azVals, azCols)) {
 					/* EVIDENCE-OF: R-38229-40159 If the callback function to
 					 * sql_exec() returns non-zero, then sql_exec() will
-					 * return SQL_ABORT.
+					 * return -1.
 					 */
-					rc = SQL_ABORT;
+					rc = -1;
 					sqlVdbeFinalize((Vdbe *) pStmt);
 					pStmt = 0;
 					goto exec_out;
