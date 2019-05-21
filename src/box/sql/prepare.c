@@ -56,7 +56,7 @@ sqlPrepare(sql * db,	/* Database handle. */
 	Parse sParse;		/* Parsing context */
 	sql_parser_create(&sParse, db, current_session()->sql_flags);
 	sParse.pReprepare = pReprepare;
-	assert(ppStmt && *ppStmt == 0);
+	*ppStmt = NULL;
 	/* assert( !db->mallocFailed ); // not true with SQL_USE_ALLOCA */
 
 	/* Check to verify that it is possible to get a read lock on all
@@ -181,37 +181,12 @@ sqlPrepare(sql * db,	/* Database handle. */
 	return rc;
 }
 
-static int
-sqlLockAndPrepare(sql * db,		/* Database handle. */
-		      const char *zSql,		/* UTF-8 encoded SQL statement. */
-		      int nBytes,		/* Length of zSql in bytes. */
-		      int saveSqlFlag,		/* True to copy SQL text into the sql_stmt */
-		      Vdbe * pOld,		/* VM being reprepared */
-		      sql_stmt ** ppStmt,	/* OUT: A pointer to the prepared statement */
-		      const char **pzTail)	/* OUT: End of parsed string */
-{
-	int rc;
-
-	*ppStmt = 0;
-	assert(zSql != NULL && db != NULL);
-	rc = sqlPrepare(db, zSql, nBytes, saveSqlFlag, pOld, ppStmt,
-			    pzTail);
-	if (rc == SQL_SCHEMA) {
-		sql_finalize(*ppStmt);
-		rc = sqlPrepare(db, zSql, nBytes, saveSqlFlag, pOld, ppStmt,
-				    pzTail);
-	}
-	assert(rc == 0 || *ppStmt == NULL);
-	return rc;
-}
-
 /*
  * Rerun the compilation of a statement after a schema change.
  */
 int
 sqlReprepare(Vdbe * p)
 {
-	int rc;
 	sql_stmt *pNew;
 	const char *zSql;
 	sql *db;
@@ -219,16 +194,11 @@ sqlReprepare(Vdbe * p)
 	zSql = sql_sql((sql_stmt *) p);
 	assert(zSql != 0);	/* Reprepare only called for prepare_v2() statements */
 	db = sqlVdbeDb(p);
-	rc = sqlLockAndPrepare(db, zSql, -1, 0, p, &pNew, 0);
-	if (rc) {
-		if (rc == SQL_NOMEM) {
-			sqlOomFault(db);
-		}
+	if (sqlPrepare(db, zSql, -1, 0, p, &pNew, 0) != 0) {
 		assert(pNew == 0);
-		return rc;
-	} else {
-		assert(pNew != 0);
+		return -1;
 	}
+	assert(pNew != 0);
 	sqlVdbeSwap((Vdbe *) pNew, p);
 	sqlTransferBindings(pNew, (sql_stmt *) p);
 	sqlVdbeResetStepResult((Vdbe *) pNew);
@@ -239,7 +209,7 @@ sqlReprepare(Vdbe * p)
 /*
  * Two versions of the official API.  Legacy and new use.  In the legacy
  * version, the original SQL text is not saved in the prepared statement
- * and so if a schema change occurs, SQL_SCHEMA is returned by
+ * and so if a schema change occurs, an error is returned by
  * sql_step().  In the new version, the original SQL text is retained
  * and the statement is automatically recompiled if an schema change
  * occurs.
@@ -251,8 +221,7 @@ sql_prepare(sql * db,		/* Database handle. */
 		sql_stmt ** ppStmt,	/* OUT: A pointer to the prepared statement */
 		const char **pzTail)	/* OUT: End of parsed string */
 {
-	int rc;
-	rc = sqlLockAndPrepare(db, zSql, nBytes, 0, 0, ppStmt, pzTail);
+	int rc = sqlPrepare(db, zSql, nBytes, 0, 0, ppStmt, pzTail);
 	assert(rc == 0 || ppStmt == NULL || *ppStmt == NULL);	/* VERIFY: F13021 */
 	return rc;
 }
@@ -265,8 +234,7 @@ sql_prepare_v2(sql * db,	/* Database handle. */
 		   const char **pzTail	/* OUT: End of parsed string */
     )
 {
-	int rc;
-	rc = sqlLockAndPrepare(db, zSql, nBytes, 1, 0, ppStmt, pzTail);
+	int rc = sqlPrepare(db, zSql, nBytes, 1, 0, ppStmt, pzTail);
 	assert(rc == 0 || ppStmt == NULL || *ppStmt == NULL);	/* VERIFY: F13021 */
 	return rc;
 }

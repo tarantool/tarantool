@@ -424,9 +424,8 @@ sqlStep(Vdbe * p)
 	}
 
 	if (p->pc <= 0 && p->expired) {
-		p->rc = SQL_SCHEMA;
-		rc = SQL_ERROR;
-		goto end_of_step;
+		p->rc = SQL_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_ERROR;
 	}
 	if (p->pc < 0) {
 
@@ -455,7 +454,6 @@ sqlStep(Vdbe * p)
 	if (SQL_NOMEM == sqlApiExit(p->db, p->rc)) {
 		p->rc = SQL_NOMEM;
 	}
- end_of_step:
 	if (p->isPrepareV2 && rc != SQL_ROW && rc != SQL_DONE) {
 		/* If this statement was prepared using sql_prepare_v2(), and an
 		 * error has occurred, then return the error code in p->rc to the
@@ -474,24 +472,9 @@ sqlStep(Vdbe * p)
 int
 sql_step(sql_stmt * pStmt)
 {
-	int rc;			/* Result from sqlStep() */
 	Vdbe *v = (Vdbe *) pStmt;	/* the prepared statement */
-	int cnt = 0;		/* Counter to prevent infinite loop of reprepares */
-
 	assert(v != NULL);
-	v->doingRerun = 0;
-	while ((rc = sqlStep(v)) == SQL_SCHEMA
-	       && cnt++ < SQL_MAX_SCHEMA_RETRY) {
-		int savedPc = v->pc;
-		rc = sqlReprepare(v);
-		if (rc != 0)
-			break;
-		sql_reset(pStmt);
-		if (savedPc >= 0)
-			v->doingRerun = 1;
-		assert(v->expired == 0);
-	}
-	return rc;
+	return sqlStep(v);
 }
 
 /*

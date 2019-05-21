@@ -40,14 +40,6 @@
 #define SQL_VDBEINT_H
 
 /*
- * The maximum number of times that a statement will try to reparse
- * itself before giving up and returning SQL_SCHEMA.
- */
-#ifndef SQL_MAX_SCHEMA_RETRY
-#define SQL_MAX_SCHEMA_RETRY 50
-#endif
-
-/*
  * SQL is translated into a sequence of instructions to be
  * executed by a virtual machine.  Each instruction is an instance
  * of the following structure.

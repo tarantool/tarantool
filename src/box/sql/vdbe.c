@@ -5089,10 +5089,7 @@ case OP_AggFinal: {
 
 /* Opcode: Expire P1 * * * *
  *
- * Cause precompiled statements to expire.  When an expired statement
- * is executed using sql_step() it will either automatically
- * reprepare itself (if it was originally created using sql_prepare_v2())
- * or it will fail with SQL_SCHEMA.
+ * Cause precompiled statements to expire.
  *
  * If P1 is 0, then all SQL statements become expired. If P1 is non-zero,
  * then only the currently executing statement is expired.
