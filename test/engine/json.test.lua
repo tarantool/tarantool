@@ -171,6 +171,7 @@ name:select({'Max'})
 name:get({'Max', 'Stierlitz', 'Otto'})
 box.snapshot()
 test_run:cmd("restart server default")
+engine = test_run:get_cfg('engine')
 s = box.space["withdata"]
 pk = s.index["pk"]
 name = s.index["name"]
@@ -195,7 +196,7 @@ s:drop()
 
 -- Check replace with tuple with map having numeric keys that
 -- cannot be included in JSON index.
-s = box.schema.space.create('withdata', {engine='vinyl'})
+s = box.schema.space.create('withdata', {engine = engine})
 pk = s:create_index('pk', {parts={{1, 'int'}}})
 idx0 = s:create_index('idx0', {parts = {{2, 'str', path = 'name'}, {3, "str"}}})
 s:insert({4, {"d", name='D'}, "test"})
@@ -204,5 +205,27 @@ idx0:drop()
 s:truncate()
 idx0 = s:create_index('idx2', {parts = {{3, 'str', path = '[1].fname'}, {3, 'str', path = '[1].sname'}}})
 s:insert({5, {1, 1, 1}, {{fname='A', sname='B'}, {fname='C', sname='D'}, {fname='A', sname='B'}}})
-s:delete(5)
+_ = s:delete(5)
+s:drop()
+
+-- Check that null isn't allowed in case array/map is expected
+-- according to json document format.
+s = box.schema.space.create('test', {engine = engine})
+_ = s:create_index('pk')
+_ = s:create_index('sk', {parts = {{'[2][1].a', 'unsigned'}}})
+s:insert{1, box.NULL} -- error
+s:insert{2, {box.NULL}} -- error
+s:insert{3} -- error
+s:insert{4, {}} -- error
+s:insert{5, {{b = 1}}} -- error
+s:insert{6, {{a = 1}}} -- ok
+s.index.sk:alter{parts = {{'[2][1].a', 'unsigned', is_nullable = true}}}
+s:insert{7, box.NULL} -- error
+s:insert{8, {box.NULL}} -- error
+-- Skipping nullable fields is okay though.
+s:insert{9} -- ok
+s:insert{10, {}} -- ok
+s:insert{11, {{b = 1}}} -- ok
+s:insert{12, {{a = box.NULL}}} -- ok
+s.index.sk:select()
 s:drop()

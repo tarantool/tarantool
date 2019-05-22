@@ -205,3 +205,22 @@ phone_idx = s:create_index('phone_idx', {parts = {{'[2][*]', 'string'}, {3, 'str
 s:insert({"Genadiy", {"911"}, 'b'})
 s:insert({"Jorge", {"911", "89457609234"}, 'a'})
 s:drop()
+
+--
+-- Inserting box.NULL where a multikey array is expected is
+-- handled gracefully: no crashes, just an error message.
+--
+s = box.schema.space.create('test', {engine = engine})
+_ = s:create_index('pk')
+_ = s:create_index('sk', {parts = {{'[2][*]', 'unsigned'}}})
+s:insert{1, box.NULL} -- error
+s:insert{2, {box.NULL}} -- error
+s:insert{3, {}} -- ok
+s:insert{4, {1}} -- ok
+s.index.sk:alter{parts = {{'[2][*]', 'unsigned', is_nullable = true}}}
+s:insert{5, box.NULL} -- still error
+s:insert{6, {box.NULL}} -- ok
+s:insert{7, {}} -- ok
+s:insert{8, {2}} -- ok
+s.index.sk:select()
+s:drop()

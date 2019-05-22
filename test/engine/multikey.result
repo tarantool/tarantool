@@ -777,3 +777,61 @@ s:insert({"Jorge", {"911", "89457609234"}, 'a'})
 s:drop()
 ---
 ...
+--
+-- Inserting box.NULL where a multikey array is expected is
+-- handled gracefully: no crashes, just an error message.
+--
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+_ = s:create_index('pk')
+---
+...
+_ = s:create_index('sk', {parts = {{'[2][*]', 'unsigned'}}})
+---
+...
+s:insert{1, box.NULL} -- error
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected array'
+...
+s:insert{2, {box.NULL}} -- error
+---
+- error: 'Tuple field [2][*] type does not match one required by operation: expected
+    unsigned'
+...
+s:insert{3, {}} -- ok
+---
+- [3, []]
+...
+s:insert{4, {1}} -- ok
+---
+- [4, [1]]
+...
+s.index.sk:alter{parts = {{'[2][*]', 'unsigned', is_nullable = true}}}
+---
+...
+s:insert{5, box.NULL} -- still error
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected array'
+...
+s:insert{6, {box.NULL}} -- ok
+---
+- [6, [null]]
+...
+s:insert{7, {}} -- ok
+---
+- [7, []]
+...
+s:insert{8, {2}} -- ok
+---
+- [8, [2]]
+...
+s.index.sk:select()
+---
+- - [6, [null]]
+  - [4, [1]]
+  - [8, [2]]
+...
+s:drop()
+---
+...
