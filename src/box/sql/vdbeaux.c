@@ -2013,8 +2013,7 @@ sqlVdbeCloseStatement(Vdbe * p, int eOp)
  * violations, return SQL_ERROR. Otherwise, 0.
  *
  * If there are outstanding FK violations and this function returns
- * SQL_ERROR, set the result of the VM to SQL_CONSTRAINT_FOREIGNKEY
- * and write an error message to it. Then return SQL_ERROR.
+ * SQL_TARANTOOL_ERROR and set an error.
  */
 int
 sqlVdbeCheckFk(Vdbe * p, int deferred)
@@ -2177,7 +2176,6 @@ sqlVdbeHalt(Vdbe * p)
 						closeCursorsAndFree(p);
 						return SQL_ERROR;
 					}
-					rc = SQL_CONSTRAINT_FOREIGNKEY;
 				} else {
 					/* The auto-commit flag is true, the vdbe program was successful
 					 * or hit an 'OR FAIL' constraint and there are no deferred foreign
@@ -2220,17 +2218,15 @@ sqlVdbeHalt(Vdbe * p)
 		/* If eStatementOp is non-zero, then a statement transaction needs to
 		 * be committed or rolled back. Call sqlVdbeCloseStatement() to
 		 * do so. If this operation returns an error, and the current statement
-		 * error code is 0 or SQL_CONSTRAINT, then promote the
+		 * error code is 0 or -1, then promote the
 		 * current statement error code.
 		 */
 		if (eStatementOp) {
 			rc = sqlVdbeCloseStatement(p, eStatementOp);
 			if (rc) {
 				box_txn_rollback();
-				if (p->rc == 0
-				    || (p->rc & 0xff) == SQL_CONSTRAINT) {
+				if (p->rc == 0)
 					p->rc = rc;
-				}
 				closeCursorsAndFree(p);
 				sqlRollbackAll(p);
 				sqlCloseSavepoints(p);

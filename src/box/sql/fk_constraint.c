@@ -44,7 +44,7 @@
  *
  * Foreign keys in sql come in two flavours: deferred and immediate.
  * If an immediate foreign key constraint is violated,
- * SQL_CONSTRAINT_FOREIGNKEY is returned and the current
+ * -1 is returned and the current
  * statement transaction rolled back. If a
  * deferred foreign key constraint is violated, no action is taken
  * immediately. However if the application attempts to commit the
@@ -110,7 +110,7 @@
  * is that the counter used is stored as part of each individual statement
  * object (struct Vdbe). If, after the statement has run, its immediate
  * constraint counter is greater than zero,
- * it returns SQL_CONSTRAINT_FOREIGNKEY
+ * it returns -1.
  * and the statement transaction is rolled back. An exception is an INSERT
  * statement that inserts a single row only (no triggers). In this case,
  * instead of using a counter, an exception is thrown immediately if the

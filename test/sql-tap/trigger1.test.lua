@@ -511,7 +511,7 @@ test:do_catchsql_test(
         -- </trigger1-6.3>
     })
 
--- verify_ex_errcode trigger1-6.3b sql_CONSTRAINT_TRIGGER
+-- Verify the previous test has not deleted anything.
 test:do_execsql_test(
     "trigger1-6.4",
     [[

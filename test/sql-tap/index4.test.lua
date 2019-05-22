@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(6)
+test:plan(7)
 
 --!./tcltestrunner.lua
 -- 2011 July 9
@@ -150,20 +150,15 @@ test:do_execsql_test(
         COMMIT;
     ]])
 
--- MUST_WORK_TEST possible reason of failing #2495
-if (0 > 0)
- then
-    test:do_catchsql_test(
-        2.2,
-        [[
-            CREATE UNIQUE INDEX i3 ON t2(x);
-        ]], {
-            -- <2.2>
-            1, "UNIQUE constraint failed: t2.x"
-            -- </2.2>
-        })
-
-end
+test:do_catchsql_test(
+    2.2,
+    [[
+        CREATE UNIQUE INDEX i3 ON t2(x);
+    ]], {
+        -- <2.2>
+        1, "Duplicate key exists in unique index 'I3' in space 'T2'"
+        -- </2.2>
+    })
 
 
 test:finish_test()

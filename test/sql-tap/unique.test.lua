@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(32)
+test:plan(35)
 
 --!./tcltestrunner.lua
 -- 2001 September 27
@@ -20,12 +20,7 @@ test:plan(32)
 -- $Id: unique.test,v 1.9 2009/05/02 15:46:47 drh Exp $
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
--- MUST_WORK_TEST
-if (0 > 0)
- then
-    -- Try to create a table with two primary keys.
-    -- (This is allowed in sql even that it is not valid SQL)
-end
+
 test:do_catchsql_test(
     "unique-1.1",
     [[
@@ -74,7 +69,7 @@ test:do_catchsql_test(
         -- </unique-1.3>
     })
 
--- verify_ex_errcode unique-1.3b sql_CONSTRAINT_PRIMARYKEY
+-- Verify the previous test has not inserted anything.
 test:do_execsql_test(
     "unique-1.4",
     [[
@@ -95,7 +90,7 @@ test:do_catchsql_test(
         -- </unique-1.5>
     })
 
--- verify_ex_errcode unique-1.5b sql_CONSTRAINT_UNIQUE
+-- Verify the previous test has not inserted anything.
 test:do_execsql_test(
     "unique-1.6",
     [[
@@ -171,7 +166,7 @@ test:do_catchsql_test(
         -- </unique-2.3>
     })
 
--- verify_ex_errcode unique-2.3b sql_CONSTRAINT_UNIQUE
+-- Verify the previous test has not inserted anything.
 test:do_catchsql_test(
     "unique-2.4",
     [[
@@ -213,20 +208,16 @@ test:do_catchsql_test(
         -- </unique-2.7>
     })
 
--- MUST_WORK_TEST i2 is checking not only "a" column #2495
-if 0 > 0 then
 test:do_catchsql_test(
     "unique-2.8",
     [[
-        select a from t2;
-        --CREATE UNIQUE INDEX i2 ON t2(a);
+        CREATE UNIQUE INDEX i2 ON t2(a);
     ]], {
         -- <unique-2.8>
-        1, "UNIQUE constraint failed: t2.a"
+        1, "Duplicate key exists in unique index 'I2' in space 'T2'"
         -- </unique-2.8>
     })
 
--- verify_ex_errcode unique-2.8b sql_CONSTRAINT_UNIQUE
 test:do_catchsql_test(
     "unique-2.9",
     [[
@@ -236,7 +227,6 @@ test:do_catchsql_test(
         0
         -- </unique-2.9>
     })
-end
 
 --integrity_check unique-2.10
 -- Test the UNIQUE keyword as used on two or more fields.
@@ -291,7 +281,6 @@ test:do_catchsql_test(
         -- </unique-3.4>
     })
 
--- verify_ex_errcode unique-3.4b sql_CONSTRAINT_UNIQUE
 --integrity_check unique-3.5
 -- Make sure NULLs are distinct as far as the UNIQUE tests are
 -- concerned.
@@ -392,20 +381,16 @@ test:do_catchsql_test(
         -- </unique-4.9>
     })
 
--- MUST_WORK_TEST i4c is checking not only "b" column #2495
-if 0 > 0 then
 test:do_catchsql_test(
     "unique-4.10",
     [[
         CREATE UNIQUE INDEX i4c ON t4(b)
     ]], {
         -- <unique-4.10>
-        1, "UNIQUE constraint failed: t4.b"
+        1, "Duplicate key exists in unique index 'I4C' in space 'T4'"
         -- </unique-4.10>
     })
-end
 
--- verify_ex_errcode unique-4.10b sql_CONSTRAINT_UNIQUE
 --integrity_check unique-4.99
 -- Test the error message generation logic.  In particular, make sure we
 -- do not overflow the static buffer used to generate the error message.
@@ -447,8 +432,5 @@ test:do_catchsql_test(
         1, "Duplicate key exists in unique index 'unique_unnamed_T5_2' in space 'T5'"
         -- </unique-5.2>
     })
-
--- verify_ex_errcode unique-5.2b sql_CONSTRAINT_UNIQUE
-
 
 test:finish_test()

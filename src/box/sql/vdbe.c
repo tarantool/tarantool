@@ -1065,7 +1065,6 @@ case OP_Halt: {
 	}
 	rc = sqlVdbeHalt(p);
 	assert(rc == 0 || rc == SQL_ERROR);
-	assert(rc == 0 || (p->rc & 0xff) == SQL_CONSTRAINT);
 	rc = p->rc ? SQL_TARANTOOL_ERROR : SQL_DONE;
 	goto vdbe_return;
 }

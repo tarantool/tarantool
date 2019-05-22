@@ -332,7 +332,6 @@ enum sql_ret_code {
 	/** Some kind of disk I/O error occurred. */
 	SQL_IOERR,
 	/** Abort due to constraint violation. */
-	SQL_CONSTRAINT,
 	SQL_TARANTOOL_ERROR,
 	/** sql_step() has another row ready. */
 	SQL_ROW,
@@ -554,9 +553,6 @@ sql_exec(sql *,	/* An open database */
 #define SQL_IOERR_CLOSE             (SQL_IOERR | (16<<8))
 #define SQL_IOERR_DELETE_NOENT      (SQL_IOERR | (23<<8))
 #define SQL_IOERR_GETTEMPPATH       (SQL_IOERR | (25<<8))
-#define SQL_CONSTRAINT_FOREIGNKEY   (SQL_CONSTRAINT | (3<<8))
-#define SQL_CONSTRAINT_NOTNULL      (SQL_CONSTRAINT | (5<<8))
-#define SQL_CONSTRAINT_TRIGGER      (SQL_CONSTRAINT | (7<<8))
 
 /**
  * Subtype of a main type. Allows to do some subtype specific
@@ -3520,17 +3516,16 @@ sql_generate_index_key(struct Parse *parse, struct index *index, int cursor,
  * ----------  ----------  --------------------------------------
  *    any       ROLLBACK   The current transaction is rolled
  *                         back and VDBE stops immediately
- *                         with return code of sql_CONSTRAINT.
+ *                         with an error.
  *
  *    any        ABORT     Back out changes from the current
  *                         command only (do not do a complete
  *                         rollback) then cause VDBE to return
- *                         immediately with sql_CONSTRAINT.
+ *                         immediately with an error.
  *
- *    any        FAIL      VDBE returns immediately with a
- *                         return code of sql_CONSTRAINT. The
- *                         transaction is not rolled back and any
- *                         changes to prior rows are retained.
+ *    any        FAIL      VDBE returns immediately with an error.
+ *                         The transaction is not rolled back and
+ *                         any changes to prior rows are retained.
  *
  *    any       IGNORE     The attempt in insert or update the
  *                         current row is skipped, without
