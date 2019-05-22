@@ -1956,6 +1956,7 @@ swim_delete(struct swim *swim)
 	wait_ack_heap_destroy(&swim->wait_ack_heap);
 	mh_swim_table_delete(swim->members);
 	free(swim->shuffled);
+	free(swim);
 }
 
 /**
