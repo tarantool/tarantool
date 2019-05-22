@@ -835,3 +835,31 @@ s.index.sk:select()
 s:drop()
 ---
 ...
+--
+-- Inserting a map where a multikey array is expected is
+-- handled gracefully: no crashes, just an error message.
+--
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+_ = s:create_index('pk')
+---
+...
+_ = s:create_index('sk', {parts = {{'[2][*]', 'unsigned'}}})
+---
+...
+s:insert{1, {a = 1}} -- error
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected array'
+...
+s:insert{2, {1}} -- ok
+---
+- [2, [1]]
+...
+s.index.sk:select()
+---
+- - [2, [1]]
+...
+s:drop()
+---
+...

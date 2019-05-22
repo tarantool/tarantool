@@ -1138,7 +1138,6 @@ tuple_format_iterator_next(struct tuple_format_iterator *it,
 			 * and is equal to multikey index
 			 * comparison hint.
 			 */
-			assert(type == MP_ARRAY);
 			it->multikey_frame = mp_stack_top(&it->stack);
 		}
 		it->parent = &field->token;
