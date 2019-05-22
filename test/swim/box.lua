@@ -7,6 +7,28 @@ listen_port = require('uri').parse(listen_uri).service
 
 box.cfg{}
 
+--
+-- SWIM instances, using broadcast, should protect themselves
+-- with encryption. Otherwise they can accidentally discover
+-- SWIM instances from other tests.
+--
+enc_key = box.info.uuid
+enc_algo = 'aes128'
+
+--
+-- Wrap swim.new with a codec to prevent test workers affecting
+-- each other.
+--
+local original_new = swim.new
+swim.new = function(...)
+    local s, err = original_new(...)
+    if s == nil then
+        return s, err
+    end
+    assert(s:set_codec({algo = enc_algo, key = enc_key, key_size = 16}))
+    return s
+end
+
 function uuid(i)
     local min_valid_prefix = '00000000-0000-1000-8000-'
     if i < 10 then

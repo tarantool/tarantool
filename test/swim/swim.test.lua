@@ -114,7 +114,7 @@ s1:remove_member(uuid(1))
 s1:delete()
 
 s1 = swim.new({uuid = uuid(1), uri = uri()})
-s2 = swim.new({uuid = uuid(2), uri = listen_uri})
+s2 = swim.new({uuid = uuid(2), uri = uri()})
 s1.probe_member()
 s1:probe_member()
 s1:probe_member(true)
@@ -122,7 +122,7 @@ s1:probe_member(true)
 s1:probe_member('127.0.0.1:1')
 fiber.yield()
 s1:size()
-s1:probe_member(listen_uri)
+s1:probe_member(s2:self():uri())
 while s1:size() ~= 2 do fiber.sleep(0.01) end
 s2:size()
 
@@ -233,8 +233,8 @@ self:is_dropped()
 -- Check payload dissemination.
 --
 s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01})
-s2 = swim.new({uuid = uuid(2), uri = listen_port, heartbeat_rate = 0.01})
-s1:add_member({uuid = uuid(2), uri = listen_port})
+s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01})
+s1:add_member({uuid = uuid(2), uri = s2:self():uri()})
 while s2:size() ~= 2 do fiber.sleep(0.01) end
 s1_view = s2:member_by_uuid(uuid(1))
 s1_view:payload()
@@ -269,7 +269,7 @@ s:delete()
 --
 -- Payload caching.
 --
-s1 = swim.new({uuid = uuid(1), uri = uri(listen_port), heartbeat_rate = 0.01})
+s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01})
 s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01})
 s1_self = s1:self()
 _ = s1:add_member({uuid = s2:self():uuid(), uri = s2:self():uri()})
@@ -371,7 +371,7 @@ cfg.key = '1234567812345678'
 cfg.key_size = 16
 s1:set_codec(cfg)
 
--- S2 does not use encryption and can't decode the ping.
+-- S2 uses different encryption and can't decode the ping.
 s1:probe_member(s2:self():uri())
 fiber.sleep(0.01)
 s1:size()
@@ -407,8 +407,8 @@ s2:size()
 s1:set_codec({algo = 'none'})
 s2:set_codec({algo = 'none'})
 s1:probe_member(s2:self():uri())
-while s1:size() ~= 2 do fiber.sleep(0.01) end
-s2:size()
+while s1:member_by_uuid(s2:self():uuid()) == nil do fiber.sleep(0.01) end
+s2:member_by_uuid(s1:self():uuid())
 
 s1:delete()
 s2:delete()

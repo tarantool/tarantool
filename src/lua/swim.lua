@@ -804,6 +804,7 @@ local swim_not_configured_mt = {
     __index = {
         delete = swim_delete,
         is_configured = swim_is_configured,
+        set_codec = swim_set_codec,
     },
     __serialize = swim_serialize
 }
