@@ -2014,8 +2014,8 @@ swim_quit(struct swim *swim)
 		 swim_encode_quit(swim, &task->packet);
 	assert(rc == 2);
 	mp_encode_map(header, rc);
-	swim_quit_step_complete(task, &swim->scheduler, 0);
 	swim->self->status = MEMBER_LEFT;
+	swim_quit_step_complete(task, &swim->scheduler, 0);
 }
 
 struct swim_member *
