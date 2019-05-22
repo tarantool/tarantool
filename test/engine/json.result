@@ -596,6 +596,9 @@ box.snapshot()
 - ok
 ...
 test_run:cmd("restart server default")
+engine = test_run:get_cfg('engine')
+---
+...
 s = box.space["withdata"]
 ---
 ...
@@ -685,7 +688,7 @@ s:drop()
 ...
 -- Check replace with tuple with map having numeric keys that
 -- cannot be included in JSON index.
-s = box.schema.space.create('withdata', {engine='vinyl'})
+s = box.schema.space.create('withdata', {engine = engine})
 ---
 ...
 pk = s:create_index('pk', {parts={{1, 'int'}}})
@@ -708,12 +711,88 @@ s:drop()
 --
 -- gh-1260: Multikey indexes
 --
-s = box.schema.space.create('withdata')
+s = box.schema.space.create('withdata', {engine = engine})
 ---
 ...
 idx = s:create_index('idx', {parts = {{3, 'str', path = '[*].fname'}, {3, 'str', path = '[*].sname'}}})
 ---
 - error: Tarantool does not support multikey indexes
+...
+s:drop()
+---
+...
+-- Check that null isn't allowed in case array/map is expected
+-- according to json document format.
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+_ = s:create_index('pk')
+---
+...
+_ = s:create_index('sk', {parts = {{'[2][1].a', 'unsigned'}}})
+---
+...
+s:insert{1, box.NULL} -- error
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected array'
+...
+s:insert{2, {box.NULL}} -- error
+---
+- error: 'Tuple field [2][1] type does not match one required by operation: expected
+    map'
+...
+s:insert{3} -- error
+---
+- error: Tuple field [2][1]["a"] required by space format is missing
+...
+s:insert{4, {}} -- error
+---
+- error: Tuple field [2][1]["a"] required by space format is missing
+...
+s:insert{5, {{b = 1}}} -- error
+---
+- error: Tuple field [2][1]["a"] required by space format is missing
+...
+s:insert{6, {{a = 1}}} -- ok
+---
+- [6, [{'a': 1}]]
+...
+s.index.sk:alter{parts = {{'[2][1].a', 'unsigned', is_nullable = true}}}
+---
+...
+s:insert{7, box.NULL} -- error
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected array'
+...
+s:insert{8, {box.NULL}} -- error
+---
+- error: 'Tuple field [2][1] type does not match one required by operation: expected
+    map'
+...
+-- Skipping nullable fields is okay though.
+s:insert{9} -- ok
+---
+- [9]
+...
+s:insert{10, {}} -- ok
+---
+- [10, []]
+...
+s:insert{11, {{b = 1}}} -- ok
+---
+- [11, [{'b': 1}]]
+...
+s:insert{12, {{a = box.NULL}}} -- ok
+---
+- [12, [{'a': null}]]
+...
+s.index.sk:select()
+---
+- - [9]
+  - [10, []]
+  - [11, [{'b': 1}]]
+  - [12, [{'a': null}]]
+  - [6, [{'a': 1}]]
 ...
 s:drop()
 ---

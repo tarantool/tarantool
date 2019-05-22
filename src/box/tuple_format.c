@@ -151,7 +151,7 @@ tuple_field_new(void)
 	field->type = FIELD_TYPE_ANY;
 	field->offset_slot = TUPLE_OFFSET_SLOT_NIL;
 	field->coll_id = COLL_NONE;
-	field->nullable_action = ON_CONFLICT_ACTION_NONE;
+	field->nullable_action = ON_CONFLICT_ACTION_DEFAULT;
 	return field;
 }
 
