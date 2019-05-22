@@ -326,35 +326,4 @@ test:do_test(
         -- </triggerA-2.11>
     })
 
--- # Only run the reamining tests if memory debugging is turned on.
--- #
--- ifcapable !memdebug {
---    puts "Skipping triggerA malloc tests: not compiled with -Dsql_MEMDEBUG..."
---    finish_test
---    return
--- }
--- source $testdir/malloc_common.tcl
--- # Save a copy of the current database configuration.
--- #
--- db close
--- forcedelete test.db-triggerA
--- copy_file test.db test.db-triggerA
--- sql db test.db
--- # Run malloc tests on the INSTEAD OF trigger firing.
--- #
--- do_malloc_test triggerA-3 -tclprep {
---   db close
---   forcedelete test.db test.db-journal
---   forcecopy test.db-triggerA test.db
---   sql db test.db
---   sql_extended_result_codes db 1
---   db eval {SELECT * FROM v5; -- warm up the cache}
--- } -sqlbody {
---    DELETE FROM v5 WHERE x=5;
---    UPDATE v5 SET b=b+9900000 WHERE x BETWEEN 3 AND 5;
--- }
--- # Clean up the saved database copy.
--- #
--- forcedelete test.db-triggerA
 test:finish_test()
-

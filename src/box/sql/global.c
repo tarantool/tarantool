@@ -177,8 +177,6 @@ SQL_WSD struct sqlConfig sqlConfig = {
 	SQL_ALLOW_COVERING_INDEX_SCAN,	/* bUseCis */
 	0x7ffffffe,		/* mxStrlen */
 	0,			/* neverCorrupt */
-	512,			/* szLookaside */
-	125,			/* nLookaside */
 	0,			/* nStmtSpill */
 	(void *)0,		/* pHeap */
 	0,			/* nHeap */

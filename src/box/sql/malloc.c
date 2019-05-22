@@ -345,44 +345,19 @@ sql_malloc64(sql_uint64 n)
 }
 
 /*
- * TRUE if p is a lookaside memory allocation from db
- */
-static int
-isLookaside(sql * db, void *p)
-{
-	return SQL_WITHIN(p, db->lookaside.pStart, db->lookaside.pEnd);
-}
-
-/*
  * Return the size of a memory allocation previously obtained from
  * sqlMalloc() or sql_malloc().
  */
 int
 sqlMallocSize(void *p)
 {
-	assert(sqlMemdebugHasType(p, MEMTYPE_HEAP));
 	return sql_sized_sizeof(p);
 }
 
-int
-sqlDbMallocSize(sql * db, void *p)
+sql_uint64
+sql_msize(void *p)
 {
-	assert(p != 0);
-	if (db == 0 || !isLookaside(db, p)) {
-#if SQL_DEBUG
-		if (db == 0) {
-			assert(sqlMemdebugNoType(p, (u8) ~ MEMTYPE_HEAP));
-			assert(sqlMemdebugHasType(p, MEMTYPE_HEAP));
-		} else {
-			assert(sqlMemdebugHasType
-			       (p, (MEMTYPE_LOOKASIDE | MEMTYPE_HEAP)));
-			assert(sqlMemdebugNoType
-			       (p, (u8) ~ (MEMTYPE_LOOKASIDE | MEMTYPE_HEAP)));
-		}
-#endif
-		return sql_sized_sizeof(p);
-	} else
-		return db->lookaside.sz;
+	return p ? sql_sized_sizeof(p) : 0;
 }
 
 /*
@@ -393,8 +368,6 @@ sql_free(void *p)
 {
 	if (p == 0)
 		return;		/* IMP: R-49053-54554 */
-	assert(sqlMemdebugHasType(p, MEMTYPE_HEAP));
-	assert(sqlMemdebugNoType(p, (u8) ~ MEMTYPE_HEAP));
 	if (sqlGlobalConfig.bMemstat) {
 		sqlStatusDown(SQL_STATUS_MEMORY_USED,
 				  sqlMallocSize(p));
@@ -411,7 +384,7 @@ sql_free(void *p)
 static SQL_NOINLINE void
 measureAllocationSize(sql * db, void *p)
 {
-	*db->pnBytesFreed += sqlDbMallocSize(db, p);
+	*db->pnBytesFreed += sqlMallocSize(p);
 }
 
 /*
@@ -428,23 +401,7 @@ sqlDbFree(sql * db, void *p)
 			measureAllocationSize(db, p);
 			return;
 		}
-		if (isLookaside(db, p)) {
-			LookasideSlot *pBuf = (LookasideSlot *) p;
-#if SQL_DEBUG
-			/* Trash all content in the buffer being freed */
-			memset(p, 0xaa, db->lookaside.sz);
-#endif
-			pBuf->pNext = db->lookaside.pFree;
-			db->lookaside.pFree = pBuf;
-			db->lookaside.nOut--;
-			return;
-		}
 	}
-	assert(sqlMemdebugHasType(p, (MEMTYPE_LOOKASIDE | MEMTYPE_HEAP)));
-	assert(sqlMemdebugNoType
-	       (p, (u8) ~ (MEMTYPE_LOOKASIDE | MEMTYPE_HEAP)));
-	assert(db != 0 || sqlMemdebugNoType(p, MEMTYPE_LOOKASIDE));
-	sqlMemdebugSetType(p, MEMTYPE_HEAP);
 	sql_free(p);
 }
 
@@ -456,8 +413,6 @@ sqlRealloc(void *pOld, u64 nBytes)
 {
 	int nOld, nNew, nDiff;
 	void *pNew;
-	assert(sqlMemdebugHasType(pOld, MEMTYPE_HEAP));
-	assert(sqlMemdebugNoType(pOld, (u8) ~ MEMTYPE_HEAP));
 	if (pOld == 0) {
 		return sqlMalloc(nBytes);	/* IMP: R-04300-56712 */
 	}
@@ -535,27 +490,9 @@ sqlDbMallocZero(sql * db, u64 n)
 	return p;
 }
 
-/* Finish the work of sqlDbMallocRawNN for the unusual and
- * slower case when the allocation cannot be fulfilled using lookaside.
- */
-static SQL_NOINLINE void *
-dbMallocRawFinish(sql * db, u64 n)
-{
-	void *p;
-	assert(db != 0);
-	p = sqlMalloc(n);
-	if (!p)
-		sqlOomFault(db);
-	sqlMemdebugSetType(p,
-			       (db->lookaside.bDisable ==
-				0) ? MEMTYPE_LOOKASIDE : MEMTYPE_HEAP);
-	return p;
-}
-
 /*
- * Allocate memory, either lookaside (if possible) or heap.
- * If the allocation fails, set the mallocFailed flag in
- * the connection pointer.
+ * Allocate heap memory. If the allocation fails, set the
+ * mallocFailed flag in the connection pointer.
  *
  * If db!=0 and db->mallocFailed is true (indicating a prior malloc
  * failure on the same database connection) then always return 0.
@@ -581,35 +518,19 @@ sqlDbMallocRaw(sql * db, u64 n)
 	if (db)
 		return sqlDbMallocRawNN(db, n);
 	p = sqlMalloc(n);
-	sqlMemdebugSetType(p, MEMTYPE_HEAP);
 	return p;
 }
 
 void *
 sqlDbMallocRawNN(sql * db, u64 n)
 {
-	LookasideSlot *pBuf;
-	assert(db != 0);
-	assert(db->pnBytesFreed == 0);
-	if (db->lookaside.bDisable == 0) {
-		assert(db->mallocFailed == 0);
-		if (n > db->lookaside.sz) {
-			db->lookaside.anStat[1]++;
-		} else if ((pBuf = db->lookaside.pFree) == 0) {
-			db->lookaside.anStat[2]++;
-		} else {
-			db->lookaside.pFree = pBuf->pNext;
-			db->lookaside.nOut++;
-			db->lookaside.anStat[0]++;
-			if (db->lookaside.nOut > db->lookaside.mxOut) {
-				db->lookaside.mxOut = db->lookaside.nOut;
-			}
-			return (void *)pBuf;
-		}
-	} else if (db->mallocFailed) {
-		return 0;
-	}
-	return dbMallocRawFinish(db, n);
+	assert(db != NULL && db->pnBytesFreed == NULL);
+	if (db->mallocFailed)
+		return NULL;
+	void *p = sqlMalloc(n);
+	if (p == NULL)
+		sqlOomFault(db);
+	return p;
 }
 
 /* Forward declaration */
@@ -625,8 +546,6 @@ sqlDbRealloc(sql * db, void *p, u64 n)
 	assert(db != 0);
 	if (p == 0)
 		return sqlDbMallocRawNN(db, n);
-	if (isLookaside(db, p) && n <= db->lookaside.sz)
-		return p;
 	return dbReallocFinish(db, p, n);
 }
 
@@ -637,27 +556,9 @@ dbReallocFinish(sql * db, void *p, u64 n)
 	assert(db != 0);
 	assert(p != 0);
 	if (db->mallocFailed == 0) {
-		if (isLookaside(db, p)) {
-			pNew = sqlDbMallocRawNN(db, n);
-			if (pNew) {
-				memcpy(pNew, p, db->lookaside.sz);
-				sqlDbFree(db, p);
-			}
-		} else {
-			assert(sqlMemdebugHasType
-			       (p, (MEMTYPE_LOOKASIDE | MEMTYPE_HEAP)));
-			assert(sqlMemdebugNoType
-			       (p, (u8) ~ (MEMTYPE_LOOKASIDE | MEMTYPE_HEAP)));
-			sqlMemdebugSetType(p, MEMTYPE_HEAP);
-			pNew = sql_realloc64(p, n);
-			if (!pNew) {
-				sqlOomFault(db);
-			}
-			sqlMemdebugSetType(pNew,
-					       (db->lookaside.bDisable ==
-						0 ? MEMTYPE_LOOKASIDE :
-						MEMTYPE_HEAP));
-		}
+		pNew = sql_realloc64(p, n);
+		if (!pNew)
+			sqlOomFault(db);
 	}
 	return pNew;
 }
@@ -719,17 +620,13 @@ sqlDbStrNDup(sql * db, const char *z, u64 n)
 
 /*
  * Call this routine to record the fact that an OOM (out-of-memory) error
- * has happened.  This routine will set db->mallocFailed, and also
- * temporarily disable the lookaside memory allocator and interrupt
- * any running VDBEs.
+ * has happened.  This routine will set db->mallocFailed.
  */
 void
 sqlOomFault(sql * db)
 {
-	if (db->mallocFailed == 0 && db->bBenignMalloc == 0) {
+	if (db->mallocFailed == 0 && db->bBenignMalloc == 0)
 		db->mallocFailed = 1;
-		db->lookaside.bDisable++;
-	}
 }
 
 /*
@@ -742,11 +639,8 @@ sqlOomFault(sql * db)
 void
 sqlOomClear(sql * db)
 {
-	if (db->mallocFailed && db->nVdbeExec == 0) {
+	if (db->mallocFailed && db->nVdbeExec == 0)
 		db->mallocFailed = 0;
-		assert(db->lookaside.bDisable > 0);
-		db->lookaside.bDisable--;
-	}
 }
 
 /*

@@ -1072,13 +1072,6 @@ jointest("join-12.6", 66, {1, 'The number of tables in a join 66 exceeds the lim
 jointest("join-12.7", 127, {1, 'The number of tables in a join 127 exceeds the limit (64)'})
 jointest("join-12.8", 128, {1, 'The number of tables in a join 128 exceeds the limit (64)'})
 jointest("join-12.9", 1000, {1, 'The number of tables in a join 1000 exceeds the limit (64)'})
--- If sql is built with sql_MEMDEBUG, then the huge number of realloc()
--- calls made by the following test cases are too time consuming to run.
--- Without sql_MEMDEBUG, realloc() is fast enough that these are not
--- a problem.
---if X(0, "X!capable", [["pragma&&compileoption_diags"]]) then
---    if X(703, "X!cmd", [=[["expr","[lsearch [db eval {PRAGMA compile_options}] MEMDEBUG]<0"]]=])
--- then
 jointest("join-12.10", 65534, {1, 'The number of tables in a join 65534 exceeds the limit (64)'})
 jointest("join-12.11", 65535, {1, 'The number of tables in a join 65535 exceeds the limit (64)'})
 jointest("join-12.12", 65536, {1, 'The number of tables in a join 65536 exceeds the limit (64)'})

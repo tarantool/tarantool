@@ -178,16 +178,13 @@
 #endif
 
 #if defined(SQL_SYSTEM_MALLOC) \
-  + defined(SQL_ZERO_MALLOC) \
-  + defined(SQL_MEMDEBUG)>1
+  + defined(SQL_ZERO_MALLOC) > 1
 #error "Two or more of the following compile-time configuration options\
  are defined but at most one is allowed:\
- SQL_SYSTEM_MALLOC, SQL_MEMDEBUG,\
- SQL_ZERO_MALLOC"
+ SQL_SYSTEM_MALLOC, SQL_ZERO_MALLOC"
 #endif
 #if defined(SQL_SYSTEM_MALLOC) \
-  + defined(SQL_ZERO_MALLOC) \
-  + defined(SQL_MEMDEBUG)==0
+  + defined(SQL_ZERO_MALLOC) == 0
 #define SQL_SYSTEM_MALLOC 1
 #endif
 
@@ -726,20 +723,6 @@ const char *
 sql_uri_parameter(const char *zFilename,
 		      const char *zParam);
 
-#define SQL_DBSTATUS_LOOKASIDE_USED       0
-#define SQL_DBSTATUS_CACHE_USED           1
-#define SQL_DBSTATUS_SCHEMA_USED          2
-#define SQL_DBSTATUS_STMT_USED            3
-#define SQL_DBSTATUS_LOOKASIDE_HIT        4
-#define SQL_DBSTATUS_LOOKASIDE_MISS_SIZE  5
-#define SQL_DBSTATUS_LOOKASIDE_MISS_FULL  6
-#define SQL_DBSTATUS_CACHE_HIT            7
-#define SQL_DBSTATUS_CACHE_MISS           8
-#define SQL_DBSTATUS_CACHE_WRITE          9
-#define SQL_DBSTATUS_DEFERRED_FKS        10
-#define SQL_DBSTATUS_CACHE_USED_SHARED   11
-#define SQL_DBSTATUS_MAX                 11	/* Largest defined DBSTATUS */
-
 const char *
 sql_sql(sql_stmt * pStmt);
 
@@ -1155,8 +1138,6 @@ typedef struct FuncDef FuncDef;
 typedef struct FuncDefHash FuncDefHash;
 typedef struct IdList IdList;
 typedef struct KeyClass KeyClass;
-typedef struct Lookaside Lookaside;
-typedef struct LookasideSlot LookasideSlot;
 typedef struct NameContext NameContext;
 typedef struct Parse Parse;
 typedef struct PrintfArguments PrintfArguments;
@@ -1198,41 +1179,6 @@ typedef int VList;
  * using the sql_limit() interface.
  */
 #define SQL_N_LIMIT (SQL_LIMIT_TRIGGER_DEPTH+1)
-
-/*
- * Lookaside malloc is a set of fixed-size buffers that can be used
- * to satisfy small transient memory allocation requests for objects
- * associated with a particular database connection.  The use of
- * lookaside malloc provides a significant performance enhancement
- * (approx 10%) by avoiding numerous malloc/free requests while parsing
- * SQL statements.
- *
- * The Lookaside structure holds configuration information about the
- * lookaside malloc subsystem.  Each available memory allocation in
- * the lookaside subsystem is stored on a linked list of LookasideSlot
- * objects.
- *
- * Lookaside allocations are only allowed for objects that are associated
- * with a particular database connection.  Hence, schema information cannot
- * be stored in lookaside because in shared cache mode the schema information
- * is shared by multiple database connections.  Therefore, while parsing
- * schema information, the Lookaside.bEnabled flag is cleared so that
- * lookaside allocations are not used to construct the schema objects.
- */
-struct Lookaside {
-	u32 bDisable;		/* Only operate the lookaside when zero */
-	u16 sz;			/* Size of each buffer in bytes */
-	u8 bMalloced;		/* True if pStart obtained from sql_malloc() */
-	int nOut;		/* Number of buffers currently checked out */
-	int mxOut;		/* Highwater mark for nOut */
-	int anStat[3];		/* 0: hits.  1: size misses.  2: full misses */
-	LookasideSlot *pFree;	/* List of available buffers */
-	void *pStart;		/* First byte of available memory space */
-	void *pEnd;		/* First byte past end of available space */
-};
-struct LookasideSlot {
-	LookasideSlot *pNext;	/* Next buffer in the list of free buffers */
-};
 
 /*
  * A hash table for built-in function definitions.  (Application-defined
@@ -1286,7 +1232,6 @@ struct sql {
 	void *pUpdateArg;
 	void (*xUpdateCallback) (void *, int, const char *, const char *,
 				 sql_int64);
-	Lookaside lookaside;	/* Lookaside malloc configuration */
 	Hash aFunc;		/* Hash table of connection functions */
 	int *pnBytesFreed;	/* If not NULL, increment this in DbFree() */
 };
@@ -2392,7 +2337,6 @@ struct Parse {
 	u8 isMultiWrite;	/* True if statement may modify/insert multiple rows */
 	u8 hasCompound;		/* Need to invoke convertCompoundSelectToSubquery() */
 	u8 okConstFactor;	/* OK to factor out constants */
-	u8 disableLookaside;	/* Number of times lookaside has been disabled */
 	u8 nColCache;		/* Number of entries in aColCache[] */
 	int nRangeReg;		/* Size of the temporary register block */
 	int iRangeReg;		/* First register in temporary register block */
@@ -2667,7 +2611,7 @@ struct TriggerStep {
  * do not necessarily know how big the string will be in the end.
  */
 struct StrAccum {
-	sql *db;		/* Optional database for lookaside.  Can be NULL */
+	sql *db;		/* Database for temporary buffers. */
 	char *zBase;		/* A base allocation.  Not from malloc. */
 	char *zText;		/* The string collected so far */
 	u32 nChar;		/* Length of the string so far */
@@ -2695,8 +2639,6 @@ struct sqlConfig {
 	int bUseCis;		/* Use covering indices for full-scans */
 	int mxStrlen;		/* Maximum string length */
 	int neverCorrupt;	/* Database is always well-formed */
-	int szLookaside;	/* Default lookaside buffer size */
-	int nLookaside;		/* Default lookaside buffer count */
 	int nStmtSpill;		/* Stmt-journal spill-to-disk threshold */
 	void *pHeap;		/* Heap storage space */
 	int nHeap;		/* Size of pHeap[] */
@@ -2829,7 +2771,6 @@ void *sqlDbReallocOrFree(sql *, void *, u64);
 void *sqlDbRealloc(sql *, void *, u64);
 void sqlDbFree(sql *, void *);
 int sqlMallocSize(void *);
-int sqlDbMallocSize(sql *, void *);
 void sqlBenignMallocHooks(void (*)(void), void (*)(void));
 int sqlHeapNearlyFull(void);
 
@@ -4697,47 +4638,6 @@ int sqlExprCheckHeight(Parse *, int);
 #ifdef SQL_DEBUG
 void sqlParserTrace(FILE *, char *);
 #endif
-
-/*
- * These routines are available for the mem2.c debugging memory allocator
- * only.  They are used to verify that different "types" of memory
- * allocations are properly tracked by the system.
- *
- * sqlMemdebugSetType() sets the "type" of an allocation to one of
- * the MEMTYPE_* macros defined below.  The type must be a bitmask with
- * a single bit set.
- *
- * sqlMemdebugHasType() returns true if any of the bits in its second
- * argument match the type set by the previous sqlMemdebugSetType().
- * sqlMemdebugHasType() is intended for use inside assert() statements.
- *
- * sqlMemdebugNoType() returns true if none of the bits in its second
- * argument match the type set by the previous sqlMemdebugSetType().
- *
- * Perhaps the most important point is the difference between MEMTYPE_HEAP
- * and MEMTYPE_LOOKASIDE.  If an allocation is MEMTYPE_LOOKASIDE, that means
- * it might have been allocated by lookaside, except the allocation was
- * too large or lookaside was already full.  It is important to verify
- * that allocations that might have been satisfied by lookaside are not
- * passed back to non-lookaside free() routines.  Asserts such as the
- * example above are placed on the non-lookaside free() routines to verify
- * this constraint.
- *
- * All of this is no-op for a production build.  It only comes into
- * play when the sql_MEMDEBUG compile-time option is used.
- */
-#ifdef SQL_MEMDEBUG
-void sqlMemdebugSetType(void *, u8);
-int sqlMemdebugHasType(void *, u8);
-int sqlMemdebugNoType(void *, u8);
-#else
-#define sqlMemdebugSetType(X,Y)	/* no-op */
-#define sqlMemdebugHasType(X,Y)  1
-#define sqlMemdebugNoType(X,Y)   1
-#endif
-#define MEMTYPE_HEAP       0x01	/* General heap allocations */
-#define MEMTYPE_LOOKASIDE  0x02	/* Heap that might have been lookaside */
-
 
 int sqlExprVectorSize(Expr * pExpr);
 int sqlExprIsVector(Expr * pExpr);
