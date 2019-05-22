@@ -1077,6 +1077,18 @@ swim_begin_step(struct ev_loop *loop, struct ev_timer *t, int events)
 	(void) events;
 	(void) loop;
 	struct swim *swim = (struct swim *) t->data;
+	/*
+	 * There are possible false-positive wakeups. They can
+	 * appear, when a round task was scheduled, but event
+	 * loop was too busy to send the task, and the timer
+	 * alarms again. In such a case stop it - it makes no
+	 * sense to waste time on idle wakeups. Completion
+	 * callback will restart the timer.
+	 */
+	if (swim_task_is_scheduled(&swim->round_step_task)) {
+		swim_ev_timer_stop(loop, t);
+		return;
+	}
 	if (! rlist_empty(&swim->round_queue))
 		say_verbose("SWIM %d: continue the round", swim_fd(swim));
 	else
@@ -1084,8 +1096,10 @@ swim_begin_step(struct ev_loop *loop, struct ev_timer *t, int events)
 	/*
 	 * Possibly empty, if no members but self are specified.
 	 */
-	if (rlist_empty(&swim->round_queue))
+	if (rlist_empty(&swim->round_queue)) {
+		swim_ev_timer_stop(loop, t);
 		return;
+	}
 	swim_encode_round_msg(swim);
 	struct swim_member *m =
 		rlist_first_entry(&swim->round_queue, struct swim_member,
@@ -1104,6 +1118,10 @@ swim_complete_step(struct swim_task *task,
 	(void) rc;
 	(void) task;
 	struct swim *swim = swim_by_scheduler(scheduler);
+	/*
+	 * It could be stopped by the step begin function, if the
+	 * sending was too long.
+	 */
 	swim_ev_timer_again(loop(), &swim->round_tick);
 	/*
 	 * It is possible that the original member was deleted

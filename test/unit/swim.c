@@ -933,10 +933,27 @@ swim_test_encryption(void)
 	swim_finish_test();
 }
 
+static void
+swim_test_slow_net(void)
+{
+	swim_start_test(0);
+	struct swim_cluster *cluster = swim_cluster_new(2);
+	swim_cluster_interconnect(cluster, 0, 1);
+	swim_cluster_block_io(cluster, 0);
+	swim_cluster_block_io(cluster, 1);
+
+	note("slow network leads to idle round steps, they should not produce "\
+	     "a new message");
+	swim_run_for(5);
+
+	swim_cluster_delete(cluster);
+	swim_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	swim_start_test(19);
+	swim_start_test(20);
 
 	(void) ap;
 	swim_test_ev_init();
@@ -961,6 +978,7 @@ main_f(va_list ap)
 	swim_test_payload_refutation();
 	swim_test_indirect_ping();
 	swim_test_encryption();
+	swim_test_slow_net();
 
 	swim_test_transport_free();
 	swim_test_ev_free();

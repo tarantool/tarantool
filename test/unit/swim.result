@@ -1,5 +1,5 @@
 	*** main_f ***
-1..19
+1..20
 	*** swim_test_one_link ***
     1..6
     ok 1 - no rounds - no fullmesh
@@ -195,4 +195,9 @@ ok 18 - subtests
     ok 3 - cluster works after encryption has been disabled
 ok 19 - subtests
 	*** swim_test_encryption: done ***
+	*** swim_test_slow_net ***
+    1..0
+    # slow network leads to idle round steps, they should not produce a new message
+ok 20 - subtests
+	*** swim_test_slow_net: done ***
 	*** main_f: done ***

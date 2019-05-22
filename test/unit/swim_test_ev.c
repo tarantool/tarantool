@@ -177,18 +177,24 @@ swim_timer_event_delete(struct swim_event *e)
 	free(te);
 }
 
+/** Create a new timer event. */
+static void
+swim_timer_event_new(struct ev_watcher *watcher, double delay);
+
 /** Process a timer event and delete it. */
 static void
 swim_timer_event_process(struct swim_event *e, struct ev_loop *loop)
 {
 	assert(e->type == SWIM_EVENT_TIMER);
 	struct ev_watcher *w = ((struct swim_timer_event *) e)->watcher;
+	struct ev_timer *t = (struct ev_timer *) w;
 	swim_timer_event_delete(e);
-	((struct ev_timer *) w)->at = 0;
+	t->at = 0;
+	if (t->repeat > 0)
+		swim_timer_event_new(w, t->repeat);
 	ev_invoke(loop, w, EV_TIMER);
 }
 
-/** Create a new timer event. */
 static void
 swim_timer_event_new(struct ev_watcher *watcher, double delay)
 {
