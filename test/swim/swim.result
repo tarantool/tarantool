@@ -236,16 +236,8 @@ s1:broadcast(listen_port)
 ---
 - true
 ...
-while s2:size() ~= 2 do fiber.sleep(0.01) end
+while s2:size() ~= 2 or s1:size() ~= 2 do fiber.sleep(0.01) s1:broadcast(listen_port) end
 ---
-...
-s1:size()
----
-- 2
-...
-s2:size()
----
-- 2
 ...
 s2:delete()
 ---
@@ -263,11 +255,10 @@ s1:remove_member('1234')
 ---
 - error: 'builtin/swim.lua:<line>: swim:remove_member: invalid UUID'
 ...
-s1:remove_member(uuid(2))
+s1:remove_member(uuid(2)) size = s1:size()
 ---
-- true
 ...
-s1:size()
+size
 ---
 - 1
 ...
@@ -293,9 +284,8 @@ s1:add_member({uuid = uuid(2)})
 - null
 - 'swim.add_member: URI and UUID are mandatory'
 ...
-s1:add_member({uri = listen_uri, uuid = uuid(2)})
+s1:remove_member(uuid(2)) s1:add_member({uri = listen_uri, uuid = uuid(2)})
 ---
-- true
 ...
 s1:add_member({uri = listen_uri, uuid = uuid(2)})
 ---
@@ -306,15 +296,14 @@ s1:size()
 ---
 - 2
 ...
-s1:cfg({uuid = uuid(3)})
+s1:cfg({uuid = uuid(3)}) old_self = s1:member_by_uuid(uuid(1))
 ---
-- true
 ...
 s1:self():uuid()
 ---
 - 00000000-0000-1000-8000-000000000003
 ...
-s1:member_by_uuid(uuid(1))
+old_self
 ---
 - uri: 127.0.0.1:<port>
   status: left
@@ -848,13 +837,11 @@ s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01})
 s1_self = s1:self()
 ---
 ...
-s1:add_member({uuid = s2:self():uuid(), uri = s2:self():uri()})
+_ = s1:add_member({uuid = s2:self():uuid(), uri = s2:self():uri()})
 ---
-- true
 ...
-s2:add_member({uuid = s1_self:uuid(), uri = s1_self:uri()})
+_ = s2:add_member({uuid = s1_self:uuid(), uri = s1_self:uri()})
 ---
-- true
 ...
 s1:size()
 ---
