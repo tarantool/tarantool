@@ -966,3 +966,33 @@ box.execute('SELECT ?', {true})
   rows:
   - [true]
 ...
+-- gh-4187: make sure that value passsed to the iterator has
+-- the same type as indexed fields.
+--
+box.execute("CREATE TABLE tboolean (s1 BOOLEAN PRIMARY KEY);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO tboolean VALUES (TRUE);")
+---
+- row_count: 1
+...
+box.execute("SELECT * FROM tboolean WHERE s1 = x'44';")
+---
+- error: 'Type mismatch: can not convert D to boolean'
+...
+box.execute("SELECT * FROM tboolean WHERE s1 = 'abc';")
+---
+- error: 'Type mismatch: can not convert abc to boolean'
+...
+box.execute("SELECT * FROM tboolean WHERE s1 = 1;")
+---
+- error: 'Type mismatch: can not convert INTEGER to boolean'
+...
+box.execute("SELECT * FROM tboolean WHERE s1 = 1.123;")
+---
+- error: 'Type mismatch: can not convert REAL to boolean'
+...
+box.space.TBOOLEAN:drop()
+---
+...

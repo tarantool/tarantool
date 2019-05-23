@@ -234,3 +234,15 @@ box.execute('SELECT \'9223372036854\' + 1;')
 
 -- Fix BOOLEAN bindings.
 box.execute('SELECT ?', {true})
+
+-- gh-4187: make sure that value passsed to the iterator has
+-- the same type as indexed fields.
+--
+box.execute("CREATE TABLE tboolean (s1 BOOLEAN PRIMARY KEY);")
+box.execute("INSERT INTO tboolean VALUES (TRUE);")
+box.execute("SELECT * FROM tboolean WHERE s1 = x'44';")
+box.execute("SELECT * FROM tboolean WHERE s1 = 'abc';")
+box.execute("SELECT * FROM tboolean WHERE s1 = 1;")
+box.execute("SELECT * FROM tboolean WHERE s1 = 1.123;")
+
+box.space.TBOOLEAN:drop()

@@ -637,18 +637,8 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
  *
  * Before returning, @types is set to point to a buffer containing a
  * copy of the column types array of the index allocated using
- * sqlDbMalloc(). Except, entries in the copy of the string associated
- * with equality constraints that use SCALAR type are set to
- * SCALAR. This is to deal with SQL such as the following:
- *
- *   CREATE TABLE t1(a TEXT PRIMARY KEY, b BLOB);
- *   SELECT ... FROM t1 AS t2, t1 WHERE t1.a = t2.b;
- *
- * In the example above, the index on t1(a) has STRING type. But since
- * the right hand side of the equality constraint (t2.b) has SCALAR type,
- * no conversion should be attempted before using a t2.b value as part of
- * a key to search the index. Hence the first byte in the returned type
- * string in this example would be set to SCALAR.
+ * sqlDbMalloc(). This array is passed to OP_ApplyType to provide
+ * correct implicit conversions.
  */
 static int
 codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
@@ -740,16 +730,6 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 				sqlVdbeAddOp2(v, OP_IsNull, regBase + j,
 						  pLevel->addrBrk);
 				VdbeCoverage(v);
-			}
-			if (type != NULL) {
-				enum field_type rhs_type =
-					sql_expr_type(pRight);
-				if (sql_type_result(rhs_type, type[j]) ==
-				    FIELD_TYPE_SCALAR) {
-					type[j] = FIELD_TYPE_SCALAR;
-				}
-				if (sql_expr_needs_no_type_change(pRight, type[j]))
-					type[j] = FIELD_TYPE_SCALAR;
 			}
 		}
 	}
