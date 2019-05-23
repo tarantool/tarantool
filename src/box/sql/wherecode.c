@@ -1048,31 +1048,80 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			start_constraints = 1;
 		}
 		struct index_def *idx_pk = space->index[0]->def;
-		int fieldno = idx_pk->key_def->parts[0].fieldno;
-
 		uint32_t pk_part_count = idx_pk->key_def->part_count;
-		if (pk_part_count == 1 &&
-		    space->def->fields[fieldno].type == FIELD_TYPE_INTEGER) {
-			/* Right now INTEGER PRIMARY KEY is the only option to
-			 * get Tarantool's INTEGER column type. Need special handling
-			 * here: try to loosely convert FLOAT to INT. If RHS type
-			 * is not INT or FLOAT - skip this ites, i.e. goto addrNxt.
-			 */
-			int limit = pRangeStart == NULL ? nEq : nEq + 1;
-			for (int i = 0; i < limit; i++) {
-				if (idx_def->key_def->parts[i].fieldno ==
-				    idx_pk->key_def->parts[0].fieldno) {
-					/* Here: we know for sure that table has INTEGER
-					   PRIMARY KEY, single column, and Index we're
-					   trying to use for scan contains this column. */
-					if (i < nEq)
-						sqlVdbeAddOp2(v, OP_MustBeInt, regBase + i, addrNxt);
-					else
-						force_integer_reg = regBase + i;
-					break;
-				}
+		/*
+		 * Tarantool's iterator over integer fields doesn't
+		 * tolerate floating point values. Hence, if term
+		 * is equality comparison and value of operand is
+		 * not integer, we can skip it since it always
+		 * results in false: INT a == 0.5 -> false;
+		 * It is done using OP_MustBeInt facilities.
+		 * In case term is greater comparison (a > ?), we
+		 * should notify OP_SeekGT to process truncation of
+		 * floating point value: a > 0.5 -> a >= 1;
+		 * It is done by setting P5 flag for OP_Seek*.
+		 * It is worth mentioning that we do not need
+		 * this step when it comes for less (<) comparison
+		 * of nullable field. Key is NULL in this case:
+		 * values are ordered as  NULL, ... NULL, min_value,
+		 * so to fetch min value we pass NULL to GT iterator.
+		 * The only exception is less comparison in
+		 * conjunction with ORDER BY DESC clause:
+		 * in such situation we use LE iterator and
+		 * truncated value to compare. But then
+		 * pRangeStart == NULL.
+		 * This procedure is correct for compound index:
+		 * only one comparison of less/greater type can be
+		 * used at the same time. For instance,
+		 * a < 1.5 AND b > 0.5 is handled by SeekGT using
+		 * column a and fetching column b from tuple and
+		 * OP_Le comparison.
+		 *
+		 * Note that OP_ApplyType, which is emitted before
+		 * OP_Seek** doesn't truncate floating point to
+		 * integer. That's why we need this routine.
+		 * Also, note that terms are separated by OR
+		 * predicates, so we consider term as sequence
+		 * of AND'ed predicates.
+		 */
+		size_t addrs_sz = sizeof(int) * nEq;
+		int *seek_addrs = region_alloc(&pParse->region, addrs_sz);
+		if (seek_addrs == NULL) {
+			diag_set(OutOfMemory, addrs_sz, "region", "seek_addrs");
+			pParse->is_aborted = true;
+			return 0;
+		}
+		memset(seek_addrs, 0, addrs_sz);
+		for (int i = 0; i < nEq; i++) {
+			enum field_type type = idx_def->key_def->parts[i].type;
+			if (type == FIELD_TYPE_INTEGER ||
+			    type == FIELD_TYPE_UNSIGNED) {
+				/*
+				 * OP_MustBeInt consider NULLs as
+				 * non-integer values, so firstly
+				 * check whether value is NULL or not.
+				 */
+				seek_addrs[i] = sqlVdbeAddOp1(v, OP_IsNull,
+							      regBase);
+				sqlVdbeAddOp2(v, OP_MustBeInt, regBase + i,
+					      addrNxt);
+				start_types[i] = FIELD_TYPE_SCALAR;
+				/*
+				 * We need to notify column cache
+				 * that type of value may change
+				 * so we should fetch value from
+				 * tuple again rather then copy
+				 * from register.
+				 */
+				sql_expr_type_cache_change(pParse, regBase + i,
+							   1);
 			}
 		}
+		/* Inequality constraint comes always at the end of list. */
+		enum field_type ineq_type = idx_def->key_def->parts[nEq].type;
+		if (pRangeStart != NULL && (ineq_type == FIELD_TYPE_INTEGER ||
+					    ineq_type == FIELD_TYPE_UNSIGNED))
+			force_integer_reg = regBase + nEq;
 		emit_apply_type(pParse, regBase, nConstraint - bSeekPastNull,
 				start_types);
 		if (pLoop->nSkip > 0 && nConstraint == pLoop->nSkip) {
@@ -1084,6 +1133,10 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			op = aStartOp[(start_constraints << 2) +
 				      (startEq << 1) + bRev];
 			assert(op != 0);
+			for (uint32_t i = 0; i < nEq; ++i) {
+				if (seek_addrs[i] != 0)
+					sqlVdbeJumpHere(v, seek_addrs[i]);
+			}
 			sqlVdbeAddOp4Int(v, op, iIdxCur, addrNxt, regBase,
 					     nConstraint);
 			/* If this is Seek* opcode, and IPK is detected in the

@@ -246,3 +246,33 @@ box.execute("SELECT * FROM tboolean WHERE s1 = 1;")
 box.execute("SELECT * FROM tboolean WHERE s1 = 1.123;")
 
 box.space.TBOOLEAN:drop()
+
+box.execute("CREATE TABLE t1(id INT PRIMARY KEY, a INT UNIQUE);")
+box.execute("INSERT INTO t1 VALUES (1, 1);")
+box.execute("SELECT a FROM t1 WHERE a IN (1.1, 2.1);")
+box.execute("SELECT a FROM t1 WHERE a = 1.1;")
+box.execute("SELECT a FROM t1 WHERE a = 1.0;")
+box.execute("SELECT a FROM t1 WHERE a > 1.1;")
+box.execute("SELECT a FROM t1 WHERE a < 1.1;")
+
+box.space.T1:drop()
+
+box.execute("CREATE TABLE t1(id INT PRIMARY KEY, a INT, b INT);")
+box.execute("CREATE INDEX i1 ON t1(a, b);")
+box.execute("INSERT INTO t1 VALUES (1, 1, 1);")
+box.execute("SELECT a FROM t1 WHERE a = 1.0 AND b > 0.5;")
+box.execute("SELECT a FROM t1 WHERE a = 1.5 AND b IS NULL;")
+box.execute("SELECT a FROM t1 WHERE a IS NULL AND b IS NULL;")
+
+box.space.T1:drop()
+
+format = {}
+format[1] = { name = 'ID', type = 'unsigned' }
+format[2] = { name = 'A', type = 'unsigned' }
+s = box.schema.create_space('T1', { format = format })
+_ = s:create_index('pk')
+_ = s:create_index('sk', { parts = { 'A' } })
+s:insert({ 1, 1 })
+box.execute("SELECT a FROM t1 WHERE a IN (1.1, 2.1);")
+
+s:drop()

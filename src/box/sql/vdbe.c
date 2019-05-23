@@ -3195,8 +3195,10 @@ case OP_Close: {
  * from the beginning toward the end.  In other words, the cursor is
  * configured to use Next, not Prev.
  *
- * If P5 is not zero, than it is offset of IPK in input vector. Force
- * corresponding value to be INTEGER.
+ * If P5 is not zero, than it is offset of integer fields in input
+ * vector. Force corresponding value to be INTEGER, in case it
+ * is floating point value. Alongside with that, type of
+ * iterator may be changed: a > 1.5 -> a >= 2.
  *
  * See also: Found, NotFound, SeekLt, SeekGt, SeekLe
  */
@@ -3216,10 +3218,10 @@ case OP_Close: {
  * from the beginning toward the end.  In other words, the cursor is
  * configured to use Next, not Prev.
  *
- * If P5 is not zero, than it is offset of IPK in input vector. Force
- * corresponding value to be INTEGER.
+ * If P5 is not zero, than it is offset of integer fields in input
+ * vector. Force corresponding value to be INTEGER.
  *
- * See also: Found, NotFound, SeekLt, SeekGe, SeekLe
+ * P5 has the same meaning as for SeekGE.
  */
 /* Opcode: SeekLT P1 P2 P3 P4 P5
  * Synopsis: key=r[P3@P4]
@@ -3237,8 +3239,7 @@ case OP_Close: {
  * from the end toward the beginning.  In other words, the cursor is
  * configured to use Prev, not Next.
  *
- * If P5 is not zero, than it is offset of IPK in input vector. Force
- * corresponding value to be INTEGER.
+ * P5 has the same meaning as for SeekGE.
  *
  * See also: Found, NotFound, SeekGt, SeekGe, SeekLe
  */
@@ -3265,6 +3266,8 @@ case OP_Close: {
  * The IdxGE opcode will be skipped if this opcode succeeds, but the
  * IdxGE opcode will be used on subsequent loop iterations.
  *
+ * P5 has the same meaning as for SeekGE.
+ *
  * See also: Found, NotFound, SeekGt, SeekGe, SeekLt
  */
 case OP_SeekLT:         /* jump, in3 */
@@ -3278,7 +3281,6 @@ case OP_SeekGT: {       /* jump, in3 */
 	int nField;        /* Number of columns or fields in the key */
 	i64 iKey;          /* The id we are to seek to */
 	int eqOnly;        /* Only interested in == results */
-	int reg_ipk=0;     /* Register number which holds IPK. */
 
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
 	assert(pOp->p2!=0);
@@ -3296,15 +3298,22 @@ case OP_SeekGT: {       /* jump, in3 */
 	pC->seekOp = pOp->opcode;
 #endif
 	iKey = 0;
-	reg_ipk = pOp->p5;
+	/*
+	 * In case floating value is intended to be passed to
+	 * iterator over integer field, we must truncate it to
+	 * integer value and change type of iterator:
+	 * a > 1.5 -> a >= 2
+	 */
+	int int_field = pOp->p5;
 
-	if (reg_ipk > 0) {
-
+	if (int_field > 0) {
 		/* The input value in P3 might be of any type: integer, real, string,
 		 * blob, or NULL.  But it needs to be an integer before we can do
 		 * the seek, so convert it.
 		 */
-		pIn3 = &aMem[reg_ipk];
+		pIn3 = &aMem[int_field];
+		if ((pIn3->flags & MEM_Null) != 0)
+			goto skip_truncate;
 		if ((pIn3->flags & (MEM_Int|MEM_Real|MEM_Str))==MEM_Str) {
 			mem_apply_numeric_type(pIn3);
 		}
@@ -3362,6 +3371,7 @@ case OP_SeekGT: {       /* jump, in3 */
 			}
 		}
 	}
+skip_truncate:
 	/*
 	 * For a cursor with the OPFLAG_SEEKEQ hint, only the
 	 * OP_SeekGE and OP_SeekLE opcodes are allowed, and these
@@ -3384,9 +3394,9 @@ case OP_SeekGT: {       /* jump, in3 */
 	r.key_def = pC->key_def;
 	r.nField = (u16)nField;
 
-	if (reg_ipk > 0) {
-		aMem[reg_ipk].u.i = iKey;
-		aMem[reg_ipk].flags = MEM_Int;
+	if (int_field > 0) {
+		aMem[int_field].u.i = iKey;
+		aMem[int_field].flags = MEM_Int;
 	}
 
 	r.default_rc = ((1 & (oc - OP_SeekLT)) ? -1 : +1);
