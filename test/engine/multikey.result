@@ -29,6 +29,10 @@ _ = s:create_index('idx2', {parts = {{3, 'str', path = '[*].fname'}, {3, 'str', 
 - error: 'Wrong index options (field 2): no more than one array index placeholder
     [*] is allowed in JSON path'
 ...
+_ = s:create_index('idx2', {parts = {{2, 'str', path = '[*]'}, {3, 'str', path = '[*]'}}})
+---
+- error: 'Wrong index options (field 2): incompatable multikey index path'
+...
 idx0 = s:create_index('idx0', {parts = {{3, 'str', path = '[1].fname'}}})
 ---
 ...

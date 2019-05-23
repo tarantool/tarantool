@@ -11,6 +11,7 @@ pk = s:create_index('pk')
 -- Test incompatible multikey index parts.
 _ = s:create_index('idx3', {parts = {{3, 'str', path = '[*].fname'}, {3, 'str', path = '["data"][*].sname'}}})
 _ = s:create_index('idx2', {parts = {{3, 'str', path = '[*].fname'}, {3, 'str', path = '[*].sname[*].a'}}})
+_ = s:create_index('idx2', {parts = {{2, 'str', path = '[*]'}, {3, 'str', path = '[*]'}}})
 idx0 = s:create_index('idx0', {parts = {{3, 'str', path = '[1].fname'}}})
 _ = s:create_index('idx', {parts = {{3, 'str', path = '[*].fname'}, {3, 'str', path = '[*].sname'}}})
 idx0:drop()

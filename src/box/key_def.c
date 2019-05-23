@@ -181,7 +181,8 @@ key_def_set_part_path(struct key_def *def, uint32_t part_no, const char *path,
 		def->multikey_path = part->path;
 		def->multikey_fieldno = part->fieldno;
 		def->multikey_path_len = (uint32_t) multikey_path_len;
-	} else if (json_path_cmp(path, multikey_path_len, def->multikey_path,
+	} else if (def->multikey_fieldno != part->fieldno ||
+		   json_path_cmp(path, multikey_path_len, def->multikey_path,
 				 def->multikey_path_len,
 				 TUPLE_INDEX_BASE) != 0) {
 		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
