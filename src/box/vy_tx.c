@@ -629,6 +629,23 @@ vy_tx_handle_deferred_delete(struct vy_tx *tx, struct txv *v)
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
 		struct vy_entry entry;
 		vy_stmt_foreach_entry(entry, delete_stmt, lsm->cmp_def) {
+			struct txv *other = write_set_search_key(&tx->write_set,
+								 lsm, entry);
+			if (other != NULL && !other->is_overwritten) {
+				/*
+				 * The write set contains a statement
+				 * for the key to be deleted. This can
+				 * only occur if it's a REPLACE that
+				 * happens not to update the secondary
+				 * index key parts. It's safe to skip it,
+				 * see vy_tx_set_entry().
+				 */
+				assert(vy_stmt_type(stmt) == IPROTO_REPLACE);
+				assert(vy_stmt_type(other->entry.stmt) ==
+								IPROTO_REPLACE);
+				other->is_nop = true;
+				continue;
+			}
 			struct txv *delete_txv = txv_new(tx, lsm, entry);
 			if (delete_txv == NULL) {
 				rc = -1;
@@ -717,6 +734,7 @@ vy_tx_prepare(struct vy_tx *tx)
 			 * to the primary index LSM tree. So we must
 			 * skip it for secondary indexes as well.
 			 */
+			v->is_overwritten = true;
 			continue;
 		}
 
