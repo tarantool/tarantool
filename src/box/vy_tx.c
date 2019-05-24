@@ -1092,6 +1092,16 @@ vy_tx_set_entry(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 		write_set_remove(&tx->write_set, old);
 		old->is_overwritten = true;
 		v->is_first_insert = old->is_first_insert;
+		/*
+		 * Inherit VY_STMT_DEFERRED_DELETE flag from the older
+		 * statement so as to generate a DELETE for the tuple
+		 * overwritten by this transaction.
+		 */
+		if (vy_stmt_flags(old->entry.stmt) & VY_STMT_DEFERRED_DELETE) {
+			uint8_t flags = vy_stmt_flags(entry.stmt);
+			vy_stmt_set_flags(entry.stmt, flags |
+					  VY_STMT_DEFERRED_DELETE);
+		}
 	}
 
 	if (old == NULL && vy_stmt_type(entry.stmt) == IPROTO_INSERT)
