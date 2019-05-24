@@ -287,8 +287,8 @@ fk_constraint_lookup_parent(struct Parse *parse_context, struct space *parent,
 		assert(incr_count == 1);
 		const char *err = tt_sprintf(tnt_errcode_desc(ER_SQL_EXECUTE),
 					     "FOREIGN KEY constraint failed");
-		sqlVdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR, 0,
-			      ER_SQL_EXECUTE, err, P4_STATIC);
+		sqlVdbeAddOp4(v, OP_Halt, -1, 0, ER_SQL_EXECUTE, err,
+			      P4_STATIC);
 	} else {
 		sqlVdbeAddOp2(v, OP_FkCounter, fk_def->is_deferred,
 				  incr_count);

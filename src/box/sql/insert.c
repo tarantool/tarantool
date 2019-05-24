@@ -810,7 +810,7 @@ vdbe_emit_ck_constraint(struct Parse *parser, struct Expr *expr,
 	sqlExprIfTrue(parser, expr, check_is_passed, SQL_JUMPIFNULL);
 	const char *fmt = tnt_errcode_desc(ER_CK_CONSTRAINT_FAILED);
 	const char *error_msg = tt_sprintf(fmt, ck_constraint_name, expr_str);
-	sqlVdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR, ON_CONFLICT_ACTION_ABORT,
+	sqlVdbeAddOp4(v, OP_Halt, -1, ON_CONFLICT_ACTION_ABORT,
 		      0, sqlDbStrDup(parser->db, error_msg), P4_DYNAMIC);
 	sqlVdbeChangeP5(v, ER_CK_CONSTRAINT_FAILED);
 	VdbeNoopComment((v, "END: ck constraint %s test", ck_constraint_name));
@@ -863,9 +863,8 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct space *space,
 						    "failed: %s.%s", def->name,
 						    def->fields[i].name));
 			addr = sqlVdbeAddOp1(v, OP_NotNull, new_tuple_reg + i);
-			sqlVdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR,
-				      on_conflict_nullable, ER_SQL_EXECUTE,
-				      err, P4_STATIC);
+			sqlVdbeAddOp4(v, OP_Halt, -1, on_conflict_nullable,
+				      ER_SQL_EXECUTE, err, P4_STATIC);
 			sqlVdbeJumpHere(v, addr);
 			break;
 		case ON_CONFLICT_ACTION_IGNORE:

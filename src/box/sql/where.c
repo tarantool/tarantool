@@ -2779,7 +2779,7 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		if (key_def == NULL) {
 tnt_error:
 			pWInfo->pParse->is_aborted = true;
-			return SQL_TARANTOOL_ERROR;
+			return -1;
 		}
 
 		struct index_opts opts;

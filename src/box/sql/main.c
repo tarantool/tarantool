@@ -241,7 +241,7 @@ sqlCreateFunc(sql * db,
 	    (255 < (sqlStrlen30(zFunctionName)))) {
 		diag_set(ClientError, ER_CREATE_FUNCTION, zFunctionName,
 			 "wrong function definition");
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	}
 
 	assert(SQL_FUNC_CONSTANT == SQL_DETERMINISTIC);
@@ -259,7 +259,7 @@ sqlCreateFunc(sql * db,
 			diag_set(ClientError, ER_CREATE_FUNCTION, zFunctionName,
 				 "unable to create function due to active "\
 				 "statements");
-			return SQL_TARANTOOL_ERROR;
+			return -1;
 		} else {
 			sqlExpirePreparedStatements(db);
 		}
@@ -268,7 +268,7 @@ sqlCreateFunc(sql * db,
 	p = sqlFindFunction(db, zFunctionName, nArg, 1);
 	assert(p || db->mallocFailed);
 	if (p == NULL)
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 
 	/* If an older version of the function with a configured destructor is
 	 * being replaced invoke the destructor function here.

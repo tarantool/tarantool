@@ -4347,9 +4347,8 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			const char *err =
 				tt_sprintf(tnt_errcode_desc(ER_SQL_EXECUTE),
 					   pExpr->u.zToken);
-			sqlVdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR,
-				      pExpr->on_conflict_action, ER_SQL_EXECUTE,
-				      err, 0);
+			sqlVdbeAddOp4(v, OP_Halt, -1, pExpr->on_conflict_action,
+				      ER_SQL_EXECUTE, err, 0);
 		}
 		break;
 	}

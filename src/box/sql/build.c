@@ -141,7 +141,7 @@ sql_finish_coding(struct Parse *parse_context)
 			sqlVdbeChangeP2(v, record->insertion_opcode,
 					    v->nOp);
 		}
-		sqlVdbeAddOp1(v, OP_Halt, SQL_TARANTOOL_ERROR);
+		sqlVdbeAddOp1(v, OP_Halt, -1);
 		VdbeComment((v,
 			     "Exit with an error if CREATE statement fails"));
 	}
@@ -3283,8 +3283,8 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
 	if (no_error) {
 		sqlVdbeAddOp0(v, OP_Halt);
 	} else {
-		sqlVdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR, 0,
-			      tarantool_error_code, error, P4_DYNAMIC);
+		sqlVdbeAddOp4(v, OP_Halt, -1, 0, tarantool_error_code, error,
+			      P4_DYNAMIC);
 	}
 	sqlVdbeAddOp1(v, OP_Close, cursor);
 	return 0;

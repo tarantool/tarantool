@@ -172,7 +172,7 @@ const void *tarantoolsqlPayloadFetch(BtCursor *pCur, u32 *pAmt)
 int tarantoolsqlFirst(BtCursor *pCur, int *pRes)
 {
 	if (key_alloc(pCur, sizeof(nil_key)) != 0)
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	memcpy(pCur->key, nil_key, sizeof(nil_key));
 	pCur->iter_type = ITER_GE;
 	return cursor_seek(pCur, pRes);
@@ -182,7 +182,7 @@ int tarantoolsqlFirst(BtCursor *pCur, int *pRes)
 int tarantoolsqlLast(BtCursor *pCur, int *pRes)
 {
 	if (key_alloc(pCur, sizeof(nil_key)) != 0)
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	memcpy(pCur->key, nil_key, sizeof(nil_key));
 	pCur->iter_type = ITER_LE;
 	return cursor_seek(pCur, pRes);
@@ -230,9 +230,9 @@ int tarantoolsqlMovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
 		sql_vdbe_mem_encode_tuple(pIdxKey->aMem, pIdxKey->nField,
 					  &tuple_size, region);
 	if (tuple == NULL)
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	if (key_alloc(pCur, tuple_size) != 0)
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	memcpy(pCur->key, tuple, tuple_size);
 	region_truncate(region, used);
 
@@ -382,9 +382,7 @@ int tarantoolsqlEphemeralInsert(struct space *space, const char *tuple,
 {
 	assert(space != NULL);
 	mp_tuple_assert(tuple, tuple_end);
-	if (space_ephemeral_replace(space, tuple, tuple_end) != 0)
-		return SQL_TARANTOOL_ERROR;
-	return 0;
+	return space_ephemeral_replace(space, tuple, tuple_end);
 }
 
 /* Simply delete ephemeral space by calling space_delete(). */
@@ -409,8 +407,7 @@ insertOrReplace(struct space *space, const char *tuple, const char *tuple_end,
 	request.space_id = space->def->id;
 	request.type = type;
 	mp_tuple_assert(request.tuple, request.tuple_end);
-	int rc = box_process_rw(&request, space, NULL);
-	return rc == 0 ? 0 : SQL_TARANTOOL_ERROR;
+	return box_process_rw(&request, space, NULL);
 }
 
 int tarantoolsqlInsert(struct space *space, const char *tuple,
@@ -431,7 +428,7 @@ int tarantoolsqlReplace(struct space *space, const char *tuple,
  *
  * @param pCur Cursor pointing to ephemeral space.
  *
- * @retval 0 on success, SQL_TARANTOOL_ERROR otherwise.
+ * @retval 0 on success, -1 otherwise.
  */
 int tarantoolsqlEphemeralDelete(BtCursor *pCur)
 {
@@ -445,12 +442,12 @@ int tarantoolsqlEphemeralDelete(BtCursor *pCur)
 				pCur->iter->index->def->key_def,
 				MULTIKEY_NONE, &key_size);
 	if (key == NULL)
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 
 	int rc = space_ephemeral_delete(pCur->space, key);
 	if (rc != 0) {
 		diag_log();
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	}
 	return 0;
 }
@@ -465,17 +462,14 @@ int tarantoolsqlDelete(BtCursor *pCur, u8 flags)
 
 	char *key;
 	uint32_t key_size;
-	int rc;
 
 	key = tuple_extract_key(pCur->last_tuple,
 				pCur->iter->index->def->key_def,
 				MULTIKEY_NONE, &key_size);
 	if (key == NULL)
-		return SQL_TARANTOOL_ERROR;
-	rc = sql_delete_by_key(pCur->space, pCur->index->def->iid, key,
-			       key_size);
-
-	return rc == 0 ? 0 : SQL_TARANTOOL_ERROR;
+		return -1;
+	return sql_delete_by_key(pCur->space, pCur->index->def->iid, key,
+				 key_size);
 }
 
 int
@@ -491,9 +485,7 @@ sql_delete_by_key(struct space *space, uint32_t iid, char *key,
 	request.space_id = space->def->id;
 	request.index_id = iid;
 	assert(space_index(space, iid)->def->opts.is_unique);
-	int rc = box_process_rw(&request, space, &unused);
-
-	return rc == 0 ? 0 : SQL_TARANTOOL_ERROR;
+	return box_process_rw(&request, space, &unused);
 }
 
 /*
@@ -503,7 +495,7 @@ sql_delete_by_key(struct space *space, uint32_t iid, char *key,
  *
  * @param pCur Cursor pointing to ephemeral space.
  *
- * @retval 0 on success, SQL_TARANTOOL_ERROR otherwise.
+ * @retval 0 on success, -1 otherwise.
  */
 int tarantoolsqlEphemeralClearTable(BtCursor *pCur)
 {
@@ -515,7 +507,7 @@ int tarantoolsqlEphemeralClearTable(BtCursor *pCur)
 						    0 /* part_count */);
 	if (it == NULL) {
 		pCur->eState = CURSOR_INVALID;
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	}
 
 	struct tuple *tuple;
@@ -527,7 +519,7 @@ int tarantoolsqlEphemeralClearTable(BtCursor *pCur)
 					MULTIKEY_NONE, &key_size);
 		if (space_ephemeral_delete(pCur->space, key) != 0) {
 			iterator_delete(it);
-			return SQL_TARANTOOL_ERROR;
+			return -1;
 		}
 	}
 	iterator_delete(it);
@@ -554,7 +546,7 @@ int tarantoolsqlClearTable(struct space *space, uint32_t *tuple_count)
 	struct index *pk = space_index(space, 0 /* PK */);
 	struct iterator *iter = index_create_iterator(pk, ITER_ALL, nil_key, 0);
 	if (iter == NULL)
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	while (iterator_next(iter, &tuple) == 0 && tuple != NULL) {
 		request.key = tuple_extract_key(tuple, pk->def->key_def,
 						MULTIKEY_NONE, &key_size);
@@ -562,7 +554,7 @@ int tarantoolsqlClearTable(struct space *space, uint32_t *tuple_count)
 		rc = box_process_rw(&request, space, &unused);
 		if (rc != 0) {
 			iterator_delete(iter);
-			return SQL_TARANTOOL_ERROR;
+			return -1;
 		}
 		(*tuple_count)++;
 	}
@@ -607,8 +599,11 @@ int tarantoolsqlRenameTrigger(const char *trig_name,
 	assert(mp_typeof(*field) == MP_MAP);
 	mp_decode_map(&field);
 	const char *sql_str = mp_decode_str(&field, &key_len);
-	if (sqlStrNICmp(sql_str, "sql", 3) != 0)
-		goto rename_fail;
+	if (sqlStrNICmp(sql_str, "sql", 3) != 0) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "can't modify name of "\
+			 "space created not via SQL facilities");
+		return -1;
+	}
 	uint32_t trigger_stmt_len;
 	const char *trigger_stmt_old = mp_decode_str(&field, &trigger_stmt_len);
 	char *trigger_stmt = (char*)region_alloc(&fiber()->gc,
@@ -644,11 +639,6 @@ int tarantoolsqlRenameTrigger(const char *trig_name,
 				      trigger_stmt_new_len);
 
 	return box_replace(BOX_TRIGGER_ID, new_tuple, new_tuple_end, NULL);
-
-rename_fail:
-	diag_set(ClientError, ER_SQL_EXECUTE, "can't modify name of space "
-		"created not via SQL facilities");
-	return -1;
 }
 
 int
@@ -676,9 +666,7 @@ sql_rename_table(uint32_t space_id, const char *new_name)
 	pos = mp_encode_str(pos, "=", 1);
 	pos = mp_encode_uint(pos, BOX_SPACE_FIELD_NAME);
 	pos = mp_encode_str(pos, new_name, name_len);
-	if (box_update(BOX_SPACE_ID, 0, raw, ops, ops, pos, 0, NULL) != 0)
-		return -1;
-	return 0;
+	return box_update(BOX_SPACE_ID, 0, raw, ops, ops, pos, 0, NULL);
 }
 
 int
@@ -848,7 +836,7 @@ key_alloc(BtCursor *cur, size_t key_size)
  * @param key Start of buffer containing key.
  * @param key_end End of buffer containing key.
  *
- * @retval 0 on success, SQL_TARANTOOL_ERROR otherwise.
+ * @retval 0 on success, -1 otherwise.
  */
 static int
 cursor_seek(BtCursor *pCur, int *pRes)
@@ -862,13 +850,13 @@ cursor_seek(BtCursor *pCur, int *pRes)
 	uint32_t part_count = mp_decode_array(&key);
 	if (key_validate(pCur->index->def, pCur->iter_type, key, part_count)) {
 		diag_log();
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	}
 
 	struct space *space = pCur->space;
 	struct txn *txn = NULL;
 	if (space->def->id != 0 && txn_begin_ro_stmt(space, &txn) != 0)
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	struct iterator *it =
 		index_create_iterator(pCur->index, pCur->iter_type, key,
 				      part_count);
@@ -876,7 +864,7 @@ cursor_seek(BtCursor *pCur, int *pRes)
 		if (txn != NULL)
 			txn_rollback_stmt();
 		pCur->eState = CURSOR_INVALID;
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	}
 	if (txn != NULL)
 		txn_commit_ro_stmt(txn);
@@ -894,7 +882,7 @@ cursor_seek(BtCursor *pCur, int *pRes)
  * @param pCur Cursor which contains space and tuple.
  * @param[out] pRes Flag which is 0 if reached end of space, 1 otherwise.
  *
- * @retval 0 on success, SQL_TARANTOOL_ERROR otherwise.
+ * @retval 0 on success, -1 otherwise.
  */
 static int
 cursor_advance(BtCursor *pCur, int *pRes)
@@ -903,7 +891,7 @@ cursor_advance(BtCursor *pCur, int *pRes)
 
 	struct tuple *tuple;
 	if (iterator_next(pCur->iter, &tuple) != 0)
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	if (pCur->last_tuple)
 		box_tuple_unref(pCur->last_tuple);
 	if (tuple) {

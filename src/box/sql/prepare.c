@@ -83,7 +83,7 @@ sqlPrepare(sql * db,	/* Database handle. */
 		if (nBytes > mxLen) {
 			diag_set(ClientError, ER_SQL_PARSER_LIMIT,
 				 "SQL command length", nBytes, mxLen);
-			rc = SQL_TARANTOOL_ERROR;
+			rc = -1;
 			goto end_prepare;
 		}
 		zSqlCopy = sqlDbStrNDup(db, zSql, nBytes);
@@ -105,7 +105,7 @@ sqlPrepare(sql * db,	/* Database handle. */
 		*pzTail = sParse.zTail;
 	}
 	if (sParse.is_aborted)
-		rc = SQL_TARANTOOL_ERROR;
+		rc = -1;
 
 	if (rc == 0 && sParse.pVdbe != NULL && sParse.explain) {
 		static const char *const azColName[] = {

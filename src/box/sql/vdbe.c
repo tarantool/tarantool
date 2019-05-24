@@ -682,7 +682,7 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 	uint32_t dummy;
 	data = field_ref->data + slots[fieldno];
 	if (vdbe_decode_msgpack_into_mem(data, dest_mem, &dummy) != 0)
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 
 	/*
 	 * MsgPack map, array or extension (unsupported in sql).
@@ -703,7 +703,7 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 		int len = dest_mem->n;
 		if (dest_mem->szMalloc < len + 1) {
 			if (sqlVdbeMemGrow(dest_mem, len + 1, 1) != 0)
-				return SQL_TARANTOOL_ERROR;
+				return -1;
 		} else {
 			dest_mem->z =
 				memcpy(dest_mem->zMalloc, dest_mem->z, len);
@@ -1014,8 +1014,8 @@ case OP_Yield: {            /* in1, jump */
  *
  * If P4 is not null then it is an error message string.
  *
- * If P1 is SQL_TARANTOOL_ERROR then P3 is a ClientError code and
- * P4 is error message to set.
+ * If P1 is -1 then P3 is a ClientError code and  P4 is error
+ * message to set.
  *
  * There is an implied "Halt 0 0 0" instruction inserted at the
  * very end of every program.  So a jump past the last instruction
@@ -1052,14 +1052,12 @@ case OP_Halt: {
 	p->errorAction = (u8)pOp->p2;
 	p->pc = pcx;
 	if (p->rc) {
-		assert(p->rc == SQL_TARANTOOL_ERROR);
 		if (pOp->p4.z != NULL)
 			box_error_set(__FILE__, __LINE__, pOp->p3, pOp->p4.z);
 		assert(! diag_is_empty(diag_get()));
 	}
-	rc = sqlVdbeHalt(p);
-	assert(rc == 0 || rc == -1);
-	rc = p->rc ? SQL_TARANTOOL_ERROR : SQL_DONE;
+	sqlVdbeHalt(p);
+	rc = p->rc ? -1 : SQL_DONE;
 	goto vdbe_return;
 }
 
@@ -3577,7 +3575,6 @@ case OP_Found: {        /* jump, in3 */
 	rc = sqlCursorMovetoUnpacked(pC->uc.pCursor, pIdxKey, &res);
 	if (pFree != NULL)
 		sqlDbFree(db, pFree);
-	assert(rc == 0 || rc == SQL_TARANTOOL_ERROR);
 	if (rc != 0)
 		goto abort_due_to_error;
 	pC->seekResult = res;
@@ -4247,7 +4244,6 @@ case OP_IdxInsert: {
 	} else if (pOp->p5 & OPFLAG_OE_ROLLBACK) {
 		p->errorAction = ON_CONFLICT_ACTION_ROLLBACK;
 	}
-	assert(rc == 0 || rc == SQL_TARANTOOL_ERROR);
 	if (rc != 0)
 		goto abort_due_to_error;
 	break;
@@ -4325,9 +4321,8 @@ case OP_Update: {
 	}
 
 	assert(rc == 0);
-	if (box_update(space->def->id, 0, key_mem->z, key_mem->z + key_mem->n,
-		       ops, ops + ops_size, 0, NULL) != 0)
-		rc = SQL_TARANTOOL_ERROR;
+	rc = box_update(space->def->id, 0, key_mem->z, key_mem->z + key_mem->n,
+			ops, ops + ops_size, 0, NULL);
 
 	if (pOp->p5 & OPFLAG_OE_IGNORE) {
 		/*
@@ -4346,7 +4341,6 @@ case OP_Update: {
 	} else if (pOp->p5 & OPFLAG_OE_ROLLBACK) {
 		p->errorAction = ON_CONFLICT_ACTION_ROLLBACK;
 	}
-	assert(rc == 0 || rc == SQL_TARANTOOL_ERROR);
 	if (rc != 0)
 		goto abort_due_to_error;
 	break;
@@ -5126,7 +5120,7 @@ case OP_Init: {          /* jump */
 	 */
 	if (p->pFrame == NULL && sql_vdbe_prepare(p) != 0) {
 		sqlDbFree(db, p);
-		rc = SQL_TARANTOOL_ERROR;
+		rc = -1;
 		break;
 	}
 
@@ -5229,7 +5223,7 @@ default: {          /* This is really OP_Noop and OP_Explain */
 	 * an error of some kind.
 	 */
 abort_due_to_error:
-	rc = SQL_TARANTOOL_ERROR;
+	rc = -1;
 	p->rc = rc;
 
 	/* This is the only way out of this procedure. */
@@ -5239,8 +5233,7 @@ vdbe_return:
 	assert(rc != 0 || nExtraDelete == 0
 		|| sql_strlike_ci("DELETE%", p->zSql, 0) != 0
 		);
-	assert(rc == 0 || rc == SQL_TARANTOOL_ERROR ||
-	       rc == SQL_ROW || rc == SQL_DONE);
+	assert(rc == 0 || rc == -1 || rc == SQL_ROW || rc == SQL_DONE);
 	return rc;
 
 	/* Jump to here if a string or blob larger than SQL_MAX_LENGTH

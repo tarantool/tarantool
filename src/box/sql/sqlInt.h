@@ -325,12 +325,10 @@ struct sql_vfs {
 #define SQL_LIMIT_TRIGGER_DEPTH             9
 
 enum sql_ret_code {
-	/** Abort due to constraint violation. */
-	SQL_TARANTOOL_ERROR = 4,
 	/** sql_step() has another row ready. */
-	SQL_ROW,
+	SQL_ROW = 1,
 	/** sql_step() has finished executing. */
-	SQL_DONE,
+	SQL_DONE = 2,
 };
 
 void *

@@ -2003,7 +2003,7 @@ sqlVdbeCloseStatement(Vdbe * p, int eOp)
  * violations, return -1. Otherwise, 0.
  *
  * If there are outstanding FK violations and this function returns
- * SQL_TARANTOOL_ERROR and set an error.
+ * -1 and set an error.
  */
 int
 sqlVdbeCheckFk(Vdbe * p, int deferred)
@@ -2012,11 +2012,11 @@ sqlVdbeCheckFk(Vdbe * p, int deferred)
 	if ((deferred && txn != NULL && txn->psql_txn != NULL &&
 	     txn->psql_txn->fk_deferred_count > 0) ||
 	    (!deferred && p->nFkConstraint > 0)) {
-		p->rc = SQL_TARANTOOL_ERROR;
+		p->rc = -1;
 		p->errorAction = ON_CONFLICT_ACTION_ABORT;
 		diag_set(ClientError, ER_SQL_EXECUTE, "FOREIGN KEY constraint "\
 			 "failed");
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	}
 	return 0;
 }
@@ -2133,7 +2133,7 @@ sqlVdbeHalt(Vdbe * p)
 					 */
 					rc = (in_txn() == NULL ||
 					      txn_commit(in_txn()) == 0) ?
-					     0 : SQL_TARANTOOL_ERROR;
+					      0 : -1;
 					closeCursorsAndFree(p);
 				}
 				if (rc != 0) {
