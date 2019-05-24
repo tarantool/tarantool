@@ -285,6 +285,27 @@ pk:select()
 sk:select()
 s:drop()
 
+--
+-- gh-4248 Deferred DELETE isn't produced on transaction commit.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+pk = s:create_index('pk')
+sk = s:create_index('sk', {parts = {2, 'unsigned'}})
+s:insert{1, 10}
+s:insert{2, 20}
+box.begin()
+s:replace{1, 11}
+s:update(1, {{'=', 2, 12}})
+s:update(2, {{'=', 2, 21}})
+s:replace{2, 22}
+box.commit()
+box.snapshot()
+pk:stat().rows -- 2: REPLACE{1, 12} + REPLACE{2, 22}
+sk:stat().rows -- ditto
+pk:select()
+sk:select()
+s:drop()
+
 box.cfg{vinyl_cache = vinyl_cache}
 
 --
