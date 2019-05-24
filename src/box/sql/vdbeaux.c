@@ -2238,9 +2238,6 @@ sqlVdbeResetStepResult(Vdbe * p)
 int
 sqlVdbeReset(Vdbe * p)
 {
-	sql *db;
-	db = p->db;
-
 	/* If the VM did not run to completion or if it encountered an
 	 * error, then it might not have been halted properly.  So halt
 	 * it now.
@@ -2312,7 +2309,7 @@ sqlVdbeReset(Vdbe * p)
 #endif
 	p->iCurrentTime = 0;
 	p->magic = VDBE_MAGIC_RESET;
-	return p->rc & db->errMask;
+	return p->rc;
 }
 
 /*
@@ -2323,10 +2320,8 @@ int
 sqlVdbeFinalize(Vdbe * p)
 {
 	int rc = 0;
-	if (p->magic == VDBE_MAGIC_RUN || p->magic == VDBE_MAGIC_HALT) {
+	if (p->magic == VDBE_MAGIC_RUN || p->magic == VDBE_MAGIC_HALT)
 		rc = sqlVdbeReset(p);
-		assert((rc & p->db->errMask) == rc);
-	}
 	sqlVdbeDelete(p);
 	return rc;
 }

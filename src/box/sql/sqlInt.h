@@ -1133,7 +1133,6 @@ struct sql {
 	struct Vdbe *pVdbe;	/* List of active virtual machines */
 	struct coll *pDfltColl;	/* The default collating sequence (BINARY) */
 	i64 szMmap;		/* Default mmap_size setting */
-	int errMask;		/* & result codes with this before returning */
 	u16 dbOptFlags;		/* Flags to enable/disable optimizations */
 	u8 enc;			/* Text encoding */
 	u8 mallocFailed;	/* True if we have seen a malloc failure */

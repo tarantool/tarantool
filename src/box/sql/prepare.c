@@ -176,8 +176,6 @@ sqlPrepare(sql * db,	/* Database handle. */
  end_prepare:
 
 	sql_parser_destroy(&sParse);
-	rc = sqlApiExit(db, rc);
-	assert((rc & db->errMask) == rc);
 	return rc;
 }
 

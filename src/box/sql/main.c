@@ -452,7 +452,6 @@ sql_init_db(sql **out_db)
 		*out_db = NULL;
 		return -1;
 	}
-	db->errMask = 0xff;
 	db->magic = SQL_MAGIC_BUSY;
 
 	db->pVfs = sql_vfs_find(0);
