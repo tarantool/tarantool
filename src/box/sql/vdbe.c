@@ -1064,7 +1064,7 @@ case OP_Halt: {
 		assert(! diag_is_empty(diag_get()));
 	}
 	rc = sqlVdbeHalt(p);
-	assert(rc == 0 || rc == SQL_ERROR);
+	assert(rc == 0 || rc == -1);
 	rc = p->rc ? SQL_TARANTOOL_ERROR : SQL_DONE;
 	goto vdbe_return;
 }

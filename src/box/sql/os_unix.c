@@ -1482,7 +1482,7 @@ unixGetTempname(int nBuf, char *zBuf)
 				 "%s/" SQL_TEMP_FILE_PREFIX "%llx%c", zDir,
 				 r, 0);
 		if (zBuf[nBuf - 2] != 0 || (iLimit++) > 10)
-			return SQL_ERROR;
+			return -1;
 	} while (access(zBuf, 0) == 0);
 	return 0;
 }

@@ -303,7 +303,7 @@ sql_create_function_v2(sql * db,
 			   void (*xFinal) (sql_context *),
 			   void (*xDestroy) (void *))
 {
-	int rc = SQL_ERROR;
+	int rc = -1;
 	FuncDestructor *pArg = 0;
 
 	if (xDestroy) {

@@ -700,7 +700,7 @@ columnMallocFailure(sql_stmt * pStmt)
 {
 	/* If malloc() failed during an encoding conversion within an
 	 * sql_column_XXX API, then set the return code of the statement to
-	 * SQL_NOMEM. The next call to _step() (if any) will return SQL_ERROR
+	 * SQL_NOMEM. The next call to _step() (if any) will return -1
 	 * and _finalize() will return NOMEM.
 	 */
 	Vdbe *p = (Vdbe *) pStmt;

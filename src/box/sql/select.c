@@ -4389,7 +4389,7 @@ is_simple_count(struct Select *select, struct AggInfo *agg_info)
  * If the source-list item passed as an argument was augmented with an
  * INDEXED BY clause, then try to locate the specified index. If there
  * was such a clause and the named index cannot be found, return
- * SQL_ERROR and leave an error in pParse. Otherwise, populate
+ * -1 and set an error. Otherwise, populate
  * pFrom->pIndex and return 0.
  */
 int
@@ -4410,7 +4410,7 @@ sqlIndexedByLookup(Parse * pParse, struct SrcList_item *pFrom)
 			diag_set(ClientError, ER_NO_SUCH_INDEX_NAME,
 				 zIndexedBy, space->def->name);
 			pParse->is_aborted = true;
-			return SQL_ERROR;
+			return -1;
 		}
 		pFrom->pIBIndex = idx->def;
 	}
@@ -4598,14 +4598,14 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
 				 tt_sprintf(pCte->zCteErr, pCte->zName));
 			pParse->is_aborted = true;
-			return SQL_ERROR;
+			return -1;
 		}
 		if (pFrom->fg.isTabFunc) {
 			const char *err = "'%s' is not a function";
 			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
 				 tt_sprintf(err, pFrom->zName));
 			pParse->is_aborted = true;
-			return SQL_ERROR;
+			return -1;
 		}
 
 		assert(pFrom->space == NULL);
@@ -4643,7 +4643,7 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 					   "table: %s", pCte->zName);
 			diag_set(ClientError, ER_SQL_PARSER_GENERIC, err_msg);
 			pParse->is_aborted = true;
-			return SQL_ERROR;
+			return -1;
 		}
 		assert(ref_counter == 0 ||
 			((pSel->selFlags & SF_Recursive) && ref_counter == 1));
@@ -4666,7 +4666,7 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 				diag_set(ClientError, ER_SQL_PARSER_GENERIC, err_msg);
 				pParse->is_aborted = true;
 				pParse->pWith = pSavedWith;
-				return SQL_ERROR;
+				return -1;
 			}
 			pEList = pCte->pCols;
 		}

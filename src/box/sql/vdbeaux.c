@@ -1404,7 +1404,7 @@ sqlVdbeList(Vdbe * p)
 		 * sql_column_text16() failed.
 		 */
 		sqlOomFault(db);
-		return SQL_ERROR;
+		return -1;
 	}
 
 	/* When the number of output rows reaches nRow, that means the
@@ -1508,7 +1508,7 @@ sqlVdbeList(Vdbe * p)
 
 		if (sqlVdbeMemClearAndResize(pMem, 256)) {
 			assert(p->db->mallocFailed);
-			return SQL_ERROR;
+			return -1;
 		}
 		pMem->flags = MEM_Str | MEM_Term;
 		zP4 = displayP4(pOp, pMem->z, pMem->szMalloc);
@@ -1525,7 +1525,7 @@ sqlVdbeList(Vdbe * p)
 		if (p->explain == 1) {
 			if (sqlVdbeMemClearAndResize(pMem, 4)) {
 				assert(p->db->mallocFailed);
-				return SQL_ERROR;
+				return -1;
 			}
 			pMem->flags = MEM_Str | MEM_Term;
 			pMem->n = 2;
@@ -1535,7 +1535,7 @@ sqlVdbeList(Vdbe * p)
 #ifdef SQL_ENABLE_EXPLAIN_COMMENTS
 			if (sqlVdbeMemClearAndResize(pMem, 500)) {
 				assert(p->db->mallocFailed);
-				return SQL_ERROR;
+				return -1;
 			}
 			pMem->flags = MEM_Str | MEM_Term;
 			pMem->n = displayComment(pOp, zP4, pMem->z, 500);
@@ -2010,7 +2010,7 @@ sqlVdbeCloseStatement(Vdbe * p, int eOp)
  * This function is called when a transaction opened by the database
  * handle associated with the VM passed as an argument is about to be
  * committed. If there are outstanding deferred foreign key constraint
- * violations, return SQL_ERROR. Otherwise, 0.
+ * violations, return -1. Otherwise, 0.
  *
  * If there are outstanding FK violations and this function returns
  * SQL_TARANTOOL_ERROR and set an error.
@@ -2174,7 +2174,7 @@ sqlVdbeHalt(Vdbe * p)
 					 */
 					if (NEVER(p->pDelFrame)) {
 						closeCursorsAndFree(p);
-						return SQL_ERROR;
+						return -1;
 					}
 				} else {
 					/* The auto-commit flag is true, the vdbe program was successful

@@ -578,7 +578,7 @@ osLocaltime(time_t * t, struct tm *pTm)
  * (a.k.a. GMT) for the time value p where p is in UTC. If no error occurs,
  * return this value and set *pRc to 0.
  *
- * Or, if an error does occur, set *pRc to SQL_ERROR. The returned value
+ * Or, if an error does occur, set *pRc to -1. The returned value
  * is undefined in this case.
  */
 static sql_int64
@@ -619,7 +619,7 @@ localtimeOffset(DateTime * p,	/* Date at which to calculate offset */
 	if (osLocaltime(&t, &sLocal)) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "local time unavailable");
 		pCtx->is_aborted = true;
-		*pRc = SQL_ERROR;
+		*pRc = -1;
 		return 0;
 	}
 	y.Y = sLocal.tm_year + 1900;
