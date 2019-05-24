@@ -389,7 +389,7 @@ _ = s:insert{7, 7}
 _ = s:insert{8, 8}
 box.snapshot()
 -- Some padding to trigger minor compaction.
-for i = 1001, 1000 + PAD2 do s:replace{i, i} end
+for i = 1001, 1000 + PAD2 do s:delete{i} end
 box.snapshot()
 -- Generate DELETE+INSERT statements and write them to disk.
 s:delete{1} s:insert{1, 100}

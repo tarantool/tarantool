@@ -333,7 +333,7 @@ s:drop()
 -- sched stats
 s = box.schema.space.create('test', {engine = 'vinyl'})
 i1 = s:create_index('i1', {parts = {1, 'unsigned'}})
-i2 = s:create_index('i2', {parts = {2, 'unsigned'}})
+i2 = s:create_index('i2', {parts = {2, 'unsigned'}, unique = false})
 
 for i = 1, 100 do s:replace{i, i, string.rep('x', 1000)} end
 st = gstat()

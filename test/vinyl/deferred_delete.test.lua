@@ -259,6 +259,32 @@ box.snapshot()
 sk:select() -- ditto
 s:drop()
 
+--
+-- gh-3693 If a REPLACE doesn't update secondary index key parts,
+-- we must not generate a deferred DELETE for it on commit.
+-- Moreover, we must skip it as it has no effect.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+pk = s:create_index('pk')
+sk = s:create_index('sk', {parts = {2, 'unsigned'}})
+s:insert{1, 1, 1}
+s:insert{2, 2, 2}
+s:replace{2, 2, 3}
+pk:stat().rows -- 3: INSERT{1,1,1} + INSERT{2,2,2} + REPLACE{2,2,3}
+sk:stat().rows -- 2: INSERT{1,1} + INSERT{2,2}
+box.begin()
+s:replace{1, 1, 2}
+s:delete{1}
+box.commit()
+pk:stat().rows -- 4: INSERT{1,1,1} + INSERT{2,2,2} + REPLACE{2,2,3} + DELETE{1}
+sk:stat().rows -- 3: INSERT{1,1} + INSERT{2,2} + DELETE{1,1}
+box.snapshot()
+pk:stat().rows -- 1: INSERT{2,2,3}
+sk:stat().rows -- 1: INSERT{2,2}
+pk:select()
+sk:select()
+s:drop()
+
 box.cfg{vinyl_cache = vinyl_cache}
 
 --
