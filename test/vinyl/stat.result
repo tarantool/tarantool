@@ -1158,7 +1158,7 @@ s = box.schema.space.create('test', {engine = 'vinyl'})
 i1 = s:create_index('i1', {parts = {1, 'unsigned'}})
 ---
 ...
-i2 = s:create_index('i2', {parts = {2, 'unsigned'}})
+i2 = s:create_index('i2', {parts = {2, 'unsigned'}, unique = false})
 ---
 ...
 for i = 1, 100 do s:replace{i, i, string.rep('x', 1000)} end
@@ -1191,7 +1191,7 @@ box.snapshot()
 stat_diff(gstat(), st, 'scheduler')
 ---
 - dump_input: 10420
-  dump_output: 10371
+  dump_output: 10411
   tasks_completed: 2
   dump_count: 1
 ...
@@ -1206,7 +1206,7 @@ while i1:stat().disk.compaction.count == 0 do fiber.sleep(0.01) end
 ...
 stat_diff(gstat(), st, 'scheduler')
 ---
-- compaction_input: 112188
+- compaction_input: 112228
   tasks_completed: 1
   compaction_output: 101984
 ...
