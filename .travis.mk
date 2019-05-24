@@ -49,7 +49,7 @@ test_ubuntu: deps_ubuntu
 
 deps_osx:
 	brew update
-	brew install openssl readline curl icu4c --force
+	brew install openssl readline curl icu4c lz4 --force
 	python2 -V || brew install python2 --force
 	curl --silent --show-error --retry 5 https://bootstrap.pypa.io/get-pip.py | python
 	pip install -r test-run/requirements.txt
