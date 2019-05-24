@@ -506,7 +506,6 @@ vdbePmaReadBlob(PmaReader * p,	/* PmaReader from which to take the blob */
 
 		/* Readr data from the file. Return early if an error occurs. */
 		rc = sqlOsRead(p->pFd, p->aBuffer, nRead, p->iReadOff);
-		assert(rc != SQL_IOERR_SHORT_READ);
 		if (rc != 0)
 			return rc;
 	}

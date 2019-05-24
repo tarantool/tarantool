@@ -1979,7 +1979,7 @@ checkActiveVdbeCnt(sql * db)
  * transaction is rolled back. If eOp is SAVEPOINT_RELEASE, then the
  * statement transaction is committed.
  *
- * If an IO error occurs, an SQL_IOERR_XXX error code is returned.
+ * If an IO error occurs, -1 is returned.
  * Otherwise 0.
  */
 int
@@ -2085,14 +2085,6 @@ sqlVdbeHalt(Vdbe * p)
 	/* This function contains the logic that determines if a statement or
 	 * transaction will be committed or rolled back as a result of the
 	 * execution of this virtual machine.
-	 *
-	 * If any of the following errors occur:
-	 *
-	 *     SQL_IOERR
-	 *
-	 * Then the internal cache might have been left in an inconsistent
-	 * state.  We need to rollback the statement transaction, if there is
-	 * one, or the complete transaction if there is no statement transaction.
 	 */
 
 	if (db->mallocFailed) {
@@ -2108,32 +2100,7 @@ sqlVdbeHalt(Vdbe * p)
 	 * SQL statement does not read or write a database file.
 	 */
 	if (p->pc >= 0) {
-		int mrc;	/* Primary error code from p->rc */
 		int eStatementOp = 0;
-		int isSpecialError;	/* Set to true if a 'special' error */
-
-		/* Check for one of the special errors */
-		mrc = p->rc & 0xff;
-		isSpecialError = mrc == SQL_IOERR;
-		if (isSpecialError) {
-			/* At least a savepoint transaction must be rolled back
-			 * to restore the database to a consistent state.
-			 *
-			 * Even if the statement is read-only, it is important to perform
-			 * a statement or transaction rollback operation. If the error
-			 * occurred while writing to the journal, sub-journal or database
-			 * file as part of an effort to free up cache space (see function
-			 * pagerStress() in pager.c), the rollback is required to restore
-			 * the pager to a consistent state.
-			 * We are forced to roll back the active transaction. Before doing
-			 * so, abort any other statements this handle currently has active.
-			 */
-			box_txn_rollback();
-			closeCursorsAndFree(p);
-			sqlRollbackAll(p);
-			sqlCloseSavepoints(p);
-			p->nChange = 0;
-		}
 
 		/* Check for immediate foreign key violations. */
 		if (p->rc == 0)
@@ -2147,8 +2114,7 @@ sqlVdbeHalt(Vdbe * p)
 		 */
 		if (p->auto_commit) {
 			if (p->rc == 0
-			    || (p->errorAction == ON_CONFLICT_ACTION_FAIL
-				&& !isSpecialError)) {
+			    || (p->errorAction == ON_CONFLICT_ACTION_FAIL)) {
 				rc = sqlVdbeCheckFk(p, 1);
 				if (rc != 0) {
 					/* Close all opened cursors if

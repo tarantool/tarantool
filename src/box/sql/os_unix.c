@@ -396,7 +396,7 @@ findInodeInfo(unixFile * pFile,	/* Unix file with file desc used in the key */
 	rc = fstat(fd, &statbuf);
 	if (rc != 0) {
 		storeLastErrno(pFile, errno);
-		return SQL_IOERR;
+		return -1;
 	}
 
 	memset(&fileId, 0, sizeof(fileId));
@@ -554,9 +554,9 @@ posixUnlock(sql_file * id, int eFileLock, int handleNFSUnlock)
 					/* In theory, the call to unixFileLock() cannot fail because another
 					 * process is holding an incompatible lock. If it does, this
 					 * indicates that the other process is not following the locking
-					 * protocol. If this happens, return SQL_IOERR_RDLOCK.
+					 * protocol. If this happens, return -1.
 					 */
-					rc = SQL_IOERR_RDLOCK;
+					rc = -1;
 					storeLastErrno(pFile, errno);
 					goto end_unlock;
 				}
@@ -570,7 +570,7 @@ posixUnlock(sql_file * id, int eFileLock, int handleNFSUnlock)
 		if (unixFileLock(pFile, &lock) == 0) {
 			pInode->eFileLock = SHARED_LOCK;
 		} else {
-			rc = SQL_IOERR_UNLOCK;
+			rc = -1;
 			storeLastErrno(pFile, errno);
 			goto end_unlock;
 		}
@@ -588,7 +588,7 @@ posixUnlock(sql_file * id, int eFileLock, int handleNFSUnlock)
 			if (unixFileLock(pFile, &lock) == 0) {
 				pInode->eFileLock = NO_LOCK;
 			} else {
-				rc = SQL_IOERR_UNLOCK;
+				rc = -1;
 				storeLastErrno(pFile, errno);
 				pInode->eFileLock = NO_LOCK;
 				pFile->eFileLock = NO_LOCK;
@@ -755,7 +755,7 @@ seekAndRead(unixFile * id, sql_int64 offset, void *pBuf, int cnt)
 
 /*
  * Read data from a file into a buffer.  Return 0 if all
- * bytes were read successfully and SQL_IOERR if anything goes
+ * bytes were read successfully and -1 if anything goes
  * wrong.
  */
 static int
@@ -792,12 +792,12 @@ unixRead(sql_file * id, void *pBuf, int amt, sql_int64 offset)
 		return 0;
 	} else if (got < 0) {
 		/* lastErrno set by seekAndRead */
-		return SQL_IOERR_READ;
+		return -1;
 	} else {
 		storeLastErrno(pFile, 0);	/* not a system error */
 		/* Unread parts of the buffer must be zero-filled */
 		memset(&((char *)pBuf)[got], 0, amt - got);
-		return SQL_IOERR_SHORT_READ;
+		return -1;
 	}
 }
 
@@ -871,7 +871,7 @@ unixWrite(sql_file * id, const void *pBuf, int amt, sql_int64 offset)
 	if (amt > wrote) {
 		if (wrote < 0 && pFile->lastErrno != ENOSPC) {
 			/* lastErrno set by seekAndWrite */
-			return SQL_IOERR_WRITE;
+			return -1;
 		} else {
 			storeLastErrno(pFile, 0);	/* not a system error */
 			return -1;
@@ -941,7 +941,7 @@ fcntlSizeHint(unixFile * pFile, i64 nByte)
 		struct stat buf;	/* Used to hold return values of fstat() */
 
 		if (fstat(pFile->h, &buf))
-			return SQL_IOERR_FSTAT;
+			return -1;
 
 		nSize =
 		    ((nByte + pFile->szChunk -
@@ -960,7 +960,7 @@ fcntlSizeHint(unixFile * pFile, i64 nByte)
 					iWrite = nSize - 1;
 				nWrite = seekAndWrite(pFile, iWrite, "", 1);
 				if (nWrite != 1)
-					return SQL_IOERR_WRITE;
+					return -1;
 			}
 		}
 	}
@@ -1167,7 +1167,7 @@ unixMapfile(unixFile * pFd, i64 nMap)
 	if (nMap < 0) {
 		struct stat statbuf;	/* Low-level file information */
 		if (fstat(pFd->h, &statbuf))
-			return SQL_IOERR_FSTAT;
+			return -1;
 		nMap = statbuf.st_size;
 	}
 	if (nMap > pFd->mmapSizeMax) {
@@ -1472,7 +1472,7 @@ unixGetTempname(int nBuf, char *zBuf)
 
 	zDir = unixTempFileDir();
 	if (zDir == 0)
-		return SQL_IOERR_GETTEMPPATH;
+		return -1;
 	do {
 		u64 r;
 		sql_randomness(sizeof(r), &r);
@@ -1559,7 +1559,7 @@ getFileMode(const char *zFile,	/* File name */
 		*pUid = sStat.st_uid;
 		*pGid = sStat.st_gid;
 	} else {
-		rc = SQL_IOERR_FSTAT;
+		rc = -1;
 	}
 	return rc;
 }
@@ -1814,12 +1814,7 @@ unixDelete(sql_vfs * NotUsed,	/* VFS containing this as the xDelete method */
 	int rc = 0;
 	UNUSED_PARAMETER(NotUsed);
 	if (unlink(zPath) == (-1)) {
-		if (errno == ENOENT) {
-			rc = SQL_IOERR_DELETE_NOENT;
-		} else {
-			rc = -1;
-		}
-		return rc;
+		return -1;
 	}
 	if ((dirSync & 1) != 0) {
 		int fd;

@@ -325,10 +325,8 @@ struct sql_vfs {
 #define SQL_LIMIT_TRIGGER_DEPTH             9
 
 enum sql_ret_code {
-	/** Some kind of disk I/O error occurred. */
-	SQL_IOERR = 3,
 	/** Abort due to constraint violation. */
-	SQL_TARANTOOL_ERROR,
+	SQL_TARANTOOL_ERROR = 4,
 	/** sql_step() has another row ready. */
 	SQL_ROW,
 	/** sql_step() has finished executing. */
@@ -535,20 +533,6 @@ sql_exec(sql *,	/* An open database */
 	     void *,	/* 1st argument to callback */
 	     char **errmsg	/* Error msg written here */
 	);
-#define SQL_IOERR_READ              (SQL_IOERR | (1<<8))
-#define SQL_IOERR_SHORT_READ        (SQL_IOERR | (2<<8))
-#define SQL_IOERR_WRITE             (SQL_IOERR | (3<<8))
-#define SQL_IOERR_DIR_FSYNC         (SQL_IOERR | (5<<8))
-#define SQL_IOERR_TRUNCATE          (SQL_IOERR | (6<<8))
-#define SQL_IOERR_FSTAT             (SQL_IOERR | (7<<8))
-#define SQL_IOERR_UNLOCK            (SQL_IOERR | (8<<8))
-#define SQL_IOERR_RDLOCK            (SQL_IOERR | (9<<8))
-#define SQL_IOERR_DELETE            (SQL_IOERR | (10<<8))
-#define SQL_IOERR_NOMEM             (SQL_IOERR | (12<<8))
-#define SQL_IOERR_ACCESS            (SQL_IOERR | (13<<8))
-#define SQL_IOERR_CLOSE             (SQL_IOERR | (16<<8))
-#define SQL_IOERR_DELETE_NOENT      (SQL_IOERR | (23<<8))
-#define SQL_IOERR_GETTEMPPATH       (SQL_IOERR | (25<<8))
 
 /**
  * Subtype of a main type. Allows to do some subtype specific

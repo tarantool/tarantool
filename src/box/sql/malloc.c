@@ -622,7 +622,7 @@ int
 sqlApiExit(sql * db, int rc)
 {
 	assert(db != 0);
-	if (db->mallocFailed || rc == SQL_IOERR_NOMEM) {
+	if (db->mallocFailed) {
 		return apiOomError(db);
 	}
 	return rc & db->errMask;
