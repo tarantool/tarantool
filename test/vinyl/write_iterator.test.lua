@@ -328,7 +328,7 @@ PAD2 = 15
 for i = 1001, 1000 + PAD1 do s:replace{i, i} end
 box.snapshot()
 -- Some padding to trigger minor compaction.
-for i = 1001, 1000 + PAD2 do s:replace{i, i} end
+for i = 1001, 1000 + PAD2 do s:delete{i} end
 box.snapshot()
 -- Generate some INSERT statements and dump them to disk.
 _ = s:insert{1, 1} -- insert
