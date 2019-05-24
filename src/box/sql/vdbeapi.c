@@ -418,8 +418,8 @@ sqlStep(Vdbe * p)
 	/* Check that malloc() has not failed. If it has, return early. */
 	db = p->db;
 	if (db->mallocFailed) {
-		p->rc = SQL_NOMEM;
-		return SQL_NOMEM;
+		p->rc = -1;
+		return -1;
 	}
 
 	if (p->pc <= 0 && p->expired) {
@@ -450,9 +450,6 @@ sqlStep(Vdbe * p)
 	if (rc != SQL_ROW)
 		checkProfileCallback(db, p);
 
-	if (SQL_NOMEM == sqlApiExit(p->db, p->rc)) {
-		p->rc = SQL_NOMEM;
-	}
 	if (p->isPrepareV2 && rc != SQL_ROW && rc != SQL_DONE) {
 		/* If this statement was prepared using sql_prepare_v2(), and an
 		 * error has occurred, then return the error code in p->rc to the
@@ -678,38 +675,6 @@ columnMem(sql_stmt * pStmt, int i)
 	return pOut;
 }
 
-/*
- * This function is called after invoking an sql_value_XXX function on a
- * column value (i.e. a value returned by evaluating an SQL expression in the
- * select list of a SELECT statement) that may cause a malloc() failure. If
- * malloc() has failed, the threads mallocFailed flag is cleared and the result
- * code of statement pStmt set to SQL_NOMEM.
- *
- * Specifically, this is called from within:
- *
- *     sql_column_int()
- *     sql_column_int64()
- *     sql_column_text()
- *     sql_column_real()
- *     sql_column_bytes()
- *     sql_column_bytes16()
- *     sqiite3_column_blob()
- */
-static void
-columnMallocFailure(sql_stmt * pStmt)
-{
-	/* If malloc() failed during an encoding conversion within an
-	 * sql_column_XXX API, then set the return code of the statement to
-	 * SQL_NOMEM. The next call to _step() (if any) will return -1
-	 * and _finalize() will return NOMEM.
-	 */
-	Vdbe *p = (Vdbe *) pStmt;
-	if (p) {
-		assert(p->db != 0);
-		p->rc = sqlApiExit(p->db, p->rc);
-	}
-}
-
 /**************************** sql_column_  ******************************
  * The following routines are used to access elements of the current row
  * in the result set.
@@ -719,60 +684,43 @@ sql_column_blob(sql_stmt * pStmt, int i)
 {
 	const void *val;
 	val = sql_value_blob(columnMem(pStmt, i));
-	/* Even though there is no encoding conversion, value_blob() might
-	 * need to call malloc() to expand the result of a zeroblob()
-	 * expression.
-	 */
-	columnMallocFailure(pStmt);
 	return val;
 }
 
 int
 sql_column_bytes(sql_stmt * pStmt, int i)
 {
-	int val = sql_value_bytes(columnMem(pStmt, i));
-	columnMallocFailure(pStmt);
-	return val;
+	return sql_value_bytes(columnMem(pStmt, i));
 }
 
 double
 sql_column_double(sql_stmt * pStmt, int i)
 {
-	double val = sql_value_double(columnMem(pStmt, i));
-	columnMallocFailure(pStmt);
-	return val;
+	return sql_value_double(columnMem(pStmt, i));
 }
 
 int
 sql_column_int(sql_stmt * pStmt, int i)
 {
-	int val = sql_value_int(columnMem(pStmt, i));
-	columnMallocFailure(pStmt);
-	return val;
+	return sql_value_int(columnMem(pStmt, i));
 }
 
 bool
 sql_column_boolean(struct sql_stmt *stmt, int i)
 {
-	bool val = sql_value_boolean(columnMem(stmt, i));
-	columnMallocFailure(stmt);
-	return val;
+	return sql_value_boolean(columnMem(stmt, i));
 }
 
 sql_int64
 sql_column_int64(sql_stmt * pStmt, int i)
 {
-	sql_int64 val = sql_value_int64(columnMem(pStmt, i));
-	columnMallocFailure(pStmt);
-	return val;
+	return sql_value_int64(columnMem(pStmt, i));
 }
 
 const unsigned char *
 sql_column_text(sql_stmt * pStmt, int i)
 {
-	const unsigned char *val = sql_value_text(columnMem(pStmt, i));
-	columnMallocFailure(pStmt);
-	return val;
+	return sql_value_text(columnMem(pStmt, i));
 }
 
 sql_value *
@@ -783,16 +731,13 @@ sql_column_value(sql_stmt * pStmt, int i)
 		pOut->flags &= ~MEM_Static;
 		pOut->flags |= MEM_Ephem;
 	}
-	columnMallocFailure(pStmt);
 	return (sql_value *) pOut;
 }
 
 enum mp_type
 sql_column_type(sql_stmt * pStmt, int i)
 {
-	enum mp_type type = sql_value_type(columnMem(pStmt, i));
-	columnMallocFailure(pStmt);
-	return type;
+	return sql_value_type(columnMem(pStmt, i));
 }
 
 enum sql_subtype

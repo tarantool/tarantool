@@ -1813,7 +1813,7 @@ generateColumnNames(Parse * pParse,	/* Parser context */
  * and other fields of Column are zeroed.
  *
  * Return 0 on success.  If a memory allocation error occurs,
- * store NULL in *paCol and 0 in *pnCol and return SQL_NOMEM.
+ * store NULL in *paCol and 0 in *pnCol and return -1.
  */
 int
 sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
@@ -1916,17 +1916,16 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 	}
 cleanup:
 	sqlHashClear(&ht);
-	int rc = db->mallocFailed ? SQL_NOMEM : 0;
-	if (rc != 0) {
+	if (db->mallocFailed) {
 		/*
 		 * pTable->def could be not temporal in
 		 * sqlViewGetColumnNames so we need clean-up.
 		 */
 		space_def->fields = NULL;
 		space_def->field_count = 0;
-		rc = SQL_NOMEM;
+		return -1;
 	}
-	return rc;
+	return 0;
 
 }
 
@@ -4614,7 +4613,7 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 			return WRC_Abort;
 		pFrom->pSelect = sqlSelectDup(db, pCte->pSelect, 0);
 		if (db->mallocFailed)
-			return SQL_NOMEM;
+			return -1;
 		assert(pFrom->pSelect);
 
 		/* Check if this is a recursive CTE. */

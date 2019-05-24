@@ -161,7 +161,6 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 		sqlVdbeFinalize((Vdbe *) pStmt);
 	sqlDbFree(db, azCols);
 
-	rc = sqlApiExit(db, rc);
 	assert(rc == 0);
 	assert((rc & db->errMask) == rc);
 	return rc;

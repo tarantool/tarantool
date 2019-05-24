@@ -607,7 +607,7 @@ static SQL_NOINLINE int
 apiOomError(sql * db)
 {
 	sqlOomClear(db);
-	return SQL_NOMEM;
+	return -1;
 }
 
 /*
@@ -616,10 +616,7 @@ apiOomError(sql * db)
  * sql_realloc.
  *
  * The returned value is normally a copy of the second argument to this
- * function. However, if a malloc() failure has occurred since the previous
- * invocation SQL_NOMEM is returned instead.
- *
- * If an OOM as occurred, SQL_NOMEM is returned.
+ * function.
  */
 int
 sqlApiExit(sql * db, int rc)

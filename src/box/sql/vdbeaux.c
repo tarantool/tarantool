@@ -159,7 +159,7 @@ sqlVdbeSwap(Vdbe * pA, Vdbe * pB)
  * to 1024/sizeof(Op).
  *
  * If an out-of-memory error occurs while resizing the array, return
- * SQL_NOMEM. In this case Vdbe.aOp and Parse.nOpAlloc remain
+ * -1. In this case Vdbe.aOp and Parse.nOpAlloc remain
  * unchanged (this is so that any opcodes already allocated can be
  * correctly deallocated along with the rest of the Vdbe).
  */
@@ -193,7 +193,7 @@ growOpArray(Vdbe * v, int nOp)
 		v->aOp = pNew;
 		return 0;
 	}
-	return SQL_NOMEM;
+	return -1;
 }
 
 #ifdef SQL_DEBUG
@@ -1383,14 +1383,12 @@ sqlVdbeList(Vdbe * p)
 	int nSub = 0;		/* Number of sub-vdbes seen so far */
 	SubProgram **apSub = 0;	/* Array of sub-vdbes */
 	Mem *pSub = 0;		/* Memory cell hold array of subprogs */
-	sql *db = p->db;	/* The database connection */
 	int i;			/* Loop counter */
 	int rc = 0;	/* Return code */
 	Mem *pMem = &p->aMem[1];	/* First Mem of result set */
 
 	assert(p->explain);
 	assert(p->magic == VDBE_MAGIC_RUN);
-	assert(p->rc == 0 || p->rc == SQL_NOMEM);
 
 	/* Even though this opcode does not use dynamic strings for
 	 * the result, result columns may become dynamic if the user calls
@@ -1398,14 +1396,6 @@ sqlVdbeList(Vdbe * p)
 	 */
 	releaseMemArray(pMem, 8);
 	p->pResultSet = 0;
-
-	if (p->rc == SQL_NOMEM) {
-		/* This happens if a malloc() inside a call to sql_column_text() or
-		 * sql_column_text16() failed.
-		 */
-		sqlOomFault(db);
-		return -1;
-	}
 
 	/* When the number of output rows reaches nRow, that means the
 	 * listing has finished and sql_step() should return SQL_DONE.
@@ -1944,7 +1934,7 @@ sqlVdbeSetColName(Vdbe * p,			/* Vdbe being configured */
 	assert(var < COLNAME_N);
 	if (p->db->mallocFailed) {
 		assert(!zName || xDel != SQL_DYNAMIC);
-		return SQL_NOMEM;
+		return -1;
 	}
 	assert(p->aColName != 0);
 	assert(var == COLNAME_NAME || var == COLNAME_DECLTYPE);
@@ -2098,7 +2088,6 @@ sqlVdbeHalt(Vdbe * p)
 	 *
 	 * If any of the following errors occur:
 	 *
-	 *     SQL_NOMEM
 	 *     SQL_IOERR
 	 *
 	 * Then the internal cache might have been left in an inconsistent
@@ -2107,7 +2096,7 @@ sqlVdbeHalt(Vdbe * p)
 	 */
 
 	if (db->mallocFailed) {
-		p->rc = SQL_NOMEM;
+		p->rc = -1;
 	}
 	closeTopFrameCursors(p);
 	if (p->magic != VDBE_MAGIC_RUN) {
@@ -2125,7 +2114,7 @@ sqlVdbeHalt(Vdbe * p)
 
 		/* Check for one of the special errors */
 		mrc = p->rc & 0xff;
-		isSpecialError = mrc == SQL_NOMEM || mrc == SQL_IOERR;
+		isSpecialError = mrc == SQL_IOERR;
 		if (isSpecialError) {
 			/* At least a savepoint transaction must be rolled back
 			 * to restore the database to a consistent state.
@@ -2136,20 +2125,14 @@ sqlVdbeHalt(Vdbe * p)
 			 * file as part of an effort to free up cache space (see function
 			 * pagerStress() in pager.c), the rollback is required to restore
 			 * the pager to a consistent state.
+			 * We are forced to roll back the active transaction. Before doing
+			 * so, abort any other statements this handle currently has active.
 			 */
-			if ((mrc == SQL_NOMEM)
-			    && box_txn()) {
-				eStatementOp = SAVEPOINT_ROLLBACK;
-			} else {
-				/* We are forced to roll back the active transaction. Before doing
-				 * so, abort any other statements this handle currently has active.
-				 */
-				box_txn_rollback();
-				closeCursorsAndFree(p);
-				sqlRollbackAll(p);
-				sqlCloseSavepoints(p);
-				p->nChange = 0;
-			}
+			box_txn_rollback();
+			closeCursorsAndFree(p);
+			sqlRollbackAll(p);
+			sqlCloseSavepoints(p);
+			p->nChange = 0;
 		}
 
 		/* Check for immediate foreign key violations. */
@@ -2257,7 +2240,7 @@ sqlVdbeHalt(Vdbe * p)
 	p->magic = VDBE_MAGIC_HALT;
 	checkActiveVdbeCnt(db);
 	if (db->mallocFailed) {
-		p->rc = SQL_NOMEM;
+		p->rc = -1;
 	}
 
 	assert(db->nVdbeActive > 0 || box_txn() ||
@@ -2889,7 +2872,7 @@ sql_vdbe_mem_alloc_region(Mem *vdbe_mem, uint32_t size)
 	vdbe_mem->n = size;
 	vdbe_mem->z = region_alloc(&fiber()->gc, size);
 	if (vdbe_mem->z == NULL)
-		return SQL_NOMEM;
+		return -1;
 	vdbe_mem->flags = MEM_Ephem | MEM_Blob;
 	assert(sqlVdbeCheckMemInvariants(vdbe_mem));
 	return 0;
@@ -2906,7 +2889,7 @@ sql_vdbe_mem_alloc_region(Mem *vdbe_mem, uint32_t size)
 static int
 vdbeCompareMemString(const Mem * pMem1, const Mem * pMem2,
 		     const struct coll * pColl,
-		     u8 * prcErr)	/* If an OOM occurs, set to SQL_NOMEM */
+		     u8 * prcErr)
 {
 	(void) prcErr;
 	return pColl->cmp(pMem1->z, (size_t)pMem1->n,

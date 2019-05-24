@@ -409,7 +409,7 @@ findInodeInfo(unixFile * pFile,	/* Unix file with file desc used in the key */
 	if (pInode == 0) {
 		pInode = sql_malloc64(sizeof(*pInode));
 		if (pInode == 0) {
-			return SQL_NOMEM;
+			return -1;
 		}
 		memset(pInode, 0, sizeof(*pInode));
 		memcpy(&pInode->fileId, &fileId, sizeof(fileId));
@@ -1697,7 +1697,7 @@ unixOpen(sql_vfs * pVfs,	/* The VFS for which this is the xOpen method */
 		} else {
 			pUnused = sql_malloc64(sizeof(*pUnused));
 			if (!pUnused) {
-				return SQL_NOMEM;
+				return -1;
 			}
 		}
 		p->pUnused = pUnused;

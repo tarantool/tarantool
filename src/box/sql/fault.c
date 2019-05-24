@@ -37,8 +37,8 @@
  * and returns 0).
  *
  * Most malloc failures are non-benign. After they occur, sql
- * abandons the current operation and returns an error code (usually
- * SQL_NOMEM) to the user. However, sometimes a fault is not necessarily
+ * abandons the current operation and returns an error
+ * to the user. However, sometimes a fault is not necessarily
  * fatal. For example, if a malloc fails while resizing a hash table, this
  * is completely recoverable simply by not carrying out the resize. The
  * hash table will continue to function normally.  So a malloc failure

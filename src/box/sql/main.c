@@ -442,16 +442,16 @@ int
 sql_init_db(sql **out_db)
 {
 	sql *db;
-	int rc;			/* Return code */
 
-	rc = sql_initialize();
-	if (rc)
-		return rc;
+	if (sql_initialize() != 0)
+		return -1;
 
 	/* Allocate the sql data structure */
 	db = sqlMallocZero(sizeof(sql));
-	if (db == 0)
-		goto opendb_out;
+	if (db == NULL) {
+		*out_db = NULL;
+		return -1;
+	}
 	db->errMask = 0xff;
 	db->magic = SQL_MAGIC_BUSY;
 
@@ -465,7 +465,9 @@ sql_init_db(sql **out_db)
 
 	db->magic = SQL_MAGIC_OPEN;
 	if (db->mallocFailed) {
-		goto opendb_out;
+		sql_free(db);
+		*out_db = NULL;
+		return -1;
 	}
 
 	/* Register all built-in functions, but do not attempt to read the
@@ -474,16 +476,8 @@ sql_init_db(sql **out_db)
 	 */
 	sqlRegisterPerConnectionBuiltinFunctions(db);
 
-opendb_out:
-	assert(db != 0 || rc == SQL_NOMEM);
-	if (rc == SQL_NOMEM)
-		db = NULL;
-	else if (rc != 0)
-		db->magic = SQL_MAGIC_SICK;
-
 	*out_db = db;
-
-	return rc;
+	return 0;
 }
 
 /*

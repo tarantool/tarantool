@@ -703,7 +703,7 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 		int len = dest_mem->n;
 		if (dest_mem->szMalloc < len + 1) {
 			if (sqlVdbeMemGrow(dest_mem, len + 1, 1) != 0)
-				return SQL_NOMEM;
+				return SQL_TARANTOOL_ERROR;
 		} else {
 			dest_mem->z =
 				memcpy(dest_mem->zMalloc, dest_mem->z, len);
@@ -746,12 +746,6 @@ int sqlVdbeExec(Vdbe *p)
 	/*** INSERT STACK UNION HERE ***/
 
 	assert(p->magic==VDBE_MAGIC_RUN);  /* sql_step() verifies this */
-	if (p->rc==SQL_NOMEM) {
-		/* This happens if a malloc() inside a call to sql_column_text() or
-		 * sql_column_text16() failed.
-		 */
-		goto no_mem;
-	}
 	assert(p->rc == 0);
 	p->rc = 0;
 	p->iCurrentTime = 0;
@@ -2618,8 +2612,7 @@ case OP_Column: {
 	}
 	struct Mem *default_val_mem =
 		pOp->p4type == P4_MEM ? pOp->p4.pMem : NULL;
-	rc = vdbe_field_ref_fetch(&pC->field_ref, p2, pDest);
-	if (rc != 0)
+	if (vdbe_field_ref_fetch(&pC->field_ref, p2, pDest) != 0)
 		goto abort_due_to_error;
 
 	if ((pDest->flags & MEM_Null) &&
@@ -2652,8 +2645,7 @@ case OP_Fetch: {
 	uint32_t field_idx = pOp->p2;
 	struct Mem *dest_mem = &aMem[pOp->p3];
 	memAboutToChange(p, dest_mem);
-	rc = vdbe_field_ref_fetch(field_ref, field_idx, dest_mem);
-	if (rc != 0)
+	if (vdbe_field_ref_fetch(field_ref, field_idx, dest_mem) != 0)
 		goto abort_due_to_error;
 	REGISTER_TRACE(p, pOp->p3, dest_mem);
 	break;

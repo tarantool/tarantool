@@ -164,7 +164,7 @@ sqlOsOpenMalloc(sql_vfs * pVfs,
 			*ppFile = pFile;
 		}
 	} else {
-		rc = SQL_NOMEM;
+		rc = -1;
 	}
 	return rc;
 }
