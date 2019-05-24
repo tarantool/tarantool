@@ -1429,7 +1429,6 @@ sqlVdbeList(Vdbe * p)
 		i = p->pc++;
 	} while (i < nRow && p->explain == 2 && p->aOp[i].opcode != OP_Explain);
 	if (i >= nRow) {
-		p->rc = 0;
 		rc = SQL_DONE;
 	} else {
 		char *zP4;
@@ -1536,7 +1535,6 @@ sqlVdbeList(Vdbe * p)
 
 		p->nResColumn = 8 - 4 * (p->explain - 1);
 		p->pResultSet = &p->aMem[1];
-		p->rc = 0;
 		rc = SQL_ROW;
 	}
 	return rc;
@@ -1636,7 +1634,7 @@ sqlVdbeRewind(Vdbe * p)
 	}
 #endif
 	p->pc = -1;
-	p->rc = 0;
+	p->is_aborted = false;
 	p->ignoreRaised = 0;
 	p->errorAction = ON_CONFLICT_ACTION_ABORT;
 	p->nChange = 0;
@@ -2012,7 +2010,7 @@ sqlVdbeCheckFk(Vdbe * p, int deferred)
 	if ((deferred && txn != NULL && txn->psql_txn != NULL &&
 	     txn->psql_txn->fk_deferred_count > 0) ||
 	    (!deferred && p->nFkConstraint > 0)) {
-		p->rc = -1;
+		p->is_aborted = true;
 		p->errorAction = ON_CONFLICT_ACTION_ABORT;
 		diag_set(ClientError, ER_SQL_EXECUTE, "FOREIGN KEY constraint "\
 			 "failed");
@@ -2088,7 +2086,7 @@ sqlVdbeHalt(Vdbe * p)
 	 */
 
 	if (db->mallocFailed) {
-		p->rc = -1;
+		p->is_aborted = true;
 	}
 	closeTopFrameCursors(p);
 	if (p->magic != VDBE_MAGIC_RUN) {
@@ -2103,7 +2101,7 @@ sqlVdbeHalt(Vdbe * p)
 		int eStatementOp = 0;
 
 		/* Check for immediate foreign key violations. */
-		if (p->rc == 0)
+		if (!p->is_aborted)
 			sqlVdbeCheckFk(p, 0);
 
 		/* If the auto-commit flag is set and this is the only active writer
@@ -2113,7 +2111,7 @@ sqlVdbeHalt(Vdbe * p)
 		 * above has occurred.
 		 */
 		if (p->auto_commit) {
-			if (p->rc == 0
+			if (!p->is_aborted
 			    || (p->errorAction == ON_CONFLICT_ACTION_FAIL)) {
 				rc = sqlVdbeCheckFk(p, 1);
 				if (rc != 0) {
@@ -2137,7 +2135,7 @@ sqlVdbeHalt(Vdbe * p)
 					closeCursorsAndFree(p);
 				}
 				if (rc != 0) {
-					p->rc = rc;
+					p->is_aborted = true;
 					box_txn_rollback();
 					closeCursorsAndFree(p);
 					sqlRollbackAll(p);
@@ -2151,7 +2149,8 @@ sqlVdbeHalt(Vdbe * p)
 			}
 			p->anonymous_savepoint = NULL;
 		} else if (eStatementOp == 0) {
-			if (p->rc == 0 || p->errorAction == ON_CONFLICT_ACTION_FAIL) {
+			if (!p->is_aborted ||
+			    p->errorAction == ON_CONFLICT_ACTION_FAIL) {
 				eStatementOp = SAVEPOINT_RELEASE;
 			} else if (p->errorAction == ON_CONFLICT_ACTION_ABORT) {
 				eStatementOp = SAVEPOINT_ROLLBACK;
@@ -2174,8 +2173,7 @@ sqlVdbeHalt(Vdbe * p)
 			rc = sqlVdbeCloseStatement(p, eStatementOp);
 			if (rc) {
 				box_txn_rollback();
-				if (p->rc == 0)
-					p->rc = rc;
+				p->is_aborted = true;
 				closeCursorsAndFree(p);
 				sqlRollbackAll(p);
 				sqlCloseSavepoints(p);
@@ -2205,9 +2203,8 @@ sqlVdbeHalt(Vdbe * p)
 	}
 	p->magic = VDBE_MAGIC_HALT;
 	checkActiveVdbeCnt(db);
-	if (db->mallocFailed) {
-		p->rc = -1;
-	}
+	if (db->mallocFailed)
+		p->is_aborted = true;
 
 	assert(db->nVdbeActive > 0 || box_txn() ||
 	       p->anonymous_savepoint == NULL);
@@ -2215,13 +2212,12 @@ sqlVdbeHalt(Vdbe * p)
 }
 
 /*
- * Each VDBE holds the result of the most recent sql_step() call
- * in p->rc.  This routine sets that result back to 0.
+ * This routine sets is_aborted of VDBE to false.
  */
 void
 sqlVdbeResetStepResult(Vdbe * p)
 {
-	p->rc = 0;
+	p->is_aborted = false;
 }
 
 /*
@@ -2260,7 +2256,7 @@ sqlVdbeReset(Vdbe * p)
 		 * is currently disabled, so this error has been
 		 * replaced with assert.
 		 */
-		assert(p->rc == 0 || p->expired == 0);
+		assert(!p->is_aborted || p->expired == 0);
 	}
 
 	/* Reclaim all memory used by the VDBE
@@ -2309,7 +2305,7 @@ sqlVdbeReset(Vdbe * p)
 #endif
 	p->iCurrentTime = 0;
 	p->magic = VDBE_MAGIC_RESET;
-	return p->rc;
+	return p->is_aborted ? -1 : 0;
 }
 
 /*

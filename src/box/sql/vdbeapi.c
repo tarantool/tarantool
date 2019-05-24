@@ -417,12 +417,12 @@ sqlStep(Vdbe * p)
 	/* Check that malloc() has not failed. If it has, return early. */
 	db = p->db;
 	if (db->mallocFailed) {
-		p->rc = -1;
+		p->is_aborted = true;
 		return -1;
 	}
 
 	if (p->pc <= 0 && p->expired) {
-		p->rc = -1;
+		p->is_aborted = true;
 		return -1;
 	}
 	if (p->pc < 0) {
@@ -451,10 +451,10 @@ sqlStep(Vdbe * p)
 
 	if (p->isPrepareV2 && rc != SQL_ROW && rc != SQL_DONE) {
 		/* If this statement was prepared using sql_prepare_v2(), and an
-		 * error has occurred, then return the error code in p->rc to the
-		 * caller. Set the error code in the database handle to the same value.
+		 * error has occurred, then return an error.
 		 */
-		rc = p->rc;
+		if (p->is_aborted)
+			rc = -1;
 	}
 	return rc;
 }
