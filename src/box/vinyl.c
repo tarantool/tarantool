@@ -1790,7 +1790,7 @@ vy_perform_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 
 	vy_stmt_set_flags(stmt->new_tuple, VY_STMT_UPDATE);
 
-	if (vy_tx_set_with_colmask(tx, pk, stmt->new_tuple, column_mask) != 0)
+	if (vy_tx_set(tx, pk, stmt->new_tuple) != 0)
 		return -1;
 	if (space->index_count == 1)
 		return 0;
@@ -1804,11 +1804,9 @@ vy_perform_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
 		if (vy_is_committed(env, lsm))
 			continue;
-		if (vy_tx_set_with_colmask(tx, lsm, delete,
-					   column_mask) != 0)
+		if (vy_tx_set(tx, lsm, delete) != 0)
 			goto error;
-		if (vy_tx_set_with_colmask(tx, lsm, stmt->new_tuple,
-					   column_mask) != 0)
+		if (vy_tx_set(tx, lsm, stmt->new_tuple) != 0)
 			goto error;
 	}
 	tuple_unref(delete);

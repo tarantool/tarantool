@@ -86,8 +86,6 @@ struct txv {
 	struct tuple *stmt;
 	/** Statement allocated on vy_mem->allocator. */
 	const struct tuple *region_stmt;
-	/** Mask of columns modified by this operation. */
-	uint64_t column_mask;
 	/** Next in the transaction log. */
 	struct stailq_entry next_in_log;
 	/** Member the transaction write set. */
@@ -99,6 +97,11 @@ struct txv {
 	 * last committed statement is DELETE.
 	 */
 	bool is_first_insert;
+	/**
+	 * True if the statement has no effect and can be safely
+	 * skipped on commit.
+	 */
+	bool is_nop;
 	/**
 	 * True if the txv was overwritten by another txv of
 	 * the same transaction.
@@ -391,16 +394,17 @@ vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
 int
 vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt);
 
-/** Add a statement to a transaction. */
+/**
+ * Insert a statement into a transaction write set.
+ * @param tx           Transaction.
+ * @param lsm          LSM tree the statement is for.
+ * @param stmt         Statement.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory allocation error.
+ */
 int
-vy_tx_set_with_colmask(struct vy_tx *tx, struct vy_lsm *lsm,
-		       struct tuple *stmt, uint64_t column_mask);
-
-static inline int
-vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
-{
-	return vy_tx_set_with_colmask(tx, lsm, stmt, UINT64_MAX);
-}
+vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt);
 
 /**
  * Iterator over the write set of a transaction.
