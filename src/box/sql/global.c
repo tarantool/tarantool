@@ -137,29 +137,6 @@ const unsigned char sqlCtypeMap[256] = {
 	0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40	/* f8..ff    ........ */
 };
 
-/* EVIDENCE-OF: R-02982-34736 In order to maintain full backwards
- * compatibility for legacy applications, the URI filename capability is
- * disabled by default.
- *
- * EVIDENCE-OF: R-38799-08373 URI filenames can be enabled or disabled
- * using the SQL_USE_URI=1 or SQL_USE_URI=0 compile-time options.
- *
- * EVIDENCE-OF: R-43642-56306 By default, URI handling is globally
- * disabled. The default value may be changed by compiling with the
- * SQL_USE_URI symbol defined.
- */
-#ifndef SQL_USE_URI
-#define  SQL_USE_URI 0
-#endif
-
-/* EVIDENCE-OF: R-38720-18127 The default setting is determined by the
- * SQL_ALLOW_COVERING_INDEX_SCAN compile-time option, or is "on" if
- * that compile-time option is omitted.
- */
-#ifndef SQL_ALLOW_COVERING_INDEX_SCAN
-#define SQL_ALLOW_COVERING_INDEX_SCAN 1
-#endif
-
 /* The minimum PMA size is set to this value multiplied by the database
  * page size in bytes.
  */
@@ -172,35 +149,16 @@ const unsigned char sqlCtypeMap[256] = {
  * the sql library.
  */
 SQL_WSD struct sqlConfig sqlConfig = {
-	SQL_DEFAULT_MEMSTATUS,	/* bMemstat */
-	SQL_USE_URI,		/* bOpenUri */
-	SQL_ALLOW_COVERING_INDEX_SCAN,	/* bUseCis */
-	0x7ffffffe,		/* mxStrlen */
-	0,			/* neverCorrupt */
-	0,			/* nStmtSpill */
-	(void *)0,		/* pHeap */
-	0,			/* nHeap */
-	0, 0,			/* mnHeap, mxHeap */
 	SQL_DEFAULT_MMAP_SIZE,	/* szMmap */
 	SQL_MAX_MMAP_SIZE,	/* mxMmap */
-	(void *)0,		/* pScratch */
-	0,			/* szScratch */
-	0,			/* nScratch */
-	(void *)0,		/* pPage */
-	0,			/* szPage */
-	SQL_DEFAULT_PCACHE_INITSZ,	/* nPage */
-	0,			/* mxParserStack */
-	0,			/* sharedCacheEnabled */
 	SQL_SORTER_PMASZ,	/* szPma */
 	/* All the rest should always be initialized to zero */
 	0,			/* isInit */
 	0,			/* inProgress */
-	0,			/* isMallocInit */
 #ifdef SQL_VDBE_COVERAGE
 	0,			/* xVdbeBranch */
 	0,			/* pVbeBranchArg */
 #endif
-	0,			/* bLocaltimeFault */
 	0x7ffffffe		/* iOnceResetThreshold */
 };
 

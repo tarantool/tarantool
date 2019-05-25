@@ -62,23 +62,6 @@ sql_sized_malloc(int nByte)
 }
 
 /*
- * Like free() but works for allocations obtained from sql_sized_malloc()
- * or sql_sized_realloc().
- *
- * For this low-level routine, we already know that pPrior!=0 since
- * cases where pPrior==0 will have been intecepted and dealt with
- * by higher-level routines.
- */
-static void
-sql_sized_free(void *pPrior)
-{
-	sql_int64 *p = (sql_int64 *) pPrior;
-	assert(pPrior != 0);
-	p--;
-	free(p);
-}
-
-/*
  * Report the allocated size of a prior return from sql_sized_malloc()
  * or sql_sized_realloc().
  */
@@ -121,145 +104,6 @@ sql_sized_realloc(void *pPrior, int nByte)
 }
 
 /*
- * Attempt to release up to n bytes of non-essential memory currently
- * held by sql. An example of non-essential memory is memory used to
- * cache database pages that are not currently in use.
- */
-int
-sql_release_memory(int n)
-{
-	/* IMPLEMENTATION-OF: R-34391-24921 The sql_release_memory() routine
-	 * is a no-op returning zero if sql is not compiled with
-	 * SQL_ENABLE_MEMORY_MANAGEMENT.
-	 */
-	UNUSED_PARAMETER(n);
-	return 0;
-}
-
-/*
- * An instance of the following object records the location of
- * each unused scratch buffer.
- */
-typedef struct ScratchFreeslot {
-	struct ScratchFreeslot *pNext;	/* Next unused scratch buffer */
-} ScratchFreeslot;
-
-/*
- * State information local to the memory allocation subsystem.
- */
-static SQL_WSD struct Mem0Global {
-	sql_int64 alarmThreshold;	/* The soft heap limit */
-
-	/*
-	 * Pointers to the end of sqlGlobalConfig.pScratch memory
-	 * (so that a range test can be used to determine if an allocation
-	 * being freed came from pScratch) and a pointer to the list of
-	 * unused scratch allocations.
-	 */
-	void *pScratchEnd;
-	ScratchFreeslot *pScratchFree;
-	u32 nScratchFree;
-
-	/*
-	 * True if heap is nearly "full" where "full" is defined by the
-	 * sql_soft_heap_limit() setting.
-	 */
-	int nearlyFull;
-} mem0 = {
-0, 0, 0, 0, 0};
-
-#define mem0 GLOBAL(struct Mem0Global, mem0)
-
-/*
- * Initialize the memory allocation subsystem.
- */
-void
-sqlMallocInit(void)
-{
-	memset(&mem0, 0, sizeof(mem0));
-	if (sqlGlobalConfig.pScratch && sqlGlobalConfig.szScratch >= 100
-	    && sqlGlobalConfig.nScratch > 0) {
-		int i, n, sz;
-		ScratchFreeslot *pSlot;
-		sz = ROUNDDOWN8(sqlGlobalConfig.szScratch);
-		sqlGlobalConfig.szScratch = sz;
-		pSlot = (ScratchFreeslot *) sqlGlobalConfig.pScratch;
-		n = sqlGlobalConfig.nScratch;
-		mem0.pScratchFree = pSlot;
-		mem0.nScratchFree = n;
-		for (i = 0; i < n - 1; i++) {
-			pSlot->pNext = (ScratchFreeslot *) (sz + (char *)pSlot);
-			pSlot = pSlot->pNext;
-		}
-		pSlot->pNext = 0;
-		mem0.pScratchEnd = (void *)&pSlot[1];
-	} else {
-		mem0.pScratchEnd = 0;
-		sqlGlobalConfig.pScratch = 0;
-		sqlGlobalConfig.szScratch = 0;
-		sqlGlobalConfig.nScratch = 0;
-	}
-	if (sqlGlobalConfig.pPage == 0 || sqlGlobalConfig.szPage < 512
-	    || sqlGlobalConfig.nPage <= 0) {
-		sqlGlobalConfig.pPage = 0;
-		sqlGlobalConfig.szPage = 0;
-	}
-}
-
-/*
- * Return true if the heap is currently under memory pressure - in other
- * words if the amount of heap used is close to the limit set by
- * sql_soft_heap_limit().
- */
-int
-sqlHeapNearlyFull(void)
-{
-	return mem0.nearlyFull;
-}
-
-/*
- * Trigger the alarm
- */
-static void
-sqlMallocAlarm(int nByte)
-{
-	if (mem0.alarmThreshold <= 0)
-		return;
-	sql_release_memory(nByte);
-}
-
-/*
- * Do a memory allocation with statistics and alarms.  Assume the
- * lock is already held.
- */
-static int
-mallocWithAlarm(int n, void **pp)
-{
-	int nFull;
-	void *p;
-	nFull = ROUND8(n);
-	sqlStatusHighwater(SQL_STATUS_MALLOC_SIZE, n);
-	if (mem0.alarmThreshold > 0) {
-		sql_int64 nUsed =
-		    sqlStatusValue(SQL_STATUS_MEMORY_USED);
-		if (nUsed >= mem0.alarmThreshold - nFull) {
-			mem0.nearlyFull = 1;
-			sqlMallocAlarm(nFull);
-		} else {
-			mem0.nearlyFull = 0;
-		}
-	}
-	p = sql_sized_malloc(nFull);
-	if (p) {
-		nFull = sqlMallocSize(p);
-		sqlStatusUp(SQL_STATUS_MEMORY_USED, nFull);
-		sqlStatusUp(SQL_STATUS_MALLOC_COUNT, 1);
-	}
-	*pp = p;
-	return nFull;
-}
-
-/*
  * Allocate memory.  This routine is like sql_malloc() except that it
  * assumes the memory subsystem has already been initialized.
  */
@@ -275,8 +119,6 @@ sqlMalloc(u64 n)
 		 * this amount.  The only way to reach the limit is with sql_malloc()
 		 */
 		p = 0;
-	} else if (sqlGlobalConfig.bMemstat) {
-		mallocWithAlarm((int)n, &p);
 	} else {
 		p = sql_sized_malloc((int)n);
 	}
@@ -311,37 +153,17 @@ sqlMallocSize(void *p)
 	return sql_sized_sizeof(p);
 }
 
-sql_uint64
-sql_msize(void *p)
-{
-	return p ? sql_sized_sizeof(p) : 0;
-}
-
 /*
  * Free memory previously obtained from sqlMalloc().
  */
 void
 sql_free(void *p)
 {
-	if (p == 0)
-		return;		/* IMP: R-49053-54554 */
-	if (sqlGlobalConfig.bMemstat) {
-		sqlStatusDown(SQL_STATUS_MEMORY_USED,
-				  sqlMallocSize(p));
-		sqlStatusDown(SQL_STATUS_MALLOC_COUNT, 1);
-		sql_sized_free(p);
-	} else
-		sql_sized_free(p);
-}
-
-/*
- * Add the size of memory allocation "p" to the count in
- * *db->pnBytesFreed.
- */
-static SQL_NOINLINE void
-measureAllocationSize(sql * db, void *p)
-{
-	*db->pnBytesFreed += sqlMallocSize(p);
+	if (p == NULL)
+		return;
+	sql_int64 *raw_p = (sql_int64 *) p;
+	raw_p--;
+	free(raw_p);
 }
 
 /*
@@ -351,14 +173,7 @@ measureAllocationSize(sql * db, void *p)
 void
 sqlDbFree(sql * db, void *p)
 {
-	if (p == 0)
-		return;
-	if (db) {
-		if (db->pnBytesFreed) {
-			measureAllocationSize(db, p);
-			return;
-		}
-	}
+	(void) db;
 	sql_free(p);
 }
 
@@ -368,7 +183,7 @@ sqlDbFree(sql * db, void *p)
 void *
 sqlRealloc(void *pOld, u64 nBytes)
 {
-	int nOld, nNew, nDiff;
+	int nOld, nNew;
 	void *pNew;
 	if (pOld == 0) {
 		return sqlMalloc(nBytes);	/* IMP: R-04300-56712 */
@@ -383,36 +198,14 @@ sqlRealloc(void *pOld, u64 nBytes)
 	}
 	nOld = sqlMallocSize(pOld);
 	nNew = ROUND8((int)nBytes);
-	if (nOld == nNew) {
+	if (nOld == nNew)
 		pNew = pOld;
-	} else if (sqlGlobalConfig.bMemstat) {
-		sqlStatusHighwater(SQL_STATUS_MALLOC_SIZE, (int)nBytes);
-		nDiff = nNew - nOld;
-		if (nDiff > 0
-		    && sqlStatusValue(SQL_STATUS_MEMORY_USED) >=
-		    mem0.alarmThreshold - nDiff) {
-			sqlMallocAlarm(nDiff);
-		}
+	else
 		pNew = sql_sized_realloc(pOld, nNew);
-		if (pNew == 0 && mem0.alarmThreshold > 0) {
-			sqlMallocAlarm((int)nBytes);
-			pNew = sql_sized_realloc(pOld, nNew);
-		}
-		if (pNew) {
-			nNew = sqlMallocSize(pNew);
-			sqlStatusUp(SQL_STATUS_MEMORY_USED, nNew - nOld);
-		}
-	} else {
-		pNew = sql_sized_realloc(pOld, nNew);
-	}
 	assert(EIGHT_BYTE_ALIGNMENT(pNew));	/* IMP: R-11148-40995 */
 	return pNew;
 }
 
-/*
- * The public interface to sqlRealloc.  Make sure that the memory
- * subsystem is initialized prior to invoking sqlRealloc.
- */
 void *
 sql_realloc64(void *pOld, sql_uint64 n)
 {
@@ -481,7 +274,7 @@ sqlDbMallocRaw(sql * db, u64 n)
 void *
 sqlDbMallocRawNN(sql * db, u64 n)
 {
-	assert(db != NULL && db->pnBytesFreed == NULL);
+	assert(db != NULL);
 	if (db->mallocFailed)
 		return NULL;
 	void *p = sqlMalloc(n);
@@ -576,17 +369,6 @@ sqlDbStrNDup(sql * db, const char *z, u64 n)
 }
 
 /*
- * Call this routine to record the fact that an OOM (out-of-memory) error
- * has happened.  This routine will set db->mallocFailed.
- */
-void
-sqlOomFault(sql * db)
-{
-	if (db->mallocFailed == 0 && db->bBenignMalloc == 0)
-		db->mallocFailed = 1;
-}
-
-/*
  * This routine reactivates the memory allocator and clears the
  * db->mallocFailed flag as necessary.
  *
@@ -598,16 +380,6 @@ sqlOomClear(sql * db)
 {
 	if (db->mallocFailed && db->nVdbeExec == 0)
 		db->mallocFailed = 0;
-}
-
-/*
- * Take actions at the end of an API call to indicate an OOM error
- */
-static SQL_NOINLINE int
-apiOomError(sql * db)
-{
-	sqlOomClear(db);
-	return -1;
 }
 
 /*
@@ -623,7 +395,8 @@ sqlApiExit(sql * db, int rc)
 {
 	assert(db != 0);
 	if (db->mallocFailed) {
-		return apiOomError(db);
+		sqlOomClear(db);
+		return -1;
 	}
 	return rc;
 }

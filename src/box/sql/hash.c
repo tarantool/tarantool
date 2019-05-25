@@ -149,18 +149,7 @@ rehash(Hash * pH, unsigned int new_size)
 	if (new_size == pH->htsize)
 		return 0;
 #endif
-
-	/* The inability to allocates space for a larger hash table is
-	 * a performance hit but it is not a fatal error.  So mark the
-	 * allocation as a benign. Use sqlMalloc()/memset(0) instead of
-	 * sqlMallocZero() to make the allocation, as sqlMallocZero()
-	 * only zeroes the requested number of bytes whereas this module will
-	 * use the actual amount of space allocated for the hash table (which
-	 * may be larger than the requested amount).
-	 */
-	sqlBeginBenignMalloc();
 	new_ht = (struct _ht *)sqlMalloc(new_size * sizeof(struct _ht));
-	sqlEndBenignMalloc();
 
 	if (new_ht == 0)
 		return 0;

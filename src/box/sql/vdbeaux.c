@@ -664,17 +664,6 @@ freeEphemeralFunction(sql * db, FuncDef * pDef)
 
 static void vdbeFreeOpArray(sql *, Op *, int);
 
-/*
- * Delete a P4 value if necessary.
- */
-static SQL_NOINLINE void
-freeP4Mem(sql * db, Mem * p)
-{
-	if (p->szMalloc)
-		sqlDbFree(db, p->zMalloc);
-	sqlDbFree(db, p);
-}
-
 static SQL_NOINLINE void
 freeP4FuncCtx(sql * db, sql_context * p)
 {
@@ -705,14 +694,9 @@ freeP4(sql * db, int p4type, void *p4)
 			freeEphemeralFunction(db, (FuncDef *) p4);
 			break;
 		}
-	case P4_MEM:{
-			if (db->pnBytesFreed == 0) {
-				sqlValueFree((sql_value *) p4);
-			} else {
-				freeP4Mem(db, (Mem *) p4);
-			}
-			break;
-		}
+	case P4_MEM:
+		sqlValueFree((sql_value *) p4);
+		break;
 	}
 }
 
@@ -1305,13 +1289,6 @@ releaseMemArray(Mem * p, int N)
 	if (p && N) {
 		Mem *pEnd = &p[N];
 		sql *db = p->db;
-		if (db->pnBytesFreed) {
-			do {
-				if (p->szMalloc)
-					sqlDbFree(db, p->zMalloc);
-			} while ((++p) < pEnd);
-			return;
-		}
 		do {
 			assert((&p[1]) == pEnd || p[0].db == p[1].db);
 			assert(sqlVdbeCheckMemInvariants(p));

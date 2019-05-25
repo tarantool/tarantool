@@ -819,43 +819,32 @@ sqlVdbeSorterInit(sql * db,	/* Database connection (for malloc()) */
 
 	pSorter = (VdbeSorter *) sqlDbMallocZero(db, sizeof(VdbeSorter));
 	pCsr->uc.pSorter = pSorter;
-	if (pSorter == 0) {
+	if (pSorter == 0)
+		return -1;
+
+	pSorter->key_def = pCsr->key_def;
+	pSorter->pgsz = pgsz = 1024;
+	pSorter->db = db;
+	pSorter->aTask.pSorter = pSorter;
+
+	/* Cache size in bytes */
+	i64 mxCache;
+	u32 szPma = sqlGlobalConfig.szPma;
+	pSorter->mnPmaSize = szPma * pgsz;
+
+	mxCache = SQL_DEFAULT_CACHE_SIZE;
+	mxCache = mxCache * -1024;
+	mxCache = MIN(mxCache, SQL_MAX_PMASZ);
+	pSorter->mxPmaSize = MAX(pSorter->mnPmaSize, (int)mxCache);
+	assert(pSorter->iMemory == 0);
+	pSorter->nMemory = pgsz;
+	pSorter->list.aMemory = (u8 *) sqlMalloc(pgsz);
+	if (!pSorter->list.aMemory)
 		rc = -1;
-	} else {
-		pSorter->key_def = pCsr->key_def;
-		pSorter->pgsz = pgsz = 1024;
-		pSorter->db = db;
-		pSorter->aTask.pSorter = pSorter;
 
-		i64 mxCache;	/* Cache size in bytes */
-		u32 szPma = sqlGlobalConfig.szPma;
-		pSorter->mnPmaSize = szPma * pgsz;
-
-		mxCache = SQL_DEFAULT_CACHE_SIZE;
-		mxCache = mxCache * -1024;
-		mxCache = MIN(mxCache, SQL_MAX_PMASZ);
-		pSorter->mxPmaSize =
-		    MAX(pSorter->mnPmaSize, (int)mxCache);
-
-		/* EVIDENCE-OF: R-26747-61719 When the application provides any amount of
-		 * scratch memory using SQL_CONFIG_SCRATCH, sql avoids unnecessary
-		 * large heap allocations.
-		 */
-		if (sqlGlobalConfig.pScratch == 0) {
-			assert(pSorter->iMemory == 0);
-			pSorter->nMemory = pgsz;
-			pSorter->list.aMemory =
-			    (u8 *) sqlMalloc(pgsz);
-			if (!pSorter->list.aMemory)
-				rc = -1;
-		}
-
-		if (pCsr->key_def->part_count < 13
-		    && (pCsr->key_def->parts[0].coll == NULL)) {
-			pSorter->typeMask =
-			    SORTER_TYPE_INTEGER | SORTER_TYPE_TEXT;
-		}
-	}
+	if (pCsr->key_def->part_count < 13 &&
+	    pCsr->key_def->parts[0].coll == NULL)
+		pSorter->typeMask = SORTER_TYPE_INTEGER | SORTER_TYPE_TEXT;
 
 	return rc;
 }
@@ -1486,9 +1475,6 @@ sqlVdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
 	 *
 	 *   * The total memory allocated for the in-memory list is greater
 	 *     than (page-size * cache-size), or
-	 *
-	 *   * The total memory allocated for the in-memory list is greater
-	 *     than (page-size * 10) and sqlHeapNearlyFull() returns true.
 	 */
 	nReq = pVal->n + sizeof(SorterRecord);
 	nPMA = pVal->n + sqlVarintLen(pVal->n);
@@ -1497,10 +1483,7 @@ sqlVdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
 			bFlush = pSorter->iMemory
 			    && (pSorter->iMemory + nReq) > pSorter->mxPmaSize;
 		} else {
-			bFlush = ((pSorter->list.szPMA > pSorter->mxPmaSize)
-				  || (pSorter->list.szPMA > pSorter->mnPmaSize
-				      && sqlHeapNearlyFull())
-			    );
+			bFlush = ((pSorter->list.szPMA > pSorter->mxPmaSize));
 		}
 		if (bFlush) {
 			rc = vdbeSorterFlushPMA(pSorter);

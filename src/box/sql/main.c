@@ -105,11 +105,6 @@ sql_initialize(void)
 	if (sqlGlobalConfig.isInit)
 		return 0;
 
-	if (!sqlGlobalConfig.isMallocInit)
-		sqlMallocInit();
-	if (rc == 0)
-		sqlGlobalConfig.isMallocInit = 1;
-
 	/* If rc is not 0 at this point, then the malloc
 	 * subsystem could not be initialized.
 	 */

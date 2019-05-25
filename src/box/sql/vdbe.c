@@ -226,10 +226,6 @@ allocateCursor(
 	 *     different sized allocations. Memory cells provide growable
 	 *     allocations.
 	 *
-	 *   * When using ENABLE_MEMORY_MANAGEMENT, memory cell buffers can
-	 *     be freed lazily via the sql_release_memory() API. This
-	 *     minimizes the number of malloc calls made by the system.
-	 *
 	 * The memory cell for cursor 0 is aMem[0]. The rest are allocated from
 	 * the top of the register space.  Cursor 1 is at Mem[p->nMem-1].
 	 * Cursor 2 is at Mem[p->nMem-2]. And so forth.
@@ -751,7 +747,6 @@ int sqlVdbeExec(Vdbe *p)
 	assert(p->explain==0);
 	p->pResultSet = 0;
 #ifdef SQL_DEBUG
-	sqlBeginBenignMalloc();
 	if (p->pc == 0 &&
 	    (p->sql_flags & (SQL_VdbeListing|SQL_VdbeEQP|SQL_VdbeTrace)) != 0) {
 		int i;
@@ -775,7 +770,6 @@ int sqlVdbeExec(Vdbe *p)
 		if ((p->sql_flags & SQL_VdbeTrace) != 0)
 			printf("VDBE Trace:\n");
 	}
-	sqlEndBenignMalloc();
 #endif
 	for(pOp=&aOp[p->pc]; 1; pOp++) {
 		/* Errors are detected by individual opcodes, with an immediate

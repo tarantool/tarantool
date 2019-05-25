@@ -31,7 +31,6 @@ add_library(sql STATIC
     date.c
     delete.c
     expr.c
-    fault.c
     fk_constraint.c
     func.c
     global.c
@@ -49,7 +48,6 @@ add_library(sql STATIC
     random.c
     resolve.c
     select.c
-    status.c
     tokenize.c
     treeview.c
     trigger.c

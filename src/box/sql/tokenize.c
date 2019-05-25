@@ -430,7 +430,7 @@ sql_token(const char *z, int *type, bool *is_reserved)
 static void
 parser_space_delete(struct sql *db, struct space *space)
 {
-	if (space == NULL || db == NULL || db->pnBytesFreed == 0)
+	if (space == NULL || db == NULL)
 		return;
 	assert(space->def->opts.is_ephemeral);
 	for (uint32_t i = 0; i < space->index_count; ++i)
@@ -514,11 +514,6 @@ sqlRunParser(Parse * pParse, const char *zSql)
 		}
 	}
 	pParse->zTail = &zSql[i];
-#ifdef YYTRACKMAXSTACKDEPTH
-	sqlStatusHighwater(SQL_STATUS_PARSER_STACK,
-			       sqlParserStackPeak(pEngine)
-	    );
-#endif				/* YYDEBUG */
 	sqlParserFree(pEngine, sql_free);
 	if (db->mallocFailed)
 		pParse->is_aborted = true;

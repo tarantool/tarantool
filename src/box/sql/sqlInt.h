@@ -168,15 +168,6 @@
 #define SQL_NOINLINE
 #endif
 
-/*
- * EVIDENCE-OF: R-25715-37072 Memory allocation statistics are enabled by
- * default unless sql is compiled with sql_DEFAULT_MEMSTATUS=0 in
- * which case memory allocation statistics are disabled by default.
- */
-#if !defined(SQL_DEFAULT_MEMSTATUS)
-#define SQL_DEFAULT_MEMSTATUS 1
-#endif
-
 #if defined(SQL_SYSTEM_MALLOC) \
   + defined(SQL_ZERO_MALLOC) > 1
 #error "Two or more of the following compile-time configuration options\
@@ -578,13 +569,6 @@ sql_initialize(void);
 
 #define SQL_DETERMINISTIC    0x800
 
-#define SQL_STATUS_MEMORY_USED          0
-#define SQL_STATUS_MALLOC_SIZE          5
-#define SQL_STATUS_PARSER_STACK         6
-#define SQL_STATUS_PAGECACHE_SIZE       7
-#define SQL_STATUS_SCRATCH_SIZE         8
-#define SQL_STATUS_MALLOC_COUNT         9
-
 int
 sql_create_function_v2(sql * db,
 			   const char *zFunctionName,
@@ -779,16 +763,6 @@ sql_bind_parameter_lindex(sql_stmt * pStmt, const char *zName,
 */
 #ifndef SQL_DEFAULT_COMPOUND_SELECT
 #define SQL_DEFAULT_COMPOUND_SELECT 30
-#endif
-
-/*
- * The default initial allocation for the pagecache when using separate
- * pagecaches for each database connection.  A positive number is the
- * number of pages.  A negative number N translations means that a buffer
- * of -1024*N bytes is allocated and used for as many pages as it will hold.
- */
-#ifndef SQL_DEFAULT_PCACHE_INITSZ
-#define SQL_DEFAULT_PCACHE_INITSZ 100
 #endif
 
 /*
@@ -1133,7 +1107,6 @@ struct sql {
 	u16 dbOptFlags;		/* Flags to enable/disable optimizations */
 	u8 enc;			/* Text encoding */
 	u8 mallocFailed;	/* True if we have seen a malloc failure */
-	u8 bBenignMalloc;	/* Do not require OOMs if true */
 	u8 dfltLockMode;	/* Default locking-mode for attached dbs */
 	u8 mTrace;		/* zero or more sql_TRACE flags */
 	u32 magic;		/* Magic number for detect library misuse */
@@ -1162,7 +1135,6 @@ struct sql {
 	void (*xUpdateCallback) (void *, int, const char *, const char *,
 				 sql_int64);
 	Hash aFunc;		/* Hash table of connection functions */
-	int *pnBytesFreed;	/* If not NULL, increment this in DbFree() */
 };
 
 /*
@@ -1223,11 +1195,7 @@ struct sql {
  * than being distinct from one another.
  */
 #define SQL_MAGIC_OPEN     0xa029a697	/* Database is open */
-#define SQL_MAGIC_CLOSED   0x9f3c2d33	/* Database is closed */
-#define SQL_MAGIC_SICK     0x4b771290	/* Error and awaiting close */
 #define SQL_MAGIC_BUSY     0xf03b7906	/* Database currently in use */
-#define SQL_MAGIC_ERROR    0xb5357930	/* An sql_MISUSE error occurred */
-#define SQL_MAGIC_ZOMBIE   0x64cffc7f	/* Close with last statement close */
 
 /**
  * SQL type definition. Now it is an alias to type, but in
@@ -2563,32 +2531,14 @@ struct StrAccum {
  * This structure also contains some state information.
  */
 struct sqlConfig {
-	int bMemstat;		/* True to enable memory status */
-	int bOpenUri;		/* True to interpret filenames as URIs */
-	int bUseCis;		/* Use covering indices for full-scans */
-	int mxStrlen;		/* Maximum string length */
-	int neverCorrupt;	/* Database is always well-formed */
-	int nStmtSpill;		/* Stmt-journal spill-to-disk threshold */
-	void *pHeap;		/* Heap storage space */
-	int nHeap;		/* Size of pHeap[] */
-	int mnReq, mxReq;	/* Min and max heap requests sizes */
 	sql_int64 szMmap;	/* mmap() space per open file */
 	sql_int64 mxMmap;	/* Maximum value for szMmap */
-	void *pScratch;		/* Scratch memory */
-	int szScratch;		/* Size of each scratch buffer */
-	int nScratch;		/* Number of scratch buffers */
-	void *pPage;		/* Page cache memory */
-	int szPage;		/* Size of each page in pPage[] */
-	int nPage;		/* Number of pages in pPage[] */
-	int mxParserStack;	/* maximum depth of the parser stack */
-	int sharedCacheEnabled;	/* true if shared-cache mode enabled */
 	u32 szPma;		/* Maximum Sorter PMA size */
 	/* The above might be initialized to non-zero.  The following need to always
 	 * initially be zero, however.
 	 */
 	int isInit;		/* True after initialization has finished */
 	int inProgress;		/* True while initialization in progress */
-	int isMallocInit;	/* True after malloc is initialized */
 #ifdef SQL_VDBE_COVERAGE
 	/* The following callback (if not NULL) is invoked on every VDBE branch
 	 * operation.  Set the callback using sql_TESTCTRL_VDBE_COVERAGE.
@@ -2596,7 +2546,6 @@ struct sqlConfig {
 	void (*xVdbeBranch) (void *, int iSrcLine, u8 eThis, u8 eMx);	/* Callback */
 	void *pVdbeBranchArg;	/* 1st argument */
 #endif
-	int bLocaltimeFault;	/* True to fail localtime() calls */
 	int iOnceResetThreshold;	/* When to reset OP_Once counters */
 };
 
@@ -2685,7 +2634,6 @@ int sqlStrICmp(const char *, const char *);
 unsigned sqlStrlen30(const char *);
 #define sqlStrNICmp sql_strnicmp
 
-void sqlMallocInit(void);
 void *sqlMalloc(u64);
 void *sqlMallocZero(u64);
 void *sqlDbMallocZero(sql *, u64);
@@ -2698,8 +2646,6 @@ void *sqlDbReallocOrFree(sql *, void *, u64);
 void *sqlDbRealloc(sql *, void *, u64);
 void sqlDbFree(sql *, void *);
 int sqlMallocSize(void *);
-void sqlBenignMallocHooks(void (*)(void), void (*)(void));
-int sqlHeapNearlyFull(void);
 
 /*
  * On systems with ample stack space and that support alloca(), make
@@ -2718,11 +2664,6 @@ int sqlHeapNearlyFull(void);
 #define sqlStackAllocZero(D,N)  sqlDbMallocZero(D,N)
 #define sqlStackFree(D,P)       sqlDbFree(D,P)
 #endif
-
-sql_int64 sqlStatusValue(int);
-void sqlStatusUp(int, int);
-void sqlStatusDown(int, int);
-void sqlStatusHighwater(int, int);
 
 int sqlIsNaN(double);
 
@@ -4348,7 +4289,14 @@ int sqlCreateFunc(sql *, const char *, enum field_type,
 		      void (*)(sql_context *, int, sql_value **),
 		      void (*)(sql_context *),
 		      FuncDestructor * pDestructor);
-void sqlOomFault(sql *);
+
+/** Set OOM error flag. */
+static inline void
+sqlOomFault(struct sql *db)
+{
+	db->mallocFailed = 1;
+}
+
 void sqlOomClear(sql *);
 int sqlApiExit(sql * db, int);
 
@@ -4529,13 +4477,6 @@ fk_constraint_emit_actions(struct Parse *parser, struct space *space, int reg_ol
  */
 bool
 fk_constraint_is_required(struct space *space, const int *changes);
-
-/*
- * The interface to the code in fault.c used for identifying "benign"
- * malloc failures.
- */
-void sqlBeginBenignMalloc(void);
-void sqlEndBenignMalloc(void);
 
 /*
  * Allowed return values from sqlFindInIndex()

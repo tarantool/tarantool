@@ -536,9 +536,6 @@ clearYMD_HMS_TZ(DateTime * p)
  * is available.  This routine returns 0 on success and
  * non-zero on any kind of error.
  *
- * If the sqlGlobalConfig.bLocaltimeFault variable is true then this
- * routine will always fail.
- *
  * EVIDENCE-OF: R-62172-00036 In this implementation, the standard C
  * library function localtime_r() is used to assist in the calculation of
  * local time.
@@ -550,18 +547,10 @@ osLocaltime(time_t * t, struct tm *pTm)
 #if !HAVE_LOCALTIME_R && !HAVE_LOCALTIME_S
 	struct tm *pX;
 	pX = localtime(t);
-
-	if (sqlGlobalConfig.bLocaltimeFault)
-		pX = 0;
-
 	if (pX)
 		*pTm = *pX;
 	rc = pX == 0;
 #else
-
-	if (sqlGlobalConfig.bLocaltimeFault)
-		return 1;
-
 #if HAVE_LOCALTIME_R
 	rc = localtime_r(t, pTm) == 0;
 #else
