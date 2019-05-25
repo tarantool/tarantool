@@ -386,13 +386,13 @@ int tarantoolsqlEphemeralInsert(struct space *space, const char *tuple,
 }
 
 /* Simply delete ephemeral space by calling space_delete(). */
-int tarantoolsqlEphemeralDrop(BtCursor *pCur)
+void
+tarantoolsqlEphemeralDrop(BtCursor *pCur)
 {
 	assert(pCur);
 	assert(pCur->curFlags & BTCF_TEphemCursor);
 	space_delete(pCur->space);
 	pCur->space = NULL;
-	return 0;
 }
 
 static inline int

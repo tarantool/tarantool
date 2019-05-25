@@ -89,7 +89,9 @@ int tarantoolsqlEphemeralInsert(struct space *space, const char *tuple,
 int tarantoolsqlEphemeralDelete(BtCursor * pCur);
 int64_t
 tarantoolsqlEphemeralCount(struct BtCursor *pCur);
-int tarantoolsqlEphemeralDrop(BtCursor * pCur);
+void
+tarantoolsqlEphemeralDrop(BtCursor * pCur);
+
 int tarantoolsqlEphemeralClearTable(BtCursor * pCur);
 
 /**
