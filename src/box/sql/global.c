@@ -196,8 +196,6 @@ SQL_WSD struct sqlConfig sqlConfig = {
 	0,			/* isInit */
 	0,			/* inProgress */
 	0,			/* isMallocInit */
-	0,			/* xLog */
-	0,			/* pLogArg */
 #ifdef SQL_VDBE_COVERAGE
 	0,			/* xVdbeBranch */
 	0,			/* pVbeBranchArg */

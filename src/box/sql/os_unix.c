@@ -1073,10 +1073,9 @@ unixUnmapfile(unixFile * pFd)
  *       unixFile.mmapSize
  *       unixFile.mmapSizeActual
  *
- * If unsuccessful, an error message is logged via sql_log() and
- * the three variables above are zeroed. In this case sql should
- * continue accessing the database using the xRead() and xWrite()
- * methods.
+ * If unsuccessful,the three variables above are zeroed. In this
+ * case sql should continue accessing the database using the
+ * xRead() and xWrite() methods.
  */
 static void
 unixRemapfile(unixFile * pFd,	/* File descriptor object */

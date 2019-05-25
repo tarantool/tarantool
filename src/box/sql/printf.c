@@ -1114,40 +1114,6 @@ sql_snprintf(int n, char *zBuf, const char *zFormat, ...)
 	return z;
 }
 
-/*
- * This is the routine that actually formats the sql_log() message.
- * We house it in a separate routine from sql_log() to avoid using
- * stack space on small-stack systems when logging is disabled.
- *
- * sqlVXPrintf() might ask for *temporary* memory allocations for
- * certain format characters (%q) or for very large precisions or widths.
- */
-static void
-renderLogMsg(int iErrCode, const char *zFormat, va_list ap)
-{
-	StrAccum acc;		/* String accumulator */
-	char zMsg[SQL_PRINT_BUF_SIZE * 3];	/* Complete log message */
-
-	sqlStrAccumInit(&acc, 0, zMsg, sizeof(zMsg), 0);
-	sqlVXPrintf(&acc, zFormat, ap);
-	sqlGlobalConfig.xLog(sqlGlobalConfig.pLogArg, iErrCode,
-				 sqlStrAccumFinish(&acc));
-}
-
-/*
- * Format and write a message to the log if logging is enabled.
- */
-void
-sql_log(int iErrCode, const char *zFormat, ...)
-{
-	va_list ap;		/* Vararg list */
-	if (sqlGlobalConfig.xLog) {
-		va_start(ap, zFormat);
-		renderLogMsg(iErrCode, zFormat, ap);
-		va_end(ap);
-	}
-}
-
 #if defined(SQL_DEBUG)
 /*
  * A version of printf() that understands %lld.  Used for debugging.

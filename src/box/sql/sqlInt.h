@@ -554,9 +554,6 @@ sql_row_count(struct sql_context *context, MAYBE_UNUSED int unused1,
 void *
 sql_user_data(sql_context *);
 
-void
-sql_log(int iErrCode, const char *zFormat, ...);
-
 void *
 sql_aggregate_context(sql_context *,
 			  int nBytes);
@@ -2592,8 +2589,6 @@ struct sqlConfig {
 	int isInit;		/* True after initialization has finished */
 	int inProgress;		/* True while initialization in progress */
 	int isMallocInit;	/* True after malloc is initialized */
-	void (*xLog) (void *, int, const char *);	/* Function for logging */
-	void *pLogArg;		/* First argument to xLog() */
 #ifdef SQL_VDBE_COVERAGE
 	/* The following callback (if not NULL) is invoked on every VDBE branch
 	 * operation.  Set the callback using sql_TESTCTRL_VDBE_COVERAGE.

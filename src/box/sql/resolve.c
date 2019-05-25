@@ -363,8 +363,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 		 * The ability to use an output result-set column in the WHERE, GROUP BY,
 		 * or HAVING clauses, or as part of a larger expression in the ORDER BY
 		 * clause is not standard SQL.  This is a (goofy) sql extension, that
-		 * is supported for backwards compatibility only. Hence, we issue a warning
-		 * on sql_log() whenever the capability is used.
+		 * is supported for backwards compatibility only.
 		 */
 		if ((pEList = pNC->pEList) != 0 && zTab == 0 && cnt == 0) {
 			for (j = 0; j < pEList->nExpr; j++) {
