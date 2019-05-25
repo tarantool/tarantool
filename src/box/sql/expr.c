@@ -2765,7 +2765,6 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 			 * then NUMBER type is used.
 			 */
 			pExpr->iTable = pParse->nTab++;
-			pExpr->is_ephemeral = 1;
 			int reg_eph = ++pParse->nMem;
 			addr = sqlVdbeAddOp2(v, OP_OpenTEphemeral,
 						 reg_eph, nVal);

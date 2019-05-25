@@ -2051,9 +2051,6 @@ struct Expr {
 				 * EP_Unlikely:  134217728 times likelihood
 				 * TK_SELECT: 1st register of result vector
 				 */
-	bool is_ephemeral;      /* If iTable was set, this flags if this table i
-				 * ephemeral or not.
-				 */
 	ynVar iColumn;		/* TK_COLUMN: column index.
 				 * TK_VARIABLE: variable number (always >= 1).
 				 * TK_SELECT_COLUMN: column of the result vector
