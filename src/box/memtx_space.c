@@ -870,10 +870,70 @@ memtx_init_ephemeral_space(struct space *space)
 	memtx_space_add_primary_key(space);
 }
 
+/* Ongoing index build state used by memtx_build_on_replace triggers. */
+struct memtx_build_state {
+	/* The index being built. */
+	struct index *index;
+	/* New index format to be enforced. */
+	struct tuple_format *format;
+	/* Index build cursor. Marks the last tuple inserted to date */
+	struct tuple *cursor;
+	/* Primary key key_def to compare inserted tuples with cursor. */
+	struct key_def *cmp_def;
+	struct diag diag;
+	int rc;
+};
+
+static void
+memtx_build_on_replace(struct trigger *trigger, void *event)
+{
+	struct txn *txn = event;
+	struct memtx_build_state *state = trigger->data;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+
+	struct tuple *cmp_tuple = stmt->new_tuple != NULL ? stmt->new_tuple :
+							    stmt->old_tuple;
+	/*
+	 * Only update the already built part of an index. All the other
+	 * tuples will be inserted when build continues.
+	 */
+	if (tuple_compare(state->cursor, HINT_NONE, cmp_tuple, HINT_NONE,
+			  state->cmp_def) < 0)
+		return;
+
+	if (stmt->new_tuple != NULL &&
+	    tuple_validate(state->format, stmt->new_tuple) != 0) {
+		state->rc = -1;
+		diag_move(diag_get(), &state->diag);
+		return;
+	}
+
+	struct tuple *delete = NULL;
+	enum dup_replace_mode mode =
+		state->index->def->opts.is_unique ? DUP_INSERT :
+						    DUP_REPLACE_OR_INSERT;
+	state->rc = index_replace(state->index, stmt->old_tuple,
+				  stmt->new_tuple, mode, &delete);
+
+	if (state->rc != 0) {
+		diag_move(diag_get(), &state->diag);
+	}
+	return;
+}
+
 static int
 memtx_space_build_index(struct space *src_space, struct index *new_index,
 			struct tuple_format *new_format)
 {
+	/*
+	 * Yield every 1K tuples.
+	 * In debug mode yield more often for testing purposes.
+	 */
+#ifdef NDEBUG
+	enum { YIELD_LOOPS = 1000 };
+#else
+	enum { YIELD_LOOPS = 10 };
+#endif
 	/**
 	 * If it's a secondary key, and we're not building them
 	 * yet (i.e. it's snapshot recovery for memtx), do nothing.
@@ -899,6 +959,17 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	if (it == NULL)
 		return -1;
 
+	struct memtx_build_state state;
+	state.index = new_index;
+	state.format = new_format;
+	state.cmp_def = pk->def->key_def;
+	state.rc = 0;
+	diag_create(&state.diag);
+
+	struct trigger on_replace;
+	trigger_create(&on_replace, memtx_build_on_replace, &state, NULL);
+	trigger_add(&src_space->on_replace, &on_replace);
+
 	/*
 	 * The index has to be built tuple by tuple, since
 	 * there is no guarantee that all tuples satisfy
@@ -909,6 +980,7 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	/* Build the new index. */
 	int rc;
 	struct tuple *tuple;
+	size_t count = 0;
 	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL) {
 		/*
 		 * Check that the tuple is OK according to the
@@ -933,8 +1005,30 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		 */
 		if (new_index->def->iid == 0)
 			tuple_ref(tuple);
+		if (++count % YIELD_LOOPS == 0) {
+			/*
+			 * Remember the latest inserted tuple to
+			 * avoid processing yet to be added tuples
+			 * in on_replace triggers.
+			 */
+			state.cursor = tuple;
+			tuple_ref(state.cursor);
+			fiber_sleep(0);
+			tuple_unref(state.cursor);
+			/*
+			 * The on_replace trigger may have failed
+			 * during the yield.
+			 */
+			if (state.rc != 0) {
+				rc = -1;
+				diag_move(&state.diag, diag_get());
+				break;
+			}
+		}
 	}
 	iterator_delete(it);
+	diag_destroy(&state.diag);
+	trigger_clear(&on_replace);
 	return rc;
 }
 
