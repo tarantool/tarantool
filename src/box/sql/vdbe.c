@@ -566,7 +566,7 @@ vdbe_autoinc_id_list(struct Vdbe *vdbe)
 	return &vdbe->autoinc_id_list;
 }
 
-int
+static int
 vdbe_add_new_autoinc_id(struct Vdbe *vdbe, int64_t id)
 {
 	assert(vdbe != NULL);
@@ -4227,12 +4227,17 @@ case OP_SorterInsert: {      /* in2 */
 	break;
 }
 
-/* Opcode: IdxInsert P1 P2 * P4 P5
+/* Opcode: IdxInsert P1 P2 P3 P4 P5
  * Synopsis: key=r[P1]
  *
  * @param P1 Index of a register with MessagePack data to insert.
  * @param P2 If P4 is not set, then P2 is register containing pointer
  *           to space to insert into.
+ * @param P3 If not 0, than it is an index of a register that
+ *           contains value that will be inserted into field with
+ *           AUTOINCREMENT. If the value is NULL, than the newly
+ *           generated autoincrement value will be saved to VDBE
+ *           context.
  * @param P4 Pointer to the struct space to insert to.
  * @param P5 Flags. If P5 contains OPFLAG_NCHANGE, then VDBE
  *        accounts the change in a case of successful insertion in
@@ -4273,6 +4278,12 @@ case OP_IdxInsert: {
 	} else {
 		rc = tarantoolsqlEphemeralInsert(space, pIn2->z,
 						     pIn2->z + pIn2->n);
+	}
+	if (rc == 0 && pOp->p3 > 0 && ((aMem[pOp->p3].flags) & MEM_Null) != 0) {
+		assert(space->sequence != NULL);
+		int64_t value = sequence_get_value(space->sequence);
+		if (vdbe_add_new_autoinc_id(p, value) != 0)
+			goto abort_due_to_error;
 	}
 
 	if (pOp->p5 & OPFLAG_OE_IGNORE) {

@@ -728,6 +728,10 @@ sqlInsert(Parse * pParse,	/* Parser context */
 			}
 		}
 
+		int autoinc_reg = 0;
+		if (autoinc_fieldno < UINT32_MAX &&
+		    pParse->triggered_space == NULL)
+			autoinc_reg = regData + autoinc_fieldno;
 		/*
 		 * Generate code to check constraints and process
 		 * final insertion.
@@ -737,7 +741,7 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		fk_constraint_emit_check(pParse, space, 0, regIns, 0);
 		vdbe_emit_insertion_completion(v, space, regIns + 1,
 					       space->def->field_count,
-					       on_error);
+					       on_error, autoinc_reg);
 	}
 
 	/* Update the count of rows that are inserted
@@ -972,14 +976,16 @@ process_index:  ;
 void
 vdbe_emit_insertion_completion(struct Vdbe *v, struct space *space,
 			       int raw_data_reg, uint32_t tuple_len,
-			       enum on_conflict_action on_conflict)
+			       enum on_conflict_action on_conflict,
+			       int autoinc_reg)
 {
 	assert(v != NULL);
 	u16 pik_flags = OPFLAG_NCHANGE;
 	SET_CONFLICT_FLAG(pik_flags, on_conflict);
 	sqlVdbeAddOp3(v, OP_MakeRecord, raw_data_reg, tuple_len,
 			  raw_data_reg + tuple_len);
-	sqlVdbeAddOp1(v, OP_IdxInsert, raw_data_reg + tuple_len);
+	sqlVdbeAddOp3(v, OP_IdxInsert, raw_data_reg + tuple_len, 0,
+		      autoinc_reg);
 	sqlVdbeChangeP4(v, -1, (char *)space, P4_SPACEPTR);
 	sqlVdbeChangeP5(v, pik_flags);
 }

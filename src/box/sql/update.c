@@ -423,7 +423,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		if (on_error == ON_CONFLICT_ACTION_REPLACE) {
 			 vdbe_emit_insertion_completion(v, space, regNew,
 							space->def->field_count,
-							on_error);
+							on_error, 0);
 
 		} else {
 			int key_reg;

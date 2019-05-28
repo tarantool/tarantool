@@ -3498,11 +3498,15 @@ vdbe_emit_ck_constraint(struct Parse *parser, struct Expr *expr,
  * @param raw_data_reg Register with raw data to insert.
  * @param tuple_len Number of registers to hold the tuple.
  * @param on_conflict On conflict action.
+ * @param autoinc_reg if not 0, then this is the register that
+ *                    contains the value that will be inserted
+ *                    into the field with AUTOINCREMENT.
  */
 void
 vdbe_emit_insertion_completion(struct Vdbe *v, struct space *space,
 			       int raw_data_reg, uint32_t tuple_len,
-			       enum on_conflict_action on_conflict);
+			       enum on_conflict_action on_conflict,
+			       int autoinc_reg);
 
 void
 sql_set_multi_write(Parse *, bool);

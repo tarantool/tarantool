@@ -551,3 +551,117 @@ box.execute("DROP TABLE t1;")
 ---
 - row_count: 1
 ...
+--
+-- gh-4188: make sure that the identifiers that were generated
+-- during the INSERT performed by the triggers are not returned.
+--
+box.execute('CREATE TABLE t1 (i INT PRIMARY KEY AUTOINCREMENT);')
+---
+- row_count: 1
+...
+box.execute('CREATE TABLE t2 (i INT PRIMARY KEY AUTOINCREMENT);')
+---
+- row_count: 1
+...
+box.execute('CREATE TABLE t3 (i INT PRIMARY KEY AUTOINCREMENT);')
+---
+- row_count: 1
+...
+box.execute('CREATE TRIGGER r1 AFTER INSERT ON t2 FOR EACH ROW BEGIN INSERT INTO t1 VALUES (null); END')
+---
+- row_count: 1
+...
+box.execute('INSERT INTO t1 VALUES (100);')
+---
+- row_count: 1
+...
+box.execute('INSERT INTO t2 VALUES (NULL), (NULL), (NULL);')
+---
+- autoincrement_ids:
+  - 1
+  - 2
+  - 3
+  row_count: 3
+...
+box.execute('SELECT * FROM t1;')
+---
+- metadata:
+  - name: I
+    type: integer
+  rows:
+  - [100]
+  - [101]
+  - [102]
+  - [103]
+...
+box.execute('SELECT * FROM t2;')
+---
+- metadata:
+  - name: I
+    type: integer
+  rows:
+  - [1]
+  - [2]
+  - [3]
+...
+box.execute('CREATE TRIGGER r2 AFTER INSERT ON t3 FOR EACH ROW BEGIN INSERT INTO t2 VALUES (null); END')
+---
+- row_count: 1
+...
+box.execute('INSERT INTO t3 VALUES (NULL), (NULL), (NULL);')
+---
+- autoincrement_ids:
+  - 1
+  - 2
+  - 3
+  row_count: 3
+...
+box.execute('SELECT * FROM t1;')
+---
+- metadata:
+  - name: I
+    type: integer
+  rows:
+  - [100]
+  - [101]
+  - [102]
+  - [103]
+  - [104]
+  - [105]
+  - [106]
+...
+box.execute('SELECT * FROM t2;')
+---
+- metadata:
+  - name: I
+    type: integer
+  rows:
+  - [1]
+  - [2]
+  - [3]
+  - [4]
+  - [5]
+  - [6]
+...
+box.execute('SELECT * FROM t3;')
+---
+- metadata:
+  - name: I
+    type: integer
+  rows:
+  - [1]
+  - [2]
+  - [3]
+...
+box.execute('DROP TABLE t1;')
+---
+- row_count: 1
+...
+box.execute('DROP TABLE t2;')
+---
+- row_count: 1
+...
+box.execute('DROP TABLE t3;')
+---
+- row_count: 1
+...

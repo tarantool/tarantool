@@ -552,8 +552,6 @@ cn:execute('insert into test values (null, 1)')
 ---
 - autoincrement_ids:
   - 127
-  - 1
-  - 2
   row_count: 1
 ...
 box.execute('create table test3 (id int primary key autoincrement)')

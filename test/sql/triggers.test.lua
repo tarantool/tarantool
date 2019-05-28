@@ -191,3 +191,27 @@ box.execute([[CREATE TRIGGER r1 AFTER INSERT ON t1 FOR EACH ROW BEGIN SELECT 1; 
 box.session.su('admin')
 box.schema.user.drop('tester')
 box.execute("DROP TABLE t1;")
+
+--
+-- gh-4188: make sure that the identifiers that were generated
+-- during the INSERT performed by the triggers are not returned.
+--
+box.execute('CREATE TABLE t1 (i INT PRIMARY KEY AUTOINCREMENT);')
+box.execute('CREATE TABLE t2 (i INT PRIMARY KEY AUTOINCREMENT);')
+box.execute('CREATE TABLE t3 (i INT PRIMARY KEY AUTOINCREMENT);')
+
+box.execute('CREATE TRIGGER r1 AFTER INSERT ON t2 FOR EACH ROW BEGIN INSERT INTO t1 VALUES (null); END')
+box.execute('INSERT INTO t1 VALUES (100);')
+box.execute('INSERT INTO t2 VALUES (NULL), (NULL), (NULL);')
+box.execute('SELECT * FROM t1;')
+box.execute('SELECT * FROM t2;')
+
+box.execute('CREATE TRIGGER r2 AFTER INSERT ON t3 FOR EACH ROW BEGIN INSERT INTO t2 VALUES (null); END')
+box.execute('INSERT INTO t3 VALUES (NULL), (NULL), (NULL);')
+box.execute('SELECT * FROM t1;')
+box.execute('SELECT * FROM t2;')
+box.execute('SELECT * FROM t3;')
+
+box.execute('DROP TABLE t1;')
+box.execute('DROP TABLE t2;')
+box.execute('DROP TABLE t3;')

@@ -216,9 +216,6 @@ sequence_next(struct sequence *seq, int64_t *result)
 					  new_data) == light_sequence_end)
 			return -1;
 		*result = def->start;
-		if (txn_vdbe() != NULL &&
-		    vdbe_add_new_autoinc_id(txn_vdbe(), *result) != 0)
-			return -1;
 		return 0;
 	}
 	old_data = light_sequence_get(&sequence_data_index, pos);
@@ -253,9 +250,6 @@ done:
 				   new_data, &old_data) == light_sequence_end)
 		unreachable();
 	*result = value;
-	if (txn_vdbe() != NULL &&
-	    vdbe_add_new_autoinc_id(txn_vdbe(), value) != 0)
-		return -1;
 	return 0;
 overflow:
 	if (!def->cycle) {
@@ -367,4 +361,16 @@ sequence_data_iterator_create(void)
 	light_sequence_iterator_begin(&sequence_data_index, &iter->iter);
 	light_sequence_iterator_freeze(&sequence_data_index, &iter->iter);
 	return &iter->base;
+}
+
+int64_t
+sequence_get_value(struct sequence *seq)
+{
+	uint32_t key = seq->def->id;
+	uint32_t hash = sequence_hash(key);
+	uint32_t pos = light_sequence_find_key(&sequence_data_index, hash, key);
+	assert(pos != light_sequence_end);
+	struct sequence_data data = light_sequence_get(&sequence_data_index,
+						       pos);
+	return data.value;
 }
