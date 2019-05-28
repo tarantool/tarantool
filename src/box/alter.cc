@@ -124,14 +124,30 @@ access_check_ddl(const char *name, uint32_t object_id, uint32_t owner_uid,
  * is incompatible with a sequence.
  */
 static void
-index_def_check_sequence(struct index_def *index_def, uint32_t sequence_part,
-			 const char *space_name)
+index_def_check_sequence(struct index_def *index_def, uint32_t sequence_fieldno,
+			 const char *sequence_path, const char *space_name)
 {
-	if (sequence_part >= index_def->key_def->part_count) {
-		tnt_raise(ClientError, ER_MODIFY_INDEX, index_def->name,
-			  space_name, "sequence part is out of bounds");
+	struct key_def *key_def = index_def->key_def;
+	struct key_part *sequence_part = NULL;
+	for (uint32_t i = 0; i < key_def->part_count; ++i) {
+		struct key_part *part = &key_def->parts[i];
+		if (part->fieldno != sequence_fieldno)
+			continue;
+		if ((part->path == NULL && sequence_path == NULL) ||
+		    (part->path != NULL && sequence_path != NULL &&
+		     json_path_cmp(part->path, part->path_len,
+				   sequence_path, strlen(sequence_path),
+				   TUPLE_INDEX_BASE) == 0)) {
+			sequence_part = part;
+			break;
+		}
 	}
-	enum field_type type = index_def->key_def->parts[sequence_part].type;
+	if (sequence_part == NULL) {
+		tnt_raise(ClientError, ER_MODIFY_INDEX, index_def->name,
+			  space_name, "sequence field must be a part of "
+			  "the index");
+	}
+	enum field_type type = sequence_part->type;
 	if (type != FIELD_TYPE_UNSIGNED && type != FIELD_TYPE_INTEGER) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX, index_def->name,
 			  space_name, "sequence cannot be used with "
@@ -284,8 +300,8 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	index_def_check_xc(index_def, space_name(space));
 	space_check_index_def_xc(space, index_def);
 	if (index_def->iid == 0 && space->sequence != NULL)
-		index_def_check_sequence(index_def, space->sequence_part,
-					 space_name(space));
+		index_def_check_sequence(index_def, space->sequence_fieldno,
+					 space->sequence_path, space_name(space));
 	index_def_guard.is_active = false;
 	return index_def;
 }
@@ -861,7 +877,8 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	space_prepare_alter_xc(alter->old_space, alter->new_space);
 
 	alter->new_space->sequence = alter->old_space->sequence;
-	alter->new_space->sequence_part = alter->old_space->sequence_part;
+	alter->new_space->sequence_fieldno = alter->old_space->sequence_fieldno;
+	alter->new_space->sequence_path = alter->old_space->sequence_path;
 	memcpy(alter->new_space->access, alter->old_space->access,
 	       sizeof(alter->old_space->access));
 
@@ -3340,12 +3357,6 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 				BOX_SPACE_SEQUENCE_FIELD_SEQUENCE_ID);
 	bool is_generated = tuple_field_bool_xc(tuple,
 				BOX_SPACE_SEQUENCE_FIELD_IS_GENERATED);
-	/* Sequence part was added in 2.2.1. */
-	uint32_t sequence_part = 0;
-	if (tuple_field_count(tuple) > BOX_SPACE_SEQUENCE_FIELD_PART) {
-		sequence_part = tuple_field_u32_xc(tuple,
-					BOX_SPACE_SEQUENCE_FIELD_PART);
-	}
 
 	struct space *space = space_cache_find_xc(space_id);
 	struct sequence *seq = sequence_cache_find(sequence_id);
@@ -3378,21 +3389,58 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 
 	if (stmt->new_tuple != NULL) {			/* INSERT, UPDATE */
 		struct index *pk = index_find_xc(space, 0);
-		index_def_check_sequence(pk->def, sequence_part,
+
+		/* Sequence field was added in 2.2.1. */
+		uint32_t sequence_fieldno;
+		const char *sequence_path_raw;
+		uint32_t sequence_path_len;
+		if (tuple_field_count(tuple) > BOX_SPACE_SEQUENCE_FIELD_FIELDNO) {
+			sequence_fieldno = tuple_field_u32_xc(tuple,
+					BOX_SPACE_SEQUENCE_FIELD_FIELDNO);
+			sequence_path_raw = tuple_field_str_xc(tuple,
+					BOX_SPACE_SEQUENCE_FIELD_PATH,
+					&sequence_path_len);
+		} else {
+			struct key_part *part = &pk->def->key_def->parts[0];
+			sequence_fieldno = part->fieldno;
+			sequence_path_raw = part->path;
+			sequence_path_len = part->path_len;
+		}
+		char *sequence_path = NULL;
+		if (sequence_path_len > 0) {
+			sequence_path = (char *)malloc(sequence_path_len + 1);
+			if (sequence_path == NULL)
+				tnt_raise(OutOfMemory, sequence_path_len + 1,
+					  "malloc", "sequence path");
+			memcpy(sequence_path, sequence_path_raw,
+			       sequence_path_len);
+			sequence_path[sequence_path_len] = 0;
+		}
+		auto sequence_path_guard = make_scoped_guard([=] {
+			free(sequence_path);
+		});
+
+		index_def_check_sequence(pk->def, sequence_fieldno,
+					 sequence_path,
 					 space_name(space));
-		if (seq->is_generated && seq != space->sequence) {
+		if (seq->is_generated) {
 			tnt_raise(ClientError, ER_ALTER_SPACE,
 				  space_name(space),
 				  "can not attach generated sequence");
 		}
 		seq->is_generated = is_generated;
 		space->sequence = seq;
-		space->sequence_part = sequence_part;
+		space->sequence_fieldno = sequence_fieldno;
+		free(space->sequence_path);
+		space->sequence_path = sequence_path;
+		sequence_path_guard.is_active = false;
 	} else {					/* DELETE */
 		assert(space->sequence == seq);
-		assert(space->sequence_part == sequence_part);
+		seq->is_generated = false;
 		space->sequence = NULL;
-		space->sequence_part = 0;
+		space->sequence_fieldno = 0;
+		free(space->sequence_path);
+		space->sequence_path = NULL;
 	}
 }
 

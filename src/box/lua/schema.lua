@@ -593,7 +593,7 @@ end
 -- field 1-based index or full JSON path. A particular case of a
 -- full JSON path is the format field name.
 --
-local function format_field_resolve(format, path, part_idx)
+local function format_field_resolve(format, path, what)
     assert(type(path) == 'number' or type(path) == 'string')
     local idx = nil
     local relative_path = nil
@@ -636,13 +636,12 @@ local function format_field_resolve(format, path, part_idx)
     end
     -- Can't resolve field index by path.
     assert(idx == nil)
-    box.error(box.error.ILLEGAL_PARAMS, "options.parts[" .. part_idx .. "]: " ..
+    box.error(box.error.ILLEGAL_PARAMS, what .. ": " ..
               "field was not found by name '" .. path .. "'")
 
 ::done::
     if idx <= 0 then
-        box.error(box.error.ILLEGAL_PARAMS,
-                  "options.parts[" .. part_idx .. "]: " ..
+        box.error(box.error.ILLEGAL_PARAMS, what .. ": " ..
                   "field (number) must be one-based")
     end
     return idx - 1, relative_path
@@ -696,7 +695,8 @@ local function update_index_parts(format, parts)
             end
         end
         if type(part.field) == 'number' or type(part.field) == 'string' then
-            local idx, path = format_field_resolve(format, part.field, i)
+            local idx, path = format_field_resolve(format, part.field,
+                                                   "options.parts[" .. i .. "]")
             part.field = idx
             part.path = path or part.path
             parts_can_be_simplified = parts_can_be_simplified and part.path == nil
@@ -749,17 +749,193 @@ local function simplify_index_parts(parts)
     return new_parts
 end
 
-local function check_sequence_part(parts, sequence_part,
-                                   index_name, space_name)
-    if sequence_part <= 0 or sequence_part > #parts then
-        box.error(box.error.MODIFY_INDEX, index_name, space_name,
-                  "sequence part is out of bounds")
+--
+-- Raise an error if a sequence isn't compatible with a given
+-- index definition.
+--
+local function space_sequence_check(sequence, parts, space_name, index_name)
+    local sequence_part = nil
+    if sequence.field ~= nil then
+        sequence.path = sequence.path or ''
+        -- Look up the index part corresponding to the given field.
+        for _, part in ipairs(parts) do
+            local field = part.field or part[1]
+            local path = part.path or ''
+            if sequence.field == field and sequence.path == path then
+                sequence_part = part
+                break
+            end
+        end
+        if sequence_part == nil then
+            box.error(box.error.MODIFY_INDEX, index_name, space_name,
+                      "sequence field must be a part of the index")
+        end
+    else
+        -- If the sequence field is omitted, use the first
+        -- indexed field.
+        sequence_part = parts[1]
+        sequence.field = sequence_part.field or sequence_part[1]
+        sequence.path = sequence_part.path or ''
     end
-    sequence_part = parts[sequence_part]
-    local sequence_part_type = sequence_part.type or sequence_part[2]
-    if sequence_part_type ~= 'integer' and sequence_part_type ~= 'unsigned' then
+    -- Check the type of the auto-increment field.
+    local t = sequence_part.type or sequence_part[2]
+    if t ~= 'integer' and t ~= 'unsigned' then
         box.error(box.error.MODIFY_INDEX, index_name, space_name,
                   "sequence cannot be used with a non-integer key")
+    end
+end
+
+--
+-- The first stage of a space sequence modification operation.
+-- Called before altering the space definition. Checks sequence
+-- options and detaches the old sequence from the space.
+-- Returns a proxy object that is supposed to be passed to
+-- space_sequence_alter_commit() to complete the operation.
+--
+local function space_sequence_alter_prepare(format, parts, options,
+                                            space_id, index_id,
+                                            space_name, index_name)
+    local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
+
+    -- A sequence can only be attached to a primary index.
+    if index_id ~= 0 then
+        -- Ignore 'sequence = false' for secondary indexes.
+        if not options.sequence then
+            return nil
+        end
+        box.error(box.error.MODIFY_INDEX, index_name, space_name,
+                  "sequence cannot be used with a secondary key")
+    end
+
+    -- Look up the currently attached sequence, if any.
+    local old_sequence
+    local tuple = _space_sequence:get(space_id)
+    if tuple ~= nil then
+        old_sequence = {
+            id = tuple.sequence_id,
+            is_generated = tuple.is_generated,
+            field = tuple.field,
+            path = tuple.path,
+        }
+    else
+        old_sequence = nil
+    end
+
+    if options.sequence == nil then
+        -- No sequence option, just check that the old sequence
+        -- is compatible with the new index definition.
+        if old_sequence ~= nil and old_sequence.field ~= nil then
+            space_sequence_check(old_sequence, parts, space_name, index_name)
+        end
+        return nil
+    end
+
+    -- Convert the provided option to the table format.
+    local new_sequence
+    if type(options.sequence) == 'table' then
+        -- Sequence is given as a table, just copy it.
+        -- Silently ignore unknown fields.
+        new_sequence = {
+            id = options.sequence.id,
+            field = options.sequence.field,
+        }
+    elseif options.sequence == true then
+        -- Create an auto-generated sequence.
+        new_sequence = {}
+    elseif options.sequence == false then
+        -- Drop the currently attached sequence.
+        new_sequence = nil
+    else
+        -- Attach a sequence with the given id.
+        new_sequence = {id = options.sequence}
+    end
+
+    if new_sequence ~= nil then
+        -- Resolve the sequence name.
+        if new_sequence.id ~= nil then
+            local id = sequence_resolve(new_sequence.id)
+            if id == nil then
+                box.error(box.error.NO_SUCH_SEQUENCE, new_sequence.id)
+            end
+            local tuple = _space_sequence.index.sequence:select(id)[1]
+            if tuple ~= nil and tuple.is_generated then
+                box.error(box.error.ALTER_SPACE, space_name,
+                          "can not attach generated sequence")
+            end
+            new_sequence.id = id
+        end
+        -- Resolve the sequence field.
+        if new_sequence.field ~= nil then
+            local field, path = format_field_resolve(format, new_sequence.field,
+                                                     "sequence field")
+            new_sequence.field = field
+            new_sequence.path = path
+        end
+        -- Inherit omitted options from the attached sequence.
+        if old_sequence ~= nil then
+            if new_sequence.id == nil and old_sequence.is_generated then
+                new_sequence.id = old_sequence.id
+                new_sequence.is_generated = true
+            end
+            if new_sequence.field == nil then
+                new_sequence.field = old_sequence.field
+                new_sequence.path = old_sequence.path
+            end
+        end
+        -- Check that the sequence is compatible with
+        -- the index definition.
+        space_sequence_check(new_sequence, parts, space_name, index_name)
+        -- If sequence id is omitted, we are supposed to create
+        -- a new auto-generated sequence for the given space.
+        if new_sequence.id == nil then
+            local seq = box.schema.sequence.create(space_name .. '_seq')
+            new_sequence.id = seq.id
+            new_sequence.is_generated = true
+        end
+        new_sequence.is_generated = new_sequence.is_generated or false
+    end
+
+    if old_sequence ~= nil then
+        -- Detach the old sequence before altering the space.
+        _space_sequence:delete(space_id)
+    end
+
+    return {
+        space_id = space_id,
+        new_sequence = new_sequence,
+        old_sequence = old_sequence,
+    }
+end
+
+--
+-- The second stage of a space sequence modification operation.
+-- Called after altering the space definition. Attaches the sequence
+-- to the space and drops the old sequence if required. 'proxy' is
+-- an object returned by space_sequence_alter_prepare().
+--
+local function space_sequence_alter_commit(proxy)
+    local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
+
+    if proxy == nil then
+        -- No sequence option, nothing to do.
+        return
+    end
+
+    local space_id = proxy.space_id
+    local old_sequence = proxy.old_sequence
+    local new_sequence = proxy.new_sequence
+
+    if new_sequence ~= nil then
+        -- Attach the new sequence.
+        _space_sequence:insert{space_id, new_sequence.id,
+                               new_sequence.is_generated,
+                               new_sequence.field, new_sequence.path}
+    end
+
+    if old_sequence ~= nil and old_sequence.is_generated and
+       (new_sequence == nil or old_sequence.id ~= new_sequence.id) then
+        -- Drop automatically generated sequence.
+        box.schema.sequence.drop(old_sequence.id)
     end
 end
 
@@ -787,8 +963,7 @@ local alter_index_template = {
     name = 'string',
     type = 'string',
     parts = 'table',
-    sequence = 'boolean, number, string',
-    sequence_part = 'number',
+    sequence = 'boolean, number, string, table',
 }
 for k, v in pairs(index_options) do
     alter_index_template[k] = v
@@ -898,41 +1073,15 @@ box.schema.index.create = function(space_id, name, options)
                      "please use '%s' instead", field_type, part.type)
         end
     end
-    local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
-    local sequence_is_generated = false
-    local sequence = options.sequence or nil -- ignore sequence = false
-    local sequence_part = options.sequence_part
-    if sequence_part ~= nil and sequence == nil then
-        box.error(box.error.MODIFY_INDEX, options.name, space.name,
-                  "sequence part cannot be used without sequence")
-    end
-    if sequence ~= nil then
-        if iid ~= 0 then
-            box.error(box.error.MODIFY_INDEX, name, space.name,
-                      "sequence cannot be used with a secondary key")
-        end
-        sequence_part = sequence_part or 1
-        check_sequence_part(parts, sequence_part, name, space.name)
-        if sequence == true then
-            sequence = box.schema.sequence.create(space.name .. '_seq')
-            sequence = sequence.id
-            sequence_is_generated = true
-        else
-            sequence = sequence_resolve(sequence)
-            if sequence == nil then
-                box.error(box.error.NO_SUCH_SEQUENCE, options.sequence)
-            end
-        end
-    end
     -- save parts in old format if possible
     if parts_can_be_simplified then
         parts = simplify_index_parts(parts)
     end
+    local sequence_proxy = space_sequence_alter_prepare(format, parts, options,
+                                                        space_id, iid,
+                                                        space.name, name)
     _index:insert{space_id, iid, name, options.type, index_opts, parts}
-    if sequence ~= nil then
-        _space_sequence:insert{space_id, sequence, sequence_is_generated,
-                               sequence_part - 1}
-    end
+    space_sequence_alter_commit(sequence_proxy)
     return space.index[name]
 end
 
@@ -1044,71 +1193,12 @@ box.schema.index.alter = function(space_id, index_id, options)
             parts = simplify_index_parts(parts)
         end
     end
-    local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
-    local sequence_is_generated = false
-    local sequence = options.sequence
-    local sequence_part = options.sequence_part
-    local sequence_tuple
-    if index_id ~= 0 then
-        if sequence or sequence_part ~= nil then
-            box.error(box.error.MODIFY_INDEX, options.name, space.name,
-                      "sequence cannot be used with a secondary key")
-        end
-        -- ignore 'sequence = false' for secondary indexes
-        sequence = nil
-    end
-    if sequence ~= nil or sequence_part ~= nil then
-        sequence_tuple = _space_sequence:get(space_id)
-        if sequence_tuple ~= nil then
-            -- Inherit omitted options from the attached sequence.
-            if sequence == nil then
-                sequence = sequence_tuple.sequence_id
-                sequence_is_generated = sequence_tuple.is_generated
-            end
-            if sequence and sequence_part == nil then
-                sequence_part = sequence_tuple.sequence_part
-            end
-        end
-    end
-    if sequence then
-        sequence_part = sequence_part or 1
-        check_sequence_part(parts, sequence_part, options.name, space.name)
-    elseif sequence_part ~= nil then
-        box.error(box.error.MODIFY_INDEX, options.name, space.name,
-                  "sequence part cannot be used without sequence")
-    end
-    if sequence == true then
-        if sequence_tuple == nil or sequence_tuple.is_generated == false then
-            sequence = box.schema.sequence.create(space.name .. '_seq')
-            sequence = sequence.id
-        else
-            -- Space already has an automatically generated sequence.
-            sequence = sequence_tuple.sequence_id
-        end
-        sequence_is_generated = true
-    elseif sequence then
-        sequence = sequence_resolve(sequence)
-        if sequence == nil then
-            box.error(box.error.NO_SUCH_SEQUENCE, options.sequence)
-        end
-    end
-    if sequence == false then
-        _space_sequence:delete(space_id)
-    end
+    local sequence_proxy = space_sequence_alter_prepare(format, parts, options,
+                                                        space_id, index_id,
+                                                        space.name, options.name)
     _index:replace{space_id, index_id, options.name, options.type,
                    index_opts, parts}
-    if sequence and (sequence_tuple == nil or
-                     sequence_tuple.sequence_id ~= sequence or
-                     sequence_tuple.sequence_part ~= sequence_part) then
-        _space_sequence:replace{space_id, sequence, sequence_is_generated,
-                                sequence_part - 1}
-    end
-    if sequence ~= nil and sequence_tuple ~= nil and
-       sequence_tuple.is_generated == true and
-       sequence_tuple.sequence_id ~= sequence then
-        -- Delete automatically generated sequence.
-        box.schema.sequence.drop(sequence_tuple.sequence_id)
-    end
+    space_sequence_alter_commit(sequence_proxy)
 end
 
 -- a static box_tuple_t ** instance for calling box_index_* API

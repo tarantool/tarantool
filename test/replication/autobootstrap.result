@@ -124,6 +124,9 @@ box.schema.user.grant('test_u', 'write', 'space', '_schema')
 box.schema.user.grant('test_u', 'write', 'space', '_index')
 ---
 ...
+box.schema.user.grant('test_u', 'read', 'space', '_space_sequence')
+---
+...
 box.session.su('test_u')
 ---
 ...
@@ -139,6 +142,9 @@ _ = box.space.test_u:replace({1, 2, 3, 4})
 box.space.test_u:select()
 ---
 - - [1, 2, 3, 4]
+...
+box.schema.user.revoke('test_u', 'read', 'space', '_space_sequence')
+---
 ...
 box.schema.user.revoke('test_u', 'write', 'space', '_index')
 ---

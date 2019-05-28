@@ -674,10 +674,10 @@ s.index.pk
   - type: unsigned
     is_nullable: false
     fieldno: 2
+  type: TREE
   id: 0
   space_id: 731
   name: pk
-  type: TREE
 ...
 s:select{}
 ---
@@ -704,10 +704,10 @@ s.index.pk
   - type: unsigned
     is_nullable: false
     fieldno: 1
-  id: 0
   space_id: 731
-  name: pk
+  id: 0
   type: TREE
+  name: pk
 ...
 s.index.secondary
 ---
@@ -716,10 +716,10 @@ s.index.secondary
   - type: unsigned
     is_nullable: false
     fieldno: 2
+  type: TREE
   id: 1
   space_id: 731
   name: secondary
-  type: TREE
 ...
 s.index.secondary:select{}
 ---

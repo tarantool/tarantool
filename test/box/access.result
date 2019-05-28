@@ -610,6 +610,9 @@ box.schema.user.grant('twostep', 'write', 'space', '_space')
 box.schema.user.grant('twostep', 'write', 'space', '_index')
 ---
 ...
+box.schema.user.grant('twostep', 'read', 'space', '_space_sequence')
+---
+...
 box.schema.user.grant('twostep', 'read,write', 'space', '_func')
 ---
 ...
@@ -1481,6 +1484,9 @@ box.schema.user.grant('tester', 'create' , 'sequence')
 box.schema.user.grant('tester', 'read', 'space', '_sequence')
 ---
 ...
+box.schema.user.grant('tester', 'read', 'space', '_space_sequence')
+---
+...
 box.schema.user.grant('tester', 'read', 'space', '_trigger')
 ---
 ...
@@ -1920,6 +1926,9 @@ box.schema.user.grant("test", "read", "space", "space1")
 ---
 ...
 box.schema.user.grant("test", "write", "space", "_index")
+---
+...
+box.schema.user.grant("test", "read", "space", "_space_sequence")
 ---
 ...
 box.session.su("test")

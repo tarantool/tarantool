@@ -196,15 +196,19 @@ s:create_index('pk', {parts = {1, 'string'}, sequence = 'test'}) -- error
 s:create_index('pk', {parts = {1, 'scalar'}, sequence = 'test'}) -- error
 s:create_index('pk', {parts = {1, 'number'}, sequence = 'test'}) -- error
 
-s:create_index('pk', {sequence_part = 1}) -- error
-s:create_index('pk', {sequence = true, sequence_part = 2}) -- error
-s:create_index('pk', {parts = {1, 'unsigned', 2, 'string'}, sequence = true, sequence_part = 2}) -- error
+s:create_index('pk', {sequence = {id = 'no_such_sequence'}}) -- error
+s:create_index('pk', {sequence = {field = 2}}) -- error
+s:create_index('pk', {sequence = {field = 'no.such.field'}}) -- error
+s:create_index('pk', {parts = {1, 'unsigned', 2, 'string'}, sequence = {field = 2}}) -- error
 
 pk = s:create_index('pk', {parts = {1, 'string', 2, 'unsigned'}}) -- ok
-pk:alter{sequence_part = 1} -- error
-pk:alter{sequence = true, sequence_part = 1} -- error
-pk:alter{sequence = true, sequence_part = 2} -- ok
-pk:alter{sequence = false, sequence_part = 2} -- error
+pk:alter{sequence = {id = 'no_such_sequence', field = 2}} -- error
+pk:alter{sequence = {id = 'test', field = 2}} -- ok
+pk:alter{sequence = {id = 'test', field = 1}} -- error
+pk:alter{sequence = false} -- ok
+pk:alter{sequence = {field = 1}} -- error
+pk:alter{sequence = {field = 2}} -- ok
+pk:alter{sequence = {field = 1}} -- error
 pk:alter{sequence = false} -- ok
 pk:drop()
 
@@ -216,7 +220,7 @@ pk:drop()
 pk = s:create_index('pk') -- ok
 s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = 'test'}) -- error
 s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = true}) -- error
-s:create_index('secondary', {parts = {2, 'unsigned'}, sequence_part = 1}) -- error
+s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = {field = 2}}) -- error
 sk = s:create_index('secondary', {parts = {2, 'unsigned'}}) -- ok
 sk:alter{sequence = 'test'} -- error
 sk:alter{sequence = true} -- error
@@ -240,13 +244,14 @@ box.space._index:delete{s.id, pk.id} -- error
 pk:alter{parts = {1, 'string'}, sequence = false} -- ok
 sk = s:create_index('sk', {parts = {2, 'unsigned'}})
 sk:alter{sequence = 'test'} -- error
-box.space._space_sequence:insert{s.id, sq.id, false, 0} -- error
-box.space._space_sequence:insert{s.id, sq.id, false, 2} -- error
+box.space._space_sequence:insert{s.id, sq.id, false, 0, ''} -- error
+box.space._space_sequence:insert{s.id, sq.id, false, 2, ''} -- error
 sk:drop()
 pk:drop()
-box.space._space_sequence:insert{s.id, sq.id, false, 0} -- error
+box.space._space_sequence:insert{s.id, sq.id, false, 0, ''} -- error
 
-s:create_index('pk', {sequence = {}}) -- error
+pk = s:create_index('pk', {sequence = {}}) -- ok
+pk:drop()
 s:create_index('pk', {sequence = 'abc'}) -- error
 s:create_index('pk', {sequence = 12345}) -- error
 pk = s:create_index('pk', {sequence = 'test'}) -- ok
@@ -257,7 +262,7 @@ s.index.pk.sequence_id == sq.id
 pk:drop()
 pk = s:create_index('pk', {sequence = false}) -- ok
 s.index.pk.sequence_id == nil
-pk:alter{sequence = {}} -- error
+pk:alter{sequence = {}} -- ok
 pk:alter{sequence = 'abc'} -- error
 pk:alter{sequence = 12345} -- error
 pk:alter{sequence = 'test'} -- ok
@@ -371,8 +376,9 @@ sq:drop()
 s1 = box.schema.space.create('test1')
 _ = s1:create_index('pk', {sequence = true})
 s2 = box.schema.space.create('test2')
-_ = s2:create_index('pk', {sequence = 'test1_seq'}) -- error
-box.space._space_sequence:insert{s2.id, box.sequence.test1_seq.id, false, 0} -- error
+s2:create_index('pk', {sequence = 'test1_seq'}) -- error
+_ = s2:create_index('pk')
+box.space._space_sequence:insert{s2.id, box.sequence.test1_seq.id, false, 0, ''} -- error
 
 s1:drop()
 s2:drop()
@@ -552,9 +558,9 @@ box.schema.user.grant('user', 'read', 'space', '_space_sequence')
 box.session.su('user')
 _ = s2:create_index('pk', {sequence = 'seq1'}) -- error
 s1.index.pk:alter({sequence = 'seq1'}) -- error
-box.space._space_sequence:replace{s1.id, sq1.id, false, 0} -- error
-box.space._space_sequence:replace{s1.id, sq2.id, false, 0} -- error
-box.space._space_sequence:replace{s2.id, sq1.id, false, 0} -- error
+box.space._space_sequence:replace{s1.id, sq1.id, false, 0, ''} -- error
+box.space._space_sequence:replace{s1.id, sq2.id, false, 0, ''} -- error
+box.space._space_sequence:replace{s2.id, sq1.id, false, 0, ''} -- error
 s2.index.pk:alter({sequence = 'seq2'}) -- ok
 box.session.su('admin')
 
@@ -666,21 +672,21 @@ s:drop()
 -- gh-4009: setting sequence for an index part other than the first.
 --
 s = box.schema.space.create('test')
-_ = s:create_index('pk', {parts = {1, 'string', 2, 'unsigned', 3, 'unsigned'}, sequence = true, sequence_part = 2})
+_ = s:create_index('pk', {parts = {1, 'string', 2, 'unsigned', 3, 'unsigned'}, sequence = {field = 2}})
 sequence_id = s.index.pk.sequence_id
 sequence_id ~= nil
-s.index.pk.sequence_part == 2
+s.index.pk.sequence_fieldno -- 2
 s:insert{'a', box.NULL, 1}
 s:insert{'a', box.NULL, 2}
 s:insert{'b', 10, 10}
 s:insert{'b', box.NULL, 11}
-s.index.pk:alter{sequence_part = 3}
-s.index.pk.sequence_part == 3
+s.index.pk:alter{sequence = {field = 3}}
+s.index.pk.sequence_fieldno -- 3
 s.index.pk.sequence_id == sequence_id
 s:insert{'c', 100, 100}
 s:insert{'c', 101, box.NULL}
-s.index.pk:alter{sequence = true, sequence_part = 2}
-s.index.pk.sequence_part == 2
+s.index.pk:alter{sequence = {field = 2}}
+s.index.pk.sequence_fieldno -- 2
 s.index.pk.sequence_id == sequence_id
 s:insert{'d', 1000, 1000}
 s:insert{'d', box.NULL, 1001}
@@ -690,10 +696,34 @@ s:drop()
 -- gh-4210: using sequence with a json path key part.
 --
 s = box.schema.space.create('test')
-_ = s:create_index('pk', {parts = {{'[1].a.b[1]', 'unsigned'}}, sequence = true})
+s:format{{'x', 'map'}}
+_ = s:create_index('pk', {parts = {{'x.a.b[1]', 'unsigned'}}, sequence = {field = 'x.a.b[1]'}})
+s.index.pk.sequence_fieldno -- 1
+s.index.pk.sequence_path -- .a.b[1]
 s:replace{} -- error
 s:replace{{c = {}}} -- error
 s:replace{{a = {c = {}}}} -- error
 s:replace{{a = {b = {}}}} -- error
 s:replace{{a = {b = {box.NULL}}}} -- ok
+s.index.pk:alter{sequence = false}
+s.index.pk:alter{sequence = {field = 'x.a.b[1]'}}
+s:replace{{a = {b = {box.NULL}}}} -- ok
+s:drop()
+
+--
+-- Check that altering parts of a primary index with a sequence
+-- attached requires sequence update. Renaming fields does not.
+--
+s = box.schema.space.create('test')
+s:format({{'x', 'map'}})
+pk = s:create_index('pk', {parts = {{'x.a', 'unsigned'}}})
+pk:alter{sequence = true} -- ok
+s:insert{{a = box.NULL, b = 1}}
+s:format{{'y', 'map'}} -- ok
+s:insert{{a = box.NULL, b = 2}}
+pk:alter{sequence = {field = 'y.b'}} -- error
+pk:alter{parts = {{'y.b', 'unsigned'}}} -- error
+pk:alter{parts = {{'y.b', 'unsigned'}}, sequence = {field = 'y.a'}} -- error
+pk:alter{parts = {{'y.b', 'unsigned'}}, sequence = {field = 'y.b'}} -- ok
+s:insert{{a = 3, b = box.NULL}}
 s:drop()

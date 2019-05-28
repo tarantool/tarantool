@@ -749,17 +749,28 @@ end
 -- Tarantool 2.2.1
 --------------------------------------------------------------------------------
 
--- Add sequence part field to _space_sequence table
+-- Add sequence field to _space_sequence table
 local function upgrade_sequence_to_2_2_1()
-    log.info("add key part field to space _space_sequence")
+    log.info("add sequence field to space _space_sequence")
+    local _index = box.space[box.schema.INDEX_ID]
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
     for _, v in _space_sequence:pairs() do
-        if #v == 3 then
-            _space_sequence:update(v[1], {{'!', 4, 0}})
+        if #v > 3 then
+            -- Must be a sequence created after upgrade.
+            -- It doesn't need to get updated.
+            goto continue
         end
+        -- Explicitly attach the sequence to the first index part.
+        local pk = _index:get{v[1], 0}
+        local part = pk[6][1]
+        local field = part.field or part[1]
+        local path = part.path or ''
+        _space_sequence:update(v[1], {{'!', 4, field}, {'!', 5, path}})
+        ::continue::
     end
     local format = _space_sequence:format()
-    format[4] = {name = 'part', type = 'unsigned'}
+    format[4] = {name = 'field', type = 'unsigned'}
+    format[5] = {name = 'path', type = 'string'}
     _space_sequence:format(format)
 end
 

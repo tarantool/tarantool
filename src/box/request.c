@@ -158,13 +158,14 @@ request_handle_sequence(struct request *request, struct space *space)
 		return 0;
 
 	/*
-	 * Look up the first field of the primary key.
+	 * Look up the auto-increment field.
 	 */
+	int fieldno = space->sequence_fieldno;
+	const char *path = space->sequence_path;
+
 	const char *data = request->tuple;
 	const char *data_end = request->tuple_end;
 	int len = mp_decode_array(&data);
-	struct key_part *part = &pk->def->key_def->parts[space->sequence_part];
-	int fieldno = part->fieldno;
 	if (unlikely(len < fieldno + 1))
 		return 0;
 
@@ -175,9 +176,8 @@ request_handle_sequence(struct request *request, struct space *space)
 		} while (--fieldno > 0);
 	}
 
-	if (part->path != NULL) {
-		tuple_go_to_path(&key, part->path, part->path_len,
-				 MULTIKEY_NONE);
+	if (path != NULL) {
+		tuple_go_to_path(&key, path, strlen(path), MULTIKEY_NONE);
 		if (key == NULL)
 			return 0; /* field not found */
 	}

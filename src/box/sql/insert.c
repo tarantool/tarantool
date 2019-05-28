@@ -82,11 +82,9 @@ static uint32_t
 sql_space_autoinc_fieldno(struct space *space)
 {
 	assert(space != NULL);
-	struct index *pk = space_index(space, 0);
-	if (pk == NULL || pk->def->key_def->part_count != 1 ||
-	    space->sequence == NULL)
+	if (space->sequence == NULL)
 		return UINT32_MAX;
-	return pk->def->key_def->parts[space->sequence_part].fieldno;
+	return space->sequence_fieldno;
 }
 
 /**

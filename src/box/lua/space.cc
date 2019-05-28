@@ -309,9 +309,17 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		 */
 		lua_rawset(L, -3);
 
-		lua_pushstring(L, "sequence_part");
+		lua_pushstring(L, "sequence_fieldno");
 		if (k == 0 && space->sequence != NULL)
-			lua_pushnumber(L, space->sequence_part + 1);
+			lua_pushnumber(L, space->sequence_fieldno +
+				       TUPLE_INDEX_BASE);
+		else
+			lua_pushnil(L);
+		lua_rawset(L, -3);
+
+		lua_pushstring(L, "sequence_path");
+		if (k == 0 && space->sequence_path != NULL)
+			lua_pushstring(L, space->sequence_path);
 		else
 			lua_pushnil(L);
 		lua_rawset(L, -3);

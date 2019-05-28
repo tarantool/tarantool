@@ -176,11 +176,10 @@ struct space {
 	struct space_def *def;
 	/** Sequence attached to this space or NULL. */
 	struct sequence *sequence;
-	/**
-	 * Auto increment part of the primary index.
-	 * Makes sense only if sequence is set.
-	 */
-	uint32_t sequence_part;
+	/** Auto increment field number. */
+	uint32_t sequence_fieldno;
+	/** Path to data in the auto-increment field. */
+	char *sequence_path;
 	/** Enable/disable triggers. */
 	bool run_triggers;
 	/**
