@@ -229,8 +229,15 @@ lbox_console_readline(struct lua_State *L)
 	top = lua_gettop(L);
 	while (top == lua_gettop(L)) {
 		while (coio_wait(STDIN_FILENO, COIO_READ,
-				 TIMEOUT_INFINITY) == 0);
-
+				 TIMEOUT_INFINITY) == 0) {
+			/*
+			 * Make sure the user of interactive
+			 * console has not hanged us, otherwise
+			 * we might spin here forever eating
+			 * the whole cpu time.
+			 */
+			luaL_testcancel(L);
+		}
 		rl_callback_read_char();
 	}
 
