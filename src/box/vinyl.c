@@ -4339,6 +4339,12 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 		return -1;
 	}
 
+	struct errinj *inj = errinj(ERRINJ_BUILD_INDEX, ERRINJ_INT);
+	if (inj != NULL && inj->iparam == (int)new_index->def->iid) {
+		diag_set(ClientError, ER_INJECTION, "build index");
+		return -1;
+	}
+
 	if (vinyl_index_open(new_index) != 0)
 		return -1;
 
@@ -4413,6 +4419,16 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 			diag_move(&ctx.diag, diag_get());
 			rc = -1;
 			break;
+		}
+		/*
+		 * Sleep after one tuple is inserted to test
+		 * on_replace triggers for index build.
+		 */
+		inj = errinj(ERRINJ_BUILD_INDEX_DELAY, ERRINJ_BOOL);
+		if (inj != NULL && inj->bparam && loops == 1) {
+			do {
+				fiber_sleep(0);
+			} while (inj->bparam);
 		}
 	}
 	vy_read_iterator_close(&itr);

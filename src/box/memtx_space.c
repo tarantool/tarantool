@@ -1025,6 +1025,19 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 				break;
 			}
 		}
+		/*
+		 * Sleep after at least one tuple is inserted to test
+		 * on_replace triggers for index build.
+		 */
+		struct errinj *inj = errinj(ERRINJ_BUILD_INDEX_DELAY, ERRINJ_BOOL);
+		if (inj != NULL && inj->bparam && count == 1) {
+			state.cursor = tuple;
+			tuple_ref(state.cursor);
+			do {
+				fiber_sleep(0);
+			} while (inj->bparam);
+			tuple_unref(state.cursor);
+		}
 	}
 	iterator_delete(it);
 	diag_destroy(&state.diag);
