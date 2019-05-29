@@ -452,7 +452,7 @@ for _, data_collation in ipairs(data_collations) do
         test:do_execsql_test(
             extendex_prefix.."select_plan_contains_b-tree",
             string.format("explain query plan select b from t1 order by b %s;",data_collation[1]),
-            {0,0,0,"SCAN TABLE T1",
+            {0,0,0,"SCAN TABLE T1 (~1048576 rows)",
                 0,0,0,"USE TEMP B-TREE FOR ORDER BY"})
         test:do_execsql_test(
             extendex_prefix.."select",
@@ -465,7 +465,7 @@ for _, data_collation in ipairs(data_collations) do
         test:do_execsql_test(
             extendex_prefix.."select_from_index_plan_does_not_contain_b-tree",
             string.format("explain query plan select b from t1 order by b %s;",data_collation[1]),
-            {0,0,0,"SCAN TABLE T1 USING COVERING INDEX I"})
+            {0,0,0,"SCAN TABLE T1 USING COVERING INDEX I (~1048576 rows)"})
         test:do_execsql_test(
             extendex_prefix.."select_from_index",
             string.format("select b from t1 order by b %s;",data_collation[1]),
@@ -494,7 +494,7 @@ local like_testcases =
         {0, {"Aab", "aaa"}} },
     {"2.1.2",
         "EXPLAIN QUERY PLAN SELECT * FROM tx1 WHERE s1 LIKE 'A%';",
-        {0, {0, 0, 0, "SEARCH TABLE TX1 USING COVERING INDEX I1 (S1>? AND S1<?)"}}},
+        {0, {0, 0, 0, "SEARCH TABLE TX1 USING COVERING INDEX I1 (S1>? AND S1<?) (~16384 rows)"}}},
     {"2.2.0",
         "PRAGMA case_sensitive_like = true;",
         {0}},

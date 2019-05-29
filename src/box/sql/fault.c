@@ -47,8 +47,6 @@
 
 #include "sqlInt.h"
 
-#ifndef SQL_UNTESTABLE
-
 /*
  * Global variables.
  */
@@ -104,4 +102,3 @@ sqlEndBenignMalloc(void)
 	}
 }
 
-#endif				/* #ifndef SQL_UNTESTABLE */

@@ -382,14 +382,14 @@ sqlTreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 					    pExpr->u.zToken);
 			break;
 		}
-#ifndef SQL_OMIT_CAST
+
 	case TK_CAST:{
 			/* Expressions of the form:   CAST(pLeft AS token) */
 			sqlTreeViewLine(pView, "CAST %Q", pExpr->u.zToken);
 			sqlTreeViewExpr(pView, pExpr->pLeft, 0);
 			break;
 		}
-#endif				/* SQL_OMIT_CAST */
+
 	case TK_LT:
 		zBinOp = "LT";
 		break;

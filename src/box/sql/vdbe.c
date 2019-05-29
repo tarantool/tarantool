@@ -147,7 +147,7 @@ int sql_found_count = 0;
  * Test a register to see if it exceeds the current maximum blob size.
  * If it does, record the new maximum blob size.
  */
-#if defined(SQL_TEST) && !defined(SQL_UNTESTABLE)
+#if defined(SQL_TEST)
 # define UPDATE_MAX_BLOBSIZE(P)  updateMaxBlobsize(P)
 #else
 # define UPDATE_MAX_BLOBSIZE(P)
@@ -746,9 +746,7 @@ int sqlVdbeExec(Vdbe *p)
 	sql *db = p->db;       /* The database */
 	int iCompare = 0;          /* Result of last comparison */
 	unsigned nVmStep = 0;      /* Number of virtual machine steps */
-#ifndef SQL_OMIT_PROGRESS_CALLBACK
 	unsigned nProgressLimit = 0;/* Invoke xProgress() when nVmStep reaches this */
-#endif
 	Mem *aMem = p->aMem;       /* Copy of p->aMem */
 	Mem *pIn1 = 0;             /* 1st input operand */
 	Mem *pIn2 = 0;             /* 2nd input operand */
@@ -773,14 +771,13 @@ int sqlVdbeExec(Vdbe *p)
 	assert(p->explain==0);
 	p->pResultSet = 0;
 	if (db->u1.isInterrupted) goto abort_due_to_interrupt;
-	sqlVdbeIOTraceSql(p);
-#ifndef SQL_OMIT_PROGRESS_CALLBACK
+
 	if (db->xProgress) {
 		u32 iPrior = p->aCounter[SQL_STMTSTATUS_VM_STEP];
 		assert(0 < db->nProgressOps);
 		nProgressLimit = db->nProgressOps - (iPrior % db->nProgressOps);
 	}
-#endif
+
 #ifdef SQL_DEBUG
 	sqlBeginBenignMalloc();
 	if (p->pc == 0 &&
@@ -819,9 +816,6 @@ int sqlVdbeExec(Vdbe *p)
 		start = sqlHwtime();
 #endif
 		nVmStep++;
-#ifdef SQL_ENABLE_STMT_SCANSTATUS
-		if (p->anExec) p->anExec[(int)(pOp-aOp)]++;
-#endif
 
 		/* Only allow tracing if SQL_DEBUG is defined.
 		 */
@@ -938,7 +932,7 @@ case OP_Goto: {             /* jump */
 	 */
 			check_for_interrupt:
 	if (db->u1.isInterrupted) goto abort_due_to_interrupt;
-#ifndef SQL_OMIT_PROGRESS_CALLBACK
+
 	/* Call the progress callback if it is configured and the required number
 	 * of VDBE ops have been executed (either since this invocation of
 	 * sqlVdbeExec() or since last time the progress callback was called).
@@ -953,7 +947,6 @@ case OP_Goto: {             /* jump */
 			goto abort_due_to_error;
 		}
 	}
-#endif
 
 	break;
 }
@@ -1517,7 +1510,6 @@ case OP_ResultRow: {
 	assert(pOp->p1>0);
 	assert(pOp->p1+pOp->p2<=(p->nMem+1 - p->nCursor)+1);
 
-#ifndef SQL_OMIT_PROGRESS_CALLBACK
 	/* Run the progress counter just before returning.
 	 */
 	if (db->xProgress!=0
@@ -1527,7 +1519,6 @@ case OP_ResultRow: {
 		rc = SQL_INTERRUPT;
 		goto abort_due_to_error;
 	}
-#endif
 
 	/* If this statement has violated immediate foreign key constraints, do
 	 * not return the number of rows modified. And do not RELEASE the statement
@@ -2088,7 +2079,6 @@ case OP_Realify: {                  /* in1 */
 	break;
 }
 
-#ifndef SQL_OMIT_CAST
 /* Opcode: Cast P1 P2 * * *
  * Synopsis: type(r[P1])
  *
@@ -2118,7 +2108,6 @@ case OP_Cast: {                  /* in1 */
 	rc = SQL_TARANTOOL_ERROR;
 	goto abort_due_to_error;
 }
-#endif /* SQL_OMIT_CAST */
 
 /* Opcode: Eq P1 P2 P3 P4 P5
  * Synopsis: IF r[P3]==r[P1]
@@ -3372,26 +3361,6 @@ case OP_Close: {
 	p->apCsr[pOp->p1] = 0;
 	break;
 }
-
-#ifdef SQL_ENABLE_COLUMN_USED_MASK
-/* Opcode: ColumnsUsed P1 * * P4 *
- *
- * This opcode (which only exists if sql was compiled with
- * SQL_ENABLE_COLUMN_USED_MASK) identifies which columns of the
- * table or index for cursor P1 are used.  P4 is a 64-bit integer
- * (P4_INT64) in which the first 63 bits are one for each of the
- * first 63 columns of the table or index that are actually used
- * by the cursor.  The high-order bit is set if any column after
- * the 64th is used.
- */
-case OP_ColumnsUsed: {
-	VdbeCursor *pC;
-	pC = p->apCsr[pOp->p1];
-	assert(pC->eCurType==CURTYPE_TARANTOOL);
-	pC->maskUsed = *(u64*)pOp->p4.pI64;
-	break;
-}
-#endif
 
 /* Opcode: SeekGE P1 P2 P3 P4 P5
  * Synopsis: key=r[P3@P4]
@@ -4979,9 +4948,6 @@ case OP_Program: {        /* jump */
 		pFrame->aOp = p->aOp;
 		pFrame->nOp = p->nOp;
 		pFrame->token = pProgram->token;
-#ifdef SQL_ENABLE_STMT_SCANSTATUS
-		pFrame->anExec = p->anExec;
-#endif
 
 		pEnd = &VdbeFrameMem(pFrame)[pFrame->nChildMem];
 		for(pMem=VdbeFrameMem(pFrame); pMem!=pEnd; pMem++) {
@@ -5011,9 +4977,6 @@ case OP_Program: {        /* jump */
 	p->apCsr = (VdbeCursor **)&aMem[p->nMem];
 	p->aOp = aOp = pProgram->aOp;
 	p->nOp = pProgram->nOp;
-#ifdef SQL_ENABLE_STMT_SCANSTATUS
-	p->anExec = 0;
-#endif
 	pOp = &aOp[-1];
 
 	break;
@@ -5379,7 +5342,6 @@ case OP_Init: {          /* jump */
 		break;
 	}
 
-#ifndef SQL_OMIT_TRACE
 	if ((db->mTrace & SQL_TRACE_STMT)!=0
 	    && !p->doingRerun
 	    && (zTrace = (pOp->p4.z ? pOp->p4.z : p->zSql))!=0
@@ -5393,7 +5355,6 @@ case OP_Init: {          /* jump */
 	    (zTrace = (pOp->p4.z ? pOp->p4.z : p->zSql)) != 0)
 		sqlDebugPrintf("SQL-trace: %s\n", zTrace);
 #endif /* SQL_DEBUG */
-#endif /* SQL_OMIT_TRACE */
 	assert(pOp->p2>0);
 	if (pOp->p1>=sqlGlobalConfig.iOnceResetThreshold) {
 		for(i=1; i<p->nOp; i++) {

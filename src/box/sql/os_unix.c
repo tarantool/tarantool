@@ -1937,7 +1937,6 @@ unixDelete(sql_vfs * NotUsed,	/* VFS containing this as the xDelete method */
 		}
 		return rc;
 	}
-#ifndef SQL_DISABLE_DIRSYNC
 	if ((dirSync & 1) != 0) {
 		int fd;
 		rc = openDirectory(zPath, &fd);
@@ -1953,7 +1952,6 @@ unixDelete(sql_vfs * NotUsed,	/* VFS containing this as the xDelete method */
 			rc = SQL_OK;
 		}
 	}
-#endif
 	return rc;
 }
 

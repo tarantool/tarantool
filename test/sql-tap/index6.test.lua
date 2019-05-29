@@ -334,8 +334,8 @@ test:do_eqp_test(
         SELECT * FROM t8a LEFT JOIN t8b ON (x = 'value' AND y = a)
     ]], {
         -- <index6-8.1>
-    {0, 0, 0, "SCAN TABLE T8A"},
-    {0, 1, 1, "SEARCH TABLE T8B USING COVERING INDEX I8C (Y=?)"}
+    {0, 0, 0, "SCAN TABLE T8A (~1048576 rows)"},
+    {0, 1, 1, "SEARCH TABLE T8B USING COVERING INDEX I8C (Y=?) (~9 rows)"}
         -- </index6-8.1>
     })
 

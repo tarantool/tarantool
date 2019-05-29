@@ -107,29 +107,3 @@ sql_randomness(int N, void *pBuf)
 		*(zBuf++) = wsdPrng.s[t];
 	} while (--N);
 }
-
-#ifndef SQL_UNTESTABLE
-/*
- * For testing purposes, we sometimes want to preserve the state of
- * PRNG and restore the PRNG to its saved state at a later time, or
- * to reset the PRNG to its initial state.  These routines accomplish
- * those tasks.
- */
-static SQL_WSD struct sqlPrngType sqlSavedPrng;
-void
-sqlPrngSaveState(void)
-{
-	memcpy(&GLOBAL(struct sqlPrngType, sqlSavedPrng),
-	       &GLOBAL(struct sqlPrngType, sqlPrng), sizeof(sqlPrng)
-	    );
-}
-
-void
-sqlPrngRestoreState(void)
-{
-	memcpy(&GLOBAL(struct sqlPrngType, sqlPrng),
-	       &GLOBAL(struct sqlPrngType, sqlSavedPrng),
-	       sizeof(sqlPrng)
-	    );
-}
-#endif				/* SQL_UNTESTABLE */

@@ -118,11 +118,6 @@
  * there are already N worker threads running, the main thread does the work
  * itself.
  *
- * The sorter is running in multi-threaded mode if (a) the library was built
- * with pre-processor symbol SQL_MAX_WORKER_THREADS set to a value greater
- * than zero, and (b) worker threads have been enabled at runtime by calling
- * "PRAGMA threads=N" with some value of N greater than 0.
- *
  * When Rewind() is called, any data remaining in memory is flushed to a
  * final PMA. So at this point the data is stored in some number of sorted
  * PMAs within temporary files on disk.
@@ -158,15 +153,6 @@
  */
 #include "sqlInt.h"
 #include "vdbeInt.h"
-
-/*
- * If SQL_DEBUG_SORTER_THREADS is defined, this module outputs various
- * messages to stderr that may be helpful in understanding the performance
- * characteristics of the sorter in multi-threaded mode.
- */
-#if 0
-#define SQL_DEBUG_SORTER_THREADS 1
-#endif
 
 /*
  * Hard-coded maximum amount of data to accumulate in memory before flushing
@@ -292,31 +278,12 @@ struct MergeEngine {
  *
  * Essentially, this structure contains all those fields of the VdbeSorter
  * structure for which each thread requires a separate instance. For example,
- * each thread requries its own UnpackedRecord object to unpack records in
+ * each thread requires its own UnpackedRecord object to unpack records in
  * as part of comparison operations.
- *
- * Before a background thread is launched, variable bDone is set to 0. Then,
- * right before it exits, the thread itself sets bDone to 1. This is used for
- * two purposes:
- *
- *   1. When flushing the contents of memory to a level-0 PMA on disk, to
- *      attempt to select a SortSubtask for which there is not already an
- *      active background thread (since doing so causes the main thread
- *      to block until it finishes).
- *
- *   2. If SQL_DEBUG_SORTER_THREADS is defined, to determine if a call
- *      to sqlThreadJoin() is likely to block. Cases that are likely to
- *      block provoke debugging output.
- *
- * In both cases, the effects of the main thread seeing (bDone==0) even
- * after the thread has finished are not dire. So we don't worry about
- * memory barriers and such here.
  */
 typedef int (*SorterCompare) (SortSubtask *, bool *, const void *,
 			      const void *);
 struct SortSubtask {
-	sqlThread *pThread;	/* Background thread, if any */
-	int bDone;		/* Set if thread is finished but not joined */
 	VdbeSorter *pSorter;	/* Sorter that owns this sub-task */
 	UnpackedRecord *pUnpacked;	/* Space to unpack a record */
 	SorterList list;	/* List for thread to write to a PMA */
@@ -349,11 +316,8 @@ struct VdbeSorter {
 	int iMemory;		/* Offset of free space in list.aMemory */
 	int nMemory;		/* Size of list.aMemory allocation in bytes */
 	u8 bUsePMA;		/* True if one or more PMAs created */
-	u8 bUseThreads;		/* True to use background threads */
-	u8 iPrev;		/* Previous thread used to flush PMA */
-	u8 nTask;		/* Size of aTask[] array */
 	u8 typeMask;
-	SortSubtask aTask[1];	/* One or more subtasks */
+	SortSubtask aTask;	/* A single subtask */
 };
 
 #define SORTER_TYPE_INTEGER 0x01
@@ -852,28 +816,8 @@ sqlVdbeSorterInit(sql * db,	/* Database connection (for malloc()) */
     )
 {
 	int pgsz;		/* Page size of main database */
-	int i;			/* Used to iterate through aTask[] */
 	VdbeSorter *pSorter;	/* The new sorter */
 	int rc = SQL_OK;
-#if SQL_MAX_WORKER_THREADS==0
-#define nWorker 0
-#else
-	int nWorker;
-#endif
-
-	/* Initialize the upper limit on the number of worker threads */
-#if SQL_MAX_WORKER_THREADS>0
-	nWorker = db->aLimit[SQL_LIMIT_WORKER_THREADS];
-#endif
-
-	/* Do not allow the total number of threads (main thread + all workers)
-	 * to exceed the maximum merge count
-	 */
-#if SQL_MAX_WORKER_THREADS>=SORTER_MAX_MERGE_COUNT
-	if (nWorker >= SORTER_MAX_MERGE_COUNT) {
-		nWorker = SORTER_MAX_MERGE_COUNT - 1;
-	}
-#endif
 
 	assert(pCsr->key_def != NULL);
 	assert(pCsr->eCurType == CURTYPE_SORTER);
@@ -885,38 +829,30 @@ sqlVdbeSorterInit(sql * db,	/* Database connection (for malloc()) */
 	} else {
 		pSorter->key_def = pCsr->key_def;
 		pSorter->pgsz = pgsz = 1024;
-		pSorter->nTask = nWorker + 1;
-		pSorter->iPrev = (u8) (nWorker - 1);
-		pSorter->bUseThreads = (pSorter->nTask > 1);
 		pSorter->db = db;
-		for (i = 0; i < pSorter->nTask; i++) {
-			SortSubtask *pTask = &pSorter->aTask[i];
-			pTask->pSorter = pSorter;
-		}
+		pSorter->aTask.pSorter = pSorter;
 
-		if (!sqlTempInMemory(db)) {
-			i64 mxCache;	/* Cache size in bytes */
-			u32 szPma = sqlGlobalConfig.szPma;
-			pSorter->mnPmaSize = szPma * pgsz;
+		i64 mxCache;	/* Cache size in bytes */
+		u32 szPma = sqlGlobalConfig.szPma;
+		pSorter->mnPmaSize = szPma * pgsz;
 
-			mxCache = SQL_DEFAULT_CACHE_SIZE;
-			mxCache = mxCache * -1024;
-			mxCache = MIN(mxCache, SQL_MAX_PMASZ);
-			pSorter->mxPmaSize =
-			    MAX(pSorter->mnPmaSize, (int)mxCache);
+		mxCache = SQL_DEFAULT_CACHE_SIZE;
+		mxCache = mxCache * -1024;
+		mxCache = MIN(mxCache, SQL_MAX_PMASZ);
+		pSorter->mxPmaSize =
+		    MAX(pSorter->mnPmaSize, (int)mxCache);
 
-			/* EVIDENCE-OF: R-26747-61719 When the application provides any amount of
-			 * scratch memory using SQL_CONFIG_SCRATCH, sql avoids unnecessary
-			 * large heap allocations.
-			 */
-			if (sqlGlobalConfig.pScratch == 0) {
-				assert(pSorter->iMemory == 0);
-				pSorter->nMemory = pgsz;
-				pSorter->list.aMemory =
-				    (u8 *) sqlMalloc(pgsz);
-				if (!pSorter->list.aMemory)
-					rc = SQL_NOMEM;
-			}
+		/* EVIDENCE-OF: R-26747-61719 When the application provides any amount of
+		 * scratch memory using SQL_CONFIG_SCRATCH, sql avoids unnecessary
+		 * large heap allocations.
+		 */
+		if (sqlGlobalConfig.pScratch == 0) {
+			assert(pSorter->iMemory == 0);
+			pSorter->nMemory = pgsz;
+			pSorter->list.aMemory =
+			    (u8 *) sqlMalloc(pgsz);
+			if (!pSorter->list.aMemory)
+				rc = SQL_NOMEM;
 		}
 
 		if (pCsr->key_def->part_count < 13
@@ -928,8 +864,6 @@ sqlVdbeSorterInit(sql * db,	/* Database connection (for malloc()) */
 
 	return rc;
 }
-
-#undef nWorker			/* Defined at the top of this function */
 
 /*
  * Free the list of sorted records starting at pRecord.
@@ -953,18 +887,10 @@ static void
 vdbeSortSubtaskCleanup(sql * db, SortSubtask * pTask)
 {
 	sqlDbFree(db, pTask->pUnpacked);
-#if SQL_MAX_WORKER_THREADS>0
-	/* pTask->list.aMemory can only be non-zero if it was handed memory
-	 * from the main thread.  That only occurs SQL_MAX_WORKER_THREADS>0
-	 */
-	if (pTask->list.aMemory) {
-		sql_free(pTask->list.aMemory);
-	} else
-#endif
-	{
-		assert(pTask->list.aMemory == 0);
-		vdbeSorterRecordFree(0, pTask->list.pList);
-	}
+
+	assert(pTask->list.aMemory == 0);
+	vdbeSorterRecordFree(0, pTask->list.pList);
+
 	if (pTask->file.pFd) {
 		sqlOsCloseFree(pTask->file.pFd);
 	}
@@ -974,116 +900,7 @@ vdbeSortSubtaskCleanup(sql * db, SortSubtask * pTask)
 	memset(pTask, 0, sizeof(SortSubtask));
 }
 
-#ifdef SQL_DEBUG_SORTER_THREADS
-static void
-vdbeSorterWorkDebug(SortSubtask * pTask, const char *zEvent)
-{
-	i64 t;
-	int iTask = (pTask - pTask->pSorter->aTask);
-	sqlOsCurrentTimeInt64(pTask->pSorter->db->pVfs, &t);
-	fprintf(stderr, "%lld:%d %s\n", t, iTask, zEvent);
-}
-
-static void
-vdbeSorterRewindDebug(const char *zEvent)
-{
-	i64 t;
-	sqlOsCurrentTimeInt64(sql_vfs_find(0), &t);
-	fprintf(stderr, "%lld:X %s\n", t, zEvent);
-}
-
-static void
-vdbeSorterPopulateDebug(SortSubtask * pTask, const char *zEvent)
-{
-	i64 t;
-	int iTask = (pTask - pTask->pSorter->aTask);
-	sqlOsCurrentTimeInt64(pTask->pSorter->db->pVfs, &t);
-	fprintf(stderr, "%lld:bg%d %s\n", t, iTask, zEvent);
-}
-
-static void
-vdbeSorterBlockDebug(SortSubtask * pTask, int bBlocked, const char *zEvent)
-{
-	if (bBlocked) {
-		i64 t;
-		sqlOsCurrentTimeInt64(pTask->pSorter->db->pVfs, &t);
-		fprintf(stderr, "%lld:main %s\n", t, zEvent);
-	}
-}
-#else
-#define vdbeSorterWorkDebug(x,y)
-#define vdbeSorterRewindDebug(y)
-#define vdbeSorterPopulateDebug(x,y)
-#define vdbeSorterBlockDebug(x,y,z)
-#endif
-
-#if SQL_MAX_WORKER_THREADS>0
-/*
- * Join thread pTask->thread.
- */
-static int
-vdbeSorterJoinThread(SortSubtask * pTask)
-{
-	int rc = SQL_OK;
-	if (pTask->pThread) {
-#ifdef SQL_DEBUG_SORTER_THREADS
-		int bDone = pTask->bDone;
-#endif
-		void *pRet = SQL_INT_TO_PTR(SQL_ERROR);
-		vdbeSorterBlockDebug(pTask, !bDone, "enter");
-		(void)sqlThreadJoin(pTask->pThread, &pRet);
-		vdbeSorterBlockDebug(pTask, !bDone, "exit");
-		rc = SQL_PTR_TO_INT(pRet);
-		assert(pTask->bDone == 1);
-		pTask->bDone = 0;
-		pTask->pThread = 0;
-	}
-	return rc;
-}
-
-/*
- * Launch a background thread to run xTask(pIn).
- */
-static int
-vdbeSorterCreateThread(SortSubtask * pTask,	/* Thread will use this task object */
-		       void *(*xTask) (void *),	/* Routine to run in a separate thread */
-		       void *pIn	/* Argument passed into xTask() */
-    )
-{
-	assert(pTask->pThread == 0 && pTask->bDone == 0);
-	return sqlThreadCreate(&pTask->pThread, xTask, pIn);
-}
-
-/*
- * Join all outstanding threads launched by SorterWrite() to create
- * level-0 PMAs.
- */
-static int
-vdbeSorterJoinAll(VdbeSorter * pSorter, int rcin)
-{
-	int rc = rcin;
-	int i;
-
-	/* This function is always called by the main user thread.
-	 *
-	 * If this function is being called after SorterRewind() has been called,
-	 * it is possible that thread pSorter->aTask[pSorter->nTask-1].pThread
-	 * is currently attempt to join one of the other threads. To avoid a race
-	 * condition where this thread also attempts to join the same object, join
-	 * thread pSorter->aTask[pSorter->nTask-1].pThread first.
-	 */
-	for (i = pSorter->nTask - 1; i >= 0; i--) {
-		SortSubtask *pTask = &pSorter->aTask[i];
-		int rc2 = vdbeSorterJoinThread(pTask);
-		if (rc == SQL_OK)
-			rc = rc2;
-	}
-	return rc;
-}
-#else
 #define vdbeSorterJoinAll(x,rcin) (rcin)
-#define vdbeSorterJoinThread(pTask) SQL_OK
-#endif
 
 /*
  * Allocate a new MergeEngine object capable of handling up to
@@ -1139,15 +956,6 @@ static void
 vdbeIncrFree(IncrMerger * pIncr)
 {
 	if (pIncr) {
-#if SQL_MAX_WORKER_THREADS>0
-		if (pIncr->bUseThread) {
-			vdbeSorterJoinThread(pIncr->pTask);
-			if (pIncr->aFile[0].pFd)
-				sqlOsCloseFree(pIncr->aFile[0].pFd);
-			if (pIncr->aFile[1].pFd)
-				sqlOsCloseFree(pIncr->aFile[1].pFd);
-		}
-#endif
 		vdbeMergeEngineFree(pIncr->pMerger);
 		sql_free(pIncr);
 	}
@@ -1159,23 +967,12 @@ vdbeIncrFree(IncrMerger * pIncr)
 void
 sqlVdbeSorterReset(sql * db, VdbeSorter * pSorter)
 {
-	int i;
 	(void)vdbeSorterJoinAll(pSorter, SQL_OK);
-	assert(pSorter->bUseThreads || pSorter->pReader == 0);
-#if SQL_MAX_WORKER_THREADS>0
-	if (pSorter->pReader) {
-		vdbePmaReaderClear(pSorter->pReader);
-		sqlDbFree(db, pSorter->pReader);
-		pSorter->pReader = 0;
-	}
-#endif
+	assert(pSorter->pReader == 0);
 	vdbeMergeEngineFree(pSorter->pMerger);
 	pSorter->pMerger = 0;
-	for (i = 0; i < pSorter->nTask; i++) {
-		SortSubtask *pTask = &pSorter->aTask[i];
-		vdbeSortSubtaskCleanup(db, pTask);
-		pTask->pSorter = pSorter;
-	}
+	vdbeSortSubtaskCleanup(db, &pSorter->aTask);
+	pSorter->aTask.pSorter = pSorter;
 	if (pSorter->list.aMemory == 0) {
 		vdbeSorterRecordFree(0, pSorter->list.pList);
 	}
@@ -1518,7 +1315,6 @@ vdbeSorterListToPMA(SortSubtask * pTask, SorterList * pList)
 	    pList->szPMA + sqlVarintLen(pList->szPMA) + pTask->file.iEof;
 #endif
 
-	vdbeSorterWorkDebug(pTask, "enter");
 	memset(&writer, 0, sizeof(PmaWriter));
 	assert(pList->szPMA > 0);
 
@@ -1560,7 +1356,6 @@ vdbeSorterListToPMA(SortSubtask * pTask, SorterList * pList)
 		rc = vdbePmaWriterFinish(&writer, &pTask->file.iEof);
 	}
 
-	vdbeSorterWorkDebug(pTask, "exit");
 	assert(rc != SQL_OK || pList->pList == 0);
 	assert(rc != SQL_OK || pTask->file.iEof == iSz);
 	return rc;
@@ -1650,22 +1445,6 @@ vdbeMergeEngineStep(MergeEngine * pMerger,	/* The merge engine to advance to the
 	return (rc == SQL_OK ? pTask->pUnpacked->errCode : rc);
 }
 
-#if SQL_MAX_WORKER_THREADS>0
-/*
- * The main routine for background threads that write level-0 PMAs.
- */
-static void *
-vdbeSorterFlushThread(void *pCtx)
-{
-	SortSubtask *pTask = (SortSubtask *) pCtx;
-	int rc;			/* Return code */
-	assert(pTask->bDone == 0);
-	rc = vdbeSorterListToPMA(pTask, &pTask->list);
-	pTask->bDone = 1;
-	return SQL_INT_TO_PTR(rc);
-}
-#endif				/* SQL_MAX_WORKER_THREADS>0 */
-
 /*
  * Flush the current contents of VdbeSorter.list to a new PMA, possibly
  * using a background thread.
@@ -1673,76 +1452,8 @@ vdbeSorterFlushThread(void *pCtx)
 static int
 vdbeSorterFlushPMA(VdbeSorter * pSorter)
 {
-#if SQL_MAX_WORKER_THREADS==0
 	pSorter->bUsePMA = 1;
-	return vdbeSorterListToPMA(&pSorter->aTask[0], &pSorter->list);
-#else
-	int rc = SQL_OK;
-	int i;
-	SortSubtask *pTask = 0;	/* Thread context used to create new PMA */
-	int nWorker = (pSorter->nTask - 1);
-
-	/* Set the flag to indicate that at least one PMA has been written.
-	 * Or will be, anyhow.
-	 */
-	pSorter->bUsePMA = 1;
-
-	/* Select a sub-task to sort and flush the current list of in-memory
-	 * records to disk. If the sorter is running in multi-threaded mode,
-	 * round-robin between the first (pSorter->nTask-1) tasks. Except, if
-	 * the background thread from a sub-tasks previous turn is still running,
-	 * skip it. If the first (pSorter->nTask-1) sub-tasks are all still busy,
-	 * fall back to using the final sub-task. The first (pSorter->nTask-1)
-	 * sub-tasks are prefered as they use background threads - the final
-	 * sub-task uses the main thread.
-	 */
-	for (i = 0; i < nWorker; i++) {
-		int iTest = (pSorter->iPrev + i + 1) % nWorker;
-		pTask = &pSorter->aTask[iTest];
-		if (pTask->bDone) {
-			rc = vdbeSorterJoinThread(pTask);
-		}
-		if (rc != SQL_OK || pTask->pThread == 0)
-			break;
-	}
-
-	if (rc == SQL_OK) {
-		if (i == nWorker) {
-			/* Use the foreground thread for this operation */
-			rc = vdbeSorterListToPMA(&pSorter->aTask[nWorker],
-						 &pSorter->list);
-		} else {
-			/* Launch a background thread for this operation */
-			u8 *aMem = pTask->list.aMemory;
-			void *pCtx = (void *)pTask;
-
-			assert(pTask->pThread == 0 && pTask->bDone == 0);
-			assert(pTask->list.pList == 0);
-			assert(pTask->list.aMemory == 0
-			       || pSorter->list.aMemory != 0);
-
-			pSorter->iPrev = (u8) (pTask - pSorter->aTask);
-			pTask->list = pSorter->list;
-			pSorter->list.pList = 0;
-			pSorter->list.szPMA = 0;
-			if (aMem) {
-				pSorter->list.aMemory = aMem;
-				pSorter->nMemory = sqlMallocSize(aMem);
-			} else if (pSorter->list.aMemory) {
-				pSorter->list.aMemory =
-				    sqlMalloc(pSorter->nMemory);
-				if (!pSorter->list.aMemory)
-					return SQL_NOMEM;
-			}
-
-			rc = vdbeSorterCreateThread(pTask,
-						    vdbeSorterFlushThread,
-						    pCtx);
-		}
-	}
-
-	return rc;
-#endif				/* SQL_MAX_WORKER_THREADS!=0 */
+	return vdbeSorterListToPMA(&pSorter->aTask, &pSorter->list);
 }
 
 /*
@@ -1878,8 +1589,6 @@ vdbeIncrPopulate(IncrMerger * pIncr)
 	PmaWriter writer;
 	assert(pIncr->bEof == 0);
 
-	vdbeSorterPopulateDebug(pTask, "enter");
-
 	vdbePmaWriterInit(pOut->pFd, &writer, pTask->pSorter->pgsz, iStart);
 	while (rc == SQL_OK) {
 		int dummy;
@@ -1906,35 +1615,8 @@ vdbeIncrPopulate(IncrMerger * pIncr)
 	rc2 = vdbePmaWriterFinish(&writer, &pOut->iEof);
 	if (rc == SQL_OK)
 		rc = rc2;
-	vdbeSorterPopulateDebug(pTask, "exit");
 	return rc;
 }
-
-#if SQL_MAX_WORKER_THREADS>0
-/*
- * The main routine for background threads that populate aFile[1] of
- * multi-threaded IncrMerger objects.
- */
-static void *
-vdbeIncrPopulateThread(void *pCtx)
-{
-	IncrMerger *pIncr = (IncrMerger *) pCtx;
-	void *pRet = SQL_INT_TO_PTR(vdbeIncrPopulate(pIncr));
-	pIncr->pTask->bDone = 1;
-	return pRet;
-}
-
-/*
- * Launch a background thread to populate aFile[1] of pIncr.
- */
-static int
-vdbeIncrBgPopulate(IncrMerger * pIncr)
-{
-	void *p = (void *)pIncr;
-	assert(pIncr->bUseThread);
-	return vdbeSorterCreateThread(pIncr->pTask, vdbeIncrPopulateThread, p);
-}
-#endif
 
 /*
  * This function is called when the PmaReader corresponding to pIncr has
@@ -1956,33 +1638,10 @@ vdbeIncrBgPopulate(IncrMerger * pIncr)
 static int
 vdbeIncrSwap(IncrMerger * pIncr)
 {
-	int rc = SQL_OK;
-
-#if SQL_MAX_WORKER_THREADS>0
-	if (pIncr->bUseThread) {
-		rc = vdbeSorterJoinThread(pIncr->pTask);
-
-		if (rc == SQL_OK) {
-			SorterFile f0 = pIncr->aFile[0];
-			pIncr->aFile[0] = pIncr->aFile[1];
-			pIncr->aFile[1] = f0;
-		}
-
-		if (rc == SQL_OK) {
-			if (pIncr->aFile[0].iEof == pIncr->iStartOff) {
-				pIncr->bEof = 1;
-			} else {
-				rc = vdbeIncrBgPopulate(pIncr);
-			}
-		}
-	} else
-#endif
-	{
-		rc = vdbeIncrPopulate(pIncr);
-		pIncr->aFile[0] = pIncr->aFile[1];
-		if (pIncr->aFile[0].iEof == pIncr->iStartOff) {
-			pIncr->bEof = 1;
-		}
+	int rc = vdbeIncrPopulate(pIncr);
+	pIncr->aFile[0] = pIncr->aFile[1];
+	if (pIncr->aFile[0].iEof == pIncr->iStartOff) {
+		pIncr->bEof = 1;
 	}
 
 	return rc;
@@ -2016,18 +1675,6 @@ vdbeIncrMergerNew(SortSubtask * pTask,	/* The thread that will be using the new 
 	}
 	return rc;
 }
-
-#if SQL_MAX_WORKER_THREADS>0
-/*
- * Set the "use-threads" flag on object pIncr.
- */
-static void
-vdbeIncrMergerSetThreads(IncrMerger * pIncr)
-{
-	pIncr->bUseThread = 1;
-	pIncr->pTask->file2.iEof -= pIncr->mxSz;
-}
-#endif				/* SQL_MAX_WORKER_THREADS>0 */
 
 /*
  * Recompute pMerger->aTree[iOut] by comparing the next keys on the
@@ -2080,37 +1727,19 @@ vdbeMergeEngineCompare(MergeEngine * pMerger,	/* Merge engine containing PmaRead
 }
 
 /*
- * Allowed values for the eMode parameter to vdbeMergeEngineInit()
- * and vdbePmaReaderIncrMergeInit().
- *
- * Only INCRINIT_NORMAL is valid in single-threaded builds (when
- * SQL_MAX_WORKER_THREADS==0).  The other values are only used
- * when there exists one or more separate worker threads.
- */
-#define INCRINIT_NORMAL 0
-#define INCRINIT_TASK   1
-#define INCRINIT_ROOT   2
-
-/*
  * Forward reference required as the vdbeIncrMergeInit() and
  * vdbePmaReaderIncrInit() routines are called mutually recursively when
  * building a merge tree.
  */
-static int vdbePmaReaderIncrInit(PmaReader * pReadr, int eMode);
+static int vdbePmaReaderIncrInit(PmaReader * pReader);
 
 /*
  * Initialize the MergeEngine object passed as the second argument. Once this
  * function returns, the first key of merged data may be read from the
  * MergeEngine object in the usual fashion.
  *
- * If argument eMode is INCRINIT_ROOT, then it is assumed that any IncrMerge
- * objects attached to the PmaReader objects that the merger reads from have
- * already been populated, but that they have not yet populated aFile[0] and
- * set the PmaReader objects up to read from it. In this case all that is
- * required is to call vdbePmaReaderNext() on each PmaReader to point it at
- * its first key.
  *
- * Otherwise, if eMode is any value other than INCRINIT_ROOT, then use
+ * Use
  * vdbePmaReaderIncrMergeInit() to initialize each PmaReader that feeds data
  * to pMerger.
  *
@@ -2118,36 +1747,19 @@ static int vdbePmaReaderIncrInit(PmaReader * pReadr, int eMode);
  */
 static int
 vdbeMergeEngineInit(SortSubtask * pTask,	/* Thread that will run pMerger */
-		    MergeEngine * pMerger,	/* MergeEngine to initialize */
-		    int eMode	/* One of the INCRINIT_XXX constants */
+		    MergeEngine * pMerger 	/* MergeEngine to initialize */
     )
 {
 	int rc = SQL_OK;	/* Return code */
 	int i;			/* For looping over PmaReader objects */
 	int nTree = pMerger->nTree;
 
-	/* eMode is always INCRINIT_NORMAL in single-threaded mode */
-	assert(SQL_MAX_WORKER_THREADS > 0 || eMode == INCRINIT_NORMAL);
-
 	/* Verify that the MergeEngine is assigned to a single thread */
 	assert(pMerger->pTask == 0);
 	pMerger->pTask = pTask;
 
 	for (i = 0; i < nTree; i++) {
-		if (SQL_MAX_WORKER_THREADS > 0 && eMode == INCRINIT_ROOT) {
-			/* PmaReaders should be normally initialized in order, as if they are
-			 * reading from the same temp file this makes for more linear file IO.
-			 * However, in the INCRINIT_ROOT case, if PmaReader aReadr[nTask-1] is
-			 * in use it will block the vdbePmaReaderNext() call while it uses
-			 * the main thread to fill its buffer. So calling PmaReaderNext()
-			 * on this PmaReader before any of the multi-threaded PmaReaders takes
-			 * better advantage of multi-processor hardware.
-			 */
-			rc = vdbePmaReaderNext(&pMerger->aReadr[nTree - i - 1]);
-		} else {
-			rc = vdbePmaReaderIncrInit(&pMerger->aReadr[i],
-						   INCRINIT_NORMAL);
-		}
+		rc = vdbePmaReaderIncrInit(&pMerger->aReadr[i]);
 		if (rc != SQL_OK)
 			return rc;
 	}
@@ -2159,50 +1771,27 @@ vdbeMergeEngineInit(SortSubtask * pTask,	/* Thread that will run pMerger */
 }
 
 /*
- * The PmaReader passed as the first argument is guaranteed to be an
+ * The PmaReader is guaranteed to be an
  * incremental-reader (pReadr->pIncr!=0). This function serves to open
  * and/or initialize the temp file related fields of the IncrMerge
  * object at (pReadr->pIncr).
  *
- * If argument eMode is set to INCRINIT_NORMAL, then all PmaReaders
- * in the sub-tree headed by pReadr are also initialized. Data is then
+ * All PmaReaders
+ * in the sub-tree headed by pReadr are also initialized. Data is
  * loaded into the buffers belonging to pReadr and it is set to point to
  * the first key in its range.
- *
- * If argument eMode is set to INCRINIT_TASK, then pReadr is guaranteed
- * to be a multi-threaded PmaReader and this function is being called in a
- * background thread. In this case all PmaReaders in the sub-tree are
- * initialized as for INCRINIT_NORMAL and the aFile[1] buffer belonging to
- * pReadr is populated. However, pReadr itself is not set up to point
- * to its first key. A call to vdbePmaReaderNext() is still required to do
- * that.
- *
- * The reason this function does not call vdbePmaReaderNext() immediately
- * in the INCRINIT_TASK case is that vdbePmaReaderNext() assumes that it has
- * to block on thread (pTask->thread) before accessing aFile[1]. But, since
- * this entire function is being run by thread (pTask->thread), that will
- * lead to the current background thread attempting to join itself.
- *
- * Finally, if argument eMode is set to INCRINIT_ROOT, it may be assumed
- * that pReadr->pIncr is a multi-threaded IncrMerge objects, and that all
- * child-trees have already been initialized using IncrInit(INCRINIT_TASK).
- * In this case vdbePmaReaderNext() is called on all child PmaReaders and
- * the current PmaReader set to point to the first key in its range.
  *
  * SQL_OK is returned if successful, or an sql error code otherwise.
  */
 static int
-vdbePmaReaderIncrMergeInit(PmaReader * pReadr, int eMode)
+vdbePmaReaderIncrMergeInit(PmaReader * pReadr)
 {
 	int rc = SQL_OK;
 	IncrMerger *pIncr = pReadr->pIncr;
 	SortSubtask *pTask = pIncr->pTask;
 	sql *db = pTask->pSorter->db;
 
-	/* eMode is always INCRINIT_NORMAL in single-threaded mode */
-	assert(SQL_MAX_WORKER_THREADS > 0 || eMode == INCRINIT_NORMAL);
-
-	rc = vdbeMergeEngineInit(pTask, pIncr->pMerger, eMode);
+	rc = vdbeMergeEngineInit(pTask, pIncr->pMerger);
 
 	/* Set up the required files for pIncr. A multi-theaded IncrMerge object
 	 * requires two temp files to itself, whereas a single-threaded object
@@ -2210,73 +1799,26 @@ vdbePmaReaderIncrMergeInit(PmaReader * pReadr, int eMode)
 	 */
 	if (rc == SQL_OK) {
 		int mxSz = pIncr->mxSz;
-#if SQL_MAX_WORKER_THREADS>0
-		if (pIncr->bUseThread) {
-			rc = vdbeSorterOpenTempFile(db, mxSz,
-						    &pIncr->aFile[0].pFd);
-			if (rc == SQL_OK) {
-				rc = vdbeSorterOpenTempFile(db, mxSz,
-							    &pIncr->aFile[1].
-							    pFd);
-			}
-		} else
-#endif
-			/*if( !pIncr->bUseThread ) */  {
-			if (pTask->file2.pFd == 0) {
-				assert(pTask->file2.iEof > 0);
-				rc = vdbeSorterOpenTempFile(db,
-							    pTask->file2.iEof,
-							    &pTask->file2.pFd);
-				pTask->file2.iEof = 0;
-			}
-			if (rc == SQL_OK) {
-				pIncr->aFile[1].pFd = pTask->file2.pFd;
-				pIncr->iStartOff = pTask->file2.iEof;
-				pTask->file2.iEof += mxSz;
-			}
-			}
+		if (pTask->file2.pFd == 0) {
+			assert(pTask->file2.iEof > 0);
+			rc = vdbeSorterOpenTempFile(db,
+						    pTask->file2.iEof,
+						    &pTask->file2.pFd);
+			pTask->file2.iEof = 0;
+		}
+		if (rc == SQL_OK) {
+			pIncr->aFile[1].pFd = pTask->file2.pFd;
+			pIncr->iStartOff = pTask->file2.iEof;
+			pTask->file2.iEof += mxSz;
+		}
 	}
-#if SQL_MAX_WORKER_THREADS>0
-	if (rc == SQL_OK && pIncr->bUseThread) {
-		/* Use the current thread to populate aFile[1], even though this
-		 * PmaReader is multi-threaded. If this is an INCRINIT_TASK object,
-		 * then this function is already running in background thread
-		 * pIncr->pTask->thread.
-		 *
-		 * If this is the INCRINIT_ROOT object, then it is running in the
-		 * main VDBE thread. But that is Ok, as that thread cannot return
-		 * control to the VDBE or proceed with anything useful until the
-		 * first results are ready from this merger object anyway.
-		 */
-		assert(eMode == INCRINIT_ROOT || eMode == INCRINIT_TASK);
-		rc = vdbeIncrPopulate(pIncr);
-	}
-#endif
 
-	if (rc == SQL_OK
-	    && (SQL_MAX_WORKER_THREADS == 0 || eMode != INCRINIT_TASK)) {
+	if (rc == SQL_OK) {
 		rc = vdbePmaReaderNext(pReadr);
 	}
 
 	return rc;
 }
-
-#if SQL_MAX_WORKER_THREADS>0
-/*
- * The main routine for vdbePmaReaderIncrMergeInit() operations run in
- * background threads.
- */
-static void *
-vdbePmaReaderBgIncrInit(void *pCtx)
-{
-	PmaReader *pReader = (PmaReader *) pCtx;
-	void *pRet =
-	    SQL_INT_TO_PTR(vdbePmaReaderIncrMergeInit(pReader, INCRINIT_TASK)
-	    );
-	pReader->pIncr->pTask->bDone = 1;
-	return pRet;
-}
-#endif
 
 /*
  * If the PmaReader passed as the first argument is not an incremental-reader
@@ -2290,23 +1832,12 @@ vdbePmaReaderBgIncrInit(void *pCtx)
  * using the current thread.
  */
 static int
-vdbePmaReaderIncrInit(PmaReader * pReadr, int eMode)
+vdbePmaReaderIncrInit(PmaReader * pReadr)
 {
 	IncrMerger *pIncr = pReadr->pIncr;	/* Incremental merger */
 	int rc = SQL_OK;	/* Return code */
 	if (pIncr) {
-#if SQL_MAX_WORKER_THREADS>0
-		assert(pIncr->bUseThread == 0 || eMode == INCRINIT_TASK);
-		if (pIncr->bUseThread) {
-			void *pCtx = (void *)pReadr;
-			rc = vdbeSorterCreateThread(pIncr->pTask,
-						    vdbePmaReaderBgIncrInit,
-						    pCtx);
-		} else
-#endif
-		{
-			rc = vdbePmaReaderIncrMergeInit(pReadr, eMode);
-		}
+		rc = vdbePmaReaderIncrMergeInit(pReadr);
 	}
 	return rc;
 }
@@ -2451,77 +1982,51 @@ vdbeSorterMergeTreeBuild(VdbeSorter * pSorter,	/* The VDBE cursor that implement
 {
 	MergeEngine *pMain = 0;
 	int rc = SQL_OK;
-	int iTask;
 
-#if SQL_MAX_WORKER_THREADS>0
-	/* If the sorter uses more than one task, then create the top-level
-	 * MergeEngine here. This MergeEngine will read data from exactly
-	 * one PmaReader per sub-task.
-	 */
-	assert(pSorter->bUseThreads || pSorter->nTask == 1);
-	if (pSorter->nTask > 1) {
-		pMain = vdbeMergeEngineNew(pSorter->nTask);
-		if (pMain == 0)
-			rc = SQL_NOMEM;
-	}
-#endif
+	SortSubtask *pTask = &pSorter->aTask;
+	assert(pTask->nPMA > 0);
+	if (pTask->nPMA) {
+		MergeEngine *pRoot = 0;	/* Root node of tree for this task */
+		int nDepth = vdbeSorterTreeDepth(pTask->nPMA);
+		i64 iReadOff = 0;
 
-	for (iTask = 0; rc == SQL_OK && iTask < pSorter->nTask; iTask++) {
-		SortSubtask *pTask = &pSorter->aTask[iTask];
-		assert(pTask->nPMA > 0 || SQL_MAX_WORKER_THREADS > 0);
-		if (SQL_MAX_WORKER_THREADS == 0 || pTask->nPMA) {
-			MergeEngine *pRoot = 0;	/* Root node of tree for this task */
-			int nDepth = vdbeSorterTreeDepth(pTask->nPMA);
-			i64 iReadOff = 0;
+		if (pTask->nPMA <= SORTER_MAX_MERGE_COUNT) {
+			rc = vdbeMergeEngineLevel0(pTask, pTask->nPMA,
+						   &iReadOff, &pRoot);
+		} else {
+			int i;
+			int iSeq = 0;
+			pRoot =
+			    vdbeMergeEngineNew(SORTER_MAX_MERGE_COUNT);
+			if (pRoot == 0)
+				rc = SQL_NOMEM;
+			for (i = 0; i < pTask->nPMA && rc == SQL_OK;
+			     i += SORTER_MAX_MERGE_COUNT) {
+				MergeEngine *pMerger = 0;	/* New level-0 PMA merger */
+				int nReader;	/* Number of level-0 PMAs to merge */
 
-			if (pTask->nPMA <= SORTER_MAX_MERGE_COUNT) {
-				rc = vdbeMergeEngineLevel0(pTask, pTask->nPMA,
-							   &iReadOff, &pRoot);
-			} else {
-				int i;
-				int iSeq = 0;
-				pRoot =
-				    vdbeMergeEngineNew(SORTER_MAX_MERGE_COUNT);
-				if (pRoot == 0)
-					rc = SQL_NOMEM;
-				for (i = 0; i < pTask->nPMA && rc == SQL_OK;
-				     i += SORTER_MAX_MERGE_COUNT) {
-					MergeEngine *pMerger = 0;	/* New level-0 PMA merger */
-					int nReader;	/* Number of level-0 PMAs to merge */
-
-					nReader =
-					    MIN(pTask->nPMA - i,
-						SORTER_MAX_MERGE_COUNT);
-					rc = vdbeMergeEngineLevel0(pTask,
-								   nReader,
-								   &iReadOff,
-								   &pMerger);
-					if (rc == SQL_OK) {
-						rc = vdbeSorterAddToTree(pTask,
-									 nDepth,
-									 iSeq++,
-									 pRoot,
-									 pMerger);
-					}
+				nReader =
+				    MIN(pTask->nPMA - i,
+					SORTER_MAX_MERGE_COUNT);
+				rc = vdbeMergeEngineLevel0(pTask,
+							   nReader,
+							   &iReadOff,
+							   &pMerger);
+				if (rc == SQL_OK) {
+					rc = vdbeSorterAddToTree(pTask,
+								 nDepth,
+								 iSeq++,
+								 pRoot,
+								 pMerger);
 				}
 			}
+		}
 
-			if (rc == SQL_OK) {
-#if SQL_MAX_WORKER_THREADS>0
-				if (pMain != 0) {
-					rc = vdbeIncrMergerNew(pTask, pRoot,
-							       &pMain->
-							       aReadr[iTask].
-							       pIncr);
-				} else
-#endif
-				{
-					assert(pMain == 0);
-					pMain = pRoot;
-				}
-			} else {
-				vdbeMergeEngineFree(pRoot);
-			}
+		if (rc == SQL_OK) {
+			assert(pMain == 0);
+			pMain = pRoot;
+		} else {
+			vdbeMergeEngineFree(pRoot);
 		}
 	}
 
@@ -2546,90 +2051,13 @@ static int
 vdbeSorterSetupMerge(VdbeSorter * pSorter)
 {
 	int rc;			/* Return code */
-	SortSubtask *pTask0 = &pSorter->aTask[0];
 	MergeEngine *pMain = 0;
-#if SQL_MAX_WORKER_THREADS
-	sql *db = pTask0->pSorter->db;
-	int i;
-	SorterCompare xCompare = vdbeSorterGetCompare(pSorter);
-	for (i = 0; i < pSorter->nTask; i++) {
-		pSorter->aTask[i].xCompare = xCompare;
-	}
-#endif
 
 	rc = vdbeSorterMergeTreeBuild(pSorter, &pMain);
 	if (rc == SQL_OK) {
-#if SQL_MAX_WORKER_THREADS
-		assert(pSorter->bUseThreads == 0 || pSorter->nTask > 1);
-		if (pSorter->bUseThreads) {
-			int iTask;
-			PmaReader *pReadr = 0;
-			SortSubtask *pLast =
-			    &pSorter->aTask[pSorter->nTask - 1];
-			rc = vdbeSortAllocUnpacked(pLast);
-			if (rc == SQL_OK) {
-				pReadr =
-				    (PmaReader *) sqlDbMallocZero(db,
-								      sizeof
-								      (PmaReader));
-				pSorter->pReader = pReadr;
-				if (pReadr == 0)
-					rc = SQL_NOMEM;
-			}
-			if (rc == SQL_OK) {
-				rc = vdbeIncrMergerNew(pLast, pMain,
-						       &pReadr->pIncr);
-				if (rc == SQL_OK) {
-					vdbeIncrMergerSetThreads(pReadr->pIncr);
-					for (iTask = 0;
-					     iTask < (pSorter->nTask - 1);
-					     iTask++) {
-						IncrMerger *pIncr;
-						if ((pIncr =
-						     pMain->aReadr[iTask].
-						     pIncr)) {
-							vdbeIncrMergerSetThreads
-							    (pIncr);
-							assert(pIncr->pTask !=
-							       pLast);
-						}
-					}
-					for (iTask = 0;
-					     rc == SQL_OK
-					     && iTask < pSorter->nTask;
-					     iTask++) {
-						/* Check that:
-						 *
-						 *   a) The incremental merge object is configured to use the
-						 *      right task, and
-						 *   b) If it is using task (nTask-1), it is configured to run
-						 *      in single-threaded mode. This is important, as the
-						 *      root merge (INCRINIT_ROOT) will be using the same task
-						 *      object.
-						 */
-						PmaReader *p =
-						    &pMain->aReadr[iTask];
-						assert(p->pIncr == 0 || ((p->pIncr->pTask == &pSorter->aTask[iTask])	/* a */
-									 &&(iTask != pSorter->nTask - 1 || p->pIncr->bUseThread == 0)	/* b */
-						       ));
-						rc = vdbePmaReaderIncrInit(p,
-									   INCRINIT_TASK);
-					}
-				}
-				pMain = 0;
-			}
-			if (rc == SQL_OK) {
-				rc = vdbePmaReaderIncrMergeInit(pReadr,
-								INCRINIT_ROOT);
-			}
-		} else
-#endif
-		{
-			rc = vdbeMergeEngineInit(pTask0, pMain,
-						 INCRINIT_NORMAL);
-			pSorter->pMerger = pMain;
-			pMain = 0;
-		}
+		rc = vdbeMergeEngineInit(&pSorter->aTask, pMain);
+		pSorter->pMerger = pMain;
+		pMain = 0;
 	}
 
 	if (rc != SQL_OK) {
@@ -2660,7 +2088,7 @@ sqlVdbeSorterRewind(const VdbeCursor * pCsr, int *pbEof)
 	if (pSorter->bUsePMA == 0) {
 		if (pSorter->list.pList) {
 			*pbEof = 0;
-			rc = vdbeSorterSort(&pSorter->aTask[0], &pSorter->list);
+			rc = vdbeSorterSort(&pSorter->aTask, &pSorter->list);
 		} else {
 			*pbEof = 1;
 		}
@@ -2678,8 +2106,6 @@ sqlVdbeSorterRewind(const VdbeCursor * pCsr, int *pbEof)
 	/* Join all threads */
 	rc = vdbeSorterJoinAll(pSorter, rc);
 
-	vdbeSorterRewindDebug("rewind");
-
 	/* Assuming no errors have occurred, set up a merger structure to
 	 * incrementally read and merge all remaining PMAs.
 	 */
@@ -2689,7 +2115,6 @@ sqlVdbeSorterRewind(const VdbeCursor * pCsr, int *pbEof)
 		*pbEof = 0;
 	}
 
-	vdbeSorterRewindDebug("rewinddone");
 	return rc;
 }
 
@@ -2708,19 +2133,9 @@ sqlVdbeSorterNext(sql * db, const VdbeCursor * pCsr, int *pbEof)
 	       || (pSorter->pReader == 0 && pSorter->pMerger == 0));
 	if (pSorter->bUsePMA) {
 		assert(pSorter->pReader == 0 || pSorter->pMerger == 0);
-		assert(pSorter->bUseThreads == 0 || pSorter->pReader);
-		assert(pSorter->bUseThreads == 1 || pSorter->pMerger);
-#if SQL_MAX_WORKER_THREADS>0
-		if (pSorter->bUseThreads) {
-			rc = vdbePmaReaderNext(pSorter->pReader);
-			*pbEof = (pSorter->pReader->pFd == 0);
-		} else
-#endif
-			/*if( !pSorter->bUseThreads ) */  {
-			assert(pSorter->pMerger != 0);
-			assert(pSorter->pMerger->pTask == (&pSorter->aTask[0]));
-			rc = vdbeMergeEngineStep(pSorter->pMerger, pbEof);
-			}
+		assert(pSorter->pMerger);
+		assert(pSorter->pMerger->pTask == &pSorter->aTask);
+		rc = vdbeMergeEngineStep(pSorter->pMerger, pbEof);
 	} else {
 		SorterRecord *pFree = pSorter->list.pList;
 		pSorter->list.pList = pFree->u.pNext;
@@ -2745,11 +2160,6 @@ vdbeSorterRowkey(const VdbeSorter * pSorter,	/* Sorter object */
 	void *pKey;
 	if (pSorter->bUsePMA) {
 		PmaReader *pReader;
-#if SQL_MAX_WORKER_THREADS>0
-		if (pSorter->bUseThreads) {
-			pReader = pSorter->pReader;
-		} else
-#endif
 			/*if( !pSorter->bUseThreads ) */  {
 			pReader =
 			    &pSorter->pMerger->aReadr[pSorter->pMerger->

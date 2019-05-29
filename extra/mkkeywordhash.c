@@ -55,41 +55,17 @@ struct Keyword {
 */
 #define ALTER        0x00000001
 #define ALWAYS       0x00000002
-#ifdef SQL_OMIT_AUTOINCREMENT
-#  define AUTOINCR   0
-#else
 #  define AUTOINCR   0x00000010
-#endif
-#ifdef SQL_OMIT_CAST
-#  define CAST       0
-#else
 #  define CAST       0x00000020
-#endif
-#ifdef SQL_OMIT_COMPOUND_SELECT
-#  define COMPOUND   0
-#else
 #  define COMPOUND   0x00000040
-#endif
-#ifdef SQL_OMIT_CONFLICT_CLAUSE
-#  define CONFLICT   0
-#else
 #  define CONFLICT   0x00000080
-#endif
 #define EXPLAIN      0x00000100
 #define FKEY         0x00000200
-#ifdef SQL_OMIT_PRAGMA
-#  define PRAGMA     0
-#else
 #  define PRAGMA     0x00000400
-#endif
 #define SUBQUERY     0x00001000
 #  define TRIGGER    0x00002000
 #  define VIEW       0x00008000
-#ifdef SQL_OMIT_CTE
-#  define CTE        0
-#else
 #  define CTE        0x00040000
-#endif
 #  define RESERVED   0x00000001
 /*
 ** These are the keywords

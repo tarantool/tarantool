@@ -222,7 +222,6 @@ operatorMask(int op)
 	return c;
 }
 
-#ifndef SQL_OMIT_LIKE_OPTIMIZATION
 /**
  * Check to see if the given expression is a LIKE operator that
  * can be optimized using inequality constraints.
@@ -341,7 +340,6 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 	sqlValueFree(pVal);
 	return rc;
 }
-#endif				/* SQL_OMIT_LIKE_OPTIMIZATION */
 
 /*
  * If the pBase expression originated in the ON or USING clause of
@@ -451,7 +449,6 @@ whereCombineDisjuncts(SrcList * pSrc,	/* the FROM clause */
 	exprAnalyze(pSrc, pWC, idxNew);
 }
 
-#if !defined(SQL_OMIT_OR_OPTIMIZATION)
 /*
  * Analyze a term that consists of two or more OR-connected
  * subterms.  So in:
@@ -822,7 +819,6 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 		}
 	}
 }
-#endif				/* !SQL_OMIT_OR_OPTIMIZATION */
 
 /*
  * We already know that pExpr is a binary operator where both operands are
@@ -1092,7 +1088,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			    (operatorMask(pDup->op) + eExtraOp) & opMask;
 		}
 	}
-#ifndef SQL_OMIT_BETWEEN_OPTIMIZATION
+
 	/* If a term is the BETWEEN operator, create two new virtual terms
 	 * that define the range that the BETWEEN implements.  For example:
 	 *
@@ -1133,9 +1129,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			markTermAsChild(pWC, idxNew, idxTerm);
 		}
 	}
-#endif				/* SQL_OMIT_BETWEEN_OPTIMIZATION */
 
-#if !defined(SQL_OMIT_OR_OPTIMIZATION)
 	/* Analyze a term that is composed of two or more subterms connected by
 	 * an OR operator.
 	 */
@@ -1144,9 +1138,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 		exprAnalyzeOrTerm(pSrc, pWC, idxTerm);
 		pTerm = &pWC->a[idxTerm];
 	}
-#endif				/* SQL_OMIT_OR_OPTIMIZATION */
 
-#ifndef SQL_OMIT_LIKE_OPTIMIZATION
 	/*
 	 * Add constraints to reduce the search space on a LIKE
 	 * operator.
@@ -1240,7 +1232,6 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			markTermAsChild(pWC, idxNew2, idxTerm);
 		}
 	}
-#endif				/* SQL_OMIT_LIKE_OPTIMIZATION */
 
 	/* If there is a vector == or IS term - e.g. "(a, b) == (?, ?)" - create
 	 * new terms for each component comparison - "a = ?" and "b = ?".  The

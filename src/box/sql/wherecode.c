@@ -158,7 +158,7 @@ explainIndexRange(StrAccum * pStr, WhereLoop * pLoop)
 
 /*
  * This function is a no-op unless currently processing an EXPLAIN QUERY PLAN
- * command, or if either SQL_DEBUG or SQL_ENABLE_STMT_SCANSTATUS was
+ * command, or if SQL_DEBUG was
  * defined at compile-time. If it is not a no-op, a single OP_Explain opcode
  * is added to the output to describe the table scan strategy in pLevel.
  *
@@ -174,7 +174,7 @@ sqlWhereExplainOneScan(Parse * pParse,	/* Parse context */
 			   u16 wctrlFlags)	/* Flags passed to sqlWhereBegin() */
 {
 	int ret = 0;
-#if !defined(SQL_DEBUG) && !defined(SQL_ENABLE_STMT_SCANSTATUS)
+#if !defined(SQL_DEBUG)
 	if (pParse->explain == 2)
 #endif
 	{
@@ -253,14 +253,14 @@ sqlWhereExplainOneScan(Parse * pParse,	/* Parse context */
 				       " USING INTEGER PRIMARY KEY (rowid%s?)",
 				       zRangeOp);
 		}
-#ifdef SQL_EXPLAIN_ESTIMATED_ROWS
+
 		if (pLoop->nOut >= 10) {
 			sqlXPrintf(&str, " (~%llu rows)",
 				       sqlLogEstToInt(pLoop->nOut));
 		} else {
 			sqlStrAccumAppend(&str, " (~1 row)", 9);
 		}
-#endif
+
 		zMsg = sqlStrAccumFinish(&str);
 		ret =
 		    sqlVdbeAddOp4(v, OP_Explain, iId, iLevel, iFrom, zMsg,
@@ -268,34 +268,6 @@ sqlWhereExplainOneScan(Parse * pParse,	/* Parse context */
 	}
 	return ret;
 }
-
-#ifdef SQL_ENABLE_STMT_SCANSTATUS
-/*
- * Configure the VM passed as the first argument with an
- * sql_stmt_scanstatus() entry corresponding to the scan used to
- * implement level pLvl. Argument pSrclist is a pointer to the FROM
- * clause that the scan reads data from.
- *
- * If argument addrExplain is not 0, it must be the address of an
- * OP_Explain instruction that describes the same loop.
- */
-void
-sqlWhereAddScanStatus(Vdbe * v,		/* Vdbe to add scanstatus entry to */
-			  SrcList * pSrclist,	/* FROM clause pLvl reads data from */
-			  WhereLevel * pLvl,	/* Level to add scanstatus() entry for */
-			  int addrExplain)	/* Address of OP_Explain (or 0) */
-{
-	const char *zObj = 0;
-	WhereLoop *pLoop = pLvl->pWLoop;
-	if (pLoop->pIndex != 0) {
-		zObj = pLoop->pIndex->zName;
-	} else {
-		zObj = pSrclist->a[pLvl->iFrom].zName;
-	}
-	sqlVdbeScanStatus(v, addrExplain, pLvl->addrBody, pLvl->addrVisit,
-			      pLoop->nOut, zObj);
-}
-#endif
 
 /*
  * Disable a term in the WHERE clause.  Except, do not disable the term
@@ -1247,9 +1219,7 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 		} else {
 			assert(pLevel->p5 == 0);
 		}
-	} else
-#ifndef SQL_OMIT_OR_OPTIMIZATION
-	if (pLoop->wsFlags & WHERE_MULTI_OR) {
+	} else if (pLoop->wsFlags & WHERE_MULTI_OR) {
 		/* Case 5:  Two or more separately indexed terms connected by OR
 		 *
 		 * Example:
@@ -1415,16 +1385,12 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 				       || db->mallocFailed);
 				if (pSubWInfo) {
 					WhereLoop *pSubLoop;
-					int addrExplain =
-					    sqlWhereExplainOneScan(pParse,
-								       pOrTab,
-								       &pSubWInfo->a[0],
-								       iLevel,
-								       pLevel->iFrom,
-								       0);
-					sqlWhereAddScanStatus(v, pOrTab,
-								  &pSubWInfo->a[0],
-								  addrExplain);
+				    	sqlWhereExplainOneScan(pParse,
+							       pOrTab,
+							       &pSubWInfo->a[0],
+							       iLevel,
+							       pLevel->iFrom,
+							       0);
 
 					/* This is the sub-WHERE clause body.  First skip over
 					 * duplicate rows from prior sub-WHERE clauses, and record the
@@ -1552,7 +1518,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 		if (!untestedTerms)
 			disableTerm(pLevel, pTerm);
 	} else
-#endif				/* SQL_OMIT_OR_OPTIMIZATION */
 
 	{
 		/* Case 6:  There is no usable index.  We must do a complete
@@ -1577,10 +1542,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			pLevel->p5 = SQL_STMTSTATUS_FULLSCAN_STEP;
 		}
 	}
-
-#ifdef SQL_ENABLE_STMT_SCANSTATUS
-	pLevel->addrVisit = sqlVdbeCurrentAddr(v);
-#endif
 
 	/* Insert code to test every subexpression that can be completely
 	 * computed using the current set of tables.

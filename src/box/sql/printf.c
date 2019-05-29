@@ -293,11 +293,6 @@ sqlVXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 			width = wx & 0x7fffffff;
 		}
 		assert(width >= 0);
-#ifdef SQL_PRINTF_PRECISION_LIMIT
-		if (width > SQL_PRINTF_PRECISION_LIMIT) {
-			width = SQL_PRINTF_PRECISION_LIMIT;
-		}
-#endif
 
 		/* Get the precision */
 		if (c == '.') {
@@ -327,11 +322,6 @@ sqlVXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 			precision = -1;
 		}
 		assert(precision >= (-1));
-#ifdef SQL_PRINTF_PRECISION_LIMIT
-		if (precision > SQL_PRINTF_PRECISION_LIMIT) {
-			precision = SQL_PRINTF_PRECISION_LIMIT;
-		}
-#endif
 
 		/* Get the conversion type modifier */
 		if (c == 'l') {

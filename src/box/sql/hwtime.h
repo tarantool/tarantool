@@ -43,34 +43,6 @@
  * processor and returns that value.  This can be used for high-res
  * profiling.
  */
-#if (defined(__GNUC__) || defined(_MSC_VER)) && \
-      (defined(i386) || defined(__i386__) || defined(_M_IX86))
-
-#if defined(__GNUC__)
-
-__inline__ sql_uint64
-sqlHwtime(void)
-{
-	unsigned int lo, hi;
-	__asm__ __volatile__("rdtsc":"=a"(lo), "=d"(hi));
-	return (sql_uint64) hi << 32 | lo;
-}
-
-#elif defined(_MSC_VER)
-
-__declspec(naked)
-__inline sql_uint64 __cdecl
-sqlHwtime(void)
-{
-	__asm {
-		rdtsc ret;
- return value at EDX:EAX}
-}
-
-#endif
-
-#elif (defined(__GNUC__) && defined(__x86_64__))
-
 __inline__ sql_uint64
 sqlHwtime(void)
 {
@@ -78,40 +50,5 @@ sqlHwtime(void)
 	__asm__ __volatile__("rdtsc":"=A"(val));
 	return val;
 }
-
-#elif (defined(__GNUC__) && defined(__ppc__))
-
-__inline__ sql_uint64
-sqlHwtime(void)
-{
-	unsigned long long retval;
-	unsigned long junk;
-	__asm__ __volatile__("\n\
-          1:      mftbu   %1\n\
-                  mftb    %L0\n\
-                  mftbu   %0\n\
-                  cmpw    %0,%1\n\
-                  bne     1b":"=r"(retval), "=r"(junk));
-	return retval;
-}
-
-#else
-
-#error Need implementation of sqlHwtime() for your platform.
-
-  /*
-   * To compile without implementing sqlHwtime() for your platform,
-   * you can remove the above #error and use the following
-   * stub function.  You will lose timing support for many
-   * of the debugging and testing utilities, but it should at
-   * least compile and run.
-   */
-sql_uint64
-sqlHwtime(void)
-{
-	return ((sql_uint64) 0);
-}
-
-#endif
 
 #endif				/* !defined(SQL_HWTIME_H) */

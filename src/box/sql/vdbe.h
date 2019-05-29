@@ -151,11 +151,7 @@ struct SubProgram {
 #define COLNAME_DATABASE 2
 #define COLNAME_TABLE    3
 #define COLNAME_COLUMN   4
-#ifdef SQL_ENABLE_COLUMN_METADATA
-#define COLNAME_N        5	/* Number of COLNAME_xxx symbols */
-#else
-#define COLNAME_N      2	/* Store the name and decltype */
-#endif
+#define COLNAME_N        2	/* Store the name and decltype */
 
 /*
  * The following macro converts a relative address in the p2 field
@@ -267,9 +263,7 @@ void sqlVdbeSwap(Vdbe *, Vdbe *);
 VdbeOp *sqlVdbeTakeOpArray(Vdbe *, int *, int *);
 sql_value *sqlVdbeGetBoundValue(Vdbe *, int, u8);
 void sqlVdbeSetVarmask(Vdbe *, int);
-#ifndef SQL_OMIT_TRACE
 char *sqlVdbeExpandSql(Vdbe *, const char *);
-#endif
 int sqlMemCompare(const Mem *, const Mem *, const struct coll *);
 
 /**
@@ -350,11 +344,4 @@ void sqlVdbeSetLineNumber(Vdbe *, int);
 #define VdbeCoverageNeverTaken(v)
 #define VDBE_OFFSET_LINENO(x) 0
 #endif
-
-#ifdef SQL_ENABLE_STMT_SCANSTATUS
-void sqlVdbeScanStatus(Vdbe *, int, int, int, LogEst, const char *);
-#else
-#define sqlVdbeScanStatus(a,b,c,d,e)
-#endif
-
 #endif				/* SQL_VDBE_H */

@@ -204,9 +204,7 @@ SQL_WSD struct sqlConfig sqlConfig = {
 	0,			/* xVdbeBranch */
 	0,			/* pVbeBranchArg */
 #endif
-#ifndef SQL_UNTESTABLE
 	0,			/* xTestCallback */
-#endif
 	0,			/* bLocaltimeFault */
 	0x7ffffffe		/* iOnceResetThreshold */
 };
@@ -246,7 +244,3 @@ int sqlPendingByte = 0x40000000;
  */
 const unsigned char sqlOpcodeProperty[] = OPFLG_INITIALIZER;
 
-/*
- * Name of the default collating sequence
- */
-const char sqlStrBINARY[] = "BINARY";

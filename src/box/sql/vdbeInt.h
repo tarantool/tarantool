@@ -112,9 +112,6 @@ struct VdbeCursor {
 	/** Info about keys needed by index cursors. */
 	struct key_def *key_def;
 	i16 nField;		/* Number of fields in the header */
-#ifdef SQL_ENABLE_COLUMN_USED_MASK
-	u64 maskUsed;		/* Mask of columns used by this cursor */
-#endif
 	/**
 	 * Auxiliary VDBE structure to speed-up tuple data
 	 * field access.
@@ -421,9 +418,7 @@ struct Vdbe {
 	 */
 	uint32_t res_var_count;
 	VList *pVList;		/* Name of variables */
-#ifndef SQL_OMIT_TRACE
 	i64 startTime;		/* Time when query started - used for profiling */
-#endif
 	int nOp;		/* Number of instructions in the program */
 	u16 nResColumn;		/* Number of columns in one row of the result set */
 	u8 errorAction;		/* Recovery action to do in case of an error */
@@ -446,11 +441,6 @@ struct Vdbe {
 	uint32_t sql_flags;
 	/* Anonymous savepoint for aborts only */
 	Savepoint *anonymous_savepoint;
-#ifdef SQL_ENABLE_STMT_SCANSTATUS
-	i64 *anExec;		/* Number of times each op has been executed */
-	int nScan;		/* Entries in aScan[] */
-	ScanStatus *aScan;	/* Scan definitions for sql_stmt_scanstatus() */
-#endif
 };
 
 /*

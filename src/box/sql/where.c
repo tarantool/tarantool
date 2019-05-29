@@ -4560,12 +4560,6 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 			VdbeComment((v, "%s", space->def->name));
 			assert(pTabItem->iCursor == pLevel->iTabCur);
 			sqlVdbeChangeP5(v, bFordelete);
-#ifdef SQL_ENABLE_COLUMN_USED_MASK
-			sqlVdbeAddOp4Dup8(v, OP_ColumnsUsed,
-					      pTabItem->iCursor, 0, 0,
-					      (const u8 *)&pTabItem->colUsed,
-					      P4_INT64);
-#endif
 		}
 		if (pLoop->wsFlags & WHERE_INDEXED) {
 			struct index_def *idx_def = pLoop->index_def;
@@ -4640,30 +4634,6 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 					sqlVdbeChangeP5(v, OPFLAG_SEEKEQ);	/* Hint to COMDB2 */
 				}
 				VdbeComment((v, "%s", idx_def->name));
-#ifdef SQL_ENABLE_COLUMN_USED_MASK
-				{
-					u64 colUsed = 0;
-					int ii, jj;
-					for (ii = 0; ii < pIx->nColumn; ii++) {
-						jj = pIx->aiColumn[ii];
-						if (jj < 0)
-							continue;
-						if (jj > 63)
-							jj = 63;
-						if ((pTabItem->
-						     colUsed & MASKBIT(jj)) ==
-						    0)
-							continue;
-						colUsed |=
-						    ((u64) 1) << (ii <
-								  63 ? ii : 63);
-					}
-					sqlVdbeAddOp4Dup8(v, OP_ColumnsUsed,
-							      iIndexCur, 0, 0,
-							      (u8 *) & colUsed,
-							      P4_INT64);
-				}
-#endif				/* SQL_ENABLE_COLUMN_USED_MASK */
 			}
 		}
 	}
@@ -4677,10 +4647,7 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	 */
 	notReady = ~(Bitmask) 0;
 	for (ii = 0; ii < nTabList; ii++) {
-		int addrExplain;
-		int wsFlags;
 		pLevel = &pWInfo->a[ii];
-		wsFlags = pLevel->pWLoop->wsFlags;
 #ifndef SQL_OMIT_AUTOMATIC_INDEX
 		if ((pLevel->pWLoop->wsFlags & WHERE_AUTO_INDEX) != 0) {
 			constructAutomaticIndex(pParse, &pWInfo->sWC,
@@ -4690,17 +4657,11 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 				goto whereBeginError;
 		}
 #endif
-		addrExplain =
-		    sqlWhereExplainOneScan(pParse, pTabList, pLevel, ii,
+		sqlWhereExplainOneScan(pParse, pTabList, pLevel, ii,
 					       pLevel->iFrom, wctrlFlags);
 		pLevel->addrBody = sqlVdbeCurrentAddr(v);
 		notReady = sqlWhereCodeOneLoopStart(pWInfo, ii, notReady);
 		pWInfo->iContinue = pLevel->addrCont;
-		if ((wsFlags & WHERE_MULTI_OR) == 0
-		    && (wctrlFlags & WHERE_OR_SUBCLAUSE) == 0) {
-			sqlWhereAddScanStatus(v, pTabList, pLevel,
-						  addrExplain);
-		}
 	}
 
 	/* Done. */

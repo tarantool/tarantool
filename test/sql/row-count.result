@@ -303,7 +303,7 @@ box.execute("EXPLAIN QUERY PLAN INSERT INTO t1 VALUES ('b'), ('c'), ('d');")
   - name: detail
     type: TEXT
   rows:
-  - [0, 0, 0, 'SCAN TABLE T2']
+  - [0, 0, 0, 'SCAN TABLE T2 (~262144 rows)']
 ...
 box.execute("SELECT ROW_COUNT();")
 ---

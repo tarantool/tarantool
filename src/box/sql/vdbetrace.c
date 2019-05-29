@@ -39,8 +39,6 @@
 #include "sqlInt.h"
 #include "vdbeInt.h"
 
-#ifndef SQL_OMIT_TRACE
-
 /*
  * zSql is a zero-terminated string of UTF-8 SQL text.  Return the number of
  * bytes in this text up to but excluding the first character in
@@ -76,11 +74,6 @@ findNextHostParameter(const char *zSql, int *pnToken)
  * their current bindings. Or, if sql.nVdbeExec is greater than 1,
  * then the returned string holds a copy of zRawSql with "-- " prepended
  * to each line of text.
- *
- * If the SQL_TRACE_SIZE_LIMIT macro is defined to an integer, then
- * then long strings and blobs are truncated to that many bytes.  This
- * can be used to prevent unreasonably large trace strings when dealing
- * with large (multi-megabyte) strings and blobs.
  *
  * The calling function is responsible for making sure the memory returned
  * is eventually freed.
@@ -163,23 +156,7 @@ sqlVdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 			} else if (pVar->flags & MEM_Str) {
 				int nOut;	/* Number of bytes of the string text to include in output */
 				nOut = pVar->n;
-#ifdef SQL_TRACE_SIZE_LIMIT
-				if (nOut > SQL_TRACE_SIZE_LIMIT) {
-					nOut = SQL_TRACE_SIZE_LIMIT;
-					while (nOut < pVar->n
-					       && (pVar->z[nOut] & 0xc0) ==
-					       0x80) {
-						nOut++;
-					}
-				}
-#endif
 				sqlXPrintf(&out, "'%.*q'", nOut, pVar->z);
-#ifdef SQL_TRACE_SIZE_LIMIT
-				if (nOut < pVar->n) {
-					sqlXPrintf(&out, "/*+%d bytes*/",
-						       pVar->n - nOut);
-				}
-#endif
 			} else if (pVar->flags & MEM_Zero) {
 				sqlXPrintf(&out, "zeroblob(%d)",
 					       pVar->u.nZero);
@@ -188,21 +165,11 @@ sqlVdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 				assert(pVar->flags & MEM_Blob);
 				sqlStrAccumAppend(&out, "x'", 2);
 				nOut = pVar->n;
-#ifdef SQL_TRACE_SIZE_LIMIT
-				if (nOut > SQL_TRACE_SIZE_LIMIT)
-					nOut = SQL_TRACE_SIZE_LIMIT;
-#endif
 				for (i = 0; i < nOut; i++) {
 					sqlXPrintf(&out, "%02x",
 						       pVar->z[i] & 0xff);
 				}
 				sqlStrAccumAppend(&out, "'", 1);
-#ifdef SQL_TRACE_SIZE_LIMIT
-				if (nOut < pVar->n) {
-					sqlXPrintf(&out, "/*+%d bytes*/",
-						       pVar->n - nOut);
-				}
-#endif
 			}
 		}
 	}
@@ -211,4 +178,3 @@ sqlVdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 	return sqlStrAccumFinish(&out);
 }
 
-#endif				/* #ifndef SQL_OMIT_TRACE */

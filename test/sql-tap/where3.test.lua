@@ -407,7 +407,7 @@ if 0
             SELECT * FROM t400, t401, t402 WHERE t402.z LIKE 'abc%';
         ]], {
             -- <where3-4.0>
-            0, 0, 2, "SCAN TABLE T402", 0, 1, 0, "SCAN TABLE T400", 0, 2, 1, "SCAN TABLE T401"
+            0, 0, 2, "SCAN TABLE T402 (~983040 rows)", 0, 1, 0, "SCAN TABLE T400 (~1048576 rows)", 0, 2, 1, "SCAN TABLE T401 (~1048576 rows)"
             -- </where3-4.0>
         })
 
@@ -418,7 +418,7 @@ if 0
             SELECT * FROM t400, t401, t402 WHERE t401.r LIKE 'abc%';
         ]], {
             -- <where3-4.1>
-            0, 0, 1, "SCAN TABLE T401", 0, 1, 0, "SCAN TABLE T400", 0, 2, 2, "SCAN TABLE T402"
+            0, 0, 1, "SCAN TABLE T401 (~983040 rows)", 0, 1, 0, "SCAN TABLE T400 (~1048576 rows)", 0, 2, 2, "SCAN TABLE T402 (~1048576 rows)"
             -- </where3-4.1>
         })
 
@@ -429,7 +429,7 @@ if 0
             SELECT * FROM t400, t401, t402 WHERE t400.c LIKE 'abc%';
         ]], {
             -- <where3-4.2>
-            0, 0, 0, "SCAN TABLE T400", 0, 1, 1, "SCAN TABLE T401", 0, 2, 2, "SCAN TABLE T402"
+            0, 0, 0, "SCAN TABLE T400 (~983040 rows)", 0, 1, 1, "SCAN TABLE T401 (~1048576 rows)", 0, 2, 2, "SCAN TABLE T402 (~1048576 rows)"
             -- </where3-4.2>
         })
 

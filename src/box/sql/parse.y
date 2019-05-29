@@ -229,9 +229,6 @@ columnname(A) ::= nm(A) typedef(Y). {sqlAddColumn(pParse,&A,&Y);}
   CONFLICT DEFERRED END FAIL
   IGNORE INITIALLY INSTEAD NO MATCH PLAN
   QUERY KEY OFFSET RAISE RELEASE REPLACE RESTRICT
-%ifdef SQL_OMIT_COMPOUND_SELECT
-  INTERSECT 
-%endif SQL_OMIT_COMPOUND_SELECT
   RENAME CTIME_KW IF
   .
 %wildcard ANY.
@@ -475,7 +472,7 @@ select(A) ::= with(W) selectnowith(X). {
 }
 
 selectnowith(A) ::= oneselect(A).
-%ifndef SQL_OMIT_COMPOUND_SELECT
+
 selectnowith(A) ::= selectnowith(A) multiselect_op(Y) oneselect(Z).  {
   Select *pRhs = Z;
   Select *pLhs = A;
@@ -502,7 +499,7 @@ selectnowith(A) ::= selectnowith(A) multiselect_op(Y) oneselect(Z).  {
 multiselect_op(A) ::= UNION(OP).             {A = @OP; /*A-overwrites-OP*/}
 multiselect_op(A) ::= UNION ALL.             {A = TK_ALL;}
 multiselect_op(A) ::= EXCEPT|INTERSECT(OP).  {A = @OP; /*A-overwrites-OP*/}
-%endif SQL_OMIT_COMPOUND_SELECT
+
 oneselect(A) ::= SELECT(S) distinct(D) selcollist(W) from(X) where_opt(Y)
                  groupby_opt(P) having_opt(Q) orderby_opt(Z) limit_opt(L). {
 #ifdef SQL_DEBUG
@@ -1036,7 +1033,7 @@ expr(A) ::= expr(A) COLLATE id(C). {
   A.pExpr = sqlExprAddCollateToken(pParse, A.pExpr, &C, 1);
   A.zEnd = &C.z[C.n];
 }
-%ifndef SQL_OMIT_CAST
+
 expr(A) ::= CAST(X) LP expr(E) AS typedef(T) RP(Y). {
   spanSet(&A,&X,&Y); /*A-overwrites-X*/
   A.pExpr = sql_expr_new_dequoted(pParse->db, TK_CAST, NULL);
@@ -1047,7 +1044,6 @@ expr(A) ::= CAST(X) LP expr(E) AS typedef(T) RP(Y). {
   A.pExpr->type = T.type;
   sqlExprAttachSubtrees(pParse->db, A.pExpr, E.pExpr, 0);
 }
-%endif  SQL_OMIT_CAST
 
 expr(A) ::= TRIM(X) LP trim_operands(Y) RP(E). {
   A.pExpr = sqlExprFunction(pParse, Y, &X);
@@ -1721,7 +1717,6 @@ cmd ::= ALTER TABLE fullname(X) DROP CONSTRAINT nm(Z). {
 %destructor wqlist {sqlWithDelete(pParse->db, $$);}
 
 with(A) ::= . {A = 0;}
-%ifndef SQL_OMIT_CTE
 with(A) ::= WITH wqlist(W).              { A = W; }
 with(A) ::= WITH RECURSIVE wqlist(W).    { A = W; }
 
@@ -1731,7 +1726,6 @@ wqlist(A) ::= nm(X) eidlist_opt(Y) AS LP select(Z) RP. {
 wqlist(A) ::= wqlist(A) COMMA nm(X) eidlist_opt(Y) AS LP select(Z) RP. {
   A = sqlWithAdd(pParse, A, &X, Y, Z);
 }
-%endif  SQL_OMIT_CTE
 
 ////////////////////////////// TYPE DECLARATION ///////////////////////////////
 %type typedef {struct type_def}

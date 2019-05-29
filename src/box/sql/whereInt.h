@@ -102,9 +102,6 @@ struct WhereLevel {
 	} u;
 	struct WhereLoop *pWLoop;	/* The selected WhereLoop object */
 	Bitmask notReady;	/* FROM entries not usable at this level */
-#ifdef SQL_ENABLE_STMT_SCANSTATUS
-	int addrVisit;		/* Address at which row is visited */
-#endif
 };
 
 /*
@@ -458,15 +455,6 @@ int sqlWhereExplainOneScan(Parse * pParse,	/* Parse context */
 			       int iFrom,	/* Value for "from" column of output */
 			       u16 wctrlFlags	/* Flags passed to sqlWhereBegin() */
     );
-#ifdef SQL_ENABLE_STMT_SCANSTATUS
-void sqlWhereAddScanStatus(Vdbe * v,	/* Vdbe to add scanstatus entry to */
-			       SrcList * pSrclist,	/* FROM clause pLvl reads data from */
-			       WhereLevel * pLvl,	/* Level to add scanstatus() entry for */
-			       int addrExplain	/* Address of OP_Explain (or 0) */
-    );
-#else
-#define sqlWhereAddScanStatus(a, b, c, d) ((void)d)
-#endif
 Bitmask sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the WHERE clause */
 				     int iLevel,	/* Which level of pWInfo->a[] should be coded */
 				     Bitmask notReady	/* Which tables are currently available */

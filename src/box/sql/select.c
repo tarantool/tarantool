@@ -1136,7 +1136,6 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 		/* In this mode, write each query result to the key of the temporary
 		 * table iParm.
 		 */
-#ifndef SQL_OMIT_COMPOUND_SELECT
 	case SRT_Union:{
 			int r1;
 			r1 = sqlGetTempReg(pParse);
@@ -1156,7 +1155,6 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 					  nResultCol);
 			break;
 		}
-#endif				/* SQL_OMIT_COMPOUND_SELECT */
 
 		/* Store the result as data using a unique key.
 		 */
@@ -1173,7 +1171,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 					  nResultCol, r1 + nPrefixReg);
 			/* Set flag to save memory allocating one by malloc. */
 			sqlVdbeChangeP5(v, 1);
-#ifndef SQL_OMIT_CTE
+
 			if (eDest == SRT_DistFifo) {
 				/* If the destination is DistFifo, then cursor (iParm+1) is open
 				 * on an ephemeral index. If the current row is already present
@@ -1189,7 +1187,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 						  pDest->reg_eph + 1);
 				assert(pSort == 0);
 			}
-#endif
+
 			if (pSort) {
 				pushOntoSorter(pParse, pSort, p,
 					       r1 + nPrefixReg, regResult, 1,
@@ -1292,7 +1290,6 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			break;
 		}
 
-#ifndef SQL_OMIT_CTE
 		/* Write the results into a priority queue that is order according to
 		 * pDest->pOrderBy (in pSO).  pDest->iSDParm (in iParm) is the cursor for an
 		 * index with pSO->nExpr+2 columns.  Build a key using pSO for the first
@@ -1343,7 +1340,6 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			sqlReleaseTempRange(pParse, r2, nKey + 2);
 			break;
 		}
-#endif				/* SQL_OMIT_CTE */
 
 		/* Discard the results.  This is used for SELECT statements inside
 		 * the body of a TRIGGER.  The purpose of such selects is to call
@@ -1516,7 +1512,6 @@ explainTempTable(Parse * pParse, const char *zUsage)
 	}
 }
 
-#if !defined(SQL_OMIT_COMPOUND_SELECT)
 /*
  * Unless an "EXPLAIN QUERY PLAN" command is being processed, this function
  * is a no-op. Otherwise, it adds a single row of output to the EQP result,
@@ -1554,10 +1549,6 @@ explainComposite(Parse * pParse,	/* Parse context */
 				  P4_DYNAMIC);
 	}
 }
-#else
-/* No-op versions of the explainXXX() functions and macros. */
-#define explainComposite(v,w,x,y,z)
-#endif
 
 /*
  * If the inner loop was generated using a non-null pOrderBy argument,
@@ -2185,7 +2176,6 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 	}
 }
 
-#ifndef SQL_OMIT_COMPOUND_SELECT
 /**
  * This function determines resulting collation sequence for
  * @n-th column of the result set for the compound SELECT
@@ -2298,7 +2288,6 @@ sql_multiselect_orderby_to_key_info(struct Parse *parse, struct Select *s,
 	return key_info;
 }
 
-#ifndef SQL_OMIT_CTE
 /*
  * This routine generates VDBE code to compute the content of a WITH RECURSIVE
  * query of the form:
@@ -2478,7 +2467,6 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 	p->pOffset = pOffset;
 	return;
 }
-#endif				/* SQL_OMIT_CTE */
 
 /* Forward references */
 static int multiSelectOrderBy(Parse * pParse,	/* Parsing context */
@@ -2637,11 +2625,9 @@ multiSelect(Parse * pParse,	/* Parsing context */
 	assert(p->pEList && pPrior->pEList);
 	assert(p->pEList->nExpr == pPrior->pEList->nExpr);
 
-#ifndef SQL_OMIT_CTE
 	if (p->selFlags & SF_Recursive) {
 		generateWithRecursiveQuery(pParse, p, &dest);
 	} else
-#endif
 
 		/* Compound SELECTs that have an ORDER BY clause are handled separately.
 		 */
@@ -2982,7 +2968,6 @@ multiSelect(Parse * pParse,	/* Parsing context */
 	sql_select_delete(db, pDelete);
 	return rc;
 }
-#endif				/* SQL_OMIT_COMPOUND_SELECT */
 
 /**
  * Code an output subroutine for a coroutine implementation of a
@@ -3238,7 +3223,6 @@ generateOutputSubroutine(struct Parse *parse, struct Select *p,
  * until all data is exhausted then jump to the "end" labe.  AltB, AeqB,
  * and AgtB jump to either L2 or to one of EofA or EofB.
  */
-#ifndef SQL_OMIT_COMPOUND_SELECT
 static int
 multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 		   Select * p,		/* The right-most of SELECTs to be coded */
@@ -3574,7 +3558,6 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	explainComposite(pParse, p->op, iSub1, iSub2, 0);
 	return pParse->is_aborted;
 }
-#endif
 
 /* Forward Declarations */
 static void substExprList(Parse *, ExprList *, int, ExprList *);
@@ -4529,7 +4512,6 @@ convertCompoundSelectToSubquery(Walker * pWalker, Select * p)
 	return WRC_Continue;
 }
 
-#ifndef SQL_OMIT_CTE
 /*
  * Argument pWith (which may be NULL) points to a linked list of nested
  * WITH contexts, from inner to outermost. If the table identified by
@@ -4717,9 +4699,7 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 
 	return SQL_OK;
 }
-#endif
 
-#ifndef SQL_OMIT_CTE
 /*
  * If the SELECT passed as the second argument has an associated WITH
  * clause, pop it from the stack stored as part of the Parse object.
@@ -4738,9 +4718,6 @@ selectPopWith(Walker * pWalker, Select * p)
 		pParse->pWith = pWith->pOuter;
 	}
 }
-#else
-#define selectPopWith 0
-#endif
 
 /*
  * This routine is a Walker callback for "expanding" a SELECT statement.
@@ -4805,12 +4782,12 @@ selectExpander(Walker * pWalker, Select * p)
 		if (pFrom->fg.isRecursive)
 			continue;
 		assert(pFrom->space == NULL);
-#ifndef SQL_OMIT_CTE
+
 		if (withExpand(pWalker, pFrom))
 			return WRC_Abort;
 		if (pFrom->space != NULL) {
 		} else
-#endif
+
 		if (pFrom->zName == 0) {
 			Select *pSel = pFrom->pSelect;
 			/* A sub-query in the FROM clause of a SELECT */
@@ -5576,7 +5553,6 @@ sqlSelect(Parse * pParse,		/* The parser context */
 	if (v == 0)
 		goto select_end;
 
-#ifndef SQL_OMIT_COMPOUND_SELECT
 	/* Handle compound SELECT statements using the separate multiSelect()
 	 * procedure.
 	 */
@@ -5597,7 +5573,6 @@ sqlSelect(Parse * pParse,		/* The parser context */
 #endif
 		return rc;
 	}
-#endif
 
 	/* Generate code for all sub-queries in the FROM clause
 	 */

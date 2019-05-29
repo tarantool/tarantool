@@ -128,16 +128,12 @@ sql_sized_realloc(void *pPrior, int nByte)
 int
 sql_release_memory(int n)
 {
-#ifdef SQL_ENABLE_MEMORY_MANAGEMENT
-	return sqlPcacheReleaseMemory(n);
-#else
 	/* IMPLEMENTATION-OF: R-34391-24921 The sql_release_memory() routine
 	 * is a no-op returning zero if sql is not compiled with
 	 * SQL_ENABLE_MEMORY_MANAGEMENT.
 	 */
 	UNUSED_PARAMETER(n);
 	return 0;
-#endif
 }
 
 /*
@@ -254,15 +250,6 @@ sqlHeapNearlyFull(void)
 }
 
 /*
- * Deinitialize the memory allocation subsystem.
- */
-void
-sqlMallocEnd(void)
-{
-	memset(&mem0, 0, sizeof(mem0));
-}
-
-/*
  * Return the amount of memory currently checked out.
  */
 sql_int64
@@ -271,19 +258,6 @@ sql_memory_used(void)
 	sql_int64 res, mx;
 	sql_status64(SQL_STATUS_MEMORY_USED, &res, &mx, 0);
 	return res;
-}
-
-/*
- * Return the maximum amount of memory that has ever been
- * checked out since either the beginning of this process
- * or since the most recent reset.
- */
-sql_int64
-sql_memory_highwater(int resetFlag)
-{
-	sql_int64 res, mx;
-	sql_status64(SQL_STATUS_MEMORY_USED, &res, &mx, resetFlag);
-	return mx;
 }
 
 /*
@@ -319,12 +293,6 @@ mallocWithAlarm(int n, void **pp)
 		}
 	}
 	p = sql_sized_malloc(nFull);
-#ifdef SQL_ENABLE_MEMORY_MANAGEMENT
-	if (p == 0 && mem0.alarmThreshold > 0) {
-		sqlMallocAlarm(nFull);
-		p = sql_sized_malloc(nFull);
-	}
-#endif
 	if (p) {
 		nFull = sqlMallocSize(p);
 		sqlStatusUp(SQL_STATUS_MEMORY_USED, nFull);
@@ -377,117 +345,13 @@ sql_malloc64(sql_uint64 n)
 }
 
 /*
- * Each thread may only have a single outstanding allocation from
- * xScratchMalloc().  We verify this constraint in the single-threaded
- * case by setting scratchAllocOut to 1 when an allocation
- * is outstanding clearing it when the allocation is freed.
- */
-#if !defined(NDEBUG)
-static int scratchAllocOut = 0;
-#endif
-
-/*
- * Allocate memory that is to be used and released right away.
- * This routine is similar to alloca() in that it is not intended
- * for situations where the memory might be held long-term.  This
- * routine is intended to get memory to old large transient data
- * structures that would not normally fit on the stack of an
- * embedded processor.
- */
-void *
-sqlScratchMalloc(int n)
-{
-	void *p;
-	assert(n > 0);
-
-	sqlStatusHighwater(SQL_STATUS_SCRATCH_SIZE, n);
-	if (mem0.nScratchFree && sqlGlobalConfig.szScratch >= n) {
-		p = mem0.pScratchFree;
-		mem0.pScratchFree = mem0.pScratchFree->pNext;
-		mem0.nScratchFree--;
-		sqlStatusUp(SQL_STATUS_SCRATCH_USED, 1);
-	} else {
-		p = sqlMalloc(n);
-		if (sqlGlobalConfig.bMemstat && p) {
-			sqlStatusUp(SQL_STATUS_SCRATCH_OVERFLOW,
-					sqlMallocSize(p));
-		}
-		sqlMemdebugSetType(p, MEMTYPE_SCRATCH);
-	}
-
-#if !defined(NDEBUG)
-	/* EVIDENCE-OF: R-12970-05880 sql will not use more than one scratch
-	 * buffers per thread.
-	 *
-	 * This can only be checked in single-threaded mode.
-	 */
-	assert(scratchAllocOut == 0);
-	if (p)
-		scratchAllocOut++;
-#endif
-
-	return p;
-}
-
-void
-sqlScratchFree(void *p)
-{
-	if (p) {
-
-#if !defined(NDEBUG)
-		/* Verify that no more than two scratch allocation per thread
-		 * is outstanding at one time.  (This is only checked in the
-		 * single-threaded case since checking in the multi-threaded case
-		 * would be much more complicated.)
-		 */
-		assert(scratchAllocOut >= 1 && scratchAllocOut <= 2);
-		scratchAllocOut--;
-#endif
-
-		if (SQL_WITHIN
-		    (p, sqlGlobalConfig.pScratch, mem0.pScratchEnd)) {
-			/* Release memory from the SQL_CONFIG_SCRATCH allocation */
-			ScratchFreeslot *pSlot;
-			pSlot = (ScratchFreeslot *) p;
-			pSlot->pNext = mem0.pScratchFree;
-			mem0.pScratchFree = pSlot;
-			mem0.nScratchFree++;
-			assert(mem0.nScratchFree <=
-			       (u32) sqlGlobalConfig.nScratch);
-			sqlStatusDown(SQL_STATUS_SCRATCH_USED, 1);
-		} else {
-			/* Release memory back to the heap */
-			assert(sqlMemdebugHasType(p, MEMTYPE_SCRATCH));
-			assert(sqlMemdebugNoType
-			       (p, (u8) ~ MEMTYPE_SCRATCH));
-			sqlMemdebugSetType(p, MEMTYPE_HEAP);
-			if (sqlGlobalConfig.bMemstat) {
-				int iSize = sqlMallocSize(p);
-				sqlStatusDown
-				    (SQL_STATUS_SCRATCH_OVERFLOW, iSize);
-				sqlStatusDown(SQL_STATUS_MEMORY_USED,
-						  iSize);
-				sqlStatusDown(SQL_STATUS_MALLOC_COUNT,
-						  1);
-				sql_sized_free(p);
-			} else
-				sql_sized_free(p);
-		}
-	}
-}
-
-/*
  * TRUE if p is a lookaside memory allocation from db
  */
-#ifndef SQL_OMIT_LOOKASIDE
 static int
 isLookaside(sql * db, void *p)
 {
 	return SQL_WITHIN(p, db->lookaside.pStart, db->lookaside.pEnd);
 }
-#else
-#define isLookaside(A,B) 0
-#endif
 
 /*
  * Return the size of a memory allocation previously obtained from
@@ -519,14 +383,6 @@ sqlDbMallocSize(sql * db, void *p)
 		return sql_sized_sizeof(p);
 	} else
 		return db->lookaside.sz;
-}
-
-sql_uint64
-sql_msize(void *p)
-{
-	assert(sqlMemdebugNoType(p, (u8) ~ MEMTYPE_HEAP));
-	assert(sqlMemdebugHasType(p, MEMTYPE_HEAP));
-	return p ? sql_sized_sizeof(p) : 0;
 }
 
 /*
@@ -646,14 +502,6 @@ sqlRealloc(void *pOld, u64 nBytes)
  * subsystem is initialized prior to invoking sqlRealloc.
  */
 void *
-sql_realloc(void *pOld, int n)
-{
-	if (n < 0)
-		n = 0;		/* IMP: R-26507-47431 */
-	return sqlRealloc(pOld, n);
-}
-
-void *
 sql_realloc64(void *pOld, sql_uint64 n)
 {
 	return sqlRealloc(pOld, n);
@@ -740,7 +588,6 @@ sqlDbMallocRaw(sql * db, u64 n)
 void *
 sqlDbMallocRawNN(sql * db, u64 n)
 {
-#ifndef SQL_OMIT_LOOKASIDE
 	LookasideSlot *pBuf;
 	assert(db != 0);
 	assert(db->pnBytesFreed == 0);
@@ -762,13 +609,6 @@ sqlDbMallocRawNN(sql * db, u64 n)
 	} else if (db->mallocFailed) {
 		return 0;
 	}
-#else
-	assert(db != 0);
-	assert(db->pnBytesFreed == 0);
-	if (db->mallocFailed) {
-		return 0;
-	}
-#endif
 	return dbMallocRawFinish(db, n);
 }
 
@@ -875,16 +715,6 @@ sqlDbStrNDup(sql * db, const char *z, u64 n)
 		zNew[n] = 0;
 	}
 	return zNew;
-}
-
-/*
- * Free any prior content in *pz and replace it with a copy of zNew.
- */
-void
-sqlSetString(char **pz, sql * db, const char *zNew)
-{
-	sqlDbFree(db, *pz);
-	*pz = sqlDbStrDup(db, zNew);
 }
 
 /*

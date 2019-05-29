@@ -770,12 +770,10 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 			     (trigger->op == TK_INSERT ? "INSERT" : ""),
 			     (trigger->op == TK_DELETE ? "DELETE" : ""),
 			      space->def->name));
-#ifndef SQL_OMIT_TRACE
 		sqlVdbeChangeP4(v, -1,
 				    sqlMPrintf(db, "-- TRIGGER %s",
 						   trigger->zName),
 				    P4_DYNAMIC);
-#endif
 
 		/*
 		 * If one was specified, code the WHEN clause. If

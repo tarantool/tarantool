@@ -66,7 +66,6 @@ vdbeSafetyNotNull(Vdbe * p)
 	}
 }
 
-#ifndef SQL_OMIT_TRACE
 /*
  * Invoke the profile callback.  This routine is only called if we already
  * know that the profile callback is defined and needs to be invoked.
@@ -98,9 +97,6 @@ invokeProfileCallback(sql * db, Vdbe * p)
  */
 #define checkProfileCallback(DB,P) \
    if( ((P)->startTime)>0 ){ invokeProfileCallback(DB,P); }
-#else
-#define checkProfileCallback(DB,P)	/*no-op */
-#endif
 
 /*
  * The following routine destroys a virtual machine that is created by
@@ -496,21 +492,9 @@ sqlStep(Vdbe * p)
 		 *
 		 * Nevertheless, some published applications that were originally written
 		 * for version 3.6.23 or earlier do in fact depend on SQL_MISUSE
-		 * returns, and those were broken by the automatic-reset change.  As a
-		 * a work-around, the SQL_OMIT_AUTORESET compile-time restores the
-		 * legacy behavior of returning SQL_MISUSE for cases where the
-		 * previous sql_step() returned something other than a SQL_LOCKED
-		 * or SQL_BUSY error.
+		 * returns, and those were broken by the automatic-reset change.
 		 */
-#ifdef SQL_OMIT_AUTORESET
-		if ((rc = p->rc & 0xff) == SQL_BUSY || rc == SQL_LOCKED) {
-			sql_reset((sql_stmt *) p);
-		} else {
-			return SQL_MISUSE;
-		}
-#else
 		sql_reset((sql_stmt *) p);
-#endif
 	}
 
 	/* Check that malloc() has not failed. If it has, return early. */
@@ -534,14 +518,12 @@ sqlStep(Vdbe * p)
 			db->u1.isInterrupted = 0;
 		}
 
-#ifndef SQL_OMIT_TRACE
 		if ((db->xProfile || (db->mTrace & SQL_TRACE_PROFILE) != 0)
 		    && !db->init.busy && p->zSql) {
 			sqlOsCurrentTimeInt64(db->pVfs, &p->startTime);
 		} else {
 			assert(p->startTime == 0);
 		}
-#endif
 
 		db->nVdbeActive++;
 		p->pc = 0;
@@ -554,11 +536,9 @@ sqlStep(Vdbe * p)
 		db->nVdbeExec--;
 	}
 
-#ifndef SQL_OMIT_TRACE
 	/* If the statement completed successfully, invoke the profile callback */
 	if (rc != SQL_ROW)
 		checkProfileCallback(db, p);
-#endif
 
 	db->errCode = rc;
 	if (SQL_NOMEM == sqlApiExit(p->db, p->rc)) {
@@ -1098,16 +1078,6 @@ sql_column_datatype(sql_stmt *pStmt, int N)
 }
 
 /*
- * Constraint:  If you have ENABLE_COLUMN_METADATA then you must
- * not define OMIT_DECLTYPE.
- */
-#if defined(SQL_OMIT_DECLTYPE) && defined(SQL_ENABLE_COLUMN_METADATA)
-#error "Must not define both SQL_OMIT_DECLTYPE \
-         and SQL_ENABLE_COLUMN_METADATA"
-#endif
-
-#ifndef SQL_OMIT_DECLTYPE
-/*
  * Return the column declaration type (if applicable) of the 'i'th column
  * of the result set of SQL statement pStmt.
  */
@@ -1117,45 +1087,6 @@ sql_column_decltype(sql_stmt * pStmt, int N)
 	return columnName(pStmt, N, (const void *(*)(Mem *))sql_value_text,
 			  COLNAME_DECLTYPE);
 }
-#endif				/* SQL_OMIT_DECLTYPE */
-
-#ifdef SQL_ENABLE_COLUMN_METADATA
-/*
- * Return the name of the database from which a result column derives.
- * NULL is returned if the result column is an expression or constant or
- * anything else which is not an unambiguous reference to a database column.
- */
-const char *
-sql_column_database_name(sql_stmt * pStmt, int N)
-{
-	return columnName(pStmt, N, (const void *(*)(Mem *))sql_value_text,
-			  COLNAME_DATABASE);
-}
-
-/*
- * Return the name of the table from which a result column derives.
- * NULL is returned if the result column is an expression or constant or
- * anything else which is not an unambiguous reference to a database column.
- */
-const char *
-sql_column_table_name(sql_stmt * pStmt, int N)
-{
-	return columnName(pStmt, N, (const void *(*)(Mem *))sql_value_text,
-			  COLNAME_TABLE);
-}
-
-/*
- * Return the name of the table column from which a result column derives.
- * NULL is returned if the result column is an expression or constant or
- * anything else which is not an unambiguous reference to a database column.
- */
-const char *
-sql_column_origin_name(sql_stmt * pStmt, int N)
-{
-	return columnName(pStmt, N, (const void *(*)(Mem *))sql_value_text,
-			  COLNAME_COLUMN);
-}
-#endif				/* SQL_ENABLE_COLUMN_METADATA */
 
 /******************************* sql_bind_  **************************
  *
@@ -1580,16 +1511,10 @@ sql_sql(sql_stmt * pStmt)
  * bound parameters expanded.  Space to hold the returned string is
  * obtained from sql_malloc().  The caller is responsible for
  * freeing the returned string by passing it to sql_free().
- *
- * The SQL_TRACE_SIZE_LIMIT puts an upper bound on the size of
- * expanded bound parameters.
  */
 char *
 sql_expanded_sql(sql_stmt * pStmt)
 {
-#ifdef SQL_OMIT_TRACE
-	return 0;
-#else
 	char *z = 0;
 	const char *zSql = sql_sql(pStmt);
 	if (zSql) {
@@ -1597,79 +1522,5 @@ sql_expanded_sql(sql_stmt * pStmt)
 		z = sqlVdbeExpandSql(p, zSql);
 	}
 	return z;
-#endif
 }
 
-#ifdef SQL_ENABLE_STMT_SCANSTATUS
-/*
- * Return status data for a single loop within query pStmt.
- */
-int
-sql_stmt_scanstatus(sql_stmt * pStmt,	/* Prepared statement being queried */
-			int idx,	/* Index of loop to report on */
-			int iScanStatusOp,	/* Which metric to return */
-			void *pOut	/* OUT: Write the answer here */
-    )
-{
-	Vdbe *p = (Vdbe *) pStmt;
-	ScanStatus *pScan;
-	if (idx < 0 || idx >= p->nScan)
-		return 1;
-	pScan = &p->aScan[idx];
-	switch (iScanStatusOp) {
-	case SQL_SCANSTAT_NLOOP:{
-			*(sql_int64 *) pOut = p->anExec[pScan->addrLoop];
-			break;
-		}
-	case SQL_SCANSTAT_NVISIT:{
-			*(sql_int64 *) pOut = p->anExec[pScan->addrVisit];
-			break;
-		}
-	case SQL_SCANSTAT_EST:{
-			double r = 1.0;
-			LogEst x = pScan->nEst;
-			while (x < 100) {
-				x += 10;
-				r *= 0.5;
-			}
-			*(double *)pOut = r * sqlLogEstToInt(x);
-			break;
-		}
-	case SQL_SCANSTAT_NAME:{
-			*(const char **)pOut = pScan->zName;
-			break;
-		}
-	case SQL_SCANSTAT_EXPLAIN:{
-			if (pScan->addrExplain) {
-				*(const char **)pOut =
-				    p->aOp[pScan->addrExplain].p4.z;
-			} else {
-				*(const char **)pOut = 0;
-			}
-			break;
-		}
-	case SQL_SCANSTAT_SELECTID:{
-			if (pScan->addrExplain) {
-				*(int *)pOut = p->aOp[pScan->addrExplain].p1;
-			} else {
-				*(int *)pOut = -1;
-			}
-			break;
-		}
-	default:{
-			return 1;
-		}
-	}
-	return 0;
-}
-
-/*
- * Zero all counters associated with the sql_stmt_scanstatus() data.
- */
-void
-sql_stmt_scanstatus_reset(sql_stmt * pStmt)
-{
-	Vdbe *p = (Vdbe *) pStmt;
-	memset(p->anExec, 0, p->nOp * sizeof(i64));
-}
-#endif				/* SQL_ENABLE_STMT_SCANSTATUS */

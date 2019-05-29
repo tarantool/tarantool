@@ -101,29 +101,4 @@ int sqlCursorIsValidNN(BtCursor *);
 #define CURSOR_INVALID           0
 #define CURSOR_VALID             1
 
-/*
- * Routines to read or write a two- and four-byte big-endian integer values.
- */
-#define get2byte(x)   ((x)[0]<<8 | (x)[1])
-#define put2byte(p,v) ((p)[0] = (u8)((v)>>8), (p)[1] = (u8)(v))
-#define get4byte sqlGet4byte
-#define put4byte sqlPut4byte
-
-/*
- * get2byteAligned(), unlike get2byte(), requires that its argument point to a
- * two-byte aligned address.  get2bytea() is only used for accessing the
- * cell addresses in a btree header.
- */
-#if SQL_BYTEORDER==4321
-#define get2byteAligned(x)  (*(u16*)(x))
-#elif SQL_BYTEORDER==1234 && !defined(SQL_DISABLE_INTRINSIC) \
-    && GCC_VERSION>=4008000
-#define get2byteAligned(x)  __builtin_bswap16(*(u16*)(x))
-#elif SQL_BYTEORDER==1234 && !defined(SQL_DISABLE_INTRINSIC) \
-    && defined(_MSC_VER) && _MSC_VER>=1300
-#define get2byteAligned(x)  _byteswap_ushort(*(u16*)(x))
-#else
-#define get2byteAligned(x)  ((x)[0]<<8 | (x)[1])
-#endif
-
 #endif				/* SQL_CURSOR_H */

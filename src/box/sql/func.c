@@ -429,16 +429,6 @@ substrFunc(sql_context * context, int argc, sql_value ** argv)
 		if (p1 < 0)
 			len = sql_utf8_char_count(z, sql_value_bytes(argv[0]));
 	}
-#ifdef SQL_SUBSTR_COMPATIBILITY
-	/* If SUBSTR_COMPATIBILITY is defined then substr(X,0,N) work the same as
-	 * as substr(X,1,N) - it returns the first N characters of X.  This
-	 * is essentially a back-out of the bug-fix in check-in [5fc125d362df4b8]
-	 * from 2009-02-02 for compatibility of applications that exploited the
-	 * old buggy behavior.
-	 */
-	if (p1 == 0)
-		p1 = 1;		/* <rdar://problem/6778339> */
-#endif
 	if (argc == 3) {
 		p2 = sql_value_int(argv[2]);
 		if (p2 < 0) {
@@ -1491,23 +1481,6 @@ trim_func_three_args(struct sql_context *context, int argc, sql_value **argv)
 	sql_free(char_len);
 }
 
-#ifdef SQL_ENABLE_UNKNOWN_SQL_FUNCTION
-/*
- * The "unknown" function is automatically substituted in place of
- * any unrecognized function name when doing an EXPLAIN or EXPLAIN QUERY PLAN
- * when the SQL_ENABLE_UNKNOWN_FUNCTION compile-time option is used.
- * When the "sql" command-line shell is built using this functionality,
- * that allows an EXPLAIN or EXPLAIN QUERY PLAN for complex queries
- * involving application-defined functions to be examined in a generic
- * sql shell.
- */
-static void
-unknownFunc(sql_context * context, int argc, sql_value ** argv)
-{
-	/* no-op */
-}
-#endif				/*SQL_ENABLE_UNKNOWN_SQL_FUNCTION */
-
 /* IMP: R-25361-16150 This function is omitted from sql by default. It
  * is only available if the SQL_SOUNDEX compile-time option is used
  * when sql is built.
@@ -1977,9 +1950,6 @@ sqlRegisterBuiltinFunctions(void)
 			 FIELD_TYPE_INTEGER),
 		LIKEFUNC(like, 3, 1, SQL_FUNC_LIKE,
 			 FIELD_TYPE_INTEGER),
-#ifdef SQL_ENABLE_UNKNOWN_SQL_FUNCTION
-		FUNCTION(unknown, -1, 0, 0, unknownFunc, 0),
-#endif
 		FUNCTION(coalesce, 1, 0, 0, 0, FIELD_TYPE_SCALAR),
 		FUNCTION(coalesce, 0, 0, 0, 0, FIELD_TYPE_SCALAR),
 		FUNCTION2(coalesce, -1, 0, 0, noopFunc, SQL_FUNC_COALESCE,

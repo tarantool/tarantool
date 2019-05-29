@@ -39,8 +39,8 @@ test:do_execsql_test(
         CREATE INDEX i1 ON t1(x, y);
     ]])
 
-local idxscan = {0, 0, 0, "SCAN TABLE T1 USING COVERING INDEX I1"}
-local tblscan = {0, 0, 0, "SCAN TABLE T1"}
+local idxscan = {0, 0, 0, "SCAN TABLE T1 USING COVERING INDEX I1 (~1048576 rows)"}
+local tblscan = {0, 0, 0, "SCAN TABLE T1 (~1048576 rows)"}
 local grpsort = {0, 0, 0, "USE TEMP B-TREE FOR GROUP BY"}
 local sort = {0, 0, 0, "USE TEMP B-TREE FOR ORDER BY"}
 local eqps = {

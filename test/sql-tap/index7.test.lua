@@ -279,7 +279,7 @@ test:do_eqp_test(
         SELECT * FROM v4 WHERE d='xyz' AND c='def'
     ]], {
         -- <index7-6.4>
-    {0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX I4 (C=?)"}
+    {0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX I4 (C=?) (~9 rows)"}
         -- </index7-6.4>
     })
 

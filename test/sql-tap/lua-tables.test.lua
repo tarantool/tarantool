@@ -149,7 +149,7 @@ test:do_eqp_test(
     [[
         SELECT * FROM test WHERE id = 2;
     ]], {
-        {0, 0, 0, 'SEARCH TABLE TEST USING PRIMARY KEY (ID=?)'}
+        {0, 0, 0, 'SEARCH TABLE TEST USING PRIMARY KEY (ID=?) (~1 row)'}
     })
 
 test:do_eqp_test(
@@ -157,7 +157,7 @@ test:do_eqp_test(
     [[
         SELECT * FROM test WHERE a = 5;
     ]], {
-        {0, 0, 0, 'SEARCH TABLE TEST USING COVERING INDEX secondary (A=?)'}
+        {0, 0, 0, 'SEARCH TABLE TEST USING COVERING INDEX secondary (A=?) (~1 row)'}
     })
 
 -- Make sure that without format it is impossible to create

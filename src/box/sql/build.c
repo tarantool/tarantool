@@ -3226,7 +3226,6 @@ sqlHaltConstraint(Parse * pParse,	/* Parsing context */
 	sqlVdbeChangeP5(v, p5Errmsg);
 }
 
-#ifndef SQL_OMIT_CTE
 /*
  * This routine is invoked once per CTE by the parser while parsing a
  * WITH clause.
@@ -3306,8 +3305,6 @@ sqlWithDelete(sql * db, With * pWith)
 		sqlDbFree(db, pWith);
 	}
 }
-
-#endif				/* !defined(SQL_OMIT_CTE) */
 
 int
 vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,

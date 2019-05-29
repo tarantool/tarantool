@@ -674,11 +674,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				pParse->is_aborted = true;
 				pNC->nErr++;
 				is_agg = 0;
-			} else if (no_such_func && pParse->db->init.busy == 0
-#ifdef SQL_ENABLE_UNKNOWN_SQL_FUNCTION
-				   && pParse->explain == 0
-#endif
-			    ) {
+			} else if (no_such_func && pParse->db->init.busy == 0) {
 				diag_set(ClientError, ER_NO_SUCH_FUNCTION, zId);
 				pParse->is_aborted = true;
 				pNC->nErr++;

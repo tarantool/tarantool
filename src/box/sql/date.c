@@ -550,18 +550,18 @@ osLocaltime(time_t * t, struct tm *pTm)
 #if !HAVE_LOCALTIME_R && !HAVE_LOCALTIME_S
 	struct tm *pX;
 	pX = localtime(t);
-#ifndef SQL_UNTESTABLE
+
 	if (sqlGlobalConfig.bLocaltimeFault)
 		pX = 0;
-#endif
+
 	if (pX)
 		*pTm = *pX;
 	rc = pX == 0;
 #else
-#ifndef SQL_UNTESTABLE
+
 	if (sqlGlobalConfig.bLocaltimeFault)
 		return 1;
-#endif
+
 #if HAVE_LOCALTIME_R
 	rc = localtime_r(t, pTm) == 0;
 #else

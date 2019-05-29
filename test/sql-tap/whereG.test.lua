@@ -278,7 +278,7 @@ test:do_execsql_test(
 --
 -- reset_db
 test:do_execsql_test(
-    5.1,
+    "5.1",
     [[
         DROP TABLE IF EXISTS t1;
         CREATE TABLE t1(a INT , b INT , c INT , PRIMARY KEY (a,b));
@@ -323,7 +323,7 @@ test:do_execsql_test(
 --
 
 test:do_execsql_test(
-    6.0,
+    "6.0",
     [[
         DROP TABLE IF EXISTS t1;
         CREATE TABLE t1(i int PRIMARY KEY, x INT , y INT , z INT );
@@ -343,7 +343,7 @@ test:do_execsql_test(
 -- Crash discovered by AFL
 -- MUST_WORK_TEST
 test:do_execsql_test(
-    7.0,
+    "7.0",
     [[
         DROP TABLE IF EXISTS t1;
         CREATE TABLE t1(a INT , b INT , PRIMARY KEY(a,b));
@@ -359,7 +359,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    7.1,
+    "7.1",
     [[
         SELECT unlikely(a), x FROM t1, t2 ORDER BY 1, 2;
     ]], {
@@ -369,7 +369,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    7.2,
+    "7.2",
     [[
         SELECT likelihood(a,0.5), x FROM t1, t2 ORDER BY 1, 2;
     ]], {
@@ -379,7 +379,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    7.3,
+    "7.3",
     [[
         SELECT coalesce(a,a), x FROM t1, t2 ORDER BY 1, 2;
     ]], {
@@ -444,7 +444,7 @@ test:do_execsql_test(
     [[
         EXPLAIN QUERY PLAN SELECT name FROM people WHERE height>=180;
     ]],
-    {0,0,0,"SCAN TABLE PEOPLE"})
+    {0,0,0,"SCAN TABLE PEOPLE (~983040 rows)"})
 
 test:do_execsql_test(
     "7.3",
@@ -454,7 +454,7 @@ test:do_execsql_test(
     ]],
     -- {0,0,0,"SEARCH TABLE PEOPLE USING COVERING INDEX PEOPLE_IDX1" ..
     --     " (ANY(ROLE) AND HEIGHT>?)"}
-    {0,0,0,"SCAN TABLE PEOPLE" }
+    {0,0,0,"SCAN TABLE PEOPLE (~983040 rows)" }
     )
 
 test:finish_test()

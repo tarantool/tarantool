@@ -37,7 +37,7 @@ test:do_eqp_test(
     "indexed-by-1.1",
     "SELECT b FROM t1 WHERE b <= 5", {
         -- <indexed-by-1.1>
-        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX2 (B<?)' }
+        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX2 (B<?) (~262144 rows)' }
         -- <indexed-by-1.1>
     })
 
@@ -45,7 +45,7 @@ test:do_eqp_test(
     "indexed-by-1.2",
     "SELECT b FROM t1 INDEXED BY t1ix1 WHERE b <= 5", {
         -- <indexed-by-1.2>
-        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX1 (B<?)' }
+        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX1 (B<?) (~262144 rows)' }
         -- <indexed-by-1.2>
     })
 
@@ -82,7 +82,7 @@ test:do_eqp_test(
     "indexed-by-1.5",
     "DELETE FROM t1 WHERE b <= 5", {
         -- <indexed-by-1.5>
-        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX2 (B<?)' }
+        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX2 (B<?) (~262144 rows)' }
         -- <indexed-by-1.5>
     })
 
@@ -90,7 +90,7 @@ test:do_eqp_test(
     "indexed-by-1.6",
     "DELETE FROM t1 INDEXED BY t1ix1  WHERE b <= 5", {
         -- <indexed-by-1.6>
-        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX1 (B<?)' }
+        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX1 (B<?) (~262144 rows)' }
         -- <indexed-by-1.6>
     })
 
@@ -124,7 +124,7 @@ test:do_eqp_test(
     "indexed-by-1.9",
     "UPDATE t1 SET b = 20 WHERE b = 10", {
         -- <indexed-by-1.9>
-        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX2 (B=?)' }
+        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX2 (B=?) (~10 rows)' }
         -- <indexed-by-1.9>
     })
 
@@ -132,7 +132,7 @@ test:do_eqp_test(
     "indexed-by-1.10",
     "UPDATE t1 INDEXED BY t1ix1 SET b = 20 WHERE b = 10", {
         -- <indexed-by-1.10>
-        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX1 (B=?)' }
+        { 0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1IX1 (B=?) (~10 rows)' }
         -- <indexed-by-1.10>
     })
 

@@ -1502,7 +1502,6 @@ sql_expr_dup(struct sql *db, struct Expr *p, int flags, char **buffer)
  * argument. If an OOM condition is encountered, NULL is returned
  * and the db->mallocFailed flag set.
  */
-#ifndef SQL_OMIT_CTE
 static With *
 withDup(sql * db, With * p)
 {
@@ -1525,9 +1524,6 @@ withDup(sql * db, With * p)
 	}
 	return pRet;
 }
-#else
-#define withDup(x,y) 0
-#endif
 
 /*
  * The following group of routines make deep copies of expressions,
@@ -2574,20 +2570,6 @@ sqlFindInIndex(Parse * pParse,	/* Parsing context */
 						parts[0].sort_order;
 
 					if (prRhsHasNull) {
-#ifdef SQL_ENABLE_COLUMN_USED_MASK
-							i64 mask =
-							    (1 << nExpr) - 1;
-							sqlVdbeAddOp4Dup8(v,
-									      OP_ColumnsUsed,
-									      iTab,
-									      0,
-									      0,
-									      (u8
-									       *)
-									      &
-									      mask,
-									      P4_INT64);
-#endif
 						*prRhsHasNull = ++pParse->nMem;
 						if (nExpr == 1) {
 							/* Tarantool: Check for null is performed on first key of the index.  */
@@ -3061,18 +3043,6 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 
 	assert(pParse->is_aborted || nVector == 1 || eType == IN_INDEX_EPH
 	       || eType == IN_INDEX_INDEX_ASC || eType == IN_INDEX_INDEX_DESC);
-#ifdef SQL_DEBUG
-	/* Confirm that aiMap[] contains nVector integer values between 0 and
-	 * nVector-1.
-	 */
-	/*
-	   for(i=0; i<nVector; i++){
-	   int j, cnt;
-	   for(cnt=j=0; j<nVector; j++) if( aiMap[j]==i ) cnt++;
-	   assert( cnt==1 );
-	   }
-	 */
-#endif
 
 	/* Code the LHS, the <expr> from "<expr> IN (...)". If the LHS is a
 	 * vector, then it is stored in an array of nVector registers starting
@@ -3087,17 +3057,6 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	rLhsOrig = exprCodeVector(pParse, pLeft, &iDummy);
 	/* Tarantoool: Order is always preserved.  */
 	rLhs = rLhsOrig;
-	/* for(i=0; i<nVector && aiMap[i]==i; i++){} /\* Are LHS fields reordered? *\/ */
-	/* if( i==nVector ){ */
-	/*   /\* LHS fields are not reordered *\/ */
-	/*   rLhs = rLhsOrig; */
-	/* }else{ */
-	/*   /\* Need to reorder the LHS fields according to aiMap *\/ */
-	/*   rLhs = sqlGetTempRange(pParse, nVector); */
-	/*   for(i=0; i<nVector; i++){ */
-	/*     sqlVdbeAddOp3(v, OP_Copy, rLhsOrig+i, rLhs+aiMap[i], 0); */
-	/*   } */
-	/* } */
 
 	/* If sqlFindInIndex() did not find or create an index that is
 	 * suitable for evaluating the IN operator, then evaluate using a
@@ -3601,7 +3560,7 @@ sqlExprCodeMove(Parse * pParse, int iFrom, int iTo, int nReg)
 	sqlExprCacheRemove(pParse, iFrom, nReg);
 }
 
-#if defined(SQL_DEBUG) || defined(SQL_COVERAGE_TEST)
+#if defined(SQL_DEBUG)
 /*
  * Return true if any register in the range iFrom..iTo (inclusive)
  * is used as part of the column cache.
@@ -3621,7 +3580,7 @@ usedAsColumnCache(Parse * pParse, int iFrom, int iTo)
 	}
 	return 0;
 }
-#endif				/* SQL_DEBUG || SQL_COVERAGE_TEST */
+#endif				/* SQL_DEBUG */
 
 /*
  * Convert a scalar expression node to a TK_REGISTER referencing
@@ -3813,7 +3772,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_REGISTER:{
 			return pExpr->iTable;
 		}
-#ifndef SQL_OMIT_CAST
+
 	case TK_CAST:{
 			/* Expressions of the form:   CAST(pLeft AS token) */
 			inReg =
@@ -3827,7 +3786,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sql_expr_type_cache_change(pParse, inReg, 1);
 			return inReg;
 		}
-#endif				/* SQL_OMIT_CAST */
+
 	case TK_LT:
 	case TK_LE:
 	case TK_GT:
@@ -3997,12 +3956,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			zId = pExpr->u.zToken;
 			pDef = sqlFindFunction(db, zId, nFarg, 0);
-#ifdef SQL_ENABLE_UNKNOWN_SQL_FUNCTION
-			if (pDef == 0 && pParse->explain) {
-				pDef =
-				    sqlFindFunction(db, "unknown", nFarg, 0);
-			}
-#endif
 			if (pDef == 0 || pDef->xFinalize != 0) {
 				diag_set(ClientError, ER_NO_SUCH_FUNCTION,
 					 zId);
@@ -4498,21 +4451,6 @@ sqlExprCode(Parse * pParse, Expr * pExpr, int target)
 					  target);
 		}
 	}
-}
-
-/*
- * Make a transient copy of expression pExpr and then code it using
- * sqlExprCode().  This routine works just like sqlExprCode()
- * except that the input expression is guaranteed to be unchanged.
- */
-void
-sqlExprCodeCopy(Parse * pParse, Expr * pExpr, int target)
-{
-	sql *db = pParse->db;
-	pExpr = sqlExprDup(db, pExpr, 0);
-	if (!db->mallocFailed)
-		sqlExprCode(pParse, pExpr, target);
-	sql_expr_delete(db, pExpr, false);
 }
 
 /*
@@ -5628,27 +5566,3 @@ sqlClearTempRegCache(Parse * pParse)
 	pParse->nRangeReg = 0;
 }
 
-/*
- * Validate that no temporary register falls within the range of
- * iFirst..iLast, inclusive.  This routine is only call from within assert()
- * statements.
- */
-#ifdef SQL_DEBUG
-int
-sqlNoTempsInRange(Parse * pParse, int iFirst, int iLast)
-{
-	int i;
-	if (pParse->nRangeReg > 0
-	    && pParse->iRangeReg + pParse->nRangeReg < iLast
-	    && pParse->iRangeReg >= iFirst) {
-		return 0;
-	}
-	for (i = 0; i < pParse->nTempReg; i++) {
-		if (pParse->aTempReg[i] >= iFirst
-		    && pParse->aTempReg[i] <= iLast) {
-			return 0;
-		}
-	}
-	return 1;
-}
-#endif				/* SQL_DEBUG */

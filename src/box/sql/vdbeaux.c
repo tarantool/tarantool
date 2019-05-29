@@ -137,10 +137,6 @@ sqlVdbeSetSql(Vdbe * p, const char *z, int n, int isPrepareV2)
 	assert(isPrepareV2 == 1 || isPrepareV2 == 0);
 	if (p == 0)
 		return;
-#if defined(SQL_OMIT_TRACE)
-	if (!isPrepareV2)
-		return;
-#endif
 	assert(p->zSql == 0);
 	p->zSql = sqlDbStrNDup(p->db, z, n);
 	p->isPrepareV2 = (u8) isPrepareV2;
@@ -746,33 +742,6 @@ sqlVdbeTakeOpArray(Vdbe * p, int *pnOp, int *pnMaxArg)
 	p->aOp = 0;
 	return aOp;
 }
-
-#if defined(SQL_ENABLE_STMT_SCANSTATUS)
-/*
- * Add an entry to the array of counters managed by sql_stmt_scanstatus().
- */
-void
-sqlVdbeScanStatus(Vdbe * p,			/* VM to add scanstatus() to */
-		      int addrExplain,		/* Address of OP_Explain (or 0) */
-		      int addrLoop,		/* Address of loop counter */
-		      int addrVisit,		/* Address of rows visited counter */
-		      LogEst nEst,		/* Estimated number of output rows */
-		      const char *zName)	/* Name of table or index being scanned */
-{
-	int nByte = (p->nScan + 1) * sizeof(ScanStatus);
-	ScanStatus *aNew;
-	aNew = (ScanStatus *) sqlDbRealloc(p->db, p->aScan, nByte);
-	if (aNew) {
-		ScanStatus *pNew = &aNew[p->nScan++];
-		pNew->addrExplain = addrExplain;
-		pNew->addrLoop = addrLoop;
-		pNew->addrVisit = addrVisit;
-		pNew->nEst = nEst;
-		pNew->zName = sqlDbStrDup(p->db, zName);
-		p->aScan = aNew;
-	}
-}
-#endif
 
 /*
  * Change the value of the opcode, or P1, P2, P3, or P5 operands
@@ -1753,40 +1722,6 @@ sqlVdbePrintSql(Vdbe * p)
 }
 #endif
 
-#if !defined(SQL_OMIT_TRACE) && defined(SQL_ENABLE_IOTRACE)
-/*
- * Print an IOTRACE message showing SQL content.
- */
-void
-sqlVdbeIOTraceSql(Vdbe * p)
-{
-	int nOp = p->nOp;
-	VdbeOp *pOp;
-	if (sqlIoTrace == 0)
-		return;
-	if (nOp < 1)
-		return;
-	pOp = &p->aOp[0];
-	if (pOp->opcode == OP_Init && pOp->p4.z != 0) {
-		int i, j;
-		char z[1000];
-		sql_snprintf(sizeof(z), z, "%s", pOp->p4.z);
-		for (i = 0; sqlIsspace(z[i]); i++) {
-		}
-		for (j = 0; z[i]; i++) {
-			if (sqlIsspace(z[i])) {
-				if (z[i - 1] != ' ') {
-					z[j++] = ' ';
-				}
-			} else {
-				z[j++] = z[i];
-			}
-		}
-		z[j] = 0;
-		sqlIoTrace("SQL %s\n", z);
-	}
-}
-#endif				/* !SQL_OMIT_TRACE && SQL_ENABLE_IOTRACE */
 
 /* An instance of this object describes bulk memory available for use
  * by subcomponents of a prepared statement.  Space is allocated out
@@ -1959,9 +1894,6 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 		p->apArg = allocSpace(&x, p->apArg, nArg * sizeof(Mem *));
 		p->apCsr =
 		    allocSpace(&x, p->apCsr, nCursor * sizeof(VdbeCursor *));
-#ifdef SQL_ENABLE_STMT_SCANSTATUS
-		p->anExec = allocSpace(&x, p->anExec, p->nOp * sizeof(i64));
-#endif
 		if (x.nNeeded == 0)
 			break;
 		x.pSpace = p->pFree = sqlDbMallocRawNN(db, x.nNeeded);
@@ -1982,9 +1914,6 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 		p->nMem = nMem;
 		initMemArray(p->aMem, nMem, db, MEM_Undefined);
 		memset(p->apCsr, 0, nCursor * sizeof(VdbeCursor *));
-#ifdef SQL_ENABLE_STMT_SCANSTATUS
-		memset(p->anExec, 0, p->nOp * sizeof(i64));
-#endif
 	}
 	sqlVdbeRewind(p);
 }
@@ -2040,9 +1969,6 @@ sqlVdbeFrameRestore(VdbeFrame * pFrame)
 {
 	Vdbe *v = pFrame->v;
 	closeCursorsInFrame(v);
-#ifdef SQL_ENABLE_STMT_SCANSTATUS
-	v->anExec = pFrame->anExec;
-#endif
 	v->aOp = pFrame->aOp;
 	v->nOp = pFrame->nOp;
 	v->aMem = pFrame->aMem;
@@ -2727,15 +2653,6 @@ sqlVdbeClearObject(sql * db, Vdbe * p)
 	vdbeFreeOpArray(db, p->aOp, p->nOp);
 	sqlDbFree(db, p->aColName);
 	sqlDbFree(db, p->zSql);
-#ifdef SQL_ENABLE_STMT_SCANSTATUS
-	{
-		int i;
-		for (i = 0; i < p->nScan; i++) {
-			sqlDbFree(db, p->aScan[i].zName);
-		}
-		sqlDbFree(db, p->aScan);
-	}
-#endif
 }
 
 /*
