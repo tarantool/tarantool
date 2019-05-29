@@ -730,6 +730,42 @@ vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
 }
 
 /**
+ * Binary search in page
+ * In terms of STL, makes lower_bound for EQ,GE,LT and upper_bound for GT,LE
+ * Additionally *equal_key argument is set to true if the found value is
+ * equal to given key (untouched otherwise)
+ * @retval position in the page
+ */
+static uint32_t
+vy_page_find_key(struct vy_page *page, const struct tuple *key,
+		 struct key_def *cmp_def, struct tuple_format *format,
+		 bool is_primary, enum iterator_type iterator_type,
+		 bool *equal_key)
+{
+	uint32_t beg = 0;
+	uint32_t end = page->row_count;
+	/* for upper bound we change zero comparison result to -1 */
+	int zero_cmp = (iterator_type == ITER_GT ||
+			iterator_type == ITER_LE ? -1 : 0);
+	while (beg != end) {
+		uint32_t mid = beg + (end - beg) / 2;
+		struct tuple *fnd_key = vy_page_stmt(page, mid, cmp_def,
+						     format, is_primary);
+		if (fnd_key == NULL)
+			return end;
+		int cmp = vy_stmt_compare(fnd_key, key, cmp_def);
+		cmp = cmp ? cmp : zero_cmp;
+		*equal_key = *equal_key || cmp == 0;
+		if (cmp < 0)
+			beg = mid + 1;
+		else
+			end = mid;
+		tuple_unref(fnd_key);
+	}
+	return end;
+}
+
+/**
  * End iteration and free cached data.
  */
 static void
@@ -1043,43 +1079,6 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 }
 
 /**
- * Binary search in page
- * In terms of STL, makes lower_bound for EQ,GE,LT and upper_bound for GT,LE
- * Additionally *equal_key argument is set to true if the found value is
- * equal to given key (untouched otherwise)
- * @retval position in the page
- */
-static uint32_t
-vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
-			       enum iterator_type iterator_type,
-			       const struct tuple *key,
-			       struct vy_page *page, bool *equal_key)
-{
-	uint32_t beg = 0;
-	uint32_t end = page->row_count;
-	/* for upper bound we change zero comparison result to -1 */
-	int zero_cmp = (iterator_type == ITER_GT ||
-			iterator_type == ITER_LE ? -1 : 0);
-	while (beg != end) {
-		uint32_t mid = beg + (end - beg) / 2;
-		struct tuple *fnd_key = vy_page_stmt(page, mid, itr->cmp_def,
-						     itr->format,
-						     itr->is_primary);
-		if (fnd_key == NULL)
-			return end;
-		int cmp = vy_stmt_compare(fnd_key, key, itr->cmp_def);
-		cmp = cmp ? cmp : zero_cmp;
-		*equal_key = *equal_key || cmp == 0;
-		if (cmp < 0)
-			beg = mid + 1;
-		else
-			end = mid;
-		tuple_unref(fnd_key);
-	}
-	return end;
-}
-
-/**
  * Binary search in a run for the given key.
  * In terms of STL, makes lower_bound for EQ,GE,LT and upper_bound for GT,LE
  * Resulting wide position is stored it *pos argument
@@ -1107,9 +1106,9 @@ vy_run_iterator_search(struct vy_run_iterator *itr,
 	if (rc != 0)
 		return rc;
 	bool equal_in_page = false;
-	pos->pos_in_page = vy_run_iterator_search_in_page(itr, iterator_type,
-							  key, page,
-							  &equal_in_page);
+	pos->pos_in_page = vy_page_find_key(page, key, itr->cmp_def,
+					    itr->format, itr->is_primary,
+					    iterator_type, &equal_in_page);
 	if (pos->pos_in_page == page->row_count) {
 		pos->page_no++;
 		pos->pos_in_page = 0;
@@ -2587,28 +2586,13 @@ vy_slice_stream_search(struct vy_stmt_stream *virt_stream)
 	if (vy_slice_stream_read_page(stream) != 0)
 		return -1;
 
-	/**
-	 * Binary search in page. Find the first position in page with
-	 * tuple >= stream->slice->begin.
-	 */
-	uint32_t beg = 0;
-	uint32_t end = stream->page->row_count;
-	while (beg != end) {
-		uint32_t mid = beg + (end - beg) / 2;
-		struct tuple *fnd_key = vy_page_stmt(stream->page, mid,
-					stream->cmp_def, stream->format,
-					stream->is_primary);
-		if (fnd_key == NULL)
-			return -1;
-		int cmp = vy_tuple_compare_with_key(fnd_key,
-				stream->slice->begin, stream->cmp_def);
-		if (cmp < 0)
-			beg = mid + 1;
-		else
-			end = mid;
-		tuple_unref(fnd_key);
-	}
-	stream->pos_in_page = end;
+	bool unused;
+	stream->pos_in_page = vy_page_find_key(stream->page,
+					       stream->slice->begin,
+					       stream->cmp_def,
+					       stream->format,
+					       stream->is_primary,
+					       ITER_GE, &unused);
 
 	if (stream->pos_in_page == stream->page->row_count) {
 		/* The first tuple is in the beginning of the next page */
