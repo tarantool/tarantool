@@ -3996,52 +3996,25 @@ field_type_sequence_dup(struct Parse *parse, enum field_type *types,
 			uint32_t len);
 
 /**
- * Convert z to a 64-bit signed integer.  z must be decimal. This
- * routine does *not* accept hexadecimal notation.
- *
- * If the z value is representable as a 64-bit twos-complement
- * integer, then write that value into *val and return 0.
- *
- * If z is exactly 9223372036854775808, return 2.  This special
- * case is broken out because while 9223372036854775808 cannot be
- * a signed 64-bit integer, its negative -9223372036854775808 can
- * be.
- *
- * If z is too big for a 64-bit integer and is not
- * 9223372036854775808  or if z contains any non-numeric text,
- * then return 1.
+ * Convert z to a 64-bit signed or unsigned integer.
+ * z must be decimal. This routine does *not* accept
+ * hexadecimal notation. Under the hood it calls
+ * strtoll or strtoull depending on presence of '-' char.
  *
  * length is the number of bytes in the string (bytes, not
  * characters). The string is not necessarily zero-terminated.
- * The encoding is given by enc.
  *
  * @param z String being parsed.
  * @param[out] val Output integer value.
+ * @param[out] is_neg Sign of the result.
  * @param length String length in bytes.
- * @retval
- *     0    Successful transformation.  Fits in a 64-bit signed
- *          integer.
- *     1    Integer too large for a 64-bit signed integer or is
- *          malformed
- *     2    Special case of 9223372036854775808
+ * @retval 0 Successful transformation. Fits in a 64-bit signed
+ *           or unsigned integer.
+ * @retval -1 Error during parsing: it contains non-digit
+ *            characters or it doesn't fit into 64-bit int.
  */
 int
-sql_atoi64(const char *z, int64_t *val, int length);
-
-/**
- * Transform a UTF-8 integer literal, in either decimal or
- * hexadecimal, into a 64-bit signed integer.  This routine
- * accepts hexadecimal literals, whereas sql_atoi64() does not.
- *
- * @param z Literal being parsed.
- * @param[out] val Parsed value.
- * @retval
- *     0    Successful transformation.  Fits in a 64-bit signed integer.
- *     1    Integer too large for a 64-bit signed integer or is malformed
- *     2    Special case of 9223372036854775808
- */
-int
-sql_dec_or_hex_to_i64(const char *z, int64_t *val);
+sql_atoi64(const char *z, int64_t *val, bool *is_neg, int length);
 
 void *sqlHexToBlob(sql *, const char *z, int n);
 u8 sqlHexToInt(int h);

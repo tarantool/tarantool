@@ -38,6 +38,7 @@
  */
 #include "sqlInt.h"
 #include <stdarg.h>
+#include <ctype.h>
 #include <math.h>
 #include "coll/coll.h"
 #include <unicode/ucasemap.h>
@@ -455,120 +456,38 @@ sqlAtoF(const char *z, double *pResult, int length)
 	return z == zEnd && nDigits > 0 && eValid && nonNum == 0;
 }
 
-/*
- * Compare the 19-character string zNum against the text representation
- * value 2^63:  9223372036854775808.  Return negative, zero, or positive
- * if zNum is less than, equal to, or greater than the string.
- * Note that zNum must contain exactly 19 characters.
- *
- * Unlike memcmp() this routine is guaranteed to return the difference
- * in the values of the last digit if the only difference is in the
- * last digit.  So, for example,
- *
- *      compare2pow63("9223372036854775800", 1)
- *
- * will return -8.
- */
-static int
-compare2pow63(const char *zNum, int incr)
-{
-	int c = 0;
-	int i;
-	/* 012345678901234567 */
-	const char *pow63 = "922337203685477580";
-	for (i = 0; c == 0 && i < 18; i++) {
-		c = (zNum[i * incr] - pow63[i]) * 10;
-	}
-	if (c == 0) {
-		c = zNum[18 * incr] - '8';
-		testcase(c == (-1));
-		testcase(c == 0);
-		testcase(c == (+1));
-	}
-	return c;
-}
-
 int
-sql_atoi64(const char *z, int64_t *val, int length)
+sql_atoi64(const char *z, int64_t *val, bool *is_neg, int length)
 {
-	int incr = 1;
-	u64 u = 0;
-	int neg = 0;		/* assume positive */
-	int i;
-	int c = 0;
-	int nonNum = 0;		/* True if input contains UTF16 with high byte non-zero */
-	const char *zStart;
-	const char *zEnd = z + length;
-	incr = 1;
-	while (z < zEnd && sqlIsspace(*z))
-		z += incr;
-	if (z < zEnd) {
-		if (*z == '-') {
-			neg = 1;
-			z += incr;
-		} else if (*z == '+') {
-			z += incr;
-		}
-	}
-	zStart = z;
-	/* Skip leading zeros. */
-	while (z < zEnd && z[0] == '0') {
-		z += incr;
-	}
-	for (i = 0; &z[i] < zEnd && (c = z[i]) >= '0' && c <= '9';
-	     i += incr) {
-		u = u * 10 + c - '0';
-	}
-	if (u > LARGEST_INT64) {
-		*val = neg ? SMALLEST_INT64 : LARGEST_INT64;
-	} else if (neg) {
-		*val = -(i64) u;
-	} else {
-		*val = (i64) u;
-	}
-	if (&z[i] < zEnd || (i == 0 && zStart == z) || i > 19 * incr ||
-	    nonNum) {
-		/* zNum is empty or contains non-numeric text or is longer
-		 * than 19 digits (thus guaranteeing that it is too large)
-		 */
-		return 1;
-	} else if (i < 19 * incr) {
-		/* Less than 19 digits, so we know that it fits in 64 bits */
-		assert(u <= LARGEST_INT64);
-		return 0;
-	} else {
-		/* zNum is a 19-digit numbers.  Compare it against 9223372036854775808. */
-		c = compare2pow63(z, incr);
-		if (c < 0) {
-			/* zNum is less than 9223372036854775808 so it fits */
-			assert(u <= LARGEST_INT64);
-			return 0;
-		} else if (c > 0) {
-			/* zNum is greater than 9223372036854775808 so it overflows */
-			return 1;
-		} else {
-			/* zNum is exactly 9223372036854775808.  Fits if negative.  The
-			 * special case 2 overflow if positive
-			 */
-			assert(u - 1 == LARGEST_INT64);
-			return neg ? 0 : 2;
-		}
-	}
-}
+	*is_neg = false;
+	const char *str_end = z + length;
+	for (; z < str_end && isspace(*z); z++);
+	if (z >= str_end)
+		return -1;
+	if (*z == '-')
+		*is_neg = true;
 
-int
-sql_dec_or_hex_to_i64(const char *z, int64_t *val)
-{
-	if (z[0] == '0' && (z[1] == 'x' || z[1] == 'X')) {
-		uint64_t u = 0;
-		int i, k;
-		for (i = 2; z[i] == '0'; i++);
-		for (k = i; sqlIsxdigit(z[k]); k++)
-			u = u * 16 + sqlHexToInt(z[k]);
-		memcpy(val, &u, 8);
-		return (z[k] == 0 && k - i <= 16) ? 0 : 1;
+	char *end = NULL;
+	errno = 0;
+	if (*z == '-') {
+		*is_neg = true;
+		*val = strtoll(z, &end, 10);
+	} else {
+		*is_neg = false;
+		uint64_t u_val = strtoull(z, &end, 10);
+		if (u_val > (uint64_t) INT64_MAX + 1)
+			return -1;
+		*val = u_val;
 	}
-	return sql_atoi64(z, val, sqlStrlen30(z));
+	/* Overflow and underflow errors. */
+	if (errno != 0)
+		return -1;
+	for (; *end != 0; ++end) {
+		if (!isspace(*end))
+			return -1;
+	}
+
+	return 0;
 }
 
 /*

@@ -48,7 +48,11 @@ box.execute('SELECT 9223372036854775808 - 1;')
 --
 box.execute('SELECT CAST(\'9223372036854775808\' AS INTEGER);')
 ---
-- error: 'Type mismatch: can not convert 9223372036854775808 to integer'
+- metadata:
+  - name: CAST('9223372036854775808' AS INTEGER)
+    type: integer
+  rows:
+  - [-9223372036854775808]
 ...
 -- Due to inexact represantation of large integers in terms of
 -- floating point numbers, numerics with value < INT64_MAX

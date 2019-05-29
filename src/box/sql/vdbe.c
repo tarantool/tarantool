@@ -263,7 +263,8 @@ mem_apply_numeric_type(struct Mem *record)
 	if ((record->flags & (MEM_Str | MEM_Int | MEM_Real)) != MEM_Str)
 		return -1;
 	int64_t integer_value;
-	if (sql_atoi64(record->z, &integer_value, record->n) == 0) {
+	bool is_neg;
+	if (sql_atoi64(record->z, &integer_value, &is_neg, record->n) == 0) {
 		record->u.i = integer_value;
 		MemSetTypeFlag(record, MEM_Int);
 		return 0;
@@ -368,7 +369,8 @@ static u16 SQL_NOINLINE computeNumericType(Mem *pMem)
 	assert((pMem->flags & (MEM_Str|MEM_Blob))!=0);
 	if (sqlAtoF(pMem->z, &pMem->u.r, pMem->n)==0)
 		return 0;
-	if (sql_atoi64(pMem->z, (int64_t *)&pMem->u.i, pMem->n) == 0)
+	bool is_neg;
+	if (sql_atoi64(pMem->z, (int64_t *) &pMem->u.i, &is_neg, pMem->n) == 0)
 		return MEM_Int;
 	return MEM_Real;
 }

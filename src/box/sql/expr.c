@@ -1224,7 +1224,8 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 			 * variable number
 			 */
 			int64_t i;
-			bool is_ok = 0 == sql_atoi64(&z[1], &i, n - 1);
+			bool is_neg;
+			bool is_ok = 0 == sql_atoi64(&z[1], &i, &is_neg, n - 1);
 			x = (ynVar) i;
 			testcase(i == 0);
 			testcase(i == 1);
@@ -3305,29 +3306,43 @@ expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg,
 		if (is_neg)
 			i = -i;
 		sqlVdbeAddOp2(v, OP_Integer, i, mem);
-	} else {
-		int64_t value;
-		const char *z = expr->u.zToken;
-		assert(z != NULL);
-		int c = sql_dec_or_hex_to_i64(z, &value);
-		if (c == 1 || (c == 2 && !is_neg) ||
-		    (is_neg && value == SMALLEST_INT64)) {
-			const char *sign = is_neg ? "-" : "";
-			if (sql_strnicmp(z, "0x", 2) == 0) {
-				diag_set(ClientError, ER_HEX_LITERAL_MAX, sign,
-					 z, strlen(z) - 2, 16);
-			} else {
-				diag_set(ClientError, ER_INT_LITERAL_MAX, sign,
-					 z, INT64_MIN, INT64_MAX);
-			}
-			parse->is_aborted = true;
+		return;
+	}
+	int64_t value;
+	const char *z = expr->u.zToken;
+	assert(z != NULL);
+	const char *sign = is_neg ? "-" : "";
+	if (z[0] == '0' && (z[1] == 'x' || z[1] == 'X')) {
+		errno = 0;
+		if (is_neg) {
+			value = strtoll(z, NULL, 16);
 		} else {
-			if (is_neg)
-				value = c == 2 ? SMALLEST_INT64 : -value;
-			sqlVdbeAddOp4Dup8(v, OP_Int64, 0, mem, 0,
-					      (u8 *)&value, P4_INT64);
+			value = strtoull(z, NULL, 16);
+			if (value > INT64_MAX)
+				goto int_overflow;
+		}
+		if (errno != 0) {
+			diag_set(ClientError, ER_HEX_LITERAL_MAX, sign, z,
+				 strlen(z) - 2, 16);
+			parse->is_aborted = true;
+			return;
+		}
+	} else {
+		size_t len = strlen(z);
+		bool unused;
+		if (sql_atoi64(z, &value, &unused, len) != 0 ||
+		    (is_neg && (uint64_t) value > (uint64_t) INT64_MAX + 1) ||
+		    (!is_neg && (uint64_t) value > INT64_MAX)) {
+int_overflow:
+			diag_set(ClientError, ER_INT_LITERAL_MAX, sign, z,
+				 INT64_MIN, INT64_MAX);
+			parse->is_aborted = true;
+			return;
 		}
 	}
+	if (is_neg)
+		value = -value;
+	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, mem, 0, (u8 *)&value, P4_INT64);
 }
 
 /*

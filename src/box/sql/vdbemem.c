@@ -460,7 +460,8 @@ sqlVdbeIntValue(Mem * pMem, int64_t *i)
 		return doubleToInt64(pMem->u.r, i);
 	} else if (flags & (MEM_Str)) {
 		assert(pMem->z || pMem->n == 0);
-		if (sql_atoi64(pMem->z, (int64_t *)i, pMem->n) == 0)
+		bool is_neg;
+		if (sql_atoi64(pMem->z, i, &is_neg, pMem->n) == 0)
 			return 0;
 	}
 	return -1;
@@ -580,7 +581,9 @@ sqlVdbeMemNumerify(Mem * pMem)
 {
 	if ((pMem->flags & (MEM_Int | MEM_Real | MEM_Null)) == 0) {
 		assert((pMem->flags & (MEM_Blob | MEM_Str)) != 0);
-		if (0 == sql_atoi64(pMem->z, (int64_t *)&pMem->u.i, pMem->n)) {
+		bool is_neg;
+		if (sql_atoi64(pMem->z, (int64_t *) &pMem->u.i, &is_neg,
+			       pMem->n) == 0) {
 			MemSetTypeFlag(pMem, MEM_Int);
 		} else {
 			double v;
@@ -645,7 +648,9 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 	if (pMem->flags & MEM_Null)
 		return 0;
 	if ((pMem->flags & MEM_Blob) != 0 && type == FIELD_TYPE_NUMBER) {
-		if (sql_atoi64(pMem->z, (int64_t *) &pMem->u.i, pMem->n) == 0) {
+		bool is_neg;
+		if (sql_atoi64(pMem->z,  (int64_t *) &pMem->u.i, &is_neg,
+			       pMem->n) == 0) {
 			MemSetTypeFlag(pMem, MEM_Real);
 			pMem->u.r = pMem->u.i;
 			return 0;
@@ -676,8 +681,9 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 		return -1;
 	case FIELD_TYPE_INTEGER:
 		if ((pMem->flags & MEM_Blob) != 0) {
-			if (sql_atoi64(pMem->z, (int64_t *) &pMem->u.i,
-				       pMem->n) != 0)
+			bool is_neg;
+			if (sql_atoi64(pMem->z,  (int64_t *) &pMem->u.i,
+				       &is_neg, pMem->n) != 0)
 				return -1;
 			MemSetTypeFlag(pMem, MEM_Int);
 			return 0;
