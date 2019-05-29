@@ -148,7 +148,7 @@ swim_task_schedule(struct swim_task *task, struct swim_scheduler *scheduler)
 {
 	assert(! swim_task_is_scheduled(task));
 	rlist_add_tail_entry(&scheduler->queue_output, task, in_queue_output);
-	swim_ev_io_start(loop(), &scheduler->output);
+	swim_ev_io_start(swim_loop(), &scheduler->output);
 }
 
 void
@@ -289,16 +289,17 @@ int
 swim_scheduler_bind(struct swim_scheduler *scheduler,
 		    const struct sockaddr_in *addr)
 {
-	swim_ev_io_stop(loop(), &scheduler->input);
-	swim_ev_io_stop(loop(), &scheduler->output);
+	struct ev_loop *l = swim_loop();
+	swim_ev_io_stop(l, &scheduler->input);
+	swim_ev_io_stop(l, &scheduler->output);
 	struct swim_transport *t = &scheduler->transport;
 	int rc = swim_transport_bind(t, (const struct sockaddr *) addr,
 				     sizeof(*addr));
 	if (t->fd >= 0) {
 		swim_ev_io_set(&scheduler->output, t->fd, EV_WRITE);
 		swim_ev_io_set(&scheduler->input, t->fd, EV_READ);
-		swim_ev_io_start(loop(), &scheduler->input);
-		swim_ev_io_start(loop(), &scheduler->output);
+		swim_ev_io_start(l, &scheduler->input);
+		swim_ev_io_start(l, &scheduler->output);
 	}
 	return rc;
 }
@@ -306,7 +307,7 @@ swim_scheduler_bind(struct swim_scheduler *scheduler,
 void
 swim_scheduler_stop_input(struct swim_scheduler *scheduler)
 {
-	swim_ev_io_stop(loop(), &scheduler->input);
+	swim_ev_io_stop(swim_loop(), &scheduler->input);
 }
 
 void
@@ -323,7 +324,7 @@ swim_scheduler_destroy(struct swim_scheduler *scheduler)
 			t->cancel(t, scheduler, -1);
 	}
 	swim_transport_destroy(&scheduler->transport);
-	swim_ev_io_stop(loop(), &scheduler->output);
+	swim_ev_io_stop(swim_loop(), &scheduler->output);
 	swim_scheduler_stop_input(scheduler);
 }
 

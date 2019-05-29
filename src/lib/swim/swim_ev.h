@@ -52,6 +52,24 @@ swim_ev_timer_again(struct ev_loop *loop, struct ev_timer *watcher);
 void
 swim_ev_timer_stop(struct ev_loop *loop, struct ev_timer *watcher);
 
+/**
+ * The unit tests code with the fake events and time does lots of
+ * forbidden things: it manually invokes pending watcher
+ * callbacks; manages global time without a kernel; puts not
+ * existing descriptors into the loop. All these actions does not
+ * affect the loop until yield. On yield a scheduler fiber wakes
+ * up and 1) infinitely generates EV_READ on not existing
+ * descriptors because considers them closed; 2) manual pending
+ * callbacks invocation asserts, because it is not allowed for
+ * non-scheduler fibers. To avoid these problems a new isolated
+ * loop is created, not visible for the scheduler. Here the fake
+ * events library can rack and ruin whatever it wants. This
+ * function is supposed to be an alias for 'loop()' in the
+ * Tarantool core, but be an isolated object in tests.
+ */
+struct ev_loop *
+swim_loop(void);
+
 #define swim_ev_is_active ev_is_active
 
 #define swim_ev_init ev_init

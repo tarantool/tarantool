@@ -55,3 +55,9 @@ swim_ev_timer_stop(struct ev_loop *loop, struct ev_timer *watcher)
 {
 	ev_timer_stop(loop, watcher);
 }
+
+struct ev_loop *
+swim_loop(void)
+{
+	return loop();
+}

@@ -63,6 +63,19 @@ typedef void (*swim_event_process_f)(struct swim_event *, struct ev_loop *);
 typedef void (*swim_event_delete_f)(struct swim_event *);
 
 /**
+ * An isolated event loop not visible to the fiber scheduler,
+ * where it is safe to use fake file descriptors, manually invoke
+ * callbacks etc.
+ */
+static struct ev_loop *test_loop;
+
+struct ev_loop *
+swim_loop(void)
+{
+	return test_loop;
+}
+
+/**
  * Base event. It is stored in the event heap and virtualizes
  * other events.
  */
@@ -330,6 +343,8 @@ swim_test_ev_init(void)
 	events_hash = mh_i64ptr_new();
 	assert(events_hash != NULL);
 	event_heap_create(&event_heap);
+	test_loop = ev_loop_new(0);
+	assert(test_loop != NULL);
 }
 
 void
@@ -338,4 +353,5 @@ swim_test_ev_free(void)
 	swim_test_ev_reset();
 	event_heap_destroy(&event_heap);
 	mh_i64ptr_delete(events_hash);
+	ev_loop_destroy(test_loop);
 }

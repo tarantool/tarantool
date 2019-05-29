@@ -519,7 +519,7 @@ swim_wait_ack(struct swim *swim, struct swim_member *member,
 			timeout *= 2;
 		member->ping_deadline = swim_time() + timeout;
 		wait_ack_heap_insert(&swim->wait_ack_heap, member);
-		swim_ev_timer_again(loop(), &swim->wait_ack_tick);
+		swim_ev_timer_again(swim_loop(), &swim->wait_ack_tick);
 	}
 }
 
@@ -802,7 +802,7 @@ swim_new_member(struct swim *swim, const struct sockaddr_in *addr,
 		return NULL;
 	}
 	if (mh_size(swim->members) > 1)
-		swim_ev_timer_again(loop(), &swim->round_tick);
+		swim_ev_timer_again(swim_loop(), &swim->round_tick);
 
 	/* Dissemination component. */
 	swim_on_member_update(swim, member);
@@ -1122,7 +1122,7 @@ swim_complete_step(struct swim_task *task,
 	 * It could be stopped by the step begin function, if the
 	 * sending was too long.
 	 */
-	swim_ev_timer_again(loop(), &swim->round_tick);
+	swim_ev_timer_again(swim_loop(), &swim->round_tick);
 	/*
 	 * It is possible that the original member was deleted
 	 * manually during the task execution.
@@ -1813,16 +1813,17 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 		addr = swim->self->addr;
 	}
 	struct ev_timer *t = &swim->round_tick;
+	struct ev_loop *l = swim_loop();
 	if (t->repeat != heartbeat_rate && heartbeat_rate > 0) {
 		swim_ev_timer_set(t, 0, heartbeat_rate);
 		if (swim_ev_is_active(t))
-			swim_ev_timer_again(loop(), t);
+			swim_ev_timer_again(l, t);
 	}
 	t = &swim->wait_ack_tick;
 	if (t->repeat != ack_timeout && ack_timeout > 0) {
 		swim_ev_timer_set(t, 0, ack_timeout);
 		if (swim_ev_is_active(t))
-			swim_ev_timer_again(loop(), t);
+			swim_ev_timer_again(l, t);
 	}
 
 	if (new_self != NULL) {
@@ -1953,9 +1954,10 @@ swim_size(const struct swim *swim)
 void
 swim_delete(struct swim *swim)
 {
+	struct ev_loop *l = swim_loop();
 	swim_scheduler_destroy(&swim->scheduler);
-	swim_ev_timer_stop(loop(), &swim->round_tick);
-	swim_ev_timer_stop(loop(), &swim->wait_ack_tick);
+	swim_ev_timer_stop(l, &swim->round_tick);
+	swim_ev_timer_stop(l, &swim->wait_ack_tick);
 	mh_int_t node;
 	mh_foreach(swim->members, node) {
 		struct swim_member *m =
@@ -2018,8 +2020,9 @@ void
 swim_quit(struct swim *swim)
 {
 	assert(swim_is_configured(swim));
-	swim_ev_timer_stop(loop(), &swim->round_tick);
-	swim_ev_timer_stop(loop(), &swim->wait_ack_tick);
+	struct ev_loop *l = swim_loop();
+	swim_ev_timer_stop(l, &swim->round_tick);
+	swim_ev_timer_stop(l, &swim->wait_ack_tick);
 	swim_scheduler_stop_input(&swim->scheduler);
 	/* Start the last round - quiting. */
 	swim_new_round(swim);

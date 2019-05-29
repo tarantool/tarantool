@@ -607,7 +607,7 @@ swim_wait_timeout(double timeout, struct swim_cluster *cluster,
 {
 	swim_ev_set_brk(timeout);
 	double deadline = swim_time() + timeout;
-	struct ev_loop *loop = loop();
+	struct ev_loop *loop = swim_loop();
 	/*
 	 * There can be pending out of bound IO events, affecting
 	 * the result. For example, 'quit' messages, which are
