@@ -389,7 +389,7 @@ _ = s:insert{7, 7}
 _ = s:insert{8, 8}
 box.snapshot()
 -- Some padding to trigger minor compaction.
-for i = 1001, 1000 + PAD2 do s:delete{i} end
+for i = 1001, 1000 + PAD2 do s:update(i, {{'+', 2, 1000}}) end
 box.snapshot()
 -- Generate DELETE+INSERT statements and write them to disk.
 s:delete{1} s:insert{1, 100}
@@ -411,7 +411,7 @@ s:delete{6}
 s:delete{7}
 s:delete{8}
 -- Some padding to trigger minor compaction.
-for i = 1001, 1000 + PAD2 do s:replace{i, i} end
+for i = 1001, 1000 + PAD2 do s:update(i, {{'+', 2, 1000}}) end
 box.snapshot()
 -- Wait for compaction.
 while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
