@@ -92,7 +92,7 @@ struct vy_page_read_task {
 	/** parent */
 	struct cbus_call_msg base;
 	/** vinyl page metadata */
-	struct vy_page_info page_info;
+	struct vy_page_info *page_info;
 	/** vy_run with fd - ref. counted */
 	struct vy_run *run;
 	/** [out] resulting vinyl page */
@@ -926,7 +926,7 @@ vy_page_read_cb(struct cbus_call_msg *base)
 	ZSTD_DStream *zdctx = vy_env_get_zdctx(task->run->env);
 	if (zdctx == NULL)
 		return -1;
-	return vy_page_read(task->page, &task->page_info, task->run, zdctx);
+	return vy_page_read(task->page, task->page_info, task->run, zdctx);
 }
 
 /**
@@ -996,7 +996,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		env->next_reader %= env->reader_pool_size;
 
 		task->run = slice->run;
-		task->page_info = *page_info;
+		task->page_info = page_info;
 		task->page = page;
 		vy_run_ref(task->run);
 
