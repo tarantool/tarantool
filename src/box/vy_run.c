@@ -96,6 +96,20 @@ struct vy_page_read_task {
 	struct vy_page_info *page_info;
 	/** vy_run with fd - ref. counted */
 	struct vy_run *run;
+	/** key to lookup within the page */
+	const struct tuple *key;
+	/** iterator type (needed for for key lookup) */
+	enum iterator_type iterator_type;
+	/** key definition (needed for key lookup) */
+	struct key_def *cmp_def;
+	/** disk format (needed for key lookup) */
+	struct tuple_format *format;
+	/** set if the index is primary */
+	bool is_primary;
+	/** [out] position of the key in the page */
+	uint32_t pos_in_page;
+	/** [out] true if key was found in the page */
+	bool equal_found;
 	/** [out] resulting vinyl page */
 	struct vy_page *page;
 };
@@ -963,7 +977,16 @@ vy_page_read_cb(struct cbus_call_msg *base)
 	ZSTD_DStream *zdctx = vy_env_get_zdctx(task->run->env);
 	if (zdctx == NULL)
 		return -1;
-	return vy_page_read(task->page, task->page_info, task->run, zdctx);
+	if (vy_page_read(task->page, task->page_info, task->run, zdctx) != 0)
+		return -1;
+	if (task->key != NULL) {
+		task->pos_in_page = vy_page_find_key(task->page, task->key,
+						     task->cmp_def, task->format,
+						     task->is_primary,
+						     task->iterator_type,
+						     &task->equal_found);
+	}
+	return 0;
 }
 
 /**
@@ -975,28 +998,36 @@ vy_page_read_cb(struct cbus_call_msg *base)
  */
 static NODISCARD int
 vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
-			  struct vy_page **result)
+			  const struct tuple *key,
+			  enum iterator_type iterator_type,
+			  struct vy_page **result, uint32_t *pos_in_page,
+			  bool *equal_found)
 {
 	struct vy_slice *slice = itr->slice;
 	struct vy_run_env *env = slice->run->env;
 
 	/* Check cache */
-	if (itr->curr_page != NULL) {
-		if (itr->curr_page->page_no == page_no) {
-			*result = itr->curr_page;
-			return 0;
-		}
-		if (itr->prev_page != NULL &&
-		    itr->prev_page->page_no == page_no) {
-			SWAP(itr->prev_page, itr->curr_page);
-			*result = itr->curr_page;
-			return 0;
-		}
+	struct vy_page *page = NULL;
+	if (itr->curr_page != NULL &&
+	    itr->curr_page->page_no == page_no) {
+		page = itr->curr_page;
+	} else if (itr->prev_page != NULL &&
+		   itr->prev_page->page_no == page_no) {
+		SWAP(itr->prev_page, itr->curr_page);
+		page = itr->curr_page;
+	}
+	if (page != NULL) {
+		if (key != NULL)
+			*pos_in_page = vy_page_find_key(page, key, itr->cmp_def,
+							itr->format, itr->is_primary,
+							iterator_type, equal_found);
+		*result = page;
+		return 0;
 	}
 
 	/* Allocate buffers */
 	struct vy_page_info *page_info = vy_run_page_info(slice->run, page_no);
-	struct vy_page *page = vy_page_new(page_info);
+	page = vy_page_new(page_info);
 	if (page == NULL)
 		return -1;
 
@@ -1011,8 +1042,18 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 	task->run = slice->run;
 	task->page_info = page_info;
 	task->page = page;
+	task->key = key;
+	task->iterator_type = iterator_type;
+	task->cmp_def = itr->cmp_def;
+	task->format = itr->format;
+	task->is_primary = itr->is_primary;
+	task->pos_in_page = 0;
+	task->equal_found = false;
 
 	int rc = vy_run_env_coio_call(env, &task->base, vy_page_read_cb);
+
+	*pos_in_page = task->pos_in_page;
+	*equal_found = task->equal_found;
 
 	mempool_free(&env->read_task_pool, task);
 	if (rc != 0) {
@@ -1051,7 +1092,10 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 		     struct tuple **stmt)
 {
 	struct vy_page *page;
-	int rc = vy_run_iterator_load_page(itr, pos.page_no, &page);
+	bool equal_found;
+	uint32_t pos_in_page;
+	int rc = vy_run_iterator_load_page(itr, pos.page_no, NULL, ITER_GE,
+					   &page, &pos_in_page, &equal_found);
 	if (rc != 0)
 		return rc;
 	*stmt = vy_page_stmt(page, pos.pos_in_page, itr->cmp_def,
@@ -1084,14 +1128,13 @@ vy_run_iterator_search(struct vy_run_iterator *itr,
 		itr->search_ended = true;
 		return 0;
 	}
+	bool equal_in_page;
 	struct vy_page *page;
-	int rc = vy_run_iterator_load_page(itr, pos->page_no, &page);
+	int rc = vy_run_iterator_load_page(itr, pos->page_no, key,
+					   iterator_type, &page,
+					   &pos->pos_in_page, &equal_in_page);
 	if (rc != 0)
 		return rc;
-	bool equal_in_page = false;
-	pos->pos_in_page = vy_page_find_key(page, key, itr->cmp_def,
-					    itr->format, itr->is_primary,
-					    iterator_type, &equal_in_page);
 	if (pos->pos_in_page == page->row_count) {
 		pos->page_no++;
 		pos->pos_in_page = 0;
