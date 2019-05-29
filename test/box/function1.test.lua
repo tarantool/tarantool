@@ -7,6 +7,7 @@ net = require('net.box')
 c = net.connect(os.getenv("LISTEN"))
 
 box.schema.func.create('function1', {language = "C"})
+box.space._func:replace{2, 1, 'function1', 0, 'LUA'}
 box.schema.user.grant('guest', 'execute', 'function', 'function1')
 _ = box.schema.space.create('test')
 _ = box.space.test:create_index('primary')

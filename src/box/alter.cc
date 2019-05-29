@@ -2550,6 +2550,10 @@ func_def_new_from_tuple(struct tuple *tuple)
 		tnt_raise(OutOfMemory, func_def_sizeof(len), "malloc", "def");
 	auto def_guard = make_scoped_guard([=] { free(def); });
 	func_def_get_ids_from_tuple(tuple, &def->fid, &def->uid);
+	if (def->fid > BOX_FUNCTION_MAX) {
+		tnt_raise(ClientError, ER_CREATE_FUNCTION,
+			  tt_cstr(name, len), "function id is too big");
+	}
 	memcpy(def->name, name, len);
 	def->name[len] = 0;
 	if (tuple_field_count(tuple) > BOX_FUNC_FIELD_SETUID)
@@ -2574,24 +2578,11 @@ func_def_new_from_tuple(struct tuple *tuple)
 
 /** Remove a function from function cache */
 static void
-func_cache_remove_func(struct trigger * /* trigger */, void *event)
+func_cache_remove_func(struct trigger *trigger, void * /* event */)
 {
-	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
-	uint32_t fid = tuple_field_u32_xc(stmt->old_tuple ?
-				       stmt->old_tuple : stmt->new_tuple,
-				       BOX_FUNC_FIELD_ID);
-	func_cache_delete(fid);
-}
-
-/** Replace a function in the function cache */
-static void
-func_cache_replace_func(struct trigger * /* trigger */, void *event)
-{
-	struct txn_stmt *stmt = txn_last_stmt((struct txn*) event);
-	struct func_def *def = func_def_new_from_tuple(stmt->new_tuple);
-	auto def_guard = make_scoped_guard([=] { free(def); });
-	func_cache_replace(def);
-	def_guard.is_active = false;
+	struct func *old_func = (struct func *) trigger->data;
+	func_cache_delete(old_func->def->fid);
+	func_delete(old_func);
 }
 
 /**
@@ -2612,13 +2603,17 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 	struct func *old_func = func_by_id(fid);
 	if (new_tuple != NULL && old_func == NULL) { /* INSERT */
 		struct func_def *def = func_def_new_from_tuple(new_tuple);
+		auto def_guard = make_scoped_guard([=] { free(def); });
 		access_check_ddl(def->name, def->fid, def->uid, SC_FUNCTION,
 				 PRIV_C);
-		auto def_guard = make_scoped_guard([=] { free(def); });
-		func_cache_replace(def);
-		def_guard.is_active = false;
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(func_cache_remove_func, NULL);
+		struct func *func = func_new(def);
+		if (func == NULL)
+			diag_raise();
+		def_guard.is_active = false;
+		func_cache_insert(func);
+		on_rollback->data = func;
 		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) {         /* DELETE */
 		uint32_t uid;
@@ -2636,16 +2631,25 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 				  "function has grants");
 		}
 		struct trigger *on_commit =
-			txn_alter_trigger_new(func_cache_remove_func, NULL);
+			txn_alter_trigger_new(func_cache_remove_func, old_func);
 		txn_on_commit(txn, on_commit);
 	} else {                                /* UPDATE, REPLACE */
-		struct func_def *def = func_def_new_from_tuple(new_tuple);
-		auto def_guard = make_scoped_guard([=] { free(def); });
-		access_check_ddl(def->name, def->fid, def->uid, SC_FUNCTION,
-				 PRIV_A);
-		struct trigger *on_commit =
-			txn_alter_trigger_new(func_cache_replace_func, NULL);
-		txn_on_commit(txn, on_commit);
+		assert(new_tuple != NULL && old_tuple != NULL);
+		/**
+		 * Allow an alter that doesn't change the
+		 * definition to support upgrade script.
+		 */
+		struct func_def *old_def = NULL, *new_def = NULL;
+		auto guard = make_scoped_guard([=] {
+			free(old_def);
+			free(new_def);
+		});
+		old_def = func_def_new_from_tuple(old_tuple);
+		new_def = func_def_new_from_tuple(new_tuple);
+		if (func_def_cmp(new_def, old_def) != 0) {
+			tnt_raise(ClientError, ER_UNSUPPORTED, "function",
+				  "alter");
+		}
 	}
 }
 

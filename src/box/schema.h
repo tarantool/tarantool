@@ -163,14 +163,11 @@ schema_free();
 struct space *schema_space(uint32_t id);
 
 /**
- * Insert a new function or update the old one.
- *
- * @param def Function definition. In a case of success the ownership
- *        of @a def is transfered to the data dictionary, thus the caller
- *        must not delete it.
+ * Insert a new function object in the function cache.
+ * @param func Function object to insert.
  */
 void
-func_cache_replace(struct func_def *def);
+func_cache_insert(struct func *func);
 
 void
 func_cache_delete(uint32_t fid);

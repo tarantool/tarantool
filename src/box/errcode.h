@@ -106,7 +106,7 @@ struct errcode_record {
 	/* 51 */_(ER_NO_SUCH_FUNCTION,		"Function '%s' does not exist") \
 	/* 52 */_(ER_FUNCTION_EXISTS,		"Function '%s' already exists") \
 	/* 53 */_(ER_BEFORE_REPLACE_RET,	"Invalid return value of space:before_replace trigger: expected tuple or nil, got %s") \
-	/* 54 */_(ER_FUNCTION_MAX,		"A limit on the total number of functions has been reached: %u") \
+	/* 54 */_(ER_UNUSED2,			"") \
 	/* 55 */_(ER_TRIGGER_EXISTS,		"Trigger '%s' already exists") \
 	/* 56 */_(ER_USER_MAX,			"A limit on the total number of users has been reached: %u") \
 	/* 57 */_(ER_NO_SUCH_ENGINE,		"Space engine '%s' does not exist") \

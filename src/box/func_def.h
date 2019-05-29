@@ -34,6 +34,10 @@
 #include "trivia/util.h"
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * The supported language of the stored function.
  */
@@ -79,11 +83,19 @@ func_def_sizeof(uint32_t name_len)
 	return sizeof(struct func_def) + name_len + 1;
 }
 
+/** Compare two given function definitions. */
+int
+func_def_cmp(struct func_def *def1, struct func_def *def2);
+
 /**
  * API of C stored function.
  */
 typedef struct box_function_ctx box_function_ctx_t;
 typedef int (*box_function_f)(box_function_ctx_t *ctx,
 	     const char *args, const char *args_end);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* TARANTOOL_BOX_FUNC_DEF_H_INCLUDED */

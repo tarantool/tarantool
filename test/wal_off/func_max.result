@@ -42,7 +42,7 @@ test_run:cmd("setopt delimiter ''");
 ...
 func_limit()
 ---
-- error: 'A limit on the total number of functions has been reached: 32000'
+- error: 'Failed to create function ''func32000'': function id is too big'
 ...
 drop_limit_func()
 ---
@@ -62,7 +62,7 @@ session.su('testuser')
 ...
 func_limit()
 ---
-- error: 'A limit on the total number of functions has been reached: 32000'
+- error: 'Failed to create function ''func32000'': function id is too big'
 ...
 drop_limit_func()
 ---

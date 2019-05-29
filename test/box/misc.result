@@ -384,7 +384,6 @@ t;
   51: box.error.NO_SUCH_FUNCTION
   52: box.error.FUNCTION_EXISTS
   53: box.error.BEFORE_REPLACE_RET
-  54: box.error.FUNCTION_MAX
   55: box.error.TRIGGER_EXISTS
   56: box.error.USER_MAX
   57: box.error.NO_SUCH_ENGINE

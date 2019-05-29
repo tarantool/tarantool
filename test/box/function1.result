@@ -16,6 +16,10 @@ c = net.connect(os.getenv("LISTEN"))
 box.schema.func.create('function1', {language = "C"})
 ---
 ...
+box.space._func:replace{2, 1, 'function1', 0, 'LUA'}
+---
+- error: function does not support alter
+...
 box.schema.user.grant('guest', 'execute', 'function', 'function1')
 ---
 ...

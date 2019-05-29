@@ -101,9 +101,6 @@ struct func *
 func_new(struct func_def *def);
 
 void
-func_update(struct func *func, struct func_def *def);
-
-void
 func_delete(struct func *func);
 
 /**

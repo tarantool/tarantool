@@ -452,14 +452,6 @@ func_call(struct func *func, box_function_ctx_t *ctx, const char *args,
 }
 
 void
-func_update(struct func *func, struct func_def *def)
-{
-	func_unload(func);
-	free(func->def);
-	func->def = def;
-}
-
-void
 func_delete(struct func *func)
 {
 	func_unload(func);
