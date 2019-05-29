@@ -37,6 +37,7 @@
 #include "msgpuck.h"
 #include "assoc.h"
 #include "sio.h"
+#include "trigger.h"
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
 
@@ -335,6 +336,19 @@ struct swim_member {
 	 */
 	struct rlist in_dissemination_queue;
 	/**
+	 * Each time a member is updated, or created, or dropped,
+	 * it is added to an event queue. Members from this queue
+	 * are dispatched into user defined triggers.
+	 */
+	struct stailq_entry in_event_queue;
+	/**
+	 * Mask of events happened with this member since a
+	 * previous trigger invocation. Once the events are
+	 * delivered into a trigger, the mask is nullified and
+	 * starts collecting new events.
+	 */
+	enum swim_ev_mask events;
+	/**
 	 *
 	 *               Failure detection component
 	 */
@@ -456,6 +470,17 @@ struct swim {
 	 */
 	struct rlist dissemination_queue;
 	/**
+	 * Queue of updated, new, and dropped members to deliver
+	 * the events to triggers. Dropped members are also kept
+	 * here until they are handled by a trigger.
+	 */
+	struct stailq event_queue;
+	/**
+	 * List of triggers to call on each new, dropped, and
+	 * updated member.
+	 */
+	struct rlist on_member_event;
+	/**
 	 * Members to which a message should be sent next during
 	 * this round.
 	 */
@@ -472,6 +497,13 @@ struct swim {
 	 * the beginning of each round.
 	 */
 	struct swim_member **shuffled;
+	/**
+	 * Fiber to serve member event triggers. This task is
+	 * being done in a separate fiber, because user triggers
+	 * can yield and libev callbacks, processing member
+	 * events, are not allowed to yield.
+	 */
+	struct fiber *event_handler;
 	/**
 	 * Single round step task. It is impossible to have
 	 * multiple round steps in the same SWIM instance at the
@@ -549,10 +581,41 @@ swim_register_event(struct swim *swim, struct swim_member *member)
  * change of its status, or incarnation, or both.
  */
 static void
-swim_on_member_update(struct swim *swim, struct swim_member *member)
+swim_on_member_update(struct swim *swim, struct swim_member *member,
+		      enum swim_ev_mask events)
 {
 	member->unacknowledged_pings = 0;
 	swim_register_event(swim, member);
+	/*
+	 * Member event should be delivered to triggers only if
+	 * there is at least one trigger.
+	 */
+	if (! rlist_empty(&swim->on_member_event)) {
+		/*
+		 * Member is referenced and added to a queue only
+		 * once. That moment can be detected when a first
+		 * event happens.
+		 */
+		if (member->events == 0 && events != 0) {
+			swim_member_ref(member);
+			stailq_add_tail_entry(&swim->event_queue, member,
+					      in_event_queue);
+			fiber_wakeup(swim->event_handler);
+		}
+		member->events |= events;
+	}
+}
+
+struct rlist *
+swim_trigger_list_on_member_event(struct swim *swim)
+{
+	return &swim->on_member_event;
+}
+
+bool
+swim_has_pending_events(struct swim *swim)
+{
+	return ! stailq_empty(&swim->event_queue);
 }
 
 /**
@@ -577,13 +640,17 @@ swim_update_member_inc_status(struct swim *swim, struct swim_member *member,
 	 */
 	assert(member != swim->self);
 	if (member->incarnation < incarnation) {
-		member->status = new_status;
+		enum swim_ev_mask events = SWIM_EV_NEW_INCARNATION;
+		if (new_status != member->status) {
+			events |= SWIM_EV_NEW_STATUS;
+			member->status = new_status;
+		}
 		member->incarnation = incarnation;
-		swim_on_member_update(swim, member);
+		swim_on_member_update(swim, member, events);
 	} else if (member->incarnation == incarnation &&
 		   member->status < new_status) {
 		member->status = new_status;
-		swim_on_member_update(swim, member);
+		swim_on_member_update(swim, member, SWIM_EV_NEW_STATUS);
 	}
 }
 
@@ -626,7 +693,7 @@ swim_update_member_payload(struct swim *swim, struct swim_member *member,
 	member->payload_size = payload_size;
 	member->payload_ttd = mh_size(swim->members);
 	member->is_payload_up_to_date = true;
-	swim_on_member_update(swim, member);
+	swim_on_member_update(swim, member, SWIM_EV_NEW_PAYLOAD);
 	return 0;
 }
 
@@ -734,7 +801,6 @@ swim_delete_member(struct swim *swim, struct swim_member *member)
 	mh_int_t rc = mh_swim_table_find(swim->members, key, NULL);
 	assert(rc != mh_end(swim->members));
 	mh_swim_table_del(swim->members, rc, NULL);
-	swim_cached_round_msg_invalidate(swim);
 	rlist_del_entry(member, in_round_queue);
 
 	/* Failure detection component. */
@@ -742,6 +808,7 @@ swim_delete_member(struct swim *swim, struct swim_member *member)
 		wait_ack_heap_delete(&swim->wait_ack_heap, member);
 
 	/* Dissemination component. */
+	swim_on_member_update(swim, member, SWIM_EV_DROP);
 	rlist_del_entry(member, in_dissemination_queue);
 
 	swim_member_delete(member);
@@ -805,7 +872,7 @@ swim_new_member(struct swim *swim, const struct sockaddr_in *addr,
 		swim_ev_timer_again(swim_loop(), &swim->round_tick);
 
 	/* Dissemination component. */
-	swim_on_member_update(swim, member);
+	swim_on_member_update(swim, member, SWIM_EV_NEW);
 	if (payload_size >= 0 &&
 	    swim_update_member_payload(swim, member, payload,
 				       payload_size) != 0) {
@@ -1299,14 +1366,15 @@ swim_check_acks(struct ev_loop *loop, struct ev_timer *t, int events)
 			if (m->unacknowledged_pings < NO_ACKS_TO_SUSPECT)
 				break;
 			m->status = MEMBER_SUSPECTED;
-			swim_on_member_update(swim, m);
+			swim_on_member_update(swim, m, SWIM_EV_NEW_STATUS);
 			if (swim_send_indirect_pings(swim, m) != 0)
 				diag_log();
 			break;
 		case MEMBER_SUSPECTED:
 			if (m->unacknowledged_pings >= NO_ACKS_TO_DEAD) {
 				m->status = MEMBER_DEAD;
-				swim_on_member_update(swim, m);
+				swim_on_member_update(swim, m,
+						      SWIM_EV_NEW_STATUS);
 			}
 			break;
 		case MEMBER_DEAD:
@@ -1332,7 +1400,7 @@ swim_update_member_addr(struct swim *swim, struct swim_member *member,
 {
 	assert(! swim_inaddr_eq(&member->addr, addr));
 	member->addr = *addr;
-	swim_on_member_update(swim, member);
+	swim_on_member_update(swim, member, SWIM_EV_NEW_URI);
 }
 
 /**
@@ -1354,12 +1422,10 @@ swim_update_member(struct swim *swim, const struct swim_member_def *def,
 	if (def->incarnation > member->incarnation) {
 		if (! swim_inaddr_eq(&def->addr, &member->addr))
 			swim_update_member_addr(swim, member, &def->addr);
-		if (def->payload_size >= 0) {
+		if (def->payload_size >= 0)
 			update_payload = true;
-		} else if (member->is_payload_up_to_date) {
+		else if (member->is_payload_up_to_date)
 			member->is_payload_up_to_date = false;
-			swim_on_member_update(swim, member);
-		}
 	} else if (! member->is_payload_up_to_date && def->payload_size >= 0) {
 		update_payload = true;
 	}
@@ -1430,7 +1496,7 @@ swim_upsert_member(struct swim *swim, const struct swim_member_def *def,
 	 */
 	if (self->incarnation < def->incarnation) {
 		self->incarnation = def->incarnation;
-		swim_on_member_update(swim, self);
+		swim_on_member_update(swim, self, SWIM_EV_NEW_INCARNATION);
 	}
 	if (def->status != MEMBER_ALIVE &&
 	    def->incarnation == self->incarnation) {
@@ -1440,7 +1506,7 @@ swim_upsert_member(struct swim *swim, const struct swim_member_def *def,
 		 * with a bigger incarnation.
 		 */
 		self->incarnation++;
-		swim_on_member_update(swim, self);
+		swim_on_member_update(swim, self, SWIM_EV_NEW_INCARNATION);
 	}
 	return 0;
 skip:
@@ -1532,7 +1598,7 @@ swim_process_failure_detection(struct swim *swim, const char **pos,
 	if (def.incarnation == member->incarnation &&
 	    member->status != MEMBER_ALIVE) {
 		member->status = MEMBER_ALIVE;
-		swim_on_member_update(swim, member);
+		swim_on_member_update(swim, member, SWIM_EV_NEW_STATUS);
 	}
 
 	switch (def.type) {
@@ -1604,7 +1670,7 @@ swim_process_quit(struct swim *swim, const char **pos, const char *end,
 		swim_update_member_inc_status(swim, m, MEMBER_LEFT, tmp);
 	} else if (tmp >= m->incarnation) {
 		m->incarnation = tmp + 1;
-		swim_on_member_update(swim, m);
+		swim_on_member_update(swim, m, SWIM_EV_NEW_INCARNATION);
 	}
 	return 0;
 }
@@ -1668,6 +1734,55 @@ error:
 	diag_log();
 }
 
+/**
+ * Event handler. At this moment its only task is dispatching
+ * member events to user defined triggers. Generally, because
+ * SWIM is fully IO driven, that fiber should be used only for
+ * yielding tasks not related to SWIM core logic. For all the
+ * other tasks libev callbacks are ok. Unfortunately, yields are
+ * not allowed directly in libev callbacks, because they are
+ * invoked by a cord scheduler fiber prohibited for manual yields.
+ */
+static int
+swim_event_handler_f(va_list va)
+{
+	struct swim *s = va_arg(va, struct swim *);
+	struct swim_on_member_event_ctx ctx;
+	while (! fiber_is_cancelled()) {
+		if (stailq_empty(&s->event_queue)) {
+			fiber_yield();
+			continue;
+		}
+		/*
+		 * Can't be empty. SWIM deletes members from
+		 * event queue only on SWIM deletion, but then
+		 * the fiber would be stopped already.
+		 */
+		assert(! stailq_empty(&s->event_queue));
+		struct swim_member *m =
+			stailq_shift_entry(&s->event_queue, struct swim_member,
+					   in_event_queue);
+		/*
+		 * It is possible, that a member was added and
+		 * removed before firing a trigger. It happens,
+		 * if a previous event was being handled too
+		 * long, for example. There is a convention not to
+		 * show such easy riders.
+		 */
+		if ((m->events & SWIM_EV_NEW) == 0 ||
+		    (m->events & SWIM_EV_DROP) == 0) {
+			ctx.member = m;
+			ctx.events = m->events;
+			m->events = 0;
+			if (trigger_run(&s->on_member_event, (void *) &ctx))
+				diag_log();
+		}
+		swim_member_unref(m);
+	}
+	return 0;
+}
+
+
 struct swim *
 swim_new(void)
 {
@@ -1700,7 +1815,16 @@ swim_new(void)
 
 	/* Dissemination component. */
 	rlist_create(&swim->dissemination_queue);
-
+	rlist_create(&swim->on_member_event);
+	stailq_create(&swim->event_queue);
+	swim->event_handler = fiber_new("SWIM event handler",
+					swim_event_handler_f);
+	if (swim->event_handler == NULL) {
+		swim_delete(swim);
+		return NULL;
+	}
+	fiber_set_joinable(swim->event_handler, true);
+	fiber_start(swim->event_handler, swim);
 	return swim;
 }
 
@@ -1809,6 +1933,9 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 		 * specified.
 		 */
 		addr = swim->scheduler.transport.addr;
+		fiber_set_name(swim->event_handler,
+			       tt_sprintf("SWIM event handler %d",
+					  swim_fd(swim)));
 	} else {
 		addr = swim->self->addr;
 	}
@@ -1828,7 +1955,7 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 
 	if (new_self != NULL) {
 		swim->self->status = MEMBER_LEFT;
-		swim_on_member_update(swim, swim->self);
+		swim_on_member_update(swim, swim->self, SWIM_EV_NEW_STATUS);
 		swim->self = new_self;
 	}
 	if (! swim_inaddr_eq(&addr, &swim->self->addr)) {
@@ -1866,7 +1993,7 @@ swim_set_payload(struct swim *swim, const char *payload, int payload_size)
 	if (swim_update_member_payload(swim, self, payload, payload_size) != 0)
 		return -1;
 	self->incarnation++;
-	swim_on_member_update(swim, self);
+	swim_on_member_update(swim, self, SWIM_EV_NEW_INCARNATION);
 	return 0;
 }
 
@@ -1951,17 +2078,44 @@ swim_size(const struct swim *swim)
 	return mh_size(swim->members);
 }
 
+/**
+ * Cancel and wait finish of an event handler fiber. That
+ * operation is not inlined in the SWIM destructor, because there
+ * is one more place, when the handler should be stopped even
+ * before SWIM deletion - quit. Quit deletes the instance only
+ * when all the 'I left' messages are sent, but it happens in a
+ * libev callback in the scheduler fiber where it is impossible
+ * to yield. So to that moment the handler should be dead already.
+ */
+static inline void
+swim_kill_event_handler(struct swim *swim)
+{
+	struct fiber *f = swim->event_handler;
+	/*
+	 * Nullify so as not to keep pointer at a fiber when it is
+	 * reused.
+	 */
+	swim->event_handler = NULL;
+	fiber_wakeup(f);
+	fiber_cancel(f);
+	fiber_join(f);
+}
+
 void
 swim_delete(struct swim *swim)
 {
+	if (swim->event_handler != NULL)
+		swim_kill_event_handler(swim);
 	struct ev_loop *l = swim_loop();
 	swim_scheduler_destroy(&swim->scheduler);
 	swim_ev_timer_stop(l, &swim->round_tick);
 	swim_ev_timer_stop(l, &swim->wait_ack_tick);
+	struct swim_member *m, *tmp;
+	stailq_foreach_entry_safe(m, tmp, &swim->event_queue, in_event_queue)
+		swim_member_unref(m);
 	mh_int_t node;
 	mh_foreach(swim->members, node) {
-		struct swim_member *m =
-			*mh_swim_table_node(swim->members, node);
+		m = *mh_swim_table_node(swim->members, node);
 		rlist_del_entry(m, in_round_queue);
 		if (! heap_node_is_stray(&m->in_wait_ack_heap))
 			wait_ack_heap_delete(&swim->wait_ack_heap, m);
@@ -1975,6 +2129,7 @@ swim_delete(struct swim *swim)
 	swim_task_destroy(&swim->round_step_task);
 	wait_ack_heap_destroy(&swim->wait_ack_heap);
 	mh_swim_table_delete(swim->members);
+	trigger_destroy(&swim->on_member_event);
 	free(swim->shuffled);
 	free(swim);
 }
@@ -1991,6 +2146,11 @@ swim_quit_step_complete(struct swim_task *task,
 	(void) rc;
 	struct swim *swim = swim_by_scheduler(scheduler);
 	if (rlist_empty(&swim->round_queue)) {
+		/*
+		 * The handler should be dead - can't yield here,
+		 * it is the scheduler fiber.
+		 */
+		assert(swim->event_handler == NULL);
 		swim_delete(swim);
 		return;
 	}
@@ -2020,6 +2180,11 @@ void
 swim_quit(struct swim *swim)
 {
 	assert(swim_is_configured(swim));
+	/*
+	 * Kill the handler now. Later it will be impossible to do
+	 * from the scheduler fiber.
+	 */
+	swim_kill_event_handler(swim);
 	struct ev_loop *l = swim_loop();
 	swim_ev_timer_stop(l, &swim->round_tick);
 	swim_ev_timer_stop(l, &swim->wait_ack_tick);

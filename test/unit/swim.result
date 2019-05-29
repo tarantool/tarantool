@@ -1,5 +1,5 @@
 	*** main_f ***
-1..20
+1..21
 	*** swim_test_one_link ***
     1..6
     ok 1 - no rounds - no fullmesh
@@ -200,4 +200,30 @@ ok 19 - subtests
     # slow network leads to idle round steps, they should not produce a new message
 ok 20 - subtests
 	*** swim_test_slow_net: done ***
+	*** swim_test_triggers ***
+    1..21
+    ok 1 - trigger is fired
+    ok 2 - is not deleted
+    ok 3 - ctx.member is set
+    ok 4 - ctx.events is set
+    ok 5 - payload is delivered, trigger caught that
+    ok 6 - S1 got S2' payload
+    ok 7 - mask says that
+    ok 8 - self payload is updated
+    ok 9 - self is set as a member
+    ok 10 - both incarnation and payload events are presented
+    ok 11 - suspicion fired a trigger
+    ok 12 - status suspected
+    ok 13 - death fired a trigger
+    ok 14 - status dead
+    ok 15 - drop fired a trigger
+    ok 16 - status dropped
+    ok 17 - dropped member is not presented in the member table
+    ok 18 - but is in the event context
+    ok 19 - yielding trigger is fired
+    ok 20 - non-yielding still is not
+    ok 21 - trigger is not deleted until all currently sleeping triggers are finished
+    # now all the triggers are done and deleted
+ok 21 - subtests
+	*** swim_test_triggers: done ***
 	*** main_f: done ***

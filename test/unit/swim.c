@@ -41,6 +41,7 @@
 #include "swim_test_transport.h"
 #include "swim_test_ev.h"
 #include "swim_test_utils.h"
+#include "trigger.h"
 #include <fcntl.h>
 
 /**
@@ -950,10 +951,152 @@ swim_test_slow_net(void)
 	swim_finish_test();
 }
 
+struct trigger_ctx {
+	int counter;
+	bool is_deleted;
+	bool need_sleep;
+	struct fiber *f;
+	struct swim_on_member_event_ctx ctx;
+};
+
+static void
+swim_on_member_event_save(struct trigger *t, void *event)
+{
+	struct trigger_ctx *c = (struct trigger_ctx *) t->data;
+	++c->counter;
+	if (c->ctx.member != NULL)
+		swim_member_unref(c->ctx.member);
+	c->ctx = *((struct swim_on_member_event_ctx *) event);
+	swim_member_ref(c->ctx.member);
+}
+
+static void
+swim_on_member_event_yield(struct trigger *t, void *event)
+{
+	struct trigger_ctx *c = (struct trigger_ctx *) t->data;
+	++c->counter;
+	c->f = fiber();
+	while (c->need_sleep)
+		fiber_yield();
+}
+
+static void
+swim_trigger_destroy_cb(struct trigger *t)
+{
+	((struct trigger_ctx *) t->data)->is_deleted = true;
+}
+
+static int
+swim_cluster_delete_f(va_list ap)
+{
+	struct swim_cluster *c = (struct swim_cluster *)
+		va_arg(ap, struct swim_cluster *);
+	swim_cluster_delete(c);
+	return 0;
+}
+
+static void
+swim_test_triggers(void)
+{
+	swim_start_test(21);
+	struct swim_cluster *cluster = swim_cluster_new(2);
+	swim_cluster_set_ack_timeout(cluster, 1);
+	struct trigger_ctx tctx, tctx2;
+	memset(&tctx, 0, sizeof(tctx));
+	memset(&tctx2, 0, sizeof(tctx2));
+	struct trigger *t1 = (struct trigger *) malloc(sizeof(*t1));
+	assert(t1 != NULL);
+	trigger_create(t1, swim_on_member_event_save, (void *) &tctx,
+		       swim_trigger_destroy_cb);
+
+	/* Skip 'new self' events. */
+	swim_cluster_run_triggers(cluster);
+
+	struct swim *s1 = swim_cluster_member(cluster, 0);
+	trigger_add(swim_trigger_list_on_member_event(s1), t1);
+	swim_cluster_interconnect(cluster, 0, 1);
+	swim_cluster_run_triggers(cluster);
+
+	is(tctx.counter, 1, "trigger is fired");
+	ok(! tctx.is_deleted, "is not deleted");
+	is(tctx.ctx.member, swim_cluster_member_view(cluster, 0, 1),
+	   "ctx.member is set");
+	is(tctx.ctx.events, SWIM_EV_NEW, "ctx.events is set");
+
+	swim_run_for(1);
+	swim_cluster_run_triggers(cluster);
+	is(tctx.counter, 2, "payload is delivered, trigger caught that");
+	is(tctx.ctx.member, swim_cluster_member_view(cluster, 0, 1),
+	   "S1 got S2' payload");
+	is(tctx.ctx.events, SWIM_EV_NEW_PAYLOAD, "mask says that");
+
+	swim_cluster_member_set_payload(cluster, 0, "123", 3);
+	swim_cluster_run_triggers(cluster);
+	is(tctx.counter, 3, "self payload is updated");
+	is(tctx.ctx.member, swim_self(s1), "self is set as a member");
+	is(tctx.ctx.events, SWIM_EV_NEW_PAYLOAD | SWIM_EV_NEW_INCARNATION,
+	   "both incarnation and payload events are presented");
+
+	swim_cluster_set_drop(cluster, 1, 100);
+	fail_if(swim_cluster_wait_status(cluster, 0, 1,
+					 MEMBER_SUSPECTED, 3) != 0);
+	swim_cluster_run_triggers(cluster);
+	is(tctx.counter, 4, "suspicion fired a trigger");
+	is(tctx.ctx.events, SWIM_EV_NEW_STATUS, "status suspected");
+
+	fail_if(swim_cluster_wait_status(cluster, 0, 1, MEMBER_DEAD, 3) != 0);
+	swim_cluster_run_triggers(cluster);
+	is(tctx.counter, 5, "death fired a trigger");
+	is(tctx.ctx.events, SWIM_EV_NEW_STATUS, "status dead");
+
+	fail_if(swim_cluster_wait_status(cluster, 0, 1,
+					 swim_member_status_MAX, 2) != 0);
+	swim_cluster_run_triggers(cluster);
+	is(tctx.counter, 6, "drop fired a trigger");
+	is(tctx.ctx.events, SWIM_EV_DROP, "status dropped");
+	is(swim_cluster_member_view(cluster, 0, 1), NULL,
+	   "dropped member is not presented in the member table");
+	isnt(tctx.ctx.member, NULL, "but is in the event context");
+	/*
+	 * There is a complication about yields. If a trigger
+	 * yields, other triggers wait for its finish. And all
+	 * the triggers should be ready to SWIM deletion in the
+	 * middle of an event processing. SWIM object should not
+	 * be deleted, until all the triggers are done.
+	 */
+	struct trigger *t2 = (struct trigger *) malloc(sizeof(*t2));
+	assert(t2 != NULL);
+	tctx2.need_sleep = true;
+	trigger_create(t2, swim_on_member_event_yield, (void *) &tctx2, NULL);
+	trigger_add(swim_trigger_list_on_member_event(s1), t2);
+	swim_cluster_add_link(cluster, 0, 1);
+	swim_cluster_run_triggers(cluster);
+	is(tctx2.counter, 1, "yielding trigger is fired");
+	is(tctx.counter, 6, "non-yielding still is not");
+
+	struct fiber *async_delete_fiber =
+		fiber_new("async delete", swim_cluster_delete_f);
+	fiber_start(async_delete_fiber, cluster);
+	ok(! tctx.is_deleted, "trigger is not deleted until all currently "\
+	   "sleeping triggers are finished");
+	tctx2.need_sleep = false;
+	fiber_wakeup(tctx2.f);
+	while (! tctx.is_deleted)
+		fiber_sleep(0);
+	note("now all the triggers are done and deleted");
+
+	free(t1);
+	free(t2);
+	if (tctx.ctx.member != NULL)
+		swim_member_unref(tctx.ctx.member);
+
+	swim_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	swim_start_test(20);
+	swim_start_test(21);
 
 	(void) ap;
 	swim_test_ev_init();
@@ -979,6 +1122,7 @@ main_f(va_list ap)
 	swim_test_indirect_ping();
 	swim_test_encryption();
 	swim_test_slow_net();
+	swim_test_triggers();
 
 	swim_test_transport_free();
 	swim_test_ev_free();

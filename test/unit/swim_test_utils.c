@@ -36,6 +36,7 @@
 #include "trivia/util.h"
 #include "fiber.h"
 #include "msgpuck.h"
+#include "trigger.h"
 
 /**
  * Drop rate packet filter to drop packets with a certain
@@ -191,12 +192,32 @@ swim_cluster_id_to_uri(char *buffer, int id)
 	sprintf(buffer, "127.0.0.1:%d", id + 1);
 }
 
+/**
+ * A trigger to check correctness of event context, and ability
+ * to yield.
+ */
+void
+swim_test_event_cb(struct trigger *trigger, void *event)
+{
+	(void) trigger;
+	struct swim_on_member_event_ctx *ctx =
+		(struct swim_on_member_event_ctx *) event;
+	assert(ctx->events != 0);
+	assert((ctx->events & SWIM_EV_NEW) == 0 ||
+	       (ctx->events & SWIM_EV_DROP) == 0);
+	fiber_sleep(0);
+}
+
 /** Create a SWIM cluster node @a n with a 0-based @a id. */
 static inline void
 swim_node_create(struct swim_node *n, int id)
 {
 	n->swim = swim_new();
 	assert(n->swim != NULL);
+	struct trigger *t = (struct trigger *) malloc(sizeof(*t));
+	trigger_create(t, swim_test_event_cb, NULL, (trigger_f0) free);
+	trigger_add(swim_trigger_list_on_member_event(n->swim), t);
+
 	char uri[128];
 	swim_cluster_id_to_uri(uri, id);
 	n->uuid = uuid_nil;
@@ -303,7 +324,7 @@ swim_cluster_add_link(struct swim_cluster *cluster, int to_id, int from_id)
 			       swim_member_uri(from), swim_member_uuid(from));
 }
 
-static const struct swim_member *
+const struct swim_member *
 swim_cluster_member_view(struct swim_cluster *cluster, int node_id,
 			 int member_id)
 {
@@ -615,6 +636,8 @@ swim_wait_timeout(double timeout, struct swim_cluster *cluster,
 	 * whatsoever.
 	 */
 	swim_test_transport_do_loop_step(loop);
+	if (cluster != NULL)
+		swim_cluster_run_triggers(cluster);
 	while (! check(cluster, data)) {
 		if (swim_time() >= deadline)
 			return -1;
@@ -625,6 +648,8 @@ swim_wait_timeout(double timeout, struct swim_cluster *cluster,
 		 * too.
 		 */
 		swim_test_transport_do_loop_step(loop);
+		if (cluster != NULL)
+			swim_cluster_run_triggers(cluster);
 	}
 	return 0;
 }
@@ -866,6 +891,23 @@ swim_cluster_wait_payload_everywhere(struct swim_cluster *cluster,
 	swim_member_template_set_payload(&t, payload, payload_size);
 	return swim_wait_timeout(timeout, cluster,
 				 swim_loop_check_member_everywhere, &t);
+}
+
+void
+swim_cluster_run_triggers(struct swim_cluster *cluster)
+{
+	bool has_events;
+	do {
+		has_events = false;
+		struct swim_node *n = cluster->node;
+		for (int i = 0; i < cluster->size; ++i, ++n) {
+			if (n->swim != NULL &&
+			    swim_has_pending_events(n->swim)) {
+				has_events = true;
+				fiber_sleep(0);
+			}
+		}
+	} while (has_events);
 }
 
 bool

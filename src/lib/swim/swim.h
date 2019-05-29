@@ -40,6 +40,7 @@ extern "C" {
 #endif
 
 struct swim;
+struct rlist;
 struct tt_uuid;
 struct swim_iterator;
 struct swim_member;
@@ -63,7 +64,8 @@ enum swim_gc_mode {
 
 /**
  * Create a new SWIM instance. Do not bind to a port or set any
- * parameters. Allocation and initialization only.
+ * parameters. Allocation and initialization only. The function
+ * yields.
  */
 struct swim *
 swim_new(void);
@@ -124,7 +126,8 @@ swim_set_codec(struct swim *swim, enum crypto_algo algo, enum crypto_mode mode,
 
 /**
  * Stop listening and broadcasting messages, cleanup all internal
- * structures, free memory.
+ * structures, free memory. The function yields. Actual deletion
+ * happens after currently working triggers are done.
  */
 void
 swim_delete(struct swim *swim);
@@ -271,6 +274,46 @@ swim_member_unref(struct swim_member *member);
  */
 bool
 swim_member_is_dropped(const struct swim_member *member);
+
+enum swim_ev_mask {
+	SWIM_EV_NEW             = 0b00000001,
+	SWIM_EV_NEW_STATUS      = 0b00000010,
+	SWIM_EV_NEW_URI         = 0b00000100,
+	SWIM_EV_NEW_INCARNATION = 0b00001000,
+	SWIM_EV_NEW_PAYLOAD     = 0b00010000,
+	/* Shortcut to check for any update. */
+	SWIM_EV_UPDATE          = 0b00011110,
+	SWIM_EV_DROP            = 0b00100000,
+};
+
+/** On member event trigger context. */
+struct swim_on_member_event_ctx {
+	/** New, dropped, or updated member. */
+	struct swim_member *member;
+	/** Mask of happened events. */
+	enum swim_ev_mask events;
+};
+
+/**
+ * A list of member event processing triggers. A couple of words
+ * about such a strange API, instead of something like
+ * "add_trigger", "drop_trigger". A main motivation is that some
+ * functions need a whole trigger list. For example, a function
+ * adding Lua functions as triggers. At the time of this writing
+ * it was lbox_trigger_reset. There is a convention, that any
+ * Tarantool trigger exposed to Lua should provide a way to add
+ * one, drop one, replace one, return all - lbox_trigger_reset
+ * does all of this.
+ */
+struct rlist *
+swim_trigger_list_on_member_event(struct swim *swim);
+
+/**
+ * Check if a SWIM instance has pending events. Is not a public
+ * one, used by tests.
+ */
+bool
+swim_has_pending_events(struct swim *swim);
 
 #if defined(__cplusplus)
 }

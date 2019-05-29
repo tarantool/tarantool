@@ -169,6 +169,14 @@ swim_cluster_member_set_payload(struct swim_cluster *cluster, int i,
 				const char *payload, int size);
 
 /**
+ * Get a member object stored in a SWIM node @a node_id and
+ * showing a known state of a SWIM node @a member_id.
+ */
+const struct swim_member *
+swim_cluster_member_view(struct swim_cluster *cluster, int node_id,
+			 int member_id);
+
+/**
  * Check if in the cluster every instance knowns the about other
  * instances.
  */
@@ -228,6 +236,10 @@ int
 swim_cluster_wait_payload_everywhere(struct swim_cluster *cluster,
 				     int member_id, const char *payload,
 				     int payload_size, double timeout);
+
+/** Run all pending triggers in the cluster. */
+void
+swim_cluster_run_triggers(struct swim_cluster *cluster);
 
 /** Process SWIM events for @a duration fake seconds. */
 void
