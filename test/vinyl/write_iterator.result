@@ -931,7 +931,7 @@ box.snapshot()
 - ok
 ...
 -- Some padding to trigger minor compaction.
-for i = 1001, 1000 + PAD2 do s:delete{i} end
+for i = 1001, 1000 + PAD2 do s:update(i, {{'+', 2, 1000}}) end
 ---
 ...
 box.snapshot()
@@ -993,7 +993,7 @@ s:delete{8}
 ---
 ...
 -- Some padding to trigger minor compaction.
-for i = 1001, 1000 + PAD2 do s:replace{i, i} end
+for i = 1001, 1000 + PAD2 do s:update(i, {{'+', 2, 1000}}) end
 ---
 ...
 box.snapshot()
