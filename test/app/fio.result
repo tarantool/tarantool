@@ -709,6 +709,12 @@ fio.mktree(tree2, tonumber('0777', 8))
 - true
 ...
 -- check mktree error reporting
+--
+-- The test is skipped for the super user, because it has ability
+-- to perform any file access despite file permissions.
+uid = ffi.C.getuid()
+---
+...
 tmp3 = fio.pathjoin(tmpdir, '5')
 ---
 ...
@@ -726,11 +732,11 @@ tree123 = fio.pathjoin(tmp3, '1/2/3')
 st, err = fio.mktree(tree123)
 ---
 ...
-st
+uid == 0 or st == false
 ---
-- false
+- true
 ...
-err:match('Permission denied') ~= nil
+uid == 0 or err:match('Permission denied') ~= nil
 ---
 - true
 ...
@@ -740,11 +746,11 @@ tree4 = fio.pathjoin(tmp3, '4')
 st, err = fio.mktree(tree4)
 ---
 ...
-st
+uid == 0 or st == false
 ---
-- false
+- true
 ...
-err:match('Permission denied') ~= nil
+uid == 0 or err:match('Permission denied') ~= nil
 ---
 - true
 ...
