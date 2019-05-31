@@ -637,6 +637,19 @@ local function check_limit(self, limit)
     return nil
 end
 
+local function check_infinity(self, limit)
+    if limit == 0 then
+        return 0
+    end
+
+    local rbuf = self.rbuf
+    if rbuf:size() == 0 then
+        return nil
+    end
+
+    return rbuf:size()
+end
+
 local function check_delimiter(self, limit, eols)
     if limit == 0 then
         return 0
@@ -1454,7 +1467,7 @@ local function lsocket_tcp_receive(self, pattern, prefix)
         local result = { prefix }
         local deadline = fiber.clock() + (self.timeout or TIMEOUT_INFINITY)
         repeat
-            local data = socket_sysread(self)
+            local data = read(self, LIMIT_INFINITY, timeout, check_infinity)
             if data == nil then
                 if not errno_is_transient[self._errno] then
                     return nil, socket_error(self)
