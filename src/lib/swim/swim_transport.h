@@ -33,6 +33,7 @@
 #include "trivia/util.h"
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 
 /** Transport implementation. */
 struct swim_transport {
