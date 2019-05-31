@@ -76,6 +76,19 @@ vy_quota_consumer_resource_map[] = {
 	 * to avoid long stalls.
 	 */
 	[VY_QUOTA_CONSUMER_COMPACTION] = (1 << VY_QUOTA_RESOURCE_MEMORY),
+	/**
+	 * Since DDL is triggered by the admin, it can be deliberately
+	 * initiated when the workload is known to be low. Throttling
+	 * it along with DML requests would only cause exasperation in
+	 * this case. So we don't apply disk-based rate limit to DDL.
+	 * This should be fine, because the disk-based limit is set
+	 * rather strictly to let the workload some space to grow, see
+	 * vy_regulator_update_rate_limit(), and in contrast to the
+	 * memory-based limit, exceeding the disk-based limit doesn't
+	 * result in abrupt stalls - it may only lead to a gradual
+	 * accumulation of disk space usage and read latency.
+	 */
+	[VY_QUOTA_CONSUMER_DDL] = (1 << VY_QUOTA_RESOURCE_MEMORY),
 };
 
 /**

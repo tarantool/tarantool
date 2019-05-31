@@ -150,6 +150,8 @@ enum vy_quota_consumer_type {
 	VY_QUOTA_CONSUMER_TX = 0,
 	/** Compaction job. */
 	VY_QUOTA_CONSUMER_COMPACTION = 1,
+	/** Request to build a new index. */
+	VY_QUOTA_CONSUMER_DDL = 2,
 
 	vy_quota_consumer_type_MAX,
 };
