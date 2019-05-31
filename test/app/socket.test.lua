@@ -983,3 +983,19 @@ client:read(1, 5) == ''
 server:close()
 
 test_run:cmd("clear filter")
+
+-- case: sicket receive inconsistent behavior
+chan = fiber.channel()
+counter = 0
+fn = function(s) counter = 0; while true do s:write((tostring(counter)):rep(chan:get())); counter = counter + 1 end end
+srv = socket.tcp_server('0.0.0.0', 8888, fn)
+s = socket.connect('localhost', 8888)
+chan:put(5)
+chan:put(5)
+s:receive(5)
+chan:put(5)
+s:settimeout(1)
+s:receive('*a')
+s:close()
+srv:close()
+
