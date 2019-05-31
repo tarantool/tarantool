@@ -4130,10 +4130,10 @@ vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
 	/* Consume memory quota. Throttle if it is exceeded. */
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
-	vy_quota_force_use(&env->quota, VY_QUOTA_CONSUMER_TX,
+	vy_quota_force_use(&env->quota, VY_QUOTA_CONSUMER_DDL,
 			   mem_used_after - mem_used_before);
 	vy_regulator_check_dump_watermark(&env->regulator);
-	vy_quota_wait(&env->quota, VY_QUOTA_CONSUMER_TX);
+	vy_quota_wait(&env->quota, VY_QUOTA_CONSUMER_DDL);
 	return rc;
 }
 
@@ -4260,7 +4260,7 @@ vy_build_recover(struct vy_env *env, struct vy_lsm *lsm, struct vy_lsm *pk)
 
 	mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
-	vy_quota_force_use(&env->quota, VY_QUOTA_CONSUMER_TX,
+	vy_quota_force_use(&env->quota, VY_QUOTA_CONSUMER_DDL,
 			   mem_used_after - mem_used_before);
 	return rc;
 }
