@@ -1183,6 +1183,8 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 				zP4 = pMem->z;
 			} else if (pMem->flags & MEM_Int) {
 				sqlXPrintf(&x, "%lld", pMem->u.i);
+			} else if (pMem->flags & MEM_UInt) {
+				sqlXPrintf(&x, "%llu", pMem->u.u);
 			} else if (pMem->flags & MEM_Real) {
 				sqlXPrintf(&x, "%.16g", pMem->u.r);
 			} else if (pMem->flags & MEM_Null) {
@@ -1427,8 +1429,9 @@ sqlVdbeList(Vdbe * p)
 			pOp = &apSub[j]->aOp[i];
 		}
 		if (p->explain == 1) {
-			pMem->flags = MEM_Int;
-			pMem->u.i = i;	/* Program counter */
+			assert(i >= 0);
+			mem_set_u64(pMem, i);
+
 			pMem++;
 
 			pMem->flags = MEM_Static | MEM_Str | MEM_Term;
@@ -1460,16 +1463,13 @@ sqlVdbeList(Vdbe * p)
 			}
 		}
 
-		pMem->flags = MEM_Int;
-		pMem->u.i = pOp->p1;	/* P1 */
+		mem_set_i64(pMem, pOp->p1);
 		pMem++;
 
-		pMem->flags = MEM_Int;
-		pMem->u.i = pOp->p2;	/* P2 */
+		mem_set_i64(pMem, pOp->p2);
 		pMem++;
 
-		pMem->flags = MEM_Int;
-		pMem->u.i = pOp->p3;	/* P3 */
+		mem_set_i64(pMem, pOp->p3);
 		pMem++;
 
 		if (sqlVdbeMemClearAndResize(pMem, 256)) {
@@ -2882,43 +2882,50 @@ sqlBlobCompare(const Mem * pB1, const Mem * pB2)
 	return n1 - n2;
 }
 
-/*
- * Do a comparison between a 64-bit signed integer and a 64-bit floating-point
- * number.  Return negative, zero, or positive if the first (i64) is less than,
- * equal to, or greater than the second (double).
+/**
+ * Do a comparison between a 64-bit unsigned/signed integer and a
+ * 64-bit floating-point number.  Return negative, zero, or
+ * positive if the first (integer) is less than, equal to, or
+ * greater than the second (double).
  */
 static int
-sqlIntFloatCompare(i64 i, double r)
+compare_uint_float(uint64_t u, double r)
 {
-	if (sizeof(LONGDOUBLE_TYPE) > 8) {
-		LONGDOUBLE_TYPE x = (LONGDOUBLE_TYPE) i;
-		if (x < r)
-			return -1;
-		if (x > r)
-			return +1;
-		return 0;
-	} else {
-		i64 y;
-		double s;
-		if (r < -9223372036854775808.0)
-			return +1;
-		if (r > 9223372036854775807.0)
-			return -1;
-		y = (i64) r;
-		if (i < y)
-			return -1;
-		if (i > y) {
-			if (y == SMALLEST_INT64 && r > 0.0)
-				return -1;
-			return +1;
-		}
-		s = (double)i;
-		if (s < r)
-			return -1;
-		if (s > r)
-			return +1;
-		return 0;
-	}
+	if (r > (double) UINT64_MAX)
+		return -1;
+	if (r < 0.0)
+		return +1;
+	uint64_t y = (uint64_t) r;
+	if (u < y)
+		return -1;
+	if (u > y)
+		return +1;
+	double s = (double) u;
+	if (s < r)
+		return -1;
+	if (s > r)
+		return +1;
+	return 0;
+}
+
+static int
+compare_int_float(int64_t i, double r)
+{
+	if (r < (double) INT64_MIN)
+		return +1;
+	if (r >= 0.0)
+		return -1;
+	int64_t y = (int64_t) r;
+	if (i < y)
+		return -1;
+	if (i > y)
+		return +1;
+	double s = (double) i;
+	if (s < r)
+		return -1;
+	if (s > r)
+		return +1;
+	return 0;
 }
 
 /*
@@ -2962,11 +2969,18 @@ sqlMemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
 
 	/* At least one of the two values is a number
 	 */
-	if (combined_flags & (MEM_Int | MEM_Real)) {
+	if ((combined_flags & (MEM_Int | MEM_UInt | MEM_Real)) != 0) {
 		if ((f1 & f2 & MEM_Int) != 0) {
 			if (pMem1->u.i < pMem2->u.i)
 				return -1;
 			if (pMem1->u.i > pMem2->u.i)
+				return +1;
+			return 0;
+		}
+		if ((f1 & f2 & MEM_UInt) != 0) {
+			if (pMem1->u.u < pMem2->u.u)
+				return -1;
+			if (pMem1->u.u > pMem2->u.u)
 				return +1;
 			return 0;
 		}
@@ -2979,16 +2993,29 @@ sqlMemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
 		}
 		if ((f1 & MEM_Int) != 0) {
 			if ((f2 & MEM_Real) != 0) {
-				return sqlIntFloatCompare(pMem1->u.i,
-							      pMem2->u.r);
+				return compare_int_float(pMem1->u.i,
+							 pMem2->u.r);
+			} else {
+				return -1;
+			}
+		}
+		if ((f1 & MEM_UInt) != 0) {
+			if ((f2 & MEM_Real) != 0) {
+				return compare_uint_float(pMem1->u.u,
+							  pMem2->u.r);
+			} else if ((f2 & MEM_Int) != 0) {
+				return +1;
 			} else {
 				return -1;
 			}
 		}
 		if ((f1 & MEM_Real) != 0) {
 			if ((f2 & MEM_Int) != 0) {
-				return -sqlIntFloatCompare(pMem2->u.i,
-							       pMem1->u.r);
+				return -compare_int_float(pMem2->u.i,
+							  pMem1->u.r);
+			} else if ((f2 & MEM_UInt) != 0) {
+				return -compare_uint_float(pMem2->u.u,
+							   pMem1->u.r);
 			} else {
 				return -1;
 			}
@@ -3148,26 +3175,33 @@ sqlVdbeCompareMsgpack(const char **key1,
 			break;
 		}
 	case MP_UINT:{
-			uint64_t v = mp_decode_uint(&aKey1);
-			if (v > INT64_MAX) {
-				mem1.u.r = (double)v;
-				goto do_float;
+			mem1.u.u = mp_decode_uint(&aKey1);
+			if ((pKey2->flags & MEM_Int) != 0) {
+				rc = +1;
+			} else if ((pKey2->flags & MEM_UInt) != 0) {
+				if (mem1.u.u < pKey2->u.u)
+					rc = -1;
+				else if (mem1.u.u > pKey2->u.u)
+					rc = +1;
+			} else if ((pKey2->flags & MEM_Real) != 0) {
+				rc = compare_uint_float(mem1.u.u, pKey2->u.r);
+			} else {
+				rc = (pKey2->flags & MEM_Null) ? +1 : -1;
 			}
-			mem1.u.i = v;
-			goto do_int;
+			break;
 		}
 	case MP_INT:{
 			mem1.u.i = mp_decode_int(&aKey1);
- do_int:
-			if (pKey2->flags & MEM_Int) {
+			if ((pKey2->flags & MEM_UInt) != 0) {
+				rc = -1;
+			} else if ((pKey2->flags & MEM_Int) != 0) {
 				if (mem1.u.i < pKey2->u.i) {
 					rc = -1;
 				} else if (mem1.u.i > pKey2->u.i) {
 					rc = +1;
 				}
 			} else if (pKey2->flags & MEM_Real) {
-				rc = sqlIntFloatCompare(mem1.u.i,
-							    pKey2->u.r);
+				rc = compare_int_float(mem1.u.i, pKey2->u.r);
 			} else {
 				rc = (pKey2->flags & MEM_Null) ? +1 : -1;
 			}
@@ -3180,9 +3214,10 @@ sqlVdbeCompareMsgpack(const char **key1,
 	case MP_DOUBLE:{
 			mem1.u.r = mp_decode_double(&aKey1);
  do_float:
-			if (pKey2->flags & MEM_Int) {
-				rc = -sqlIntFloatCompare(pKey2->u.i,
-							     mem1.u.r);
+			if ((pKey2->flags & MEM_Int) != 0) {
+				rc = -compare_int_float(pKey2->u.i, mem1.u.r);
+			} else if (pKey2->flags & MEM_UInt) {
+				rc = -compare_uint_float(pKey2->u.u, mem1.u.r);
 			} else if (pKey2->flags & MEM_Real) {
 				if (mem1.u.r < pKey2->u.r) {
 					rc = -1;
@@ -3306,8 +3341,8 @@ vdbe_decode_msgpack_into_mem(const char *buf, struct Mem *mem, uint32_t *len)
 				 "integer is overflowed");
 			return -1;
 		}
-		mem->u.i = v;
-		mem->flags = MEM_Int;
+		mem->u.u = v;
+		mem->flags = MEM_UInt;
 		break;
 	}
 	case MP_INT: {

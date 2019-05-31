@@ -109,6 +109,7 @@ typeofFunc(sql_context * context, int NotUsed, sql_value ** argv)
 	UNUSED_PARAMETER(NotUsed);
 	switch (sql_value_type(argv[0])) {
 	case MP_INT:
+	case MP_UINT:
 		z = "integer";
 		break;
 	case MP_STR:
@@ -143,6 +144,7 @@ lengthFunc(sql_context * context, int argc, sql_value ** argv)
 	switch (sql_value_type(argv[0])) {
 	case MP_BIN:
 	case MP_INT:
+	case MP_UINT:
 	case MP_DOUBLE:{
 			sql_result_int(context,
 					   sql_value_bytes(argv[0]));
@@ -175,6 +177,7 @@ absFunc(sql_context * context, int argc, sql_value ** argv)
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
 	switch (sql_value_type(argv[0])) {
+	case MP_UINT:
 	case MP_INT:{
 			i64 iVal = sql_value_int64(argv[0]);
 			if (iVal < 0) {
@@ -1016,6 +1019,7 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 					    SQL_TRANSIENT);
 			break;
 		}
+	case MP_UINT:
 	case MP_INT:{
 			sql_result_value(context, argv[0]);
 			break;
@@ -1418,7 +1422,8 @@ trim_func_two_args(struct sql_context *context, int argc, sql_value **argv)
 		return;
 
 	int input_str_sz = sql_value_bytes(argv[1]);
-	if (sql_value_type(argv[0]) == MP_INT) {
+	if (sql_value_type(argv[0]) == MP_INT ||
+	    sql_value_type(argv[0]) == MP_UINT) {
 		uint8_t len_one = 1;
 		trim_procedure(context, sql_value_int(argv[0]),
 			       (const unsigned char *) " ", &len_one, 1,
@@ -1449,7 +1454,8 @@ trim_func_three_args(struct sql_context *context, int argc, sql_value **argv)
 	assert(argc == 3);
 	(void) argc;
 
-	assert(sql_value_type(argv[0]) == MP_INT);
+	assert(sql_value_type(argv[0]) == MP_INT ||
+	       sql_value_type(argv[0]) == MP_UINT);
 	const unsigned char *input_str, *trim_set;
 	if ((input_str = sql_value_text(argv[2])) == NULL ||
 	    (trim_set = sql_value_text(argv[1])) == NULL)
@@ -1554,7 +1560,7 @@ sum_step(struct sql_context *context, int argc, sql_value **argv)
 	int type = sql_value_type(argv[0]);
 	if (type == MP_NIL || p == NULL)
 		return;
-	if (type != MP_DOUBLE && type != MP_INT) {
+	if (type != MP_DOUBLE && type != MP_INT && type != MP_UINT) {
 		if (mem_apply_numeric_type(argv[0]) != 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 				 sql_value_text(argv[0]), "number");
@@ -1564,7 +1570,7 @@ sum_step(struct sql_context *context, int argc, sql_value **argv)
 		type = sql_value_type(argv[0]);
 	}
 	p->cnt++;
-	if (type == MP_INT) {
+	if (type == MP_INT || type == MP_UINT) {
 		int64_t v = sql_value_int64(argv[0]);
 		p->rSum += v;
 		if ((p->approx | p->overflow) == 0 &&

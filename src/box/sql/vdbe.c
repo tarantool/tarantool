@@ -260,13 +260,12 @@ allocateCursor(
 int
 mem_apply_numeric_type(struct Mem *record)
 {
-	if ((record->flags & (MEM_Str | MEM_Int | MEM_Real)) != MEM_Str)
+	if ((record->flags & MEM_Str) == 0)
 		return -1;
 	int64_t integer_value;
 	bool is_neg;
 	if (sql_atoi64(record->z, &integer_value, &is_neg, record->n) == 0) {
-		record->u.i = integer_value;
-		MemSetTypeFlag(record, MEM_Int);
+		mem_set_int(record, integer_value, is_neg);
 		return 0;
 	}
 	double float_value;
@@ -309,12 +308,13 @@ mem_apply_type(struct Mem *record, enum field_type type)
 	case FIELD_TYPE_UNSIGNED:
 		if ((record->flags & MEM_Int) == MEM_Int)
 			return 0;
+		if ((record->flags & MEM_UInt) == MEM_UInt)
+			return 0;
 		if ((record->flags & MEM_Real) == MEM_Real) {
 			int64_t i = (int64_t) record->u.r;
-			if (i == record->u.r) {
-				record->u.i = i;
-				MemSetTypeFlag(record, MEM_Int);
-			}
+			if (i == record->u.r)
+				mem_set_int(record, record->u.r,
+					    record->u.r <= -1);
 			return 0;
 		}
 		return sqlVdbeMemIntegerify(record, false);
@@ -323,7 +323,7 @@ mem_apply_type(struct Mem *record, enum field_type type)
 			return 0;
 		return -1;
 	case FIELD_TYPE_NUMBER:
-		if ((record->flags & (MEM_Real | MEM_Int)) != 0)
+		if ((record->flags & (MEM_Real | MEM_Int | MEM_UInt)) != 0)
 			return 0;
 		return sqlVdbeMemRealify(record);
 	case FIELD_TYPE_STRING:
@@ -332,11 +332,10 @@ mem_apply_type(struct Mem *record, enum field_type type)
 		 * an integer or real representation (BLOB and
 		 * NULL do not get converted).
 		 */
-		if ((record->flags & MEM_Str) == 0) {
-			if ((record->flags & (MEM_Real | MEM_Int)))
-				sqlVdbeMemStringify(record, 1);
-		}
-		record->flags &= ~(MEM_Real | MEM_Int);
+		if ((record->flags & MEM_Str) == 0 &&
+		    (record->flags & (MEM_Real | MEM_Int | MEM_UInt)) != 0)
+			sqlVdbeMemStringify(record, 1);
+		record->flags &= ~(MEM_Real | MEM_Int | MEM_UInt);
 		return 0;
 	case FIELD_TYPE_SCALAR:
 		return 0;
@@ -365,13 +364,13 @@ sql_value_apply_type(
  */
 static u16 SQL_NOINLINE computeNumericType(Mem *pMem)
 {
-	assert((pMem->flags & (MEM_Int|MEM_Real))==0);
+	assert((pMem->flags & (MEM_Int | MEM_UInt | MEM_Real)) == 0);
 	assert((pMem->flags & (MEM_Str|MEM_Blob))!=0);
 	if (sqlAtoF(pMem->z, &pMem->u.r, pMem->n)==0)
 		return 0;
 	bool is_neg;
 	if (sql_atoi64(pMem->z, (int64_t *) &pMem->u.i, &is_neg, pMem->n) == 0)
-		return MEM_Int;
+		return is_neg ? MEM_Int : MEM_UInt;
 	return MEM_Real;
 }
 
@@ -384,9 +383,8 @@ static u16 SQL_NOINLINE computeNumericType(Mem *pMem)
  */
 static u16 numericType(Mem *pMem)
 {
-	if (pMem->flags & (MEM_Int|MEM_Real)) {
-		return pMem->flags & (MEM_Int|MEM_Real);
-	}
+	if ((pMem->flags & (MEM_Int | MEM_UInt | MEM_Real)) != 0)
+		return pMem->flags & (MEM_Int | MEM_UInt | MEM_Real);
 	if (pMem->flags & (MEM_Str|MEM_Blob)) {
 		return computeNumericType(pMem);
 	}
@@ -490,6 +488,8 @@ memTracePrint(Mem *p)
 		printf(" si:%lld", p->u.i);
 	} else if (p->flags & MEM_Int) {
 		printf(" i:%lld", p->u.i);
+	} else if (p->flags & MEM_UInt) {
+		printf(" u:%"PRIu64"", p->u.u);
 	} else if (p->flags & MEM_Real) {
 		printf(" r:%g", p->u.r);
 	} else if (p->flags & MEM_Bool) {
@@ -588,6 +588,8 @@ mem_type_to_str(const struct Mem *p)
 		return "TEXT";
 	case MEM_Int:
 		return "INTEGER";
+	case MEM_UInt:
+		return "UNSIGNED";
 	case MEM_Real:
 		return "REAL";
 	case MEM_Blob:
@@ -915,8 +917,7 @@ case OP_Gosub: {            /* jump */
 	pIn1 = &aMem[pOp->p1];
 	assert(VdbeMemDynamic(pIn1)==0);
 	memAboutToChange(p, pIn1);
-	pIn1->flags = MEM_Int;
-	pIn1->u.i = (int)(pOp-aOp);
+	mem_set_u64(pIn1, pOp - aOp);
 	REGISTER_TRACE(p, pOp->p1, pIn1);
 
 	/* Most jump operations do a goto to this spot in order to update
@@ -934,8 +935,8 @@ case OP_Gosub: {            /* jump */
  */
 case OP_Return: {           /* in1 */
 	pIn1 = &aMem[pOp->p1];
-	assert(pIn1->flags==MEM_Int);
-	pOp = &aOp[pIn1->u.i];
+	assert(pIn1->flags==MEM_UInt);
+	pOp = &aOp[pIn1->u.u];
 	pIn1->flags = MEM_Undefined;
 	break;
 }
@@ -954,11 +955,10 @@ case OP_Return: {           /* in1 */
 case OP_InitCoroutine: {     /* jump */
 	assert(pOp->p1>0 &&  pOp->p1<=(p->nMem+1 - p->nCursor));
 	assert(pOp->p2>=0 && pOp->p2<p->nOp);
-	assert(pOp->p3>=0 && pOp->p3<p->nOp);
+	assert(pOp->p3>0 && pOp->p3<p->nOp);
 	pOut = &aMem[pOp->p1];
 	assert(!VdbeMemDynamic(pOut));
-	pOut->u.i = pOp->p3 - 1;
-	pOut->flags = MEM_Int;
+	mem_set_u64(pOut, pOp->p3 - 1);
 	if (pOp->p2) goto jump_to_p2;
 	break;
 }
@@ -974,9 +974,9 @@ case OP_InitCoroutine: {     /* jump */
 case OP_EndCoroutine: {           /* in1 */
 	VdbeOp *pCaller;
 	pIn1 = &aMem[pOp->p1];
-	assert(pIn1->flags==MEM_Int);
-	assert(pIn1->u.i>=0 && pIn1->u.i<p->nOp);
-	pCaller = &aOp[pIn1->u.i];
+	assert(pIn1->flags == MEM_UInt);
+	assert(pIn1->u.u < (uint64_t) p->nOp);
+	pCaller = &aOp[pIn1->u.u];
 	assert(pCaller->opcode==OP_Yield);
 	assert(pCaller->p2>=0 && pCaller->p2<p->nOp);
 	pOp = &aOp[pCaller->p2 - 1];
@@ -998,12 +998,10 @@ case OP_EndCoroutine: {           /* in1 */
  * See also: InitCoroutine
  */
 case OP_Yield: {            /* in1, jump */
-	int pcDest;
 	pIn1 = &aMem[pOp->p1];
 	assert(VdbeMemDynamic(pIn1)==0);
-	pIn1->flags = MEM_Int;
-	pcDest = (int)pIn1->u.i;
-	pIn1->u.i = (int)(pOp - aOp);
+	int pcDest = (int)pIn1->u.u;
+	mem_set_u64(pIn1, pOp - aOp);
 	REGISTER_TRACE(p, pOp->p1, pIn1);
 	pOp = &aOp[pcDest];
 	break;
@@ -1073,7 +1071,12 @@ case OP_Halt: {
  */
 case OP_Integer: {         /* out2 */
 	pOut = out2Prerelease(p, pOp);
-	pOut->u.i = pOp->p1;
+	if (pOp->p1 < 0) {
+		pOut->u.i = pOp->p1;
+		assert((pOut->flags & MEM_Int) != 0);
+	} else {
+		mem_set_u64(pOut, pOp->p1);
+	}
 	break;
 }
 
@@ -1098,7 +1101,7 @@ case OP_Bool: {         /* out2 */
 case OP_Int64: {           /* out2 */
 	pOut = out2Prerelease(p, pOp);
 	assert(pOp->p4.pI64!=0);
-	pOut->u.i = *pOp->p4.pI64;
+	mem_set_i64(pOut, *pOp->p4.pI64);
 	break;
 }
 
@@ -1182,8 +1185,7 @@ case OP_NextAutoincValue: {
 		goto abort_due_to_error;
 
 	pOut = out2Prerelease(p, pOp);
-	pOut->flags = MEM_Int;
-	pOut->u.i = value;
+	mem_set_i64(pOut, value);
 
 	break;
 }
@@ -1379,9 +1381,9 @@ case OP_SCopy: {            /* out2 */
  */
 case OP_IntCopy: {            /* out2 */
 	pIn1 = &aMem[pOp->p1];
-	assert((pIn1->flags & MEM_Int)!=0);
+	assert((pIn1->flags & (MEM_Int | MEM_UInt)) != 0);
 	pOut = &aMem[pOp->p2];
-	sqlVdbeMemSetInt64(pOut, pIn1->u.i);
+	mem_set_int(pOut, pIn1->u.i, (pIn1->flags & MEM_Int) != 0);
 	break;
 }
 
@@ -1591,7 +1593,8 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 	pOut = &aMem[pOp->p3];
 	flags = pIn1->flags | pIn2->flags;
 	if ((flags & MEM_Null)!=0) goto arithmetic_result_is_null;
-	if ((type1 & type2 & MEM_Int)!=0) {
+	if ((type1 & (MEM_Int | MEM_UInt)) != 0 &&
+	    (type2 & (MEM_Int | MEM_UInt)) != 0) {
 		iA = pIn1->u.i;
 		iB = pIn2->u.i;
 		bIntint = 1;
@@ -1614,8 +1617,7 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 			break;
 		}
 		}
-		pOut->u.i = iB;
-		MemSetTypeFlag(pOut, MEM_Int);
+		mem_set_i64(pOut, iB);
 	} else {
 		bIntint = 0;
 		if (sqlVdbeRealValue(pIn1, &rA) != 0) {
@@ -1840,12 +1842,13 @@ case OP_ShiftRight: {           /* same as TK_RSHIFT, in1, in2, out3 */
 		sqlVdbeMemSetNull(pOut);
 		break;
 	}
-	if (sqlVdbeIntValue(pIn2, (int64_t *) &iA) != 0) {
+	bool unused;
+	if (sqlVdbeIntValue(pIn2, &iA, &unused) != 0) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 sql_value_text(pIn2), "integer");
 		goto abort_due_to_error;
 	}
-	if (sqlVdbeIntValue(pIn1, (int64_t *) &iB) != 0) {
+	if (sqlVdbeIntValue(pIn1, &iB, &unused) != 0) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 sql_value_text(pIn1), "integer");
 		goto abort_due_to_error;
@@ -1879,8 +1882,7 @@ case OP_ShiftRight: {           /* same as TK_RSHIFT, in1, in2, out3 */
 			memcpy(&iA, &uA, sizeof(iA));
 		}
 	}
-	pOut->u.i = iA;
-	MemSetTypeFlag(pOut, MEM_Int);
+	mem_set_i64(pOut, iA);
 	break;
 }
 
@@ -1888,15 +1890,14 @@ case OP_ShiftRight: {           /* same as TK_RSHIFT, in1, in2, out3 */
  * Synopsis: r[P1]=r[P1]+P2
  *
  * Add the constant P2 to the value in register P1.
- * The result is always an integer.
- *
- * To force any register to be an integer, just add 0.
+ * Content of register P1 and value P2 are assumed to be
+ * unsigned.
  */
 case OP_AddImm: {            /* in1 */
 	pIn1 = &aMem[pOp->p1];
 	memAboutToChange(p, pIn1);
-	assert((pIn1->flags & MEM_Int) != 0);
-	pIn1->u.i += pOp->p2;
+	assert((pIn1->flags & MEM_UInt) != 0 && pOp->p2 >= 0);
+	pIn1->u.u += pOp->p2;
 	break;
 }
 
@@ -1909,10 +1910,9 @@ case OP_AddImm: {            /* in1 */
  */
 case OP_MustBeInt: {            /* jump, in1 */
 	pIn1 = &aMem[pOp->p1];
-	if ((pIn1->flags & MEM_Int)==0) {
+	if ((pIn1->flags & (MEM_Int | MEM_UInt)) == 0) {
 		mem_apply_type(pIn1, FIELD_TYPE_INTEGER);
-		VdbeBranchTaken((pIn1->flags&MEM_Int)==0, 2);
-		if ((pIn1->flags & MEM_Int)==0) {
+		if ((pIn1->flags & (MEM_Int | MEM_UInt)) == 0) {
 			if (pOp->p2==0) {
 				diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 					 sql_value_text(pIn1), "integer");
@@ -1922,7 +1922,6 @@ case OP_MustBeInt: {            /* jump, in1 */
 			}
 		}
 	}
-	MemSetTypeFlag(pIn1, MEM_Int);
 	break;
 }
 
@@ -1937,7 +1936,7 @@ case OP_MustBeInt: {            /* jump, in1 */
  */
 case OP_Realify: {                  /* in1 */
 	pIn1 = &aMem[pOp->p1];
-	if (pIn1->flags & MEM_Int) {
+	if ((pIn1->flags & (MEM_Int | MEM_UInt)) != 0) {
 		sqlVdbeMemRealify(pIn1);
 	}
 	break;
@@ -2126,12 +2125,12 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 		enum field_type type = pOp->p5 & FIELD_TYPE_MASK;
 		if (sql_type_is_numeric(type)) {
 			if ((flags1 | flags3)&MEM_Str) {
-				if ((flags1 & (MEM_Int|MEM_Real|MEM_Str))==MEM_Str) {
+				if ((flags1 & MEM_Str) == MEM_Str) {
 					mem_apply_numeric_type(pIn1);
 					testcase( flags3!=pIn3->flags); /* Possible if pIn1==pIn3 */
 					flags3 = pIn3->flags;
 				}
-				if ((flags3 & (MEM_Int|MEM_Real|MEM_Str))==MEM_Str) {
+				if ((flags3 & MEM_Str) == MEM_Str) {
 					if (mem_apply_numeric_type(pIn3) != 0) {
 						diag_set(ClientError,
 							 ER_SQL_TYPE_MISMATCH,
@@ -2145,14 +2144,16 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 			/* Handle the common case of integer comparison here, as an
 			 * optimization, to avoid a call to sqlMemCompare()
 			 */
-			if ((pIn1->flags & pIn3->flags & MEM_Int)!=0) {
+			if ((pIn1->flags & pIn3->flags &
+			    (MEM_Int | MEM_UInt)) != 0) {
 				if (pIn3->u.i > pIn1->u.i) { res = +1; goto compare_op; }
 				if (pIn3->u.i < pIn1->u.i) { res = -1; goto compare_op; }
 				res = 0;
 				goto compare_op;
 			}
 		} else if (type == FIELD_TYPE_STRING) {
-			if ((flags1 & MEM_Str)==0 && (flags1 & (MEM_Int|MEM_Real))!=0) {
+			if ((flags1 & MEM_Str) == 0 &&
+			    (flags1 & (MEM_Int | MEM_UInt | MEM_Real)) != 0) {
 				testcase( pIn1->flags & MEM_Int);
 				testcase( pIn1->flags & MEM_Real);
 				sqlVdbeMemStringify(pIn1, 1);
@@ -2160,7 +2161,8 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 				flags1 = (pIn1->flags & ~MEM_TypeMask) | (flags1 & MEM_TypeMask);
 				assert(pIn1!=pIn3);
 			}
-			if ((flags3 & MEM_Str)==0 && (flags3 & (MEM_Int|MEM_Real))!=0) {
+			if ((flags3 & MEM_Str) == 0 &&
+			    (flags3 & (MEM_Int | MEM_UInt | MEM_Real)) != 0) {
 				testcase( pIn3->flags & MEM_Int);
 				testcase( pIn3->flags & MEM_Real);
 				sqlVdbeMemStringify(pIn3, 1);
@@ -2441,13 +2443,13 @@ case OP_BitNot: {             /* same as TK_BITNOT, in1, out2 */
 	sqlVdbeMemSetNull(pOut);
 	if ((pIn1->flags & MEM_Null)==0) {
 		int64_t i;
-		if (sqlVdbeIntValue(pIn1, &i) != 0) {
+		bool is_neg;
+		if (sqlVdbeIntValue(pIn1, &i, &is_neg) != 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 				 sql_value_text(pIn1), "integer");
 			goto abort_due_to_error;
 		}
-		pOut->flags = MEM_Int;
-		pOut->u.i = ~i;
+		mem_set_i64(pOut, ~i);
 	}
 	break;
 }
@@ -2623,9 +2625,13 @@ case OP_Column: {
 	    default_val_mem != NULL) {
 		sqlVdbeMemShallowCopy(pDest, default_val_mem, MEM_Static);
 	}
-	if ((pDest->flags & MEM_Int) != 0) {
-		if (field_type == FIELD_TYPE_NUMBER)
-			sqlVdbeMemSetDouble(pDest, pDest->u.i);
+	if ((pDest->flags & (MEM_Int | MEM_UInt)) != 0) {
+		if (field_type == FIELD_TYPE_NUMBER) {
+			if ((pDest->flags & MEM_Int) != 0)
+				sqlVdbeMemSetDouble(pDest, pDest->u.i);
+			else
+				sqlVdbeMemSetDouble(pDest, pDest->u.u);
+		}
 	}
 op_column_out:
 	REGISTER_TRACE(p, pOp->p3, pDest);
@@ -2808,7 +2814,7 @@ case OP_Count: {         /* out2 */
 		nEntry = tarantoolsqlEphemeralCount(pCrsr);
 	}
 	pOut = out2Prerelease(p, pOp);
-	pOut->u.i = nEntry;
+	mem_set_u64(pOut, nEntry);
 	break;
 }
 
@@ -2919,7 +2925,8 @@ case OP_Savepoint: {
 case OP_CheckViewReferences: {
 	assert(pOp->p1 > 0);
 	pIn1 = &aMem[pOp->p1];
-	uint32_t space_id = pIn1->u.i;
+	uint64_t space_id = pIn1->u.u;
+	assert(space_id <= INT32_MAX);
 	struct space *space = space_by_id(space_id);
 	assert(space != NULL);
 	if (space->def->view_ref_count > 0) {
@@ -3316,6 +3323,7 @@ case OP_SeekGT: {       /* jump, in3 */
 	 * a > 1.5 -> a >= 2
 	 */
 	int int_field = pOp->p5;
+	bool is_neg = false;
 
 	if (int_field > 0) {
 		/* The input value in P3 might be of any type: integer, real, string,
@@ -3325,12 +3333,15 @@ case OP_SeekGT: {       /* jump, in3 */
 		pIn3 = &aMem[int_field];
 		if ((pIn3->flags & MEM_Null) != 0)
 			goto skip_truncate;
-		if ((pIn3->flags & (MEM_Int|MEM_Real|MEM_Str))==MEM_Str) {
+		if ((pIn3->flags & MEM_Str) != 0)
 			mem_apply_numeric_type(pIn3);
-		}
 		int64_t i;
 		if ((pIn3->flags & MEM_Int) == MEM_Int) {
 			i = pIn3->u.i;
+			is_neg = true;
+		} else if ((pIn3->flags & MEM_UInt) == MEM_UInt) {
+			i = pIn3->u.u;
+			is_neg = false;
 		} else if ((pIn3->flags & MEM_Real) == MEM_Real) {
 			if (pIn3->u.r > INT64_MAX)
 				i = INT64_MAX;
@@ -3338,6 +3349,7 @@ case OP_SeekGT: {       /* jump, in3 */
 				i = INT64_MIN;
 			else
 				i = pIn3->u.r;
+			is_neg = i < 0;
 		} else {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 				 sql_value_text(pIn3), "integer");
@@ -3348,7 +3360,7 @@ case OP_SeekGT: {       /* jump, in3 */
 		/* If the P3 value could not be converted into an integer without
 		 * loss of information, then special processing is required...
 		 */
-		if ((pIn3->flags & MEM_Int)==0) {
+		if ((pIn3->flags & (MEM_Int | MEM_UInt)) == 0) {
 			if ((pIn3->flags & MEM_Real)==0) {
 				/* If the P3 value cannot be converted into any kind of a number,
 				 * then the seek is not possible, so jump to P2
@@ -3405,10 +3417,8 @@ skip_truncate:
 	r.key_def = pC->key_def;
 	r.nField = (u16)nField;
 
-	if (int_field > 0) {
-		aMem[int_field].u.i = iKey;
-		aMem[int_field].flags = MEM_Int;
-	}
+	if (int_field > 0)
+		mem_set_int(&aMem[int_field], iKey, is_neg);
 
 	r.default_rc = ((1 & (oc - OP_SeekLT)) ? -1 : +1);
 	assert(oc!=OP_SeekGT || r.default_rc==-1);
@@ -3618,7 +3628,8 @@ case OP_Sequence: {           /* out2 */
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
 	assert(p->apCsr[pOp->p1]!=0);
 	pOut = out2Prerelease(p, pOp);
-	pOut->u.i = p->apCsr[pOp->p1]->seqCount++;
+	int64_t seq_val = p->apCsr[pOp->p1]->seqCount++;
+	mem_set_u64(pOut, seq_val);
 	break;
 }
 
@@ -3631,10 +3642,10 @@ case OP_Sequence: {           /* out2 */
  */
 case OP_NextSequenceId: {
 	pOut = &aMem[pOp->p2];
-	tarantoolSqlNextSeqId((uint64_t *) &pOut->u.i);
-
-	pOut->u.i += 1;
-	pOut->flags = MEM_Int;
+	uint64_t id;
+	tarantoolSqlNextSeqId(&id);
+	id++;
+	mem_set_u64(pOut, id);
 	break;
 }
 
@@ -3664,8 +3675,7 @@ case OP_NextIdEphemeral: {
 		goto abort_due_to_error;
 	}
 	pOut = &aMem[pOp->p2];
-	pOut->u.i = rowid;
-	pOut->flags = MEM_Int;
+	mem_set_u64(pOut, rowid);
 	break;
 }
 
@@ -3697,12 +3707,10 @@ case OP_FCopy: {     /* out2 */
 		/* Flag is set and register is NULL -> do nothing  */
 	} else {
 		assert(memIsValid(pIn1));
-		assert(pIn1->flags &  MEM_Int);
+		assert((pIn1->flags & (MEM_Int | MEM_UInt)) != 0);
 
 		pOut = &aMem[pOp->p2];
-		MemSetTypeFlag(pOut, MEM_Int);
-
-		pOut->u.i = pIn1->u.i;
+		mem_set_int(pOut, pIn1->u.i, pIn1->flags == MEM_Int);
 	}
 	break;
 }
@@ -4870,10 +4878,17 @@ case OP_FkIfZero: {         /* jump */
  */
 case OP_IfPos: {        /* jump, in1 */
 	pIn1 = &aMem[pOp->p1];
-	assert(pIn1->flags&MEM_Int);
-	VdbeBranchTaken( pIn1->u.i>0, 2);
-	if (pIn1->u.i>0) {
-		pIn1->u.i -= pOp->p3;
+	assert((pIn1->flags & (MEM_Int | MEM_UInt)) != 0);
+	if ((pIn1->flags & MEM_UInt) != 0 && pIn1->u.u != 0) {
+		assert(pOp->p3 >= 0);
+		uint64_t res = pIn1->u.u - (uint64_t) pOp->p3;
+		/*
+		 * To not bother setting integer flag in case
+		 * result of subtraction is negative, just
+		 * use saturated arithmetic.
+		 */
+		res &= -(res <= pIn1->u.u);
+		pIn1->u.u = res;
 		goto jump_to_p2;
 	}
 	break;
@@ -4897,15 +4912,16 @@ case OP_OffsetLimit: {    /* in1, out2, in3 */
 	pIn1 = &aMem[pOp->p1];
 	pIn3 = &aMem[pOp->p3];
 	pOut = out2Prerelease(p, pOp);
-	assert(pIn1->flags & MEM_Int);
-	assert(pIn3->flags & MEM_Int);
-	i64 x = pIn1->u.i;
-	if (sqlAddInt64(&x, pIn3->u.i) != 0) {
+
+	assert((pIn1->flags & MEM_UInt) != 0);
+	assert((pIn3->flags & MEM_UInt) != 0);
+	uint64_t x = pIn1->u.u;
+	if (sqlAddInt64((i64 *) &x, pIn3->u.u) != 0) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "sum of LIMIT and OFFSET "
-			 "values should not result in integer overflow");
+			"values should not result in integer overflow");
 		goto abort_due_to_error;
 	}
-	pOut->u.i = x;
+	mem_set_u64(pOut, x);
 	break;
 }
 
@@ -4919,10 +4935,9 @@ case OP_OffsetLimit: {    /* in1, out2, in3 */
  */
 case OP_IfNotZero: {        /* jump, in1 */
 	pIn1 = &aMem[pOp->p1];
-	assert(pIn1->flags&MEM_Int);
-	VdbeBranchTaken(pIn1->u.i<0, 2);
-	if (pIn1->u.i) {
-		if (pIn1->u.i>0) pIn1->u.i--;
+	assert((pIn1->flags & MEM_UInt) != 0);
+	if (pIn1->u.u > 0) {
+		pIn1->u.u--;
 		goto jump_to_p2;
 	}
 	break;
@@ -4936,10 +4951,10 @@ case OP_IfNotZero: {        /* jump, in1 */
  */
 case OP_DecrJumpZero: {      /* jump, in1 */
 	pIn1 = &aMem[pOp->p1];
-	assert(pIn1->flags&MEM_Int);
-	if (pIn1->u.i>SMALLEST_INT64) pIn1->u.i--;
-	VdbeBranchTaken(pIn1->u.i==0, 2);
-	if (pIn1->u.i==0) goto jump_to_p2;
+	assert((pIn1->flags & MEM_UInt) != 0);
+	if (pIn1->u.u > 0)
+		pIn1->u.u--;
+	if (pIn1->u.u == 0) goto jump_to_p2;
 	break;
 }
 
@@ -5161,9 +5176,9 @@ case OP_IncMaxid: {
 	assert(pOp->p1 > 0);
 	pOut = &aMem[pOp->p1];
 
-	if (tarantoolsqlIncrementMaxid((uint64_t*) &pOut->u.i) != 0)
+	if (tarantoolsqlIncrementMaxid(&pOut->u.u) != 0)
 		goto abort_due_to_error;
-	pOut->flags = MEM_Int;
+	pOut->flags = MEM_UInt;
 	break;
 }
 

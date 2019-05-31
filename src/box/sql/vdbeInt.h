@@ -164,6 +164,7 @@ struct Mem {
 	union MemValue {
 		double r;	/* Real value used when MEM_Real is set in flags */
 		i64 i;		/* Integer value used when MEM_Int is set in flags */
+		uint64_t u;	/* Unsigned integer used when MEM_UInt is set. */
 		bool b;         /* Boolean value used when MEM_Bool is set in flags */
 		int nZero;	/* Used when bit MEM_Zero is set in flags */
 		void *p;	/* Generic pointer */
@@ -211,7 +212,7 @@ struct Mem {
 #define MEM_Real      0x0008	/* Value is a real number */
 #define MEM_Blob      0x0010	/* Value is a BLOB */
 #define MEM_Bool      0x0020    /* Value is a bool */
-#define MEM_Ptr       0x0040	/* Value is a generic pointer */
+#define MEM_UInt      0x0040	/* Value is an unsigned integer */
 #define MEM_Frame     0x0080	/* Value is a VdbeFrame object */
 #define MEM_Undefined 0x0100	/* Value is undefined */
 #define MEM_Cleared   0x0200	/* NULL set by OP_Null, not from data */
@@ -229,6 +230,7 @@ struct Mem {
 #define MEM_Agg       0x4000	/* Mem.z points to an agg function context */
 #define MEM_Zero      0x8000	/* Mem.i contains count of 0s appended to blob */
 #define MEM_Subtype   0x10000	/* Mem.eSubtype is valid */
+#define MEM_Ptr       0x20000	/* Value is a generic pointer */
 
 /**
  * In contrast to Mem_TypeMask, this one allows to get
@@ -236,8 +238,13 @@ struct Mem {
  * auxiliary flags.
  */
 enum {
-	MEM_PURE_TYPE_MASK = 0x3f
+	MEM_PURE_TYPE_MASK = 0x7f
 };
+
+static_assert(MEM_PURE_TYPE_MASK == (MEM_Null | MEM_Str | MEM_Int | MEM_Real |
+				     MEM_Blob | MEM_Bool | MEM_UInt),
+	      "value of type mask must consist of corresponding to memory "\
+	      "type bits");
 
 /**
  * Simple type to str convertor. It is used to simplify
@@ -451,7 +458,6 @@ void sqlVdbeMemShallowCopy(Mem *, const Mem *, int);
 void sqlVdbeMemMove(Mem *, Mem *);
 int sqlVdbeMemNulTerminate(Mem *);
 int sqlVdbeMemSetStr(Mem *, const char *, int, u8, void (*)(void *));
-void sqlVdbeMemSetInt64(Mem *, i64);
 
 void
 mem_set_bool(struct Mem *mem, bool value);
@@ -464,13 +470,32 @@ mem_set_bool(struct Mem *mem, bool value);
 void
 mem_set_ptr(struct Mem *mem, void *ptr);
 
+/**
+ * Set integer value. Depending on its sign MEM_Int (in case
+ * of negative value) or MEM_UInt flag is set.
+ */
+void
+mem_set_i64(struct Mem *mem, int64_t value);
+
+/** Set unsigned value and MEM_UInt flag. */
+void
+mem_set_u64(struct Mem *mem, uint64_t value);
+
+/**
+ * Set integer value. According to is_neg flag value is considered
+ * to be signed or unsigned.
+ */
+void
+mem_set_int(struct Mem *mem, int64_t value, bool is_neg);
+
 void sqlVdbeMemSetDouble(Mem *, double);
 void sqlVdbeMemInit(Mem *, sql *, u32);
 void sqlVdbeMemSetNull(Mem *);
 void sqlVdbeMemSetZeroBlob(Mem *, int);
 int sqlVdbeMemMakeWriteable(Mem *);
 int sqlVdbeMemStringify(Mem *, u8);
-int sqlVdbeIntValue(Mem *, int64_t *);
+int sqlVdbeIntValue(Mem *, int64_t *, bool *is_neg);
+
 int sqlVdbeMemIntegerify(Mem *, bool is_forced);
 int sqlVdbeRealValue(Mem *, double *);
 

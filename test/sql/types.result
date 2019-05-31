@@ -152,7 +152,7 @@ sp:drop()
 --
 box.execute("SELECT 'abc' || 1;")
 ---
-- error: 'Inconsistent types: expected TEXT or BLOB got INTEGER'
+- error: 'Inconsistent types: expected TEXT or BLOB got UNSIGNED'
 ...
 box.execute("SELECT 'abc' || 1.123;")
 ---
@@ -160,7 +160,7 @@ box.execute("SELECT 'abc' || 1.123;")
 ...
 box.execute("SELECT 1 || 'abc';")
 ---
-- error: 'Inconsistent types: expected TEXT or BLOB got INTEGER'
+- error: 'Inconsistent types: expected TEXT or BLOB got UNSIGNED'
 ...
 box.execute("SELECT 1.123 || 'abc';")
 ---
@@ -168,7 +168,7 @@ box.execute("SELECT 1.123 || 'abc';")
 ...
 box.execute("SELECt 'a' || 'b' || 1;")
 ---
-- error: 'Inconsistent types: expected TEXT or BLOB got INTEGER'
+- error: 'Inconsistent types: expected TEXT or BLOB got UNSIGNED'
 ...
 -- What is more, they must be of the same type.
 --
@@ -230,11 +230,11 @@ box.execute("INSERT INTO t1 VALUES (1);")
 ...
 box.execute("SELECT * FROM t1 WHERE s LIKE 'int';")
 ---
-- error: 'Inconsistent types: expected TEXT got INTEGER'
+- error: 'Inconsistent types: expected TEXT got UNSIGNED'
 ...
 box.execute("SELECT * FROM t1 WHERE 'int' LIKE 4;")
 ---
-- error: 'Inconsistent types: expected TEXT got INTEGER'
+- error: 'Inconsistent types: expected TEXT got UNSIGNED'
 ...
 box.execute("SELECT NULL LIKE s FROM t1;")
 ---
@@ -355,7 +355,7 @@ box.execute("SELECT unknown = true;")
 ...
 box.execute("SELECT 1 = true;")
 ---
-- error: 'Type mismatch: can not convert INTEGER to boolean'
+- error: 'Type mismatch: can not convert UNSIGNED to boolean'
 ...
 box.execute("SELECT 'abc' = true;")
 ---
@@ -987,7 +987,7 @@ box.execute("SELECT * FROM tboolean WHERE s1 = 'abc';")
 ...
 box.execute("SELECT * FROM tboolean WHERE s1 = 1;")
 ---
-- error: 'Type mismatch: can not convert INTEGER to boolean'
+- error: 'Type mismatch: can not convert UNSIGNED to boolean'
 ...
 box.execute("SELECT * FROM tboolean WHERE s1 = 1.123;")
 ---

@@ -139,17 +139,20 @@ sql_column_to_messagepack(struct sql_stmt *stmt, int i,
 	switch (type) {
 	case MP_INT: {
 		int64_t n = sql_column_int64(stmt, i);
-		if (n >= 0)
-			size = mp_sizeof_uint(n);
-		else
-			size = mp_sizeof_int(n);
+		size = mp_sizeof_int(n);
 		char *pos = (char *) region_alloc(region, size);
 		if (pos == NULL)
 			goto oom;
-		if (n >= 0)
-			mp_encode_uint(pos, n);
-		else
-			mp_encode_int(pos, n);
+		mp_encode_int(pos, n);
+		break;
+	}
+	case MP_UINT: {
+		uint64_t n = sql_column_int64(stmt, i);
+		size = mp_sizeof_uint(n);
+		char *pos = (char *) region_alloc(region, size);
+		if (pos == NULL)
+			goto oom;
+		mp_encode_uint(pos, n);
 		break;
 	}
 	case MP_DOUBLE: {

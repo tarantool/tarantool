@@ -52,7 +52,7 @@ box.execute('SELECT CAST(\'9223372036854775808\' AS INTEGER);')
   - name: CAST('9223372036854775808' AS INTEGER)
     type: integer
   rows:
-  - [-9223372036854775808]
+  - [9223372036854775808]
 ...
 -- Due to inexact represantation of large integers in terms of
 -- floating point numbers, numerics with value < INT64_MAX

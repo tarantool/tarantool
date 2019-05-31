@@ -151,6 +151,8 @@ sqlVdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 				sqlStrAccumAppend(&out, "NULL", 4);
 			} else if (pVar->flags & MEM_Int) {
 				sqlXPrintf(&out, "%lld", pVar->u.i);
+			} else if (pVar->flags & MEM_UInt) {
+				sqlXPrintf(&out, "%llu", pVar->u.u);
 			} else if (pVar->flags & MEM_Real) {
 				sqlXPrintf(&out, "%!.15g", pVar->u.r);
 			} else if (pVar->flags & MEM_Str) {

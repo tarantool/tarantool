@@ -228,7 +228,7 @@ test:do_test(
         return test:catchsql "SELECT position(34, 12345);"
     end, {
         -- <position-1.23>
-        1, "Inconsistent types: expected TEXT or BLOB got INTEGER"
+        1, "Inconsistent types: expected TEXT or BLOB got UNSIGNED"
         -- </position-1.23>
     })
 

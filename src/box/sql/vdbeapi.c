@@ -166,7 +166,8 @@ int
 sql_value_int(sql_value * pVal)
 {
 	int64_t i = 0;
-	sqlVdbeIntValue((Mem *) pVal, &i);
+	bool is_neg;
+	sqlVdbeIntValue((Mem *) pVal, &i, &is_neg);
 	return (int)i;
 }
 
@@ -174,7 +175,8 @@ sql_int64
 sql_value_int64(sql_value * pVal)
 {
 	int64_t i = 0;
-	sqlVdbeIntValue((Mem *) pVal, &i);
+	bool unused;
+	sqlVdbeIntValue((Mem *) pVal, &i, &unused);
 	return i;
 }
 
@@ -199,6 +201,7 @@ sql_value_type(sql_value *pVal)
 {
 	switch (pVal->flags & MEM_PURE_TYPE_MASK) {
 	case MEM_Int: return MP_INT;
+	case MEM_UInt: return MP_UINT;
 	case MEM_Real: return MP_DOUBLE;
 	case MEM_Str: return MP_STR;
 	case MEM_Blob: return MP_BIN;
@@ -319,7 +322,7 @@ sql_result_double(sql_context * pCtx, double rVal)
 void
 sql_result_int(sql_context * pCtx, int iVal)
 {
-	sqlVdbeMemSetInt64(pCtx->pOut, (i64) iVal);
+	mem_set_i64(pCtx->pOut, iVal);
 }
 
 void
@@ -331,7 +334,7 @@ sql_result_bool(struct sql_context *ctx, bool value)
 void
 sql_result_int64(sql_context * pCtx, i64 iVal)
 {
-	sqlVdbeMemSetInt64(pCtx->pOut, iVal);
+	mem_set_i64(pCtx->pOut, iVal);
 }
 
 void
@@ -975,7 +978,7 @@ sql_bind_int64(sql_stmt * pStmt, int i, sql_int64 iValue)
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	int rc = sql_bind_type(p, i, "INTEGER");
-	sqlVdbeMemSetInt64(&p->aVar[i - 1], iValue);
+	mem_set_i64(&p->aVar[i - 1], iValue);
 	return rc;
 }
 
