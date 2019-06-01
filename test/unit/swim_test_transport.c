@@ -85,6 +85,7 @@ swim_test_packet_new(const char *data, int size, const struct sockaddr_in *src,
 static inline void
 swim_test_packet_delete(struct swim_test_packet *p)
 {
+	rlist_del_entry(p, in_queue);
 	free(p);
 }
 
