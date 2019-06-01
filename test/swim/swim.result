@@ -1220,6 +1220,269 @@ s1:delete()
 s2:delete()
 ---
 ...
+--
+-- gh-4250: allow to set triggers on a new member appearance, old
+-- member drop, member update.
+--
+s1 = swim.new()
+---
+...
+s1.on_member_event()
+---
+- error: 'builtin/swim.lua:<line>: swim:on_member_event: first argument is not a SWIM
+    instance'
+...
+m_list = {}
+---
+...
+e_list = {}
+---
+...
+ctx_list = {}
+---
+...
+f = nil
+---
+...
+f_need_sleep = false
+---
+...
+_ = test_run:cmd("setopt delimiter ';'")
+---
+...
+t_save_event = function(m, e, ctx)
+    table.insert(m_list, m)
+    table.insert(e_list, e)
+    table.insert(ctx_list, ctx)
+end;
+---
+...
+t_yield = function(m, e, ctx)
+    f = fiber.self()
+    t_save_event(m, e, ctx)
+    while f_need_sleep do fiber.sleep(10000) end
+end;
+---
+...
+_ = test_run:cmd("setopt delimiter ''");
+---
+...
+t_save_event_id = s1:on_member_event(t_save_event, 'ctx')
+---
+...
+-- Not equal, because SWIM wraps user triggers with a closure for
+-- context preprocessing.
+t_save_event_id ~= t_save_event
+---
+- true
+...
+s1:cfg{uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01}
+---
+- true
+...
+while #m_list < 1 do fiber.sleep(0) end
+---
+...
+m_list
+---
+- - uri: 127.0.0.1:<port>
+    status: alive
+    incarnation: 1
+    uuid: 00000000-0000-1000-8000-000000000001
+    payload_size: 0
+...
+e_list
+---
+- - is_new_payload: true
+    is_new_uri: true
+    is_new: true
+    is_update: true
+...
+ctx_list
+---
+- - ctx
+...
+m_list = {} e_list = {} ctx_list = {}
+---
+...
+t_yield_id = s1:on_member_event(t_yield, 'ctx2')
+---
+...
+f_need_sleep = true
+---
+...
+s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01})
+---
+...
+s2:add_member({uuid = s1:self():uuid(), uri = s1:self():uri()})
+---
+- true
+...
+while s1:size() ~= 2 do fiber.sleep(0.01) end
+---
+...
+-- Only first trigger worked. Second is waiting, because first
+-- sleeps.
+m_list
+---
+- - uri: 127.0.0.1:<port>
+    status: alive
+    incarnation: 1
+    uuid: 00000000-0000-1000-8000-000000000002
+    payload_size: 0
+...
+e_list
+---
+- - is_new_payload: true
+    is_new: true
+    is_update: true
+...
+ctx_list
+---
+- - ctx2
+...
+m_list = {} e_list = {} ctx_list = {}
+---
+...
+-- But it does not prevent normal SWIM operation.
+s1:set_payload('payload')
+---
+- true
+...
+while not s2:member_by_uuid(s1:self():uuid()):payload() do fiber.sleep(0.01) end
+---
+...
+s2:member_by_uuid(s1:self():uuid()):payload()
+---
+- payload
+...
+f_need_sleep = false
+---
+...
+fiber.wakeup(f)
+---
+...
+while #m_list ~= 3 do fiber.sleep(0.01) end
+---
+...
+m_list
+---
+- - uri: 127.0.0.1:<port>
+    status: alive
+    incarnation: 1
+    uuid: 00000000-0000-1000-8000-000000000002
+    payload_size: 0
+  - uri: 127.0.0.1:<port>
+    status: alive
+    incarnation: 2
+    uuid: 00000000-0000-1000-8000-000000000001
+    payload_size: 8
+  - uri: 127.0.0.1:<port>
+    status: alive
+    incarnation: 2
+    uuid: 00000000-0000-1000-8000-000000000001
+    payload_size: 8
+...
+e_list
+---
+- - is_new_payload: true
+    is_new: true
+    is_update: true
+  - is_new_payload: true
+    is_update: true
+    is_new_incarnation: true
+  - is_new_payload: true
+    is_update: true
+    is_new_incarnation: true
+...
+ctx_list
+---
+- - ctx
+  - ctx2
+  - ctx
+...
+m_list = {} e_list = {} ctx_list = {}
+---
+...
+#s1:on_member_event()
+---
+- 2
+...
+s1:on_member_event(nil, t_yield_id)
+---
+...
+s2:quit()
+---
+...
+while s1:size() ~= 1 do fiber.sleep(0.01) end
+---
+...
+-- Process event.
+fiber.sleep(0)
+---
+...
+-- Two events - status update to 'left', and 'drop'.
+m_list
+---
+- - uri: 127.0.0.1:<port>
+    status: left
+    incarnation: 1
+    uuid: 00000000-0000-1000-8000-000000000002
+    payload_size: 0
+  - uri: 127.0.0.1:<port>
+    status: left
+    incarnation: 1
+    uuid: 00000000-0000-1000-8000-000000000002
+    payload_size: 0
+...
+e_list
+---
+- - is_new_status: true
+    is_update: true
+  - is_drop: true
+...
+ctx_list
+---
+- - ctx
+  - ctx
+...
+m = m_list[1]
+---
+...
+-- Cached member table works even when a member is deleted.
+m_list[1] == m_list[2]
+---
+- true
+...
+m_list = {} e_list = {} ctx_list = {}
+---
+...
+s1:on_member_event(nil, t_save_event_id)
+---
+...
+s1:add_member({uuid = m:uuid(), uri = m:uri()})
+---
+- true
+...
+fiber.sleep(0)
+---
+...
+-- No events - all the triggers are dropped.
+m_list
+---
+- []
+...
+e_list
+---
+- []
+...
+ctx_list
+---
+- []
+...
+s1:delete()
+---
+...
 test_run:cmd("clear filter")
 ---
 - true

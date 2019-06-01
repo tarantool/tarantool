@@ -33,7 +33,30 @@
 #include "diag.h"
 #include "lua/utils.h"
 
+static uint32_t ctid_swim_member_ptr;
 static uint32_t ctid_swim_ptr;
+
+/** Push member event context into a Lua stack. */
+static int
+lua_swim_member_event_push(struct lua_State *L, void *event)
+{
+	struct swim_on_member_event_ctx *ctx =
+		(struct swim_on_member_event_ctx *) event;
+	*(struct swim_member **) luaL_pushcdata(L, ctid_swim_member_ptr) =
+		ctx->member;
+	lua_pushinteger(L, ctx->events);
+	return 2;
+}
+
+/** Set or/and delete a trigger on a SWIM member event. */
+static int
+lua_swim_on_member_event(struct lua_State *L)
+{
+	uint32_t ctypeid;
+	struct swim *s = *(struct swim **) luaL_checkcdata(L, 1, &ctypeid);
+	return lbox_trigger_reset(L, 3, swim_trigger_list_on_member_event(s),
+				  lua_swim_member_event_push, NULL);
+}
 
 /**
  * Create a new SWIM instance. SWIM is not created via FFI,
@@ -68,12 +91,14 @@ lua_swim_delete(struct lua_State *L)
 void
 tarantool_lua_swim_init(struct lua_State *L)
 {
-	luaL_cdef(L, "struct swim;");
+	luaL_cdef(L, "struct swim_member; struct swim;");
+	ctid_swim_member_ptr = luaL_ctypeid(L, "struct swim_member *");
 	ctid_swim_ptr = luaL_ctypeid(L, "struct swim *");
 
 	static const struct luaL_Reg lua_swim_internal_methods [] = {
 		{"swim_new", lua_swim_new},
 		{"swim_delete", lua_swim_delete},
+		{"swim_on_member_event", lua_swim_on_member_event},
 		{NULL, NULL}
 	};
 	luaL_register_module(L, "swim", lua_swim_internal_methods);

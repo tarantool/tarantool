@@ -414,4 +414,89 @@ s2:member_by_uuid(s1:self():uuid())
 s1:delete()
 s2:delete()
 
+--
+-- gh-4250: allow to set triggers on a new member appearance, old
+-- member drop, member update.
+--
+s1 = swim.new()
+s1.on_member_event()
+
+m_list = {}
+e_list = {}
+ctx_list = {}
+f = nil
+f_need_sleep = false
+_ = test_run:cmd("setopt delimiter ';'")
+t_save_event = function(m, e, ctx)
+    table.insert(m_list, m)
+    table.insert(e_list, e)
+    table.insert(ctx_list, ctx)
+end;
+t_yield = function(m, e, ctx)
+    f = fiber.self()
+    t_save_event(m, e, ctx)
+    while f_need_sleep do fiber.sleep(10000) end
+end;
+_ = test_run:cmd("setopt delimiter ''");
+t_save_event_id = s1:on_member_event(t_save_event, 'ctx')
+-- Not equal, because SWIM wraps user triggers with a closure for
+-- context preprocessing.
+t_save_event_id ~= t_save_event
+
+s1:cfg{uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01}
+while #m_list < 1 do fiber.sleep(0) end
+m_list
+e_list
+ctx_list
+m_list = {} e_list = {} ctx_list = {}
+
+t_yield_id = s1:on_member_event(t_yield, 'ctx2')
+f_need_sleep = true
+s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01})
+s2:add_member({uuid = s1:self():uuid(), uri = s1:self():uri()})
+while s1:size() ~= 2 do fiber.sleep(0.01) end
+-- Only first trigger worked. Second is waiting, because first
+-- sleeps.
+m_list
+e_list
+ctx_list
+m_list = {} e_list = {} ctx_list = {}
+-- But it does not prevent normal SWIM operation.
+s1:set_payload('payload')
+while not s2:member_by_uuid(s1:self():uuid()):payload() do fiber.sleep(0.01) end
+s2:member_by_uuid(s1:self():uuid()):payload()
+
+f_need_sleep = false
+fiber.wakeup(f)
+while #m_list ~= 3 do fiber.sleep(0.01) end
+m_list
+e_list
+ctx_list
+m_list = {} e_list = {} ctx_list = {}
+#s1:on_member_event()
+
+s1:on_member_event(nil, t_yield_id)
+s2:quit()
+while s1:size() ~= 1 do fiber.sleep(0.01) end
+-- Process event.
+fiber.sleep(0)
+-- Two events - status update to 'left', and 'drop'.
+m_list
+e_list
+ctx_list
+m = m_list[1]
+-- Cached member table works even when a member is deleted.
+m_list[1] == m_list[2]
+m_list = {} e_list = {} ctx_list = {}
+
+s1:on_member_event(nil, t_save_event_id)
+s1:add_member({uuid = m:uuid(), uri = m:uri()})
+fiber.sleep(0)
+-- No events - all the triggers are dropped.
+m_list
+e_list
+ctx_list
+
+s1:delete()
+
 test_run:cmd("clear filter")

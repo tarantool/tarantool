@@ -24,6 +24,16 @@ ffi.cdef[[
         MEMBER_LEFT,
     };
 
+    enum swim_ev_mask {
+        SWIM_EV_NEW             = 0b00000001,
+        SWIM_EV_NEW_STATUS      = 0b00000010,
+        SWIM_EV_NEW_URI         = 0b00000100,
+        SWIM_EV_NEW_INCARNATION = 0b00001000,
+        SWIM_EV_NEW_PAYLOAD     = 0b00010000,
+        SWIM_EV_UPDATE          = 0b00011110,
+        SWIM_EV_DROP            = 0b00100000,
+    };
+
     bool
     swim_is_configured(const struct swim *swim);
 
@@ -697,6 +707,84 @@ local function swim_pairs(s)
     return swim_pairs_next, {swim = s, iterator = iterator}, nil
 end
 
+local swim_member_event_index = {
+    is_new = function(self)
+        return bit.band(self[1], capi.SWIM_EV_NEW) ~= 0
+    end,
+    is_drop = function(self)
+        return bit.band(self[1], capi.SWIM_EV_DROP) ~= 0
+    end,
+    is_update = function(self)
+        return bit.band(self[1], capi.SWIM_EV_UPDATE) ~= 0
+    end,
+    is_new_status = function(self)
+        return bit.band(self[1], capi.SWIM_EV_NEW_STATUS) ~= 0
+    end,
+    is_new_uri = function(self)
+        return bit.band(self[1], capi.SWIM_EV_NEW_URI) ~= 0
+    end,
+    is_new_incarnation = function(self)
+        return bit.band(self[1], capi.SWIM_EV_NEW_INCARNATION) ~= 0
+    end,
+    is_new_payload = function(self)
+        return bit.band(self[1], capi.SWIM_EV_NEW_PAYLOAD) ~= 0
+    end,
+}
+
+local swim_member_event_mt = {
+    __index = swim_member_event_index,
+    __serialize = function(self)
+        local res = {}
+        for k, v in pairs(swim_member_event_index) do
+            v = v(self)
+            if v then
+                res[k] = v
+            end
+        end
+        return res
+    end,
+}
+
+--
+-- Create a closure function for preprocessing raw SWIM member
+-- event trigger parameters.
+-- @param s SWIM instance.
+-- @param callback User functions to call.
+-- @param ctx An optional parameter for @a callback passed as is.
+-- @return A function to set as a trigger.
+--
+local function swim_on_member_event_new(s, callback, ctx)
+    return function(member_ptr, event_mask)
+        local m = swim_wrap_member(s, member_ptr)
+        local event = setmetatable({event_mask}, swim_member_event_mt)
+        return callback(m, event, ctx)
+    end
+end
+
+--
+-- Add or/and delete a trigger on member event. Possible usages:
+--
+-- * on_member_event(new[, ctx]) - add a new trigger. It should
+--   accept 3 arguments: an updated member, an events object, an
+--   optional @a ctx parameter passed as is.
+--
+-- * on_member_event(new, old[, ctx]) - add a new trigger @a new
+--   if not nil, in place of @a old trigger.
+--
+-- * on_member_event() - get a list of triggers.
+--
+local function swim_on_member_event(s, new, old, ctx)
+    local ptr = swim_check_instance(s, 'swim:on_member_event')
+    if type(old) ~= 'function' then
+        ctx = old
+        old = nil
+    end
+    if new ~= nil then
+        new = swim_on_member_event_new(s, new, ctx)
+    end
+    return internal.swim_on_member_event(ptr, new, old)
+end
+
 --
 -- Normal metatable of a configured SWIM instance.
 --
@@ -716,6 +804,7 @@ local swim_mt = {
         set_payload = swim_set_payload,
         set_codec = swim_set_codec,
         pairs = swim_pairs,
+        on_member_event = swim_on_member_event,
     },
     __serialize = swim_serialize
 }
@@ -808,6 +897,7 @@ local swim_not_configured_mt = {
         delete = swim_delete,
         is_configured = swim_is_configured,
         set_codec = swim_set_codec,
+        on_member_event = swim_on_member_event,
     },
     __serialize = swim_serialize
 }
