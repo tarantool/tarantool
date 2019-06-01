@@ -3,6 +3,7 @@ local uuid = require('uuid')
 local buffer = require('buffer')
 local msgpack = require('msgpack')
 local crypto = require('crypto')
+local internal = require('swim')
 
 ffi.cdef[[
     struct swim;
@@ -23,9 +24,6 @@ ffi.cdef[[
         MEMBER_LEFT,
     };
 
-    struct swim *
-    swim_new(void);
-
     bool
     swim_is_configured(const struct swim *swim);
 
@@ -40,9 +38,6 @@ ffi.cdef[[
     int
     swim_set_codec(struct swim *swim, enum crypto_algo algo,
                    enum crypto_mode mode, const char *key, int key_size);
-
-    void
-    swim_delete(struct swim *swim);
 
     int
     swim_add_member(struct swim *swim, const char *uri,
@@ -474,7 +469,7 @@ local swim_mt_deleted = {
 --
 local function swim_delete(s)
     local ptr = swim_check_instance(s, 'swim:delete')
-    capi.swim_delete(ffi.gc(ptr, nil))
+    internal.swim_delete(ffi.gc(ptr, nil))
     s.ptr = nil
     setmetatable(s, swim_mt_deleted)
 end
@@ -829,11 +824,11 @@ local cache_table_mt = { __mode = 'v' }
 -- provided.
 --
 local function swim_new(cfg)
-    local ptr = capi.swim_new()
+    local ptr = internal.swim_new()
     if ptr == nil then
         return nil, box.error.last()
     end
-    ffi.gc(ptr, capi.swim_delete)
+    ffi.gc(ptr, internal.swim_delete)
     local s = setmetatable({
         ptr = ptr,
         cfg = setmetatable({index = {}}, swim_cfg_not_configured_mt),

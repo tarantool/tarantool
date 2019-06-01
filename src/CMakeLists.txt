@@ -118,6 +118,7 @@ set (server_sources
      lua/info.c
      lua/string.c
      lua/buffer.c
+     lua/swim.c
      ${lua_sources}
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/lyaml.cc
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/b64.c
@@ -170,7 +171,7 @@ target_link_libraries(server core coll http_parser bit uri uuid swim swim_udp
 
 # Rule of thumb: if exporting a symbol from a static library, list the
 # library here.
-set (reexport_libraries server core misc bitset csv swim
+set (reexport_libraries server core misc bitset csv swim swim_udp swim_ev
      ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES})
 
 set (common_libraries
