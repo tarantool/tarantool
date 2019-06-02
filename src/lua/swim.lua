@@ -391,7 +391,15 @@ end
 -- metatable, serialization, string conversions etc.
 --
 local function swim_member_uuid(m)
-    return capi.swim_member_uuid(swim_check_member(m, 'member:uuid()'))
+    local ptr = swim_check_member(m, 'member:uuid()')
+    local u = m.u
+    if not u then
+        ptr = capi.swim_member_uuid(ptr)
+        u = ffi.new('struct tt_uuid')
+        ffi.copy(u, ptr, ffi.sizeof('struct tt_uuid'))
+        rawset(m, 'u', u)
+    end
+    return u
 end
 
 local function swim_member_serialize(m)

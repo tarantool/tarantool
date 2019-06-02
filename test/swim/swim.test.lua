@@ -137,6 +137,7 @@ s = s1:self()
 s
 s:status()
 s:uuid()
+s:uuid() == s:uuid()
 s:uri()
 s:incarnation()
 s:payload_cdata()
