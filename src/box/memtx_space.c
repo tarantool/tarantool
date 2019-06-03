@@ -43,6 +43,17 @@
 #include "column_mask.h"
 #include "sequence.h"
 
+/*
+ * Yield every 1K tuples while building a new index or checking
+ * a space format. In debug mode yield more often for testing
+ * purposes.
+ */
+#ifdef NDEBUG
+enum { MEMTX_DDL_YIELD_LOOPS = 1000 };
+#else
+enum { MEMTX_DDL_YIELD_LOOPS = 10 };
+#endif
+
 static void
 memtx_space_destroy(struct space *space)
 {
@@ -814,6 +825,52 @@ memtx_space_add_primary_key(struct space *space)
 	return 0;
 }
 
+/*
+ * Ongoing index build or format check state used by
+ * corrseponding on_replace triggers.
+ */
+struct memtx_ddl_state {
+	/* The index being built. */
+	struct index *index;
+	/* New format to be enforced. */
+	struct tuple_format *format;
+	/* Operation cursor. Marks the last processed tuple to date */
+	struct tuple *cursor;
+	/* Primary key key_def to compare new tuples with cursor. */
+	struct key_def *cmp_def;
+	struct diag diag;
+	int rc;
+};
+
+static void
+memtx_check_on_replace(struct trigger *trigger, void *event)
+{
+	struct txn *txn = event;
+	struct memtx_ddl_state *state = trigger->data;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+
+	/* Nothing to check on DELETE. */
+	if (stmt->new_tuple == NULL)
+		return;
+
+	/* We have already failed. */
+	if (state->rc != 0)
+		return;
+
+	/*
+	 * Only check format for already processed part of the space,
+	 * all the tuples inserted below cursor will be checked by the
+	 * main routine later.
+	 */
+	if (tuple_compare(state->cursor, HINT_NONE, stmt->new_tuple, HINT_NONE,
+			  state->cmp_def) < 0)
+		return;
+
+	state->rc = tuple_validate(state->format, stmt->new_tuple);
+	if (state->rc != 0)
+		diag_move(diag_get(), &state->diag);
+}
+
 static int
 memtx_space_check_format(struct space *space, struct tuple_format *format)
 {
@@ -827,8 +884,19 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 	if (it == NULL)
 		return -1;
 
+	struct memtx_ddl_state state;
+	state.format = format;
+	state.cmp_def = pk->def->key_def;
+	state.rc = 0;
+	diag_create(&state.diag);
+
+	struct trigger on_replace;
+	trigger_create(&on_replace, memtx_check_on_replace, &state, NULL);
+	trigger_add(&space->on_replace, &on_replace);
+
 	int rc;
 	struct tuple *tuple;
+	size_t count = 0;
 	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL) {
 		/*
 		 * Check that the tuple is OK according to the
@@ -837,8 +905,22 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 		rc = tuple_validate(format, tuple);
 		if (rc != 0)
 			break;
+		if (++count % MEMTX_DDL_YIELD_LOOPS == 0) {
+			state.cursor = tuple;
+			tuple_ref(state.cursor);
+			fiber_sleep(0);
+			tuple_unref(state.cursor);
+
+			if (state.rc != 0) {
+				rc = -1;
+				diag_move(&state.diag, diag_get());
+				break;
+			}
+		}
 	}
 	iterator_delete(it);
+	diag_destroy(&state.diag);
+	trigger_clear(&on_replace);
 	return rc;
 }
 
@@ -870,25 +952,11 @@ memtx_init_ephemeral_space(struct space *space)
 	memtx_space_add_primary_key(space);
 }
 
-/* Ongoing index build state used by memtx_build_on_replace triggers. */
-struct memtx_build_state {
-	/* The index being built. */
-	struct index *index;
-	/* New index format to be enforced. */
-	struct tuple_format *format;
-	/* Index build cursor. Marks the last tuple inserted to date */
-	struct tuple *cursor;
-	/* Primary key key_def to compare inserted tuples with cursor. */
-	struct key_def *cmp_def;
-	struct diag diag;
-	int rc;
-};
-
 static void
 memtx_build_on_replace(struct trigger *trigger, void *event)
 {
 	struct txn *txn = event;
-	struct memtx_build_state *state = trigger->data;
+	struct memtx_ddl_state *state = trigger->data;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 
 	struct tuple *cmp_tuple = stmt->new_tuple != NULL ? stmt->new_tuple :
@@ -925,15 +993,6 @@ static int
 memtx_space_build_index(struct space *src_space, struct index *new_index,
 			struct tuple_format *new_format)
 {
-	/*
-	 * Yield every 1K tuples.
-	 * In debug mode yield more often for testing purposes.
-	 */
-#ifdef NDEBUG
-	enum { YIELD_LOOPS = 1000 };
-#else
-	enum { YIELD_LOOPS = 10 };
-#endif
 	/**
 	 * If it's a secondary key, and we're not building them
 	 * yet (i.e. it's snapshot recovery for memtx), do nothing.
@@ -959,7 +1018,7 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	if (it == NULL)
 		return -1;
 
-	struct memtx_build_state state;
+	struct memtx_ddl_state state;
 	state.index = new_index;
 	state.format = new_format;
 	state.cmp_def = pk->def->key_def;
@@ -1005,7 +1064,7 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		 */
 		if (new_index->def->iid == 0)
 			tuple_ref(tuple);
-		if (++count % YIELD_LOOPS == 0) {
+		if (++count % MEMTX_DDL_YIELD_LOOPS == 0) {
 			/*
 			 * Remember the latest inserted tuple to
 			 * avoid processing yet to be added tuples
