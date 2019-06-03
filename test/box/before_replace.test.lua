@@ -291,3 +291,18 @@ _ = s:upsert({3,4,5}, {{'+', 2, 1}})
 save_type
 
 s:drop()
+
+--
+-- gh-4266 triggers on temporary space fail
+--
+s = box.schema.space.create('test', {temporary = true})
+
+_ = s:create_index('pk')
+
+save_type = ''
+
+_ = s:before_replace(function(old,new, name, type) save_type = type return new end)
+_ = s:insert{1}
+save_type
+
+s:drop()

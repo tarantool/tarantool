@@ -255,7 +255,24 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 */
 	if (stmt->space != NULL && !rlist_empty(&stmt->space->on_replace) &&
 	    stmt->space->run_triggers && (stmt->old_tuple || stmt->new_tuple)) {
-		if (trigger_run(&stmt->space->on_replace, txn) != 0)
+		int rc = 0;
+		if(!space_is_temporary(stmt->space)) {
+			rc = trigger_run(&stmt->space->on_replace, txn);
+		} else {
+			/*
+			 * There is no row attached to txn_stmt for
+			 * temporary spaces, since DML operations on them
+			 * are not written to WAL. Fake a row to pass operation
+			 * type to lua on_replace triggers.
+			 */
+			assert(stmt->row == NULL);
+			struct xrow_header temp_header;
+			temp_header.type = request->type;
+			stmt->row = &temp_header;
+			rc = trigger_run(&stmt->space->on_replace, txn);
+			stmt->row = NULL;
+		}
+		if (rc != 0)
 			goto fail;
 	}
 	--txn->in_sub_stmt;
