@@ -1360,12 +1360,12 @@ test:do_catchsql_test(
     "limit-15.1",
     [[
         SELECT 1 LIMIT 9223372036854775807 OFFSET 1;
-    ]], { 1, "Failed to execute SQL statement: sum of LIMIT and OFFSET values should not result in integer overflow" } )
+    ]], { 0, {} } )
 
 test:do_catchsql_test(
     "limit-15.2",
     [[
         SELECT 1 LIMIT 1 OFFSET 9223372036854775807;
-    ]], { 1,  "Failed to execute SQL statement: sum of LIMIT and OFFSET values should not result in integer overflow"} )
+    ]], { 0, {} } )
 
 test:finish_test()

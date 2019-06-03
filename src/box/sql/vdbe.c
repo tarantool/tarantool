@@ -1597,27 +1597,48 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 	    (type2 & (MEM_Int | MEM_UInt)) != 0) {
 		iA = pIn1->u.i;
 		iB = pIn2->u.i;
+		bool is_lhs_neg = pIn1->flags & MEM_Int;
+		bool is_rhs_neg = pIn2->flags & MEM_Int;
+		bool is_res_neg;
 		bIntint = 1;
 		switch( pOp->opcode) {
-		case OP_Add:       if (sqlAddInt64(&iB,iA)) goto integer_overflow; break;
-		case OP_Subtract:  if (sqlSubInt64(&iB,iA)) goto integer_overflow; break;
-		case OP_Multiply:  if (sqlMulInt64(&iB,iA)) goto integer_overflow; break;
+		case OP_Add: {
+			if (sql_add_int(iA, is_lhs_neg, iB, is_rhs_neg,
+					(int64_t *) &iB, &is_res_neg) != 0)
+				goto integer_overflow;
+			break;
+		}
+		case OP_Subtract: {
+			if (sql_sub_int(iB, is_rhs_neg, iA, is_lhs_neg,
+					(int64_t *) &iB, &is_res_neg) != 0)
+				goto integer_overflow;
+			break;
+		}
+		case OP_Multiply: {
+			if (sql_mul_int(iA, is_lhs_neg, iB, is_rhs_neg,
+					(int64_t *) &iB, &is_res_neg) != 0)
+				goto integer_overflow;
+			break;
+		}
 		case OP_Divide: {
 			if (iA == 0)
 				goto division_by_zero;
-			if (iA==-1 && iB==SMALLEST_INT64) goto integer_overflow;
-			iB /= iA;
+			if (sql_div_int(iB, is_rhs_neg, iA, is_lhs_neg,
+					(int64_t *) &iB, &is_res_neg) != 0)
+				goto integer_overflow;
 			break;
 		}
 		default: {
 			if (iA == 0)
 				goto division_by_zero;
 			if (iA==-1) iA = 1;
-			iB %= iA;
+			if (sql_rem_int(iB, is_rhs_neg, iA, is_lhs_neg,
+					(int64_t *) &iB, &is_res_neg) != 0)
+				goto integer_overflow;
 			break;
 		}
 		}
-		mem_set_i64(pOut, iB);
+		mem_set_int(pOut, iB, is_res_neg);
 	} else {
 		bIntint = 0;
 		if (sqlVdbeRealValue(pIn1, &rA) != 0) {
@@ -1843,12 +1864,12 @@ case OP_ShiftRight: {           /* same as TK_RSHIFT, in1, in2, out3 */
 		break;
 	}
 	bool unused;
-	if (sqlVdbeIntValue(pIn2, &iA, &unused) != 0) {
+	if (sqlVdbeIntValue(pIn2, (int64_t *) &iA, &unused) != 0) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 sql_value_text(pIn2), "integer");
 		goto abort_due_to_error;
 	}
-	if (sqlVdbeIntValue(pIn1, &iB, &unused) != 0) {
+	if (sqlVdbeIntValue(pIn1, (int64_t *) &iB, &unused) != 0) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 sql_value_text(pIn1), "integer");
 		goto abort_due_to_error;
@@ -2144,11 +2165,31 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 			/* Handle the common case of integer comparison here, as an
 			 * optimization, to avoid a call to sqlMemCompare()
 			 */
-			if ((pIn1->flags & pIn3->flags &
-			    (MEM_Int | MEM_UInt)) != 0) {
-				if (pIn3->u.i > pIn1->u.i) { res = +1; goto compare_op; }
-				if (pIn3->u.i < pIn1->u.i) { res = -1; goto compare_op; }
-				res = 0;
+			if ((pIn1->flags & pIn3->flags & (MEM_Int | MEM_UInt)) != 0) {
+				if ((pIn1->flags & pIn3->flags & MEM_Int) != 0) {
+					if (pIn3->u.i > pIn1->u.i)
+						res = +1;
+					else if (pIn3->u.i < pIn1->u.i)
+						res = -1;
+					else
+						res = 0;
+					goto compare_op;
+				}
+				if ((pIn1->flags & pIn3->flags & MEM_UInt) != 0) {
+					if (pIn3->u.u > pIn1->u.u)
+						res = +1;
+					else if (pIn3->u.u < pIn1->u.u)
+						res = -1;
+					else
+						res = 0;
+					goto compare_op;
+				}
+				if ((pIn1->flags & MEM_UInt) != 0 &&
+				    (pIn3->flags & MEM_Int) != 0) {
+					res = -1;
+					goto compare_op;
+				}
+				res = 1;
 				goto compare_op;
 			}
 		} else if (type == FIELD_TYPE_STRING) {
@@ -4916,7 +4957,9 @@ case OP_OffsetLimit: {    /* in1, out2, in3 */
 	assert((pIn1->flags & MEM_UInt) != 0);
 	assert((pIn3->flags & MEM_UInt) != 0);
 	uint64_t x = pIn1->u.u;
-	if (sqlAddInt64((i64 *) &x, pIn3->u.u) != 0) {
+	uint64_t rhs = pIn3->u.u;
+	bool unused;
+	if (sql_add_int(x, false, rhs, false, (int64_t *) &x, &unused) != 0) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "sum of LIMIT and OFFSET "
 			"values should not result in integer overflow");
 		goto abort_due_to_error;

@@ -945,74 +945,178 @@ sqlHexToBlob(sql * db, const char *z, int n)
 }
 #endif				/* !SQL_OMIT_BLOB_LITERAL || SQL_HAS_CODEC */
 
-/*
- * Attempt to add, substract, or multiply the 64-bit signed value iB against
- * the other 64-bit signed integer at *pA and store the result in *pA.
- * Return 0 on success.  Or if the operation would have resulted in an
- * overflow, leave *pA unchanged and return 1.
- */
 int
-sqlAddInt64(i64 * pA, i64 iB)
+sql_add_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
+	    int64_t *res, bool *is_res_neg)
 {
-	i64 iA = *pA;
-	testcase(iA == 0);
-	testcase(iA == 1);
-	testcase(iB == -1);
-	testcase(iB == 0);
-	if (iB >= 0) {
-		testcase(iA > 0 && LARGEST_INT64 - iA == iB);
-		testcase(iA > 0 && LARGEST_INT64 - iA == iB - 1);
-		if (iA > 0 && LARGEST_INT64 - iA < iB)
-			return 1;
-	} else {
-		testcase(iA < 0 && -(iA + LARGEST_INT64) == iB + 1);
-		testcase(iA < 0 && -(iA + LARGEST_INT64) == iB + 2);
-		if (iA < 0 && -(iA + LARGEST_INT64) > iB + 1)
-			return 1;
+	/* Addition of two negative integers. */
+	if (is_lhs_neg && is_rhs_neg) {
+		assert(lhs < 0 && rhs < 0);
+		if (lhs < INT64_MIN - rhs)
+				return -1;
+		*is_res_neg = true;
+		*res = lhs + rhs;
+		return 0;
 	}
-	*pA += iB;
+	/* Both are unsigned integers. */
+	if (!is_lhs_neg && !is_rhs_neg) {
+		uint64_t u_lhs = (uint64_t) lhs;
+		uint64_t u_rhs = (uint64_t) rhs;
+		if (UINT64_MAX - u_lhs < u_rhs)
+			return -1;
+		*is_res_neg = false;
+		*res = lhs + rhs;
+		return 0;
+	}
+	*is_res_neg = is_rhs_neg ? (uint64_t)(-rhs) > (uint64_t) lhs :
+				   (uint64_t)(-lhs) > (uint64_t) rhs;
+	*res = lhs + rhs;
 	return 0;
 }
 
 int
-sqlSubInt64(i64 * pA, i64 iB)
+sql_sub_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
+	    int64_t *res, bool *is_res_neg)
 {
-	testcase(iB == SMALLEST_INT64 + 1);
-	if (iB == SMALLEST_INT64) {
-		testcase((*pA) == (-1));
-		testcase((*pA) == 0);
-		if ((*pA) >= 0)
-			return 1;
-		*pA -= iB;
+	if (!is_lhs_neg && !is_rhs_neg) {
+		uint64_t u_lhs = (uint64_t) lhs;
+		uint64_t u_rhs = (uint64_t) rhs;
+		if (u_lhs >= u_rhs) {
+			*is_res_neg = false;
+			*res = u_lhs - u_rhs;
+			return 0;
+		}
+		if (u_rhs - u_lhs > (uint64_t) INT64_MAX + 1)
+			return -1;
+		*is_res_neg = true;
+		*res = lhs - rhs;
 		return 0;
-	} else {
-		return sqlAddInt64(pA, -iB);
 	}
+	if (is_rhs_neg) {
+		return sql_add_int(lhs, is_lhs_neg, -rhs, false, res,
+				   is_res_neg);
+	}
+	assert(is_lhs_neg && !is_rhs_neg);
+	/*
+	 * (lhs - rhs) < 0, lhs < 0, rhs > 0: in this case their
+	 * difference must not be less than INT64_MIN.
+	 */
+	if ((uint64_t) -lhs + (uint64_t) rhs > (uint64_t) INT64_MAX + 1)
+		return -1;
+	*is_res_neg = true;
+	*res = lhs - rhs;
+	return 0;
 }
 
 int
-sqlMulInt64(i64 * pA, i64 iB)
+sql_mul_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
+	    int64_t *res, bool *is_res_neg)
 {
-	i64 iA = *pA;
-	if (iB > 0) {
-		if (iA > LARGEST_INT64 / iB)
-			return 1;
-		if (iA < SMALLEST_INT64 / iB)
-			return 1;
-	} else if (iB < 0) {
-		if (iA > 0) {
-			if (iB < SMALLEST_INT64 / iA)
-				return 1;
-		} else if (iA < 0) {
-			if (iB == SMALLEST_INT64)
-				return 1;
-			if (iA == SMALLEST_INT64)
-				return 1;
-			if (-iA > LARGEST_INT64 / -iB)
-				return 1;
-		}
+	if (lhs == 0 || rhs == 0) {
+		*res = 0;
+		*is_res_neg = false;
+		return 0;
 	}
-	*pA = iA * iB;
+	/*
+	 * Multiplication of integers with same sign leads to
+	 * unsigned result.
+	 */
+	if (is_lhs_neg == is_rhs_neg) {
+		uint64_t u_res = is_lhs_neg ?
+				 (uint64_t) (-lhs) * (uint64_t) (-rhs) :
+				 (uint64_t) lhs * (uint64_t) (rhs);
+		/*
+		 * Overflow detection is quite primitive due to
+		 * the absence of overflow with unsigned values:
+		 * lhs * rhs == res --> rhs == res / lhs;
+		 * If this predicate is false, then result was
+		 * reduced modulo UINT_MAX + 1.
+		 */
+		if ((is_lhs_neg && u_res / (uint64_t) (-lhs) !=
+					   (uint64_t) (-rhs)) ||
+		    (!is_lhs_neg && u_res / (uint64_t) lhs != (uint64_t) rhs))
+			return -1;
+		*is_res_neg = false;
+		*res = u_res;
+		return 0;
+	}
+	/*
+	 * Make sure we've got only one combination of
+	 * positive and negative operands.
+	 */
+	if (is_lhs_neg) {
+		SWAP(is_lhs_neg, is_rhs_neg);
+		SWAP(lhs, rhs);
+	}
+	assert(! is_lhs_neg && is_rhs_neg);
+	uint64_t u_rhs = (uint64_t) (-rhs);
+	uint64_t u_res = u_rhs * (uint64_t) lhs;
+	if (u_res / u_rhs != (uint64_t) lhs ||
+	    u_res > (uint64_t) INT64_MAX + 1)
+		return -1;
+	*is_res_neg = true;
+	*res = lhs * rhs;
+	return 0;
+}
+
+int
+sql_div_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
+	    int64_t *res, bool *is_res_neg)
+{
+	if (lhs == 0) {
+		*res = 0;
+		*is_res_neg = false;
+		return 0;
+	}
+	/*
+	 * The only possible overflow situations is when operands
+	 * of different signs and result turns out to be less
+	 * than INT64_MIN.
+	 */
+	if (is_lhs_neg != is_rhs_neg) {
+		uint64_t u_res = is_lhs_neg ?
+				 (uint64_t) (-lhs) / (uint64_t) rhs :
+				 (uint64_t) lhs / (uint64_t) (-rhs);
+		if (u_res > (uint64_t) INT64_MAX + 1)
+			return -1;
+		*is_res_neg = u_res != 0;
+		*res = -u_res;
+		return 0;
+	}
+	*is_res_neg = false;
+	/*
+	 * Another one special case: INT64_MIN / -1
+	 * Signed division leads to program termination due
+	 * to overflow.
+	 */
+	if (is_lhs_neg && lhs == INT64_MIN && rhs == -1) {
+		*res = (uint64_t) INT64_MAX + 1;
+		return 0;
+	}
+	*res = is_lhs_neg ? (uint64_t) (lhs / rhs) :
+	       (uint64_t) lhs / (uint64_t) rhs;
+	return 0;
+}
+
+int
+sql_rem_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
+	    int64_t *res, bool *is_res_neg)
+{
+	uint64_t u_rhs = is_rhs_neg ? (uint64_t) (-rhs) : (uint64_t) rhs;
+	if (is_lhs_neg) {
+		uint64_t u_lhs = (uint64_t) (-lhs);
+		uint64_t u_res = u_lhs % u_rhs;
+		*res = -u_res;
+		*is_res_neg = true;
+		return 0;
+	}
+	/*
+	 * While calculating remainder we always ignore sign of
+	 * rhs - it doesn't affect the result.
+	 * */
+	uint64_t u_lhs = (uint64_t) lhs;
+	*res = u_lhs % u_rhs;
+	*is_res_neg = false;
 	return 0;
 }
 

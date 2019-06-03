@@ -4,11 +4,14 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 
 -- gh-3735: make sure that integer overflows errors are
 -- handled during VDBE execution.
+-- gh-3810: range of integer is extended up to 2^64 - 1.
 --
 box.execute('SELECT (2147483647 * 2147483647 * 2147483647);')
 box.execute('SELECT (-9223372036854775808 / -1);')
 box.execute('SELECT (-9223372036854775808 - 1);')
 box.execute('SELECT (9223372036854775807 + 1);')
+box.execute('SELECT (9223372036854775807 + 9223372036854775807 + 2);')
+
 -- Literals are checked right after parsing.
 --
 box.execute('SELECT 9223372036854775808;')

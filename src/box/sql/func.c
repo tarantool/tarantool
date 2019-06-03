@@ -1535,7 +1535,9 @@ soundexFunc(sql_context * context, int argc, sql_value ** argv)
 typedef struct SumCtx SumCtx;
 struct SumCtx {
 	double rSum;		/* Floating point sum */
-	i64 iSum;		/* Integer sum */
+	int64_t iSum;		/* Integer sum */
+	/** True if iSum < 0. */
+	bool is_neg;
 	i64 cnt;		/* Number of elements summed */
 	u8 overflow;		/* True if integer overflow seen */
 	u8 approx;		/* True if non-integer value was input to the sum */
@@ -1572,9 +1574,13 @@ sum_step(struct sql_context *context, int argc, sql_value **argv)
 	p->cnt++;
 	if (type == MP_INT || type == MP_UINT) {
 		int64_t v = sql_value_int64(argv[0]);
-		p->rSum += v;
+		if (type == MP_INT)
+			p->rSum += v;
+		else
+			p->rSum += (uint64_t) v;
 		if ((p->approx | p->overflow) == 0 &&
-		    sqlAddInt64(&p->iSum, v) != 0) {
+		    sql_add_int(p->iSum, p->is_neg, v, type == MP_INT, &p->iSum,
+				&p->is_neg) != 0) {
 			p->overflow = 1;
 		}
 	} else {
@@ -1596,7 +1602,7 @@ sumFinalize(sql_context * context)
 		} else if (p->approx) {
 			sql_result_double(context, p->rSum);
 		} else {
-			sql_result_int64(context, p->iSum);
+			mem_set_int(context->pOut, p->iSum, p->is_neg);
 		}
 	}
 }

@@ -10,6 +10,7 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 ...
 -- gh-3735: make sure that integer overflows errors are
 -- handled during VDBE execution.
+-- gh-3810: range of integer is extended up to 2^64 - 1.
 --
 box.execute('SELECT (2147483647 * 2147483647 * 2147483647);')
 ---
@@ -17,13 +18,25 @@ box.execute('SELECT (2147483647 * 2147483647 * 2147483647);')
 ...
 box.execute('SELECT (-9223372036854775808 / -1);')
 ---
-- error: 'Failed to execute SQL statement: integer is overflowed'
+- metadata:
+  - name: (-9223372036854775808 / -1)
+    type: integer
+  rows:
+  - [9223372036854775808]
 ...
 box.execute('SELECT (-9223372036854775808 - 1);')
 ---
 - error: 'Failed to execute SQL statement: integer is overflowed'
 ...
 box.execute('SELECT (9223372036854775807 + 1);')
+---
+- metadata:
+  - name: (9223372036854775807 + 1)
+    type: integer
+  rows:
+  - [9223372036854775808]
+...
+box.execute('SELECT (9223372036854775807 + 9223372036854775807 + 2);')
 ---
 - error: 'Failed to execute SQL statement: integer is overflowed'
 ...

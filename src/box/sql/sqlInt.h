@@ -4034,9 +4034,37 @@ Expr *sqlExprAddCollateString(Parse *, Expr *, const char *);
 Expr *sqlExprSkipCollate(Expr *);
 int sqlCheckIdentifierName(Parse *, char *);
 void sqlVdbeSetChanges(sql *, int);
-int sqlAddInt64(i64 *, i64);
-int sqlSubInt64(i64 *, i64);
-int sqlMulInt64(i64 *, i64);
+
+/**
+ * Attempt to add, subtract, multiply or get the remainder of
+ * 64-bit integer values. There functions are able to operate
+ * on signed as well as unsigned integers. If result of operation
+ * is greater 0, then it is assumed to be unsigned and can take
+ * values in range up to 2^64 - 1. If the result is negative,
+ * then its minimum value is -2^63.
+ * Return 0 on success.  Or if the operation would have resulted
+ * in an overflow, return -1.
+ */
+int
+sql_add_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
+	    int64_t *res, bool *is_res_neg);
+
+int
+sql_sub_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
+	    int64_t *res, bool *is_res_neg);
+
+int
+sql_mul_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
+	    int64_t *res, bool *is_res_neg);
+
+int
+sql_div_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
+	    int64_t *res, bool *is_res_neg);
+
+int
+sql_rem_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
+	    int64_t *res, bool *is_res_neg);
+
 u8 sqlGetBoolean(const char *z, u8);
 
 const void *sqlValueText(sql_value *);

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14602)
+test:plan(14603)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -912,25 +912,25 @@ test:do_execsql_test(
         -- </func-8.6>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "func-8.7",
     [[
         SELECT typeof(sum(x)) FROM (SELECT '9223372036' || '854775808' AS x
                             UNION ALL SELECT -9223372036854775807)
     ]], {
         -- <func-8.7>
-        1, "Failed to execute SQL statement: integer overflow"
+        "integer"
         -- </func-8.7>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "func-8.8",
     [[
         SELECT sum(x)>0.0 FROM (SELECT '9223372036' || '854775808' AS x
                             UNION ALL SELECT -9223372036850000000)
     ]], {
         -- <func-8.8>
-        1, "Failed to execute SQL statement: integer overflow"
+        true
         -- </func-8.8>
     })
 
@@ -1591,14 +1591,14 @@ test:do_execsql_test(
         -- </func-18.11>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "func-18.12",
     [[
         INSERT INTO t6 VALUES(3, 1<<62);
         SELECT sum(x) - ((1<<62)*2.0+1) from t6;
     ]], {
         -- <func-18.12>
-        1, "Failed to execute SQL statement: integer overflow"
+        0
         -- </func-18.12>
     })
 
@@ -1645,17 +1645,29 @@ test:do_catchsql_test(
     -- </func-18.17>
 })
 
-test:do_catchsql_test(
-    "func-18.15",
+test:do_execsql_test(
+    "func-18.15.1",
     [[
         SELECT sum(x) FROM
            (SELECT 9223372036854775807 AS x UNION ALL
             SELECT 10 AS x);
     ]], {
-        -- <func-18.15>
-        1, "Failed to execute SQL statement: integer overflow"
-        -- </func-18.15>
+        -- <func-18.15.1>
+        9223372036854775817LL
+        -- </func-18.15.1>
     })
+
+test:do_catchsql_test(
+    "func-18.15.2",
+    [[
+        SELECT sum(x) FROM
+           (SELECT 9223372036854775807 AS x UNION ALL SELECT 9223372036854775807 AS x
+            UNION ALL SELECT 10 AS x);
+    ]], {
+    -- <func-18.15.2>
+    1, "Failed to execute SQL statement: integer overflow"
+    -- </func-18.15.2>
+})
 
 test:do_catchsql_test(
     "func-18.18",
