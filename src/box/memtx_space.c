@@ -917,6 +917,21 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 				break;
 			}
 		}
+
+		struct errinj *inj = errinj(ERRINJ_CHECK_FORMAT_DELAY, ERRINJ_BOOL);
+		if (inj != NULL && inj->bparam && count == 1) {
+			state.cursor = tuple;
+			tuple_ref(state.cursor);
+			do {
+				fiber_sleep(0);
+			} while (inj->bparam);
+			tuple_unref(state.cursor);
+			if (state.rc != 0) {
+				rc = -1;
+				diag_move(&state.diag, diag_get());
+				break;
+			}
+		}
 	}
 	iterator_delete(it);
 	diag_destroy(&state.diag);

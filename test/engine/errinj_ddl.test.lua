@@ -3,6 +3,39 @@ fiber = require('fiber')
 engine = test_run:get_cfg('engine')
 errinj = box.error.injection
 
+--
+-- Check that ALTER is abroted if a tuple inserted during space
+-- format change does not conform to the new format.
+--
+format = {}
+format[1] = {name = 'field1', type = 'unsigned'}
+format[2] = {name = 'field2', type = 'string', is_nullable = true}
+s = box.schema.space.create('test', {engine = engine, format = format})
+_ = s:create_index('pk')
+
+pad = string.rep('x', 16)
+for i = 101, 200 do s:replace{i, pad} end
+
+ch = fiber.channel(1)
+test_run:cmd("setopt delimiter ';'")
+_ = fiber.create(function()
+    fiber.sleep(0.01)
+    for i = 1, 100 do
+        s:replace{i, box.NULL}
+    end
+    errinj.set("ERRINJ_CHECK_FORMAT_DELAY", false)
+    ch:put(true)
+end);
+test_run:cmd("setopt delimiter ''");
+
+format[2].is_nullable = false
+errinj.set("ERRINJ_CHECK_FORMAT_DELAY", true)
+s:format(format) -- must fail
+ch:get()
+
+s:count() -- 200
+s:drop()
+
 t = box.schema.space.create("space", {engine = engine})
 _ = t:create_index("pk")
 for i = 1,1000 do t:insert{i, i} end

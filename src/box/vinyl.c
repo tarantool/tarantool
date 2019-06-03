@@ -1156,6 +1156,12 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 		 */
 		if (++loops % VY_YIELD_LOOPS == 0)
 			fiber_sleep(0);
+		struct errinj *inj = errinj(ERRINJ_CHECK_FORMAT_DELAY, ERRINJ_BOOL);
+		if (inj != NULL && inj->bparam && loops == 1) {
+			do {
+				fiber_sleep(0);
+			} while (inj->bparam);
+		}
 		if (ctx.is_failed) {
 			diag_move(&ctx.diag, diag_get());
 			rc = -1;
