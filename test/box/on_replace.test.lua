@@ -52,6 +52,8 @@ function f2() print('test2') end
 type(box.space._space:on_replace(f2))
 #box.space._space:on_replace()
 
+box.space._space:on_replace(nil, f)
+box.space._space:on_replace(nil, f2)
 
 --
 -- gh-587: crash on attempt to modify space from triggers
