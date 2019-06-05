@@ -693,10 +693,13 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 			return 0;
 		return -1;
 	case FIELD_TYPE_INTEGER:
+	case FIELD_TYPE_UNSIGNED:
 		if ((pMem->flags & MEM_Blob) != 0) {
 			bool is_neg;
 			int64_t val;
 			if (sql_atoi64(pMem->z, &val, &is_neg, pMem->n) != 0)
+				return -1;
+			if (type == FIELD_TYPE_UNSIGNED && is_neg)
 				return -1;
 			mem_set_int(pMem, val, is_neg);
 			return 0;
@@ -706,7 +709,12 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 			MemSetTypeFlag(pMem, MEM_UInt);
 			return 0;
 		}
-		return sqlVdbeMemIntegerify(pMem, true);
+		if (sqlVdbeMemIntegerify(pMem, true) != 0)
+			return -1;
+		if (type == FIELD_TYPE_UNSIGNED &&
+		    (pMem->flags & MEM_UInt) == 0)
+			return -1;
+		return 0;
 	case FIELD_TYPE_NUMBER:
 		return sqlVdbeMemRealify(pMem);
 	default:

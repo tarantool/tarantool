@@ -185,6 +185,7 @@ static Keyword aKeywordTable[] = {
   { "UNION",                  "TK_UNION",       COMPOUND,         true  },
   { "UNIQUE",                 "TK_UNIQUE",      ALWAYS,           true  },
   { "UNKNOWN",                "TK_NULL",        ALWAYS,           true  },
+  { "UNSIGNED",               "TK_UNSIGNED",    ALWAYS,           true  },
   { "UPDATE",                 "TK_UPDATE",      ALWAYS,           true  },
   { "USING",                  "TK_USING",       ALWAYS,           true  },
   { "VALUES",                 "TK_VALUES",      ALWAYS,           true  },

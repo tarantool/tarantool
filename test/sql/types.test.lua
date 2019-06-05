@@ -382,3 +382,20 @@ box.execute("SELECT CAST(18446744073709551615 AS TEXT);")
 box.execute("SELECT CAST(18446744073709551615 AS SCALAR);")
 box.execute("SELECT CAST(18446744073709551615 AS BOOLEAN);")
 box.execute("SELECT CAST('18446744073709551615' AS INTEGER);")
+
+-- gh-4015: introduce unsigned type in SQL.
+--
+box.execute("CREATE TABLE t1 (id UNSIGNED PRIMARY KEY);")
+box.execute("INSERT INTO t1 VALUES (0), (1), (2);")
+box.execute("INSERT INTO t1 VALUES (-3);")
+box.execute("SELECT id FROM t1;")
+
+box.execute("SELECT CAST(123 AS UNSIGNED);")
+box.execute("SELECT CAST(-123 AS UNSIGNED);")
+box.execute("SELECT CAST(1.5 AS UNSIGNED);")
+box.execute("SELECT CAST(-1.5 AS UNSIGNED);")
+box.execute("SELECT CAST(true AS UNSIGNED);")
+box.execute("SELECT CAST('123' AS UNSIGNED);")
+box.execute("SELECT CAST('-123' AS UNSIGNED);")
+
+box.space.T1:drop()

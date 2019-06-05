@@ -1755,6 +1755,7 @@ typedef(A) ::= VARCHAR char_len(B) . {
 typedef(A) ::= number_typedef(A) .
 number_typedef(A) ::= FLOAT_KW|REAL|DOUBLE . { A.type = FIELD_TYPE_NUMBER; }
 number_typedef(A) ::= INT|INTEGER_KW . { A.type = FIELD_TYPE_INTEGER; }
+number_typedef(A) ::= UNSIGNED . { A.type = FIELD_TYPE_UNSIGNED; }
 
 /**
  * NUMERIC type is temporary disabled. To be enabled when

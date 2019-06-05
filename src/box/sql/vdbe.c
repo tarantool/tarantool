@@ -306,8 +306,6 @@ mem_apply_type(struct Mem *record, enum field_type type)
 	switch (type) {
 	case FIELD_TYPE_INTEGER:
 	case FIELD_TYPE_UNSIGNED:
-		if ((record->flags & MEM_Int) == MEM_Int)
-			return 0;
 		if ((record->flags & MEM_UInt) == MEM_UInt)
 			return 0;
 		if ((record->flags & MEM_Real) == MEM_Real) {
@@ -317,7 +315,14 @@ mem_apply_type(struct Mem *record, enum field_type type)
 					    record->u.r <= -1);
 			return 0;
 		}
-		return sqlVdbeMemIntegerify(record, false);
+		if (sqlVdbeMemIntegerify(record, false) != 0)
+			return -1;
+		if ((record->flags & MEM_Int) == MEM_Int) {
+			if (type == FIELD_TYPE_UNSIGNED)
+				return -1;
+			return 0;
+		}
+		return 0;
 	case FIELD_TYPE_BOOLEAN:
 		if ((record->flags & MEM_Bool) == MEM_Bool)
 			return 0;
