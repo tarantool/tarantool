@@ -1,0 +1,460 @@
+-- test-run result file version 2
+decimal = require('decimal')
+ | ---
+ | ...
+test_run = require('test_run').new()
+ | ---
+ | ...
+ffi = require('ffi')
+ | ---
+ | ...
+
+-- check various constructors
+decimal.new('1234.5678')
+ | ---
+ | - '1234.5678'
+ | ...
+decimal.new('1e6')
+ | ---
+ | - '1000000'
+ | ...
+decimal.new('-6.234612e2')
+ | ---
+ | - '-623.4612'
+ | ...
+-- check (u)int16/32/64_t
+decimal.new(2ULL ^ 63)
+ | ---
+ | - '9223372036854775808'
+ | ...
+decimal.new(123456789123456789ULL)
+ | ---
+ | - '123456789123456789'
+ | ...
+decimal.new(-123456789123456789LL)
+ | ---
+ | - '-123456789123456789'
+ | ...
+decimal.new(ffi.new('uint8_t', 231))
+ | ---
+ | - '231'
+ | ...
+decimal.new(ffi.new('int8_t', -113))
+ | ---
+ | - '-113'
+ | ...
+decimal.new(ffi.new('uint16_t', 65535))
+ | ---
+ | - '65535'
+ | ...
+decimal.new(ffi.new('int16_t', -31263))
+ | ---
+ | - '-31263'
+ | ...
+decimal.new(ffi.new('uint32_t', 4123123123))
+ | ---
+ | - '4123123123'
+ | ...
+decimal.new(ffi.new('int32_t', -2123123123))
+ | ---
+ | - '-2123123123'
+ | ...
+decimal.new(ffi.new('float', 128.5))
+ | ---
+ | - '128.5'
+ | ...
+decimal.new(ffi.new('double', 128.5))
+ | ---
+ | - '128.5'
+ | ...
+
+decimal.new(1)
+ | ---
+ | - '1'
+ | ...
+decimal.new(-1)
+ | ---
+ | - '-1'
+ | ...
+decimal.new(2^64)
+ | ---
+ | - '18446744073709600000'
+ | ...
+decimal.new(2^(-20))
+ | ---
+ | - '0.00000095367431640625'
+ | ...
+
+-- incorrect constructions
+decimal.new(box.NULL)
+ | ---
+ | - error: expected decimal, number or string as 1 argument
+ | ...
+decimal.new(ffi.new('float', 1 / 0))
+ | ---
+ | - error: incorrect value to convert to decimal as 1 argument
+ | ...
+decimal.new(ffi.new('double', 1 / 0))
+ | ---
+ | - error: incorrect value to convert to decimal as 1 argument
+ | ...
+decimal.new(1 / 0)
+ | ---
+ | - error: incorrect value to convert to decimal as 1 argument
+ | ...
+decimal.new({1, 2, 3})
+ | ---
+ | - error: expected decimal, number or string as 1 argument
+ | ...
+decimal.new()
+ | ---
+ | - error: 'usage: decimal.new(value)'
+ | ...
+decimal.new('inf')
+ | ---
+ | - error: incorrect value to convert to decimal as 1 argument
+ | ...
+decimal.new('NaN')
+ | ---
+ | - error: incorrect value to convert to decimal as 1 argument
+ | ...
+decimal.new('not a valid number')
+ | ---
+ | - error: incorrect value to convert to decimal as 1 argument
+ | ...
+
+a = decimal.new('10')
+ | ---
+ | ...
+a
+ | ---
+ | - '10'
+ | ...
+b = decimal.new('0.1')
+ | ---
+ | ...
+b
+ | ---
+ | - '0.1'
+ | ...
+a + b
+ | ---
+ | - '10.1'
+ | ...
+a - b
+ | ---
+ | - '9.9'
+ | ...
+a * b
+ | ---
+ | - '1.0'
+ | ...
+a / b
+ | ---
+ | - '100'
+ | ...
+a ^ b
+ | ---
+ | - '1.2589254117941672104239541063958006061'
+ | ...
+b ^ a
+ | ---
+ | - '0.0000000001'
+ | ...
+-a + -b == -(a + b)
+ | ---
+ | - true
+ | ...
+a
+ | ---
+ | - '10'
+ | ...
+b
+ | ---
+ | - '0.1'
+ | ...
+
+a < b
+ | ---
+ | - false
+ | ...
+b < a
+ | ---
+ | - true
+ | ...
+a <= b
+ | ---
+ | - false
+ | ...
+b <= a
+ | ---
+ | - true
+ | ...
+a > b
+ | ---
+ | - true
+ | ...
+b > a
+ | ---
+ | - false
+ | ...
+a >= b
+ | ---
+ | - true
+ | ...
+b >= a
+ | ---
+ | - false
+ | ...
+a == b
+ | ---
+ | - false
+ | ...
+a ~= b
+ | ---
+ | - true
+ | ...
+a
+ | ---
+ | - '10'
+ | ...
+b
+ | ---
+ | - '0.1'
+ | ...
+
+decimal.sqrt(a)
+ | ---
+ | - '3.1622776601683793319988935444327185337'
+ | ...
+decimal.ln(a)
+ | ---
+ | - '2.3025850929940456840179914546843642076'
+ | ...
+decimal.log10(a)
+ | ---
+ | - '1'
+ | ...
+decimal.exp(a)
+ | ---
+ | - '22026.465794806716516957900645284244366'
+ | ...
+a == decimal.ln(decimal.exp(a))
+ | ---
+ | - true
+ | ...
+a == decimal.sqrt(a ^ 2)
+ | ---
+ | - true
+ | ...
+a == decimal.log10('10' ^ a)
+ | ---
+ | - true
+ | ...
+a == decimal.abs(-a)
+ | ---
+ | - true
+ | ...
+a + -a == 0
+ | ---
+ | - true
+ | ...
+a
+ | ---
+ | - '10'
+ | ...
+
+a = decimal.new('1.1234567891234567891234567891234567891')
+ | ---
+ | ...
+a
+ | ---
+ | - '1.1234567891234567891234567891234567891'
+ | ...
+decimal.precision(a)
+ | ---
+ | - 38
+ | ...
+decimal.scale(a)
+ | ---
+ | - 37
+ | ...
+decimal.round(a, 37) == a
+ | ---
+ | - true
+ | ...
+a
+ | ---
+ | - '1.1234567891234567891234567891234567891'
+ | ...
+a = decimal.round(a, 36)
+ | ---
+ | ...
+decimal.precision(a)
+ | ---
+ | - 37
+ | ...
+decimal.scale(a)
+ | ---
+ | - 36
+ | ...
+decimal.round(a, 100) == a
+ | ---
+ | - true
+ | ...
+-- noop
+decimal.round(a, -5) == a
+ | ---
+ | - true
+ | ...
+decimal.round(a, 7)
+ | ---
+ | - '1.1234568'
+ | ...
+decimal.round(a, 3)
+ | ---
+ | - '1.123'
+ | ...
+decimal.round(a, 0)
+ | ---
+ | - '1'
+ | ...
+a
+ | ---
+ | - '1.123456789123456789123456789123456789'
+ | ...
+
+decimal.ln(0)
+ | ---
+ | - error: decimal operation failed
+ | ...
+decimal.ln(-1)
+ | ---
+ | - error: decimal operation failed
+ | ...
+decimal.ln(1)
+ | ---
+ | - '0'
+ | ...
+decimal.log10(0)
+ | ---
+ | - error: decimal operation failed
+ | ...
+decimal.log10(-1)
+ | ---
+ | - error: decimal operation failed
+ | ...
+decimal.log10(1)
+ | ---
+ | - '0'
+ | ...
+decimal.exp(88)
+ | ---
+ | - error: decimal operation failed
+ | ...
+decimal.exp(87)
+ | ---
+ | - '60760302250568721495223289381302760753'
+ | ...
+decimal.sqrt(-5)
+ | ---
+ | - error: decimal operation failed
+ | ...
+decimal.sqrt(5)
+ | ---
+ | - '2.2360679774997896964091736687312762354'
+ | ...
+
+-- various incorrect operands
+decimal.round(a)
+ | ---
+ | - error: 'usage: decimal.round(decimal, scale)'
+ | ...
+decimal.round(1, 2)
+ | ---
+ | - error: expected cdata as 1 argument
+ | ...
+decimal.scale(1.234)
+ | ---
+ | - error: expected cdata as 1 argument
+ | ...
+decimal.precision(1.234)
+ | ---
+ | - error: expected cdata as 1 argument
+ | ...
+decimal.scale()
+ | ---
+ | - error: 'usage: decimal.scale(decimal)'
+ | ...
+decimal.precision()
+ | ---
+ | - error: 'usage: decimal.precision(decimal)'
+ | ...
+decimal.abs()
+ | ---
+ | - error: 'usage: decimal.abs(decimal)'
+ | ...
+
+a = decimal.new('1e19')
+ | ---
+ | ...
+a * '1e19'
+ | ---
+ | - error: '[string "return a * ''1e19'' "]:1: decimal operation failed'
+ | ...
+a ^ 2
+ | ---
+ | - error: '[string "return a ^ 2 "]:1: decimal operation failed'
+ | ...
+a ^ 1.9
+ | ---
+ | - '1258925411794167210423954106395800606.1'
+ | ...
+a * '1e18'
+ | ---
+ | - '10000000000000000000000000000000000000'
+ | ...
+a = decimal.new(string.rep('9', 38))
+ | ---
+ | ...
+decimal.precision(a)
+ | ---
+ | - 38
+ | ...
+a + 1
+ | ---
+ | - error: '[string "return a + 1 "]:1: decimal operation failed'
+ | ...
+a + '0.9'
+ | ---
+ | - error: '[string "return a + ''0.9'' "]:1: decimal operation failed'
+ | ...
+a + '0.5'
+ | ---
+ | - error: '[string "return a + ''0.5'' "]:1: decimal operation failed'
+ | ...
+a + '0.4'
+ | ---
+ | - '99999999999999999999999999999999999999'
+ | ...
+a / 0.5
+ | ---
+ | - error: '[string "return a / 0.5 "]:1: decimal operation failed'
+ | ...
+1 / decimal.new('0')
+ | ---
+ | - error: '[string "return 1 / decimal.new(''0'') "]:1: decimal operation failed'
+ | ...
+
+a = decimal.new('-13')
+ | ---
+ | ...
+a ^ 2
+ | ---
+ | - '169'
+ | ...
+-- fractional powers are allowed only for positive numbers
+a ^ 2.5
+ | ---
+ | - error: '[string "return a ^ 2.5 "]:1: decimal operation failed'
+ | ...

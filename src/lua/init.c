@@ -59,6 +59,7 @@
 #include "lua/httpc.h"
 #include "lua/utf8.h"
 #include "lua/swim.h"
+#include "lua/decimal.h"
 #include "digest.h"
 #include <small/ibuf.h>
 
@@ -454,6 +455,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_pickle_init(L);
 	tarantool_lua_digest_init(L);
 	tarantool_lua_swim_init(L);
+	tarantool_lua_decimal_init(L);
 	luaopen_http_client_driver(L);
 	lua_pop(L, 1);
 	luaopen_msgpack(L);
