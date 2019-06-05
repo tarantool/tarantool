@@ -156,7 +156,8 @@ sql_row_count(struct sql_context *context, MAYBE_UNUSED int unused1,
 	      MAYBE_UNUSED sql_value **unused2)
 {
 	sql *db = sql_context_db_handle(context);
-	sql_result_int(context, db->nChange);
+	assert(db->nChange >= 0);
+	sql_result_uint(context, db->nChange);
 }
 
 /*

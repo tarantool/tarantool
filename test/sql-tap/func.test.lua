@@ -1742,7 +1742,7 @@ test:do_catchsql_test(
         SELECT abs(-9223372036854775807-1);
     ]], {
         -- <func-18.32>
-        1, "Failed to execute SQL statement: integer is overflowed"
+        0, {9223372036854775808LL}
         -- </func-18.32>
     })
 

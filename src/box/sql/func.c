@@ -146,8 +146,7 @@ lengthFunc(sql_context * context, int argc, sql_value ** argv)
 	case MP_INT:
 	case MP_UINT:
 	case MP_DOUBLE:{
-			sql_result_int(context,
-					   sql_value_bytes(argv[0]));
+			sql_result_uint(context, sql_value_bytes(argv[0]));
 			break;
 		}
 	case MP_STR:{
@@ -155,7 +154,7 @@ lengthFunc(sql_context * context, int argc, sql_value ** argv)
 			if (z == 0)
 				return;
 			len = sql_utf8_char_count(z, sql_value_bytes(argv[0]));
-			sql_result_int(context, len);
+			sql_result_uint(context, len);
 			break;
 		}
 	default:{
@@ -177,21 +176,16 @@ absFunc(sql_context * context, int argc, sql_value ** argv)
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
 	switch (sql_value_type(argv[0])) {
-	case MP_UINT:
-	case MP_INT:{
-			i64 iVal = sql_value_int64(argv[0]);
-			if (iVal < 0) {
-				if (iVal == SMALLEST_INT64) {
-					diag_set(ClientError, ER_SQL_EXECUTE,
-						 "integer is overflowed");
-					context->is_aborted = true;
-					return;
-				}
-				iVal = -iVal;
-			}
-			sql_result_int64(context, iVal);
-			break;
-		}
+	case MP_UINT: {
+		sql_result_uint(context, sql_value_uint64(argv[0]));
+		break;
+	}
+	case MP_INT: {
+		int64_t value = sql_value_int64(argv[0]);
+		assert(value < 0);
+		sql_result_uint(context, -value);
+		break;
+	}
 	case MP_NIL:{
 			/* IMP: R-37434-19929 Abs(X) returns NULL if X is NULL. */
 			sql_result_null(context);
@@ -349,7 +343,8 @@ position_func(struct sql_context *context, int argc, struct Mem **argv)
 		}
 	}
 finish:
-	sql_result_int(context, position);
+	assert(position >= 0);
+	sql_result_uint(context, position);
 }
 
 /*
@@ -619,21 +614,10 @@ ICU_CASE_CONVERT(Upper);
 static void
 randomFunc(sql_context * context, int NotUsed, sql_value ** NotUsed2)
 {
-	sql_int64 r;
+	int64_t r;
 	UNUSED_PARAMETER2(NotUsed, NotUsed2);
 	sql_randomness(sizeof(r), &r);
-	if (r < 0) {
-		/* We need to prevent a random number of 0x8000000000000000
-		 * (or -9223372036854775808) since when you do abs() of that
-		 * number of you get the same value back again.  To do this
-		 * in a way that is testable, mask the sign bit off of negative
-		 * values, resulting in a positive value.  Then take the
-		 * 2s complement of that positive value.  The end result can
-		 * therefore be no less than -9223372036854775807.
-		 */
-		r = -(r & LARGEST_INT64);
-	}
-	sql_result_int64(context, r);
+	sql_result_int(context, r);
 }
 
 /*
@@ -1101,7 +1085,7 @@ unicodeFunc(sql_context * context, int argc, sql_value ** argv)
 	const unsigned char *z = sql_value_text(argv[0]);
 	(void)argc;
 	if (z && z[0])
-		sql_result_int(context, sqlUtf8Read(&z));
+		sql_result_uint(context, sqlUtf8Read(&z));
 }
 
 /*
@@ -1120,10 +1104,13 @@ charFunc(sql_context * context, int argc, sql_value ** argv)
 		return;
 	}
 	for (i = 0; i < argc; i++) {
-		sql_int64 x;
+		uint64_t x;
 		unsigned c;
-		x = sql_value_int64(argv[i]);
-		if (x < 0 || x > 0x10ffff)
+		if (sql_value_type(argv[i]) == MP_INT)
+			x = 0xfffd;
+		else
+			x = sql_value_uint64(argv[i]);
+		if (x > 0x10ffff)
 			x = 0xfffd;
 		c = (unsigned)(x & 0x1fffff);
 		if (c < 0x00080) {
@@ -1652,7 +1639,7 @@ countFinalize(sql_context * context)
 {
 	CountCtx *p;
 	p = sql_aggregate_context(context, 0);
-	sql_result_int64(context, p ? p->n : 0);
+	sql_result_uint(context, p ? p->n : 0);
 }
 
 /*

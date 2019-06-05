@@ -180,6 +180,16 @@ sql_value_int64(sql_value * pVal)
 	return i;
 }
 
+uint64_t
+sql_value_uint64(sql_value *val)
+{
+	int64_t i = 0;
+	bool is_neg;
+	sqlVdbeIntValue((struct Mem *) val, &i, &is_neg);
+	assert(!is_neg);
+	return i;
+}
+
 enum sql_subtype
 sql_value_subtype(sql_value * pVal)
 {
@@ -320,21 +330,21 @@ sql_result_double(sql_context * pCtx, double rVal)
 }
 
 void
-sql_result_int(sql_context * pCtx, int iVal)
+sql_result_uint(sql_context *ctx, uint64_t u_val)
 {
-	mem_set_i64(pCtx->pOut, iVal);
+	mem_set_u64(ctx->pOut, u_val);
+}
+
+void
+sql_result_int(sql_context *ctx, int64_t val)
+{
+	mem_set_i64(ctx->pOut, val);
 }
 
 void
 sql_result_bool(struct sql_context *ctx, bool value)
 {
 	mem_set_bool(ctx->pOut, value);
-}
-
-void
-sql_result_int64(sql_context * pCtx, i64 iVal)
-{
-	mem_set_i64(pCtx->pOut, iVal);
 }
 
 void

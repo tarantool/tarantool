@@ -320,10 +320,10 @@ test:do_execsql_test(
         CREATE TABLE j(j INT PRIMARY KEY REFERENCES i);
         INSERT INTO i VALUES(35);
         INSERT INTO j VALUES(35);
-        SELECT j, typeof(j) FROM j;
+        SELECT j FROM j;
     ]], {
         -- <fkey2-2.1>
-        35, "integer"
+        35
         -- </fkey2-2.1>
     })
 

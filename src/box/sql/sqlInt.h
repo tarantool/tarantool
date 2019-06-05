@@ -367,6 +367,9 @@ sql_column_subtype(struct sql_stmt *stmt, int i);
 sql_int64
 sql_value_int64(sql_value *);
 
+uint64_t
+sql_value_uint64(sql_value *val);
+
 const unsigned char *
 sql_value_text(sql_value *);
 
@@ -395,13 +398,13 @@ void
 sql_result_double(sql_context *, double);
 
 void
-sql_result_int(sql_context *, int);
+sql_result_uint(sql_context *ctx, uint64_t u_val);
+
+void
+sql_result_int(sql_context *ctx, int64_t val);
 
 void
 sql_result_bool(struct sql_context *ctx, bool value);
-
-void
-sql_result_int64(sql_context *, sql_int64);
 
 void
 sql_result_null(sql_context *);
