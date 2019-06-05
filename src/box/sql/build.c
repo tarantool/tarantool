@@ -1023,10 +1023,10 @@ emitNewSysSequenceRecord(Parse *pParse, int reg_seq_id, const char *seq_name)
 
 	/* 5. Minimum  */
 	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, first_col + 5, 0,
-			      (unsigned char*)&min_usigned_long_long, P4_INT64);
+			  (unsigned char *) &min_usigned_long_long, P4_UINT64);
 	/* 6. Maximum  */
 	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, first_col + 6, 0,
-			      (unsigned char*)&max_usigned_long_long, P4_INT64);
+			  (unsigned char *) &max_usigned_long_long, P4_UINT64);
 	/* 7. Start  */
 	sqlVdbeAddOp2(v, OP_Integer, 1, first_col + 7);
 

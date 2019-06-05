@@ -142,12 +142,9 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 		return -1;
 	switch (field.type) {
 	case MP_UINT:
-		if ((uint64_t) field.ival > INT64_MAX) {
-			diag_set(ClientError, ER_SQL_BIND_VALUE,
-				 sql_bind_name(bind), "INTEGER");
-			return -1;
-		}
-		FALLTHROUGH;
+		bind->u64 = field.ival;
+		bind->bytes = sizeof(bind->u64);
+		break;
 	case MP_INT:
 		bind->i64 = field.ival;
 		bind->bytes = sizeof(bind->i64);

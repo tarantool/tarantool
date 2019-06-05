@@ -1101,7 +1101,7 @@ case OP_Bool: {         /* out2 */
 case OP_Int64: {           /* out2 */
 	pOut = out2Prerelease(p, pOp);
 	assert(pOp->p4.pI64!=0);
-	mem_set_i64(pOut, *pOp->p4.pI64);
+	mem_set_int(pOut, *pOp->p4.pI64, pOp->p4type == P4_INT64);
 	break;
 }
 

@@ -374,11 +374,11 @@ cn:execute('select $2, $1, $3', parameters)
 ---
 - metadata:
   - name: $2
-    type: INTEGER
+    type: UNSIGNED
   - name: $1
-    type: INTEGER
+    type: UNSIGNED
   - name: $3
-    type: INTEGER
+    type: UNSIGNED
   rows:
   - [22, 11, 33]
 ...

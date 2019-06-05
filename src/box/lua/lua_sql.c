@@ -61,7 +61,7 @@ lua_sql_call(sql_context *pCtx, int nVal, sql_value **apVal) {
 			luaL_pushint64(L, sql_value_int64(param));
 			break;
 		case MP_UINT:
-			luaL_pushuint64(L, sql_value_int64(param));
+			luaL_pushuint64(L, sql_value_uint64(param));
 			break;
 		case MP_DOUBLE:
 			lua_pushnumber(L, sql_value_double(param));

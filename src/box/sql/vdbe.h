@@ -70,7 +70,7 @@ struct VdbeOp {
 		int i;		/* Integer value if p4type==P4_INT32 */
 		void *p;	/* Generic pointer */
 		char *z;	/* Pointer to data for string (char array) types */
-		i64 *pI64;	/* Used when p4type is P4_INT64 */
+		i64 *pI64;	/* Used when p4type is P4_INT64/UINT64 */
 		double *pReal;	/* Used when p4type is P4_REAL */
 		FuncDef *pFunc;	/* Used when p4type is P4_FUNCDEF */
 		sql_context *pCtx;	/* Used when p4type is P4_FUNCCTX */
@@ -127,6 +127,7 @@ struct SubProgram {
 #define P4_TRANSIENT  0		/* P4 is a pointer to a transient string */
 #define P4_REAL     (-9)	/* P4 is a 64-bit floating point value */
 #define P4_INT64    (-10)	/* P4 is a 64-bit signed integer */
+#define P4_UINT64   (-8)	/* P4 is a 64-bit signed integer */
 #define P4_INT32    (-11)	/* P4 is a 32-bit signed integer */
 #define P4_INTARRAY (-12)	/* P4 is a vector of 32-bit integers */
 #define P4_SUBPROGRAM  (-13)	/* P4 is a pointer to a SubProgram structure */

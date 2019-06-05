@@ -475,8 +475,6 @@ sql_atoi64(const char *z, int64_t *val, bool *is_neg, int length)
 	} else {
 		*is_neg = false;
 		uint64_t u_val = strtoull(z, &end, 10);
-		if (u_val > (uint64_t) INT64_MAX + 1)
-			return -1;
 		*val = u_val;
 	}
 	/* Overflow and underflow errors. */

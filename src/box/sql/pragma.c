@@ -134,7 +134,7 @@ static void
 returnSingleInt(Vdbe * v, i64 value)
 {
 	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, 1, 0, (const u8 *)&value,
-			      P4_INT64);
+			  value < 0 ? P4_INT64 : P4_UINT64);
 	sqlVdbeAddOp2(v, OP_ResultRow, 1, 1);
 }
 

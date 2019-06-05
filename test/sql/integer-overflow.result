@@ -40,22 +40,53 @@ box.execute('SELECT (9223372036854775807 + 9223372036854775807 + 2);')
 ---
 - error: 'Failed to execute SQL statement: integer is overflowed'
 ...
+box.execute('SELECT 18446744073709551615 * 2;')
+---
+- error: 'Failed to execute SQL statement: integer is overflowed'
+...
+box.execute('SELECT (-9223372036854775807 * (-2));')
+---
+- metadata:
+  - name: (-9223372036854775807 * (-2))
+    type: integer
+  rows:
+  - [18446744073709551614]
+...
 -- Literals are checked right after parsing.
 --
 box.execute('SELECT 9223372036854775808;')
 ---
-- error: Integer literal 9223372036854775808 exceeds the supported range -9223372036854775808
-    - 9223372036854775807
+- metadata:
+  - name: '9223372036854775808'
+    type: integer
+  rows:
+  - [9223372036854775808]
 ...
 box.execute('SELECT -9223372036854775809;')
 ---
-- error: Integer literal -9223372036854775809 exceeds the supported range -9223372036854775808
-    - 9223372036854775807
+- error: Integer literal -9223372036854775809 exceeds the supported range [-9223372036854775808,
+    18446744073709551615]
 ...
 box.execute('SELECT 9223372036854775808 - 1;')
 ---
-- error: Integer literal 9223372036854775808 exceeds the supported range -9223372036854775808
-    - 9223372036854775807
+- metadata:
+  - name: 9223372036854775808 - 1
+    type: integer
+  rows:
+  - [9223372036854775807]
+...
+box.execute('SELECT 18446744073709551615;')
+---
+- metadata:
+  - name: '18446744073709551615'
+    type: integer
+  rows:
+  - [18446744073709551615]
+...
+box.execute('SELECT 18446744073709551616;')
+---
+- error: Integer literal 18446744073709551616 exceeds the supported range [-9223372036854775808,
+    18446744073709551615]
 ...
 -- Test that CAST may also leads to overflow.
 --
@@ -66,6 +97,10 @@ box.execute('SELECT CAST(\'9223372036854775808\' AS INTEGER);')
     type: integer
   rows:
   - [9223372036854775808]
+...
+box.execute('SELECT CAST(\'18446744073709551616\' AS INTEGER);')
+---
+- error: 'Type mismatch: can not convert 18446744073709551616 to integer'
 ...
 -- Due to inexact represantation of large integers in terms of
 -- floating point numbers, numerics with value < INT64_MAX
@@ -89,9 +124,47 @@ box.space.T:insert({9223372036854775809})
 ---
 - [9223372036854775808]
 ...
+box.space.T:insert({18446744073709551615ULL})
+---
+- [18446744073709551615]
+...
 box.execute('SELECT * FROM t;')
 ---
-- error: 'Failed to execute SQL statement: integer is overflowed'
+- metadata:
+  - name: ID
+    type: integer
+  rows:
+  - [9223372036854775808]
+  - [18446744073709551615]
+...
+box.space.T:drop()
+---
+...
+-- Make sure that integers stored in NUMBER field are converted
+-- to floating point properly.
+--
+box.execute("CREATE TABLE t(id INT PRIMARY KEY, a FLOAT);")
+---
+- row_count: 1
+...
+box.space.T:insert({1, 18446744073709551615ULL})
+---
+- [1, 18446744073709551615]
+...
+box.space.T:insert({2, -1})
+---
+- [2, -1]
+...
+box.execute("SELECT * FROM t;")
+---
+- metadata:
+  - name: ID
+    type: integer
+  - name: A
+    type: number
+  rows:
+  - [1, 1.844674407371e+19]
+  - [2, -1]
 ...
 box.space.T:drop()
 ---

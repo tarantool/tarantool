@@ -701,6 +701,12 @@ sql_column_int64(sql_stmt * pStmt, int i)
 	return sql_value_int64(columnMem(pStmt, i));
 }
 
+uint64_t
+sql_column_uint64(sql_stmt * pStmt, int i)
+{
+	return sql_value_uint64(columnMem(pStmt, i));
+}
+
 const unsigned char *
 sql_column_text(sql_stmt * pStmt, int i)
 {
@@ -988,7 +994,19 @@ sql_bind_int64(sql_stmt * pStmt, int i, sql_int64 iValue)
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	int rc = sql_bind_type(p, i, "INTEGER");
-	mem_set_i64(&p->aVar[i - 1], iValue);
+	assert(iValue < 0);
+	mem_set_int(&p->aVar[i - 1], iValue, true);
+	return rc;
+}
+
+int
+sql_bind_uint64(struct sql_stmt *stmt, int i, uint64_t value)
+{
+	struct Vdbe *p = (struct Vdbe *) stmt;
+	if (vdbeUnbind(p, i) != 0)
+		return -1;
+	int rc = sql_bind_type(p, i, "UNSIGNED");
+	mem_set_u64(&p->aVar[i - 1], value);
 	return rc;
 }
 

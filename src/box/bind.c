@@ -69,13 +69,8 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 	switch (type) {
 	case MP_UINT: {
 		uint64_t n = mp_decode_uint(packet);
-		if (n > INT64_MAX) {
-			diag_set(ClientError, ER_SQL_BIND_VALUE,
-				 sql_bind_name(bind), "INTEGER");
-			return -1;
-		}
-		bind->i64 = (int64_t) n;
-		bind->bytes = sizeof(bind->i64);
+		bind->u64 = n;
+		bind->bytes = sizeof(bind->u64);
 		break;
 	}
 	case MP_INT:
@@ -172,8 +167,9 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 	}
 	switch (p->type) {
 	case MP_INT:
-	case MP_UINT:
 		return sql_bind_int64(stmt, pos, p->i64);
+	case MP_UINT:
+		return sql_bind_uint64(stmt, pos, p->u64);
 	case MP_BOOL:
 		return sql_bind_boolean(stmt, pos, p->b);
 	case MP_DOUBLE:

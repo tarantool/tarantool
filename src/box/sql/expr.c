@@ -1231,7 +1231,7 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 			testcase(i == 1);
 			testcase(i == SQL_BIND_PARAMETER_MAX - 1);
 			testcase(i == SQL_BIND_PARAMETER_MAX);
-			if (i < 1) {
+			if (is_neg || i < 1) {
 				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
 					 "Index of binding slots must start "\
 					 "from 1");
@@ -3331,18 +3331,17 @@ expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg,
 		size_t len = strlen(z);
 		bool unused;
 		if (sql_atoi64(z, &value, &unused, len) != 0 ||
-		    (is_neg && (uint64_t) value > (uint64_t) INT64_MAX + 1) ||
-		    (!is_neg && (uint64_t) value > INT64_MAX)) {
+		    (is_neg && (uint64_t) value > (uint64_t) INT64_MAX + 1)) {
 int_overflow:
-			diag_set(ClientError, ER_INT_LITERAL_MAX, sign, z,
-				 INT64_MIN, INT64_MAX);
+			diag_set(ClientError, ER_INT_LITERAL_MAX, sign, z);
 			parse->is_aborted = true;
 			return;
 		}
 	}
 	if (is_neg)
 		value = -value;
-	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, mem, 0, (u8 *)&value, P4_INT64);
+	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, mem, 0, (u8 *) &value,
+			  is_neg ? P4_INT64 : P4_UINT64);
 }
 
 /*

@@ -370,8 +370,8 @@ sqlVdbeAddOp4(Vdbe * p,	/* Add the opcode to this VM */
 }
 
 /*
- * Add an opcode that includes the p4 value with a P4_INT64 or
- * P4_REAL type.
+ * Add an opcode that includes the p4 value with a P4_INT64/UINT64
+ * or P4_REAL type.
  */
 int
 sqlVdbeAddOp4Dup8(Vdbe * p,	/* Add the opcode to this VM */
@@ -682,6 +682,7 @@ freeP4(sql * db, int p4type, void *p4)
 		}
 	case P4_REAL:
 	case P4_INT64:
+	case P4_UINT64:
 	case P4_DYNAMIC:
 	case P4_INTARRAY:{
 			sqlDbFree(db, p4);
@@ -1169,6 +1170,10 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 			sqlXPrintf(&x, "%lld", *pOp->p4.pI64);
 			break;
 		}
+	case P4_UINT64: {
+		sqlXPrintf(&x, "%llu", (uint64_t)*pOp->p4.pI64);
+			break;
+	}
 	case P4_INT32:{
 			sqlXPrintf(&x, "%d", pOp->p4.i);
 			break;
@@ -3336,11 +3341,6 @@ vdbe_decode_msgpack_into_mem(const char *buf, struct Mem *mem, uint32_t *len)
 	}
 	case MP_UINT: {
 		uint64_t v = mp_decode_uint(&buf);
-		if (v > INT64_MAX) {
-			diag_set(ClientError, ER_SQL_EXECUTE,
-				 "integer is overflowed");
-			return -1;
-		}
 		mem->u.u = v;
 		mem->flags = MEM_UInt;
 		break;

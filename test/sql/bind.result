@@ -72,11 +72,11 @@ execute('SELECT ?, ?, ?', {1, 2, 3})
 ---
 - metadata:
   - name: '?'
-    type: INTEGER
+    type: UNSIGNED
   - name: '?'
-    type: INTEGER
+    type: UNSIGNED
   - name: '?'
-    type: INTEGER
+    type: UNSIGNED
   rows:
   - [1, 2, 3]
 ...
@@ -102,11 +102,11 @@ execute('SELECT ?, :value1, @value2', parameters)
 ---
 - metadata:
   - name: '?'
-    type: INTEGER
+    type: UNSIGNED
   - name: :value1
-    type: INTEGER
+    type: UNSIGNED
   - name: '@value2'
-    type: INTEGER
+    type: UNSIGNED
   rows:
   - [10, 11, 12]
 ...
@@ -144,21 +144,21 @@ execute('SELECT :value3, ?, :value1, ?, ?, @value2, ?, :value3', parameters)
 ---
 - metadata:
   - name: :value3
-    type: INTEGER
+    type: UNSIGNED
   - name: '?'
-    type: INTEGER
+    type: UNSIGNED
   - name: :value1
-    type: INTEGER
+    type: UNSIGNED
   - name: '?'
-    type: INTEGER
+    type: UNSIGNED
   - name: '?'
-    type: INTEGER
+    type: UNSIGNED
   - name: '@value2'
-    type: INTEGER
+    type: UNSIGNED
   - name: '?'
     type: boolean
   - name: :value3
-    type: INTEGER
+    type: UNSIGNED
   rows:
   - [1, 2, 3, 4, 5, 6, null, 1]
 ...
@@ -187,9 +187,9 @@ execute('SELECT ? AS kek, ? AS kek2', {1, 2})
 ---
 - metadata:
   - name: KEK
-    type: INTEGER
+    type: UNSIGNED
   - name: KEK2
-    type: INTEGER
+    type: UNSIGNED
   rows:
   - [1, 2]
 ...
@@ -236,7 +236,11 @@ execute(sql, parameters)
 -- suitable method in its bind API.
 execute('SELECT ? AS big_uint', {0xefffffffffffffff})
 ---
-- error: Bind value for parameter 1 is out of range for type INTEGER
+- metadata:
+  - name: BIG_UINT
+    type: UNSIGNED
+  rows:
+  - [17293822569102704640]
 ...
 -- Bind incorrect parameters.
 ok, err = pcall(execute, 'SELECT ?', { {1, 2, 3} })
@@ -274,6 +278,16 @@ parameters[1][':value'] = {kek = 300}
 execute('SELECT :value', parameters)
 ---
 - error: Bind value type MAP for parameter ':value' is not supported
+...
+-- gh-3810: bind values of integer in range up to 2^64 - 1.
+--
+execute('SELECT ? ', {18446744073709551615ULL})
+---
+- metadata:
+  - name: '?'
+    type: UNSIGNED
+  rows:
+  - [18446744073709551615]
 ...
 test_run:cmd("setopt delimiter ';'")
 ---

@@ -493,6 +493,9 @@ sql_column_boolean(struct sql_stmt *stmt, int column);
 sql_int64
 sql_column_int64(sql_stmt *, int iCol);
 
+uint64_t
+sql_column_uint64(struct sql_stmt *stmt, int column);
+
 const unsigned char *
 sql_column_text(sql_stmt *,
 		    int iCol);
@@ -677,6 +680,9 @@ sql_bind_int(sql_stmt *, int, int);
 
 int
 sql_bind_int64(sql_stmt *, int, sql_int64);
+
+int
+sql_bind_uint64(struct sql_stmt *stmt, int i, uint64_t value);
 
 int
 sql_bind_null(sql_stmt *, int);

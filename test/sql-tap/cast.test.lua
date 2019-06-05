@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(82)
+test:plan(84)
 
 --!./tcltestrunner.lua
 -- 2005 June 25
@@ -792,6 +792,18 @@ if true then --test:execsql("PRAGMA encoding")[1][1]=="UTF-8" then
             -- </cast-3.24>
         })
 end
+
+test:do_execsql_test(
+    "case-3.25",
+    [[
+        SELECT CAST(x'3138343436373434303733373039353531363135' AS REAL);
+    ]], { 1.844674407371e+19 } )
+
+test:do_execsql_test(
+    "case-3.26",
+    [[
+        SELECT CAST(x'3138343436373434303733373039353531363135' AS INT);
+    ]], { 18446744073709551615LL } )
 
 test:do_execsql_test(
     "case-3.31",

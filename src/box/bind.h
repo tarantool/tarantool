@@ -64,6 +64,7 @@ struct sql_bind {
 		bool b;
 		double d;
 		int64_t i64;
+		uint64_t u64;
 		/** For string or blob. */
 		const char *s;
 	};

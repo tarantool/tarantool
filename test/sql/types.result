@@ -1113,3 +1113,570 @@ box.execute("SELECT a FROM t1 WHERE a IN (1.1, 2.1);")
 s:drop()
 ---
 ...
+-- gh-3810: range of integer is extended up to 2^64 - 1.
+--
+box.execute("SELECT 18446744073709551615 > 18446744073709551614;")
+---
+- metadata:
+  - name: 18446744073709551615 > 18446744073709551614
+    type: boolean
+  rows:
+  - [true]
+...
+box.execute("SELECT 18446744073709551615 > -9223372036854775808;")
+---
+- metadata:
+  - name: 18446744073709551615 > -9223372036854775808
+    type: boolean
+  rows:
+  - [true]
+...
+box.execute("SELECT -1 < 18446744073709551615;")
+---
+- metadata:
+  - name: -1 < 18446744073709551615
+    type: boolean
+  rows:
+  - [true]
+...
+box.execute("SELECT 1.5 < 18446744073709551615")
+---
+- metadata:
+  - name: 1.5 < 18446744073709551615
+    type: boolean
+  rows:
+  - [true]
+...
+box.execute("SELECT 1.5 > 18446744073709551615")
+---
+- metadata:
+  - name: 1.5 > 18446744073709551615
+    type: boolean
+  rows:
+  - [false]
+...
+box.execute("SELECT 18446744073709551615 > 1.5")
+---
+- metadata:
+  - name: 18446744073709551615 > 1.5
+    type: boolean
+  rows:
+  - [true]
+...
+box.execute("SELECT 18446744073709551615 < 1.5")
+---
+- metadata:
+  - name: 18446744073709551615 < 1.5
+    type: boolean
+  rows:
+  - [false]
+...
+box.execute("SELECT 18446744073709551615 = 18446744073709551615;")
+---
+- metadata:
+  - name: 18446744073709551615 = 18446744073709551615
+    type: boolean
+  rows:
+  - [true]
+...
+box.execute("SELECT 18446744073709551615 > -9223372036854775808;")
+---
+- metadata:
+  - name: 18446744073709551615 > -9223372036854775808
+    type: boolean
+  rows:
+  - [true]
+...
+box.execute("SELECT 18446744073709551615 < -9223372036854775808;")
+---
+- metadata:
+  - name: 18446744073709551615 < -9223372036854775808
+    type: boolean
+  rows:
+  - [false]
+...
+box.execute("SELECT -1 < 18446744073709551615;")
+---
+- metadata:
+  - name: -1 < 18446744073709551615
+    type: boolean
+  rows:
+  - [true]
+...
+box.execute("SELECT -1 > 18446744073709551615;")
+---
+- metadata:
+  - name: -1 > 18446744073709551615
+    type: boolean
+  rows:
+  - [false]
+...
+box.execute("SELECT 18446744073709551610 - 18446744073709551615;")
+---
+- metadata:
+  - name: 18446744073709551610 - 18446744073709551615
+    type: integer
+  rows:
+  - [-5]
+...
+box.execute("SELECT 18446744073709551615 = null;")
+---
+- metadata:
+  - name: 18446744073709551615 = null
+    type: boolean
+  rows:
+  - [null]
+...
+box.execute("SELECT 18446744073709551615 = 18446744073709551615.0;")
+---
+- metadata:
+  - name: 18446744073709551615 = 18446744073709551615.0
+    type: boolean
+  rows:
+  - [false]
+...
+box.execute("SELECT 18446744073709551615.0 > 18446744073709551615")
+---
+- metadata:
+  - name: 18446744073709551615.0 > 18446744073709551615
+    type: boolean
+  rows:
+  - [false]
+...
+box.execute("SELECT 18446744073709551615 IN ('18446744073709551615', 18446744073709551615.0)")
+---
+- metadata:
+  - name: 18446744073709551615 IN ('18446744073709551615', 18446744073709551615.0)
+    type: boolean
+  rows:
+  - [true]
+...
+box.execute("SELECT 1 LIMIT 18446744073709551615;")
+---
+- metadata:
+  - name: '1'
+    type: integer
+  rows:
+  - [1]
+...
+box.execute("SELECT 1 LIMIT 1 OFFSET 18446744073709551614;")
+---
+- metadata:
+  - name: '1'
+    type: integer
+  rows: []
+...
+box.execute("SELECT CAST('18446744073' || '709551616' AS INTEGER);")
+---
+- error: 'Type mismatch: can not convert 18446744073709551616 to integer'
+...
+box.execute("SELECT CAST('18446744073' || '709551615' AS INTEGER);")
+---
+- metadata:
+  - name: CAST('18446744073' || '709551615' AS INTEGER)
+    type: integer
+  rows:
+  - [18446744073709551615]
+...
+box.execute("SELECT 18446744073709551610 + 5;")
+---
+- metadata:
+  - name: 18446744073709551610 + 5
+    type: integer
+  rows:
+  - [18446744073709551615]
+...
+box.execute("SELECT 18446744073709551615 * 1;")
+---
+- metadata:
+  - name: 18446744073709551615 * 1
+    type: integer
+  rows:
+  - [18446744073709551615]
+...
+box.execute("SELECT 1 / 18446744073709551615;")
+---
+- metadata:
+  - name: 1 / 18446744073709551615
+    type: integer
+  rows:
+  - [0]
+...
+box.execute("SELECT 18446744073709551615 / 18446744073709551615;")
+---
+- metadata:
+  - name: 18446744073709551615 / 18446744073709551615
+    type: integer
+  rows:
+  - [1]
+...
+box.execute("SELECT 18446744073709551615 / -9223372036854775808;")
+---
+- metadata:
+  - name: 18446744073709551615 / -9223372036854775808
+    type: integer
+  rows:
+  - [-1]
+...
+box.execute("SELECT 0 - 18446744073709551610;")
+---
+- error: 'Failed to execute SQL statement: integer is overflowed'
+...
+box.execute("CREATE TABLE t (id INT PRIMARY KEY, i INT);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t VALUES (1, 18446744073709551615);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t VALUES (2, 18446744073709551614);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t VALUES (3, 18446744073709551613)")
+---
+- row_count: 1
+...
+box.execute("SELECT i FROM t;")
+---
+- metadata:
+  - name: I
+    type: integer
+  rows:
+  - [18446744073709551615]
+  - [18446744073709551614]
+  - [18446744073709551613]
+...
+box.execute("SELECT i FROM t WHERE i = 18446744073709551615;")
+---
+- metadata:
+  - name: I
+    type: integer
+  rows:
+  - [18446744073709551615]
+...
+box.execute("SELECT i FROM t WHERE i BETWEEN 18446744073709551613 AND 18446744073709551615;")
+---
+- metadata:
+  - name: I
+    type: integer
+  rows:
+  - [18446744073709551615]
+  - [18446744073709551614]
+  - [18446744073709551613]
+...
+box.execute("SELECT i FROM t ORDER BY i;")
+---
+- metadata:
+  - name: I
+    type: integer
+  rows:
+  - [18446744073709551613]
+  - [18446744073709551614]
+  - [18446744073709551615]
+...
+box.execute("SELECT i FROM t ORDER BY -i;")
+---
+- error: 'Failed to execute SQL statement: integer is overflowed'
+...
+box.execute("SELECT i FROM t ORDER BY i LIMIT 1;")
+---
+- metadata:
+  - name: I
+    type: integer
+  rows:
+  - [18446744073709551613]
+...
+-- Test that built-in functions are capable of handling unsigneds.
+--
+box.execute("DELETE FROM t WHERE i > 18446744073709551613;")
+---
+- row_count: 2
+...
+box.execute("INSERT INTO t VALUES (1, 1);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t VALUES (2, -1);")
+---
+- row_count: 1
+...
+box.execute("SELECT sum(i) FROM t;")
+---
+- metadata:
+  - name: sum(i)
+    type: number
+  rows:
+  - [18446744073709551613]
+...
+box.execute("SELECT avg(i) FROM t;")
+---
+- metadata:
+  - name: avg(i)
+    type: number
+  rows:
+  - [6148914691236516864]
+...
+box.execute("SELECT total(i) FROM t;")
+---
+- metadata:
+  - name: total(i)
+    type: number
+  rows:
+  - [1.844674407371e+19]
+...
+box.execute("SELECT min(i) FROM t;")
+---
+- metadata:
+  - name: min(i)
+    type: scalar
+  rows:
+  - [-1]
+...
+box.execute("SELECT max(i) FROM t;")
+---
+- metadata:
+  - name: max(i)
+    type: scalar
+  rows:
+  - [18446744073709551613]
+...
+box.execute("SELECT count(i) FROM t;")
+---
+- metadata:
+  - name: count(i)
+    type: integer
+  rows:
+  - [3]
+...
+box.execute("SELECT group_concat(i) FROM t;")
+---
+- metadata:
+  - name: group_concat(i)
+    type: string
+  rows:
+  - ['1,-1,18446744073709551613']
+...
+box.execute("DELETE FROM t WHERE i < 18446744073709551613;")
+---
+- row_count: 2
+...
+box.execute("SELECT lower(i) FROM t;")
+---
+- metadata:
+  - name: lower(i)
+    type: string
+  rows:
+  - ['18446744073709551613']
+...
+box.execute("SELECT upper(i) FROM t;")
+---
+- metadata:
+  - name: upper(i)
+    type: string
+  rows:
+  - ['18446744073709551613']
+...
+box.execute("SELECT abs(i) FROM t;")
+---
+- metadata:
+  - name: abs(i)
+    type: number
+  rows:
+  - [18446744073709551613]
+...
+box.execute("SELECT typeof(i) FROM t;")
+---
+- metadata:
+  - name: typeof(i)
+    type: string
+  rows:
+  - ['integer']
+...
+box.execute("SELECT quote(i) FROM t;")
+---
+- metadata:
+  - name: quote(i)
+    type: string
+  rows:
+  - [18446744073709551613]
+...
+box.execute("SELECT min(-1, i) FROM t;")
+---
+- metadata:
+  - name: min(-1, i)
+    type: scalar
+  rows:
+  - [-1]
+...
+box.execute("SELECT quote(i) FROM t;")
+---
+- metadata:
+  - name: quote(i)
+    type: string
+  rows:
+  - [18446744073709551613]
+...
+box.execute("CREATE INDEX i ON t(i);")
+---
+- row_count: 1
+...
+box.execute("SELECT i FROM t WHERE i = 18446744073709551613;")
+---
+- metadata:
+  - name: I
+    type: integer
+  rows:
+  - [18446744073709551613]
+...
+box.execute("SELECT i FROM t WHERE i >= 18446744073709551613 ORDER BY i;")
+---
+- metadata:
+  - name: I
+    type: integer
+  rows:
+  - [18446744073709551613]
+...
+box.execute("UPDATE t SET i = 18446744073709551615 WHERE i = 18446744073709551613;")
+---
+- row_count: 1
+...
+box.execute("SELECT i FROM t;")
+---
+- metadata:
+  - name: I
+    type: integer
+  rows:
+  - [18446744073709551615]
+...
+-- Test constraints functionality.
+--
+box.execute("CREATE TABLE parent (id INT PRIMARY KEY, a INT UNIQUE);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO parent VALUES (1, 18446744073709551613);")
+---
+- row_count: 1
+...
+box.space.T:truncate()
+---
+...
+box.execute("ALTER TABLE t ADD CONSTRAINT fk1 FOREIGN KEY (i) REFERENCES parent (a);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t VALUES (1, 18446744073709551615);")
+---
+- error: 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+...
+box.execute("INSERT INTO parent VALUES (2, 18446744073709551615);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t VALUES (1, 18446744073709551615);")
+---
+- row_count: 1
+...
+box.execute("ALTER TABLE t DROP CONSTRAINT fk1;")
+---
+- row_count: 1
+...
+box.space.PARENT:drop()
+---
+...
+box.space.T:drop()
+---
+...
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT CHECK (a > 18446744073709551612));")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t1 VALUES (1, 18446744073709551611);")
+---
+- error: 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a > 18446744073709551612'
+...
+box.execute("INSERT INTO t1 VALUES (1, -1);")
+---
+- error: 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a > 18446744073709551612'
+...
+box.space.T1:drop()
+---
+...
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT DEFAULT 18446744073709551615);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t1 (id) VALUES (1);")
+---
+- row_count: 1
+...
+box.space.T1:select()
+---
+- - [1, 18446744073709551615]
+...
+box.space.T1:drop()
+---
+...
+-- Test that autoincrement accepts only max 2^63 - 1 .
+--
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY AUTOINCREMENT);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t1 VALUES (18446744073709551615);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t1 VALUES (NULL);")
+---
+- autoincrement_ids:
+  - 1
+  row_count: 1
+...
+box.space.T1:drop()
+---
+...
+-- Test CAST facilities.
+--
+box.execute("SELECT CAST(18446744073709551615 AS FLOAT);")
+---
+- metadata:
+  - name: CAST(18446744073709551615 AS FLOAT)
+    type: number
+  rows:
+  - [1.844674407371e+19]
+...
+box.execute("SELECT CAST(18446744073709551615 AS TEXT);")
+---
+- metadata:
+  - name: CAST(18446744073709551615 AS TEXT)
+    type: string
+  rows:
+  - ['18446744073709551615']
+...
+box.execute("SELECT CAST(18446744073709551615 AS SCALAR);")
+---
+- metadata:
+  - name: CAST(18446744073709551615 AS SCALAR)
+    type: scalar
+  rows:
+  - [18446744073709551615]
+...
+box.execute("SELECT CAST(18446744073709551615 AS BOOLEAN);")
+---
+- metadata:
+  - name: CAST(18446744073709551615 AS BOOLEAN)
+    type: boolean
+  rows:
+  - [true]
+...
+box.execute("SELECT CAST('18446744073709551615' AS INTEGER);")
+---
+- metadata:
+  - name: CAST('18446744073709551615' AS INTEGER)
+    type: integer
+  rows:
+  - [18446744073709551615]
+...

@@ -11,15 +11,21 @@ box.execute('SELECT (-9223372036854775808 / -1);')
 box.execute('SELECT (-9223372036854775808 - 1);')
 box.execute('SELECT (9223372036854775807 + 1);')
 box.execute('SELECT (9223372036854775807 + 9223372036854775807 + 2);')
+box.execute('SELECT 18446744073709551615 * 2;')
+box.execute('SELECT (-9223372036854775807 * (-2));')
 
 -- Literals are checked right after parsing.
 --
 box.execute('SELECT 9223372036854775808;')
 box.execute('SELECT -9223372036854775809;')
 box.execute('SELECT 9223372036854775808 - 1;')
+box.execute('SELECT 18446744073709551615;')
+box.execute('SELECT 18446744073709551616;')
+
 -- Test that CAST may also leads to overflow.
 --
 box.execute('SELECT CAST(\'9223372036854775808\' AS INTEGER);')
+box.execute('SELECT CAST(\'18446744073709551616\' AS INTEGER);')
 -- Due to inexact represantation of large integers in terms of
 -- floating point numbers, numerics with value < INT64_MAX
 -- have INT64_MAX + 1 value in integer representation:
@@ -33,5 +39,15 @@ box.execute('SELECT CAST(9223372036854775807.0 AS INTEGER);')
 --
 box.execute('CREATE TABLE t (id INT PRIMARY KEY);')
 box.space.T:insert({9223372036854775809})
+box.space.T:insert({18446744073709551615ULL})
 box.execute('SELECT * FROM t;')
+box.space.T:drop()
+
+-- Make sure that integers stored in NUMBER field are converted
+-- to floating point properly.
+--
+box.execute("CREATE TABLE t(id INT PRIMARY KEY, a FLOAT);")
+box.space.T:insert({1, 18446744073709551615ULL})
+box.space.T:insert({2, -1})
+box.execute("SELECT * FROM t;")
 box.space.T:drop()

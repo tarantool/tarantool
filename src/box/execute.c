@@ -147,7 +147,7 @@ sql_column_to_messagepack(struct sql_stmt *stmt, int i,
 		break;
 	}
 	case MP_UINT: {
-		uint64_t n = sql_column_int64(stmt, i);
+		uint64_t n = sql_column_uint64(stmt, i);
 		size = mp_sizeof_uint(n);
 		char *pos = (char *) region_alloc(region, size);
 		if (pos == NULL)

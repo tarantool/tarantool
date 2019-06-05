@@ -658,7 +658,10 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 		if (sql_atoi64(pMem->z,  (int64_t *) &pMem->u.i, &is_neg,
 			       pMem->n) == 0) {
 			MemSetTypeFlag(pMem, MEM_Real);
-			pMem->u.r = pMem->u.i;
+			if (is_neg)
+				pMem->u.r = pMem->u.i;
+			else
+				pMem->u.r = pMem->u.u;
 			return 0;
 		}
 		return ! sqlAtoF(pMem->z, &pMem->u.r, pMem->n);

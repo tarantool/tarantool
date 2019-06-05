@@ -89,6 +89,10 @@ parameters[1] = {}
 parameters[1][':value'] = {kek = 300}
 execute('SELECT :value', parameters)
 
+-- gh-3810: bind values of integer in range up to 2^64 - 1.
+--
+execute('SELECT ? ', {18446744073709551615ULL})
+
 test_run:cmd("setopt delimiter ';'")
 if remote then
 	cn:close()

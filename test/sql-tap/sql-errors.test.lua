@@ -139,10 +139,10 @@ test:do_catchsql_test(
 test:do_catchsql_test(
 	"sql-errors-1.13",
 	[[
-		SELECT 9223372036854775808;
+		SELECT 18446744073709551616;
 	]], {
 		-- <sql-errors-1.13>
-		1,"Integer literal 9223372036854775808 exceeds the supported range -9223372036854775808 - 9223372036854775807"
+		1,"Integer literal 18446744073709551616 exceeds the supported range [-9223372036854775808, 18446744073709551615]"
 		-- </sql-errors-1.13>
 	})
 

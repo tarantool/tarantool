@@ -242,7 +242,7 @@ struct errcode_record {
 	/*187 */_(ER_SQL_ANALYZE_ARGUMENT,	"ANALYZE statement argument %s is not a base table") \
 	/*188 */_(ER_SQL_COLUMN_COUNT_MAX,	"Failed to create space '%s': space column count %d exceeds the limit (%d)") \
 	/*189 */_(ER_HEX_LITERAL_MAX,		"Hex literal %s%s length %d exceeds the supported limit (%d)") \
-	/*190 */_(ER_INT_LITERAL_MAX,		"Integer literal %s%s exceeds the supported range %lld - %lld") \
+	/*190 */_(ER_INT_LITERAL_MAX,		"Integer literal %s%s exceeds the supported range [-9223372036854775808, 18446744073709551615]") \
 	/*191 */_(ER_SQL_PARSER_LIMIT,		"%s %d exceeds the limit (%d)") \
 	/*192 */_(ER_INDEX_DEF_UNSUPPORTED,	"%s are prohibited in an index definition") \
 	/*193 */_(ER_CK_DEF_UNSUPPORTED,	"%s are prohibited in a ck constraint definition") \
