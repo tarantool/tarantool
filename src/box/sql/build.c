@@ -1274,9 +1274,9 @@ sqlEndTable(struct Parse *pParse)
 	 * In case IF NOT EXISTS clause is specified and table
 	 * exists, we will silently halt VDBE execution.
 	 */
-	char *space_name_copy = sqlDbStrDup(db, new_space->def->name);
+	char *space_name_copy = sqlDbStrDup(pParse->db, new_space->def->name);
 	if (space_name_copy == NULL)
-		goto cleanup;
+		return;
 	int name_reg = ++pParse->nMem;
 	sqlVdbeAddOp4(pParse->pVdbe, OP_String8, 0, name_reg, 0,
 		      space_name_copy, P4_DYNAMIC);
@@ -1287,7 +1287,7 @@ sqlEndTable(struct Parse *pParse)
 					      name_reg, 1, ER_SPACE_EXISTS,
 					      error_msg, (no_err != 0),
 					      OP_NoConflict) != 0)
-		goto cleanup;
+		return;
 
 	int reg_space_id = getNewSpaceId(pParse);
 	vdbe_emit_space_create(pParse, reg_space_id, name_reg, new_space);
