@@ -223,7 +223,7 @@ local function test_post_and_get(test, url, opts)
 end
 
 local function test_errors(test)
-    test:plan(3)
+    test:plan(2)
     local http = client:new()
     local status, err = pcall(http.get, http, "htp://mail.ru")
     test:ok(not status and string.find(json.encode(err),
@@ -234,7 +234,6 @@ local function test_errors(test)
                         "Unsupported protocol"),
                         "POST: exception on bad protocol")
     local r = http:get("http://do_not_exist_8ffad33e0cb01e6a01a03d00089e71e5b2b7e9930dfcba.ru")
-    test:is(r.status, 595, "GET: response on bad url")
 end
 
 -- gh-3679 allow only headers can be converted to string
@@ -522,16 +521,14 @@ local function test_concurrent(test, url, opts)
 end
 
 function run_tests(test, sock_family, sock_addr)
-    test:plan(10)
+    test:plan(11)
     local server, url, opts = start_server(test, sock_family, sock_addr)
     test:test("http.client", test_http_client, url, opts)
     test:test("http.client headers redefine", test_http_client_headers_redefine,
               url, opts)
     test:test("cancel and errinj", test_cancel_and_errinj, url .. 'long_query', opts)
     test:test("basic http post/get", test_post_and_get, url, opts)
--- disabled, please make test local, the internet is not always available
--- and quick during a test, gh-4254
---    test:test("errors", test_errors)
+    test:test("errors", test_errors)
     test:test("request_headers", test_request_headers, url, opts)
     test:test("headers", test_headers, url, opts)
     test:test("special methods", test_special_methods, url, opts)
