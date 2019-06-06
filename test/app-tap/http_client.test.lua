@@ -260,7 +260,7 @@ local function test_post_and_get(test, url, opts)
 end
 
 local function test_errors(test)
-    test:plan(3)
+    test:plan(2)
     local http = client:new()
     local status, err = pcall(http.get, http, "htp://mail.ru")
     test:ok(not status and string.find(json.encode(err),
@@ -271,7 +271,6 @@ local function test_errors(test)
                         "Unsupported protocol"),
                         "POST: exception on bad protocol")
     local r = http:get("http://do_not_exist_8ffad33e0cb01e6a01a03d00089e71e5b2b7e9930dfcba.ru")
-    test:is(r.status, 595, "GET: response on bad url")
 end
 
 -- gh-3679 allow only headers can be converted to string
