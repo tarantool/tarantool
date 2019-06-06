@@ -67,6 +67,8 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 static struct tuple_format_vtab tuple_format_runtime_vtab = {
 	runtime_tuple_delete,
 	runtime_tuple_new,
+	NULL,
+	NULL,
 };
 
 static struct tuple *

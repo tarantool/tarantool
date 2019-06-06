@@ -118,6 +118,8 @@ vy_stmt_env_create(struct vy_stmt_env *env)
 {
 	env->tuple_format_vtab.tuple_new = vy_tuple_new;
 	env->tuple_format_vtab.tuple_delete = vy_tuple_delete;
+	env->tuple_format_vtab.tuple_chunk_new = NULL;
+	env->tuple_format_vtab.tuple_chunk_delete = NULL;
 	env->max_tuple_size = 1024 * 1024;
 	env->key_format = vy_stmt_format_new(env, NULL, 0, NULL, 0, 0, NULL);
 	if (env->key_format == NULL)

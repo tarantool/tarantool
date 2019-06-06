@@ -447,6 +447,40 @@ tuple_delete(struct tuple *tuple)
 	format->vtab.tuple_delete(format, tuple);
 }
 
+/** Tuple chunk memory object. */
+struct tuple_chunk {
+	/** The payload size. Needed to perform memory release.*/
+	uint32_t data_sz;
+	/** Metadata object payload. */
+	char data[0];
+};
+
+/** Calculate the size of tuple_chunk object by given data_sz. */
+static inline uint32_t
+tuple_chunk_sz(uint32_t data_sz)
+{
+	return sizeof(struct tuple_chunk) + data_sz;
+}
+
+/**
+ * Allocate a new tuple_chunk for given tuple and data and
+ * return a pointer to it's payload section.
+ */
+static inline const char *
+tuple_chunk_new(struct tuple *tuple, const char *data, uint32_t data_sz)
+{
+	struct tuple_format *format = tuple_format(tuple);
+	return format->vtab.tuple_chunk_new(format, tuple, data, data_sz);
+}
+
+/** Free a tuple_chunk allocated for given tuple and data. */
+static inline void
+tuple_chunk_delete(struct tuple *tuple, const char *data)
+{
+	struct tuple_format *format = tuple_format(tuple);
+	format->vtab.tuple_chunk_delete(format, data);
+}
+
 /**
  * Check tuple data correspondence to space format.
  * Actually, checks everything that is checked by
