@@ -587,3 +587,18 @@ fio = require('fio')
 #fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*.index.inprogress')) == 0
 
 box.space.test:drop()
+
+-- gh-4276 - check grant privilege rollback
+_ = box.schema.user.create('testg')
+_ = box.schema.space.create('testg'):create_index('pk')
+
+box.error.injection.set('ERRINJ_WAL_IO', true)
+-- the grant operation above fails and test hasn't any space test permissions
+box.schema.user.grant('testg', 'read,write', 'space', 'testg')
+-- switch user and check they couldn't select
+box.session.su('testg')
+box.space.testg:select()
+box.session.su('admin')
+box.error.injection.set('ERRINJ_WAL_IO', false)
+box.schema.user.drop('testg')
+box.space.testg:drop()

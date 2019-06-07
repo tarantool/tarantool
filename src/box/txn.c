@@ -428,6 +428,12 @@ txn_commit(struct txn *txn)
 			goto fail;
 	}
 	/*
+	 * Engine can be NULL if transaction contains IPROTO_NOP
+	 * statements only.
+	 */
+	if (txn->engine != NULL)
+		engine_commit(txn->engine, txn);
+	/*
 	 * The transaction is in the binary log. No action below
 	 * may throw. In case an error has happened, there is
 	 * no other option but terminate.
@@ -438,12 +444,6 @@ txn_commit(struct txn *txn)
 		unreachable();
 		panic("commit trigger failed");
 	}
-	/*
-	 * Engine can be NULL if transaction contains IPROTO_NOP
-	 * statements only.
-	 */
-	if (txn->engine != NULL)
-		engine_commit(txn->engine, txn);
 
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next)
@@ -475,6 +475,8 @@ txn_rollback()
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return;
+	if (txn->engine)
+		engine_rollback(txn->engine, txn);
 	/* Rollback triggers must not throw. */
 	if (txn->has_triggers &&
 	    trigger_run(&txn->on_rollback, txn) != 0) {
@@ -482,8 +484,6 @@ txn_rollback()
 		unreachable();
 		panic("rollback trigger failed");
 	}
-	if (txn->engine)
-		engine_rollback(txn->engine, txn);
 
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next)

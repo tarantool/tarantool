@@ -1686,3 +1686,40 @@ fio = require('fio')
 box.space.test:drop()
 ---
 ...
+-- gh-4276 - check grant privilege rollback
+_ = box.schema.user.create('testg')
+---
+...
+_ = box.schema.space.create('testg'):create_index('pk')
+---
+...
+box.error.injection.set('ERRINJ_WAL_IO', true)
+---
+- ok
+...
+-- the grant operation above fails and test hasn't any space test permissions
+box.schema.user.grant('testg', 'read,write', 'space', 'testg')
+---
+- error: Failed to write to disk
+...
+-- switch user and check they couldn't select
+box.session.su('testg')
+---
+...
+box.space.testg:select()
+---
+- error: Read access to space 'testg' is denied for user 'testg'
+...
+box.session.su('admin')
+---
+...
+box.error.injection.set('ERRINJ_WAL_IO', false)
+---
+- ok
+...
+box.schema.user.drop('testg')
+---
+...
+box.space.testg:drop()
+---
+...
