@@ -2339,14 +2339,14 @@ connected_cnt
 ...
 disconnected_cnt
 ---
-- 2
+- 1
 ...
 conn:close()
 ---
 ...
 disconnected_cnt
 ---
-- 3
+- 2
 ...
 test_run:cmd('stop server connecter')
 ---
