@@ -620,9 +620,9 @@ test_run:wait_log("replica", "REPLICASET_UUID_MISMATCH", nil, 1.0)
 ---
 - REPLICASET_UUID_MISMATCH
 ...
-box.info.replication[2].downstream.status
+test_run:wait_downstream(2, {status = 'stopped'})
 ---
-- stopped
+- true
 ...
 test_run:cmd("stop server replica")
 ---
