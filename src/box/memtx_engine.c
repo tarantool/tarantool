@@ -94,15 +94,12 @@ memtx_init_txn(struct txn *txn)
 
 	trigger_create(&txn->fiber_on_yield, txn_on_yield,
 		       NULL, NULL);
-	trigger_create(&txn->fiber_on_stop, txn_on_stop,
-		       NULL, NULL);
 	/*
 	 * Memtx doesn't allow yields between statements of
 	 * a transaction. Set a trigger which would roll
 	 * back the transaction if there is a yield.
 	 */
 	trigger_add(&fiber->on_yield, &txn->fiber_on_yield);
-	trigger_add(&fiber->on_stop, &txn->fiber_on_stop);
 	/*
 	 * This serves as a marker that the triggers are
 	 * initialized.
@@ -379,7 +376,6 @@ memtx_engine_prepare(struct engine *engine, struct txn *txn)
 	 * on calls to trigger_create/trigger_clear.
 	 */
 	trigger_clear(&txn->fiber_on_yield);
-	trigger_clear(&txn->fiber_on_stop);
 	if (txn->is_aborted) {
 		diag_set(ClientError, ER_TRANSACTION_YIELD);
 		diag_log();
@@ -458,7 +454,6 @@ memtx_engine_rollback(struct engine *engine, struct txn *txn)
 {
 	if (txn->engine_tx != NULL) {
 		trigger_clear(&txn->fiber_on_yield);
-		trigger_clear(&txn->fiber_on_stop);
 	}
 	struct txn_stmt *stmt;
 	stailq_reverse(&txn->stmts);

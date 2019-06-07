@@ -198,6 +198,8 @@ txn_begin(bool is_autocommit)
 	txn->psql_txn = NULL;
 	/* fiber_on_yield/fiber_on_stop initialized by engine on demand */
 	fiber_set_txn(fiber(), txn);
+	trigger_create(&txn->fiber_on_stop, txn_on_stop, NULL, NULL);
+	trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
 	return txn;
 }
 
@@ -421,6 +423,7 @@ txn_commit(struct txn *txn)
 		if (engine_prepare(txn->engine, txn) != 0)
 			goto fail;
 	}
+	trigger_clear(&txn->fiber_on_stop);
 
 	if (txn->n_new_rows + txn->n_applier_rows > 0) {
 		txn->signature = txn_write_to_wal(txn);
@@ -475,6 +478,7 @@ txn_rollback()
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return;
+	trigger_clear(&txn->fiber_on_stop);
 	if (txn->engine)
 		engine_rollback(txn->engine, txn);
 	/* Rollback triggers must not throw. */
