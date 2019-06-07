@@ -114,6 +114,10 @@ struct applier {
 	bool is_paused;
 	/** Condition variable signaled to resume the applier. */
 	struct fiber_cond resume_cond;
+	/* Diag to raise an error. */
+	struct diag diag;
+	/* Master's vclock at the time of SUBSCRIBE. */
+	struct vclock remote_vclock_at_subscribe;
 };
 
 /**

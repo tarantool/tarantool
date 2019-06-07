@@ -232,6 +232,17 @@ struct replicaset {
 		 * struct replica object).
 		 */
 		struct latch order_latch;
+		/*
+		 * A vclock of the last transaction wich was read
+		 * by applier and processed by tx.
+		 */
+		struct vclock vclock;
+		/* Trigger to fire when a replication request failed to apply. */
+		struct rlist on_rollback;
+		/* Trigget to fire a replication request commited to a wal. */
+		struct rlist on_commit;
+		/* Shared applier diagnostic area. */
+		struct diag diag;
 	} applier;
 	/** Map of all known replica_id's to correspponding replica's. */
 	struct replica **replica_by_id;
