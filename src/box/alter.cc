@@ -3047,33 +3047,26 @@ grant_or_revoke(struct priv_def *priv)
 	}
 }
 
-/** A trigger called on rollback of grant, or on commit of revoke. */
+/** A trigger called on rollback of grant. */
 static void
-revoke_priv(struct trigger * /* trigger */, void *event)
+revoke_priv(struct trigger *trigger, void *event)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_last_stmt(txn);
-	struct tuple *tuple = (stmt->new_tuple ?
-			       stmt->new_tuple : stmt->old_tuple);
+	(void) event;
+	struct tuple *tuple = (struct tuple *)trigger->data;
 	struct priv_def priv;
 	priv_def_create_from_tuple(&priv, tuple);
-	/*
-	 * Access to the object has been removed altogether so
-	 * there should be no grants at all. If only some grants
-	 * were removed, modify_priv trigger would have been
-	 * invoked.
-	 */
 	priv.access = 0;
 	grant_or_revoke(&priv);
 }
 
-/** A trigger called on rollback of grant, or on commit of revoke. */
+/** A trigger called on rollback of revoke or modify. */
 static void
-modify_priv(struct trigger * /* trigger */, void *event)
+modify_priv(struct trigger *trigger, void *event)
 {
-	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
+	(void) event;
+	struct tuple *tuple = (struct tuple *)trigger->data;
 	struct priv_def priv;
-	priv_def_create_from_tuple(&priv, stmt->new_tuple);
+	priv_def_create_from_tuple(&priv, tuple);
 	grant_or_revoke(&priv);
 }
 
@@ -3096,21 +3089,24 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 		priv_def_check(&priv, PRIV_GRANT);
 		grant_or_revoke(&priv);
 		struct trigger *on_rollback =
-			txn_alter_trigger_new(revoke_priv, NULL);
+			txn_alter_trigger_new(revoke_priv, new_tuple);
 		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) {                /* revoke */
 		assert(old_tuple);
 		priv_def_create_from_tuple(&priv, old_tuple);
 		priv_def_check(&priv, PRIV_REVOKE);
-		struct trigger *on_commit =
-			txn_alter_trigger_new(revoke_priv, NULL);
-		txn_on_commit(txn, on_commit);
+		priv.access = 0;
+		grant_or_revoke(&priv);
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(modify_priv, old_tuple);
+		txn_on_rollback(txn, on_rollback);
 	} else {                                       /* modify */
 		priv_def_create_from_tuple(&priv, new_tuple);
 		priv_def_check(&priv, PRIV_GRANT);
-		struct trigger *on_commit =
-			txn_alter_trigger_new(modify_priv, NULL);
-		txn_on_commit(txn, on_commit);
+		grant_or_revoke(&priv);
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(modify_priv, old_tuple);
+		txn_on_rollback(txn, on_rollback);
 	}
 }
 
