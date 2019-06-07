@@ -4624,7 +4624,7 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 		 * which will propagate the WAL row LSN to
 		 * the LSM tree.
 		 */
-		struct trigger *on_commit = region_alloc(&fiber()->gc,
+		struct trigger *on_commit = region_alloc(&txn->region,
 							 sizeof(*on_commit));
 		if (on_commit == NULL) {
 			diag_set(OutOfMemory, sizeof(*on_commit),
@@ -4632,7 +4632,7 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 			rc = -1;
 			break;
 		}
-		struct trigger *on_rollback = region_alloc(&fiber()->gc,
+		struct trigger *on_rollback = region_alloc(&txn->region,
 							   sizeof(*on_commit));
 		if (on_rollback == NULL) {
 			diag_set(OutOfMemory, sizeof(*on_commit),

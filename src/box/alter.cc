@@ -658,7 +658,7 @@ public:
 
 	void *operator new(size_t size)
 	{
-		return region_aligned_calloc_xc(&fiber()->gc, size,
+		return region_aligned_calloc_xc(&in_txn()->region, size,
 						alignof(uint64_t));
 	}
 	void operator delete(void * /* ptr */) {}
@@ -672,7 +672,7 @@ static struct trigger *
 txn_alter_trigger_new(trigger_f run, void *data)
 {
 	struct trigger *trigger = (struct trigger *)
-		region_calloc_object_xc(&fiber()->gc, struct trigger);
+		region_calloc_object_xc(&in_txn()->region, struct trigger);
 	trigger->run = run;
 	trigger->data = data;
 	trigger->destroy = NULL;
@@ -708,7 +708,7 @@ static struct alter_space *
 alter_space_new(struct space *old_space)
 {
 	struct alter_space *alter =
-		region_calloc_object_xc(&fiber()->gc, struct alter_space);
+		region_calloc_object_xc(&in_txn()->region, struct alter_space);
 	rlist_create(&alter->ops);
 	alter->old_space = old_space;
 	alter->space_def = space_def_dup_xc(alter->old_space->def);
@@ -3358,7 +3358,7 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 	struct tuple *new_tuple = stmt->new_tuple;
 
 	struct alter_sequence *alter =
-		region_calloc_object_xc(&fiber()->gc, struct alter_sequence);
+		region_calloc_object_xc(&txn->region, struct alter_sequence);
 
 	struct sequence_def *new_def = NULL;
 	auto def_guard = make_scoped_guard([=] { free(new_def); });
