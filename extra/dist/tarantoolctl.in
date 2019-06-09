@@ -964,6 +964,9 @@ local function rocks()
         pack = "luarocks.cmd.pack",
         unpack = "luarocks.cmd.unpack",
         doc = "luarocks.cmd.doc",
+        help = "luarocks.cmd.help",
+        test = "luarocks.cmd.test",
+        make_manifest = "luarocks.admin.cmd.make_manifest",
     }
 
     if keyword_arguments.chdir then
@@ -1185,7 +1188,7 @@ local commands = setmetatable({
     }, rocks = {
         func = exit_wrapper(rocks), process = process_remote, help = {
             header =
-                "%s rocks [install|make|remove|show|search|list|pack|unpack|doc]",
+                "%s rocks [install|make|remove|show|search|list|pack|unpack|doc|test|make_manifest|help]",
             description =
 [=[
         Package management.
@@ -1266,12 +1269,32 @@ local commands = setmetatable({
 ]=],
                 }
             },
+            test = {
+                weight = 141,
+                help = {
+                    header = "%s rocks test [<rockspec>]",
+                    description = [=[
+        Run the test suite in the current directory.
+]=],
+                }
+            },
             doc = {
                 weight = 151,
                 help = {
                     header = "%s rocks doc <rockname>",
                     description = [=[
         Show documentation for an installed rock.
+]=],
+                }
+            },
+            make_manifest = {
+                weight = 161,
+                help = {
+                    header = "%s rocks make_manifest <argument>",
+                    description = [=[
+        Compile a manifest file for a repository.
+
+        <argument>, if given, is a local repository pathname.
 ]=],
                 }
             },
