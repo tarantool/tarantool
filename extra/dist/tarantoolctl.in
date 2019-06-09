@@ -1185,7 +1185,7 @@ local commands = setmetatable({
     }, rocks = {
         func = exit_wrapper(rocks), process = process_remote, help = {
             header =
-                "%s rocks [install|remove|show|search|list]",
+                "%s rocks [install|make|remove|show|search|list|pack|unpack|doc]",
             description =
 [=[
         Package management.
@@ -1197,16 +1197,25 @@ local commands = setmetatable({
             install = {
                 weight = 100,
                 help = {
-                    header = "%s rocks install ROCKNAME",
+                    header = "%s rocks install {<rock>|<name> [<version>]}",
                     description = [=[
         Install a rock.
+]=],
+                }
+            },
+            make = {
+                weight = 101,
+                help = {
+                    header = "%s rocks make [<rockspec>]",
+                    description = [=[
+        Compile package in current directory using a rockspec.
 ]=],
                 }
             },
             remove = {
                 weight = 101,
                 help = {
-                    header = "%s rocks remove ROCKNAME",
+                    header = "%s rocks remove <name> [<version>]",
                     description = [=[
         Uninstall a rock.
 ]=],
@@ -1215,7 +1224,7 @@ local commands = setmetatable({
             show = {
                 weight = 110,
                 help = {
-                    header = "%s rocks list <FILTER>",
+                    header = "%s rocks list <filter>",
                     description = [=[
         Show information about an installed rock
 ]=],
@@ -1224,7 +1233,7 @@ local commands = setmetatable({
             search = {
                 weight = 120,
                 help = {
-                    header = "%s rocks search <PATTERN>",
+                    header = "%s rocks search <name> [<version>]",
                     description = [=[
         Search the rocks list for a pattern.
 ]=],
@@ -1233,9 +1242,36 @@ local commands = setmetatable({
             list = {
                 weight = 121,
                 help = {
-                    header = "%s rocks list <FILTER>",
+                    header = "%s rocks list <filter>",
                     description = [=[
         List all installed rocks.
+]=],
+                }
+            },
+            pack = {
+                weight = 131,
+                help = {
+                    header = "%s rocks pack {<rockspec>|<name> [<version>]}",
+                    description = [=[
+        Create a rock, packing sources or binaries.
+]=],
+                }
+            },
+            unpack = {
+                weight = 131,
+                help = {
+                    header = "%s rocks unpack {<rock>|<name> [<version>]}",
+                    description = [=[
+        Unpack the contents of a rock.
+]=],
+                }
+            },
+            doc = {
+                weight = 151,
+                help = {
+                    header = "%s rocks doc <rockname>",
+                    description = [=[
+        Show documentation for an installed rock.
 ]=],
                 }
             },
