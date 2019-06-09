@@ -1,0 +1,25 @@
+return {
+PREFIX=[[@CMAKE_INSTALL_PREFIX@]],
+LUA_INCDIR=[[@MODULE_FULL_INCLUDEDIR@]],
+LUA_BINDIR=[[@CMAKE_INSTALL_FULL_BINDIR@]],
+LUA_INTERPRETER=[[tarantool]],
+LUA_MODULES_LIB_SUBDIR=[[/lib/tarantool]],
+LUA_MODULES_LUA_SUBDIR=[[/share/tarantool]],
+SYSCONFDIR=[[@CMAKE_INSTALL_FULL_SYSCONFDIR@/tarantool/rocks]],
+FORCE_CONFIG=true,
+ROCKS_TREE=[[/usr/local/]],
+ROCKS_SUBDIR=[[/share/tarantool/rocks]],
+ROCKS_SERVERS={
+    [[http://rocks.tarantool.org/]]
+},
+LOCALDIR = require('fio').cwd(),
+HOME_TREE_SUBDIR=[[/.rocks]],
+LUA_DIR_SET=true,
+UNAME_S=[[@CMAKE_SYSTEM_NAME@]],
+UNAME_M=[[@CMAKE_SYSTEM_PROCESSOR@]],
+DOWNLOADER=[[curl]],
+MD5CHECKER=[[openssl]],
+EXTERNAL_DEPS_SUBDIRS={ bin="bin", lib={ "lib", [[@MULTILIB@]] }, include="include" },
+RUNTIME_EXTERNAL_DEPS_SUBDIRS={ bin="bin", lib={ "lib", [[@MULTILIB@]] }, include="include" },
+LOCAL_BY_DEFAULT = true,
+}
