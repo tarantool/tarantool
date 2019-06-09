@@ -934,10 +934,10 @@ local function find_arg(name_arg)
 end
 
 local function rocks()
-    local cfg = require("luarocks.cfg")
+    local cfg = require("luarocks.core.cfg")
+    cfg.init()
     local util = require("luarocks.util")
-    local loader = require("luarocks.loader")
-    local command_line = require("luarocks.command_line")
+    local command_line = require("luarocks.cmd")
     local options = keyword_arguments
     local key = nil
     if options["only-server"] ~= nil then
@@ -954,24 +954,23 @@ local function rocks()
     end
 
     -- Enable only useful commands
-    local commands = {
-       install = "luarocks.install",
-       search = "luarocks.search",
-       list = "luarocks.list",
-       remove = "luarocks.remove",
-       show = "luarocks.show",
-       make = "luarocks.make",
-       pack = "luarocks.pack",
-       unpack = "luarocks.unpack",
-       doc = "luarocks.doc",
+    local rocks_commands = {
+        install = "luarocks.cmd.install",
+        search = "luarocks.cmd.search",
+        list = "luarocks.cmd.list",
+        remove = "luarocks.cmd.remove",
+        show = "luarocks.cmd.show",
+        make = "luarocks.cmd.make",
+        pack = "luarocks.cmd.pack",
+        unpack = "luarocks.cmd.unpack",
+        doc = "luarocks.cmd.doc",
     }
-    rawset(_G, 'commands', commands)
 
     if keyword_arguments.chdir then
         ffi.C.chdir(keyword_arguments.chdir)
     end
     -- Call LuaRocks
-    command_line.run_command(unpack(positional_arguments))
+    command_line.run_command('', rocks_commands, nil, unpack(positional_arguments))
 end
 
 local function exit_wrapper(func)
