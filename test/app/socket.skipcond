@@ -5,6 +5,7 @@ import os.path
 import socket
 import os
 import tempfile
+import platform
 
 test_dir = tempfile.mkdtemp(prefix='tarantool-test-socket')
 test_path = os.path.join(test_dir, 'socket')
@@ -20,3 +21,7 @@ s.close()
 if os.path.exists(test_path):
     os.remove(test_path)
     os.rmdir(test_dir)
+
+# Disabled on FreeBSD due to flaky fail #4271.
+if platform.system() == 'FreeBSD':
+    self.skip = 1
