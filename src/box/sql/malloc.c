@@ -381,22 +381,3 @@ sqlOomClear(sql * db)
 	if (db->mallocFailed && db->nVdbeExec == 0)
 		db->mallocFailed = 0;
 }
-
-/*
- * This function must be called before exiting any API function (i.e.
- * returning control to the user) that has called sql_malloc or
- * sql_realloc.
- *
- * The returned value is normally a copy of the second argument to this
- * function.
- */
-int
-sqlApiExit(sql * db, int rc)
-{
-	assert(db != 0);
-	if (db->mallocFailed) {
-		sqlOomClear(db);
-		return -1;
-	}
-	return rc;
-}

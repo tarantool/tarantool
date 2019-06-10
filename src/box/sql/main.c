@@ -298,7 +298,6 @@ sql_create_function_v2(sql * db,
 			   void (*xFinal) (sql_context *),
 			   void (*xDestroy) (void *))
 {
-	int rc = -1;
 	FuncDestructor *pArg = 0;
 
 	if (xDestroy) {
@@ -308,21 +307,18 @@ sql_create_function_v2(sql * db,
 							   (FuncDestructor));
 		if (!pArg) {
 			xDestroy(p);
-			goto out;
+			return -1;
 		}
 		pArg->xDestroy = xDestroy;
 		pArg->pUserData = p;
 	}
-	rc = sqlCreateFunc(db, zFunc, type, nArg, flags, p, xSFunc, xStep,
+	int rc = sqlCreateFunc(db, zFunc, type, nArg, flags, p, xSFunc, xStep,
 			       xFinal, pArg);
 	if (pArg && pArg->nRef == 0) {
 		assert(rc != 0);
 		xDestroy(p);
 		sqlDbFree(db, pArg);
 	}
-
- out:
-	rc = sqlApiExit(db, rc);
 	return rc;
 }
 

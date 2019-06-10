@@ -78,21 +78,13 @@ invokeProfileCallback(sql * db, Vdbe * p)
 int
 sql_finalize(sql_stmt * pStmt)
 {
-	int rc;
-	if (pStmt == 0) {
-		/* IMPLEMENTATION-OF: R-57228-12904 Invoking sql_finalize() on a NULL
-		 * pointer is a harmless no-op.
-		 */
-		rc = 0;
-	} else {
-		Vdbe *v = (Vdbe *) pStmt;
-		sql *db = v->db;
-		assert(db != NULL);
-		checkProfileCallback(db, v);
-		rc = sqlVdbeFinalize(v);
-		rc = sqlApiExit(db, rc);
-	}
-	return rc;
+	if (pStmt == NULL)
+		return 0;
+	Vdbe *v = (Vdbe *) pStmt;
+	sql *db = v->db;
+	assert(db != NULL);
+	checkProfileCallback(db, v);
+	return sqlVdbeFinalize(v);
 }
 
 int
@@ -104,7 +96,7 @@ sql_reset(sql_stmt * pStmt)
 	checkProfileCallback(db, v);
 	int rc = sqlVdbeReset(v);
 	sqlVdbeRewind(v);
-	return sqlApiExit(db, rc);
+	return rc;
 }
 
 /*
@@ -1064,18 +1056,14 @@ sql_bind_zeroblob(sql_stmt * pStmt, int i, int n)
 int
 sql_bind_zeroblob64(sql_stmt * pStmt, int i, sql_uint64 n)
 {
-	int rc;
 	Vdbe *p = (Vdbe *) pStmt;
 	if (n > (u64) p->db->aLimit[SQL_LIMIT_LENGTH]) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob is too "\
 			 "big");
-		rc = -1;
-	} else {
-		assert((n & 0x7FFFFFFF) == n);
-		rc = sql_bind_zeroblob(pStmt, i, n);
+		return -1;
 	}
-	rc = sqlApiExit(p->db, rc);
-	return rc;
+	assert((n & 0x7FFFFFFF) == n);
+	return sql_bind_zeroblob(pStmt, i, n);
 }
 
 /*

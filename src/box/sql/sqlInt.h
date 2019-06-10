@@ -4298,7 +4298,6 @@ sqlOomFault(struct sql *db)
 }
 
 void sqlOomClear(sql *);
-int sqlApiExit(sql * db, int);
 
 void sqlStrAccumInit(StrAccum *, sql *, char *, int, int);
 void sqlStrAccumAppend(StrAccum *, const char *, int);
