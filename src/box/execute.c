@@ -108,6 +108,7 @@ const struct port_vtab port_sql_vtab = {
 	/* .dump_msgpack_16 = */ NULL,
 	/* .dump_lua = */ port_sql_dump_lua,
 	/* .dump_plain = */ NULL,
+	/* .get_msgpack = */ NULL,
 	/* .destroy = */ port_sql_destroy,
 };
 

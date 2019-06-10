@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdbool.h>
 #include <stdint.h>
 
 #if defined(__cplusplus)
@@ -62,8 +63,17 @@ struct port_vtab {
 	 * header. Used by the legacy Tarantool 1.6 format.
 	 */
 	int (*dump_msgpack_16)(struct port *port, struct obuf *out);
-	/** Dump the content of a port to Lua stack. */
-	void (*dump_lua)(struct port *port, struct lua_State *L);
+	/**
+	 * Dump the content of a port to a given Lua stack.
+	 * When is_flat == true is specified, the data is dumped
+	 * directly to Lua stack, item-by-item. Otherwise, a
+	 * result table is created. The is_flat == true mode
+	 * follows Lua functions convention to pass arguments
+	 * and return a results, while is_flat == false follows
+	 * Tarantool's :select convention when the table of
+	 * results is returned.
+	 */
+	void (*dump_lua)(struct port *port, struct lua_State *L, bool is_flat);
 	/**
 	 * Dump a port content as a plain text into a buffer,
 	 * allocated inside.
@@ -74,6 +84,20 @@ struct port_vtab {
 	 * @retval not nil Plain text.
 	 */
 	const char *(*dump_plain)(struct port *port, uint32_t *size);
+	/**
+	 * Get the content of a port as a msgpack data.
+	 * By an obsolete convention, C stored routines expect
+	 * msgpack data as input format for its arguments.
+	 * This API is also usefull to process a function
+	 * returned value as msgpack data in memory.
+	 * The lifecycle of the returned value is
+	 * implementation-specific: it may either be returned
+	 * directly from the port, in which case the data will
+	 * stay alive as long as the port is alive, or it may be
+	 * allocated on the fiber()->gc, in which case the caller
+	 * is responsible for cleaning up.
+	 **/
+	const char *(*get_msgpack)(struct port *port, uint32_t *size);
 	/** Destroy a port and release associated resources. */
 	void (*destroy)(struct port *port);
 };
@@ -109,15 +133,21 @@ port_dump_msgpack_16(struct port *port, struct obuf *out)
 }
 
 static inline void
-port_dump_lua(struct port *port, struct lua_State *L)
+port_dump_lua(struct port *port, struct lua_State *L, bool is_flat)
 {
-	port->vtab->dump_lua(port, L);
+	port->vtab->dump_lua(port, L, is_flat);
 }
 
 static inline const char *
 port_dump_plain(struct port *port, uint32_t *size)
 {
 	return port->vtab->dump_plain(port, size);
+}
+
+static inline const char *
+port_get_msgpack(struct port *port, uint32_t *size)
+{
+	return port->vtab->get_msgpack(port, size);
 }
 
 #if defined(__cplusplus)

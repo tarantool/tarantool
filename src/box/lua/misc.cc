@@ -65,8 +65,10 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
  * but implemented here to eliminate port.c dependency on Lua.
  */
 extern "C" void
-port_tuple_dump_lua(struct port *base, struct lua_State *L)
+port_tuple_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 {
+	(void) is_flat;
+	assert(is_flat == false);
 	struct port_tuple *port = port_tuple(base);
 	lua_createtable(L, port->size, 0);
 	struct port_tuple_entry *pe = port->first;
@@ -74,6 +76,19 @@ port_tuple_dump_lua(struct port *base, struct lua_State *L)
 		luaT_pushtuple(L, pe->tuple);
 		lua_rawseti(L, -2, ++i);
 	}
+}
+
+extern "C" void
+port_msgpack_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
+{
+	(void) is_flat;
+	assert(is_flat == true);
+	struct port_msgpack *port = (struct port_msgpack *) base;
+
+	const char *args = port->data;
+	uint32_t arg_count = mp_decode_array(&args);
+	for (uint32_t i = 0; i < arg_count; i++)
+		luamp_decode(L, luaL_msgpack_default, &args);
 }
 
 /* }}} */
@@ -113,7 +128,7 @@ lbox_select(lua_State *L)
 	 * table always crashed the first (can't be fixed with pcall).
 	 * https://github.com/tarantool/tarantool/issues/1182
 	 */
-	port_dump_lua(&port, L);
+	port_dump_lua(&port, L, false);
 	port_destroy(&port);
 	return 1; /* lua table with tuples */
 }

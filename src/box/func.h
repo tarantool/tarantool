@@ -104,11 +104,10 @@ void
 func_delete(struct func *func);
 
 /**
- * Call stored C function using @a args.
+ * Call function with arguments represented with given args.
  */
 int
-func_call(struct func *func, box_function_ctx_t *ctx, const char *args,
-	  const char *args_end);
+func_call(struct func *func, struct port *args, struct port *ret);
 
 /**
  * Reload dynamically loadable module.

@@ -39,8 +39,10 @@ lua_sql_get_metadata(struct sql_stmt *stmt, struct lua_State *L,
 }
 
 void
-port_sql_dump_lua(struct port *port, struct lua_State *L)
+port_sql_dump_lua(struct port *port, struct lua_State *L, bool is_flat)
 {
+	(void) is_flat;
+	assert(is_flat == false);
 	assert(port->vtab == &port_sql_vtab);
 	struct sql *db = sql_get();
 	struct sql_stmt *stmt = ((struct port_sql *)port)->stmt;
@@ -49,7 +51,7 @@ port_sql_dump_lua(struct port *port, struct lua_State *L)
 		lua_createtable(L, 0, 2);
 		lua_sql_get_metadata(stmt, L, column_count);
 		lua_setfield(L, -2, "metadata");
-		port_tuple_vtab.dump_lua(port, L);
+		port_tuple_vtab.dump_lua(port, L, false);
 		lua_setfield(L, -2, "rows");
 	} else {
 		assert(((struct port_tuple *)port)->size == 0);
@@ -262,7 +264,7 @@ lbox_execute(struct lua_State *L)
 	if (sql_prepare_and_execute(sql, length, bind, bind_count, &port,
 				    &fiber()->gc) != 0)
 		return luaT_error(L);
-	port_dump_lua(&port, L);
+	port_dump_lua(&port, L, false);
 	port_destroy(&port);
 	return 1;
 }

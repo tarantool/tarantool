@@ -32,6 +32,7 @@
  */
 #include "trivia/util.h"
 #include <port.h>
+#include <stdbool.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -79,6 +80,20 @@ port_tuple_create(struct port *port);
  */
 int
 port_tuple_add(struct port *port, struct tuple *tuple);
+
+/** Port implementation used for storing raw data. */
+struct port_msgpack {
+	const struct port_vtab *vtab;
+	const char *data;
+	uint32_t data_sz;
+};
+
+static_assert(sizeof(struct port_msgpack) <= sizeof(struct port),
+	      "sizeof(struct port_msgpack) must be <= sizeof(struct port)");
+
+/** Initialize a port to dump raw data. */
+void
+port_msgpack_create(struct port *port, const char *data, uint32_t data_sz);
 
 /** Port for storing the result of a Lua CALL/EVAL. */
 struct port_lua {

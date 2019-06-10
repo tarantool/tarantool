@@ -90,6 +90,13 @@ func_def_cmp(struct func_def *def1, struct func_def *def2);
 /**
  * API of C stored function.
  */
+
+struct port;
+
+struct box_function_ctx {
+	struct port *port;
+};
+
 typedef struct box_function_ctx box_function_ctx_t;
 typedef int (*box_function_f)(box_function_ctx_t *ctx,
 	     const char *args, const char *args_end);

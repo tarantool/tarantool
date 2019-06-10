@@ -38,10 +38,6 @@ extern "C" {
 struct port;
 struct call_request;
 
-struct box_function_ctx {
-	struct port *port;
-};
-
 /**
  * Reload loadable module by name.
  *

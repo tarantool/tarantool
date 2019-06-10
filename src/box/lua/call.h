@@ -31,6 +31,8 @@
  * SUCH DAMAGE.
  */
 
+#include <stdint.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -48,10 +50,12 @@ struct call_request;
  * (implementation of 'CALL' command code).
  */
 int
-box_lua_call(struct call_request *request, struct port *port);
+box_lua_call(const char *name, uint32_t name_len,
+	     struct port *args, struct port *ret);
 
 int
-box_lua_eval(struct call_request *request, struct port *port);
+box_lua_eval(const char *expr, uint32_t expr_len,
+	     struct port *args, struct port *ret);
 
 #if defined(__cplusplus)
 } /* extern "C" */

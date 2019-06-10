@@ -30,6 +30,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdbool.h>
+
 struct port;
 struct sql_bind;
 struct lua_State;
@@ -42,7 +44,7 @@ struct lua_State;
  * @param L Lua stack.
  */
 void
-port_sql_dump_lua(struct port *port, struct lua_State *L);
+port_sql_dump_lua(struct port *port, struct lua_State *L, bool is_flat);
 
 /**
  * Parse Lua table of SQL parameters.

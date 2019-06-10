@@ -36,7 +36,6 @@
 #include "lua/utils.h"
 #include "lua/msgpack.h"
 
-#include "box/xrow.h"
 #include "box/port.h"
 #include "box/lua/tuple.h"
 #include "small/obuf.h"
@@ -282,28 +281,31 @@ port_lua_create(struct port *port, struct lua_State *L)
 	port_lua->ref = -1;
 }
 
+struct execute_lua_ctx {
+	const char *name;
+	uint32_t name_len;
+	struct port *args;
+};
+
 static int
 execute_lua_call(lua_State *L)
 {
-	struct call_request *request = (struct call_request *)
-		lua_topointer(L, 1);
+	struct execute_lua_ctx *ctx =
+		(struct execute_lua_ctx *) lua_topointer(L, 1);
 	lua_settop(L, 0); /* clear the stack to simplify the logic below */
 
-	const char *name = request->name;
-	uint32_t name_len = mp_decode_strl(&name);
+	const char *name = ctx->name;
+	uint32_t name_len = ctx->name_len;
 
 	int oc = 0; /* how many objects are on stack after box_lua_find */
 	/* Try to find a function by name in Lua */
 	oc = box_lua_find(L, name, name + name_len);
 
 	/* Push the rest of args (a tuple). */
-	const char *args = request->args;
+	int top = lua_gettop(L);
+	port_dump_lua(ctx->args, L, true);
+	int arg_count = lua_gettop(L) - top;
 
-	uint32_t arg_count = mp_decode_array(&args);
-	luaL_checkstack(L, arg_count, "call: out of stack");
-
-	for (uint32_t i = 0; i < arg_count; i++)
-		luamp_decode(L, luaL_msgpack_default, &args);
 	lua_call(L, arg_count + oc - 1, LUA_MULTRET);
 	return lua_gettop(L);
 }
@@ -311,24 +313,22 @@ execute_lua_call(lua_State *L)
 static int
 execute_lua_eval(lua_State *L)
 {
-	struct call_request *request = (struct call_request *)
-		lua_topointer(L, 1);
+	struct execute_lua_ctx *ctx =
+		(struct execute_lua_ctx *) lua_topointer(L, 1);
 	lua_settop(L, 0); /* clear the stack to simplify the logic below */
 
 	/* Compile expression */
-	const char *expr = request->expr;
-	uint32_t expr_len = mp_decode_strl(&expr);
+	const char *expr = ctx->name;
+	uint32_t expr_len = ctx->name_len;
 	if (luaL_loadbuffer(L, expr, expr_len, "=eval")) {
 		diag_set(LuajitError, lua_tostring(L, -1));
 		luaT_error(L);
 	}
 
 	/* Unpack arguments */
-	const char *args = request->args;
-	uint32_t arg_count = mp_decode_array(&args);
-	luaL_checkstack(L, arg_count, "eval: out of stack");
-	for (uint32_t i = 0; i < arg_count; i++)
-		luamp_decode(L, luaL_msgpack_default, &args);
+	int top = lua_gettop(L);
+	port_dump_lua(ctx->args, L, true);
+	int arg_count = lua_gettop(L) - top;
 
 	/* Call compiled code */
 	lua_call(L, arg_count, LUA_MULTRET);
@@ -429,37 +429,48 @@ static const struct port_vtab port_lua_vtab = {
 	.dump_msgpack_16 = port_lua_dump_16,
 	.dump_lua = NULL,
 	.dump_plain = port_lua_dump_plain,
+	.get_msgpack = NULL,
 	.destroy = port_lua_destroy,
 };
 
 static inline int
-box_process_lua(struct call_request *request, struct port *base,
-		lua_CFunction handler)
+box_process_lua(lua_CFunction handler, struct execute_lua_ctx *ctx,
+		struct port *ret)
 {
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
-	port_lua_create(base, L);
-	((struct port_lua *) base)->ref = coro_ref;
+	port_lua_create(ret, L);
+	((struct port_lua *) ret)->ref = coro_ref;
 
 	lua_pushcfunction(L, handler);
-	lua_pushlightuserdata(L, request);
+	lua_pushlightuserdata(L, ctx);
 	if (luaT_call(L, 1, LUA_MULTRET) != 0) {
-		port_lua_destroy(base);
+		port_lua_destroy(ret);
 		return -1;
 	}
 	return 0;
 }
 
 int
-box_lua_call(struct call_request *request, struct port *port)
+box_lua_call(const char *name, uint32_t name_len,
+	     struct port *args, struct port *ret)
 {
-	return box_process_lua(request, port, execute_lua_call);
+	struct execute_lua_ctx ctx;
+	ctx.name = name;
+	ctx.name_len = name_len;
+	ctx.args = args;
+	return box_process_lua(execute_lua_call, &ctx, ret);
 }
 
 int
-box_lua_eval(struct call_request *request, struct port *port)
+box_lua_eval(const char *expr, uint32_t expr_len,
+	     struct port *args, struct port *ret)
 {
-	return box_process_lua(request, port, execute_lua_eval);
+	struct execute_lua_ctx ctx;
+	ctx.name = expr;
+	ctx.name_len = expr_len;
+	ctx.args = args;
+	return box_process_lua(execute_lua_eval, &ctx, ret);
 }
 
 static int

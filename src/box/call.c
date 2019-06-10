@@ -43,6 +43,39 @@
 #include "small/obuf.h"
 #include "tt_static.h"
 
+static const struct port_vtab port_msgpack_vtab;
+
+void
+port_msgpack_create(struct port *base, const char *data, uint32_t data_sz)
+{
+	struct port_msgpack *port_msgpack = (struct port_msgpack *) base;
+	memset(port_msgpack, 0, sizeof(*port_msgpack));
+	port_msgpack->vtab = &port_msgpack_vtab;
+	port_msgpack->data = data;
+	port_msgpack->data_sz = data_sz;
+}
+
+static const char *
+port_msgpack_get_msgpack(struct port *base, uint32_t *size)
+{
+	struct port_msgpack *port = (struct port_msgpack *) base;
+	assert(port->vtab == &port_msgpack_vtab);
+	*size = port->data_sz;
+	return port->data;
+}
+
+extern void
+port_msgpack_dump_lua(struct port *base, struct lua_State *L, bool is_flat);
+
+static const struct port_vtab port_msgpack_vtab = {
+	.dump_msgpack = NULL,
+	.dump_msgpack_16 = NULL,
+	.dump_lua = port_msgpack_dump_lua,
+	.dump_plain = NULL,
+	.get_msgpack = port_msgpack_get_msgpack,
+	.destroy = NULL,
+};
+
 /**
  * Find a function by name and check "EXECUTE" permissions.
  *
@@ -106,27 +139,22 @@ access_check_func(const char *name, uint32_t name_len, struct func **funcp)
 }
 
 static int
-box_c_call(struct func *func, struct call_request *request, struct port *port)
+box_c_call(struct func *func, struct port *args, struct port *ret)
 {
 	assert(func != NULL && func->def->language == FUNC_LANGUAGE_C);
-
-	/* Create a call context */
-	port_tuple_create(port);
-	box_function_ctx_t ctx = { port };
 
 	/* Clear all previous errors */
 	diag_clear(&fiber()->diag);
 	assert(!in_txn()); /* transaction is not started */
 
 	/* Call function from the shared library */
-	int rc = func_call(func, &ctx, request->args, request->args_end);
+	int rc = func_call(func, args, ret);
 	func = NULL; /* May be deleted by DDL */
 	if (rc != 0) {
 		if (diag_last_error(&fiber()->diag) == NULL) {
 			/* Stored procedure forget to set diag  */
 			diag_set(ClientError, ER_PROC_C, "unknown error");
 		}
-		port_destroy(port);
 		return -1;
 	}
 	return 0;
@@ -199,10 +227,13 @@ box_process_call(struct call_request *request, struct port *port)
 	}
 
 	int rc;
+	struct port args;
+	port_msgpack_create(&args, request->args,
+			    request->args_end - request->args);
 	if (func && func->def->language == FUNC_LANGUAGE_C) {
-		rc = box_c_call(func, request, port);
+		rc = box_c_call(func, &args, port);
 	} else {
-		rc = box_lua_call(request, port);
+		rc = box_lua_call(name, name_len, &args, port);
 	}
 	/* Restore the original user */
 	if (orig_credentials)
@@ -229,7 +260,12 @@ box_process_eval(struct call_request *request, struct port *port)
 	/* Check permissions */
 	if (access_check_universe(PRIV_X) != 0)
 		return -1;
-	if (box_lua_eval(request, port) != 0) {
+	struct port args;
+	port_msgpack_create(&args, request->args,
+			    request->args_end - request->args);
+	const char *expr = request->expr;
+	uint32_t expr_len = mp_decode_strl(&expr);
+	if (box_lua_eval(expr, expr_len, &args, port) != 0) {
 		txn_rollback();
 		return -1;
 	}
@@ -239,6 +275,5 @@ box_process_eval(struct call_request *request, struct port *port)
 		txn_rollback();
 		return -1;
 	}
-
 	return 0;
 }

@@ -29,11 +29,13 @@
  * SUCH DAMAGE.
  */
 #include "func.h"
+#include "fiber.h"
 #include "trivia/config.h"
 #include "assoc.h"
 #include "lua/utils.h"
 #include "error.h"
 #include "diag.h"
+#include "port.h"
 #include <dlfcn.h>
 
 /**
@@ -433,21 +435,36 @@ func_load(struct func *func)
 }
 
 int
-func_call(struct func *func, box_function_ctx_t *ctx, const char *args,
-	  const char *args_end)
+func_call(struct func *func, struct port *args, struct port *ret)
 {
+	assert(func != NULL && func->def->language == FUNC_LANGUAGE_C);
 	if (func->func == NULL) {
 		if (func_load(func) != 0)
 			return -1;
 	}
 
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	uint32_t data_sz;
+	const char *data = port_get_msgpack(args, &data_sz);
+	if (data == NULL)
+		return -1;
+
+	port_tuple_create(ret);
+	box_function_ctx_t ctx = { ret };
+
 	/* Module can be changed after function reload. */
 	struct module *module = func->module;
 	assert(module != NULL);
 	++module->calls;
-	int rc = func->func(ctx, args, args_end);
+	int rc = func->func(&ctx, data, data + data_sz);
 	--module->calls;
 	module_gc(module);
+	region_truncate(region, region_svp);
+	if (rc != 0) {
+		port_destroy(ret);
+		return -1;
+	}
 	return rc;
 }
 
