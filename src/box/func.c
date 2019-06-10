@@ -33,9 +33,12 @@
 #include "trivia/config.h"
 #include "assoc.h"
 #include "lua/utils.h"
+#include "lua/call.h"
 #include "error.h"
 #include "diag.h"
 #include "port.h"
+#include "schema.h"
+#include "session.h"
 #include <dlfcn.h>
 
 /**
@@ -48,6 +51,24 @@ struct func_name {
 	const char *package;
 	/** A pointer to the last character in ->package + 1 */
 	const char *package_end;
+};
+
+struct func_c {
+	/** Function object base class. */
+	struct func base;
+	/**
+	 * Anchor for module membership.
+	 */
+	struct rlist item;
+	/**
+	 * For C functions, the body of the function.
+	 */
+	box_function_f func;
+	/**
+	 * Each stored function keeps a handle to the
+	 * dynamic library for the C callback.
+	 */
+	struct module *module;
 };
 
 /***
@@ -314,10 +335,10 @@ module_reload(const char *package, const char *package_end, struct module **modu
 	if (new_module == NULL)
 		return -1;
 
-	struct func *func, *tmp_func;
+	struct func_c *func, *tmp_func;
 	rlist_foreach_entry_safe(func, &old_module->funcs, item, tmp_func) {
 		struct func_name name;
-		func_split_name(func->def->name, &name);
+		func_split_name(func->base.def->name, &name);
 		func->func = module_sym(new_module, name.sym);
 		if (func->func == NULL)
 			goto restore;
@@ -338,7 +359,7 @@ restore:
 	 */
 	do {
 		struct func_name name;
-		func_split_name(func->def->name, &name);
+		func_split_name(func->base.def->name, &name);
 		func->func = module_sym(old_module, name.sym);
 		if (func->func == NULL) {
 			/*
@@ -351,20 +372,27 @@ restore:
 		func->module = old_module;
 		rlist_move(&old_module->funcs, &func->item);
 	} while (func != rlist_first_entry(&old_module->funcs,
-					   struct func, item));
+					   struct func_c, item));
 	assert(rlist_empty(&new_module->funcs));
 	module_delete(new_module);
 	return -1;
 }
 
+static struct func *
+func_c_new(struct func_def *def);
+
 struct func *
 func_new(struct func_def *def)
 {
-	struct func *func = (struct func *) malloc(sizeof(struct func));
-	if (func == NULL) {
-		diag_set(OutOfMemory, sizeof(*func), "malloc", "func");
-		return NULL;
+	struct func *func;
+	if (def->language == FUNC_LANGUAGE_C) {
+		func = func_c_new(def);
+	} else {
+		assert(def->language == FUNC_LANGUAGE_LUA);
+		func = func_lua_new(def);
 	}
+	if (func == NULL)
+		return NULL;
 	func->def = def;
 	/** Nobody has access to the function but the owner. */
 	memset(func->access, 0, sizeof(func->access));
@@ -380,19 +408,35 @@ func_new(struct func_def *def)
 	 * checks (see user_has_data()).
 	 */
 	func->owner_credentials.auth_token = BOX_USER_MAX; /* invalid value */
-	func->func = NULL;
-	func->module = NULL;
 	return func;
 }
 
+static struct func_vtab func_c_vtab;
+
+static struct func *
+func_c_new(struct func_def *def)
+{
+	(void) def;
+	assert(def->language == FUNC_LANGUAGE_C);
+	struct func_c *func = (struct func_c *) malloc(sizeof(struct func_c));
+	if (func == NULL) {
+		diag_set(OutOfMemory, sizeof(*func), "malloc", "func");
+		return NULL;
+	}
+	func->base.vtab = &func_c_vtab;
+	func->func = NULL;
+	func->module = NULL;
+	return &func->base;
+}
+
 static void
-func_unload(struct func *func)
+func_c_unload(struct func_c *func)
 {
 	if (func->module) {
 		rlist_del(&func->item);
 		if (rlist_empty(&func->module->funcs)) {
 			struct func_name name;
-			func_split_name(func->def->name, &name);
+			func_split_name(func->base.def->name, &name);
 			module_cache_del(name.package, name.package_end);
 		}
 		module_gc(func->module);
@@ -401,17 +445,27 @@ func_unload(struct func *func)
 	func->func = NULL;
 }
 
+static void
+func_c_destroy(struct func *base)
+{
+	assert(base->vtab == &func_c_vtab);
+	assert(base != NULL && base->def->language == FUNC_LANGUAGE_C);
+	struct func_c *func = (struct func_c *) base;
+	func_c_unload(func);
+	free(func);
+}
+
 /**
  * Resolve func->func (find the respective DLL and fetch the
  * symbol from it).
  */
 static int
-func_load(struct func *func)
+func_c_load(struct func_c *func)
 {
 	assert(func->func == NULL);
 
 	struct func_name name;
-	func_split_name(func->def->name, &name);
+	func_split_name(func->base.def->name, &name);
 
 	struct module *module = module_cache_find(name.package,
 						  name.package_end);
@@ -435,11 +489,13 @@ func_load(struct func *func)
 }
 
 int
-func_call(struct func *func, struct port *args, struct port *ret)
+func_c_call(struct func *base, struct port *args, struct port *ret)
 {
-	assert(func != NULL && func->def->language == FUNC_LANGUAGE_C);
+	assert(base->vtab == &func_c_vtab);
+	assert(base != NULL && base->def->language == FUNC_LANGUAGE_C);
+	struct func_c *func = (struct func_c *) base;
 	if (func->func == NULL) {
-		if (func_load(func) != 0)
+		if (func_c_load(func) != 0)
 			return -1;
 	}
 
@@ -462,16 +518,94 @@ func_call(struct func *func, struct port *args, struct port *ret)
 	module_gc(module);
 	region_truncate(region, region_svp);
 	if (rc != 0) {
+		if (diag_last_error(&fiber()->diag) == NULL) {
+			/* Stored procedure forget to set diag  */
+			diag_set(ClientError, ER_PROC_C, "unknown error");
+		}
 		port_destroy(ret);
 		return -1;
 	}
 	return rc;
 }
 
+static struct func_vtab func_c_vtab = {
+	.call = func_c_call,
+	.destroy = func_c_destroy,
+};
+
 void
 func_delete(struct func *func)
 {
-	func_unload(func);
-	free(func->def);
-	free(func);
+	struct func_def *def = func->def;
+	func->vtab->destroy(func);
+	free(def);
+}
+
+/** Check "EXECUTE" permissions for a given function. */
+static int
+func_access_check(struct func *func)
+{
+	struct credentials *credentials = effective_user();
+	/*
+	 * If the user has universal access, don't bother with
+	 * checks. No special check for ADMIN user is necessary
+	 * since ADMIN has universal access.
+	 */
+	if ((credentials->universal_access & (PRIV_X | PRIV_U)) ==
+	    (PRIV_X | PRIV_U))
+		return 0;
+	user_access_t access = PRIV_X | PRIV_U;
+	/* Check access for all functions. */
+	access &= ~entity_access_get(SC_FUNCTION)[credentials->auth_token].effective;
+	user_access_t func_access = access & ~credentials->universal_access;
+	if ((func_access & PRIV_U) != 0 ||
+	    (func->def->uid != credentials->uid &&
+	     func_access & ~func->access[credentials->auth_token].effective)) {
+		/* Access violation, report error. */
+		struct user *user = user_find(credentials->uid);
+		if (user != NULL) {
+			diag_set(AccessDeniedError, priv_name(PRIV_X),
+				 schema_object_name(SC_FUNCTION),
+				 func->def->name, user->def->name);
+		}
+		return -1;
+	}
+	return 0;
+}
+
+int
+func_call(struct func *base, struct port *args, struct port *ret)
+{
+	if (func_access_check(base) != 0)
+		return -1;
+	/**
+	 * Change the current user id if the function is
+	 * a set-definer-uid one. If the function is not
+	 * defined, it's obviously not a setuid one.
+	 */
+	struct credentials *orig_credentials = NULL;
+	if (base->def->setuid) {
+		orig_credentials = effective_user();
+		/* Remember and change the current user id. */
+		if (base->owner_credentials.auth_token >= BOX_USER_MAX) {
+			/*
+			 * Fill the cache upon first access, since
+			 * when func is created, no user may
+			 * be around to fill it (recovery of
+			 * system spaces from a snapshot).
+			 */
+			struct user *owner = user_find(base->def->uid);
+			if (owner == NULL)
+				return -1;
+			credentials_init(&base->owner_credentials,
+					 owner->auth_token,
+					 owner->def->uid);
+		}
+		fiber_set_user(fiber(), &base->owner_credentials);
+	}
+	int rc = base->vtab->call(base, args, ret);
+	/* Restore the original user */
+	if (orig_credentials)
+		fiber_set_user(fiber(), orig_credentials);
+	return rc;
 }

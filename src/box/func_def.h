@@ -67,6 +67,8 @@ struct func_def {
 	 * The language of the stored function.
 	 */
 	enum func_language language;
+	/** The length of the function name. */
+	uint32_t name_len;
 	/** Function name. */
 	char name[0];
 };

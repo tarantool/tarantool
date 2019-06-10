@@ -44,6 +44,7 @@ box_lua_call_init(struct lua_State *L);
 
 struct port;
 struct call_request;
+struct func_def;
 
 /**
  * Invoke a Lua stored procedure from the binary protocol
@@ -56,6 +57,10 @@ box_lua_call(const char *name, uint32_t name_len,
 int
 box_lua_eval(const char *expr, uint32_t expr_len,
 	     struct port *args, struct port *ret);
+
+/** Construct a Lua function object. */
+struct func *
+func_lua_new(struct func_def *def);
 
 #if defined(__cplusplus)
 } /* extern "C" */

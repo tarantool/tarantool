@@ -312,6 +312,16 @@ access_check_session(struct user *user);
 int
 access_check_universe(user_access_t access);
 
+/**
+ * Same as access_check_universe(), but in case the current user
+ * doesn't have universal access, set AccessDeniedError for the
+ * given object type and name.
+ */
+int
+access_check_universe_object(user_access_t access,
+			     enum schema_object_type object_type,
+			     const char *object_name);
+
 static inline int
 session_push(struct session *session, uint64_t sync, struct port *port)
 {

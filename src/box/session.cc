@@ -297,7 +297,9 @@ access_check_session(struct user *user)
 }
 
 int
-access_check_universe(user_access_t access)
+access_check_universe_object(user_access_t access,
+			     enum schema_object_type object_type,
+			     const char *object_name)
 {
 	struct credentials *credentials = effective_user();
 	access |= PRIV_U;
@@ -313,7 +315,7 @@ access_check_universe(user_access_t access)
 		if (user != NULL) {
 			diag_set(AccessDeniedError,
 				 priv_name(denied_access),
-				 schema_object_name(SC_UNIVERSE), "",
+				 schema_object_name(object_type), object_name,
 				 user->def->name);
 		} else {
 			/*
@@ -326,6 +328,12 @@ access_check_universe(user_access_t access)
 		return -1;
 	}
 	return 0;
+}
+
+int
+access_check_universe(user_access_t access)
+{
+	return access_check_universe_object(access, SC_UNIVERSE, "");
 }
 
 int

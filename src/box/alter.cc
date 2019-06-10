@@ -2556,6 +2556,7 @@ func_def_new_from_tuple(struct tuple *tuple)
 	}
 	memcpy(def->name, name, len);
 	def->name[len] = 0;
+	def->name_len = len;
 	if (tuple_field_count(tuple) > BOX_FUNC_FIELD_SETUID)
 		def->setuid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_SETUID);
 	else

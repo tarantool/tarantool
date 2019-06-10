@@ -31,6 +31,8 @@
 #include "box/lua/call.h"
 #include "box/call.h"
 #include "box/error.h"
+#include "box/func.h"
+#include "box/func_def.h"
 #include "fiber.h"
 
 #include "lua/utils.h"
@@ -472,6 +474,49 @@ box_lua_eval(const char *expr, uint32_t expr_len,
 	ctx.args = args;
 	return box_process_lua(execute_lua_eval, &ctx, ret);
 }
+
+struct func_lua {
+	/** Function object base class. */
+	struct func base;
+};
+
+static struct func_vtab func_lua_vtab;
+
+struct func *
+func_lua_new(struct func_def *def)
+{
+	(void) def;
+	assert(def->language == FUNC_LANGUAGE_LUA);
+	struct func_lua *func =
+		(struct func_lua *) malloc(sizeof(struct func_lua));
+	if (func == NULL) {
+		diag_set(OutOfMemory, sizeof(*func), "malloc", "func");
+		return NULL;
+	}
+	func->base.vtab = &func_lua_vtab;
+	return &func->base;
+}
+
+static void
+func_lua_destroy(struct func *func)
+{
+	assert(func != NULL && func->def->language == FUNC_LANGUAGE_LUA);
+	assert(func->vtab == &func_lua_vtab);
+	free(func);
+}
+
+static inline int
+func_lua_call(struct func *func, struct port *args, struct port *ret)
+{
+	assert(func != NULL && func->def->language == FUNC_LANGUAGE_LUA);
+	assert(func->vtab == &func_lua_vtab);
+	return box_lua_call(func->def->name, func->def->name_len, args, ret);
+}
+
+static struct func_vtab func_lua_vtab = {
+	.call = func_lua_call,
+	.destroy = func_lua_destroy,
+};
 
 static int
 lbox_module_reload(lua_State *L)

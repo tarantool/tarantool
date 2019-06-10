@@ -76,90 +76,6 @@ static const struct port_vtab port_msgpack_vtab = {
 	.destroy = NULL,
 };
 
-/**
- * Find a function by name and check "EXECUTE" permissions.
- *
- * @param name function name
- * @param name_len length of @a name
- * @param[out] funcp function object
- * Sic: *pfunc == NULL means that perhaps the user has a global
- * "EXECUTE" privilege, so no specific grant to a function.
- *
- * @retval -1 on access denied
- * @retval  0 on success
- */
-static inline int
-access_check_func(const char *name, uint32_t name_len, struct func **funcp)
-{
-	struct func *func = func_by_name(name, name_len);
-	struct credentials *credentials = effective_user();
-	/*
-	 * If the user has universal access, don't bother with checks.
-	 * No special check for ADMIN user is necessary
-	 * since ADMIN has universal access.
-	 */
-	if ((credentials->universal_access & (PRIV_X | PRIV_U)) ==
-	    (PRIV_X | PRIV_U)) {
-
-		*funcp = func;
-		return 0;
-	}
-	user_access_t access = PRIV_X | PRIV_U;
-	/* Check access for all functions. */
-	access &= ~entity_access_get(SC_FUNCTION)[credentials->auth_token].effective;
-	user_access_t func_access = access & ~credentials->universal_access;
-	if (func == NULL ||
-	    /* Check for missing Usage access, ignore owner rights. */
-	    func_access & PRIV_U ||
-	    /* Check for missing specific access, respect owner rights. */
-	    (func->def->uid != credentials->uid &&
-	    func_access & ~func->access[credentials->auth_token].effective)) {
-
-		/* Access violation, report error. */
-		struct user *user = user_find(credentials->uid);
-		if (user != NULL) {
-			if (!(access & credentials->universal_access)) {
-				diag_set(AccessDeniedError,
-					 priv_name(PRIV_U),
-					 schema_object_name(SC_UNIVERSE), "",
-					 user->def->name);
-			} else {
-				diag_set(AccessDeniedError,
-					 priv_name(PRIV_X),
-					 schema_object_name(SC_FUNCTION),
-					 tt_cstr(name, name_len),
-					 user->def->name);
-			}
-		}
-		return -1;
-	}
-
-	*funcp = func;
-	return 0;
-}
-
-static int
-box_c_call(struct func *func, struct port *args, struct port *ret)
-{
-	assert(func != NULL && func->def->language == FUNC_LANGUAGE_C);
-
-	/* Clear all previous errors */
-	diag_clear(&fiber()->diag);
-	assert(!in_txn()); /* transaction is not started */
-
-	/* Call function from the shared library */
-	int rc = func_call(func, args, ret);
-	func = NULL; /* May be deleted by DDL */
-	if (rc != 0) {
-		if (diag_last_error(&fiber()->diag) == NULL) {
-			/* Stored procedure forget to set diag  */
-			diag_set(ClientError, ER_PROC_C, "unknown error");
-		}
-		return -1;
-	}
-	return 0;
-}
-
 int
 box_module_reload(const char *name)
 {
@@ -191,53 +107,20 @@ box_process_call(struct call_request *request, struct port *port)
 	const char *name = request->name;
 	assert(name != NULL);
 	uint32_t name_len = mp_decode_strl(&name);
-
-	struct func *func = NULL;
-	/**
-	 * Sic: func == NULL means that perhaps the user has a global
-	 * "EXECUTE" privilege, so no specific grant to a function.
-	 */
-	if (access_check_func(name, name_len, &func) != 0)
-		return -1; /* permission denied */
-
-	/**
-	 * Change the current user id if the function is
-	 * a set-definer-uid one. If the function is not
-	 * defined, it's obviously not a setuid one.
-	 */
-	struct credentials *orig_credentials = NULL;
-	if (func && func->def->setuid) {
-		orig_credentials = effective_user();
-		/* Remember and change the current user id. */
-		if (func->owner_credentials.auth_token >= BOX_USER_MAX) {
-			/*
-			 * Fill the cache upon first access, since
-			 * when func is created, no user may
-			 * be around to fill it (recovery of
-			 * system spaces from a snapshot).
-			 */
-			struct user *owner = user_find(func->def->uid);
-			if (owner == NULL)
-				return -1;
-			credentials_init(&func->owner_credentials,
-					 owner->auth_token,
-					 owner->def->uid);
-		}
-		fiber_set_user(fiber(), &func->owner_credentials);
-	}
+	/* Transaction is not started. */
+	assert(!in_txn());
 
 	int rc;
 	struct port args;
 	port_msgpack_create(&args, request->args,
 			    request->args_end - request->args);
-	if (func && func->def->language == FUNC_LANGUAGE_C) {
-		rc = box_c_call(func, &args, port);
-	} else {
+	struct func *func = func_by_name(name, name_len);
+	if (func != NULL) {
+		rc = func_call(func, &args, port);
+	} else if ((rc = access_check_universe_object(PRIV_X | PRIV_U,
+				SC_FUNCTION, tt_cstr(name, name_len))) == 0) {
 		rc = box_lua_call(name, name_len, &args, port);
 	}
-	/* Restore the original user */
-	if (orig_credentials)
-		fiber_set_user(fiber(), orig_credentials);
 
 	if (rc != 0) {
 		txn_rollback();
