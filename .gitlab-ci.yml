@@ -1,0 +1,321 @@
+stages:
+  - test
+  - deploy
+
+variables:
+  IMAGE_TEST: "${CI_REGISTRY}/${CI_PROJECT_PATH}/testing/debian-stretch:latest"
+  IMAGE_TEST_LTO: "${CI_REGISTRY}/${CI_PROJECT_PATH}/testing/debian-buster:latest"
+  GITLAB_MAKE: "make -f .gitlab.mk"
+
+# Tests
+
+release:
+  image: ${IMAGE_TEST}
+  stage: test
+  tags:
+    - docker_test
+  script:
+    - ${GITLAB_MAKE} test_debian_no_deps
+
+debug:
+  image: ${IMAGE_TEST}
+  stage: test
+  tags:
+    - docker_test
+  script:
+    - ${GITLAB_MAKE} test_coverage_debian_no_deps
+
+release_clang:
+  image: ${IMAGE_TEST}
+  stage: test
+  tags:
+    - docker_test
+  variables:
+    CC: clang
+    CXX: clang++
+  script:
+    - ${GITLAB_MAKE} test_debian_no_deps
+
+release_lto:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  image: ${IMAGE_TEST_LTO}
+  stage: test
+  tags:
+    - docker_test
+  variables:
+    CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
+  script:
+    - ${GITLAB_MAKE} test_debian_no_deps
+
+release_lto_clang8:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  image: ${IMAGE_TEST_LTO}
+  stage: test
+  tags:
+    - docker_test
+  variables:
+    CC: clang-8
+    CXX: clang++-8
+    CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
+  script:
+    - ${GITLAB_MAKE} test_debian_no_deps
+
+osx_13_release:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: test
+  tags:
+    - vms_osx_13
+  variables:
+    VMS_NAME: 'osx_13'
+    VMS_USER: 'tarantool'
+    VMS_PORT: '2212'
+  before_script:
+    - ${GITLAB_MAKE} vms_start
+  script:
+    - ${GITLAB_MAKE} vms_test_osx
+  after_script:
+    - ${GITLAB_MAKE} vms_shutdown
+
+osx_14_release:
+  stage: test
+  tags:
+    - vms_osx_14
+  variables:
+    VMS_NAME: 'osx_14'
+    VMS_USER: 'tarantool'
+    VMS_PORT: '2222'
+  before_script:
+    - ${GITLAB_MAKE} vms_start
+  script:
+    - ${GITLAB_MAKE} vms_test_osx
+  after_script:
+    - ${GITLAB_MAKE} vms_shutdown
+
+osx_14_release_lto:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: test
+  tags:
+    - vms_osx_14
+  variables:
+    EXTRA_ENV: "export CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON ;"
+    VMS_NAME: 'osx_14'
+    VMS_USER: 'tarantool'
+    VMS_PORT: '2222'
+  before_script:
+    - ${GITLAB_MAKE} vms_start
+  script:
+    - ${GITLAB_MAKE} vms_test_osx
+  after_script:
+    - ${GITLAB_MAKE} vms_shutdown
+
+freebsd_12_release:
+  stage: test
+  tags:
+    - vms_freebsd_12
+  variables:
+    VMS_NAME: 'freebsd_12'
+    VMS_USER: 'vagrant'
+    VMS_PORT: '2232'
+    MAKE: 'gmake'
+  before_script:
+    - ${GITLAB_MAKE} vms_start
+  script:
+    - ${GITLAB_MAKE} vms_test_freebsd
+  after_script:
+    - ${GITLAB_MAKE} vms_shutdown
+
+# Packs
+
+centos_6:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: deploy
+  tags:
+    - deploy
+  variables:
+    OS: 'el'
+    DIST: '6'
+  script:
+    - ${GITLAB_MAKE} package
+
+centos_7:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: deploy
+  tags:
+    - deploy_test
+  variables:
+    OS: 'el'
+    DIST: '7'
+  script:
+    - ${GITLAB_MAKE} package
+
+fedora_28:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: deploy
+  tags:
+    - deploy_test
+  variables:
+    OS: 'fedora'
+    DIST: '28'
+  script:
+    - ${GITLAB_MAKE} package
+
+fedora_29:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: deploy
+  tags:
+    - deploy_test
+  variables:
+    OS: 'fedora'
+    DIST: '29'
+  script:
+    - ${GITLAB_MAKE} package
+
+fedora_30:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: deploy
+  tags:
+    - deploy_test
+  variables:
+    OS: 'fedora'
+    DIST: '30'
+  script:
+    - ${GITLAB_MAKE} package
+
+ubuntu_14_04:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: deploy
+  tags:
+    - deploy
+  variables:
+    OS: 'ubuntu'
+    DIST: 'trusty'
+  script:
+    - ${GITLAB_MAKE} package
+
+ubuntu_16_04:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: deploy
+  tags:
+    - deploy
+  variables:
+    OS: 'ubuntu'
+    DIST: 'xenial'
+  script:
+    - ${GITLAB_MAKE} package
+
+ubuntu_18_04:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: deploy
+  tags:
+    - deploy
+  variables:
+    OS: 'ubuntu'
+    DIST: 'bionic'
+  script:
+    - ${GITLAB_MAKE} package
+
+ubuntu_18_10:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: deploy
+  tags:
+    - deploy
+  variables:
+    OS: 'ubuntu'
+    DIST: 'cosmic'
+  script:
+    - ${GITLAB_MAKE} package
+
+ubuntu_19_04:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: deploy
+  tags:
+    - deploy
+  variables:
+    OS: 'ubuntu'
+    DIST: 'disco'
+  script:
+    - ${GITLAB_MAKE} package
+
+debian_8:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: deploy
+  tags:
+    - deploy
+  variables:
+    OS: 'debian'
+    DIST: 'jessie'
+  script:
+    - ${GITLAB_MAKE} package
+
+debian_9:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: deploy
+  tags:
+    - deploy
+  variables:
+    OS: 'debian'
+    DIST: 'stretch'
+  script:
+    - ${GITLAB_MAKE} package
+
+debian_10:
+  only:
+    refs:
+      - master
+      - /^.*-full-ci$/
+  stage: deploy
+  tags:
+    - deploy
+  variables:
+    OS: 'debian'
+    DIST: 'buster'
+  script:
+    - ${GITLAB_MAKE} package
