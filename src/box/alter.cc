@@ -2583,6 +2583,7 @@ func_cache_remove_func(struct trigger *trigger, void * /* event */)
 {
 	struct func *old_func = (struct func *) trigger->data;
 	func_cache_delete(old_func->def->fid);
+	trigger_run_xc(&on_alter_func, old_func);
 	func_delete(old_func);
 }
 
@@ -2615,6 +2616,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		def_guard.is_active = false;
 		func_cache_insert(func);
 		on_rollback->data = func;
+		trigger_run_xc(&on_alter_func, func);
 		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) {         /* DELETE */
 		uint32_t uid;

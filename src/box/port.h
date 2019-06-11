@@ -102,8 +102,6 @@ struct port_lua {
 	struct lua_State *L;
 	/** Reference to L in tarantool_L. */
 	int ref;
-	/** The argument of port_dump */
-	struct obuf *out;
 	/** Number of entries dumped to the port. */
 	int size;
 };

@@ -67,14 +67,14 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 extern "C" void
 port_tuple_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 {
-	(void) is_flat;
-	assert(is_flat == false);
 	struct port_tuple *port = port_tuple(base);
-	lua_createtable(L, port->size, 0);
+	if (!is_flat)
+		lua_createtable(L, port->size, 0);
 	struct port_tuple_entry *pe = port->first;
 	for (int i = 0; pe != NULL; pe = pe->next) {
 		luaT_pushtuple(L, pe->tuple);
-		lua_rawseti(L, -2, ++i);
+		if (!is_flat)
+			lua_rawseti(L, -2, ++i);
 	}
 }
 

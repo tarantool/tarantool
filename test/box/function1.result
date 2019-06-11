@@ -57,6 +57,25 @@ c:call('function1.args', { 15 })
 ---
 - [[15, 'hello']]
 ...
+box.func["function1.args"]
+---
+- language: C
+  setuid: false
+  name: function1.args
+  id: 2
+...
+box.func["function1.args"]:call()
+---
+- error: invalid argument count
+...
+box.func["function1.args"]:call({ "xx" })
+---
+- error: first tuple field must be uint
+...
+box.func["function1.args"]:call({ 15 })
+---
+- [15, 'hello']
+...
 box.schema.func.drop("function1.args")
 ---
 ...
@@ -260,6 +279,10 @@ s:drop()
 test_run = require('test_run').new()
 ---
 ...
+test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
+---
+- true
+...
 identifier = require("identifier")
 ---
 ...
@@ -298,4 +321,196 @@ test_run:cmd("setopt delimiter ''");
 ...
 c:close()
 ---
+...
+-- Test registered functions interface.
+function divide(a, b) return a / b end
+---
+...
+box.schema.func.create("divide")
+---
+...
+func = box.func.divide
+---
+...
+func.call({4, 2})
+---
+- error: 'builtin/box/schema.lua: Use func:call(...) instead of func.call(...)'
+...
+func:call(4, 2)
+---
+- error: 'builtin/box/schema.lua: Use func:call(table)'
+...
+func:call()
+---
+- error: '[string "function divide(a, b) return a / b end "]:1: attempt to perform
+    arithmetic on local ''a'' (a nil value)'
+...
+func:call({})
+---
+- error: '[string "function divide(a, b) return a / b end "]:1: attempt to perform
+    arithmetic on local ''a'' (a nil value)'
+...
+func:call({4})
+---
+- error: '[string "function divide(a, b) return a / b end "]:1: attempt to perform
+    arithmetic on local ''b'' (a nil value)'
+...
+func:call({4, 2})
+---
+- 2
+...
+func:call({4, 2, 1})
+---
+- 2
+...
+func:drop()
+---
+...
+func
+---
+- language: LUA
+  setuid: false
+  name: divide
+  id: 2
+...
+func.drop()
+---
+- error: 'builtin/box/schema.lua: Use func:drop(...) instead of func.drop(...)'
+...
+func:drop()
+---
+- error: Function 'divide' does not exist
+...
+func:call({4, 2})
+---
+- error: Function 'divide' does not exist
+...
+box.internal.func_call('divide', 4, 2)
+---
+- error: Function 'divide' does not exist
+...
+box.schema.func.create("function1.divide", {language = 'C'})
+---
+...
+func = box.func["function1.divide"]
+---
+...
+func:call(4, 2)
+---
+- error: 'builtin/box/schema.lua: Use func:call(table)'
+...
+func:call()
+---
+- error: invalid argument
+...
+func:call({})
+---
+- error: invalid argument
+...
+func:call({4})
+---
+- error: invalid argument
+...
+func:call({4, 2})
+---
+- [2]
+...
+func:call({4, 2, 1})
+---
+- [2]
+...
+func:drop()
+---
+...
+func
+---
+- language: C
+  setuid: false
+  name: function1.divide
+  id: 2
+...
+func:drop()
+---
+- error: Function 'function1.divide' does not exist
+...
+func:call({4, 2})
+---
+- error: Function 'function1.divide' does not exist
+...
+box.internal.func_call('function1.divide', 4, 2)
+---
+- error: Function 'function1.divide' does not exist
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function minmax(array)
+	local min = 999
+	local max = -1
+	for _, v in pairs(array) do
+		min = math.min(min, v)
+		max = math.max(max, v)
+	end
+	return min, max
+end
+test_run:cmd("setopt delimiter ''");
+---
+...
+box.schema.func.create("minmax")
+---
+...
+func = box.func.minmax
+---
+...
+func:call({{1, 2, 99, 3, -1}})
+---
+- -1
+- 99
+...
+func:drop()
+---
+...
+-- Test access checks for registered functions.
+function secret() return 1 end
+---
+...
+box.schema.func.create("secret")
+---
+...
+box.func.secret:call({})
+---
+- 1
+...
+function secret_leak() return box.func.secret:call() end
+---
+...
+box.schema.func.create('secret_leak')
+---
+...
+box.schema.user.grant('guest', 'execute', 'function', 'secret_leak')
+---
+...
+conn = net.connect(box.cfg.listen)
+---
+...
+conn:call('secret_leak')
+---
+- error: Execute access to function 'secret' is denied for user 'guest'
+...
+conn:close()
+---
+...
+box.schema.user.revoke('guest', 'execute', 'function', 'secret_leak')
+---
+...
+box.schema.func.drop('secret_leak')
+---
+...
+box.schema.func.drop('secret')
+---
+...
+test_run:cmd("clear filter")
+---
+- true
 ...

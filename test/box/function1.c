@@ -42,6 +42,39 @@ args(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	return box_return_tuple(ctx, tuple);
 }
 
+int
+divide(box_function_ctx_t *ctx, const char *args, const char *args_end)
+{
+	uint32_t arg_count = mp_decode_array(&args);
+	if (arg_count < 2)
+		goto error;
+
+	if (mp_typeof(*args) != MP_UINT)
+		goto error;
+	double a = mp_decode_uint(&args);
+	if (mp_typeof(*args) != MP_UINT)
+		goto error;
+	double b = mp_decode_uint(&args);
+	if (b == 0)
+		goto error;
+
+	char tuple_buf[512];
+	char *d = tuple_buf;
+	d = mp_encode_array(d, 1);
+	d = mp_encode_double(d, a / b);
+	assert(d <= tuple_buf + sizeof(tuple_buf));
+
+	box_tuple_format_t *fmt = box_tuple_format_default();
+	box_tuple_t *tuple = box_tuple_new(fmt, tuple_buf, d);
+	if (tuple == NULL)
+		return -1;
+	return box_return_tuple(ctx, tuple);
+error:
+	return box_error_set(__FILE__, __LINE__, ER_PROC_C, "%s",
+			     "invalid argument");
+}
+
+
 /*
  * For each UINT key in arguments create or increment counter in
  * box.space.test space.

@@ -21,6 +21,10 @@ box.schema.user.grant('guest', 'execute', 'function', 'function1.args')
 c:call('function1.args')
 c:call('function1.args', { "xx" })
 c:call('function1.args', { 15 })
+box.func["function1.args"]
+box.func["function1.args"]:call()
+box.func["function1.args"]:call({ "xx" })
+box.func["function1.args"]:call({ 15 })
 box.schema.func.drop("function1.args")
 
 box.schema.func.create('function1.multi_inc', {language = "C"})
@@ -86,6 +90,7 @@ s:drop()
 
 -- gh-2914: check identifier constraints.
 test_run = require('test_run').new()
+test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
 identifier = require("identifier")
 test_run:cmd("setopt delimiter ';'")
 --
@@ -112,3 +117,67 @@ identifier.run_test(
 );
 test_run:cmd("setopt delimiter ''");
 c:close()
+
+-- Test registered functions interface.
+function divide(a, b) return a / b end
+box.schema.func.create("divide")
+func = box.func.divide
+func.call({4, 2})
+func:call(4, 2)
+func:call()
+func:call({})
+func:call({4})
+func:call({4, 2})
+func:call({4, 2, 1})
+func:drop()
+func
+func.drop()
+func:drop()
+func:call({4, 2})
+box.internal.func_call('divide', 4, 2)
+
+box.schema.func.create("function1.divide", {language = 'C'})
+func = box.func["function1.divide"]
+func:call(4, 2)
+func:call()
+func:call({})
+func:call({4})
+func:call({4, 2})
+func:call({4, 2, 1})
+func:drop()
+func
+func:drop()
+func:call({4, 2})
+box.internal.func_call('function1.divide', 4, 2)
+
+test_run:cmd("setopt delimiter ';'")
+function minmax(array)
+	local min = 999
+	local max = -1
+	for _, v in pairs(array) do
+		min = math.min(min, v)
+		max = math.max(max, v)
+	end
+	return min, max
+end
+test_run:cmd("setopt delimiter ''");
+box.schema.func.create("minmax")
+func = box.func.minmax
+func:call({{1, 2, 99, 3, -1}})
+func:drop()
+
+-- Test access checks for registered functions.
+function secret() return 1 end
+box.schema.func.create("secret")
+box.func.secret:call({})
+function secret_leak() return box.func.secret:call() end
+box.schema.func.create('secret_leak')
+box.schema.user.grant('guest', 'execute', 'function', 'secret_leak')
+conn = net.connect(box.cfg.listen)
+conn:call('secret_leak')
+conn:close()
+box.schema.user.revoke('guest', 'execute', 'function', 'secret_leak')
+box.schema.func.drop('secret_leak')
+box.schema.func.drop('secret')
+
+test_run:cmd("clear filter")

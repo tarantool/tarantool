@@ -72,6 +72,7 @@ uint32_t space_cache_version = 0;
 struct rlist on_schema_init = RLIST_HEAD_INITIALIZER(on_schema_init);
 struct rlist on_alter_space = RLIST_HEAD_INITIALIZER(on_alter_space);
 struct rlist on_alter_sequence = RLIST_HEAD_INITIALIZER(on_alter_sequence);
+struct rlist on_alter_func = RLIST_HEAD_INITIALIZER(on_alter_func);
 
 /**
  * Lock of scheme modification

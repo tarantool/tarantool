@@ -2190,7 +2190,36 @@ function box.schema.func.exists(name_or_id)
     return tuple ~= nil
 end
 
+-- Helper function to check func:method() usage
+local function check_func_arg(func, method)
+    if type(func) ~= 'table' or func.name == nil then
+        local fmt = 'Use func:%s(...) instead of func.%s(...)'
+        error(string.format(fmt, method, method))
+    end
+end
+
+local func_mt = {}
+
+func_mt.drop = function(func, opts)
+    check_func_arg(func, 'drop')
+    box.schema.func.drop(func.name, opts)
+end
+
+func_mt.call = function(func, args)
+    check_func_arg(func, 'call')
+    args = args or {}
+    if type(args) ~= 'table' then
+        error('Use func:call(table)')
+    end
+    return box.schema.func.call(func.name, unpack(args))
+end
+
+function box.schema.func.bless(func)
+    setmetatable(func, {__index = func_mt})
+end
+
 box.schema.func.reload = internal.module_reload
+box.schema.func.call = internal.func_call
 
 box.internal.collation = {}
 box.internal.collation.create = function(name, coll_type, locale, opts)

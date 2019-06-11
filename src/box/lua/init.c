@@ -39,6 +39,7 @@
 
 #include "box/box.h"
 #include "box/txn.h"
+#include "box/func.h"
 #include "box/vclock.h"
 
 #include "box/lua/error.h"

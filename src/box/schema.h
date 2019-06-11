@@ -238,6 +238,11 @@ extern struct rlist on_alter_sequence;
 extern struct rlist on_access_denied;
 
 /**
+ * Triggers fired after committing a change in _func space.
+ */
+extern struct rlist on_alter_func;
+
+/**
  * Context passed to on_access_denied trigger.
  */
 struct on_access_denied_ctx {

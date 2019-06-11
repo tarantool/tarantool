@@ -33,10 +33,13 @@
 #include "box/error.h"
 #include "box/func.h"
 #include "box/func_def.h"
+#include "box/schema.h"
 #include "fiber.h"
+#include "tt_static.h"
 
 #include "lua/utils.h"
 #include "lua/msgpack.h"
+#include "lua/trigger.h"
 
 #include "box/port.h"
 #include "box/lua/tuple.h"
@@ -337,61 +340,62 @@ execute_lua_eval(lua_State *L)
 	return lua_gettop(L);
 }
 
+struct encode_lua_ctx {
+	struct port_lua *port;
+	struct mpstream *stream;
+};
+
 static int
 encode_lua_call(lua_State *L)
 {
-	struct port_lua *port = (struct port_lua *) lua_topointer(L, -1);
+	struct encode_lua_ctx *ctx =
+		(struct encode_lua_ctx *) lua_topointer(L, 1);
 	/*
 	 * Add all elements from Lua stack to the buffer.
 	 *
 	 * TODO: forbid explicit yield from __serialize or __index here
 	 */
-	struct mpstream stream;
-	mpstream_init(&stream, port->out, obuf_reserve_cb, obuf_alloc_cb,
-		      luamp_error, port->L);
-
 	struct luaL_serializer *cfg = luaL_msgpack_default;
-	int size = lua_gettop(port->L);
+	int size = lua_gettop(ctx->port->L);
 	for (int i = 1; i <= size; ++i)
-		luamp_encode(port->L, cfg, &stream, i);
-	port->size = size;
-	mpstream_flush(&stream);
+		luamp_encode(ctx->port->L, cfg, ctx->stream, i);
+	ctx->port->size = size;
+	mpstream_flush(ctx->stream);
 	return 0;
 }
 
 static int
 encode_lua_call_16(lua_State *L)
 {
-	struct port_lua *port = (struct port_lua *) lua_topointer(L, -1);
+	struct encode_lua_ctx *ctx =
+		(struct encode_lua_ctx *) lua_topointer(L, 1);
 	/*
 	 * Add all elements from Lua stack to the buffer.
 	 *
 	 * TODO: forbid explicit yield from __serialize or __index here
 	 */
-	struct mpstream stream;
-	mpstream_init(&stream, port->out, obuf_reserve_cb, obuf_alloc_cb,
-		      luamp_error, port->L);
-
 	struct luaL_serializer *cfg = luaL_msgpack_default;
-	port->size = luamp_encode_call_16(port->L, cfg, &stream);
-	mpstream_flush(&stream);
+	ctx->port->size = luamp_encode_call_16(ctx->port->L, cfg, ctx->stream);
+	mpstream_flush(ctx->stream);
 	return 0;
 }
 
 static inline int
-port_lua_do_dump(struct port *base, struct obuf *out, lua_CFunction handler)
+port_lua_do_dump(struct port *base, struct mpstream *stream,
+		 lua_CFunction handler)
 {
-	struct port_lua *port = (struct port_lua *)base;
+	struct port_lua *port = (struct port_lua *) base;
 	assert(port->vtab == &port_lua_vtab);
-	/* Use port to pass arguments to encoder quickly. */
-	port->out = out;
 	/*
 	 * Use the same global state, assuming the encoder doesn't
 	 * yield.
 	 */
+	struct encode_lua_ctx ctx;
+	ctx.port = port;
+	ctx.stream = stream;
 	struct lua_State *L = tarantool_L;
 	int top = lua_gettop(L);
-	if (lua_cpcall(L, handler, port) != 0) {
+	if (lua_cpcall(L, handler, &ctx) != 0) {
 		luaT_toerror(port->L);
 		return -1;
 	}
@@ -402,13 +406,57 @@ port_lua_do_dump(struct port *base, struct obuf *out, lua_CFunction handler)
 static int
 port_lua_dump(struct port *base, struct obuf *out)
 {
-	return port_lua_do_dump(base, out, encode_lua_call);
+	struct port_lua *port = (struct port_lua *) base;
+	struct mpstream stream;
+	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
+		      luamp_error, port->L);
+	return port_lua_do_dump(base, &stream, encode_lua_call);
 }
 
 static int
 port_lua_dump_16(struct port *base, struct obuf *out)
 {
-	return port_lua_do_dump(base, out, encode_lua_call_16);
+	struct port_lua *port = (struct port_lua *)base;
+	struct mpstream stream;
+	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
+		      luamp_error, port->L);
+	return port_lua_do_dump(base, &stream, encode_lua_call_16);
+}
+
+static void
+port_lua_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
+{
+	(void) is_flat;
+	assert(is_flat == true);
+	struct port_lua *port = (struct port_lua *) base;
+	uint32_t size = lua_gettop(port->L);
+	lua_xmove(port->L, L, size);
+	port->size = size;
+}
+
+static const char *
+port_lua_get_msgpack(struct port *base, uint32_t *size)
+{
+	struct port_lua *port = (struct port_lua *) base;
+	struct region *region = &fiber()->gc;
+	uint32_t region_svp = region_used(region);
+	struct mpstream stream;
+	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
+		      luamp_error, port->L);
+	mpstream_encode_array(&stream, lua_gettop(port->L));
+	int rc = port_lua_do_dump(base, &stream, encode_lua_call);
+	if (rc < 0) {
+		region_truncate(region, region_svp);
+		return NULL;
+	}
+	*size = region_used(region) - region_svp;
+	const char *data = region_join(region, *size);
+	if (data == NULL) {
+		diag_set(OutOfMemory, *size, "region", "data");
+		region_truncate(region, region_svp);
+		return NULL;
+	}
+	return data;
 }
 
 static void
@@ -429,9 +477,9 @@ port_lua_dump_plain(struct port *port, uint32_t *size);
 static const struct port_vtab port_lua_vtab = {
 	.dump_msgpack = port_lua_dump,
 	.dump_msgpack_16 = port_lua_dump_16,
-	.dump_lua = NULL,
+	.dump_lua = port_lua_dump_lua,
 	.dump_plain = port_lua_dump_plain,
-	.get_msgpack = NULL,
+	.get_msgpack = port_lua_get_msgpack,
 	.destroy = port_lua_destroy,
 };
 
@@ -527,10 +575,150 @@ lbox_module_reload(lua_State *L)
 	return 0;
 }
 
+int
+lbox_func_call(struct lua_State *L)
+{
+	if (lua_gettop(L) < 1 || !lua_isstring(L, 1))
+		return luaL_error(L, "Use func:call(...)");
+
+	size_t name_len;
+	const char *name = lua_tolstring(L, 1, &name_len);
+	struct func *func = func_by_name(name, name_len);
+	if (func == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_FUNCTION,
+			 tt_cstr(name, name_len));
+		return luaT_error(L);
+	}
+
+	/*
+	 * Prepare a new Lua stack for input arguments
+	 * before the function call to pass it into the
+	 * pcall-sandboxed tarantool_L handler.
+	 */
+	lua_State *args_L = lua_newthread(tarantool_L);
+	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
+	lua_xmove(L, args_L, lua_gettop(L) - 1);
+	struct port args;
+	port_lua_create(&args, args_L);
+	((struct port_lua *) &args)->ref = coro_ref;
+
+	struct port ret;
+	if (func_call(func, &args, &ret) != 0) {
+		port_destroy(&args);
+		return luaT_error(L);
+	}
+
+	int top = lua_gettop(L);
+	port_dump_lua(&ret, L, true);
+	int cnt = lua_gettop(L) - top;
+
+	port_destroy(&ret);
+	port_destroy(&args);
+	return cnt;
+}
+
+static void
+lbox_func_new(struct lua_State *L, struct func *func)
+{
+	lua_getfield(L, LUA_GLOBALSINDEX, "box");
+	lua_getfield(L, -1, "func");
+	if (!lua_istable(L, -1)) {
+		lua_pop(L, 1); /* pop nil */
+		lua_newtable(L);
+		lua_setfield(L, -2, "func");
+		lua_getfield(L, -1, "func");
+	}
+	lua_rawgeti(L, -1, func->def->fid);
+	if (lua_isnil(L, -1)) {
+		/*
+		 * If the function already exists, modify it,
+		 * rather than create a new one -- to not
+		 * invalidate Lua variable references to old func
+		 * outside the box.schema.func[].
+		 */
+		lua_pop(L, 1);
+		lua_newtable(L);
+		lua_rawseti(L, -2, func->def->fid);
+		lua_rawgeti(L, -1, func->def->fid);
+	} else {
+		/* Clear the reference to old func by old name. */
+		lua_getfield(L, -1, "name");
+		lua_pushnil(L);
+		lua_settable(L, -4);
+	}
+	int top = lua_gettop(L);
+	lua_pushstring(L, "id");
+	lua_pushnumber(L, func->def->fid);
+	lua_settable(L, top);
+	lua_pushstring(L, "name");
+	lua_pushstring(L, func->def->name);
+	lua_settable(L, top);
+	lua_pushstring(L, "setuid");
+	lua_pushboolean(L, func->def->setuid);
+	lua_settable(L, top);
+	lua_pushstring(L, "language");
+	lua_pushstring(L, func_language_strs[func->def->language]);
+	lua_settable(L, top);
+
+	/* Bless func object. */
+	lua_getfield(L, LUA_GLOBALSINDEX, "box");
+	lua_pushstring(L, "schema");
+	lua_gettable(L, -2);
+	lua_pushstring(L, "func");
+	lua_gettable(L, -2);
+	lua_pushstring(L, "bless");
+	lua_gettable(L, -2);
+
+	lua_pushvalue(L, top);
+	lua_call(L, 1, 0);
+	lua_pop(L, 3);
+
+	lua_setfield(L, -2, func->def->name);
+
+	lua_pop(L, 2);
+}
+
+static void
+lbox_func_delete(struct lua_State *L, struct func *func)
+{
+	uint32_t fid = func->def->fid;
+	lua_getfield(L, LUA_GLOBALSINDEX, "box");
+	lua_getfield(L, -1, "func");
+	assert(!lua_isnil(L, -1));
+	lua_rawgeti(L, -1, fid);
+	if (!lua_isnil(L, -1)) {
+		lua_getfield(L, -1, "name");
+		lua_pushnil(L);
+		lua_rawset(L, -4);
+		lua_pop(L, 1); /* pop func */
+		lua_pushnil(L);
+		lua_rawseti(L, -2, fid);
+	} else {
+		lua_pop(L, 1);
+	}
+	lua_pop(L, 2); /* box, func */
+}
+
+static void
+lbox_func_new_or_delete(struct trigger *trigger, void *event)
+{
+	struct lua_State *L = (struct lua_State *) trigger->data;
+	struct func *func = (struct func *)event;
+	if (func != NULL)
+		lbox_func_new(L, func);
+	else
+		lbox_func_delete(L, func);
+}
+
+static struct trigger on_alter_func_in_lua = {
+	RLIST_LINK_INITIALIZER, lbox_func_new_or_delete, NULL, NULL
+};
+
 static const struct luaL_Reg boxlib_internal[] = {
 	{"call_loadproc",  lbox_call_loadproc},
 	{"sql_create_function",  lbox_sql_create_function},
 	{"module_reload", lbox_module_reload},
+	{"func_call", lbox_func_call},
 	{NULL, NULL}
 };
 
@@ -539,7 +727,12 @@ box_lua_call_init(struct lua_State *L)
 {
 	luaL_register(L, "box.internal", boxlib_internal);
 	lua_pop(L, 1);
-
+	/*
+	 * Register the trigger that will push persistent
+	 * Lua functions objects to Lua.
+	 */
+	on_alter_func_in_lua.data = L;
+	trigger_add(&on_alter_func, &on_alter_func_in_lua);
 #if 0
 	/* Get CTypeID for `struct port *' */
 	int rc = luaL_cdef(L, "struct port;");
