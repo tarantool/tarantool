@@ -63,12 +63,12 @@ local function decode_data(raw_data)
     local response, raw_end = decode(raw_data)
     return response[IPROTO_DATA_KEY], raw_end
 end
-local function decode_tuple(raw_data)
-    local response, raw_end = internal.decode_select(raw_data)
+local function decode_tuple(raw_data, raw_data_end, args)
+    local response, raw_end = internal.decode_select(raw_data, args.format)
     return response[1], raw_end
 end
-local function decode_get(raw_data)
-    local body, raw_end = internal.decode_select(raw_data)
+local function decode_get(raw_data, raw_data_end, args)
+    local body, raw_end = internal.decode_select(raw_data, args.format)
     if body[2] then
         return nil, raw_end, box.error.MORE_THAN_ONE_TUPLE
     end
@@ -81,6 +81,12 @@ end
 local function decode_push(raw_data)
     local response, raw_end = decode(raw_data)
     return response[IPROTO_DATA_KEY][1], raw_end
+end
+local function decode_call_16(raw_data)
+    return internal.decode_select(raw_data)
+end
+local function decode_select(raw_data, raw_data_end, args)
+    return internal.decode_select(raw_data, args.format)
 end
 
 local function encode_call(send_buf, id, args)
@@ -150,7 +156,7 @@ local method_encoder = {
 
 local method_decoder = {
     ping    = decode_nil,
-    call_16 = internal.decode_select,
+    call_16 = decode_call_16,
     call_17 = decode_data,
     eval    = decode_data,
     insert  = decode_tuple,
@@ -158,7 +164,7 @@ local method_decoder = {
     delete  = decode_tuple,
     update  = decode_tuple,
     upsert  = decode_nil,
-    select  = internal.decode_select,
+    select  = decode_select,
     execute = internal.decode_execute,
     get     = decode_get,
     min     = decode_get,
@@ -623,7 +629,8 @@ local function create_transport(host, port, user, password, callback,
         -- Decode xrow.body[DATA] to Lua objects
         if status == IPROTO_OK_KEY then
             request.response, real_end, request.errno =
-                method_decoder[request.method](body_rpos, body_end)
+                method_decoder[request.method](body_rpos, body_end,
+                                               request.args)
             assert(real_end == body_end, "invalid body length")
             requests[id] = nil
             request.id = nil
@@ -1267,6 +1274,7 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
         s.index = {}
         s.temporary = false
         s._format = format
+        s._format_cdata = box.internal.new_tuple_format(format)
         s.connection = self
         if #space > 5 then
             local opts = space[6]
@@ -1384,13 +1392,15 @@ space_metatable = function(remote)
 
     function methods:insert(tuple, opts)
         check_space_arg(self, 'insert')
-        local args = {space_id = self.id, tuple = tuple}
+        local args = {space_id = self.id, tuple = tuple,
+                      format = self._format_cdata}
         return remote:_request('insert', opts, args)
     end
 
     function methods:replace(tuple, opts)
         check_space_arg(self, 'replace')
-        local args = {space_id = self.id, tuple = tuple}
+        local args = {space_id = self.id, tuple = tuple,
+                      format = self._format_cdata}
         return remote:_request('replace', opts, args)
     end
 
@@ -1443,7 +1453,7 @@ index_metatable = function(remote)
         local limit = tonumber(opts and opts.limit) or 0xFFFFFFFF
         local args = {space_id = self.space.id, index_id = self.id,
                       iterator = iterator, offset = offset, limit = limit,
-                      key = key}
+                      key = key, format = self.space._format_cdata}
         return (remote:_request('select', opts, args))
     end
 
@@ -1453,7 +1463,8 @@ index_metatable = function(remote)
             error("index:get() doesn't support `buffer` argument")
         end
         local args = {space_id = self.space.id, index_id = self.id,
-                      iterator = box.index.EQ, offset = 0, limit = 2, key = key}
+                      iterator = box.index.EQ, offset = 0, limit = 2, key = key,
+                      format = self.space._format_cdata}
         return nothing_or_data(remote:_request('get', opts, args))
     end
 
@@ -1463,7 +1474,8 @@ index_metatable = function(remote)
             error("index:min() doesn't support `buffer` argument")
         end
         local args = {space_id = self.space.id, index_id = self.id,
-                      iterator = box.index.GE, offset = 0, limit = 1, key = key}
+                      iterator = box.index.GE, offset = 0, limit = 1, key = key,
+                      format = self.space._format_cdata}
         return nothing_or_data(remote:_request('min', opts, args))
     end
 
@@ -1473,7 +1485,8 @@ index_metatable = function(remote)
             error("index:max() doesn't support `buffer` argument")
         end
         local args = {space_id = self.space.id, index_id = self.id,
-                      iterator = box.index.LE, offset = 0, limit = 1, key = key}
+                      iterator = box.index.LE, offset = 0, limit = 1, key = key,
+                      format = self.space._format_cdata}
         return nothing_or_data(remote:_request('max', opts, args))
     end
 
@@ -1490,14 +1503,15 @@ index_metatable = function(remote)
 
     function methods:delete(key, opts)
         check_index_arg(self, 'delete')
-        local args = {space_id = self.space.id, index_id = self.id, key = key}
+        local args = {space_id = self.space.id, index_id = self.id, key = key,
+                      format = self.space._format_cdata}
         return nothing_or_data(remote:_request('delete', opts, args))
     end
 
     function methods:update(key, oplist, opts)
         check_index_arg(self, 'update')
         local args = {space_id = self.space.id, index_id = self.id, key = key,
-                      oplist = oplist}
+                      oplist = oplist, format = self.space._format_cdata}
         return nothing_or_data(remote:_request('update', opts, args))
     end
 

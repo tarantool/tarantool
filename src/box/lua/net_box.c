@@ -48,6 +48,7 @@
 #include "box/errcode.h"
 #include "lua/fiber.h"
 #include "mpstream.h"
+#include "misc.h" /* lbox_check_tuple_format() */
 
 #define cfg luaL_msgpack_default
 
@@ -590,12 +591,11 @@ netbox_encode_execute(lua_State *L)
  * @param data MessagePack.
  */
 static void
-netbox_decode_data(struct lua_State *L, const char **data)
+netbox_decode_data(struct lua_State *L, const char **data,
+		   struct tuple_format *format)
 {
 	uint32_t count = mp_decode_array(data);
 	lua_createtable(L, count, 0);
-	struct tuple_format *format =
-		box_tuple_format_default();
 	for (uint32_t j = 0; j < count; ++j) {
 		const char *begin = *data;
 		mp_next(data);
@@ -618,6 +618,13 @@ static int
 netbox_decode_select(struct lua_State *L)
 {
 	uint32_t ctypeid;
+	int top = lua_gettop(L);
+	assert(top == 1 || top == 2);
+	struct tuple_format *format;
+	if (top == 2 && lua_type(L, 2) == LUA_TCDATA)
+		format = lbox_check_tuple_format(L, 2);
+	else
+		format = tuple_format_runtime;
 	const char *data = *(const char **)luaL_checkcdata(L, 1, &ctypeid);
 	assert(mp_typeof(*data) == MP_MAP);
 	uint32_t map_size = mp_decode_map(&data);
@@ -627,7 +634,7 @@ netbox_decode_select(struct lua_State *L)
 	uint32_t key = mp_decode_uint(&data);
 	assert(key == IPROTO_DATA);
 	(void) key;
-	netbox_decode_data(L, &data);
+	netbox_decode_data(L, &data, format);
 	*(const char **)luaL_pushcdata(L, ctypeid) = data;
 	return 2;
 }
@@ -716,7 +723,7 @@ netbox_decode_execute(struct lua_State *L)
 		uint32_t key = mp_decode_uint(&data);
 		switch(key) {
 		case IPROTO_DATA:
-			netbox_decode_data(L, &data);
+			netbox_decode_data(L, &data, tuple_format_runtime);
 			rows_index = i - map_size;
 			break;
 		case IPROTO_METADATA:
