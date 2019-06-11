@@ -1271,3 +1271,91 @@ box.cfg{too_long_threshold = too_long_threshold}
 s:drop()
 ---
 ...
+--
+-- gh-2978: Function to parse space format.
+--
+-- Error: no field name:
+format = {}
+---
+...
+format[1] = {}
+---
+...
+format[1].type = 'unsigned'
+---
+...
+box.internal.new_tuple_format(format)
+---
+- error: field 1 name is not specified
+...
+-- Error: duplicate field name:
+format[1].name = 'aaa'
+---
+...
+format[2] = {}
+---
+...
+format[2].name = 'aaa'
+---
+...
+format[2].type = 'any'
+---
+...
+box.internal.new_tuple_format(format)
+---
+- error: Space field 'aaa' is duplicate
+...
+-- Error: wrong field type:
+format[2].name = 'bbb'
+---
+...
+format[3] = {}
+---
+...
+format[3].name = 'ccc'
+---
+...
+format[3].type = 'something'
+---
+...
+box.internal.new_tuple_format(format)
+---
+- error: field 3 has unknown field type
+...
+-- Error: too many arguments:
+box.internal.new_tuple_format(format, format)
+---
+- error: 'Usage: box.internal.format_new(format)'
+...
+-- Error: wrong argument:
+box.internal.new_tuple_format(1)
+---
+- error: 'Usage: box.internal.format_new(format)'
+...
+--
+-- In next tests we should receive cdata("struct tuple_format *").
+-- We do not have a way to check cdata in Lua, but there should be
+-- no errors.
+--
+-- Without argument it is equivalent to new_tuple_format({})
+tuple_format = box.internal.new_tuple_format()
+---
+...
+-- If no type that type == "any":
+format[3].type = nil
+---
+...
+tuple_format = box.internal.new_tuple_format(format)
+---
+...
+-- Function space:format() without arguments returns valid format:
+tuple_format = box.internal.new_tuple_format(box.space._space:format())
+---
+...
+-- Check is_nullable option fo field
+format[2].is_nullable = true
+---
+...
+tuple_format = box.internal.new_tuple_format(format)
+---
+...

@@ -37,8 +37,12 @@
 
 #include "box/box.h"
 #include "box/port.h"
+#include "box/tuple.h"
+#include "box/tuple_format.h"
 #include "box/lua/tuple.h"
 #include "mpstream.h"
+
+static uint32_t CTID_STRUCT_TUPLE_FORMAT_PTR;
 
 /** {{{ Miscellaneous utils **/
 
@@ -116,14 +120,130 @@ lbox_select(lua_State *L)
 
 /* }}} */
 
+/** {{{ Utils to work with tuple_format. **/
+
+struct tuple_format *
+lbox_check_tuple_format(struct lua_State *L, int narg)
+{
+	uint32_t ctypeid;
+	struct tuple_format *format =
+		*(struct tuple_format **)luaL_checkcdata(L, narg, &ctypeid);
+	if (ctypeid != CTID_STRUCT_TUPLE_FORMAT_PTR) {
+		luaL_error(L, "Invalid argument: 'struct tuple_format *' "
+			   "expected, got %s)",
+			   lua_typename(L, lua_type(L, narg)));
+	}
+	return format;
+}
+
+static int
+lbox_tuple_format_gc(struct lua_State *L)
+{
+	struct tuple_format *format =  lbox_check_tuple_format(L, 1);
+	tuple_format_unref(format);
+	return 0;
+}
+
+static int
+lbox_push_tuple_format(struct lua_State *L, struct tuple_format *format)
+{
+	struct tuple_format **ptr = (struct tuple_format **)
+		luaL_pushcdata(L, CTID_STRUCT_TUPLE_FORMAT_PTR);
+	*ptr = format;
+	tuple_format_ref(format);
+	lua_pushcfunction(L, lbox_tuple_format_gc);
+	luaL_setcdatagc(L, -2);
+	return 1;
+}
+
+static int
+lbox_tuple_format_new(struct lua_State *L)
+{
+	assert(CTID_STRUCT_TUPLE_FORMAT_PTR != 0);
+	if (lua_gettop(L) == 0)
+		return lbox_push_tuple_format(L, tuple_format_runtime);
+	if (lua_gettop(L) > 1 || ! lua_istable(L, 1))
+		return luaL_error(L, "Usage: box.internal.format_new(format)");
+	uint32_t count = lua_objlen(L, 1);
+	if (count == 0)
+		return lbox_push_tuple_format(L, tuple_format_runtime);
+	size_t size = count * sizeof(struct field_def);
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	struct field_def *fields =
+		(struct field_def *)region_alloc(region, size);
+	if (fields == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "fields");
+		return luaT_error(L);
+	}
+	for (uint32_t i = 0; i < count; ++i) {
+		size_t len;
+
+		fields[i] = field_def_default;
+
+		lua_pushinteger(L, i + 1);
+		lua_gettable(L, 1);
+
+		lua_pushstring(L, "type");
+		lua_gettable(L, -2);
+		if (! lua_isnil(L, -1)) {
+			const char *type_name = lua_tolstring(L, -1, &len);
+			fields[i].type = field_type_by_name(type_name, len);
+			if (fields[i].type == field_type_MAX) {
+				const char *err =
+					"field %d has unknown field type";
+				return luaL_error(L, tt_sprintf(err, i + 1));
+			}
+		}
+		lua_pop(L, 1);
+
+		lua_pushstring(L, "name");
+		lua_gettable(L, -2);
+		if (lua_isnil(L, -1)) {
+			return luaL_error(L, tt_sprintf("field %d name is not "
+							"specified", i + 1));
+		}
+		const char *name = lua_tolstring(L, -1, &len);
+		fields[i].name = (char *)region_alloc(region, len + 1);
+		if (fields == NULL) {
+			diag_set(OutOfMemory, size, "region_alloc",
+				 "fields[i].name");
+			return luaT_error(L);
+		}
+		memcpy(fields[i].name, name, len);
+		fields[i].name[len] = '\0';
+		lua_pop(L, 1);
+		lua_pop(L, 1);
+	}
+	struct tuple_dictionary *dict = tuple_dictionary_new(fields, count);
+	region_truncate(region, region_svp);
+	if (dict == NULL)
+		return luaT_error(L);
+	struct tuple_format *format =
+		tuple_format_new(&tuple_format_runtime->vtab, NULL, NULL, 0,
+				 NULL, 0, 0, dict, false, false);
+	if (format == NULL)
+		return luaT_error(L);
+	return lbox_push_tuple_format(L, format);
+}
+
+/* }}} */
+
 void
 box_lua_misc_init(struct lua_State *L)
 {
 	static const struct luaL_Reg boxlib_internal[] = {
 		{"select", lbox_select},
+		{"new_tuple_format", lbox_tuple_format_new},
 		{NULL, NULL}
 	};
 
 	luaL_register(L, "box.internal", boxlib_internal);
 	lua_pop(L, 1);
+
+	int rc = luaL_cdef(L, "struct tuple_format;");
+	assert(rc == 0);
+	(void) rc;
+	CTID_STRUCT_TUPLE_FORMAT_PTR = luaL_ctypeid(L, "struct tuple_format *");
+	assert(CTID_STRUCT_TUPLE_FORMAT_PTR != 0);
 }

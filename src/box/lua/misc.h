@@ -45,6 +45,9 @@ lbox_encode_tuple_on_gc(struct lua_State *L, int idx, size_t *p_len);
 void
 box_lua_misc_init(struct lua_State *L);
 
+struct tuple_format *
+lbox_check_tuple_format(struct lua_State *L, int narg);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
