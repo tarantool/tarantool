@@ -56,7 +56,7 @@ static int
 box_lua_find(lua_State *L, const char *name, const char *name_end)
 {
 	int index = LUA_GLOBALSINDEX;
-	int objstack = 0;
+	int objstack = 0, top = lua_gettop(L);
 	const char *start = name, *end;
 
 	while ((end = (const char *) memchr(start, '.', name_end - start))) {
@@ -66,7 +66,7 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 		if (! lua_istable(L, -1)) {
 			diag_set(ClientError, ER_NO_SUCH_PROC,
 				 name_end - name, name);
-			luaT_error(L);
+			return -1;
 		}
 		start = end + 1; /* next piece of a.b.c */
 		index = lua_gettop(L); /* top of the stack */
@@ -81,11 +81,12 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 			lua_islightuserdata(L, -1) || lua_isuserdata(L, -1) )) {
 				diag_set(ClientError, ER_NO_SUCH_PROC,
 					  name_end - name, name);
-				luaT_error(L);
+				return -1;
 		}
+
 		start = end + 1; /* next piece of a.b.c */
 		index = lua_gettop(L); /* top of the stack */
-		objstack = index;
+		objstack = index - top;
 	}
 
 
@@ -96,21 +97,24 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 		 * for us, but our own message is more verbose. */
 		diag_set(ClientError, ER_NO_SUCH_PROC,
 			  name_end - name, name);
-		luaT_error(L);
+		return -1;
 	}
+
 	/* setting stack that it would contain only
 	 * the function pointer. */
 	if (index != LUA_GLOBALSINDEX) {
 		if (objstack == 0) {        /* no object, only a function */
-			lua_replace(L, 1);
+			lua_replace(L, top + 1);
+			lua_pop(L, lua_gettop(L) - top - 1);
 		} else if (objstack == 1) { /* just two values, swap them */
 			lua_insert(L, -2);
+			lua_pop(L, lua_gettop(L) - top - 2);
 		} else {		    /* long path */
-			lua_insert(L, 1);
-			lua_insert(L, 2);
+			lua_insert(L, top + 1);
+			lua_insert(L, top + 2);
+			lua_pop(L, objstack - 1);
 			objstack = 1;
 		}
-		lua_settop(L, 1 + objstack);
 	}
 	return 1 + objstack;
 }
@@ -128,7 +132,10 @@ lbox_call_loadproc(struct lua_State *L)
 	const char *name;
 	size_t name_len;
 	name = lua_tolstring(L, 1, &name_len);
-	return box_lua_find(L, name, name + name_len);
+	int count = box_lua_find(L, name, name + name_len);
+	if (count < 0)
+		return luaT_error(L);
+	return count;
 }
 
 /*
@@ -302,9 +309,10 @@ execute_lua_call(lua_State *L)
 	const char *name = ctx->name;
 	uint32_t name_len = ctx->name_len;
 
-	int oc = 0; /* how many objects are on stack after box_lua_find */
-	/* Try to find a function by name in Lua */
-	oc = box_lua_find(L, name, name + name_len);
+	/* How many objects are on stack after box_lua_find. */
+	int oc = box_lua_find(L, name, name + name_len);
+	if (oc < 0)
+		return luaT_error(L);
 
 	/* Push the rest of args (a tuple). */
 	int top = lua_gettop(L);
