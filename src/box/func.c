@@ -416,8 +416,13 @@ static struct func_vtab func_c_vtab;
 static struct func *
 func_c_new(struct func_def *def)
 {
-	(void) def;
 	assert(def->language == FUNC_LANGUAGE_C);
+	if (def->body != NULL || def->is_sandboxed) {
+		diag_set(ClientError, ER_CREATE_FUNCTION, def->name,
+			 "body and is_sandboxed options are not compatible "
+			 "with C language");
+		return NULL;
+	}
 	struct func_c *func = (struct func_c *) malloc(sizeof(struct func_c));
 	if (func == NULL) {
 		diag_set(OutOfMemory, sizeof(*func), "malloc", "func");

@@ -7,7 +7,12 @@ net = require('net.box')
 c = net.connect(os.getenv("LISTEN"))
 
 box.schema.func.create('function1', {language = "C"})
-box.space._func:replace{2, 1, 'function1', 0, 'LUA'}
+function setmap(tab) return setmetatable(tab, { __serialize = 'map' }) end
+datetime = os.date("%Y-%m-%d %H:%M:%S")
+box.space._func:replace{2, 1, 'function1', 0, 'LUA', '', 'procedure', setmap({}), 'none', false, false, true, setmap({}), '', datetime, datetime}
+box.space._func:replace{2, 1, 'function1', 0, 'LUA', '', 'function', setmap({}), 'reads', false, false, true, setmap({}), '', datetime, datetime}
+box.space._func:replace{2, 1, 'function1', 0, 'LUA', '', 'function', setmap({}), 'none', false, false, false, setmap({}), '', datetime, datetime}
+box.space._func:replace{2, 1, 'function1', 0, 'LUA', '', 'function', setmap({}), 'none', false, false, true, setmap({}), '', datetime, datetime}
 box.schema.user.grant('guest', 'execute', 'function', 'function1')
 _ = box.schema.space.create('test')
 _ = box.space.test:create_index('primary')
@@ -120,7 +125,7 @@ c:close()
 
 -- Test registered functions interface.
 function divide(a, b) return a / b end
-box.schema.func.create("divide")
+box.schema.func.create("divide", {comment = 'Divide two values'})
 func = box.func.divide
 func.call({4, 2})
 func:call(4, 2)
@@ -179,5 +184,69 @@ conn:close()
 box.schema.user.revoke('guest', 'execute', 'function', 'secret_leak')
 box.schema.func.drop('secret_leak')
 box.schema.func.drop('secret')
+
+--
+-- gh-4182: Introduce persistent Lua functions.
+--
+test_run:cmd("setopt delimiter ';'")
+body = [[function(tuple)
+		if type(tuple.address) ~= 'string' then
+			return nil, 'Invalid field type'
+		end
+		local t = tuple.address:upper():split()
+		for k,v in pairs(t) do t[k] = v end
+		return t
+	end
+]]
+test_run:cmd("setopt delimiter ''");
+box.schema.func.create('addrsplit', {body = body, language = "C"})
+box.schema.func.create('addrsplit', {is_sandboxed = true, language = "C"})
+box.schema.func.create('addrsplit', {is_sandboxed = true})
+box.schema.func.create('invalid', {body = "function(tuple) ret tuple"})
+box.schema.func.create('addrsplit', {body = body, is_deterministic = true})
+box.schema.user.grant('guest', 'execute', 'function', 'addrsplit')
+conn = net.connect(box.cfg.listen)
+conn:call('addrsplit', {{address = "Moscow Dolgoprudny"}})
+box.func.addrsplit:call({{address = "Moscow Dolgoprudny"}})
+conn:close()
+box.snapshot()
+test_run:cmd("restart server default")
+test_run = require('test_run').new()
+test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
+net = require('net.box')
+conn = net.connect(box.cfg.listen)
+conn:call('addrsplit', {{address = "Moscow Dolgoprudny"}})
+box.func.addrsplit:call({{address = "Moscow Dolgoprudny"}})
+conn:close()
+box.schema.user.revoke('guest', 'execute', 'function', 'addrsplit')
+box.func.addrsplit:drop()
+
+-- Test sandboxed functions.
+test_run:cmd("setopt delimiter ';'")
+body = [[function(number)
+		math.abs = math.log
+		return math.abs(number)
+	end]]
+test_run:cmd("setopt delimiter ''");
+box.schema.func.create('monkey', {body = body, is_sandboxed = true})
+box.func.monkey:call({1})
+math.abs(1)
+box.func.monkey:drop()
+
+sum = 0
+function inc_g(val) sum = sum + val end
+box.schema.func.create('call_inc_g', {body = "function(val) inc_g(val) end"})
+box.func.call_inc_g:call({1})
+assert(sum == 1)
+box.schema.func.create('call_inc_g_safe', {body = "function(val) inc_g(val) end", is_sandboxed = true})
+box.func.call_inc_g_safe:call({1})
+assert(sum == 1)
+box.func.call_inc_g:drop()
+box.func.call_inc_g_safe:drop()
+
+-- Test persistent function assemble corner cases
+box.schema.func.create('compiletime_tablef', {body = "{}"})
+box.schema.func.create('compiletime_call_inc_g', {body = "inc_g()"})
+assert(sum == 1)
 
 test_run:cmd("clear filter")

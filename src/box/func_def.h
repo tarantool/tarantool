@@ -58,11 +58,26 @@ struct func_def {
 	uint32_t fid;
 	/** Owner of the function. */
 	uint32_t uid;
+	/** Definition of the persistent function. */
+	char *body;
+	/** User-defined comment for a function. */
+	char *comment;
 	/**
 	 * True if the function requires change of user id before
 	 * invocation.
 	 */
 	bool setuid;
+	/**
+	 * Whether this function is deterministic (can produce
+	 * only one result for a given list of parameters).
+	 */
+	bool is_deterministic;
+	/**
+	 * Whether the routine must be initialized with isolated
+	 * sandbox where only a limited number if functions is
+	 * available.
+	 */
+	bool is_sandboxed;
 	/**
 	 * The language of the stored function.
 	 */
@@ -76,13 +91,22 @@ struct func_def {
 /**
  * @param name_len length of func_def->name
  * @returns size in bytes needed to allocate for struct func_def
- * for a function of length @a a name_len.
+ * for a function of length @a a name_len, body @a body_len and
+ * with comment @a comment_len.
  */
 static inline size_t
-func_def_sizeof(uint32_t name_len)
+func_def_sizeof(uint32_t name_len, uint32_t body_len, uint32_t comment_len,
+		uint32_t *body_offset, uint32_t *comment_offset)
 {
 	/* +1 for '\0' name terminating. */
-	return sizeof(struct func_def) + name_len + 1;
+	size_t sz = sizeof(struct func_def) + name_len + 1;
+	*body_offset = sz;
+	if (body_len > 0)
+		sz += body_len + 1;
+	*comment_offset = sz;
+	if (comment_len > 0)
+		sz += comment_len + 1;
+	return sz;
 }
 
 /** Compare two given function definitions. */

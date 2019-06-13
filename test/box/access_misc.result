@@ -793,7 +793,12 @@ box.space._space:select()
         'type': 'string'}, {'name': 'opts', 'type': 'map'}, {'name': 'parts', 'type': 'array'}]]
   - [296, 1, '_func', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'setuid',
-        'type': 'unsigned'}]]
+        'type': 'unsigned'}, {'name': 'language', 'type': 'string'}, {'name': 'body',
+        'type': 'string'}, {'name': 'routine_type', 'type': 'string'}, {'name': 'data_type',
+        'type': 'map'}, {'name': 'sql_data_access', 'type': 'string'}, {'name': 'is_deterministic',
+        'type': 'boolean'}, {'name': 'is_sandboxed', 'type': 'boolean'}, {'name': 'is_null_call',
+        'type': 'boolean'}, {'name': 'opts', 'type': 'map'}, {'name': 'comment', 'type': 'string'},
+      {'name': 'created', 'type': 'string'}, {'name': 'last_altered', 'type': 'string'}]]
   - [297, 1, '_vfunc', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'setuid',
         'type': 'unsigned'}]]
@@ -829,7 +834,8 @@ box.space._space:select()
 ...
 box.space._func:select()
 ---
-- - [1, 1, 'box.schema.user.info', 1, 'LUA']
+- - [1, 1, 'box.schema.user.info', 1, 'LUA', '', 'function', {}, 'none', false, false,
+    true, {}, '', '2019-06-23 18:11:31', '2019-06-23 18:11:31']
 ...
 session = nil
 ---

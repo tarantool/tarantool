@@ -2537,31 +2537,83 @@ func_def_get_ids_from_tuple(struct tuple *tuple, uint32_t *fid, uint32_t *uid)
 static struct func_def *
 func_def_new_from_tuple(struct tuple *tuple)
 {
-	uint32_t len;
-	const char *name = tuple_field_str_xc(tuple, BOX_FUNC_FIELD_NAME,
-					      &len);
-	if (len > BOX_NAME_MAX)
+	uint32_t field_count = tuple_field_count(tuple);
+	uint32_t name_len, body_len, comment_len;
+	const char *name, *body, *comment;
+	name = tuple_field_str_xc(tuple, BOX_FUNC_FIELD_NAME, &name_len);
+	if (name_len > BOX_NAME_MAX) {
 		tnt_raise(ClientError, ER_CREATE_FUNCTION,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  "function name is too long");
-	identifier_check_xc(name, len);
-	struct func_def *def = (struct func_def *) malloc(func_def_sizeof(len));
+	}
+	identifier_check_xc(name, name_len);
+	if (field_count > BOX_FUNC_FIELD_BODY) {
+		body = tuple_field_str_xc(tuple, BOX_FUNC_FIELD_BODY,
+					  &body_len);
+		comment = tuple_field_str_xc(tuple, BOX_FUNC_FIELD_COMMENT,
+					     &comment_len);
+		uint32_t len;
+		const char *routine_type = tuple_field_str_xc(tuple,
+					BOX_FUNC_FIELD_ROUTINE_TYPE, &len);
+		if (len != strlen("function") ||
+		    strncasecmp(routine_type, "function", len) != 0) {
+			tnt_raise(ClientError, ER_CREATE_FUNCTION, name,
+				  "unsupported routine_type value");
+		}
+		const char *sql_data_access = tuple_field_str_xc(tuple,
+					BOX_FUNC_FIELD_SQL_DATA_ACCESS, &len);
+		if (len != strlen("none") ||
+		    strncasecmp(sql_data_access, "none", len) != 0) {
+			tnt_raise(ClientError, ER_CREATE_FUNCTION, name,
+				  "unsupported sql_data_access value");
+		}
+		bool is_null_call = tuple_field_bool_xc(tuple,
+						BOX_FUNC_FIELD_IS_NULL_CALL);
+		if (is_null_call != true) {
+			tnt_raise(ClientError, ER_CREATE_FUNCTION, name,
+				  "unsupported is_null_call value");
+		}
+	} else {
+		body = NULL;
+		body_len = 0;
+		comment = NULL;
+		comment_len = 0;
+	}
+	uint32_t body_offset, comment_offset;
+	uint32_t def_sz = func_def_sizeof(name_len, body_len, comment_len,
+					  &body_offset, &comment_offset);
+	struct func_def *def =
+		(struct func_def *) malloc(def_sz);
 	if (def == NULL)
-		tnt_raise(OutOfMemory, func_def_sizeof(len), "malloc", "def");
+		tnt_raise(OutOfMemory, def_sz, "malloc", "def");
 	auto def_guard = make_scoped_guard([=] { free(def); });
 	func_def_get_ids_from_tuple(tuple, &def->fid, &def->uid);
 	if (def->fid > BOX_FUNCTION_MAX) {
 		tnt_raise(ClientError, ER_CREATE_FUNCTION,
-			  tt_cstr(name, len), "function id is too big");
+			  tt_cstr(name, name_len), "function id is too big");
 	}
-	memcpy(def->name, name, len);
-	def->name[len] = 0;
-	def->name_len = len;
-	if (tuple_field_count(tuple) > BOX_FUNC_FIELD_SETUID)
+	memcpy(def->name, name, name_len);
+	def->name[name_len] = 0;
+	def->name_len = name_len;
+	if (body_len > 0) {
+		def->body = (char *)def + body_offset;
+		memcpy(def->body, body, body_len);
+		def->body[body_len] = 0;
+	} else {
+		def->body = NULL;
+	}
+	if (comment_len > 0) {
+		def->comment = (char *)def + comment_offset;
+		memcpy(def->comment, comment, comment_len);
+		def->comment[comment_len] = 0;
+	} else {
+		def->comment = NULL;
+	}
+	if (field_count > BOX_FUNC_FIELD_SETUID)
 		def->setuid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_SETUID);
 	else
 		def->setuid = false;
-	if (tuple_field_count(tuple) > BOX_FUNC_FIELD_LANGUAGE) {
+	if (field_count > BOX_FUNC_FIELD_LANGUAGE) {
 		const char *language =
 			tuple_field_cstr_xc(tuple, BOX_FUNC_FIELD_LANGUAGE);
 		def->language = STR2ENUM(func_language, language);
@@ -2572,6 +2624,17 @@ func_def_new_from_tuple(struct tuple *tuple)
 	} else {
 		/* Lua is the default. */
 		def->language = FUNC_LANGUAGE_LUA;
+	}
+	if (field_count > BOX_FUNC_FIELD_BODY) {
+		def->is_deterministic =
+			tuple_field_bool_xc(tuple,
+					    BOX_FUNC_FIELD_IS_DETERMINISTIC);
+		def->is_sandboxed =
+			tuple_field_bool_xc(tuple,
+					    BOX_FUNC_FIELD_IS_SANDBOXED);
+	} else {
+		def->is_deterministic = false;
+		def->is_sandboxed = false;
 	}
 	def_guard.is_active = false;
 	return def;
