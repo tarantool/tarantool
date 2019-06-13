@@ -1053,7 +1053,6 @@ vdbeSortAllocUnpacked(SortSubtask * pTask)
 		if (pTask->pUnpacked == 0)
 			return -1;
 		pTask->pUnpacked->nField = pTask->pSorter->key_def->part_count;
-		pTask->pUnpacked->errCode = 0;
 	}
 	return 0;
 }
@@ -1171,7 +1170,7 @@ vdbeSorterSort(SortSubtask * pTask, SorterList * pList)
 	pList->pList = p;
 
 	sql_free(aSlot);
-	return pTask->pUnpacked->errCode;
+	return 0;
 }
 
 /*
@@ -1420,7 +1419,7 @@ vdbeMergeEngineStep(MergeEngine * pMerger,	/* The merge engine to advance to the
 		*pbEof = (pMerger->aReadr[pMerger->aTree[1]].pFd == 0);
 	}
 
-	return rc == 0 ? pTask->pUnpacked->errCode : rc;
+	return rc;
 }
 
 /*
@@ -1739,7 +1738,7 @@ vdbeMergeEngineInit(SortSubtask * pTask,	/* Thread that will run pMerger */
 	for (i = pMerger->nTree - 1; i > 0; i--) {
 		vdbeMergeEngineCompare(pMerger, i);
 	}
-	return pTask->pUnpacked->errCode;
+	return 0;
 }
 
 /*

@@ -1708,7 +1708,7 @@ sql_analysis_load(struct sql *db)
 	const char *load_stat1 =
 		"SELECT \"tbl\",\"idx\",\"stat\" FROM \"_sql_stat1\"";
 	/* Load new statistics out of the _sql_stat1 table. */
-	if (sql_exec(db, load_stat1, analysis_loader, &info, 0) != 0)
+	if (sql_exec(db, load_stat1, analysis_loader, &info) != 0)
 		goto fail;
 	if (info.index_count == 0) {
 		box_txn_commit();

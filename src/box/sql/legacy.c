@@ -41,8 +41,7 @@
 
 /*
  * Execute SQL code.  Return one of the SQL_ success/failure
- * codes.  Also write an error message into memory obtained from
- * malloc() and make *pzErrMsg point to that message.
+ * codes.
  *
  * If the SQL is a query, then for each row in the query result
  * the xCallback() function is called.  pArg becomes the first
@@ -53,11 +52,9 @@ int
 sql_exec(sql * db,	/* The database on which the SQL executes */
 	     const char *zSql,	/* The SQL to be executed */
 	     sql_callback xCallback,	/* Invoke this callback routine */
-	     void *pArg,	/* First argument to xCallback() */
-	     char **pzErrMsg	/* Write error messages here */
+	     void *pArg	/* First argument to xCallback() */
     )
 {
-	(void)pzErrMsg;
 	int rc = 0;	/* Return code */
 	const char *zLeftover;	/* Tail of unprocessed SQL */
 	sql_stmt *pStmt = 0;	/* The current SQL statement */

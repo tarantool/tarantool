@@ -2822,10 +2822,8 @@ sql_vdbe_mem_alloc_region(Mem *vdbe_mem, uint32_t size)
  */
 static int
 vdbeCompareMemString(const Mem * pMem1, const Mem * pMem2,
-		     const struct coll * pColl,
-		     u8 * prcErr)
+		     const struct coll * pColl)
 {
-	(void) prcErr;
 	return pColl->cmp(pMem1->z, (size_t)pMem1->n,
 			      pMem2->z, (size_t)pMem2->n, pColl);
 }
@@ -3011,7 +3009,7 @@ sqlMemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
 		 * compiled (this was not always the case).
 		 */
 		if (pColl) {
-			return vdbeCompareMemString(pMem1, pMem2, pColl, 0);
+			return vdbeCompareMemString(pMem1, pMem2, pColl);
 		} else {
 			size_t n = pMem1->n < pMem2->n ? pMem1->n : pMem2->n;
 			int res;
@@ -3205,9 +3203,7 @@ sqlVdbeCompareMsgpack(const char **key1,
 				if (coll != NULL) {
 					mem1.flags = MEM_Str;
 					rc = vdbeCompareMemString(&mem1, pKey2,
-								  coll,
-								  &unpacked->
-								  errCode);
+								  coll);
 				} else {
 					goto do_bin_cmp;
 				}

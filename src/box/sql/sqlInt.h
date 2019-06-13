@@ -519,8 +519,7 @@ int
 sql_exec(sql *,	/* An open database */
 	     const char *sql,	/* SQL to be evaluated */
 	     int (*callback) (void *, int, char **, char **),	/* Callback function */
-	     void *,	/* 1st argument to callback */
-	     char **errmsg	/* Error msg written here */
+	     void *	/* 1st argument to callback */
 	);
 
 /**
@@ -1483,7 +1482,6 @@ struct UnpackedRecord {
 	Mem *aMem;		/* Values */
 	u16 nField;		/* Number of entries in apMem[] */
 	i8 default_rc;		/* Comparison result if keys are equal */
-	u8 errCode;		/* Error detected by xRecordCompare (CORRUPT or NOMEM) */
 	i8 r1;			/* Value to return if (lhs > rhs) */
 	i8 r2;			/* Value to return if (rhs < lhs) */
 	u8 eqSeen;		/* True if an equality comparison has been seen */
