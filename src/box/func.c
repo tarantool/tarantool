@@ -381,15 +381,61 @@ restore:
 static struct func *
 func_c_new(struct func_def *def);
 
+/** A stub object for SQL builtins to avoid name clash with UDF. */
+static struct func_vtab func_sql_builtin_vtab;
+
+/** Construct a SQL builtin function object. */
+struct func *
+func_sql_builtin_new(struct func_def *def)
+{
+	assert(def->language == FUNC_LANGUAGE_SQL_BUILTIN);
+	if (def->body != NULL || def->is_sandboxed) {
+		diag_set(ClientError, ER_CREATE_FUNCTION, def->name,
+			 "body and is_sandboxed options are not compatible "
+			 "with SQL language");
+		return NULL;
+	}
+	struct func *func =
+		(struct func *) malloc(sizeof(*func));
+	if (func == NULL) {
+		diag_set(OutOfMemory, sizeof(*func), "malloc", "func");
+		return NULL;
+	}
+	/** Don't export SQL builtins in Lua for now. */
+	def->exports.lua = false;
+	func->vtab = &func_sql_builtin_vtab;
+	return func;
+}
+
+static void
+func_sql_builtin_destroy(struct func *func)
+{
+	assert(func->vtab == &func_sql_builtin_vtab);
+	assert(func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
+	free(func);
+}
+
+static struct func_vtab func_sql_builtin_vtab = {
+	.call = NULL,
+	.destroy = func_sql_builtin_destroy,
+};
+
 struct func *
 func_new(struct func_def *def)
 {
 	struct func *func;
-	if (def->language == FUNC_LANGUAGE_C) {
+	switch (def->language) {
+	case FUNC_LANGUAGE_C:
 		func = func_c_new(def);
-	} else {
-		assert(def->language == FUNC_LANGUAGE_LUA);
+		break;
+	case FUNC_LANGUAGE_LUA:
 		func = func_lua_new(def);
+		break;
+	case FUNC_LANGUAGE_SQL_BUILTIN:
+		func = func_sql_builtin_new(def);
+		break;
+	default:
+		unreachable();
 	}
 	if (func == NULL)
 		return NULL;
@@ -416,8 +462,8 @@ static struct func_vtab func_c_vtab;
 static struct func *
 func_c_new(struct func_def *def)
 {
-	(void) def;
 	assert(def->language == FUNC_LANGUAGE_C);
+	assert(def->body == NULL && !def->is_sandboxed);
 	struct func_c *func = (struct func_c *) malloc(sizeof(struct func_c));
 	if (func == NULL) {
 		diag_set(OutOfMemory, sizeof(*func), "malloc", "func");

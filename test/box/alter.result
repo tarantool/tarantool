@@ -190,7 +190,7 @@ _index:select{}
   - [289, 2, 'name', 'tree', {'unique': true}, [[0, 'unsigned'], [2, 'string']]]
   - [296, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [296, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
-  - [296, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
+  - [296, 2, 'name', 'tree', {'unique': true}, [{'field': 2, 'collation': 2, 'type': 'string'}]]
   - [297, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [297, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [297, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]

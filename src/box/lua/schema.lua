@@ -2107,7 +2107,9 @@ box.schema.func.create = function(name, opts)
     opts = opts or {}
     check_param_table(opts, { setuid = 'boolean',
                               if_not_exists = 'boolean',
-                              language = 'string'})
+                              language = 'string', body = 'string',
+                              is_deterministic = 'boolean',
+                              is_sandboxed = 'boolean', comment = 'string' })
     local _func = box.space[box.schema.FUNC_ID]
     local _vfunc = box.space[box.schema.VFUNC_ID]
     local func = _vfunc.index.name:get{name}
@@ -2117,10 +2119,21 @@ box.schema.func.create = function(name, opts)
         end
         return
     end
-    opts = update_param_table(opts, { setuid = false, language = 'lua'})
+    local datetime = os.date("%Y-%m-%d %H:%M:%S")
+    opts = update_param_table(opts, { setuid = false, language = 'lua',
+                    body = '', routine_type = 'function', returns = 'any',
+                    param_list = {}, aggregate = 'none', sql_data_access = 'none',
+                    is_deterministic = false, is_sandboxed = false,
+                    is_null_call = true, exports = {'LUA'}, opts = setmap{},
+                    comment = '', created = datetime, last_altered = datetime})
     opts.language = string.upper(opts.language)
     opts.setuid = opts.setuid and 1 or 0
-    _func:auto_increment{session.euid(), name, opts.setuid, opts.language}
+    _func:auto_increment{session.euid(), name, opts.setuid, opts.language,
+                         opts.body, opts.routine_type, opts.param_list,
+                         opts.returns, opts.aggregate, opts.sql_data_access,
+                         opts.is_deterministic, opts.is_sandboxed,
+                         opts.is_null_call, opts.exports, opts.opts,
+                         opts.comment, opts.created, opts.last_altered}
 end
 
 box.schema.func.drop = function(name, opts)

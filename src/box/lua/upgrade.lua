@@ -152,6 +152,7 @@ local function initial_1_7_5()
     local _cluster = box.space[box.schema.CLUSTER_ID]
     local _truncate = box.space[box.schema.TRUNCATE_ID]
     local MAP = setmap({})
+    local datetime = os.date("%Y-%m-%d %H:%M:%S")
 
     --
     -- _schema
@@ -326,7 +327,9 @@ local function initial_1_7_5()
 
     -- create "box.schema.user.info" function
     log.info('create function "box.schema.user.info" with setuid')
-    _func:replace{1, ADMIN, 'box.schema.user.info', 1, 'LUA'}
+    _func:replace({1, ADMIN, 'box.schema.user.info', 1, 'LUA', '', 'function',
+                  {}, 'any', 'none', 'none', false, false, true, {'LUA'},
+                  MAP, '', datetime, datetime})
 
     -- grant 'public' role access to 'box.schema.user.info' function
     log.info('grant execute on function "box.schema.user.info" to public')
@@ -820,10 +823,73 @@ local function create_vcollation_space()
     box.space[box.schema.VCOLLATION_ID]:format(format)
 end
 
+local function upgrade_func_to_2_2_1()
+    log.info("Update _func format")
+    local _func = box.space[box.schema.FUNC_ID]
+    local _priv = box.space[box.schema.PRIV_ID]
+    local datetime = os.date("%Y-%m-%d %H:%M:%S")
+    for _, v in box.space._func:pairs() do
+        box.space._func:replace({v.id, v.owner, v.name, v.setuid, v[5] or 'LUA',
+                                 '', 'function', {}, 'any', 'none', 'none',
+                                 false, false, true, v[15] or {'LUA'},
+                                 setmap({}), '', datetime, datetime})
+    end
+    local sql_builtin_list = {
+        "TRIM", "TYPEOF", "PRINTF", "UNICODE", "CHAR", "HEX", "VERSION",
+        "QUOTE", "REPLACE", "SUBSTR", "GROUP_CONCAT", "JULIANDAY", "DATE",
+        "TIME", "DATETIME", "STRFTIME", "CURRENT_TIME", "CURRENT_TIMESTAMP",
+        "CURRENT_DATE", "LENGTH", "POSITION", "ROUND", "UPPER", "LOWER",
+        "IFNULL", "RANDOM", "CEIL", "CEILING", "CHARACTER_LENGTH",
+        "CHAR_LENGTH", "FLOOR", "MOD", "OCTET_LENGTH", "ROW_COUNT", "COUNT",
+        "LIKE", "ABS", "EXP", "LN", "POWER", "SQRT", "SUM", "TOTAL", "AVG",
+        "RANDOMBLOB", "NULLIF", "ZEROBLOB", "MIN", "MAX", "COALESCE", "EVERY",
+        "EXISTS", "EXTRACT", "SOME", "GREATER", "LESSER", "SOUNDEX",
+        "LIKELIHOOD", "LIKELY", "UNLIKELY", "_sql_stat_get", "_sql_stat_push",
+        "_sql_stat_init",
+    }
+    for _, v in pairs(sql_builtin_list) do
+        local t = _func:auto_increment({ADMIN, v, 1, 'SQL_BUILTIN', '',
+                                       'function', {}, 'any', 'none', 'none',
+                                        false, false, true, {}, setmap({}), '',
+                                        datetime, datetime})
+        _priv:replace{ADMIN, PUBLIC, 'function', t.id, box.priv.X}
+    end
+    local t = _func:auto_increment({ADMIN, 'LUA', 1, 'LUA',
+                        'function(code) return assert(loadstring(code))() end',
+                        'function', {'string'}, 'any', 'none', 'none',
+                        false, false, true, {'LUA', 'SQL'},
+                        setmap({}), '', datetime, datetime})
+    _priv:replace{ADMIN, PUBLIC, 'function', t.id, box.priv.X}
+    local format = {}
+    format[1] = {name='id', type='unsigned'}
+    format[2] = {name='owner', type='unsigned'}
+    format[3] = {name='name', type='string'}
+    format[4] = {name='setuid', type='unsigned'}
+    format[5] = {name='language', type='string'}
+    format[6] = {name='body', type='string'}
+    format[7] = {name='routine_type', type='string'}
+    format[8] = {name='param_list', type='array'}
+    format[9] = {name='returns', type='string'}
+    format[10] = {name='aggregate', type='string'}
+    format[11] = {name='sql_data_access', type='string'}
+    format[12] = {name='is_deterministic', type='boolean'}
+    format[13] = {name='is_sandboxed', type='boolean'}
+    format[14] = {name='is_null_call', type='boolean'}
+    format[15] = {name='exports', type='array'}
+    format[16] = {name='opts', type='map'}
+    format[17] = {name='comment', type='string'}
+    format[18] = {name='created', type='string'}
+    format[19] = {name='last_altered', type='string'}
+    _func:format(format)
+    _func.index.name:alter({parts = {{'name', 'string',
+                                      collation = 'unicode_ci'}}})
+end
+
 local function upgrade_to_2_2_1()
     upgrade_sequence_to_2_2_1()
     upgrade_ck_constraint_to_2_2_1()
     create_vcollation_space()
+    upgrade_func_to_2_2_1()
 end
 
 --------------------------------------------------------------------------------

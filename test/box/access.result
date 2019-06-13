@@ -691,7 +691,7 @@ box.schema.func.exists(1)
 ---
 - true
 ...
-box.schema.func.exists(2)
+box.schema.func.exists(66)
 ---
 - false
 ...

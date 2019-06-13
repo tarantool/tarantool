@@ -299,7 +299,7 @@ box.schema.user.grant('guest', 'execute', 'universe')
 function f1() return box.space._func:get(1)[4] end
 ---
 ...
-function f2() return box.space._func:get(2)[4] end
+function f2() return box.space._func:get(66)[4] end
 ---
 ...
 box.schema.func.create('f1')

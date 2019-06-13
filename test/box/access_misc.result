@@ -793,7 +793,14 @@ box.space._space:select()
         'type': 'string'}, {'name': 'opts', 'type': 'map'}, {'name': 'parts', 'type': 'array'}]]
   - [296, 1, '_func', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'setuid',
-        'type': 'unsigned'}]]
+        'type': 'unsigned'}, {'name': 'language', 'type': 'string'}, {'name': 'body',
+        'type': 'string'}, {'name': 'routine_type', 'type': 'string'}, {'name': 'param_list',
+        'type': 'array'}, {'name': 'returns', 'type': 'string'}, {'name': 'aggregate',
+        'type': 'string'}, {'name': 'sql_data_access', 'type': 'string'}, {'name': 'is_deterministic',
+        'type': 'boolean'}, {'name': 'is_sandboxed', 'type': 'boolean'}, {'name': 'is_null_call',
+        'type': 'boolean'}, {'name': 'exports', 'type': 'array'}, {'name': 'opts',
+        'type': 'map'}, {'name': 'comment', 'type': 'string'}, {'name': 'created',
+        'type': 'string'}, {'name': 'last_altered', 'type': 'string'}]]
   - [297, 1, '_vfunc', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'setuid',
         'type': 'unsigned'}]]
@@ -829,7 +836,137 @@ box.space._space:select()
 ...
 box.space._func:select()
 ---
-- - [1, 1, 'box.schema.user.info', 1, 'LUA']
+- - [1, 1, 'box.schema.user.info', 1, 'LUA', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, ['LUA'], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [2, 1, 'TRIM', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [3, 1, 'TYPEOF', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [4, 1, 'PRINTF', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [5, 1, 'UNICODE', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [6, 1, 'CHAR', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [7, 1, 'HEX', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [8, 1, 'VERSION', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [9, 1, 'QUOTE', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [10, 1, 'REPLACE', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [11, 1, 'SUBSTR', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [12, 1, 'GROUP_CONCAT', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [13, 1, 'JULIANDAY', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [14, 1, 'DATE', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [15, 1, 'TIME', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [16, 1, 'DATETIME', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [17, 1, 'STRFTIME', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [18, 1, 'CURRENT_TIME', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [19, 1, 'CURRENT_TIMESTAMP', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none',
+    'none', false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [20, 1, 'CURRENT_DATE', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [21, 1, 'LENGTH', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [22, 1, 'POSITION', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [23, 1, 'ROUND', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [24, 1, 'UPPER', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [25, 1, 'LOWER', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [26, 1, 'IFNULL', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [27, 1, 'RANDOM', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [28, 1, 'CEIL', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [29, 1, 'CEILING', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [30, 1, 'CHARACTER_LENGTH', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none',
+    'none', false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [31, 1, 'CHAR_LENGTH', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [32, 1, 'FLOOR', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [33, 1, 'MOD', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [34, 1, 'OCTET_LENGTH', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [35, 1, 'ROW_COUNT', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [36, 1, 'COUNT', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [37, 1, 'LIKE', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [38, 1, 'ABS', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [39, 1, 'EXP', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [40, 1, 'LN', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [41, 1, 'POWER', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [42, 1, 'SQRT', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [43, 1, 'SUM', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [44, 1, 'TOTAL', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [45, 1, 'AVG', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [46, 1, 'RANDOMBLOB', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [47, 1, 'NULLIF', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [48, 1, 'ZEROBLOB', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [49, 1, 'MIN', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [50, 1, 'MAX', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [51, 1, 'COALESCE', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [52, 1, 'EVERY', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [53, 1, 'EXISTS', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [54, 1, 'EXTRACT', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [55, 1, 'SOME', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none', false,
+    false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [56, 1, 'GREATER', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [57, 1, 'LESSER', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [58, 1, 'SOUNDEX', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [59, 1, 'LIKELIHOOD', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [60, 1, 'LIKELY', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [61, 1, 'UNLIKELY', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none', 'none',
+    false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [62, 1, '_sql_stat_get', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none',
+    'none', false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [63, 1, '_sql_stat_push', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none',
+    'none', false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [64, 1, '_sql_stat_init', 1, 'SQL_BUILTIN', '', 'function', [], 'any', 'none',
+    'none', false, false, true, [], {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
+  - [65, 1, 'LUA', 1, 'LUA', 'function(code) return assert(loadstring(code))() end',
+    'function', ['string'], 'any', 'none', 'none', false, false, true, ['LUA', 'SQL'],
+    {}, '', '2019-07-11 13:57:48', '2019-07-11 13:57:48']
 ...
 session = nil
 ---

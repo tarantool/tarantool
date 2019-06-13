@@ -32,6 +32,7 @@
  */
 
 #include "trivia/util.h"
+#include "field_def.h"
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -44,10 +45,20 @@ extern "C" {
 enum func_language {
 	FUNC_LANGUAGE_LUA,
 	FUNC_LANGUAGE_C,
+	FUNC_LANGUAGE_SQL,
+	FUNC_LANGUAGE_SQL_BUILTIN,
 	func_language_MAX,
 };
 
 extern const char *func_language_strs[];
+
+enum func_aggregate {
+	FUNC_AGGREGATE_NONE,
+	FUNC_AGGREGATE_GROUP,
+	func_aggregate_MAX,
+};
+
+extern const char *func_aggregate_strs[];
 
 /**
  * Definition of a function. Function body is not stored
@@ -58,17 +69,46 @@ struct func_def {
 	uint32_t fid;
 	/** Owner of the function. */
 	uint32_t uid;
+	/** Definition of the persistent function. */
+	char *body;
+	/** User-defined comment for a function. */
+	char *comment;
 	/**
 	 * True if the function requires change of user id before
 	 * invocation.
 	 */
 	bool setuid;
 	/**
+	 * Whether this function is deterministic (can produce
+	 * only one result for a given list of parameters).
+	 */
+	bool is_deterministic;
+	/**
+	 * Whether the routine must be initialized with isolated
+	 * sandbox where only a limited number if functions is
+	 * available.
+	 */
+	bool is_sandboxed;
+	/** The count of function's input arguments. */
+	int param_count;
+	/** The type of the value returned by function. */
+	enum field_type returns;
+	/** Function aggregate option. */
+	enum func_aggregate aggregate;
+	/**
 	 * The language of the stored function.
 	 */
 	enum func_language language;
 	/** The length of the function name. */
 	uint32_t name_len;
+	/** Frontends where function must be available. */
+	union {
+		struct {
+			bool lua : 1;
+			bool sql : 1;
+		};
+		uint8_t all;
+	} exports;
 	/** Function name. */
 	char name[0];
 };
@@ -76,18 +116,35 @@ struct func_def {
 /**
  * @param name_len length of func_def->name
  * @returns size in bytes needed to allocate for struct func_def
- * for a function of length @a a name_len.
+ * for a function of length @a a name_len, body @a body_len and
+ * with comment @a comment_len.
  */
 static inline size_t
-func_def_sizeof(uint32_t name_len)
+func_def_sizeof(uint32_t name_len, uint32_t body_len, uint32_t comment_len,
+		uint32_t *body_offset, uint32_t *comment_offset)
 {
 	/* +1 for '\0' name terminating. */
-	return sizeof(struct func_def) + name_len + 1;
+	size_t sz = sizeof(struct func_def) + name_len + 1;
+	*body_offset = sz;
+	if (body_len > 0)
+		sz += body_len + 1;
+	*comment_offset = sz;
+	if (comment_len > 0)
+		sz += comment_len + 1;
+	return sz;
 }
 
 /** Compare two given function definitions. */
 int
 func_def_cmp(struct func_def *def1, struct func_def *def2);
+
+/** Duplicate a given function defintion object. */
+struct func_def *
+func_def_dup(struct func_def *def);
+
+/** Check if a non-empty function body is correct. */
+int
+func_def_check(struct func_def *def);
 
 /**
  * API of C stored function.

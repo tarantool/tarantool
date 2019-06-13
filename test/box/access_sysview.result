@@ -258,11 +258,11 @@ box.session.su('guest')
 ...
 #box.space._vpriv:select{}
 ---
-- 16
+- 80
 ...
 #box.space._vfunc:select{}
 ---
-- 1
+- 65
 ...
 #box.space._vcollation:select{}
 ---
@@ -290,11 +290,11 @@ box.session.su('guest')
 ...
 #box.space._vpriv:select{}
 ---
-- 16
+- 80
 ...
 #box.space._vfunc:select{}
 ---
-- 1
+- 65
 ...
 #box.space._vsequence:select{}
 ---

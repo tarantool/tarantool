@@ -16,7 +16,40 @@ c = net.connect(os.getenv("LISTEN"))
 box.schema.func.create('function1', {language = "C"})
 ---
 ...
-box.space._func:replace{2, 1, 'function1', 0, 'LUA'}
+id = box.func["function1"].id
+---
+...
+function setmap(tab) return setmetatable(tab, { __serialize = 'map' }) end
+---
+...
+datetime = os.date("%Y-%m-%d %H:%M:%S")
+---
+...
+box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'procedure', {}, 'any', 'none', 'none', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime}
+---
+- error: 'Failed to create function ''function1'': unsupported routine_type value'
+...
+box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'none', 'reads', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime}
+---
+- error: 'Failed to create function ''function1'': unsupported sql_data_access value'
+...
+box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'none', 'none', false, false, false, {"LUA"}, setmap({}), '', datetime, datetime}
+---
+- error: 'Failed to create function ''function1'': unsupported is_null_call value'
+...
+box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'data', 'none', 'none', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime}
+---
+- error: 'Failed to create function ''function1'': invalid returns value'
+...
+box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'none', 'none', false, false, true, {"LUA", "C"}, setmap({}), '', datetime, datetime}
+---
+- error: 'Failed to create function ''function1'': invalid exports value'
+...
+box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'aggregate', 'none', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime}
+---
+- error: 'Failed to create function ''function1'': invalid aggregate value'
+...
+box.space._func:replace{id, 1, 'function1', 0, 'LUA', '', 'function', {}, 'any', 'none', 'none', false, false, true, {"LUA"}, setmap({}), '', datetime, datetime}
 ---
 - error: function does not support alter
 ...
@@ -59,10 +92,16 @@ c:call('function1.args', { 15 })
 ...
 box.func["function1.args"]
 ---
-- language: C
+- aggregate: none
+  returns: any
+  exports:
+    lua: true
+    sql: false
+  id: 66
   setuid: false
+  is_deterministic: false
   name: function1.args
-  id: 2
+  language: C
 ...
 box.func["function1.args"]:call()
 ---
@@ -330,7 +369,7 @@ c:close()
 function divide(a, b) return a / b end
 ---
 ...
-box.schema.func.create("divide")
+box.schema.func.create("divide", {comment = 'Divide two values'})
 ---
 ...
 func = box.func.divide
@@ -372,10 +411,17 @@ func:drop()
 ...
 func
 ---
-- language: LUA
+- aggregate: none
+  returns: any
+  exports:
+    lua: true
+    sql: false
+  id: 66
   setuid: false
+  is_deterministic: false
+  comment: Divide two values
   name: divide
-  id: 2
+  language: LUA
 ...
 func.drop()
 ---
@@ -436,10 +482,16 @@ box.func["function1.divide"]
 ...
 func
 ---
-- language: C
+- aggregate: none
+  returns: any
+  exports:
+    lua: true
+    sql: false
+  id: 66
   setuid: false
+  is_deterministic: false
   name: function1.divide
-  id: 2
+  language: C
 ...
 func:drop()
 ---
@@ -526,6 +578,177 @@ box.schema.func.drop('secret_leak')
 box.schema.func.drop('secret')
 ---
 ...
+--
+-- gh-4182: Introduce persistent Lua functions.
+--
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+body = [[function(tuple)
+		if type(tuple.address) ~= 'string' then
+			return nil, 'Invalid field type'
+		end
+		local t = tuple.address:upper():split()
+		for k,v in pairs(t) do t[k] = v end
+		return t
+	end
+]]
+test_run:cmd("setopt delimiter ''");
+---
+...
+box.schema.func.create('addrsplit', {body = body, language = "C"})
+---
+- error: 'Failed to create function ''addrsplit'': body and is_sandboxed options are
+    not compatible with C language'
+...
+box.schema.func.create('addrsplit', {is_sandboxed = true, language = "C"})
+---
+- error: 'Failed to create function ''addrsplit'': body and is_sandboxed options are
+    not compatible with C language'
+...
+box.schema.func.create('addrsplit', {is_sandboxed = true})
+---
+- error: 'Failed to create function ''addrsplit'': is_sandboxed option may be set
+    only for a persistent Lua function (one with a non-empty body)'
+...
+box.schema.func.create('invalid', {body = "function(tuple) ret tuple"})
+---
+- error: 'Failed to dynamically load function ''invalid'': [string "return function(tuple)
+    ret tuple"]:1: ''='' expected near ''tuple'''
+...
+box.schema.func.create('addrsplit', {body = body, is_deterministic = true})
+---
+...
+box.schema.user.grant('guest', 'execute', 'function', 'addrsplit')
+---
+...
+conn = net.connect(box.cfg.listen)
+---
+...
+conn:call('addrsplit', {{address = "Moscow Dolgoprudny"}})
+---
+- ['MOSCOW', 'DOLGOPRUDNY']
+...
+box.func.addrsplit:call({{address = "Moscow Dolgoprudny"}})
+---
+- - MOSCOW
+  - DOLGOPRUDNY
+...
+conn:close()
+---
+...
+box.snapshot()
+---
+- ok
+...
+test_run:cmd("restart server default")
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
+---
+- true
+...
+net = require('net.box')
+---
+...
+conn = net.connect(box.cfg.listen)
+---
+...
+conn:call('addrsplit', {{address = "Moscow Dolgoprudny"}})
+---
+- ['MOSCOW', 'DOLGOPRUDNY']
+...
+box.func.addrsplit:call({{address = "Moscow Dolgoprudny"}})
+---
+- - MOSCOW
+  - DOLGOPRUDNY
+...
+conn:close()
+---
+...
+box.schema.user.revoke('guest', 'execute', 'function', 'addrsplit')
+---
+...
+box.func.addrsplit:drop()
+---
+...
+-- Test sandboxed functions.
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+body = [[function(number)
+		math.abs = math.log
+		return math.abs(number)
+	end]]
+test_run:cmd("setopt delimiter ''");
+---
+...
+box.schema.func.create('monkey', {body = body, is_sandboxed = true})
+---
+...
+box.func.monkey:call({1})
+---
+- 0
+...
+math.abs(1)
+---
+- 1
+...
+box.func.monkey:drop()
+---
+...
+sum = 0
+---
+...
+function inc_g(val) sum = sum + val end
+---
+...
+box.schema.func.create('call_inc_g', {body = "function(val) inc_g(val) end"})
+---
+...
+box.func.call_inc_g:call({1})
+---
+...
+assert(sum == 1)
+---
+- true
+...
+box.schema.func.create('call_inc_g_safe', {body = "function(val) inc_g(val) end", is_sandboxed = true})
+---
+...
+box.func.call_inc_g_safe:call({1})
+---
+- error: '[string "return function(val) inc_g(val) end"]:1: attempt to call global
+    ''inc_g'' (a nil value)'
+...
+assert(sum == 1)
+---
+- true
+...
+box.func.call_inc_g:drop()
+---
+...
+box.func.call_inc_g_safe:drop()
+---
+...
+-- Test persistent function assemble corner cases
+box.schema.func.create('compiletime_tablef', {body = "{}"})
+---
+- error: 'Failed to dynamically load function ''compiletime_tablef'': given body doesn''t
+    define a function'
+...
+box.schema.func.create('compiletime_call_inc_g', {body = "inc_g()"})
+---
+- error: 'Failed to dynamically load function ''compiletime_call_inc_g'': [string
+    "return inc_g()"]:1: attempt to call global ''inc_g'' (a nil value)'
+...
+assert(sum == 1)
+---
+- true
+...
 test_run:cmd("clear filter")
 ---
 - true
@@ -563,4 +786,39 @@ box.func.test ~= nil
 ...
 box.func.test:drop()
 ---
+...
+-- Check SQL builtins
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+sql_builtin_list = {
+	"TRIM", "TYPEOF", "PRINTF", "UNICODE", "CHAR", "HEX", "VERSION",
+	"QUOTE", "REPLACE", "SUBSTR", "GROUP_CONCAT", "JULIANDAY", "DATE",
+	"TIME", "DATETIME", "STRFTIME", "CURRENT_TIME", "CURRENT_TIMESTAMP",
+	"CURRENT_DATE", "LENGTH", "POSITION", "ROUND", "UPPER", "LOWER",
+	"IFNULL", "RANDOM", "CEIL", "CEILING", "CHARACTER_LENGTH",
+	"CHAR_LENGTH", "FLOOR", "MOD", "OCTET_LENGTH", "ROW_COUNT", "COUNT",
+	"LIKE", "ABS", "EXP", "LN", "POWER", "SQRT", "SUM", "TOTAL", "AVG",
+	"RANDOMBLOB", "NULLIF", "ZEROBLOB", "MIN", "MAX", "COALESCE", "EVERY",
+	"EXISTS", "EXTRACT", "SOME", "GREATER", "LESSER", "SOUNDEX",
+	"LIKELIHOOD", "LIKELY", "UNLIKELY", "_sql_stat_get", "_sql_stat_push",
+	"_sql_stat_init",
+}
+test_run:cmd("setopt delimiter ''");
+---
+...
+ok = true
+---
+...
+for _, v in pairs(sql_builtin_list) do ok = ok and (box.space._func.index.name:get(v) ~= nil) end
+---
+...
+ok == true
+---
+- true
+...
+box.func.LUA:call({"return 1 + 1"})
+---
+- 2
 ...

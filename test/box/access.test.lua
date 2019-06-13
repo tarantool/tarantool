@@ -276,7 +276,7 @@ box.schema.user.exists{}
 box.schema.func.exists('nosuchfunc')
 box.schema.func.exists('guest')
 box.schema.func.exists(1)
-box.schema.func.exists(2)
+box.schema.func.exists(66)
 box.schema.func.exists('box.schema.user.info')
 box.schema.func.exists()
 box.schema.func.exists(nil)
