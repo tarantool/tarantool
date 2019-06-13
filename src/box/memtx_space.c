@@ -47,6 +47,10 @@
  * Yield every 1K tuples while building a new index or checking
  * a space format. In debug mode yield more often for testing
  * purposes.
+ *
+ * Yields do not happen during recovery. At this point of time
+ * iproto aready accepts requests, and yielding would allow them
+ * to be proccessed while data is not fully recovered.
  */
 #ifdef NDEBUG
 enum { MEMTX_DDL_YIELD_LOOPS = 1000 };
@@ -884,6 +888,7 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 	if (it == NULL)
 		return -1;
 
+	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
 	struct memtx_ddl_state state;
 	state.format = format;
 	state.cmp_def = pk->def->key_def;
@@ -905,7 +910,8 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 		rc = tuple_validate(format, tuple);
 		if (rc != 0)
 			break;
-		if (++count % MEMTX_DDL_YIELD_LOOPS == 0) {
+		if (++count % MEMTX_DDL_YIELD_LOOPS == 0 &&
+		    memtx->state == MEMTX_OK) {
 			state.cursor = tuple;
 			tuple_ref(state.cursor);
 			fiber_sleep(0);
@@ -1033,6 +1039,7 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	if (it == NULL)
 		return -1;
 
+	struct memtx_engine *memtx = (struct memtx_engine *)src_space->engine;
 	struct memtx_ddl_state state;
 	state.index = new_index;
 	state.format = new_format;
@@ -1079,7 +1086,8 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		 */
 		if (new_index->def->iid == 0)
 			tuple_ref(tuple);
-		if (++count % MEMTX_DDL_YIELD_LOOPS == 0) {
+		if (++count % MEMTX_DDL_YIELD_LOOPS == 0 &&
+		    memtx->state == MEMTX_OK) {
 			/*
 			 * Remember the latest inserted tuple to
 			 * avoid processing yet to be added tuples
