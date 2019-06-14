@@ -1531,11 +1531,12 @@ data = string.fromhex('3C'..string.rep(require('digest').sha1_hex('bcde'), 3))
 sock:write(data)
 sock:close()
 
-test_run:grep_log('default', 'Got a corrupted row.*')
-test_run:grep_log('default', '00000000:.*')
-test_run:grep_log('default', '00000010:.*')
-test_run:grep_log('default', '00000020:.*')
-test_run:grep_log('default', '00000030:.*')
+test_run:wait_log('default', 'Got a corrupted row.*', nil, 10)
+test_run:wait_log('default', '00000000:.*', nil, 10)
+test_run:wait_log('default', '00000010:.*', nil, 10)
+test_run:wait_log('default', '00000020:.*', nil, 10)
+test_run:wait_log('default', '00000030:.*', nil, 10)
+-- we expect nothing below, so don't wait
 test_run:grep_log('default', '00000040:.*')
 
 box.cfg{log_level=log_level}
