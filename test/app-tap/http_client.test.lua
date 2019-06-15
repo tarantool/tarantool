@@ -236,17 +236,61 @@ local function test_errors(test)
     local r = http:get("http://do_not_exist_8ffad33e0cb01e6a01a03d00089e71e5b2b7e9930dfcba.ru")
 end
 
--- gh-3679 allow only headers can be converted to string
+-- gh-3679 Check that opts.headers values can be strings or table
+-- convertible to string only.
+-- gh-4281 Check that opts.headers can be a table and opts.headers
+-- keys can be strings only.
 local function test_request_headers(test, url, opts)
-    local exp_err = 'headers must be string or table with "__tostring"'
+    local exp_err_bad_opts_headers = 'opts.headers should be a table'
+    local exp_err_bad_key = 'opts.headers keys should be strings'
+    local exp_err_bad_value = 'opts.headers values should be strings or ' ..
+                              'tables with "__tostring"'
     local cases = {
+        -- Verify opts.headers type checks.
         {
-            'string header',
+            'string opts.headers',
+            opts = {headers = 'aaa'},
+            exp_err = exp_err_bad_opts_headers,
+        },
+        {
+            'number opts.headers',
+            opts = {headers = 1},
+            exp_err = exp_err_bad_opts_headers,
+        },
+        {
+            'cdata (box.NULL) opts.headers',
+            opts = {headers = box.NULL},
+            exp_err = exp_err_bad_opts_headers,
+        },
+        -- Verify a header key type checks.
+        {
+            'number header key',
+            opts = {headers = {[1] = 'aaa'}},
+            exp_err = exp_err_bad_key,
+        },
+        {
+            'boolean header key',
+            opts = {headers = {[true] = 'aaa'}},
+            exp_err = exp_err_bad_key,
+        },
+        {
+            'table header key',
+            opts = {headers = {[{}] = 'aaa'}},
+            exp_err = exp_err_bad_key,
+        },
+        {
+            'cdata header key (box.NULL)',
+            opts = {headers = {[box.NULL] = 'aaa'}},
+            exp_err = exp_err_bad_key,
+        },
+        -- Verify a header value type checks.
+        {
+            'string header key & value',
             opts = {headers = {aaa = 'aaa'}},
             exp_err = nil,
         },
         {
-            'header with __tostring() metamethod',
+            'header value with __tostring() metamethod',
             opts = {headers = {aaa = setmetatable({}, {
                 __tostring = function(self)
                     return 'aaa'
@@ -258,34 +302,34 @@ local function test_request_headers(test, url, opts)
             end,
         },
         {
-            'boolean header',
+            'boolean header value',
             opts = {headers = {aaa = true}},
-            exp_err = exp_err,
+            exp_err = exp_err_bad_value,
         },
         {
-            'number header',
+            'number header value',
             opts = {headers = {aaa = 10}},
-            exp_err = exp_err,
+            exp_err = exp_err_bad_value,
         },
         {
-            'cdata header (box.NULL)',
+            'cdata header value (box.NULL)',
             opts = {headers = {aaa = box.NULL}},
-            exp_err = exp_err,
+            exp_err = exp_err_bad_value,
         },
         {
-            'cdata<uint64_t> header',
+            'cdata<uint64_t> header value',
             opts = {headers = {aaa = 10ULL}},
-            exp_err = exp_err,
+            exp_err = exp_err_bad_value,
         },
         {
-            'table header w/o metatable',
+            'table header value w/o metatable',
             opts = {headers = {aaa = {}}},
-            exp_err = exp_err,
+            exp_err = exp_err_bad_value,
         },
         {
-            'table header w/o __tostring() metamethod',
+            'table header value w/o __tostring() metamethod',
             opts = {headers = {aaa = setmetatable({}, {})}},
-            exp_err = exp_err,
+            exp_err = exp_err_bad_value,
         },
     }
     test:plan(#cases)
