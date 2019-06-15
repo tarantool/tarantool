@@ -1503,9 +1503,8 @@ vy_task_compaction_complete(struct vy_task *task)
 		if (slice == last_slice)
 			break;
 	}
-	int64_t gc_lsn = vy_log_signature();
 	rlist_foreach_entry(run, &unused_runs, in_unused)
-		vy_log_drop_run(run->id, gc_lsn);
+		vy_log_drop_run(run->id, VY_LOG_GC_LSN_CURRENT);
 	if (new_slice != NULL) {
 		vy_log_create_run(lsm->id, new_run->id, new_run->dump_lsn,
 				  new_run->dump_count);
@@ -1530,7 +1529,7 @@ vy_task_compaction_complete(struct vy_task *task)
 	 * next checkpoint.
 	 */
 	rlist_foreach_entry(run, &unused_runs, in_unused) {
-		if (run->dump_lsn > gc_lsn)
+		if (run->dump_lsn > vy_log_signature())
 			vy_run_remove_files(lsm->env->path, lsm->space_id,
 					    lsm->index_id, run->id);
 	}

@@ -221,6 +221,16 @@ enum vy_log_record_type {
 	vy_log_record_type_MAX
 };
 
+/**
+ * Special value of vy_log_record::gc_lsn replaced with the signature
+ * of the vylog file the record will be written to. We need it so as
+ * to make sure we write the current vylog signature (not the previous
+ * one) when compaction completion races with vylog rotation. Writing
+ * the previous vylog signature would result in premature run file
+ * collection.
+ */
+enum { VY_LOG_GC_LSN_CURRENT = -1 };
+
 /** Record in the metadata log. */
 struct vy_log_record {
 	/** Type of the record. */
@@ -273,7 +283,7 @@ struct vy_log_record {
 	int64_t gc_lsn;
 	/** For runs: number of dumps it took to create the run. */
 	uint32_t dump_count;
-	/** Link in vy_log::tx. */
+	/** Link in vy_log_tx::records. */
 	struct stailq_entry in_tx;
 };
 
@@ -510,6 +520,8 @@ vy_log_tx_commit(void);
  * buffered records to disk, but in case of failure pending records
  * are not expunged from the buffer, so that the next transaction
  * will retry to flush them.
+ *
+ * In contrast to vy_log_tx_commit(), this function doesn't yield.
  */
 void
 vy_log_tx_try_commit(void);
