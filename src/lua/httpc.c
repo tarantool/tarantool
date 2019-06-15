@@ -176,20 +176,31 @@ luaT_httpc_request(lua_State *L)
 
 	lua_getfield(L, 5, "headers");
 	if (!lua_isnil(L, -1)) {
+		if (lua_istable(L, -1) == 0) {
+			httpc_request_delete(req);
+			return luaL_error(L, "opts.headers should be a table");
+		}
 		lua_pushnil(L);
 		while (lua_next(L, -2) != 0) {
 			int header_type = lua_type(L, -1);
 			if (header_type != LUA_TSTRING) {
 				const char *err_msg =
-					"headers must be string or table "\
-					"with \"__tostring\"";
+					"opts.headers values should be strings "
+					"or tables with \"__tostring\"";
 				if (header_type != LUA_TTABLE) {
+					httpc_request_delete(req);
 					return luaL_error(L, err_msg);
 				} else if (!luaL_getmetafield(L, -1,
 							      "__tostring")) {
+					httpc_request_delete(req);
 					return luaL_error(L, err_msg);
 				}
 				lua_pop(L, 1);
+			}
+			if (lua_type(L, -2) != LUA_TSTRING) {
+				httpc_request_delete(req);
+				return luaL_error(L, "opts.headers keys should "
+						  "be strings");
 			}
 			if (httpc_set_header(req, "%s: %s",
 					     lua_tostring(L, -2),
