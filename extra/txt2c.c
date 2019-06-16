@@ -70,6 +70,8 @@ int main(int argc, char** argv) {
 		case '\r': fputs("\\r", out); break;
 		case '\\': fputs("\\\\", out); break;
 		case '\"': fputs("\\\"", out); break;
+		/* Don't interpret ??X as a trigraph. */
+		case '?': fputs("\\\?", out); break;
 		default: fputc(c, out); break;
 		}
 	}
