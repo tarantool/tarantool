@@ -706,10 +706,6 @@ vy_tx_prepare(struct vy_tx *tx)
 		}
 		assert(lsm->space_id == current_space_id);
 
-		/* Do not save statements that was overwritten by the same tx */
-		if (v->is_overwritten || v->is_nop)
-			continue;
-
 		if (lsm->index_id > 0 && repsert == NULL && delete == NULL) {
 			/*
 			 * This statement is for a secondary index,
@@ -724,8 +720,11 @@ vy_tx_prepare(struct vy_tx *tx)
 			 * skip it for secondary indexes as well.
 			 */
 			v->is_overwritten = true;
-			continue;
 		}
+
+		/* Do not save statements that was overwritten by the same tx */
+		if (v->is_overwritten || v->is_nop)
+			continue;
 
 		enum iproto_type type = vy_stmt_type(v->stmt);
 
