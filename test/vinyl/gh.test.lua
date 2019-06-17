@@ -312,3 +312,18 @@ cont = false
 while finished ~= 2 do fiber.sleep(0.01) end
 
 s:drop()
+
+--
+-- gh-4294: assertion failure when deleting a no-op statement from
+-- a secondary index write set.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+_ = s:create_index('sk', {parts = {2, 'unsigned'}})
+s:replace{1, 1, 1}
+box.begin()
+s:update(1, {{'+', 3, 1}})
+s:delete(1)
+box.commit()
+s:select()
+s:drop()
