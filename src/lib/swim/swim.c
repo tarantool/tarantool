@@ -1960,6 +1960,8 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 	}
 	if (! swim_inaddr_eq(&addr, &swim->self->addr)) {
 		swim->self->incarnation++;
+		swim_on_member_update(swim, swim->self,
+				      SWIM_EV_NEW_INCARNATION);
 		swim_update_member_addr(swim, swim->self, &addr);
 	}
 	if (gc_mode != SWIM_GC_DEFAULT)

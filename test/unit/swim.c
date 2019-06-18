@@ -998,7 +998,7 @@ swim_cluster_delete_f(va_list ap)
 static void
 swim_test_triggers(void)
 {
-	swim_start_test(21);
+	swim_start_test(22);
 	struct swim_cluster *cluster = swim_cluster_new(2);
 	swim_cluster_set_ack_timeout(cluster, 1);
 	struct trigger_ctx tctx, tctx2;
@@ -1085,10 +1085,28 @@ swim_test_triggers(void)
 		fiber_sleep(0);
 	note("now all the triggers are done and deleted");
 
-	free(t1);
 	free(t2);
 	if (tctx.ctx.member != NULL)
 		swim_member_unref(tctx.ctx.member);
+
+	/* Check that recfg fires incarnation update trigger. */
+	s1 = swim_new();
+	struct tt_uuid uuid = uuid_nil;
+	uuid.time_low = 1;
+	fail_if(swim_cfg(s1, "127.0.0.1:1", -1, -1, -1, &uuid) != 0);
+
+	memset(&tctx, 0, sizeof(tctx));
+	trigger_add(swim_trigger_list_on_member_event(s1), t1);
+	fail_if(swim_cfg(s1, "127.0.0.1:2", -1, -1, -1, NULL) != 0);
+	while (tctx.ctx.events == 0)
+		fiber_sleep(0);
+	is(tctx.ctx.events, SWIM_EV_NEW_URI | SWIM_EV_NEW_INCARNATION,
+	   "local URI update warns about incarnation update");
+	swim_delete(s1);
+
+	if (tctx.ctx.member != NULL)
+		swim_member_unref(tctx.ctx.member);
+	free(t1);
 
 	swim_finish_test();
 }

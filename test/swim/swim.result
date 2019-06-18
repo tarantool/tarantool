@@ -1293,10 +1293,11 @@ m_list
 ...
 e_list
 ---
-- - is_new_payload: true
+- - is_update: true
+    is_new_payload: true
     is_new_uri: true
     is_new: true
-    is_update: true
+    is_new_incarnation: true
 ...
 ctx_list
 ---

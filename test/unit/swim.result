@@ -201,7 +201,7 @@ ok 19 - subtests
 ok 20 - subtests
 	*** swim_test_slow_net: done ***
 	*** swim_test_triggers ***
-    1..21
+    1..22
     ok 1 - trigger is fired
     ok 2 - is not deleted
     ok 3 - ctx.member is set
@@ -224,6 +224,7 @@ ok 20 - subtests
     ok 20 - non-yielding still is not
     ok 21 - trigger is not deleted until all currently sleeping triggers are finished
     # now all the triggers are done and deleted
+    ok 22 - local URI update warns about incarnation update
 ok 21 - subtests
 	*** swim_test_triggers: done ***
 	*** main_f: done ***
