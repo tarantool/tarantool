@@ -3575,6 +3575,12 @@ unlock_after_dd(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	(void) event;
+	/*
+	 * In case of yielding journal this trigger will be processed
+	 * in a context of tx_prio endpoint instead of a context of
+	 * a fiber which has this latch locked. So steal the latch first.
+	 */
+	latch_steal(&schema_lock);
 	latch_unlock(&schema_lock);
 }
 

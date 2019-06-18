@@ -41,7 +41,8 @@ static int64_t
 dummy_journal_write(struct journal *journal, struct journal_entry *entry)
 {
 	(void) journal;
-	(void) entry;
+	entry->res = 0;
+	journal_entry_complete(entry);
 	return 0;
 }
 
@@ -53,7 +54,9 @@ static struct journal dummy_journal = {
 struct journal *current_journal = &dummy_journal;
 
 struct journal_entry *
-journal_entry_new(size_t n_rows, struct region *region)
+journal_entry_new(size_t n_rows, struct region *region,
+		  journal_entry_done_cb on_done_cb,
+		  void *on_done_cb_data)
 {
 	struct journal_entry *entry;
 
@@ -70,6 +73,8 @@ journal_entry_new(size_t n_rows, struct region *region)
 	entry->n_rows = n_rows;
 	entry->res = -1;
 	entry->fiber = fiber();
+	entry->on_done_cb = on_done_cb;
+	entry->on_done_cb_data = on_done_cb_data;
 	return entry;
 }
 

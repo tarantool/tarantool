@@ -260,8 +260,10 @@ tx_schedule_queue(struct stailq *queue)
 	 * are many ready fibers.
 	 */
 	struct journal_entry *req;
-	stailq_foreach_entry(req, queue, fifo)
+	stailq_foreach_entry(req, queue, fifo) {
+		journal_entry_complete(req);
 		fiber_wakeup(req->fiber);
+	}
 }
 
 /**
@@ -1131,7 +1133,9 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 {
 	struct wal_writer *writer = (struct wal_writer *) journal;
 
-	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
+	ERROR_INJECT(ERRINJ_WAL_IO, {
+		goto fail;
+	});
 
 	if (! stailq_empty(&writer->rollback)) {
 		/*
@@ -1144,7 +1148,7 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 		say_error("Aborting transaction %llu during "
 			  "cascading rollback",
 			  vclock_sum(&writer->vclock));
-		return -1;
+		goto fail;
 	}
 
 	struct wal_msg *batch;
@@ -1158,7 +1162,7 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 		if (batch == NULL) {
 			diag_set(OutOfMemory, sizeof(struct wal_msg),
 				 "region", "struct wal_msg");
-			return -1;
+			goto fail;
 		}
 		wal_msg_create(batch);
 		/*
@@ -1182,6 +1186,11 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 	fiber_yield(); /* Request was inserted. */
 	fiber_set_cancellable(cancellable);
 	return entry->res;
+
+fail:
+	entry->res = -1;
+	journal_entry_complete(entry);
+	return -1;
 }
 
 int64_t
@@ -1195,7 +1204,9 @@ wal_write_in_wal_mode_none(struct journal *journal,
 		       entry->rows + entry->n_rows);
 	vclock_merge(&writer->vclock, &vclock_diff);
 	vclock_copy(&replicaset.vclock, &writer->vclock);
-	return vclock_sum(&writer->vclock);
+	entry->res = vclock_sum(&writer->vclock);
+	journal_entry_complete(entry);
+	return entry->res;
 }
 
 void

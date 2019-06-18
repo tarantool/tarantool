@@ -39,6 +39,11 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct xrow_header;
+struct journal_entry;
+
+/** Journal entry finalization callback typedef. */
+typedef void (*journal_entry_done_cb)(struct journal_entry *entry, void *data);
+
 /**
  * An entry for an abstract journal.
  * Simply put, a write ahead log request.
@@ -58,6 +63,17 @@ struct journal_entry {
 	 * The fiber issuing the request.
 	 */
 	struct fiber *fiber;
+	/**
+	 * A journal entry finalization callback which is going to be called
+	 * after the entry processing was finished in both cases: success
+	 * or fail. Entry->res is set to a result value before the callback
+	 * is fired.
+	 */
+	journal_entry_done_cb on_done_cb;
+	/**
+	 * A journal entry completion callback argument.
+	 */
+	void *on_done_cb_data;
 	/**
 	 * Approximate size of this request when encoded.
 	 */
@@ -80,7 +96,18 @@ struct region;
  * @return NULL if out of memory, fiber diagnostics area is set
  */
 struct journal_entry *
-journal_entry_new(size_t n_rows, struct region *region);
+journal_entry_new(size_t n_rows, struct region *region,
+		  journal_entry_done_cb on_done_cb,
+		  void *on_done_cb_data);
+
+/**
+ * Finalize a single entry.
+ */
+static inline void
+journal_entry_complete(struct journal_entry *entry)
+{
+	entry->on_done_cb(entry, entry->on_done_cb_data);
+}
 
 /**
  * An API for an abstract journal for all transactions of this

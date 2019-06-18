@@ -156,6 +156,16 @@ latch_trylock(struct latch *l)
 }
 
 /**
+ * Take a latch ownership
+ */
+static inline void
+latch_steal(struct latch *l)
+{
+	assert(l->owner != NULL);
+	l->owner = fiber();
+}
+
+/**
  * \copydoc box_latch_unlock
  */
 static inline void

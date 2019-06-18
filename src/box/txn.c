@@ -337,6 +337,64 @@ fail:
 	return -1;
 }
 
+/*
+ * A helper function to process on_commit/on_rollback triggers.
+ */
+static inline void
+txn_run_triggers(struct txn *txn, struct rlist *trigger)
+{
+	/*
+	 * Some triggers require for in_txn variable to be set so
+	 * restore it for the time triggers are in progress.
+	 */
+	fiber_set_txn(fiber(), txn);
+	/* Rollback triggers must not throw. */
+	if (trigger_run(trigger, txn) != 0) {
+		/*
+		 * As transaction couldn't handle a trigger error so
+		 * there is no option except panic.
+		 */
+		diag_log();
+		unreachable();
+		panic("commit/rollback trigger failed");
+	}
+	fiber_set_txn(fiber(), NULL);
+}
+
+/**
+ * Complete transaction processing.
+ */
+static void
+txn_complete(struct txn *txn)
+{
+	/*
+	 * Note, engine can be NULL if transaction contains
+	 * IPROTO_NOP statements only.
+	 */
+	if (txn->signature < 0) {
+		/* Undo the transaction. */
+		if (txn->engine)
+			engine_rollback(txn->engine, txn);
+		if (txn->has_triggers)
+			txn_run_triggers(txn, &txn->on_rollback);
+	} else {
+		/* Commit the transaction. */
+		if (txn->engine != NULL)
+			engine_commit(txn->engine, txn);
+		if (txn->has_triggers)
+			txn_run_triggers(txn, &txn->on_commit);
+	}
+}
+
+static void
+txn_entry_done_cb(struct journal_entry *entry, void *data)
+{
+	struct txn *txn = data;
+	txn->signature = entry->res;
+	txn_complete(txn);
+}
+
+
 static int64_t
 txn_write_to_wal(struct txn *txn)
 {
@@ -344,7 +402,9 @@ txn_write_to_wal(struct txn *txn)
 
 	struct journal_entry *req = journal_entry_new(txn->n_new_rows +
 						      txn->n_applier_rows,
-						      &txn->region);
+						      &txn->region,
+						      txn_entry_done_cb,
+						      txn);
 	if (req == NULL) {
 		txn_rollback(txn);
 		return -1;
@@ -370,16 +430,14 @@ txn_write_to_wal(struct txn *txn)
 	ev_tstamp stop = ev_monotonic_now(loop());
 
 	if (res < 0) {
-		/* Cascading rollback. */
-		txn_rollback(txn); /* Perform our part of cascading rollback. */
-		/*
-		 * Move fiber to end of event loop to avoid
-		 * execution of any new requests before all
-		 * pending rollbacks are processed.
-		 */
-		fiber_reschedule();
 		diag_set(ClientError, ER_WAL_IO);
 		diag_log();
+		/*
+		 * Despite the fact that the transaction was rolled back
+		 * by the journal completion callback, it's our duty to
+		 * free it.
+		 */
+		txn_free(txn);
 	} else if (stop - start > too_long_threshold) {
 		int n_rows = txn->n_new_rows + txn->n_applier_rows;
 		say_warn_ratelimited("too long WAL write: %d rows at "
@@ -418,30 +476,23 @@ txn_commit(struct txn *txn)
 	}
 	trigger_clear(&txn->fiber_on_stop);
 
+	/*
+	 * After this point the transaction must not be used
+	 * so reset the corresponding key in the fiber storage.
+	 */
+	fiber_set_txn(fiber(), NULL);
 	if (txn->n_new_rows + txn->n_applier_rows > 0) {
 		txn->signature = txn_write_to_wal(txn);
 		if (txn->signature < 0)
 			return -1;
+	} else {
+		/*
+		 * Even though there's nothing to write to WAL,
+		 * we still must complete the transaction.
+		 */
+		txn->signature = 0;
+		txn_complete(txn);
 	}
-	/*
-	 * Engine can be NULL if transaction contains IPROTO_NOP
-	 * statements only.
-	 */
-	if (txn->engine != NULL)
-		engine_commit(txn->engine, txn);
-	/*
-	 * The transaction is in the binary log. No action below
-	 * may throw. In case an error has happened, there is
-	 * no other option but terminate.
-	 */
-	if (txn->has_triggers &&
-	    trigger_run(&txn->on_commit, txn) != 0) {
-		diag_log();
-		unreachable();
-		panic("commit trigger failed");
-	}
-
-	fiber_set_txn(fiber(), NULL);
 	txn_free(txn);
 	return 0;
 fail:
@@ -463,18 +514,10 @@ txn_rollback(struct txn *txn)
 {
 	assert(txn == in_txn());
 	trigger_clear(&txn->fiber_on_stop);
-	if (txn->engine)
-		engine_rollback(txn->engine, txn);
-	/* Rollback triggers must not throw. */
-	if (txn->has_triggers &&
-	    trigger_run(&txn->on_rollback, txn) != 0) {
-		diag_log();
-		unreachable();
-		panic("rollback trigger failed");
-	}
-
-	fiber_set_txn(fiber(), NULL);
+	txn->signature = -1;
+	txn_complete(txn);
 	txn_free(txn);
+	fiber_set_txn(fiber(), NULL);
 }
 
 void

@@ -303,10 +303,12 @@ struct recovery_journal {
  */
 static int64_t
 recovery_journal_write(struct journal *base,
-		       struct journal_entry * /* entry */)
+		       struct journal_entry *entry)
 {
 	struct recovery_journal *journal = (struct recovery_journal *) base;
-	return vclock_sum(journal->vclock);
+	entry->res = vclock_sum(journal->vclock);
+	journal_entry_complete(entry);
+	return entry->res;
 }
 
 static inline void
