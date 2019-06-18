@@ -196,6 +196,8 @@ struct key_def {
 	bool is_nullable;
 	/** True if some key part has JSON path. */
 	bool has_json_paths;
+	/** True if it is multikey key definition. */
+	bool is_multikey;
 	/**
 	 * True, if some key parts can be absent in a tuple. These
 	 * fields assumed to be MP_NIL.
@@ -220,14 +222,14 @@ struct key_def {
 	const char *multikey_path;
 	/**
 	 * The length of the key_def::multikey_path.
-	 * Valid when key_def_is_multikey(key_def) is true,
+	 * Valid when key_def->is_multikey is true,
 	 * undefined otherwise.
 	 */
 	uint32_t multikey_path_len;
 	/**
 	 * The index of the root field of the multikey JSON
 	 * path index key_def::multikey_path.
-	 * Valid when key_def_is_multikey(key_def) is true,
+	 * Valid when key_def->is_multikey is true,
 	 * undefined otherwise.
 	*/
 	uint32_t multikey_fieldno;
@@ -467,12 +469,6 @@ key_def_is_sequential(const struct key_def *key_def)
 			return false;
 	}
 	return true;
-}
-
-static inline bool
-key_def_is_multikey(const struct key_def *key_def)
-{
-	return key_def->multikey_path != NULL;
 }
 
 /**

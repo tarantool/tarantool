@@ -155,7 +155,7 @@ struct TupleHash
 {
 	static uint32_t hash(struct tuple *tuple, struct key_def *key_def)
 	{
-		assert(!key_def_is_multikey(key_def));
+		assert(!key_def->is_multikey);
 		uint32_t h = HASH_SEED;
 		uint32_t carry = 0;
 		uint32_t total_size = 0;
@@ -172,7 +172,7 @@ template <>
 struct TupleHash<FIELD_TYPE_UNSIGNED> {
 	static uint32_t	hash(struct tuple *tuple, struct key_def *key_def)
 	{
-		assert(!key_def_is_multikey(key_def));
+		assert(!key_def->is_multikey);
 		const char *field = tuple_field_by_part(tuple,
 						key_def->parts,
 						MULTIKEY_NONE);
@@ -364,7 +364,7 @@ tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def)
 {
 	assert(has_json_paths == key_def->has_json_paths);
 	assert(has_optional_parts == key_def->has_optional_parts);
-	assert(!key_def_is_multikey(key_def));
+	assert(!key_def->is_multikey);
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
 	uint32_t total_size = 0;

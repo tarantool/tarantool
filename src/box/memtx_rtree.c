@@ -120,7 +120,7 @@ extract_rectangle(struct rtree_rect *rect, struct tuple *tuple,
 		  struct index_def *index_def)
 {
 	assert(index_def->key_def->part_count == 1);
-	assert(!key_def_is_multikey(index_def->key_def));
+	assert(!index_def->key_def->is_multikey);
 	const char *elems = tuple_field_by_part(tuple,
 				index_def->key_def->parts, MULTIKEY_NONE);
 	unsigned dimension = index_def->opts.dimension;

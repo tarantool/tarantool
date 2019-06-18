@@ -1251,7 +1251,6 @@ memtx_index_def_change_requires_rebuild(struct index *index,
 				  TUPLE_INDEX_BASE) != 0)
 			return true;
 	}
-	assert(key_def_is_multikey(old_cmp_def) ==
-	       key_def_is_multikey(new_cmp_def));
+	assert(old_cmp_def->is_multikey == new_cmp_def->is_multikey);
 	return false;
 }

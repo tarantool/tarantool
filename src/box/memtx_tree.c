@@ -882,7 +882,7 @@ memtx_tree_index_end_build(struct index *base)
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	qsort_arg(index->build_array, index->build_array_size,
 		  sizeof(index->build_array[0]), memtx_tree_qcompare, cmp_def);
-	if (key_def_is_multikey(cmp_def)) {
+	if (cmp_def->is_multikey) {
 		/*
 		 * Multikey index may have equal(in terms of
 		 * cmp_def) keys inserted by different multikey
@@ -1027,7 +1027,7 @@ memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 			 "malloc", "struct memtx_tree_index");
 		return NULL;
 	}
-	const struct index_vtab *vtab = key_def_is_multikey(def->key_def) ?
+	const struct index_vtab *vtab = def->key_def->is_multikey ?
 					&memtx_tree_index_multikey_vtab :
 					&memtx_tree_index_vtab;
 	if (index_create(&index->base, (struct engine *)memtx,

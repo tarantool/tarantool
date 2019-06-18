@@ -276,7 +276,7 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
 
 	assert(!base->def->opts.is_unique);
-	assert(!key_def_is_multikey(base->def->key_def));
+	assert(!base->def->key_def->is_multikey);
 	assert(old_tuple != NULL || new_tuple != NULL);
 	(void) mode;
 

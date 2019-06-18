@@ -653,7 +653,7 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 				 "HASH index must be unique");
 			return -1;
 		}
-		if (key_def_is_multikey(index_def->key_def)) {
+		if (index_def->key_def->is_multikey) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "HASH index cannot be multikey");
@@ -682,7 +682,7 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 				 "RTREE index field type must be ARRAY");
 			return -1;
 		}
-		if (key_def_is_multikey(index_def->key_def)) {
+		if (index_def->key_def->is_multikey) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "RTREE index cannot be multikey");
@@ -710,7 +710,7 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 				 "BITSET index field type must be NUM or STR");
 			return -1;
 		}
-		if (key_def_is_multikey(index_def->key_def)) {
+		if (index_def->key_def->is_multikey) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "BITSET index cannot be multikey");

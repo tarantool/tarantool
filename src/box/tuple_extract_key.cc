@@ -118,8 +118,8 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 	assert(has_optional_parts == key_def->has_optional_parts);
 	assert(contains_sequential_parts ==
 	       key_def_contains_sequential_parts(key_def));
-	assert(is_multikey == key_def_is_multikey(key_def));
-	assert(!key_def_is_multikey(key_def) || multikey_idx != MULTIKEY_NONE);
+	assert(is_multikey == key_def->is_multikey);
+	assert(!key_def->is_multikey || multikey_idx != MULTIKEY_NONE);
 	assert(mp_sizeof_nil() == 1);
 	const char *data = tuple_data(tuple);
 	uint32_t part_count = key_def->part_count;
@@ -250,7 +250,7 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 	assert(has_json_paths == key_def->has_json_paths);
 	assert(!has_optional_parts || key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);
-	assert(!key_def_is_multikey(key_def) || multikey_idx != MULTIKEY_NONE);
+	assert(!key_def->is_multikey || multikey_idx != MULTIKEY_NONE);
 	assert(mp_sizeof_nil() == 1);
 	/* allocate buffer with maximal possible size */
 	char *key = (char *) region_alloc(&fiber()->gc, data_end - data);
@@ -366,7 +366,7 @@ static void
 key_def_set_extract_func_plain(struct key_def *def)
 {
 	assert(!def->has_json_paths);
-	assert(!key_def_is_multikey(def));
+	assert(!def->is_multikey);
 	if (key_def_is_sequential(def)) {
 		assert(contains_sequential_parts || def->part_count == 1);
 		def->tuple_extract_key = tuple_extract_key_sequential
@@ -387,7 +387,7 @@ static void
 key_def_set_extract_func_json(struct key_def *def)
 {
 	assert(def->has_json_paths);
-	if (key_def_is_multikey(def)) {
+	if (def->is_multikey) {
 		def->tuple_extract_key = tuple_extract_key_slowpath
 					<contains_sequential_parts,
 					 has_optional_parts, true, true>;
@@ -452,7 +452,7 @@ tuple_key_contains_null(struct tuple *tuple, struct key_def *def,
 int
 tuple_validate_key_parts(struct key_def *key_def, struct tuple *tuple)
 {
-	assert(!key_def_is_multikey(key_def));
+	assert(!key_def->is_multikey);
 	for (uint32_t idx = 0; idx < key_def->part_count; idx++) {
 		struct key_part *part = &key_def->parts[idx];
 		const char *field = tuple_field_by_part(tuple, part,

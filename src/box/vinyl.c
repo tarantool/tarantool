@@ -1019,8 +1019,7 @@ vinyl_index_def_change_requires_rebuild(struct index *index,
 				  TUPLE_INDEX_BASE) != 0)
 			return true;
 	}
-	assert(key_def_is_multikey(old_cmp_def) ==
-	       key_def_is_multikey(new_cmp_def));
+	assert(old_cmp_def->is_multikey == new_cmp_def->is_multikey);
 	return false;
 }
 
@@ -1643,7 +1642,7 @@ vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
 {
 	if (!lsm->check_is_unique)
 		return 0;
-	if (!key_def_is_multikey(lsm->cmp_def)) {
+	if (!lsm->cmp_def->is_multikey) {
 		return vy_check_is_unique_secondary_one(tx, rv,
 				space_name, index_name, lsm, stmt,
 				MULTIKEY_NONE);

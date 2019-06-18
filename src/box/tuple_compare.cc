@@ -460,9 +460,9 @@ tuple_compare_slowpath(struct tuple *tuple_a, hint_t tuple_a_hint,
 	assert(!has_optional_parts || is_nullable);
 	assert(is_nullable == key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);
-	assert(key_def_is_multikey(key_def) == is_multikey);
-	assert(!is_multikey || (is_multikey == has_json_paths &&
-		tuple_a_hint != HINT_NONE && tuple_b_hint != HINT_NONE));
+	assert(key_def->is_multikey == is_multikey);
+	assert(!is_multikey || (tuple_a_hint != HINT_NONE &&
+		tuple_b_hint != HINT_NONE));
 	int rc = 0;
 	if (!is_multikey && (rc = hint_cmp(tuple_a_hint, tuple_b_hint)) != 0)
 		return rc;
@@ -619,9 +619,9 @@ tuple_compare_with_key_slowpath(struct tuple *tuple, hint_t tuple_hint,
 	assert(has_optional_parts == key_def->has_optional_parts);
 	assert(key != NULL || part_count == 0);
 	assert(part_count <= key_def->part_count);
-	assert(key_def_is_multikey(key_def) == is_multikey);
-	assert(!is_multikey || (is_multikey == has_json_paths &&
-		tuple_hint != HINT_NONE && key_hint == HINT_NONE));
+	assert(key_def->is_multikey == is_multikey);
+	assert(!is_multikey || (tuple_hint != HINT_NONE &&
+		key_hint == HINT_NONE));
 	int rc = 0;
 	if (!is_multikey && (rc = hint_cmp(tuple_hint, key_hint)) != 0)
 		return rc;
@@ -1573,7 +1573,7 @@ template <enum field_type type, bool is_nullable>
 static hint_t
 key_hint(const char *key, uint32_t part_count, struct key_def *key_def)
 {
-	assert(!key_def_is_multikey(key_def));
+	assert(!key_def->is_multikey);
 	if (part_count == 0)
 		return HINT_NONE;
 	return field_hint<type, is_nullable>(key, key_def->parts->coll);
@@ -1583,7 +1583,7 @@ template <enum field_type type, bool is_nullable>
 static hint_t
 tuple_hint(struct tuple *tuple, struct key_def *key_def)
 {
-	assert(!key_def_is_multikey(key_def));
+	assert(!key_def->is_multikey);
 	const char *field = tuple_field_by_part(tuple, key_def->parts,
 						MULTIKEY_NONE);
 	if (is_nullable && field == NULL)
@@ -1607,7 +1607,7 @@ key_hint_multikey(const char *key, uint32_t part_count, struct key_def *key_def)
 	 * do nothing on key hint calculation an it is valid
 	 * because it is never used(unlike tuple hint).
 	 */
-	assert(key_def_is_multikey(key_def));
+	assert(key_def->is_multikey);
 	return HINT_NONE;
 }
 
@@ -1641,7 +1641,7 @@ key_def_set_hint_func(struct key_def *def)
 static void
 key_def_set_hint_func(struct key_def *def)
 {
-	if (key_def_is_multikey(def)) {
+	if (def->is_multikey) {
 		def->key_hint = key_hint_multikey;
 		def->tuple_hint = tuple_hint_multikey;
 		return;
@@ -1756,7 +1756,7 @@ static void
 key_def_set_compare_func_json(struct key_def *def)
 {
 	assert(def->has_json_paths);
-	if (key_def_is_multikey(def)) {
+	if (def->is_multikey) {
 		def->tuple_compare = tuple_compare_slowpath
 				<is_nullable, has_optional_parts, true, true>;
 		def->tuple_compare_with_key = tuple_compare_with_key_slowpath

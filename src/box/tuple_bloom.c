@@ -109,7 +109,7 @@ tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
 			int multikey_idx)
 {
 	assert(builder->part_count == key_def->part_count);
-	assert(!key_def_is_multikey(key_def) || multikey_idx != MULTIKEY_NONE);
+	assert(!key_def->is_multikey || multikey_idx != MULTIKEY_NONE);
 
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
@@ -204,7 +204,7 @@ bool
 tuple_bloom_maybe_has(const struct tuple_bloom *bloom, struct tuple *tuple,
 		      struct key_def *key_def, int multikey_idx)
 {
-	assert(!key_def_is_multikey(key_def) || multikey_idx != MULTIKEY_NONE);
+	assert(!key_def->is_multikey || multikey_idx != MULTIKEY_NONE);
 
 	if (bloom->is_legacy) {
 		return bloom_maybe_has(&bloom->parts[0],

@@ -553,7 +553,7 @@ tuple_raw_multikey_count(struct tuple_format *format, const char *data,
 			       const uint32_t *field_map,
 			       struct key_def *key_def)
 {
-	assert(key_def_is_multikey(key_def));
+	assert(key_def->is_multikey);
 	const char *array_raw =
 		tuple_field_raw_by_path(format, data, field_map,
 					key_def->multikey_fieldno,

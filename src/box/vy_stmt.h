@@ -696,7 +696,7 @@ vy_stmt_str(struct tuple *stmt);
 static inline int
 vy_entry_multikey_idx(struct vy_entry entry, struct key_def *key_def)
 {
-	if (!key_def_is_multikey(key_def) || vy_stmt_is_key(entry.stmt))
+	if (!key_def->is_multikey || vy_stmt_is_key(entry.stmt))
 		return MULTIKEY_NONE;
 	assert(entry.hint != HINT_NONE);
 	return (int)entry.hint;
@@ -766,11 +766,11 @@ vy_entry_compare_with_raw_key(struct vy_entry entry,
  */
 #define vy_stmt_foreach_entry(entry, src_stmt, key_def)			\
 	for (uint32_t multikey_idx = 0,					\
-	     multikey_count = !key_def_is_multikey((key_def)) ? 1 :	\
+	     multikey_count = !(key_def)->is_multikey ? 1 :		\
 			tuple_multikey_count((src_stmt), (key_def));	\
 	     multikey_idx < multikey_count &&				\
 	     (((entry).stmt = (src_stmt)),				\
-	      ((entry).hint = !key_def_is_multikey((key_def)) ?		\
+	      ((entry).hint = !(key_def)->is_multikey ?			\
 			vy_stmt_hint((src_stmt), (key_def)) :		\
 			multikey_idx), true);				\
 	     ++multikey_idx)

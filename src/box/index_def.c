@@ -291,7 +291,7 @@ index_def_is_valid(struct index_def *index_def, const char *space_name)
 			 space_name, "too many key parts");
 		return false;
 	}
-	if (index_def->iid == 0 && key_def_is_multikey(index_def->key_def)) {
+	if (index_def->iid == 0 && index_def->key_def->is_multikey) {
 		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
 			 space_name, "primary key cannot be multikey");
 		return false;

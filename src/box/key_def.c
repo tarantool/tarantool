@@ -181,6 +181,7 @@ key_def_set_part_path(struct key_def *def, uint32_t part_no, const char *path,
 		def->multikey_path = part->path;
 		def->multikey_fieldno = part->fieldno;
 		def->multikey_path_len = (uint32_t) multikey_path_len;
+		def->is_multikey = true;
 	} else if (def->multikey_fieldno != part->fieldno ||
 		   json_path_cmp(path, multikey_path_len, def->multikey_path,
 				 def->multikey_path_len,
@@ -752,6 +753,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	new_def->is_nullable = first->is_nullable || second->is_nullable;
 	new_def->has_optional_parts = first->has_optional_parts ||
 				      second->has_optional_parts;
+	new_def->is_multikey = first->is_multikey || second->is_multikey;
 
 	/* JSON paths data in the new key_def. */
 	char *path_pool = (char *)new_def + key_def_sizeof(new_part_count, 0);
