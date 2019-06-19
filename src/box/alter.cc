@@ -2165,6 +2165,16 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 		make_scoped_guard([=] { alter_space_delete(alter); });
 
 	/*
+	 * Modify the WAL header to prohibit
+	 * replication of local & temporary
+	 * spaces truncation.
+	 */
+	if (space_is_temporary(old_space) ||
+	    space_group_id(old_space) == GROUP_LOCAL) {
+		stmt->row->group_id = GROUP_LOCAL;
+	}
+
+	/*
 	 * Recreate all indexes of the truncated space.
 	 */
 	for (uint32_t i = 0; i < old_space->index_count; i++) {
