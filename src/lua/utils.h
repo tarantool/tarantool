@@ -129,6 +129,19 @@ luaL_cdef(struct lua_State *L, const char *ctypename);
 
 /** \endcond public */
 
+/**
+ * @brief Return CTypeID (FFI) of given CDATA type,
+ * register a metatable with \a methods to be
+ * associated with every value of the given
+ * type on its creation iva FFI.
+ * @sa luaL_register_type
+ * @sa luaL_ctypeid
+ * @return CTypeID
+ */
+uint32_t
+luaL_metatype(struct lua_State *L, const char *ctypename,
+	      const struct luaL_Reg *methods);
+
 static inline lua_Integer
 luaL_arrlen(struct lua_State *L, int idx)
 {

@@ -141,6 +141,34 @@ luaL_ctypeid(struct lua_State *L, const char *ctypename)
 	return ctypeid;
 }
 
+uint32_t
+luaL_metatype(struct lua_State *L, const char *ctypename,
+	      const struct luaL_Reg *methods)
+{
+	/* Create a metatable for our ffi metatype. */
+	luaL_register_type(L, ctypename, methods);
+	int idx = lua_gettop(L);
+	/*
+	 * Get ffi.metatype function. It is like typeof with
+	 * an additional effect of registering a metatable for
+	 * all the cdata objects of the type.
+	 */
+	luaL_loadstring(L, "return require('ffi').metatype");
+	lua_call(L, 0, 1);
+	assert(lua_gettop(L) == idx + 1 && lua_isfunction(L, idx + 1));
+	lua_pushstring(L, ctypename);
+	/* Push the freshly created metatable as the second parameter. */
+	luaL_getmetatable(L, ctypename);
+	assert(lua_gettop(L) == idx + 3 && lua_istable(L, idx + 3));
+	lua_call(L, 2, 1);
+	uint32_t ctypetypeid;
+	CTypeID ctypeid = *(CTypeID *)luaL_checkcdata(L, idx + 1, &ctypetypeid);
+	assert(ctypetypeid == CTID_CTYPEID);
+
+	lua_settop(L, idx);
+	return ctypeid;
+}
+
 int
 luaL_cdef(struct lua_State *L, const char *what)
 {
