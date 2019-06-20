@@ -62,8 +62,12 @@ PMurHash32_Result
 crc32_calc
 mp_encode_double
 mp_encode_float
+mp_encode_decimal
 mp_decode_double
 mp_decode_float
+mp_decode_extl
+mp_sizeof_decimal
+decimal_unpack
 
 log_type
 say_set_log_level

@@ -411,9 +411,15 @@ static void json_append_data(lua_State *l, struct luaL_serializer *cfg,
     json_append_array(l, cfg, current_depth, json, field.size);
     return;
     case MP_EXT:
-    /* handled by luaL_convertfield */
-    assert(false);
-    return;
+	switch (field.ext_type) {
+	case MP_DECIMAL:
+	{
+	    const char *str = decimal_to_string(field.decval);
+	    return json_append_string(cfg, json, str, strlen(str));
+	}
+	default:
+	    assert(false);
+	}
     }
 }
 

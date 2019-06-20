@@ -252,3 +252,44 @@ msgpack.decode(ffi.cast('char *', '\x04\x05\x06'), -1)
 ---
 - error: 'msgpack.decode: size can''t be negative'
 ...
+--
+-- gh-4333: msgpack encode/decode decimals.
+--
+decimal = require('decimal')
+---
+...
+a = decimal.new('1e37')
+---
+...
+b = decimal.new('1e-38')
+---
+...
+c = decimal.new('1')
+---
+...
+d = decimal.new('0.1234567')
+---
+...
+e = decimal.new('123.4567')
+---
+...
+msgpack.decode(msgpack.encode(a)) == a
+---
+- true
+...
+msgpack.decode(msgpack.encode(b)) == b
+---
+- true
+...
+msgpack.decode(msgpack.encode(c)) == c
+---
+- true
+...
+msgpack.decode(msgpack.encode(d)) == d
+---
+- true
+...
+msgpack.decode(msgpack.encode(e)) == e
+---
+- true
+...

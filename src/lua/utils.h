@@ -55,6 +55,9 @@ extern "C" {
 
 #include "lua/error.h"
 
+#include "lib/core/mp_extension_types.h"
+#include "lib/core/decimal.h" /* decimal_t */
+
 struct lua_State;
 struct ibuf;
 
@@ -286,8 +289,11 @@ struct luaL_field {
 		bool bval;
 		/* Array or map. */
 		uint32_t size;
+		decimal_t *decval;
 	};
 	enum mp_type type;
+	/* subtypes of MP_EXT */
+	enum mp_extension_type ext_type;
 	bool compact;                /* a flag used by YAML serializer */
 };
 
@@ -373,7 +379,7 @@ luaL_checkfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 {
 	if (luaL_tofield(L, cfg, idx, field) < 0)
 		luaT_error(L);
-	if (field->type != MP_EXT)
+	if (field->type != MP_EXT || field->ext_type != MP_UNKNOWN_EXTENSION)
 		return;
 	luaL_convertfield(L, cfg, idx, field);
 }

@@ -72,10 +72,11 @@ end
 
 tap.test("msgpackffi", function(test)
     local serializer = require('msgpackffi')
-    test:plan(9)
+    test:plan(10)
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
     test:test("double", common.test_double, serializer)
+    test:test("decimal", common.test_decimal, serializer)
     test:test("boolean", common.test_boolean, serializer)
     test:test("string", common.test_string, serializer)
     test:test("nil", common.test_nil, serializer)

@@ -79,10 +79,8 @@ ldecimal_##name(struct lua_State *L) {						\
 	return 1;								\
 }
 
-static uint32_t CTID_DECIMAL;
-
 /** Push a new decimal on the stack and return a pointer to it. */
-static decimal_t *
+decimal_t *
 lua_pushdecimal(struct lua_State *L)
 {
 	decimal_t *res = luaL_pushcdata(L, CTID_DECIMAL);

@@ -189,6 +189,17 @@ local function test_double(test, s)
     ss = nil
 end
 
+local function test_decimal(test, s)
+    local decimal = require('decimal')
+    test:plan(10)
+
+    rt(test, s, decimal.new(1), 'cdata')
+    rt(test, s, decimal.new('1e37'), 'cdata')
+    rt(test, s, decimal.new('1e-38'), 'cdata')
+    rt(test, s, decimal.new('1234567891234567890.0987654321987654321'), 'cdata')
+    rt(test, s, decimal.new('-1234567891234567890.0987654321987654321'), 'cdata')
+end
+
 local function test_boolean(test, s)
     test:plan(4)
 
@@ -222,6 +233,8 @@ local function test_nil(test, s)
     local t = s.decode(s.encode({1, 2, 3, [5] = 5}))
     test:is(t[4], s.NULL, "sparse array with NULL")
 end
+
+
 
 local function test_table(test, s, is_array, is_map)
     test:plan(s.cfg and 31 or 13)
@@ -398,4 +411,5 @@ return {
     test_nil = test_nil;
     test_table = test_table;
     test_ucdata = test_ucdata;
+    test_decimal = test_decimal;
 }

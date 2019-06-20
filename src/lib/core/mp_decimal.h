@@ -1,5 +1,7 @@
+#ifndef TARANTOOL_LIB_CORE_MP_DECIMAL_INCLUDED
+#define TARANTOOL_LIB_CORE_MP_DECIMAL_INCLUDED
 /*
- * Copyright 2010-2019, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2019, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,27 +30,33 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#ifndef TARANTOOL_LUA_DECIMAL_H_INCLUDED
-#define TARANTOOL_LUA_DECIMAL_H_INCLUDED
 
-#include "lib/core/decimal.h"
+#include "decimal.h"
+#include <stdint.h>
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
+/**
+ * \brief Calculate exact buffer size needed to store a decimal
+ * pointed to by \a dec.
+ */
+uint32_t
+mp_sizeof_decimal(const decimal_t *dec);
 
-extern uint32_t CTID_DECIMAL;
-
-struct lua_State;
-
+/**
+ * \brief Decode a decimal from MsgPack \a data
+ * \param data - buffer pointer
+ * \return the decoded decimal
+ * \post *data = *data + mp_sizeof_decimal(retval)
+ */
 decimal_t *
-lua_pushdecimal(struct lua_State *L);
+mp_decode_decimal(const char **data, decimal_t *dec);
 
-void
-tarantool_lua_decimal_init(struct lua_State *L);
+/**
+ * \brief Encode a decimal pointed to by \a dec.
+ * \parad dec - decimal pointer
+ * \param data - a buffer
+ * \return \a data + mp_sizeof_decimal(\a dec)
+ */
+char *
+mp_encode_decimal(char *data, const decimal_t *dec);
 
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
-
-#endif /* TARANTOOL_LUA_DECIMAL_H_INCLUDED */
+#endif

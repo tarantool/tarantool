@@ -32,6 +32,7 @@
  */
 
 #include "diag.h"
+#include "decimal.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -135,6 +136,9 @@ mpstream_encode_bool(struct mpstream *stream, bool val);
 
 void
 mpstream_encode_binl(struct mpstream *stream, uint32_t len);
+
+void
+mpstream_encode_decimal(struct mpstream *stream, const decimal_t *val);
 
 /** Copies n bytes from memory area src to stream. */
 void

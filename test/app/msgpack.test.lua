@@ -84,3 +84,18 @@ size = msgpack.encode(100, buf)
 -- is not negative.
 --
 msgpack.decode(ffi.cast('char *', '\x04\x05\x06'), -1)
+
+--
+-- gh-4333: msgpack encode/decode decimals.
+--
+decimal = require('decimal')
+a = decimal.new('1e37')
+b = decimal.new('1e-38')
+c = decimal.new('1')
+d = decimal.new('0.1234567')
+e = decimal.new('123.4567')
+msgpack.decode(msgpack.encode(a)) == a
+msgpack.decode(msgpack.encode(b)) == b
+msgpack.decode(msgpack.encode(c)) == c
+msgpack.decode(msgpack.encode(d)) == d
+msgpack.decode(msgpack.encode(e)) == e

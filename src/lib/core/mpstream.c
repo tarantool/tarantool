@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include "msgpuck.h"
+#include "mp_decimal.h"
 
 void
 mpstream_reserve_slow(struct mpstream *stream, size_t size)
@@ -183,6 +184,16 @@ mpstream_encode_binl(struct mpstream *stream, uint32_t len)
 	if (data == NULL)
 		return;
 	char *pos = mp_encode_binl(data, len);
+	mpstream_advance(stream, pos - data);
+}
+
+void
+mpstream_encode_decimal(struct mpstream *stream, const decimal_t *val)
+{
+	char *data = mpstream_reserve(stream, mp_sizeof_decimal(val));
+	if (data == NULL)
+		return;
+	char *pos = mp_encode_decimal(data, val);
 	mpstream_advance(stream, pos - data);
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2019, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,27 +28,45 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#ifndef TARANTOOL_LUA_DECIMAL_H_INCLUDED
-#define TARANTOOL_LUA_DECIMAL_H_INCLUDED
 
-#include "lib/core/decimal.h"
+#include "mp_decimal.h"
+#include "mp_extension_types.h"
+#include "msgpuck.h"
+#include "decimal.h"
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
-
-extern uint32_t CTID_DECIMAL;
-
-struct lua_State;
+uint32_t
+mp_sizeof_decimal(const decimal_t *dec)
+{
+	return mp_sizeof_ext(decimal_len(dec));
+}
 
 decimal_t *
-lua_pushdecimal(struct lua_State *L);
+mp_decode_decimal(const char **data, decimal_t *dec)
+{
+	if (mp_typeof(**data) != MP_EXT)
+		return NULL;
 
-void
-tarantool_lua_decimal_init(struct lua_State *L);
+	int8_t type;
+	uint32_t len;
+	const char *const svp = *data;
 
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
+	len = mp_decode_extl(data, &type);
 
-#endif /* TARANTOOL_LUA_DECIMAL_H_INCLUDED */
+	if (type != MP_DECIMAL || len == 0) {
+		*data = svp;
+		return NULL;
+	}
+	decimal_t *res = decimal_unpack(data,  len, dec);
+	if (!res)
+		*data = svp;
+	return res;
+}
+
+char *
+mp_encode_decimal(char *data, const decimal_t *dec)
+{
+	uint32_t len = decimal_len(dec);
+	data = mp_encode_extl(data, MP_DECIMAL, len);
+	data = decimal_pack(data, dec);
+	return data;
+}

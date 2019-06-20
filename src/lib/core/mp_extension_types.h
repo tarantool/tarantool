@@ -1,5 +1,7 @@
+#ifndef TARANTOOL_LIB_CORE_MP_USER_TYPES_H_INCLUDED
+#define TARANTOOL_LIB_CORE_MP_USER_TYPES_H_INCLUDED
 /*
- * Copyright 2010-2019, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2019, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,27 +30,18 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#ifndef TARANTOOL_LUA_DECIMAL_H_INCLUDED
-#define TARANTOOL_LUA_DECIMAL_H_INCLUDED
 
-#include "lib/core/decimal.h"
+#include "msgpuck.h"
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
+/**
+ * MessagePack extension type. Used as a subtype after MP_EXT
+ * format specifier.
+ * Values in range [-128, -1] are reserved.
+ * You may assign values in range [0, 127]
+ */
+enum mp_extension_type {
+    MP_UNKNOWN_EXTENSION = 0,
+    MP_DECIMAL = 1,
+};
 
-extern uint32_t CTID_DECIMAL;
-
-struct lua_State;
-
-decimal_t *
-lua_pushdecimal(struct lua_State *L);
-
-void
-tarantool_lua_decimal_init(struct lua_State *L);
-
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
-
-#endif /* TARANTOOL_LUA_DECIMAL_H_INCLUDED */
+#endif

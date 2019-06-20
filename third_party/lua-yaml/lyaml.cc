@@ -49,6 +49,7 @@ extern "C" {
 #include "b64.h"
 } /* extern "C" */
 #include "lua/utils.h"
+#include "lib/core/decimal.h"
 
 #define LUAYAML_TAG_PREFIX "tag:yaml.org,2002:"
 
@@ -693,7 +694,14 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       len = 4;
       break;
    case MP_EXT:
-      assert(0); /* checked by luaL_checkfield() */
+      switch (field.ext_type) {
+      case MP_DECIMAL:
+         str = decimal_to_string(field.decval);
+	 len = strlen(str);
+	 break;
+      default:
+	 assert(0); /* checked by luaL_checkfield() */
+      }
       break;
     }
 

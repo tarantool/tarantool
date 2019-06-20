@@ -1,0 +1,81 @@
+-- test-run result file version 2
+env = require('test_run')
+ | ---
+ | ...
+test_run = env.new()
+ | ---
+ | ...
+engine = test_run:get_cfg('engine')
+ | ---
+ | ...
+
+decimal = require('decimal')
+ | ---
+ | ...
+
+_ = box.schema.space.create('test', {engine=engine})
+ | ---
+ | ...
+_ = box.space.test:create_index('pk')
+ | ---
+ | ...
+box.space.test:insert{1, decimal.new(1.1)}
+ | ---
+ | - [1, 1.1]
+ | ...
+box.space.test:insert{2, decimal.new(2.2)}
+ | ---
+ | - [2, 2.2]
+ | ...
+box.space.test:insert{3, decimal.new(1.1)}
+ | ---
+ | - [3, 1.1]
+ | ...
+box.space.test:insert{4, decimal.new('1234567890123456789.9876543210987654321'), decimal.new(1.2345)}
+ | ---
+ | - [4, 1234567890123456789.9876543210987654321, 1.2345]
+ | ...
+box.space.test:select{}
+ | ---
+ | - - [1, 1.1]
+ |   - [2, 2.2]
+ |   - [3, 1.1]
+ |   - [4, 1234567890123456789.9876543210987654321, 1.2345]
+ | ...
+a = box.space.test:get{4}
+ | ---
+ | ...
+a:next()
+ | ---
+ | - 1
+ | - 4
+ | ...
+a:next(1)
+ | ---
+ | - 2
+ | - 1234567890123456789.9876543210987654321
+ | ...
+a:next(2)
+ | ---
+ | - 3
+ | - 1.2345
+ | ...
+a:slice(-2)
+ | ---
+ | - 1234567890123456789.9876543210987654321
+ | - 1.2345
+ | ...
+box.space.test:replace{3, decimal.new(3.3)}
+ | ---
+ | - [3, 3.3]
+ | ...
+box.space.test:select{}
+ | ---
+ | - - [1, 1.1]
+ |   - [2, 2.2]
+ |   - [3, 3.3]
+ |   - [4, 1234567890123456789.9876543210987654321, 1.2345]
+ | ...
+box.space.test:drop()
+ | ---
+ | ...

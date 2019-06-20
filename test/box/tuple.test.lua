@@ -426,3 +426,26 @@ s2:frommap({a="1", k="11"})
 s2:frommap({a="1", k="11"}):tomap({names_only = true})
 
 s2:drop()
+
+-- test decimals in tuple
+dec = require('decimal')
+a = dec.new('1')
+b = dec.new('1e10')
+c = dec.new('1e-10')
+d = box.tuple.new{5, a, 6, b, 7, c, "string"}
+d
+state, val = d:next()
+state
+val
+state, val = d:next(state)
+state
+val
+state, val = d:next(state)
+state, val
+d:slice(1)
+d:slice(-1)
+d:slice(-2)
+msgpack.decode(msgpackffi.encode(d))
+d:bsize()
+d:update{{'!', 3, dec.new('1234.5678')}}
+d:update{{'=', -1, dec.new('0.12345678910111213')}}

@@ -45,6 +45,8 @@ static uint32_t CTID_STRUCT_IBUF;
 static uint32_t CTID_STRUCT_IBUF_PTR;
 uint32_t CTID_CHAR_PTR;
 uint32_t CTID_CONST_CHAR_PTR;
+uint32_t CTID_DECIMAL;
+
 
 void *
 luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
@@ -723,6 +725,12 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 			/* Fall through */
 		default:
 			field->type = MP_EXT;
+			if (cd->ctypeid == CTID_DECIMAL) {
+				field->ext_type = MP_DECIMAL;
+				field->decval = (decimal_t *) cdata;
+			} else {
+				field->ext_type = MP_UNKNOWN_EXTENSION;
+			}
 		}
 		return 0;
 	}
@@ -754,6 +762,7 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 		/* Fall through */
 	default:
 		field->type = MP_EXT;
+		field->ext_type = MP_UNKNOWN_EXTENSION;
 	}
 #undef CHECK_NUMBER
 	return 0;
@@ -765,7 +774,7 @@ luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 {
 	if (idx < 0)
 		idx = lua_gettop(L) + idx + 1;
-	assert(field->type == MP_EXT); /* must be called after tofield() */
+	assert(field->type == MP_EXT && field->ext_type == MP_UNKNOWN_EXTENSION); /* must be called after tofield() */
 
 	if (cfg->encode_load_metatables) {
 		int type = lua_type(L, idx);
@@ -782,10 +791,11 @@ luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 		}
 	}
 
-	if (field->type == MP_EXT && cfg->encode_use_tostring)
+	if (field->type == MP_EXT && field->ext_type == MP_UNKNOWN_EXTENSION &&
+	    cfg->encode_use_tostring)
 		lua_field_tostring(L, cfg, idx, field);
 
-	if (field->type != MP_EXT)
+	if (field->type != MP_EXT || field->ext_type != MP_UNKNOWN_EXTENSION)
 		return;
 
 	if (cfg->encode_invalid_as_nil) {

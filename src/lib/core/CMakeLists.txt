@@ -27,6 +27,7 @@ set(core_sources
     mpstream.c
     port.c
     decimal.c
+    mp_decimal.c
 )
 
 if (TARGET_OS_NETBSD)

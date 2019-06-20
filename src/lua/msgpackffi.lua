@@ -17,10 +17,18 @@ char *
 mp_encode_float(char *data, float num);
 char *
 mp_encode_double(char *data, double num);
+char *
+mp_encode_decimal(char *data, decimal_t *dec);
+uint32_t
+mp_sizeof_decimal(const decimal_t *dec);
 float
 mp_decode_float(const char **data);
 double
 mp_decode_double(const char **data);
+uint32_t
+mp_decode_extl(const char **data, int8_t *type);
+decimal_t *
+decimal_unpack(const char **data, uint32_t len, decimal_t *dec);
 ]])
 
 local strict_alignment = (jit.arch == 'arm')
@@ -115,6 +123,11 @@ end
 local function encode_double(buf, num)
     local p = buf:alloc(9)
     builtin.mp_encode_double(p, num)
+end
+
+local function encode_decimal(buf, num)
+    local p = buf:alloc(builtin.mp_sizeof_decimal(num))
+    builtin.mp_encode_decimal(p, num)
 end
 
 local function encode_int(buf, num)
@@ -294,6 +307,7 @@ on_encode(ffi.typeof('const unsigned char'), encode_int)
 on_encode(ffi.typeof('bool'), encode_bool_cdata)
 on_encode(ffi.typeof('float'), encode_float)
 on_encode(ffi.typeof('double'), encode_double)
+on_encode(ffi.typeof('decimal_t'), encode_decimal)
 
 --------------------------------------------------------------------------------
 -- Decoder
@@ -473,6 +487,28 @@ local function decode_map(data, size)
     return setmetatable(map, msgpack.map_mt)
 end
 
+local ext_decoder = {
+    -- MP_UNKNOWN_EXTENSION
+    [0] = function(data, len) error("unsupported extension type") end,
+    -- MP_DECIMAL
+    [1] = function(data, len) local num = ffi.new("decimal_t") builtin.decimal_unpack(data, len, num) return num end,
+}
+
+local function decode_ext(data)
+    local t = ffi.new("int8_t[1]")
+    -- mp_decode_extl and mp_decode_decimal
+    -- need type code
+    data[0] = data[0] - 1
+    local old_data = data[0]
+    local len = builtin.mp_decode_extl(data, t)
+    local fun = ext_decoder[t[0]]
+    if type(fun) == 'function' then
+        return fun(data, len)
+    else
+        error("Unsupported extension type")
+    end
+end
+
 local decoder_hint = {
     --[[{{{ MP_BIN]]
     [0xc4] = function(data) return decode_str(data, decode_u8(data)) end;
@@ -528,6 +564,8 @@ decode_r = function(data)
         return false
     elseif c == 0xc3 then
         return true
+    elseif c >= 0xd4 and c <= 0xd8 or c >= 0xc7 and c <= 0xc9 then
+        return decode_ext(data)
     else
         local fun = decoder_hint[c];
         assert (type(fun) == "function")

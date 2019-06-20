@@ -1,5 +1,8 @@
 #include "unit.h"
 #include "decimal.h"
+#include "mp_decimal.h"
+#include "mp_extension_types.h"
+#include "msgpuck.h"
 #include <limits.h>
 #include <string.h>
 #include <float.h> /* DBL_DIG */
@@ -71,6 +74,32 @@
 
 char buf[32];
 
+#define test_mpdec(str) ({\
+	decimal_t dec;\
+	decimal_from_string(&dec, str);\
+	uint32_t l1 = mp_sizeof_decimal(&dec);\
+	ok(l1 <= 25 && l1 >= 4, "mp_sizeof_decimal("str")");\
+	char *b1 = mp_encode_decimal(buf, &dec);\
+	is(b1, buf + l1, "mp_sizeof_decimal("str") == len(mp_encode_decimal("str"))");\
+	const char *b2 = buf;\
+	const char *b3 = buf;\
+	decimal_t d2;\
+	mp_next(&b3);\
+	is(b3, b1, "mp_next(mp_encode("str"))");\
+	mp_decode_decimal(&b2, &d2);\
+	is(b1, b2, "mp_decode(mp_encode("str") len");\
+	is(decimal_compare(&dec, &d2), 0, "mp_decode(mp_encode("str")) value");\
+	is(decimal_scale(&dec), decimal_scale(&d2), "mp_decode(mp_encode("str")) scale");\
+	is(strcmp(decimal_to_string(&d2), str), 0, "str(mp_decode(mp_encode("str"))) == "str);\
+	b2 = buf;\
+	int8_t type;\
+	uint32_t l2 = mp_decode_extl(&b2, &type);\
+	is(type, MP_DECIMAL, "mp_ext_type is MP_DECIMAL");\
+	is(&d2, decimal_unpack(&b2, l2, &d2), "decimal_unpack() after mp_decode_extl()");\
+	is(decimal_compare(&dec, &d2), 0, "decimal_unpack() after mp_decode_extl() value");\
+	is(b2, buf + l1, "decimal_unpack() after mp_decode_extl() len");\
+})
+
 #define test_decpack(str) ({\
 	decimal_t dec;\
 	decimal_from_string(&dec, str);\
@@ -136,10 +165,37 @@ test_pack_unpack(void)
 	return check_plan();
 }
 
+static int
+test_mp_decimal(void)
+{
+	plan(198);
+
+	test_mpdec("0");
+	test_mpdec("-0");
+	test_mpdec("1");
+	test_mpdec("-1");
+	test_mpdec("0.1");
+	test_mpdec("-0.1");
+	test_mpdec("2.718281828459045");
+	test_mpdec("-2.718281828459045");
+	test_mpdec("3.141592653589793");
+	test_mpdec("-3.141592653589793");
+	test_mpdec("1234567891234567890.0987654321987654321");
+	test_mpdec("-1234567891234567890.0987654321987654321");
+	test_mpdec("0.0000000000000000000000000000000000001");
+	test_mpdec("-0.0000000000000000000000000000000000001");
+	test_mpdec("0.00000000000000000000000000000000000001");
+	test_mpdec("-0.00000000000000000000000000000000000001");
+	test_mpdec("99999999999999999999999999999999999999");
+	test_mpdec("-99999999999999999999999999999999999999");
+
+	return check_plan();
+}
+
 int
 main(void)
 {
-	plan(279);
+	plan(280);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -200,6 +256,8 @@ main(void)
 	dectest_op1_fail(sqrt, -10);
 
 	test_pack_unpack();
+
+	test_mp_decimal();
 
 	return check_plan();
 }
