@@ -15,7 +15,7 @@ box.info['unknown_variable']
 ---
 - null
 ...
-string.match(box.info.version, '^[1-9]') ~= nil
+string.match(box.info.version, '^[%a%s]*[1-9]') ~= nil
 ---
 - true
 ...

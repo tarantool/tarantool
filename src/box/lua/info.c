@@ -610,7 +610,7 @@ lbox_info_init_static_values(struct lua_State *L)
 {
 	/* tarantool version */
 	lua_pushstring(L, "version");
-	lua_pushstring(L, tarantool_version());
+	lua_pushfstring(L, "%s %s", tarantool_package(), tarantool_version());
 	lua_settable(L, -3);
 }
 
