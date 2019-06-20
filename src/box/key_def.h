@@ -443,13 +443,15 @@ key_def_find_pk_in_cmp_def(const struct key_def *cmp_def,
  * @param key MessagePack'ed data for matching.
  * @param part_count Field count in the key.
  * @param allow_nullable True if nullable parts are allowed.
+ * @param key_end[out] The end of the validated key.
  *
  * @retval 0  The key is valid.
  * @retval -1 The key is invalid.
  */
 int
 key_validate_parts(const struct key_def *key_def, const char *key,
-		   uint32_t part_count, bool allow_nullable);
+		   uint32_t part_count, bool allow_nullable,
+		   const char **key_end);
 
 /**
  * Return true if @a index_def defines a sequential key without

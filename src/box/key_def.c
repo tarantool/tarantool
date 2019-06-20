@@ -834,7 +834,8 @@ out:
 
 int
 key_validate_parts(const struct key_def *key_def, const char *key,
-		   uint32_t part_count, bool allow_nullable)
+		   uint32_t part_count, bool allow_nullable,
+		   const char **key_end)
 {
 	for (uint32_t i = 0; i < part_count; i++) {
 		const struct key_part *part = &key_def->parts[i];
@@ -844,5 +845,6 @@ key_validate_parts(const struct key_def *key_def, const char *key,
 			return -1;
 		mp_next(&key);
 	}
+	*key_end = key;
 	return 0;
 }
