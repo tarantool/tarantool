@@ -173,7 +173,7 @@ decimal_sqrt(decimal_t *res, const decimal_t *lhs);
 
 /** @return The length in bytes decimal packed representation will take. */
 uint32_t
-decimal_len(decimal_t *dec);
+decimal_len(const decimal_t *dec);
 
 /**
  * Convert a decimal \a dec to its packed representation.
@@ -181,7 +181,7 @@ decimal_len(decimal_t *dec);
  * @return data + decimal_len(dec);
  */
 char *
-decimal_pack(char *data, decimal_t *dec);
+decimal_pack(char *data, const decimal_t *dec);
 
 /**
  * Using a packed representation of size \a len pointed to by

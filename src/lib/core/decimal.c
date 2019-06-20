@@ -310,14 +310,14 @@ decimal_sqrt(decimal_t *res, const decimal_t *lhs)
 }
 
 uint32_t
-decimal_len(decimal_t *dec)
+decimal_len(const decimal_t *dec)
 {
 	/* 1  + ceil((digits + 1) / 2) */
 	return 2 + dec->digits / 2;
 }
 
 char *
-decimal_pack(char *data, decimal_t *dec)
+decimal_pack(char *data, const decimal_t *dec)
 {
 	uint32_t len = decimal_len(dec);
 	*data++ = decimal_scale(dec);
