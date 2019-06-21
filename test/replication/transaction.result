@@ -7,10 +7,19 @@ test_run = env.new()
 box.schema.user.grant('guest', 'replication')
 ---
 ...
-s = box.schema.space.create('test', {engine = test_run:get_cfg('engine')})
+engine = test_run:get_cfg('engine')
+---
+...
+s = box.schema.space.create('test', {engine = engine})
 ---
 ...
 _ = s:create_index('pk')
+---
+...
+l = box.schema.space.create('l_space', {engine = engine, is_local = true})
+---
+...
+_ = l:create_index('pk')
 ---
 ...
 -- transaction w/o conflict
@@ -92,6 +101,11 @@ box.cfg{replication = replication}
 ---
 ...
 -- replication stopped of third transaction
+-- flush wal
+box.space.l_space:replace({1})
+---
+- [1]
+...
 v1[1] + 2 == box.info.vclock[1]
 ---
 - true

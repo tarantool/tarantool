@@ -30,7 +30,7 @@ function fill()
         box.space.test:replace{i}
     end
     fiber.create(function()
-        box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0.1)
+        box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0.0025)
         test_run:wait_cond(function()
             local r = box.info.replication[2]
             return r ~= nil and r.downstream ~= nil and
@@ -39,7 +39,6 @@ function fill()
         for i = count + 101, count + 200 do
             box.space.test:replace{i}
         end
-        box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0)
     end)
     count = count + 200
 end;
@@ -136,6 +135,7 @@ box.cfg{replication_sync_lag = 1}
 box.cfg{replication_sync_timeout = 10}
 
 test_run:cmd("switch default")
+box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0)
 box.error.injection.set('ERRINJ_WAL_DELAY', true)
 test_run:cmd("setopt delimiter ';'")
 _ = fiber.create(function()

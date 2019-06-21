@@ -1,9 +1,12 @@
 env = require('test_run')
 test_run = env.new()
 box.schema.user.grant('guest', 'replication')
+engine = test_run:get_cfg('engine')
 
-s = box.schema.space.create('test', {engine = test_run:get_cfg('engine')})
+s = box.schema.space.create('test', {engine = engine})
 _ = s:create_index('pk')
+l = box.schema.space.create('l_space', {engine = engine, is_local = true})
+_ = l:create_index('pk')
 
 -- transaction w/o conflict
 box.begin() s:insert({1, 'm'}) s:insert({2, 'm'}) box.commit()
@@ -37,6 +40,8 @@ replication = box.cfg.replication
 box.cfg{replication = {}}
 box.cfg{replication = replication}
 -- replication stopped of third transaction
+-- flush wal
+box.space.l_space:replace({1})
 v1[1] + 2 == box.info.vclock[1]
 box.space.test:select()
 -- check replication status
