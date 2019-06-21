@@ -168,6 +168,10 @@ txn_new()
 inline static void
 txn_free(struct txn *txn)
 {
+	struct txn_stmt *stmt;
+	stailq_foreach_entry(stmt, &txn->stmts, next)
+		txn_stmt_unref_tuples(stmt);
+
 	/* Truncate region up to struct txn size. */
 	region_truncate(&txn->region, sizeof(struct txn));
 	stailq_add(&txn_cache, &txn->in_txn_cache);
@@ -448,10 +452,6 @@ txn_commit(struct txn *txn)
 		panic("commit trigger failed");
 	}
 
-	struct txn_stmt *stmt;
-	stailq_foreach_entry(stmt, &txn->stmts, next)
-		txn_stmt_unref_tuples(stmt);
-
 	fiber_set_txn(fiber(), NULL);
 	txn_free(txn);
 	return 0;
@@ -488,10 +488,6 @@ txn_rollback()
 		unreachable();
 		panic("rollback trigger failed");
 	}
-
-	struct txn_stmt *stmt;
-	stailq_foreach_entry(stmt, &txn->stmts, next)
-		txn_stmt_unref_tuples(stmt);
 
 	/** Free volatile txn memory. */
 	fiber_gc();
