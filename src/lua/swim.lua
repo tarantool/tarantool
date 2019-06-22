@@ -28,14 +28,16 @@ ffi.cdef[[
         SWIM_EV_NEW             = 0b00000001,
         SWIM_EV_NEW_STATUS      = 0b00000010,
         SWIM_EV_NEW_URI         = 0b00000100,
-        SWIM_EV_NEW_VERSION     = 0b00001000,
-        SWIM_EV_NEW_INCARNATION = 0b00001000,
-        SWIM_EV_NEW_PAYLOAD     = 0b00010000,
-        SWIM_EV_UPDATE          = 0b00011110,
-        SWIM_EV_DROP            = 0b00100000,
+        SWIM_EV_NEW_GENERATION  = 0b00001000,
+        SWIM_EV_NEW_VERSION     = 0b00010000,
+        SWIM_EV_NEW_INCARNATION = 0b00011000,
+        SWIM_EV_NEW_PAYLOAD     = 0b00100000,
+        SWIM_EV_UPDATE          = 0b00111110,
+        SWIM_EV_DROP            = 0b01000000,
     };
 
     struct swim_incarnation {
+        uint64_t generation;
         uint64_t version;
     };
 
@@ -131,16 +133,19 @@ local swim_member_status_strs = {
 
 local swim_incarnation_mt = {
     __eq = function(l, r)
-        return l.version == r.version
+        return l.version == r.version and l.generation == r.generation
     end,
     __lt = function(l, r)
-        return l.version < r.version
+        return l.generation < r.generation or
+               l.generation == r.generation and l.version < r.version
     end,
     __le = function(l, r)
-        return l.version <= r.version
+        return l.generation < r.generation or
+               l.generation == r.generation and l.version <= r.version
     end,
     __tostring = function(i)
-        return string.format('cdata {version = %s}', i.version)
+        return string.format('cdata {generation = %s, version = %s}',
+                             i.generation, i.version)
     end,
 }
 ffi.metatype(ffi.typeof('struct swim_incarnation'), swim_incarnation_mt)
@@ -747,6 +752,9 @@ local swim_member_event_index = {
     is_new_incarnation = function(self)
         return bit.band(self[1], capi.SWIM_EV_NEW_INCARNATION) ~= 0
     end,
+    is_new_generation = function(self)
+        return bit.band(self[1], capi.SWIM_EV_NEW_GENERATION) ~= 0
+    end,
     is_new_version = function(self)
         return bit.band(self[1], capi.SWIM_EV_NEW_VERSION) ~= 0
     end,
@@ -938,7 +946,19 @@ local cache_table_mt = { __mode = 'v' }
 -- provided.
 --
 local function swim_new(cfg)
-    local ptr = internal.swim_new()
+    local generation = 0
+    if cfg and type(cfg) == 'table' and cfg.generation then
+        generation = cfg.generation
+        if type(generation) ~= 'number' or generation < 0 or
+           math.floor(generation) ~= generation then
+            return error('swim.new: generation should be non-negative integer')
+        end
+        cfg = table.copy(cfg)
+        -- Nullify in order to do not raise errors in the
+        -- following swim:cfg() about unknown parameters.
+        cfg.generation = nil
+    end
+    local ptr = internal.swim_new(generation)
     if ptr == nil then
         return nil, box.error.last()
     end

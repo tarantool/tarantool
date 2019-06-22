@@ -68,7 +68,7 @@ enum swim_gc_mode {
  * yields.
  */
 struct swim *
-swim_new(void);
+swim_new(uint64_t generation);
 
 /** Check if a swim instance is configured. */
 bool
@@ -279,16 +279,17 @@ enum swim_ev_mask {
 	SWIM_EV_NEW             = 0b00000001,
 	SWIM_EV_NEW_STATUS      = 0b00000010,
 	SWIM_EV_NEW_URI         = 0b00000100,
-	SWIM_EV_NEW_VERSION     = 0b00001000,
+	SWIM_EV_NEW_GENERATION  = 0b00001000,
+	SWIM_EV_NEW_VERSION     = 0b00010000,
 	/*
 	 * Shortcut to check for update of any part of
 	 * incarnation.
 	 */
-	SWIM_EV_NEW_INCARNATION = 0b00001000,
-	SWIM_EV_NEW_PAYLOAD     = 0b00010000,
+	SWIM_EV_NEW_INCARNATION = 0b00011000,
+	SWIM_EV_NEW_PAYLOAD     = 0b00100000,
 	/* Shortcut to check for any update. */
-	SWIM_EV_UPDATE          = 0b00011110,
-	SWIM_EV_DROP            = 0b00100000,
+	SWIM_EV_UPDATE          = 0b00111110,
+	SWIM_EV_DROP            = 0b01000000,
 };
 
 /** On member event trigger context. */

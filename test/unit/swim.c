@@ -133,7 +133,7 @@ swim_test_cfg(void)
 {
 	swim_start_test(16);
 
-	struct swim *s = swim_new();
+	struct swim *s = swim_new(0);
 	assert(s != NULL);
 	is(swim_cfg(s, NULL, -1, -1, -1, NULL), -1, "first cfg failed - no URI");
 	ok(swim_error_check_match("mandatory"), "diag says 'mandatory'");
@@ -149,7 +149,7 @@ swim_test_cfg(void)
 	is(strcmp(self_uri, uri), 0, "URI is unchanged after recfg with NULL "\
 	   "URI");
 
-	struct swim *s2 = swim_new();
+	struct swim *s2 = swim_new(0);
 	assert(s2 != NULL);
 	const char *bad_uri1 = "127.1.1.1.1.1.1:1";
 	const char *bad_uri2 = "google.com:1";
@@ -379,7 +379,7 @@ swim_test_probe(void)
 static void
 swim_test_refute(void)
 {
-	swim_start_test(4);
+	swim_start_test(6);
 	struct swim_cluster *cluster = swim_cluster_new(2);
 	swim_cluster_set_ack_timeout(cluster, 2);
 
@@ -391,16 +391,21 @@ swim_test_refute(void)
 	fail_if(swim_cluster_wait_status(cluster, 0, 1,
 					 MEMBER_SUSPECTED, 4) != 0);
 	swim_cluster_set_drop(cluster, 1, 0);
-	is(swim_cluster_wait_incarnation(cluster, 1, 1, 1, 1), 0,
+	is(swim_cluster_wait_incarnation(cluster, 1, 1, 0, 1, 1), 0,
 	   "S2 increments its own incarnation to refute its suspicion");
-	is(swim_cluster_wait_incarnation(cluster, 0, 1, 1, 1), 0,
+	is(swim_cluster_wait_incarnation(cluster, 0, 1, 0, 1, 1), 0,
 	   "new incarnation has reached S1 with a next round message");
 
 	swim_cluster_restart_node(cluster, 1);
-	is(swim_cluster_member_incarnation(cluster, 1, 1).version, 0,
-	   "after restart S2's incarnation is default again");
-	is(swim_cluster_wait_incarnation(cluster, 1, 1, 1, 1), 0,
-	   "S2 learned its old bigger incarnation 1 from S0");
+	struct swim_incarnation inc =
+		swim_cluster_member_incarnation(cluster, 1, 1);
+	is(inc.version, 0, "after restart S2's version is 0 again");
+	is(inc.generation, 1, "but generation is new");
+
+	is(swim_cluster_wait_incarnation(cluster, 0, 1, 1, 0, 1), 0,
+	   "S2 disseminates new incarnation, S1 learns it");
+	is(swim_cluster_member_status(cluster, 0, 1), MEMBER_ALIVE,
+	   "and considers S2 alive");
 
 	swim_cluster_delete(cluster);
 	swim_finish_test();
@@ -527,7 +532,7 @@ swim_test_quit(void)
 	 * old LEFT status.
 	 */
 	swim_cluster_restart_node(cluster, 0);
-	is(swim_cluster_wait_incarnation(cluster, 0, 0, 1, 2), 0,
+	is(swim_cluster_wait_incarnation(cluster, 0, 0, 1, 0, 2), 0,
 	   "quited member S1 has returned and refuted the old status");
 	fail_if(swim_cluster_wait_fullmesh(cluster, 2) != 0);
 	/*
@@ -555,9 +560,14 @@ swim_test_quit(void)
 	is(swim_cluster_member_status(cluster, 2, 0), swim_member_status_MAX,
 	   "S3 did not add S1 back when received its 'quit'");
 
-	/* Now allow S2 to get the 'self-quit' message. */
+	/*
+	 * Now allow S2 to get the 'self-quit' message. Note,
+	 * together with 'quit' it receives new generation, which
+	 * belonged to S1 before. Of course, it is a bug, but in
+	 * a user application - UUIDs are messed.
+	 */
 	swim_cluster_unblock_io(cluster, 1);
-	is(swim_cluster_wait_incarnation(cluster, 1, 1, 2, 0), 0,
+	is(swim_cluster_wait_incarnation(cluster, 1, 1, 1, 1, 0), 0,
 	   "S2 finally got 'quit' message from S1, but with its 'own' UUID - "\
 	   "refute it")
 	swim_cluster_delete(cluster);
@@ -1090,7 +1100,7 @@ swim_test_triggers(void)
 		swim_member_unref(tctx.ctx.member);
 
 	/* Check that recfg fires version update trigger. */
-	s1 = swim_new();
+	s1 = swim_new(0);
 	struct tt_uuid uuid = uuid_nil;
 	uuid.time_low = 1;
 	fail_if(swim_cfg(s1, "127.0.0.1:1", -1, -1, -1, &uuid) != 0);
@@ -1113,10 +1123,39 @@ swim_test_triggers(void)
 	swim_finish_test();
 }
 
+static void
+swim_test_generation(void)
+{
+	swim_start_test(3);
+
+	struct swim_cluster *cluster = swim_cluster_new(2);
+	swim_cluster_interconnect(cluster, 0, 1);
+
+	const char *p1 = "payload 1";
+	int p1_size = strlen(p1);
+	swim_cluster_member_set_payload(cluster, 0, p1, p1_size);
+	is(swim_cluster_wait_payload_everywhere(cluster, 0, p1, p1_size, 1), 0,
+	   "S1 disseminated its payload to S2");
+
+	swim_cluster_restart_node(cluster, 0);
+	const char *p2 = "payload 2";
+	int p2_size = strlen(p2);
+	swim_cluster_member_set_payload(cluster, 0, p2, p2_size);
+	is(swim_cluster_wait_payload_everywhere(cluster, 0, p2, p2_size, 2), 0,
+	   "S1 restarted and set another payload. Without generation it could "\
+	   "lead to never disseminated new payload.");
+	is(swim_cluster_member_incarnation(cluster, 1, 0).generation, 1,
+	   "S2 sees new generation of S1");
+
+	swim_cluster_delete(cluster);
+
+	swim_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	swim_start_test(21);
+	swim_start_test(22);
 
 	(void) ap;
 	swim_test_ev_init();
@@ -1143,6 +1182,7 @@ main_f(va_list ap)
 	swim_test_encryption();
 	swim_test_slow_net();
 	swim_test_triggers();
+	swim_test_generation();
 
 	swim_test_transport_free();
 	swim_test_ev_free();

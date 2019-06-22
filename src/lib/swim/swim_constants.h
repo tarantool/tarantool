@@ -64,6 +64,12 @@ extern const char *swim_member_status_strs[];
  */
 struct swim_incarnation {
 	/**
+	 * Generation is a persistent part of incarnation. It is
+	 * set by a user on SWIM start, and normally is not
+	 * changed during instance lifetime.
+	 */
+	uint64_t generation;
+	/**
 	 * Version is a volatile part of incarnation. It is
 	 * managed by SWIM fully internally.
 	 */
@@ -72,8 +78,10 @@ struct swim_incarnation {
 
 /** Create a new incarnation value. */
 static inline void
-swim_incarnation_create(struct swim_incarnation *i, uint64_t version)
+swim_incarnation_create(struct swim_incarnation *i, uint64_t generation,
+			uint64_t version)
 {
+	i->generation = generation;
 	i->version = version;
 }
 

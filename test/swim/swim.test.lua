@@ -499,4 +499,40 @@ ctx_list
 
 s1:delete()
 
+--
+-- gh-4280: 'generation' counter to detect restarts and refute
+-- information left from previous lifes of a SWIM instance.
+--
+s1 = swim.new({uuid = uuid(1), uri = 0, heartbeat_rate = 0.01, generation = 0})
+s2 = swim.new({uuid = uuid(2), uri = 0, heartbeat_rate = 0.01})
+s2:add_member({uuid = uuid(1), uri = s1:self():uri()})
+s1_view = s2:member_by_uuid(uuid(1))
+s1:set_payload('payload 1')
+while not s1_view:payload() do fiber.sleep(0.1) end
+s1_view:payload()
+s1:self():incarnation()
+
+-- Now S2 knows S1's payload as 'payload 1'.
+
+new_gen_ev = nil
+_ = s2:on_member_event(function(m, e) if e:is_new_generation() then new_gen_ev = e end end)
+s1:delete()
+s1 = swim.new({uuid = uuid(1), uri = 0, heartbeat_rate = 0.01, generation = 1})
+s1:add_member({uuid = uuid(2), uri = s2:self():uri()})
+s1:set_payload('payload 2')
+-- Without the new generation S2 would believe that S1's payload
+-- is still 'payload 1'. Because 'payload 1' and 'payload 2' were
+-- disseminated with the same version.
+s1:self():incarnation()
+
+while s1_view:payload() ~= 'payload 2' do fiber.sleep(0.1) end
+s1_view:payload()
+new_gen_ev
+
+-- Generation is static parameter.
+s1:cfg({generation = 5})
+
+s1:delete()
+s2:delete()
+
 test_run:cmd("clear filter")

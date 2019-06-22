@@ -157,6 +157,8 @@ struct swim_node {
 	 * that instance.
 	 */
 	struct tt_uuid uuid;
+	/** Generation to increment on restart. */
+	uint64_t generation;
 	/**
 	 * Filter to drop packets with a certain probability
 	 * from/to a specified direction.
@@ -212,7 +214,8 @@ swim_test_event_cb(struct trigger *trigger, void *event)
 static inline void
 swim_node_create(struct swim_node *n, int id)
 {
-	n->swim = swim_new();
+	n->generation = 0;
+	n->swim = swim_new(0);
 	assert(n->swim != NULL);
 	struct trigger *t = (struct trigger *) malloc(sizeof(*t));
 	trigger_create(t, swim_test_event_cb, NULL, (trigger_f0) free);
@@ -356,7 +359,7 @@ swim_cluster_member_incarnation(struct swim_cluster *cluster, int node_id,
 		swim_cluster_member_view(cluster, node_id, member_id);
 	if (m == NULL) {
 		struct swim_incarnation inc;
-		swim_incarnation_create(&inc, UINT64_MAX);
+		swim_incarnation_create(&inc, UINT64_MAX, UINT64_MAX);
 		return inc;
 	}
 	return swim_member_incarnation(m);
@@ -405,7 +408,7 @@ swim_cluster_restart_node(struct swim_cluster *cluster, int i)
 					&n->uuid));
 		swim_delete(s);
 	}
-	s = swim_new();
+	s = swim_new(++n->generation);
 	assert(s != NULL);
 	int rc = swim_cfg(s, uri, -1, cluster->ack_timeout, cluster->gc_mode,
 			  &n->uuid);
@@ -754,10 +757,10 @@ swim_member_template_set_status(struct swim_member_template *t,
  */
 static inline void
 swim_member_template_set_incarnation(struct swim_member_template *t,
-				     uint64_t version)
+				     uint64_t generation, uint64_t version)
 {
 	t->need_check_incarnation = true;
-	swim_incarnation_create(&t->incarnation, version);
+	swim_incarnation_create(&t->incarnation, generation, version);
 }
 
 /**
@@ -790,7 +793,7 @@ swim_loop_check_member(struct swim_cluster *cluster, void *data)
 		payload = swim_member_payload(m, &payload_size);
 	} else {
 		status = swim_member_status_MAX;
-		swim_incarnation_create(&incarnation, 0);
+		swim_incarnation_create(&incarnation, 0, 0);
 		payload = NULL;
 		payload_size = 0;
 	}
@@ -852,12 +855,12 @@ swim_cluster_wait_status(struct swim_cluster *cluster, int node_id,
 
 int
 swim_cluster_wait_incarnation(struct swim_cluster *cluster, int node_id,
-			      int member_id, uint64_t version,
-			      double timeout)
+			      int member_id, uint64_t generation,
+			      uint64_t version, double timeout)
 {
 	struct swim_member_template t;
 	swim_member_template_create(&t, node_id, member_id);
-	swim_member_template_set_incarnation(&t, version);
+	swim_member_template_set_incarnation(&t, generation, version);
 	return swim_wait_timeout(timeout, cluster, swim_loop_check_member, &t);
 }
 

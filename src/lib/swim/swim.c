@@ -222,11 +222,21 @@ swim_incarnation_diff(const struct swim_incarnation *l,
 		      const struct swim_incarnation *r,
 		      enum swim_ev_mask *diff)
 {
-	if (l->version == r->version) {
+	if (l->generation == r->generation &&
+	    l->version == r->version) {
 		*diff = 0;
 		return 0;
 	}
 	*diff = SWIM_EV_NEW_VERSION;
+	if (l->generation < r->generation) {
+		*diff |= SWIM_EV_NEW_GENERATION;
+		return -1;
+	}
+	if (l->generation > r->generation) {
+		*diff |= SWIM_EV_NEW_GENERATION;
+		return 1;
+	}
+	assert(l->version != r->version);
 	return l->version < r->version ? -1 : 1;
 }
 
@@ -483,6 +493,15 @@ struct swim {
 	struct ev_timer wait_ack_tick;
 	/** GC state saying how to remove dead members. */
 	enum swim_gc_mode gc_mode;
+	/**
+	 * Generation of that instance is set when the latter is
+	 * created. It is actual only until the instance is
+	 * configured. After that the instance can learn a bigger
+	 * own generation from other members. Despite meaning
+	 * in fact a wrong usage of SWIM generations, it is still
+	 * possible.
+	 */
+	uint64_t initial_generation;
 	/**
 	 *
 	 *                 Dissemination component
@@ -1683,12 +1702,17 @@ swim_process_quit(struct swim *swim, const char **pos, const char *end,
 		return -1;
 	}
 	struct swim_incarnation incarnation;
-	swim_incarnation_create(&incarnation, 0);
+	swim_incarnation_create(&incarnation, 0, 0);
 	for (uint32_t i = 0; i < size; ++i) {
 		uint64_t tmp;
 		if (swim_decode_uint(pos, end, &tmp, prefix, "a key") != 0)
 			return -1;
 		switch (tmp) {
+		case SWIM_QUIT_GENERATION:
+			if (swim_decode_uint(pos, end, &incarnation.generation,
+					     prefix, "generation") != 0)
+				return -1;
+			break;
 		case SWIM_QUIT_VERSION:
 			if (swim_decode_uint(pos, end, &incarnation.version,
 					     prefix, "version") != 0)
@@ -1829,13 +1853,14 @@ swim_event_handler_f(va_list va)
 
 
 struct swim *
-swim_new(void)
+swim_new(uint64_t generation)
 {
 	struct swim *swim = (struct swim *) calloc(1, sizeof(*swim));
 	if (swim == NULL) {
 		diag_set(OutOfMemory, sizeof(*swim), "calloc", "swim");
 		return NULL;
 	}
+	swim->initial_generation = generation;
 	swim->members = mh_swim_table_new();
 	if (swim->members == NULL) {
 		free(swim);
@@ -1941,7 +1966,8 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 			return -1;
 		}
 		struct swim_incarnation incarnation;
-		swim_incarnation_create(&incarnation, 0);
+		swim_incarnation_create(&incarnation, swim->initial_generation,
+					0);
 		swim->self = swim_new_member(swim, &addr, uuid, MEMBER_ALIVE,
 					     &incarnation, NULL, 0);
 		if (swim->self == NULL)
@@ -2062,7 +2088,7 @@ swim_add_member(struct swim *swim, const char *uri, const struct tt_uuid *uuid)
 	struct swim_member *member = swim_find_member(swim, uuid);
 	if (member == NULL) {
 		struct swim_incarnation inc;
-		swim_incarnation_create(&inc, 0);
+		swim_incarnation_create(&inc, 0, 0);
 		member = swim_new_member(swim, &addr, uuid, MEMBER_ALIVE, &inc,
 					 NULL, -1);
 		return member == NULL ? -1 : 0;

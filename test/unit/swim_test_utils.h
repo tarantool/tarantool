@@ -224,8 +224,8 @@ swim_cluster_wait_status_everywhere(struct swim_cluster *cluster, int member_id,
  */
 int
 swim_cluster_wait_incarnation(struct swim_cluster *cluster, int node_id,
-			      int member_id, uint64_t version,
-			      double timeout);
+			      int member_id, uint64_t generation,
+			      uint64_t version, double timeout);
 
 /**
  * Wait until a member with id @a member_id is seen with

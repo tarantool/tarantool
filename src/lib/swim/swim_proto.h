@@ -72,6 +72,7 @@ enum {
  * |                                                             |
  * |     SWIM_FAILURE_DETECTION: {                               |
  * |         SWIM_FD_MSG_TYPE: uint, enum swim_fd_msg_type,      |
+ * |         SWIM_FD_GENERATION: uint,                           |
  * |         SWIM_FD_VERSION: uint                               |
  * |     },                                                      |
  * |                                                             |
@@ -83,6 +84,7 @@ enum {
  * |             SWIM_MEMBER_ADDRESS: uint, ip,                  |
  * |             SWIM_MEMBER_PORT: uint, port,                   |
  * |             SWIM_MEMBER_UUID: 16 byte UUID,                 |
+ * |             SWIM_MEMBER_GENERATION: uint,                   |
  * |             SWIM_MEMBER_VERSION: uint,                      |
  * |             SWIM_MEMBER_PAYLOAD: bin                        |
  * |         },                                                  |
@@ -97,6 +99,7 @@ enum {
  * |             SWIM_MEMBER_ADDRESS: uint, ip,                  |
  * |             SWIM_MEMBER_PORT: uint, port,                   |
  * |             SWIM_MEMBER_UUID: 16 byte UUID,                 |
+ * |             SWIM_MEMBER_GENERATION: uint,                   |
  * |             SWIM_MEMBER_VERSION: uint,                      |
  * |             SWIM_MEMBER_PAYLOAD: bin                        |
  * |         },                                                  |
@@ -106,6 +109,7 @@ enum {
  * |               OR/AND                                        |
  * |                                                             |
  * |     SWIM_QUIT: {                                            |
+ * |         SWIM_QUIT_GENERATION: uint,                         |
  * |         SWIM_QUIT_VERSION: uint                             |
  * |     }                                                       |
  * | }                                                           |
@@ -118,7 +122,7 @@ enum {
 	 * Structures storing an incarnation should use this size
 	 * so as to correctly encode MessagePack map header.
 	 */
-	SWIM_INCARNATION_BIN_SIZE = 1,
+	SWIM_INCARNATION_BIN_SIZE = 2,
 };
 
 /**
@@ -126,6 +130,12 @@ enum {
  * value. It expects its owner is a map.
  */
 struct PACKED swim_incarnation_bin {
+	/** mp_encode_uint(generation key) */
+	uint8_t k_generation;
+	/** mp_encode_uint(64bit generation) */
+	uint8_t m_generation;
+	uint64_t v_generation;
+
 	/** mp_encode_uint(version key) */
 	uint8_t k_version;
 	/** mp_encode_uint(64bit version) */
@@ -209,6 +219,7 @@ enum swim_fd_key {
 	 * it was considered dead, but ping/ack with greater
 	 * incarnation was received from it.
 	 */
+	SWIM_FD_GENERATION,
 	SWIM_FD_VERSION,
 };
 
@@ -225,7 +236,7 @@ extern const char *swim_fd_msg_type_strs[];
 struct PACKED swim_fd_header_bin {
 	/** mp_encode_uint(SWIM_FAILURE_DETECTION) */
 	uint8_t k_header;
-	/** mp_encode_map(2) */
+	/** mp_encode_map(3) */
 	uint8_t m_header;
 
 	/** mp_encode_uint(SWIM_FD_MSG_TYPE) */
@@ -233,7 +244,7 @@ struct PACKED swim_fd_header_bin {
 	/** mp_encode_uint(enum swim_fd_msg_type) */
 	uint8_t v_type;
 
-	/** SWIM_FD_VERSION */
+	/** SWIM_FD_GENERATION, SWIM_FD_VERSION */
 	struct swim_incarnation_bin incarnation;
 };
 
@@ -309,6 +320,7 @@ enum swim_member_key {
 	SWIM_MEMBER_ADDRESS,
 	SWIM_MEMBER_PORT,
 	SWIM_MEMBER_UUID,
+	SWIM_MEMBER_GENERATION,
 	SWIM_MEMBER_VERSION,
 	SWIM_MEMBER_PAYLOAD,
 	swim_member_key_MAX,
@@ -340,7 +352,7 @@ swim_anti_entropy_header_bin_create(struct swim_anti_entropy_header_bin *header,
  * date and TTD is > 0.
  */
 struct PACKED swim_passport_bin {
-	/** mp_encode_map(5 or 6) */
+	/** mp_encode_map(6 or 7) */
 	uint8_t m_header;
 
 	/** mp_encode_uint(SWIM_MEMBER_STATUS) */
@@ -358,7 +370,7 @@ struct PACKED swim_passport_bin {
 	uint8_t m_uuid_len;
 	uint8_t v_uuid[UUID_LEN];
 
-	/** SWIM_MEMBER_VERSION */
+	/** SWIM_MEMBER_GENERATION, SWIM_MEMBER_VERSION */
 	struct swim_incarnation_bin incarnation;
 };
 
@@ -579,17 +591,18 @@ swim_route_bin_create(struct swim_route_bin *route,
 
 enum swim_quit_key {
 	/** Incarnation to ignore old quit messages. */
-	SWIM_QUIT_VERSION = 0,
+	SWIM_QUIT_GENERATION = 0,
+	SWIM_QUIT_VERSION,
 };
 
 /** Quit section. Describes voluntary quit from the cluster. */
 struct PACKED swim_quit_bin {
 	/** mp_encode_uint(SWIM_QUIT) */
 	uint8_t k_quit;
-	/** mp_encode_map(1) */
+	/** mp_encode_map(2) */
 	uint8_t m_quit;
 
-	/** SWIM_QUIT_VERSION */
+	/** SWIM_QUIT_GENERATION, SWIM_QUIT_VERSION */
 	struct swim_incarnation_bin incarnation;
 };
 

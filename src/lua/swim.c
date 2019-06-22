@@ -67,7 +67,8 @@ lua_swim_on_member_event(struct lua_State *L)
 static int
 lua_swim_new(struct lua_State *L)
 {
-	struct swim *s = swim_new();
+	uint64_t generation = luaL_checkuint64(L, 1);
+	struct swim *s = swim_new(generation);
 	*(struct swim **) luaL_pushcdata(L, ctid_swim_ptr) = s;
 	if (s != NULL)
 		return 1;

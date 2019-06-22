@@ -161,8 +161,10 @@ swim_decode_uuid(struct tt_uuid *uuid, const char **pos, const char *end,
  */
 static inline void
 swim_incarnation_bin_create(struct swim_incarnation_bin *bin,
-			    uint8_t version_key)
+			    uint8_t generation_key, uint8_t version_key)
 {
+	bin->k_generation = generation_key;
+	bin->m_generation = 0xcf;
 	bin->k_version = version_key;
 	bin->m_version = 0xcf;
 }
@@ -175,6 +177,7 @@ static inline void
 swim_incarnation_bin_fill(struct swim_incarnation_bin *bin,
 			  const struct swim_incarnation *incarnation)
 {
+	bin->v_generation = mp_bswap_u64(incarnation->generation);
 	bin->v_version = mp_bswap_u64(incarnation->version);
 }
 
@@ -270,6 +273,11 @@ swim_decode_member_key(enum swim_member_key key, const char **pos,
 				     "member uuid") != 0)
 			return -1;
 		break;
+	case SWIM_MEMBER_GENERATION:
+		if (swim_decode_uint(pos, end, &def->incarnation.generation,
+				     prefix, "member generation") != 0)
+			return -1;
+		break;
 	case SWIM_MEMBER_VERSION:
 		if (swim_decode_uint(pos, end, &def->incarnation.version,
 				     prefix, "member version") != 0)
@@ -342,7 +350,8 @@ swim_fd_header_bin_create(struct swim_fd_header_bin *header,
 	header->k_type = SWIM_FD_MSG_TYPE;
 	header->v_type = type;
 
-	swim_incarnation_bin_create(&header->incarnation, SWIM_FD_VERSION);
+	swim_incarnation_bin_create(&header->incarnation, SWIM_FD_GENERATION,
+				    SWIM_FD_VERSION);
 	swim_incarnation_bin_fill(&header->incarnation, incarnation);
 }
 
@@ -377,6 +386,12 @@ swim_failure_detection_def_decode(struct swim_failure_detection_def *def,
 				return -1;
 			}
 			def->type = key;
+			break;
+		case SWIM_FD_GENERATION:
+			if (swim_decode_uint(pos, end,
+					     &def->incarnation.generation,
+					     prefix, "generation") != 0)
+				return -1;
 			break;
 		case SWIM_FD_VERSION:
 			if (swim_decode_uint(pos, end,
@@ -429,6 +444,7 @@ swim_passport_bin_create(struct swim_passport_bin *passport)
 	passport->m_uuid = 0xc4;
 	passport->m_uuid_len = UUID_LEN;
 	swim_incarnation_bin_create(&passport->incarnation,
+				    SWIM_MEMBER_GENERATION,
 				    SWIM_MEMBER_VERSION);
 }
 
@@ -591,7 +607,8 @@ swim_quit_bin_create(struct swim_quit_bin *header,
 	header->k_quit = SWIM_QUIT;
 	assert(mp_sizeof_map(SWIM_INCARNATION_BIN_SIZE) == 1);
 	header->m_quit = 0x80 | SWIM_INCARNATION_BIN_SIZE;
-	swim_incarnation_bin_create(&header->incarnation, SWIM_QUIT_VERSION);
+	swim_incarnation_bin_create(&header->incarnation, SWIM_QUIT_GENERATION,
+				    SWIM_QUIT_VERSION);
 	swim_incarnation_bin_fill(&header->incarnation, incarnation);
 }
 
