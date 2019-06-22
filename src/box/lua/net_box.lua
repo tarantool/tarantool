@@ -25,6 +25,7 @@ local check_primary_index = box.internal.check_primary_index
 
 local communicate     = internal.communicate
 local encode_auth     = internal.encode_auth
+local encode_select   = internal.encode_select
 local decode_greeting = internal.decode_greeting
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
@@ -63,12 +64,12 @@ local function decode_data(raw_data)
     local response, raw_end = decode(raw_data)
     return response[IPROTO_DATA_KEY], raw_end
 end
-local function decode_tuple(raw_data, raw_data_end, args)
-    local response, raw_end = internal.decode_select(raw_data, args.format)
+local function decode_tuple(raw_data, raw_data_end, format)
+    local response, raw_end = internal.decode_select(raw_data, nil, format)
     return response[1], raw_end
 end
-local function decode_get(raw_data, raw_data_end, args)
-    local body, raw_end = internal.decode_select(raw_data, args.format)
+local function decode_get(raw_data, raw_data_end, format)
+    local body, raw_end = internal.decode_select(raw_data, nil, format)
     if body[2] then
         return nil, raw_end, box.error.MORE_THAN_ONE_TUPLE
     end
@@ -82,70 +83,23 @@ local function decode_push(raw_data)
     local response, raw_end = decode(raw_data)
     return response[IPROTO_DATA_KEY][1], raw_end
 end
-local function decode_call_16(raw_data)
-    return internal.decode_select(raw_data)
-end
-local function decode_select(raw_data, raw_data_end, args)
-    return internal.decode_select(raw_data, args.format)
-end
-
-local function encode_call(send_buf, id, args)
-    return internal.encode_call(send_buf, id, args.func_name, args.args)
-end
-local function encode_call_16(send_buf, id, args)
-    return internal.encode_call_16(send_buf, id, args.func_name, args.args)
-end
-local function encode_ping(send_buf, id, ...)
-    return internal.encode_ping(send_buf, id, ...)
-end
-local function encode_eval(send_buf, id, args)
-    return internal.encode_eval(send_buf, id, args.code, args.args)
-end
-local function encode_insert(send_buf, id, args)
-    return internal.encode_insert(send_buf, id, args.space_id, args.tuple)
-end
-local function encode_replace(send_buf, id, args)
-    return internal.encode_replace(send_buf, id, args.space_id, args.tuple)
-end
-local function encode_delete(send_buf, id, args)
-    return internal.encode_delete(send_buf, id, args.space_id, args.index_id,
-                                  args.key)
-end
-local function encode_update(send_buf, id, args)
-    return internal.encode_update(send_buf, id, args.space_id, args.index_id,
-                                  args.key, args.oplist)
-end
-local function encode_upsert(send_buf, id, args)
-    return internal.encode_upsert(send_buf, id, args.space_id, args.key,
-                                  args.oplist)
-end
-local function encode_select(send_buf, id, args)
-    return internal.encode_select(send_buf, id, args.space_id, args.index_id,
-                                  args.iterator, args.offset, args.limit,
-                                  args.key)
-end
-local function encode_execute(send_buf, id, args)
-    return internal.encode_execute(send_buf, id, args.query, args.parameters,
-                                   args.sql_opts)
-end
-
 
 local method_encoder = {
-    ping    = encode_ping,
-    call_16 = encode_call_16,
-    call_17 = encode_call,
-    eval    = encode_eval,
-    insert  = encode_insert,
-    replace = encode_replace,
-    delete  = encode_delete,
-    update  = encode_update,
-    upsert  = encode_upsert,
-    select  = encode_select,
-    execute = encode_execute,
-    get     = encode_select,
-    min     = encode_select,
-    max     = encode_select,
-    count   = encode_call,
+    ping    = internal.encode_ping,
+    call_16 = internal.encode_call_16,
+    call_17 = internal.encode_call,
+    eval    = internal.encode_eval,
+    insert  = internal.encode_insert,
+    replace = internal.encode_replace,
+    delete  = internal.encode_delete,
+    update  = internal.encode_update,
+    upsert  = internal.encode_upsert,
+    select  = internal.encode_select,
+    execute = internal.encode_execute,
+    get     = internal.encode_select,
+    min     = internal.encode_select,
+    max     = internal.encode_select,
+    count   = internal.encode_call,
     -- inject raw data into connection, used by console and tests
     inject = function(buf, id, bytes)
         local ptr = buf:reserve(#bytes)
@@ -156,7 +110,7 @@ local method_encoder = {
 
 local method_decoder = {
     ping    = decode_nil,
-    call_16 = decode_call_16,
+    call_16 = internal.decode_select,
     call_17 = decode_data,
     eval    = decode_data,
     insert  = decode_tuple,
@@ -164,7 +118,7 @@ local method_decoder = {
     delete  = decode_tuple,
     update  = decode_tuple,
     upsert  = decode_nil,
-    select  = decode_select,
+    select  = internal.decode_select,
     execute = internal.decode_execute,
     get     = decode_get,
     min     = decode_get,
@@ -532,7 +486,7 @@ local function create_transport(host, port, user, password, callback,
     -- @retval not nil Future object.
     --
     local function perform_async_request(buffer, skip_header, method, on_push,
-                                         on_push_ctx, args)
+                                         on_push_ctx, request_ctx, ...)
         if state ~= 'active' and state ~= 'fetch_schema' then
             return nil, box.error.new({code = last_errno or E_NO_CONNECTION,
                                        reason = last_error})
@@ -543,11 +497,11 @@ local function create_transport(host, port, user, password, callback,
             worker_fiber:wakeup()
         end
         local id = next_request_id
-        method_encoder[method](send_buf, id, args)
+        method_encoder[method](send_buf, id, ...)
         next_request_id = next_id(id)
         -- Request in most cases has maximum 10 members:
         -- method, buffer, skip_header, id, cond, errno, response,
-        -- on_push, on_push_ctx and args.
+        -- on_push, on_push_ctx and ctx.
         local request = setmetatable(table_new(0, 10), request_mt)
         request.method = method
         request.buffer = buffer
@@ -557,7 +511,7 @@ local function create_transport(host, port, user, password, callback,
         requests[id] = request
         request.on_push = on_push
         request.on_push_ctx = on_push_ctx
-        request.args = args
+        request.ctx = request_ctx
         return request
     end
 
@@ -567,10 +521,10 @@ local function create_transport(host, port, user, password, callback,
     -- @retval not nil Response object.
     --
     local function perform_request(timeout, buffer, skip_header, method,
-                                   on_push, on_push_ctx, args)
+                                   on_push, on_push_ctx, request_ctx, ...)
         local request, err =
             perform_async_request(buffer, skip_header, method, on_push,
-                                  on_push_ctx, args)
+                                  on_push_ctx, request_ctx, ...)
         if not request then
             return nil, err
         end
@@ -629,8 +583,7 @@ local function create_transport(host, port, user, password, callback,
         -- Decode xrow.body[DATA] to Lua objects
         if status == IPROTO_OK_KEY then
             request.response, real_end, request.errno =
-                method_decoder[request.method](body_rpos, body_end,
-                                               request.args)
+                method_decoder[request.method](body_rpos, body_end, request.ctx)
             assert(real_end == body_end, "invalid body length")
             requests[id] = nil
             request.id = nil
@@ -787,14 +740,13 @@ local function create_transport(host, port, user, password, callback,
         local select3_id = new_request_id()
         local response = {}
         -- fetch everything from space _vspace, 2 = ITER_ALL
-        internal.encode_select(send_buf, select1_id, VSPACE_ID, 0, 2, 0,
-                               0xFFFFFFFF, nil)
+        encode_select(send_buf, select1_id, VSPACE_ID, 0, 2, 0, 0xFFFFFFFF, nil)
         -- fetch everything from space _vindex, 2 = ITER_ALL
-        internal.encode_select(send_buf, select2_id, VINDEX_ID, 0, 2, 0,
-                               0xFFFFFFFF, nil)
+        encode_select(send_buf, select2_id, VINDEX_ID, 0, 2, 0, 0xFFFFFFFF, nil)
         -- fetch everything from space _vcollation, 2 = ITER_ALL
-        internal.encode_select(send_buf, select3_id, VCOLLATION_ID, 0, 2, 0,
-                               0xFFFFFFFF, nil)
+        encode_select(send_buf, select3_id, VCOLLATION_ID, 0, 2, 0, 0xFFFFFFFF,
+                      nil)
+
         schema_version = nil -- any schema_version will do provided that
                              -- it is consistent across responses
         repeat
@@ -1113,7 +1065,7 @@ function remote_methods:wait_connected(timeout)
     return self._transport.wait_state('active', timeout)
 end
 
-function remote_methods:_request(method, opts, args)
+function remote_methods:_request(method, opts, request_ctx, ...)
     local transport = self._transport
     local on_push, on_push_ctx, buffer, skip_header, deadline
     -- Extract options, set defaults, check if the request is
@@ -1127,7 +1079,8 @@ function remote_methods:_request(method, opts, args)
             end
             local res, err =
                 transport.perform_async_request(buffer, skip_header, method,
-                                                table.insert, {}, args)
+                                                table.insert, {}, request_ctx,
+                                                ...)
             if err then
                 box.error(err)
             end
@@ -1155,7 +1108,7 @@ function remote_methods:_request(method, opts, args)
     end
     local res, err = transport.perform_request(timeout, buffer, skip_header,
                                                method, on_push, on_push_ctx,
-                                               args)
+                                               request_ctx, ...)
     if err then
         box.error(err)
     end
@@ -1182,16 +1135,14 @@ end
 -- @deprecated since 1.7.4
 function remote_methods:call_16(func_name, ...)
     check_remote_arg(self, 'call')
-    local args = {func_name = tostring(func_name), args = {...}}
-    return (self:_request('call_16', nil, args))
+    return (self:_request('call_16', nil, nil, tostring(func_name), {...}))
 end
 
-function remote_methods:call(func_name, call_args, opts)
+function remote_methods:call(func_name, args, opts)
     check_remote_arg(self, 'call')
-    check_call_args(call_args)
-    call_args = call_args or {}
-    local args = {func_name = tostring(func_name), args = call_args}
-    local res = self:_request('call_17', opts, args)
+    check_call_args(args)
+    args = args or {}
+    local res = self:_request('call_17', opts, nil, tostring(func_name), args)
     if type(res) ~= 'table' or opts and opts.is_async then
         return res
     end
@@ -1201,16 +1152,14 @@ end
 -- @deprecated since 1.7.4
 function remote_methods:eval_16(code, ...)
     check_remote_arg(self, 'eval')
-    local args = {code = code, args = {...}}
-    return unpack((self:_request('eval', nil, args)))
+    return unpack((self:_request('eval', nil, nil, code, {...})))
 end
 
-function remote_methods:eval(code, eval_args, opts)
+function remote_methods:eval(code, args, opts)
     check_remote_arg(self, 'eval')
-    check_eval_args(eval_args)
-    eval_args = eval_args or {}
-    local args = {code = code, args = eval_args}
-    local res = self:_request('eval', opts, args)
+    check_eval_args(args)
+    args = args or {}
+    local res = self:_request('eval', opts, nil, code, args)
     if type(res) ~= 'table' or opts and opts.is_async then
         return res
     end
@@ -1222,9 +1171,8 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "execute", "options")
     end
-    local args = {query =query, parameters = parameters or {},
-                  sql_opts = sql_opts or {}}
-    return self:_request('execute', netbox_opts, args)
+    return self:_request('execute', netbox_opts, nil, query, parameters or {},
+                         sql_opts or {})
 end
 
 function remote_methods:wait_state(state, timeout)
@@ -1369,11 +1317,12 @@ function console_methods:eval(line, timeout)
     end
     if self.protocol == 'Binary' then
         local loader = 'return require("console").eval(...)'
-        local args = {code = loader, args = {line}}
-        res, err = pr(timeout, nil, false, 'eval', nil, nil, args)
+        res, err = pr(timeout, nil, false, 'eval', nil, nil, nil, loader,
+                      {line})
     else
         assert(self.protocol == 'Lua console')
-        res, err = pr(timeout, nil, false, 'inject', nil, nil, line..'$EOF$\n')
+        res, err = pr(timeout, nil, false, 'inject', nil, nil, nil,
+                      line..'$EOF$\n')
     end
     if err then
         box.error(err)
@@ -1392,16 +1341,12 @@ space_metatable = function(remote)
 
     function methods:insert(tuple, opts)
         check_space_arg(self, 'insert')
-        local args = {space_id = self.id, tuple = tuple,
-                      format = self._format_cdata}
-        return remote:_request('insert', opts, args)
+        return remote:_request('insert', opts, self._format_cdata, self.id, tuple)
     end
 
     function methods:replace(tuple, opts)
         check_space_arg(self, 'replace')
-        local args = {space_id = self.id, tuple = tuple,
-                      format = self._format_cdata}
-        return remote:_request('replace', opts, args)
+        return remote:_request('replace', opts, self._format_cdata, self.id, tuple)
     end
 
     function methods:select(key, opts)
@@ -1421,8 +1366,8 @@ space_metatable = function(remote)
 
     function methods:upsert(key, oplist, opts)
         check_space_arg(self, 'upsert')
-        local args = {space_id = self.id, key = key, oplist = oplist}
-        return nothing_or_data(remote:_request('upsert', opts, args))
+        return nothing_or_data(remote:_request('upsert', opts, nil, self.id, key,
+                                               oplist))
     end
 
     function methods:get(key, opts)
@@ -1451,10 +1396,9 @@ index_metatable = function(remote)
         local iterator = check_iterator_type(opts, key_is_nil)
         local offset = tonumber(opts and opts.offset) or 0
         local limit = tonumber(opts and opts.limit) or 0xFFFFFFFF
-        local args = {space_id = self.space.id, index_id = self.id,
-                      iterator = iterator, offset = offset, limit = limit,
-                      key = key, format = self.space._format_cdata}
-        return (remote:_request('select', opts, args))
+        return (remote:_request('select', opts, self.space._format_cdata,
+                                self.space.id, self.id, iterator, offset,
+                                limit, key))
     end
 
     function methods:get(key, opts)
@@ -1462,10 +1406,10 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:get() doesn't support `buffer` argument")
         end
-        local args = {space_id = self.space.id, index_id = self.id,
-                      iterator = box.index.EQ, offset = 0, limit = 2, key = key,
-                      format = self.space._format_cdata}
-        return nothing_or_data(remote:_request('get', opts, args))
+        return nothing_or_data(remote:_request('get', opts,
+                                               self.space._format_cdata,
+                                               self.space.id, self.id,
+                                               box.index.EQ, 0, 2, key))
     end
 
     function methods:min(key, opts)
@@ -1473,10 +1417,10 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:min() doesn't support `buffer` argument")
         end
-        local args = {space_id = self.space.id, index_id = self.id,
-                      iterator = box.index.GE, offset = 0, limit = 1, key = key,
-                      format = self.space._format_cdata}
-        return nothing_or_data(remote:_request('min', opts, args))
+        return nothing_or_data(remote:_request('min', opts,
+                                               self.space._format_cdata,
+                                               self.space.id, self.id,
+                                               box.index.GE, 0, 1, key))
     end
 
     function methods:max(key, opts)
@@ -1484,10 +1428,10 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:max() doesn't support `buffer` argument")
         end
-        local args = {space_id = self.space.id, index_id = self.id,
-                      iterator = box.index.LE, offset = 0, limit = 1, key = key,
-                      format = self.space._format_cdata}
-        return nothing_or_data(remote:_request('max', opts, args))
+        return nothing_or_data(remote:_request('max', opts,
+                                               self.space._format_cdata,
+                                               self.space.id, self.id,
+                                               box.index.LE, 0, 1, key))
     end
 
     function methods:count(key, opts)
@@ -1497,22 +1441,22 @@ index_metatable = function(remote)
         end
         local code = string.format('box.space.%s.index.%s:count',
                                    self.space.name, self.name)
-        local args = {func_name = code, args = { key, opts }}
-        return remote:_request('count', opts, args)
+        return remote:_request('count', opts, nil, code, { key, opts })
     end
 
     function methods:delete(key, opts)
         check_index_arg(self, 'delete')
-        local args = {space_id = self.space.id, index_id = self.id, key = key,
-                      format = self.space._format_cdata}
-        return nothing_or_data(remote:_request('delete', opts, args))
+        return nothing_or_data(remote:_request('delete', opts,
+                                               self.space._format_cdata,
+                                               self.space.id, self.id, key))
     end
 
     function methods:update(key, oplist, opts)
         check_index_arg(self, 'update')
-        local args = {space_id = self.space.id, index_id = self.id, key = key,
-                      oplist = oplist, format = self.space._format_cdata}
-        return nothing_or_data(remote:_request('update', opts, args))
+        return nothing_or_data(remote:_request('update', opts,
+                                               self.space._format_cdata,
+                                               self.space.id, self.id, key,
+                                               oplist))
     end
 
     return { __index = methods, __metatable = false }

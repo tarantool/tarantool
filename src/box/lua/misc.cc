@@ -175,10 +175,10 @@ static int
 lbox_tuple_format_new(struct lua_State *L)
 {
 	assert(CTID_STRUCT_TUPLE_FORMAT_PTR != 0);
-	if (lua_gettop(L) == 0)
+	int top = lua_gettop(L);
+	if (top == 0)
 		return lbox_push_tuple_format(L, tuple_format_runtime);
-	if (lua_gettop(L) > 1 || ! lua_istable(L, 1))
-		return luaL_error(L, "Usage: box.internal.format_new(format)");
+	assert(top == 1 && lua_istable(L, 1));
 	uint32_t count = lua_objlen(L, 1);
 	if (count == 0)
 		return lbox_push_tuple_format(L, tuple_format_runtime);
@@ -204,25 +204,19 @@ lbox_tuple_format_new(struct lua_State *L)
 		if (! lua_isnil(L, -1)) {
 			const char *type_name = lua_tolstring(L, -1, &len);
 			fields[i].type = field_type_by_name(type_name, len);
-			if (fields[i].type == field_type_MAX) {
-				const char *err =
-					"field %d has unknown field type";
-				return luaL_error(L, tt_sprintf(err, i + 1));
-			}
+			assert(fields[i].type != field_type_MAX);
 		}
 		lua_pop(L, 1);
 
 		lua_pushstring(L, "name");
 		lua_gettable(L, -2);
-		if (lua_isnil(L, -1)) {
-			return luaL_error(L, tt_sprintf("field %d name is not "
-							"specified", i + 1));
-		}
+		assert(! lua_isnil(L, -1));
 		const char *name = lua_tolstring(L, -1, &len);
 		fields[i].name = (char *)region_alloc(region, len + 1);
 		if (fields == NULL) {
 			diag_set(OutOfMemory, size, "region_alloc",
 				 "fields[i].name");
+			region_truncate(region, region_svp);
 			return luaT_error(L);
 		}
 		memcpy(fields[i].name, name, len);

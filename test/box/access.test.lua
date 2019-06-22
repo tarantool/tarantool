@@ -343,12 +343,9 @@ box.schema.func.drop(name)
 -- very large space id, no crash occurs.
 LISTEN = require('uri').parse(box.cfg.listen)
 c = (require 'net.box').connect(LISTEN.host, LISTEN.service)
-args = {space_id=1, index_id=0, iterator=box.index.EQ, offset=0, limit=0xFFFFFFFF, key={}}
-c:_request("select", nil, args)
-args.space_id = 65537
-c:_request("select", nil, args)
-args.space_id = 4294967295
-c:_request("select", nil, args)
+c:_request("select", nil, nil, 1, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
+c:_request("select", nil, nil, 65537, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
+c:_request("select", nil, nil, 4294967295, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
 c:close()
 
 session = box.session

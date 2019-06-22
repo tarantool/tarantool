@@ -618,11 +618,10 @@ static int
 netbox_decode_select(struct lua_State *L)
 {
 	uint32_t ctypeid;
-	int top = lua_gettop(L);
-	assert(top == 1 || top == 2);
+	assert(lua_gettop(L) == 3);
 	struct tuple_format *format;
-	if (top == 2 && lua_type(L, 2) == LUA_TCDATA)
-		format = lbox_check_tuple_format(L, 2);
+	if (lua_type(L, 3) == LUA_TCDATA)
+		format = lbox_check_tuple_format(L, 3);
 	else
 		format = tuple_format_runtime;
 	const char *data = *(const char **)luaL_checkcdata(L, 1, &ctypeid);
