@@ -55,4 +55,36 @@ enum swim_member_status {
 
 extern const char *swim_member_status_strs[];
 
+/**
+ * A monotonically growing value to refute false gossips and
+ * update member attributes on remote instances. Any piece of
+ * information is labeled with an incarnation value. Information
+ * labeled with a newer (bigger) incarnation is considered more
+ * actual.
+ */
+struct swim_incarnation {
+	/**
+	 * Version is a volatile part of incarnation. It is
+	 * managed by SWIM fully internally.
+	 */
+	uint64_t version;
+};
+
+/** Create a new incarnation value. */
+static inline void
+swim_incarnation_create(struct swim_incarnation *i, uint64_t version)
+{
+	i->version = version;
+}
+
+/**
+ * Compare two incarnation values.
+ * @retval =0 l == r.
+ * @retval <0 l < r.
+ * @retval >0 l > r.
+ */
+int
+swim_incarnation_cmp(const struct swim_incarnation *l,
+		     const struct swim_incarnation *r);
+
 #endif /* TARANTOOL_SWIM_CONSTANTS_H_INCLUDED */

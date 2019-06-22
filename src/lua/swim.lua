@@ -28,10 +28,15 @@ ffi.cdef[[
         SWIM_EV_NEW             = 0b00000001,
         SWIM_EV_NEW_STATUS      = 0b00000010,
         SWIM_EV_NEW_URI         = 0b00000100,
+        SWIM_EV_NEW_VERSION     = 0b00001000,
         SWIM_EV_NEW_INCARNATION = 0b00001000,
         SWIM_EV_NEW_PAYLOAD     = 0b00010000,
         SWIM_EV_UPDATE          = 0b00011110,
         SWIM_EV_DROP            = 0b00100000,
+    };
+
+    struct swim_incarnation {
+        uint64_t version;
     };
 
     bool
@@ -92,7 +97,7 @@ ffi.cdef[[
     const struct tt_uuid *
     swim_member_uuid(const struct swim_member *member);
 
-    uint64_t
+    struct swim_incarnation
     swim_member_incarnation(const struct swim_member *member);
 
     const char *
@@ -123,6 +128,22 @@ local swim_member_status_strs = {
     [capi.MEMBER_DEAD] = 'dead',
     [capi.MEMBER_LEFT] = 'left'
 }
+
+local swim_incarnation_mt = {
+    __eq = function(l, r)
+        return l.version == r.version
+    end,
+    __lt = function(l, r)
+        return l.version < r.version
+    end,
+    __le = function(l, r)
+        return l.version <= r.version
+    end,
+    __tostring = function(i)
+        return string.format('cdata {version = %s}', i.version)
+    end,
+}
+ffi.metatype(ffi.typeof('struct swim_incarnation'), swim_incarnation_mt)
 
 --
 -- Check if @a value is something that can be passed as a
@@ -370,7 +391,7 @@ local function swim_member_payload(m)
     -- payload. For example, via ACK messages.
     local key1 = capi.swim_member_incarnation(ptr)
     local key2 = capi.swim_member_is_payload_up_to_date(ptr)
-    if key1 == m.p_key1 and key2 == m.p_key2 then
+    if m.p_key1 and key1 == m.p_key1 and key2 == m.p_key2 then
         return m.p
     end
     local cdata, size = swim_member_payload_raw(ptr)
@@ -725,6 +746,9 @@ local swim_member_event_index = {
     end,
     is_new_incarnation = function(self)
         return bit.band(self[1], capi.SWIM_EV_NEW_INCARNATION) ~= 0
+    end,
+    is_new_version = function(self)
+        return bit.band(self[1], capi.SWIM_EV_NEW_VERSION) ~= 0
     end,
     is_new_payload = function(self)
         return bit.band(self[1], capi.SWIM_EV_NEW_PAYLOAD) ~= 0

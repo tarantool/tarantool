@@ -348,14 +348,17 @@ swim_cluster_member_status(struct swim_cluster *cluster, int node_id,
 	return swim_member_status(m);
 }
 
-uint64_t
+struct swim_incarnation
 swim_cluster_member_incarnation(struct swim_cluster *cluster, int node_id,
 				int member_id)
 {
 	const struct swim_member *m =
 		swim_cluster_member_view(cluster, node_id, member_id);
-	if (m == NULL)
-		return UINT64_MAX;
+	if (m == NULL) {
+		struct swim_incarnation inc;
+		swim_incarnation_create(&inc, UINT64_MAX);
+		return inc;
+	}
 	return swim_member_incarnation(m);
 }
 
@@ -713,7 +716,7 @@ struct swim_member_template {
 	 * to @a incarnation.
 	 */
 	bool need_check_incarnation;
-	uint64_t incarnation;
+	struct swim_incarnation incarnation;
 	/**
 	 * True, if the payload should be checked to be equal to
 	 * @a payload of size @a payload_size.
@@ -751,10 +754,10 @@ swim_member_template_set_status(struct swim_member_template *t,
  */
 static inline void
 swim_member_template_set_incarnation(struct swim_member_template *t,
-				     uint64_t incarnation)
+				     uint64_t version)
 {
 	t->need_check_incarnation = true;
-	t->incarnation = incarnation;
+	swim_incarnation_create(&t->incarnation, version);
 }
 
 /**
@@ -778,7 +781,7 @@ swim_loop_check_member(struct swim_cluster *cluster, void *data)
 	const struct swim_member *m =
 		swim_cluster_member_view(cluster, t->node_id, t->member_id);
 	enum swim_member_status status;
-	uint64_t incarnation;
+	struct swim_incarnation incarnation;
 	const char *payload;
 	int payload_size;
 	if (m != NULL) {
@@ -787,13 +790,14 @@ swim_loop_check_member(struct swim_cluster *cluster, void *data)
 		payload = swim_member_payload(m, &payload_size);
 	} else {
 		status = swim_member_status_MAX;
-		incarnation = 0;
+		swim_incarnation_create(&incarnation, 0);
 		payload = NULL;
 		payload_size = 0;
 	}
 	if (t->need_check_status && status != t->status)
 		return false;
-	if (t->need_check_incarnation && incarnation != t->incarnation)
+	if (t->need_check_incarnation &&
+	    swim_incarnation_cmp(&incarnation, &t->incarnation) != 0)
 		return false;
 	if (t->need_check_payload &&
 	    (payload_size != t->payload_size ||
@@ -848,12 +852,12 @@ swim_cluster_wait_status(struct swim_cluster *cluster, int node_id,
 
 int
 swim_cluster_wait_incarnation(struct swim_cluster *cluster, int node_id,
-			      int member_id, uint64_t incarnation,
+			      int member_id, uint64_t version,
 			      double timeout)
 {
 	struct swim_member_template t;
 	swim_member_template_create(&t, node_id, member_id);
-	swim_member_template_set_incarnation(&t, incarnation);
+	swim_member_template_set_incarnation(&t, version);
 	return swim_wait_timeout(timeout, cluster, swim_loop_check_member, &t);
 }
 

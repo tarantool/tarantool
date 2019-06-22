@@ -156,6 +156,29 @@ swim_decode_uuid(struct tt_uuid *uuid, const char **pos, const char *end,
 }
 
 /**
+ * Create incarnation binary MessagePack structure. It expects
+ * parent structure specific keys for incarnation parts.
+ */
+static inline void
+swim_incarnation_bin_create(struct swim_incarnation_bin *bin,
+			    uint8_t version_key)
+{
+	bin->k_version = version_key;
+	bin->m_version = 0xcf;
+}
+
+/**
+ * Fill a created incarnation binary structure with an incarnation
+ * value.
+ */
+static inline void
+swim_incarnation_bin_fill(struct swim_incarnation_bin *bin,
+			  const struct swim_incarnation *incarnation)
+{
+	bin->v_version = mp_bswap_u64(incarnation->version);
+}
+
+/**
  * Check if @a addr is not empty, i.e. not nullified. Set an error
  * in the diagnostics area in case of emptiness.
  */
@@ -247,9 +270,9 @@ swim_decode_member_key(enum swim_member_key key, const char **pos,
 				     "member uuid") != 0)
 			return -1;
 		break;
-	case SWIM_MEMBER_INCARNATION:
-		if (swim_decode_uint(pos, end, &def->incarnation, prefix,
-				     "member incarnation") != 0)
+	case SWIM_MEMBER_VERSION:
+		if (swim_decode_uint(pos, end, &def->incarnation.version,
+				     prefix, "member version") != 0)
 			return -1;
 		break;
 	case SWIM_MEMBER_PAYLOAD:
@@ -308,17 +331,19 @@ swim_src_uuid_bin_create(struct swim_src_uuid_bin *header,
 
 void
 swim_fd_header_bin_create(struct swim_fd_header_bin *header,
-			  enum swim_fd_msg_type type, uint64_t incarnation)
+			  enum swim_fd_msg_type type,
+			  const struct swim_incarnation *incarnation)
 {
 	header->k_header = SWIM_FAILURE_DETECTION;
-	header->m_header = 0x82;
+	int map_size = 1 + SWIM_INCARNATION_BIN_SIZE;
+	assert(mp_sizeof_map(map_size) == 1);
+	header->m_header = 0x80 | map_size;
 
 	header->k_type = SWIM_FD_MSG_TYPE;
 	header->v_type = type;
 
-	header->k_incarnation = SWIM_FD_INCARNATION;
-	header->m_incarnation = 0xcf;
-	header->v_incarnation = mp_bswap_u64(incarnation);
+	swim_incarnation_bin_create(&header->incarnation, SWIM_FD_VERSION);
+	swim_incarnation_bin_fill(&header->incarnation, incarnation);
 }
 
 int
@@ -331,9 +356,10 @@ swim_failure_detection_def_decode(struct swim_failure_detection_def *def,
 		return -1;
 	memset(def, 0, sizeof(*def));
 	def->type = swim_fd_msg_type_MAX;
-	if (size != 2) {
-		diag_set(SwimError, "%s root map should have two keys - "\
-			 "message type and incarnation", prefix);
+	if (size != 1 + SWIM_INCARNATION_BIN_SIZE) {
+		diag_set(SwimError, "%s root map should have %d keys - "\
+			 "message type and version", prefix,
+			 1 + SWIM_INCARNATION_BIN_SIZE);
 		return -1;
 	}
 	for (int i = 0; i < (int) size; ++i) {
@@ -352,9 +378,10 @@ swim_failure_detection_def_decode(struct swim_failure_detection_def *def,
 			}
 			def->type = key;
 			break;
-		case SWIM_FD_INCARNATION:
-			if (swim_decode_uint(pos, end, &def->incarnation,
-					     prefix, "incarnation") != 0)
+		case SWIM_FD_VERSION:
+			if (swim_decode_uint(pos, end,
+					     &def->incarnation.version, prefix,
+					     "version") != 0)
 				return -1;
 			break;
 		default:
@@ -401,24 +428,26 @@ swim_passport_bin_create(struct swim_passport_bin *passport)
 	passport->k_uuid = SWIM_MEMBER_UUID;
 	passport->m_uuid = 0xc4;
 	passport->m_uuid_len = UUID_LEN;
-	passport->k_incarnation = SWIM_MEMBER_INCARNATION;
-	passport->m_incarnation = 0xcf;
+	swim_incarnation_bin_create(&passport->incarnation,
+				    SWIM_MEMBER_VERSION);
 }
 
 void
 swim_passport_bin_fill(struct swim_passport_bin *passport,
 		       const struct sockaddr_in *addr,
 		       const struct tt_uuid *uuid,
-		       enum swim_member_status status, uint64_t incarnation,
+		       enum swim_member_status status,
+		       const struct swim_incarnation *incarnation,
 		       bool encode_payload)
 {
-	int map_size = 3 + SWIM_INADDR_BIN_SIZE + encode_payload;
+	int map_size = 2 + SWIM_INCARNATION_BIN_SIZE + SWIM_INADDR_BIN_SIZE +
+		       encode_payload;
 	assert(mp_sizeof_map(map_size) == 1);
 	passport->m_header = 0x80 | map_size;
 	passport->v_status = status;
 	swim_inaddr_bin_fill(&passport->addr, addr);
 	memcpy(passport->v_uuid, uuid, UUID_LEN);
-	passport->v_incarnation = mp_bswap_u64(incarnation);
+	swim_incarnation_bin_fill(&passport->incarnation, incarnation);
 }
 
 void
@@ -556,13 +585,14 @@ swim_meta_def_decode(struct swim_meta_def *def, const char **pos,
 }
 
 void
-swim_quit_bin_create(struct swim_quit_bin *header, uint64_t incarnation)
+swim_quit_bin_create(struct swim_quit_bin *header,
+		     const struct swim_incarnation *incarnation)
 {
 	header->k_quit = SWIM_QUIT;
-	header->m_quit = 0x81;
-	header->k_incarnation = SWIM_QUIT_INCARNATION;
-	header->m_incarnation = 0xcf;
-	header->v_incarnation = mp_bswap_u64(incarnation);
+	assert(mp_sizeof_map(SWIM_INCARNATION_BIN_SIZE) == 1);
+	header->m_quit = 0x80 | SWIM_INCARNATION_BIN_SIZE;
+	swim_incarnation_bin_create(&header->incarnation, SWIM_QUIT_VERSION);
+	swim_incarnation_bin_fill(&header->incarnation, incarnation);
 }
 
 void

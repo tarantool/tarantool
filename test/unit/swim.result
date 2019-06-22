@@ -88,7 +88,7 @@ ok 7 - subtests
     1..4
     ok 1 - S2 increments its own incarnation to refute its suspicion
     ok 2 - new incarnation has reached S1 with a next round message
-    ok 3 - after restart S2's incarnation is 0 again
+    ok 3 - after restart S2's incarnation is default again
     ok 4 - S2 learned its old bigger incarnation 1 from S0
 ok 8 - subtests
 	*** swim_test_refute: done ***
@@ -158,25 +158,25 @@ ok 15 - subtests
     ok 2 - can not set too big payload
     ok 3 - diag says too big
     ok 4 - payload is set
-    ok 5 - incarnation is incremeted on each payload update
+    ok 5 - version is incremented on each payload update
     ok 6 - payload is successfully obtained back
     ok 7 - payload is disseminated
     ok 8 - payload is changed
-    ok 9 - incarnation is incremeted on each payload update
+    ok 9 - version is incremented on each payload update
     ok 10 - second payload is disseminated
     ok 11 - third payload is disseminated via anti-entropy
 ok 16 - subtests
 	*** swim_test_payload_basic: done ***
 	*** swim_test_payload_refutation ***
     1..11
-    ok 1 - S2 sees new incarnation of S1
+    ok 1 - S2 sees new version of S1
     ok 2 - S3 does the same
     ok 3 - but S2 does not known the new payload
     ok 4 - as well as S3
     ok 5 - S2 learned S1's payload via anti-entropy
-    ok 6 - incarnation still is the same
+    ok 6 - version still is the same
     ok 7 - S3 was blocked and does not know anything
-    ok 8 - incarnation still is the same
+    ok 8 - version still is the same
     ok 9 - S2 keeps the same new S1's payload, S3 did not rewrite it
     ok 10 - S3 still does not know anything
     ok 11 - S3 learns S1's payload from S2
@@ -201,7 +201,7 @@ ok 19 - subtests
 ok 20 - subtests
 	*** swim_test_slow_net: done ***
 	*** swim_test_triggers ***
-    1..22
+    1..23
     ok 1 - trigger is fired
     ok 2 - is not deleted
     ok 3 - ctx.member is set
@@ -211,7 +211,7 @@ ok 20 - subtests
     ok 7 - mask says that
     ok 8 - self payload is updated
     ok 9 - self is set as a member
-    ok 10 - both incarnation and payload events are presented
+    ok 10 - both version and payload events are presented
     ok 11 - suspicion fired a trigger
     ok 12 - status suspected
     ok 13 - death fired a trigger
@@ -224,7 +224,8 @@ ok 20 - subtests
     ok 20 - non-yielding still is not
     ok 21 - trigger is not deleted until all currently sleeping triggers are finished
     # now all the triggers are done and deleted
-    ok 22 - local URI update warns about incarnation update
+    ok 22 - local URI update warns about version update
+    ok 23 - version is a part of incarnation, so the latter is updated too
 ok 21 - subtests
 	*** swim_test_triggers: done ***
 	*** main_f: done ***

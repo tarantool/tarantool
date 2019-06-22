@@ -156,7 +156,7 @@ enum swim_member_status
 swim_cluster_member_status(struct swim_cluster *cluster, int node_id,
 			   int member_id);
 
-uint64_t
+struct swim_incarnation
 swim_cluster_member_incarnation(struct swim_cluster *cluster, int node_id,
 				int member_id);
 
@@ -218,13 +218,13 @@ swim_cluster_wait_status_everywhere(struct swim_cluster *cluster, int member_id,
 				    double timeout);
 
 /**
- * Wait until a member with id @a member_id is seen with @a
+ * Wait until a member with id @a member_id is seen with needed
  * incarnation in the membership table of a member with id @a
  * node_id. At most @a timeout seconds.
  */
 int
 swim_cluster_wait_incarnation(struct swim_cluster *cluster, int node_id,
-			      int member_id, uint64_t incarnation,
+			      int member_id, uint64_t version,
 			      double timeout);
 
 /**

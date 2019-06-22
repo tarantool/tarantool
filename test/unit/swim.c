@@ -397,8 +397,8 @@ swim_test_refute(void)
 	   "new incarnation has reached S1 with a next round message");
 
 	swim_cluster_restart_node(cluster, 1);
-	is(swim_cluster_member_incarnation(cluster, 1, 1), 0,
-	   "after restart S2's incarnation is 0 again");
+	is(swim_cluster_member_incarnation(cluster, 1, 1).version, 0,
+	   "after restart S2's incarnation is default again");
 	is(swim_cluster_wait_incarnation(cluster, 1, 1, 1, 1), 0,
 	   "S2 learned its old bigger incarnation 1 from S0");
 
@@ -698,8 +698,8 @@ swim_test_payload_basic(void)
 	is(swim_cluster_member_set_payload(cluster, 0, s0_payload,
 					   s0_payload_size), 0,
 	   "payload is set");
-	is(swim_cluster_member_incarnation(cluster, 0, 0), 1,
-	   "incarnation is incremeted on each payload update");
+	is(swim_cluster_member_incarnation(cluster, 0, 0).version, 1,
+	   "version is incremented on each payload update");
 	const char *tmp = swim_cluster_member_payload(cluster, 0, 0, &size);
 	ok(size == s0_payload_size && memcmp(s0_payload, tmp, size) == 0,
 	   "payload is successfully obtained back");
@@ -712,8 +712,8 @@ swim_test_payload_basic(void)
 	is(swim_cluster_member_set_payload(cluster, 0, s0_payload,
 					   s0_payload_size), 0,
 	   "payload is changed");
-	is(swim_cluster_member_incarnation(cluster, 0, 0), 2,
-	   "incarnation is incremeted on each payload update");
+	is(swim_cluster_member_incarnation(cluster, 0, 0).version, 2,
+	   "version is incremented on each payload update");
 	is(swim_cluster_wait_payload_everywhere(cluster, 0, s0_payload,
 						s0_payload_size, cluster_size),
 	   0, "second payload is disseminated");
@@ -759,9 +759,9 @@ swim_test_payload_refutation(void)
 	 * The test checks the following case. Assume there are 3
 	 * nodes: S1, S2, S3. They all know each other. S1 sets
 	 * new payload, S2 and S3 knows that. They all see that S1
-	 * has incarnation 1 and payload P1.
+	 * has version 1 and payload P1.
 	 *
-	 * Now S1 changes payload to P2. Its incarnation becomes
+	 * Now S1 changes payload to P2. Its version becomes
 	 * 2. During next entire round its round messages are
 	 * lost, however ACKs work ok.
 	 */
@@ -774,9 +774,9 @@ swim_test_payload_refutation(void)
 	swim_run_for(3);
 	swim_cluster_drop_components(cluster, 0, NULL, 0);
 
-	is(swim_cluster_member_incarnation(cluster, 1, 0), 2,
-	   "S2 sees new incarnation of S1");
-	is(swim_cluster_member_incarnation(cluster, 2, 0), 2,
+	is(swim_cluster_member_incarnation(cluster, 1, 0).version, 2,
+	   "S2 sees new version of S1");
+	is(swim_cluster_member_incarnation(cluster, 2, 0).version, 2,
 	   "S3 does the same");
 
 	const char *tmp = swim_cluster_member_payload(cluster, 1, 0, &size);
@@ -794,7 +794,7 @@ swim_test_payload_refutation(void)
 
 	/*
 	 * Now S1's payload TTD is 0, but via ACKs S1 sent its new
-	 * incarnation to S2 and S3. Despite that they should
+	 * version to S2 and S3. Despite that they should
 	 * apply new S1's payload via anti-entropy. Next lines
 	 * test that:
 	 *
@@ -821,15 +821,15 @@ swim_test_payload_refutation(void)
 	ok(size == s0_new_payload_size &&
 	   memcmp(tmp, s0_new_payload, size) == 0,
 	   "S2 learned S1's payload via anti-entropy");
-	is(swim_cluster_member_incarnation(cluster, 1, 0), 2,
-	   "incarnation still is the same");
+	is(swim_cluster_member_incarnation(cluster, 1, 0).version, 2,
+	   "version still is the same");
 
 	tmp = swim_cluster_member_payload(cluster, 2, 0, &size);
 	ok(size == s0_old_payload_size &&
 	   memcmp(tmp, s0_old_payload, size) == 0,
 	   "S3 was blocked and does not know anything");
-	is(swim_cluster_member_incarnation(cluster, 2, 0), 2,
-	   "incarnation still is the same");
+	is(swim_cluster_member_incarnation(cluster, 2, 0).version, 2,
+	   "version still is the same");
 
 	/* S1 will not participate in the tests further. */
 	swim_cluster_set_drop(cluster, 0, 100);
@@ -855,7 +855,7 @@ swim_test_payload_refutation(void)
 
 	/*
 	 * Now check the case (3) - S3 accepts new S1's payload
-	 * from S2. Even knowing the same S1's incarnation.
+	 * from S2. Even knowing the same S1's version.
 	 */
 	swim_cluster_set_drop(cluster, 1, 0);
 	swim_cluster_set_drop_out(cluster, 2, 100);
@@ -998,7 +998,7 @@ swim_cluster_delete_f(va_list ap)
 static void
 swim_test_triggers(void)
 {
-	swim_start_test(22);
+	swim_start_test(23);
 	struct swim_cluster *cluster = swim_cluster_new(2);
 	swim_cluster_set_ack_timeout(cluster, 1);
 	struct trigger_ctx tctx, tctx2;
@@ -1034,8 +1034,8 @@ swim_test_triggers(void)
 	swim_cluster_run_triggers(cluster);
 	is(tctx.counter, 3, "self payload is updated");
 	is(tctx.ctx.member, swim_self(s1), "self is set as a member");
-	is(tctx.ctx.events, SWIM_EV_NEW_PAYLOAD | SWIM_EV_NEW_INCARNATION,
-	   "both incarnation and payload events are presented");
+	is(tctx.ctx.events, SWIM_EV_NEW_PAYLOAD | SWIM_EV_NEW_VERSION,
+	   "both version and payload events are presented");
 
 	swim_cluster_set_drop(cluster, 1, 100);
 	fail_if(swim_cluster_wait_status(cluster, 0, 1,
@@ -1089,7 +1089,7 @@ swim_test_triggers(void)
 	if (tctx.ctx.member != NULL)
 		swim_member_unref(tctx.ctx.member);
 
-	/* Check that recfg fires incarnation update trigger. */
+	/* Check that recfg fires version update trigger. */
 	s1 = swim_new();
 	struct tt_uuid uuid = uuid_nil;
 	uuid.time_low = 1;
@@ -1100,8 +1100,10 @@ swim_test_triggers(void)
 	fail_if(swim_cfg(s1, "127.0.0.1:2", -1, -1, -1, NULL) != 0);
 	while (tctx.ctx.events == 0)
 		fiber_sleep(0);
-	is(tctx.ctx.events, SWIM_EV_NEW_URI | SWIM_EV_NEW_INCARNATION,
-	   "local URI update warns about incarnation update");
+	is(tctx.ctx.events, SWIM_EV_NEW_URI | SWIM_EV_NEW_VERSION,
+	   "local URI update warns about version update");
+	ok((tctx.ctx.events & SWIM_EV_NEW_INCARNATION) != 0,
+	   "version is a part of incarnation, so the latter is updated too");
 	swim_delete(s1);
 
 	if (tctx.ctx.member != NULL)

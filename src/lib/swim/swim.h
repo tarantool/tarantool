@@ -234,7 +234,7 @@ const struct tt_uuid *
 swim_member_uuid(const struct swim_member *member);
 
 /** Member's incarnation. */
-uint64_t
+struct swim_incarnation
 swim_member_incarnation(const struct swim_member *member);
 
 /** Member's payload. */
@@ -279,6 +279,11 @@ enum swim_ev_mask {
 	SWIM_EV_NEW             = 0b00000001,
 	SWIM_EV_NEW_STATUS      = 0b00000010,
 	SWIM_EV_NEW_URI         = 0b00000100,
+	SWIM_EV_NEW_VERSION     = 0b00001000,
+	/*
+	 * Shortcut to check for update of any part of
+	 * incarnation.
+	 */
 	SWIM_EV_NEW_INCARNATION = 0b00001000,
 	SWIM_EV_NEW_PAYLOAD     = 0b00010000,
 	/* Shortcut to check for any update. */
