@@ -86,11 +86,17 @@ test_aes128_codec(void)
 	is(rc, plain_size, "decrypt returns correct number of bytes");
 	is(memcmp(buffer2, plain, plain_size), 0,
 	   "and correctly decrypts data");
-
-	rc = crypto_codec_decrypt(c, "false iv not meaning anything",
-				  buffer1, 16, buffer2, buffer_size);
-	is(rc, -1, "decrypt can fail with wrong IV");
-	ok(! diag_is_empty(diag_get()), "diag error is set");
+	/*
+	 * Create a different IV to ensure it does not decrypt a
+	 * message with the original IV.
+	 */
+	for (int i = 0; i < CRYPTO_AES_IV_SIZE; ++i)
+		iv[i]++;
+	rc = crypto_codec_decrypt(c, iv, buffer1, 16, buffer2, buffer_size);
+	ok(rc == -1 || rc != plain_size || memcmp(buffer1, buffer2, rc) != 0,
+	   "decrypt can't correctly decode anything with a wrong IV");
+	ok(rc != -1 || ! diag_is_empty(diag_get()),
+	   "in case decrypt has totally failed, diag is set");
 
 	crypto_codec_gen_iv(c, iv2, sizeof(iv2));
 	rc = crypto_codec_encrypt(c, iv2, plain, plain_size,

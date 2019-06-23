@@ -15,8 +15,8 @@ ok 1 - crypto checks that algo argument is correct
     ok 10 - decrypt also checks length and returns needed number of bytes
     ok 11 - decrypt returns correct number of bytes
     ok 12 - and correctly decrypts data
-    ok 13 - decrypt can fail with wrong IV
-    ok 14 - diag error is set
+    ok 13 - decrypt can't correctly decode anything with a wrong IV
+    ok 14 - in case decrypt has totally failed, diag is set
     ok 15 - encrypt with different IV and the same number of written bytes returned
     ok 16 - the encrypted data looks different
     ok 17 - decrypt works with correct but another IV
