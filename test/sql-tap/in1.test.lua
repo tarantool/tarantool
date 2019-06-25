@@ -207,7 +207,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in-2.10",
     [[
-        SELECT a FROM t1 WHERE min(0,b IN (a,30)) <> 0
+        SELECT a FROM t1 WHERE min(0, CAST(b IN (a,30) AS INT)) <> 0
     ]], {
         -- <in-2.10>
         

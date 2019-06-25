@@ -2955,6 +2955,8 @@ sqlMemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
 				return 1;
 			return -1;
 		}
+		if ((f2 & MEM_Bool) != 0)
+			return +1;
 		return -1;
 	}
 

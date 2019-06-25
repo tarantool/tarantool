@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(15)
+test:plan(19)
 
 --!./tcltestrunner.lua
 -- 2010 August 27
@@ -228,5 +228,33 @@ test:do_catchsql_test(
         -- <func5-3.10>
     }
 )
+
+-- Order of arguments of min/max functions doesn't affect
+-- the result: boolean is always less than numbers, which
+-- are less than strings.
+--
+test:do_execsql_test(
+    "func-5-4.1",
+    [[
+        SELECT max (false, 'STR', 1, 0.5);
+    ]], { "STR" } )
+
+test:do_execsql_test(
+    "func-5-4.2",
+    [[
+        SELECT max ('STR', 1, 0.5, false);
+    ]], { "STR" } )
+
+test:do_execsql_test(
+    "func-5-4.3",
+    [[
+        SELECT min ('STR', 1, 0.5, false);
+    ]], { false } )
+
+test:do_execsql_test(
+    "func-5-4.4",
+    [[
+        SELECT min (false, 'STR', 1, 0.5);
+    ]], { false } )
 
 test:finish_test()
