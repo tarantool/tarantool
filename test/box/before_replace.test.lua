@@ -306,3 +306,42 @@ _ = s:insert{1}
 save_type
 
 s:drop()
+
+--
+-- gh-4275 segfault if before_replace
+-- trigger set in on_schema_init triggers runs on recovery.
+--
+test_run:cmd('create server test with script="box/on_schema_init.lua"')
+test_run:cmd('start server test')
+test_run:cmd('switch test')
+s = box.schema.space.create('test_on_schema_init')
+_ = s:create_index('pk')
+test_run:cmd('setopt delimiter ";"')
+function gen_inserts()
+    box.begin()
+    for i = 1,1000 do
+        s:upsert({1, 1}, {{'+', 2, 1}})
+    end
+    box.commit()
+end;
+test_run:cmd('setopt delimiter ""');
+for i = 1,17 do gen_inserts() end
+test_run:cmd('restart server test')
+s = box.space.test_on_schema_init
+s:count()
+-- For this test the number of invocations of the before_replace
+-- trigger during recovery multiplied by the amount of return values
+-- in before_replace trigger must be greater than 66000.
+-- A total of 1 + 16999 + 17000 + 1= 34001
+-- insertion: 16999 updates from gen_inserts(), starting value is 1,
+-- plus additional 17000 runs of before_replace trigger, each updating
+-- the value by adding 1.
+-- recovery: 17000 invocations of before replace trigger.
+-- Each invocation updates the recovered tuple, but only in-memory, the
+-- WAL remains intact. Thus, we only see the last update. During recovery
+-- the value is only increased by 1, and this change is visible only in memory.
+s:get{1}[2] == 1 + 16999 + 17000 + 1 or s:get{1}[2]
+test_run:cmd('switch default')
+test_run:cmd('stop server test')
+test_run:cmd('cleanup server test')
+test_run:cmd('delete server test')

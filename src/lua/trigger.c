@@ -102,9 +102,15 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	int nret = lua_gettop(L) - top;
 	if (trigger->pop_event != NULL &&
 	    trigger->pop_event(L, nret, event) != 0) {
+		lua_settop(L, top);
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 		diag_raise();
 	}
+	/*
+	 * Clear the stack after pop_event saves all
+	 * the needed return values.
+	 */
+	lua_settop(L, top);
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 }
 
