@@ -48,7 +48,7 @@ for i = 1, 10000 - 1, 1 do
             local y = test:execsql(string.format("SELECT %s=CAST(quote(%s) AS real)",x, x))
             return y
         end, {
-            1
+            true
         })
 
 end

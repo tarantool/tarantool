@@ -43,7 +43,7 @@ test:do_execsql_test(
         SELECT 1 IN ()
     ]], {
         -- <tkt-80e031a00f.1>
-        0
+        false
         -- </tkt-80e031a00f.1>
     })
 
@@ -53,7 +53,7 @@ test:do_execsql_test(
         SELECT 1 IN (2)
     ]], {
         -- <tkt-80e031a00f.1b>
-        0
+        false
         -- </tkt-80e031a00f.1b>
     })
 
@@ -63,7 +63,7 @@ test:do_execsql_test(
         SELECT 1 IN (2,3,4,5,6,7,8,9)
     ]], {
         -- <tkt-80e031a00f.1c>
-        0
+        false
         -- </tkt-80e031a00f.1c>
     })
 
@@ -73,7 +73,7 @@ test:do_execsql_test(
         SELECT 1 NOT IN ()
     ]], {
         -- <tkt-80e031a00f.2>
-        1
+        true
         -- </tkt-80e031a00f.2>
     })
 
@@ -83,7 +83,7 @@ test:do_execsql_test(
         SELECT 1 NOT IN (2)
     ]], {
         -- <tkt-80e031a00f.2b>
-        1
+        true
         -- </tkt-80e031a00f.2b>
     })
 
@@ -93,7 +93,7 @@ test:do_execsql_test(
         SELECT 1 NOT IN (2,3,4,5,6,7,8,9)
     ]], {
         -- <tkt-80e031a00f.2c>
-        1
+        true
         -- </tkt-80e031a00f.2c>
     })
 
@@ -103,7 +103,7 @@ test:do_execsql_test(
         SELECT null IN ()
     ]], {
         -- <tkt-80e031a00f.3>
-        0
+        false
         -- </tkt-80e031a00f.3>
     })
 
@@ -113,7 +113,7 @@ test:do_execsql_test(
         SELECT null NOT IN ()
     ]], {
         -- <tkt-80e031a00f.4>
-        1
+        true
         -- </tkt-80e031a00f.4>
     })
 
@@ -124,7 +124,7 @@ test:do_execsql_test(
         SELECT 1 IN t1;
     ]], {
         -- <tkt-80e031a00f.5>
-        0
+        false
         -- </tkt-80e031a00f.5>
     })
 
@@ -134,7 +134,7 @@ test:do_execsql_test(
         SELECT 1 NOT IN t1
     ]], {
         -- <tkt-80e031a00f.6>
-        1
+        true
         -- </tkt-80e031a00f.6>
     })
 
@@ -144,7 +144,7 @@ test:do_execsql_test(
         SELECT null IN t1
     ]], {
         -- <tkt-80e031a00f.7>
-        0
+        false
         -- </tkt-80e031a00f.7>
     })
 
@@ -154,7 +154,7 @@ test:do_execsql_test(
         SELECT null NOT IN t1
     ]], {
         -- <tkt-80e031a00f.8>
-        1
+        true
         -- </tkt-80e031a00f.8>
     })
 
@@ -165,7 +165,7 @@ test:do_execsql_test(
         SELECT 1 IN t2;
     ]], {
         -- <tkt-80e031a00f.9>
-        0
+        false
         -- </tkt-80e031a00f.9>
     })
 
@@ -175,7 +175,7 @@ test:do_execsql_test(
         SELECT 1 NOT IN t2
     ]], {
         -- <tkt-80e031a00f.10>
-        1
+        true
         -- </tkt-80e031a00f.10>
     })
 
@@ -185,7 +185,7 @@ test:do_execsql_test(
         SELECT null IN t2
     ]], {
         -- <tkt-80e031a00f.11>
-        0
+        false
         -- </tkt-80e031a00f.11>
     })
 
@@ -195,7 +195,7 @@ test:do_execsql_test(
         SELECT null NOT IN t2
     ]], {
         -- <tkt-80e031a00f.12>
-        1
+        true
         -- </tkt-80e031a00f.12>
     })
 
@@ -206,7 +206,7 @@ test:do_execsql_test(
         SELECT 1 IN t3;
     ]], {
         -- <tkt-80e031a00f.13>
-        0
+        false
         -- </tkt-80e031a00f.13>
     })
 
@@ -216,7 +216,7 @@ test:do_execsql_test(
         SELECT 1 NOT IN t3
     ]], {
         -- <tkt-80e031a00f.14>
-        1
+        true
         -- </tkt-80e031a00f.14>
     })
 
@@ -226,7 +226,7 @@ test:do_execsql_test(
         SELECT null IN t3
     ]], {
         -- <tkt-80e031a00f.15>
-        0
+        false
         -- </tkt-80e031a00f.15>
     })
 
@@ -236,7 +236,7 @@ test:do_execsql_test(
         SELECT null NOT IN t3
     ]], {
         -- <tkt-80e031a00f.16>
-        1
+        true
         -- </tkt-80e031a00f.16>
     })
 
@@ -246,7 +246,7 @@ test:do_execsql_test(
         SELECT 1 IN (SELECT x+y FROM t1, t2)
     ]], {
         -- <tkt-80e031a00f.17>
-        0
+        false
         -- </tkt-80e031a00f.17>
     })
 
@@ -256,7 +256,7 @@ test:do_execsql_test(
         SELECT 1 NOT IN (SELECT x+y FROM t1,t2)
     ]], {
         -- <tkt-80e031a00f.18>
-        1
+        true
         -- </tkt-80e031a00f.18>
     })
 
@@ -266,7 +266,7 @@ test:do_execsql_test(
         SELECT null IN (SELECT x+y FROM t1,t2)
     ]], {
         -- <tkt-80e031a00f.19>
-        0
+        false
         -- </tkt-80e031a00f.19>
     })
 
@@ -276,7 +276,7 @@ test:do_execsql_test(
         SELECT null NOT IN (SELECT x+y FROM t1,t2)
     ]], {
         -- <tkt-80e031a00f.20>
-        1
+        true
         -- </tkt-80e031a00f.20>
     })
 
@@ -286,7 +286,7 @@ test:do_execsql_test(
         SELECT 1.23 IN ()
     ]], {
         -- <tkt-80e031a00f.21>
-        0
+        false
         -- </tkt-80e031a00f.21>
     })
 
@@ -296,7 +296,7 @@ test:do_execsql_test(
         SELECT 1.23 NOT IN ()
     ]], {
         -- <tkt-80e031a00f.22>
-        1
+        true
         -- </tkt-80e031a00f.22>
     })
 
@@ -306,7 +306,7 @@ test:do_execsql_test(
         SELECT 1.23 IN t1
     ]], {
         -- <tkt-80e031a00f.23>
-        0
+        false
         -- </tkt-80e031a00f.23>
     })
 
@@ -316,7 +316,7 @@ test:do_execsql_test(
         SELECT 1.23 NOT IN t1
     ]], {
         -- <tkt-80e031a00f.24>
-        1
+        true
         -- </tkt-80e031a00f.24>
     })
 
@@ -326,7 +326,7 @@ test:do_execsql_test(
         SELECT 'hello' IN ()
     ]], {
         -- <tkt-80e031a00f.25>
-        0
+        false
         -- </tkt-80e031a00f.25>
     })
 
@@ -336,7 +336,7 @@ test:do_execsql_test(
         SELECT 'hello' NOT IN ()
     ]], {
         -- <tkt-80e031a00f.26>
-        1
+        true
         -- </tkt-80e031a00f.26>
     })
 
@@ -366,7 +366,7 @@ test:do_execsql_test(
         SELECT x'303132' IN ()
     ]], {
         -- <tkt-80e031a00f.29>
-        0
+        false
         -- </tkt-80e031a00f.29>
     })
 
@@ -376,7 +376,7 @@ test:do_execsql_test(
         SELECT x'303132' NOT IN ()
     ]], {
         -- <tkt-80e031a00f.30>
-        1
+        true
         -- </tkt-80e031a00f.30>
     })
 
@@ -415,7 +415,7 @@ test:do_execsql_test(
         SELECT 1 IN (2,3,4)
     ]], {
         -- <tkt-80e031a00f.100>
-        0
+        false
         -- </tkt-80e031a00f.100>
     })
 
@@ -425,7 +425,7 @@ test:do_execsql_test(
         SELECT 1 NOT IN (2,3,4)
     ]], {
         -- <tkt-80e031a00f.101>
-        1
+        true
         -- </tkt-80e031a00f.101>
     })
 
@@ -435,7 +435,7 @@ test:do_execsql_test(
         SELECT 'a' IN ('b','c','d')
     ]], {
         -- <tkt-80e031a00f.102>
-        0
+        false
         -- </tkt-80e031a00f.102>
     })
 
@@ -445,7 +445,7 @@ test:do_execsql_test(
         SELECT 'a' NOT IN ('b','c','d')
     ]], {
         -- <tkt-80e031a00f.103>
-        1
+        true
         -- </tkt-80e031a00f.103>
     })
 
@@ -485,7 +485,7 @@ test:do_test(
         return test:execsql "SELECT 1 IN t4"
     end, {
         -- <tkt-80e031a00f.104>
-        0
+        false
         -- </tkt-80e031a00f.104>
     })
 
@@ -495,7 +495,7 @@ test:do_execsql_test(
         SELECT 1 NOT IN t4
     ]], {
         -- <tkt-80e031a00f.105>
-        1
+        true
         -- </tkt-80e031a00f.105>
     })
 
@@ -505,7 +505,7 @@ test:do_execsql_test(
         SELECT 1 IN t5
     ]], {
         -- <tkt-80e031a00f.106>
-        0
+        false
         -- </tkt-80e031a00f.106>
     })
 
@@ -515,7 +515,7 @@ test:do_execsql_test(
         SELECT 1 NOT IN t5
     ]], {
         -- <tkt-80e031a00f.107>
-        1
+        true
         -- </tkt-80e031a00f.107>
     })
 
@@ -525,7 +525,7 @@ test:do_execsql_test(
         SELECT 1 IN t6
     ]], {
         -- <tkt-80e031a00f.108>
-        0
+        false
         -- </tkt-80e031a00f.108>
     })
 
@@ -535,7 +535,7 @@ test:do_execsql_test(
         SELECT 1 NOT IN t6
     ]], {
         -- <tkt-80e031a00f.109>
-        1
+        true
         -- </tkt-80e031a00f.109>
     })
 
@@ -545,7 +545,7 @@ test:do_execsql_test(
         SELECT 'a' IN t7
     ]], {
         -- <tkt-80e031a00f.110>
-        0
+        false
         -- </tkt-80e031a00f.110>
     })
 
@@ -555,7 +555,7 @@ test:do_execsql_test(
         SELECT 'a' NOT IN t7
     ]], {
         -- <tkt-80e031a00f.111>
-        1
+        true
         -- </tkt-80e031a00f.111>
     })
 
@@ -565,7 +565,7 @@ test:do_execsql_test(
         SELECT 'a' IN t8
     ]], {
         -- <tkt-80e031a00f.112>
-        0
+        false
         -- </tkt-80e031a00f.112>
     })
 
@@ -575,7 +575,7 @@ test:do_execsql_test(
         SELECT 'a' NOT IN t8
     ]], {
         -- <tkt-80e031a00f.113>
-        1
+        true
         -- </tkt-80e031a00f.113>
     })
 
@@ -588,7 +588,7 @@ test:do_execsql_test(
         SELECT 2 IN (2,3,4,null)
     ]], {
         -- <tkt-80e031a00f.300>
-        1
+        true
         -- </tkt-80e031a00f.300>
     })
 
@@ -598,7 +598,7 @@ test:do_execsql_test(
         SELECT 3 NOT IN (2,3,4,null)
     ]], {
         -- <tkt-80e031a00f.301>
-        0
+        false
         -- </tkt-80e031a00f.301>
     })
 
@@ -608,7 +608,7 @@ test:do_execsql_test(
         SELECT 4 IN (2,3,4)
     ]], {
         -- <tkt-80e031a00f.302>
-        1
+        true
         -- </tkt-80e031a00f.302>
     })
 
@@ -618,7 +618,7 @@ test:do_execsql_test(
         SELECT 2 NOT IN (2,3,4)
     ]], {
         -- <tkt-80e031a00f.303>
-        0
+        false
         -- </tkt-80e031a00f.303>
     })
 
@@ -628,7 +628,7 @@ test:do_execsql_test(
         SELECT 'b' IN ('b','c','d')
     ]], {
         -- <tkt-80e031a00f.304>
-        1
+        true
         -- </tkt-80e031a00f.304>
     })
 
@@ -638,7 +638,7 @@ test:do_execsql_test(
         SELECT 'c' NOT IN ('b','c','d')
     ]], {
         -- <tkt-80e031a00f.305>
-        0
+        false
         -- </tkt-80e031a00f.305>
     })
 
@@ -648,7 +648,7 @@ test:do_execsql_test(
         SELECT 'd' IN ('b','c',null,'d')
     ]], {
         -- <tkt-80e031a00f.306>
-        1
+        true
         -- </tkt-80e031a00f.306>
     })
 
@@ -658,7 +658,7 @@ test:do_execsql_test(
         SELECT 'b' NOT IN (null,'b','c','d')
     ]], {
         -- <tkt-80e031a00f.307>
-        0
+        false
         -- </tkt-80e031a00f.307>
     })
 
@@ -668,7 +668,7 @@ test:do_execsql_test(
         SELECT 2 IN t4
     ]], {
         -- <tkt-80e031a00f.308>
-        1
+        true
         -- </tkt-80e031a00f.308>
     })
 
@@ -678,7 +678,7 @@ test:do_execsql_test(
         SELECT 3 NOT IN t4
     ]], {
         -- <tkt-80e031a00f.309>
-        0
+        false
         -- </tkt-80e031a00f.309>
     })
 
@@ -688,7 +688,7 @@ test:do_execsql_test(
         SELECT 4 IN (select a from t4n)
     ]], {
         -- <tkt-80e031a00f.310>
-        1
+        true
         -- </tkt-80e031a00f.310>
     })
 
@@ -698,7 +698,7 @@ test:do_execsql_test(
         SELECT 2 NOT IN (select a from t4n)
     ]], {
         -- <tkt-80e031a00f.311>
-        0
+        false
         -- </tkt-80e031a00f.311>
     })
 
@@ -708,7 +708,7 @@ test:do_execsql_test(
         SELECT 2 IN t5
     ]], {
         -- <tkt-80e031a00f.312>
-        1
+        true
         -- </tkt-80e031a00f.312>
     })
 
@@ -718,7 +718,7 @@ test:do_execsql_test(
         SELECT 3 NOT IN t5
     ]], {
         -- <tkt-80e031a00f.313>
-        0
+        false
         -- </tkt-80e031a00f.313>
     })
 
@@ -728,7 +728,7 @@ test:do_execsql_test(
         SELECT 2 IN t6
     ]], {
         -- <tkt-80e031a00f.314>
-        1
+        true
         -- </tkt-80e031a00f.314>
     })
 
@@ -738,7 +738,7 @@ test:do_execsql_test(
         SELECT 3 NOT IN t6
     ]], {
         -- <tkt-80e031a00f.315>
-        0
+        false
         -- </tkt-80e031a00f.315>
     })
 
@@ -748,7 +748,7 @@ test:do_execsql_test(
         SELECT 4 IN (select b from t6n)
     ]], {
         -- <tkt-80e031a00f.316>
-        1
+        true
         -- </tkt-80e031a00f.316>
     })
 
@@ -758,7 +758,7 @@ test:do_execsql_test(
         SELECT 2 NOT IN (select b from t6n)
     ]], {
         -- <tkt-80e031a00f.317>
-        0
+        false
         -- </tkt-80e031a00f.317>
     })
 
@@ -768,7 +768,7 @@ test:do_execsql_test(
         SELECT 'b' IN t7
     ]], {
         -- <tkt-80e031a00f.318>
-        1
+        true
         -- </tkt-80e031a00f.318>
     })
 
@@ -778,7 +778,7 @@ test:do_execsql_test(
         SELECT 'c' NOT IN t7
     ]], {
         -- <tkt-80e031a00f.319>
-        0
+        false
         -- </tkt-80e031a00f.319>
     })
 
@@ -788,7 +788,7 @@ test:do_execsql_test(
         SELECT 'c' IN (select a from t7n)
     ]], {
         -- <tkt-80e031a00f.320>
-        1
+        true
         -- </tkt-80e031a00f.320>
     })
 
@@ -798,7 +798,7 @@ test:do_execsql_test(
         SELECT 'd' NOT IN (select a from t7n)
     ]], {
         -- <tkt-80e031a00f.321>
-        0
+        false
         -- </tkt-80e031a00f.321>
     })
 
@@ -808,7 +808,7 @@ test:do_execsql_test(
         SELECT 'b' IN t8
     ]], {
         -- <tkt-80e031a00f.322>
-        1
+        true
         -- </tkt-80e031a00f.322>
     })
 
@@ -818,7 +818,7 @@ test:do_execsql_test(
         SELECT 'c' NOT IN t8
     ]], {
         -- <tkt-80e031a00f.323>
-        0
+        false
         -- </tkt-80e031a00f.323>
     })
 
@@ -828,7 +828,7 @@ test:do_execsql_test(
         SELECT 'c' IN (select c from t8n)
     ]], {
         -- <tkt-80e031a00f.324>
-        1
+        true
         -- </tkt-80e031a00f.324>
     })
 
@@ -838,7 +838,7 @@ test:do_execsql_test(
         SELECT 'd' NOT IN (select c from t8n)
     ]], {
         -- <tkt-80e031a00f.325>
-        0
+        false
         -- </tkt-80e031a00f.325>
     })
 
@@ -848,7 +848,7 @@ test:do_execsql_test(
         SELECT 'a' IN (NULL,'a')
     ]], {
         -- <tkt-80e031a00f.326>
-        1
+        true
         -- </tkt-80e031a00f.326>
     })
 
@@ -868,7 +868,7 @@ test:do_execsql_test(
         SELECT 'a' NOT IN (NULL,'a')
     ]], {
         -- <tkt-80e031a00f.328>
-        0
+        false
         -- </tkt-80e031a00f.328>
     })
 

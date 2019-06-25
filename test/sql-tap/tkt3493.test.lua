@@ -129,7 +129,7 @@ test:do_execsql_test(
         SELECT a=123 FROM t1 GROUP BY a 
     ]], {
         -- <tkt3493-2.2.1>
-        1
+        true
         -- </tkt3493-2.2.1>
     })
 
@@ -139,7 +139,7 @@ test:do_execsql_test(
         SELECT a=123 FROM t1 
     ]], {
         -- <tkt3493-2.2.2>
-        1
+        true
         -- </tkt3493-2.2.2>
     })
 
@@ -149,7 +149,7 @@ test:do_execsql_test(
         SELECT a='123' FROM t1 
     ]], {
         -- <tkt3493-2.2.3>
-        1
+        true
         -- </tkt3493-2.2.3>
     })
 
@@ -159,7 +159,7 @@ test:do_execsql_test(
         SELECT count(*), a=123 FROM t1 
     ]], {
         -- <tkt3493-2.2.4>
-        1, 1
+        1, true
         -- </tkt3493-2.2.4>
     })
 
@@ -169,7 +169,7 @@ test:do_execsql_test(
         SELECT count(*), +a=123 FROM t1 
     ]], {
         -- <tkt3493-2.2.5>
-        1, 1
+        1, true
         -- </tkt3493-2.2.5>
     })
 
@@ -179,7 +179,7 @@ test:do_execsql_test(
         SELECT b='456' FROM t1 GROUP BY a 
     ]], {
         -- <tkt3493-2.3.3>
-        1
+        true
         -- </tkt3493-2.3.3>
     })
 
@@ -189,7 +189,7 @@ test:do_execsql_test(
         SELECT b='456' FROM t1 GROUP BY b 
     ]], {
         -- <tkt3493-2.3.1>
-        1
+        true
         -- </tkt3493-2.3.1>
     })
 
@@ -199,7 +199,7 @@ test:do_execsql_test(
         SELECT b='456' FROM t1 
     ]], {
         -- <tkt3493-2.3.2>
-        1
+        true
         -- </tkt3493-2.3.2>
     })
 
@@ -264,7 +264,7 @@ test:do_execsql_test(
         SELECT a='abc' FROM t2 GROUP BY a 
     ]], {
         -- <tkt3493-3.2.1>
-        1
+        true
         -- </tkt3493-3.2.1>
     })
 
@@ -274,7 +274,7 @@ test:do_execsql_test(
         SELECT a='abc' FROM t2 
     ]], {
         -- <tkt3493-3.2.2>
-        1
+        true
         -- </tkt3493-3.2.2>
     })
 
@@ -284,7 +284,7 @@ test:do_execsql_test(
         SELECT a>b FROM t2 GROUP BY a, b
     ]], {
         -- <tkt3493-3.3.1>
-        0
+        false
         -- </tkt3493-3.3.1>
     })
 
@@ -294,7 +294,7 @@ test:do_execsql_test(
         SELECT a>b COLLATE "binary" FROM t2 GROUP BY a, b
     ]], {
         -- <tkt3493-3.3.2>
-        1
+        true
         -- </tkt3493-3.3.2>
     })
 
@@ -304,7 +304,7 @@ test:do_execsql_test(
         SELECT b>a FROM t2 GROUP BY a, b
     ]], {
         -- <tkt3493-3.3.3>
-        1
+        true
         -- </tkt3493-3.3.3>
     })
 
@@ -314,7 +314,7 @@ test:do_execsql_test(
         SELECT b>a COLLATE "unicode_ci" FROM t2 GROUP BY a, b
     ]], {
         -- <tkt3493-3.3.4>
-        1
+        true
         -- </tkt3493-3.3.4>
     })
 

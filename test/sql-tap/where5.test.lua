@@ -422,7 +422,7 @@ test:do_execsql_test("where5-4.6", [[
     SELECT x IS NULL FROM t3
 ]], {
     -- <where5-4.6>
-    0, 0, 0
+    false, false, false
     -- </where5-4.6>
 })
 
@@ -430,7 +430,7 @@ test:do_execsql_test("where5-4.7", [[
     SELECT x IS NOT NULL FROM t3
 ]], {
     -- <where5-4.7>
-    1, 1, 1
+    true, true, true
     -- </where5-4.7>
 })
 

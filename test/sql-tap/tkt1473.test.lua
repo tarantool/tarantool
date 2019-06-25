@@ -217,7 +217,7 @@ test:do_execsql_test(
           (SELECT 1 FROM t1 WHERE a=1 UNION SELECT 2 FROM t1 WHERE b=0)
     ]], {
         -- <tkt1473-3.3>
-        1
+        true
         -- </tkt1473-3.3>
     })
 
@@ -261,7 +261,7 @@ test:do_execsql_test(
           (SELECT 1 FROM t1 WHERE a=0 UNION SELECT 2 FROM t1 WHERE b=4)
     ]], {
         -- <tkt1473-3.7>
-        1
+        true
         -- </tkt1473-3.7>
     })
 
@@ -272,7 +272,7 @@ test:do_execsql_test(
           (SELECT 1 FROM t1 WHERE a=0 UNION ALL SELECT 2 FROM t1 WHERE b=0)
     ]], {
         -- <tkt1473-3.8>
-        0
+        false
         -- </tkt1473-3.8>
     })
 
@@ -283,7 +283,7 @@ test:do_execsql_test(
           (SELECT 1 FROM t1 WHERE a=0 UNION SELECT 2 FROM t1 WHERE b=0)
     ]], {
         -- <tkt1473-3.9>
-        0
+        false
         -- </tkt1473-3.9>
     })
 
@@ -629,7 +629,7 @@ test:do_execsql_test(
         )
     ]], {
         -- <tkt1473-5.7>
-        0
+        false
         -- </tkt1473-5.7>
     })
 
@@ -719,7 +719,7 @@ test:do_execsql_test(
         )
     ]], {
         -- <tkt1473-6.5>
-        1
+        true
         -- </tkt1473-6.5>
     })
 
@@ -749,7 +749,7 @@ test:do_execsql_test(
         )
     ]], {
         -- <tkt1473-6.6>
-        1
+        true
         -- </tkt1473-6.6>
     })
 
@@ -779,7 +779,7 @@ test:do_execsql_test(
         )
     ]], {
         -- <tkt1473-6.7>
-        0
+        false
         -- </tkt1473-6.7>
     })
 
@@ -809,7 +809,7 @@ test:do_execsql_test(
         )
     ]], {
         -- <tkt1473-6.8>
-        1
+        true
         -- </tkt1473-6.8>
     })
 
@@ -839,7 +839,7 @@ test:do_execsql_test(
         )
     ]], {
         -- <tkt1473-6.9>
-        0
+        false
         -- </tkt1473-6.9>
     })
 
@@ -873,7 +873,7 @@ test:do_execsql_test(
         )
     ]], {
         -- <tkt1473-7.3>
-        1
+        true
         -- </tkt1473-7.3>
     })
 
@@ -897,7 +897,7 @@ test:do_execsql_test(
         )
     ]], {
         -- <tkt1473-7.5>
-        0
+        false
         -- </tkt1473-7.5>
     })
 
@@ -953,7 +953,7 @@ test:do_execsql_test(
         )
     ]], {
         -- <tkt1473-8.5>
-        0
+        false
         -- </tkt1473-8.5>
     })
 
@@ -965,7 +965,7 @@ test:do_execsql_test(
         )
     ]], {
         -- <tkt1473-8.6>
-        1
+        true
         -- </tkt1473-8.6>
     })
 
@@ -989,7 +989,7 @@ test:do_execsql_test(
         )
     ]], {
         -- <tkt1473-8.8>
-        0
+        false
         -- </tkt1473-8.8>
     })
 

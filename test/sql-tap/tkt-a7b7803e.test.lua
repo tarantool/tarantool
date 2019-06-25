@@ -33,7 +33,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt-a7b7803e.1>
-        1, "first"
+        true, "first"
         -- </tkt-a7b7803e.1>
     })
 
@@ -47,7 +47,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt-a7b7803e.2>
-        99, 1
+        99, true
         -- </tkt-a7b7803e.2>
     })
 
@@ -61,7 +61,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt-a7b7803e.3>
-        1, 1, 99, "fuzzy"
+        true, true, 99, "fuzzy"
         -- </tkt-a7b7803e.3>
     })
 
@@ -76,7 +76,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt-a7b7803e.4>
-        0, 1, 0, "first", 1, 0, 99, "fuzzy"
+        false, true, 0, "first", true, false, 99, "fuzzy"
         -- </tkt-a7b7803e.4>
     })
 
@@ -91,7 +91,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt-a7b7803e.5>
-        0, "first", 1, "first", 1, "fuzzy", 1, "first", 1, "fuzzy", 0, "fuzzy"
+        false, "first", true, "first", true, "fuzzy", true, "first", true, "fuzzy", false, "fuzzy"
         -- </tkt-a7b7803e.5>
     })
 
@@ -106,7 +106,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt-a7b7803e.6>
-        1, "fuzzy", 1, "first"
+        true, "fuzzy", true, "first"
         -- </tkt-a7b7803e.6>
     })
 
@@ -120,7 +120,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt-a7b7803e.7>
-        1, "fuzzy", 1, "first"
+        true, "fuzzy", true, "first"
         -- </tkt-a7b7803e.7>
     })
 
@@ -134,7 +134,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt-a7b7803e.8>
-        1, "fuzzy", 1, "first", 1, "fuzzy", 0, "fuzzy"
+        true, "fuzzy", true, "first", true, "fuzzy", false, "fuzzy"
         -- </tkt-a7b7803e.8>
     })
 

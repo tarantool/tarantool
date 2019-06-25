@@ -130,7 +130,7 @@ test:do_execsql_test(
         SELECT (y*2)>b FROM t1, t2 WHERE a=x;
     ]], {
         -- <subquery-1.9.1>
-        0, 1, 1, 1
+        false, true, true, true
         -- </subquery-1.9.1>
     })
 
@@ -290,7 +290,7 @@ test:do_execsql_test(
         SELECT a IN (10.0, 20) FROM t3;
     ]], {
         -- <subquery-2.3.2>
-        0
+        false
         -- </subquery-2.3.2>
     })
 
@@ -572,7 +572,7 @@ test:do_execsql_test(
          ORDER BY a.x;
     ]], {
         -- <subquery-3.4.3>
-        106, 4.5, 0, 1, 107, 4.0, 1, 0
+        106, 4.5, false, true, 107, 4.0, true, false
         -- </subquery-3.4.3>
     })
 

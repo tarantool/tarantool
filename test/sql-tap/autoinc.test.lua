@@ -43,7 +43,7 @@ test:do_execsql_test(
         SELECT * FROM "_sequence";
     ]], {
         -- <autoinc-1.3>
-        1,1,"T1",1,0,9223372036854775807LL,1,0,0
+        1,1,"T1",1,0,9223372036854775807LL,1,0,false
         -- </autoinc-1.3>
     })
 

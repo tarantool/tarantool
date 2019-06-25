@@ -930,7 +930,7 @@ test:do_execsql_test(
                             UNION ALL SELECT -9223372036850000000)
     ]], {
         -- <func-8.8>
-        1
+        true
         -- </func-8.8>
     })
 
@@ -948,7 +948,7 @@ test:do_execsql_test(
         SELECT random() is not null;
     ]], {
         -- <func-9.1>
-        1
+        true
         -- </func-9.1>
     })
 
@@ -968,7 +968,7 @@ test:do_execsql_test(
         SELECT randomblob(32) is not null;
     ]], {
         -- <func-9.3>
-        1
+        true
         -- </func-9.3>
     })
 
@@ -2746,94 +2746,94 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-43",
     "SELECT CHAR(00) LIKE CHAR(00);",
-    {1})
+    {true})
 
 test:do_execsql_test(
     "func-44",
     "SELECT CHAR(00) LIKE CHAR(65);",
-    {0})
+    {false})
 
 test:do_execsql_test(
     "func-45",
     "SELECT CHAR(00,65) LIKE CHAR(00,65);",
-    {1})
+    {true})
 
 test:do_execsql_test(
     "func-46",
     "SELECT CHAR(00,65) LIKE CHAR(00,66);",
-    {0})
+    {false})
 
 test:do_execsql_test(
     "func-47",
     "SELECT CHAR(00,65, 00) LIKE CHAR(00,65,00);",
-    {1})
+    {true})
 
 test:do_execsql_test(
     "func-48",
     "SELECT CHAR(00,65,00) LIKE CHAR(00,65);",
-    {0})
+    {false})
 
 test:do_execsql_test(
     "func-49",
     "SELECT CHAR(65,00,65,00,65) LIKE CHAR(65,00,65,00,65);",
-    {1})
+    {true})
 
 test:do_execsql_test(
     "func-50",
     "SELECT CHAR(65,00,65,00,65) LIKE CHAR(65,00,65,00,66);",
-    {0})
+    {false})
 
 -- LIKE ('%' and '_')
 test:do_execsql_test(
     "func-51",
     "SELECT CHAR(00) LIKE '_';",
-    {1})
+    {true})
 
 test:do_execsql_test(
     "func-52",
     "SELECT CHAR(00) LIKE '__';",
-    {0})
+    {false})
 
 test:do_execsql_test(
     "func-53",
     "SELECT CHAR(00,65) LIKE '__';",
-    {1})
+    {true})
 
 test:do_execsql_test(
     "func-54",
     "SELECT CHAR(00,65) LIKE '_A';",
-    {1})
+    {true})
 
 test:do_execsql_test(
     "func-55",
     "SELECT CHAR(00,65,00) LIKE '%';",
-    {1})
+    {true})
 
 test:do_execsql_test(
     "func-56",
     "SELECT CHAR(00,65,00) LIKE '%A';",
-    {0})
+    {false})
 
 test:do_execsql_test(
     "func-57",
     "SELECT CHAR(65,00,65,00,65) LIKE '%A';",
-    {1})
+    {true})
 
 test:do_execsql_test(
     "func-58",
     "SELECT CHAR(65,00,65,00,65) LIKE '%B';",
-    {0})
+    {false})
 
 -- LIKE (ESCAPE symbols)
 test:do_execsql_test(
     "func-59",
     "SELECT CHAR(00) || '_' LIKE '_#_' ESCAPE '#';",
-    {1})
+    {true})
 
 test:do_execsql_test(
     "func-60",
     "SELECT CHAR(00) || '_' LIKE '_#%' ESCAPE '#';",
-    {0})
+    {false})
 
 -- REPLACE
 test:do_execsql_test(

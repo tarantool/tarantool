@@ -338,7 +338,7 @@ test:do_execsql_test(
     4.2,
 genstmt(10), {
         -- <4.2>
-        1
+        true
         -- </4.2>
     })
 
@@ -346,7 +346,7 @@ test:do_execsql_test(
     4.3,
 genstmt(100), {
         -- <4.3>
-        1
+        true
         -- </4.3>
     })
 
@@ -354,7 +354,7 @@ test:do_execsql_test(
     4.4,
 genstmt(255), {
         -- <4.4>
-        1
+        true
         -- </4.4>
     })
 

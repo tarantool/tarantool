@@ -115,7 +115,7 @@ for i = 1, #from_lua_to_sql, 1 do
     test:do_execsql_test(
         "lua_sql-2.3."..i,
         "select "..from_lua_to_sql[i][1].." = check_from_lua_to_sql("..i..")",
-        {1})
+        {true})
 end
 
 local from_lua_to_sql_bad = {

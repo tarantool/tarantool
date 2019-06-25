@@ -492,7 +492,7 @@ test:do_execsql_test(
 		SELECT (1, 2, 3) < (1, 2, 4);
 	]], {
 		-- <sql-errors-1.44>
-		1
+		true
 		-- </sql-errors-1.44>
 	})
 
@@ -502,7 +502,7 @@ test:do_execsql_test(
 		SELECT (1, 2, 3) < (1, 2, 2);
 	]], {
 		-- <sql-errors-1.45>
-		0
+		false
 		-- </sql-errors-1.45>
 	})
 

@@ -216,7 +216,7 @@ test:do_execsql_test(
         SELECT a IS NULL FROM t3;
     ]], {
         -- <types-2.3.2>
-        1
+        true
         -- </types-2.3.2>
     })
 

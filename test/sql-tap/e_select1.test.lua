@@ -869,9 +869,9 @@ test:do_select_tests(
         {"1", "SELECT a, b FROM z1", {51.65, -59.58, -5, "", -2.2, -23.18, "", 67, -1.04, -32.3, 63, 0}},
 
         {"2", "SELECT a IS NULL, b+1, a,b,c FROM z1",
-            {0, -58.58, 51.65, -59.58, "belfries", 0, "", -5, "", "75",
-                0, -22.18, -2.2, -23.18, "suiters", 1, 68, "", 67, "quartets", 0, -31.3,
-                -1.04, -32.3, "aspen", 0, 1, 63, 0, "-26"}},
+            {false, -58.58, 51.65, -59.58, "belfries", false, "", -5, "", "75",
+                false, -22.18, -2.2, -23.18, "suiters", true, 68, "", 67, "quartets", false, -31.3,
+                -1.04, -32.3, "aspen", false, 1, 63, 0, "-26"}},
 
         {"3", "SELECT 32*32, CAST(d AS TEXT) || CAST(e AS TEXT) FROM z2", {1024, "", 1024, "36.06.0"}},
     })
@@ -952,7 +952,7 @@ test:do_select_tests(
     {
         {"1", "SELECT one, two, count(*) FROM a1 WHERE false", {"", "", 0}},
         {"2", "SELECT sum(two), * FROM a1, a2 WHERE three>5", {"", "", "", "", ""}},
-        {"3", "SELECT max(one) IS NULL, one IS NULL, two IS NULL FROM a1 WHERE two=7", {1, 1, 1}},
+        {"3", "SELECT max(one) IS NULL, one IS NULL, two IS NULL FROM a1 WHERE two=7", {true, true, true}},
     })
 
 -- EVIDENCE-OF: R-64138-28774 An aggregate query without a GROUP BY

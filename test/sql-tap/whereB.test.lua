@@ -41,7 +41,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-1.1>
-    1, 2, 1
+    1, 2, true
     -- </whereB-1.1>
     })
 
@@ -52,7 +52,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-1.2>
-    1, 2, 1
+    1, 2, true
     -- </whereB-1.2>
     })
 
@@ -63,7 +63,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-1.3>
-    1, 2, 1
+    1, 2, true
     -- </whereB-1.3>
     })
 
@@ -74,7 +74,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-1.4>
-    1, 2, 1
+    1, 2, true
     -- </whereB-1.4>
     })
 
@@ -86,7 +86,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-1.100>
-    1, 2, 1
+    1, 2, true
     -- </whereB-1.100>
     })
 
@@ -97,7 +97,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-1.101>
-    1, 2, 1
+    1, 2, true
     -- </whereB-1.101>
     })
 
@@ -108,7 +108,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-1.102>
-    1, 2, 1
+    1, 2, true
     -- </whereB-1.102>
     })
 
@@ -137,7 +137,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-2.1>
-    1, 2, 0
+    1, 2, false
     -- </whereB-2.1>
     })
 
@@ -233,7 +233,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-3.1>
-    1, 2, 0
+    1, 2, false
     -- </whereB-3.1>
     })
 
@@ -329,7 +329,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-4.1>
-    1, 2, 1
+    1, 2, true
     -- </whereB-4.1>
     })
 
@@ -340,7 +340,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-4.2>
-    1, 2, 1
+    1, 2, true
     -- </whereB-4.2>
     })
 
@@ -351,7 +351,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-4.3>
-    1, 2, 1
+    1, 2, true
     -- </whereB-4.3>
     })
 
@@ -364,7 +364,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-4.4>
-    1, 2, 1
+    1, 2, true
     -- </whereB-4.4>
     })
 
@@ -376,7 +376,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-4.100>
-    1, 2, 1
+    1, 2, true
     -- </whereB-4.100>
     })
 
@@ -387,7 +387,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-4.101>
-    1, 2, 1
+    1, 2, true
     -- </whereB-4.101>
     })
 
@@ -400,7 +400,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-4.102>
-    1, 2, 1
+    1, 2, true
     -- </whereB-4.102>
     })
 
@@ -429,7 +429,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-5.1>
-    1, 2, 1
+    1, 2, true
     -- </whereB-5.1>
     })
 
@@ -440,7 +440,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-5.2>
-    1, 2, 1
+    1, 2, true
     -- </whereB-5.2>
     })
 
@@ -451,7 +451,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-5.3>
-    1, 2, 1
+    1, 2, true
     -- </whereB-5.3>
     })
 
@@ -464,7 +464,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-5.4>
-    1, 2, 1
+    1, 2, true
     -- </whereB-5.4>
     })
 
@@ -476,7 +476,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-5.100>
-    1, 2, 1
+    1, 2, true
     -- </whereB-5.100>
     })
 
@@ -487,7 +487,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-5.101>
-    1, 2, 1
+    1, 2, true
     -- </whereB-5.101>
     })
 
@@ -500,7 +500,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-5.102>
-    1, 2, 1
+    1, 2, true
     -- </whereB-5.102>
     })
 
@@ -529,7 +529,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-6.1>
-    1, 2, 1
+    1, 2, true
     -- </whereB-6.1>
     })
 
@@ -540,7 +540,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-6.2>
-    1, 2, 1
+    1, 2, true
     -- </whereB-6.2>
     })
 
@@ -551,7 +551,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-6.3>
-    1, 2, 1
+    1, 2, true
     -- </whereB-6.3>
     })
 
@@ -564,7 +564,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-6.4>
-    1, 2, 1
+    1, 2, true
     -- </whereB-6.4>
     })
 
@@ -576,7 +576,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-6.100>
-    1, 2, 1
+    1, 2, true
     -- </whereB-6.100>
     })
 
@@ -587,7 +587,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-6.101>
-    1, 2, 1
+    1, 2, true
     -- </whereB-6.101>
     })
 
@@ -600,7 +600,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-6.102>
-    1, 2, 1
+    1, 2, true
     -- </whereB-6.102>
     })
 
@@ -629,7 +629,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-7.1>
-    1, 2, 1
+    1, 2, true
     -- </whereB-7.1>
     })
 
@@ -640,7 +640,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-7.2>
-    1, 2, 1
+    1, 2, true
     -- </whereB-7.2>
     })
 
@@ -651,7 +651,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-7.3>
-    1, 2, 1
+    1, 2, true
     -- </whereB-7.3>
     })
 
@@ -664,7 +664,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-7.4>
-    1, 2, 1
+    1, 2, true
     -- </whereB-7.4>
     })
 
@@ -676,7 +676,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-7.100>
-    1, 2, 1
+    1, 2, true
     -- </whereB-7.100>
     })
 
@@ -687,7 +687,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-7.101>
-    1, 2, 1
+    1, 2, true
     -- </whereB-7.101>
     })
 
@@ -700,7 +700,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-7.102>
-    1, 2, 1
+    1, 2, true
     -- </whereB-7.102>
     })
 
@@ -729,7 +729,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-8.1>
-    1, 2, 1
+    1, 2, true
     -- </whereB-8.1>
     })
 
@@ -740,7 +740,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-8.2>
-    1, 2, 1
+    1, 2, true
     -- </whereB-8.2>
     })
 
@@ -751,7 +751,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-8.3>
-    1, 2, 1
+    1, 2, true
     -- </whereB-8.3>
     })
 
@@ -764,7 +764,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-8.4>
-    1, 2, 1
+    1, 2, true
     -- </whereB-8.4>
     })
 
@@ -776,7 +776,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-8.100>
-    1, 2, 1
+    1, 2, true
     -- </whereB-8.100>
     })
 
@@ -787,7 +787,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-8.101>
-    1, 2, 1
+    1, 2, true
     -- </whereB-8.101>
     })
 
@@ -800,7 +800,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-8.102>
-    1, 2, 1
+    1, 2, true
     -- </whereB-8.102>
     })
 
@@ -829,7 +829,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-9.1>
-    1, 2, 1
+    1, 2, true
     -- </whereB-9.1>
     })
 
@@ -840,7 +840,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-9.2>
-    1, 2, 1
+    1, 2, true
     -- </whereB-9.2>
     })
 
@@ -851,7 +851,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-9.3>
-    1, 2, 1
+    1, 2, true
     -- </whereB-9.3>
     })
 
@@ -864,7 +864,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-9.4>
-    1, 2, 1
+    1, 2, true
     -- </whereB-9.4>
     })
 
@@ -876,7 +876,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-9.100>
-    1, 2, 1
+    1, 2, true
     -- </whereB-9.100>
     })
 
@@ -887,7 +887,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-9.101>
-    1, 2, 1
+    1, 2, true
     -- </whereB-9.101>
     })
 
@@ -900,7 +900,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-9.102>
-    1, 2, 1
+    1, 2, true
     -- </whereB-9.102>
     })
 

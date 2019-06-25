@@ -313,7 +313,7 @@ test:do_execsql_test("insert-4.7", [[
       return {test:lsearch(x, 'OpenTEphemeral') > 0} -- X(264, "X!cmd", [=[["expr","[lsearch $x OpenEphemeral]>0"]]=])
     end, {
       -- <insert-5.3>
-      1
+      true
       -- </insert-5.3>
     })
 
@@ -348,7 +348,7 @@ test:do_execsql_test("insert-4.7", [[
       return {test:lsearch(x, 'OpenTemp') > 0} -- X(298, "X!cmd", [=[["expr","[lsearch $x OpenTemp]>0"]]=])
     end, {
       -- <insert-5.7>
-      0
+      false
       -- </insert-5.7>
     })
 

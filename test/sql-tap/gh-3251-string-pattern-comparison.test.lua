@@ -158,15 +158,15 @@ for i, tested_string in ipairs(invalid_testcases) do
 
     test_name = prefix .. "5." .. tostring(i)
     test_itself = "SELECT 'ab" .. tested_string .. "' LIKE 'abc';"
-    test:do_execsql_test(test_name, test_itself, {0})
+    test:do_execsql_test(test_name, test_itself, {false})
 
     test_name = prefix .. "6." .. tostring(i)
     test_itself = "SELECT 'abc" .. tested_string .. "' LIKE 'abc';"
-    test:do_execsql_test(test_name, test_itself, {0})
+    test:do_execsql_test(test_name, test_itself, {false})
 
     test_name = prefix .. "7." .. tostring(i)
     test_itself = "SELECT 'ab" .. tested_string .. "c' LIKE 'abc';"
-    test:do_execsql_test(test_name, test_itself, {0})
+    test:do_execsql_test(test_name, test_itself, {false})
 end
 
 -- Unicode byte sequences.
@@ -187,27 +187,27 @@ local valid_testcases = {
 for i, tested_string in ipairs(valid_testcases) do
     local test_name = prefix .. "8." .. tostring(i)
     local test_itself = "SELECT 'abc' LIKE 'ab" .. tested_string .. "';"
-    test:do_execsql_test(test_name, test_itself, {0})
+    test:do_execsql_test(test_name, test_itself, {false})
 
     test_name = prefix .. "9." .. tostring(i)
     test_itself = "SELECT 'abc' LIKE 'abc" .. tested_string .. "';"
-    test:do_execsql_test(test_name, test_itself, {0})
+    test:do_execsql_test(test_name, test_itself, {false})
 
     test_name = prefix .. "10." .. tostring(i)
     test_itself = "SELECT 'abc' LIKE 'ab" .. tested_string .. "c';"
-    test:do_execsql_test(test_name,	test_itself, {0})
+    test:do_execsql_test(test_name,	test_itself, {false})
 
     test_name = prefix .. "11." .. tostring(i)
     test_itself = "SELECT 'ab" .. tested_string .. "' LIKE 'abc';"
-    test:do_execsql_test(test_name,	test_itself, {0})
+    test:do_execsql_test(test_name,	test_itself, {false})
 
     test_name = prefix .. "12." .. tostring(i)
     test_itself = "SELECT 'abc" .. tested_string .. "' LIKE 'abc';"
-    test:do_execsql_test(test_name, test_itself, {0})
+    test:do_execsql_test(test_name, test_itself, {false})
 
     test_name = prefix .. "13." .. tostring(i)
     test_itself = "SELECT 'ab" .. tested_string .. "c' LIKE 'abc';"
-    test:do_execsql_test(test_name, test_itself, {0})
+    test:do_execsql_test(test_name, test_itself, {false})
 end
 
 test:finish_test()

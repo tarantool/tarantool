@@ -870,7 +870,7 @@ test:do_test(
         ]]
     end, {
         -- <triggerC-11.4>
-        "", "", 1, 1
+        "", "", true, true
         -- </triggerC-11.4>
     })
 

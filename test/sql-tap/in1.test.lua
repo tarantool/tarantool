@@ -865,7 +865,7 @@ test:do_test(
   ]]
     end, {
         -- <in-13.1>
-        1, '', 0, ''
+        true, '', false, ''
         -- </in-13.1>
     })
 
@@ -890,7 +890,7 @@ test:do_execsql_test(
         SELECT 2 IN (SELECT a FROM t7) 
     ]], {
         -- <in-13.3>
-        1
+        true
         -- </in-13.3>
     })
 
@@ -900,7 +900,7 @@ test:do_execsql_test(
         SELECT 6 IN (SELECT a FROM t7) 
     ]], {
         -- <in-13.4>
-        ''
+        ""
         -- </in-13.4>
     })
 
@@ -910,7 +910,7 @@ test:do_execsql_test(
         SELECT 2 IN (SELECT b FROM t7) 
     ]], {
         -- <in-13.5>
-        1
+        true
         -- </in-13.5>
     })
 
@@ -920,7 +920,7 @@ test:do_execsql_test(
         SELECT 6 IN (SELECT b FROM t7) 
     ]], {
         -- <in-13.6>
-        0
+        false
         -- </in-13.6>
     })
 
@@ -930,7 +930,7 @@ test:do_execsql_test(
         SELECT 2 IN (SELECT c FROM t7) 
     ]], {
         -- <in-13.7>
-        1
+        true
         -- </in-13.7>
     })
 
@@ -940,7 +940,7 @@ test:do_execsql_test(
         SELECT 6 IN (SELECT c FROM t7) 
     ]], {
         -- <in-13.8>
-        0
+        false
         -- </in-13.8>
     })
 
@@ -956,7 +956,7 @@ test:do_execsql_test(
           6 NOT IN (SELECT c FROM t7)
     ]], {
         -- <in-13.9>
-        0, '', 0, 1, 0, 1
+        false, "", false, true, false, true
         -- </in-13.9>
     })
 
@@ -971,7 +971,7 @@ test:do_execsql_test(
         FROM t7 AS outside ORDER BY b;
     ]], {
         -- <in-13.10>
-        0, '', '', '', 0
+        false, "", "", "", false
         -- </in-13.10>
     })
 
@@ -986,7 +986,7 @@ test:do_execsql_test(
         FROM t7 AS outside ORDER BY b;
     ]], {
         -- <in-13.11>
-        1, '', '', '', 1
+        true, "", "", "", true
         -- </in-13.11>
     })
 
@@ -1009,7 +1009,7 @@ test:do_test(
         ]]
     end, {
         -- <in-13.12>
-        1, '', 1, 0, 1, 0
+        true, "", true, false, true, false
         -- </in-13.12>
     })
 
@@ -1025,7 +1025,7 @@ test:do_execsql_test(
           6 NOT IN (SELECT c FROM t7)
     ]], {
         -- <in-13.13>
-        0, '', 0, 1, 0, 1
+        false, "", false, true, false, true
         -- </in-13.13>
     })
 

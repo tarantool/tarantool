@@ -272,7 +272,7 @@ test:do_execsql_test(
         SELECT x IN() AS a FROM t3 WHERE NOT a 
     ]], {
         -- <in4-3.9>
-        0, 0
+        false, false
         -- </in4-3.9>
     })
 

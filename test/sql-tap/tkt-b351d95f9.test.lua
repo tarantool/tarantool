@@ -56,7 +56,7 @@ test:do_execsql_test(
         SELECT x, y BETWEEN 'xy' AND 'xz' FROM t2 ORDER BY x;
     ]], {
         -- <tkt-b351d95.3>
-        "name1", 0, "name2", 1
+        "name1", false, "name2", true
         -- </tkt-b351d95.3>
     })
 

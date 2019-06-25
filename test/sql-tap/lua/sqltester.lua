@@ -27,28 +27,6 @@ local function flatten(arr)
     return result
 end
 
--- Goal of this routine is to update expected result
--- to be comparable with expected.
--- Right now it converts logical values to numbers.
--- Input must be a table.
-local function fix_result(arr)
-    if type(arr) ~= 'table' then return arr end
-    for i, v in ipairs(arr) do
-        if type(v) == 'table' then
-            -- it is ok to pass array
-            --fix_expect(v)
-        else
-            if type(v) == 'boolean' then
-                if v then
-                    arr[i] = 1
-                else
-                    arr[i] = 0
-                end
-            end
-        end
-    end
-end
-
 local function finish_test()
     test:check()
     os.exit()
@@ -143,8 +121,6 @@ local function do_test(self, label, func, expect)
     local ok, result = pcall(func)
     if ok then
         if result == nil then result = { } end
-        -- Convert all trues and falses to 1s and 0s
-        fix_result(result)
 
         -- If nothing is expected: just make sure there were no error.
         if expect == nil then

@@ -606,7 +606,7 @@ test:do_execsql_test(
         SELECT '0'=='0.0'
     ]], {
         -- <misc1-12.1>
-        0
+        false
         -- </misc1-12.1>
     })
 
@@ -616,7 +616,7 @@ test:do_execsql_test(
         SELECT '0'==0.0
     ]], {
         -- <misc1-12.2>
-        1
+        true
         -- </misc1-12.2>
     })
 
@@ -626,7 +626,7 @@ test:do_execsql_test(
         SELECT '12345678901234567890'=='12345678901234567891'
     ]], {
         -- <misc1-12.3>
-        0
+        false
         -- </misc1-12.3>
     })
 

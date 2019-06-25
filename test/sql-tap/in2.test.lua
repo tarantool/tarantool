@@ -90,7 +90,7 @@ for ii=3,N-1 do
         "in2-"..ii,
         'SELECT 1 IN (SELECT a FROM a WHERE (i <'..ii..' ) OR (i >= '..N..'))',
         {
-            1
+            true
         })
 
 end

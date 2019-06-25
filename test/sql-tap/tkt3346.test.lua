@@ -33,7 +33,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt3346-1.1>
-        2, "bob", 0, 1, "alice", 1, 3, "claire", 0
+        2, "bob", false, 1, "alice", true, 3, "claire", false
         -- </tkt3346-1.1>
     })
 

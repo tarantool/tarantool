@@ -299,7 +299,7 @@ test:do_test(
         return exec_neph(" SELECT x IN (SELECT a FROM t1) FROM t2 ")
     end, {
         -- <in3-3.2>
-        0, 1
+        0, true
         -- </in3-3.2>
     })
 
@@ -311,7 +311,7 @@ test:do_test(
         return exec_neph(" SELECT x IN (SELECT b FROM t1) FROM t2 ")
     end, {
         -- <in3-3.3>
-        1, 1
+        1, true
         -- </in3-3.3>
     })
 
@@ -323,7 +323,7 @@ test:do_test(
         return exec_neph(" SELECT x IN (SELECT c FROM t1) FROM t2 ")
     end, {
         -- <in3-3.4>
-        1, 1
+        1, true
         -- </in3-3.4>
     })
 
@@ -335,7 +335,7 @@ test:do_test(
         return exec_neph(" SELECT y IN (SELECT a FROM t1) FROM t2 ")
     end, {
         -- <in3-3.5>
-        1, 1
+        1, true
         -- </in3-3.5>
     })
 
@@ -347,7 +347,7 @@ test:do_test(
         return exec_neph(" SELECT y IN (SELECT b FROM t1) FROM t2 ")
     end, {
         -- <in3-3.6>
-        0, 1
+        0, true
         -- </in3-3.6>
     })
 
@@ -359,7 +359,7 @@ test:do_test(
         return exec_neph(" SELECT y IN (SELECT c FROM t1) FROM t2 ")
     end, {
         -- <in3-3.7>
-        1, 1
+        1, true
         -- </in3-3.7>
     })
 
@@ -395,7 +395,7 @@ test:do_test(
         return exec_neph(" SELECT 'text' IN (SELECT b FROM t3)")
     end, {
         -- <in3-4.2>
-        0, 1
+        0, true
         -- </in3-4.2>
     })
 
@@ -408,7 +408,7 @@ test:do_test(
         return exec_neph(" SELECT 'TEXT' COLLATE \"unicode_ci\" IN (SELECT b FROM t3) ")
     end, {
         -- <in3-4.3>
-        1, 1
+        1, true
         -- </in3-4.3>
     })
 

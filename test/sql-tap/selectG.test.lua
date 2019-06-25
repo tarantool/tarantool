@@ -50,7 +50,7 @@ test:do_test(
             :format(end_time - start_time, time_quota))
     end, {
         -- <100>
-        100000, 5000050000, 50000.5, 1
+        100000, 5000050000, 50000.5, true
         -- </100>
     })
 

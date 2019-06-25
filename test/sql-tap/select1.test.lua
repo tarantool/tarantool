@@ -2058,7 +2058,7 @@ test:do_test(
             SELECT 2 IN (SELECT a FROM t1) 
         ]], {
             -- <select1-15.3>
-            1
+            true
             -- </select1-15.3>
         })
 

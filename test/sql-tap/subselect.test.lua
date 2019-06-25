@@ -175,7 +175,7 @@ test:do_execsql_test(
         SELECT 1 IN (SELECT a FROM t1 ORDER BY a);
     ]], {
         -- <subselect-2.2>
-        1
+        true
         -- </subselect-2.2>
     })
 
@@ -185,7 +185,7 @@ test:do_execsql_test(
         SELECT 2 IN (SELECT a FROM t1 ORDER BY a DESC);
     ]], {
         -- <subselect-2.3>
-        0
+        false
         -- </subselect-2.3>
     })
 
