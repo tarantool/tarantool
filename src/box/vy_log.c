@@ -802,7 +802,7 @@ vy_log_flush(void)
 		return -1;
 
 	/* Success. Free flushed records. */
-	region_reset(&vy_log.pool);
+	region_free(&vy_log.pool);
 	stailq_create(&vy_log.tx);
 	return 0;
 }
