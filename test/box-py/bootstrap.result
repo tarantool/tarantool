@@ -53,12 +53,7 @@ box.space._space:select{}
         'type': 'string'}, {'name': 'opts', 'type': 'map'}, {'name': 'parts', 'type': 'array'}]]
   - [296, 1, '_func', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'setuid',
-        'type': 'unsigned'}, {'name': 'language', 'type': 'string'}, {'name': 'body',
-        'type': 'string'}, {'name': 'routine_type', 'type': 'string'}, {'name': 'data_type',
-        'type': 'map'}, {'name': 'sql_data_access', 'type': 'string'}, {'name': 'is_deterministic',
-        'type': 'boolean'}, {'name': 'is_sandboxed', 'type': 'boolean'}, {'name': 'is_null_call',
-        'type': 'boolean'}, {'name': 'opts', 'type': 'map'}, {'name': 'comment', 'type': 'string'},
-      {'name': 'created', 'type': 'string'}, {'name': 'last_altered', 'type': 'string'}]]
+        'type': 'unsigned'}]]
   - [297, 1, '_vfunc', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'setuid',
         'type': 'unsigned'}]]
@@ -155,10 +150,9 @@ box.space._user:select{}
   - [3, 1, 'replication', 'role', {}]
   - [31, 1, 'super', 'role', {}]
 ...
-for _, v in box.space._func:pairs{} do r = {} table.insert(r, v:update({{"=", 15, ""}, {"=", 16, ""}})) return r end
+box.space._func:select{}
 ---
-- - [1, 1, 'box.schema.user.info', 1, 'LUA', '', 'function', {}, 'none', false, false,
-    true, {}, '', '', '']
+- - [1, 1, 'box.schema.user.info', 1, 'LUA']
 ...
 box.space._priv:select{}
 ---

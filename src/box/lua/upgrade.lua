@@ -152,7 +152,6 @@ local function initial_1_7_5()
     local _cluster = box.space[box.schema.CLUSTER_ID]
     local _truncate = box.space[box.schema.TRUNCATE_ID]
     local MAP = setmap({})
-    local datetime = os.date("%Y-%m-%d %H:%M:%S")
 
     --
     -- _schema
@@ -327,8 +326,7 @@ local function initial_1_7_5()
 
     -- create "box.schema.user.info" function
     log.info('create function "box.schema.user.info" with setuid')
-    _func:replace{1, ADMIN, 'box.schema.user.info', 1, 'LUA', '', 'function',
-                  MAP, 'none', false, false, true, MAP, '', datetime, datetime}
+    _func:replace{1, ADMIN, 'box.schema.user.info', 1, 'LUA'}
 
     -- grant 'public' role access to 'box.schema.user.info' function
     log.info('grant execute on function "box.schema.user.info" to public')
@@ -822,41 +820,10 @@ local function create_vcollation_space()
     box.space[box.schema.VCOLLATION_ID]:format(format)
 end
 
-local function upgrade_func_to_2_2_1()
-    log.info("Update _func format")
-    local _func = box.space[box.schema.FUNC_ID]
-    local format = {}
-    format[1] = {name='id', type='unsigned'}
-    format[2] = {name='owner', type='unsigned'}
-    format[3] = {name='name', type='string'}
-    format[4] = {name='setuid', type='unsigned'}
-    format[5] = {name='language', type='string'}
-    format[6] = {name='body', type='string'}
-    format[7] = {name='routine_type', type='string'}
-    format[8] = {name='data_type', type='map'}
-    format[9] = {name='sql_data_access', type='string'}
-    format[10] = {name='is_deterministic', type='boolean'}
-    format[11] = {name='is_sandboxed', type='boolean'}
-    format[12] = {name='is_null_call', type='boolean'}
-    format[13] = {name='opts', type='map'}
-    format[14] = {name='comment', type='string'}
-    format[15] = {name='created', type='string'}
-    format[16] = {name='last_altered', type='string'}
-    local datetime = os.date("%Y-%m-%d %H:%M:%S")
-    for _, v in box.space._func:pairs() do
-        _ = box.space._func:replace({v.id, v.owner, v.name, v.setuid,
-                                     v[5] or 'LUA', '', 'function', setmap({}),
-                                     'none', false, false, true, setmap({}),
-                                     '', datetime, datetime})
-    end
-    _func:format(format)
-end
-
 local function upgrade_to_2_2_1()
     upgrade_sequence_to_2_2_1()
     upgrade_ck_constraint_to_2_2_1()
     create_vcollation_space()
-    upgrade_func_to_2_2_1()
 end
 
 --------------------------------------------------------------------------------

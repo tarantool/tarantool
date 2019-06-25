@@ -294,7 +294,6 @@ port_lua_create(struct port *port, struct lua_State *L)
 }
 
 struct execute_lua_ctx {
-	int lua_ref;
 	const char *name;
 	uint32_t name_len;
 	struct port *args;
@@ -321,24 +320,6 @@ execute_lua_call(lua_State *L)
 	int arg_count = lua_gettop(L) - top;
 
 	lua_call(L, arg_count + oc - 1, LUA_MULTRET);
-	return lua_gettop(L);
-}
-
-static int
-execute_lua_call_by_ref(lua_State *L)
-{
-	struct execute_lua_ctx *ctx =
-		(struct execute_lua_ctx *) lua_topointer(L, 1);
-	lua_settop(L, 0); /* clear the stack to simplify the logic below */
-
-	lua_rawgeti(L, LUA_REGISTRYINDEX, ctx->lua_ref);
-
-	/* Push the rest of args (a tuple). */
-	int top = lua_gettop(L);
-	port_dump_lua(ctx->args, L, true);
-	int arg_count = lua_gettop(L) - top;
-
-	lua_call(L, arg_count, LUA_MULTRET);
 	return lua_gettop(L);
 }
 
@@ -553,168 +534,22 @@ box_lua_eval(const char *expr, uint32_t expr_len,
 struct func_lua {
 	/** Function object base class. */
 	struct func base;
-	/**
-	 * For a persistent function: a reference to the
-	 * function body. Otherwise LUA_REFNIL.
-	 */
-	int lua_ref;
 };
 
 static struct func_vtab func_lua_vtab;
-static struct func_vtab func_persistent_lua_vtab;
-
-static const char *default_sandbox_exports[] = {
-	"assert", "error", "ipairs", "math", "next", "pairs", "pcall", "print",
-	"select", "string", "table", "tonumber", "tostring", "type", "unpack",
-	"xpcall", "utf8",
-};
-
-/**
- * Assemble a new sandbox with given exports table on the top of
- * a given Lua stack. All modules in exports list are copied
- * deeply to ensure the immutability of this system object.
- */
-static int
-prepare_lua_sandbox(struct lua_State *L, const char *exports[],
-		    int export_count)
-{
-	lua_createtable(L, export_count, 0);
-	if (export_count == 0)
-		return 0;
-	int rc = -1;
-	const char *deepcopy = "table.deepcopy";
-	int luaL_deepcopy_func_ref = LUA_REFNIL;
-	int ret = box_lua_find(L, deepcopy, deepcopy + strlen(deepcopy));
-	if (ret < 0)
-		goto end;
-	luaL_deepcopy_func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	assert(luaL_deepcopy_func_ref != LUA_REFNIL);
-	for (int i = 0; i < export_count; i++) {
-		uint32_t name_len = strlen(exports[i]);
-		ret = box_lua_find(L, exports[i], exports[i] + name_len);
-		if (ret < 0)
-			goto end;
-		switch (lua_type(L, -1)) {
-		case LUA_TTABLE:
-			lua_rawgeti(L, LUA_REGISTRYINDEX,
-				    luaL_deepcopy_func_ref);
-			lua_insert(L, -2);
-			lua_call(L, 1, 1);
-			break;
-		case LUA_TFUNCTION:
-			break;
-		default:
-			unreachable();
-		}
-		lua_setfield(L, -2, exports[i]);
-	}
-	rc = 0;
-end:
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, luaL_deepcopy_func_ref);
-	return rc;
-}
-
-/**
- * Assemble a Lua function object by user-defined function body.
- */
-static int
-func_persistent_lua_load(struct func_lua *func)
-{
-	int rc = -1;
-	int top = lua_gettop(tarantool_L);
-	struct region *region = &fiber()->gc;
-	size_t region_svp = region_used(region);
-	const char *load_pref = "return ";
-	uint32_t load_str_sz =
-		strlen(load_pref) + strlen(func->base.def->body) + 1;
-	char *load_str = region_alloc(region, load_str_sz);
-	if (load_str == NULL) {
-		diag_set(OutOfMemory, load_str_sz, "region", "load_str");
-		return -1;
-	}
-	sprintf(load_str, "%s%s", load_pref, func->base.def->body);
-
-	/*
-	 * Perform loading of the persistent Lua function
-	 * in a new sandboxed Lua thread. The sandbox is
-	 * required to guarantee the safety of executing
-	 * an arbitrary user-defined code
-	 * (e.g. body = 'fiber.yield()').
-	 */
-	struct lua_State *coro_L = lua_newthread(tarantool_L);
-	if (!func->base.def->is_sandboxed) {
-		/*
-		 * Keep an original env to apply for non-sandboxed
-		 * persistent function. It is required because
-		 * built object inherits parent env.
-		 */
-		lua_getfenv(tarantool_L, -1);
-		lua_insert(tarantool_L, -2);
-	}
-	if (prepare_lua_sandbox(tarantool_L, NULL, 0) != 0)
-		unreachable();
-	lua_setfenv(tarantool_L, -2);
-	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
-	if (luaL_loadstring(coro_L, load_str) != 0 ||
-	    lua_pcall(coro_L, 0, 1, 0) != 0) {
-		diag_set(ClientError, ER_LOAD_FUNCTION, func->base.def->name,
-			 luaT_tolstring(coro_L, -1, NULL));
-		goto end;
-	}
-	if (!lua_isfunction(coro_L, -1)) {
-		diag_set(ClientError, ER_LOAD_FUNCTION, func->base.def->name,
-			 "given body doesn't define a function");
-		goto end;
-	}
-	lua_xmove(coro_L, tarantool_L, 1);
-	if (func->base.def->is_sandboxed) {
-		if (prepare_lua_sandbox(tarantool_L, default_sandbox_exports,
-					nelem(default_sandbox_exports)) != 0) {
-			diag_set(ClientError, ER_LOAD_FUNCTION,
-				func->base.def->name,
-				diag_last_error(diag_get())->errmsg);
-			goto end;
-		}
-	} else {
-		lua_insert(tarantool_L, -2);
-	}
-	lua_setfenv(tarantool_L, -2);
-	func->lua_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
-	rc = 0;
-end:
-	lua_settop(tarantool_L, top);
-	region_truncate(region, region_svp);
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-	return rc;
-}
 
 struct func *
 func_lua_new(struct func_def *def)
 {
+	(void) def;
 	assert(def->language == FUNC_LANGUAGE_LUA);
-	if (def->is_sandboxed && def->body == NULL) {
-		diag_set(ClientError, ER_CREATE_FUNCTION, def->name,
-			 "is_sandboxed option may be set only for persistent "
-			 "Lua function (when body option is set)");
-		return NULL;
-	}
 	struct func_lua *func =
 		(struct func_lua *) malloc(sizeof(struct func_lua));
 	if (func == NULL) {
 		diag_set(OutOfMemory, sizeof(*func), "malloc", "func");
 		return NULL;
 	}
-	if (def->body != NULL) {
-		func->base.def = def;
-		func->base.vtab = &func_persistent_lua_vtab;
-		if (func_persistent_lua_load(func) != 0) {
-			free(func);
-			return NULL;
-		}
-	} else {
-		func->lua_ref = LUA_REFNIL;
-		func->base.vtab = &func_lua_vtab;
-	}
+	func->base.vtab = &func_lua_vtab;
 	return &func->base;
 }
 
@@ -737,42 +572,6 @@ func_lua_call(struct func *func, struct port *args, struct port *ret)
 static struct func_vtab func_lua_vtab = {
 	.call = func_lua_call,
 	.destroy = func_lua_destroy,
-};
-
-static void
-func_persistent_lua_unload(struct func_lua *func)
-{
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, func->lua_ref);
-}
-
-static void
-func_persistent_lua_destroy(struct func *base)
-{
-	assert(base != NULL && base->def->language == FUNC_LANGUAGE_LUA &&
-	       base->def->body != NULL);
-	assert(base->vtab == &func_persistent_lua_vtab);
-	struct func_lua *func = (struct func_lua *) base;
-	func_persistent_lua_unload(func);
-	free(func);
-}
-
-static inline int
-func_persistent_lua_call(struct func *base, struct port *args, struct port *ret)
-{
-	assert(base != NULL && base->def->language == FUNC_LANGUAGE_LUA &&
-	       base->def->body != NULL);
-	assert(base->vtab == &func_persistent_lua_vtab);
-	struct func_lua *func = (struct func_lua *)base;
-	struct execute_lua_ctx ctx;
-	ctx.lua_ref = func->lua_ref;
-	ctx.args = args;
-	return box_process_lua(execute_lua_call_by_ref, &ctx, ret);
-
-}
-
-static struct func_vtab func_persistent_lua_vtab = {
-	.call = func_persistent_lua_call,
-	.destroy = func_persistent_lua_destroy,
 };
 
 static int
@@ -867,27 +666,6 @@ lbox_func_new(struct lua_State *L, struct func *func)
 	lua_settable(L, top);
 	lua_pushstring(L, "language");
 	lua_pushstring(L, func_language_strs[func->def->language]);
-	lua_settable(L, top);
-	lua_pushstring(L, "body");
-	if (func->def->body != NULL)
-		lua_pushstring(L, func->def->body);
-	else
-		lua_pushnil(L);
-	lua_settable(L, top);
-	lua_pushstring(L, "comment");
-	if (func->def->comment != NULL)
-		lua_pushstring(L, func->def->comment);
-	else
-		lua_pushnil(L);
-	lua_settable(L, top);
-	lua_pushstring(L, "is_deterministic");
-	lua_pushboolean(L, func->def->is_deterministic);
-	lua_settable(L, top);
-	lua_pushstring(L, "is_sandboxed");
-	if (func->def->body != NULL)
-		lua_pushboolean(L, func->def->is_sandboxed);
-	else
-		lua_pushnil(L);
 	lua_settable(L, top);
 
 	/* Bless func object. */

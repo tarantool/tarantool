@@ -2138,10 +2138,7 @@ box.schema.func.create = function(name, opts)
     opts = opts or {}
     check_param_table(opts, { setuid = 'boolean',
                               if_not_exists = 'boolean',
-                              language = 'string', body = 'string',
-                              is_deterministic = 'boolean',
-                              is_sandboxed = 'boolean',
-                              comment = 'string' })
+                              language = 'string'})
     local _func = box.space[box.schema.FUNC_ID]
     local _vfunc = box.space[box.schema.VFUNC_ID]
     local func = _vfunc.index.name:get{name}
@@ -2151,19 +2148,10 @@ box.schema.func.create = function(name, opts)
         end
         return
     end
-    local datetime = os.date("%Y-%m-%d %H:%M:%S")
-    opts = update_param_table(opts, { setuid = false, language = 'lua',
-                    body = '', routine_type = 'function', data_type = setmap{},
-                    sql_data_access = 'none', is_deterministic = false,
-                    is_sandboxed = false, is_null_call = true, opts = setmap{},
-                    comment = '', created = datetime, last_altered = datetime})
+    opts = update_param_table(opts, { setuid = false, language = 'lua'})
     opts.language = string.upper(opts.language)
     opts.setuid = opts.setuid and 1 or 0
-    _func:auto_increment{session.euid(), name, opts.setuid, opts.language,
-                         opts.body, opts.routine_type, opts.data_type,
-                         opts.sql_data_access, opts.is_deterministic,
-                         opts.is_sandboxed, opts.is_null_call, opts.opts,
-                         opts.comment, opts.created, opts.last_altered}
+    _func:auto_increment{session.euid(), name, opts.setuid, opts.language}
 end
 
 box.schema.func.drop = function(name, opts)
