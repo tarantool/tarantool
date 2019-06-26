@@ -111,6 +111,7 @@ luaT_key_def_set_part(struct lua_State *L, struct key_part_def *part,
 	part->type = field_type_by_name(type_name, type_len);
 	switch (part->type) {
 	case FIELD_TYPE_ANY:
+	case FIELD_TYPE_VARBINARY:
 	case FIELD_TYPE_ARRAY:
 	case FIELD_TYPE_MAP:
 		/* Tuple comparators don't support these types. */

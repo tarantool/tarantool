@@ -404,6 +404,8 @@ tuple_compare_field(const char *field_a, const char *field_b,
 		return mp_compare_number(field_a, field_b);
 	case FIELD_TYPE_BOOLEAN:
 		return mp_compare_bool(field_a, field_b);
+	case FIELD_TYPE_VARBINARY:
+		return mp_compare_bin(field_a, field_b);
 	case FIELD_TYPE_SCALAR:
 		return coll != NULL ?
 		       mp_compare_scalar_coll(field_a, field_b, coll) :
@@ -434,6 +436,8 @@ tuple_compare_field_with_type(const char *field_a, enum mp_type a_type,
 						   field_b, b_type);
 	case FIELD_TYPE_BOOLEAN:
 		return mp_compare_bool(field_a, field_b);
+	case FIELD_TYPE_VARBINARY:
+		return mp_compare_bin(field_a, field_b);
 	case FIELD_TYPE_SCALAR:
 		return coll != NULL ?
 		       mp_compare_scalar_coll(field_a, field_b, coll) :
@@ -1503,6 +1507,14 @@ field_hint_string(const char *field, struct coll *coll)
 }
 
 static inline hint_t
+field_hint_varbinary(const char *field)
+{
+	assert(mp_typeof(*field) == MP_BIN);
+	uint32_t len = mp_decode_binl(&field);
+	return hint_bin(field, len);
+}
+
+static inline hint_t
 field_hint_scalar(const char *field, struct coll *coll)
 {
 	uint32_t len;
@@ -1547,6 +1559,8 @@ field_hint(const char *field, struct coll *coll)
 		return field_hint_number(field);
 	case FIELD_TYPE_STRING:
 		return field_hint_string(field, coll);
+	case FIELD_TYPE_VARBINARY:
+		return field_hint_varbinary(field);
 	case FIELD_TYPE_SCALAR:
 		return field_hint_scalar(field, coll);
 	default:
@@ -1647,6 +1661,9 @@ key_def_set_hint_func(struct key_def *def)
 		break;
 	case FIELD_TYPE_STRING:
 		key_def_set_hint_func<FIELD_TYPE_STRING>(def);
+		break;
+	case FIELD_TYPE_VARBINARY:
+		key_def_set_hint_func<FIELD_TYPE_VARBINARY>(def);
 		break;
 	case FIELD_TYPE_SCALAR:
 		key_def_set_hint_func<FIELD_TYPE_SCALAR>(def);

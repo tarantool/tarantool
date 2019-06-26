@@ -1,0 +1,152 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+--
+-- gh-4201: Introduce varbinary field type.
+--
+s = box.schema.space.create('withdata')
+---
+...
+s:format({{"b", "integer"}})
+---
+...
+_ = s:create_index('pk', {parts = {1, "varbinary"}})
+---
+- error: Field 1 has type 'integer' in space format, but type 'varbinary' in index
+    definition
+...
+s:format({{"b", "varbinary"}})
+---
+...
+_ = s:create_index('pk', {parts = {1, "integer"}})
+---
+- error: Field 1 has type 'varbinary' in space format, but type 'integer' in index
+    definition
+...
+pk = s:create_index('pk', {parts = {1, "varbinary"}})
+---
+...
+buffer = require('buffer')
+---
+...
+ffi = require('ffi')
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function bintuple_insert(space, bytes)
+	local tmpbuf = buffer.IBUF_SHARED
+	tmpbuf:reset()
+	local p = tmpbuf:alloc(3 + #bytes)
+	p[0] = 0x91
+	p[1] = 0xC4
+	p[2] = #bytes
+	for i, c in pairs(bytes) do p[i + 3 - 1] = c end
+	ffi.cdef[[int box_insert(uint32_t space_id, const char *tuple, const char *tuple_end, box_tuple_t **result);]]
+	ffi.C.box_insert(space.id, tmpbuf.rpos, tmpbuf.wpos, nil)
+end
+test_run:cmd("setopt delimiter ''");
+---
+...
+bintuple_insert(s, {0xDE, 0xAD, 0xBE, 0xAF})
+---
+...
+bintuple_insert(s, {0xFE, 0xED, 0xFA, 0xCE})
+---
+...
+s:select()
+---
+- - [!!binary 3q2+rw==]
+  - [!!binary /u36zg==]
+...
+box.execute("SELECT * FROM \"withdata\" WHERE \"b\" < x'FEEDFACE';")
+---
+- metadata:
+  - name: b
+    type: varbinary
+  rows:
+  - [!!binary 3q2+rw==]
+...
+pk:alter({parts = {1, "scalar"}})
+---
+...
+s:format({{"b", "scalar"}})
+---
+...
+s:insert({11})
+---
+- [11]
+...
+s:insert({22})
+---
+- [22]
+...
+s:insert({"11"})
+---
+- ['11']
+...
+s:insert({"22"})
+---
+- ['22']
+...
+s:select()
+---
+- - [11]
+  - [22]
+  - ['11']
+  - ['22']
+  - [!!binary 3q2+rw==]
+  - [!!binary /u36zg==]
+...
+box.execute("SELECT * FROM \"withdata\" WHERE \"b\" <= x'DEADBEAF';")
+---
+- metadata:
+  - name: b
+    type: scalar
+  rows:
+  - [11]
+  - [22]
+  - ['11']
+  - ['22']
+  - [!!binary 3q2+rw==]
+...
+pk:alter({parts = {1, "varbinary"}})
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected varbinary'
+...
+s:delete({11})
+---
+- [11]
+...
+s:delete({22})
+---
+- [22]
+...
+s:delete({"11"})
+---
+- ['11']
+...
+s:delete({"22"})
+---
+- ['22']
+...
+bintuple_insert(s, {0xFA, 0xDE, 0xDE, 0xAD})
+---
+...
+pk:alter({parts = {1, "varbinary"}})
+---
+...
+s:select()
+---
+- - [!!binary 3q2+rw==]
+  - [!!binary +t7erQ==]
+  - [!!binary /u36zg==]
+...
+s:drop()
+---
+...
