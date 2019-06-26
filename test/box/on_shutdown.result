@@ -1,19 +1,22 @@
 env = require('test_run')
 ---
 ...
+log = require('log')
+---
+...
 test_run = env.new()
 ---
 ...
 --
 -- gh-1607: on_shutdown triggers.
 --
-f = function() print('on_shutdown 1') end
+f = function() log.warn('on_shutdown 1') end
 ---
 ...
-g = function() print('on_shutdown 2') end
+g = function() log.warn('on_shutdown 2') end
 ---
 ...
-h = function() print('on_shutdown 3') end
+h = function() log.warn('on_shutdown 3') end
 ---
 ...
 -- Check that on_shutdown triggers may yield
@@ -31,7 +34,7 @@ trig = function()
     box.schema.space.create("shutdown")
     box.space.shutdown:create_index("pk")
     box.space.shutdown:insert{1,2,3}
-    print('on_shutdown 4')
+    log.warn('on_shutdown 4')
 end;
 ---
 ...
@@ -52,8 +55,8 @@ _ = box.ctl.on_shutdown(h, g)
 _ = box.ctl.on_shutdown(trig)
 ---
 ...
-test_run:cmd('restart server default')
-test_run:grep_log('default', 'on_shutdown 1', nil, {noreset=true})
+test_run:cmd('restart server default with wait=False')
+test_run:wait_log('default', 'on_shutdown 1', nil, 30, {noreset=true})
 ---
 - on_shutdown 1
 ...
@@ -108,7 +111,10 @@ test_run:cmd("switch test")
 ---
 - true
 ...
-_ = box.ctl.on_shutdown(function() print("on_shutdown 5") end)
+log = require('log')
+---
+...
+_ = box.ctl.on_shutdown(function() log.warn("on_shutdown 5") end)
 ---
 ...
 -- Check that we don't hang infinitely after os.exit()
