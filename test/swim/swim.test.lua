@@ -535,6 +535,10 @@ s1:cfg({generation = 5})
 s1:delete()
 s2:delete()
 
+-- It is allowed to create a SWIM with a generation value, but do
+-- not configure it.
+swim.new({generation = 0})
+
 --
 -- Check that Lua triggers don't keep a reference of SWIM instance
 -- preventing its GC.

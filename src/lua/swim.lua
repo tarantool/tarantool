@@ -980,6 +980,11 @@ local function swim_new(cfg)
         -- Nullify in order to do not raise errors in the
         -- following swim:cfg() about unknown parameters.
         cfg.generation = nil
+        -- When only 'generation' is specified, empty config will
+        -- raise an error at swim:cfg(). It should not.
+        if next(cfg) == nil then
+            cfg = nil
+        end
     end
     local ptr = internal.swim_new(generation)
     if ptr == nil then
