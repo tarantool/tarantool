@@ -86,7 +86,7 @@ box.execute("INSERT INTO \"test\" VALUES(11, 11);")
 box.execute("INSERT INTO \"test\" VALUES(12, 11);")
 s:drop()
 box.execute("CREATE TABLE T2(ID INT PRIMARY KEY, CONSTRAINT CK1 CHECK(ID > 0), CONSTRAINT CK1 CHECK(ID < 0))")
-box.space.T2:drop()
+box.space.T2
 box.space._ck_constraint:select()
 
 --

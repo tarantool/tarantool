@@ -251,8 +251,9 @@ box.execute("CREATE TABLE T2(ID INT PRIMARY KEY, CONSTRAINT CK1 CHECK(ID > 0), C
 ---
 - error: Constraint CK1 already exists
 ...
-box.space.T2:drop()
+box.space.T2
 ---
+- null
 ...
 box.space._ck_constraint:select()
 ---

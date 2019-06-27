@@ -71,22 +71,33 @@ struct saved_record
 	int reg_key;
 	/** Number of registers the key consists of. */
 	int reg_key_count;
-	/** The number of the OP_SInsert operation. */
-	int insertion_opcode;
+	/** The address of the opcode. */
+	int op_addr;
+	/** Flag to show that operation is SInsert. */
+	bool is_insert;
 };
 
 /**
- * Save inserted in system space record in list.
+ * Save inserted in system space record in list. This procedure is
+ * called after generation of either OP_SInsert or OP_NoColflict +
+ * OP_SetDiag. In the first case, record inserted to the system
+ * space is supposed to be deleted on error; in the latter - jump
+ * target specified in OP_SetDiag should be adjusted to the start
+ * of clean-up routines (current entry isn't inserted to the space
+ * yet, so there's no need to delete it).
  *
  * @param parser SQL Parser object.
  * @param space_id Id of table in which record is inserted.
  * @param reg_key Register that contains first field of the key.
  * @param reg_key_count Exact number of fields of the key.
- * @param insertion_opcode Number of OP_SInsert opcode.
+ * @param op_addr Address of opcode (OP_SetDiag or OP_SInsert).
+ *                Used to fix jump target (see
+ *                sql_finish_coding()).
+ * @param is_insert_op Whether opcode is OP_SInsert or not.
  */
 static inline void
 save_record(struct Parse *parser, uint32_t space_id, int reg_key,
-	    int reg_key_count, int insertion_opcode)
+	    int reg_key_count, int op_addr, bool is_insert_op)
 {
 	struct saved_record *record =
 		region_alloc(&parser->region, sizeof(*record));
@@ -99,7 +110,8 @@ save_record(struct Parse *parser, uint32_t space_id, int reg_key,
 	record->space_id = space_id;
 	record->reg_key = reg_key;
 	record->reg_key_count = reg_key_count;
-	record->insertion_opcode = insertion_opcode;
+	record->op_addr = op_addr;
+	record->is_insert = is_insert_op;
 	rlist_add_entry(&parser->record_list, record, link);
 }
 
@@ -118,28 +130,39 @@ sql_finish_coding(struct Parse *parse_context)
 	 * it won't be created. This code works the same way for
 	 * other "CREATE ..." statements but it won't delete
 	 * anything as these statements create no more than one
-	 * record.
+	 * record. Hence for processed insertions we should remove
+	 * entries from corresponding system spaces alongside
+	 * with fixing jump address for OP_SInsert opcode in
+	 * case it fails during VDBE runtime; for OP_SetDiag only
+	 * adjust jump target to the start of clean-up program
+	 * for already inserted entries.
 	 */
 	if (!rlist_empty(&parse_context->record_list)) {
 		struct saved_record *record =
 			rlist_shift_entry(&parse_context->record_list,
 					  struct saved_record, link);
-		/* Set P2 of SInsert. */
-		sqlVdbeChangeP2(v, record->insertion_opcode, v->nOp);
+		/*
+		 * Set jump target for OP_SetDiag and OP_SInsert.
+		 */
+		sqlVdbeChangeP2(v, record->op_addr, v->nOp);
 		MAYBE_UNUSED const char *comment =
 			"Delete entry from %s if CREATE TABLE fails";
 		rlist_foreach_entry(record, &parse_context->record_list, link) {
-			int record_reg = ++parse_context->nMem;
-			sqlVdbeAddOp3(v, OP_MakeRecord, record->reg_key,
-					  record->reg_key_count, record_reg);
-			sqlVdbeAddOp2(v, OP_SDelete, record->space_id,
-					  record_reg);
-			MAYBE_UNUSED struct space *space =
-				space_by_id(record->space_id);
-			VdbeComment((v, comment, space_name(space)));
-			/* Set P2 of SInsert. */
-			sqlVdbeChangeP2(v, record->insertion_opcode,
-					    v->nOp);
+			if (record->is_insert) {
+				int rec_reg = ++parse_context->nMem;
+				sqlVdbeAddOp3(v, OP_MakeRecord, record->reg_key,
+					      record->reg_key_count, rec_reg);
+				sqlVdbeAddOp2(v, OP_SDelete, record->space_id,
+					      rec_reg);
+				MAYBE_UNUSED struct space *space =
+					space_by_id(record->space_id);
+				VdbeComment((v, comment, space_name(space)));
+			}
+			/*
+			 * Set jump target for OP_SetDiag and
+			 * OP_SInsert.
+			 */
+			sqlVdbeChangeP2(v, record->op_addr, v->nOp);
 		}
 		sqlVdbeAddOp1(v, OP_Halt, -1);
 		VdbeComment((v,
@@ -911,7 +934,7 @@ vdbe_emit_create_index(struct Parse *parse, struct space_def *def,
 			  SQL_SUBTYPE_MSGPACK, index_parts, P4_STATIC);
 	sqlVdbeAddOp3(v, OP_MakeRecord, entry_reg, 6, tuple_reg);
 	sqlVdbeAddOp3(v, OP_SInsert, BOX_INDEX_ID, 0, tuple_reg);
-	save_record(parse, BOX_INDEX_ID, entry_reg, 2, v->nOp - 1);
+	save_record(parse, BOX_INDEX_ID, entry_reg, 2, v->nOp - 1, true);
 	return;
 error:
 	parse->is_aborted = true;
@@ -970,7 +993,7 @@ vdbe_emit_space_create(struct Parse *pParse, int space_id_reg,
 	sqlVdbeAddOp3(v, OP_MakeRecord, iFirstCol, 7, tuple_reg);
 	sqlVdbeAddOp3(v, OP_SInsert, BOX_SPACE_ID, 0, tuple_reg);
 	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
-	save_record(pParse, BOX_SPACE_ID, iFirstCol, 1, v->nOp - 1);
+	save_record(pParse, BOX_SPACE_ID, iFirstCol, 1, v->nOp - 1, true);
 	return;
 error:
 	pParse->is_aborted = true;
@@ -1092,12 +1115,12 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 	if (vdbe_emit_halt_with_presence_test(parser, BOX_CK_CONSTRAINT_ID, 0,
 					      ck_constraint_reg, 2,
 					      ER_CONSTRAINT_EXISTS, error_msg,
-					      false, OP_NoConflict) != 0)
+					      false, OP_NoConflict, true) != 0)
 		return;
 	sqlVdbeAddOp3(v, OP_SInsert, BOX_CK_CONSTRAINT_ID, 0,
 		      ck_constraint_reg + 5);
 	save_record(parser, BOX_CK_CONSTRAINT_ID, ck_constraint_reg, 2,
-		    v->nOp - 1);
+		    v->nOp - 1, true);
 	VdbeComment((v, "Create CK constraint %s", ck_def->name));
 	sqlReleaseTempRange(parser, ck_constraint_reg, 5);
 }
@@ -1157,7 +1180,7 @@ vdbe_emit_fk_constraint_create(struct Parse *parse_context,
 					      BOX_FK_CONSTRAINT_ID, 0,
 					      constr_tuple_reg, 2,
 					      ER_CONSTRAINT_EXISTS, error_msg,
-					      false, OP_NoConflict) != 0)
+					      false, OP_NoConflict, true) != 0)
 		return;
 	sqlVdbeAddOp2(vdbe, OP_Bool, fk->is_deferred, constr_tuple_reg + 3);
 	sqlVdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 4, 0,
@@ -1207,7 +1230,7 @@ vdbe_emit_fk_constraint_create(struct Parse *parse_context,
 		sqlVdbeChangeP5(vdbe, OPFLAG_NCHANGE);
 	}
 	save_record(parse_context, BOX_FK_CONSTRAINT_ID, constr_tuple_reg, 2,
-		    vdbe->nOp - 1);
+		    vdbe->nOp - 1, true);
 	sqlReleaseTempRange(parse_context, constr_tuple_reg, 10);
 	return;
 error:
@@ -1304,7 +1327,7 @@ sqlEndTable(struct Parse *pParse)
 	if (vdbe_emit_halt_with_presence_test(pParse, BOX_SPACE_ID, 2,
 					      name_reg, 1, ER_SPACE_EXISTS,
 					      error_msg, (no_err != 0),
-					      OP_NoConflict) != 0)
+					      OP_NoConflict, false) != 0)
 		return;
 
 	int reg_space_id = getNewSpaceId(pParse);
@@ -1330,7 +1353,7 @@ sqlEndTable(struct Parse *pParse)
 		sqlVdbeAddOp3(v, OP_SInsert, BOX_SEQUENCE_ID, 0,
 				  reg_seq_record);
 		save_record(pParse, BOX_SEQUENCE_ID, reg_seq_record + 1, 1,
-			    v->nOp - 1);
+			    v->nOp - 1, true);
 		/* Do an insertion into _space_sequence. */
 		int reg_space_seq_record = emitNewSysSpaceSequenceRecord(pParse,
 							reg_space_id, reg_seq_id,
@@ -1338,7 +1361,7 @@ sqlEndTable(struct Parse *pParse)
 		sqlVdbeAddOp3(v, OP_SInsert, BOX_SPACE_SEQUENCE_ID, 0,
 				  reg_space_seq_record);
 		save_record(pParse, BOX_SPACE_SEQUENCE_ID,
-			    reg_space_seq_record + 1, 1, v->nOp - 1);
+			    reg_space_seq_record + 1, 1, v->nOp - 1, true);
 	}
 	/* Code creation of FK constraints, if any. */
 	struct fk_constraint_parse *fk_parse;
@@ -1465,7 +1488,7 @@ sql_create_view(struct Parse *parse_context)
 	if (vdbe_emit_halt_with_presence_test(parse_context, BOX_SPACE_ID, 2,
 					      name_reg, 1, ER_SPACE_EXISTS,
 					      error_msg, (no_err != 0),
-					      OP_NoConflict) != 0)
+					      OP_NoConflict, false) != 0)
 		goto create_view_fail;
 
 	vdbe_emit_space_create(parse_context, getNewSpaceId(parse_context),
@@ -1584,7 +1607,7 @@ vdbe_emit_fk_constraint_drop(struct Parse *parse_context, char *constraint_name,
 					      BOX_FK_CONSTRAINT_ID, 0,
 					      key_reg, 2, ER_NO_SUCH_CONSTRAINT,
 					      error_msg, false,
-					      OP_Found) != 0) {
+					      OP_Found, false) != 0) {
 		sqlDbFree(parse_context->db, constraint_name);
 		return;
 	}
@@ -1617,7 +1640,7 @@ vdbe_emit_ck_constraint_drop(struct Parse *parser, const char *ck_name,
 	if (vdbe_emit_halt_with_presence_test(parser, BOX_CK_CONSTRAINT_ID, 0,
 					      key_reg, 2, ER_NO_SUCH_CONSTRAINT,
 					      error_msg, false,
-					      OP_Found) != 0)
+					      OP_Found, false) != 0)
 		return;
 	sqlVdbeAddOp3(v, OP_MakeRecord, key_reg, 2, key_reg + 2);
 	sqlVdbeAddOp2(v, OP_SDelete, BOX_CK_CONSTRAINT_ID, key_reg + 2);
@@ -3283,7 +3306,7 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
 				  int index_id, int key_reg, uint32_t key_len,
 				  int tarantool_error_code,
 				  const char *error_src, bool no_error,
-				  int cond_opcode)
+				  int cond_opcode, bool is_clean_needed)
 {
 	assert(cond_opcode == OP_NoConflict || cond_opcode == OP_Found);
 	struct Vdbe *v = sqlGetVdbe(parser);
@@ -3304,7 +3327,10 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
 	} else {
 		sqlVdbeAddOp4(v, OP_SetDiag, tarantool_error_code, 0, 0, error,
 			      P4_DYNAMIC);
-		sqlVdbeAddOp1(v, OP_Halt, -1);
+		if (is_clean_needed)
+			save_record(parser, 0, 0, 0, v->nOp - 1, false);
+		else
+			sqlVdbeAddOp1(v, OP_Halt, -1);
 	}
 	sqlVdbeJumpHere(v, addr);
 	sqlVdbeAddOp1(v, OP_Close, cursor);

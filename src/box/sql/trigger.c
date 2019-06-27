@@ -112,7 +112,8 @@ sql_trigger_begin(struct Parse *parse)
 						      name_reg, 1,
 						      ER_TRIGGER_EXISTS,
 						      error_msg, (no_err != 0),
-						      OP_NoConflict) != 0)
+						      OP_NoConflict,
+						      false) != 0)
 			goto trigger_cleanup;
 	}
 
@@ -420,7 +421,8 @@ sql_drop_trigger(struct Parse *parser)
 	sqlVdbeAddOp4(v, OP_String8, 0, name_reg, 0, name_copy, P4_DYNAMIC);
 	if (vdbe_emit_halt_with_presence_test(parser, BOX_TRIGGER_ID, 0,
 					      name_reg, 1, ER_NO_SUCH_TRIGGER,
-					      error_msg, no_err, OP_Found) != 0)
+					      error_msg, no_err, OP_Found,
+					      false) != 0)
 		goto drop_trigger_cleanup;
 
 	vdbe_code_drop_trigger(parser, trigger_name, true);

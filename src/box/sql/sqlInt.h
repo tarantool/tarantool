@@ -4542,7 +4542,7 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
 				  int index_id, int key_reg, uint32_t key_len,
 				  int tarantool_error_code,
 				  const char *error_src, bool no_error,
-				  int cond_opcode);
+				  int cond_opcode, bool is_clean_needed);
 
 /**
  * Generate VDBE code to delete records from system _sql_stat1 or
