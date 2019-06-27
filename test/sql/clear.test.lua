@@ -43,3 +43,12 @@ box.space._ck_constraint:select()
 box.execute("CREATE TABLE t2(id INT PRIMARY KEY, CONSTRAINT fk1 FOREIGN KEY(id) REFERENCES t2, CONSTRAINT fk1 FOREIGN KEY(id) REFERENCES t2);")
 box.space.t2
 box.space._fk_constraint:select()
+
+--
+-- Make sure that keys for tuples inserted into system spaces were
+-- not stored in temporary cells.
+--
+box.execute("CREATE TABLE t3(id INT PRIMARY KEY, CONSTRAINT ck1 CHECK(id > 0), CONSTRAINT ck1 FOREIGN KEY(id) REFERENCES t3, CONSTRAINT fk1 FOREIGN KEY(id) REFERENCES t3, CONSTRAINT ck1 CHECK(id < 0));")
+box.space.t1
+box.space._ck_constraint:select()
+box.space._fk_constraint:select()

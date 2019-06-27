@@ -1098,7 +1098,12 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 	struct sql *db = parser->db;
 	struct Vdbe *v = sqlGetVdbe(parser);
 	assert(v != NULL);
-	int ck_constraint_reg = sqlGetTempRange(parser, 6);
+	/*
+	 * Occupy registers for 5 fields: each member in
+	 * _ck_constraint space plus one for final msgpack tuple.
+	 */
+	int ck_constraint_reg = parser->nMem + 1;
+	parser->nMem += 6;
 	sqlVdbeAddOp2(v, OP_SCopy, reg_space_id, ck_constraint_reg);
 	sqlVdbeAddOp4(v, OP_String8, 0, ck_constraint_reg + 1, 0,
 		      sqlDbStrDup(db, ck_def->name), P4_DYNAMIC);
@@ -1122,7 +1127,6 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 	save_record(parser, BOX_CK_CONSTRAINT_ID, ck_constraint_reg, 2,
 		    v->nOp - 1, true);
 	VdbeComment((v, "Create CK constraint %s", ck_def->name));
-	sqlReleaseTempRange(parser, ck_constraint_reg, 5);
 }
 
 /**
@@ -1141,10 +1145,11 @@ vdbe_emit_fk_constraint_create(struct Parse *parse_context,
 	struct Vdbe *vdbe = sqlGetVdbe(parse_context);
 	assert(vdbe != NULL);
 	/*
-	 * Occupy registers for 8 fields: each member in
-	 * _constraint space plus one for final msgpack tuple.
+	 * Occupy registers for 9 fields: each member in
+	 * _fk_constraint space plus one for final msgpack tuple.
 	 */
-	int constr_tuple_reg = sqlGetTempRange(parse_context, 10);
+	int constr_tuple_reg = parse_context->nMem + 1;
+	parse_context->nMem += 10;
 	char *name_copy = sqlDbStrDup(parse_context->db, fk->name);
 	if (name_copy == NULL)
 		return;
@@ -1231,7 +1236,6 @@ vdbe_emit_fk_constraint_create(struct Parse *parse_context,
 	}
 	save_record(parse_context, BOX_FK_CONSTRAINT_ID, constr_tuple_reg, 2,
 		    vdbe->nOp - 1, true);
-	sqlReleaseTempRange(parse_context, constr_tuple_reg, 10);
 	return;
 error:
 	parse_context->is_aborted = true;
