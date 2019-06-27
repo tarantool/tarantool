@@ -4369,8 +4369,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			const char *err =
 				tt_sprintf(tnt_errcode_desc(ER_SQL_EXECUTE),
 					   pExpr->u.zToken);
-			sqlVdbeAddOp4(v, OP_Halt, -1, pExpr->on_conflict_action,
-				      ER_SQL_EXECUTE, err, 0);
+			sqlVdbeAddOp4(v, OP_SetDiag, ER_SQL_EXECUTE, 0, 0, err,
+				      P4_STATIC);
+			sqlVdbeAddOp2(v, OP_Halt, -1,
+				      pExpr->on_conflict_action);
 		}
 		break;
 	}

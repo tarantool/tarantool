@@ -3297,15 +3297,16 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
 	int cursor = parser->nTab++;
 	vdbe_emit_open_cursor(parser, cursor, index_id, space_by_id(space_id));
 	sqlVdbeChangeP5(v, OPFLAG_SYSTEMSP);
-	int label = sqlVdbeCurrentAddr(v);
-	sqlVdbeAddOp4Int(v, cond_opcode, cursor, label + 3, key_reg,
-			     key_len);
+	int addr = sqlVdbeAddOp4Int(v, cond_opcode, cursor, 0, key_reg,
+				    key_len);
 	if (no_error) {
 		sqlVdbeAddOp0(v, OP_Halt);
 	} else {
-		sqlVdbeAddOp4(v, OP_Halt, -1, 0, tarantool_error_code, error,
+		sqlVdbeAddOp4(v, OP_SetDiag, tarantool_error_code, 0, 0, error,
 			      P4_DYNAMIC);
+		sqlVdbeAddOp1(v, OP_Halt, -1);
 	}
+	sqlVdbeJumpHere(v, addr);
 	sqlVdbeAddOp1(v, OP_Close, cursor);
 	return 0;
 }

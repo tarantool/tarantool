@@ -885,6 +885,24 @@ case OP_Goto: {             /* jump */
 	goto jump_to_p2;
 }
 
+/* Opcode: SetDiag P1 P2 * P4 *
+ *
+ * Set diag error. After that jump to address P2 if it is not 0.
+ * Otherwise, go to the next instruction. Note that is_aborted
+ * flag is not set in this case, which allows to continue VDBE
+ * execution. For instance, to provide auxiliary query-specific
+ * clean-up.
+ *
+ * P1 parameter is an error code to be set. The P4 parameter is a
+ * text description of the error.
+ */
+case OP_SetDiag: {             /* jump */
+	box_error_set(__FILE__, __LINE__, pOp->p1, pOp->p4.z);
+	if (pOp->p2 != 0)
+		goto jump_to_p2;
+	break;
+}
+
 /* Opcode:  Gosub P1 P2 * * *
  *
  * Write the current address onto register P1
@@ -989,7 +1007,7 @@ case OP_Yield: {            /* in1, jump */
 	break;
 }
 
-/* Opcode:  Halt P1 P2 P3 P4 *
+/* Opcode:  Halt P1 P2 * * *
  *
  * Exit immediately.  All open cursors, etc are closed
  * automatically.
@@ -1005,11 +1023,6 @@ case OP_Yield: {            /* in1, jump */
  * have occurred during this execution of the VDBE, but do not
  * rollback the transaction.
  *
- * If P4 is not null then it is an error message string.
- *
- * If P1 is -1 then P3 is a ClientError code and  P4 is error
- * message to set.
- *
  * There is an implied "Halt 0 0 0" instruction inserted at the
  * very end of every program.  So a jump past the last instruction
  * of the program is the same as executing Halt.
@@ -1017,6 +1030,7 @@ case OP_Yield: {            /* in1, jump */
 case OP_Halt: {
 	VdbeFrame *pFrame;
 	int pcx;
+	assert(pOp->p1 == 0 || ! diag_is_empty(diag_get()));
 
 	pcx = (int)(pOp - aOp);
 	if (pOp->p1 == 0 && p->pFrame != NULL) {
@@ -1045,11 +1059,6 @@ case OP_Halt: {
 		p->is_aborted = true;
 	p->errorAction = (u8)pOp->p2;
 	p->pc = pcx;
-	if (p->is_aborted) {
-		if (pOp->p4.z != NULL)
-			box_error_set(__FILE__, __LINE__, pOp->p3, pOp->p4.z);
-		assert(! diag_is_empty(diag_get()));
-	}
 	sqlVdbeHalt(p);
 	rc = p->is_aborted ? -1 : SQL_DONE;
 	goto vdbe_return;
