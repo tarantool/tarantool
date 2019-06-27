@@ -3,6 +3,7 @@ local uuid = require('uuid')
 local buffer = require('buffer')
 local msgpack = require('msgpack')
 local crypto = require('crypto')
+local fiber = require('fiber')
 local internal = require('swim')
 
 ffi.cdef[[
@@ -949,6 +950,21 @@ swim_cfg_not_configured_mt.__call = swim_cfg_first_call
 local cache_table_mt = { __mode = 'v' }
 
 --
+-- SWIM garbage collection function. It can't delete the SWIM
+-- instance immediately, because it is invoked by Lua GC. Firstly,
+-- it is not safe to yield in FFI - Jit can't survive a yield.
+-- Secondly, it is not safe to yield in any GC function, because
+-- it stops garbage collection. Instead, here a new fiber is
+-- created without yields, which works at the end of the event
+-- loop, and deletes the instance asynchronously.
+--
+local function swim_gc(ptr)
+    fiber.new(function()
+        internal.swim_delete(ptr)
+    end)
+end
+
+--
 -- Create a new SWIM instance, and configure if @a cfg is
 -- provided.
 --
@@ -969,7 +985,7 @@ local function swim_new(cfg)
     if ptr == nil then
         return nil, box.error.last()
     end
-    ffi.gc(ptr, internal.swim_delete)
+    ffi.gc(ptr, swim_gc)
     local s = setmetatable({
         ptr = ptr,
         cfg = setmetatable({index = {}}, swim_cfg_not_configured_mt),

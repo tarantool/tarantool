@@ -545,4 +545,16 @@ s = setmetatable({s}, {__mode = 'v'})
 collectgarbage('collect')
 s
 
+--
+-- Check that SWIM GC doesn't block nor crash garbage collector.
+--
+s = swim.new()
+allow_gc = false
+_ = s:on_member_event(function() while not allow_gc do pcall(fiber.sleep, 0.01) end end)
+s:cfg({uri = 0, uuid = uuid(1)})
+s = setmetatable({s}, {__mode = 'v'})
+collectgarbage('collect')
+s
+allow_gc = true
+
 test_run:cmd("clear filter")
