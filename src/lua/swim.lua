@@ -969,7 +969,7 @@ end
 -- provided.
 --
 local function swim_new(cfg)
-    local generation = 0
+    local generation
     if cfg and type(cfg) == 'table' and cfg.generation then
         generation = cfg.generation
         if type(generation) ~= 'number' or generation < 0 or
@@ -985,6 +985,8 @@ local function swim_new(cfg)
         if next(cfg) == nil then
             cfg = nil
         end
+    else
+        generation = fiber.time64()
     end
     local ptr = internal.swim_new(generation)
     if ptr == nil then

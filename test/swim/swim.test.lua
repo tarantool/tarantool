@@ -71,8 +71,8 @@ s:delete()
 --
 -- Basic member table manipulations.
 --
-s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01})
-s2 = swim.new({uuid = uuid(2), uri = listen_uri, heartbeat_rate = 0.01})
+s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01, generation = 0})
+s2 = swim.new({uuid = uuid(2), uri = listen_uri, heartbeat_rate = 0.01, generation = 0})
 
 s1.broadcast()
 s1:broadcast('wrong port')
@@ -132,7 +132,7 @@ s2:delete()
 --
 -- Member API.
 --
-s1 = swim.new({uuid = uuid(1), uri = uri()})
+s1 = swim.new({uuid = uuid(1), uri = uri(), generation = 0})
 s = s1:self()
 s
 s:status()
@@ -233,8 +233,8 @@ self:is_dropped()
 --
 -- Check payload dissemination.
 --
-s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01})
-s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01})
+s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01, generation = 0})
+s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01, generation = 0})
 s1:add_member({uuid = uuid(2), uri = s2:self():uri()})
 while s2:size() ~= 2 do fiber.sleep(0.01) end
 s1_view = s2:member_by_uuid(uuid(1))
@@ -256,7 +256,7 @@ s2:delete()
 -- Iterators.
 --
 function iterate() local t = {} for k, v in s:pairs() do table.insert(t, {k, v}) end return t end
-s = swim.new()
+s = swim.new({generation = 0})
 iterate()
 s:cfg({uuid = uuid(1), uri = uri(), gc_mode = 'off'})
 s.pairs()
@@ -270,8 +270,8 @@ s:delete()
 --
 -- Payload caching.
 --
-s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01})
-s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01})
+s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01, generation = 0})
+s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01, generation = 0})
 s1_self = s1:self()
 _ = s1:add_member({uuid = s2:self():uuid(), uri = s2:self():uri()})
 _ = s2:add_member({uuid = s1_self:uuid(), uri = s1_self:uri()})
@@ -344,8 +344,8 @@ s:delete()
 --
 -- Encryption.
 --
-s1 = swim.new({uuid = uuid(1), uri = uri()})
-s2 = swim.new({uuid = uuid(2), uri = uri()})
+s1 = swim.new({uuid = uuid(1), uri = uri(), generation = 0})
+s2 = swim.new({uuid = uuid(2), uri = uri(), generation = 0})
 
 s1.set_codec()
 s1:set_codec(100)
@@ -418,7 +418,7 @@ s2:delete()
 -- gh-4250: allow to set triggers on a new member appearance, old
 -- member drop, member update.
 --
-s1 = swim.new()
+s1 = swim.new({generation = 0})
 s1.on_member_event()
 
 m_list = {}
@@ -452,7 +452,7 @@ m_list = {} e_list = {} ctx_list = {}
 
 t_yield_id = s1:on_member_event(t_yield, 'ctx2')
 f_need_sleep = true
-s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01})
+s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01, generation = 0})
 s2:add_member({uuid = s1:self():uuid(), uri = s1:self():uri()})
 while s1:size() ~= 2 do fiber.sleep(0.01) end
 -- Only first trigger worked. Second is waiting, because first

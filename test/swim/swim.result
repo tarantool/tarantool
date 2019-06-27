@@ -208,10 +208,10 @@ s:delete()
 --
 -- Basic member table manipulations.
 --
-s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01})
+s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01, generation = 0})
 ---
 ...
-s2 = swim.new({uuid = uuid(2), uri = listen_uri, heartbeat_rate = 0.01})
+s2 = swim.new({uuid = uuid(2), uri = listen_uri, heartbeat_rate = 0.01, generation = 0})
 ---
 ...
 s1.broadcast()
@@ -381,7 +381,7 @@ s2:delete()
 --
 -- Member API.
 --
-s1 = swim.new({uuid = uuid(1), uri = uri()})
+s1 = swim.new({uuid = uuid(1), uri = uri(), generation = 0})
 ---
 ...
 s = s1:self()
@@ -699,10 +699,10 @@ self:is_dropped()
 --
 -- Check payload dissemination.
 --
-s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01})
+s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01, generation = 0})
 ---
 ...
-s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01})
+s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01, generation = 0})
 ---
 ...
 s1:add_member({uuid = uuid(2), uri = s2:self():uri()})
@@ -757,7 +757,7 @@ s2:delete()
 function iterate() local t = {} for k, v in s:pairs() do table.insert(t, {k, v}) end return t end
 ---
 ...
-s = swim.new()
+s = swim.new({generation = 0})
 ---
 ...
 iterate()
@@ -832,10 +832,10 @@ s:delete()
 --
 -- Payload caching.
 --
-s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01})
+s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01, generation = 0})
 ---
 ...
-s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01})
+s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01, generation = 0})
 ---
 ...
 s1_self = s1:self()
@@ -1014,10 +1014,10 @@ s:delete()
 --
 -- Encryption.
 --
-s1 = swim.new({uuid = uuid(1), uri = uri()})
+s1 = swim.new({uuid = uuid(1), uri = uri(), generation = 0})
 ---
 ...
-s2 = swim.new({uuid = uuid(2), uri = uri()})
+s2 = swim.new({uuid = uuid(2), uri = uri(), generation = 0})
 ---
 ...
 s1.set_codec()
@@ -1224,7 +1224,7 @@ s2:delete()
 -- gh-4250: allow to set triggers on a new member appearance, old
 -- member drop, member update.
 --
-s1 = swim.new()
+s1 = swim.new({generation = 0})
 ---
 ...
 s1.on_member_event()
@@ -1313,7 +1313,7 @@ t_yield_id = s1:on_member_event(t_yield, 'ctx2')
 f_need_sleep = true
 ---
 ...
-s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01})
+s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01, generation = 0})
 ---
 ...
 s2:add_member({uuid = s1:self():uuid(), uri = s1:self():uri()})
