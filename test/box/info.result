@@ -79,6 +79,7 @@ t
   - id
   - lsn
   - memory
+  - package
   - pid
   - replication
   - ro
