@@ -535,4 +535,14 @@ s1:cfg({generation = 5})
 s1:delete()
 s2:delete()
 
+--
+-- Check that Lua triggers don't keep a reference of SWIM instance
+-- preventing its GC.
+--
+s = swim.new({uri = 0, uuid = uuid(1)})
+_ = s:on_member_event(function() end)
+s = setmetatable({s}, {__mode = 'v'})
+collectgarbage('collect')
+s
+
 test_run:cmd("clear filter")

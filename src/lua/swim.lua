@@ -786,10 +786,17 @@ local swim_member_event_mt = {
 -- @return A function to set as a trigger.
 --
 local function swim_on_member_event_new(s, callback, ctx)
+    -- Do not keep a hard reference to a SWIM instance. Otherwise
+    -- it is a cyclic reference, and both the instance and the
+    -- trigger will never be GC-ed.
+    s = setmetatable({s}, {__mode = 'v'})
     return function(member_ptr, event_mask)
-        local m = swim_wrap_member(s, member_ptr)
-        local event = setmetatable({event_mask}, swim_member_event_mt)
-        return callback(m, event, ctx)
+        local s = s[1]
+        if s then
+            local m = swim_wrap_member(s, member_ptr)
+            local event = setmetatable({event_mask}, swim_member_event_mt)
+            return callback(m, event, ctx)
+        end
     end
 end
 
