@@ -351,3 +351,20 @@ box.execute("SELECT typeof(CAST(0 AS UNSIGNED));")
 
 box.space.T:drop()
 box.space.T1:drop()
+
+--
+-- gh-4189: make sure that update doesn't throw an error if format
+-- of table features map/array field types.
+--
+format = {}
+format[1] = {type = 'integer', name = 'I'}
+format[2] = {type = 'boolean', name = 'B'}
+format[3] = {type = 'array', name = 'F1'}
+format[4] = {type = 'map', name = 'F2'}
+format[5] = {type = 'any', name = 'F3'}
+s = box.schema.space.create('T', {format = format})
+ii = s:create_index('ii')
+s:insert({1, true, {1, 2}, {a = 3}, 'asd'})
+box.execute('UPDATE t SET b = false WHERE i = 1;')
+s:select()
+s:drop()
