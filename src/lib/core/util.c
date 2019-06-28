@@ -41,6 +41,8 @@
 #include <unistd.h>
 #include <limits.h>
 
+#include <unicode/utf8.h>
+#include <unicode/uchar.h>
 #include <msgpuck/msgpuck.h> /* mp_char2escape[] table */
 
 #include "say.h"
@@ -271,7 +273,8 @@ utf8_check_printable(const char *start, size_t length)
 		      (pointer[0] == 0xEF &&
 		       !(pointer[1] == 0xBB && pointer[2] == 0xBF) &&
 		       !(pointer[1] == 0xBF &&
-			 (pointer[2] == 0xBE || pointer[2] == 0xBF)))
+			 (pointer[2] == 0xBE || pointer[2] == 0xBF))) ||
+		      (u_isprint(value))
 		      )
 		    ) {
 			return 0;

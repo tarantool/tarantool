@@ -42,7 +42,7 @@ local function test_compact(test, s)
 end
 
 local function test_output(test, s)
-    test:plan(12)
+    test:plan(17)
     test:is(s.encode({true}), '---\n- true\n...\n', "encode for true")
     test:is(s.decode("---\nyes\n..."), true, "decode for 'yes'")
     test:is(s.encode({false}), '---\n- false\n...\n', "encode for false")
@@ -55,6 +55,14 @@ local function test_output(test, s)
         "encode for binary (2) - gh-354")
     test:is(s.encode("\xe0\x82\x85\x00"), '--- !!binary 4IKFAA==\n...\n',
         "encode for binary (3) - gh-1302")
+    -- gh-4090: some printable unicode characters displayed as byte sequences.
+    -- The following tests ensures that various 4-byte encoded unicode characters
+    -- displayed as expected.
+    test:is(s.encode("\xF0\x9F\x86\x98"), '--- 🆘\n...\n', "encode - gh-4090 (1)")
+    test:is(s.encode("\xF0\x9F\x84\xBD"), '--- 🄽\n...\n', "encode - gh-4090 (2)")
+    test:is(s.encode("\xF0\x9F\x85\xA9"), '--- 🅩\n...\n', "encode - gh-4090 (3)")
+    test:is(s.encode("\xF0\x9F\x87\xA6"), '--- 🇦\n...\n', "encode - gh-4090 (4)")
+    test:is(s.encode("\xF0\x9F\x88\xB2"), '--- 🈲\n...\n', "encode - gh-4090 (5)")
     -- gh-883: console can hang tarantool process
     local t = {}
     for i=0x8000,0xffff,1 do
