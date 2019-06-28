@@ -292,7 +292,19 @@ mem_apply_numeric_type(struct Mem *record)
  *    Convert mem to a string representation.
  *
  * SCALAR:
- *    Mem is unchanged, but flag is set to BLOB.
+ *    Mem is unchanged, but flag is set to BLOB in case of
+ *    scalar-like type. Otherwise, (MAP, ARRAY) conversion
+ *    is impossible.
+ *
+ * BOOLEAN:
+ *    If memory holds BOOLEAN no actions take place.
+ *
+ * ANY:
+ *    Mem is unchanged, no actions take place.
+ *
+ * MAP/ARRAY:
+ *    These types can't be casted to scalar ones, or to each
+ *    other. So the only valid conversion is to type itself.
  *
  * @param record The value to apply type to.
  * @param type The type to be applied.
@@ -347,6 +359,27 @@ mem_apply_type(struct Mem *record, enum field_type type)
 			return -1;
 		return 0;
 	case FIELD_TYPE_SCALAR:
+		/* Can't cast MAP and ARRAY to scalar types. */
+		if ((record->flags & MEM_Subtype) != 0 &&
+		    record->subtype == SQL_SUBTYPE_MSGPACK) {
+			assert(mp_typeof(*record->z) == MP_MAP ||
+			       mp_typeof(*record->z) == MP_ARRAY);
+			return -1;
+		}
+		return 0;
+	case FIELD_TYPE_MAP:
+		if ((record->flags & MEM_Subtype) != 0 &&
+		    record->subtype == SQL_SUBTYPE_MSGPACK &&
+		    mp_typeof(*record->z) == MP_MAP)
+			return 0;
+		return -1;
+	case FIELD_TYPE_ARRAY:
+		if ((record->flags & MEM_Subtype) != 0 &&
+		    record->subtype == SQL_SUBTYPE_MSGPACK &&
+		    mp_typeof(*record->z) == MP_ARRAY)
+			return 0;
+		return -1;
+	case FIELD_TYPE_ANY:
 		return 0;
 	default:
 		return -1;
