@@ -1040,12 +1040,7 @@ vy_task_write_run(struct vy_task *task, bool no_compression)
 	ERROR_INJECT(ERRINJ_VY_RUN_WRITE,
 		     {diag_set(ClientError, ER_INJECTION,
 			       "vinyl dump"); return -1;});
-
-	struct errinj *inj = errinj(ERRINJ_VY_RUN_WRITE_DELAY, ERRINJ_BOOL);
-	if (inj != NULL && inj->bparam) {
-		while (inj->bparam)
-			usleep(10000);
-	}
+	ERROR_INJECT_SLEEP(ERRINJ_VY_RUN_WRITE_DELAY);
 
 	struct vy_run_writer writer;
 	if (vy_run_writer_create(&writer, task->new_run, lsm->env->path,
@@ -1061,7 +1056,8 @@ vy_task_write_run(struct vy_task *task, bool no_compression)
 	int loops = 0;
 	struct vy_entry entry = vy_entry_none();
 	while ((rc = wi->iface->next(wi, &entry)) == 0 && entry.stmt != NULL) {
-		inj = errinj(ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT, ERRINJ_DOUBLE);
+		struct errinj *inj = errinj(ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT,
+					    ERRINJ_DOUBLE);
 		if (inj != NULL && inj->dparam > 0)
 			usleep(inj->dparam * 1000000);
 
@@ -1095,11 +1091,7 @@ fail:
 static int
 vy_task_dump_execute(struct vy_task *task)
 {
-	struct errinj *errinj = errinj(ERRINJ_VY_DUMP_DELAY, ERRINJ_BOOL);
-	if (errinj != NULL && errinj->bparam) {
-		while (errinj->bparam)
-			fiber_sleep(0.01);
-	}
+	ERROR_INJECT_SLEEP(ERRINJ_VY_DUMP_DELAY);
 	/*
 	 * Don't compress L1 runs as they are most frequently read
 	 * and smallest runs at the same time and so we would gain
@@ -1441,11 +1433,7 @@ err:
 static int
 vy_task_compaction_execute(struct vy_task *task)
 {
-	struct errinj *errinj = errinj(ERRINJ_VY_COMPACTION_DELAY, ERRINJ_BOOL);
-	if (errinj != NULL && errinj->bparam) {
-		while (errinj->bparam)
-			fiber_sleep(0.01);
-	}
+	ERROR_INJECT_SLEEP(ERRINJ_VY_COMPACTION_DELAY);
 	return vy_task_write_run(task, false);
 }
 

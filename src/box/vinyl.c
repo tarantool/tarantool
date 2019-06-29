@@ -1156,12 +1156,7 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 		 */
 		if (++loops % VY_YIELD_LOOPS == 0)
 			fiber_sleep(0);
-		struct errinj *inj = errinj(ERRINJ_CHECK_FORMAT_DELAY, ERRINJ_BOOL);
-		if (inj != NULL && inj->bparam && loops == 1) {
-			do {
-				fiber_sleep(0);
-			} while (inj->bparam);
-		}
+		ERROR_INJECT_YIELD(ERRINJ_CHECK_FORMAT_DELAY);
 		if (ctx.is_failed) {
 			diag_move(&ctx.diag, diag_get());
 			rc = -1;
@@ -3882,14 +3877,7 @@ next:
 		*ret = NULL;
 		return 0;
 	}
-#ifndef NDEBUG
-	struct errinj *delay = errinj(ERRINJ_VY_DELAY_PK_LOOKUP,
-				      ERRINJ_BOOL);
-	if (delay && delay->bparam) {
-		while (delay->bparam)
-			fiber_sleep(0.01);
-	}
-#endif
+	ERROR_INJECT_YIELD(ERRINJ_VY_DELAY_PK_LOOKUP);
 	/* Get the full tuple from the primary index. */
 	if (vy_get_by_secondary_tuple(it->lsm, it->tx,
 				      vy_tx_read_view(it->tx),
@@ -4422,12 +4410,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 		 * Sleep after one tuple is inserted to test
 		 * on_replace triggers for index build.
 		 */
-		inj = errinj(ERRINJ_BUILD_INDEX_DELAY, ERRINJ_BOOL);
-		if (inj != NULL && inj->bparam && loops == 1) {
-			do {
-				fiber_sleep(0);
-			} while (inj->bparam);
-		}
+		ERROR_INJECT_YIELD(ERRINJ_BUILD_INDEX_DELAY);
 	}
 	vy_read_iterator_close(&itr);
 

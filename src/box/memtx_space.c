@@ -910,33 +910,21 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 		rc = tuple_validate(format, tuple);
 		if (rc != 0)
 			break;
+
+		state.cursor = tuple;
+		tuple_ref(state.cursor);
+
 		if (++count % MEMTX_DDL_YIELD_LOOPS == 0 &&
-		    memtx->state == MEMTX_OK) {
-			state.cursor = tuple;
-			tuple_ref(state.cursor);
+		    memtx->state == MEMTX_OK)
 			fiber_sleep(0);
-			tuple_unref(state.cursor);
 
-			if (state.rc != 0) {
-				rc = -1;
-				diag_move(&state.diag, diag_get());
-				break;
-			}
-		}
+		ERROR_INJECT_YIELD(ERRINJ_CHECK_FORMAT_DELAY);
 
-		struct errinj *inj = errinj(ERRINJ_CHECK_FORMAT_DELAY, ERRINJ_BOOL);
-		if (inj != NULL && inj->bparam && count == 1) {
-			state.cursor = tuple;
-			tuple_ref(state.cursor);
-			do {
-				fiber_sleep(0);
-			} while (inj->bparam);
-			tuple_unref(state.cursor);
-			if (state.rc != 0) {
-				rc = -1;
-				diag_move(&state.diag, diag_get());
-				break;
-			}
+		tuple_unref(state.cursor);
+		if (state.rc != 0) {
+			rc = -1;
+			diag_move(&state.diag, diag_get());
+			break;
 		}
 	}
 	iterator_delete(it);
@@ -1086,39 +1074,30 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		 */
 		if (new_index->def->iid == 0)
 			tuple_ref(tuple);
+		/*
+		 * Remember the latest inserted tuple to
+		 * avoid processing yet to be added tuples
+		 * in on_replace triggers.
+		 */
+		state.cursor = tuple;
+		tuple_ref(state.cursor);
 		if (++count % MEMTX_DDL_YIELD_LOOPS == 0 &&
-		    memtx->state == MEMTX_OK) {
-			/*
-			 * Remember the latest inserted tuple to
-			 * avoid processing yet to be added tuples
-			 * in on_replace triggers.
-			 */
-			state.cursor = tuple;
-			tuple_ref(state.cursor);
+		    memtx->state == MEMTX_OK)
 			fiber_sleep(0);
-			tuple_unref(state.cursor);
-			/*
-			 * The on_replace trigger may have failed
-			 * during the yield.
-			 */
-			if (state.rc != 0) {
-				rc = -1;
-				diag_move(&state.diag, diag_get());
-				break;
-			}
-		}
 		/*
 		 * Sleep after at least one tuple is inserted to test
 		 * on_replace triggers for index build.
 		 */
-		struct errinj *inj = errinj(ERRINJ_BUILD_INDEX_DELAY, ERRINJ_BOOL);
-		if (inj != NULL && inj->bparam && count == 1) {
-			state.cursor = tuple;
-			tuple_ref(state.cursor);
-			do {
-				fiber_sleep(0);
-			} while (inj->bparam);
-			tuple_unref(state.cursor);
+		ERROR_INJECT_YIELD(ERRINJ_BUILD_INDEX_DELAY);
+		tuple_unref(state.cursor);
+		/*
+		 * The on_replace trigger may have failed
+		 * during the yield.
+		 */
+		if (state.rc != 0) {
+			rc = -1;
+			diag_move(&state.diag, diag_get());
+			break;
 		}
 	}
 	iterator_delete(it);

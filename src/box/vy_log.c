@@ -807,11 +807,7 @@ vy_log_tx_flush(struct vy_log_tx *tx)
 		diag_set(ClientError, ER_INJECTION, "vinyl log flush");
 		return -1;
 	});
-	struct errinj *delay = errinj(ERRINJ_VY_LOG_FLUSH_DELAY, ERRINJ_BOOL);
-	if (delay != NULL && delay->bparam) {
-		while (delay->bparam)
-			fiber_sleep(0.001);
-	}
+	ERROR_INJECT_YIELD(ERRINJ_VY_LOG_FLUSH_DELAY);
 
 	int tx_size = 0;
 	struct vy_log_record *record;

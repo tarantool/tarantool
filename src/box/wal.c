@@ -936,9 +936,7 @@ wal_write_to_disk(struct cmsg *msg)
 	struct vclock vclock_diff;
 	vclock_create(&vclock_diff);
 
-	struct errinj *inj = errinj(ERRINJ_WAL_DELAY, ERRINJ_BOOL);
-	while (inj != NULL && inj->bparam)
-		usleep(10);
+	ERROR_INJECT_SLEEP(ERRINJ_WAL_DELAY);
 
 	if (writer->in_rollback.route != NULL) {
 		/* We're rolling back a failed write. */

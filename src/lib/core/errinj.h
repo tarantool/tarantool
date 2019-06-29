@@ -153,6 +153,7 @@ errinj_foreach(errinj_cb cb, void *cb_ctx);
 
 #ifdef NDEBUG
 #  define ERROR_INJECT(ID, CODE)
+#  define ERROR_INJECT_WHILE(ID, CODE)
 #  define errinj(ID, TYPE) ((struct errinj *) NULL)
 #else
 #  /* Returns the error injection by id */
@@ -167,9 +168,16 @@ errinj_foreach(errinj_cb cb, void *cb_ctx);
 		if (errinj(ID, ERRINJ_BOOL)->bparam) \
 			CODE; \
 	} while (0)
+#  define ERROR_INJECT_WHILE(ID, CODE) \
+	do { \
+		while (errinj(ID, ERRINJ_BOOL)->bparam) \
+			CODE; \
+	} while (0)
 #endif
 
 #define ERROR_INJECT_RETURN(ID) ERROR_INJECT(ID, return -1)
+#define ERROR_INJECT_SLEEP(ID) ERROR_INJECT_WHILE(ID, usleep(1000))
+#define ERROR_INJECT_YIELD(ID) ERROR_INJECT_WHILE(ID, fiber_sleep(0.001))
 
 #if defined(__cplusplus)
 } /* extern "C" */

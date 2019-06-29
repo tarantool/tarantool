@@ -297,12 +297,7 @@ curl_execute(struct curl_request *curl_request, struct curl_env *env,
 	mcode = curl_multi_add_handle(env->multi, curl_request->easy);
 	if (mcode != CURLM_OK)
 		goto curl_merror;
-#ifndef NDEBUG
-	struct errinj *errinj = errinj(ERRINJ_HTTP_RESPONSE_ADD_WAIT,
-				       ERRINJ_BOOL);
-	while (errinj != NULL && errinj->bparam)
-		fiber_sleep(0.001);
-#endif
+	ERROR_INJECT_YIELD(ERRINJ_HTTP_RESPONSE_ADD_WAIT);
 	/* Don't wait on a cond if request has already failed or finished. */
 	if (curl_request->code == CURLE_OK && curl_request->in_progress) {
 		++env->stat.active_requests;

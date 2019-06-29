@@ -774,14 +774,7 @@ memtx_engine_commit_checkpoint(struct engine *engine,
 		snprintf(to, sizeof(to), "%s",
 			 xdir_format_filename(dir, lsn, NONE));
 		const char *from = xdir_format_filename(dir, lsn, INPROGRESS);
-#ifndef NDEBUG
-		struct errinj *delay = errinj(ERRINJ_SNAP_COMMIT_DELAY,
-					       ERRINJ_BOOL);
-		if (delay != NULL && delay->bparam) {
-			while (delay->bparam)
-				fiber_sleep(0.001);
-		}
-#endif
+		ERROR_INJECT_YIELD(ERRINJ_SNAP_COMMIT_DELAY);
 		int rc = coio_rename(from, to);
 		if (rc != 0)
 			panic("can't rename .snap.inprogress");
@@ -990,12 +983,7 @@ memtx_engine_gc_f(va_list va)
 	struct memtx_engine *memtx = va_arg(va, struct memtx_engine *);
 	while (!fiber_is_cancelled()) {
 		bool stop;
-		struct errinj *delay = errinj(ERRINJ_MEMTX_DELAY_GC,
-					      ERRINJ_BOOL);
-		if (delay != NULL && delay->bparam) {
-			while (delay->bparam)
-				fiber_sleep(0.001);
-		}
+		ERROR_INJECT_YIELD(ERRINJ_MEMTX_DELAY_GC);
 		memtx_engine_run_gc(memtx, &stop);
 		if (stop) {
 			fiber_yield_timeout(TIMEOUT_INFINITY);
