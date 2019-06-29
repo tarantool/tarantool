@@ -501,7 +501,7 @@ for i = 1, count do box.space.tmp:insert{i, pad} end
 
 -- Start background snapshot.
 c = fiber.channel(1)
-box.error.injection.set('ERRINJ_SNAP_WRITE_ROW_TIMEOUT', 0.01)
+box.error.injection.set('ERRINJ_SNAP_WRITE_DELAY', true)
 _ = fiber.create(function() box.snapshot() c:put(true) end)
 
 -- Overwrite data stored in the temporary space while snapshot
@@ -511,7 +511,7 @@ for i = 1, count do box.space.tmp:delete{i} end
 _ = collectgarbage('collect')
 for i = 1, count do box.space.tmp:insert{i, pad} end
 
-box.error.injection.set('ERRINJ_SNAP_WRITE_ROW_TIMEOUT', 0)
+box.error.injection.set('ERRINJ_SNAP_WRITE_DELAY', false)
 c:get()
 
 box.space.tmp:drop()
@@ -532,7 +532,7 @@ _ = box.schema.space.create('test')
 _ = box.space.test:create_index('primary')
 for i = 1, 10 do box.space.test:insert{i} end
 
-errinj.set('ERRINJ_SNAP_WRITE_ROW_TIMEOUT', 9000)
+errinj.set('ERRINJ_SNAP_WRITE_DELAY', true)
 _ = fiber.create(function() box.snapshot() end)
 path = fio.pathjoin(box.cfg.memtx_dir, '*.snap.inprogress')
 while #fio.glob(path) == 0 do fiber.sleep(0.001) end

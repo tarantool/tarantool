@@ -20,12 +20,12 @@ errinj.info()
     state: false
   ERRINJ_VYRUN_DATA_READ:
     state: false
-  ERRINJ_SNAP_WRITE_ROW_TIMEOUT:
-    state: 0
   ERRINJ_SQL_NAME_NORMALIZATION:
     state: false
   ERRINJ_VY_SCHED_TIMEOUT:
     state: 0
+  ERRINJ_COIO_SENDFILE_CHUNK:
+    state: -1
   ERRINJ_WAL_WRITE_PARTIAL:
     state: -1
   ERRINJ_VY_GC:
@@ -36,33 +36,33 @@ errinj.info()
     state: -1
   ERRINJ_WAL_WRITE_EOF:
     state: false
-  ERRINJ_COIO_SENDFILE_CHUNK:
-    state: -1
+  ERRINJ_VY_LOG_FILE_RENAME:
+    state: false
   ERRINJ_VYRUN_INDEX_GARBAGE:
     state: false
   ERRINJ_BUILD_INDEX_DELAY:
     state: false
-  ERRINJ_VY_RUN_FILE_RENAME:
-    state: false
   ERRINJ_BUILD_INDEX:
     state: -1
-  ERRINJ_RELAY_BREAK_LSN:
-    state: -1
+  ERRINJ_VY_INDEX_FILE_RENAME:
+    state: false
+  ERRINJ_CHECK_FORMAT_DELAY:
+    state: false
   ERRINJ_VY_DELAY_PK_LOOKUP:
     state: false
   ERRINJ_VY_TASK_COMPLETE:
     state: false
   ERRINJ_PORT_DUMP:
     state: false
-  ERRINJ_CHECK_FORMAT_DELAY:
+  ERRINJ_VY_DUMP_DELAY:
     state: false
   ERRINJ_WAL_IO:
     state: false
   ERRINJ_WAL_FALLOCATE:
     state: 0
-  ERRINJ_VY_DUMP_DELAY:
-    state: false
   ERRINJ_WAL_BREAK_LSN:
+    state: -1
+  ERRINJ_RELAY_BREAK_LSN:
     state: -1
   ERRINJ_TUPLE_FORMAT_COUNT:
     state: -1
@@ -74,7 +74,7 @@ errinj.info()
     state: false
   ERRINJ_RELAY_REPORT_INTERVAL:
     state: 0
-  ERRINJ_VY_INDEX_FILE_RENAME:
+  ERRINJ_VY_RUN_FILE_RENAME:
     state: false
   ERRINJ_VY_READ_PAGE_TIMEOUT:
     state: 0
@@ -82,13 +82,13 @@ errinj.info()
     state: false
   ERRINJ_SIO_READ_MAX:
     state: -1
-  ERRINJ_VY_LOG_FILE_RENAME:
+  ERRINJ_HTTP_RESPONSE_ADD_WAIT:
     state: false
   ERRINJ_WAL_WRITE_DISK:
     state: false
-  ERRINJ_HTTP_RESPONSE_ADD_WAIT:
-    state: false
   ERRINJ_SNAP_COMMIT_DELAY:
+    state: false
+  ERRINJ_SNAP_WRITE_DELAY:
     state: false
   ERRINJ_VY_RUN_WRITE:
     state: false
@@ -1485,7 +1485,7 @@ for i = 1, count do box.space.tmp:insert{i, pad} end
 c = fiber.channel(1)
 ---
 ...
-box.error.injection.set('ERRINJ_SNAP_WRITE_ROW_TIMEOUT', 0.01)
+box.error.injection.set('ERRINJ_SNAP_WRITE_DELAY', true)
 ---
 - ok
 ...
@@ -1504,7 +1504,7 @@ _ = collectgarbage('collect')
 for i = 1, count do box.space.tmp:insert{i, pad} end
 ---
 ...
-box.error.injection.set('ERRINJ_SNAP_WRITE_ROW_TIMEOUT', 0)
+box.error.injection.set('ERRINJ_SNAP_WRITE_DELAY', false)
 ---
 - ok
 ...
@@ -1549,7 +1549,7 @@ _ = box.space.test:create_index('primary')
 for i = 1, 10 do box.space.test:insert{i} end
 ---
 ...
-errinj.set('ERRINJ_SNAP_WRITE_ROW_TIMEOUT', 9000)
+errinj.set('ERRINJ_SNAP_WRITE_DELAY', true)
 ---
 - ok
 ...

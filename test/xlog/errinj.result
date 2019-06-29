@@ -94,7 +94,7 @@ fio = require('fio')
 box.space._schema:delete('test') -- bump LSN
 ---
 ...
-box.error.injection.set('ERRINJ_SNAP_WRITE_ROW_TIMEOUT', 0.1)
+box.error.injection.set('ERRINJ_SNAP_WRITE_DELAY', true)
 ---
 - ok
 ...
@@ -132,7 +132,7 @@ box.cfg{checkpoint_interval = 10}
 box.cfg{checkpoint_interval = default_checkpoint_interval}
 ---
 ...
-box.error.injection.set('ERRINJ_SNAP_WRITE_ROW_TIMEOUT', 0)
+box.error.injection.set('ERRINJ_SNAP_WRITE_DELAY', false)
 ---
 - ok
 ...

@@ -497,11 +497,6 @@ memtx_engine_bootstrap(struct engine *engine)
 static int
 checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 {
-	struct errinj *errinj = errinj(ERRINJ_SNAP_WRITE_ROW_TIMEOUT,
-				       ERRINJ_DOUBLE);
-	if (errinj != NULL && errinj->dparam > 0)
-		usleep(errinj->dparam * 1000000);
-
 	static ev_tstamp last = 0;
 	if (last == 0) {
 		ev_now_update(loop());
@@ -674,6 +669,7 @@ checkpoint_f(va_list ap)
 		return -1;
 
 	say_info("saving snapshot `%s'", snap.filename);
+	ERROR_INJECT_SLEEP(ERRINJ_SNAP_WRITE_DELAY);
 	struct checkpoint_entry *entry;
 	rlist_foreach_entry(entry, &ckpt->entries, link) {
 		uint32_t size;
