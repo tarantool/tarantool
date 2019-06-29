@@ -164,3 +164,27 @@ ch:get()
 
 s:count() -- 200
 s:drop()
+
+--
+-- Dropping and recreating a space while it is being written
+-- to a checkpoint.
+--
+s = box.schema.space.create('test', {engine = engine})
+_ = s:create_index('pk')
+for i = 1, 5 do s:insert{i, i} end
+
+errinj.set("ERRINJ_SNAP_WRITE_DELAY", true)
+ch = fiber.channel(1)
+_ = fiber.create(function() box.snapshot() ch:put(true) end)
+
+s:drop()
+
+s = box.schema.space.create('test', {engine = engine})
+_ = s:create_index('pk')
+for i = 1, 5 do s:insert{i, i * 10} end
+
+errinj.set("ERRINJ_SNAP_WRITE_DELAY", false)
+ch:get()
+
+s:select()
+s:drop()

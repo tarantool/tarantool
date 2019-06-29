@@ -155,6 +155,11 @@ struct memtx_engine {
 	 * memtx_gc_task::link.
 	 */
 	struct stailq gc_queue;
+	/**
+	 * List of tasks awaiting to be freed once checkpointing
+	 * is complete, linked by memtx_gc_task::link.
+	 */
+	struct stailq gc_to_free;
 };
 
 struct memtx_gc_task;

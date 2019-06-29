@@ -86,7 +86,8 @@ local i2 = s2:create_index('test', { type = 'tree', parts = {1, 'unsigned'} })
 
 for i = 1,1000 do s1:insert{i, i, i} end
 
-fiber.create(function () box.snapshot() end)
+local snap_chan = fiber.channel()
+fiber.create(function () box.snapshot() snap_chan:put(true) end)
 
 fiber.sleep(0)
 
@@ -95,6 +96,8 @@ s2:update({1}, {{'+', 2, 2}})
 
 s1:drop()
 s2:drop()
+
+snap_chan:get()
 
 test:ok(true, "gh-1185: no crash in matras_touch")
 
