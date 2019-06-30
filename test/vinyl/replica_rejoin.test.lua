@@ -6,6 +6,8 @@ test_run = env.new()
 -- after rebootstrap.
 --
 box.schema.user.grant('guest', 'replication')
+_ = box.schema.space.create('mem')
+_ = box.space.mem:create_index('pk', {parts = {1, 'string'}})
 _ = box.schema.space.create('test', { id = 9000, engine = 'vinyl' })
 _ = box.space.test:create_index('pk')
 pad = string.rep('x', 12 * 1024)
@@ -15,11 +17,8 @@ box.snapshot()
 -- Join a replica. Check its files.
 test_run:cmd("create server replica with rpl_master=default, script='vinyl/replica_rejoin.lua'")
 test_run:cmd("start server replica")
-test_run:cmd("switch replica")
-fio = require('fio')
-fio.chdir(box.cfg.vinyl_dir)
-fio.glob(fio.pathjoin(box.space.test.id, 0, '*'))
-test_run:cmd("switch default")
+files = test_run:eval("replica", "fio = require('fio') return fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*'))")[1]
+_ = box.space.mem:replace{'files', files}
 test_run:cmd("stop server replica")
 
 -- Invoke garbage collector on the master.
@@ -36,11 +35,15 @@ test_run:cmd("start server replica")
 test_run:cmd("switch replica")
 box.cfg{checkpoint_count = 1}
 box.snapshot()
-fio = require('fio')
-fio.chdir(box.cfg.vinyl_dir)
-fio.glob(fio.pathjoin(box.space.test.id, 0, '*'))
 box.space.test:count() -- 99
 test_run:cmd("switch default")
+files = box.space.mem:get('files')[2]
+ok = true
+fio = require('fio')
+for _, f in ipairs(files) do ok = ok and not fio.path.exists(f) end
+ok
+files = test_run:eval("replica", "fio = require('fio') return fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*'))")[1]
+_ = box.space.mem:replace{'files', files}
 test_run:cmd("stop server replica")
 
 -- Invoke garbage collector on the master.
@@ -59,11 +62,11 @@ test_run:cmd("start server replica with crash_expected=True") -- fail
 test_run:cmd("start server replica with crash_expected=True") -- fail again
 test_run:cmd("start server replica with args='disable_replication'")
 test_run:cmd("switch replica")
-fio = require('fio')
-fio.chdir(box.cfg.vinyl_dir)
-fio.glob(fio.pathjoin(box.space.test.id, 0, '*'))
 box.space.test:count() -- 99
 test_run:cmd("switch default")
+old_files = box.space.mem:get('files')[2]
+new_files = test_run:eval("replica", "fio = require('fio') return fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*'))")[1]
+#old_files == #new_files
 test_run:cmd("stop server replica")
 box.error.injection.set('ERRINJ_RELAY_FINAL_JOIN', false)
 
@@ -73,14 +76,17 @@ test_run:cmd("start server replica")
 test_run:cmd("switch replica")
 box.cfg{checkpoint_count = 1}
 box.snapshot()
-fio = require('fio')
-fio.chdir(box.cfg.vinyl_dir)
-fio.glob(fio.pathjoin(box.space.test.id, 0, '*'))
 box.space.test:count() -- 98
 test_run:cmd("switch default")
+files = box.space.mem:get('files')[2]
+ok = true
+fio = require('fio')
+for _, f in ipairs(files) do ok = ok and not fio.path.exists(f) end
+ok
 test_run:cmd("stop server replica")
 
 -- Cleanup.
 test_run:cmd("cleanup server replica")
 box.space.test:drop()
+box.space.mem:drop()
 box.schema.user.revoke('guest', 'replication')

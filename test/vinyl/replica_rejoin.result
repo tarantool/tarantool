@@ -11,6 +11,12 @@ test_run = env.new()
 box.schema.user.grant('guest', 'replication')
 ---
 ...
+_ = box.schema.space.create('mem')
+---
+...
+_ = box.space.mem:create_index('pk', {parts = {1, 'string'}})
+---
+...
 _ = box.schema.space.create('test', { id = 9000, engine = 'vinyl' })
 ---
 ...
@@ -36,27 +42,11 @@ test_run:cmd("start server replica")
 ---
 - true
 ...
-test_run:cmd("switch replica")
----
-- true
-...
-fio = require('fio')
+files = test_run:eval("replica", "fio = require('fio') return fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*'))")[1]
 ---
 ...
-fio.chdir(box.cfg.vinyl_dir)
+_ = box.space.mem:replace{'files', files}
 ---
-- true
-...
-fio.glob(fio.pathjoin(box.space.test.id, 0, '*'))
----
-- - 9000/0/00000000000000000002.index
-  - 9000/0/00000000000000000002.run
-  - 9000/0/00000000000000000004.index
-  - 9000/0/00000000000000000004.run
-...
-test_run:cmd("switch default")
----
-- true
 ...
 test_run:cmd("stop server replica")
 ---
@@ -97,20 +87,6 @@ box.snapshot()
 ---
 - ok
 ...
-fio = require('fio')
----
-...
-fio.chdir(box.cfg.vinyl_dir)
----
-- true
-...
-fio.glob(fio.pathjoin(box.space.test.id, 0, '*'))
----
-- - 9000/0/00000000000000000008.index
-  - 9000/0/00000000000000000008.run
-  - 9000/0/00000000000000000010.index
-  - 9000/0/00000000000000000010.run
-...
 box.space.test:count() -- 99
 ---
 - 99
@@ -118,6 +94,28 @@ box.space.test:count() -- 99
 test_run:cmd("switch default")
 ---
 - true
+...
+files = box.space.mem:get('files')[2]
+---
+...
+ok = true
+---
+...
+fio = require('fio')
+---
+...
+for _, f in ipairs(files) do ok = ok and not fio.path.exists(f) end
+---
+...
+ok
+---
+- true
+...
+files = test_run:eval("replica", "fio = require('fio') return fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*'))")[1]
+---
+...
+_ = box.space.mem:replace{'files', files}
+---
 ...
 test_run:cmd("stop server replica")
 ---
@@ -164,25 +162,21 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-fio = require('fio')
----
-...
-fio.chdir(box.cfg.vinyl_dir)
----
-- true
-...
-fio.glob(fio.pathjoin(box.space.test.id, 0, '*'))
----
-- - 9000/0/00000000000000000008.index
-  - 9000/0/00000000000000000008.run
-  - 9000/0/00000000000000000010.index
-  - 9000/0/00000000000000000010.run
-...
 box.space.test:count() -- 99
 ---
 - 99
 ...
 test_run:cmd("switch default")
+---
+- true
+...
+old_files = box.space.mem:get('files')[2]
+---
+...
+new_files = test_run:eval("replica", "fio = require('fio') return fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*'))")[1]
+---
+...
+#old_files == #new_files
 ---
 - true
 ...
@@ -211,25 +205,27 @@ box.snapshot()
 ---
 - ok
 ...
-fio = require('fio')
----
-...
-fio.chdir(box.cfg.vinyl_dir)
----
-- true
-...
-fio.glob(fio.pathjoin(box.space.test.id, 0, '*'))
----
-- - 9000/0/00000000000000000022.index
-  - 9000/0/00000000000000000022.run
-  - 9000/0/00000000000000000024.index
-  - 9000/0/00000000000000000024.run
-...
 box.space.test:count() -- 98
 ---
 - 98
 ...
 test_run:cmd("switch default")
+---
+- true
+...
+files = box.space.mem:get('files')[2]
+---
+...
+ok = true
+---
+...
+fio = require('fio')
+---
+...
+for _, f in ipairs(files) do ok = ok and not fio.path.exists(f) end
+---
+...
+ok
 ---
 - true
 ...
@@ -243,6 +239,9 @@ test_run:cmd("cleanup server replica")
 - true
 ...
 box.space.test:drop()
+---
+...
+box.space.mem:drop()
 ---
 ...
 box.schema.user.revoke('guest', 'replication')
