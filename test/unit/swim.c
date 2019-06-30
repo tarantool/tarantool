@@ -1217,10 +1217,35 @@ swim_test_dissemination_speed(void)
 	swim_finish_test();
 }
 
+static void
+swim_test_suspect_new_members(void)
+{
+	swim_start_test(2);
+
+	struct swim_cluster *cluster = swim_cluster_new(3);
+	swim_cluster_set_ack_timeout(cluster, 1);
+	swim_cluster_interconnect(cluster, 0, 1);
+	swim_cluster_interconnect(cluster, 1, 2);
+
+	swim_cluster_set_drop(cluster, 0, 100);
+	swim_cluster_block_io(cluster, 2);
+	is(swim_cluster_wait_status(cluster, 1, 0, swim_member_status_MAX, 15),
+	   0, "S2 dropped S1 as dead");
+	swim_cluster_unblock_io(cluster, 2);
+	swim_run_for(1);
+	is(swim_cluster_member_status(cluster, 2, 0), swim_member_status_MAX,
+	   "S3 didn't add S1 from S2's messages, because S1 didn't answer "\
+	   "on a ping");
+
+	swim_cluster_delete(cluster);
+
+	swim_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	swim_start_test(23);
+	swim_start_test(24);
 
 	(void) ap;
 	swim_test_ev_init();
@@ -1249,6 +1274,7 @@ main_f(va_list ap)
 	swim_test_triggers();
 	swim_test_generation();
 	swim_test_dissemination_speed();
+	swim_test_suspect_new_members();
 
 	swim_test_transport_free();
 	swim_test_ev_free();

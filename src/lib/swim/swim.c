@@ -1511,6 +1511,10 @@ swim_update_member(struct swim *swim, const struct swim_member_def *def,
  * @param swim SWIM instance to upsert into.
  * @param def Member definition to build a new member or update an
  *        existing one.
+ * @param is_direct True, if the member definition was received
+ *        directly from that member. Via ping or ack from him.
+ *        Otherwise the definition can't be trusted, if it states,
+ *        that a new member should be added.
  * @param[out] result A result member: a new, or an updated, or
  *        NULL in case of nothing has changed. For example, @a def
  *        was too old.
@@ -1521,7 +1525,7 @@ swim_update_member(struct swim *swim, const struct swim_member_def *def,
  */
 static int
 swim_upsert_member(struct swim *swim, const struct swim_member_def *def,
-		   struct swim_member **result)
+		   bool is_direct, struct swim_member **result)
 {
 	struct swim_member *member = swim_find_member(swim, &def->uuid);
 	if (member == NULL) {
@@ -1539,6 +1543,25 @@ swim_upsert_member(struct swim *swim, const struct swim_member_def *def,
 			 * forever.
 			 */
 			goto skip;
+		} else if (def->status < MEMBER_DEAD && ! is_direct) {
+			/*
+			 * If a member is not dead, then it can't
+			 * be added as simple as that. In fact it
+			 * can be already dead, but sender of that
+			 * definition didn't know that. The only
+			 * way to be sure - send him a ping. And
+			 * one exception - if the sender of the
+			 * definition is exactly that member, then
+			 * it can be trusted of course.
+			 */
+			struct swim_task *t = swim_task_new(swim_task_delete_cb,
+							    swim_task_delete_cb,
+							    "probe ping");
+			if (t == NULL)
+				return -1;
+			swim_send_ping(swim, t, &def->addr);
+			*result = NULL;
+			return 0;
 		}
 		*result = swim_new_member(swim, &def->addr, &def->uuid,
 					  def->status, &def->incarnation,
@@ -1598,7 +1621,7 @@ swim_process_members(struct swim *swim, const char *prefix,
 		struct swim_member *member;
 		if (swim_member_def_decode(&def, pos, end, prefix) != 0)
 			return -1;
-		if (swim_upsert_member(swim, &def, &member) != 0) {
+		if (swim_upsert_member(swim, &def, false, &member) != 0) {
 			/*
 			 * Not a critical error. Other members
 			 * still can be updated.
@@ -1640,7 +1663,7 @@ swim_process_failure_detection(struct swim *swim, const char **pos,
 	mdef.incarnation = def.incarnation;
 	mdef.uuid = *uuid;
 	struct swim_member *member;
-	if (swim_upsert_member(swim, &mdef, &member) != 0)
+	if (swim_upsert_member(swim, &mdef, true, &member) != 0)
 		return -1;
 	/*
 	 * It can be NULL, for example, in case of too old

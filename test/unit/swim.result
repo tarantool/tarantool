@@ -1,5 +1,5 @@
 	*** main_f ***
-1..23
+1..24
 	*** swim_test_one_link ***
     1..6
     ok 1 - no rounds - no fullmesh
@@ -243,4 +243,10 @@ ok 22 - subtests
     ok 2 - dissemination can withstand an event storm
 ok 23 - subtests
 	*** swim_test_dissemination_speed: done ***
+	*** swim_test_suspect_new_members ***
+    1..2
+    ok 1 - S2 dropped S1 as dead
+    ok 2 - S3 didn't add S1 from S2's messages, because S1 didn't answer on a ping
+ok 24 - subtests
+	*** swim_test_suspect_new_members: done ***
 	*** main_f: done ***
