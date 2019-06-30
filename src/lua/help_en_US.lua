@@ -8,6 +8,7 @@ To start the interactive Tarantool tutorial, type 'tutorial()' here.
 Available backslash commands:
 
   \set language <language>   -- set language (lua or sql)
+  \set output <format>       -- set output format (lua[,line|block] or yaml)
   \set delimiter <delimiter> -- set expression delimiter
   \help                      -- show this screen
   \quit                      -- quit interactive console

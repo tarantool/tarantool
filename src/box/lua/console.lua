@@ -1,5 +1,6 @@
 -- console.lua -- internal file
 
+local serpent = require('serpent')
 local internal = require('console')
 local session_internal = require('box.internal.session')
 local fiber = require('fiber')
@@ -13,7 +14,9 @@ local net_box = require('net.box')
 local YAML_TERM = '\n...\n'
 local PUSH_TAG_HANDLE = '!push!'
 
-local function format(status, ...)
+local output_handlers = { }
+
+output_handlers["yaml"] = function(status, opts, ...)
     local err
     if status then
         -- serializer can raise an exception
@@ -31,6 +34,92 @@ local function format(status, ...)
         end
     end
     return internal.format({ error = err })
+end
+
+output_handlers["lua"] = function(status, opts, ...)
+    local data = ...
+    --
+    -- Don't print nil if there is no data
+    if data == nil then
+        return ""
+    end
+    --
+    -- Map internal symbols which serpent doesn't know
+    -- about to a known representation.
+    local map_symbols = function(tag, head, body, tail, level)
+        local symbols = {
+            ['"cdata<void %*>: NULL"']  = 'box.NULL'
+        }
+        for k,v in pairs(symbols) do
+            body = body:gsub(k, v)
+        end
+        return tag..head..body..tail
+    end
+    local serpent_opts = {
+        custom  = map_symbols,
+        comment = false,
+    }
+    if opts == "block" then
+        return serpent.block(..., serpent_opts)
+    end
+    return serpent.line(..., serpent_opts)
+end
+
+local function output_verify_opts(fmt, opts)
+    if opts == nil then
+        return true, nil
+    end
+    if fmt == "lua" then
+        if opts ~= "line" and opts ~= "block" then
+            local msg = 'Wrong option "%s", expecting: line or block.'
+            return false, msg:format(opts)
+        end
+    end
+    return true, nil
+end
+
+local function output_parse(value)
+    local fmt, opts
+    if value:match("([^,]+),([^,]+)") ~= nil then
+        fmt, opts = value:match("([^,]+),([^,]+)")
+    else
+        fmt = value
+    end
+    for k, _ in pairs(output_handlers) do
+        if k == fmt then
+            local status, err = output_verify_opts(fmt, opts)
+            if status ~= true then
+                return false, err
+            end
+            return true, nil, fmt, opts
+        end
+    end
+    local msg = 'Invalid format "%s", supported languages: lua and yaml.'
+    return false, msg:format(value)
+end
+
+local function output_save(fmt, opts)
+    --
+    -- Output format descriptors are saved per
+    -- session thus each console may specify
+    -- own mode.
+    box.session.storage.console_output = {
+        ["fmt"] = fmt, ["opts"] = opts
+    }
+end
+
+local function format(status, ...)
+    local d = box.session.storage.console_output
+    --
+    -- If there was no assignment yet provide
+    -- a default value; for now it is YAML
+    -- for backward compatibility sake (don't
+    -- forget about test results which are in
+    -- YAML format).
+    if d == nil then
+        d = { ["fmt"] = "yaml", ["opts"] = nil }
+    end
+    return output_handlers[d["fmt"]](status, d["opts"], ...)
 end
 
 --
@@ -71,11 +160,22 @@ local function set_language(storage, value)
     return true
 end
 
+local function set_output(storage, value)
+    local status, err, fmt, opts = output_parse(value)
+    if status ~= true then
+        return error(err)
+    end
+    output_save(fmt, opts)
+    return true
+end
+
 local function set_param(storage, func, param, value)
     local params = {
         language = set_language,
         lang = set_language,
         l = set_language,
+        output = set_output,
+        o = set_output,
         delimiter = set_delimiter,
         delim = set_delimiter,
         d = set_delimiter
