@@ -616,7 +616,24 @@ swim_register_event(struct swim *swim, struct swim_member *member)
 		rlist_add_tail_entry(&swim->dissemination_queue, member,
 				     in_dissemination_queue);
 	}
-	member->status_ttd = mh_size(swim->members);
+	/*
+	 * Logarithm is a perfect number of disseminations of an
+	 * event.
+	 *
+	 * Firstly, it matches the dissemination speed.
+	 *
+	 * Secondly, bigger number of disseminations (for example,
+	 * linear) causes events and anti-entropy starvation in
+	 * big clusters, when lots of events occupy the whole UDP
+	 * packet, and factually the same packet content is being
+	 * sent for quite a long time. No randomness. Anti-entropy
+	 * does not get a chance to disseminate something new and
+	 * random. Bigger orders are redundant and harmful.
+	 *
+	 * Thirdly, logarithm is proved by the original
+	 * SWIM paper as the best option.
+	 */
+	member->status_ttd = ceil(log2(mh_size(swim->members))) + 1;
 	swim_cached_round_msg_invalidate(swim);
 }
 
@@ -1170,6 +1187,7 @@ swim_decrease_event_ttd(struct swim *swim)
 			if (--member->payload_ttd == 0)
 				swim_cached_round_msg_invalidate(swim);
 		}
+		assert(member->status_ttd > 0);
 		if (--member->status_ttd == 0) {
 			rlist_del_entry(member, in_dissemination_queue);
 			swim_cached_round_msg_invalidate(swim);

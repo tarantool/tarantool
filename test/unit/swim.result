@@ -1,5 +1,5 @@
 	*** main_f ***
-1..22
+1..23
 	*** swim_test_one_link ***
     1..6
     ok 1 - no rounds - no fullmesh
@@ -237,4 +237,10 @@ ok 21 - subtests
     ok 3 - S2 sees new generation of S1
 ok 22 - subtests
 	*** swim_test_generation: done ***
+	*** swim_test_dissemination_speed ***
+    1..2
+    ok 1 - dissemination work in log time even at the very start of a cluster
+    ok 2 - dissemination can withstand an event storm
+ok 23 - subtests
+	*** swim_test_dissemination_speed: done ***
 	*** main_f: done ***

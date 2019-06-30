@@ -43,6 +43,7 @@
 #include "swim_test_utils.h"
 #include "trigger.h"
 #include <fcntl.h>
+#include <math.h>
 
 /**
  * Test result is a real returned value of main_f. Fiber_join can
@@ -1152,10 +1153,74 @@ swim_test_generation(void)
 	swim_finish_test();
 }
 
+static void
+swim_test_dissemination_speed(void)
+{
+	swim_start_test(2);
+
+	int size = 100;
+	double ack_timeout = 0.1;
+	struct swim_cluster *cluster = swim_cluster_new(size);
+	swim_cluster_set_ack_timeout(cluster, ack_timeout);
+	swim_cluster_set_gc(cluster, SWIM_GC_OFF);
+	for (int i = 0; i < size; ++i) {
+		for (int j = i + 1; j < size; ++j)
+			swim_cluster_interconnect(cluster, i, j);
+	}
+	swim_cluster_set_drop(cluster, 0, 100);
+	fail_if(swim_cluster_wait_status_anywhere(cluster, 0,
+						  MEMBER_DEAD, size) != 0);
+	/*
+	 * Not a trivial problem - at start of a cluster there are
+	 * so many events, that they occupy a UDP packet fully.
+	 * All these events are 'a new member is added'. And
+	 * because of that other much more important events
+	 * starve. In this concrete test a new event 'member is
+	 * dead' starves. To beat that problem SWIM says that
+	 * events should be disseminated not longer than for a
+	 * O(log) round steps. In such a case all the events are
+	 * expired quite fast, and anti-entropy swiftly finishes
+	 * the job. Usually this test works in log * 2, log * 3
+	 * steps. Here it is log * 6 to avoid flakiness in some
+	 * extra rare and slow random cases, but to still check
+	 * for O(log) speed.
+	 */
+	is(swim_cluster_wait_status_everywhere(cluster, 0, MEMBER_DEAD,
+					       log2(size) * 6), 0,
+	   "dissemination work in log time even at the very start of a cluster");
+	swim_cluster_set_drop(cluster, 0, 0);
+	fail_if(swim_cluster_wait_status_everywhere(cluster, 0,
+						    MEMBER_ALIVE, size) != 0);
+	/*
+	 * Another big-cluster case. Assume, that something
+	 * happened and all the members generated an event. For
+	 * example, changed their payload. It creates a storm of
+	 * events, among which some important ones can be lost.
+	 * Such as a failure detection. The only solution again -
+	 * make the events as short living as possible in order to
+	 * faster free space in a UDP packet for other events and
+	 * for anti-entropy. The test below proves that even when
+	 * there is an event storm, failure dissemination still
+	 * works for O(log) time.
+	 */
+	swim_cluster_set_drop(cluster, 0, 100);
+	fail_if(swim_cluster_wait_status_anywhere(cluster, 0,
+						  MEMBER_DEAD, size) != 0);
+	for (int i = 0; i < size; ++i)
+		swim_cluster_member_set_payload(cluster, i, "", 0);
+	is(swim_cluster_wait_status_everywhere(cluster, 0, MEMBER_DEAD,
+					       log2(size) * 6), 0,
+	   "dissemination can withstand an event storm");
+
+	swim_cluster_delete(cluster);
+
+	swim_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	swim_start_test(22);
+	swim_start_test(23);
 
 	(void) ap;
 	swim_test_ev_init();
@@ -1183,6 +1248,7 @@ main_f(va_list ap)
 	swim_test_slow_net();
 	swim_test_triggers();
 	swim_test_generation();
+	swim_test_dissemination_speed();
 
 	swim_test_transport_free();
 	swim_test_ev_free();
