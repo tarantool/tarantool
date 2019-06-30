@@ -42,6 +42,9 @@ vy_log_next_id(void)
 void
 vy_log_tx_begin(void) {}
 
+void
+vy_log_tx_try_commit(void) {}
+
 int
 vy_log_tx_commit(void)
 {

@@ -79,7 +79,11 @@ _ = s1:insert{3, 'c'}
 s2.index.pk:drop()
 
 -- pending records must not be rolled back on error
-s2:create_index('pk') -- error
+SCHED_TIMEOUT = 0.05
+box.error.injection.set('ERRINJ_VY_SCHED_TIMEOUT', SCHED_TIMEOUT)
+box.snapshot() -- error
+fiber.sleep(2 * SCHED_TIMEOUT)
+box.error.injection.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
 
 box.error.injection.set('ERRINJ_VY_LOG_FLUSH', false);
 
@@ -126,13 +130,15 @@ _ = s1:insert{333, 'ccc'}
 -- VY_LOG_DROP_LSM missing
 s2.index.pk:drop()
 
+-- VY_LOG_PREPARE_LSM missing
+_ = s2:create_index('pk')
+
 test_run:cmd('restart server default')
 
 s1 = box.space.test1
 s2 = box.space.test2
 
 _ = s1:insert{444, 'ddd'}
-_ = s2:create_index('pk')
 _ = s2:insert{555, 'eee'}
 
 s1:select()
