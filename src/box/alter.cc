@@ -1680,7 +1680,6 @@ on_drop_view_commit(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct Select *select = (struct Select *)trigger->data;
-	update_view_references(select, -1, true, NULL);
 	sql_select_delete(sql_get(), select);
 }
 
@@ -1694,6 +1693,7 @@ on_drop_view_rollback(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct Select *select = (struct Select *)trigger->data;
+	update_view_references(select, 1, true, NULL);
 	sql_select_delete(sql_get(), select);
 }
 
@@ -1912,6 +1912,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				txn_alter_trigger_new(on_drop_view_rollback,
 						      select);
 			txn_on_rollback(txn, on_rollback_view);
+			update_view_references(select, -1, true, NULL);
 			select_guard.is_active = false;
 		}
 	} else { /* UPDATE, REPLACE */
