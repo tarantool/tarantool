@@ -79,6 +79,10 @@ box.func["function1.args"]:call({ 15 })
 box.schema.func.drop("function1.args")
 ---
 ...
+box.func["function1.args"]
+---
+- null
+...
 box.schema.func.create('function1.multi_inc', {language = "C"})
 ---
 ...
@@ -377,6 +381,10 @@ func.drop()
 ---
 - error: 'builtin/box/schema.lua: Use func:drop(...) instead of func.drop(...)'
 ...
+box.func.divide
+---
+- null
+...
 func:drop()
 ---
 - error: Function 'divide' does not exist
@@ -421,6 +429,10 @@ func:call({4, 2, 1})
 ...
 func:drop()
 ---
+...
+box.func["function1.divide"]
+---
+- null
 ...
 func
 ---
@@ -470,6 +482,10 @@ func:call({{1, 2, 99, 3, -1}})
 ...
 func:drop()
 ---
+...
+box.func.minmax
+---
+- null
 ...
 -- Test access checks for registered functions.
 function secret() return 1 end

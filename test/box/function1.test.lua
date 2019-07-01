@@ -26,6 +26,7 @@ box.func["function1.args"]:call()
 box.func["function1.args"]:call({ "xx" })
 box.func["function1.args"]:call({ 15 })
 box.schema.func.drop("function1.args")
+box.func["function1.args"]
 
 box.schema.func.create('function1.multi_inc', {language = "C"})
 box.schema.user.grant('guest', 'execute', 'function', 'function1.multi_inc')
@@ -132,6 +133,7 @@ func:call({4, 2, 1})
 func:drop()
 func
 func.drop()
+box.func.divide
 func:drop()
 func:call({4, 2})
 box.internal.func_call('divide', 4, 2)
@@ -145,6 +147,7 @@ func:call({4})
 func:call({4, 2})
 func:call({4, 2, 1})
 func:drop()
+box.func["function1.divide"]
 func
 func:drop()
 func:call({4, 2})
@@ -165,6 +168,7 @@ box.schema.func.create("minmax")
 func = box.func.minmax
 func:call({{1, 2, 99, 3, -1}})
 func:drop()
+box.func.minmax
 
 -- Test access checks for registered functions.
 function secret() return 1 end

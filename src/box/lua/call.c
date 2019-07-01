@@ -712,7 +712,7 @@ lbox_func_new_or_delete(struct trigger *trigger, void *event)
 {
 	struct lua_State *L = (struct lua_State *) trigger->data;
 	struct func *func = (struct func *)event;
-	if (func != NULL)
+	if (func_by_id(func->def->fid) != NULL)
 		lbox_func_new(L, func);
 	else
 		lbox_func_delete(L, func);
