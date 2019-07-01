@@ -121,7 +121,15 @@ decimal_from_double(decimal_t *dec, double d)
 	char buf[DECIMAL_MAX_DIGITS + 3];
 	if (isinf(d) || isnan(d))
 		return NULL;
-	snprintf(buf, sizeof(buf), "%.*f", DBL_DIG, d);
+	/*
+	 * DBL_DIG is 15, it is the guaranteed amount of
+	 * correct significant decimal digits in a double
+	 * value.  There is no point in using higher precision,
+	 * since every non-representable number has a long
+	 * tail of erroneous digits:
+	 * `23.42` -> `23.420000000000001705302565824240446091`
+	 */
+	snprintf(buf, sizeof(buf), "%.*g", DBL_DIG, d);
 	return decimal_from_string(dec, buf);
 }
 

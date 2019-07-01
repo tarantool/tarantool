@@ -27,7 +27,8 @@
 	\
 	is(decimal_div(&t, &u, &v), &t, "decimal("#a") / decimal("#b")");\
 	is(decimal_from_double(&w, (double)((a)) / (b)), &w, "decimal(("#a") / ("#b"))");\
-	is(decimal_round(&t, DBL_DIG), &t, "decimal_round(("#a")/("#b"), %d)", DBL_DIG);\
+	is(decimal_round(&t, DBL_DIG - decimal_precision(&t) + decimal_scale(&t)), &t,\
+	   "decimal_round(("#a")/("#b"), %d)", DBL_DIG);\
 	is(decimal_compare(&t, &w), 0, "decimal("#a") / decimal("#b") == ("#a") / ("#b")");\
 })
 
