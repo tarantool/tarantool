@@ -1467,56 +1467,6 @@ sqlValueFromExpr(sql * db,	/* The database connection */
 }
 
 /*
- * The implementation of the sql_record() function. This function accepts
- * a single argument of any type. The return value is a formatted database
- * record (a blob) containing the argument value.
- *
- * This is used to convert the value stored in the 'sample' column of the
- * sql_stat4 table to the record format sql uses internally.
- */
-static void
-recordFunc(sql_context * context, int argc, sql_value ** argv)
-{
-	const int file_format = 1;
-	u32 iSerial;		/* Serial type */
-	int nSerial;		/* Bytes of space for iSerial as varint */
-	u32 nVal;		/* Bytes of space required for argv[0] */
-	int nRet;
-	sql *db;
-	u8 *aRet;
-
-	UNUSED_PARAMETER(argc);
-	iSerial = sqlVdbeSerialType(argv[0], file_format, &nVal);
-	nSerial = sqlVarintLen(iSerial);
-	db = sql_context_db_handle(context);
-
-	nRet = 1 + nSerial + nVal;
-	aRet = sqlDbMallocRawNN(db, nRet);
-	if (aRet == 0) {
-		context->is_aborted = true;
-	} else {
-		aRet[0] = nSerial + 1;
-		putVarint32(&aRet[1], iSerial);
-		sqlVdbeSerialPut(&aRet[1 + nSerial], argv[0], iSerial);
-		sql_result_blob(context, aRet, nRet, SQL_TRANSIENT);
-		sqlDbFree(db, aRet);
-	}
-}
-
-/*
- * Register built-in functions used to help read ANALYZE data.
- */
-void
-sqlAnalyzeFunctions(void)
-{
-	static FuncDef aAnalyzeTableFuncs[] = {
-		FUNCTION(sql_record, 1, 0, 0, recordFunc, 0),
-	};
-	sqlInsertBuiltinFuncs(aAnalyzeTableFuncs,
-				  ArraySize(aAnalyzeTableFuncs));
-}
-
-/*
  * Attempt to extract a value from pExpr and use it to construct *ppVal.
  *
  * If pAlloc is not NULL, then an UnpackedRecord object is created for

@@ -350,18 +350,6 @@ statInit(sql_context * context, int argc, sql_value ** argv)
 	sql_result_blob(context, p, sizeof(*p), stat4Destructor);
 }
 
-static const FuncDef statInitFuncdef = {
-	3,			/* nArg */
-	0,			/* funcFlags */
-	0,			/* pUserData */
-	0,			/* pNext */
-	statInit,		/* xSFunc */
-	0,			/* xFinalize */
-	"stat_init",		/* zName */
-	{0},
-	0, false
-};
-
 /*
  * pNew and pOld are both candidate non-periodic samples selected for
  * the same column (pNew->iCol==pOld->iCol). Ignoring this column and
@@ -606,18 +594,6 @@ statPush(sql_context * context, int argc, sql_value ** argv)
 	}
 }
 
-static const FuncDef statPushFuncdef = {
-	3,			/* nArg */
-	0,			/* funcFlags */
-	0,			/* pUserData */
-	0,			/* pNext */
-	statPush,		/* xSFunc */
-	0,			/* xFinalize */
-	"stat_push",		/* zName */
-	{0},
-	0, false
-};
-
 #define STAT_GET_STAT1 0	/* "stat" column of stat1 table */
 #define STAT_GET_KEY   1	/* "key" column of stat4 entry */
 #define STAT_GET_NEQ   2	/* "neq" column of stat4 entry */
@@ -734,25 +710,16 @@ UNUSED_PARAMETER(argc);
 #endif
 }
 
-static const FuncDef statGetFuncdef = {
-	2,			/* nArg */
-	0,			/* funcFlags */
-	0,			/* pUserData */
-	0,			/* pNext */
-	statGet,		/* xSFunc */
-	0,			/* xFinalize */
-	"stat_get",		/* zName */
-	{0},
-	0, false
-};
-
 static void
 callStatGet(Vdbe * v, int regStat4, int iParam, int regOut)
 {
 	assert(regOut != regStat4 && regOut != regStat4 + 1);
 	sqlVdbeAddOp2(v, OP_Integer, iParam, regStat4 + 1);
+	struct FuncDef *func =
+		sqlFindFunction(sql_get(), "_sql_stat_get", 2, 0);
+	assert(func != NULL);
 	sqlVdbeAddOp4(v, OP_Function0, 0, regStat4, regOut,
-			  (char *)&statGetFuncdef, P4_FUNCDEF);
+		      (char *)func, P4_FUNCDEF);
 	sqlVdbeChangeP5(v, 2);
 }
 
@@ -888,8 +855,11 @@ vdbe_emit_analyze_space(struct Parse *parse, struct space *space)
 		sqlVdbeAddOp2(v, OP_Count, idx_cursor, stat4_reg + 3);
 		sqlVdbeAddOp2(v, OP_Integer, part_count, stat4_reg + 1);
 		sqlVdbeAddOp2(v, OP_Integer, part_count, stat4_reg + 2);
+		struct FuncDef *init_func =
+			sqlFindFunction(sql_get(), "_sql_stat_init", 3, 0);
+		assert(init_func != NULL);
 		sqlVdbeAddOp4(v, OP_Function0, 0, stat4_reg + 1, stat4_reg,
-				  (char *)&statInitFuncdef, P4_FUNCDEF);
+			      (char *)init_func, P4_FUNCDEF);
 		sqlVdbeChangeP5(v, 3);
 		/*
 		 * Implementation of the following:
@@ -986,8 +956,11 @@ vdbe_emit_analyze_space(struct Parse *parse, struct space *space)
 		sqlVdbeAddOp3(v, OP_MakeRecord, stat_key_reg,
 				  pk_part_count, key_reg);
 		assert(chng_reg == (stat4_reg + 1));
+		struct FuncDef *push_func =
+			sqlFindFunction(sql_get(), "_sql_stat_push", 3, 0);
+		assert(push_func != NULL);
 		sqlVdbeAddOp4(v, OP_Function0, 1, stat4_reg, tmp_reg,
-				  (char *)&statPushFuncdef, P4_FUNCDEF);
+			      (char *)push_func, P4_FUNCDEF);
 		sqlVdbeChangeP5(v, 3);
 		sqlVdbeAddOp2(v, OP_Next, idx_cursor, next_row_addr);
 		/* Add the entry to the stat1 table. */
@@ -1773,4 +1746,15 @@ sql_analysis_load(struct sql *db)
 fail:
 	box_txn_rollback();
 	return -1;
+}
+
+void
+sql_register_analyze_builtins(void)
+{
+	static FuncDef funcs[] = {
+		FUNCTION(_sql_stat_get, 2, 0, 0, statGet, FIELD_TYPE_ANY),
+		FUNCTION(_sql_stat_push, 3, 0, 0, statPush, FIELD_TYPE_ANY),
+		FUNCTION(_sql_stat_init, 3, 0, 0, statInit, FIELD_TYPE_ANY),
+	};
+	sqlInsertBuiltinFuncs(funcs, nelem(funcs));
 }

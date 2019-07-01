@@ -1906,7 +1906,7 @@ sqlRegisterBuiltinFunctions(void)
 		FUNCTION2(coalesce, -1, 0, 0, noopFunc, SQL_FUNC_COALESCE,
 			  FIELD_TYPE_SCALAR),
 	};
-	sqlAnalyzeFunctions();
+	sql_register_analyze_builtins();
 	sqlRegisterDateTimeFunctions();
 	sqlInsertBuiltinFuncs(aBuiltinFunc, ArraySize(aBuiltinFunc));
 

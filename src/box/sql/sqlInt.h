@@ -4512,6 +4512,10 @@ Expr *sqlExprForVectorField(Parse *, Expr *, int);
  */
 extern int sqlSubProgramsRemaining;
 
+/** Register built-in functions to work with ANALYZE data. */
+void
+sql_register_analyze_builtins(void);
+
 /**
  * Generate VDBE code to halt execution with correct error if
  * the object with specified key is already present (or doesn't
