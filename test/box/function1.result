@@ -530,3 +530,37 @@ test_run:cmd("clear filter")
 ---
 - true
 ...
+--
+-- Check that function cache is updated synchronously with _func changes.
+--
+box.begin() box.schema.func.create('test') f = box.func.test box.rollback()
+---
+...
+f ~= nil
+---
+- true
+...
+box.func.test == nil
+---
+- true
+...
+box.schema.func.create('test')
+---
+...
+f = box.func.test
+---
+...
+box.begin() box.space._func:delete{f.id} f = box.func.test box.rollback()
+---
+...
+f == nil
+---
+- true
+...
+box.func.test ~= nil
+---
+- true
+...
+box.func.test:drop()
+---
+...

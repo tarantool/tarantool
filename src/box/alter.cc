@@ -2587,14 +2587,31 @@ func_def_new_from_tuple(struct tuple *tuple)
 	return def;
 }
 
-/** Remove a function from function cache */
 static void
-func_cache_remove_func(struct trigger *trigger, void * /* event */)
+on_create_func_rollback(struct trigger *trigger, void * /* event */)
 {
-	struct func *old_func = (struct func *) trigger->data;
-	func_cache_delete(old_func->def->fid);
-	trigger_run_xc(&on_alter_func, old_func);
-	func_delete(old_func);
+	/* Remove the new function from the cache and delete it. */
+	struct func *func = (struct func *)trigger->data;
+	func_cache_delete(func->def->fid);
+	trigger_run_xc(&on_alter_func, func);
+	func_delete(func);
+}
+
+static void
+on_drop_func_commit(struct trigger *trigger, void * /* event */)
+{
+	/* Delete the old function. */
+	struct func *func = (struct func *)trigger->data;
+	func_delete(func);
+}
+
+static void
+on_drop_func_rollback(struct trigger *trigger, void * /* event */)
+{
+	/* Insert the old function back into the cache. */
+	struct func *func = (struct func *)trigger->data;
+	func_cache_insert(func);
+	trigger_run_xc(&on_alter_func, func);
 }
 
 /**
@@ -2619,15 +2636,15 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		access_check_ddl(def->name, def->fid, def->uid, SC_FUNCTION,
 				 PRIV_C);
 		struct trigger *on_rollback =
-			txn_alter_trigger_new(func_cache_remove_func, NULL);
+			txn_alter_trigger_new(on_create_func_rollback, NULL);
 		struct func *func = func_new(def);
 		if (func == NULL)
 			diag_raise();
 		def_guard.is_active = false;
 		func_cache_insert(func);
 		on_rollback->data = func;
-		trigger_run_xc(&on_alter_func, func);
 		txn_on_rollback(txn, on_rollback);
+		trigger_run_xc(&on_alter_func, func);
 	} else if (new_tuple == NULL) {         /* DELETE */
 		uint32_t uid;
 		func_def_get_ids_from_tuple(old_tuple, &fid, &uid);
@@ -2644,8 +2661,13 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 				  "function has grants");
 		}
 		struct trigger *on_commit =
-			txn_alter_trigger_new(func_cache_remove_func, old_func);
+			txn_alter_trigger_new(on_drop_func_commit, old_func);
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(on_drop_func_rollback, old_func);
+		func_cache_delete(old_func->def->fid);
 		txn_on_commit(txn, on_commit);
+		txn_on_rollback(txn, on_rollback);
+		trigger_run_xc(&on_alter_func, old_func);
 	} else {                                /* UPDATE, REPLACE */
 		assert(new_tuple != NULL && old_tuple != NULL);
 		/**

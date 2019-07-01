@@ -185,3 +185,16 @@ box.schema.func.drop('secret_leak')
 box.schema.func.drop('secret')
 
 test_run:cmd("clear filter")
+
+--
+-- Check that function cache is updated synchronously with _func changes.
+--
+box.begin() box.schema.func.create('test') f = box.func.test box.rollback()
+f ~= nil
+box.func.test == nil
+box.schema.func.create('test')
+f = box.func.test
+box.begin() box.space._func:delete{f.id} f = box.func.test box.rollback()
+f == nil
+box.func.test ~= nil
+box.func.test:drop()
