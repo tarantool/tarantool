@@ -69,13 +69,14 @@ static __thread decContext decimal_context = {
 
 /**
  * A finalizer for all the operations.
- * Check the operation context status and empty it.
+ * Check the operation context status and empty it,
+ * check that result isn't a NaN or infinity.
  *
  * @return NULL if finalization failed.
  *         result pointer otherwise.
  */
-static inline int
-decimal_check_status(decContext *context)
+static decimal_t *
+decimal_check_status(decimal_t *dec, decContext *context)
 {
 	uint32_t status = decContextGetStatus(context);
 	decContextZeroStatus(context);
@@ -88,7 +89,7 @@ decimal_check_status(decContext *context)
 	 */
 	status &= ~(uint32_t)(DEC_Inexact | DEC_Rounded | DEC_Underflow |
 			      DEC_Subnormal | DEC_Clamped);
-	return status ? -1 : 0;
+	return status || !decNumberIsFinite(dec) ? NULL : dec;
 }
 
 int decimal_precision(const decimal_t *dec) {
@@ -111,11 +112,7 @@ decimal_t *
 decimal_from_string(decimal_t *dec, const char *str)
 {
 	decNumberFromString(dec, str, &decimal_context);
-	if (decimal_check_status(&decimal_context) != 0) {
-		return NULL;
-	} else {
-		return dec;
-	}
+	return decimal_check_status(dec, &decimal_context);
 }
 
 decimal_t *
@@ -157,7 +154,7 @@ decimal_compare(const decimal_t *lhs, const decimal_t *rhs)
 	decNumber res;
 	decNumberCompare(&res, lhs, rhs, &decimal_context);
 	int r = decNumberToInt32(&res, &decimal_context);
-	assert(decimal_check_status(&decimal_context) == 0);
+	assert(decimal_check_status(&res, &decimal_context) != NULL);
 	return r;
 }
 
@@ -182,7 +179,7 @@ decimal_round(decimal_t *dec, int scale)
 	};
 
 	decNumberPlus(dec, dec, &context);
-	assert(decimal_check_status(&context) == 0);
+	assert(decimal_check_status(dec, &context) != NULL);
 	return dec;
 }
 
@@ -190,7 +187,7 @@ decimal_t *
 decimal_abs(decimal_t *res, const decimal_t *dec)
 {
 	decNumberAbs(res, dec, &decimal_context);
-	assert(decimal_check_status(&decimal_context) == 0);
+	assert(decimal_check_status(res, &decimal_context) != NULL);
 	return res;
 }
 
@@ -198,7 +195,7 @@ decimal_t *
 decimal_minus(decimal_t *res, const decimal_t *dec)
 {
 	decNumberMinus(res, dec, &decimal_context);
-	assert(decimal_check_status(&decimal_context) == 0);
+	assert(decimal_check_status(res, &decimal_context) != NULL);
 	return res;
 }
 
@@ -206,11 +203,7 @@ decimal_t *
 decimal_add(decimal_t *res, const decimal_t *lhs, const decimal_t *rhs)
 {
 	decNumberAdd(res, lhs, rhs, &decimal_context);
-	if (decimal_check_status(&decimal_context) != 0) {
-		return NULL;
-	} else {
-		return res;
-	}
+	return decimal_check_status(res, &decimal_context);
 }
 
 decimal_t *
@@ -218,11 +211,7 @@ decimal_sub(decimal_t *res, const decimal_t *lhs, const decimal_t *rhs)
 {
 	decNumberSubtract(res, lhs, rhs, &decimal_context);
 
-	if (decimal_check_status(&decimal_context) != 0) {
-		return NULL;
-	} else {
-		return res;
-	}
+	return decimal_check_status(res, &decimal_context);
 }
 
 decimal_t *
@@ -230,11 +219,7 @@ decimal_mul(decimal_t *res, const decimal_t *lhs, const decimal_t *rhs)
 {
 	decNumberMultiply(res, lhs, rhs, &decimal_context);
 
-	if (decimal_check_status(&decimal_context) != 0) {
-		return NULL;
-	} else {
-		return res;
-	}
+	return decimal_check_status(res, &decimal_context);
 }
 
 decimal_t *
@@ -242,11 +227,7 @@ decimal_div(decimal_t *res, const decimal_t *lhs, const decimal_t *rhs)
 {
 	decNumberDivide(res, lhs, rhs, &decimal_context);
 
-	if (decimal_check_status(&decimal_context) != 0) {
-		return NULL;
-	} else {
-		return res;
-	}
+	return decimal_check_status(res, &decimal_context);
 }
 
 decimal_t *
@@ -254,11 +235,7 @@ decimal_log10(decimal_t *res, const decimal_t *lhs)
 {
 	decNumberLog10(res, lhs, &decimal_context);
 
-	if (decimal_check_status(&decimal_context) != 0) {
-		return NULL;
-	} else {
-		return res;
-	}
+	return decimal_check_status(res, &decimal_context);
 }
 
 decimal_t *
@@ -279,7 +256,7 @@ decimal_ln(decimal_t *res, const decimal_t *lhs)
 	decNumberLn(res, lhs, &decimal_context);
 
 	decimal_context.emin = emin;
-	if (decimal_check_status(&decimal_context) != 0) {
+	if (decimal_check_status(res, &decimal_context) == NULL) {
 		return NULL;
 	} else {
 		/*
@@ -297,11 +274,7 @@ decimal_pow(decimal_t *res, const decimal_t *lhs, const decimal_t *rhs)
 {
 	decNumberPower(res, lhs, rhs, &decimal_context);
 
-	if (decimal_check_status(&decimal_context) != 0) {
-		return NULL;
-	} else {
-		return res;
-	}
+	return decimal_check_status(res, &decimal_context);
 }
 
 decimal_t *
@@ -309,11 +282,7 @@ decimal_exp(decimal_t *res, const decimal_t *lhs)
 {
 	decNumberExp(res, lhs, &decimal_context);
 
-	if (decimal_check_status(&decimal_context) != 0) {
-		return NULL;
-	} else {
-		return res;
-	}
+	return decimal_check_status(res, &decimal_context);
 }
 
 decimal_t *
@@ -321,11 +290,7 @@ decimal_sqrt(decimal_t *res, const decimal_t *lhs)
 {
 	decNumberSquareRoot(res, lhs, &decimal_context);
 
-	if (decimal_check_status(&decimal_context) != 0) {
-		return NULL;
-	} else {
-		return res;
-	}
+	return decimal_check_status(res, &decimal_context);
 }
 
 uint32_t

@@ -1,4 +1,4 @@
-1..266
+1..279
 ok 1 - decimal(314)
 ok 2 - decimal(271)
 ok 3 - decimal(314) + decimal(271)
@@ -252,18 +252,31 @@ ok 250 - decimal_compare(10)
 ok 251 - decimal construction from 2e38 failure
 ok 252 - decimal construction from "1e38" failure
 ok 253 - decimal construction from "100000000000000000000000000000000000000" failure
-ok 254 - decimal construction from LONG_MIN success
-ok 255 - decimal construction from LONG_MAX success
-ok 256 - decimal construction from ULONG_MAX success
-ok 257 - decimal_from_string(9e37)
-ok 258 - decimal_from_string(1e37)
-ok 259 - decimal_add(9e37, 1e37) - overflow
-ok 260 - decimal_from_string(1e19)
-ok 261 - decimal_from_string(1e19)
-ok 262 - decimal_mul(1e19, 1e19) - overflow
+ok 254 - decimal construction from "inf" failure
+ok 255 - decimal construction from "NaN" failure
+ok 256 - decimal construction from "a random string" failure
+ok 257 - decimal construction from LONG_MIN success
+ok 258 - decimal construction from LONG_MAX success
+ok 259 - decimal construction from ULONG_MAX success
+ok 260 - decimal_from_string(9e37)
+ok 261 - decimal_from_string(1e37)
+ok 262 - decimal_add(9e37, 1e37) - overflow
 ok 263 - decimal_from_string(1e19)
-ok 264 - decimal_from_string(1e-19)
-ok 265 - decimal_div(1e19, 1e-19) - overflow
+ok 264 - decimal_from_string(1e19)
+ok 265 - decimal_mul(1e19, 1e19) - overflow
+ok 266 - decimal_from_string(1e19)
+ok 267 - decimal_from_string(1e-19)
+ok 268 - decimal_div(1e19, 1e-19) - overflow
+ok 269 - decimal_from_string(0)
+ok 270 - decimal_ln(0) - error on wrong operands.
+ok 271 - decimal_from_string(-1)
+ok 272 - decimal_ln(-1) - error on wrong operands.
+ok 273 - decimal_from_string(0)
+ok 274 - decimal_log10(0) - error on wrong operands.
+ok 275 - decimal_from_string(-1)
+ok 276 - decimal_log10(-1) - error on wrong operands.
+ok 277 - decimal_from_string(-10)
+ok 278 - decimal_sqrt(-10) - error on wrong operands.
     1..146
     ok 1 - decimal_len(0)
     ok 2 - decimal_len(0) == len(decimal_pack(0)
@@ -411,4 +424,4 @@ ok 265 - decimal_div(1e19, 1e-19) - overflow
     ok 144 - str(decimal_unpack(decimal_pack(-99999999999999999999999999999999999999)) == -99999999999999999999999999999999999999
     ok 145 - unpack malformed decimal fails
     ok 146 - decode malformed decimal preserves buffer position
-ok 266 - subtests
+ok 279 - subtests

@@ -62,6 +62,12 @@
 	is(decimal_##op(&c, &a, &b), NULL, "decimal_"#op"("#stra", "#strb") - overflow");\
 })
 
+#define dectest_op1_fail(op, stra) ({\
+	decimal_t a, b;\
+	is(decimal_from_string(&a, #stra), &a, "decimal_from_string("#stra")");\
+	is(decimal_##op(&b, &a), NULL, "decimal_"#op"("#stra") - error on wrong operands.");\
+})
+
 char buf[32];
 
 #define test_decpack(str) ({\
@@ -121,7 +127,7 @@ test_pack_unpack(void)
 int
 main(void)
 {
-	plan(266);
+	plan(279);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -162,6 +168,10 @@ main(void)
 	dectest_construct(double, 2e38, failure);
 	dectest_construct(string, "1e38", failure);
 	dectest_construct(string, "100000000000000000000000000000000000000", failure);
+	/* Check that inf and NaN are not allowed. Check bad input. */
+	dectest_construct(string, "inf", failure);
+	dectest_construct(string, "NaN", failure);
+	dectest_construct(string, "a random string", failure);
 
 	dectest_construct(int64, LONG_MIN, success);
 	dectest_construct(int64, LONG_MAX, success);
@@ -170,6 +180,12 @@ main(void)
 	dectest_op_fail(add, 9e37, 1e37);
 	dectest_op_fail(mul, 1e19, 1e19);
 	dectest_op_fail(div, 1e19, 1e-19);
+
+	dectest_op1_fail(ln, 0);
+	dectest_op1_fail(ln, -1);
+	dectest_op1_fail(log10, 0);
+	dectest_op1_fail(log10, -1);
+	dectest_op1_fail(sqrt, -10);
 
 	test_pack_unpack();
 
