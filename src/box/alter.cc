@@ -2445,22 +2445,18 @@ user_def_new_from_tuple(struct tuple *tuple)
 }
 
 static void
-user_cache_remove_user(struct trigger * /* trigger */, void *event)
+user_cache_remove_user(struct trigger *trigger, void * /* event */)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_last_stmt(txn);
-	uint32_t uid = tuple_field_u32_xc(stmt->old_tuple ?
-				       stmt->old_tuple : stmt->new_tuple,
-				       BOX_USER_FIELD_ID);
+	struct tuple *tuple = (struct tuple *)trigger->data;
+	uint32_t uid = tuple_field_u32_xc(tuple, BOX_USER_FIELD_ID);
 	user_cache_delete(uid);
 }
 
 static void
-user_cache_alter_user(struct trigger * /* trigger */, void *event)
+user_cache_alter_user(struct trigger *trigger, void * /* event */)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_last_stmt(txn);
-	struct user_def *user = user_def_new_from_tuple(stmt->new_tuple);
+	struct tuple *tuple = (struct tuple *)trigger->data;
+	struct user_def *user = user_def_new_from_tuple(tuple);
 	auto def_guard = make_scoped_guard([=] { free(user); });
 	/* Can throw if, e.g. too many users. */
 	user_cache_replace(user);
@@ -2490,7 +2486,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		(void) user_cache_replace(user);
 		def_guard.is_active = false;
 		struct trigger *on_rollback =
-			txn_alter_trigger_new(user_cache_remove_user, NULL);
+			txn_alter_trigger_new(user_cache_remove_user, new_tuple);
 		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
 		access_check_ddl(old_user->def->name, old_user->def->uid,
@@ -2510,9 +2506,10 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 			tnt_raise(ClientError, ER_DROP_USER,
 				  old_user->def->name, "the user has objects");
 		}
-		struct trigger *on_commit =
-			txn_alter_trigger_new(user_cache_remove_user, NULL);
-		txn_on_commit(txn, on_commit);
+		user_cache_delete(uid);
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(user_cache_alter_user, old_tuple);
+		txn_on_rollback(txn, on_rollback);
 	} else { /* UPDATE, REPLACE */
 		assert(old_user != NULL && new_tuple != NULL);
 		/*
@@ -2524,9 +2521,11 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		access_check_ddl(user->name, user->uid, user->uid,
 			         old_user->def->type, PRIV_A);
 		auto def_guard = make_scoped_guard([=] { free(user); });
-		struct trigger *on_commit =
-			txn_alter_trigger_new(user_cache_alter_user, NULL);
-		txn_on_commit(txn, on_commit);
+		user_cache_replace(user);
+		def_guard.is_active = false;
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(user_cache_alter_user, old_tuple);
+		txn_on_rollback(txn, on_rollback);
 	}
 }
 
