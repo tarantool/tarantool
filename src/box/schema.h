@@ -205,12 +205,12 @@ struct sequence *
 sequence_cache_find(uint32_t id);
 
 /**
- * Insert a new sequence object into the cache or update
- * an existing one if there's already a sequence with
- * the given id in the cache.
+ * Insert a new sequence object into the cache.
+ * There must not be a sequence with the same id
+ * in the cache.
  */
 void
-sequence_cache_replace(struct sequence_def *def);
+sequence_cache_insert(struct sequence *seq);
 
 /** Delete a sequence from the sequence cache. */
 void

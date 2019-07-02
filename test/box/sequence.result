@@ -2153,3 +2153,45 @@ s:insert{{a = 3, b = box.NULL}}
 s:drop()
 ---
 ...
+--
+-- Check that sequence cache is updated synchronously with _sequence changes.
+--
+box.begin() box.schema.sequence.create('test') sq = box.sequence.test box.rollback()
+---
+...
+sq ~= nil
+---
+- true
+...
+box.sequence.test == nil
+---
+- true
+...
+sq = box.schema.sequence.create('test')
+---
+...
+box.begin() sq:alter{step = 10} step = sq.step box.rollback()
+---
+...
+step -- 10
+---
+- 10
+...
+sq.step -- 1
+---
+- 1
+...
+box.begin() box.space._sequence:delete{sq.id} sq = box.sequence.test box.rollback()
+---
+...
+sq == nil
+---
+- true
+...
+box.sequence.test ~= nil
+---
+- true
+...
+box.sequence.test:drop()
+---
+...

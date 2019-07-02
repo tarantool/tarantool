@@ -127,6 +127,27 @@ sequence_free(void)
 	mempool_destroy(&sequence_data_extent_pool);
 }
 
+struct sequence *
+sequence_new(struct sequence_def *def)
+{
+	struct sequence *seq = calloc(1, sizeof(*seq));
+	if (seq == NULL) {
+		diag_set(OutOfMemory, sizeof(*seq), "malloc", "sequence");
+		return NULL;
+	}
+	seq->def = def;
+	return seq;
+}
+
+void
+sequence_delete(struct sequence *seq)
+{
+	/* Delete sequence data. */
+	sequence_reset(seq);
+	free(seq->def);
+	free(seq);
+}
+
 void
 sequence_reset(struct sequence *seq)
 {

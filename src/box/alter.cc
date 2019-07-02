@@ -3337,50 +3337,52 @@ sequence_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 	return def;
 }
 
-/** Argument passed to on_commit_dd_sequence() trigger. */
-struct alter_sequence {
-	/** Trigger invoked on commit in the _sequence space. */
-	struct trigger on_commit;
-	/** Trigger invoked on rollback in the _sequence space. */
-	struct trigger on_rollback;
-	/** Old sequence definition or NULL if create. */
-	struct sequence_def *old_def;
-	/** New sequence defitition or NULL if drop. */
-	struct sequence_def *new_def;
-};
-
-/**
- * Trigger invoked on commit in the _sequence space.
- */
 static void
-on_commit_dd_sequence(struct trigger *trigger, void *event)
+on_create_sequence_rollback(struct trigger *trigger, void * /* event */)
 {
-	struct txn *txn = (struct txn *) event;
-	struct alter_sequence *alter = (struct alter_sequence *) trigger->data;
-
-	if (alter->new_def != NULL && alter->old_def != NULL) {
-		/* Alter a sequence. */
-		sequence_cache_replace(alter->new_def);
-	} else if (alter->new_def == NULL) {
-		/* Drop a sequence. */
-		sequence_cache_delete(alter->old_def->id);
-	}
-
-	trigger_run_xc(&on_alter_sequence, txn_last_stmt(txn));
+	/* Remove the new sequence from the cache and delete it. */
+	struct sequence *seq = (struct sequence *)trigger->data;
+	sequence_cache_delete(seq->def->id);
+	trigger_run_xc(&on_alter_sequence, seq);
+	sequence_delete(seq);
 }
 
-/**
- * Trigger invoked on rollback in the _sequence space.
- */
 static void
-on_rollback_dd_sequence(struct trigger *trigger, void * /* event */)
+on_drop_sequence_commit(struct trigger *trigger, void * /* event */)
 {
-	struct alter_sequence *alter = (struct alter_sequence *) trigger->data;
+	/* Delete the old sequence. */
+	struct sequence *seq = (struct sequence *)trigger->data;
+	sequence_delete(seq);
+}
 
-	if (alter->new_def != NULL && alter->old_def == NULL) {
-		/* Rollback creation of a sequence. */
-		sequence_cache_delete(alter->new_def->id);
-	}
+static void
+on_drop_sequence_rollback(struct trigger *trigger, void * /* event */)
+{
+	/* Insert the old sequence back into the cache. */
+	struct sequence *seq = (struct sequence *)trigger->data;
+	sequence_cache_insert(seq);
+	trigger_run_xc(&on_alter_sequence, seq);
+}
+
+
+static void
+on_alter_sequence_commit(struct trigger *trigger, void * /* event */)
+{
+	/* Delete the old old sequence definition. */
+	struct sequence_def *def = (struct sequence_def *)trigger->data;
+	free(def);
+}
+
+static void
+on_alter_sequence_rollback(struct trigger *trigger, void * /* event */)
+{
+	/* Restore the old sequence definition. */
+	struct sequence_def *def = (struct sequence_def *)trigger->data;
+	struct sequence *seq = sequence_by_id(def->id);
+	assert(seq != NULL);
+	free(seq->def);
+	seq->def = def;
+	trigger_run_xc(&on_alter_sequence, seq);
 }
 
 /**
@@ -3396,24 +3398,25 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
-	struct alter_sequence *alter =
-		region_calloc_object_xc(&txn->region, struct alter_sequence);
-
 	struct sequence_def *new_def = NULL;
 	auto def_guard = make_scoped_guard([=] { free(new_def); });
 
+	struct sequence *seq;
 	if (old_tuple == NULL && new_tuple != NULL) {		/* INSERT */
 		new_def = sequence_def_new_from_tuple(new_tuple,
 						      ER_CREATE_SEQUENCE);
-		assert(sequence_by_id(new_def->id) == NULL);
 		access_check_ddl(new_def->name, new_def->id, new_def->uid,
 				 SC_SEQUENCE, PRIV_C);
-		sequence_cache_replace(new_def);
-		alter->new_def = new_def;
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(on_create_sequence_rollback, NULL);
+		seq = sequence_new_xc(new_def);
+		sequence_cache_insert(seq);
+		on_rollback->data = seq;
+		txn_on_rollback(txn, on_rollback);
 	} else if (old_tuple != NULL && new_tuple == NULL) {	/* DELETE */
 		uint32_t id = tuple_field_u32_xc(old_tuple,
 						 BOX_SEQUENCE_DATA_FIELD_ID);
-		struct sequence *seq = sequence_by_id(id);
+		seq = sequence_by_id(id);
 		assert(seq != NULL);
 		access_check_ddl(seq->def->name, seq->def->id, seq->def->uid,
 				 SC_SEQUENCE, PRIV_D);
@@ -3426,26 +3429,31 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 		if (schema_find_grants("sequence", seq->def->id))
 			tnt_raise(ClientError, ER_DROP_SEQUENCE,
 				  seq->def->name, "the sequence has grants");
-		alter->old_def = seq->def;
+		struct trigger *on_commit =
+			txn_alter_trigger_new(on_drop_sequence_commit, seq);
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(on_drop_sequence_rollback, seq);
+		sequence_cache_delete(seq->def->id);
+		txn_on_commit(txn, on_commit);
+		txn_on_rollback(txn, on_rollback);
 	} else {						/* UPDATE */
 		new_def = sequence_def_new_from_tuple(new_tuple,
 						      ER_ALTER_SEQUENCE);
-		struct sequence *seq = sequence_by_id(new_def->id);
+		seq = sequence_by_id(new_def->id);
 		assert(seq != NULL);
 		access_check_ddl(seq->def->name, seq->def->id, seq->def->uid,
 				 SC_SEQUENCE, PRIV_A);
-		alter->old_def = seq->def;
-		alter->new_def = new_def;
+		struct trigger *on_commit =
+			txn_alter_trigger_new(on_alter_sequence_commit, seq->def);
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(on_alter_sequence_rollback, seq->def);
+		seq->def = new_def;
+		txn_on_commit(txn, on_commit);
+		txn_on_rollback(txn, on_rollback);
 	}
 
 	def_guard.is_active = false;
-
-	trigger_create(&alter->on_commit,
-		       on_commit_dd_sequence, alter, NULL);
-	txn_on_commit(txn, &alter->on_commit);
-	trigger_create(&alter->on_rollback,
-		       on_rollback_dd_sequence, alter, NULL);
-	txn_on_rollback(txn, &alter->on_rollback);
+	trigger_run_xc(&on_alter_sequence, seq);
 }
 
 /**

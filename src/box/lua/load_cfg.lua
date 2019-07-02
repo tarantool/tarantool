@@ -467,7 +467,6 @@ setmetatable(box, {
 })
 
 local function load_cfg(cfg)
-    box.internal.schema.init()
     cfg = upgrade_cfg(cfg, translate_cfg)
     cfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
     apply_default_cfg(cfg, default_cfg);

@@ -1806,42 +1806,11 @@ sequence_mt.drop = function(self)
     box.schema.sequence.drop(self.id)
 end
 
-local function sequence_tuple_decode(seq, tuple)
-    seq.id, seq.uid, seq.name, seq.step, seq.min, seq.max,
-        seq.start, seq.cache, seq.cycle = tuple:unpack()
-end
-
-local function sequence_new(tuple)
-    local seq = setmetatable({}, sequence_mt)
-    sequence_tuple_decode(seq, tuple)
-    return seq
-end
-
-local function sequence_on_alter(old_tuple, new_tuple)
-    if old_tuple and not new_tuple then
-        local old_name = old_tuple.name
-        box.sequence[old_name] = nil
-    elseif not old_tuple and new_tuple then
-        local seq = sequence_new(new_tuple)
-        box.sequence[seq.name] = seq
-    else
-        local old_name = old_tuple.name
-        local seq = box.sequence[old_name]
-        if not seq then
-            seq = sequence_new(seq, new_tuple)
-        else
-            sequence_tuple_decode(seq, new_tuple)
-        end
-        box.sequence[old_name] = nil
-        box.sequence[seq.name] = seq
-    end
-end
-
 box.sequence = {}
-local function box_sequence_init()
-    -- Install a trigger that will update Lua objects on
-    -- _sequence space modifications.
-    internal.sequence.on_alter(sequence_on_alter)
+box.schema.sequence = {}
+
+function box.schema.sequence.bless(seq)
+    setmetatable(seq, {__index = sequence_mt})
 end
 
 local sequence_options = {
@@ -1859,7 +1828,6 @@ create_sequence_options.if_not_exists = 'boolean'
 local alter_sequence_options = table.deepcopy(sequence_options)
 alter_sequence_options.name = 'string'
 
-box.schema.sequence = {}
 box.schema.sequence.create = function(name, opts)
     opts = opts or {}
     check_param(name, 'name', 'string')
@@ -1897,7 +1865,8 @@ box.schema.sequence.alter = function(name, opts)
         return
     end
     local seq = {}
-    sequence_tuple_decode(seq, tuple)
+    seq.id, seq.uid, seq.name, seq.step, seq.min, seq.max,
+        seq.start, seq.cache, seq.cycle = tuple:unpack()
     opts = update_param_table(opts, seq)
     local _sequence = box.space[box.schema.SEQUENCE_ID]
     _sequence:replace{seq.id, seq.uid, opts.name, opts.step, opts.min,
@@ -2688,11 +2657,6 @@ local function box_space_mt(tab)
 end
 
 setmetatable(box.space, { __serialize = box_space_mt })
-
-box.internal.schema = {}
-box.internal.schema.init = function()
-    box_sequence_init()
-end
 
 box.feedback = {}
 box.feedback.save = function(file_name)

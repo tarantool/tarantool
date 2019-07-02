@@ -635,41 +635,24 @@ sequence_cache_find(uint32_t id)
 }
 
 void
-sequence_cache_replace(struct sequence_def *def)
+sequence_cache_insert(struct sequence *seq)
 {
-	struct sequence *seq = sequence_by_id(def->id);
-	if (seq == NULL) {
-		/* Create a new sequence. */
-		seq = (struct sequence *) calloc(1, sizeof(*seq));
-		if (seq == NULL)
-			goto error;
-		struct mh_i32ptr_node_t node = { def->id, seq };
-		if (mh_i32ptr_put(sequences, &node, NULL, NULL) ==
-		    mh_end(sequences))
-			goto error;
-	} else {
-		/* Update an existing sequence. */
-		free(seq->def);
+	assert(sequence_by_id(seq->def->id) == NULL);
+
+	struct mh_i32ptr_node_t node = { seq->def->id, seq };
+	mh_int_t k = mh_i32ptr_put(sequences, &node, NULL, NULL);
+	if (k == mh_end(sequences)) {
+		panic_syserror("Out of memory for the data "
+			       "dictionary cache (sequence).");
 	}
-	seq->def = def;
-	return;
-error:
-	panic_syserror("Out of memory for the data "
-		       "dictionary cache (sequence).");
 }
 
 void
 sequence_cache_delete(uint32_t id)
 {
-	struct sequence *seq = sequence_by_id(id);
-	if (seq != NULL) {
-		/* Delete sequence data. */
-		sequence_reset(seq);
-		mh_i32ptr_del(sequences, seq->def->id, NULL);
-		free(seq->def);
-		TRASH(seq);
-		free(seq);
-	}
+	mh_int_t k = mh_i32ptr_find(sequences, id, NULL);
+	if (k != mh_end(sequences))
+		mh_i32ptr_del(sequences, k, NULL);
 }
 
 const char *

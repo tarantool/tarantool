@@ -727,3 +727,18 @@ pk:alter{parts = {{'y.b', 'unsigned'}}, sequence = {field = 'y.a'}} -- error
 pk:alter{parts = {{'y.b', 'unsigned'}}, sequence = {field = 'y.b'}} -- ok
 s:insert{{a = 3, b = box.NULL}}
 s:drop()
+
+--
+-- Check that sequence cache is updated synchronously with _sequence changes.
+--
+box.begin() box.schema.sequence.create('test') sq = box.sequence.test box.rollback()
+sq ~= nil
+box.sequence.test == nil
+sq = box.schema.sequence.create('test')
+box.begin() sq:alter{step = 10} step = sq.step box.rollback()
+step -- 10
+sq.step -- 1
+box.begin() box.space._sequence:delete{sq.id} sq = box.sequence.test box.rollback()
+sq == nil
+box.sequence.test ~= nil
+box.sequence.test:drop()

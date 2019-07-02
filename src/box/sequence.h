@@ -36,6 +36,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "diag.h"
 #include "user_def.h"
 
 #if defined(__cplusplus)
@@ -99,6 +100,22 @@ sequence_init(void);
 void
 sequence_free(void);
 
+/**
+ * Create a new sequence object with the given definition.
+ * Note, on success the sequence definition is assigned to
+ * the new sequence and will be freed automatically when
+ * the sequence is destroyed so it must be allocated with
+ * malloc().
+ */
+struct sequence *
+sequence_new(struct sequence_def *def);
+
+/**
+ * Destroy a sequence and its definition.
+ */
+void
+sequence_delete(struct sequence *seq);
+
 /** Reset a sequence. */
 void
 sequence_reset(struct sequence *seq);
@@ -155,6 +172,16 @@ sequence_data_iterator_create(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */
+
+static inline struct sequence *
+sequence_new_xc(struct sequence_def *def)
+{
+	struct sequence *seq = sequence_new(def);
+	if (seq == NULL)
+		diag_raise();
+	return seq;
+}
+
 #endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_BOX_SEQUENCE_H */
