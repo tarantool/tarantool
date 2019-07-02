@@ -532,11 +532,6 @@ struct swim {
 	/** Generator of round step events. */
 	struct ev_timer round_tick;
 	/**
-	 * True if a packet in the round step task is still valid
-	 * and can be resent on a next round step.
-	 */
-	bool is_round_packet_valid;
-	/**
 	 * Preallocated buffer to store shuffled members here at
 	 * the beginning of each round.
 	 */
@@ -563,20 +558,6 @@ struct swim {
 	 */
 	struct swim_task round_step_task;
 };
-
-/**
- * Mark cached round message invalid on any change of any member.
- * It triggers postponed rebuilding of the message. The round
- * packet can not be rebuilt right now because 1) invalidation can
- * occur several times in row when multiple member attributes are
- * updated, or more than one member are added, 2) the message can
- * be in fly right now in the output queue inside the scheduler.
- */
-static inline void
-swim_cached_round_msg_invalidate(struct swim *swim)
-{
-	swim->is_round_packet_valid = false;
-}
 
 /** Put the member into a list of ACK waiters. */
 static void
@@ -634,7 +615,6 @@ swim_register_event(struct swim *swim, struct swim_member *member)
 	 * SWIM paper as the best option.
 	 */
 	member->status_ttd = ceil(log2(mh_size(swim->members))) + 1;
-	swim_cached_round_msg_invalidate(swim);
 }
 
 /**
@@ -988,7 +968,6 @@ swim_new_round(struct swim *swim)
 	/* -1 for self. */
 	say_verbose("SWIM %d: start a new round with %d members", swim_fd(swim),
 		    size - 1);
-	swim_cached_round_msg_invalidate(swim);
 	swim_shuffle_members(swim);
 	rlist_create(&swim->round_queue);
 	for (int i = 0; i < size; ++i) {
@@ -1147,8 +1126,6 @@ swim_encode_dissemination(struct swim *swim, struct swim_packet *packet)
 static void
 swim_encode_round_msg(struct swim *swim)
 {
-	if (swim->is_round_packet_valid)
-		return;
 	struct swim_packet *packet = &swim->round_step_task.packet;
 	swim_packet_create(packet);
 	char *header = swim_packet_alloc(packet, 1);
@@ -1161,7 +1138,6 @@ swim_encode_round_msg(struct swim *swim)
 
 	assert(mp_sizeof_map(map_size) == 1 && map_size >= 2);
 	mp_encode_map(header, map_size);
-	swim->is_round_packet_valid = true;
 }
 
 /**
@@ -1183,14 +1159,11 @@ swim_decrease_event_ttd(struct swim *swim)
 	rlist_foreach_entry_safe(member, &swim->dissemination_queue,
 				 in_dissemination_queue,
 				 tmp) {
-		if (member->payload_ttd > 0) {
-			if (--member->payload_ttd == 0)
-				swim_cached_round_msg_invalidate(swim);
-		}
+		if (member->payload_ttd > 0)
+			--member->payload_ttd;
 		assert(member->status_ttd > 0);
 		if (--member->status_ttd == 0) {
 			rlist_del_entry(member, in_dissemination_queue);
-			swim_cached_round_msg_invalidate(swim);
 			if (member->status == MEMBER_LEFT)
 				swim_delete_member(swim, member);
 		}
