@@ -38,6 +38,7 @@
 #include "assoc.h"
 #include "sio.h"
 #include "trigger.h"
+#include "errinj.h"
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
 
@@ -1133,6 +1134,10 @@ swim_encode_round_msg(struct swim *swim)
 	map_size += swim_encode_src_uuid(swim, packet);
 	map_size += swim_encode_failure_detection(swim, packet,
 						  SWIM_FD_MSG_PING);
+	ERROR_INJECT(ERRINJ_SWIM_FD_ONLY, {
+		mp_encode_map(header, map_size);
+		return;
+	});
 	map_size += swim_encode_dissemination(swim, packet);
 	map_size += swim_encode_anti_entropy(swim, packet);
 

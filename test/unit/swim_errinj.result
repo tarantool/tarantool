@@ -1,0 +1,18 @@
+	*** main_f ***
+1..1
+	*** swim_test_payload_refutation ***
+    1..11
+    ok 1 - S2 sees new version of S1
+    ok 2 - S3 does the same
+    ok 3 - but S2 does not known the new payload
+    ok 4 - as well as S3
+    ok 5 - S2 learned S1's payload via anti-entropy
+    ok 6 - version still is the same
+    ok 7 - S3 was blocked and does not know anything
+    ok 8 - version still is the same
+    ok 9 - S2 keeps the same new S1's payload, S3 did not rewrite it
+    ok 10 - S3 still does not know anything
+    ok 11 - S3 learns S1's payload from S2
+ok 1 - subtests
+	*** swim_test_payload_refutation: done ***
+	*** main_f: done ***

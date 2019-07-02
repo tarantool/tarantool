@@ -31,7 +31,15 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
+#include "uuid/tt_uuid.h"
+#include "unit.h"
+#include "fiber.h"
+#include "uri/uri.h"
 #include "swim/swim.h"
+#include "swim/swim_ev.h"
+#include "swim/swim_proto.h"
+#include "swim_test_transport.h"
+#include "swim_test_ev.h"
 
 struct swim_cluster;
 
@@ -116,15 +124,6 @@ swim_cluster_set_drop_out(struct swim_cluster *cluster, int i, double value);
  */
 void
 swim_cluster_set_drop_in(struct swim_cluster *cluster, int i, double value);
-
-/**
- * Drop all packets from/to a SWIM instance with id @a i
- * containing components specified in @a keys. Components are
- * defined by the constants in the packet body.
- */
-void
-swim_cluster_drop_components(struct swim_cluster *cluster, int i,
-			     const int *keys, int key_count);
 
 /**
  * When @a value is true, break a one direction network link
@@ -244,6 +243,13 @@ swim_cluster_run_triggers(struct swim_cluster *cluster);
 /** Process SWIM events for @a duration fake seconds. */
 void
 swim_run_for(double duration);
+
+/**
+ * A helper to initialize all the necessary subsystems before a
+ * test, and free them afterwards.
+ */
+void
+swim_run_test(const char *log_file, fiber_func test);
 
 #define swim_start_test(n) { \
 	header(); \

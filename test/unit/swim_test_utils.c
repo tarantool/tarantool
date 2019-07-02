@@ -34,9 +34,11 @@
 #include "swim/swim_ev.h"
 #include "uuid/tt_uuid.h"
 #include "trivia/util.h"
-#include "fiber.h"
 #include "msgpuck.h"
 #include "trigger.h"
+#include "memory.h"
+#include "random.h"
+#include <fcntl.h>
 
 /**
  * Drop rate packet filter to drop packets with a certain
@@ -59,26 +61,6 @@ swim_drop_rate_create(struct swim_drop_rate *dr, double rate, bool is_for_in,
 	dr->is_for_in = is_for_in;
 	dr->is_for_out = is_for_out;
 	dr->rate = rate;
-}
-
-/**
- * Drop components packet filter to drop packets containing
- * specified SWIM components.
- */
-struct swim_drop_components {
-	/** List of component body keys. */
-	const int *keys;
-	/** Length of @a keys. */
-	int key_count;
-};
-
-/** Initialize drop components packet filter. */
-static inline void
-swim_drop_components_create(struct swim_drop_components *dc, const int *keys,
-			    int key_count)
-{
-	dc->keys = keys;
-	dc->key_count = key_count;
 }
 
 /** Packet filter to drop packets with specified destinations. */
@@ -164,10 +146,6 @@ struct swim_node {
 	 * from/to a specified direction.
 	 */
 	struct swim_drop_rate drop_rate;
-	/**
-	 * Filter to drop packets with specified SWIM components.
-	 */
-	struct swim_drop_components drop_components;
 	/** Filter to drop packets with specified destinations. */
 	struct swim_drop_channel drop_channel;
 };
@@ -230,7 +208,6 @@ swim_node_create(struct swim_node *n, int id)
 	(void) rc;
 
 	swim_drop_rate_create(&n->drop_rate, 0, false, false);
-	swim_drop_components_create(&n->drop_components, NULL, 0);
 	swim_drop_channel_create(&n->drop_channel);
 }
 
@@ -493,48 +470,6 @@ void
 swim_cluster_set_drop_in(struct swim_cluster *cluster, int i, double value)
 {
 	swim_cluster_set_drop_generic(cluster, i, value, true, false);
-}
-
-/**
- * Check if a packet contains any of the components to filter out.
- */
-static bool
-swim_filter_drop_component(const char *data, int size, void *udata, int dir,
-			   int peer_fd)
-{
-	(void) size;
-	(void) dir;
-	(void) peer_fd;
-	struct swim_drop_components *dc = (struct swim_drop_components *) udata;
-	/* Skip meta. */
-	mp_next(&data);
-	int map_size = mp_decode_map(&data);
-	for (int i = 0; i < map_size; ++i) {
-		int key = mp_decode_uint(&data);
-		for (int j = 0; j < dc->key_count; ++j) {
-			if (dc->keys[j] == key)
-				return true;
-		}
-		/* Skip value. */
-		mp_next(&data);
-	}
-	return false;
-}
-
-void
-swim_cluster_drop_components(struct swim_cluster *cluster, int i,
-			     const int *keys, int key_count)
-{
-	struct swim_node *n = swim_cluster_node(cluster, i);
-	int fd = swim_fd(n->swim);
-	if (key_count == 0) {
-		swim_test_transport_remove_filter(fd,
-						  swim_filter_drop_component);
-		return;
-	}
-	swim_drop_components_create(&n->drop_components, keys, key_count);
-	swim_test_transport_add_filter(fd, swim_filter_drop_component,
-				       &n->drop_components);
 }
 
 /**
@@ -921,4 +856,35 @@ bool
 swim_error_check_match(const char *msg)
 {
 	return strstr(diag_last_error(diag_get())->errmsg, msg) != NULL;
+}
+
+void
+swim_run_test(const char *log_file, fiber_func test)
+{
+	random_init();
+	time_t seed = time(NULL);
+	srand(seed);
+	memory_init();
+	fiber_init(fiber_c_invoke);
+	int fd = open(log_file, O_TRUNC);
+	if (fd != -1)
+		close(fd);
+	say_logger_init(log_file, 6, 1, "plain", 0);
+	/*
+	 * Print the seed to be able to reproduce a bug with the
+	 * same seed.
+	 */
+	say_info("Random seed = %llu", (unsigned long long) seed);
+
+	struct fiber *main_fiber = fiber_new("main", test);
+	fiber_set_joinable(main_fiber, true);
+	assert(main_fiber != NULL);
+	fiber_wakeup(main_fiber);
+	ev_run(loop(), 0);
+	fiber_join(main_fiber);
+
+	say_logger_free();
+	fiber_free();
+	memory_free();
+	random_free();
 }

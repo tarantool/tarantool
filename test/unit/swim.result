@@ -1,5 +1,5 @@
 	*** main_f ***
-1..24
+1..23
 	*** swim_test_one_link ***
     1..6
     ok 1 - no rounds - no fullmesh
@@ -169,38 +169,23 @@ ok 15 - subtests
     ok 11 - third payload is disseminated via anti-entropy
 ok 16 - subtests
 	*** swim_test_payload_basic: done ***
-	*** swim_test_payload_refutation ***
-    1..11
-    ok 1 - S2 sees new version of S1
-    ok 2 - S3 does the same
-    ok 3 - but S2 does not known the new payload
-    ok 4 - as well as S3
-    ok 5 - S2 learned S1's payload via anti-entropy
-    ok 6 - version still is the same
-    ok 7 - S3 was blocked and does not know anything
-    ok 8 - version still is the same
-    ok 9 - S2 keeps the same new S1's payload, S3 did not rewrite it
-    ok 10 - S3 still does not know anything
-    ok 11 - S3 learns S1's payload from S2
-ok 17 - subtests
-	*** swim_test_payload_refutation: done ***
 	*** swim_test_indirect_ping ***
     1..2
     ok 1 - S1 is still alive everywhere
     ok 2 - as well as S2 - they communicated via S3
-ok 18 - subtests
+ok 17 - subtests
 	*** swim_test_indirect_ping: done ***
 	*** swim_test_encryption ***
     1..3
     ok 1 - cluster works with encryption
     ok 2 - different encryption keys - can't interact
     ok 3 - cluster works after encryption has been disabled
-ok 19 - subtests
+ok 18 - subtests
 	*** swim_test_encryption: done ***
 	*** swim_test_slow_net ***
     1..0
     # slow network leads to idle round steps, they should not produce a new message
-ok 20 - subtests
+ok 19 - subtests
 	*** swim_test_slow_net: done ***
 	*** swim_test_triggers ***
     1..23
@@ -228,25 +213,25 @@ ok 20 - subtests
     # now all the triggers are done and deleted
     ok 22 - local URI update warns about version update
     ok 23 - version is a part of incarnation, so the latter is updated too
-ok 21 - subtests
+ok 20 - subtests
 	*** swim_test_triggers: done ***
 	*** swim_test_generation ***
     1..3
     ok 1 - S1 disseminated its payload to S2
     ok 2 - S1 restarted and set another payload. Without generation it could lead to never disseminated new payload.
     ok 3 - S2 sees new generation of S1
-ok 22 - subtests
+ok 21 - subtests
 	*** swim_test_generation: done ***
 	*** swim_test_dissemination_speed ***
     1..2
     ok 1 - dissemination work in log time even at the very start of a cluster
     ok 2 - dissemination can withstand an event storm
-ok 23 - subtests
+ok 22 - subtests
 	*** swim_test_dissemination_speed: done ***
 	*** swim_test_suspect_new_members ***
     1..2
     ok 1 - S2 dropped S1 as dead
     ok 2 - S3 didn't add S1 from S2's messages, because S1 didn't answer on a ping
-ok 24 - subtests
+ok 23 - subtests
 	*** swim_test_suspect_new_members: done ***
 	*** main_f: done ***

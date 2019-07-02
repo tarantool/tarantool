@@ -24,6 +24,8 @@ errinj.info()
     state: false
   ERRINJ_VY_SCHED_TIMEOUT:
     state: 0
+  ERRINJ_SWIM_FD_ONLY:
+    state: false
   ERRINJ_COIO_SENDFILE_CHUNK:
     state: -1
   ERRINJ_WAL_WRITE_PARTIAL:

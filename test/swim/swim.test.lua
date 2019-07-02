@@ -287,28 +287,6 @@ while not s1_view:payload() do fiber.sleep(0.01) end
 p = s1_view:payload()
 s1_view:payload() == p
 
--- Now a complex case. It is possible, that a new member's
--- incarnation is learned, but new payload is not. Payload cache
--- should correctly process that.
-
-s1:cfg({heartbeat_rate = 1000})
-s2:cfg({heartbeat_rate = 1000})
-
-s1:set_payload({a = 200})
--- Via probe() S2 learns new incarnation of S1, but without new
--- payload.
-s2:probe_member(s1_self:uri())
-s1_view:payload()
-s1_view:incarnation()
-
-s1:cfg({heartbeat_rate = 0.01})
-s2:cfg({heartbeat_rate = 0.01})
-while s1_view:payload().a ~= 200 do fiber.sleep(0.01) end
-p = s1_view:payload()
-s1_view:payload() == p
-p
-s1_view:incarnation()
-
 s1:delete()
 s2:delete()
 
