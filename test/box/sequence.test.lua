@@ -742,3 +742,22 @@ box.begin() box.space._sequence:delete{sq.id} sq = box.sequence.test box.rollbac
 sq == nil
 box.sequence.test ~= nil
 box.sequence.test:drop()
+
+--
+-- Check that changes to _space_sequence are rolled back properly.
+--
+s = box.schema.space.create('test')
+_ = s:create_index('pk')
+sq = box.schema.sequence.create('test')
+box.begin() box.space._space_sequence:insert{s.id, sq.id, false, 0, ''} id = s.index.pk.sequence_id box.rollback()
+id == sq.id
+s.index.pk.sequence_id == nil
+s:insert{box.NULL} -- error
+s.index.pk:alter{sequence = sq}
+box.begin() box.space._space_sequence:delete{s.id} id = s.index.pk.sequence_id box.rollback()
+id == nil
+s.index.pk.sequence_id == sq.id
+s:insert{box.NULL} -- ok
+s.index.pk:alter{sequence = false}
+sq:drop()
+s:drop()

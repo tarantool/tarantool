@@ -126,7 +126,8 @@ access_check_ddl(const char *name, uint32_t object_id, uint32_t owner_uid,
  */
 static void
 index_def_check_sequence(struct index_def *index_def, uint32_t sequence_fieldno,
-			 const char *sequence_path, const char *space_name)
+			 const char *sequence_path, uint32_t sequence_path_len,
+			 const char *space_name)
 {
 	struct key_def *key_def = index_def->key_def;
 	struct key_part *sequence_part = NULL;
@@ -137,7 +138,7 @@ index_def_check_sequence(struct index_def *index_def, uint32_t sequence_fieldno,
 		if ((part->path == NULL && sequence_path == NULL) ||
 		    (part->path != NULL && sequence_path != NULL &&
 		     json_path_cmp(part->path, part->path_len,
-				   sequence_path, strlen(sequence_path),
+				   sequence_path, sequence_path_len,
 				   TUPLE_INDEX_BASE) == 0)) {
 			sequence_part = part;
 			break;
@@ -302,7 +303,10 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	space_check_index_def_xc(space, index_def);
 	if (index_def->iid == 0 && space->sequence != NULL)
 		index_def_check_sequence(index_def, space->sequence_fieldno,
-					 space->sequence_path, space_name(space));
+					 space->sequence_path,
+					 space->sequence_path != NULL ?
+					 strlen(space->sequence_path) : 0,
+					 space_name(space));
 	index_def_guard.is_active = false;
 	return index_def;
 }
@@ -3484,12 +3488,83 @@ on_replace_dd_sequence_data(struct trigger * /* trigger */, void *event)
 }
 
 /**
- * Run the triggers registered on commit of a change in _space.
+ * Extract field number and path from _space_sequence tuple.
+ * The path is allocated using malloc().
  */
-static void
-on_commit_dd_space_sequence(struct trigger *trigger, void * /* event */)
+static uint32_t
+sequence_field_from_tuple(struct space *space, struct tuple *tuple,
+			  char **path_ptr)
 {
-	struct space *space = (struct space *) trigger->data;
+	struct index *pk = index_find_xc(space, 0);
+	struct key_part *part = &pk->def->key_def->parts[0];
+	uint32_t fieldno = part->fieldno;
+	const char *path_raw = part->path;
+	uint32_t path_len = part->path_len;
+
+	/* Sequence field was added in 2.2.1. */
+	if (tuple_field_count(tuple) > BOX_SPACE_SEQUENCE_FIELD_FIELDNO) {
+		fieldno = tuple_field_u32_xc(tuple,
+				BOX_SPACE_SEQUENCE_FIELD_FIELDNO);
+		path_raw = tuple_field_str_xc(tuple,
+				BOX_SPACE_SEQUENCE_FIELD_PATH, &path_len);
+		if (path_len == 0)
+			path_raw = NULL;
+	}
+	index_def_check_sequence(pk->def, fieldno, path_raw, path_len,
+				 space_name(space));
+	char *path = NULL;
+	if (path_raw != NULL) {
+		path = (char *)malloc(path_len + 1);
+		if (path == NULL)
+			tnt_raise(OutOfMemory, path_len + 1,
+				  "malloc", "sequence path");
+		memcpy(path, path_raw, path_len);
+		path[path_len] = 0;
+	}
+	*path_ptr = path;
+	return fieldno;
+}
+
+/** Attach a sequence to a space on rollback in _space_sequence. */
+static void
+set_space_sequence(struct trigger *trigger, void * /* event */)
+{
+	struct tuple *tuple = (struct tuple *)trigger->data;
+	uint32_t space_id = tuple_field_u32_xc(tuple,
+			BOX_SPACE_SEQUENCE_FIELD_ID);
+	uint32_t sequence_id = tuple_field_u32_xc(tuple,
+			BOX_SPACE_SEQUENCE_FIELD_SEQUENCE_ID);
+	bool is_generated = tuple_field_bool_xc(tuple,
+			BOX_SPACE_SEQUENCE_FIELD_IS_GENERATED);
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	struct sequence *seq = sequence_by_id(sequence_id);
+	assert(seq != NULL);
+	char *path;
+	uint32_t fieldno = sequence_field_from_tuple(space, tuple, &path);
+	seq->is_generated = is_generated;
+	space->sequence = seq;
+	space->sequence_fieldno = fieldno;
+	free(space->sequence_path);
+	space->sequence_path = path;
+	trigger_run_xc(&on_alter_space, space);
+}
+
+/** Detach a sequence from a space on rollback in _space_sequence. */
+static void
+clear_space_sequence(struct trigger *trigger, void * /* event */)
+{
+	struct tuple *tuple = (struct tuple *)trigger->data;
+	uint32_t space_id = tuple_field_u32_xc(tuple,
+			BOX_SPACE_SEQUENCE_FIELD_ID);
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	assert(space->sequence != NULL);
+	space->sequence->is_generated = false;
+	space->sequence = NULL;
+	space->sequence_fieldno = 0;
+	free(space->sequence_path);
+	space->sequence_path = NULL;
 	trigger_run_xc(&on_alter_space, space);
 }
 
@@ -3537,65 +3612,46 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 	access_check_ddl(space->def->name, space->def->id, space->def->uid,
 			 SC_SPACE, PRIV_A);
 
-	struct trigger *on_commit =
-		txn_alter_trigger_new(on_commit_dd_space_sequence, space);
-	txn_on_commit(txn, on_commit);
-
 	if (stmt->new_tuple != NULL) {			/* INSERT, UPDATE */
-		struct index *pk = index_find_xc(space, 0);
-
-		/* Sequence field was added in 2.2.1. */
+		char *sequence_path;
 		uint32_t sequence_fieldno;
-		const char *sequence_path_raw;
-		uint32_t sequence_path_len;
-		if (tuple_field_count(tuple) > BOX_SPACE_SEQUENCE_FIELD_FIELDNO) {
-			sequence_fieldno = tuple_field_u32_xc(tuple,
-					BOX_SPACE_SEQUENCE_FIELD_FIELDNO);
-			sequence_path_raw = tuple_field_str_xc(tuple,
-					BOX_SPACE_SEQUENCE_FIELD_PATH,
-					&sequence_path_len);
-		} else {
-			struct key_part *part = &pk->def->key_def->parts[0];
-			sequence_fieldno = part->fieldno;
-			sequence_path_raw = part->path;
-			sequence_path_len = part->path_len;
-		}
-		char *sequence_path = NULL;
-		if (sequence_path_len > 0) {
-			sequence_path = (char *)malloc(sequence_path_len + 1);
-			if (sequence_path == NULL)
-				tnt_raise(OutOfMemory, sequence_path_len + 1,
-					  "malloc", "sequence path");
-			memcpy(sequence_path, sequence_path_raw,
-			       sequence_path_len);
-			sequence_path[sequence_path_len] = 0;
-		}
+		sequence_fieldno = sequence_field_from_tuple(space, tuple,
+							     &sequence_path);
 		auto sequence_path_guard = make_scoped_guard([=] {
 			free(sequence_path);
 		});
-
-		index_def_check_sequence(pk->def, sequence_fieldno,
-					 sequence_path,
-					 space_name(space));
 		if (seq->is_generated) {
 			tnt_raise(ClientError, ER_ALTER_SPACE,
 				  space_name(space),
 				  "can not attach generated sequence");
 		}
+		struct trigger *on_rollback;
+		if (stmt->old_tuple != NULL)
+			on_rollback = txn_alter_trigger_new(set_space_sequence,
+							    stmt->old_tuple);
+		else
+			on_rollback = txn_alter_trigger_new(clear_space_sequence,
+							    stmt->new_tuple);
 		seq->is_generated = is_generated;
 		space->sequence = seq;
 		space->sequence_fieldno = sequence_fieldno;
 		free(space->sequence_path);
 		space->sequence_path = sequence_path;
 		sequence_path_guard.is_active = false;
+		txn_on_rollback(txn, on_rollback);
 	} else {					/* DELETE */
+		struct trigger *on_rollback;
+		on_rollback = txn_alter_trigger_new(set_space_sequence,
+						    stmt->old_tuple);
 		assert(space->sequence == seq);
 		seq->is_generated = false;
 		space->sequence = NULL;
 		space->sequence_fieldno = 0;
 		free(space->sequence_path);
 		space->sequence_path = NULL;
+		txn_on_rollback(txn, on_rollback);
 	}
+	trigger_run_xc(&on_alter_space, space);
 }
 
 /* }}} sequence */

@@ -2195,3 +2195,57 @@ box.sequence.test ~= nil
 box.sequence.test:drop()
 ---
 ...
+--
+-- Check that changes to _space_sequence are rolled back properly.
+--
+s = box.schema.space.create('test')
+---
+...
+_ = s:create_index('pk')
+---
+...
+sq = box.schema.sequence.create('test')
+---
+...
+box.begin() box.space._space_sequence:insert{s.id, sq.id, false, 0, ''} id = s.index.pk.sequence_id box.rollback()
+---
+...
+id == sq.id
+---
+- true
+...
+s.index.pk.sequence_id == nil
+---
+- true
+...
+s:insert{box.NULL} -- error
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+...
+s.index.pk:alter{sequence = sq}
+---
+...
+box.begin() box.space._space_sequence:delete{s.id} id = s.index.pk.sequence_id box.rollback()
+---
+...
+id == nil
+---
+- true
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+s:insert{box.NULL} -- ok
+---
+- [1]
+...
+s.index.pk:alter{sequence = false}
+---
+...
+sq:drop()
+---
+...
+s:drop()
+---
+...
