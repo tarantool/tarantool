@@ -121,7 +121,7 @@ test_pack_unpack(void)
 int
 main(void)
 {
-	plan(258);
+	plan(266);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -152,6 +152,9 @@ main(void)
 
 	dectest_op1(log10, 100, 2, 0);
 	dectest_op1(ln, 10, 2.3, 2);
+	dectest_op1(ln, 1.1, 0.1, 1);
+	dectest_op1(ln, 1.0000000000000000000000000000000000001,
+		    0.0000000000000000000000000000000000001, 0);
 	dectest_op1(exp, 2, 7.39, 2);
 	dectest_op1(sqrt, 100, 10, 0);
 

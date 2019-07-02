@@ -1,4 +1,4 @@
-1..258
+1..266
 ok 1 - decimal(314)
 ok 2 - decimal(271)
 ok 3 - decimal(314) + decimal(271)
@@ -233,29 +233,37 @@ ok 231 - decimal_from_string(10)
 ok 232 - decimal_from_string(2.3)
 ok 233 - decimal_ln(10)
 ok 234 - decimal_compare(2.3)
-ok 235 - decimal_from_string(2)
-ok 236 - decimal_from_string(7.39)
-ok 237 - decimal_exp(2)
-ok 238 - decimal_compare(7.39)
-ok 239 - decimal_from_string(100)
-ok 240 - decimal_from_string(10)
-ok 241 - decimal_sqrt(100)
-ok 242 - decimal_compare(10)
-ok 243 - decimal construction from 2e38 failure
-ok 244 - decimal construction from "1e38" failure
-ok 245 - decimal construction from "100000000000000000000000000000000000000" failure
-ok 246 - decimal construction from LONG_MIN success
-ok 247 - decimal construction from LONG_MAX success
-ok 248 - decimal construction from ULONG_MAX success
-ok 249 - decimal_from_string(9e37)
-ok 250 - decimal_from_string(1e37)
-ok 251 - decimal_add(9e37, 1e37) - overflow
-ok 252 - decimal_from_string(1e19)
-ok 253 - decimal_from_string(1e19)
-ok 254 - decimal_mul(1e19, 1e19) - overflow
-ok 255 - decimal_from_string(1e19)
-ok 256 - decimal_from_string(1e-19)
-ok 257 - decimal_div(1e19, 1e-19) - overflow
+ok 235 - decimal_from_string(1.1)
+ok 236 - decimal_from_string(0.1)
+ok 237 - decimal_ln(1.1)
+ok 238 - decimal_compare(0.1)
+ok 239 - decimal_from_string(1.0000000000000000000000000000000000001)
+ok 240 - decimal_from_string(0.0000000000000000000000000000000000001)
+ok 241 - decimal_ln(1.0000000000000000000000000000000000001)
+ok 242 - decimal_compare(0.0000000000000000000000000000000000001)
+ok 243 - decimal_from_string(2)
+ok 244 - decimal_from_string(7.39)
+ok 245 - decimal_exp(2)
+ok 246 - decimal_compare(7.39)
+ok 247 - decimal_from_string(100)
+ok 248 - decimal_from_string(10)
+ok 249 - decimal_sqrt(100)
+ok 250 - decimal_compare(10)
+ok 251 - decimal construction from 2e38 failure
+ok 252 - decimal construction from "1e38" failure
+ok 253 - decimal construction from "100000000000000000000000000000000000000" failure
+ok 254 - decimal construction from LONG_MIN success
+ok 255 - decimal construction from LONG_MAX success
+ok 256 - decimal construction from ULONG_MAX success
+ok 257 - decimal_from_string(9e37)
+ok 258 - decimal_from_string(1e37)
+ok 259 - decimal_add(9e37, 1e37) - overflow
+ok 260 - decimal_from_string(1e19)
+ok 261 - decimal_from_string(1e19)
+ok 262 - decimal_mul(1e19, 1e19) - overflow
+ok 263 - decimal_from_string(1e19)
+ok 264 - decimal_from_string(1e-19)
+ok 265 - decimal_div(1e19, 1e-19) - overflow
     1..146
     ok 1 - decimal_len(0)
     ok 2 - decimal_len(0) == len(decimal_pack(0)
@@ -403,4 +411,4 @@ ok 257 - decimal_div(1e19, 1e-19) - overflow
     ok 144 - str(decimal_unpack(decimal_pack(-99999999999999999999999999999999999999)) == -99999999999999999999999999999999999999
     ok 145 - unpack malformed decimal fails
     ok 146 - decode malformed decimal preserves buffer position
-ok 258 - subtests
+ok 266 - subtests

@@ -264,11 +264,30 @@ decimal_log10(decimal_t *res, const decimal_t *lhs)
 decimal_t *
 decimal_ln(decimal_t *res, const decimal_t *lhs)
 {
+	/*
+	 * ln hangs in an infinite loop when result is
+	 * between -10 ^ emin and 10 ^ emin.
+	 * For small x, ln(1 + x) = x. Say, we take the
+	 * smallest allowed value for
+	 * (1 + x) = 1 + 10 ^ -(DECIMAL_MAX_DIGITS - 1).
+	 * For ln to work for this value we need to set emin to
+	 * -DECIMAL_MAX_DIGITS.
+	 */
+	int32_t emin = decimal_context.emin;
+	decimal_context.emin = -DECIMAL_MAX_DIGITS;
+
 	decNumberLn(res, lhs, &decimal_context);
 
+	decimal_context.emin = emin;
 	if (decimal_check_status(&decimal_context) != 0) {
 		return NULL;
 	} else {
+		/*
+		 * The increased EMIN allows for scale up to
+		 * 2 * (DECIMAL_MAX_DIGITS - 1).
+		 * Round back to DECIMAL_MAX_DIGITS - 1.
+		 */
+		decimal_round(res, DECIMAL_MAX_DIGITS - 1);
 		return res;
 	}
 }
