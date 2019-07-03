@@ -3720,45 +3720,50 @@ lock_before_dd(struct trigger *trigger, void *event)
 	latch_lock(&schema_lock);
 }
 
-/**
- * Trigger invoked on rollback in the _trigger space.
- * Since rollback trigger is invoked after insertion to hash and space,
- * we have to delete it from those structures and release memory.
- * Vice versa, after deletion of trigger we must return it back to hash and space*.
- */
+/** Delete the new trigger on rollback of an INSERT statement. */
 static void
-on_replace_trigger_rollback(struct trigger *trigger, void *event)
+on_create_trigger_rollback(struct trigger *trigger, void * /* event */)
 {
-	struct txn_stmt *stmt = txn_last_stmt((struct txn*) event);
 	struct sql_trigger *old_trigger = (struct sql_trigger *)trigger->data;
 	struct sql_trigger *new_trigger;
+	int rc = sql_trigger_replace(sql_trigger_name(old_trigger),
+				     sql_trigger_space_id(old_trigger),
+				     NULL, &new_trigger);
+	(void)rc;
+	assert(rc == 0);
+	assert(new_trigger == old_trigger);
+	sql_trigger_delete(sql_get(), new_trigger);
+}
 
-	if (stmt->old_tuple != NULL && stmt->new_tuple == NULL) {
-		/* Rollback DELETE trigger. */
-		if (old_trigger == NULL)
-			return;
-		if (sql_trigger_replace(sql_trigger_name(old_trigger),
-					sql_trigger_space_id(old_trigger),
-					old_trigger, &new_trigger) != 0)
-			panic("Out of memory on insertion into trigger hash");
-		assert(new_trigger == NULL);
-	}  else if (stmt->new_tuple != NULL && stmt->old_tuple == NULL) {
-		/* Rollback INSERT trigger. */
-		int rc = sql_trigger_replace(sql_trigger_name(old_trigger),
-					     sql_trigger_space_id(old_trigger),
-					     NULL, &new_trigger);
-		(void)rc;
-		assert(rc == 0);
-		assert(new_trigger == old_trigger);
-		sql_trigger_delete(sql_get(), new_trigger);
-	} else {
-		/* Rollback REPLACE trigger. */
-		if (sql_trigger_replace(sql_trigger_name(old_trigger),
-					sql_trigger_space_id(old_trigger),
-					old_trigger, &new_trigger) != 0)
-			panic("Out of memory on insertion into trigger hash");
-		sql_trigger_delete(sql_get(), new_trigger);
-	}
+/** Restore the old trigger on rollback of a DELETE statement. */
+static void
+on_drop_trigger_rollback(struct trigger *trigger, void * /* event */)
+{
+	struct sql_trigger *old_trigger = (struct sql_trigger *)trigger->data;
+	struct sql_trigger *new_trigger;
+	if (old_trigger == NULL)
+		return;
+	if (sql_trigger_replace(sql_trigger_name(old_trigger),
+				sql_trigger_space_id(old_trigger),
+				old_trigger, &new_trigger) != 0)
+		panic("Out of memory on insertion into trigger hash");
+	assert(new_trigger == NULL);
+}
+
+/**
+ * Restore the old trigger and delete the new trigger on rollback
+ * of a REPLACE statement.
+ */
+static void
+on_replace_trigger_rollback(struct trigger *trigger, void * /* event */)
+{
+	struct sql_trigger *old_trigger = (struct sql_trigger *)trigger->data;
+	struct sql_trigger *new_trigger;
+	if (sql_trigger_replace(sql_trigger_name(old_trigger),
+				sql_trigger_space_id(old_trigger),
+				old_trigger, &new_trigger) != 0)
+		panic("Out of memory on insertion into trigger hash");
+	sql_trigger_delete(sql_get(), new_trigger);
 }
 
 /**
@@ -3785,8 +3790,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
-	struct trigger *on_rollback =
-		txn_alter_trigger_new(on_replace_trigger_rollback, NULL);
+	struct trigger *on_rollback = txn_alter_trigger_new(NULL, NULL);
 	struct trigger *on_commit =
 		txn_alter_trigger_new(on_replace_trigger_commit, NULL);
 
@@ -3813,6 +3817,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 
 		on_commit->data = old_trigger;
 		on_rollback->data = old_trigger;
+		on_rollback->run = on_drop_trigger_rollback;
 	} else {
 		/* INSERT, REPLACE trigger. */
 		uint32_t trigger_name_len;
@@ -3860,8 +3865,13 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 			diag_raise();
 
 		on_commit->data = old_trigger;
-		on_rollback->data =
-			old_tuple == NULL ? new_trigger : old_trigger;
+		if (old_tuple != NULL) {
+			on_rollback->data = old_trigger;
+			on_rollback->run = on_replace_trigger_rollback;
+		} else {
+			on_rollback->data = new_trigger;
+			on_rollback->run = on_create_trigger_rollback;
+		}
 		new_trigger_guard.is_active = false;
 	}
 
