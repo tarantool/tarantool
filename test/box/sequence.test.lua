@@ -761,3 +761,13 @@ s:insert{box.NULL} -- ok
 s.index.pk:alter{sequence = false}
 sq:drop()
 s:drop()
+
+--
+-- Check that if a deletion from _sequence_data is rolled back,
+-- the sequence state is restored.
+--
+sq = box.schema.sequence.create('test')
+sq:next() -- 1
+box.begin() box.space._sequence_data:delete{sq.id} box.rollback()
+sq:next() -- 2
+sq:drop()

@@ -3460,6 +3460,20 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 	trigger_run_xc(&on_alter_sequence, seq);
 }
 
+/** Restore the old sequence value on rollback. */
+static void
+on_drop_sequence_data_rollback(struct trigger *trigger, void * /* event */)
+{
+	struct tuple *tuple = (struct tuple *)trigger->data;
+	uint32_t id = tuple_field_u32_xc(tuple, BOX_SEQUENCE_DATA_FIELD_ID);
+	int64_t val = tuple_field_i64_xc(tuple, BOX_SEQUENCE_DATA_FIELD_VALUE);
+
+	struct sequence *seq = sequence_by_id(id);
+	assert(seq != NULL);
+	if (sequence_set(seq, val) != 0)
+		panic("Can't restore sequence value");
+}
+
 /**
  * A trigger invoked on replace in space _sequence_data.
  * Used to update a sequence value.
@@ -3483,6 +3497,16 @@ on_replace_dd_sequence_data(struct trigger * /* trigger */, void *event)
 		if (sequence_set(seq, value) != 0)
 			diag_raise();
 	} else {					/* DELETE */
+		/*
+		 * A sequence isn't supposed to roll back to the old
+		 * value if the transaction it was used in is aborted
+		 * for some reason. However, if a sequence is dropped,
+		 * we do want to restore the original sequence value
+		 * on rollback.
+		 */
+		struct trigger *on_rollback = txn_alter_trigger_new(
+				on_drop_sequence_data_rollback, old_tuple);
+		txn_on_rollback(txn, on_rollback);
 		sequence_reset(seq);
 	}
 }
