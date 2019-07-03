@@ -4371,76 +4371,86 @@ ck_constraint_def_new_from_tuple(struct tuple *tuple)
 	return ck_def;
 }
 
-/** Trigger invoked on rollback in the _ck_constraint space. */
+/** Rollback INSERT check constraint. */
 static void
-on_replace_ck_constraint_rollback(struct trigger *trigger, void *event)
+on_create_ck_constraint_rollback(struct trigger *trigger, void * /* event */)
 {
-	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
-	struct ck_constraint *ck = (struct ck_constraint *)trigger->data;
-	assert(ck != NULL);
-	struct space *space = space_by_id(ck->def->space_id);
-	struct trigger *ck_trigger = space->ck_constraint_trigger;
-	if (stmt->old_tuple != NULL && stmt->new_tuple == NULL) {
-		/* Rollback DELETE check constraint. */
-		assert(ck != NULL);
-		assert(space != NULL);
-		assert(space_ck_constraint_by_name(space,
-				ck->def->name, strlen(ck->def->name)) == NULL);
-		rlist_add_entry(&space->ck_constraint, ck, link);
-		if (rlist_empty(&ck_trigger->link))
-			trigger_add(&space->on_replace, ck_trigger);
-	}  else if (stmt->new_tuple != NULL && stmt->old_tuple == NULL) {
-		/* Rollback INSERT check constraint. */
-		assert(space != NULL);
-		assert(space_ck_constraint_by_name(space,
-				ck->def->name, strlen(ck->def->name)) != NULL);
-		rlist_del_entry(ck, link);
-		ck_constraint_delete(ck);
-		if (rlist_empty(&space->ck_constraint)) {
-			trigger_clear(ck_trigger);
-			ck_trigger->destroy(ck_trigger);
-			space->ck_constraint_trigger = NULL;
-		}
-	} else {
-		/* Rollback REPLACE check constraint. */
-		assert(space != NULL);
-		const char *name = ck->def->name;
-		struct ck_constraint *new_ck =
-			space_ck_constraint_by_name(space, name, strlen(name));
-		assert(new_ck != NULL);
-		rlist_del_entry(new_ck, link);
-		rlist_add_entry(&space->ck_constraint, ck, link);
-		ck_constraint_delete(new_ck);
-	}
-}
-
-/**
- * Trigger invoked on commit in the _ck_constraint space.
- * Drop useless old check constraint object if exists.
- */
-static void
-on_replace_ck_constraint_commit(struct trigger *trigger, void *event)
-{
-	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
 	struct ck_constraint *ck = (struct ck_constraint *)trigger->data;
 	assert(ck != NULL);
 	struct space *space = space_by_id(ck->def->space_id);
 	assert(space != NULL);
-	if (stmt->old_tuple != NULL && stmt->new_tuple == NULL) {
-		/* Commit DELETE check constraint. */
-		struct trigger *ck_trigger = space->ck_constraint_trigger;
-		assert(ck_trigger != NULL);
-		if (rlist_empty(&space->ck_constraint)) {
-			ck_trigger->destroy(ck_trigger);
-			space->ck_constraint_trigger = NULL;
-			ck_constraint_delete(ck);
-		}
-	} else if (stmt->old_tuple != NULL) {
-		/* Commit REPLACE check constraint. */
-		assert(stmt->new_tuple != NULL);
+	struct trigger *ck_trigger = space->ck_constraint_trigger;
+	assert(ck_trigger != NULL);
+	assert(space_ck_constraint_by_name(space, ck->def->name,
+					   strlen(ck->def->name)) != NULL);
+	rlist_del_entry(ck, link);
+	ck_constraint_delete(ck);
+	if (rlist_empty(&space->ck_constraint)) {
+		trigger_clear(ck_trigger);
+		ck_trigger->destroy(ck_trigger);
+		space->ck_constraint_trigger = NULL;
+	}
+	trigger_run_xc(&on_alter_space, space);
+}
+
+/** Commit DELETE check constraint. */
+static void
+on_drop_ck_constraint_commit(struct trigger *trigger, void * /* event */)
+{
+	struct ck_constraint *ck = (struct ck_constraint *)trigger->data;
+	assert(ck != NULL);
+	struct space *space = space_by_id(ck->def->space_id);
+	assert(space != NULL);
+	struct trigger *ck_trigger = space->ck_constraint_trigger;
+	assert(ck_trigger != NULL);
+	if (rlist_empty(&space->ck_constraint)) {
+		ck_trigger->destroy(ck_trigger);
+		space->ck_constraint_trigger = NULL;
 		ck_constraint_delete(ck);
 	}
-	/* Export schema changes to Lua. */
+}
+
+/** Rollback DELETE check constraint. */
+static void
+on_drop_ck_constraint_rollback(struct trigger *trigger, void * /* event */)
+{
+	struct ck_constraint *ck = (struct ck_constraint *)trigger->data;
+	assert(ck != NULL);
+	struct space *space = space_by_id(ck->def->space_id);
+	assert(space != NULL);
+	struct trigger *ck_trigger = space->ck_constraint_trigger;
+	assert(ck_trigger != NULL);
+	assert(space_ck_constraint_by_name(space, ck->def->name,
+					   strlen(ck->def->name)) == NULL);
+	rlist_add_entry(&space->ck_constraint, ck, link);
+	if (rlist_empty(&ck_trigger->link))
+		trigger_add(&space->on_replace, ck_trigger);
+	trigger_run_xc(&on_alter_space, space);
+}
+
+/** Commit REPLACE check constraint. */
+static void
+on_replace_ck_constraint_commit(struct trigger *trigger, void * /* event */)
+{
+	struct ck_constraint *ck = (struct ck_constraint *)trigger->data;
+	if (ck != NULL)
+		ck_constraint_delete(ck);
+}
+
+/** Rollback REPLACE check constraint. */
+static void
+on_replace_ck_constraint_rollback(struct trigger *trigger, void * /* event */)
+{
+	struct ck_constraint *ck = (struct ck_constraint *)trigger->data;
+	assert(ck != NULL);
+	struct space *space = space_by_id(ck->def->space_id);
+	assert(space != NULL);
+	struct ck_constraint *new_ck = space_ck_constraint_by_name(space,
+					ck->def->name, strlen(ck->def->name));
+	assert(new_ck != NULL);
+	rlist_del_entry(new_ck, link);
+	rlist_add_entry(&space->ck_constraint, ck, link);
+	ck_constraint_delete(new_ck);
 	trigger_run_xc(&on_alter_space, space);
 }
 
@@ -4459,10 +4469,8 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 	struct space *space = space_cache_find_xc(space_id);
 	struct trigger *ck_trigger = space->ck_constraint_trigger;
 	assert(ck_trigger == NULL || !rlist_empty(&ck_trigger->link));
-	struct trigger *on_rollback =
-		txn_alter_trigger_new(on_replace_ck_constraint_rollback, NULL);
-	struct trigger *on_commit =
-		txn_alter_trigger_new(on_replace_ck_constraint_commit, NULL);
+	struct trigger *on_rollback = txn_alter_trigger_new(NULL, NULL);
+	struct trigger *on_commit = txn_alter_trigger_new(NULL, NULL);
 
 	if (new_tuple != NULL) {
 		bool is_deferred =
@@ -4516,9 +4524,15 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 			space->ck_constraint_trigger = ck_trigger;
 		}
 		ck_guard.is_active = false;
-		on_commit->data = old_tuple == NULL ? new_ck_constraint :
-						      old_ck_constraint;
-		on_rollback->data = on_commit->data;
+		if (old_tuple != NULL) {
+			on_rollback->data = old_ck_constraint;
+			on_rollback->run = on_replace_ck_constraint_rollback;
+		} else {
+			on_rollback->data = new_ck_constraint;
+			on_rollback->run = on_create_ck_constraint_rollback;
+		}
+		on_commit->data = old_ck_constraint;
+		on_commit->run = on_replace_ck_constraint_commit;
 	} else {
 		assert(ck_trigger != NULL);
 		assert(new_tuple == NULL && old_tuple != NULL);
@@ -4535,11 +4549,15 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 		if (rlist_empty(&space->ck_constraint))
 			trigger_clear(ck_trigger);
 		on_commit->data = old_ck_constraint;
+		on_commit->run = on_drop_ck_constraint_commit;
 		on_rollback->data = old_ck_constraint;
+		on_rollback->run = on_drop_ck_constraint_rollback;
 	}
 
 	txn_on_rollback(txn, on_rollback);
 	txn_on_commit(txn, on_commit);
+
+	trigger_run_xc(&on_alter_space, space);
 }
 
 struct trigger alter_space_on_replace_space = {
