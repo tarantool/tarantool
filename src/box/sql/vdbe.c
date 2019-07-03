@@ -1168,33 +1168,6 @@ case OP_String: {          /* out2 */
 	break;
 }
 
-/* Opcode: NextAutoincValue P1 P2 * * *
- * Synopsis: r[P2] = next value from space sequence, which pageno is r[P1]
- *
- * Get next value from space sequence, which pageno is written into register
- * P1, write this value into register P2. If space doesn't exists (invalid
- * space_id or something else), raise an error. If space with
- * specified space_id doesn't have attached sequence, also raise an error.
- */
-case OP_NextAutoincValue: {
-	assert(pOp->p1 > 0);
-	assert(pOp->p2 > 0);
-
-	struct space *space = space_by_id(pOp->p1);
-	if (space == NULL)
-		goto abort_due_to_error;
-
-	int64_t value;
-	struct sequence *sequence = space->sequence;
-	if (sequence == NULL || sequence_next(sequence, &value) != 0)
-		goto abort_due_to_error;
-
-	pOut = out2Prerelease(p, pOp);
-	mem_set_i64(pOut, value);
-
-	break;
-}
-
 /* Opcode: Null P1 P2 P3 * *
  * Synopsis: r[P2..P3]=NULL
  *
