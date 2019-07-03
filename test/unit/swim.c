@@ -892,9 +892,9 @@ swim_test_indirect_ping(void)
 	swim_cluster_set_drop_channel(cluster, 0, 1, true);
 	swim_cluster_set_drop_channel(cluster, 1, 0, true);
 	swim_run_for(10);
-	is(swim_cluster_wait_status_everywhere(cluster, 0, MEMBER_ALIVE, 0),
+	is(swim_cluster_wait_status_everywhere(cluster, 0, MEMBER_ALIVE, 3),
 	   0, "S1 is still alive everywhere");
-	is(swim_cluster_wait_status_everywhere(cluster, 1, MEMBER_ALIVE, 0),
+	is(swim_cluster_wait_status_everywhere(cluster, 1, MEMBER_ALIVE, 3),
 	   0, "as well as S2 - they communicated via S3");
 
 	swim_cluster_delete(cluster);
