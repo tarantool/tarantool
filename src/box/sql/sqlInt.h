@@ -1229,13 +1229,6 @@ struct FuncDef {
 	} u;
 	/* Return type. */
 	enum field_type ret_type;
-	/**
-	 * If function returns string, it may require collation
-	 * to be applied on its result. For instance, result of
-	 * substr() built-in function must have the same collation
-	 * as its first argument.
-	 */
-	bool is_coll_derived;
 };
 
 /*
@@ -1290,6 +1283,13 @@ struct FuncDestructor {
 #define SQL_FUNC_SLOCHNG  0x2000	/* "Slow Change". Value constant during a
 					 * single query - might change over time
 					 */
+/**
+ * If function returns string, it may require collation to be
+ * applied on its result. For instance, result of substr()
+ * built-in function must have the same collation as its first
+ * argument.
+ */
+#define SQL_FUNC_DERIVEDCOLL 0x4000
 
 /*
  * Trim side mask components. TRIM_LEADING means to trim left side
@@ -1342,31 +1342,31 @@ enum trim_side_mask {
  */
 #define FUNCTION(zName, nArg, iArg, bNC, xFunc, type) \
   {nArg, SQL_FUNC_CONSTANT|(bNC*SQL_FUNC_NEEDCOLL), \
-   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type, false}
+   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type}
 #define FUNCTION_COLL(zName, nArg, iArg, bNC, xFunc) \
-  {nArg, SQL_FUNC_CONSTANT|(bNC*SQL_FUNC_NEEDCOLL), \
-   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, FIELD_TYPE_STRING, true}
+  {nArg, SQL_FUNC_CONSTANT|SQL_FUNC_DERIVEDCOLL|(bNC*SQL_FUNC_NEEDCOLL), \
+   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, FIELD_TYPE_STRING}
 #define VFUNCTION(zName, nArg, iArg, bNC, xFunc, type) \
   {nArg, (bNC*SQL_FUNC_NEEDCOLL), \
-   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type, false }
+   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type}
 #define DFUNCTION(zName, nArg, iArg, bNC, xFunc, type) \
   {nArg, SQL_FUNC_SLOCHNG|(bNC*SQL_FUNC_NEEDCOLL), \
-   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type, false }
+   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type}
 #define FUNCTION2(zName, nArg, iArg, bNC, xFunc, extraFlags, type) \
   {nArg,SQL_FUNC_CONSTANT|(bNC*SQL_FUNC_NEEDCOLL)|extraFlags,\
-   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type, false }
+   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type}
 #define STR_FUNCTION(zName, nArg, pArg, bNC, xFunc) \
   {nArg, SQL_FUNC_SLOCHNG|(bNC*SQL_FUNC_NEEDCOLL), \
-   pArg, 0, xFunc, 0, #zName, {SQL_AFF_STRING, {0}}, false}
+   pArg, 0, xFunc, 0, #zName, {SQL_AFF_STRING, {0}}}
 #define LIKEFUNC(zName, nArg, arg, flags, type) \
   {nArg, SQL_FUNC_CONSTANT|flags, \
-   (void *)(SQL_INT_TO_PTR(arg)), 0, likeFunc, 0, #zName, {0}, type, false }
+   (void *)(SQL_INT_TO_PTR(arg)), 0, likeFunc, 0, #zName, {0}, type}
 #define AGGREGATE(zName, nArg, arg, nc, xStep, xFinal, type) \
   {nArg, (nc*SQL_FUNC_NEEDCOLL), \
-   SQL_INT_TO_PTR(arg), 0, xStep,xFinal,#zName, {0}, type, false}
+   SQL_INT_TO_PTR(arg), 0, xStep,xFinal,#zName, {0}, type}
 #define AGGREGATE2(zName, nArg, arg, nc, xStep, xFinal, extraFlags, type) \
   {nArg, (nc*SQL_FUNC_NEEDCOLL)|extraFlags, \
-   SQL_INT_TO_PTR(arg), 0, xStep,xFinal,#zName, {0}, type, false}
+   SQL_INT_TO_PTR(arg), 0, xStep,xFinal,#zName, {0}, type}
 
 /*
  * All current savepoints are stored in a linked list starting at

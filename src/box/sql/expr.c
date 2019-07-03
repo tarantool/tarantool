@@ -290,7 +290,7 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 							       arg_count, 0);
 			if (func == NULL)
 				break;
-			if (func->is_coll_derived) {
+			if ((func->funcFlags & SQL_FUNC_DERIVEDCOLL) != 0) {
 				/*
 				 * Now we use quite straightforward
 				 * approach assuming that resulting
