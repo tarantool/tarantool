@@ -2777,41 +2777,36 @@ coll_id_def_new_from_tuple(struct tuple *tuple, struct coll_id_def *def)
 	}
 }
 
-/**
- * Rollback a change in collation space.
- * A change is only INSERT or DELETE, UPDATE is not supported.
- */
+/** Delete the new collation identifier. */
 static void
-coll_id_cache_rollback(struct trigger *trigger, void *event)
+on_create_collation_rollback(struct trigger *trigger, void *event)
 {
+	(void) event;
 	struct coll_id *coll_id = (struct coll_id *) trigger->data;
-	struct txn_stmt *stmt = txn_last_stmt((struct txn*) event);
-
-	if (stmt->new_tuple == NULL) {
-		/* DELETE: put the collation identifier back. */
-		assert(stmt->old_tuple != NULL);
-		struct coll_id *replaced_id;
-		if (coll_id_cache_replace(coll_id, &replaced_id) != 0) {
-			panic("Out of memory on insertion into collation "\
-			      "cache");
-		}
-		assert(replaced_id == NULL);
-	} else {
-		/* INSERT: delete the new collation identifier. */
-		assert(stmt->old_tuple == NULL);
-		coll_id_cache_delete(coll_id);
-		coll_id_delete(coll_id);
-	}
+	coll_id_cache_delete(coll_id);
+	coll_id_delete(coll_id);
 }
 
 
 /** Free a deleted collation identifier on commit. */
 static void
-coll_id_cache_commit(struct trigger *trigger, void *event)
+on_drop_collation_commit(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct coll_id *coll_id = (struct coll_id *) trigger->data;
 	coll_id_delete(coll_id);
+}
+
+/** Put the collation identifier back on rollback. */
+static void
+on_drop_collation_rollback(struct trigger *trigger, void *event)
+{
+	(void) event;
+	struct coll_id *coll_id = (struct coll_id *) trigger->data;
+	struct coll_id *replaced_id;
+	if (coll_id_cache_replace(coll_id, &replaced_id) != 0)
+		panic("Out of memory on insertion into collation cache");
+	assert(replaced_id == NULL);
 }
 
 /**
@@ -2826,12 +2821,12 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	txn_check_singlestatement_xc(txn, "Space _collation");
-	struct trigger *on_rollback =
-		txn_alter_trigger_new(coll_id_cache_rollback, NULL);
-	struct trigger *on_commit =
-		txn_alter_trigger_new(coll_id_cache_commit, NULL);
 	if (new_tuple == NULL && old_tuple != NULL) {
 		/* DELETE */
+		struct trigger *on_commit =
+			txn_alter_trigger_new(on_drop_collation_commit, NULL);
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(on_drop_collation_rollback, NULL);
 		/*
 		 * TODO: Check that no index uses the collation
 		 * identifier.
@@ -2865,6 +2860,8 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 		txn_on_commit(txn, on_commit);
 	} else if (new_tuple != NULL && old_tuple == NULL) {
 		/* INSERT */
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(on_create_collation_rollback, NULL);
 		struct coll_id_def new_def;
 		coll_id_def_new_from_tuple(new_tuple, &new_def);
 		access_check_ddl(new_def.name, new_def.id, new_def.owner_id,
