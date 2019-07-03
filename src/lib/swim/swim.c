@@ -728,9 +728,20 @@ swim_update_member_payload(struct swim *swim, struct swim_member *member,
 			return -1;
 		}
 		memcpy(new_payload, payload, payload_size);
-	} else {
+	} else if (member->payload_size > 0) {
 		free(member->payload);
 		new_payload = NULL;
+	} else {
+		/*
+		 * A special free-to-check case. Both new and old
+		 * payloads are empty usually at a cluster
+		 * startup. Skip of that useless event frees one
+		 * slot in UDP packets for something more
+		 * meaningful, and speeds up the tests.
+		 */
+		assert(member->payload_size == 0 && payload_size == 0);
+		member->is_payload_up_to_date = true;
+		return 0;
 	}
 	member->payload = new_payload;
 	member->payload_size = payload_size;

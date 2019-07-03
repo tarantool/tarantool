@@ -866,7 +866,7 @@ swim_cluster_delete_f(va_list ap)
 static void
 swim_test_triggers(void)
 {
-	swim_start_test(23);
+	swim_start_test(20);
 	struct swim_cluster *cluster = swim_cluster_new(2);
 	swim_cluster_set_ack_timeout(cluster, 1);
 	struct trigger_ctx tctx, tctx2;
@@ -891,16 +891,9 @@ swim_test_triggers(void)
 	   "ctx.member is set");
 	is(tctx.ctx.events, SWIM_EV_NEW, "ctx.events is set");
 
-	swim_run_for(1);
-	swim_cluster_run_triggers(cluster);
-	is(tctx.counter, 2, "payload is delivered, trigger caught that");
-	is(tctx.ctx.member, swim_cluster_member_view(cluster, 0, 1),
-	   "S1 got S2' payload");
-	is(tctx.ctx.events, SWIM_EV_NEW_PAYLOAD, "mask says that");
-
 	swim_cluster_member_set_payload(cluster, 0, "123", 3);
 	swim_cluster_run_triggers(cluster);
-	is(tctx.counter, 3, "self payload is updated");
+	is(tctx.counter, 2, "self payload is updated");
 	is(tctx.ctx.member, swim_self(s1), "self is set as a member");
 	is(tctx.ctx.events, SWIM_EV_NEW_PAYLOAD | SWIM_EV_NEW_VERSION,
 	   "both version and payload events are presented");
@@ -909,18 +902,18 @@ swim_test_triggers(void)
 	fail_if(swim_cluster_wait_status(cluster, 0, 1,
 					 MEMBER_SUSPECTED, 3) != 0);
 	swim_cluster_run_triggers(cluster);
-	is(tctx.counter, 4, "suspicion fired a trigger");
+	is(tctx.counter, 3, "suspicion fired a trigger");
 	is(tctx.ctx.events, SWIM_EV_NEW_STATUS, "status suspected");
 
 	fail_if(swim_cluster_wait_status(cluster, 0, 1, MEMBER_DEAD, 3) != 0);
 	swim_cluster_run_triggers(cluster);
-	is(tctx.counter, 5, "death fired a trigger");
+	is(tctx.counter, 4, "death fired a trigger");
 	is(tctx.ctx.events, SWIM_EV_NEW_STATUS, "status dead");
 
 	fail_if(swim_cluster_wait_status(cluster, 0, 1,
 					 swim_member_status_MAX, 2) != 0);
 	swim_cluster_run_triggers(cluster);
-	is(tctx.counter, 6, "drop fired a trigger");
+	is(tctx.counter, 5, "drop fired a trigger");
 	is(tctx.ctx.events, SWIM_EV_DROP, "status dropped");
 	is(swim_cluster_member_view(cluster, 0, 1), NULL,
 	   "dropped member is not presented in the member table");
@@ -940,7 +933,7 @@ swim_test_triggers(void)
 	swim_cluster_add_link(cluster, 0, 1);
 	swim_cluster_run_triggers(cluster);
 	is(tctx2.counter, 1, "yielding trigger is fired");
-	is(tctx.counter, 6, "non-yielding still is not");
+	is(tctx.counter, 5, "non-yielding still is not");
 
 	struct fiber *async_delete_fiber =
 		fiber_new("async delete", swim_cluster_delete_f);

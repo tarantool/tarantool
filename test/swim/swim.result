@@ -1240,7 +1240,6 @@ e_list
 ---
 - - is_new_version: true
     is_update: true
-    is_new_payload: true
     is_new_uri: true
     is_new: true
     is_new_incarnation: true
@@ -1280,9 +1279,7 @@ m_list
 ...
 e_list
 ---
-- - is_new_payload: true
-    is_new: true
-    is_update: true
+- - is_new: true
 ...
 ctx_list
 ---
@@ -1332,9 +1329,7 @@ m_list
 ...
 e_list
 ---
-- - is_new_payload: true
-    is_new: true
-    is_update: true
+- - is_new: true
   - is_new_payload: true
     is_new_version: true
     is_new_incarnation: true

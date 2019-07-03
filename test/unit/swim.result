@@ -188,31 +188,28 @@ ok 18 - subtests
 ok 19 - subtests
 	*** swim_test_slow_net: done ***
 	*** swim_test_triggers ***
-    1..23
+    1..20
     ok 1 - trigger is fired
     ok 2 - is not deleted
     ok 3 - ctx.member is set
     ok 4 - ctx.events is set
-    ok 5 - payload is delivered, trigger caught that
-    ok 6 - S1 got S2' payload
-    ok 7 - mask says that
-    ok 8 - self payload is updated
-    ok 9 - self is set as a member
-    ok 10 - both version and payload events are presented
-    ok 11 - suspicion fired a trigger
-    ok 12 - status suspected
-    ok 13 - death fired a trigger
-    ok 14 - status dead
-    ok 15 - drop fired a trigger
-    ok 16 - status dropped
-    ok 17 - dropped member is not presented in the member table
-    ok 18 - but is in the event context
-    ok 19 - yielding trigger is fired
-    ok 20 - non-yielding still is not
-    ok 21 - trigger is not deleted until all currently sleeping triggers are finished
+    ok 5 - self payload is updated
+    ok 6 - self is set as a member
+    ok 7 - both version and payload events are presented
+    ok 8 - suspicion fired a trigger
+    ok 9 - status suspected
+    ok 10 - death fired a trigger
+    ok 11 - status dead
+    ok 12 - drop fired a trigger
+    ok 13 - status dropped
+    ok 14 - dropped member is not presented in the member table
+    ok 15 - but is in the event context
+    ok 16 - yielding trigger is fired
+    ok 17 - non-yielding still is not
+    ok 18 - trigger is not deleted until all currently sleeping triggers are finished
     # now all the triggers are done and deleted
-    ok 22 - local URI update warns about version update
-    ok 23 - version is a part of incarnation, so the latter is updated too
+    ok 19 - local URI update warns about version update
+    ok 20 - version is a part of incarnation, so the latter is updated too
 ok 20 - subtests
 	*** swim_test_triggers: done ***
 	*** swim_test_generation ***
