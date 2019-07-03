@@ -430,8 +430,8 @@ struct mh_swim_table_key {
 #define mh_arg_t void *
 #define mh_hash(a, arg) ((*a)->hash)
 #define mh_hash_key(a, arg) (a.hash)
-#define mh_cmp(a, b, arg) (tt_uuid_compare(&(*a)->uuid, &(*b)->uuid))
-#define mh_cmp_key(a, b, arg) (tt_uuid_compare(a.uuid, &(*b)->uuid))
+#define mh_cmp(a, b, arg) (!tt_uuid_is_equal(&(*a)->uuid, &(*b)->uuid))
+#define mh_cmp_key(a, b, arg) (!tt_uuid_is_equal(a.uuid, &(*b)->uuid))
 #define MH_SOURCE 1
 #include "salad/mhash.h"
 
