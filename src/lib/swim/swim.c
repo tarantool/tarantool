@@ -1136,15 +1136,13 @@ swim_encode_dissemination(struct swim *swim, struct swim_packet *packet)
 
 /** Encode SWIM components into a UDP packet. */
 static void
-swim_encode_round_msg(struct swim *swim)
+swim_encode_msg(struct swim *swim, struct swim_packet *packet,
+		enum swim_fd_msg_type fd_type)
 {
-	struct swim_packet *packet = &swim->round_step_task.packet;
-	swim_packet_create(packet);
 	char *header = swim_packet_alloc(packet, 1);
 	int map_size = 0;
 	map_size += swim_encode_src_uuid(swim, packet);
-	map_size += swim_encode_failure_detection(swim, packet,
-						  SWIM_FD_MSG_PING);
+	map_size += swim_encode_failure_detection(swim, packet, fd_type);
 	ERROR_INJECT(ERRINJ_SWIM_FD_ONLY, {
 		mp_encode_map(header, map_size);
 		return;
@@ -1221,7 +1219,9 @@ swim_begin_step(struct ev_loop *loop, struct ev_timer *t, int events)
 		swim_ev_timer_stop(loop, t);
 		return;
 	}
-	swim_encode_round_msg(swim);
+	struct swim_packet *packet = &swim->round_step_task.packet;
+	swim_packet_create(packet);
+	swim_encode_msg(swim, packet, SWIM_FD_MSG_PING);
 	struct swim_member *m =
 		rlist_first_entry(&swim->round_queue, struct swim_member,
 				  in_round_queue);
@@ -1280,11 +1280,7 @@ swim_send_fd_msg(struct swim *swim, struct swim_task *task,
 	swim_packet_create(&task->packet);
 	if (proxy != NULL)
 		swim_task_set_proxy(task, proxy);
-	char *header = swim_packet_alloc(&task->packet, 1);
-	int map_size = swim_encode_src_uuid(swim, &task->packet);
-	map_size += swim_encode_failure_detection(swim, &task->packet, type);
-	assert(map_size == 2);
-	mp_encode_map(header, map_size);
+	swim_encode_msg(swim, &task->packet, type);
 	say_verbose("SWIM %d: schedule %s to %s", swim_fd(swim),
 		    swim_fd_msg_type_strs[type], swim_inaddr_str(dst));
 	swim_task_send(task, dst, &swim->scheduler);
