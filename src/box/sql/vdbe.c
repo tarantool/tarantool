@@ -2963,7 +2963,7 @@ case OP_CheckViewReferences: {
  * Otherwise, raise an error with appropriate error message.
  */
 case OP_TransactionBegin: {
-	if (sql_txn_begin(p) != 0)
+	if (sql_txn_begin() != 0)
 		goto abort_due_to_error;
 	p->auto_commit = false	;
 	break;
@@ -3019,7 +3019,7 @@ case OP_TransactionRollback: {
  */
 case OP_TTransaction: {
 	if (!box_txn()) {
-		if (sql_txn_begin(p) != 0)
+		if (sql_txn_begin() != 0)
 			goto abort_due_to_error;
 	} else {
 		p->anonymous_savepoint = sql_savepoint(p, NULL);

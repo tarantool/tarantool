@@ -118,8 +118,6 @@ struct sql_txn {
 	 * VDBE to the next in the same transaction.
 	 */
 	uint32_t fk_deferred_count;
-	/** Current VDBE. */
-	struct Vdbe *vdbe;
 };
 
 /**
@@ -409,21 +407,6 @@ static inline struct txn_stmt *
 txn_last_stmt(struct txn *txn)
 {
 	return stailq_last_entry(&txn->stmts, struct txn_stmt, next);
-}
-
-/**
- * Return VDBE that is being currently executed.
- *
- * @retval VDBE that is being currently executed.
- * @retval NULL Either txn or ptxn_sql or vdbe is NULL;
- */
-static inline struct Vdbe *
-txn_vdbe()
-{
-	struct txn *txn = in_txn();
-	if (txn == NULL || txn->psql_txn == NULL)
-		return NULL;
-	return txn->psql_txn->vdbe;
 }
 
 /**

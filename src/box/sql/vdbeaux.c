@@ -77,7 +77,7 @@ sqlVdbeCreate(Parse * pParse)
 }
 
 struct sql_txn *
-sql_alloc_txn(struct Vdbe *v)
+sql_alloc_txn()
 {
 	struct sql_txn *txn = region_alloc_object(&fiber()->gc,
 						  struct sql_txn);
@@ -86,7 +86,6 @@ sql_alloc_txn(struct Vdbe *v)
 			 "struct sql_txn");
 		return NULL;
 	}
-	txn->vdbe = v;
 	txn->pSavepoint = NULL;
 	txn->fk_deferred_count = 0;
 	return txn;
@@ -106,11 +105,10 @@ sql_vdbe_prepare(struct Vdbe *vdbe)
 		 * check FK violations, at least now.
 		 */
 		if (txn->psql_txn == NULL) {
-			txn->psql_txn = sql_alloc_txn(vdbe);
+			txn->psql_txn = sql_alloc_txn();
 			if (txn->psql_txn == NULL)
 				return -1;
 		}
-		txn->psql_txn->vdbe = vdbe;
 	}
 	return 0;
 }
@@ -2002,7 +2000,7 @@ sqlVdbeCheckFk(Vdbe * p, int deferred)
 }
 
 int
-sql_txn_begin(Vdbe *p)
+sql_txn_begin()
 {
 	if (in_txn()) {
 		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
@@ -2011,7 +2009,7 @@ sql_txn_begin(Vdbe *p)
 	struct txn *ptxn = txn_begin(false);
 	if (ptxn == NULL)
 		return -1;
-	ptxn->psql_txn = sql_alloc_txn(p);
+	ptxn->psql_txn = sql_alloc_txn();
 	if (ptxn->psql_txn == NULL) {
 		box_txn_rollback();
 		return -1;
