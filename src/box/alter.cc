@@ -3189,24 +3189,9 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
  * with it.
  */
 static void
-on_commit_dd_cluster(struct trigger *trigger, void *event)
+register_replica(struct trigger *trigger, void * /* event */)
 {
-	(void) trigger;
-	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
-	struct tuple *new_tuple = stmt->new_tuple;
-	struct tuple *old_tuple = stmt->old_tuple;
-
-	if (new_tuple == NULL) {
-		struct tt_uuid old_uuid;
-		tuple_field_uuid_xc(stmt->old_tuple, BOX_CLUSTER_FIELD_UUID,
-				    &old_uuid);
-		struct replica *replica = replica_by_uuid(&old_uuid);
-		assert(replica != NULL);
-		replica_clear_id(replica);
-		return;
-	} else if (old_tuple != NULL) {
-		return; /* nothing to change */
-	}
+	struct tuple *new_tuple = (struct tuple *)trigger->data;
 
 	uint32_t id = tuple_field_u32_xc(new_tuple, BOX_CLUSTER_FIELD_ID);
 	tt_uuid uuid;
@@ -3222,6 +3207,19 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 			panic("Can't register replica: %s", e->errmsg);
 		}
 	}
+}
+
+static void
+unregister_replica(struct trigger *trigger, void * /* event */)
+{
+	struct tuple *old_tuple = (struct tuple *)trigger->data;
+
+	struct tt_uuid old_uuid;
+	tuple_field_uuid_xc(old_tuple, BOX_CLUSTER_FIELD_UUID, &old_uuid);
+
+	struct replica *replica = replica_by_uuid(&old_uuid);
+	assert(replica != NULL);
+	replica_clear_id(replica);
 }
 
 /**
@@ -3276,6 +3274,11 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 					  "Space _cluster",
 					  "updates of instance uuid");
 			}
+		} else {
+			struct trigger *on_commit;
+			on_commit = txn_alter_trigger_new(register_replica,
+							  new_tuple);
+			txn_on_commit(txn, on_commit);
 		}
 	} else {
 		/*
@@ -3286,11 +3289,12 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 		uint32_t replica_id =
 			tuple_field_u32_xc(old_tuple, BOX_CLUSTER_FIELD_ID);
 		replica_check_id(replica_id);
-	}
 
-	struct trigger *on_commit =
-			txn_alter_trigger_new(on_commit_dd_cluster, NULL);
-	txn_on_commit(txn, on_commit);
+		struct trigger *on_commit;
+		on_commit = txn_alter_trigger_new(unregister_replica,
+						  old_tuple);
+		txn_on_commit(txn, on_commit);
+	}
 }
 
 /* }}} cluster configuration */
