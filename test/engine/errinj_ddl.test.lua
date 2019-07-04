@@ -188,3 +188,41 @@ ch:get()
 
 s:select()
 s:drop()
+
+--
+-- Concurrent DDL.
+--
+s1 = box.schema.space.create('test1', {engine = engine})
+_ = s1:create_index('pk')
+for i = 1, 5 do s1:insert{i, i} end
+
+s2 = box.schema.space.create('test2', {engine = engine})
+_ = s2:create_index('pk')
+for i = 1, 5 do s2:insert{i, i} end
+
+errinj.set("ERRINJ_BUILD_INDEX_DELAY", true)
+ch = fiber.channel(1)
+_ = fiber.create(function() s1:create_index('sk', {parts = {2, 'unsigned'}}) ch:put(true) end)
+
+-- Modification of the same space must fail while an index creation
+-- is in progress.
+s1:format{{'a', 'unsigned'}, {'b', 'unsigned'}}
+s1:truncate()
+_ = s1:create_index('tk', {parts = {3, 'unsigned'}})
+s1:drop()
+
+-- Modification of another space must work though.
+s2:format{{'a', 'unsigned'}, {'b', 'unsigned'}}
+s2:truncate()
+_ = s2:create_index('sk', {parts = {2, 'unsigned'}})
+s2:drop()
+s2 = box.schema.space.create('test2', {engine = engine})
+_ = s2:create_index('pk')
+s2:drop()
+
+errinj.set("ERRINJ_BUILD_INDEX_DELAY", false)
+ch:get()
+
+s1.index.pk:select()
+s1.index.sk:select()
+s1:drop()

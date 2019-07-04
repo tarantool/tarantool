@@ -404,3 +404,101 @@ s:select()
 s:drop()
 ---
 ...
+--
+-- Concurrent DDL.
+--
+s1 = box.schema.space.create('test1', {engine = engine})
+---
+...
+_ = s1:create_index('pk')
+---
+...
+for i = 1, 5 do s1:insert{i, i} end
+---
+...
+s2 = box.schema.space.create('test2', {engine = engine})
+---
+...
+_ = s2:create_index('pk')
+---
+...
+for i = 1, 5 do s2:insert{i, i} end
+---
+...
+errinj.set("ERRINJ_BUILD_INDEX_DELAY", true)
+---
+- ok
+...
+ch = fiber.channel(1)
+---
+...
+_ = fiber.create(function() s1:create_index('sk', {parts = {2, 'unsigned'}}) ch:put(true) end)
+---
+...
+-- Modification of the same space must fail while an index creation
+-- is in progress.
+s1:format{{'a', 'unsigned'}, {'b', 'unsigned'}}
+---
+- error: 'Can''t modify space ''test1'': the space is already being modified'
+...
+s1:truncate()
+---
+- error: 'Can''t modify space ''test1'': the space is already being modified'
+...
+_ = s1:create_index('tk', {parts = {3, 'unsigned'}})
+---
+- error: 'Can''t modify space ''test1'': the space is already being modified'
+...
+s1:drop()
+---
+- error: 'Can''t modify space ''test1'': the space is already being modified'
+...
+-- Modification of another space must work though.
+s2:format{{'a', 'unsigned'}, {'b', 'unsigned'}}
+---
+...
+s2:truncate()
+---
+...
+_ = s2:create_index('sk', {parts = {2, 'unsigned'}})
+---
+...
+s2:drop()
+---
+...
+s2 = box.schema.space.create('test2', {engine = engine})
+---
+...
+_ = s2:create_index('pk')
+---
+...
+s2:drop()
+---
+...
+errinj.set("ERRINJ_BUILD_INDEX_DELAY", false)
+---
+- ok
+...
+ch:get()
+---
+- true
+...
+s1.index.pk:select()
+---
+- - [1, 1]
+  - [2, 2]
+  - [3, 3]
+  - [4, 4]
+  - [5, 5]
+...
+s1.index.sk:select()
+---
+- - [1, 1]
+  - [2, 2]
+  - [3, 3]
+  - [4, 4]
+  - [5, 5]
+...
+s1:drop()
+---
+...

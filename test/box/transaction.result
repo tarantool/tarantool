@@ -87,7 +87,7 @@ while f:status() ~= 'dead' do fiber.sleep(0) end;
 -- some operation involves more than one ddl spaces, so they should fail
 box.begin() box.schema.space.create('test');
 ---
-- error: DDL does not support multi-statement transactions
+- error: Space _space does not support multi-statement transactions
 ...
 box.rollback();
 ---

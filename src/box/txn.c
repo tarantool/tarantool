@@ -242,9 +242,6 @@ txn_begin_stmt(struct txn *txn, struct space *space)
 	if (space == NULL)
 		return 0;
 
-	if (trigger_run(&space->on_stmt_begin, txn) != 0)
-		goto fail;
-
 	struct engine *engine = space->engine;
 	if (txn_begin_in_engine(engine, txn) != 0)
 		goto fail;

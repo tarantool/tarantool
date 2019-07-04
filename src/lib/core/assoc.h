@@ -40,6 +40,19 @@ extern "C" {
 #include "third_party/PMurHash.h"
 
 /*
+ * Set: (i32)
+ */
+#define mh_name _i32
+#define mh_key_t uint32_t
+#define mh_node_t uint32_t
+#define mh_arg_t void *
+#define mh_hash(a, arg) (*(a))
+#define mh_hash_key(a, arg) (a)
+#define mh_cmp(a, b, arg) (*(a) != *(b))
+#define mh_cmp_key(a, b, arg) ((a) != *(b))
+#include "salad/mhash.h"
+
+/*
  * Map: (i32) => (void *)
  */
 #define mh_name _i32ptr

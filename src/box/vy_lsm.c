@@ -38,6 +38,7 @@
 #include <small/mempool.h>
 
 #include "diag.h"
+#include "fiber.h"
 #include "errcode.h"
 #include "histogram.h"
 #include "index_def.h"

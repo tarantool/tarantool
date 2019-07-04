@@ -154,8 +154,6 @@ struct space {
 	struct rlist before_replace;
 	/** Triggers fired after space_replace() -- see txn_commit_stmt(). */
 	struct rlist on_replace;
-	/** Triggers fired before space statement */
-	struct rlist on_stmt_begin;
 	/** SQL Trigger list. */
 	struct sql_trigger *sql_triggers;
 	/**

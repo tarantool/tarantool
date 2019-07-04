@@ -477,7 +477,7 @@ t = s:on_replace(function () s:create_index('sec') end, t)
 ...
 s:replace({2, 3})
 ---
-- error: DDL does not support multi-statement transactions
+- error: Space _index does not support multi-statement transactions
 ...
 t = s:on_replace(function () box.schema.user.create('newu') end, t)
 ---
@@ -512,7 +512,7 @@ t = s:on_replace(function () s:drop() end, t)
 ...
 s:replace({5, 6})
 ---
-- error: DDL does not support multi-statement transactions
+- error: Space _index does not support multi-statement transactions
 ...
 t = s:on_replace(function () box.schema.func.create('newf') end, t)
 ---
@@ -533,14 +533,14 @@ t = s:on_replace(function () s:rename('newname') end, t)
 ...
 s:replace({8, 9})
 ---
-- error: DDL does not support multi-statement transactions
+- error: Space _space does not support multi-statement transactions
 ...
 t = s:on_replace(function () s.index.pk:rename('newname') end, t)
 ---
 ...
 s:replace({9, 10})
 ---
-- error: DDL does not support multi-statement transactions
+- error: Space _index does not support multi-statement transactions
 ...
 s:select()
 ---

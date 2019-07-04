@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "alter.h"
+#include "assoc.h"
 #include "ck_constraint.h"
 #include "column_mask.h"
 #include "schema.h"
@@ -572,7 +573,6 @@ space_swap_triggers(struct space *new_space, struct space *old_space)
 {
 	rlist_swap(&new_space->before_replace, &old_space->before_replace);
 	rlist_swap(&new_space->on_replace, &old_space->on_replace);
-	rlist_swap(&new_space->on_stmt_begin, &old_space->on_stmt_begin);
 	/** Swap SQL Triggers pointer. */
 	struct sql_trigger *new_value = new_space->sql_triggers;
 	new_space->sql_triggers = old_space->sql_triggers;
@@ -745,6 +745,40 @@ AlterSpaceOp::AlterSpaceOp(struct alter_space *alter)
 	rlist_add_tail_entry(&alter->ops, this, link);
 }
 
+class AlterSpaceLock {
+	/** Set of all taken locks. */
+	static struct mh_i32_t *registry;
+	/** Identifier of the space this lock is for. */
+	uint32_t space_id;
+public:
+	/** Take a lock for the altered space. */
+	AlterSpaceLock(struct alter_space *alter) {
+		if (registry == NULL) {
+			registry = mh_i32_new();
+			if (registry == NULL) {
+				tnt_raise(OutOfMemory, 0, "mh_i32_new",
+					  "alter lock registry");
+			}
+		}
+		space_id = alter->old_space->def->id;
+		if (mh_i32_find(registry, space_id, NULL) != mh_end(registry)) {
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(alter->old_space),
+				  "the space is already being modified");
+		}
+		mh_int_t k = mh_i32_put(registry, &space_id, NULL, NULL);
+		if (k == mh_end(registry))
+			tnt_raise(OutOfMemory, 0, "mh_i32_put", "alter lock");
+	}
+	~AlterSpaceLock() {
+		mh_int_t k = mh_i32_find(registry, space_id, NULL);
+		assert(k != mh_end(registry));
+		mh_i32_del(registry, k, NULL);
+	}
+};
+
+struct mh_i32_t *AlterSpaceLock::registry;
+
 /**
  * Commit the alter.
  *
@@ -773,6 +807,7 @@ alter_space_commit(struct trigger *trigger, void *event)
 	 * going to use it.
 	 */
 	space_delete(alter->old_space);
+	alter->old_space = NULL;
 	alter_space_delete(alter);
 }
 
@@ -838,6 +873,14 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 static void
 alter_space_do(struct txn *txn, struct alter_space *alter)
 {
+	/**
+	 * AlterSpaceOp::prepare() may perform a potentially long
+	 * lasting operation that may yield, e.g. building of a new
+	 * index. We really don't want the space to be replaced by
+	 * another DDL operation while this one is in progress so
+	 * we lock out all concurrent DDL for this space.
+	 */
+	AlterSpaceLock lock(alter);
 	/*
 	 * Prepare triggers while we may fail. Note, we don't have to
 	 * free them in case of failure, because they are allocated on
@@ -3681,49 +3724,6 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 
 /* }}} sequence */
 
-static void
-unlock_after_dd(struct trigger *trigger, void *event)
-{
-	(void) trigger;
-	(void) event;
-	/*
-	 * In case of yielding journal this trigger will be processed
-	 * in a context of tx_prio endpoint instead of a context of
-	 * a fiber which has this latch locked. So steal the latch first.
-	 */
-	latch_steal(&schema_lock);
-	latch_unlock(&schema_lock);
-}
-
-static void
-lock_before_dd(struct trigger *trigger, void *event)
-{
-	(void) trigger;
-	if (fiber() == latch_owner(&schema_lock))
-		return;
-	struct txn *txn = (struct txn *)event;
-	/*
-	 * This trigger is executed before any check and may yield
-	 * on the latch lock. But a yield in a non-autocommit
-	 * memtx transaction will roll it back silently, rather
-	 * than produce an error, which is very confusing.
-	 * So don't try to lock a latch if there is
-	 * a multi-statement transaction.
-	 */
-	txn_check_singlestatement_xc(txn, "DDL");
-	struct trigger *on_commit =
-		txn_alter_trigger_new(unlock_after_dd, NULL);
-	struct trigger *on_rollback =
-		txn_alter_trigger_new(unlock_after_dd, NULL);
-	/*
-	 * Setting triggers doesn't fail. Lock the latch last
-	 * to avoid leaking the latch in case of exception.
-	 */
-	txn_on_commit(txn, on_commit);
-	txn_on_rollback(txn, on_rollback);
-	latch_lock(&schema_lock);
-}
-
 /** Delete the new trigger on rollback of an INSERT statement. */
 static void
 on_create_trigger_rollback(struct trigger *trigger, void * /* event */)
@@ -4610,18 +4610,6 @@ struct trigger on_replace_sequence_data = {
 
 struct trigger on_replace_space_sequence = {
 	RLIST_LINK_INITIALIZER, on_replace_dd_space_sequence, NULL, NULL
-};
-
-struct trigger on_stmt_begin_space = {
-	RLIST_LINK_INITIALIZER, lock_before_dd, NULL, NULL
-};
-
-struct trigger on_stmt_begin_index = {
-	RLIST_LINK_INITIALIZER, lock_before_dd, NULL, NULL
-};
-
-struct trigger on_stmt_begin_truncate = {
-	RLIST_LINK_INITIALIZER, lock_before_dd, NULL, NULL
 };
 
 struct trigger on_replace_trigger = {

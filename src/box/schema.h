@@ -35,7 +35,6 @@
 #include <stdio.h> /* snprintf */
 #include "error.h"
 #include "space.h"
-#include "latch.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -48,11 +47,6 @@ extern uint32_t space_cache_version;
 
 /** Triggers invoked after schema initialization. */
 extern struct rlist on_schema_init;
-
-/**
- * Lock of schema modification
- */
-extern struct latch schema_lock;
 
 /**
  * Try to look up a space by space number in the space cache.
