@@ -191,7 +191,6 @@ sqlFindFunction(sql * db,	/* An open database */
 	int bestScore = 0;	/* Score of best match */
 	int h;			/* Hash value */
 	int nName;		/* Length of the name */
-	struct session *user_session = current_session();
 
 	assert(nArg >= (-2));
 	assert(nArg >= (-1) || createFlag == 0);
@@ -211,19 +210,13 @@ sqlFindFunction(sql * db,	/* An open database */
 
 	/* If no match is found, search the built-in functions.
 	 *
-	 * If the SQL_PreferBuiltin flag is set, then search the built-in
-	 * functions even if a prior app-defined function was found.  And give
-	 * priority to built-in functions.
-	 *
 	 * Except, if createFlag is true, that means that we are trying to
 	 * install a new function.  Whatever FuncDef structure is returned it will
 	 * have fields overwritten with new information appropriate for the
 	 * new function.  But the FuncDefs for built-in functions are read-only.
 	 * So we must not search for built-ins when creating a new function.
 	 */
-	if (!createFlag &&
-	    (pBest == 0
-	     || (user_session->sql_flags & SQL_PreferBuiltin) != 0)) {
+	if (!createFlag && (pBest == NULL)) {
 		bestScore = 0;
 		h = (sqlUpperToLower[(u8) zName[0]] +
 		     nName) % SQL_FUNC_HASH_SZ;
