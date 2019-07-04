@@ -106,6 +106,15 @@ struct LimitVal {
 */
 struct TrigEvent { int a; IdList * b; };
 
+/*
+** Disable lookaside memory allocation for objects that might be
+** shared across database connections.
+*/
+static void disableLookaside(Parse *pParse){
+  pParse->disableLookaside++;
+  pParse->db->lookaside.bDisable++;
+}
+
 } // end %include
 
 // Input is a single SQL command
@@ -169,11 +178,12 @@ cmd ::= ROLLBACK TO savepoint_opt nm(X). {
 ///////////////////// The CREATE TABLE statement ////////////////////////////
 //
 cmd ::= create_table create_table_args.
-create_table ::= CREATE TABLE ifnotexists(E) nm(Y). {
+create_table ::= createkw TABLE ifnotexists(E) nm(Y). {
   create_table_def_init(&pParse->create_table_def, &Y, E);
   pParse->create_table_def.new_space = sqlStartTable(pParse, &Y);
   pParse->initiateTTrans = true;
 }
+createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
 
 %type ifnotexists {int}
 ifnotexists(A) ::= .              {A = 0;}
@@ -398,7 +408,7 @@ ifexists(A) ::= .            {A = 0;}
 
 ///////////////////// The CREATE VIEW statement /////////////////////////////
 //
-cmd ::= CREATE(X) VIEW ifnotexists(E) nm(Y) eidlist_opt(C)
+cmd ::= createkw(X) VIEW ifnotexists(E) nm(Y) eidlist_opt(C)
           AS select(S). {
   if (!pParse->parse_only) {
     create_view_def_init(&pParse->create_view_def, &Y, &X, C, S, E);
@@ -1400,7 +1410,7 @@ paren_exprlist(A) ::= LP exprlist(X) RP.  {A = X;}
 
 ///////////////////////////// The CREATE INDEX command ///////////////////////
 //
-cmd ::= CREATE uniqueflag(U) INDEX ifnotexists(NE) nm(X)
+cmd ::= createkw uniqueflag(U) INDEX ifnotexists(NE) nm(X)
         ON nm(Y) LP sortlist(Z) RP. {
   struct SrcList *src_list = sql_src_list_append(pParse->db,0,&Y);
   if (src_list == NULL) {
@@ -1505,7 +1515,7 @@ plus_num(A) ::= number(A).
 minus_num(A) ::= MINUS number(X).     {A = X;}
 //////////////////////////// The CREATE TRIGGER command /////////////////////
 
-cmd ::= CREATE trigger_decl(A) BEGIN trigger_cmd_list(S) END(Z). {
+cmd ::= createkw trigger_decl(A) BEGIN trigger_cmd_list(S) END(Z). {
   Token all;
   all.z = A.z;
   all.n = (int)(Z.z - A.z) + Z.n;

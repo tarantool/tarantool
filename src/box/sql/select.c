@@ -1993,6 +1993,10 @@ sqlResultSetOfSelect(Parse * pParse, Select * pSelect)
 	struct space *space = sql_ephemeral_space_new(pParse, NULL);
 	if (space == NULL)
 		return NULL;
+	/* The sqlResultSetOfSelect() is only used in contexts where lookaside
+	 * is disabled
+	 */
+	assert(db->lookaside.bDisable);
 	sqlColumnsFromExprList(pParse, pSelect->pEList, space->def);
 	sqlSelectAddColumnTypeAndCollation(pParse, space->def, pSelect);
 	if (db->mallocFailed)

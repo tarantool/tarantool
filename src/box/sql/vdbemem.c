@@ -71,8 +71,8 @@ sqlVdbeCheckMemInvariants(Mem * p)
 	assert((p->flags & (MEM_Int | MEM_UInt)) != (MEM_Int | MEM_UInt));
 
 	/* The szMalloc field holds the correct memory allocation size */
-	assert(p->szMalloc == 0
-	       || p->szMalloc == sqlMallocSize(p->zMalloc));
+	assert(p->szMalloc == 0 ||
+	       p->szMalloc == sqlDbMallocSize(p->db, p->zMalloc));
 
 	/* If p holds a string or blob, the Mem.z must point to exactly
 	 * one of the following:
@@ -113,8 +113,8 @@ sqlVdbeMemGrow(Mem * pMem, int n, int bPreserve)
 	assert(bPreserve == 0 || pMem->flags & (MEM_Blob | MEM_Str));
 	testcase(bPreserve && pMem->z == 0);
 
-	assert(pMem->szMalloc == 0
-	       || pMem->szMalloc == sqlMallocSize(pMem->zMalloc));
+	assert(pMem->szMalloc == 0 ||
+	       pMem->szMalloc == sqlDbMallocSize(pMem->db, pMem->zMalloc));
 	if (pMem->szMalloc < n) {
 		if (n < 32)
 			n = 32;
@@ -133,7 +133,8 @@ sqlVdbeMemGrow(Mem * pMem, int n, int bPreserve)
 			pMem->szMalloc = 0;
 			return -1;
 		} else {
-			pMem->szMalloc = sqlMallocSize(pMem->zMalloc);
+			pMem->szMalloc = sqlDbMallocSize(pMem->db,
+							 pMem->zMalloc);
 		}
 	}
 
@@ -1050,7 +1051,7 @@ sqlVdbeMemSetStr(Mem * pMem,	/* Memory cell to set to string value */
 	} else if (xDel == SQL_DYNAMIC) {
 		sqlVdbeMemRelease(pMem);
 		pMem->zMalloc = pMem->z = (char *)z;
-		pMem->szMalloc = sqlMallocSize(pMem->zMalloc);
+		pMem->szMalloc = sqlDbMallocSize(pMem->db, pMem->zMalloc);
 	} else {
 		sqlVdbeMemRelease(pMem);
 		pMem->z = (char *)z;

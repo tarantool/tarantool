@@ -144,6 +144,15 @@ sql_malloc64(sql_uint64 n)
 }
 
 /*
+ * TRUE if p is a lookaside memory allocation from db
+ */
+static int
+isLookaside(sql * db, void *p)
+{
+	return SQL_WITHIN(p, db->lookaside.pStart, db->lookaside.pEnd);
+}
+
+/*
  * Return the size of a memory allocation previously obtained from
  * sqlMalloc() or sql_malloc().
  */
@@ -151,6 +160,16 @@ int
 sqlMallocSize(void *p)
 {
 	return sql_sized_sizeof(p);
+}
+
+int
+sqlDbMallocSize(sql * db, void *p)
+{
+	assert(p != 0);
+	if (db == 0 || !isLookaside(db, p))
+		return sql_sized_sizeof(p);
+	else
+		return db->lookaside.sz;
 }
 
 /*
@@ -173,7 +192,15 @@ sql_free(void *p)
 void
 sqlDbFree(sql * db, void *p)
 {
-	(void) db;
+	if (db != NULL) {
+		if (isLookaside(db, p)) {
+			LookasideSlot *pBuf = (LookasideSlot *) p;
+			pBuf->pNext = db->lookaside.pFree;
+			db->lookaside.pFree = pBuf;
+			db->lookaside.nOut--;
+			return;
+		}
+	}
 	sql_free(p);
 }
 
@@ -240,9 +267,24 @@ sqlDbMallocZero(sql * db, u64 n)
 	return p;
 }
 
+/* Finish the work of sqlDbMallocRawNN for the unusual and
+ * slower case when the allocation cannot be fulfilled using lookaside.
+ */
+static SQL_NOINLINE void *
+dbMallocRawFinish(sql * db, u64 n)
+{
+	void *p;
+	assert(db != 0);
+	p = sqlMalloc(n);
+	if (!p)
+		sqlOomFault(db);
+	return p;
+}
+
 /*
- * Allocate heap memory. If the allocation fails, set the
- * mallocFailed flag in the connection pointer.
+ * Allocate memory, either lookaside (if possible) or heap.
+ * If the allocation fails, set the mallocFailed flag in
+ * the connection pointer.
  *
  * If db!=0 and db->mallocFailed is true (indicating a prior malloc
  * failure on the same database connection) then always return 0.
@@ -275,12 +317,26 @@ void *
 sqlDbMallocRawNN(sql * db, u64 n)
 {
 	assert(db != NULL);
-	if (db->mallocFailed)
-		return NULL;
-	void *p = sqlMalloc(n);
-	if (p == NULL)
-		sqlOomFault(db);
-	return p;
+	LookasideSlot *pBuf;
+	if (db->lookaside.bDisable == 0) {
+		assert(db->mallocFailed == 0);
+		if (n > db->lookaside.sz) {
+			db->lookaside.anStat[1]++;
+		} else if ((pBuf = db->lookaside.pFree) == 0) {
+			db->lookaside.anStat[2]++;
+		} else {
+			db->lookaside.pFree = pBuf->pNext;
+			db->lookaside.nOut++;
+			db->lookaside.anStat[0]++;
+			if (db->lookaside.nOut > db->lookaside.mxOut) {
+				db->lookaside.mxOut = db->lookaside.nOut;
+			}
+			return (void *)pBuf;
+		}
+	} else if (db->mallocFailed) {
+		return 0;
+	}
+	return dbMallocRawFinish(db, n);
 }
 
 /* Forward declaration */
@@ -296,6 +352,8 @@ sqlDbRealloc(sql * db, void *p, u64 n)
 	assert(db != 0);
 	if (p == 0)
 		return sqlDbMallocRawNN(db, n);
+	if (isLookaside(db, p) && n <= db->lookaside.sz)
+		return p;
 	return dbReallocFinish(db, p, n);
 }
 
@@ -306,9 +364,17 @@ dbReallocFinish(sql * db, void *p, u64 n)
 	assert(db != 0);
 	assert(p != 0);
 	if (db->mallocFailed == 0) {
-		pNew = sql_realloc64(p, n);
-		if (!pNew)
-			sqlOomFault(db);
+		if (isLookaside(db, p)) {
+			pNew = sqlDbMallocRawNN(db, n);
+			if (pNew) {
+				memcpy(pNew, p, db->lookaside.sz);
+				sqlDbFree(db, p);
+			}
+		} else {
+			pNew = sql_realloc64(p, n);
+			if (!pNew)
+				sqlOomFault(db);
+		}
 	}
 	return pNew;
 }
@@ -378,6 +444,9 @@ sqlDbStrNDup(sql * db, const char *z, u64 n)
 void
 sqlOomClear(sql * db)
 {
-	if (db->mallocFailed && db->nVdbeExec == 0)
+	if (db->mallocFailed && db->nVdbeExec == 0) {
 		db->mallocFailed = 0;
+		assert(db->lookaside.bDisable > 0);
+		db->lookaside.bDisable--;
+	}
 }

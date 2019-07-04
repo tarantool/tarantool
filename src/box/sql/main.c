@@ -58,6 +58,11 @@ char *sql_temp_directory = 0;
  */
 char *sql_data_directory = 0;
 
+enum {
+	LOOKASIDE_SLOT_NUMBER = 125,
+	LOOKASIDE_SLOT_SIZE = 512,
+};
+
 /*
  * Initialize sql.
  *
@@ -148,6 +153,72 @@ sql_initialize(void)
 	memcpy(&y, &x, 8);
 	assert(sqlIsNaN(y));
 #endif
+	return 0;
+}
+
+/*
+ * Set up the lookaside buffers for a database connection.
+ * Return SQL_OK on success.
+ * If lookaside is already active, return SQL_BUSY.
+ *
+ * The sz parameter is the number of bytes in each lookaside slot.
+ * The cnt parameter is the number of slots.  If pStart is NULL the
+ * space for the lookaside memory is obtained from sql_malloc().
+ * If pStart is not NULL then it is sz*cnt bytes of memory to use for
+ * the lookaside memory.
+ */
+static int
+setupLookaside(sql * db, void *pBuf, int sz, int cnt)
+{
+	void *pStart;
+	if (db->lookaside.nOut)
+		return -1;
+	/* Free any existing lookaside buffer for this handle before
+	 * allocating a new one so we don't have to have space for
+	 * both at the same time.
+	 */
+	if (db->lookaside.bMalloced)
+		sql_free(db->lookaside.pStart);
+	/* The size of a lookaside slot after ROUNDDOWN8 needs to be larger
+	 * than a pointer to be useful.
+	 */
+	sz = ROUNDDOWN8(sz);	/* IMP: R-33038-09382 */
+	if (sz <= (int)sizeof(LookasideSlot *))
+		sz = 0;
+	if (cnt < 0)
+		cnt = 0;
+	if (sz == 0 || cnt == 0) {
+		sz = 0;
+		pStart = 0;
+	} else if (pBuf == 0) {
+		pStart = sqlMalloc(sz * cnt);	/* IMP: R-61949-35727 */
+		if (pStart)
+			cnt = sqlMallocSize(pStart) / sz;
+	} else {
+		pStart = pBuf;
+	}
+	db->lookaside.pStart = pStart;
+	db->lookaside.pFree = 0;
+	db->lookaside.sz = (u16) sz;
+	if (pStart) {
+		int i;
+		LookasideSlot *p;
+		assert(sz > (int)sizeof(LookasideSlot *));
+		p = (LookasideSlot *) pStart;
+		for (i = cnt - 1; i >= 0; i--) {
+			p->pNext = db->lookaside.pFree;
+			db->lookaside.pFree = p;
+			p = (LookasideSlot *) & ((u8 *) p)[sz];
+		}
+		db->lookaside.pEnd = p;
+		db->lookaside.bDisable = 0;
+		db->lookaside.bMalloced = pBuf == 0 ? 1 : 0;
+	} else {
+		db->lookaside.pStart = db;
+		db->lookaside.pEnd = db;
+		db->lookaside.bDisable = 1;
+		db->lookaside.bMalloced = 0;
+	}
 	return 0;
 }
 
@@ -460,6 +531,9 @@ sql_init_db(sql **out_db)
 		*out_db = NULL;
 		return -1;
 	}
+
+	/* Enable the lookaside-malloc subsystem */
+	setupLookaside(db, 0, LOOKASIDE_SLOT_SIZE, LOOKASIDE_SLOT_NUMBER);
 
 	*out_db = db;
 	return 0;

@@ -1044,6 +1044,8 @@ typedef struct FuncDef FuncDef;
 typedef struct FuncDefHash FuncDefHash;
 typedef struct IdList IdList;
 typedef struct KeyClass KeyClass;
+typedef struct Lookaside Lookaside;
+typedef struct LookasideSlot LookasideSlot;
 typedef struct NameContext NameContext;
 typedef struct Parse Parse;
 typedef struct PrintfArguments PrintfArguments;
@@ -1085,6 +1087,41 @@ typedef int VList;
  * using the sql_limit() interface.
  */
 #define SQL_N_LIMIT (SQL_LIMIT_TRIGGER_DEPTH+1)
+
+/*
+ * Lookaside malloc is a set of fixed-size buffers that can be used
+ * to satisfy small transient memory allocation requests for objects
+ * associated with a particular database connection.  The use of
+ * lookaside malloc provides a significant performance enhancement
+ * (approx 10%) by avoiding numerous malloc/free requests while parsing
+ * SQL statements.
+ *
+ * The Lookaside structure holds configuration information about the
+ * lookaside malloc subsystem.  Each available memory allocation in
+ * the lookaside subsystem is stored on a linked list of LookasideSlot
+ * objects.
+ *
+ * Lookaside allocations are only allowed for objects that are associated
+ * with a particular database connection.  Hence, schema information cannot
+ * be stored in lookaside because in shared cache mode the schema information
+ * is shared by multiple database connections.  Therefore, while parsing
+ * schema information, the Lookaside.bEnabled flag is cleared so that
+ * lookaside allocations are not used to construct the schema objects.
+ */
+struct Lookaside {
+	u32 bDisable;		/* Only operate the lookaside when zero */
+	u16 sz;			/* Size of each buffer in bytes */
+	u8 bMalloced;		/* True if pStart obtained from sql_malloc() */
+	int nOut;		/* Number of buffers currently checked out */
+	int mxOut;		/* Highwater mark for nOut */
+	int anStat[3];		/* 0: hits.  1: size misses.  2: full misses */
+	LookasideSlot *pFree;	/* List of available buffers */
+	void *pStart;		/* First byte of available memory space */
+	void *pEnd;		/* First byte past end of available space */
+};
+struct LookasideSlot {
+	LookasideSlot *pNext;	/* Next buffer in the list of free buffers */
+};
 
 /*
  * A hash table for built-in function definitions.  (Application-defined
@@ -1136,6 +1173,7 @@ struct sql {
 	void *pUpdateArg;
 	void (*xUpdateCallback) (void *, int, const char *, const char *,
 				 sql_int64);
+	Lookaside lookaside;	/* Lookaside malloc configuration */
 	Hash aFunc;		/* Hash table of connection functions */
 };
 
@@ -2232,6 +2270,7 @@ struct Parse {
 	u8 isMultiWrite;	/* True if statement may modify/insert multiple rows */
 	u8 hasCompound;		/* Need to invoke convertCompoundSelectToSubquery() */
 	u8 okConstFactor;	/* OK to factor out constants */
+	u8 disableLookaside;	/* Number of times lookaside has been disabled */
 	u8 nColCache;		/* Number of entries in aColCache[] */
 	int nRangeReg;		/* Size of the temporary register block */
 	int iRangeReg;		/* First register in temporary register block */
@@ -2501,7 +2540,7 @@ struct TriggerStep {
  * do not necessarily know how big the string will be in the end.
  */
 struct StrAccum {
-	sql *db;		/* Database for temporary buffers. */
+	sql *db;		/* Optional database for lookaside.  Can be NULL */
 	char *zBase;		/* A base allocation.  Not from malloc. */
 	char *zText;		/* The string collected so far */
 	u32 nChar;		/* Length of the string so far */
@@ -2639,6 +2678,7 @@ void *sqlDbReallocOrFree(sql *, void *, u64);
 void *sqlDbRealloc(sql *, void *, u64);
 void sqlDbFree(sql *, void *);
 int sqlMallocSize(void *);
+int sqlDbMallocSize(sql *, void *);
 
 /*
  * On systems with ample stack space and that support alloca(), make
@@ -4239,6 +4279,7 @@ static inline void
 sqlOomFault(struct sql *db)
 {
 	db->mallocFailed = 1;
+	db->lookaside.bDisable++;
 }
 
 void sqlOomClear(sql *);

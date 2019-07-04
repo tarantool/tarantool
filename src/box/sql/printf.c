@@ -864,7 +864,7 @@ sqlStrAccumEnlarge(StrAccum * p, int N)
 			if (!isMalloced(p) && p->nChar > 0)
 				memcpy(zNew, p->zText, p->nChar);
 			p->zText = zNew;
-			p->nAlloc = sqlMallocSize(zNew);
+			p->nAlloc = sqlDbMallocSize(p->db, zNew);
 			p->printfFlags |= SQL_PRINTF_MALLOCED;
 		} else {
 			sqlStrAccumReset(p);
@@ -989,8 +989,9 @@ sqlStrAccumReset(StrAccum * p)
  * Initialize a string accumulator.
  *
  * p:     The accumulator to be initialized.
- * db:    Pointer to a database connection.  May be NULL.
- *        db->mallocFailed is set appropriately when not NULL.
+ * db:    Pointer to a database connection.  May be NULL.  Lookaside
+ *        memory is used if not NULL. db->mallocFailed is set appropriately
+ *        when not NULL.
  * zBase: An initial buffer.  May be NULL in which case the initial buffer
  *        is malloced.
  * n:     Size of zBase in bytes.  If total space requirements never exceed

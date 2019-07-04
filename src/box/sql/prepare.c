@@ -255,6 +255,12 @@ sql_parser_destroy(Parse *parser)
 	sqlDbFree(db, parser->aLabel);
 	sql_expr_list_delete(db, parser->pConstExpr);
 	create_table_def_destroy(&parser->create_table_def);
+	if (db != NULL) {
+		assert(db->lookaside.bDisable >=
+		       parser->disableLookaside);
+		db->lookaside.bDisable -= parser->disableLookaside;
+	}
+	parser->disableLookaside = 0;
 	switch (parser->parsed_ast_type) {
 	case AST_TYPE_SELECT:
 		sql_select_delete(db, parser->parsed_ast.select);
