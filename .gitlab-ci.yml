@@ -1,6 +1,5 @@
 stages:
   - test
-  - deploy
 
 variables:
   IMAGE_TEST: "${CI_REGISTRY}/${CI_PROJECT_PATH}/testing/debian-stretch:latest"
@@ -143,7 +142,7 @@ centos_6:
     refs:
       - master
       - /^.*-full-ci$/
-  stage: deploy
+  stage: test
   tags:
     - deploy
   variables:
@@ -157,7 +156,7 @@ centos_7:
     refs:
       - master
       - /^.*-full-ci$/
-  stage: deploy
+  stage: test
   tags:
     - deploy_test
   variables:
@@ -171,7 +170,7 @@ fedora_28:
     refs:
       - master
       - /^.*-full-ci$/
-  stage: deploy
+  stage: test
   tags:
     - deploy_test
   variables:
@@ -185,7 +184,7 @@ fedora_29:
     refs:
       - master
       - /^.*-full-ci$/
-  stage: deploy
+  stage: test
   tags:
     - deploy_test
   variables:
@@ -199,7 +198,7 @@ fedora_30:
     refs:
       - master
       - /^.*-full-ci$/
-  stage: deploy
+  stage: test
   tags:
     - deploy_test
   variables:
@@ -213,7 +212,7 @@ ubuntu_14_04:
     refs:
       - master
       - /^.*-full-ci$/
-  stage: deploy
+  stage: test
   tags:
     - deploy
   variables:
@@ -227,7 +226,7 @@ ubuntu_16_04:
     refs:
       - master
       - /^.*-full-ci$/
-  stage: deploy
+  stage: test
   tags:
     - deploy
   variables:
@@ -241,7 +240,7 @@ ubuntu_18_04:
     refs:
       - master
       - /^.*-full-ci$/
-  stage: deploy
+  stage: test
   tags:
     - deploy
   variables:
@@ -255,7 +254,7 @@ ubuntu_18_10:
     refs:
       - master
       - /^.*-full-ci$/
-  stage: deploy
+  stage: test
   tags:
     - deploy
   variables:
@@ -269,7 +268,7 @@ ubuntu_19_04:
     refs:
       - master
       - /^.*-full-ci$/
-  stage: deploy
+  stage: test
   tags:
     - deploy
   variables:
@@ -283,7 +282,7 @@ debian_8:
     refs:
       - master
       - /^.*-full-ci$/
-  stage: deploy
+  stage: test
   tags:
     - deploy
   variables:
@@ -297,7 +296,7 @@ debian_9:
     refs:
       - master
       - /^.*-full-ci$/
-  stage: deploy
+  stage: test
   tags:
     - deploy
   variables:
@@ -311,7 +310,7 @@ debian_10:
     refs:
       - master
       - /^.*-full-ci$/
-  stage: deploy
+  stage: test
   tags:
     - deploy
   variables:
