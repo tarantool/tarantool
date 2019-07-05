@@ -45,8 +45,6 @@
 #include <unicode/uchar.h>
 #include <unicode/ucol.h>
 
-static UConverter* pUtf8conv;
-
 /*
  * Return the collating function associated with a function.
  */
@@ -656,7 +654,8 @@ randomBlob(sql_context * context, int argc, sql_value ** argv)
 	}
 }
 
-#define Utf8Read(s, e) ucnv_getNextUChar(pUtf8conv, &(s), (e), &status)
+#define Utf8Read(s, e) \
+	ucnv_getNextUChar(icu_utf8_conv, &(s), (e), &status)
 
 #define SQL_END_OF_STRING        0xffff
 #define SQL_INVALID_UTF8_SYMBOL  0xfffd
@@ -1816,14 +1815,6 @@ sql_is_like_func(struct sql *db, struct Expr *expr, int *is_like_ci)
 void
 sqlRegisterBuiltinFunctions(void)
 {
-	/*
-	 * Initialize default case map for UPPER/LOWER functions
-	 * This structure is not freed at db exit, but that is ok.
-	 */
-	UErrorCode status = U_ZERO_ERROR;
-
-	pUtf8conv = ucnv_open("utf8", &status);
-	assert(pUtf8conv);
 	/*
 	 * The following array holds FuncDef structures for all of the functions
 	 * defined in this file.

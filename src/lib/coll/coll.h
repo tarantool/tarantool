@@ -55,6 +55,8 @@ struct UCollator;
 
 /** Default universal casemap for case transformations. */
 extern struct UCaseMap *icu_ucase_default_map;
+/** Default universal utf8 converter. */
+extern struct UConverter *icu_utf8_conv;
 
 /**
  * Collation. It has no unique features like name, id or owner.

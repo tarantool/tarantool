@@ -34,10 +34,12 @@
 #include "diag.h"
 #include "assoc.h"
 #include <unicode/ucol.h>
+#include <unicode/ucnv.h>
 #include <unicode/ucasemap.h>
 #include "tt_static.h"
 
 struct UCaseMap *icu_ucase_default_map = NULL;
+struct UConverter *icu_utf8_conv = NULL;
 
 #define mh_name _coll
 struct mh_coll_key_t {
@@ -420,7 +422,9 @@ coll_init()
 	UErrorCode err = U_ZERO_ERROR;
 	coll_cache = mh_coll_new();
 	icu_ucase_default_map = ucasemap_open("", 0, &err);
-	if (coll_cache == NULL || icu_ucase_default_map == NULL)
+	icu_utf8_conv = ucnv_open("utf8", &err);
+	if (coll_cache == NULL || icu_ucase_default_map == NULL ||
+	    icu_utf8_conv == NULL)
 		panic("Can not create system collations cache");
 }
 
@@ -428,5 +432,6 @@ void
 coll_free()
 {
 	ucasemap_close(icu_ucase_default_map);
+	ucnv_close(icu_utf8_conv);
 	mh_coll_delete(coll_cache);
 }
