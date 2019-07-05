@@ -1397,13 +1397,13 @@ sock:write(data)
 ---
 - 104
 ...
+test_run:wait_log('default', 'ER_INVALID_MSGPACK: Invalid MsgPack %- packet length', nil, 10)
+---
+- 'ER_INVALID_MSGPACK: Invalid MsgPack - packet length'
+...
 sock:close()
 ---
 - true
-...
-test_run:grep_log('default', 'ER_INVALID_MSGPACK.*')
----
-- 'ER_INVALID_MSGPACK: Invalid MsgPack - packet length'
 ...
 -- gh-983 selecting a lot of data crashes the server or hangs the
 -- connection
