@@ -358,8 +358,11 @@ void
 txn_rollback_stmt(struct txn *txn);
 
 /**
- * Raise an error if this is a multi-statement transaction: DDL
- * can not be part of a multi-statement transaction.
+ * Raise an error if this is a multi-statement transaction:
+ * a yielding DDL operation, such as index build or space format
+ * check, can not be part of a multi-statement transaction,
+ * because there may be uncommitted objects in the schema cache,
+ * which would be revealed to other fibers on yield.
  */
 int
 txn_check_singlestatement(struct txn *txn, const char *where);
@@ -512,16 +515,6 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *savepoint);
 
 #if defined(__cplusplus)
 } /* extern "C" */
-
-#include "diag.h"
-
-static inline void
-txn_check_singlestatement_xc(struct txn *txn, const char *where)
-{
-	if (txn_check_singlestatement(txn, where) != 0)
-		diag_raise();
-}
-
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_TXN_H_INCLUDED */

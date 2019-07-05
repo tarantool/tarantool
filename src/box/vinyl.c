@@ -919,16 +919,17 @@ vinyl_index_commit_modify(struct index *index, int64_t lsn)
 	       env->status == VINYL_FINAL_RECOVERY_LOCAL ||
 	       env->status == VINYL_FINAL_RECOVERY_REMOTE);
 
-	if (lsn <= lsm->commit_lsn) {
+	if (env->status == VINYL_FINAL_RECOVERY_LOCAL &&
+	    lsn <= lsm->commit_lsn) {
 		/*
-		 * This must be local recovery from WAL, when
-		 * the operation has already been committed to
-		 * vylog.
+		 * The statement we are recovering from WAL has
+		 * been successfully written to vylog so we must
+		 * not replay it.
 		 */
-		assert(env->status == VINYL_FINAL_RECOVERY_LOCAL);
 		return;
 	}
 
+	assert(lsm->commit_lsn <= lsn);
 	lsm->commit_lsn = lsn;
 
 	vy_log_tx_begin();
@@ -1121,6 +1122,12 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	 */
 	bool need_wal_sync;
 	tx_manager_abort_writers_for_ddl(env->xm, space, &need_wal_sync);
+
+	if (!need_wal_sync && vy_lsm_is_empty(pk))
+		return 0; /* space is empty, nothing to do */
+
+	if (txn_check_singlestatement(txn, "space format check") != 0)
+		return -1;
 
 	/* See the comment in vinyl_space_build_index(). */
 	txn_can_yield(txn, true);
@@ -4350,6 +4357,12 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	 */
 	bool need_wal_sync;
 	tx_manager_abort_writers_for_ddl(env->xm, src_space, &need_wal_sync);
+
+	if (!need_wal_sync && vy_lsm_is_empty(pk))
+		return 0; /* space is empty, nothing to do */
+
+	if (txn_check_singlestatement(txn, "index build") != 0)
+		return -1;
 
 	/*
 	 * Tarantool doesn't support multi-engine transactions, and

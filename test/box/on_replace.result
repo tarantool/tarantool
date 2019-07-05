@@ -465,86 +465,83 @@ s = box.schema.space.create('test_on_repl_ddl')
 _ = s:create_index('pk')
 ---
 ...
+_ = s:create_index('sk', {parts = {2, 'unsigned'}})
+---
+...
 t = s:on_replace(function () box.schema.space.create('some_space') end)
 ---
 ...
 s:replace({1, 2})
 ---
-- error: Space _schema does not support multi-statement transactions
+- [1, 2]
 ...
-t = s:on_replace(function () s:create_index('sec') end, t)
+t = s:on_replace(function () s:format({{'a', 'unsigned'}, {'b', 'unsigned'}}) end, t)
 ---
 ...
 s:replace({2, 3})
 ---
-- error: Space _index does not support multi-statement transactions
+- [2, 3]
 ...
-t = s:on_replace(function () box.schema.user.create('newu') end, t)
+t = s:on_replace(function () box.schema.user.create('newu') box.schema.role.create('newr') end, t)
 ---
 ...
 s:replace({3, 4})
 ---
-- error: Space _user does not support multi-statement transactions
+- [3, 4]
 ...
-t = s:on_replace(function () box.schema.role.create('newr') end, t)
+t = s:on_replace(function () box.schema.user.drop('newu') box.schema.role.drop('newr') end, t)
 ---
 ...
 s:replace({4, 5})
 ---
-- error: Space _user does not support multi-statement transactions
+- [4, 5]
 ...
-t = s:on_replace(function () box.space._user:delete{box.schema.GUEST_ID} end, t)
----
-...
-s:replace({4, 5})
----
-- error: Space _user does not support multi-statement transactions
-...
-t = s:on_replace(function () box.space._user:delete{box.schema.SUPER_ROLE_ID} end, t)
----
-...
-s:replace({4, 5})
----
-- error: Space _user does not support multi-statement transactions
-...
-t = s:on_replace(function () s:drop() end, t)
+t = s:on_replace(function () s.index.sk:drop() end, t)
 ---
 ...
 s:replace({5, 6})
 ---
-- error: Space _index does not support multi-statement transactions
+- [5, 6]
 ...
 t = s:on_replace(function () box.schema.func.create('newf') end, t)
 ---
 ...
 s:replace({6, 7})
 ---
-- error: Space _func does not support multi-statement transactions
+- [6, 7]
 ...
 t = s:on_replace(function () box.schema.user.grant('guest', 'read,write', 'space', 'test_on_repl_ddl') end, t)
 ---
 ...
 s:replace({7, 8})
 ---
-- error: Space _priv does not support multi-statement transactions
+- [7, 8]
 ...
 t = s:on_replace(function () s:rename('newname') end, t)
 ---
 ...
 s:replace({8, 9})
 ---
-- error: Space _space does not support multi-statement transactions
+- [8, 9]
 ...
 t = s:on_replace(function () s.index.pk:rename('newname') end, t)
 ---
 ...
 s:replace({9, 10})
 ---
-- error: Space _index does not support multi-statement transactions
+- [9, 10]
 ...
 s:select()
 ---
-- []
+- - [1, 2]
+  - [2, 3]
+  - [3, 4]
+  - [4, 5]
+  - [5, 6]
+  - [6, 7]
+  - [7, 8]
+  - [8, 9]
+  - [9, 10]
 ...
 s:drop() -- test_on_repl_ddl
 ---

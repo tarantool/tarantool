@@ -827,8 +827,43 @@ box.begin()
 box.schema.user.revoke('guest', 'write', 'space', 'ddl_test')
 box.commit();
 
--- index and space drop are not currently supported (because of truncate)
-s.index.pk:drop();
+box.begin()
+s.index.pk:drop()
+s:drop()
+box.commit();
+
+--
+-- Only the first statement in a transaction is allowed to be
+-- a yielding DDL statement (index build, space format check).
+--
+s = box.schema.space.create('test', {engine = engine});
+_ = s:create_index('pk');
+s:insert{1, 1};
+
+-- ok
+box.begin()
+s:create_index('sk', {parts = {2, 'unsigned'}})
+box.commit();
+s.index.sk:drop();
+
+-- ok
+box.begin()
+s:format({{'a', 'unsigned'}, {'b', 'unsigned'}})
+box.commit();
+s:format({});
+
+-- error
+box.begin()
+s.index.pk:alter{sequence = true}
+s:create_index('sk', {parts = {2, 'unsigned'}});
+box.rollback();
+
+-- error
+box.begin()
+s.index.pk:alter{sequence = true}
+s:format({{'a', 'unsigned'}, {'b', 'unsigned'}});
+box.rollback();
+
 s:drop();
 
 --

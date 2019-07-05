@@ -576,8 +576,7 @@ int
 txn_check_singlestatement(struct txn *txn, const char *where)
 {
 	if (!txn_is_first_statement(txn)) {
-		diag_set(ClientError, ER_UNSUPPORTED,
-			 where, "multi-statement transactions");
+		diag_set(ClientError, ER_MULTISTATEMENT_TRANSACTION, where);
 		return -1;
 	}
 	return 0;

@@ -709,7 +709,6 @@ priv_grant(struct user *grantee, struct priv_def *priv)
 	if (object == NULL)
 		return;
 	struct access *access = &object[grantee->auth_token];
-	assert(privset_search(&grantee->privs, priv) || access->granted == 0);
 	access->granted = priv->access;
 	rebuild_effective_grants(grantee);
 }

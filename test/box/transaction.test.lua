@@ -41,12 +41,8 @@ f = fiber.create(sloppy);
 -- ensure it's rolled back automatically
 while f:status() ~= 'dead' do fiber.sleep(0) end;
 -- transactions and system spaces
--- some operation involves more than one ddl spaces, so they should fail
-box.begin() box.schema.space.create('test');
-box.rollback();
-box.begin() box.schema.user.create('test');
-box.rollback();
--- but this is Ok now
+box.begin() box.schema.space.create('test') box.rollback();
+box.begin() box.schema.user.create('test') box.rollback();
 box.begin() box.schema.func.create('test') box.rollback();
 box.begin() box.schema.user.grant('guest', 'read', 'space', '_priv') box.rollback();
 space = box.schema.space.create('test');
@@ -341,16 +337,13 @@ box.space.vinyl:select{};
 -- Two DDL satements in a row
 box.begin()
 box.space.test:truncate()
-box.space.test:truncate();
-
--- A transaction is left open due to an exception in the above fragment
+box.space.test:truncate()
 box.rollback();
 
 -- Two DDL stateemnts on different engines
 box.begin()
 box.space.memtx:truncate()
-box.space.vinyl:truncate();
-
+box.space.vinyl:truncate()
 box.rollback();
 
 box.space.memtx:select{};
@@ -381,3 +374,44 @@ s = box.schema.space.create('test')
 box.begin() s:create_index('pk') fiber.sleep(0)
 box.commit() -- error
 s:drop()
+
+--
+-- Multiple DDL statements in the same transaction.
+--
+test_run:cmd("setopt delimiter ';'")
+function create()
+    box.schema.role.create('my_role')
+    box.schema.user.create('my_user')
+    box.schema.user.grant('my_user', 'my_role')
+    box.schema.space.create('memtx_space', {engine = 'memtx'})
+    box.schema.space.create('vinyl_space', {engine = 'vinyl'})
+    box.schema.role.grant('my_role', 'read,write', 'space', 'vinyl_space')
+    box.schema.user.grant('my_user', 'read,write', 'space', 'memtx_space')
+    box.space.memtx_space:create_index('pk', {sequence = true})
+    box.space.memtx_space:create_index('sk', {parts = {2, 'unsigned'}})
+    box.space.vinyl_space:create_index('pk', {sequence = true})
+    box.space.vinyl_space:create_index('sk', {parts = {2, 'unsigned'}})
+    box.space.memtx_space:truncate()
+    box.space.vinyl_space:truncate()
+    box.space.memtx_space:format({{'a', 'unsigned'}, {'b', 'unsigned'}})
+    box.space.vinyl_space:format({{'a', 'unsigned'}, {'b', 'unsigned'}})
+    box.schema.func.create('my_func')
+end;
+function drop()
+    box.schema.func.drop('my_func')
+    box.space.memtx_space:truncate()
+    box.space.vinyl_space:truncate()
+    box.schema.user.revoke('my_user', 'read,write', 'space', 'memtx_space')
+    box.schema.role.revoke('my_role', 'read,write', 'space', 'vinyl_space')
+    box.space.memtx_space:drop()
+    box.space.vinyl_space:drop()
+    box.schema.user.revoke('my_user', 'my_role')
+    box.schema.user.drop('my_user')
+    box.schema.role.drop('my_role')
+end;
+test_run:cmd("setopt delimiter ''");
+
+box.begin() create() box.rollback()
+box.begin() create() box.commit()
+box.begin() drop() box.rollback()
+box.begin() drop() box.commit()

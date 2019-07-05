@@ -890,6 +890,9 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 	if (it == NULL)
 		return -1;
 
+	if (txn_check_singlestatement(txn, "space format check") != 0)
+		return -1;
+
 	txn_can_yield(txn, true);
 
 	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
@@ -1021,6 +1024,8 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	struct index *pk = index_find(src_space, 0);
 	if (pk == NULL)
 		return -1;
+	if (index_size(pk) == 0)
+		return 0;
 
 	struct errinj *inj = errinj(ERRINJ_BUILD_INDEX, ERRINJ_INT);
 	if (inj != NULL && inj->iparam == (int)new_index->def->iid) {
@@ -1031,6 +1036,9 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	/* Now deal with any kind of add index during normal operation. */
 	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
 	if (it == NULL)
+		return -1;
+
+	if (txn_check_singlestatement(txn, "index build") != 0)
 		return -1;
 
 	txn_can_yield(txn, true);
