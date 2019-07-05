@@ -373,3 +373,11 @@ fiber.sleep(0)
 s.index.pk == nil
 box.commit() -- error
 s:drop()
+
+--
+-- Check that a DDL transaction is rolled back on fiber yield.
+--
+s = box.schema.space.create('test')
+box.begin() s:create_index('pk') fiber.sleep(0)
+box.commit() -- error
+s:drop()

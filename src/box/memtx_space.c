@@ -878,6 +878,8 @@ memtx_check_on_replace(struct trigger *trigger, void *event)
 static int
 memtx_space_check_format(struct space *space, struct tuple_format *format)
 {
+	struct txn *txn = in_txn();
+
 	if (space->index_count == 0)
 		return 0;
 	struct index *pk = space->index[0];
@@ -887,6 +889,8 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
 	if (it == NULL)
 		return -1;
+
+	txn_can_yield(txn, true);
 
 	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
 	struct memtx_ddl_state state;
@@ -930,6 +934,7 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 	iterator_delete(it);
 	diag_destroy(&state.diag);
 	trigger_clear(&on_replace);
+	txn_can_yield(txn, false);
 	return rc;
 }
 
@@ -1002,6 +1007,7 @@ static int
 memtx_space_build_index(struct space *src_space, struct index *new_index,
 			struct tuple_format *new_format)
 {
+	struct txn *txn = in_txn();
 	/**
 	 * If it's a secondary key, and we're not building them
 	 * yet (i.e. it's snapshot recovery for memtx), do nothing.
@@ -1026,6 +1032,8 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
 	if (it == NULL)
 		return -1;
+
+	txn_can_yield(txn, true);
 
 	struct memtx_engine *memtx = (struct memtx_engine *)src_space->engine;
 	struct memtx_ddl_state state;
@@ -1103,6 +1111,7 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	iterator_delete(it);
 	diag_destroy(&state.diag);
 	trigger_clear(&on_replace);
+	txn_can_yield(txn, false);
 	return rc;
 }
 

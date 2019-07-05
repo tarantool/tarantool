@@ -1093,6 +1093,7 @@ static int
 vinyl_space_check_format(struct space *space, struct tuple_format *format)
 {
 	struct vy_env *env = vy_env(space->engine);
+	struct txn *txn = in_txn();
 
 	/*
 	 * If this is local recovery, the space was checked before
@@ -1120,6 +1121,9 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	 */
 	bool need_wal_sync;
 	tx_manager_abort_writers_for_ddl(env->xm, space, &need_wal_sync);
+
+	/* See the comment in vinyl_space_build_index(). */
+	txn_can_yield(txn, true);
 
 	struct trigger on_replace;
 	struct vy_check_format_ctx ctx;
@@ -1168,6 +1172,7 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 
 	diag_destroy(&ctx.diag);
 	trigger_clear(&on_replace);
+	txn_can_yield(txn, false);
 	return rc;
 }
 
@@ -4314,6 +4319,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 {
 	struct vy_env *env = vy_env(src_space->engine);
 	struct vy_lsm *pk = vy_lsm(src_space->index[0]);
+	struct txn *txn = in_txn();
 
 	if (new_index->def->iid == 0 && !vy_lsm_is_empty(pk)) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
@@ -4344,6 +4350,23 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	 */
 	bool need_wal_sync;
 	tx_manager_abort_writers_for_ddl(env->xm, src_space, &need_wal_sync);
+
+	/*
+	 * Tarantool doesn't support multi-engine transactions, and
+	 * DDL system tables are memtx tables. Memtx transactions,
+	 * generally, can't yield. So here we're in the middle of
+	 * a *memtx* transaction. We don't start a hidden vinyl
+	 * transaction for DDL to avoid its overhead, but some long
+	 * DDL operations can yield, like checking a format or
+	 * building an index. Unless we switch off memtx yield
+	 * rollback triggers, such yield leads to memtx transaction
+	 * rollback. It is safe to switch the trigger off though:
+	 * it protects subsequent memtx transactions from reading
+	 * a dirty state, and at this phase vinyl DDL does not
+	 * change the data dictionary, so there is no dirty state
+	 * that can be observed.
+	 */
+	txn_can_yield(txn, true);
 
 	/*
 	 * Iterate over all tuples stored in the space and insert
@@ -4438,6 +4461,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 
 	diag_destroy(&ctx.diag);
 	trigger_clear(&on_replace);
+	txn_can_yield(txn, false);
 	return rc;
 }
 

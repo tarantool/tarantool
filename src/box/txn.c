@@ -40,6 +40,12 @@ double too_long_threshold;
 /* Txn cache. */
 static struct stailq txn_cache = {NULL, &txn_cache.first};
 
+static void
+txn_on_stop(struct trigger *trigger, void *event);
+
+static void
+txn_on_yield(struct trigger *trigger, void *event);
+
 static inline void
 fiber_set_txn(struct fiber *fiber, struct txn *txn)
 {
@@ -193,7 +199,8 @@ txn_begin()
 	txn->n_applier_rows = 0;
 	txn->has_triggers  = false;
 	txn->is_done = false;
-	txn->is_aborted = false;
+	txn->can_yield = true;
+	txn->is_aborted_by_yield = false;
 	txn->in_sub_stmt = 0;
 	txn->id = ++tsn;
 	txn->signature = -1;
@@ -201,8 +208,8 @@ txn_begin()
 	txn->engine_tx = NULL;
 	txn->psql_txn = NULL;
 	txn->fiber = NULL;
-	/* fiber_on_yield/fiber_on_stop initialized by engine on demand */
 	fiber_set_txn(fiber(), txn);
+	/* fiber_on_yield is initialized by engine on demand */
 	trigger_create(&txn->fiber_on_stop, txn_on_stop, NULL, NULL);
 	trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
 	return txn;
@@ -463,6 +470,12 @@ txn_write_to_wal(struct txn *txn)
 static int
 txn_prepare(struct txn *txn)
 {
+	if (txn->is_aborted_by_yield) {
+		assert(!txn->can_yield);
+		diag_set(ClientError, ER_TRANSACTION_YIELD);
+		diag_log();
+		return -1;
+	}
 	/*
 	 * If transaction has been started in SQL, deferred
 	 * foreign key constraints must not be violated.
@@ -484,6 +497,8 @@ txn_prepare(struct txn *txn)
 			return -1;
 	}
 	trigger_clear(&txn->fiber_on_stop);
+	if (!txn->can_yield)
+		trigger_clear(&txn->fiber_on_yield);
 	return 0;
 }
 
@@ -550,21 +565,11 @@ txn_rollback(struct txn *txn)
 {
 	assert(txn == in_txn());
 	trigger_clear(&txn->fiber_on_stop);
+	if (!txn->can_yield)
+		trigger_clear(&txn->fiber_on_yield);
 	txn->signature = -1;
 	txn_complete(txn);
 	fiber_set_txn(fiber(), NULL);
-}
-
-void
-txn_abort(struct txn *txn)
-{
-	assert(in_txn() == txn);
-	txn_rollback_to_svp(txn, NULL);
-	if (txn->has_triggers) {
-		txn_run_triggers(txn, &txn->on_rollback);
-		txn->has_triggers = false;
-	}
-	txn->is_aborted = true;
 }
 
 int
@@ -576,6 +581,20 @@ txn_check_singlestatement(struct txn *txn, const char *where)
 		return -1;
 	}
 	return 0;
+}
+
+void
+txn_can_yield(struct txn *txn, bool set)
+{
+	assert(txn == in_txn());
+	assert(txn->can_yield != set);
+	txn->can_yield = set;
+	if (set) {
+		trigger_clear(&txn->fiber_on_yield);
+	} else {
+		trigger_create(&txn->fiber_on_yield, txn_on_yield, NULL, NULL);
+		trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
+	}
 }
 
 int64_t
@@ -711,7 +730,7 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 	return 0;
 }
 
-void
+static void
 txn_on_stop(struct trigger *trigger, void *event)
 {
 	(void) trigger;
@@ -719,3 +738,34 @@ txn_on_stop(struct trigger *trigger, void *event)
 	txn_rollback(in_txn());                 /* doesn't yield or fail */
 }
 
+/**
+ * Memtx yield-in-transaction trigger callback.
+ *
+ * In case of a yield inside memtx multi-statement transaction
+ * we must, first of all, roll back the effects of the transaction
+ * so that concurrent transactions won't see dirty, uncommitted
+ * data.
+ *
+ * Second, we must abort the transaction, since it has been rolled
+ * back implicitly. The transaction can not be rolled back
+ * completely from within a yield trigger, since a yield trigger
+ * can't fail. Instead, we mark the transaction as aborted and
+ * raise an error on attempt to commit it.
+ *
+ * So much hassle to be user-friendly until we have a true
+ * interactive transaction support in memtx.
+ */
+static void
+txn_on_yield(struct trigger *trigger, void *event)
+{
+	(void) trigger;
+	(void) event;
+	struct txn *txn = in_txn();
+	assert(txn != NULL && !txn->can_yield);
+	txn_rollback_to_svp(txn, NULL);
+	if (txn->has_triggers) {
+		txn_run_triggers(txn, &txn->on_rollback);
+		txn->has_triggers = false;
+	}
+	txn->is_aborted_by_yield = true;
+}

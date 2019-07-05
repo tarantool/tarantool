@@ -55,58 +55,6 @@
 static void
 checkpoint_cancel(struct checkpoint *ckpt);
 
-/*
- * Memtx yield-in-transaction trigger: roll back the effects
- * of the transaction and mark the transaction as aborted.
- */
-static void
-txn_on_yield(struct trigger *trigger, void *event)
-{
-	(void) trigger;
-	(void) event;
-
-	struct txn *txn = in_txn();
-	assert(txn && txn->engine_tx);
-	if (txn == NULL || txn->engine_tx == NULL)
-		return;
-	txn_abort(txn);                 /* doesn't yield or fail */
-}
-
-/**
- * Initialize context for yield triggers.
- * In case of a yield inside memtx multi-statement transaction
- * we must, first of all, roll back the effects of the transaction
- * so that concurrent transactions won't see dirty, uncommitted
- * data.
- * Second, we must abort the transaction, since it has been rolled
- * back implicitly. The transaction can not be rolled back
- * completely from within a yield trigger, since a yield trigger
- * can't fail. Instead, we mark the transaction as aborted and
- * raise an error on attempt to commit it.
- *
- * So much hassle to be user-friendly until we have a true
- * interactive transaction support in memtx.
- */
-void
-memtx_init_txn(struct txn *txn)
-{
-	struct fiber *fiber = fiber();
-
-	trigger_create(&txn->fiber_on_yield, txn_on_yield,
-		       NULL, NULL);
-	/*
-	 * Memtx doesn't allow yields between statements of
-	 * a transaction. Set a trigger which would roll
-	 * back the transaction if there is a yield.
-	 */
-	trigger_add(&fiber->on_yield, &txn->fiber_on_yield);
-	/*
-	 * This serves as a marker that the triggers are
-	 * initialized.
-	 */
-	txn->engine_tx = txn;
-}
-
 struct PACKED memtx_tuple {
 	/*
 	 * sic: the header of the tuple is used
@@ -372,45 +320,10 @@ memtx_engine_create_space(struct engine *engine, struct space_def *def,
 }
 
 static int
-memtx_engine_prepare(struct engine *engine, struct txn *txn)
-{
-	(void)engine;
-	if (txn->engine_tx == 0)
-		return 0;
-	/*
-	 * These triggers are only used for memtx and only
-	 * when autocommit == false, so we are saving
-	 * on calls to trigger_create/trigger_clear.
-	 */
-	trigger_clear(&txn->fiber_on_yield);
-	if (txn->is_aborted) {
-		diag_set(ClientError, ER_TRANSACTION_YIELD);
-		diag_log();
-		return -1;
-	}
-	return 0;
-}
-
-static int
 memtx_engine_begin(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
-	(void)txn;
-	return 0;
-}
-
-static int
-memtx_engine_begin_statement(struct engine *engine, struct txn *txn)
-{
-	(void)engine;
-	(void)txn;
-	if (txn->engine_tx == NULL) {
-		struct space *space = txn_last_stmt(txn)->space;
-
-		if (space->def->id > BOX_SYSTEM_ID_MAX)
-			/* Setup triggers for non-ddl transactions. */
-			memtx_init_txn(txn);
-	}
+	txn_can_yield(txn, false);
 	return 0;
 }
 
@@ -459,9 +372,6 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 static void
 memtx_engine_rollback(struct engine *engine, struct txn *txn)
 {
-	if (txn->engine_tx != NULL) {
-		trigger_clear(&txn->fiber_on_yield);
-	}
 	struct txn_stmt *stmt;
 	stailq_reverse(&txn->stmts);
 	stailq_foreach_entry(stmt, &txn->stmts, next)
@@ -948,8 +858,8 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .create_space = */ memtx_engine_create_space,
 	/* .join = */ memtx_engine_join,
 	/* .begin = */ memtx_engine_begin,
-	/* .begin_statement = */ memtx_engine_begin_statement,
-	/* .prepare = */ memtx_engine_prepare,
+	/* .begin_statement = */ generic_engine_begin_statement,
+	/* .prepare = */ generic_engine_prepare,
 	/* .commit = */ generic_engine_commit,
 	/* .rollback_statement = */ memtx_engine_rollback_statement,
 	/* .rollback = */ memtx_engine_rollback,

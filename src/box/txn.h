@@ -168,7 +168,12 @@ struct txn {
 	 * True if the transaction was aborted so should be
 	 * rolled back at commit.
 	 */
-	bool is_aborted;
+	bool is_aborted_by_yield;
+	/**
+	 * True if yields are allowed inside a transaction,
+	 * see txn_can_yield().
+	 */
+	bool can_yield;
 	/** True if on_commit and on_rollback lists are non-empty. */
 	bool has_triggers;
 	/** The number of active nested statement-level transactions. */
@@ -257,17 +262,6 @@ txn_rollback(struct txn *txn);
  */
 int
 txn_write(struct txn *txn);
-
-/**
- * Roll back the transaction but keep the object around.
- * A special case for memtx transaction abort on yield. In this
- * case we need to abort the transaction to avoid dirty reads but
- * need to keep it around to ensure a new one is not implicitly
- * started and committed by the user program. Later, at
- * transaction commit we will raise an exception.
- */
-void
-txn_abort(struct txn *txn);
 
 /**
  * Most txns don't have triggers, and txn objects
@@ -371,6 +365,21 @@ int
 txn_check_singlestatement(struct txn *txn, const char *where);
 
 /**
+ * Enables or disables fiber yields inside the current transaction
+ * depending on the value of the given flag. Yields are disabled
+ * by installing a fiber-on-yield trigger that marks the transaction
+ * as aborted, which results in rolling back the transaction on
+ * commit.
+ *
+ * This function is used by the memtx engine, because it doesn't
+ * support yields inside transactions. It is also used to temporarily
+ * enable yields for long DDL operations such as building an index
+ * or checking a space format.
+ */
+void
+txn_can_yield(struct txn *txn, bool set);
+
+/**
  * Returns true if the transaction has a single statement.
  * Supposed to be used from a space on_replace trigger to
  * detect transaction boundaries.
@@ -398,12 +407,6 @@ txn_last_stmt(struct txn *txn)
 {
 	return stailq_last_entry(&txn->stmts, struct txn_stmt, next);
 }
-
-/**
- * Fiber-stop trigger: roll back the transaction.
- */
-void
-txn_on_stop(struct trigger *trigger, void *event);
 
 /**
  * Return VDBE that is being currently executed.

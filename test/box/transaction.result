@@ -722,3 +722,19 @@ box.commit() -- error
 s:drop()
 ---
 ...
+--
+-- Check that a DDL transaction is rolled back on fiber yield.
+--
+s = box.schema.space.create('test')
+---
+...
+box.begin() s:create_index('pk') fiber.sleep(0)
+---
+...
+box.commit() -- error
+---
+- error: Transaction has been aborted by a fiber yield
+...
+s:drop()
+---
+...
