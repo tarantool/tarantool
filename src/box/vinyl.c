@@ -1052,25 +1052,8 @@ vinyl_space_invalidate(struct space *space)
 	 * soon as it's done reading disk, which will make the DML
 	 * request bail out early, without dereferencing the space.
 	 */
-	tx_manager_abort_writers_for_ddl(env->xm, space);
-}
-
-/**
- * This function is called after installing on_replace trigger
- * used for propagating changes done during DDL. It aborts all
- * rw transactions affecting the given space that began
- * before the trigger was installed so that DDL doesn't miss
- * their working set.
- */
-static void
-vy_abort_writers_for_ddl(struct vy_env *env, struct space *space)
-{
-	tx_manager_abort_writers_for_ddl(env->xm, space);
-	/*
-	 * Wait for prepared transactions to complete
-	 * (we can't abort them as they reached WAL).
-	 */
-	wal_sync();
+	bool unused;
+	tx_manager_abort_writers_for_ddl(env->xm, space, &unused);
 }
 
 /** Argument passed to vy_check_format_on_replace(). */
@@ -1131,6 +1114,13 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	 */
 	struct vy_lsm *pk = vy_lsm(space->index[0]);
 
+	/*
+	 * Transactions started before the space alter request can't
+	 * be checked with on_replace trigger so we abort them.
+	 */
+	bool need_wal_sync;
+	tx_manager_abort_writers_for_ddl(env->xm, space, &need_wal_sync);
+
 	struct trigger on_replace;
 	struct vy_check_format_ctx ctx;
 	ctx.format = format;
@@ -1139,7 +1129,13 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	trigger_create(&on_replace, vy_check_format_on_replace, &ctx, NULL);
 	trigger_add(&space->on_replace, &on_replace);
 
-	vy_abort_writers_for_ddl(env, space);
+	/*
+	 * Flush transactions waiting on WAL after installing on_replace
+	 * trigger so that changes made by newer transactions are checked
+	 * by the trigger callback.
+	 */
+	if (need_wal_sync)
+		wal_sync();
 
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, pk->env->empty_key,
@@ -4343,6 +4339,13 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 		return vy_build_recover(env, new_lsm, pk);
 
 	/*
+	 * Transactions started before the space alter request can't
+	 * be checked with on_replace trigger so we abort them.
+	 */
+	bool need_wal_sync;
+	tx_manager_abort_writers_for_ddl(env->xm, src_space, &need_wal_sync);
+
+	/*
 	 * Iterate over all tuples stored in the space and insert
 	 * each of them into the new LSM tree. Since read iterator
 	 * may yield, we install an on_replace trigger to forward
@@ -4359,7 +4362,13 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	trigger_create(&on_replace, vy_build_on_replace, &ctx, NULL);
 	trigger_add(&src_space->on_replace, &on_replace);
 
-	vy_abort_writers_for_ddl(env, src_space);
+	/*
+	 * Flush transactions waiting on WAL after installing on_replace
+	 * trigger so that changes made by newer transactions are checked
+	 * by the trigger callback.
+	 */
+	if (need_wal_sync)
+		wal_sync();
 
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, pk->env->empty_key,

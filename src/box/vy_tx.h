@@ -293,9 +293,14 @@ tx_manager_mem_used(struct tx_manager *xm);
  * Abort all rw transactions that affect the given space
  * and haven't reached WAL yet. Called before executing a DDL
  * operation.
+ *
+ * @need_wal_sync is set if at least one transaction can't be
+ * aborted, because it has reached WAL. The caller is supposed
+ * to call wal_sync() to flush them.
  */
 void
-tx_manager_abort_writers_for_ddl(struct tx_manager *xm, struct space *space);
+tx_manager_abort_writers_for_ddl(struct tx_manager *xm, struct space *space,
+				 bool *need_wal_sync);
 
 /**
  * Abort all local rw transactions that haven't reached WAL yet.

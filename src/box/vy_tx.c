@@ -1144,13 +1144,22 @@ vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 }
 
 void
-tx_manager_abort_writers_for_ddl(struct tx_manager *xm, struct space *space)
+tx_manager_abort_writers_for_ddl(struct tx_manager *xm, struct space *space,
+				 bool *need_wal_sync)
 {
+	*need_wal_sync = false;
 	if (space->index_count == 0)
 		return; /* no indexes, no conflicts */
 	struct vy_lsm *lsm = vy_lsm(space->index[0]);
 	struct vy_tx *tx;
 	rlist_foreach_entry(tx, &xm->writers, in_writers) {
+		/*
+		 * We can't abort prepared transactions as they have
+		 * already reached WAL. The caller needs to sync WAL
+		 * to make sure they are gone.
+		 */
+		if (tx->state == VINYL_TX_COMMIT)
+			*need_wal_sync = true;
 		if (tx->state != VINYL_TX_READY)
 			continue;
 		if (tx->last_stmt_space == space ||
