@@ -166,7 +166,8 @@ void
 swim_task_create(struct swim_task *task, swim_task_f complete,
 		 swim_task_f cancel, const char *desc)
 {
-	memset(task, 0, sizeof(*task));
+	/* Do not nullify the whole structure! It is too big. */
+	memset(task, 0, offsetof(struct swim_task, packet));
 	task->complete = complete;
 	task->cancel = cancel;
 	task->desc = desc;

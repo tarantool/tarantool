@@ -233,8 +233,6 @@ struct swim_task {
 	 * and it cancels all its tasks.
 	 */
 	swim_task_f cancel;
-	/** Packet to send. */
-	struct swim_packet packet;
 	/** Destination address. */
 	struct sockaddr_in dst;
 	/**
@@ -264,6 +262,8 @@ struct swim_task {
 	};
 	/** Link in the task pool. */
 	struct stailq_entry in_pool;
+	/** Packet to send. */
+	struct swim_packet packet;
 };
 
 /** Check if @a task is already scheduled. */
