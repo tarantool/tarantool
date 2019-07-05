@@ -46,6 +46,7 @@
  */
 
 struct swim_task;
+struct swim_member;
 struct swim_scheduler;
 
 enum {
@@ -247,11 +248,22 @@ struct swim_task {
 	 * A short description of the packet content. For logging.
 	 */
 	const char *desc;
-	/**
-	 * Sender's UUID used by ping tasks to schedule deadline
-	 * for an ACK.
-	 */
-	struct tt_uuid uuid;
+	union {
+		/**
+		 * Receiver's UUID used by ping tasks to schedule
+		 * deadline for an ACK.
+		 */
+		struct tt_uuid uuid;
+		/**
+		 * Alternative to UUID - direct pointer to the
+		 * receiver member. It works, when members and
+		 * tasks of a certain type are isomorphic. It is
+		 * faster than lookup by UUID.
+		 */
+		struct swim_member *member;
+	};
+	/** Link in the task pool. */
+	struct stailq_entry in_pool;
 };
 
 /** Check if @a task is already scheduled. */
@@ -283,6 +295,10 @@ swim_task_create(struct swim_task *task, swim_task_f complete,
 /** Allocate and create a new task. */
 struct swim_task *
 swim_task_new(swim_task_f complete, swim_task_f cancel, const char *desc);
+
+/** Destroy a task, free its memory. */
+void
+swim_task_delete(struct swim_task *task);
 
 /** Callback to delete a task after its completion. */
 void

@@ -36,6 +36,59 @@
 #include <ifaddrs.h>
 #include <net/if.h>
 
+enum {
+	/**
+	 * A rough estimation of how many tasks a SWIM instance
+	 * would need simultaneously. 1 for an ACK, 2 for indirect
+	 * ping, 1 for direct ping. Total is 4 for normal
+	 * operation. Others are 1) to get a beautiful number,
+	 * 2) in case random() is not perfect and this instance
+	 * interacts with 2 and more other instances during one
+	 * round.
+	 */
+	TASKS_PER_SCHEDULER = 16,
+};
+
+/**
+ * All the SWIM instances and their members use the same objects
+ * to send data - tasks. Each task is ~1.5KB, and on one hand it
+ * would be a waste of memory to keep preallocated tasks for each
+ * member. One the other hand it would be too slow to allocate
+ * and delete ~1.5KB on each interaction, ~3KB on each round step.
+ * Here is a pool of free tasks shared among all SWIM instances
+ * to avoid allocations, but do not keep a separate task for each
+ * member.
+ */
+static struct stailq swim_task_pool;
+/** Number of pooled tasks. */
+static int swim_task_pool_size = 0;
+/**
+ * Number of currently active schedulers. Used to limit max size
+ * of the pool.
+ */
+static int scheduler_count = 0;
+
+/** First scheduler should create the pool. */
+static inline void
+swim_task_pool_create(void)
+{
+	assert(scheduler_count == 1);
+	assert(swim_task_pool_size == 0);
+	stailq_create(&swim_task_pool);
+}
+
+/** Last scheduler destroys the pool. */
+static inline void
+swim_task_pool_destroy(void)
+{
+	assert(scheduler_count == 0);
+	while (! stailq_empty(&swim_task_pool)) {
+		free(stailq_shift_entry(&swim_task_pool, struct swim_task,
+					in_pool));
+	}
+	swim_task_pool_size = 0;
+}
+
 /**
  * Allocate memory for meta. The same as mere alloc, but moves
  * body pointer.
@@ -124,13 +177,33 @@ swim_task_create(struct swim_task *task, swim_task_f complete,
 struct swim_task *
 swim_task_new(swim_task_f complete, swim_task_f cancel, const char *desc)
 {
-	struct swim_task *task = (struct swim_task *) malloc(sizeof(*task));
-	if (task == NULL) {
-		diag_set(OutOfMemory, sizeof(*task), "malloc", "task");
-		return NULL;
+	struct swim_task *task;
+	if (swim_task_pool_size > 0) {
+		assert(! stailq_empty(&swim_task_pool));
+		--swim_task_pool_size;
+		task = stailq_shift_entry(&swim_task_pool, struct swim_task,
+					  in_pool);
+	} else {
+		task = (struct swim_task *) malloc(sizeof(*task));
+		if (task == NULL) {
+			diag_set(OutOfMemory, sizeof(*task), "malloc", "task");
+			return NULL;
+		}
 	}
 	swim_task_create(task, complete, cancel, desc);
 	return task;
+}
+
+void
+swim_task_delete(struct swim_task *task)
+{
+	swim_task_destroy(task);
+	if (swim_task_pool_size < TASKS_PER_SCHEDULER * scheduler_count) {
+		stailq_add_entry(&swim_task_pool, task, in_pool);
+		++swim_task_pool_size;
+	} else {
+		free(task);
+	}
 }
 
 void
@@ -139,7 +212,7 @@ swim_task_delete_cb(struct swim_task *task, struct swim_scheduler *scheduler,
 {
 	(void) rc;
 	(void) scheduler;
-	free(task);
+	swim_task_delete(task);
 }
 
 /** Put the task into the queue of output tasks. */
@@ -283,6 +356,8 @@ swim_scheduler_create(struct swim_scheduler *scheduler,
 					  CRYPTO_MODE_ECB, NULL, 0);
 	assert(rc == 0);
 	(void) rc;
+	if (++scheduler_count == 1)
+		swim_task_pool_create();
 }
 
 int
@@ -326,6 +401,9 @@ swim_scheduler_destroy(struct swim_scheduler *scheduler)
 	swim_transport_destroy(&scheduler->transport);
 	swim_ev_io_stop(swim_loop(), &scheduler->output);
 	swim_scheduler_stop_input(scheduler);
+	assert(scheduler_count > 0);
+	if (--scheduler_count == 0)
+		swim_task_pool_destroy();
 }
 
 /**

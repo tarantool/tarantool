@@ -414,10 +414,14 @@ struct swim_member {
 	 * message to it.
 	 */
 	struct heap_node in_wait_ack_heap;
-	/** Ready at hand regular ACK task. */
-	struct swim_task ack_task;
-	/** Ready at hand regular PING task. */
-	struct swim_task ping_task;
+	/**
+	 * Last sent failure detection tasks. Kept so as
+	 * 1) not to send them twice;
+	 * 2) to be able to cancel them when the member is
+	 *    deleted.
+	 */
+	struct swim_task *ack_task;
+	struct swim_task *ping_task;
 };
 
 #define mh_name _swim_table
@@ -759,16 +763,31 @@ static void
 swim_ping_task_complete(struct swim_task *task,
 			struct swim_scheduler *scheduler, int rc)
 {
+	struct swim *swim = swim_by_scheduler(scheduler);
+	struct swim_member *m = task->member;
+	assert(m != NULL);
+	assert(m->ping_task == task);
 	/*
 	 * If ping send has failed, it makes no sense to wait for
 	 * an ACK.
 	 */
-	if (rc < 0)
-		return;
-	struct swim *swim = swim_by_scheduler(scheduler);
-	struct swim_member *m = container_of(task, struct swim_member,
-					     ping_task);
-	swim_wait_ack(swim, m, false);
+	if (rc >= 0)
+		swim_wait_ack(swim, m, false);
+	m->ping_task = NULL;
+	swim_task_delete(task);
+}
+
+/** When ACK is completed, allow to send a new ACK. */
+static void
+swim_ack_task_complete(struct swim_task *task, struct swim_scheduler *scheduler,
+		       int rc)
+{
+	(void) scheduler;
+	(void) rc;
+	assert(task->member != NULL);
+	assert(task->member->ack_task == task);
+	task->member->ack_task = NULL;
+	swim_task_delete(task);
 }
 
 void
@@ -802,8 +821,14 @@ swim_member_delete(struct swim_member *member)
 
 	/* Failure detection component. */
 	assert(heap_node_is_stray(&member->in_wait_ack_heap));
-	swim_task_destroy(&member->ack_task);
-	swim_task_destroy(&member->ping_task);
+	if (member->ack_task != NULL) {
+		swim_task_delete(member->ack_task);
+		member->ack_task = NULL;
+	}
+	if (member->ping_task != NULL) {
+		swim_task_delete(member->ping_task);
+		member->ping_task = NULL;
+	}
 
 	/* Dissemination component. */
 	assert(rlist_empty(&member->in_dissemination_queue));
@@ -833,9 +858,6 @@ swim_member_new(const struct sockaddr_in *addr, const struct tt_uuid *uuid,
 	/* Failure detection component. */
 	member->incarnation = *incarnation;
 	heap_node_create(&member->in_wait_ack_heap);
-	swim_task_create(&member->ack_task, NULL, NULL, "ack");
-	swim_task_create(&member->ping_task, swim_ping_task_complete, NULL,
-			 "ping");
 
 	/* Dissemination component. */
 	rlist_create(&member->in_dissemination_queue);
@@ -1340,7 +1362,7 @@ swim_iping_task_complete(struct swim_task *task,
 	if (m != NULL && m->status != MEMBER_ALIVE)
 		swim_wait_ack(swim, m, true);
 finish:
-	swim_task_delete_cb(task, scheduler, rc);
+	swim_task_delete(task);
 }
 
 /**
@@ -1439,7 +1461,14 @@ swim_check_acks(struct ev_loop *loop, struct ev_timer *t, int events)
 		default:
 			unreachable();
 		}
-		swim_send_ping(swim, &m->ping_task, &m->addr);
+		m->ping_task = swim_task_new(swim_ping_task_complete, NULL,
+					     "ping");
+		if (m->ping_task != NULL) {
+			m->ping_task->member = m;
+			swim_send_ping(swim, m->ping_task, &m->addr);
+		} else {
+			diag_log();
+		}
 	}
 }
 
@@ -1683,8 +1712,16 @@ swim_process_failure_detection(struct swim *swim, const char **pos,
 			if (swim_send_indirect_ack(swim, &member->addr,
 						   proxy) != 0)
 				diag_log();
-		} else if (! swim_task_is_scheduled(&member->ack_task)) {
-			swim_send_ack(swim, &member->ack_task, &member->addr);
+		} else if (member->ack_task == NULL) {
+			member->ack_task = swim_task_new(swim_ack_task_complete,
+							 NULL, "ack");
+			if (member->ack_task != NULL) {
+				member->ack_task->member = member;
+				swim_send_ack(swim, member->ack_task,
+					      &member->addr);
+			} else {
+				diag_log();
+			}
 		}
 		break;
 	case SWIM_FD_MSG_ACK:
@@ -2297,8 +2334,7 @@ swim_quit(struct swim *swim)
 	swim_new_round(swim);
 	struct swim_task *task = &swim->round_step_task;
 	swim_task_destroy(task);
-	swim_task_create(task, swim_quit_step_complete, swim_task_delete_cb,
-			 "quit");
+	swim_task_create(task, swim_quit_step_complete, NULL, "quit");
 	char *header = swim_packet_alloc(&task->packet, 1);
 	int rc = swim_encode_src_uuid(swim, &task->packet) +
 		 swim_encode_quit(swim, &task->packet);
