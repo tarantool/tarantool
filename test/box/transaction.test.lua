@@ -363,3 +363,13 @@ if box.space.test then box.space.test:drop() end
 box.space.memtx:drop()
 box.space.vinyl:drop()
 
+--
+-- Check that changes done to the schema by a DDL statement are
+-- rolled back when the transaction is aborted on fiber yield.
+--
+s = box.schema.space.create('test')
+box.begin() s:create_index('pk') s:insert{1}
+fiber.sleep(0)
+s.index.pk == nil
+box.commit() -- error
+s:drop()

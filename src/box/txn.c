@@ -342,11 +342,6 @@ fail:
 static inline void
 txn_run_triggers(struct txn *txn, struct rlist *trigger)
 {
-	/*
-	 * Some triggers require for in_txn variable to be set so
-	 * restore it for the time triggers are in progress.
-	 */
-	fiber_set_txn(fiber(), txn);
 	/* Rollback triggers must not throw. */
 	if (trigger_run(trigger, txn) != 0) {
 		/*
@@ -357,7 +352,6 @@ txn_run_triggers(struct txn *txn, struct rlist *trigger)
 		unreachable();
 		panic("commit/rollback trigger failed");
 	}
-	fiber_set_txn(fiber(), NULL);
 }
 
 /**
@@ -412,7 +406,15 @@ txn_entry_done_cb(struct journal_entry *entry, void *data)
 {
 	struct txn *txn = data;
 	txn->signature = entry->res;
+	/*
+	 * Some commit/rollback triggers require for in_txn fiber
+	 * variable to be set so restore it for the time triggers
+	 * are in progress.
+	 */
+	assert(in_txn() == NULL);
+	fiber_set_txn(fiber(), txn);
 	txn_complete(txn);
+	fiber_set_txn(fiber(), NULL);
 }
 
 static int64_t
@@ -497,14 +499,15 @@ txn_write(struct txn *txn)
 	 * After this point the transaction must not be used
 	 * so reset the corresponding key in the fiber storage.
 	 */
-	fiber_set_txn(fiber(), NULL);
 	txn->start_tm = ev_monotonic_now(loop());
 	if (txn->n_new_rows + txn->n_applier_rows == 0) {
 		/* Nothing to do. */
 		txn->signature = 0;
 		txn_complete(txn);
+		fiber_set_txn(fiber(), NULL);
 		return 0;
 	}
+	fiber_set_txn(fiber(), NULL);
 	return txn_write_to_wal(txn);
 }
 
@@ -555,7 +558,12 @@ txn_rollback(struct txn *txn)
 void
 txn_abort(struct txn *txn)
 {
+	assert(in_txn() == txn);
 	txn_rollback_to_svp(txn, NULL);
+	if (txn->has_triggers) {
+		txn_run_triggers(txn, &txn->on_rollback);
+		txn->has_triggers = false;
+	}
 	txn->is_aborted = true;
 }
 
