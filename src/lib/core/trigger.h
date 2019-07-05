@@ -84,6 +84,17 @@ trigger_add(struct rlist *list, struct trigger *trigger)
 	rlist_add_entry(list, trigger, link);
 }
 
+/**
+ * Same as trigger_add(), but adds a trigger to the tail of the list
+ * rather than to the head. Use it when you need to ensure a certain
+ * execution order among triggers.
+ */
+static inline void
+trigger_add_tail(struct rlist *list, struct trigger *trigger)
+{
+	rlist_add_tail_entry(list, trigger, link);
+}
+
 static inline void
 trigger_add_unique(struct rlist *list, struct trigger *trigger)
 {

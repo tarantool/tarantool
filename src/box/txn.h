@@ -198,7 +198,16 @@ struct txn {
 	 * in case a fiber stops (all engines).
 	 */
 	struct trigger fiber_on_stop;
-	 /** Commit and rollback triggers */
+	/**
+	 * Commit and rollback triggers.
+	 *
+	 * Note, we commit triggers are added to the tail of
+	 * the list while rollback triggers are added to the
+	 * head, see txn_on_commit() and txn_on_rollback().
+	 * This ensures that the triggers are fired in the
+	 * same order as statements that added them, both on
+	 * commit and on rollback.
+	 */
 	struct rlist on_commit, on_rollback;
 	struct sql_txn *psql_txn;
 };
@@ -279,7 +288,7 @@ static inline void
 txn_on_commit(struct txn *txn, struct trigger *trigger)
 {
 	txn_init_triggers(txn);
-	trigger_add(&txn->on_commit, trigger);
+	trigger_add_tail(&txn->on_commit, trigger);
 }
 
 static inline void
