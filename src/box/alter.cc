@@ -745,6 +745,36 @@ AlterSpaceOp::AlterSpaceOp(struct alter_space *alter)
 	rlist_add_tail_entry(&alter->ops, this, link);
 }
 
+/**
+ * This is a per-space lock which protects the space from
+ * concurrent DDL. The current algorithm template for DDL is:
+ * 1) Capture change of a system table in a on_replace
+ *    trigger
+ * 2) Build new schema object, e..g new struct space, and insert
+ *    it in the cache - all the subsequent transactions will begin
+ *    using this object
+ * 3) Write the operation to WAL; this yields, giving a window to
+ *    concurrent transactions to use the object, but if there is
+ *    a rollback of WAL write, the roll back is *cascading*, so all
+ *    subsequent transactions are rolled back first.
+ * Step 2 doesn't yield most of the time - e.g. rename of
+ * a column, or a compatible change of the format builds a new
+ * space objects immediately. Some long operations run in
+ * background, after WAL write: this is drop index, and, transitively,
+ * drop space, so these don't yield either. But a few operations
+ * need to do a long job *before* WAL write: this is create index and
+ * deploy of the new format, which checks each space row to
+ * conform with index/format constraints, row by row. So this lock
+ * is here exactly for these operations. If we allow another DDL
+ * against the same space to get in while these operations are in
+ * progress, it will use old space object in the space cache, and
+ * thus overwrite this transaction's space object, or, worse yet,
+ * will get overwritten itself when a long-running DDL completes.
+ *
+ * Since we consider such concurrent operations to be rare, this
+ * lock is optimistic: if there is a lock already, we simply throw
+ * an exception.
+ */
 class AlterSpaceLock {
 	/** Set of all taken locks. */
 	static struct mh_i32_t *registry;
