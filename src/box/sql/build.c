@@ -668,6 +668,11 @@ trim_space_snprintf(char *wptr, const char *str, uint32_t str_len)
 	*wptr = '\0';
 }
 
+static void
+vdbe_emit_ck_constraint_create(struct Parse *parser,
+			       const struct ck_constraint_def *ck_def,
+			       uint32_t reg_space_id);
+
 void
 sql_create_check_contraint(struct Parse *parser)
 {
@@ -680,7 +685,7 @@ sql_create_check_contraint(struct Parse *parser)
 	assert(alter_def->entity_type == ENTITY_TYPE_CK);
 	(void) alter_def;
 	struct space *space = parser->create_table_def.new_space;
-	assert(space != NULL);
+	bool is_alter = space == NULL;
 
 	/* Prepare payload for ck constraint definition. */
 	struct region *region = &parser->region;
@@ -694,6 +699,7 @@ sql_create_check_contraint(struct Parse *parser)
 			return;
 		}
 	} else {
+		assert(! is_alter);
 		uint32_t ck_idx = ++parser->create_table_def.check_count;
 		name = tt_sprintf("CK_CONSTRAINT_%d_%s", ck_idx,
 				  space->def->name);
@@ -734,8 +740,22 @@ sql_create_check_contraint(struct Parse *parser)
 	trim_space_snprintf(ck_def->expr_str, expr_str, expr_str_len);
 	memcpy(ck_def->name, name, name_len);
 	ck_def->name[name_len] = '\0';
-
-	rlist_add_entry(&parser->create_table_def.new_check, ck_parse, link);
+	if (is_alter) {
+		const char *space_name = alter_def->entity_name->a[0].zName;
+		struct space *space = space_by_name(space_name);
+		if (space == NULL) {
+			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
+			parser->is_aborted = true;
+			return;
+		}
+		int space_id_reg = ++parser->nMem;
+		sqlVdbeAddOp2(sqlGetVdbe(parser), OP_Integer, space->def->id,
+			      space_id_reg);
+		vdbe_emit_ck_constraint_create(parser, ck_def, space_id_reg);
+	} else {
+		rlist_add_entry(&parser->create_table_def.new_check, ck_parse,
+				link);
+	}
 }
 
 /*

@@ -283,7 +283,7 @@ ccons ::= cconsname(N) UNIQUE. {
 ccons ::= check_constraint_def .
 
 check_constraint_def ::= cconsname(N) CHECK LP expr(X) RP. {
-  create_ck_def_init(&pParse->create_ck_def, &N, &X);
+  create_ck_def_init(&pParse->create_ck_def, NULL, &N, &X);
   sql_create_check_contraint(pParse);
 }
 
@@ -1678,6 +1678,11 @@ cmd ::= alter_add_constraint(N) FOREIGN KEY LP eidlist(FA) RP REFERENCES
   create_fk_def_init(&pParse->create_fk_def, N.table_name, &N.name, FA, &T, TA,
                      M, R, D);
   sql_create_foreign_key(pParse);
+}
+
+cmd ::= alter_add_constraint(N) CHECK LP expr(X) RP. {
+    create_ck_def_init(&pParse->create_ck_def, N.table_name, &N.name, &X);
+    sql_create_check_contraint(pParse);
 }
 
 cmd ::= alter_add_constraint(N) unique_spec(U) LP sortlist(X) RP. {

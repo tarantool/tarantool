@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(21)
+test:plan(26)
 
 -- This suite is aimed to test ALTER TABLE ADD CONSTRAINT statement.
 --
@@ -259,5 +259,51 @@ test:do_catchsql_test(
         1, "Constraint FAKE does not exist"
         -- </alter2-5.2>
     })
+
+-- Test ADD CONSTRAINT CHECK functionality. CHECK constraints are
+-- integrated into Tarantool's core, so basically we would test
+-- only grammar and validate correctness of raised errors.
+--
+test:do_catchsql_test(
+    "alter2-6.1",
+    [[
+        CREATE TABLE t1 (id INT PRIMARY KEY);
+        ALTER TABLE t1 ADD CONSTRAINT ck CHECK(id > 0);
+        INSERT INTO t1 VALUES (-1);
+    ]], { 1, "Check constraint failed 'CK': id > 0" })
+
+-- Make sure that one can't create constraint with the same name twice.
+--
+test:do_catchsql_test(
+    "alter2-6.2",
+    [[
+        ALTER TABLE t1 ADD CONSTRAINT ck CHECK(id > 0);
+    ]], { 1, "Constraint CK already exists" })
+
+-- Make sure that CHECK constraint can be created only on empty space.
+--
+test:do_catchsql_test(
+    "alter2-6.3",
+    [[
+        INSERT INTO t1 VALUES (1);
+        ALTER TABLE t1 ADD CONSTRAINT ck1 CHECK(id > 0);
+    ]], { 1, "Failed to create check constraint 'CK1': referencing space must be empty" })
+
+-- "Non-existant" space error is raised correctly.
+--
+test:do_catchsql_test(
+    "alter2-6.4",
+    [[
+        ALTER TABLE fake ADD CONSTRAINT ck CHECK(id > 0);
+    ]], { 1, "Space 'FAKE' does not exist" })
+
+-- "Non-existant" column error is raised correctly.
+--
+test:do_catchsql_test(
+    "alter2-6.5",
+    [[
+        CREATE TABLE t2 (id INT PRIMARY KEY);
+        ALTER TABLE t2 ADD CONSTRAINT ck CHECK(fake_col > 0);
+    ]], { 1, "Failed to create check constraint 'CK': Can’t resolve field 'FAKE_COL'" })
 
 test:finish_test()

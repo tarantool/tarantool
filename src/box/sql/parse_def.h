@@ -417,10 +417,10 @@ create_trigger_def_init(struct create_trigger_def *trigger_def,
 }
 
 static inline void
-create_ck_def_init(struct create_ck_def *ck_def, struct Token *name,
-		   struct ExprSpan *expr)
+create_ck_def_init(struct create_ck_def *ck_def, struct SrcList *table_name,
+		   struct Token *name, struct ExprSpan *expr)
 {
-	create_constraint_def_init(&ck_def->base, NULL, name, false,
+	create_constraint_def_init(&ck_def->base, table_name, name, false,
 				   false, ENTITY_TYPE_CK);
 	ck_def->expr = expr;
 }
