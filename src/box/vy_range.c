@@ -343,7 +343,7 @@ vy_range_update_compaction_priority(struct vy_range *range,
 	uint64_t size;
 	struct vy_slice *slice;
 	slice = rlist_last_entry(&range->slices, struct vy_slice, in_range);
-	size = slice->count.bytes;
+	size = MAX(slice->count.bytes, 1);
 	slice = rlist_first_entry(&range->slices, struct vy_slice, in_range);
 	do {
 		target_run_size = size;
