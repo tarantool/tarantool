@@ -4,6 +4,9 @@ fio = require 'fio'
 ffi = require 'ffi'
 ---
 ...
+fiber = require 'fiber'
+---
+...
 buffer = require 'buffer'
 ---
 ...
@@ -1045,6 +1048,103 @@ fh:close()
 ---
 - true
 ...
+-- test utime
+test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
+---
+- true
+...
+fh = fio.open('newfile', {'O_RDWR','O_CREAT'})
+---
+...
+current_time = math.floor(fiber.time())
+---
+...
+fiber_time = fiber.time
+---
+...
+fiber.time = function() return current_time end
+---
+...
+fio.utime('newfile', 0, 0)
+---
+- true
+...
+fh:stat().atime == 0
+---
+- true
+...
+fh:stat().mtime == 0
+---
+- true
+...
+fio.utime('newfile', 1, 2)
+---
+- true
+...
+fh:stat().atime == 1
+---
+- true
+...
+fh:stat().mtime == 2
+---
+- true
+...
+fio.utime('newfile', 3)
+---
+- true
+...
+fh:stat().atime == 3
+---
+- true
+...
+fh:stat().mtime == 3
+---
+- true
+...
+fio.utime('newfile')
+---
+- true
+...
+fh:stat().atime == current_time
+---
+- true
+...
+fh:stat().mtime == current_time
+---
+- true
+...
+fio.utime(nil)
+---
+- error: 'builtin/fio.lua: Usage: fio.utime(filepath[, atime[, mtime]])'
+...
+fio.utime('newfile', 'string')
+---
+- error: 'builtin/fio.lua: fio.utime: atime should be a number'
+...
+fio.utime('newfile', 1, 'string')
+---
+- error: 'builtin/fio.lua: fio.utime: mtime should be a number'
+...
+fh:close()
+---
+- true
+...
+fio.unlink('newfile')
+---
+- true
+...
+fh = nil
+---
+...
+current_time = nil
+---
+...
+fiber.time = fiber_time
+---
+...
+fiber_time = nil
+---
+...
 -- gh-2924
 -- fio.path.exists lexists is_file, etc
 --
@@ -1279,10 +1379,6 @@ fio.rmdir(tmpdir)
 --
 -- gh-3580: Check that error messages are descriptive enough.
 --
-test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
----
-- true
-...
 fh1:seek(nil, 'a')
 ---
 - error: 'builtin/fio.lua: fio.seek(): unknown whence: a'

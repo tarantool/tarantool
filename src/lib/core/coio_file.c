@@ -631,3 +631,11 @@ coio_copyfile(const char *source, const char *dest)
 	eio_req *req = eio_custom(coio_do_copyfile, 0, coio_complete, &eio);
 	return coio_wait_done(req, &eio);
 }
+
+int
+coio_utime(const char *pathname, double atime, double mtime)
+{
+	INIT_COEIO_FILE(eio);
+	eio_req *req = eio_utime(pathname, atime, mtime, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
+}

@@ -3,6 +3,7 @@
 local fio = require('fio')
 local ffi = require('ffi')
 local buffer = require('buffer')
+local fiber = require('fiber')
 
 ffi.cdef[[
     int umask(int mask);
@@ -466,6 +467,27 @@ fio.copytree = function(from, to)
         end
     end
     return true
+end
+
+local function check_time(time, name)
+    if time ~= nil and type(time) ~= 'number' then
+        error('fio.utime: ' .. name .. ' should be a number', 2)
+    end
+end
+
+fio.utime = function(path, atime, mtime)
+    if type(path) ~= 'string' then
+        error('Usage: fio.utime(filepath[, atime[, mtime]])')
+    end
+
+    check_time(atime, 'atime')
+    check_time(mtime, 'mtime')
+
+    local current_time = fiber.time()
+    atime = atime or current_time
+    mtime = mtime or atime
+
+    return internal.utime(path, atime, mtime)
 end
 
 fio.path = {}

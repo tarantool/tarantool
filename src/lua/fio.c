@@ -703,7 +703,14 @@ lbox_fio_copyfile(struct lua_State *L)
 	return lbox_fio_pushbool(L, coio_copyfile(source, dest) == 0);
 }
 
-
+static int
+lbox_fio_utime(struct lua_State *L)
+{
+	const char *pathname = lua_tostring(L, 1);
+	double atime = lua_tonumber(L, 2);
+	double mtime = lua_tonumber(L, 3);
+	return lbox_fio_pushbool(L, coio_utime(pathname, atime, mtime) == 0);
+}
 
 void
 tarantool_lua_fio_init(struct lua_State *L)
@@ -747,6 +754,7 @@ tarantool_lua_fio_init(struct lua_State *L)
 		{ "listdir",		lbox_fio_listdir		},
 		{ "fstat",		lbox_fio_fstat			},
 		{ "copyfile",		lbox_fio_copyfile,		},
+		{ "utime",		lbox_fio_utime			},
 		{ NULL,			NULL				}
 	};
 	luaL_register(L, NULL, internal_methods);

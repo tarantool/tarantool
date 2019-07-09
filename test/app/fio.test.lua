@@ -1,5 +1,6 @@
 fio = require 'fio'
 ffi = require 'ffi'
+fiber = require 'fiber'
 buffer = require 'buffer'
 test_run = require('test_run').new()
 -- umask
@@ -341,6 +342,34 @@ fh:read(64)
 buf:recycle()
 fh:close()
 
+-- test utime
+test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
+fh = fio.open('newfile', {'O_RDWR','O_CREAT'})
+current_time = math.floor(fiber.time())
+fiber_time = fiber.time
+fiber.time = function() return current_time end
+fio.utime('newfile', 0, 0)
+fh:stat().atime == 0
+fh:stat().mtime == 0
+fio.utime('newfile', 1, 2)
+fh:stat().atime == 1
+fh:stat().mtime == 2
+fio.utime('newfile', 3)
+fh:stat().atime == 3
+fh:stat().mtime == 3
+fio.utime('newfile')
+fh:stat().atime == current_time
+fh:stat().mtime == current_time
+fio.utime(nil)
+fio.utime('newfile', 'string')
+fio.utime('newfile', 1, 'string')
+fh:close()
+fio.unlink('newfile')
+fh = nil
+current_time = nil
+fiber.time = fiber_time
+fiber_time = nil
+
 -- gh-2924
 -- fio.path.exists lexists is_file, etc
 --
@@ -423,7 +452,6 @@ fio.rmdir(tmpdir)
 --
 -- gh-3580: Check that error messages are descriptive enough.
 --
-test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
 fh1:seek(nil, 'a')
 fio.open(nil)
 fio.open(tmp1, {'A'}, tonumber('0777', 8))

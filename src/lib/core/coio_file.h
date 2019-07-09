@@ -84,6 +84,7 @@ int	coio_tempdir(char *path, size_t path_len);
 
 int	coio_readdir(const char *path, char **buf);
 int	coio_copyfile(const char *source, const char *dest);
+int	coio_utime(const char *pathname, double atime, double mtime);
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
