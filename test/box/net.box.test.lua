@@ -1447,6 +1447,7 @@ box.cfg{readahead = readahead}
 log_level = box.cfg.log_level
 box.cfg{log_level=6}
 sock = socket.tcp_connect(LISTEN.host, LISTEN.service)
+sock:read(9)
 -- we need to have a packet with correctly encoded length,
 -- so that it bypasses iproto length check, but cannot be
 -- decoded in xrow_header_decode
