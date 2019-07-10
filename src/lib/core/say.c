@@ -758,10 +758,10 @@ say_format_plain_tail(char *buf, int len, int level, const char *filename,
 
 	if (level == S_WARN || level == S_ERROR || level == S_SYSERROR) {
 		/* Primitive basename(filename) */
-		for (const char *f = filename; *f; f++)
-			if (*f == '/' && *(f + 1) != '\0')
-				filename = f + 1;
 		if (filename) {
+			for (const char *f = filename; *f; f++)
+				if (*f == '/' && *(f + 1) != '\0')
+					filename = f + 1;
 			SNPRINT(total, snprintf, buf, len, " %s:%i", filename,
 				line);
 		}
