@@ -1764,34 +1764,6 @@ groupConcatFinalize(sql_context * context)
 }
 
 /*
- * If the function already exists as a regular global function, then
- * this routine is a no-op.  If the function does not exist, then create
- * a new one that always throws a run-time error.
- */
-static inline int
-sql_overload_function(sql * db, const char *zName,
-			  enum field_type type, int nArg)
-{
-	if (sqlFindFunction(db, zName, nArg, 0) == 0) {
-		return sqlCreateFunc(db, zName, type, nArg, 0, 0,
-				     sqlInvalidFunction, 0, 0, 0);
-	}
-	return 0;
-}
-
-/*
- * This routine does per-connection function registration.  Most
- * of the built-in functions above are part of the global function set.
- * This routine only deals with those that are not global.
- */
-void
-sqlRegisterPerConnectionBuiltinFunctions(sql * db)
-{
-	if (sql_overload_function(db, "MATCH", FIELD_TYPE_SCALAR, 2) != 0)
-		sqlOomFault(db);
-}
-
-/*
  * Set the LIKEOPT flag on the 2-argument function with the given name.
  */
 static void

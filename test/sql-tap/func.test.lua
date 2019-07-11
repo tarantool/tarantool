@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14590)
+test:plan(14586)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -1732,48 +1732,6 @@ test:do_catchsql_test(
         -- <func-18.32>
         1, "Failed to execute SQL statement: integer is overflowed"
         -- </func-18.32>
-    })
-
--- The MATCH function exists but is only a stub and always throws an error.
---
-test:do_execsql_test(
-    "func-19.1",
-    [[
-        SELECT match(a,b) FROM t1 WHERE false;
-    ]], {
-        -- <func-19.1>
-        
-        -- </func-19.1>
-    })
-
-test:do_catchsql_test(
-    "func-19.2",
-    [[
-        SELECT 'abc' MATCH 'xyz';
-    ]], {
-        -- <func-19.2>
-        1, "Failed to execute SQL statement: unable to use function MATCH in the requested context"
-        -- </func-19.2>
-    })
-
-test:do_catchsql_test(
-    "func-19.3",
-    [[
-        SELECT 'abc' NOT MATCH 'xyz';
-    ]], {
-        -- <func-19.3>
-        1, "Failed to execute SQL statement: unable to use function MATCH in the requested context"
-        -- </func-19.3>
-    })
-
-test:do_catchsql_test(
-    "func-19.4",
-    [[
-        SELECT match(1,2,3);
-    ]], {
-        -- <func-19.4>
-        1, "wrong number of arguments to function MATCH()"
-        -- </func-19.4>
     })
 
 -- Soundex tests.

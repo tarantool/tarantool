@@ -3524,7 +3524,6 @@ void sqlInsertBuiltinFuncs(FuncDef *, int);
 FuncDef *sqlFindFunction(sql *, const char *, int, u8);
 void sqlRegisterBuiltinFunctions(void);
 void sqlRegisterDateTimeFunctions(void);
-void sqlRegisterPerConnectionBuiltinFunctions(sql *);
 
 /**
  * Evaluate a view and store its result in an ephemeral table.
@@ -4359,7 +4358,6 @@ void sqlParser(void *, int, Token, Parse *);
 int sqlParserStackPeak(void *);
 #endif
 
-void sqlInvalidFunction(sql_context *, int, sql_value **);
 sql_int64 sqlStmtCurrentTime(sql_context *);
 int sqlVdbeParameterIndex(Vdbe *, const char *, int);
 int sqlTransferBindings(sql_stmt *, sql_stmt *);

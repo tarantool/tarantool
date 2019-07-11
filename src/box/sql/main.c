@@ -460,12 +460,6 @@ sql_init_db(sql **out_db)
 		return -1;
 	}
 
-	/* Register all built-in functions, but do not attempt to read the
-	 * database schema yet. This is delayed until the first time the database
-	 * is accessed.
-	 */
-	sqlRegisterPerConnectionBuiltinFunctions(db);
-
 	*out_db = db;
 	return 0;
 }
