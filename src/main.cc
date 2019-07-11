@@ -555,7 +555,6 @@ load_cfg()
 			cfg_getb("log_nonblock"),
 			log_format,
 			background);
-	systemd_init();
 
 	if (background)
 		daemonize();
@@ -795,6 +794,7 @@ main(int argc, char **argv)
 	cbus_init();
 	coll_init();
 	crypto_init();
+	systemd_init();
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
 
 	start_time = ev_monotonic_time();
