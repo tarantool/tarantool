@@ -36,6 +36,8 @@ RUN set -x \
 
 RUN yum -y install ncurses-static readline-static zlib-static pcre-static glibc-static
 
+RUN yum -y install python-devel python-pip
+
 RUN set -x && \
     cd / && \
     curl -O -L https://www.openssl.org/source/openssl-1.1.0h.tar.gz && \
@@ -75,6 +77,8 @@ RUN set -x && \
     cd tarantool && \
     git submodule init && \
     git submodule update
+
+RUN pip install -r /tarantool/test-run/requirements.txt
 
 RUN set -x \
     && (cd /tarantool; \
