@@ -29,6 +29,7 @@ docker_%:
 		-e COVERALLS_TOKEN=${COVERALLS_TOKEN} \
 		-e TRAVIS_JOB_ID=${TRAVIS_JOB_ID} \
 		-e CMAKE_EXTRA_PARAMS=${CMAKE_EXTRA_PARAMS} \
+		-e APT_EXTRA_FLAGS="${APT_EXTRA_FLAGS}" \
 		-e CC=${CC} \
 		-e CXX=${CXX} \
 		${DOCKER_IMAGE} \
@@ -39,7 +40,7 @@ docker_%:
 #########
 
 deps_debian:
-	apt-get update && apt-get install -y -f \
+	apt-get update ${APT_EXTRA_FLAGS} && apt-get install -y -f \
 		build-essential cmake coreutils sed \
 		libreadline-dev libncurses5-dev libyaml-dev libssl-dev \
 		libcurl4-openssl-dev libunwind-dev libicu-dev \
