@@ -1374,7 +1374,7 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
-test_run:grep_log("default", "ER_NO_SUCH_PROC")
+test_run:wait_log('default', 'ER_NO_SUCH_PROC', nil, 10)
 ---
 - ER_NO_SUCH_PROC
 ...
