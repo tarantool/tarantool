@@ -44,12 +44,14 @@ jobs:
           TARGET=test
           CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
           DOCKER_IMAGE=packpack/packpack:debian-buster
+          APT_EXTRA_FLAGS="--allow-releaseinfo-change-version --allow-releaseinfo-change-suite"
         if: branch = "master"
       - name: "LTO build + test (Linux, clang)"
         env: >
           TARGET=test
           CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
           DOCKER_IMAGE=packpack/packpack:debian-buster
+          APT_EXTRA_FLAGS="--allow-releaseinfo-change-version --allow-releaseinfo-change-suite"
         if: branch = "master"
         compiler: clang
       - name: "LTO build + test (OS X Mojave 10.14)"
