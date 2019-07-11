@@ -73,7 +73,7 @@ cfg_filter(box.cfg)
   - - slab_alloc_factor
     - 1.05
   - - strip_core
-    - false
+    - true
   - - too_long_threshold
     - 0.5
   - - vinyl_bloom_fpr
@@ -174,7 +174,7 @@ cfg_filter(box.cfg)
   - - slab_alloc_factor
     - 1.05
   - - strip_core
-    - false
+    - true
   - - too_long_threshold
     - 0.5
   - - vinyl_bloom_fpr

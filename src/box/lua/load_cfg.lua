@@ -25,7 +25,7 @@ end
 local default_cfg = {
     listen              = nil,
     memtx_memory        = 256 * 1024 *1024,
-    strip_core          = false,
+    strip_core          = true,
     memtx_min_tuple_size = 16,
     memtx_max_tuple_size = 1024 * 1024,
     slab_alloc_factor   = 1.05,
