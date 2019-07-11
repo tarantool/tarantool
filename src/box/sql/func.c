@@ -1467,12 +1467,6 @@ trim_func_three_args(struct sql_context *context, int argc, sql_value **argv)
 		       char_cnt, input_str, input_str_sz);
 	sql_free(char_len);
 }
-
-/* IMP: R-25361-16150 This function is omitted from sql by default. It
- * is only available if the SQL_SOUNDEX compile-time option is used
- * when sql is built.
- */
-#ifdef SQL_SOUNDEX
 /*
  * Compute the soundex encoding of a word.
  *
@@ -1482,6 +1476,7 @@ trim_func_three_args(struct sql_context *context, int argc, sql_value **argv)
 static void
 soundexFunc(sql_context * context, int argc, sql_value ** argv)
 {
+	(void) argc;
 	char zResult[8];
 	const u8 *zIn;
 	int i, j;
@@ -1527,7 +1522,6 @@ soundexFunc(sql_context * context, int argc, sql_value ** argv)
 		sql_result_text(context, "?000", 4, SQL_STATIC);
 	}
 }
-#endif				/* SQL_SOUNDEX */
 
 /*
  * An instance of the following structure holds the context of a
@@ -1841,9 +1835,7 @@ sqlRegisterBuiltinFunctions(void)
 	 * For peak efficiency, put the most frequently used function last.
 	 */
 	static FuncDef aBuiltinFunc[] = {
-#ifdef SQL_SOUNDEX
-		FUNCTION(soundex, 1, 0, 0, soundexFunc),
-#endif
+		FUNCTION(soundex, 1, 0, 0, soundexFunc, FIELD_TYPE_STRING),
 		FUNCTION2(unlikely, 1, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
 			  FIELD_TYPE_BOOLEAN),
 		FUNCTION2(likelihood, 2, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,

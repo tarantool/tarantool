@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14586)
+test:plan(14602)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -1133,7 +1133,7 @@ end
 -- } [sql -version]
 -- Test that destructors passed to sql by calls to sql_result_text()
 -- etc. are called. These tests use two special user-defined functions
--- (implemented in func.c) only available in test builds. 
+-- (implemented in func.c) only available in test builds.
 --
 -- Function test_destructor() takes one argument and returns a copy of the
 -- text form of that argument. A destructor is associated with the return
@@ -1227,7 +1227,7 @@ test:do_execsql_test(
         DROP TABLE t4;
     ]], {
         -- <func-12.7>
-        
+
         -- </func-12.7>
     })
 
@@ -1252,7 +1252,7 @@ test:do_execsql_test(
         INSERT INTO t4 VALUES(2, 'ghi', 'jkl');
     ]], {
         -- <func-13.2>
-        
+
         -- </func-13.2>
     })
 
@@ -1648,7 +1648,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-18.15",
     [[
-        SELECT sum(x) FROM 
+        SELECT sum(x) FROM
            (SELECT 9223372036854775807 AS x UNION ALL
             SELECT 10 AS x);
     ]], {
@@ -1660,7 +1660,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-18.18",
     [[
-        SELECT sum(x) FROM 
+        SELECT sum(x) FROM
            (SELECT -9223372036854775807 AS x UNION ALL
             SELECT -10 AS x);
     ]], {
@@ -1737,33 +1737,30 @@ test:do_catchsql_test(
 -- Soundex tests.
 --
 -- false condition for current tarantool version
-if pcall( function() test:execsql("SELECT soundex('hello')") end ) then
-    for i, val in ipairs({
-        {"euler", "E460"},
-        {"EULER", "E460"},    
-        {"Euler", "E460"},    
-        {"ellery", "E460"},    
-        {"gauss", "G200"},    
-        {"ghosh", "G200"},    
-        {"hilbert", "H416"},    
-        {"Heilbronn", "H416"},    
-        {"knuth", "K530"},    
-        {"kant", "K530"},    
-        {"Lloyd", "L300"},    
-        {"LADD", "L300"},    
-        {"Lukasiewicz", "L222"},    
-        {"Lissajous", "L222"},    
-        {"A", "A000"},    
-        {"12345", "?000"} }) do
-        local name = val[1]
-        local sdx = val[2]
-        test:do_execsql_test(
-            "func-20."..i,
-            string.format("SELECT soundex('%s')", name), {
-                sdx
-            })
-
-    end
+for i, val in ipairs({
+    {"euler", "E460"},
+    {"EULER", "E460"},
+    {"Euler", "E460"},
+    {"ellery", "E460"},
+    {"gauss", "G200"},
+    {"ghosh", "G200"},
+    {"hilbert", "H416"},
+    {"Heilbronn", "H416"},
+    {"knuth", "K530"},
+    {"kant", "K530"},
+    {"Lloyd", "L300"},
+    {"LADD", "L300"},
+    {"Lukasiewicz", "L222"},
+    {"Lissajous", "L222"},
+    {"A", "A000"},
+    {"12345", "?000"} }) do
+    local name = val[1]
+    local sdx = val[2]
+    test:do_execsql_test(
+        "func-20."..i,
+        string.format("SELECT soundex('%s')", name), {
+            sdx
+        })
 end
 -- Tests of the REPLACE function.
 --
@@ -1850,8 +1847,8 @@ test:do_execsql_test(
 test:do_test(
     "func-21.9",
     function()
-        -- Attempt to exploit a buffer-overflow that at one time existed 
-        -- in the REPLACE function. 
+        -- Attempt to exploit a buffer-overflow that at one time existed
+        -- in the REPLACE function.
         local str = string.format("%sCC%s", string.rep("A", 29998), string.rep("A", 35537))
         local rep = string.rep("B", 65536)
         return test:execsql(string.format([[
@@ -2430,7 +2427,7 @@ test:do_test(
         return X(1236, "X!cmd", [=[["abuse_create_function","db"]]=])
     end, {
         -- <func-26.1>
-        
+
         -- </func-26.1>
     })
 
@@ -2633,7 +2630,7 @@ end
 test:do_execsql_test(
     "func-31.1",
     [[
-        SELECT char(), length(char()), typeof(char()) 
+        SELECT char(), length(char()), typeof(char())
     ]], {
         -- <func-31.1>
         "", 0, "string"
