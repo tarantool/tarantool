@@ -2606,10 +2606,6 @@ c.space.test:delete{1}
 _ = c._transport.perform_request(nil, nil, 'inject', nil, nil, '\x80')
 ---
 ...
-c.state
----
-- error_reconnect
-...
 while not c:is_connected() do fiber.sleep(0.01) end
 ---
 ...
