@@ -389,12 +389,6 @@ struct func *
 func_sql_builtin_new(struct func_def *def)
 {
 	assert(def->language == FUNC_LANGUAGE_SQL_BUILTIN);
-	if (def->body != NULL || def->is_sandboxed) {
-		diag_set(ClientError, ER_CREATE_FUNCTION, def->name,
-			 "body and is_sandboxed options are not compatible "
-			 "with SQL language");
-		return NULL;
-	}
 	struct func *func =
 		(struct func *) malloc(sizeof(*func));
 	if (func == NULL) {
