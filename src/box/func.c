@@ -454,7 +454,7 @@ func_new(struct func_def *def)
 static struct func_vtab func_c_vtab;
 
 static struct func *
-func_c_new(struct func_def *def)
+func_c_new(MAYBE_UNUSED struct func_def *def)
 {
 	assert(def->language == FUNC_LANGUAGE_C);
 	assert(def->body == NULL && !def->is_sandboxed);
