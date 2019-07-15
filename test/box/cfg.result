@@ -1,538 +1,586 @@
+-- test-run result file version 2
 env = require('test_run')
----
-...
+ | ---
+ | ...
 test_run = env.new()
----
-...
+ | ---
+ | ...
 test_run:cmd("push filter '(error: .*)\\.lua:[0-9]+: ' to '\\1.lua:<line>: '")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 box.cfg.nosuchoption = 1
----
-- error: 'builtin/box/load_cfg.lua:<line>: Attempt to modify a read-only table'
-...
+ | ---
+ | - error: 'builtin/box/load_cfg.lua:<line>: Attempt to modify a read-only table'
+ | ...
 cfg_filter(box.cfg)
----
-- - - background
-    - false
-  - - checkpoint_count
-    - 2
-  - - checkpoint_interval
-    - 3600
-  - - checkpoint_wal_threshold
-    - 1000000000000000000
-  - - coredump
-    - false
-  - - feedback_enabled
-    - true
-  - - feedback_host
-    - https://feedback.tarantool.io
-  - - feedback_interval
-    - 3600
-  - - force_recovery
-    - false
-  - - hot_standby
-    - false
-  - - listen
-    - <hidden>
-  - - log
-    - <hidden>
-  - - log_format
-    - plain
-  - - log_level
-    - 5
-  - - memtx_dir
-    - <hidden>
-  - - memtx_max_tuple_size
-    - <hidden>
-  - - memtx_memory
-    - 107374182
-  - - memtx_min_tuple_size
-    - <hidden>
-  - - net_msg_max
-    - 768
-  - - pid_file
-    - <hidden>
-  - - read_only
-    - false
-  - - readahead
-    - 16320
-  - - replication_connect_timeout
-    - 30
-  - - replication_skip_conflict
-    - false
-  - - replication_sync_lag
-    - 10
-  - - replication_sync_timeout
-    - 300
-  - - replication_timeout
-    - 1
-  - - rows_per_wal
-    - 500000
-  - - slab_alloc_factor
-    - 1.05
-  - - strip_core
-    - true
-  - - too_long_threshold
-    - 0.5
-  - - vinyl_bloom_fpr
-    - 0.05
-  - - vinyl_cache
-    - 134217728
-  - - vinyl_dir
-    - <hidden>
-  - - vinyl_max_tuple_size
-    - 1048576
-  - - vinyl_memory
-    - 134217728
-  - - vinyl_page_size
-    - 8192
-  - - vinyl_read_threads
-    - 1
-  - - vinyl_run_count_per_level
-    - 2
-  - - vinyl_run_size_ratio
-    - 3.5
-  - - vinyl_timeout
-    - 60
-  - - vinyl_write_threads
-    - 4
-  - - wal_dir
-    - <hidden>
-  - - wal_dir_rescan_delay
-    - 2
-  - - wal_max_size
-    - 268435456
-  - - wal_mode
-    - write
-  - - worker_pool_threads
-    - 4
-...
+ | ---
+ | - - - background
+ |     - false
+ |   - - checkpoint_count
+ |     - 2
+ |   - - checkpoint_interval
+ |     - 3600
+ |   - - checkpoint_wal_threshold
+ |     - 1000000000000000000
+ |   - - coredump
+ |     - false
+ |   - - feedback_enabled
+ |     - true
+ |   - - feedback_host
+ |     - https://feedback.tarantool.io
+ |   - - feedback_interval
+ |     - 3600
+ |   - - force_recovery
+ |     - false
+ |   - - hot_standby
+ |     - false
+ |   - - listen
+ |     - <hidden>
+ |   - - log
+ |     - <hidden>
+ |   - - log_format
+ |     - plain
+ |   - - log_level
+ |     - 5
+ |   - - memtx_dir
+ |     - <hidden>
+ |   - - memtx_max_tuple_size
+ |     - <hidden>
+ |   - - memtx_memory
+ |     - 107374182
+ |   - - memtx_min_tuple_size
+ |     - <hidden>
+ |   - - net_msg_max
+ |     - 768
+ |   - - pid_file
+ |     - <hidden>
+ |   - - read_only
+ |     - false
+ |   - - readahead
+ |     - 16320
+ |   - - replication_connect_timeout
+ |     - 30
+ |   - - replication_skip_conflict
+ |     - false
+ |   - - replication_sync_lag
+ |     - 10
+ |   - - replication_sync_timeout
+ |     - 300
+ |   - - replication_timeout
+ |     - 1
+ |   - - rows_per_wal
+ |     - 500000
+ |   - - slab_alloc_factor
+ |     - 1.05
+ |   - - strip_core
+ |     - true
+ |   - - too_long_threshold
+ |     - 0.5
+ |   - - vinyl_bloom_fpr
+ |     - 0.05
+ |   - - vinyl_cache
+ |     - 134217728
+ |   - - vinyl_dir
+ |     - <hidden>
+ |   - - vinyl_max_tuple_size
+ |     - 1048576
+ |   - - vinyl_memory
+ |     - 134217728
+ |   - - vinyl_page_size
+ |     - 8192
+ |   - - vinyl_read_threads
+ |     - 1
+ |   - - vinyl_run_count_per_level
+ |     - 2
+ |   - - vinyl_run_size_ratio
+ |     - 3.5
+ |   - - vinyl_timeout
+ |     - 60
+ |   - - vinyl_write_threads
+ |     - 4
+ |   - - wal_dir
+ |     - <hidden>
+ |   - - wal_dir_rescan_delay
+ |     - 2
+ |   - - wal_max_size
+ |     - 268435456
+ |   - - wal_mode
+ |     - write
+ |   - - worker_pool_threads
+ |     - 4
+ | ...
 -- must be read-only
 box.cfg()
----
-...
+ | ---
+ | ...
 cfg_filter(box.cfg)
----
-- - - background
-    - false
-  - - checkpoint_count
-    - 2
-  - - checkpoint_interval
-    - 3600
-  - - checkpoint_wal_threshold
-    - 1000000000000000000
-  - - coredump
-    - false
-  - - feedback_enabled
-    - true
-  - - feedback_host
-    - https://feedback.tarantool.io
-  - - feedback_interval
-    - 3600
-  - - force_recovery
-    - false
-  - - hot_standby
-    - false
-  - - listen
-    - <hidden>
-  - - log
-    - <hidden>
-  - - log_format
-    - plain
-  - - log_level
-    - 5
-  - - memtx_dir
-    - <hidden>
-  - - memtx_max_tuple_size
-    - <hidden>
-  - - memtx_memory
-    - 107374182
-  - - memtx_min_tuple_size
-    - <hidden>
-  - - net_msg_max
-    - 768
-  - - pid_file
-    - <hidden>
-  - - read_only
-    - false
-  - - readahead
-    - 16320
-  - - replication_connect_timeout
-    - 30
-  - - replication_skip_conflict
-    - false
-  - - replication_sync_lag
-    - 10
-  - - replication_sync_timeout
-    - 300
-  - - replication_timeout
-    - 1
-  - - rows_per_wal
-    - 500000
-  - - slab_alloc_factor
-    - 1.05
-  - - strip_core
-    - true
-  - - too_long_threshold
-    - 0.5
-  - - vinyl_bloom_fpr
-    - 0.05
-  - - vinyl_cache
-    - 134217728
-  - - vinyl_dir
-    - <hidden>
-  - - vinyl_max_tuple_size
-    - 1048576
-  - - vinyl_memory
-    - 134217728
-  - - vinyl_page_size
-    - 8192
-  - - vinyl_read_threads
-    - 1
-  - - vinyl_run_count_per_level
-    - 2
-  - - vinyl_run_size_ratio
-    - 3.5
-  - - vinyl_timeout
-    - 60
-  - - vinyl_write_threads
-    - 4
-  - - wal_dir
-    - <hidden>
-  - - wal_dir_rescan_delay
-    - 2
-  - - wal_max_size
-    - 268435456
-  - - wal_mode
-    - write
-  - - worker_pool_threads
-    - 4
-...
+ | ---
+ | - - - background
+ |     - false
+ |   - - checkpoint_count
+ |     - 2
+ |   - - checkpoint_interval
+ |     - 3600
+ |   - - checkpoint_wal_threshold
+ |     - 1000000000000000000
+ |   - - coredump
+ |     - false
+ |   - - feedback_enabled
+ |     - true
+ |   - - feedback_host
+ |     - https://feedback.tarantool.io
+ |   - - feedback_interval
+ |     - 3600
+ |   - - force_recovery
+ |     - false
+ |   - - hot_standby
+ |     - false
+ |   - - listen
+ |     - <hidden>
+ |   - - log
+ |     - <hidden>
+ |   - - log_format
+ |     - plain
+ |   - - log_level
+ |     - 5
+ |   - - memtx_dir
+ |     - <hidden>
+ |   - - memtx_max_tuple_size
+ |     - <hidden>
+ |   - - memtx_memory
+ |     - 107374182
+ |   - - memtx_min_tuple_size
+ |     - <hidden>
+ |   - - net_msg_max
+ |     - 768
+ |   - - pid_file
+ |     - <hidden>
+ |   - - read_only
+ |     - false
+ |   - - readahead
+ |     - 16320
+ |   - - replication_connect_timeout
+ |     - 30
+ |   - - replication_skip_conflict
+ |     - false
+ |   - - replication_sync_lag
+ |     - 10
+ |   - - replication_sync_timeout
+ |     - 300
+ |   - - replication_timeout
+ |     - 1
+ |   - - rows_per_wal
+ |     - 500000
+ |   - - slab_alloc_factor
+ |     - 1.05
+ |   - - strip_core
+ |     - true
+ |   - - too_long_threshold
+ |     - 0.5
+ |   - - vinyl_bloom_fpr
+ |     - 0.05
+ |   - - vinyl_cache
+ |     - 134217728
+ |   - - vinyl_dir
+ |     - <hidden>
+ |   - - vinyl_max_tuple_size
+ |     - 1048576
+ |   - - vinyl_memory
+ |     - 134217728
+ |   - - vinyl_page_size
+ |     - 8192
+ |   - - vinyl_read_threads
+ |     - 1
+ |   - - vinyl_run_count_per_level
+ |     - 2
+ |   - - vinyl_run_size_ratio
+ |     - 3.5
+ |   - - vinyl_timeout
+ |     - 60
+ |   - - vinyl_write_threads
+ |     - 4
+ |   - - wal_dir
+ |     - <hidden>
+ |   - - wal_dir_rescan_delay
+ |     - 2
+ |   - - wal_max_size
+ |     - 268435456
+ |   - - wal_mode
+ |     - write
+ |   - - worker_pool_threads
+ |     - 4
+ | ...
+
 -- check that cfg with unexpected parameter fails.
 box.cfg{sherlock = 'holmes'}
----
-- error: 'Incorrect value for option ''sherlock'': unexpected option'
-...
+ | ---
+ | - error: 'Incorrect value for option ''sherlock'': unexpected option'
+ | ...
+
 -- check that cfg with unexpected type of parameter fails
 box.cfg{listen = {}}
----
-- error: 'Incorrect value for option ''listen'': should be one of types string, number'
-...
+ | ---
+ | - error: 'Incorrect value for option ''listen'': should be one of types string, number'
+ | ...
 box.cfg{wal_dir = 0}
----
-- error: 'Incorrect value for option ''wal_dir'': should be of type string'
-...
+ | ---
+ | - error: 'Incorrect value for option ''wal_dir'': should be of type string'
+ | ...
 box.cfg{coredump = 'true'}
----
-- error: 'Incorrect value for option ''coredump'': should be of type boolean'
-...
+ | ---
+ | - error: 'Incorrect value for option ''coredump'': should be of type boolean'
+ | ...
+
 -- check comment to issue #2191 - bad argument #2 to ''uri_parse''
 box.cfg{replication = {}}
----
-...
+ | ---
+ | ...
 box.cfg{replication = {}}
----
-...
+ | ---
+ | ...
+
 --------------------------------------------------------------------------------
 -- Test of hierarchical cfg type check
 --------------------------------------------------------------------------------
+
 box.cfg{memtx_memory = "100500"}
----
-- error: 'Incorrect value for option ''memtx_memory'': should be of type number'
-...
+ | ---
+ | - error: 'Incorrect value for option ''memtx_memory'': should be of type number'
+ | ...
 box.cfg{memtx_memory = -1}
----
-- error: 'Incorrect value for option ''memtx_memory'': must not be less than 0'
-...
+ | ---
+ | - error: 'Incorrect value for option ''memtx_memory'': must not be less than 0'
+ | ...
 box.cfg{vinyl_memory = -1}
----
-- error: 'Incorrect value for option ''vinyl_memory'': must not be less than 0'
-...
+ | ---
+ | - error: 'Incorrect value for option ''vinyl_memory'': must not be less than 0'
+ | ...
 box.cfg{vinyl = "vinyl"}
----
-- error: 'Incorrect value for option ''vinyl'': unexpected option'
-...
+ | ---
+ | - error: 'Incorrect value for option ''vinyl'': unexpected option'
+ | ...
 box.cfg{vinyl_write_threads = "threads"}
----
-- error: 'Incorrect value for option ''vinyl_write_threads'': should be of type number'
-...
+ | ---
+ | - error: 'Incorrect value for option ''vinyl_write_threads'': should be of type number'
+ | ...
+
 --------------------------------------------------------------------------------
 -- Dynamic configuration check
 --------------------------------------------------------------------------------
+
 replication_sync_lag = box.cfg.replication_sync_lag
----
-...
+ | ---
+ | ...
 box.cfg{replication_sync_lag = 0.123}
----
-...
+ | ---
+ | ...
 box.cfg.replication_sync_lag
----
-- 0.123
-...
+ | ---
+ | - 0.123
+ | ...
 box.cfg{replication_sync_lag = replication_sync_lag}
----
-...
+ | ---
+ | ...
+
 replication_sync_timeout = box.cfg.replication_sync_timeout
----
-...
+ | ---
+ | ...
 box.cfg{replication_sync_timeout = 123}
----
-...
+ | ---
+ | ...
 box.cfg.replication_sync_timeout
----
-- 123
-...
+ | ---
+ | - 123
+ | ...
 box.cfg{replication_sync_timeout = replication_sync_timeout}
----
-...
+ | ---
+ | ...
+
 box.cfg{instance_uuid = box.info.uuid}
----
-...
+ | ---
+ | ...
 box.cfg{instance_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
----
-- error: Can't set option 'instance_uuid' dynamically
-...
+ | ---
+ | - error: Can't set option 'instance_uuid' dynamically
+ | ...
+
 box.cfg{replicaset_uuid = box.info.cluster.uuid}
----
-...
+ | ---
+ | ...
 box.cfg{replicaset_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
----
-- error: Can't set option 'replicaset_uuid' dynamically
-...
+ | ---
+ | - error: Can't set option 'replicaset_uuid' dynamically
+ | ...
+
 box.cfg{memtx_memory = box.cfg.memtx_memory}
----
-...
+ | ---
+ | ...
 box.cfg{vinyl_memory = box.cfg.vinyl_memory}
----
-...
+ | ---
+ | ...
+
 --------------------------------------------------------------------------------
 -- Test of default cfg options
 --------------------------------------------------------------------------------
+
 test_run:cmd('create server cfg_tester1 with script = "box/lua/cfg_test1.lua"')
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("start server cfg_tester1")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd('switch cfg_tester1')
----
-- true
-...
+ | ---
+ | - true
+ | ...
 box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
----
-- 268435456
-- 1.05
-- 4
-...
+ | ---
+ | - 268435456
+ | - 1.05
+ | - 4
+ | ...
 test_run:cmd("switch default")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("stop server cfg_tester1")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("cleanup server cfg_tester1")
----
-- true
-...
+ | ---
+ | - true
+ | ...
+
 test_run:cmd('create server cfg_tester2 with script = "box/lua/cfg_test2.lua"')
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("start server cfg_tester2")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd('switch cfg_tester2')
----
-- true
-...
+ | ---
+ | - true
+ | ...
 box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
----
-- 214748364
-- 1.05
-- 4
-...
+ | ---
+ | - 214748364
+ | - 1.05
+ | - 4
+ | ...
 test_run:cmd("switch default")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("stop server cfg_tester2")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("cleanup server cfg_tester2")
----
-- true
-...
+ | ---
+ | - true
+ | ...
+
 test_run:cmd('create server cfg_tester3 with script = "box/lua/cfg_test3.lua"')
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("start server cfg_tester3")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd('switch cfg_tester3')
----
-- true
-...
+ | ---
+ | - true
+ | ...
 box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
----
-- 214748364
-- 1.05
-- 10
-...
+ | ---
+ | - 214748364
+ | - 1.05
+ | - 10
+ | ...
 test_run:cmd("switch default")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("stop server cfg_tester3")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("cleanup server cfg_tester3")
----
-- true
-...
+ | ---
+ | - true
+ | ...
+
 test_run:cmd('create server cfg_tester4 with script = "box/lua/cfg_test4.lua"')
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("start server cfg_tester4")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd('switch cfg_tester4')
----
-- true
-...
+ | ---
+ | - true
+ | ...
 box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
----
-- 268435456
-- 3.14
-- 4
-...
+ | ---
+ | - 268435456
+ | - 3.14
+ | - 4
+ | ...
 test_run:cmd("switch default")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("stop server cfg_tester4")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("cleanup server cfg_tester4")
----
-- true
-...
+ | ---
+ | - true
+ | ...
+
 --------------------------------------------------------------------------------
 -- Check fix for pid_file option overwritten by tarantoolctl
 --------------------------------------------------------------------------------
+
 test_run:cmd('create server cfg_tester5 with script = "box/lua/cfg_test1.lua"')
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("start server cfg_tester5")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd('switch cfg_tester5')
----
-- true
-...
+ | ---
+ | - true
+ | ...
 box.cfg{pid_file = "current.pid"}
----
-...
+ | ---
+ | ...
 test_run:cmd("switch default")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("stop server cfg_tester5")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("cleanup server cfg_tester5")
----
-- true
-...
+ | ---
+ | - true
+ | ...
+
 --------------------------------------------------------------------------------
 -- Check that 'vinyl_dir' cfg option is not checked as long as
 -- there is no vinyl indexes (issue #2664)
 --------------------------------------------------------------------------------
+
 test_run:cmd('create server cfg_tester with script = "box/lua/cfg_bad_vinyl_dir.lua"')
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("start server cfg_tester")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd('switch cfg_tester')
----
-- true
-...
+ | ---
+ | - true
+ | ...
 _ = box.schema.space.create('test_memtx', {engine = 'memtx'})
----
-...
+ | ---
+ | ...
 _ = box.space.test_memtx:create_index('pk') -- ok
----
-...
+ | ---
+ | ...
 _ = box.schema.space.create('test_vinyl', {engine = 'vinyl'})
----
-...
+ | ---
+ | ...
 _ = box.space.test_vinyl:create_index('pk') -- error
----
-- error: can not access vinyl data directory
-...
+ | ---
+ | - error: can not access vinyl data directory
+ | ...
 box.snapshot()
----
-- ok
-...
+ | ---
+ | - ok
+ | ...
 test_run:cmd("restart server cfg_tester")
+ | 
 test_run:cmd("switch default")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("stop server cfg_tester")
----
-- true
-...
+ | ---
+ | - true
+ | ...
 test_run:cmd("cleanup server cfg_tester")
----
-- true
-...
+ | ---
+ | - true
+ | ...
+
 --
 -- gh-3320: box.cfg{net_msg_max}.
 --
 box.cfg{net_msg_max = 'invalid'}
----
-- error: 'Incorrect value for option ''net_msg_max'': should be of type number'
-...
+ | ---
+ | - error: 'Incorrect value for option ''net_msg_max'': should be of type number'
+ | ...
 --
 -- gh-3425: incorrect error message: must not contain 'iproto'.
 --
 box.cfg{net_msg_max = 0}
----
-- error: 'Incorrect value for option ''net_msg_max'': minimal value is 2'
-...
+ | ---
+ | - error: 'Incorrect value for option ''net_msg_max'': minimal value is 2'
+ | ...
 old = box.cfg.net_msg_max
----
-...
+ | ---
+ | ...
 box.cfg{net_msg_max = 2}
----
-...
+ | ---
+ | ...
 box.cfg{net_msg_max = old + 1000}
----
-...
+ | ---
+ | ...
 box.cfg{net_msg_max = old}
----
-...
+ | ---
+ | ...
+
 test_run:cmd("clear filter")
----
-- true
-...
+ | ---
+ | - true
+ | ...
+
+--
+-- gh-4236: initial box.cfg{} call did not log changes to default state
+--
+test_run:cmd('create server cfg_tester6 with script = "box/lua/cfg_test5.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd("start server cfg_tester6")
+ | ---
+ | - true
+ | ...
+test_run:grep_log('cfg_tester6', 'set \'vinyl_memory\' configuration option to 1073741824', 1000)
+ | ---
+ | - set 'vinyl_memory' configuration option to 1073741824
+ | ...
+test_run:cmd("stop server cfg_tester6")
+ | ---
+ | - true
+ | ...
+test_run:cmd("cleanup server cfg_tester6")
+ | ---
+ | - true
+ | ...

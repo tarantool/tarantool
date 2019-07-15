@@ -132,3 +132,12 @@ box.cfg{net_msg_max = old + 1000}
 box.cfg{net_msg_max = old}
 
 test_run:cmd("clear filter")
+
+--
+-- gh-4236: initial box.cfg{} call did not log changes to default state
+--
+test_run:cmd('create server cfg_tester6 with script = "box/lua/cfg_test5.lua"')
+test_run:cmd("start server cfg_tester6")
+test_run:grep_log('cfg_tester6', 'set \'vinyl_memory\' configuration option to 1073741824', 1000)
+test_run:cmd("stop server cfg_tester6")
+test_run:cmd("cleanup server cfg_tester6")

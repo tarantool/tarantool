@@ -492,8 +492,10 @@ local function load_cfg(cfg)
     private.cfg_load()
     for key, fun in pairs(dynamic_cfg) do
         local val = cfg[key]
-        if val ~= nil and not dynamic_cfg_skip_at_load[key] then
-            fun()
+        if val ~= nil then
+            if not dynamic_cfg_skip_at_load[key] then
+                fun()
+            end
             if not compare_cfg(val, default_cfg[key]) then
                 log.info("set '%s' configuration option to %s", key, json.encode(val))
             end
