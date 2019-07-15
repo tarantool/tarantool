@@ -51,6 +51,7 @@ struct request;
 struct port;
 struct tuple;
 struct tuple_format;
+struct ck_constraint;
 
 struct space_vtab {
 	/** Free a space instance. */
@@ -506,6 +507,22 @@ space_dump_def(const struct space *space, struct rlist *key_list);
 /** Rebuild index map in a space after a series of swap index. */
 void
 space_fill_index_map(struct space *space);
+
+/**
+ * Add a new ck constraint to the space. A ck constraint check
+ * trigger is created, if this is a first ck in this space. The
+ * space takes ownership of this object.
+ */
+int
+space_add_ck_constraint(struct space *space, struct ck_constraint *ck);
+
+/**
+ * Remove a ck constraint from the space. A ck constraint check
+ * trigger is deleted, if this is a last ck in this space. This
+ * object may be deleted manually after the call.
+ */
+void
+space_remove_ck_constraint(struct space *space, struct ck_constraint *ck);
 
 /*
  * Virtual method stubs.

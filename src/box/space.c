@@ -583,6 +583,38 @@ space_execute_dml(struct space *space, struct txn *txn,
 	return 0;
 }
 
+int
+space_add_ck_constraint(struct space *space, struct ck_constraint *ck)
+{
+	rlist_add_entry(&space->ck_constraint, ck, link);
+	if (space->ck_constraint_trigger == NULL) {
+		struct trigger *ck_trigger =
+			(struct trigger *) malloc(sizeof(*ck_trigger));
+		if (ck_trigger == NULL) {
+			diag_set(OutOfMemory, sizeof(*ck_trigger), "malloc",
+				 "ck_trigger");
+			return -1;
+		}
+		trigger_create(ck_trigger, ck_constraint_on_replace_trigger,
+			       NULL, (trigger_f0) free);
+		trigger_add(&space->on_replace, ck_trigger);
+		space->ck_constraint_trigger = ck_trigger;
+	}
+	return 0;
+}
+
+void
+space_remove_ck_constraint(struct space *space, struct ck_constraint *ck)
+{
+	rlist_del_entry(ck, link);
+	if (rlist_empty(&space->ck_constraint)) {
+		struct trigger *ck_trigger = space->ck_constraint_trigger;
+		trigger_clear(ck_trigger);
+		ck_trigger->destroy(ck_trigger);
+		space->ck_constraint_trigger = NULL;
+	}
+}
+
 /* {{{ Virtual method stubs */
 
 size_t
