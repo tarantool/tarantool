@@ -181,7 +181,7 @@ s:insert{1, 1, 1}
 box.snapshot()
 
 for i = 1, 1024 do s:update(1, {{'=', 3, string.rep('x', 1024)}}) end
-test_run:wait_cond(function() return pk:stat().disk.dump.count == 2 end)
+test_run:wait_cond(function() return pk:stat().disk.dump.count >= 2 end) or pk:stat().disk.dump.count
 sk:stat().disk.dump.count -- 1
 
 test_run:cmd('restart server test with args="1048576"')
