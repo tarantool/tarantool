@@ -510,3 +510,21 @@ decimal.trim(a)
  | ---
  | - '123.456789'
  | ...
+
+-- check correct rounding when scale = 0
+decimal.round(decimal.new(0.9), 0)
+ | ---
+ | - '1'
+ | ...
+decimal.round(decimal.new(9.9), 0)
+ | ---
+ | - '10'
+ | ...
+decimal.round(decimal.new(99.9), 0)
+ | ---
+ | - '100'
+ | ...
+decimal.round(decimal.new(99.4), 0)
+ | ---
+ | - '99'
+ | ...

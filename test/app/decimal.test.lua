@@ -143,3 +143,9 @@ decimal.trim(decimal.rescale(a, 10))
 a = decimal.new('123.456789000000000')
 a
 decimal.trim(a)
+
+-- check correct rounding when scale = 0
+decimal.round(decimal.new(0.9), 0)
+decimal.round(decimal.new(9.9), 0)
+decimal.round(decimal.new(99.9), 0)
+decimal.round(decimal.new(99.4), 0)

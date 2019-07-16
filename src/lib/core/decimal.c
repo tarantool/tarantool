@@ -172,14 +172,14 @@ decimal_round(decimal_t *dec, int scale)
 	if (scale < 0 || scale > DECIMAL_MAX_DIGITS)
 		return NULL;
 
-	if (scale > decimal_scale(dec))
+	if (scale >= decimal_scale(dec))
 		return dec;
 
-	int ndig = decimal_precision(dec) - decimal_scale(dec) + scale;
+	int ndig = MAX(decimal_precision(dec) - decimal_scale(dec) + scale, 1);
 	decContext context = {
 		ndig, /* Precision */
-		ndig - 1, /* emax */
-		-1, /* emin */
+		ndig, /* emax */
+		scale != 0 ? -1 : 0, /* emin */
 		DECIMAL_ROUNDING, /* rounding */
 		0, /* no traps */
 		0, /* zero status */
