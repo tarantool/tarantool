@@ -1,0 +1,6230 @@
+-- test-run result file version 2
+-- Create table for tests
+CREATE TABLE t (a BOOLEAN PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t VALUES (true), (false);
+ | ---
+ | - row_count: 2
+ | ...
+
+-- Create user-defined function.
+\set language lua
+ | ---
+ | - true
+ | ...
+test_run = require('test_run').new()
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ';'")
+ | ---
+ | - true
+ | ...
+box.schema.func.create('RETURN_TYPE', {language = 'Lua',
+		       is_deterministic = true,
+		       body = 'function(x) return type(x) end',
+		       returns = 'string', param_list = {'any'},
+		       exports = {'LUA', 'SQL'}});
+ | ---
+ | ...
+box.schema.func.create('IS_BOOLEAN', {language = 'Lua',
+		       is_deterministic = true,
+		       body = "function(x) return type(x) == 'boolean' end",
+		       returns = 'boolean', param_list = {'any'},
+		       exports = {'LUA', 'SQL'}});
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
+ | ...
+\set language sql
+ | ---
+ | - true
+ | ...
+
+-- Check boolean as WHERE argument.
+SELECT a FROM t WHERE a;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT a FROM t WHERE a != true;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+
+-- Check DEFAULT values for boolean.
+CREATE TABLE t0 (i INT PRIMARY KEY, a BOOLEAN DEFAULT true);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t0 VALUES (1, false);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t0(i) VALUES (2);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t0 VALUES (3, NULL);
+ | ---
+ | - row_count: 1
+ | ...
+SELECT * FROM t0;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: A
+ |     type: boolean
+ |   rows:
+ |   - [1, false]
+ |   - [2, true]
+ |   - [3, null]
+ | ...
+
+-- Check UNKNOWN value for boolean.
+INSERT INTO t0 VALUES (4, UNKNOWN);
+ | ---
+ | - row_count: 1
+ | ...
+SELECT * FROM t0;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: A
+ |     type: boolean
+ |   rows:
+ |   - [1, false]
+ |   - [2, true]
+ |   - [3, null]
+ |   - [4, null]
+ | ...
+
+-- Make sure that SCALAR can handle boolean values.
+CREATE TABLE ts (id INT PRIMARY KEY AUTOINCREMENT, s SCALAR);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO ts SELECT * FROM t0;
+ | ---
+ | - row_count: 4
+ | ...
+SELECT s FROM ts WHERE s = true;
+ | ---
+ | - metadata:
+ |   - name: S
+ |     type: scalar
+ |   rows:
+ |   - [true]
+ | ...
+INSERT INTO ts(s) VALUES ('abc'), (12.5);
+ | ---
+ | - autoincrement_ids:
+ |   - 5
+ |   - 6
+ |   row_count: 2
+ | ...
+SELECT s FROM ts WHERE s = true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT s FROM ts WHERE s < true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT s FROM ts WHERE s IN (true, 1, 'abcd');
+ | ---
+ | - metadata:
+ |   - name: S
+ |     type: scalar
+ |   rows:
+ |   - [true]
+ | ...
+
+--
+-- Make sure that BOOLEAN is not implicitly converted to INTEGER
+-- while inserted to PRIMARY KEY field.
+--
+INSERT INTO ts VALUES (true, 12345);
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+
+-- Check that we can create index on field of type BOOLEAN.
+CREATE INDEX i0 ON t0(a);
+ | ---
+ | - row_count: 1
+ | ...
+
+-- Check boolean as LIMIT argument.
+SELECT * FROM t LIMIT true;
+ | ---
+ | - null
+ | - 'Failed to execute SQL statement: Only positive integers are allowed in the LIMIT
+ |   clause'
+ | ...
+SELECT * FROM t LIMIT false;
+ | ---
+ | - null
+ | - 'Failed to execute SQL statement: Only positive integers are allowed in the LIMIT
+ |   clause'
+ | ...
+
+-- Check boolean as OFFSET argument.
+SELECT * FROM t LIMIT 1 OFFSET true;
+ | ---
+ | - null
+ | - 'Failed to execute SQL statement: Only positive integers are allowed in the OFFSET
+ |   clause'
+ | ...
+SELECT * FROM t LIMIT 1 OFFSET false;
+ | ---
+ | - null
+ | - 'Failed to execute SQL statement: Only positive integers are allowed in the OFFSET
+ |   clause'
+ | ...
+
+-- Check involvance in index search.
+EXPLAIN QUERY PLAN SELECT a FROM t0 WHERE a = true;
+ | ---
+ | - metadata:
+ |   - name: selectid
+ |     type: INTEGER
+ |   - name: order
+ |     type: INTEGER
+ |   - name: from
+ |     type: INTEGER
+ |   - name: detail
+ |     type: TEXT
+ |   rows:
+ |   - [0, 0, 0, 'SEARCH TABLE T0 USING COVERING INDEX I0 (A=?) (~10 rows)']
+ | ...
+
+-- Check that ephemeral tables are used with BOOLEAN.
+\set language lua
+ | ---
+ | - true
+ | ...
+result = box.execute('EXPLAIN SELECT * FROM (VALUES(true)), t;')
+ | ---
+ | ...
+i = 0
+ | ---
+ | ...
+for _,v in pairs(result.rows) do if (v[2] == 'OpenTEphemeral') then i = i + 1 end end
+ | ---
+ | ...
+i > 0
+ | ---
+ | - true
+ | ...
+\set language sql
+ | ---
+ | - true
+ | ...
+
+-- Check BOOLEAN as argument of user-defined function.
+SELECT return_type(a) FROM t;
+ | ---
+ | - metadata:
+ |   - name: return_type(a)
+ |     type: string
+ |   rows:
+ |   - ['boolean']
+ |   - ['boolean']
+ | ...
+SELECT return_type('false');
+ | ---
+ | - metadata:
+ |   - name: return_type('false')
+ |     type: string
+ |   rows:
+ |   - ['string']
+ | ...
+SELECT is_boolean(a) FROM t LIMIT 1;
+ | ---
+ | - metadata:
+ |   - name: is_boolean(a)
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT is_boolean('true');
+ | ---
+ | - metadata:
+ |   - name: is_boolean('true')
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+
+-- Check BOOLEAN as argument of scalar function.
+SELECT abs(a) FROM t0;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected number got BOOLEAN'
+ | ...
+SELECT lower(a) FROM t0;
+ | ---
+ | - metadata:
+ |   - name: lower(a)
+ |     type: string
+ |   rows:
+ |   - ['false']
+ |   - ['true']
+ |   - [null]
+ |   - [null]
+ | ...
+SELECT upper(a) FROM t0;
+ | ---
+ | - metadata:
+ |   - name: upper(a)
+ |     type: string
+ |   rows:
+ |   - ['FALSE']
+ |   - ['TRUE']
+ |   - [null]
+ |   - [null]
+ | ...
+SELECT quote(a) FROM t0;
+ | ---
+ | - metadata:
+ |   - name: quote(a)
+ |     type: string
+ |   rows:
+ |   - ['false']
+ |   - ['true']
+ |   - ['NULL']
+ |   - ['NULL']
+ | ...
+SELECT length(a) FROM t0;
+ | ---
+ | - metadata:
+ |   - name: length(a)
+ |     type: integer
+ |   rows:
+ |   - [null]
+ |   - [null]
+ |   - [null]
+ |   - [null]
+ | ...
+SELECT typeof(a) FROM t0;
+ | ---
+ | - metadata:
+ |   - name: typeof(a)
+ |     type: string
+ |   rows:
+ |   - ['boolean']
+ |   - ['boolean']
+ |   - ['boolean']
+ |   - ['boolean']
+ | ...
+
+-- Check BOOLEAN as argument of aggregate function.
+SELECT AVG(a) FROM t0;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to number'
+ | ...
+SELECT MIN(a) FROM t0;
+ | ---
+ | - metadata:
+ |   - name: MIN(a)
+ |     type: scalar
+ |   rows:
+ |   - [false]
+ | ...
+SELECT MAX(a) FROM t0;
+ | ---
+ | - metadata:
+ |   - name: MAX(a)
+ |     type: scalar
+ |   rows:
+ |   - [true]
+ | ...
+SELECT SUM(a) FROM t0;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to number'
+ | ...
+SELECT COUNT(a) FROM t0;
+ | ---
+ | - metadata:
+ |   - name: COUNT(a)
+ |     type: integer
+ |   rows:
+ |   - [2]
+ | ...
+SELECT TOTAL(a) FROM t0;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to number'
+ | ...
+SELECT GROUP_CONCAT(a, ' +++ ') FROM t0;
+ | ---
+ | - metadata:
+ |   - name: GROUP_CONCAT(a, ' +++ ')
+ |     type: string
+ |   rows:
+ |   - ['false +++ true']
+ | ...
+
+-- Check BOOLEAN as binding parameter.
+\set language lua
+ | ---
+ | - true
+ | ...
+box.execute('SELECT ?, ?, return_type($1), typeof($2);', {true, false})
+ | ---
+ | - metadata:
+ |   - name: '?'
+ |     type: BOOLEAN
+ |   - name: '?'
+ |     type: BOOLEAN
+ |   - name: return_type($1)
+ |     type: string
+ |   - name: typeof($2)
+ |     type: string
+ |   rows:
+ |   - [true, false, 'boolean', 'boolean']
+ | ...
+
+parameters = {}
+ | ---
+ | ...
+parameters[1] = {}
+ | ---
+ | ...
+parameters[1]['@value2'] = true
+ | ---
+ | ...
+parameters[2] = {}
+ | ---
+ | ...
+parameters[2][':value1'] = false
+ | ---
+ | ...
+box.execute('SELECT :value1, @value2;', parameters)
+ | ---
+ | - metadata:
+ |   - name: :value1
+ |     type: BOOLEAN
+ |   - name: '@value2'
+ |     type: BOOLEAN
+ |   rows:
+ |   - [false, true]
+ | ...
+\set language sql
+ | ---
+ | - true
+ | ...
+
+-- Check interactions with CHECK constraint.
+CREATE TABLE t1 (i INT PRIMARY KEY, a BOOLEAN, CONSTRAINT ck CHECK(a != true));
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t1 VALUES (1, false);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t1 VALUES (2, true);
+ | ---
+ | - null
+ | - 'Check constraint failed ''CK'': a != true'
+ | ...
+
+-- Check interactions with FOREIGN KEY constraint.
+CREATE TABLE t2 (a BOOLEAN PRIMARY KEY, b BOOLEAN REFERENCES t2(a));
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t2 VALUES (false, true)
+ | ---
+ | - null
+ | - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+ | ...
+INSERT INTO t2 VALUES (true, false)
+ | ---
+ | - null
+ | - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+ | ...
+INSERT INTO t2 VALUES (true, true)
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t2 VALUES (false, true)
+ | ---
+ | - row_count: 1
+ | ...
+
+-- Check interactions with UNIQUE constraint.
+CREATE TABLE t3 (i INT PRIMARY KEY, a BOOLEAN, CONSTRAINT uq UNIQUE(a));
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t3 VALUES (1, true)
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t3 VALUES (2, false)
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t3 VALUES (3, true)
+ | ---
+ | - null
+ | - Duplicate key exists in unique index 'UQ' in space 'T3'
+ | ...
+INSERT INTO t3 VALUES (4, false)
+ | ---
+ | - null
+ | - Duplicate key exists in unique index 'UQ' in space 'T3'
+ | ...
+
+-- Check CAST from BOOLEAN to the other types.
+SELECT cast(true AS INTEGER), cast(false AS INTEGER);
+ | ---
+ | - metadata:
+ |   - name: cast(true AS INTEGER)
+ |     type: integer
+ |   - name: cast(false AS INTEGER)
+ |     type: integer
+ |   rows:
+ |   - [1, 0]
+ | ...
+SELECT cast(true AS NUMBER), cast(false AS NUMBER);
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to number'
+ | ...
+SELECT cast(true AS TEXT), cast(false AS TEXT);
+ | ---
+ | - metadata:
+ |   - name: cast(true AS TEXT)
+ |     type: string
+ |   - name: cast(false AS TEXT)
+ |     type: string
+ |   rows:
+ |   - ['TRUE', 'FALSE']
+ | ...
+SELECT cast(true AS BOOLEAN), cast(false AS BOOLEAN);
+ | ---
+ | - metadata:
+ |   - name: cast(true AS BOOLEAN)
+ |     type: boolean
+ |   - name: cast(false AS BOOLEAN)
+ |     type: boolean
+ |   rows:
+ |   - [true, false]
+ | ...
+
+-- Check CAST to BOOLEAN from the other types.
+SELECT cast(100 AS BOOLEAN), cast(1 AS BOOLEAN), cast(0 AS BOOLEAN);
+ | ---
+ | - metadata:
+ |   - name: cast(100 AS BOOLEAN)
+ |     type: boolean
+ |   - name: cast(1 AS BOOLEAN)
+ |     type: boolean
+ |   - name: cast(0 AS BOOLEAN)
+ |     type: boolean
+ |   rows:
+ |   - [true, true, false]
+ | ...
+SELECT cast(0.123 AS BOOLEAN), cast(0.0 AS BOOLEAN);
+ | ---
+ | - metadata:
+ |   - name: cast(0.123 AS BOOLEAN)
+ |     type: boolean
+ |   - name: cast(0.0 AS BOOLEAN)
+ |     type: boolean
+ |   rows:
+ |   - [true, false]
+ | ...
+SELECT cast('true' AS BOOLEAN), cast('false' AS BOOLEAN);
+ | ---
+ | - metadata:
+ |   - name: cast('true' AS BOOLEAN)
+ |     type: boolean
+ |   - name: cast('false' AS BOOLEAN)
+ |     type: boolean
+ |   rows:
+ |   - [true, false]
+ | ...
+SELECT cast('TRUE' AS BOOLEAN), cast('FALSE' AS BOOLEAN);
+ | ---
+ | - metadata:
+ |   - name: cast('TRUE' AS BOOLEAN)
+ |     type: boolean
+ |   - name: cast('FALSE' AS BOOLEAN)
+ |     type: boolean
+ |   rows:
+ |   - [true, false]
+ | ...
+
+-- Check usage in trigger.
+CREATE TABLE t4 (i INT PRIMARY KEY, a BOOLEAN);
+ | ---
+ | - row_count: 1
+ | ...
+CREATE TABLE t5 (i INT PRIMARY KEY AUTOINCREMENT, b BOOLEAN);
+ | ---
+ | - row_count: 1
+ | ...
+CREATE TRIGGER r AFTER INSERT ON t4 FOR EACH ROW BEGIN INSERT INTO t5(b) VALUES(true); END;
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t4 VALUES (100, false);
+ | ---
+ | - row_count: 1
+ | ...
+DROP TRIGGER r;
+ | ---
+ | - row_count: 1
+ | ...
+SELECT * FROM t4;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: A
+ |     type: boolean
+ |   rows:
+ |   - [100, false]
+ | ...
+SELECT * FROM t5;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: B
+ |     type: boolean
+ |   rows:
+ |   - [1, true]
+ | ...
+
+-- Check UNION, UNION ALL AND INTERSECT.
+INSERT INTO t5 VALUES (100, false);
+ | ---
+ | - row_count: 1
+ | ...
+SELECT * FROM t4 UNION SELECT * FROM t5;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: A
+ |     type: boolean
+ |   rows:
+ |   - [1, true]
+ |   - [100, false]
+ | ...
+SELECT * FROM t4 UNION ALL SELECT * FROM t5;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: A
+ |     type: boolean
+ |   rows:
+ |   - [100, false]
+ |   - [1, true]
+ |   - [100, false]
+ | ...
+SELECT * FROM t4 INTERSECT SELECT * FROM t5;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: A
+ |     type: boolean
+ |   rows:
+ |   - [100, false]
+ | ...
+
+-- Check SUBSELECT.
+INSERT INTO t5(b) SELECT a FROM t4;
+ | ---
+ | - autoincrement_ids:
+ |   - 101
+ |   row_count: 1
+ | ...
+SELECT * FROM t5;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: B
+ |     type: boolean
+ |   rows:
+ |   - [1, true]
+ |   - [100, false]
+ |   - [101, false]
+ | ...
+
+SELECT * FROM (SELECT t4.i, t5.i, a, b FROM t4, t5 WHERE a = false OR b = true);
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: I_1
+ |     type: integer
+ |   - name: A
+ |     type: boolean
+ |   - name: B
+ |     type: boolean
+ |   rows:
+ |   - [100, 1, false, true]
+ |   - [100, 100, false, false]
+ |   - [100, 101, false, false]
+ | ...
+
+-- Check VIEW.
+CREATE VIEW v AS SELECT b FROM t5;
+ | ---
+ | - row_count: 1
+ | ...
+SELECT * FROM v;
+ | ---
+ | - metadata:
+ |   - name: B
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ |   - [false]
+ |   - [false]
+ | ...
+
+-- Check DISTINCT.
+SELECT DISTINCT * FROM v;
+ | ---
+ | - metadata:
+ |   - name: B
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ |   - [false]
+ | ...
+
+-- Check CTE
+WITH temp(x, y) AS (VALUES (111, false) UNION ALL VALUES (222, true)) \
+INSERT INTO t4 SELECT * from temp;
+ | ---
+ | - row_count: 2
+ | ...
+SELECT * FROM t4;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: A
+ |     type: boolean
+ |   rows:
+ |   - [100, false]
+ |   - [111, false]
+ |   - [222, true]
+ | ...
+
+WITH RECURSIVE cnt(x, y) AS \
+(VALUES(1, false) UNION ALL SELECT x+1, x % 2 == 1 FROM cnt WHERE x<10) \
+SELECT x, y FROM cnt;
+ | ---
+ | - metadata:
+ |   - name: X
+ |     type: integer
+ |   - name: Y
+ |     type: boolean
+ |   rows:
+ |   - [1, false]
+ |   - [2, true]
+ |   - [3, false]
+ |   - [4, true]
+ |   - [5, false]
+ |   - [6, true]
+ |   - [7, false]
+ |   - [8, true]
+ |   - [9, false]
+ |   - [10, true]
+ | ...
+
+-- Check JOINs.
+SELECT * FROM t4 JOIN t5 ON t4.a = t5.b;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: A
+ |     type: boolean
+ |   - name: I
+ |     type: integer
+ |   - name: B
+ |     type: boolean
+ |   rows:
+ |   - [100, false, 100, false]
+ |   - [100, false, 101, false]
+ |   - [111, false, 100, false]
+ |   - [111, false, 101, false]
+ |   - [222, true, 1, true]
+ | ...
+SELECT * FROM t4 LEFT JOIN t5 ON t4.a = t5.b;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: A
+ |     type: boolean
+ |   - name: I
+ |     type: integer
+ |   - name: B
+ |     type: boolean
+ |   rows:
+ |   - [100, false, 100, false]
+ |   - [100, false, 101, false]
+ |   - [111, false, 100, false]
+ |   - [111, false, 101, false]
+ |   - [222, true, 1, true]
+ | ...
+SELECT * FROM t4 INNER JOIN t5 ON t4.a = t5.b;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: A
+ |     type: boolean
+ |   - name: I
+ |     type: integer
+ |   - name: B
+ |     type: boolean
+ |   rows:
+ |   - [100, false, 100, false]
+ |   - [100, false, 101, false]
+ |   - [111, false, 100, false]
+ |   - [111, false, 101, false]
+ |   - [222, true, 1, true]
+ | ...
+
+-- Check UPDATE.
+UPDATE t4 SET a = NOT a;
+ | ---
+ | - row_count: 3
+ | ...
+SELECT * FROM t4;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: A
+ |     type: boolean
+ |   rows:
+ |   - [100, true]
+ |   - [111, true]
+ |   - [222, false]
+ | ...
+
+-- Check SWITCH-CASE.
+SELECT i, \
+CASE \
+	WHEN a == true AND i % 2 == 1 THEN false \
+	WHEN a == true and i % 2 == 0 THEN true \
+	WHEN a != true then false \
+END AS a0 \
+FROM t4;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: A0
+ |     type: boolean
+ |   rows:
+ |   - [100, true]
+ |   - [111, false]
+ |   - [222, false]
+ | ...
+
+-- Check ORDER BY.
+SELECT * FROM t4 UNION SELECT * FROM t5 ORDER BY a, i;
+ | ---
+ | - metadata:
+ |   - name: I
+ |     type: integer
+ |   - name: A
+ |     type: boolean
+ |   rows:
+ |   - [100, false]
+ |   - [101, false]
+ |   - [222, false]
+ |   - [1, true]
+ |   - [100, true]
+ |   - [111, true]
+ | ...
+
+-- Check GROUP BY.
+SELECT a, COUNT(*) FROM (SELECT * FROM t4 UNION SELECT * FROM t5) GROUP BY a;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: COUNT(*)
+ |     type: integer
+ |   rows:
+ |   - [false, 3]
+ |   - [true, 3]
+ | ...
+
+-- Check logical, bitwise and arithmetical operations.
+CREATE TABLE t6 (a1 BOOLEAN PRIMARY KEY, a2 BOOLEAN);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t6 VALUES (true, false), (false, true);
+ | ---
+ | - row_count: 2
+ | ...
+
+SELECT NOT true;
+ | ---
+ | - metadata:
+ |   - name: NOT true
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT NOT false;
+ | ---
+ | - metadata:
+ |   - name: NOT false
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT a, NOT a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: NOT a
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, false]
+ | ...
+
+SELECT true AND true;
+ | ---
+ | - metadata:
+ |   - name: true AND true
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT true AND false;
+ | ---
+ | - metadata:
+ |   - name: true AND false
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false AND true;
+ | ---
+ | - metadata:
+ |   - name: false AND true
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false AND false;
+ | ---
+ | - metadata:
+ |   - name: false AND false
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true OR true;
+ | ---
+ | - metadata:
+ |   - name: true OR true
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT true OR false;
+ | ---
+ | - metadata:
+ |   - name: true OR false
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT false OR true;
+ | ---
+ | - metadata:
+ |   - name: false OR true
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT false OR false;
+ | ---
+ | - metadata:
+ |   - name: false OR false
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+
+SELECT a, true AND a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: true AND a
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, true]
+ | ...
+SELECT a, false AND a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: false AND a
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, false]
+ | ...
+SELECT a, true OR a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: true OR a
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, true]
+ | ...
+SELECT a, false OR a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: false OR a
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, true]
+ | ...
+SELECT a, a AND true FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a AND true
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, true]
+ | ...
+SELECT a, a AND false FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a AND false
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, false]
+ | ...
+SELECT a, a OR true FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a OR true
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, true]
+ | ...
+SELECT a, a OR false FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a OR false
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, true]
+ | ...
+
+SELECT a, a1, a AND a1 FROM t, t6;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: A1
+ |     type: boolean
+ |   - name: a AND a1
+ |     type: boolean
+ |   rows:
+ |   - [false, false, false]
+ |   - [false, true, false]
+ |   - [true, false, false]
+ |   - [true, true, true]
+ | ...
+SELECT a, a1, a OR a1 FROM t, t6;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: A1
+ |     type: boolean
+ |   - name: a OR a1
+ |     type: boolean
+ |   rows:
+ |   - [false, false, false]
+ |   - [false, true, true]
+ |   - [true, false, true]
+ |   - [true, true, true]
+ | ...
+
+SELECT -true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT -false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT -a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+
+SELECT true + true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT true + false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT false + true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false + false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT true - true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT true - false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT false - true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false - false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT true * true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT true * false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT false * true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false * false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT true / true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT true / false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT false / true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false / false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT true % true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT true % false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT false % true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false % false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+
+SELECT a, true + a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, false + a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, true - a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, false - a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, true * a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, false * a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, true / a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, false / a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, true % a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, false % a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, a + true FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a, a + false FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, a - true FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a, a - false FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, a * true FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a, a * false FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, a / true FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a, a / false FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, a % true FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a, a % false FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+
+SELECT a, a1, a + a1 FROM t, t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, a1, a - a1 FROM t, t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, a1, a * a1 FROM t, t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, a1, a / a1 FROM t, t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a, a1, a % a1 FROM t, t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+
+SELECT ~true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT ~false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT true & true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT true & false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT false & true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT false & false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT true | true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT true | false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT false | true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT false | false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT true << true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT true << false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT false << true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT false << false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT true >> true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT true >> false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT false >> true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT false >> false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+
+SELECT a, true & a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a, false & a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a, true | a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a, false | a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a, true << a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a, false << a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a, true >> a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a, false >> a FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a, a & true FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a, a & false FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a, a | true FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a, a | false FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a, a << true FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a, a << false FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a, a >> true FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a, a >> false FROM t;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+
+SELECT a, a1, a & a1 FROM t, t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a, a1, a | a1 FROM t, t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a, a1, a << a1 FROM t, t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a, a1, a >> a1 FROM t, t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+
+-- Check concatenate.
+SELECT true || true;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT true || false;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT false || true;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT false || false;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+
+SELECT a, true || a FROM t;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT a, false || a FROM t;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT a, a || true FROM t;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT a, a || false FROM t;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+
+SELECT a1, a1 || a1 FROM t6;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT a2, a2 || a2 FROM t6;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT a1, a2, a1 || a1 FROM t6;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT a1, a2, a2 || a2 FROM t6;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+
+-- Check comparisons.
+SELECT true > true;
+ | ---
+ | - metadata:
+ |   - name: true > true
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true > false;
+ | ---
+ | - metadata:
+ |   - name: true > false
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT false > true;
+ | ---
+ | - metadata:
+ |   - name: false > true
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false > false;
+ | ---
+ | - metadata:
+ |   - name: false > false
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true < true;
+ | ---
+ | - metadata:
+ |   - name: true < true
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true < false;
+ | ---
+ | - metadata:
+ |   - name: true < false
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false < true;
+ | ---
+ | - metadata:
+ |   - name: false < true
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT false < false;
+ | ---
+ | - metadata:
+ |   - name: false < false
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+
+SELECT a, true > a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: true > a
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, false]
+ | ...
+SELECT a, false > a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: false > a
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, false]
+ | ...
+SELECT a, true < a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: true < a
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, false]
+ | ...
+SELECT a, false < a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: false < a
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, true]
+ | ...
+SELECT a, a > true FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a > true
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, false]
+ | ...
+SELECT a, a > false FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a > false
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, true]
+ | ...
+SELECT a, a < true FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a < true
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, false]
+ | ...
+SELECT a, a < false FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a < false
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, false]
+ | ...
+
+SELECT a, a1, a > a1 FROM t, t6;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: A1
+ |     type: boolean
+ |   - name: a > a1
+ |     type: boolean
+ |   rows:
+ |   - [false, false, false]
+ |   - [false, true, false]
+ |   - [true, false, true]
+ |   - [true, true, false]
+ | ...
+SELECT a, a1, a < a1 FROM t, t6;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: A1
+ |     type: boolean
+ |   - name: a < a1
+ |     type: boolean
+ |   rows:
+ |   - [false, false, false]
+ |   - [false, true, true]
+ |   - [true, false, false]
+ |   - [true, true, false]
+ | ...
+
+SELECT true >= true;
+ | ---
+ | - metadata:
+ |   - name: true >= true
+ |     type: any
+ |   rows:
+ |   - [true]
+ | ...
+SELECT true >= false;
+ | ---
+ | - metadata:
+ |   - name: true >= false
+ |     type: any
+ |   rows:
+ |   - [true]
+ | ...
+SELECT false >= true;
+ | ---
+ | - metadata:
+ |   - name: false >= true
+ |     type: any
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false >= false;
+ | ---
+ | - metadata:
+ |   - name: false >= false
+ |     type: any
+ |   rows:
+ |   - [true]
+ | ...
+SELECT true <= true;
+ | ---
+ | - metadata:
+ |   - name: true <= true
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT true <= false;
+ | ---
+ | - metadata:
+ |   - name: true <= false
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false <= true;
+ | ---
+ | - metadata:
+ |   - name: false <= true
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT false <= false;
+ | ---
+ | - metadata:
+ |   - name: false <= false
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+
+SELECT a, true >= a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: true >= a
+ |     type: any
+ |   rows:
+ |   - [false, true]
+ |   - [true, true]
+ | ...
+SELECT a, false >= a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: false >= a
+ |     type: any
+ |   rows:
+ |   - [false, true]
+ |   - [true, false]
+ | ...
+SELECT a, true <= a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: true <= a
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, true]
+ | ...
+SELECT a, false <= a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: false <= a
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, true]
+ | ...
+SELECT a, a >= true FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a >= true
+ |     type: any
+ |   rows:
+ |   - [false, false]
+ |   - [true, true]
+ | ...
+SELECT a, a >= false FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a >= false
+ |     type: any
+ |   rows:
+ |   - [false, true]
+ |   - [true, true]
+ | ...
+SELECT a, a <= true FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a <= true
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, true]
+ | ...
+SELECT a, a <= false FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a <= false
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, false]
+ | ...
+
+SELECT a, a1, a >= a1 FROM t, t6;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: A1
+ |     type: boolean
+ |   - name: a >= a1
+ |     type: any
+ |   rows:
+ |   - [false, false, true]
+ |   - [false, true, false]
+ |   - [true, false, true]
+ |   - [true, true, true]
+ | ...
+SELECT a, a1, a <= a1 FROM t, t6;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: A1
+ |     type: boolean
+ |   - name: a <= a1
+ |     type: boolean
+ |   rows:
+ |   - [false, false, true]
+ |   - [false, true, true]
+ |   - [true, false, false]
+ |   - [true, true, true]
+ | ...
+
+SELECT true == true;
+ | ---
+ | - metadata:
+ |   - name: true == true
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT true == false;
+ | ---
+ | - metadata:
+ |   - name: true == false
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false == true;
+ | ---
+ | - metadata:
+ |   - name: false == true
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false == false;
+ | ---
+ | - metadata:
+ |   - name: false == false
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT true != true;
+ | ---
+ | - metadata:
+ |   - name: true != true
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true != false;
+ | ---
+ | - metadata:
+ |   - name: true != false
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT false != true;
+ | ---
+ | - metadata:
+ |   - name: false != true
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT false != false;
+ | ---
+ | - metadata:
+ |   - name: false != false
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+
+SELECT a, true == a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: true == a
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, true]
+ | ...
+SELECT a, false == a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: false == a
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, false]
+ | ...
+SELECT a, true != a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: true != a
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, false]
+ | ...
+SELECT a, false != a FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: false != a
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, true]
+ | ...
+SELECT a, a == true FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a == true
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, true]
+ | ...
+SELECT a, a == false FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a == false
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, false]
+ | ...
+SELECT a, a != true FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a != true
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, false]
+ | ...
+SELECT a, a != false FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a != false
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, true]
+ | ...
+
+SELECT a, a1, a == a1 FROM t, t6;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: A1
+ |     type: boolean
+ |   - name: a == a1
+ |     type: boolean
+ |   rows:
+ |   - [false, false, true]
+ |   - [false, true, false]
+ |   - [true, false, false]
+ |   - [true, true, true]
+ | ...
+SELECT a, a1, a != a1 FROM t, t6;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: A1
+ |     type: boolean
+ |   - name: a != a1
+ |     type: boolean
+ |   rows:
+ |   - [false, false, false]
+ |   - [false, true, true]
+ |   - [true, false, true]
+ |   - [true, true, false]
+ | ...
+
+SELECT true IN (true);
+ | ---
+ | - metadata:
+ |   - name: true IN (true)
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT false IN (true);
+ | ---
+ | - metadata:
+ |   - name: false IN (true)
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true IN (false);
+ | ---
+ | - metadata:
+ |   - name: true IN (false)
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false IN (false);
+ | ---
+ | - metadata:
+ |   - name: false IN (false)
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT true IN (true, false);
+ | ---
+ | - metadata:
+ |   - name: true IN (true, false)
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT false IN (true, false);
+ | ---
+ | - metadata:
+ |   - name: false IN (true, false)
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT true IN (SELECT a1 FROM t6);
+ | ---
+ | - metadata:
+ |   - name: true IN (SELECT a1 FROM t6)
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT false IN (SELECT a1 FROM t6);
+ | ---
+ | - metadata:
+ |   - name: false IN (SELECT a1 FROM t6)
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT true IN (SELECT a1 FROM t6 LIMIT 1);
+ | ---
+ | - metadata:
+ |   - name: true IN (SELECT a1 FROM t6 LIMIT 1)
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false IN (SELECT a1 FROM t6 LIMIT 1);
+ | ---
+ | - metadata:
+ |   - name: false IN (SELECT a1 FROM t6 LIMIT 1)
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT true IN (1, 1.2, 'true', false);
+ | ---
+ | - metadata:
+ |   - name: true IN (1, 1.2, 'true', false)
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false IN (1, 1.2, 'true', false);
+ | ---
+ | - metadata:
+ |   - name: false IN (1, 1.2, 'true', false)
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+
+SELECT a, a IN (true) FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a IN (true)
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, true]
+ | ...
+SELECT a, a IN (false) FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a IN (false)
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, false]
+ | ...
+SELECT a, a IN (true, false) FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a IN (true, false)
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, true]
+ | ...
+SELECT a, a IN (SELECT a1 FROM t6 LIMIT 1) FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a IN (SELECT a1 FROM t6 LIMIT 1)
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, false]
+ | ...
+SELECT a, a IN (SELECT a1 FROM t6) FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a IN (SELECT a1 FROM t6)
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, true]
+ | ...
+SELECT a, a IN (1, 1.2, 'true', false) FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a IN (1, 1.2, 'true', false)
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, false]
+ | ...
+
+SELECT true BETWEEN true AND true;
+ | ---
+ | - metadata:
+ |   - name: true BETWEEN true AND true
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT false BETWEEN true AND true;
+ | ---
+ | - metadata:
+ |   - name: false BETWEEN true AND true
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true BETWEEN false AND false;
+ | ---
+ | - metadata:
+ |   - name: true BETWEEN false AND false
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false BETWEEN false AND false;
+ | ---
+ | - metadata:
+ |   - name: false BETWEEN false AND false
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT true BETWEEN true AND false;
+ | ---
+ | - metadata:
+ |   - name: true BETWEEN true AND false
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false BETWEEN true AND false;
+ | ---
+ | - metadata:
+ |   - name: false BETWEEN true AND false
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true BETWEEN false AND true;
+ | ---
+ | - metadata:
+ |   - name: true BETWEEN false AND true
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+SELECT false BETWEEN false AND true;
+ | ---
+ | - metadata:
+ |   - name: false BETWEEN false AND true
+ |     type: boolean
+ |   rows:
+ |   - [true]
+ | ...
+
+SELECT a, a BETWEEN true AND true FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a BETWEEN true AND true
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, true]
+ | ...
+SELECT a, a BETWEEN false AND false FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a BETWEEN false AND false
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, false]
+ | ...
+SELECT a, a BETWEEN true AND false FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a BETWEEN true AND false
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, false]
+ | ...
+SELECT a, a BETWEEN false AND true FROM t;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: boolean
+ |   - name: a BETWEEN false AND true
+ |     type: boolean
+ |   rows:
+ |   - [false, true]
+ |   - [true, true]
+ | ...
+
+-- Check interaction of BOOLEAN and INTEGER.
+CREATE TABLE t7 (b INT PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t7 VALUES (123);
+ | ---
+ | - row_count: 1
+ | ...
+
+SELECT true AND 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2 to boolean'
+ | ...
+SELECT false AND 2;
+ | ---
+ | - metadata:
+ |   - name: false AND 2
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true OR 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2 to boolean'
+ | ...
+SELECT false OR 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2 to boolean'
+ | ...
+SELECT 2 AND true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2 to boolean'
+ | ...
+SELECT 2 AND false;
+ | ---
+ | - metadata:
+ |   - name: 2 AND false
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT 2 OR true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2 to boolean'
+ | ...
+SELECT 2 OR false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2 to boolean'
+ | ...
+
+SELECT a1, a1 AND 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2 to boolean'
+ | ...
+SELECT a1, a1 OR 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2 to boolean'
+ | ...
+SELECT a1, 2 AND a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2 to boolean'
+ | ...
+SELECT a1, 2 OR a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2 to boolean'
+ | ...
+SELECT a2, a2 AND 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2 to boolean'
+ | ...
+SELECT a2, a2 OR 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2 to boolean'
+ | ...
+SELECT a2, 2 AND a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2 to boolean'
+ | ...
+SELECT a2, 2 OR a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2 to boolean'
+ | ...
+
+SELECT b, true AND b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 123 to boolean'
+ | ...
+SELECT b, false AND b FROM t7;
+ | ---
+ | - metadata:
+ |   - name: B
+ |     type: integer
+ |   - name: false AND b
+ |     type: boolean
+ |   rows:
+ |   - [123, false]
+ | ...
+SELECT b, true OR b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 123 to boolean'
+ | ...
+SELECT b, false OR b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 123 to boolean'
+ | ...
+SELECT b, b AND true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 123 to boolean'
+ | ...
+SELECT b, b AND false FROM t7;
+ | ---
+ | - metadata:
+ |   - name: B
+ |     type: integer
+ |   - name: b AND false
+ |     type: boolean
+ |   rows:
+ |   - [123, false]
+ | ...
+SELECT b, b OR true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 123 to boolean'
+ | ...
+SELECT b, b OR false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 123 to boolean'
+ | ...
+
+SELECT a1, b, a1 AND b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 123 to boolean'
+ | ...
+SELECT a1, b, a1 OR b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 123 to boolean'
+ | ...
+SELECT a1, b, b AND a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 123 to boolean'
+ | ...
+SELECT a1, b, b OR a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 123 to boolean'
+ | ...
+SELECT a2, b, a2 AND b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 123 to boolean'
+ | ...
+SELECT a2, b, a2 OR b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 123 to boolean'
+ | ...
+SELECT a2, b, b AND a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 123 to boolean'
+ | ...
+SELECT a2, b, b OR a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 123 to boolean'
+ | ...
+
+SELECT true + 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false + 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT true - 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false - 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT true * 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false * 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT true / 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false / 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT true % 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false % 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT 2 + true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT 2 + false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT 2 - true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT 2 - false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT 2 * true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT 2 * false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT 2 / true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT 2 / false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT 2 % true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT 2 % false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+
+SELECT a1, a1 + 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, a1 - 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, a1 * 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, a1 / 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, a1 % 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, 2 + a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, 2 - a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, 2 * a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, 2 / a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, 2 % a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a2, a2 + 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, a2 - 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, a2 * 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, a2 / 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, a2 % 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, 2 + a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, 2 - a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, 2 * a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, 2 / a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, 2 % a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+
+SELECT b, true + b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT b, false + b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT b, true - b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT b, false - b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT b, true * b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT b, false * b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT b, true / b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT b, false / b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT b, true % b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT b, false % b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT b, b + true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT b, b + false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT b, b - true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT b, b - false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT b, b * true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT b, b * false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT b, b / true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT b, b / false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT b, b % true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT b, b % false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+
+SELECT a1, b, a1 + b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, b, a1 - b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, b, a1 * b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, b, a1 / b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, b, a1 % b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, b, b + a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, b, b - a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, b, b * a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, b, b / a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, b, b % a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a2, b, a2 + b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, b, a2 - b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, b, a2 * b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, b, a2 / b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, b, a2 % b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, b, b + a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, b, b - a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, b, b * a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, b, b / a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, b, b % a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+
+SELECT true & 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT false & 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT true | 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT false | 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT true << 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT false << 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT true >> 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT false >> 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT 2 & true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT 2 & false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT 2 | true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT 2 | false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT 2 << true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT 2 << false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT 2 >> true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT 2 >> false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+
+SELECT a1, a1 & 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, a1 | 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, a1 << 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, a1 >> 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, 2 & a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, 2 | a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, 2 << a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, 2 >> a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a2, a2 & 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a2, a2 | 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a2, a2 << 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a2, a2 >> 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a2, 2 & a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a2, 2 | a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a2, 2 << a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a2, 2 >> a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+
+SELECT b, true & b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT b, false & b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT b, true | b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT b, false | b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT b, true << b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT b, false << b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT b, true >> b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT b, false >> b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT b, b & true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT b, b & false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT b, b | true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT b, b | false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT b, b << true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT b, b << false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT b, b >> true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT b, b >> false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+
+SELECT a1, b, a1 & b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, b, a1 | b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, b, a1 << b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, b, a1 >> b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, b, b & a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, b, b | a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, b, b << a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, b, b >> a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a2, b, a2 & b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a2, b, a2 | b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a2, b, a2 << b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a2, b, a2 >> b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a2, b, b & a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a2, b, b | a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a2, b, b << a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT a2, b, b >> a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+
+SELECT true > 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT false > 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT true < 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT false < 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT 2 > true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT 2 > false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT 2 < true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT 2 < false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+
+SELECT a1, a1 > 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, a1 < 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, 2 > a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, 2 < a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, a2 > 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, a2 < 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, 2 > a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, 2 < a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+
+SELECT b, true > b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, false > b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, true < b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, false < b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, b > true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, b > false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, b < true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, b < false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+
+SELECT a1, b, a1 > b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, b, a1 < b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, b, b > a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, b, b < a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, b, a2 > b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, b, a2 < b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, b, b > a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, b, b < a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+
+SELECT true >= 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT false >= 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT true <= 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT false <= 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT 2 >= true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT 2 >= false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT 2 <= true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT 2 <= false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+
+SELECT a1, a1 >= 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, a1 <= 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, 2 >= a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, 2 <= a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, a2 >= 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, a2 <= 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, 2 >= a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, 2 <= a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+
+SELECT b, true >= b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, false >= b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, true <= b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, false <= b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, b >= true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, b >= false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, b <= true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, b <= false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+
+SELECT a1, b, a1 >= b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, b, a1 <= b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, b, b >= a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, b, b <= a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, b, a2 >= b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, b, a2 <= b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, b, b >= a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, b, b <= a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+
+SELECT true == 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT false == 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT true != 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT false != 2;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT 2 == true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT 2 == false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT 2 != true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT 2 != false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+
+SELECT a1, a1 == 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, a1 != 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, 2 == a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, 2 != a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, a2 == 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, a2 != 2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, 2 == a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, 2 != a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+
+SELECT b, true == b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, false == b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, true != b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, false != b FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, b == true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, b == false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, b != true FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT b, b != false FROM t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+
+SELECT a1, b, a1 == b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, b, a1 != b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, b, b == a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, b, b != a1 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, b, a2 == b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, b, a2 != b FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, b, b == a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, b, b != a2 FROM t6, t7;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+
+SELECT true IN (0, 1, 2, 3);
+ | ---
+ | - metadata:
+ |   - name: true IN (0, 1, 2, 3)
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false IN (0, 1, 2, 3);
+ | ---
+ | - metadata:
+ |   - name: false IN (0, 1, 2, 3)
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true IN (SELECT b FROM t7);
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to integer'
+ | ...
+SELECT false IN (SELECT b FROM t7);
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to integer'
+ | ...
+SELECT a1, a1 IN (0, 1, 2, 3) FROM t6
+ | ---
+ | - metadata:
+ |   - name: A1
+ |     type: boolean
+ |   - name: a1 IN (0, 1, 2, 3)
+ |     type: boolean
+ |   rows:
+ |   - [false, false]
+ |   - [true, false]
+ | ...
+
+SELECT true BETWEEN 0 and 10;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT false BETWEEN 0 and 10;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a1, a1 BETWEEN 0 and 10 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+SELECT a2, a2 BETWEEN 0 and 10 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+ | ...
+
+-- Check interaction of BOOLEAN and NUMBER.
+CREATE TABLE t8 (c NUMBER PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t8 VALUES (4.56);
+ | ---
+ | - row_count: 1
+ | ...
+
+SELECT true AND 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2.3 to boolean'
+ | ...
+SELECT false AND 2.3;
+ | ---
+ | - metadata:
+ |   - name: false AND 2.3
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true OR 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2.3 to boolean'
+ | ...
+SELECT false OR 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2.3 to boolean'
+ | ...
+SELECT 2.3 AND true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2.3 to boolean'
+ | ...
+SELECT 2.3 AND false;
+ | ---
+ | - metadata:
+ |   - name: 2.3 AND false
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT 2.3 OR true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2.3 to boolean'
+ | ...
+SELECT 2.3 OR false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2.3 to boolean'
+ | ...
+
+SELECT a1, a1 AND 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2.3 to boolean'
+ | ...
+SELECT a1, a1 OR 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2.3 to boolean'
+ | ...
+SELECT a1, 2.3 AND a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2.3 to boolean'
+ | ...
+SELECT a1, 2.3 OR a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2.3 to boolean'
+ | ...
+SELECT a2, a2 AND 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2.3 to boolean'
+ | ...
+SELECT a2, a2 OR 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2.3 to boolean'
+ | ...
+SELECT a2, 2.3 AND a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2.3 to boolean'
+ | ...
+SELECT a2, 2.3 OR a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 2.3 to boolean'
+ | ...
+
+SELECT c, true AND c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 4.56 to boolean'
+ | ...
+SELECT c, false AND c FROM t8;
+ | ---
+ | - metadata:
+ |   - name: C
+ |     type: number
+ |   - name: false AND c
+ |     type: boolean
+ |   rows:
+ |   - [4.56, false]
+ | ...
+SELECT c, true OR c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 4.56 to boolean'
+ | ...
+SELECT c, false OR c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 4.56 to boolean'
+ | ...
+SELECT c, c AND true FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 4.56 to boolean'
+ | ...
+SELECT c, c AND false FROM t8;
+ | ---
+ | - metadata:
+ |   - name: C
+ |     type: number
+ |   - name: c AND false
+ |     type: boolean
+ |   rows:
+ |   - [4.56, false]
+ | ...
+SELECT c, c OR true FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 4.56 to boolean'
+ | ...
+SELECT c, c OR false FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 4.56 to boolean'
+ | ...
+
+SELECT a1, c, a1 AND c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 4.56 to boolean'
+ | ...
+SELECT a1, c, a1 OR c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 4.56 to boolean'
+ | ...
+SELECT a1, c, c AND a1 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 4.56 to boolean'
+ | ...
+SELECT a1, c, c OR a1 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 4.56 to boolean'
+ | ...
+SELECT a2, c, a2 AND c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 4.56 to boolean'
+ | ...
+SELECT a2, c, a2 OR c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 4.56 to boolean'
+ | ...
+SELECT a2, c, c AND a2 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 4.56 to boolean'
+ | ...
+SELECT a2, c, c OR a2 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert 4.56 to boolean'
+ | ...
+
+SELECT true + 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false + 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT true - 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false - 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT true * 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false * 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT true / 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false / 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT true % 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT false % 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT 2.3 + true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT 2.3 + false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT 2.3 - true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT 2.3 - false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT 2.3 * true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT 2.3 * false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT 2.3 / true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT 2.3 / false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT 2.3 % true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT 2.3 % false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+
+SELECT a1, a1 + 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, a1 - 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, a1 * 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, a1 / 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, a1 % 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, 2.3 + a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, 2.3 - a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, 2.3 * a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, 2.3 / a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, 2.3 % a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a2, a2 + 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, a2 - 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, a2 * 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, a2 / 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, a2 % 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, 2.3 + a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, 2.3 - a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, 2.3 * a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, 2.3 / a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, 2.3 % a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+
+SELECT c, true + c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT c, false + c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT c, true - c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT c, false - c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT c, true * c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT c, false * c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT c, true / c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT c, false / c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT c, true % c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT c, false % c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT c, c + true FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT c, c + false FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT c, c - true FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT c, c - false FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT c, c * true FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT c, c * false FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT c, c / true FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT c, c / false FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT c, c % true FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT c, c % false FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+
+SELECT a1, c, a1 + c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, c, a1 - c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, c, a1 * c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, c, a1 / c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, c, a1 % c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, c, c + a1 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, c, c - a1 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, c, c * a1 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, c, c / a1 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a1, c, c % a1 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to numeric'
+ | ...
+SELECT a2, c, a2 + c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, c, a2 - c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, c, a2 * c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, c, a2 / c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, c, a2 % c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, c, c + a2 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, c, c - a2 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, c, c * a2 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, c, c / a2 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+SELECT a2, c, c % a2 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to numeric'
+ | ...
+
+SELECT true > 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT false > 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT true < 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT false < 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT 2.3 > true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT 2.3 > false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT 2.3 < true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT 2.3 < false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+
+SELECT a1, a1 > 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, a1 < 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, 2.3 > a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, 2.3 < a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, a2 > 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, a2 < 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, 2.3 > a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, 2.3 < a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+
+SELECT c, true > c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, false > c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, true < c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, false < c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, c > true FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, c > false FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, c < true FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, c < false FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+
+SELECT a1, c, a1 > c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, c, a1 < c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, c, c > a1 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, c, c < a1 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, c, a2 > c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, c, a2 < c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, c, c > a2 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, c, c < a2 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+
+SELECT true >= 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT false >= 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT true <= 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT false <= 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT 2.3 >= true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT 2.3 >= false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT 2.3 <= true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT 2.3 <= false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+
+SELECT a1, a1 >= 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, a1 <= 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, 2.3 >= a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, 2.3 <= a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, a2 >= 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, a2 <= 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, 2.3 >= a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, 2.3 <= a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+
+SELECT c, true >= c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, false >= c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, true <= c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, false <= c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, c >= true FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, c >= false FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, c <= true FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, c <= false FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+
+SELECT a1, c, a1 >= c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, c, a1 <= c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, c, c >= a1 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, c, c <= a1 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, c, a2 >= c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, c, a2 <= c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, c, c >= a2 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, c, c <= a2 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+
+SELECT true == 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT false == 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT true != 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT false != 2.3;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT 2.3 == true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT 2.3 == false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT 2.3 != true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT 2.3 != false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+
+SELECT a1, a1 == 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, a1 != 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, 2.3 == a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, 2.3 != a1 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, a2 == 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, a2 != 2.3 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, 2.3 == a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, 2.3 != a2 FROM t6
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+
+SELECT c, true == c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, false == c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, true != c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, false != c FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, c == true FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, c == false FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, c != true FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT c, c != false FROM t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+
+SELECT a1, c, a1 == c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, c, a1 != c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, c, c == a1 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, c, c != a1 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, c, a2 == c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, c, a2 != c FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, c, c == a2 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, c, c != a2 FROM t6, t8;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+
+SELECT true IN (0.1, 1.2, 2.3, 3.4);
+ | ---
+ | - metadata:
+ |   - name: true IN (0.1, 1.2, 2.3, 3.4)
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT false IN (0.1, 1.2, 2.3, 3.4);
+ | ---
+ | - metadata:
+ |   - name: false IN (0.1, 1.2, 2.3, 3.4)
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT a1 IN (0.1, 1.2, 2.3, 3.4) FROM t6 LIMIT 1;
+ | ---
+ | - metadata:
+ |   - name: a1 IN (0.1, 1.2, 2.3, 3.4)
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT a2 IN (0.1, 1.2, 2.3, 3.4) FROM t6 LIMIT 1;
+ | ---
+ | - metadata:
+ |   - name: a2 IN (0.1, 1.2, 2.3, 3.4)
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true IN (SELECT c FROM t8);
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to number'
+ | ...
+SELECT false IN (SELECT c FROM t8);
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to number'
+ | ...
+SELECT a1 IN (SELECT c FROM t8) FROM t6 LIMIT 1;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to number'
+ | ...
+SELECT a2 IN (SELECT c FROM t8) FROM t6 LIMIT 1;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to number'
+ | ...
+
+SELECT true BETWEEN 0.1 and 9.9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT false BETWEEN 0.1 and 9.9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a1, a1 BETWEEN 0.1 and 9.9 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+SELECT a2, a2 BETWEEN 0.1 and 9.9 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert REAL to BOOLEAN'
+ | ...
+
+-- Check interaction of BOOLEAN and TEXT.
+CREATE TABLE t9 (d TEXT PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t9 VALUES ('AsdF');
+ | ---
+ | - row_count: 1
+ | ...
+
+SELECT true AND 'abc';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert abc to boolean'
+ | ...
+SELECT false AND 'abc';
+ | ---
+ | - metadata:
+ |   - name: false AND 'abc'
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true OR 'abc';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert abc to boolean'
+ | ...
+SELECT false OR 'abc';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert abc to boolean'
+ | ...
+SELECT 'abc' AND true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert abc to boolean'
+ | ...
+SELECT 'abc' AND false;
+ | ---
+ | - metadata:
+ |   - name: '''abc'' AND false'
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT 'abc' OR true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert abc to boolean'
+ | ...
+SELECT 'abc' OR false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert abc to boolean'
+ | ...
+
+SELECT a1, a1 AND 'abc' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert abc to boolean'
+ | ...
+SELECT a1, a1 OR 'abc' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert abc to boolean'
+ | ...
+SELECT a1, 'abc' AND a1 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert abc to boolean'
+ | ...
+SELECT a1, 'abc' OR a1 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert abc to boolean'
+ | ...
+SELECT a2, a2 AND 'abc' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert abc to boolean'
+ | ...
+SELECT a2, a2 OR 'abc' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert abc to boolean'
+ | ...
+SELECT a2, 'abc' AND a2 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert abc to boolean'
+ | ...
+SELECT a2, 'abc' OR a2 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert abc to boolean'
+ | ...
+
+SELECT d, true AND d FROM t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert AsdF to boolean'
+ | ...
+SELECT d, false AND d FROM t9;
+ | ---
+ | - metadata:
+ |   - name: D
+ |     type: string
+ |   - name: false AND d
+ |     type: boolean
+ |   rows:
+ |   - ['AsdF', false]
+ | ...
+SELECT d, true OR d FROM t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert AsdF to boolean'
+ | ...
+SELECT d, false OR d FROM t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert AsdF to boolean'
+ | ...
+SELECT d, d AND true FROM t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert AsdF to boolean'
+ | ...
+SELECT d, d AND false FROM t9;
+ | ---
+ | - metadata:
+ |   - name: D
+ |     type: string
+ |   - name: d AND false
+ |     type: boolean
+ |   rows:
+ |   - ['AsdF', false]
+ | ...
+SELECT d, d OR true FROM t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert AsdF to boolean'
+ | ...
+SELECT d, d OR false FROM t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert AsdF to boolean'
+ | ...
+
+SELECT a1, d, a1 AND d FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert AsdF to boolean'
+ | ...
+SELECT a1, d, a1 OR d FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert AsdF to boolean'
+ | ...
+SELECT a1, d, d AND a1 FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert AsdF to boolean'
+ | ...
+SELECT a1, d, d OR a1 FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert AsdF to boolean'
+ | ...
+SELECT a2, d, a2 AND d FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert AsdF to boolean'
+ | ...
+SELECT a2, d, a2 OR d FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert AsdF to boolean'
+ | ...
+SELECT a2, d, d AND a2 FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert AsdF to boolean'
+ | ...
+SELECT a2, d, d OR a2 FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert AsdF to boolean'
+ | ...
+
+SELECT true > 'abc';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT false > 'abc';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT true < 'abc';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT false < 'abc';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT 'abc' > true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT 'abc' > false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT 'abc' < true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT 'abc' < false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+
+SELECT d, true > d FROM t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT d, false > d FROM t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT d, true < d FROM t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT d, false < d FROM t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT d, d > true FROM t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT d, d > false FROM t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT d, d < true FROM t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT d, d < false FROM t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+
+SELECT a1, d, a1 > d FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT a1, d, a1 < d FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT a1, d, d > a1 FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT a1, d, d < a1 FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT a2, d, a2 > d FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT a2, d, a2 < d FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT a2, d, d > a2 FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+SELECT a2, d, d < a2 FROM t6, t9;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TEXT to BOOLEAN'
+ | ...
+
+SELECT true || 'abc';
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT false || 'abc';
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT 'abc' || false;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT 'abc' || true;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+
+SELECT d, true || d FROM t9;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT d, false || d FROM t9;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT d, d || false FROM t9;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT d, d || true FROM t9;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+
+SELECT d, a1 || d FROM t6, t9;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT d, a2 || d FROM t6, t9;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT d, d || a1 FROM t6, t9;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+SELECT d, d || a2 FROM t6, t9;
+ | ---
+ | - null
+ | - 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+ | ...
+
+--
+-- Check special types of strings: 'TRUE', 'true', 'FALSE',
+-- 'false'.
+--
+INSERT INTO t9 VALUES ('TRUE'), ('true'), ('FALSE'), ('false');
+ | ---
+ | - row_count: 4
+ | ...
+
+SELECT true AND 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT false AND 'TRUE';
+ | ---
+ | - metadata:
+ |   - name: false AND 'TRUE'
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true OR 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT false OR 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT 'TRUE' AND true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT 'TRUE' AND false;
+ | ---
+ | - metadata:
+ |   - name: '''TRUE'' AND false'
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT 'TRUE' OR true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT 'TRUE' OR false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+
+SELECT a1, a1 AND 'TRUE' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT a1, a1 OR 'TRUE' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT a1, 'TRUE' AND a1 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT a1, 'TRUE' OR a1 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT a2, a2 AND 'TRUE' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT a2, a2 OR 'TRUE' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT a2, 'TRUE' AND a2 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT a2, 'TRUE' OR a2 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+
+SELECT d, true AND d FROM t9 WHERE d = 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT d, false AND d FROM t9 WHERE d = 'TRUE';
+ | ---
+ | - metadata:
+ |   - name: D
+ |     type: string
+ |   - name: false AND d
+ |     type: boolean
+ |   rows:
+ |   - ['TRUE', false]
+ | ...
+SELECT d, true OR d FROM t9 WHERE d = 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT d, false OR d FROM t9 WHERE d = 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT d, d AND true FROM t9 WHERE d = 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT d, d AND false FROM t9 WHERE d = 'TRUE';
+ | ---
+ | - metadata:
+ |   - name: D
+ |     type: string
+ |   - name: d AND false
+ |     type: boolean
+ |   rows:
+ |   - ['TRUE', false]
+ | ...
+SELECT d, d OR true FROM t9 WHERE d = 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT d, d OR false FROM t9 WHERE d = 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+
+SELECT a1, d, a1 AND d FROM t6, t9 WHERE d = 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT a1, d, a1 OR d FROM t6, t9 WHERE d = 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT a1, d, d AND a1 FROM t6, t9 WHERE d = 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT a1, d, d OR a1 FROM t6, t9 WHERE d = 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT a2, d, a2 AND d FROM t6, t9 WHERE d = 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT a2, d, a2 OR d FROM t6, t9 WHERE d = 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT a2, d, d AND a2 FROM t6, t9 WHERE d = 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+SELECT a2, d, d OR a2 FROM t6, t9 WHERE d = 'TRUE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert TRUE to boolean'
+ | ...
+
+SELECT true AND 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT false AND 'true';
+ | ---
+ | - metadata:
+ |   - name: false AND 'true'
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true OR 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT false OR 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT 'true' AND true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT 'true' AND false;
+ | ---
+ | - metadata:
+ |   - name: '''true'' AND false'
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT 'true' OR true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT 'true' OR false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+
+SELECT a1, a1 AND 'true' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT a1, a1 OR 'true' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT a1, 'true' AND a1 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT a1, 'true' OR a1 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT a2, a2 AND 'true' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT a2, a2 OR 'true' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT a2, 'true' AND a2 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT a2, 'true' OR a2 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+
+SELECT d, true AND d FROM t9 WHERE d = 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT d, false AND d FROM t9 WHERE d = 'true';
+ | ---
+ | - metadata:
+ |   - name: D
+ |     type: string
+ |   - name: false AND d
+ |     type: boolean
+ |   rows:
+ |   - ['true', false]
+ | ...
+SELECT d, true OR d FROM t9 WHERE d = 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT d, false OR d FROM t9 WHERE d = 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT d, d AND true FROM t9 WHERE d = 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT d, d AND false FROM t9 WHERE d = 'true';
+ | ---
+ | - metadata:
+ |   - name: D
+ |     type: string
+ |   - name: d AND false
+ |     type: boolean
+ |   rows:
+ |   - ['true', false]
+ | ...
+SELECT d, d OR true FROM t9 WHERE d = 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT d, d OR false FROM t9 WHERE d = 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+
+SELECT a1, d, a1 AND d FROM t6, t9 WHERE d = 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT a1, d, a1 OR d FROM t6, t9 WHERE d = 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT a1, d, d AND a1 FROM t6, t9 WHERE d = 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT a1, d, d OR a1 FROM t6, t9 WHERE d = 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT a2, d, a2 AND d FROM t6, t9 WHERE d = 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT a2, d, a2 OR d FROM t6, t9 WHERE d = 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT a2, d, d AND a2 FROM t6, t9 WHERE d = 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+SELECT a2, d, d OR a2 FROM t6, t9 WHERE d = 'true';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert true to boolean'
+ | ...
+
+SELECT true AND 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT false AND 'FALSE';
+ | ---
+ | - metadata:
+ |   - name: false AND 'FALSE'
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true OR 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT false OR 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT 'FALSE' AND true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT 'FALSE' AND false;
+ | ---
+ | - metadata:
+ |   - name: '''FALSE'' AND false'
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT 'FALSE' OR true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT 'FALSE' OR false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+
+SELECT a1, a1 AND 'FALSE' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT a1, a1 OR 'FALSE' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT a1, 'FALSE' AND a1 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT a1, 'FALSE' OR a1 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT a2, a2 AND 'FALSE' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT a2, a2 OR 'FALSE' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT a2, 'FALSE' AND a2 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT a2, 'FALSE' OR a2 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+
+SELECT d, true AND d FROM t9 WHERE d = 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT d, false AND d FROM t9 WHERE d = 'FALSE';
+ | ---
+ | - metadata:
+ |   - name: D
+ |     type: string
+ |   - name: false AND d
+ |     type: boolean
+ |   rows:
+ |   - ['FALSE', false]
+ | ...
+SELECT d, true OR d FROM t9 WHERE d = 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT d, false OR d FROM t9 WHERE d = 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT d, d AND true FROM t9 WHERE d = 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT d, d AND false FROM t9 WHERE d = 'FALSE';
+ | ---
+ | - metadata:
+ |   - name: D
+ |     type: string
+ |   - name: d AND false
+ |     type: boolean
+ |   rows:
+ |   - ['FALSE', false]
+ | ...
+SELECT d, d OR true FROM t9 WHERE d = 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT d, d OR false FROM t9 WHERE d = 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+
+SELECT a1, d, a1 AND d FROM t6, t9 WHERE d = 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT a1, d, a1 OR d FROM t6, t9 WHERE d = 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT a1, d, d AND a1 FROM t6, t9 WHERE d = 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT a1, d, d OR a1 FROM t6, t9 WHERE d = 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT a2, d, a2 AND d FROM t6, t9 WHERE d = 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT a2, d, a2 OR d FROM t6, t9 WHERE d = 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT a2, d, d AND a2 FROM t6, t9 WHERE d = 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+SELECT a2, d, d OR a2 FROM t6, t9 WHERE d = 'FALSE';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert FALSE to boolean'
+ | ...
+
+SELECT true AND 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT false AND 'false';
+ | ---
+ | - metadata:
+ |   - name: false AND 'false'
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT true OR 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT false OR 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT 'false' AND true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT 'false' AND false;
+ | ---
+ | - metadata:
+ |   - name: '''false'' AND false'
+ |     type: boolean
+ |   rows:
+ |   - [false]
+ | ...
+SELECT 'false' OR true;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT 'false' OR false;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+
+SELECT a1, a1 AND 'false' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT a1, a1 OR 'false' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT a1, 'false' AND a1 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT a1, 'false' OR a1 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT a2, a2 AND 'false' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT a2, a2 OR 'false' FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT a2, 'false' AND a2 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT a2, 'false' OR a2 FROM t6;
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+
+SELECT d, true AND d FROM t9 WHERE d = 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT d, false AND d FROM t9 WHERE d = 'false';
+ | ---
+ | - metadata:
+ |   - name: D
+ |     type: string
+ |   - name: false AND d
+ |     type: boolean
+ |   rows:
+ |   - ['false', false]
+ | ...
+SELECT d, true OR d FROM t9 WHERE d = 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT d, false OR d FROM t9 WHERE d = 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT d, d AND true FROM t9 WHERE d = 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT d, d AND false FROM t9 WHERE d = 'false';
+ | ---
+ | - metadata:
+ |   - name: D
+ |     type: string
+ |   - name: d AND false
+ |     type: boolean
+ |   rows:
+ |   - ['false', false]
+ | ...
+SELECT d, d OR true FROM t9 WHERE d = 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT d, d OR false FROM t9 WHERE d = 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+
+SELECT a1, d, a1 AND d FROM t6, t9 WHERE d = 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT a1, d, a1 OR d FROM t6, t9 WHERE d = 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT a1, d, d AND a1 FROM t6, t9 WHERE d = 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT a1, d, d OR a1 FROM t6, t9 WHERE d = 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT a2, d, a2 AND d FROM t6, t9 WHERE d = 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT a2, d, a2 OR d FROM t6, t9 WHERE d = 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT a2, d, d AND a2 FROM t6, t9 WHERE d = 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+SELECT a2, d, d OR a2 FROM t6, t9 WHERE d = 'false';
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert false to boolean'
+ | ...
+
+-- Cleaning.
+DROP VIEW v;
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE t9;
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE t8;
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE t7;
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE t6;
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE t5;
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE t4;
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE t3;
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE t2;
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE t1;
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE t0;
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE ts;
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE t;
+ | ---
+ | - row_count: 1
+ | ...
