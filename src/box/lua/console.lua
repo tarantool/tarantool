@@ -14,6 +14,10 @@ local net_box = require('net.box')
 local YAML_TERM = '\n...\n'
 local PUSH_TAG_HANDLE = '!push!'
 
+--
+-- Default output handler set to YAML for backward
+-- compatibility reason.
+local ouput_default_handler = { ["fmt"] = "yaml", ["opts"] = nil }
 local output_handlers = { }
 
 output_handlers["yaml"] = function(status, opts, ...)
@@ -99,6 +103,22 @@ local function output_parse(value)
     return false, msg:format(value)
 end
 
+local function set_default_output(value)
+    if value == nil then
+        error("Nil output value passed")
+    end
+    local status, err, fmt, opts = output_parse(value)
+    if status ~= true then
+        error(err)
+    end
+    ouput_default_handler["fmt"] = fmt
+    ouput_default_handler["opts"] = opts
+end
+
+local function get_default_output()
+    return ouput_default_handler
+end
+
 local function output_save(fmt, opts)
     --
     -- Output format descriptors are saved per
@@ -111,14 +131,8 @@ end
 
 local function format(status, ...)
     local d = box.session.storage.console_output
-    --
-    -- If there was no assignment yet provide
-    -- a default value; for now it is YAML
-    -- for backward compatibility sake (don't
-    -- forget about test results which are in
-    -- YAML format).
     if d == nil then
-        d = { ["fmt"] = "yaml", ["opts"] = nil }
+        d = ouput_default_handler
     end
     return output_handlers[d["fmt"]](status, d["opts"], ...)
 end
@@ -674,6 +688,8 @@ package.loaded['console'] = {
     start = start;
     eval = eval;
     delimiter = delimiter;
+    set_default_output = set_default_output;
+    get_default_output = get_default_output;
     ac = ac;
     connect = connect;
     listen = listen;
