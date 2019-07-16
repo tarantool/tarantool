@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(111)
+test:plan(113)
 
 --!./tcltestrunner.lua
 -- 2001 November 6
@@ -1353,5 +1353,19 @@ test:do_execsql_test(
 
     -- </limit-14.7.2>
 })
+
+-- Sum of LIMIT and OFFSET values should not cause integer overflow.
+--
+test:do_catchsql_test(
+    "limit-15.1",
+    [[
+        SELECT 1 LIMIT 9223372036854775807 OFFSET 1;
+    ]], { 1, "Failed to execute SQL statement: sum of LIMIT and OFFSET values should not result in integer overflow" } )
+
+test:do_catchsql_test(
+    "limit-15.2",
+    [[
+        SELECT 1 LIMIT 1 OFFSET 9223372036854775807;
+    ]], { 1,  "Failed to execute SQL statement: sum of LIMIT and OFFSET values should not result in integer overflow"} )
 
 test:finish_test()

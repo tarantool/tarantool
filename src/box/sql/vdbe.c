@@ -4880,7 +4880,7 @@ case OP_IfPos: {        /* jump, in1 */
 }
 
 /* Opcode: OffsetLimit P1 P2 P3 * *
- * Synopsis: if r[P1]>0 then r[P2]=r[P1]+max(0,r[P3]) else r[P2]=(-1)
+ * Synopsis: r[P2]=r[P1]+r[P3]
  *
  * This opcode performs a commonly used computation associated with
  * LIMIT and OFFSET process.  r[P1] holds the limit counter.  r[P3]
@@ -4889,35 +4889,23 @@ case OP_IfPos: {        /* jump, in1 */
  * value computed is the total number of rows that will need to be
  * visited in order to complete the query.
  *
- * If r[P3] is zero or negative, that means there is no OFFSET
- * and r[P2] is set to be the value of the LIMIT, r[P1].
- *
- * if r[P1] is zero or negative, that means there is no LIMIT
- * and r[P2] is set to -1.
- *
- * Otherwise, r[P2] is set to the sum of r[P1] and r[P3].
+ * Otherwise, r[P2] is set to the sum of r[P1] and r[P3]. If the
+ * sum is larger than 2^63-1 (i.e. overflow takes place) then
+ * error is raised.
  */
 case OP_OffsetLimit: {    /* in1, out2, in3 */
-	i64 x;
 	pIn1 = &aMem[pOp->p1];
 	pIn3 = &aMem[pOp->p3];
 	pOut = out2Prerelease(p, pOp);
 	assert(pIn1->flags & MEM_Int);
 	assert(pIn3->flags & MEM_Int);
-	x = pIn1->u.i;
-	if (x<=0 || sqlAddInt64(&x, pIn3->u.i>0?pIn3->u.i:0)) {
-		/* If the LIMIT is less than or equal to zero, loop forever.  This
-		 * is documented.  But also, if the LIMIT+OFFSET exceeds 2^63 then
-		 * also loop forever.  This is undocumented.  In fact, one could argue
-		 * that the loop should terminate.  But assuming 1 billion iterations
-		 * per second (far exceeding the capabilities of any current hardware)
-		 * it would take nearly 300 years to actually reach the limit.  So
-		 * looping forever is a reasonable approximation.
-		 */
-		pOut->u.i = -1;
-	} else {
-		pOut->u.i = x;
+	i64 x = pIn1->u.i;
+	if (sqlAddInt64(&x, pIn3->u.i) != 0) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "sum of LIMIT and OFFSET "
+			 "values should not result in integer overflow");
+		goto abort_due_to_error;
 	}
+	pOut->u.i = x;
 	break;
 }
 
