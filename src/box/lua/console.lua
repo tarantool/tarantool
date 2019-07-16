@@ -58,6 +58,7 @@ output_handlers["lua"] = function(status, opts, ...)
     local serpent_opts = {
         custom  = map_symbols,
         comment = false,
+        nocode = true,
     }
     if opts == "block" then
         return serpent.block(..., serpent_opts)
