@@ -33,6 +33,7 @@
 #include "session.h"
 #include "msgpuck.h"
 #include "error.h"
+#include "third_party/base64.h"
 
 static char zero_hash[SCRAMBLE_SIZE];
 
@@ -52,10 +53,14 @@ authenticate(const char *user_name, uint32_t len, const char *salt,
 	 * pooling.
 	 */
 	part_count = mp_decode_array(&tuple);
-	if (part_count == 0 && user->def->uid == GUEST &&
-	    memcmp(user->def->hash2, zero_hash, SCRAMBLE_SIZE) == 0) {
-		/* No password is set for GUEST, OK. */
-		goto ok;
+	if (part_count == 0 && user->def->uid == GUEST) {
+		if (memcmp(user->def->hash2, zero_hash, SCRAMBLE_SIZE) == 0)
+			goto ok; /* no password is set, OK */
+		char hash2[SCRAMBLE_SIZE];
+		base64_decode(CHAP_SHA1_EMPTY_PASSWORD, SCRAMBLE_BASE64_SIZE,
+			      hash2, SCRAMBLE_SIZE);
+		if (memcmp(user->def->hash2, hash2, SCRAMBLE_SIZE) == 0)
+			goto ok; /* empty password is set, OK */
 	}
 
 	access_check_session_xc(user);
@@ -90,11 +95,11 @@ authenticate(const char *user_name, uint32_t len, const char *salt,
 			diag_raise();
 		tnt_raise(ClientError, ER_PASSWORD_MISMATCH, user->def->name);
 	}
+ok:
 	/* check and run auth triggers on success */
 	if (! rlist_empty(&session_on_auth) &&
 	    session_run_on_auth_triggers(&auth_res) != 0)
 		diag_raise();
-ok:
 	credentials_init(&session->credentials, user->auth_token,
 			 user->def->uid);
 }

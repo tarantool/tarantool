@@ -53,12 +53,6 @@
 #include "version.h"
 #include "sequence.h"
 
-/**
- * chap-sha1 of empty string, i.e.
- * base64_encode(sha1(sha1(""), 0)
- */
-#define CHAP_SHA1_EMPTY_PASSWORD "vhvewKp0tNyweZQ+cFKAlsyphfg="
-
 /* {{{ Auxiliary functions and methods. */
 
 static void
