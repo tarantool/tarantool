@@ -757,6 +757,18 @@ i3:alter{parts = {4, 'integer', 5, 'string'}} -- error: field missing
 i3:alter{parts = {2, 'string', 4, 'integer'}} -- ok
 i3:select()
 
+--
+-- gh-4350: crash while trying to drop a multi-index space created
+-- transactionally after recovery.
+--
+inspector:cmd("setopt delimiter ';'")
+box.begin()
+s = box.schema.space.create('test_crash', {engine = engine})
+_ = s:create_index('pk')
+_ = s:create_index('sk', {parts = {2, 'unsigned'}})
+box.commit();
+inspector:cmd("setopt delimiter ''");
+
 -- Check that recovery works.
 inspector:cmd("restart server default")
 test_run = require('test_run')
@@ -767,6 +779,9 @@ s = box.space.test
 s.index.i1:select()
 s.index.i2:select()
 s.index.i3:select()
+
+-- gh-4350: see above.
+box.space.test_crash:drop()
 
 --
 -- gh-3903: index build doesn't work after recovery.

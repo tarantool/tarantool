@@ -338,6 +338,15 @@ txn_stmt_on_rollback(struct txn_stmt *stmt, struct trigger *trigger)
 	trigger_add(&stmt->on_rollback, trigger);
 }
 
+/*
+ * Return the total number of rows committed in the txn.
+ */
+static inline int
+txn_n_rows(struct txn *txn)
+{
+	return txn->n_new_rows + txn->n_applier_rows;
+}
+
 /**
  * Start a new statement.
  */

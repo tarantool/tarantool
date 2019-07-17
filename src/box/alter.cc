@@ -700,13 +700,21 @@ struct alter_space {
 	 * of key_defs and key_parts.
 	 */
 	uint32_t new_min_field_count;
+	/**
+	 * Number of rows in the transaction at the time when this
+	 * DDL operation was performed. It is used to compute this
+	 * operation signature on commit, which is needed to keep
+	 * xlog in sync with vylog, see alter_space_commit().
+	 */
+	int n_rows;
 };
 
 static struct alter_space *
 alter_space_new(struct space *old_space)
 {
-	struct alter_space *alter =
-		region_calloc_object_xc(&in_txn()->region, struct alter_space);
+	struct txn *txn = in_txn();
+	struct alter_space *alter = region_calloc_object_xc(&txn->region,
+							    struct alter_space);
 	rlist_create(&alter->ops);
 	alter->old_space = old_space;
 	alter->space_def = space_def_dup_xc(alter->old_space->def);
@@ -714,6 +722,7 @@ alter_space_new(struct space *old_space)
 		alter->new_min_field_count = old_space->format->min_field_count;
 	else
 		alter->new_min_field_count = 0;
+	alter->n_rows = txn_n_rows(txn);
 	return alter;
 }
 
@@ -817,13 +826,21 @@ alter_space_commit(struct trigger *trigger, void *event)
 	struct txn *txn = (struct txn *) event;
 	struct alter_space *alter = (struct alter_space *) trigger->data;
 	/*
+	 * The engine (vinyl) expects us to pass the signature of
+	 * the row that performed this operation, not the signature
+	 * of the transaction itself (this is needed to sync vylog
+	 * with xlog on recovery). It's trivial to get this given
+	 * the number of rows in the transaction at the time when
+	 * the operation was performed.
+	 */
+	int64_t signature = txn->signature - txn_n_rows(txn) + alter->n_rows;
+	/*
 	 * Commit alter ops, this will move the changed
 	 * indexes into their new places.
 	 */
 	class AlterSpaceOp *op;
-	rlist_foreach_entry(op, &alter->ops, link) {
-		op->commit(alter, txn->signature);
-	}
+	rlist_foreach_entry(op, &alter->ops, link)
+		op->commit(alter, signature);
 
 	alter->new_space = NULL; /* for alter_space_delete(). */
 	/*

@@ -2073,6 +2073,25 @@ i3:select()
   - [4, 'zzz', 'ddd', -666]
   - [1, 'zzz', 'aaa', 999, 'fff']
 ...
+--
+-- gh-4350: crash while trying to drop a multi-index space created
+-- transactionally after recovery.
+--
+inspector:cmd("setopt delimiter ';'")
+---
+- true
+...
+box.begin()
+s = box.schema.space.create('test_crash', {engine = engine})
+_ = s:create_index('pk')
+_ = s:create_index('sk', {parts = {2, 'unsigned'}})
+box.commit();
+---
+...
+inspector:cmd("setopt delimiter ''");
+---
+- true
+...
 -- Check that recovery works.
 inspector:cmd("restart server default")
 test_run = require('test_run')
@@ -2113,6 +2132,10 @@ s.index.i3:select()
   - [6, 'yyy', null, -444]
   - [4, 'zzz', 'ddd', -666]
   - [1, 'zzz', 'aaa', 999, 'fff']
+...
+-- gh-4350: see above.
+box.space.test_crash:drop()
+---
 ...
 --
 -- gh-3903: index build doesn't work after recovery.
