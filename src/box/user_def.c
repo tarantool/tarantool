@@ -29,6 +29,9 @@
  * SUCH DAMAGE.
  */
 #include "user_def.h"
+
+const char *CHAP_SHA1_EMPTY_PASSWORD = "vhvewKp0tNyweZQ+cFKAlsyphfg=";
+
 const char *
 priv_name(user_access_t access)
 {

@@ -39,6 +39,11 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/**
+ * chap-sha1 of empty string, i.e. base64_encode(sha1(sha1(""), 0)
+ */
+extern const char *CHAP_SHA1_EMPTY_PASSWORD;
+
 typedef uint16_t user_access_t;
 /**
  * Effective session user. A cache of user data
