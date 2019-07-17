@@ -85,6 +85,11 @@ release_lto_clang8:
   script:
     - ${GITLAB_MAKE} test_debian_no_deps
 
+release_asan_clang8:
+  <<: *docker_test_clang8_definition
+  script:
+    - ${GITLAB_MAKE} test_asan_debian_no_deps
+
 osx_13_release:
   <<: *release_only_definition
   <<: *vbox_definition
