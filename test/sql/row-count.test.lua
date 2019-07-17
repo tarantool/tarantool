@@ -73,3 +73,11 @@ box.execute("DROP TABLE t2;")
 box.execute("DROP TABLE t3;")
 box.execute("DROP TABLE t1;")
 
+--
+-- gh-4188: make sure that in case of INSERT OR IGNORE only
+-- successful inserts are counted.
+--
+box.execute("CREATE TABLE t (i INT PRIMARY KEY AUTOINCREMENT, a INT check (a > 0));")
+box.execute("INSERT OR IGNORE INTO t VALUES (null, 1), (null, -1), (null, 2);")
+box.execute("SELECT * FROM t;")
+box.execute("DROP TABLE t;")

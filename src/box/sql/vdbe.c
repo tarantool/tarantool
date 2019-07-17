@@ -4255,8 +4255,6 @@ case OP_IdxReplace:
 case OP_IdxInsert: {
 	pIn2 = &aMem[pOp->p1];
 	assert((pIn2->flags & MEM_Blob) != 0);
-	if (pOp->p5 & OPFLAG_NCHANGE)
-		p->nChange++;
 	if (ExpandBlob(pIn2) != 0)
 		goto abort_due_to_error;
 	struct space *space;
@@ -4279,26 +4277,34 @@ case OP_IdxInsert: {
 		rc = tarantoolsqlEphemeralInsert(space, pIn2->z,
 						     pIn2->z + pIn2->n);
 	}
-	if (rc == 0 && pOp->p3 > 0 && ((aMem[pOp->p3].flags) & MEM_Null) != 0) {
+	if (rc != 0) {
+		if ((pOp->p5 & OPFLAG_OE_IGNORE) != 0) {
+			/*
+			 * Ignore any kind of fails and do not
+			 * raise error message. If we are in
+			 * trigger, increment ignore raised
+			 * counter.
+			 */
+			rc = 0;
+			if (p->pFrame != NULL)
+				p->ignoreRaised++;
+			break;
+		}
+		if ((pOp->p5 & OPFLAG_OE_FAIL) != 0) {
+			p->errorAction = ON_CONFLICT_ACTION_FAIL;
+		} else if ((pOp->p5 & OPFLAG_OE_ROLLBACK) != 0) {
+			p->errorAction = ON_CONFLICT_ACTION_ROLLBACK;
+		}
+		goto abort_due_to_error;
+	}
+	if ((pOp->p5 & OPFLAG_NCHANGE) != 0)
+		p->nChange++;
+	if (pOp->p3 > 0 && ((aMem[pOp->p3].flags) & MEM_Null) != 0) {
 		assert(space->sequence != NULL);
 		int64_t value = sequence_get_value(space->sequence);
 		if (vdbe_add_new_autoinc_id(p, value) != 0)
 			goto abort_due_to_error;
 	}
-
-	if (pOp->p5 & OPFLAG_OE_IGNORE) {
-		/* Ignore any kind of failes and do not raise error message */
-		rc = 0;
-		/* If we are in trigger, increment ignore raised counter */
-		if (p->pFrame)
-			p->ignoreRaised++;
-	} else if (pOp->p5 & OPFLAG_OE_FAIL) {
-		p->errorAction = ON_CONFLICT_ACTION_FAIL;
-	} else if (pOp->p5 & OPFLAG_OE_ROLLBACK) {
-		p->errorAction = ON_CONFLICT_ACTION_ROLLBACK;
-	}
-	if (rc != 0)
-		goto abort_due_to_error;
 	break;
 }
 
