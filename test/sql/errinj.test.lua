@@ -118,28 +118,6 @@ box.execute("INSERT INTO t3 VALUES(1, 1, 3);")
 errinj.set("ERRINJ_WAL_IO", false)
 box.execute("DROP TABLE t3;")
 
--- gh-3780: space without PK raises error if
--- it is used in SQL queries.
---
-errinj = box.error.injection
-fiber = require('fiber')
-box.execute("CREATE TABLE t (id INT PRIMARY KEY);")
-box.execute("INSERT INTO t VALUES (1);")
-errinj.set("ERRINJ_WAL_DELAY", true)
--- DROP TABLE consists of several steps: firstly indexes
--- are deleted, then space itself. Lets make sure that if
--- first part of drop is successfully finished, but resulted
--- in yield, all operations on space will be blocked due to
--- absence of primary key.
---
-function drop_table_yield() box.execute("DROP TABLE t;") end
-f = fiber.create(drop_table_yield)
-box.execute("SELECT * FROM t;")
-box.execute("INSERT INTO t VALUES (2);")
-box.execute("UPDATE t SET id = 2;")
--- Finish drop space.
-errinj.set("ERRINJ_WAL_DELAY", false)
-
 --
 -- gh-3931: Store regular identifiers in case-normal form
 --

@@ -5,8 +5,8 @@ fiber = require('fiber')
 
 -- View reference counters are incremented before firing
 -- on_commit triggers (i.e. before being written into WAL), so
--- it is impossible to create view on dropped (but not written
--- into WAL) space.
+-- it is impossible to drop a space referenced by a created, but
+-- *still* not yet committed view.
 --
 box.execute('CREATE TABLE t1(id INT PRIMARY KEY)')
 function create_view() box.execute('CREATE VIEW v1 AS SELECT * FROM t1') end
@@ -18,8 +18,8 @@ f2 = fiber.create(drop_index_t1)
 f3 = fiber.create(drop_space_t1)
 box.error.injection.set("ERRINJ_WAL_DELAY", false)
 fiber.sleep(0.1)
-box.space.T1
-box.space.V1
+box.space.T1 ~= nil
+box.space.V1 ~= nil
 
 --
 -- In the same way, we have to drop all referenced spaces before

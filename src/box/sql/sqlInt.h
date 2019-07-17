@@ -2338,11 +2338,6 @@ struct Parse {
 	 * sqlEndTable() function).
 	 */
 	struct create_table_def create_table_def;
-	/**
-	 * List of all records that were inserted in system spaces
-	 * in current statement.
-	 */
-	struct rlist record_list;
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
 	/** If set - do not emit byte code at all, just parse.  */
 	bool parse_only;
@@ -4505,7 +4500,7 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
 				  int index_id, int key_reg, uint32_t key_len,
 				  int tarantool_error_code,
 				  const char *error_src, bool no_error,
-				  int cond_opcode, bool is_clean_needed);
+				  int cond_opcode);
 
 /**
  * Generate VDBE code to delete records from system _sql_stat1 or

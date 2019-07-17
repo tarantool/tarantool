@@ -4405,8 +4405,8 @@ case OP_Update: {
 	break;
 }
 
-/* Opcode: SInsert P1 P2 P3 * P5
- * Synopsis: space id = P1, key = r[P3], on error goto P2
+/* Opcode: SInsert P1 P2 * * P5
+ * Synopsis: space id = P1, key = r[P2]
  *
  * This opcode is used only during DDL routine.
  * In contrast to ordinary insertion, insertion to system spaces
@@ -4419,15 +4419,15 @@ case OP_Update: {
  */
 case OP_SInsert: {
 	assert(pOp->p1 > 0);
-	assert(pOp->p2 > 0);
-	assert(pOp->p3 >= 0);
+	assert(pOp->p2 >= 0);
 
-	pIn3 = &aMem[pOp->p3];
+	pIn2 = &aMem[pOp->p2];
 	struct space *space = space_by_id(pOp->p1);
 	assert(space != NULL);
 	assert(space_is_system(space));
-	if (tarantoolsqlInsert(space, pIn3->z, pIn3->z + pIn3->n) != 0)
-		goto jump_to_p2;
+	assert(p->errorAction == ON_CONFLICT_ACTION_ABORT);
+	if (tarantoolsqlInsert(space, pIn2->z, pIn2->z + pIn2->n) != 0)
+		goto abort_due_to_error;
 	if (pOp->p5 & OPFLAG_NCHANGE)
 		p->nChange++;
 	break;
@@ -4450,6 +4450,7 @@ case OP_SDelete: {
 	struct space *space = space_by_id(pOp->p1);
 	assert(space != NULL);
 	assert(space_is_system(space));
+	assert(p->errorAction == ON_CONFLICT_ACTION_ABORT);
 	if (sql_delete_by_key(space, 0, pIn2->z, pIn2->n) != 0)
 		goto abort_due_to_error;
 	if (pOp->p5 & OPFLAG_NCHANGE)

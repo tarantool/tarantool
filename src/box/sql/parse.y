@@ -172,6 +172,7 @@ cmd ::= create_table create_table_args.
 create_table ::= CREATE TABLE ifnotexists(E) nm(Y). {
   create_table_def_init(&pParse->create_table_def, &Y, E);
   pParse->create_table_def.new_space = sqlStartTable(pParse, &Y);
+  pParse->initiateTTrans = true;
 }
 
 %type ifnotexists {int}
@@ -380,12 +381,14 @@ resolvetype(A) ::= REPLACE.                  {A = ON_CONFLICT_ACTION_REPLACE;}
 cmd ::= DROP TABLE ifexists(E) fullname(X) . {
   struct Token t = Token_nil;
   drop_table_def_init(&pParse->drop_table_def, X, &t, E);
+  pParse->initiateTTrans = true;
   sql_drop_table(pParse);
 }
 
 cmd ::= DROP VIEW ifexists(E) fullname(X) . {
   struct Token t = Token_nil;
   drop_view_def_init(&pParse->drop_view_def, X, &t, E);
+  pParse->initiateTTrans = true;
   sql_drop_table(pParse);
 }
 
@@ -399,6 +402,7 @@ cmd ::= CREATE(X) VIEW ifnotexists(E) nm(Y) eidlist_opt(C)
           AS select(S). {
   if (!pParse->parse_only) {
     create_view_def_init(&pParse->create_view_def, &Y, &X, C, S, E);
+    pParse->initiateTTrans = true;
     sql_create_view(pParse);
   } else {
     sql_store_select(pParse, S);
@@ -775,6 +779,7 @@ cmd ::= with(C) DELETE FROM fullname(X) indexed_opt(I) where_opt(W). {
 /////////////////////////// The TRUNCATE statement /////////////////////////////
 //
 cmd ::= TRUNCATE TABLE fullname(X). {
+  pParse->initiateTTrans = true;
   sql_table_truncate(pParse, X);
 }
 
@@ -1404,6 +1409,7 @@ cmd ::= CREATE uniqueflag(U) INDEX ifnotexists(NE) nm(X)
   }
   create_index_def_init(&pParse->create_index_def, src_list, &X, Z, U,
                         SORT_ORDER_ASC, NE);
+  pParse->initiateTTrans = true;
   sql_create_index(pParse);
 }
 
@@ -1456,6 +1462,7 @@ eidlist(A) ::= nm(Y). {
 //
 cmd ::= DROP INDEX ifexists(E) nm(X) ON fullname(Y).   {
   drop_index_def_init(&pParse->drop_index_def, Y, &X, E);
+  pParse->initiateTTrans = true;
   sql_drop_index(pParse);
 }
 
@@ -1502,7 +1509,7 @@ cmd ::= CREATE trigger_decl(A) BEGIN trigger_cmd_list(S) END(Z). {
   Token all;
   all.z = A.z;
   all.n = (int)(Z.z - A.z) + Z.n;
-  pParse->initiateTTrans = false;
+  pParse->initiateTTrans = true;
   sql_trigger_finish(pParse, S, &all);
 }
 
@@ -1652,6 +1659,7 @@ raisetype(A) ::= FAIL.      {A = ON_CONFLICT_ACTION_FAIL;}
 cmd ::= DROP TRIGGER ifexists(NOERR) fullname(X). {
   struct Token t = Token_nil;
   drop_trigger_def_init(&pParse->drop_trigger_def, X, &t, NOERR);
+  pParse->initiateTTrans = true;
   sql_drop_trigger(pParse);
 }
 
@@ -1671,6 +1679,7 @@ alter_table_start(A) ::= ALTER TABLE fullname(T) . { A = T; }
 alter_add_constraint(A) ::= alter_table_start(T) ADD CONSTRAINT nm(N). {
   A.table_name = T;
   A.name = N;
+  pParse->initiateTTrans = true;
 }
 
 cmd ::= alter_add_constraint(N) FOREIGN KEY LP eidlist(FA) RP REFERENCES
@@ -1697,11 +1706,13 @@ unique_spec(U) ::= PRIMARY KEY. { U = SQL_INDEX_TYPE_CONSTRAINT_PK; }
 
 cmd ::= alter_table_start(A) RENAME TO nm(N). {
     rename_entity_def_init(&pParse->rename_entity_def, A, &N);
+    pParse->initiateTTrans = true;
     sql_alter_table_rename(pParse);
 }
 
 cmd ::= ALTER TABLE fullname(X) DROP CONSTRAINT nm(Z). {
   drop_fk_def_init(&pParse->drop_fk_def, X, &Z, false);
+  pParse->initiateTTrans = true;
   sql_drop_foreign_key(pParse);
 }
 
