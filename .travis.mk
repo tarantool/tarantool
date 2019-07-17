@@ -16,6 +16,9 @@ test: test_$(TRAVIS_OS_NAME)
 # Redirect some targets via docker
 test_linux: docker_test_debian
 coverage: docker_coverage_debian
+lto: docker_test_debian
+lto_clang8: docker_test_debian_clang8
+asan: docker_test_asan_debian
 
 docker_%:
 	mkdir -p ~/.cache/ccache
@@ -39,6 +42,8 @@ docker_%:
 # Linux #
 #########
 
+# Depends
+
 deps_debian:
 	apt-get update ${APT_EXTRA_FLAGS} && apt-get install -y -f \
 		build-essential cmake coreutils sed \
@@ -55,6 +60,8 @@ deps_buster_clang_8: deps_debian
 	apt-get update
 	apt-get install -y clang-8 llvm-8-dev
 
+# Release
+
 build_debian:
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
 	make -j
@@ -63,6 +70,10 @@ test_debian_no_deps: build_debian
 	cd test && /usr/bin/python test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_debian: deps_debian test_debian_no_deps
+
+test_debian_clang8: deps_debian deps_buster_clang_8 test_debian_no_deps
+
+# Debug with coverage
 
 build_coverage_debian:
 	cmake . -DCMAKE_BUILD_TYPE=Debug -DENABLE_GCOV=ON
@@ -83,6 +94,21 @@ test_coverage_debian_no_deps: build_coverage_debian
 	fi;
 
 coverage_debian: deps_debian test_coverage_debian_no_deps
+
+# ASAN
+
+build_asan_debian:
+	CC=clang-8 CXX=clang++-8 cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
+	CC=clang-8 CXX=clang++-8 cmake . -DENABLE_ASAN=ON ${CMAKE_EXTRA_PARAMS}
+	make -j
+
+test_asan_debian_no_deps: build_asan_debian
+	# temporary excluded engine/ and replication/ suites with some tests from other suites by issue #4360
+	cd test && ASAN=ON ASAN_OPTIONS=detect_leaks=0 ./test-run.py --force $(TEST_RUN_EXTRA_PARAMS) \
+		app/ app-tap/ box/ box-py/ box-tap/ engine_long/ long_run-py/ luajit-tap/ \
+		replication-py/ small/ sql/ sql-tap/ swim/ unit/ vinyl/ wal_off/ xlog/ xlog-py/
+
+test_asan_debian: deps_debian deps_buster_clang_8 test_asan_debian_no_deps
 
 #######
 # OSX #

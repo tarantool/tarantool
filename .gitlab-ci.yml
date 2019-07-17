@@ -65,6 +65,14 @@ release_lto_clang8:
   script:
     - ${GITLAB_MAKE} test_debian_no_deps
 
+release_asan_clang8:
+  image: ${IMAGE_TEST_LTO}
+  stage: test
+  tags:
+    - docker_test
+  script:
+    - ${GITLAB_MAKE} test_asan_debian_no_deps
+
 osx_13_release:
   only:
     refs:
