@@ -385,15 +385,7 @@ tuple_free(void)
 
 /* {{{ tuple_field_* getters */
 
-/**
- * Propagate @a field to MessagePack(field)[index].
- * @param[in][out] field Field to propagate.
- * @param index 0-based index to propagate to.
- *
- * @retval  0 Success, the index was found.
- * @retval -1 Not found.
- */
-static inline int
+int
 tuple_field_go_to_index(const char **field, uint64_t index)
 {
 	enum mp_type type = mp_typeof(**field);
@@ -428,16 +420,7 @@ tuple_field_go_to_index(const char **field, uint64_t index)
 	return -1;
 }
 
-/**
- * Propagate @a field to MessagePack(field)[key].
- * @param[in][out] field Field to propagate.
- * @param key Key to propagate to.
- * @param len Length of @a key.
- *
- * @retval  0 Success, the index was found.
- * @retval -1 Not found.
- */
-static inline int
+int
 tuple_field_go_to_key(const char **field, const char *key, int len)
 {
 	enum mp_type type = mp_typeof(**field);

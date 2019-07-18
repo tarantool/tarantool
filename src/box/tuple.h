@@ -552,6 +552,29 @@ tuple_go_to_path(const char **data, const char *path, uint32_t path_len,
 		 int multikey_idx);
 
 /**
+ * Propagate @a field to MessagePack(field)[index].
+ * @param[in][out] field Field to propagate.
+ * @param index 0-based index to propagate to.
+ *
+ * @retval  0 Success, the index was found.
+ * @retval -1 Not found.
+ */
+int
+tuple_field_go_to_index(const char **field, uint64_t index);
+
+/**
+ * Propagate @a field to MessagePack(field)[key].
+ * @param[in][out] field Field to propagate.
+ * @param key Key to propagate to.
+ * @param len Length of @a key.
+ *
+ * @retval  0 Success, the index was found.
+ * @retval -1 Not found.
+ */
+int
+tuple_field_go_to_key(const char **field, const char *key, int len);
+
+/**
  * Get tuple field by field index, relative JSON path and
  * multikey_idx.
  * @param format Tuple format.
