@@ -772,9 +772,13 @@ sql_create_check_contraint(struct Parse *parser)
 			return;
 		}
 		int space_id_reg = ++parser->nMem;
-		sqlVdbeAddOp2(sqlGetVdbe(parser), OP_Integer, space->def->id,
+		struct Vdbe *v = sqlGetVdbe(parser);
+		sqlVdbeAddOp2(v, OP_Integer, space->def->id,
 			      space_id_reg);
 		vdbe_emit_ck_constraint_create(parser, ck_def, space_id_reg);
+		assert(sqlVdbeGetOp(v, v->nOp - 1)->opcode == OP_SInsert);
+		sqlVdbeCountChanges(v);
+		sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 	} else {
 		rlist_add_entry(&parser->create_table_def.new_check, ck_parse,
 				link);

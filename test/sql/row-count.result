@@ -365,3 +365,19 @@ box.execute("DROP TABLE t;")
 ---
 - row_count: 1
 ...
+--
+-- gh-4363: make sure that row_count has increased in the case of
+-- ALTER TABLE <table> ADD CONSTRAINT <constraint> CHECK(<expr>);
+--
+box.execute('CREATE TABLE t1(id INTEGER PRIMARY KEY);')
+---
+- row_count: 1
+...
+box.execute('ALTER TABLE t1 ADD CONSTRAINT ck1 CHECK(id > 0);')
+---
+- row_count: 1
+...
+box.execute('DROP TABLE t1;')
+---
+- row_count: 1
+...
