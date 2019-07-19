@@ -4,6 +4,7 @@
 
 DOCKER_IMAGE?=packpack/packpack:debian-stretch
 TEST_RUN_EXTRA_PARAMS?=
+MAX_FILES?=65534
 
 all: package
 
@@ -134,12 +135,21 @@ build_osx:
 
 test_osx_no_deps: build_osx
 	# Increase the maximum number of open file descriptors on macOS
-	sudo sysctl -w kern.maxfiles=20480 || :
-	sudo sysctl -w kern.maxfilesperproc=20480 || :
-	sudo launchctl limit maxfiles 20480 || :
-	ulimit -S -n 20480 || :
-	ulimit -n
-	cd test && ./test-run.py --force $(TEST_RUN_EXTRA_PARAMS) unit/ app/ app-tap/ box/ box-tap/
+	echo tarantool | sudo -S echo "Initialize sudo for the next commands..." :
+	sudo sysctl -w kern.maxfiles=${MAX_FILES} || echo tarantool | sudo -S sysctl -w kern.maxfiles=${MAX_FILES} || :
+	sysctl -w kern.maxfiles || :
+	sudo sysctl -w kern.maxfilesperproc=${MAX_FILES} || echo tarantool | sudo -S sysctl -w kern.maxfilesperproc=${MAX_FILES} || :
+	sysctl -w kern.maxfilesperproc || :
+	sudo launchctl limit maxfiles ${MAX_FILES} || echo tarantool | sudo -S launchctl limit maxfiles ${MAX_FILES} || :
+	launchctl limit maxfiles || :
+	sudo ulimit -S -n ${MAX_FILES} || echo tarantool | sudo -S ulimit -S -n ${MAX_FILES} || :
+	ulimit -S -n || :
+	sudo ulimit -H -n ${MAX_FILES} || echo tarantool | sudo -S ulimit -H -n ${MAX_FILES} || :
+	ulimit -H -n
+	# temporary excluded replication/ suite with some tests from other suites by issues #4357 and #4370
+	cd test && ./test-run.py --force $(TEST_RUN_EXTRA_PARAMS) \
+		app/ app-tap/ box/ box-py/ box-tap/ engine/ engine_long/ long_run-py/ luajit-tap/ \
+		replication-py/ small/ sql/ sql-tap/ swim/ unit/ vinyl/ wal_off/ xlog/ xlog-py/
 
 test_osx: deps_osx test_osx_no_deps
 
