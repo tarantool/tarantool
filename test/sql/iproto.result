@@ -769,7 +769,7 @@ cn:execute("SELECT zeroblob(1);")
 ---
 - metadata:
   - name: zeroblob(1)
-    type: scalar
+    type: varbinary
   rows:
   - ["\0"]
 ...
@@ -782,7 +782,7 @@ res = cn:execute("SELECT randomblob(1);")
 res.metadata
 ---
 - - name: randomblob(1)
-    type: scalar
+    type: varbinary
 ...
 -- Type set during compilation stage, and since min/max are accept
 -- arguments of all scalar type, we can't say nothing more than

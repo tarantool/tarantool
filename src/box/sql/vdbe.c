@@ -342,6 +342,10 @@ mem_apply_type(struct Mem *record, enum field_type type)
 			sqlVdbeMemStringify(record);
 		record->flags &= ~(MEM_Real | MEM_Int | MEM_UInt);
 		return 0;
+	case FIELD_TYPE_VARBINARY:
+		if ((record->flags & MEM_Blob) == 0)
+			return -1;
+		return 0;
 	case FIELD_TYPE_SCALAR:
 		return 0;
 	default:
@@ -2103,20 +2107,24 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 			}
 			break;
 		}
-	} else if ((flags1 | flags3) & MEM_Bool) {
+	} else if (((flags1 | flags3) & MEM_Bool) != 0 ||
+		   ((flags1 | flags3) & MEM_Blob) != 0) {
 		/*
-		 * If one of values is of type BOOLEAN, then the
-		 * second one must be BOOLEAN as well. Otherwise
-		 * an error is raised.
+		 * If one of values is of type BOOLEAN or VARBINARY,
+		 * then the second one must be of the same type as
+		 * well. Otherwise an error is raised.
 		 */
-		bool is_bool_type_arg1 = flags1 & MEM_Bool;
-		bool is_bool_type_arg3 = flags3 & MEM_Bool;
-		if (! is_bool_type_arg1 || ! is_bool_type_arg3) {
-			char *inconsistent_type = ! is_bool_type_arg1 ?
+		int type_arg1 = flags1 & (MEM_Bool | MEM_Blob);
+		int type_arg3 = flags3 & (MEM_Bool | MEM_Blob);
+		if (type_arg1 != type_arg3) {
+			char *inconsistent_type = type_arg1 != 0 ?
+						  mem_type_to_str(pIn3) :
+						  mem_type_to_str(pIn1);
+			char *expected_type     = type_arg1 != 0 ?
 						  mem_type_to_str(pIn1) :
 						  mem_type_to_str(pIn3);
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-				 inconsistent_type, "boolean");
+				 inconsistent_type, expected_type);
 			goto abort_due_to_error;
 		}
 		res = sqlMemCompare(pIn3, pIn1, NULL);

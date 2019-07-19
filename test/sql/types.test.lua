@@ -417,3 +417,64 @@ box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHE
 box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4 WHEN 'e' THEN 5 WHEN 'f' THEN 'asd' END;")
 box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4 WHEN 'e' THEN 5 WHEN 'f' THEN 6 ELSE 'asd' END;")
 box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4 WHEN 'e' THEN 5 WHEN 'f' THEN 6 ELSE 7 END;")
+
+-- Test basic capabilities of VARBINARY type.
+--
+box.execute("CREATE TABLE t (id INT PRIMARY KEY, v VARBINARY);")
+box.execute("INSERT INTO t VALUES(1, 1);")
+box.execute("INSERT INTO t VALUES(1, 1.123);")
+box.execute("INSERT INTO t VALUES(1, true);")
+box.execute("INSERT INTO t VALUES(1, 'asd');")
+box.execute("INSERT INTO t VALUES(1, x'616263');")
+box.execute("SELECT * FROM t WHERE v = 1")
+box.execute("SELECT * FROM t WHERE v = 1.123")
+box.execute("SELECT * FROM t WHERE v = 'str'")
+box.execute("SELECT * FROM t WHERE v = x'616263'")
+
+box.execute("SELECT sum(v) FROM t;")
+box.execute("SELECT avg(v) FROM t;")
+box.execute("SELECT total(v) FROM t;")
+box.execute("SELECT min(v) FROM t;")
+box.execute("SELECT max(v) FROM t;")
+box.execute("SELECT count(v) FROM t;")
+box.execute("SELECT group_concat(v) FROM t;")
+
+box.execute("SELECT lower(v) FROM t;")
+box.execute("SELECT upper(v) FROM t;")
+box.execute("SELECT abs(v) FROM t;")
+box.execute("SELECT typeof(v) FROM t;")
+box.execute("SELECT quote(v) FROM t;")
+box.execute("SELECT min(v, x'') FROM t;")
+
+box.execute("CREATE INDEX iv ON t(v);")
+box.execute("SELECT v FROM t WHERE v = x'616263';")
+box.execute("SELECT v FROM t ORDER BY v;")
+
+box.execute("UPDATE t SET v = x'636261' WHERE v = x'616263';")
+box.execute("SELECT v FROM t;")
+
+box.execute("CREATE TABLE parent (id INT PRIMARY KEY, a VARBINARY UNIQUE);")
+box.space.T:truncate()
+box.execute("ALTER TABLE t ADD CONSTRAINT fk1 FOREIGN KEY (v) REFERENCES parent (a);")
+box.execute("INSERT INTO t VALUES (1, x'616263');")
+box.execute("INSERT INTO parent VALUES (1, x'616263');")
+box.execute("INSERT INTO t VALUES (1, x'616263');")
+box.execute("ALTER TABLE t DROP CONSTRAINT fk1;")
+box.space.PARENT:drop()
+
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a VARBINARY CHECK (a = x'616263'));")
+box.execute("INSERT INTO t1 VALUES (1, x'006162');")
+box.execute("INSERT INTO t1 VALUES (1, x'616263');")
+box.space.T1:drop()
+
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a VARBINARY DEFAULT x'616263');")
+box.execute("INSERT INTO t1 (id) VALUES (1);")
+box.space.T1:select()
+box.space.T1:drop()
+
+box.execute("SELECT CAST(1 AS VARBINARY);")
+box.execute("SELECT CAST(1.123 AS VARBINARY);")
+box.execute("SELECT CAST(true AS VARBINARY);")
+box.execute("SELECT CAST('asd' AS VARBINARY);")
+box.execute("SELECT CAST(x'' AS VARBINARY);")
+>>>>>>> ff84ee4c2... sql: introduce VARBINARY column type

@@ -191,6 +191,7 @@ static Keyword aKeywordTable[] = {
   { "UPDATE",                 "TK_UPDATE",      ALWAYS,           true  },
   { "USING",                  "TK_USING",       ALWAYS,           true  },
   { "VALUES",                 "TK_VALUES",      ALWAYS,           true  },
+  { "VARBINARY",              "TK_VARBINARY",   ALWAYS,           true  },
   { "VIEW",                   "TK_VIEW",        VIEW,             true  },
   { "WITH",                   "TK_WITH",        CTE,              true  },
   { "WHEN",                   "TK_WHEN",        ALWAYS,           true  },

@@ -719,6 +719,14 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 		return 0;
 	case FIELD_TYPE_NUMBER:
 		return sqlVdbeMemRealify(pMem);
+	case FIELD_TYPE_VARBINARY:
+		if ((pMem->flags & MEM_Blob) != 0)
+			return 0;
+		if ((pMem->flags & MEM_Str) != 0) {
+			MemSetTypeFlag(pMem, MEM_Str);
+			return 0;
+		}
+		return -1;
 	default:
 		assert(type == FIELD_TYPE_STRING);
 		assert(MEM_Str == (MEM_Blob >> 3));

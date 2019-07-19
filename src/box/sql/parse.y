@@ -902,7 +902,7 @@ idlist(A) ::= nm(Y). {
         p->type = FIELD_TYPE_STRING;
         break;
       case TK_BLOB:
-        p->type = FIELD_TYPE_SCALAR;
+        p->type = FIELD_TYPE_VARBINARY;
         break;
       case TK_INTEGER:
         p->type = FIELD_TYPE_INTEGER;
@@ -1741,6 +1741,7 @@ typedef(A) ::= SCALAR . { A.type = FIELD_TYPE_SCALAR; }
 /** BOOL | BOOLEAN is not used due to possible bug in Lemon. */
 typedef(A) ::= BOOL . { A.type = FIELD_TYPE_BOOLEAN; }
 typedef(A) ::= BOOLEAN . { A.type = FIELD_TYPE_BOOLEAN; }
+typedef(A) ::= VARBINARY . { A.type = FIELD_TYPE_VARBINARY; }
 
 /**
  * Time-like types are temporary disabled, until they are

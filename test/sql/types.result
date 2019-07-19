@@ -355,15 +355,15 @@ box.execute("SELECT unknown = true;")
 ...
 box.execute("SELECT 1 = true;")
 ---
-- error: 'Type mismatch: can not convert UNSIGNED to boolean'
+- error: 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
 ...
 box.execute("SELECT 'abc' = true;")
 ---
-- error: 'Type mismatch: can not convert TEXT to boolean'
+- error: 'Type mismatch: can not convert TEXT to BOOLEAN'
 ...
 box.execute("SELECT 1.123 > true;")
 ---
-- error: 'Type mismatch: can not convert REAL to boolean'
+- error: 'Type mismatch: can not convert REAL to BOOLEAN'
 ...
 box.execute("SELECT true IN (1, 'abc', true)")
 ---
@@ -626,7 +626,7 @@ box.execute("SELECT upper(b) FROM t;")
 ...
 box.execute("SELECT abs(b) FROM t;")
 ---
-- error: 'Inconsistent types: expected number got boolean'
+- error: 'Inconsistent types: expected number got BOOLEAN'
 ...
 box.execute("SELECT typeof(b) FROM t;")
 ---
@@ -895,11 +895,11 @@ box.execute("INSERT INTO t1 VALUES (3, 'abc'), (4, 12.5);")
 ...
 box.execute("SELECT s FROM t1 WHERE s = true;")
 ---
-- error: 'Type mismatch: can not convert TEXT to boolean'
+- error: 'Type mismatch: can not convert TEXT to BOOLEAN'
 ...
 box.execute("SELECT s FROM t1 WHERE s < true;")
 ---
-- error: 'Type mismatch: can not convert TEXT to boolean'
+- error: 'Type mismatch: can not convert TEXT to BOOLEAN'
 ...
 box.execute("SELECT s FROM t1 WHERE s IN (true, 1, 'abcd')")
 ---
@@ -987,11 +987,11 @@ box.execute("SELECT * FROM tboolean WHERE s1 = 'abc';")
 ...
 box.execute("SELECT * FROM tboolean WHERE s1 = 1;")
 ---
-- error: 'Type mismatch: can not convert UNSIGNED to boolean'
+- error: 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
 ...
 box.execute("SELECT * FROM tboolean WHERE s1 = 1.123;")
 ---
-- error: 'Type mismatch: can not convert REAL to boolean'
+- error: 'Type mismatch: can not convert REAL to BOOLEAN'
 ...
 box.space.TBOOLEAN:drop()
 ---
@@ -1834,4 +1834,257 @@ box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHE
     type: integer
   rows:
   - [1]
+...
+-- Test basic capabilities of VARBINARY type.
+--
+box.execute("CREATE TABLE t (id INT PRIMARY KEY, v VARBINARY);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t VALUES(1, 1);")
+---
+- error: 'Type mismatch: can not convert 1 to varbinary'
+...
+box.execute("INSERT INTO t VALUES(1, 1.123);")
+---
+- error: 'Type mismatch: can not convert 1.123 to varbinary'
+...
+box.execute("INSERT INTO t VALUES(1, true);")
+---
+- error: 'Type mismatch: can not convert true to varbinary'
+...
+box.execute("INSERT INTO t VALUES(1, 'asd');")
+---
+- error: 'Type mismatch: can not convert asd to varbinary'
+...
+box.execute("INSERT INTO t VALUES(1, x'616263');")
+---
+- row_count: 1
+...
+box.execute("SELECT * FROM t WHERE v = 1")
+---
+- error: 'Type mismatch: can not convert UNSIGNED to VARBINARY'
+...
+box.execute("SELECT * FROM t WHERE v = 1.123")
+---
+- error: 'Type mismatch: can not convert REAL to VARBINARY'
+...
+box.execute("SELECT * FROM t WHERE v = 'str'")
+---
+- error: 'Type mismatch: can not convert TEXT to VARBINARY'
+...
+box.execute("SELECT * FROM t WHERE v = x'616263'")
+---
+- metadata:
+  - name: ID
+    type: integer
+  - name: V
+    type: varbinary
+  rows:
+  - [1, 'abc']
+...
+box.execute("SELECT sum(v) FROM t;")
+---
+- error: 'Type mismatch: can not convert abc to number'
+...
+box.execute("SELECT avg(v) FROM t;")
+---
+- error: 'Type mismatch: can not convert abc to number'
+...
+box.execute("SELECT total(v) FROM t;")
+---
+- error: 'Type mismatch: can not convert abc to number'
+...
+box.execute("SELECT min(v) FROM t;")
+---
+- metadata:
+  - name: min(v)
+    type: scalar
+  rows:
+  - ['abc']
+...
+box.execute("SELECT max(v) FROM t;")
+---
+- metadata:
+  - name: max(v)
+    type: scalar
+  rows:
+  - ['abc']
+...
+box.execute("SELECT count(v) FROM t;")
+---
+- metadata:
+  - name: count(v)
+    type: integer
+  rows:
+  - [1]
+...
+box.execute("SELECT group_concat(v) FROM t;")
+---
+- metadata:
+  - name: group_concat(v)
+    type: string
+  rows:
+  - ['abc']
+...
+box.execute("SELECT lower(v) FROM t;")
+---
+- error: 'Inconsistent types: expected TEXT got VARBINARY'
+...
+box.execute("SELECT upper(v) FROM t;")
+---
+- error: 'Inconsistent types: expected TEXT got VARBINARY'
+...
+box.execute("SELECT abs(v) FROM t;")
+---
+- error: 'Inconsistent types: expected number got VARBINARY'
+...
+box.execute("SELECT typeof(v) FROM t;")
+---
+- metadata:
+  - name: typeof(v)
+    type: string
+  rows:
+  - ['varbinary']
+...
+box.execute("SELECT quote(v) FROM t;")
+---
+- metadata:
+  - name: quote(v)
+    type: string
+  rows:
+  - ['X''616263''']
+...
+box.execute("SELECT min(v, x'') FROM t;")
+---
+- metadata:
+  - name: min(v, x'')
+    type: scalar
+  rows:
+  - ['']
+...
+box.execute("CREATE INDEX iv ON t(v);")
+---
+- row_count: 1
+...
+box.execute("SELECT v FROM t WHERE v = x'616263';")
+---
+- metadata:
+  - name: V
+    type: varbinary
+  rows:
+  - ['abc']
+...
+box.execute("SELECT v FROM t ORDER BY v;")
+---
+- metadata:
+  - name: V
+    type: varbinary
+  rows:
+  - ['abc']
+...
+box.execute("UPDATE t SET v = x'636261' WHERE v = x'616263';")
+---
+- row_count: 1
+...
+box.execute("SELECT v FROM t;")
+---
+- metadata:
+  - name: V
+    type: varbinary
+  rows:
+  - ['cba']
+...
+box.execute("CREATE TABLE parent (id INT PRIMARY KEY, a VARBINARY UNIQUE);")
+---
+- row_count: 1
+...
+box.space.T:truncate()
+---
+...
+box.execute("ALTER TABLE t ADD CONSTRAINT fk1 FOREIGN KEY (v) REFERENCES parent (a);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t VALUES (1, x'616263');")
+---
+- error: 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+...
+box.execute("INSERT INTO parent VALUES (1, x'616263');")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t VALUES (1, x'616263');")
+---
+- row_count: 1
+...
+box.execute("ALTER TABLE t DROP CONSTRAINT fk1;")
+---
+- row_count: 1
+...
+box.space.PARENT:drop()
+---
+...
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a VARBINARY CHECK (a = x'616263'));")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t1 VALUES (1, x'006162');")
+---
+- error: 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a = x''616263'''
+...
+box.execute("INSERT INTO t1 VALUES (1, x'616263');")
+---
+- row_count: 1
+...
+box.space.T1:drop()
+---
+...
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a VARBINARY DEFAULT x'616263');")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t1 (id) VALUES (1);")
+---
+- row_count: 1
+...
+box.space.T1:select()
+---
+- - [1, 'abc']
+...
+box.space.T1:drop()
+---
+...
+box.execute("SELECT CAST(1 AS VARBINARY);")
+---
+- error: 'Type mismatch: can not convert 1 to varbinary'
+...
+box.execute("SELECT CAST(1.123 AS VARBINARY);")
+---
+- error: 'Type mismatch: can not convert 1.123 to varbinary'
+...
+box.execute("SELECT CAST(true AS VARBINARY);")
+---
+- error: 'Type mismatch: can not convert true to varbinary'
+...
+box.execute("SELECT CAST('asd' AS VARBINARY);")
+---
+- metadata:
+  - name: CAST('asd' AS VARBINARY)
+    type: varbinary
+  rows:
+  - ['asd']
+...
+box.execute("SELECT CAST(x'' AS VARBINARY);")
+---
+- metadata:
+  - name: CAST(x'' AS VARBINARY)
+    type: varbinary
+  rows:
+  - ['']
+...
+>>>>>>> ff84ee4c2... sql: introduce VARBINARY column type
+---
+- error: '[string ">>>>>>> ff84ee4c2... sql: introduce VARBINARY..."]:1: unexpected
+    symbol near ''>'''
 ...

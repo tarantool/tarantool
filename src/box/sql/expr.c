@@ -2264,7 +2264,7 @@ sql_expr_needs_no_type_change(const struct Expr *p, enum field_type type)
 	case TK_STRING:
 		return type == FIELD_TYPE_STRING;
 	case TK_BLOB:
-		return true;
+		return type == FIELD_TYPE_VARBINARY;
 	case TK_COLUMN:
 		/* p cannot be part of a CHECK constraint. */
 		assert(p->iTable >= 0);

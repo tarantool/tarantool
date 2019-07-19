@@ -102,7 +102,7 @@ box.execute('SELECT X\'4D6564766564\'')
 ---
 - metadata:
   - name: X'4D6564766564'
-    type: scalar
+    type: varbinary
   rows:
   - ['Medved']
 ...
