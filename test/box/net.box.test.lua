@@ -869,9 +869,10 @@ test_run:cmd('stop server connecter')
 test_run:cmd('start server connecter')
 while conn.state ~= 'active' do fiber.sleep(0.1) end
 connected_cnt
-disconnected_cnt
+old_disconnected_cnt = disconnected_cnt
+disconnected_cnt >= 1
 conn:close()
-disconnected_cnt
+disconnected_cnt == old_disconnected_cnt + 1
 test_run:cmd('stop server connecter')
 
 --

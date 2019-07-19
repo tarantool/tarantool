@@ -2125,16 +2125,19 @@ connected_cnt
 ---
 - 1
 ...
-disconnected_cnt
+old_disconnected_cnt = disconnected_cnt
 ---
-- 1
+...
+disconnected_cnt >= 1
+---
+- true
 ...
 conn:close()
 ---
 ...
-disconnected_cnt
+disconnected_cnt == old_disconnected_cnt + 1
 ---
-- 2
+- true
 ...
 test_run:cmd('stop server connecter')
 ---
