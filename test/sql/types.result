@@ -1764,3 +1764,74 @@ box.space.T:format()[1].type
 box.space.T:drop()
 ---
 ...
+-- Make sure that CASE-THEN statement return type is SCALAR in
+-- case two THEN clauses feature different types.
+--
+box.execute("SELECT CASE 1 WHEN 1 THEN x'0000000000' WHEN 2 THEN 'str' END")
+---
+- metadata:
+  - name: CASE 1 WHEN 1 THEN x'0000000000' WHEN 2 THEN 'str' END
+    type: scalar
+  rows:
+  - ["\0\0\0\0\0"]
+...
+box.execute("SELECT CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 END")
+---
+- metadata:
+  - name: CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 END
+    type: integer
+  rows:
+  - [666]
+...
+box.execute("SELECT CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 ELSE 321 END")
+---
+- metadata:
+  - name: CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 ELSE 321 END
+    type: integer
+  rows:
+  - [666]
+...
+box.execute("SELECT CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 ELSE 'asd' END")
+---
+- metadata:
+  - name: CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 ELSE 'asd' END
+    type: integer
+  rows:
+  - [666]
+...
+box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4 WHEN 'e' THEN 5 WHEN 'f' THEN 6 END;")
+---
+- metadata:
+  - name: CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4
+      WHEN 'e' THEN 5 WHEN 'f' THEN 6 END
+    type: integer
+  rows:
+  - [1]
+...
+box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4 WHEN 'e' THEN 5 WHEN 'f' THEN 'asd' END;")
+---
+- metadata:
+  - name: CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4
+      WHEN 'e' THEN 5 WHEN 'f' THEN 'asd' END
+    type: integer
+  rows:
+  - [1]
+...
+box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4 WHEN 'e' THEN 5 WHEN 'f' THEN 6 ELSE 'asd' END;")
+---
+- metadata:
+  - name: CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4
+      WHEN 'e' THEN 5 WHEN 'f' THEN 6 ELSE 'asd' END
+    type: integer
+  rows:
+  - [1]
+...
+box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4 WHEN 'e' THEN 5 WHEN 'f' THEN 6 ELSE 7 END;")
+---
+- metadata:
+  - name: CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4
+      WHEN 'e' THEN 5 WHEN 'f' THEN 6 ELSE 7 END
+    type: integer
+  rows:
+  - [1]
+...

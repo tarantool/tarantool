@@ -85,18 +85,33 @@ sql_expr_type(struct Expr *pExpr)
 		return sql_type_result(rhs_type, lhs_type);
 	case TK_CONCAT:
 		return FIELD_TYPE_STRING;
-	case TK_CASE:
-		assert(pExpr->x.pList->nExpr >= 2);
+	case TK_CASE: {
+		struct ExprList *cs = pExpr->x.pList;
+		assert(cs->nExpr >= 2);
 		/*
 		 * CASE expression comes at least with one
 		 * WHEN and one THEN clauses. So, first
 		 * expression always represents WHEN
 		 * argument, and the second one - THEN.
-		 *
-		 * TODO: We must ensure that all THEN clauses
-		 * have arguments of the same type.
+		 * In case at least one type of THEN argument
+		 * is different from others then we can't
+		 * determine type of returning value at compiling
+		 * stage and set SCALAR (i.e. most general) type.
 		 */
-		return sql_expr_type(pExpr->x.pList->a[1].pExpr);
+		enum field_type ref_type = sql_expr_type(cs->a[1].pExpr);
+		for (int i = 3; i < cs->nExpr; i += 2) {
+			if (ref_type != sql_expr_type(cs->a[i].pExpr))
+				return FIELD_TYPE_SCALAR;
+		}
+		/*
+		 * ELSE clause is optional but we should check
+		 * its type as well.
+		 */
+		if (cs->nExpr % 2 == 1 &&
+		    ref_type != sql_expr_type(cs->a[cs->nExpr - 1].pExpr))
+			return FIELD_TYPE_SCALAR;
+		return ref_type;
+	}
 	case TK_LT:
 	case TK_GT:
 	case TK_EQ:
