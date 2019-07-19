@@ -344,20 +344,41 @@ fail:
 }
 
 /*
- * A helper function to process on_commit/on_rollback triggers.
+ * A helper function to process on_commit triggers.
  */
-static inline void
-txn_run_triggers(struct txn *txn, struct rlist *trigger)
+static void
+txn_run_commit_triggers(struct txn *txn)
 {
-	/* Rollback triggers must not throw. */
-	if (trigger_run(trigger, txn) != 0) {
+	/*
+	 * Commit triggers must be run in the same order they
+	 * were added so that a trigger sees the changes done
+	 * by previous triggers (this is vital for DDL).
+	 */
+	if (trigger_run_reverse(&txn->on_commit, txn) != 0) {
 		/*
 		 * As transaction couldn't handle a trigger error so
 		 * there is no option except panic.
 		 */
 		diag_log();
 		unreachable();
-		panic("commit/rollback trigger failed");
+		panic("commit trigger failed");
+	}
+}
+
+/*
+ * A helper function to process on_rollback triggers.
+ */
+static void
+txn_run_rollback_triggers(struct txn *txn)
+{
+	if (trigger_run(&txn->on_rollback, txn) != 0) {
+		/*
+		 * As transaction couldn't handle a trigger error so
+		 * there is no option except panic.
+		 */
+		diag_log();
+		unreachable();
+		panic("rollback trigger failed");
 	}
 }
 
@@ -376,13 +397,13 @@ txn_complete(struct txn *txn)
 		if (txn->engine)
 			engine_rollback(txn->engine, txn);
 		if (txn->has_triggers)
-			txn_run_triggers(txn, &txn->on_rollback);
+			txn_run_rollback_triggers(txn);
 	} else {
 		/* Commit the transaction. */
 		if (txn->engine != NULL)
 			engine_commit(txn->engine, txn);
 		if (txn->has_triggers)
-			txn_run_triggers(txn, &txn->on_commit);
+			txn_run_commit_triggers(txn);
 
 		double stop_tm = ev_monotonic_now(loop());
 		if (stop_tm - txn->start_tm > too_long_threshold) {
@@ -763,7 +784,7 @@ txn_on_yield(struct trigger *trigger, void *event)
 	assert(txn != NULL && !txn->can_yield);
 	txn_rollback_to_svp(txn, NULL);
 	if (txn->has_triggers) {
-		txn_run_triggers(txn, &txn->on_rollback);
+		txn_run_rollback_triggers(txn);
 		txn->has_triggers = false;
 	}
 	txn->is_aborted_by_yield = true;

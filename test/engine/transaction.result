@@ -377,10 +377,10 @@ inspector:cmd("setopt delimiter ''");
 -- Yes, the order is reversed. Like all other Lua triggers.
 call_list
 ---
-- - on_commit_3
+- - on_commit_1
   - on_commit_3
   - on_commit_3
-  - on_commit_1
+  - on_commit_3
 ...
 funcs
 ---

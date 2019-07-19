@@ -84,17 +84,6 @@ trigger_add(struct rlist *list, struct trigger *trigger)
 	rlist_add_entry(list, trigger, link);
 }
 
-/**
- * Same as trigger_add(), but adds a trigger to the tail of the list
- * rather than to the head. Use it when you need to ensure a certain
- * execution order among triggers.
- */
-static inline void
-trigger_add_tail(struct rlist *list, struct trigger *trigger)
-{
-	rlist_add_tail_entry(list, trigger, link);
-}
-
 static inline void
 trigger_add_unique(struct rlist *list, struct trigger *trigger)
 {
@@ -124,8 +113,23 @@ trigger_destroy(struct rlist *list)
 	}
 }
 
+/**
+ * Run registered triggers. Stop and return an error if
+ * a trigger fails.
+ *
+ * Note, since triggers are added to the list head, this
+ * function first runs triggers that were added last
+ */
 int
 trigger_run(struct rlist *list, void *event);
+
+/**
+ * Same as trigger_run(), but runs triggers in the reverse
+ * order, i.e. it runs triggers in the same order they were
+ * added.
+ */
+int
+trigger_run_reverse(struct rlist *list, void *event);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -45,3 +45,15 @@ trigger_run(struct rlist *list, void *event)
 	return 0;
 }
 
+int
+trigger_run_reverse(struct rlist *list, void *event)
+{
+	try {
+		struct trigger *trigger, *tmp;
+		rlist_foreach_entry_safe_reverse(trigger, list, link, tmp)
+			trigger->run(trigger, event);
+	} catch (Exception *e) {
+		return -1;
+	}
+	return 0;
+}
