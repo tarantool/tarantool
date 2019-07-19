@@ -458,3 +458,55 @@ a ^ 2.5
  | ---
  | - error: '[string "return a ^ 2.5 "]:1: decimal operation failed'
  | ...
+
+a = decimal.new('1e5')
+ | ---
+ | ...
+a
+ | ---
+ | - '100000'
+ | ...
+decimal.trim(a)
+ | ---
+ | - '100000'
+ | ...
+decimal.trim(decimal.rescale(a, 10))
+ | ---
+ | - '100000'
+ | ...
+decimal.rescale(a, 10)
+ | ---
+ | - '100000.0000000000'
+ | ...
+decimal.rescale(a, -5)
+ | ---
+ | - '100000'
+ | ...
+decimal.rescale(a, 0)
+ | ---
+ | - '100000'
+ | ...
+decimal.rescale(a, 32)
+ | ---
+ | - '100000.00000000000000000000000000000000'
+ | ...
+-- scale too big
+decimal.rescale(a, 33)
+ | ---
+ | - '100000'
+ | ...
+decimal.trim(decimal.rescale(a, 10))
+ | ---
+ | - '100000'
+ | ...
+a = decimal.new('123.456789000000000')
+ | ---
+ | ...
+a
+ | ---
+ | - '123.456789000000000'
+ | ...
+decimal.trim(a)
+ | ---
+ | - '123.456789'
+ | ...

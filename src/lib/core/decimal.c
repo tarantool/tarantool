@@ -192,6 +192,34 @@ decimal_round(decimal_t *dec, int scale)
 }
 
 decimal_t *
+decimal_trim(decimal_t *dec)
+{
+	decimal_t *res = decNumberTrim(dec);
+
+	/* No errors are possible */
+	assert(res == dec);
+	return res;
+}
+
+decimal_t *
+decimal_rescale(decimal_t *dec, int scale)
+{
+	if (scale < 0)
+		return NULL;
+	if (scale <= decimal_scale(dec))
+		return decimal_round(dec, scale);
+	/* how much zeros shoud we append. */
+	int delta = scale + dec->exponent;
+	if (scale > DECIMAL_MAX_DIGITS || dec->digits + delta > DECIMAL_MAX_DIGITS)
+		return NULL;
+	decimal_t new_scale;
+	decimal_from_int64(&new_scale, -scale);
+	decNumberRescale(dec, dec, &new_scale, &decimal_context);
+	assert(decimal_check_status(dec, &decimal_context) != NULL);
+	return dec;
+}
+
+decimal_t *
 decimal_abs(decimal_t *res, const decimal_t *dec)
 {
 	decNumberAbs(res, dec, &decimal_context);

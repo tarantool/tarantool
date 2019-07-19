@@ -128,3 +128,18 @@ a = decimal.new('-13')
 a ^ 2
 -- fractional powers are allowed only for positive numbers
 a ^ 2.5
+
+a = decimal.new('1e5')
+a
+decimal.trim(a)
+decimal.trim(decimal.rescale(a, 10))
+decimal.rescale(a, 10)
+decimal.rescale(a, -5)
+decimal.rescale(a, 0)
+decimal.rescale(a, 32)
+-- scale too big
+decimal.rescale(a, 33)
+decimal.trim(decimal.rescale(a, 10))
+a = decimal.new('123.456789000000000')
+a
+decimal.trim(a)

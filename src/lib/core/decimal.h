@@ -123,6 +123,25 @@ decimal_t *
 decimal_round(decimal_t *dec, int scale);
 
 /**
+ * Remove trailing zeros from the fractional part of a number.
+ * @return \a dec with trimmed fractional zeros.
+ */
+decimal_t *
+decimal_trim(decimal_t *dec);
+
+/**
+ * Set scale of \a dec to \a scale.
+ * If \a scale is < than scale(\a dec),
+ * performs decimal_round().
+ * Otherwise appends a sufficient amount of trailing
+ * fractional zeros.
+ * @return NULL, scale < 0 or too big.
+ * @return \a dec with set scale.
+ */
+decimal_t *
+decimal_rescale(decimal_t *dec, int scale);
+
+/**
  * res is set to the absolute value of dec
  * decimal_abs(&a, &a) is allowed.
  */

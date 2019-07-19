@@ -264,7 +264,41 @@ ldecimal_round(struct lua_State *L)
 	int n = lua_tointeger(L, 2);
 	decimal_t *res = lua_pushdecimal(L);
 	*res = *lhs;
+	/*
+	 * If the operation fails, it just
+	 * leaves the number intact.
+	 */
 	decimal_round(res, n);
+	return 1;
+}
+
+static int
+ldecimal_trim(struct lua_State *L)
+{
+	if (lua_gettop(L) < 1)
+		return luaL_error(L, "usage: decimal.trim(decimal)");
+	decimal_t *lhs = lua_checkdecimal(L, 1);
+	decimal_t *res = lua_pushdecimal(L);
+	*res = *lhs;
+	/* trim never fails */
+	decimal_trim(res);
+	return 1;
+}
+
+static int
+ldecimal_rescale(struct lua_State *L)
+{
+	if (lua_gettop(L) < 2)
+		return luaL_error(L, "usage: decimal.rescale(decimal, scale)");
+	decimal_t *lhs = lua_checkdecimal(L, 1);
+	int n = lua_tointeger(L, 2);
+	decimal_t *res = lua_pushdecimal(L);
+	*res = *lhs;
+	/*
+	 * If the operation fails, it just
+	 * leaves the number intact.
+	 */
+	decimal_rescale(res, n);
 	return 1;
 }
 
@@ -321,6 +355,8 @@ static const luaL_Reg ldecimal_lib[] = {
 	{"sqrt", ldecimal_sqrt},
 	{"round", ldecimal_round},
 	{"scale", ldecimal_scale},
+	{"trim", ldecimal_trim},
+	{"rescale", ldecimal_rescale},
 	{"precision", ldecimal_precision},
 	{"abs", ldecimal_abs},
 	{"new", ldecimal_new},
