@@ -220,12 +220,20 @@ xrow_update_op_do_array_insert(struct xrow_update_op *op,
 			       struct xrow_update_field *field)
 {
 	assert(field->type == XUPDATE_ARRAY);
+	struct xrow_update_array_item *item;
+	if (!xrow_update_op_is_term(op)) {
+		item = xrow_update_array_extract_item(field, op);
+		if (item == NULL)
+			return -1;
+		return xrow_update_op_do_field_insert(op, &item->field);
+	}
+
 	struct xrow_update_rope *rope = field->array.rope;
 	uint32_t size = xrow_update_rope_size(rope);
 	if (xrow_update_op_adjust_field_no(op, size + 1) != 0)
 		return -1;
 
-	struct xrow_update_array_item *item = (struct xrow_update_array_item *)
+	item = (struct xrow_update_array_item *)
 		xrow_update_alloc(rope->ctx, sizeof(*item));
 	if (item == NULL)
 		return -1;
@@ -248,6 +256,8 @@ xrow_update_op_do_array_set(struct xrow_update_op *op,
 		xrow_update_array_extract_item(field, op);
 	if (item == NULL)
 		return -1;
+	if (!xrow_update_op_is_term(op))
+		return xrow_update_op_do_field_set(op, &item->field);
 	op->new_field_len = op->arg.set.length;
 	/*
 	 * Ignore the previous op, if any. It is not correct,
@@ -265,6 +275,14 @@ xrow_update_op_do_array_delete(struct xrow_update_op *op,
 			       struct xrow_update_field *field)
 {
 	assert(field->type == XUPDATE_ARRAY);
+	if (!xrow_update_op_is_term(op)) {
+		struct xrow_update_array_item *item =
+			xrow_update_array_extract_item(field, op);
+		if (item == NULL)
+			return -1;
+		return xrow_update_op_do_field_delete(op, &item->field);
+	}
+
 	struct xrow_update_rope *rope = field->array.rope;
 	uint32_t size = xrow_update_rope_size(rope);
 	if (xrow_update_op_adjust_field_no(op, size) != 0)
@@ -287,6 +305,8 @@ xrow_update_op_do_array_##op_type(struct xrow_update_op *op,			\
 		xrow_update_array_extract_item(field, op);			\
 	if (item == NULL)							\
 		return -1;							\
+	if (!xrow_update_op_is_term(op))					\
+		return xrow_update_op_do_field_##op_type(op, &item->field);	\
 	if (item->field.type != XUPDATE_NOP)					\
 		return xrow_update_err_double(op);				\
 	if (xrow_update_op_do_##op_type(op, item->field.data) != 0)		\

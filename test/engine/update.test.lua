@@ -156,8 +156,6 @@ t:update({{':', 'field4', 3, 3, 'bbccdd'}, {'+', 'field6', 50}, {'!', 7, 300}})
 -- Any path is interpreted as a field name first. And only then
 -- as JSON.
 t:update({{'+', '[1]', 50}})
--- JSON paths are not allowed yet.
-t:update({{'=', 'field2[1]', 13}})
 
 s:update({1}, {{'=', 'field3', {d = 30, e = 31, f = 32}}})
 

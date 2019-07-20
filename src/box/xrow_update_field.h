@@ -32,6 +32,7 @@
  */
 #include "trivia/util.h"
 #include "tt_static.h"
+#include "json/json.h"
 #include "bit/int96.h"
 #include "mp_decimal.h"
 #include <stdint.h>
@@ -184,6 +185,12 @@ struct xrow_update_op {
 	uint32_t new_field_len;
 	/** Opcode symbol: = + - / ... */
 	char opcode;
+	/**
+	 * Operation target path and its lexer in one. This lexer
+	 * is used when the operation is applied down through the
+	 * update tree.
+	 */
+	struct json_lexer lexer;
 };
 
 /**
@@ -199,6 +206,21 @@ struct xrow_update_op {
 int
 xrow_update_op_decode(struct xrow_update_op *op, int index_base,
 		      struct tuple_dictionary *dict, const char **expr);
+
+/**
+ * Check if the operation should be applied on the current path
+ * node, i.e. it is terminal. When an operation is just decoded
+ * and is applied to the top level of a tuple, a head of the JSON
+ * path is cut out. If nothing left, it is applied there.
+ * Otherwise the operation is applied to the next level of the
+ * tuple, according to where the path goes, and so on. In the end
+ * it reaches the target point, where it becomes terminal.
+ */
+static inline bool
+xrow_update_op_is_term(const struct xrow_update_op *op)
+{
+	return json_lexer_is_eof(&op->lexer);
+}
 
 /* }}} xrow_update_op */
 
@@ -224,6 +246,14 @@ enum xrow_update_type {
 	 * of individual fields.
 	 */
 	XUPDATE_ARRAY,
+	/**
+	 * Field of this type stores such update, that has
+	 * non-empty JSON path isolated from all other update
+	 * operations. In such optimized case it is possible to do
+	 * not allocate neither fields nor ops nor anything for
+	 * path nodes. And this is the most common case.
+	 */
+	XUPDATE_BAR,
 };
 
 /**
@@ -255,6 +285,55 @@ struct xrow_update_field {
 		struct {
 			struct xrow_update_rope *rope;
 		} array;
+		/**
+		 * Bar update - by an isolated JSON path not
+		 * intersected with any another update operation.
+		 */
+		struct {
+			/**
+			 * Bar update is a single operation
+			 * always, no children, by definition.
+			 */
+			struct xrow_update_op *op;
+			/**
+			 * Always has a non-empty path leading
+			 * inside this field's data. This is used
+			 * to find the longest common prefix, when
+			 * a new update operation intersects with
+			 * this bar.
+			 */
+			const char *path;
+			int path_len;
+			/**
+			 * For insertion/deletion to change
+			 * parent's header.
+			 */
+			const char *parent;
+			union {
+				/**
+				 * For scalar op; insertion into
+				 * array; deletion. This is the
+				 * point to delete, change or
+				 * insert after.
+				 */
+				struct {
+					const char *point;
+					uint32_t point_size;
+				};
+				/*
+				 * For insertion into map. New
+				 * key. On insertion into a map
+				 * there is no strict order as in
+				 * array and no point. The field
+				 * is inserted just right after
+				 * the parent header.
+				 */
+				struct {
+					const char *new_key;
+					uint32_t new_key_len;
+				};
+			};
+		} bar;
 	};
 };
 
@@ -351,6 +430,18 @@ OP_DECL_GENERIC(array)
 
 /* }}} xrow_update_field.array */
 
+/* {{{ update_field.bar */
+
+OP_DECL_GENERIC(bar)
+
+/* }}} update_field.bar */
+
+/* {{{ update_field.nop */
+
+OP_DECL_GENERIC(nop)
+
+/* }}} update_field.nop */
+
 #undef OP_DECL_GENERIC
 
 /* {{{ Common helpers. */
@@ -372,6 +463,10 @@ xrow_update_op_do_field_##op_type(struct xrow_update_op *op,			\
 	switch (field->type) {							\
 	case XUPDATE_ARRAY:							\
 		return xrow_update_op_do_array_##op_type(op, field);		\
+	case XUPDATE_NOP:							\
+		return xrow_update_op_do_nop_##op_type(op, field);		\
+	case XUPDATE_BAR:							\
+		return xrow_update_op_do_bar_##op_type(op, field);		\
 	default:								\
 		unreachable();							\
 	}									\
@@ -437,6 +532,26 @@ static inline int
 xrow_update_err_double(const struct xrow_update_op *op)
 {
 	return xrow_update_err(op, "double update of the same field");
+}
+
+static inline int
+xrow_update_err_bad_json(const struct xrow_update_op *op, int pos)
+{
+	return xrow_update_err(op, tt_sprintf("invalid JSON in position %d",
+					      pos));
+}
+
+static inline int
+xrow_update_err_delete1(const struct xrow_update_op *op)
+{
+	return xrow_update_err(op, "can delete only 1 field from a map in a "\
+			       "row");
+}
+
+static inline int
+xrow_update_err_duplicate(const struct xrow_update_op *op)
+{
+	return xrow_update_err(op, "the key exists already");
 }
 
 /** }}} Error helpers. */

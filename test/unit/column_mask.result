@@ -1,5 +1,5 @@
 	*** main ***
-1..27
+1..28
 ok 1 - check result length
 ok 2 - tuple update is correct
 ok 3 - column_mask is correct
@@ -27,4 +27,10 @@ ok 24 - column_mask is correct
 ok 25 - check result length
 ok 26 - tuple update is correct
 ok 27 - column_mask is correct
+	*** test_paths ***
+    1..2
+    ok 1 - JSON update works
+    ok 2 - column mask match
+ok 28 - subtests
+	*** test_paths: done ***
 	*** main: done ***

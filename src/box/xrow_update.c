@@ -116,7 +116,12 @@ struct xrow_update
 	 * re-encode each Lua update with 0-based indexes.
 	 */
 	int index_base;
-	/** A bitmask of all columns modified by this update. */
+	/**
+	 * A bitmask of all columns modified by this update. Only
+	 * the first level of a tuple is accounted here. I.e. if
+	 * a field [1][2][3] was updated, then only [1] is
+	 * reflected.
+	 */
 	uint64_t column_mask;
 	/** First level of update tree. It is always array. */
 	struct xrow_update_field root;
@@ -182,9 +187,26 @@ xrow_update_read_ops(struct xrow_update *update, const char *expr,
 		 */
 		if (column_mask != COLUMN_MASK_FULL) {
 			int32_t field_no;
+			char opcode;
+			if (xrow_update_op_is_term(op)) {
+				opcode = op->opcode;
+			} else {
+				/*
+				 * When a field is not terminal,
+				 * on the first level it for sure
+				 * changes only one field and in
+				 * terms of column mask is
+				 * equivalent to any scalar
+				 * operation. Even if it was '!'
+				 * or '#'. Zero means, that it
+				 * won't match any checks with
+				 * non-scalar operations below.
+				 */
+				opcode = 0;
+			}
 			if (op->field_no >= 0)
 				field_no = op->field_no;
-			else if (op->opcode != '!')
+			else if (opcode != '!')
 				field_no = field_count_hint + op->field_no;
 			else
 				/*
@@ -227,12 +249,12 @@ xrow_update_read_ops(struct xrow_update *update, const char *expr,
 			 * hint. It is used to translate negative
 			 * field numbers into positive ones.
 			 */
-			if (op->opcode == '!')
+			if (opcode == '!')
 				++field_count_hint;
-			else if (op->opcode == '#')
+			else if (opcode == '#')
 				field_count_hint -= (int32_t) op->arg.del.count;
 
-			if (op->opcode == '!' || op->opcode == '#')
+			if (opcode == '!' || opcode == '#')
 				/*
 				 * If the operation is insertion
 				 * or deletion then it potentially
@@ -411,6 +433,15 @@ xrow_upsert_squash(const char *expr1, const char *expr1_end,
 			struct xrow_update_op *op = &update[j].ops[i];
 			if (op->opcode != '+' && op->opcode != '-' &&
 			    op->opcode != '=')
+				return NULL;
+			/*
+			 * Not terminal operation means, that the
+			 * update is not flat, and squash would
+			 * need to build a tree of operations to
+			 * find matches. That is too complex,
+			 * squash is skipped.
+			 */
+			if (!xrow_update_op_is_term(op))
 				return NULL;
 			if (op->field_no <= prev_field_no)
 				return NULL;

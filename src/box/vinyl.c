@@ -2004,13 +2004,25 @@ request_normalize_ops(struct request *request)
 		ops_end = mp_encode_str(ops_end, op_name, op_name_len);
 
 		int field_no;
-		if (mp_typeof(*pos) == MP_INT) {
+		const char *field_name;
+		switch (mp_typeof(*pos)) {
+		case MP_INT:
 			field_no = mp_decode_int(&pos);
 			ops_end = mp_encode_int(ops_end, field_no);
-		} else {
+			break;
+		case MP_UINT:
 			field_no = mp_decode_uint(&pos);
 			field_no -= request->index_base;
 			ops_end = mp_encode_uint(ops_end, field_no);
+			break;
+		case MP_STR:
+			field_name = pos;
+			mp_next(&pos);
+			memcpy(ops_end, field_name, pos - field_name);
+			ops_end += pos - field_name;
+			break;
+		default:
+			unreachable();
 		}
 
 		if (*op_name == ':') {

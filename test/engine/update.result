@@ -843,11 +843,6 @@ t:update({{'+', '[1]', 50}})
 ---
 - [1, [10, 11, 12], {'b': 21, 'a': 20, 'c': 22}, 'abcdefgh', true, -100, 250]
 ...
--- JSON paths are not allowed yet.
-t:update({{'=', 'field2[1]', 13}})
----
-- error: Field 'field2[1]' was not found in the tuple
-...
 s:update({1}, {{'=', 'field3', {d = 30, e = 31, f = 32}}})
 ---
 - [1, [10, 11, 12], {'d': 30, 'f': 32, 'e': 31}, 'abcdefgh', true, -100, 200]

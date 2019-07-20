@@ -225,16 +225,87 @@ basic_test()
 				    column_masks[i]);
 }
 
+static void
+test_paths(void)
+{
+	header();
+	plan(2);
+
+	char buffer1[1024];
+	char *pos1 = mp_encode_array(buffer1, 7);
+
+	pos1 = mp_encode_uint(pos1, 1);
+	pos1 = mp_encode_uint(pos1, 2);
+	pos1 = mp_encode_array(pos1, 2);
+		pos1 = mp_encode_uint(pos1, 3);
+		pos1 = mp_encode_uint(pos1, 4);
+	pos1 = mp_encode_uint(pos1, 5);
+	pos1 = mp_encode_array(pos1, 2);
+		pos1 = mp_encode_uint(pos1, 6);
+		pos1 = mp_encode_uint(pos1, 7);
+	pos1 = mp_encode_uint(pos1, 8);
+	pos1 = mp_encode_uint(pos1, 9);
+
+
+	char buffer2[1024];
+	char *pos2 = mp_encode_array(buffer2, 2);
+
+	pos2 = mp_encode_array(pos2, 3);
+		pos2 = mp_encode_str(pos2, "!", 1);
+		pos2 = mp_encode_str(pos2, "[3][1]", 6);
+		pos2 = mp_encode_double(pos2, 2.5);
+
+	pos2 = mp_encode_array(pos2, 3);
+		pos2 = mp_encode_str(pos2, "#", 1);
+		pos2 = mp_encode_str(pos2, "[5][1]", 6);
+		pos2 = mp_encode_uint(pos2, 1);
+
+	struct region *gc = &fiber()->gc;
+	size_t svp = region_used(gc);
+	uint32_t result_size;
+	uint64_t column_mask;
+	const char *result =
+		xrow_update_execute(buffer2, pos2, buffer1, pos1,
+				    box_tuple_format_default()->dict,
+				    &result_size, 1, &column_mask);
+	isnt(result, NULL, "JSON update works");
+
+	/*
+	 * Updates on their first level change fields [3] and [5],
+	 * or 2 and 4 if 0-based. If that was the single level,
+	 * the operations '!' and '#' would change the all the
+	 * fields from 2. But each of these operations are not for
+	 * the root and therefore does not affect anything except
+	 * [3] and [5] on the first level.
+	 */
+	uint64_t expected_mask = 0;
+	column_mask_set_fieldno(&expected_mask, 2);
+	column_mask_set_fieldno(&expected_mask, 4);
+	is(column_mask, expected_mask, "column mask match");
+
+	region_truncate(gc, svp);
+
+	check_plan();
+	footer();
+}
+
+static uint32_t
+simple_hash(const char* str, uint32_t len)
+{
+	return str[0] + len;
+}
+
 int
 main()
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	tuple_init(NULL);
+	tuple_init(simple_hash);
 	header();
-	plan(27);
+	plan(28);
 
 	basic_test();
+	test_paths();
 
 	footer();
 	check_plan();

@@ -280,3 +280,148 @@ t:update({{'=', 3, map}})
 s:update(1, {{'=', 3, map}})
 
 s:drop()
+
+--
+-- gh-1261: update by JSON path.
+--
+format = {}
+format[1] = {'field1', 'unsigned'}
+format[2] = {'f', 'map'}
+format[3] = {'g', 'array'}
+s = box.schema.create_space('test', {format = format})
+pk = s:create_index('pk')
+t = {}
+t[1] = 1
+t[2] = {                            \
+    a = 100,                        \
+    b = 200,                        \
+    c = {                           \
+        d = 400,                    \
+        e = 500,                    \
+        f = {4, 5, 6, 7, 8},        \
+        g = {k = 600, l = 700}      \
+    },                              \
+    m = true,                       \
+    g = {800, 900}                  \
+};                                  \
+t[3] = {                            \
+    100,                            \
+    200,                            \
+    {                               \
+        {300, 350},                 \
+        {400, 450}                  \
+    },                              \
+    {a = 500, b = 600},             \
+    {c = 700, d = 800}              \
+}
+t = s:insert(t)
+
+t4_array = t:update({{'!', 4, setmetatable({}, {__serialize = 'array'})}})
+t4_map = t:update({{'!', 4, setmetatable({}, {__serialize = 'map'})}})
+
+t
+--
+-- At first, test simple non-intersected paths.
+--
+
+--
+-- !
+--
+t:update({{'!', 'f.c.f[1]', 3}, {'!', '[3][1]', {100, 200, 300}}})
+t:update({{'!', 'f.g[3]', 1000}})
+t:update({{'!', 'g[6]', 'new element'}})
+t:update({{'!', 'f.e', 300}, {'!', 'g[4].c', 700}})
+t:update({{'!', 'f.c.f[2]', 4.5}, {'!', 'g[3][2][2]', 425}})
+t2 = t:update({{'!', 'g[6]', {100}}})
+-- Test single element array update.
+t2:update({{'!', 'g[6][2]', 200}})
+t2:update({{'!', 'g[6][1]', 50}})
+-- Test empty array/map.
+t4_array:update({{'!', '[4][1]', 100}})
+t4_map:update({{'!', '[4].a', 100}})
+-- Test errors.
+t:update({{'!', 'a', 100}}) -- No such field.
+t:update({{'!', 'f.a', 300}}) -- Key already exists.
+t:update({{'!', 'f.c.f[0]', 3.5}}) -- No such index, too small.
+t:update({{'!', 'f.c.f[100]', 100}}) -- No such index, too big.
+t:update({{'!', 'g[4][100]', 700}}) -- Insert index into map.
+t:update({{'!', 'g[1][1]', 300}})
+t:update({{'!', 'f.g.a', 700}}) -- Insert key into array.
+t:update({{'!', 'f.g[1].a', 700}})
+t:update({{'!', 'f[*].k', 20}}) -- 'Any' is not considered valid JSON.
+-- JSON error after the not existing field to insert.
+t:update({{'!', '[2].e.100000', 100}})
+-- Correct JSON, but next to last field does not exist. '!' can't
+-- create the whole path.
+t:update({{'!', '[2].e.f', 100}})
+
+--
+-- =
+--
+-- Set existing fields.
+t:update({{'=', 'f.a', 150}, {'=', 'g[3][1][2]', 400}})
+t:update({{'=', 'f', {a = 100, b = 200}}})
+t:update({{'=', 'g[4].b', 700}})
+-- Insert via set.
+t:update({{'=', 'f.e', 300}})
+t:update({{'=', 'f.g[3]', 1000}})
+t:update({{'=', 'f.g[1]', 0}})
+-- Test empty array/map.
+t4_array:update({{'=', '[4][1]', 100}})
+t4_map:update({{'=', '[4]["a"]', 100}})
+-- Test errors.
+t:update({{'=', 'f.a[1]', 100}})
+t:update({{'=', 'f.a.k', 100}})
+t:update({{'=', 'f.c.f[1]', 100}})
+t:update({{'=', 'f.c.f[100]', 100}})
+t:update({{'=', '[2].c.f 1 1 1 1', 100}})
+
+--
+-- #
+--
+t:update({{'#', '[2].b', 1}})
+t:update({{'#', 'f.c.f[1]', 1}})
+t:update({{'#', 'f.c.f[1]', 2}})
+t:update({{'#', 'f.c.f[1]', 100}})
+t:update({{'#', 'f.c.f[5]', 1}})
+t:update({{'#', 'f.c.f[5]', 2}})
+-- Test errors.
+t:update({{'#', 'f.h', 1}})
+t:update({{'#', 'f.c.f[100]', 1}})
+t:update({{'#', 'f.b', 2}})
+t:update({{'#', 'f.b', 0}})
+t:update({{'#', 'f', 0}})
+
+--
+-- Scalar operations.
+--
+t:update({{'+', 'f.a', 50}})
+t:update({{'-', 'f.c.f[1]', 0.5}})
+t:update({{'&', 'f.c.f[2]', 4}})
+t2 = t:update({{'=', 4, {str = 'abcd'}}})
+t2:update({{':', '[4].str', 2, 2, 'e'}})
+-- Test errors.
+t:update({{'+', 'g[3]', 50}})
+t:update({{'+', '[2].b.......', 100}})
+t:update({{'+', '[2].b.c.d.e', 100}})
+t:update({{'-', '[2][*]', 20}})
+
+-- Vinyl normalizes field numbers. It should not touch paths,
+-- and they should not affect squashing.
+format = {}
+format[1] = {'field1', 'unsigned'}
+format[2] = {'field2', 'any'}
+vy_s = box.schema.create_space('test2', {engine = 'vinyl', format = format})
+pk = vy_s:create_index('pk')
+_ = vy_s:replace(t)
+
+box.begin()
+-- Use a scalar operation, only they can be squashed.
+vy_s:upsert({1, 1}, {{'+', 'field2.c.f[1]', 1}})
+vy_s:upsert({1, 1}, {{'+', '[3][3][1][1]', 1}})
+box.commit()
+
+vy_s:select()
+vy_s:drop()
+
+s:drop()
