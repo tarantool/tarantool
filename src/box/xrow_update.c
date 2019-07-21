@@ -269,11 +269,12 @@ xrow_update_read_ops(struct xrow_update *update, const char *expr,
  * @retval -1 Error.
  */
 static int
-xrow_update_do_ops(struct xrow_update *update, const char *old_data,
-		   const char *old_data_end, uint32_t part_count)
+xrow_update_do_ops(struct xrow_update *update, const char *header,
+		   const char *old_data, const char *old_data_end,
+		   uint32_t part_count)
 {
-	if (xrow_update_array_create(&update->root, old_data, old_data_end,
-				     part_count) != 0)
+	if (xrow_update_array_create(&update->root, header, old_data,
+				     old_data_end, part_count) != 0)
 		return -1;
 	struct xrow_update_op *op = update->ops;
 	struct xrow_update_op *ops_end = op + update->op_count;
@@ -290,12 +291,12 @@ xrow_update_do_ops(struct xrow_update *update, const char *old_data,
  *        and it is enough to simply write the error to the log.
  */
 static int
-xrow_upsert_do_ops(struct xrow_update *update, const char *old_data,
-		   const char *old_data_end, uint32_t part_count,
-		   bool suppress_error)
+xrow_upsert_do_ops(struct xrow_update *update, const char *header,
+		   const char *old_data, const char *old_data_end,
+		   uint32_t part_count, bool suppress_error)
 {
-	if (xrow_update_array_create(&update->root, old_data, old_data_end,
-				     part_count) != 0)
+	if (xrow_update_array_create(&update->root, header, old_data,
+				     old_data_end, part_count) != 0)
 		return -1;
 	struct xrow_update_op *op = update->ops;
 	struct xrow_update_op *ops_end = op + update->op_count;
@@ -352,12 +353,14 @@ xrow_update_execute(const char *expr,const char *expr_end,
 {
 	struct xrow_update update;
 	xrow_update_init(&update, index_base);
+	const char *header = old_data;
 	uint32_t field_count = mp_decode_array(&old_data);
 
 	if (xrow_update_read_ops(&update, expr, expr_end, dict,
 				 field_count) != 0)
 		return NULL;
-	if (xrow_update_do_ops(&update, old_data, old_data_end, field_count))
+	if (xrow_update_do_ops(&update, header, old_data, old_data_end,
+			       field_count) != 0)
 		return NULL;
 	if (column_mask)
 		*column_mask = update.column_mask;
@@ -373,13 +376,14 @@ xrow_upsert_execute(const char *expr,const char *expr_end,
 {
 	struct xrow_update update;
 	xrow_update_init(&update, index_base);
+	const char *header = old_data;
 	uint32_t field_count = mp_decode_array(&old_data);
 
 	if (xrow_update_read_ops(&update, expr, expr_end, dict,
 				 field_count) != 0)
 		return NULL;
-	if (xrow_upsert_do_ops(&update, old_data, old_data_end, field_count,
-			       suppress_error))
+	if (xrow_upsert_do_ops(&update, header, old_data, old_data_end,
+			       field_count, suppress_error) != 0)
 		return NULL;
 	if (column_mask)
 		*column_mask = update.column_mask;

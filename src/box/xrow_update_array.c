@@ -142,12 +142,13 @@ xrow_update_array_extract_item(struct xrow_update_field *field,
 }
 
 int
-xrow_update_array_create(struct xrow_update_field *field, const char *data,
-			 const char *data_end, uint32_t field_count)
+xrow_update_array_create(struct xrow_update_field *field, const char *header,
+			 const char *data, const char *data_end,
+			 uint32_t field_count)
 {
 	field->type = XUPDATE_ARRAY;
-	field->data = data;
-	field->size = data_end - data;
+	field->data = header;
+	field->size = data_end - header;
 	struct region *region = &fiber()->gc;
 	field->array.rope = xrow_update_rope_new(region);
 	if (field->array.rope == NULL)

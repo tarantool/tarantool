@@ -334,6 +334,7 @@ xrow_update_##type##_store(struct xrow_update_field *field, char *out,		\
 /**
  * Initialize @a field as an array to update.
  * @param[out] field Field to initialize.
+ * @param header Header of the MessagePack array @a data.
  * @param data MessagePack data of the array to update.
  * @param data_end End of @a data.
  * @param field_count Field count in @data.
@@ -342,8 +343,9 @@ xrow_update_##type##_store(struct xrow_update_field *field, char *out,		\
  * @retval -1 Error.
  */
 int
-xrow_update_array_create(struct xrow_update_field *field, const char *data,
-			 const char *data_end, uint32_t field_count);
+xrow_update_array_create(struct xrow_update_field *field, const char *header,
+			 const char *data, const char *data_end,
+			 uint32_t field_count);
 
 OP_DECL_GENERIC(array)
 
