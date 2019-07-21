@@ -25,7 +25,6 @@ parts:
         plugin: cmake
         configflags:
           - -DCMAKE_BUILD_TYPE=RelWithDebInfo
-          - -DENABLE_BUNDLED_LIBYAML=OFF
           - -DENABLE_DIST=OFF # Disable tarantoolctl, init scripts, etc.
         build-packages:
           - cmake
