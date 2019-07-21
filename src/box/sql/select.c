@@ -6071,8 +6071,7 @@ sqlSelect(Parse * pParse,		/* The parser context */
 					if (pCol->iSorterColumn >= j) {
 						int r1 = j + regBase;
 						sqlExprCodeGetColumnToReg
-						    (pParse, pCol->space_def,
-						     pCol->iColumn,
+						    (pParse, pCol->iColumn,
 						     pCol->iTable, r1);
 						j++;
 					}

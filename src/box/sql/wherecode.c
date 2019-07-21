@@ -1444,7 +1444,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 								fieldno;
 							sqlExprCodeGetColumnToReg
 								(pParse,
-								 space->def,
 								 fieldno,
 								 iCur,
 								 r + iPk);

@@ -38,31 +38,6 @@
 #include "box/tuple_format.h"
 #include "box/schema.h"
 
-void
-sqlColumnDefault(Vdbe *v, struct space_def *def, int i, int ireg)
-{
-	assert(def != 0);
-	if (!def->opts.is_view) {
-		sql_value *pValue = 0;
-		enum field_type type = def->fields[i].type;
-		VdbeComment((v, "%s.%s", def->name, def->fields[i].name));
-		assert(i < (int)def->field_count);
-
-		Expr *expr = NULL;
-		assert(def->fields != NULL && i < (int)def->field_count);
-		if (def->fields != NULL)
-			expr = def->fields[i].default_value_expr;
-		sqlValueFromExpr(sqlVdbeDb(v), expr, type,
-				     &pValue);
-		if (pValue) {
-			sqlVdbeAppendP4(v, pValue, P4_MEM);
-		}
-		if (type == FIELD_TYPE_NUMBER) {
-			sqlVdbeAddOp1(v, OP_Realify, ireg);
-		}
-	}
-}
-
 /*
  * Process an UPDATE statement.
  *
@@ -266,10 +241,9 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		}
 	} else {
 		for (i = 0; i < (int) pk_part_count; i++) {
-			sqlExprCodeGetColumnOfTable(v, def, pk_cursor,
-							pPk->def->key_def->
-								parts[i].fieldno,
-							iPk + i);
+			sqlVdbeAddOp3(v, OP_Column, pk_cursor,
+				      pPk->def->key_def->parts[i].fieldno,
+				      iPk + i);
 		}
 	}
 
@@ -341,8 +315,8 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		for (i = 0; i < (int)def->field_count; i++) {
 			if (column_mask_fieldno_is_set(oldmask, i) ||
 			    sql_space_column_is_in_pk(space, i)) {
-				sqlExprCodeGetColumnOfTable(v, def, pk_cursor,
-							    i, regOld + i);
+				sqlVdbeAddOp3(v, OP_Column, pk_cursor, i,
+					      regOld + i);
 			} else {
 				sqlVdbeAddOp2(v, OP_Null, 0, regOld + i);
 			}
@@ -377,8 +351,8 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 			 * if there are one or more BEFORE triggers that use this value via
 			 * a new.* reference in a trigger program.
 			 */
-			sqlExprCodeGetColumnToReg(pParse, def, i,
-						      pk_cursor, regNew + i);
+			sqlExprCodeGetColumnToReg(pParse, i, pk_cursor,
+						  regNew + i);
 		} else {
 			sqlVdbeAddOp2(v, OP_Null, 0, regNew + i);
 		}
@@ -416,9 +390,8 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		 */
 		for (i = 0; i < (int)def->field_count; i++) {
 			if (aXRef[i] < 0) {
-				sqlExprCodeGetColumnOfTable(v, def,
-								pk_cursor, i,
-								regNew + i);
+				sqlVdbeAddOp3(v, OP_Column, pk_cursor, i,
+					      regNew + i);
 			}
 		}
 	}

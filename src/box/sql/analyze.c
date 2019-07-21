@@ -998,9 +998,8 @@ vdbe_emit_analyze_space(struct Parse *parse, struct space *space)
 		 */
 		for (int i = 0; i < part_count; i++) {
 			uint32_t tabl_col = idx->def->key_def->parts[i].fieldno;
-			sqlExprCodeGetColumnOfTable(v, space->def,
-							tab_cursor, tabl_col,
-							col_reg + i);
+			sqlVdbeAddOp3(v, OP_Column, tab_cursor, tabl_col,
+				      col_reg + i);
 		}
 		sqlVdbeAddOp3(v, OP_MakeRecord, col_reg, part_count,
 				  sample_reg);

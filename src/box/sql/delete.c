@@ -294,11 +294,8 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		if (!is_view) {
 			struct key_part_def *part = pk_info->parts;
 			for (int i = 0; i < pk_len; i++, part++) {
-				struct space_def *def = space->def;
-				sqlExprCodeGetColumnOfTable(v, def,
-								tab_cursor,
-								part->fieldno,
-								reg_pk + i);
+				sqlVdbeAddOp3(v, OP_Column, tab_cursor,
+					      part->fieldno, reg_pk + i);
 			}
 		} else {
 			for (int i = 0; i < pk_len; i++) {
@@ -482,10 +479,8 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 		sqlVdbeAddOp2(v, OP_Copy, reg_pk, first_old_reg);
 		for (int i = 0; i < (int)space->def->field_count; i++) {
 			if (column_mask_fieldno_is_set(mask, i)) {
-				sqlExprCodeGetColumnOfTable(v, space->def,
-								cursor, i,
-								first_old_reg +
-								i + 1);
+				sqlVdbeAddOp3(v, OP_Column, cursor, i,
+					      first_old_reg + i + 1);
 			}
 		}
 
@@ -567,8 +562,6 @@ sql_generate_index_key(struct Parse *parse, struct index *index, int cursor,
 	int reg_base = sqlGetTempRange(parse, col_cnt);
 	if (prev != NULL && reg_base != reg_prev)
 		prev = NULL;
-	struct space *space = space_by_id(index->def->space_id);
-	assert(space != NULL);
 	for (int j = 0; j < col_cnt; j++) {
 		if (prev != NULL && prev->def->key_def->parts[j].fieldno ==
 				    index->def->key_def->parts[j].fieldno) {
@@ -579,8 +572,7 @@ sql_generate_index_key(struct Parse *parse, struct index *index, int cursor,
 			continue;
 		}
 		uint32_t tabl_col = index->def->key_def->parts[j].fieldno;
-		sqlExprCodeGetColumnOfTable(v, space->def, cursor, tabl_col,
-						reg_base + j);
+		sqlVdbeAddOp3(v, OP_Column, cursor, tabl_col, reg_base + j);
 		/*
 		 * If the column type is NUMBER but the number
 		 * is an integer, then it might be stored in the

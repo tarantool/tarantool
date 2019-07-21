@@ -3183,7 +3183,6 @@ int sqlWhereOkOnePass(WhereInfo *, int *);
  * stored in any register.  But the result is guaranteed to land
  * in register iReg for GetColumnToReg().
  * @param pParse Parsing and code generating context.
- * @param space_def Space definition.
  * @param iColumn Index of the table column.
  * @param iTable The cursor pointing to the table.
  * @param iReg Store results here.
@@ -3191,31 +3190,19 @@ int sqlWhereOkOnePass(WhereInfo *, int *);
  * @return iReg value.
  */
 int
-sqlExprCodeGetColumn(Parse *, struct space_def *, int, int, int, u8);
+sqlExprCodeGetColumn(Parse *, int, int, int, u8);
 
 /**
  * Generate code that will extract the iColumn-th column from
  * table defined by space_def and store the column value in
  * a register, copy the result.
  * @param pParse Parsing and code generating context.
- * @param space_def Space definition.
  * @param iColumn Index of the table column.
  * @param iTable The cursor pointing to the table.
  * @param iReg Store results here.
  */
 void
-sqlExprCodeGetColumnToReg(Parse *, struct space_def *, int, int, int);
-
-/**
- * Generate code to extract the value of the iCol-th column of a table.
- * @param v  The VDBE under construction.
- * @param space_def Space definition.
- * @param iTabCur The PK cursor.
- * @param iCol Index of the column to extract.
- * @param regOut  Extract the value into this register.
- */
-void
-sqlExprCodeGetColumnOfTable(Vdbe *, struct space_def *, int, int, int);
+sqlExprCodeGetColumnToReg(Parse *, int, int, int);
 
 void sqlExprCodeMove(Parse *, int, int, int);
 void sqlExprCacheStore(Parse *, int, int, int);
@@ -4109,44 +4096,6 @@ int sqlResolveExprNames(NameContext *, Expr *);
 int sqlResolveExprListNames(NameContext *, ExprList *);
 void sqlResolveSelectNames(Parse *, Select *, NameContext *);
 int sqlResolveOrderGroupBy(Parse *, Select *, ExprList *, const char *);
-
-/**
- * Generate code for default value.
- * The most recently coded instruction was an OP_Column to retrieve the
- * i-th column of table defined by space_def. This routine sets
- * the P4 parameter of the OP_Column to the default value, if any.
- *
- * The default value of a column is specified by a DEFAULT clause in the
- * column definition. This was either supplied by the user when the table
- * was created, or added later to the table definition by an ALTER TABLE
- * command. If the latter, then the row-records in the table btree on disk
- * may not contain a value for the column and the default value, taken
- * from the P4 parameter of the OP_Column instruction, is returned instead.
- * If the former, then all row-records are guaranteed to include a value
- * for the column and the P4 value is not required.
- *
- * Column definitions created by an ALTER TABLE command may only have
- * literal default values specified: a number, null or a string. (If a more
- * complicated default expression value was provided, it is evaluated
- * when the ALTER TABLE is executed and one of the literal values written
- * into the schema.)
- *
- * Therefore, the P4 parameter is only required if the default value for
- * the column is a literal number, string or null. The sqlValueFromExpr()
- * function is capable of transforming these types of expressions into
- * sql_value objects.
- *
- * If parameter iReg is not negative, code an OP_Realify instruction
- * on register iReg. This is used when an equivalent integer value is
- * stored in place of an 8-byte floating point value in order to save
- * space.
- * @param v Vdbe object.
- * @param def space definition object.
- * @param i column index.
- * @param iReg register index.
- */
-void
-sqlColumnDefault(Vdbe *v, struct space_def *def, int i, int ireg);
 
 char* rename_trigger(sql *, char const *, char const *, bool *);
 /**

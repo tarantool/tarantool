@@ -3502,19 +3502,8 @@ sqlExprCachePinRegister(Parse * pParse, int iReg)
 	}
 }
 
-void
-sqlExprCodeGetColumnOfTable(Vdbe *v, struct space_def *space_def,
-				int iTabCur, int iCol, int regOut)
-{
-	sqlVdbeAddOp3(v, OP_Column, iTabCur, iCol, regOut);
-	if (iCol >= 0) {
-		sqlColumnDefault(v, space_def, iCol, regOut);
-	}
-}
-
 int
-sqlExprCodeGetColumn(Parse *pParse, struct space_def *space_def,
-			 int iColumn, int iTable, int iReg, u8 p5)
+sqlExprCodeGetColumn(Parse *pParse, int iColumn, int iTable, int iReg, u8 p5)
 {
 	Vdbe *v = pParse->pVdbe;
 	int i;
@@ -3529,7 +3518,7 @@ sqlExprCodeGetColumn(Parse *pParse, struct space_def *space_def,
 		}
 	}
 	assert(v != 0);
-	sqlExprCodeGetColumnOfTable(v, space_def, iTable, iColumn, iReg);
+	sqlVdbeAddOp3(v, OP_Column, iTable, iColumn, iReg);
 	if (p5) {
 		sqlVdbeChangeP5(v, p5);
 	} else {
@@ -3539,12 +3528,10 @@ sqlExprCodeGetColumn(Parse *pParse, struct space_def *space_def,
 }
 
 void
-sqlExprCodeGetColumnToReg(Parse * pParse, struct space_def * space_def,
-			      int iColumn, int iTable, int iReg)
+sqlExprCodeGetColumnToReg(Parse * pParse, int iColumn, int iTable, int iReg)
 {
 	int r1 =
-		sqlExprCodeGetColumn(pParse, space_def, iColumn, iTable,
-					 iReg, 0);
+		sqlExprCodeGetColumn(pParse, iColumn, iTable, iReg, 0);
 	if (r1 != iReg)
 		sqlVdbeAddOp2(pParse->pVdbe, OP_SCopy, r1, iReg);
 }
@@ -3743,10 +3730,8 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					iTab = pParse->iSelfTab;
 				}
 			}
-			return sqlExprCodeGetColumn(pParse,
-							pExpr->space_def, col,
-							iTab, target,
-							pExpr->op2);
+			return sqlExprCodeGetColumn(pParse, col, iTab, target,
+						    pExpr->op2);
 		}
 	case TK_INTEGER:{
 			expr_code_int(pParse, pExpr, false, target);
