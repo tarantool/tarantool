@@ -23,10 +23,8 @@ build() {
     cd "$builddir"
 
     cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DENABLE_BUNDLED_LIBYAML:BOOL=OFF \
           -DENABLE_BACKTRACE:BOOL=ON \
           -DENABLE_DIST:BOOL=ON \
-          -DENABLE_BUNDLED_LIBYAML:BOOL=OFF \
           -DCMAKE_INSTALL_PREFIX=/usr \
           -DCMAKE_INSTALL_SYSCONFDIR=/etc \
           -DCMAKE_INSTALL_LOCALSTATEDIR=/var \

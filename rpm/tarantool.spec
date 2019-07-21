@@ -145,7 +145,6 @@ C and Lua/C modules.
 %cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo \
          -DCMAKE_INSTALL_LOCALSTATEDIR:PATH=%{_localstatedir} \
          -DCMAKE_INSTALL_SYSCONFDIR:PATH=%{_sysconfdir} \
-         -DENABLE_BUNDLED_LIBYAML:BOOL=OFF \
 %if %{with backtrace}
          -DENABLE_BACKTRACE:BOOL=ON \
 %else
