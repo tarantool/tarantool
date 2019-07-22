@@ -685,8 +685,17 @@ void generic_index_compact(struct index *);
 void generic_index_reset_stat(struct index *);
 void generic_index_begin_build(struct index *);
 int generic_index_reserve(struct index *, uint32_t);
+struct iterator *
+generic_index_create_iterator(struct index *base, enum iterator_type type,
+			      const char *key, uint32_t part_count);
 int generic_index_build_next(struct index *, struct tuple *);
 void generic_index_end_build(struct index *);
+int
+disabled_index_build_next(struct index *index, struct tuple *tuple);
+int
+disabled_index_replace(struct index *index, struct tuple *old_tuple,
+		       struct tuple *new_tuple, enum dup_replace_mode mode,
+		       struct tuple **result);
 
 #if defined(__cplusplus)
 } /* extern "C" */

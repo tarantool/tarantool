@@ -112,6 +112,8 @@ enum {
 	BOX_FK_CONSTRAINT_ID = 356,
 	/** Space id of _ck_contraint. */
 	BOX_CK_CONSTRAINT_ID = 364,
+	/** Space id of _func_index. */
+	BOX_FUNC_INDEX_ID = 372,
 	/** End of the reserved range of system spaces. */
 	BOX_SYSTEM_ID_MAX = 511,
 	BOX_ID_NIL = 2147483647
@@ -265,6 +267,13 @@ enum {
 	BOX_CK_CONSTRAINT_FIELD_DEFERRED = 2,
 	BOX_CK_CONSTRAINT_FIELD_LANGUAGE = 3,
 	BOX_CK_CONSTRAINT_FIELD_CODE = 4,
+};
+
+/** _func_index fields. */
+enum {
+	BOX_FUNC_INDEX_FIELD_SPACE_ID = 0,
+	BOX_FUNC_INDEX_FIELD_INDEX_ID = 1,
+	BOX_FUNC_INDEX_FUNCTION_ID = 2,
 };
 
 /*

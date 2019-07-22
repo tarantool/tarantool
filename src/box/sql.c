@@ -347,7 +347,7 @@ sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 		}
 	}
 	struct key_def *ephemer_key_def = key_def_new(ephemer_key_parts,
-						      field_count);
+						      field_count, false);
 	if (ephemer_key_def == NULL)
 		return NULL;
 

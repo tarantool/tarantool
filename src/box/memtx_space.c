@@ -659,6 +659,12 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 				 "HASH index cannot be multikey");
 			return -1;
 		}
+		if (index_def->key_def->for_func_index) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "HASH index can not use a function");
+			return -1;
+		}
 		break;
 	case TREE:
 		/* TREE index has no limitations. */
@@ -688,6 +694,12 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 				 "RTREE index cannot be multikey");
 			return -1;
 		}
+		if (index_def->key_def->for_func_index) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "RTREE index can not use a function");
+			return -1;
+		}
 		/* no furter checks of parts needed */
 		return 0;
 	case BITSET:
@@ -714,6 +726,12 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "BITSET index cannot be multikey");
+			return -1;
+		}
+		if (index_def->key_def->for_func_index) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "BITSET index can not use a function");
 			return -1;
 		}
 		/* no furter checks of parts needed */

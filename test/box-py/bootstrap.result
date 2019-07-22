@@ -93,6 +93,8 @@ box.space._space:select{}
   - [364, 1, '_ck_constraint', 'memtx', 0, {}, [{'name': 'space_id', 'type': 'unsigned'},
       {'name': 'name', 'type': 'string'}, {'name': 'is_deferred', 'type': 'boolean'},
       {'name': 'language', 'type': 'str'}, {'name': 'code', 'type': 'str'}]]
+  - [372, 1, '_func_index', 'memtx', 0, {}, [{'name': 'space_id', 'type': 'unsigned'},
+      {'name': 'index_id', 'type': 'unsigned'}, {'name': 'func_id', 'type': 'unsigned'}]]
 ...
 box.space._index:select{}
 ---
@@ -148,6 +150,8 @@ box.space._index:select{}
   - [356, 0, 'primary', 'tree', {'unique': true}, [[0, 'string'], [1, 'unsigned']]]
   - [356, 1, 'child_id', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [364, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'string']]]
+  - [372, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'unsigned']]]
+  - [372, 1, 'fid', 'tree', {'unique': false}, [[2, 'unsigned']]]
 ...
 box.space._user:select{}
 ---

@@ -462,6 +462,8 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 	/* extract field type info */
 	for (uint16_t key_no = 0; key_no < key_count; ++key_no) {
 		const struct key_def *key_def = keys[key_no];
+		if (key_def->for_func_index)
+			continue;
 		bool is_sequential = key_def_is_sequential(key_def);
 		const struct key_part *part = key_def->parts;
 		const struct key_part *parts_end = part + key_def->part_count;
@@ -615,6 +617,8 @@ tuple_format_alloc(struct key_def * const *keys, uint16_t key_count,
 	/* find max max field no */
 	for (uint16_t key_no = 0; key_no < key_count; ++key_no) {
 		const struct key_def *key_def = keys[key_no];
+		if (key_def->for_func_index)
+			continue;
 		const struct key_part *part = key_def->parts;
 		const struct key_part *pend = part + key_def->part_count;
 		for (; part < pend; part++) {

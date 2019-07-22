@@ -253,7 +253,8 @@ key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 }
 
 struct key_def *
-key_def_new(const struct key_part_def *parts, uint32_t part_count)
+key_def_new(const struct key_part_def *parts, uint32_t part_count,
+	    bool for_func_index)
 {
 	size_t sz = 0;
 	for (uint32_t i = 0; i < part_count; i++)
@@ -267,7 +268,7 @@ key_def_new(const struct key_part_def *parts, uint32_t part_count)
 
 	def->part_count = part_count;
 	def->unique_part_count = part_count;
-
+	def->for_func_index = for_func_index;
 	/* A pointer to the JSON paths data in the new key_def. */
 	char *path_pool = (char *)def + key_def_sizeof(part_count, 0);
 	for (uint32_t i = 0; i < part_count; i++) {
@@ -278,8 +279,7 @@ key_def_new(const struct key_part_def *parts, uint32_t part_count)
 			if (coll_id == NULL) {
 				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
 					 i + 1, "collation was not found by ID");
-				key_def_delete(def);
-				return NULL;
+				goto error;
 			}
 			coll = coll_id->coll;
 		}
@@ -288,14 +288,28 @@ key_def_new(const struct key_part_def *parts, uint32_t part_count)
 				     part->nullable_action, coll, part->coll_id,
 				     part->sort_order, part->path, path_len,
 				     &path_pool, TUPLE_OFFSET_SLOT_NIL,
-				     0) != 0) {
-			key_def_delete(def);
-			return NULL;
+				     0) != 0)
+			goto error;
+	}
+	if (for_func_index) {
+		if (def->has_json_paths) {
+			diag_set(ClientError, ER_UNSUPPORTED,
+				 "Functional index", "json paths");
+			goto error;
+		}
+		if(!key_def_is_sequential(def) || parts->fieldno != 0) {
+			diag_set(ClientError, ER_FUNC_INDEX_PARTS,
+				 "key part numbers must be sequential and "
+				 "first part number must be 1");
+			goto error;
 		}
 	}
 	assert(path_pool == (char *)def + sz);
 	key_def_set_func(def);
 	return def;
+error:
+	key_def_delete(def);
+	return NULL;
 }
 
 int
@@ -704,6 +718,12 @@ key_def_find(const struct key_def *key_def, const struct key_part *to_find)
 bool
 key_def_contains(const struct key_def *first, const struct key_def *second)
 {
+	/*
+	 * Func index definitions cannot be contained in
+	 * each other.
+	 */
+	if (first->for_func_index || second->for_func_index)
+		return false;
 	const struct key_part *part = second->parts;
 	const struct key_part *end = part + second->part_count;
 	for (; part != end; part++) {
@@ -720,6 +740,14 @@ static bool
 key_def_can_merge(const struct key_def *key_def,
 		  const struct key_part *to_merge)
 {
+	if (key_def->for_func_index) {
+		/*
+		 * Nothing can be omitted in functional index
+		 * key definition, everything should be merged.
+		 */
+		return true;
+	}
+
 	const struct key_part *part = key_def_find(key_def, to_merge);
 	if (part == NULL)
 		return true;
@@ -734,6 +762,7 @@ key_def_can_merge(const struct key_def *key_def,
 struct key_def *
 key_def_merge(const struct key_def *first, const struct key_def *second)
 {
+	assert(!second->for_func_index);
 	uint32_t new_part_count = first->part_count + second->part_count;
 	/*
 	 * Find and remove part duplicates, i.e. parts counted
@@ -766,6 +795,8 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	new_def->has_optional_parts = first->has_optional_parts ||
 				      second->has_optional_parts;
 	new_def->is_multikey = first->is_multikey || second->is_multikey;
+	new_def->for_func_index = first->for_func_index;
+	new_def->func_index_func = first->func_index_func;
 
 	/* JSON paths data in the new key_def. */
 	char *path_pool = (char *)new_def + key_def_sizeof(new_part_count, 0);
@@ -838,7 +869,7 @@ key_def_find_pk_in_cmp_def(const struct key_def *cmp_def,
 	}
 
 	/* Finally, allocate the new key definition. */
-	extracted_def = key_def_new(parts, pk_def->part_count);
+	extracted_def = key_def_new(parts, pk_def->part_count, false);
 out:
 	region_truncate(region, region_svp);
 	return extracted_def;

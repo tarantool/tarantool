@@ -680,6 +680,11 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 			return -1;
 		}
 	}
+	if (index_def->key_def->for_func_index) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+			 "functional index");
+		return -1;
+	}
 	return 0;
 }
 
@@ -973,6 +978,8 @@ vinyl_index_def_change_requires_rebuild(struct index *index,
 	assert(old_def->type == TREE && new_def->type == TREE);
 
 	if (!old_def->opts.is_unique && new_def->opts.is_unique)
+		return true;
+	if (old_def->opts.func_id != new_def->opts.func_id)
 		return true;
 
 	assert(index_depends_on_pk(index));
@@ -3150,7 +3157,7 @@ vy_send_lsm(struct vy_join_ctx *ctx, struct vy_lsm_recovery_info *lsm_info)
 
 	/* Create key definition and tuple format. */
 	ctx->key_def = key_def_new(lsm_info->key_parts,
-				   lsm_info->key_part_count);
+				   lsm_info->key_part_count, false);
 	if (ctx->key_def == NULL)
 		goto out;
 	ctx->format = vy_stmt_format_new(&ctx->env->stmt_env, &ctx->key_def, 1,

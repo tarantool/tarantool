@@ -163,6 +163,8 @@ struct index_opts {
 	 * filled after running ANALYZE command.
 	 */
 	struct index_stat *stat;
+	/** Identifier of the functional index function. */
+	uint32_t func_id;
 };
 
 extern const struct index_opts index_opts_default;
@@ -207,6 +209,8 @@ index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)
 		return o1->run_size_ratio < o2->run_size_ratio ? -1 : 1;
 	if (o1->bloom_fpr != o2->bloom_fpr)
 		return o1->bloom_fpr < o2->bloom_fpr ? -1 : 1;
+	if (o1->func_id != o2->func_id)
+		return o1->func_id - o2->func_id;
 	return 0;
 }
 
@@ -296,6 +300,25 @@ index_def_update_optionality(struct index_def *def, uint32_t min_field_count)
 {
 	key_def_update_optionality(def->key_def, min_field_count);
 	key_def_update_optionality(def->cmp_def, min_field_count);
+}
+
+/**
+ * Update func pointer for a functional index key definition.
+ * @param def Index def, containing key definitions to update.
+ * @param func The func_index function pointer.
+ */
+static inline void
+index_def_set_func(struct index_def *def, struct func *func)
+{
+	assert(def->opts.func_id > 0 &&
+	       def->key_def->for_func_index && def->cmp_def->for_func_index);
+	/*
+	 * Set func_index_func for functional index key
+	 * definition. It is used in key_list module to extract
+	 * a key for given tuple.
+	 */
+	def->key_def->func_index_func = func;
+	def->cmp_def->func_index_func = NULL;
 }
 
 /**

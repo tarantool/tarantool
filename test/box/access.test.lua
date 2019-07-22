@@ -557,6 +557,7 @@ box.schema.user.grant('tester', 'read', 'space', '_space_sequence')
 box.schema.user.grant('tester', 'read', 'space', '_trigger')
 box.schema.user.grant('tester', 'read', 'space', '_fk_constraint')
 box.schema.user.grant('tester', 'read', 'space', '_ck_constraint')
+box.schema.user.grant('tester', 'read', 'space', '_func_index')
 box.session.su("tester")
 -- successful create
 s1 = box.schema.space.create("test_space")

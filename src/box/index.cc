@@ -679,6 +679,16 @@ generic_index_replace(struct index *index, struct tuple *old_tuple,
 	return -1;
 }
 
+struct iterator *
+generic_index_create_iterator(struct index *base, enum iterator_type type,
+			      const char *key, uint32_t part_count)
+{
+	(void) type; (void) key; (void) part_count;
+	diag_set(UnsupportedIndexFeature, base->def, "read view");
+	return NULL;
+}
+
+
 struct snapshot_iterator *
 generic_index_create_snapshot_iterator(struct index *index)
 {
@@ -727,6 +737,24 @@ generic_index_build_next(struct index *index, struct tuple *tuple)
 void
 generic_index_end_build(struct index *)
 {
+}
+
+int
+disabled_index_build_next(struct index *index, struct tuple *tuple)
+{
+	(void) index; (void) tuple;
+	return 0;
+}
+
+int
+disabled_index_replace(struct index *index, struct tuple *old_tuple,
+		       struct tuple *new_tuple, enum dup_replace_mode mode,
+		       struct tuple **result)
+{
+	(void) old_tuple; (void) new_tuple; (void) mode;
+	(void) index;
+	*result = NULL;
+	return 0;
 }
 
 /* }}} */

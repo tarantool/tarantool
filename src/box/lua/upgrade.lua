@@ -885,11 +885,29 @@ local function upgrade_func_to_2_2_1()
                                       collation = 'unicode_ci'}}})
 end
 
+local function create_func_index()
+    log.info("Create _func_index space")
+    local _func_index = box.space[box.schema.FUNC_INDEX_ID]
+    local _space = box.space._space
+    local _index = box.space._index
+    local format = {{name='space_id', type='unsigned'},
+                    {name='index_id', type='unsigned'},
+                    {name='func_id',  type='unsigned'}}
+    _space:insert{_func_index.id, ADMIN, '_func_index', 'memtx', 0,
+                  setmap({}), format}
+    _index:insert{_func_index.id, 0, 'primary', 'tree', {unique = true},
+                  {{0, 'unsigned'}, {1, 'unsigned'}}}
+    _index:insert{_func_index.id, 1, 'fid', 'tree', {unique = false},
+                  {{2, 'unsigned'}}}
+
+end
+
 local function upgrade_to_2_2_1()
     upgrade_sequence_to_2_2_1()
     upgrade_ck_constraint_to_2_2_1()
     create_vcollation_space()
     upgrade_func_to_2_2_1()
+    create_func_index()
 end
 
 --------------------------------------------------------------------------------

@@ -182,3 +182,12 @@ test_run:wait_cond(function() return i:stat().disk.compaction.count > 0 end)
 stat = i:stat().disk
 stat.bytes_compressed < stat.bytes / 10
 s:drop()
+
+-- Vinyl doesn't support functional index.
+s = box.schema.space.create('withdata', {engine = 'vinyl'})
+lua_code = [[function(tuple) return tuple[1] + tuple[2] end]]
+box.schema.func.create('s', {body = lua_code, is_deterministic = true, is_sandboxed = true})
+_ = s:create_index('pk')
+_ = s:create_index('idx', {func = box.func.s.id, parts = {{1, 'unsigned'}}})
+s:drop()
+box.schema.func.drop('s')

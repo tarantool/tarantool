@@ -285,7 +285,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 				 space->def->fields,
 				 space->def->field_count, &fiber()->gc) != 0)
 		diag_raise();
-	key_def = key_def_new(part_def, part_count);
+	key_def = key_def_new(part_def, part_count, opts.func_id > 0);
 	if (key_def == NULL)
 		diag_raise();
 	struct index_def *index_def =
@@ -1367,6 +1367,27 @@ RebuildIndex::~RebuildIndex()
 	if (new_index_def != NULL)
 		index_def_delete(new_index_def);
 }
+
+/**
+ * RebuildFuncIndex - prepare func index definition,
+ * drop the old index data and rebuild index from by reading the
+ * primary key.
+ */
+class RebuildFuncIndex: public RebuildIndex
+{
+	struct index_def *
+	func_index_def_new(struct index_def *index_def, struct func *func)
+	{
+		struct index_def *new_index_def = index_def_dup_xc(index_def);
+		index_def_set_func(new_index_def, func);
+		return new_index_def;
+	}
+public:
+	RebuildFuncIndex(struct alter_space *alter,
+			 struct index_def *old_index_def_arg, struct func *func) :
+		RebuildIndex(alter, func_index_def_new(old_index_def_arg, func),
+			     old_index_def_arg) {}
+};
 
 /** TruncateIndex - truncate an index. */
 class TruncateIndex: public AlterSpaceOp
@@ -2843,6 +2864,12 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 			tnt_raise(ClientError, ER_DROP_FUNCTION,
 				  (unsigned) old_func->def->uid,
 				  "function has grants");
+		}
+		if (old_func != NULL &&
+		    space_has_data(BOX_FUNC_INDEX_ID, 1, old_func->def->fid)) {
+			tnt_raise(ClientError, ER_DROP_FUNCTION,
+				  (unsigned) old_func->def->uid,
+				  "function has references");
 		}
 		struct trigger *on_commit =
 			txn_alter_trigger_new(on_drop_func_commit, old_func);
@@ -4692,6 +4719,64 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 	trigger_run_xc(&on_alter_space, space);
 }
 
+/** A trigger invoked on replace in the _func_index space. */
+static void
+on_replace_dd_func_index(struct trigger *trigger, void *event)
+{
+	(void) trigger;
+	struct txn *txn = (struct txn *) event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
+
+	struct alter_space *alter = NULL;
+	struct func *func = NULL;
+	struct index *index;
+	struct space *space;
+	if (old_tuple == NULL && new_tuple != NULL) {
+		uint32_t space_id = tuple_field_u32_xc(new_tuple,
+					BOX_FUNC_INDEX_FIELD_SPACE_ID);
+		uint32_t index_id = tuple_field_u32_xc(new_tuple,
+					BOX_FUNC_INDEX_FIELD_INDEX_ID);
+		uint32_t fid = tuple_field_u32_xc(new_tuple,
+					BOX_FUNC_INDEX_FUNCTION_ID);
+		space = space_cache_find_xc(space_id);
+		index = index_find_xc(space, index_id);
+		func = func_cache_find(fid);
+		if (func->def->language != FUNC_LANGUAGE_LUA ||
+		    func->def->body == NULL || !func->def->is_deterministic ||
+		    !func->def->is_sandboxed) {
+			tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS, 0,
+				  "referenced function doesn't satisfy "
+				  "functional index function constraints");
+		}
+	} else if (old_tuple != NULL && new_tuple == NULL) {
+		uint32_t space_id = tuple_field_u32_xc(old_tuple,
+					BOX_FUNC_INDEX_FIELD_SPACE_ID);
+		uint32_t index_id = tuple_field_u32_xc(old_tuple,
+					BOX_FUNC_INDEX_FIELD_INDEX_ID);
+		space = space_cache_find_xc(space_id);
+		index = index_find_xc(space, index_id);
+		func = NULL;
+	} else {
+		assert(old_tuple != NULL && new_tuple != NULL);
+		tnt_raise(ClientError, ER_UNSUPPORTED,
+			  "functional index", "alter");
+	}
+
+	alter = alter_space_new(space);
+	auto scoped_guard = make_scoped_guard([=] {alter_space_delete(alter);});
+	alter_space_move_indexes(alter, 0, index->def->iid);
+	(void) new RebuildFuncIndex(alter, index->def, func);
+	alter_space_move_indexes(alter, index->def->iid + 1,
+				 space->index_id_max + 1);
+	(void) new MoveCkConstraints(alter);
+	(void) new UpdateSchemaVersion(alter);
+	alter_space_do(txn, alter);
+
+	scoped_guard.is_active = false;
+}
+
 struct trigger alter_space_on_replace_space = {
 	RLIST_LINK_INITIALIZER, on_replace_dd_space, NULL, NULL
 };
@@ -4750,6 +4835,10 @@ struct trigger on_replace_fk_constraint = {
 
 struct trigger on_replace_ck_constraint = {
 	RLIST_LINK_INITIALIZER, on_replace_dd_ck_constraint, NULL, NULL
+};
+
+struct trigger on_replace_func_index = {
+	RLIST_LINK_INITIALIZER, on_replace_dd_func_index, NULL, NULL
 };
 
 /* vim: set foldmethod=marker */

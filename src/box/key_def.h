@@ -198,6 +198,8 @@ struct key_def {
 	bool has_json_paths;
 	/** True if it is multikey key definition. */
 	bool is_multikey;
+	/** True if it is functional index key definition. */
+	bool for_func_index;
 	/**
 	 * True, if some key parts can be absent in a tuple. These
 	 * fields assumed to be MP_NIL.
@@ -205,6 +207,16 @@ struct key_def {
 	bool has_optional_parts;
 	/** Key fields mask. @sa column_mask.h for details. */
 	uint64_t column_mask;
+	/**
+	 * A pointer to a functional index function.
+	 * It is initialized externally when possible and key
+	 * definiton object doesn't take a (semantics) reference
+	 * on functional index function object. For example, it
+	 * is not possible to define this pointer during recovery.
+	 * Thus functional index key definition may have this
+	 * field uninitialized (NULL).
+	 */
+	struct func *func_index_func;
 	/**
 	 * In case of the multikey index, a pointer to the
 	 * JSON path string, the path to the root node of
@@ -330,7 +342,8 @@ key_def_sizeof(uint32_t part_count, uint32_t path_pool_size)
  * and initialize its parts.
  */
 struct key_def *
-key_def_new(const struct key_part_def *parts, uint32_t part_count);
+key_def_new(const struct key_part_def *parts, uint32_t part_count,
+	    bool for_func_index);
 
 /**
  * Dump part definitions of the given key def.

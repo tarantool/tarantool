@@ -365,6 +365,7 @@ tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def)
 	assert(has_json_paths == key_def->has_json_paths);
 	assert(has_optional_parts == key_def->has_optional_parts);
 	assert(!key_def->is_multikey);
+	assert(!key_def->for_func_index);
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
 	uint32_t total_size = 0;

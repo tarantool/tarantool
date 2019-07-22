@@ -2775,7 +2775,7 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		part.coll_id = COLL_NONE;
 		part.path = NULL;
 
-		struct key_def *key_def = key_def_new(&part, 1);
+		struct key_def *key_def = key_def_new(&part, 1, false);
 		if (key_def == NULL) {
 tnt_error:
 			pWInfo->pParse->is_aborted = true;

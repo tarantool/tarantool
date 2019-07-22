@@ -243,3 +243,12 @@ s = box.schema.space.create('test')
 _ = s:create_index('primary')
 _ = s:create_index('rtree', {type = 'rtree', parts = {{'[2][*]', 'array'}}})
 s:drop()
+
+-- Rtree index can not use function.
+s = box.schema.space.create('withdata')
+lua_code = [[function(tuple) return {tuple[1] + tuple[2], tuple[1] - tuple[2]} end]]
+box.schema.func.create('fextract', {body = lua_code, is_deterministic = true, is_sandboxed = true})
+_ = s:create_index('pk')
+_ = s:create_index('idx', {type = 'rtree', func = box.func.fextract.id, parts = {{1, 'array'}}})
+s:drop()
+box.schema.func.drop('fextract')

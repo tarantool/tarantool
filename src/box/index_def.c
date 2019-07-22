@@ -50,6 +50,7 @@ const struct index_opts index_opts_default = {
 	/* .bloom_fpr           = */ 0.05,
 	/* .lsn                 = */ 0,
 	/* .stat                = */ NULL,
+	/* .func                = */ 0,
 };
 
 const struct opt_def index_opts_reg[] = {
@@ -63,6 +64,7 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF("run_size_ratio", OPT_FLOAT, struct index_opts, run_size_ratio),
 	OPT_DEF("bloom_fpr", OPT_FLOAT, struct index_opts, bloom_fpr),
 	OPT_DEF("lsn", OPT_INT64, struct index_opts, lsn),
+	OPT_DEF("func", OPT_UINT32, struct index_opts, func_id),
 	OPT_DEF_LEGACY("sql"),
 	OPT_END,
 };
@@ -294,6 +296,11 @@ index_def_is_valid(struct index_def *index_def, const char *space_name)
 	if (index_def->iid == 0 && index_def->key_def->is_multikey) {
 		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
 			 space_name, "primary key cannot be multikey");
+		return false;
+	}
+	if (index_def->iid == 0 && index_def->key_def->for_func_index) {
+		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
+			space_name, "primary key can not use a function");
 		return false;
 	}
 	for (uint32_t i = 0; i < index_def->key_def->part_count; i++) {

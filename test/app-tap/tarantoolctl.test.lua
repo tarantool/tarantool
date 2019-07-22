@@ -405,8 +405,8 @@ do
             check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system --replica 1", "\n", 3)
             check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system --replica 1 --replica 2", "\n", 3)
             check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system --replica 2", "\n", 0)
-            check_ctlcat_snap(test_i, dir, "--space=280", "---\n", 23)
-            check_ctlcat_snap(test_i, dir, "--space=288", "---\n", 50)
+            check_ctlcat_snap(test_i, dir, "--space=280", "---\n", 24)
+            check_ctlcat_snap(test_i, dir, "--space=288", "---\n", 52)
         end)
     end)
 

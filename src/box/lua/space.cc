@@ -42,6 +42,8 @@ extern "C" {
 	#include <lualib.h>
 } /* extern "C" */
 
+#include "box/func.h"
+#include "box/func_def.h"
 #include "box/space.h"
 #include "box/schema.h"
 #include "box/user_def.h"
@@ -333,6 +335,22 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		} else if (index_def->type == RTREE) {
 			lua_pushnumber(L, index_opts->dimension);
 			lua_setfield(L, -2, "dimension");
+		}
+
+		if (index_opts->func_id > 0) {
+			lua_pushstring(L, "func");
+			lua_newtable(L);
+
+			lua_pushnumber(L, index_opts->func_id);
+			lua_setfield(L, -2, "fid");
+
+			struct func *func = func_by_id(index_opts->func_id);
+			if (func != NULL) {
+				lua_pushstring(L, func->def->name);
+				lua_setfield(L, -2, "name");
+			}
+
+			lua_settable(L, -3);
 		}
 
 		lua_pushstring(L, index_type_strs[index_def->type]);
@@ -629,6 +647,8 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "VSEQUENCE_ID");
 	lua_pushnumber(L, BOX_SPACE_SEQUENCE_ID);
 	lua_setfield(L, -2, "SPACE_SEQUENCE_ID");
+	lua_pushnumber(L, BOX_FUNC_INDEX_ID);
+	lua_setfield(L, -2, "FUNC_INDEX_ID");
 	lua_pushnumber(L, BOX_SYSTEM_ID_MIN);
 	lua_setfield(L, -2, "SYSTEM_ID_MIN");
 	lua_pushnumber(L, BOX_SYSTEM_ID_MAX);
