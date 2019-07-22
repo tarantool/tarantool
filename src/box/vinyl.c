@@ -963,6 +963,15 @@ vinyl_index_commit_drop(struct index *index, int64_t lsn)
 	vy_log_tx_try_commit();
 }
 
+static void
+vinyl_index_update_def(struct index *index)
+{
+	struct vy_lsm *lsm = vy_lsm(index);
+	lsm->opts = index->def->opts;
+	key_def_copy(lsm->key_def, index->def->key_def);
+	key_def_copy(lsm->cmp_def, index->def->cmp_def);
+}
+
 static bool
 vinyl_index_depends_on_pk(struct index *index)
 {
@@ -1200,9 +1209,6 @@ vinyl_space_swap_index(struct space *old_space, struct space *new_space,
 	SWAP(old_lsm->check_is_unique, new_lsm->check_is_unique);
 	SWAP(old_lsm->mem_format, new_lsm->mem_format);
 	SWAP(old_lsm->disk_format, new_lsm->disk_format);
-	SWAP(old_lsm->opts, new_lsm->opts);
-	key_def_swap(old_lsm->key_def, new_lsm->key_def);
-	key_def_swap(old_lsm->cmp_def, new_lsm->cmp_def);
 
 	/* Update pointer to the primary key. */
 	vy_lsm_update_pk(old_lsm, vy_lsm(old_space->index_map[0]));
@@ -4741,7 +4747,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .abort_create = */ vinyl_index_abort_create,
 	/* .commit_modify = */ vinyl_index_commit_modify,
 	/* .commit_drop = */ vinyl_index_commit_drop,
-	/* .update_def = */ generic_index_update_def,
+	/* .update_def = */ vinyl_index_update_def,
 	/* .depends_on_pk = */ vinyl_index_depends_on_pk,
 	/* .def_change_requires_rebuild = */
 		vinyl_index_def_change_requires_rebuild,

@@ -250,11 +250,11 @@ struct key_def *
 key_def_dup(const struct key_def *src);
 
 /**
- * Swap content of two key definitions in memory.
+ * Copy content of key definition src to dest.
  * The two key definitions must have the same size.
  */
 void
-key_def_swap(struct key_def *old_def, struct key_def *new_def);
+key_def_copy(struct key_def *dest, const struct key_def *src);
 
 /**
  * Delete @a key_def.

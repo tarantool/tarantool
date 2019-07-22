@@ -81,18 +81,26 @@ const struct opt_def part_def_reg[] = {
 	OPT_END,
 };
 
-struct key_def *
-key_def_dup(const struct key_def *src)
+/**
+ * Return the size of memory occupied by the given key definition.
+ */
+static inline size_t
+key_def_copy_size(const struct key_def *def)
 {
 	size_t sz = 0;
-	for (uint32_t i = 0; i < src->part_count; i++)
-		sz += src->parts[i].path_len;
-	sz = key_def_sizeof(src->part_count, sz);
-	struct key_def *res = (struct key_def *)malloc(sz);
-	if (res == NULL) {
-		diag_set(OutOfMemory, sz, "malloc", "res");
-		return NULL;
-	}
+	for (uint32_t i = 0; i < def->part_count; i++)
+		sz += def->parts[i].path_len;
+	return key_def_sizeof(def->part_count, sz);
+}
+
+/**
+ * A helper function for key_def_copy() and key_def_dup() that
+ * copies key definition src of size sz to res without checking
+ * that the two key definitions have the same allocation size.
+ */
+static struct key_def *
+key_def_copy_impl(struct key_def *res, const struct key_def *src, size_t sz)
+{
 	memcpy(res, src, sz);
 	/*
 	 * Update the paths pointers so that they refer to the
@@ -112,20 +120,24 @@ key_def_dup(const struct key_def *src)
 }
 
 void
-key_def_swap(struct key_def *old_def, struct key_def *new_def)
+key_def_copy(struct key_def *dest, const struct key_def *src)
 {
-	assert(old_def->part_count == new_def->part_count);
-	for (uint32_t i = 0; i < new_def->part_count; i++) {
-		SWAP(old_def->parts[i], new_def->parts[i]);
-		/*
-		 * Paths are allocated as a part of key_def so
-		 * we need to swap path pointers back - it's OK
-		 * as paths aren't supposed to change.
-		 */
-		assert(old_def->parts[i].path_len == new_def->parts[i].path_len);
-		SWAP(old_def->parts[i].path, new_def->parts[i].path);
+	size_t sz = key_def_copy_size(src);
+	assert(sz = key_def_copy_size(dest));
+	key_def_copy_impl(dest, src, sz);
+}
+
+struct key_def *
+key_def_dup(const struct key_def *src)
+{
+	size_t sz = key_def_copy_size(src);
+	struct key_def *res = malloc(sz);
+	if (res == NULL) {
+		diag_set(OutOfMemory, sz, "malloc", "res");
+		return NULL;
 	}
-	SWAP(*old_def, *new_def);
+	key_def_copy_impl(res, src, sz);
+	return res;
 }
 
 void
