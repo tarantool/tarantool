@@ -512,3 +512,34 @@ s:insert({1, true, {1, 2}, {a = 3}, 'asd'})
 box.execute('UPDATE t SET b = false WHERE i = 1;')
 s:select()
 s:drop()
+
+--
+-- Make sure that the array/map conversion to scalar error is
+-- displayed correctly.
+--
+box.execute('CREATE TABLE t1(i INT PRIMARY KEY AUTOINCREMENT, a SCALAR);')
+format = {}
+format[1] = {type = 'integer', name = 'I'}
+format[2] = {type = 'array', name = 'A'}
+s = box.schema.space.create('T2', {format=format})
+i = s:create_index('ii')
+s:insert({1, {1,2,3}})
+box.execute('INSERT INTO t1(a) SELECT a FROM t2;')
+s:replace({1, {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30}})
+box.execute('INSERT INTO t1(a) SELECT a FROM t2;')
+--
+-- Make sure that the error will be displayed correctly even if
+-- the value is too long.
+--
+long_array = {}
+for i = 1,120 do long_array[i] = i end
+s:replace({1, long_array})
+box.execute('INSERT INTO t1(a) SELECT a FROM t2;')
+s:drop()
+format[2].type = 'map'
+s = box.schema.space.create('T2', {format=format})
+i = s:create_index('ii')
+s:insert({1, {b = 1}})
+box.execute('INSERT INTO t1(a) SELECT a FROM t2;')
+s:drop()
+box.execute('DROP TABLE t1;')
