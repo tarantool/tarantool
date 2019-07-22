@@ -263,6 +263,13 @@ sqlVdbeMemNulTerminate(Mem * pMem)
 	}
 }
 
+static inline bool
+mem_has_msgpack_subtype(struct Mem *mem)
+{
+	return (mem->flags & MEM_Subtype) != 0 &&
+	       mem->subtype == SQL_SUBTYPE_MSGPACK;
+}
+
 /*
  * Add MEM_Str to the set of representations for the given Mem.  Numbers
  * are converted using sql_snprintf().  Converting a BLOB to a string
@@ -281,14 +288,28 @@ int
 sqlVdbeMemStringify(Mem * pMem)
 {
 	int fg = pMem->flags;
-	const int nByte = 32;
+	int nByte = 32;
 
-	if ((fg & (MEM_Null | MEM_Str | MEM_Blob)) != 0)
+	if ((fg & (MEM_Null | MEM_Str | MEM_Blob)) != 0 &&
+	    !mem_has_msgpack_subtype(pMem))
 		return 0;
 
 	assert(!(fg & MEM_Zero));
-	assert((fg & (MEM_Int | MEM_UInt | MEM_Real | MEM_Bool)) != 0);
+	assert((fg & (MEM_Int | MEM_UInt | MEM_Real | MEM_Bool |
+		      MEM_Blob)) != 0);
 	assert(EIGHT_BYTE_ALIGNMENT(pMem));
+
+	/*
+	 * In case we have ARRAY/MAP we should save decoded value
+	 * before clearing pMem->z.
+	 */
+	char *value = NULL;
+	if (mem_has_msgpack_subtype(pMem)) {
+		const char *value_str = mp_str(pMem->z);
+		nByte = strlen(value_str) + 1;
+		value = region_alloc(&fiber()->gc, nByte);
+		memcpy(value, value_str, nByte);
+	}
 
 	if (sqlVdbeMemClearAndResize(pMem, nByte)) {
 		return -1;
@@ -302,6 +323,10 @@ sqlVdbeMemStringify(Mem * pMem)
 	} else if ((fg & MEM_Bool) != 0) {
 		sql_snprintf(nByte, pMem->z, "%s", pMem->u.b ? "true" : "false");
 		pMem->flags &= ~MEM_Bool;
+	} else if (mem_has_msgpack_subtype(pMem)) {
+		sql_snprintf(nByte, pMem->z, "%s", value);
+		pMem->flags &= ~MEM_Subtype;
+		pMem->subtype = SQL_SUBTYPE_NO;
 	} else {
 		assert(fg & MEM_Real);
 		sql_snprintf(nByte, pMem->z, "%!.15g", pMem->u.r);
@@ -1140,7 +1165,8 @@ valueToText(sql_value * pVal)
 {
 	assert(pVal != 0);
 	assert((pVal->flags & (MEM_Null)) == 0);
-	if (pVal->flags & (MEM_Blob | MEM_Str)) {
+	if ((pVal->flags & (MEM_Blob | MEM_Str)) &&
+	    !mem_has_msgpack_subtype(pVal)) {
 		if (ExpandBlob(pVal))
 			return 0;
 		pVal->flags |= MEM_Str;
@@ -1809,8 +1835,7 @@ encode_uint:
 		 * Emit BIN header iff the BLOB doesn't store
 		 * MsgPack content.
 		 */
-		if ((var->flags & MEM_Subtype) == 0 ||
-		     var->subtype != SQL_SUBTYPE_MSGPACK) {
+		if (!mem_has_msgpack_subtype(var)) {
 			uint32_t binl = var->n +
 					((var->flags & MEM_Zero) ?
 					var->u.nZero : 0);
