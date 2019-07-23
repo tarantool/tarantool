@@ -179,8 +179,23 @@ struct xrow_update_op {
 	const struct xrow_update_op_meta *meta;
 	/** Operation arguments. */
 	union xrow_update_arg arg;
-	/** First level field no. */
-	int32_t field_no;
+	/** Current level token. */
+	enum json_token_type token_type;
+	/**
+	 * The flag says whether the token is already consumed by
+	 * the update operation during its forwarding down the
+	 * update tree. When the flag is true, it means that the
+	 * next node of the update tree will need to fetch a next
+	 * token from the lexer.
+	 */
+	bool is_token_consumed;
+	union {
+		struct {
+			const char *key;
+			uint32_t key_len;
+		};
+		int32_t field_no;
+	};
 	/** Size of a new field after it is updated. */
 	uint32_t new_field_len;
 	/** Opcode symbol: = + - / ... */
@@ -192,6 +207,17 @@ struct xrow_update_op {
 	 */
 	struct json_lexer lexer;
 };
+
+/**
+ * Extract a next token from the operation path lexer. The result
+ * is used to decide to which child of a current map/array the
+ * operation should be forwarded. It is not just a synonym to
+ * json_lexer_next_token, because fills some fields of @a op,
+ * and should be used only to chose a next child inside a current
+ * map/array.
+ */
+int
+xrow_update_op_next_token(struct xrow_update_op *op);
 
 /**
  * Decode an update operation from MessagePack.

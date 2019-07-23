@@ -612,6 +612,23 @@ xrow_update_op_by(char opcode)
 }
 
 int
+xrow_update_op_next_token(struct xrow_update_op *op)
+{
+	struct json_token token;
+	int rc = json_lexer_next_token(&op->lexer, &token);
+	if (rc != 0)
+		return xrow_update_err_bad_json(op, rc);
+	if (token.type == JSON_TOKEN_END)
+		return xrow_update_err_no_such_field(op);
+	op->is_token_consumed = false;
+	op->token_type = token.type;
+	op->key = token.str;
+	op->key_len = token.len;
+	op->field_no = token.num;
+	return 0;
+}
+
+int
 xrow_update_op_decode(struct xrow_update_op *op, int index_base,
 		      struct tuple_dictionary *dict, const char **expr)
 {
@@ -639,6 +656,13 @@ xrow_update_op_decode(struct xrow_update_op *op, int index_base,
 		diag_set(ClientError, ER_UNKNOWN_UPDATE_OP);
 		return -1;
 	}
+	/*
+	 * First token is always num. Even if a user specified a
+	 * field name it is converted to num by the tuple
+	 * dictionary.
+	 */
+	op->token_type = JSON_TOKEN_NUM;
+	op->is_token_consumed = false;
 	int32_t field_no = 0;
 	switch(mp_typeof(**expr)) {
 	case MP_INT:
