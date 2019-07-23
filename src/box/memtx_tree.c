@@ -73,7 +73,7 @@ static bool
 memtx_tree_data_identical(const struct memtx_tree_data *a,
 			  const struct memtx_tree_data *b)
 {
-	return a->tuple == b->tuple && a->hint == b->hint;
+	return a->tuple == b->tuple;
 }
 
 #define BPS_TREE_NAME memtx_tree
@@ -85,6 +85,7 @@ memtx_tree_data_identical(const struct memtx_tree_data *a,
 	tuple_compare_with_key((&a)->tuple, (&a)->hint, (b)->key,\
 			       (b)->part_count, (b)->hint, arg)
 #define BPS_TREE_IDENTICAL(a, b) memtx_tree_data_identical(&a, &b)
+#define BPS_TREE_NO_DEBUG 1
 #define bps_tree_elem_t struct memtx_tree_data
 #define bps_tree_key_t struct memtx_tree_key_data *
 #define bps_tree_arg_t struct key_def *
@@ -97,6 +98,7 @@ memtx_tree_data_identical(const struct memtx_tree_data *a,
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
 #undef BPS_TREE_IDENTICAL
+#undef BPS_TREE_NO_DEBUG
 #undef bps_tree_elem_t
 #undef bps_tree_key_t
 #undef bps_tree_arg_t
@@ -591,13 +593,15 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 static int
 memtx_tree_index_replace_multikey_one(struct memtx_tree_index *index,
 			struct tuple *old_tuple, struct tuple *new_tuple,
-			enum dup_replace_mode mode, int multikey_idx,
-			struct tuple **replaced_tuple)
+			enum dup_replace_mode mode, hint_t hint,
+			struct memtx_tree_data *replaced_data,
+			bool *is_multikey_conflict)
 {
 	struct memtx_tree_data new_data, dup_data;
 	new_data.tuple = new_tuple;
-	new_data.hint = multikey_idx;
+	new_data.hint = hint;
 	dup_data.tuple = NULL;
+	*is_multikey_conflict = false;
 	if (memtx_tree_insert(&index->tree, new_data, &dup_data) != 0) {
 		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE, "memtx_tree_index",
 			 "replace");
@@ -610,7 +614,7 @@ memtx_tree_index_replace_multikey_one(struct memtx_tree_index *index,
 		 * times, the previous key occurrence is pushed
 		 * out of the index.
 		 */
-		dup_data.tuple = NULL;
+		*is_multikey_conflict = true;
 	} else if ((errcode = replace_check_dup(old_tuple, dup_data.tuple,
 					        mode)) != 0) {
 		/* Rollback replace. */
@@ -624,7 +628,7 @@ memtx_tree_index_replace_multikey_one(struct memtx_tree_index *index,
 		}
 		return -1;
 	}
-	*replaced_tuple = dup_data.tuple;
+	*replaced_data = dup_data;
 	return 0;
 }
 
@@ -681,16 +685,19 @@ memtx_tree_index_replace_multikey(struct index *base, struct tuple *old_tuple,
 			tuple_multikey_count(new_tuple, cmp_def);
 		for (; (uint32_t) multikey_idx < multikey_count;
 		     multikey_idx++) {
-			struct tuple *replaced_tuple;
+			bool is_multikey_conflict;
+			struct memtx_tree_data replaced_data;
 			err = memtx_tree_index_replace_multikey_one(index,
 						old_tuple, new_tuple, mode,
-						multikey_idx, &replaced_tuple);
+						multikey_idx, &replaced_data,
+						&is_multikey_conflict);
 			if (err != 0)
 				break;
-			if (replaced_tuple != NULL) {
+			if (replaced_data.tuple != NULL &&
+			    !is_multikey_conflict) {
 				assert(*result == NULL ||
-				       *result == replaced_tuple);
-				*result = replaced_tuple;
+				       *result == replaced_data.tuple);
+				*result = replaced_data.tuple;
 			}
 		}
 		if (err != 0) {
