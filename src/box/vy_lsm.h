@@ -207,14 +207,6 @@ struct vy_lsm {
 	 */
 	struct key_def *pk_in_cmp_def;
 	/**
-	 * If the following flag is set, the index this LSM tree
-	 * is created for is unique and it must be checked for
-	 * duplicates on INSERT. Otherwise, the check can be skipped,
-	 * either because the index is not unique or it is a part
-	 * of another unique index.
-	 */
-	bool check_is_unique;
-	/**
 	 * Tuple format for tuples of this LSM tree created when
 	 * reading pages from disk.
 	 * Is distinct from mem_format only for secondary keys,

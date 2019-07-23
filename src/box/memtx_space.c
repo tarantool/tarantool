@@ -1008,8 +1008,12 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 
 static int
 memtx_space_build_index(struct space *src_space, struct index *new_index,
-			struct tuple_format *new_format)
+			struct tuple_format *new_format,
+			bool check_unique_constraint)
 {
+	/* In memtx unique check comes for free so we never skip it. */
+	(void)check_unique_constraint;
+
 	struct txn *txn = in_txn();
 	/**
 	 * If it's a secondary key, and we're not building them

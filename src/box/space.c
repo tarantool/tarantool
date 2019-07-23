@@ -32,6 +32,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include "bit/bit.h"
 #include "tuple_format.h"
 #include "trigger.h"
 #include "user.h"
@@ -156,16 +157,51 @@ space_create(struct space *space, struct engine *engine,
 		goto fail;
 	}
 	space->index = space->index_map + index_id_max + 1;
+	size_t size = bitmap_size(index_id_max + 1);
+	space->check_unique_constraint_map = calloc(size, 1);
+	if (space->check_unique_constraint_map == NULL) {
+		diag_set(OutOfMemory, size, "malloc",
+			 "check_unique_constraint_map");
+		goto fail;
+	}
 	rlist_foreach_entry(index_def, key_list, link) {
 		struct index *index = space_create_index(space, index_def);
 		if (index == NULL)
 			goto fail_free_indexes;
 		space->index_map[index_def->iid] = index;
+		if (index_def->opts.is_unique)
+			bit_set(space->check_unique_constraint_map,
+				index_def->iid);
 	}
 	space_fill_index_map(space);
 	rlist_create(&space->parent_fk_constraint);
 	rlist_create(&space->child_fk_constraint);
 	rlist_create(&space->ck_constraint);
+
+	/*
+	 * Check if there are unique indexes that are contained
+	 * by other unique indexes. For them, we can skip check
+	 * for duplicates on INSERT. Prefer indexes with higher
+	 * ids for uniqueness check optimization as they are
+	 * likelier to have a "colder" cache.
+	 */
+	for (int i = space->index_count - 1; i >= 0; i--) {
+		struct index *index = space->index[i];
+		if (!bit_test(space->check_unique_constraint_map,
+			      index->def->iid))
+			continue;
+		for (int j = 0; j < (int)space->index_count; j++) {
+			struct index *other = space->index[j];
+			if (i != j && bit_test(space->check_unique_constraint_map,
+					       other->def->iid) &&
+			    key_def_contains(index->def->key_def,
+					     other->def->key_def)) {
+				bit_clear(space->check_unique_constraint_map,
+					  index->def->iid);
+				break;
+			}
+		}
+	}
 	return 0;
 
 fail_free_indexes:
@@ -176,6 +212,7 @@ fail_free_indexes:
 	}
 fail:
 	free(space->index_map);
+	free(space->check_unique_constraint_map);
 	if (space->def != NULL)
 		space_def_delete(space->def);
 	if (space->format != NULL)
@@ -214,6 +251,7 @@ space_delete(struct space *space)
 			index_delete(index);
 	}
 	free(space->index_map);
+	free(space->check_unique_constraint_map);
 	if (space->format != NULL)
 		tuple_format_unref(space->format);
 	trigger_destroy(&space->before_replace);
@@ -635,11 +673,13 @@ generic_space_check_format(struct space *space, struct tuple_format *format)
 
 int
 generic_space_build_index(struct space *src_space, struct index *new_index,
-			  struct tuple_format *new_format)
+			  struct tuple_format *new_format,
+			  bool check_unique_constraint)
 {
 	(void)src_space;
 	(void)new_index;
 	(void)new_format;
+	(void)check_unique_constraint;
 	return 0;
 }
 

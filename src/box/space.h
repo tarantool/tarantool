@@ -33,6 +33,7 @@
 #include "user_def.h"
 #include "space_def.h"
 #include "small/rlist.h"
+#include "bit/bit.h"
 #include "engine.h"
 #include "index.h"
 #include "error.h"
@@ -115,11 +116,19 @@ struct space_vtab {
 	 * @param src_space   space to use as build source
 	 * @param new_index   index to build
 	 * @param new_format  format for validating tuples
-	 * @retval  0         success
-	 * @retval -1         build failed
+	 * @param check_unique_constraint
+	 *                    if this flag is set the build procedure
+	 *                    must check the uniqueness constraint of
+	 *                    the new index, otherwise the check may
+	 *                    be optimized out even if the index is
+	 *                    marked as unique
+	 *
+	 * @retval  0           success
+	 * @retval -1           build failed
 	 */
 	int (*build_index)(struct space *src_space, struct index *new_index,
-			   struct tuple_format *new_format);
+			   struct tuple_format *new_format,
+			   bool check_unique_constraint);
 	/**
 	 * Exchange two index objects in two spaces. Used
 	 * to update a space with a newly built index, while
@@ -196,6 +205,15 @@ struct space {
 	 */
 	struct index **index;
 	/**
+	 * If bit i is set, the unique constraint of index i must
+	 * be checked before inserting a tuple into this space.
+	 * Note, it isn't quite the same as index_opts::is_unique,
+	 * as we don't need to check the unique constraint of
+	 * a unique index in case the uniqueness of the indexed
+	 * fields is guaranteed by another unique index.
+	 */
+	void *check_unique_constraint_map;
+	/**
 	 * List of check constraints linked with
 	 * ck_constraint::link.
 	 */
@@ -263,6 +281,17 @@ space_index(struct space *space, uint32_t id)
 	if (id <= space->index_id_max)
 		return space->index_map[id];
 	return NULL;
+}
+
+/**
+ * Return true if the unique constraint must be checked for
+ * the index with the given id before inserting a tuple into
+ * the space.
+ */
+static inline bool
+space_needs_check_unique_constraint(struct space *space, uint32_t index_id)
+{
+	return bit_test(space->check_unique_constraint_map, index_id);
 }
 
 /**
@@ -403,9 +432,11 @@ space_drop_primary_key(struct space *space)
 
 static inline int
 space_build_index(struct space *src_space, struct index *new_index,
-		  struct tuple_format *new_format)
+		  struct tuple_format *new_format,
+		  bool check_unique_constraint)
 {
-	return src_space->vtab->build_index(src_space, new_index, new_format);
+	return src_space->vtab->build_index(src_space, new_index, new_format,
+					    check_unique_constraint);
 }
 
 static inline void
@@ -490,7 +521,7 @@ int generic_space_add_primary_key(struct space *space);
 void generic_space_drop_primary_key(struct space *space);
 int generic_space_check_format(struct space *, struct tuple_format *);
 int generic_space_build_index(struct space *, struct index *,
-			      struct tuple_format *);
+			      struct tuple_format *, bool);
 int generic_space_prepare_alter(struct space *, struct space *);
 void generic_space_invalidate(struct space *);
 
@@ -588,9 +619,11 @@ space_check_format_xc(struct space *space, struct tuple_format *format)
 
 static inline void
 space_build_index_xc(struct space *src_space, struct index *new_index,
-		     struct tuple_format *new_format)
+		     struct tuple_format *new_format,
+		     bool check_unique_constraint)
 {
-	if (space_build_index(src_space, new_index, new_format) != 0)
+	if (space_build_index(src_space, new_index, new_format,
+			      check_unique_constraint) != 0)
 		diag_raise();
 }
 

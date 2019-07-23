@@ -207,7 +207,6 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	lsm->index_id = index_def->iid;
 	lsm->group_id = group_id;
 	lsm->opts = index_def->opts;
-	lsm->check_is_unique = lsm->opts.is_unique;
 	vy_lsm_read_set_new(&lsm->read_set);
 
 	lsm_env->lsm_count++;

@@ -647,27 +647,6 @@ vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 
 	/* Format is now referenced by the space. */
 	tuple_format_unref(format);
-
-	/*
-	 * Check if there are unique indexes that are contained
-	 * by other unique indexes. For them, we can skip check
-	 * for duplicates on INSERT. Prefer indexes with higher
-	 * ids for uniqueness check optimization as they are
-	 * likelier to have a "colder" cache.
-	 */
-	for (int i = space->index_count - 1; i >= 0; i--) {
-		struct vy_lsm *lsm = vy_lsm(space->index[i]);
-		if (!lsm->check_is_unique)
-			continue;
-		for (int j = 0; j < (int)space->index_count; j++) {
-			struct vy_lsm *other = vy_lsm(space->index[j]);
-			if (other != lsm && other->check_is_unique &&
-			    key_def_contains(lsm->key_def, other->key_def)) {
-				lsm->check_is_unique = false;
-				break;
-			}
-		}
-	}
 	return space;
 }
 
@@ -1206,7 +1185,6 @@ vinyl_space_swap_index(struct space *old_space, struct space *new_space,
 				 old_index_id, new_index_id);
 
 	SWAP(old_lsm, new_lsm);
-	SWAP(old_lsm->check_is_unique, new_lsm->check_is_unique);
 	SWAP(old_lsm->mem_format, new_lsm->mem_format);
 	SWAP(old_lsm->disk_format, new_lsm->disk_format);
 
@@ -1564,10 +1542,9 @@ vy_check_is_unique_primary(struct vy_tx *tx, const struct vy_read_view **rv,
 			   struct vy_lsm *lsm, struct tuple *stmt)
 {
 	assert(lsm->index_id == 0);
+	assert(lsm->opts.is_unique);
 	assert(vy_stmt_type(stmt) == IPROTO_INSERT);
 
-	if (!lsm->check_is_unique)
-		return 0;
 	struct tuple *found;
 	if (vy_get(lsm, tx, rv, stmt, &found))
 		return -1;
@@ -1610,8 +1587,8 @@ vy_check_is_unique_secondary_one(struct vy_tx *tx, const struct vy_read_view **r
 	 * without modifying the secondary key and so there's
 	 * actually no conflict. For INSERT this can only happen
 	 * if we optimized out the primary index uniqueness check
-	 * (see vy_lsm::check_is_unique), in which case we must
-	 * fail here.
+	 * (see space_needs_check_unique_constraint()), in which
+	 * case we must fail here.
 	 */
 	if (found != NULL && vy_stmt_type(stmt) == IPROTO_REPLACE &&
 	    vy_stmt_compare(stmt, HINT_NONE, found, HINT_NONE,
@@ -1646,8 +1623,7 @@ vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
 			     const char *space_name, const char *index_name,
 			     struct vy_lsm *lsm, struct tuple *stmt)
 {
-	if (!lsm->check_is_unique)
-		return 0;
+	assert(lsm->opts.is_unique);
 	if (!lsm->cmp_def->is_multikey) {
 		return vy_check_is_unique_secondary_one(tx, rv,
 				space_name, index_name, lsm, stmt,
@@ -1699,7 +1675,8 @@ vy_check_is_unique(struct vy_env *env, struct vy_tx *tx,
 	 * if this is INSERT, because REPLACE will silently overwrite
 	 * the existing tuple, if any.
 	 */
-	if (vy_stmt_type(stmt) == IPROTO_INSERT) {
+	if (space_needs_check_unique_constraint(space, 0) &&
+	    vy_stmt_type(stmt) == IPROTO_INSERT) {
 		struct vy_lsm *lsm = vy_lsm(space->index[0]);
 		if (vy_check_is_unique_primary(tx, rv, space_name(space),
 					       index_name_by_id(space, 0),
@@ -1713,6 +1690,8 @@ vy_check_is_unique(struct vy_env *env, struct vy_tx *tx,
 	 */
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
+		if (!space_needs_check_unique_constraint(space, lsm->index_id))
+			continue;
 		if (key_update_can_be_skipped(lsm->key_def->column_mask,
 					      column_mask))
 			continue;
@@ -4029,6 +4008,11 @@ struct vy_build_ctx {
 	/** Format to check new tuples against. */
 	struct tuple_format *format;
 	/**
+	 * Check the unique constraint of the new index
+	 * if this flag is set.
+	 */
+	bool check_unique_constraint;
+	/**
 	 * Names of the altered space and the new index.
 	 * Used for error reporting.
 	 */
@@ -4063,7 +4047,7 @@ vy_build_on_replace(struct trigger *trigger, void *event)
 		goto err;
 
 	/* Check key uniqueness if necessary. */
-	if (stmt->new_tuple != NULL &&
+	if (ctx->check_unique_constraint && stmt->new_tuple != NULL &&
 	    vy_check_is_unique_secondary(tx, vy_tx_read_view(tx),
 					 ctx->space_name, ctx->index_name,
 					 lsm, stmt->new_tuple) != 0)
@@ -4138,7 +4122,8 @@ vy_build_insert_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
 static int
 vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
 		      const char *space_name, const char *index_name,
-		      struct tuple_format *new_format, struct tuple *tuple)
+		      struct tuple_format *new_format,
+		      bool check_unique_constraint, struct tuple *tuple)
 {
 	int rc;
 	struct vy_mem *mem = lsm->mem;
@@ -4175,13 +4160,16 @@ vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
 	 * uniqueness check helper is sensitive to the statement
 	 * type, we must not use the original tuple for the check.
 	 */
-	vy_mem_pin(mem);
-	rc = vy_check_is_unique_secondary(NULL, &env->xm->p_committed_read_view,
-					  space_name, index_name, lsm, stmt);
-	vy_mem_unpin(mem);
-	if (rc != 0) {
-		tuple_unref(stmt);
-		return -1;
+	if (check_unique_constraint) {
+		vy_mem_pin(mem);
+		rc = vy_check_is_unique_secondary(NULL,
+				&env->xm->p_committed_read_view,
+				space_name, index_name, lsm, stmt);
+		vy_mem_unpin(mem);
+		if (rc != 0) {
+			tuple_unref(stmt);
+			return -1;
+		}
 	}
 
 	/* Insert the new tuple into the in-memory index. */
@@ -4329,7 +4317,8 @@ vy_build_recover(struct vy_env *env, struct vy_lsm *lsm, struct vy_lsm *pk)
 
 static int
 vinyl_space_build_index(struct space *src_space, struct index *new_index,
-			struct tuple_format *new_format)
+			struct tuple_format *new_format,
+			bool check_unique_constraint)
 {
 	struct vy_env *env = vy_env(src_space->engine);
 	struct vy_lsm *pk = vy_lsm(src_space->index[0]);
@@ -4398,6 +4387,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	struct vy_build_ctx ctx;
 	ctx.lsm = new_lsm;
 	ctx.format = new_format;
+	ctx.check_unique_constraint = check_unique_constraint;
 	ctx.space_name = space_name(src_space);
 	ctx.index_name = new_index->def->name;
 	ctx.is_failed = false;
@@ -4441,7 +4431,9 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 			rc = vy_build_insert_tuple(env, new_lsm,
 						   space_name(src_space),
 						   new_index->def->name,
-						   new_format, tuple);
+						   new_format,
+						   check_unique_constraint,
+						   tuple);
 			if (rc != 0)
 				break;
 		}
