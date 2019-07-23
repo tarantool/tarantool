@@ -55,7 +55,7 @@
 static inline int
 json_read_symbol(struct json_lexer *lexer, UChar32 *out)
 {
-	if (lexer->offset == lexer->src_len) {
+	if (json_lexer_is_eof(lexer)) {
 		*out = U_SENTINEL;
 		return lexer->symbol_count + 1;
 	}
@@ -211,7 +211,7 @@ json_parse_identifier(struct json_lexer *lexer, struct json_token *token)
 int
 json_lexer_next_token(struct json_lexer *lexer, struct json_token *token)
 {
-	if (lexer->offset == lexer->src_len) {
+	if (json_lexer_is_eof(lexer)) {
 		token->type = JSON_TOKEN_END;
 		return 0;
 	}
@@ -223,7 +223,7 @@ json_lexer_next_token(struct json_lexer *lexer, struct json_token *token)
 	switch(c) {
 	case (UChar32)'[':
 		/* Error for '[\0'. */
-		if (lexer->offset == lexer->src_len)
+		if (json_lexer_is_eof(lexer))
 			return lexer->symbol_count;
 		c = json_current_char(lexer);
 		if (c == '"' || c == '\'') {
@@ -240,14 +240,14 @@ json_lexer_next_token(struct json_lexer *lexer, struct json_token *token)
 		 * Expression, started from [ must be finished
 		 * with ] regardless of its type.
 		 */
-		if (lexer->offset == lexer->src_len ||
+		if (json_lexer_is_eof(lexer) ||
 		    json_current_char(lexer) != ']')
 			return lexer->symbol_count + 1;
 		/* Skip ] - one byte char. */
 		json_skip_char(lexer);
 		return 0;
 	case (UChar32)'.':
-		if (lexer->offset == lexer->src_len)
+		if (json_lexer_is_eof(lexer))
 			return lexer->symbol_count + 1;
 		return json_parse_identifier(lexer, token);
 	default:
@@ -259,26 +259,15 @@ json_lexer_next_token(struct json_lexer *lexer, struct json_token *token)
 }
 
 /**
- * Compare JSON token keys.
+ * Compare JSON tokens as nodes of a JSON tree. That is, including
+ * parent references.
  */
 static int
-json_token_cmp(const struct json_token *a, const struct json_token *b)
+json_token_cmp_in_tree(const struct json_token *a, const struct json_token *b)
 {
 	if (a->parent != b->parent)
 		return a->parent - b->parent;
-	if (a->type != b->type)
-		return a->type - b->type;
-	int ret = 0;
-	if (a->type == JSON_TOKEN_STR) {
-		if (a->len != b->len)
-			return a->len - b->len;
-		ret = memcmp(a->str, b->str, a->len);
-	} else if (a->type == JSON_TOKEN_NUM) {
-		ret = a->num - b->num;
-	} else {
-		assert(a->type == JSON_TOKEN_ANY);
-	}
-	return ret;
+	return json_token_cmp(a, b);
 }
 
 int
@@ -289,7 +278,7 @@ json_path_cmp(const char *a, int a_len, const char *b, int b_len,
 	json_lexer_create(&lexer_a, a, a_len, index_base);
 	json_lexer_create(&lexer_b, b, b_len, index_base);
 	struct json_token token_a, token_b;
-	/* For the sake of json_token_cmp(). */
+	/* For the sake of json_token_cmp_in_tree(). */
 	token_a.parent = NULL;
 	token_b.parent = NULL;
 	int rc_a, rc_b;
@@ -297,7 +286,7 @@ json_path_cmp(const char *a, int a_len, const char *b, int b_len,
 	       (rc_b = json_lexer_next_token(&lexer_b, &token_b)) == 0 &&
 		token_a.type != JSON_TOKEN_END &&
 		token_b.type != JSON_TOKEN_END) {
-		int rc = json_token_cmp(&token_a, &token_b);
+		int rc = json_token_cmp_in_tree(&token_a, &token_b);
 		if (rc != 0)
 			return rc;
 	}
@@ -423,8 +412,8 @@ json_tree_snprint_path(char *buf, int size, const struct json_token *token,
 #define mh_arg_t void *
 #define mh_hash(a, arg) ((*(a))->hash)
 #define mh_hash_key(a, arg) ((a)->hash)
-#define mh_cmp(a, b, arg) (json_token_cmp(*(a), *(b)))
-#define mh_cmp_key(a, b, arg) (json_token_cmp((a), *(b)))
+#define mh_cmp(a, b, arg) (json_token_cmp_in_tree(*(a), *(b)))
+#define mh_cmp_key(a, b, arg) (json_token_cmp_in_tree((a), *(b)))
 #include "salad/mhash.h"
 
 static const uint32_t hash_seed = 13U;

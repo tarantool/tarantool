@@ -241,6 +241,13 @@ json_lexer_create(struct json_lexer *lexer, const char *src, int src_len,
 int
 json_lexer_next_token(struct json_lexer *lexer, struct json_token *token);
 
+/** Check if @a lexer has finished parsing. */
+static inline bool
+json_lexer_is_eof(const struct json_lexer *lexer)
+{
+	return lexer->offset == lexer->src_len;
+}
+
 /**
  * Compare two JSON paths using Lexer class.
  * - in case of paths that have same token-sequence prefix,
@@ -277,6 +284,30 @@ static inline bool
 json_token_is_leaf(struct json_token *token)
 {
 	return token->max_child_idx < 0;
+}
+
+/**
+ * Compare two JSON tokens, not taking into account their tree
+ * attributes. Only the token values are compared. That might be
+ * used to compare two JSON paths. String comparison of the paths
+ * may not work because the same token can be present in different
+ * forms: ['a'] == .a, for example.
+ */
+static inline int
+json_token_cmp(const struct json_token *l, const struct json_token *r)
+{
+	if (l->type != r->type)
+		return l->type - r->type;
+	switch(l->type) {
+	case JSON_TOKEN_NUM:
+		return l->num - r->num;
+	case JSON_TOKEN_STR:
+		if (l->len != r->len)
+			return l->len - r->len;
+		return memcmp(l->str, r->str, l->len);
+	default:
+		return 0;
+	}
 }
 
 /**
