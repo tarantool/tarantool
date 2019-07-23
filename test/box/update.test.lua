@@ -424,4 +424,98 @@ box.commit()
 vy_s:select()
 vy_s:drop()
 
+--
+-- Complex updates. Intersected paths, different types.
+--
+
+--
+-- =
+--
+-- Difference in the last part.
+t:update({{'=', '[3][3][1][1]', 325}, {'=', '[3][3][1][2]', 375}})
+-- Different starting from the non-last part.
+t:update({{'=', '[3][3][1][1]', 325}, {'=', '[3][3][2][2]', 475}})
+-- Contains string keys in the middle.
+t:update({{'=', '[2].c.f[1]', 4000}, {'=', '[2].c.f[2]', 5000}})
+t = {1}
+t[2] = setmetatable({}, {__serialize = 'map'})
+t[3] = {}
+t[4] = {                        \
+    1,                          \
+    2,                          \
+    3,                          \
+    {                           \
+        4,                      \
+        5,                      \
+        6,                      \
+        7,                      \
+        {                       \
+            8,                  \
+            9,                  \
+            {10, 11, 12},       \
+            13,                 \
+            14,                 \
+        },                      \
+        15,                     \
+        16,                     \
+        {17, 18, 19}            \
+    },                          \
+    20,                         \
+    {                           \
+        a = 21,                 \
+        b = 22,                 \
+        c = {                   \
+            d = 23,             \
+            e = 24              \
+        }                       \
+    },                          \
+    25                          \
+}
+t = s:replace(t)
+-- Non-first and non-last field updates.
+t:update({{'=', '[4][4][5][3][2]', 11000}, {'=', '[4][4][8][3]', 19000}})
+-- Triple intersection with enabled fast jump by route.
+t:update({{'=', '[4][4][3]', 6000}, {'=', '[4][4][5][2]', 9000}, {'=', '[4][4][8][2]', 18000}})
+-- Triple intersection with no optimizations.
+t:update({{'=', '[4][3]', 3000}, {'=', '[4][4][2]', 5000}, {'=', '[4][4][5][1]', 8000}})
+-- Last operation splits previous ones.
+t:update({{'=', '[4][4][5][3][2]', 11000}, {'=', '[4][4][5][3][1]', 10000}, {'=', '[4][4][3]', 6000}})
+-- First two operations generate a route '[4]' in the 4th field of
+-- the tuple. With childs [1] and [2]. The last operation should
+-- delete the route and replace it with a full featured array.
+t:update({{'=', '[4][4][1]', 4.5}, {'=', '[4][4][2]', 5.5}, {'=', '[4][3]', 3.5}})
+-- Test errors.
+t:update({{'=', '[4][4][5][1]', 8000}, {'=', '[4][4][5].a', -1}})
+t:update({{'=', '[4][4][5][1]', 8000}, {'=', '[4][4][*].a', -1}})
+t:update({{'=', '[4][4][*].b', 8000}, {'=', '[4][4][*].a', -1}})
+t:update({{'=', '[4][4][1]', 4000}, {'=', '[4][4]-badjson', -1}})
+t:update({{'=', '[4][4][1]', 1}, {'=', '[4][4][1]', 2}})
+-- First two operations produce zero length bar update in field
+-- [4][4][5][4]. The third operation should raise an error.
+t:update({{'+', '[4][4][5][4]', 13000}, {'=', '[4][4][5][1]', 8000}, {'+', '[4][4][5][4]', 1}})
+
+--
+-- !
+--
+t:update({{'!', '[4][5]', 19.5}, {'!', '[4][6]', 19.75}, {'!', '[4][4][3]', 5.5}, {'=', '[4][4][2]', 5.25}})
+--
+-- #
+--
+t:update({{'#', '[4][4][5]', 1}, {'#', '[4][4][4]', 1}, {'#', '[4][4][5]', 1}})
+--
+-- Scalar operations.
+--
+t:update({{'+', '[4][3]', 0.5}, {'+', '[4][4][5][5]', 0.75}})
+t:update({{'+', '[4][3]', 0.5}, {'+', '[4][4][5][5]', 0.75}, {'+', '[4][4][3]', 0.25}})
+-- Combined - check that operations following '!' take into
+-- account that there is a new element. Indexes should be relative
+-- to the new array size.
+t:update({{'!', '[4][3]', 2.5}, {'+', '[4][5][5][5]', 0.75}, {'+', '[4][5][3]', 0.25}})
+-- Error - an attempt to follow JSON path in a scalar field
+-- during branching.
+t:update({{'+', '[4][3]', 0.5}, {'+', '[4][3][2]', 0.5}})
+-- Error - array update should check that its token is a number.
+-- Parent field won't guarantee that.
+t:update({{'=', '[3]', {0}}, {'=', '[4][3]', 3.5}, {'=', '[4][4][1]', 4.5}, {'=', '[4][4][2]', 5.5}, {'=', '[4][4].key', 6.5}})
+
 s:drop()

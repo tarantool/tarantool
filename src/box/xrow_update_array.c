@@ -190,6 +190,56 @@ xrow_update_array_create(struct xrow_update_field *field, const char *header,
 	return xrow_update_rope_append(field->array.rope, item, field_count);
 }
 
+int
+xrow_update_array_create_with_child(struct xrow_update_field *field,
+				    const char *header,
+				    const struct xrow_update_field *child,
+				    int32_t field_no)
+{
+	const char *data = header;
+	uint32_t field_count = mp_decode_array(&data);
+	const char *first_field = data;
+	const char *first_field_end = first_field;
+	mp_next(&first_field_end);
+	struct region *region = &fiber()->gc;
+	struct xrow_update_rope *rope = xrow_update_rope_new(region);
+	if (rope == NULL)
+		return -1;
+	struct xrow_update_array_item *item = (struct xrow_update_array_item *)
+		xrow_update_alloc(region, sizeof(*item));
+	if (item == NULL)
+		return -1;
+	const char *end = first_field_end;
+	if (field_no > 0) {
+		for (int32_t i = 1; i < field_no; ++i)
+			mp_next(&end);
+		xrow_update_array_item_create(item, XUPDATE_NOP, first_field,
+					      first_field_end - first_field,
+					      end - first_field_end);
+		if (xrow_update_rope_append(rope, item, field_no) != 0)
+			return -1;
+		item = (struct xrow_update_array_item *)
+			xrow_update_alloc(region, sizeof(*item));
+		if (item == NULL)
+			return -1;
+		first_field = end;
+		first_field_end = first_field;
+		mp_next(&first_field_end);
+		end = first_field_end;
+	}
+	for (uint32_t i = field_no + 1; i < field_count; ++i)
+		mp_next(&end);
+	item->field = *child;
+	xrow_update_array_item_create(item, child->type, first_field,
+				      first_field_end - first_field,
+				      end - first_field_end);
+	field->type = XUPDATE_ARRAY;
+	field->data = header;
+	field->size = end - header;
+	field->array.rope = rope;
+	return xrow_update_rope_append(rope, item, field_count - field_no);
+}
+
 uint32_t
 xrow_update_array_sizeof(struct xrow_update_field *field)
 {

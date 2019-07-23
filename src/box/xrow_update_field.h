@@ -280,6 +280,23 @@ enum xrow_update_type {
 	 * path nodes. And this is the most common case.
 	 */
 	XUPDATE_BAR,
+	/**
+	 * Field with a subtree of updates having the same prefix
+	 * stored here explicitly. New updates with the same
+	 * prefix just follow it without decoding of JSON nor
+	 * MessagePack. It can be quite helpful when an update
+	 * works with the same internal object via several
+	 * operations like this:
+	 *
+	 *    [1][2].a.b.c[1] = 20
+	 *    [1][2].a.b.c[2] = 30
+	 *    [1][2].a.b.c[3] = true
+	 *
+	 * Here [1][2].a.b.c is stored only once as a route with a
+	 * child XUPDATE_ARRAY making updates '[1] = 20',
+	 * '[2] = 30', '[3] = true'.
+	 */
+	XUPDATE_ROUTE,
 };
 
 /**
@@ -360,6 +377,17 @@ struct xrow_update_field {
 				};
 			};
 		} bar;
+		/** Route update - path to an update subtree. */
+		struct {
+			/**
+			 * Common prefix of all updates in the
+			 * subtree.
+			 */
+			const char *path;
+			int path_len;
+			/** Update subtree. */
+			struct xrow_update_field *next_hop;
+		} route;
 	};
 };
 
@@ -452,6 +480,33 @@ xrow_update_array_create(struct xrow_update_field *field, const char *header,
 			 const char *data, const char *data_end,
 			 uint32_t field_count);
 
+/**
+ * The same as mere create, but the array is created with a first
+ * child right away. It allows to make it more efficient, because
+ * under the hood a rope is created not as a one huge range which
+ * is then split in parts, but as two rope nodes from the
+ * beginning. On the summary: -1 rope node split, -1 decoding of
+ * fields from 0 to @a field_no.
+ *
+ * The function is used during branching, where there was an
+ * existing update, but another one came with the same prefix, and
+ * a different suffix.
+ *
+ * @param[out] field Field to initialize.
+ * @param header Header of the MessagePack array.
+ * @param child A child subtree. The child is copied by value into
+ *        the created array.
+ * @param field_no Field number of @a child.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error.
+ */
+int
+xrow_update_array_create_with_child(struct xrow_update_field *field,
+				    const char *header,
+				    const struct xrow_update_field *child,
+				    int32_t field_no);
+
 OP_DECL_GENERIC(array)
 
 /* }}} xrow_update_field.array */
@@ -468,6 +523,37 @@ OP_DECL_GENERIC(nop)
 
 /* }}} update_field.nop */
 
+/* {{{ xrow_update_field.route */
+
+/**
+ * Take a bar or a route @a field and split its path in the place
+ * where @a new_op should be applied. Prefix becomes a new route
+ * object, suffix becomes a child of the result route. In the
+ * result @a field stays root of its subtree, and a node of that
+ * subtree is returned, to which @a new_op should be applied.
+ *
+ * Note, this function does not apply @a new_op. It just finds to
+ * where it *should be* applied and does all preparations. It is
+ * done deliberately, because otherwise do_cb() virtual function
+ * of @a new_op would have been called here, since there is no
+ * context. But a caller always knows exactly if it was insert,
+ * set, arith, etc. And a caller can and does use more specific
+ * function like xrow_update_op_do_field_set/insert/... .
+ *
+ * @param field Field to find where to apply @a new_op.
+ * @param new_op New operation to apply.
+ *
+ * @retval not-NULL A field to which @a new_op should be applied.
+ * @retval NULL Error.
+ */
+struct xrow_update_field *
+xrow_update_route_branch(struct xrow_update_field *field,
+			 struct xrow_update_op *new_op);
+
+OP_DECL_GENERIC(route)
+
+/* }}} xrow_update_field.route */
+
 #undef OP_DECL_GENERIC
 
 /* {{{ Common helpers. */
@@ -480,6 +566,17 @@ OP_DECL_GENERIC(nop)
  * xrow_update_op_do_field_set on its childs. Each child can be
  * another array, a bar, a route, a map - anything. The functions
  * below help to make such places shorter and simpler.
+ *
+ * Note, that they are recursive, although it is not clearly
+ * visible. For example, if an update tree contains several array
+ * nodes on one tree branch, then update of the deepest array goes
+ * through each of these nodes and calls
+ * xrow_update_op_do_array_<opname>() on needed children. But it
+ * is ok, because operation count is usually small (<<50 in the
+ * most cases, usually <= 5), and the update tree depth is not
+ * bigger than operation count. Also, fiber stack is big enough to
+ * fit ~10k update tree depth - incredible number, even though the
+ * real limit is 4k due to limited number of operations.
  */
 #define OP_DECL_GENERIC(op_type)						\
 static inline int								\
@@ -493,6 +590,8 @@ xrow_update_op_do_field_##op_type(struct xrow_update_op *op,			\
 		return xrow_update_op_do_nop_##op_type(op, field);		\
 	case XUPDATE_BAR:							\
 		return xrow_update_op_do_bar_##op_type(op, field);		\
+	case XUPDATE_ROUTE:							\
+		return xrow_update_op_do_route_##op_type(op, field);		\
 	default:								\
 		unreachable();							\
 	}									\

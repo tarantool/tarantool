@@ -307,17 +307,11 @@ int										\
 xrow_update_op_do_bar_##op_type(struct xrow_update_op *op,			\
 				struct xrow_update_field *field)		\
 {										\
-	/*									\
-	 * The only way to update a bar is to make a second update		\
-	 * with the same prefix as this bar. But it is not			\
-	 * supported yet.							\
-	 */									\
-	(void) op;								\
-	(void) field;								\
 	assert(field->type == XUPDATE_BAR);					\
-	diag_set(ClientError, ER_UNSUPPORTED, "update",				\
-		 "intersected JSON paths");					\
-	return -1;								\
+	field = xrow_update_route_branch(field, op);				\
+	if (field == NULL)							\
+		return -1;							\
+	return xrow_update_op_do_field_##op_type(op, field);			\
 }
 
 DO_BAR_OP_GENERIC(insert)

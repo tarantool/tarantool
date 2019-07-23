@@ -114,6 +114,8 @@ xrow_update_field_sizeof(struct xrow_update_field *field)
 		return xrow_update_array_sizeof(field);
 	case XUPDATE_BAR:
 		return xrow_update_bar_sizeof(field);
+	case XUPDATE_ROUTE:
+		return xrow_update_route_sizeof(field);
 	default:
 		unreachable();
 	}
@@ -141,6 +143,8 @@ xrow_update_field_store(struct xrow_update_field *field, char *out,
 		return xrow_update_array_store(field, out, out_end);
 	case XUPDATE_BAR:
 		return xrow_update_bar_store(field, out, out_end);
+	case XUPDATE_ROUTE:
+		return xrow_update_route_store(field, out, out_end);
 	default:
 		unreachable();
 	}
