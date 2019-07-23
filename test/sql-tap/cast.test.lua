@@ -40,7 +40,7 @@ test:do_execsql_test(
         SELECT typeof(x'616263')
     ]], {
         -- <cast-1.2>
-        "scalar"
+        "varbinary"
         -- </cast-1.2>
     })
 
@@ -90,7 +90,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(x'616263' AS SCALAR))
     ]], {
         -- <cast-1.8>
-        "scalar"
+        "varbinary"
         -- </cast-1.8>
     })
 

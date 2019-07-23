@@ -108,7 +108,7 @@ local from_lua_to_sql = {
 local function check_from_lua_to_sql(i)
     return from_lua_to_sql[i][2]
 end
-box.internal.sql_create_function("check_from_lua_to_sql", "BLOB", check_from_lua_to_sql)
+box.internal.sql_create_function("check_from_lua_to_sql", "VARBINARY", check_from_lua_to_sql)
 
 -- check for different types
 for i = 1, #from_lua_to_sql, 1 do
@@ -125,7 +125,7 @@ local from_lua_to_sql_bad = {
 local function check_from_lua_to_sql_bad(i)
     return from_lua_to_sql_bad[i]
 end
-box.internal.sql_create_function("check_from_lua_to_sql_bad", "BLOB", check_from_lua_to_sql_bad)
+box.internal.sql_create_function("check_from_lua_to_sql_bad", "VARBINARY", check_from_lua_to_sql_bad)
 
 for i = 1, #from_lua_to_sql_bad, 1 do
     test:do_catchsql_test(

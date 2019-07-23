@@ -1194,7 +1194,7 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 				zP4 = "NULL";
 			} else {
 				assert(pMem->flags & MEM_Blob);
-				zP4 = "(blob)";
+				zP4 = "(binary string)";
 			}
 			break;
 		}

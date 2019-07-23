@@ -166,7 +166,7 @@ lbox_sql_create_function(struct lua_State *L)
 		type = FIELD_TYPE_STRING;
 	else if (strcmp(type_arg, "NUMBER") == 0)
 		type = FIELD_TYPE_NUMBER;
-	else if (strcmp(type_arg, "BLOB") == 0)
+	else if (strcmp(type_arg, "VARBINARY") == 0)
 		type = FIELD_TYPE_SCALAR;
 	else if (strcmp(type_arg, "BOOL") == 0 ||
 		 strcmp(type_arg, "BOOLEAN") == 0)

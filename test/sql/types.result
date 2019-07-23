@@ -152,33 +152,33 @@ sp:drop()
 --
 box.execute("SELECT 'abc' || 1;")
 ---
-- error: 'Inconsistent types: expected TEXT or BLOB got UNSIGNED'
+- error: 'Inconsistent types: expected TEXT or VARBINARY got UNSIGNED'
 ...
 box.execute("SELECT 'abc' || 1.123;")
 ---
-- error: 'Inconsistent types: expected TEXT or BLOB got REAL'
+- error: 'Inconsistent types: expected TEXT or VARBINARY got REAL'
 ...
 box.execute("SELECT 1 || 'abc';")
 ---
-- error: 'Inconsistent types: expected TEXT or BLOB got UNSIGNED'
+- error: 'Inconsistent types: expected TEXT or VARBINARY got UNSIGNED'
 ...
 box.execute("SELECT 1.123 || 'abc';")
 ---
-- error: 'Inconsistent types: expected TEXT or BLOB got REAL'
+- error: 'Inconsistent types: expected TEXT or VARBINARY got REAL'
 ...
 box.execute("SELECt 'a' || 'b' || 1;")
 ---
-- error: 'Inconsistent types: expected TEXT or BLOB got UNSIGNED'
+- error: 'Inconsistent types: expected TEXT or VARBINARY got UNSIGNED'
 ...
 -- What is more, they must be of the same type.
 --
 box.execute("SELECT 'abc' || randomblob(5);")
 ---
-- error: 'Inconsistent types: expected TEXT got BLOB'
+- error: 'Inconsistent types: expected TEXT got VARBINARY'
 ...
 box.execute("SELECT randomblob(5) || 'x';")
 ---
-- error: 'Inconsistent types: expected BLOB got TEXT'
+- error: 'Inconsistent types: expected VARBINARY got TEXT'
 ...
 -- Result of BLOBs concatenation must be BLOB.
 --
@@ -188,7 +188,7 @@ box.execute("VALUES (TYPEOF(randomblob(5) || zeroblob(5)));")
   - name: column1
     type: string
   rows:
-  - ['scalar']
+  - ['varbinary']
 ...
 -- gh-3954: LIKE accepts only arguments of type TEXT and NULLs.
 --
@@ -202,15 +202,15 @@ box.execute("INSERT INTO t1 VALUES (randomblob(5));")
 ...
 box.execute("SELECT * FROM t1 WHERE s LIKE 'blob';")
 ---
-- error: 'Inconsistent types: expected TEXT got BLOB'
+- error: 'Inconsistent types: expected TEXT got VARBINARY'
 ...
 box.execute("SELECT * FROM t1 WHERE 'blob' LIKE s;")
 ---
-- error: 'Inconsistent types: expected TEXT got BLOB'
+- error: 'Inconsistent types: expected TEXT got VARBINARY'
 ...
 box.execute("SELECT * FROM t1 WHERE 'blob' LIKE x'0000';")
 ---
-- error: 'Inconsistent types: expected TEXT got BLOB'
+- error: 'Inconsistent types: expected TEXT got VARBINARY'
 ...
 box.execute("SELECT s LIKE NULL FROM t1;")
 ---
@@ -393,7 +393,7 @@ box.execute("SELECT 1 LIMIT 1 OFFSET true;")
 ...
 box.execute("SELECT 'abc' || true;")
 ---
-- error: 'Inconsistent types: expected TEXT or BLOB got BOOLEAN'
+- error: 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
 ...
 -- Boolean can take part in arithmetic operations.
 --
@@ -1795,7 +1795,7 @@ box.execute("SELECT CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 ELSE 'asd' END")
 ---
 - metadata:
   - name: CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 ELSE 'asd' END
-    type: integer
+    type: scalar
   rows:
   - [666]
 ...
@@ -1813,7 +1813,7 @@ box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHE
 - metadata:
   - name: CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4
       WHEN 'e' THEN 5 WHEN 'f' THEN 'asd' END
-    type: integer
+    type: scalar
   rows:
   - [1]
 ...
@@ -1822,7 +1822,7 @@ box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHE
 - metadata:
   - name: CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4
       WHEN 'e' THEN 5 WHEN 'f' THEN 6 ELSE 'asd' END
-    type: integer
+    type: scalar
   rows:
   - [1]
 ...

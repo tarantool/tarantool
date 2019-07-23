@@ -228,7 +228,7 @@ test:do_test(
         return test:catchsql "SELECT position(34, 12345);"
     end, {
         -- <position-1.23>
-        1, "Inconsistent types: expected TEXT or BLOB got UNSIGNED"
+        1, "Inconsistent types: expected TEXT or VARBINARY got UNSIGNED"
         -- </position-1.23>
     })
 
@@ -238,7 +238,7 @@ test:do_test(
         return test:catchsql "SELECT position(34, 123456.78);"
     end, {
         -- <position-1.24>
-        1, "Inconsistent types: expected TEXT or BLOB got REAL"
+        1, "Inconsistent types: expected TEXT or VARBINARY got REAL"
         -- </position-1.24>
     })
 
@@ -248,7 +248,7 @@ test:do_test(
         return test:catchsql "SELECT position(x'3334', 123456.78);"
     end, {
         -- <position-1.25>
-        1, "Inconsistent types: expected TEXT or BLOB got REAL"
+        1, "Inconsistent types: expected TEXT or VARBINARY got REAL"
         -- </position-1.25>
     })
 
@@ -554,7 +554,7 @@ test:do_test(
         return test:catchsql("SELECT position('x', x'78c3a4e282ac79');")
     end, {
         -- <position-1.54>
-        1, "Inconsistent types: expected TEXT got BLOB"
+        1, "Inconsistent types: expected TEXT got VARBINARY"
         -- </position-1.54>
     })
 
@@ -564,7 +564,7 @@ test:do_test(
         return test:catchsql "SELECT position('y', x'78c3a4e282ac79');"
     end, {
         -- <position-1.55>
-        1, "Inconsistent types: expected TEXT got BLOB"
+        1, "Inconsistent types: expected TEXT got VARBINARY"
         -- </position-1.55>
     })
 
@@ -614,7 +614,7 @@ test:do_test(
         return test:catchsql "SELECT position(x'79', 'xä€y');"
     end, {
         -- <position-1.57.1>
-        1, "Inconsistent types: expected BLOB got TEXT"
+        1, "Inconsistent types: expected VARBINARY got TEXT"
         -- </position-1.57.1>
     })
 
@@ -624,7 +624,7 @@ test:do_test(
         return test:catchsql "SELECT position(x'a4', 'xä€y');"
     end, {
         -- <position-1.57.2>
-        1, "Inconsistent types: expected BLOB got TEXT"
+        1, "Inconsistent types: expected VARBINARY got TEXT"
         -- </position-1.57.2>
     })
 
@@ -634,7 +634,7 @@ test:do_test(
         return test:catchsql "SELECT position('y', x'78c3a4e282ac79');"
     end, {
         -- <position-1.57.3>
-        1, "Inconsistent types: expected TEXT got BLOB"
+        1, "Inconsistent types: expected TEXT got VARBINARY"
         -- </position-1.57.3>
     })
 

@@ -293,8 +293,8 @@ invokeValueDestructor(const void *p,	/* Value to destroy */
 		xDel((void *)p);
 	}
 	if (pCtx) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob is too "\
-			 "big");
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or binary string"\
+			 "is too big");
 		pCtx->is_aborted = true;
 	}
 	return -1;
@@ -392,8 +392,8 @@ sql_result_zeroblob64(sql_context * pCtx, u64 n)
 {
 	Mem *pOut = pCtx->pOut;
 	if (n > (u64) pOut->db->aLimit[SQL_LIMIT_LENGTH]) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob is too "\
-			 "big");
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or binary string"\
+			 "is too big");
 		return -1;
 	}
 	sqlVdbeMemSetZeroBlob(pCtx->pOut, (int)n);
@@ -941,7 +941,7 @@ sql_bind_blob(sql_stmt * pStmt,
 	struct Mem *var = &p->aVar[i - 1];
 	if (sqlVdbeMemSetStr(var, zData, nData, 0, xDel) != 0)
 		return -1;
-	return sql_bind_type(p, i, "BLOB");
+	return sql_bind_type(p, i, "VARBINARY");
 }
 
 int
@@ -1025,7 +1025,7 @@ sql_bind_ptr(struct sql_stmt *stmt, int i, void *ptr)
 	struct Vdbe *p = (struct Vdbe *) stmt;
 	int rc = vdbeUnbind(p, i);
 	if (rc == 0) {
-		rc = sql_bind_type(p, i, "BLOB");
+		rc = sql_bind_type(p, i, "VARBINARY");
 		mem_set_ptr(&p->aVar[i - 1], ptr);
 	}
 	return rc;
@@ -1069,8 +1069,8 @@ sql_bind_zeroblob64(sql_stmt * pStmt, int i, sql_uint64 n)
 {
 	Vdbe *p = (Vdbe *) pStmt;
 	if (n > (u64) p->db->aLimit[SQL_LIMIT_LENGTH]) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob is too "\
-			 "big");
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or binary string"\
+			 "is too big");
 		return -1;
 	}
 	assert((n & 0x7FFFFFFF) == n);

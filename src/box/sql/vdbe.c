@@ -598,7 +598,7 @@ mem_type_to_str(const struct Mem *p)
 	case MEM_Real:
 		return "REAL";
 	case MEM_Blob:
-		return "BLOB";
+		return "VARBINARY";
 	case MEM_Bool:
 		return "BOOLEAN";
 	default:
@@ -1476,7 +1476,7 @@ case OP_Concat: {           /* same as TK_CONCAT, in1, in2, out3 */
 		char *inconsistent_type = str_type_p1 == 0 ?
 					  mem_type_to_str(pIn1) :
 					  mem_type_to_str(pIn2);
-		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT or BLOB",
+		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT or VARBINARY",
 			 inconsistent_type);
 		goto abort_due_to_error;
 	}

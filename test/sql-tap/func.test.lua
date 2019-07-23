@@ -978,7 +978,7 @@ test:do_execsql_test(
         SELECT typeof(randomblob(32));
     ]], {
         -- <func-9.4>
-        "scalar"
+        "varbinary"
         -- </func-9.4>
     })
 

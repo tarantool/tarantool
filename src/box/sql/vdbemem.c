@@ -1028,8 +1028,8 @@ sqlVdbeMemSetStr(Mem * pMem,	/* Memory cell to set to string value */
 			nAlloc += 1; //SQL_UTF8
 		}
 		if (nByte > iLimit) {
-			diag_set(ClientError, ER_SQL_EXECUTE, "string or blob "\
-				 "is too big");
+			diag_set(ClientError, ER_SQL_EXECUTE, "string or binary"\
+				 "string is too big");
 			return -1;
 		}
 		testcase(nAlloc == 0);
@@ -1054,8 +1054,8 @@ sqlVdbeMemSetStr(Mem * pMem,	/* Memory cell to set to string value */
 	pMem->flags = flags;
 
 	if (nByte > iLimit) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob is too "\
-			 "big");
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or binary string"\
+			 "is too big");
 		return -1;
 	}
 
