@@ -280,5 +280,5 @@ Count: 10575
 	*** approximate_count: done ***
 	*** insert_get_iterator ***
 	*** insert_get_iterator: done ***
-	*** delete_identical_check ***
-	*** delete_identical_check: done ***
+	*** delete_value_check ***
+	*** delete_value_check: done ***

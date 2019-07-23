@@ -839,7 +839,7 @@ insert_get_iterator()
 }
 
 static void
-delete_identical_check()
+delete_value_check()
 {
 	header();
 	struct_tree tree;
@@ -847,11 +847,11 @@ delete_identical_check()
 	struct elem_t e1 = {1, 1};
 	struct_tree_insert(&tree, e1, NULL);
 	struct elem_t e2 = {1, 2};
-	if (struct_tree_delete_identical(&tree, e2) == 0)
+	if (struct_tree_delete_value(&tree, e2, NULL) == 0)
 		fail("deletion of the non-identical element must fail", "false");
 	if (struct_tree_find(&tree, 1) == NULL)
 		fail("test non-identical element deletion failure", "false");
-	if (struct_tree_delete_identical(&tree, e1) != 0)
+	if (struct_tree_delete_value(&tree, e1, NULL) != 0)
 		fail("deletion of the identical element must not fail", "false");
 	if (struct_tree_find(&tree, 1) != NULL)
 		fail("test identical element deletion completion", "false");
@@ -873,5 +873,5 @@ main(void)
 	if (extents_count != 0)
 		fail("memory leak!", "true");
 	insert_get_iterator();
-	delete_identical_check();
+	delete_value_check();
 }

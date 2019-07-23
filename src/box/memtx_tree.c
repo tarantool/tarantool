@@ -667,7 +667,7 @@ memtx_tree_index_replace_multikey_rollback(struct memtx_tree_index *index,
 	data.tuple = new_tuple;
 	for (int i = 0; i < err_multikey_idx; i++) {
 		data.hint = i;
-		memtx_tree_delete_identical(&index->tree, data);
+		memtx_tree_delete_value(&index->tree, data, NULL);
 	}
 }
 
@@ -763,7 +763,7 @@ memtx_tree_index_replace_multikey(struct index *base, struct tuple *old_tuple,
 			tuple_multikey_count(old_tuple, cmp_def);
 		for (int i = 0; (uint32_t) i < multikey_count; i++) {
 			data.hint = i;
-			memtx_tree_delete_identical(&index->tree, data);
+			memtx_tree_delete_value(&index->tree, data, NULL);
 		}
 	}
 	return 0;
