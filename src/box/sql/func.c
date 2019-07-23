@@ -191,9 +191,10 @@ absFunc(sql_context * context, int argc, sql_value ** argv)
 			sql_result_null(context);
 			break;
 		}
-	case MP_BOOL: {
+	case MP_BOOL:
+	case MP_BIN: {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES, "number",
-			 "boolean");
+			 mem_type_to_str(argv[0]));
 		context->is_aborted = true;
 		return;
 	}
@@ -502,6 +503,12 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 	}
 	if (sql_value_is_null(argv[0]))
 		return;
+	if (sql_value_type(argv[0]) == MP_BIN) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+			 sql_value_text(argv[0]), "numeric");
+		context->is_aborted = true;
+		return;
+	}
 	r = sql_value_double(argv[0]);
 	/* If Y==0 and X will fit in a 64-bit int,
 	 * handle the rounding directly,
@@ -556,6 +563,13 @@ case_type##ICUFunc(sql_context *context, int argc, sql_value **argv)   \
 	const char *z2;                                                        \
 	int n;                                                                 \
 	UNUSED_PARAMETER(argc);                                                \
+	int arg_type = sql_value_type(argv[0]);                                \
+	if (arg_type == MP_BIN) {                                              \
+		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT",           \
+			 "VARBINARY");                                         \
+		context->is_aborted = true;                                    \
+		return;                                                        \
+	}                                                                      \
 	z2 = (char *)sql_value_text(argv[0]);                              \
 	n = sql_value_bytes(argv[0]);                                      \
 	/*                                                                     \
@@ -631,6 +645,12 @@ randomBlob(sql_context * context, int argc, sql_value ** argv)
 	unsigned char *p;
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
+	if (sql_value_type(argv[0]) == MP_BIN) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+			 sql_value_text(argv[0]), "numeric");
+		context->is_aborted = true;
+		return;
+	}
 	n = sql_value_int(argv[0]);
 	if (n < 1)
 		return;
@@ -1484,6 +1504,12 @@ soundexFunc(sql_context * context, int argc, sql_value ** argv)
 		1, 2, 6, 2, 3, 0, 1, 0, 2, 0, 2, 0, 0, 0, 0, 0,
 	};
 	assert(argc == 1);
+	if (sql_value_type(argv[0]) == MP_BIN) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+			 sql_value_text(argv[0]), "TEXT");
+		context->is_aborted = true;
+		return;
+	}
 	zIn = (u8 *) sql_value_text(argv[0]);
 	if (zIn == 0)
 		zIn = (u8 *) "";
