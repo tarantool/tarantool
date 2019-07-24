@@ -19,7 +19,7 @@ static int compare_key(const elem_t &a, long b);
 #define BPS_TREE_NAME test
 #define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
 #define BPS_TREE_EXTENT_SIZE 1024 /* value is to low specially for tests */
-#define BPS_TREE_IDENTICAL(a, b) equal(a, b)
+#define BPS_TREE_IS_IDENTICAL(a, b) equal(a, b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) compare_key(a, b)
 #define bps_tree_elem_t struct elem_t

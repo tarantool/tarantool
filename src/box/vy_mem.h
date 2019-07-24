@@ -121,7 +121,7 @@ vy_mem_tree_cmp_key(struct vy_entry entry, struct vy_mem_tree_key *key,
 #define BPS_TREE_EXTENT_SIZE VY_MEM_TREE_EXTENT_SIZE
 #define BPS_TREE_COMPARE(a, b, cmp_def) vy_mem_tree_cmp(a, b, cmp_def)
 #define BPS_TREE_COMPARE_KEY(a, b, cmp_def) vy_mem_tree_cmp_key(a, b, cmp_def)
-#define BPS_TREE_IDENTICAL(a, b) vy_entry_is_equal(a, b)
+#define BPS_TREE_IS_IDENTICAL(a, b) vy_entry_is_equal(a, b)
 #define bps_tree_elem_t struct vy_entry
 #define bps_tree_key_t struct vy_mem_tree_key *
 #define bps_tree_arg_t struct key_def *
@@ -136,7 +136,7 @@ vy_mem_tree_cmp_key(struct vy_entry entry, struct vy_mem_tree_key *key,
 #undef bps_tree_elem_t
 #undef bps_tree_key_t
 #undef bps_tree_arg_t
-#undef BPS_TREE_IDENTICAL
+#undef BPS_TREE_IS_IDENTICAL
 
 /** @endcond false */
 

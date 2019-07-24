@@ -97,7 +97,7 @@ vy_cache_tree_key_cmp(struct vy_cache_node *a, struct vy_entry b,
 #define bps_tree_elem_t struct vy_cache_node *
 #define bps_tree_key_t struct vy_entry
 #define bps_tree_arg_t struct key_def *
-#define BPS_TREE_IDENTICAL(a, b) vy_entry_is_equal(a->entry, b->entry)
+#define BPS_TREE_IS_IDENTICAL(a, b) vy_entry_is_equal(a->entry, b->entry)
 
 #include "salad/bps_tree.h"
 
@@ -109,7 +109,7 @@ vy_cache_tree_key_cmp(struct vy_cache_node *a, struct vy_entry b,
 #undef bps_tree_elem_t
 #undef bps_tree_key_t
 #undef bps_tree_arg_t
-#undef BPS_TREE_IDENTICAL
+#undef BPS_TREE_IS_IDENTICAL
 
 /**
  * Environment of the cache

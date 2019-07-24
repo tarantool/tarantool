@@ -70,8 +70,8 @@ struct memtx_tree_data {
  * @retval false - Otherwise.
  */
 static bool
-memtx_tree_data_identical(const struct memtx_tree_data *a,
-			  const struct memtx_tree_data *b)
+memtx_tree_data_is_equal(const struct memtx_tree_data *a,
+			 const struct memtx_tree_data *b)
 {
 	return a->tuple == b->tuple;
 }
@@ -84,7 +84,7 @@ memtx_tree_data_identical(const struct memtx_tree_data *a,
 #define BPS_TREE_COMPARE_KEY(a, b, arg)\
 	tuple_compare_with_key((&a)->tuple, (&a)->hint, (b)->key,\
 			       (b)->part_count, (b)->hint, arg)
-#define BPS_TREE_IDENTICAL(a, b) memtx_tree_data_identical(&a, &b)
+#define BPS_TREE_IS_IDENTICAL(a, b) memtx_tree_data_is_equal(&a, &b)
 #define BPS_TREE_NO_DEBUG 1
 #define bps_tree_elem_t struct memtx_tree_data
 #define bps_tree_key_t struct memtx_tree_key_data *
@@ -97,7 +97,7 @@ memtx_tree_data_identical(const struct memtx_tree_data *a,
 #undef BPS_TREE_EXTENT_SIZE
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
-#undef BPS_TREE_IDENTICAL
+#undef BPS_TREE_IS_IDENTICAL
 #undef BPS_TREE_NO_DEBUG
 #undef bps_tree_elem_t
 #undef bps_tree_key_t
@@ -182,7 +182,7 @@ tree_iterator_next(struct iterator *iterator, struct tuple **ret)
 	assert(it->current.tuple != NULL);
 	struct memtx_tree_data *check =
 		memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
-	if (check == NULL || !memtx_tree_data_identical(check, &it->current)) {
+	if (check == NULL || !memtx_tree_data_is_equal(check, &it->current)) {
 		it->tree_iterator =
 			memtx_tree_upper_bound_elem(it->tree, it->current,
 						    NULL);
@@ -211,7 +211,7 @@ tree_iterator_prev(struct iterator *iterator, struct tuple **ret)
 	assert(it->current.tuple != NULL);
 	struct memtx_tree_data *check =
 		memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
-	if (check == NULL || !memtx_tree_data_identical(check, &it->current)) {
+	if (check == NULL || !memtx_tree_data_is_equal(check, &it->current)) {
 		it->tree_iterator =
 			memtx_tree_lower_bound_elem(it->tree, it->current, NULL);
 	}
@@ -238,7 +238,7 @@ tree_iterator_next_equal(struct iterator *iterator, struct tuple **ret)
 	assert(it->current.tuple != NULL);
 	struct memtx_tree_data *check =
 		memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
-	if (check == NULL || !memtx_tree_data_identical(check, &it->current)) {
+	if (check == NULL || !memtx_tree_data_is_equal(check, &it->current)) {
 		it->tree_iterator =
 			memtx_tree_upper_bound_elem(it->tree, it->current, NULL);
 	} else {
@@ -272,7 +272,7 @@ tree_iterator_prev_equal(struct iterator *iterator, struct tuple **ret)
 	assert(it->current.tuple != NULL);
 	struct memtx_tree_data *check =
 		memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
-	if (check == NULL || !memtx_tree_data_identical(check, &it->current)) {
+	if (check == NULL || !memtx_tree_data_is_equal(check, &it->current)) {
 		it->tree_iterator =
 			memtx_tree_lower_bound_elem(it->tree, it->current, NULL);
 	}

@@ -25,7 +25,7 @@ compare(type_t a, type_t b);
 #define BPS_TREE_NAME testtest
 #define BPS_TREE_BLOCK_SIZE 512 /* value is to low specially for tests */
 #define BPS_TREE_EXTENT_SIZE 16*1024 /* value is to low specially for tests */
-#define BPS_TREE_IDENTICAL(a, b) (a == b)
+#define BPS_TREE_IS_IDENTICAL(a, b) (a == b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) compare(a, b)
 #define bps_tree_elem_t char
@@ -35,7 +35,7 @@ compare(type_t a, type_t b);
 #undef BPS_TREE_NAME
 #undef BPS_TREE_BLOCK_SIZE
 #undef BPS_TREE_EXTENT_SIZE
-#undef BPS_TREE_IDENTICAL
+#undef BPS_TREE_IS_IDENTICAL
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
 #undef bps_tree_elem_t
@@ -46,7 +46,7 @@ compare(type_t a, type_t b);
 #define BPS_TREE_NAME test
 #define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
 #define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
-#define BPS_TREE_IDENTICAL(a, b) (a == b)
+#define BPS_TREE_IS_IDENTICAL(a, b) (a == b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) compare(a, b)
 #define bps_tree_elem_t type_t
@@ -57,7 +57,7 @@ compare(type_t a, type_t b);
 #undef BPS_TREE_NAME
 #undef BPS_TREE_BLOCK_SIZE
 #undef BPS_TREE_EXTENT_SIZE
-#undef BPS_TREE_IDENTICAL
+#undef BPS_TREE_IS_IDENTICAL
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
 #undef bps_tree_elem_t
@@ -88,7 +88,7 @@ static int compare_key(const elem_t &a, long b)
 #define BPS_TREE_NAME struct_tree
 #define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
 #define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
-#define BPS_TREE_IDENTICAL(a, b) equal(a, b)
+#define BPS_TREE_IS_IDENTICAL(a, b) equal(a, b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) compare_key(a, b)
 #define bps_tree_elem_t struct elem_t
@@ -100,7 +100,7 @@ static int compare_key(const elem_t &a, long b)
 #undef BPS_TREE_EXTENT_SIZE
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
-#undef BPS_TREE_IDENTICAL
+#undef BPS_TREE_IS_IDENTICAL
 #undef bps_tree_elem_t
 #undef bps_tree_key_t
 #undef bps_tree_arg_t
@@ -109,7 +109,7 @@ static int compare_key(const elem_t &a, long b)
 #define BPS_TREE_NAME approx
 #define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
 #define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
-#define BPS_TREE_IDENTICAL(a, b) (a == b)
+#define BPS_TREE_IS_IDENTICAL(a, b) (a == b)
 #define BPS_TREE_COMPARE(a, b, arg) ((a) < (b) ? -1 : (a) > (b) ? 1 : 0)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) (((a) >> 32) < (b) ? -1 : ((a) >> 32) > (b) ? 1 : 0)
 #define bps_tree_elem_t uint64_t
