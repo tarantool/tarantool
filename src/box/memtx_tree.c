@@ -908,6 +908,8 @@ memtx_tree_index_build_next_multikey(struct index *base, struct tuple *tuple)
 static void
 memtx_tree_index_build_array_deduplicate(struct memtx_tree_index *index)
 {
+	if (index->build_array_size == 0)
+		return;
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	size_t w_idx = 0, r_idx = 1;
 	while (r_idx < index->build_array_size) {
