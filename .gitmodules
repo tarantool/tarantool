@@ -36,4 +36,4 @@
 	url = https://github.com/tarantool/decNumber.git
 [submodule "third_party/serpent"]
 	path = third_party/serpent
-	url = git@github.com:tarantool/serpent.git
+	url = https://github.com/tarantool/serpent.git
