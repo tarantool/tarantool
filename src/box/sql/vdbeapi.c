@@ -1007,7 +1007,7 @@ sql_bind_uint64(struct sql_stmt *stmt, int i, uint64_t value)
 	struct Vdbe *p = (struct Vdbe *) stmt;
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
-	int rc = sql_bind_type(p, i, "UNSIGNED");
+	int rc = sql_bind_type(p, i, "INTEGER");
 	mem_set_u64(&p->aVar[i - 1], value);
 	return rc;
 }
