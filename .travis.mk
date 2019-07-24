@@ -119,12 +119,6 @@ deps_osx:
 	brew update
 	brew install openssl readline curl icu4c libiconv --force
 	python2 -V || brew install python2 --force
-	###################################################
-	# Temporary workaround to curl version from
-	# issue #4288 to downgrade from 7.65.1 to 7.65.0:
-	# TODO: remove the workaround after 7.65.2 released
-	brew reinstall https://raw.githubusercontent.com/Homebrew/homebrew-core/e47f3e2682fa3d8a6ee58ded40718a1326e08a6d/Formula/curl.rb
-	###################################################
 	curl --silent --show-error --retry 5 https://bootstrap.pypa.io/get-pip.py >get-pip.py
 	python get-pip.py --user
 	pip install --user --force-reinstall -r test-run/requirements.txt
