@@ -17,7 +17,7 @@ local PUSH_TAG_HANDLE = '!push!'
 --
 -- Default output handler set to YAML for backward
 -- compatibility reason.
-local ouput_default_handler = { ["fmt"] = "yaml", ["opts"] = nil }
+local default_output_format = { ["fmt"] = "yaml", ["opts"] = nil }
 local output_handlers = { }
 
 output_handlers["yaml"] = function(status, opts, ...)
@@ -111,12 +111,12 @@ local function set_default_output(value)
     if status ~= true then
         error(err)
     end
-    ouput_default_handler["fmt"] = fmt
-    ouput_default_handler["opts"] = opts
+    default_output_format["fmt"] = fmt
+    default_output_format["opts"] = opts
 end
 
 local function get_default_output()
-    return ouput_default_handler
+    return default_output_format
 end
 
 local function output_save(fmt, opts)
@@ -124,15 +124,15 @@ local function output_save(fmt, opts)
     -- Output format descriptors are saved per
     -- session thus each console may specify
     -- own mode.
-    box.session.storage.console_output = {
+    box.session.storage.console_output_format = {
         ["fmt"] = fmt, ["opts"] = opts
     }
 end
 
 local function format(status, ...)
-    local d = box.session.storage.console_output
+    local d = box.session.storage.console_output_format
     if d == nil then
-        d = ouput_default_handler
+        d = default_output_format
     end
     return output_handlers[d["fmt"]](status, d["opts"], ...)
 end
