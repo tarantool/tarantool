@@ -671,6 +671,52 @@ memtx_tree_index_replace_multikey_rollback(struct memtx_tree_index *index,
 	}
 }
 
+/**
+ * :replace() function for a multikey index: replace old tuple
+ * index entries with ones from the new tuple.
+ *
+ * In a multikey index a single tuple is associated with 0..N keys
+ * of the b+*tree. Imagine old tuple key set is called "old_keys"
+ * and a new tuple set is called "new_keys". This function must
+ * 1) delete all removed keys: (new_keys - old_keys)
+ * 2) update tuple pointer in all preserved keys: (old_keys ^ new_keys)
+ * 3) insert data for all new keys (new_keys - old_keys).
+ *
+ * Compare with a standard unique or non-unique index, when a key
+ * is present only once, so whenever we encounter a duplicate, it
+ * is guaranteed to point at the old tuple (in non-unique indexes
+ * we augment the secondary key parts with primary key parts, so
+ * b+*tree still contains unique entries only).
+ *
+ * To reduce the number of insert and delete operations on the
+ * tree, this function attempts to optimistically add all keys
+ * from the new tuple to the tree first.
+ *
+ * When this step finds a duplicate, it's either of the following:
+ * - for a unique multikey index, it may be the old tuple or
+ *   some other tuple. Since unique index forbids duplicates,
+ *   this branch ends with an error unless we found the old tuple.
+ * - for a non-unique multikey index, both secondary and primary
+ *   key parts must match, so it's guaranteed to be the old tuple.
+ *
+ * In other words, when an optimistic insert finds a duplicate,
+ * it's either an error, in which case we roll back all the new
+ * keys from the tree and abort the procedure, or the old tuple,
+ * which we save to get back to, later.
+ *
+ * When adding new keys finishes, we have completed steps
+ * 2) and 3):
+ * - added set (new_keys - old_keys) to the index
+ * - updated set (new_keys ^ old_keys) with a new tuple pointer.
+ *
+ * We now must perform 1), which is remove (old_keys - new_keys).
+ *
+ * This is done by using the old tuple pointer saved from the
+ * previous step. To not accidentally delete the common key
+ * set of the old and the new tuple, we don't using key parts alone
+ * to compare - we also look at b+* tree value that has the tuple
+ * pointer, and delete old tuple entries only.
+ */
 static int
 memtx_tree_index_replace_multikey(struct index *base, struct tuple *old_tuple,
 			struct tuple *new_tuple, enum dup_replace_mode mode,
