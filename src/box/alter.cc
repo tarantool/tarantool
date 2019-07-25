@@ -733,16 +733,6 @@ alter_space_delete(struct alter_space *alter)
 	space_def_delete(alter->space_def);
 }
 
-/** A trivial wrapper around space_build_index(). */
-static void
-alter_space_build_index(struct space *src_space, struct space *new_space,
-			struct index *new_index)
-{
-	bool check = space_needs_check_unique_constraint(new_space,
-							 new_index->def->iid);
-	space_build_index_xc(src_space, new_index, new_space->format, check);
-}
-
 AlterSpaceOp::AlterSpaceOp(struct alter_space *alter)
 {
 	/* Add to the tail: operations must be processed in order. */
@@ -1290,7 +1280,7 @@ CreateIndex::prepare(struct alter_space *alter)
 		space_add_primary_key_xc(alter->new_space);
 		return;
 	}
-	alter_space_build_index(alter->old_space, alter->new_space, new_index);
+	space_build_index_xc(alter->old_space, alter->new_space, new_index);
 }
 
 void
@@ -1355,7 +1345,7 @@ RebuildIndex::prepare(struct alter_space *alter)
 	/* Get the new index and build it.  */
 	new_index = space_index(alter->new_space, new_index_def->iid);
 	assert(new_index != NULL);
-	alter_space_build_index(alter->old_space, alter->new_space, new_index);
+	space_build_index_xc(alter->old_space, alter->new_space, new_index);
 }
 
 void
@@ -1421,7 +1411,7 @@ TruncateIndex::prepare(struct alter_space *alter)
 	 * callback to load indexes during local recovery.
 	 */
 	assert(new_index != NULL);
-	alter_space_build_index(alter->new_space, alter->new_space, new_index);
+	space_build_index_xc(alter->new_space, alter->new_space, new_index);
 }
 
 void

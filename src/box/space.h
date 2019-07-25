@@ -431,12 +431,13 @@ space_drop_primary_key(struct space *space)
 }
 
 static inline int
-space_build_index(struct space *src_space, struct index *new_index,
-		  struct tuple_format *new_format,
-		  bool check_unique_constraint)
+space_build_index(struct space *src_space, struct space *new_space,
+		  struct index *new_index)
 {
-	return src_space->vtab->build_index(src_space, new_index, new_format,
-					    check_unique_constraint);
+	bool check = space_needs_check_unique_constraint(new_space,
+							 new_index->def->iid);
+	return src_space->vtab->build_index(src_space, new_index,
+					    new_space->format, check);
 }
 
 static inline void
@@ -618,12 +619,10 @@ space_check_format_xc(struct space *space, struct tuple_format *format)
 }
 
 static inline void
-space_build_index_xc(struct space *src_space, struct index *new_index,
-		     struct tuple_format *new_format,
-		     bool check_unique_constraint)
+space_build_index_xc(struct space *src_space, struct space *new_space,
+		     struct index *new_index)
 {
-	if (space_build_index(src_space, new_index, new_format,
-			      check_unique_constraint) != 0)
+	if (space_build_index(src_space, new_space, new_index) != 0)
 		diag_raise();
 }
 
