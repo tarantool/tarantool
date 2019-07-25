@@ -120,7 +120,7 @@ test:do_execsql_test(
         SELECT typeof(NULL)
     ]], {
         -- <cast-1.12>
-        "null"
+        "boolean"
         -- </cast-1.12>
     })
 
@@ -180,7 +180,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(NULL AS SCALAR))
     ]], {
         -- <cast-1.18>
-        "null"
+        "boolean"
         -- </cast-1.18>
     })
 

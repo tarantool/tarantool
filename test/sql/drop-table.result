@@ -185,7 +185,7 @@ box.execute('CREATE TABLE t3(a INTEGER PRIMARY KEY);')
 box.execute('CREATE TABLE t4(x INTEGER PRIMARY KEY REFERENCES t3, a INT UNIQUE, c TEXT REFERENCES t3);')
 ---
 - null
-- 'Failed to create foreign key constraint ''FK_CONSTRAINT_2_T4'': field type mismatch'
+- 'Failed to create foreign key constraint ''fk_unnamed_T4_2'': field type mismatch'
 ...
 box.execute('DROP TABLE t3;')
 ---

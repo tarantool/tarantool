@@ -276,7 +276,7 @@ box.space._ck_constraint:select()
 box.execute("CREATE TABLE w2 (s1 INT PRIMARY KEY, CHECK ((SELECT COUNT(*) FROM w2) = 0));")
 ---
 - null
-- 'Failed to create check constraint ''CK_CONSTRAINT_1_W2'': Subqueries are prohibited
+- 'Failed to create check constraint ''ck_unnamed_W2_1'': Subqueries are prohibited
   in a ck constraint definition'
 ...
 box.execute("DROP TABLE w2;")
@@ -290,7 +290,7 @@ box.execute("DROP TABLE w2;")
 box.execute("CREATE TABLE t5(x INT PRIMARY KEY, y INT, CHECK( x*y < ? ));")
 ---
 - null
-- 'Failed to create check constraint ''CK_CONSTRAINT_1_T5'': bindings are not allowed
+- 'Failed to create check constraint ''ck_unnamed_T5_1'': bindings are not allowed
   in DDL'
 ...
 -- Test trim CK constraint code correctness.
@@ -305,12 +305,12 @@ box.space._ck_constraint:select()[1].code
 box.execute("INSERT INTO t1 VALUES('1 a')")
 ---
 - null
-- 'Check constraint failed ''CK_CONSTRAINT_1_T1'': x LIKE ''1  a'''
+- 'Check constraint failed ''ck_unnamed_T1_1'': x LIKE ''1  a'''
 ...
 box.execute("INSERT INTO t1 VALUES('1   a')")
 ---
 - null
-- 'Check constraint failed ''CK_CONSTRAINT_1_T1'': x LIKE ''1  a'''
+- 'Check constraint failed ''ck_unnamed_T1_1'': x LIKE ''1  a'''
 ...
 box.execute("INSERT INTO t1 VALUES('1  a')")
 ---

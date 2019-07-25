@@ -134,10 +134,11 @@ typeofFunc(sql_context * context, int NotUsed, sql_value ** argv)
 		z = "varbinary";
 		break;
 	case MP_BOOL:
+	case MP_NIL:
 		z = "boolean";
 		break;
 	default:
-		z = "null";
+		unreachable();
 		break;
 	}
 	sql_result_text(context, z, -1, SQL_STATIC);

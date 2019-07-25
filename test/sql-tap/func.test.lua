@@ -1802,7 +1802,7 @@ test:do_execsql_test(
         SELECT typeof(replace('This is the main test string', NULL, 'ALT'));
     ]], {
         -- <func-21.3>
-        "null"
+        "boolean"
         -- </func-21.3>
     })
 
@@ -1812,7 +1812,7 @@ test:do_execsql_test(
         SELECT typeof(replace(NULL, 'main', 'ALT'));
     ]], {
         -- <func-21.4>
-        "null"
+        "boolean"
         -- </func-21.4>
     })
 
@@ -1822,7 +1822,7 @@ test:do_execsql_test(
         SELECT typeof(replace('This is the main test string', 'main', NULL));
     ]], {
         -- <func-21.5>
-        "null"
+        "boolean"
         -- </func-21.5>
     })
 
@@ -2043,7 +2043,7 @@ test:do_execsql_test(
         SELECT typeof(trim(NULL));
     ]], {
         -- <func-22.20>
-        "null"
+        "boolean"
         -- </func-22.20>
     })
 
@@ -2053,7 +2053,7 @@ test:do_execsql_test(
         SELECT typeof(TRIM('xyz' FROM NULL));
     ]], {
         -- <func-22.21>
-        "null"
+        "boolean"
         -- </func-22.21>
     })
 
@@ -2063,7 +2063,7 @@ test:do_execsql_test(
         SELECT typeof(TRIM(NULL FROM 'hello'));
     ]], {
         -- <func-22.22>
-        "null"
+        "boolean"
         -- </func-22.22>
     })
 

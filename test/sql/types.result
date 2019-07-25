@@ -778,7 +778,7 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a BOOLEAN CHECK (a = true));")
 box.execute("INSERT INTO t1 VALUES (1, false);")
 ---
 - null
-- 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a = true'
+- 'Check constraint failed ''ck_unnamed_T1_1'': a = true'
 ...
 box.execute("INSERT INTO t1 VALUES (1, true);")
 ---
@@ -1645,12 +1645,12 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT CHECK (a > 1844674407370
 box.execute("INSERT INTO t1 VALUES (1, 18446744073709551611);")
 ---
 - null
-- 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a > 18446744073709551612'
+- 'Check constraint failed ''ck_unnamed_T1_1'': a > 18446744073709551612'
 ...
 box.execute("INSERT INTO t1 VALUES (1, -1);")
 ---
 - null
-- 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a > 18446744073709551612'
+- 'Check constraint failed ''ck_unnamed_T1_1'': a > 18446744073709551612'
 ...
 box.space.T1:drop()
 ---
@@ -2104,7 +2104,7 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a VARBINARY CHECK (a = x'61626
 box.execute("INSERT INTO t1 VALUES (1, x'006162');")
 ---
 - null
-- 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a = x''616263'''
+- 'Check constraint failed ''ck_unnamed_T1_1'': a = x''616263'''
 ...
 box.execute("INSERT INTO t1 VALUES (1, x'616263');")
 ---
@@ -2179,7 +2179,7 @@ box.execute("SELECT typeof(a), typeof(s) FROM t;")
     type: string
   rows:
   - ['integer', 'integer']
-  - ['integer', 'null']
+  - ['integer', 'boolean']
 ...
 box.execute('CREATE TABLE t1 (id INTEGER PRIMARY KEY, a INTEGER, b INTEGER)')
 ---
