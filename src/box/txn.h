@@ -180,7 +180,7 @@ struct txn {
 	 * First statement at each statement-level.
 	 * Needed to rollback sub statements.
 	 */
-	struct stailq_entry *sub_stmt_begin[TXN_SUB_STMT_MAX];
+	struct stailq_entry *sub_stmt_begin[TXN_SUB_STMT_MAX + 1];
 	/** LSN of this transaction when written to WAL. */
 	int64_t signature;
 	/** Engine involved in multi-statement transaction. */
