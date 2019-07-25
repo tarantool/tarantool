@@ -35,11 +35,26 @@
 
 #include "trivia/config.h"
 
+/*
+ * Linux supports MSG_NOSIGNAL flag for sendmsg.
+ * macOS lacks it, but has SO_NOSIGPIPE for setsockopt to achieve same behaviour.
+ */
+#ifdef MSG_NOSIGNAL
+# define SYSTEMD_MSG_NOSIGNAL MSG_NOSIGNAL
+#else
+# define SYSTEMD_MSG_NOSIGNAL 0
+# include <sys/socket.h>
+# ifdef SO_NOSIGPIPE
+#  define SYSTEMD_USE_SO_NOSIGPIPE
+# else
+#  error "No way to block SIGPIPE in sendmsg!"
+# endif
+#endif
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-#if defined(WITH_SYSTEMD)
 /**
  * Open connection with systemd daemon (using unix socket located in
  * "NOTIFY_SOCKET" environmnent variable)
@@ -94,14 +109,6 @@ systemd_vsnotify(const char *format, va_list ap);
  */
 int
 systemd_snotify(const char *format, ...);
-
-#else /* !defined(WITH_SYSTEMD) */
-#  define systemd_init()
-#  define systemd_free()
-#  define systemd_notify(...)
-#  define systemd_vsnotify(...)
-#  define systemd_snotify(...)
-#endif /* WITH_SYSTEMD */
 
 #if defined(__cplusplus)
 } /* extern "C" */

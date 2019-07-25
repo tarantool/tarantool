@@ -30,7 +30,6 @@
  */
 #include "systemd.h"
 
-#if defined(WITH_SYSTEMD)
 #include <errno.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -68,11 +67,25 @@ int systemd_init() {
 		say_error("systemd: NOTIFY_SOCKET is longer that MAX_UNIX_PATH");
 		goto error;
 	}
-	if ((systemd_fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0)) == -1) {
+	if ((systemd_fd = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
 		say_syserror("systemd: failed to create unix socket");
 		goto error;
 	}
-	int sndbuf_sz = 8 * 1024 * 1024;
+	if (fcntl(systemd_fd, F_SETFD, FD_CLOEXEC) == -1) {
+		say_syserror("systemd: fcntl failed to set FD_CLOEXEC");
+		goto error;
+	}
+
+	#ifdef SYSTEMD_USE_SO_NOSIGPIPE
+	int val = 1;
+	if (setsockopt(systemd_fd, SOL_SOCKET, SO_NOSIGPIPE, (void*)&val,
+			sizeof(val)) < 0) {
+		say_syserror("systemd: failed to set NOSIGPIPE");
+		goto error;
+	}
+	#endif
+
+	int sndbuf_sz = 4 * 1024 * 1024;
 	if (setsockopt(systemd_fd, SOL_SOCKET, SO_SNDBUF, &sndbuf_sz,
 		      sizeof(int)) < 0) {
 		say_syserror("systemd: failed to set sndbuf size");
@@ -100,23 +113,13 @@ int systemd_notify(const char *message) {
 	struct sockaddr_un sa = {
 		.sun_family = AF_UNIX,
 	};
-	struct iovec vec = {
-		.iov_base = (char  *)message,
-		.iov_len  = (size_t )strlen(message)
-	};
-	struct msghdr msg = {
-		.msg_iov    = &vec,
-		.msg_iovlen = 1,
-		.msg_name   = &sa,
-	};
-
-	msg.msg_namelen = sizeof(sa.sun_family) + strlen(sd_unix_path);
 	strncpy(sa.sun_path, sd_unix_path, sizeof(sa.sun_path));
 	if (sa.sun_path[0] == '@')
 		sa.sun_path[0] = '\0';
 
 	say_debug("systemd: sending message '%s'", message);
-	ssize_t sent = sendmsg(systemd_fd, &msg, MSG_NOSIGNAL);
+	ssize_t sent = sendto(systemd_fd, message, (size_t)strlen(message),
+		SYSTEMD_MSG_NOSIGNAL, (struct sockaddr*)&sa, sizeof(sa));
 	if (sent == -1) {
 		say_syserror("systemd: failed to send message");
 		return -1;
@@ -151,4 +154,3 @@ systemd_snotify(const char *format, ...)
 	va_end(args);
 	return res;
 }
-#endif /* defined(WITH_SYSTEMD) */

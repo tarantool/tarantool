@@ -201,11 +201,6 @@
  */
 #cmakedefine HAVE_ICU_STRCOLLUTF8 1
 
-/*
-* Defined if systemd is enabled
- */
-#cmakedefine WITH_SYSTEMD 1
-
 /** \cond public */
 
 /** System configuration dir (e.g /etc) */
