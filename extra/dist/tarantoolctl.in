@@ -428,7 +428,9 @@ local cat_formats = setmetatable({
 -- -------------------------------------------------------------------------- --
 --                               Commands                                     --
 -- -------------------------------------------------------------------------- --
-local orig_cfg = box.cfg
+local orig_box_cfg = box.cfg
+-- Last configured log device to fetch logs from
+local configured_log_device
 
 local function wrapper_cfg(cfg)
     fiber.name(instance_name, {truncate=true})
@@ -464,23 +466,19 @@ local function wrapper_cfg(cfg)
     else
         cfg.username = nil
     end
-    if os.getenv("NOTIFY_SOCKET") then
-        cfg.background = false
-    elseif cfg.background == nil then
-        cfg.background = true
-    end
+    cfg.background = false
 
     mk_default_dirs(cfg)
-    local success, data = pcall(orig_cfg, cfg)
-    if not success then
-        log.error("Configuration failed: %s", data)
-        if type(cfg) ~= 'function' then
-            local log_type, log_args = logger_parse(cfg.log)
-            if log_type == 'file' and fio.stat(log_args) then
-                os.execute('tail -n 10 ' .. log_args)
-            end
+    configured_log_device = cfg.log
+    local data = orig_box_cfg(cfg)
+
+    local box_cfg_mt = getmetatable(box.cfg)
+    local orig_box_cfg_call = box_cfg_mt.__call
+    box_cfg_mt.__call = function(old_cfg, new_cfg)
+        if old_cfg.pid_file ~= nil and new_cfg ~= nil and new_cfg.pid_file ~= nil then
+            new_cfg.pid_file = old_cfg.pid_file
         end
-        os.exit(1)
+        return orig_box_cfg_call(old_cfg, new_cfg)
     end
 
     return data
@@ -506,6 +504,90 @@ local function start_check()
     return pid
 end
 
+ffi.cdef([[
+    pid_t fork(void);
+    int execve(const char *pathname, char *const argv[], char *const envp[]);
+    int dup2(int oldfd, int newfd);
+    int fileno(struct FILE *stream);
+]])
+
+local function ffi_table_to_const_char(input)
+    local result = ffi.new('char const*[?]', #input + 1, input)
+    result[#input] = nil
+    return ffi.cast('char *const*', result)
+end
+
+-- Starts process and returns immediately, not waiting until process is finished.
+-- @param path Executable path.
+-- @param[opt] args
+-- @param[opt] env
+local function fork_execve(path, args, env)
+    args = args or {}
+    env = env or {}
+    table.insert(args, 1, path)
+    local argv = ffi_table_to_const_char(args)
+    local env_list = fun.iter(env):map(function(k, v) return k .. '=' .. v end):totable()
+    local envp = ffi_table_to_const_char(env_list)
+    local pid = tonumber(ffi.C.fork())
+    if pid == -1 then
+        error('fork failed: ' .. errno.strerror())
+    elseif pid > 0 then
+        return pid
+    end
+    ffi.C.execve(path, argv, envp)
+    io.stderr:write('execve failed: ' .. errno.strerror() .. '\n')
+    os.exit(1)
+end
+
+-- Create socket and run forked tarantool with NOTIFY_SOCKET.
+--
+-- `box.cfg` may not be called inside init script and tarantool
+-- will not be daemonized (forcing `background = true` in hijacked `box.cfg`),
+-- so we need to fork tarantool before running this script.
+--
+-- To find out the moment when tarantool finishes startup it waits for `READY=1`
+-- message on NOTIFY_SOCKET which is emitted after init script is finished.
+local function fork_and_start_over()
+    local sock = assert(socket('AF_UNIX', 'SOCK_DGRAM', 0), 'Can not create socket')
+    local sock_name = '/tmp/tntctl-' .. require('uuid').str()
+    local ok = sock:bind('unix/', sock_name)
+    assert(ok, sock:error())
+    fio.chown(sock_name, default_cfg.username, group_name)
+    fio.chmod(sock_name, tonumber('0770', 8))
+
+    local env = table.copy(os.environ())
+    env.NOTIFY_SOCKET = sock_name
+    env.TARANTOOLCTL_DAEMONIZED = 'true'
+    -- slice 1..#arg indices into array-table
+    local args = fun.iter(arg):totable()
+    table.insert(args, 1, arg[0])
+    local pid = fork_execve(arg[-1], args, env)
+
+    local function exit(code)
+        fio.unlink(sock_name)
+        os.exit(code)
+    end
+
+    local function check_process_alive()
+        if os.execute('ps -p ' .. pid .. ' > /dev/null') ~= 0 then
+            exit(1)
+        end
+    end
+
+    local POLL_SOCKET_TIMEOUT = 1 -- sec.
+    while true do
+        check_process_alive()
+        if sock:readable(POLL_SOCKET_TIMEOUT) then
+            local str = sock:recv()
+            if str:match('READY=1') then
+                exit(0)
+            end
+            log.info(str)
+        end
+        check_process_alive()
+    end
+end
+
 local function start()
     log.info("Starting instance %s...", instance_name)
     if forward_to_systemd() then
@@ -524,6 +606,10 @@ local function start()
         log.error("The daemon is already running: PID %s", pid)
         os.exit(1)
     end
+    if not os.getenv('NOTIFY_SOCKET') then
+        return fork_and_start_over()
+    end
+
     box.cfg = wrapper_cfg
     require('title').update{
         script_name = instance_path,
@@ -539,26 +625,25 @@ local function start()
     -- if load fails - show last 10 lines of the log file and exit
     if not success then
         log.error("Start failed: %s", data)
-        if type(box.cfg) ~= 'function' then
-            local log_type, log_args = logger_parse(box.cfg.log)
+        local log_device = type(box.cfg) ~= 'function' and box.cfg.log or configured_log_device
+        if log_device then
+            local log_type, log_args = logger_parse(log_device)
             if log_type == 'file' and fio.stat(log_args) then
                 os.execute('tail -n 10 ' .. log_args)
             end
         end
         os.exit(1)
     end
-    local box_cfg_mt = getmetatable(box.cfg)
-    if box_cfg_mt == nil then
-        log.error('box.cfg() is not called in an instance file')
-        os.exit(1)
+
+    -- close descriptors in forked process after init script is finished
+    -- to show possible errors and logs.
+    if os.getenv('TARANTOOLCTL_DAEMONIZED') then
+        local fd = fio.open('/dev/null', fio.c.flag.O_RDONLY)
+        ffi.C.dup2(fd.fh, ffi.C.fileno(io.stdout))
+        ffi.C.dup2(fd.fh, ffi.C.fileno(io.stderr))
+        fd:close()
     end
-    local old_call = box_cfg_mt.__call
-    box_cfg_mt.__call = function(old_cfg, cfg)
-        if old_cfg.pid_file ~= nil and cfg ~= nil and cfg.pid_file ~= nil then
-            cfg.pid_file = old_cfg.pid_file
-        end
-        old_call(old_cfg, cfg)
-    end
+
     return 0
 end
 
