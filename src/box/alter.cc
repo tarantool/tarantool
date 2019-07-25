@@ -2652,6 +2652,7 @@ func_def_new_from_tuple(struct tuple *tuple)
 		tnt_raise(ClientError, ER_CREATE_FUNCTION,
 			  tt_cstr(name, name_len), "function id is too big");
 	}
+	func_opts_create(&def->opts);
 	memcpy(def->name, name, name_len);
 	def->name[name_len] = '\0';
 	def->name_len = name_len;
@@ -2750,6 +2751,11 @@ func_def_new_from_tuple(struct tuple *tuple)
 			}
 		}
 		def->param_count = argc;
+		const char *opts = tuple_field(tuple, BOX_FUNC_FIELD_OPTS);
+		if (opts_decode(&def->opts, func_opts_reg, &opts,
+				ER_WRONG_SPACE_OPTIONS, BOX_FUNC_FIELD_OPTS,
+				NULL) != 0)
+			diag_raise();
 	} else {
 		def->is_deterministic = false;
 		def->is_sandboxed = false;

@@ -900,6 +900,9 @@ lbox_func_new(struct lua_State *L, struct func *func)
 	lua_pushstring(L, "is_deterministic");
 	lua_pushboolean(L, func->def->is_deterministic);
 	lua_settable(L, top);
+	lua_pushstring(L, "is_multikey");
+	lua_pushboolean(L, func->def->opts.is_multikey);
+	lua_settable(L, top);
 	lua_pushstring(L, "is_sandboxed");
 	if (func->def->body != NULL)
 		lua_pushboolean(L, func->def->is_sandboxed);

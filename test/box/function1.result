@@ -99,6 +99,7 @@ box.func["function1.args"]
     sql: false
   id: 66
   setuid: false
+  is_multikey: false
   is_deterministic: false
   name: function1.args
   language: C
@@ -418,6 +419,7 @@ func
     sql: false
   id: 66
   setuid: false
+  is_multikey: false
   is_deterministic: false
   comment: Divide two values
   name: divide
@@ -489,6 +491,7 @@ func
     sql: false
   id: 66
   setuid: false
+  is_multikey: false
   is_deterministic: false
   name: function1.divide
   language: C
@@ -821,4 +824,15 @@ ok == true
 box.func.LUA:call({"return 1 + 1"})
 ---
 - 2
+...
+-- Introduce function options
+box.schema.func.create('test', {body = "function(tuple) return tuple end", is_deterministic = true, opts = {is_multikey = true}})
+---
+...
+box.func['test'].is_multikey == true
+---
+- true
+...
+box.func['test']:drop()
+---
 ...

@@ -293,3 +293,8 @@ for _, v in pairs(sql_builtin_list) do ok = ok and (box.space._func.index.name:g
 ok == true
 
 box.func.LUA:call({"return 1 + 1"})
+
+-- Introduce function options
+box.schema.func.create('test', {body = "function(tuple) return tuple end", is_deterministic = true, opts = {is_multikey = true}})
+box.func['test'].is_multikey == true
+box.func['test']:drop()

@@ -33,6 +33,7 @@
 
 #include "trivia/util.h"
 #include "field_def.h"
+#include "opt_def.h"
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -59,6 +60,25 @@ enum func_aggregate {
 };
 
 extern const char *func_aggregate_strs[];
+
+/** Function options. */
+struct func_opts {
+	/**
+	 * True when a function returns multiple values
+	 * packed in array.
+	 */
+	bool is_multikey;
+};
+
+extern const struct func_opts func_opts_default;
+extern const struct opt_def func_opts_reg[];
+
+/** Create index options using default values. */
+static inline void
+func_opts_create(struct func_opts *opts)
+{
+	*opts = func_opts_default;
+}
 
 /**
  * Definition of a function. Function body is not stored
@@ -109,6 +129,8 @@ struct func_def {
 		};
 		uint8_t all;
 	} exports;
+	/** The function options. */
+	struct func_opts opts;
 	/** Function name. */
 	char name[0];
 };

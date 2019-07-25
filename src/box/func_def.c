@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "func_def.h"
+#include "opt_def.h"
 #include "string.h"
 #include "diag.h"
 #include "error.h"
@@ -36,6 +37,22 @@
 const char *func_language_strs[] = {"LUA", "C", "SQL", "SQL_BUILTIN"};
 
 const char *func_aggregate_strs[] = {"none", "group"};
+
+const struct func_opts func_opts_default = {
+	/* .is_multikey = */ false,
+};
+
+const struct opt_def func_opts_reg[] = {
+	OPT_DEF("is_multikey", OPT_BOOL, struct func_opts, is_multikey),
+};
+
+int
+func_opts_cmp(struct func_opts *o1, struct func_opts *o2)
+{
+	if (o1->is_multikey != o2->is_multikey)
+		return o1->is_multikey - o2->is_multikey;
+	return 0;
+}
 
 int
 func_def_cmp(struct func_def *def1, struct func_def *def2)
@@ -70,7 +87,7 @@ func_def_cmp(struct func_def *def1, struct func_def *def2)
 		return def1->comment - def2->comment;
 	if (def1->comment != NULL && strcmp(def1->comment, def2->comment) != 0)
 		return strcmp(def1->comment, def2->comment);
-	return 0;
+	return func_opts_cmp(&def1->opts, &def2->opts);
 }
 
 /**
