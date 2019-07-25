@@ -493,6 +493,33 @@ add_subdirectory(extra)
 add_subdirectory(test)
 add_subdirectory(doc)
 
+option(WITH_NOTIFY_SOCKET "Enable notifications on NOTIFY_SOCKET" ON)
+
+if (WITH_SYSTEMD AND NOT WITH_NOTIFY_SOCKET)
+    message(FATAL_ERROR "WITH_NOTIFY_SOCKET must be enabled when WITH_SYSTEMD enabled")
+endif()
+
+if (WITH_NOTIFY_SOCKET)
+    check_c_source_compiles("
+        #include <sys/types.h>
+        #include <sys/socket.h>
+        int main(){ return MSG_NOSIGNAL; }
+    " HAVE_MSG_NOSIGNAL)
+    check_c_source_compiles("
+        #include <sys/types.h>
+        #include <sys/socket.h>
+        int main(){ return SO_NOSIGPIPE; }
+    " HAVE_SO_NOSIGPIPE)
+    # Linux supports MSG_NOSIGNAL flag for sendmsg.
+    # macOS lacks it, but has SO_NOSIGPIPE for setsockopt
+    # to achieve same behavior.
+    if (NOT HAVE_MSG_NOSIGNAL AND NOT HAVE_SO_NOSIGPIPE)
+        message(FATAL_ERROR
+            "No way to block SIGPIPE in sendmsg. Can not compile with WITH_NOTIFY_SOCKET"
+        )
+    endif()
+endif()
+
 if(NOT "${PROJECT_BINARY_DIR}" STREQUAL "${PROJECT_SOURCE_DIR}")
     add_custom_target(distclean)
     add_custom_command(TARGET distclean
