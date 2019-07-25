@@ -39,7 +39,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-#if defined(WITH_SYSTEMD)
+#if defined(WITH_NOTIFY_SOCKET)
 /**
  * Open connection with systemd daemon (using unix socket located in
  * "NOTIFY_SOCKET" environmnent variable)
@@ -95,13 +95,13 @@ systemd_vsnotify(const char *format, va_list ap);
 int
 systemd_snotify(const char *format, ...);
 
-#else /* !defined(WITH_SYSTEMD) */
+#else /* !defined(WITH_NOTIFY_SOCKET) */
 #  define systemd_init()
 #  define systemd_free()
 #  define systemd_notify(...)
 #  define systemd_vsnotify(...)
 #  define systemd_snotify(...)
-#endif /* WITH_SYSTEMD */
+#endif /* WITH_NOTIFY_SOCKET */
 
 #if defined(__cplusplus)
 } /* extern "C" */

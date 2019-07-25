@@ -171,6 +171,9 @@
 #cmakedefine HAVE_MREMAP 1
 #cmakedefine HAVE_SYNC_FILE_RANGE 1
 
+#cmakedefine HAVE_MSG_NOSIGNAL 1
+#cmakedefine HAVE_SO_NOSIGPIPE 1
+
 #cmakedefine HAVE_PRCTL_H 1
 
 #cmakedefine HAVE_UUIDGEN 1
@@ -202,9 +205,9 @@
 #cmakedefine HAVE_ICU_STRCOLLUTF8 1
 
 /*
-* Defined if systemd is enabled
+* Defined if notifications on NOTIFY_SOCKET are enabled
  */
-#cmakedefine WITH_SYSTEMD 1
+#cmakedefine WITH_NOTIFY_SOCKET 1
 
 /** \cond public */
 
