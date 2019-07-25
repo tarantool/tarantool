@@ -3661,7 +3661,7 @@ case OP_Sequence: {           /* out2 */
  */
 case OP_NextSequenceId: {
 	pOut = &aMem[pOp->p2];
-	uint64_t id;
+	uint64_t id = 0;
 	tarantoolSqlNextSeqId(&id);
 	id++;
 	mem_set_u64(pOut, id);
