@@ -114,7 +114,11 @@ local function set_default_output(value)
     default_output_format["opts"] = opts
 end
 
-local function get_default_output()
+local function get_default_output(...)
+    local args = ...
+    if args ~= nil then
+        error("Arguments provided while prohibited")
+    end
     return default_output_format
 end
 
