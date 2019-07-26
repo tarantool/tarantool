@@ -41,10 +41,9 @@ output_handlers["yaml"] = function(status, opts, ...)
 end
 
 output_handlers["lua"] = function(status, opts, ...)
-    local data = ...
     --
     -- Don't print nil if there is no data
-    if data == nil then
+    if not ... then
         return ""
     end
     --
