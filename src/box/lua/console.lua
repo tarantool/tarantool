@@ -72,15 +72,15 @@ end
 
 local function output_verify_opts(fmt, opts)
     if opts == nil then
-        return true, nil
+        return nil
     end
     if fmt == "lua" then
         if opts ~= "line" and opts ~= "block" then
             local msg = 'Wrong option "%s", expecting: line or block.'
-            return false, msg:format(opts)
+            return msg:format(opts)
         end
     end
-    return true, nil
+    return nil
 end
 
 local function output_parse(value)
@@ -92,23 +92,23 @@ local function output_parse(value)
     end
     for k, _ in pairs(output_handlers) do
         if k == fmt then
-            local status, err = output_verify_opts(fmt, opts)
-            if status ~= true then
-                return false, err
+            local err = output_verify_opts(fmt, opts)
+            if err then
+                return err
             end
-            return true, nil, fmt, opts
+            return nil, fmt, opts
         end
     end
     local msg = 'Invalid format "%s", supported languages: lua and yaml.'
-    return false, msg:format(value)
+    return msg:format(value)
 end
 
 local function set_default_output(value)
     if value == nil then
         error("Nil output value passed")
     end
-    local status, err, fmt, opts = output_parse(value)
-    if status ~= true then
+    local err, fmt, opts = output_parse(value)
+    if err then
         error(err)
     end
     default_output_format["fmt"] = fmt
@@ -176,8 +176,8 @@ local function set_language(storage, value)
 end
 
 local function set_output(storage, value)
-    local status, err, fmt, opts = output_parse(value)
-    if status ~= true then
+    local err, fmt, opts = output_parse(value)
+    if err then
         return error(err)
     end
     output_save(fmt, opts)
