@@ -1272,14 +1272,14 @@ static const comparator_with_key_signature cmp_wk_arr[] = {
 };
 
 /**
- * The following compare method is valid for func_index:
- * tuple_a_hint and tuple_b_hint are expected to be a valid
- * pointers to extracted key memory. Thouse keys had been already
- * validated and have a format of MsgPack array having exact
- * func_index_part_count parts, while a given cmp_def has
- * part_count > func_index_part_count. The cmp_def had been
- * produced with key_def_merge call and it last unique parts are
- * taken from primary index key definition.
+ * A functional index tuple compare.
+ * tuple_a_hint and tuple_b_hint are expected to be valid
+ * pointers to functional key memory. These keys have been already
+ * validated and are represented as a MsgPack array with exactly
+ * func_index_part_count parts. The cmp_def has part_count > func_index_part_count,
+ * since it was  produced by key_def_merge() of the functional key part
+ * and the primary key. So its tail parts are taken from primary
+ * index key definition.
  */
 template<bool is_nullable>
 static inline int
@@ -1303,7 +1303,7 @@ func_index_compare(struct tuple *tuple_a, hint_t tuple_a_hint,
 	if (rc != 0)
 		return rc;
 	/*
-	 * Primary index definiton key compare.
+	 * Primary index definition key compare.
 	 * It cannot contain nullable parts so the code is
 	 * simplified correspondingly.
 	 */
@@ -1334,10 +1334,10 @@ func_index_compare(struct tuple *tuple_a, hint_t tuple_a_hint,
 }
 
 /**
- * The following compare with key method is valid for func_index:
+ * A functional index key compare.
  * tuple_hint is expected to be a valid pointer to
- * extracted key memory to be compared with given key by
- * func_index key definition.
+ * functional key memory and is compared with the given key by
+ * using the functional index key definition.
  */
 template<bool is_nullable>
 static inline int

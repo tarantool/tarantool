@@ -196,9 +196,12 @@ struct key_def {
 	bool is_nullable;
 	/** True if some key part has JSON path. */
 	bool has_json_paths;
-	/** True if it is multikey key definition. */
+	/** True if it is a multikey index definition.
+	 * XXX Not used for multikey functional indexes,
+	 * please use func->def.is_multikey instead.
+	 */
 	bool is_multikey;
-	/** True if it is functional index key definition. */
+	/** True if it is a functional index key definition. */
 	bool for_func_index;
 	/**
 	 * True, if some key parts can be absent in a tuple. These
@@ -209,12 +212,21 @@ struct key_def {
 	uint64_t column_mask;
 	/**
 	 * A pointer to a functional index function.
-	 * It is initialized externally when possible and key
-	 * definiton object doesn't take a (semantics) reference
-	 * on functional index function object. For example, it
-	 * is not possible to define this pointer during recovery.
-	 * Thus functional index key definition may have this
-	 * field uninitialized (NULL).
+	 * Initially set to NULL and is initialized when the
+	 * record in _func_index is handled by a respective trigger.
+	 * The reason is that we may not yet have a defined
+	 * function when a functional index is defined. E.g.
+	 * during recovery, we recovery _index first, and _func
+	 * second, so when recovering _index no func object is
+	 * loaded in the cache and nothing can be assigned.
+	 * Once a pointer is assigned its life cycle is guarded by
+	 * a check in _func on_replace trigger in alter.cc which
+	 * would not let anyone change a function until it is
+	 * referenced by a functional index.
+	 * In future, one will be able to update a function of
+	 * a functional index by disabling the index, thus
+	 * clearing this pointer, modifying the function, and
+	 * enabling/rebuilding the index.
 	 */
 	struct func *func_index_func;
 	/**

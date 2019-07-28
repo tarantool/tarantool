@@ -770,24 +770,21 @@ memtx_tree_index_replace_multikey(struct index *base, struct tuple *old_tuple,
 	return 0;
 }
 
-/**
- * Dummy functional index hint allocator doesn't allocates memory,
- * just returning a given key value.
- */
+/** A dummy key allocator used when removing tuples from an index. */
 static const char *
 func_index_key_dummy_alloc(struct tuple *tuple, const char *key,
 			   uint32_t key_sz)
 {
-	(void)tuple;
-	(void)key_sz;
-	return (void *)key;
+	(void) tuple;
+	(void) key_sz;
+	return (void*) key;
 }
 
 /**
- * The entry for multikey functional index replace operation
- * is required to rollback an incomplete action, restore the
- * original key_hint(s) hints both as to commit a completed
- * replace action and destruct useless key_hint(s).
+ * An undo entry for multikey functional index replace operation.
+ * Used to roll back a failed insert/replace and restore the
+ * original key_hint(s) and to commit a completed insert/replace
+ * and destruct old tuple key_hint(s).
 */
 struct func_key_undo {
 	/** A link to organize entries in list. */
@@ -831,15 +828,15 @@ memtx_tree_func_index_replace_rollback(struct memtx_tree_index *index,
 
 /**
  * @sa memtx_tree_index_replace_multikey().
- * Use functional index function from the key definition
+ * Use the functional index function from the key definition
  * to build a key list. Then each returned key is reallocated in
  * engine's memory as key_hint object and is used as comparison
  * hint.
- * To control key_hint(s) life cycle in case of functional index
- * we use a tiny list object is allocated on region.
- * It allows to restore original nodes with their original
- * key_hint(s) pointers in case of failure and release
- * useless hints of replaced items in case of success.
+ * To release key_hint memory in case of replace failure
+ * we use a list of undo records which are allocated on region.
+ * It is used to restore the original b+* entries with their
+ * original key_hint(s) pointers in case of failure and release
+ * the now useless hints of old items in case of success.
  */
 static int
 memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
@@ -893,9 +890,9 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 					/*
 					 * Can't append this
 					 * operation in rollback
-					 * journal. Rollback it
+					 * journal. Roll it back
 					 * manually.
-					  */
+					 */
 					memtx_tree_insert(&index->tree,
 							  old_data, NULL);
 					err = -1;
@@ -907,8 +904,8 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 			} else if (old_data.tuple != NULL &&
 				   is_multikey_conflict) {
 				/*
-				 * Remove replaced undo from
-				 * undo list
+				 * Remove the replaced tuple undo
+				 * from undo list.
 				 */
 				tuple_chunk_delete(new_tuple,
 						(const char *)old_data.hint);
@@ -953,7 +950,7 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 			if (deleted_data.tuple != NULL) {
 				/*
 				 * Release related hint on
-				 * successfull node deletion.
+				 * successful node deletion.
 				 */
 				tuple_chunk_delete(deleted_data.tuple,
 					(const char *)deleted_data.hint);

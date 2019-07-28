@@ -40,8 +40,6 @@
 #include "port.h"
 #include "schema.h"
 #include "tt_static.h"
-#include "tuple.h"
-#include "tuple_compare.h"
 
 int
 key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
@@ -64,8 +62,9 @@ key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
 	port_destroy(&in_port);
 	if (rc != 0) {
 		/* Can't evaluate function. */
+		struct space *space = space_by_id(index_def->space_id);
 		diag_set(ClientError, ER_FUNC_INDEX_FUNC, index_def->name,
-			 space_by_id(index_def->space_id)->def->name,
+			 space ? space_name(space) : "",
 			 diag_last_error(diag_get())->errmsg);
 		return -1;
 	}
@@ -73,9 +72,10 @@ key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
 	const char *key_data = port_get_msgpack(&out_port, &key_data_sz);
 	port_destroy(&out_port);
 	if (key_data == NULL) {
+		struct space *space = space_by_id(index_def->space_id);
 		/* Can't get a result returned by function . */
 		diag_set(ClientError, ER_FUNC_INDEX_FUNC, index_def->name,
-			 space_by_id(index_def->space_id)->def->name,
+			 space ? space_name(space) : "",
 			 diag_last_error(diag_get())->errmsg);
 		return -1;
 	}
@@ -83,6 +83,7 @@ key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
 	it->data_end = key_data + key_data_sz;
 	assert(mp_typeof(*key_data) == MP_ARRAY);
 	if (mp_decode_array(&key_data) != 1) {
+		struct space *space = space_by_id(index_def->space_id);
 		/*
 		 * Function return doesn't follow the
 		 * convention: to many values were returned.
@@ -90,12 +91,13 @@ key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
 		 */
 		region_truncate(region, region_svp);
 		diag_set(ClientError, ER_FUNC_INDEX_FORMAT, index_def->name,
-			 space_by_id(index_def->space_id)->def->name,
+			 space ? space_name(space) : "",
 			 "to many values were returned");
 		return -1;
 	}
 	if (func->def->opts.is_multikey) {
 		if (mp_typeof(*key_data) != MP_ARRAY) {
+			struct space * space = space_by_id(index_def->space_id);
 			/*
 			 * Multikey function must return an array
 			 * of keys.
@@ -103,8 +105,8 @@ key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
 			region_truncate(region, region_svp);
 			diag_set(ClientError, ER_FUNC_INDEX_FORMAT,
 				 index_def->name,
-				 space_by_id(index_def->space_id)->def->name,
-				 "multikey function mustn't return scalar");
+				 space ? space_name(space) : "",
+				 "a multikey function mustn't return a scalar");
 			return -1;
 		}
 		(void)mp_decode_array(&key_data);
@@ -134,12 +136,13 @@ key_list_iterator_next(struct key_list_iterator *it, const char **value)
 	}
 
 	if (mp_typeof(*key) != MP_ARRAY) {
+		struct space *space = space_by_id(it->index_def->space_id);
 		/*
 		 * A value returned by func_index function is
 		 * not a valid key, i.e. {1}.
 		 */
 		diag_set(ClientError, ER_FUNC_INDEX_FORMAT, it->index_def->name,
-			 space_by_id(it->index_def->space_id)->def->name,
+			 space ? space_name(space) : "",
 			 tt_sprintf("supplied key type is invalid: expected %s",
 				    field_type_strs[MP_ARRAY]));
 		return -1;
@@ -148,12 +151,13 @@ key_list_iterator_next(struct key_list_iterator *it, const char **value)
 	const char *rptr = key;
 	uint32_t part_count = mp_decode_array(&rptr);
 	if (part_count != key_def->part_count) {
+		struct space *space = space_by_id(it->index_def->space_id);
 		/*
 		 * The key must have exact functional index
 		 * definition's part_count(s).
 		 */
 		diag_set(ClientError, ER_FUNC_INDEX_FORMAT, it->index_def->name,
-			 space_by_id(it->index_def->space_id)->def->name,
+			 space ? space_name(space) : "",
 			 tt_sprintf(tnt_errcode_desc(ER_EXACT_MATCH),
 				   key_def->part_count, part_count));
 		return -1;
@@ -161,12 +165,13 @@ key_list_iterator_next(struct key_list_iterator *it, const char **value)
 	const char *key_end;
 	if (key_validate_parts(key_def, rptr, part_count, true,
 			       &key_end) != 0) {
+		struct space *space = space_by_id(it->index_def->space_id);
 		/*
 		 * The key doesn't follow functional index key
 		 * definition.
 		 */
 		diag_set(ClientError, ER_FUNC_INDEX_FORMAT, it->index_def->name,
-			 space_by_id(it->index_def->space_id)->def->name,
+			 space ? space_name(space) : "",
 			 diag_last_error(diag_get())->errmsg);
 		return -1;
 	}

@@ -41,47 +41,59 @@ struct index_def;
 struct tuple;
 
 /**
- * Function to prepare a value returned by
- * key_list_iterator_next method.
+ * We iterate over a functional index key list in two cases: when
+ * adding a new tuple or removing the old one. When adding a new
+ * tuple we need to copy functional index data to tuple memory, so
+ * provide an allocator for that. When removing an old index, it's
+ * fine to use a temporary memory area for the functional index
+ * key, since the key is only used to lookup the old tuple in the
+ * b+* tree, so we pass in a dummy allocator.
  */
 typedef const char *(*key_list_allocator_t)(struct tuple *tuple, const char *key,
-				       uint32_t key_sz);
+					    uint32_t key_sz);
 
 /**
- * An iterator to iterate over the key_data returned by function
- * and validate it with given key definition (when required).
+ * An iterator over key_data returned by a stored function function.
+ * Is used in two contexts:
+ * When indexing a new tuple, to validate the key using the provided
+ * key definition and copy it to tuple memory if validation succeeds.
+ * When deleting an old tuple, to simply go over all keys, without
+ * validation or copying.
+ * Abstracts out multi-key and single-key functional indexes, i.e.
+ * single-key functions simply return a list of keys of size 1.
  */
 struct key_list_iterator {
-	/** The ancestor tuple. */
+	/** The tuple to supply to the function. */
 	struct tuple *tuple;
 	/**
-	 * The sequential functional index key definition that
-	 * describes a format of functional index function keys.
+	 * A functional index definition. We're mostly interested
+	 * in index_def->key_def->func, but also need to know the
+	 * space and index name to properly report errors.
 	 */
 	struct index_def *index_def;
-	/** The pointer to currently processed key. */
+	/** The pointer to the current key. */
 	const char *data;
-	/** The pointer to the end of extracted key_data. */
+	/** The pointer to the end of the current key_data. */
 	const char *data_end;
-	/** Whether iterator must validate processed keys. */
+	/** Whether the iterator must validate processed keys. */
 	bool validate;
-	/** The method to allocate a key to be returned. */
+	/** Allocate a key copy before returning it. */
 	key_list_allocator_t key_allocator;
 };
 
 /**
- * Initialize a new functional index function returned
- * keys iterator.
- * Execute a function specified in a given functional index key
- * definition (a functional index function) and initialize a new
- * iterator on MsgPack array of with keys. Each key is a MsgPack
- * array as well.
+ * Initialize a new key list iterator.
  *
- * When validate flag is specified, processed keys are validated
- * to match given functional index key definition.
+ * Executes a function specified in the given functional index
+ * definition and initializes a new iterator over the MsgPack
+ * array with keys. Each key is a nested MsgPack array.
  *
- * Returns 0 in case of success, -1 otherwise.
+ * When validate flag is set, each array entry is validated
+ * to match the given functional index key definition.
  * Uses fiber region to allocate memory.
+ *
+ * @retval 0 in case of success
+ * @retval -1 on function error, validation error, memory error.
  */
 int
 key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
@@ -89,11 +101,11 @@ key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
 			 key_list_allocator_t key_allocator);
 
 /**
- * Perform key iterator step and update iterator state.
- * Update key pointer with an actual key.
+ * Return the next key and advance the iterator state.
+ * If the iterator is exhausted, the value is set to 0.
  *
- * Returns 0 on success. In case of error returns -1 and sets
- * the corresponding diag message.
+ * @retval 0 on success or EOF.
+ * @retval -1 on error; diag is set.
  */
 int
 key_list_iterator_next(struct key_list_iterator *it, const char **value);

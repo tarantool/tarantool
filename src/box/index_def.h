@@ -305,7 +305,7 @@ index_def_update_optionality(struct index_def *def, uint32_t min_field_count)
 /**
  * Update func pointer for a functional index key definition.
  * @param def Index def, containing key definitions to update.
- * @param func The func_index function pointer.
+ * @param func The functional index function pointer.
  */
 static inline void
 index_def_set_func(struct index_def *def, struct func *func)
@@ -313,11 +313,11 @@ index_def_set_func(struct index_def *def, struct func *func)
 	assert(def->opts.func_id > 0 &&
 	       def->key_def->for_func_index && def->cmp_def->for_func_index);
 	/*
-	 * Set func_index_func for functional index key
-	 * definition. It is used in key_list module to extract
+	 * def->key_def is used in key_list module to build a key
 	 * a key for given tuple.
 	 */
 	def->key_def->func_index_func = func;
+	/* The functional index doesn't use cmp_def, so do not set it. */
 	def->cmp_def->func_index_func = NULL;
 }
 

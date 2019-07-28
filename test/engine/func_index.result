@@ -246,7 +246,7 @@ idx = s:create_index('idx', {func = box.func.invalidreturn5.id, parts = {{1, 'un
 s:insert({1})
  | ---
  | - error: 'Key format doesn''t match one defined in functional index ''idx'' of space
- |     ''withdata'': multikey function mustn''t return scalar'
+ |     ''withdata'': a multikey function mustn''t return a scalar'
  | ...
 idx:drop()
  | ---
