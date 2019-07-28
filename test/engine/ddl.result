@@ -1422,7 +1422,7 @@ s = box.schema.space.create('test', {engine = engine, format = format})
 ...
 s:create_index('primary', { parts = { 'field1' } })
 ---
-- error: Primary index of the space 'test' can not contain nullable parts
+- error: Primary index of space 'test' can not contain nullable parts
 ...
 -- This is allowed, but the actual part is_nullable stays false.
 pk = s:create_index('primary', { parts = {{'field1', is_nullable = false}} })
@@ -1439,7 +1439,7 @@ s:format(format)
 ...
 s:create_index('primary', { parts = {{'field1', is_nullable = true}} })
 ---
-- error: Primary index of the space 'test' can not contain nullable parts
+- error: Primary index of space 'test' can not contain nullable parts
 ...
 i = s:create_index('primary', { parts = {'field1'} })
 ---

@@ -62,7 +62,7 @@ test:do_catchsql_test(
         INSERT INTO x VALUES(3,1,2);
     ]], {
         -- <triggerB-2.1>
-        1, "Field 'X' was not found in the space 'WEN' format"
+        1, "Field 'X' was not found in space 'WEN' format"
         -- </triggerB-2.1>
     })
 
@@ -76,7 +76,7 @@ test:do_catchsql_test(
         UPDATE x SET y=y+1;
     ]], {
         -- <triggerB-2.2>
-        1, "Field 'X' was not found in the space 'DLO' format"
+        1, "Field 'X' was not found in space 'DLO' format"
         -- </triggerB-2.2>
     })
 
@@ -116,7 +116,7 @@ test:do_test(
         ]]
     end, {
         -- <triggerB-2.4>
-        1, "Field 'C' was not found in the space 'OLD' format"
+        1, "Field 'C' was not found in space 'OLD' format"
         -- </triggerB-2.4>
     })
 

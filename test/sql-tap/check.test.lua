@@ -368,7 +368,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-3.5>
-        1, "Failed to create check constraint 'CK_CONSTRAINT_1_T3': Field 'X' was not found in the space 'T2' format"
+        1, "Failed to create check constraint 'CK_CONSTRAINT_1_T3': Field 'X' was not found in space 'T2' format"
         -- </check-3.5>
     })
 

@@ -55,7 +55,7 @@ parts[1] = {field = 2, type = 'unsigned', is_nullable = true}
 ...
 pk = s:create_index('pk', { parts = parts }) -- Fail.
 ---
-- error: Primary index of the space 'test' can not contain nullable parts
+- error: Primary index of space 'test' can not contain nullable parts
 ...
 pk = s:create_index('pk')
 ---

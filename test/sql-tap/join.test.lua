@@ -580,7 +580,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 JOIN t2 ON t3.a=t2.b;
     ]], {
         -- <join-3.6>
-        1, "Field 'A' was not found in the space 'T3' format"
+        1, "Field 'A' was not found in space 'T3' format"
         -- </join-3.6>
     })
 

@@ -204,8 +204,8 @@ struct errcode_record {
 	/*149 */_(ER_SPACE_FIELD_IS_DUPLICATE,	"Space field '%s' is duplicate") \
 	/*150 */_(ER_CANT_CREATE_COLLATION,	"Failed to initialize collation: %s.") \
 	/*151 */_(ER_WRONG_COLLATION_OPTIONS,	"Wrong collation options (field %u): %s") \
-	/*152 */_(ER_NULLABLE_PRIMARY,		"Primary index of the space '%s' can not contain nullable parts") \
-	/*153 */_(ER_NO_SUCH_FIELD_NAME,	"Field '%s' was not found in the space '%s' format") \
+	/*152 */_(ER_NULLABLE_PRIMARY,		"Primary index of space '%s' can not contain nullable parts") \
+	/*153 */_(ER_NO_SUCH_FIELD_NAME,	"Field '%s' was not found in space '%s' format") \
 	/*154 */_(ER_TRANSACTION_YIELD,		"Transaction has been aborted by a fiber yield") \
 	/*155 */_(ER_NO_SUCH_GROUP,		"Replication group '%s' does not exist") \
 	/*156 */_(ER_SQL_BIND_VALUE,            "Bind value for parameter %s is out of range for type %s") \
@@ -250,8 +250,8 @@ struct errcode_record {
 	/*195 */_(ER_CREATE_CK_CONSTRAINT,	"Failed to create check constraint '%s': %s") \
 	/*196 */_(ER_CK_CONSTRAINT_FAILED,	"Check constraint failed '%s': %s") \
 	/*197 */_(ER_SQL_COLUMN_COUNT,		"Unequal number of entries in row expression: left side has %u, but right side - %u") \
-	/*198 */_(ER_FUNC_INDEX_FUNC,		"Failed to build a key for functional index '%s' of the space '%s': %s") \
-	/*199 */_(ER_FUNC_INDEX_FORMAT,		"Key format doesn't match on defined in the functional index '%s' of the space '%s': %s") \
+	/*198 */_(ER_FUNC_INDEX_FUNC,		"Failed to build a key for functional index '%s' of space '%s': %s") \
+	/*199 */_(ER_FUNC_INDEX_FORMAT,		"Key format doesn't match one defined in functional index '%s' of space '%s': %s") \
 	/*200 */_(ER_FUNC_INDEX_PARTS,		"Wrong functional index definition: %s") \
 
 /*

@@ -147,8 +147,8 @@ idx = s:create_index('idx', {func = box.func.invalidreturn0.id, parts = {{1, 'un
  | ...
 s:insert({1})
  | ---
- | - error: 'Key format doesn''t match on defined in the functional index ''idx'' of
- |     the space ''withdata'': supplied key type is invalid: expected boolean'
+ | - error: 'Key format doesn''t match one defined in functional index ''idx'' of space
+ |     ''withdata'': supplied key type is invalid: expected boolean'
  | ...
 idx:drop()
  | ---
@@ -166,9 +166,9 @@ idx = s:create_index('idx', {func = box.func.invalidreturn1.id, parts = {{1, 'un
  | ...
 s:insert({1})
  | ---
- | - error: 'Key format doesn''t match on defined in the functional index ''idx'' of
- |     the space ''withdata'': Supplied key type of part 0 does not match index part
- |     type: expected unsigned'
+ | - error: 'Key format doesn''t match one defined in functional index ''idx'' of space
+ |     ''withdata'': Supplied key type of part 0 does not match index part type: expected
+ |     unsigned'
  | ...
 idx:drop()
  | ---
@@ -186,8 +186,8 @@ idx = s:create_index('idx', {func = box.func.invalidreturn2.id, parts = {{1, 'un
  | ...
 s:insert({1})
  | ---
- | - error: 'Key format doesn''t match on defined in the functional index ''idx'' of
- |     the space ''withdata'': to many values were returned'
+ | - error: 'Key format doesn''t match one defined in functional index ''idx'' of space
+ |     ''withdata'': to many values were returned'
  | ...
 idx:drop()
  | ---
@@ -205,9 +205,9 @@ idx = s:create_index('idx', {func = box.func.invalidreturn3.id, parts = {{1, 'un
  | ...
 s:insert({1})
  | ---
- | - error: 'Key format doesn''t match on defined in the functional index ''idx'' of
- |     the space ''withdata'': Supplied key type of part 0 does not match index part
- |     type: expected unsigned'
+ | - error: 'Key format doesn''t match one defined in functional index ''idx'' of space
+ |     ''withdata'': Supplied key type of part 0 does not match index part type: expected
+ |     unsigned'
  | ...
 idx:drop()
  | ---
@@ -225,9 +225,9 @@ idx = s:create_index('idx', {func = box.func.invalidreturn4.id, parts = {{1, 'un
  | ...
 s:insert({1})
  | ---
- | - error: 'Key format doesn''t match on defined in the functional index ''idx'' of
- |     the space ''withdata'': Supplied key type of part 0 does not match index part
- |     type: expected unsigned'
+ | - error: 'Key format doesn''t match one defined in functional index ''idx'' of space
+ |     ''withdata'': Supplied key type of part 0 does not match index part type: expected
+ |     unsigned'
  | ...
 idx:drop()
  | ---
@@ -245,8 +245,8 @@ idx = s:create_index('idx', {func = box.func.invalidreturn5.id, parts = {{1, 'un
  | ...
 s:insert({1})
  | ---
- | - error: 'Key format doesn''t match on defined in the functional index ''idx'' of
- |     the space ''withdata'': multikey function mustn''t return scalar'
+ | - error: 'Key format doesn''t match one defined in functional index ''idx'' of space
+ |     ''withdata'': multikey function mustn''t return scalar'
  | ...
 idx:drop()
  | ---
@@ -272,7 +272,7 @@ idx = s:create_index('idx', {func = box.func.runtimeerror.id, parts = {{1, 'stri
  | ...
 s:insert({1})
  | ---
- | - error: 'Failed to build a key for functional index ''idx'' of the space ''withdata'':
+ | - error: 'Failed to build a key for functional index ''idx'' of space ''withdata'':
  |     [string "return function(tuple)                 local ..."]:1: attempt to call
  |     global ''require'' (a nil value)'
  | ...
@@ -668,9 +668,8 @@ idx = s:create_index('idx', {unique = false, func = box.func.extr.id, parts = {{
  | ...
 s:insert({1})
  | ---
- | - error: 'Key format doesn''t match on defined in the functional index ''idx'' of
- |     the space ''withdata'': Invalid key part count in an exact match (expected 1,
- |     got 0)'
+ | - error: 'Key format doesn''t match one defined in functional index ''idx'' of space
+ |     ''withdata'': Invalid key part count in an exact match (expected 1, got 0)'
  | ...
 s:drop()
  | ---

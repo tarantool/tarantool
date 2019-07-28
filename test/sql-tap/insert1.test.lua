@@ -77,7 +77,7 @@ test:do_catchsql_test("insert-1.4", [[
   INSERT INTO test1(one,four) VALUES(1,2)
 ]], {
   -- <insert-1.4>
-  1, "Field 'FOUR' was not found in the space 'TEST1' format"
+  1, "Field 'FOUR' was not found in space 'TEST1' format"
   -- </insert-1.4>
 })
 
@@ -240,7 +240,7 @@ end, {
     SELECT * FROM t3 ORDER BY a;
   ]], {
     -- <insert-4.3>
-    1, "Field 'A' was not found in the space 'T3' format"
+    1, "Field 'A' was not found in space 'T3' format"
     -- </insert-4.3>
   })
 
