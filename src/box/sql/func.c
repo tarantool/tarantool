@@ -1397,15 +1397,20 @@ trim_func_one_arg(struct sql_context *context, int argc, sql_value **argv)
 {
 	assert(argc == 1);
 	(void) argc;
-
-	const unsigned char *input_str;
-	if ((input_str = sql_value_text(argv[0])) == NULL)
+	/* In case of VARBINARY type default trim octet is X'00'. */
+	const unsigned char *default_trim;
+	enum mp_type val_type = sql_value_type(argv[0]);
+	if (val_type == MP_NIL)
 		return;
-
+	if (val_type == MP_BIN)
+		default_trim = (const unsigned char *) "\0";
+	else
+		default_trim = (const unsigned char *) " ";
 	int input_str_sz = sql_value_bytes(argv[0]);
-	uint8_t len_one = 1;
-	trim_procedure(context, TRIM_BOTH, (const unsigned char *) " ",
-		       &len_one, 1, input_str, input_str_sz);
+	const unsigned char *input_str = sql_value_text(argv[0]);
+	uint8_t trim_char_len[1] = { 1 };
+	trim_procedure(context, TRIM_BOTH, default_trim, trim_char_len, 1,
+		       input_str, input_str_sz);
 }
 
 /**

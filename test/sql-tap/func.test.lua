@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14603)
+test:plan(14606)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -2231,6 +2231,24 @@ test:do_catchsql_test(
         1, "Syntax error near 'FROM'"
         -- </func-22.38>
     })
+
+test:do_execsql_test(
+    "func-22.39",
+    [[
+        SELECT HEX(TRIM(X'004420'))
+    ]], { "4420"  })
+
+test:do_execsql_test(
+    "func-22.40",
+    [[
+        SELECT HEX(TRIM(X'00442000'))
+    ]], { "4420"  })
+
+test:do_execsql_test(
+    "func-22.41",
+    [[
+        SELECT HEX(TRIM(X'442000'))
+    ]], { "4420"  })
 
 -- This is to test the deprecated sql_aggregate_count() API.
 --
