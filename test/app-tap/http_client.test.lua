@@ -273,15 +273,13 @@ local function test_errors(test)
     local r = http:get("http://do_not_exist_8ffad33e0cb01e6a01a03d00089e71e5b2b7e9930dfcba.ru")
 end
 
--- gh-3679 Check that opts.headers values can be strings or table
--- convertible to string only.
+-- gh-3679 Check that opts.headers values can be strings only.
 -- gh-4281 Check that opts.headers can be a table and opts.headers
 -- keys can be strings only.
 local function test_request_headers(test, url, opts)
     local exp_err_bad_opts_headers = 'opts.headers should be a table'
     local exp_err_bad_key = 'opts.headers keys should be strings'
-    local exp_err_bad_value = 'opts.headers values should be strings or ' ..
-                              'tables with "__tostring"'
+    local exp_err_bad_value = 'opts.headers values should be strings'
     local cases = {
         -- Verify opts.headers type checks.
         {
@@ -327,18 +325,6 @@ local function test_request_headers(test, url, opts)
             exp_err = nil,
         },
         {
-            'header value with __tostring() metamethod',
-            opts = {headers = {aaa = setmetatable({}, {
-                __tostring = function(self)
-                    return 'aaa'
-                end})}},
-            exp_err = nil,
-            postrequest_check = function(opts)
-                assert(type(opts.headers.aaa) == 'table',
-                    '"aaa" header was modified in http_client')
-            end,
-        },
-        {
             'boolean header value',
             opts = {headers = {aaa = true}},
             exp_err = exp_err_bad_value,
@@ -359,13 +345,8 @@ local function test_request_headers(test, url, opts)
             exp_err = exp_err_bad_value,
         },
         {
-            'table header value w/o metatable',
+            'table header value',
             opts = {headers = {aaa = {}}},
-            exp_err = exp_err_bad_value,
-        },
-        {
-            'table header value w/o __tostring() metamethod',
-            opts = {headers = {aaa = setmetatable({}, {})}},
             exp_err = exp_err_bad_value,
         },
     }
