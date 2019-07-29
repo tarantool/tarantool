@@ -1760,6 +1760,16 @@ update_view_references(struct Select *select, int update_value,
 		const char *space_name = sql_src_list_entry_name(list, i);
 		if (space_name == NULL)
 			continue;
+		/*
+		 * Views are allowed to contain CTEs. CTE is a
+		 * temporary object, created and destroyed at SQL
+		 * runtime (it is represented by an ephemeral
+		 * table). So, it is absent in space cache and as
+		 * a consequence we can't increment its reference
+		 * counter. Skip iteration.
+		 */
+		if (sql_select_constains_cte(select, space_name))
+			continue;
 		struct space *space = space_by_name(space_name);
 		if (space == NULL) {
 			if (! suppress_error) {

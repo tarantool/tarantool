@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(73)
+test:plan(78)
 
 --!./tcltestrunner.lua
 -- 2002 February 26
@@ -1231,6 +1231,98 @@ test:do_catchsql_test(
         -- <view-23.8>
         0
         -- </view-23.8>
+    })
+
+-- gh-4149: Make sure that VIEW can be created as CTE.
+test:do_execsql_test(
+    "view-24.1",
+    [[
+        CREATE TABLE ts (s1 INT PRIMARY KEY);
+        INSERT INTO ts VALUES (1);
+    ]], {
+        -- <view-24.1>
+        -- </view-24.1>
+    })
+
+test:do_execsql_test(
+    "view-24.2",
+    [[
+        CREATE VIEW v AS WITH w(id) AS (
+            SELECT 1)
+          SELECT * FROM ts, w;
+        SELECT * FROM v;
+    ]], {
+        -- <view-24.2>
+        1, 1
+        -- </view-24.2>
+    })
+
+test:do_execsql_test(
+    "view-24.3",
+    [[
+        DROP VIEW v;
+        CREATE VIEW v AS WITH RECURSIVE w AS (
+            SELECT s1 FROM ts
+            UNION ALL
+            SELECT s1+1 FROM w WHERE s1 < 4)
+          SELECT * FROM w;
+        SELECT * FROM v;
+    ]], {
+        -- <view-24.3>
+        1,2,3,4
+        -- </view-24.3>
+    })
+
+test:do_execsql_test(
+    "view-24.4",
+    [[
+        DROP VIEW v;
+        CREATE VIEW v AS SELECT * FROM
+            (SELECT 1),
+            (SELECT 2) JOIN
+            (WITH RECURSIVE w AS (
+                SELECT s1 FROM ts
+                UNION ALL
+                SELECT s1+1 FROM w WHERE s1 < 4)
+              SELECT * FROM w);
+          SELECT * FROM v;
+    ]], {
+        -- <view-24.4>
+        1,2,1,1,2,2,1,2,3,1,2,4
+        -- </view-24.4>
+    })
+
+test:do_execsql_test(
+    "view-24.5",
+    [[
+        DROP VIEW v;
+        DROP TABLE ts;
+        CREATE VIEW v AS WITH RECURSIVE
+            xaxis(x) AS (
+                VALUES(-2.0)
+                UNION ALL
+                SELECT x+0.5 FROM xaxis WHERE x<1.2),
+            yaxis(y) AS (
+                VALUES(-1.0)
+                UNION ALL
+                SELECT y+0.5 FROM yaxis WHERE y<1.0),
+            m(iter, cx, cy, x, y) AS (
+                SELECT 0, x, y, 0.0, 0.0 FROM xaxis, yaxis
+                UNION ALL
+                SELECT iter+1, cx, cy, x*x-y*y + cx, 2.0*x*y + cy FROM m WHERE (x*x + y*y) < 4.0 AND iter<1
+            ),
+            m2(iter, cx, cy) AS (
+            SELECT max(iter), cx, cy FROM m GROUP BY cx, cy
+            ),
+            a(t) AS (
+                SELECT group_concat( substr('a', 1+least(iter/7,4), 1), '') FROM m2 GROUP BY cy
+            )
+          SELECT group_concat(trim(t),x'0a') FROM a;
+        SELECT * FROM v;
+    ]], {
+        -- <view-24.5>
+        "aaaaaaaa\naaaaaaaa\naaaaaaaa\naaaaaaaa\naaaaaaaa"
+        -- </view-24.5>
     })
 
 test:finish_test()

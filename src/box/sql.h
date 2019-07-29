@@ -324,6 +324,19 @@ struct SrcList *
 sql_select_expand_from_tables(struct Select *select);
 
 /**
+ * Check if @a name matches with at least one of CTE names typed
+ * in <WITH> clauses within @a select except <WITH>s that are
+ * nested within other <WITH>s.
+ *
+ * @param select Select which may contain CTE.
+ * @param name The name of CTE, that may contained.
+ * @retval true Has CTE with @a name.
+ * @retval false Hasn't CTE with @a name.
+*/
+bool
+sql_select_constains_cte(struct Select *select, const char *name);
+
+/**
  * Temporary getter in order to avoid including sqlInt.h
  * in alter.cc.
  *

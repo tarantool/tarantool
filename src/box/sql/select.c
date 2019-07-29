@@ -332,6 +332,46 @@ sql_select_expand_from_tables(struct Select *select)
 	return walker.u.pSrcList;
 }
 
+bool
+sql_select_constains_cte(struct Select *select, const char *name)
+{
+	assert(select != NULL && name != NULL);
+	struct With *with = select->pWith;
+	if (with != NULL) {
+		for (int i = 0; i < with->nCte; i++) {
+			const struct Cte *cte = &with->a[i];
+			/*
+			 * Don't use recursive call for
+			 * cte->pSelect, because this function is
+			 * used during view creation. Consider
+			 * the nested <WITH>s query schema:
+			 * CREATE VIEW v AS
+			 *     WITH w AS (
+			 *         WITH w_nested AS
+			 *             (...)
+			 *         SELECT ...)
+			 *     SELECT ... FROM ...;
+			 * The use of CTE "w_nested" after the
+			 * external select's <FROM> is disallowed.
+			 * So, it is pointless to check <WITH>,
+			 * which is nested to other <WITH>.
+			 */
+			if (memcmp(name, cte->zName, strlen(name)) == 0)
+				return true;
+		}
+	}
+	struct SrcList *list = select->pSrc;
+	int item_count = sql_src_list_entry_count(list);
+	for (int i = 0; i < item_count; ++i) {
+		if (list->a[i].pSelect != NULL) {
+			if (sql_select_constains_cte(list->a[i].pSelect,
+							 name))
+				return true;
+		}
+	}
+	return false;
+}
+
 /*
  * Given 1 to 3 identifiers preceding the JOIN keyword, determine the
  * type of join.  Return an integer constant that expresses that type
