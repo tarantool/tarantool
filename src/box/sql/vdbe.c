@@ -1200,21 +1200,6 @@ case OP_Null: {           /* out2 */
 	break;
 }
 
-/* Opcode: SoftNull P1 * * * *
- * Synopsis: r[P1]=NULL
- *
- * Set register P1 to have the value NULL as seen by the OP_MakeRecord
- * instruction, but do not free any string or blob memory associated with
- * the register, so that if the value was a string or blob that was
- * previously copied using OP_SCopy, the copies will continue to be valid.
- */
-case OP_SoftNull: {
-	assert(pOp->p1>0 && pOp->p1<=(p->nMem+1 - p->nCursor));
-	pOut = &aMem[pOp->p1];
-	pOut->flags = (pOut->flags|MEM_Null)&~MEM_Undefined;
-	break;
-}
-
 /* Opcode: Blob P1 P2 P3 P4 *
  * Synopsis: r[P2]=P4 (len=P1, subtype=P3)
  *
