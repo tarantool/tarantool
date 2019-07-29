@@ -1725,6 +1725,7 @@ wqlist(A) ::= wqlist(A) COMMA nm(X) eidlist_opt(Y) AS LP select(Z) RP. {
 ////////////////////////////// TYPE DECLARATION ///////////////////////////////
 %type typedef {struct type_def}
 typedef(A) ::= TEXT . { A.type = FIELD_TYPE_STRING; }
+typedef(A) ::= STRING_KW . { A.type = FIELD_TYPE_STRING; }
 typedef(A) ::= SCALAR . { A.type = FIELD_TYPE_SCALAR; }
 /** BOOL | BOOLEAN is not used due to possible bug in Lemon. */
 typedef(A) ::= BOOL . { A.type = FIELD_TYPE_BOOLEAN; }

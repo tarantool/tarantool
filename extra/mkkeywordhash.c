@@ -176,6 +176,7 @@ static Keyword aKeywordTable[] = {
   { "SET",                    "TK_SET",         ALWAYS,           true  },
   { "SIMPLE",                 "TK_SIMPLE",      ALWAYS,           true  },
   { "START",                  "TK_START",       ALWAYS,           true  },
+  { "STRING",                 "TK_STRING_KW",   ALWAYS,           true  },
   { "TABLE",                  "TK_TABLE",       ALWAYS,           true  },
   { "THEN",                   "TK_THEN",        ALWAYS,           true  },
   { "TO",                     "TK_TO",          ALWAYS,           true  },

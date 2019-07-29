@@ -399,3 +399,9 @@ box.execute("SELECT CAST('123' AS UNSIGNED);")
 box.execute("SELECT CAST('-123' AS UNSIGNED);")
 
 box.space.T1:drop()
+
+-- Check that STRING is a valid alias to TEXT type.
+--
+box.execute("CREATE TABLE t (id STRING PRIMARY KEY);")
+box.space.T:format()[1].type
+box.space.T:drop()
