@@ -182,18 +182,9 @@ luaT_httpc_request(lua_State *L)
 		while (lua_next(L, -2) != 0) {
 			int header_type = lua_type(L, -1);
 			if (header_type != LUA_TSTRING) {
-				const char *err_msg =
-					"opts.headers values should be strings "
-					"or tables with \"__tostring\"";
-				if (header_type != LUA_TTABLE) {
-					httpc_request_delete(req);
-					return luaL_error(L, err_msg);
-				} else if (!luaL_getmetafield(L, -1,
-							      "__tostring")) {
-					httpc_request_delete(req);
-					return luaL_error(L, err_msg);
-				}
-				lua_pop(L, 1);
+				httpc_request_delete(req);
+				return luaL_error(L, "opts.headers values "
+						  "should be strings");
 			}
 			if (lua_type(L, -2) != LUA_TSTRING) {
 				httpc_request_delete(req);
