@@ -1278,6 +1278,7 @@ initMemArray(Mem * p, int N, sql * db, u32 flags)
 		p->db = db;
 		p->flags = flags;
 		p->szMalloc = 0;
+		p->field_type = field_type_MAX;
 #ifdef SQL_DEBUG
 		p->pScopyFrom = 0;
 #endif

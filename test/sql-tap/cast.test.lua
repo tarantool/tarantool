@@ -140,7 +140,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(NULL AS text))
     ]], {
         -- <cast-1.14>
-        "null"
+        "string"
         -- </cast-1.14>
     })
 
@@ -160,7 +160,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(NULL AS NUMBER))
     ]], {
         -- <cast-1.16>
-        "null"
+        "number"
         -- </cast-1.16>
     })
 
@@ -200,7 +200,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(NULL AS integer))
     ]], {
         -- <cast-1.20>
-        "null"
+        "integer"
         -- </cast-1.20>
     })
 
@@ -511,7 +511,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(null AS NUMBER))
     ]], {
         -- <case-1.61>
-        "null"
+        "number"
         -- </case-1.61>
     })
 

@@ -906,7 +906,7 @@ test:do_execsql_test(
         FROM t7 LIMIT 1;
     ]], {
         -- <table-11.1>
-        "integer", "null", "null", "null", "null", "null", "null", "null"
+        "integer", "number", "string", "string", "null", "null", "string", "string"
         -- </table-11.1>
     })
 
@@ -917,7 +917,7 @@ test:do_execsql_test(
         FROM t7 LIMIT 1;
     ]], {
         -- <table-11.2>
-        "null", "null", "null", "null"
+        "number", "string", "number", "string"
         -- </table-11.2>
     })
 

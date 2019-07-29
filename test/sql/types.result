@@ -668,7 +668,7 @@ box.execute("SELECT typeof(b) FROM t;")
   rows:
   - ['boolean']
   - ['boolean']
-  - ['null']
+  - ['boolean']
 ...
 box.execute("SELECT quote(b) FROM t;")
 ---
@@ -2094,6 +2094,9 @@ box.execute("ALTER TABLE t DROP CONSTRAINT fk1;")
 box.space.PARENT:drop()
 ---
 ...
+box.space.T:drop()
+---
+...
 box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a VARBINARY CHECK (a = x'616263'));")
 ---
 - row_count: 1
@@ -2156,8 +2159,67 @@ box.execute("SELECT CAST(x'' AS VARBINARY);")
   rows:
   - ['']
 ...
->>>>>>> ff84ee4c2... sql: introduce VARBINARY column type
+-- gh-4148: make sure that typeof() returns origin type of column
+-- even if value is null.
+--
+box.execute("CREATE TABLE t (id INT PRIMARY KEY, a INT, s SCALAR);")
 ---
-- error: '[string ">>>>>>> ff84ee4c2... sql: introduce VARBINARY..."]:1: unexpected
-    symbol near ''>'''
+- row_count: 1
+...
+box.execute("INSERT INTO t VALUES (1, 1, 1), (2, NULL, NULL);")
+---
+- row_count: 2
+...
+box.execute("SELECT typeof(a), typeof(s) FROM t;")
+---
+- metadata:
+  - name: typeof(a)
+    type: string
+  - name: typeof(s)
+    type: string
+  rows:
+  - ['integer', 'integer']
+  - ['integer', 'null']
+...
+box.execute('CREATE TABLE t1 (id INTEGER PRIMARY KEY, a INTEGER, b INTEGER)')
+---
+- row_count: 1
+...
+box.execute('INSERT INTO t1 VALUES (1, NULL, NULL);')
+---
+- row_count: 1
+...
+box.execute('SELECT typeof(a & b) FROM t1;')
+---
+- metadata:
+  - name: typeof(a & b)
+    type: string
+  rows:
+  - ['integer']
+...
+box.execute('SELECT typeof(a), typeof(b), typeof(a & b) FROM t1')
+---
+- metadata:
+  - name: typeof(a)
+    type: string
+  - name: typeof(b)
+    type: string
+  - name: typeof(a & b)
+    type: string
+  rows:
+  - ['integer', 'integer', 'integer']
+...
+box.execute("SELECT typeof(CAST(0 AS UNSIGNED));")
+---
+- metadata:
+  - name: typeof(CAST(0 AS UNSIGNED))
+    type: string
+  rows:
+  - ['unsigned']
+...
+box.space.T:drop()
+---
+...
+box.space.T1:drop()
+---
 ...

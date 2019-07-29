@@ -536,32 +536,16 @@ registerTrace(int iReg, Mem *p) {
 
 #endif
 
-/*
- * Return the register of pOp->p2 after first preparing it to be
- * overwritten with an integer value.
- */
-static SQL_NOINLINE Mem *
-out2PrereleaseWithClear(Mem *pOut)
+static struct Mem *
+vdbe_prepare_null_out(struct Vdbe *v, int n)
 {
-	sqlVdbeMemSetNull(pOut);
-	pOut->flags = MEM_Int;
-	return pOut;
-}
-
-static Mem *
-out2Prerelease(Vdbe *p, VdbeOp *pOp)
-{
-	Mem *pOut;
-	assert(pOp->p2>0);
-	assert(pOp->p2<=(p->nMem+1 - p->nCursor));
-	pOut = &p->aMem[pOp->p2];
-	memAboutToChange(p, pOut);
-	if (VdbeMemDynamic(pOut)) { /*OPTIMIZATION-IF-FALSE*/
-		return out2PrereleaseWithClear(pOut);
-	} else {
-		pOut->flags = MEM_Int;
-		return pOut;
-	}
+	assert(n > 0);
+	assert(n <= (v->nMem + 1 - v->nCursor));
+	struct Mem *out = &v->aMem[n];
+	memAboutToChange(v, out);
+	sqlVdbeMemSetNull(out);
+	out->field_type = field_type_MAX;
+	return out;
 }
 
 struct stailq *
@@ -610,6 +594,17 @@ mem_type_to_str(const struct Mem *p)
 	}
 }
 
+static inline const struct tuple_field *
+vdbe_field_ref_fetch_field(struct vdbe_field_ref *field_ref, uint32_t fieldno)
+{
+	if (field_ref->tuple == NULL)
+		return NULL;
+	struct tuple_format *format = tuple_format(field_ref->tuple);
+	if (fieldno >= tuple_format_field_count(format))
+		return NULL;
+	return tuple_format_field(format, fieldno);
+}
+
 /**
  * Try to get a current tuple field using its field map.
  * @param field_ref The vdbe_field_ref instance to use.
@@ -623,18 +618,25 @@ static const void *
 vdbe_field_ref_fast_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 			  uint32_t *field_size)
 {
-	if (field_ref->tuple == NULL)
-		return NULL;
-	struct tuple_format *format = tuple_format(field_ref->tuple);
-	if (fieldno >= tuple_format_field_count(format) ||
-	    tuple_format_field(format, fieldno)->offset_slot ==
-	    TUPLE_OFFSET_SLOT_NIL)
+	const struct tuple_field *tf =
+		vdbe_field_ref_fetch_field(field_ref, fieldno);
+	if (tf == NULL || tf->offset_slot == TUPLE_OFFSET_SLOT_NIL)
 		return NULL;
 	const char *field = tuple_field(field_ref->tuple, fieldno);
 	const char *end = field;
 	mp_next(&end);
 	*field_size = end - field;
 	return field;
+}
+
+static inline enum field_type
+vdbe_field_ref_fetch_type(struct vdbe_field_ref *field_ref, uint32_t fieldno)
+{
+	const struct tuple_field *tf =
+		vdbe_field_ref_fetch_field(field_ref, fieldno);
+	if (tf == NULL || tf->type == FIELD_TYPE_ANY)
+		return field_type_MAX;
+	return tf->type;
 }
 
 /**
@@ -650,7 +652,6 @@ static int
 vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 		     struct Mem *dest_mem)
 {
-	sqlVdbeMemSetNull(dest_mem);
 	uint32_t *slots = field_ref->slots;
 	if (fieldno >= field_ref->field_count) {
 		UPDATE_MAX_BLOBSIZE(dest_mem);
@@ -722,6 +723,7 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 		dest_mem->flags |= MEM_Term;
 	}
 	UPDATE_MAX_BLOBSIZE(dest_mem);
+	dest_mem->field_type = vdbe_field_ref_fetch_type(field_ref, fieldno);
 	return 0;
 }
 
@@ -1076,13 +1078,8 @@ case OP_Halt: {
  * The 32-bit integer value P1 is written into register P2.
  */
 case OP_Integer: {         /* out2 */
-	pOut = out2Prerelease(p, pOp);
-	if (pOp->p1 < 0) {
-		pOut->u.i = pOp->p1;
-		assert((pOut->flags & MEM_Int) != 0);
-	} else {
-		mem_set_u64(pOut, pOp->p1);
-	}
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
+	mem_set_i64(pOut, pOp->p1);
 	break;
 }
 
@@ -1092,7 +1089,7 @@ case OP_Integer: {         /* out2 */
  * The boolean value P1 is written into register P2.
  */
 case OP_Bool: {         /* out2 */
-	pOut = out2Prerelease(p, pOp);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	assert(pOp->p1 == 1 || pOp->p1 == 0);
 	mem_set_bool(pOut, pOp->p1);
 	break;
@@ -1105,7 +1102,7 @@ case OP_Bool: {         /* out2 */
  * Write that value into register P2.
  */
 case OP_Int64: {           /* out2 */
-	pOut = out2Prerelease(p, pOp);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	assert(pOp->p4.pI64!=0);
 	mem_set_int(pOut, *pOp->p4.pI64, pOp->p4type == P4_INT64);
 	break;
@@ -1118,7 +1115,7 @@ case OP_Int64: {           /* out2 */
  * Write that value into register P2.
  */
 case OP_Real: {            /* same as TK_FLOAT, out2 */
-	pOut = out2Prerelease(p, pOp);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	pOut->flags = MEM_Real;
 	assert(!sqlIsNaN(*pOp->p4.pReal));
 	pOut->u.r = *pOp->p4.pReal;
@@ -1135,7 +1132,6 @@ case OP_Real: {            /* same as TK_FLOAT, out2 */
  */
 case OP_String8: {         /* same as TK_STRING, out2 */
 	assert(pOp->p4.z!=0);
-	pOut = out2Prerelease(p, pOp);
 	pOp->opcode = OP_String;
 	pOp->p1 = sqlStrlen30(pOp->p4.z);
 
@@ -1161,7 +1157,7 @@ case OP_String8: {         /* same as TK_STRING, out2 */
  */
 case OP_String: {          /* out2 */
 	assert(pOp->p4.z!=0);
-	pOut = out2Prerelease(p, pOp);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	pOut->flags = MEM_Str|MEM_Static|MEM_Term;
 	pOut->z = pOp->p4.z;
 	pOut->n = pOp->p1;
@@ -1184,7 +1180,7 @@ case OP_String: {          /* out2 */
 case OP_Null: {           /* out2 */
 	int cnt;
 	u16 nullFlag;
-	pOut = out2Prerelease(p, pOp);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	cnt = pOp->p3-pOp->p2;
 	assert(pOp->p3<=(p->nMem+1 - p->nCursor));
 	pOut->flags = nullFlag = pOp->p1 ? (MEM_Null|MEM_Cleared) : MEM_Null;
@@ -1194,6 +1190,7 @@ case OP_Null: {           /* out2 */
 		memAboutToChange(p, pOut);
 		sqlVdbeMemSetNull(pOut);
 		pOut->flags = nullFlag;
+		pOut->field_type = field_type_MAX;
 		pOut->n = 0;
 		cnt--;
 	}
@@ -1208,7 +1205,7 @@ case OP_Null: {           /* out2 */
  */
 case OP_Blob: {                /* out2 */
 	assert(pOp->p1 <= SQL_MAX_LENGTH);
-	pOut = out2Prerelease(p, pOp);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	sqlVdbeMemSetStr(pOut, pOp->p4.z, pOp->p1, 0, 0);
 	if (pOp->p3!=0) {
 		pOut->flags |= MEM_Subtype;
@@ -1235,7 +1232,7 @@ case OP_Variable: {            /* out2 */
 	if (sqlVdbeMemTooBig(pVar)) {
 		goto too_big;
 	}
-	pOut = out2Prerelease(p, pOp);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	sqlVdbeMemShallowCopy(pOut, pVar, MEM_Static);
 	UPDATE_MAX_BLOBSIZE(pOut);
 	break;
@@ -1335,22 +1332,6 @@ case OP_SCopy: {            /* out2 */
 	break;
 }
 
-/* Opcode: IntCopy P1 P2 * * *
- * Synopsis: r[P2]=r[P1]
- *
- * Transfer the integer value held in register P1 into register P2.
- *
- * This is an optimized version of SCopy that works only for integer
- * values.
- */
-case OP_IntCopy: {            /* out2 */
-	pIn1 = &aMem[pOp->p1];
-	assert((pIn1->flags & (MEM_Int | MEM_UInt)) != 0);
-	pOut = &aMem[pOp->p2];
-	mem_set_int(pOut, pIn1->u.i, (pIn1->flags & MEM_Int) != 0);
-	break;
-}
-
 /* Opcode: ResultRow P1 P2 * * *
  * Synopsis: output=r[P1@P2]
  *
@@ -1446,10 +1427,11 @@ case OP_Concat: {           /* same as TK_CONCAT, in1, in2, out3 */
 
 	pIn1 = &aMem[pOp->p1];
 	pIn2 = &aMem[pOp->p2];
-	pOut = &aMem[pOp->p3];
+	pOut = vdbe_prepare_null_out(p, pOp->p3);
 	assert(pIn1!=pOut);
 	if ((pIn1->flags | pIn2->flags) & MEM_Null) {
-		sqlVdbeMemSetNull(pOut);
+		/* Force NULL be of type STRING. */
+		pOut->field_type = FIELD_TYPE_STRING;
 		break;
 	}
 	/*
@@ -1554,7 +1536,7 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 	type1 = numericType(pIn1);
 	pIn2 = &aMem[pOp->p2];
 	type2 = numericType(pIn2);
-	pOut = &aMem[pOp->p3];
+	pOut = vdbe_prepare_null_out(p, pOp->p3);
 	flags = pIn1->flags | pIn2->flags;
 	if ((flags & MEM_Null)!=0) goto arithmetic_result_is_null;
 	if ((type1 & (MEM_Int | MEM_UInt)) != 0 &&
@@ -1647,7 +1629,8 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 	break;
 
 arithmetic_result_is_null:
-	sqlVdbeMemSetNull(pOut);
+	/* Force NULL be of type NUMBER. */
+	pOut->field_type = FIELD_TYPE_NUMBER;
 	break;
 
 division_by_zero:
@@ -1750,20 +1733,18 @@ case OP_Function: {
 	 * checks to see if the register array has changed, and if so it
 	 * reinitializes the relavant parts of the sql_context object
 	 */
-	pOut = &aMem[pOp->p3];
+	pOut = vdbe_prepare_null_out(p, pOp->p3);
 	if (pCtx->pOut != pOut) {
 		pCtx->pOut = pOut;
 		for(i=pCtx->argc-1; i>=0; i--) pCtx->argv[i] = &aMem[pOp->p2+i];
 	}
 
-	memAboutToChange(p, pCtx->pOut);
 #ifdef SQL_DEBUG
 	for(i=0; i<pCtx->argc; i++) {
 		assert(memIsValid(pCtx->argv[i]));
 		REGISTER_TRACE(p, pOp->p2+i, pCtx->argv[i]);
 	}
 #endif
-	MemSetTypeFlag(pCtx->pOut, MEM_Null);
 	pCtx->is_aborted = false;
 	(*pCtx->pFunc->xSFunc)(pCtx, pCtx->argc, pCtx->argv);/* IMP: R-24505-23230 */
 
@@ -1822,9 +1803,10 @@ case OP_ShiftRight: {           /* same as TK_RSHIFT, in1, in2, out3 */
 
 	pIn1 = &aMem[pOp->p1];
 	pIn2 = &aMem[pOp->p2];
-	pOut = &aMem[pOp->p3];
+	pOut = vdbe_prepare_null_out(p, pOp->p3);
 	if ((pIn1->flags | pIn2->flags) & MEM_Null) {
-		sqlVdbeMemSetNull(pOut);
+		/* Force NULL be of type INTEGER. */
+		pOut->field_type = FIELD_TYPE_INTEGER;
 		break;
 	}
 	bool unused;
@@ -1947,6 +1929,13 @@ case OP_Cast: {                  /* in1 */
 	if (ExpandBlob(pIn1) != 0)
 		goto abort_due_to_error;
 	rc = sqlVdbeMemCast(pIn1, pOp->p2);
+	/*
+	 * SCALAR is not type itself, but rather an aggregation
+	 * of types. Hence, cast to this type shouldn't change
+	 * original type of argument.
+	 */
+	if (pOp->p2 != FIELD_TYPE_SCALAR)
+		pIn1->field_type = pOp->p2;
 	UPDATE_MAX_BLOBSIZE(pIn1);
 	if (rc == 0)
 		break;
@@ -2053,6 +2042,8 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 	pIn3 = &aMem[pOp->p3];
 	flags1 = pIn1->flags;
 	flags3 = pIn3->flags;
+	enum field_type ft_p1 = pIn1->field_type;
+	enum field_type ft_p3 = pIn3->field_type;
 	if ((flags1 | flags3)&MEM_Null) {
 		/* One or both operands are NULL */
 		if (pOp->p5 & SQL_NULLEQ) {
@@ -2076,10 +2067,8 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 			 * The jump is taken if the SQL_JUMPIFNULL bit is set.
 			 */
 			if (pOp->p5 & SQL_STOREP2) {
-				pOut = &aMem[pOp->p2];
+				pOut = vdbe_prepare_null_out(p, pOp->p2);
 				iCompare = 1;    /* Operands are not equal */
-				memAboutToChange(p, pOut);
-				MemSetTypeFlag(pOut, MEM_Null);
 				REGISTER_TRACE(p, pOp->p2, pOut);
 			} else {
 				VdbeBranchTaken(2,3);
@@ -2195,11 +2184,12 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 	/* Undo any changes made by mem_apply_type() to the input registers. */
 	assert((pIn1->flags & MEM_Dyn) == (flags1 & MEM_Dyn));
 	pIn1->flags = flags1;
+	pIn1->field_type = ft_p1;
 	assert((pIn3->flags & MEM_Dyn) == (flags3 & MEM_Dyn));
 	pIn3->flags = flags3;
+	pIn3->field_type = ft_p3;
 
 	if (pOp->p5 & SQL_STOREP2) {
-		pOut = &aMem[pOp->p2];
 		iCompare = res;
 		res2 = res2!=0;  /* For this path res2 must be exactly 0 or 1 */
 		if ((pOp->p5 & SQL_KEEPNULL)!=0) {
@@ -2219,7 +2209,7 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 			testcase( res2==1 && pOp->opcode==OP_Ne);
 			if ((pOp->opcode==OP_Eq)==res2) break;
 		}
-		memAboutToChange(p, pOut);
+		pOut = vdbe_prepare_null_out(p, pOp->p2);
 		mem_set_bool(pOut, res2);
 		REGISTER_TRACE(p, pOp->p2, pOut);
 	} else {
@@ -2408,12 +2398,9 @@ case OP_Or: {             /* same as TK_OR, in1, in2, out3 */
 		static const unsigned char or_logic[] = { 0, 1, 2, 1, 1, 1, 2, 1, 2 };
 		v1 = or_logic[v1*3+v2];
 	}
-	pOut = &aMem[pOp->p3];
-	if (v1==2) {
-		MemSetTypeFlag(pOut, MEM_Null);
-	} else {
+	pOut = vdbe_prepare_null_out(p, pOp->p3);
+	if (v1 != 2)
 		mem_set_bool(pOut, v1);
-	}
 	break;
 }
 
@@ -2426,8 +2413,8 @@ case OP_Or: {             /* same as TK_OR, in1, in2, out3 */
  */
 case OP_Not: {                /* same as TK_NOT, in1, out2 */
 	pIn1 = &aMem[pOp->p1];
-	pOut = &aMem[pOp->p2];
-	sqlVdbeMemSetNull(pOut);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
+	pOut->field_type = FIELD_TYPE_BOOLEAN;
 	if ((pIn1->flags & MEM_Null)==0) {
 		if ((pIn1->flags & MEM_Bool) == 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
@@ -2448,8 +2435,9 @@ case OP_Not: {                /* same as TK_NOT, in1, out2 */
  */
 case OP_BitNot: {             /* same as TK_BITNOT, in1, out2 */
 	pIn1 = &aMem[pOp->p1];
-	pOut = &aMem[pOp->p2];
-	sqlVdbeMemSetNull(pOut);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
+	/* Force NULL be of type INTEGER. */
+	pOut->field_type = FIELD_TYPE_INTEGER;
 	if ((pIn1->flags & MEM_Null)==0) {
 		int64_t i;
 		bool is_neg;
@@ -2575,8 +2563,7 @@ case OP_Column: {
 	p2 = pOp->p2;
 
 	assert(pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor));
-	pDest = &aMem[pOp->p3];
-	memAboutToChange(p, pDest);
+	pDest = vdbe_prepare_null_out(p, pOp->p3);
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
 	assert(pC!=0);
 	assert(p2<pC->nField);
@@ -2593,7 +2580,6 @@ case OP_Column: {
 				vdbe_field_ref_prepare_data(&pC->field_ref,
 							    pReg->z, pReg->n);
 			} else {
-				sqlVdbeMemSetNull(pDest);
 				goto op_column_out;
 			}
 		} else {
@@ -2608,7 +2594,7 @@ case OP_Column: {
 		}
 		pC->cacheStatus = p->cacheCtr;
 	}
-	enum field_type field_type = FIELD_TYPE_ANY;
+	enum field_type field_type = field_type_MAX;
 	if (pC->eCurType == CURTYPE_TARANTOOL) {
 		/*
 		 * Ephemeral spaces feature only one index
@@ -2623,6 +2609,8 @@ case OP_Column: {
 			field_type = pC->uc.pCursor->space->def->
 					fields[p2].type;
 		}
+	} else if (pC->eCurType == CURTYPE_SORTER) {
+		field_type = vdbe_sorter_get_field_type(pC->uc.pSorter, p2);
 	}
 	struct Mem *default_val_mem =
 		pOp->p4type == P4_MEM ? pOp->p4.pMem : NULL;
@@ -2642,6 +2630,7 @@ case OP_Column: {
 				sqlVdbeMemSetDouble(pDest, pDest->u.u);
 		}
 	}
+	pDest->field_type = field_type;
 op_column_out:
 	REGISTER_TRACE(p, pOp->p3, pDest);
 	break;
@@ -2661,8 +2650,7 @@ case OP_Fetch: {
 	struct vdbe_field_ref *field_ref =
 		(struct vdbe_field_ref *) p->aMem[pOp->p1].u.p;
 	uint32_t field_idx = pOp->p2;
-	struct Mem *dest_mem = &aMem[pOp->p3];
-	memAboutToChange(p, dest_mem);
+	struct Mem *dest_mem = vdbe_prepare_null_out(p, pOp->p3);
 	if (vdbe_field_ref_fetch(field_ref, field_idx, dest_mem) != 0)
 		goto abort_due_to_error;
 	REGISTER_TRACE(p, pOp->p3, dest_mem);
@@ -2746,8 +2734,7 @@ case OP_MakeRecord: {
 
 	/* Identify the output register */
 	assert(pOp->p3<pOp->p1 || pOp->p3>=pOp->p1+pOp->p2);
-	pOut = &aMem[pOp->p3];
-	memAboutToChange(p, pOut);
+	pOut = vdbe_prepare_null_out(p, pOp->p3);
 
 	/* Apply the requested types to all inputs */
 	assert(pData0<=pLast);
@@ -2822,7 +2809,7 @@ case OP_Count: {         /* out2 */
 		assert((pCrsr->curFlags & BTCF_TEphemCursor) != 0);
 		nEntry = tarantoolsqlEphemeralCount(pCrsr);
 	}
-	pOut = out2Prerelease(p, pOp);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	mem_set_u64(pOut, nEntry);
 	break;
 }
@@ -3636,7 +3623,7 @@ case OP_Found: {        /* jump, in3 */
 case OP_Sequence: {           /* out2 */
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
 	assert(p->apCsr[pOp->p1]!=0);
-	pOut = out2Prerelease(p, pOp);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	int64_t seq_val = p->apCsr[pOp->p1]->seqCount++;
 	mem_set_u64(pOut, seq_val);
 	break;
@@ -3650,7 +3637,7 @@ case OP_Sequence: {           /* out2 */
  * incremented by one.
  */
 case OP_NextSequenceId: {
-	pOut = &aMem[pOp->p2];
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	uint64_t id = 0;
 	tarantoolSqlNextSeqId(&id);
 	id++;
@@ -3683,7 +3670,7 @@ case OP_NextIdEphemeral: {
 		diag_set(ClientError, ER_ROWID_OVERFLOW);
 		goto abort_due_to_error;
 	}
-	pOut = &aMem[pOp->p2];
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	mem_set_u64(pOut, rowid);
 	break;
 }
@@ -3711,15 +3698,14 @@ case OP_FCopy: {     /* out2 */
 	}
 
 	if ((pOp->p3 & OPFLAG_NOOP_IF_NULL) && (pIn1->flags & MEM_Null)) {
-		pOut = &aMem[pOp->p2];
-		if (pOut->flags & MEM_Undefined) pOut->flags = MEM_Null;
-		/* Flag is set and register is NULL -> do nothing  */
+		pOut = vdbe_prepare_null_out(p, pOp->p2);
 	} else {
 		assert(memIsValid(pIn1));
 		assert((pIn1->flags & (MEM_Int | MEM_UInt)) != 0);
 
-		pOut = &aMem[pOp->p2];
+		pOut = vdbe_prepare_null_out(p, pOp->p2);
 		mem_set_int(pOut, pIn1->u.i, pIn1->flags == MEM_Int);
+		pOut->field_type = pIn1->field_type;
 	}
 	break;
 }
@@ -3845,7 +3831,7 @@ case OP_SorterCompare: {
 case OP_SorterData: {
 	VdbeCursor *pC;
 
-	pOut = &aMem[pOp->p2];
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	pC = p->apCsr[pOp->p1];
 	assert(isSorter(pC));
 	if (sqlVdbeSorterRowkey(pC, pOut) != 0)
@@ -3889,8 +3875,7 @@ case OP_RowData: {
 	}
 #endif
 
-	pOut = &aMem[pOp->p2];
-	memAboutToChange(p, pOut);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
 	pC = p->apCsr[pOp->p1];
@@ -3917,7 +3902,6 @@ case OP_RowData: {
 	}
 	testcase( n==0);
 
-	sqlVdbeMemRelease(pOut);
 	if (sql_vdbe_mem_alloc_region(pOut, n) != 0)
 		goto abort_due_to_error;
 	sqlCursorPayload(pCrsr, 0, n, pOut->z);
@@ -4840,7 +4824,7 @@ case OP_Program: {        /* jump */
 case OP_Param: {           /* out2 */
 	VdbeFrame *pFrame;
 	Mem *pIn;
-	pOut = out2Prerelease(p, pOp);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	pFrame = p->pFrame;
 	pIn = &pFrame->aMem[pOp->p1 + pFrame->aOp[pFrame->pc].p1];
 	sqlVdbeMemShallowCopy(pOut, pIn, MEM_Ephem);
@@ -4938,7 +4922,7 @@ case OP_IfPos: {        /* jump, in1 */
 case OP_OffsetLimit: {    /* in1, out2, in3 */
 	pIn1 = &aMem[pOp->p1];
 	pIn3 = &aMem[pOp->p3];
-	pOut = out2Prerelease(p, pOp);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
 
 	assert((pIn1->flags & MEM_UInt) != 0);
 	assert((pIn3->flags & MEM_UInt) != 0);
@@ -5203,7 +5187,7 @@ case OP_Init: {          /* jump */
  */
 case OP_IncMaxid: {
 	assert(pOp->p1 > 0);
-	pOut = &aMem[pOp->p1];
+	pOut = vdbe_prepare_null_out(p, pOp->p1);
 
 	if (tarantoolsqlIncrementMaxid(&pOut->u.u) != 0)
 		goto abort_due_to_error;

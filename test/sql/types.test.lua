@@ -461,6 +461,7 @@ box.execute("INSERT INTO parent VALUES (1, x'616263');")
 box.execute("INSERT INTO t VALUES (1, x'616263');")
 box.execute("ALTER TABLE t DROP CONSTRAINT fk1;")
 box.space.PARENT:drop()
+box.space.T:drop()
 
 box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a VARBINARY CHECK (a = x'616263'));")
 box.execute("INSERT INTO t1 VALUES (1, x'006162');")
@@ -477,4 +478,20 @@ box.execute("SELECT CAST(1.123 AS VARBINARY);")
 box.execute("SELECT CAST(true AS VARBINARY);")
 box.execute("SELECT CAST('asd' AS VARBINARY);")
 box.execute("SELECT CAST(x'' AS VARBINARY);")
->>>>>>> ff84ee4c2... sql: introduce VARBINARY column type
+
+-- gh-4148: make sure that typeof() returns origin type of column
+-- even if value is null.
+--
+box.execute("CREATE TABLE t (id INT PRIMARY KEY, a INT, s SCALAR);")
+box.execute("INSERT INTO t VALUES (1, 1, 1), (2, NULL, NULL);")
+box.execute("SELECT typeof(a), typeof(s) FROM t;")
+
+box.execute('CREATE TABLE t1 (id INTEGER PRIMARY KEY, a INTEGER, b INTEGER)')
+box.execute('INSERT INTO t1 VALUES (1, NULL, NULL);')
+box.execute('SELECT typeof(a & b) FROM t1;')
+box.execute('SELECT typeof(a), typeof(b), typeof(a & b) FROM t1')
+
+box.execute("SELECT typeof(CAST(0 AS UNSIGNED));")
+
+box.space.T:drop()
+box.space.T1:drop()

@@ -330,6 +330,7 @@ sqlVdbeMemFinalize(Mem * pMem, FuncDef * pFunc)
 		memset(&t, 0, sizeof(t));
 		t.flags = MEM_Null;
 		t.db = pMem->db;
+		t.field_type = field_type_MAX;
 		ctx.pOut = &t;
 		ctx.pMem = pMem;
 		ctx.pFunc = pFunc;
@@ -758,6 +759,7 @@ sqlVdbeMemInit(Mem * pMem, sql * db, u32 flags)
 	pMem->flags = flags;
 	pMem->db = db;
 	pMem->szMalloc = 0;
+	pMem->field_type = field_type_MAX;
 }
 
 /*

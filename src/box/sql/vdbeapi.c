@@ -620,6 +620,7 @@ columnNullValue(void)
 		0},
 		    /* .flags      = */ (u16) MEM_Null,
 		    /* .eSubtype   = */ (u8) 0,
+		    /* .field_type = */ field_type_MAX,
 		    /* .n          = */ (int)0,
 		    /* .z          = */ (char *)0,
 		    /* .zMalloc    = */ (char *)0,
@@ -833,6 +834,7 @@ vdbeUnbind(Vdbe * p, int i)
 	pVar = &p->aVar[i];
 	sqlVdbeMemRelease(pVar);
 	pVar->flags = MEM_Null;
+	pVar->field_type = field_type_MAX;
 
 	/* If the bit corresponding to this variable in Vdbe.expmask is set, then
 	 * binding a new value to this variable invalidates the current query plan.

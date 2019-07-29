@@ -250,13 +250,14 @@ test:do_catchsql_test(
         -- </check-2.4>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "check-2.5",
     [[
         INSERT INTO t2 VALUES(4, NULL, 5, NULL);
+        DELETE FROM t2 WHERE id = 4;
     ]], {
         -- <check-2.5>
-        1, "Check constraint failed 'TWO': typeof(coalesce(y,0.1))=='number'"
+
         -- </check-2.5>
     })
 
