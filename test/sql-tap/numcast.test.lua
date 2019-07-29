@@ -49,7 +49,7 @@ for _, enc in ipairs({"utf8"}) do
         test:do_test(
             string.format("numcast-%s.%s.1", enc, idx),
             function()
-                return test:execsql("SELECT CAST("..str.." AS real)")
+                return test:execsql("SELECT CAST("..str.." AS NUMBER)")
             end, {
                 rval
             })

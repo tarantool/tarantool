@@ -10,7 +10,7 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 ...
 -- box.cfg()
 -- create space
-box.execute("CREATE TABLE zzoobar (c1 FLOAT, c2 INT PRIMARY KEY, c3 TEXT, c4 FLOAT)")
+box.execute("CREATE TABLE zzoobar (c1 NUMBER, c2 INT PRIMARY KEY, c3 TEXT, c4 NUMBER)")
 ---
 - row_count: 1
 ...

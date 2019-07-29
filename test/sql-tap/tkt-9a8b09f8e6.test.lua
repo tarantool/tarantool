@@ -50,7 +50,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     1.3,
     [[
-        CREATE TABLE t3(x REAL primary key);
+        CREATE TABLE t3(x NUMBER primary key);
         INSERT INTO t3 VALUES(1.0);
     ]], {
         -- <1.3>
@@ -61,7 +61,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     1.4,
     [[
-        CREATE TABLE t4(x REAL primary key);
+        CREATE TABLE t4(x NUMBER primary key);
         INSERT INTO t4 VALUES(1.11);
     ]], {
         -- <1.4>

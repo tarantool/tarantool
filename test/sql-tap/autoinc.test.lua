@@ -541,7 +541,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "autoinc-7.1",
     [[
-        CREATE TABLE t7(x INTEGER, y REAL, PRIMARY KEY(x AUTOINCREMENT));
+        CREATE TABLE t7(x INTEGER, y NUMBER, PRIMARY KEY(x AUTOINCREMENT));
         INSERT INTO t7(y) VALUES(123);
         INSERT INTO t7(y) VALUES(234);
         DELETE FROM t7;
@@ -627,7 +627,7 @@ test:do_test(
     function()
         return test:execsql([[
             DROP TABLE IF EXISTS t7;
-            CREATE TABLE t7(x INT, y REAL, PRIMARY KEY(x AUTOINCREMENT));
+            CREATE TABLE t7(x INT, y NUMBER, PRIMARY KEY(x AUTOINCREMENT));
             INSERT INTO t7(y) VALUES(123);
             INSERT INTO t7(y) VALUES(234);
             DELETE FROM t7;

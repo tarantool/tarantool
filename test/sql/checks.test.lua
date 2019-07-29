@@ -46,7 +46,7 @@ box.space._ck_constraint:delete({513, 'CK_CONSTRAINT_01'})
 box.space._space:delete({513})
 
 -- Create table with checks in sql.
-box.execute("CREATE TABLE t1(x INTEGER CONSTRAINT ONE CHECK( x<5 ), y REAL CONSTRAINT TWO CHECK( y>x ), z INTEGER PRIMARY KEY);")
+box.execute("CREATE TABLE t1(x INTEGER CONSTRAINT ONE CHECK( x<5 ), y NUMBER CONSTRAINT TWO CHECK( y>x ), z INTEGER PRIMARY KEY);")
 box.space._ck_constraint:count()
 box.execute("INSERT INTO t1 VALUES (7, 1, 1)")
 box.space.T1:insert({7, 1, 1})
@@ -57,7 +57,7 @@ box.space.T1:update({1}, {{'+', 1, 5}})
 box.execute("DROP TABLE t1")
 
 -- Test space creation rollback on spell error in ck constraint.
-box.execute("CREATE TABLE first (id FLOAT PRIMARY KEY CHECK(id < 5), a INT CONSTRAINT ONE CHECK(a >< 5));")
+box.execute("CREATE TABLE first (id NUMBER PRIMARY KEY CHECK(id < 5), a INT CONSTRAINT ONE CHECK(a >< 5));")
 box.space.FIRST == nil
 box.space._ck_constraint:count() == 0
 

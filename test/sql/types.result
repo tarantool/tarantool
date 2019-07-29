@@ -31,7 +31,7 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT, b UNIQUE);")
 ...
 -- gh-3104: real type is stored in space format.
 --
-box.execute("CREATE TABLE t1 (id TEXT PRIMARY KEY, a REAL, b INT, c TEXT, d SCALAR);")
+box.execute("CREATE TABLE t1 (id TEXT PRIMARY KEY, a NUMBER, b INT, c TEXT, d SCALAR);")
 ---
 - row_count: 1
 ...
@@ -799,7 +799,7 @@ box.execute("SELECT CAST(true AS TEXT);")
   rows:
   - ['TRUE']
 ...
-box.execute("SELECT CAST(true AS FLOAT);")
+box.execute("SELECT CAST(true AS NUMBER);")
 ---
 - error: 'Type mismatch: can not convert true to number'
 ...
@@ -1640,10 +1640,10 @@ box.space.T1:drop()
 ...
 -- Test CAST facilities.
 --
-box.execute("SELECT CAST(18446744073709551615 AS FLOAT);")
+box.execute("SELECT CAST(18446744073709551615 AS NUMBER);")
 ---
 - metadata:
-  - name: CAST(18446744073709551615 AS FLOAT)
+  - name: CAST(18446744073709551615 AS NUMBER)
     type: number
   rows:
   - [1.844674407371e+19]

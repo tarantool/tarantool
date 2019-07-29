@@ -21,7 +21,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE Item(
            a integer PRIMARY KEY NOT NULL ,
-           b double NULL ,
+           b NUMBER NULL ,
            c int NOT NULL DEFAULT 0
         );
         CREATE TABLE Undo(id INTEGER PRIMARY KEY, UndoAction TEXT);

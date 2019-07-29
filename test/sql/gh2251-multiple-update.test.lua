@@ -13,7 +13,7 @@ box.execute("UPDATE t1 SET e=e+1 WHERE b IN (SELECT b FROM t1);")
 
 box.execute("SELECT e FROM t1")
 
-box.execute("CREATE TABLE t2(a integer primary key, b INT UNIQUE, c FLOAT, d FLOAT, e INT,  UNIQUE(c,d));")
+box.execute("CREATE TABLE t2(a integer primary key, b INT UNIQUE, c NUMBER, d NUMBER, e INT,  UNIQUE(c,d));")
 box.execute("INSERT INTO t2 VALUES(1,2,3,4,5);")
 box.execute("INSERT INTO t2 VALUES(2,3,4,4,6);")
 

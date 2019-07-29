@@ -26,7 +26,7 @@ test:do_test(
     "boundary3-1.1",
     function()
         return test:execsql([[
-            CREATE TABLE t1(rowid  INT primary key, a FLOAT ,x SCALAR);
+            CREATE TABLE t1(rowid  INT primary key, a NUMBER ,x SCALAR);
             INSERT INTO t1(rowid,a,x) VALUES(-8388609,1,'ffffffffff7fffff');
             INSERT INTO t1(rowid,a,x) VALUES(-36028797018963969,2,'ff7fffffffffffff');
             INSERT INTO t1(rowid,a,x) VALUES(9223372036854775806,3,'7fffffffffffffff');
@@ -109,7 +109,7 @@ test:do_test(
     "boundary3-1.3",
     function()
         return test:execsql([[
-            CREATE TABLE t2(r INT primary key, a REAL);
+            CREATE TABLE t2(r INT primary key, a NUMBER);
             INSERT INTO t2 SELECT rowid, a FROM t1;
             CREATE INDEX t2i1 ON t2(r);
             CREATE INDEX t2i2 ON t2(a);
@@ -282,12 +282,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.2.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=16 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=16 ORDER BY t1.rowid"
     ,{23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.2.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=16 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=16 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23})
 
 test:do_execsql_test(
@@ -317,12 +317,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.2.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=16 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=16 ORDER BY t1.rowid"
     ,{16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.2.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=16 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=16 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16})
 
 test:do_execsql_test(
@@ -352,12 +352,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.2.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=16 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=16 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8})
 
 test:do_execsql_test(
     "boundary3-2.2.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=16 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=16 ORDER BY t1.rowid DESC"
     ,{8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -387,12 +387,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.2.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=16 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=16 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16})
 
 test:do_execsql_test(
     "boundary3-2.2.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=16 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=16 ORDER BY t1.rowid DESC"
     ,{16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -437,12 +437,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.3.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=36 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=36 ORDER BY t1.rowid"
     ,{39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.3.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=36 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=36 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39})
 
 test:do_execsql_test(
@@ -472,12 +472,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.3.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=36 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=36 ORDER BY t1.rowid"
     ,{36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.3.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=36 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=36 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36})
 
 test:do_execsql_test(
@@ -507,12 +507,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.3.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=36 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=36 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14})
 
 test:do_execsql_test(
     "boundary3-2.3.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=36 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=36 ORDER BY t1.rowid DESC"
     ,{14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -542,12 +542,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.3.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=36 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=36 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36})
 
 test:do_execsql_test(
     "boundary3-2.3.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=36 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=36 ORDER BY t1.rowid DESC"
     ,{36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -592,12 +592,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.4.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=6 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=6 ORDER BY t1.rowid"
     ,{12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.4.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=6 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=6 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12})
 
 test:do_execsql_test(
@@ -627,12 +627,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.4.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=6 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=6 ORDER BY t1.rowid"
     ,{6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.4.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=6 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=6 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6})
 
 test:do_execsql_test(
@@ -662,12 +662,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.4.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=6 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=6 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9})
 
 test:do_execsql_test(
     "boundary3-2.4.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=6 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=6 ORDER BY t1.rowid DESC"
     ,{9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -697,12 +697,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.4.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=6 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=6 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6})
 
 test:do_execsql_test(
     "boundary3-2.4.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=6 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=6 ORDER BY t1.rowid DESC"
     ,{6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -747,12 +747,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.5.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=29 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=29 ORDER BY t1.rowid"
     ,{32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.5.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=29 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=29 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32})
 
 test:do_execsql_test(
@@ -782,12 +782,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.5.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=29 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=29 ORDER BY t1.rowid"
     ,{29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.5.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=29 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=29 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29})
 
 test:do_execsql_test(
@@ -817,12 +817,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.5.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=29 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=29 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37})
 
 test:do_execsql_test(
     "boundary3-2.5.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=29 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=29 ORDER BY t1.rowid DESC"
     ,{37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -852,12 +852,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.5.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=29 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=29 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29})
 
 test:do_execsql_test(
     "boundary3-2.5.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=29 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=29 ORDER BY t1.rowid DESC"
     ,{29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -1017,12 +1017,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.7.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=41 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=41 ORDER BY t1.rowid"
     ,{5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.7.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=41 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=41 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5})
 
 test:do_execsql_test(
@@ -1052,12 +1052,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.7.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=41 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=41 ORDER BY t1.rowid"
     ,{41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.7.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=41 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=41 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41})
 
 test:do_execsql_test(
@@ -1087,12 +1087,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.7.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=41 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=41 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60})
 
 test:do_execsql_test(
     "boundary3-2.7.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=41 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=41 ORDER BY t1.rowid DESC"
     ,{60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -1122,12 +1122,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.7.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=41 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=41 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41})
 
 test:do_execsql_test(
     "boundary3-2.7.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=41 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=41 ORDER BY t1.rowid DESC"
     ,{41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -1172,12 +1172,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.8.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=31 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=31 ORDER BY t1.rowid"
     ,{4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.8.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=31 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=31 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4})
 
 test:do_execsql_test(
@@ -1207,12 +1207,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.8.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=31 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=31 ORDER BY t1.rowid"
     ,{31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.8.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=31 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=31 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31})
 
 test:do_execsql_test(
@@ -1242,12 +1242,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.8.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=31 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=31 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5})
 
 test:do_execsql_test(
     "boundary3-2.8.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=31 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=31 ORDER BY t1.rowid DESC"
     ,{5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -1277,12 +1277,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.8.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=31 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=31 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31})
 
 test:do_execsql_test(
     "boundary3-2.8.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=31 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=31 ORDER BY t1.rowid DESC"
     ,{31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -1442,12 +1442,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.10.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=61 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=61 ORDER BY t1.rowid"
     ,{8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.10.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=61 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=61 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8})
 
 test:do_execsql_test(
@@ -1477,12 +1477,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.10.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=61 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=61 ORDER BY t1.rowid"
     ,{61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.10.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=61 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=61 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61})
 
 test:do_execsql_test(
@@ -1512,12 +1512,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.10.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=61 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=61 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30})
 
 test:do_execsql_test(
     "boundary3-2.10.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=61 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=61 ORDER BY t1.rowid DESC"
     ,{30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -1547,12 +1547,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.10.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=61 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=61 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61})
 
 test:do_execsql_test(
     "boundary3-2.10.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=61 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=61 ORDER BY t1.rowid DESC"
     ,{61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -1597,12 +1597,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.11.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=22 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=22 ORDER BY t1.rowid"
     ,{46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.11.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=22 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=22 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46})
 
 test:do_execsql_test(
@@ -1632,12 +1632,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.11.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=22 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=22 ORDER BY t1.rowid"
     ,{22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.11.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=22 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=22 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22})
 
 test:do_execsql_test(
@@ -1667,12 +1667,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.11.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=22 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=22 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39})
 
 test:do_execsql_test(
     "boundary3-2.11.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=22 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=22 ORDER BY t1.rowid DESC"
     ,{39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -1702,12 +1702,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.11.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=22 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=22 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22})
 
 test:do_execsql_test(
     "boundary3-2.11.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=22 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=22 ORDER BY t1.rowid DESC"
     ,{22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -1752,12 +1752,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.12.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=62 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=62 ORDER BY t1.rowid"
     ,{15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.12.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=62 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=62 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15})
 
 test:do_execsql_test(
@@ -1787,12 +1787,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.12.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=62 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=62 ORDER BY t1.rowid"
     ,{62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.12.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=62 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=62 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62})
 
 test:do_execsql_test(
@@ -1822,12 +1822,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.12.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=62 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=62 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48})
 
 test:do_execsql_test(
     "boundary3-2.12.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=62 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=62 ORDER BY t1.rowid DESC"
     ,{48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -1857,12 +1857,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.12.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=62 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=62 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62})
 
 test:do_execsql_test(
     "boundary3-2.12.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=62 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=62 ORDER BY t1.rowid DESC"
     ,{62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -1907,12 +1907,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.13.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=40 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=40 ORDER BY t1.rowid"
     ,{20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.13.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=40 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=40 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20})
 
 test:do_execsql_test(
@@ -1942,12 +1942,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.13.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=40 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=40 ORDER BY t1.rowid"
     ,{40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.13.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=40 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=40 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40})
 
 test:do_execsql_test(
@@ -1977,12 +1977,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.13.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=40 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=40 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12})
 
 test:do_execsql_test(
     "boundary3-2.13.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=40 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=40 ORDER BY t1.rowid DESC"
     ,{12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -2012,12 +2012,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.13.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=40 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=40 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40})
 
 test:do_execsql_test(
     "boundary3-2.13.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=40 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=40 ORDER BY t1.rowid DESC"
     ,{40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -2177,12 +2177,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.15.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=19 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=19 ORDER BY t1.rowid"
     ,{7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.15.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=19 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=19 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7})
 
 test:do_execsql_test(
@@ -2212,12 +2212,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.15.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=19 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=19 ORDER BY t1.rowid"
     ,{19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.15.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=19 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=19 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19})
 
 test:do_execsql_test(
@@ -2247,12 +2247,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.15.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=19 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=19 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57})
 
 test:do_execsql_test(
     "boundary3-2.15.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=19 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=19 ORDER BY t1.rowid DESC"
     ,{57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -2282,12 +2282,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.15.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=19 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=19 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19})
 
 test:do_execsql_test(
     "boundary3-2.15.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=19 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=19 ORDER BY t1.rowid DESC"
     ,{19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -2432,12 +2432,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.17.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=50 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=50 ORDER BY t1.rowid"
     ,{48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.17.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=50 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=50 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48})
 
 test:do_execsql_test(
@@ -2467,12 +2467,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.17.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=50 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=50 ORDER BY t1.rowid"
     ,{50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.17.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=50 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=50 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50})
 
 test:do_execsql_test(
@@ -2502,12 +2502,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.17.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=50 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=50 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23})
 
 test:do_execsql_test(
     "boundary3-2.17.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=50 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=50 ORDER BY t1.rowid DESC"
     ,{23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -2537,12 +2537,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.17.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=50 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=50 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50})
 
 test:do_execsql_test(
     "boundary3-2.17.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=50 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=50 ORDER BY t1.rowid DESC"
     ,{50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -2702,12 +2702,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.19.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=48 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=48 ORDER BY t1.rowid"
     ,{62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.19.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=48 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=48 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62})
 
 test:do_execsql_test(
@@ -2737,12 +2737,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.19.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=48 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=48 ORDER BY t1.rowid"
     ,{48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.19.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=48 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=48 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48})
 
 test:do_execsql_test(
@@ -2772,12 +2772,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.19.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=48 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=48 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50})
 
 test:do_execsql_test(
     "boundary3-2.19.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=48 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=48 ORDER BY t1.rowid DESC"
     ,{50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -2807,12 +2807,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.19.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=48 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=48 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48})
 
 test:do_execsql_test(
     "boundary3-2.19.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=48 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=48 ORDER BY t1.rowid DESC"
     ,{48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -2857,12 +2857,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.20.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=14 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=14 ORDER BY t1.rowid"
     ,{36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.20.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=14 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=14 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36})
 
 test:do_execsql_test(
@@ -2892,12 +2892,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.20.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=14 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=14 ORDER BY t1.rowid"
     ,{14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.20.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=14 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=14 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14})
 
 test:do_execsql_test(
@@ -2927,12 +2927,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.20.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=14 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=14 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51})
 
 test:do_execsql_test(
     "boundary3-2.20.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=14 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=14 ORDER BY t1.rowid DESC"
     ,{51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -2962,12 +2962,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.20.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=14 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=14 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14})
 
 test:do_execsql_test(
     "boundary3-2.20.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=14 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=14 ORDER BY t1.rowid DESC"
     ,{14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -3012,12 +3012,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.21.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=57 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=57 ORDER BY t1.rowid"
     ,{19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.21.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=57 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=57 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19})
 
 test:do_execsql_test(
@@ -3047,12 +3047,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.21.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=57 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=57 ORDER BY t1.rowid"
     ,{57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.21.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=57 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=57 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57})
 
 test:do_execsql_test(
@@ -3082,12 +3082,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.21.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=57 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=57 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35})
 
 test:do_execsql_test(
     "boundary3-2.21.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=57 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=57 ORDER BY t1.rowid DESC"
     ,{35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -3117,12 +3117,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.21.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=57 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=57 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57})
 
 test:do_execsql_test(
     "boundary3-2.21.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=57 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=57 ORDER BY t1.rowid DESC"
     ,{57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -3167,12 +3167,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.22.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=37 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=37 ORDER BY t1.rowid"
     ,{29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.22.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=37 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=37 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29})
 
 test:do_execsql_test(
@@ -3202,12 +3202,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.22.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=37 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=37 ORDER BY t1.rowid"
     ,{37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.22.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=37 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=37 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37})
 
 test:do_execsql_test(
@@ -3237,12 +3237,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.22.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=37 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=37 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1})
 
 test:do_execsql_test(
     "boundary3-2.22.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=37 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=37 ORDER BY t1.rowid DESC"
     ,{1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -3272,12 +3272,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.22.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=37 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=37 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37})
 
 test:do_execsql_test(
     "boundary3-2.22.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=37 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=37 ORDER BY t1.rowid DESC"
     ,{37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -3322,12 +3322,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.23.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=35 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=35 ORDER BY t1.rowid"
     ,{57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.23.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=35 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=35 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57})
 
 test:do_execsql_test(
@@ -3357,12 +3357,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.23.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=35 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=35 ORDER BY t1.rowid"
     ,{35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.23.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=35 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=35 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35})
 
 test:do_execsql_test(
@@ -3392,12 +3392,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.23.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=35 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=35 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46})
 
 test:do_execsql_test(
     "boundary3-2.23.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=35 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=35 ORDER BY t1.rowid DESC"
     ,{46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -3427,12 +3427,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.23.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=35 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=35 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35})
 
 test:do_execsql_test(
     "boundary3-2.23.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=35 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=35 ORDER BY t1.rowid DESC"
     ,{35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -3477,12 +3477,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.24.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=18 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=18 ORDER BY t1.rowid"
     ,{24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.24.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=18 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=18 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24})
 
 test:do_execsql_test(
@@ -3512,12 +3512,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.24.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=18 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=18 ORDER BY t1.rowid"
     ,{18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.24.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=18 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=18 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18})
 
 test:do_execsql_test(
@@ -3547,12 +3547,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.24.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=18 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=18 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42})
 
 test:do_execsql_test(
     "boundary3-2.24.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=18 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=18 ORDER BY t1.rowid DESC"
     ,{42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -3582,12 +3582,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.24.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=18 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=18 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18})
 
 test:do_execsql_test(
     "boundary3-2.24.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=18 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=18 ORDER BY t1.rowid DESC"
     ,{18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -3632,12 +3632,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.25.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=52 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=52 ORDER BY t1.rowid"
     ,{33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.25.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=52 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=52 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33})
 
 test:do_execsql_test(
@@ -3667,12 +3667,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.25.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=52 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=52 ORDER BY t1.rowid"
     ,{52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.25.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=52 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=52 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52})
 
 test:do_execsql_test(
@@ -3702,12 +3702,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.25.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=52 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=52 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53})
 
 test:do_execsql_test(
     "boundary3-2.25.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=52 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=52 ORDER BY t1.rowid DESC"
     ,{53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -3737,12 +3737,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.25.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=52 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=52 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52})
 
 test:do_execsql_test(
     "boundary3-2.25.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=52 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=52 ORDER BY t1.rowid DESC"
     ,{52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -3787,12 +3787,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.26.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=59 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=59 ORDER BY t1.rowid"
     ,{60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.26.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=59 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=59 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60})
 
 test:do_execsql_test(
@@ -3822,12 +3822,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.26.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=59 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=59 ORDER BY t1.rowid"
     ,{59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.26.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=59 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=59 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59})
 
 test:do_execsql_test(
@@ -3857,12 +3857,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.26.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=59 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=59 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38})
 
 test:do_execsql_test(
     "boundary3-2.26.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=59 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=59 ORDER BY t1.rowid DESC"
     ,{38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -3892,12 +3892,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.26.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=59 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=59 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59})
 
 test:do_execsql_test(
     "boundary3-2.26.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=59 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=59 ORDER BY t1.rowid DESC"
     ,{59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -3942,12 +3942,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.27.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=38 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=38 ORDER BY t1.rowid"
     ,{59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.27.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=38 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=38 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59})
 
 test:do_execsql_test(
@@ -3977,12 +3977,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.27.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=38 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=38 ORDER BY t1.rowid"
     ,{38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.27.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=38 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=38 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38})
 
 test:do_execsql_test(
@@ -4012,12 +4012,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.27.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=38 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=38 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33})
 
 test:do_execsql_test(
     "boundary3-2.27.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=38 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=38 ORDER BY t1.rowid DESC"
     ,{33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -4047,12 +4047,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.27.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=38 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=38 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38})
 
 test:do_execsql_test(
     "boundary3-2.27.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=38 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=38 ORDER BY t1.rowid DESC"
     ,{38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -4097,12 +4097,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.28.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=33 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=33 ORDER BY t1.rowid"
     ,{38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.28.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=33 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=33 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38})
 
 test:do_execsql_test(
@@ -4132,12 +4132,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.28.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=33 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=33 ORDER BY t1.rowid"
     ,{33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.28.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=33 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=33 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33})
 
 test:do_execsql_test(
@@ -4167,12 +4167,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.28.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=33 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=33 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52})
 
 test:do_execsql_test(
     "boundary3-2.28.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=33 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=33 ORDER BY t1.rowid DESC"
     ,{52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -4202,12 +4202,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.28.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=33 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=33 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33})
 
 test:do_execsql_test(
     "boundary3-2.28.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=33 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=33 ORDER BY t1.rowid DESC"
     ,{33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -4252,12 +4252,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.29.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=42 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=42 ORDER BY t1.rowid"
     ,{18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.29.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=42 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=42 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18})
 
 test:do_execsql_test(
@@ -4287,12 +4287,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.29.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=42 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=42 ORDER BY t1.rowid"
     ,{42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.29.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=42 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=42 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42})
 
 test:do_execsql_test(
@@ -4322,12 +4322,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.29.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=42 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=42 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15})
 
 test:do_execsql_test(
     "boundary3-2.29.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=42 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=42 ORDER BY t1.rowid DESC"
     ,{15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -4357,12 +4357,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.29.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=42 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=42 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42})
 
 test:do_execsql_test(
     "boundary3-2.29.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=42 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=42 ORDER BY t1.rowid DESC"
     ,{42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -4407,12 +4407,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.30.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=49 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=49 ORDER BY t1.rowid"
     ,{30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.30.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=49 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=49 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30})
 
 test:do_execsql_test(
@@ -4442,12 +4442,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.30.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=49 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=49 ORDER BY t1.rowid"
     ,{49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.30.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=49 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=49 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49})
 
 test:do_execsql_test(
@@ -4477,12 +4477,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.30.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=49 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=49 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4})
 
 test:do_execsql_test(
     "boundary3-2.30.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=49 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=49 ORDER BY t1.rowid DESC"
     ,{4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -4512,12 +4512,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.30.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=49 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=49 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49})
 
 test:do_execsql_test(
     "boundary3-2.30.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=49 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=49 ORDER BY t1.rowid DESC"
     ,{49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -4562,12 +4562,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.31.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=30 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=30 ORDER BY t1.rowid"
     ,{61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.31.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=30 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=30 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61})
 
 test:do_execsql_test(
@@ -4597,12 +4597,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.31.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=30 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=30 ORDER BY t1.rowid"
     ,{30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.31.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=30 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=30 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30})
 
 test:do_execsql_test(
@@ -4632,12 +4632,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.31.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=30 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=30 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49})
 
 test:do_execsql_test(
     "boundary3-2.31.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=30 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=30 ORDER BY t1.rowid DESC"
     ,{49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -4667,12 +4667,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.31.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=30 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=30 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30})
 
 test:do_execsql_test(
     "boundary3-2.31.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=30 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=30 ORDER BY t1.rowid DESC"
     ,{30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -4717,12 +4717,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.32.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=11 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=11 ORDER BY t1.rowid"
     ,{1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.32.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=11 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=11 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1})
 
 test:do_execsql_test(
@@ -4752,12 +4752,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.32.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=11 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=11 ORDER BY t1.rowid"
     ,{11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.32.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=11 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=11 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11})
 
 test:do_execsql_test(
@@ -4787,12 +4787,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.32.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=11 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=11 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47})
 
 test:do_execsql_test(
     "boundary3-2.32.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=11 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=11 ORDER BY t1.rowid DESC"
     ,{47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -4822,12 +4822,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.32.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=11 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=11 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11})
 
 test:do_execsql_test(
     "boundary3-2.32.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=11 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=11 ORDER BY t1.rowid DESC"
     ,{11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -4872,12 +4872,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.33.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=39 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=39 ORDER BY t1.rowid"
     ,{22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.33.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=39 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=39 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22})
 
 test:do_execsql_test(
@@ -4907,12 +4907,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.33.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=39 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=39 ORDER BY t1.rowid"
     ,{39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.33.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=39 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=39 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39})
 
 test:do_execsql_test(
@@ -4942,12 +4942,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.33.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=39 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=39 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36})
 
 test:do_execsql_test(
     "boundary3-2.33.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=39 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=39 ORDER BY t1.rowid DESC"
     ,{36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -4977,12 +4977,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.33.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=39 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=39 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39})
 
 test:do_execsql_test(
     "boundary3-2.33.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=39 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=39 ORDER BY t1.rowid DESC"
     ,{39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -5027,12 +5027,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.34.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=58 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=58 ORDER BY t1.rowid"
     ,{63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.34.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=58 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=58 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63})
 
 test:do_execsql_test(
@@ -5062,12 +5062,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.34.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=58 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=58 ORDER BY t1.rowid"
     ,{58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.34.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=58 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=58 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58})
 
 test:do_execsql_test(
@@ -5097,12 +5097,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.34.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=58 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=58 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44})
 
 test:do_execsql_test(
     "boundary3-2.34.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=58 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=58 ORDER BY t1.rowid DESC"
     ,{44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -5132,12 +5132,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.34.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=58 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=58 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58})
 
 test:do_execsql_test(
     "boundary3-2.34.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=58 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=58 ORDER BY t1.rowid DESC"
     ,{58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -5182,12 +5182,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.35.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=32 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=32 ORDER BY t1.rowid"
     ,{54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.35.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=32 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=32 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54})
 
 test:do_execsql_test(
@@ -5217,12 +5217,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.35.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=32 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=32 ORDER BY t1.rowid"
     ,{32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.35.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=32 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=32 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32})
 
 test:do_execsql_test(
@@ -5252,12 +5252,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.35.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=32 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=32 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29})
 
 test:do_execsql_test(
     "boundary3-2.35.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=32 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=32 ORDER BY t1.rowid DESC"
     ,{29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -5287,12 +5287,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.35.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=32 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=32 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32})
 
 test:do_execsql_test(
     "boundary3-2.35.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=32 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=32 ORDER BY t1.rowid DESC"
     ,{32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -5337,12 +5337,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.36.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=20 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=20 ORDER BY t1.rowid"
     ,{51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.36.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=20 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=20 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51})
 
 test:do_execsql_test(
@@ -5372,12 +5372,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.36.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=20 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=20 ORDER BY t1.rowid"
     ,{20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.36.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=20 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=20 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20})
 
 test:do_execsql_test(
@@ -5407,12 +5407,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.36.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=20 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=20 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40})
 
 test:do_execsql_test(
     "boundary3-2.36.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=20 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=20 ORDER BY t1.rowid DESC"
     ,{40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -5442,12 +5442,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.36.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=20 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=20 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20})
 
 test:do_execsql_test(
     "boundary3-2.36.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=20 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=20 ORDER BY t1.rowid DESC"
     ,{20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -5492,12 +5492,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.37.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=54 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=54 ORDER BY t1.rowid"
     ,{53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.37.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=54 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=54 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53})
 
 test:do_execsql_test(
@@ -5527,12 +5527,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.37.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=54 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=54 ORDER BY t1.rowid"
     ,{54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.37.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=54 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=54 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54})
 
 test:do_execsql_test(
@@ -5562,12 +5562,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.37.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=54 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=54 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32})
 
 test:do_execsql_test(
     "boundary3-2.37.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=54 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=54 ORDER BY t1.rowid DESC"
     ,{32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -5597,12 +5597,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.37.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=54 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=54 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54})
 
 test:do_execsql_test(
     "boundary3-2.37.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=54 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=54 ORDER BY t1.rowid DESC"
     ,{54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -5647,12 +5647,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.38.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=53 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=53 ORDER BY t1.rowid"
     ,{52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.38.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=53 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=53 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52})
 
 test:do_execsql_test(
@@ -5682,12 +5682,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.38.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=53 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=53 ORDER BY t1.rowid"
     ,{53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.38.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=53 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=53 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53})
 
 test:do_execsql_test(
@@ -5717,12 +5717,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.38.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=53 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=53 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54})
 
 test:do_execsql_test(
     "boundary3-2.38.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=53 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=53 ORDER BY t1.rowid DESC"
     ,{54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -5752,12 +5752,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.38.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=53 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=53 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53})
 
 test:do_execsql_test(
     "boundary3-2.38.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=53 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=53 ORDER BY t1.rowid DESC"
     ,{53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -5917,12 +5917,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.40.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=51 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=51 ORDER BY t1.rowid"
     ,{14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.40.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=51 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=51 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14})
 
 test:do_execsql_test(
@@ -5952,12 +5952,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.40.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=51 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=51 ORDER BY t1.rowid"
     ,{51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.40.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=51 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=51 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51})
 
 test:do_execsql_test(
@@ -5987,12 +5987,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.40.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=51 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=51 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20})
 
 test:do_execsql_test(
     "boundary3-2.40.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=51 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=51 ORDER BY t1.rowid DESC"
     ,{20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -6022,12 +6022,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.40.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=51 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=51 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51})
 
 test:do_execsql_test(
     "boundary3-2.40.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=51 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=51 ORDER BY t1.rowid DESC"
     ,{51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -6072,12 +6072,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.41.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=46 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=46 ORDER BY t1.rowid"
     ,{35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.41.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=46 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=46 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35})
 
 test:do_execsql_test(
@@ -6107,12 +6107,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.41.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=46 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=46 ORDER BY t1.rowid"
     ,{46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.41.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=46 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=46 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46})
 
 test:do_execsql_test(
@@ -6142,12 +6142,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.41.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=46 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=46 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22})
 
 test:do_execsql_test(
     "boundary3-2.41.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=46 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=46 ORDER BY t1.rowid DESC"
     ,{22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -6177,12 +6177,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.41.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=46 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=46 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46})
 
 test:do_execsql_test(
     "boundary3-2.41.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=46 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=46 ORDER BY t1.rowid DESC"
     ,{46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -6227,12 +6227,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.42.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=63 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=63 ORDER BY t1.rowid"
     ,{47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.42.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=63 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=63 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47})
 
 test:do_execsql_test(
@@ -6262,12 +6262,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.42.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=63 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=63 ORDER BY t1.rowid"
     ,{63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.42.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=63 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=63 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63})
 
 test:do_execsql_test(
@@ -6297,12 +6297,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.42.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=63 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=63 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58})
 
 test:do_execsql_test(
     "boundary3-2.42.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=63 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=63 ORDER BY t1.rowid DESC"
     ,{58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -6332,12 +6332,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.42.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=63 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=63 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63})
 
 test:do_execsql_test(
     "boundary3-2.42.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=63 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=63 ORDER BY t1.rowid DESC"
     ,{63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -6497,12 +6497,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.44.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=7 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=7 ORDER BY t1.rowid"
     ,{56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.44.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=7 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=7 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56})
 
 test:do_execsql_test(
@@ -6532,12 +6532,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.44.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=7 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=7 ORDER BY t1.rowid"
     ,{7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.44.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=7 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=7 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7})
 
 test:do_execsql_test(
@@ -6567,12 +6567,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.44.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=7 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=7 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19})
 
 test:do_execsql_test(
     "boundary3-2.44.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=7 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=7 ORDER BY t1.rowid DESC"
     ,{19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -6602,12 +6602,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.44.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=7 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=7 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7})
 
 test:do_execsql_test(
     "boundary3-2.44.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=7 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=7 ORDER BY t1.rowid DESC"
     ,{7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -6652,12 +6652,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.45.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=12 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=12 ORDER BY t1.rowid"
     ,{40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.45.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=12 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=12 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40})
 
 test:do_execsql_test(
@@ -6687,12 +6687,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.45.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=12 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=12 ORDER BY t1.rowid"
     ,{12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.45.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=12 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=12 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12})
 
 test:do_execsql_test(
@@ -6722,12 +6722,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.45.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=12 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=12 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6})
 
 test:do_execsql_test(
     "boundary3-2.45.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=12 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=12 ORDER BY t1.rowid DESC"
     ,{6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -6757,12 +6757,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.45.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=12 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=12 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12})
 
 test:do_execsql_test(
     "boundary3-2.45.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=12 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=12 ORDER BY t1.rowid DESC"
     ,{12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -7037,12 +7037,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.48.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=1 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=1 ORDER BY t1.rowid"
     ,{37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.48.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=1 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=1 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37})
 
 test:do_execsql_test(
@@ -7072,12 +7072,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.48.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=1 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=1 ORDER BY t1.rowid"
     ,{1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.48.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=1 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=1 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1})
 
 test:do_execsql_test(
@@ -7107,12 +7107,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.48.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=1 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=1 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11})
 
 test:do_execsql_test(
     "boundary3-2.48.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=1 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=1 ORDER BY t1.rowid DESC"
     ,{11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -7142,12 +7142,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.48.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=1 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=1 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1})
 
 test:do_execsql_test(
     "boundary3-2.48.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=1 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=1 ORDER BY t1.rowid DESC"
     ,{1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -7192,12 +7192,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.49.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=9 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=9 ORDER BY t1.rowid"
     ,{6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.49.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=9 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=9 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6})
 
 test:do_execsql_test(
@@ -7227,12 +7227,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.49.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=9 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=9 ORDER BY t1.rowid"
     ,{9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.49.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=9 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=9 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9})
 
 test:do_execsql_test(
@@ -7262,12 +7262,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.49.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=9 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=9 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24})
 
 test:do_execsql_test(
     "boundary3-2.49.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=9 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=9 ORDER BY t1.rowid DESC"
     ,{24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -7297,12 +7297,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.49.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=9 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=9 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9})
 
 test:do_execsql_test(
     "boundary3-2.49.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=9 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=9 ORDER BY t1.rowid DESC"
     ,{9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -7347,12 +7347,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.50.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=24 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=24 ORDER BY t1.rowid"
     ,{9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.50.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=24 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=24 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9})
 
 test:do_execsql_test(
@@ -7382,12 +7382,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.50.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=24 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=24 ORDER BY t1.rowid"
     ,{24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.50.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=24 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=24 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24})
 
 test:do_execsql_test(
@@ -7417,12 +7417,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.50.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=24 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=24 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18})
 
 test:do_execsql_test(
     "boundary3-2.50.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=24 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=24 ORDER BY t1.rowid DESC"
     ,{18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -7452,12 +7452,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.50.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=24 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=24 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24})
 
 test:do_execsql_test(
     "boundary3-2.50.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=24 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=24 ORDER BY t1.rowid DESC"
     ,{24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -7502,12 +7502,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.51.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=8 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=8 ORDER BY t1.rowid"
     ,{16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.51.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=8 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=8 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16})
 
 test:do_execsql_test(
@@ -7537,12 +7537,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.51.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=8 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=8 ORDER BY t1.rowid"
     ,{8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.51.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=8 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=8 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8})
 
 test:do_execsql_test(
@@ -7572,12 +7572,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.51.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=8 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=8 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61})
 
 test:do_execsql_test(
     "boundary3-2.51.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=8 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=8 ORDER BY t1.rowid DESC"
     ,{61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -7607,12 +7607,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.51.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=8 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=8 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8})
 
 test:do_execsql_test(
     "boundary3-2.51.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=8 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=8 ORDER BY t1.rowid DESC"
     ,{8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -7772,12 +7772,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.53.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=15 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=15 ORDER BY t1.rowid"
     ,{42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.53.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=15 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=15 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42})
 
 test:do_execsql_test(
@@ -7807,12 +7807,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.53.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=15 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=15 ORDER BY t1.rowid"
     ,{15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.53.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=15 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=15 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15})
 
 test:do_execsql_test(
@@ -7842,12 +7842,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.53.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=15 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=15 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62})
 
 test:do_execsql_test(
     "boundary3-2.53.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=15 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=15 ORDER BY t1.rowid DESC"
     ,{62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -7877,12 +7877,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.53.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=15 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=15 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15})
 
 test:do_execsql_test(
     "boundary3-2.53.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=15 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=15 ORDER BY t1.rowid DESC"
     ,{15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -8157,12 +8157,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.56.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=23 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=23 ORDER BY t1.rowid"
     ,{50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.56.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=23 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=23 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50})
 
 test:do_execsql_test(
@@ -8192,12 +8192,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.56.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=23 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=23 ORDER BY t1.rowid"
     ,{23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.56.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=23 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=23 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23})
 
 test:do_execsql_test(
@@ -8227,12 +8227,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.56.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=23 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=23 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16})
 
 test:do_execsql_test(
     "boundary3-2.56.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=23 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=23 ORDER BY t1.rowid DESC"
     ,{16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -8262,12 +8262,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.56.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=23 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=23 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23})
 
 test:do_execsql_test(
     "boundary3-2.56.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=23 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=23 ORDER BY t1.rowid DESC"
     ,{23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -8312,12 +8312,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.57.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=4 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=4 ORDER BY t1.rowid"
     ,{49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.57.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=4 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=4 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49})
 
 test:do_execsql_test(
@@ -8347,12 +8347,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.57.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=4 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=4 ORDER BY t1.rowid"
     ,{4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.57.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=4 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=4 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4})
 
 test:do_execsql_test(
@@ -8382,12 +8382,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.57.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=4 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=4 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31})
 
 test:do_execsql_test(
     "boundary3-2.57.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=4 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=4 ORDER BY t1.rowid DESC"
     ,{31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -8417,12 +8417,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.57.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=4 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=4 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4})
 
 test:do_execsql_test(
     "boundary3-2.57.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=4 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=4 ORDER BY t1.rowid DESC"
     ,{4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -8582,12 +8582,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.59.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=56 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=56 ORDER BY t1.rowid"
     ,{25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.59.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=56 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=56 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25})
 
 test:do_execsql_test(
@@ -8617,12 +8617,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.59.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=56 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=56 ORDER BY t1.rowid"
     ,{56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.59.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=56 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=56 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56})
 
 test:do_execsql_test(
@@ -8652,12 +8652,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.59.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=56 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=56 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7})
 
 test:do_execsql_test(
     "boundary3-2.59.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=56 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=56 ORDER BY t1.rowid DESC"
     ,{7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -8687,12 +8687,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.59.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=56 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=56 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56})
 
 test:do_execsql_test(
     "boundary3-2.59.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=56 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=56 ORDER BY t1.rowid DESC"
     ,{56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -8737,12 +8737,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.60.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=60 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=60 ORDER BY t1.rowid"
     ,{41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.60.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=60 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=60 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41})
 
 test:do_execsql_test(
@@ -8772,12 +8772,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.60.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=60 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=60 ORDER BY t1.rowid"
     ,{60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.60.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=60 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=60 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60})
 
 test:do_execsql_test(
@@ -8807,12 +8807,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.60.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=60 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=60 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59})
 
 test:do_execsql_test(
     "boundary3-2.60.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=60 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=60 ORDER BY t1.rowid DESC"
     ,{59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -8842,12 +8842,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.60.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=60 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=60 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60})
 
 test:do_execsql_test(
     "boundary3-2.60.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=60 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=60 ORDER BY t1.rowid DESC"
     ,{60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -9007,12 +9007,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.62.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=47 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=47 ORDER BY t1.rowid"
     ,{11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.62.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=47 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=47 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11})
 
 test:do_execsql_test(
@@ -9042,12 +9042,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.62.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=47 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=47 ORDER BY t1.rowid"
     ,{47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.62.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=47 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=47 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47})
 
 test:do_execsql_test(
@@ -9077,12 +9077,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.62.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=47 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=47 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63})
 
 test:do_execsql_test(
     "boundary3-2.62.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=47 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=47 ORDER BY t1.rowid DESC"
     ,{63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -9112,12 +9112,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.62.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=47 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=47 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47})
 
 test:do_execsql_test(
     "boundary3-2.62.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=47 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=47 ORDER BY t1.rowid DESC"
     ,{47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -9277,12 +9277,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.64.gt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=5 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=5 ORDER BY t1.rowid"
     ,{31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.64.gt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS real) WHERE t2.a=5 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid > CAST(t2.r AS NUMBER) WHERE t2.a=5 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31})
 
 test:do_execsql_test(
@@ -9312,12 +9312,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.64.ge.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=5 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=5 ORDER BY t1.rowid"
     ,{5, 31, 4, 49, 30, 61, 8, 16, 23, 50, 48, 62, 15, 42, 18, 24, 9, 6, 12, 40, 20, 51, 14, 36, 39, 22, 46, 35, 57, 19, 7, 56, 25, 34, 10, 26, 13, 43, 27, 45, 17, 28, 3})
 
 test:do_execsql_test(
     "boundary3-2.64.ge.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS real) WHERE t2.a=5 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid >= CAST(t2.r AS NUMBER) WHERE t2.a=5 ORDER BY t1.rowid DESC"
     ,{3, 28, 17, 45, 27, 43, 13, 26, 10, 34, 25, 56, 7, 19, 57, 35, 46, 22, 39, 36, 14, 51, 20, 40, 12, 6, 9, 24, 18, 42, 15, 62, 48, 50, 23, 16, 8, 61, 30, 49, 4, 31, 5})
 
 test:do_execsql_test(
@@ -9347,12 +9347,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.64.lt.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=5 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=5 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41})
 
 test:do_execsql_test(
     "boundary3-2.64.lt.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS real) WHERE t2.a=5 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid < CAST(t2.r AS NUMBER) WHERE t2.a=5 ORDER BY t1.rowid DESC"
     ,{41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(
@@ -9382,12 +9382,12 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "boundary3-2.64.le.10",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=5 ORDER BY t1.rowid"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=5 ORDER BY t1.rowid"
     ,{55, 2, 64, 21, 44, 58, 63, 47, 11, 1, 37, 29, 32, 54, 53, 52, 33, 38, 59, 60, 41, 5})
 
 test:do_execsql_test(
     "boundary3-2.64.le.11",
-    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS real) WHERE t2.a=5 ORDER BY t1.rowid DESC"
+    "SELECT t1.a FROM  t1 JOIN t2 ON t1.rowid <= CAST(t2.r AS NUMBER) WHERE t2.a=5 ORDER BY t1.rowid DESC"
     ,{5, 41, 60, 59, 38, 33, 52, 53, 54, 32, 29, 37, 1, 11, 47, 63, 58, 44, 21, 64, 2, 55})
 
 test:do_execsql_test(

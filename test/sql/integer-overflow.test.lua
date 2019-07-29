@@ -46,7 +46,7 @@ box.space.T:drop()
 -- Make sure that integers stored in NUMBER field are converted
 -- to floating point properly.
 --
-box.execute("CREATE TABLE t(id INT PRIMARY KEY, a FLOAT);")
+box.execute("CREATE TABLE t(id INT PRIMARY KEY, a NUMBER);")
 box.space.T:insert({1, 18446744073709551615ULL})
 box.space.T:insert({2, -1})
 box.execute("SELECT * FROM t;")

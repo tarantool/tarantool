@@ -279,7 +279,7 @@ test:do_test(
     "index-6.1",
     function()
         test:execsql "CREATE TABLE test1(id  INT primary key, f1 int, f2 int)"
-        test:execsql "CREATE TABLE test2(id  INT primary key, g1 float, g2 float)"
+        test:execsql "CREATE TABLE test2(id  INT primary key, g1 NUMBER, g2 NUMBER)"
         return test:execsql "CREATE INDEX index1 ON test1(f1)"
     end, {
         -- <index-6.1>
@@ -578,7 +578,7 @@ test:do_test(
             CREATE TABLE t3(
               a text,
               b int,
-              c float,
+              c NUMBER,
               PRIMARY KEY(b)
             );
         ]]
@@ -605,7 +605,7 @@ end
 test:do_execsql_test(
     "index-12.1",
     [[
-        CREATE TABLE t4(id  INT primary key, a FLOAT,b INT );
+        CREATE TABLE t4(id  INT primary key, a NUMBER,b INT );
         INSERT INTO t4 VALUES(1, '0.0',1);
         INSERT INTO t4 VALUES(2, '0.00',2);
         INSERT INTO t4 VALUES(4, '-1.0',4);
@@ -688,7 +688,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t5(
            a int UNIQUE,
-           b float PRIMARY KEY,
+           b NUMBER PRIMARY KEY,
            c  TEXT,
            UNIQUE(a,c)
         );

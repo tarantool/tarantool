@@ -357,7 +357,7 @@ test:do_test(
     "func-4.1",
     function()
         test:execsql([[
-            CREATE TABLE t1(id integer primary key, a INT,b REAL,c REAL);
+            CREATE TABLE t1(id integer primary key, a INT,b NUMBER,c NUMBER);
             INSERT INTO t1(id, a,b,c) VALUES(1, 1,2,3);
             INSERT INTO t1(id, a,b,c) VALUES(2, 2,1.2345678901234,-12345.67890);
             INSERT INTO t1(id, a,b,c) VALUES(3, 3,-2,-5);

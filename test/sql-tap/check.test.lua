@@ -29,7 +29,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t1(
           x INTEGER CHECK( x<5 ),
-          y REAL CHECK( y>x ),
+          y NUMBER CHECK( y>x ),
           z  INT primary key
         );
     ]], {
@@ -207,7 +207,7 @@ test:do_execsql_test(
         CREATE TABLE t2(
           id  INT primary key,
           x SCALAR CONSTRAINT one CHECK( typeof(coalesce(x,0))=='integer'),
-          y REAL CONSTRAINT two CHECK( typeof(coalesce(y,0.1))=='number' ),
+          y NUMBER CONSTRAINT two CHECK( typeof(coalesce(y,0.1))=='number' ),
           z SCALAR CONSTRAINT three CHECK( typeof(coalesce(z,''))=='string' )
         );
     ]], {

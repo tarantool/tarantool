@@ -308,7 +308,7 @@ test:do_select_tests(
 -- clause, then the result of the join is simply the cartesian product of
 -- the left and right-hand datasets.
 --
---    The tests are built on this assertion. Really, they test that the output
+--    The tests are built on this assertion. NUMBERly, they test that the output
 --    of a CROSS JOIN, JOIN, INNER JOIN or "," join matches the expected result
 --    of calculating the cartesian product of the left and right-hand datasets.
 --
@@ -327,7 +327,7 @@ test:do_execsql_test(
     "e_select-1.4.0",
     [[
         CREATE TABLE x1(id  INT primary key, a TEXT , b TEXT );
-        CREATE TABLE x2(id  INT primary key, c FLOAT , d FLOAT , e FLOAT );
+        CREATE TABLE x2(id  INT primary key, c NUMBER , d NUMBER , e NUMBER );
         CREATE TABLE x3(id  INT primary key, f TEXT , g TEXT , h TEXT , i TEXT );
 
         -- x1: 3 rows, 2 columns
@@ -748,9 +748,9 @@ test:drop_all_tables()
 test:do_execsql_test(
     "e_select-4.0",
     [[
-        CREATE TABLE z1(id  INT primary key, a FLOAT, b FLOAT, c TEXT);
-        CREATE TABLE z2(id  INT primary key, d FLOAT, e FLOAT);
-        CREATE TABLE z3(id  INT primary key, a FLOAT, b FLOAT);
+        CREATE TABLE z1(id  INT primary key, a NUMBER, b NUMBER, c TEXT);
+        CREATE TABLE z2(id  INT primary key, d NUMBER, e NUMBER);
+        CREATE TABLE z3(id  INT primary key, a NUMBER, b NUMBER);
 
         INSERT INTO z1 VALUES(1, 51.65, -59.58, 'belfries');
         INSERT INTO z1 VALUES(2, -5, NULL, 75);
@@ -1453,8 +1453,8 @@ test:drop_all_tables()
 test:do_execsql_test(
     "e_select-7.4.0",
     [[
-        CREATE TABLE q1(id  INT primary key, a TEXT, b FLOAT, c FLOAT);
-        CREATE TABLE q2(id  INT primary key, d TEXT, e FLOAT);
+        CREATE TABLE q1(id  INT primary key, a TEXT, b NUMBER, c NUMBER);
+        CREATE TABLE q2(id  INT primary key, d TEXT, e NUMBER);
         CREATE TABLE q3(id  INT primary key, f TEXT, g INT);
 
         INSERT INTO q1 VALUES(1, 16, -87.66, NULL);
@@ -1599,7 +1599,7 @@ test:drop_all_tables()
 test:do_execsql_test(
     "e_select-7.10.0",
     [[
-        CREATE TABLE w1(a TEXT PRIMARY KEY, b FLOAT);
+        CREATE TABLE w1(a TEXT PRIMARY KEY, b NUMBER);
         CREATE TABLE w2(a  INT PRIMARY KEY, b TEXT);
 
         INSERT INTO w1 VALUES('1', 4.1);
@@ -1875,7 +1875,7 @@ test:do_select_tests(
 test:do_execsql_test(
     "e_select-8.8.0",
     [[
-        CREATE TABLE d3(id  INT primary key, a FLOAT);
+        CREATE TABLE d3(id  INT primary key, a NUMBER);
         INSERT INTO d3 VALUES(1, 0);
         INSERT INTO d3 VALUES(2, 14.1);
         INSERT INTO d3 VALUES(3, 13);

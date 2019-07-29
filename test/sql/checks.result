@@ -116,7 +116,7 @@ box.space._space:delete({513})
 - [513, 1, 'test', 'memtx', 0, {'checks': [{'expr': 'X>5'}]}, [{'name': 'X', 'type': 'unsigned'}]]
 ...
 -- Create table with checks in sql.
-box.execute("CREATE TABLE t1(x INTEGER CONSTRAINT ONE CHECK( x<5 ), y REAL CONSTRAINT TWO CHECK( y>x ), z INTEGER PRIMARY KEY);")
+box.execute("CREATE TABLE t1(x INTEGER CONSTRAINT ONE CHECK( x<5 ), y NUMBER CONSTRAINT TWO CHECK( y>x ), z INTEGER PRIMARY KEY);")
 ---
 - row_count: 1
 ...
@@ -153,7 +153,7 @@ box.execute("DROP TABLE t1")
 - row_count: 1
 ...
 -- Test space creation rollback on spell error in ck constraint.
-box.execute("CREATE TABLE first (id FLOAT PRIMARY KEY CHECK(id < 5), a INT CONSTRAINT ONE CHECK(a >< 5));")
+box.execute("CREATE TABLE first (id NUMBER PRIMARY KEY CHECK(id < 5), a INT CONSTRAINT ONE CHECK(a >< 5));")
 ---
 - error: Syntax error near '<'
 ...

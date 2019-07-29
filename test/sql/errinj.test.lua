@@ -18,7 +18,7 @@ errinj.set('ERRINJ_MEMTX_DELAY_GC', false)
 errinj.set('ERRINJ_TUPLE_FORMAT_COUNT', -1)
 box.execute('DROP TABLE t4')
 
-box.execute('create table test (id int primary key, a float, b text)')
+box.execute('create table test (id int primary key, a NUMBER, b text)')
 box.schema.user.grant('guest','read,write,execute', 'universe')
 cn = remote.connect(box.cfg.listen)
 cn:ping()
@@ -95,7 +95,7 @@ box.execute("DROP TABLE t2;")
 -- Tests which are aimed at verifying work of commit/rollback
 -- triggers on _fk_constraint space.
 --
-box.execute("CREATE TABLE t3 (id FLOAT PRIMARY KEY, a INT REFERENCES t3, b INT UNIQUE);")
+box.execute("CREATE TABLE t3 (id NUMBER PRIMARY KEY, a INT REFERENCES t3, b INT UNIQUE);")
 t = box.space._fk_constraint:select{}[1]:totable()
 errinj = box.error.injection
 errinj.set("ERRINJ_WAL_IO", true)

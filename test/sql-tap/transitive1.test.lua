@@ -228,7 +228,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "transitive1-410",
     [[
-        CREATE TABLE bookmark ( idBookmark integer primary key, idFile integer, timeInSeconds double, totalTimeInSeconds double, thumbNailImage text, player text, playerState text, type integer);
+        CREATE TABLE bookmark ( idBookmark integer primary key, idFile integer, timeInSeconds NUMBER, totalTimeInSeconds NUMBER, thumbNailImage text, player text, playerState text, type integer);
         CREATE TABLE path ( idPath integer primary key, strPath text, strContent text, strScraper text, strHash text, scanRecursive integer, useFolderNames  INT , strSettings text, noUpdate  INT , exclude  INT , dateAdded text);
         INSERT INTO path VALUES(1,'/tmp/tvshows/','tvshows','metadata.tvdb.com','989B1CE5680A14F5F86123F751169B49',0,0,'<settings><setting id="absolutenumber" value="false" /><setting id="dvdorder" value="false" /><setting id="fanart" value="true" /><setting id="language" value="en" /></settings>',0,0,NULL);
         INSERT INTO path VALUES(2,'/tmp/tvshows/The.Big.Bang.Theory/','','','85E1DAAB2F5FF6EAE8AEDF1B5C882D1E',NULL,NULL,NULL,NULL,NULL,'2013-10-23 18:58:43');

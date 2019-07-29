@@ -35,7 +35,7 @@ box.execute("SELECT e FROM t1")
   - [7]
   - [8]
 ...
-box.execute("CREATE TABLE t2(a integer primary key, b INT UNIQUE, c FLOAT, d FLOAT, e INT,  UNIQUE(c,d));")
+box.execute("CREATE TABLE t2(a integer primary key, b INT UNIQUE, c NUMBER, d NUMBER, e INT,  UNIQUE(c,d));")
 ---
 - row_count: 1
 ...

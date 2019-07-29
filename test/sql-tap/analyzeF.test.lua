@@ -22,7 +22,7 @@ local function isqrt(i)
     return math.floor(math.sqrt(i))
 end
 
-box.internal.sql_create_function("isqrt", "FLOAT", isqrt)
+box.internal.sql_create_function("isqrt", "NUMBER", isqrt)
 
 test:do_execsql_test(
     1.0,

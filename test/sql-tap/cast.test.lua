@@ -67,7 +67,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "cast-1.5",
     [[
-        SELECT CAST(x'616263' AS FLOAT)
+        SELECT CAST(x'616263' AS NUMBER)
     ]], {
         -- <cast-1.5>
         1, 'Type mismatch: can not convert abc to number'
@@ -147,7 +147,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.15",
     [[
-        SELECT CAST(NULL AS FLOAT)
+        SELECT CAST(NULL AS NUMBER)
     ]], {
         -- <cast-1.15>
         ""
@@ -157,7 +157,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.16",
     [[
-        SELECT typeof(CAST(NULL AS FLOAT))
+        SELECT typeof(CAST(NULL AS NUMBER))
     ]], {
         -- <cast-1.16>
         "null"
@@ -247,7 +247,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.25",
     [[
-        SELECT CAST(123 AS FLOAT)
+        SELECT CAST(123 AS NUMBER)
     ]], {
         -- <cast-1.25>
         123
@@ -257,7 +257,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.26",
     [[
-        SELECT typeof(CAST(123 AS FLOAT))
+        SELECT typeof(CAST(123 AS NUMBER))
     ]], {
         -- <cast-1.26>
         "number"
@@ -347,7 +347,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.35",
     [[
-        SELECT CAST(123.456 AS FLOAT)
+        SELECT CAST(123.456 AS NUMBER)
     ]], {
         -- <cast-1.35>
         123.456
@@ -357,7 +357,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.36",
     [[
-        SELECT typeof(CAST(123.456 AS FLOAT))
+        SELECT typeof(CAST(123.456 AS NUMBER))
     ]], {
         -- <cast-1.36>
         "number"
@@ -447,7 +447,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "cast-1.45",
     [[
-        SELECT CAST('123abc' AS FLOAT)
+        SELECT CAST('123abc' AS NUMBER)
     ]], {
         -- <cast-1.45>
         1, 'Type mismatch: can not convert 123abc to number'
@@ -477,7 +477,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "cast-1.51",
     [[
-        SELECT CAST('123.5abc' AS FLOAT)
+        SELECT CAST('123.5abc' AS NUMBER)
     ]], {
         -- <cast-1.51>
         1, 'Type mismatch: can not convert 123.5abc to number'
@@ -498,7 +498,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "case-1.60",
     [[
-        SELECT CAST(null AS REAL)
+        SELECT CAST(null AS NUMBER)
     ]], {
         -- <case-1.60>
         ""
@@ -508,7 +508,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "case-1.61",
     [[
-        SELECT typeof(CAST(null AS REAL))
+        SELECT typeof(CAST(null AS NUMBER))
     ]], {
         -- <case-1.61>
         "null"
@@ -518,7 +518,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "case-1.62",
     [[
-        SELECT CAST(1 AS REAL)
+        SELECT CAST(1 AS NUMBER)
     ]], {
         -- <case-1.62>
         1.0
@@ -528,7 +528,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "case-1.63",
     [[
-        SELECT typeof(CAST(1 AS REAL))
+        SELECT typeof(CAST(1 AS NUMBER))
     ]], {
         -- <case-1.63>
         "number"
@@ -538,7 +538,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "case-1.64",
     [[
-        SELECT CAST('1' AS REAL)
+        SELECT CAST('1' AS NUMBER)
     ]], {
         -- <case-1.64>
         1.0
@@ -548,7 +548,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "case-1.65",
     [[
-        SELECT typeof(CAST('1' AS REAL))
+        SELECT typeof(CAST('1' AS NUMBER))
     ]], {
         -- <case-1.65>
         "number"
@@ -558,7 +558,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "case-1.66",
     [[
-        SELECT CAST('abc' AS REAL)
+        SELECT CAST('abc' AS NUMBER)
     ]], {
         -- <case-1.66>
         1, 'Type mismatch: can not convert abc to number'
@@ -568,7 +568,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "case-1.68",
     [[
-        SELECT CAST(x'31' AS REAL)
+        SELECT CAST(x'31' AS NUMBER)
     ]], {
         -- <case-1.68>
         1.0
@@ -578,7 +578,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "case-1.69",
     [[
-        SELECT typeof(CAST(x'31' AS REAL))
+        SELECT typeof(CAST(x'31' AS NUMBER))
     ]], {
         -- <case-1.69>
         "number"
@@ -600,7 +600,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-2.2",
     [[
-        SELECT CAST('   -123.456' AS real)
+        SELECT CAST('   -123.456' AS NUMBER)
     ]], {
         -- <cast-2.2>
         -123.456
@@ -625,7 +625,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-3.2",
     [[
-        SELECT CAST(9223372036854774800 AS FLOAT)
+        SELECT CAST(9223372036854774800 AS NUMBER)
     ]], {
         -- <cast-3.2>
         9223372036854774784
@@ -634,13 +634,13 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "cast-3.3",
-    "SELECT CAST(9223372036854774800 AS real)",
+    "SELECT CAST(9223372036854774800 AS NUMBER)",
     {9.22337203685477e+18})
 
 test:do_execsql_test(
     "cast-3.4",
     [[
-        SELECT CAST(CAST(9223372036854774800 AS real) AS integer)
+        SELECT CAST(CAST(9223372036854774800 AS NUMBER) AS integer)
     ]], {
         -- <cast-3.4>
         9223372036854774784LL
@@ -660,7 +660,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-3.6",
     [[
-        SELECT CAST(-9223372036854774800 AS float)
+        SELECT CAST(-9223372036854774800 AS NUMBER)
     ]], {
         -- <cast-3.6>
         -9223372036854774784
@@ -669,13 +669,13 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "cast-3.7",
-    "SELECT CAST(-9223372036854774800 AS real)",
+    "SELECT CAST(-9223372036854774800 AS NUMBER)",
     {-9.22337203685477e+18})
 
 test:do_execsql_test(
     "cast-3.8",
     [[
-        SELECT CAST(CAST(-9223372036854774800 AS real) AS integer)
+        SELECT CAST(CAST(-9223372036854774800 AS NUMBER) AS integer)
     ]], {
         -- <cast-3.8>
         -9223372036854774784LL
@@ -695,7 +695,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-3.12",
     [[
-        SELECT CAST('9223372036854774800' AS FLOAT)
+        SELECT CAST('9223372036854774800' AS NUMBER)
     ]], {
         -- <cast-3.12>
         9223372036854774784
@@ -704,13 +704,13 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "cast-3.13",
-    "SELECT CAST(9223372036854774800 AS real)",
+    "SELECT CAST(9223372036854774800 AS NUMBER)",
     {9.22337203685477e+18})
 
 test:do_execsql_test(
     "cast-3.14",
     [[
-        SELECT CAST(CAST('9223372036854774800' AS real) AS integer)
+        SELECT CAST(CAST('9223372036854774800' AS NUMBER) AS integer)
     ]], {
         -- <cast-3.14>
         9223372036854774784LL
@@ -732,7 +732,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-3.16",
     [[
-        SELECT CAST('-9223372036854774800' AS FLOAT)
+        SELECT CAST('-9223372036854774800' AS NUMBER)
     ]], {
         -- <cast-3.16>
         -9223372036854774784
@@ -741,13 +741,13 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "cast-3.17",
-    "SELECT CAST('-9223372036854774800' AS real)",
+    "SELECT CAST('-9223372036854774800' AS NUMBER)",
     {-9.22337203685477e+18})
 
 test:do_execsql_test(
     "cast-3.18",
     [[
-        SELECT CAST(CAST('-9223372036854774800' AS real) AS integer)
+        SELECT CAST(CAST('-9223372036854774800' AS NUMBER) AS integer)
     ]], {
         -- <cast-3.18>
         -9223372036854774784LL
@@ -770,7 +770,7 @@ if true then --test:execsql("PRAGMA encoding")[1][1]=="UTF-8" then
     test:do_execsql_test(
         "cast-3.22",
         [[
-            SELECT CAST(x'39323233333732303336383534373734383030' AS FLOAT)
+            SELECT CAST(x'39323233333732303336383534373734383030' AS NUMBER)
         ]], {
             -- <cast-3.22>
             9223372036854774784
@@ -778,13 +778,13 @@ if true then --test:execsql("PRAGMA encoding")[1][1]=="UTF-8" then
         })
     test:do_execsql_test(
         "cast-3.23",
-        "SELECT CAST(x'39323233333732303336383534373734383030' AS real)",
+        "SELECT CAST(x'39323233333732303336383534373734383030' AS NUMBER)",
         {9.22337203685477e+18})
 
     test:do_execsql_test(
         "cast-3.24",
         [[
-            SELECT CAST(CAST(x'39323233333732303336383534373734383030' AS real)
+            SELECT CAST(CAST(x'39323233333732303336383534373734383030' AS NUMBER)
                         AS integer)
         ]], {
             -- <cast-3.24>
@@ -796,7 +796,7 @@ end
 test:do_execsql_test(
     "case-3.25",
     [[
-        SELECT CAST(x'3138343436373434303733373039353531363135' AS REAL);
+        SELECT CAST(x'3138343436373434303733373039353531363135' AS NUMBER);
     ]], { 1.844674407371e+19 } )
 
 test:do_execsql_test(
@@ -808,7 +808,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "case-3.31",
     [[
-        SELECT CAST(NULL AS FLOAT)
+        SELECT CAST(NULL AS NUMBER)
     ]], {
         -- <case-3.31>
         ""
@@ -825,7 +825,7 @@ test:do_test(
     function()
         blob = 1234567890
         DB = sql_connection_pointer("db")
-        STMT = sql_prepare(DB, "SELECT CAST(? AS real)", -1, "TAIL")
+        STMT = sql_prepare(DB, "SELECT CAST(? AS NUMBER)", -1, "TAIL")
         sql_bind_blob("-static", STMT, 1, blob, 5)
         return sql_step(STMT)
     end, {
@@ -883,7 +883,7 @@ test:do_test(
     "cast-4.4",
     function()
         return test:catchsql [[
-            SELECT a, CAST(a AS real), a FROM t1;
+            SELECT a, CAST(a AS NUMBER), a FROM t1;
         ]]
     end, {
         -- <cast-4.4>

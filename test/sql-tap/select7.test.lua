@@ -188,7 +188,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "select7-7.1",
     [[
-        CREATE TABLE t3(a REAL primary key);
+        CREATE TABLE t3(a NUMBER primary key);
         INSERT INTO t3 VALUES(44.0);
         INSERT INTO t3 VALUES(56.0);
     ]], {
@@ -211,7 +211,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select7-7.3",
     [[
-        CREATE TABLE t4(a REAL primary key);
+        CREATE TABLE t4(a NUMBER primary key);
         INSERT INTO t4 VALUES( 2.0 );
         INSERT INTO t4 VALUES( 3.0 );
     ]], {

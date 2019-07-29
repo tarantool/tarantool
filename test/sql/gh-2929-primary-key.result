@@ -22,15 +22,15 @@ box.execute("CREATE TABLE t2(a INT UNIQUE, b INT)")
 ---
 - error: 'Failed to create space ''T2'': PRIMARY KEY missing'
 ...
-box.execute("CREATE TABLE t3(a FLOAT)")
+box.execute("CREATE TABLE t3(a NUMBER)")
 ---
 - error: 'Failed to create space ''T3'': PRIMARY KEY missing'
 ...
-box.execute("CREATE TABLE t4(a FLOAT, b TEXT)")
+box.execute("CREATE TABLE t4(a NUMBER, b TEXT)")
 ---
 - error: 'Failed to create space ''T4'': PRIMARY KEY missing'
 ...
-box.execute("CREATE TABLE t5(a FLOAT, b FLOAT UNIQUE)")
+box.execute("CREATE TABLE t5(a NUMBER, b NUMBER UNIQUE)")
 ---
 - error: 'Failed to create space ''T5'': PRIMARY KEY missing'
 ...

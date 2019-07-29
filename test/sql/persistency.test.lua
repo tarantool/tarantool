@@ -41,7 +41,7 @@ box.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 -- multi-index
 
 -- create space
-box.execute("CREATE TABLE barfoo (bar TEXT, foo FLOAT PRIMARY KEY)")
+box.execute("CREATE TABLE barfoo (bar TEXT, foo NUMBER PRIMARY KEY)")
 box.execute("CREATE UNIQUE INDEX barfoo2 ON barfoo(bar)")
 
 -- prepare data

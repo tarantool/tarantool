@@ -107,7 +107,7 @@ test:do_test(
 test:execsql(
 	[[
 		DROP TABLE IF EXISTS gh3733;
-		CREATE TABLE gh3733(id INT primary key, f float);
+		CREATE TABLE gh3733(id INT primary key, f NUMBER);
 		INSERT INTO gh3733 VALUES(1, 0.1), (2, 0.2), (3, 0.3);
 		CREATE INDEX IDX ON GH3733 (id);
 	]])

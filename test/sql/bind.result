@@ -4,7 +4,7 @@ netbox = require('net.box')
 test_run = require('test_run').new()
 ---
 ...
-box.execute('CREATE TABLE test (id INT PRIMARY KEY, a FLOAT, b TEXT)')
+box.execute('CREATE TABLE test (id INT PRIMARY KEY, a NUMBER, b TEXT)')
 ---
 - row_count: 1
 ...

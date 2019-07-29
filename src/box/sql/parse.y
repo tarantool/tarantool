@@ -1754,7 +1754,7 @@ typedef(A) ::= VARCHAR char_len(B) . {
 
 %type number_typedef {struct type_def}
 typedef(A) ::= number_typedef(A) .
-number_typedef(A) ::= FLOAT_KW|REAL|DOUBLE . { A.type = FIELD_TYPE_NUMBER; }
+number_typedef(A) ::= NUMBER . { A.type = FIELD_TYPE_NUMBER; }
 number_typedef(A) ::= INT|INTEGER_KW . { A.type = FIELD_TYPE_INTEGER; }
 number_typedef(A) ::= UNSIGNED . { A.type = FIELD_TYPE_UNSIGNED; }
 

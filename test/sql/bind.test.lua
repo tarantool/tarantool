@@ -1,7 +1,7 @@
 netbox = require('net.box')
 test_run = require('test_run').new()
 
-box.execute('CREATE TABLE test (id INT PRIMARY KEY, a FLOAT, b TEXT)')
+box.execute('CREATE TABLE test (id INT PRIMARY KEY, a NUMBER, b TEXT)')
 box.space.TEST:replace{1, 2, '3'}
 box.space.TEST:replace{7, 8.5, '9'}
 box.space.TEST:replace{10, 11, box.NULL}

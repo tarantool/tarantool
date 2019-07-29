@@ -21,7 +21,7 @@ testprefix = "tkt-91e2e8ba6f"
 test:do_execsql_test(
     1.1,
     [[
-        CREATE TABLE t1(x INTEGER PRIMARY KEY, y REAL);
+        CREATE TABLE t1(x INTEGER PRIMARY KEY, y NUMBER);
         INSERT INTO t1 VALUES(11, 11);
     ]], {
         -- <1.1>

@@ -11,9 +11,9 @@ box.cfg{}
 box.execute("CREATE TABLE t1(a INT PRIMARY KEY, b INT UNIQUE)")
 box.execute("CREATE TABLE t2(a INT UNIQUE, b INT)")
 
-box.execute("CREATE TABLE t3(a FLOAT)")
-box.execute("CREATE TABLE t4(a FLOAT, b TEXT)")
-box.execute("CREATE TABLE t5(a FLOAT, b FLOAT UNIQUE)")
+box.execute("CREATE TABLE t3(a NUMBER)")
+box.execute("CREATE TABLE t4(a NUMBER, b TEXT)")
+box.execute("CREATE TABLE t5(a NUMBER, b NUMBER UNIQUE)")
 
 box.execute("DROP TABLE t1")
 

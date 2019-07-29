@@ -308,7 +308,7 @@ box.execute("PRAGMA sql_default_engine('memtx');")
 ---
 - row_count: 0
 ...
-box.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 REAL);")
+box.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 NUMBER);")
 ---
 - row_count: 1
 ...
@@ -351,7 +351,7 @@ box.execute("PRAGMA sql_default_engine('vinyl');")
 ---
 - row_count: 0
 ...
-box.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 REAL);")
+box.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 NUMBER);")
 ---
 - row_count: 1
 ...

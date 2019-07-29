@@ -31,7 +31,7 @@ test:do_test(
                v varchar(10),
                log int,
                roman varchar(10),
-               flt real
+               flt NUMBER
             );
             INSERT INTO t1 VALUES(1,'one',0,'I',3.141592653);
             INSERT INTO t1 VALUES(2,'two',1,'II',2.15);
@@ -633,7 +633,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "sort-8.1",
     [[
-        CREATE TABLE t5(a real, b text PRIMARY KEY);
+        CREATE TABLE t5(a NUMBER, b text PRIMARY KEY);
         INSERT INTO t5 VALUES(100,'A1');
         INSERT INTO t5 VALUES(100.0,'A2');
         SELECT * FROM t5 ORDER BY a, b;

@@ -367,18 +367,18 @@ test:do_execsql_test("select3-7.2", [[
   -- </select3-7.2>
 })
 
--- If a table column is of type REAL but we are storing integer values
+-- If a table column is of typeNUMBER but we are storing integer values
 -- in it, the values are stored as integers to take up less space.  The
--- values are converted by to REAL as they are read out of the table.
+-- values are converted by toNUMBER as they are read out of the table.
 -- Make sure the GROUP BY clause does this conversion correctly.
 -- Ticket #2251.
 --
 test:do_execsql_test("select3-8.1", [[
   DROP TABLE IF EXISTS A;
   CREATE TABLE A (
-    A1 DOUBLE,
+    A1 NUMBER,
     A2 TEXT,
-    A3 DOUBLE,
+    A3 NUMBER,
     id int primary key
   );
   INSERT INTO A VALUES(39136,'ABC',1201900000, 1);

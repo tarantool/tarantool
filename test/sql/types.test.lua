@@ -11,7 +11,7 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT, b UNIQUE);")
 
 -- gh-3104: real type is stored in space format.
 --
-box.execute("CREATE TABLE t1 (id TEXT PRIMARY KEY, a REAL, b INT, c TEXT, d SCALAR);")
+box.execute("CREATE TABLE t1 (id TEXT PRIMARY KEY, a NUMBER, b INT, c TEXT, d SCALAR);")
 box.space.T1:format()
 box.execute("CREATE VIEW v1 AS SELECT b + a, b - a FROM t1;")
 box.space.V1:format()
@@ -191,7 +191,7 @@ box.space.V:drop()
 --
 box.execute("SELECT CAST(true AS INTEGER);")
 box.execute("SELECT CAST(true AS TEXT);")
-box.execute("SELECT CAST(true AS FLOAT);")
+box.execute("SELECT CAST(true AS NUMBER);")
 box.execute("SELECT CAST(true AS SCALAR);")
 box.execute("SELECT CAST(1 AS BOOLEAN);")
 box.execute("SELECT CAST(1.123 AS BOOLEAN);")
@@ -377,7 +377,7 @@ box.space.T1:drop()
 
 -- Test CAST facilities.
 --
-box.execute("SELECT CAST(18446744073709551615 AS FLOAT);")
+box.execute("SELECT CAST(18446744073709551615 AS NUMBER);")
 box.execute("SELECT CAST(18446744073709551615 AS TEXT);")
 box.execute("SELECT CAST(18446744073709551615 AS SCALAR);")
 box.execute("SELECT CAST(18446744073709551615 AS BOOLEAN);")

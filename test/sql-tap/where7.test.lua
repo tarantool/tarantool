@@ -332,7 +332,7 @@ test:do_test(
     "where7-2.1",
     function()
         return test:execsql [[
-            CREATE TABLE t2(a INTEGER PRIMARY KEY,b INT,c INT,d REAL,e REAL,f TEXT,g TEXT);
+            CREATE TABLE t2(a INTEGER PRIMARY KEY,b INT,c INT,d NUMBER,e NUMBER,f TEXT,g TEXT);
             INSERT INTO t2 VALUES(1,11,1001,1.001,100.1,'bcdefghij','yxwvuts');
             INSERT INTO t2 VALUES(2,22,1001,2.002,100.1,'cdefghijk','yxwvuts');
             INSERT INTO t2 VALUES(3,33,1001,3.0029999999999997,100.1,'defghijkl','xwvutsr');
@@ -439,7 +439,7 @@ test:do_test(
             CREATE INDEX t2e ON t2(e);
             CREATE INDEX t2f ON t2(f);
             CREATE INDEX t2g ON t2(g);
-            CREATE TABLE t3(a INTEGER PRIMARY KEY,b INT,c INT,d REAL,e REAL,f TEXT,g TEXT);
+            CREATE TABLE t3(a INTEGER PRIMARY KEY,b INT,c INT,d NUMBER,e NUMBER,f TEXT,g TEXT);
             INSERT INTO t3 SELECT * FROM t2;
             CREATE INDEX t3b ON t3(b,c);
             CREATE INDEX t3c ON t3(c,e);

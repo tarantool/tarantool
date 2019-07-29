@@ -164,9 +164,7 @@ lbox_sql_create_function(struct lua_State *L)
 		type = FIELD_TYPE_INTEGER;
 	else if (strcmp(type_arg, "TEXT") == 0)
 		type = FIELD_TYPE_STRING;
-	else if (strcmp(type_arg, "FLOAT") == 0)
-		type = FIELD_TYPE_NUMBER;
-	else if (strcmp(type_arg, "NUM") == 0)
+	else if (strcmp(type_arg, "NUMBER") == 0)
 		type = FIELD_TYPE_NUMBER;
 	else if (strcmp(type_arg, "BLOB") == 0)
 		type = FIELD_TYPE_SCALAR;

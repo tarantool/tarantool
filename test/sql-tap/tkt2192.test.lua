@@ -33,7 +33,7 @@ test:do_execsql_test(
         -- Raw data (RBS) --------
 
         create table records (
-          date_t        real primary key,
+          date_t        NUMBER primary key,
           type          text,
           description   text,
           value         integer,

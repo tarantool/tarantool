@@ -62,7 +62,7 @@ test:do_test(
     function()
         -- Tarantool: waiting for #2130
         -- test:execsql("CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, t INT ,u INT ,v TEXT COLLATE nocase,w INT ,x INT ,y INT ,z INT )")
-        test:execsql("CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, t TEXT ,u TEXT ,v TEXT ,w TEXT ,x TEXT ,y TEXT ,z FLOAT)")
+        test:execsql("CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, t TEXT ,u TEXT ,v TEXT ,w TEXT ,x TEXT ,y TEXT ,z NUMBER)")
         for i=0,999 do -- _ in X(0, "X!for", [=[["set i 0","$i < 1000","incr i"]]=]) do
             if  ((i >= 25) and (i <= 50)) then
                 y = 1
