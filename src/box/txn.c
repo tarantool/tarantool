@@ -197,10 +197,7 @@ txn_begin()
 	txn->n_new_rows = 0;
 	txn->n_local_rows = 0;
 	txn->n_applier_rows = 0;
-	txn->has_triggers  = false;
-	txn->is_done = false;
-	txn->can_yield = true;
-	txn->is_aborted_by_yield = false;
+	txn->flags = 0;
 	txn->in_sub_stmt = 0;
 	txn->id = ++tsn;
 	txn->signature = -1;
@@ -212,6 +209,12 @@ txn_begin()
 	/* fiber_on_yield is initialized by engine on demand */
 	trigger_create(&txn->fiber_on_stop, txn_on_stop, NULL, NULL);
 	trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
+	/*
+	 * By default all transactions may yield.
+	 * It's a responsibility of an engine to disable yields
+	 * if they are not supported.
+	 */
+	txn_set_flag(txn, TXN_CAN_YIELD);
 	return txn;
 }
 
@@ -396,13 +399,13 @@ txn_complete(struct txn *txn)
 		/* Undo the transaction. */
 		if (txn->engine)
 			engine_rollback(txn->engine, txn);
-		if (txn->has_triggers)
+		if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
 			txn_run_rollback_triggers(txn);
 	} else {
 		/* Commit the transaction. */
 		if (txn->engine != NULL)
 			engine_commit(txn->engine, txn);
-		if (txn->has_triggers)
+		if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
 			txn_run_commit_triggers(txn);
 
 		double stop_tm = ev_monotonic_now(loop());
@@ -422,7 +425,7 @@ txn_complete(struct txn *txn)
 	if (txn->fiber == NULL)
 		txn_free(txn);
 	else {
-		txn->is_done = true;
+		txn_set_flag(txn, TXN_IS_DONE);
 		if (txn->fiber != fiber())
 			/* Wake a waiting fiber up. */
 			fiber_wakeup(txn->fiber);
@@ -491,8 +494,8 @@ txn_write_to_wal(struct txn *txn)
 static int
 txn_prepare(struct txn *txn)
 {
-	if (txn->is_aborted_by_yield) {
-		assert(!txn->can_yield);
+	if (txn_has_flag(txn, TXN_IS_ABORTED_BY_YIELD)) {
+		assert(!txn_has_flag(txn, TXN_CAN_YIELD));
 		diag_set(ClientError, ER_TRANSACTION_YIELD);
 		diag_log();
 		return -1;
@@ -518,7 +521,7 @@ txn_prepare(struct txn *txn)
 			return -1;
 	}
 	trigger_clear(&txn->fiber_on_stop);
-	if (!txn->can_yield)
+	if (!txn_has_flag(txn, TXN_CAN_YIELD))
 		trigger_clear(&txn->fiber_on_yield);
 	return 0;
 }
@@ -558,7 +561,7 @@ txn_commit(struct txn *txn)
 	 * In case of non-yielding journal the transaction could already
 	 * be done and there is nothing to wait in such cases.
 	 */
-	if (!txn->is_done) {
+	if (!txn_has_flag(txn, TXN_IS_DONE)) {
 		bool cancellable = fiber_set_cancellable(false);
 		fiber_yield();
 		fiber_set_cancellable(cancellable);
@@ -586,7 +589,7 @@ txn_rollback(struct txn *txn)
 {
 	assert(txn == in_txn());
 	trigger_clear(&txn->fiber_on_stop);
-	if (!txn->can_yield)
+	if (!txn_has_flag(txn, TXN_CAN_YIELD))
 		trigger_clear(&txn->fiber_on_yield);
 	txn->signature = -1;
 	txn_complete(txn);
@@ -607,11 +610,13 @@ void
 txn_can_yield(struct txn *txn, bool set)
 {
 	assert(txn == in_txn());
-	assert(txn->can_yield != set);
-	txn->can_yield = set;
 	if (set) {
+		assert(!txn_has_flag(txn, TXN_CAN_YIELD));
+		txn_set_flag(txn, TXN_CAN_YIELD);
 		trigger_clear(&txn->fiber_on_yield);
 	} else {
+		assert(txn_has_flag(txn, TXN_CAN_YIELD));
+		txn_clear_flag(txn, TXN_CAN_YIELD);
 		trigger_create(&txn->fiber_on_yield, txn_on_yield, NULL, NULL);
 		trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
 	}
@@ -781,11 +786,12 @@ txn_on_yield(struct trigger *trigger, void *event)
 	(void) trigger;
 	(void) event;
 	struct txn *txn = in_txn();
-	assert(txn != NULL && !txn->can_yield);
+	assert(txn != NULL);
+	assert(!txn_has_flag(txn, TXN_CAN_YIELD));
 	txn_rollback_to_svp(txn, NULL);
-	if (txn->has_triggers) {
+	if (txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
 		txn_run_rollback_triggers(txn);
-		txn->has_triggers = false;
+		txn_clear_flag(txn, TXN_HAS_TRIGGERS);
 	}
-	txn->is_aborted_by_yield = true;
+	txn_set_flag(txn, TXN_IS_ABORTED_BY_YIELD);
 }

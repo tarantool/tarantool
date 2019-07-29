@@ -51,6 +51,23 @@ struct tuple;
 struct xrow_header;
 struct Vdbe;
 
+enum txn_flag {
+	/** Transaction has been processed. */
+	TXN_IS_DONE,
+	/**
+	 * Transaction has been aborted by fiber yield so
+	 * should be rolled back at commit.
+	 */
+	TXN_IS_ABORTED_BY_YIELD,
+	/**
+	 * fiber_yield() is allowed inside the transaction.
+	 * See txn_can_yield() for more details.
+	 */
+	TXN_CAN_YIELD,
+	/** on_commit and/or on_rollback list is not empty. */
+	TXN_HAS_TRIGGERS,
+};
+
 enum {
 	/**
 	 * Maximum recursion depth for on_replace triggers.
@@ -160,20 +177,8 @@ struct txn {
 	 * already assigned LSN.
 	 */
 	int n_applier_rows;
-	/* True when transaction is processed. */
-	bool is_done;
-	/**
-	 * True if the transaction was aborted so should be
-	 * rolled back at commit.
-	 */
-	bool is_aborted_by_yield;
-	/**
-	 * True if yields are allowed inside a transaction,
-	 * see txn_can_yield().
-	 */
-	bool can_yield;
-	/** True if on_commit and on_rollback lists are non-empty. */
-	bool has_triggers;
+	/** Bit mask of transaction flags, see txn_flag. */
+	unsigned flags;
 	/** The number of active nested statement-level transactions. */
 	int8_t in_sub_stmt;
 	/**
@@ -205,6 +210,24 @@ struct txn {
 	struct rlist on_commit, on_rollback;
 	struct sql_txn *psql_txn;
 };
+
+static inline bool
+txn_has_flag(struct txn *txn, enum txn_flag flag)
+{
+	return (txn->flags & (1 << flag)) != 0;
+}
+
+static inline void
+txn_set_flag(struct txn *txn, enum txn_flag flag)
+{
+	txn->flags |= 1 << flag;
+}
+
+static inline void
+txn_clear_flag(struct txn *txn, enum txn_flag flag)
+{
+	txn->flags &= ~(1 << flag);
+}
 
 /* Pointer to the current transaction (if any) */
 static inline struct txn *
@@ -260,10 +283,10 @@ txn_write(struct txn *txn);
 static inline void
 txn_init_triggers(struct txn *txn)
 {
-	if (txn->has_triggers == false) {
+	if (!txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
 		rlist_create(&txn->on_commit);
 		rlist_create(&txn->on_rollback);
-		txn->has_triggers = true;
+		txn_set_flag(txn, TXN_HAS_TRIGGERS);
 	}
 }
 
