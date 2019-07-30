@@ -231,6 +231,7 @@ txv_new(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 	v->is_overwritten = false;
 	v->overwritten = NULL;
 	xm->write_set_size += tuple_size(entry.stmt);
+	vy_stmt_counter_acct_tuple(&lsm->stat.txw.count, entry.stmt);
 	return v;
 }
 
@@ -239,6 +240,7 @@ txv_delete(struct txv *v)
 {
 	struct tx_manager *xm = v->tx->xm;
 	xm->write_set_size -= tuple_size(v->entry.stmt);
+	vy_stmt_counter_unacct_tuple(&v->lsm->stat.txw.count, v->entry.stmt);
 	tuple_unref(v->entry.stmt);
 	vy_lsm_unref(v->lsm);
 	mempool_free(&xm->txv_mempool, v);
@@ -344,11 +346,8 @@ vy_tx_destroy(struct vy_tx *tx)
 	tx_manager_destroy_read_view(tx->xm, tx->read_view);
 
 	struct txv *v, *tmp;
-	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
-		vy_stmt_counter_unacct_tuple(&v->lsm->stat.txw.count,
-					     v->entry.stmt);
+	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log)
 		txv_delete(v);
-	}
 
 	vy_tx_read_set_iter(&tx->read_set, NULL, vy_tx_read_set_free_cb, NULL);
 	rlist_del_entry(tx, in_writers);
@@ -653,8 +652,6 @@ vy_tx_handle_deferred_delete(struct vy_tx *tx, struct txv *v)
 			}
 			stailq_insert_entry(&tx->log, delete_txv, v,
 					    next_in_log);
-			vy_stmt_counter_acct_tuple(&lsm->stat.txw.count,
-						   entry.stmt);
 		}
 		if (rc != 0)
 			break;
@@ -1127,7 +1124,6 @@ vy_tx_set_entry(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 	write_set_insert(&tx->write_set, v);
 	tx->write_set_version++;
 	tx->write_size += tuple_size(entry.stmt);
-	vy_stmt_counter_acct_tuple(&lsm->stat.txw.count, entry.stmt);
 	stailq_add_tail_entry(&tx->log, v, next_in_log);
 	return 0;
 }

@@ -591,6 +591,24 @@ i:stat().dumps_per_compaction -- 1
 
 s:drop()
 
+--
+-- Check that index.stat.txw.rows is unaccounted on rollback
+-- to a savepoint.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i = s:create_index('pk')
+box.begin()
+s:insert{1}
+i:stat().txw.rows -- 1
+sv = box.savepoint()
+s:insert{2}
+i:stat().txw.rows -- 2
+box.rollback_to_savepoint(sv)
+i:stat().txw.rows -- 1
+box.commit()
+i:stat().txw.rows -- 0
+s:drop()
+
 test_run:cmd('switch default')
 test_run:cmd('stop server test')
 test_run:cmd('cleanup server test')
