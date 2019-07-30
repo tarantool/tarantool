@@ -60,6 +60,9 @@ errinj.set("ERRINJ_SWIM_FD_ONLY", false)
 ---
 - ok
 ...
+while s1_view:incarnation().version ~= 2 do fiber.sleep(0.01) end
+---
+...
 s1_view:payload()
 ---
 - null
