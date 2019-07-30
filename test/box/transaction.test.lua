@@ -415,3 +415,26 @@ box.begin() create() box.rollback()
 box.begin() create() box.commit()
 box.begin() drop() box.rollback()
 box.begin() drop() box.commit()
+
+--
+-- gh-4364: DDL doesn't care about savepoints.
+--
+test_run:cmd("setopt delimiter ';'")
+box.begin()
+s1 = box.schema.create_space('test1')
+save = box.savepoint()
+s2 = box.schema.create_space('test2')
+check1 = box.space.test1 ~= nil
+check2 = box.space.test2 ~= nil
+box.rollback_to_savepoint(save)
+check3 = box.space.test1 ~= nil
+check4 = box.space.test2 ~= nil
+box.commit();
+test_run:cmd("setopt delimiter ''");
+check1, check2, check3, check4
+
+--
+-- gh-4365: DDL reverted by yield triggers crash.
+--
+box.begin() box.execute([[CREATE TABLE test(id INTEGER PRIMARY KEY AUTOINCREMENT)]]) fiber.yield()
+box.rollback()

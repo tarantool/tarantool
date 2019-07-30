@@ -46,6 +46,9 @@ txn_on_stop(struct trigger *trigger, void *event);
 static void
 txn_on_yield(struct trigger *trigger, void *event);
 
+static void
+txn_run_rollback_triggers(struct txn *txn, struct rlist *triggers);
+
 static inline void
 fiber_set_txn(struct fiber *fiber, struct txn *txn)
 {
@@ -100,6 +103,7 @@ txn_stmt_new(struct region *region)
 	stmt->new_tuple = NULL;
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
+	stmt->has_triggers = false;
 	return stmt;
 }
 
@@ -115,11 +119,25 @@ txn_stmt_unref_tuples(struct txn_stmt *stmt)
 static void
 txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 {
+	/*
+	 * Undo changes done to the database by the rolled back
+	 * statements and collect corresponding rollback triggers.
+	 * Don't release the tuples as rollback triggers might
+	 * still need them.
+	 */
 	struct txn_stmt *stmt;
 	struct stailq rollback;
+	RLIST_HEAD(on_rollback);
 	stailq_cut_tail(&txn->stmts, svp, &rollback);
 	stailq_reverse(&rollback);
 	stailq_foreach_entry(stmt, &rollback, next) {
+		/*
+		 * Note the statement list is reversed hence
+		 * we must append triggers to the tail so as
+		 * to preserve the rollback order.
+		 */
+		if (stmt->has_triggers)
+			rlist_splice_tail(&on_rollback, &stmt->on_rollback);
 		if (txn->engine != NULL && stmt->space != NULL)
 			engine_rollback_statement(txn->engine, txn, stmt);
 		if (stmt->row != NULL && stmt->row->replica_id == 0) {
@@ -132,10 +150,15 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 			assert(txn->n_applier_rows > 0);
 			txn->n_applier_rows--;
 		}
-		txn_stmt_unref_tuples(stmt);
 		stmt->space = NULL;
 		stmt->row = NULL;
 	}
+	/* Run rollback triggers installed after the savepoint. */
+	txn_run_rollback_triggers(txn, &on_rollback);
+
+	/* Release the tuples. */
+	stailq_foreach_entry(stmt, &rollback, next)
+		txn_stmt_unref_tuples(stmt);
 }
 
 /*
@@ -350,14 +373,14 @@ fail:
  * A helper function to process on_commit triggers.
  */
 static void
-txn_run_commit_triggers(struct txn *txn)
+txn_run_commit_triggers(struct txn *txn, struct rlist *triggers)
 {
 	/*
 	 * Commit triggers must be run in the same order they
 	 * were added so that a trigger sees the changes done
 	 * by previous triggers (this is vital for DDL).
 	 */
-	if (trigger_run_reverse(&txn->on_commit, txn) != 0) {
+	if (trigger_run_reverse(triggers, txn) != 0) {
 		/*
 		 * As transaction couldn't handle a trigger error so
 		 * there is no option except panic.
@@ -372,9 +395,9 @@ txn_run_commit_triggers(struct txn *txn)
  * A helper function to process on_rollback triggers.
  */
 static void
-txn_run_rollback_triggers(struct txn *txn)
+txn_run_rollback_triggers(struct txn *txn, struct rlist *triggers)
 {
-	if (trigger_run(&txn->on_rollback, txn) != 0) {
+	if (trigger_run(triggers, txn) != 0) {
 		/*
 		 * As transaction couldn't handle a trigger error so
 		 * there is no option except panic.
@@ -400,13 +423,13 @@ txn_complete(struct txn *txn)
 		if (txn->engine)
 			engine_rollback(txn->engine, txn);
 		if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
-			txn_run_rollback_triggers(txn);
+			txn_run_rollback_triggers(txn, &txn->on_rollback);
 	} else {
 		/* Commit the transaction. */
 		if (txn->engine != NULL)
 			engine_commit(txn->engine, txn);
 		if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
-			txn_run_commit_triggers(txn);
+			txn_run_commit_triggers(txn, &txn->on_commit);
 
 		double stop_tm = ev_monotonic_now(loop());
 		if (stop_tm - txn->start_tm > too_long_threshold) {
@@ -468,6 +491,11 @@ txn_write_to_wal(struct txn *txn)
 	struct xrow_header **remote_row = req->rows;
 	struct xrow_header **local_row = req->rows + txn->n_applier_rows;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
+		if (stmt->has_triggers) {
+			txn_init_triggers(txn);
+			rlist_splice(&txn->on_commit, &stmt->on_commit);
+			rlist_splice(&txn->on_rollback, &stmt->on_rollback);
+		}
 		if (stmt->row == NULL)
 			continue; /* A read (e.g. select) request */
 		if (stmt->row->replica_id == 0)
@@ -591,6 +619,13 @@ txn_rollback(struct txn *txn)
 	trigger_clear(&txn->fiber_on_stop);
 	if (!txn_has_flag(txn, TXN_CAN_YIELD))
 		trigger_clear(&txn->fiber_on_yield);
+	struct txn_stmt *stmt;
+	stailq_foreach_entry(stmt, &txn->stmts, next) {
+		if (stmt->has_triggers) {
+			txn_init_triggers(txn);
+			rlist_splice(&txn->on_rollback, &stmt->on_rollback);
+		}
+	}
 	txn->signature = -1;
 	txn_complete(txn);
 	fiber_set_txn(fiber(), NULL);
@@ -789,9 +824,5 @@ txn_on_yield(struct trigger *trigger, void *event)
 	assert(txn != NULL);
 	assert(!txn_has_flag(txn, TXN_CAN_YIELD));
 	txn_rollback_to_svp(txn, NULL);
-	if (txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
-		txn_run_rollback_triggers(txn);
-		txn_clear_flag(txn, TXN_HAS_TRIGGERS);
-	}
 	txn_set_flag(txn, TXN_IS_ABORTED_BY_YIELD);
 }

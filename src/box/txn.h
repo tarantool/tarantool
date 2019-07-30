@@ -93,6 +93,11 @@ struct txn_stmt {
 	void *engine_savepoint;
 	/** Redo info: the binary log row */
 	struct xrow_header *row;
+	/** on_commit and/or on_rollback list is not empty. */
+	bool has_triggers;
+	/** Commit/rollback triggers associated with this statement. */
+	struct rlist on_commit;
+	struct rlist on_rollback;
 };
 
 /**
@@ -302,6 +307,35 @@ txn_on_rollback(struct txn *txn, struct trigger *trigger)
 {
 	txn_init_triggers(txn);
 	trigger_add(&txn->on_rollback, trigger);
+}
+
+/**
+ * Most statements don't have triggers, and txn objects
+ * are created on every access to data, so statements
+ * are partially initialized.
+ */
+static inline void
+txn_stmt_init_triggers(struct txn_stmt *stmt)
+{
+	if (!stmt->has_triggers) {
+		rlist_create(&stmt->on_commit);
+		rlist_create(&stmt->on_rollback);
+		stmt->has_triggers = true;
+	}
+}
+
+static inline void
+txn_stmt_on_commit(struct txn_stmt *stmt, struct trigger *trigger)
+{
+	txn_stmt_init_triggers(stmt);
+	trigger_add(&stmt->on_commit, trigger);
+}
+
+static inline void
+txn_stmt_on_rollback(struct txn_stmt *stmt, struct trigger *trigger)
+{
+	txn_stmt_init_triggers(stmt);
+	trigger_add(&stmt->on_rollback, trigger);
 }
 
 /**
