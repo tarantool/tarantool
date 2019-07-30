@@ -413,7 +413,7 @@ coio_getaddrinfo(const char *host, const char *port,
 		return -1; /* timed out or cancelled */
 
 	/* Task finished */
-	if (task->rc < 0) {
+	if (task->rc != 0) {
 		/* getaddrinfo() failed */
 		errno = EIO;
 		diag_set(SystemError, "getaddrinfo: %s",

@@ -7,6 +7,8 @@
 # call done with res 0
 	*** test_call_f: done ***
 	*** test_getaddrinfo ***
-1..1
+1..3
 ok 1 - getaddrinfo
+ok 2 - getaddrinfo retval
+ok 3 - getaddrinfo error message
 	*** test_getaddrinfo: done ***

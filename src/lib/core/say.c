@@ -482,13 +482,16 @@ static inline int
 syslog_connect_unix(const char *path)
 {
 	int fd = socket(PF_UNIX, SOCK_DGRAM, 0);
-	if (fd < 0)
+	if (fd < 0) {
+		diag_set(SystemError, strerror(errno));
 		return -1;
+	}
 	struct sockaddr_un un;
 	memset(&un, 0, sizeof(un));
 	snprintf(un.sun_path, sizeof(un.sun_path), "%s", path);
 	un.sun_family = AF_UNIX;
 	if (connect(fd, (struct sockaddr *) &un, sizeof(un)) != 0) {
+		diag_set(SystemError, strerror(errno));
 		close(fd);
 		return -1;
 	}
@@ -529,7 +532,7 @@ syslog_connect_remote(const char *server_address)
 	hints.ai_protocol = IPPROTO_UDP;
 
 	ret = getaddrinfo(remote, portnum, &hints, &inf);
-	if (ret < 0) {
+	if (ret != 0) {
 		errno = EIO;
 		diag_set(SystemError, "getaddrinfo: %s",
 			 gai_strerror(ret));
@@ -616,6 +619,7 @@ log_syslog_init(struct log *log, const char *init_str)
 	say_free_syslog_opts(&opts);
 	log->fd = log_syslog_connect(log);
 	if (log->fd < 0) {
+		diag_log();
 		/* syslog indent is freed in atexit(). */
 		diag_set(SystemError, "syslog logger: %s", strerror(errno));
 		return -1;
