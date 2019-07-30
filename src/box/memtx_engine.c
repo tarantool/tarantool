@@ -369,15 +369,6 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 		tuple_unref(stmt->new_tuple);
 }
 
-static void
-memtx_engine_rollback(struct engine *engine, struct txn *txn)
-{
-	struct txn_stmt *stmt;
-	stailq_reverse(&txn->stmts);
-	stailq_foreach_entry(stmt, &txn->stmts, next)
-		memtx_engine_rollback_statement(engine, txn, stmt);
-}
-
 static int
 memtx_engine_bootstrap(struct engine *engine)
 {
@@ -862,7 +853,7 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .prepare = */ generic_engine_prepare,
 	/* .commit = */ generic_engine_commit,
 	/* .rollback_statement = */ memtx_engine_rollback_statement,
-	/* .rollback = */ memtx_engine_rollback,
+	/* .rollback = */ generic_engine_rollback,
 	/* .switch_to_ro = */ generic_engine_switch_to_ro,
 	/* .bootstrap = */ memtx_engine_bootstrap,
 	/* .begin_initial_recovery = */ memtx_engine_begin_initial_recovery,

@@ -438,3 +438,23 @@ check1, check2, check3, check4
 --
 box.begin() box.execute([[CREATE TABLE test(id INTEGER PRIMARY KEY AUTOINCREMENT)]]) fiber.yield()
 box.rollback()
+
+--
+-- gh-4368: transaction rollback leads to a crash if DDL and DML statements
+-- are mixed in the same transaction.
+--
+test_run:cmd("setopt delimiter ';'")
+for i = 1, 100 do
+    box.begin()
+    s = box.schema.space.create('test')
+    s:create_index('pk')
+    s:create_index('sk', {unique = true, parts = {2, 'unsigned'}})
+    s:insert{1, 1}
+    s.index.sk:alter{unique = false}
+    s:insert{2, 1}
+    s.index.sk:drop()
+    s:delete{2}
+    box.rollback()
+    fiber.sleep(0)
+end;
+test_run:cmd("setopt delimiter ''");

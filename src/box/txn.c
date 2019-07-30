@@ -116,30 +116,36 @@ txn_stmt_unref_tuples(struct txn_stmt *stmt)
 		tuple_unref(stmt->new_tuple);
 }
 
+/*
+ * Undo changes done by a statement and run the corresponding
+ * rollback triggers.
+ *
+ * Note, a trigger set by a particular statement must be run right
+ * after the statement is rolled back, because rollback triggers
+ * installed by DDL statements restore the schema cache, which is
+ * necessary to roll back previous statements. For example, to roll
+ * back a DML statement applied to a space whose index is dropped
+ * later in the same transaction, we must restore the dropped index
+ * first.
+ */
+static void
+txn_rollback_one_stmt(struct txn *txn, struct txn_stmt *stmt)
+{
+	if (txn->engine != NULL && stmt->space != NULL)
+		engine_rollback_statement(txn->engine, txn, stmt);
+	if (stmt->has_triggers)
+		txn_run_rollback_triggers(txn, &stmt->on_rollback);
+}
+
 static void
 txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 {
-	/*
-	 * Undo changes done to the database by the rolled back
-	 * statements and collect corresponding rollback triggers.
-	 * Don't release the tuples as rollback triggers might
-	 * still need them.
-	 */
 	struct txn_stmt *stmt;
 	struct stailq rollback;
-	RLIST_HEAD(on_rollback);
 	stailq_cut_tail(&txn->stmts, svp, &rollback);
 	stailq_reverse(&rollback);
 	stailq_foreach_entry(stmt, &rollback, next) {
-		/*
-		 * Note the statement list is reversed hence
-		 * we must append triggers to the tail so as
-		 * to preserve the rollback order.
-		 */
-		if (stmt->has_triggers)
-			rlist_splice_tail(&on_rollback, &stmt->on_rollback);
-		if (txn->engine != NULL && stmt->space != NULL)
-			engine_rollback_statement(txn->engine, txn, stmt);
+		txn_rollback_one_stmt(txn, stmt);
 		if (stmt->row != NULL && stmt->row->replica_id == 0) {
 			assert(txn->n_new_rows > 0);
 			txn->n_new_rows--;
@@ -150,15 +156,10 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 			assert(txn->n_applier_rows > 0);
 			txn->n_applier_rows--;
 		}
+		txn_stmt_unref_tuples(stmt);
 		stmt->space = NULL;
 		stmt->row = NULL;
 	}
-	/* Run rollback triggers installed after the savepoint. */
-	txn_run_rollback_triggers(txn, &on_rollback);
-
-	/* Release the tuples. */
-	stailq_foreach_entry(stmt, &rollback, next)
-		txn_stmt_unref_tuples(stmt);
 }
 
 /*
@@ -420,6 +421,10 @@ txn_complete(struct txn *txn)
 	 */
 	if (txn->signature < 0) {
 		/* Undo the transaction. */
+		struct txn_stmt *stmt;
+		stailq_reverse(&txn->stmts);
+		stailq_foreach_entry(stmt, &txn->stmts, next)
+			txn_rollback_one_stmt(txn, stmt);
 		if (txn->engine)
 			engine_rollback(txn->engine, txn);
 		if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
@@ -494,7 +499,6 @@ txn_write_to_wal(struct txn *txn)
 		if (stmt->has_triggers) {
 			txn_init_triggers(txn);
 			rlist_splice(&txn->on_commit, &stmt->on_commit);
-			rlist_splice(&txn->on_rollback, &stmt->on_rollback);
 		}
 		if (stmt->row == NULL)
 			continue; /* A read (e.g. select) request */
@@ -619,13 +623,6 @@ txn_rollback(struct txn *txn)
 	trigger_clear(&txn->fiber_on_stop);
 	if (!txn_has_flag(txn, TXN_CAN_YIELD))
 		trigger_clear(&txn->fiber_on_yield);
-	struct txn_stmt *stmt;
-	stailq_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->has_triggers) {
-			txn_init_triggers(txn);
-			rlist_splice(&txn->on_rollback, &stmt->on_rollback);
-		}
-	}
 	txn->signature = -1;
 	txn_complete(txn);
 	fiber_set_txn(fiber(), NULL);

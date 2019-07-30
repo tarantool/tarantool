@@ -908,7 +908,8 @@ vy_tx_begin_statement(struct vy_tx *tx, struct space *space, void **savepoint)
 void
 vy_tx_rollback_statement(struct vy_tx *tx, void *svp)
 {
-	if (tx->state == VINYL_TX_ABORT)
+	if (tx->state == VINYL_TX_ABORT ||
+	    tx->state == VINYL_TX_COMMIT)
 		return;
 
 	assert(tx->state == VINYL_TX_READY);
