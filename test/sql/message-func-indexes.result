@@ -21,7 +21,8 @@ box.execute("CREATE TABLE t2(object INTEGER PRIMARY KEY, price INTEGER, count IN
 -- should return certain message.
 box.execute("CREATE INDEX i1 ON t1(a+1)")
 ---
-- error: Tarantool does not support functional indexes
+- null
+- Tarantool does not support functional indexes
 ...
 box.execute("CREATE INDEX i2 ON t1(a)")
 ---
@@ -29,7 +30,8 @@ box.execute("CREATE INDEX i2 ON t1(a)")
 ...
 box.execute("CREATE INDEX i3 ON t2(price + 100)")
 ---
-- error: Tarantool does not support functional indexes
+- null
+- Tarantool does not support functional indexes
 ...
 box.execute("CREATE INDEX i4 ON t2(price)")
 ---
@@ -37,11 +39,13 @@ box.execute("CREATE INDEX i4 ON t2(price)")
 ...
 box.execute("CREATE INDEX i5 ON t2(count + 1)")
 ---
-- error: Tarantool does not support functional indexes
+- null
+- Tarantool does not support functional indexes
 ...
 box.execute("CREATE INDEX i6 ON t2(count * price)")
 ---
-- error: Tarantool does not support functional indexes
+- null
+- Tarantool does not support functional indexes
 ...
 -- Cleaning up.
 box.execute("DROP TABLE t1")

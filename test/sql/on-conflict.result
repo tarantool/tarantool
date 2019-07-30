@@ -14,57 +14,69 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 --
 box.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v INTEGER UNIQUE ON CONFLICT ABORT)")
 ---
-- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- null
+- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 box.execute("CREATE TABLE q (id INTEGER PRIMARY KEY, v INTEGER UNIQUE ON CONFLICT FAIL)")
 ---
-- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- null
+- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 box.execute("CREATE TABLE p (id INTEGER PRIMARY KEY, v INTEGER UNIQUE ON CONFLICT IGNORE)")
 ---
-- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- null
+- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 box.execute("CREATE TABLE g (id INTEGER PRIMARY KEY, v INTEGER UNIQUE ON CONFLICT REPLACE)")
 ---
-- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- null
+- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 box.execute("CREATE TABLE e (id INTEGER PRIMARY KEY ON CONFLICT REPLACE, v INTEGER)")
 ---
-- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- null
+- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 box.execute("CREATE TABLE t1(a INT PRIMARY KEY ON CONFLICT REPLACE)")
 ---
-- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- null
+- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 box.execute("CREATE TABLE t2(a INT PRIMARY KEY ON CONFLICT IGNORE)")
 ---
-- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- null
+- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 -- CHECK constraint is illegal with REPLACE option.
 --
 box.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, a INTEGER CHECK (a > 5) ON CONFLICT REPLACE);")
 ---
-- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- null
+- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 --
 -- gh-3473: Primary key can't be declared with NULL.
 --
 box.execute("CREATE TABLE te17 (s1 INT NULL PRIMARY KEY NOT NULL);")
 ---
-- error: Primary index of space 'TE17' can not contain nullable parts
+- null
+- Primary index of space 'TE17' can not contain nullable parts
 ...
 box.execute("CREATE TABLE te17 (s1 INT NULL PRIMARY KEY);")
 ---
-- error: Primary index of space 'TE17' can not contain nullable parts
+- null
+- Primary index of space 'TE17' can not contain nullable parts
 ...
 box.execute("CREATE TABLE test (a int PRIMARY KEY, b int NULL ON CONFLICT IGNORE);")
 ---
-- error: 'Failed to execute SQL statement: NULL declaration for column ''B'' of table
-    ''TEST'' has been already set to ''none'''
+- null
+- 'Failed to execute SQL statement: NULL declaration for column ''B'' of table ''TEST''
+  has been already set to ''none'''
 ...
 box.execute("CREATE TABLE test (a int, b int NULL, c int, PRIMARY KEY(a, b, c))")
 ---
-- error: Primary index of space 'TEST' can not contain nullable parts
+- null
+- Primary index of space 'TEST' can not contain nullable parts
 ...
 -- Several NOT NULL REPLACE constraints work
 --

@@ -150,7 +150,10 @@ local function execsql_one_by_one(sql)
     local last_res_rows = nil
     local last_res_metadata = nil
     for _, query in pairs(queries) do
-        local new_res = box.execute(query)
+        local new_res, err = box.execute(query)
+        if err ~= nil then
+            error(err)
+        end
         if new_res ~= nil and new_res.rows ~= nil then
             last_res_rows = new_res.rows
             last_res_metadata = new_res.metadata

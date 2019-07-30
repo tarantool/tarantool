@@ -36,7 +36,13 @@ if remote then
 	cn = netbox.connect(box.cfg.listen)
 	execute = function(...) return cn:execute(...) end
 else
-	execute = box.execute
+	execute = function(...)
+		local res, err = box.execute(...)
+		if err ~= nil then
+			error(err)
+		end
+		return res
+	end
 end;
 ---
 ...
@@ -323,9 +329,11 @@ box.execute('DROP TABLE test')
 ...
 box.execute('SELECT ?', {1, 2})
 ---
-- error: 'Failed to execute SQL statement: The number of parameters is too large'
+- null
+- 'Failed to execute SQL statement: The number of parameters is too large'
 ...
 box.execute('SELECT $2', {1, 2, 3})
 ---
-- error: 'Failed to execute SQL statement: The number of parameters is too large'
+- null
+- 'Failed to execute SQL statement: The number of parameters is too large'
 ...

@@ -14,30 +14,30 @@ for _, term in ipairs({'UNION', 'UNION ALL', 'INTERSECT', 'EXCEPT'}) do
                  function()
                      for i = 1,table_count do
                          drop_string = 'DROP TABLE IF EXISTS t' .. i .. ';\n'
-                         box.execute(drop_string)
+                         test:execsql(drop_string)
                      end
 
                      for i = 1,table_count do
                          create_string = 'CREATE TABLE t' .. i .. ' (s1 int primary key, s2 int);\n'
-                         box.execute(create_string)
+                         test:execsql(create_string)
                      end
 
                      for i = 1,table_count do
                          insert_string = 'INSERT INTO t' .. i .. ' VALUES (0,' .. i .. ');\n'
-                         box.execute(insert_string)
+                         test:execsql(insert_string)
                      end
 
                      for i = 1,table_count-1 do
                          if i > 1 then select_string = select_string .. ' ' .. term .. ' ' end
                          select_string = select_string .. 'SELECT * FROM t' .. i
                      end
-                     return pcall( function() box.execute(select_string) end)
+                     return pcall( function() test:execsql(select_string) end)
                  end,
                  true)
     test:do_test("Negative COMPOUND "..term,
                  function()
                      select_string = select_string .. ' ' .. term ..' ' .. 'SELECT * FROM t' .. table_count
-                     return  pcall(function() box.execute(select_string) end)
+                     return  pcall(function() test:execsql(select_string) end)
                  end,
                  false)
 

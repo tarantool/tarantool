@@ -19,19 +19,23 @@ s = box.schema.create_space('test', {format = format})
 ...
 box.execute("SELECT * FROM \"test\";")
 ---
-- error: SQL does not support spaces without primary key
+- null
+- SQL does not support spaces without primary key
 ...
 box.execute("INSERT INTO \"test\" VALUES (1);")
 ---
-- error: SQL does not support spaces without primary key
+- null
+- SQL does not support spaces without primary key
 ...
 box.execute("DELETE FROM \"test\";")
 ---
-- error: SQL does not support spaces without primary key
+- null
+- SQL does not support spaces without primary key
 ...
 box.execute("UPDATE \"test\" SET id = 3;")
 ---
-- error: SQL does not support spaces without primary key
+- null
+- SQL does not support spaces without primary key
 ...
 s:drop()
 ---
@@ -54,7 +58,8 @@ box.space.T1:drop()
 ...
 box.execute("SELECT * FROM v1;")
 ---
-- error: SQL does not support spaces without primary key
+- null
+- SQL does not support spaces without primary key
 ...
 box.space.V1:drop()
 ---

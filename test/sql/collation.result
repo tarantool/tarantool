@@ -15,23 +15,28 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 -- All of these tests should throw error "near "COLLATE": syntax error"
 box.execute("SELECT 1 LIMIT 1 COLLATE BINARY;")
 ---
-- error: Syntax error near 'COLLATE'
+- null
+- Syntax error near 'COLLATE'
 ...
 box.execute("SELECT 1 LIMIT 1 COLLATE BINARY OFFSET 1;")
 ---
-- error: Syntax error near 'COLLATE'
+- null
+- Syntax error near 'COLLATE'
 ...
 box.execute("SELECT 1 LIMIT 1 OFFSET 1 COLLATE BINARY;")
 ---
-- error: Syntax error near 'COLLATE'
+- null
+- Syntax error near 'COLLATE'
 ...
 box.execute("SELECT 1 LIMIT 1, 1 COLLATE BINARY;")
 ---
-- error: Syntax error near 'COLLATE'
+- null
+- Syntax error near 'COLLATE'
 ...
 box.execute("SELECT 1 LIMIT 1 COLLATE BINARY, 1;")
 ---
-- error: Syntax error near 'COLLATE'
+- null
+- Syntax error near 'COLLATE'
 ...
 -- gh-3052: upper/lower support only default locale
 -- For tr-TR result depends on collation
@@ -253,7 +258,8 @@ box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = b;")
 ...
 box.execute("SELECT * FROM t WHERE b = c;")
 ---
-- error: Illegal mix of collations
+- null
+- Illegal mix of collations
 ...
 box.execute("SELECT * FROM t WHERE b COLLATE \"binary\" = c;")
 ---
@@ -283,22 +289,26 @@ box.execute("SELECT * FROM t WHERE a = c;")
 ...
 box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = c COLLATE \"unicode\";")
 ---
-- error: Illegal mix of collations
+- null
+- Illegal mix of collations
 ...
 -- Compound queries perform implicit comparisons between values.
 -- Hence, rules for collations compatibilities are the same.
 --
 box.execute("SELECT 'abc' COLLATE \"binary\" UNION SELECT 'ABC' COLLATE \"unicode_ci\"")
 ---
-- error: Illegal mix of collations
+- null
+- Illegal mix of collations
 ...
 box.execute("SELECT 'abc' COLLATE \"unicode_ci\" UNION SELECT 'ABC' COLLATE binary")
 ---
-- error: Illegal mix of collations
+- null
+- Illegal mix of collations
 ...
 box.execute("SELECT c FROM t UNION SELECT b FROM t;")
 ---
-- error: Illegal mix of collations
+- null
+- Illegal mix of collations
 ...
 box.execute("SELECT b FROM t UNION SELECT a FROM t;")
 ---
@@ -345,7 +355,8 @@ box.session.su('tmp')
 -- Error: read access to space is denied.
 box.execute("pragma collation_list")
 ---
-- error: Read access to space '_collation' is denied for user 'tmp'
+- null
+- Read access to space '_collation' is denied for user 'tmp'
 ...
 box.session.su('admin')
 ---
@@ -426,7 +437,8 @@ box.execute("INSERT INTO t1 VALUES (1,'a');")
 -- Should fail.
 box.execute("UPDATE t0 SET s1 = 'A';")
 ---
-- error: 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+- null
+- 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
 ...
 box.execute("SELECT * FROM t1;")
 ---
@@ -496,11 +508,13 @@ box.execute("SELECT c FROM t4a WHERE (a COLLATE \"binary\"||'') = b;")
 --
 box.execute("SELECT c FROM t4a WHERE (a COLLATE \"binary\"||'' COLLATE \"unicode_ci\") = b;")
 ---
-- error: Illegal mix of collations
+- null
+- Illegal mix of collations
 ...
 box.execute("SELECT c FROM t4a WHERE (a COLLATE \"binary\"||'') = b COLLATE \"unicode\";")
 ---
-- error: Illegal mix of collations
+- null
+- Illegal mix of collations
 ...
 -- No collation is used since LHS and RHS of concatenation
 -- operator have different implicit collations.
@@ -555,7 +569,8 @@ box.execute("SELECT c FROM t4a WHERE (a||b COLLATE \"binary\")=(b||a);")
 ...
 box.execute("SELECT c FROM t4a WHERE (a||b COLLATE \"binary\")=(b COLLATE \"unicode_ci\"||a);")
 ---
-- error: Illegal mix of collations
+- null
+- Illegal mix of collations
 ...
 box.execute("INSERT INTO t4b VALUES('abc', 'xxx', 2);")
 ---
@@ -676,7 +691,8 @@ box.execute("INSERT INTO t3b VALUES ('A');")
 ...
 box.execute("INSERT INTO t3b VALUES ('a');")
 ---
-- error: Duplicate key exists in unique index 'pk_unnamed_T3B_1' in space 'T3B'
+- null
+- Duplicate key exists in unique index 'pk_unnamed_T3B_1' in space 'T3B'
 ...
 box.execute("SELECT * FROM t3b;")
 ---
@@ -740,7 +756,8 @@ box.execute("INSERT INTO t3c VALUES ('A');")
 ...
 box.execute("INSERT INTO t3c VALUES ('a');")
 ---
-- error: Duplicate key exists in unique index 'pk_unnamed_T3C_1' in space 'T3C'
+- null
+- Duplicate key exists in unique index 'pk_unnamed_T3C_1' in space 'T3C'
 ...
 box.execute("SELECT * FROM t3c;")
 ---
@@ -804,7 +821,8 @@ box.execute("INSERT INTO t3d VALUES ('A');")
 ...
 box.execute("INSERT INTO t3d VALUES ('a');")
 ---
-- error: Duplicate key exists in unique index 'pk_unnamed_T3D_1' in space 'T3D'
+- null
+- Duplicate key exists in unique index 'pk_unnamed_T3D_1' in space 'T3D'
 ...
 box.execute("SELECT * FROM t3d;")
 ---
@@ -834,7 +852,8 @@ box.execute("INSERT INTO t3e VALUES ('a');")
 ...
 box.execute("INSERT INTO t3e VALUES ('A');")
 ---
-- error: Duplicate key exists in unique index 'pk_unnamed_T3E_1' in space 'T3E'
+- null
+- Duplicate key exists in unique index 'pk_unnamed_T3E_1' in space 'T3E'
 ...
 box.execute("SELECT * FROM t3e;")
 ---
@@ -897,7 +916,8 @@ box.execute("INSERT INTO t3f VALUES ('A');")
 ...
 box.execute("INSERT INTO t3f VALUES ('a');")
 ---
-- error: Duplicate key exists in unique index 'pk_unnamed_T3F_1' in space 'T3F'
+- null
+- Duplicate key exists in unique index 'pk_unnamed_T3F_1' in space 'T3F'
 ...
 box.execute("SELECT * FROM t3f;")
 ---
@@ -927,7 +947,8 @@ box.execute("INSERT INTO t3g VALUES ('a');")
 ...
 box.execute("INSERT INTO t3g VALUES ('A');")
 ---
-- error: Duplicate key exists in unique index 'pk_unnamed_T3G_1' in space 'T3G'
+- null
+- Duplicate key exists in unique index 'pk_unnamed_T3G_1' in space 'T3G'
 ...
 box.execute("SELECT * FROM t3g;")
 ---

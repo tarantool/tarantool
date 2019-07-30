@@ -22,7 +22,8 @@ box.execute("CREATE VIEW v1 AS SELECT a+b FROM t1;");
 -- View can't have any indexes.
 box.execute("CREATE INDEX i1 on v1(a);");
 ---
-- error: 'Can''t create or modify index ''I1'' in space ''V1'': views can not be indexed'
+- null
+- 'Can''t create or modify index ''I1'' in space ''V1'': views can not be indexed'
 ...
 v1 = box.space.V1;
 ---
@@ -78,8 +79,8 @@ box.schema.create_space('view', {view = true})
 -- Space referenced by a view can't be renamed.
 box.execute("ALTER TABLE t1 RENAME TO new_name;")
 ---
-- error: 'Can''t modify space ''T1'': can not rename space which is referenced by
-    view'
+- null
+- 'Can''t modify space ''T1'': can not rename space which is referenced by view'
 ...
 -- View can be created via straight insertion into _space.
 sp = box.schema.create_space('test');
@@ -148,7 +149,8 @@ box.execute("CREATE VIEW v2 AS SELECT * FROM t2;");
 ...
 box.execute("DROP TABLE t2;");
 ---
-- error: 'Can''t drop space ''T2'': other views depend on this space'
+- null
+- 'Can''t drop space ''T2'': other views depend on this space'
 ...
 sp = box.space._space:get{box.space.T2.id};
 ---
@@ -158,7 +160,8 @@ sp = box.space._space:replace(sp);
 ...
 box.execute("DROP TABLE t2;");
 ---
-- error: 'Can''t drop space ''T2'': other views depend on this space'
+- null
+- 'Can''t drop space ''T2'': other views depend on this space'
 ...
 box.execute("DROP VIEW v2;");
 ---
@@ -216,7 +219,8 @@ box.execute("CREATE VIEW bv (wombat) AS VALUES ((SELECT 'k' FROM b));")
 ...
 box.execute("DROP TABLE b;")
 ---
-- error: 'Can''t drop space ''B'': other views depend on this space'
+- null
+- 'Can''t drop space ''B'': other views depend on this space'
 ...
 box.execute("DROP VIEW bv;")
 ---
@@ -240,7 +244,8 @@ box.execute("CREATE VIEW bcv AS SELECT * FROM b WHERE s1 IN (SELECT * FROM c);")
 ...
 box.execute("DROP TABLE c;")
 ---
-- error: 'Can''t drop space ''C'': other views depend on this space'
+- null
+- 'Can''t drop space ''C'': other views depend on this space'
 ...
 box.execute("DROP VIEW bcv;")
 ---
@@ -260,7 +265,8 @@ box.execute("CREATE VIEW bcv(x, y) AS VALUES((SELECT 'k' FROM b), (VALUES((SELEC
 ...
 box.execute("DROP TABLE c;")
 ---
-- error: 'Can''t drop space ''C'': other views depend on this space'
+- null
+- 'Can''t drop space ''C'': other views depend on this space'
 ...
 box.space.BCV:drop()
 ---
@@ -291,7 +297,8 @@ box.execute("CREATE VIEW v2 AS SELECT * FROM t2;")
 test_run:cmd('restart server default')
 box.execute("DROP TABLE t2;")
 ---
-- error: 'Can''t drop space ''T2'': other views depend on this space'
+- null
+- 'Can''t drop space ''T2'': other views depend on this space'
 ...
 box.execute("SELECT * FROM v2;")
 ---

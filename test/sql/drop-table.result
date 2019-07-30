@@ -32,7 +32,8 @@ box.execute("DROP TABLE zzzoobar")
 -- Table does not exist anymore. Should error here.
 box.execute("INSERT INTO zzzoobar VALUES (111, 222, 'c3', 444)")
 ---
-- error: Space 'ZZZOOBAR' does not exist
+- null
+- Space 'ZZZOOBAR' does not exist
 ...
 -- gh-3712: if space features sequence, data from _sequence_data
 -- must be deleted before space is dropped.
@@ -97,12 +98,14 @@ box.session.su('tmp')
 --
 box.execute('CREATE TABLE t1 (id INT PRIMARY KEY, a INT)')
 ---
-- error: Write access to space '_index' is denied for user 'tmp'
+- null
+- Write access to space '_index' is denied for user 'tmp'
 ...
 -- Error: no such table.
 box.execute('DROP TABLE t1')
 ---
-- error: Space 'T1' does not exist
+- null
+- Space 'T1' does not exist
 ...
 box.session.su('admin')
 ---
@@ -138,7 +141,8 @@ box.session.su('tmp')
 --
 box.execute('CREATE TABLE t2 (id INT PRIMARY KEY AUTOINCREMENT, a INT UNIQUE, b INT UNIQUE, c INT UNIQUE, d INT UNIQUE)')
 ---
-- error: Write access to space '_sequence' is denied for user 'tmp'
+- null
+- Write access to space '_sequence' is denied for user 'tmp'
 ...
 box.session.su('admin')
 ---
@@ -180,8 +184,8 @@ box.execute('CREATE TABLE t3(a INTEGER PRIMARY KEY);')
 --
 box.execute('CREATE TABLE t4(x INTEGER PRIMARY KEY REFERENCES t3, a INT UNIQUE, c TEXT REFERENCES t3);')
 ---
-- error: 'Failed to create foreign key constraint ''FK_CONSTRAINT_2_T4'': field type
-    mismatch'
+- null
+- 'Failed to create foreign key constraint ''FK_CONSTRAINT_2_T4'': field type mismatch'
 ...
 box.execute('DROP TABLE t3;')
 ---

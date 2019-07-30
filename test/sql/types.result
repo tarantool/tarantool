@@ -8,26 +8,28 @@ test_run = env.new()
 --
 box.execute("CREATE TABLE t1 (id PRIMARY KEY);")
 ---
-- error: Keyword 'PRIMARY' is reserved. Please use double quotes if 'PRIMARY' is an
-    identifier.
+- null
+- Keyword 'PRIMARY' is reserved. Please use double quotes if 'PRIMARY' is an identifier.
 ...
 box.execute("CREATE TABLE t1 (a, id INT PRIMARY KEY);")
 ---
-- error: Syntax error near ','
+- null
+- Syntax error near ','
 ...
 box.execute("CREATE TABLE t1 (id PRIMARY KEY, a INT);")
 ---
-- error: Keyword 'PRIMARY' is reserved. Please use double quotes if 'PRIMARY' is an
-    identifier.
+- null
+- Keyword 'PRIMARY' is reserved. Please use double quotes if 'PRIMARY' is an identifier.
 ...
 box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a);")
 ---
-- error: Syntax error near ')'
+- null
+- Syntax error near ')'
 ...
 box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT, b UNIQUE);")
 ---
-- error: Keyword 'UNIQUE' is reserved. Please use double quotes if 'UNIQUE' is an
-    identifier.
+- null
+- Keyword 'UNIQUE' is reserved. Please use double quotes if 'UNIQUE' is an identifier.
 ...
 -- gh-3104: real type is stored in space format.
 --
@@ -152,33 +154,40 @@ sp:drop()
 --
 box.execute("SELECT 'abc' || 1;")
 ---
-- error: 'Inconsistent types: expected TEXT or VARBINARY got UNSIGNED'
+- null
+- 'Inconsistent types: expected TEXT or VARBINARY got UNSIGNED'
 ...
 box.execute("SELECT 'abc' || 1.123;")
 ---
-- error: 'Inconsistent types: expected TEXT or VARBINARY got REAL'
+- null
+- 'Inconsistent types: expected TEXT or VARBINARY got REAL'
 ...
 box.execute("SELECT 1 || 'abc';")
 ---
-- error: 'Inconsistent types: expected TEXT or VARBINARY got UNSIGNED'
+- null
+- 'Inconsistent types: expected TEXT or VARBINARY got UNSIGNED'
 ...
 box.execute("SELECT 1.123 || 'abc';")
 ---
-- error: 'Inconsistent types: expected TEXT or VARBINARY got REAL'
+- null
+- 'Inconsistent types: expected TEXT or VARBINARY got REAL'
 ...
 box.execute("SELECt 'a' || 'b' || 1;")
 ---
-- error: 'Inconsistent types: expected TEXT or VARBINARY got UNSIGNED'
+- null
+- 'Inconsistent types: expected TEXT or VARBINARY got UNSIGNED'
 ...
 -- What is more, they must be of the same type.
 --
 box.execute("SELECT 'abc' || randomblob(5);")
 ---
-- error: 'Inconsistent types: expected TEXT got VARBINARY'
+- null
+- 'Inconsistent types: expected TEXT got VARBINARY'
 ...
 box.execute("SELECT randomblob(5) || 'x';")
 ---
-- error: 'Inconsistent types: expected VARBINARY got TEXT'
+- null
+- 'Inconsistent types: expected VARBINARY got TEXT'
 ...
 -- Result of BLOBs concatenation must be BLOB.
 --
@@ -202,15 +211,18 @@ box.execute("INSERT INTO t1 VALUES (randomblob(5));")
 ...
 box.execute("SELECT * FROM t1 WHERE s LIKE 'blob';")
 ---
-- error: 'Inconsistent types: expected TEXT got VARBINARY'
+- null
+- 'Inconsistent types: expected TEXT got VARBINARY'
 ...
 box.execute("SELECT * FROM t1 WHERE 'blob' LIKE s;")
 ---
-- error: 'Inconsistent types: expected TEXT got VARBINARY'
+- null
+- 'Inconsistent types: expected TEXT got VARBINARY'
 ...
 box.execute("SELECT * FROM t1 WHERE 'blob' LIKE x'0000';")
 ---
-- error: 'Inconsistent types: expected TEXT got VARBINARY'
+- null
+- 'Inconsistent types: expected TEXT got VARBINARY'
 ...
 box.execute("SELECT s LIKE NULL FROM t1;")
 ---
@@ -230,11 +242,13 @@ box.execute("INSERT INTO t1 VALUES (1);")
 ...
 box.execute("SELECT * FROM t1 WHERE s LIKE 'int';")
 ---
-- error: 'Inconsistent types: expected TEXT got UNSIGNED'
+- null
+- 'Inconsistent types: expected TEXT got UNSIGNED'
 ...
 box.execute("SELECT * FROM t1 WHERE 'int' LIKE 4;")
 ---
-- error: 'Inconsistent types: expected TEXT got UNSIGNED'
+- null
+- 'Inconsistent types: expected TEXT got UNSIGNED'
 ...
 box.execute("SELECT NULL LIKE s FROM t1;")
 ---
@@ -355,15 +369,18 @@ box.execute("SELECT unknown = true;")
 ...
 box.execute("SELECT 1 = true;")
 ---
-- error: 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+- null
+- 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
 ...
 box.execute("SELECT 'abc' = true;")
 ---
-- error: 'Type mismatch: can not convert TEXT to BOOLEAN'
+- null
+- 'Type mismatch: can not convert TEXT to BOOLEAN'
 ...
 box.execute("SELECT 1.123 > true;")
 ---
-- error: 'Type mismatch: can not convert REAL to BOOLEAN'
+- null
+- 'Type mismatch: can not convert REAL to BOOLEAN'
 ...
 box.execute("SELECT true IN (1, 'abc', true)")
 ---
@@ -383,31 +400,37 @@ box.execute("SELECT true IN (1, 'abc', false)")
 ...
 box.execute("SELECT 1 LIMIT true;")
 ---
-- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
-    LIMIT clause'
+- null
+- 'Failed to execute SQL statement: Only positive integers are allowed in the LIMIT
+  clause'
 ...
 box.execute("SELECT 1 LIMIT 1 OFFSET true;")
 ---
-- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
-    OFFSET clause'
+- null
+- 'Failed to execute SQL statement: Only positive integers are allowed in the OFFSET
+  clause'
 ...
 box.execute("SELECT 'abc' || true;")
 ---
-- error: 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
+- null
+- 'Inconsistent types: expected TEXT or VARBINARY got BOOLEAN'
 ...
 -- Boolean can take part in arithmetic operations.
 --
 box.execute("SELECT true + false;")
 ---
-- error: 'Type mismatch: can not convert false to numeric'
+- null
+- 'Type mismatch: can not convert false to numeric'
 ...
 box.execute("SELECT true * 1;")
 ---
-- error: 'Type mismatch: can not convert true to numeric'
+- null
+- 'Type mismatch: can not convert true to numeric'
 ...
 box.execute("SELECT false / 0;")
 ---
-- error: 'Type mismatch: can not convert false to numeric'
+- null
+- 'Type mismatch: can not convert false to numeric'
 ...
 box.execute("SELECT not true;")
 ---
@@ -419,19 +442,23 @@ box.execute("SELECT not true;")
 ...
 box.execute("SELECT ~true;")
 ---
-- error: 'Type mismatch: can not convert true to integer'
+- null
+- 'Type mismatch: can not convert true to integer'
 ...
 box.execute("SELECT -true;")
 ---
-- error: 'Type mismatch: can not convert true to numeric'
+- null
+- 'Type mismatch: can not convert true to numeric'
 ...
 box.execute("SELECT true << 1;")
 ---
-- error: 'Type mismatch: can not convert true to integer'
+- null
+- 'Type mismatch: can not convert true to integer'
 ...
 box.execute("SELECT true | 1;")
 ---
-- error: 'Type mismatch: can not convert true to integer'
+- null
+- 'Type mismatch: can not convert true to integer'
 ...
 box.execute("SELECT true and false;")
 ---
@@ -553,22 +580,26 @@ box.execute("SELECT b FROM t GROUP BY b LIMIT 1;")
 ...
 box.execute("SELECT b FROM t LIMIT true;")
 ---
-- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
-    LIMIT clause'
+- null
+- 'Failed to execute SQL statement: Only positive integers are allowed in the LIMIT
+  clause'
 ...
 -- Most of aggregates don't accept boolean arguments.
 --
 box.execute("SELECT sum(b) FROM t;")
 ---
-- error: 'Type mismatch: can not convert true to number'
+- null
+- 'Type mismatch: can not convert true to number'
 ...
 box.execute("SELECT avg(b) FROM t;")
 ---
-- error: 'Type mismatch: can not convert true to number'
+- null
+- 'Type mismatch: can not convert true to number'
 ...
 box.execute("SELECT total(b) FROM t;")
 ---
-- error: 'Type mismatch: can not convert true to number'
+- null
+- 'Type mismatch: can not convert true to number'
 ...
 box.execute("SELECT min(b) FROM t;")
 ---
@@ -626,7 +657,8 @@ box.execute("SELECT upper(b) FROM t;")
 ...
 box.execute("SELECT abs(b) FROM t;")
 ---
-- error: 'Inconsistent types: expected number got BOOLEAN'
+- null
+- 'Inconsistent types: expected number got BOOLEAN'
 ...
 box.execute("SELECT typeof(b) FROM t;")
 ---
@@ -721,7 +753,8 @@ box.execute("ALTER TABLE t ADD CONSTRAINT fk1 FOREIGN KEY (b) REFERENCES parent 
 ...
 box.execute("INSERT INTO t VALUES (1, true);")
 ---
-- error: 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+- null
+- 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
 ...
 box.execute("INSERT INTO parent VALUES (1, true);")
 ---
@@ -744,7 +777,8 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a BOOLEAN CHECK (a = true));")
 ...
 box.execute("INSERT INTO t1 VALUES (1, false);")
 ---
-- error: 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a = true'
+- null
+- 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a = true'
 ...
 box.execute("INSERT INTO t1 VALUES (1, true);")
 ---
@@ -801,7 +835,8 @@ box.execute("SELECT CAST(true AS TEXT);")
 ...
 box.execute("SELECT CAST(true AS NUMBER);")
 ---
-- error: 'Type mismatch: can not convert true to number'
+- null
+- 'Type mismatch: can not convert true to number'
 ...
 box.execute("SELECT CAST(true AS SCALAR);")
 ---
@@ -845,7 +880,8 @@ box.execute("SELECT CAST(0.00000001 AS BOOLEAN);")
 ...
 box.execute("SELECT CAST('abc' AS BOOLEAN);")
 ---
-- error: 'Type mismatch: can not convert abc to boolean'
+- null
+- 'Type mismatch: can not convert abc to boolean'
 ...
 box.execute("SELECT CAST('  TrUe' AS BOOLEAN);")
 ---
@@ -865,11 +901,13 @@ box.execute("SELECT CAST('  falsE    ' AS BOOLEAN);")
 ...
 box.execute("SELECT CAST('  fals' AS BOOLEAN);")
 ---
-- error: 'Type mismatch: can not convert   fals to boolean'
+- null
+- 'Type mismatch: can not convert   fals to boolean'
 ...
 box.execute("SELECT CAST(X'4D6564766564' AS BOOLEAN);")
 ---
-- error: 'Type mismatch: can not convert Medved to boolean'
+- null
+- 'Type mismatch: can not convert Medved to boolean'
 ...
 -- Make sure that SCALAR can handle boolean values.
 --
@@ -895,11 +933,13 @@ box.execute("INSERT INTO t1 VALUES (3, 'abc'), (4, 12.5);")
 ...
 box.execute("SELECT s FROM t1 WHERE s = true;")
 ---
-- error: 'Type mismatch: can not convert TEXT to BOOLEAN'
+- null
+- 'Type mismatch: can not convert TEXT to BOOLEAN'
 ...
 box.execute("SELECT s FROM t1 WHERE s < true;")
 ---
-- error: 'Type mismatch: can not convert TEXT to BOOLEAN'
+- null
+- 'Type mismatch: can not convert TEXT to BOOLEAN'
 ...
 box.execute("SELECT s FROM t1 WHERE s IN (true, 1, 'abcd')")
 ---
@@ -924,7 +964,8 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY);")
 ...
 box.execute("INSERT INTO t1 VALUES (true);")
 ---
-- error: 'Type mismatch: can not convert true to integer'
+- null
+- 'Type mismatch: can not convert true to integer'
 ...
 box.space.T1:drop()
 ---
@@ -979,19 +1020,23 @@ box.execute("INSERT INTO tboolean VALUES (TRUE);")
 ...
 box.execute("SELECT * FROM tboolean WHERE s1 = x'44';")
 ---
-- error: 'Type mismatch: can not convert D to boolean'
+- null
+- 'Type mismatch: can not convert D to boolean'
 ...
 box.execute("SELECT * FROM tboolean WHERE s1 = 'abc';")
 ---
-- error: 'Type mismatch: can not convert abc to boolean'
+- null
+- 'Type mismatch: can not convert abc to boolean'
 ...
 box.execute("SELECT * FROM tboolean WHERE s1 = 1;")
 ---
-- error: 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
+- null
+- 'Type mismatch: can not convert UNSIGNED to BOOLEAN'
 ...
 box.execute("SELECT * FROM tboolean WHERE s1 = 1.123;")
 ---
-- error: 'Type mismatch: can not convert REAL to BOOLEAN'
+- null
+- 'Type mismatch: can not convert REAL to BOOLEAN'
 ...
 box.space.TBOOLEAN:drop()
 ---
@@ -1268,7 +1313,8 @@ box.execute("SELECT 1 LIMIT 1 OFFSET 18446744073709551614;")
 ...
 box.execute("SELECT CAST('18446744073' || '709551616' AS INTEGER);")
 ---
-- error: 'Type mismatch: can not convert 18446744073709551616 to integer'
+- null
+- 'Type mismatch: can not convert 18446744073709551616 to integer'
 ...
 box.execute("SELECT CAST('18446744073' || '709551615' AS INTEGER);")
 ---
@@ -1320,7 +1366,8 @@ box.execute("SELECT 18446744073709551615 / -9223372036854775808;")
 ...
 box.execute("SELECT 0 - 18446744073709551610;")
 ---
-- error: 'Failed to execute SQL statement: integer is overflowed'
+- null
+- 'Failed to execute SQL statement: integer is overflowed'
 ...
 box.execute("CREATE TABLE t (id INT PRIMARY KEY, i INT);")
 ---
@@ -1378,7 +1425,8 @@ box.execute("SELECT i FROM t ORDER BY i;")
 ...
 box.execute("SELECT i FROM t ORDER BY -i;")
 ---
-- error: 'Failed to execute SQL statement: integer is overflowed'
+- null
+- 'Failed to execute SQL statement: integer is overflowed'
 ...
 box.execute("SELECT i FROM t ORDER BY i LIMIT 1;")
 ---
@@ -1569,7 +1617,8 @@ box.execute("ALTER TABLE t ADD CONSTRAINT fk1 FOREIGN KEY (i) REFERENCES parent 
 ...
 box.execute("INSERT INTO t VALUES (1, 18446744073709551615);")
 ---
-- error: 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+- null
+- 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
 ...
 box.execute("INSERT INTO parent VALUES (2, 18446744073709551615);")
 ---
@@ -1595,11 +1644,13 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT CHECK (a > 1844674407370
 ...
 box.execute("INSERT INTO t1 VALUES (1, 18446744073709551611);")
 ---
-- error: 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a > 18446744073709551612'
+- null
+- 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a > 18446744073709551612'
 ...
 box.execute("INSERT INTO t1 VALUES (1, -1);")
 ---
-- error: 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a > 18446744073709551612'
+- null
+- 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a > 18446744073709551612'
 ...
 box.space.T1:drop()
 ---
@@ -1692,7 +1743,8 @@ box.execute("INSERT INTO t1 VALUES (0), (1), (2);")
 ...
 box.execute("INSERT INTO t1 VALUES (-3);")
 ---
-- error: 'Type mismatch: can not convert -3 to unsigned'
+- null
+- 'Type mismatch: can not convert -3 to unsigned'
 ...
 box.execute("SELECT id FROM t1;")
 ---
@@ -1714,7 +1766,8 @@ box.execute("SELECT CAST(123 AS UNSIGNED);")
 ...
 box.execute("SELECT CAST(-123 AS UNSIGNED);")
 ---
-- error: 'Type mismatch: can not convert -123 to unsigned'
+- null
+- 'Type mismatch: can not convert -123 to unsigned'
 ...
 box.execute("SELECT CAST(1.5 AS UNSIGNED);")
 ---
@@ -1726,7 +1779,8 @@ box.execute("SELECT CAST(1.5 AS UNSIGNED);")
 ...
 box.execute("SELECT CAST(-1.5 AS UNSIGNED);")
 ---
-- error: 'Type mismatch: can not convert -1 to unsigned'
+- null
+- 'Type mismatch: can not convert -1 to unsigned'
 ...
 box.execute("SELECT CAST(true AS UNSIGNED);")
 ---
@@ -1746,7 +1800,8 @@ box.execute("SELECT CAST('123' AS UNSIGNED);")
 ...
 box.execute("SELECT CAST('-123' AS UNSIGNED);")
 ---
-- error: 'Type mismatch: can not convert -123 to unsigned'
+- null
+- 'Type mismatch: can not convert -123 to unsigned'
 ...
 box.space.T1:drop()
 ---
@@ -1843,19 +1898,23 @@ box.execute("CREATE TABLE t (id INT PRIMARY KEY, v VARBINARY);")
 ...
 box.execute("INSERT INTO t VALUES(1, 1);")
 ---
-- error: 'Type mismatch: can not convert 1 to varbinary'
+- null
+- 'Type mismatch: can not convert 1 to varbinary'
 ...
 box.execute("INSERT INTO t VALUES(1, 1.123);")
 ---
-- error: 'Type mismatch: can not convert 1.123 to varbinary'
+- null
+- 'Type mismatch: can not convert 1.123 to varbinary'
 ...
 box.execute("INSERT INTO t VALUES(1, true);")
 ---
-- error: 'Type mismatch: can not convert true to varbinary'
+- null
+- 'Type mismatch: can not convert true to varbinary'
 ...
 box.execute("INSERT INTO t VALUES(1, 'asd');")
 ---
-- error: 'Type mismatch: can not convert asd to varbinary'
+- null
+- 'Type mismatch: can not convert asd to varbinary'
 ...
 box.execute("INSERT INTO t VALUES(1, x'616263');")
 ---
@@ -1863,15 +1922,18 @@ box.execute("INSERT INTO t VALUES(1, x'616263');")
 ...
 box.execute("SELECT * FROM t WHERE v = 1")
 ---
-- error: 'Type mismatch: can not convert UNSIGNED to VARBINARY'
+- null
+- 'Type mismatch: can not convert UNSIGNED to VARBINARY'
 ...
 box.execute("SELECT * FROM t WHERE v = 1.123")
 ---
-- error: 'Type mismatch: can not convert REAL to VARBINARY'
+- null
+- 'Type mismatch: can not convert REAL to VARBINARY'
 ...
 box.execute("SELECT * FROM t WHERE v = 'str'")
 ---
-- error: 'Type mismatch: can not convert TEXT to VARBINARY'
+- null
+- 'Type mismatch: can not convert TEXT to VARBINARY'
 ...
 box.execute("SELECT * FROM t WHERE v = x'616263'")
 ---
@@ -1885,15 +1947,18 @@ box.execute("SELECT * FROM t WHERE v = x'616263'")
 ...
 box.execute("SELECT sum(v) FROM t;")
 ---
-- error: 'Type mismatch: can not convert abc to number'
+- null
+- 'Type mismatch: can not convert abc to number'
 ...
 box.execute("SELECT avg(v) FROM t;")
 ---
-- error: 'Type mismatch: can not convert abc to number'
+- null
+- 'Type mismatch: can not convert abc to number'
 ...
 box.execute("SELECT total(v) FROM t;")
 ---
-- error: 'Type mismatch: can not convert abc to number'
+- null
+- 'Type mismatch: can not convert abc to number'
 ...
 box.execute("SELECT min(v) FROM t;")
 ---
@@ -1929,15 +1994,18 @@ box.execute("SELECT group_concat(v) FROM t;")
 ...
 box.execute("SELECT lower(v) FROM t;")
 ---
-- error: 'Inconsistent types: expected TEXT got VARBINARY'
+- null
+- 'Inconsistent types: expected TEXT got VARBINARY'
 ...
 box.execute("SELECT upper(v) FROM t;")
 ---
-- error: 'Inconsistent types: expected TEXT got VARBINARY'
+- null
+- 'Inconsistent types: expected TEXT got VARBINARY'
 ...
 box.execute("SELECT abs(v) FROM t;")
 ---
-- error: 'Inconsistent types: expected number got VARBINARY'
+- null
+- 'Inconsistent types: expected number got VARBINARY'
 ...
 box.execute("SELECT typeof(v) FROM t;")
 ---
@@ -2008,7 +2076,8 @@ box.execute("ALTER TABLE t ADD CONSTRAINT fk1 FOREIGN KEY (v) REFERENCES parent 
 ...
 box.execute("INSERT INTO t VALUES (1, x'616263');")
 ---
-- error: 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+- null
+- 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
 ...
 box.execute("INSERT INTO parent VALUES (1, x'616263');")
 ---
@@ -2031,7 +2100,8 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a VARBINARY CHECK (a = x'61626
 ...
 box.execute("INSERT INTO t1 VALUES (1, x'006162');")
 ---
-- error: 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a = x''616263'''
+- null
+- 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a = x''616263'''
 ...
 box.execute("INSERT INTO t1 VALUES (1, x'616263');")
 ---
@@ -2057,15 +2127,18 @@ box.space.T1:drop()
 ...
 box.execute("SELECT CAST(1 AS VARBINARY);")
 ---
-- error: 'Type mismatch: can not convert 1 to varbinary'
+- null
+- 'Type mismatch: can not convert 1 to varbinary'
 ...
 box.execute("SELECT CAST(1.123 AS VARBINARY);")
 ---
-- error: 'Type mismatch: can not convert 1.123 to varbinary'
+- null
+- 'Type mismatch: can not convert 1.123 to varbinary'
 ...
 box.execute("SELECT CAST(true AS VARBINARY);")
 ---
-- error: 'Type mismatch: can not convert true to varbinary'
+- null
+- 'Type mismatch: can not convert true to varbinary'
 ...
 box.execute("SELECT CAST('asd' AS VARBINARY);")
 ---

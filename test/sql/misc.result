@@ -19,13 +19,13 @@ box.execute('select 1;')
 ...
 box.execute('select 1; select 2;')
 ---
-- error: Keyword 'select' is reserved. Please use double quotes if 'select' is an
-    identifier.
+- null
+- Keyword 'select' is reserved. Please use double quotes if 'select' is an identifier.
 ...
 box.execute('create table t1 (id INT primary key); select 100;')
 ---
-- error: Keyword 'select' is reserved. Please use double quotes if 'select' is an
-    identifier.
+- null
+- Keyword 'select' is reserved. Please use double quotes if 'select' is an identifier.
 ...
 box.space.t1 == nil
 ---
@@ -33,35 +33,40 @@ box.space.t1 == nil
 ...
 box.execute(';')
 ---
-- error: Failed to execute an empty SQL statement
+- null
+- Failed to execute an empty SQL statement
 ...
 box.execute('')
 ---
-- error: Failed to execute an empty SQL statement
+- null
+- Failed to execute an empty SQL statement
 ...
 box.execute('     ;')
 ---
-- error: Failed to execute an empty SQL statement
+- null
+- Failed to execute an empty SQL statement
 ...
 box.execute('\n\n\n\t\t\t   ')
 ---
-- error: Failed to execute an empty SQL statement
+- null
+- Failed to execute an empty SQL statement
 ...
 -- gh-3820: only table constraints can have a name.
 --
 box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b INTEGER CONSTRAINT c1 NULL)')
 ---
-- error: Keyword 'NULL' is reserved. Please use double quotes if 'NULL' is an identifier.
+- null
+- Keyword 'NULL' is reserved. Please use double quotes if 'NULL' is an identifier.
 ...
 box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b INTEGER CONSTRAINT c1 DEFAULT 300)')
 ---
-- error: Keyword 'DEFAULT' is reserved. Please use double quotes if 'DEFAULT' is an
-    identifier.
+- null
+- Keyword 'DEFAULT' is reserved. Please use double quotes if 'DEFAULT' is an identifier.
 ...
 box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b TEXT CONSTRAINT c1 COLLATE "binary")')
 ---
-- error: Keyword 'COLLATE' is reserved. Please use double quotes if 'COLLATE' is an
-    identifier.
+- null
+- Keyword 'COLLATE' is reserved. Please use double quotes if 'COLLATE' is an identifier.
 ...
 -- Make sure that type of literals in meta complies with its real
 -- type. For instance, typeof(0.5) is number, not integer.

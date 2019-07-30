@@ -322,7 +322,8 @@ box.execute("INSERT INTO n VALUES (0, '',null);")
 ...
 box.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 ---
-- error: A multi-statement transaction can not use multiple storage engines
+- null
+- A multi-statement transaction can not use multiple storage engines
 ...
 -- ANALYZE banned in gh-4069
 -- box.sql.execute("ANALYZE m;")
@@ -365,7 +366,8 @@ box.execute("INSERT INTO n VALUES (0, '',null);")
 ...
 box.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 ---
-- error: A multi-statement transaction can not use multiple storage engines
+- null
+- A multi-statement transaction can not use multiple storage engines
 ...
 -- ANALYZE banned in gh-4069
 -- box.sql.execute("ANALYZE n;")
@@ -408,7 +410,8 @@ box.execute("INSERT INTO test VALUES (1)")
 ...
 box.execute("SELECT * FROM test2")
 ---
-- error: A multi-statement transaction can not use multiple storage engines
+- null
+- A multi-statement transaction can not use multiple storage engines
 ...
 box.execute("ROLLBACK;")
 ---
@@ -483,7 +486,8 @@ space_id = box.space.T1.id
 ...
 box.execute("CREATE TRIGGER tr1 AFTER INSERT ON t1 FOR EACH ROW WHEN new.a = ? BEGIN SELECT 1; END;")
 ---
-- error: bindings are not allowed in DDL
+- null
+- bindings are not allowed in DDL
 ...
 tuple = {"TR1", space_id, {sql = [[CREATE TRIGGER tr1 AFTER INSERT ON t1 FOR EACH ROW WHEN new.a = ? BEGIN SELECT 1; END;]]}}
 ---
@@ -508,8 +512,8 @@ space_id = box.space.T1.id
 ...
 box.execute("CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN ; END;")
 ---
-- error: FOR EACH STATEMENT triggers are not implemented, please supply FOR EACH ROW
-    clause
+- null
+- FOR EACH STATEMENT triggers are not implemented, please supply FOR EACH ROW clause
 ...
 box.execute("DROP TABLE t1;")
 ---
@@ -539,7 +543,8 @@ box.session.su('tester')
 --
 box.execute([[CREATE TRIGGER r1 AFTER INSERT ON t1 FOR EACH ROW BEGIN SELECT 1; END; ]])
 ---
-- error: Space 'T1' does not exist
+- null
+- Space 'T1' does not exist
 ...
 box.session.su('admin')
 ---

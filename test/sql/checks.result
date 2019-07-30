@@ -73,7 +73,8 @@ box.space._ck_constraint:count({})
 ...
 box.execute("INSERT INTO \"test\" VALUES(5);")
 ---
-- error: 'Check constraint failed ''CK_CONSTRAINT_01'': X<5'
+- null
+- 'Check constraint failed ''CK_CONSTRAINT_01'': X<5'
 ...
 box.space.test:insert({5})
 ---
@@ -89,7 +90,8 @@ box.execute("INSERT INTO \"test\" VALUES(5);")
 ...
 box.execute("INSERT INTO \"test\" VALUES(6);")
 ---
-- error: 'Check constraint failed ''CK_CONSTRAINT_01'': X<=5'
+- null
+- 'Check constraint failed ''CK_CONSTRAINT_01'': X<=5'
 ...
 box.space.test:insert({6})
 ---
@@ -126,7 +128,8 @@ box.space._ck_constraint:count()
 ...
 box.execute("INSERT INTO t1 VALUES (7, 1, 1)")
 ---
-- error: 'Check constraint failed ''ONE'': x<5'
+- null
+- 'Check constraint failed ''ONE'': x<5'
 ...
 box.space.T1:insert({7, 1, 1})
 ---
@@ -134,7 +137,8 @@ box.space.T1:insert({7, 1, 1})
 ...
 box.execute("INSERT INTO t1 VALUES (2, 1, 1)")
 ---
-- error: 'Check constraint failed ''TWO'': y>x'
+- null
+- 'Check constraint failed ''TWO'': y>x'
 ...
 box.space.T1:insert({2, 1, 1})
 ---
@@ -155,7 +159,8 @@ box.execute("DROP TABLE t1")
 -- Test space creation rollback on spell error in ck constraint.
 box.execute("CREATE TABLE first (id NUMBER PRIMARY KEY CHECK(id < 5), a INT CONSTRAINT ONE CHECK(a >< 5));")
 ---
-- error: Syntax error near '<'
+- null
+- Syntax error near '<'
 ...
 box.space.FIRST == nil
 ---
@@ -184,14 +189,16 @@ _ = box.space._ck_constraint:insert({s.id, 'physics', false, 'SQL', 'X<Y'})
 ...
 box.execute("INSERT INTO \"test\" VALUES(2, 1);")
 ---
-- error: 'Check constraint failed ''physics'': X<Y'
+- null
+- 'Check constraint failed ''physics'': X<Y'
 ...
 s:format({{name='Y', type='integer'}, {name='X', type='integer'}})
 ---
 ...
 box.execute("INSERT INTO \"test\" VALUES(1, 2);")
 ---
-- error: 'Check constraint failed ''physics'': X<Y'
+- null
+- 'Check constraint failed ''physics'': X<Y'
 ...
 box.execute("INSERT INTO \"test\" VALUES(2, 1);")
 ---
@@ -202,7 +209,8 @@ s:truncate()
 ...
 box.execute("INSERT INTO \"test\" VALUES(1, 2);")
 ---
-- error: 'Check constraint failed ''physics'': X<Y'
+- null
+- 'Check constraint failed ''physics'': X<Y'
 ...
 s:format({})
 ---
@@ -234,11 +242,13 @@ _ = box.space._ck_constraint:insert({s.id, 'conflict', false, 'SQL', 'X>10'})
 ...
 box.execute("INSERT INTO \"test\" VALUES(1, 2);")
 ---
-- error: 'Check constraint failed ''conflict'': X>10'
+- null
+- 'Check constraint failed ''conflict'': X>10'
 ...
 box.execute("INSERT INTO \"test\" VALUES(11, 11);")
 ---
-- error: 'Check constraint failed ''physics'': X<Y'
+- null
+- 'Check constraint failed ''physics'': X<Y'
 ...
 box.execute("INSERT INTO \"test\" VALUES(12, 11);")
 ---
@@ -249,7 +259,8 @@ s:drop()
 ...
 box.execute("CREATE TABLE T2(ID INT PRIMARY KEY, CONSTRAINT CK1 CHECK(ID > 0), CONSTRAINT CK1 CHECK(ID < 0))")
 ---
-- error: Constraint CK1 already exists
+- null
+- Constraint CK1 already exists
 ...
 box.space.T2
 ---
@@ -264,20 +275,23 @@ box.space._ck_constraint:select()
 --
 box.execute("CREATE TABLE w2 (s1 INT PRIMARY KEY, CHECK ((SELECT COUNT(*) FROM w2) = 0));")
 ---
-- error: 'Failed to create check constraint ''CK_CONSTRAINT_1_W2'': Subqueries are
-    prohibited in a ck constraint definition'
+- null
+- 'Failed to create check constraint ''CK_CONSTRAINT_1_W2'': Subqueries are prohibited
+  in a ck constraint definition'
 ...
 box.execute("DROP TABLE w2;")
 ---
-- error: Space 'W2' does not exist
+- null
+- Space 'W2' does not exist
 ...
 --
 -- gh-3653: Dissallow bindings for DDL
 --
 box.execute("CREATE TABLE t5(x INT PRIMARY KEY, y INT, CHECK( x*y < ? ));")
 ---
-- error: 'Failed to create check constraint ''CK_CONSTRAINT_1_T5'': bindings are not
-    allowed in DDL'
+- null
+- 'Failed to create check constraint ''CK_CONSTRAINT_1_T5'': bindings are not allowed
+  in DDL'
 ...
 -- Test trim CK constraint code correctness.
 box.execute("CREATE TABLE t1(x TEXT PRIMARY KEY CHECK(x    LIKE     '1  a'))")
@@ -290,11 +304,13 @@ box.space._ck_constraint:select()[1].code
 ...
 box.execute("INSERT INTO t1 VALUES('1 a')")
 ---
-- error: 'Check constraint failed ''CK_CONSTRAINT_1_T1'': x LIKE ''1  a'''
+- null
+- 'Check constraint failed ''CK_CONSTRAINT_1_T1'': x LIKE ''1  a'''
 ...
 box.execute("INSERT INTO t1 VALUES('1   a')")
 ---
-- error: 'Check constraint failed ''CK_CONSTRAINT_1_T1'': x LIKE ''1  a'''
+- null
+- 'Check constraint failed ''CK_CONSTRAINT_1_T1'': x LIKE ''1  a'''
 ...
 box.execute("INSERT INTO t1 VALUES('1  a')")
 ---

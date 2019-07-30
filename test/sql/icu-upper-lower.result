@@ -276,13 +276,16 @@ test_run:cmd("setopt delimiter ''");
 -- Bad test cases
 box.execute("select upper('1', 2)")
 ---
-- error: wrong number of arguments to function UPPER()
+- null
+- wrong number of arguments to function UPPER()
 ...
 box.execute("select upper(\"1\")")
 ---
-- error: Can’t resolve field '1'
+- null
+- Can’t resolve field '1'
 ...
 box.execute("select upper()")
 ---
-- error: wrong number of arguments to function UPPER()
+- null
+- wrong number of arguments to function UPPER()
 ...

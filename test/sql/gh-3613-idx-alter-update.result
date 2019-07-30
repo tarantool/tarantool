@@ -33,7 +33,8 @@ box.snapshot()
 test_run:cmd('restart server default')
 box.execute('DROP INDEX i ON j3')
 ---
-- error: No index 'I' is defined in space 'J3'
+- null
+- No index 'I' is defined in space 'J3'
 ...
 box.execute('CREATE INDEX i ON j3 (s1)')
 ---

@@ -57,7 +57,8 @@ box.execute("DROP TABLE t1;");
 --
 box.execute("DELETE FROM t1;")
 ---
-- error: Space 'T1' does not exist
+- null
+- Space 'T1' does not exist
 ...
 box.execute("CREATE TABLE t2 (s1 INT PRIMARY KEY);")
 ---
@@ -69,7 +70,8 @@ box.execute("CREATE TRIGGER t2 BEFORE INSERT ON t2 FOR EACH ROW BEGIN DELETE FRO
 ...
 box.execute("INSERT INTO t2 VALUES (0);")
 ---
-- error: Space 'T1' does not exist
+- null
+- Space 'T1' does not exist
 ...
 box.execute("DROP TABLE t2;")
 ---
@@ -81,7 +83,8 @@ box.execute("DROP TABLE t2;")
 -- can't truncate system table.
 box.execute("TRUNCATE TABLE \"_fk_constraint\";")
 ---
-- error: Can't truncate a system space, space '_fk_constraint'
+- null
+- Can't truncate a system space, space '_fk_constraint'
 ...
 box.execute("CREATE TABLE t1(id INT PRIMARY KEY, a INT, b TEXT);")
 ---
@@ -128,8 +131,9 @@ box.execute("CREATE VIEW v1 AS SELECT * FROM t1;")
 ...
 box.execute("TRUNCATE TABLE v1;")
 ---
-- error: 'Failed to execute SQL statement: can not truncate space ''V1'' because space
-    is a view'
+- null
+- 'Failed to execute SQL statement: can not truncate space ''V1'' because space is
+  a view'
 ...
 -- Can't truncate table with FK.
 box.execute("CREATE TABLE t2(x INT PRIMARY KEY REFERENCES t1(id));")
@@ -138,8 +142,9 @@ box.execute("CREATE TABLE t2(x INT PRIMARY KEY REFERENCES t1(id));")
 ...
 box.execute("TRUNCATE TABLE t1;")
 ---
-- error: 'Failed to execute SQL statement: can not truncate space ''T1'' because other
-    objects depend on it'
+- null
+- 'Failed to execute SQL statement: can not truncate space ''T1'' because other objects
+  depend on it'
 ...
 -- Table triggers should be ignored.
 box.execute("DROP TABLE t2;")

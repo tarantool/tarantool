@@ -31,7 +31,8 @@ box.execute("INSERT INTO foobar VALUES (1000, 'foobar')")
 ...
 box.execute("INSERT INTO foobar VALUES (1, 'duplicate')")
 ---
-- error: Duplicate key exists in unique index 'pk_unnamed_FOOBAR_1' in space 'FOOBAR'
+- null
+- Duplicate key exists in unique index 'pk_unnamed_FOOBAR_1' in space 'FOOBAR'
 ...
 -- simple select
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
@@ -369,7 +370,8 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
 -- ... functional
 box.execute("INSERT INTO foobar VALUES ('foobar trigger test', 8888)")
 ---
-- error: 'Type mismatch: can not convert foobar trigger test to integer'
+- null
+- 'Type mismatch: can not convert foobar trigger test to integer'
 ...
 box.execute("SELECT * FROM barfoo WHERE foo = 9999");
 ---
@@ -400,7 +402,8 @@ box.execute("DROP TRIGGER tfoobar")
 -- Should error
 box.execute("DROP TRIGGER tfoobar")
 ---
-- error: Trigger 'TFOOBAR' doesn't exist
+- null
+- Trigger 'TFOOBAR' doesn't exist
 ...
 -- Should be empty
 box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
@@ -415,7 +418,8 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
 -- prove barfoo2 still exists
 box.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")
 ---
-- error: Duplicate key exists in unique index 'pk_unnamed_BARFOO_1' in space 'BARFOO'
+- null
+- Duplicate key exists in unique index 'pk_unnamed_BARFOO_1' in space 'BARFOO'
 ...
 box.execute("SELECT * FROM barfoo")
 ---

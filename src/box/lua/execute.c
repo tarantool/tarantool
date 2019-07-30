@@ -255,12 +255,12 @@ lbox_execute(struct lua_State *L)
 			return luaL_error(L, "Second argument must be a table");
 		bind_count = lua_sql_bind_list_decode(L, &bind, 2);
 		if (bind_count < 0)
-			return luaT_error(L);
+			return luaT_push_nil_and_error(L);
 	}
 
 	if (sql_prepare_and_execute(sql, length, bind, bind_count, &port,
 				    &fiber()->gc) != 0)
-		return luaT_error(L);
+		return luaT_push_nil_and_error(L);
 	port_dump_lua(&port, L, false);
 	port_destroy(&port);
 	return 1;

@@ -19,7 +19,10 @@ box.execute('CREATE TABLE child(id INT PRIMARY KEY, x INT REFERENCES parent(y) D
 fk_violation_1 = function()
     box.begin()
     box.execute('INSERT INTO child VALUES (1, 1);')
-    box.execute('COMMIT;')
+    local _, err = box.execute('COMMIT;')
+    if err ~= nil then
+        return err
+    end
 end;
 fk_violation_1();
 box.space.CHILD:select();
@@ -49,7 +52,10 @@ box.execute('CREATE TABLE child(id INT PRIMARY KEY, x INT REFERENCES parent(y))'
 
 fk_defer = function()
     box.begin()
-    box.execute('INSERT INTO child VALUES (1, 2);')
+    local _, err = box.execute('INSERT INTO child VALUES (1, 2);')
+    if err ~= nil then
+        return err
+    end
     box.execute('INSERT INTO parent VALUES (2, 2);')
     box.commit()
 end;

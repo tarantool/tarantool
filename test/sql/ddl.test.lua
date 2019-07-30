@@ -42,10 +42,10 @@ box.space.T1:replace{5, 5, 5}
 box.snapshot()
 
 test_run:cmd("setopt delimiter ';'")
-box.begin()
-box.execute('CREATE TABLE t2(id INTEGER PRIMARY KEY)')
-box.execute('CREATE INDEX t1a ON t1(a)')
-box.execute('CREATE INDEX t1b ON t1(b)')
+box.begin(),
+box.execute('CREATE TABLE t2(id INTEGER PRIMARY KEY)') or box.error(),
+box.execute('CREATE INDEX t1a ON t1(a)') or box.error(),
+box.execute('CREATE INDEX t1b ON t1(b)') or box.error(),
 box.commit();
 test_run:cmd("setopt delimiter ''");
 box.rollback()
@@ -140,7 +140,7 @@ function monster_ddl()
 
     box.execute('ALTER TABLE t1 ADD CONSTRAINT ck1 CHECK(b > 0);')
 
-    _, err1 = pcall(box.execute, 'ALTER TABLE t_to_rename RENAME TO t1;')
+    _, err1 = box.execute('ALTER TABLE t_to_rename RENAME TO t1;')
 
     box.execute('ALTER TABLE t1 ADD CONSTRAINT ck2 CHECK(a > 0);')
     box.space.T1.ck_constraint.CK1:drop()
@@ -149,7 +149,7 @@ function monster_ddl()
                   (a) REFERENCES t2(b);]])
     box.execute('ALTER TABLE t1 DROP CONSTRAINT fk1;')
 
-    _, err2 = pcall(box.execute, 'CREATE TABLE t1(id INTEGER PRIMARY KEY);')
+    _, err2 = box.execute('CREATE TABLE t1(id INTEGER PRIMARY KEY);')
 
     box.execute([[ALTER TABLE t1 ADD CONSTRAINT fk1 FOREIGN KEY
                   (a) REFERENCES t2(b);]])
@@ -166,18 +166,18 @@ function monster_ddl()
                       INSERT INTO trigger_catcher VALUES(1);
                   END; ]])
 
-    _, err3 = pcall(box.execute, 'DROP TABLE t3;')
+    _, err3 = box.execute('DROP TABLE t3;')
 
     box.execute([[CREATE TRIGGER t2t AFTER INSERT ON t2 FOR EACH ROW
                   BEGIN
                       INSERT INTO trigger_catcher VALUES(1);
                   END; ]])
 
-    _, err4 = pcall(box.execute, 'CREATE INDEX t1a ON t1(a, b);')
+    _, err4 = box.execute('CREATE INDEX t1a ON t1(a, b);')
 
     box.execute('TRUNCATE TABLE t1;')
-    _, err5 = pcall(box.execute, 'TRUNCATE TABLE t2;')
-    _, err6 = pcall(box.execute, 'TRUNCATE TABLE t_does_not_exist;')
+    _, err5 = box.execute('TRUNCATE TABLE t2;')
+    _, err6 = box.execute('TRUNCATE TABLE t_does_not_exist;')
 
     box.execute('DROP TRIGGER t2t;')
 
@@ -201,11 +201,11 @@ function monster_ddl_is_clean()
 end$
 function monster_ddl_check()
     local _, err1, err2, err3, err4, res
-    _, err1 = pcall(box.execute, 'INSERT INTO t2 VALUES (1, 1, 101)')
+    _, err1 = box.execute('INSERT INTO t2 VALUES (1, 1, 101)')
     box.execute('INSERT INTO t2 VALUES (1, 1, 1)')
-    _, err2 = pcall(box.execute, 'INSERT INTO t2 VALUES(2, 2, 1)')
-    _, err3 = pcall(box.execute, 'INSERT INTO t1 VALUES(1, 20, 1)')
-    _, err4 = pcall(box.execute, 'INSERT INTO t1 VALUES(1, -1, 1)')
+    _, err2 = box.execute('INSERT INTO t2 VALUES(2, 2, 1)')
+    _, err3 = box.execute('INSERT INTO t1 VALUES(1, 20, 1)')
+    _, err4 = box.execute('INSERT INTO t1 VALUES(1, -1, 1)')
     box.execute('INSERT INTO t1 VALUES (1, 1, 1)')
     res = box.execute('SELECT * FROM trigger_catcher')
     assert(box.space.T_RENAMED ~= nil)
@@ -217,7 +217,7 @@ end$
 function monster_ddl_clear()
     box.execute('DROP TRIGGER IF EXISTS t1t;')
     box.execute('DROP TABLE IF EXISTS trigger_catcher;')
-    pcall(box.execute, 'ALTER TABLE t1 DROP CONSTRAINT fk1;')
+    box.execute('ALTER TABLE t1 DROP CONSTRAINT fk1;')
     box.execute('DROP TABLE IF EXISTS t2')
     box.execute('DROP TABLE IF EXISTS t1')
     box.execute('DROP TABLE IF EXISTS t_renamed')

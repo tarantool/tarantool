@@ -15,7 +15,13 @@ if remote then
 	cn = netbox.connect(box.cfg.listen)
 	execute = function(...) return cn:execute(...) end
 else
-	execute = box.execute
+	execute = function(...)
+		local res, err = box.execute(...)
+		if err ~= nil then
+			error(err)
+		end
+		return res
+	end
 end;
 test_run:cmd("setopt delimiter ''");
 --

@@ -272,7 +272,8 @@ box.execute("SELECT ROW_COUNT();")
 ...
 box.execute("COMMIT;")
 ---
-- error: 'Failed to execute SQL statement: cannot commit - no transaction is active'
+- null
+- 'Failed to execute SQL statement: cannot commit - no transaction is active'
 ...
 box.execute("SELECT ROW_COUNT();")
 ---

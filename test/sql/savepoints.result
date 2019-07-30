@@ -14,15 +14,18 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 --
 box.execute('SAVEPOINT t1;');
 ---
-- error: No active transaction
+- null
+- No active transaction
 ...
 box.execute('RELEASE SAVEPOINT t1;');
 ---
-- error: No active transaction
+- null
+- No active transaction
 ...
 box.execute('ROLLBACK TO SAVEPOINT t1;');
 ---
-- error: No active transaction
+- null
+- No active transaction
 ...
 box.begin() box.execute('SAVEPOINT t1;') box.execute('RELEASE SAVEPOINT t1;') box.commit();
 ---
@@ -61,13 +64,16 @@ release_sv_fail = function()
     box.execute('SAVEPOINT t2;')
     box.execute('RELEASE SAVEPOINT t2;')
     box.execute('RELEASE SAVEPOINT t1;')
-    box.execute('ROLLBACK TO t1;')
+    local _, err = box.execute('ROLLBACK TO t1;')
+    if err ~= nil then
+        return err
+    end
 end;
 ---
 ...
 release_sv_fail();
 ---
-- error: 'Can not rollback to savepoint: the savepoint does not exist'
+- 'Can not rollback to savepoint: the savepoint does not exist'
 ...
 box.commit();
 ---
