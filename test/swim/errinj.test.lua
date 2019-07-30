@@ -26,6 +26,7 @@ s1:self():incarnation()
 errinj.set("ERRINJ_SWIM_FD_ONLY", true)
 s1:probe_member(s2:self():uri())
 errinj.set("ERRINJ_SWIM_FD_ONLY", false)
+while s1_view:incarnation().version ~= 2 do fiber.sleep(0.01) end
 s1_view:payload()
 s1_view:incarnation()
 
