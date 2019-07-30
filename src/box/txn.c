@@ -84,10 +84,10 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 
 /** Initialize a new stmt object within txn. */
 static struct txn_stmt *
-txn_stmt_new(struct txn *txn)
+txn_stmt_new(struct region *region)
 {
 	struct txn_stmt *stmt;
-	stmt = region_alloc_object(&txn->region, struct txn_stmt);
+	stmt = region_alloc_object(region, struct txn_stmt);
 	if (stmt == NULL) {
 		diag_set(OutOfMemory, sizeof(*stmt),
 			 "region", "struct txn_stmt");
@@ -100,12 +100,6 @@ txn_stmt_new(struct txn *txn)
 	stmt->new_tuple = NULL;
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
-
-	/* Set the savepoint for statement rollback. */
-	txn->sub_stmt_begin[txn->in_sub_stmt] = stailq_last(&txn->stmts);
-	txn->in_sub_stmt++;
-
-	stailq_add_tail_entry(&txn->stmts, stmt, next);
 	return stmt;
 }
 
@@ -246,9 +240,15 @@ txn_begin_stmt(struct txn *txn, struct space *space)
 		diag_set(ClientError, ER_SUB_STMT_MAX);
 		return -1;
 	}
-	struct txn_stmt *stmt = txn_stmt_new(txn);
+	struct txn_stmt *stmt = txn_stmt_new(&txn->region);
 	if (stmt == NULL)
 		return -1;
+
+	/* Set the savepoint for statement rollback. */
+	txn->sub_stmt_begin[txn->in_sub_stmt] = stailq_last(&txn->stmts);
+	txn->in_sub_stmt++;
+	stailq_add_tail_entry(&txn->stmts, stmt, next);
+
 	if (space == NULL)
 		return 0;
 
