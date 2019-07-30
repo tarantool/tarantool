@@ -29,7 +29,7 @@ cn.space.tweedledum:select() --small request
 box.stat.net.SENT.total > 0
 box.stat.net.RECEIVED.total > 0
 box.stat.net.CONNECTIONS.total
-box.stat.net.REQUESTS.total
+box.stat.net.REQUESTS.total > 0
 box.stat.net.CONNECTIONS.current
 box.stat.net.REQUESTS.current
 
@@ -41,6 +41,7 @@ test_run:wait_cond(function() return box.stat.net.CONNECTIONS.current == 2 end, 
 cn3:close()
 test_run:wait_cond(function() return box.stat.net.CONNECTIONS.current == 1 end, WAIT_COND_TIMEOUT)
 
+requests_total_saved = box.stat.net.REQUESTS.total
 future1 = cn:call('tweedledee', {}, {is_async = true})
 test_run:wait_cond(function() return box.stat.net.REQUESTS.current == 1 end, WAIT_COND_TIMEOUT)
 future2 = cn:call('tweedledee', {}, {is_async = true})
@@ -50,7 +51,7 @@ ch:put(true)
 future1:wait_result()
 future2:wait_result()
 test_run:wait_cond(function() return box.stat.net.REQUESTS.current == 0 end, WAIT_COND_TIMEOUT)
-box.stat.net.REQUESTS.total
+box.stat.net.REQUESTS.total - requests_total_saved == 2
 
 -- reset
 box.stat.reset()

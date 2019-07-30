@@ -84,6 +84,14 @@ local function decode_push(raw_data)
     return response[IPROTO_DATA_KEY][1], raw_end
 end
 
+local function version_id(major, minor, patch)
+    return bit.bor(bit.lshift(major, 16), bit.lshift(minor, 8), patch)
+end
+
+local function version_at_least(peer_version_id, major, minor, patch)
+    return peer_version_id >= version_id(major, minor, patch)
+end
+
 local method_encoder = {
     ping    = internal.encode_ping,
     call_16 = internal.encode_call_16,
@@ -735,17 +743,23 @@ local function create_transport(host, port, user, password, callback,
             set_state('active')
             return iproto_sm(schema_version)
         end
+        -- _vcollation view was added in 2.2.0-389-g3e3ef182f
+        local peer_has_vcollation = version_at_least(greeting.version_id,
+                                                     2, 2, 1)
         local select1_id = new_request_id()
         local select2_id = new_request_id()
-        local select3_id = new_request_id()
+        local select3_id
         local response = {}
         -- fetch everything from space _vspace, 2 = ITER_ALL
         encode_select(send_buf, select1_id, VSPACE_ID, 0, 2, 0, 0xFFFFFFFF, nil)
         -- fetch everything from space _vindex, 2 = ITER_ALL
         encode_select(send_buf, select2_id, VINDEX_ID, 0, 2, 0, 0xFFFFFFFF, nil)
         -- fetch everything from space _vcollation, 2 = ITER_ALL
-        encode_select(send_buf, select3_id, VCOLLATION_ID, 0, 2, 0, 0xFFFFFFFF,
-                      nil)
+        if peer_has_vcollation then
+            select3_id = new_request_id()
+            encode_select(send_buf, select3_id, VCOLLATION_ID, 0, 2, 0,
+                          0xFFFFFFFF, nil)
+        end
 
         schema_version = nil -- any schema_version will do provided that
                              -- it is consistent across responses
@@ -754,6 +768,8 @@ local function create_transport(host, port, user, password, callback,
             if err then return error_sm(err, hdr) end
             dispatch_response_iproto(hdr, body_rpos, body_end)
             local id = hdr[IPROTO_SYNC_KEY]
+            -- trick: omit check for peer_has_vcollation: id is
+            -- not nil
             if id == select1_id or id == select2_id or id == select3_id then
                 -- response to a schema query we've submitted
                 local status = hdr[IPROTO_STATUS_KEY]
@@ -774,9 +790,10 @@ local function create_transport(host, port, user, password, callback,
                 response[id] = body[IPROTO_DATA_KEY]
             end
         until response[select1_id] and response[select2_id] and
-              response[select3_id]
+              (not peer_has_vcollation or response[select3_id])
+        -- trick: response[select3_id] is nil when the key is nil
         callback('did_fetch_schema', schema_version, response[select1_id],
-                 response[select2_id],response[select3_id])
+                 response[select2_id], response[select3_id])
         set_state('active')
         return iproto_sm(schema_version)
     end
@@ -1269,17 +1286,23 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
                 local pkcollationid = index[PARTS][k].collation
                 local pktype = index[PARTS][k][2] or index[PARTS][k].type
                 local pkfield = index[PARTS][k][1] or index[PARTS][k].field
+                -- resolve a collation name if a peer has
+                -- _vcollation view
                 local pkcollation = nil
-                if pkcollationid ~= nil then
+                if pkcollationid ~= nil and collations ~= nil then
                     pkcollation = collations[pkcollationid + 1][2]
                 end
 
                 local pk = {
                     type = pktype,
                     fieldno = pkfield + 1,
-                    collation = pkcollation,
                     is_nullable = pknullable
                 }
+                if collations == nil then
+                    pk.collation_id = pkcollationid
+                else
+                    pk.collation = pkcollation
+                end
                 idx.parts[k] = pk
             end
             idx.unique = not not index[OPTS].unique

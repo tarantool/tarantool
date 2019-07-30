@@ -83,9 +83,9 @@ box.stat.net.CONNECTIONS.total
 ---
 - 4
 ...
-box.stat.net.REQUESTS.total
+box.stat.net.REQUESTS.total > 0
 ---
-- 17
+- true
 ...
 box.stat.net.CONNECTIONS.current
 ---
@@ -114,6 +114,9 @@ cn3:close()
 test_run:wait_cond(function() return box.stat.net.CONNECTIONS.current == 1 end, WAIT_COND_TIMEOUT)
 ---
 - true
+...
+requests_total_saved = box.stat.net.REQUESTS.total
+---
 ...
 future1 = cn:call('tweedledee', {}, {is_async = true})
 ---
@@ -149,9 +152,9 @@ test_run:wait_cond(function() return box.stat.net.REQUESTS.current == 0 end, WAI
 ---
 - true
 ...
-box.stat.net.REQUESTS.total
+box.stat.net.REQUESTS.total - requests_total_saved == 2
 ---
-- 19
+- true
 ...
 -- reset
 box.stat.reset()
