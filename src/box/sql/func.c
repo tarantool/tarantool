@@ -869,32 +869,6 @@ sql_utf8_pattern_compare(const char *pattern,
 }
 
 /**
- * Compare two UTF-8 strings for equality using case sensitive
- * sql_utf8_pattern_compare.
- */
-int
-sql_strlike_cs(const char *zPattern, const char *zStr, unsigned int esc)
-{
-	struct coll_id *p = coll_by_name("unicode", strlen("unicode"));
-	return sql_utf8_pattern_compare(zPattern, zStr,
-		                        zPattern + strlen(zPattern),
-		                        zStr + strlen(zStr), p->coll, esc);
-}
-
-/**
- * Compare two UTF-8 strings for equality using case insensitive
- * sql_utf8_pattern_compare.
- */
-int
-sql_strlike_ci(const char *zPattern, const char *zStr, unsigned int esc)
-{
-	struct coll_id *p = coll_by_name("unicode_ci", strlen("unicode_ci"));
-	return sql_utf8_pattern_compare(zPattern, zStr,
-		                        zPattern + strlen(zPattern),
-		                        zStr + strlen(zStr), p->coll, esc);
-}
-
-/**
  * Implementation of the like() SQL function. This function
  * implements the built-in LIKE operator. The first argument to
  * the function is the pattern and the second argument is the

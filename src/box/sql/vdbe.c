@@ -736,9 +736,6 @@ int sqlVdbeExec(Vdbe *p)
 #if defined(SQL_DEBUG) || defined(VDBE_PROFILE)
 	Op *pOrigOp;               /* Value of pOp at the top of the loop */
 #endif
-#ifdef SQL_DEBUG
-	int nExtraDelete = 0;      /* Verifies FORDELETE and AUXDELETE flags */
-#endif
 	int rc = 0;        /* Value to return */
 	sql *db = p->db;       /* The database */
 	int iCompare = 0;          /* Result of last comparison */
@@ -5295,9 +5292,6 @@ abort_due_to_error:
 vdbe_return:
 	testcase( nVmStep>0);
 	p->aCounter[SQL_STMTSTATUS_VM_STEP] += (int)nVmStep;
-	assert(rc != 0 || nExtraDelete == 0
-		|| sql_strlike_ci("DELETE%", p->zSql, 0) != 0
-		);
 	assert(rc == 0 || rc == -1 || rc == SQL_ROW || rc == SQL_DONE);
 	return rc;
 

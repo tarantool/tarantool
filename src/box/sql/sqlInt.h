@@ -443,12 +443,6 @@ sql_vsnprintf(int, char *, const char *, va_list);
 #define MATCH_ONE_WILDCARD '_'
 #define MATCH_ALL_WILDCARD '%'
 
-int
-sql_strlike_cs(const char *zLike, const char *zStr, unsigned int cEsc);
-
-int
-sql_strlike_ci(const char *zLike, const char *zStr, unsigned int cEsc);
-
 typedef void (*sql_destructor_type) (void *);
 #define SQL_STATIC      ((sql_destructor_type)0)
 #define SQL_TRANSIENT   ((sql_destructor_type)-1)
