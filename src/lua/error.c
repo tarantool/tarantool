@@ -104,6 +104,16 @@ luaT_error(lua_State *L)
 	return 0;
 }
 
+int
+luaT_push_nil_and_error(lua_State *L)
+{
+	struct error *e = diag_last_error(&fiber()->diag);
+	assert(e != NULL);
+	lua_pushnil(L);
+	luaT_pusherror(L, e);
+	return 2;
+}
+
 void
 tarantool_lua_error_init(struct lua_State *L)
 {

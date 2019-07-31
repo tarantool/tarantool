@@ -395,14 +395,10 @@ lbox_session_push(struct lua_State *L)
 	}
 	struct port port;
 	port_lua_create(&port, L);
-	if (session_push(session, sync, &port) != 0) {
-		lua_pushnil(L);
-		luaT_pusherror(L, box_error_last());
-		return 2;
-	} else {
-		lua_pushboolean(L, true);
-		return 1;
-	}
+	if (session_push(session, sync, &port) != 0)
+		return luaT_push_nil_and_error(L);
+	lua_pushboolean(L, true);
+	return 1;
 }
 
 /**

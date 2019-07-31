@@ -49,6 +49,15 @@ struct error;
 LUA_API int
 luaT_error(lua_State *L);
 
+/**
+ * Return nil as the first return value and an error as the
+ * second. The error is received using box_error_last().
+ *
+ * @param L Lua stack.
+ */
+LUA_API int
+luaT_push_nil_and_error(lua_State *L);
+
 void
 luaT_pusherror(struct lua_State *L, struct error *e);
 /** \endcond public */

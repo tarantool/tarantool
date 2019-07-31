@@ -47,12 +47,10 @@
 #include "lua/utils.h"
 #include "coio_file.h"
 
-static inline void
-lbox_fio_pushsyserror(struct lua_State *L)
-{
-	diag_set(SystemError, "fio: %s", strerror(errno));
-	luaT_pusherror(L, diag_get()->last);
-}
+#define lbox_fio_pushsyserror(L) ({				\
+	diag_set(SystemError, "fio: %s", strerror(errno));	\
+	luaT_push_nil_and_error(L);				\
+})
 
 static int
 lbox_fio_open(struct lua_State *L)
@@ -69,11 +67,8 @@ usage:
 	int mode = lua_tointeger(L, 3);
 
 	int fh = coio_file_open(pathname, flags, mode);
-	if (fh < 0) {
-		lua_pushnil(L);
-		lbox_fio_pushsyserror(L);
-		return 2;
-	}
+	if (fh < 0)
+		return lbox_fio_pushsyserror(L);
 	lua_pushinteger(L, fh);
 	return 1;
 }
@@ -90,11 +85,8 @@ lbox_fio_pwrite(struct lua_State *L)
 	size_t offset = lua_tonumber(L, 4);
 
 	int res = coio_pwrite(fh, buf, len, offset);
-	if (res < 0) {
-		lua_pushnil(L);
-		lbox_fio_pushsyserror(L);
-		return 2;
-	}
+	if (res < 0)
+		return lbox_fio_pushsyserror(L);
 	lua_pushinteger(L, res);
 	return 1;
 }
@@ -115,11 +107,8 @@ lbox_fio_pread(struct lua_State *L)
 
 	int res = coio_pread(fh, buf, len, offset);
 
-	if (res < 0) {
-		lua_pushnil(L);
-		lbox_fio_pushsyserror(L);
-		return 2;
-	}
+	if (res < 0)
+		return lbox_fio_pushsyserror(L);
 	lua_pushinteger(L, res);
 	return 1;
 }
@@ -129,7 +118,10 @@ lbox_fio_pushbool(struct lua_State *L, bool res)
 {
 	lua_pushboolean(L, res);
 	if (!res) {
-		lbox_fio_pushsyserror(L);
+		diag_set(SystemError, "fio: %s", strerror(errno));
+		struct error *e = diag_last_error(diag_get());
+		assert(e != NULL);
+		luaT_pusherror(L, e);
 		return 2;
 	}
 	return 1;
@@ -211,11 +203,8 @@ lbox_fio_write(struct lua_State *L)
 	size_t len = lua_tonumber(L, 3);
 
 	int res = coio_write(fh, buf, len);
-	if (res < 0) {
-		lua_pushnil(L);
-		lbox_fio_pushsyserror(L);
-		return 2;
-	}
+	if (res < 0)
+		return lbox_fio_pushsyserror(L);
 	lua_pushinteger(L, res);
 	return 1;
 }
@@ -298,11 +287,8 @@ lbox_fio_read(struct lua_State *L)
 
 	int res = coio_read(fh, buf, len);
 
-	if (res < 0) {
-		lua_pushnil(L);
-		lbox_fio_pushsyserror(L);
-		return 2;
-	}
+	if (res < 0)
+		return lbox_fio_pushsyserror(L);
 	lua_pushinteger(L, res);
 	return 1;
 }
@@ -371,11 +357,8 @@ DEF_STAT_METHOD(is_sock, S_ISSOCK);
 static int
 lbox_fio_pushstat(struct lua_State *L, int res, const struct stat *stat)
 {
-	if (res < 0) {
-		lua_pushnil(L);
-		lbox_fio_pushsyserror(L);
-		return 2;
-	}
+	if (res < 0)
+		return lbox_fio_pushsyserror(L);
 	lua_newtable(L);
 
 	PUSHTABLE("dev", lua_pushinteger, stat->st_dev);
@@ -518,11 +501,8 @@ lbox_fio_listdir(struct lua_State *L)
 	}
 	pathname = lua_tostring(L, 1);
 	char *buf;
-	if (coio_readdir(pathname, &buf) < 0) {
-		lua_pushnil(L);
-		lbox_fio_pushsyserror(L);
-		return 2;
-	}
+	if (coio_readdir(pathname, &buf) < 0)
+		return lbox_fio_pushsyserror(L);
 	lua_pushstring(L, buf);
 	free(buf);
 	return 1;
@@ -613,11 +593,8 @@ usage:
 		goto usage;
 	char *path = (char *)lua_newuserdata(L, PATH_MAX);
 	int res = coio_readlink(pathname, path, PATH_MAX);
-	if (res < 0) {
-		lua_pushnil(L);
-		lbox_fio_pushsyserror(L);
-		return 2;
-	}
+	if (res < 0)
+		return lbox_fio_pushsyserror(L);
 	lua_pushlstring(L, path, res);
 	lua_remove(L, -2);
 	return 1;
@@ -629,16 +606,11 @@ lbox_fio_tempdir(struct lua_State *L)
 	char *buf = (char *)lua_newuserdata(L, PATH_MAX);
 	if (!buf) {
 		errno = ENOMEM;
-		lua_pushnil(L);
-		lbox_fio_pushsyserror(L);
-		return 2;
+		return lbox_fio_pushsyserror(L);
 	}
 
-	if (coio_tempdir(buf, PATH_MAX) != 0) {
-		lua_pushnil(L);
-		lbox_fio_pushsyserror(L);
-		return 2;
-	}
+	if (coio_tempdir(buf, PATH_MAX) != 0)
+		return lbox_fio_pushsyserror(L);
 	lua_pushstring(L, buf);
 	lua_remove(L, -2);
 	return 1;
@@ -650,20 +622,12 @@ lbox_fio_cwd(struct lua_State *L)
 	char *buf = (char *)lua_newuserdata(L, PATH_MAX);
 	if (!buf) {
 		errno = ENOMEM;
-		lua_pushnil(L);
-		lbox_fio_pushsyserror(L);
-		return 2;
+		return lbox_fio_pushsyserror(L);
 	}
-
-
-	if (getcwd(buf, PATH_MAX)) {
-		lua_pushstring(L, buf);
-		lua_remove(L, -2);
-	} else {
-		lbox_fio_pushsyserror(L);
-		lua_pushnil(L);
-		return 2;
-	}
+	if (getcwd(buf, PATH_MAX) == NULL)
+		return lbox_fio_pushsyserror(L);
+	lua_pushstring(L, buf);
+	lua_remove(L, -2);
 	return 1;
 }
 
