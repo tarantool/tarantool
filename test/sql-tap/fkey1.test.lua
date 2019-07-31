@@ -217,7 +217,7 @@ test:do_catchsql_test(
         CREATE TABLE c1(a INT PRIMARY KEY REFERENCES p1(x));
     ]], {
         -- <fkey1-6.1>
-        1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_C1': referenced fields don't compose unique index"
+        1, "Failed to create foreign key constraint 'fk_unnamed_C1_1': referenced fields don't compose unique index"
         -- </fkey1-6.1>
     })
 

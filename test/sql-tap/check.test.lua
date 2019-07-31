@@ -55,7 +55,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(6,7, 2);
     ]], {
         -- <check-1.3>
-        1, "Check constraint failed 'CK_CONSTRAINT_1_T1': x<5"
+        1, "Check constraint failed 'ck_unnamed_T1_1': x<5"
         -- </check-1.3>
     })
 
@@ -75,7 +75,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(4,3, 2);
     ]], {
         -- <check-1.5>
-        1, "Check constraint failed 'CK_CONSTRAINT_2_T1': y>x"
+        1, "Check constraint failed 'ck_unnamed_T1_2': y>x"
         -- </check-1.5>
     })
 
@@ -147,7 +147,7 @@ test:do_catchsql_test(
         UPDATE t1 SET x=7 WHERE x==2
     ]], {
         -- <check-1.12>
-        1, "Check constraint failed 'CK_CONSTRAINT_1_T1': x<5"
+        1, "Check constraint failed 'ck_unnamed_T1_1': x<5"
         -- </check-1.12>
     })
 
@@ -167,7 +167,7 @@ test:do_catchsql_test(
         UPDATE t1 SET x=5 WHERE x==2
     ]], {
         -- <check-1.14>
-        1, "Check constraint failed 'CK_CONSTRAINT_1_T1': x<5"
+        1, "Check constraint failed 'ck_unnamed_T1_1': x<5"
         -- </check-1.14>
     })
 
@@ -320,7 +320,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-3.1>
-        1, "Failed to create check constraint 'CK_CONSTRAINT_1_T3': Subqueries are prohibited in a ck constraint definition"
+        1, "Failed to create check constraint 'ck_unnamed_T3_1': Subqueries are prohibited in a ck constraint definition"
         -- </check-3.1>
     })
 
@@ -345,7 +345,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-3.3>
-        1, "Failed to create check constraint 'CK_CONSTRAINT_1_T3': Can’t resolve field 'Q'"
+        1, "Failed to create check constraint 'ck_unnamed_T3_1': Can’t resolve field 'Q'"
         -- </check-3.3>
     })
 
@@ -369,7 +369,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-3.5>
-        1, "Failed to create check constraint 'CK_CONSTRAINT_1_T3': Field 'X' was not found in space 'T2' format"
+        1, "Failed to create check constraint 'ck_unnamed_T3_1': Field 'X' was not found in space 'T2' format"
         -- </check-3.5>
     })
 
@@ -414,7 +414,7 @@ test:do_catchsql_test(
         INSERT INTO t3 VALUES(111,222,333);
     ]], {
         -- <check-3.9>
-        1, "Check constraint failed 'CK_CONSTRAINT_1_T3': t3.x<25"
+        1, "Check constraint failed 'ck_unnamed_T3_1': t3.x<25"
         -- </check-3.9>
     })
 
@@ -485,7 +485,7 @@ test:do_catchsql_test(
         UPDATE t4 SET x=0, y=1;
     ]], {
         -- <check-4.6>
-        1, "Check constraint failed 'CK_CONSTRAINT_1_T4': x+y==11 OR x*y==12 OR x/y BETWEEN 5 AND 8 OR -x==y+10"
+        1, "Check constraint failed 'ck_unnamed_T4_1': x+y==11 OR x*y==12 OR x/y BETWEEN 5 AND 8 OR -x==y+10"
         -- </check-4.6>
     })
 
@@ -505,7 +505,7 @@ test:do_catchsql_test(
         UPDATE t4 SET x=0, y=2;
     ]], {
         -- <check-4.9>
-        1, "Check constraint failed 'CK_CONSTRAINT_1_T4': x+y==11 OR x*y==12 OR x/y BETWEEN 5 AND 8 OR -x==y+10"
+        1, "Check constraint failed 'ck_unnamed_T4_1': x+y==11 OR x*y==12 OR x/y BETWEEN 5 AND 8 OR -x==y+10"
         -- </check-4.9>
     })
 
@@ -517,7 +517,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-5.1>
-        1, "Failed to create check constraint 'CK_CONSTRAINT_1_T5': bindings are not allowed in DDL"
+        1, "Failed to create check constraint 'ck_unnamed_T5_1': bindings are not allowed in DDL"
         -- </check-5.1>
     })
 
@@ -529,7 +529,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-5.2>
-        1, "Failed to create check constraint 'CK_CONSTRAINT_1_T5': bindings are not allowed in DDL"
+        1, "Failed to create check constraint 'ck_unnamed_T5_1': bindings are not allowed in DDL"
         -- </check-5.2>
     })
 
@@ -582,7 +582,7 @@ test:do_catchsql_test(
         UPDATE OR FAIL t1 SET x=7-x, y=y+1;
     ]], {
         -- <check-6.5>
-        1, "Check constraint failed 'CK_CONSTRAINT_1_T1': x<5"
+        1, "Check constraint failed 'ck_unnamed_T1_1': x<5"
         -- </check-6.5>
     })
 
@@ -604,7 +604,7 @@ test:do_catchsql_test(
         INSERT OR ROLLBACK INTO t1 VALUES(8,40.0, 10);
     ]], {
         -- <check-6.7>
-        1, "Check constraint failed 'CK_CONSTRAINT_1_T1': x<5"
+        1, "Check constraint failed 'ck_unnamed_T1_1': x<5"
         -- </check-6.7>
     })
 
@@ -637,7 +637,7 @@ test:do_catchsql_test(
         REPLACE INTO t1 VALUES(6,7, 11);
     ]], {
         -- <check-6.12>
-        1, "Check constraint failed 'CK_CONSTRAINT_1_T1': x<5"
+        1, "Check constraint failed 'ck_unnamed_T1_1': x<5"
         -- </check-6.12>
     })
 
@@ -701,7 +701,7 @@ test:do_catchsql_test(
     7.3,
     " INSERT INTO t6 VALUES(11) ", {
         -- <7.3>
-        1, "Check constraint failed 'CK_CONSTRAINT_1_T6': myfunc(a)"
+        1, "Check constraint failed 'ck_unnamed_T6_1': myfunc(a)"
         -- </7.3>
     })
 

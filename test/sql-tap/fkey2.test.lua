@@ -362,7 +362,7 @@ test:do_catchsql_test(
         UPDATE ab SET a = 5;
     ]], {
         -- <fkey2-3.2>
-        1, "Check constraint failed 'CK_CONSTRAINT_1_EF': e!=5"
+        1, "Check constraint failed 'ck_unnamed_EF_1': e!=5"
         -- </fkey2-3.2>
     })
 
@@ -382,7 +382,7 @@ test:do_catchsql_test(
         UPDATE ab SET a = 5;
     ]], {
         -- <fkey2-3.4>
-        1, "Check constraint failed 'CK_CONSTRAINT_1_EF': e!=5"
+        1, "Check constraint failed 'ck_unnamed_EF_1': e!=5"
         -- </fkey2-3.4>
     })
 
@@ -722,7 +722,7 @@ test:do_catchsql_test(
         CREATE TABLE c(x INT PRIMARY KEY REFERENCES p(c));
     ]], {
         -- <fkey2-7.1>
-        1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_C': foreign key refers to nonexistent field C"
+        1, "Failed to create foreign key constraint 'fk_unnamed_C_1': foreign key refers to nonexistent field C"
         -- </fkey2-7.1>
     })
 
@@ -733,7 +733,7 @@ test:do_catchsql_test(
         CREATE TABLE c(x  INT PRIMARY KEY REFERENCES v(y));
     ]], {
         -- <fkey2-7.2>
-        1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_C': referenced space can't be VIEW"
+        1, "Failed to create foreign key constraint 'fk_unnamed_C_1': referenced space can't be VIEW"
         -- </fkey2-7.2>
     })
 
@@ -748,7 +748,7 @@ test:do_catchsql_test(
         CREATE TABLE c(x TEXT PRIMARY KEY REFERENCES p(a));
     ]], {
         -- <fkey2-7.3>
-        1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_C': field collation mismatch"
+        1, "Failed to create foreign key constraint 'fk_unnamed_C_1': field collation mismatch"
         -- </fkey2-7.3>
     })
 
@@ -761,7 +761,7 @@ test:do_catchsql_test(
         CREATE TABLE c(x INT PRIMARY KEY REFERENCES p);
     ]], {
         -- <fkey2-7.4>
-        1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_C': number of columns in foreign key does not match the number of columns in the primary index of referenced table"
+        1, "Failed to create foreign key constraint 'fk_unnamed_C_1': number of columns in foreign key does not match the number of columns in the primary index of referenced table"
         -- </fkey2-7.4>
     })
 
@@ -1100,7 +1100,7 @@ test:do_catchsql_test(
         CREATE TABLE cc(a  INT PRIMARY KEY, b INT , FOREIGN KEY(a, b) REFERENCES pp(x, z));
     ]], {
         -- <fkey2-10.14>
-        1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_CC': foreign key refers to nonexistent field Z"
+        1, "Failed to create foreign key constraint 'fk_unnamed_CC_1': foreign key refers to nonexistent field Z"
         -- </fkey2-10.14>
     })
 
@@ -1162,7 +1162,7 @@ test:do_catchsql_test(
         CREATE TABLE t1(x INT PRIMARY KEY REFERENCES v);
     ]], {
         -- <fkey2-10.20>
-        1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_T1': referenced space can't be VIEW"
+        1, "Failed to create foreign key constraint 'fk_unnamed_T1_1': referenced space can't be VIEW"
         -- </fkey2-10.20>
     })
 

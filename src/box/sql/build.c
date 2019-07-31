@@ -620,8 +620,7 @@ sql_create_check_contraint(struct Parse *parser)
 	} else {
 		assert(! is_alter);
 		uint32_t ck_idx = ++parser->create_table_def.check_count;
-		name = tt_sprintf("CK_CONSTRAINT_%d_%s", ck_idx,
-				  space->def->name);
+		name = tt_sprintf("ck_unnamed_%s_%d", space->def->name, ck_idx);
 	}
 	size_t name_len = strlen(name);
 
@@ -1857,9 +1856,9 @@ sql_create_foreign_key(struct Parse *parse_context)
 	if (!is_alter) {
 		if (create_def->name.n == 0) {
 			constraint_name =
-				sqlMPrintf(db, "FK_CONSTRAINT_%d_%s",
-					       ++table_def->fkey_count,
-					       space->def->name);
+				sqlMPrintf(db, "fk_unnamed_%s_%d",
+					   space->def->name,
+					   ++table_def->fkey_count);
 		} else {
 			constraint_name =
 				sql_name_from_token(db, &create_def->name);

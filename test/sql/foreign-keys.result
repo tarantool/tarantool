@@ -365,8 +365,7 @@ box.execute('SELECT row_count();')
 box.space._fk_constraint:select{}
 ---
 - - ['FK1', 518, 517, false, 'partial', 'cascade', 'set_null', [0], [0]]
-  - ['FK_CONSTRAINT_1_TC', 518, 517, false, 'full', 'set_null', 'no_action', [1],
-    [1]]
+  - ['fk_unnamed_TC_1', 518, 517, false, 'full', 'set_null', 'no_action', [1], [1]]
 ...
 box.execute('ALTER TABLE tc DROP CONSTRAINT fk1;')
 ---

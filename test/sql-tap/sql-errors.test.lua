@@ -112,7 +112,7 @@ test:do_catchsql_test(
 		CREATE TABLE t10(i INT PRIMARY KEY REFERENCES v0);
 	]], {
 		-- <sql-errors-1.10>
-		1,"Failed to create foreign key constraint 'FK_CONSTRAINT_1_T10': referenced space can't be VIEW"
+		1,"Failed to create foreign key constraint 'fk_unnamed_T10_1': referenced space can't be VIEW"
 		-- </sql-errors-1.10>
 	})
 
@@ -313,7 +313,7 @@ test:do_catchsql_test(
 		CREATE TABLE t27 (i INT PRIMARY KEY, CHECK(i < (SELECT * FROM t0)));
 	]], {
 		-- <sql-errors-1.27>
-		1,"Failed to create check constraint 'CK_CONSTRAINT_1_T27': Subqueries are prohibited in a ck constraint definition"
+		1,"Failed to create check constraint 'ck_unnamed_T27_1': Subqueries are prohibited in a ck constraint definition"
 		-- </sql-errors-1.27>
 	})
 
