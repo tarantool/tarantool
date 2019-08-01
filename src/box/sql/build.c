@@ -2381,22 +2381,17 @@ sql_create_index(struct Parse *parse) {
 		*/
 		assert(idx_type == SQL_INDEX_TYPE_CONSTRAINT_UNIQUE ||
 		       idx_type == SQL_INDEX_TYPE_CONSTRAINT_PK);
-		const char *prefix = NULL;
-		if (idx_type == SQL_INDEX_TYPE_CONSTRAINT_UNIQUE) {
-			prefix = constraint_name == NULL ?
-				"unique_unnamed_%s_%d" : "unique_%s_%d";
-		} else {
-			prefix = constraint_name == NULL ?
-				"pk_unnamed_%s_%d" : "pk_%s_%d";
-		}
 		uint32_t idx_count = space->index_count;
-		if (constraint_name == NULL ||
-		    strcmp(constraint_name, "") == 0) {
-			name = sqlMPrintf(db, prefix, def->name,
-					      idx_count + 1);
+		if (constraint_name == NULL) {
+			if (idx_type == SQL_INDEX_TYPE_CONSTRAINT_UNIQUE) {
+				name = sqlMPrintf(db, "unique_unnamed_%s_%d",
+						  def->name, idx_count + 1);
+			} else {
+				name = sqlMPrintf(db, "pk_unnamed_%s_%d",
+						  def->name, idx_count + 1);
+			}
 		} else {
-			name = sqlMPrintf(db, prefix,
-					      constraint_name, idx_count + 1);
+			name = sqlDbStrDup(db, constraint_name);
 		}
 		sqlDbFree(db, constraint_name);
 	}
