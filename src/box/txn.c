@@ -222,6 +222,7 @@ txn_begin()
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
 	txn->psql_txn = NULL;
+	txn->fk_deferred_count = 0;
 	txn->fiber = NULL;
 	fiber_set_txn(fiber(), txn);
 	/* fiber_on_yield is initialized by engine on demand */
@@ -537,12 +538,9 @@ txn_prepare(struct txn *txn)
 	 * foreign key constraints must not be violated.
 	 * If not so, just rollback transaction.
 	 */
-	if (txn->psql_txn != NULL) {
-		struct sql_txn *sql_txn = txn->psql_txn;
-		if (sql_txn->fk_deferred_count != 0) {
-			diag_set(ClientError, ER_FOREIGN_KEY_CONSTRAINT);
-			return -1;
-		}
+	if (txn->fk_deferred_count != 0) {
+		diag_set(ClientError, ER_FOREIGN_KEY_CONSTRAINT);
+		return -1;
 	}
 	/*
 	 * Perform transaction conflict resolution. Engine == NULL when
@@ -754,8 +752,7 @@ box_txn_savepoint()
 	}
 	svp->stmt = stailq_last(&txn->stmts);
 	svp->in_sub_stmt = txn->in_sub_stmt;
-	if (txn->psql_txn != NULL)
-		svp->fk_deferred_count = txn->psql_txn->fk_deferred_count;
+	svp->fk_deferred_count = txn->fk_deferred_count;
 	return svp;
 }
 
@@ -782,8 +779,7 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 		return -1;
 	}
 	txn_rollback_to_svp(txn, svp->stmt);
-	if (txn->psql_txn != NULL)
-		txn->psql_txn->fk_deferred_count = svp->fk_deferred_count;
+	txn->fk_deferred_count = svp->fk_deferred_count;
 	return 0;
 }
 

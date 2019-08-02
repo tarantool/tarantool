@@ -87,7 +87,6 @@ sql_alloc_txn()
 		return NULL;
 	}
 	txn->pSavepoint = NULL;
-	txn->fk_deferred_count = 0;
 	return txn;
 }
 
@@ -1988,8 +1987,7 @@ int
 sqlVdbeCheckFk(Vdbe * p, int deferred)
 {
 	struct txn *txn = in_txn();
-	if ((deferred && txn != NULL && txn->psql_txn != NULL &&
-	     txn->psql_txn->fk_deferred_count > 0) ||
+	if ((deferred && txn != NULL && txn->fk_deferred_count > 0) ||
 	    (!deferred && p->nFkConstraint > 0)) {
 		p->is_aborted = true;
 		p->errorAction = ON_CONFLICT_ACTION_ABORT;
