@@ -663,6 +663,11 @@ relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 	}
 
 	relay_start(relay, fd, sync, relay_send_row);
+	auto relay_guard = make_scoped_guard([=] {
+		relay_stop(relay);
+		replica_on_relay_stop(replica);
+	});
+
 	vclock_copy(&relay->local_vclock_at_subscribe, &replicaset.vclock);
 	relay->r = recovery_new(cfg_gets("wal_dir"), false,
 			        replica_clock);
@@ -673,10 +678,6 @@ relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 			      relay_subscribe_f, relay);
 	if (rc == 0)
 		rc = cord_cojoin(&relay->cord);
-
-	relay_stop(relay);
-	replica_on_relay_stop(replica);
-
 	if (rc != 0)
 		diag_raise();
 }
