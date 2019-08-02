@@ -2823,13 +2823,9 @@ case OP_Count: {         /* out2 */
 case OP_Savepoint: {
 	int p1;                         /* Value of P1 operand */
 	char *zName;                    /* Name of savepoint */
-	Savepoint *pNew;
-	Savepoint *pSavepoint;
-	Savepoint *pTmp;
 	struct txn *txn = in_txn();
-	struct sql_txn *psql_txn = txn != NULL ? txn->psql_txn : NULL;
 
-	if (psql_txn == NULL) {
+	if (txn == NULL) {
 		assert(!box_txn());
 		diag_set(ClientError, ER_NO_TRANSACTION);
 		goto abort_due_to_error;
@@ -2840,69 +2836,31 @@ case OP_Savepoint: {
 	/* Assert that the p1 parameter is valid. Also that if there is no open
 	 * transaction, then there cannot be any savepoints.
 	 */
-	assert(psql_txn->pSavepoint == NULL || box_txn());
+	assert(rlist_empty(&txn->savepoints) || box_txn());
 	assert(p1==SAVEPOINT_BEGIN||p1==SAVEPOINT_RELEASE||p1==SAVEPOINT_ROLLBACK);
 
 	if (p1==SAVEPOINT_BEGIN) {
-		/* Create a new savepoint structure. */
-		pNew = sql_savepoint(p, zName);
-		/* Link the new savepoint into the database handle's list. */
-		pNew->pNext = psql_txn->pSavepoint;
-		psql_txn->pSavepoint = pNew;
+		/*
+		 * Savepoint is available by its name so we don't
+		 * care about object itself.
+		 */
+		if (txn_savepoint_new(txn, zName) == NULL)
+			goto abort_due_to_error;
 	} else {
 		/* Find the named savepoint. If there is no such savepoint, then an
 		 * an error is returned to the user.
 		 */
-		for(
-			pSavepoint = psql_txn->pSavepoint;
-			pSavepoint && sqlStrICmp(pSavepoint->zName, zName);
-			pSavepoint = pSavepoint->pNext
-			);
-		if (!pSavepoint) {
+		struct txn_savepoint *sv = txn_savepoint_by_name(txn, zName);
+		if (sv == NULL) {
 			diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
 			goto abort_due_to_error;
+		}
+		if (p1 == SAVEPOINT_RELEASE) {
+			txn_savepoint_release(sv);
 		} else {
-
-			/* Determine whether or not this is a transaction savepoint. If so,
-			 * and this is a RELEASE command, then the current transaction
-			 * is committed.
-			 */
-			int isTransaction = pSavepoint->pNext == 0;
-			if (isTransaction && p1==SAVEPOINT_RELEASE) {
-				if ((rc = sqlVdbeCheckFk(p, 1)) != 0)
-					goto vdbe_return;
-				sqlVdbeHalt(p);
-				if (p->is_aborted)
-					goto abort_due_to_error;
-			} else {
-				if (p1==SAVEPOINT_ROLLBACK)
-					box_txn_rollback_to_savepoint(pSavepoint->tnt_savepoint);
-			}
-
-			/* Regardless of whether this is a RELEASE or ROLLBACK, destroy all
-			 * savepoints nested inside of the savepoint being operated on.
-			 */
-			while (psql_txn->pSavepoint != pSavepoint) {
-				pTmp = psql_txn->pSavepoint;
-				psql_txn->pSavepoint = pTmp->pNext;
-				/*
-				 * Since savepoints are stored in region, we do not
-				 * have to destroy them
-				 */
-			}
-
-			/* If it is a RELEASE, then destroy the savepoint being operated on
-			 * too. If it is a ROLLBACK TO, then set the number of deferred
-			 * constraint violations present in the database to the value stored
-			 * when the savepoint was created.
-			 */
-			if (p1==SAVEPOINT_RELEASE) {
-				assert(pSavepoint == psql_txn->pSavepoint);
-				psql_txn->pSavepoint = pSavepoint->pNext;
-			} else {
-				txn->fk_deferred_count =
-					pSavepoint->tnt_savepoint->fk_deferred_count;
-			}
+			assert(p1 == SAVEPOINT_ROLLBACK);
+			if (box_txn_rollback_to_savepoint(sv) != 0)
+				goto abort_due_to_error;
 		}
 	}
 
@@ -2940,7 +2898,11 @@ case OP_CheckViewReferences: {
  * Otherwise, raise an error with appropriate error message.
  */
 case OP_TransactionBegin: {
-	if (sql_txn_begin() != 0)
+	if (in_txn()) {
+		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
+		goto abort_due_to_error;
+	}
+	if (txn_begin() == NULL)
 		goto abort_due_to_error;
 	p->auto_commit = false	;
 	break;
@@ -2996,7 +2958,7 @@ case OP_TransactionRollback: {
  */
 case OP_TTransaction: {
 	if (!box_txn()) {
-		if (sql_txn_begin() != 0)
+		if (txn_begin() == NULL)
 			goto abort_due_to_error;
 	} else {
 		p->anonymous_savepoint = sql_savepoint(p, NULL);
@@ -4843,7 +4805,6 @@ case OP_FkCounter: {
 	if (((p->sql_flags & SQL_DeferFKs) != 0 || pOp->p1 != 0) &&
 	    !p->auto_commit) {
 		struct txn *txn = in_txn();
-		assert(txn != NULL && txn->psql_txn != NULL);
 		txn->fk_deferred_count += pOp->p2;
 	} else {
 		p->nFkConstraint += pOp->p2;
@@ -4867,7 +4828,6 @@ case OP_FkIfZero: {         /* jump */
 	if (((p->sql_flags & SQL_DeferFKs) != 0 || pOp->p1 != 0) &&
 	    !p->auto_commit) {
 		struct txn *txn = in_txn();
-		assert(txn != NULL && txn->psql_txn != NULL);
 		if (txn->fk_deferred_count == 0)
 			goto jump_to_p2;
 	} else {

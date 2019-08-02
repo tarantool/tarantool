@@ -453,8 +453,7 @@ u32 sqlVdbeSerialGet(const unsigned char *, u32, Mem *);
 
 int sqlVdbeExec(Vdbe *);
 int sqlVdbeList(Vdbe *);
-int
-sql_txn_begin();
+
 Savepoint *
 sql_savepoint(Vdbe *p,
 	      const char *zName);

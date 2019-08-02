@@ -76,39 +76,12 @@ sqlVdbeCreate(Parse * pParse)
 	return p;
 }
 
-struct sql_txn *
-sql_alloc_txn()
-{
-	struct sql_txn *txn = region_alloc_object(&fiber()->gc,
-						  struct sql_txn);
-	if (txn == NULL) {
-		diag_set(OutOfMemory, sizeof(struct sql_txn), "region",
-			 "struct sql_txn");
-		return NULL;
-	}
-	txn->pSavepoint = NULL;
-	return txn;
-}
-
 int
 sql_vdbe_prepare(struct Vdbe *vdbe)
 {
 	assert(vdbe != NULL);
 	struct txn *txn = in_txn();
 	vdbe->auto_commit = txn == NULL;
-	if (txn != NULL) {
-		/*
-		 * If transaction has been started in Lua, then
-		 * sql_txn is NULL. On the other hand, it is not
-		 * critical, since in Lua it is impossible to
-		 * check FK violations, at least now.
-		 */
-		if (txn->psql_txn == NULL) {
-			txn->psql_txn = sql_alloc_txn();
-			if (txn->psql_txn == NULL)
-				return -1;
-		}
-	}
 	return 0;
 }
 
@@ -1993,24 +1966,6 @@ sqlVdbeCheckFk(Vdbe * p, int deferred)
 		p->errorAction = ON_CONFLICT_ACTION_ABORT;
 		diag_set(ClientError, ER_SQL_EXECUTE, "FOREIGN KEY constraint "\
 			 "failed");
-		return -1;
-	}
-	return 0;
-}
-
-int
-sql_txn_begin()
-{
-	if (in_txn()) {
-		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
-		return -1;
-	}
-	struct txn *ptxn = txn_begin(false);
-	if (ptxn == NULL)
-		return -1;
-	ptxn->psql_txn = sql_alloc_txn();
-	if (ptxn->psql_txn == NULL) {
-		box_txn_rollback();
 		return -1;
 	}
 	return 0;
