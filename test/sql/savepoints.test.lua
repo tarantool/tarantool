@@ -31,6 +31,18 @@ end;
 release_sv();
 box.commit();
 
+release_sv_2 = function()
+    box.begin()
+    box.execute('SAVEPOINT t1;')
+    box.execute('SAVEPOINT t2;')
+    box.execute('SAVEPOINT t3;')
+    box.execute('RELEASE SAVEPOINT t2;')
+    local _, err = box.execute('ROLLBACK TO t1;')
+    assert(err == nil)
+end;
+release_sv_2();
+box.commit();
+
 release_sv_fail = function()
     box.begin()
     box.execute('SAVEPOINT t1;')

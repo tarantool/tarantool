@@ -173,15 +173,6 @@ struct SubProgram {
 Vdbe *sqlVdbeCreate(Parse *);
 
 /**
- * Allocate and initialize SQL-specific struct which completes
- * original Tarantool's txn struct using region allocator.
- *
- * @retval NULL on OOM, new psql_txn struct on success.
- **/
-struct sql_txn *
-sql_alloc_txn();
-
-/**
  * Prepare given VDBE to execution: initialize structs connected
  * with transaction routine: autocommit mode, deferred foreign
  * keys counter, struct representing SQL savepoint.

@@ -221,8 +221,8 @@ txn_begin()
 	txn->signature = -1;
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
-	txn->psql_txn = NULL;
 	txn->fk_deferred_count = 0;
+	rlist_create(&txn->savepoints);
 	txn->fiber = NULL;
 	fiber_set_txn(fiber(), txn);
 	/* fiber_on_yield is initialized by engine on demand */
@@ -734,6 +734,42 @@ box_txn_alloc(size_t size)
 	                            alignof(union natural_align));
 }
 
+struct txn_savepoint *
+txn_savepoint_new(struct txn *txn, const char *name)
+{
+	assert(txn == in_txn());
+	size_t svp_sz = sizeof(struct txn_savepoint);
+	int name_len = name != NULL ? strlen(name) : 0;
+	svp_sz += name_len;
+	struct txn_savepoint *svp =
+		(struct txn_savepoint *) region_alloc(&txn->region, svp_sz);
+	if (svp == NULL) {
+		diag_set(OutOfMemory, svp_sz, "region", "svp");
+		return NULL;
+	}
+	svp->stmt = stailq_last(&txn->stmts);
+	svp->in_sub_stmt = txn->in_sub_stmt;
+	svp->fk_deferred_count = txn->fk_deferred_count;
+	if (name != NULL)
+		memcpy(svp->name, name, name_len + 1);
+	else
+		svp->name[0] = 0;
+	rlist_add_entry(&txn->savepoints, svp, link);
+	return svp;
+}
+
+struct txn_savepoint *
+txn_savepoint_by_name(struct txn *txn, const char *name)
+{
+	assert(txn == in_txn());
+	struct txn_savepoint *sv;
+	rlist_foreach_entry(sv, &txn->savepoints, link) {
+		if (strcmp(sv->name, name) == 0)
+			return sv;
+	}
+	return NULL;
+}
+
 box_txn_savepoint_t *
 box_txn_savepoint()
 {
@@ -742,18 +778,7 @@ box_txn_savepoint()
 		diag_set(ClientError, ER_NO_TRANSACTION);
 		return NULL;
 	}
-	struct txn_savepoint *svp =
-		(struct txn_savepoint *) region_alloc_object(&txn->region,
-							struct txn_savepoint);
-	if (svp == NULL) {
-		diag_set(OutOfMemory, sizeof(*svp),
-			 "region", "struct txn_savepoint");
-		return NULL;
-	}
-	svp->stmt = stailq_last(&txn->stmts);
-	svp->in_sub_stmt = txn->in_sub_stmt;
-	svp->fk_deferred_count = txn->fk_deferred_count;
-	return svp;
+	return txn_savepoint_new(txn, NULL);
 }
 
 int
@@ -779,8 +804,29 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 		return -1;
 	}
 	txn_rollback_to_svp(txn, svp->stmt);
+	/* Discard from list all newer savepoints. */
+	RLIST_HEAD(discard);
+	rlist_cut_before(&discard, &txn->savepoints, &svp->link);
 	txn->fk_deferred_count = svp->fk_deferred_count;
 	return 0;
+}
+
+void
+txn_savepoint_release(struct txn_savepoint *svp)
+{
+	struct txn *txn = in_txn();
+	assert(txn != NULL);
+	/* Make sure that savepoint hasn't been released yet. */
+	struct txn_stmt *stmt = svp->stmt == NULL ? NULL :
+				stailq_entry(svp->stmt, struct txn_stmt, next);
+	assert(stmt == NULL || (stmt->space != NULL && stmt->row != NULL));
+	(void) stmt;
+	/*
+	 * Discard current savepoint alongside with all
+	 * created after it savepoints.
+	 */
+	RLIST_HEAD(discard);
+	rlist_cut_before(&discard, &txn->savepoints, rlist_next(&svp->link));
 }
 
 static void
