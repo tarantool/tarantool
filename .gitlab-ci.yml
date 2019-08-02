@@ -38,7 +38,7 @@ release_clang:
 release_lto:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   image: ${IMAGE_TEST_LTO}
   stage: test
@@ -52,7 +52,7 @@ release_lto:
 release_lto_clang8:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   image: ${IMAGE_TEST_LTO}
   stage: test
@@ -76,7 +76,7 @@ release_asan_clang8:
 osx_13_release:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
@@ -110,7 +110,7 @@ osx_14_release:
 osx_14_release_lto:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
@@ -148,7 +148,7 @@ freebsd_12_release:
 centos_6:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
@@ -162,7 +162,7 @@ centos_6:
 centos_7:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
@@ -176,7 +176,7 @@ centos_7:
 fedora_28:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
@@ -190,7 +190,7 @@ fedora_28:
 fedora_29:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
@@ -204,7 +204,7 @@ fedora_29:
 fedora_30:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
@@ -218,7 +218,7 @@ fedora_30:
 ubuntu_14_04:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
@@ -232,7 +232,7 @@ ubuntu_14_04:
 ubuntu_16_04:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
@@ -246,7 +246,7 @@ ubuntu_16_04:
 ubuntu_18_04:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
@@ -260,7 +260,7 @@ ubuntu_18_04:
 ubuntu_18_10:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
@@ -274,7 +274,7 @@ ubuntu_18_10:
 ubuntu_19_04:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
@@ -288,7 +288,7 @@ ubuntu_19_04:
 debian_8:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
@@ -302,7 +302,7 @@ debian_8:
 debian_9:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
@@ -316,7 +316,7 @@ debian_9:
 debian_10:
   only:
     refs:
-      - master
+      - 2.2
       - /^.*-full-ci$/
   stage: test
   tags:
