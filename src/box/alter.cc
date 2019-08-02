@@ -232,6 +232,23 @@ index_opts_decode(struct index_opts *opts, const char *map,
 }
 
 /**
+ * Helper routine for functional index function verification:
+ * only a deterministic persistent Lua function may be used in
+ * functional index for now.
+ */
+static void
+func_index_check_func(struct func *func) {
+	assert(func != NULL);
+	if (func->def->language != FUNC_LANGUAGE_LUA ||
+	    func->def->body == NULL || !func->def->is_deterministic ||
+	    !func->def->is_sandboxed) {
+		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS, 0,
+			  "referenced function doesn't satisfy "
+			  "functional index function constraints");
+	}
+}
+
+/**
  * Create a index_def object from a record in _index
  * system space.
  *
@@ -285,7 +302,8 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 				 space->def->fields,
 				 space->def->field_count, &fiber()->gc) != 0)
 		diag_raise();
-	key_def = key_def_new(part_def, part_count, opts.func_id > 0);
+	bool for_func_index = opts.func_id > 0;
+	key_def = key_def_new(part_def, part_count, for_func_index);
 	if (key_def == NULL)
 		diag_raise();
 	struct index_def *index_def =
@@ -296,6 +314,26 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
 	index_def_check_xc(index_def, space_name(space));
 	space_check_index_def_xc(space, index_def);
+	/*
+	 * In case of functional index definition, resolve a
+	 * function pointer to perform a complete index build
+	 * (istead of initializing it in inactive state) in
+	 * on_replace_dd_index trigger. This allows wrap index
+	 * creation operation into transaction: only the first
+	 * opperation in transaction is allowed to yeld.
+	 *
+	 * The initialisation during recovery is slightly
+	 * different, because function cache is not initialized
+	 * during _index space loading. Therefore the completion
+	 * of a functional index creation is performed in
+	 * _func_index space's trigger, via IndexRebuild
+	 * operation.
+	 */
+	struct func *func = NULL;
+	if (for_func_index && (func = func_by_id(opts.func_id)) != NULL) {
+		func_index_check_func(func);
+		index_def_set_func(index_def, func);
+	}
 	if (index_def->iid == 0 && space->sequence != NULL)
 		index_def_check_sequence(index_def, space->sequence_fieldno,
 					 space->sequence_path,
@@ -4725,12 +4763,11 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 		space = space_cache_find_xc(space_id);
 		index = index_find_xc(space, index_id);
 		func = func_cache_find(fid);
-		if (func->def->language != FUNC_LANGUAGE_LUA ||
-		    func->def->body == NULL || !func->def->is_deterministic ||
-		    !func->def->is_sandboxed) {
+		func_index_check_func(func);
+		if (index->def->opts.func_id != func->def->fid) {
 			tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS, 0,
-				  "referenced function doesn't satisfy "
-				  "functional index function constraints");
+				  "Function ids defined in _index and "
+				  "_func_index don't match");
 		}
 	} else if (old_tuple != NULL && new_tuple == NULL) {
 		uint32_t space_id = tuple_field_u32_xc(old_tuple,
@@ -4745,6 +4782,13 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 		tnt_raise(ClientError, ER_UNSUPPORTED,
 			  "functional index", "alter");
 	}
+
+	/**
+	 * Index is already initialized for corresponding
+	 * function. Index rebuild is not required.
+	 */
+	if (index_def_get_func(index->def) == func)
+		return;
 
 	alter = alter_space_new(space);
 	auto scoped_guard = make_scoped_guard([=] {alter_space_delete(alter);});

@@ -322,6 +322,18 @@ index_def_set_func(struct index_def *def, struct func *func)
 }
 
 /**
+ * Get a func pointer by index definition.
+ * @param def Index def, containing key definitions.
+ * @returns not NULL function pointer when index definition
+ *          refers to function and NULL otherwise.
+ */
+static inline struct func *
+index_def_get_func(struct index_def *def)
+{
+	return def->key_def->func_index_func;
+}
+
+/**
  * Add an index definition to a list, preserving the
  * first position of the primary key.
  *
