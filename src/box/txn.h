@@ -135,11 +135,6 @@ extern double too_long_threshold;
 struct sql_txn {
 	/** List of active SQL savepoints. */
 	struct Savepoint *pSavepoint;
-	/**
-	 * This variables transfer deferred constraints from one
-	 * VDBE to the next in the same transaction.
-	 */
-	uint32_t fk_deferred_count;
 };
 
 /**
@@ -213,6 +208,18 @@ struct txn {
 	struct trigger fiber_on_stop;
 	/** Commit and rollback triggers. */
 	struct rlist on_commit, on_rollback;
+	/**
+	 * This member represents counter of deferred foreign key
+	 * violations within transaction. DEFERRED mode means
+	 * that until transaction is committed violations are
+	 * allowed to appear. However, transaction can't be
+	 * committed in presence of violations, i.e. if this
+	 * counter is not equal to zero. In the normal mode
+	 * violations of FK are checked at the end of each
+	 * statement processing. Note that at the moment it is
+	 * SQL specific property.
+	 */
+	uint32_t fk_deferred_count;
 	struct sql_txn *psql_txn;
 };
 

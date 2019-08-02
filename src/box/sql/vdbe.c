@@ -2900,7 +2900,7 @@ case OP_Savepoint: {
 				assert(pSavepoint == psql_txn->pSavepoint);
 				psql_txn->pSavepoint = pSavepoint->pNext;
 			} else {
-				psql_txn->fk_deferred_count =
+				txn->fk_deferred_count =
 					pSavepoint->tnt_savepoint->fk_deferred_count;
 			}
 		}
@@ -4844,7 +4844,7 @@ case OP_FkCounter: {
 	    !p->auto_commit) {
 		struct txn *txn = in_txn();
 		assert(txn != NULL && txn->psql_txn != NULL);
-		txn->psql_txn->fk_deferred_count += pOp->p2;
+		txn->fk_deferred_count += pOp->p2;
 	} else {
 		p->nFkConstraint += pOp->p2;
 	}
@@ -4868,7 +4868,7 @@ case OP_FkIfZero: {         /* jump */
 	    !p->auto_commit) {
 		struct txn *txn = in_txn();
 		assert(txn != NULL && txn->psql_txn != NULL);
-		if (txn->psql_txn->fk_deferred_count == 0)
+		if (txn->fk_deferred_count == 0)
 			goto jump_to_p2;
 	} else {
 		if (p->nFkConstraint == 0)
