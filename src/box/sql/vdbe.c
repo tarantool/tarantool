@@ -2978,7 +2978,7 @@ case OP_TTransaction: {
 		if (txn_begin() == NULL)
 			goto abort_due_to_error;
 	} else {
-		p->anonymous_savepoint = sql_savepoint(p, NULL);
+		p->anonymous_savepoint = txn_savepoint_new(in_txn(), NULL);
 		if (p->anonymous_savepoint == NULL)
 			goto abort_due_to_error;
 	}

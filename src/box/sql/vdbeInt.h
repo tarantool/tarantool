@@ -426,7 +426,7 @@ struct Vdbe {
 	/** Parser flags with which this object was built. */
 	uint32_t sql_flags;
 	/* Anonymous savepoint for aborts only */
-	Savepoint *anonymous_savepoint;
+	struct txn_savepoint *anonymous_savepoint;
 };
 
 /*
@@ -455,9 +455,6 @@ u32 sqlVdbeSerialGet(const unsigned char *, u32, Mem *);
 int sqlVdbeExec(Vdbe *);
 int sqlVdbeList(Vdbe *);
 
-Savepoint *
-sql_savepoint(Vdbe *p,
-	      const char *zName);
 int sqlVdbeHalt(Vdbe *);
 int sqlVdbeMemTooBig(Mem *);
 int sqlVdbeMemCopy(Mem *, const Mem *);
