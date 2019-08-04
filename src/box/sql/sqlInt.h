@@ -1050,7 +1050,6 @@ typedef struct NameContext NameContext;
 typedef struct Parse Parse;
 typedef struct PrintfArguments PrintfArguments;
 typedef struct RowSet RowSet;
-typedef struct Savepoint Savepoint;
 typedef struct Select Select;
 typedef struct sqlThread sqlThread;
 typedef struct SelectDest SelectDest;
@@ -1405,18 +1404,6 @@ enum trim_side_mask {
 #define AGGREGATE2(zName, nArg, arg, nc, xStep, xFinal, extraFlags, type) \
   {nArg, (nc*SQL_FUNC_NEEDCOLL)|extraFlags, \
    SQL_INT_TO_PTR(arg), 0, xStep,xFinal,#zName, {0}, type}
-
-/*
- * All current savepoints are stored in a linked list starting at
- * sql.pSavepoint. The first element in the list is the most recently
- * opened savepoint. Savepoints are added to the list by the vdbe
- * OP_Savepoint instruction.
- */
-struct Savepoint {
-	box_txn_savepoint_t *tnt_savepoint; /* Tarantool's savepoint struct */
-	char *zName;		/* Savepoint name (nul-terminated) */
-	Savepoint *pNext;	/* Parent savepoint (if any) */
-};
 
 /*
  * The following are used as the second parameter to sqlSavepoint(),

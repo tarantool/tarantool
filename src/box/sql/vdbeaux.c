@@ -1937,12 +1937,12 @@ int
 sqlVdbeCloseStatement(Vdbe * p, int eOp)
 {
 	int rc = 0;
-	const Savepoint *savepoint = p->anonymous_savepoint;
+	struct txn_savepoint *savepoint = p->anonymous_savepoint;
 	/*
 	 * If we have an anonymous transaction opened -> perform eOp.
 	 */
 	if (savepoint && eOp == SAVEPOINT_ROLLBACK)
-		rc = box_txn_rollback_to_savepoint(savepoint->tnt_savepoint);
+		rc = box_txn_rollback_to_savepoint(savepoint);
 	p->anonymous_savepoint = NULL;
 	return rc;
 }
@@ -1969,32 +1969,6 @@ sqlVdbeCheckFk(Vdbe * p, int deferred)
 		return -1;
 	}
 	return 0;
-}
-
-Savepoint *
-sql_savepoint(MAYBE_UNUSED Vdbe *p, const char *zName)
-{
-	assert(p);
-	size_t nName = zName ? strlen(zName) + 1 : 0;
-	size_t savepoint_sz = sizeof(Savepoint) + nName;
-	Savepoint *pNew;
-
-	pNew = (Savepoint *)region_aligned_alloc(&fiber()->gc,
-						 savepoint_sz,
-						 alignof(Savepoint));
-	if (pNew == NULL) {
-		diag_set(OutOfMemory, savepoint_sz, "region",
-			 "savepoint");
-		return NULL;
-	}
-	pNew->tnt_savepoint = box_txn_savepoint();
-	if (!pNew->tnt_savepoint)
-		return NULL;
-	if (zName) {
-		pNew->zName = (char *)&pNew[1];
-		memcpy(pNew->zName, zName, nName);
-	};
-	return pNew;
 }
 
 /*
