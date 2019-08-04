@@ -124,6 +124,39 @@ xrow_update_route_branch_array(struct xrow_update_field *next_hop,
 	return op->meta->do_op(op, next_hop);
 }
 
+/**
+ * Do the actual branch, but by a map and a key in that map. Works
+ * exactly the same as the array-counterpart.
+ */
+static int
+xrow_update_route_branch_map(struct xrow_update_field *next_hop,
+			     const char *parent,
+			     const struct xrow_update_field *child,
+			     const char *key, int key_len)
+{
+	struct xrow_update_op *op = child->bar.op;
+	if (child->type != XUPDATE_BAR || child->bar.path_len > 0 ||
+	    (op->opcode != '!' && op->opcode != '#')) {
+		return xrow_update_map_create_with_child(next_hop, parent,
+							 child, key, key_len);
+	}
+	op->is_token_consumed = false;
+	op->token_type = JSON_TOKEN_STR;
+	op->key = key;
+	op->key_len = key_len;
+	const char *data = parent;
+	uint32_t field_count = mp_decode_map(&data);
+	const char *end = data;
+	for (uint32_t i = 0; i < field_count; ++i) {
+		mp_next(&end);
+		mp_next(&end);
+	}
+	if (xrow_update_map_create(next_hop, parent, data, end,
+				   field_count) != 0)
+		return -1;
+	return op->meta->do_op(op, next_hop);
+}
+
 struct xrow_update_field *
 xrow_update_route_branch(struct xrow_update_field *field,
 			 struct xrow_update_op *new_op)
@@ -258,9 +291,19 @@ xrow_update_route_branch(struct xrow_update_field *field,
 						   old_token.num) != 0)
 			return NULL;
 	} else if (type == MP_MAP) {
-		diag_set(ClientError, ER_UNSUPPORTED, "update",
-			 "path intersection on map");
-		return NULL;
+		if (new_token.type != JSON_TOKEN_STR) {
+			xrow_update_err(new_op, "can not update map by "\
+					"non-string key");
+			return NULL;
+		}
+		new_op->is_token_consumed = false;
+		new_op->token_type = JSON_TOKEN_STR;
+		new_op->key = new_token.str;
+		new_op->key_len = new_token.len;
+		if (xrow_update_route_branch_map(next_hop, parent, &child,
+						 old_token.str,
+						 old_token.len) != 0)
+			return NULL;
 	} else {
 		xrow_update_err_no_such_field(new_op);
 		return NULL;

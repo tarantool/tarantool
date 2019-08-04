@@ -1478,6 +1478,158 @@ t:update({{'=', '[3]', {0}}, {'=', '[4][3]', 3.5}, {'=', '[4][4][1]', 4.5}, {'='
 - error: 'Field ''[4][4].key'' UPDATE error: can''t update an array by a non-numeric
     index'
 ...
+--
+-- Intersecting map updates.
+--
+t:update({{'=', '[4][6].c.d', 2300}, {'=', '[4][6].c.e', 2400}})
+---
+- [1, {}, [], [1, 2, 3, [4, 5, 6, 7, [8, 9, [10, 11, 12], 13, 14], 15, 16, [17, 18,
+        19]], 20, {'b': 22, 'a': 21, 'c': {'d': 2300, 'e': 2400}}, 25]]
+...
+-- Fill an empty map.
+t:update({{'=', '[2].k', 100}, {'=', '[2].v', 200}})
+---
+- [1, {'k': 100, 'v': 200}, [], [1, 2, 3, [4, 5, 6, 7, [8, 9, [10, 11, 12], 13, 14],
+      15, 16, [17, 18, 19]], 20, {'b': 22, 'a': 21, 'c': {'d': 23, 'e': 24}}, 25]]
+...
+t = {}                                  \
+t[1] = 1                                \
+t[2] = {                                \
+    a = 1,                              \
+    b = 2,                              \
+    c = {3, 4, 5},                      \
+    d = {                               \
+        [0] = 0,                        \
+        e = 6,                          \
+        [true] = false,                 \
+        f = 7,                          \
+        [-1] = -1,                      \
+    },                                  \
+    g = {                               \
+        {k = 8, v = 9},                 \
+        [box.NULL] = box.NULL,          \
+        {k = 10, v = 11},               \
+        {k = '12str', v = '13str'},     \
+    },                                  \
+    h = {                               \
+        [-1] = {{{{-1}, -1}, -1}, -1},  \
+        i = {                           \
+            j = 14,                     \
+            k = 15,                     \
+        },                              \
+        m = 16,                         \
+    }                                   \
+}
+---
+...
+t[3] = {}
+---
+...
+t = box.tuple.new(t)
+---
+...
+-- Insert and delete from the same map at once.
+t:update({{'!', '[2].n', 17}, {'#', '[2].b', 1}})
+---
+- [1, {'a': 1, 'n': 17, 'd': {0: 0, -1: -1, true: false, 'f': 7, 'e': 6}, 'h': {'i': {
+        'j': 14, 'k': 15}, -1: [[[[-1], -1], -1], -1], 'm': 16}, 'c': [3, 4, 5], 'g': {
+      1: {'k': 8, 'v': 9}, 2: {'k': 10, 'v': 11}, 3: {'k': '12str', 'v': '13str'},
+      null: null}}, []]
+...
+-- Delete a not existing key.
+t:update({{'=', '[2].d.g', 6000}, {'#', '[2].d.old', 1}})
+---
+- [1, {'b': 2, 'a': 1, 'd': {0: 0, 'f': 7, 'e': 6, -1: -1, true: false, 'g': 6000},
+    'h': {'i': {'j': 14, 'k': 15}, -1: [[[[-1], -1], -1], -1], 'm': 16}, 'c': [3,
+      4, 5], 'g': {1: {'k': 8, 'v': 9}, 2: {'k': 10, 'v': 11}, 3: {'k': '12str', 'v': '13str'},
+      null: null}}, []]
+...
+-- Scalar operations.
+t:update({{'+', '[2].d.e', 1}, {'+', '[2].b', 1}, {'+', '[2].d.f', 1}})
+---
+- [1, {'b': 3, 'c': [3, 4, 5], 'd': {0: 0, true: false, 'f': 8, -1: -1, 'e': 7}, 'h': {
+      'i': {'j': 14, 'k': 15}, -1: [[[[-1], -1], -1], -1], 'm': 16}, 'a': 1, 'g': {
+      1: {'k': 8, 'v': 9}, 2: {'k': 10, 'v': 11}, 3: {'k': '12str', 'v': '13str'},
+      null: null}}, []]
+...
+-- Errors.
+-- This operation array creates an update tree with several full
+-- featured maps, not bars. It is required to cover some complex
+-- cases about fields extraction.
+ops = {{'=', '[2].h.i.j', 14000}, {'=', '[2].h.i.k', 15000}, {'=', '[2].h.m', 16000}, {'=', '[2].b', 2000}, {}}
+---
+...
+-- When a map update extracts a next token on demand, it should
+-- reject bad json, obviously. Scalar and '!'/'#' operations are
+-- implemented separately and tested both.
+ops[#ops] = {'+', '[2].h.i.<badjson>', -1}
+---
+...
+t:update(ops)
+---
+- error: 'Field ''[2].h.i.<badjson>'' UPDATE error: invalid JSON in position 9'
+...
+ops[#ops][1] = '!'
+---
+...
+t:update(ops)
+---
+- error: 'Field ''[2].h.i.<badjson>'' UPDATE error: invalid JSON in position 9'
+...
+ops[#ops][1] = '#'
+---
+...
+ops[#ops][3] = 1
+---
+...
+t:update(ops)
+---
+- error: 'Field ''[2].h.i.<badjson>'' UPDATE error: invalid JSON in position 9'
+...
+-- Key extractor should reject any attempt to use non-string keys.
+ops[#ops] = {'-', '[2].h.i[20]', -1}
+---
+...
+t:update(ops)
+---
+- error: 'Field ''[2].h.i[20]'' UPDATE error: can''t update a map by not a string
+    key'
+...
+ops[#ops][1] = '='
+---
+...
+t:update(ops)
+---
+- error: 'Field ''[2].h.i[20]'' UPDATE error: can''t update a map by not a string
+    key'
+...
+t:update({{'+', '[2].d.e', 1}, {'+', '[2].d.f', 1}, {'+', '[2].d.k', 1}})
+---
+- error: Field ''[2].d.k'' was not found in the tuple
+...
+t:update({{'=', '[2].d.e', 6000}, {'!', '[2].d.g.h', -1}})
+---
+- error: Field ''[2].d.g.h'' was not found in the tuple
+...
+t:update({{'!', '[2].d.g', 6000}, {'!', '[2].d.e', -1}})
+---
+- error: 'Field ''[2].d.e'' UPDATE error: the key exists already'
+...
+t:update({{'=', '[2].d.g', 6000}, {'#', '[2].d.old', 10}})
+---
+- error: 'Field ''[2].d.old'' UPDATE error: can delete only 1 field from a map in
+    a row'
+...
+-- '!'/'=' can be used to create a field, but only if it is a
+-- tail. These operations can't create the whole path.
+t:update({{'=', '[2].d.g', 6000}, {'=', '[2].d.new.new', -1}})
+---
+- error: Field ''[2].d.new.new'' was not found in the tuple
+...
+t:update({{'=', '[2].d.g', 6000}, {'#', '[2].d.old.old', 1}})
+---
+- error: Field ''[2].d.old.old'' was not found in the tuple
+...
 s:drop()
 ---
 ...

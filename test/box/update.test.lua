@@ -518,4 +518,79 @@ t:update({{'+', '[4][3]', 0.5}, {'+', '[4][3][2]', 0.5}})
 -- Parent field won't guarantee that.
 t:update({{'=', '[3]', {0}}, {'=', '[4][3]', 3.5}, {'=', '[4][4][1]', 4.5}, {'=', '[4][4][2]', 5.5}, {'=', '[4][4].key', 6.5}})
 
+--
+-- Intersecting map updates.
+--
+t:update({{'=', '[4][6].c.d', 2300}, {'=', '[4][6].c.e', 2400}})
+-- Fill an empty map.
+t:update({{'=', '[2].k', 100}, {'=', '[2].v', 200}})
+
+t = {}                                  \
+t[1] = 1                                \
+t[2] = {                                \
+    a = 1,                              \
+    b = 2,                              \
+    c = {3, 4, 5},                      \
+    d = {                               \
+        [0] = 0,                        \
+        e = 6,                          \
+        [true] = false,                 \
+        f = 7,                          \
+        [-1] = -1,                      \
+    },                                  \
+    g = {                               \
+        {k = 8, v = 9},                 \
+        [box.NULL] = box.NULL,          \
+        {k = 10, v = 11},               \
+        {k = '12str', v = '13str'},     \
+    },                                  \
+    h = {                               \
+        [-1] = {{{{-1}, -1}, -1}, -1},  \
+        i = {                           \
+            j = 14,                     \
+            k = 15,                     \
+        },                              \
+        m = 16,                         \
+    }                                   \
+}
+t[3] = {}
+t = box.tuple.new(t)
+-- Insert and delete from the same map at once.
+t:update({{'!', '[2].n', 17}, {'#', '[2].b', 1}})
+-- Delete a not existing key.
+t:update({{'=', '[2].d.g', 6000}, {'#', '[2].d.old', 1}})
+
+-- Scalar operations.
+t:update({{'+', '[2].d.e', 1}, {'+', '[2].b', 1}, {'+', '[2].d.f', 1}})
+
+-- Errors.
+-- This operation array creates an update tree with several full
+-- featured maps, not bars. It is required to cover some complex
+-- cases about fields extraction.
+ops = {{'=', '[2].h.i.j', 14000}, {'=', '[2].h.i.k', 15000}, {'=', '[2].h.m', 16000}, {'=', '[2].b', 2000}, {}}
+-- When a map update extracts a next token on demand, it should
+-- reject bad json, obviously. Scalar and '!'/'#' operations are
+-- implemented separately and tested both.
+ops[#ops] = {'+', '[2].h.i.<badjson>', -1}
+t:update(ops)
+ops[#ops][1] = '!'
+t:update(ops)
+ops[#ops][1] = '#'
+ops[#ops][3] = 1
+t:update(ops)
+-- Key extractor should reject any attempt to use non-string keys.
+ops[#ops] = {'-', '[2].h.i[20]', -1}
+t:update(ops)
+ops[#ops][1] = '='
+t:update(ops)
+
+t:update({{'+', '[2].d.e', 1}, {'+', '[2].d.f', 1}, {'+', '[2].d.k', 1}})
+t:update({{'=', '[2].d.e', 6000}, {'!', '[2].d.g.h', -1}})
+t:update({{'!', '[2].d.g', 6000}, {'!', '[2].d.e', -1}})
+t:update({{'=', '[2].d.g', 6000}, {'#', '[2].d.old', 10}})
+-- '!'/'=' can be used to create a field, but only if it is a
+-- tail. These operations can't create the whole path.
+t:update({{'=', '[2].d.g', 6000}, {'=', '[2].d.new.new', -1}})
+t:update({{'=', '[2].d.g', 6000}, {'#', '[2].d.old.old', 1}})
+
 s:drop()

@@ -32,6 +32,7 @@
  */
 #include "trivia/util.h"
 #include "tt_static.h"
+#include "salad/stailq.h"
 #include "json/json.h"
 #include "bit/int96.h"
 #include "mp_decimal.h"
@@ -259,7 +260,8 @@ enum xrow_update_type {
 	 * for example, when a rope is split in two parts: not
 	 * changed left range of fields, and a right range with
 	 * its first field changed. In this case the left range is
-	 * NOP.
+	 * NOP. And when a map is updated and split into rages,
+	 * when only certain points are not NOP.
 	 */
 	XUPDATE_NOP,
 	/**
@@ -297,6 +299,11 @@ enum xrow_update_type {
 	 * '[2] = 30', '[3] = true'.
 	 */
 	XUPDATE_ROUTE,
+	/**
+	 * Field is an updated map. Check item list for updates of
+	 * individual fields.
+	 */
+	XUPDATE_MAP,
 };
 
 /**
@@ -388,6 +395,48 @@ struct xrow_update_field {
 			/** Update subtree. */
 			struct xrow_update_field *next_hop;
 		} route;
+		/**
+		 * The field is an updated map. Individual fields
+		 * are stored very similar to array update and its
+		 * rope nodes. Each item is a key, a value, and a
+		 * tail of unchanged key-value pairs. The items
+		 * are stored in a list. But the list is not
+		 * sorted anyhow by keys, because it does not
+		 * really make any sense:
+		 *
+		 * 1) Keys in MessagePack are not sorted anyway,
+		 *    and any kind of search would not be possible
+		 *    even if they were sorted. Sort of a map
+		 *    would require Nlog(N) time and N memory even
+		 *    if only a few fields were updated.
+		 *
+		 * 2) Double scalar update of the same key is not
+		 *    possible.
+		 *
+		 * Although there is something which can be and is
+		 * optimized. When a key is updated first time,
+		 * it is moved to the beginning of the list, and
+		 * after all operations are done, it is stored
+		 * in the result tuple before unchanged fields. On
+		 * a second update of the same tuple it is found
+		 * immediately.
+		 */
+		struct {
+			/**
+			 * List of map update items. Each item is
+			 * a key, a value, and an unchanged tail.
+			 */
+			struct stailq items;
+			/**
+			 * Number of key-value pairs in the list.
+			 * Note, it is not a number of items, but
+			 * exactly number of key-value pairs. It
+			 * is used to store MessagePack map header
+			 * without decoding each item again just
+			 * to learn the size.
+			 */
+			int size;
+		} map;
 	};
 };
 
@@ -511,6 +560,38 @@ OP_DECL_GENERIC(array)
 
 /* }}} xrow_update_field.array */
 
+/* {{{ xrow_update_field.map */
+
+/**
+ * Initialize @a field as a map to update.
+ * @param[out] field Field to initialize.
+ * @param header Header of the MessagePack map @a data.
+ * @param data MessagePack data of the map to update.
+ * @param data_end End of @a data.
+ * @param field_count Key-value pair count in @data.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error.
+ */
+int
+xrow_update_map_create(struct xrow_update_field *field, const char *header,
+		       const char *data, const char *data_end, int field_count);
+
+/**
+ * Create a map update with an existing child. Motivation is
+ * exactly the same as with a similar array constructor. It allows
+ * to avoid unnecessary MessagePack decoding.
+ */
+int
+xrow_update_map_create_with_child(struct xrow_update_field *field,
+				  const char *header,
+				  const struct xrow_update_field *child,
+				  const char *key, uint32_t key_len);
+
+OP_DECL_GENERIC(map)
+
+/* }}} xrow_update_field.map */
+
 /* {{{ update_field.bar */
 
 OP_DECL_GENERIC(bar)
@@ -592,6 +673,8 @@ xrow_update_op_do_field_##op_type(struct xrow_update_op *op,			\
 		return xrow_update_op_do_bar_##op_type(op, field);		\
 	case XUPDATE_ROUTE:							\
 		return xrow_update_op_do_route_##op_type(op, field);		\
+	case XUPDATE_MAP:							\
+		return xrow_update_op_do_map_##op_type(op, field);		\
 	default:								\
 		unreachable();							\
 	}									\
