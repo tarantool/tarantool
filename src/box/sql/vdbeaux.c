@@ -2813,52 +2813,6 @@ sqlBlobCompare(const Mem * pB1, const Mem * pB2)
 	return n1 - n2;
 }
 
-/**
- * Do a comparison between a 64-bit unsigned/signed integer and a
- * 64-bit floating-point number.  Return negative, zero, or
- * positive if the first (integer) is less than, equal to, or
- * greater than the second (double).
- */
-static int
-compare_uint_float(uint64_t u, double r)
-{
-	if (r > (double) UINT64_MAX)
-		return -1;
-	if (r < 0.0)
-		return +1;
-	uint64_t y = (uint64_t) r;
-	if (u < y)
-		return -1;
-	if (u > y)
-		return +1;
-	double s = (double) u;
-	if (s < r)
-		return -1;
-	if (s > r)
-		return +1;
-	return 0;
-}
-
-static int
-compare_int_float(int64_t i, double r)
-{
-	if (r < (double) INT64_MIN)
-		return +1;
-	if (r >= 0.0)
-		return -1;
-	int64_t y = (int64_t) r;
-	if (i < y)
-		return -1;
-	if (i > y)
-		return +1;
-	double s = (double) i;
-	if (s < r)
-		return -1;
-	if (s > r)
-		return +1;
-	return 0;
-}
-
 /*
  * Compare the values contained by the two memory cells, returning
  * negative, zero or positive if pMem1 is less than, equal to, or greater
@@ -2924,16 +2878,16 @@ sqlMemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
 		}
 		if ((f1 & MEM_Int) != 0) {
 			if ((f2 & MEM_Real) != 0) {
-				return compare_int_float(pMem1->u.i,
-							 pMem2->u.r);
+				return double_compare_uint64(-pMem2->u.r,
+							     -pMem1->u.i, 1);
 			} else {
 				return -1;
 			}
 		}
 		if ((f1 & MEM_UInt) != 0) {
 			if ((f2 & MEM_Real) != 0) {
-				return compare_uint_float(pMem1->u.u,
-							  pMem2->u.r);
+				return double_compare_uint64(pMem2->u.r,
+							     pMem1->u.u, -1);
 			} else if ((f2 & MEM_Int) != 0) {
 				return +1;
 			} else {
@@ -2942,11 +2896,11 @@ sqlMemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
 		}
 		if ((f1 & MEM_Real) != 0) {
 			if ((f2 & MEM_Int) != 0) {
-				return -compare_int_float(pMem2->u.i,
-							  pMem1->u.r);
+				return double_compare_uint64(-pMem1->u.r,
+							     -pMem2->u.i, -1);
 			} else if ((f2 & MEM_UInt) != 0) {
-				return -compare_uint_float(pMem2->u.u,
-							   pMem1->u.r);
+				return double_compare_uint64(pMem1->u.r,
+							     pMem2->u.u, 1);
 			} else {
 				return -1;
 			}
@@ -3115,7 +3069,8 @@ sqlVdbeCompareMsgpack(const char **key1,
 				else if (mem1.u.u > pKey2->u.u)
 					rc = +1;
 			} else if ((pKey2->flags & MEM_Real) != 0) {
-				rc = compare_uint_float(mem1.u.u, pKey2->u.r);
+				rc = double_compare_uint64(pKey2->u.r,
+							   mem1.u.u, -1);
 			} else {
 				rc = (pKey2->flags & MEM_Null) ? +1 : -1;
 			}
@@ -3132,7 +3087,8 @@ sqlVdbeCompareMsgpack(const char **key1,
 					rc = +1;
 				}
 			} else if (pKey2->flags & MEM_Real) {
-				rc = compare_int_float(mem1.u.i, pKey2->u.r);
+				rc = double_compare_uint64(-pKey2->u.r,
+							   -mem1.u.i, 1);
 			} else {
 				rc = (pKey2->flags & MEM_Null) ? +1 : -1;
 			}
@@ -3146,9 +3102,11 @@ sqlVdbeCompareMsgpack(const char **key1,
 			mem1.u.r = mp_decode_double(&aKey1);
  do_float:
 			if ((pKey2->flags & MEM_Int) != 0) {
-				rc = -compare_int_float(pKey2->u.i, mem1.u.r);
+				rc = double_compare_uint64(-mem1.u.r,
+							   -pKey2->u.i, -1);
 			} else if (pKey2->flags & MEM_UInt) {
-				rc = -compare_uint_float(pKey2->u.u, mem1.u.r);
+				rc = double_compare_uint64(mem1.u.r,
+							   pKey2->u.u, 1);
 			} else if (pKey2->flags & MEM_Real) {
 				if (mem1.u.r < pKey2->u.r) {
 					rc = -1;
