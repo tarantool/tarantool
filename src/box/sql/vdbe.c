@@ -1680,7 +1680,7 @@ case OP_CollSeq: {
 	break;
 }
 
-/* Opcode: Function0 P1 P2 P3 P4 P5
+/* Opcode: BuiltinFunction0 P1 P2 P3 P4 P5
  * Synopsis: r[P3]=func(r[P2@P5])
  *
  * Invoke a user function (P4 is a pointer to a FuncDef object that
@@ -1692,9 +1692,9 @@ case OP_CollSeq: {
  * function was determined to be constant at compile time. If the first
  * argument was constant then bit 0 of P1 is set.
  *
- * See also: Function, AggStep, AggFinal
+ * See also: BuiltinFunction, AggStep, AggFinal
  */
-/* Opcode: Function P1 P2 P3 P4 P5
+/* Opcode: BuiltinFunction P1 P2 P3 P4 P5
  * Synopsis: r[P3]=func(r[P2@P5])
  *
  * Invoke a user function (P4 is a pointer to an sql_context object that
@@ -1706,16 +1706,17 @@ case OP_CollSeq: {
  * function was determined to be constant at compile time. If the first
  * argument was constant then bit 0 of P1 is set.
  *
- * SQL functions are initially coded as OP_Function0 with P4 pointing
- * to a FuncDef object.  But on first evaluation, the P4 operand is
- * automatically converted into an sql_context object and the operation
- * changed to this OP_Function opcode.  In this way, the initialization of
- * the sql_context object occurs only once, rather than once for each
- * evaluation of the function.
+ * SQL functions are initially coded as OP_BuiltinFunction0 with
+ * P4 pointing to a FuncDef object.  But on first evaluation,
+ * the P4 operand is automatically converted into an sql_context
+ * object and the operation changed to this OP_BuiltinFunction
+ * opcode.  In this way, the initialization of the sql_context
+ * object occurs only once, rather than once for each evaluation
+ * of the function.
  *
- * See also: Function0, AggStep, AggFinal
+ * See also: BuiltinFunction0, AggStep, AggFinal
  */
-case OP_Function0: {
+case OP_BuiltinFunction0: {
 	int n;
 	sql_context *pCtx;
 
@@ -1733,11 +1734,11 @@ case OP_Function0: {
 	pCtx->argc = n;
 	pOp->p4type = P4_FUNCCTX;
 	pOp->p4.pCtx = pCtx;
-	pOp->opcode = OP_Function;
-	/* Fall through into OP_Function */
+	pOp->opcode = OP_BuiltinFunction;
+	/* Fall through into OP_BuiltinFunction */
 	FALLTHROUGH;
 }
-case OP_Function: {
+case OP_BuiltinFunction: {
 	int i;
 	sql_context *pCtx;
 

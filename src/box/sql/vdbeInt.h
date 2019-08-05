@@ -312,7 +312,8 @@ struct sql_context {
 	FuncDef *pFunc;		/* Pointer to function information */
 	Mem *pMem;		/* Memory cell used to store aggregate context */
 	Vdbe *pVdbe;		/* The VM that owns this context */
-	int iOp;		/* Instruction number of OP_Function */
+	/** Instruction number of OP_BuiltinFunction0. */
+	int iOp;
 	/*
 	 * True, if an error occurred during the execution of the
 	 * function.

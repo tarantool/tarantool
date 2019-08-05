@@ -4132,7 +4132,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				sqlVdbeAddOp4(v, OP_CollSeq, 0, 0, 0,
 						  (char *)coll, P4_COLLSEQ);
 			}
-			sqlVdbeAddOp4(v, OP_Function0, constMask, r1,
+			sqlVdbeAddOp4(v, OP_BuiltinFunction0, constMask, r1,
 					  target, (char *)pDef, P4_FUNCDEF);
 			sqlVdbeChangeP5(v, (u8) nFarg);
 			if (nFarg && constMask == 0) {
