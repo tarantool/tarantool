@@ -1404,21 +1404,19 @@ trim_prepare_char_len(struct sql_context *context,
  * the trimming set.
  */
 static void
-trim_func_one_arg(struct sql_context *context, int argc, sql_value **argv)
+trim_func_one_arg(struct sql_context *context, sql_value *arg)
 {
-	assert(argc == 1);
-	(void) argc;
 	/* In case of VARBINARY type default trim octet is X'00'. */
 	const unsigned char *default_trim;
-	enum mp_type val_type = sql_value_type(argv[0]);
+	enum mp_type val_type = sql_value_type(arg);
 	if (val_type == MP_NIL)
 		return;
 	if (val_type == MP_BIN)
 		default_trim = (const unsigned char *) "\0";
 	else
 		default_trim = (const unsigned char *) " ";
-	int input_str_sz = sql_value_bytes(argv[0]);
-	const unsigned char *input_str = sql_value_text(argv[0]);
+	int input_str_sz = sql_value_bytes(arg);
+	const unsigned char *input_str = sql_value_text(arg);
 	uint8_t trim_char_len[1] = { 1 };
 	trim_procedure(context, TRIM_BOTH, default_trim, trim_char_len, 1,
 		       input_str, input_str_sz);
@@ -1436,24 +1434,21 @@ trim_func_one_arg(struct sql_context *context, int argc, sql_value **argv)
  * procedure with the specified side and " " as the trimming set.
  */
 static void
-trim_func_two_args(struct sql_context *context, int argc, sql_value **argv)
+trim_func_two_args(struct sql_context *context, sql_value *arg1,
+		   sql_value *arg2)
 {
-	assert(argc == 2);
-	(void) argc;
-
 	const unsigned char *input_str, *trim_set;
-	if ((input_str = sql_value_text(argv[1])) == NULL)
+	if ((input_str = sql_value_text(arg2)) == NULL)
 		return;
 
-	int input_str_sz = sql_value_bytes(argv[1]);
-	if (sql_value_type(argv[0]) == MP_INT ||
-	    sql_value_type(argv[0]) == MP_UINT) {
+	int input_str_sz = sql_value_bytes(arg2);
+	if (sql_value_type(arg1) == MP_INT || sql_value_type(arg1) == MP_UINT) {
 		uint8_t len_one = 1;
-		trim_procedure(context, sql_value_int(argv[0]),
+		trim_procedure(context, sql_value_int(arg1),
 			       (const unsigned char *) " ", &len_one, 1,
 			       input_str, input_str_sz);
-	} else if ((trim_set = sql_value_text(argv[0])) != NULL) {
-		int trim_set_sz = sql_value_bytes(argv[0]);
+	} else if ((trim_set = sql_value_text(arg1)) != NULL) {
+		int trim_set_sz = sql_value_bytes(arg1);
 		uint8_t *char_len;
 		int char_cnt = trim_prepare_char_len(context, trim_set,
 						     trim_set_sz, &char_len);
@@ -1473,29 +1468,52 @@ trim_func_two_args(struct sql_context *context, int argc, sql_value **argv)
  * call trimming procedure with that args.
  */
 static void
-trim_func_three_args(struct sql_context *context, int argc, sql_value **argv)
+trim_func_three_args(struct sql_context *context, sql_value *arg1,
+		     sql_value *arg2, sql_value *arg3)
 {
-	assert(argc == 3);
-	(void) argc;
-
-	assert(sql_value_type(argv[0]) == MP_INT ||
-	       sql_value_type(argv[0]) == MP_UINT);
+	assert(sql_value_type(arg1) == MP_INT || sql_value_type(arg1) == MP_UINT);
 	const unsigned char *input_str, *trim_set;
-	if ((input_str = sql_value_text(argv[2])) == NULL ||
-	    (trim_set = sql_value_text(argv[1])) == NULL)
+	if ((input_str = sql_value_text(arg3)) == NULL ||
+	    (trim_set = sql_value_text(arg2)) == NULL)
 		return;
 
-	int trim_set_sz = sql_value_bytes(argv[1]);
-	int input_str_sz = sql_value_bytes(argv[2]);
+	int trim_set_sz = sql_value_bytes(arg2);
+	int input_str_sz = sql_value_bytes(arg3);
 	uint8_t *char_len;
 	int char_cnt = trim_prepare_char_len(context, trim_set, trim_set_sz,
 					     &char_len);
 	if (char_cnt == -1)
 		return;
-	trim_procedure(context, sql_value_int(argv[0]), trim_set, char_len,
+	trim_procedure(context, sql_value_int(arg1), trim_set, char_len,
 		       char_cnt, input_str, input_str_sz);
 	sql_free(char_len);
 }
+
+/**
+ * Normalize args from @a argv input array when it has one,
+ * two or three args.
+ *
+ * This is a dispatcher function that calls corresponding
+ * implementation depending on the number of arguments.
+*/
+static void
+trim_func(struct sql_context *context, int argc, sql_value **argv)
+{
+	switch (argc) {
+	case 1:
+		trim_func_one_arg(context, argv[0]);
+		break;
+	case 2:
+		trim_func_two_args(context, argv[0], argv[1]);
+		break;
+	case 3:
+		trim_func_three_args(context, argv[0], argv[1], argv[2]);
+		break;
+	default:
+		unreachable();
+	}
+}
+
 /*
  * Compute the soundex encoding of a word.
  *
@@ -1840,9 +1858,9 @@ sqlRegisterBuiltinFunctions(void)
 			  FIELD_TYPE_BOOLEAN),
 		FUNCTION2(likely, 1, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
 			  FIELD_TYPE_BOOLEAN),
-		FUNCTION_COLL(trim, 1, 3, 0, trim_func_one_arg),
-		FUNCTION_COLL(trim, 2, 3, 0, trim_func_two_args),
-		FUNCTION_COLL(trim, 3, 3, 0, trim_func_three_args),
+		FUNCTION_COLL(trim, 1, 3, 0, trim_func),
+		FUNCTION_COLL(trim, 2, 3, 0, trim_func),
+		FUNCTION_COLL(trim, 3, 3, 0, trim_func),
 		FUNCTION(least, -1, 0, 1, minmaxFunc, FIELD_TYPE_SCALAR),
 		AGGREGATE2(min, 1, 0, 1, minmaxStep, minMaxFinalize,
 			   SQL_FUNC_MINMAX, FIELD_TYPE_SCALAR),
