@@ -1,4 +1,4 @@
-1..280
+1..281
 ok 1 - decimal(314)
 ok 2 - decimal(271)
 ok 3 - decimal(314) + decimal(271)
@@ -277,6 +277,74 @@ ok 275 - decimal_from_string(-1)
 ok 276 - decimal_log10(-1) - error on wrong operands.
 ok 277 - decimal_from_string(-10)
 ok 278 - decimal_sqrt(-10) - error on wrong operands.
+    1..66
+    ok 1 - Conversion of 18446744073709551615 to decimal and back to uint64 successful
+    ok 2 - Conversion back to uint64 correct
+    ok 3 - Conversion of 9223372036854775807 to decimal and back to int64 successful
+    ok 4 - Conversion back to int64 correct
+    ok 5 - Conversion of -9223372036854775808 to decimal and back to int64 successful
+    ok 6 - Conversion back to int64 correct
+    ok 7 - Conversion of 0 to decimal and back to uint64 successful
+    ok 8 - Conversion back to uint64 correct
+    ok 9 - Conversion of 0 to decimal and back to int64 successful
+    ok 10 - Conversion back to int64 correct
+    ok 11 - Conversion of -1 to decimal and back to int64 successful
+    ok 12 - Conversion back to int64 correct
+    ok 13 - Conversion of 117495185182863386 to decimal and back to uint64 successful
+    ok 14 - Conversion back to uint64 correct
+    ok 15 - Conversion of 58747592591431693 to decimal and back to int64 successful
+    ok 16 - Conversion back to int64 correct
+    ok 17 - Conversion of -58747592591431693 to decimal and back to int64 successful
+    ok 18 - Conversion back to int64 correct
+    ok 19 - Conversion of 778113809158035 to decimal and back to uint64 successful
+    ok 20 - Conversion back to uint64 correct
+    ok 21 - Conversion of 389056904579017 to decimal and back to int64 successful
+    ok 22 - Conversion back to int64 correct
+    ok 23 - Conversion of -389056904579017 to decimal and back to int64 successful
+    ok 24 - Conversion back to int64 correct
+    ok 25 - Conversion of 5222240329919 to decimal and back to uint64 successful
+    ok 26 - Conversion back to uint64 correct
+    ok 27 - Conversion of 2611120164959 to decimal and back to int64 successful
+    ok 28 - Conversion back to int64 correct
+    ok 29 - Conversion of -2611120164959 to decimal and back to int64 successful
+    ok 30 - Conversion back to int64 correct
+    ok 31 - Conversion of 37570074315 to decimal and back to uint64 successful
+    ok 32 - Conversion back to uint64 correct
+    ok 33 - Conversion of 18785037157 to decimal and back to int64 successful
+    ok 34 - Conversion back to int64 correct
+    ok 35 - Conversion of -18785037157 to decimal and back to int64 successful
+    ok 36 - Conversion back to int64 correct
+    ok 37 - Conversion of 274234119 to decimal and back to uint64 successful
+    ok 38 - Conversion back to uint64 correct
+    ok 39 - Conversion of 137996015 to decimal and back to int64 successful
+    ok 40 - Conversion back to int64 correct
+    ok 41 - Conversion of -137996015 to decimal and back to int64 successful
+    ok 42 - Conversion back to int64 correct
+    ok 43 - Conversion of 4294967295 to decimal and back to uint64 successful
+    ok 44 - Conversion back to uint64 correct
+    ok 45 - Conversion of 2147483647 to decimal and back to int64 successful
+    ok 46 - Conversion back to int64 correct
+    ok 47 - Conversion of -2147483648 to decimal and back to int64 successful
+    ok 48 - Conversion back to int64 correct
+    ok 49 - Conversion of 27356479 to decimal and back to uint64 successful
+    ok 50 - Conversion back to uint64 correct
+    ok 51 - Conversion of 13678239 to decimal and back to int64 successful
+    ok 52 - Conversion back to int64 correct
+    ok 53 - Conversion of -13678239 to decimal and back to int64 successful
+    ok 54 - Conversion back to int64 correct
+    ok 55 - Conversion of 181168 to decimal and back to uint64 successful
+    ok 56 - Conversion back to uint64 correct
+    ok 57 - Conversion of 90584 to decimal and back to int64 successful
+    ok 58 - Conversion back to int64 correct
+    ok 59 - Conversion of -90584 to decimal and back to int64 successful
+    ok 60 - Conversion back to int64 correct
+    ok 61 - Conversion of 1215 to decimal and back to uint64 successful
+    ok 62 - Conversion back to uint64 correct
+    ok 63 - Conversion of 607 to decimal and back to int64 successful
+    ok 64 - Conversion back to int64 correct
+    ok 65 - Conversion of -607 to decimal and back to int64 successful
+    ok 66 - Conversion back to int64 correct
+ok 279 - subtests
     1..151
     ok 1 - decimal_len(0)
     ok 2 - decimal_len(0) == len(decimal_pack(0)
@@ -429,7 +497,7 @@ ok 278 - decimal_sqrt(-10) - error on wrong operands.
     ok 149 - positive exponent number is packed/unpacked correctly
     ok 150 - unpack malformed decimal fails
     ok 151 - decode malformed decimal preserves buffer position
-ok 279 - subtests
+ok 280 - subtests
     1..198
     ok 1 - mp_sizeof_decimal(0)
     ok 2 - mp_sizeof_decimal(0) == len(mp_encode_decimal(0))
@@ -629,4 +697,4 @@ ok 279 - subtests
     ok 196 - decimal_unpack() after mp_decode_extl()
     ok 197 - decimal_unpack() after mp_decode_extl() value
     ok 198 - decimal_unpack() after mp_decode_extl() len
-ok 280 - subtests
+ok 281 - subtests

@@ -102,6 +102,18 @@ const char *
 decimal_to_string(const decimal_t *dec);
 
 /**
+ * Convert a given decimal to int64_t
+ * \param[out] num - the result
+ * @return NULL if \a dec doesn't fit into int64_t
+ */
+decimal_t *
+decimal_to_int64(const decimal_t *dec, int64_t *num);
+
+/** \sa decimal_to_int64 */
+decimal_t *
+decimal_to_uint64(const decimal_t *dec, uint64_t *num);
+
+/**
  * Compare 2 decimal values.
  * @return -1, lhs < rhs,
  *	    0, lhs = rhs,
@@ -121,6 +133,13 @@ decimal_compare(const decimal_t *lhs, const decimal_t *rhs);
  */
 decimal_t *
 decimal_round(decimal_t *dec, int scale);
+
+/**
+ * Round a decimal towards zero.
+ * \sa decimal_round
+ */
+decimal_t *
+decimal_floor(decimal_t *dec, int scale);
 
 /**
  * Remove trailing zeros from the fractional part of a number.

@@ -5,6 +5,7 @@
 #include "msgpuck.h"
 #include <limits.h>
 #include <string.h>
+#include <inttypes.h>
 #include <float.h> /* DBL_DIG */
 
 #define success(x) x
@@ -117,6 +118,15 @@ char buf[32];
 	is(strcmp(decimal_to_string(&d2), str), 0, "str(decimal_unpack(decimal_pack("str")) == "str);\
 })
 
+#define test_toint(type, num, out_fmt) ({\
+	decimal_t dec;\
+	type##_t val;\
+	decimal_from_##type(&dec, num);\
+	isnt(decimal_to_##type(&dec, &val), NULL, "Conversion of %"out_fmt\
+						  " to decimal and back to "#type" successful", (type##_t) num);\
+	is(val, num, "Conversion back to "#type" correct");\
+})
+
 static int
 test_pack_unpack(void)
 {
@@ -192,10 +202,62 @@ test_mp_decimal(void)
 	return check_plan();
 }
 
+static int
+test_to_int(void)
+{
+	plan(66);
+
+	test_toint(uint64, ULLONG_MAX, PRIu64);
+	test_toint(int64, LLONG_MAX, PRId64);
+	test_toint(int64, LLONG_MIN, PRId64);
+	test_toint(uint64, 0, PRIu64);
+	test_toint(int64, 0, PRId64);
+	test_toint(int64, -1, PRId64);
+
+	/* test some arbitrary values. */
+	test_toint(uint64, ULLONG_MAX / 157, PRIu64);
+	test_toint(int64, LLONG_MAX / 157, PRId64);
+	test_toint(int64, LLONG_MIN / 157, PRId64);
+
+	test_toint(uint64, ULLONG_MAX / 157 / 151, PRIu64);
+	test_toint(int64, LLONG_MAX / 157 / 151, PRId64);
+	test_toint(int64, LLONG_MIN / 157 / 151, PRId64);
+
+	test_toint(uint64, ULLONG_MAX / 157 / 151 / 149, PRIu64);
+	test_toint(int64, LLONG_MAX / 157 / 151 / 149, PRId64);
+	test_toint(int64, LLONG_MIN / 157 / 151 / 149, PRId64);
+
+	test_toint(uint64, ULLONG_MAX / 157 / 151 / 149 / 139, PRIu64);
+	test_toint(int64, LLONG_MAX / 157 / 151 / 149 / 139, PRId64);
+	test_toint(int64, LLONG_MIN / 157 / 151 / 149 / 139, PRId64);
+
+	test_toint(uint64, ULLONG_MAX / 157 / 151 / 149 / 139 / 137, PRIu64);
+	test_toint(int64, LLONG_MAX / 156 / 151 / 149 / 139 / 137, PRId64);
+	test_toint(int64, LLONG_MIN / 156 / 151 / 149 / 139 / 137, PRId64);
+
+	test_toint(uint64, UINT_MAX, PRIu64);
+	test_toint(int64, INT_MAX, PRId64);
+	test_toint(int64, INT_MIN, PRId64);
+
+	test_toint(uint64, UINT_MAX / 157, PRIu64); /* ~ 27356479 */
+	test_toint(int64, INT_MAX / 157, PRId64);
+	test_toint(int64, INT_MIN / 157, PRId64);
+
+	test_toint(uint64, UINT_MAX / 157 / 151, PRIu64); /* ~ 181168 */
+	test_toint(int64, INT_MAX / 157 / 151, PRId64);
+	test_toint(int64, INT_MIN / 157 / 151, PRId64);
+
+	test_toint(uint64, UINT_MAX / 157 / 151 / 149, PRIu64); /* ~ 1215 */
+	test_toint(int64, INT_MAX / 157 / 151 / 149, PRId64);
+	test_toint(int64, INT_MIN / 157 / 151 / 149, PRId64);
+
+	return check_plan();
+}
+
 int
 main(void)
 {
-	plan(280);
+	plan(281);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -254,6 +316,8 @@ main(void)
 	dectest_op1_fail(log10, 0);
 	dectest_op1_fail(log10, -1);
 	dectest_op1_fail(sqrt, -10);
+
+	test_to_int();
 
 	test_pack_unpack();
 

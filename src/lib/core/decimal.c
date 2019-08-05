@@ -157,6 +157,45 @@ decimal_to_string(const decimal_t *dec)
 	return buf;
 }
 
+static decimal_t *
+decimal_to_integer(decimal_t *dec)
+{
+	decimal_t z;
+	decNumberZero(&z);
+	if (decimal_scale(dec) != 0) {
+		/*
+		 * Rounding mode is important here.
+		 * We want to be consistent with double
+		 * to int conversion so that comparison
+		 * hints work correctly.
+		 */
+		decimal_floor(dec, 0);
+	}
+	/* Zero the number exponent for decNumberToInt64. */
+	decNumberRescale(dec, dec, &z, &decimal_context);
+	return decimal_check_status(dec, &decimal_context);
+}
+
+decimal_t *
+decimal_to_int64(const decimal_t *dec, int64_t *num)
+{
+	decimal_t d = *dec;
+	if (decimal_to_integer(&d) == NULL)
+		return NULL;
+	*num = decNumberToInt64(&d, &decimal_context);
+	return decimal_check_status(&d, &decimal_context);
+}
+
+decimal_t *
+decimal_to_uint64(const decimal_t *dec, uint64_t *num)
+{
+	decimal_t d = *dec;
+	if (decimal_to_integer(&d) == NULL)
+		return NULL;
+	*num = decNumberToUInt64(&d, &decimal_context);
+	return decimal_check_status(&d, &decimal_context);
+}
+
 int
 decimal_compare(const decimal_t *lhs, const decimal_t *rhs)
 {
@@ -167,8 +206,8 @@ decimal_compare(const decimal_t *lhs, const decimal_t *rhs)
 	return r;
 }
 
-decimal_t *
-decimal_round(decimal_t *dec, int scale)
+static decimal_t *
+decimal_round_with_mode(decimal_t *dec, int scale, enum rounding mode)
 {
 	if (scale < 0 || scale > DECIMAL_MAX_DIGITS)
 		return NULL;
@@ -181,7 +220,7 @@ decimal_round(decimal_t *dec, int scale)
 		ndig, /* Precision */
 		ndig, /* emax */
 		scale != 0 ? -1 : 0, /* emin */
-		DECIMAL_ROUNDING, /* rounding */
+		mode, /* rounding */
 		0, /* no traps */
 		0, /* zero status */
 		0 /* no clamping */
@@ -190,6 +229,18 @@ decimal_round(decimal_t *dec, int scale)
 	decNumberPlus(dec, dec, &context);
 	assert(decimal_check_status(dec, &context) != NULL);
 	return dec;
+}
+
+inline decimal_t *
+decimal_round(decimal_t *dec, int scale)
+{
+	return decimal_round_with_mode(dec, scale, DECIMAL_ROUNDING);
+}
+
+inline decimal_t *
+decimal_floor(decimal_t *dec, int scale)
+{
+	return decimal_round_with_mode(dec, scale, DEC_ROUND_DOWN);
 }
 
 decimal_t *
