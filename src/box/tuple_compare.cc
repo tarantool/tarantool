@@ -98,8 +98,6 @@ static enum mp_class mp_ext_classes[] = {
 	/* .MP_DECIMAL		 = */ MP_CLASS_NUMBER,
 };
 
-#define COMPARE_RESULT(a, b) (a < b ? -1 : a > b)
-
 static enum mp_class
 mp_classof(enum mp_type type)
 {
@@ -154,77 +152,6 @@ mp_compare_integer_with_type(const char *field_a, enum mp_type a_type,
 	}
 }
 
-#define EXP2_53 9007199254740992.0      /* 2.0 ^ 53 */
-#define EXP2_64 1.8446744073709552e+19  /* 2.0 ^ 64 */
-
-/*
- * Compare LHS with RHS, return a value <0, 0 or >0 depending on the
- * comparison result (strcmp-style).
- * Normally, K==1. If K==-1, the result is inverted (as if LHS and RHS
- * were swapped).
- * K is needed to enable tail call optimization in Release build.
- * NOINLINE attribute was added to avoid aggressive inlining which
- * resulted in over 2Kb code size for mp_compare_number.
- */
-NOINLINE static int
-mp_compare_double_uint64(double lhs, uint64_t rhs, int k)
-{
-	assert(k==1 || k==-1);
-	/*
-	 * IEEE double represents 2^N precisely.
-	 * The value below is 2^53.  If a double exceeds this threshold,
-	 * there's no fractional part. Moreover, the "next" float is
-	 * 2^53+2, i.e. there's not enough precision to encode even some
-	 * "odd" integers.
-	 * Note: ">=" is important, see next block.
-	 */
-	if (lhs >= EXP2_53) {
-		/*
-		 * The value below is 2^64.
-		 * Note: UINT64_MAX is 2^64-1, hence ">="
-		 */
-		if (lhs >= EXP2_64)
-			return k;
-		/* Within [2^53, 2^64) double->uint64_t is lossless. */
-		assert((double)(uint64_t)lhs == lhs);
-		return k*COMPARE_RESULT((uint64_t)lhs, rhs);
-	}
-	/*
-	 * According to the IEEE 754 the double format is the
-	 * following:
-	 * +------+----------+----------+
-	 * | sign | exponent | fraction |
-	 * +------+----------+----------+
-	 *  1 bit    11 bits    52 bits
-	 * If the exponent is 0x7FF, the value is a special one.
-	 * Special value can be NaN, +inf and -inf.
-	 * If the fraction == 0, the value is inf. Sign depends on
-	 * the sign bit.
-	 * If the first bit of the fraction is 1, the value is the
-	 * quiet NaN, else the signaling NaN.
-	 */
-	if (!isnan(lhs)) {
-		/*
-		 * lhs is a number or inf.
-		 * If RHS < 2^53, uint64_t->double is lossless.
-		 * Otherwize the value may get rounded.	 It's
-		 * unspecified whether it gets rounded up or down,
-		 * i.e. the conversion may yield 2^53 for a
-		 * RHS > 2^53. Since we've aready ensured that
-		 * LHS < 2^53, the result is still correct even if
-		 * rounding happens.
-		 */
-		assert(lhs < EXP2_53);
-		assert((uint64_t)(double)rhs == rhs || rhs > (uint64_t)EXP2_53);
-		return k*COMPARE_RESULT(lhs, (double)rhs);
-	}
-	/*
-	 * Lhs is NaN. We assume all NaNs to be less than any
-	 * number.
-	 */
-	return -k;
-}
-
 static int
 mp_compare_double_any_int(double lhs, const char *rhs, enum mp_type rhs_type,
 			  int k)
@@ -232,13 +159,12 @@ mp_compare_double_any_int(double lhs, const char *rhs, enum mp_type rhs_type,
 	if (rhs_type == MP_INT) {
 		int64_t v = mp_decode_int(&rhs);
 		if (v < 0) {
-			return mp_compare_double_uint64(-lhs, (uint64_t)-v,
-							-k);
+			return double_compare_uint64(-lhs, (uint64_t)-v, -k);
 		}
-		return mp_compare_double_uint64(lhs, (uint64_t)v, k);
+		return double_compare_uint64(lhs, (uint64_t)v, k);
 	}
 	assert(rhs_type == MP_UINT);
-	return mp_compare_double_uint64(lhs, mp_decode_uint(&rhs), k);
+	return double_compare_uint64(lhs, mp_decode_uint(&rhs), k);
 }
 
 static int

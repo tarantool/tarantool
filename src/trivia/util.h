@@ -500,6 +500,18 @@ json_escape(char *buf, int size, const char *data);
 	}									\
 } while(0)
 
+#define COMPARE_RESULT(a, b) (a < b ? -1 : a > b)
+
+/**
+ * Compare LHS with RHS, return a value <0, 0 or >0 depending on the
+ * comparison result (strcmp-style).
+ * Normally, K==1. If K==-1, the result is inverted (as if LHS and RHS
+ * were swapped).
+ * K is needed to enable tail call optimization in Release build.
+ */
+int
+double_compare_uint64(double lhs, uint64_t rhs, int k);
+
 #if !defined(__cplusplus) && !defined(static_assert)
 # define static_assert _Static_assert
 #endif

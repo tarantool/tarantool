@@ -30,6 +30,7 @@
  */
 #include "trivia/util.h"
 
+#include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -323,4 +324,66 @@ fpconv_check()
 	 * Just check that locale decimal point is '.'.
 	 */
 	assert(buf[1] == '.');
+}
+
+#define EXP2_53 9007199254740992.0      /* 2.0 ^ 53 */
+#define EXP2_64 1.8446744073709552e+19  /* 2.0 ^ 64 */
+
+int
+double_compare_uint64(double lhs, uint64_t rhs, int k)
+{
+	assert(k==1 || k==-1);
+	/*
+	 * IEEE double represents 2^N precisely.
+	 * The value below is 2^53.  If a double exceeds this threshold,
+	 * there's no fractional part. Moreover, the "next" float is
+	 * 2^53+2, i.e. there's not enough precision to encode even some
+	 * "odd" integers.
+	 * Note: ">=" is important, see next block.
+	 */
+	if (lhs >= EXP2_53) {
+		/*
+		 * The value below is 2^64.
+		 * Note: UINT64_MAX is 2^64-1, hence ">="
+		 */
+		if (lhs >= EXP2_64)
+			return k;
+		/* Within [2^53, 2^64) double->uint64_t is lossless. */
+		assert((double)(uint64_t)lhs == lhs);
+		return k*COMPARE_RESULT((uint64_t)lhs, rhs);
+	}
+	/*
+	 * According to the IEEE 754 the double format is the
+	 * following:
+	 * +------+----------+----------+
+	 * | sign | exponent | fraction |
+	 * +------+----------+----------+
+	 *  1 bit    11 bits    52 bits
+	 * If the exponent is 0x7FF, the value is a special one.
+	 * Special value can be NaN, +inf and -inf.
+	 * If the fraction == 0, the value is inf. Sign depends on
+	 * the sign bit.
+	 * If the first bit of the fraction is 1, the value is the
+	 * quiet NaN, else the signaling NaN.
+	 */
+	if (!isnan(lhs)) {
+		/*
+		 * lhs is a number or inf.
+		 * If RHS < 2^53, uint64_t->double is lossless.
+		 * Otherwize the value may get rounded.	 It's
+		 * unspecified whether it gets rounded up or down,
+		 * i.e. the conversion may yield 2^53 for a
+		 * RHS > 2^53. Since we've aready ensured that
+		 * LHS < 2^53, the result is still correct even if
+		 * rounding happens.
+		 */
+		assert(lhs < EXP2_53);
+		assert((uint64_t)(double)rhs == rhs || rhs > (uint64_t)EXP2_53);
+		return k*COMPARE_RESULT(lhs, (double)rhs);
+	}
+	/*
+	 * Lhs is NaN. We assume all NaNs to be less than any
+	 * number.
+	 */
+	return -k;
 }
