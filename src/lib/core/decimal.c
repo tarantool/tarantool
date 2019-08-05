@@ -33,6 +33,7 @@
 #include "third_party/decNumber/decContext.h"
 #include "third_party/decNumber/decPacked.h"
 #include "lib/core/tt_static.h"
+#include "lib/msgpuck/msgpuck.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <float.h> /* DBL_DIG */
@@ -339,20 +340,27 @@ decimal_sqrt(decimal_t *res, const decimal_t *lhs)
 uint32_t
 decimal_len(const decimal_t *dec)
 {
-	/* 1  + ceil((digits + 1) / 2) */
-	return 2 + dec->digits / 2;
+	uint32_t sizeof_scale = dec->exponent > 0 ? mp_sizeof_int(-dec->exponent) :
+						    mp_sizeof_uint(-dec->exponent);
+	/* sizeof_scale  + ceil((digits + 1) / 2) */
+	return sizeof_scale + 1 + dec->digits / 2;
 }
 
 char *
 decimal_pack(char *data, const decimal_t *dec)
 {
 	uint32_t len = decimal_len(dec);
-	*data++ = decimal_scale(dec);
-	len--;
+	char *svp = data;
+	/* encode scale */
+	if (dec->exponent > 0) {
+		data = mp_encode_int(data, -dec->exponent);
+	} else {
+		data = mp_encode_uint(data, -dec->exponent);
+	}
+	len -= data - svp;
 	int32_t scale;
 	char *tmp = (char *)decPackedFromNumber((uint8_t *)data, len, &scale, dec);
 	assert(tmp == data);
-	assert(scale == (int32_t)decimal_scale(dec));
 	(void)tmp;
 	data += len;
 	return data;
@@ -361,12 +369,30 @@ decimal_pack(char *data, const decimal_t *dec)
 decimal_t *
 decimal_unpack(const char **data, uint32_t len, decimal_t *dec)
 {
-	int32_t scale = *((*data)++);
-	len--;
+	int32_t scale;
+	const char *svp = *data;
+	if (mp_typeof(**data) == MP_UINT) {
+		scale = mp_decode_uint(data);
+	} else if (mp_typeof(**data) == MP_INT) {
+		scale = mp_decode_int(data);
+	} else {
+		return NULL;
+	}
+	/*
+	 * scale = -exponent. The exponent should be in range
+	 * [-DECIMAL_MAX_DIGITS; DECIMAL_MAX_DIGITS)
+	 */
+	if (scale > DECIMAL_MAX_DIGITS ||
+	    scale <= -DECIMAL_MAX_DIGITS) {
+		*data = svp;
+		return NULL;
+	}
+
+	len -= *data - svp;
 	decimal_t *res = decPackedToNumber((uint8_t *)*data, len, &scale, dec);
 	if (res)
 		*data += len;
 	else
-		(*data)--;
+		*data = svp;
 	return res;
 }

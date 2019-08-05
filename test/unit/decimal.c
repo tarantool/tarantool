@@ -91,7 +91,7 @@ char buf[32];
 static int
 test_pack_unpack(void)
 {
-	plan(146);
+	plan(151);
 
 	test_decpack("0");
 	test_decpack("-0");
@@ -112,13 +112,24 @@ test_pack_unpack(void)
 	test_decpack("99999999999999999999999999999999999999");
 	test_decpack("-99999999999999999999999999999999999999");
 
+	/* Check correct encoding of positive exponent numbers. */
+	decimal_t dec, d1;
+	decimal_from_string(&dec, "1e10");
+	uint32_t l1 = decimal_len(&dec);
+	ok(l1 == 2, "decimal_len() is small for positive exponent decimal");
+	char *b1 = decimal_pack(buf, &dec);
+	is(b1, buf + l1, "positive exponent decimal length");
+	const char *b2 = buf;
+	is(decimal_unpack(&b2, l1, &d1), &d1, "decimal_unpack() of a positive exponent decimal");
+	is(b1, b2, "decimal_unpack uses every byte packed by decimal_pack");
+	is(decimal_compare(&dec, &d1), 0, "positive exponent number is packed/unpacked correctly");
+
 	/* Pack an invalid decimal. */
 	char *b = buf;
 	*b++ = 1;
 	*b++ = '\xab';
 	*b++ = '\xcd';
 	const char *bb = buf;
-	decimal_t dec;
 	is(decimal_unpack(&bb, 3, &dec), NULL, "unpack malformed decimal fails");
 	is(bb, buf, "decode malformed decimal preserves buffer position");
 

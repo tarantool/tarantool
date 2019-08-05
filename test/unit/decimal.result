@@ -277,7 +277,7 @@ ok 275 - decimal_from_string(-1)
 ok 276 - decimal_log10(-1) - error on wrong operands.
 ok 277 - decimal_from_string(-10)
 ok 278 - decimal_sqrt(-10) - error on wrong operands.
-    1..146
+    1..151
     ok 1 - decimal_len(0)
     ok 2 - decimal_len(0) == len(decimal_pack(0)
     ok 3 - decimal_unpack(decimal_pack(0))
@@ -422,6 +422,11 @@ ok 278 - decimal_sqrt(-10) - error on wrong operands.
     ok 142 - decimal_unpack(decimal_pack(-99999999999999999999999999999999999999)) scale
     ok 143 - decimal_unpack(decimal_pack(-99999999999999999999999999999999999999)) precision
     ok 144 - str(decimal_unpack(decimal_pack(-99999999999999999999999999999999999999)) == -99999999999999999999999999999999999999
-    ok 145 - unpack malformed decimal fails
-    ok 146 - decode malformed decimal preserves buffer position
+    ok 145 - decimal_len() is small for positive exponent decimal
+    ok 146 - positive exponent decimal length
+    ok 147 - decimal_unpack() of a positive exponent decimal
+    ok 148 - decimal_unpack uses every byte packed by decimal_pack
+    ok 149 - positive exponent number is packed/unpacked correctly
+    ok 150 - unpack malformed decimal fails
+    ok 151 - decode malformed decimal preserves buffer position
 ok 279 - subtests
