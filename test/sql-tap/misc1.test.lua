@@ -330,7 +330,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc1-6.4",
     [[
-        SELECT abort+"asc",max(key,"pragma",temp) FROM t4
+        SELECT abort+"asc",GREATEST(key,"pragma",temp) FROM t4
     ]], {
         -- <misc1-6.4>
         3, 17

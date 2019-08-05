@@ -911,6 +911,25 @@ local function upgrade_to_2_2_1()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 2.3.0
+--------------------------------------------------------------------------------
+
+local function upgrade_to_2_3_0()
+    log.info("Create GREATEST and LEAST SQL Builtins")
+    local _func = box.space[box.schema.FUNC_ID]
+    local _priv = box.space[box.schema.PRIV_ID]
+    local datetime = os.date("%Y-%m-%d %H:%M:%S")
+    local new_builtins = {"GREATEST", "LEAST"}
+    for _, v in pairs(new_builtins) do
+        local t = _func:auto_increment({ADMIN, v, 1, 'SQL_BUILTIN', '',
+                                       'function', {}, 'any', 'none', 'none',
+                                        false, false, true, {}, setmap({}), '',
+                                        datetime, datetime})
+        _priv:replace{ADMIN, PUBLIC, 'function', t.id, box.priv.X}
+    end
+end
+
+--------------------------------------------------------------------------------
 
 local function get_version()
     local version = box.space._schema:get{'version'}
@@ -944,6 +963,7 @@ local function upgrade(options)
         {version = mkversion(2, 1, 2), func = upgrade_to_2_1_2, auto = true},
         {version = mkversion(2, 1, 3), func = upgrade_to_2_1_3, auto = true},
         {version = mkversion(2, 2, 1), func = upgrade_to_2_2_1, auto = true},
+        {version = mkversion(2, 3, 0), func = upgrade_to_2_3_0, auto = true},
     }
 
     for _, handler in ipairs(handlers) do

@@ -1,3 +1,8 @@
+-- Test that recovery had been completed without errors
+test_run = require('test_run').new()
+test_run:cmd("restart server default")
+box.error.last() == nil
+
 errinj = box.error.injection
 net_box = require('net.box')
 

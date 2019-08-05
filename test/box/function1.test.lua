@@ -285,7 +285,7 @@ sql_builtin_list = {
 	"RANDOMBLOB", "NULLIF", "ZEROBLOB", "MIN", "MAX", "COALESCE", "EVERY",
 	"EXISTS", "EXTRACT", "SOME", "GREATER", "LESSER", "SOUNDEX",
 	"LIKELIHOOD", "LIKELY", "UNLIKELY", "_sql_stat_get", "_sql_stat_push",
-	"_sql_stat_init",
+	"_sql_stat_init", "GREATEST", "LEAST"
 }
 test_run:cmd("setopt delimiter ''");
 ok = true

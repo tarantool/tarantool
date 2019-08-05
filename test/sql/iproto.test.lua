@@ -240,8 +240,8 @@ res.metadata
 -- arguments of all scalar type, we can't say nothing more than
 -- SCALAR.
 --
-cn:execute("SELECT min(1, 2, 3);")
-cn:execute("SELECT max(1, 2, 3);")
+cn:execute("SELECT LEAST(1, 2, 3);")
+cn:execute("SELECT GREATEST(1, 2, 3);")
 
 cn:close()
 box.execute('DROP TABLE t1')

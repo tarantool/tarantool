@@ -98,13 +98,13 @@ test:do_execsql_test(
         -- </func5-2.2>
     })
 
--- The following tests ensures that max() and min() functions
--- raise error if argument's collations are incompatible.
+-- The following tests ensures that GREATEST() and LEAST()
+-- functions raise error if argument's collations are incompatible.
 
 test:do_catchsql_test(
     "func-5-3.1",
     [[
-        SELECT max('a' COLLATE "unicode", 'A' COLLATE "unicode_ci");
+        SELECT GREATEST('a' COLLATE "unicode", 'A' COLLATE "unicode_ci");
     ]],
     {
         -- <func5-3.1>
@@ -120,7 +120,7 @@ test:do_catchsql_test(
         CREATE TABLE test2 (s2 VARCHAR(5) PRIMARY KEY COLLATE "unicode_ci");
         INSERT INTO test1 VALUES ('a');
         INSERT INTO test2 VALUES ('a');
-        SELECT max(s1, s2) FROM test1 JOIN test2;
+        SELECT GREATEST(s1, s2) FROM test1 JOIN test2;
     ]],
     {
         -- <func5-3.2>
@@ -132,7 +132,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-5-3.3",
     [[
-        SELECT max ('abc', 'asd' COLLATE "binary", 'abc' COLLATE "unicode")
+        SELECT GREATEST ('abc', 'asd' COLLATE "binary", 'abc' COLLATE "unicode")
     ]],
     {
         -- <func5-3.3>
@@ -144,7 +144,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "func-5-3.4",
     [[
-        SELECT max (s1, 'asd' COLLATE "binary", s2) FROM test1 JOIN test2;
+        SELECT GREATEST (s1, 'asd' COLLATE "binary", s2) FROM test1 JOIN test2;
     ]], {
         -- <func5-3.4>
         "asd"
@@ -161,7 +161,7 @@ test:do_catchsql_test(
         INSERT INTO test3 VALUES ('a');
         INSERT INTO test4 VALUES ('a');
         INSERT INTO test5 VALUES ('a');
-        SELECT max(s3, s4, s5) FROM test3 JOIN test4 JOIN test5;
+        SELECT GREATEST(s3, s4, s5) FROM test3 JOIN test4 JOIN test5;
     ]],
     {
         -- <func5-3.5>
@@ -173,7 +173,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-5-3.6",
     [[
-        SELECT min('a' COLLATE "unicode", 'A' COLLATE "unicode_ci");
+        SELECT LEAST('a' COLLATE "unicode", 'A' COLLATE "unicode_ci");
     ]],
     {
         -- <func5-3.6>
@@ -185,7 +185,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-5-3.7",
     [[
-        SELECT min(s1, s2) FROM test1 JOIN test2;
+        SELECT LEAST(s1, s2) FROM test1 JOIN test2;
     ]],
     {
         -- <func5-3.7>
@@ -197,7 +197,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-5-3.8",
     [[
-        SELECT min ('abc', 'asd' COLLATE "binary", 'abc' COLLATE "unicode")
+        SELECT LEAST('abc', 'asd' COLLATE "binary", 'abc' COLLATE "unicode")
     ]],
     {
         -- <func5-3.8>
@@ -209,7 +209,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "func-5-3.9",
     [[
-        SELECT min (s1, 'asd' COLLATE "binary", s2) FROM test1 JOIN test2;
+        SELECT LEAST(s1, 'asd' COLLATE "binary", s2) FROM test1 JOIN test2;
     ]], {
         -- <func5-3.9>
         "a"
@@ -220,7 +220,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "func-5.3.10",
     [[
-        SELECT min(s3, s4, s5) FROM test3 JOIN test4 JOIN test5;
+        SELECT LEAST(s3, s4, s5) FROM test3 JOIN test4 JOIN test5;
     ]],
     {
         -- <func5-3.10>
@@ -229,32 +229,32 @@ test:do_catchsql_test(
     }
 )
 
--- Order of arguments of min/max functions doesn't affect
+-- Order of arguments of LEAST/GREATEST functions doesn't affect
 -- the result: boolean is always less than numbers, which
 -- are less than strings.
 --
 test:do_execsql_test(
     "func-5-4.1",
     [[
-        SELECT max (false, 'STR', 1, 0.5);
+        SELECT GREATEST (false, 'STR', 1, 0.5);
     ]], { "STR" } )
 
 test:do_execsql_test(
     "func-5-4.2",
     [[
-        SELECT max ('STR', 1, 0.5, false);
+        SELECT GREATEST ('STR', 1, 0.5, false);
     ]], { "STR" } )
 
 test:do_execsql_test(
     "func-5-4.3",
     [[
-        SELECT min ('STR', 1, 0.5, false);
+        SELECT LEAST('STR', 1, 0.5, false);
     ]], { false } )
 
 test:do_execsql_test(
     "func-5-4.4",
     [[
-        SELECT min (false, 'STR', 1, 0.5);
+        SELECT LEAST(false, 'STR', 1, 0.5);
     ]], { false } )
 
 test:finish_test()

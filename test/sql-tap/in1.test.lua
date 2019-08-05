@@ -177,7 +177,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in-2.7",
     [[
-        SELECT a FROM t1 WHERE b IN (max(5,10,b),20)
+        SELECT a FROM t1 WHERE b IN (GREATEST(5,10,b),20)
     ]], {
         -- <in-2.7>
         4, 5, 6, 7, 8, 9, 10
@@ -197,7 +197,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in-2.9",
     [[
-        SELECT a FROM t1 WHERE b IN (max(5,10),20)
+        SELECT a FROM t1 WHERE b IN (GREATEST(5,10),20)
     ]], {
         -- <in-2.9>
         
@@ -207,7 +207,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in-2.10",
     [[
-        SELECT a FROM t1 WHERE min(0, CAST(b IN (a,30) AS INT)) <> 0
+        SELECT a FROM t1 WHERE LEAST(0, CAST(b IN (a,30) AS INT)) <> 0
     ]], {
         -- <in-2.10>
         

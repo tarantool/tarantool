@@ -680,10 +680,10 @@ box.execute("SELECT quote(b) FROM t;")
   - ['false']
   - ['NULL']
 ...
-box.execute("SELECT min(b, true) FROM t;")
+box.execute("SELECT LEAST(b, true) FROM t;")
 ---
 - metadata:
-  - name: min(b, true)
+  - name: LEAST(b, true)
     type: scalar
   rows:
   - [true]
@@ -1550,10 +1550,10 @@ box.execute("SELECT quote(i) FROM t;")
   rows:
   - [18446744073709551613]
 ...
-box.execute("SELECT min(-1, i) FROM t;")
+box.execute("SELECT LEAST(-1, i) FROM t;")
 ---
 - metadata:
-  - name: min(-1, i)
+  - name: LEAST(-1, i)
     type: scalar
   rows:
   - [-1]
@@ -2023,10 +2023,10 @@ box.execute("SELECT quote(v) FROM t;")
   rows:
   - ['X''616263''']
 ...
-box.execute("SELECT min(v, x'') FROM t;")
+box.execute("SELECT LEAST(v, x'') FROM t;")
 ---
 - metadata:
-  - name: min(v, x'')
+  - name: LEAST(v, x'')
     type: scalar
   rows:
   - ['']

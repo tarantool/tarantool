@@ -135,8 +135,8 @@ test:do_catchsql_test(
 test:do_test(
     "func3-5.20",
     function()
-        return test:execsql "EXPLAIN SELECT likelihood(min(1.0+'2.0',4*11), 0.5)"
-    end, test:execsql("EXPLAIN SELECT min(1.0+'2.0',4*11)"))
+        return test:execsql "EXPLAIN SELECT likelihood(LEAST(1.0+'2.0',4*11), 0.5)"
+    end, test:execsql("EXPLAIN SELECT LEAST(1.0+'2.0',4*11)"))
 
 -- EVIDENCE-OF: R-11152-23456 The unlikely(X) function returns the
 -- argument X unchanged.
@@ -208,8 +208,8 @@ test:do_execsql_test(
 test:do_test(
     "func3-5.39",
     function()
-        return test:execsql "EXPLAIN SELECT unlikely(min(1.0+'2.0',4*11))"
-    end, test:execsql "EXPLAIN SELECT min(1.0+'2.0',4*11)")
+        return test:execsql "EXPLAIN SELECT unlikely(LEAST(1.0+'2.0',4*11))"
+    end, test:execsql "EXPLAIN SELECT LEAST(1.0+'2.0',4*11)")
 
 -- EVIDENCE-OF: R-23735-03107 The likely(X) function returns the argument
 -- X unchanged.
@@ -281,8 +281,8 @@ test:do_execsql_test(
 test:do_test(
     "func3-5.59",
     function()
-        return test:execsql "EXPLAIN SELECT likely(min(1.0+'2.0',4*11))"
-    end, test:execsql "EXPLAIN SELECT min(1.0+'2.0',4*11)")
+        return test:execsql "EXPLAIN SELECT likely(LEAST(1.0+'2.0',4*11))"
+    end, test:execsql "EXPLAIN SELECT LEAST(1.0+'2.0',4*11)")
 
 
 --

@@ -788,18 +788,18 @@ res.metadata
 -- arguments of all scalar type, we can't say nothing more than
 -- SCALAR.
 --
-cn:execute("SELECT min(1, 2, 3);")
+cn:execute("SELECT LEAST(1, 2, 3);")
 ---
 - metadata:
-  - name: min(1, 2, 3)
+  - name: LEAST(1, 2, 3)
     type: scalar
   rows:
   - [1]
 ...
-cn:execute("SELECT max(1, 2, 3);")
+cn:execute("SELECT GREATEST(1, 2, 3);")
 ---
 - metadata:
-  - name: max(1, 2, 3)
+  - name: GREATEST(1, 2, 3)
     type: scalar
   rows:
   - [3]

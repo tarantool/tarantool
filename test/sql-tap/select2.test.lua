@@ -201,7 +201,7 @@ test:do_execsql_test(
         INSERT INTO aa VALUES(3);
         INSERT INTO bb VALUES(2);
         INSERT INTO bb VALUES(4);
-        SELECT * FROM aa, bb WHERE max(a,b)>2;
+        SELECT * FROM aa, bb WHERE GREATEST(a,b)>2;
     ]], {
         -- <select2-4.1>
         1, 4, 3, 2, 3, 4
@@ -232,7 +232,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select2-4.4",
     [[
-        SELECT * FROM aa, bb WHERE min(a,b) <> 0;
+        SELECT * FROM aa, bb WHERE LEAST(a,b) <> 0;
     ]], {
         -- <select2-4.4>
         1, 2, 1, 4, 3, 2, 3, 4
@@ -242,7 +242,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select2-4.5",
     [[
-        SELECT * FROM aa, bb WHERE NOT min(a,b) <> 0;
+        SELECT * FROM aa, bb WHERE NOT LEAST(a,b) <> 0;
     ]], {
         -- <select2-4.5>
         1, 0, 3, 0

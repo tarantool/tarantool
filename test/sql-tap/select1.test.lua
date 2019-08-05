@@ -105,7 +105,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select1-1.8.2",
     [[
-        SELECT *, min(f1,f2), max(f1,f2) FROM test1
+        SELECT *, LEAST(f1,f2), GREATEST(f1,f2) FROM test1
     ]], {
         -- <select1-1.8.2>
         11, 22, 11, 22
@@ -197,7 +197,7 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "select1-1.12",
-    [[SELECT max(test1.f1,test2.r1), min(test1.f2,test2.r2)
+    [[SELECT GREATEST(test1.f1,test2.r1), LEAST(test1.f2,test2.r2)
            FROM test2, test1]], {
         -- <select1-1.12>
         11, 2
@@ -206,7 +206,7 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "select1-1.13",
-    [[SELECT min(test1.f1,test2.r1), max(test1.f2,test2.r2)
+    [[SELECT LEAST(test1.f1,test2.r1), GREATEST(test1.f2,test2.r2)
            FROM test1, test2]], {
         -- <select1-1.13>
         1, 22
@@ -343,7 +343,7 @@ test:do_test(
     function()
         local msg
         local v = pcall(function()
-            msg = test:execsql "SELECT MIN(f1,f2) FROM test1"
+            msg = test:execsql "SELECT LEAST(f1,f2) FROM test1"
             end)
         v = v == true and {0} or {1} 
         return table.insert(v,table.sort(msg) or msg) or v
@@ -408,7 +408,7 @@ test:do_test(
     function()
         local msg
         local v = pcall(function()
-            msg = test:execsql "SELECT max(f1,f2) FROM test1"
+            msg = test:execsql "SELECT GREATEST(f1,f2) FROM test1"
             end)
         v = v == true and {0} or {1} 
         return table.insert(v,table.sort(msg) or msg) or v
@@ -423,7 +423,7 @@ test:do_test(
     function()
         local msg
         local v = pcall(function()
-            msg = test:execsql "SELECT MAX(f1,f2)+1 FROM test1"
+            msg = test:execsql "SELECT GREATEST(f1,f2)+1 FROM test1"
             end)
         v = v == true and {0} or {1} 
         return table.insert(v,table.sort(msg) or msg) or v
@@ -526,7 +526,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "select1-2.19",
     [[
-        SELECT SUM(min(f1,f2)) FROM test1
+        SELECT SUM(LEAST(f1,f2)) FROM test1
     ]], {
         -- <select1-2.19>
         0, {44}
@@ -660,7 +660,7 @@ test:do_test(
     function()
         local msg
         local v = pcall(function()
-            msg = test:execsql "SELECT f1 FROM test1 WHERE min(f1,f2)!=11"
+            msg = test:execsql "SELECT f1 FROM test1 WHERE LEAST(f1,f2)!=11"
             end)
         v = v == true and {0} or {1} 
         return table.insert(v,table.sort(msg) or msg) or v
@@ -675,7 +675,7 @@ test:do_test(
     function()
         local msg
         local v = pcall(function()
-            msg = test:execsql "SELECT f1 FROM test1 WHERE max(f1,f2)!=11"
+            msg = test:execsql "SELECT f1 FROM test1 WHERE GREATEST(f1,f2)!=11"
             end)
         v = v == true and {0} or {1} 
         return table.insert(v,table.sort(msg) or msg) or v
@@ -720,7 +720,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "select1-4.3",
     [[
-        SELECT f1 FROM test1 ORDER BY min(f1,f2)
+        SELECT f1 FROM test1 ORDER BY LEAST(f1,f2)
     ]], {
         -- <select1-4.3>
         0, {11, 33}
@@ -1546,7 +1546,7 @@ end
 test:do_execsql_test(
     "select1-8.5",
     [[
-        SELECT min(1,2,3), -max(1,2,3)
+        SELECT LEAST(1,2,3), -GREATEST(1,2,3)
         FROM test1 ORDER BY f1
     ]], {
         -- <select1-8.5>

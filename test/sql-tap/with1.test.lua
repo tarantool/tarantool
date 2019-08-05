@@ -547,7 +547,7 @@ test:do_execsql_test("8.1-mandelbrot", [[
       SELECT max(iter), cx, cy FROM m GROUP BY cx, cy
     ),
     a(t) AS (
-      SELECT group_concat( substr(' .+*#', 1+min(iter/7,4), 1), '') 
+      SELECT group_concat( substr(' .+*#', 1+LEAST(iter/7,4), 1), '')
       FROM m2 GROUP BY cy
     )
   SELECT group_concat(TRIM(TRAILING FROM t),x'0a') FROM a;

@@ -273,7 +273,7 @@ test:do_catchsql_test("insert-4.6", [[
 })
 
 test:do_execsql_test("insert-4.7", [[
-  INSERT INTO t3 VALUES(min(1,2,3),max(1,2,3),99);
+  INSERT INTO t3 VALUES(LEAST(1,2,3),GREATEST(1,2,3),99);
   SELECT * FROM t3 WHERE c=99;
 ]], {
   -- <insert-4.7>
