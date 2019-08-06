@@ -62,6 +62,14 @@ a ~= b
 a
 b
 
+-- check comparsion with nil
+a == nil
+a ~= nil
+a > nil
+a < nil
+a >= nil
+a <= nil
+
 decimal.sqrt(a)
 decimal.ln(a)
 decimal.log10(a)

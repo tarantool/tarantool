@@ -223,6 +223,32 @@ b
  | - '0.1'
  | ...
 
+-- check comparsion with nil
+a == nil
+ | ---
+ | - false
+ | ...
+a ~= nil
+ | ---
+ | - true
+ | ...
+a > nil
+ | ---
+ | - error: '[string "return a > nil "]:1: attempt to compare decimal with nil'
+ | ...
+a < nil
+ | ---
+ | - error: '[string "return a < nil "]:1: attempt to compare decimal with nil'
+ | ...
+a >= nil
+ | ---
+ | - error: '[string "return a >= nil "]:1: attempt to compare decimal with nil'
+ | ...
+a <= nil
+ | ---
+ | - error: '[string "return a <= nil "]:1: attempt to compare decimal with nil'
+ | ...
+
 decimal.sqrt(a)
  | ---
  | - '3.1622776601683793319988935444327185337'

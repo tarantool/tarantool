@@ -69,6 +69,10 @@ ldecimal_##name(struct lua_State *L) {						\
 static int									\
 ldecimal_##name(struct lua_State *L) {						\
 	assert(lua_gettop(L) == 2);						\
+	if (lua_isnil(L, 1) || lua_isnil(L, 2)) {				\
+		luaL_error(L, "attempt to compare decimal with nil");		\
+		return 1;							\
+	}									\
 	decimal_t *lhs = lua_todecimal(L, 1);					\
 	decimal_t *rhs = lua_todecimal(L, 2);					\
 	lua_pushboolean(L, decimal_compare(lhs, rhs) cmp 0);			\
@@ -226,9 +230,22 @@ LDECIMAL_FUNC(exp, exp)
 LDECIMAL_FUNC(sqrt, sqrt)
 LDECIMAL_FUNC(abs, abs)
 
-LDECIMAL_CMPOP(eq, ==)
 LDECIMAL_CMPOP(lt, <)
 LDECIMAL_CMPOP(le, <=)
+
+static int
+ldecimal_eq(struct lua_State *L)
+{
+	assert(lua_gettop(L) == 2);
+	if (lua_isnil(L, 1) || lua_isnil(L, 2)) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+	decimal_t *lhs = lua_todecimal(L, 1);
+	decimal_t *rhs = lua_todecimal(L, 2);
+	lua_pushboolean(L, decimal_compare(lhs, rhs) == 0);
+	return 1;
+}
 
 static int
 ldecimal_minus(struct lua_State *L)
