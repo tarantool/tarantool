@@ -22,6 +22,9 @@ ffi.cdef[[
     void
     say_set_log_format(enum say_format format);
 
+    void
+    say_logger_init(const char *init_str, int level, int nonblock,
+        const char *format, int background);
 
     extern sayfunc_t _say;
     extern struct ev_loop;
@@ -63,6 +66,12 @@ json.cfg{
     encode_use_tostring    = true,
     encode_invalid_as_nil  = true,
 }
+
+local cfg = setmetatable({}, {
+    __newindex = function()
+        error('Attempt to modify a read-only table')
+    end,
+})
 
 local special_fields = {
     "file",
@@ -124,10 +133,25 @@ local function log_rotate()
 end
 
 local function log_level(level)
+    if level == nil then
+        return ffi.C.log_level
+    end
+    rawset(cfg, 'level', level)
+
     return ffi.C.say_set_log_level(level)
 end
 
 local function log_format(format_name)
+    if format_name == nil then
+        if ffi.C.log_format == ffi.C.SF_PLAIN then
+            return 'plain'
+        elseif ffi.C.log_format == ffi.C.SF_JSON then
+            return 'json'
+        else
+            return
+        end
+    end
+
     if format_name == "json" then
         if ffi.C.log_type() == ffi.C.SAY_LOGGER_SYSLOG then
             error("log_format: 'json' can't be used with syslog logger")
@@ -138,6 +162,8 @@ local function log_format(format_name)
     else
         error("log_format: expected 'json' or 'plain'")
     end
+
+    rawset(cfg, 'format', format_name)
 end
 
 local function log_pid()
@@ -155,6 +181,38 @@ local compat_v16 = {
     end;
 }
 
+local function init(args)
+    args = args or {}
+    assert(type(args) == 'table', "init(args): expected 'args' to be a 'table'")
+
+    assert(type(args.init_str) == 'nil' or type(args.init_str) == 'string',
+        "init(args): expected 'args.init_str' to be either 'nil' or 'string'")
+
+    args.format = args.format or "plain"
+    assert(type(args.format) == 'string',
+        "init(args): expected 'args.format' to be a 'string'")
+
+    args.level = args.level or 5
+    assert(type(args.level) == 'number',
+        "init(args): expected 'args.level' to be a 'number'")
+
+    args.background = args.background or false
+    assert(type(args.background) == 'boolean',
+        "init(args): expected 'args.background' to be a 'boolean'")
+
+    args.nonblock = args.nonblock or false
+    assert(type(args.nonblock) == 'boolean',
+        "init(args): expected 'args.nonblock' to be a 'boolean'")
+
+    ffi.C.say_logger_init(args.init_str, args.level, args.nonblock, args.format, args.background)
+
+    rawset(cfg, 'init_str', args.init_str)
+    rawset(cfg, 'format', args.format)
+    rawset(cfg, 'level', args.level)
+    rawset(cfg, 'background', args.background)
+    rawset(cfg, 'nonblock', args.nonblock)
+end
+
 return setmetatable({
     warn = say_closure(S_WARN);
     info = say_closure(S_INFO);
@@ -165,6 +223,8 @@ return setmetatable({
     pid = log_pid;
     level = log_level;
     log_format = log_format;
+    init = init;
+    cfg = cfg;
 }, {
     __index = compat_v16;
 })

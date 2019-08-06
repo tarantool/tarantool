@@ -50,6 +50,8 @@
 
 pid_t log_pid = 0;
 int log_level = S_INFO;
+bool log_initialized = false;
+
 enum say_format log_format = SF_PLAIN;
 enum { SAY_SYSLOG_DEFAULT_PORT = 512 };
 
@@ -701,6 +703,7 @@ say_logger_init(const char *init_str, int level, int nonblock,
 			dup2(log_default->fd, STDOUT_FILENO);
 		}
 	}
+	log_initialized = true;
 	return;
 fail:
 	diag_log();

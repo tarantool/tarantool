@@ -6,6 +6,10 @@ local private = require('box.internal')
 local urilib = require('uri')
 local math = require('math')
 local fiber = require('fiber')
+local ffi = require('ffi')
+ffi.cdef[[
+    extern bool log_initialized;
+]]
 
 -- Function decorator that is used to prevent box.cfg() from
 -- being called concurrently by different fibers.
@@ -45,10 +49,6 @@ local default_cfg = {
     vinyl_range_size          = nil, -- set automatically
     vinyl_page_size           = 8 * 1024,
     vinyl_bloom_fpr           = 0.05,
-    log                 = nil,
-    log_nonblock        = nil,
-    log_level           = 5,
-    log_format          = "plain",
     io_collect_interval = nil,
     readahead           = 16320,
     snap_io_rate_limit  = nil, -- no limit
@@ -82,6 +82,13 @@ local default_cfg = {
     feedback_host         = "https://feedback.tarantool.io",
     feedback_interval     = 3600,
     net_msg_max           = 768,
+}
+
+local default_log_cfg = {
+    log                 = nil,
+    log_nonblock        = nil,
+    log_level           = 5,
+    log_format          = "plain",
 }
 
 -- types of available options
@@ -389,6 +396,17 @@ local function apply_default_cfg(cfg, default_cfg)
     end
 end
 
+local function apply_default_log_cfg(cfg, default_cfg)
+    if not ffi.C.log_initialized then
+        apply_default_cfg(cfg, default_cfg)
+    else
+        cfg.log = log.cfg.init_str
+        cfg.log_level = log.level()
+        cfg.log_format = log.log_format()
+        cfg.log_nonblock = log.cfg.nonblock
+    end
+end
+
 -- Return true if two configurations are equivalent.
 local function compare_cfg(cfg1, cfg2)
     if type(cfg1) ~= type(cfg2) then
@@ -469,7 +487,9 @@ setmetatable(box, {
 local function load_cfg(cfg)
     cfg = upgrade_cfg(cfg, translate_cfg)
     cfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
-    apply_default_cfg(cfg, default_cfg);
+    apply_default_cfg(cfg, default_cfg)
+    apply_default_log_cfg(cfg, default_log_cfg)
+
     -- Save new box.cfg
     box.cfg = cfg
     if not pcall(private.cfg_check)  then

@@ -52,6 +52,7 @@ tt_uuid_is_equal
 tt_uuid_is_nil
 tt_uuid_bswap
 tt_uuid_from_string
+log_initialized
 log_level
 log_format
 uri_parse
@@ -73,6 +74,7 @@ log_type
 say_set_log_level
 say_logrotate
 say_set_log_format
+say_logger_init
 tarantool_uptime
 tarantool_exit
 log_pid

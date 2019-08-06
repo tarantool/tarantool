@@ -69,6 +69,7 @@ enum say_format {
 };
 
 extern int log_level;
+extern bool log_initialized;
 
 static inline bool
 say_log_level_is_enabled(int level)
