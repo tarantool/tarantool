@@ -109,14 +109,14 @@ lbox_pack(struct lua_State *L)
 		case 'I':
 		case 'i':
 			/* signed and unsigned 32-bit integers */
-			if (field.type != MP_UINT && field.ival != MP_INT)
+			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "pickle.pack: expected 32-bit int");
 
 			luaL_region_dup(L, buf, &field.ival, sizeof(uint32_t));
 			break;
 		case 'N':
 			/* signed and unsigned 32-bit big endian integers */
-			if (field.type != MP_UINT && field.ival != MP_INT)
+			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "pickle.pack: expected 32-bit int");
 
 			field.ival = htonl(field.ival);

@@ -26,6 +26,14 @@ pickle.pack('s', 0x4d)
 ---
 - "M\0"
 ...
+pickle.pack('i', -1)
+---
+- !!binary /////w==
+...
+pickle.pack('N', -1)
+---
+- !!binary /////w==
+...
 pickle.pack('ssss', 25940, 29811, 28448, 11883)
 ---
 - Test ok.
