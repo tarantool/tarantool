@@ -37,6 +37,7 @@
 #include <small/mempool.h>
 #include <small/rlist.h>
 
+#include "index.h"
 #include "index_def.h"
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -51,7 +52,6 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct histogram;
-struct index;
 struct tuple;
 struct tuple_format;
 struct vy_lsm;
@@ -179,6 +179,7 @@ vy_lsm_env_destroy(struct vy_lsm_env *env);
  *   secondary key, i.e. the tuple stored. This is key_def.
  */
 struct vy_lsm {
+	struct index base;
 	/** Common LSM tree environment. */
 	struct vy_lsm_env *env;
 	/**

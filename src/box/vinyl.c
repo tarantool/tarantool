@@ -142,19 +142,6 @@ struct vy_env {
 	bool force_recovery;
 };
 
-struct vinyl_index {
-	struct index base;
-	/** LSM tree that stores index data. */
-	struct vy_lsm *lsm;
-};
-
-/** Extract vy_lsm from an index object. */
-struct vy_lsm *
-vy_lsm(struct index *index)
-{
-	return ((struct vinyl_index *)index)->lsm;
-}
-
 /** Mask passed to vy_gc(). */
 enum {
 	/** Delete incomplete runs. */
@@ -204,6 +191,14 @@ vy_env(struct engine *engine)
 {
 	assert(engine->vtab == &vinyl_engine_vtab);
 	return (struct vy_env *)engine;
+}
+
+/** Extract vy_lsm from an index object. */
+struct vy_lsm *
+vy_lsm(struct index *index)
+{
+	assert(index->vtab == &vinyl_index_vtab);
+	return (struct vy_lsm *)index;
 }
 
 /**
@@ -688,12 +683,6 @@ static struct index *
 vinyl_space_create_index(struct space *space, struct index_def *index_def)
 {
 	assert(index_def->type == TREE);
-	struct vinyl_index *index = calloc(1, sizeof(*index));
-	if (index == NULL) {
-		diag_set(OutOfMemory, sizeof(*index),
-			 "malloc", "struct vinyl_index");
-		return NULL;
-	}
 	struct vy_env *env = vy_env(space->engine);
 	struct vy_lsm *pk = NULL;
 	if (index_def->iid > 0) {
@@ -703,18 +692,15 @@ vinyl_space_create_index(struct space *space, struct index_def *index_def)
 	struct vy_lsm *lsm = vy_lsm_new(&env->lsm_env, &env->cache_env,
 					&env->mem_env, index_def, space->format,
 					pk, space_group_id(space));
-	if (lsm == NULL) {
-		free(index);
+	if (lsm == NULL)
 		return NULL;
-	}
-	if (index_create(&index->base, &env->base,
+
+	if (index_create(&lsm->base, &env->base,
 			 &vinyl_index_vtab, index_def) != 0) {
 		vy_lsm_delete(lsm);
-		free(index);
 		return NULL;
 	}
-	index->lsm = lsm;
-	return &index->base;
+	return &lsm->base;
 }
 
 static void
@@ -727,7 +713,6 @@ vinyl_index_destroy(struct index *index)
 	 * is gone.
 	 */
 	vy_lsm_unref(lsm);
-	free(index);
 }
 
 /**
