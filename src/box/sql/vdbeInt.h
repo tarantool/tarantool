@@ -46,6 +46,8 @@
  */
 typedef struct VdbeOp Op;
 
+struct func;
+
 /*
  * Boolean values
  */
@@ -168,7 +170,11 @@ struct Mem {
 		bool b;         /* Boolean value used when MEM_Bool is set in flags */
 		int nZero;	/* Used when bit MEM_Zero is set in flags */
 		void *p;	/* Generic pointer */
-		FuncDef *pDef;	/* Used only when flags==MEM_Agg */
+		/**
+		 * A pointer to function implementation.
+		 * Used only when flags==MEM_Agg.
+		 */
+		struct func *func;
 		VdbeFrame *pFrame;	/* Used when flags==MEM_Frame */
 	} u;
 	u32 flags;		/* Some combination of MEM_Null, MEM_Str, MEM_Dyn, etc. */
@@ -309,7 +315,8 @@ mem_apply_numeric_type(struct Mem *record);
  */
 struct sql_context {
 	Mem *pOut;		/* The return value is stored here */
-	FuncDef *pFunc;		/* Pointer to function information */
+	/* A pointer to function implementation. */
+	struct func *func;
 	Mem *pMem;		/* Memory cell used to store aggregate context */
 	Vdbe *pVdbe;		/* The VM that owns this context */
 	/** Instruction number of OP_BuiltinFunction0. */
@@ -512,7 +519,17 @@ int sqlVdbeMemNumerify(Mem *);
 int sqlVdbeMemCast(Mem *, enum field_type type);
 int sqlVdbeMemFromBtree(BtCursor *, u32, u32, Mem *);
 void sqlVdbeMemRelease(Mem * p);
-int sqlVdbeMemFinalize(Mem *, FuncDef *);
+
+/**
+ * Memory cell mem contains the context of an aggregate function.
+ * This routine calls the finalize method for that function. The
+ * result of the aggregate is stored back into mem.
+ *
+ * Returns -1 if the finalizer reports an error. 0 otherwise.
+ */
+int
+sql_vdbemem_finalize(struct Mem *mem, struct func *func);
+
 const char *sqlOpcodeName(int);
 int sqlVdbeMemGrow(Mem * pMem, int n, int preserve);
 int sqlVdbeMemClearAndResize(Mem * pMem, int n);

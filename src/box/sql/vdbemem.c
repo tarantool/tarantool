@@ -312,37 +312,29 @@ sqlVdbeMemStringify(Mem * pMem)
 	return 0;
 }
 
-/*
- * Memory cell pMem contains the context of an aggregate function.
- * This routine calls the finalize method for that function.  The
- * result of the aggregate is stored back into pMem.
- *
- * Return -1 if the finalizer reports an error. 0 otherwise.
- */
 int
-sqlVdbeMemFinalize(Mem * pMem, FuncDef * pFunc)
+sql_vdbemem_finalize(struct Mem *mem, struct func *func)
 {
-	if (ALWAYS(pFunc && pFunc->xFinalize)) {
-		sql_context ctx;
-		Mem t;
-		assert((pMem->flags & MEM_Null) != 0 || pFunc == pMem->u.pDef);
-		memset(&ctx, 0, sizeof(ctx));
-		memset(&t, 0, sizeof(t));
-		t.flags = MEM_Null;
-		t.db = pMem->db;
-		t.field_type = field_type_MAX;
-		ctx.pOut = &t;
-		ctx.pMem = pMem;
-		ctx.pFunc = pFunc;
-		pFunc->xFinalize(&ctx);	/* IMP: R-24505-23230 */
-		assert((pMem->flags & MEM_Dyn) == 0);
-		if (pMem->szMalloc > 0)
-			sqlDbFree(pMem->db, pMem->zMalloc);
-		memcpy(pMem, &t, sizeof(t));
-		if (ctx.is_aborted)
-			return -1;
-	}
-	return 0;
+	assert(func != NULL);
+	assert(func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
+	assert(func->def->aggregate == FUNC_AGGREGATE_GROUP);
+	assert((mem->flags & MEM_Null) != 0 || func == mem->u.func);
+	sql_context ctx;
+	memset(&ctx, 0, sizeof(ctx));
+	Mem t;
+	memset(&t, 0, sizeof(t));
+	t.flags = MEM_Null;
+	t.db = mem->db;
+	t.field_type = field_type_MAX;
+	ctx.pOut = &t;
+	ctx.pMem = mem;
+	ctx.func = func;
+	((struct func_sql_builtin *)func)->finalize(&ctx);
+	assert((mem->flags & MEM_Dyn) == 0);
+	if (mem->szMalloc > 0)
+		sqlDbFree(mem->db, mem->zMalloc);
+	memcpy(mem, &t, sizeof(t));
+	return ctx.is_aborted ? -1 : 0;
 }
 
 /*
@@ -359,7 +351,7 @@ vdbeMemClearExternAndSetNull(Mem * p)
 {
 	assert(VdbeMemDynamic(p));
 	if (p->flags & MEM_Agg) {
-		sqlVdbeMemFinalize(p, p->u.pDef);
+		sql_vdbemem_finalize(p, p->u.func);
 		assert((p->flags & MEM_Agg) == 0);
 		testcase(p->flags & MEM_Dyn);
 	}
@@ -1289,7 +1281,6 @@ valueFromFunction(sql * db,	/* The database connection */
 	sql_context ctx;	/* Context object for function invocation */
 	sql_value **apVal = 0;	/* Function arguments */
 	int nVal = 0;		/* Size of apVal[] array */
-	FuncDef *pFunc = 0;	/* Function definition */
 	sql_value *pVal = 0;	/* New value */
 	int rc = 0;	/* Return code */
 	ExprList *pList = 0;	/* Function arguments */
@@ -1300,10 +1291,10 @@ valueFromFunction(sql * db,	/* The database connection */
 	pList = p->x.pList;
 	if (pList)
 		nVal = pList->nExpr;
-	pFunc = sqlFindFunction(db, p->u.zToken, nVal, 0);
-	assert(pFunc);
-	if ((pFunc->funcFlags & SQL_FUNC_CONSTANT) == 0 ||
-	    (pFunc->funcFlags & SQL_FUNC_NEEDCOLL))
+	struct func *func = sql_func_by_signature(p->u.zToken, nVal);
+	if (func == NULL || func->def->language != FUNC_LANGUAGE_SQL_BUILTIN ||
+	    !func->def->is_deterministic ||
+	    sql_func_flag_is_set(func, SQL_FUNC_NEEDCOLL))
 		return 0;
 
 	if (pList) {
@@ -1332,8 +1323,8 @@ valueFromFunction(sql * db,	/* The database connection */
 	assert(!pCtx->pParse->is_aborted);
 	memset(&ctx, 0, sizeof(ctx));
 	ctx.pOut = pVal;
-	ctx.pFunc = pFunc;
-	pFunc->xSFunc(&ctx, nVal, apVal);
+	ctx.func = func;
+	((struct func_sql_builtin *)func)->call(&ctx, nVal, apVal);
 	assert(!ctx.is_aborted);
 	sql_value_apply_type(pVal, type);
 	assert(rc == 0);

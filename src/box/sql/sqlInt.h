@@ -70,6 +70,8 @@
 #include "box/column_mask.h"
 #include "parse_def.h"
 #include "box/field_def.h"
+#include "box/func.h"
+#include "box/func_def.h"
 #include "box/sql.h"
 #include "box/txn.h"
 #include "trivia/util.h"
@@ -542,9 +544,6 @@ sql_row_count(struct sql_context *context, MAYBE_UNUSED int unused1,
 	      MAYBE_UNUSED sql_value **unused2);
 
 void *
-sql_user_data(sql_context *);
-
-void *
 sql_aggregate_context(sql_context *,
 			  int nBytes);
 
@@ -565,26 +564,6 @@ sql_initialize(void);
 #define SQL_TRACE_PROFILE    0x02
 #define SQL_TRACE_ROW        0x04
 #define SQL_TRACE_CLOSE      0x08
-
-#define SQL_DETERMINISTIC    0x800
-
-int
-sql_create_function_v2(sql * db,
-			   const char *zFunctionName,
-			   enum field_type type,
-			   int nArg,
-			   int flags,
-			   void *pApp,
-			   void (*xFunc) (sql_context *,
-					  int,
-					  sql_value **),
-			   void (*xStep) (sql_context *,
-					  int,
-					  sql_value **),
-			   void (*xFinal)
-			   (sql_context *),
-			   void (*xDestroy) (void *)
-	);
 
 #define SQL_OPEN_READONLY         0x00000001	/* Ok for sql_open_v2() */
 #define SQL_OPEN_READWRITE        0x00000002	/* Ok for sql_open_v2() */
@@ -1039,9 +1018,6 @@ typedef struct Column Column;
 typedef struct Expr Expr;
 typedef struct ExprList ExprList;
 typedef struct ExprSpan ExprSpan;
-typedef struct FuncDestructor FuncDestructor;
-typedef struct FuncDef FuncDef;
-typedef struct FuncDefHash FuncDefHash;
 typedef struct IdList IdList;
 typedef struct KeyClass KeyClass;
 typedef struct Lookaside Lookaside;
@@ -1120,18 +1096,6 @@ struct Lookaside {
 };
 struct LookasideSlot {
 	LookasideSlot *pNext;	/* Next buffer in the list of free buffers */
-};
-
-/*
- * A hash table for built-in function definitions.  (Application-defined
- * functions use a regular table table from hash.h.)
- *
- * Hash each FuncDef structure into one of the FuncDefHash.a[] slots.
- * Collisions are on the FuncDef.u.pHash chain.
- */
-#define SQL_FUNC_HASH_SZ 23
-struct FuncDefHash {
-	FuncDef *a[SQL_FUNC_HASH_SZ];	/* Hash table for functions */
 };
 
 /*
@@ -1243,65 +1207,12 @@ struct type_def {
 };
 
 /*
- * Each SQL function is defined by an instance of the following
- * structure.  For global built-in functions (ex: substr(), max(), count())
- * a pointer to this structure is held in the sqlBuiltinFunctions object.
- * For per-connection application-defined functions, a pointer to this
- * structure is held in the db->aHash hash table.
- *
- * The u.pHash field is used by the global built-ins.  The u.pDestructor
- * field is used by per-connection app-def functions.
- */
-struct FuncDef {
-	i8 nArg;		/* Number of arguments.  -1 means unlimited */
-	u16 funcFlags;		/* Some combination of sql_FUNC_* */
-	void *pUserData;	/* User data parameter */
-	FuncDef *pNext;		/* Next function with same name */
-	void (*xSFunc) (sql_context *, int, sql_value **);	/* func or agg-step */
-	void (*xFinalize) (sql_context *);	/* Agg finalizer */
-	const char *zName;	/* SQL name of the function. */
-	union {
-		FuncDef *pHash;	/* Next with a different name but the same hash */
-		FuncDestructor *pDestructor;	/* Reference counted destructor function */
-	} u;
-	/* Return type. */
-	enum field_type ret_type;
-};
-
-/*
- * This structure encapsulates a user-function destructor callback (as
- * configured using create_function_v2()) and a reference counter. When
- * create_function_v2() is called to create a function with a destructor,
- * a single object of this type is allocated. FuncDestructor.nRef is set to
- * the number of FuncDef objects created (either 1 or 3, depending on whether
- * or not the specified encoding is sql_ANY). The FuncDef.pDestructor
- * member of each of the new FuncDef objects is set to point to the allocated
- * FuncDestructor.
- *
- * Thereafter, when one of the FuncDef objects is deleted, the reference
- * count on this object is decremented. When it reaches 0, the destructor
- * is invoked and the FuncDestructor structure freed.
- */
-struct FuncDestructor {
-	int nRef;
-	void (*xDestroy) (void *);
-	void *pUserData;
-};
-
-/*
- * Possible values for FuncDef.flags.  Note that the _LENGTH and _TYPEOF
- * values must correspond to OPFLAG_LENGTHARG and OPFLAG_TYPEOFARG.  And
- * sql_FUNC_CONSTANT must be the same as sql_DETERMINISTIC.  There
- * are assert() statements in the code to verify this.
- *
  * Value constraints (enforced via assert()):
  *     NC_MinMaxAgg      == SF_MinMaxAgg
  *     SQL_FUNC_LENGTH    ==  OPFLAG_LENGTHARG
  *     SQL_FUNC_TYPEOF    ==  OPFLAG_TYPEOFARG
- *     SQL_FUNC_CONSTANT  ==  sql_DETERMINISTIC from the API
  */
 #define SQL_FUNC_LIKE     0x0004	/* Candidate for the LIKE optimization */
-#define SQL_FUNC_EPHEM    0x0010	/* Ephemeral.  Delete with VDBE */
 #define SQL_FUNC_NEEDCOLL 0x0020	/* sqlGetFuncCollSeq() might be called.
 					 * The flag is set when the collation
 					 * of function arguments should be
@@ -1315,7 +1226,6 @@ struct FuncDestructor {
 #define SQL_FUNC_COUNT    0x0100
 #define SQL_FUNC_COALESCE 0x0200	/* Built-in coalesce() or ifnull() */
 #define SQL_FUNC_UNLIKELY 0x0400	/* Built-in unlikely() function */
-#define SQL_FUNC_CONSTANT 0x0800	/* Constant inputs give a constant output */
 /** Built-in min() or least() function. */
 #define SQL_FUNC_MIN      0x1000
 /** Built-in max() or greatest() function. */
@@ -1338,61 +1248,6 @@ enum trim_side_mask {
 	TRIM_TRAILING = 2,
 	TRIM_BOTH = TRIM_LEADING | TRIM_TRAILING
 };
-
-/*
- * The following three macros, FUNCTION(), LIKEFUNC() and AGGREGATE() are
- * used to create the initializers for the FuncDef structures.
- *
- *   FUNCTION(zName, nArg, iArg, bNC, xFunc)
- *     Used to create a scalar function definition of a function zName
- *     implemented by C function xFunc that accepts nArg arguments. The
- *     value passed as iArg is cast to a (void*) and made available
- *     as the user-data (sql_user_data()) for the function. If
- *     argument bNC is true, then the sql_FUNC_NEEDCOLL flag is set.
- *
- *   FUNCTION_COLL
- *     Like FUNCTION except it assumes that function returns
- *     STRING which collation should be derived from first
- *     argument (trim, substr etc).
- *
- *   VFUNCTION(zName, nArg, iArg, bNC, xFunc)
- *     Like FUNCTION except it omits the sql_FUNC_CONSTANT flag.
- *
- *   AGGREGATE(zName, nArg, iArg, bNC, xStep, xFinal)
- *     Used to create an aggregate function definition implemented by
- *     the C functions xStep and xFinal. The first four parameters
- *     are interpreted in the same way as the first 4 parameters to
- *     FUNCTION().
- *
- *   LIKEFUNC(zName, nArg, pArg, flags)
- *     Used to create a scalar function definition of a function zName
- *     that accepts nArg arguments and is implemented by a call to C
- *     function likeFunc. Argument pArg is cast to a (void *) and made
- *     available as the function user-data (sql_user_data()). The
- *     FuncDef.flags variable is set to the value passed as the flags
- *     parameter.
- */
-#define FUNCTION(zName, nArg, iArg, bNC, xFunc, type) \
-  {nArg, SQL_FUNC_CONSTANT|(bNC*SQL_FUNC_NEEDCOLL), \
-   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type}
-#define FUNCTION_COLL(zName, nArg, iArg, bNC, xFunc) \
-  {nArg, SQL_FUNC_CONSTANT|SQL_FUNC_DERIVEDCOLL|(bNC*SQL_FUNC_NEEDCOLL), \
-   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, FIELD_TYPE_STRING}
-#define VFUNCTION(zName, nArg, iArg, bNC, xFunc, type) \
-  {nArg, (bNC*SQL_FUNC_NEEDCOLL), \
-   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type}
-#define FUNCTION2(zName, nArg, iArg, bNC, xFunc, extraFlags, type) \
-  {nArg,SQL_FUNC_CONSTANT|(bNC*SQL_FUNC_NEEDCOLL)|extraFlags,\
-   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type}
-#define LIKEFUNC(zName, nArg, arg, flags, type) \
-  {nArg, SQL_FUNC_NEEDCOLL|SQL_FUNC_CONSTANT|flags, \
-   (void *)(SQL_INT_TO_PTR(arg)), 0, likeFunc, 0, #zName, {0}, type}
-#define AGGREGATE(zName, nArg, arg, nc, xStep, xFinal, type) \
-  {nArg, (nc*SQL_FUNC_NEEDCOLL), \
-   SQL_INT_TO_PTR(arg), 0, xStep,xFinal,#zName, {0}, type}
-#define AGGREGATE2(zName, nArg, arg, nc, xStep, xFinal, extraFlags, type) \
-  {nArg, (nc*SQL_FUNC_NEEDCOLL)|extraFlags, \
-   SQL_INT_TO_PTR(arg), 0, xStep,xFinal,#zName, {0}, type}
 
 /*
  * The following are used as the second parameter to sqlSavepoint(),
@@ -1574,7 +1429,8 @@ struct AggInfo {
 				 */
 	struct AggInfo_func {	/* For each aggregate function */
 		Expr *pExpr;	/* Expression encoding the function */
-		FuncDef *pFunc;	/* The aggregate function implementation */
+		/** The aggregate function implementation. */
+		struct func *func;
 		int iMem;	/* Memory location that acts as accumulator */
 		int iDistinct;	/* Ephemeral table used to enforce DISTINCT */
 		/**
@@ -3522,10 +3378,6 @@ void sqlSelectSetName(Select *, const char *);
 #else
 #define sqlSelectSetName(A,B)
 #endif
-void sqlInsertBuiltinFuncs(FuncDef *, int);
-FuncDef *sqlFindFunction(sql *, const char *, int, u8);
-void sqlRegisterBuiltinFunctions(void);
-void sqlRegisterDateTimeFunctions(void);
 
 /**
  * Evaluate a view and store its result in an ephemeral table.
@@ -4098,7 +3950,6 @@ extern const unsigned char sqlUpperToLower[];
 extern const unsigned char sqlCtypeMap[];
 extern const Token sqlIntTokens[];
 extern SQL_WSD struct sqlConfig sqlConfig;
-extern FuncDefHash sqlBuiltinFunctions;
 extern int sqlPendingByte;
 
 /**
@@ -4234,21 +4085,13 @@ sql_key_info_to_key_def(struct sql_key_info *key_info);
  * Check if the function implements LIKE-style comparison & if it
  * is appropriate to apply a LIKE query optimization.
  *
- * @param db database structure.
  * @param pExpr pointer to a function-implementing expression.
  * @param[out] is_like_ci true if LIKE is case insensitive.
  *
  * @retval 1 if LIKE optimization can be used, 0 otherwise.
  */
 int
-sql_is_like_func(struct sql *db, struct Expr *expr);
-
-int sqlCreateFunc(sql *, const char *, enum field_type,
-		      int, int, void *,
-		      void (*)(sql_context *, int, sql_value **),
-		      void (*)(sql_context *, int, sql_value **),
-		      void (*)(sql_context *),
-		      FuncDestructor * pDestructor);
+sql_is_like_func(struct Expr *expr);
 
 /** Set OOM error flag. */
 static inline void
@@ -4285,7 +4128,6 @@ sql_expr_new_column(struct sql *db, struct SrcList *src_list, int src_idx,
 
 int sqlExprCheckIN(Parse *, Expr *);
 
-void sqlAnalyzeFunctions(void);
 int sqlStat4ProbeSetValue(Parse *, struct index_def *, UnpackedRecord **, Expr *, int,
 			      int, int *);
 int sqlStat4ValueFromExpr(Parse *, Expr *, enum field_type type,
@@ -4476,9 +4318,55 @@ Expr *sqlExprForVectorField(Parse *, Expr *, int);
  */
 extern int sqlSubProgramsRemaining;
 
-/** Register built-in functions to work with ANALYZE data. */
-void
-sql_register_analyze_builtins(void);
+struct func_sql_builtin {
+	/** Function object base class. */
+	struct func base;
+	/** A bitmask of SQL flags. */
+	uint16_t flags;
+	/**
+	 * A VDBE-memory-compatible call method.
+	 * SQL built-ins don't use func base class "call"
+	 * method to provide a best performance for SQL requests.
+	 * Access checks are redundant, because all SQL built-ins
+	 * are predefined and are executed on SQL privilege level.
+	 */
+	void (*call)(sql_context *ctx, int argc, sql_value **argv);
+	/**
+	 * A VDBE-memory-compatible finalize method
+	 * (is valid only for aggregate function).
+	 */
+	void (*finalize)(sql_context *ctx);
+};
+
+/**
+ * Test whether SQL-specific flag is set for given function.
+ * Currently only SQL Builtin Functions have such hint flags,
+ * so function returns false for other functions. Such approach
+ * decreases code complexity and allows do not distinguish
+ * functions by implementation details where it is unnecessary.
+ *
+ * Returns true when given flag is set for a given function and
+ * false otherwise.
+ */
+static inline bool
+sql_func_flag_is_set(struct func *func, uint16_t flag)
+{
+	if (func->def->language != FUNC_LANGUAGE_SQL_BUILTIN)
+		return false;
+	return (((struct func_sql_builtin *)func)->flags & flag) != 0;
+}
+
+/**
+ * A SQL method to find a function in a hash by its name and
+ * count of arguments. Only functions that have 'SQL' engine
+ * export field set true and have exactly the same signature
+ * are returned.
+ *
+ * Returns not NULL function pointer when a valid and exported
+ * to SQL engine function is found and NULL otherwise.
+ */
+struct func *
+sql_func_by_signature(const char *name, int argc);
 
 /**
  * Generate VDBE code to halt execution with correct error if

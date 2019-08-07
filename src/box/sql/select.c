@@ -4381,7 +4381,9 @@ is_simple_count(struct Select *select, struct AggInfo *agg_info)
 		return NULL;
 	if (NEVER(agg_info->nFunc == 0))
 		return NULL;
-	if ((agg_info->aFunc->pFunc->funcFlags & SQL_FUNC_COUNT) == 0 ||
+	assert(agg_info->aFunc->func->def->language ==
+	       FUNC_LANGUAGE_SQL_BUILTIN);
+	if (sql_func_flag_is_set(agg_info->aFunc->func, SQL_FUNC_COUNT) ||
 	    (agg_info->aFunc->pExpr->x.pList != NULL &&
 	     agg_info->aFunc->pExpr->x.pList->nExpr > 0))
 		return NULL;
@@ -5278,7 +5280,7 @@ finalizeAggFunctions(Parse * pParse, AggInfo * pAggInfo)
 		assert(!ExprHasProperty(pF->pExpr, EP_xIsSelect));
 		sqlVdbeAddOp2(v, OP_AggFinal, pF->iMem,
 				  pList ? pList->nExpr : 0);
-		sqlVdbeAppendP4(v, pF->pFunc, P4_FUNCDEF);
+		sqlVdbeAppendP4(v, pF->func, P4_FUNC);
 	}
 }
 
@@ -5319,7 +5321,7 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 			vdbe_insert_distinct(pParse, pF->iDistinct, pF->reg_eph,
 					     addrNext, 1, regAgg);
 		}
-		if (pF->pFunc->funcFlags & SQL_FUNC_NEEDCOLL) {
+		if (sql_func_flag_is_set(pF->func, SQL_FUNC_NEEDCOLL)) {
 			struct coll *coll = NULL;
 			struct ExprList_item *pItem;
 			int j;
@@ -5338,7 +5340,7 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 					  (char *)coll, P4_COLLSEQ);
 		}
 		sqlVdbeAddOp3(v, OP_AggStep0, 0, regAgg, pF->iMem);
-		sqlVdbeAppendP4(v, pF->pFunc, P4_FUNCDEF);
+		sqlVdbeAppendP4(v, pF->func, P4_FUNC);
 		sqlVdbeChangeP5(v, (u8) nArg);
 		sql_expr_type_cache_change(pParse, regAgg, nArg);
 		sqlReleaseTempRange(pParse, regAgg, nArg);

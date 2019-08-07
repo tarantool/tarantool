@@ -273,7 +273,7 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 	/* Result code to return. */
 	int rc;
 
-	if (!sql_is_like_func(db, pExpr)) {
+	if (!sql_is_like_func(pExpr)) {
 		return 0;
 	}
 	pList = pExpr->x.pList;

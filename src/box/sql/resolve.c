@@ -38,6 +38,7 @@
 #include "sqlInt.h"
 #include <stdlib.h>
 #include <string.h>
+#include "box/schema.h"
 
 /*
  * Walk the expression tree pExpr and increase the aggregate function
@@ -591,83 +592,71 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 	case TK_FUNCTION:{
 			ExprList *pList = pExpr->x.pList;	/* The argument list */
 			int n = pList ? pList->nExpr : 0;	/* Number of arguments */
-			int is_agg = 0;	/* True if is an aggregate function */
 			int nId;	/* Number of characters in function name */
 			const char *zId;	/* The function name. */
-			FuncDef *pDef;	/* Information about the function */
 
 			assert(!ExprHasProperty(pExpr, EP_xIsSelect));
 			zId = pExpr->u.zToken;
 			nId = sqlStrlen30(zId);
-			pDef = sqlFindFunction(pParse->db, zId, n, 0);
-			if (pDef == 0) {
-				pDef =
-				    sqlFindFunction(pParse->db, zId, -2,0);
-				if (pDef == 0) {
-					diag_set(ClientError,
-						 ER_NO_SUCH_FUNCTION, zId);
-				} else {
-					uint32_t argc = pDef->nArg;
-					const char *err = tt_sprintf("%d", argc);
-					diag_set(ClientError,
-						 ER_FUNC_WRONG_ARG_COUNT,
-						 pDef->zName, err, n);
-				}
+			struct func *func = func_by_name(zId, nId);
+			if (func == NULL) {
+				diag_set(ClientError, ER_NO_SUCH_FUNCTION, zId);
 				pParse->is_aborted = true;
 				pNC->nErr++;
-			} else {
-				is_agg = pDef->xFinalize != 0;
-				pExpr->type = pDef->ret_type;
-				const char *err =
-					"second argument to likelihood() must "\
-					"be a constant between 0.0 and 1.0";
-				if (pDef->funcFlags & SQL_FUNC_UNLIKELY) {
-					ExprSetProperty(pExpr,
-							EP_Unlikely | EP_Skip);
-					if (n == 2) {
-						pExpr->iTable =
-						    exprProbability(pList->a[1].
-								    pExpr);
-						if (pExpr->iTable < 0) {
-							diag_set(ClientError,
-								 ER_ILLEGAL_PARAMS,
-								 err);
-							pParse->is_aborted =
-								true;
-							pNC->nErr++;
-						}
-					} else {
-						/* EVIDENCE-OF: R-61304-29449 The unlikely(X) function is
-						 * equivalent to likelihood(X, 0.0625).
-						 * EVIDENCE-OF: R-01283-11636 The unlikely(X) function is
-						 * short-hand for likelihood(X,0.0625).
-						 * EVIDENCE-OF: R-36850-34127 The likely(X) function is short-hand
-						 * for likelihood(X,0.9375).
-						 * EVIDENCE-OF: R-53436-40973 The likely(X) function is equivalent
-						 * to likelihood(X,0.9375).
-						 */
-						/* TUNING: unlikely() probability is 0.0625.  likely() is 0.9375 */
-						pExpr->iTable =
-						    pDef->zName[0] ==
-						    'u' ? 8388608 : 125829120;
-					}
-				}
-				if ((pDef->funcFlags & SQL_FUNC_CONSTANT) != 0) {
-					/* For the purposes of the EP_ConstFunc flag, date and time
-					 * functions and other functions that change slowly are considered
-					 * constant because they are constant for the duration of one query
-					 */
-					ExprSetProperty(pExpr, EP_ConstFunc);
-				}
-				if ((pDef->funcFlags & SQL_FUNC_CONSTANT) ==
-				    0) {
-					/* Date/time functions that use 'now', and other functions
-					 * that might change over time cannot be used
-					 * in an index.
-					 */
-					assert((pNC->ncFlags & NC_IdxExpr) == 0);
-				}
+				return WRC_Abort;
 			}
+			if (!func->def->exports.sql) {
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 tt_sprintf("function %.*s() is not "
+						    "available in SQL",
+						     nId, zId));
+				pParse->is_aborted = true;
+				pNC->nErr++;
+				return WRC_Abort;
+			}
+			if (func->def->param_count != -1 &&
+			    func->def->param_count != n) {
+				uint32_t argc = func->def->param_count;
+				const char *err = tt_sprintf("%d", argc);
+				diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT,
+					 func->def->name, err, n);
+				pParse->is_aborted = true;
+				pNC->nErr++;
+				return WRC_Abort;
+			}
+			bool is_agg = func->def->aggregate ==
+				      FUNC_AGGREGATE_GROUP;
+			assert(!is_agg || func->def->language ==
+					  FUNC_LANGUAGE_SQL_BUILTIN);
+			pExpr->type = func->def->returns;
+			if (sql_func_flag_is_set(func, SQL_FUNC_UNLIKELY) &&
+			    n == 2) {
+				ExprSetProperty(pExpr, EP_Unlikely | EP_Skip);
+				pExpr->iTable =
+					exprProbability(pList->a[1].pExpr);
+				if (pExpr->iTable < 0) {
+					diag_set(ClientError, ER_ILLEGAL_PARAMS,
+						"second argument to "
+						"likelihood() must be a "
+						"constant between 0.0 and 1.0");
+					pParse->is_aborted = true;
+					pNC->nErr++;
+					return WRC_Abort;
+				}
+			} else if (sql_func_flag_is_set(func,
+							SQL_FUNC_UNLIKELY)) {
+				ExprSetProperty(pExpr, EP_Unlikely | EP_Skip);
+				/*
+				 * unlikely() probability is
+				 * 0.0625, likely() is 0.9375
+				 */
+				pExpr->iTable = func->def->name[0] == 'u' ?
+						8388608 : 125829120;
+			}
+			assert(!func->def->is_deterministic ||
+			       (pNC->ncFlags & NC_IdxExpr) == 0);
+			if (func->def->is_deterministic)
+				ExprSetProperty(pExpr, EP_ConstFunc);
 			if (is_agg && (pNC->ncFlags & NC_AllowAgg) == 0) {
 				const char *err =
 					tt_sprintf("misuse of aggregate "\
@@ -692,13 +681,12 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 					pExpr->op2++;
 					pNC2 = pNC2->pNext;
 				}
-				assert(pDef != 0);
+				assert(func != NULL);
 				if (pNC2) {
 					pNC2->ncFlags |= NC_HasAgg;
-					if ((pDef->funcFlags &
-					    SQL_FUNC_MIN) != 0 ||
-					    (pDef->funcFlags &
-					    SQL_FUNC_MAX) != 0)
+					if (sql_func_flag_is_set(func,
+							         SQL_FUNC_MIN |
+								 SQL_FUNC_MAX))
 						pNC2->ncFlags |= NC_MinMaxAgg;
 				}
 				pNC->ncFlags |= NC_AllowAgg;

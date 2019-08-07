@@ -130,7 +130,6 @@ add_library(box STATIC
     ${lua_sources}
     lua/init.c
     lua/call.c
-    lua/lua_sql.c
     lua/cfg.cc
     lua/console.c
     lua/tuple.c

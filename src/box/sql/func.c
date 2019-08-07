@@ -45,6 +45,8 @@
 #include <unicode/uchar.h>
 #include <unicode/ucol.h>
 #include "box/coll_id_cache.h"
+#include "box/schema.h"
+#include "box/func.h"
 
 /*
  * Return the collating function associated with a function.
@@ -79,8 +81,8 @@ minmaxFunc(sql_context * context, int argc, sql_value ** argv)
 	int i;
 	int iBest;
 	struct coll *pColl;
-	struct FuncDef *func = context->pFunc;
-	int mask = (func->funcFlags & SQL_FUNC_MAX) != 0 ? -1 : 0;
+	struct func *func = context->func;
+	int mask = sql_func_flag_is_set(func, SQL_FUNC_MAX) ? -1 : 0;
 	if (argc < 2) {
 		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT,
 		mask ? "GREATEST" : "LEAST", "at least two", argc);
@@ -1741,6 +1743,8 @@ minmaxStep(sql_context * context, int NotUsed, sql_value ** argv)
 	Mem *pBest;
 	UNUSED_PARAMETER(NotUsed);
 
+	struct func_sql_builtin *func =
+		(struct func_sql_builtin *)context->func;
 	pBest = (Mem *) sql_aggregate_context(context, sizeof(*pBest));
 	if (!pBest)
 		return;
@@ -1757,7 +1761,7 @@ minmaxStep(sql_context * context, int NotUsed, sql_value ** argv)
 		 * between the two being that the sense of the
 		 * comparison is inverted.
 		 */
-		bool is_max = (context->pFunc->funcFlags & SQL_FUNC_MAX) != 0;
+		bool is_max = (func->flags & SQL_FUNC_MAX) != 0;
 		cmp = sqlMemCompare(pBest, pArg, pColl);
 		if ((is_max && cmp < 0) || (!is_max && cmp > 0)) {
 			sqlVdbeMemCopy(pBest, pArg);
@@ -1847,116 +1851,783 @@ groupConcatFinalize(sql_context * context)
 }
 
 int
-sql_is_like_func(struct sql *db, struct Expr *expr)
+sql_is_like_func(struct Expr *expr)
 {
 	if (expr->op != TK_FUNCTION || !expr->x.pList ||
 	    expr->x.pList->nExpr != 2)
 		return 0;
 	assert(!ExprHasProperty(expr, EP_xIsSelect));
-	struct FuncDef *func = sqlFindFunction(db, expr->u.zToken, 2, 0);
-	assert(func != NULL);
-	if ((func->funcFlags & SQL_FUNC_LIKE) == 0)
+	struct func *func = sql_func_by_signature(expr->u.zToken, 2);
+	if (func == NULL || !sql_func_flag_is_set(func, SQL_FUNC_LIKE))
 		return 0;
 	return 1;
 }
 
-/*
- * All of the FuncDef structures in the aBuiltinFunc[] array above
- * to the global function hash table.  This occurs at start-time (as
- * a consequence of calling sql_initialize()).
- *
- * After this routine runs
- */
-void
-sqlRegisterBuiltinFunctions(void)
+struct func *
+sql_func_by_signature(const char *name, int argc)
 {
-	/*
-	 * The following array holds FuncDef structures for all of the functions
-	 * defined in this file.
-	 *
-	 * The array cannot be constant since changes are made to the
-	 * FuncDef.pHash elements at start-time.  The elements of this array
-	 * are read-only after initialization is complete.
-	 *
-	 * For peak efficiency, put the most frequently used function last.
-	 */
-	static FuncDef aBuiltinFunc[] = {
-		FUNCTION(SOUNDEX, 1, 0, 0, soundexFunc, FIELD_TYPE_STRING),
-		FUNCTION2(UNLIKELY, 1, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
-			  FIELD_TYPE_BOOLEAN),
-		FUNCTION2(LIKELIHOOD, 2, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
-			  FIELD_TYPE_BOOLEAN),
-		FUNCTION2(LIKELY, 1, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
-			  FIELD_TYPE_BOOLEAN),
-		FUNCTION_COLL(TRIM, -1, 3, 0, trim_func),
-		FUNCTION2(LEAST, -1, 0, 1, minmaxFunc, SQL_FUNC_MIN,
-			  FIELD_TYPE_SCALAR),
-		AGGREGATE2(MIN, 1, 0, 1, minmaxStep, minMaxFinalize,
-			   SQL_FUNC_MIN, FIELD_TYPE_SCALAR),
-		FUNCTION2(greatest, -1, 1, 1, minmaxFunc, SQL_FUNC_MAX,
-			  FIELD_TYPE_SCALAR),
-		AGGREGATE2(MAX, 1, 1, 1, minmaxStep, minMaxFinalize,
-			   SQL_FUNC_MAX, FIELD_TYPE_SCALAR),
-		FUNCTION2(TYPEOF, 1, 0, 0, typeofFunc, SQL_FUNC_TYPEOF,
-			  FIELD_TYPE_STRING),
-		FUNCTION2(LENGTH, 1, 0, 0, lengthFunc, SQL_FUNC_LENGTH,
-			  FIELD_TYPE_INTEGER),
-		FUNCTION(CHAR_LENGTH, 1, 0, 0, lengthFunc, FIELD_TYPE_INTEGER),
-		FUNCTION(CHARACTER_LENGTH, 1, 0, 0, lengthFunc,
-			 FIELD_TYPE_INTEGER),
-		FUNCTION(POSITION, 2, 0, 1, position_func, FIELD_TYPE_INTEGER),
-		FUNCTION(PRINTF, -1, 0, 0, printfFunc, FIELD_TYPE_STRING),
-		FUNCTION(UNICODE, 1, 0, 0, unicodeFunc, FIELD_TYPE_STRING),
-		FUNCTION(CHAR, -1, 0, 0, charFunc, FIELD_TYPE_STRING),
-		FUNCTION(ABS, 1, 0, 0, absFunc, FIELD_TYPE_NUMBER),
-		FUNCTION(ROUND, -1, 0, 0, roundFunc, FIELD_TYPE_INTEGER),
-		FUNCTION_COLL(UPPER, 1, 0, 1, UpperICUFunc),
-		FUNCTION_COLL(LOWER, 1, 0, 1, LowerICUFunc),
-		FUNCTION(HEX, 1, 0, 0, hexFunc, FIELD_TYPE_STRING),
-		FUNCTION2(IFNULL, 2, 0, 0, noopFunc, SQL_FUNC_COALESCE,
-			  FIELD_TYPE_INTEGER),
-		VFUNCTION(RANDOM, 0, 0, 0, randomFunc, FIELD_TYPE_INTEGER),
-		VFUNCTION(RANDOMBLOB, 1, 0, 0, randomBlob, FIELD_TYPE_VARBINARY),
-		FUNCTION(NULLIF, 2, 0, 1, nullifFunc, FIELD_TYPE_SCALAR),
-		FUNCTION(VERSION, 0, 0, 0, sql_func_version, FIELD_TYPE_STRING),
-		FUNCTION(QUOTE, 1, 0, 0, quoteFunc, FIELD_TYPE_STRING),
-		VFUNCTION(ROW_COUNT, 0, 0, 0, sql_row_count, FIELD_TYPE_INTEGER),
-		FUNCTION_COLL(REPLACE, 3, 0, 0, replaceFunc),
-		FUNCTION(ZEROBLOB, 1, 0, 0, zeroblobFunc, FIELD_TYPE_VARBINARY),
-		FUNCTION_COLL(SUBSTR, -1, 0, 0, substrFunc),
-		AGGREGATE(SUM, 1, 0, 0, sum_step, sumFinalize,
-			  FIELD_TYPE_NUMBER),
-		AGGREGATE(TOTAL, 1, 0, 0, sum_step, totalFinalize,
-			  FIELD_TYPE_NUMBER),
-		AGGREGATE(AVG, 1, 0, 0, sum_step, avgFinalize,
-			  FIELD_TYPE_NUMBER),
-		AGGREGATE2(COUNT, -1, 0, 0, countStep, countFinalize,
-			  SQL_FUNC_COUNT, FIELD_TYPE_INTEGER),
-		AGGREGATE(GROUP_CONCAT, -1, 0, 0, groupConcatStep,
-			  groupConcatFinalize, FIELD_TYPE_STRING),
-		LIKEFUNC(LIKE, -1, 1, SQL_FUNC_LIKE,
-			 FIELD_TYPE_INTEGER),
-		FUNCTION2(COALESCE, -1, 0, 0, noopFunc, SQL_FUNC_COALESCE,
-			  FIELD_TYPE_SCALAR),
-	};
-	sql_register_analyze_builtins();
-	sqlRegisterDateTimeFunctions();
-	sqlInsertBuiltinFuncs(aBuiltinFunc, ArraySize(aBuiltinFunc));
+	struct func *base = func_by_name(name, strlen(name));
+	if (base == NULL || !base->def->exports.sql)
+		return NULL;
 
-#if 0				/* Enable to print out how the built-in functions are hashed */
-	{
-		int i;
-		FuncDef *p;
-		for (i = 0; i < SQL_FUNC_HASH_SZ; i++) {
-			printf("FUNC-HASH %02d:", i);
-			for (p = sqlBuiltinFunctions.a[i]; p;
-			     p = p->u.pHash) {
-				int n = sqlStrlen30(p->zName);
-				int h = p->zName[0] + n;
-				printf(" %s(%d)", p->zName, h);
-			}
-			printf("\n");
-		}
-	}
-#endif
+	if (base->def->param_count != -1 && base->def->param_count != argc)
+		return NULL;
+	return base;
 }
+
+static int
+func_sql_builtin_call_stub(struct func *func, struct port *args,
+			   struct port *ret)
+{
+	(void) func; (void) args; (void) ret;
+	diag_set(ClientError, ER_UNSUPPORTED,
+		 "sql builtin function", "Lua frontend");
+	return -1;
+}
+
+static void
+sql_builtin_stub(sql_context *ctx, int argc, sql_value **argv)
+{
+	(void) argc; (void) argv;
+	diag_set(ClientError, ER_SQL_EXECUTE,
+		 tt_sprintf("function '%s' is not implemented",
+			    ctx->func->def->name));
+	ctx->is_aborted = true;
+}
+
+/**
+ * A sequence of SQL builtins definitions in
+ * lexicographic order.
+ */
+static struct {
+	/**
+	 * Name is used to find corresponding entry in array
+	 * sql_builtins applying binary search.
+	 */
+	const char *name;
+	/** Members below are related to struct func_sql_builtin. */
+	uint16_t flags;
+	void (*call)(sql_context *ctx, int argc, sql_value **argv);
+	void (*finalize)(sql_context *ctx);
+	/** Members below are related to struct func_def. */
+	bool is_deterministic;
+	int param_count;
+	enum field_type returns;
+	enum func_aggregate aggregate;
+	bool export_to_sql;
+} sql_builtins[] = {
+	{.name = "ABS",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_NUMBER,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = 0,
+	 .call = absFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "AVG",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_NUMBER,
+	 .is_deterministic = false,
+	 .aggregate = FUNC_AGGREGATE_GROUP,
+	 .flags = 0,
+	 .call = sum_step,
+	 .finalize = avgFinalize,
+	 .export_to_sql = true,
+	}, {
+	 .name = "CEIL",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "CEILING",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "CHAR",
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_STRING,
+	 .is_deterministic = true,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .flags = 0,
+	 .call = charFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	 }, {
+	 .name = "CHARACTER_LENGTH",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_INTEGER,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = 0,
+	 .call = lengthFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "CHAR_LENGTH",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_INTEGER,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = 0,
+	 .call = lengthFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "COALESCE",
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_SCALAR,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_COALESCE,
+	 .call = sql_builtin_stub,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "COUNT",
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_INTEGER,
+	 .aggregate = FUNC_AGGREGATE_GROUP,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .call = countStep,
+	 .finalize = countFinalize,
+	 .export_to_sql = true,
+	}, {
+	 .name = "CURRENT_DATE",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "CURRENT_TIME",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "CURRENT_TIMESTAMP",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "DATE",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "DATETIME",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "EVERY",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "EXISTS",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "EXP",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "EXTRACT",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "FLOOR",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "GREATER",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "GREATEST",
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_SCALAR,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_NEEDCOLL | SQL_FUNC_MAX,
+	 .call = minmaxFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "GROUP_CONCAT",
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_STRING,
+	 .aggregate = FUNC_AGGREGATE_GROUP,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .call = groupConcatStep,
+	 .finalize = groupConcatFinalize,
+	 .export_to_sql = true,
+	}, {
+	 .name = "HEX",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_STRING,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = 0,
+	 .call = hexFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "IFNULL",
+	 .param_count = 2,
+	 .returns = FIELD_TYPE_INTEGER,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_COALESCE,
+	 .call = sql_builtin_stub,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "JULIANDAY",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "LEAST",
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_SCALAR,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_NEEDCOLL | SQL_FUNC_MIN,
+	 .call = minmaxFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "LENGTH",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_INTEGER,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_LENGTH,
+	 .call = lengthFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "LESSER",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "LIKE",
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_INTEGER,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_NEEDCOLL | SQL_FUNC_LIKE,
+	 .call = likeFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "LIKELIHOOD",
+	 .param_count = 2,
+	 .returns = FIELD_TYPE_BOOLEAN,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_UNLIKELY,
+	 .call = sql_builtin_stub,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "LIKELY",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_BOOLEAN,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_UNLIKELY,
+	 .call = sql_builtin_stub,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "LN",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "LOWER",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_STRING,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_DERIVEDCOLL | SQL_FUNC_NEEDCOLL,
+	 .call = LowerICUFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "MAX",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_SCALAR,
+	 .aggregate = FUNC_AGGREGATE_GROUP,
+	 .is_deterministic = false,
+	 .flags = SQL_FUNC_NEEDCOLL | SQL_FUNC_MAX,
+	 .call = minmaxStep,
+	 .finalize = minMaxFinalize,
+	 .export_to_sql = true,
+	}, {
+	 .name = "MIN",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_SCALAR,
+	 .aggregate = FUNC_AGGREGATE_GROUP,
+	 .is_deterministic = false,
+	 .flags = SQL_FUNC_NEEDCOLL | SQL_FUNC_MIN,
+	 .call = minmaxStep,
+	 .finalize = minMaxFinalize,
+	 .export_to_sql = true,
+	}, {
+	 .name = "MOD",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "NULLIF",
+	 .param_count = 2,
+	 .returns = FIELD_TYPE_SCALAR,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_NEEDCOLL,
+	 .call = nullifFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "OCTET_LENGTH",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "POSITION",
+	 .param_count = 2,
+	 .returns = FIELD_TYPE_INTEGER,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_NEEDCOLL,
+	 .call = position_func,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "POWER",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "PRINTF",
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_STRING,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = 0,
+	 .call = printfFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "QUOTE",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_STRING,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = 0,
+	 .call = quoteFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "RANDOM",
+	 .param_count = 0,
+	 .returns = FIELD_TYPE_INTEGER,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .call = randomFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "RANDOMBLOB",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_VARBINARY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .call = randomBlob,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "REPLACE",
+	 .param_count = 3,
+	 .returns = FIELD_TYPE_STRING,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_DERIVEDCOLL,
+	 .call = replaceFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "ROUND",
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_INTEGER,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = 0,
+	 .call = roundFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "ROW_COUNT",
+	 .param_count = 0,
+	 .returns = FIELD_TYPE_INTEGER,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = 0,
+	 .call = sql_row_count,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "SOME",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "SOUNDEX",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_STRING,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = 0,
+	 .call = soundexFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "SQRT",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "STRFTIME",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "SUBSTR",
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_STRING,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_DERIVEDCOLL,
+	 .call = substrFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "SUM",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_NUMBER,
+	 .aggregate = FUNC_AGGREGATE_GROUP,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .call = sum_step,
+	 .finalize = sumFinalize,
+	 .export_to_sql = true,
+	}, {
+	 .name = "TIME",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "TOTAL",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_NUMBER,
+	 .aggregate = FUNC_AGGREGATE_GROUP,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .call = sum_step,
+	 .finalize = totalFinalize,
+	 .export_to_sql = true,
+	}, {
+	 .name = "TRIM",
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_STRING,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_DERIVEDCOLL,
+	 .call = trim_func,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "TYPEOF",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_STRING,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_TYPEOF,
+	 .call = typeofFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "UNICODE",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_STRING,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = 0,
+	 .call = unicodeFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "UNLIKELY",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_BOOLEAN,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_UNLIKELY,
+	 .call = sql_builtin_stub,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "UPPER",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_STRING,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = SQL_FUNC_DERIVEDCOLL | SQL_FUNC_NEEDCOLL,
+	 .call = UpperICUFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "VERSION",
+	 .param_count = 0,
+	 .returns = FIELD_TYPE_STRING,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = 0,
+	 .call = sql_func_version,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "ZEROBLOB",
+	 .param_count = 1,
+	 .returns = FIELD_TYPE_VARBINARY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = true,
+	 .flags = 0,
+	 .call = zeroblobFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "_sql_stat_get",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "_sql_stat_init",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	}, {
+	 .name = "_sql_stat_push",
+	 .call = sql_builtin_stub,
+	 .export_to_sql = false,
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_ANY,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .finalize = NULL,
+	},
+};
+
+static struct func_vtab func_sql_builtin_vtab;
+
+struct func *
+func_sql_builtin_new(struct func_def *def)
+{
+	assert(def->language == FUNC_LANGUAGE_SQL_BUILTIN);
+	/** Binary search for corresponding builtin entry. */
+	int idx = -1, left = 0, right = nelem(sql_builtins) - 1;
+	while (left <= right) {
+		uint32_t mid = (left + right) / 2;
+		int rc = strcmp(def->name, sql_builtins[mid].name);
+		if (rc == 0) {
+			idx = mid;
+			break;
+		}
+		if (rc < 0)
+			right = mid - 1;
+		else
+			left = mid + 1;
+	}
+	/*
+	 * All SQL built-in(s) (stubs) are defined in a snapshot.
+	 * Implementation-specific metadata is defined in
+	 * sql_builtins list. When a definition were not found
+	 * above, the function name is invalid, i.e. it is
+	 * not built-in function.
+	 */
+	if (idx == -1) {
+		diag_set(ClientError, ER_CREATE_FUNCTION, def->name,
+			 "given built-in is not predefined");
+		return NULL;
+	}
+	struct func_sql_builtin *func =
+		(struct func_sql_builtin *) calloc(1, sizeof(*func));
+	if (func == NULL) {
+		diag_set(OutOfMemory, sizeof(*func), "malloc", "func");
+		return NULL;
+	}
+	func->base.def = def;
+	func->base.vtab = &func_sql_builtin_vtab;
+	func->flags = sql_builtins[idx].flags;
+	func->call = sql_builtins[idx].call;
+	func->finalize = sql_builtins[idx].finalize;
+	def->param_count = sql_builtins[idx].param_count;
+	def->is_deterministic = sql_builtins[idx].is_deterministic;
+	def->returns = sql_builtins[idx].returns;
+	def->aggregate = sql_builtins[idx].aggregate;
+	def->exports.sql = sql_builtins[idx].export_to_sql;
+	return &func->base;
+}
+
+static void
+func_sql_builtin_destroy(struct func *func)
+{
+	assert(func->vtab == &func_sql_builtin_vtab);
+	assert(func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
+	free(func);
+}
+
+static struct func_vtab func_sql_builtin_vtab = {
+	.call = func_sql_builtin_call_stub,
+	.destroy = func_sql_builtin_destroy,
+};

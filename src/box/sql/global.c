@@ -163,13 +163,6 @@ SQL_WSD struct sqlConfig sqlConfig = {
 };
 
 /*
- * Hash table for global functions - functions common to all
- * database connections.  After initialization, this table is
- * read-only.
- */
-FuncDefHash sqlBuiltinFunctions;
-
-/*
  * The value of the "pending" byte must be 0x40000000 (1 byte past the
  * 1-gibabyte boundary) in a compatible database.  sql never uses
  * the database page that contains the pending byte.  It never attempts

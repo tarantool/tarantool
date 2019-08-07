@@ -131,9 +131,6 @@ sql_initialize(void)
 	if (sqlGlobalConfig.isInit == 0
 	    && sqlGlobalConfig.inProgress == 0) {
 		sqlGlobalConfig.inProgress = 1;
-		memset(&sqlBuiltinFunctions, 0,
-		       sizeof(sqlBuiltinFunctions));
-		sqlRegisterBuiltinFunctions();
 		sql_os_init();
 		sqlGlobalConfig.isInit = 1;
 		sqlGlobalConfig.inProgress = 0;
@@ -243,25 +240,6 @@ sqlCloseSavepoints(Vdbe * pVdbe)
 }
 
 /*
- * Invoke the destructor function associated with FuncDef p, if any. Except,
- * if this is not the last copy of the function, do not invoke it. Multiple
- * copies of a single function are created when create_function() is called
- * with SQL_ANY as the encoding.
- */
-static void
-functionDestroy(sql * db, FuncDef * p)
-{
-	FuncDestructor *pDestructor = p->u.pDestructor;
-	if (pDestructor) {
-		pDestructor->nRef--;
-		if (pDestructor->nRef == 0) {
-			pDestructor->xDestroy(pDestructor->pUserData);
-			sqlDbFree(db, pDestructor);
-		}
-	}
-}
-
-/*
  * Rollback all database files.  If tripCode is not 0, then
  * any write cursors are invalidated ("tripped" - as in "tripping a circuit
  * breaker") and made to return tripCode if there are any further
@@ -277,121 +255,6 @@ sqlRollbackAll(Vdbe * pVdbe)
 	if (db->xRollbackCallback && (!pVdbe->auto_commit)) {
 		db->xRollbackCallback(db->pRollbackArg);
 	}
-}
-
-/*
- * This function is exactly the same as sql_create_function(), except
- * that it is designed to be called by internal code. The difference is
- * that if a malloc() fails in sql_create_function(), an error code
- * is returned and the mallocFailed flag cleared.
- */
-int
-sqlCreateFunc(sql * db,
-		  const char *zFunctionName,
-		  enum field_type type,
-		  int nArg,
-		  int flags,
-		  void *pUserData,
-		  void (*xSFunc) (sql_context *, int, sql_value **),
-		  void (*xStep) (sql_context *, int, sql_value **),
-		  void (*xFinal) (sql_context *),
-		  FuncDestructor * pDestructor)
-{
-	FuncDef *p;
-	int extraFlags;
-
-	if (zFunctionName == 0 ||
-	    (xSFunc && (xFinal || xStep)) ||
-	    (!xSFunc && (xFinal && !xStep)) ||
-	    (!xSFunc && (!xFinal && xStep)) ||
-	    (nArg < -1 || nArg > SQL_MAX_FUNCTION_ARG) ||
-	    (255 < (sqlStrlen30(zFunctionName)))) {
-		diag_set(ClientError, ER_CREATE_FUNCTION, zFunctionName,
-			 "wrong function definition");
-		return -1;
-	}
-
-	assert(SQL_FUNC_CONSTANT == SQL_DETERMINISTIC);
-	extraFlags = flags & SQL_DETERMINISTIC;
-
-
-	/* Check if an existing function is being overridden or deleted. If so,
-	 * and there are active VMs, then return an error. If a function
-	 * is being overridden/deleted but there are no active VMs, allow the
-	 * operation to continue but invalidate all precompiled statements.
-	 */
-	p = sqlFindFunction(db, zFunctionName, nArg, 0);
-	if (p && p->nArg == nArg) {
-		if (db->nVdbeActive) {
-			diag_set(ClientError, ER_CREATE_FUNCTION, zFunctionName,
-				 "unable to create function due to active "\
-				 "statements");
-			return -1;
-		} else {
-			sqlExpirePreparedStatements(db);
-		}
-	}
-
-	p = sqlFindFunction(db, zFunctionName, nArg, 1);
-	assert(p || db->mallocFailed);
-	if (p == NULL)
-		return -1;
-
-	/* If an older version of the function with a configured destructor is
-	 * being replaced invoke the destructor function here.
-	 */
-	functionDestroy(db, p);
-
-	if (pDestructor) {
-		pDestructor->nRef++;
-	}
-	p->u.pDestructor = pDestructor;
-	p->funcFlags = extraFlags;
-	testcase(p->funcFlags & SQL_DETERMINISTIC);
-	p->xSFunc = xSFunc ? xSFunc : xStep;
-	p->xFinalize = xFinal;
-	p->pUserData = pUserData;
-	p->nArg = (u16) nArg;
-	p->ret_type = type;
-	return 0;
-}
-
-int
-sql_create_function_v2(sql * db,
-			   const char *zFunc,
-			   enum field_type type,
-			   int nArg,
-			   int flags,
-			   void *p,
-			   void (*xSFunc) (sql_context *, int,
-					   sql_value **),
-			   void (*xStep) (sql_context *, int,
-					  sql_value **),
-			   void (*xFinal) (sql_context *),
-			   void (*xDestroy) (void *))
-{
-	FuncDestructor *pArg = 0;
-
-	if (xDestroy) {
-		pArg =
-		    (FuncDestructor *) sqlDbMallocZero(db,
-							   sizeof
-							   (FuncDestructor));
-		if (!pArg) {
-			xDestroy(p);
-			return -1;
-		}
-		pArg->xDestroy = xDestroy;
-		pArg->pUserData = p;
-	}
-	int rc = sqlCreateFunc(db, zFunc, type, nArg, flags, p, xSFunc, xStep,
-			       xFinal, pArg);
-	if (pArg && pArg->nRef == 0) {
-		assert(rc != 0);
-		xDestroy(p);
-		sqlDbFree(db, pArg);
-	}
-	return rc;
 }
 
 /*

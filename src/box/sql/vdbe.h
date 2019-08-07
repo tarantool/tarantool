@@ -72,7 +72,11 @@ struct VdbeOp {
 		char *z;	/* Pointer to data for string (char array) types */
 		i64 *pI64;	/* Used when p4type is P4_INT64/UINT64 */
 		double *pReal;	/* Used when p4type is P4_REAL */
-		FuncDef *pFunc;	/* Used when p4type is P4_FUNCDEF */
+		/**
+		 * A pointer to function implementation.
+		 * Used when p4type is P4_FUNC.
+		 */
+		struct func *func;
 		sql_context *pCtx;	/* Used when p4type is P4_FUNCCTX */
 		struct coll *pColl;	/* Used when p4type is P4_COLLSEQ */
 		Mem *pMem;	/* Used when p4type is P4_MEM */
@@ -122,7 +126,8 @@ struct SubProgram {
 #define P4_DYNAMIC  (-1)	/* Pointer to a string obtained from sqlMalloc() */
 #define P4_STATIC   (-2)	/* Pointer to a static string */
 #define P4_COLLSEQ  (-3)	/* P4 is a pointer to a CollSeq structure */
-#define P4_FUNCDEF  (-4)	/* P4 is a pointer to a FuncDef structure */
+/** P4 is a pointer to a func structure. */
+#define P4_FUNC     (-4)
 #define P4_MEM      (-7)	/* P4 is a pointer to a Mem*    structure */
 #define P4_TRANSIENT  0		/* P4 is a pointer to a transient string */
 #define P4_REAL     (-9)	/* P4 is a 64-bit floating point value */

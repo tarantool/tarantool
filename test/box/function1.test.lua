@@ -294,6 +294,13 @@ ok == true
 
 box.func.LUA:call({"return 1 + 1"})
 
+box.schema.user.grant('guest', 'execute', 'function', 'SUM')
+c = net.connect(box.cfg.listen)
+c:call("SUM")
+c:close()
+box.schema.user.revoke('guest', 'execute', 'function', 'SUM')
+box.schema.func.drop("SUM")
+
 -- Introduce function options
 box.schema.func.create('test', {body = "function(tuple) return tuple end", is_deterministic = true, opts = {is_multikey = true}})
 box.func['test'].is_multikey == true

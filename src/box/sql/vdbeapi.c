@@ -480,17 +480,6 @@ sql_step(sql_stmt * pStmt)
 /*
  * Extract the user data from a sql_context structure and return a
  * pointer to it.
- */
-void *
-sql_user_data(sql_context * p)
-{
-	assert(p && p->pFunc);
-	return p->pFunc->pUserData;
-}
-
-/*
- * Extract the user data from a sql_context structure and return a
- * pointer to it.
  *
  * IMPLEMENTATION-OF: R-46798-50301 The sql_context_db_handle() interface
  * returns a copy of the pointer to the database connection (the 1st
@@ -547,7 +536,7 @@ createAggContext(sql_context * p, int nByte)
 	} else {
 		sqlVdbeMemClearAndResize(pMem, nByte);
 		pMem->flags = MEM_Agg;
-		pMem->u.pDef = p->pFunc;
+		pMem->u.func = p->func;
 		if (pMem->z) {
 			memset(pMem->z, 0, nByte);
 		}
@@ -563,7 +552,9 @@ createAggContext(sql_context * p, int nByte)
 void *
 sql_aggregate_context(sql_context * p, int nByte)
 {
-	assert(p && p->pFunc && p->pFunc->xFinalize);
+	assert(p != NULL && p->func != NULL);
+	assert(p->func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
+	assert(p->func->def->aggregate == FUNC_AGGREGATE_GROUP);
 	testcase(nByte < 0);
 	if ((p->pMem->flags & MEM_Agg) == 0) {
 		return createAggContext(p, nByte);

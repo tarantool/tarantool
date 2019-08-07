@@ -44,7 +44,6 @@
 #include "box/port.h"
 #include "box/lua/tuple.h"
 #include "small/obuf.h"
-#include "lua_sql.h"
 #include "trivia/util.h"
 #include "mpstream.h"
 
@@ -968,7 +967,6 @@ static struct trigger on_alter_func_in_lua = {
 
 static const struct luaL_Reg boxlib_internal[] = {
 	{"call_loadproc",  lbox_call_loadproc},
-	{"sql_create_function",  lbox_sql_create_function},
 	{"module_reload", lbox_module_reload},
 	{"func_call", lbox_func_call},
 	{NULL, NULL}

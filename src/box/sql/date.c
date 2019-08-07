@@ -1290,31 +1290,3 @@ currentTimeFunc(sql_context * context, int argc, sql_value ** argv)
 	}
 }
 #endif
-
-/*
- * This function registered all of the above C functions as SQL
- * functions.  This should be the only routine in this file with
- * external linkage.
- */
-void
-sqlRegisterDateTimeFunctions(void)
-{
-	static FuncDef aDateTimeFuncs[] = {
-#if 0
-		DFUNCTION(julianday, -1, 0, 0, juliandayFunc, FIELD_TYPE_NUMBER),
-		DFUNCTION(date, -1, 0, 0, dateFunc, FIELD_TYPE_STRING),
-		DFUNCTION(time, -1, 0, 0, timeFunc, FIELD_TYPE_STRING),
-		DFUNCTION(datetime, -1, 0, 0, datetimeFunc, FIELD_TYPE_STRING),
-		DFUNCTION(strftime, -1, 0, 0, strftimeFunc, FIELD_TYPE_STRING),
-		DFUNCTION(current_time, 0, 0, 0, ctimeFunc, FIELD_TYPE_STRING),
-		DFUNCTION(current_timestamp, 0, 0, 0, ctimestampFunc,
-			  FIELD_TYPE_STRING),
-		DFUNCTION(current_date, 0, 0, 0, cdateFunc, FIELD_TYPE_STRING),
-		STR_FUNCTION(current_time, 0, "%H:%M:%S", 0, currentTimeFunc),
-		STR_FUNCTION(current_date, 0, "%Y-%m-%d", 0, currentTimeFunc),
-		STR_FUNCTION(current_timestamp, 0, "%Y-%m-%d %H:%M:%S", 0,
-			     currentTimeFunc),
-#endif
-	};
-	sqlInsertBuiltinFuncs(aDateTimeFuncs, ArraySize(aDateTimeFuncs));
-}

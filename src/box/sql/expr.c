@@ -328,12 +328,11 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 		if (op == TK_FUNCTION) {
 			uint32_t arg_count = p->x.pList == NULL ? 0 :
 					     p->x.pList->nExpr;
-			struct FuncDef *func = sqlFindFunction(parse->db,
-							       p->u.zToken,
-							       arg_count, 0);
+			struct func *func =
+				sql_func_by_signature(p->u.zToken, arg_count);
 			if (func == NULL)
 				break;
-			if ((func->funcFlags & SQL_FUNC_DERIVEDCOLL) != 0) {
+			if (sql_func_flag_is_set(func, SQL_FUNC_DERIVEDCOLL)) {
 				/*
 				 * Now we use quite straightforward
 				 * approach assuming that resulting
@@ -342,7 +341,7 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 				 * built-in functions: trim, upper,
 				 * lower, replace, substr.
 				 */
-				assert(func->ret_type == FIELD_TYPE_STRING);
+				assert(func->def->returns == FIELD_TYPE_STRING);
 				p = p->x.pList->a->pExpr;
 				continue;
 			}
@@ -3975,11 +3974,9 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_FUNCTION:{
 			ExprList *pFarg;	/* List of function arguments */
 			int nFarg;	/* Number of function arguments */
-			FuncDef *pDef;	/* The function definition object */
 			const char *zId;	/* The function name */
 			u32 constMask = 0;	/* Mask of function arguments that are constant */
 			int i;	/* Loop counter */
-			sql *db = pParse->db;	/* The database connection */
 			struct coll *coll = NULL;
 
 			assert(!ExprHasProperty(pExpr, EP_xIsSelect));
@@ -3991,8 +3988,8 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			nFarg = pFarg ? pFarg->nExpr : 0;
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			zId = pExpr->u.zToken;
-			pDef = sqlFindFunction(db, zId, nFarg, 0);
-			if (pDef == 0 || pDef->xFinalize != 0) {
+			struct func *func = sql_func_by_signature(zId, nFarg);
+			if (func == NULL) {
 				diag_set(ClientError, ER_NO_SUCH_FUNCTION,
 					 zId);
 				pParse->is_aborted = true;
@@ -4002,13 +3999,13 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			 * IFNULL() functions.  This avoids unnecessary evaluation of
 			 * arguments past the first non-NULL argument.
 			 */
-			if (pDef->funcFlags & SQL_FUNC_COALESCE) {
+			if (sql_func_flag_is_set(func, SQL_FUNC_COALESCE)) {
 				int endCoalesce = sqlVdbeMakeLabel(v);
 				if (nFarg < 2) {
 					diag_set(ClientError,
 						 ER_FUNC_WRONG_ARG_COUNT,
-						 pDef->zName, "at least two",
-						 nFarg);
+						 func->def->name,
+						 "at least two", nFarg);
 					pParse->is_aborted = true;
 					break;
 				}
@@ -4033,12 +4030,12 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			/* The UNLIKELY() function is a no-op.  The result is the value
 			 * of the first argument.
 			 */
-			if (pDef->funcFlags & SQL_FUNC_UNLIKELY) {
+			if (sql_func_flag_is_set(func, SQL_FUNC_UNLIKELY)) {
 				if (nFarg < 1) {
 					diag_set(ClientError,
-						ER_FUNC_WRONG_ARG_COUNT,
-						pDef->zName, "at least one",
-						nFarg);
+						 ER_FUNC_WRONG_ARG_COUNT,
+						 func->def->name,
+						 "at least one", nFarg);
 					pParse->is_aborted = true;
 					break;
 				}
@@ -4063,7 +4060,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			 * is done using ANSI rules from
 			 * collations_check_compatibility().
 			 */
-			if ((pDef->funcFlags & SQL_FUNC_NEEDCOLL) != 0 &&
+			if (sql_func_flag_is_set(func, SQL_FUNC_NEEDCOLL) &&
 			    nFarg > 0) {
 				struct coll *unused = NULL;
 				uint32_t curr_id = COLL_NONE;
@@ -4111,9 +4108,8 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				 * or OPFLAG_TYPEOFARG respectively, to avoid unnecessary data
 				 * loading.
 				 */
-				if ((pDef->
-				     funcFlags & (SQL_FUNC_LENGTH |
-						  SQL_FUNC_TYPEOF)) != 0) {
+				if (sql_func_flag_is_set(func, SQL_FUNC_LENGTH |
+							       SQL_FUNC_TYPEOF)) {
 					u8 exprOp;
 					assert(nFarg == 1);
 					assert(pFarg->a[0].pExpr != 0);
@@ -4124,14 +4120,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 						       OPFLAG_LENGTHARG);
 						assert(SQL_FUNC_TYPEOF ==
 						       OPFLAG_TYPEOFARG);
-						testcase(pDef->
-							 funcFlags &
-							 OPFLAG_LENGTHARG);
-						pFarg->a[0].pExpr->op2 =
-						    pDef->
-						    funcFlags &
-						    (OPFLAG_LENGTHARG |
-						     OPFLAG_TYPEOFARG);
+						pFarg->a[0].pExpr->op2 = true;
 					}
 				}
 
@@ -4143,12 +4132,15 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			} else {
 				r1 = 0;
 			}
-			if (pDef->funcFlags & SQL_FUNC_NEEDCOLL) {
+			if (sql_func_flag_is_set(func, SQL_FUNC_NEEDCOLL)) {
 				sqlVdbeAddOp4(v, OP_CollSeq, 0, 0, 0,
 						  (char *)coll, P4_COLLSEQ);
 			}
-			sqlVdbeAddOp4(v, OP_BuiltinFunction0, constMask, r1,
-					  target, (char *)pDef, P4_FUNCDEF);
+			assert(func->def->language ==
+			       FUNC_LANGUAGE_SQL_BUILTIN);
+			int op = OP_BuiltinFunction0;
+			sqlVdbeAddOp4(v, op, constMask, r1, target,
+				      (char *)func, P4_FUNC);
 			sqlVdbeChangeP5(v, (u8) nFarg);
 			if (nFarg && constMask == 0) {
 				sqlReleaseTempRange(pParse, r1, nFarg);
@@ -5456,12 +5448,21 @@ analyzeAggregate(Walker * pWalker, Expr * pExpr)
 						pItem->iMem = ++pParse->nMem;
 						assert(!ExprHasProperty
 						       (pExpr, EP_IntValue));
-						pItem->pFunc = sqlFindFunction(
-							pParse->db,
-							pExpr->u.zToken,
-							pExpr->x.pList ?
-							pExpr->x.pList->nExpr : 0,
-							0);
+						const char *name =
+							pExpr->u.zToken;
+						uint32_t argc =
+							pExpr->x.pList != NULL ?
+							pExpr->x.pList->nExpr : 0;
+						pItem->func =
+							sql_func_by_signature(
+								name, argc);
+						assert(pItem->func != NULL);
+						assert(pItem->func->def->
+						       language ==
+						       FUNC_LANGUAGE_SQL_BUILTIN &&
+						       pItem->func->def->
+						       aggregate ==
+						       FUNC_AGGREGATE_GROUP);
 						if (pExpr->flags & EP_Distinct) {
 							pItem->iDistinct =
 								pParse->nTab++;

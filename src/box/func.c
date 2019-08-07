@@ -381,38 +381,9 @@ restore:
 static struct func *
 func_c_new(struct func_def *def);
 
-/** A stub object for SQL builtins to avoid name clash with UDF. */
-static struct func_vtab func_sql_builtin_vtab;
-
 /** Construct a SQL builtin function object. */
-struct func *
-func_sql_builtin_new(struct func_def *def)
-{
-	assert(def->language == FUNC_LANGUAGE_SQL_BUILTIN);
-	struct func *func =
-		(struct func *) malloc(sizeof(*func));
-	if (func == NULL) {
-		diag_set(OutOfMemory, sizeof(*func), "malloc", "func");
-		return NULL;
-	}
-	/** Don't export SQL builtins in Lua for now. */
-	def->exports.lua = false;
-	func->vtab = &func_sql_builtin_vtab;
-	return func;
-}
-
-static void
-func_sql_builtin_destroy(struct func *func)
-{
-	assert(func->vtab == &func_sql_builtin_vtab);
-	assert(func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
-	free(func);
-}
-
-static struct func_vtab func_sql_builtin_vtab = {
-	.call = NULL,
-	.destroy = func_sql_builtin_destroy,
-};
+extern struct func *
+func_sql_builtin_new(struct func_def *def);
 
 struct func *
 func_new(struct func_def *def)

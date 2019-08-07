@@ -620,24 +620,11 @@ sqlVdbeJumpHere(Vdbe * p, int addr)
 	sqlVdbeChangeP2(p, addr, p->nOp);
 }
 
-/*
- * If the input FuncDef structure is ephemeral, then free it.  If
- * the FuncDef is not ephermal, then do nothing.
- */
-static void
-freeEphemeralFunction(sql * db, FuncDef * pDef)
-{
-	if ((pDef->funcFlags & SQL_FUNC_EPHEM) != 0) {
-		sqlDbFree(db, pDef);
-	}
-}
-
 static void vdbeFreeOpArray(sql *, Op *, int);
 
 static SQL_NOINLINE void
 freeP4FuncCtx(sql * db, sql_context * p)
 {
-	freeEphemeralFunction(db, p->pFunc);
 	sqlDbFree(db, p);
 }
 
@@ -661,12 +648,10 @@ freeP4(sql * db, int p4type, void *p4)
 	case P4_KEYINFO:
 		sql_key_info_unref(p4);
 		break;
-	case P4_FUNCDEF:{
-			freeEphemeralFunction(db, (FuncDef *) p4);
-			break;
-		}
 	case P4_MEM:
 		sqlValueFree((sql_value *) p4);
+		break;
+	default:
 		break;
 	}
 }
@@ -1121,15 +1106,17 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 				sqlXPrintf(&x, "(binary)");
 			break;
 		}
-	case P4_FUNCDEF:{
-			FuncDef *pDef = pOp->p4.pFunc;
-			sqlXPrintf(&x, "%s(%d)", pDef->zName, pDef->nArg);
+	case P4_FUNC:{
+			struct func *func = pOp->p4.func;
+			sqlXPrintf(&x, "%s(%d)", func->def->name,
+				   func->def->param_count);
 			break;
 		}
 #if defined(SQL_DEBUG) || defined(VDBE_PROFILE)
 	case P4_FUNCCTX:{
-			FuncDef *pDef = pOp->p4.pCtx->pFunc;
-			sqlXPrintf(&x, "%s(%d)", pDef->zName, pDef->nArg);
+			struct func *func = pOp->p4.func;
+			sqlXPrintf(&x, "%s(%d)", func->def->name,
+				   func->def->param_count);
 			break;
 		}
 #endif
