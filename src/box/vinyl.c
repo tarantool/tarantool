@@ -707,12 +707,7 @@ static void
 vinyl_index_destroy(struct index *index)
 {
 	struct vy_lsm *lsm = vy_lsm(index);
-	/*
-	 * There still may be a task scheduled for this LSM tree
-	 * so postpone actual deletion until the last reference
-	 * is gone.
-	 */
-	vy_lsm_unref(lsm);
+	vy_lsm_delete(lsm);
 }
 
 /**

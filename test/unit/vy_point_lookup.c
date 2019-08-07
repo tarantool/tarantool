@@ -15,6 +15,7 @@ uint32_t schema_version;
 uint32_t space_cache_version;
 struct space *space_by_id(uint32_t id) { return NULL; }
 struct vy_lsm *vy_lsm(struct index *index) { return NULL; }
+void index_delete(struct index *index) { unreachable(); }
 
 static int
 write_run(struct vy_run *run, const char *dir_name,
@@ -303,7 +304,7 @@ test_basic()
 	is(results_ok, true, "select results");
 	is(has_errors, false, "no errors happened");
 
-	vy_lsm_unref(pk);
+	vy_lsm_delete(pk);
 	index_def_delete(index_def);
 	tuple_format_unref(format);
 	vy_cache_destroy(&cache);

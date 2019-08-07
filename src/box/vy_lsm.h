@@ -182,11 +182,6 @@ struct vy_lsm {
 	struct index base;
 	/** Common LSM tree environment. */
 	struct vy_lsm_env *env;
-	/**
-	 * Reference counter. Used to postpone LSM tree deletion
-	 * until all pending operations have completed.
-	 */
-	int refs;
 	/** Unique ID of this LSM tree. */
 	int64_t id;
 	/** ID of the index this LSM tree is for. */
@@ -370,8 +365,7 @@ vy_lsm_dumps_per_compaction(struct vy_lsm *lsm)
 static inline void
 vy_lsm_ref(struct vy_lsm *lsm)
 {
-	assert(lsm->refs >= 0);
-	lsm->refs++;
+	index_ref(&lsm->base);
 }
 
 /**
@@ -382,9 +376,7 @@ vy_lsm_ref(struct vy_lsm *lsm)
 static inline void
 vy_lsm_unref(struct vy_lsm *lsm)
 {
-	assert(lsm->refs > 0);
-	if (--lsm->refs == 0)
-		vy_lsm_delete(lsm);
+	index_unref(&lsm->base);
 }
 
 /**

@@ -208,7 +208,7 @@ fail_free_indexes:
 	for (uint32_t i = 0; i <= index_id_max; i++) {
 		struct index *index = space->index_map[i];
 		if (index != NULL)
-			index_delete(index);
+			index_unref(index);
 	}
 fail:
 	free(space->index_map);
@@ -248,7 +248,7 @@ space_delete(struct space *space)
 	for (uint32_t j = 0; j <= space->index_id_max; j++) {
 		struct index *index = space->index_map[j];
 		if (index != NULL)
-			index_delete(index);
+			index_unref(index);
 	}
 	free(space->index_map);
 	free(space->check_unique_constraint_map);

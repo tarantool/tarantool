@@ -488,6 +488,7 @@ index_create(struct index *index, struct engine *engine,
 	index->vtab = vtab;
 	index->engine = engine;
 	index->def = def;
+	index->refs = 1;
 	index->space_cache_version = space_cache_version;
 	return 0;
 }
@@ -495,6 +496,7 @@ index_create(struct index *index, struct engine *engine,
 void
 index_delete(struct index *index)
 {
+	assert(index->refs == 0);
 	/*
 	 * Free index_def after destroying the index as
 	 * engine might still need it, e.g. to check if

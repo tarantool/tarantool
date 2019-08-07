@@ -188,7 +188,6 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 		goto fail_mem;
 
 	lsm->id = -1;
-	lsm->refs = 1;
 	lsm->dump_lsn = -1;
 	lsm->commit_lsn = -1;
 	vy_cache_create(&lsm->cache, cache_env, cmp_def, index_def->iid == 0);
@@ -245,7 +244,6 @@ vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 void
 vy_lsm_delete(struct vy_lsm *lsm)
 {
-	assert(lsm->refs == 0);
 	assert(heap_node_is_stray(&lsm->in_dump));
 	assert(heap_node_is_stray(&lsm->in_compaction));
 	assert(vy_lsm_read_set_empty(&lsm->read_set));

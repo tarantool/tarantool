@@ -454,6 +454,8 @@ struct index {
 	struct engine *engine;
 	/* Description of a possibly multipart key. */
 	struct index_def *def;
+	/** Reference counter. */
+	int refs;
 	/* Space cache version at the time of construction. */
 	uint32_t space_cache_version;
 };
@@ -501,6 +503,30 @@ index_create(struct index *index, struct engine *engine,
 /** Free an index instance. */
 void
 index_delete(struct index *index);
+
+/**
+ * Increment the reference counter of an index to prevent
+ * it from being destroyed when the space it belongs to is
+ * freed.
+ */
+static inline void
+index_ref(struct index *index)
+{
+	assert(index->refs > 0);
+	index->refs++;
+}
+
+/**
+ * Decrement the reference counter of an index.
+ * Destroy the index if it isn't used anymore.
+ */
+static inline void
+index_unref(struct index *index)
+{
+	assert(index->refs > 0);
+	if (--index->refs == 0)
+		index_delete(index);
+}
 
 /** Build this index based on the contents of another index. */
 int
