@@ -390,6 +390,10 @@ luaopen_tarantool(lua_State *L)
 	};
 	luaL_register_module(L, "tarantool", initlib);
 
+	/* package */
+	lua_pushstring(L, tarantool_package());
+	lua_setfield(L, -2, "package");
+
 	/* version */
 	lua_pushstring(L, tarantool_version());
 	lua_setfield(L, -2, "version");

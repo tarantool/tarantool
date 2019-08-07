@@ -3,8 +3,9 @@
 local tarantool = require('tarantool')
 
 require('tap').test("info", function(test)
-    test:plan(8)
+    test:plan(9)
     test:like(tarantool.version, '^[1-9]', "version")
+    test:isstring(tarantool.package, "package")
     test:ok(_TARANTOOL == tarantool.version, "version")
     test:isstring(tarantool.build.target, "build.target")
     test:isstring(tarantool.build.compiler, "build.compiler")
