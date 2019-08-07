@@ -1169,8 +1169,7 @@ tuple_format_iterator_next(struct tuple_format_iterator *it,
 	 * defined in format.
 	 */
 	bool is_nullable = tuple_field_is_nullable(field);
-	if (!field_mp_type_is_compatible(field->type, mp_typeof(*entry->data),
-					 is_nullable) != 0) {
+	if (!field_mp_type_is_compatible(field->type, entry->data, is_nullable) != 0) {
 		diag_set(ClientError, ER_FIELD_TYPE,
 			 tuple_field_path(field),
 			 field_type_strs[field->type]);

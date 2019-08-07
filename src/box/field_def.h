@@ -58,6 +58,7 @@ enum field_type {
 	FIELD_TYPE_BOOLEAN,
 	FIELD_TYPE_VARBINARY,
 	FIELD_TYPE_SCALAR,
+	FIELD_TYPE_DECIMAL,
 	FIELD_TYPE_ARRAY,
 	FIELD_TYPE_MAP,
 	field_type_MAX
@@ -109,8 +110,9 @@ field_type_by_name(const char *name, size_t len);
 /* MsgPack type names */
 extern const char *mp_type_strs[];
 
-/** A helper table for field_mp_type_is_compatible */
+/** Two helper tables for field_mp_type_is_compatible */
 extern const uint32_t field_mp_type[];
+extern const uint32_t field_ext_type[];
 
 extern const struct opt_def field_def_reg[];
 extern const struct field_def field_def_default;
@@ -144,13 +146,26 @@ struct field_def {
 
 /** Checks if mp_type (MsgPack) is compatible with field type. */
 static inline bool
-field_mp_type_is_compatible(enum field_type type, enum mp_type mp_type,
+field_mp_type_is_compatible(enum field_type type, const char *data,
 			    bool is_nullable)
 {
 	assert(type < field_type_MAX);
+	enum mp_type mp_type = mp_typeof(*data);
 	assert((size_t)mp_type < CHAR_BIT * sizeof(*field_mp_type));
-	uint32_t mask = field_mp_type[type] | (is_nullable * (1U << MP_NIL));
-	return (mask & (1U << mp_type)) != 0;
+	uint32_t mask;
+	if (mp_type != MP_EXT) {
+		mask = field_mp_type[type] | (is_nullable * (1U << MP_NIL));
+		return (mask & (1U << mp_type)) != 0;
+	} else {
+		int8_t ext_type;
+		mp_decode_extl(&data, &ext_type);
+		if (ext_type >= 0) {
+			mask = field_ext_type[type];
+			return (mask & (1U << ext_type)) != 0;
+		} else {
+			return false;
+		}
+	}
 }
 
 static inline bool

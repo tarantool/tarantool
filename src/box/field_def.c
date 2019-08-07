@@ -32,6 +32,7 @@
 #include "field_def.h"
 #include "trivia/util.h"
 #include "key_def.h"
+#include "mp_extension_types.h"
 
 const char *mp_type_strs[] = {
 	/* .MP_NIL    = */ "nil",
@@ -47,6 +48,11 @@ const char *mp_type_strs[] = {
 	/* .MP_EXT    = */ "extension",
 };
 
+/*
+ * messagepack types supported by given field types.
+ * MP_EXT requires to parse extension type to check
+ * compatibility with field type.
+ */
 const uint32_t field_mp_type[] = {
 	/* [FIELD_TYPE_ANY]      =  */ UINT32_MAX,
 	/* [FIELD_TYPE_UNSIGNED] =  */ 1U << MP_UINT,
@@ -59,8 +65,23 @@ const uint32_t field_mp_type[] = {
 	/* [FIELD_TYPE_SCALAR]   =  */ (1U << MP_UINT) | (1U << MP_INT) |
 		(1U << MP_FLOAT) | (1U << MP_DOUBLE) | (1U << MP_STR) |
 		(1U << MP_BIN) | (1U << MP_BOOL),
+	/* [FIELD_TYPE_DECIMAL]  =  */ 0, /* only MP_DECIMAL is supported */
 	/* [FIELD_TYPE_ARRAY]    =  */ 1U << MP_ARRAY,
 	/* [FIELD_TYPE_MAP]      =  */ (1U << MP_MAP),
+};
+
+const uint32_t field_ext_type[] = {
+	/* [FIELD_TYPE_ANY]       = */ UINT32_MAX ^ (1U << MP_UNKNOWN_EXTENSION),
+	/* [FIELD_TYPE_UNSIGNED]  = */ 0,
+	/* [FIELD_TYPE_STRING]    = */ 0,
+	/* [FIELD_TYPE_NUMBER]    = */ 1U << MP_DECIMAL,
+	/* [FIELD_TYPE_INTEGER]   = */ 0,
+	/* [FIELD_TYPE_BOOLEAN]   = */ 0,
+	/* [FIELD_TYPE_VARBINARY] = */ 0,
+	/* [FIELD_TYPE_SCALAR]    = */ 1U << MP_DECIMAL,
+	/* [FIELD_TYPE_DECIMAL]   = */ 1U << MP_DECIMAL,
+	/* [FIELD_TYPE_ARRAY]     = */ 0,
+	/* [FIELD_TYPE_MAP]       = */ 0,
 };
 
 const char *field_type_strs[] = {
@@ -72,6 +93,7 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_BOOLEAN]  = */ "boolean",
 	/* [FIELD_TYPE_VARBINARY] = */"varbinary",
 	/* [FIELD_TYPE_SCALAR]   = */ "scalar",
+	/* [FIELD_TYPE_DECIMAL]  = */ "decimal",
 	/* [FIELD_TYPE_ARRAY]    = */ "array",
 	/* [FIELD_TYPE_MAP]      = */ "map",
 };
@@ -98,17 +120,18 @@ field_type_by_name_wrapper(const char *str, uint32_t len)
  * values can be stored in the j type.
  */
 static const bool field_type_compatibility[] = {
-	   /*   ANY   UNSIGNED  STRING   NUMBER  INTEGER  BOOLEAN VARBINARY SCALAR   ARRAY     MAP */
-/*   ANY    */ true,   false,   false,   false,   false,   false,   false,  false,   false,   false,
-/* UNSIGNED */ true,   true,    false,   true,    true,    false,   false,  true,    false,   false,
-/*  STRING  */ true,   false,   true,    false,   false,   false,   false,  true,    false,   false,
-/*  NUMBER  */ true,   false,   false,   true,    false,   false,   false,  true,    false,   false,
-/*  INTEGER */ true,   false,   false,   true,    true,    false,   false,  true,    false,   false,
-/*  BOOLEAN */ true,   false,   false,   false,   false,   true,    false,  true,    false,   false,
-/* VARBINARY*/ true,   false,   false,   false,   false,   false,   true,   true,    false,   false,
-/*  SCALAR  */ true,   false,   false,   false,   false,   false,   false,  true,    false,   false,
-/*   ARRAY  */ true,   false,   false,   false,   false,   false,   false,  false,   true,    false,
-/*    MAP   */ true,   false,   false,   false,   false,   false,   false,  false,   false,   true,
+	   /*   ANY   UNSIGNED  STRING   NUMBER  INTEGER  BOOLEAN VARBINARY SCALAR  DECIMAL  ARRAY    MAP  */
+/*   ANY    */ true,   false,   false,   false,   false,   false,   false,  false,  false,  false,   false,
+/* UNSIGNED */ true,   true,    false,   true,    true,    false,   false,  true,   false,  false,   false,
+/*  STRING  */ true,   false,   true,    false,   false,   false,   false,  true,   false,  false,   false,
+/*  NUMBER  */ true,   false,   false,   true,    false,   false,   false,  true,   false,  false,   false,
+/*  INTEGER */ true,   false,   false,   true,    true,    false,   false,  true,   false,  false,   false,
+/*  BOOLEAN */ true,   false,   false,   false,   false,   true,    false,  true,   false,  false,   false,
+/* VARBINARY*/ true,   false,   false,   false,   false,   false,   true,   true,   false,  false,   false,
+/*  SCALAR  */ true,   false,   false,   false,   false,   false,   false,  true,   false,  false,   false,
+/*  DECIMAL */ true,   false,   false,   true,    false,   false,   false,  true,   true,   false,   false,
+/*   ARRAY  */ true,   false,   false,   false,   false,   false,   false,  false,  false,  true,    false,
+/*    MAP   */ true,   false,   false,   false,   false,   false,   false,  false,  false,  false,   true,
 };
 
 bool

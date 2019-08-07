@@ -528,8 +528,7 @@ static inline int
 key_part_validate(enum field_type key_type, const char *key,
 		  uint32_t field_no, bool is_nullable)
 {
-	if (unlikely(!field_mp_type_is_compatible(key_type, mp_typeof(*key),
-						  is_nullable))) {
+	if (unlikely(!field_mp_type_is_compatible(key_type, key, is_nullable))) {
 		diag_set(ClientError, ER_KEY_PART_TYPE, field_no,
 			 field_type_strs[key_type]);
 		return -1;

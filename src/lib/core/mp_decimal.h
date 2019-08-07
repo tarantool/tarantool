@@ -34,6 +34,10 @@
 #include "decimal.h"
 #include <stdint.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /**
  * \brief Calculate exact buffer size needed to store a decimal
  * pointed to by \a dec.
@@ -58,5 +62,9 @@ mp_decode_decimal(const char **data, decimal_t *dec);
  */
 char *
 mp_encode_decimal(char *data, const decimal_t *dec);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif

@@ -1034,6 +1034,9 @@ s:drop()
 --
 -- gh-2800: space formats checking is broken.
 --
+decimal = require('decimal')
+---
+...
 -- Ensure that vinyl correctly process field count change.
 s = box.schema.space.create('test', {engine = engine, field_count = 2})
 ---
@@ -1092,13 +1095,16 @@ format[9] = {name = 'field9', type = 'array'}
 format[10] = {name = 'field10', type = 'map'}
 ---
 ...
+format[11] = {name = 'field11', type = 'decimal'}
+---
+...
 s = box.schema.space.create('test', {engine = engine, format = format})
 ---
 ...
 pk = s:create_index('pk')
 ---
 ...
-t = s:replace{1, {2}, 3, '4', 5.5, -6, true, -8, {9, 9}, {val = 10}}
+t = s:replace{1, {2}, 3, '4', 5.5, -6, true, -8, {9, 9}, {val = 10}, decimal.new(-11.11)}
 ---
 ...
 inspector:cmd("setopt delimiter ';'")
@@ -1160,6 +1166,11 @@ fail_format_change(3, 'map')
 ---
 - 'Tuple field 3 type does not match one required by operation: expected map'
 ...
+-- unsigned --X--> decimal
+fail_format_change(3, 'decimal')
+---
+- 'Tuple field 3 type does not match one required by operation: expected decimal'
+...
 -- string -----> any
 ok_format_change(4, 'any')
 ---
@@ -1173,6 +1184,11 @@ fail_format_change(4, 'boolean')
 ---
 - 'Tuple field 4 type does not match one required by operation: expected boolean'
 ...
+-- string --X--> decimal
+fail_format_change(4, 'decimal')
+---
+- 'Tuple field 4 type does not match one required by operation: expected decimal'
+...
 -- number -----> any
 ok_format_change(5, 'any')
 ---
@@ -1185,6 +1201,11 @@ ok_format_change(5, 'scalar')
 fail_format_change(5, 'integer')
 ---
 - 'Tuple field 5 type does not match one required by operation: expected integer'
+...
+-- number --X--> decimal
+fail_format_change(5, 'decimal')
+---
+- 'Tuple field 5 type does not match one required by operation: expected decimal'
 ...
 -- integer -----> any
 ok_format_change(6, 'any')
@@ -1203,6 +1224,11 @@ fail_format_change(6, 'unsigned')
 ---
 - 'Tuple field 6 type does not match one required by operation: expected unsigned'
 ...
+-- integer --X--> decimal
+fail_format_change(6, 'decimal')
+---
+- 'Tuple field 6 type does not match one required by operation: expected decimal'
+...
 -- boolean -----> any
 ok_format_change(7, 'any')
 ---
@@ -1216,6 +1242,11 @@ fail_format_change(7, 'string')
 ---
 - 'Tuple field 7 type does not match one required by operation: expected string'
 ...
+-- boolead --X--> decimal
+fail_format_change(7, 'decimal')
+---
+- 'Tuple field 7 type does not match one required by operation: expected decimal'
+...
 -- scalar -----> any
 ok_format_change(8, 'any')
 ---
@@ -1224,6 +1255,11 @@ ok_format_change(8, 'any')
 fail_format_change(8, 'unsigned')
 ---
 - 'Tuple field 8 type does not match one required by operation: expected unsigned'
+...
+-- scalar --X--> decimal
+fail_format_change(8, 'decimal')
+---
+- 'Tuple field 8 type does not match one required by operation: expected decimal'
 ...
 -- array -----> any
 ok_format_change(9, 'any')
@@ -1234,6 +1270,11 @@ fail_format_change(9, 'scalar')
 ---
 - 'Tuple field 9 type does not match one required by operation: expected scalar'
 ...
+-- arary --X--> decimal
+fail_format_change(9, 'decimal')
+---
+- 'Tuple field 9 type does not match one required by operation: expected decimal'
+...
 -- map -----> any
 ok_format_change(10, 'any')
 ---
@@ -1242,6 +1283,48 @@ ok_format_change(10, 'any')
 fail_format_change(10, 'scalar')
 ---
 - 'Tuple field 10 type does not match one required by operation: expected scalar'
+...
+-- map --X--> decimal
+fail_format_change(10, 'decimal')
+---
+- 'Tuple field 10 type does not match one required by operation: expected decimal'
+...
+-- decimal ----> any
+ok_format_change(11, 'any')
+---
+...
+-- decimal ----> number
+ok_format_change(11, 'number')
+---
+...
+-- decimal ----> scalar
+ok_format_change(11, 'scalar')
+---
+...
+-- decimal --X--> string
+fail_format_change(11, 'string')
+---
+- 'Tuple field 11 type does not match one required by operation: expected string'
+...
+-- decimal --X--> integer
+fail_format_change(11, 'integer')
+---
+- 'Tuple field 11 type does not match one required by operation: expected integer'
+...
+-- decimal --X--> unsigned
+fail_format_change(11, 'unsigned')
+---
+- 'Tuple field 11 type does not match one required by operation: expected unsigned'
+...
+-- decimal --X--> map
+fail_format_change(11, 'map')
+---
+- 'Tuple field 11 type does not match one required by operation: expected map'
+...
+-- decimal --X--> array
+fail_format_change(11, 'array')
+---
+- 'Tuple field 11 type does not match one required by operation: expected array'
 ...
 s:drop()
 ---

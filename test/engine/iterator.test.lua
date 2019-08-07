@@ -48,6 +48,28 @@ t = {} for state, v in index:pairs(77, {iterator = 'LT'}) do table.insert(t, v) 
 t
 space:drop()
 
+-- iterator (decimal)
+decimal = require('decimal')
+space = box.schema.space.create('test', { engine = engine })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'decimal'} })
+for key = 1, 100 do space:replace{decimal.new((key-50)/10)} end
+t = {} for state, v in index:pairs({}, {iterator = 'ALL'}) do table.insert(t, v) end
+t
+t = {} for state, v in index:pairs({}, {iterator = 'GE'}) do table.insert(t, v) end
+t
+t = {} for state, v in index:pairs(decimal.new(-0.6), {iterator = 'GE'}) do table.insert(t, v) end
+t
+t = {} for state, v in index:pairs(decimal.new(-0.6), {iterator = 'GT'}) do table.insert(t, v) end
+t
+t = {} for state, v in index:pairs({}, {iterator = 'LE'}) do table.insert(t, v) end
+t
+t = {} for state, v in index:pairs(decimal.new(2.7), {iterator = 'LE'}) do table.insert(t, v) end
+t
+t = {} for state, v in index:pairs({}, {iterator = 'LT'}) do table.insert(t, v) end
+t
+t = {} for state, v in index:pairs(decimal.new(2.7), {iterator = 'LT'}) do table.insert(t, v) end
+t
+space:drop()
 
 -- iterator multi-part (num, num)
 space = box.schema.space.create('test', { engine = engine })
