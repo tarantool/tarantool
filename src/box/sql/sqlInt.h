@@ -1312,7 +1312,8 @@ struct FuncDestructor {
 					 */
 #define SQL_FUNC_LENGTH   0x0040	/* Built-in length() function */
 #define SQL_FUNC_TYPEOF   0x0080	/* Built-in typeof() function */
-#define SQL_FUNC_COUNT    0x0100	/* Built-in count(*) aggregate */
+/** Built-in count() function. */
+#define SQL_FUNC_COUNT    0x0100
 #define SQL_FUNC_COALESCE 0x0200	/* Built-in coalesce() or ifnull() */
 #define SQL_FUNC_UNLIKELY 0x0400	/* Built-in unlikely() function */
 #define SQL_FUNC_CONSTANT 0x0800	/* Constant inputs give a constant output */

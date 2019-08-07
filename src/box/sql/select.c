@@ -4381,7 +4381,9 @@ is_simple_count(struct Select *select, struct AggInfo *agg_info)
 		return NULL;
 	if (NEVER(agg_info->nFunc == 0))
 		return NULL;
-	if ((agg_info->aFunc[0].pFunc->funcFlags & SQL_FUNC_COUNT) == 0)
+	if ((agg_info->aFunc->pFunc->funcFlags & SQL_FUNC_COUNT) == 0 ||
+	    (agg_info->aFunc->pExpr->x.pList != NULL &&
+	     agg_info->aFunc->pExpr->x.pList->nExpr > 0))
 		return NULL;
 	if (expr->flags & EP_Distinct)
 		return NULL;
