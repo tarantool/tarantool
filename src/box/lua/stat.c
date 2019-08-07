@@ -121,8 +121,7 @@ lbox_stat_vinyl(struct lua_State *L)
 {
 	struct info_handler h;
 	luaT_info_handler_create(&h, L);
-	struct vinyl_engine *vinyl;
-	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	struct engine *vinyl = engine_by_name("vinyl");
 	assert(vinyl != NULL);
 	vinyl_engine_stat(vinyl, &h);
 	return 1;

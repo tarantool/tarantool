@@ -94,6 +94,7 @@ enum vy_status {
 };
 
 struct vy_env {
+	struct engine base;
 	/** Recovery status */
 	enum vy_status status;
 	/** TX manager */
@@ -140,19 +141,6 @@ struct vy_env {
 	/** Try to recover corrupted data if set. */
 	bool force_recovery;
 };
-
-struct vinyl_engine {
-	struct engine base;
-	/** Vinyl environment. */
-	struct vy_env *env;
-};
-
-/** Extract vy_env from an engine object. */
-static inline struct vy_env *
-vy_env(struct engine *engine)
-{
-	return ((struct vinyl_engine *)engine)->env;
-}
 
 struct vinyl_index {
 	struct index base;
@@ -209,6 +197,14 @@ static const struct space_vtab vinyl_space_vtab;
 static const struct index_vtab vinyl_index_vtab;
 
 static struct trigger on_replace_vinyl_deferred_delete;
+
+/** Extract vy_env from an engine object. */
+static inline struct vy_env *
+vy_env(struct engine *engine)
+{
+	assert(engine->vtab == &vinyl_engine_vtab);
+	return (struct vy_env *)engine;
+}
 
 /**
  * A quick intro into Vinyl cosmology and file format
@@ -327,9 +323,9 @@ vy_info_append_disk(struct vy_env *env, struct info_handler *h)
 }
 
 void
-vinyl_engine_stat(struct vinyl_engine *vinyl, struct info_handler *h)
+vinyl_engine_stat(struct engine *engine, struct info_handler *h)
 {
-	struct vy_env *env = vinyl->env;
+	struct vy_env *env = vy_env(engine);
 
 	info_begin(h);
 	vy_info_append_tx(env, h);
@@ -692,14 +688,13 @@ static struct index *
 vinyl_space_create_index(struct space *space, struct index_def *index_def)
 {
 	assert(index_def->type == TREE);
-	struct vinyl_engine *vinyl = (struct vinyl_engine *)space->engine;
 	struct vinyl_index *index = calloc(1, sizeof(*index));
 	if (index == NULL) {
 		diag_set(OutOfMemory, sizeof(*index),
 			 "malloc", "struct vinyl_index");
 		return NULL;
 	}
-	struct vy_env *env = vinyl->env;
+	struct vy_env *env = vy_env(space->engine);
 	struct vy_lsm *pk = NULL;
 	if (index_def->iid > 0) {
 		pk = vy_lsm(space_index(space, 0));
@@ -712,7 +707,7 @@ vinyl_space_create_index(struct space *space, struct index_def *index_def)
 		free(index);
 		return NULL;
 	}
-	if (index_create(&index->base, (struct engine *)vinyl,
+	if (index_create(&index->base, &env->base,
 			 &vinyl_index_vtab, index_def) != 0) {
 		vy_lsm_delete(lsm);
 		free(index);
@@ -2689,82 +2684,77 @@ vy_env_complete_recovery(struct vy_env *env)
 	vy_regulator_start(&env->regulator);
 }
 
-struct vinyl_engine *
+struct engine *
 vinyl_engine_new(const char *dir, size_t memory,
 		 int read_threads, int write_threads, bool force_recovery)
 {
-	struct vinyl_engine *vinyl = calloc(1, sizeof(*vinyl));
-	if (vinyl == NULL) {
-		diag_set(OutOfMemory, sizeof(*vinyl),
-			 "malloc", "struct vinyl_engine");
+	struct vy_env *env = vy_env_new(dir, memory, read_threads,
+					write_threads, force_recovery);
+	if (env == NULL)
 		return NULL;
-	}
 
-	vinyl->env = vy_env_new(dir, memory, read_threads,
-				write_threads, force_recovery);
-	if (vinyl->env == NULL) {
-		free(vinyl);
-		return NULL;
-	}
-
-	vinyl->base.vtab = &vinyl_engine_vtab;
-	vinyl->base.name = "vinyl";
-	return vinyl;
+	env->base.vtab = &vinyl_engine_vtab;
+	env->base.name = "vinyl";
+	return &env->base;
 }
 
 static void
 vinyl_engine_shutdown(struct engine *engine)
 {
-	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
-	vy_env_delete(vinyl->env);
-	free(vinyl);
+	struct vy_env *env = vy_env(engine);
+	vy_env_delete(env);
 }
 
 void
-vinyl_engine_set_cache(struct vinyl_engine *vinyl, size_t quota)
+vinyl_engine_set_cache(struct engine *engine, size_t quota)
 {
-	vy_cache_env_set_quota(&vinyl->env->cache_env, quota);
+	struct vy_env *env = vy_env(engine);
+	vy_cache_env_set_quota(&env->cache_env, quota);
 }
 
 int
-vinyl_engine_set_memory(struct vinyl_engine *vinyl, size_t size)
+vinyl_engine_set_memory(struct engine *engine, size_t size)
 {
-	if (size < vinyl->env->quota.limit) {
+	struct vy_env *env = vy_env(engine);
+	if (size < env->quota.limit) {
 		diag_set(ClientError, ER_CFG, "vinyl_memory",
 			 "cannot decrease memory size at runtime");
 		return -1;
 	}
-	vy_regulator_set_memory_limit(&vinyl->env->regulator, size);
+	vy_regulator_set_memory_limit(&env->regulator, size);
 	return 0;
 }
 
 void
-vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size)
+vinyl_engine_set_max_tuple_size(struct engine *engine, size_t max_size)
 {
-	vinyl->env->stmt_env.max_tuple_size = max_size;
+	struct vy_env *env = vy_env(engine);
+	env->stmt_env.max_tuple_size = max_size;
 }
 
 void
-vinyl_engine_set_timeout(struct vinyl_engine *vinyl, double timeout)
+vinyl_engine_set_timeout(struct engine *engine, double timeout)
 {
-	vinyl->env->timeout = timeout;
+	struct vy_env *env = vy_env(engine);
+	env->timeout = timeout;
 }
 
 void
-vinyl_engine_set_too_long_threshold(struct vinyl_engine *vinyl,
+vinyl_engine_set_too_long_threshold(struct engine *engine,
 				    double too_long_threshold)
 {
-	vinyl->env->quota.too_long_threshold = too_long_threshold;
-	vinyl->env->lsm_env.too_long_threshold = too_long_threshold;
+	struct vy_env *env = vy_env(engine);
+	env->quota.too_long_threshold = too_long_threshold;
+	env->lsm_env.too_long_threshold = too_long_threshold;
 }
 
 void
-vinyl_engine_set_snap_io_rate_limit(struct vinyl_engine *vinyl, double limit)
+vinyl_engine_set_snap_io_rate_limit(struct engine *engine, double limit)
 {
+	struct vy_env *env = vy_env(engine);
 	int64_t limit_in_bytes = limit * 1024 * 1024;
-	vinyl->env->run_env.snap_io_rate_limit = limit_in_bytes;
-	vy_regulator_reset_dump_bandwidth(&vinyl->env->regulator,
-					  limit_in_bytes);
+	env->run_env.snap_io_rate_limit = limit_in_bytes;
+	vy_regulator_reset_dump_bandwidth(&env->regulator, limit_in_bytes);
 }
 
 /** }}} Environment */

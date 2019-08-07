@@ -39,9 +39,9 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct info_handler;
-struct vinyl_engine;
+struct engine;
 
-struct vinyl_engine *
+struct engine *
 vinyl_engine_new(const char *dir, size_t memory,
 		 int read_threads, int write_threads, bool force_recovery);
 
@@ -49,55 +49,55 @@ vinyl_engine_new(const char *dir, size_t memory,
  * Vinyl engine statistics (box.stat.vinyl()).
  */
 void
-vinyl_engine_stat(struct vinyl_engine *vinyl, struct info_handler *handler);
+vinyl_engine_stat(struct engine *engine, struct info_handler *handler);
 
 /**
  * Update vinyl cache size.
  */
 void
-vinyl_engine_set_cache(struct vinyl_engine *vinyl, size_t quota);
+vinyl_engine_set_cache(struct engine *engine, size_t quota);
 
 /**
  * Update vinyl memory size.
  */
 int
-vinyl_engine_set_memory(struct vinyl_engine *vinyl, size_t size);
+vinyl_engine_set_memory(struct engine *engine, size_t size);
 
 /**
  * Update max tuple size.
  */
 void
-vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size);
+vinyl_engine_set_max_tuple_size(struct engine *engine, size_t max_size);
 
 /**
  * Update query timeout.
  */
 void
-vinyl_engine_set_timeout(struct vinyl_engine *vinyl, double timeout);
+vinyl_engine_set_timeout(struct engine *engine, double timeout);
 
 /**
  * Update too_long_threshold.
  */
 void
-vinyl_engine_set_too_long_threshold(struct vinyl_engine *vinyl,
+vinyl_engine_set_too_long_threshold(struct engine *engine,
 				    double too_long_threshold);
 
 /**
  * Update snap_io_rate_limit.
  */
 void
-vinyl_engine_set_snap_io_rate_limit(struct vinyl_engine *vinyl, double limit);
+vinyl_engine_set_snap_io_rate_limit(struct engine *engine, double limit);
 
 #ifdef __cplusplus
 } /* extern "C" */
 
 #include "diag.h"
 
-static inline struct vinyl_engine *
+static inline struct engine *
 vinyl_engine_new_xc(const char *dir, size_t memory,
 		    int read_threads, int write_threads, bool force_recovery)
 {
-	struct vinyl_engine *vinyl;
+	struct engine *vinyl;
 	vinyl = vinyl_engine_new(dir, memory, read_threads,
 				 write_threads, force_recovery);
 	if (vinyl == NULL)
@@ -106,9 +106,9 @@ vinyl_engine_new_xc(const char *dir, size_t memory,
 }
 
 static inline void
-vinyl_engine_set_memory_xc(struct vinyl_engine *vinyl, size_t size)
+vinyl_engine_set_memory_xc(struct engine *engine, size_t size)
 {
-	if (vinyl_engine_set_memory(vinyl, size) != 0)
+	if (vinyl_engine_set_memory(engine, size) != 0)
 		diag_raise();
 }
 

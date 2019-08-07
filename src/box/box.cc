@@ -784,8 +784,7 @@ box_set_snap_io_rate_limit(void)
 	assert(memtx != NULL);
 	memtx_engine_set_snap_io_rate_limit(memtx,
 			cfg_getd("snap_io_rate_limit"));
-	struct vinyl_engine *vinyl;
-	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	struct engine *vinyl = engine_by_name("vinyl");
 	assert(vinyl != NULL);
 	vinyl_engine_set_snap_io_rate_limit(vinyl,
 			cfg_getd("snap_io_rate_limit"));
@@ -816,8 +815,7 @@ box_set_too_long_threshold(void)
 {
 	too_long_threshold = cfg_getd("too_long_threshold");
 
-	struct vinyl_engine *vinyl;
-	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	struct engine *vinyl = engine_by_name("vinyl");
 	assert(vinyl != NULL);
 	vinyl_engine_set_too_long_threshold(vinyl, too_long_threshold);
 }
@@ -855,8 +853,7 @@ box_set_checkpoint_wal_threshold(void)
 void
 box_set_vinyl_memory(void)
 {
-	struct vinyl_engine *vinyl;
-	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	struct engine *vinyl = engine_by_name("vinyl");
 	assert(vinyl != NULL);
 	vinyl_engine_set_memory_xc(vinyl,
 		box_check_vinyl_memory(cfg_geti64("vinyl_memory")));
@@ -865,8 +862,7 @@ box_set_vinyl_memory(void)
 void
 box_set_vinyl_max_tuple_size(void)
 {
-	struct vinyl_engine *vinyl;
-	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	struct engine *vinyl = engine_by_name("vinyl");
 	assert(vinyl != NULL);
 	vinyl_engine_set_max_tuple_size(vinyl,
 			cfg_geti("vinyl_max_tuple_size"));
@@ -875,8 +871,7 @@ box_set_vinyl_max_tuple_size(void)
 void
 box_set_vinyl_cache(void)
 {
-	struct vinyl_engine *vinyl;
-	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	struct engine *vinyl = engine_by_name("vinyl");
 	assert(vinyl != NULL);
 	vinyl_engine_set_cache(vinyl, cfg_geti64("vinyl_cache"));
 }
@@ -884,8 +879,7 @@ box_set_vinyl_cache(void)
 void
 box_set_vinyl_timeout(void)
 {
-	struct vinyl_engine *vinyl;
-	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	struct engine *vinyl = engine_by_name("vinyl");
 	assert(vinyl != NULL);
 	vinyl_engine_set_timeout(vinyl,	cfg_getd("vinyl_timeout"));
 }
@@ -1718,7 +1712,7 @@ engine_init()
 	struct engine *blackhole = blackhole_engine_new_xc();
 	engine_register(blackhole);
 
-	struct vinyl_engine *vinyl;
+	struct engine *vinyl;
 	vinyl = vinyl_engine_new_xc(cfg_gets("vinyl_dir"),
 				    cfg_geti64("vinyl_memory"),
 				    cfg_geti("vinyl_read_threads"),
