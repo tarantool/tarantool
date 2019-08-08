@@ -610,10 +610,6 @@ memtx_engine_begin_checkpoint(struct engine *engine)
 		memtx->checkpoint = NULL;
 		return -1;
 	}
-
-	/* increment snapshot version; set tuple deletion to delayed mode */
-	memtx->snapshot_version++;
-	small_alloc_setopt(&memtx->alloc, SMALL_DELAYED_FREE_MODE, true);
 	return 0;
 }
 
@@ -661,8 +657,6 @@ memtx_engine_commit_checkpoint(struct engine *engine,
 	/* waitCheckpoint() must have been done. */
 	assert(!memtx->checkpoint->waiting_for_snap_thread);
 
-	small_alloc_setopt(&memtx->alloc, SMALL_DELAYED_FREE_MODE, false);
-
 	if (!memtx->checkpoint->touch) {
 		int64_t lsn = vclock_sum(&memtx->checkpoint->vclock);
 		struct xdir *dir = &memtx->checkpoint->dir;
@@ -702,8 +696,6 @@ memtx_engine_abort_checkpoint(struct engine *engine)
 			diag_log();
 		memtx->checkpoint->waiting_for_snap_thread = false;
 	}
-
-	small_alloc_setopt(&memtx->alloc, SMALL_DELAYED_FREE_MODE, false);
 
 	/** Remove garbage .inprogress file. */
 	const char *filename =
@@ -1012,6 +1004,22 @@ void
 memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size)
 {
 	memtx->max_tuple_size = max_size;
+}
+
+void
+memtx_enter_delayed_free_mode(struct memtx_engine *memtx)
+{
+	memtx->snapshot_version++;
+	if (memtx->delayed_free_mode++ == 0)
+		small_alloc_setopt(&memtx->alloc, SMALL_DELAYED_FREE_MODE, true);
+}
+
+void
+memtx_leave_delayed_free_mode(struct memtx_engine *memtx)
+{
+	assert(memtx->delayed_free_mode > 0);
+	if (--memtx->delayed_free_mode == 0)
+		small_alloc_setopt(&memtx->alloc, SMALL_DELAYED_FREE_MODE, false);
 }
 
 struct tuple *

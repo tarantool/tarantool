@@ -1215,6 +1215,8 @@ tree_snapshot_iterator_free(struct snapshot_iterator *iterator)
 	assert(iterator->free == tree_snapshot_iterator_free);
 	struct tree_snapshot_iterator *it =
 		(struct tree_snapshot_iterator *)iterator;
+	memtx_leave_delayed_free_mode((struct memtx_engine *)
+				      it->index->base.engine);
 	memtx_tree_iterator_destroy(&it->index->tree, &it->tree_iterator);
 	index_unref(&it->index->base);
 	free(iterator);
@@ -1262,6 +1264,7 @@ memtx_tree_index_create_snapshot_iterator(struct index *base)
 	index_ref(base);
 	it->tree_iterator = memtx_tree_iterator_first(&index->tree);
 	memtx_tree_iterator_freeze(&index->tree, &it->tree_iterator);
+	memtx_enter_delayed_free_mode((struct memtx_engine *)base->engine);
 	return (struct snapshot_iterator *) it;
 }
 

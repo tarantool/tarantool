@@ -414,6 +414,8 @@ hash_snapshot_iterator_free(struct snapshot_iterator *iterator)
 	assert(iterator->free == hash_snapshot_iterator_free);
 	struct hash_snapshot_iterator *it =
 		(struct hash_snapshot_iterator *) iterator;
+	memtx_leave_delayed_free_mode((struct memtx_engine *)
+				      it->index->base.engine);
 	light_index_iterator_destroy(&it->index->hash_table, &it->iterator);
 	index_unref(&it->index->base);
 	free(iterator);
@@ -465,6 +467,7 @@ memtx_hash_index_create_snapshot_iterator(struct index *base)
 	index_ref(base);
 	light_index_iterator_begin(&index->hash_table, &it->iterator);
 	light_index_iterator_freeze(&index->hash_table, &it->iterator);
+	memtx_enter_delayed_free_mode((struct memtx_engine *)base->engine);
 	return (struct snapshot_iterator *) it;
 }
 

@@ -137,6 +137,12 @@ struct memtx_engine {
 	size_t max_tuple_size;
 	/** Incremented with each next snapshot. */
 	uint32_t snapshot_version;
+	/**
+	 * Unless zero, freeing of tuples allocated before the last
+	 * call to memtx_enter_delayed_free_mode() is delayed until
+	 * memtx_leave_delayed_free_mode() is called.
+	 */
+	uint32_t delayed_free_mode;
 	/** Memory pool for rtree index iterator. */
 	struct mempool rtree_iterator_pool;
 	/**
@@ -204,6 +210,23 @@ memtx_engine_set_memory(struct memtx_engine *memtx, size_t size);
 
 void
 memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size);
+
+/**
+ * Enter tuple delayed free mode: tuple allocated before the call
+ * won't be freed until memtx_leave_delayed_free_mode() is called.
+ * This function is reentrant, meaning it's okay to call it multiple
+ * times from the same or different fibers - one just has to leave
+ * the delayed free mode the same amount of times then.
+ */
+void
+memtx_enter_delayed_free_mode(struct memtx_engine *memtx);
+
+/**
+ * Leave tuple delayed free mode. This function undoes the effect
+ * of memtx_enter_delayed_free_mode().
+ */
+void
+memtx_leave_delayed_free_mode(struct memtx_engine *memtx);
 
 /** Allocate a memtx tuple. @sa tuple_new(). */
 struct tuple *
