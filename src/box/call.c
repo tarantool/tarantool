@@ -73,6 +73,7 @@ static const struct port_vtab port_msgpack_vtab = {
 	.dump_lua = port_msgpack_dump_lua,
 	.dump_plain = NULL,
 	.get_msgpack = port_msgpack_get_msgpack,
+	.get_vdbemem = NULL,
 	.destroy = NULL,
 };
 

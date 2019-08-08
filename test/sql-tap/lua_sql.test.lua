@@ -1,19 +1,16 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
 NULL = require('msgpack').NULL
-test:plan(24)
-
-local function func1(a)
-    return a
-end
-local function allways_2(a)
-    return 2
-end
+test:plan(22)
 
 test:do_test(
     "lua_sql-1.0",
     function ()
-        box.internal.sql_create_function("func1", "INT", allways_2)
+        box.schema.func.create('FUNC1', {language = 'Lua',
+                         is_deterministic = true,
+                         body = 'function(a) return 2 end',
+                         param_list = {'any'}, returns = 'integer',
+                         exports = {'LUA', 'SQL'}})
         return test:execsql("select func1(1)")
     end,
     {2})
@@ -22,33 +19,15 @@ test:do_test(
 test:do_test(
     "lua_sql-1.1",
     function ()
-        box.internal.sql_create_function("func1", "INT", func1)
+        box.func.FUNC1:drop()
+        box.schema.func.create('FUNC1', {language = 'Lua',
+                        is_deterministic = true,
+                        body = 'function(a) return a end',
+                        param_list = {'scalar'}, returns = 'integer',
+                        exports = {'LUA', 'SQL'}})
         return test:execsql("select func1(1)")
     end,
     {1})
-
--- try to loose memory
-test:do_test(
-    "lua_sql-1.2",
-    function ()
-        for i = 1, 1000000, 1 do
-            box.internal.sql_create_function("func1", "INT", func1)
-        end
-        return test:execsql("select func1(1)")
-    end,
-    {1})
-
--- check sql polymorphism
-test:do_test(
-    "lua_sql-1.3",
-    function ()
-        box.internal.sql_create_function("allways_2", "INT", allways_2, 1) -- specify 1 arg
-        box.internal.sql_create_function("allways_2", "INT", func1)
-        box.internal.sql_create_function("allways_2", "INT", func1, 2)
-        box.internal.sql_create_function("allways_2", "INT", func1, 3)
-        return test:execsql("select allways_2(1)")
-    end,
-    {2})
 
 test:do_catchsql_test(
     "lua_sql-1.0",
@@ -72,7 +51,7 @@ for _, val in ipairs({
         {result})
 end
 
-local from_sql_to_lua = {
+from_sql_to_lua = {
     [1] = {1, 1},
     [2] = {"1", 1},
     [3] = {"1.5", 1.5},
@@ -81,14 +60,19 @@ local from_sql_to_lua = {
     [6] = {"x'0500'", "\u{0005}\u{0000}"},
     [7] = {"123123123123123", 123123123123123LL},
 }
-local json = require("json")
-local function check_from_sql_to_lua(i, arg)
-    if from_sql_to_lua[i][2] == arg then
-        return 1
-    end
-    return 0
-end
-box.internal.sql_create_function("check_from_sql_to_lua", "INT", check_from_sql_to_lua)
+
+box.schema.func.create('CHECK_FROM_SQL_TO_LUA', {language = 'Lua',
+                       is_deterministic = true,
+                       body = [[
+                           function(i, arg)
+                               if from_sql_to_lua[i][2] == arg then
+                                   return 1
+                               end
+                               return 0
+                           end
+                       ]],
+                       param_list = {'integer', 'scalar'}, returns = 'integer',
+                       exports = {'LUA', 'SQL'}})
 
 -- check for different types
 for i = 1, #from_sql_to_lua, 1 do
@@ -98,17 +82,23 @@ for i = 1, #from_sql_to_lua, 1 do
         {1})
 end
 
-local from_lua_to_sql = {
+from_lua_to_sql = {
     [1] = {1, 1},
     [2] = {"1.5", 1.5},
     [3] = {"'1'", "1"},
     [4] = {"true", true},
     [5] = {"false", false},
 }
-local function check_from_lua_to_sql(i)
-    return from_lua_to_sql[i][2]
-end
-box.internal.sql_create_function("check_from_lua_to_sql", "VARBINARY", check_from_lua_to_sql)
+
+box.schema.func.create('CHECK_FROM_LUA_TO_SQL', {language = 'Lua',
+                       is_deterministic = true,
+                       body = [[
+                           function(i)
+                               return from_lua_to_sql[i][2]
+                           end
+                       ]],
+                       param_list = {'integer'}, returns = 'scalar',
+                       exports = {'LUA', 'SQL'}})
 
 -- check for different types
 for i = 1, #from_lua_to_sql, 1 do
@@ -118,14 +108,20 @@ for i = 1, #from_lua_to_sql, 1 do
         {true})
 end
 
-local from_lua_to_sql_bad = {
+from_lua_to_sql_bad = {
     [1] = NULL,
     [2] = 12LL, -- it is possible to support this type
 }
-local function check_from_lua_to_sql_bad(i)
-    return from_lua_to_sql_bad[i]
-end
-box.internal.sql_create_function("check_from_lua_to_sql_bad", "VARBINARY", check_from_lua_to_sql_bad)
+
+box.schema.func.create('CHECK_FROM_LUA_TO_SQL_BAD', {language = 'Lua',
+                       is_deterministic = true,
+                       body = [[
+                           function(i)
+                               return from_lua_to_sql_bad[i]
+                           end
+                       ]],
+                       param_list = {'integer'}, returns = 'scalar',
+                       exports = {'LUA', 'SQL'}})
 
 for i = 1, #from_lua_to_sql_bad, 1 do
     test:do_catchsql_test(
@@ -134,16 +130,27 @@ for i = 1, #from_lua_to_sql_bad, 1 do
         {1, "/Unsupported/"})
 end
 
-local function allways_error()
-    error("my_error123")
-    return 1
-end
-box.internal.sql_create_function("allways_error", "INT", allways_error)
+box.schema.func.create('ALLWAYS_ERROR', {language = 'Lua',
+                       is_deterministic = true,
+                       body = [[
+                           function()
+                               error("my_error123")
+                               return 1
+                           end
+                       ]],
+                       param_list = {}, returns = 'integer',
+                       exports = {'LUA', 'SQL'}})
+
 
 test:do_catchsql_test(
     "lua_sql-2.6",
     "select allways_error()",
     {1, "/my_error123/"})
 
+box.func.FUNC1:drop()
+box.func.CHECK_FROM_SQL_TO_LUA:drop()
+box.func.CHECK_FROM_LUA_TO_SQL:drop()
+box.func.CHECK_FROM_LUA_TO_SQL_BAD:drop()
+box.func.ALLWAYS_ERROR:drop()
 
 test:finish_test()

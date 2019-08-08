@@ -44,6 +44,7 @@
 #include "box/fk_constraint.h"
 #include "box/txn.h"
 #include "box/tuple.h"
+#include "box/port.h"
 #include "sqlInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
@@ -1791,6 +1792,48 @@ case OP_BuiltinFunction: {
 
 	REGISTER_TRACE(p, pOp->p3, pCtx->pOut);
 	UPDATE_MAX_BLOBSIZE(pCtx->pOut);
+	break;
+}
+
+/* Opcode: Function * P2 P3 P4 P5
+ * Synopsis: r[P3]=func(r[P2@P5])
+ *
+ * Invoke a user function (P4 is a pointer to a function object
+ * that defines the function) with P5 arguments taken from
+ * register P2 and successors. The result of the function is
+ * stored in register P3.
+ */
+case OP_Function: {
+	struct func *func = pOp->p4.func;
+	int argc = pOp->p5;
+	struct Mem *argv = &aMem[pOp->p2];
+	struct port args, ret;
+
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	port_vdbemem_create(&args, (struct sql_value *)argv, argc);
+	if (func_call(func, &args, &ret) != 0)
+		goto abort_due_to_error;
+
+	pOut = vdbe_prepare_null_out(p, pOp->p3);
+	uint32_t size;
+	struct Mem *mem = (struct Mem *)port_get_vdbemem(&ret, &size);
+	if (mem != NULL && size > 0)
+		*pOut = mem[0];
+	port_destroy(&ret);
+	region_truncate(region, region_svp);
+	if (mem == NULL)
+		goto abort_due_to_error;
+
+	/*
+	 * Copy the result of the function invocation into
+	 * register P3.
+	 */
+	if ((pOut->flags & (MEM_Str | MEM_Blob)) != 0)
+		if (sqlVdbeMemTooBig(pOut)) goto too_big;
+
+	REGISTER_TRACE(p, pOp->p3, pOut);
+	UPDATE_MAX_BLOBSIZE(pOut);
 	break;
 }
 

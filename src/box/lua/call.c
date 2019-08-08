@@ -510,12 +510,16 @@ port_lua_destroy(struct port *base)
 extern const char *
 port_lua_dump_plain(struct port *port, uint32_t *size);
 
+extern struct sql_value *
+port_lua_get_vdbemem(struct port *base, uint32_t *size);
+
 static const struct port_vtab port_lua_vtab = {
 	.dump_msgpack = port_lua_dump,
 	.dump_msgpack_16 = port_lua_dump_16,
 	.dump_lua = port_lua_dump_lua,
 	.dump_plain = port_lua_dump_plain,
 	.get_msgpack = port_lua_get_msgpack,
+	.get_vdbemem = port_lua_get_vdbemem,
 	.destroy = port_lua_destroy,
 };
 

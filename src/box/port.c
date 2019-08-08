@@ -140,11 +140,15 @@ port_free(void)
 	mempool_destroy(&port_tuple_entry_pool);
 }
 
+extern struct sql_value *
+port_tuple_get_vdbemem(struct port *base, uint32_t *size);
+
 const struct port_vtab port_tuple_vtab = {
 	.dump_msgpack = port_tuple_dump_msgpack,
 	.dump_msgpack_16 = port_tuple_dump_msgpack_16,
 	.dump_lua = port_tuple_dump_lua,
 	.dump_plain = NULL,
 	.get_msgpack = NULL,
+	.get_vdbemem = port_tuple_get_vdbemem,
 	.destroy = port_tuple_destroy,
 };

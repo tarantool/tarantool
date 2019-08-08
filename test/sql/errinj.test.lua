@@ -119,16 +119,6 @@ errinj.set("ERRINJ_WAL_IO", false)
 box.execute("DROP TABLE t3;")
 
 --
--- gh-3931: Store regular identifiers in case-normal form
---
-errinj = box.error.injection
-errinj.set("ERRINJ_SQL_NAME_NORMALIZATION", true)
-box.execute("CREATE TABLE hello (id INT primary key,x INT,y INT);")
-dummy_f = function(int) return 1 end
-box.internal.sql_create_function("counter1", "INT", dummy_f, -1, false)
-errinj.set("ERRINJ_SQL_NAME_NORMALIZATION", false)
-
---
 -- Tests which are aimed at verifying work of commit/rollback
 -- triggers on _ck_constraint space.
 --

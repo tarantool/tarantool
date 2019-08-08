@@ -710,17 +710,20 @@ test:do_execsql_test(
 -- for a matching column name did not cause an otherwise static subquery
 -- to become a dynamic (correlated) subquery.
 --
-local callcnt = 0
+callcnt = 0
 test:do_test(
     "subquery-5.1",
     function()
-        local function callcntproc(n)
-            callcnt = callcnt + 1
-            return n
-        end
-
-        callcnt = 0
-        box.internal.sql_create_function("callcnt", "INT", callcntproc)
+        box.schema.func.create('CALLCNT', {language = 'Lua',
+                               is_deterministic = true,
+                               param_list = {'integer'}, returns = 'integer',
+                               exports = {'LUA', 'SQL'},
+                               body = [[
+                                   function(n)
+                                           callcnt = callcnt + 1
+                                           return n
+                                   end
+                               ]]})
         return test:execsql [[
             CREATE TABLE t4(x TEXT,y  INT PRIMARY KEY);
             INSERT INTO t4 VALUES('one',1);
@@ -790,6 +793,8 @@ test:do_test(
     function()
         return callcnt
     end, 1)
+
+box.func.CALLCNT:drop()
 
 --############  was disable until we get #2652 fixed
 -- Ticket #2652.  Allow aggregate functions of outer queries inside

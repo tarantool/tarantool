@@ -680,10 +680,11 @@ test:do_execsql_test(
 -- cannot be tested).
 --
 --reset_db()
-local function myfunc(x)
-    return x < 10
-end
-box.internal.sql_create_function("myfunc", "INT", myfunc)
+box.schema.func.create('MYFUNC', {language = 'Lua',
+                       is_deterministic = true,
+                       body = 'function(x) return x < 10 end',
+                       returns = 'boolean', param_list = {'number'},
+                       exports = {'LUA', 'SQL'}})
 
 test:do_execsql_test(
     7.1,
@@ -807,6 +808,8 @@ test:do_catchsql_test(
         1, "Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier."
         -- </9.3>
     })
+
+box.func.MYFUNC:drop()
 
 test:finish_test()
 

@@ -128,6 +128,69 @@ identifier.run_test(
 test_run:cmd("setopt delimiter ''");
 c:close()
 
+--
+-- gh-2233: Invoke Lua functions created outside SQL.
+--
+box.schema.func.create('WAITFOR', {language = 'SQL_BUILTIN', \
+	param_list = {'integer'}, returns = 'integer',exports = {'SQL'}})
+
+test_run:cmd("setopt delimiter ';'")
+box.schema.func.create("function1.divide", {language = 'C', returns = 'number',
+					    is_deterministic = true,
+					    exports = {'LUA'}})
+test_run:cmd("setopt delimiter ''");
+box.execute('SELECT "function1.divide"()')
+box.func["function1.divide"]:drop()
+test_run:cmd("setopt delimiter ';'")
+box.schema.func.create("function1.divide", {language = 'C', returns = 'number',
+					    is_deterministic = true,
+					    exports = {'LUA', 'SQL'}})
+test_run:cmd("setopt delimiter ''");
+box.execute('SELECT "function1.divide"()')
+box.execute('SELECT "function1.divide"(6)')
+box.execute('SELECT "function1.divide"(6, 3)')
+box.func["function1.divide"]:drop()
+test_run:cmd("setopt delimiter ';'")
+box.schema.func.create("function1.divide", {language = 'C', returns = 'number',
+					    param_list = {'number', 'number'},
+					    is_deterministic = true,
+					    exports = {'LUA', 'SQL'}})
+test_run:cmd("setopt delimiter ''");
+box.execute('SELECT "function1.divide"()')
+box.execute('SELECT "function1.divide"(6)')
+box.execute('SELECT "function1.divide"(6, 3, 3)')
+box.execute('SELECT "function1.divide"(6, 3)')
+box.execute('SELECT "function1.divide"(5, 2)')
+box.func["function1.divide"]:drop()
+
+function SUMMARIZE(a, b) return a + b end
+test_run:cmd("setopt delimiter ';'")
+box.schema.func.create("SUMMARIZE", {language = 'LUA', returns = 'number',
+				     is_deterministic = true,
+				     param_list = {'number', 'number'},
+				     exports = {'LUA', 'SQL'}})
+test_run:cmd("setopt delimiter ''");
+box.execute('SELECT summarize(1, 2)')
+box.func.SUMMARIZE:drop()
+
+test_run:cmd("setopt delimiter ';'")
+box.schema.func.create("SUMMARIZE", {language = 'LUA', returns = 'number',
+				     body = 'function (a, b) return a + b end',
+				     is_deterministic = true,
+				     param_list = {'number', 'number'},
+				     exports = {'LUA', 'SQL'}})
+test_run:cmd("setopt delimiter ''");
+box.execute('SELECT summarize(1, 2)')
+box.func.SUMMARIZE:drop()
+
+--
+-- gh-4113: Valid method to use Lua from SQL
+--
+box.execute('SELECT lua(\'return 1 + 1\')')
+box.execute('SELECT lua(\'return box.cfg\')')
+box.execute('SELECT lua(\'return box.cfg()\')')
+box.execute('SELECT lua(\'return box.cfg.memtx_memory\')')
+
 -- Test registered functions interface.
 function divide(a, b) return a / b end
 box.schema.func.create("divide", {comment = 'Divide two values'})

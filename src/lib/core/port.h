@@ -98,6 +98,15 @@ struct port_vtab {
 	 * is responsible for cleaning up.
 	 **/
 	const char *(*get_msgpack)(struct port *port, uint32_t *size);
+	/**
+	 * Get the content of a port as a sequence of VDBE memory
+	 * cells. This API is used to pass VDBE variables to
+	 * user-defined Lua functions (see OP_Function in sql/vdbe.c).
+	 * The lifecycle of the returned value is the same as for
+	 * @get_msgpack method, i.e. it depends on particular
+	 * implementation
+	 */
+	struct sql_value *(*get_vdbemem)(struct port *port, uint32_t *size);
 	/** Destroy a port and release associated resources. */
 	void (*destroy)(struct port *port);
 };
@@ -148,6 +157,12 @@ static inline const char *
 port_get_msgpack(struct port *port, uint32_t *size)
 {
 	return port->vtab->get_msgpack(port, size);
+}
+
+static inline struct sql_value *
+port_get_vdbemem(struct port *port, uint32_t *size)
+{
+	return port->vtab->get_vdbemem(port, size);
 }
 
 #if defined(__cplusplus)

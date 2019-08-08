@@ -2143,7 +2143,8 @@ box.schema.func.create = function(name, opts)
                               language = 'string', body = 'string',
                               is_deterministic = 'boolean',
                               is_sandboxed = 'boolean', comment = 'string',
-                              opts = 'table' })
+                              param_list = 'table', returns = 'string',
+                              exports = 'table', opts = 'table' })
     local _func = box.space[box.schema.FUNC_ID]
     local _vfunc = box.space[box.schema.VFUNC_ID]
     local func = _vfunc.index.name:get{name}

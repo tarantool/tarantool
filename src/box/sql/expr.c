@@ -4136,9 +4136,9 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				sqlVdbeAddOp4(v, OP_CollSeq, 0, 0, 0,
 						  (char *)coll, P4_COLLSEQ);
 			}
-			assert(func->def->language ==
-			       FUNC_LANGUAGE_SQL_BUILTIN);
-			int op = OP_BuiltinFunction0;
+			int op = func->def->language ==
+				 FUNC_LANGUAGE_SQL_BUILTIN ?
+				 OP_BuiltinFunction0 : OP_Function;
 			sqlVdbeAddOp4(v, op, constMask, r1, target,
 				      (char *)func, P4_FUNC);
 			sqlVdbeChangeP5(v, (u8) nFarg);

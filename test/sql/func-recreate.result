@@ -12,7 +12,15 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 fiber = require('fiber')
 ---
 ...
-box.internal.sql_create_function('WAITFOR', 'INT', function (n) fiber.sleep(n) return n end)
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+box.schema.func.create('WAITFOR', {language = 'Lua',
+                       body = 'function (n) fiber.sleep(n) return n end',
+                       param_list = {'integer'}, returns = 'integer',
+                       exports = {'LUA', 'SQL'}})
+test_run:cmd("setopt delimiter ''");
 ---
 ...
 ch = fiber.channel(1)
@@ -24,10 +32,19 @@ _ = fiber.create(function () ch:put(box.execute('select WAITFOR(0.2)')) end)
 fiber.sleep(0.1)
 ---
 ...
-box.internal.sql_create_function('WAITFOR', 'INT', function (n) require('fiber').sleep(n) return n end)
+box.func.WAITFOR:drop()
 ---
-- error: 'Failed to create function ''WAITFOR'': unable to create function due to
-    active statements'
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+box.schema.func.create('WAITFOR', {language = 'Lua',
+                       body = 'function (n) fiber.sleep(n) return n end',
+                       param_list = {'integer'}, returns = 'integer',
+                       exports = {'LUA', 'SQL'}})
+test_run:cmd("setopt delimiter ''");
+---
 ...
 ch:get()
 ---
@@ -37,6 +54,20 @@ ch:get()
   rows:
   - [0.2]
 ...
-box.internal.sql_create_function('WAITFOR', 'INT', function (n) require('fiber').sleep(n) return n end)
+box.func.WAITFOR:drop()
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+box.schema.func.create('WAITFOR', {language = 'Lua',
+                   body = 'function (n) fiber.sleep(n) return n end',
+                   param_list = {'integer'}, returns = 'integer',
+                   exports = {'LUA', 'SQL'}})
+test_run:cmd("setopt delimiter ''");
+---
+...
+box.func.WAITFOR:drop()
 ---
 ...

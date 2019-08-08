@@ -46,7 +46,11 @@ local function has_rowdata(sql)
 --     X(41, "X!cmd", [=[["expr","[lsearch [execsql \"explain $sql\"] RowData]>=0"]]=])
 end
 
-box.internal.sql_create_function('randstr', 'TEXT', test.randstr, 1)
+box.schema.func.create('RANDSTR', {language = 'Lua',
+                   body = 'function(n) return test.randstr(n) end',
+                   param_list = {'integer'}, returns = 'string',
+                   exports = {'LUA', 'SQL'}})
+
 
 -- MUST_WORK_TEST
 test:do_execsql_test(
@@ -170,6 +174,8 @@ test:do_execsql_test(
 
         -- </trigger9-1.4.3>
     })
+
+box.func.RANDSTR:drop()
 
 test:do_execsql_test(
     "trigger9-1.5.1",
