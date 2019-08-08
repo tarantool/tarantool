@@ -44,7 +44,6 @@
 
 struct hash_iterator {
 	struct iterator base; /* Must be the first member. */
-	struct light_index_core *hash_table;
 	struct light_index_iterator iterator;
 	/** Memory pool the iterator was allocated from. */
 	struct mempool *pool;
@@ -63,7 +62,8 @@ hash_iterator_ge(struct iterator *ptr, struct tuple **ret)
 {
 	assert(ptr->free == hash_iterator_free);
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
-	struct tuple **res = light_index_iterator_get_and_next(it->hash_table,
+	struct memtx_hash_index *index = (struct memtx_hash_index *)ptr->index;
+	struct tuple **res = light_index_iterator_get_and_next(&index->hash_table,
 							       &it->iterator);
 	*ret = res != NULL ? *res : NULL;
 	return 0;
@@ -75,10 +75,11 @@ hash_iterator_gt(struct iterator *ptr, struct tuple **ret)
 	assert(ptr->free == hash_iterator_free);
 	ptr->next = hash_iterator_ge;
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
-	struct tuple **res = light_index_iterator_get_and_next(it->hash_table,
+	struct memtx_hash_index *index = (struct memtx_hash_index *)ptr->index;
+	struct tuple **res = light_index_iterator_get_and_next(&index->hash_table,
 							       &it->iterator);
 	if (res != NULL)
-		res = light_index_iterator_get_and_next(it->hash_table,
+		res = light_index_iterator_get_and_next(&index->hash_table,
 							&it->iterator);
 	*ret = res != NULL ? *res : NULL;
 	return 0;
@@ -321,27 +322,26 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 	iterator_create(&it->base, base);
 	it->pool = &memtx->hash_iterator_pool;
 	it->base.free = hash_iterator_free;
-	it->hash_table = &index->hash_table;
-	light_index_iterator_begin(it->hash_table, &it->iterator);
+	light_index_iterator_begin(&index->hash_table, &it->iterator);
 
 	switch (type) {
 	case ITER_GT:
 		if (part_count != 0) {
-			light_index_iterator_key(it->hash_table, &it->iterator,
+			light_index_iterator_key(&index->hash_table, &it->iterator,
 					key_hash(key, base->def->key_def), key);
 			it->base.next = hash_iterator_gt;
 		} else {
-			light_index_iterator_begin(it->hash_table, &it->iterator);
+			light_index_iterator_begin(&index->hash_table, &it->iterator);
 			it->base.next = hash_iterator_ge;
 		}
 		break;
 	case ITER_ALL:
-		light_index_iterator_begin(it->hash_table, &it->iterator);
+		light_index_iterator_begin(&index->hash_table, &it->iterator);
 		it->base.next = hash_iterator_ge;
 		break;
 	case ITER_EQ:
 		assert(part_count > 0);
-		light_index_iterator_key(it->hash_table, &it->iterator,
+		light_index_iterator_key(&index->hash_table, &it->iterator,
 				key_hash(key, base->def->key_def), key);
 		it->base.next = hash_iterator_eq;
 		break;

@@ -155,9 +155,6 @@ value_to_tuple(size_t value)
 struct bitset_index_iterator {
 	struct iterator base; /* Must be the first member. */
 	struct tt_bitset_iterator bitset_it;
-#ifndef OLD_GOOD_BITSET
-	struct memtx_bitset_index *bitset_index;
-#endif /* #ifndef OLD_GOOD_BITSET */
 	/** Memory pool the iterator was allocated from. */
 	struct mempool *pool;
 };
@@ -191,7 +188,9 @@ bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 	}
 
 #ifndef OLD_GOOD_BITSET
-	*ret = memtx_bitset_index_value_to_tuple(it->bitset_index, value);
+	struct memtx_bitset_index *index =
+		(struct memtx_bitset_index *)iterator->index;
+	*ret = memtx_bitset_index_value_to_tuple(index, value);
 #else /* #ifndef OLD_GOOD_BITSET */
 	*ret = value_to_tuple(value);
 #endif /* #ifndef OLD_GOOD_BITSET */
@@ -331,9 +330,6 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 	it->base.free = bitset_index_iterator_free;
 
 	tt_bitset_iterator_create(&it->bitset_it, realloc);
-#ifndef OLD_GOOD_BITSET
-	it->bitset_index = index;
-#endif
 	const void *bitset_key = NULL;
 	uint32_t bitset_key_size = 0;
 
