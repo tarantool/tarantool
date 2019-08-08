@@ -194,15 +194,11 @@ vy_scheduler_reset_stat(struct vy_scheduler *scheduler);
 
 /**
  * Add an LSM tree to scheduler dump/compaction queues.
+ * When the LSM tree is destroyed, it will be removed
+ * from the queues automatically.
  */
-void
+int
 vy_scheduler_add_lsm(struct vy_scheduler *, struct vy_lsm *);
-
-/**
- * Remove an LSM tree from scheduler dump/compaction queues.
- */
-void
-vy_scheduler_remove_lsm(struct vy_scheduler *, struct vy_lsm *);
 
 /**
  * Trigger dump of all currently existing in-memory trees.

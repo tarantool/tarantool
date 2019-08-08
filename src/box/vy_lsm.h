@@ -312,6 +312,20 @@ struct vy_lsm {
 	 * this LSM tree.
 	 */
 	vy_lsm_read_set_t read_set;
+	/**
+	 * Triggers run when the last reference to this LSM tree
+	 * is dropped and the LSM tree is about to be destroyed.
+	 * A pointer to this LSM tree is passed to the trigger
+	 * callback in the 'event' argument.
+	 *
+	 * For instance, this trigger is used to remove a dropped
+	 * LSM tree from the scheduler before it gets destroyed.
+	 * Since each dump/compaction task takes a reference to
+	 * the target index, this means that a dropped index will
+	 * not get destroyed until all tasks scheduled for it have
+	 * been completed.
+	 */
+	struct rlist on_destroy;
 };
 
 /** Extract vy_lsm from an index object. */

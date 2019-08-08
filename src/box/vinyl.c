@@ -755,18 +755,8 @@ vinyl_index_open(struct index *index)
 	/*
 	 * Add the new LSM tree to the scheduler so that it can
 	 * be dumped and compacted.
-	 *
-	 * Note, during local recovery an LSM tree may be marked
-	 * as dropped, which means that it will be dropped before
-	 * recovery is complete. In this case there's no need in
-	 * letting the scheduler know about it.
 	 */
-	if (!lsm->is_dropped)
-		vy_scheduler_add_lsm(&env->scheduler, lsm);
-	else
-		assert(env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
-		       env->status == VINYL_FINAL_RECOVERY_LOCAL);
-	return 0;
+	return vy_scheduler_add_lsm(&env->scheduler, lsm);
 }
 
 static void
@@ -836,8 +826,6 @@ vinyl_index_abort_create(struct index *index)
 		return;
 	}
 
-	vy_scheduler_remove_lsm(&env->scheduler, lsm);
-
 	lsm->is_dropped = true;
 
 	vy_log_tx_begin();
@@ -890,8 +878,6 @@ vinyl_index_commit_drop(struct index *index, int64_t lsn)
 	 */
 	if (env->status == VINYL_FINAL_RECOVERY_LOCAL && lsm->is_dropped)
 		return;
-
-	vy_scheduler_remove_lsm(&env->scheduler, lsm);
 
 	lsm->is_dropped = true;
 

@@ -45,6 +45,7 @@
 #include "say.h"
 #include "schema.h"
 #include "tuple.h"
+#include "trigger.h"
 #include "vy_log.h"
 #include "vy_mem.h"
 #include "vy_range.h"
@@ -207,6 +208,7 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	lsm->group_id = group_id;
 	lsm->opts = index_def->opts;
 	vy_lsm_read_set_new(&lsm->read_set);
+	rlist_create(&lsm->on_destroy);
 
 	lsm_env->lsm_count++;
 	return lsm;
@@ -244,6 +246,8 @@ vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 void
 vy_lsm_delete(struct vy_lsm *lsm)
 {
+	trigger_run(&lsm->on_destroy, lsm);
+
 	assert(heap_node_is_stray(&lsm->in_dump));
 	assert(heap_node_is_stray(&lsm->in_compaction));
 	assert(vy_lsm_read_set_empty(&lsm->read_set));

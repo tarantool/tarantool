@@ -510,35 +510,47 @@ vy_scheduler_reset_stat(struct vy_scheduler *scheduler)
 	stat->compaction_output = 0;
 }
 
-void
-vy_scheduler_add_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
+static void
+vy_scheduler_on_delete_lsm(struct trigger *trigger, void *event)
 {
-	assert(!lsm->is_dropped);
-	assert(heap_node_is_stray(&lsm->in_dump));
-	assert(heap_node_is_stray(&lsm->in_compaction));
-	vy_dump_heap_insert(&scheduler->dump_heap, lsm);
-	vy_compaction_heap_insert(&scheduler->compaction_heap, lsm);
-}
-
-void
-vy_scheduler_remove_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
-{
-	assert(!lsm->is_dropped);
+	struct vy_lsm *lsm = event;
+	struct vy_scheduler *scheduler = trigger->data;
 	assert(! heap_node_is_stray(&lsm->in_dump));
 	assert(! heap_node_is_stray(&lsm->in_compaction));
 	vy_dump_heap_delete(&scheduler->dump_heap, lsm);
 	vy_compaction_heap_delete(&scheduler->compaction_heap, lsm);
+	trigger_clear(trigger);
+	free(trigger);
+}
+
+int
+vy_scheduler_add_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
+{
+	assert(heap_node_is_stray(&lsm->in_dump));
+	assert(heap_node_is_stray(&lsm->in_compaction));
+	/*
+	 * Register a trigger that will remove this LSM tree from
+	 * the scheduler queues on destruction.
+	 */
+	struct trigger *trigger = malloc(sizeof(*trigger));
+	if (trigger == NULL) {
+		diag_set(OutOfMemory, sizeof(*trigger), "malloc", "trigger");
+		return -1;
+	}
+	trigger_create(trigger, vy_scheduler_on_delete_lsm, scheduler, NULL);
+	trigger_add(&lsm->on_destroy, trigger);
+	/*
+	 * Add this LSM tree to the scheduler queues so that it
+	 * can be dumped and compacted in a timely manner.
+	 */
+	vy_dump_heap_insert(&scheduler->dump_heap, lsm);
+	vy_compaction_heap_insert(&scheduler->compaction_heap, lsm);
+	return 0;
 }
 
 static void
 vy_scheduler_update_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 {
-	if (lsm->is_dropped) {
-		/* Dropped LSM trees are exempted from scheduling. */
-		assert(heap_node_is_stray(&lsm->in_dump));
-		assert(heap_node_is_stray(&lsm->in_compaction));
-		return;
-	}
 	assert(! heap_node_is_stray(&lsm->in_dump));
 	assert(! heap_node_is_stray(&lsm->in_compaction));
 	vy_dump_heap_update(&scheduler->dump_heap, lsm);
@@ -1267,15 +1279,9 @@ vy_task_dump_abort(struct vy_task *task)
 	/* The iterator has been cleaned up in a worker thread. */
 	task->wi->iface->close(task->wi);
 
-	/*
-	 * It's no use alerting the user if the server is
-	 * shutting down or the LSM tree was dropped.
-	 */
-	if (!lsm->is_dropped) {
-		struct error *e = diag_last_error(&task->diag);
-		error_log(e);
-		say_error("%s: dump failed", vy_lsm_name(lsm));
-	}
+	struct error *e = diag_last_error(&task->diag);
+	error_log(e);
+	say_error("%s: dump failed", vy_lsm_name(lsm));
 
 	vy_run_discard(task->new_run);
 
@@ -1287,18 +1293,6 @@ vy_task_dump_abort(struct vy_task *task)
 
 	assert(scheduler->dump_task_count > 0);
 	scheduler->dump_task_count--;
-
-	/*
-	 * If the LSM tree was dropped during dump, we abort
-	 * the dump task, but we should still poke the scheduler
-	 * to check if the current dump round is complete.
-	 * If we don't and this LSM tree happens to be the last
-	 * one of the current generation, the scheduler will
-	 * never be notified about dump completion and hence
-	 * memory will never be released.
-	 */
-	if (lsm->is_dropped)
-		vy_scheduler_complete_dump(scheduler);
 }
 
 /**
@@ -1317,7 +1311,6 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 		.abort = vy_task_dump_abort,
 	};
 
-	assert(!lsm->is_dropped);
 	assert(!lsm->is_dumping);
 	assert(lsm->pin_count == 0);
 	assert(vy_lsm_generation(lsm) == scheduler->dump_generation);
@@ -1602,16 +1595,10 @@ vy_task_compaction_abort(struct vy_task *task)
 	/* The iterator has been cleaned up in worker. */
 	task->wi->iface->close(task->wi);
 
-	/*
-	 * It's no use alerting the user if the server is
-	 * shutting down or the LSM tree was dropped.
-	 */
-	if (!lsm->is_dropped) {
-		struct error *e = diag_last_error(&task->diag);
-		error_log(e);
-		say_error("%s: failed to compact range %s",
-			  vy_lsm_name(lsm), vy_range_str(range));
-	}
+	struct error *e = diag_last_error(&task->diag);
+	error_log(e);
+	say_error("%s: failed to compact range %s",
+		  vy_lsm_name(lsm), vy_range_str(range));
 
 	vy_run_discard(task->new_run);
 
@@ -1629,7 +1616,6 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 		.complete = vy_task_compaction_complete,
 		.abort = vy_task_compaction_abort,
 	};
-	assert(!lsm->is_dropped);
 
 	struct vy_range *range = vy_range_heap_top(&lsm->range_heap);
 	assert(range != NULL);
@@ -1945,12 +1931,6 @@ vy_task_complete(struct vy_task *task)
 	assert(scheduler->stat.tasks_inprogress > 0);
 	scheduler->stat.tasks_inprogress--;
 
-	if (task->lsm->is_dropped) {
-		if (task->ops->abort)
-			task->ops->abort(task);
-		goto out;
-	}
-
 	struct diag *diag = &task->diag;
 	if (task->is_failed) {
 		assert(!diag_is_empty(diag));
@@ -1967,7 +1947,6 @@ vy_task_complete(struct vy_task *task)
 		diag_move(diag_get(), diag);
 		goto fail;
 	}
-out:
 	scheduler->stat.tasks_completed++;
 	return 0;
 fail:
