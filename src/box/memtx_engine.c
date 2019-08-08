@@ -649,19 +649,6 @@ memtx_engine_wait_checkpoint(struct engine *engine,
 	return result;
 }
 
-/**
- * Called after checkpointing is complete to free indexes dropped
- * while checkpointing was in progress, see memtx_engine_run_gc().
- */
-static void
-memtx_engine_gc_after_checkpoint(struct memtx_engine *memtx)
-{
-	struct memtx_gc_task *task, *next;
-	stailq_foreach_entry_safe(task, next, &memtx->gc_to_free, link)
-		task->vtab->free(task);
-	stailq_create(&memtx->gc_to_free);
-}
-
 static void
 memtx_engine_commit_checkpoint(struct engine *engine,
 			       const struct vclock *vclock)
@@ -699,8 +686,6 @@ memtx_engine_commit_checkpoint(struct engine *engine,
 
 	checkpoint_delete(memtx->checkpoint);
 	memtx->checkpoint = NULL;
-
-	memtx_engine_gc_after_checkpoint(memtx);
 }
 
 static void
@@ -885,15 +870,7 @@ memtx_engine_run_gc(struct memtx_engine *memtx, bool *stop)
 	task->vtab->run(task, &task_done);
 	if (task_done) {
 		stailq_shift(&memtx->gc_queue);
-		/*
-		 * If checkpointing is in progress, the index may be
-		 * used by the checkpoint thread so we postpone freeing
-		 * until checkpointing is complete.
-		 */
-		if (memtx->checkpoint == NULL)
-			task->vtab->free(task);
-		else
-			stailq_add_entry(&memtx->gc_to_free, task, link);
+		task->vtab->free(task);
 	}
 }
 
@@ -965,7 +942,6 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	}
 
 	stailq_create(&memtx->gc_queue);
-	stailq_create(&memtx->gc_to_free);
 	memtx->gc_fiber = fiber_new("memtx.gc", memtx_engine_gc_f);
 	if (memtx->gc_fiber == NULL)
 		goto fail;

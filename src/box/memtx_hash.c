@@ -399,7 +399,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 
 struct hash_snapshot_iterator {
 	struct snapshot_iterator base;
-	struct light_index_core *hash_table;
+	struct memtx_hash_index *index;
 	struct light_index_iterator iterator;
 };
 
@@ -414,7 +414,8 @@ hash_snapshot_iterator_free(struct snapshot_iterator *iterator)
 	assert(iterator->free == hash_snapshot_iterator_free);
 	struct hash_snapshot_iterator *it =
 		(struct hash_snapshot_iterator *) iterator;
-	light_index_iterator_destroy(it->hash_table, &it->iterator);
+	light_index_iterator_destroy(&it->index->hash_table, &it->iterator);
+	index_unref(&it->index->base);
 	free(iterator);
 }
 
@@ -430,7 +431,8 @@ hash_snapshot_iterator_next(struct snapshot_iterator *iterator,
 	assert(iterator->free == hash_snapshot_iterator_free);
 	struct hash_snapshot_iterator *it =
 		(struct hash_snapshot_iterator *) iterator;
-	struct tuple **res = light_index_iterator_get_and_next(it->hash_table,
+	struct light_index_core *hash_table = &it->index->hash_table;
+	struct tuple **res = light_index_iterator_get_and_next(hash_table,
 							       &it->iterator);
 	if (res == NULL) {
 		*data = NULL;
@@ -459,9 +461,10 @@ memtx_hash_index_create_snapshot_iterator(struct index *base)
 
 	it->base.next = hash_snapshot_iterator_next;
 	it->base.free = hash_snapshot_iterator_free;
-	it->hash_table = &index->hash_table;
-	light_index_iterator_begin(it->hash_table, &it->iterator);
-	light_index_iterator_freeze(it->hash_table, &it->iterator);
+	it->index = index;
+	index_ref(base);
+	light_index_iterator_begin(&index->hash_table, &it->iterator);
+	light_index_iterator_freeze(&index->hash_table, &it->iterator);
 	return (struct snapshot_iterator *) it;
 }
 
