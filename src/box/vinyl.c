@@ -156,10 +156,8 @@ vy_gc(struct vy_env *env, struct vy_recovery *recovery,
 
 struct vinyl_iterator {
 	struct iterator base;
-	/** Vinyl environment. */
-	struct vy_env *env;
-	/** LSM tree this iterator is for. */
-	struct vy_lsm *lsm;
+	/** Memory pool the iterator was allocated from. */
+	struct mempool *pool;
 	/**
 	 * Points either to tx_autocommit for autocommit mode
 	 * or to a multi-statement transaction active when the
@@ -3730,8 +3728,6 @@ static void
 vinyl_iterator_close(struct vinyl_iterator *it)
 {
 	vy_read_iterator_close(&it->iterator);
-	vy_lsm_unref(it->lsm);
-	it->lsm = NULL;
 	tuple_unref(it->key.stmt);
 	it->key = vy_entry_none();
 	if (it->tx == &it->tx_autocommit) {
@@ -3804,10 +3800,17 @@ vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 
 	assert(base->next = vinyl_iterator_primary_next);
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
-	assert(it->lsm->index_id == 0);
+	struct vy_lsm *lsm = it->iterator.lsm;
+	assert(lsm->index_id == 0);
+	/*
+	 * Make sure the LSM tree isn't deleted while we are
+	 * reading from it.
+	 */
+	vy_lsm_ref(lsm);
 
 	if (vinyl_iterator_check_tx(it) != 0)
 		goto fail;
+
 	struct vy_entry entry;
 	if (vy_read_iterator_next(&it->iterator, &entry) != 0)
 		goto fail;
@@ -3820,9 +3823,11 @@ vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 		tuple_bless(entry.stmt);
 	}
 	*ret = entry.stmt;
+	vy_lsm_unref(lsm);
 	return 0;
 fail:
 	vinyl_iterator_close(it);
+	vy_lsm_unref(lsm);
 	return -1;
 }
 
@@ -3833,9 +3838,15 @@ vinyl_iterator_secondary_next(struct iterator *base, struct tuple **ret)
 
 	assert(base->next = vinyl_iterator_secondary_next);
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
-	assert(it->lsm->index_id > 0);
-	struct vy_entry partial, entry;
+	struct vy_lsm *lsm = it->iterator.lsm;
+	assert(lsm->index_id > 0);
+	/*
+	 * Make sure the LSM tree isn't deleted while we are
+	 * reading from it.
+	 */
+	vy_lsm_ref(lsm);
 
+	struct vy_entry partial, entry;
 next:
 	if (vinyl_iterator_check_tx(it) != 0)
 		goto fail;
@@ -3849,12 +3860,11 @@ next:
 		vinyl_iterator_account_read(it, start_time, NULL);
 		vinyl_iterator_close(it);
 		*ret = NULL;
-		return 0;
+		goto out;
 	}
 	ERROR_INJECT_YIELD(ERRINJ_VY_DELAY_PK_LOOKUP);
 	/* Get the full tuple from the primary index. */
-	if (vy_get_by_secondary_tuple(it->lsm, it->tx,
-				      vy_tx_read_view(it->tx),
+	if (vy_get_by_secondary_tuple(lsm, it->tx, vy_tx_read_view(it->tx),
 				      partial, &entry) != 0)
 		goto fail;
 	if (entry.stmt == NULL)
@@ -3864,9 +3874,12 @@ next:
 	*ret = entry.stmt;
 	tuple_bless(*ret);
 	tuple_unref(*ret);
+out:
+	vy_lsm_unref(lsm);
 	return 0;
 fail:
 	vinyl_iterator_close(it);
+	vy_lsm_unref(lsm);
 	return -1;
 }
 
@@ -3877,7 +3890,7 @@ vinyl_iterator_free(struct iterator *base)
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
 	if (base->next != vinyl_iterator_last)
 		vinyl_iterator_close(it);
-	mempool_free(&it->env->iterator_pool, it);
+	mempool_free(it->pool, it);
 }
 
 static struct iterator *
@@ -3918,10 +3931,7 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	else
 		it->base.next = vinyl_iterator_secondary_next;
 	it->base.free = vinyl_iterator_free;
-
-	it->env = env;
-	it->lsm = lsm;
-	vy_lsm_ref(lsm);
+	it->pool = &env->iterator_pool;
 
 	if (tx != NULL) {
 		/*
