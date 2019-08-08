@@ -149,3 +149,15 @@ decimal.round(decimal.new(0.9), 0)
 decimal.round(decimal.new(9.9), 0)
 decimal.round(decimal.new(99.9), 0)
 decimal.round(decimal.new(99.4), 0)
+
+-- check remainder operation
+a = decimal.new(172.51)
+a % 1
+a % 2
+a % 0.3
+a % 0.13
+a % 13.27
+a % 100
+a % 173
+a % 72
+720 % a

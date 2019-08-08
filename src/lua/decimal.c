@@ -218,6 +218,7 @@ LDECIMAL_BINOP(sub, sub)
 LDECIMAL_BINOP(mul, mul)
 LDECIMAL_BINOP(div, div)
 LDECIMAL_BINOP(pow, pow)
+LDECIMAL_BINOP(remainder, remainder)
 
 LDECIMAL_FUNC(log10, log10)
 LDECIMAL_FUNC(ln, ln)
@@ -340,6 +341,7 @@ static const luaL_Reg ldecimal_mt[] = {
 	{"__sub", ldecimal_sub},
 	{"__mul", ldecimal_mul},
 	{"__div", ldecimal_div},
+	{"__mod", ldecimal_remainder},
 	{"__pow", ldecimal_pow},
 	{"__eq", ldecimal_eq},
 	{"__lt", ldecimal_lt},

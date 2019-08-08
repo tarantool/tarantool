@@ -142,6 +142,12 @@ decimal_t *
 decimal_rescale(decimal_t *dec, int scale);
 
 /**
+ * res is set to the remainder of dividing lhs by rhs.
+ */
+decimal_t *
+decimal_remainder(decimal_t *res, const decimal_t *lhs, const decimal_t *rhs);
+
+/**
  * res is set to the absolute value of dec
  * decimal_abs(&a, &a) is allowed.
  */

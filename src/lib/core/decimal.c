@@ -220,6 +220,13 @@ decimal_rescale(decimal_t *dec, int scale)
 }
 
 decimal_t *
+decimal_remainder(decimal_t *res, const decimal_t *lhs, const decimal_t *rhs)
+{
+	decNumberRemainder(res, lhs, rhs, &decimal_context);
+	return decimal_check_status(res, &decimal_context);
+}
+
+decimal_t *
 decimal_abs(decimal_t *res, const decimal_t *dec)
 {
 	decNumberAbs(res, dec, &decimal_context);
