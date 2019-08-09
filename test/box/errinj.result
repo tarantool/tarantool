@@ -20,25 +20,27 @@ errinj.info()
     state: false
   ERRINJ_VYRUN_DATA_READ:
     state: false
+  ERRINJ_SWIM_FD_ONLY:
+    state: false
   ERRINJ_SQL_NAME_NORMALIZATION:
     state: false
   ERRINJ_VY_SCHED_TIMEOUT:
     state: 0
-  ERRINJ_SWIM_FD_ONLY:
-    state: false
   ERRINJ_COIO_SENDFILE_CHUNK:
     state: -1
+  ERRINJ_VY_LOG_FILE_RENAME:
+    state: false
   ERRINJ_WAL_WRITE_PARTIAL:
     state: -1
   ERRINJ_VY_GC:
     state: false
   ERRINJ_WAL_DELAY:
     state: false
-  ERRINJ_VY_INDEX_DUMP:
-    state: -1
+  ERRINJ_INDEX_ALLOC:
+    state: false
   ERRINJ_WAL_WRITE_EOF:
     state: false
-  ERRINJ_VY_LOG_FILE_RENAME:
+  ERRINJ_WAL_SYNC:
     state: false
   ERRINJ_VYRUN_INDEX_GARBAGE:
     state: false
@@ -122,20 +124,20 @@ errinj.info()
     state: false
   ERRINJ_XLOG_GARBAGE:
     state: false
-  ERRINJ_INDEX_ALLOC:
-    state: false
+  ERRINJ_VY_INDEX_DUMP:
+    state: -1
   ERRINJ_VY_READ_PAGE_DELAY:
     state: false
   ERRINJ_TESTING:
     state: false
-  ERRINJ_RELAY_TIMEOUT:
-    state: 0
+  ERRINJ_RELAY_SEND_DELAY:
+    state: false
   ERRINJ_VY_SQUASH_TIMEOUT:
     state: 0
   ERRINJ_VY_LOG_FLUSH:
     state: false
-  ERRINJ_RELAY_SEND_DELAY:
-    state: false
+  ERRINJ_RELAY_TIMEOUT:
+    state: 0
 ...
 errinj.set("some-injection", true)
 ---

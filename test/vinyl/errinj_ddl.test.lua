@@ -300,3 +300,29 @@ box.error.injection.set('ERRINJ_VY_READ_PAGE_TIMEOUT', 0);
 test_run:cmd("setopt delimiter ''");
 
 box.cfg{vinyl_cache = default_vinyl_cache}
+
+--
+-- Check that DDL fails if it fails to flush pending WAL writes.
+-- Done in the scope of gh-1271.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('primary')
+s:replace{1, 2}
+
+box.error.injection.set('ERRINJ_WAL_SYNC', true)
+
+s:format({{'a', 'unsigned'}, {'b', 'unsigned'}}) -- ok
+_ = s:create_index('secondary', {parts = {2, 'unsigned'}}) -- ok
+
+s:format({})
+s.index.secondary:drop()
+
+box.error.injection.set('ERRINJ_WAL_DELAY', true)
+_ = fiber.create(function() s:replace{3, 4} end)
+
+s:format({{'a', 'unsigned'}, {'b', 'unsigned'}}) -- error
+_ = s:create_index('secondary', {parts = {2, 'unsigned'}}) -- error
+
+box.error.injection.set('ERRINJ_WAL_DELAY', false)
+box.error.injection.set('ERRINJ_WAL_SYNC', false)
+s:drop()

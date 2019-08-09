@@ -524,13 +524,41 @@ wal_free(void)
 	wal_writer_destroy(writer);
 }
 
-void
+static int
+wal_sync_f(struct cbus_call_msg *msg)
+{
+	(void)msg;
+	struct wal_writer *writer = &wal_writer_singleton;
+	if (writer->in_rollback.route != NULL) {
+		/* We're rolling back a failed write. */
+		diag_set(ClientError, ER_WAL_IO);
+		return -1;
+	}
+	return 0;
+}
+
+int
 wal_sync(void)
 {
+	ERROR_INJECT(ERRINJ_WAL_SYNC, {
+		diag_set(ClientError, ER_INJECTION, "wal sync");
+		return -1;
+	});
+
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->wal_mode == WAL_NONE)
-		return;
-	cbus_flush(&writer->wal_pipe, &writer->tx_prio_pipe, NULL);
+		return 0;
+	if (!stailq_empty(&writer->rollback)) {
+		/* We're rolling back a failed write. */
+		diag_set(ClientError, ER_WAL_IO);
+		return -1;
+	}
+	bool cancellable = fiber_set_cancellable(false);
+	struct cbus_call_msg msg;
+	int rc = cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe,
+			   &msg, wal_sync_f, NULL, TIMEOUT_INFINITY);
+	fiber_set_cancellable(cancellable);
+	return rc;
 }
 
 static int

@@ -171,9 +171,10 @@ enum wal_mode
 wal_mode();
 
 /**
- * Wait till all pending changes to the WAL are flushed.
+ * Wait until all submitted writes are successfully flushed
+ * to disk. Returns 0 on success, -1 if write failed.
  */
-void
+int
 wal_sync(void);
 
 struct wal_checkpoint {

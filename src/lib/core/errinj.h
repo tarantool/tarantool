@@ -73,6 +73,7 @@ struct errinj {
 #define ERRINJ_LIST(_) \
 	_(ERRINJ_TESTING, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_IO, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_SYNC, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_ROTATE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_WRITE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_WRITE_PARTIAL, ERRINJ_INT, {.iparam = -1}) \

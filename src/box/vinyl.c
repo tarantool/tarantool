@@ -1114,13 +1114,16 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	 * trigger so that changes made by newer transactions are checked
 	 * by the trigger callback.
 	 */
-	if (need_wal_sync)
-		wal_sync();
+	int rc;
+	if (need_wal_sync) {
+		rc = wal_sync();
+		if (rc != 0)
+			goto out;
+	}
 
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, pk->env->empty_key,
 			      &env->xm->p_committed_read_view);
-	int rc;
 	int loops = 0;
 	struct vy_entry entry;
 	while ((rc = vy_read_iterator_next(&itr, &entry)) == 0) {
@@ -1145,7 +1148,7 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 			break;
 	}
 	vy_read_iterator_close(&itr);
-
+out:
 	diag_destroy(&ctx.diag);
 	trigger_clear(&on_replace);
 	txn_can_yield(txn, false);
@@ -4377,13 +4380,16 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	 * trigger so that changes made by newer transactions are checked
 	 * by the trigger callback.
 	 */
-	if (need_wal_sync)
-		wal_sync();
+	int rc;
+	if (need_wal_sync) {
+		rc = wal_sync();
+		if (rc != 0)
+			goto out;
+	}
 
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, pk->env->empty_key,
 			      &env->xm->p_committed_read_view);
-	int rc;
 	int loops = 0;
 	struct vy_entry entry;
 	int64_t build_lsn = env->xm->lsn;
@@ -4447,7 +4453,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 		diag_move(&ctx.diag, diag_get());
 		rc = -1;
 	}
-
+out:
 	diag_destroy(&ctx.diag);
 	trigger_clear(&on_replace);
 	txn_can_yield(txn, false);
