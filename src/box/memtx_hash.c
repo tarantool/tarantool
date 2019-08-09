@@ -423,17 +423,21 @@ hash_snapshot_iterator_free(struct snapshot_iterator *iterator)
  * Virtual method of snapshot iterator.
  * @sa index_vtab::create_snapshot_iterator.
  */
-static const char *
-hash_snapshot_iterator_next(struct snapshot_iterator *iterator, uint32_t *size)
+static int
+hash_snapshot_iterator_next(struct snapshot_iterator *iterator,
+			    const char **data, uint32_t *size)
 {
 	assert(iterator->free == hash_snapshot_iterator_free);
 	struct hash_snapshot_iterator *it =
 		(struct hash_snapshot_iterator *) iterator;
 	struct tuple **res = light_index_iterator_get_and_next(it->hash_table,
 							       &it->iterator);
-	if (res == NULL)
-		return NULL;
-	return tuple_data_range(*res, size);
+	if (res == NULL) {
+		*data = NULL;
+		return 0;
+	}
+	*data = tuple_data_range(*res, size);
+	return 0;
 }
 
 /**

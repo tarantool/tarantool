@@ -311,27 +311,31 @@ struct sequence_data_iterator {
 #define SEQUENCE_TUPLE_BUF_SIZE		(mp_sizeof_array(2) + \
 					 2 * mp_sizeof_uint(UINT64_MAX))
 
-static const char *
-sequence_data_iterator_next(struct snapshot_iterator *base, uint32_t *size)
+static int
+sequence_data_iterator_next(struct snapshot_iterator *base,
+			    const char **data, uint32_t *size)
 {
 	struct sequence_data_iterator *iter =
 		(struct sequence_data_iterator *)base;
 
-	struct sequence_data *data =
+	struct sequence_data *sd =
 		light_sequence_iterator_get_and_next(&sequence_data_index,
 						     &iter->iter);
-	if (data == NULL)
-		return NULL;
+	if (sd == NULL) {
+		*data = NULL;
+		return 0;
+	}
 
 	char *buf_end = iter->tuple;
 	buf_end = mp_encode_array(buf_end, 2);
-	buf_end = mp_encode_uint(buf_end, data->id);
-	buf_end = (data->value >= 0 ?
-		   mp_encode_uint(buf_end, data->value) :
-		   mp_encode_int(buf_end, data->value));
+	buf_end = mp_encode_uint(buf_end, sd->id);
+	buf_end = (sd->value >= 0 ?
+		   mp_encode_uint(buf_end, sd->value) :
+		   mp_encode_int(buf_end, sd->value));
 	assert(buf_end <= iter->tuple + SEQUENCE_TUPLE_BUF_SIZE);
+	*data = iter->tuple;
 	*size = buf_end - iter->tuple;
-	return iter->tuple;
+	return 0;
 }
 
 static void

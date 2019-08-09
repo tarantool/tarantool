@@ -1220,18 +1220,22 @@ tree_snapshot_iterator_free(struct snapshot_iterator *iterator)
 	free(iterator);
 }
 
-static const char *
-tree_snapshot_iterator_next(struct snapshot_iterator *iterator, uint32_t *size)
+static int
+tree_snapshot_iterator_next(struct snapshot_iterator *iterator,
+			    const char **data, uint32_t *size)
 {
 	assert(iterator->free == tree_snapshot_iterator_free);
 	struct tree_snapshot_iterator *it =
 		(struct tree_snapshot_iterator *)iterator;
 	struct memtx_tree_data *res =
 		memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
-	if (res == NULL)
-		return NULL;
+	if (res == NULL) {
+		*data = NULL;
+		return 0;
+	}
 	memtx_tree_iterator_next(it->tree, &it->tree_iterator);
-	return tuple_data_range(res->tuple, size);
+	*data = tuple_data_range(res->tuple, size);
+	return 0;
 }
 
 /**

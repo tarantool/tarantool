@@ -575,25 +575,27 @@ checkpoint_f(va_list ap)
 	ERROR_INJECT_SLEEP(ERRINJ_SNAP_WRITE_DELAY);
 	struct checkpoint_entry *entry;
 	rlist_foreach_entry(entry, &ckpt->entries, link) {
+		int rc;
 		uint32_t size;
 		const char *data;
 		struct snapshot_iterator *it = entry->iterator;
-		for (data = it->next(it, &size); data != NULL;
-		     data = it->next(it, &size)) {
+		while ((rc = it->next(it, &data, &size)) == 0 && data != NULL) {
 			if (checkpoint_write_tuple(&snap, entry->space_id,
-					entry->group_id, data, size) != 0) {
-				xlog_close(&snap, false);
-				return -1;
-			}
+					entry->group_id, data, size) != 0)
+				goto fail;
 		}
+		if (rc != 0)
+			goto fail;
 	}
-	if (xlog_flush(&snap) < 0) {
-		xlog_close(&snap, false);
-		return -1;
-	}
+	if (xlog_flush(&snap) < 0)
+		goto fail;
+
 	xlog_close(&snap, false);
 	say_info("done");
 	return 0;
+fail:
+	xlog_close(&snap, false);
+	return -1;
 }
 
 static int

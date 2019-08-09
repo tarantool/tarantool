@@ -293,7 +293,8 @@ struct snapshot_iterator {
 	 * Returns a pointer to the tuple data and its
 	 * size or NULL if EOF.
 	 */
-	const char *(*next)(struct snapshot_iterator *, uint32_t *size);
+	int (*next)(struct snapshot_iterator *,
+		    const char **data, uint32_t *size);
 	/**
 	 * Destroy the iterator.
 	 */
