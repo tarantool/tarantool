@@ -343,6 +343,17 @@ struct PACKED request_replace_body {
 	uint8_t k_tuple;
 };
 
+static inline void
+request_replace_body_create(struct request_replace_body *body,
+			    uint32_t space_id)
+{
+	body->m_body = 0x82; /* map of two elements. */
+	body->k_space_id = IPROTO_SPACE_ID;
+	body->m_space_id = 0xce; /* uint32 */
+	body->v_space_id = mp_bswap_u32(space_id);
+	body->k_tuple = IPROTO_TUPLE;
+}
+
 /**
  * Xrow keys for Vinyl run information.
  * @sa struct vy_run_info.

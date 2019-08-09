@@ -432,11 +432,7 @@ checkpoint_write_tuple(struct xlog *l, uint32_t space_id, uint32_t group_id,
 		       const char *data, uint32_t size)
 {
 	struct request_replace_body body;
-	body.m_body = 0x82; /* map of two elements. */
-	body.k_space_id = IPROTO_SPACE_ID;
-	body.m_space_id = 0xce; /* uint32 */
-	body.v_space_id = mp_bswap_u32(space_id);
-	body.k_tuple = IPROTO_TUPLE;
+	request_replace_body_create(&body, space_id);
 
 	struct xrow_header row;
 	memset(&row, 0, sizeof(struct xrow_header));
