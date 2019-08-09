@@ -375,6 +375,16 @@ sql_value_uint64(sql_value *val);
 const unsigned char *
 sql_value_text(sql_value *);
 
+/**
+ * Return pointer to a string with the data type in the case of
+ * binary data stored in @a value. Otherwise, return the result
+ * of sql_value_text(). It is used due to the fact that not all
+ * binary strings can be displayed correctly (e.g. contain
+ * unprintable symbols).
+ */
+const char *
+sql_value_to_diag_str(sql_value *value);
+
 enum mp_type
 sql_value_type(sql_value *);
 

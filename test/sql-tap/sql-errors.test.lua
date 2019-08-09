@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(63)
+test:plan(72)
 
 test:execsql([[
 	CREATE TABLE t0 (i INT PRIMARY KEY, a INT);
@@ -684,6 +684,99 @@ test:do_catchsql_test(
 		-- <sql-errors-1.63>
 		1, "Unequal number of entries in row expression: left side has 2, but right side - 3"
 		-- </sql-errors-1.63>
+	})
+
+-- gh-4356: Make sure that 'varbinary' is printed instead of the
+-- binary data itself (since binary data can contain unprintable symbols).
+--
+test:do_catchsql_test(
+	"sql-errors-2.1",
+	[[
+		SELECT X'ff' + 1;
+	]], {
+		-- <sql-errors-2.1>
+		1, "Type mismatch: can not convert varbinary to numeric"
+		-- </sql-errors-2.1>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-2.2",
+	[[
+		SELECT X'ff' - 1;
+	]], {
+		-- <sql-errors-2.2>
+		1, "Type mismatch: can not convert varbinary to numeric"
+		-- </sql-errors-2.2>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-2.3",
+	[[
+		SELECT X'ff' * 1;
+	]], {
+		-- <sql-errors-2.3>
+		1, "Type mismatch: can not convert varbinary to numeric"
+		-- </sql-errors-2.3>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-2.4",
+	[[
+		SELECT X'ff' / 1;
+	]], {
+		-- <sql-errors-2.4>
+		1, "Type mismatch: can not convert varbinary to numeric"
+		-- </sql-errors-2.4>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-2.5",
+	[[
+		SELECT X'ff' AND true;
+	]], {
+		-- <sql-errors-2.5>
+		1, "Type mismatch: can not convert varbinary to boolean"
+		-- </sql-errors-2.5>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-2.6",
+	[[
+		SELECT X'ff' OR false;
+	]], {
+		-- <sql-errors-2.6>
+		1, "Type mismatch: can not convert varbinary to boolean"
+		-- </sql-errors-2.6>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-2.7",
+	[[
+		SELECT false OR X'ff';
+	]], {
+		-- <sql-errors-2.7>
+		1, "Type mismatch: can not convert varbinary to boolean"
+		-- </sql-errors-2.7>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-2.8",
+	[[
+		SELECT X'ff' >= false;
+	]], {
+		-- <sql-errors-2.8>
+		1, "Type mismatch: can not convert VARBINARY to BOOLEAN"
+		-- </sql-errors-2.8>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-2.9",
+	[[
+		SELECT X'ff' <= false;
+	]], {
+		-- <sql-errors-2.9>
+		1, "Type mismatch: can not convert VARBINARY to BOOLEAN"
+		-- </sql-errors-2.9>
 	})
 
 test:finish_test()

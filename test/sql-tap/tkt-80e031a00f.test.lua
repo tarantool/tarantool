@@ -386,7 +386,7 @@ test:do_catchsql_test(
         SELECT x'303132' IN t1
     ]], {
         -- <tkt-80e031a00f.31>
-        1, 'Type mismatch: can not convert 012 to integer'
+        1, 'Type mismatch: can not convert varbinary to integer'
         -- </tkt-80e031a00f.31>
     })
 
@@ -396,7 +396,7 @@ test:do_catchsql_test(
         SELECT x'303132' NOT IN t1
     ]], {
         -- <tkt-80e031a00f.32>
-        1, 'Type mismatch: can not convert 012 to integer'
+        1, 'Type mismatch: can not convert varbinary to integer'
         -- </tkt-80e031a00f.32>
     })
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14606)
+test:plan(14610)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -2908,5 +2908,48 @@ test:do_execsql_test(
     "func-76",
     "SELECT POSITION(CHAR(00), CHAR(65,66));",
     {0})
+
+-- gh-4356: Make sure that 'VARBINARY' is printed instead of the
+-- binary data itself.
+
+test:do_catchsql_test(
+    "func-76.1",
+    [[
+        SELECT ROUND(X'FF')
+    ]], {
+        -- <func-76.1>
+        1, "Type mismatch: can not convert varbinary to numeric"
+        -- </func-76.1>
+    })
+
+test:do_catchsql_test(
+    "func-76.2",
+    [[
+        SELECT RANDOMBLOB(X'FF')
+    ]], {
+        -- <func-76.2>
+        1, "Type mismatch: can not convert varbinary to numeric"
+        -- </func-76.2>
+    })
+
+test:do_catchsql_test(
+    "func-76.3",
+    [[
+        SELECT SOUNDEX(X'FF')
+    ]], {
+        -- <func-76.3>
+        1, "Type mismatch: can not convert varbinary to TEXT"
+        -- </func-76.3>
+    })
+
+test:do_catchsql_test(
+    "func-76.4",
+    [[
+        SELECT SUM(X'FF')
+    ]], {
+        -- <func-76.4>
+        1, "Type mismatch: can not convert varbinary to number"
+        -- </func-76.4>
+    })
 
 test:finish_test()

@@ -1202,6 +1202,17 @@ sqlValueText(sql_value * pVal)
 	return valueToText(pVal);
 }
 
+const char *
+sql_value_to_diag_str(sql_value *value)
+{
+	if (sql_value_type(value) == MP_BIN) {
+		if (mem_has_msgpack_subtype(value))
+			return sqlValueText(value);
+		return "varbinary";
+	}
+	return sqlValueText(value);
+}
+
 /*
  * Create a new sql_value object.
  */

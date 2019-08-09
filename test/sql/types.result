@@ -344,7 +344,7 @@ box.execute("INSERT INTO tboolean VALUES (TRUE);")
 box.execute("SELECT * FROM tboolean WHERE s1 = x'44';")
 ---
 - null
-- 'Type mismatch: can not convert D to boolean'
+- 'Type mismatch: can not convert varbinary to boolean'
 ...
 box.execute("SELECT * FROM tboolean WHERE s1 = 'abc';")
 ---
@@ -1271,17 +1271,17 @@ box.execute("SELECT * FROM t WHERE v = x'616263'")
 box.execute("SELECT sum(v) FROM t;")
 ---
 - null
-- 'Type mismatch: can not convert abc to number'
+- 'Type mismatch: can not convert varbinary to number'
 ...
 box.execute("SELECT avg(v) FROM t;")
 ---
 - null
-- 'Type mismatch: can not convert abc to number'
+- 'Type mismatch: can not convert varbinary to number'
 ...
 box.execute("SELECT total(v) FROM t;")
 ---
 - null
-- 'Type mismatch: can not convert abc to number'
+- 'Type mismatch: can not convert varbinary to number'
 ...
 box.execute("SELECT min(v) FROM t;")
 ---

@@ -70,7 +70,7 @@ test:do_catchsql_test(
         SELECT CAST(x'616263' AS NUMBER)
     ]], {
         -- <cast-1.5>
-        1, 'Type mismatch: can not convert abc to number'
+        1, 'Type mismatch: can not convert varbinary to number'
         -- </cast-1.5>
     })
 
@@ -100,7 +100,7 @@ test:do_catchsql_test(
         SELECT CAST(x'616263' AS integer)
     ]], {
         -- <cast-1.9>
-        1, 'Type mismatch: can not convert abc to integer'
+        1, 'Type mismatch: can not convert varbinary to integer'
         -- </cast-1.9>
     })
 

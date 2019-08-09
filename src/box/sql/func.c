@@ -812,7 +812,7 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 		return;
 	if (sql_value_type(argv[0]) == MP_BIN) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 sql_value_text(argv[0]), "numeric");
+			 sql_value_to_diag_str(argv[0]), "numeric");
 		context->is_aborted = true;
 		return;
 	}
@@ -954,7 +954,7 @@ randomBlob(sql_context * context, int argc, sql_value ** argv)
 	UNUSED_PARAMETER(argc);
 	if (sql_value_type(argv[0]) == MP_BIN) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 sql_value_text(argv[0]), "numeric");
+			 sql_value_to_diag_str(argv[0]), "numeric");
 		context->is_aborted = true;
 		return;
 	}
@@ -1842,7 +1842,7 @@ soundexFunc(sql_context * context, int argc, sql_value ** argv)
 	assert(argc == 1);
 	if (sql_value_type(argv[0]) == MP_BIN) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 sql_value_text(argv[0]), "TEXT");
+			 sql_value_to_diag_str(argv[0]), "TEXT");
 		context->is_aborted = true;
 		return;
 	}
@@ -1915,7 +1915,7 @@ sum_step(struct sql_context *context, int argc, sql_value **argv)
 	if (type != MP_DOUBLE && type != MP_INT && type != MP_UINT) {
 		if (mem_apply_numeric_type(argv[0]) != 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-				 sql_value_text(argv[0]), "number");
+				 sql_value_to_diag_str(argv[0]), "number");
 			context->is_aborted = true;
 			return;
 		}
