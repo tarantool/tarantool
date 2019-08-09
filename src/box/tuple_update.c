@@ -43,6 +43,8 @@
 #include <bit/int96.h>
 #include <salad/rope.h>
 #include "column_mask.h"
+#include "mp_extension_types.h"
+#include "mp_decimal.h"
 
 
 /** UPDATE request implementation.
@@ -125,9 +127,10 @@ struct op_del_arg {
  * MsgPack codes are not used to simplify type calculation.
  */
 enum arith_type {
-	AT_DOUBLE = 0, /* MP_DOUBLE */
-	AT_FLOAT = 1, /* MP_FLOAT */
-	AT_INT = 2 /* MP_INT/MP_UINT */
+	AT_DECIMAL = 0, /* MP_EXT + MP_DECIMAL */
+	AT_DOUBLE = 1, /* MP_DOUBLE */
+	AT_FLOAT = 2, /* MP_FLOAT */
+	AT_INT = 3 /* MP_INT/MP_UINT */
 };
 
 /**
@@ -157,6 +160,7 @@ struct op_arith_arg {
 		double dbl;
 		float flt;
 		struct int96_num int96;
+		decimal_t dec;
 	};
 };
 
@@ -291,8 +295,19 @@ mp_read_arith_arg(int index_base, struct update_op *op,
 	} else if (mp_typeof(**expr) == MP_FLOAT) {
 		ret->type = AT_FLOAT;
 		ret->flt = mp_decode_float(expr);
+	} else if (mp_typeof(**expr) == MP_EXT) {
+		int8_t ext_type;
+		uint32_t len = mp_decode_extl(expr, &ext_type);
+		switch (ext_type) {
+		case MP_DECIMAL:
+			ret->type = AT_DECIMAL;
+			decimal_unpack(expr, len, &ret->dec);
+			break;
+		default:
+			goto err;
+		}
 	} else {
-		diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char)op->opcode,
+err:		diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char)op->opcode,
 			 index_base + op->field_no, "a number");
 		return -1;
 	}
@@ -421,6 +436,32 @@ cast_arith_arg_to_double(struct op_arith_arg arg)
 	}
 }
 
+static inline decimal_t *
+cast_arith_arg_to_decimal(struct op_arith_arg arg, decimal_t *dec)
+{
+	decimal_t *ret;
+	if (arg.type == AT_DECIMAL) {
+		*dec = arg.dec;
+		return dec;
+	} else if (arg.type == AT_DOUBLE) {
+		ret = decimal_from_double(dec, arg.dbl);
+	} else if (arg.type == AT_FLOAT) {
+		ret = decimal_from_double(dec, arg.flt);
+	} else {
+		assert(arg.type == AT_INT);
+		if (int96_is_uint64(&arg.int96)) {
+			uint64_t val = int96_extract_uint64(&arg.int96);
+			ret = decimal_from_uint64(dec, val);
+		} else {
+			assert(int96_is_neg_int64(&arg.int96));
+			int64_t val = int96_extract_neg_int64(&arg.int96);
+			ret = decimal_from_int64(dec, val);
+		}
+	}
+
+	return ret;
+}
+
 /** Return the MsgPack size of an arithmetic operation result. */
 static inline uint32_t
 mp_sizeof_op_arith_arg(struct op_arith_arg arg)
@@ -435,9 +476,11 @@ mp_sizeof_op_arith_arg(struct op_arith_arg arg)
 		}
 	} else if (arg.type == AT_DOUBLE) {
 		return mp_sizeof_double(arg.dbl);
-	} else {
-		assert(arg.type == AT_FLOAT);
+	} else if (arg.type == AT_FLOAT) {
 		return mp_sizeof_float(arg.flt);
+	} else {
+		assert(arg.type == AT_DECIMAL);
+		return mp_sizeof_decimal(&arg.dec);
 	}
 }
 
@@ -471,7 +514,7 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 		}
 		*ret = arg1;
 		return 0;
-	} else {
+	} else if (lowest_type >= AT_DOUBLE) {
 		/* At least one of operands is double or float */
 		double a = cast_arith_arg_to_double(arg1);
 		double b = cast_arith_arg_to_double(arg2);
@@ -494,6 +537,38 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 			ret->type = AT_FLOAT;
 			ret->flt = (float)c;
 		}
+	} else {
+		/* At least one of the operands is decimal. */
+		decimal_t a, b, c;
+		if (! cast_arith_arg_to_decimal(arg1, &a) ||
+		    ! cast_arith_arg_to_decimal(arg2, &b)) {
+			diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char)opcode,
+				 err_fieldno, "a number convertible to decimal.");
+			return -1;
+		}
+
+		switch(opcode) {
+		case '+':
+			if (decimal_add(&c, &a, &b) == NULL) {
+				diag_set(ClientError, ER_UPDATE_DECIMAL_OVERFLOW,
+					 opcode, err_fieldno);
+				return -1;
+			}
+			break;
+		case '-':
+			if (decimal_sub(&c, &a, &b) == NULL) {
+				diag_set(ClientError, ER_UPDATE_DECIMAL_OVERFLOW,
+					 opcode, err_fieldno);
+				return -1;
+			}
+			break;
+		default:
+			diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char)opcode,
+				 err_fieldno);
+			return -1;
+		}
+		ret->type = AT_DECIMAL;
+		ret->dec = c;
 	}
 	return 0;
 }
@@ -722,9 +797,11 @@ store_op_arith(struct op_arith_arg *arg, const char *in, char *out)
 		}
 	} else if (arg->type == AT_DOUBLE) {
 		mp_encode_double(out, arg->dbl);
-	} else {
-		assert(arg->type == AT_FLOAT);
+	} else if (arg->type == AT_FLOAT) {
 		mp_encode_float(out, arg->flt);
+	} else {
+		assert (arg->type == AT_DECIMAL);
+		mp_encode_decimal(out, &arg->dec);
 	}
 }
 

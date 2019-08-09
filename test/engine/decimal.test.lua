@@ -101,4 +101,15 @@ box.space.test.index.sk:alter{parts={2, 'number'}}
 box.space.test:insert{2, -5}
 box.space.test.index.sk:select{}
 
+box.space.test:truncate()
+
+-- test update operations
+box.space.test:insert{1, decimal.new(1.10)}
+box.space.test:insert{2, 2}
+box.space.test:update(1, {{'+', 2, 3.1}})
+box.space.test.index.sk:select{}
+box.space.test:update(1, {{'-', 2, decimal.new(3.3)}})
+box.space.test:update(2, {{'+', 2, decimal.new(0.1)}})
+box.space.test.index.sk:select{}
+
 box.space.test:drop()

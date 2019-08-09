@@ -449,3 +449,27 @@ msgpack.decode(msgpackffi.encode(d))
 d:bsize()
 d:update{{'!', 3, dec.new('1234.5678')}}
 d:update{{'=', -1, dec.new('0.12345678910111213')}}
+
+--
+-- gh-4413: tuple:update arithmetic for decimals
+--
+ffi = require('ffi')
+
+d = box.tuple.new(dec.new('1'))
+d:update{{'+', 1, dec.new('0.5')}}
+d:update{{'-', 1, dec.new('0.5')}}
+d:update{{'+', 1, 1.36}}
+d:update{{'+', 1, ffi.new('uint64_t', 1712)}}
+d:update{{'-', 1, ffi.new('float', 635)}}
+
+-- test erroneous values
+-- nan
+d:update{{'+', 1, 0/0}}
+-- inf
+d:update{{'-', 1, 1/0}}
+
+-- decimal overflow
+d = box.tuple.new(dec.new('9e37'))
+d
+d:update{{'+', 1, dec.new('1e37')}}
+d:update{{'-', 1, dec.new('1e37')}}

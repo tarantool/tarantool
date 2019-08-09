@@ -210,6 +210,17 @@ s:update({0}, {{'-', 2, ffi.new("float", 1.5)}}) -- float - float = float 5.5
 s:update({0}, {{'+', 2, ffi.new("float", 3.5)}}) -- float + float = float 9
 s:update({0}, {{'-', 2, ffi.new("float", 9)}}) -- float + float = float 0
 s:update({0}, {{'+', 2, ffi.new("float", 1.2)}}) -- float + float = float 1.2
+-- decimal
+decimal = require('decimal')
+s:replace{0, decimal.new("2.000")}
+s:update({0}, {{'+', 2, 2ULL}}) -- decimal + unsigned = decimal 4.000
+s:update({0}, {{'+', 2, -4LL}}) -- decimal + signed = decimal 0.000
+s:update({0}, {{'+', 2, 2}})  -- decimal + number = decimal 2.000
+s:update({0}, {{'-', 2, 2}}) -- decimal - number = decimal 0.000
+s:update({0}, {{'-', 2, ffi.new('float', 2)}}) -- decimal - float = decimal -2.000
+s:update({0}, {{'-', 2, ffi.new('double', 2)}}) -- decimal - double = decimal -4.000
+s:update({0}, {{'+', 2, decimal.new(4)}}) -- decimal + decimal = decimal 0.000
+s:update({0}, {{'-', 2, decimal.new(2)}}) -- decimal - decimal = decimal -2.000
 -- overflow --
 s:replace{0, 0xfffffffffffffffeull}
 s:update({0}, {{'+', 2, 1}}) -- ok

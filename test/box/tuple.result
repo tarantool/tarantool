@@ -1337,3 +1337,61 @@ d:update{{'=', -1, dec.new('0.12345678910111213')}}
 ---
 - [5, 1, 6, 10000000000, 7, 0.0000000001, 0.12345678910111213]
 ...
+--
+-- gh-4413: tuple:update arithmetic for decimals
+--
+ffi = require('ffi')
+---
+...
+d = box.tuple.new(dec.new('1'))
+---
+...
+d:update{{'+', 1, dec.new('0.5')}}
+---
+- [1.5]
+...
+d:update{{'-', 1, dec.new('0.5')}}
+---
+- [0.5]
+...
+d:update{{'+', 1, 1.36}}
+---
+- [2.36]
+...
+d:update{{'+', 1, ffi.new('uint64_t', 1712)}}
+---
+- [1713]
+...
+d:update{{'-', 1, ffi.new('float', 635)}}
+---
+- [-634]
+...
+-- test erroneous values
+-- nan
+d:update{{'+', 1, 0/0}}
+---
+- error: 'Argument type in operation ''+'' on field 1 does not match field type: expected
+    a number convertible to decimal.'
+...
+-- inf
+d:update{{'-', 1, 1/0}}
+---
+- error: 'Argument type in operation ''-'' on field 1 does not match field type: expected
+    a number convertible to decimal.'
+...
+-- decimal overflow
+d = box.tuple.new(dec.new('9e37'))
+---
+...
+d
+---
+- [90000000000000000000000000000000000000]
+...
+d:update{{'+', 1, dec.new('1e37')}}
+---
+- error: Decimal overflow when performing operation '+' on field 1
+...
+d:update{{'-', 1, dec.new('1e37')}}
+---
+- [80000000000000000000000000000000000000]
+...
