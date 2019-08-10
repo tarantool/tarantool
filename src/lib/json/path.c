@@ -238,6 +238,8 @@ json_path_next(struct json_path_parser *parser, struct json_path_node *node)
 			return parser->symbol_count + 1;
 		return json_parse_identifier(parser, node);
 	default:
+		if (last_offset != 0)
+			return parser->symbol_count;
 		json_revert_symbol(parser, last_offset);
 		return json_parse_identifier(parser, node);
 	}

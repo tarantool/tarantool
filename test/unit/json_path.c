@@ -94,7 +94,7 @@ void
 test_errors()
 {
 	header();
-	plan(20);
+	plan(21);
 	const char *path;
 	int len;
 	struct json_path_parser parser;
@@ -154,6 +154,10 @@ test_errors()
 	reset_to_new_path("field\t1")
 	json_path_next(&parser, &node);
 	is(json_path_next(&parser, &node), 6, "tab inside identifier");
+
+	reset_to_new_path("[1]field")
+	json_path_next(&parser, &node);
+	is(json_path_next(&parser, &node), 4, "no . between ] and a key");
 
 	check_plan();
 	footer();

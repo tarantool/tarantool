@@ -76,7 +76,7 @@
 ok 1 - subtests
 	*** test_basic: done ***
 	*** test_errors ***
-    1..20
+    1..21
     ok 1 - error on position 2 for <[[>
     ok 2 - error on position 2 for <[field]>
     ok 3 - error on position 1 for <'field1'.field2>
@@ -97,6 +97,7 @@ ok 1 - subtests
     ok 18 - error in leading <.>
     ok 19 - space inside identifier
     ok 20 - tab inside identifier
+    ok 21 - no . between ] and a key
 ok 2 - subtests
 	*** test_errors: done ***
 	*** main: done ***
