@@ -97,7 +97,7 @@ void
 test_errors()
 {
 	header();
-	plan(21);
+	plan(22);
 	const char *path;
 	int len;
 	struct json_lexer lexer;
@@ -145,6 +145,11 @@ test_errors()
 	struct json_token token;
 	json_lexer_next_token(&lexer, &token);
 	is(json_lexer_next_token(&lexer, &token), 3, "can not write <field.[index]>")
+
+	reset_to_new_path("[1]key")
+	json_lexer_next_token(&lexer, &token);
+	is(json_lexer_next_token(&lexer, &token), 4, "can not omit '.' before "\
+	   "not a first key out of []");
 
 	reset_to_new_path("f.")
 	json_lexer_next_token(&lexer, &token);

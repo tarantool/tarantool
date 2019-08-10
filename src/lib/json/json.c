@@ -251,6 +251,8 @@ json_lexer_next_token(struct json_lexer *lexer, struct json_token *token)
 			return lexer->symbol_count + 1;
 		return json_parse_identifier(lexer, token);
 	default:
+		if (last_offset != 0)
+			return lexer->symbol_count;
 		json_revert_symbol(lexer, last_offset);
 		return json_parse_identifier(lexer, token);
 	}

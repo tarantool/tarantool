@@ -76,7 +76,7 @@
 ok 1 - subtests
 	*** test_basic: done ***
 	*** test_errors ***
-    1..21
+    1..22
     ok 1 - error on position 2 for <[[>
     ok 2 - error on position 2 for <[field]>
     ok 3 - error on position 1 for <'field1'.field2>
@@ -94,10 +94,11 @@ ok 1 - subtests
     ok 15 - error on position 6 for <['aaaÂÂ']>
     ok 16 - error on position 2 for <.ÂÂ>
     ok 17 - can not write <field.[index]>
-    ok 18 - error in leading <.>
-    ok 19 - space inside identifier
-    ok 20 - tab inside identifier
-    ok 21 - invalid token for index_base 1
+    ok 18 - can not omit '.' before not a first key out of []
+    ok 19 - error in leading <.>
+    ok 20 - space inside identifier
+    ok 21 - tab inside identifier
+    ok 22 - invalid token for index_base 1
 ok 2 - subtests
 	*** test_errors: done ***
 	*** test_tree ***
