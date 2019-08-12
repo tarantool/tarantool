@@ -606,27 +606,74 @@ vdbe_field_ref_fetch_field(struct vdbe_field_ref *field_ref, uint32_t fieldno)
 }
 
 /**
- * Try to get a current tuple field using its field map.
+ * Find the left closest field for a given fieldno in field_ref's
+ * slot_bitmask. The fieldno is expected to be greater than 0.
+ * @param field_ref The vdbe_field_ref instance to use.
+ * @param fieldno Number of a field to find the nearest left
+ *        neighbor of.
+ * @retval >0 An index of the closest smaller fieldno
+ *            initialized in slot_bitmask.
+ */
+static inline uint32_t
+vdbe_field_ref_closest_slotno(struct vdbe_field_ref *field_ref,
+			      uint32_t fieldno)
+{
+	uint64_t slot_bitmask = field_ref->slot_bitmask;
+	assert(slot_bitmask != 0 && fieldno > 0);
+	uint64_t le_mask = fieldno < 64 ? slot_bitmask & ((1LLU << fieldno) - 1)
+			   : slot_bitmask;
+	assert(bit_clz_u64(le_mask) < 64);
+	return 64 - bit_clz_u64(le_mask) - 1;
+}
+
+/**
+ * Get a tuple's field using field_ref's slot_bitmask, and tuple's
+ * field_map when possible. Required field must be present in
+ * tuple.
  * @param field_ref The vdbe_field_ref instance to use.
  * @param fieldno Number of a field to get.
- * @param[out] field_size Result field size.
  * @retval not NULL MessagePack field.
- * @retval NULL Can not use field_map - it does not contain
- *              offset to @a fieldno.
  */
-static const void *
-vdbe_field_ref_fast_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
-			  uint32_t *field_size)
+static const char *
+vdbe_field_ref_fetch_data(struct vdbe_field_ref *field_ref, uint32_t fieldno)
 {
-	const struct tuple_field *tf =
-		vdbe_field_ref_fetch_field(field_ref, fieldno);
-	if (tf == NULL || tf->offset_slot == TUPLE_OFFSET_SLOT_NIL)
-		return NULL;
-	const char *field = tuple_field(field_ref->tuple, fieldno);
-	const char *end = field;
-	mp_next(&end);
-	*field_size = end - field;
-	return field;
+	if (field_ref->slots[fieldno] != 0)
+		return field_ref->data + field_ref->slots[fieldno];
+
+	const char *field_begin;
+	const struct tuple_field *field = vdbe_field_ref_fetch_field(field_ref,
+								     fieldno);
+	if (field != NULL && field->offset_slot != TUPLE_OFFSET_SLOT_NIL) {
+		field_begin = tuple_field(field_ref->tuple, fieldno);
+	} else {
+		uint32_t prev = vdbe_field_ref_closest_slotno(field_ref,
+							      fieldno);;
+		if (fieldno >= 64) {
+			/*
+			 * There could be initialized slots
+			 * that didn't fit in the bitmask.
+			 * Try to find the biggest initialized
+			 * slot.
+			 */
+			for (uint32_t it = fieldno - 1; it > prev; it--) {
+				if (field_ref->slots[it] == 0)
+					continue;
+				prev = it;
+				break;
+			}
+		}
+		field_begin = field_ref->data + field_ref->slots[prev];
+		for (prev++; prev < fieldno; prev++) {
+			mp_next(&field_begin);
+			field_ref->slots[prev] =
+				(uint32_t)(field_begin - field_ref->data);
+			bitmask64_set_bit(&field_ref->slot_bitmask, prev);
+		}
+		mp_next(&field_begin);
+	}
+	field_ref->slots[fieldno] = (uint32_t)(field_begin - field_ref->data);
+	bitmask64_set_bit(&field_ref->slot_bitmask, fieldno);
+	return field_begin;
 }
 
 static inline enum field_type
@@ -652,45 +699,13 @@ static int
 vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 		     struct Mem *dest_mem)
 {
-	uint32_t *slots = field_ref->slots;
 	if (fieldno >= field_ref->field_count) {
 		UPDATE_MAX_BLOBSIZE(dest_mem);
 		return 0;
 	}
-
-	const char *data;
-	if (field_ref->rightmost_slot <= fieldno) {
-		uint32_t field_sz;
-		data = vdbe_field_ref_fast_fetch(field_ref, fieldno,
-						 &field_sz);
-		if (data != NULL) {
-			/*
-			 * Special case for tarantool spaces: for
-			 * indexed fields a tuple field map can be
-			 * used. Else there is no sense in
-			 * tuple_field usage, because it makes
-			 * foreach field { mp_next(); } to find
-			 * a field. In such a case sql is
-			 * better - it saves offsets to all fields
-			 * visited in mp_next() cycle.
-			 */
-			uint32_t offset = (uint32_t)(data - field_ref->data);
-			slots[fieldno] = offset;
-			slots[fieldno + 1] = offset + field_sz;
-		} else {
-			uint32_t i = field_ref->rightmost_slot;
-			data = field_ref->data + slots[i];
-			do {
-				mp_next(&data);
-				slots[++i] = (uint32_t)(data - field_ref->data);
-			} while (i <= fieldno);
-			field_ref->rightmost_slot = i;
-		}
-	}
-
 	assert(sqlVdbeCheckMemInvariants(dest_mem) != 0);
+	const char *data = vdbe_field_ref_fetch_data(field_ref, fieldno);
 	uint32_t dummy;
-	data = field_ref->data + slots[fieldno];
 	if (vdbe_decode_msgpack_into_mem(data, dest_mem, &dummy) != 0)
 		return -1;
 
@@ -699,8 +714,9 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 	 * Wrap it in a blob verbatim.
 	 */
 	if (dest_mem->flags == 0) {
-		dest_mem->n = slots[fieldno + 1] - slots[fieldno];
 		dest_mem->z = (char *) data;
+		dest_mem->n = vdbe_field_ref_fetch_data(field_ref,
+							fieldno + 1) - data;
 		dest_mem->flags = MEM_Blob | MEM_Ephem | MEM_Subtype;
 		dest_mem->subtype = SQL_SUBTYPE_MSGPACK;
 	}

@@ -133,3 +133,70 @@ box.execute('select * from "s"')
 s:drop()
 ---
 ...
+--
+-- gh-4267: Full power of vdbe_field_ref
+-- Tarantool's SQL internally stores data offset for all acceded
+-- fields. It also keeps a bitmask of size 64 with all initialized
+-- slots in actual state to find the nearest left field really
+-- fast and parse tuple from that position. For fieldno >= 64
+-- bitmask is not applicable, so it scans data offsets area in
+-- a cycle.
+--
+-- The test below covers a case when this optimisation doesn't
+-- work and the second lookup require parsing tuple from
+-- beginning.
+---
+format = {}
+---
+...
+t = {}
+---
+...
+for i = 1, 70 do                                                \
+        format[i] = {name = 'FIELD'..i, type = 'unsigned'}      \
+        t[i] = i                                                \
+end
+---
+...
+s = box.schema.create_space('TEST', {format = format})
+---
+...
+pk = s:create_index('pk', {parts = {70}})
+---
+...
+s:insert(t)
+---
+- [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+  23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
+  43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62,
+  63, 64, 65, 66, 67, 68, 69, 70]
+...
+box.execute('SELECT field70, field64 FROM test')
+---
+- metadata:
+  - name: FIELD70
+    type: unsigned
+  - name: FIELD64
+    type: unsigned
+  rows:
+  - [70, 64]
+...
+-- In the case below described optimization works fine.
+pk:alter({parts = {66}})
+---
+...
+box.execute('SELECT field66, field68, field70 FROM test')
+---
+- metadata:
+  - name: FIELD66
+    type: unsigned
+  - name: FIELD68
+    type: unsigned
+  - name: FIELD70
+    type: unsigned
+  rows:
+  - [66, 68, 70]
+...
+box.space.TEST:drop()
+---
+...

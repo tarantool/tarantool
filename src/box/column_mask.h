@@ -123,4 +123,31 @@ column_mask_fieldno_is_set(uint64_t column_mask, uint32_t fieldno)
 	return (column_mask & mask) != 0;
 }
 
+/**
+ * Set a bit with given index @a bitno in a given @a bitmask.
+ * Do nothing when @a bitno is greater than size of bitmask.
+ * @param bitmask Bitmask to test.
+ * @param bitno Bit number to test (must be 0-based).
+ */
+static inline void
+bitmask64_set_bit(uint64_t *bitmask, uint32_t bitno)
+{
+	if (bitno < 64)
+		*bitmask |= ((uint64_t)1 << bitno);
+}
+
+/**
+ * Test a bit in the bitmask corresponding to @a bitno.
+ * @param bitmask Bitmask to test.
+ * @param bitno Bit number to test (must be 0-based).
+ * @return Whether given bit is set in a given bitmask.
+ *         When bitno is greater than size of bitmask returns
+ *         false.
+ */
+static inline bool
+bitmask64_is_bit_set(uint64_t bitmask, uint32_t bitno)
+{
+	return bitno < 64 && (bitmask & ((uint64_t)1 << bitno)) != 0;
+}
+
 #endif

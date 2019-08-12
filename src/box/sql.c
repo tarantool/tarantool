@@ -1245,7 +1245,10 @@ vdbe_field_ref_create(struct vdbe_field_ref *field_ref, struct tuple *tuple,
 	const char *field0 = data;
 	field_ref->field_count = mp_decode_array((const char **) &field0);
 	field_ref->slots[0] = (uint32_t)(field0 - data);
-	field_ref->rightmost_slot = 0;
+	memset(&field_ref->slots[1], 0,
+	       field_ref->field_count * sizeof(field_ref->slots[0]));
+	field_ref->slot_bitmask = 0;
+	bitmask64_set_bit(&field_ref->slot_bitmask, 0);
 }
 
 void

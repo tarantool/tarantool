@@ -372,10 +372,13 @@ struct vdbe_field_ref {
 	/** Count of fields in tuple. */
 	uint32_t field_count;
 	/**
-	 * Index of the rightmost initialized slot in slots
-	 * array.
+	 * Bitmask of initialized slots. The fieldno == 0 slot
+	 * must be initialized in vdbe_field_ref constructor.
+	 * This bitmap allows to lookup for the nearest
+	 * initialized slot for a given fieldno to perform as few
+	 * extra tuple decoding as possible.
 	 */
-	uint32_t rightmost_slot;
+	uint64_t slot_bitmask;
 	/**
 	 * Array of offsets of tuple fields.
 	 * Only values <= rightmost_slot are valid.
