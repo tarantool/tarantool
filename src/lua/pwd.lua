@@ -194,6 +194,19 @@ local function getgrall()
     return grs
 end
 
+-- Workaround pwd.getpwall() issue on Fedora 29: successful
+-- getgrent() call that should normally return NULL and preserve
+-- errno, set it to ENOENT due to systemd-nss issue [1] when a
+-- password database is traversed first time.
+--
+-- [1]: https://github.com/systemd/systemd/issues/9585
+--
+-- It is disabled on FreeBSD due to gh-4428: getpwall() hangs on
+-- FreeBSD 12.
+if jit.os ~= 'BSD' then
+    pcall(getpwall)
+end
+
 return {
     getpw = getpw,
     getgr = getgr,
