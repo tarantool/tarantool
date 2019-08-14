@@ -340,30 +340,6 @@ s._gc_socket = nil
 tostring(s)
 s = nil
 
--- close
-serv = socket('AF_INET', 'SOCK_STREAM', 'tcp')
-serv:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
-serv:bind('127.0.0.1', port)
-port = serv:name().port
-serv:listen()
-test_run:cmd("setopt delimiter ';'")
-f = fiber.create(function(serv)
-    serv:readable()
-    sc = serv:accept()
-    sc:write("Tarantool test server")
-    sc:shutdown()
-    sc:close()
-    serv:close()
-end, serv);
-test_run:cmd("setopt delimiter ''");
-
-s = socket.tcp_connect('127.0.0.1', port)
-ch = fiber.channel()
-f = fiber.create(function() s:read(12) ch:put(true) end)
-s:close()
-ch:get(1)
-s:error()
-
 -- random port
 master = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 master:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
