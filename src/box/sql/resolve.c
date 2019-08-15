@@ -647,9 +647,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 						    'u' ? 8388608 : 125829120;
 					}
 				}
-				if (pDef->
-				    funcFlags & (SQL_FUNC_CONSTANT |
-						 SQL_FUNC_SLOCHNG)) {
+				if ((pDef->funcFlags & SQL_FUNC_CONSTANT) != 0) {
 					/* For the purposes of the EP_ConstFunc flag, date and time
 					 * functions and other functions that change slowly are considered
 					 * constant because they are constant for the duration of one query

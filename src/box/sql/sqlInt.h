@@ -1318,9 +1318,7 @@ struct FuncDestructor {
 #define SQL_FUNC_UNLIKELY 0x0400	/* Built-in unlikely() function */
 #define SQL_FUNC_CONSTANT 0x0800	/* Constant inputs give a constant output */
 #define SQL_FUNC_MINMAX   0x1000	/* True for min() and max() aggregates */
-#define SQL_FUNC_SLOCHNG  0x2000	/* "Slow Change". Value constant during a
-					 * single query - might change over time
-					 */
+
 /**
  * If function returns string, it may require collation to be
  * applied on its result. For instance, result of substr()
@@ -1359,11 +1357,6 @@ enum trim_side_mask {
  *   VFUNCTION(zName, nArg, iArg, bNC, xFunc)
  *     Like FUNCTION except it omits the sql_FUNC_CONSTANT flag.
  *
- *   DFUNCTION(zName, nArg, iArg, bNC, xFunc)
- *     Like FUNCTION except it omits the sql_FUNC_CONSTANT flag and
- *     adds the sql_FUNC_SLOCHNG flag.  Used for date & time functions,
- *     but not during a single query.
- *
  *   AGGREGATE(zName, nArg, iArg, bNC, xStep, xFinal)
  *     Used to create an aggregate function definition implemented by
  *     the C functions xStep and xFinal. The first four parameters
@@ -1387,15 +1380,9 @@ enum trim_side_mask {
 #define VFUNCTION(zName, nArg, iArg, bNC, xFunc, type) \
   {nArg, (bNC*SQL_FUNC_NEEDCOLL), \
    SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type}
-#define DFUNCTION(zName, nArg, iArg, bNC, xFunc, type) \
-  {nArg, SQL_FUNC_SLOCHNG|(bNC*SQL_FUNC_NEEDCOLL), \
-   SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type}
 #define FUNCTION2(zName, nArg, iArg, bNC, xFunc, extraFlags, type) \
   {nArg,SQL_FUNC_CONSTANT|(bNC*SQL_FUNC_NEEDCOLL)|extraFlags,\
    SQL_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type}
-#define STR_FUNCTION(zName, nArg, pArg, bNC, xFunc) \
-  {nArg, SQL_FUNC_SLOCHNG|(bNC*SQL_FUNC_NEEDCOLL), \
-   pArg, 0, xFunc, 0, #zName, {SQL_AFF_STRING, {0}}}
 #define LIKEFUNC(zName, nArg, arg, flags, type) \
   {nArg, SQL_FUNC_NEEDCOLL|SQL_FUNC_CONSTANT|flags, \
    (void *)(SQL_INT_TO_PTR(arg)), 0, likeFunc, 0, #zName, {0}, type}

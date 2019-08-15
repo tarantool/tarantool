@@ -1302,11 +1302,9 @@ valueFromFunction(sql * db,	/* The database connection */
 		nVal = pList->nExpr;
 	pFunc = sqlFindFunction(db, p->u.zToken, nVal, 0);
 	assert(pFunc);
-	if ((pFunc->funcFlags & (SQL_FUNC_CONSTANT | SQL_FUNC_SLOCHNG)) ==
-	    0 || (pFunc->funcFlags & SQL_FUNC_NEEDCOLL)
-	    ) {
+	if ((pFunc->funcFlags & SQL_FUNC_CONSTANT) == 0 ||
+	    (pFunc->funcFlags & SQL_FUNC_NEEDCOLL))
 		return 0;
-	}
 
 	if (pList) {
 		apVal =
