@@ -117,6 +117,7 @@ if (TARGET_OS_NETBSD)
 endif ()
 
 add_library(core STATIC ${core_sources})
+add_dependencies(core curl)
 target_link_libraries(core
     salad small
     ${LIBEV_LIBRARIES}
@@ -223,6 +224,7 @@ endif()
 
 set_source_files_compile_flags(${server_sources})
 add_library(server STATIC ${server_sources})
+add_dependencies(server build_bundled_libs)
 target_link_libraries(server core bit uri uuid ${ICU_LIBRARIES})
 
 # Rule of thumb: if exporting a symbol from a static library, list the
@@ -280,6 +282,8 @@ if(BUILD_STATIC)
             list(APPEND EXPORT_LIST ${SYMBOLS_LIB})
             # set variable to allow rescan (CMake depended)
             set(SYMBOLS_LIB "SYMBOLS_LIB-NOTFOUND")
+        elseif (${libstatic} STREQUAL bundled-libcurl)
+            message("We don't need to export symbols from statically linked libcurl, skipped")
         else()
             message(WARNING "${libstatic} should be a static")
         endif()

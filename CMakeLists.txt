@@ -327,8 +327,15 @@ endif()
 #
 # Curl
 #
-set(CURL_FIND_REQUIRED ON)
-find_package(CURL)
+option(ENABLE_BUNDLED_LIBCURL "Enable building of the bundled libcurl" ON)
+if (ENABLE_BUNDLED_LIBCURL)
+    include(BuildLibCURL)
+    curl_build()
+    add_dependencies(build_bundled_libs bundled-libcurl)
+else()
+    set(CURL_FIND_REQUIRED ON)
+    find_package(CURL)
+endif()
 
 #
 # ReadLine
@@ -511,6 +518,7 @@ set(options PACKAGE VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
     ENABLE_BACKTRACE
     ENABLE_DOC
     ENABLE_DIST
+    ENABLE_BUNDLED_LIBCURL
     ENABLE_BUNDLED_LIBYAML
     ENABLE_BUNDLED_MSGPUCK)
 foreach(option IN LISTS options)
