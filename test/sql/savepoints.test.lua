@@ -56,3 +56,22 @@ release_sv_fail = function()
 end;
 release_sv_fail();
 box.commit();
+
+-- Make sure that if the current transaction has a savepoint
+-- with the same name, the old savepoint is deleted and
+-- a new one is set. Note that no error should be raised.
+--
+collision_sv_2 = function()
+    box.begin()
+    box.execute('SAVEPOINT t1;')
+    box.execute('SAVEPOINT t2;')
+    local _,err = box.execute('SAVEPOINT t1;')
+    assert(err == nil)
+    box.execute('RELEASE SAVEPOINT t1;')
+    local _,err = box.execute('RELEASE SAVEPOINT t1;')
+    assert(err ~= nil)
+    local _, err = box.execute('ROLLBACK TO t2;')
+    assert(err == nil)
+end;
+collision_sv_2();
+box.commit();
