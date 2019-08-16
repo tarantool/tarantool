@@ -52,7 +52,7 @@ export DEBIAN_STRETCH_DOCKERFILE
 define DEBIAN_BUSTER_DOCKERFILE
 FROM packpack/packpack:debian-buster
 COPY .travis.mk .
-RUN make -f .travis.mk deps_buster_clang_8
+RUN make APT_EXTRA_FLAGS="--allow-releaseinfo-change-version --allow-releaseinfo-change-suite" -f .travis.mk deps_buster_clang_8
 endef
 export DEBIAN_BUSTER_DOCKERFILE
 
