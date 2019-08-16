@@ -46,7 +46,7 @@ deps_debian:
 		libcurl4-openssl-dev libunwind-dev libicu-dev \
 		python python-pip python-setuptools python-dev \
 		python-msgpack python-yaml python-argparse python-six python-gevent \
-		lcov ruby clang llvm llvm-dev
+		lcov ruby clang llvm llvm-dev zlib1g-dev autoconf automake libtool
 
 deps_buster_clang_8: deps_debian
 	echo "deb http://apt.llvm.org/buster/ llvm-toolchain-buster-8 main" > /etc/apt/sources.list.d/clang_8.list
@@ -90,7 +90,7 @@ coverage_debian: deps_debian test_coverage_debian_no_deps
 
 deps_osx:
 	brew update
-	brew install openssl readline curl icu4c --force
+	brew install openssl readline curl icu4c zlib autoconf automake libtool --force
 	python2 -V || brew install python2 --force
 	curl --silent --show-error --retry 5 https://bootstrap.pypa.io/get-pip.py >get-pip.py
 	python get-pip.py --user
@@ -117,10 +117,10 @@ test_osx: deps_osx test_osx_no_deps
 
 deps_freebsd:
 	sudo pkg install -y git cmake gmake gcc coreutils \
-		readline ncurses libyaml openssl curl libunwind icu \
+		readline ncurses libyaml openssl libunwind icu \
 		python27 py27-pip py27-setuptools py27-daemon \
 		py27-yaml py27-argparse py27-six py27-gevent \
-		gdb bash
+		gdb bash autoconf automake libtool
 
 build_freebsd:
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}

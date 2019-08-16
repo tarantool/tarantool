@@ -17,7 +17,6 @@ BuildRequires: sed
 BuildRequires: readline-devel
 BuildRequires: libyaml-devel
 BuildRequires: openssl-devel
-BuildRequires: libcurl-devel
 BuildRequires: libicu-devel
 #BuildRequires: msgpuck-devel
 %if 0%{?fedora} > 0
@@ -26,6 +25,13 @@ BuildRequires: perl-podlators
 %endif
 Requires(pre): %{_sbindir}/useradd
 Requires(pre): %{_sbindir}/groupadd
+
+# libcurl dependencies (except ones we have already).
+BuildRequires: autoconf
+BuildRequires: automake
+BuildRequires: libtool
+BuildRequires: zlib-devel
+Requires: zlib
 
 %if %{with systemd}
 Requires(post): systemd
@@ -84,7 +90,6 @@ Requires: /etc/services
 # Deps for built-in package manager
 # https://github.com/tarantool/tarantool/issues/2612
 Requires: openssl
-Requires: curl
 %if (0%{?fedora} >= 22 || 0%{?rhel} >= 8)
 # RHEL <= 7 doesn't support Recommends:
 Recommends: tarantool-devel

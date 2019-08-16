@@ -19,7 +19,7 @@ RUN set -x \
         zip \
         unzip \
         libunwind \
-        libcurl \
+        zlib \
     && yum -y install \
         perl \
         gcc-c++ \
@@ -43,17 +43,8 @@ RUN set -x && \
     curl -O -L https://www.openssl.org/source/openssl-1.1.0h.tar.gz && \
     tar -xvf openssl-1.1.0h.tar.gz && \
     cd openssl-1.1.0h && \
-    ./config && \
+    ./config --libdir=lib && \
     make && make install
-
-RUN set -x && \
-    cd / && \
-    git clone https://github.com/curl/curl.git && \
-    cd curl && \
-    git checkout curl-7_59_0 && \
-    ./buildconf && \
-    LD_LIBRARY_PATH=/usr/local/lib64 LIBS=" -lssl -lcrypto -ldl" ./configure --enable-static --enable-shared --with-ssl && \
-    make -j && make install
 
 RUN set -x && \
     cd / && \
@@ -92,6 +83,7 @@ RUN set -x \
              -DENABLE_DIST:BOOL=ON \
              -DBUILD_STATIC=ON \
              -DOPENSSL_USE_STATIC_LIBS=ON \
+             -DOPENSSL_ROOT_DIR=/usr/local \
              .) \
     && make -C /tarantool -j
 
