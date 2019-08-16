@@ -182,6 +182,7 @@ relay_new(struct replica *replica)
 		return NULL;
 	}
 	relay->replica = replica;
+	relay->last_row_time = ev_monotonic_now(loop());
 	fiber_cond_create(&relay->reader_cond);
 	diag_create(&relay->diag);
 	stailq_create(&relay->pending_gc);
@@ -203,6 +204,7 @@ relay_start(struct relay *relay, int fd, uint64_t sync,
 	coio_create(&relay->io, fd);
 	relay->sync = sync;
 	relay->state = RELAY_FOLLOW;
+	relay->last_row_time = ev_monotonic_now(loop());
 }
 
 void
