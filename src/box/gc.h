@@ -240,7 +240,9 @@ void
 gc_add_checkpoint(const struct vclock *vclock);
 
 /**
- * Make a checkpoint.
+ * Make a *manual* checkpoint.
+ * This is entry point for box.snapshot() and SIGUSR1 signal
+ * handler.
  *
  * This function runs engine/WAL callbacks to create a checkpoint
  * on disk, then tracks the new checkpoint in the garbage collector

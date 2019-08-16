@@ -404,11 +404,18 @@ gc_checkpoint(void)
 	}
 
 	/*
-	 * Reset the schedule and wake up the checkpoint daemon
-	 * so that it can readjust.
+	 * Since a user invoked a snapshot manually, this may be
+	 * because he may be not happy with the current randomized
+	 * schedule. Randomize the schedule again and wake up the
+	 * checkpoint daemon so that it * can readjust.
+	 * It is also a good idea to randomize the interval, since
+	 * otherwise many instances running on the same host will
+	 * no longer run their checkpoints randomly after
+	 * a sweeping box.snapshot() (gh-4432).
 	 */
-	checkpoint_schedule_reset(&gc.checkpoint_schedule,
-				  ev_monotonic_now(loop()));
+	checkpoint_schedule_cfg(&gc.checkpoint_schedule,
+				ev_monotonic_now(loop()),
+				gc.checkpoint_schedule.interval);
 	fiber_wakeup(gc.checkpoint_fiber);
 
 	if (gc_do_checkpoint() != 0)
