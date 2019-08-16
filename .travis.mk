@@ -45,6 +45,18 @@ docker_%:
 
 # Depends
 
+# When dependencies in 'deps_debian' or 'deps_buster_clang_8' goal
+# are changed, push a new docker image into GitLab Registry using
+# the following command:
+#
+# $ make GITLAB_USER=foo -f .gitlab.mk docker_bootstrap
+#
+# It is highly recommended to only add dependencies (don't remove
+# them), because all branches use the same latest image and it is
+# often that a short-term branch is based on non-so-recent master
+# commit, so the build requires old dependencies to be installed.
+# See ce623a23416eb192ce70116fd14992e84e7ccbbe ('Enable GitLab CI
+# testing') for more information.
 deps_debian:
 	apt-get update ${APT_EXTRA_FLAGS} && apt-get install -y -f \
 		build-essential cmake coreutils sed \
