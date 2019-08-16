@@ -750,10 +750,20 @@ txn_savepoint_new(struct txn *txn, const char *name)
 	svp->stmt = stailq_last(&txn->stmts);
 	svp->in_sub_stmt = txn->in_sub_stmt;
 	svp->fk_deferred_count = txn->fk_deferred_count;
-	if (name != NULL)
+	if (name != NULL) {
+		/*
+		 * If savepoint with given name already exists,
+		 * erase it from the list. This has to be done
+		 * in accordance with ANSI SQL compliance.
+		 */
+		struct txn_savepoint *old_svp =
+			txn_savepoint_by_name(txn, name);
+		if (old_svp != NULL)
+			rlist_del(&old_svp->link);
 		memcpy(svp->name, name, name_len + 1);
-	else
+	} else {
 		svp->name[0] = 0;
+	}
 	rlist_add_entry(&txn->savepoints, svp, link);
 	return svp;
 }
