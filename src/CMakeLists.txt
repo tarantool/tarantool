@@ -168,6 +168,7 @@ endif()
 
 set_source_files_compile_flags(${server_sources})
 add_library(server STATIC ${server_sources})
+add_dependencies(server build_bundled_libs)
 target_link_libraries(server core coll http_parser bit uri uuid swim swim_udp
                       swim_ev crypto)
 
@@ -226,6 +227,8 @@ if(BUILD_STATIC)
             list(APPEND EXPORT_LIST ${SYMBOLS_LIB})
             # set variable to allow rescan (CMake depended)
             set(SYMBOLS_LIB "SYMBOLS_LIB-NOTFOUND")
+        elseif (${libstatic} STREQUAL bundled-libcurl)
+            message("We don't need to export symbols from statically linked libcurl, skipped")
         else()
             message(WARNING "${libstatic} should be a static")
         endif()

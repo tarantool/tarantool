@@ -10,9 +10,10 @@ Build-Depends: cdbs (>= 0.4.100), debhelper (>= 9), dpkg-dev (>= 1.16.1~),
  libncurses5-dev,
  libyaml-dev,
  libssl-dev,
- libcurl4-gnutls-dev | libcurl4-openssl-dev | libcurl4-nss-dev,
  libunwind-dev | libunwind8-dev | libunwind7-dev,
  libicu-dev,
+# libcurl build dependencies
+ autoconf, automake, libtool, zlib1g-dev,
 Section: database
 Standards-Version: 3.9.8
 Homepage: http://tarantool.org/
@@ -42,7 +43,7 @@ Replaces: tarantool-common (<< 1.5.3), tarantool-lts-common
 Depends: ${misc:Depends}, adduser, lsb-base,
 # Deps for built-in package manager
 # https://github.com/tarantool/tarantool/issues/2612
- openssl, curl
+ openssl
 Recommends: tarantool-dev, git, build-essential, cmake
 Description: Tarantool in-memory database - common files
  Tarantool is an in-memory database and Lua application server.
@@ -53,7 +54,9 @@ Package: tarantool
 Architecture: i386 amd64 armhf arm64
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, netbase, binutils, libgomp1,
- libyaml-0-2, openssl, tarantool-common (>= 1.7.5.46)
+ libyaml-0-2, openssl, tarantool-common (>= 1.7.5.46),
+# libcurl dependencies (except ones we have already)
+ zlib1g
 Replaces: tarantool-lts
 Conflicts: tarantool-lts-modules,
  tarantool-lts-postgresql-module,
