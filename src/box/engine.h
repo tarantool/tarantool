@@ -235,10 +235,8 @@ static inline struct engine *
 engine_find(const char *name)
 {
 	struct engine *engine = engine_by_name(name);
-	if (engine == NULL) {
+	if (engine == NULL)
 		diag_set(ClientError, ER_NO_SUCH_ENGINE, name);
-		diag_log();
-	}
 	return engine;
 }
 
