@@ -22,7 +22,7 @@ end
 
 tap.test("json", function(test)
     local serializer = require('json')
-    test:plan(28)
+    test:plan(32)
 
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
@@ -100,4 +100,25 @@ tap.test("json", function(test)
     test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000)
     test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000)
     test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000)
+
+    --
+    -- gh-4366: segmentation fault with recursive table
+    --
+    serializer.cfg({encode_max_depth = 2})
+    local rec1 = {}
+    rec1[1] = rec1
+    test:is(serializer.encode(rec1), '[[null]]')
+    local rec2 = {}
+    rec2['x'] = rec2
+    test:is(serializer.encode(rec2), '{"x":{"x":null}}')
+    local rec3 = {}
+    rec3[1] = rec3
+    rec3[2] = rec3
+    test:is(serializer.encode(rec3), '[[null,null],[null,null]]')
+    local rec4 = {}
+    rec4['a'] = rec4
+    rec4['b'] = rec4
+    test:is(serializer.encode(rec4),
+            '{"a":{"a":null,"b":null},"b":{"a":null,"b":null}}')
+    serializer.cfg({encode_max_depth = orig_encode_max_depth})
 end)
