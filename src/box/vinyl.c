@@ -123,17 +123,6 @@ struct vy_env {
 	struct vy_recovery *recovery;
 	/** Local recovery vclock. */
 	const struct vclock *recovery_vclock;
-	/**
-	 * LSN to assign to the next statement received during
-	 * initial join.
-	 *
-	 * We can't use original statements' LSNs, because we
-	 * send statements not in the chronological order while
-	 * the receiving end expects LSNs to grow monotonically
-	 * due to the design of the lsregion allocator, which is
-	 * used for storing statements in memory.
-	 */
-	int64_t join_lsn;
 	/** Path to the data directory. */
 	char *path;
 	/** Max time a transaction may wait for memory. */
@@ -800,15 +789,6 @@ vinyl_index_commit_create(struct index *index, int64_t lsn)
 		 */
 		if (lsm->commit_lsn >= 0)
 			return;
-	}
-
-	if (env->status == VINYL_INITIAL_RECOVERY_REMOTE) {
-		/*
-		 * Records received during initial join do not
-		 * have LSNs so we use a fake one to identify
-		 * the index in vylog.
-		 */
-		lsn = ++env->join_lsn;
 	}
 
 	/*
@@ -3037,7 +3017,7 @@ vy_send_range_f(struct cbus_call_msg *cmsg)
 			break;
 		/*
 		 * Reset the LSN as the replica will ignore it
-		 * anyway - see comment to vy_env::join_lsn.
+		 * anyway.
 		 */
 		xrow.lsn = 0;
 		rc = xstream_write(ctx->stream, &xrow);
@@ -3283,7 +3263,7 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 
 	rc = vy_tx_prepare(tx);
 	if (rc == 0)
-		vy_tx_commit(tx, ++env->join_lsn);
+		vy_tx_commit(tx, 0);
 	else
 		vy_tx_rollback(tx);
 

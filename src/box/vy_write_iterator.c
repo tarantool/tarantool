@@ -511,7 +511,7 @@ vy_write_iterator_merge_step(struct vy_write_iterator *stream)
  * Try to get VLSN of the read view with the specified number in
  * the vy_write_iterator.read_views array.
  * If the requested read view is older than all existing ones,
- * return 0, as the oldest possible VLSN.
+ * return -1, which is less than any possible VLSN.
  *
  * @param stream Write iterator.
  * @param current_rv_i Index of the read view.
@@ -522,7 +522,7 @@ static inline int64_t
 vy_write_iterator_get_vlsn(struct vy_write_iterator *stream, int rv_i)
 {
 	if (rv_i >= stream->rv_count)
-		return 0;
+		return -1;
 	return stream->read_views[rv_i].vlsn;
 }
 
@@ -753,8 +753,8 @@ vy_write_iterator_build_history(struct vy_write_iterator *stream,
 		 * and other optimizations.
 		 */
 		if (vy_stmt_type(src->entry.stmt) == IPROTO_DELETE &&
-		    stream->is_last_level && merge_until_lsn == 0) {
-			current_rv_lsn = 0; /* Force skip */
+		    stream->is_last_level && merge_until_lsn < 0) {
+			current_rv_lsn = -1; /* Force skip */
 			goto next_lsn;
 		}
 

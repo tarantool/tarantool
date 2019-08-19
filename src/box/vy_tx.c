@@ -804,7 +804,7 @@ vy_tx_commit(struct vy_tx *tx, int64_t lsn)
 	if (vy_tx_is_ro(tx))
 		goto out;
 
-	assert(xm->lsn < lsn);
+	assert(xm->lsn <= lsn);
 	xm->lsn = lsn;
 
 	/* Fix LSNs of the records and commit changes. */
