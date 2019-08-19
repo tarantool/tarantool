@@ -177,7 +177,7 @@ cmd ::= ROLLBACK TO savepoint_opt nm(X). {
 
 ///////////////////// The CREATE TABLE statement ////////////////////////////
 //
-cmd ::= create_table create_table_args.
+cmd ::= create_table create_table_args with_opts create_table_end.
 create_table ::= createkw TABLE ifnotexists(E) nm(Y). {
   create_table_def_init(&pParse->create_table_def, &Y, E);
   pParse->create_table_def.new_space = sqlStartTable(pParse, &Y);
@@ -189,9 +189,30 @@ createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
 ifnotexists(A) ::= .              {A = 0;}
 ifnotexists(A) ::= IF NOT EXISTS. {A = 1;}
 
-create_table_args ::= LP columnlist RP. {
-  sqlEndTable(pParse);
+create_table_args ::= LP columnlist RP.
+
+with_opts ::= WITH engine_opts.
+with_opts ::= .
+
+engine_opts ::= ENGINE EQ STRING(A). {
+  /* Note that specifying engine clause overwrites default engine. */
+  if (A.n > ENGINE_NAME_MAX) {
+    diag_set(ClientError, ER_CREATE_SPACE,
+             pParse->create_table_def.new_space->def->name,
+             "space engine name is too long");
+    pParse->is_aborted = true;
+    return;
+  }
+  /* Need to dequote name. */
+  char *normalized_name = sql_name_from_token(pParse->db, &A);
+  if (normalized_name == NULL)
+    return;
+  memcpy(pParse->create_table_def.new_space->def->engine_name, normalized_name,
+         strlen(normalized_name) + 1);
+  sqlDbFree(pParse->db, normalized_name);
 }
+
+create_table_end ::= . { sqlEndTable(pParse); }
 
 /*
  * CREATE TABLE AS SELECT is broken. To be re-implemented

@@ -48,3 +48,88 @@ box.execute("DROP TABLE t3_memtx;")
 ---
 - row_count: 1
 ...
+-- gh-4422: allow to specify engine in CREATE TABLE statement.
+--
+box.execute("CREATE TABLE t1_vinyl (id INT PRIMARY KEY) WITH ENGINE = 'vinyl'")
+---
+- row_count: 1
+...
+assert(box.space.T1_VINYL.engine == 'vinyl')
+---
+- true
+...
+box.execute("CREATE TABLE t1_memtx (id INT PRIMARY KEY) WITH ENGINE = 'memtx'")
+---
+- row_count: 1
+...
+assert(box.space.T1_MEMTX.engine == 'memtx')
+---
+- true
+...
+box.execute("pragma sql_default_engine='vinyl'")
+---
+- row_count: 0
+...
+box.execute("CREATE TABLE t2_vinyl (id INT PRIMARY KEY) WITH ENGINE = 'vinyl'")
+---
+- row_count: 1
+...
+assert(box.space.T2_VINYL.engine == 'vinyl')
+---
+- true
+...
+box.execute("CREATE TABLE t2_memtx (id INT PRIMARY KEY) WITH ENGINE = 'memtx'")
+---
+- row_count: 1
+...
+assert(box.space.T2_MEMTX.engine == 'memtx')
+---
+- true
+...
+box.space.T1_VINYL:drop()
+---
+...
+box.space.T1_MEMTX:drop()
+---
+...
+box.space.T2_VINYL:drop()
+---
+...
+box.space.T2_MEMTX:drop()
+---
+...
+-- Name of engine considered to be string literal, so should be
+-- lowercased and quoted.
+--
+box.execute("CREATE TABLE t1_vinyl (id INT PRIMARY KEY) WITH ENGINE = VINYL")
+---
+- null
+- Syntax error near 'VINYL'
+...
+box.execute("CREATE TABLE t1_vinyl (id INT PRIMARY KEY) WITH ENGINE = vinyl")
+---
+- null
+- Syntax error near 'vinyl'
+...
+box.execute("CREATE TABLE t1_vinyl (id INT PRIMARY KEY) WITH ENGINE = 'VINYL'")
+---
+- null
+- Space engine 'VINYL' does not exist
+...
+box.execute("CREATE TABLE t1_vinyl (id INT PRIMARY KEY) WITH ENGINE = \"vinyl\"")
+---
+- null
+- Syntax error near '"vinyl"'
+...
+-- Make sure that wrong engine name is handled properly.
+--
+box.execute("CREATE TABLE t_wrong_engine (id INT PRIMARY KEY) WITH ENGINE = 'abc'")
+---
+- null
+- Space engine 'abc' does not exist
+...
+box.execute("CREATE TABLE t_long_engine_name (id INT PRIMARY KEY) WITH ENGINE = 'very_long_engine_name'")
+---
+- null
+- 'Failed to create space ''T_LONG_ENGINE_NAME'': space engine name is too long'
+...
