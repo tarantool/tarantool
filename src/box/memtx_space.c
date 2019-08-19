@@ -317,35 +317,6 @@ dup_replace_mode(uint32_t op)
 }
 
 static int
-memtx_space_apply_initial_join_row(struct space *space, struct request *request)
-{
-	struct memtx_space *memtx_space = (struct memtx_space *)space;
-	if (request->type != IPROTO_INSERT) {
-		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE, request->type);
-		return -1;
-	}
-	request->header->replica_id = 0;
-	struct txn *txn = in_txn();
-	if (txn_begin_stmt(txn, space) != 0)
-		return -1;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
-	stmt->new_tuple = memtx_tuple_new(space->format, request->tuple,
-					  request->tuple_end);
-	if (stmt->new_tuple == NULL)
-		goto rollback;
-	tuple_ref(stmt->new_tuple);
-	if (memtx_space->replace(space, NULL, stmt->new_tuple,
-				 DUP_INSERT, &stmt->old_tuple) != 0)
-		goto rollback;
-	return txn_commit_stmt(txn, request);
-
-rollback:
-	say_error("rollback: %s", diag_last_error(diag_get())->errmsg);
-	txn_rollback_stmt(txn);
-	return -1;
-}
-
-static int
 memtx_space_execute_replace(struct space *space, struct txn *txn,
 			    struct request *request, struct tuple **result)
 {
@@ -1168,7 +1139,6 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 static const struct space_vtab memtx_space_vtab = {
 	/* .destroy = */ memtx_space_destroy,
 	/* .bsize = */ memtx_space_bsize,
-	/* .apply_initial_join_row = */ memtx_space_apply_initial_join_row,
 	/* .execute_replace = */ memtx_space_execute_replace,
 	/* .execute_delete = */ memtx_space_execute_delete,
 	/* .execute_update = */ memtx_space_execute_update,

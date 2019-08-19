@@ -9,6 +9,9 @@ test_run = env.new()
 test_run:cmd('create server replica with rpl_master=default, script="replication/replica_on_schema_init.lua"')
 
 test_engine = box.schema.space.create('test_engine', {engine='memtx'})
+-- Make sure that space.before_replace trigger is invoked for rows
+-- received during both initial and final join stages.
+box.snapshot()
 test_local =  box.schema.space.create('test_local', {is_local=false})
 test_engine.engine
 test_local.is_local

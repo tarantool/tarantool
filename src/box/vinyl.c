@@ -3213,73 +3213,6 @@ out:
 	return rc;
 }
 
-static int
-vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
-{
-	assert(request->header != NULL);
-	struct vy_env *env = vy_env(space->engine);
-
-	struct vy_tx *tx = vy_tx_begin(env->xm);
-	if (tx == NULL)
-		return -1;
-
-	struct txn_stmt stmt;
-	memset(&stmt, 0, sizeof(stmt));
-
-	int rc = -1;
-	switch (request->type) {
-	case IPROTO_INSERT:
-		rc = vy_insert(env, tx, &stmt, space, request);
-		break;
-	case IPROTO_REPLACE:
-		rc = vy_replace(env, tx, &stmt, space, request);
-		break;
-	case IPROTO_UPSERT:
-		rc = vy_upsert(env, tx, &stmt, space, request);
-		break;
-	case IPROTO_DELETE:
-		rc = vy_delete(env, tx, &stmt, space, request);
-		break;
-	default:
-		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE, request->type);
-		break;
-	}
-	if (rc != 0) {
-		vy_tx_rollback(tx);
-		return -1;
-	}
-
-	/*
-	 * Account memory quota, see vinyl_engine_prepare()
-	 * and vinyl_engine_commit() for more details about
-	 * quota accounting.
-	 */
-	size_t reserved = tx->write_size;
-	if (vy_quota_use(&env->quota, VY_QUOTA_CONSUMER_TX,
-			 reserved, TIMEOUT_INFINITY) != 0)
-		unreachable();
-
-	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
-
-	rc = vy_tx_prepare(tx);
-	if (rc == 0)
-		vy_tx_commit(tx, 0);
-	else
-		vy_tx_rollback(tx);
-
-	if (stmt.old_tuple != NULL)
-		tuple_unref(stmt.old_tuple);
-	if (stmt.new_tuple != NULL)
-		tuple_unref(stmt.new_tuple);
-
-	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
-	assert(mem_used_after >= mem_used_before);
-	size_t used = mem_used_after - mem_used_before;
-	vy_quota_adjust(&env->quota, VY_QUOTA_CONSUMER_TX, reserved, used);
-	vy_regulator_check_dump_watermark(&env->regulator);
-	return rc;
-}
-
 /* }}} Replication */
 
 /* {{{ Garbage collection */
@@ -4685,7 +4618,6 @@ static const struct engine_vtab vinyl_engine_vtab = {
 static const struct space_vtab vinyl_space_vtab = {
 	/* .destroy = */ vinyl_space_destroy,
 	/* .bsize = */ vinyl_space_bsize,
-	/* .apply_initial_join_row = */ vinyl_space_apply_initial_join_row,
 	/* .execute_replace = */ vinyl_space_execute_replace,
 	/* .execute_delete = */ vinyl_space_execute_delete,
 	/* .execute_update = */ vinyl_space_execute_update,

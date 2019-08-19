@@ -202,23 +202,29 @@ applier_writer_f(va_list ap)
 static int
 apply_initial_join_row(struct xrow_header *row)
 {
+	int rc;
+	struct request request;
+	if (xrow_decode_dml(row, &request, dml_request_key_map(row->type)) != 0)
+		return -1;
+	struct space *space = space_cache_find(request.space_id);
+	if (space == NULL)
+		return -1;
 	struct txn *txn = txn_begin();
 	if (txn == NULL)
 		return -1;
-	struct request request;
-	xrow_decode_dml(row, &request, dml_request_key_map(row->type));
-	struct space *space = space_cache_find(request.space_id);
-	if (space == NULL)
+	if (txn_begin_stmt(txn, space) != 0)
 		goto rollback;
 	/* no access checks here - applier always works with admin privs */
-	if (space_apply_initial_join_row(space, &request))
+	struct tuple *unused;
+	if (space_execute_dml(space, txn, &request, &unused) != 0)
+		goto rollback_stmt;
+	if (txn_commit_stmt(txn, &request))
 		goto rollback;
-	int rc;
 	rc = txn_commit(txn);
-	if (rc < 0)
-		return -1;
 	fiber_gc();
 	return rc;
+rollback_stmt:
+	txn_rollback_stmt(txn);
 rollback:
 	txn_rollback(txn);
 	fiber_gc();

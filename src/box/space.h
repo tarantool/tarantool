@@ -59,8 +59,6 @@ struct space_vtab {
 	/** Return binary size of a space. */
 	size_t (*bsize)(struct space *);
 
-	int (*apply_initial_join_row)(struct space *, struct request *);
-
 	int (*execute_replace)(struct space *, struct txn *,
 			       struct request *, struct tuple **result);
 	int (*execute_delete)(struct space *, struct txn *,
@@ -361,12 +359,6 @@ index_name_by_id(struct space *space, uint32_t id);
 int
 access_check_space(struct space *space, user_access_t access);
 
-static inline int
-space_apply_initial_join_row(struct space *space, struct request *request)
-{
-	return space->vtab->apply_initial_join_row(space, request);
-}
-
 /**
  * Execute a DML request on the given space.
  */
@@ -528,7 +520,6 @@ space_remove_ck_constraint(struct space *space, struct ck_constraint *ck);
  * Virtual method stubs.
  */
 size_t generic_space_bsize(struct space *);
-int generic_space_apply_initial_join_row(struct space *, struct request *);
 int generic_space_ephemeral_replace(struct space *, const char *, const char *);
 int generic_space_ephemeral_delete(struct space *, const char *);
 int generic_space_ephemeral_rowid_next(struct space *, uint64_t *);
@@ -596,13 +587,6 @@ index_find_system_xc(struct space *space, uint32_t index_id)
 			  space->engine->name, "system data");
 	}
 	return index_find_xc(space, index_id);
-}
-
-static inline void
-space_apply_initial_join_row_xc(struct space *space, struct request *request)
-{
-	if (space_apply_initial_join_row(space, request) != 0)
-		diag_raise();
 }
 
 static inline void

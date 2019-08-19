@@ -490,7 +490,6 @@ sysview_space_create_index(struct space *space, struct index_def *def)
 static const struct space_vtab sysview_space_vtab = {
 	/* .destroy = */ sysview_space_destroy,
 	/* .bsize = */ generic_space_bsize,
-	/* .apply_initial_join_row = */ generic_space_apply_initial_join_row,
 	/* .execute_replace = */ sysview_space_execute_replace,
 	/* .execute_delete = */ sysview_space_execute_delete,
 	/* .execute_update = */ sysview_space_execute_update,

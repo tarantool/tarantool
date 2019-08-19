@@ -625,15 +625,6 @@ generic_space_bsize(struct space *space)
 }
 
 int
-generic_space_apply_initial_join_row(struct space *space,
-				     struct request *request)
-{
-	(void)space;
-	(void)request;
-	return 0;
-}
-
-int
 generic_space_ephemeral_replace(struct space *space, const char *tuple,
 				const char *tuple_end)
 {

@@ -205,7 +205,7 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 			 (uint32_t) row->type);
 		return -1;
 	}
-
+	int rc;
 	struct request request;
 	if (xrow_decode_dml(row, &request, dml_request_key_map(row->type)) != 0)
 		return -1;
@@ -220,13 +220,15 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 	struct txn *txn = txn_begin();
 	if (txn == NULL)
 		return -1;
+	if (txn_begin_stmt(txn, space) != 0)
+		goto rollback;
 	/* no access checks here - applier always works with admin privs */
-	if (space_apply_initial_join_row(space, &request) != 0) {
-		txn_rollback(txn);
-		fiber_gc();
-		return -1;
-	}
-	int rc = txn_commit(txn);
+	struct tuple *unused;
+	if (space_execute_dml(space, txn, &request, &unused) != 0)
+		goto rollback_stmt;
+	if (txn_commit_stmt(txn, &request) != 0)
+		goto rollback;
+	rc = txn_commit(txn);
 	/*
 	 * Don't let gc pool grow too much. Yet to
 	 * it before reading the next row, to make
@@ -234,6 +236,12 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 	 */
 	fiber_gc();
 	return rc;
+rollback_stmt:
+	txn_rollback_stmt(txn);
+rollback:
+	txn_rollback(txn);
+	fiber_gc();
+	return -1;
 }
 
 /** Called at start to tell memtx to recover to a given LSN. */
