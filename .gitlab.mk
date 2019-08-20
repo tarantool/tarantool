@@ -105,3 +105,10 @@ vms_shutdown:
 package: git_submodule_update
 	git clone https://github.com/packpack/packpack.git packpack
 	PACKPACK_EXTRA_DOCKER_RUN_PARAMS='--network=host' ./packpack/packpack
+
+# ############
+# Static build
+# ############
+
+static_build:
+	docker build --network=host -f Dockerfile.staticbuild .
