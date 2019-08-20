@@ -100,23 +100,14 @@ int systemd_notify(const char *message) {
 	struct sockaddr_un sa = {
 		.sun_family = AF_UNIX,
 	};
-	struct iovec vec = {
-		.iov_base = (char  *)message,
-		.iov_len  = (size_t )strlen(message)
-	};
-	struct msghdr msg = {
-		.msg_iov    = &vec,
-		.msg_iovlen = 1,
-		.msg_name   = &sa,
-	};
 
-	msg.msg_namelen = sizeof(sa.sun_family) + strlen(sd_unix_path);
 	strncpy(sa.sun_path, sd_unix_path, sizeof(sa.sun_path));
 	if (sa.sun_path[0] == '@')
 		sa.sun_path[0] = '\0';
 
 	say_debug("systemd: sending message '%s'", message);
-	ssize_t sent = sendmsg(systemd_fd, &msg, MSG_NOSIGNAL);
+	ssize_t sent = sendto(systemd_fd, message, (size_t) strlen(message),
+		MSG_NOSIGNAL, (struct sockaddr *) &sa, sizeof(sa));
 	if (sent == -1) {
 		say_syserror("systemd: failed to send message");
 		return -1;
