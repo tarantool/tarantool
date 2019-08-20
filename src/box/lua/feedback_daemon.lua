@@ -37,10 +37,9 @@ end
 
 local function feedback_loop(self)
     fiber.name(PREFIX, { truncate = true })
-    local header = { feedback_type = "version", feedback_version = 1 }
 
     while true do
-        local feedback = fill_in_feedback(header)
+        local feedback = self:generate_feedback()
         local msg = self.control:get(self.interval)
         -- if msg == "send" then we simply send feedback
         if msg == "stop" then
