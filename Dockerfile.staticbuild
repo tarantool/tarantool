@@ -78,6 +78,12 @@ RUN set -x && \
     git submodule init && \
     git submodule update
 
+WORKDIR /tarantool
+
+RUN set -x && \
+    find . -name 'CMakeFiles' -type d -exec rm -rf {} + && \
+    find . -name 'CMakeCache.txt' -type f -delete
+
 RUN pip install -r /tarantool/test-run/requirements.txt
 
 RUN set -x \
@@ -90,5 +96,11 @@ RUN set -x \
     && make -C /tarantool -j
 
 RUN cd /tarantool && make install
+
+ARG RUN_TESTS
+RUN [ -n ${RUN_TESTS} ] && \
+    set -x && \
+    cd test && \
+    /usr/bin/python test-run.py --force
 
 ENTRYPOINT /bin/bash

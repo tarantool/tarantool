@@ -326,3 +326,16 @@ debian_10:
     DIST: 'buster'
   script:
     - ${GITLAB_MAKE} package
+
+static_build:
+  only:
+    refs:
+      - "2.2"
+      - /^.*-full-ci$/
+  stage: test
+  tags:
+    - deploy
+  variables:
+    RUN_TESTS: 'ON'
+  script:
+    - ${GITLAB_MAKE} static_build
