@@ -18,9 +18,11 @@
 
 if(BUILD_STATIC)
     set(CURL_LIB_NAME libcurl.a)
+    set(Z_LIB_NAME libz.a)
     set(NGHTTP2_LIB_NAME libnghttp2.a)
 else()
     set(CURL_LIB_NAME curl)
+    set(Z_LIB_NAME z)
     set(NGHTTP2_LIB_NAME nghttp2)
 endif()
 
@@ -30,6 +32,7 @@ set(DL_LIB_NAME dl)
 
 # Curl may be linked with optional or target-dependent libraries,
 # search for them and add to dependicies if found.
+find_library(Z_LIBRARY NAMES ${Z_LIB_NAME})
 find_library(NGHTTP2_LIBRARY NAMES ${NGHTTP2_LIB_NAME})
 find_library(PTHREAD_LIBRARY NAMES ${PTHREAD_LIB_NAME})
 find_library(DL_LIBRARY NAMES ${DL_LIB_NAME})
@@ -88,6 +91,9 @@ if(CURL_FOUND)
   set(CURL_LIBRARIES ${CURL_LIBRARIES} ${OPENSSL_LIBRARIES})
   if(BUILD_STATIC)
     # In case of a static build we have to add curl dependencies.
+    if(NOT "${Z_LIBRARY}" STREQUAL "Z_LIBRARY-NOTFOUND")
+      set(CURL_LIBRARIES ${CURL_LIBRARIES} ${Z_LIBRARY})
+    endif()
     if(NOT "${NGHTTP2_LIBRARY}" STREQUAL "NGHTTP2_LIBRARY-NOTFOUND")
       set(CURL_LIBRARIES ${CURL_LIBRARIES} ${NGHTTP2_LIBRARY})
     endif()
