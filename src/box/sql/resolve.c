@@ -700,16 +700,12 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				}
 				assert(pDef != 0);
 				if (pNC2) {
-					assert(SQL_FUNC_MINMAX ==
-					       NC_MinMaxAgg);
-					testcase((pDef->
-						  funcFlags &
-						  SQL_FUNC_MINMAX) != 0);
-					pNC2->ncFlags |=
-					    NC_HasAgg | (pDef->
-							 funcFlags &
-							 SQL_FUNC_MINMAX);
-
+					pNC2->ncFlags |= NC_HasAgg;
+					if ((pDef->funcFlags &
+					    SQL_FUNC_MIN) != 0 ||
+					    (pDef->funcFlags &
+					    SQL_FUNC_MAX) != 0)
+						pNC2->ncFlags |= NC_MinMaxAgg;
 				}
 				pNC->ncFlags |= NC_AllowAgg;
 			}

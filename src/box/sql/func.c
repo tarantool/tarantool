@@ -77,11 +77,10 @@ static void
 minmaxFunc(sql_context * context, int argc, sql_value ** argv)
 {
 	int i;
-	int mask;		/* 0 for min() or 0xffffffff for max() */
 	int iBest;
 	struct coll *pColl;
-
-	mask = sql_user_data(context) == 0 ? 0 : -1;
+	struct FuncDef *func = context->pFunc;
+	int mask = (func->funcFlags & SQL_FUNC_MAX) != 0 ? -1 : 0;
 	if (argc < 2) {
 		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT,
 		mask ? "GREATEST" : "LEAST", "at least two", argc);
@@ -1726,20 +1725,17 @@ minmaxStep(sql_context * context, int NotUsed, sql_value ** argv)
 		if (pBest->flags)
 			sqlSkipAccumulatorLoad(context);
 	} else if (pBest->flags) {
-		int max;
 		int cmp;
 		struct coll *pColl = sqlGetFuncCollSeq(context);
-		/* This step function is used for both the min() and max() aggregates,
-		 * the only difference between the two being that the sense of the
-		 * comparison is inverted. For the max() aggregate, the
-		 * sql_user_data() function returns (void *)-1. For min() it
-		 * returns (void *)db, where db is the sql* database pointer.
-		 * Therefore the next statement sets variable 'max' to 1 for the max()
-		 * aggregate, or 0 for min().
+		/*
+		 * This step function is used for both the min()
+		 * and max() aggregates, the only difference
+		 * between the two being that the sense of the
+		 * comparison is inverted.
 		 */
-		max = sql_user_data(context) != 0;
+		bool is_max = (context->pFunc->funcFlags & SQL_FUNC_MAX) != 0;
 		cmp = sqlMemCompare(pBest, pArg, pColl);
-		if ((max && cmp < 0) || (!max && cmp > 0)) {
+		if ((is_max && cmp < 0) || (!is_max && cmp > 0)) {
 			sqlVdbeMemCopy(pBest, pArg);
 		} else {
 			sqlSkipAccumulatorLoad(context);
@@ -1866,12 +1862,14 @@ sqlRegisterBuiltinFunctions(void)
 		FUNCTION_COLL(trim, 1, 3, 0, trim_func),
 		FUNCTION_COLL(trim, 2, 3, 0, trim_func),
 		FUNCTION_COLL(trim, 3, 3, 0, trim_func),
-		FUNCTION(least, -1, 0, 1, minmaxFunc, FIELD_TYPE_SCALAR),
+		FUNCTION2(least, -1, 0, 1, minmaxFunc, SQL_FUNC_MIN,
+			  FIELD_TYPE_SCALAR),
 		AGGREGATE2(min, 1, 0, 1, minmaxStep, minMaxFinalize,
-			   SQL_FUNC_MINMAX, FIELD_TYPE_SCALAR),
-		FUNCTION(greatest, -1, 1, 1, minmaxFunc, FIELD_TYPE_SCALAR),
+			   SQL_FUNC_MIN, FIELD_TYPE_SCALAR),
+		FUNCTION2(greatest, -1, 1, 1, minmaxFunc, SQL_FUNC_MAX,
+			  FIELD_TYPE_SCALAR),
 		AGGREGATE2(max, 1, 1, 1, minmaxStep, minMaxFinalize,
-			   SQL_FUNC_MINMAX, FIELD_TYPE_SCALAR),
+			   SQL_FUNC_MAX, FIELD_TYPE_SCALAR),
 		FUNCTION2(typeof, 1, 0, 0, typeofFunc, SQL_FUNC_TYPEOF,
 			  FIELD_TYPE_STRING),
 		FUNCTION2(length, 1, 0, 0, lengthFunc, SQL_FUNC_LENGTH,

@@ -1295,7 +1295,7 @@ struct FuncDestructor {
  * are assert() statements in the code to verify this.
  *
  * Value constraints (enforced via assert()):
- *     SQL_FUNC_MINMAX    ==  NC_MinMaxAgg      == SF_MinMaxAgg
+ *     NC_MinMaxAgg      == SF_MinMaxAgg
  *     SQL_FUNC_LENGTH    ==  OPFLAG_LENGTHARG
  *     SQL_FUNC_TYPEOF    ==  OPFLAG_TYPEOFARG
  *     SQL_FUNC_CONSTANT  ==  sql_DETERMINISTIC from the API
@@ -1316,8 +1316,10 @@ struct FuncDestructor {
 #define SQL_FUNC_COALESCE 0x0200	/* Built-in coalesce() or ifnull() */
 #define SQL_FUNC_UNLIKELY 0x0400	/* Built-in unlikely() function */
 #define SQL_FUNC_CONSTANT 0x0800	/* Constant inputs give a constant output */
-#define SQL_FUNC_MINMAX   0x1000	/* True for min() and max() aggregates */
-
+/** Built-in min() or least() function. */
+#define SQL_FUNC_MIN      0x1000
+/** Built-in max() or greatest() function. */
+#define SQL_FUNC_MAX      0x2000
 /**
  * If function returns string, it may require collation to be
  * applied on its result. For instance, result of substr()
@@ -2001,7 +2003,7 @@ struct NameContext {
  *
  * Value constraints (all checked via assert()):
  *    NC_HasAgg    == SF_HasAgg
- *    NC_MinMaxAgg == SF_MinMaxAgg == sql_FUNC_MINMAX
+ *    NC_MinMaxAgg == SF_MinMaxAgg
  *
  */
 #define NC_AllowAgg  0x0001	/* Aggregate functions are allowed here */
@@ -2059,7 +2061,7 @@ struct Select {
  *
  * Value constraints (all checked via assert())
  *     SF_HasAgg     == NC_HasAgg
- *     SF_MinMaxAgg  == NC_MinMaxAgg     == sql_FUNC_MINMAX
+ *     SF_MinMaxAgg  == NC_MinMaxAgg
  *     SF_FixedLimit == WHERE_USE_LIMIT
  */
 #define SF_Distinct       0x00001	/* Output should be DISTINCT */
