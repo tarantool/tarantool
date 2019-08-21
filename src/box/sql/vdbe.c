@@ -594,6 +594,19 @@ mem_type_to_str(const struct Mem *p)
 	}
 }
 
+/* Allocate memory for internal VDBE structure on region. */
+static int
+vdbe_mem_alloc_blob_region(struct Mem *vdbe_mem, uint32_t size)
+{
+	vdbe_mem->n = size;
+	vdbe_mem->z = region_alloc(&fiber()->gc, size);
+	if (vdbe_mem->z == NULL)
+		return -1;
+	vdbe_mem->flags = MEM_Ephem | MEM_Blob;
+	assert(sqlVdbeCheckMemInvariants(vdbe_mem));
+	return 0;
+}
+
 static inline const struct tuple_field *
 vdbe_field_ref_fetch_field(struct vdbe_field_ref *field_ref, uint32_t fieldno)
 {
@@ -3881,7 +3894,7 @@ case OP_RowData: {
 	}
 	testcase( n==0);
 
-	if (sql_vdbe_mem_alloc_region(pOut, n) != 0)
+	if (vdbe_mem_alloc_blob_region(pOut, n) != 0)
 		goto abort_due_to_error;
 	sqlCursorPayload(pCrsr, 0, n, pOut->z);
 	UPDATE_MAX_BLOBSIZE(pOut);

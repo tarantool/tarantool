@@ -269,8 +269,6 @@ int sqlVdbeRecordCompare(struct sql *db, int key_count,
 			     const void *key1, UnpackedRecord *key2);
 UnpackedRecord *sqlVdbeAllocUnpackedRecord(struct sql *,
 					       struct key_def *);
-int sql_vdbe_mem_alloc_region(Mem *, uint32_t);
-
 void sqlVdbeLinkSubProgram(Vdbe *, SubProgram *);
 
 /* Use SQL_ENABLE_COMMENTS to enable generation of extra comments on

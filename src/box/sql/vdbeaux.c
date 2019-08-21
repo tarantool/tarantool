@@ -2730,19 +2730,6 @@ sqlVdbeAllocUnpackedRecord(struct sql *db, struct key_def *key_def)
 	return p;
 }
 
-/* Allocate memory for internal VDBE structure on region. */
-int
-sql_vdbe_mem_alloc_region(Mem *vdbe_mem, uint32_t size)
-{
-	vdbe_mem->n = size;
-	vdbe_mem->z = region_alloc(&fiber()->gc, size);
-	if (vdbe_mem->z == NULL)
-		return -1;
-	vdbe_mem->flags = MEM_Ephem | MEM_Blob;
-	assert(sqlVdbeCheckMemInvariants(vdbe_mem));
-	return 0;
-}
-
 /*
  * Both *pMem1 and *pMem2 contain string values. Compare the two values
  * using the collation sequence pColl. As usual, return a negative , zero
