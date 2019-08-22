@@ -112,7 +112,7 @@ local function getgr(gid)
     if gid == nil then
         gid = tonumber(ffi.C.getgid())
     end
-    local gr = _getgr(gid)
+    local gr = type(gid) == 'cdata' and gid or _getgr(gid)
     if gr == nil then
         if errno() ~= 0 then
             error(pwgr_errstr:format('gr', errno(), errno.strerror()))
@@ -141,7 +141,7 @@ local function getpw(uid)
     if uid == nil then
         uid = tonumber(ffi.C.getuid())
     end
-    local pw = _getpw(uid)
+    local pw = type(uid) == 'cdata' and uid or _getpw(uid)
     if pw == nil then
         if errno() ~= 0 then
             error(pwgr_errstr:format('pw', errno(), errno.strerror()))
@@ -170,7 +170,7 @@ local function getpwall()
             end
             break
         end
-        table.insert(pws, getpw(pw.pw_uid))
+        table.insert(pws, getpw(pw))
     end
     ffi.C.endpwent()
     return pws
@@ -188,7 +188,7 @@ local function getgrall()
             end
             break
         end
-        table.insert(grs, getpw(gr.gr_gid))
+        table.insert(grs, getgr(gr))
     end
     ffi.C.endgrent()
     return grs
@@ -200,12 +200,7 @@ end
 -- password database is traversed first time.
 --
 -- [1]: https://github.com/systemd/systemd/issues/9585
---
--- It is disabled on FreeBSD due to gh-4428: getpwall() hangs on
--- FreeBSD 12.
-if jit.os ~= 'BSD' then
-    pcall(getpwall)
-end
+pcall(getpwall)
 
 return {
     getpw = getpw,
