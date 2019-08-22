@@ -177,7 +177,7 @@ exception_init();
 #define tnt_error(class, ...) ({					\
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
 	class *e = new class(__FILE__, __LINE__, ##__VA_ARGS__);	\
-	diag_add_error(diag_get(), e);					\
+	diag_set_error(diag_get(), e);					\
 	e;								\
 })
 

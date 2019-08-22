@@ -1022,7 +1022,7 @@ luaT_toerror(lua_State *L)
 	struct error *e = luaL_iserror(L, -1);
 	if (e != NULL) {
 		/* Re-throw original error */
-		diag_add_error(&fiber()->diag, e);
+		diag_set_error(&fiber()->diag, e);
 	} else {
 		/* Convert Lua error to a Tarantool exception. */
 		diag_set(LuajitError, luaT_tolstring(L, -1, NULL));

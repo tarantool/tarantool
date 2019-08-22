@@ -843,7 +843,7 @@ applier_on_rollback(struct trigger *trigger, void *event)
 	struct applier *applier = (struct applier *)trigger->data;
 	/* Setup a shared error. */
 	if (!diag_is_empty(&replicaset.applier.diag)) {
-		diag_add_error(&applier->diag,
+		diag_set_error(&applier->diag,
 			       diag_last_error(&replicaset.applier.diag));
 	}
 	/* Stop the applier fiber. */

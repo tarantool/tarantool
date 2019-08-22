@@ -99,7 +99,7 @@ Exception::operator new(size_t size)
 	void *buf = malloc(size);
 	if (buf != NULL)
 		return buf;
-	diag_add_error(diag_get(), &out_of_memory);
+	diag_set_error(diag_get(), &out_of_memory);
 	throw &out_of_memory;
 }
 

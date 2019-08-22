@@ -168,12 +168,12 @@ diag_clear(struct diag *diag)
 }
 
 /**
- * Add a new error to the diagnostics area
+ * Set a new error to the diagnostics area, replacing existent.
  * \param diag diagnostics area
  * \param e error to add
  */
 static inline void
-diag_add_error(struct diag *diag, struct error *e)
+diag_set_error(struct diag *diag, struct error *e)
 {
 	assert(e != NULL);
 	error_ref(e);
@@ -275,7 +275,7 @@ BuildSocketError(const char *file, unsigned line, const char *socketname,
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
 	struct error *e;						\
 	e = Build##class(__FILE__, __LINE__, ##__VA_ARGS__);		\
-	diag_add_error(diag_get(), e);					\
+	diag_set_error(diag_get(), e);					\
 	/* Restore the errno which might have been reset.  */           \
 	errno = save_errno;                                             \
 } while (0)

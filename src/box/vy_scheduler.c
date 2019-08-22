@@ -619,7 +619,7 @@ vy_scheduler_dump(struct vy_scheduler *scheduler)
 		if (scheduler->is_throttled) {
 			/* Dump error occurred. */
 			struct error *e = diag_last_error(&scheduler->diag);
-			diag_add_error(diag_get(), e);
+			diag_set_error(diag_get(), e);
 			return -1;
 		}
 		fiber_cond_wait(&scheduler->dump_cond);
@@ -693,7 +693,7 @@ vy_scheduler_begin_checkpoint(struct vy_scheduler *scheduler)
 	 */
 	if (scheduler->is_throttled) {
 		struct error *e = diag_last_error(&scheduler->diag);
-		diag_add_error(diag_get(), e);
+		diag_set_error(diag_get(), e);
 		say_error("cannot checkpoint vinyl, "
 			  "scheduler is throttled with: %s", e->errmsg);
 		return -1;
@@ -729,7 +729,7 @@ vy_scheduler_wait_checkpoint(struct vy_scheduler *scheduler)
 		if (scheduler->is_throttled) {
 			/* A dump error occurred, abort checkpoint. */
 			struct error *e = diag_last_error(&scheduler->diag);
-			diag_add_error(diag_get(), e);
+			diag_set_error(diag_get(), e);
 			say_error("vinyl checkpoint failed: %s", e->errmsg);
 			return -1;
 		}

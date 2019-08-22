@@ -82,7 +82,7 @@ box_error_set(const char *file, unsigned line, uint32_t code,
 		error_vformat_msg(e, fmt, ap);
 		va_end(ap);
 	}
-	diag_add_error(&fiber()->diag, e);
+	diag_set_error(&fiber()->diag, e);
 	return -1;
 }
 

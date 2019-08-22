@@ -479,7 +479,7 @@ relay_set_error(struct relay *relay, struct error *e)
 {
 	/* Don't override existing error. */
 	if (diag_is_empty(&relay->diag))
-		diag_add_error(&relay->diag, e);
+		diag_set_error(&relay->diag, e);
 }
 
 static void
@@ -658,7 +658,7 @@ relay_subscribe_f(va_list ap)
 	 * Don't clear the error for status reporting.
 	 */
 	assert(!diag_is_empty(&relay->diag));
-	diag_add_error(diag_get(), diag_last_error(&relay->diag));
+	diag_set_error(diag_get(), diag_last_error(&relay->diag));
 	diag_log();
 	say_crit("exiting the relay loop");
 
