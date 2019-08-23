@@ -39,4 +39,4 @@
 	url = https://github.com/tarantool/serpent.git
 [submodule "third_party/curl"]
 	path = third_party/curl
-	url = https://github.com/curl/curl.git
+	url = https://github.com/tarantool/curl.git
