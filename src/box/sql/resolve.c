@@ -591,8 +591,6 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 	case TK_FUNCTION:{
 			ExprList *pList = pExpr->x.pList;	/* The argument list */
 			int n = pList ? pList->nExpr : 0;	/* Number of arguments */
-			int no_such_func = 0;	/* True if no such function exists */
-			int wrong_num_args = 0;	/* True if wrong number of arguments */
 			int is_agg = 0;	/* True if is an aggregate function */
 			int nId;	/* Number of characters in function name */
 			const char *zId;	/* The function name. */
@@ -606,10 +604,17 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				pDef =
 				    sqlFindFunction(pParse->db, zId, -2,0);
 				if (pDef == 0) {
-					no_such_func = 1;
+					diag_set(ClientError,
+						 ER_NO_SUCH_FUNCTION, zId);
 				} else {
-					wrong_num_args = 1;
+					uint32_t argc = pDef->nArg;
+					const char *err = tt_sprintf("%d", argc);
+					diag_set(ClientError,
+						 ER_FUNC_WRONG_ARG_COUNT,
+						 pDef->zName, err, n);
 				}
+				pParse->is_aborted = true;
+				pNC->nErr++;
 			} else {
 				is_agg = pDef->xFinalize != 0;
 				pExpr->type = pDef->ret_type;
@@ -671,17 +676,6 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				pParse->is_aborted = true;
 				pNC->nErr++;
 				is_agg = 0;
-			} else if (no_such_func && pParse->db->init.busy == 0) {
-				diag_set(ClientError, ER_NO_SUCH_FUNCTION, zId);
-				pParse->is_aborted = true;
-				pNC->nErr++;
-			} else if (wrong_num_args) {
-				const char *err = "wrong number of arguments "\
-						  "to function %.*s()";
-				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
-					 tt_sprintf(err, nId, zId));
-				pParse->is_aborted = true;
-				pNC->nErr++;
 			}
 			if (is_agg)
 				pNC->ncFlags &= ~NC_AllowAgg;

@@ -414,7 +414,12 @@ substrFunc(sql_context * context, int argc, sql_value ** argv)
 	i64 p1, p2;
 	int negP2 = 0;
 
-	assert(argc == 3 || argc == 2);
+	if (argc != 2 && argc != 3) {
+		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, "SUBSTR",
+			 "1 or 2", argc);
+		context->is_aborted = true;
+		return;
+	}
 	if (sql_value_is_null(argv[1])
 	    || (argc == 3 && sql_value_is_null(argv[2]))
 	    ) {
@@ -510,7 +515,12 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 {
 	int n = 0;
 	double r;
-	assert(argc == 1 || argc == 2);
+	if (argc != 1 && argc != 2) {
+		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, "ROUND",
+			 "1 or 2", argc);
+		context->is_aborted = true;
+		return;
+	}
 	if (argc == 2) {
 		if (sql_value_is_null(argv[1]))
 			return;
@@ -902,6 +912,12 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 {
 	u32 escape = SQL_END_OF_STRING;
 	int nPat;
+	if (argc != 2 && argc != 3) {
+		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT,
+			 "LIKE", "2 or 3", argc);
+		context->is_aborted = true;
+		return;
+	}
 	sql *db = sql_context_db_handle(context);
 	int rhs_type = sql_value_type(argv[0]);
 	int lhs_type = sql_value_type(argv[1]);
@@ -1514,7 +1530,9 @@ trim_func(struct sql_context *context, int argc, sql_value **argv)
 		trim_func_three_args(context, argv[0], argv[1], argv[2]);
 		break;
 	default:
-		unreachable();
+		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, "TRIM",
+			 "1 or 2 or 3", argc);
+		context->is_aborted = true;
 	}
 }
 
@@ -1693,6 +1711,12 @@ static void
 countStep(sql_context * context, int argc, sql_value ** argv)
 {
 	CountCtx *p;
+	if (argc != 0 && argc != 1) {
+		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT,
+			 "COUNT", "0 or 1", argc);
+		context->is_aborted = true;
+		return;
+	}
 	p = sql_aggregate_context(context, sizeof(*p));
 	if ((argc == 0 || ! sql_value_is_null(argv[0])) && p) {
 		p->n++;
@@ -1769,7 +1793,12 @@ groupConcatStep(sql_context * context, int argc, sql_value ** argv)
 	StrAccum *pAccum;
 	const char *zSep;
 	int nVal, nSep;
-	assert(argc == 1 || argc == 2);
+	if (argc != 1 && argc != 2) {
+		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT,
+			 "GROUP_CONCAT", "1 or 2", argc);
+		context->is_aborted = true;
+		return;
+	}
 	if (sql_value_is_null(argv[0]))
 		return;
 	pAccum =
@@ -1852,75 +1881,62 @@ sqlRegisterBuiltinFunctions(void)
 	 * For peak efficiency, put the most frequently used function last.
 	 */
 	static FuncDef aBuiltinFunc[] = {
-		FUNCTION(soundex, 1, 0, 0, soundexFunc, FIELD_TYPE_STRING),
-		FUNCTION2(unlikely, 1, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
+		FUNCTION(SOUNDEX, 1, 0, 0, soundexFunc, FIELD_TYPE_STRING),
+		FUNCTION2(UNLIKELY, 1, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
 			  FIELD_TYPE_BOOLEAN),
-		FUNCTION2(likelihood, 2, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
+		FUNCTION2(LIKELIHOOD, 2, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
 			  FIELD_TYPE_BOOLEAN),
-		FUNCTION2(likely, 1, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
+		FUNCTION2(LIKELY, 1, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
 			  FIELD_TYPE_BOOLEAN),
-		FUNCTION_COLL(trim, 1, 3, 0, trim_func),
-		FUNCTION_COLL(trim, 2, 3, 0, trim_func),
-		FUNCTION_COLL(trim, 3, 3, 0, trim_func),
-		FUNCTION2(least, -1, 0, 1, minmaxFunc, SQL_FUNC_MIN,
+		FUNCTION_COLL(TRIM, -1, 3, 0, trim_func),
+		FUNCTION2(LEAST, -1, 0, 1, minmaxFunc, SQL_FUNC_MIN,
 			  FIELD_TYPE_SCALAR),
-		AGGREGATE2(min, 1, 0, 1, minmaxStep, minMaxFinalize,
+		AGGREGATE2(MIN, 1, 0, 1, minmaxStep, minMaxFinalize,
 			   SQL_FUNC_MIN, FIELD_TYPE_SCALAR),
 		FUNCTION2(greatest, -1, 1, 1, minmaxFunc, SQL_FUNC_MAX,
 			  FIELD_TYPE_SCALAR),
-		AGGREGATE2(max, 1, 1, 1, minmaxStep, minMaxFinalize,
+		AGGREGATE2(MAX, 1, 1, 1, minmaxStep, minMaxFinalize,
 			   SQL_FUNC_MAX, FIELD_TYPE_SCALAR),
-		FUNCTION2(typeof, 1, 0, 0, typeofFunc, SQL_FUNC_TYPEOF,
+		FUNCTION2(TYPEOF, 1, 0, 0, typeofFunc, SQL_FUNC_TYPEOF,
 			  FIELD_TYPE_STRING),
-		FUNCTION2(length, 1, 0, 0, lengthFunc, SQL_FUNC_LENGTH,
+		FUNCTION2(LENGTH, 1, 0, 0, lengthFunc, SQL_FUNC_LENGTH,
 			  FIELD_TYPE_INTEGER),
-		FUNCTION(char_length, 1, 0, 0, lengthFunc, FIELD_TYPE_INTEGER),
-		FUNCTION(character_length, 1, 0, 0, lengthFunc,
+		FUNCTION(CHAR_LENGTH, 1, 0, 0, lengthFunc, FIELD_TYPE_INTEGER),
+		FUNCTION(CHARACTER_LENGTH, 1, 0, 0, lengthFunc,
 			 FIELD_TYPE_INTEGER),
-		FUNCTION(position, 2, 0, 1, position_func, FIELD_TYPE_INTEGER),
-		FUNCTION(printf, -1, 0, 0, printfFunc, FIELD_TYPE_STRING),
-		FUNCTION(unicode, 1, 0, 0, unicodeFunc, FIELD_TYPE_STRING),
-		FUNCTION(char, -1, 0, 0, charFunc, FIELD_TYPE_STRING),
-		FUNCTION(abs, 1, 0, 0, absFunc, FIELD_TYPE_NUMBER),
-		FUNCTION(round, 1, 0, 0, roundFunc, FIELD_TYPE_INTEGER),
-		FUNCTION(round, 2, 0, 0, roundFunc, FIELD_TYPE_INTEGER),
-		FUNCTION_COLL(upper, 1, 0, 1, UpperICUFunc),
-		FUNCTION_COLL(lower, 1, 0, 1, LowerICUFunc),
-		FUNCTION(hex, 1, 0, 0, hexFunc, FIELD_TYPE_STRING),
-		FUNCTION2(ifnull, 2, 0, 0, noopFunc, SQL_FUNC_COALESCE,
+		FUNCTION(POSITION, 2, 0, 1, position_func, FIELD_TYPE_INTEGER),
+		FUNCTION(PRINTF, -1, 0, 0, printfFunc, FIELD_TYPE_STRING),
+		FUNCTION(UNICODE, 1, 0, 0, unicodeFunc, FIELD_TYPE_STRING),
+		FUNCTION(CHAR, -1, 0, 0, charFunc, FIELD_TYPE_STRING),
+		FUNCTION(ABS, 1, 0, 0, absFunc, FIELD_TYPE_NUMBER),
+		FUNCTION(ROUND, -1, 0, 0, roundFunc, FIELD_TYPE_INTEGER),
+		FUNCTION_COLL(UPPER, 1, 0, 1, UpperICUFunc),
+		FUNCTION_COLL(LOWER, 1, 0, 1, LowerICUFunc),
+		FUNCTION(HEX, 1, 0, 0, hexFunc, FIELD_TYPE_STRING),
+		FUNCTION2(IFNULL, 2, 0, 0, noopFunc, SQL_FUNC_COALESCE,
 			  FIELD_TYPE_INTEGER),
-		VFUNCTION(random, 0, 0, 0, randomFunc, FIELD_TYPE_INTEGER),
-		VFUNCTION(randomblob, 1, 0, 0, randomBlob, FIELD_TYPE_VARBINARY),
-		FUNCTION(nullif, 2, 0, 1, nullifFunc, FIELD_TYPE_SCALAR),
-		FUNCTION(version, 0, 0, 0, sql_func_version, FIELD_TYPE_STRING),
-		FUNCTION(quote, 1, 0, 0, quoteFunc, FIELD_TYPE_STRING),
-		VFUNCTION(row_count, 0, 0, 0, sql_row_count, FIELD_TYPE_INTEGER),
-		FUNCTION_COLL(replace, 3, 0, 0, replaceFunc),
-		FUNCTION(zeroblob, 1, 0, 0, zeroblobFunc, FIELD_TYPE_VARBINARY),
-		FUNCTION_COLL(substr, 2, 0, 0, substrFunc),
-		FUNCTION_COLL(substr, 3, 0, 0, substrFunc),
-		AGGREGATE(sum, 1, 0, 0, sum_step, sumFinalize,
+		VFUNCTION(RANDOM, 0, 0, 0, randomFunc, FIELD_TYPE_INTEGER),
+		VFUNCTION(RANDOMBLOB, 1, 0, 0, randomBlob, FIELD_TYPE_VARBINARY),
+		FUNCTION(NULLIF, 2, 0, 1, nullifFunc, FIELD_TYPE_SCALAR),
+		FUNCTION(VERSION, 0, 0, 0, sql_func_version, FIELD_TYPE_STRING),
+		FUNCTION(QUOTE, 1, 0, 0, quoteFunc, FIELD_TYPE_STRING),
+		VFUNCTION(ROW_COUNT, 0, 0, 0, sql_row_count, FIELD_TYPE_INTEGER),
+		FUNCTION_COLL(REPLACE, 3, 0, 0, replaceFunc),
+		FUNCTION(ZEROBLOB, 1, 0, 0, zeroblobFunc, FIELD_TYPE_VARBINARY),
+		FUNCTION_COLL(SUBSTR, -1, 0, 0, substrFunc),
+		AGGREGATE(SUM, 1, 0, 0, sum_step, sumFinalize,
 			  FIELD_TYPE_NUMBER),
-		AGGREGATE(total, 1, 0, 0, sum_step, totalFinalize,
+		AGGREGATE(TOTAL, 1, 0, 0, sum_step, totalFinalize,
 			  FIELD_TYPE_NUMBER),
-		AGGREGATE(avg, 1, 0, 0, sum_step, avgFinalize,
+		AGGREGATE(AVG, 1, 0, 0, sum_step, avgFinalize,
 			  FIELD_TYPE_NUMBER),
-		AGGREGATE2(count, 0, 0, 0, countStep, countFinalize,
+		AGGREGATE2(COUNT, -1, 0, 0, countStep, countFinalize,
 			  SQL_FUNC_COUNT, FIELD_TYPE_INTEGER),
-		AGGREGATE2(count, 1, 0, 0, countStep, countFinalize,
-			   SQL_FUNC_COUNT, FIELD_TYPE_INTEGER),
-		AGGREGATE(group_concat, 1, 0, 0, groupConcatStep,
+		AGGREGATE(GROUP_CONCAT, -1, 0, 0, groupConcatStep,
 			  groupConcatFinalize, FIELD_TYPE_STRING),
-		AGGREGATE(group_concat, 2, 0, 0, groupConcatStep,
-			  groupConcatFinalize, FIELD_TYPE_STRING),
-
-		LIKEFUNC(like, 2, 1, SQL_FUNC_LIKE,
+		LIKEFUNC(LIKE, -1, 1, SQL_FUNC_LIKE,
 			 FIELD_TYPE_INTEGER),
-		LIKEFUNC(like, 3, 1, SQL_FUNC_LIKE,
-			 FIELD_TYPE_INTEGER),
-		FUNCTION(coalesce, 1, 0, 0, 0, FIELD_TYPE_SCALAR),
-		FUNCTION(coalesce, 0, 0, 0, 0, FIELD_TYPE_SCALAR),
-		FUNCTION2(coalesce, -1, 0, 0, noopFunc, SQL_FUNC_COALESCE,
+		FUNCTION2(COALESCE, -1, 0, 0, noopFunc, SQL_FUNC_COALESCE,
 			  FIELD_TYPE_SCALAR),
 	};
 	sql_register_analyze_builtins();

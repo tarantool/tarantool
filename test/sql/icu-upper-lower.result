@@ -277,7 +277,7 @@ test_run:cmd("setopt delimiter ''");
 box.execute("select upper('1', 2)")
 ---
 - null
-- wrong number of arguments to function UPPER()
+- 'Wrong number of arguments is passed to UPPER(): expected 1, got 2'
 ...
 box.execute("select upper(\"1\")")
 ---
@@ -287,5 +287,5 @@ box.execute("select upper(\"1\")")
 box.execute("select upper()")
 ---
 - null
-- wrong number of arguments to function UPPER()
+- 'Wrong number of arguments is passed to UPPER(): expected 1, got 0'
 ...

@@ -69,7 +69,7 @@ test:do_catchsql_test(
         SELECT length(*) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-1.1>
-        1, "wrong number of arguments to function LENGTH()"
+        1, "Wrong number of arguments is passed to LENGTH(): expected 1, got 0"
         -- </func-1.1>
     })
 
@@ -79,7 +79,7 @@ test:do_catchsql_test(
         SELECT length(t1,5) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-1.2>
-        1, "wrong number of arguments to function LENGTH()"
+        1, "Wrong number of arguments is passed to LENGTH(): expected 1, got 2"
         -- </func-1.2>
     })
 
@@ -365,7 +365,7 @@ test:do_test(
         return test:catchsql("SELECT abs(a,b) FROM t1")
     end, {
         -- <func-4.1>
-        1, "wrong number of arguments to function ABS()"
+        1, "Wrong number of arguments is passed to ABS(): expected 1, got 2"
         -- </func-4.1>
     })
 
@@ -377,7 +377,7 @@ test:do_catchsql_test(
         SELECT abs() FROM t1
     ]], {
         -- <func-4.2>
-        1, "wrong number of arguments to function ABS()"
+        1, "Wrong number of arguments is passed to ABS(): expected 1, got 0"
         -- </func-4.2>
     })
 
@@ -428,7 +428,7 @@ test:do_catchsql_test(
         SELECT round(a,b,c) FROM t1
     ]], {
         -- <func-4.5>
-        1, "wrong number of arguments to function ROUND()"
+        1, "Wrong number of arguments is passed to ROUND(): expected 1 or 2, got 3"
         -- </func-4.5>
     })
 
@@ -488,7 +488,7 @@ test:do_catchsql_test(
         SELECT round() FROM t1 ORDER BY a
     ]], {
         -- <func-4.11>
-        1, "wrong number of arguments to function ROUND()"
+        1, "Wrong number of arguments is passed to ROUND(): expected 1 or 2, got 0"
         -- </func-4.11>
     })
 
@@ -778,7 +778,7 @@ test:do_catchsql_test(
         SELECT upper(*) FROM t2
     ]], {
         -- <func-5.5>
-        1, "wrong number of arguments to function UPPER()"
+        1, "Wrong number of arguments is passed to UPPER(): expected 1, got 0"
         -- </func-5.5>
     })
 
@@ -1782,7 +1782,7 @@ test:do_catchsql_test(
         SELECT replace(1,2);
     ]], {
         -- <func-21.1>
-        1, "wrong number of arguments to function REPLACE()"
+        1, "Wrong number of arguments is passed to REPLACE(): expected 3, got 2"
         -- </func-21.1>
     })
 
@@ -1792,7 +1792,7 @@ test:do_catchsql_test(
         SELECT replace(1,2,3,4);
     ]], {
         -- <func-21.2>
-        1, "wrong number of arguments to function REPLACE()"
+        1, "Wrong number of arguments is passed to REPLACE(): expected 3, got 4"
         -- </func-21.2>
     })
 
@@ -2540,7 +2540,7 @@ test:do_catchsql_test(
         SELECT coalesce()
     ]], {
         -- <func-27.1>
-        1, "wrong number of arguments to function COALESCE()"
+        1, "Wrong number of arguments is passed to COALESCE(): expected at least two, got 0"
         -- </func-27.1>
     })
 
@@ -2550,7 +2550,7 @@ test:do_catchsql_test(
         SELECT coalesce(1)
     ]], {
         -- <func-27.2>
-        1, "wrong number of arguments to function COALESCE()"
+        1, "Wrong number of arguments is passed to COALESCE(): expected at least two, got 1"
         -- </func-27.2>
     })
 

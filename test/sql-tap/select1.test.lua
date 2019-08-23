@@ -244,7 +244,7 @@ test:do_catchsql_test(
         SELECT count(f1,f2) FROM test1
     ]], {
         -- <select1-2.1>
-        1, "wrong number of arguments to function COUNT()"
+        1, "Wrong number of arguments is passed to COUNT(): expected 0 or 1, got 2"
         -- </select1-2.1>
     })
 
@@ -324,7 +324,7 @@ test:do_catchsql_test(
         SELECT min(*) FROM test1
     ]], {
         -- <select1-2.6>
-        1, "wrong number of arguments to function MIN()"
+        1, "Wrong number of arguments is passed to MIN(): expected 1, got 0"
         -- </select1-2.6>
     })
 
@@ -389,7 +389,7 @@ test:do_catchsql_test(
         SELECT MAX(*) FROM test1
     ]], {
         -- <select1-2.9>
-        1, "wrong number of arguments to function MAX()"
+        1, "Wrong number of arguments is passed to MAX(): expected 1, got 0"
         -- </select1-2.9>
     })
 
@@ -469,7 +469,7 @@ test:do_catchsql_test(
         SELECT SUM(*) FROM test1
     ]], {
         -- <select1-2.14>
-        1, "wrong number of arguments to function SUM()"
+        1, "Wrong number of arguments is passed to SUM(): expected 1, got 0"
         -- </select1-2.14>
     })
 
@@ -489,7 +489,7 @@ test:do_catchsql_test(
         SELECT sum(f1,f2) FROM test1
     ]], {
         -- <select1-2.16>
-        1, "wrong number of arguments to function SUM()"
+        1, "Wrong number of arguments is passed to SUM(): expected 1, got 2"
         -- </select1-2.16>
     })
 
@@ -691,7 +691,7 @@ test:do_catchsql_test(
         SELECT f1 FROM test1 WHERE count(f1,f2)!=11
     ]], {
         -- <select1-3.9>
-        1, "wrong number of arguments to function COUNT()"
+        1, "misuse of aggregate function COUNT()"
         -- </select1-3.9>
     })
 

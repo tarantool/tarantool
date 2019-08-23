@@ -231,7 +231,7 @@ test:do_execsql_test(
         EXPLAIN SELECT * FROM x1, x2 WHERE x=1 ORDER BY random();
     ]], {
         -- <where2-2.5>
-        "/random/"
+        "/RANDOM/"
         -- </where2-2.5>
     })
 
@@ -254,7 +254,7 @@ test:do_execsql_test(
         EXPLAIN SELECT * FROM x1, x2 WHERE x=1 ORDER BY abs(5);
     ]], {
         -- <where2-2.6>
-        "~/abs/"
+        "~/ABS/"
         -- </where2-2.6>
     })
 
