@@ -8,9 +8,23 @@ variables:
 
 .release_only_template: &release_only_definition
   only:
-    refs:
-      - master
-      - /^.*-full-ci$/
+    - master
+    - /^.*-full-ci$/
+
+.deploy_only_template: &deploy_only_definition
+  only:
+    - master
+  except:
+    - schedules
+    - external_pull_requests
+    - merge_requests
+
+.pack_only_template: &pack_only_definition
+  only:
+    - schedules
+    - external_pull_requests
+    - merge_requests
+    - /^.*-full-ci$/
 
 .docker_test_template: &docker_test_definition
   image: "${CI_REGISTRY}/${CI_PROJECT_PATH}/testing/debian-stretch:latest"
@@ -24,21 +38,37 @@ variables:
   tags:
     - docker_test
 
-.deploy_template: &deploy_definition
-  <<: *release_only_definition
+.pack_template: &pack_definition
+  <<: *pack_only_definition
   stage: test
   tags:
     - deploy
   script:
     - ${GITLAB_MAKE} package
 
-.deploy_test_template: &deploy_test_definition
-  <<: *release_only_definition
+.pack_test_template: &pack_test_definition
+  <<: *pack_only_definition
   stage: test
   tags:
     - deploy_test
   script:
     - ${GITLAB_MAKE} package
+
+.deploy_template: &deploy_definition
+  <<: *deploy_only_definition
+  stage: test
+  tags:
+    - deploy
+  script:
+    - ${GITLAB_MAKE} deploy
+
+.deploy_test_template: &deploy_test_definition
+  <<: *deploy_only_definition
+  stage: test
+  tags:
+    - deploy_test
+  script:
+    - ${GITLAB_MAKE} deploy
 
 .vbox_template: &vbox_definition
   stage: test
@@ -141,96 +171,194 @@ freebsd_12_release:
 # Packs
 
 centos_6:
-  <<: *deploy_definition
+  <<: *pack_definition
   variables:
     OS: 'el'
     DIST: '6'
 
 centos_7:
-  <<: *deploy_test_definition
+  <<: *pack_test_definition
   variables:
     OS: 'el'
     DIST: '7'
 
 centos_8:
-  <<: *deploy_test_definition
+  <<: *pack_test_definition
   variables:
     OS: 'el'
     DIST: '8'
 
 fedora_28:
-  <<: *deploy_test_definition
+  <<: *pack_test_definition
   variables:
     OS: 'fedora'
     DIST: '28'
 
 fedora_29:
-  <<: *deploy_test_definition
+  <<: *pack_test_definition
   variables:
     OS: 'fedora'
     DIST: '29'
 
 fedora_30:
-  <<: *deploy_test_definition
+  <<: *pack_test_definition
   variables:
     OS: 'fedora'
     DIST: '30'
 
 fedora_31:
-  <<: *deploy_test_definition
+  <<: *pack_test_definition
   variables:
     OS: 'fedora'
     DIST: '31'
 
 ubuntu_14_04:
-  <<: *deploy_definition
+  <<: *pack_definition
   variables:
     OS: 'ubuntu'
     DIST: 'trusty'
 
 ubuntu_16_04:
-  <<: *deploy_definition
+  <<: *pack_definition
   variables:
     OS: 'ubuntu'
     DIST: 'xenial'
 
 ubuntu_18_04:
-  <<: *deploy_definition
+  <<: *pack_definition
   variables:
     OS: 'ubuntu'
     DIST: 'bionic'
 
 ubuntu_18_10:
-  <<: *deploy_definition
+  <<: *pack_definition
   variables:
     OS: 'ubuntu'
     DIST: 'cosmic'
 
 ubuntu_19_04:
-  <<: *deploy_definition
+  <<: *pack_definition
   variables:
     OS: 'ubuntu'
     DIST: 'disco'
 
 ubuntu_19_10:
-  <<: *deploy_definition
+  <<: *pack_definition
   variables:
     OS: 'ubuntu'
     DIST: 'eoan'
 
 debian_8:
-  <<: *deploy_definition
+  <<: *pack_definition
   variables:
     OS: 'debian'
     DIST: 'jessie'
 
 debian_9:
-  <<: *deploy_definition
+  <<: *pack_definition
   variables:
     OS: 'debian'
     DIST: 'stretch'
 
 debian_10:
+  <<: *pack_definition
+  variables:
+    OS: 'debian'
+    DIST: 'buster'
+
+# Deploy
+
+centos_6_deploy:
+  <<: *deploy_definition
+  variables:
+    OS: 'el'
+    DIST: '6'
+
+centos_7_deploy:
+  <<: *deploy_test_definition
+  variables:
+    OS: 'el'
+    DIST: '7'
+
+centos_8_deploy:
+  <<: *deploy_test_definition
+  variables:
+    OS: 'el'
+    DIST: '8'
+
+fedora_28_deploy:
+  <<: *deploy_test_definition
+  variables:
+    OS: 'fedora'
+    DIST: '28'
+
+fedora_29_deploy:
+  <<: *deploy_test_definition
+  variables:
+    OS: 'fedora'
+    DIST: '29'
+
+fedora_30_deploy:
+  <<: *deploy_test_definition
+  variables:
+    OS: 'fedora'
+    DIST: '30'
+
+fedora_31_deploy:
+  <<: *deploy_test_definition
+  variables:
+    OS: 'fedora'
+    DIST: '31'
+
+ubuntu_14_04_deploy:
+  <<: *deploy_definition
+  variables:
+    OS: 'ubuntu'
+    DIST: 'trusty'
+
+ubuntu_16_04_deploy:
+  <<: *deploy_definition
+  variables:
+    OS: 'ubuntu'
+    DIST: 'xenial'
+
+ubuntu_18_04_deploy:
+  <<: *deploy_definition
+  variables:
+    OS: 'ubuntu'
+    DIST: 'bionic'
+
+ubuntu_18_10_deploy:
+  <<: *deploy_definition
+  variables:
+    OS: 'ubuntu'
+    DIST: 'cosmic'
+
+ubuntu_19_04_deploy:
+  <<: *deploy_definition
+  variables:
+    OS: 'ubuntu'
+    DIST: 'disco'
+
+ubuntu_19_10_deploy:
+  <<: *deploy_definition
+  variables:
+    OS: 'ubuntu'
+    DIST: 'eoan'
+
+debian_8_deploy:
+  <<: *deploy_definition
+  variables:
+    OS: 'debian'
+    DIST: 'jessie'
+
+debian_9_deploy:
+  <<: *deploy_definition
+  variables:
+    OS: 'debian'
+    DIST: 'stretch'
+
+debian_10_deploy:
   <<: *deploy_definition
   variables:
     OS: 'debian'
