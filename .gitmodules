@@ -33,4 +33,4 @@
 	branch = tarantool-1.7
 [submodule "third_party/curl"]
 	path = third_party/curl
-	url = https://github.com/curl/curl.git
+	url = https://github.com/tarantool/curl.git
