@@ -122,7 +122,7 @@ struct port {
 	 * Implementation dependent content. Needed to declare
 	 * an abstract port instance on stack.
 	 */
-	char pad[48];
+	char pad[52];
 };
 
 /** Is not inlined just to be exported. */
