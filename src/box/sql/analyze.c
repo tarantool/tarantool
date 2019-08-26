@@ -1336,14 +1336,13 @@ sample_compare(const void *a, const void *b, void *arg)
  * statistics (i.e. arrays lt, dt, dlt and avg_eq). 'load' query
  * is needed for
  *
- * @param db Database handler.
  * @param sql_select_prepare SELECT statement, see above.
  * @param sql_select_load SELECT statement, see above.
  * @param[out] stats Statistics is saved here.
  * @retval 0 on success, -1 otherwise.
  */
 static int
-load_stat_from_space(struct sql *db, const char *sql_select_prepare,
+load_stat_from_space(const char *sql_select_prepare,
 		     const char *sql_select_load, struct index_stat *stats)
 {
 	struct index **indexes = NULL;
@@ -1359,7 +1358,7 @@ load_stat_from_space(struct sql *db, const char *sql_select_prepare,
 		}
 	}
 	sql_stmt *stmt = NULL;
-	int rc = sql_prepare(db, sql_select_prepare, -1, &stmt, 0);
+	int rc = sql_prepare(sql_select_prepare, -1, &stmt, 0);
 	if (rc)
 		goto finalize;
 	uint32_t current_idx_count = 0;
@@ -1427,7 +1426,7 @@ load_stat_from_space(struct sql *db, const char *sql_select_prepare,
 	rc = sql_finalize(stmt);
 	if (rc)
 		goto finalize;
-	rc = sql_prepare(db, sql_select_load, -1, &stmt, 0);
+	rc = sql_prepare(sql_select_load, -1, &stmt, 0);
 	if (rc)
 		goto finalize;
 	struct index *prev_index = NULL;
@@ -1505,12 +1504,11 @@ load_stat_from_space(struct sql *db, const char *sql_select_prepare,
 }
 
 static int
-load_stat_to_index(struct sql *db, const char *sql_select_load,
-		   struct index_stat **stats)
+load_stat_to_index(const char *sql_select_load, struct index_stat **stats)
 {
 	assert(stats != NULL && *stats != NULL);
 	struct sql_stmt *stmt = NULL;
-	if (sql_prepare(db, sql_select_load, -1, &stmt, 0) != 0)
+	if (sql_prepare(sql_select_load, -1, &stmt, 0) != 0)
 		return -1;
 	uint32_t current_idx_count = 0;
 	while (sql_step(stmt) == SQL_ROW) {
@@ -1696,7 +1694,7 @@ sql_analysis_load(struct sql *db)
 	const char *load_query = "SELECT \"tbl\",\"idx\",\"neq\",\"nlt\","
 				 "\"ndlt\",\"sample\" FROM \"_sql_stat4\"";
 	/* Load the statistics from the _sql_stat4 table. */
-	if (load_stat_from_space(db, init_query, load_query, stats) != 0)
+	if (load_stat_from_space(init_query, load_query, stats) != 0)
 		goto fail;
 	/*
 	 * Now we have complete statistics for each index
@@ -1739,7 +1737,7 @@ sql_analysis_load(struct sql *db)
 	 */
 	const char *order_query = "SELECT \"tbl\",\"idx\" FROM "
 				  "\"_sql_stat4\" GROUP BY \"tbl\",\"idx\"";
-	if (load_stat_to_index(db, order_query, heap_stats) == 0)
+	if (load_stat_to_index(order_query, heap_stats) == 0)
 		return box_txn_commit();
 fail:
 	box_txn_rollback();

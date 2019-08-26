@@ -441,7 +441,6 @@ struct Vdbe {
 	bft explain:2;		/* True if EXPLAIN present on SQL command */
 	bft changeCntOn:1;	/* True to update the change-counter */
 	bft runOnlyOnce:1;	/* Automatically expire on reset */
-	bft isPrepareV2:1;	/* True if prepared with prepare_v2() */
 	u32 aCounter[5];	/* Counters used by sql_stmt_status() */
 	char *zSql;		/* Text of the SQL statement that generated this */
 	void *pFree;		/* Free this when deleting the vdbe */

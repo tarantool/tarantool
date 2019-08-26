@@ -458,7 +458,7 @@ sqlStep(Vdbe * p)
 	if (rc != SQL_ROW)
 		checkProfileCallback(db, p);
 
-	if (p->isPrepareV2 && rc != SQL_ROW && rc != SQL_DONE) {
+	if (rc != SQL_ROW && rc != SQL_DONE) {
 		/* If this statement was prepared using sql_prepare(), and an
 		 * error has occurred, then return an error.
 		 */

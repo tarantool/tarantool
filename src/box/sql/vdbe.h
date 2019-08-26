@@ -268,7 +268,7 @@ vdbe_metadata_set_col_span(struct Vdbe *p, int idx, const char *span);
 
 void sqlVdbeCountChanges(Vdbe *);
 sql *sqlVdbeDb(Vdbe *);
-void sqlVdbeSetSql(Vdbe *, const char *z, int n, int);
+void sqlVdbeSetSql(Vdbe *, const char *z, int n);
 void sqlVdbeSwap(Vdbe *, Vdbe *);
 VdbeOp *sqlVdbeTakeOpArray(Vdbe *, int *, int *);
 sql_value *sqlVdbeGetBoundValue(Vdbe *, int, u8);

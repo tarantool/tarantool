@@ -89,14 +89,12 @@ sql_vdbe_prepare(struct Vdbe *vdbe)
  * Remember the SQL string for a prepared statement.
  */
 void
-sqlVdbeSetSql(Vdbe * p, const char *z, int n, int isPrepareV2)
+sqlVdbeSetSql(Vdbe * p, const char *z, int n)
 {
-	assert(isPrepareV2 == 1 || isPrepareV2 == 0);
 	if (p == 0)
 		return;
 	assert(p->zSql == 0);
 	p->zSql = sqlDbStrNDup(p->db, z, n);
-	p->isPrepareV2 = (u8) isPrepareV2;
 }
 
 /*
@@ -120,7 +118,6 @@ sqlVdbeSwap(Vdbe * pA, Vdbe * pB)
 	zTmp = pA->zSql;
 	pA->zSql = pB->zSql;
 	pB->zSql = zTmp;
-	pB->isPrepareV2 = pA->isPrepareV2;
 }
 
 /*

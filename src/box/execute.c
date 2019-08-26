@@ -517,8 +517,7 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 			struct region *region)
 {
 	struct sql_stmt *stmt;
-	struct sql *db = sql_get();
-	if (sql_prepare(db, sql, len, &stmt, NULL) != 0)
+	if (sql_prepare(sql, len, &stmt, NULL) != 0)
 		return -1;
 	assert(stmt != NULL);
 	port_sql_create(port, stmt);

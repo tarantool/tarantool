@@ -46,7 +46,6 @@ static int
 sqlPrepare(sql * db,	/* Database handle. */
 	       const char *zSql,	/* UTF-8 encoded SQL statement. */
 	       int nBytes,	/* Length of zSql in bytes. */
-	       int saveSqlFlag,	/* True to copy SQL text into the sql_stmt */
 	       Vdbe * pReprepare,	/* VM being reprepared */
 	       sql_stmt ** ppStmt,	/* OUT: A pointer to the prepared statement */
 	       const char **pzTail	/* OUT: End of parsed string */
@@ -155,8 +154,7 @@ sqlPrepare(sql * db,	/* Database handle. */
 
 	if (db->init.busy == 0) {
 		Vdbe *pVdbe = sParse.pVdbe;
-		sqlVdbeSetSql(pVdbe, zSql, (int)(sParse.zTail - zSql),
-				  saveSqlFlag);
+		sqlVdbeSetSql(pVdbe, zSql, (int)(sParse.zTail - zSql));
 	}
 	if (sParse.pVdbe != NULL && (rc != 0 || db->mallocFailed)) {
 		sqlVdbeFinalize(sParse.pVdbe);
@@ -191,7 +189,7 @@ sqlReprepare(Vdbe * p)
 	zSql = sql_sql((sql_stmt *) p);
 	assert(zSql != 0);
 	db = sqlVdbeDb(p);
-	if (sqlPrepare(db, zSql, -1, 0, p, &pNew, 0) != 0) {
+	if (sqlPrepare(db, zSql, -1, p, &pNew, 0) != 0) {
 		assert(pNew == 0);
 		return -1;
 	}
@@ -204,10 +202,10 @@ sqlReprepare(Vdbe * p)
 }
 
 int
-sql_prepare(struct sql *db, const char *sql, int length, struct sql_stmt **stmt,
+sql_prepare(const char *sql, int length, struct sql_stmt **stmt,
 	    const char **sql_tail)
 {
-	int rc = sqlPrepare(db, sql, length, 1, 0, stmt, sql_tail);
+	int rc = sqlPrepare(sql_get(), sql, length, 0, stmt, sql_tail);
 	assert(rc == 0 || stmt == NULL || *stmt == NULL);
 	return rc;
 }
