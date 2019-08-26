@@ -37,6 +37,7 @@
  */
 
 #include "sqlInt.h"
+#include "box/execute.h"
 #include "box/session.h"
 
 /*

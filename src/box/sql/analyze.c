@@ -106,6 +106,7 @@
  */
 
 #include "box/box.h"
+#include "box/execute.h"
 #include "box/index.h"
 #include "box/key_def.h"
 #include "box/schema.h"
