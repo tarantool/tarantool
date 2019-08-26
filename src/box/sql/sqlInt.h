@@ -468,21 +468,18 @@ typedef void (*sql_destructor_type) (void *);
 #define SQL_STATIC      ((sql_destructor_type)0)
 #define SQL_TRANSIENT   ((sql_destructor_type)-1)
 
+/**
+ * Prepare (compile into VDBE byte-code) statement.
+ *
+ * @param db Database handle.
+ * @param sql UTF-8 encoded SQL statement.
+ * @param length Length of @param sql in bytes.
+ * @param[out] stmt A pointer to the prepared statement.
+ * @param[out] sql_tail End of parsed string.
+ */
 int
-sql_prepare(sql * db,	/* Database handle */
-		const char *zSql,	/* SQL statement, UTF-8 encoded */
-		int nByte,	/* Maximum length of zSql in bytes. */
-		sql_stmt ** ppStmt,	/* OUT: Statement handle */
-		const char **pzTail	/* OUT: Pointer to unused portion of zSql */
-	);
-
-int
-sql_prepare_v2(sql * db,	/* Database handle */
-		   const char *zSql,	/* SQL statement, UTF-8 encoded */
-		   int nByte,	/* Maximum length of zSql in bytes. */
-		   sql_stmt ** ppStmt,	/* OUT: Statement handle */
-		   const char **pzTail	/* OUT: Pointer to unused portion of zSql */
-	);
+sql_prepare(struct sql *db, const char *sql, int length, struct sql_stmt **stmt,
+	    const char **sql_tail);
 
 int
 sql_step(sql_stmt *);

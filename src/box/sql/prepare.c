@@ -189,7 +189,7 @@ sqlReprepare(Vdbe * p)
 	sql *db;
 
 	zSql = sql_sql((sql_stmt *) p);
-	assert(zSql != 0);	/* Reprepare only called for prepare_v2() statements */
+	assert(zSql != 0);
 	db = sqlVdbeDb(p);
 	if (sqlPrepare(db, zSql, -1, 0, p, &pNew, 0) != 0) {
 		assert(pNew == 0);
@@ -203,36 +203,12 @@ sqlReprepare(Vdbe * p)
 	return 0;
 }
 
-/*
- * Two versions of the official API.  Legacy and new use.  In the legacy
- * version, the original SQL text is not saved in the prepared statement
- * and so if a schema change occurs, an error is returned by
- * sql_step().  In the new version, the original SQL text is retained
- * and the statement is automatically recompiled if an schema change
- * occurs.
- */
 int
-sql_prepare(sql * db,		/* Database handle. */
-		const char *zSql,	/* UTF-8 encoded SQL statement. */
-		int nBytes,		/* Length of zSql in bytes. */
-		sql_stmt ** ppStmt,	/* OUT: A pointer to the prepared statement */
-		const char **pzTail)	/* OUT: End of parsed string */
+sql_prepare(struct sql *db, const char *sql, int length, struct sql_stmt **stmt,
+	    const char **sql_tail)
 {
-	int rc = sqlPrepare(db, zSql, nBytes, 0, 0, ppStmt, pzTail);
-	assert(rc == 0 || ppStmt == NULL || *ppStmt == NULL);	/* VERIFY: F13021 */
-	return rc;
-}
-
-int
-sql_prepare_v2(sql * db,	/* Database handle. */
-		   const char *zSql,	/* UTF-8 encoded SQL statement. */
-		   int nBytes,	/* Length of zSql in bytes. */
-		   sql_stmt ** ppStmt,	/* OUT: A pointer to the prepared statement */
-		   const char **pzTail	/* OUT: End of parsed string */
-    )
-{
-	int rc = sqlPrepare(db, zSql, nBytes, 1, 0, ppStmt, pzTail);
-	assert(rc == 0 || ppStmt == NULL || *ppStmt == NULL);	/* VERIFY: F13021 */
+	int rc = sqlPrepare(db, sql, length, 1, 0, stmt, sql_tail);
+	assert(rc == 0 || stmt == NULL || *stmt == NULL);
 	return rc;
 }
 
