@@ -289,6 +289,14 @@ tx_manager_delete(struct tx_manager *xm);
 size_t
 tx_manager_mem_used(struct tx_manager *xm);
 
+/** Create or reuse an instance of a read view. */
+struct vy_read_view *
+tx_manager_read_view(struct tx_manager *xm);
+
+/** Dereference and possibly destroy a read view. */
+void
+tx_manager_destroy_read_view(struct tx_manager *xm, struct vy_read_view *rv);
+
 /**
  * Abort all rw transactions that affect the given space
  * and haven't reached WAL yet. Called before executing a DDL

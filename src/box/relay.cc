@@ -298,7 +298,30 @@ relay_initial_join(int fd, uint64_t sync, struct vclock *vclock)
 		relay_delete(relay);
 	});
 
-	engine_join_xc(vclock, &relay->stream);
+	/* Freeze a read view in engines. */
+	struct engine_join_ctx ctx;
+	engine_prepare_join_xc(&ctx);
+	auto join_guard = make_scoped_guard([&] {
+		engine_complete_join(&ctx);
+	});
+
+	/*
+	 * Sync WAL to make sure that all changes visible from
+	 * the frozen read view are successfully committed.
+	 */
+	if (wal_sync() != 0)
+		diag_raise();
+
+	vclock_copy(vclock, &replicaset.vclock);
+
+	/* Respond to the JOIN request with the current vclock. */
+	struct xrow_header row;
+	xrow_encode_vclock_xc(&row, vclock);
+	row.sync = sync;
+	coio_write_xrow(&relay->io, &row);
+
+	/* Send read view to the replica. */
+	engine_join_xc(&ctx, &relay->stream);
 }
 
 int

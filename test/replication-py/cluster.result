@@ -23,19 +23,6 @@ box.schema.user.grant('guest', 'replication')
 ...
 ok - join with granted role
 -------------------------------------------------------------
-gh-707: Master crashes on JOIN if it does not have snapshot files
-gh-480: If socket is closed while JOIN, replica wont reconnect
--------------------------------------------------------------
-ok - join without snapshots
-ok - _cluster did not change after unsuccessful JOIN
-box.schema.user.revoke('guest', 'replication')
----
-...
-box.snapshot()
----
-- ok
-...
--------------------------------------------------------------
 gh-434: Assertion if replace _cluster tuple for local server
 -------------------------------------------------------------
 box.space._cluster:replace{1, require('uuid').NULL:str()}

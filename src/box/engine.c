@@ -36,6 +36,12 @@
 
 RLIST_HEAD(engines);
 
+/**
+ * For simplicity, assume that the engine count can't exceed
+ * the value of this constant.
+ */
+enum { MAX_ENGINE_COUNT = 10 };
+
 /** Register engine instance. */
 void engine_register(struct engine *engine)
 {
@@ -175,14 +181,52 @@ engine_backup(const struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 }
 
 int
-engine_join(const struct vclock *vclock, struct xstream *stream)
+engine_prepare_join(struct engine_join_ctx *ctx)
 {
+	ctx->array = calloc(MAX_ENGINE_COUNT, sizeof(void *));
+	if (ctx->array == NULL) {
+		diag_set(OutOfMemory, MAX_ENGINE_COUNT * sizeof(void *),
+			 "malloc", "engine join context");
+		return -1;
+	}
+	int i = 0;
 	struct engine *engine;
 	engine_foreach(engine) {
-		if (engine->vtab->join(engine, vclock, stream) != 0)
-			return -1;
+		assert(i < MAX_ENGINE_COUNT);
+		if (engine->vtab->prepare_join(engine, &ctx->array[i]) != 0)
+			goto fail;
+		i++;
 	}
 	return 0;
+fail:
+	engine_complete_join(ctx);
+	return -1;
+}
+
+int
+engine_join(struct engine_join_ctx *ctx, struct xstream *stream)
+{
+	int i = 0;
+	struct engine *engine;
+	engine_foreach(engine) {
+		if (engine->vtab->join(engine, ctx->array[i], stream) != 0)
+			return -1;
+		i++;
+	}
+	return 0;
+}
+
+void
+engine_complete_join(struct engine_join_ctx *ctx)
+{
+	int i = 0;
+	struct engine *engine;
+	engine_foreach(engine) {
+		if (ctx->array[i] != NULL)
+			engine->vtab->complete_join(engine, ctx->array[i]);
+		i++;
+	}
+	free(ctx->array);
 }
 
 void
@@ -205,13 +249,27 @@ engine_reset_stat(void)
 /* {{{ Virtual method stubs */
 
 int
-generic_engine_join(struct engine *engine, const struct vclock *vclock,
-		    struct xstream *stream)
+generic_engine_prepare_join(struct engine *engine, void **ctx)
 {
 	(void)engine;
-	(void)vclock;
+	*ctx = NULL;
+	return 0;
+}
+
+int
+generic_engine_join(struct engine *engine, void *ctx, struct xstream *stream)
+{
+	(void)engine;
+	(void)ctx;
 	(void)stream;
 	return 0;
+}
+
+void
+generic_engine_complete_join(struct engine *engine, void *ctx)
+{
+	(void)engine;
+	(void)ctx;
 }
 
 int

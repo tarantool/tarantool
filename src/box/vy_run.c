@@ -1675,14 +1675,8 @@ vy_run_recover(struct vy_run *run, const char *dir,
 
 	/* Read run header. */
 	struct xrow_header xrow;
-	ERROR_INJECT(ERRINJ_VYRUN_INDEX_GARBAGE, {
-		errinj(ERRINJ_XLOG_GARBAGE, ERRINJ_BOOL)->bparam = true;
-	});
 	/* all rows should be in one tx */
 	int rc = xlog_cursor_next_tx(&cursor);
-	ERROR_INJECT(ERRINJ_VYRUN_INDEX_GARBAGE, {
-		errinj(ERRINJ_XLOG_GARBAGE, ERRINJ_BOOL)->bparam = false;
-	});
 
 	if (rc != 0) {
 		if (rc > 0)

@@ -74,10 +74,21 @@ struct engine_vtab {
 	struct space *(*create_space)(struct engine *engine,
 			struct space_def *def, struct rlist *key_list);
 	/**
-	 * Write statements stored in checkpoint @vclock to @stream.
+	 * Freeze a read view to feed to a new replica.
+	 * Setup and return a context that will be used
+	 * on further steps.
 	 */
-	int (*join)(struct engine *engine, const struct vclock *vclock,
-		    struct xstream *stream);
+	int (*prepare_join)(struct engine *engine, void **ctx);
+	/**
+	 * Feed the read view frozen on the previous step to
+	 * the given stream.
+	 */
+	int (*join)(struct engine *engine, void *ctx, struct xstream *stream);
+	/**
+	 * Release the read view and free the context prepared
+	 * on the first step.
+	 */
+	void (*complete_join)(struct engine *engine, void *ctx);
 	/**
 	 * Begin a new single or multi-statement transaction.
 	 * Called on first statement in a transaction, not when
@@ -220,6 +231,11 @@ struct engine {
 	struct rlist link;
 };
 
+struct engine_join_ctx {
+	/** Array of engine join contexts, one per each engine. */
+	void **array;
+};
+
 /** Register engine engine instance. */
 void engine_register(struct engine *engine);
 
@@ -328,12 +344,14 @@ engine_begin_final_recovery(void);
 int
 engine_end_recovery(void);
 
-/**
- * Feed checkpoint data as join events to the replicas.
- * (called on the master).
- */
 int
-engine_join(const struct vclock *vclock, struct xstream *stream);
+engine_prepare_join(struct engine_join_ctx *ctx);
+
+int
+engine_join(struct engine_join_ctx *ctx, struct xstream *stream);
+
+void
+engine_complete_join(struct engine_join_ctx *ctx);
 
 int
 engine_begin_checkpoint(void);
@@ -362,8 +380,9 @@ engine_reset_stat(void);
 /*
  * Virtual method stubs.
  */
-int generic_engine_join(struct engine *, const struct vclock *,
-			struct xstream *);
+int generic_engine_prepare_join(struct engine *, void **);
+int generic_engine_join(struct engine *, void *, struct xstream *);
+void generic_engine_complete_join(struct engine *, void *);
 int generic_engine_begin(struct engine *, struct txn *);
 int generic_engine_begin_statement(struct engine *, struct txn *);
 int generic_engine_prepare(struct engine *, struct txn *);
@@ -467,9 +486,16 @@ engine_end_recovery_xc(void)
 }
 
 static inline void
-engine_join_xc(const struct vclock *vclock, struct xstream *stream)
+engine_prepare_join_xc(struct engine_join_ctx *ctx)
 {
-	if (engine_join(vclock, stream) != 0)
+	if (engine_prepare_join(ctx) != 0)
+		diag_raise();
+}
+
+static inline void
+engine_join_xc(struct engine_join_ctx *ctx, struct xstream *stream)
+{
+	if (engine_join(ctx, stream) != 0)
 		diag_raise();
 }
 

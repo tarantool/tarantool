@@ -57,14 +57,24 @@ box.schema.user.grant('guest', 'replication')
 _ = box.schema.space.create('test', {id = 9000})
 _ = box.space.test:create_index('pk')
 box.space.test:auto_increment{'v0'}
-lsn = box.info.vclock[1]
-box.error.injection.set("ERRINJ_RELAY_BREAK_LSN", lsn + 1)
-box.space.test:auto_increment{'v1'}
+
+-- Inject a broken LSN in the final join stage.
+lsn = -1
+box.error.injection.set("ERRINJ_REPLICA_JOIN_DELAY", true)
+
+fiber = require('fiber')
+test_run:cmd("setopt delimiter ';'")
+_ = fiber.create(function()
+    test_run:wait_cond(function() return box.space._cluster:get(2) ~= nil end)
+    lsn = box.info.vclock[1]
+    box.error.injection.set("ERRINJ_RELAY_BREAK_LSN", lsn + 1)
+    box.space.test:auto_increment{'v1'}
+    box.error.injection.set("ERRINJ_REPLICA_JOIN_DELAY", false)
+end);
+test_run:cmd("setopt delimiter ''");
 
 test_run:cmd('create server replica with rpl_master=default, script="xlog/replica.lua"')
 test_run:cmd('start server replica with crash_expected=True')
-fiber = require('fiber')
-while box.info.replication[2] == nil do fiber.sleep(0.001) end
 box.error.injection.set("ERRINJ_RELAY_BREAK_LSN", -1)
 
 -- Check that log contains the mention of broken LSN and the request printout

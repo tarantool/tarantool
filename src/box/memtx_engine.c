@@ -734,77 +734,134 @@ memtx_engine_backup(struct engine *engine, const struct vclock *vclock,
 	return cb(filename, cb_arg);
 }
 
-/** Used to pass arguments to memtx_initial_join_f */
-struct memtx_join_arg {
-	const char *snap_dirname;
-	int64_t checkpoint_lsn;
+struct memtx_join_entry {
+	struct rlist in_ctx;
+	uint32_t space_id;
+	struct snapshot_iterator *iterator;
+};
+
+struct memtx_join_ctx {
+	struct rlist entries;
 	struct xstream *stream;
 };
 
-/**
- * Invoked from a thread to feed snapshot rows.
- */
 static int
-memtx_initial_join_f(va_list ap)
+memtx_join_add_space(struct space *space, void *arg)
 {
-	struct memtx_join_arg *arg = va_arg(ap, struct memtx_join_arg *);
-	const char *snap_dirname = arg->snap_dirname;
-	int64_t checkpoint_lsn = arg->checkpoint_lsn;
-	struct xstream *stream = arg->stream;
-
-	struct xdir dir;
-	/*
-	 * snap_dirname and INSTANCE_UUID don't change after start,
-	 * safe to use in another thread.
-	 */
-	xdir_create(&dir, snap_dirname, SNAP, &INSTANCE_UUID,
-		    &xlog_opts_default);
-	struct xlog_cursor cursor;
-	int rc = xdir_open_cursor(&dir, checkpoint_lsn, &cursor);
-	xdir_destroy(&dir);
-	if (rc < 0)
+	struct memtx_join_ctx *ctx = arg;
+	if (!space_is_memtx(space))
+		return 0;
+	if (space_is_temporary(space))
+		return 0;
+	if (space_group_id(space) == GROUP_LOCAL)
+		return 0;
+	struct index *pk = space_index(space, 0);
+	if (pk == NULL)
+		return 0;
+	struct memtx_join_entry *entry = malloc(sizeof(*entry));
+	if (entry == NULL) {
+		diag_set(OutOfMemory, sizeof(*entry),
+			 "malloc", "struct memtx_join_entry");
 		return -1;
-
-	struct xrow_header row;
-	while ((rc = xlog_cursor_next(&cursor, &row, true)) == 0) {
-		rc = xstream_write(stream, &row);
-		if (rc < 0)
-			break;
 	}
-	xlog_cursor_close(&cursor, false);
-	if (rc < 0)
+	entry->space_id = space_id(space);
+	entry->iterator = index_create_snapshot_iterator(pk);
+	if (entry->iterator == NULL) {
+		free(entry);
 		return -1;
-
-	/**
-	 * We should never try to read snapshots with no EOF
-	 * marker - such snapshots are very likely corrupted and
-	 * should not be trusted.
-	 */
-	/* TODO: replace panic with diag_set() */
-	if (!xlog_cursor_is_eof(&cursor))
-		panic("snapshot `%s' has no EOF marker", cursor.name);
+	}
+	rlist_add_tail_entry(&ctx->entries, entry, in_ctx);
 	return 0;
 }
 
 static int
-memtx_engine_join(struct engine *engine, const struct vclock *vclock,
-		  struct xstream *stream)
+memtx_engine_prepare_join(struct engine *engine, void **arg)
 {
-	struct memtx_engine *memtx = (struct memtx_engine *)engine;
+	(void)engine;
+	struct memtx_join_ctx *ctx = malloc(sizeof(*ctx));
+	if (ctx == NULL) {
+		diag_set(OutOfMemory, sizeof(*ctx),
+			 "malloc", "struct memtx_join_ctx");
+		return -1;
+	}
+	rlist_create(&ctx->entries);
+	if (space_foreach(memtx_join_add_space, ctx) != 0) {
+		free(ctx);
+		return -1;
+	}
+	*arg = ctx;
+	return 0;
+}
 
+static int
+memtx_join_send_tuple(struct xstream *stream, uint32_t space_id,
+		      const char *data, size_t size)
+{
+	struct request_replace_body body;
+	request_replace_body_create(&body, space_id);
+
+	struct xrow_header row;
+	memset(&row, 0, sizeof(row));
+	row.type = IPROTO_INSERT;
+
+	row.bodycnt = 2;
+	row.body[0].iov_base = &body;
+	row.body[0].iov_len = sizeof(body);
+	row.body[1].iov_base = (char *)data;
+	row.body[1].iov_len = size;
+
+	return xstream_write(stream, &row);
+}
+
+static int
+memtx_join_f(va_list ap)
+{
+	struct memtx_join_ctx *ctx = va_arg(ap, struct memtx_join_ctx *);
+	struct memtx_join_entry *entry;
+	rlist_foreach_entry(entry, &ctx->entries, in_ctx) {
+		struct snapshot_iterator *it = entry->iterator;
+		int rc;
+		uint32_t size;
+		const char *data;
+		while ((rc = it->next(it, &data, &size)) == 0 && data != NULL) {
+			if (memtx_join_send_tuple(ctx->stream, entry->space_id,
+						  data, size) != 0)
+				return -1;
+		}
+		if (rc != 0)
+			return -1;
+	}
+	return 0;
+}
+
+static int
+memtx_engine_join(struct engine *engine, void *arg, struct xstream *stream)
+{
+	(void)engine;
+	struct memtx_join_ctx *ctx = arg;
+	ctx->stream = stream;
 	/*
-	 * cord_costart() passes only void * pointer as an argument.
+	 * Memtx snapshot iterators are safe to use from another
+	 * thread and so we do so as not to consume too much of
+	 * precious tx cpu time while a new replica is joining.
 	 */
-	struct memtx_join_arg arg = {
-		/* .snap_dirname   = */ memtx->snap_dir.dirname,
-		/* .checkpoint_lsn = */ vclock_sum(vclock),
-		/* .stream         = */ stream
-	};
-
-	/* Send snapshot using a thread */
 	struct cord cord;
-	cord_costart(&cord, "initial_join", memtx_initial_join_f, &arg);
+	if (cord_costart(&cord, "initial_join", memtx_join_f, ctx) != 0)
+		return -1;
 	return cord_cojoin(&cord);
+}
+
+static void
+memtx_engine_complete_join(struct engine *engine, void *arg)
+{
+	(void)engine;
+	struct memtx_join_ctx *ctx = arg;
+	struct memtx_join_entry *entry, *next;
+	rlist_foreach_entry_safe(entry, &ctx->entries, in_ctx, next) {
+		entry->iterator->free(entry->iterator);
+		free(entry);
+	}
+	free(ctx);
 }
 
 static int
@@ -830,7 +887,9 @@ memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 static const struct engine_vtab memtx_engine_vtab = {
 	/* .shutdown = */ memtx_engine_shutdown,
 	/* .create_space = */ memtx_engine_create_space,
+	/* .prepare_join = */ memtx_engine_prepare_join,
 	/* .join = */ memtx_engine_join,
+	/* .complete_join = */ memtx_engine_complete_join,
 	/* .begin = */ memtx_engine_begin,
 	/* .begin_statement = */ generic_engine_begin_statement,
 	/* .prepare = */ generic_engine_prepare,

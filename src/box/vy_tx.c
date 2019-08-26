@@ -156,8 +156,7 @@ tx_manager_mem_used(struct tx_manager *xm)
 	return ret;
 }
 
-/** Create or reuse an instance of a read view. */
-static struct vy_read_view *
+struct vy_read_view *
 tx_manager_read_view(struct tx_manager *xm)
 {
 	struct vy_read_view *rv;
@@ -195,12 +194,9 @@ tx_manager_read_view(struct tx_manager *xm)
 	return rv;
 }
 
-/** Dereference and possibly destroy a read view. */
-static void
-tx_manager_destroy_read_view(struct tx_manager *xm,
-			     const struct vy_read_view *read_view)
+void
+tx_manager_destroy_read_view(struct tx_manager *xm, struct vy_read_view *rv)
 {
-	struct vy_read_view *rv = (struct vy_read_view *) read_view;
 	if (rv == xm->p_global_read_view)
 		return;
 	assert(rv->refs);

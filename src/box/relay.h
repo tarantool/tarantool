@@ -102,7 +102,7 @@ relay_last_row_time(const struct relay *relay);
  *
  * @param fd        client connection
  * @param sync      sync from incoming JOIN request
- * @param vclock    vclock of the last checkpoint
+ * @param vclock[out] vclock of the read view sent to the replica
  */
 void
 relay_initial_join(int fd, uint64_t sync, struct vclock *vclock);

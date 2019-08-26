@@ -1116,7 +1116,7 @@ box.snapshot()
 box.schema.user.grant('guest', 'replication')
 ---
 ...
-errinj.set('ERRINJ_VYRUN_INDEX_GARBAGE', true)
+errinj.set('ERRINJ_VY_READ_PAGE', true)
 ---
 - ok
 ...
@@ -1136,7 +1136,7 @@ test_run:cmd("delete server replica")
 ---
 - true
 ...
-errinj.set('ERRINJ_VYRUN_INDEX_GARBAGE', false)
+errinj.set('ERRINJ_VY_READ_PAGE', false)
 ---
 - ok
 ...

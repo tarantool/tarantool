@@ -166,6 +166,12 @@ struct vinyl_iterator {
 	struct trigger on_tx_destroy;
 };
 
+struct vinyl_snapshot_iterator {
+	struct snapshot_iterator base;
+	struct vy_read_view *rv;
+	struct vy_read_iterator iterator;
+};
+
 static const struct engine_vtab vinyl_engine_vtab;
 static const struct space_vtab vinyl_space_vtab;
 static const struct index_vtab vinyl_index_vtab;
@@ -2893,309 +2899,118 @@ vinyl_engine_end_recovery(struct engine *engine)
 
 /** {{{ Replication */
 
-/** Relay context, passed to all relay functions. */
-struct vy_join_ctx {
-	/** Environment. */
-	struct vy_env *env;
-	/** Stream to relay statements to. */
-	struct xstream *stream;
-	/** Pipe to the relay thread. */
-	struct cpipe relay_pipe;
-	/** Pipe to the tx thread. */
-	struct cpipe tx_pipe;
-	/**
-	 * Cbus message, used for calling functions
-	 * on behalf of the relay thread.
-	 */
-	struct cbus_call_msg cmsg;
-	/** ID of the space currently being relayed. */
+struct vy_join_entry {
+	struct rlist in_ctx;
 	uint32_t space_id;
-	/**
-	 * LSM tree key definition, as defined by the user.
-	 * We only send the primary key, so the definition
-	 * provided by the user is correct for compare.
-	 */
-	struct key_def *key_def;
-	/** LSM tree format used for REPLACE and DELETE statements. */
-	struct tuple_format *format;
-	/**
-	 * Write iterator for merging runs before sending
-	 * them to the replica.
-	 */
-	struct vy_stmt_stream *wi;
-	/**
-	 * List of run slices of the current range, linked by
-	 * vy_slice::in_join. The newer a slice the closer it
-	 * is to the head of the list.
-	 */
-	struct rlist slices;
+	struct snapshot_iterator *iterator;
 };
 
-/**
- * Recover a slice and add it to the list of slices.
- * Newer slices are supposed to be recovered first.
- * Returns 0 on success, -1 on failure.
- */
-static int
-vy_prepare_send_slice(struct vy_join_ctx *ctx,
-		      struct vy_slice_recovery_info *slice_info)
-{
-	int rc = -1;
-	struct vy_run *run = NULL;
-	struct vy_entry begin = vy_entry_none();
-	struct vy_entry end = vy_entry_none();
-
-	run = vy_run_new(&ctx->env->run_env, slice_info->run->id);
-	if (run == NULL)
-		goto out;
-	if (vy_run_recover(run, ctx->env->path, ctx->space_id, 0,
-			   ctx->key_def) != 0)
-		goto out;
-
-	if (slice_info->begin != NULL) {
-		begin = vy_entry_key_from_msgpack(ctx->env->lsm_env.key_format,
-						  ctx->key_def,
-						  slice_info->begin);
-		if (begin.stmt == NULL)
-			goto out;
-	}
-	if (slice_info->end != NULL) {
-		end = vy_entry_key_from_msgpack(ctx->env->lsm_env.key_format,
-						ctx->key_def,
-						slice_info->end);
-		if (end.stmt == NULL)
-			goto out;
-	}
-
-	struct vy_slice *slice = vy_slice_new(slice_info->id, run,
-					      begin, end, ctx->key_def);
-	if (slice == NULL)
-		goto out;
-
-	rlist_add_tail_entry(&ctx->slices, slice, in_join);
-	rc = 0;
-out:
-	if (run != NULL)
-		vy_run_unref(run);
-	if (begin.stmt != NULL)
-		tuple_unref(begin.stmt);
-	if (end.stmt != NULL)
-		tuple_unref(end.stmt);
-	return rc;
-}
+struct vy_join_ctx {
+	struct rlist entries;
+};
 
 static int
-vy_send_range_f(struct cbus_call_msg *cmsg)
+vy_join_add_space(struct space *space, void *arg)
 {
-	struct vy_join_ctx *ctx = container_of(cmsg, struct vy_join_ctx, cmsg);
-
-	int rc = ctx->wi->iface->start(ctx->wi);
-	if (rc != 0)
-		goto err;
-	struct vy_entry entry;
-	while ((rc = ctx->wi->iface->next(ctx->wi, &entry)) == 0 &&
-	       entry.stmt != NULL) {
-		struct xrow_header xrow;
-		rc = vy_stmt_encode_primary(entry.stmt, ctx->key_def,
-					    ctx->space_id, &xrow);
-		if (rc != 0)
-			break;
-		/*
-		 * Reset the LSN as the replica will ignore it
-		 * anyway.
-		 */
-		xrow.lsn = 0;
-		rc = xstream_write(ctx->stream, &xrow);
-		if (rc != 0)
-			break;
-		fiber_gc();
-	}
-err:
-	ctx->wi->iface->stop(ctx->wi);
-	fiber_gc();
-	return rc;
-}
-
-/** Merge and send all runs of the given range. */
-static int
-vy_send_range(struct vy_join_ctx *ctx,
-	      struct vy_range_recovery_info *range_info)
-{
-	int rc;
-	struct vy_slice *slice, *tmp;
-
-	if (rlist_empty(&range_info->slices))
-		return 0; /* nothing to do */
-
-	/* Recover slices. */
-	struct vy_slice_recovery_info *slice_info;
-	rlist_foreach_entry(slice_info, &range_info->slices, in_range) {
-		rc = vy_prepare_send_slice(ctx, slice_info);
-		if (rc != 0)
-			goto out_delete_slices;
-	}
-
-	/* Create a write iterator. */
-	struct rlist fake_read_views;
-	rlist_create(&fake_read_views);
-	ctx->wi = vy_write_iterator_new(ctx->key_def, true, true,
-					&fake_read_views, NULL);
-	if (ctx->wi == NULL) {
-		rc = -1;
-		goto out;
-	}
-	rlist_foreach_entry(slice, &ctx->slices, in_join) {
-		rc = vy_write_iterator_new_slice(ctx->wi, slice, ctx->format);
-		if (rc != 0)
-			goto out_delete_wi;
-	}
-
-	/* Do the actual work from the relay thread. */
-	bool cancellable = fiber_set_cancellable(false);
-	rc = cbus_call(&ctx->relay_pipe, &ctx->tx_pipe, &ctx->cmsg,
-		       vy_send_range_f, NULL, TIMEOUT_INFINITY);
-	fiber_set_cancellable(cancellable);
-
-out_delete_wi:
-	ctx->wi->iface->close(ctx->wi);
-	ctx->wi = NULL;
-out_delete_slices:
-	rlist_foreach_entry_safe(slice, &ctx->slices, in_join, tmp)
-		vy_slice_delete(slice);
-	rlist_create(&ctx->slices);
-out:
-	return rc;
-}
-
-/** Send all tuples stored in the given LSM tree. */
-static int
-vy_send_lsm(struct vy_join_ctx *ctx, struct vy_lsm_recovery_info *lsm_info)
-{
-	int rc = -1;
-
-	if (lsm_info->drop_lsn >= 0 || lsm_info->create_lsn < 0) {
-		/* Dropped or not yet built LSM tree. */
+	struct vy_join_ctx *ctx = arg;
+	if (!space_is_vinyl(space))
 		return 0;
-	}
-	if (lsm_info->group_id == GROUP_LOCAL) {
-		/* Replica local space. */
+	if (space_group_id(space) == GROUP_LOCAL)
 		return 0;
-	}
-
-	/*
-	 * We are only interested in the primary index LSM tree.
-	 * Secondary keys will be rebuilt on the destination.
-	 */
-	if (lsm_info->index_id != 0)
+	struct index *pk = space_index(space, 0);
+	if (pk == NULL)
 		return 0;
-
-	ctx->space_id = lsm_info->space_id;
-
-	/* Create key definition and tuple format. */
-	ctx->key_def = key_def_new(lsm_info->key_parts,
-				   lsm_info->key_part_count, false);
-	if (ctx->key_def == NULL)
-		goto out;
-	ctx->format = vy_stmt_format_new(&ctx->env->stmt_env, &ctx->key_def, 1,
-					 NULL, 0, 0, NULL);
-	if (ctx->format == NULL)
-		goto out_free_key_def;
-	tuple_format_ref(ctx->format);
-
-	/* Send ranges. */
-	struct vy_range_recovery_info *range_info;
-	assert(!rlist_empty(&lsm_info->ranges));
-	rlist_foreach_entry(range_info, &lsm_info->ranges, in_lsm) {
-		rc = vy_send_range(ctx, range_info);
-		if (rc != 0)
-			break;
+	struct vy_join_entry *entry = malloc(sizeof(*entry));
+	if (entry == NULL) {
+		diag_set(OutOfMemory, sizeof(*entry),
+			 "malloc", "struct vy_join_entry");
+		return -1;
 	}
-
-	tuple_format_unref(ctx->format);
-	ctx->format = NULL;
-out_free_key_def:
-	key_def_delete(ctx->key_def);
-	ctx->key_def = NULL;
-out:
-	return rc;
-}
-
-/** Relay cord function. */
-static int
-vy_join_f(va_list ap)
-{
-	struct vy_join_ctx *ctx = va_arg(ap, struct vy_join_ctx *);
-
-	coio_enable();
-
-	cpipe_create(&ctx->tx_pipe, "tx");
-
-	struct cbus_endpoint endpoint;
-	cbus_endpoint_create(&endpoint, cord_name(cord()),
-			     fiber_schedule_cb, fiber());
-
-	cbus_loop(&endpoint);
-
-	cbus_endpoint_destroy(&endpoint, cbus_process);
-	cpipe_destroy(&ctx->tx_pipe);
+	entry->space_id = space_id(space);
+	entry->iterator = index_create_snapshot_iterator(pk);
+	if (entry->iterator == NULL) {
+		free(entry);
+		return -1;
+	}
+	rlist_add_tail_entry(&ctx->entries, entry, in_ctx);
 	return 0;
 }
 
 static int
-vinyl_engine_join(struct engine *engine, const struct vclock *vclock,
-		  struct xstream *stream)
+vinyl_engine_prepare_join(struct engine *engine, void **arg)
 {
-	struct vy_env *env = vy_env(engine);
-	int rc = -1;
-
-	/* Allocate the relay context. */
+	(void)engine;
 	struct vy_join_ctx *ctx = malloc(sizeof(*ctx));
 	if (ctx == NULL) {
-		diag_set(OutOfMemory, PATH_MAX, "malloc", "struct vy_join_ctx");
-		goto out;
+		diag_set(OutOfMemory, sizeof(*ctx),
+			 "malloc", "struct vy_join_ctx");
+		return -1;
 	}
-	memset(ctx, 0, sizeof(*ctx));
-	ctx->env = env;
-	ctx->stream = stream;
-	rlist_create(&ctx->slices);
-
-	/* Start the relay cord. */
-	char name[FIBER_NAME_MAX];
-	snprintf(name, sizeof(name), "initial_join_%p", stream);
-	struct cord cord;
-	if (cord_costart(&cord, name, vy_join_f, ctx) != 0)
-		goto out_free_ctx;
-	cpipe_create(&ctx->relay_pipe, name);
-
-	/*
-	 * Load the recovery context from the given point in time.
-	 * Send all runs stored in it to the replica.
-	 */
-	struct vy_recovery *recovery;
-	recovery = vy_recovery_new(vclock_sum(vclock),
-				   VY_RECOVERY_LOAD_CHECKPOINT);
-	if (recovery == NULL) {
-		say_error("failed to recover vylog to join a replica");
-		goto out_join_cord;
+	rlist_create(&ctx->entries);
+	if (space_foreach(vy_join_add_space, ctx) != 0) {
+		free(ctx);
+		return -1;
 	}
-	rc = 0;
-	struct vy_lsm_recovery_info *lsm_info;
-	rlist_foreach_entry(lsm_info, &recovery->lsms, in_recovery) {
-		rc = vy_send_lsm(ctx, lsm_info);
+	*arg = ctx;
+	return 0;
+}
+
+static int
+vy_join_send_tuple(struct xstream *stream, uint32_t space_id,
+		   const char *data, size_t size)
+{
+	struct request_replace_body body;
+	request_replace_body_create(&body, space_id);
+
+	struct xrow_header row;
+	memset(&row, 0, sizeof(row));
+	row.type = IPROTO_INSERT;
+
+	row.bodycnt = 2;
+	row.body[0].iov_base = &body;
+	row.body[0].iov_len = sizeof(body);
+	row.body[1].iov_base = (char *)data;
+	row.body[1].iov_len = size;
+
+	return xstream_write(stream, &row);
+}
+
+static int
+vinyl_engine_join(struct engine *engine, void *arg, struct xstream *stream)
+{
+	(void)engine;
+	int loops = 0;
+	struct vy_join_ctx *ctx = arg;
+	struct vy_join_entry *entry;
+	rlist_foreach_entry(entry, &ctx->entries, in_ctx) {
+		struct snapshot_iterator *it = entry->iterator;
+		int rc;
+		uint32_t size;
+		const char *data;
+		while ((rc = it->next(it, &data, &size)) == 0 && data != NULL) {
+			if (vy_join_send_tuple(stream, entry->space_id,
+					       data, size) != 0)
+				return -1;
+		}
 		if (rc != 0)
-			break;
+			return -1;
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
 	}
-	vy_recovery_delete(recovery);
+	return 0;
+}
 
-out_join_cord:
-	cbus_stop_loop(&ctx->relay_pipe);
-	cpipe_destroy(&ctx->relay_pipe);
-	if (cord_cojoin(&cord) != 0)
-		rc = -1;
-out_free_ctx:
+static void
+vinyl_engine_complete_join(struct engine *engine, void *arg)
+{
+	(void)engine;
+	struct vy_join_ctx *ctx = arg;
+	struct vy_join_entry *entry, *next;
+	rlist_foreach_entry_safe(entry, &ctx->entries, in_ctx, next) {
+		entry->iterator->free(entry->iterator);
+		free(entry);
+	}
 	free(ctx);
-out:
-	return rc;
 }
 
 /* }}} Replication */
@@ -3849,6 +3664,66 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	vy_read_iterator_open(&it->iterator, lsm, tx, type, it->key,
 			      (const struct vy_read_view **)&tx->read_view);
 	return (struct iterator *)it;
+}
+
+static int
+vinyl_snapshot_iterator_next(struct snapshot_iterator *base,
+			     const char **data, uint32_t *size)
+{
+	assert(base->next == vinyl_snapshot_iterator_next);
+	struct vinyl_snapshot_iterator *it =
+		(struct vinyl_snapshot_iterator *)base;
+	struct vy_entry entry;
+	if (vy_read_iterator_next(&it->iterator, &entry) != 0)
+		return -1;
+	*data = entry.stmt != NULL ? tuple_data_range(entry.stmt, size) : NULL;
+	return 0;
+}
+
+static void
+vinyl_snapshot_iterator_free(struct snapshot_iterator *base)
+{
+	assert(base->free == vinyl_snapshot_iterator_free);
+	struct vinyl_snapshot_iterator *it =
+		(struct vinyl_snapshot_iterator *)base;
+	struct vy_lsm *lsm = it->iterator.lsm;
+	struct vy_env *env = vy_env(lsm->base.engine);
+	vy_read_iterator_close(&it->iterator);
+	tx_manager_destroy_read_view(env->xm, it->rv);
+	vy_lsm_unref(lsm);
+	free(it);
+}
+
+static struct snapshot_iterator *
+vinyl_index_create_snapshot_iterator(struct index *base)
+{
+	struct vy_lsm *lsm = vy_lsm(base);
+	struct vy_env *env = vy_env(base->engine);
+
+	struct vinyl_snapshot_iterator *it = malloc(sizeof(*it));
+	if (it == NULL) {
+		diag_set(OutOfMemory, sizeof(*it), "malloc",
+			 "struct vinyl_snapshot_iterator");
+		return NULL;
+	}
+	it->base.next = vinyl_snapshot_iterator_next;
+	it->base.free = vinyl_snapshot_iterator_free;
+
+	it->rv = tx_manager_read_view(env->xm);
+	if (it->rv == NULL) {
+		free(it);
+		return NULL;
+	}
+	vy_read_iterator_open(&it->iterator, lsm, NULL,
+			      ITER_ALL, lsm->env->empty_key,
+			      (const struct vy_read_view **)&it->rv);
+	/*
+	 * The index may be dropped while we are reading it.
+	 * The iterator must go on as if nothing happened.
+	 */
+	vy_lsm_ref(lsm);
+
+	return &it->base;
 }
 
 static int
@@ -4577,7 +4452,9 @@ static struct trigger on_replace_vinyl_deferred_delete = {
 static const struct engine_vtab vinyl_engine_vtab = {
 	/* .shutdown = */ vinyl_engine_shutdown,
 	/* .create_space = */ vinyl_engine_create_space,
+	/* .prepare_join = */ vinyl_engine_prepare_join,
 	/* .join = */ vinyl_engine_join,
+	/* .complete_join = */ vinyl_engine_complete_join,
 	/* .begin = */ vinyl_engine_begin,
 	/* .begin_statement = */ vinyl_engine_begin_statement,
 	/* .prepare = */ vinyl_engine_prepare,
@@ -4643,7 +4520,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .replace = */ generic_index_replace,
 	/* .create_iterator = */ vinyl_index_create_iterator,
 	/* .create_snapshot_iterator = */
-		generic_index_create_snapshot_iterator,
+		vinyl_index_create_snapshot_iterator,
 	/* .stat = */ vinyl_index_stat,
 	/* .compact = */ vinyl_index_compact,
 	/* .reset_stat = */ vinyl_index_reset_stat,

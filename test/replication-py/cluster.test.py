@@ -72,31 +72,6 @@ server_id = check_join('join with granted role')
 server.iproto.py_con.space('_cluster').delete(server_id)
 
 print '-------------------------------------------------------------'
-print 'gh-707: Master crashes on JOIN if it does not have snapshot files'
-print 'gh-480: If socket is closed while JOIN, replica wont reconnect'
-print '-------------------------------------------------------------'
-
-data_dir = os.path.join(server.vardir, server.name)
-for k in glob.glob(os.path.join(data_dir, '*.snap')):
-    os.unlink(k)
-
-# remember the number of servers in _cluster table
-server_count = len(server.iproto.py_con.space('_cluster').select(()))
-
-rows = list(server.iproto.py_con.join(replica_uuid))
-print len(rows) > 0 and rows[-1].return_message.find('.snap') >= 0 and \
-    'ok' or 'not ok', '-', 'join without snapshots'
-res = server.iproto.py_con.space('_cluster').select(())
-if server_count <= len(res):
-    print 'ok - _cluster did not change after unsuccessful JOIN'
-else:
-    print 'not ok - _cluster did change after unsuccessful JOIN'
-    print res
-
-server.admin("box.schema.user.revoke('guest', 'replication')")
-server.admin('box.snapshot()')
-
-print '-------------------------------------------------------------'
 print 'gh-434: Assertion if replace _cluster tuple for local server'
 print '-------------------------------------------------------------'
 
