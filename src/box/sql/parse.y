@@ -225,8 +225,17 @@ create_table_end ::= . { sqlEndTable(pParse); }
  */
 
 columnlist ::= columnlist COMMA tcons.
-columnlist ::= columnlist COMMA columnname carglist.
-columnlist ::= columnname carglist.
+columnlist ::= columnlist COMMA columnname carglist autoinc(I). {
+  uint32_t fieldno = pParse->create_table_def.new_space->def->field_count - 1;
+  if (I == 1 && sql_add_autoincrement(pParse, fieldno) != 0)
+    return;
+}
+
+columnlist ::= columnname carglist autoinc(I). {
+  uint32_t fieldno = pParse->create_table_def.new_space->def->field_count - 1;
+  if (I == 1 && sql_add_autoincrement(pParse, fieldno) != 0)
+    return;
+}
 columnlist ::= tcons.
 columnname(A) ::= nm(A) typedef(Y). {sqlAddColumn(pParse,&A,&Y);}
 
@@ -299,8 +308,7 @@ ccons ::= NULL onconf(R).        {
         sql_column_add_nullable_action(pParse, R);
 }
 ccons ::= NOT NULL onconf(R).    {sql_column_add_nullable_action(pParse, R);}
-ccons ::= cconsname(N) PRIMARY KEY sortorder(Z) autoinc(I). {
-  pParse->create_table_def.has_autoinc = I;
+ccons ::= cconsname(N) PRIMARY KEY sortorder(Z). {
   create_index_def_init(&pParse->create_index_def, NULL, &N, NULL,
                         SQL_INDEX_TYPE_CONSTRAINT_PK, Z, false);
   sqlAddPrimaryKey(pParse);
@@ -369,8 +377,7 @@ init_deferred_pred_opt(A) ::= .                       {A = 0;}
 init_deferred_pred_opt(A) ::= INITIALLY DEFERRED.     {A = 1;}
 init_deferred_pred_opt(A) ::= INITIALLY IMMEDIATE.    {A = 0;}
 
-tcons ::= cconsname(N) PRIMARY KEY LP sortlist(X) autoinc(I) RP. {
-  pParse->create_table_def.has_autoinc = I;
+tcons ::= cconsname(N) PRIMARY KEY LP col_list_with_autoinc(X) RP. {
   create_index_def_init(&pParse->create_index_def, NULL, &N, X,
                         SQL_INDEX_TYPE_CONSTRAINT_PK, SORT_ORDER_ASC, false);
   sqlAddPrimaryKey(pParse);
@@ -758,6 +765,37 @@ sortlist(A) ::= expr(Y) sortorder(Z). {
   /* A-overwrites-Y. */
   A = sql_expr_list_append(pParse->db,NULL,Y.pExpr);
   sqlExprListSetSortOrder(A,Z);
+}
+
+/**
+ * Non-terminal rule to store a list of columns within PRIMARY KEY
+ * declaration.
+ */
+%type col_list_with_autoinc {ExprList*}
+%destructor col_list_with_autoinc {sql_expr_list_delete(pParse->db, $$);}
+
+col_list_with_autoinc(A) ::= col_list_with_autoinc(A) COMMA expr(Y)
+                             autoinc(I). {
+  uint32_t fieldno;
+  if (I == 1) {
+    if (sql_fieldno_by_name(pParse, Y.pExpr, &fieldno) != 0)
+      return;
+    if (sql_add_autoincrement(pParse, fieldno) != 0)
+      return;
+  }
+  A = sql_expr_list_append(pParse->db, A, Y.pExpr);
+}
+
+col_list_with_autoinc(A) ::= expr(Y) autoinc(I). {
+  if (I == 1) {
+    uint32_t fieldno = 0;
+    if (sql_fieldno_by_name(pParse, Y.pExpr, &fieldno) != 0)
+      return;
+    if (sql_add_autoincrement(pParse, fieldno) != 0)
+      return;
+  }
+  /* A-overwrites-Y. */
+  A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
 }
 
 %type sortorder {int}

@@ -214,6 +214,8 @@ struct create_table_def {
 	struct rlist new_check;
 	/** True, if table to be created has AUTOINCREMENT PK. */
 	bool has_autoinc;
+	/** Id of field with AUTOINCREMENT. */
+	uint32_t autoinc_fieldno;
 };
 
 struct create_view_def {
@@ -461,6 +463,7 @@ create_table_def_init(struct create_table_def *table_def, struct Token *name,
 			       if_not_exists);
 	rlist_create(&table_def->new_fkey);
 	rlist_create(&table_def->new_check);
+	table_def->autoinc_fieldno = 0;
 }
 
 static inline void

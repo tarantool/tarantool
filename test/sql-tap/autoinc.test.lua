@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(47)
+test:plan(57)
 
 --!./tcltestrunner.lua
 -- 2004 November 12
@@ -561,7 +561,7 @@ test:do_catchsql_test(
         CREATE TABLE t8(x TEXT PRIMARY KEY AUTOINCREMENT);
     ]], {
         -- <autoinc-7.2>
-        1, "Failed to create space 'T8': AUTOINCREMENT is only allowed on an INTEGER PRIMARY KEY or INT PRIMARY KEY"
+        1, "Can't create or modify index 'pk_unnamed_T8_1' in space 'T8': sequence cannot be used with a non-integer key"
         -- </autoinc-7.2>
     })
 
@@ -813,5 +813,98 @@ test:do_catchsql_test(
         1, "Type mismatch: can not convert a to integer"
         -- </autoinc-gh-3670>
     })
+
+--
+-- gh-4217: make sure that AUTOINCREMENT can be used for any
+-- INTEGER field of PRIMARY KEY.
+--
+
+test:do_execsql_test(
+    "autoinc-11.1",
+    [[
+        CREATE TABLE t11_1 (i INT AUTOINCREMENT, a INT, PRIMARY KEY(i, a));
+        INSERT INTO t11_1 VALUES (NULL, 1), (NULL, 1), (NULL, 1);
+        SELECT * FROM t11_1;
+    ]], {
+        1, 1, 2, 1, 3, 1
+    })
+
+test:do_execsql_test(
+    "autoinc-11.2",
+    [[
+        CREATE TABLE t11_2 (i INT AUTOINCREMENT, a INT, PRIMARY KEY(a, i));
+        INSERT INTO t11_2 VALUES (NULL, 1), (NULL, 1), (NULL, 1);
+        SELECT * FROM t11_2;
+    ]], {
+        1, 1, 2, 1, 3, 1
+    })
+
+test:do_execsql_test(
+    "autoinc-11.3",
+    [[
+        CREATE TABLE t11_3 (i INT, a INT, PRIMARY KEY(i AUTOINCREMENT, a));
+        INSERT INTO t11_3 VALUES (NULL, 1), (NULL, 1), (NULL, 1);
+        SELECT * FROM t11_3;
+    ]], {
+        1, 1, 2, 1, 3, 1
+    })
+
+test:do_execsql_test(
+    "autoinc-11.4",
+    [[
+        CREATE TABLE t11_4 (i INT, a INT, PRIMARY KEY(a, i AUTOINCREMENT));
+        INSERT INTO t11_4 VALUES (NULL, 1), (NULL, 1), (NULL, 1);
+        SELECT * FROM t11_4;
+    ]], {
+        1, 1, 2, 1, 3, 1
+    })
+
+test:do_catchsql_test(
+    "autoinc-11.5",
+    [[
+        CREATE TABLE t11_5 (i INT, a INT, PRIMARY KEY(a, i COLLATE "unicode_ci" AUTOINCREMENT));
+    ]], {
+        1, "Wrong index options (field 2): collation is reasonable only for string and scalar parts"
+    })
+
+test:do_catchsql_test(
+    "autoinc-11.6",
+    [[
+        CREATE TABLE t11_6 (i INT, a INT, b INT AUTOINCREMENT, PRIMARY KEY(a, i));
+    ]], {
+        1, "Can't create or modify index 'pk_unnamed_T11_6_1' in space 'T11_6': sequence field must be a part of the index"
+    })
+
+test:do_catchsql_test(
+    "autoinc-11.7",
+    [[
+        CREATE TABLE t11_7 (i INT AUTOINCREMENT, a INT AUTOINCREMENT, PRIMARY KEY(a, i));
+    ]], {
+        1, "Syntax error in CREATE TABLE: Table must feature at most one AUTOINCREMENT field"
+    })
+
+test:do_catchsql_test(
+    "autoinc-11.8",
+    [[
+        CREATE TABLE t11_8 (i INT, a INT, PRIMARY KEY(a AUTOINCREMENT, i AUTOINCREMENT));
+    ]], {
+        1, "Syntax error in CREATE TABLE: Table must feature at most one AUTOINCREMENT field"
+    })
+
+test:do_catchsql_test(
+    "autoinc-11.9",
+    [[
+        CREATE TABLE t11_9 (i INT, PRIMARY KEY(a AUTOINCREMENT), a INT);
+    ]], {
+        1, "Can’t resolve field 'A'"
+    })
+
+test:do_catchsql_test(
+    "autoinc-11.10",
+    [[
+        CREATE TABLE t11_8 (i INT, a INT, PRIMARY KEY(a, 1 AUTOINCREMENT));
+    ]], {
+        1, "Expressions are prohibited in an index definition"
+})
 
 test:finish_test()

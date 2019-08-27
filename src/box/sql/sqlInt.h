@@ -4419,4 +4419,35 @@ void
 vdbe_emit_stat_space_clear(struct Parse *parse, const char *stat_table_name,
 			   const char *idx_name, const char *table_name);
 
+/**
+ * Add AUTOINCREMENT feature for one of INTEGER or UNSIGNED fields
+ * of PRIMARY KEY.
+ *
+ * @param parse_context Parsing context.
+ * @param fieldno Field number in space format under construction.
+ *
+ * @retval 0 on success.
+ * @retval -1 if table already has declared AUTOINCREMENT feature.
+ */
+int
+sql_add_autoincrement(struct Parse *parse_context, uint32_t fieldno);
+
+/**
+ * Get fieldno by field name. At the moment of forming space format
+ * there's no tuple dictionary, so we can't use hash, in contrast to
+ * tuple_fieldno_by_name(). However, AUTOINCREMENT can occur at most
+ * once in table's definition, so it's not a big deal if we use O(n)
+ * search.
+ *
+ * @param parse_context Parsing context.
+ * @param field_name Expr that contains field name.
+ * @param fieldno[out] Field number in new space format.
+ *
+ * @retval 0 on success.
+ * @retval -1 on error.
+ */
+int
+sql_fieldno_by_name(struct Parse *parse_context, struct Expr *field_name,
+		    uint32_t *fieldno);
+
 #endif				/* sqlINT_H */

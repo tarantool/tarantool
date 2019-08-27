@@ -62,7 +62,7 @@ test:do_catchsql_test(
 		CREATE TABLE t5 (i TEXT PRIMARY KEY AUTOINCREMENT);
 	]], {
 		-- <sql-errors-1.5>
-		1,"Failed to create space 'T5': AUTOINCREMENT is only allowed on an INTEGER PRIMARY KEY or INT PRIMARY KEY"
+		1,"Can't create or modify index 'pk_unnamed_T5_1' in space 'T5': sequence cannot be used with a non-integer key"
 		-- </sql-errors-1.5>
 	})
 
