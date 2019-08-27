@@ -97,6 +97,7 @@ applier_log_error(struct applier *applier, struct error *e)
 	case ER_ACCESS_DENIED:
 	case ER_NO_SUCH_USER:
 	case ER_SYSTEM:
+	case ER_UNKNOWN_REPLICA:
 		say_info("will retry every %.2lf second",
 			 replication_reconnect_interval());
 		break;
