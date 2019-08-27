@@ -33,11 +33,6 @@ jobs:
         os: osx
       - name: "Debug build + test + coverage (Linux, gcc)"
         env: TARGET=coverage
-      - name: "RelWithDebInfo build + test (OS X High Sierra 10.13)"
-        env: TARGET=test
-        os: osx
-        osx_image: xcode9.4
-        if: branch = "1.10"
       # Deploy targets (they also catch distro-specific problems).
       - name: "Create and deploy tarball"
         env: TARGET=source
