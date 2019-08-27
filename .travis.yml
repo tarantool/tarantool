@@ -33,39 +33,6 @@ jobs:
         os: osx
       - name: "Debug build + test + coverage (Linux, gcc)"
         env: TARGET=coverage
-      - name: "RelWithDebInfo build + test (OS X High Sierra 10.13)"
-        env: TARGET=test
-        os: osx
-        osx_image: xcode9.4
-        if: branch = "2.2"
-      # Special targets for LTO.
-      - name: "LTO build + test (Linux, gcc)"
-        env: >
-          TARGET=lto
-          CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
-          DOCKER_IMAGE=packpack/packpack:debian-buster
-          APT_EXTRA_FLAGS="--allow-releaseinfo-change-version --allow-releaseinfo-change-suite"
-        if: branch = "2.2"
-      - name: "LTO build + test (Linux, clang8)"
-        env: >
-          TARGET=lto_clang8
-          CC=clang-8
-          CXX=clang++-8
-          CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
-          DOCKER_IMAGE=packpack/packpack:debian-buster
-          APT_EXTRA_FLAGS="--allow-releaseinfo-change-version --allow-releaseinfo-change-suite"
-        if: branch = "2.2"
-        compiler: clang
-      - name: "LTO build + test (OS X Mojave 10.14)"
-        os: osx
-        env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
-        if: branch = "2.2"
-      # Special targets for ASAN.
-      - name: "ASAN build + test (Linux, clang8)"
-        env: >
-          TARGET=asan
-          DOCKER_IMAGE=packpack/packpack:debian-buster
-          APT_EXTRA_FLAGS="--allow-releaseinfo-change-version --allow-releaseinfo-change-suite"
       # Deploy targets (they also catch distro-specific problems).
       - name: "Create and deploy tarball"
         env: TARGET=source
