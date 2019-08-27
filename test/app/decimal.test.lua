@@ -69,6 +69,14 @@ a > nil
 a < nil
 a >= nil
 a <= nil
+-- and with box.NULL
+--
+a == box.NULL
+a ~= box.NULL
+a > box.NULL
+a < box.NULL
+a >= box.NULL
+a <= box.NULL
 
 decimal.sqrt(a)
 decimal.ln(a)

@@ -248,6 +248,36 @@ a <= nil
  | ---
  | - error: '[string "return a <= nil "]:1: attempt to compare decimal with nil'
  | ...
+-- and with box.NULL
+--
+a == box.NULL
+ | ---
+ | - false
+ | ...
+a ~= box.NULL
+ | ---
+ | - true
+ | ...
+a > box.NULL
+ | ---
+ | - error: '[string "return a > box.NULL "]:1: expected decimal, number or string as
+ |     1 argument'
+ | ...
+a < box.NULL
+ | ---
+ | - error: '[string "return a < box.NULL "]:1: expected decimal, number or string as
+ |     2 argument'
+ | ...
+a >= box.NULL
+ | ---
+ | - error: '[string "return a >= box.NULL "]:1: expected decimal, number or string as
+ |     1 argument'
+ | ...
+a <= box.NULL
+ | ---
+ | - error: '[string "return a <= box.NULL "]:1: expected decimal, number or string as
+ |     2 argument'
+ | ...
 
 decimal.sqrt(a)
  | ---

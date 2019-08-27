@@ -235,7 +235,8 @@ static int
 ldecimal_eq(struct lua_State *L)
 {
 	assert(lua_gettop(L) == 2);
-	if (lua_isnil(L, 1) || lua_isnil(L, 2)) {
+	if (lua_isnil(L, 1) || lua_isnil(L, 2) ||
+	    luaL_isnull(L, 1) || luaL_isnull(L, 2)) {
 		lua_pushboolean(L, false);
 		return 1;
 	}
