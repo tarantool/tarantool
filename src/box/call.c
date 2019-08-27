@@ -215,6 +215,7 @@ box_process_call(struct call_request *request, struct port *port)
 	if (in_txn()) {
 		diag_set(ClientError, ER_FUNCTION_TX_ACTIVE);
 		txn_rollback();
+		port_destroy(port);
 		return -1;
 	}
 
