@@ -81,8 +81,13 @@ minmaxFunc(sql_context * context, int argc, sql_value ** argv)
 	int iBest;
 	struct coll *pColl;
 
-	assert(argc > 1);
 	mask = sql_user_data(context) == 0 ? 0 : -1;
+	if (argc < 2) {
+		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT,
+		mask ? "GREATEST" : "LEAST", "at least two", argc);
+		context->is_aborted = true;
+		return;
+	}
 	pColl = sqlGetFuncCollSeq(context);
 	assert(mask == -1 || mask == 0);
 	iBest = 0;

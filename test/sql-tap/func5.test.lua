@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(19)
+test:plan(22)
 
 --!./tcltestrunner.lua
 -- 2010 August 27
@@ -256,5 +256,26 @@ test:do_execsql_test(
     [[
         SELECT LEAST(false, 'STR', 1, 0.5);
     ]], { false } )
+
+-- gh-4453: GREATEST()/LEAST() require at least two arguments
+-- be passed to these functions.
+--
+test:do_catchsql_test(
+    "func-5-5.1",
+    [[
+        SELECT LEAST(false);
+    ]], { 1, "Wrong number of arguments is passed to LEAST(): expected at least two, got 1" } )
+
+test:do_catchsql_test(
+    "func-5-5.2",
+    [[
+        SELECT GREATEST('abc');
+    ]], { 1, "Wrong number of arguments is passed to GREATEST(): expected at least two, got 1" } )
+
+test:do_catchsql_test(
+    "func-5-5.3",
+    [[
+        SELECT LEAST();
+    ]], { 1, "Wrong number of arguments is passed to LEAST(): expected at least two, got 0" } )
 
 test:finish_test()

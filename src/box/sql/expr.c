@@ -4049,7 +4049,8 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			 * is done using ANSI rules from
 			 * collations_check_compatibility().
 			 */
-			if ((pDef->funcFlags & SQL_FUNC_NEEDCOLL) != 0) {
+			if ((pDef->funcFlags & SQL_FUNC_NEEDCOLL) != 0 &&
+			    nFarg > 0) {
 				struct coll *unused = NULL;
 				uint32_t curr_id = COLL_NONE;
 				bool is_curr_forced = false;

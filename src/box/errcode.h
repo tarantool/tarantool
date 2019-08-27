@@ -254,6 +254,7 @@ struct errcode_record {
 	/*199 */_(ER_FUNC_INDEX_FORMAT,		"Key format doesn't match one defined in functional index '%s' of space '%s': %s") \
 	/*200 */_(ER_FUNC_INDEX_PARTS,		"Wrong functional index definition: %s") \
 	/*201 */_(ER_NO_SUCH_FIELD_NAME,	"Field '%s' was not found in the tuple") \
+	/*202 */_(ER_FUNC_WRONG_ARG_COUNT,	"Wrong number of arguments is passed to %s(): expected %s, got %d") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
