@@ -1310,3 +1310,17 @@ format[1].is_nullable = true
 tuple_format = box.internal.new_tuple_format(format)
 ---
 ...
+--
+-- Test that calling _say using FFI w/ null filepointer doesn't
+-- segfault
+--
+box.cfg{}
+---
+...
+local ffi = require'ffi' ffi.C._say(ffi.C.S_WARN, nil, 0, nil, "%s", "test log")
+---
+...
+test_run:grep_log('default', 'test log')
+---
+- test log
+...
