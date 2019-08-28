@@ -353,3 +353,10 @@ lsn == expected_lsn
 box.cfg{too_long_threshold = too_long_threshold}
 s:drop()
 
+--
+-- Test that calling _say using FFI w/ null filepointer doesn't
+-- segfault
+--
+box.cfg{}
+local ffi = require'ffi' ffi.C._say(ffi.C.S_WARN, nil, 0, nil, "%s", "test log")
+test_run:grep_log('default', 'test log')
