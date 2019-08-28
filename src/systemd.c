@@ -53,8 +53,8 @@ static const char *sd_unix_path = NULL;
 int systemd_init() {
 	sd_unix_path = getenv("NOTIFY_SOCKET");
 	if (sd_unix_path == NULL) {
-		say_info("systemd: NOTIFY_SOCKET variable is empty, skipping");
-		return -1;
+		/* Do nothing if the path is not set. */
+		return 0;
 	}
 	if ((sd_unix_path[0] != '@' && sd_unix_path[0] != '/') ||
 	    (sd_unix_path[1] == '\0')) {
