@@ -128,6 +128,13 @@ void
 box_set_orphan(bool orphan);
 
 /**
+ * Set orphan mode but don't update instance title.
+ * \sa box_set_orphan
+ */
+void
+box_do_set_orphan(bool orphan);
+
+/**
  * Iterate over all spaces and save them to the
  * snapshot file.
  */
