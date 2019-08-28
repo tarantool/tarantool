@@ -610,6 +610,17 @@ replicaset_connect(struct applier **appliers, int count,
 
 	say_info("connecting to %d replicas", count);
 
+	if (!connect_quorum) {
+		/*
+		 * Enter orphan mode on configuration change and
+		 * only leave it when we manage to sync with
+		 * replicaset_quorum instances. Don't change
+		 * title though, it should be 'loading' during
+		 * local recovery.
+		 */
+		box_do_set_orphan(true);
+	}
+
 	/*
 	 * Simultaneously connect to remote peers to receive their UUIDs
 	 * and fill the resulting set:
