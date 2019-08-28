@@ -8,7 +8,10 @@ box.schema.user.grant('guest', 'replication')
 replication_timeout = box.cfg.replication_timeout
 replication_connect_timeout = box.cfg.replication_connect_timeout
 box.cfg{replication_timeout=0.05, replication_connect_timeout=0.05, replication={}}
+box.cfg{replication_connect_quorum=2}
 box.cfg{replication = {'127.0.0.1:12345', box.cfg.listen}}
+box.info.status
+box.info.ro
 
 -- gh-3606 - Tarantool crashes if box.cfg.replication is updated concurrently
 fiber = require('fiber')
@@ -19,7 +22,9 @@ f()
 c:get()
 c:get()
 
-box.cfg{replication_timeout = replication_timeout, replication_connect_timeout = replication_connect_timeout}
+box.cfg{replication = "", replication_timeout = replication_timeout, replication_connect_timeout = replication_connect_timeout}
+box.info.status
+box.info.ro
 
 -- gh-3111 - Allow to rebootstrap a replica from a read-only master
 replica_uuid = uuid.new()
@@ -293,3 +298,37 @@ test_run:cmd("cleanup server replica")
 test_run:cmd("delete server replica")
 test_run:cleanup_cluster()
 box.schema.user.revoke('guest', 'replication')
+
+--
+-- gh-4424 Always enter orphan mode on error in replication
+-- configuration change.
+--
+replication_connect_timeout = box.cfg.replication_connect_timeout
+replication_connect_quorum = box.cfg.replication_connect_quorum
+box.cfg{replication="12345", replication_connect_timeout=0.1, replication_connect_quorum=1}
+box.info.status
+box.info.ro
+-- reset replication => leave orphan mode
+box.cfg{replication=""}
+box.info.status
+box.info.ro
+-- no switch to orphan when quorum == 0
+box.cfg{replication="12345", replication_connect_quorum=0}
+box.info.status
+box.info.ro
+
+-- we could connect to one out of two replicas. Set orphan.
+box.cfg{replication_connect_quorum=2}
+box.cfg{replication={box.cfg.listen, "12345"}}
+box.info.status
+box.info.ro
+-- lower quorum => leave orphan mode
+box.cfg{replication_connect_quorum=1}
+box.info.status
+box.info.ro
+
+box.cfg{replication=""}
+
+
+box.cfg{replication_connect_timeout=replication_connect_timeout}
+box.cfg{replication_connect_quorum=replication_connect_quorum}
