@@ -685,7 +685,10 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 				pMem->u.r = pMem->u.u;
 			return 0;
 		}
-		return ! sqlAtoF(pMem->z, &pMem->u.r, pMem->n);
+		if (sqlAtoF(pMem->z, &pMem->u.r, pMem->n) == 0)
+			return -1;
+		MemSetTypeFlag(pMem, MEM_Real);
+		return 0;
 	}
 	switch (type) {
 	case FIELD_TYPE_SCALAR:

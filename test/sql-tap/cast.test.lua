@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(84)
+test:plan(85)
 
 --!./tcltestrunner.lua
 -- 2005 June 25
@@ -892,5 +892,17 @@ test:do_test(
     })
 
 
+-- gh-4356: Check that result of blob to number cast if of type
+-- number.
+--
+test:do_execsql_test(
+    "cast-5.1",
+    [[
+        SELECT CAST(x'3138343436373434303733372e33' AS NUMBER)
+    ]], {
+        -- <cast-5.1>
+        184467440737.3
+        -- </cast-5.1>
+    })
 
 test:finish_test()
