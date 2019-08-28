@@ -496,7 +496,19 @@ load_cfg()
 	 */
 	if (cfg_geti("strip_core")) {
 		if (!small_test_feature(SMALL_FEATURE_DONTDUMP)) {
-			say_warn("'strip_core' is set but unsupported");
+			static const char strip_msg[] =
+				"'strip_core' is set but unsupported";
+#ifdef TARGET_OS_LINUX
+			/*
+			 * Linux is known to support madvise(DONT_DUMP)
+			 * feature, thus warn on this platform only. The
+			 * rest should be notified on verbose level only
+			 * to not spam a user.
+			 */
+			say_warn(strip_msg);
+#else
+			say_verbose(strip_msg);
+#endif
 		}
 	}
 
