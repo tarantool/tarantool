@@ -129,6 +129,13 @@ extern bool box_checkpoint_is_in_progress;
 extern uint32_t snapshot_version;
 
 /**
+ * Set orphan mode but don't update instance title.
+ * \sa box_set_orphan
+ */
+void
+box_do_set_orphan(bool orphan);
+
+/**
  * Iterate over all spaces and save them to the
  * snapshot file.
  */

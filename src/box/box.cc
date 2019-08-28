@@ -249,7 +249,7 @@ box_wait_ro(bool ro, double timeout)
 }
 
 void
-box_set_orphan(bool orphan)
+box_do_set_orphan(bool orphan)
 {
 	if (is_orphan == orphan)
 		return; /* nothing to do */
@@ -258,7 +258,12 @@ box_set_orphan(bool orphan)
 
 	is_orphan = orphan;
 	fiber_cond_broadcast(&ro_cond);
+}
 
+void
+box_set_orphan(bool orphan)
+{
+	box_do_set_orphan(orphan);
 	/* Update the title to reflect the new status. */
 	if (is_orphan) {
 		say_crit("entering orphan mode");
@@ -700,11 +705,10 @@ box_set_replication(void)
 	box_check_replication();
 	/*
 	 * Try to connect to all replicas within the timeout period.
-	 * The configuration will succeed as long as we've managed
-	 * to connect to at least replication_connect_quorum
-	 * masters.
+	 * Stay in orphan mode in case we fail to connect to at least
+	 * 'replication_connect_quorum' remote instances.
 	 */
-	box_sync_replication(true);
+	box_sync_replication(false);
 	/* Follow replica */
 	replicaset_follow();
 	/* Wait until appliers are in sync */
