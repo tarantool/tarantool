@@ -165,6 +165,7 @@ box_process_eval(struct call_request *request, struct port *port)
 	txn = in_txn();
 	if (txn != NULL) {
 		diag_set(ClientError, ER_FUNCTION_TX_ACTIVE);
+		port_destroy(port);
 		txn_rollback(txn);
 		fiber_gc();
 		return -1;
