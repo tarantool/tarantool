@@ -1,6 +1,7 @@
 # Tarantool
 
 [![Build Status][travis-badge]][travis-url]
+[![Build Status][gitlab-ci-badge]][gitlab-ci-url]
 [![Code Coverage][coverage-badge]][coverage-url]
 [![Telegram][telegram-badge]][telegram-url]
 [![Slack][slack-badge]][slack-url]
@@ -52,10 +53,12 @@ list, tarantool@googlegroups.com.
 
 Thank you for your interest in Tarantool!
 
-[travis-badge]: https://api.travis-ci.org/tarantool/tarantool.svg?branch=2.1
+[travis-badge]: https://api.travis-ci.org/tarantool/tarantool.svg?branch=master
 [travis-url]: https://travis-ci.org/tarantool/tarantool
-[coverage-badge]: https://coveralls.io/repos/github/tarantool/tarantool/badge.svg?branch=2.1
-[coverage-url]: https://coveralls.io/github/tarantool/tarantool?branch=2.1
+[gitlab-ci-badge]: https://gitlab.com/tarantool/tarantool/badges/master/pipeline.svg
+[gitlab-ci-url]: https://gitlab.com/tarantool/tarantool/commits/master
+[coverage-badge]: https://coveralls.io/repos/github/tarantool/tarantool/badge.svg?branch=master
+[coverage-url]: https://coveralls.io/github/tarantool/tarantool?branch=master
 [groups-badge]: https://img.shields.io/badge/Google-Groups-orange.svg
 [groups-url]: https://groups.google.com/forum/#!forum/tarantool
 [telegram-badge]: https://img.shields.io/badge/Telegram-join%20chat-blue.svg
