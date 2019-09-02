@@ -1,6 +1,8 @@
 local ffi   = require('ffi')
 local errno = require('errno')
 
+-- {{{ Definitions
+
 -- GID_T, UID_T and TIME_T are, essentially, `integer types`.
 -- http://pubs.opengroup.org/onlinepubs/009695399/basedefs/sys/types.h.html
 ffi.cdef[[
@@ -80,6 +82,29 @@ ffi.cdef[[
     void           setgrent();
 ]]
 
+-- }}}
+
+-- {{{ Error handling
+
+local pwgr_errstr = "get%s failed [errno %d]: %s"
+
+-- Use it in the following way: set errno to zero, call a passwd /
+-- group function, then call this function to check whether there
+-- was an error.
+local function pwgrcheck(func_name, pwgr)
+    if pwgr ~= nil then
+        return
+    end
+    if errno() == 0 then
+        return
+    end
+    error(pwgr_errstr:format(func_name, errno(), errno.strerror()))
+end
+
+-- }}}
+
+-- {{{ Call passwd / group database
+
 local function _getpw(uid)
     local pw = nil
     errno(0)
@@ -90,6 +115,7 @@ local function _getpw(uid)
     else
         error("Bad type of uid (expected 'string'/'number')")
     end
+    pwgrcheck('_getpw', pw)
     return pw
 end
 
@@ -103,22 +129,15 @@ local function _getgr(gid)
     else
         error("Bad type of gid (expected 'string'/'number')")
     end
+    pwgrcheck('_getgr', gr)
     return gr
 end
 
-local pwgr_errstr = "get%s failed [errno %d]: %s"
+-- }}}
 
-local function getgr(gid)
-    if gid == nil then
-        gid = tonumber(ffi.C.getgid())
-    end
-    local gr = type(gid) == 'cdata' and gid or _getgr(gid)
-    if gr == nil then
-        if errno() ~= 0 then
-            error(pwgr_errstr:format('gr', errno(), errno.strerror()))
-        end
-        return nil
-    end
+-- {{{ Serialize passwd / group structures to tables
+
+local function grtotable(gr)
     local gr_mem, group_members = gr.gr_mem, {}
     local i = 0
     while true do
@@ -129,48 +148,69 @@ local function getgr(gid)
         table.insert(group_members, ffi.string(member))
         i = i + 1
     end
-    local group = {
+    return {
         id      = tonumber(gr.gr_gid),
         name    = ffi.string(gr.gr_name),
         members = group_members,
     }
-    return group
+end
+
+-- gr is optional
+local function pwtotable(pw, gr)
+    local user = {
+        name    = ffi.string(pw.pw_name),
+        id      = tonumber(pw.pw_uid),
+        workdir = ffi.string(pw.pw_dir),
+        shell   = ffi.string(pw.pw_shell),
+    }
+    if gr ~= nil then
+        user.group = grtotable(gr)
+    end
+    return user
+end
+
+-- }}}
+
+-- {{{ Public API functions
+
+local function getgr(gid)
+    if gid == nil then
+        gid = tonumber(ffi.C.getgid())
+    end
+    local gr = _getgr(gid)
+    if gr == nil then
+        return nil
+    end
+    return grtotable(gr)
 end
 
 local function getpw(uid)
     if uid == nil then
         uid = tonumber(ffi.C.getuid())
     end
-    local pw = type(uid) == 'cdata' and uid or _getpw(uid)
+    local pw = _getpw(uid)
     if pw == nil then
-        if errno() ~= 0 then
-            error(pwgr_errstr:format('pw', errno(), errno.strerror()))
-        end
         return nil
     end
-    local user = {
-        name    = ffi.string(pw.pw_name),
-        id      = tonumber(pw.pw_uid),
-        group   = getgr(pw.pw_gid),
-        workdir = ffi.string(pw.pw_dir),
-        shell   = ffi.string(pw.pw_shell),
-    }
-    return user
+    local gr = _getgr(pw.pw_gid) -- can be nil
+    return pwtotable(pw, gr)
 end
 
 local function getpwall()
     ffi.C.setpwent()
     local pws = {}
+    -- Note: Don't call _getpw() during the loop: it leads to drop
+    -- of a getpwent() current entry to a first one on CentOS 6
+    -- and FreeBSD 12.
     while true do
         errno(0)
         local pw = ffi.C.getpwent()
         if pw == nil then
-            if errno() ~= 0 then
-                error(pwgr_errstr:format('pwall', errno(), errno.strerror()))
-            end
+            pwgrcheck('getpwall', pw)
             break
         end
-        table.insert(pws, getpw(pw))
+        local gr = _getgr(pw.pw_gid) -- can be nil
+        table.insert(pws, pwtotable(pw, gr))
     end
     ffi.C.endpwent()
     return pws
@@ -179,20 +219,23 @@ end
 local function getgrall()
     ffi.C.setgrent()
     local grs = {}
+    -- Note: Don't call _getgr() during the loop: it leads to drop
+    -- of a getgrent() current entry to a first one on CentOS 6
+    -- and FreeBSD 12.
     while true do
         errno(0)
         local gr = ffi.C.getgrent()
         if gr == nil then
-            if errno() ~= 0 then
-                error(pwgr_errstr:format('grall', errno(), errno.strerror()))
-            end
+            pwgrcheck('getgrall', gr)
             break
         end
-        table.insert(grs, getgr(gr))
+        table.insert(grs, grtotable(gr))
     end
     ffi.C.endgrent()
     return grs
 end
+
+-- }}}
 
 -- Workaround pwd.getpwall() issue on Fedora 29: successful
 -- getgrent() call that should normally return NULL and preserve
