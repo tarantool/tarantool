@@ -250,6 +250,7 @@ struct errcode_record {
 	/*195 */_(ER_UNUSED2,			"") \
 	/*196 */_(ER_UNUSED3,			"") \
 	/*197 */_(ER_SQL_COLUMN_COUNT,		"Unequal number of entries in row expression: left side has %u, but right side - %u") \
+	/*198 */_(ER_BOOTSTRAP_READONLY,	"Trying to bootstrap a local read-only instance as master") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

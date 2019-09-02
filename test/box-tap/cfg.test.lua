@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(104)
+test:plan(105)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -584,6 +584,15 @@ os.exit(0)
 test:is(run_script(code1), 0, "create huge tuple")
 test:is(run_script(code2), PANIC, "panic on huge tuple recovery")
 fio.rmtree(dir)
+
+--
+-- gh-4321 don't bootstrap a readonly instance as master
+--
+code=[[
+box.cfg{read_only=true}
+]]
+test:is(run_script(code), PANIC, "panic on bootstrapping a read-only instance as master")
+
 
 test:check()
 os.exit(0)

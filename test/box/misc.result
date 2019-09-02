@@ -523,6 +523,7 @@ t;
   192: box.error.INDEX_DEF_UNSUPPORTED
   193: box.error.CK_DEF_UNSUPPORTED
   197: box.error.SQL_COLUMN_COUNT
+  198: box.error.BOOTSTRAP_READONLY
 ...
 test_run:cmd("setopt delimiter ''");
 ---
