@@ -42,6 +42,7 @@
 #include "vclock.h"
 #include "scramble.h"
 #include "iproto_constants.h"
+#include "mpstream.h"
 
 static_assert(IPROTO_DATA < 0x7f && IPROTO_METADATA < 0x7f &&
 	      IPROTO_SQL_INFO < 0x7f, "encoded IPROTO_BODY keys must fit into "\
@@ -381,10 +382,6 @@ static const struct iproto_body_bin iproto_body_bin = {
 	0x81, IPROTO_DATA, 0xdd, 0
 };
 
-static const struct iproto_body_bin iproto_error_bin = {
-	0x81, IPROTO_ERROR, 0xdb, 0
-};
-
 /** Return a 4-byte numeric error code, with status flags. */
 static inline uint32_t
 iproto_encode_error(uint32_t error)
@@ -478,46 +475,77 @@ iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 	return 0;
 }
 
+static void
+mpstream_error_handler(void *error_ctx)
+{
+	*(bool *)error_ctx = true;
+}
+
+static void
+mpstream_iproto_encode_error(struct mpstream *stream, const struct error *error)
+{
+	mpstream_encode_map(stream, 2);
+	mpstream_encode_uint(stream, IPROTO_ERROR);
+	mpstream_encode_str(stream, error->errmsg);
+}
+
 int
 iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 		   uint32_t schema_version)
 {
-	uint32_t msg_len = strlen(e->errmsg);
-	uint32_t errcode = box_error_code(e);
-
-	struct iproto_body_bin body = iproto_error_bin;
 	char *header = (char *)obuf_alloc(out, IPROTO_HEADER_LEN);
 	if (header == NULL)
 		return -1;
 
+	bool is_error = false;
+	struct mpstream stream;
+	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
+		      mpstream_error_handler, &is_error);
+
+	uint32_t used = obuf_size(out);
+	mpstream_iproto_encode_error(&stream, e);
+	mpstream_flush(&stream);
+
+	uint32_t errcode = box_error_code(e);
 	iproto_header_encode(header, iproto_encode_error(errcode), sync,
-			     schema_version, sizeof(body) + msg_len);
-	body.v_data_len = mp_bswap_u32(msg_len);
+			     schema_version, obuf_size(out) - used);
+
 	/* Malformed packet appears to be a lesser evil than abort. */
-	return obuf_dup(out, &body, sizeof(body)) != sizeof(body) ||
-	       obuf_dup(out, e->errmsg, msg_len) != msg_len ? -1 : 0;
+	return is_error ? -1 : 0;
 }
 
 void
 iproto_write_error(int fd, const struct error *e, uint32_t schema_version,
 		   uint64_t sync)
 {
-	uint32_t msg_len = strlen(e->errmsg);
+	bool is_error = false;
+	struct mpstream stream;
+	struct region *region = &fiber()->gc;
+	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
+		      mpstream_error_handler, &is_error);
+
+	size_t region_svp = region_used(region);
+	mpstream_iproto_encode_error(&stream, e);
+	mpstream_flush(&stream);
+	if (is_error)
+		goto cleanup;
+
+	size_t payload_size = region_used(region) - region_svp;
+	char *payload = region_join(region, payload_size);
+	if (payload == NULL)
+		goto cleanup;
+
 	uint32_t errcode = box_error_code(e);
-
 	char header[IPROTO_HEADER_LEN];
-	struct iproto_body_bin body = iproto_error_bin;
-
 	iproto_header_encode(header, iproto_encode_error(errcode), sync,
-			     schema_version, sizeof(body) + msg_len);
-
-	body.v_data_len = mp_bswap_u32(msg_len);
+			     schema_version, payload_size);
 
 	ssize_t unused;
 	unused = write(fd, header, sizeof(header));
-	unused = write(fd, &body, sizeof(body));
-	unused = write(fd, e->errmsg, msg_len);
+	unused = write(fd, payload, payload_size);
 	(void) unused;
+cleanup:
+	region_truncate(region, region_svp);
 }
 
 int
