@@ -253,6 +253,7 @@ struct errcode_record {
 	/*198 */_(ER_FUNC_INDEX_FUNC,		"Failed to build a key for functional index '%s' of space '%s': %s") \
 	/*199 */_(ER_FUNC_INDEX_FORMAT,		"Key format doesn't match one defined in functional index '%s' of space '%s': %s") \
 	/*200 */_(ER_FUNC_INDEX_PARTS,		"Wrong functional index definition: %s") \
+	/*201 */_(ER_BOOTSTRAP_READONLY,	"Trying to bootstrap a local read-only instance as master") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

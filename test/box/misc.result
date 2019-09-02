@@ -529,6 +529,7 @@ t;
   198: box.error.FUNC_INDEX_FUNC
   199: box.error.FUNC_INDEX_FORMAT
   200: box.error.FUNC_INDEX_PARTS
+  201: box.error.BOOTSTRAP_READONLY
 ...
 test_run:cmd("setopt delimiter ''");
 ---

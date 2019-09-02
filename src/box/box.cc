@@ -1740,6 +1740,10 @@ engine_init()
 static void
 bootstrap_master(const struct tt_uuid *replicaset_uuid)
 {
+	/* Do not allow to bootstrap a readonly instance as master. */
+	if (cfg_geti("read_only") == 1) {
+		tnt_raise(ClientError, ER_BOOTSTRAP_READONLY);
+	}
 	engine_bootstrap_xc();
 
 	uint32_t replica_id = 1;
