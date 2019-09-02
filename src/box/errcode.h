@@ -208,6 +208,7 @@ struct errcode_record {
 	/*153 */_(ER_UNUSED,			"") \
 	/*154 */_(ER_TRANSACTION_YIELD,		"Transaction has been aborted by a fiber yield") \
 	/*155 */_(ER_NO_SUCH_GROUP,		"Replication group '%s' does not exist") \
+	/*156 */_(ER_BOOTSTRAP_READONLY,	"Trying to bootstrap a local read-only instance as master") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
