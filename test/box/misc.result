@@ -532,6 +532,7 @@ t;
   200: box.error.FUNC_INDEX_PARTS
   201: box.error.NO_SUCH_FIELD_NAME
   202: box.error.FUNC_WRONG_ARG_COUNT
+  203: box.error.BOOTSTRAP_READONLY
 ...
 test_run:cmd("setopt delimiter ''");
 ---

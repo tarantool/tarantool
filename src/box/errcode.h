@@ -255,6 +255,7 @@ struct errcode_record {
 	/*200 */_(ER_FUNC_INDEX_PARTS,		"Wrong functional index definition: %s") \
 	/*201 */_(ER_NO_SUCH_FIELD_NAME,	"Field '%s' was not found in the tuple") \
 	/*202 */_(ER_FUNC_WRONG_ARG_COUNT,	"Wrong number of arguments is passed to %s(): expected %s, got %d") \
+	/*203 */_(ER_BOOTSTRAP_READONLY,	"Trying to bootstrap a local read-only instance as master") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
