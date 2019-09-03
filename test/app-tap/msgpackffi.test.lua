@@ -36,7 +36,7 @@ local function test_offsets(test, s)
 end
 
 local function test_other(test, s)
-    test:plan(19)
+    test:plan(23)
     local buf = string.char(0x93, 0x6e, 0xcb, 0x42, 0x2b, 0xed, 0x30, 0x47,
         0x6f, 0xff, 0xff, 0xac, 0x77, 0x6b, 0x61, 0x71, 0x66, 0x7a, 0x73,
         0x7a, 0x75, 0x71, 0x71, 0x78)
@@ -68,6 +68,44 @@ local function test_other(test, s)
     test:is(#s.encode(-0x8001), 5, "len(encode(-0x8001))")
     test:is(#s.encode(-0x80000000), 5, "len(encode(-0x80000000))")
     test:is(#s.encode(-0x80000001), 9, "len(encode(-0x80000001))")
+
+    --
+    -- gh-4434: msgpackffi does not care about msgpack serializer
+    -- configuration, but it should.
+    --
+    local function check_depth(depth_to_try)
+        local t = nil
+        for i = 1, depth_to_try do t = {t} end
+        t = s.decode_unchecked(s.encode(t))
+        local level = 0
+        while t ~= nil do level = level + 1 t = t[1] end
+        return level
+    end
+    local msgpack = require('msgpack')
+    local max_depth = msgpack.cfg.encode_max_depth
+    local result_depth = check_depth(max_depth + 5)
+    test:is(result_depth, max_depth,
+            "msgpackffi uses msgpack.cfg.encode_max_depth")
+
+    msgpack.cfg({encode_max_depth = max_depth + 5})
+    result_depth = check_depth(max_depth + 5)
+    test:is(result_depth, max_depth + 5, "and uses it dynamically")
+
+    -- Recursive tables are handled correctly.
+    local level = 0
+    local t = {}
+    t[1] = t
+    t = s.decode(s.encode(t))
+    while t ~= nil do level = level + 1 t = t[1] end
+    test:is(level, max_depth + 5, "recursive array")
+    t = {}
+    t.key = t
+    t = s.decode(s.encode(t))
+    level = 0
+    while t ~= nil do level = level + 1 t = t.key end
+    test:is(level, max_depth + 5, "recursive map")
+
+    msgpack.cfg({encode_max_depth = max_depth})
 end
 
 tap.test("msgpackffi", function(test)
