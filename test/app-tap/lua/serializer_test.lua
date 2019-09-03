@@ -389,6 +389,18 @@ local function test_ucdata(test, s)
     ss = nil
 end
 
+local function test_depth(test, s)
+    test:plan(1)
+    --
+    -- gh-4434: serializer update should be reflected in Lua.
+    --
+    local max_depth = s.cfg.encode_max_depth
+    s.cfg({encode_max_depth = max_depth + 5})
+    test:is(s.cfg.encode_max_depth, max_depth + 5,
+            "cfg({<name> = value}) is reflected in cfg.<name>")
+    s.cfg({encode_max_depth = max_depth})
+end
+
 return {
     test_unsigned = test_unsigned;
     test_signed = test_signed;
@@ -398,4 +410,5 @@ return {
     test_nil = test_nil;
     test_table = test_table;
     test_ucdata = test_ucdata;
+    test_depth = test_depth;
 }
