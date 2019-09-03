@@ -22,7 +22,7 @@ end
 
 tap.test("json", function(test)
     local serializer = require('json')
-    test:plan(32)
+    test:plan(33)
 
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
@@ -32,6 +32,7 @@ tap.test("json", function(test)
     test:test("nil", common.test_nil, serializer)
     test:test("table", common.test_table, serializer, is_array, is_map)
     test:test("ucdata", common.test_ucdata, serializer)
+    test:test("depth", common.test_depth, serializer)
     test:test("misc", test_misc, serializer)
 
     --
