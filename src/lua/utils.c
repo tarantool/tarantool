@@ -258,7 +258,8 @@ luaL_serializer_create(struct luaL_serializer *cfg)
 }
 
 /**
- * Configure one field in @a cfg.
+ * Configure one field in @a cfg. Value of the field is kept on
+ * Lua stack after this function, and should be popped manually.
  * @param L Lua stack.
  * @param i Index of option in OPTIONS[].
  * @param cfg Serializer to inherit configuration.
@@ -270,10 +271,8 @@ luaL_serializer_parse_option(struct lua_State *L, int i,
 			     struct luaL_serializer *cfg)
 {
 	lua_getfield(L, 2, OPTIONS[i].name);
-	if (lua_isnil(L, -1)) {
-		lua_pop(L, 1);
+	if (lua_isnil(L, -1))
 		return NULL;
-	}
 	/*
 	 * Update struct luaL_serializer using pointer to a
 	 * configuration value (all values must be `int` for that).
@@ -289,7 +288,6 @@ luaL_serializer_parse_option(struct lua_State *L, int i,
 	default:
 		unreachable();
 	}
-	lua_pop(L, 1);
 	return pval;
 }
 
@@ -297,8 +295,10 @@ void
 luaL_serializer_parse_options(struct lua_State *L,
 			      struct luaL_serializer *cfg)
 {
-	for (int i = 0; OPTIONS[i].name != NULL; i++)
+	for (int i = 0; OPTIONS[i].name != NULL; ++i) {
 		luaL_serializer_parse_option(L, i, cfg);
+		lua_pop(L, 1);
+	}
 }
 
 /**
@@ -307,16 +307,25 @@ luaL_serializer_parse_options(struct lua_State *L,
  * luaL_serializer structure. serializer.cfg has overriden __call() method
  * to change configuration keys in internal userdata (like box.cfg{}).
  * Please note that direct change in serializer.cfg.key will not affect
- * internal state of userdata.
+ * internal state of userdata. Changes via cfg() are reflected in
+ * both Lua cfg table, and C serializer structure.
  * @param L lua stack
  * @return 0
  */
 static int
 luaL_serializer_cfg(struct lua_State *L)
 {
-	luaL_checktype(L, 1, LUA_TTABLE); /* serializer */
-	luaL_checktype(L, 2, LUA_TTABLE); /* serializer.cfg */
-	luaL_serializer_parse_options(L, luaL_checkserializer(L));
+	/* Serializer.cfg */
+	luaL_checktype(L, 1, LUA_TTABLE);
+	/* Updated parameters. */
+	luaL_checktype(L, 2, LUA_TTABLE);
+	struct luaL_serializer *cfg = luaL_checkserializer(L);
+	for (int i = 0; OPTIONS[i].name != NULL; ++i) {
+		if (luaL_serializer_parse_option(L, i, cfg) == NULL)
+			lua_pop(L, 1);
+		else
+			lua_setfield(L, 1, OPTIONS[i].name);
+	}
 	return 0;
 }
 
