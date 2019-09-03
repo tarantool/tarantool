@@ -4,7 +4,6 @@ local ffi = require('ffi')
 local buffer = require('buffer')
 local builtin = ffi.C
 local msgpack = require('msgpack') -- .NULL, .array_mt, .map_mt, .cfg
-local MAXNESTING = 16
 local int8_ptr_t = ffi.typeof('int8_t *')
 local uint8_ptr_t = ffi.typeof('uint8_t *')
 local uint16_ptr_t = ffi.typeof('uint16_t *')
@@ -216,7 +215,7 @@ local function encode_r(buf, obj, level)
     elseif type(obj) == "string" then
         encode_str(buf, obj)
     elseif type(obj) == "table" then
-        if level >= MAXNESTING then -- Limit nested tables
+        if level >= msgpack.cfg.encode_max_depth then
             encode_nil(buf)
             return
         end
