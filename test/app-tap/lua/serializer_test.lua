@@ -403,7 +403,7 @@ local function test_ucdata(test, s)
 end
 
 local function test_depth(test, s)
-    test:plan(1)
+    test:plan(3)
     --
     -- gh-4434: serializer update should be reflected in Lua.
     --
@@ -412,6 +412,25 @@ local function test_depth(test, s)
     test:is(s.cfg.encode_max_depth, max_depth + 5,
             "cfg({<name> = value}) is reflected in cfg.<name>")
     s.cfg({encode_max_depth = max_depth})
+
+    --
+    -- gh-4434 (yes, the same issue): let users choose whether
+    -- they want to raise an error on tables with too high nest
+    -- level.
+    --
+    local deep_as_nil = s.cfg.encode_deep_as_nil
+    s.cfg({encode_deep_as_nil = false})
+
+    local t = nil
+    for i = 1, max_depth + 1 do t = {t} end
+    local ok, err = pcall(s.encode, t)
+    test:ok(not ok, "too deep encode depth")
+
+    s.cfg({encode_max_depth = max_depth + 1})
+    ok, err = pcall(s.encode, t)
+    test:ok(ok, "no throw in a corner case")
+
+    s.cfg({encode_deep_as_nil = deep_as_nil, encode_max_depth = max_depth})
 end
 
 return {

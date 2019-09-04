@@ -36,7 +36,7 @@ local function test_offsets(test, s)
 end
 
 local function test_other(test, s)
-    test:plan(23)
+    test:plan(24)
     local buf = string.char(0x93, 0x6e, 0xcb, 0x42, 0x2b, 0xed, 0x30, 0x47,
         0x6f, 0xff, 0xff, 0xac, 0x77, 0x6b, 0x61, 0x71, 0x66, 0x7a, 0x73,
         0x7a, 0x75, 0x71, 0x71, 0x78)
@@ -82,6 +82,8 @@ local function test_other(test, s)
         return level
     end
     local msgpack = require('msgpack')
+    local deep_as_nil = msgpack.cfg.encode_deep_as_nil
+    msgpack.cfg({encode_deep_as_nil = true})
     local max_depth = msgpack.cfg.encode_max_depth
     local result_depth = check_depth(max_depth + 5)
     test:is(result_depth, max_depth,
@@ -105,7 +107,12 @@ local function test_other(test, s)
     while t ~= nil do level = level + 1 t = t.key end
     test:is(level, max_depth + 5, "recursive map")
 
-    msgpack.cfg({encode_max_depth = max_depth})
+    msgpack.cfg({encode_deep_as_nil = false})
+    local ok = pcall(check_depth, max_depth + 6)
+    test:ok(not ok, "exception is thrown when crop is not allowed")
+
+    msgpack.cfg({encode_deep_as_nil = deep_as_nil,
+                 encode_max_depth = max_depth})
 end
 
 tap.test("msgpackffi", function(test)

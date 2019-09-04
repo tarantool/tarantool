@@ -219,6 +219,10 @@ local function encode_r(buf, obj, level)
         encode_str(buf, obj)
     elseif type(obj) == "table" then
         if level >= msgpack.cfg.encode_max_depth then
+            if not msgpack.cfg.encode_deep_as_nil then
+                error(string.format('Too high nest level - %d',
+                                    msgpack.cfg.encode_max_depth + 1))
+            end
             encode_nil(buf)
             return
         end
