@@ -1258,6 +1258,12 @@ s2:drop()
 max_depth = msgpack.cfg.encode_max_depth
 ---
 ...
+deep_as_nil = msgpack.cfg.encode_deep_as_nil
+---
+...
+msgpack.cfg({encode_deep_as_nil = true})
+---
+...
 t = nil
 ---
 ...
@@ -1295,6 +1301,6 @@ level == max_depth + 5 or {level, max_depth}
 ---
 - true
 ...
-msgpack.cfg({encode_max_depth = max_depth})
+msgpack.cfg({encode_max_depth = max_depth, encode_deep_as_nil = deep_as_nil})
 ---
 ...

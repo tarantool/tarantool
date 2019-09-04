@@ -210,6 +210,13 @@ struct luaL_serializer {
 	int encode_sparse_safe;
 	/** Max recursion depth for encoding (MsgPack, CJSON only) */
 	int encode_max_depth;
+	/**
+	 * A flag whether a table with too high nest level should
+	 * be cropped. The not-encoded fields are replaced with
+	 * one null. If not set, too high nesting is considered an
+	 * error.
+	 */
+	int encode_deep_as_nil;
 	/** Enables encoding of NaN and Inf numbers */
 	int encode_invalid_numbers;
 	/** Floating point numbers precision (YAML, CJSON only) */
