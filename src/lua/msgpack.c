@@ -142,6 +142,10 @@ restart: /* used by MP_EXT */
 	case MP_MAP:
 		/* Map */
 		if (level >= cfg->encode_max_depth) {
+			if (! cfg->encode_deep_as_nil) {
+				return luaL_error(L, "Too high nest level - %d",
+						  level + 1);
+			}
 			mpstream_encode_nil(stream); /* Limit nested maps */
 			return MP_NIL;
 		}
@@ -163,6 +167,10 @@ restart: /* used by MP_EXT */
 	case MP_ARRAY:
 		/* Array */
 		if (level >= cfg->encode_max_depth) {
+			if (! cfg->encode_deep_as_nil) {
+				return luaL_error(L, "Too high nest level - %d",
+						  level + 1);
+			}
 			mpstream_encode_nil(stream); /* Limit nested arrays */
 			return MP_NIL;
 		}

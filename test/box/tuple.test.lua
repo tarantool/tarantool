@@ -431,6 +431,8 @@ s2:drop()
 -- gh-4434: tuple should use global msgpack serializer.
 --
 max_depth = msgpack.cfg.encode_max_depth
+deep_as_nil = msgpack.cfg.encode_deep_as_nil
+msgpack.cfg({encode_deep_as_nil = true})
 t = nil
 for i = 1, max_depth + 5 do t = {t} end
 tuple = box.tuple.new(t):totable()
@@ -446,4 +448,4 @@ while tuple ~= nil do level = level + 1 tuple = tuple[1] end
 -- serializer allows deeper tables.
 level == max_depth + 5 or {level, max_depth}
 
-msgpack.cfg({encode_max_depth = max_depth})
+msgpack.cfg({encode_max_depth = max_depth, encode_deep_as_nil = deep_as_nil})
