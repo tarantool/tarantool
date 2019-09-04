@@ -36,6 +36,7 @@
 #include <math.h> /* modf, isfinite */
 
 #include <msgpuck.h> /* enum mp_type */
+#include "trigger.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -242,6 +243,23 @@ struct luaL_serializer {
 
 	/** Enable support for compact represenation (internal, YAML-only). */
 	int has_compact;
+	/**
+	 * Border where copyable fields end. Is used to copy
+	 * serializer options into an existing serializer without
+	 * erasure of its non-option fields like triggers.
+	 */
+	char end_of_options[0];
+	/**
+	 * Trigger object to subscribe on updates of a more
+	 * general serializer. For example, tuple serializer
+	 * subscribes on msgpack.
+	 */
+	struct trigger update_trigger;
+	/**
+	 * List of triggers on update of this serializer. To push
+	 * updates down to dependent serializers.
+	 */
+	struct rlist on_update;
 };
 
 extern int luaL_nil_ref;
@@ -253,6 +271,14 @@ extern int luaL_array_metatable_ref;
 
 struct luaL_serializer *
 luaL_newserializer(struct lua_State *L, const char *modname, const luaL_Reg *reg);
+
+/**
+ * Copy all option fields of @a src into @a dst. Other fields,
+ * such as triggers, are not touched.
+ */
+void
+luaL_serializer_copy_options(struct luaL_serializer *dst,
+			     const struct luaL_serializer *src);
 
 static inline struct luaL_serializer *
 luaL_checkserializer(struct lua_State *L) {

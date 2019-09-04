@@ -473,3 +473,24 @@ d = box.tuple.new(dec.new('9e37'))
 d
 d:update{{'+', 1, dec.new('1e37')}}
 d:update{{'-', 1, dec.new('1e37')}}
+
+--
+-- gh-4434: tuple should use global msgpack serializer.
+--
+max_depth = msgpack.cfg.encode_max_depth
+t = nil
+for i = 1, max_depth + 5 do t = {t} end
+tuple = box.tuple.new(t):totable()
+level = 0
+while tuple ~= nil do level = level + 1 tuple = tuple[1] end
+level == max_depth or {level, max_depth}
+
+msgpack.cfg({encode_max_depth = max_depth + 5})
+tuple = box.tuple.new(t):totable()
+level = 0
+while tuple ~= nil do level = level + 1 tuple = tuple[1] end
+-- Level should be bigger now, because the default msgpack
+-- serializer allows deeper tables.
+level == max_depth + 5 or {level, max_depth}
+
+msgpack.cfg({encode_max_depth = max_depth})

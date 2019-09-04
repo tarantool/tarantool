@@ -170,8 +170,8 @@ main()
 	luaL_openlibs(L);
 
 	box_init();
-	box_lua_tuple_init(L);
 	luaopen_msgpack(L);
+	box_lua_tuple_init(L);
 	lua_pop(L, 1);
 
 	return test_basic(L);
