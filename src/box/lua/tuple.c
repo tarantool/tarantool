@@ -58,6 +58,11 @@
 
 static const char *tuplelib_name = "box.tuple";
 static const char *tuple_iteratorlib_name = "box.tuple.iterator";
+/*
+ * Special serializer for box.tuple.new() to disable storage
+ * optimization for excessively sparse arrays as a tuple always
+ * must be regular MP_ARRAY.
+ */
 static struct luaL_serializer tuple_serializer;
 
 extern char tuple_lua[]; /* Lua source */
@@ -530,6 +535,21 @@ static const struct luaL_Reg lbox_tuple_iterator_meta[] = {
 
 /* }}} */
 
+static inline void
+tuple_serializer_update_options(void)
+{
+	luaL_serializer_copy_options(&tuple_serializer, luaL_msgpack_default);
+	tuple_serializer.encode_sparse_ratio = 0;
+}
+
+static void
+on_msgpack_serializer_update(struct trigger *trigger, void *event)
+{
+	(void) trigger;
+	(void) event;
+	tuple_serializer_update_options();
+}
+
 void
 box_lua_tuple_init(struct lua_State *L)
 {
@@ -546,14 +566,11 @@ box_lua_tuple_init(struct lua_State *L)
 
 	luamp_set_encode_extension(luamp_encode_extension_box);
 
-	/*
-	 * Create special serializer for box.tuple.new().
-	 * Disable storage optimization for excessively
-	 * sparse arrays as a tuple always must be regular
-	 * MP_ARRAY.
-	 */
-	luaL_serializer_create(&tuple_serializer);
-	tuple_serializer.encode_sparse_ratio = 0;
+	tuple_serializer_update_options();
+	trigger_create(&tuple_serializer.update_trigger,
+		       on_msgpack_serializer_update, NULL, NULL);
+	trigger_add(&luaL_msgpack_default->on_update,
+		    &tuple_serializer.update_trigger);
 
 	/* Get CTypeID for `struct tuple' */
 	int rc = luaL_cdef(L, "struct tuple;");

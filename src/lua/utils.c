@@ -216,10 +216,18 @@ static struct {
 void
 luaL_serializer_create(struct luaL_serializer *cfg)
 {
+	rlist_create(&cfg->on_update);
 	for (int i = 0; OPTIONS[i].name != NULL; i++) {
 		int *pval = (int *) ((char *) cfg + OPTIONS[i].offset);
 		*pval = OPTIONS[i].defvalue;
 	}
+}
+
+void
+luaL_serializer_copy_options(struct luaL_serializer *dst,
+			     const struct luaL_serializer *src)
+{
+	memcpy(dst, src, offsetof(struct luaL_serializer, end_of_options));
 }
 
 /**
@@ -291,6 +299,7 @@ luaL_serializer_cfg(struct lua_State *L)
 		else
 			lua_setfield(L, 1, OPTIONS[i].name);
 	}
+	trigger_run(&cfg->on_update, cfg);
 	return 0;
 }
 
@@ -314,7 +323,7 @@ luaL_newserializer(struct lua_State *L, const char *modname, const luaL_Reg *reg
 			lua_newuserdata(L, sizeof(*serializer));
 	luaL_getmetatable(L, LUAL_SERIALIZER);
 	lua_setmetatable(L, -2);
-	memset(serializer, 0, sizeof(*serializer));
+	luaL_serializer_create(serializer);
 
 	for (; reg->name != NULL; reg++) {
 		/* push luaL_serializer as upvalue */
@@ -334,7 +343,6 @@ luaL_newserializer(struct lua_State *L, const char *modname, const luaL_Reg *reg
 	/* Save configuration values to serializer.cfg */
 	for (int i = 0; OPTIONS[i].name != NULL; i++) {
 		int *pval = (int *) ((char *) serializer + OPTIONS[i].offset);
-		*pval = OPTIONS[i].defvalue;
 		switch (OPTIONS[i].type) {
 		case LUA_TBOOLEAN:
 			lua_pushboolean(L, *pval);
