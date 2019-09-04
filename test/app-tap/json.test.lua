@@ -38,9 +38,10 @@ tap.test("json", function(test)
     --
     -- gh-2888: Check the possibility of using options in encode()/decode().
     --
+    local orig_encode_deep_as_nil = serializer.cfg.encode_deep_as_nil
     local orig_encode_max_depth = serializer.cfg.encode_max_depth
     local sub = {a = 1, { b = {c = 1, d = {e = 1}}}}
-    serializer.cfg({encode_max_depth = 1})
+    serializer.cfg({encode_max_depth = 1, encode_deep_as_nil = true})
     test:ok(serializer.encode(sub) == '{"1":null,"a":1}',
             'depth of encoding is 1 with .cfg')
     serializer.cfg({encode_max_depth = orig_encode_max_depth})
@@ -121,5 +122,6 @@ tap.test("json", function(test)
     rec4['b'] = rec4
     test:is(serializer.encode(rec4),
             '{"a":{"a":null,"b":null},"b":{"a":null,"b":null}}')
-    serializer.cfg({encode_max_depth = orig_encode_max_depth})
+    serializer.cfg({encode_max_depth = orig_encode_max_depth,
+                    encode_deep_as_nil = orig_encode_deep_as_nil})
 end)

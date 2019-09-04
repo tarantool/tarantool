@@ -400,14 +400,20 @@ static void json_append_data(lua_State *l, struct luaL_serializer *cfg,
     json_append_nil(cfg, json);
     break;
     case MP_MAP:
-    if (current_depth >= cfg->encode_max_depth)
+    if (current_depth >= cfg->encode_max_depth) {
+        if (! cfg->encode_deep_as_nil)
+            luaL_error(l, "Too high nest level");
         return json_append_nil(cfg, json); /* Limit nested maps */
+    }
     json_append_object(l, cfg, current_depth + 1, json);
     return;
     case MP_ARRAY:
     /* Array */
-    if (current_depth >= cfg->encode_max_depth)
+    if (current_depth >= cfg->encode_max_depth) {
+        if (! cfg->encode_deep_as_nil)
+            luaL_error(l, "Too high nest level");
         return json_append_nil(cfg, json); /* Limit nested arrays */
+    }
     json_append_array(l, cfg, current_depth + 1, json, field.size);
     return;
     case MP_EXT:
