@@ -21,6 +21,14 @@ if(POLICY CMP0037)
     cmake_policy(SET CMP0037 OLD)
 endif(POLICY CMP0037)
 
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/luajit-tap
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        ${PROJECT_SOURCE_DIR}/third_party/luajit/test
+        ${CMAKE_CURRENT_BINARY_DIR}/luajit-tap
+        COMMENT Create a symlink for luajit test dir to fix out-of-source tests)
+add_custom_target(symlink_luajit_tests ALL
+   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/luajit-tap)
+
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/small
     COMMAND ${CMAKE_COMMAND} -E create_symlink
         ${PROJECT_SOURCE_DIR}/src/lib/small/test/
@@ -31,12 +39,14 @@ add_custom_target(symlink_small_tests ALL
 
 add_custom_target(test
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
+            ${CMAKE_CURRENT_BINARY_DIR}/luajit-tap
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
         --builddir=${PROJECT_BINARY_DIR}
         --vardir=${PROJECT_BINARY_DIR}/test/var)
 
 add_custom_target(test-force
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
+            ${CMAKE_CURRENT_BINARY_DIR}/luajit-tap
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
         --builddir=${PROJECT_BINARY_DIR}
         --vardir=${PROJECT_BINARY_DIR}/test/var
