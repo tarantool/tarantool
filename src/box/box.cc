@@ -454,22 +454,31 @@ box_check_replication_sync_timeout(void)
 	return timeout;
 }
 
+static inline void
+box_check_uuid(struct tt_uuid *uuid, const char *name)
+{
+	*uuid = uuid_nil;
+	const char *uuid_str = cfg_gets(name);
+	if (uuid_str == NULL)
+		return;
+	if (tt_uuid_from_string(uuid_str, uuid) != 0)
+		tnt_raise(ClientError, ER_CFG, name, uuid_str);
+	if (tt_uuid_is_nil(uuid)) {
+		tnt_raise(ClientError, ER_CFG, name,
+			  tt_sprintf("nil UUID is reserved"));
+	}
+}
+
 static void
 box_check_instance_uuid(struct tt_uuid *uuid)
 {
-	*uuid = uuid_nil;
-	const char *uuid_str = cfg_gets("instance_uuid");
-	if (uuid_str != NULL && tt_uuid_from_string(uuid_str, uuid) != 0)
-		tnt_raise(ClientError, ER_CFG, "instance_uuid", uuid_str);
+	box_check_uuid(uuid, "instance_uuid");
 }
 
 static void
 box_check_replicaset_uuid(struct tt_uuid *uuid)
 {
-	*uuid = uuid_nil;
-	const char *uuid_str = cfg_gets("replicaset_uuid");
-	if (uuid_str != NULL && tt_uuid_from_string(uuid_str, uuid) != 0)
-		tnt_raise(ClientError, ER_CFG, "replicaset_uuid", uuid_str);
+	box_check_uuid(uuid, "replicaset_uuid");
 }
 
 static enum wal_mode
