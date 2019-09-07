@@ -8,10 +8,10 @@ test_run = env.new()
 -- and wal_schedule fiber schedulers.
 -- The same fiber should not be scheduled by ev_schedule (e.g.
 -- due to cancellation) if it is within th wal_schedule queue.
--- The test case is dependent on rows_per_wal, since this is when
+-- The test case is dependent on wal_max_size, since this is when
 -- we reopen the .xlog file and thus wal_scheduler takes a long
 -- pause
-box.cfg.rows_per_wal
+box.cfg.wal_max_size
 space:insert{1, 'testing', 'lua rocks'}
 space:delete{1}
 space:insert{1, 'testing', 'lua rocks'}

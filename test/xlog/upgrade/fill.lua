@@ -2,7 +2,7 @@
 --- A script to generate some dataset used by migration.test.lua
 ---
 
-box.cfg{ rows_per_wal = 5 }
+box.cfg{ wal_max_size = 250 }
 box.schema.space.create("distro")
 box.space.distro:create_index('primary', { type = 'hash', unique = true,
     parts = {1, 'str', 2, 'str', 3, 'num'}})

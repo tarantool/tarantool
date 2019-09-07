@@ -30,12 +30,13 @@ _ = test:create_index('primary')
 
 box.schema.user.grant('guest', 'write', 'space', 'test')
 
-for i=1, box.cfg.rows_per_wal do test:insert{i, 'test'} end
+row_count_per_wal = box.cfg.wal_max_size / 50 + 10
+for i=1, row_count_per_wal do test:insert{i, 'test'} end
 c = require('net.box').connect(box.cfg.listen)
 
 -- try to write xlog without permission to write to disk
 errinj.set('ERRINJ_WAL_WRITE', true)
-c.space.test:insert({box.cfg.rows_per_wal + 1,1,2,3})
+c.space.test:insert({row_count_per_wal + 1,1,2,3})
 errinj.set('ERRINJ_WAL_WRITE', false)
 
 -- Cleanup

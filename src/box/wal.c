@@ -92,8 +92,6 @@ struct wal_writer
 	/** A memory pool for messages. */
 	struct mempool msg_pool;
 	/* ----------------- wal ------------------- */
-	/** A setting from instance configuration - rows_per_wal */
-	int64_t wal_max_rows;
 	/** A setting from instance configuration - wal_max_size */
 	int64_t wal_max_size;
 	/** Another one - wal_mode */
@@ -344,13 +342,12 @@ tx_notify_checkpoint(struct cmsg *msg)
  */
 static void
 wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
-		  const char *wal_dirname, int64_t wal_max_rows,
+		  const char *wal_dirname,
 		  int64_t wal_max_size, const struct tt_uuid *instance_uuid,
 		  wal_on_garbage_collection_f on_garbage_collection,
 		  wal_on_checkpoint_threshold_f on_checkpoint_threshold)
 {
 	writer->wal_mode = wal_mode;
-	writer->wal_max_rows = wal_max_rows;
 	writer->wal_max_size = wal_max_size;
 	journal_create(&writer->base, wal_mode == WAL_NONE ?
 		       wal_write_in_wal_mode_none : wal_write, NULL);
@@ -461,16 +458,14 @@ wal_open(struct wal_writer *writer)
 }
 
 int
-wal_init(enum wal_mode wal_mode, const char *wal_dirname, int64_t wal_max_rows,
+wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	 int64_t wal_max_size, const struct tt_uuid *instance_uuid,
 	 wal_on_garbage_collection_f on_garbage_collection,
 	 wal_on_checkpoint_threshold_f on_checkpoint_threshold)
 {
-	assert(wal_max_rows > 1);
-
 	/* Initialize the state. */
 	struct wal_writer *writer = &wal_writer_singleton;
-	wal_writer_create(writer, wal_mode, wal_dirname, wal_max_rows,
+	wal_writer_create(writer, wal_mode, wal_dirname,
 			  wal_max_size, instance_uuid, on_garbage_collection,
 			  on_checkpoint_threshold);
 
@@ -762,8 +757,7 @@ wal_opt_rotate(struct wal_writer *writer)
 	 * one.
 	 */
 	if (xlog_is_open(&writer->current_wal) &&
-	    (writer->current_wal.rows >= writer->wal_max_rows ||
-	     writer->current_wal.offset >= writer->wal_max_size)) {
+	    writer->current_wal.offset >= writer->wal_max_size) {
 		/*
 		 * We can not handle xlog_close()
 		 * failure in any reasonable way.

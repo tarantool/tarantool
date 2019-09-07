@@ -7,7 +7,6 @@ box.cfg{
     pid_file            = "tarantool.pid",
     force_recovery  = false,
     slab_alloc_factor = 1.1,
-    rows_per_wal        = 5000000
 }
 
 require('console').listen(os.getenv('ADMIN'))

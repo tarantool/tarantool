@@ -286,8 +286,6 @@ struct wal_stream {
 	struct xstream base;
 	/** How many rows have been recovered so far. */
 	size_t rows;
-	/** Yield once per 'yield' rows. */
-	size_t yield;
 };
 
 /**
@@ -341,22 +339,15 @@ apply_wal_row(struct xstream *stream, struct xrow_header *row)
 	 * Yield once in a while, but not too often,
 	 * mostly to allow signal handling to take place.
 	 */
-	if (++xstream->rows % xstream->yield == 0)
+	if (++xstream->rows % WAL_ROWS_PER_YIELD == 0)
 		fiber_sleep(0);
 }
 
 static void
-wal_stream_create(struct wal_stream *ctx, size_t wal_max_rows)
+wal_stream_create(struct wal_stream *ctx)
 {
 	xstream_create(&ctx->base, apply_wal_row);
 	ctx->rows = 0;
-	/**
-	 * Make the yield logic covered by the functional test
-	 * suite, which has a small setting for rows_per_wal.
-	 * Each yield can take up to 1ms if there are no events,
-	 * so we can't afford many of them during recovery.
-	 */
-	ctx->yield = (wal_max_rows >> 4)  + 1;
 }
 
 /* {{{ configuration bindings */
@@ -529,17 +520,6 @@ box_check_checkpoint_count(int checkpoint_count)
 }
 
 static int64_t
-box_check_wal_max_rows(int64_t wal_max_rows)
-{
-	/* check rows_per_wal configuration */
-	if (wal_max_rows <= 1) {
-		tnt_raise(ClientError, ER_CFG, "rows_per_wal",
-			  "the value must be greater than one");
-	}
-	return wal_max_rows;
-}
-
-static int64_t
 box_check_wal_max_size(int64_t wal_max_size)
 {
 	/* check wal_max_bytes configuration */
@@ -626,7 +606,6 @@ box_check_config()
 	box_check_replication_sync_timeout();
 	box_check_readahead(cfg_geti("readahead"));
 	box_check_checkpoint_count(cfg_geti("checkpoint_count"));
-	box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
 	box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
 	box_check_memtx_memory(cfg_geti64("memtx_memory"));
@@ -1909,7 +1888,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	say_info("instance uuid %s", tt_uuid_str(&INSTANCE_UUID));
 
 	struct wal_stream wal_stream;
-	wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
+	wal_stream_create(&wal_stream);
 
 	struct recovery *recovery;
 	recovery = recovery_new(cfg_gets("wal_dir"),
@@ -2095,10 +2074,9 @@ box_cfg_xc(void)
 	iproto_init();
 	sql_init();
 
-	int64_t wal_max_rows = box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
 	int64_t wal_max_size = box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
-	if (wal_init(wal_mode, cfg_gets("wal_dir"), wal_max_rows,
+	if (wal_init(wal_mode, cfg_gets("wal_dir"),
 		     wal_max_size, &INSTANCE_UUID, on_wal_garbage_collection,
 		     on_wal_checkpoint_threshold) != 0) {
 		diag_raise();

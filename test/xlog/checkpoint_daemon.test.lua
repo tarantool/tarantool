@@ -54,17 +54,18 @@ test_run:cmd("setopt delimiter ''");
 box.cfg{checkpoint_interval = PERIOD, checkpoint_count = 2 }
 
 no = 1
+row_count_per_wal = box.cfg.wal_max_size / 50
 -- first xlog
-for i = 1, box.cfg.rows_per_wal + 10 do space:insert { no } no = no + 1 end
+for i = 1, row_count_per_wal + 10 do space:insert { no } no = no + 1 end
 -- second xlog
-for i = 1, box.cfg.rows_per_wal + 10 do space:insert { no } no = no + 1 end
+for i = 1, row_count_per_wal + 10 do space:insert { no } no = no + 1 end
 
 wait_snapshot(WAIT_COND_TIMEOUT)
 
 -- third xlog
-for i = 1, box.cfg.rows_per_wal + 10 do space:insert { no } no = no + 1 end
+for i = 1, row_count_per_wal + 10 do space:insert { no } no = no + 1 end
 -- fourth xlog
-for i = 1, box.cfg.rows_per_wal + 10 do space:insert { no } no = no + 1 end
+for i = 1, row_count_per_wal + 10 do space:insert { no } no = no + 1 end
 
 wait_snapshot(WAIT_COND_TIMEOUT)
 wait_snapshot_gc(WAIT_COND_TIMEOUT)

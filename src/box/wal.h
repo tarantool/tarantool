@@ -43,6 +43,15 @@ struct tt_uuid;
 
 enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 
+enum {
+	/**
+	 * Recovery yields once per that number of rows read and
+	 * applied from WAL. It allows not to block the event
+	 * loop for the whole recovery stage.
+	 */
+	WAL_ROWS_PER_YIELD = 32000,
+};
+
 /** String constants for the supported modes. */
 extern const char *wal_mode_STRS[];
 
@@ -72,7 +81,7 @@ typedef void (*wal_on_checkpoint_threshold_f)(void);
  * Start WAL thread and initialize WAL writer.
  */
 int
-wal_init(enum wal_mode wal_mode, const char *wal_dirname, int64_t wal_max_rows,
+wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	 int64_t wal_max_size, const struct tt_uuid *instance_uuid,
 	 wal_on_garbage_collection_f on_garbage_collection,
 	 wal_on_checkpoint_threshold_f on_checkpoint_threshold);
