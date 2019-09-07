@@ -69,8 +69,6 @@ cfg_filter(box.cfg)
  |     - 300
  |   - - replication_timeout
  |     - 1
- |   - - rows_per_wal
- |     - 500000
  |   - - slab_alloc_factor
  |     - 1.05
  |   - - strip_core
@@ -170,8 +168,6 @@ cfg_filter(box.cfg)
  |     - 300
  |   - - replication_timeout
  |     - 1
- |   - - rows_per_wal
- |     - 500000
  |   - - slab_alloc_factor
  |     - 1.05
  |   - - strip_core

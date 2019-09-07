@@ -11,7 +11,7 @@ box.cfg{
     listen              = os.getenv("LISTEN"),
     memtx_memory        = 107374182,
     pid_file            = "tarantool.pid",
-    rows_per_wal        = 50,
+    wal_max_size        = 2500,
     vinyl_read_threads  = 2,
     vinyl_write_threads = 3,
     vinyl_range_size    = 64 * 1024,
