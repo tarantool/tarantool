@@ -3,7 +3,17 @@ local fiber = require('fiber')
 local tap = require('tap')
 local test = tap.test("cfg")
 
-test:plan(9)
+test:plan(11)
+
+--
+-- gh-4282: box.cfg should not allow nor just ignore nil UUID.
+-- It is a special reserved value.
+--
+local nil_uuid = '00000000-0000-0000-0000-000000000000'
+local ok = pcall(box.cfg, {instance_uuid = nil_uuid})
+test:ok(not ok, 'nil instance UUID is not allowed')
+ok, err = pcall(box.cfg, {replicaset_uuid = nil_uuid})
+test:ok(not ok, 'nil replicaset UUID is not allowed')
 
 test:is(type(box.ctl), "table", "box.ctl is available before box.cfg")
 test:is(type(box.ctl.wait_ro), "function", "box.ctl.wait_ro is available")
