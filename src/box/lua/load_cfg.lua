@@ -278,19 +278,32 @@ local function convert_gb(size)
     return math.floor(size * 1024 * 1024 * 1024)
 end
 
--- Old to new config translation tables
+-- Old to new config translation tables. In case a translation is
+-- not 1-to-1, then a function can be used. It takes 2 parameters:
+-- value of the old option, value of the new if present. It
+-- returns two values - value to replace the old option and to
+-- replace the new one.
 local translate_cfg = {
     snapshot_count = {'checkpoint_count'},
     snapshot_period = {'checkpoint_interval'},
-    slab_alloc_arena = {'memtx_memory', convert_gb},
+    slab_alloc_arena = {'memtx_memory', function(old)
+        return nil, convert_gb(old)
+    end},
     slab_alloc_minimal = {'memtx_min_tuple_size'},
     slab_alloc_maximal = {'memtx_max_tuple_size'},
     snap_dir = {'memtx_dir'},
     logger = {'log'},
     logger_nonblock = {'log_nonblock'},
-    panic_on_snap_error = {'force_recovery', function (p) return not p end},
-    panic_on_wal_error = {'force_recovery', function (p) return not p end},
+    panic_on_snap_error = {'force_recovery', function(old)
+        return nil, not old end
+    },
+    panic_on_wal_error = {'force_recovery', function(old)
+        return nil, not old end
+    },
     replication_source = {'replication'},
+    rows_per_wal = {'wal_max_size', function(old, new)
+        return old, new
+    end},
 }
 
 -- Upgrade old config
@@ -302,19 +315,23 @@ local function upgrade_cfg(cfg, translate_cfg)
     for k, v in pairs(cfg) do
         local translation = translate_cfg[k]
         if translation ~= nil then
-            log.warn('Deprecated option %s, please use %s instead', k, translation[1])
-            local new_val
-            if translation[2] == nil then
+            local new_key = translation[1]
+            local transform = translation[2]
+            log.warn('Deprecated option %s, please use %s instead', k, new_key)
+            local new_val_orig = cfg[new_key]
+            local old_val, new_val
+            if transform == nil then
                 new_val = v
             else
-                new_val = translation[2](v)
+                old_val, new_val = transform(v, new_val_orig)
             end
-            if cfg[translation[1]] ~= nil and
-               cfg[translation[1]] ~= new_val then
+            if new_val_orig ~= nil and
+               new_val_orig ~= new_val then
                 box.error(box.error.CFG, k,
                           'can not override a value for a deprecated option')
             end
-            result_cfg[translation[1]] = new_val
+            result_cfg[k] = old_val
+            result_cfg[new_key] = new_val
         else
             result_cfg[k] = v
         end
