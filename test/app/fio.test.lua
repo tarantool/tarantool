@@ -411,3 +411,8 @@ ch:get() == hash
 fio.unlink(tmp1)
 fio.unlink(tmp2)
 fio.rmdir(tmpdir)
+--
+-- gh-4439: mktree error handling fix - creation of existing file/directory
+--
+fio.mktree('/dev/null')
+fio.mktree('/dev/null/dir')

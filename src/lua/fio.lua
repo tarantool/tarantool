@@ -3,6 +3,7 @@
 local fio = require('fio')
 local ffi = require('ffi')
 local buffer = require('buffer')
+local errno = require('errno')
 
 ffi.cdef[[
     int umask(int mask);
@@ -355,12 +356,16 @@ fio.mktree = function(path, mode)
     local current_dir = "/"
     for i, dir in ipairs(dirs) do
         current_dir = fio.pathjoin(current_dir, dir)
-        if not fio.stat(current_dir) then
+        local stat = fio.stat(current_dir)
+        if stat == nil then
             local st, err = fio.mkdir(current_dir, mode)
             if err ~= nil  then
                 return false, string.format("Error creating directory %s: %s",
                     current_dir, tostring(err))
             end
+        elseif not stat:is_dir() then
+            return false, string.format("Error creating directory %s: %s",
+                current_dir, errno.strerror(errno.EEXIST))
         end
     end
     return true
