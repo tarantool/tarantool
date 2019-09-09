@@ -432,3 +432,9 @@ fio.rmtree(1)
 fio.copytree(nil, nil)
 fio.copytree(nil, nil)
 test_run:cmd("clear filter")
+
+--
+-- gh-4439: mktree error handling fix - creation of existing file/directory
+--
+fio.mktree('/dev/null')
+fio.mktree('/dev/null/dir')
