@@ -1443,3 +1443,16 @@ test_run:cmd("clear filter")
 ---
 - true
 ...
+--
+-- gh-4439: mktree error handling fix - creation of existing file/directory
+--
+fio.mktree('/dev/null')
+---
+- false
+- 'Error creating directory /dev/null: File exists'
+...
+fio.mktree('/dev/null/dir')
+---
+- false
+- 'Error creating directory /dev/null: File exists'
+...
