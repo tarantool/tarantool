@@ -1112,7 +1112,7 @@ metmx_tuple_chunk_delete(struct tuple_format *format, const char *data)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	struct tuple_chunk *tuple_chunk =
-		container_of((typeof(tuple_chunk->data) *)data,
+		container_of((const char (*)[0])data,
 			     struct tuple_chunk, data);
 	uint32_t sz = tuple_chunk_sz(tuple_chunk->data_sz);
 	smfree(&memtx->alloc, tuple_chunk, sz);
