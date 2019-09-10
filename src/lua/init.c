@@ -496,19 +496,17 @@ tarantool_lua_slab_cache()
 /**
  * Push argument and call a function on the top of Lua stack
  */
-static void
+static int
 lua_main(lua_State *L, int argc, char **argv)
 {
 	assert(lua_isfunction(L, -1));
 	lua_checkstack(L, argc - 1);
 	for (int i = 1; i < argc; i++)
 		lua_pushstring(L, argv[i]);
-	if (luaT_call(L, lua_gettop(L) - 1, 0) != 0) {
-		struct error *e = diag_last_error(&fiber()->diag);
-		panic("%s", e->errmsg);
-	}
+	int rc = luaT_call(L, lua_gettop(L) - 1, 0);
 	/* clear the stack from return values. */
 	lua_settop(L, 0);
+	return rc;
 }
 
 /**
@@ -524,7 +522,13 @@ run_script_f(va_list ap)
 	char **optv = va_arg(ap, char **);
 	int argc = va_arg(ap, int);
 	char **argv = va_arg(ap, char **);
-	struct diag *diag = &fiber()->diag;
+	/*
+	 * An error is returned via an external diag. A caller
+	 * can't use fiber_join(), because the script can call
+	 * os.exit(). That call makes the script runner fiber
+	 * never really dead. It never returns from its function.
+	 */
+	struct diag *diag = va_arg(ap, struct diag *);
 
 	/*
 	 * Load libraries and execute chunks passed by -l and -e
@@ -539,10 +543,8 @@ run_script_f(va_list ap)
 			 */
 			lua_getglobal(L, "require");
 			lua_pushstring(L, optv[i + 1]);
-			if (luaT_call(L, 1, 1) != 0) {
-				struct error *e = diag_last_error(diag);
-				panic("%s", e->errmsg);
-			}
+			if (luaT_call(L, 1, 1) != 0)
+				goto error;
 			/* Non-standard: set name = require('name') */
 			lua_setglobal(L, optv[i + 1]);
 			lua_settop(L, 0);
@@ -552,13 +554,10 @@ run_script_f(va_list ap)
 			 * Execute chunk
 			 */
 			if (luaL_loadbuffer(L, optv[i + 1], strlen(optv[i + 1]),
-					    "=(command line)") != 0) {
-				panic("%s", lua_tostring(L, -1));
-			}
-			if (luaT_call(L, 0, 0) != 0) {
-				struct error *e = diag_last_error(diag);
-				panic("%s", e->errmsg);
-			}
+					    "=(command line)") != 0)
+				goto luajit_error;
+			if (luaT_call(L, 0, 0) != 0)
+				goto error;
 			lua_settop(L, 0);
 			break;
 		default:
@@ -576,13 +575,15 @@ run_script_f(va_list ap)
 	if (path && strcmp(path, "-") != 0 && access(path, F_OK) == 0) {
 		/* Execute script. */
 		if (luaL_loadfile(L, path) != 0)
-			panic("%s", lua_tostring(L, -1));
-		lua_main(L, argc, argv);
+			goto luajit_error;
+		if (lua_main(L, argc, argv) != 0)
+			goto error;
 	} else if (!isatty(STDIN_FILENO) || (path && strcmp(path, "-") == 0)) {
 		/* Execute stdin */
 		if (luaL_loadfile(L, NULL) != 0)
-			panic("%s", lua_tostring(L, -1));
-		lua_main(L, argc, argv);
+			goto luajit_error;
+		if (lua_main(L, argc, argv) != 0)
+			goto error;
 	} else {
 		interactive = true;
 	}
@@ -601,18 +602,25 @@ run_script_f(va_list ap)
 		lua_remove(L, -2); /* remove package.loaded.console */
 		lua_remove(L, -2); /* remove package.loaded */
 		start_loop = false;
-		lua_main(L, argc, argv);
+		if (lua_main(L, argc, argv) != 0)
+			goto error;
 	}
-
 	/*
 	 * Lua script finished. Stop the auxiliary event loop and
 	 * return control back to tarantool_lua_run_script.
 	 */
+end:
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
+
+luajit_error:
+	diag_set(LuajitError, lua_tostring(L, -1));
+error:
+	diag_move(diag_get(), diag);
+	goto end;
 }
 
-void
+int
 tarantool_lua_run_script(char *path, bool interactive,
 			 int optc, char **optv, int argc, char **argv)
 {
@@ -630,7 +638,7 @@ tarantool_lua_run_script(char *path, bool interactive,
 		panic("%s", diag_last_error(diag_get())->errmsg);
 	script_fiber->storage.lua.stack = tarantool_L;
 	fiber_start(script_fiber, tarantool_L, path, interactive,
-		    optc, optv, argc, argv);
+		    optc, optv, argc, argv, diag_get());
 
 	/*
 	 * Run an auxiliary event loop to re-schedule run_script fiber.
@@ -639,6 +647,12 @@ tarantool_lua_run_script(char *path, bool interactive,
 	ev_run(loop(), 0);
 	/* The fiber running the startup script has ended. */
 	script_fiber = NULL;
+	/*
+	 * Result can't be obtained via fiber_join - script fiber
+	 * never dies if os.exit() was called. This is why diag
+	 * is checked explicitly.
+	 */
+	return diag_is_empty(diag_get()) ? 0 : -1;
 }
 
 void
