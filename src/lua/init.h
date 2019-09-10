@@ -65,8 +65,12 @@ tarantool_lua_free();
  * @param interactive force interactive mode
  * @param argc argc the number of command line arguments
  * @param argv argv command line arguments
+ *
+ * @retval 0 The script is successfully finished.
+ * @retval -1 Error during the script execution. Diagnostics area
+ *        error is set.
  */
-void
+int
 tarantool_lua_run_script(char *path, bool force_interactive,
 			 int optc, char **optv,
 			 int argc, char **argv);
