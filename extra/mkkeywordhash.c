@@ -93,7 +93,7 @@ static Keyword aKeywordTable[] = {
   { "DISTINCT",               "TK_DISTINCT",    true  },
   { "DROP",                   "TK_DROP",        true  },
   { "END",                    "TK_END",         true  },
-  { "ENGINE",                 "TK_ENGINE",      true  },
+  { "ENGINE",                 "TK_ENGINE",      false },
   { "EACH",                   "TK_EACH",        true  },
   { "ELSE",                   "TK_ELSE",        true  },
   { "ESCAPE",                 "TK_ESCAPE",      true  },
