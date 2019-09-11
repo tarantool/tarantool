@@ -46,6 +46,21 @@
 
 #include <third_party/coro/coro.h>
 
+/*
+ * Fiber top doesn't work on ARM processors at the moment,
+ * because we haven't chosen an alternative to rdtsc.
+ */
+#ifdef __CC_ARM
+#define ENABLE_FIBER_TOP 0
+#else
+#define ENABLE_FIBER_TOP 1
+#endif
+
+#if ENABLE_FIBER_TOP
+/* A fiber reports used up CPU time with nanosecond resolution. */
+#define FIBER_TIME_RES 1000000000
+#endif /* ENABLE_FIBER_TOP */
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -386,6 +401,23 @@ struct fiber {
 	uint32_t fid;
 	/** Fiber flags */
 	uint32_t flags;
+#if ENABLE_FIBER_TOP
+	/**
+	 * Accumulated clock value calculated using exponential
+	 * moving average.
+	 */
+	uint64_t clock_acc;
+	/**
+	 * Total processor time this fiber has spent with
+	 * 1 / FIBER_TIME_RES second precision.
+	 */
+	uint64_t cputime;
+	/**
+	 * Clock delta calculated on previous event loop iteration.
+	 */
+	uint64_t clock_delta_last;
+	uint64_t clock_delta;
+#endif /* ENABLE_FIBER_TOP */
 	/** Link in cord->alive or cord->dead list. */
 	struct rlist link;
 	/** Link in cord->ready list. */
@@ -457,6 +489,23 @@ struct cord {
 	 * reserved.
 	 */
 	uint32_t max_fid;
+#if ENABLE_FIBER_TOP
+	uint64_t clock_acc;
+	uint64_t clock_delta;
+	uint64_t clock_delta_last;
+	uint64_t clock_last;
+	uint32_t cpu_id_last;
+	uint32_t cpu_miss_count;
+	uint32_t cpu_miss_count_last;
+	/**
+	 * This thread's CPU time at the beginning of event loop
+	 * iteration. Used to calculate how much cpu time has
+	 * each loop iteration consumed and update fiber cpu
+	 * times propotionally. The resolution is
+	 * 1 / FIBER_TIME_RES seconds.
+	 */
+	uint64_t cputime_last;
+#endif /* ENABLE_FIBER_TOP */
 	pthread_t id;
 	const struct cord_on_exit *on_exit;
 	/** A helper hash to map id -> fiber. */
@@ -482,6 +531,16 @@ struct cord {
 	 * is no 1 ms delay in case of zero sleep timeout.
 	 */
 	ev_idle idle_event;
+#if ENABLE_FIBER_TOP
+	/** An event triggered on every event loop iteration start. */
+	ev_check check_event;
+	/**
+	 * An event triggered on every event loop iteration end.
+	 * Just like the event above it is used in per-fiber cpu
+	 * time calculations.
+	 */
+	ev_prepare prepare_event;
+#endif /* ENABLE_FIBER_TOP */
 	/** A memory cache for (struct fiber) */
 	struct mempool fiber_mempool;
 	/** A runtime slab cache for general use in this cord. */
@@ -624,6 +683,17 @@ typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
 
 int
 fiber_stat(fiber_stat_cb cb, void *cb_ctx);
+
+#if ENABLE_FIBER_TOP
+bool
+fiber_top_is_enabled();
+
+void
+fiber_top_enable();
+
+void
+fiber_top_disable();
+#endif /* ENABLE_FIBER_TOP */
 
 /** Useful for C unit tests */
 static inline int

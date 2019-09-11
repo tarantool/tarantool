@@ -33,6 +33,7 @@
 #include <fiber.h>
 #include "lua/utils.h"
 #include "backtrace.h"
+#include "tt_static.h"
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -276,6 +277,10 @@ lbox_fiber_statof(struct fiber *f, void *cb_ctx, bool backtrace)
 	lua_pushnumber(L, f->csw);
 	lua_settable(L, -3);
 
+	lua_pushliteral(L, "time");
+	lua_pushnumber(L, f->cputime / (double) FIBER_TIME_RES);
+	lua_settable(L, -3);
+
 	lua_pushliteral(L, "memory");
 	lua_newtable(L);
 	lua_pushstring(L, "used");
@@ -318,6 +323,68 @@ lbox_fiber_statof_nobt(struct fiber *f, void *cb_ctx)
 {
 	return lbox_fiber_statof(f, cb_ctx, false);
 }
+
+#if ENABLE_FIBER_TOP
+static int
+lbox_fiber_top_entry(struct fiber *f, void *cb_ctx)
+{
+	struct lua_State *L = (struct lua_State *) cb_ctx;
+
+	lua_pushstring(L, tt_sprintf("%u/%s", f->fid, f->name));
+
+	lua_newtable(L);
+
+	lua_pushliteral(L, "average");
+	lua_pushnumber(L, f->clock_acc / (double)cord()->clock_acc * 100);
+	lua_settable(L, -3);
+	lua_pushliteral(L, "instant");
+	lua_pushnumber(L, f->clock_delta_last / (double)cord()->clock_delta_last * 100);
+	lua_settable(L, -3);
+	lua_pushliteral(L, "time");
+	lua_pushnumber(L, f->cputime / (double) FIBER_TIME_RES);
+	lua_settable(L, -3);
+	lua_settable(L, -3);
+
+	return 0;
+}
+
+static int
+lbox_fiber_top(struct lua_State *L)
+{
+	if (!fiber_top_is_enabled()) {
+		luaL_error(L, "fiber.top() is disabled. Enable it with"
+			      " fiber.top_enable() first");
+	}
+	lua_newtable(L);
+	lua_pushliteral(L, "cpu_misses");
+	lua_pushnumber(L, cord()->cpu_miss_count_last);
+	lua_settable(L, -3);
+
+	lua_pushliteral(L, "cpu");
+	lua_newtable(L);
+	lbox_fiber_top_entry(&cord()->sched, L);
+	fiber_stat(lbox_fiber_top_entry, L);
+	lua_settable(L, -3);
+
+	return 1;
+}
+
+static int
+lbox_fiber_top_enable(struct lua_State *L)
+{
+	(void) L;
+	fiber_top_enable();
+	return 0;
+}
+
+static int
+lbox_fiber_top_disable(struct lua_State *L)
+{
+	(void) L;
+	fiber_top_disable();
+	return 0;
+}
+#endif /* ENABLE_FIBER_TOP */
 
 /**
  * Return fiber statistics.
@@ -743,6 +810,11 @@ static const struct luaL_Reg lbox_fiber_meta [] = {
 
 static const struct luaL_Reg fiberlib[] = {
 	{"info", lbox_fiber_info},
+#if ENABLE_FIBER_TOP
+	{"top", lbox_fiber_top},
+	{"top_enable", lbox_fiber_top_enable},
+	{"top_disable", lbox_fiber_top_disable},
+#endif /* ENABLE_FIBER_TOP */
 	{"sleep", lbox_fiber_sleep},
 	{"yield", lbox_fiber_yield},
 	{"self", lbox_fiber_self},
