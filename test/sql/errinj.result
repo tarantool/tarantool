@@ -410,7 +410,7 @@ errinj.set("ERRINJ_WAL_IO", true)
 ---
 - ok
 ...
-_ = box.space._ck_constraint:insert({s.id, 'CK_CONSTRAINT_01', false, 'SQL', 'X<5'})
+_ = box.space._ck_constraint:insert({s.id, 'CK_CONSTRAINT_01', false, 'SQL', 'X<5', true})
 ---
 - error: Failed to write to disk
 ...
@@ -418,7 +418,7 @@ errinj.set("ERRINJ_WAL_IO", false)
 ---
 - ok
 ...
-_ = box.space._ck_constraint:insert({s.id, 'CK_CONSTRAINT_01', false, 'SQL', 'X<5'})
+_ = box.space._ck_constraint:insert({s.id, 'CK_CONSTRAINT_01', false, 'SQL', 'X<5', true})
 ---
 ...
 box.execute("INSERT INTO \"test\" VALUES(5);")
@@ -430,7 +430,7 @@ errinj.set("ERRINJ_WAL_IO", true)
 ---
 - ok
 ...
-_ = box.space._ck_constraint:replace({s.id, 'CK_CONSTRAINT_01', false, 'SQL', 'X<=5'})
+_ = box.space._ck_constraint:replace({s.id, 'CK_CONSTRAINT_01', false, 'SQL', 'X<=5', true})
 ---
 - error: Failed to write to disk
 ...
@@ -438,7 +438,7 @@ errinj.set("ERRINJ_WAL_IO", false)
 ---
 - ok
 ...
-_ = box.space._ck_constraint:replace({s.id, 'CK_CONSTRAINT_01', false, 'SQL', 'X<=5'})
+_ = box.space._ck_constraint:replace({s.id, 'CK_CONSTRAINT_01', false, 'SQL', 'X<=5', true})
 ---
 ...
 box.execute("INSERT INTO \"test\" VALUES(5);")
@@ -484,10 +484,10 @@ _ = s:create_index('pk')
 s:format({{name='X', type='integer'}, {name='Y', type='integer'}})
 ---
 ...
-_ = box.space._ck_constraint:insert({s.id, 'XlessY', false, 'SQL', 'X < Y'})
+_ = box.space._ck_constraint:insert({s.id, 'XlessY', false, 'SQL', 'X < Y', true})
 ---
 ...
-_ = box.space._ck_constraint:insert({s.id, 'Xgreater10', false, 'SQL', 'X > 10'})
+_ = box.space._ck_constraint:insert({s.id, 'Xgreater10', false, 'SQL', 'X > 10', true})
 ---
 ...
 box.execute("INSERT INTO \"test\" VALUES(1, 2);")

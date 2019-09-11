@@ -205,6 +205,9 @@ lbox_push_ck_constraint(struct lua_State *L, struct space *space, int i)
 		lua_pushstring(L, ck_constraint->def->expr_str);
 		lua_setfield(L, -2, "expr");
 
+		lua_pushboolean(L, ck_constraint->def->is_enabled);
+		lua_setfield(L, -2, "is_enabled");
+
 		lua_setfield(L, -2, ck_constraint->def->name);
 	}
 	lua_pop(L, 1);

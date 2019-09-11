@@ -92,7 +92,8 @@ box.space._space:select{}
       {'name': 'child_cols', 'type': 'array'}, {'name': 'parent_cols', 'type': 'array'}]]
   - [364, 1, '_ck_constraint', 'memtx', 0, {}, [{'name': 'space_id', 'type': 'unsigned'},
       {'name': 'name', 'type': 'string'}, {'name': 'is_deferred', 'type': 'boolean'},
-      {'name': 'language', 'type': 'str'}, {'name': 'code', 'type': 'str'}]]
+      {'name': 'language', 'type': 'str'}, {'name': 'code', 'type': 'str'}, {'name': 'is_enabled',
+        'type': 'boolean'}]]
   - [372, 1, '_func_index', 'memtx', 0, {}, [{'name': 'space_id', 'type': 'unsigned'},
       {'name': 'index_id', 'type': 'unsigned'}, {'name': 'func_id', 'type': 'unsigned'}]]
 ...

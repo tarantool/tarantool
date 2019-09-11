@@ -44,7 +44,7 @@ const char *ck_constraint_language_strs[] = {"SQL"};
 struct ck_constraint_def *
 ck_constraint_def_new(const char *name, uint32_t name_len, const char *expr_str,
 		      uint32_t expr_str_len, uint32_t space_id,
-		      enum ck_constraint_language language)
+		      enum ck_constraint_language language, bool is_enabled)
 {
 	uint32_t expr_str_offset;
 	uint32_t ck_def_sz = ck_constraint_def_sizeof(name_len, expr_str_len,
@@ -55,6 +55,7 @@ ck_constraint_def_new(const char *name, uint32_t name_len, const char *expr_str,
 		diag_set(OutOfMemory, ck_def_sz, "malloc", "ck_def");
 		return NULL;
 	}
+	ck_def->is_enabled = is_enabled;
 	ck_def->expr_str = (char *)ck_def + expr_str_offset;
 	ck_def->language = language;
 	ck_def->space_id = space_id;
@@ -201,7 +202,8 @@ ck_constraint_on_replace_trigger(struct trigger *trigger, void *event)
 
 	struct ck_constraint *ck_constraint;
 	rlist_foreach_entry(ck_constraint, &space->ck_constraint, link) {
-		if (ck_constraint_program_run(ck_constraint, field_ref) != 0)
+		if (ck_constraint->def->is_enabled &&
+		    ck_constraint_program_run(ck_constraint, field_ref) != 0)
 			diag_raise();
 	}
 }

@@ -71,6 +71,11 @@ struct ck_constraint_def {
 	 * defined for.
 	 */
 	uint32_t space_id;
+	/**
+	 * Per constraint option regulating its execution: it is
+	 * disabled (set to false) contraint won't be fired.
+	 */
+	bool is_enabled;
 	/** The language of ck constraint. */
 	enum ck_constraint_language language;
 	/**
@@ -140,6 +145,7 @@ ck_constraint_def_sizeof(uint32_t name_len, uint32_t expr_str_len,
  * @param expr_str_len The length of the @a expr string.
  * @param space_id The identifier of the target space.
  * @param language The language of the @a expr string.
+ * @param is_enabled Whether this ck constraint should be fired.
  * @retval not NULL Check constraint definition object pointer
  *                  on success.
  * @retval NULL Otherwise. The diag message is set.
@@ -147,7 +153,7 @@ ck_constraint_def_sizeof(uint32_t name_len, uint32_t expr_str_len,
 struct ck_constraint_def *
 ck_constraint_def_new(const char *name, uint32_t name_len, const char *expr,
 		      uint32_t expr_str_len, uint32_t space_id,
-		      enum ck_constraint_language language);
+		      enum ck_constraint_language language, bool is_enabled);
 
 /**
  * Destroy check constraint definition memory, release acquired

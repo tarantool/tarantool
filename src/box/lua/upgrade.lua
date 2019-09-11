@@ -927,6 +927,19 @@ local function upgrade_to_2_3_0()
                                         datetime, datetime})
         _priv:replace{ADMIN, PUBLIC, 'function', t.id, box.priv.X}
     end
+
+    log.info("Extend _ck_constraint space format with is_enabled field")
+    local _ck_constraint = box.space._ck_constraint
+    for _, tuple in _ck_constraint:pairs() do
+        _ck_constraint:update({tuple[1], tuple[2]}, {{'=', 6, true}})
+    end
+    local format = {{name='space_id', type='unsigned'},
+                    {name='name', type='string'},
+                    {name='is_deferred', type='boolean'},
+                    {name='language', type='str'},
+                    {name='code', type='str'},
+                    {name='is_enabled', type='boolean'}}
+    _ck_constraint:format(format)
 end
 
 --------------------------------------------------------------------------------

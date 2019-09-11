@@ -982,7 +982,7 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 	 * Occupy registers for 5 fields: each member in
 	 * _ck_constraint space plus one for final msgpack tuple.
 	 */
-	int ck_constraint_reg = sqlGetTempRange(parser, 6);
+	int ck_constraint_reg = sqlGetTempRange(parser, 7);
 	sqlVdbeAddOp2(v, OP_SCopy, reg_space_id, ck_constraint_reg);
 	sqlVdbeAddOp4(v, OP_String8, 0, ck_constraint_reg + 1, 0,
 		      sqlDbStrDup(db, ck_def->name), P4_DYNAMIC);
@@ -991,8 +991,9 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 		      ck_constraint_language_strs[ck_def->language], P4_STATIC);
 	sqlVdbeAddOp4(v, OP_String8, 0, ck_constraint_reg + 4, 0,
 		      sqlDbStrDup(db, ck_def->expr_str), P4_DYNAMIC);
-	sqlVdbeAddOp3(v, OP_MakeRecord, ck_constraint_reg, 5,
-		      ck_constraint_reg + 5);
+	sqlVdbeAddOp2(v, OP_Bool, true, ck_constraint_reg + 5);
+	sqlVdbeAddOp3(v, OP_MakeRecord, ck_constraint_reg, 6,
+		      ck_constraint_reg + 6);
 	const char *error_msg =
 		tt_sprintf(tnt_errcode_desc(ER_CONSTRAINT_EXISTS),
 					    ck_def->name);
@@ -1002,9 +1003,9 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 					      false, OP_NoConflict) != 0)
 		return;
 	sqlVdbeAddOp2(v, OP_SInsert, BOX_CK_CONSTRAINT_ID,
-		      ck_constraint_reg + 5);
+		      ck_constraint_reg + 6);
 	VdbeComment((v, "Create CK constraint %s", ck_def->name));
-	sqlReleaseTempRange(parser, ck_constraint_reg, 6);
+	sqlReleaseTempRange(parser, ck_constraint_reg, 7);
 }
 
 /**

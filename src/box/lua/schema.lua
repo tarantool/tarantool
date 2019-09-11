@@ -1706,7 +1706,7 @@ space_mt.create_check_constraint = function(space, name, code)
         box.error(box.error.PROC_LUA,
                   "Usage: space:create_constraint(name, code)")
     end
-    box.space._ck_constraint:insert({space.id, name, false, 'SQL', code})
+    box.space._ck_constraint:insert({space.id, name, false, 'SQL', code, true})
     return space.ck_constraint[name]
 end
 space_mt.pairs = function(space, key, opts)
@@ -1758,6 +1758,20 @@ local ck_constraint_mt = {}
 ck_constraint_mt.drop = function(ck_constraint)
     check_ck_constraint_arg(ck_constraint, 'drop')
     box.space._ck_constraint:delete({ck_constraint.space_id, ck_constraint.name})
+end
+ck_constraint_mt.enable = function(ck_constraint, yesno)
+    check_ck_constraint_arg(ck_constraint, 'enable')
+    local s = builtin.space_by_id(ck_constraint.space_id)
+    if s == nil then
+        box.error(box.error.NO_SUCH_SPACE, tostring(ck_constraint.space_id))
+    end
+    local t = box.space._ck_constraint:get({ck_constraint.space_id,
+                                            ck_constraint.name})
+    if t == nil then
+        box.error(box.error.NO_SUCH_CONSTRAINT, tostring(ck_constraint.name))
+    end
+    box.space._ck_constraint:update({ck_constraint.space_id, ck_constraint.name},
+                                    {{'=', 6, yesno}})
 end
 
 box.schema.index_mt = base_index_mt

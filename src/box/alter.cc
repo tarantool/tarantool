@@ -4595,9 +4595,12 @@ ck_constraint_def_new_from_tuple(struct tuple *tuple)
 	const char *expr_str =
 		tuple_field_str_xc(tuple, BOX_CK_CONSTRAINT_FIELD_CODE,
 				   &expr_str_len);
+	bool is_enabled =
+		tuple_field_count(tuple) <= BOX_CK_CONSTRAINT_FIELD_IS_ENABLED ||
+		tuple_field_bool_xc(tuple, BOX_CK_CONSTRAINT_FIELD_IS_ENABLED);
 	struct ck_constraint_def *ck_def =
 		ck_constraint_def_new(name, name_len, expr_str, expr_str_len,
-				      space_id, language);
+				      space_id, language, is_enabled);
 	if (ck_def == NULL)
 		diag_raise();
 	return ck_def;
@@ -4698,14 +4701,37 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 			ck_constraint_def_delete(ck_def);
 		});
 		/*
+		 * A corner case: enabling/disabling an existent
+		 * ck constraint doesn't require the object
+		 * rebuilding.
+		 * FIXME: here we need to re-run check constraint
+		 * in case it is turned on after insertion of new
+		 * tuples. Otherwise, data in space can turn out to
+		 * be inconsistent (i.e. violate existing constraints).
+		 */
+		const char *name = ck_def->name;
+		struct ck_constraint *old_ck_constraint =
+			space_ck_constraint_by_name(space, name, strlen(name));
+		if (old_ck_constraint != NULL) {
+			struct ck_constraint_def *old_def =
+						old_ck_constraint->def;
+			assert(old_def->space_id == ck_def->space_id);
+			assert(strcmp(old_def->name, ck_def->name) == 0);
+			if (old_def->language == ck_def->language &&
+			    strcmp(old_def->expr_str, ck_def->expr_str) == 0) {
+				old_def->is_enabled = ck_def->is_enabled;
+				trigger_run_xc(&on_alter_space, space);
+				return;
+			}
+		}
+		/*
 		 * FIXME: Ck constraint creation on non-empty
 		 * space is not implemented yet.
 		 */
 		struct index *pk = space_index(space, 0);
 		if (pk != NULL && index_size(pk) > 0) {
 			tnt_raise(ClientError, ER_CREATE_CK_CONSTRAINT,
-				  ck_def->name,
-				  "referencing space must be empty");
+				  name, "referencing space must be empty");
 		}
 		struct ck_constraint *new_ck_constraint =
 			ck_constraint_new(ck_def, space->def);
@@ -4715,9 +4741,6 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 		auto ck_guard = make_scoped_guard([=] {
 			ck_constraint_delete(new_ck_constraint);
 		});
-		const char *name = new_ck_constraint->def->name;
-		struct ck_constraint *old_ck_constraint =
-			space_ck_constraint_by_name(space, name, strlen(name));
 		if (old_ck_constraint != NULL)
 			rlist_del_entry(old_ck_constraint, link);
 		if (space_add_ck_constraint(space, new_ck_constraint) != 0)
