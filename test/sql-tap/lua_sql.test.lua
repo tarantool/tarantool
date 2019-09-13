@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
 NULL = require('msgpack').NULL
-test:plan(22)
+test:plan(24)
 
 test:do_test(
     "lua_sql-1.0",
@@ -9,7 +9,7 @@ test:do_test(
         box.schema.func.create('FUNC1', {language = 'Lua',
                          is_deterministic = true,
                          body = 'function(a) return 2 end',
-                         param_list = {'any'}, returns = 'integer',
+                         param_list = {'scalar'}, returns = 'integer',
                          exports = {'LUA', 'SQL'}})
         return test:execsql("select func1(1)")
     end,
@@ -23,7 +23,7 @@ test:do_test(
         box.schema.func.create('FUNC1', {language = 'Lua',
                         is_deterministic = true,
                         body = 'function(a) return a end',
-                        param_list = {'scalar'}, returns = 'integer',
+                        param_list = {'scalar'}, returns = 'scalar',
                         exports = {'LUA', 'SQL'}})
         return test:execsql("select func1(1)")
     end,
@@ -88,6 +88,7 @@ from_lua_to_sql = {
     [3] = {"'1'", "1"},
     [4] = {"true", true},
     [5] = {"false", false},
+    [6] = {12, 12LL},
 }
 
 box.schema.func.create('CHECK_FROM_LUA_TO_SQL', {language = 'Lua',
@@ -97,38 +98,20 @@ box.schema.func.create('CHECK_FROM_LUA_TO_SQL', {language = 'Lua',
                                return from_lua_to_sql[i][2]
                            end
                        ]],
-                       param_list = {'integer'}, returns = 'scalar',
+                       param_list = {'integer'}, returns = 'any',
                        exports = {'LUA', 'SQL'}})
 
 -- check for different types
 for i = 1, #from_lua_to_sql, 1 do
     test:do_execsql_test(
         "lua_sql-2.3."..i,
-        "select "..from_lua_to_sql[i][1].." = check_from_lua_to_sql("..i..")",
+        "select "..tostring(from_lua_to_sql[i][1]).." = check_from_lua_to_sql("..i..")",
         {true})
 end
 
-from_lua_to_sql_bad = {
-    [1] = NULL,
-    [2] = 12LL, -- it is possible to support this type
-}
-
-box.schema.func.create('CHECK_FROM_LUA_TO_SQL_BAD', {language = 'Lua',
-                       is_deterministic = true,
-                       body = [[
-                           function(i)
-                               return from_lua_to_sql_bad[i]
-                           end
-                       ]],
-                       param_list = {'integer'}, returns = 'scalar',
-                       exports = {'LUA', 'SQL'}})
-
-for i = 1, #from_lua_to_sql_bad, 1 do
-    test:do_catchsql_test(
-        "lua_sql-2.5."..i,
-        "select check_from_lua_to_sql_bad("..i..")",
-        {1, "/Unsupported/"})
-end
+test:do_execsql_test("lua_sql-2.4.1", "SELECT LUA('return box.NULL') is NULL", {true})
+test:do_execsql_test("lua_sql-2.4.2", "SELECT LUA('return nil') is NULL", {true})
+test:do_execsql_test("lua_sql-2.4.3", "SELECT LUA('ffi = require(\"ffi\") return ffi.new(\"uint64_t\", (2LLU^64)-1)') = 18446744073709551615", {true})
 
 box.schema.func.create('ALLWAYS_ERROR', {language = 'Lua',
                        is_deterministic = true,
@@ -150,7 +133,6 @@ test:do_catchsql_test(
 box.func.FUNC1:drop()
 box.func.CHECK_FROM_SQL_TO_LUA:drop()
 box.func.CHECK_FROM_LUA_TO_SQL:drop()
-box.func.CHECK_FROM_LUA_TO_SQL_BAD:drop()
 box.func.ALLWAYS_ERROR:drop()
 
 test:finish_test()

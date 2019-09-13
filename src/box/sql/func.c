@@ -49,6 +49,7 @@
 #include "box/func.h"
 #include "box/port.h"
 #include "box/tuple.h"
+#include "lua/msgpack.h"
 #include "lua/utils.h"
 #include "mpstream.h"
 
@@ -160,7 +161,7 @@ port_vdbemem_get_msgpack(struct port *base, uint32_t *size)
 			FALLTHROUGH;
 		}
 		case MP_UINT: {
-			sql_int64 val = sql_value_int64(param);
+			sql_uint64 val = sql_value_uint64(param);
 			mpstream_encode_uint(&stream, val);
 			break;
 		}
@@ -255,19 +256,32 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 	if (val == NULL)
 		return NULL;
 	for (int i = 0; i < argc; i++) {
-		switch(lua_type(L, -1 - i)) {
-		case LUA_TBOOLEAN:
-			mem_set_bool(&val[i], lua_toboolean(L, -1 - i));
+		struct luaL_field field;
+		if (luaL_tofield(L, luaL_msgpack_default, -1 - i, &field) < 0)
+			goto error;
+		switch (field.type) {
+		case MP_BOOL:
+			mem_set_bool(&val[i], field.bval);
 			break;
-		case LUA_TNUMBER:
-			sqlVdbeMemSetDouble(&val[i], lua_tonumber(L, -1 - i));
+		case MP_FLOAT:
+			sqlVdbeMemSetDouble(&val[i], field.fval);
 			break;
-		case LUA_TSTRING:
-			if (sqlVdbeMemSetStr(&val[i], lua_tostring(L, -1 - i),
-					     -1, 1, SQL_TRANSIENT) != 0)
+		case MP_DOUBLE:
+			sqlVdbeMemSetDouble(&val[i], field.dval);
+			break;
+		case MP_INT:
+			mem_set_i64(&val[i], field.ival);
+			break;
+		case MP_UINT:
+			mem_set_u64(&val[i], field.ival);
+			break;
+		case MP_STR:
+			if (sqlVdbeMemSetStr(&val[i], field.sval.data,
+					     field.sval.len, 1,
+					     SQL_TRANSIENT) != 0)
 				goto error;
 			break;
-		case LUA_TNIL:
+		case MP_NIL:
 			sqlVdbeMemSetNull(&val[i]);
 			break;
 		default:
