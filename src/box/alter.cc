@@ -564,6 +564,7 @@ space_swap_fk_constraints(struct space *new_space, struct space *old_space)
 		   &old_space->child_fk_constraint);
 	rlist_swap(&new_space->parent_fk_constraint,
 		   &old_space->parent_fk_constraint);
+	SWAP(new_space->fk_constraint_mask, old_space->fk_constraint_mask);
 }
 
 /**
