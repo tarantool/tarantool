@@ -194,5 +194,20 @@ box.execute("ALTER TABLE t2 ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES t1;")
 t1:drop()
 t2:drop()
 
+-- gh-4495: space alter resulted in foreign key mask reset.
+-- Which in turn led to wrong byte-code generation. Make sure
+-- that alter of space doesn't affect result of query execution.
+--
+box.execute("CREATE TABLE t (id TEXT PRIMARY KEY, a INTEGER NOT NULL);")
+box.execute("CREATE TABLE s (t_id TEXT PRIMARY KEY, a INTEGER NOT NULL, FOREIGN KEY(t_id) REFERENCES t(id) ON DELETE CASCADE);")
+box.space.T:insert({'abc', 1})
+box.space.S:insert({'abc', 1})
+box.execute("CREATE INDEX i ON s (t_id);")
+box.execute("DELETE FROM t WHERE id = 'abc';")
+box.space.T:select()
+
+box.space.S:drop()
+box.space.T:drop()
+
 --- Clean-up SQL DD hash.
 -test_run:cmd('restart server default with cleanup=1')
