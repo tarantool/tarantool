@@ -7,7 +7,7 @@ fiber = require('fiber')
 test_run:cmd("setopt delimiter ';'")
 box.schema.func.create('WAITFOR', {language = 'Lua',
                        body = 'function (n) fiber.sleep(n) return n end',
-                       param_list = {'integer'}, returns = 'integer',
+                       param_list = {'number'}, returns = 'number',
                        exports = {'LUA', 'SQL'}})
 test_run:cmd("setopt delimiter ''");
 
@@ -21,7 +21,7 @@ box.func.WAITFOR:drop()
 test_run:cmd("setopt delimiter ';'")
 box.schema.func.create('WAITFOR', {language = 'Lua',
                        body = 'function (n) fiber.sleep(n) return n end',
-                       param_list = {'integer'}, returns = 'integer',
+                       param_list = {'number'}, returns = 'number',
                        exports = {'LUA', 'SQL'}})
 test_run:cmd("setopt delimiter ''");
 ch:get()
@@ -30,7 +30,7 @@ box.func.WAITFOR:drop()
 test_run:cmd("setopt delimiter ';'")
 box.schema.func.create('WAITFOR', {language = 'Lua',
                    body = 'function (n) fiber.sleep(n) return n end',
-                   param_list = {'integer'}, returns = 'integer',
+                   param_list = {'number'}, returns = 'number',
                    exports = {'LUA', 'SQL'}})
 test_run:cmd("setopt delimiter ''");
 

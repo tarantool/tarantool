@@ -257,6 +257,7 @@ struct errcode_record {
 	/*202 */_(ER_FUNC_WRONG_ARG_COUNT,	"Wrong number of arguments is passed to %s(): expected %s, got %d") \
 	/*203 */_(ER_BOOTSTRAP_READONLY,	"Trying to bootstrap a local read-only instance as master") \
 	/*204 */_(ER_SQL_FUNC_WRONG_RET_COUNT,	"SQL expects exactly one argument returned from %s, got %d")\
+	/*205 */_(ER_FUNC_INVALID_RETURN_TYPE,	"Function '%s' returned value of invalid type: expected %s got %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

@@ -1843,6 +1843,11 @@ case OP_FunctionByName: {
 		diag_set(ClientError, ER_NO_SUCH_FUNCTION, pOp->p4.z);
 		goto abort_due_to_error;
 	}
+	/*
+	 * Function call may yield so pointer to the function may
+	 * turn out to be invalid after call.
+	 */
+	enum field_type returns = func->def->returns;
 	int argc = pOp->p5;
 	struct Mem *argv = &aMem[pOp->p2];
 	struct port args, ret;
@@ -1862,6 +1867,12 @@ case OP_FunctionByName: {
 	region_truncate(region, region_svp);
 	if (mem == NULL)
 		goto abort_due_to_error;
+	enum mp_type type = sql_value_type((sql_value *)pOut);
+	if (!field_mp_plain_type_is_compatible(returns, type, false)) {
+		diag_set(ClientError, ER_FUNC_INVALID_RETURN_TYPE, pOp->p4.z,
+			 field_type_strs[returns], mp_type_strs[type]);
+		goto abort_due_to_error;
+	}
 
 	/*
 	 * Copy the result of the function invocation into

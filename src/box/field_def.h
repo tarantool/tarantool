@@ -144,6 +144,19 @@ struct field_def {
 	struct Expr *default_value_expr;
 };
 
+/**
+ * Checks if mp_type (except MP_EXT) (MsgPack) is compatible
+ * with given field type.
+ */
+static inline bool
+field_mp_plain_type_is_compatible(enum field_type type, enum mp_type mp_type,
+				  bool is_nullable)
+{
+	assert(mp_type != MP_EXT);
+	uint32_t mask = field_mp_type[type] | (is_nullable * (1U << MP_NIL));
+	return (mask & (1U << mp_type)) != 0;
+}
+
 /** Checks if mp_type (MsgPack) is compatible with field type. */
 static inline bool
 field_mp_type_is_compatible(enum field_type type, const char *data,
@@ -154,8 +167,8 @@ field_mp_type_is_compatible(enum field_type type, const char *data,
 	assert((size_t)mp_type < CHAR_BIT * sizeof(*field_mp_type));
 	uint32_t mask;
 	if (mp_type != MP_EXT) {
-		mask = field_mp_type[type] | (is_nullable * (1U << MP_NIL));
-		return (mask & (1U << mp_type)) != 0;
+		return field_mp_plain_type_is_compatible(type, mp_type,
+							 is_nullable);
 	} else {
 		int8_t ext_type;
 		mp_decode_extl(&data, &ext_type);

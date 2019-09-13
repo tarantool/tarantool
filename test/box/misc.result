@@ -534,6 +534,7 @@ t;
   202: box.error.FUNC_WRONG_ARG_COUNT
   203: box.error.BOOTSTRAP_READONLY
   204: box.error.SQL_FUNC_WRONG_RET_COUNT
+  205: box.error.FUNC_INVALID_RETURN_TYPE
 ...
 test_run:cmd("setopt delimiter ''");
 ---

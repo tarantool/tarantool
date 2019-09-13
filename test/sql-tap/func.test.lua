@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14610)
+test:plan(14694)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -2951,5 +2951,126 @@ test:do_catchsql_test(
         1, "Type mismatch: can not convert varbinary to number"
         -- </func-76.4>
     })
+
+ffi = require('ffi')
+box.schema.func.create('TOSTRING', {language = 'Lua', is_deterministic = true,
+                                    body = 'function(a) return a end',
+                                    param_list = {'any'}, returns = 'string',
+                                    exports = {'LUA', 'SQL'}})
+test:do_execsql_test("func-77.1", "SELECT TOSTRING('1');", {'1'})
+test:do_execsql_test("func-77.2", "SELECT TOSTRING('a');", {'a'})
+test:do_catchsql_test("func-77.3", "SELECT TOSTRING(1);", {1, "Function 'TOSTRING' returned value of invalid type: expected string got unsigned"})
+test:do_catchsql_test("func-77.4", "SELECT TOSTRING(-1);", {1, "Function 'TOSTRING' returned value of invalid type: expected string got integer"})
+test:do_catchsql_test("func-77.5", "SELECT TOSTRING(-1.1);", {1, "Function 'TOSTRING' returned value of invalid type: expected string got double"})
+test:do_catchsql_test("func-77.6", "SELECT TOSTRING(TRUE);", {1, "Function 'TOSTRING' returned value of invalid type: expected string got boolean"})
+test:do_catchsql_test("func-77.7", "SELECT TOSTRING(NULL);", {1, "Function 'TOSTRING' returned value of invalid type: expected string got nil"})
+test:do_catchsql_test("func-77.8", "SELECT TOSTRING(LUA('return nil'));", {1, "Function 'TOSTRING' returned value of invalid type: expected string got nil"})
+test:do_catchsql_test("func-77.9", "SELECT TOSTRING(LUA('return box.NULL'));", {1, "Function 'TOSTRING' returned value of invalid type: expected string got nil"})
+test:do_catchsql_test("func-77.10", "SELECT TOSTRING(LUA('return ffi.new(\"unsigned\", 666)'));", {1, "Function 'TOSTRING' returned value of invalid type: expected string got unsigned"})
+test:do_catchsql_test("func-77.11", "SELECT TOSTRING(LUA('return ffi.new(\"int\", -666)'));", {1, "Function 'TOSTRING' returned value of invalid type: expected string got integer"})
+test:do_catchsql_test("func-77.12", "SELECT TOSTRING(LUA('return ffi.new(\"double\", -666.666)'));", {1, "Function 'TOSTRING' returned value of invalid type: expected string got double"})
+test:do_catchsql_test("func-77.14", "SELECT TOSTRING(LUA('return ffi.new(\"bool\", true)'));", {1, "Function 'TOSTRING' returned value of invalid type: expected string got boolean"})
+test:do_execsql_test("func-77.13", "SELECT TOSTRING(LUA('return ffi.string(\"hello\", 5)'));", {'hello'})
+box.func.TOSTRING:drop()
+
+box.schema.func.create('TOUNSIGNED', {language = 'Lua', is_deterministic = true,
+                                      body = 'function(a) return a end',
+                                      param_list = {'any'}, returns = 'unsigned',
+                                      exports = {'LUA', 'SQL'}})
+test:do_catchsql_test("func-78.1", "SELECT TOUNSIGNED('1');", {1, "Function 'TOUNSIGNED' returned value of invalid type: expected unsigned got string"})
+test:do_catchsql_test("func-78.2", "SELECT TOUNSIGNED('a');", {1, "Function 'TOUNSIGNED' returned value of invalid type: expected unsigned got string"})
+test:do_execsql_test("func-78.3", "SELECT TOUNSIGNED(1);", {1})
+test:do_catchsql_test("func-78.4", "SELECT TOUNSIGNED(-1);", {1, "Function 'TOUNSIGNED' returned value of invalid type: expected unsigned got integer"})
+test:do_catchsql_test("func-78.5", "SELECT TOUNSIGNED(-1.1);", {1, "Function 'TOUNSIGNED' returned value of invalid type: expected unsigned got double"})
+test:do_catchsql_test("func-78.6", "SELECT TOUNSIGNED(TRUE);", {1, "Function 'TOUNSIGNED' returned value of invalid type: expected unsigned got boolean"})
+test:do_catchsql_test("func-78.7", "SELECT TOUNSIGNED(NULL);", {1, "Function 'TOUNSIGNED' returned value of invalid type: expected unsigned got nil"})
+test:do_catchsql_test("func-78.8", "SELECT TOUNSIGNED(LUA('return nil'));", {1, "Function 'TOUNSIGNED' returned value of invalid type: expected unsigned got nil"})
+test:do_catchsql_test("func-78.9", "SELECT TOUNSIGNED(LUA('return box.NULL'));", {1, "Function 'TOUNSIGNED' returned value of invalid type: expected unsigned got nil"})
+test:do_execsql_test("func-78.10", "SELECT TOUNSIGNED(LUA('return ffi.new(\"unsigned\", 666)'));", {666})
+test:do_catchsql_test("func-78.11", "SELECT TOUNSIGNED(LUA('return ffi.new(\"int\", -666)'));", {1, "Function 'TOUNSIGNED' returned value of invalid type: expected unsigned got integer"})
+test:do_catchsql_test("func-78.12", "SELECT TOUNSIGNED(LUA('return ffi.new(\"double\", -666.666)'));", {1, "Function 'TOUNSIGNED' returned value of invalid type: expected unsigned got double"})
+test:do_catchsql_test("func-78.14", "SELECT TOUNSIGNED(LUA('return ffi.new(\"bool\", true)'));", {1, "Function 'TOUNSIGNED' returned value of invalid type: expected unsigned got boolean"})
+test:do_catchsql_test("func-78.13", "SELECT TOUNSIGNED(LUA('return ffi.string(\"hello\", 5)'));", {1, "Function 'TOUNSIGNED' returned value of invalid type: expected unsigned got string"})
+box.func.TOUNSIGNED:drop()
+
+box.schema.func.create('TOINTEGER', {language = 'Lua', is_deterministic = true,
+                                     body = 'function(a) return a end',
+                                     param_list = {'any'}, returns = 'integer',
+                                     exports = {'LUA', 'SQL'}})
+test:do_catchsql_test("func-79.1", "SELECT TOINTEGER('1');", {1, "Function 'TOINTEGER' returned value of invalid type: expected integer got string"})
+test:do_catchsql_test("func-79.2", "SELECT TOINTEGER('a');", {1, "Function 'TOINTEGER' returned value of invalid type: expected integer got string"})
+test:do_execsql_test("func-79.3", "SELECT TOINTEGER(1);", {1})
+test:do_execsql_test("func-79.4", "SELECT TOINTEGER(-1);", {-1})
+test:do_catchsql_test("func-79.5", "SELECT TOINTEGER(-1.1);", {1, "Function 'TOINTEGER' returned value of invalid type: expected integer got double"})
+test:do_catchsql_test("func-79.6", "SELECT TOINTEGER(TRUE);", {1, "Function 'TOINTEGER' returned value of invalid type: expected integer got boolean"})
+test:do_catchsql_test("func-79.7", "SELECT TOINTEGER(NULL);", {1, "Function 'TOINTEGER' returned value of invalid type: expected integer got nil"})
+test:do_catchsql_test("func-79.8", "SELECT TOINTEGER(LUA('return nil'));", {1, "Function 'TOINTEGER' returned value of invalid type: expected integer got nil"})
+test:do_catchsql_test("func-79.9", "SELECT TOINTEGER(LUA('return box.NULL'));", {1, "Function 'TOINTEGER' returned value of invalid type: expected integer got nil"})
+test:do_execsql_test("func-79.10", "SELECT TOINTEGER(LUA('return ffi.new(\"unsigned\", 666)'));", {666})
+test:do_execsql_test("func-79.11", "SELECT TOINTEGER(LUA('return ffi.new(\"int\", -666)'));", {-666})
+test:do_catchsql_test("func-79.12", "SELECT TOINTEGER(LUA('return ffi.new(\"double\", -666.666)'));", {1, "Function 'TOINTEGER' returned value of invalid type: expected integer got double"})
+test:do_catchsql_test("func-79.14", "SELECT TOINTEGER(LUA('return ffi.new(\"bool\", true)'));", {1, "Function 'TOINTEGER' returned value of invalid type: expected integer got boolean"})
+test:do_catchsql_test("func-79.13", "SELECT TOINTEGER(LUA('return ffi.string(\"hello\", 5)'));", {1, "Function 'TOINTEGER' returned value of invalid type: expected integer got string"})
+box.func.TOINTEGER:drop()
+
+box.schema.func.create('TONUMBER', {language = 'Lua', is_deterministic = true,
+                                    body = 'function(a) return a end',
+                                    param_list = {'any'}, returns = 'number',
+                                    exports = {'LUA', 'SQL'}})
+test:do_catchsql_test("func-80.1", "SELECT TONUMBER('1');", {1, "Function 'TONUMBER' returned value of invalid type: expected number got string"})
+test:do_catchsql_test("func-80.2", "SELECT TONUMBER('a');", {1, "Function 'TONUMBER' returned value of invalid type: expected number got string"})
+test:do_execsql_test("func-80.3", "SELECT TONUMBER(1);", {1})
+test:do_execsql_test("func-80.4", "SELECT TONUMBER(-1);", {-1})
+test:do_execsql_test("func-80.5", "SELECT TONUMBER(-1.1);", {-1.1})
+test:do_catchsql_test("func-80.6", "SELECT TONUMBER(TRUE);", {1, "Function 'TONUMBER' returned value of invalid type: expected number got boolean"})
+test:do_catchsql_test("func-80.7", "SELECT TONUMBER(NULL);", {1, "Function 'TONUMBER' returned value of invalid type: expected number got nil"})
+test:do_catchsql_test("func-80.8", "SELECT TONUMBER(LUA('return nil'));", {1, "Function 'TONUMBER' returned value of invalid type: expected number got nil"})
+test:do_catchsql_test("func-80.9", "SELECT TONUMBER(LUA('return box.NULL'));", {1, "Function 'TONUMBER' returned value of invalid type: expected number got nil"})
+test:do_execsql_test("func-80.10", "SELECT TONUMBER(LUA('return ffi.new(\"unsigned\", 666)'));", {666})
+test:do_execsql_test("func-80.11", "SELECT TONUMBER(LUA('return ffi.new(\"int\", -666)'));", {-666})
+test:do_execsql_test("func-80.12", "SELECT TONUMBER(LUA('return ffi.new(\"double\", -666.666)'));", {-666.666})
+test:do_catchsql_test("func-80.14", "SELECT TONUMBER(LUA('return ffi.new(\"bool\", true)'));", {1, "Function 'TONUMBER' returned value of invalid type: expected number got boolean"})
+test:do_catchsql_test("func-80.13", "SELECT TONUMBER(LUA('return ffi.string(\"hello\", 5)'));", {1, "Function 'TONUMBER' returned value of invalid type: expected number got string"})
+box.func.TONUMBER:drop()
+
+box.schema.func.create('TOBOOLEAN', {language = 'Lua', is_deterministic = true,
+                                    body = 'function(a) return a end',
+                                    param_list = {'any'}, returns = 'boolean',
+                                    exports = {'LUA', 'SQL'}})
+test:do_catchsql_test("func-81.1", "SELECT TOBOOLEAN('1');", {1, "Function 'TOBOOLEAN' returned value of invalid type: expected boolean got string"})
+test:do_catchsql_test("func-81.2", "SELECT TOBOOLEAN('a');", {1, "Function 'TOBOOLEAN' returned value of invalid type: expected boolean got string"})
+test:do_catchsql_test("func-81.3", "SELECT TOBOOLEAN(1);", {1, "Function 'TOBOOLEAN' returned value of invalid type: expected boolean got unsigned"})
+test:do_catchsql_test("func-81.4", "SELECT TOBOOLEAN(-1);", {1, "Function 'TOBOOLEAN' returned value of invalid type: expected boolean got integer"})
+test:do_catchsql_test("func-81.5", "SELECT TOBOOLEAN(-1.1);", {1, "Function 'TOBOOLEAN' returned value of invalid type: expected boolean got double"})
+test:do_execsql_test("func-81.6", "SELECT TOBOOLEAN(TRUE);", {true})
+test:do_catchsql_test("func-81.7", "SELECT TOBOOLEAN(NULL);", {1, "Function 'TOBOOLEAN' returned value of invalid type: expected boolean got nil"})
+test:do_catchsql_test("func-81.8", "SELECT TOBOOLEAN(LUA('return nil'));", {1, "Function 'TOBOOLEAN' returned value of invalid type: expected boolean got nil"})
+test:do_catchsql_test("func-81.9", "SELECT TOBOOLEAN(LUA('return box.NULL'));", {1, "Function 'TOBOOLEAN' returned value of invalid type: expected boolean got nil"})
+test:do_catchsql_test("func-81.10", "SELECT TOBOOLEAN(LUA('return ffi.new(\"unsigned\", 666)'));", {1, "Function 'TOBOOLEAN' returned value of invalid type: expected boolean got unsigned"})
+test:do_catchsql_test("func-81.11", "SELECT TOBOOLEAN(LUA('return ffi.new(\"int\", -666)'));", {1, "Function 'TOBOOLEAN' returned value of invalid type: expected boolean got integer"})
+test:do_catchsql_test("func-81.12", "SELECT TOBOOLEAN(LUA('return ffi.new(\"double\", -666.666)'));", {1, "Function 'TOBOOLEAN' returned value of invalid type: expected boolean got double"})
+test:do_execsql_test("func-81.14", "SELECT TOBOOLEAN(LUA('return ffi.new(\"bool\", true)'));", {true})
+test:do_catchsql_test("func-81.13", "SELECT TOBOOLEAN(LUA('return ffi.string(\"hello\", 5)'));", {1, "Function 'TOBOOLEAN' returned value of invalid type: expected boolean got string"})
+box.func.TOBOOLEAN:drop()
+
+box.schema.func.create('TOSCALAR', {language = 'Lua', is_deterministic = true,
+                                    body = 'function(a) return a end',
+                                    param_list = {'any'}, returns = 'scalar',
+                                    exports = {'LUA', 'SQL'}})
+test:do_execsql_test("func-82.1", "SELECT TOSCALAR('1');", {'1'})
+test:do_execsql_test("func-82.2", "SELECT TOSCALAR('a');", {'a'})
+test:do_execsql_test("func-82.3", "SELECT TOSCALAR(1);", {1})
+test:do_execsql_test("func-82.4", "SELECT TOSCALAR(-1);", {-1})
+test:do_execsql_test("func-82.5", "SELECT TOSCALAR(-1.1);", {-1.1})
+test:do_execsql_test("func-82.6", "SELECT TOSCALAR(TRUE);", {true})
+test:do_catchsql_test("func-82.7", "SELECT TOSCALAR(NULL);", {1, "Function 'TOSCALAR' returned value of invalid type: expected scalar got nil"})
+test:do_catchsql_test("func-82.8", "SELECT TOSCALAR(LUA('return nil'));", {1, "Function 'TOSCALAR' returned value of invalid type: expected scalar got nil"})
+test:do_catchsql_test("func-82.9", "SELECT TOSCALAR(LUA('return box.NULL'));", {1, "Function 'TOSCALAR' returned value of invalid type: expected scalar got nil"})
+test:do_execsql_test("func-82.10", "SELECT TOSCALAR(LUA('return ffi.new(\"unsigned\", 666)'));", {666})
+test:do_execsql_test("func-82.11", "SELECT TOSCALAR(LUA('return ffi.new(\"int\", -666)'));", {-666})
+test:do_execsql_test("func-82.12", "SELECT TOSCALAR(LUA('return ffi.new(\"double\", -666.666)'));", {-666.666})
+test:do_execsql_test("func-82.14", "SELECT TOSCALAR(LUA('return ffi.new(\"bool\", true)'));", {true})
+test:do_execsql_test("func-82.13", "SELECT TOSCALAR(LUA('return ffi.string(\"hello\", 5)'));", {"hello"})
+box.func.TOSCALAR:drop()
 
 test:finish_test()
