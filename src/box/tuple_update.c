@@ -457,10 +457,14 @@ static int
 read_arg_splice(int index_base, struct update_op *op,
 		const char **expr)
 {
-	(void) index_base;
 	struct op_splice_arg *arg = &op->arg.splice;
 	if (mp_read_i32(op, expr, &arg->offset) != 0)
 		return -1;
+	if (arg->offset >= 0) {
+		if (arg->offset - index_base < 0)
+			return update_err_splice_bound(op);
+		arg->offset -= index_base;
+	}
 	/* cut length */
 	if (mp_read_i32(op, expr, &arg->cut_length) != 0)
 		return -1;
@@ -757,12 +761,8 @@ do_op_splice(struct tuple_update *update, struct update_op *op)
 		if (-arg->offset > str_len + 1)
 			return update_err_splice_bound(op);
 		arg->offset = arg->offset + str_len + 1;
-	} else if (arg->offset - update->index_base >= 0) {
-		arg->offset -= update->index_base;
-		if (arg->offset > str_len)
-			arg->offset = str_len;
-	} else /* (offset <= 0) */ {
-		return update_err_splice_bound(op);
+	} else if (arg->offset > str_len) {
+		arg->offset = str_len;
 	}
 
 	assert(arg->offset >= 0 && arg->offset <= str_len);
