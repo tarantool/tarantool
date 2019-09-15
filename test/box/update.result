@@ -16,7 +16,7 @@ s:update({1000001}, {{'#', 1, 1}})
 s:update({1000001}, {{'#', 1, "only one record please"}})
 ---
 - error: 'Argument type in operation ''#'' on field 1 does not match field type: expected
-    a number of fields to delete'
+    a positive integer'
 ...
 s:truncate()
 ---
@@ -81,7 +81,7 @@ s:update({0}, {{'#', 42, 1}})
 s:update({0}, {{'#', 4, 'abirvalg'}})
 ---
 - error: 'Argument type in operation ''#'' on field 4 does not match field type: expected
-    a number of fields to delete'
+    a positive integer'
 ...
 s:update({0}, {{'#', 2, 1}, {'#', 4, 2}, {'#', 6, 1}})
 ---

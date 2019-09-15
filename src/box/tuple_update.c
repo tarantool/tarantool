@@ -44,6 +44,7 @@
 #include "mp_decimal.h"
 #include "fiber.h"
 #include "tuple_dictionary.h"
+#include "tuple_format.h"
 #include "tt_static.h"
 
 /** UPDATE request implementation.
@@ -237,6 +238,69 @@ struct update_op {
 	uint8_t opcode;
 };
 
+static inline const char *
+update_op_field_str(const struct update_op *op)
+{
+	if (op->field_no >= 0)
+		return tt_sprintf("%d", op->field_no + TUPLE_INDEX_BASE);
+	else
+		return tt_sprintf("%d", op->field_no);
+}
+
+static inline int
+update_err_arg_type(const struct update_op *op, const char *needed_type)
+{
+	diag_set(ClientError, ER_UPDATE_ARG_TYPE, op->opcode,
+		 update_op_field_str(op), needed_type);
+	return -1;
+}
+
+static inline int
+update_err_int_overflow(const struct update_op *op)
+{
+	diag_set(ClientError, ER_UPDATE_INTEGER_OVERFLOW, op->opcode,
+		 update_op_field_str(op));
+	return -1;
+}
+
+static inline int
+update_err_decimal_overflow(const struct update_op *op)
+{
+	diag_set(ClientError, ER_UPDATE_DECIMAL_OVERFLOW, op->opcode,
+		 update_op_field_str(op));
+	return -1;
+}
+
+static inline int
+update_err_splice_bound(const struct update_op *op)
+{
+	diag_set(ClientError, ER_UPDATE_SPLICE, update_op_field_str(op),
+		 "offset is out of bound");
+	return -1;
+}
+
+static inline int
+update_err_no_such_field(const struct update_op *op)
+{
+	diag_set(ClientError, ER_NO_SUCH_FIELD_NO, op->field_no >= 0 ?
+		 TUPLE_INDEX_BASE + op->field_no : op->field_no);
+	return -1;
+}
+
+static inline int
+update_err(const struct update_op *op, const char *reason)
+{
+	diag_set(ClientError, ER_UPDATE_FIELD, update_op_field_str(op),
+		 reason);
+	return -1;
+}
+
+static inline int
+update_err_double(const struct update_op *op)
+{
+	return update_err(op, "double update of the same field");
+}
+
 /**
  * We can have more than one operation on the same field.
  * A descriptor of one changed field.
@@ -270,28 +334,21 @@ update_field_init(struct update_field *field,
 
 /** Read a field index or any other integer field. */
 static inline int
-mp_read_i32(int index_base, struct update_op *op,
-	    const char **expr, int32_t *ret)
+mp_read_i32(struct update_op *op, const char **expr, int32_t *ret)
 {
 	if (mp_read_int32(expr, ret) == 0)
 		return 0;
-	diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char)op->opcode,
-		 index_base + op->field_no, "an integer");
-	return -1;
+	return update_err_arg_type(op, "an integer");
 }
 
 static inline int
-mp_read_uint(int index_base, struct update_op *op,
-	     const char **expr, uint64_t *ret)
+mp_read_uint(struct update_op *op, const char **expr, uint64_t *ret)
 {
 	if (mp_typeof(**expr) == MP_UINT) {
 		*ret = mp_decode_uint(expr);
 		return 0;
-	} else {
-		diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char)op->opcode,
-			 index_base + op->field_no, "a positive integer");
-		return -1;
 	}
+	return update_err_arg_type(op, "a positive integer");
 }
 
 /**
@@ -299,8 +356,8 @@ mp_read_uint(int index_base, struct update_op *op,
  * or from the UPDATE command.
  */
 static inline int
-mp_read_arith_arg(int index_base, struct update_op *op,
-		  const char **expr, struct op_arith_arg *ret)
+mp_read_arith_arg(struct update_op *op, const char **expr,
+		  struct op_arith_arg *ret)
 {
 	if (mp_typeof(**expr) == MP_UINT) {
 		ret->type = AT_INT;
@@ -326,24 +383,21 @@ mp_read_arith_arg(int index_base, struct update_op *op,
 			goto err;
 		}
 	} else {
-err:		diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char)op->opcode,
-			 index_base + op->field_no, "a number");
-		return -1;
+err:
+		return update_err_arg_type(op, "a number");
 	}
 	return 0;
 }
 
 static inline int
-mp_read_str(int index_base, struct update_op *op,
-	    const char **expr, uint32_t *len, const char **ret)
+mp_read_str(struct update_op *op, const char **expr, uint32_t *len,
+	    const char **ret)
 {
-	if (mp_typeof(**expr) != MP_STR) {
-		diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char) op->opcode,
-			 index_base + op->field_no, "a string");
-		return -1;
+	if (mp_typeof(**expr) == MP_STR) {
+		*ret = mp_decode_str(expr, len); /* value */
+		return 0;
 	}
-	*ret = mp_decode_str(expr, len); /* value */
-	return 0;
+	return update_err_arg_type(op, "a string");
 }
 
 /* }}} read_arg helpers */
@@ -372,45 +426,46 @@ static int
 read_arg_delete(int index_base, struct update_op *op,
 		const char **expr)
 {
+	(void) index_base;
 	if (mp_typeof(**expr) == MP_UINT) {
 		op->arg.del.count = (uint32_t) mp_decode_uint(expr);
-		return 0;
-	} else {
-		diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char)op->opcode,
-			 index_base + op->field_no,
-			 "a number of fields to delete");
-		return -1;
+		if (op->arg.del.count != 0)
+			return 0;
+		return update_err(op, "cannot delete 0 fields");
 	}
+	return update_err_arg_type(op, "a positive integer");
 }
 
 static int
 read_arg_arith(int index_base, struct update_op *op,
 	       const char **expr)
 {
-	return mp_read_arith_arg(index_base, op, expr, &op->arg.arith);
+	(void) index_base;
+	return mp_read_arith_arg(op, expr, &op->arg.arith);
 }
 
 static int
 read_arg_bit(int index_base, struct update_op *op,
 	     const char **expr)
 {
+	(void) index_base;
 	struct op_bit_arg *arg = &op->arg.bit;
-	return mp_read_uint(index_base, op, expr, &arg->val);
+	return mp_read_uint(op, expr, &arg->val);
 }
 
 static int
 read_arg_splice(int index_base, struct update_op *op,
 		const char **expr)
 {
+	(void) index_base;
 	struct op_splice_arg *arg = &op->arg.splice;
-	if (mp_read_i32(index_base, op, expr, &arg->offset))
+	if (mp_read_i32(op, expr, &arg->offset) != 0)
 		return -1;
 	/* cut length */
-	if (mp_read_i32(index_base, op, expr, &arg->cut_length))
+	if (mp_read_i32(op, expr, &arg->cut_length) != 0)
 		return -1;
 	 /* value */
-	return mp_read_str(index_base, op, expr, &arg->paste_length,
-			   &arg->paste);
+	return mp_read_str(op, expr, &arg->paste_length, &arg->paste);
 }
 
 /* }}} read_arg */
@@ -418,23 +473,16 @@ read_arg_splice(int index_base, struct update_op *op,
 /* {{{ do_op helpers */
 
 static inline int
-op_adjust_field_no(struct tuple_update *update, struct update_op *op,
-		   int32_t field_max)
+op_adjust_field_no(struct update_op *op, int32_t field_max)
 {
 	if (op->field_no >= 0) {
 		if (op->field_no < field_max)
 			return 0;
-		diag_set(ClientError, ER_NO_SUCH_FIELD_NO, update->index_base +
-			 op->field_no);
-		return -1;
-	} else {
-		if (op->field_no + field_max >= 0) {
-			op->field_no += field_max;
-			return 0;
-		}
-		diag_set(ClientError, ER_NO_SUCH_FIELD_NO, op->field_no);
-		return -1;
+	} else if (op->field_no + field_max >= 0) {
+		op->field_no += field_max;
+		return 0;
 	}
+	return update_err_no_such_field(op);
 }
 
 static inline double
@@ -504,10 +552,13 @@ mp_sizeof_op_arith_arg(struct op_arith_arg arg)
 }
 
 static inline int
-make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
-		     char opcode, uint32_t err_fieldno, struct op_arith_arg *ret)
+make_arith_operation(struct update_op *op, struct op_arith_arg arg,
+		     struct op_arith_arg *ret)
 {
+	struct op_arith_arg arg1 = arg;
+	struct op_arith_arg arg2 = op->arg.arith;
 	enum arith_type lowest_type = arg1.type;
+	char opcode = op->opcode;
 	if (arg1.type > arg2.type)
 		lowest_type = arg2.type;
 
@@ -525,12 +576,8 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 			break;
 		}
 		if (!int96_is_uint64(&arg1.int96) &&
-		    !int96_is_neg_int64(&arg1.int96)) {
-			diag_set(ClientError,
-				 ER_UPDATE_INTEGER_OVERFLOW,
-				 opcode, err_fieldno);
-			return -1;
-		}
+		    !int96_is_neg_int64(&arg1.int96))
+			return update_err_int_overflow(op);
 		*ret = arg1;
 		return 0;
 	} else if (lowest_type >= AT_DOUBLE) {
@@ -542,9 +589,8 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 		case '+': c = a + b; break;
 		case '-': c = a - b; break;
 		default:
-			diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char)opcode,
-				 err_fieldno, "a positive integer");
-			return -1;
+			unreachable();
+			break;
 		}
 		if (lowest_type == AT_DOUBLE) {
 			/* result is DOUBLE */
@@ -561,30 +607,21 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 		decimal_t a, b, c;
 		if (! cast_arith_arg_to_decimal(arg1, &a) ||
 		    ! cast_arith_arg_to_decimal(arg2, &b)) {
-			diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char)opcode,
-				 err_fieldno, "a number convertible to decimal.");
-			return -1;
+			return update_err_arg_type(op, "a number convertible "\
+						   "to decimal.");
 		}
-
 		switch(opcode) {
 		case '+':
-			if (decimal_add(&c, &a, &b) == NULL) {
-				diag_set(ClientError, ER_UPDATE_DECIMAL_OVERFLOW,
-					 opcode, err_fieldno);
-				return -1;
-			}
+			if (decimal_add(&c, &a, &b) == NULL)
+				return update_err_decimal_overflow(op);
 			break;
 		case '-':
-			if (decimal_sub(&c, &a, &b) == NULL) {
-				diag_set(ClientError, ER_UPDATE_DECIMAL_OVERFLOW,
-					 opcode, err_fieldno);
-				return -1;
-			}
+			if (decimal_sub(&c, &a, &b) == NULL)
+				return update_err_decimal_overflow(op);
 			break;
 		default:
-			diag_set(ClientError, ER_UPDATE_ARG_TYPE, (char)opcode,
-				 err_fieldno);
-			return -1;
+			unreachable();
+			break;
 		}
 		ret->type = AT_DECIMAL;
 		ret->dec = c;
@@ -599,7 +636,7 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 static int
 do_op_insert(struct tuple_update *update, struct update_op *op)
 {
-	if (op_adjust_field_no(update, op, rope_size(update->rope) + 1))
+	if (op_adjust_field_no(op, rope_size(update->rope) + 1) != 0)
 		return -1;
 	struct update_field *field = (struct update_field *)
 		update_alloc(update->region, sizeof(*field));
@@ -615,7 +652,7 @@ do_op_set(struct tuple_update *update, struct update_op *op)
 	/* intepret '=' for n +1 field as insert */
 	if (op->field_no == (int32_t) rope_size(update->rope))
 		return do_op_insert(update, op);
-	if (op_adjust_field_no(update, op, rope_size(update->rope)))
+	if (op_adjust_field_no(op, rope_size(update->rope)) != 0)
 		return -1;
 	struct update_field *field = rope_extract(update->rope, op->field_no);
 	if (field == NULL)
@@ -629,20 +666,14 @@ do_op_set(struct tuple_update *update, struct update_op *op)
 static int
 do_op_delete(struct tuple_update *update, struct update_op *op)
 {
-	if (op_adjust_field_no(update, op, rope_size(update->rope)))
+	if (op_adjust_field_no(op, rope_size(update->rope)) != 0)
 		return -1;
 	uint32_t delete_count = op->arg.del.count;
 
 	if ((uint64_t) op->field_no + delete_count > rope_size(update->rope))
 		delete_count = rope_size(update->rope) - op->field_no;
 
-	if (delete_count == 0) {
-		diag_set(ClientError, ER_UPDATE_FIELD,
-			 update->index_base + op->field_no,
-			 "cannot delete 0 fields");
-		return -1;
-	}
-
+	assert(delete_count > 0);
 	for (uint32_t u = 0; u < delete_count; u++)
 		rope_erase(update->rope, op->field_no);
 	return 0;
@@ -651,27 +682,20 @@ do_op_delete(struct tuple_update *update, struct update_op *op)
 static int
 do_op_arith(struct tuple_update *update, struct update_op *op)
 {
-	if (op_adjust_field_no(update, op, rope_size(update->rope)))
+	if (op_adjust_field_no(op, rope_size(update->rope)) != 0)
 		return -1;
 
 	struct update_field *field = rope_extract(update->rope, op->field_no);
 	if (field == NULL)
 		return -1;
-	if (field->op) {
-		diag_set(ClientError, ER_UPDATE_FIELD,
-			 update->index_base + op->field_no,
-			 "double update of the same field");
-		return -1;
-	}
+	if (field->op != NULL)
+		return update_err_double(op);
 	const char *old = field->old;
 	struct op_arith_arg left_arg;
-	if (mp_read_arith_arg(update->index_base, op, &old, &left_arg))
+	if (mp_read_arith_arg(op, &old, &left_arg) != 0)
 		return -1;
 
-	struct op_arith_arg right_arg = op->arg.arith;
-	if (make_arith_operation(left_arg, right_arg, op->opcode,
-				 update->index_base + op->field_no,
-				 &op->arg.arith))
+	if (make_arith_operation(op, left_arg, &op->arg.arith) != 0)
 		return -1;
 	field->op = op;
 	op->new_field_len = mp_sizeof_op_arith_arg(op->arg.arith);
@@ -681,21 +705,17 @@ do_op_arith(struct tuple_update *update, struct update_op *op)
 static int
 do_op_bit(struct tuple_update *update, struct update_op *op)
 {
-	if (op_adjust_field_no(update, op, rope_size(update->rope)))
+	if (op_adjust_field_no(op, rope_size(update->rope)) != 0)
 		return -1;
 	struct update_field *field = rope_extract(update->rope, op->field_no);
 	if (field == NULL)
 		return -1;
 	struct op_bit_arg *arg = &op->arg.bit;
-	if (field->op) {
-		diag_set(ClientError, ER_UPDATE_FIELD,
-			 update->index_base + op->field_no,
-			 "double update of the same field");
-		return -1;
-	}
+	if (field->op != NULL)
+		return update_err_double(op);
 	const char *old = field->old;
 	uint64_t val;
-	if (mp_read_uint(update->index_base, op, &old, &val))
+	if (mp_read_uint(op, &old, &val) != 0)
 		return -1;
 	switch (op->opcode) {
 	case '&':
@@ -718,42 +738,31 @@ do_op_bit(struct tuple_update *update, struct update_op *op)
 static int
 do_op_splice(struct tuple_update *update, struct update_op *op)
 {
-	if (op_adjust_field_no(update, op, rope_size(update->rope)))
+	if (op_adjust_field_no(op, rope_size(update->rope)) != 0)
 		return -1;
 	struct update_field *field = rope_extract(update->rope, op->field_no);
 	if (field == NULL)
 		return -1;
-	if (field->op) {
-		diag_set(ClientError, ER_UPDATE_FIELD,
-			 update->index_base + op->field_no,
-			 "double update of the same field");
-		return -1;
-	}
+	if (field->op != NULL)
+		return update_err_double(op);
 
 	struct op_splice_arg *arg = &op->arg.splice;
 
 	const char *in = field->old;
 	int32_t str_len;
-	if (mp_read_str(update->index_base, op, &in, (uint32_t *) &str_len, &in))
+	if (mp_read_str(op, &in, (uint32_t *) &str_len, &in) != 0)
 		return -1;
 
 	if (arg->offset < 0) {
-		if (-arg->offset > str_len + 1) {
-			diag_set(ClientError, ER_SPLICE,
-				 update->index_base + op->field_no,
-				 "offset is out of bound");
-			return -1;
-		}
+		if (-arg->offset > str_len + 1)
+			return update_err_splice_bound(op);
 		arg->offset = arg->offset + str_len + 1;
 	} else if (arg->offset - update->index_base >= 0) {
 		arg->offset -= update->index_base;
 		if (arg->offset > str_len)
 			arg->offset = str_len;
 	} else /* (offset <= 0) */ {
-		diag_set(ClientError, ER_SPLICE,
-			 update->index_base + op->field_no,
-			 "offset is out of bound");
-		return -1;
+		return update_err_splice_bound(op);
 	}
 
 	assert(arg->offset >= 0 && arg->offset <= str_len);
@@ -1050,7 +1059,7 @@ update_op_decode(struct update_op *op, int index_base,
 	switch(mp_typeof(**expr)) {
 	case MP_INT:
 	case MP_UINT: {
-		if (mp_read_i32(index_base, op, expr, &field_no) != 0)
+		if (mp_read_i32(op, expr, &field_no) != 0)
 			return -1;
 		if (field_no - index_base >= 0) {
 			op->field_no = field_no - index_base;
@@ -1429,10 +1438,7 @@ tuple_upsert_squash(const char *expr1, const char *expr1_end,
 			int96_invert(&op[0]->arg.arith.int96);
 		}
 		struct op_arith_arg res;
-		if (make_arith_operation(op[0]->arg.arith, op[1]->arg.arith,
-					 op[1]->opcode,
-					 update[0].index_base +
-					 op[0]->field_no, &res))
+		if (make_arith_operation(op[1], op[0]->arg.arith, &res) != 0)
 			return NULL;
 		res_ops = mp_encode_array(res_ops, 3);
 		res_ops = mp_encode_str(res_ops,

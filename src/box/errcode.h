@@ -77,11 +77,11 @@ struct errcode_record {
 	/* 22 */_(ER_TUPLE_NOT_ARRAY,		"Tuple/Key must be MsgPack array") \
 	/* 23 */_(ER_FIELD_TYPE,		"Tuple field %s type does not match one required by operation: expected %s") \
 	/* 24 */_(ER_INDEX_PART_TYPE_MISMATCH,	"Field %s has type '%s' in one index, but type '%s' in another") \
-	/* 25 */_(ER_SPLICE,			"SPLICE error on field %u: %s") \
-	/* 26 */_(ER_UPDATE_ARG_TYPE,		"Argument type in operation '%c' on field %u does not match field type: expected %s") \
+	/* 25 */_(ER_UPDATE_SPLICE,		"SPLICE error on field %s: %s") \
+	/* 26 */_(ER_UPDATE_ARG_TYPE,		"Argument type in operation '%c' on field %s does not match field type: expected %s") \
 	/* 27 */_(ER_FORMAT_MISMATCH_INDEX_PART, "Field %s has type '%s' in space format, but type '%s' in index definition") \
 	/* 28 */_(ER_UNKNOWN_UPDATE_OP,		"Unknown UPDATE operation") \
-	/* 29 */_(ER_UPDATE_FIELD,		"Field %u UPDATE error: %s") \
+	/* 29 */_(ER_UPDATE_FIELD,		"Field %s UPDATE error: %s") \
 	/* 30 */_(ER_FUNCTION_TX_ACTIVE,	"Transaction is active at return from function") \
 	/* 31 */_(ER_KEY_PART_COUNT,		"Invalid key part count (expected [0..%u], got %u)") \
 	/* 32 */_(ER_PROC_LUA,			"%s") \
@@ -147,7 +147,7 @@ struct errcode_record {
 	/* 92 */_(ER_ROLE_NOT_GRANTED,		"User '%s' does not have role '%s'") \
 	/* 93 */_(ER_MISSING_SNAPSHOT,		"Can't find snapshot") \
 	/* 94 */_(ER_CANT_UPDATE_PRIMARY_KEY,	"Attempt to modify a tuple field which is part of index '%s' in space '%s'") \
-	/* 95 */_(ER_UPDATE_INTEGER_OVERFLOW,   "Integer overflow when performing '%c' operation on field %u") \
+	/* 95 */_(ER_UPDATE_INTEGER_OVERFLOW,   "Integer overflow when performing '%c' operation on field %s") \
 	/* 96 */_(ER_GUEST_USER_PASSWORD,       "Setting password for guest user has no effect") \
 	/* 97 */_(ER_TRANSACTION_CONFLICT,      "Transaction has been aborted by conflict") \
 	/* 98 */_(ER_UNSUPPORTED_PRIV,		"Unsupported %s privilege '%s'") \
@@ -212,7 +212,7 @@ struct errcode_record {
 	/*157 */_(ER_SQL_BIND_TYPE,             "Bind value type %s for parameter %s is not supported") \
 	/*158 */_(ER_SQL_BIND_PARAMETER_MAX,    "SQL bind parameter limit reached: %d") \
 	/*159 */_(ER_SQL_EXECUTE,               "Failed to execute SQL statement: %s") \
-	/*160 */_(ER_UPDATE_DECIMAL_OVERFLOW,	"Decimal overflow when performing operation '%c' on field %u") \
+	/*160 */_(ER_UPDATE_DECIMAL_OVERFLOW,	"Decimal overflow when performing operation '%c' on field %s") \
 	/*161 */_(ER_SQL_BIND_NOT_FOUND,	"Parameter %s was not found in the statement") \
 	/*162 */_(ER_ACTION_MISMATCH,		"Field %s contains %s on conflict action, but %s in index parts") \
 	/*163 */_(ER_VIEW_MISSING_SQL,		"Space declared as a view must have SQL statement") \

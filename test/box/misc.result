@@ -356,7 +356,7 @@ t;
   22: box.error.TUPLE_NOT_ARRAY
   23: box.error.FIELD_TYPE
   24: box.error.INDEX_PART_TYPE_MISMATCH
-  25: box.error.SPLICE
+  25: box.error.UPDATE_SPLICE
   26: box.error.UPDATE_ARG_TYPE
   27: box.error.FORMAT_MISMATCH_INDEX_PART
   28: box.error.UNKNOWN_UPDATE_OP
