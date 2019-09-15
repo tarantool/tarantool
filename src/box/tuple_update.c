@@ -111,7 +111,6 @@ update_alloc(struct region *region, size_t size)
 /** Update internal state */
 struct tuple_update
 {
-	struct region *region;
 	struct rope *rope;
 	struct update_op *ops;
 	uint32_t op_count;
@@ -643,7 +642,7 @@ do_op_insert(struct tuple_update *update, struct update_op *op)
 	if (op_adjust_field_no(op, rope_size(update->rope) + 1) != 0)
 		return -1;
 	struct update_field *field = (struct update_field *)
-		update_alloc(update->region, sizeof(*field));
+		update_alloc(&fiber()->gc, sizeof(*field));
 	if (field == NULL)
 		return -1;
 	update_field_init(field, op->arg.set.value, op->arg.set.length, 0);
@@ -900,7 +899,6 @@ update_field_split(struct region *region, struct update_field *prev,
 /**
  * We found a tuple to do the update on. Prepare a rope
  * to perform operations on.
- * @param update Update meta.
  * @param tuple_data MessagePack array without the array header.
  * @param tuple_data_end End of the @tuple_data.
  * @param field_count Field count in @tuple_data.
@@ -909,9 +907,10 @@ update_field_split(struct region *region, struct update_field *prev,
  * @retval -1 Error.
  */
 struct rope *
-tuple_rope_new(struct region *region, const char *tuple_data,
-	       const char *tuple_data_end, uint32_t field_count)
+tuple_rope_new(const char *tuple_data, const char *tuple_data_end,
+	       uint32_t field_count)
 {
+	struct region *region = &fiber()->gc;
 	struct rope *rope = rope_new(region);
 	if (rope == NULL)
 		return NULL;
@@ -1130,11 +1129,15 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		return -1;
 	}
 
-	/* Read update operations.  */
-	update->ops = (struct update_op *) update_alloc(update->region,
-				update->op_count * sizeof(struct update_op));
-	if (update->ops == NULL)
+	int size = update->op_count * sizeof(update->ops[0]);
+	update->ops = (struct update_op *)
+		region_aligned_alloc(&fiber()->gc, size,
+				     alignof(struct update_op));
+	if (update->ops == NULL) {
+		diag_set(OutOfMemory, size, "region_aligned_alloc",
+			 "update->ops");
 		return -1;
+	}
 	struct update_op *op = update->ops;
 	struct update_op *ops_end = op + update->op_count;
 	for (; op < ops_end; op++) {
@@ -1236,8 +1239,7 @@ static int
 update_do_ops(struct tuple_update *update, const char *old_data,
 	      const char *old_data_end, uint32_t part_count)
 {
-	update->rope = tuple_rope_new(update->region, old_data, old_data_end,
-				      part_count);
+	update->rope = tuple_rope_new(old_data, old_data_end, part_count);
 	if (update->rope == NULL)
 		return -1;
 	struct update_op *op = update->ops;
@@ -1259,8 +1261,7 @@ upsert_do_ops(struct tuple_update *update, const char *old_data,
 	      const char *old_data_end, uint32_t part_count,
 	      bool suppress_error)
 {
-	update->rope = tuple_rope_new(update->region, old_data, old_data_end,
-				      part_count);
+	update->rope = tuple_rope_new(old_data, old_data_end, part_count);
 	if (update->rope == NULL)
 		return -1;
 	struct update_op *op = update->ops;
@@ -1283,7 +1284,6 @@ static void
 update_init(struct tuple_update *update, int index_base)
 {
 	memset(update, 0, sizeof(*update));
-	update->region = &fiber()->gc;
 	/*
 	 * Base field offset, e.g. 0 for C and 1 for Lua. Used only for
 	 * error messages. All fields numbers must be zero-based!
@@ -1295,9 +1295,11 @@ const char *
 update_finish(struct tuple_update *update, uint32_t *p_tuple_len)
 {
 	uint32_t tuple_len = update_calc_tuple_length(update);
-	char *buffer = (char *) update_alloc(update->region, tuple_len);
-	if (buffer == NULL)
+	char *buffer = (char *) region_alloc(&fiber()->gc, tuple_len);
+	if (buffer == NULL) {
+		diag_set(OutOfMemory, tuple_len, "region_alloc", "buffer");
 		return NULL;
+	}
 	*p_tuple_len = update_write_tuple(update, buffer, buffer + tuple_len);
 	return buffer;
 }
@@ -1380,10 +1382,13 @@ tuple_upsert_squash(const char *expr1, const char *expr1_end,
 	}
 	size_t possible_size = expr1_end - expr1 + expr2_end - expr2;
 	const uint32_t space_for_arr_tag = 5;
-	char *buf = (char *) update_alloc(&fiber()->gc,
+	char *buf = (char *) region_alloc(&fiber()->gc,
 					  possible_size + space_for_arr_tag);
-	if (buf == NULL)
+	if (buf == NULL) {
+		diag_set(OutOfMemory, possible_size + space_for_arr_tag,
+			 "region_alloc", "buf");
 		return NULL;
+	}
 	/* reserve some space for mp array header */
 	char *res_ops = buf + space_for_arr_tag;
 	uint32_t res_count = 0; /* number of resulting operations */
