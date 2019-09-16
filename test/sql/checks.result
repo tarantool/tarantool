@@ -839,6 +839,31 @@ box.execute("DROP TABLE test;")
 ---
 - row_count: 1
 ...
+--
+-- gh-4176: Can't recover if check constraint involves function.
+--
+function MYFUNC(x) return x < 10 end
+---
+...
+box.schema.func.create('MYFUNC', {param_list = {'integer'}, returns = 'integer', is_deterministic = true, exports = {'LUA', 'SQL'}})
+---
+...
+box.execute("CREATE TABLE t6(a  INT CHECK (myfunc(a)) primary key);");
+---
+- row_count: 1
+...
+box.func.MYFUNC:drop()
+---
+...
+box.execute("INSERT INTO t6 VALUES(11);");
+---
+- null
+- Function 'MYFUNC' does not exist
+...
+box.execute("DROP TABLE t6")
+---
+- row_count: 1
+...
 test_run:cmd("clear filter")
 ---
 - true

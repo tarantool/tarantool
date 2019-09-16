@@ -1828,7 +1828,7 @@ case OP_BuiltinFunction: {
 	break;
 }
 
-/* Opcode: Function * P2 P3 P4 P5
+/* Opcode: FunctionByName * P2 P3 P4 P5
  * Synopsis: r[P3]=func(r[P2@P5])
  *
  * Invoke a user function (P4 is a pointer to a function object
@@ -1836,8 +1836,13 @@ case OP_BuiltinFunction: {
  * register P2 and successors. The result of the function is
  * stored in register P3.
  */
-case OP_Function: {
-	struct func *func = pOp->p4.func;
+case OP_FunctionByName: {
+	assert(pOp->p4type == P4_DYNAMIC);
+	struct func *func = func_by_name(pOp->p4.z, strlen(pOp->p4.z));
+	if (unlikely(func == NULL)) {
+		diag_set(ClientError, ER_NO_SUCH_FUNCTION, pOp->p4.z);
+		goto abort_due_to_error;
+	}
 	int argc = pOp->p5;
 	struct Mem *argv = &aMem[pOp->p2];
 	struct port args, ret;

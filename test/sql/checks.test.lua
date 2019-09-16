@@ -272,4 +272,14 @@ assert(box.space.TEST.ck_constraint.some_ck.is_enabled == true)
 box.space.TEST:insert({12})
 box.execute("DROP TABLE test;")
 
+--
+-- gh-4176: Can't recover if check constraint involves function.
+--
+function MYFUNC(x) return x < 10 end
+box.schema.func.create('MYFUNC', {param_list = {'integer'}, returns = 'integer', is_deterministic = true, exports = {'LUA', 'SQL'}})
+box.execute("CREATE TABLE t6(a  INT CHECK (myfunc(a)) primary key);");
+box.func.MYFUNC:drop()
+box.execute("INSERT INTO t6 VALUES(11);");
+box.execute("DROP TABLE t6")
+
 test_run:cmd("clear filter")
