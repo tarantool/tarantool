@@ -257,4 +257,19 @@ assert(box.space.TEST.ck_constraint.CK.is_enabled == true)
 box.space.TEST:insert({13})
 box.space.TEST:drop()
 
+--
+-- Test ENABLE/DISABLE CK constraints from SQL works.
+--
+box.execute("ALTER TABLE falsch DISABLE CHECK CONSTRAINT \"some_ck\"")
+box.execute("CREATE TABLE test(a INT PRIMARY KEY);");
+box.execute('ALTER TABLE test ADD CONSTRAINT \"some_ck\" CHECK(a < 10);')
+box.execute("ALTER TABLE test DISABLE CHECK CONSTRAINT \"falsch\"")
+box.execute("ALTER TABLE test DISABLE CHECK CONSTRAINT \"some_ck\"")
+assert(box.space.TEST.ck_constraint.some_ck.is_enabled == false)
+box.space.TEST:insert({11})
+box.execute("ALTER TABLE test ENABLE CHECK CONSTRAINT \"some_ck\"")
+assert(box.space.TEST.ck_constraint.some_ck.is_enabled == true)
+box.space.TEST:insert({12})
+box.execute("DROP TABLE test;")
+
 test_run:cmd("clear filter")

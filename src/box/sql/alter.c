@@ -79,6 +79,68 @@ tnt_error:
 	goto exit_rename_table;
 }
 
+void
+sql_alter_ck_constraint_enable(struct Parse *parse)
+{
+	struct enable_entity_def *enable_def = &parse->enable_entity_def;
+	struct SrcList *src_tab = enable_def->base.entity_name;
+	assert(enable_def->base.entity_type == ENTITY_TYPE_CK);
+	assert(enable_def->base.alter_action == ALTER_ACTION_ENABLE);
+	assert(src_tab->nSrc == 1);
+	struct sql *db = parse->db;
+
+	char *constraint_name = NULL;
+	const char *tbl_name = src_tab->a[0].zName;
+	struct space *space = space_by_name(tbl_name);
+	if (space == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_SPACE, tbl_name);
+		parse->is_aborted = true;
+		goto exit_alter_ck_constraint;
+	}
+
+	constraint_name = sql_name_from_token(db, &enable_def->name);
+	if (constraint_name == NULL) {
+		parse->is_aborted = true;
+		goto exit_alter_ck_constraint;
+	}
+
+	struct Vdbe *v = sqlGetVdbe(parse);
+	if (v == NULL)
+		goto exit_alter_ck_constraint;
+
+	struct space *ck_space = space_by_id(BOX_CK_CONSTRAINT_ID);
+	assert(ck_space != NULL);
+	int cursor = parse->nTab++;
+	vdbe_emit_open_cursor(parse, cursor, 0, ck_space);
+	sqlVdbeChangeP5(v, OPFLAG_SYSTEMSP);
+
+	int key_reg = sqlGetTempRange(parse, 2);
+	sqlVdbeAddOp2(v, OP_Integer, space->def->id, key_reg);
+	sqlVdbeAddOp4(v, OP_String8, 0, key_reg + 1, 0,
+		      sqlDbStrDup(db, constraint_name), P4_DYNAMIC);
+	int addr = sqlVdbeAddOp4Int(v, OP_Found, cursor, 0, key_reg, 2);
+	sqlVdbeAddOp4(v, OP_SetDiag, ER_NO_SUCH_CONSTRAINT, 0, 0,
+		      sqlMPrintf(db, tnt_errcode_desc(ER_NO_SUCH_CONSTRAINT),
+				 constraint_name), P4_DYNAMIC);
+	sqlVdbeAddOp2(v, OP_Halt, -1, ON_CONFLICT_ACTION_ABORT);
+	sqlVdbeJumpHere(v, addr);
+
+	const int field_count = 6;
+	int tuple_reg = sqlGetTempRange(parse, field_count + 1);
+	for (int i = 0; i < field_count - 1; ++i)
+		sqlVdbeAddOp3(v, OP_Column, cursor, i, tuple_reg + i);
+	sqlVdbeAddOp1(v, OP_Close, cursor);
+	sqlVdbeAddOp2(v, OP_Bool, enable_def->is_enabled,
+		      tuple_reg + field_count - 1);
+	sqlVdbeAddOp3(v, OP_MakeRecord, tuple_reg, field_count,
+		      tuple_reg + field_count);
+	sqlVdbeAddOp4(v, OP_IdxReplace, tuple_reg + field_count, 0, 0,
+		      (char *)ck_space, P4_SPACEPTR);
+exit_alter_ck_constraint:
+	sqlDbFree(db, constraint_name);
+	sqlSrcListDelete(db, src_tab);
+}
+
 /* This function is used to implement the ALTER TABLE command.
  * The table name in the CREATE TRIGGER statement is replaced with the third
  * argument and the result returned. This is analagous to rename_table()

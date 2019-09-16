@@ -790,6 +790,55 @@ box.space.TEST:insert({13})
 box.space.TEST:drop()
 ---
 ...
+--
+-- Test ENABLE/DISABLE CK constraints from SQL works.
+--
+box.execute("ALTER TABLE falsch DISABLE CHECK CONSTRAINT \"some_ck\"")
+---
+- null
+- Space 'FALSCH' does not exist
+...
+box.execute("CREATE TABLE test(a INT PRIMARY KEY);");
+---
+- row_count: 1
+...
+box.execute('ALTER TABLE test ADD CONSTRAINT \"some_ck\" CHECK(a < 10);')
+---
+- row_count: 1
+...
+box.execute("ALTER TABLE test DISABLE CHECK CONSTRAINT \"falsch\"")
+---
+- null
+- Constraint falsch does not exist
+...
+box.execute("ALTER TABLE test DISABLE CHECK CONSTRAINT \"some_ck\"")
+---
+- row_count: 0
+...
+assert(box.space.TEST.ck_constraint.some_ck.is_enabled == false)
+---
+- true
+...
+box.space.TEST:insert({11})
+---
+- [11]
+...
+box.execute("ALTER TABLE test ENABLE CHECK CONSTRAINT \"some_ck\"")
+---
+- row_count: 0
+...
+assert(box.space.TEST.ck_constraint.some_ck.is_enabled == true)
+---
+- true
+...
+box.space.TEST:insert({12})
+---
+- error: 'Check constraint failed ''some_ck'': a < 10'
+...
+box.execute("DROP TABLE test;")
+---
+- row_count: 1
+...
 test_run:cmd("clear filter")
 ---
 - true

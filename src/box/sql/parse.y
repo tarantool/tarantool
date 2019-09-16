@@ -260,7 +260,7 @@ columnname(A) ::= nm(A) typedef(Y). {sqlAddColumn(pParse,&A,&Y);}
   CONFLICT DEFERRED END ENGINE FAIL
   IGNORE INITIALLY INSTEAD NO MATCH PLAN
   QUERY KEY OFFSET RAISE RELEASE REPLACE RESTRICT
-  RENAME CTIME_KW IF
+  RENAME CTIME_KW IF ENABLE DISABLE
   .
 %wildcard ANY.
 
@@ -797,6 +797,10 @@ col_list_with_autoinc(A) ::= expr(Y) autoinc(I). {
   /* A-overwrites-Y. */
   A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
 }
+
+%type enable {bool}
+enable(A) ::= ENABLE.           {A = true;}
+enable(A) ::= DISABLE.          {A = false;}
 
 %type sortorder {int}
 
@@ -1783,6 +1787,12 @@ cmd ::= ALTER TABLE fullname(X) DROP CONSTRAINT nm(Z). {
   drop_fk_def_init(&pParse->drop_fk_def, X, &Z, false);
   pParse->initiateTTrans = true;
   sql_drop_foreign_key(pParse);
+}
+
+cmd ::= alter_table_start(A) enable(E) CHECK CONSTRAINT nm(Z). {
+    enable_entity_def_init(&pParse->enable_entity_def, ENTITY_TYPE_CK, A,
+                           &Z, E);
+    sql_alter_ck_constraint_enable(pParse);
 }
 
 //////////////////////// COMMON TABLE EXPRESSIONS ////////////////////////////

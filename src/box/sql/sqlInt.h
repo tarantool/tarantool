@@ -2202,6 +2202,7 @@ struct Parse {
 		struct drop_table_def drop_table_def;
 		struct drop_trigger_def drop_trigger_def;
 		struct drop_view_def drop_view_def;
+		struct enable_entity_def enable_entity_def;
 	};
 	/**
 	 * Table def is not part of union since information
@@ -3968,6 +3969,15 @@ extern int sqlPendingByte;
  */
 void
 sql_alter_table_rename(struct Parse *parse);
+
+/**
+ * Generate code to implement the "ALTER TABLE xxx ENABLE/DISABLE
+ * CHECK CONSTRAINT" command.
+ *
+ * @param parse Current parsing context.
+ */
+void
+sql_alter_ck_constraint_enable(struct Parse *parse);
 
 /**
  * Return the length (in bytes) of the token that begins at z[0].
