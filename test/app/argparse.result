@@ -1,4 +1,11 @@
 -- internal argparse test
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua:<line>\"]: '")
+---
+- true
+...
 argparse = require('internal.argparse').parse
 ---
 ...
@@ -92,7 +99,7 @@ argparse({'tarantoolctl', 'start', 'instance', '--start', 'lalochka'})
 ...
 argparse({'tarantoolctl', 'start', 'instance', '--start', '--', 'lalochka'})
 ---
-- error: 'builtin/internal.argparse.lua:105: bad argument #5: ID not valid'
+- error: 'builtin/internal.argparse.lua:<line>"]: bad argument #5: ID not valid'
 ...
 argparse({'tarantoolctl', 'start', 'instance', '--start', '-', 'lalochka'})
 ---
@@ -130,17 +137,17 @@ argparse({'--verh=42'}, {'verh'})
 ...
 argparse({'--verh=42'}, {{'verh', 'boolean'}})
 ---
-- error: 'builtin/internal.argparse.lua:35: Bad input for parameter "verh". Expected
+- error: 'builtin/internal.argparse.lua:<line>"]: Bad input for parameter "verh". Expected
     boolean, got "42"'
 ...
 argparse({'--verh=42'}, {{'verh', 'boolean+'}})
 ---
-- error: 'builtin/internal.argparse.lua:35: Bad input for parameter "verh". Expected
+- error: 'builtin/internal.argparse.lua:<line>"]: Bad input for parameter "verh". Expected
     boolean, got "42"'
 ...
 argparse({'--verh=42'}, {'niz'})
 ---
-- error: 'builtin/internal.argparse.lua:142: unknown options: verh'
+- error: 'builtin/internal.argparse.lua:<line>"]: unknown options: verh'
 ...
 argparse({'--super-option'})
 ---
@@ -155,4 +162,8 @@ argparse({'tarantoolctl', 'start', 'instance', '--start=lalochka', 'option', '-'
   5: '-'
   6: another option
   start: lalochka
+...
+test_run:cmd("clear filter")
+---
+- true
 ...

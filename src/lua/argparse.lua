@@ -31,12 +31,20 @@ local function convert_parameter_simple(name, convert_from, convert_to)
         end
         return converted
     elseif convert_to == 'boolean' then
-        if type(convert_from) ~= 'boolean' then
-            error(
-                ('Bad input for parameter "%s". Expected boolean, got "%s"')
-                :format(name, convert_from)
-            )
+        if type(convert_from) == 'boolean' then
+            return convert_from
         end
+        convert_from = string.lower(convert_from)
+        if convert_from == '0' or convert_from == 'false' then
+            return false
+        end
+        if convert_from == '1' or convert_from == 'true' then
+            return true
+        end
+        error(
+            ('Bad input for parameter "%s". Expected boolean, got "%s"')
+            :format(name, convert_from)
+        )
     elseif convert_to == 'string' then
         if type(convert_from) ~= 'string' then
             error(

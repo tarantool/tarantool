@@ -1,4 +1,6 @@
 -- internal argparse test
+test_run = require('test_run').new()
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua:<line>\"]: '")
 
 argparse = require('internal.argparse').parse
 
@@ -28,3 +30,5 @@ argparse({'--verh=42'}, {{'verh', 'boolean+'}})
 argparse({'--verh=42'}, {'niz'})
 argparse({'--super-option'})
 argparse({'tarantoolctl', 'start', 'instance', '--start=lalochka', 'option', '-', 'another option'})
+
+test_run:cmd("clear filter")
