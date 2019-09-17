@@ -65,7 +65,7 @@ box.error.injection.set("ERRINJ_REPLICA_JOIN_DELAY", true)
 fiber = require('fiber')
 test_run:cmd("setopt delimiter ';'")
 _ = fiber.create(function()
-    test_run:wait_cond(function() return box.space._cluster:get(2) ~= nil end)
+    test_run:wait_cond(function() return box.info.replication[2] ~= nil end)
     lsn = box.info.vclock[1]
     box.error.injection.set("ERRINJ_RELAY_BREAK_LSN", lsn + 1)
     box.space.test:auto_increment{'v1'}
