@@ -130,18 +130,16 @@ test_osx: deps_osx test_osx_no_deps
 ###########
 
 deps_freebsd:
-	sudo pkg install -y git cmake gmake gcc coreutils \
-		readline ncurses libyaml openssl libunwind icu \
-		python27 py27-pip py27-setuptools py27-daemon \
-		py27-yaml py27-argparse py27-six py27-gevent \
-		gdb bash autoconf automake libtool
+	sudo pkg install -y git cmake gmake icu libiconv \
+		python27 py27-yaml py27-six py27-gevent \
+		autoconf automake libtool
 
 build_freebsd:
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
 	gmake -j
 
 test_freebsd_no_deps: build_freebsd
-	cd test && /usr/bin/python test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
+	cd test && python2.7 test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_freebsd: deps_freebsd test_freebsd_no_deps
 
