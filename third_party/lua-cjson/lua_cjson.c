@@ -66,6 +66,7 @@ typedef enum {
     T_COMMA,
     T_END,
     T_WHITESPACE,
+    T_LINEFEED,
     T_ERROR,
     T_UNKNOWN
 } json_token_type_t;
@@ -85,6 +86,7 @@ static const char *json_token_type_name[] = {
     "T_COMMA",
     "T_END",
     "T_WHITESPACE",
+    "T_LINEFEED",
     "T_ERROR",
     "T_UNKNOWN",
     NULL
@@ -105,11 +107,13 @@ typedef struct {
     strbuf_t *tmp;    /* Temporary storage for strings */
     struct luaL_serializer *cfg;
     int current_depth;
+    int line_count;
+    const char *cur_line_ptr;
 } json_parse_t;
 
 typedef struct {
     json_token_type_t type;
-    int index;
+    int column_index;
     union {
         const char *string;
         double number;
@@ -195,7 +199,7 @@ static void json_create_tokens()
     ch2token['\0'] = T_END;
     ch2token[' '] = T_WHITESPACE;
     ch2token['\t'] = T_WHITESPACE;
-    ch2token['\n'] = T_WHITESPACE;
+    ch2token['\n'] = T_LINEFEED;
     ch2token['\r'] = T_WHITESPACE;
 
     /* Update characters that require further processing */
@@ -598,7 +602,7 @@ static void json_set_token_error(json_token_t *token, json_parse_t *json,
                                  const char *errtype)
 {
     token->type = T_ERROR;
-    token->index = json->ptr - json->data;
+    token->column_index = json->ptr - json->cur_line_ptr;
     token->value.string = errtype;
 }
 
@@ -738,14 +742,18 @@ static void json_next_token(json_parse_t *json, json_token_t *token)
     while (1) {
         ch = (unsigned char)*(json->ptr);
         token->type = ch2token[ch];
-        if (token->type != T_WHITESPACE)
+        if (token->type == T_LINEFEED) {
+            json->line_count++;
+            json->cur_line_ptr = json->ptr + 1;
+        } else if (token->type != T_WHITESPACE) {
             break;
+        }
         json->ptr++;
     }
 
     /* Store location of new token. Required when throwing errors
      * for unexpected tokens (syntax errors). */
-    token->index = json->ptr - json->data;
+    token->column_index = json->ptr - json->cur_line_ptr;
 
     /* Don't advance the pointer for an error or the end */
     if (token->type == T_ERROR) {
@@ -835,9 +843,9 @@ static void json_throw_parse_error(lua_State *l, json_parse_t *json,
     else
         found = json_token_type_name[token->type];
 
-    /* Note: token->index is 0 based, display starting from 1 */
-    luaL_error(l, "Expected %s but found %s at character %d",
-               exp, found, token->index + 1);
+    /* Note: token->column_index is 0 based, display starting from 1 */
+    luaL_error(l, "Expected %s but found %s on line %d at character %d", exp,
+               found, json->line_count, token->column_index + 1);
 }
 
 static inline void json_decode_ascend(json_parse_t *json)
@@ -855,8 +863,9 @@ static void json_decode_descend(lua_State *l, json_parse_t *json, int slots)
     }
 
     strbuf_free(json->tmp);
-    luaL_error(l, "Found too many nested data structures (%d) at character %d",
-        json->current_depth, json->ptr - json->data);
+    luaL_error(l, "Found too many nested data structures (%d) on line %d at "
+               "character %d", json->current_depth, json->line_count,
+               json->ptr - json->cur_line_ptr);
 }
 
 static void json_parse_object_context(lua_State *l, json_parse_t *json)
@@ -1007,6 +1016,8 @@ static int json_decode(lua_State *l)
     json.data = luaL_checklstring(l, 1, &json_len);
     json.current_depth = 0;
     json.ptr = json.data;
+    json.line_count = 1;
+    json.cur_line_ptr = json.data;
 
     /* Detect Unicode other than UTF-8 (see RFC 4627, Sec 3)
      *
