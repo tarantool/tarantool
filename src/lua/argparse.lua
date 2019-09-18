@@ -20,14 +20,21 @@ local function result_set_add(t_out, key, val)
     end
 end
 
+local function err_bad_parameter_value(name, got, expected)
+    if type(got) ~= 'string' then
+        got = 'nothing'
+    else
+        got = string.format('"%s"', got)
+    end
+    error(string.format('Bad value for parameter "%s". Expected %s, got %s',
+                        name, expected, got))
+end
+
 local function convert_parameter_simple(name, convert_from, convert_to)
     if convert_to == 'number' then
         local converted = tonumber(convert_from)
         if converted == nil then
-            error(
-                ('Bad value for parameter %s. expected type %s, got "%s"')
-                :format(name, convert_to, convert_from)
-            )
+            return err_bad_parameter_value(name, convert_from, convert_to)
         end
         return converted
     elseif convert_to == 'boolean' then
@@ -41,20 +48,14 @@ local function convert_parameter_simple(name, convert_from, convert_to)
         if convert_from == '1' or convert_from == 'true' then
             return true
         end
-        error(
-            ('Bad input for parameter "%s". Expected boolean, got "%s"')
-            :format(name, convert_from)
-        )
+        return err_bad_parameter_value(name, convert_from, convert_to)
     elseif convert_to == 'string' then
         if type(convert_from) ~= 'string' then
-            error(
-                ('Bad input for parameter "%s". Expected string, got "%s"')
-                :format(name, convert_from)
-            )
+            return err_bad_parameter_value(name, convert_from, convert_to)
         end
     else
         error(
-            ('Bad convertion format "%s" provided for %s')
+            ('Bad conversion format "%s" provided for %s')
             :format(convert_to, name)
         )
     end
