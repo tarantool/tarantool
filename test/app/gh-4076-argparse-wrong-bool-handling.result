@@ -48,8 +48,34 @@ args = {'--flag1', 'abc'}
  | ...
 argparse(args, params)
  | ---
- | - error: 'builtin/internal.argparse.lua:<line>"]: Bad input for parameter "flag1". Expected
+ | - error: 'builtin/internal.argparse.lua:<line>"]: Bad value for parameter "flag1". Expected
  |     boolean, got "abc"'
+ | ...
+
+--
+-- When parameter value was omitted, it was replaced internally
+-- with boolean true, and sometimes was showed in error messages.
+-- Now it is 'nothing'.
+--
+params = {}
+ | ---
+ | ...
+params[1] = {'value', 'number'}
+ | ---
+ | ...
+argparse({'--value'}, params)
+ | ---
+ | - error: 'builtin/internal.argparse.lua:<line>"]: Bad value for parameter "value". Expected
+ |     number, got nothing'
+ | ...
+
+params[1][2] = 'string'
+ | ---
+ | ...
+argparse({'--value'}, params)
+ | ---
+ | - error: 'builtin/internal.argparse.lua:<line>"]: Bad value for parameter "value". Expected
+ |     string, got nothing'
  | ...
 
 test_run:cmd("clear filter")

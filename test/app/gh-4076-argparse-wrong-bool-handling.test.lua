@@ -17,4 +17,16 @@ argparse(args, params)
 args = {'--flag1', 'abc'}
 argparse(args, params)
 
+--
+-- When parameter value was omitted, it was replaced internally
+-- with boolean true, and sometimes was showed in error messages.
+-- Now it is 'nothing'.
+--
+params = {}
+params[1] = {'value', 'number'}
+argparse({'--value'}, params)
+
+params[1][2] = 'string'
+argparse({'--value'}, params)
+
 test_run:cmd("clear filter")
