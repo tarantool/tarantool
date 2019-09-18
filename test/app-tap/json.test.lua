@@ -124,4 +124,34 @@ tap.test("json", function(test)
             '{"a":{"a":null,"b":null},"b":{"a":null,"b":null}}')
     serializer.cfg({encode_max_depth = orig_encode_max_depth,
                     encode_deep_as_nil = orig_encode_deep_as_nil})
+
+    --
+    -- gh-3316: Make sure that line number is printed in the error
+    -- message.
+    --
+    local _, err_msg
+    _, err_msg = pcall(serializer.decode, 'a{"hello": \n"world"}')
+    test:ok(string.find(err_msg, 'line 1 at character 1') ~= nil,
+            'mistake on first line')
+    _, err_msg = pcall(serializer.decode, '{"hello": \n"world"a}')
+    test:ok(string.find(err_msg, 'line 2 at character 8') ~= nil,
+            'mistake on second line')
+    _, err_msg = pcall(serializer.decode, '\n\n\n\n{"hello": "world"a}')
+    test:ok(string.find(err_msg, 'line 5 at character 18') ~= nil,
+            'mistake on fifth line')
+    serializer.cfg{decode_max_depth = 1}
+    _, err_msg = pcall(serializer.decode,
+                       '{"hello": {"world": {"hello": "world"}}}')
+    test:ok(string.find(err_msg, 'line 1 at character 11') ~= nil,
+            'mistake on first line')
+    _, err_msg = pcall(serializer.decode,
+                       '{"hello": \n{"world": {"hello": "world"}}}')
+    test:ok(string.find(err_msg, 'line 2 at character 1') ~= nil,
+            'mistake on second line')
+    _, err_msg = pcall(serializer.decode, "{ 100: 200 }")
+    test:ok(string.find(err_msg, 'line 1 at character 3') ~= nil,
+            'mistake on first line')
+    _, err_msg = pcall(serializer.decode, '{"hello": "world",\n 100: 200}')
+    test:ok(string.find(err_msg, 'line 2 at character 2') ~= nil,
+            'mistake on second line')
 end)
