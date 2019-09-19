@@ -14,13 +14,23 @@ macro(curl_build)
         message(FATAL_ERROR "Unable to find zlib")
     endif()
 
-    # Set curl option to find OpenSSL library.
-    if ("${OPENSSL_ROOT_DIR}" STREQUAL "")
-        # Linux / FreeBSD.
-        set(LIBCURL_OPENSSL_OPT "--with-ssl")
-    else()
-        # Mac OS.
-        set(LIBCURL_OPENSSL_OPT "--with-ssl=${OPENSSL_ROOT_DIR}")
+    # Use the same OpenSSL library for libcurl as is used for
+    # tarantool itself.
+    get_filename_component(FOUND_OPENSSL_ROOT_DIR ${OPENSSL_INCLUDE_DIR} DIRECTORY)
+    set(LIBCURL_OPENSSL_OPT "--with-ssl=${FOUND_OPENSSL_ROOT_DIR}")
+
+    # Pass -isysroot=<SDK_PATH> option on Mac OS to a preprocessor
+    # and a C compiler to find header files installed with an SDK.
+    #
+    # The idea here is to don't pass all compiler/linker options
+    # that is set for tarantool, but only a subset that is
+    # necessary for choosen toolchain, and let curl's configure
+    # script set options that are appropriate for libcurl.
+    set(LIBCURL_CPPFLAGS "")
+    set(LIBCURL_CFLAGS "")
+    if (TARGET_OS_DARWIN AND NOT "${CMAKE_OSX_SYSROOT}" STREQUAL "")
+        set(LIBCURL_CPPFLAGS "${LIBCURL_CPPFLAGS} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT}")
+        set(LIBCURL_CFLAGS "${LIBCURL_CFLAGS} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT}")
     endif()
 
     include(ExternalProject)
@@ -35,6 +45,9 @@ macro(curl_build)
         CONFIGURE_COMMAND
             cd <SOURCE_DIR> && ./buildconf &&
             cd <BINARY_DIR> && <SOURCE_DIR>/configure
+                CC=${CMAKE_C_COMPILER}
+                CPPFLAGS=${LIBCURL_CPPFLAGS}
+                CFLAGS=${LIBCURL_CFLAGS}
                 --prefix <INSTALL_DIR>
                 --enable-static
                 --enable-shared
@@ -112,6 +125,9 @@ macro(curl_build)
         set(CURL_LIBRARIES ${CURL_LIBRARIES} rt)
     endif()
 
+    unset(LIBCURL_CPPFLAGS)
+    unset(LIBCURL_CFLAGS)
+    unset(FOUND_OPENSSL_ROOT_DIR)
     unset(LIBCURL_INSTALL_DIR)
     unset(LIBCURL_BINARY_DIR)
     unset(LIBCURL_SOURCE_DIR)
