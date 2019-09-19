@@ -717,7 +717,7 @@ do_op_bit(struct tuple_update *update, struct update_op *op)
 	if (field->op != NULL)
 		return update_err_double(op);
 	const char *old = field->old;
-	uint64_t val;
+	uint64_t val = 0;
 	if (mp_read_uint(op, &old, &val) != 0)
 		return -1;
 	switch (op->opcode) {
@@ -752,7 +752,7 @@ do_op_splice(struct tuple_update *update, struct update_op *op)
 	struct op_splice_arg *arg = &op->arg.splice;
 
 	const char *in = field->old;
-	int32_t str_len;
+	int32_t str_len = 0;
 	if (mp_read_str(op, &in, (uint32_t *) &str_len, &in) != 0)
 		return -1;
 
@@ -1054,7 +1054,7 @@ update_op_decode(struct update_op *op, int index_base,
 		diag_set(ClientError, ER_UNKNOWN_UPDATE_OP);
 		return -1;
 	}
-	int32_t field_no;
+	int32_t field_no = 0;
 	switch(mp_typeof(**expr)) {
 	case MP_INT:
 	case MP_UINT: {
