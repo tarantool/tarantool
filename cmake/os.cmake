@@ -22,6 +22,41 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "kFreeBSD")
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
     set(TARGET_OS_FREEBSD 1)
     find_package_message(PLATFORM "Building for FreeBSD" "${CMAKE_SYSTEM_NAME}")
+
+    # FreeBSD has OpenSSL library installed in /usr as part of a
+    # base system. A user may install OpenSSL from ports / pkg to
+    # /usr/local. It is tricky to use the library from /usr in the
+    # case, because a compilation unit can also depend on
+    # libraries from /usr/local. When -I/usr/local/include is
+    # passed to a compiler it will find openssl/ssl.h from
+    # /usr/local/include first.
+    #
+    # In theory we can create a directory on the build stage and
+    # fill it with symlinks to choosen headers. However this way
+    # does not look as usual way to pick libraries to build
+    # against. I suspect that this is common problem on FreeBSD
+    # and we should wait for some general resolution from FreeBSD
+    # developers rather then work it around.
+    #
+    # Verify that /usr is not set as a directory to pick OpenSSL
+    # library and header files, because it is likely that a user
+    # set it to use the library from a base system, while the
+    # library is also installed into /usr/local.
+    #
+    # It is possible however that a user is aware of the problem,
+    # but want to use -DOPENSSL_ROOT_DIR=<...> CMake option to
+    # choose OpenSSL from /usr anyway. We should not fail the
+    # build and block this ability. Say, a user may know that
+    # there are no OpenSSL libraries in /usr/local, but finds it
+    # convenient to set the CMake option explicitly due to some
+    # external reason.
+    get_filename_component(REAL_OPENSSL_ROOT_DIR "${OPENSSL_ROOT_DIR}"
+                           REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
+    if ("${REAL_OPENSSL_ROOT_DIR}" STREQUAL "/usr")
+        message(WARNING "Using OPENSSL_ROOT_DIR on FreeBSD to choose base "
+                        "system libraries is not supported")
+    endif()
+    unset(REAL_OPENSSL_ROOT_DIR)
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "NetBSD")
     set(TARGET_OS_NETBSD 1)
     find_package_message(PLATFORM "Building for NetBSD" "${CMAKE_SYSTEM_NAME}")
