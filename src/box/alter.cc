@@ -3627,7 +3627,8 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 		/* Check fields */
 		uint32_t replica_id =
 			tuple_field_u32_xc(new_tuple, BOX_CLUSTER_FIELD_ID);
-		replica_check_id(replica_id);
+		if (replica_check_id(replica_id) != 0)
+			return -1;
 		tt_uuid replica_uuid;
 		tuple_field_uuid_xc(new_tuple, BOX_CLUSTER_FIELD_UUID,
 				    &replica_uuid);
@@ -3665,7 +3666,8 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 		assert(old_tuple != NULL);
 		uint32_t replica_id =
 			tuple_field_u32_xc(old_tuple, BOX_CLUSTER_FIELD_ID);
-		replica_check_id(replica_id);
+		if (replica_check_id(replica_id) != 0)
+			return -1;
 
 		struct trigger *on_commit;
 		on_commit = txn_alter_trigger_new(unregister_replica,

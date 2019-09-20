@@ -352,7 +352,7 @@ replica_on_relay_stop(struct replica *replica);
 #if defined(__cplusplus)
 } /* extern "C" */
 
-void
+int
 replica_check_id(uint32_t replica_id);
 
 /**

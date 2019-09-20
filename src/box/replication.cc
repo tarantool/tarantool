@@ -114,15 +114,19 @@ replication_free(void)
 	free(replicaset.replica_by_id);
 }
 
-void
+int
 replica_check_id(uint32_t replica_id)
 {
-        if (replica_id == REPLICA_ID_NIL)
-		tnt_raise(ClientError, ER_REPLICA_ID_IS_RESERVED,
+	if (replica_id == REPLICA_ID_NIL) {
+		diag_set(ClientError, ER_REPLICA_ID_IS_RESERVED,
 			  (unsigned) replica_id);
-	if (replica_id >= VCLOCK_MAX)
-		tnt_raise(LoggedError, ER_REPLICA_MAX,
+		return -1;
+	}
+	if (replica_id >= VCLOCK_MAX) {
+		diag_set(ClientError, ER_REPLICA_MAX,
 			  (unsigned) replica_id);
+		return -1;
+	}
 	/*
 	 * It's okay to update the instance id while it is joining to
 	 * a cluster as long as the id is set by the time bootstrap is
@@ -133,9 +137,12 @@ replica_check_id(uint32_t replica_id)
 	 * case it will replay this operation during the final join
 	 * stage.
 	 */
-        if (!replicaset.is_joining && replica_id == instance_id)
-		tnt_raise(ClientError, ER_LOCAL_INSTANCE_ID_IS_READ_ONLY,
+	if (!replicaset.is_joining && replica_id == instance_id) {
+		diag_set(ClientError, ER_LOCAL_INSTANCE_ID_IS_READ_ONLY,
 			  (unsigned) replica_id);
+		return -1;
+	}
+	return 0;
 }
 
 /* Return true if replica doesn't have id, relay and applier */
