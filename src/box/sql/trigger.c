@@ -170,7 +170,6 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 	char *trigger_name = trigger->zName;
 	trigger->step_list = step_list;
 	while (step_list != NULL) {
-		step_list->trigger = trigger;
 		step_list = step_list->pNext;
 	}
 

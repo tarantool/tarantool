@@ -895,7 +895,6 @@ fk_constraint_action_trigger(struct Parse *pParse, struct space_def *def,
 		step->op = TK_UPDATE;
 	}
 
-	step->trigger = trigger;
 	if (is_update) {
 		fk->on_update_trigger = trigger;
 		trigger->op = TK_UPDATE;

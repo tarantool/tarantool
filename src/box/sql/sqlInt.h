@@ -2366,8 +2366,6 @@ struct sql_trigger {
 struct TriggerStep {
 	u8 op;			/* One of TK_DELETE, TK_UPDATE, TK_INSERT, TK_SELECT */
 	u8 orconf;		/* ON_CONFLICT_ACTION_ROLLBACK etc. */
-	/** The trigger that this step is a part of */
-	struct sql_trigger *trigger;
 	Select *pSelect;	/* SELECT statement or RHS of INSERT INTO SELECT ... */
 	char *zTarget;		/* Target table for DELETE, UPDATE, INSERT */
 	Expr *pWhere;		/* The WHERE clause for DELETE or UPDATE steps */
