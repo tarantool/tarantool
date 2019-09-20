@@ -1970,7 +1970,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			struct Select *select = sql_view_compile(sql_get(),
 								 def->opts.sql);
 			if (select == NULL)
-				diag_raise();
+				return -1;
 			auto select_guard = make_scoped_guard([=] {
 				sql_select_delete(sql_get(), select);
 			});
@@ -1983,8 +1983,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				 */
 				update_view_references(select, -1, false,
 						       &disappeared_space);
-				tnt_raise(ClientError, ER_NO_SUCH_SPACE,
+				diag_set(ClientError, ER_NO_SUCH_SPACE,
 					  disappeared_space);
+				return -1;
 			}
 			struct trigger *on_commit_view =
 				txn_alter_trigger_new(on_create_view_commit,
@@ -2001,23 +2002,28 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				 old_space->def->uid, SC_SPACE, PRIV_D);
 		/* Verify that the space is empty (has no indexes) */
 		if (old_space->index_count) {
-			tnt_raise(ClientError, ER_DROP_SPACE,
+			diag_set(ClientError, ER_DROP_SPACE,
 				  space_name(old_space),
 				  "the space has indexes");
+			return -1;
 		}
 		if (schema_find_grants("space", old_space->def->id)) {
-			tnt_raise(ClientError, ER_DROP_SPACE,
+			diag_set(ClientError, ER_DROP_SPACE,
 				  space_name(old_space),
 				  "the space has grants");
+			return -1;
 		}
-		if (space_has_data(BOX_TRUNCATE_ID, 0, old_space->def->id))
-			tnt_raise(ClientError, ER_DROP_SPACE,
+		if (space_has_data(BOX_TRUNCATE_ID, 0, old_space->def->id)) {
+			diag_set(ClientError, ER_DROP_SPACE,
 				  space_name(old_space),
 				  "the space has truncate record");
+			return -1;
+		}
 		if (old_space->def->view_ref_count > 0) {
-			tnt_raise(ClientError, ER_DROP_SPACE,
+			diag_set(ClientError, ER_DROP_SPACE,
 				  space_name(old_space),
 				  "other views depend on this space");
+			return -1;
 		}
 		/*
 		 * No need to check existence of parent keys,
@@ -2026,15 +2032,17 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * one referenced index which can't be dropped
 		 * before constraint itself.
 		 */
-		if (! rlist_empty(&old_space->child_fk_constraint)) {
-			tnt_raise(ClientError, ER_DROP_SPACE,
+		if (!rlist_empty(&old_space->child_fk_constraint)) {
+			diag_set(ClientError, ER_DROP_SPACE,
 				  space_name(old_space),
 				  "the space has foreign key constraints");
+			return -1;
 		}
 		if (!rlist_empty(&old_space->ck_constraint)) {
-			tnt_raise(ClientError, ER_DROP_SPACE,
+			diag_set(ClientError, ER_DROP_SPACE,
 				  space_name(old_space),
 				  "the space has check constraints");
+			return -1;
 		}
 		/**
 		 * The space must be deleted from the space
@@ -2059,7 +2067,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				sql_view_compile(sql_get(),
 						 old_space->def->opts.sql);
 			if (select == NULL)
-				diag_raise();
+				return -1;
 			auto select_guard = make_scoped_guard([=] {
 				sql_select_delete(sql_get(), select);
 			});
@@ -2083,29 +2091,39 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			make_scoped_guard([=] { space_def_delete(def); });
 		access_check_ddl(def->name, def->id, def->uid, SC_SPACE,
 				 PRIV_A);
-		if (def->id != space_id(old_space))
-			tnt_raise(ClientError, ER_ALTER_SPACE,
+		if (def->id != space_id(old_space)) {
+			diag_set(ClientError, ER_ALTER_SPACE,
 				  space_name(old_space),
 				  "space id is immutable");
-		if (strcmp(def->engine_name, old_space->def->engine_name) != 0)
-			tnt_raise(ClientError, ER_ALTER_SPACE,
+			return -1;
+		}
+		if (strcmp(def->engine_name, old_space->def->engine_name) != 0) {
+			diag_set(ClientError, ER_ALTER_SPACE,
 				  space_name(old_space),
 				  "can not change space engine");
-		if (def->opts.group_id != space_group_id(old_space))
-			tnt_raise(ClientError, ER_ALTER_SPACE,
+			return -1;
+		}
+		if (def->opts.group_id != space_group_id(old_space)) {
+			diag_set(ClientError, ER_ALTER_SPACE,
 				  space_name(old_space),
 				  "replication group is immutable");
-		if (def->opts.is_view != old_space->def->opts.is_view)
-			tnt_raise(ClientError, ER_ALTER_SPACE,
+			return -1;
+		}
+		if (def->opts.is_view != old_space->def->opts.is_view) {
+			diag_set(ClientError, ER_ALTER_SPACE,
 				  space_name(old_space),
 				  "can not convert a space to "
 				  "a view and vice versa");
+			return -1;
+		}
 		if (strcmp(def->name, old_space->def->name) != 0 &&
-		    old_space->def->view_ref_count > 0)
-			tnt_raise(ClientError, ER_ALTER_SPACE,
+		    old_space->def->view_ref_count > 0) {
+			diag_set(ClientError, ER_ALTER_SPACE,
 				  space_name(old_space),
 				  "can not rename space which is referenced by "
 				  "view");
+			return -1;
+		}
 		/*
 		 * Allow change of space properties, but do it
 		 * in WAL-error-safe mode.
@@ -2221,8 +2239,9 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 					  BOX_INDEX_FIELD_ID);
 	struct space *old_space = space_cache_find_xc(id);
 	if (old_space->def->opts.is_view) {
-		tnt_raise(ClientError, ER_ALTER_SPACE, space_name(old_space),
+		diag_set(ClientError, ER_ALTER_SPACE, space_name(old_space),
 			  "can not add index on a view");
+		return -1;
 	}
 	enum priv_type priv_type = new_tuple ? PRIV_C : PRIV_D;
 	if (old_tuple && new_tuple)
@@ -2238,24 +2257,28 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		/*
 		 * Dropping the primary key in a system space: off limits.
 		 */
-		if (space_is_system(old_space))
-			tnt_raise(ClientError, ER_LAST_DROP,
+		if (space_is_system(old_space)) {
+			diag_set(ClientError, ER_LAST_DROP,
 				  space_name(old_space));
+			return -1;
+		}
 		/*
 		 * Can't drop primary key before secondary keys.
 		 */
 		if (old_space->index_count > 1) {
-			tnt_raise(ClientError, ER_DROP_PRIMARY_KEY,
+			diag_set(ClientError, ER_DROP_PRIMARY_KEY,
 				  space_name(old_space));
+			return -1;
 		}
 		/*
 		 * Can't drop primary key before space sequence.
 		 */
 		if (old_space->sequence != NULL) {
-			tnt_raise(ClientError, ER_ALTER_SPACE,
+			diag_set(ClientError, ER_ALTER_SPACE,
 				  space_name(old_space),
 				  "can not drop primary key while "
 				  "space sequence exists");
+			return -1;
 		}
 	}
 
@@ -2264,9 +2287,10 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		 * A secondary index can not be created without
 		 * a primary key.
 		 */
-		tnt_raise(ClientError, ER_ALTER_SPACE,
+		diag_set(ClientError, ER_ALTER_SPACE,
 			  space_name(old_space),
 			  "can not add a secondary key before primary");
+		return -1;
 	}
 
 	struct alter_space *alter = alter_space_new(old_space);
@@ -2288,9 +2312,10 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		 */
 		if (index_is_used_by_fk_constraint(&old_space->parent_fk_constraint,
 						   iid)) {
-			tnt_raise(ClientError, ER_ALTER_SPACE,
+			diag_set(ClientError, ER_ALTER_SPACE,
 				  space_name(old_space),
 				  "can not drop a referenced index");
+			return -1;
 		}
 		alter_space_move_indexes(alter, 0, iid);
 		(void) new DropIndex(alter, old_index);
@@ -2354,9 +2379,10 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 							     index_def)) {
 			if (index_is_used_by_fk_constraint(&old_space->parent_fk_constraint,
 							   iid)) {
-				tnt_raise(ClientError, ER_ALTER_SPACE,
+				diag_set(ClientError, ER_ALTER_SPACE,
 					  space_name(old_space),
 					  "can not alter a referenced index");
+				return -1;
 			}
 			/*
 			 * Operation demands an index rebuild.
@@ -2432,9 +2458,11 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	 * with internal objects. Since space truncation doesn't
 	 * invoke triggers, we don't permit it for system spaces.
 	 */
-	if (space_is_system(old_space))
-		tnt_raise(ClientError, ER_TRUNCATE_SYSTEM_SPACE,
+	if (space_is_system(old_space)) {
+		diag_set(ClientError, ER_TRUNCATE_SYSTEM_SPACE,
 			  space_name(old_space));
+		return -1;
+	}
 
 	/*
 	 * Check if a write privilege was given, raise an error if not.
@@ -2674,17 +2702,19 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 				 PRIV_D);
 		/* Can't drop guest or super user */
 		if (uid <= (uint32_t) BOX_SYSTEM_USER_ID_MAX || uid == SUPER) {
-			tnt_raise(ClientError, ER_DROP_USER,
+			diag_set(ClientError, ER_DROP_USER,
 				  old_user->def->name,
 				  "the user or the role is a system");
+			return -1;
 		}
 		/*
 		 * Can only delete user if it has no spaces,
 		 * no functions and no grants.
 		 */
 		if (user_has_data(old_user)) {
-			tnt_raise(ClientError, ER_DROP_USER,
+			diag_set(ClientError, ER_DROP_USER,
 				  old_user->def->name, "the user has objects");
+			return -1;
 		}
 		user_cache_delete(uid);
 		struct trigger *on_rollback =
@@ -2960,7 +2990,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 			txn_alter_trigger_new(on_create_func_rollback, NULL);
 		struct func *func = func_new(def);
 		if (func == NULL)
-			diag_raise();
+			return -1;
 		def_guard.is_active = false;
 		func_cache_insert(func);
 		on_rollback->data = func;
@@ -2977,21 +3007,24 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 				 PRIV_D);
 		/* Can only delete func if it has no grants. */
 		if (schema_find_grants("function", old_func->def->fid)) {
-			tnt_raise(ClientError, ER_DROP_FUNCTION,
+			diag_set(ClientError, ER_DROP_FUNCTION,
 				  (unsigned) old_func->def->uid,
 				  "function has grants");
+			return -1;
 		}
 		if (old_func != NULL &&
 		    space_has_data(BOX_FUNC_INDEX_ID, 1, old_func->def->fid)) {
-			tnt_raise(ClientError, ER_DROP_FUNCTION,
+			diag_set(ClientError, ER_DROP_FUNCTION,
 				  (unsigned) old_func->def->uid,
 				  "function has references");
+			return -1;
 		}
 		/* Can't' drop a builtin function. */
 		if (old_func->def->language == FUNC_LANGUAGE_SQL_BUILTIN) {
-			tnt_raise(ClientError, ER_DROP_FUNCTION,
+			diag_set(ClientError, ER_DROP_FUNCTION,
 				  (unsigned) old_func->def->uid,
 				  "function is SQL built-in");
+			return -1;
 		}
 		struct trigger *on_commit =
 			txn_alter_trigger_new(on_drop_func_commit, old_func);
@@ -3015,8 +3048,9 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		old_def = func_def_new_from_tuple(old_tuple);
 		new_def = func_def_new_from_tuple(new_tuple);
 		if (func_def_cmp(new_def, old_def) != 0) {
-			tnt_raise(ClientError, ER_UNSUPPORTED, "function",
+			diag_set(ClientError, ER_UNSUPPORTED, "function",
 				  "alter");
+			return -1;
 		}
 	}
 	return 0;
@@ -3172,8 +3206,9 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 		 * fact that "none" collation features id == 0.
 		 */
 		if (old_id == COLL_NONE) {
-			tnt_raise(ClientError, ER_DROP_COLLATION, "none",
+			diag_set(ClientError, ER_DROP_COLLATION, "none",
 				  "system collation");
+			return -1;
 		}
 		struct coll_id *old_coll_id = coll_by_id(old_id);
 		assert(old_coll_id != NULL);
@@ -3200,11 +3235,11 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 				 SC_COLLATION, PRIV_C);
 		struct coll_id *new_coll_id = coll_id_new(&new_def);
 		if (new_coll_id == NULL)
-			diag_raise();
+			return -1;
 		struct coll_id *replaced_id;
 		if (coll_id_cache_replace(new_coll_id, &replaced_id) != 0) {
 			coll_id_delete(new_coll_id);
-			diag_raise();
+			return -1;
 		}
 		assert(replaced_id == NULL);
 		on_rollback->data = new_coll_id;
@@ -3212,7 +3247,8 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 	} else {
 		/* UPDATE */
 		assert(new_tuple != NULL && old_tuple != NULL);
-		tnt_raise(ClientError, ER_UNSUPPORTED, "collation", "alter");
+		diag_set(ClientError, ER_UNSUPPORTED, "collation", "alter");
+		return -1;
 	}
 	return 0;
 }
@@ -3508,8 +3544,10 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 	const char *key = tuple_field_cstr_xc(new_tuple ? new_tuple : old_tuple,
 					      BOX_SCHEMA_FIELD_KEY);
 	if (strcmp(key, "cluster") == 0) {
-		if (new_tuple == NULL)
-			tnt_raise(ClientError, ER_REPLICASET_UUID_IS_RO);
+		if (new_tuple == NULL) {
+			diag_set(ClientError, ER_REPLICASET_UUID_IS_RO);
+			return -1;
+		}
 		tt_uuid uu;
 		tuple_field_uuid_xc(new_tuple, BOX_CLUSTER_FIELD_UUID, &uu);
 		REPLICASET_UUID = uu;
@@ -3593,9 +3631,11 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 		tt_uuid replica_uuid;
 		tuple_field_uuid_xc(new_tuple, BOX_CLUSTER_FIELD_UUID,
 				    &replica_uuid);
-		if (tt_uuid_is_nil(&replica_uuid))
-			tnt_raise(ClientError, ER_INVALID_UUID,
+		if (tt_uuid_is_nil(&replica_uuid)) {
+			diag_set(ClientError, ER_INVALID_UUID,
 				  tt_uuid_str(&replica_uuid));
+			return -1;
+		}
 		if (old_tuple != NULL) {
 			/*
 			 * Forbid changes of UUID for a registered instance:
@@ -3606,9 +3646,10 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 			tuple_field_uuid_xc(old_tuple, BOX_CLUSTER_FIELD_UUID,
 					    &old_uuid);
 			if (!tt_uuid_is_equal(&replica_uuid, &old_uuid)) {
-				tnt_raise(ClientError, ER_UNSUPPORTED,
+				diag_set(ClientError, ER_UNSUPPORTED,
 					  "Space _cluster",
 					  "updates of instance uuid");
+				return -1;
 			}
 		} else {
 			struct trigger *on_commit;
@@ -3766,15 +3807,21 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 		assert(seq != NULL);
 		access_check_ddl(seq->def->name, seq->def->id, seq->def->uid,
 				 SC_SEQUENCE, PRIV_D);
-		if (space_has_data(BOX_SEQUENCE_DATA_ID, 0, id))
-			tnt_raise(ClientError, ER_DROP_SEQUENCE,
+		if (space_has_data(BOX_SEQUENCE_DATA_ID, 0, id)) {
+			diag_set(ClientError, ER_DROP_SEQUENCE,
 				  seq->def->name, "the sequence has data");
-		if (space_has_data(BOX_SPACE_SEQUENCE_ID, 1, id))
-			tnt_raise(ClientError, ER_DROP_SEQUENCE,
+			return -1;
+		}
+		if (space_has_data(BOX_SPACE_SEQUENCE_ID, 1, id)) {
+			diag_set(ClientError, ER_DROP_SEQUENCE,
 				  seq->def->name, "the sequence is in use");
-		if (schema_find_grants("sequence", seq->def->id))
-			tnt_raise(ClientError, ER_DROP_SEQUENCE,
+			return -1;
+		}
+		if (schema_find_grants("sequence", seq->def->id)) {
+			diag_set(ClientError, ER_DROP_SEQUENCE,
 				  seq->def->name, "the sequence has grants");
+			return -1;
+		}
 		struct trigger *on_commit =
 			txn_alter_trigger_new(on_drop_sequence_commit, seq);
 		struct trigger *on_rollback =
@@ -3834,12 +3881,12 @@ on_replace_dd_sequence_data(struct trigger * /* trigger */, void *event)
 					 BOX_SEQUENCE_DATA_FIELD_ID);
 	struct sequence *seq = sequence_cache_find(id);
 	if (seq == NULL)
-		diag_raise();
+		return -1;
 	if (new_tuple != NULL) {			/* INSERT, UPDATE */
 		int64_t value = tuple_field_i64_xc(new_tuple,
 				BOX_SEQUENCE_DATA_FIELD_VALUE);
 		if (sequence_set(seq, value) != 0)
-			diag_raise();
+			return -1;
 	} else {					/* DELETE */
 		/*
 		 * A sequence isn't supposed to roll back to the old
@@ -3991,9 +4038,10 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 			free(sequence_path);
 		});
 		if (seq->is_generated) {
-			tnt_raise(ClientError, ER_ALTER_SPACE,
+			diag_set(ClientError, ER_ALTER_SPACE,
 				  space_name(space),
 				  "can not attach generated sequence");
+			return -1;
 		}
 		struct trigger *on_rollback;
 		if (stmt->old_tuple != NULL)
@@ -4145,7 +4193,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 		struct sql_trigger *new_trigger =
 			sql_trigger_compile(sql_get(), opts.sql);
 		if (new_trigger == NULL)
-			diag_raise();
+			return -1;
 
 		auto new_trigger_guard = make_scoped_guard([=] {
 		    sql_trigger_delete(sql_get(), new_trigger);
@@ -4155,24 +4203,26 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 		if (strlen(trigger_name) != trigger_name_len ||
 		    memcmp(trigger_name_src, trigger_name,
 			   trigger_name_len) != 0) {
-			tnt_raise(ClientError, ER_SQL_EXECUTE,
+			diag_set(ClientError, ER_SQL_EXECUTE,
 				  "trigger name does not match extracted "
 				  "from SQL");
+			return -1;
 		}
 		uint32_t space_id =
 			tuple_field_u32_xc(new_tuple,
 					   BOX_TRIGGER_FIELD_SPACE_ID);
 		if (space_id != sql_trigger_space_id(new_trigger)) {
-			tnt_raise(ClientError, ER_SQL_EXECUTE,
+			diag_set(ClientError, ER_SQL_EXECUTE,
 				  "trigger space_id does not match the value "
 				  "resolved on AST building from SQL");
+			return -1;
 		}
 
 		struct sql_trigger *old_trigger;
 		if (sql_trigger_replace(trigger_name,
 					sql_trigger_space_id(new_trigger),
 					new_trigger, &old_trigger) != 0)
-			diag_raise();
+			return -1;
 
 		on_commit->data = old_trigger;
 		if (old_tuple != NULL) {
@@ -4495,16 +4545,18 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 		struct space *child_space =
 			space_cache_find_xc(fk_def->child_id);
 		if (child_space->def->opts.is_view) {
-			tnt_raise(ClientError, ER_CREATE_FK_CONSTRAINT,
+			diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
 				  fk_def->name,
 				  "referencing space can't be VIEW");
+			return -1;
 		}
 		struct space *parent_space =
 			space_cache_find_xc(fk_def->parent_id);
 		if (parent_space->def->opts.is_view) {
-			tnt_raise(ClientError, ER_CREATE_FK_CONSTRAINT,
+			diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
 				  fk_def->name,
 				  "referenced space can't be VIEW");
+			return -1;
 		}
 		/*
 		 * FIXME: until SQL triggers are completely
@@ -4515,9 +4567,10 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 		 */
 		struct index *pk = space_index(child_space, 0);
 		if (pk != NULL && index_size(pk) > 0) {
-			tnt_raise(ClientError, ER_CREATE_FK_CONSTRAINT,
+			diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
 				  fk_def->name,
 				  "referencing space must be empty");
+			return -1;
 		}
 		/* Check types of referenced fields. */
 		for (uint32_t i = 0; i < fk_def->field_count; ++i) {
@@ -4525,9 +4578,10 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 			uint32_t parent_fieldno = fk_def->links[i].parent_field;
 			if (child_fieldno >= child_space->def->field_count ||
 			    parent_fieldno >= parent_space->def->field_count) {
-				tnt_raise(ClientError, ER_CREATE_FK_CONSTRAINT,
+				diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
 					  fk_def->name, "foreign key refers to "
-						        "nonexistent field");
+							"nonexistent field");
+				return -1;
 			}
 			struct field_def *child_field =
 				&child_space->def->fields[child_fieldno];
@@ -4535,13 +4589,15 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 				&parent_space->def->fields[parent_fieldno];
 			if (! field_type1_contains_type2(parent_field->type,
 							 child_field->type)) {
-				tnt_raise(ClientError, ER_CREATE_FK_CONSTRAINT,
+				diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
 					  fk_def->name, "field type mismatch");
+				return -1;
 			}
 			if (child_field->coll_id != parent_field->coll_id) {
-				tnt_raise(ClientError, ER_CREATE_FK_CONSTRAINT,
+				diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
 					  fk_def->name,
 					  "field collation mismatch");
+				return -1;
 			}
 		}
 		fk_constraint_check_dup_links(fk_def);
@@ -4573,15 +4629,17 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 			break;
 		}
 		if (fk_index == NULL) {
-			tnt_raise(ClientError, ER_CREATE_FK_CONSTRAINT,
+			diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
 				  fk_def->name, "referenced fields don't "
 						"compose unique index");
+			return -1;
 		}
 		struct fk_constraint *fk =
 			(struct fk_constraint *) malloc(sizeof(*fk));
 		if (fk == NULL) {
-			tnt_raise(OutOfMemory, sizeof(*fk),
+			diag_set(OutOfMemory, sizeof(*fk),
 				  "malloc", "struct fk_constraint");
+			return -1;
 		}
 		auto fk_guard = make_scoped_guard([=] { free(fk); });
 		memset(fk, 0, sizeof(*fk));
@@ -4779,8 +4837,9 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 			tuple_field_bool_xc(new_tuple,
 					    BOX_CK_CONSTRAINT_FIELD_DEFERRED);
 		if (is_deferred) {
-			tnt_raise(ClientError, ER_UNSUPPORTED, "Tarantool",
+			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
 				  "deferred ck constraints");
+			return -1;
 		}
 		/* Create or replace check constraint. */
 		struct ck_constraint_def *ck_def =
@@ -4818,13 +4877,15 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 		 */
 		struct index *pk = space_index(space, 0);
 		if (pk != NULL && index_size(pk) > 0) {
-			tnt_raise(ClientError, ER_CREATE_CK_CONSTRAINT,
-				  name, "referencing space must be empty");
+			diag_set(ClientError, ER_CREATE_CK_CONSTRAINT,
+				  name,
+				  "referencing space must be empty");
+			return -1;
 		}
 		struct ck_constraint *new_ck_constraint =
 			ck_constraint_new(ck_def, space->def);
 		if (new_ck_constraint == NULL)
-			diag_raise();
+			return -1;
 		ck_def_guard.is_active = false;
 		auto ck_guard = make_scoped_guard([=] {
 			ck_constraint_delete(new_ck_constraint);
@@ -4832,7 +4893,7 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 		if (old_ck_constraint != NULL)
 			rlist_del_entry(old_ck_constraint, link);
 		if (space_add_ck_constraint(space, new_ck_constraint) != 0)
-			diag_raise();
+			return -1;
 		ck_guard.is_active = false;
 		if (old_tuple != NULL) {
 			on_rollback->data = old_ck_constraint;
@@ -4894,9 +4955,10 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 		func = func_cache_find(fid);
 		func_index_check_func(func);
 		if (index->def->opts.func_id != func->def->fid) {
-			tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS, 0,
+			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS, 0,
 				  "Function ids defined in _index and "
 				  "_func_index don't match");
+			return -1;
 		}
 	} else if (old_tuple != NULL && new_tuple == NULL) {
 		uint32_t space_id = tuple_field_u32_xc(old_tuple,
@@ -4908,8 +4970,8 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 		func = NULL;
 	} else {
 		assert(old_tuple != NULL && new_tuple != NULL);
-		tnt_raise(ClientError, ER_UNSUPPORTED,
-			  "functional index", "alter");
+		diag_set(ClientError, ER_UNSUPPORTED, "functional index", "alter");
+		return -1;
 	}
 
 	/**
