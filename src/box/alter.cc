@@ -856,11 +856,20 @@ static struct alter_space *
 alter_space_new(struct space *old_space)
 {
 	struct txn *txn = in_txn();
-	struct alter_space *alter = region_calloc_object_xc(&txn->region,
-							    struct alter_space);
+	size_t size = sizeof(struct alter_space);
+	struct alter_space *alter = (struct alter_space *)
+		region_aligned_alloc(&in_txn()->region, size,
+				     alignof(struct alter_space));
+	if (alter == NULL) {
+		diag_set(OutOfMemory, size, "region", "new slab");
+		return NULL;
+	}
+	alter = (struct alter_space *)memset(alter, 0, size);
 	rlist_create(&alter->ops);
 	alter->old_space = old_space;
-	alter->space_def = space_def_dup_xc(alter->old_space->def);
+	alter->space_def = space_def_dup(alter->old_space->def);
+	if (alter->space_def == NULL)
+		return NULL;
 	if (old_space->format != NULL)
 		alter->new_min_field_count = old_space->format->min_field_count;
 	else
@@ -2266,6 +2275,8 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * in WAL-error-safe mode.
 		 */
 		struct alter_space *alter = alter_space_new(old_space);
+		if (alter == NULL)
+			return -1;
 		auto alter_guard =
 			make_scoped_guard([=] {alter_space_delete(alter);});
 		/*
@@ -2440,6 +2451,8 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	}
 
 	struct alter_space *alter = alter_space_new(old_space);
+	if (alter == NULL)
+		return -1;
 	auto scoped_guard =
 		make_scoped_guard([=] { alter_space_delete(alter); });
 
@@ -2626,6 +2639,8 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 		return -1;
 
 	struct alter_space *alter = alter_space_new(old_space);
+	if (alter == NULL)
+		return -1;
 	auto scoped_guard =
 		make_scoped_guard([=] { alter_space_delete(alter); });
 
@@ -5456,6 +5471,8 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 		return 0;
 
 	alter = alter_space_new(space);
+	if (alter == NULL)
+		return -1;
 	auto scoped_guard = make_scoped_guard([=] {alter_space_delete(alter);});
 	alter_space_move_indexes(alter, 0, index->def->iid);
 	(void) new RebuildFuncIndex(alter, index->def, func);
