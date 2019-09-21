@@ -3339,88 +3339,110 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 }
 
 /** Create a collation identifier definition from tuple. */
-void
+int
 coll_id_def_new_from_tuple(struct tuple *tuple, struct coll_id_def *def)
 {
 	memset(def, 0, sizeof(*def));
 	uint32_t name_len, locale_len, type_len;
-	def->id = tuple_field_u32_xc(tuple, BOX_COLLATION_FIELD_ID);
-	def->name = tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_NAME, &name_len);
+	if (tuple_field_u32(tuple, BOX_COLLATION_FIELD_ID, &(def->id)) != 0)
+		return -1;
+	def->name = tuple_field_str(tuple, BOX_COLLATION_FIELD_NAME, &name_len);
+	if (def->name == NULL)
+		return -1;
 	def->name_len = name_len;
-	if (name_len > BOX_NAME_MAX)
-		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+	if (name_len > BOX_NAME_MAX) {
+		diag_set(ClientError, ER_CANT_CREATE_COLLATION,
 			  "collation name is too long");
-	identifier_check_xc(def->name, name_len);
-
-	def->owner_id = tuple_field_u32_xc(tuple, BOX_COLLATION_FIELD_UID);
+		return -1;
+	}
+	if (identifier_check(def->name, name_len) != 0)
+		return -1;
+	if (tuple_field_u32(tuple, BOX_COLLATION_FIELD_UID, &(def->owner_id)) != 0)
+		return -1;
+	const char *type = tuple_field_str(tuple, BOX_COLLATION_FIELD_TYPE,
+			       &type_len);
+	if (type == NULL)
+		return -1;
 	struct coll_def *base = &def->base;
-	const char *type = tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_TYPE,
-					      &type_len);
 	base->type = STRN2ENUM(coll_type, type, type_len);
-	if (base->type == coll_type_MAX)
-		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+	if (base->type == coll_type_MAX) {
+		diag_set(ClientError, ER_CANT_CREATE_COLLATION,
 			  "unknown collation type");
-	const char *locale =
-		tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_LOCALE,
-				   &locale_len);
-	if (locale_len > COLL_LOCALE_LEN_MAX)
-		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+		return -1;
+	}
+	const char *locale = tuple_field_str(tuple, BOX_COLLATION_FIELD_LOCALE,
+					     &locale_len);
+	if (locale == NULL)
+		return -1;
+	if (locale_len > COLL_LOCALE_LEN_MAX) {
+		diag_set(ClientError, ER_CANT_CREATE_COLLATION,
 			  "collation locale is too long");
+		return -1;
+	}
 	if (locale_len > 0)
-		identifier_check_xc(locale, locale_len);
+		if (identifier_check(locale, locale_len) != 0)
+			return -1;
 	snprintf(base->locale, sizeof(base->locale), "%.*s", locale_len,
 		 locale);
-	const char *options =
-		tuple_field_with_type_xc(tuple, BOX_COLLATION_FIELD_OPTIONS,
-					 MP_MAP);
-
+	const char *options = tuple_field_with_type(tuple,
+					BOX_COLLATION_FIELD_OPTIONS, MP_MAP);
+	if (options == NULL)
+		return -1;
 	if (opts_decode(&base->icu, coll_icu_opts_reg, &options,
 			ER_WRONG_COLLATION_OPTIONS,
 			BOX_COLLATION_FIELD_OPTIONS, NULL) != 0)
-		diag_raise();
+		return -1;
 
 	if (base->icu.french_collation == coll_icu_on_off_MAX) {
-		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+		diag_set(ClientError, ER_CANT_CREATE_COLLATION,
 			  "ICU wrong french_collation option setting, "
 				  "expected ON | OFF");
+		return -1;
 	}
 
 	if (base->icu.alternate_handling == coll_icu_alternate_handling_MAX) {
-		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+		diag_set(ClientError, ER_CANT_CREATE_COLLATION,
 			  "ICU wrong alternate_handling option setting, "
 				  "expected NON_IGNORABLE | SHIFTED");
+		return -1;
 	}
 
 	if (base->icu.case_first == coll_icu_case_first_MAX) {
-		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+		diag_set(ClientError, ER_CANT_CREATE_COLLATION,
 			  "ICU wrong case_first option setting, "
 				  "expected OFF | UPPER_FIRST | LOWER_FIRST");
+		return -1;
 	}
 
 	if (base->icu.case_level == coll_icu_on_off_MAX) {
-		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+		diag_set(ClientError, ER_CANT_CREATE_COLLATION,
 			  "ICU wrong case_level option setting, "
 				  "expected ON | OFF");
+		return -1;
 	}
 
 	if (base->icu.normalization_mode == coll_icu_on_off_MAX) {
-		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+		diag_set(ClientError, ER_CANT_CREATE_COLLATION,
 			  "ICU wrong normalization_mode option setting, "
 				  "expected ON | OFF");
+		return -1;
 	}
 
 	if (base->icu.strength == coll_icu_strength_MAX) {
-		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+		diag_set(ClientError, ER_CANT_CREATE_COLLATION,
 			  "ICU wrong strength option setting, "
 				  "expected PRIMARY | SECONDARY | "
 				  "TERTIARY | QUATERNARY | IDENTICAL");
+		return -1;
 	}
 
 	if (base->icu.numeric_collation == coll_icu_on_off_MAX) {
-		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+		diag_set(ClientError, ER_CANT_CREATE_COLLATION,
 			  "ICU wrong numeric_collation option setting, "
 				  "expected ON | OFF");
+		return -1;
 	}
+	return 0;
 }
 
 /** Delete the new collation identifier. */
@@ -3519,7 +3541,8 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 		if (on_rollback == NULL)
 			return -1;
 		struct coll_id_def new_def;
-		coll_id_def_new_from_tuple(new_tuple, &new_def);
+		if (coll_id_def_new_from_tuple(new_tuple, &new_def) != 0)
+			return -1;
 		if (access_check_ddl(new_def.name, new_def.id, new_def.owner_id,
 				 SC_COLLATION, PRIV_C) != 0)
 			return -1;
