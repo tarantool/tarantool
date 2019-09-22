@@ -118,10 +118,10 @@ access_check_ddl(const char *name, uint32_t object_id, uint32_t owner_uid,
 }
 
 /**
- * Throw an exception if the given index definition
+ * Return an error if the given index definition
  * is incompatible with a sequence.
  */
-static void
+static int
 index_def_check_sequence(struct index_def *index_def, uint32_t sequence_fieldno,
 			 const char *sequence_path, uint32_t sequence_path_len,
 			 const char *space_name)
@@ -142,24 +142,27 @@ index_def_check_sequence(struct index_def *index_def, uint32_t sequence_fieldno,
 		}
 	}
 	if (sequence_part == NULL) {
-		tnt_raise(ClientError, ER_MODIFY_INDEX, index_def->name,
-			  space_name, "sequence field must be a part of "
-			  "the index");
+		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
+			 space_name, "sequence field must be a part of "
+				     "the index");
+		return -1;
 	}
 	enum field_type type = sequence_part->type;
 	if (type != FIELD_TYPE_UNSIGNED && type != FIELD_TYPE_INTEGER) {
-		tnt_raise(ClientError, ER_MODIFY_INDEX, index_def->name,
-			  space_name, "sequence cannot be used with "
-			  "a non-integer key");
+		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
+			 space_name, "sequence cannot be used with "
+				     "a non-integer key");
+		return -1;
 	}
+	return 0;
 }
 
 /**
  * Support function for index_def_new_from_tuple(..)
- * Checks tuple (of _index space) and throws a nice error if it is invalid
+ * Checks tuple (of _index space) and sets a nice diag if it is invalid
  * Checks only types of fields and their count!
  */
-static void
+static int
 index_def_check_tuple(struct tuple *tuple)
 {
 	const mp_type common_template[] =
@@ -175,7 +178,7 @@ index_def_check_tuple(struct tuple *tuple)
 			goto err;
 		mp_next(&data);
 	}
-	return;
+	return 0;
 
 err:
 	char got[DIAG_ERRMSG_MAX];
@@ -186,51 +189,58 @@ err:
 		mp_next(&data);
 		p += snprintf(p, e - p, i ? ", %s" : "%s", mp_type_strs[type]);
 	}
-	tnt_raise(ClientError, ER_WRONG_INDEX_RECORD, got,
+	diag_set(ClientError, ER_WRONG_INDEX_RECORD, got,
 		  "space id (unsigned), index id (unsigned), name (string), "\
 		  "type (string), options (map), parts (array)");
+	return -1;
 }
 
 /**
  * Fill index_opts structure from opts field in tuple of space _index
- * Throw an error is unrecognized option.
+ * Return an error if option is unrecognized.
  */
-static void
+static int
 index_opts_decode(struct index_opts *opts, const char *map,
 		  struct region *region)
 {
 	index_opts_create(opts);
 	if (opts_decode(opts, index_opts_reg, &map, ER_WRONG_INDEX_OPTIONS,
 			BOX_INDEX_FIELD_OPTS, region) != 0)
-		diag_raise();
+		return -1;
 	if (opts->distance == rtree_index_distance_type_MAX) {
-		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
-			  BOX_INDEX_FIELD_OPTS, "distance must be either "\
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+			 BOX_INDEX_FIELD_OPTS, "distance must be either "\
 			  "'euclid' or 'manhattan'");
+		return -1;
 	}
 	if (opts->page_size <= 0 || (opts->range_size > 0 &&
 				     opts->page_size > opts->range_size)) {
-		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
-			  BOX_INDEX_FIELD_OPTS,
-			  "page_size must be greater than 0 and "
-			  "less than or equal to range_size");
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+			 BOX_INDEX_FIELD_OPTS,
+			 "page_size must be greater than 0 and "
+			 "less than or equal to range_size");
+		return -1;
 	}
 	if (opts->run_count_per_level <= 0) {
-		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
-			  BOX_INDEX_FIELD_OPTS,
-			  "run_count_per_level must be greater than 0");
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+			 BOX_INDEX_FIELD_OPTS,
+			 "run_count_per_level must be greater than 0");
+		return -1;
 	}
 	if (opts->run_size_ratio <= 1) {
-		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
-			  BOX_INDEX_FIELD_OPTS,
-			  "run_size_ratio must be greater than 1");
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+			 BOX_INDEX_FIELD_OPTS,
+			 "run_size_ratio must be greater than 1");
+		return -1;
 	}
 	if (opts->bloom_fpr <= 0 || opts->bloom_fpr > 1) {
-		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
-			  BOX_INDEX_FIELD_OPTS,
-			  "bloom_fpr must be greater than 0 and "
-			  "less than or equal to 1");
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+			 BOX_INDEX_FIELD_OPTS,
+			 "bloom_fpr must be greater than 0 and "
+			 "less than or equal to 1");
+		return -1;
 	}
+	return 0;
 }
 
 /**
@@ -238,16 +248,18 @@ index_opts_decode(struct index_opts *opts, const char *map,
  * only a deterministic persistent Lua function may be used in
  * functional index for now.
  */
-static void
+static int
 func_index_check_func(struct func *func) {
 	assert(func != NULL);
 	if (func->def->language != FUNC_LANGUAGE_LUA ||
 	    func->def->body == NULL || !func->def->is_deterministic ||
 	    !func->def->is_sandboxed) {
-		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS, 0,
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS, 0,
 			  "referenced function doesn't satisfy "
 			  "functional index function constraints");
+		return -1;
 	}
+	return 0;
 }
 
 /**
@@ -265,35 +277,48 @@ func_index_check_func(struct func *func) {
 static struct index_def *
 index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 {
-	index_def_check_tuple(tuple);
+	if (index_def_check_tuple(tuple) != 0)
+		return NULL;
 
 	struct index_opts opts;
-	uint32_t id = tuple_field_u32_xc(tuple, BOX_INDEX_FIELD_SPACE_ID);
-	uint32_t index_id = tuple_field_u32_xc(tuple, BOX_INDEX_FIELD_ID);
-	enum index_type type =
-		STR2ENUM(index_type, tuple_field_cstr_xc(tuple,
-							 BOX_INDEX_FIELD_TYPE));
+	uint32_t id;
+	if (tuple_field_u32(tuple, BOX_INDEX_FIELD_SPACE_ID, &id) != 0)
+		return NULL;
+	uint32_t index_id;
+	if (tuple_field_u32(tuple, BOX_INDEX_FIELD_ID, &index_id) != 0)
+		return NULL;
+	const char *out = tuple_field_cstr(tuple, BOX_INDEX_FIELD_TYPE);
+	if (out == NULL)
+		return NULL;
+	enum index_type type = STR2ENUM(index_type, out);
 	uint32_t name_len;
-	const char *name = tuple_field_str_xc(tuple, BOX_INDEX_FIELD_NAME,
-					      &name_len);
-	const char *opts_field =
-		tuple_field_with_type_xc(tuple, BOX_INDEX_FIELD_OPTS,
-					 MP_MAP);
-	index_opts_decode(&opts, opts_field, &fiber()->gc);
+	const char *name = tuple_field_str(tuple, BOX_INDEX_FIELD_NAME,
+					   &name_len);
+	if (name == NULL)
+		return NULL;
+	const char *opts_field = tuple_field_with_type(tuple,
+				 BOX_INDEX_FIELD_OPTS, MP_MAP);
+	if (opts_field == NULL)
+		return NULL;
+	if (index_opts_decode(&opts, opts_field, &fiber()->gc) != 0)
+		return NULL;
 	const char *parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS);
 	uint32_t part_count = mp_decode_array(&parts);
 	if (name_len > BOX_NAME_MAX) {
-		tnt_raise(ClientError, ER_MODIFY_INDEX,
+		diag_set(ClientError, ER_MODIFY_INDEX,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  space_name(space), "index name is too long");
+		return NULL;
 	}
-	identifier_check_xc(name, name_len);
+	if (identifier_check(name, name_len) != 0)
+		return NULL;
 	struct key_def *key_def = NULL;
 	struct key_part_def *part_def = (struct key_part_def *)
-			malloc(sizeof(*part_def) * part_count);
+		malloc(sizeof(*part_def) * part_count);
 	if (part_def == NULL) {
-		tnt_raise(OutOfMemory, sizeof(*part_def) * part_count,
-			  "malloc", "key_part_def");
+		diag_set(OutOfMemory, sizeof(*part_def) * part_count,
+			 "malloc", "key_part_def");
+		return NULL;
 	}
 	auto key_def_guard = make_scoped_guard([&] {
 		free(part_def);
@@ -303,19 +328,21 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	if (key_def_decode_parts(part_def, part_count, &parts,
 				 space->def->fields,
 				 space->def->field_count, &fiber()->gc) != 0)
-		diag_raise();
+		return NULL;
 	bool for_func_index = opts.func_id > 0;
 	key_def = key_def_new(part_def, part_count, for_func_index);
 	if (key_def == NULL)
-		diag_raise();
+		return NULL;
 	struct index_def *index_def =
 		index_def_new(id, index_id, name, name_len, type,
 			      &opts, key_def, space_index_key_def(space, 0));
 	if (index_def == NULL)
-		diag_raise();
+		return NULL;
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
-	index_def_check_xc(index_def, space_name(space));
-	space_check_index_def_xc(space, index_def);
+	if (!index_def_is_valid(index_def, space_name(space)))
+		return NULL;
+	if (space_check_index_def(space, index_def) != 0)
+		return NULL;
 	/*
 	 * In case of functional index definition, resolve a
 	 * function pointer to perform a complete index build
@@ -333,15 +360,17 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	 */
 	struct func *func = NULL;
 	if (for_func_index && (func = func_by_id(opts.func_id)) != NULL) {
-		func_index_check_func(func);
+		if (func_index_check_func(func) != 0)
+			return NULL;
 		index_def_set_func(index_def, func);
 	}
 	if (index_def->iid == 0 && space->sequence != NULL)
-		index_def_check_sequence(index_def, space->sequence_fieldno,
-					 space->sequence_path,
-					 space->sequence_path != NULL ?
-					 strlen(space->sequence_path) : 0,
-					 space_name(space));
+		if (index_def_check_sequence(index_def, space->sequence_fieldno,
+					     space->sequence_path,
+					     space->sequence_path != NULL ?
+					     strlen(space->sequence_path) : 0,
+					     space_name(space)) != 0)
+			return NULL;
 	index_def_guard.is_active = false;
 	return index_def;
 }
@@ -2359,6 +2388,8 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		CreateIndex *create_index = new CreateIndex(alter);
 		create_index->new_index_def =
 			index_def_new_from_tuple(new_tuple, old_space);
+		if (create_index->new_index_def == NULL)
+			return -1;
 		index_def_update_optionality(create_index->new_index_def,
 					     alter->new_min_field_count);
 	}
@@ -2366,6 +2397,8 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	if (old_index != NULL && new_tuple != NULL) {
 		struct index_def *index_def;
 		index_def = index_def_new_from_tuple(new_tuple, old_space);
+		if (index_def == NULL)
+			return -1;
 		auto index_def_guard =
 			make_scoped_guard([=] { index_def_delete(index_def); });
 		/*
@@ -4066,8 +4099,9 @@ sequence_field_from_tuple(struct space *space, struct tuple *tuple,
 		if (path_len == 0)
 			path_raw = NULL;
 	}
-	index_def_check_sequence(pk->def, fieldno, path_raw, path_len,
-				 space_name(space));
+	if (index_def_check_sequence(pk->def, fieldno, path_raw, path_len,
+				 space_name(space)) != 0)
+		diag_raise();
 	char *path = NULL;
 	if (path_raw != NULL) {
 		path = (char *)malloc(path_len + 1);
@@ -5115,7 +5149,8 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 		space = space_cache_find_xc(space_id);
 		index = index_find_xc(space, index_id);
 		func = func_cache_find(fid);
-		func_index_check_func(func);
+		if (func_index_check_func(func) != 0)
+			return -1;
 		if (index->def->opts.func_id != func->def->fid) {
 			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS, 0,
 				  "Function ids defined in _index and "
