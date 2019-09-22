@@ -147,7 +147,7 @@ replica_is_orphan(struct replica *replica)
 	       relay_get_state(replica->relay) != RELAY_FOLLOW;
 }
 
-static void
+static int
 replica_on_applier_state_f(struct trigger *trigger, void *event);
 
 static struct replica *
@@ -401,7 +401,7 @@ replica_on_applier_disconnect(struct replica *replica)
 		replicaset.applier.loading++;
 }
 
-static void
+static int
 replica_on_applier_state_f(struct trigger *trigger, void *event)
 {
 	(void)event;
@@ -443,6 +443,7 @@ replica_on_applier_state_f(struct trigger *trigger, void *event)
 		break;
 	}
 	fiber_cond_signal(&replicaset.applier.cond);
+	return 0;
 }
 
 /**
@@ -575,7 +576,7 @@ struct applier_on_connect {
 	struct replicaset_connect_state *state;
 };
 
-static void
+static int
 applier_on_connect_f(struct trigger *trigger, void *event)
 {
 	struct applier_on_connect *on_connect = container_of(trigger,
@@ -592,10 +593,11 @@ applier_on_connect_f(struct trigger *trigger, void *event)
 		state->connected++;
 		break;
 	default:
-		return;
+		return 0;
 	}
 	fiber_cond_signal(&state->wakeup);
 	applier_pause(applier);
+	return 0;
 }
 
 void

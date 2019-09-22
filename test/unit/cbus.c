@@ -43,13 +43,14 @@ do_nothing(struct cmsg *m)
 }
 
 /** Callback called on each flush to the main thread. */
-static void
+static int
 flush_cb(struct trigger *t, void *e)
 {
 	(void) t;
 	(void) e;
 	++flushed_cnt;
 	printf("flush event, counter = %d\n", flushed_cnt);
+	return 0;
 }
 
 /** Callback to finish the test. It breaks the main event loop. */

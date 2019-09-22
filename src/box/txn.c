@@ -40,10 +40,10 @@ double too_long_threshold;
 /* Txn cache. */
 static struct stailq txn_cache = {NULL, &txn_cache.first};
 
-static void
+static int
 txn_on_stop(struct trigger *trigger, void *event);
 
-static void
+static int
 txn_on_yield(struct trigger *trigger, void *event);
 
 static void
@@ -839,12 +839,13 @@ txn_savepoint_release(struct txn_savepoint *svp)
 	rlist_cut_before(&discard, &txn->savepoints, rlist_next(&svp->link));
 }
 
-static void
+static int
 txn_on_stop(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	(void) event;
 	txn_rollback(in_txn());                 /* doesn't yield or fail */
+	return 0;
 }
 
 /**
@@ -864,7 +865,7 @@ txn_on_stop(struct trigger *trigger, void *event)
  * So much hassle to be user-friendly until we have a true
  * interactive transaction support in memtx.
  */
-static void
+static int
 txn_on_yield(struct trigger *trigger, void *event)
 {
 	(void) trigger;
@@ -874,4 +875,5 @@ txn_on_yield(struct trigger *trigger, void *event)
 	assert(!txn_has_flag(txn, TXN_CAN_YIELD));
 	txn_rollback_to_svp(txn, NULL);
 	txn_set_flag(txn, TXN_IS_ABORTED_BY_YIELD);
+	return 0;
 }

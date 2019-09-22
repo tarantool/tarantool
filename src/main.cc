@@ -683,10 +683,11 @@ print_help(const char *program)
 	puts("to see online documentation, submit bugs or contribute a patch.");
 }
 
-static void
+static int
 break_loop(struct trigger *, void *)
 {
 	ev_break(loop(), EVBREAK_ALL);
+	return 0;
 }
 
 int

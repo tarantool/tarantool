@@ -1505,7 +1505,7 @@ error:
 	tx_reply_error(msg);
 }
 
-static void
+static int
 tx_process_call_on_yield(struct trigger *trigger, void *event)
 {
 	(void)event;
@@ -1513,6 +1513,7 @@ tx_process_call_on_yield(struct trigger *trigger, void *event)
 	TRASH(&msg->call);
 	tx_discard_input(msg);
 	trigger_clear(trigger);
+	return 0;
 }
 
 static void

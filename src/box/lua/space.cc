@@ -503,7 +503,7 @@ box_lua_space_delete(struct lua_State *L, uint32_t id)
 	lua_pop(L, 2); /* box, space */
 }
 
-static void
+static int
 box_lua_space_new_or_delete(struct trigger *trigger, void *event)
 {
 	struct lua_State *L = (struct lua_State *) trigger->data;
@@ -514,6 +514,7 @@ box_lua_space_new_or_delete(struct trigger *trigger, void *event)
 	} else {
 		box_lua_space_delete(L, space->def->id);
 	}
+	return 0;
 }
 
 static struct trigger on_alter_space_in_lua = {

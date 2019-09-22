@@ -80,7 +80,7 @@ sid_max()
 	return sid_max;
 }
 
-static void
+static int
 session_on_stop(struct trigger *trigger, void * /* event */)
 {
 	/*
@@ -91,6 +91,7 @@ session_on_stop(struct trigger *trigger, void * /* event */)
 	trigger_clear(trigger);
 	/* Destroy the session */
 	session_destroy(fiber_get_session(fiber()));
+	return 0;
 }
 
 static int

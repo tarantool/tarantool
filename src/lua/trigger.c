@@ -62,7 +62,7 @@ lbox_trigger_destroy(struct trigger *ptr)
 	free(ptr);
 }
 
-static void
+static int
 lbox_trigger_run(struct trigger *ptr, void *event)
 {
 	struct lbox_trigger *trigger = (struct lbox_trigger *) ptr;
@@ -93,14 +93,14 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	}
 	if (luaT_call(L, nargs, LUA_MULTRET)) {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-		diag_raise();
+		return -1;
 	}
 	int nret = lua_gettop(L) - top;
 	if (trigger->pop_event != NULL &&
 	    trigger->pop_event(L, nret, event) != 0) {
 		lua_settop(L, top);
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-		diag_raise();
+		return -1;
 	}
 	/*
 	 * Clear the stack after pop_event saves all
@@ -108,6 +108,7 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	 */
 	lua_settop(L, top);
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+	return 0;
 }
 
 static struct lbox_trigger *

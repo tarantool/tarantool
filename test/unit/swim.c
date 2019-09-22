@@ -827,7 +827,7 @@ struct trigger_ctx {
 	struct swim_on_member_event_ctx ctx;
 };
 
-static void
+static int
 swim_on_member_event_save(struct trigger *t, void *event)
 {
 	struct trigger_ctx *c = (struct trigger_ctx *) t->data;
@@ -836,9 +836,10 @@ swim_on_member_event_save(struct trigger *t, void *event)
 		swim_member_unref(c->ctx.member);
 	c->ctx = *((struct swim_on_member_event_ctx *) event);
 	swim_member_ref(c->ctx.member);
+	return 0;
 }
 
-static void
+static int
 swim_on_member_event_yield(struct trigger *t, void *event)
 {
 	struct trigger_ctx *c = (struct trigger_ctx *) t->data;
@@ -846,6 +847,7 @@ swim_on_member_event_yield(struct trigger *t, void *event)
 	c->f = fiber();
 	while (c->need_sleep)
 		fiber_yield();
+	return 0;
 }
 
 static void

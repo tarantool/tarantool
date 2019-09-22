@@ -834,7 +834,7 @@ struct memtx_ddl_state {
 	int rc;
 };
 
-static void
+static int
 memtx_check_on_replace(struct trigger *trigger, void *event)
 {
 	struct txn *txn = event;
@@ -843,11 +843,11 @@ memtx_check_on_replace(struct trigger *trigger, void *event)
 
 	/* Nothing to check on DELETE. */
 	if (stmt->new_tuple == NULL)
-		return;
+		return 0;
 
 	/* We have already failed. */
 	if (state->rc != 0)
-		return;
+		return 0;
 
 	/*
 	 * Only check format for already processed part of the space,
@@ -856,11 +856,12 @@ memtx_check_on_replace(struct trigger *trigger, void *event)
 	 */
 	if (tuple_compare(state->cursor, HINT_NONE, stmt->new_tuple, HINT_NONE,
 			  state->cmp_def) < 0)
-		return;
+		return 0;
 
 	state->rc = tuple_validate(state->format, stmt->new_tuple);
 	if (state->rc != 0)
 		diag_move(diag_get(), &state->diag);
+	return 0;
 }
 
 static int
@@ -957,7 +958,7 @@ memtx_init_ephemeral_space(struct space *space)
 	memtx_space_add_primary_key(space);
 }
 
-static void
+static int
 memtx_build_on_replace(struct trigger *trigger, void *event)
 {
 	struct txn *txn = event;
@@ -972,13 +973,13 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 	 */
 	if (tuple_compare(state->cursor, HINT_NONE, cmp_tuple, HINT_NONE,
 			  state->cmp_def) < 0)
-		return;
+		return 0;
 
 	if (stmt->new_tuple != NULL &&
 	    tuple_validate(state->format, stmt->new_tuple) != 0) {
 		state->rc = -1;
 		diag_move(diag_get(), &state->diag);
-		return;
+		return 0;
 	}
 
 	struct tuple *delete = NULL;
@@ -991,7 +992,7 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 	if (state->rc != 0) {
 		diag_move(diag_get(), &state->diag);
 	}
-	return;
+	return 0;
 }
 
 static int

@@ -411,7 +411,7 @@ tx_gc_advance(struct cmsg *msg)
 	free(m);
 }
 
-static void
+static int
 relay_on_close_log_f(struct trigger *trigger, void * /* event */)
 {
 	static const struct cmsg_hop route[] = {
@@ -421,7 +421,7 @@ relay_on_close_log_f(struct trigger *trigger, void * /* event */)
 	struct relay_gc_msg *m = (struct relay_gc_msg *)malloc(sizeof(*m));
 	if (m == NULL) {
 		say_warn("failed to allocate relay gc message");
-		return;
+		return 0;
 	}
 	cmsg_init(&m->msg, route);
 	m->relay = relay;
@@ -432,6 +432,7 @@ relay_on_close_log_f(struct trigger *trigger, void * /* event */)
 	 * sent xlog.
 	 */
 	stailq_add_tail_entry(&relay->pending_gc, m, in_pending);
+	return 0;
 }
 
 /**

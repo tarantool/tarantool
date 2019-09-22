@@ -40,7 +40,7 @@ extern "C" {
  * on an event.
  */
 struct trigger;
-typedef void (*trigger_f)(struct trigger *trigger, void *event);
+typedef int (*trigger_f)(struct trigger *trigger, void *event);
 typedef void (*trigger_f0)(struct trigger *trigger);
 
 struct trigger

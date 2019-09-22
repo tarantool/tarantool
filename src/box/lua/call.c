@@ -958,17 +958,18 @@ lbox_func_delete(struct lua_State *L, struct func *func)
 	lua_pop(L, 2); /* box, func */
 }
 
-static void
+static int
 lbox_func_new_or_delete(struct trigger *trigger, void *event)
 {
 	struct lua_State *L = (struct lua_State *) trigger->data;
 	struct func *func = (struct func *)event;
 	if (!func->def->exports.lua)
-		return;
+		return 0;
 	if (func_by_id(func->def->fid) != NULL)
 		lbox_func_new(L, func);
 	else
 		lbox_func_delete(L, func);
+	return 0;
 }
 
 static struct trigger on_alter_func_in_lua = {

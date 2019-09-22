@@ -176,7 +176,7 @@ swim_cluster_id_to_uri(char *buffer, int id)
  * A trigger to check correctness of event context, and ability
  * to yield.
  */
-void
+int
 swim_test_event_cb(struct trigger *trigger, void *event)
 {
 	(void) trigger;
@@ -186,6 +186,7 @@ swim_test_event_cb(struct trigger *trigger, void *event)
 	assert((ctx->events & SWIM_EV_NEW) == 0 ||
 	       (ctx->events & SWIM_EV_DROP) == 0);
 	fiber_sleep(0);
+	return 0;
 }
 
 /** Create a SWIM cluster node @a n with a 0-based @a id. */

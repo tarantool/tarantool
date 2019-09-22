@@ -1298,12 +1298,13 @@ cord_cojoin(struct cord *cord)
 	return cord_join(cord);
 }
 
-void
+int
 break_ev_loop_f(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	(void) event;
 	ev_break(loop(), EVBREAK_ALL);
+	return 0;
 }
 
 struct costart_ctx

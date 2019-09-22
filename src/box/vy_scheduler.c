@@ -510,7 +510,7 @@ vy_scheduler_reset_stat(struct vy_scheduler *scheduler)
 	stat->compaction_output = 0;
 }
 
-static void
+static int
 vy_scheduler_on_delete_lsm(struct trigger *trigger, void *event)
 {
 	struct vy_lsm *lsm = event;
@@ -521,6 +521,7 @@ vy_scheduler_on_delete_lsm(struct trigger *trigger, void *event)
 	vy_compaction_heap_delete(&scheduler->compaction_heap, lsm);
 	trigger_clear(trigger);
 	free(trigger);
+	return 0;
 }
 
 int

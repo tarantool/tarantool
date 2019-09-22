@@ -176,7 +176,7 @@ ck_constraint_program_run(struct ck_constraint *ck_constraint,
 	return sql_reset(ck_constraint->stmt);
 }
 
-void
+int
 ck_constraint_on_replace_trigger(struct trigger *trigger, void *event)
 {
 	(void) trigger;
@@ -185,7 +185,7 @@ ck_constraint_on_replace_trigger(struct trigger *trigger, void *event)
 	assert(stmt != NULL);
 	struct tuple *new_tuple = stmt->new_tuple;
 	if (new_tuple == NULL)
-		return;
+		return 0;
 
 	struct space *space = stmt->space;
 	assert(space != NULL);
@@ -196,7 +196,7 @@ ck_constraint_on_replace_trigger(struct trigger *trigger, void *event)
 	if (field_ref == NULL) {
 		diag_set(OutOfMemory, field_ref_sz, "region_alloc",
 			 "field_ref");
-		diag_raise();
+		return -1;
 	}
 	vdbe_field_ref_prepare_tuple(field_ref, new_tuple);
 
@@ -204,8 +204,9 @@ ck_constraint_on_replace_trigger(struct trigger *trigger, void *event)
 	rlist_foreach_entry(ck_constraint, &space->ck_constraint, link) {
 		if (ck_constraint->def->is_enabled &&
 		    ck_constraint_program_run(ck_constraint, field_ref) != 0)
-			diag_raise();
+			return -1;
 	}
+	return 0;
 }
 
 struct ck_constraint *

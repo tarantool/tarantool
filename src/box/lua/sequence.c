@@ -157,7 +157,7 @@ lbox_sequence_delete(struct lua_State *L, struct sequence *seq)
 	lua_pop(L, 2); /* box, sequence */
 }
 
-static void
+static int
 lbox_sequence_new_or_delete(struct trigger *trigger, void *event)
 {
 	struct lua_State *L = trigger->data;
@@ -166,6 +166,7 @@ lbox_sequence_new_or_delete(struct trigger *trigger, void *event)
 		lbox_sequence_new(L, seq);
 	else
 		lbox_sequence_delete(L, seq);
+	return 0;
 }
 
 void
