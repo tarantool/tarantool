@@ -185,11 +185,11 @@ func_cache_find(uint32_t fid)
  * Check whether or not an object has grants on it (restrict
  * constraint in drop object).
  * _priv space to look up by space id
- * @retval true object has grants
- * @retval false object has no grants
+ * @retval (bool *out) true object has grants
+ * @retval (bool *out) false object has no grants
  */
-bool
-schema_find_grants(const char *type, uint32_t id);
+int
+schema_find_grants(const char *type, uint32_t id, bool *out);
 
 /**
  * A wrapper around sequence_by_id() that raises an exception

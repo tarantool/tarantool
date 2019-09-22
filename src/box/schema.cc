@@ -599,12 +599,22 @@ func_by_name(const char *name, uint32_t name_len)
 	return (struct func *) mh_strnptr_node(funcs_by_name, func)->val;
 }
 
-bool
-schema_find_grants(const char *type, uint32_t id)
+int
+schema_find_grants(const char *type, uint32_t id, bool *out)
 {
-	struct space *priv = space_cache_find_xc(BOX_PRIV_ID);
+	struct space *priv = space_cache_find(BOX_PRIV_ID);
+	if (priv == NULL)
+		return -1;
+
 	/** "object" index */
-	struct index *index = index_find_system_xc(priv, 2);
+	if (!space_is_memtx(priv)) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 priv->engine->name, "system data");
+		return -1;
+	}
+	struct index *index = index_find(priv, 2);
+	if (index == NULL)
+		return -1;
 	/*
 	 * +10 = max(mp_sizeof_uint32) +
 	 *       max(mp_sizeof_strl(uint32)).
@@ -612,9 +622,15 @@ schema_find_grants(const char *type, uint32_t id)
 	char key[GRANT_NAME_MAX + 10];
 	assert(strlen(type) <= GRANT_NAME_MAX);
 	mp_encode_uint(mp_encode_str(key, type, strlen(type)), id);
-	struct iterator *it = index_create_iterator_xc(index, ITER_EQ, key, 2);
+	struct iterator *it = index_create_iterator(index, ITER_EQ, key, 2);
+	if (it == NULL)
+		return -1;
 	IteratorGuard iter_guard(it);
-	return iterator_next_xc(it);
+	struct tuple *tuple;
+	if (iterator_next(it, &tuple) != 0)
+		return -1;
+	*out = (tuple != NULL);
+	return 0;
 }
 
 struct sequence *

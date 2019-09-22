@@ -2026,7 +2026,11 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  "the space has indexes");
 			return -1;
 		}
-		if (schema_find_grants("space", old_space->def->id)) {
+		bool out;
+		if (schema_find_grants("space", old_space->def->id, &out) != 0) {
+			return -1;
+		}
+		if (out) {
 			diag_set(ClientError, ER_DROP_SPACE,
 				  space_name(old_space),
 				  "the space has grants");
@@ -3048,7 +3052,11 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 				 PRIV_D) != 0)
 			return -1;
 		/* Can only delete func if it has no grants. */
-		if (schema_find_grants("function", old_func->def->fid)) {
+		bool out;
+		if (schema_find_grants("function", old_func->def->fid, &out) != 0) {
+			return -1;
+		}
+		if (out) {
 			diag_set(ClientError, ER_DROP_FUNCTION,
 				  (unsigned) old_func->def->uid,
 				  "function has grants");
@@ -3938,7 +3946,11 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 				  seq->def->name, "the sequence is in use");
 			return -1;
 		}
-		if (schema_find_grants("sequence", seq->def->id)) {
+		bool out;
+		if (schema_find_grants("sequence", seq->def->id, &out) != 0) {
+			return -1;
+		}
+		if (out) {
 			diag_set(ClientError, ER_DROP_SEQUENCE,
 				  seq->def->name, "the sequence has grants");
 			return -1;
