@@ -1969,8 +1969,10 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 	 * old_tuple ID field, if old_tuple is set, since UPDATE
 	 * may have changed space id.
 	 */
-	uint32_t old_id = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
-					     BOX_SPACE_FIELD_ID);
+	uint32_t old_id;
+	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+			    BOX_SPACE_FIELD_ID, &old_id) != 0)
+		return -1;
 	struct space *old_space = space_by_id(old_id);
 	if (new_tuple != NULL && old_space == NULL) { /* INSERT */
 		struct space_def *def =
@@ -1982,7 +1984,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				 PRIV_C) != 0)
 			return -1;
 		RLIST_HEAD(empty_list);
-		struct space *space = space_new_xc(def, &empty_list);
+		struct space *space = space_new(def, &empty_list);
+		if (space == NULL)
+			return -1;
 		/**
 		 * The new space must be inserted in the space
 		 * cache right away to achieve linearisable
@@ -2202,8 +2206,11 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 */
 		struct key_def **keys;
 		size_t bsize = old_space->index_count * sizeof(keys[0]);
-		keys = (struct key_def **) region_alloc_xc(&fiber()->gc,
-							   bsize);
+		keys = (struct key_def **) region_alloc(&fiber()->gc, bsize);
+		if (keys == NULL) {
+			diag_set(OutOfMemory, bsize, "region", "new slab");
+			return -1;
+		}
 		for (uint32_t i = 0; i < old_space->index_count; ++i)
 			keys[i] = old_space->index[i]->def->key_def;
 		alter->new_min_field_count =
@@ -2294,11 +2301,16 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
-	uint32_t id = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
-					 BOX_INDEX_FIELD_SPACE_ID);
-	uint32_t iid = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
-					  BOX_INDEX_FIELD_ID);
-	struct space *old_space = space_cache_find_xc(id);
+	uint32_t id, iid;
+	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+			    BOX_INDEX_FIELD_SPACE_ID, &id) != 0)
+		return -1;
+	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+			    BOX_INDEX_FIELD_ID, &iid) != 0)
+		return -1;
+	struct space *old_space = space_cache_find(id);
+	if (old_space == NULL)
+		return -1;
 	if (old_space->def->opts.is_view) {
 		diag_set(ClientError, ER_ALTER_SPACE, space_name(old_space),
 			  "can not add index on a view");
@@ -2419,10 +2431,12 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		 */
 		struct key_def **keys;
 		size_t bsize = old_space->index_count * sizeof(keys[0]);
-		keys = (struct key_def **) region_alloc_xc(&fiber()->gc,
-							   bsize);
-		for (uint32_t i = 0, j = 0; i < old_space->index_count;
-		     ++i) {
+		keys = (struct key_def **) region_alloc(&fiber()->gc, bsize);
+		if (keys == NULL) {
+			diag_set(OutOfMemory, bsize, "region", "new slab");
+			return -1;
+		}
+		for (uint32_t i = 0, j = 0; i < old_space->index_count; ++i) {
 			struct index_def *d = old_space->index[i]->def;
 			if (d->iid != index_def->iid)
 				keys[j++] = d->key_def;
@@ -2507,9 +2521,12 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 		return 0;
 	}
 
-	uint32_t space_id =
-		tuple_field_u32_xc(new_tuple, BOX_TRUNCATE_FIELD_SPACE_ID);
-	struct space *old_space = space_cache_find_xc(space_id);
+	uint32_t space_id;
+	if (tuple_field_u32(new_tuple, BOX_TRUNCATE_FIELD_SPACE_ID, &space_id) != 0)
+		return -1;
+	struct space *old_space = space_cache_find(space_id);
+	if (old_space == NULL)
+		return -1;
 
 	if (stmt->row->type == IPROTO_INSERT) {
 		/*
@@ -2531,9 +2548,10 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	}
 
 	/*
-	 * Check if a write privilege was given, raise an error if not.
+	 * Check if a write privilege was given, return an error if not.
 	 */
-	access_check_space_xc(old_space, PRIV_W);
+	if (access_check_space(old_space, PRIV_W) != 0)
+		return -1;
 
 	struct alter_space *alter = alter_space_new(old_space);
 	auto scoped_guard =
@@ -2713,7 +2731,9 @@ static int
 user_cache_remove_user(struct trigger *trigger, void * /* event */)
 {
 	struct tuple *tuple = (struct tuple *)trigger->data;
-	uint32_t uid = tuple_field_u32_xc(tuple, BOX_USER_FIELD_ID);
+	uint32_t uid;
+	if (tuple_field_u32(tuple, BOX_USER_FIELD_ID, &uid) != 0)
+		return -1;
 	user_cache_delete(uid);
 	return 0;
 }
@@ -2745,8 +2765,10 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
-	uint32_t uid = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
-					  BOX_USER_FIELD_ID);
+	uint32_t uid;
+	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+			    BOX_USER_FIELD_ID, &uid) != 0)
+		return -1;
 	struct user *old_user = user_by_id(uid);
 	if (new_tuple != NULL && old_user == NULL) { /* INSERT */
 		struct user_def *user = user_def_new_from_tuple(new_tuple);
@@ -3057,7 +3079,8 @@ on_create_func_rollback(struct trigger *trigger, void * /* event */)
 	/* Remove the new function from the cache and delete it. */
 	struct func *func = (struct func *)trigger->data;
 	func_cache_delete(func->def->fid);
-	trigger_run_xc(&on_alter_func, func);
+	if (trigger_run(&on_alter_func, func) != 0)
+		return -1;
 	func_delete(func);
 	return 0;
 }
@@ -3077,7 +3100,8 @@ on_drop_func_rollback(struct trigger *trigger, void * /* event */)
 	/* Insert the old function back into the cache. */
 	struct func *func = (struct func *)trigger->data;
 	func_cache_insert(func);
-	trigger_run_xc(&on_alter_func, func);
+	if (trigger_run(&on_alter_func, func) != 0)
+		return -1;
 	return 0;
 }
 
@@ -3093,8 +3117,10 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
-	uint32_t fid = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
-					  BOX_FUNC_FIELD_ID);
+	uint32_t fid;
+	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+			    BOX_FUNC_FIELD_ID, &fid) != 0)
+		return -1;
 	struct func *old_func = func_by_id(fid);
 	if (new_tuple != NULL && old_func == NULL) { /* INSERT */
 		struct func_def *def = func_def_new_from_tuple(new_tuple);
@@ -3115,7 +3141,8 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		func_cache_insert(func);
 		on_rollback->data = func;
 		txn_stmt_on_rollback(stmt, on_rollback);
-		trigger_run_xc(&on_alter_func, func);
+		if (trigger_run(&on_alter_func, func) != 0)
+			return -1;
 	} else if (new_tuple == NULL) {         /* DELETE */
 		uint32_t uid;
 		if (func_def_get_ids_from_tuple(old_tuple, &fid, &uid) != 0)
@@ -3161,7 +3188,8 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		func_cache_delete(old_func->def->fid);
 		txn_stmt_on_commit(stmt, on_commit);
 		txn_stmt_on_rollback(stmt, on_rollback);
-		trigger_run_xc(&on_alter_func, old_func);
+		if (trigger_run(&on_alter_func, old_func) != 0)
+			return -1;
 	} else {                                /* UPDATE, REPLACE */
 		assert(new_tuple != NULL && old_tuple != NULL);
 		/**
@@ -3329,8 +3357,10 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 		 * TODO: Check that no index uses the collation
 		 * identifier.
 		 */
-		int32_t old_id = tuple_field_u32_xc(old_tuple,
-						    BOX_COLLATION_FIELD_ID);
+		uint32_t out;
+		if (tuple_field_u32(old_tuple, BOX_COLLATION_FIELD_ID, &out) != 0)
+			return -1;
+		int32_t old_id = out;
 		/*
 		 * Don't allow user to drop "none" collation
 		 * since it is very special and vastly used
@@ -3738,15 +3768,18 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
-	const char *key = tuple_field_cstr_xc(new_tuple ? new_tuple : old_tuple,
+	const char *key = tuple_field_cstr(new_tuple ? new_tuple : old_tuple,
 					      BOX_SCHEMA_FIELD_KEY);
+	if (key == NULL)
+		return -1;
 	if (strcmp(key, "cluster") == 0) {
 		if (new_tuple == NULL) {
 			diag_set(ClientError, ER_REPLICASET_UUID_IS_RO);
 			return -1;
 		}
 		tt_uuid uu;
-		tuple_field_uuid_xc(new_tuple, BOX_CLUSTER_FIELD_UUID, &uu);
+		if (tuple_field_uuid(new_tuple, BOX_CLUSTER_FIELD_UUID, &uu) != 0)
+			return -1;
 		REPLICASET_UUID = uu;
 		say_info("cluster uuid %s", tt_uuid_str(&uu));
 	}
@@ -3762,10 +3795,12 @@ static int
 register_replica(struct trigger *trigger, void * /* event */)
 {
 	struct tuple *new_tuple = (struct tuple *)trigger->data;
-
-	uint32_t id = tuple_field_u32_xc(new_tuple, BOX_CLUSTER_FIELD_ID);
+	uint32_t id;
+	if (tuple_field_u32(new_tuple, BOX_CLUSTER_FIELD_ID, &id) != 0)
+		return -1;
 	tt_uuid uuid;
-	tuple_field_uuid_xc(new_tuple, BOX_CLUSTER_FIELD_UUID, &uuid);
+	if (tuple_field_uuid(new_tuple, BOX_CLUSTER_FIELD_UUID, &uuid) != 0)
+		return -1;
 	struct replica *replica = replica_by_uuid(&uuid);
 	if (replica != NULL) {
 		replica_set_id(replica, id);
@@ -3786,7 +3821,8 @@ unregister_replica(struct trigger *trigger, void * /* event */)
 	struct tuple *old_tuple = (struct tuple *)trigger->data;
 
 	struct tt_uuid old_uuid;
-	tuple_field_uuid_xc(old_tuple, BOX_CLUSTER_FIELD_UUID, &old_uuid);
+	if (tuple_field_uuid(old_tuple, BOX_CLUSTER_FIELD_UUID, &old_uuid) != 0)
+		return -1;
 
 	struct replica *replica = replica_by_uuid(&old_uuid);
 	assert(replica != NULL);
@@ -3822,13 +3858,15 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 	struct tuple *new_tuple = stmt->new_tuple;
 	if (new_tuple != NULL) { /* Insert or replace */
 		/* Check fields */
-		uint32_t replica_id =
-			tuple_field_u32_xc(new_tuple, BOX_CLUSTER_FIELD_ID);
+		uint32_t replica_id;
+		if (tuple_field_u32(new_tuple, BOX_CLUSTER_FIELD_ID, &replica_id) != 0)
+			return -1;
 		if (replica_check_id(replica_id) != 0)
 			return -1;
 		tt_uuid replica_uuid;
-		tuple_field_uuid_xc(new_tuple, BOX_CLUSTER_FIELD_UUID,
-				    &replica_uuid);
+		if (tuple_field_uuid(new_tuple, BOX_CLUSTER_FIELD_UUID,
+				    &replica_uuid) != 0)
+			return -1;
 		if (tt_uuid_is_nil(&replica_uuid)) {
 			diag_set(ClientError, ER_INVALID_UUID,
 				  tt_uuid_str(&replica_uuid));
@@ -3841,8 +3879,9 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 			 * in sync with appliers and relays.
 			 */
 			tt_uuid old_uuid;
-			tuple_field_uuid_xc(old_tuple, BOX_CLUSTER_FIELD_UUID,
-					    &old_uuid);
+			if (tuple_field_uuid(old_tuple, BOX_CLUSTER_FIELD_UUID,
+						    &old_uuid) != 0)
+				return -1;
 			if (!tt_uuid_is_equal(&replica_uuid, &old_uuid)) {
 				diag_set(ClientError, ER_UNSUPPORTED,
 					  "Space _cluster",
@@ -3863,8 +3902,9 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 		 * from _cluster.
 		 */
 		assert(old_tuple != NULL);
-		uint32_t replica_id =
-			tuple_field_u32_xc(old_tuple, BOX_CLUSTER_FIELD_ID);
+		uint32_t replica_id;
+		if (tuple_field_u32(old_tuple, BOX_CLUSTER_FIELD_ID, &replica_id) != 0)
+			return -1;
 		if (replica_check_id(replica_id) != 0)
 			return -1;
 
@@ -3949,7 +3989,8 @@ on_create_sequence_rollback(struct trigger *trigger, void * /* event */)
 	/* Remove the new sequence from the cache and delete it. */
 	struct sequence *seq = (struct sequence *)trigger->data;
 	sequence_cache_delete(seq->def->id);
-	trigger_run_xc(&on_alter_sequence, seq);
+	if (trigger_run(&on_alter_sequence, seq) != 0)
+		return -1;
 	sequence_delete(seq);
 	return 0;
 }
@@ -3969,7 +4010,8 @@ on_drop_sequence_rollback(struct trigger *trigger, void * /* event */)
 	/* Insert the old sequence back into the cache. */
 	struct sequence *seq = (struct sequence *)trigger->data;
 	sequence_cache_insert(seq);
-	trigger_run_xc(&on_alter_sequence, seq);
+	if (trigger_run(&on_alter_sequence, seq) != 0)
+		return -1;
 	return 0;
 }
 
@@ -3992,7 +4034,8 @@ on_alter_sequence_rollback(struct trigger *trigger, void * /* event */)
 	assert(seq != NULL);
 	free(seq->def);
 	seq->def = def;
-	trigger_run_xc(&on_alter_sequence, seq);
+	if (trigger_run(&on_alter_sequence, seq) != 0)
+		return -1;
 	return 0;
 }
 
@@ -4024,13 +4067,16 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 			txn_alter_trigger_new(on_create_sequence_rollback, NULL);
 		if (on_rollback == NULL)
 			return -1;
-		seq = sequence_new_xc(new_def);
+		seq = sequence_new(new_def);
+		if (seq == NULL)
+			return -1;
 		sequence_cache_insert(seq);
 		on_rollback->data = seq;
 		txn_stmt_on_rollback(stmt, on_rollback);
 	} else if (old_tuple != NULL && new_tuple == NULL) {	/* DELETE */
-		uint32_t id = tuple_field_u32_xc(old_tuple,
-						 BOX_SEQUENCE_DATA_FIELD_ID);
+		uint32_t id;
+		if (tuple_field_u32(old_tuple, BOX_SEQUENCE_DATA_FIELD_ID, &id) != 0)
+			return -1;
 		seq = sequence_by_id(id);
 		assert(seq != NULL);
 		if (access_check_ddl(seq->def->name, seq->def->id, seq->def->uid,
@@ -4086,7 +4132,8 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 	}
 
 	def_guard.is_active = false;
-	trigger_run_xc(&on_alter_sequence, seq);
+	if (trigger_run(&on_alter_sequence, seq) != 0)
+		return -1;
 	return 0;
 }
 
@@ -4095,9 +4142,12 @@ static int
 on_drop_sequence_data_rollback(struct trigger *trigger, void * /* event */)
 {
 	struct tuple *tuple = (struct tuple *)trigger->data;
-	uint32_t id = tuple_field_u32_xc(tuple, BOX_SEQUENCE_DATA_FIELD_ID);
-	int64_t val = tuple_field_i64_xc(tuple, BOX_SEQUENCE_DATA_FIELD_VALUE);
-
+	uint32_t id;
+	if (tuple_field_u32(tuple, BOX_SEQUENCE_DATA_FIELD_ID, &id) != 0)
+		return -1;
+	int64_t val;
+	if (tuple_field_i64(tuple, BOX_SEQUENCE_DATA_FIELD_VALUE, &val) != 0)
+		return -1;
 	struct sequence *seq = sequence_by_id(id);
 	assert(seq != NULL);
 	if (sequence_set(seq, val) != 0)
@@ -4117,14 +4167,18 @@ on_replace_dd_sequence_data(struct trigger * /* trigger */, void *event)
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
-	uint32_t id = tuple_field_u32_xc(old_tuple ?: new_tuple,
-					 BOX_SEQUENCE_DATA_FIELD_ID);
-	struct sequence *seq = sequence_cache_find(id);
+	uint32_t id;
+	if (tuple_field_u32(old_tuple ?: new_tuple, BOX_SEQUENCE_DATA_FIELD_ID,
+			    &id) != 0)
+		return -1;
+	struct sequence *seq = sequence_by_id(id);
 	if (seq == NULL)
 		return -1;
 	if (new_tuple != NULL) {			/* INSERT, UPDATE */
-		int64_t value = tuple_field_i64_xc(new_tuple,
-				BOX_SEQUENCE_DATA_FIELD_VALUE);
+		int64_t value;
+		if (tuple_field_i64(new_tuple, BOX_SEQUENCE_DATA_FIELD_VALUE,
+				    &value) != 0)
+			return -1;
 		if (sequence_set(seq, value) != 0)
 			return -1;
 	} else {					/* DELETE */
@@ -4198,12 +4252,17 @@ static int
 set_space_sequence(struct trigger *trigger, void * /* event */)
 {
 	struct tuple *tuple = (struct tuple *)trigger->data;
-	uint32_t space_id = tuple_field_u32_xc(tuple,
-			BOX_SPACE_SEQUENCE_FIELD_ID);
-	uint32_t sequence_id = tuple_field_u32_xc(tuple,
-			BOX_SPACE_SEQUENCE_FIELD_SEQUENCE_ID);
-	bool is_generated = tuple_field_bool_xc(tuple,
-			BOX_SPACE_SEQUENCE_FIELD_IS_GENERATED);
+	uint32_t space_id;
+	if (tuple_field_u32(tuple, BOX_SPACE_SEQUENCE_FIELD_ID, &space_id) != 0)
+		return -1;
+	uint32_t sequence_id;
+	if (tuple_field_u32(tuple, BOX_SPACE_SEQUENCE_FIELD_SEQUENCE_ID,
+			    &sequence_id) != 0)
+		return -1;
+	bool is_generated;
+	if (tuple_field_bool(tuple, BOX_SPACE_SEQUENCE_FIELD_IS_GENERATED,
+		&is_generated) != 0)
+		return -1;
 	struct space *space = space_by_id(space_id);
 	assert(space != NULL);
 	struct sequence *seq = sequence_by_id(sequence_id);
@@ -4217,7 +4276,8 @@ set_space_sequence(struct trigger *trigger, void * /* event */)
 	space->sequence_fieldno = fieldno;
 	free(space->sequence_path);
 	space->sequence_path = path;
-	trigger_run_xc(&on_alter_space, space);
+	if (trigger_run(&on_alter_space, space) != 0)
+		return -1;
 	return 0;
 }
 
@@ -4226,8 +4286,9 @@ static int
 clear_space_sequence(struct trigger *trigger, void * /* event */)
 {
 	struct tuple *tuple = (struct tuple *)trigger->data;
-	uint32_t space_id = tuple_field_u32_xc(tuple,
-			BOX_SPACE_SEQUENCE_FIELD_ID);
+	uint32_t space_id;
+	if (tuple_field_u32(tuple, BOX_SPACE_SEQUENCE_FIELD_ID, &space_id) != 0)
+		return -1;
 	struct space *space = space_by_id(space_id);
 	assert(space != NULL);
 	assert(space->sequence != NULL);
@@ -4236,7 +4297,8 @@ clear_space_sequence(struct trigger *trigger, void * /* event */)
 	space->sequence_fieldno = 0;
 	free(space->sequence_path);
 	space->sequence_path = NULL;
-	trigger_run_xc(&on_alter_space, space);
+	if (trigger_run(&on_alter_space, space) != 0)
+		return -1;
 	return 0;
 }
 
@@ -4250,16 +4312,23 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *tuple = stmt->new_tuple ? stmt->new_tuple : stmt->old_tuple;
-
-	uint32_t space_id = tuple_field_u32_xc(tuple,
-					       BOX_SPACE_SEQUENCE_FIELD_ID);
-	uint32_t sequence_id = tuple_field_u32_xc(tuple,
-				BOX_SPACE_SEQUENCE_FIELD_SEQUENCE_ID);
-	bool is_generated = tuple_field_bool_xc(tuple,
-				BOX_SPACE_SEQUENCE_FIELD_IS_GENERATED);
-
-	struct space *space = space_cache_find_xc(space_id);
-	struct sequence *seq = sequence_cache_find(sequence_id);
+	uint32_t space_id;
+	if (tuple_field_u32(tuple, BOX_SPACE_SEQUENCE_FIELD_ID, &space_id) != 0)
+		return -1;
+	uint32_t sequence_id;
+	if (tuple_field_u32(tuple, BOX_SPACE_SEQUENCE_FIELD_SEQUENCE_ID,
+			    &sequence_id) != 0)
+		return -1;
+	bool is_generated;
+	if (tuple_field_bool(tuple, BOX_SPACE_SEQUENCE_FIELD_IS_GENERATED,
+			     &is_generated) != 0)
+		return -1;
+	struct space *space = space_cache_find(space_id);
+	if (space == NULL)
+		return -1;
+	struct sequence *seq = sequence_by_id(sequence_id);
+	if (seq == NULL)
+		return -1;
 
 	enum priv_type priv_type = stmt->new_tuple ? PRIV_C : PRIV_D;
 	if (stmt->new_tuple && stmt->old_tuple)
@@ -4332,7 +4401,8 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 		space->sequence_path = NULL;
 		txn_stmt_on_rollback(stmt, on_rollback);
 	}
-	trigger_run_xc(&on_alter_space, space);
+	if (trigger_run(&on_alter_space, space) != 0)
+		return -1;
 	return 0;
 }
 
@@ -4420,15 +4490,18 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 	if (old_tuple != NULL && new_tuple == NULL) {
 		/* DROP trigger. */
 		uint32_t trigger_name_len;
-		const char *trigger_name_src =
-			tuple_field_str_xc(old_tuple, BOX_TRIGGER_FIELD_NAME,
-					   &trigger_name_len);
-		uint32_t space_id =
-			tuple_field_u32_xc(old_tuple,
-					   BOX_TRIGGER_FIELD_SPACE_ID);
-		char *trigger_name =
-			(char *)region_alloc_xc(&fiber()->gc,
-						trigger_name_len + 1);
+		const char *trigger_name_src = tuple_field_str(old_tuple,
+			BOX_TRIGGER_FIELD_NAME, &trigger_name_len);
+		if (trigger_name_src == NULL)
+			return -1;
+		uint32_t space_id;
+		if (tuple_field_u32(old_tuple, BOX_TRIGGER_FIELD_SPACE_ID,
+				    &space_id) != 0)
+			return -1;
+		char *trigger_name = (char *)region_alloc(&fiber()->gc,
+							  trigger_name_len + 1);
+		if (trigger_name == NULL)
+			return -1;
 		memcpy(trigger_name, trigger_name_src, trigger_name_len);
 		trigger_name[trigger_name_len] = 0;
 
@@ -4444,14 +4517,14 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 	} else {
 		/* INSERT, REPLACE trigger. */
 		uint32_t trigger_name_len;
-		const char *trigger_name_src =
-			tuple_field_str_xc(new_tuple, BOX_TRIGGER_FIELD_NAME,
-					   &trigger_name_len);
-
-		const char *space_opts =
-			tuple_field_with_type_xc(new_tuple,
-						 BOX_TRIGGER_FIELD_OPTS,
-						 MP_MAP);
+		const char *trigger_name_src = tuple_field_str(new_tuple,
+			BOX_TRIGGER_FIELD_NAME, &trigger_name_len);
+		if (trigger_name_src == NULL)
+			return -1;
+		const char *space_opts = tuple_field_with_type(new_tuple,
+				BOX_TRIGGER_FIELD_OPTS,MP_MAP);
+		if (space_opts == NULL)
+			return -1;
 		struct space_opts opts;
 		struct region *region = &fiber()->gc;
 		space_opts_decode(&opts, space_opts, region);
@@ -4473,9 +4546,10 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 				  "from SQL");
 			return -1;
 		}
-		uint32_t space_id =
-			tuple_field_u32_xc(new_tuple,
-					   BOX_TRIGGER_FIELD_SPACE_ID);
+		uint32_t space_id;
+		if (tuple_field_u32(new_tuple, BOX_TRIGGER_FIELD_SPACE_ID,
+				    &space_id) != 0)
+			return -1;
 		if (space_id != sql_trigger_space_id(new_trigger)) {
 			diag_set(ClientError, ER_SQL_EXECUTE,
 				  "trigger space_id does not match the value "
@@ -4807,16 +4881,18 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 			fk_constraint_def_new_from_tuple(new_tuple,
 							 ER_CREATE_FK_CONSTRAINT);
 		auto fk_def_guard = make_scoped_guard([=] { free(fk_def); });
-		struct space *child_space =
-			space_cache_find_xc(fk_def->child_id);
+		struct space *child_space = space_cache_find(fk_def->child_id);
+		if (child_space == NULL)
+			return -1;
 		if (child_space->def->opts.is_view) {
 			diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
 				  fk_def->name,
 				  "referencing space can't be VIEW");
 			return -1;
 		}
-		struct space *parent_space =
-			space_cache_find_xc(fk_def->parent_id);
+		struct space *parent_space = space_cache_find(fk_def->parent_id);
+		if (parent_space == NULL)
+			return -1;
 		if (parent_space->def->opts.is_view) {
 			diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
 				  fk_def->name,
@@ -4958,10 +5034,10 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 			fk_constraint_def_new_from_tuple(old_tuple,
 						ER_DROP_FK_CONSTRAINT);
 		auto fk_def_guard = make_scoped_guard([=] { free(fk_def); });
-		struct space *child_space =
-			space_cache_find_xc(fk_def->child_id);
-		struct space *parent_space =
-			space_cache_find_xc(fk_def->parent_id);
+		struct space *child_space = space_cache_find(fk_def->child_id);
+		struct space *parent_space = space_cache_find(fk_def->parent_id);
+		if (child_space == NULL or parent_space == NULL)
+			return -1;
 		struct fk_constraint *old_fk=
 			fk_constraint_remove(&child_space->child_fk_constraint,
 					     fk_def->name);
@@ -5034,7 +5110,8 @@ on_create_ck_constraint_rollback(struct trigger *trigger, void * /* event */)
 					   strlen(ck->def->name)) != NULL);
 	space_remove_ck_constraint(space, ck);
 	ck_constraint_delete(ck);
-	trigger_run_xc(&on_alter_space, space);
+	if (trigger_run(&on_alter_space, space) != 0)
+		return -1;
 	return 0;
 }
 
@@ -5060,7 +5137,8 @@ on_drop_ck_constraint_rollback(struct trigger *trigger, void * /* event */)
 					   strlen(ck->def->name)) == NULL);
 	if (space_add_ck_constraint(space, ck) != 0)
 		panic("Can't recover after CK constraint drop rollback");
-	trigger_run_xc(&on_alter_space, space);
+	if (trigger_run(&on_alter_space, space) != 0)
+		return -1;
 	return 0;
 }
 
@@ -5088,7 +5166,8 @@ on_replace_ck_constraint_rollback(struct trigger *trigger, void * /* event */)
 	rlist_del_entry(new_ck, link);
 	rlist_add_entry(&space->ck_constraint, ck, link);
 	ck_constraint_delete(new_ck);
-	trigger_run_xc(&on_alter_space, space);
+	if (trigger_run(&on_alter_space, space) != 0)
+		return -1;
 	return 0;
 }
 
@@ -5100,19 +5179,23 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
-	uint32_t space_id =
-		tuple_field_u32_xc(old_tuple != NULL ? old_tuple : new_tuple,
-				   BOX_CK_CONSTRAINT_FIELD_SPACE_ID);
-	struct space *space = space_cache_find_xc(space_id);
+	uint32_t space_id;
+	if (tuple_field_u32(old_tuple != NULL ? old_tuple : new_tuple,
+			    BOX_CK_CONSTRAINT_FIELD_SPACE_ID, &space_id) != 0)
+		return -1;
+	struct space *space = space_cache_find(space_id);
+	if (space == NULL)
+		return -1;
 	struct trigger *on_rollback = txn_alter_trigger_new(NULL, NULL);
 	struct trigger *on_commit = txn_alter_trigger_new(NULL, NULL);
 	if (on_commit == NULL || on_rollback == NULL)
 		return -1;
 
 	if (new_tuple != NULL) {
-		bool is_deferred =
-			tuple_field_bool_xc(new_tuple,
-					    BOX_CK_CONSTRAINT_FIELD_DEFERRED);
+		bool is_deferred;
+		if (tuple_field_bool(new_tuple,
+			BOX_CK_CONSTRAINT_FIELD_DEFERRED, &is_deferred) != 0)
+			return -1;
 		if (is_deferred) {
 			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
 				  "deferred ck constraints");
@@ -5185,10 +5268,10 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 		assert(new_tuple == NULL && old_tuple != NULL);
 		/* Drop check constraint. */
 		uint32_t name_len;
-		const char *name =
-			tuple_field_str_xc(old_tuple,
-					   BOX_CK_CONSTRAINT_FIELD_NAME,
-					   &name_len);
+		const char *name = tuple_field_str(old_tuple,
+				BOX_CK_CONSTRAINT_FIELD_NAME, &name_len);
+		if (name == NULL)
+			return -1;
 		struct ck_constraint *old_ck_constraint =
 			space_ck_constraint_by_name(space, name, name_len);
 		assert(old_ck_constraint != NULL);
@@ -5202,7 +5285,8 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 	txn_stmt_on_rollback(stmt, on_rollback);
 	txn_stmt_on_commit(stmt, on_commit);
 
-	trigger_run_xc(&on_alter_space, space);
+	if (trigger_run(&on_alter_space, space) != 0)
+		return -1;
 	return 0;
 }
 
@@ -5221,15 +5305,29 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 	struct index *index;
 	struct space *space;
 	if (old_tuple == NULL && new_tuple != NULL) {
-		uint32_t space_id = tuple_field_u32_xc(new_tuple,
-					BOX_FUNC_INDEX_FIELD_SPACE_ID);
-		uint32_t index_id = tuple_field_u32_xc(new_tuple,
-					BOX_FUNC_INDEX_FIELD_INDEX_ID);
-		uint32_t fid = tuple_field_u32_xc(new_tuple,
-					BOX_FUNC_INDEX_FUNCTION_ID);
-		space = space_cache_find_xc(space_id);
-		index = index_find_xc(space, index_id);
-		func = func_cache_find(fid);
+		uint32_t space_id;
+		uint32_t index_id;
+		uint32_t fid;
+		if (tuple_field_u32(new_tuple, BOX_FUNC_INDEX_FIELD_SPACE_ID,
+				    &space_id) != 0)
+			return -1;
+		if (tuple_field_u32(new_tuple, BOX_FUNC_INDEX_FIELD_INDEX_ID,
+				    &index_id) != 0)
+			return -1;
+		if (tuple_field_u32(new_tuple, BOX_FUNC_INDEX_FUNCTION_ID,
+	       			    &fid) != 0)
+			return -1;
+		space = space_cache_find(space_id);
+		if (space == NULL)
+			return -1;
+		index = index_find(space, index_id);
+		if (index == NULL)
+			return -1;
+		func = func_by_id(fid);
+		if (func == NULL) {
+			diag_set(ClientError, ER_NO_SUCH_FUNCTION, int2str(fid));
+			return -1;
+		}
 		if (func_index_check_func(func) != 0)
 			return -1;
 		if (index->def->opts.func_id != func->def->fid) {
@@ -5239,12 +5337,20 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 			return -1;
 		}
 	} else if (old_tuple != NULL && new_tuple == NULL) {
-		uint32_t space_id = tuple_field_u32_xc(old_tuple,
-					BOX_FUNC_INDEX_FIELD_SPACE_ID);
-		uint32_t index_id = tuple_field_u32_xc(old_tuple,
-					BOX_FUNC_INDEX_FIELD_INDEX_ID);
-		space = space_cache_find_xc(space_id);
-		index = index_find_xc(space, index_id);
+		uint32_t space_id;
+		uint32_t index_id;
+		if (tuple_field_u32(old_tuple, BOX_FUNC_INDEX_FIELD_SPACE_ID,
+				    &space_id) != 0)
+			return -1;
+		if (tuple_field_u32(old_tuple, BOX_FUNC_INDEX_FIELD_INDEX_ID,
+				    &index_id) != 0)
+			return -1;
+		space = space_cache_find(space_id);
+		if (space == NULL)
+			return -1;
+		index = index_find(space, index_id);
+		if (index == NULL)
+			return -1;
 		func = NULL;
 	} else {
 		assert(old_tuple != NULL && new_tuple != NULL);

@@ -171,15 +171,6 @@ schema_free();
 
 struct space *schema_space(uint32_t id);
 
-static inline struct func *
-func_cache_find(uint32_t fid)
-{
-	struct func *func = func_by_id(fid);
-	if (func == NULL)
-		tnt_raise(ClientError, ER_NO_SUCH_FUNCTION, int2str(fid));
-	return func;
-}
-
 
 /**
  * Check whether or not an object has grants on it (restrict

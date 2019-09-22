@@ -1139,26 +1139,6 @@ tuple_field_bool_xc(struct tuple *tuple, uint32_t fieldno)
 	return out;
 }
 
-/* @copydoc tuple_field_i64() */
-static inline int64_t
-tuple_field_i64_xc(struct tuple *tuple, uint32_t fieldno)
-{
-	int64_t out;
-	if (tuple_field_i64(tuple, fieldno, &out) != 0)
-		diag_raise();
-	return out;
-}
-
-/* @copydoc tuple_field_u64() */
-static inline uint64_t
-tuple_field_u64_xc(struct tuple *tuple, uint32_t fieldno)
-{
-	uint64_t out;
-	if (tuple_field_u64(tuple, fieldno, &out) != 0)
-		diag_raise();
-	return out;
-}
-
 /* @copydoc tuple_field_u32() */
 static inline uint32_t
 tuple_field_u32_xc(struct tuple *tuple, uint32_t fieldno)
@@ -1187,14 +1167,6 @@ tuple_field_cstr_xc(struct tuple *tuple, uint32_t fieldno)
 	if (out == NULL)
 		diag_raise();
 	return out;
-}
-
-/** @copydoc tuple_field_uuid() */
-static inline void
-tuple_field_uuid_xc(struct tuple *tuple, int fieldno, struct tt_uuid *out)
-{
-	if (tuple_field_uuid(tuple, fieldno, out) != 0)
-		diag_raise();
 }
 
 #endif /* defined(__cplusplus) */

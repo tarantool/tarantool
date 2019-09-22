@@ -179,15 +179,6 @@ sequence_get_value(struct sequence *seq);
 #if defined(__cplusplus)
 } /* extern "C" */
 
-static inline struct sequence *
-sequence_new_xc(struct sequence_def *def)
-{
-	struct sequence *seq = sequence_new(def);
-	if (seq == NULL)
-		diag_raise();
-	return seq;
-}
-
 #endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_BOX_SEQUENCE_H */
