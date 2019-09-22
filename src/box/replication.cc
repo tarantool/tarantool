@@ -415,10 +415,14 @@ replica_on_applier_state_f(struct trigger *trigger, void *event)
 		replicaset.is_joining = false;
 		break;
 	case APPLIER_CONNECTED:
-		if (tt_uuid_is_nil(&replica->uuid))
-			replica_on_applier_connect(replica);
-		else
-			replica_on_applier_reconnect(replica);
+		try {
+			if (tt_uuid_is_nil(&replica->uuid))
+				replica_on_applier_connect(replica);
+			else
+				replica_on_applier_reconnect(replica);
+		} catch (Exception *e) {
+			return -1;
+		}
 		break;
 	case APPLIER_LOADING:
 	case APPLIER_DISCONNECTED:

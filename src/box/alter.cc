@@ -878,8 +878,12 @@ alter_space_commit(struct trigger *trigger, void *event)
 	 * indexes into their new places.
 	 */
 	class AlterSpaceOp *op;
-	rlist_foreach_entry(op, &alter->ops, link)
-		op->commit(alter, signature);
+	try {
+		rlist_foreach_entry(op, &alter->ops, link)
+			op->commit(alter, signature);
+	} catch (Exception *e) {
+		return -1;
+	}
 
 	alter->new_space = NULL; /* for alter_space_delete(). */
 	/*
@@ -906,8 +910,12 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	struct alter_space *alter = (struct alter_space *) trigger->data;
 	/* Rollback alter ops */
 	class AlterSpaceOp *op;
-	rlist_foreach_entry(op, &alter->ops, link) {
-		op->rollback(alter);
+	try {
+		rlist_foreach_entry(op, &alter->ops, link) {
+			op->rollback(alter);
+		}
+	} catch (Exception *e) {
+		return -1;
 	}
 	/* Rebuild index maps once for all indexes. */
 	space_fill_index_map(alter->old_space);
@@ -2132,7 +2140,11 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		alter_space_move_indexes(alter, 0, old_space->index_id_max + 1);
 		/* Remember to update schema_version. */
 		(void) new UpdateSchemaVersion(alter);
-		alter_space_do(stmt, alter);
+		try {
+			alter_space_do(stmt, alter);
+		} catch (Exception *e) {
+			return -1;
+		}
 		alter_guard.is_active = false;
 	}
 	return 0;
@@ -2371,7 +2383,11 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	(void) new MoveCkConstraints(alter);
 	/* Add an op to update schema_version on commit. */
 	(void) new UpdateSchemaVersion(alter);
-	alter_space_do(stmt, alter);
+	try {
+		alter_space_do(stmt, alter);
+	} catch (Exception *e) {
+		return -1;
+	}
 	scoped_guard.is_active = false;
 	return 0;
 }
@@ -2448,7 +2464,11 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	}
 
 	(void) new MoveCkConstraints(alter);
-	alter_space_do(stmt, alter);
+	try {
+		alter_space_do(stmt, alter);
+	} catch (Exception *e) {
+		return -1;
+	}
 	scoped_guard.is_active = false;
 	return 0;
 }
@@ -2611,7 +2631,11 @@ user_cache_alter_user(struct trigger *trigger, void * /* event */)
 	struct user_def *user = user_def_new_from_tuple(tuple);
 	auto def_guard = make_scoped_guard([=] { free(user); });
 	/* Can throw if, e.g. too many users. */
-	user_cache_replace(user);
+	try {
+		user_cache_replace(user);
+	} catch (Exception *e) {
+		return -1;
+	}
 	def_guard.is_active = false;
 	return 0;
 }
@@ -2635,7 +2659,11 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		access_check_ddl(user->name, user->uid, user->owner, user->type,
 				 PRIV_C);
 		auto def_guard = make_scoped_guard([=] { free(user); });
-		(void) user_cache_replace(user);
+		try {
+			(void) user_cache_replace(user);
+		} catch (Exception *e) {
+			return -1;
+		}
 		def_guard.is_active = false;
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(user_cache_remove_user, new_tuple);
@@ -2673,7 +2701,11 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		access_check_ddl(user->name, user->uid, user->uid,
 			         old_user->def->type, PRIV_A);
 		auto def_guard = make_scoped_guard([=] { free(user); });
-		user_cache_replace(user);
+		try {
+			user_cache_replace(user);
+		} catch (Exception *e) {
+			return -1;
+		}
 		def_guard.is_active = false;
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(user_cache_alter_user, old_tuple);
@@ -4895,7 +4927,11 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 				 space->index_id_max + 1);
 	(void) new MoveCkConstraints(alter);
 	(void) new UpdateSchemaVersion(alter);
-	alter_space_do(stmt, alter);
+	try {
+		alter_space_do(stmt, alter);
+	} catch (Exception *e) {
+		return -1;
+	}
 
 	scoped_guard.is_active = false;
 	return 0;
