@@ -4149,11 +4149,14 @@ on_replace_dd_sequence_data(struct trigger * /* trigger */, void *event)
  * Extract field number and path from _space_sequence tuple.
  * The path is allocated using malloc().
  */
-static uint32_t
+static int
 sequence_field_from_tuple(struct space *space, struct tuple *tuple,
-			  char **path_ptr)
+			  char **path_ptr, uint32_t *out)
 {
-	struct index *pk = index_find_xc(space, 0);
+	struct index *pk = index_find(space, 0);
+	if (pk == NULL) {
+		return -1;
+	}
 	struct key_part *part = &pk->def->key_def->parts[0];
 	uint32_t fieldno = part->fieldno;
 	const char *path_raw = part->path;
@@ -4161,27 +4164,33 @@ sequence_field_from_tuple(struct space *space, struct tuple *tuple,
 
 	/* Sequence field was added in 2.2.1. */
 	if (tuple_field_count(tuple) > BOX_SPACE_SEQUENCE_FIELD_FIELDNO) {
-		fieldno = tuple_field_u32_xc(tuple,
-				BOX_SPACE_SEQUENCE_FIELD_FIELDNO);
-		path_raw = tuple_field_str_xc(tuple,
-				BOX_SPACE_SEQUENCE_FIELD_PATH, &path_len);
+		if (tuple_field_u32(tuple, BOX_SPACE_SEQUENCE_FIELD_FIELDNO,
+				    &fieldno) != 0)
+			return -1;
+		path_raw = tuple_field_str(tuple, BOX_SPACE_SEQUENCE_FIELD_PATH,
+					   &path_len);
+		if (path_raw == NULL)
+			return -1;
 		if (path_len == 0)
 			path_raw = NULL;
 	}
 	if (index_def_check_sequence(pk->def, fieldno, path_raw, path_len,
-				 space_name(space)) != 0)
-		diag_raise();
+				     space_name(space)) != 0)
+		return -1;
 	char *path = NULL;
 	if (path_raw != NULL) {
 		path = (char *)malloc(path_len + 1);
-		if (path == NULL)
-			tnt_raise(OutOfMemory, path_len + 1,
+		if (path == NULL) {
+			diag_set(OutOfMemory, path_len + 1,
 				  "malloc", "sequence path");
+			return -1;
+		}
 		memcpy(path, path_raw, path_len);
 		path[path_len] = 0;
 	}
 	*path_ptr = path;
-	return fieldno;
+	*out = fieldno;
+	return 0;
 }
 
 /** Attach a sequence to a space on rollback in _space_sequence. */
@@ -4200,7 +4209,9 @@ set_space_sequence(struct trigger *trigger, void * /* event */)
 	struct sequence *seq = sequence_by_id(sequence_id);
 	assert(seq != NULL);
 	char *path;
-	uint32_t fieldno = sequence_field_from_tuple(space, tuple, &path);
+	uint32_t fieldno;
+	if (sequence_field_from_tuple(space, tuple, &path, &fieldno) != 0)
+		return -1;
 	seq->is_generated = is_generated;
 	space->sequence = seq;
 	space->sequence_fieldno = fieldno;
@@ -4279,8 +4290,9 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 	if (stmt->new_tuple != NULL) {			/* INSERT, UPDATE */
 		char *sequence_path;
 		uint32_t sequence_fieldno;
-		sequence_fieldno = sequence_field_from_tuple(space, tuple,
-							     &sequence_path);
+		if (sequence_field_from_tuple(space, tuple, &sequence_path,
+					      &sequence_fieldno) != 0)
+			return -1;
 		auto sequence_path_guard = make_scoped_guard([=] {
 			free(sequence_path);
 		});
