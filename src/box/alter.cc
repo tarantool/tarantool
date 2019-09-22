@@ -3887,38 +3887,58 @@ static struct sequence_def *
 sequence_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 {
 	uint32_t name_len;
-	const char *name = tuple_field_str_xc(tuple, BOX_USER_FIELD_NAME,
-					      &name_len);
+	const char *name = tuple_field_str(tuple, BOX_USER_FIELD_NAME,
+					   &name_len);
+	if (name == NULL)
+		return NULL;
 	if (name_len > BOX_NAME_MAX) {
-		tnt_raise(ClientError, errcode,
+		diag_set(ClientError, errcode,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  "sequence name is too long");
+		return NULL;
 	}
-	identifier_check_xc(name, name_len);
+	if (identifier_check(name, name_len) != 0)
+		return NULL;
 	size_t sz = sequence_def_sizeof(name_len);
 	struct sequence_def *def = (struct sequence_def *) malloc(sz);
-	if (def == NULL)
-		tnt_raise(OutOfMemory, sz, "malloc", "sequence");
+	if (def == NULL) {
+		diag_set(OutOfMemory, sz, "malloc", "sequence");
+		return NULL;
+	}
 	auto def_guard = make_scoped_guard([=] { free(def); });
 	memcpy(def->name, name, name_len);
 	def->name[name_len] = '\0';
-	def->id = tuple_field_u32_xc(tuple, BOX_SEQUENCE_FIELD_ID);
-	def->uid = tuple_field_u32_xc(tuple, BOX_SEQUENCE_FIELD_UID);
-	def->step = tuple_field_i64_xc(tuple, BOX_SEQUENCE_FIELD_STEP);
-	def->min = tuple_field_i64_xc(tuple, BOX_SEQUENCE_FIELD_MIN);
-	def->max = tuple_field_i64_xc(tuple, BOX_SEQUENCE_FIELD_MAX);
-	def->start = tuple_field_i64_xc(tuple, BOX_SEQUENCE_FIELD_START);
-	def->cache = tuple_field_i64_xc(tuple, BOX_SEQUENCE_FIELD_CACHE);
-	def->cycle = tuple_field_bool_xc(tuple, BOX_SEQUENCE_FIELD_CYCLE);
-	if (def->step == 0)
-		tnt_raise(ClientError, errcode, def->name,
-			  "step option must be non-zero");
-	if (def->min > def->max)
-		tnt_raise(ClientError, errcode, def->name,
-			  "max must be greater than or equal to min");
-	if (def->start < def->min || def->start > def->max)
-		tnt_raise(ClientError, errcode, def->name,
-			  "start must be between min and max");
+	if (tuple_field_u32(tuple, BOX_SEQUENCE_FIELD_ID, &(def->id)) != 0)
+		return NULL;
+	if (tuple_field_u32(tuple, BOX_SEQUENCE_FIELD_UID, &(def->uid)) != 0)
+		return NULL;
+	if (tuple_field_i64(tuple, BOX_SEQUENCE_FIELD_STEP, &(def->step)) != 0)
+		return NULL;
+	if (tuple_field_i64(tuple, BOX_SEQUENCE_FIELD_MIN, &(def->min)) != 0)
+		return NULL;
+	if (tuple_field_i64(tuple, BOX_SEQUENCE_FIELD_MAX, &(def->max)) != 0)
+		return NULL;
+	if (tuple_field_i64(tuple, BOX_SEQUENCE_FIELD_START, &(def->start)) != 0)
+		return NULL;
+	if (tuple_field_i64(tuple, BOX_SEQUENCE_FIELD_CACHE, &(def->cache)) != 0)
+		return NULL;
+	if (tuple_field_bool(tuple, BOX_SEQUENCE_FIELD_CYCLE, &(def->cycle)) != 0)
+		return NULL;
+	if (def->step == 0) {
+		diag_set(ClientError, errcode, def->name,
+			 "step option must be non-zero");
+		return NULL;
+	}
+	if (def->min > def->max) {
+		diag_set(ClientError, errcode, def->name,
+			 "max must be greater than or equal to min");
+		return NULL;
+	}
+	if (def->start < def->min || def->start > def->max) {
+		diag_set(ClientError, errcode, def->name,
+			 "start must be between min and max");
+		return NULL;
+	}
 	def_guard.is_active = false;
 	return def;
 }
@@ -3995,6 +4015,8 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 	if (old_tuple == NULL && new_tuple != NULL) {		/* INSERT */
 		new_def = sequence_def_new_from_tuple(new_tuple,
 						      ER_CREATE_SEQUENCE);
+		if (new_def == NULL)
+			return -1;
 		if (access_check_ddl(new_def->name, new_def->id, new_def->uid,
 				 SC_SEQUENCE, PRIV_C) != 0)
 			return -1;
@@ -4045,6 +4067,8 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 	} else {						/* UPDATE */
 		new_def = sequence_def_new_from_tuple(new_tuple,
 						      ER_ALTER_SEQUENCE);
+		if (new_def == NULL)
+			return -1;
 		seq = sequence_by_id(new_def->id);
 		assert(seq != NULL);
 		if (access_check_ddl(seq->def->name, seq->def->id, seq->def->uid,
