@@ -2826,11 +2826,12 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
  * @param[out] fid Function identifier.
  * @param[out] uid Owner identifier.
  */
-static inline void
+static inline int
 func_def_get_ids_from_tuple(struct tuple *tuple, uint32_t *fid, uint32_t *uid)
 {
-	*fid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_ID);
-	*uid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_UID);
+	if (tuple_field_u32(tuple, BOX_FUNC_FIELD_ID, fid) != 0)
+		return -1;
+	return tuple_field_u32(tuple, BOX_FUNC_FIELD_UID, uid);
 }
 
 /** Create a function definition from tuple. */
@@ -2840,38 +2841,54 @@ func_def_new_from_tuple(struct tuple *tuple)
 	uint32_t field_count = tuple_field_count(tuple);
 	uint32_t name_len, body_len, comment_len;
 	const char *name, *body, *comment;
-	name = tuple_field_str_xc(tuple, BOX_FUNC_FIELD_NAME, &name_len);
+	name = tuple_field_str(tuple, BOX_FUNC_FIELD_NAME, &name_len);
+	if (name == NULL)
+		return NULL;
 	if (name_len > BOX_NAME_MAX) {
-		tnt_raise(ClientError, ER_CREATE_FUNCTION,
+		diag_set(ClientError, ER_CREATE_FUNCTION,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  "function name is too long");
+		return NULL;
 	}
-	identifier_check_xc(name, name_len);
+	if (identifier_check(name, name_len) != 0)
+		return NULL;
 	if (field_count > BOX_FUNC_FIELD_BODY) {
-		body = tuple_field_str_xc(tuple, BOX_FUNC_FIELD_BODY,
-					  &body_len);
-		comment = tuple_field_str_xc(tuple, BOX_FUNC_FIELD_COMMENT,
-					     &comment_len);
+		body = tuple_field_str(tuple, BOX_FUNC_FIELD_BODY, &body_len);
+		if (body == NULL)
+			return NULL;
+		comment = tuple_field_str(tuple, BOX_FUNC_FIELD_COMMENT,
+					  &comment_len);
+		if (comment == NULL)
+			return NULL;
 		uint32_t len;
-		const char *routine_type = tuple_field_str_xc(tuple,
+		const char *routine_type = tuple_field_str(tuple,
 					BOX_FUNC_FIELD_ROUTINE_TYPE, &len);
+		if (routine_type == NULL)
+			return NULL;
 		if (len != strlen("function") ||
 		    strncasecmp(routine_type, "function", len) != 0) {
-			tnt_raise(ClientError, ER_CREATE_FUNCTION, name,
+			diag_set(ClientError, ER_CREATE_FUNCTION, name,
 				  "unsupported routine_type value");
+			return NULL;
 		}
-		const char *sql_data_access = tuple_field_str_xc(tuple,
+		const char *sql_data_access = tuple_field_str(tuple,
 					BOX_FUNC_FIELD_SQL_DATA_ACCESS, &len);
+		if (sql_data_access == NULL)
+			return NULL;
 		if (len != strlen("none") ||
 		    strncasecmp(sql_data_access, "none", len) != 0) {
-			tnt_raise(ClientError, ER_CREATE_FUNCTION, name,
+			diag_set(ClientError, ER_CREATE_FUNCTION, name,
 				  "unsupported sql_data_access value");
+			return NULL;
 		}
-		bool is_null_call = tuple_field_bool_xc(tuple,
-						BOX_FUNC_FIELD_IS_NULL_CALL);
+		bool is_null_call;
+		if (tuple_field_bool(tuple, BOX_FUNC_FIELD_IS_NULL_CALL,
+				     &is_null_call) != 0)
+			return NULL;
 		if (is_null_call != true) {
-			tnt_raise(ClientError, ER_CREATE_FUNCTION, name,
+			diag_set(ClientError, ER_CREATE_FUNCTION, name,
 				  "unsupported is_null_call value");
+			return NULL;
 		}
 	} else {
 		body = NULL;
@@ -2883,13 +2900,17 @@ func_def_new_from_tuple(struct tuple *tuple)
 	uint32_t def_sz = func_def_sizeof(name_len, body_len, comment_len,
 					  &body_offset, &comment_offset);
 	struct func_def *def = (struct func_def *) malloc(def_sz);
-	if (def == NULL)
-		tnt_raise(OutOfMemory, def_sz, "malloc", "def");
+	if (def == NULL) {
+		diag_set(OutOfMemory, def_sz, "malloc", "def");
+		return NULL;
+	}
 	auto def_guard = make_scoped_guard([=] { free(def); });
-	func_def_get_ids_from_tuple(tuple, &def->fid, &def->uid);
+	if (func_def_get_ids_from_tuple(tuple, &def->fid, &def->uid) != 0)
+		return NULL;
 	if (def->fid > BOX_FUNCTION_MAX) {
-		tnt_raise(ClientError, ER_CREATE_FUNCTION,
+		diag_set(ClientError, ER_CREATE_FUNCTION,
 			  tt_cstr(name, name_len), "function id is too big");
+		return NULL;
 	}
 	func_opts_create(&def->opts);
 	memcpy(def->name, name, name_len);
@@ -2909,47 +2930,59 @@ func_def_new_from_tuple(struct tuple *tuple)
 	} else {
 		def->comment = NULL;
 	}
-	if (field_count > BOX_FUNC_FIELD_SETUID)
-		def->setuid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_SETUID);
-	else
+	if (field_count > BOX_FUNC_FIELD_SETUID) {
+		uint32_t out;
+		if (tuple_field_u32(tuple, BOX_FUNC_FIELD_SETUID, &out) != 0)
+			return NULL;
+		def->setuid = out;
+	} else {
 		def->setuid = false;
+	}
 	if (field_count > BOX_FUNC_FIELD_LANGUAGE) {
 		const char *language =
-			tuple_field_cstr_xc(tuple, BOX_FUNC_FIELD_LANGUAGE);
+			tuple_field_cstr(tuple, BOX_FUNC_FIELD_LANGUAGE);
+		if (language == NULL)
+			return NULL;
 		def->language = STR2ENUM(func_language, language);
 		if (def->language == func_language_MAX ||
 		    def->language == FUNC_LANGUAGE_SQL) {
-			tnt_raise(ClientError, ER_FUNCTION_LANGUAGE,
+			diag_set(ClientError, ER_FUNCTION_LANGUAGE,
 				  language, def->name);
+			return NULL;
 		}
 	} else {
 		/* Lua is the default. */
 		def->language = FUNC_LANGUAGE_LUA;
 	}
 	if (field_count > BOX_FUNC_FIELD_BODY) {
-		def->is_deterministic =
-			tuple_field_bool_xc(tuple,
-					    BOX_FUNC_FIELD_IS_DETERMINISTIC);
-		def->is_sandboxed =
-			tuple_field_bool_xc(tuple,
-					    BOX_FUNC_FIELD_IS_SANDBOXED);
+		if (tuple_field_bool(tuple, BOX_FUNC_FIELD_IS_DETERMINISTIC,
+				     &(def->is_deterministic)) != 0)
+			return NULL;
+		if (tuple_field_bool(tuple, BOX_FUNC_FIELD_IS_SANDBOXED,
+				     &(def->is_sandboxed)) != 0)
+			return NULL;
 		const char *returns =
-			tuple_field_cstr_xc(tuple, BOX_FUNC_FIELD_RETURNS);
+			tuple_field_cstr(tuple, BOX_FUNC_FIELD_RETURNS);
+		if (returns == NULL)
+			return NULL;
 		def->returns = STR2ENUM(field_type, returns);
 		if (def->returns == field_type_MAX) {
-			tnt_raise(ClientError, ER_CREATE_FUNCTION,
+			diag_set(ClientError, ER_CREATE_FUNCTION,
 				  def->name, "invalid returns value");
+			return NULL;
 		}
 		def->exports.all = 0;
-		const char *exports =
-			tuple_field_with_type_xc(tuple, BOX_FUNC_FIELD_EXPORTS,
-						 MP_ARRAY);
+		const char *exports = tuple_field_with_type(tuple,
+			BOX_FUNC_FIELD_EXPORTS, MP_ARRAY);
+		if (exports == NULL)
+			return NULL;
 		uint32_t cnt = mp_decode_array(&exports);
 		for (uint32_t i = 0; i < cnt; i++) {
-			 if (mp_typeof(*exports) != MP_STR) {
-				tnt_raise(ClientError, ER_FIELD_TYPE,
+			if (mp_typeof(*exports) != MP_STR) {
+				diag_set(ClientError, ER_FIELD_TYPE,
 					  int2str(BOX_FUNC_FIELD_EXPORTS + 1),
-					  mp_type_strs[MP_STR]);
+					 mp_type_strs[MP_STR]);
+				return NULL;
 			}
 			uint32_t len;
 			const char *str = mp_decode_str(&exports, &len);
@@ -2961,32 +2994,39 @@ func_def_new_from_tuple(struct tuple *tuple)
 				def->exports.sql = true;
 				break;
 			default:
-				tnt_raise(ClientError, ER_CREATE_FUNCTION,
+				diag_set(ClientError, ER_CREATE_FUNCTION,
 					  def->name, "invalid exports value");
+				return NULL;
 			}
 		}
 		const char *aggregate =
-			tuple_field_cstr_xc(tuple, BOX_FUNC_FIELD_AGGREGATE);
+			tuple_field_cstr(tuple, BOX_FUNC_FIELD_AGGREGATE);
+		if (aggregate == NULL)
+			return NULL;
 		def->aggregate = STR2ENUM(func_aggregate, aggregate);
 		if (def->aggregate == func_aggregate_MAX) {
-			tnt_raise(ClientError, ER_CREATE_FUNCTION,
+			diag_set(ClientError, ER_CREATE_FUNCTION,
 				  def->name, "invalid aggregate value");
+			return NULL;
 		}
-		const char *param_list =
-			tuple_field_with_type_xc(tuple,
-					BOX_FUNC_FIELD_PARAM_LIST, MP_ARRAY);
+		const char *param_list = tuple_field_with_type(tuple,
+			BOX_FUNC_FIELD_PARAM_LIST, MP_ARRAY);
+		if (param_list == NULL)
+			return NULL;
 		uint32_t argc = mp_decode_array(&param_list);
 		for (uint32_t i = 0; i < argc; i++) {
 			 if (mp_typeof(*param_list) != MP_STR) {
-				tnt_raise(ClientError, ER_FIELD_TYPE,
+				diag_set(ClientError, ER_FIELD_TYPE,
 					  int2str(BOX_FUNC_FIELD_PARAM_LIST + 1),
-					  mp_type_strs[MP_STR]);
+					 mp_type_strs[MP_STR]);
+				return NULL;
 			}
 			uint32_t len;
 			const char *str = mp_decode_str(&param_list, &len);
 			if (STRN2ENUM(field_type, str, len) == field_type_MAX) {
-				tnt_raise(ClientError, ER_CREATE_FUNCTION,
+				diag_set(ClientError, ER_CREATE_FUNCTION,
 					  def->name, "invalid argument type");
+				return NULL;
 			}
 		}
 		def->param_count = argc;
@@ -2994,7 +3034,7 @@ func_def_new_from_tuple(struct tuple *tuple)
 		if (opts_decode(&def->opts, func_opts_reg, &opts,
 				ER_WRONG_SPACE_OPTIONS, BOX_FUNC_FIELD_OPTS,
 				NULL) != 0)
-			diag_raise();
+			return NULL;
 	} else {
 		def->is_deterministic = false;
 		def->is_sandboxed = false;
@@ -3006,7 +3046,7 @@ func_def_new_from_tuple(struct tuple *tuple)
 		def->param_count = 0;
 	}
 	if (func_def_check(def) != 0)
-		diag_raise();
+		return NULL;
 	def_guard.is_active = false;
 	return def;
 }
@@ -3058,6 +3098,8 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 	struct func *old_func = func_by_id(fid);
 	if (new_tuple != NULL && old_func == NULL) { /* INSERT */
 		struct func_def *def = func_def_new_from_tuple(new_tuple);
+		if (def == NULL)
+			return -1;
 		auto def_guard = make_scoped_guard([=] { free(def); });
 		if (access_check_ddl(def->name, def->fid, def->uid, SC_FUNCTION,
 				 PRIV_C) != 0)
@@ -3076,7 +3118,8 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		trigger_run_xc(&on_alter_func, func);
 	} else if (new_tuple == NULL) {         /* DELETE */
 		uint32_t uid;
-		func_def_get_ids_from_tuple(old_tuple, &fid, &uid);
+		if (func_def_get_ids_from_tuple(old_tuple, &fid, &uid) != 0)
+			return -1;
 		/*
 		 * Can only delete func if you're the one
 		 * who created it or a superuser.
@@ -3132,6 +3175,8 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		});
 		old_def = func_def_new_from_tuple(old_tuple);
 		new_def = func_def_new_from_tuple(new_tuple);
+		if (old_def == NULL || new_def == NULL)
+			return -1;
 		if (func_def_cmp(new_def, old_def) != 0) {
 			diag_set(ClientError, ER_UNSUPPORTED, "function",
 				  "alter");
