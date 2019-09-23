@@ -707,25 +707,41 @@ space_swap_fk_constraints(struct space *new_space, struct space *old_space)
  * True if the space has records identified by key 'uid'.
  * Uses 'iid' index.
  */
-bool
-space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
+int
+space_has_data(uint32_t id, uint32_t iid, uint32_t uid, bool *out)
 {
 	struct space *space = space_by_id(id);
-	if (space == NULL)
-		return false;
+	if (space == NULL) {
+		*out = false;
+		return 0;
+	}
 
-	if (space_index(space, iid) == NULL)
-		return false;
+	if (space_index(space, iid) == NULL) {
+		*out = false;
+		return 0;
+	}
 
-	struct index *index = index_find_system_xc(space, iid);
+	if (!space_is_memtx(space)) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 space->engine->name, "system data");
+		return -1;
+	}
+	struct index *index = index_find(space, iid);
+	if (index == NULL)
+		return -1;
+
 	char key[6];
 	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
 	mp_encode_uint(key, uid);
-	struct iterator *it = index_create_iterator_xc(index, ITER_EQ, key, 1);
+	struct iterator *it = index_create_iterator(index, ITER_EQ, key, 1);
+	if (it == NULL)
+		return -1;
 	IteratorGuard iter_guard(it);
-	if (iterator_next_xc(it) != NULL)
-		return true;
-	return false;
+	struct tuple *tuple;
+	if (iterator_next(it, &tuple) != 0)
+		return -1;
+	*out = (tuple != NULL);
+	return 0;
 }
 
 /* }}} */
@@ -2121,7 +2137,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  "the space has grants");
 			return -1;
 		}
-		if (space_has_data(BOX_TRUNCATE_ID, 0, old_space->def->id)) {
+		if (space_has_data(BOX_TRUNCATE_ID, 0, old_space->def->id, &out) != 0)
+			return -1;
+		if (out) {
 			diag_set(ClientError, ER_DROP_SPACE,
 				  space_name(old_space),
 				  "the space has truncate record");
@@ -2641,8 +2659,8 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 
 /* {{{ access control */
 
-bool
-user_has_data(struct user *user)
+int
+user_has_data(struct user *user, bool *has_data)
 {
 	uint32_t uid = user->def->uid;
 	uint32_t spaces[] = { BOX_SPACE_ID, BOX_FUNC_ID, BOX_SEQUENCE_ID,
@@ -2653,18 +2671,26 @@ user_has_data(struct user *user)
 	 */
 	uint32_t indexes[] = { 1, 1, 1, 1, 0 };
 	uint32_t count = sizeof(spaces)/sizeof(*spaces);
+	bool out;
 	for (uint32_t i = 0; i < count; i++) {
-		if (space_has_data(spaces[i], indexes[i], uid))
-			return true;
+		if (space_has_data(spaces[i], indexes[i], uid, &out) != 0)
+			return -1;
+		if (out) {
+			*has_data = true;
+			return 0;
+		}
 	}
-	if (! user_map_is_empty(&user->users))
-		return true;
+	if (! user_map_is_empty(&user->users)) {
+		*has_data = true;
+		return 0;
+	}
 	/*
 	 * If there was a role, the previous check would have
 	 * returned true.
 	 */
 	assert(user_map_is_empty(&user->roles));
-	return false;
+	*has_data = false;
+	return 0;
 }
 
 /**
@@ -2857,7 +2883,11 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		 * Can only delete user if it has no spaces,
 		 * no functions and no grants.
 		 */
-		if (user_has_data(old_user)) {
+		bool has_data;
+		if (user_has_data(old_user, &has_data) != 0) {
+			return -1;
+		}
+		if (has_data) {
 			diag_set(ClientError, ER_DROP_USER,
 				  old_user->def->name, "the user has objects");
 			return -1;
@@ -3219,8 +3249,9 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 				  "function has grants");
 			return -1;
 		}
-		if (old_func != NULL &&
-		    space_has_data(BOX_FUNC_INDEX_ID, 1, old_func->def->fid)) {
+		if (space_has_data(BOX_FUNC_INDEX_ID, 1, old_func->def->fid, &out) != 0)
+			return -1;
+		if (old_func != NULL && out) {
 			diag_set(ClientError, ER_DROP_FUNCTION,
 				  (unsigned) old_func->def->uid,
 				  "function has references");
@@ -4136,17 +4167,21 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 		if (access_check_ddl(seq->def->name, seq->def->id, seq->def->uid,
 				 SC_SEQUENCE, PRIV_D) != 0)
 			return -1;
-		if (space_has_data(BOX_SEQUENCE_DATA_ID, 0, id)) {
+		bool out;
+		if (space_has_data(BOX_SEQUENCE_DATA_ID, 0, id, &out) != 0)
+			return -1;
+		if (out) {
 			diag_set(ClientError, ER_DROP_SEQUENCE,
 				  seq->def->name, "the sequence has data");
 			return -1;
 		}
-		if (space_has_data(BOX_SPACE_SEQUENCE_ID, 1, id)) {
+		if (space_has_data(BOX_SPACE_SEQUENCE_ID, 1, id, &out) != 0)
+			return -1;
+		if (out) {
 			diag_set(ClientError, ER_DROP_SEQUENCE,
 				  seq->def->name, "the sequence is in use");
 			return -1;
 		}
-		bool out;
 		if (schema_find_grants("sequence", seq->def->id, &out) != 0) {
 			return -1;
 		}
