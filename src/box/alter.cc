@@ -5244,41 +5244,48 @@ static struct ck_constraint_def *
 ck_constraint_def_new_from_tuple(struct tuple *tuple)
 {
 	uint32_t name_len;
-	const char *name =
-		tuple_field_str_xc(tuple, BOX_CK_CONSTRAINT_FIELD_NAME,
-				   &name_len);
+	const char *name = tuple_field_str(tuple, BOX_CK_CONSTRAINT_FIELD_NAME,
+					   &name_len);
+	if (name == NULL)
+		return NULL;
 	if (name_len > BOX_NAME_MAX) {
-		tnt_raise(ClientError, ER_CREATE_CK_CONSTRAINT,
+		diag_set(ClientError, ER_CREATE_CK_CONSTRAINT,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 				  "check constraint name is too long");
+		return NULL;
 	}
-	identifier_check_xc(name, name_len);
-	uint32_t space_id =
-		tuple_field_u32_xc(tuple, BOX_CK_CONSTRAINT_FIELD_SPACE_ID);
-	const char *language_str =
-		tuple_field_cstr_xc(tuple, BOX_CK_CONSTRAINT_FIELD_LANGUAGE);
+	if (identifier_check(name, name_len) != 0)
+		return NULL;
+	uint32_t space_id;
+	if (tuple_field_u32(tuple, BOX_CK_CONSTRAINT_FIELD_SPACE_ID,
+			    &space_id) != 0)
+		return NULL;
+	const char *language_str = tuple_field_cstr(tuple,
+		BOX_CK_CONSTRAINT_FIELD_LANGUAGE);
+	if (language_str == NULL)
+		return NULL;
 	enum ck_constraint_language language =
 		STR2ENUM(ck_constraint_language, language_str);
 	if (language == ck_constraint_language_MAX) {
-		tnt_raise(ClientError, ER_FUNCTION_LANGUAGE, language_str,
+		diag_set(ClientError, ER_FUNCTION_LANGUAGE, language_str,
 			  tt_cstr(name, name_len));
+		return NULL;
 	}
 	uint32_t expr_str_len;
-	const char *expr_str =
-		tuple_field_str_xc(tuple, BOX_CK_CONSTRAINT_FIELD_CODE,
-				   &expr_str_len);
+	const char *expr_str = tuple_field_str(tuple,
+		BOX_CK_CONSTRAINT_FIELD_CODE, &expr_str_len);
+	if (expr_str == NULL)
+		return NULL;
 	bool is_enabled = true;
 	if (tuple_field_count(tuple) > BOX_CK_CONSTRAINT_FIELD_IS_ENABLED) {
 		if (tuple_field_bool(tuple,
 				     BOX_CK_CONSTRAINT_FIELD_IS_ENABLED,
 				     &is_enabled) != 0)
-			diag_raise();
+			return NULL;
 	}
 	struct ck_constraint_def *ck_def =
 		ck_constraint_def_new(name, name_len, expr_str, expr_str_len,
 				      space_id, language, is_enabled);
-	if (ck_def == NULL)
-		diag_raise();
 	return ck_def;
 }
 
@@ -5388,6 +5395,8 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 		/* Create or replace check constraint. */
 		struct ck_constraint_def *ck_def =
 			ck_constraint_def_new_from_tuple(new_tuple);
+		if (ck_def == NULL)
+			return -1;
 		auto ck_def_guard = make_scoped_guard([=] {
 			ck_constraint_def_delete(ck_def);
 		});

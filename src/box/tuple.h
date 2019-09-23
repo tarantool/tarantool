@@ -1128,26 +1128,6 @@ tuple_field_u32_xc(struct tuple *tuple, uint32_t fieldno)
 	return out;
 }
 
-/** @copydoc tuple_field_str() */
-static inline const char *
-tuple_field_str_xc(struct tuple *tuple, uint32_t fieldno, uint32_t *len)
-{
-	const char *ret = tuple_field_str(tuple, fieldno, len);
-	if (ret == NULL)
-		diag_raise();
-	return ret;
-}
-
-/** @copydoc tuple_field_cstr() */
-static inline const char *
-tuple_field_cstr_xc(struct tuple *tuple, uint32_t fieldno)
-{
-	const char *out = tuple_field_cstr(tuple, fieldno);
-	if (out == NULL)
-		diag_raise();
-	return out;
-}
-
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */

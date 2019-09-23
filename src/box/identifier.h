@@ -51,16 +51,6 @@ identifier_check(const char *str, int str_len);
 #if defined(__cplusplus)
 } /* extern "C" */
 
-/**
- * Throw an error if identifier is not valid.
- */
-static inline void
-identifier_check_xc(const char *str, int str_len)
-{
-	if (identifier_check(str, str_len))
-		diag_raise();
-}
-
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_IDENTIFIER_H_INCLUDED */
