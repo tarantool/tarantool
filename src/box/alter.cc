@@ -2713,7 +2713,7 @@ user_has_data(struct user *user, bool *has_data)
  * defined, but for now we only support chap-sha1. Get
  * password of chap-sha1 from the _user space.
  */
-void
+int
 user_def_fill_auth_data(struct user_def *user, const char *auth_data)
 {
 	uint8_t type = mp_typeof(*auth_data);
@@ -2725,13 +2725,14 @@ user_def_fill_auth_data(struct user_def *user, const char *auth_data)
 		 * table may well be encoded as an msgpack array.
 		 * Treat as no data.
 		 */
-		return;
+		return 0;
 	}
 	if (mp_typeof(*auth_data) != MP_MAP) {
 		/** Prevent users from making silly mistakes */
-		tnt_raise(ClientError, ER_CREATE_USER,
+		diag_set(ClientError, ER_CREATE_USER,
 			  user->name, "invalid password format, "
 			  "use box.schema.user.passwd() to reset password");
+		return -1;
 	}
 	uint32_t mech_count = mp_decode_map(&auth_data);
 	for (uint32_t i = 0; i < mech_count; i++) {
@@ -2748,50 +2749,64 @@ user_def_fill_auth_data(struct user_def *user, const char *auth_data)
 		}
 		const char *hash2_base64 = mp_decode_str(&auth_data, &len);
 		if (len != 0 && len != SCRAMBLE_BASE64_SIZE) {
-			tnt_raise(ClientError, ER_CREATE_USER,
+			diag_set(ClientError, ER_CREATE_USER,
 				  user->name, "invalid user password");
+			return -1;
 		}
 		if (user->uid == GUEST) {
-		    /** Guest user is permitted to have empty password */
-		    if (strncmp(hash2_base64, CHAP_SHA1_EMPTY_PASSWORD, len))
-			tnt_raise(ClientError, ER_GUEST_USER_PASSWORD);
+			/** Guest user is permitted to have empty password */
+			if (strncmp(hash2_base64, CHAP_SHA1_EMPTY_PASSWORD, len)) {
+				diag_set(ClientError, ER_GUEST_USER_PASSWORD);
+				return -1;
+			}
 		}
 
 		base64_decode(hash2_base64, len, user->hash2,
 			      sizeof(user->hash2));
 		break;
 	}
+	return 0;
 }
 
 static struct user_def *
 user_def_new_from_tuple(struct tuple *tuple)
 {
 	uint32_t name_len;
-	const char *name = tuple_field_str_xc(tuple, BOX_USER_FIELD_NAME,
-					      &name_len);
+	const char *name = tuple_field_str(tuple, BOX_USER_FIELD_NAME,
+					   &name_len);
+	if (name == NULL)
+		return NULL;
 	if (name_len > BOX_NAME_MAX) {
-		tnt_raise(ClientError, ER_CREATE_USER,
+		diag_set(ClientError, ER_CREATE_USER,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  "user name is too long");
+		return NULL;
 	}
 	size_t size = user_def_sizeof(name_len);
 	/* Use calloc: in case user password is empty, fill it with \0 */
 	struct user_def *user = (struct user_def *) malloc(size);
-	if (user == NULL)
-		tnt_raise(OutOfMemory, size, "malloc", "user");
+	if (user == NULL) {
+		diag_set(OutOfMemory, size, "malloc", "user");
+		return NULL;
+	}
 	auto def_guard = make_scoped_guard([=] { free(user); });
-	user->uid = tuple_field_u32_xc(tuple, BOX_USER_FIELD_ID);
-	user->owner = tuple_field_u32_xc(tuple, BOX_USER_FIELD_UID);
-	const char *user_type =
-		tuple_field_cstr_xc(tuple, BOX_USER_FIELD_TYPE);
-	user->type= schema_object_type(user_type);
+	if (tuple_field_u32(tuple, BOX_USER_FIELD_ID, &(user->uid)) != 0)
+		return NULL;
+	if (tuple_field_u32(tuple, BOX_USER_FIELD_UID, &(user->owner)) != 0)
+		return NULL;
+	const char *user_type = tuple_field_cstr(tuple, BOX_USER_FIELD_TYPE);
+	if (user_type == NULL)
+		return NULL;
+	user->type = schema_object_type(user_type);
 	memcpy(user->name, name, name_len);
 	user->name[name_len] = 0;
 	if (user->type != SC_ROLE && user->type != SC_USER) {
-		tnt_raise(ClientError, ER_CREATE_USER,
+		diag_set(ClientError, ER_CREATE_USER,
 			  user->name, "unknown user type");
+		return NULL;
 	}
-	identifier_check_xc(user->name, name_len);
+	if (identifier_check(user->name, name_len) != 0)
+		return NULL;
 	/*
 	 * AUTH_DATA field in _user space should contain
 	 * chap-sha1 -> base64_encode(sha1(sha1(password), 0).
@@ -2812,11 +2827,14 @@ user_def_new_from_tuple(struct tuple *tuple)
 		} else {
 			is_auth_empty = false;
 		}
-		if (!is_auth_empty && user->type == SC_ROLE)
-			tnt_raise(ClientError, ER_CREATE_ROLE, user->name,
+		if (!is_auth_empty && user->type == SC_ROLE) {
+			diag_set(ClientError, ER_CREATE_ROLE, user->name,
 				  "authentication data can not be set for a "\
 				  "role");
-		user_def_fill_auth_data(user, auth_data);
+			return NULL;
+		}
+		if (user_def_fill_auth_data(user, auth_data) != 0)
+			return NULL;
 	}
 	def_guard.is_active = false;
 	return user;
@@ -2838,6 +2856,8 @@ user_cache_alter_user(struct trigger *trigger, void * /* event */)
 {
 	struct tuple *tuple = (struct tuple *)trigger->data;
 	struct user_def *user = user_def_new_from_tuple(tuple);
+	if (user == NULL)
+		return -1;
 	auto def_guard = make_scoped_guard([=] { free(user); });
 	/* Can throw if, e.g. too many users. */
 	try {
@@ -2867,6 +2887,8 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 	struct user *old_user = user_by_id(uid);
 	if (new_tuple != NULL && old_user == NULL) { /* INSERT */
 		struct user_def *user = user_def_new_from_tuple(new_tuple);
+		if (user == NULL)
+			return -1;
 		if (access_check_ddl(user->name, user->uid, user->owner, user->type,
 				 PRIV_C) != 0)
 			return -1;
@@ -2921,6 +2943,8 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		 * correct.
 		 */
 		struct user_def *user = user_def_new_from_tuple(new_tuple);
+		if (user == NULL)
+			return -1;
 		if (access_check_ddl(user->name, user->uid, user->uid,
 				 old_user->def->type, PRIV_A) != 0)
 			return -1;
