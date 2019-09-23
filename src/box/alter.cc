@@ -5013,7 +5013,7 @@ on_drop_or_replace_fk_constraint_commit(struct trigger *trigger, void *event)
  * use bit mask. Otherwise, fall through slow check where we
  * use O(field_cont^2) simple nested cycle iterations.
  */
-static void
+static int
 fk_constraint_check_dup_links(struct fk_constraint_def *fk_def)
 {
 	uint64_t field_mask = 0;
@@ -5026,7 +5026,7 @@ fk_constraint_check_dup_links(struct fk_constraint_def *fk_def)
 			goto error;
 		field_mask |= parent_field;
 	}
-	return;
+	return 0;
 slow_check:
 	for (uint32_t i = 0; i < fk_def->field_count; ++i) {
 		uint32_t parent_field = fk_def->links[i].parent_field;
@@ -5035,10 +5035,11 @@ slow_check:
 				goto error;
 		}
 	}
-	return;
+	return 0;
 error:
-	tnt_raise(ClientError, ER_CREATE_FK_CONSTRAINT, fk_def->name,
+	diag_set(ClientError, ER_CREATE_FK_CONSTRAINT, fk_def->name,
 		  "referenced fields can not contain duplicates");
+	return -1;
 }
 
 /** A trigger invoked on replace in the _fk_constraint space. */
@@ -5117,7 +5118,8 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 				return -1;
 			}
 		}
-		fk_constraint_check_dup_links(fk_def);
+		if (fk_constraint_check_dup_links(fk_def) != 0)
+			return -1;
 		/*
 		 * Search for suitable index in parent space:
 		 * it must be unique and consist exactly from
