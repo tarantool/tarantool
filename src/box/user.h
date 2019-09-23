@@ -144,16 +144,6 @@ user_cache_replace(struct user_def *user);
 void
 user_cache_delete(uint32_t uid);
 
-/* Find a user by name. Used by authentication. */
-static inline struct user *
-user_find_xc(uint32_t uid)
-{
-	struct user *user = user_find(uid);
-	if (user == NULL)
-		diag_raise();
-	return user;
-}
-
 static inline struct user *
 user_find_by_name_xc(const char *name, uint32_t len)
 {
@@ -178,19 +168,19 @@ user_cache_free();
  * and no loop in the graph will occur when grantee gets
  * a given role.
  */
-void
+int
 role_check(struct user *grantee, struct user *role);
 
 /**
  * Grant a role to a user or another role.
  */
-void
+int
 role_grant(struct user *grantee, struct user *role);
 
 /**
  * Revoke a role from a user or another role.
  */
-void
+int
 role_revoke(struct user *grantee, struct user *role);
 
 /**
@@ -198,10 +188,10 @@ role_revoke(struct user *grantee, struct user *role);
  * and re-evaluate effective access of all users of this
  * role if this role.
  */
-void
+int
 priv_grant(struct user *grantee, struct priv_def *priv);
 
-void
+int
 priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple);
 
 /* }}} */

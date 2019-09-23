@@ -180,18 +180,24 @@ user_destroy(struct user *user)
  * Add a privilege definition to the list
  * of effective privileges of a user.
  */
-void
+int
 user_grant_priv(struct user *user, struct priv_def *def)
 {
 	struct priv_def *old = privset_search(&user->privs, def);
 	if (old == NULL) {
+		size_t size = sizeof(struct priv_def);
 		old = (struct priv_def *)
-			region_alloc_xc(&user->pool, sizeof(struct priv_def));
+			region_alloc(&user->pool, size);
+		if (old == NULL) {
+			diag_set(OutOfMemory, size, "region", "new slab");
+			return -1;
+		}
 		*old = *def;
 		privset_insert(&user->privs, old);
 	} else {
 		old->access |= def->access;
 	}
+	return 0;
 }
 
 /**
@@ -305,11 +311,11 @@ user_set_effective_access(struct user *user)
 /**
  * Reload user privileges and re-grant them.
  */
-static void
+static int
 user_reload_privs(struct user *user)
 {
 	if (user->is_dirty == false)
-		return;
+		return 0;
 	struct priv_def *priv;
 	/**
 	 * Reset effective access of the user in the
@@ -326,26 +332,43 @@ user_reload_privs(struct user *user)
 	privset_new(&user->privs);
 	/* Load granted privs from _priv space. */
 	{
-		struct space *space = space_cache_find_xc(BOX_PRIV_ID);
+		struct space *space = space_cache_find(BOX_PRIV_ID);
+		if (space == NULL)
+			return -1;
 		char key[6];
 		/** Primary key - by user id */
-		struct index *index = index_find_system_xc(space, 0);
+		if (!space_is_memtx(space)) {
+			diag_set(ClientError, ER_UNSUPPORTED,
+			          space->engine->name, "system data");
+			return -1;
+		}
+		struct index *index = index_find(space, 0);
+		if (index == NULL)
+			return -1;
 		mp_encode_uint(key, user->def->uid);
 
-		struct iterator *it = index_create_iterator_xc(index, ITER_EQ,
+		struct iterator *it = index_create_iterator(index, ITER_EQ,
 							       key, 1);
+		if (it == NULL)
+			return -1;
 		IteratorGuard iter_guard(it);
 
 		struct tuple *tuple;
-		while ((tuple = iterator_next_xc(it)) != NULL) {
+		if (iterator_next(it, &tuple) != 0)
+			return -1;
+		while (tuple != NULL) {
 			struct priv_def priv;
-			priv_def_create_from_tuple(&priv, tuple);
+			if (priv_def_create_from_tuple(&priv, tuple) != 0)
+				return -1;
 			/**
 			 * Skip role grants, we're only
 			 * interested in real objects.
 			 */
 			if (priv.object_type != SC_ROLE || !(priv.access & PRIV_X))
-				user_grant_priv(user, &priv);
+				if (user_grant_priv(user, &priv) != 0)
+					return -1;
+			if (iterator_next(it, &tuple) != 0)
+				return -1;
 		}
 	}
 	{
@@ -358,12 +381,14 @@ user_reload_privs(struct user *user)
 			privset_ifirst(&role->privs, &it);
 			struct priv_def *def;
 			while ((def = privset_inext(&it))) {
-				user_grant_priv(user, def);
+				if (user_grant_priv(user, def) != 0)
+					return -1;
 			}
 		}
 	}
 	user_set_effective_access(user);
 	user->is_dirty = false;
+	return 0;
 }
 
 /** }}} */
@@ -559,7 +584,7 @@ user_cache_free()
 
 /** {{{ roles */
 
-void
+int
 role_check(struct user *grantee, struct user *role)
 {
 	/*
@@ -592,16 +617,18 @@ role_check(struct user *grantee, struct user *role)
 	 */
 	if (user_map_is_set(&transitive_closure,
 			    role->auth_token)) {
-		tnt_raise(ClientError, ER_ROLE_LOOP,
+		diag_set(ClientError, ER_ROLE_LOOP,
 			  role->def->name, grantee->def->name);
+		return -1;
 	}
+	return 0;
 }
 
 /**
  * Re-calculate effective grants of the linked subgraph
  * this user/role is a part of.
  */
-void
+int
 rebuild_effective_grants(struct user *grantee)
 {
 	/*
@@ -653,7 +680,8 @@ rebuild_effective_grants(struct user *grantee)
 			struct user_map indirect_edges = user->roles;
 			user_map_minus(&indirect_edges, &transitive_closure);
 			if (user_map_is_empty(&indirect_edges)) {
-				user_reload_privs(user);
+				if (user_reload_privs(user) != 0)
+					return -1;
 				user_map_union(&next_layer, &user->users);
 			} else {
 				/*
@@ -674,6 +702,7 @@ rebuild_effective_grants(struct user *grantee)
 		user_map_union(&transitive_closure, &current_layer);
 		current_layer = next_layer;
 	}
+	return 0;
 }
 
 
@@ -682,35 +711,41 @@ rebuild_effective_grants(struct user *grantee)
  * Grant all effective privileges of the role to whoever
  * this role was granted to.
  */
-void
+int
 role_grant(struct user *grantee, struct user *role)
 {
 	user_map_set(&role->users, grantee->auth_token);
 	user_map_set(&grantee->roles, role->auth_token);
-	rebuild_effective_grants(grantee);
+	if (rebuild_effective_grants(grantee) != 0)
+		return -1;
+	return 0;
 }
 
 /**
  * Update the role dependencies graph.
  * Rebuild effective privileges of the grantee.
  */
-void
+int
 role_revoke(struct user *grantee, struct user *role)
 {
 	user_map_clear(&role->users, grantee->auth_token);
 	user_map_clear(&grantee->roles, role->auth_token);
-	rebuild_effective_grants(grantee);
+	if (rebuild_effective_grants(grantee) != 0)
+		return -1;
+	return 0;
 }
 
-void
+int
 priv_grant(struct user *grantee, struct priv_def *priv)
 {
 	struct access *object = access_find(priv->object_type, priv->object_id);
 	if (object == NULL)
-		return;
+		return 0;
 	struct access *access = &object[grantee->auth_token];
 	access->granted = priv->access;
-	rebuild_effective_grants(grantee);
+	if (rebuild_effective_grants(grantee) != 0)
+		return -1;
+	return 0;
 }
 
 /** }}} */
