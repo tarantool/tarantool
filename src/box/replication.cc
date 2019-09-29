@@ -651,6 +651,20 @@ replicaset_connect(struct applier **appliers, int count,
 	}
 
 	while (state.connected < count) {
+		/*
+		 * After a quorum is reached, it is considered
+		 * enough to proceed. Except if a connection is
+		 * critical.
+		 * Connection *is* critical even with 0 quorum
+		 * when the instance starts first time and needs
+		 * to choose replicaset UUID, fill _cluster, etc.
+		 * If 0 quorum allowed to return immediately even
+		 * at first start, then it would be impossible to
+		 * bootstrap a replicaset - all nodes would start
+		 * immediately and choose different cluster UUIDs.
+		 */
+		if (state.connected >= quorum && !connect_quorum)
+			break;
 		double wait_start = ev_monotonic_now(loop());
 		if (fiber_cond_wait_timeout(&state.wakeup, timeout) != 0)
 			break;
