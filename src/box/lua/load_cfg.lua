@@ -249,6 +249,39 @@ local dynamic_cfg = {
     net_msg_max             = private.cfg_set_net_msg_max,
 }
 
+--
+-- For some options it is important in which order they are set.
+-- For example, setting 'replication', including self, before
+-- 'listen' makes no sense:
+--
+--     box.cfg{replication = {'localhost:3301'}, listen = 3301}
+--
+-- Replication won't be able to connect to a not being listened
+-- port. In the table below for each option can be set a number.
+-- An option is set before all other options having a bigger
+-- number. Options without a number are installed after others in
+-- an undefined order. The table works for reconfiguration only.
+-- Order of first configuration is hardcoded in C and can't be
+-- changed.
+--
+local dynamic_cfg_order = {
+    listen                  = 100,
+    -- Order of replication_* options does not matter. The only
+    -- rule - apply before replication itself.
+    replication_timeout     = 150,
+    replication_sync_lag    = 150,
+    replication_sync_timeout    = 150,
+    replication_connect_timeout = 150,
+    replication_connect_quorum  = 150,
+    replication             = 200,
+}
+
+local function sort_cfg_cb(l, r)
+    l = dynamic_cfg_order[l] or math.huge
+    r = dynamic_cfg_order[r] or math.huge
+    return l < r
+end
+
 local dynamic_cfg_skip_at_load = {
     listen                  = true,
     memtx_memory            = true,
@@ -423,13 +456,16 @@ end
 local function reload_cfg(oldcfg, cfg)
     cfg = upgrade_cfg(cfg, translate_cfg)
     local newcfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
+    local ordered_cfg = {}
     -- iterate over original table because prepare_cfg() may store NILs
     for key, val in pairs(cfg) do
         if dynamic_cfg[key] == nil and oldcfg[key] ~= val then
             box.error(box.error.RELOAD_CFG, key);
         end
+        table.insert(ordered_cfg, key)
     end
-    for key in pairs(cfg) do
+    table.sort(ordered_cfg, sort_cfg_cb)
+    for _, key in pairs(ordered_cfg) do
         local val = newcfg[key]
         local oldval = oldcfg[key]
         if not compare_cfg(val, oldval) then
