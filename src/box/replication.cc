@@ -855,8 +855,8 @@ replicaset_next(struct replica *replica)
 }
 
 /**
- * Compare vclock and read only mode of all connected
- * replicas and elect a leader.
+ * Compare vclock, read only mode and orphan status
+ * of all connected replicas and elect a leader.
  * Initiallly, skip read-only replicas, since they
  * can not properly act as bootstrap masters (register
  * new nodes in _cluster table). If there are no read-write
@@ -884,6 +884,12 @@ replicaset_round(bool skip_ro)
 			leader = replica;
 			continue;
 		}
+		/*
+		 * Try to find a replica which has already left
+		 * orphan mode.
+		 */
+		if (applier->ballot.is_loading && ! leader->applier->ballot.is_loading)
+			continue;
 		/*
 		 * Choose the replica with the most advanced
 		 * vclock. If there are two or more replicas
