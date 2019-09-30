@@ -307,7 +307,6 @@ memtx_engine_end_recovery(struct engine *engine)
 		if (space_foreach(memtx_build_secondary_keys, memtx) != 0)
 			return -1;
 	}
-	xdir_collect_inprogress(&memtx->snap_dir);
 	return 0;
 }
 
@@ -739,6 +738,7 @@ memtx_engine_collect_garbage(struct engine *engine, const struct vclock *vclock)
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 	xdir_collect_garbage(&memtx->snap_dir, vclock_sum(vclock),
 			     XDIR_GC_ASYNC);
+	xdir_collect_inprogress(&memtx->snap_dir);
 }
 
 static int
