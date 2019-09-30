@@ -1955,6 +1955,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 
 	engine_begin_final_recovery_xc();
 	recover_remaining_wals(recovery, &wal_stream.base, NULL, false);
+	engine_end_recovery_xc();
 	/*
 	 * Leave hot standby mode, if any, only after
 	 * acquiring the lock.
@@ -1991,8 +1992,6 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	 */
 	if (wal_enable() != 0)
 		diag_raise();
-
-	engine_end_recovery_xc();
 
 	/* Check replica set UUID. */
 	if (!tt_uuid_is_nil(replicaset_uuid) &&

@@ -71,6 +71,7 @@ box.info.status
 
 space = box.schema.space.create('tweedledum', {engine = engine})
 index = space:create_index('primary', {type = 'tree'})
+index = space:create_index('secondary', {type = 'tree'})
 
 -- set begin lsn on master, replica and hot_standby.
 test_run:cmd("set variable replica_port to 'replica.listen'")
@@ -92,6 +93,7 @@ _select(1, 10)
 -- Check box.info.vclock is updated during hot standby.
 test_run:cmd("switch hot_standby")
 _wait_lsn(10)
+box.space.tweedledum.index[1]:select()
 
 test_run:cmd("switch replica")
 _wait_lsn(10)

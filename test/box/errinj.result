@@ -1668,18 +1668,6 @@ errinj.set('ERRINJ_VY_GC', false)
 ---
 - ok
 ...
-#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, '*.vylog.inprogress')) > 0
----
-- true
-...
-#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*.run.inprogress')) > 0
----
-- true
-...
-#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*.index.inprogress')) > 0
----
-- true
-...
 test_run:cmd('restart server default')
 fio = require('fio')
 ---
