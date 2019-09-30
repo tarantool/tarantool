@@ -245,6 +245,11 @@ xrow_encode_auth(struct xrow_header *row, const char *salt, size_t salt_len,
 struct ballot {
 	/** Set if the instance is running in read-only mode. */
 	bool is_ro;
+	/**
+	 * Set if the instance hasn't finished bootstrap or recovery, or
+	 * is syncing with other replicas in the replicaset.
+	 */
+	bool is_loading;
 	/** Current instance vclock. */
 	struct vclock vclock;
 	/** Oldest vclock available on the instance. */

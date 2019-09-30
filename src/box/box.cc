@@ -1645,6 +1645,14 @@ void
 box_process_vote(struct ballot *ballot)
 {
 	ballot->is_ro = cfg_geti("read_only") != 0;
+	/*
+	 * is_ro is true on initial load and is set to box.cfg.read_only
+	 * after box_cfg() returns, during dynamic box.cfg parameters setting.
+	 * We would like to prefer already bootstrapped instances to the ones
+	 * still bootstrapping and the ones still bootstrapping, but writeable
+	 * to the ones that have box.cfg.read_only = true.
+	 */
+	ballot->is_loading = is_ro;
 	vclock_copy(&ballot->vclock, &replicaset.vclock);
 	vclock_copy(&ballot->gc_vclock, &gc.vclock);
 }
