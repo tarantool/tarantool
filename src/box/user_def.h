@@ -34,6 +34,7 @@
 #include "scramble.h" /* for SCRAMBLE_SIZE */
 #define RB_COMPACT 1
 #include "small/rb.h"
+#include "small/rlist.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -61,6 +62,12 @@ struct credentials {
 	user_access_t universal_access;
 	/** User id of the authenticated user. */
 	uint32_t uid;
+	/**
+	 * Member of credentials list of the source user. The list
+	 * is used to collect privilege updates to keep the
+	 * credentials up to date.
+	 */
+	struct rlist in_user;
 };
 
 enum priv_type {

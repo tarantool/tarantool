@@ -213,9 +213,8 @@ box.space._user:replace(u)
 - [1, 1, 'admin', 'user', {}]
 ...
 --
--- Roles: test that universal access of an authenticated
--- session is not updated if grant is made from another
--- session
+-- gh-2763: test that universal access of an authenticated session
+-- is updated if grant is made from another session.
 --
 test = box.schema.space.create('test')
 ---
@@ -251,7 +250,7 @@ box.schema.role.grant('public', 'read', 'universe')
 ...
 c.space.test:select{}
 ---
-- error: Read access to space 'test' is denied for user 'test'
+- - [1]
 ...
 c:close()
 ---
@@ -268,7 +267,7 @@ box.schema.role.revoke('public', 'read', 'universe')
 ...
 c.space.test:select{}
 ---
-- - [1]
+- error: Read access to space 'test' is denied for user 'test'
 ...
 box.session.su('test')
 ---
