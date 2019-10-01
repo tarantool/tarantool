@@ -88,6 +88,12 @@ struct user
 	bool is_dirty;
 	/** Memory pool for privs */
 	struct region pool;
+	/**
+	 * List of all currently existing credentials caches of
+	 * the user. Any update of user privileges is applied to
+	 * them.
+	 */
+	struct rlist credentials_list;
 	/** Cached runtime access imformation. */
 	struct access access[BOX_USER_MAX];
 };
