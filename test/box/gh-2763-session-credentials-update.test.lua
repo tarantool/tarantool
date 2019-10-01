@@ -1,0 +1,94 @@
+netbox = require('net.box')
+fiber = require('fiber')
+--
+-- gh-2763: when credentials of a user are updated, it should be
+-- reflected in all his sessions and objects.
+--
+
+box.schema.user.create('test_user', {password = '1'})
+function test1() return 'success' end
+
+conns = {}
+for i = 1, 10 do                                                    \
+    local c                                                         \
+    if i % 2 == 0 then                                              \
+        c = netbox.connect(                                         \
+            box.cfg.listen, {user = 'test_user', password = '1'})   \
+    else                                                            \
+        c = netbox.connect(box.cfg.listen)                          \
+    end                                                             \
+    local ok, err = pcall(c.call, c, 'test1')                       \
+    assert(not ok and err.code == box.error.ACCESS_DENIED)          \
+    table.insert(conns, c)                                          \
+end
+
+box.schema.user.grant('test_user', 'execute', 'universe')
+box.schema.user.grant('guest', 'execute', 'universe')
+-- Succeeds without a reconnect.
+for _, c in pairs(conns) do                                         \
+    assert(c:call('test1') == 'success')                            \
+    c:close()                                                       \
+end
+
+box.schema.user.revoke('guest', 'execute', 'universe')
+box.schema.user.drop('test_user')
+
+--
+-- Box.session.su() credentials are updated even when su-ed
+-- function is still in progress.
+--
+
+-- Create a persistent function, because normal Lua functions
+-- does not check 'execute' locally.
+box.schema.func.create("test2", {                                   \
+    language = 'LUA', returns = 'string',                           \
+    body = 'function () return "success" end',                      \
+    is_deterministic = true, param_list = {}                        \
+})
+
+do_wait = true
+ok, err = nil
+function call_wait_call()                                           \
+    ok, err = pcall(box.func.test2.call, box.func.test2)            \
+    while do_wait do fiber.yield() end                              \
+    ok, err = pcall(box.func.test2.call, box.func.test2)            \
+end
+f = fiber.create(box.session.su, 'guest', call_wait_call)
+
+while ok == nil do fiber.yield() end
+-- Error, 'guest' does not have access to 'test2'.
+ok, err
+
+box.schema.user.grant('guest', 'execute', 'universe')
+do_wait = false
+while f:status() ~= 'dead' do fiber.yield() end
+-- Should be ok even though su() was still in progress.
+ok, err
+box.schema.user.revoke('guest', 'execute', 'universe')
+
+--
+-- Setuid functions initialize their credentials on demand. And
+-- these credentials should be up to date.
+--
+box.schema.user.grant('guest', 'read, write', 'space', '_func')
+box.schema.user.grant('guest', 'create', 'function')
+box.session.su('guest')
+box.schema.func.create("test3", {                                   \
+    language = 'LUA', returns = 'string',                           \
+    body = 'function () return box.func.test2:call() end',          \
+    is_deterministic = true, param_list = {}, setuid = true         \
+})
+box.session.su('admin')
+-- Error, guest does not have access to 'test2' called from
+-- 'test3'.
+box.func.test3:call()
+box.schema.user.grant('guest', 'execute', 'universe')
+-- Now the function owner's credentials should be updated, and
+-- anyone called test3 should have updated rights.
+box.func.test3:call()
+
+box.func.test3:drop()
+box.func.test2:drop()
+box.schema.user.revoke('guest', 'create', 'function')
+box.schema.user.revoke('guest', 'read, write', 'space', '_func')
+box.schema.user.revoke('guest', 'execute', 'universe')

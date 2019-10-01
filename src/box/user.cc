@@ -35,7 +35,7 @@
 #include "func.h"
 #include "index.h"
 #include "bit/bit.h"
-#include "session.h"
+#include "fiber.h"
 #include "scoped_guard.h"
 #include "sequence.h"
 #include "tt_static.h"
@@ -160,11 +160,14 @@ user_create(struct user *user, uint8_t auth_token)
 	user->auth_token = auth_token;
 	privset_new(&user->privs);
 	region_create(&user->pool, &cord()->slabc);
+	rlist_create(&user->credentials_list);
 }
 
 static void
 user_destroy(struct user *user)
 {
+	while (!rlist_empty(&user->credentials_list))
+		rlist_shift(&user->credentials_list);
 	/*
 	 * Sic: we don't have to remove a deleted
 	 * user from users set of roles, since
@@ -288,7 +291,6 @@ access_find(enum schema_object_type object_type, uint32_t object_id)
 static void
 user_set_effective_access(struct user *user)
 {
-	struct credentials *cr = effective_user();
 	struct privset_iterator it;
 	privset_ifirst(&user->privs, &it);
 	struct priv_def *priv;
@@ -300,11 +302,6 @@ user_set_effective_access(struct user *user)
 			continue;
 		struct access *access = &object[user->auth_token];
 		access->effective = access->granted | priv->access;
-		/** Update global access in the current session. */
-		if (priv->object_type == SC_UNIVERSE &&
-		    user->def->uid == cr->uid) {
-			cr->universal_access = access->effective;
-		}
 	}
 }
 
@@ -388,6 +385,10 @@ user_reload_privs(struct user *user)
 	}
 	user_set_effective_access(user);
 	user->is_dirty = false;
+	struct credentials *creds;
+	user_access_t new_access = universe.access[user->auth_token].effective;
+	rlist_foreach_entry(creds, &user->credentials_list, in_user)
+		creds->universal_access = new_access;
 	return 0;
 }
 
@@ -756,6 +757,7 @@ credentials_create(struct credentials *cr, struct user *user)
 	cr->auth_token = user->auth_token;
 	cr->universal_access = universe.access[user->auth_token].effective;
 	cr->uid = user->def->uid;
+	rlist_add_entry(&user->credentials_list, cr, in_user);
 }
 
 void
@@ -764,10 +766,11 @@ credentials_create_empty(struct credentials *cr)
 	cr->auth_token = BOX_USER_MAX;
 	cr->universal_access = 0;
 	cr->uid = BOX_USER_MAX;
+	rlist_create(&cr->in_user);
 }
 
 void
 credentials_destroy(struct credentials *cr)
 {
-	(void) cr;
+	rlist_del_entry(cr, in_user);
 }
