@@ -81,9 +81,8 @@ c:call('dostring', { 'return 2 + 2' })
 c:close()
 box.space._user:replace(u)
 --
--- Roles: test that universal access of an authenticated
--- session is not updated if grant is made from another
--- session
+-- gh-2763: test that universal access of an authenticated session
+-- is updated if grant is made from another session.
 --
 test = box.schema.space.create('test')
 _ = test:create_index('primary')
