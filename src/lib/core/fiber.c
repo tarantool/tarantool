@@ -868,6 +868,24 @@ fiber_stack_watermark_create(struct fiber *fiber)
 }
 #endif /* HAVE_MADV_DONTNEED */
 
+static void
+fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
+{
+	if (fiber->stack != NULL) {
+		VALGRIND_STACK_DEREGISTER(fiber->stack_id);
+#if ENABLE_ASAN
+		ASAN_UNPOISON_MEMORY_REGION(fiber->stack, fiber->stack_size);
+#endif
+		void *guard;
+		if (stack_direction < 0)
+			guard = page_align_down(fiber->stack - page_size);
+		else
+			guard = page_align_up(fiber->stack + fiber->stack_size);
+		fiber_mprotect(guard, page_size, PROT_READ | PROT_WRITE);
+		slab_put(slabc, fiber->stack_slab);
+	}
+}
+
 static int
 fiber_stack_create(struct fiber *fiber, size_t stack_size)
 {
@@ -911,24 +929,6 @@ fiber_stack_create(struct fiber *fiber, size_t stack_size)
 	fiber_mprotect(guard, page_size, PROT_NONE);
 	fiber_stack_watermark_create(fiber);
 	return 0;
-}
-
-static void
-fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
-{
-	if (fiber->stack != NULL) {
-		VALGRIND_STACK_DEREGISTER(fiber->stack_id);
-#if ENABLE_ASAN
-		ASAN_UNPOISON_MEMORY_REGION(fiber->stack, fiber->stack_size);
-#endif
-		void *guard;
-		if (stack_direction < 0)
-			guard = page_align_down(fiber->stack - page_size);
-		else
-			guard = page_align_up(fiber->stack + fiber->stack_size);
-		fiber_mprotect(guard, page_size, PROT_READ | PROT_WRITE);
-		slab_put(slabc, fiber->stack_slab);
-	}
 }
 
 struct fiber *
