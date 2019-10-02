@@ -887,10 +887,11 @@ fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
 }
 
 static int
-fiber_stack_create(struct fiber *fiber, size_t stack_size)
+fiber_stack_create(struct fiber *fiber, struct slab_cache *slabc,
+		   size_t stack_size)
 {
 	stack_size -= slab_sizeof();
-	fiber->stack_slab = slab_get(&cord()->slabc, stack_size);
+	fiber->stack_slab = slab_get(slabc, stack_size);
 
 	if (fiber->stack_slab == NULL) {
 		diag_set(OutOfMemory, stack_size,
@@ -927,7 +928,7 @@ fiber_stack_create(struct fiber *fiber, size_t stack_size)
 						  fiber->stack_size);
 
 	if (fiber_mprotect(guard, page_size, PROT_NONE)) {
-		fiber_stack_destroy(fiber, &cord()->slabc);
+		fiber_stack_destroy(fiber, slabc);
 		return -1;
 	}
 
@@ -959,7 +960,8 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 		}
 		memset(fiber, 0, sizeof(struct fiber));
 
-		if (fiber_stack_create(fiber, fiber_attr->stack_size)) {
+		if (fiber_stack_create(fiber, &cord()->slabc,
+				       fiber_attr->stack_size)) {
 			mempool_free(&cord->fiber_mempool, fiber);
 			return NULL;
 		}
