@@ -926,7 +926,11 @@ fiber_stack_create(struct fiber *fiber, size_t stack_size)
 						  (char *)fiber->stack +
 						  fiber->stack_size);
 
-	fiber_mprotect(guard, page_size, PROT_NONE);
+	if (fiber_mprotect(guard, page_size, PROT_NONE)) {
+		fiber_stack_destroy(fiber, &cord()->slabc);
+		return -1;
+	}
+
 	fiber_stack_watermark_create(fiber);
 	return 0;
 }
