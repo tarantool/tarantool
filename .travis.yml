@@ -43,6 +43,9 @@ jobs:
       - name: "CentOS 7 build + test + deploy RPM"
         env: OS=el DIST=7
         if: branch = "1.10"
+      - name: "CentOS 8 build + test + deploy RPM"
+        env: OS=el DIST=8
+        if: branch = "1.10"
       - name: "Fedora 28 build + test + deploy RPM"
         env: OS=fedora DIST=28
         if: branch = "1.10"
