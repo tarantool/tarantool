@@ -152,6 +152,12 @@ centos_7:
     OS: 'el'
     DIST: '7'
 
+centos_8:
+  <<: *deploy_test_definition
+  variables:
+    OS: 'el'
+    DIST: '8'
+
 fedora_28:
   <<: *deploy_test_definition
   variables:
