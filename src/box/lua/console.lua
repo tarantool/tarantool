@@ -11,7 +11,6 @@ local urilib = require('uri')
 local yaml = require('yaml')
 local net_box = require('net.box')
 
-local YAML_TERM = '\n...\n'
 local PUSH_TAG_HANDLE = '!push!'
 
 --
@@ -19,6 +18,18 @@ local PUSH_TAG_HANDLE = '!push!'
 -- compatibility reason.
 local default_output_format = { ["fmt"] = "yaml", ["opts"] = nil }
 local output_handlers = { }
+
+--
+-- This is an end-of-stream marker for text output of Tarantool
+-- server, for different output formats - yaml and Lua.
+--
+-- While for yaml ... is a standard stream end marker, using ';'
+-- for Lua output we're walking on a thin ice - ';' is legal inside
+-- a valid Lua block as well. But since this marker is used when
+-- reading data created by a Tarantool server, we can rely on it not
+-- being present inside of stream, since Tarantool server never
+-- puts it inside of a stream.
+local output_eos = { ["yaml"] = '\n...\n', ["lua"] = ';' }
 
 output_handlers["yaml"] = function(status, opts, ...)
     local err
@@ -66,13 +77,15 @@ end
 
 output_handlers["lua"] = function(status, opts, ...)
     --
-    -- Don't print nil if there is no data
+    -- If no data present at least EOS should be put,
+    -- otherwise wire readers won't be able to find
+    -- where the end of string is.
     if not ... then
-        return ""
+        return output_eos["lua"]
     end
     for k,v in pairs(lua_map_direct_symbols) do
         if k == ... then
-            return v
+            return v .. output_eos["lua"]
         end
     end
     local serpent_opts = {
@@ -81,9 +94,9 @@ output_handlers["lua"] = function(status, opts, ...)
         nocode = true,
     }
     if opts == "block" then
-        return serpent.block(..., serpent_opts)
+        return serpent.block(..., serpent_opts) .. output_eos["lua"]
     end
-    return serpent.line(..., serpent_opts)
+    return serpent.line(..., serpent_opts) .. output_eos["lua"]
 end
 
 local function output_verify_opts(fmt, opts)
@@ -315,7 +328,7 @@ local text_connection_mt = {
         -- @retval     nil Error.
         --
         read = function(self)
-            local ret = self._socket:read(YAML_TERM)
+            local ret = self._socket:read(output_eos["yaml"])
             if ret and ret ~= '' then
                 return ret
             end
