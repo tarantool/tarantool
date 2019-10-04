@@ -178,6 +178,23 @@ local function current_eos()
 end
 
 --
+-- Set/get current console EOS value from
+-- currently active output format.
+local function console_eos(eos_value)
+    if not eos_value then
+        return tostring(current_eos())
+    end
+    -- We can't allow to change yaml eos format
+    -- because it is a part of encoding standart.
+    local d = current_output()
+    if d["fmt"] == "yaml" then
+        error("console.eos(): is immutable for output " .. d["fmt"])
+    else
+        output_eos[d["fmt"]] = eos_value
+    end
+end
+
+--
 -- Map output format descriptor into a "\set" command.
 local function output_to_cmd_string(desc)
     if desc["opts"] then
@@ -805,6 +822,7 @@ package.loaded['console'] = {
     delimiter = delimiter;
     set_default_output = set_default_output;
     get_default_output = get_default_output;
+    eos = console_eos;
     ac = ac;
     connect = connect;
     listen = listen;
