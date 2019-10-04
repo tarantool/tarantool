@@ -40,11 +40,23 @@ output_handlers["yaml"] = function(status, opts, ...)
     return internal.format({ error = err })
 end
 
+-- A map for internal symbols in case if they
+-- are not inside tables and serpent won't be
+-- able to handle them properly.
+local lua_map_direct_symbols = {
+    [box.NULL]      = 'box.NULL',
+}
+
 output_handlers["lua"] = function(status, opts, ...)
     --
     -- Don't print nil if there is no data
     if not ... then
         return ""
+    end
+    for k,v in pairs(lua_map_direct_symbols) do
+        if k == ... then
+            return v
+        end
     end
     --
     -- Map internal symbols which serpent doesn't know
