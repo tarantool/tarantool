@@ -47,6 +47,23 @@ local lua_map_direct_symbols = {
     [box.NULL]      = 'box.NULL',
 }
 
+-- A map for internal symbols in case if they
+-- are coming from tables and we need to depict
+-- them into user known values.
+local lua_map_table_symbols = {
+    ['"cdata<void %*>: NULL"']  = 'box.NULL'
+}
+
+--
+-- Map internal symbols which serpent doesn't
+-- know about to a known representation.
+local serpent_map_symbols = function(tag, head, body, tail, level)
+    for k,v in pairs(lua_map_table_symbols) do
+        body = body:gsub(k, v)
+    end
+    return tag..head..body..tail
+end
+
 output_handlers["lua"] = function(status, opts, ...)
     --
     -- Don't print nil if there is no data
@@ -58,20 +75,8 @@ output_handlers["lua"] = function(status, opts, ...)
             return v
         end
     end
-    --
-    -- Map internal symbols which serpent doesn't know
-    -- about to a known representation.
-    local map_symbols = function(tag, head, body, tail, level)
-        local symbols = {
-            ['"cdata<void %*>: NULL"']  = 'box.NULL'
-        }
-        for k,v in pairs(symbols) do
-            body = body:gsub(k, v)
-        end
-        return tag..head..body..tail
-    end
     local serpent_opts = {
-        custom  = map_symbols,
+        custom  = serpent_map_symbols,
         comment = false,
         nocode = true,
     }
