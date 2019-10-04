@@ -170,6 +170,24 @@ local function current_output()
     return d
 end
 
+--
+-- Return current EOS value for currently
+-- active output format.
+local function current_eos()
+    return output_eos[current_output()["fmt"]]
+end
+
+--
+-- Map output format descriptor into a "\set" command.
+local function output_to_cmd_string(desc)
+    if desc["opts"] then
+        string.format("\\set output %s,%s", desc["fmt"], desc["opts"])
+    else
+        string.format("\\set output %s", desc["fmt"])
+    end
+    return cmd
+end
+
 local function format(status, ...)
     local d = current_output()
     return output_handlers[d["fmt"]](status, d["opts"], ...)
@@ -359,15 +377,39 @@ local text_connection_mt = {
         -- @retval     nil Error.
         --
         read = function(self)
-            local ret = self._socket:read(output_eos["yaml"])
+            local ret = self._socket:read(self.eos)
             if ret and ret ~= '' then
                 return ret
+            end
+        end,
+        --
+        -- The command might modify EOS so
+        -- we have to parse and preprocess it
+        -- first to not stuck in :read() forever.
+        --
+        -- Same time the EOS is per connection
+        -- value so we keep it inside the metatable
+        -- instace, and because we can't use same
+        -- name as output_eos() function we call
+        -- it simplier as self.eos.
+        preprocess_eval = function(self, text)
+            local command = get_command(text)
+            if command == nil then
+                return
+            end
+            local nr_items, items = parse_operators(command)
+            if nr_items == 3 then
+                local err, fmt, opts = output_parse(items[3])
+                if not err then
+                    self.eos = output_eos[fmt]
+                end
             end
         end,
         --
         -- Write + Read.
         --
         eval = function(self, text)
+            self:preprocess_eval(text)
             text = text..'$EOF$\n'
             if not self:write(text) then
                 error(self:set_error())
@@ -422,9 +464,18 @@ local function wrap_text_socket(connection, url, print_f)
         host = url.host or 'localhost',
         port = url.service,
         print_f = print_f,
+        eos = current_eos(),
     }, text_connection_mt)
-    if not conn:write('require("console").delimiter("$EOF$")\n') or
-       not conn:read() then
+    --
+    -- Prepare the connection: setup EOS symbol
+    -- by executing the \set command on remote machine
+    -- explicitly, and then setup a delimiter.
+    local cmd_set_output = output_to_cmd_string(current_output()) .. '\n'
+    if not conn:write(cmd_set_output) or not conn:read() then
+        conn:set_error()
+    end
+    local cmd_delimiter = 'require("console").delimiter("$EOF$")\n'
+    if not conn:write(cmd_delimiter) or not conn:read() then
         conn:set_error()
     end
     return conn
