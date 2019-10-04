@@ -193,14 +193,6 @@ fiber_set_session(struct fiber *fiber, struct session *session)
 	fiber->storage.session = session;
 }
 
-static inline void
-credentials_init(struct credentials *cr, uint8_t auth_token, uint32_t uid)
-{
-	cr->auth_token = auth_token;
-	cr->universal_access = universe.access[cr->auth_token].effective;
-	cr->uid = uid;
-}
-
 /*
  * For use in local hot standby, which runs directly
  * from ev watchers (without current fiber), but needs

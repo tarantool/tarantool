@@ -180,7 +180,7 @@ box_process_call(struct call_request *request, struct port *port)
 	if (func && func->def->setuid) {
 		orig_credentials = effective_user();
 		/* Remember and change the current user id. */
-		if (func->owner_credentials.auth_token >= BOX_USER_MAX) {
+		if (credentials_is_empty(&func->owner_credentials)) {
 			/*
 			 * Fill the cache upon first access, since
 			 * when func is created, no user may
@@ -190,9 +190,7 @@ box_process_call(struct call_request *request, struct port *port)
 			struct user *owner = user_find(func->def->uid);
 			if (owner == NULL)
 				return -1;
-			credentials_init(&func->owner_credentials,
-					 owner->auth_token,
-					 owner->def->uid);
+			credentials_reset(&func->owner_credentials, owner);
 		}
 		fiber_set_user(fiber(), &func->owner_credentials);
 	}
