@@ -142,8 +142,7 @@ session_create(enum session_type type)
 	session->sql_default_engine = SQL_STORAGE_ENGINE_MEMTX;
 
 	/* For on_connect triggers. */
-	credentials_init(&session->credentials, guest_user->auth_token,
-			 guest_user->def->uid);
+	credentials_create(&session->credentials, guest_user);
 	struct mh_i64ptr_node_t node;
 	node.key = session->id;
 	node.val = session;
@@ -172,8 +171,7 @@ session_create_on_demand()
 	};
 	/* Add a trigger to destroy session on fiber stop */
 	trigger_add(&fiber()->on_stop, &s->fiber_on_stop);
-	credentials_init(&s->credentials, admin_user->auth_token,
-			 admin_user->def->uid);
+	credentials_reset(&s->credentials, admin_user);
 	/*
 	 * At bootstrap, admin user access is not loaded yet (is
 	 * 0), force global access. @sa comment in session_init()
@@ -232,6 +230,7 @@ session_destroy(struct session *session)
 	session_storage_cleanup(session->id);
 	struct mh_i64ptr_node_t node = { session->id, NULL };
 	mh_i64ptr_remove(session_registry, &node, NULL);
+	credentials_destroy(&session->credentials);
 	mempool_free(&session_pool, session);
 }
 
@@ -252,7 +251,7 @@ session_init()
 	if (session_registry == NULL)
 		panic("out of memory");
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
-	credentials_init(&admin_credentials, ADMIN, ADMIN);
+	credentials_create(&admin_credentials, admin_user);
 	/*
 	 * For performance reasons, we do not always explicitly
 	 * look at user id in access checks, while still need to
@@ -278,6 +277,7 @@ session_free()
 {
 	if (session_registry)
 		mh_i64ptr_delete(session_registry);
+	credentials_destroy(&admin_credentials);
 }
 
 int

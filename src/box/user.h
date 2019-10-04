@@ -106,6 +106,33 @@ user_find_by_name(const char *name, uint32_t len);
 struct user *
 user_find(uint32_t uid);
 
+/** Create a cache of user's privileges in @a cr. */
+void
+credentials_create(struct credentials *cr, struct user *user);
+
+/** Create a dummy credentials cache without a user. */
+void
+credentials_create_empty(struct credentials *cr);
+
+/** Check if @a cr has a source user. */
+static inline bool
+credentials_is_empty(const struct credentials *cr)
+{
+	return cr->auth_token == BOX_USER_MAX;
+}
+
+/** Free credentials resources, invalidate the object. */
+void
+credentials_destroy(struct credentials *cr);
+
+/** Change source user of the credentials cache. */
+static inline void
+credentials_reset(struct credentials *cr, struct user *new_user)
+{
+	credentials_destroy(cr);
+	credentials_create(cr, new_user);
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

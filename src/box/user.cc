@@ -714,3 +714,25 @@ priv_grant(struct user *grantee, struct priv_def *priv)
 }
 
 /** }}} */
+
+void
+credentials_create(struct credentials *cr, struct user *user)
+{
+	cr->auth_token = user->auth_token;
+	cr->universal_access = universe.access[user->auth_token].effective;
+	cr->uid = user->def->uid;
+}
+
+void
+credentials_create_empty(struct credentials *cr)
+{
+	cr->auth_token = BOX_USER_MAX;
+	cr->universal_access = 0;
+	cr->uid = BOX_USER_MAX;
+}
+
+void
+credentials_destroy(struct credentials *cr)
+{
+	(void) cr;
+}
