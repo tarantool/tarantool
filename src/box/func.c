@@ -418,7 +418,7 @@ func_new(struct func_def *def)
 	 * Later on consistency of the cache is ensured by DDL
 	 * checks (see user_has_data()).
 	 */
-	func->owner_credentials.auth_token = BOX_USER_MAX; /* invalid value */
+	credentials_create_empty(&func->owner_credentials);
 	return func;
 }
 
@@ -549,6 +549,7 @@ func_delete(struct func *func)
 {
 	struct func_def *def = func->def;
 	func->vtab->destroy(func);
+	credentials_destroy(&func->owner_credentials);
 	free(def);
 }
 
@@ -598,7 +599,7 @@ func_call(struct func *base, struct port *args, struct port *ret)
 	if (base->def->setuid) {
 		orig_credentials = effective_user();
 		/* Remember and change the current user id. */
-		if (base->owner_credentials.auth_token >= BOX_USER_MAX) {
+		if (credentials_is_empty(&base->owner_credentials)) {
 			/*
 			 * Fill the cache upon first access, since
 			 * when func is created, no user may
@@ -608,9 +609,7 @@ func_call(struct func *base, struct port *args, struct port *ret)
 			struct user *owner = user_find(base->def->uid);
 			if (owner == NULL)
 				return -1;
-			credentials_init(&base->owner_credentials,
-					 owner->auth_token,
-					 owner->def->uid);
+			credentials_reset(&base->owner_credentials, owner);
 		}
 		fiber_set_user(fiber(), &base->owner_credentials);
 	}

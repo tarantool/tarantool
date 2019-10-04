@@ -100,6 +100,5 @@ ok:
 	if (! rlist_empty(&session_on_auth) &&
 	    session_run_on_auth_triggers(&auth_res) != 0)
 		diag_raise();
-	credentials_init(&session->credentials, user->auth_token,
-			 user->def->uid);
+	credentials_reset(&session->credentials, user);
 }
