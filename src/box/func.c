@@ -34,6 +34,7 @@
 #include "lua/utils.h"
 #include "error.h"
 #include "diag.h"
+#include "user.h"
 #include <dlfcn.h>
 
 /**
@@ -380,7 +381,7 @@ func_new(struct func_def *def)
 	 * Later on consistency of the cache is ensured by DDL
 	 * checks (see user_has_data()).
 	 */
-	func->owner_credentials.auth_token = BOX_USER_MAX; /* invalid value */
+	credentials_create_empty(&func->owner_credentials);
 	func->func = NULL;
 	func->module = NULL;
 	return func;
@@ -479,6 +480,7 @@ void
 func_delete(struct func *func)
 {
 	func_unload(func);
+	credentials_destroy(&func->owner_credentials);
 	free(func->def);
 	free(func);
 }
