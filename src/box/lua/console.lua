@@ -112,7 +112,7 @@ local function output_verify_opts(fmt, opts)
     return nil
 end
 
-local function output_parse(value)
+local function parse_output(value)
     local fmt, opts
     if value:match("([^,]+),([^,]+)") ~= nil then
         fmt, opts = value:match("([^,]+),([^,]+)")
@@ -136,7 +136,7 @@ local function set_default_output(value)
     if value == nil then
         error("Nil output value passed")
     end
-    local err, fmt, opts = output_parse(value)
+    local err, fmt, opts = parse_output(value)
     if err then
         error(err)
     end
@@ -249,7 +249,7 @@ local function set_language(storage, value)
 end
 
 local function set_output(storage, value)
-    local err, fmt, opts = output_parse(value)
+    local err, fmt, opts = parse_output(value)
     if err then
         return error(err)
     end
@@ -416,7 +416,7 @@ local text_connection_mt = {
             end
             local nr_items, items = parse_operators(command)
             if nr_items == 3 then
-                local err, fmt, opts = output_parse(items[3])
+                local err, fmt, opts = parse_output(items[3])
                 if not err then
                     self.eos = output_eos[fmt]
                 end
