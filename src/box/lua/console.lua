@@ -198,11 +198,10 @@ end
 -- Map output format descriptor into a "\set" command.
 local function output_to_cmd_string(desc)
     if desc["opts"] then
-        string.format("\\set output %s,%s", desc["fmt"], desc["opts"])
+        return string.format("\\set output %s,%s", desc["fmt"], desc["opts"])
     else
-        string.format("\\set output %s", desc["fmt"])
+        return string.format("\\set output %s", desc["fmt"])
     end
-    return cmd
 end
 
 local function format(status, ...)
