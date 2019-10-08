@@ -15,7 +15,6 @@ BuildRequires: gcc-c++ >= 4.5
 BuildRequires: coreutils
 BuildRequires: sed
 BuildRequires: readline-devel
-BuildRequires: libyaml-devel
 BuildRequires: openssl-devel
 BuildRequires: libicu-devel
 #BuildRequires: msgpuck-devel
