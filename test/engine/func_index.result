@@ -139,7 +139,7 @@ idx = s:create_index('idx', {func = box.func.invalidreturn0.id, parts = {{1, 'un
 s:insert({1})
  | ---
  | - error: 'Key format doesn''t match one defined in functional index ''idx'' of space
- |     ''withdata'': supplied key type is invalid: expected boolean'
+ |     ''withdata'': supplied key type is invalid: expected array'
  | ...
 idx:drop()
  | ---
