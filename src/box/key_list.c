@@ -144,7 +144,7 @@ key_list_iterator_next(struct key_list_iterator *it, const char **value)
 		diag_set(ClientError, ER_FUNC_INDEX_FORMAT, it->index_def->name,
 			 space ? space_name(space) : "",
 			 tt_sprintf("supplied key type is invalid: expected %s",
-				    field_type_strs[MP_ARRAY]));
+				    field_type_strs[FIELD_TYPE_ARRAY]));
 		return -1;
 	}
 	struct key_def *key_def = it->index_def->key_def;
