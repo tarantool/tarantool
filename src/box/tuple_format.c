@@ -378,7 +378,8 @@ tuple_format_use_key_part(struct tuple_format *format, uint32_t field_count,
 	 * i.e. DEFAULT.
 	 */
 	if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
-		if (part->nullable_action != ON_CONFLICT_ACTION_NONE)
+		if (part->nullable_action != ON_CONFLICT_ACTION_NONE ||
+		    part->path != NULL)
 			field->nullable_action = part->nullable_action;
 	} else if (part->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
 		if (field->nullable_action == ON_CONFLICT_ACTION_NONE)
