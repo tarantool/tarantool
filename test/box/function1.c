@@ -13,6 +13,25 @@ function1(box_function_ctx_t *ctx, const char *args, const char *args_end)
 }
 
 int
+multireturn(box_function_ctx_t *ctx, const char *args, const char *args_end)
+{
+	char tuple_buf[512];
+	char *d = tuple_buf;
+	d = mp_encode_array(d, 1);
+	d = mp_encode_uint(d, 1);
+	assert(d <= tuple_buf + sizeof(tuple_buf));
+
+	box_tuple_format_t *fmt = box_tuple_format_default();
+	box_tuple_t *tuple_a = box_tuple_new(fmt, tuple_buf, d);
+	if (tuple_a == NULL)
+		return -1;
+	int rc = box_return_tuple(ctx, tuple_a);
+	if (rc != 0)
+		return rc;
+	return box_return_tuple(ctx, tuple_a);
+}
+
+int
 args(box_function_ctx_t *ctx, const char *args, const char *args_end)
 {
 	uint32_t arg_count = mp_decode_array(&args);

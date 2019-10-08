@@ -242,12 +242,13 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 	struct port_lua *port = (struct port_lua *) base;
 	struct lua_State *L = port->L;
 	int argc = lua_gettop(L);
-	if (argc == 0) {
-		diag_set(ClientError, ER_SQL_EXECUTE,
-			 "No value was passed from Lua");
+	if (argc == 0 || argc > 1) {
+		diag_set(ClientError, ER_SQL_FUNC_WRONG_RET_COUNT, "Lua", argc);
 		return NULL;
 	}
 	*size = argc;
+	/** FIXME: Implement an ability to return a vector. */
+	assert(*size == 1);
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	struct Mem *val = vdbemem_alloc_on_region(argc);
@@ -288,11 +289,12 @@ port_tuple_get_vdbemem(struct port *base, uint32_t *size)
 {
 	struct port_tuple *port = (struct port_tuple *)base;
 	*size = port->size;
-	if (*size == 0) {
-		diag_set(ClientError, ER_SQL_EXECUTE,
-			 "No value was passed from C");
+	if (*size == 0 || *size > 1) {
+		diag_set(ClientError, ER_SQL_FUNC_WRONG_RET_COUNT, "C", *size);
 		return NULL;
 	}
+	/** FIXME: Implement an ability to return a vector. */
+	assert(*size == 1);
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	struct Mem *val = vdbemem_alloc_on_region(port->size);
@@ -321,10 +323,10 @@ port_tuple_get_vdbemem(struct port *base, uint32_t *size)
 			sqlVdbeMemSetDouble(&val[i], mp_decode_double(&data));
 			break;
 		case MP_INT:
-			mem_set_i64(val, mp_decode_int(&data));
+			mem_set_i64(&val[i], mp_decode_int(&data));
 			break;
 		case MP_UINT:
-			mem_set_u64(val, mp_decode_uint(&data));
+			mem_set_u64(&val[i], mp_decode_uint(&data));
 			break;
 		case MP_STR:
 			str = mp_decode_str(&data, &len);
@@ -333,7 +335,7 @@ port_tuple_get_vdbemem(struct port *base, uint32_t *size)
 				goto error;
 			break;
 		case MP_NIL:
-			sqlVdbeMemSetNull(val);
+			sqlVdbeMemSetNull(&val[i]);
 			break;
 		default:
 			diag_set(ClientError, ER_SQL_EXECUTE,

@@ -256,6 +256,18 @@ box.schema.user.revoke('guest', 'execute', 'function', 'secret_leak')
 box.schema.func.drop('secret_leak')
 box.schema.func.drop('secret')
 
+-- UDF corner cases for SQL: no value returned, too many values returned
+box.execute("SELECT LUA('a = 1 + 1')")
+box.execute("SELECT LUA('return 1, 2')")
+
+box.schema.func.create('function1', {language = "C", exports = {'LUA', 'SQL'}})
+box.execute("SELECT \"function1\"()")
+box.schema.func.drop("function1")
+
+box.schema.func.create('function1.multireturn', {language = "C", exports = {'LUA', 'SQL'}})
+box.execute("SELECT \"function1.multireturn\"()")
+box.schema.func.drop("function1.multireturn")
+
 --
 -- gh-4182: Introduce persistent Lua functions.
 --

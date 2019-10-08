@@ -532,7 +532,7 @@ box.execute('SELECT lua(\'return box.cfg\')')
 box.execute('SELECT lua(\'return box.cfg()\')')
 ---
 - null
-- 'Failed to execute SQL statement: No value was passed from Lua'
+- SQL expects exactly one argument returned from Lua, got 0
 ...
 box.execute('SELECT lua(\'return box.cfg.memtx_memory\')')
 ---
@@ -755,6 +755,39 @@ box.schema.func.drop('secret_leak')
 ---
 ...
 box.schema.func.drop('secret')
+---
+...
+-- UDF corner cases for SQL: no value returned, too many values returned
+box.execute("SELECT LUA('a = 1 + 1')")
+---
+- null
+- SQL expects exactly one argument returned from Lua, got 0
+...
+box.execute("SELECT LUA('return 1, 2')")
+---
+- null
+- SQL expects exactly one argument returned from Lua, got 2
+...
+box.schema.func.create('function1', {language = "C", exports = {'LUA', 'SQL'}})
+---
+...
+box.execute("SELECT \"function1\"()")
+---
+- null
+- SQL expects exactly one argument returned from C, got 0
+...
+box.schema.func.drop("function1")
+---
+...
+box.schema.func.create('function1.multireturn', {language = "C", exports = {'LUA', 'SQL'}})
+---
+...
+box.execute("SELECT \"function1.multireturn\"()")
+---
+- null
+- SQL expects exactly one argument returned from C, got 2
+...
+box.schema.func.drop("function1.multireturn")
 ---
 ...
 --
