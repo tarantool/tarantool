@@ -801,3 +801,43 @@ s.index.sk:select()
 s:drop()
 ---
 ...
+--
+-- gh-4520: Nullable fields in JSON index are not working with a
+--          space having a format defined.
+--
+s = box.schema.space.create('x', {engine = engine})
+---
+...
+pk = s:create_index('pk')
+---
+...
+_ = s:create_index( '_rawdata', { type='tree', unique=false, parts={{ 5, 'scalar', path='pay_date_to', is_nullable=true }} } )
+---
+...
+_ = s:insert{6, 1569246252, 2, 77, { f1 = 123, pay_date_to = box.NULL }, 21, 1, 361 }
+---
+...
+s:format({{type='any', name='1'}, {type='any', name='2'}, {type='any', name='3'}, {type='any', name='4'}, {type='map', name='_rawdata', is_nullable=true}})
+---
+...
+s:drop()
+---
+...
+s = box.schema.space.create('sp', {engine = engine, format = {{type='string', name='key'}, {type='map', name='value', is_nullable=true}}})
+---
+...
+_ = s:create_index('pk', {parts = {'key'}})
+---
+...
+_ = s:create_index('clid', {parts = {{'value.clid', 'str', is_nullable = true}}})
+---
+...
+_ = s:insert({'01', {clid = 'AA', cltp = 20}})
+---
+...
+_ = s:insert({'02', {cltp = 'BB'}})
+---
+...
+s:drop()
+---
+...
