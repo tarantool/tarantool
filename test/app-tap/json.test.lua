@@ -22,7 +22,7 @@ end
 
 tap.test("json", function(test)
     local serializer = require('json')
-    test:plan(40)
+    test:plan(51)
 
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
@@ -154,4 +154,34 @@ tap.test("json", function(test)
     _, err_msg = pcall(serializer.decode, '{"hello": "world",\n 100: 200}')
     test:ok(string.find(err_msg, 'line 2 at character 2') ~= nil,
             'mistake on second line')
+
+    --
+    -- gh-4339: Make sure that tokens 'T_*' are absent in error
+    -- messages and a context is printed.
+    --
+    _, err_msg = pcall(serializer.decode, '{{: "world"}')
+    test:ok(string.find(err_msg, '\'{\'') ~= nil, '"{" instead of T_OBJ_BEGIN')
+    _, err_msg = pcall(serializer.decode, '{"a": "world"}}')
+    test:ok(string.find(err_msg, '\'}\'') ~= nil, '"}" instead of T_OBJ_END')
+    _, err_msg = pcall(serializer.decode, '{[: "world"}')
+    test:ok(string.find(err_msg, '\'[\'', 1, true) ~= nil,
+            '"[" instead of T_ARR_BEGIN')
+    _, err_msg = pcall(serializer.decode, '{]: "world"}')
+    test:ok(string.find(err_msg, '\']\'', 1, true) ~= nil,
+            '"]" instead of T_ARR_END')
+    _, err_msg = pcall(serializer.decode, '{1: "world"}')
+    test:ok(string.find(err_msg, 'int') ~= nil, 'int instead of T_INT')
+    _, err_msg = pcall(serializer.decode, '{1.0: "world"}')
+    test:ok(string.find(err_msg, 'number') ~= nil, 'number instead of T_NUMBER')
+    _, err_msg = pcall(serializer.decode, '{true: "world"}')
+    test:ok(string.find(err_msg, 'boolean') ~= nil,
+            'boolean instead of T_BOOLEAN')
+    _, err_msg = pcall(serializer.decode, '{null: "world"}')
+    test:ok(string.find(err_msg, 'null') ~= nil, 'null instead of T_NULL')
+    _, err_msg = pcall(serializer.decode, '{:: "world"}')
+    test:ok(string.find(err_msg, 'colon') ~= nil, 'colon instead of T_COLON')
+    _, err_msg = pcall(serializer.decode, '{,: "world"}')
+    test:ok(string.find(err_msg, 'comma') ~= nil, 'comma instead of T_COMMA')
+    _, err_msg = pcall(serializer.decode, '{')
+    test:ok(string.find(err_msg, 'end') ~= nil, 'end instead of T_END')
 end)
