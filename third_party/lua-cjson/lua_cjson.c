@@ -75,23 +75,23 @@ typedef enum {
 } json_token_type_t;
 
 static const char *json_token_type_name[] = {
-    "T_OBJ_BEGIN",
-    "T_OBJ_END",
-    "T_ARR_BEGIN",
-    "T_ARR_END",
-    "T_STRING",
-    "T_UINT",
-    "T_INT",
-    "T_NUMBER",
-    "T_BOOLEAN",
-    "T_NULL",
-    "T_COLON",
-    "T_COMMA",
-    "T_END",
-    "T_WHITESPACE",
-    "T_LINEFEED",
-    "T_ERROR",
-    "T_UNKNOWN",
+    "'{'",
+    "'}'",
+    "'['",
+    "']'",
+    "string",
+    "unsigned int",
+    "int",
+    "number",
+    "boolean",
+    "null",
+    "colon",
+    "comma",
+    "end",
+    "whitespace",
+    "line feed",
+    "error",
+    "unknown symbol",
     NULL
 };
 
@@ -920,7 +920,7 @@ static void json_parse_object_context(lua_State *l, json_parse_t *json)
         }
 
         if (token.type != T_COMMA)
-            json_throw_parse_error(l, json, "comma or object end", &token);
+            json_throw_parse_error(l, json, "comma or '}'", &token);
 
         json_next_token(json, &token);
     }
@@ -960,7 +960,7 @@ static void json_parse_array_context(lua_State *l, json_parse_t *json)
         }
 
         if (token.type != T_COMMA)
-            json_throw_parse_error(l, json, "comma or array end", &token);
+            json_throw_parse_error(l, json, "comma or ']'", &token);
 
         json_next_token(json, &token);
     }
