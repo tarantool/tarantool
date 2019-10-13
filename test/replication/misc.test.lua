@@ -342,7 +342,7 @@ box.cfg{                                                        \
 box.cfg{replication = {'localhost:12345'}}
 box.info.status
 box.cfg{                                                        \
-    replication = replication,                                  \
+    replication = {},                                           \
     replication_connect_quorum = replication_connect_quorum,    \
     replication_connect_timeout = replication_connect_timeout   \
 }
