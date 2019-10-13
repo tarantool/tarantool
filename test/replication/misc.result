@@ -842,7 +842,7 @@ box.info.status
 - running
 ...
 box.cfg{                                                        \
-    replication = replication,                                  \
+    replication = {},                                           \
     replication_connect_quorum = replication_connect_quorum,    \
     replication_connect_timeout = replication_connect_timeout   \
 }
