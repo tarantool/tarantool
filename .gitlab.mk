@@ -111,4 +111,4 @@ package: git_submodule_update
 # ############
 
 static_build:
-	docker build --network=host -f Dockerfile.staticbuild .
+	docker build --network=host --build-arg RUN_TESTS="${RUN_TESTS}" -f Dockerfile.staticbuild .

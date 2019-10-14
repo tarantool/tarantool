@@ -90,9 +90,10 @@ RUN set -x \
 RUN cd /tarantool && make install
 
 ARG RUN_TESTS
-RUN [ -n ${RUN_TESTS} ] && \
-    set -x && \
-    cd test && \
-    /usr/bin/python test-run.py --force
+RUN if [ -n "${RUN_TESTS}" ]; then \
+        set -x && \
+        cd test && \
+        /usr/bin/python test-run.py --force; \
+    fi
 
 ENTRYPOINT /bin/bash
