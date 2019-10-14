@@ -6,7 +6,7 @@ rm_dir='rm -rf'
 mk_dir='mkdir -p'
 ws_prefix=/tmp/tarantool_repo_s3
 
-alloss='ubuntu debian el fedora'
+alloss='ubuntu debian el fedora opensuse-leap'
 product=tarantool
 remove=
 force=
@@ -31,6 +31,8 @@ function get_os_dists {
         alldists='6 7 8'
     elif [ "$os" == "fedora" ]; then
         alldists='27 28 29 30 31'
+    elif [ "$os" == "opensuse-leap" ]; then
+        alldists='15.0 15.1 15.2'
     fi
 
     echo "$alldists"
@@ -934,7 +936,7 @@ if [ "$os" == "ubuntu" -o "$os" == "debian" ]; then
     # unlock the publishing
     $rm_file $ws_lockfile
     popd
-elif [ "$os" == "el" -o "$os" == "fedora" ]; then
+elif [ "$os" == "el" -o "$os" == "fedora" -o "$os" == "opensuse-leap" ]; then
     # RPM packages structure needs different paths for binaries and sources
     # packages, in this way it is needed to call the packages registering
     # script twice with the given format:
