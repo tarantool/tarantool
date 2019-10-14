@@ -1,5 +1,5 @@
 # Enable systemd for on RHEL >= 7 and Fedora >= 15
-%if (0%{?fedora} >= 15 || 0%{?rhel} >= 7)
+%if (0%{?fedora} >= 15 || 0%{?rhel} >= 7 || 0%{?sle_version} >= 1500)
 %bcond_without systemd
 %else
 %bcond_with systemd
@@ -7,7 +7,7 @@
 
 BuildRequires: cmake >= 2.8
 BuildRequires: make
-%if (0%{?fedora} >= 22 || 0%{?rhel} >= 7)
+%if (0%{?fedora} >= 22 || 0%{?rhel} >= 7 || 0%{?sle_version} >= 1500)
 # RHEL 6 requires devtoolset
 BuildRequires: gcc >= 4.5
 BuildRequires: gcc-c++ >= 4.5
@@ -53,6 +53,12 @@ Requires(preun): initscripts
 %bcond_without backtrace
 %endif
 
+# openSuSE sets its own build directory in its macros, but we
+# want to use in-source build there to simplify the RPM spec.
+%if (0%{?sle_version} >= 1500)
+%global __builddir .
+%endif
+
 %if %{with backtrace}
 BuildRequires: libunwind-devel
 #
@@ -78,7 +84,7 @@ BuildRequires: python2-six >= 1.9.0
 BuildRequires: python2-gevent >= 1.0
 BuildRequires: python2-yaml >= 3.0.9
 %else
-%if (0%{?rhel} != 6)
+%if (0%{?rhel} != 6 || 0%{?sle_version} >= 1500)
 BuildRequires: python >= 2.7
 BuildRequires: python-six >= 1.9.0
 BuildRequires: python-gevent >= 1.0
@@ -105,7 +111,7 @@ Requires: /etc/services
 # Deps for built-in package manager
 # https://github.com/tarantool/tarantool/issues/2612
 Requires: openssl
-%if (0%{?fedora} >= 22 || 0%{?rhel} >= 8)
+%if (0%{?fedora} >= 22 || 0%{?rhel} >= 8 || 0%{?sle_version} >= 1500)
 # RHEL <= 7 doesn't support Recommends:
 Recommends: tarantool-devel
 Recommends: git-core
@@ -164,7 +170,7 @@ rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
 
 %check
 %if "%{_ci}" == "travis"
-%if (0%{?fedora} >= 22 || 0%{?rhel} >= 7)
+%if (0%{?fedora} >= 22 || 0%{?rhel} >= 7 || 0%{?sle_version} >= 1500)
 cd test && ./test-run.py --force -j 1 unit/ app/ app-tap/ box/ box-tap/ engine/ vinyl/
 %endif
 %else

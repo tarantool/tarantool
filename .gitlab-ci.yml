@@ -419,6 +419,18 @@ debian_10:
     OS: 'debian'
     DIST: 'buster'
 
+opensuse_15_1:
+  <<: *pack_definition
+  variables:
+    OS: 'opensuse-leap'
+    DIST: '15.1'
+
+opensuse_15_2:
+  <<: *pack_definition
+  variables:
+    OS: 'opensuse-leap'
+    DIST: '15.2'
+
 # Deploy
 
 sources_deploy:
@@ -515,6 +527,18 @@ debian_10_deploy:
   variables:
     OS: 'debian'
     DIST: 'buster'
+
+opensuse_15_1_deploy:
+  <<: *deploy_definition
+  variables:
+    OS: 'opensuse-leap'
+    DIST: '15.1'
+
+opensuse_15_2_deploy:
+  <<: *deploy_definition
+  variables:
+    OS: 'opensuse-leap'
+    DIST: '15.2'
 
 # Static builds
 
