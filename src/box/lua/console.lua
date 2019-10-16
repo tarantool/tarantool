@@ -256,24 +256,25 @@ local function set_output(storage, value)
     return true
 end
 
+local param_handlers = {
+    language = set_language,
+    lang = set_language,
+    l = set_language,
+    output = set_output,
+    o = set_output,
+    delimiter = set_delimiter,
+    delim = set_delimiter,
+    d = set_delimiter
+}
+
 local function set_param(storage, func, param, value)
-    local params = {
-        language = set_language,
-        lang = set_language,
-        l = set_language,
-        output = set_output,
-        o = set_output,
-        delimiter = set_delimiter,
-        delim = set_delimiter,
-        d = set_delimiter
-    }
     if param == nil then
         return format(false, 'Invalid set syntax, type \\help for help')
     end
-    if params[param] == nil then
+    if param_handlers[param] == nil then
         return format(false, 'Unknown parameter: ' .. tostring(param))
     end
-    return format(pcall(params[param], storage, value))
+    return format(pcall(param_handlers[param], storage, value))
 end
 
 local function help_wrapper(storage)
