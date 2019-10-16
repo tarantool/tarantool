@@ -416,9 +416,14 @@ local text_connection_mt = {
             end
             local nr_items, items = parse_operators(command)
             if nr_items == 3 then
-                local err, fmt, opts = parse_output(items[3])
-                if not err then
-                    self.eos = output_eos[fmt]
+                --
+                -- Make sure it is exactly "\set output" command.
+                if operators[items[1]] == set_param and
+                    param_handlers[items[2]] == set_output then
+                    local err, fmt, opts = parse_output(items[3])
+                    if not err then
+                        self.eos = output_eos[fmt]
+                    end
                 end
             end
         end,
