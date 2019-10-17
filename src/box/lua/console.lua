@@ -451,7 +451,7 @@ local text_connection_mt = {
                     self.print_f(rc)
                 end
             end
-            return rc
+            return error(self:set_error())
         end,
         --
         -- Make the connection be in error state, set error
