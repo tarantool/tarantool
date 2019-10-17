@@ -101,6 +101,7 @@ applier_log_error(struct applier *applier, struct error *e)
 	case ER_NO_SUCH_USER:
 	case ER_SYSTEM:
 	case ER_UNKNOWN_REPLICA:
+	case ER_PASSWORD_MISMATCH:
 		say_info("will retry every %.2lf second",
 			 replication_reconnect_interval());
 		break;
@@ -979,7 +980,8 @@ applier_f(va_list ap)
 				goto reconnect;
 			} else if (e->errcode() == ER_CFG ||
 				   e->errcode() == ER_ACCESS_DENIED ||
-				   e->errcode() == ER_NO_SUCH_USER) {
+				   e->errcode() == ER_NO_SUCH_USER ||
+				   e->errcode() == ER_PASSWORD_MISMATCH) {
 				/* Invalid configuration */
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_LOADING);
