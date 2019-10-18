@@ -314,7 +314,6 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 		if (pVal && sql_value_type(pVal) == MP_STR) {
 			z = (char *)sql_value_text(pVal);
 		}
-		sqlVdbeSetVarmask(pParse->pVdbe, iCol);
 		assert(pRight->op == TK_VARIABLE || pRight->op == TK_REGISTER);
 	} else if (op == TK_STRING) {
 		z = pRight->u.zToken;
@@ -336,7 +335,6 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 			*ppPrefix = pPrefix;
 			if (op == TK_VARIABLE) {
 				Vdbe *v = pParse->pVdbe;
-				sqlVdbeSetVarmask(v, pRight->iColumn);
 				if (*pisComplete && pRight->u.zToken[1]) {
 					/* If the rhs of the LIKE expression is a variable, and the current
 					 * value of the variable means there is no need to invoke the LIKE

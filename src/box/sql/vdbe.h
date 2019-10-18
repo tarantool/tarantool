@@ -255,7 +255,6 @@ void sqlVdbeSetSql(Vdbe *, const char *z, int n, int);
 void sqlVdbeSwap(Vdbe *, Vdbe *);
 VdbeOp *sqlVdbeTakeOpArray(Vdbe *, int *, int *);
 sql_value *sqlVdbeGetBoundValue(Vdbe *, int, u8);
-void sqlVdbeSetVarmask(Vdbe *, int);
 char *sqlVdbeExpandSql(Vdbe *, const char *);
 int sqlMemCompare(const Mem *, const Mem *, const struct coll *);
 

@@ -124,3 +124,12 @@ box.execute('DROP TABLE test')
 
 box.execute('SELECT ?', {1, 2})
 box.execute('SELECT $2', {1, 2, 3})
+
+-- gh-4566: bind variable to LIKE argument resulted to crash.
+--
+box.execute("CREATE TABLE t (id INT PRIMARY KEY, a TEXT);")
+box.execute("SELECT * FROM t WHERE a LIKE ?;", {'a%'});
+box.execute("INSERT INTO t VALUES (1, 'aA'), (2, 'Ba'), (3, 'A');")
+box.execute("SELECT * FROM t WHERE a LIKE ?;", {'a%'});
+
+box.space.T:drop()

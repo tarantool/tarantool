@@ -428,7 +428,6 @@ struct Vdbe {
 	VdbeFrame *pFrame;	/* Parent frame */
 	VdbeFrame *pDelFrame;	/* List of frame objects to free on VM reset */
 	int nFrame;		/* Number of frames in pFrame list */
-	u32 expmask;		/* Binding to these vars invalidates VM */
 	SubProgram *pProgram;	/* Linked list of all sub-programs used by VM */
 	/** Parser flags with which this object was built. */
 	uint32_t sql_flags;

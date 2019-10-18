@@ -112,9 +112,6 @@ sql_clear_bindings(sql_stmt * pStmt)
 		sqlVdbeMemRelease(&p->aVar[i]);
 		p->aVar[i].flags = MEM_Null;
 	}
-	if (p->isPrepareV2 && p->expmask) {
-		p->expired = 1;
-	}
 	return rc;
 }
 
@@ -826,22 +823,6 @@ vdbeUnbind(Vdbe * p, int i)
 	sqlVdbeMemRelease(pVar);
 	pVar->flags = MEM_Null;
 	pVar->field_type = field_type_MAX;
-
-	/* If the bit corresponding to this variable in Vdbe.expmask is set, then
-	 * binding a new value to this variable invalidates the current query plan.
-	 *
-	 * IMPLEMENTATION-OF: R-48440-37595 If the specific value bound to host
-	 * parameter in the WHERE clause might influence the choice of query plan
-	 * for a statement, then the statement will be automatically recompiled,
-	 * as if there had been a schema change, on the first sql_step() call
-	 * following any change to the bindings of that parameter.
-	 */
-	if (p->isPrepareV2 &&
-	    ((i < 32 && p->expmask & ((u32) 1 << i))
-	     || p->expmask == 0xffffffff)
-	    ) {
-		p->expired = 1;
-	}
 	return 0;
 }
 

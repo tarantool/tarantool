@@ -337,3 +337,35 @@ box.execute('SELECT $2', {1, 2, 3})
 - null
 - 'Failed to execute SQL statement: The number of parameters is too large'
 ...
+-- gh-4566: bind variable to LIKE argument resulted to crash.
+--
+box.execute("CREATE TABLE t (id INT PRIMARY KEY, a TEXT);")
+---
+- row_count: 1
+...
+box.execute("SELECT * FROM t WHERE a LIKE ?;", {'a%'});
+---
+- metadata:
+  - name: ID
+    type: integer
+  - name: A
+    type: string
+  rows: []
+...
+box.execute("INSERT INTO t VALUES (1, 'aA'), (2, 'Ba'), (3, 'A');")
+---
+- row_count: 3
+...
+box.execute("SELECT * FROM t WHERE a LIKE ?;", {'a%'});
+---
+- metadata:
+  - name: ID
+    type: integer
+  - name: A
+    type: string
+  rows:
+  - [1, 'aA']
+...
+box.space.T:drop()
+---
+...

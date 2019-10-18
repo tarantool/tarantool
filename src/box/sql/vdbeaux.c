@@ -2988,22 +2988,6 @@ sqlVdbeGetBoundValue(Vdbe * v, int iVar, u8 aff)
 	return 0;
 }
 
-/*
- * Configure SQL variable iVar so that binding a new value to it signals
- * to sql_reoptimize() that re-preparing the statement may result
- * in a better query plan.
- */
-void
-sqlVdbeSetVarmask(Vdbe * v, int iVar)
-{
-	assert(iVar > 0);
-	if (iVar > 32) {
-		v->expmask = 0xffffffff;
-	} else {
-		v->expmask |= ((u32) 1 << (iVar - 1));
-	}
-}
-
 int
 sqlVdbeCompareMsgpack(const char **key1,
 			  struct UnpackedRecord *unpacked, int key2_idx)

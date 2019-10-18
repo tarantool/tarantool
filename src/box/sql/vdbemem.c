@@ -1596,7 +1596,6 @@ stat4ValueFromExpr(Parse * pParse,	/* Parse context */
 	    ) {
 		Vdbe *v;
 		int iBindVar = pExpr->iColumn;
-		sqlVdbeSetVarmask(pParse->pVdbe, iBindVar);
 		if ((v = pParse->pReprepare) != 0) {
 			pVal = valueNew(db, pAlloc);
 			if (pVal) {
