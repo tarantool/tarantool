@@ -295,6 +295,9 @@ fiber_wakeup(struct fiber *f);
 API_EXPORT void
 fiber_cancel(struct fiber *f);
 
+API_EXPORT void
+fiber_recycle(struct fiber *fiber);
+
 /**
  * Make it possible or not possible to wakeup the current
  * fiber immediately when it's cancelled.

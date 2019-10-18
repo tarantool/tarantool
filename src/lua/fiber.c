@@ -460,6 +460,35 @@ lua_fiber_run_f(MAYBE_UNUSED va_list ap)
 }
 
 /**
+ * Fiber is created joinable by default so it must be marked
+ * as not joinable before it's dead.
+ * If GC'ed fiber is already dead it's simply recycled
+ * the same way as fiber_join do.
+ */
+static int
+lbox_fiber_gc(lua_State *L) {
+	int index = 1;
+	uint32_t fid;
+	if (lua_type(L, index) == LUA_TNUMBER) {
+		fid = lua_tonumber(L, index);
+	} else {
+		fid = *(uint32_t *) luaL_checkudata(L, index, fiberlib_name);
+	}
+	struct fiber *fiber = fiber_find(fid);
+	if (fiber != NULL) {
+		if (fiber_is_dead(fiber)) {
+			fiber_recycle(fiber);
+		} else {
+			fiber_set_joinable(fiber, false);
+		}
+	}
+
+	lua_pushboolean(L, true);
+	lua_pushinteger(L, 0);
+	return 2;
+}
+
+/**
  * Utility function for fiber.create and fiber.new
  */
 static struct fiber *
@@ -480,6 +509,7 @@ fiber_create(struct lua_State *L)
 	lua_xmove(L, child_L, lua_gettop(L));
 	/* XXX: 'fiber' is leaked if this throws a Lua error. */
 	lbox_pushfiber(L, f->fid);
+	fiber_set_joinable(f, true);
 	/* Pass coro_ref via lua stack so that we don't have to pass it
 	 * as an argument of fiber_run function.
 	 * No function will work with child_L until the function is called.
@@ -815,6 +845,7 @@ static const struct luaL_Reg lbox_fiber_meta [] = {
 	{"set_joinable", lbox_fiber_set_joinable},
 	{"wakeup", lbox_fiber_wakeup},
 	{"__index", lbox_fiber_index},
+	{"__gc", lbox_fiber_gc},
 	{NULL, NULL}
 };
 
