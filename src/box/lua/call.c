@@ -527,7 +527,9 @@ static inline int
 box_process_lua(lua_CFunction handler, struct execute_lua_ctx *ctx,
 		struct port *ret)
 {
-	lua_State *L = lua_newthread(tarantool_L);
+	lua_State *L = luaT_newthread(tarantool_L);
+	if (L == NULL)
+		return -1;
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	port_lua_create(ret, L);
 	((struct port_lua *) ret)->ref = coro_ref;
@@ -654,7 +656,9 @@ func_persistent_lua_load(struct func_lua *func)
 	 * an arbitrary user-defined code
 	 * (e.g. body = 'fiber.yield()').
 	 */
-	struct lua_State *coro_L = lua_newthread(tarantool_L);
+	lua_State *coro_L = luaT_newthread(tarantool_L);
+	if (coro_L == NULL)
+		return -1;
 	if (!func->base.def->is_sandboxed) {
 		/*
 		 * Keep the original env to apply to a non-sandboxed
@@ -811,7 +815,9 @@ lbox_func_call(struct lua_State *L)
 	 * before the function call to pass it into the
 	 * pcall-sandboxed tarantool_L handler.
 	 */
-	lua_State *args_L = lua_newthread(tarantool_L);
+	lua_State *args_L = luaT_newthread(tarantool_L);
+	if (args_L == NULL)
+		return luaT_error(L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	lua_xmove(L, args_L, lua_gettop(L) - 1);
 	struct port args;
