@@ -388,7 +388,9 @@ lua_fiber_run_f(MAYBE_UNUSED va_list ap)
 static struct fiber *
 fiber_create(struct lua_State *L)
 {
-	struct lua_State *child_L = lua_newthread(L);
+	lua_State *child_L = luaT_newthread(L);
+	if (child_L == NULL)
+		luaT_error(L);
 	int coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
 	struct fiber *f = fiber_new("lua", lua_fiber_run_f);

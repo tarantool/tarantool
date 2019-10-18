@@ -781,7 +781,10 @@ lua_yaml_encode(lua_State *L, struct luaL_serializer *serializer,
    dumper.cfg = serializer;
    dumper.error = 0;
    /* create thread to use for YAML buffer */
-   dumper.outputL = lua_newthread(L);
+   dumper.outputL = luaT_newthread(L);
+   if (dumper.outputL == NULL) {
+      return luaL_error(L, OOM_ERRMSG);
+   }
    luaL_buffinit(dumper.outputL, &dumper.yamlbuf);
 
    if (!yaml_emitter_initialize(&dumper.emitter))

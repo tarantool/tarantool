@@ -430,7 +430,9 @@ static inline int
 box_process_lua(struct call_request *request, struct port *base,
 		lua_CFunction handler)
 {
-	lua_State *L = lua_newthread(tarantool_L);
+	lua_State *L = luaT_newthread(tarantool_L);
+	if (L == NULL)
+		return -1;
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	port_lua_create(base, L);
 	((struct port_lua *) base)->ref = coro_ref;
