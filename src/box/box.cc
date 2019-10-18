@@ -1533,11 +1533,11 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
 
-	struct tt_uuid replicaset_uuid = uuid_nil, replica_uuid = uuid_nil;
+	struct tt_uuid replica_uuid = uuid_nil;
 	struct vclock replica_clock;
 	uint32_t replica_version_id;
 	vclock_create(&replica_clock);
-	xrow_decode_subscribe_xc(header, &replicaset_uuid, &replica_uuid,
+	xrow_decode_subscribe_xc(header, NULL, &replica_uuid,
 				 &replica_clock, &replica_version_id);
 
 	/* Forbid connection to itself */
