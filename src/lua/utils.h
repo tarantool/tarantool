@@ -559,6 +559,36 @@ luaL_checkfinite(struct lua_State *L, struct luaL_serializer *cfg,
 		luaL_error(L, "number must not be NaN or Inf");
 }
 
+/**
+ * @brief A wrapper for lua_newthread() to pass it into luaT_cpcall
+ * @param L is a Lua State
+ * @sa lua_newthread()
+ */
+static inline int
+luaT_newthread_wrapper(lua_State *L)
+{
+	*(lua_State **)lua_touserdata(L, 1) = lua_newthread(L);
+	return 0;
+}
+
+/**
+ * @brief Safe wrapper for lua_newthread()
+ * @param L is a Lua State
+ * @sa lua_newthread()
+ */
+static inline lua_State *
+luaT_newthread(lua_State *L)
+{
+	lua_State *L1 = NULL;
+	if (luaT_cpcall(L, luaT_newthread_wrapper, &L1) != 0) {
+		return NULL;
+	}
+	assert(L1 != NULL);
+	setthreadV(L, L->top, L1);
+	incr_top(L);
+	return L1;
+}
+
 int
 tarantool_lua_utils_init(struct lua_State *L);
 
