@@ -1391,13 +1391,14 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 * => JOIN { INSTANCE_UUID: replica_uuid }
 	 * <= OK { VCLOCK: start_vclock }
 	 *    Replica has enough permissions and master is ready for JOIN.
-	 *     - start_vclock - vclock of the latest master's checkpoint.
+	 *     - start_vclock - master's vclock at the time of join.
 	 *
 	 * <= INSERT
 	 *    ...
 	 *    Initial data: a stream of engine-specifc rows, e.g. snapshot
-	 *    rows for memtx or dirty cursor data for Vinyl. Engine can
-	 *    use REPLICA_ID, LSN and other fields for internal purposes.
+	 *    rows for memtx or dirty cursor data for Vinyl fed from a
+	 *    read-view. Engine can use REPLICA_ID, LSN and other fields
+	 *    for internal purposes.
 	 *    ...
 	 * <= INSERT
 	 * <= OK { VCLOCK: stop_vclock } - end of initial JOIN stage.
