@@ -73,17 +73,13 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	 * trigger yields, so when it's time to clean
 	 * up the coro, we wouldn't know which stack position
 	 * it is on.
-	 *
-	 * XXX: lua_newthread() may throw if out of memory,
-	 * this needs to be wrapped with lua_pcall() as well.
-	 * Don't, since it's a stupid overhead on every trigger
-	 * invocation, and in future we plan to hack into Lua
-	 * C API to fix this.
 	 */
-	struct lua_State *L;
+	lua_State *L;
 	int coro_ref;
 	if (fiber()->storage.lua.stack == NULL) {
-		L = lua_newthread(tarantool_L);
+		L = luaT_newthread(tarantool_L);
+		if (L == NULL)
+			diag_raise();
 		coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	} else {
 		L = fiber()->storage.lua.stack;
