@@ -292,10 +292,6 @@ box.schema.func.drop("test_func")
 s:drop()
 sq:drop()
 
-box.space._user:select()
-box.space._space:select()
-box.space._func:select()
-
 session = nil
 
 -- an error when granting or revoking non-existent privilege
