@@ -1118,10 +1118,20 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			}
 		}
 		/* Inequality constraint comes always at the end of list. */
-		enum field_type ineq_type = idx_def->key_def->parts[nEq].type;
-		if (pRangeStart != NULL && (ineq_type == FIELD_TYPE_INTEGER ||
-					    ineq_type == FIELD_TYPE_UNSIGNED))
-			force_integer_reg = regBase + nEq;
+		part_count = idx_def->key_def->part_count;
+		if (pRangeStart != NULL) {
+			/*
+			 * nEq == 0 means that filter condition
+			 * contains only inequality.
+			 */
+			uint32_t ineq_idx = nEq == 0 ? 0 : nEq - 1;
+			assert(ineq_idx < part_count);
+			enum field_type ineq_type =
+				idx_def->key_def->parts[ineq_idx].type;
+			if (ineq_type == FIELD_TYPE_INTEGER ||
+			    ineq_type == FIELD_TYPE_UNSIGNED)
+				force_integer_reg = regBase + nEq;
+		}
 		emit_apply_type(pParse, regBase, nConstraint - bSeekPastNull,
 				start_types);
 		if (pLoop->nSkip > 0 && nConstraint == pLoop->nSkip) {
