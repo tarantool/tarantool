@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "box/session.h"
+#include "execute.h"
 #include "bind.h"
 #include "ck_constraint.h"
 #include "errcode.h"

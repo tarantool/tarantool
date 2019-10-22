@@ -89,6 +89,9 @@ struct port_sql {
 
 extern const struct port_vtab port_sql_vtab;
 
+int
+sql_stmt_finalize(struct sql_stmt *stmt);
+
 /**
  * Prepare (compile into VDBE byte-code) statement.
  *

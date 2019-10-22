@@ -520,9 +520,6 @@ sql_value *
 sql_column_value(sql_stmt *,
 		     int iCol);
 
-int
-sql_stmt_finalize(sql_stmt * pStmt);
-
 /*
  * Terminate the current execution of an SQL statement and reset
  * it back to its starting state so that it can be reused.
