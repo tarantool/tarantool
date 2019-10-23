@@ -67,6 +67,9 @@ jobs:
       - name: "Ubuntu Disco (19.04) build + deploy DEB"
         env: OS=ubuntu DIST=disco
         if: branch = "1.10"
+      - name: "Ubuntu Eoan (19.10) build + deploy DEB"
+        env: OS=ubuntu DIST=eoan
+        if: branch = "1.10"
       - name: "Debian Jessie (8) build + deploy DEB"
         env: OS=debian DIST=jessie
         if: branch = "1.10"

@@ -195,6 +195,12 @@ ubuntu_19_04:
     OS: 'ubuntu'
     DIST: 'disco'
 
+ubuntu_19_10:
+  <<: *deploy_definition
+  variables:
+    OS: 'ubuntu'
+    DIST: 'eoan'
+
 debian_8:
   <<: *deploy_definition
   variables:
