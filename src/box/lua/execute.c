@@ -71,18 +71,21 @@ port_sql_dump_lua(struct port *port, struct lua_State *L, bool is_flat)
 	assert(is_flat == false);
 	assert(port->vtab == &port_sql_vtab);
 	struct sql *db = sql_get();
-	struct sql_stmt *stmt = ((struct port_sql *)port)->stmt;
-	int column_count = sql_column_count(stmt);
-	if (column_count > 0) {
+	struct port_sql *port_sql = (struct port_sql *)port;
+	struct sql_stmt *stmt = port_sql->stmt;
+	switch (port_sql->serialization_format) {
+	case DQL_EXECUTE: {
 		lua_createtable(L, 0, 2);
-		lua_sql_get_metadata(stmt, L, column_count);
+		lua_sql_get_metadata(stmt, L, sql_column_count(stmt));
 		lua_setfield(L, -2, "metadata");
 		port_tuple_vtab.dump_lua(port, L, false);
 		lua_setfield(L, -2, "rows");
-	} else {
-		assert(((struct port_tuple *)port)->size == 0);
+		break;
+	}
+	case DML_EXECUTE: {
+		assert(((struct port_tuple *) port)->size == 0);
 		struct stailq *autoinc_id_list =
-			vdbe_autoinc_id_list((struct Vdbe *)stmt);
+			vdbe_autoinc_id_list((struct Vdbe *) stmt);
 		lua_createtable(L, 0, stailq_empty(autoinc_id_list) ? 1 : 2);
 
 		luaL_pushuint64(L, db->nChange);
@@ -103,6 +106,11 @@ port_sql_dump_lua(struct port *port, struct lua_State *L, bool is_flat)
 				sql_info_key_strs[SQL_INFO_AUTOINCREMENT_IDS];
 			lua_setfield(L, -2, field_name);
 		}
+		break;
+	}
+	default: {
+		unreachable();
+	}
 	}
 }
 

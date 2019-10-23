@@ -100,7 +100,9 @@ static void
 port_sql_destroy(struct port *base)
 {
 	port_tuple_vtab.destroy(base);
-	sql_stmt_finalize(((struct port_sql *)base)->stmt);
+	struct port_sql *port_sql = (struct port_sql *) base;
+	if (port_sql->do_finalize)
+		sql_stmt_finalize(((struct port_sql *)base)->stmt);
 }
 
 const struct port_vtab port_sql_vtab = {
@@ -114,11 +116,15 @@ const struct port_vtab port_sql_vtab = {
 };
 
 static void
-port_sql_create(struct port *port, struct sql_stmt *stmt)
+port_sql_create(struct port *port, struct sql_stmt *stmt,
+		enum sql_serialization_format format, bool do_finalize)
 {
 	port_tuple_create(port);
-	((struct port_sql *)port)->stmt = stmt;
 	port->vtab = &port_sql_vtab;
+	struct port_sql *port_sql = (struct port_sql *) port;
+	port_sql->stmt = stmt;
+	port_sql->serialization_format = format;
+	port_sql->do_finalize = do_finalize;
 }
 
 /**
@@ -399,9 +405,10 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
 {
 	assert(port->vtab == &port_sql_vtab);
 	sql *db = sql_get();
-	struct sql_stmt *stmt = ((struct port_sql *)port)->stmt;
-	int column_count = sql_column_count(stmt);
-	if (column_count > 0) {
+	struct port_sql *sql_port = (struct port_sql *)port;
+	struct sql_stmt *stmt = sql_port->stmt;
+	switch (sql_port->serialization_format) {
+	case DQL_EXECUTE: {
 		int keys = 2;
 		int size = mp_sizeof_map(keys);
 		char *pos = (char *) obuf_alloc(out, size);
@@ -410,7 +417,7 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
 			return -1;
 		}
 		pos = mp_encode_map(pos, keys);
-		if (sql_get_metadata(stmt, out, column_count) != 0)
+		if (sql_get_metadata(stmt, out, sql_column_count(stmt)) != 0)
 			return -1;
 		size = mp_sizeof_uint(IPROTO_DATA);
 		pos = (char *) obuf_alloc(out, size);
@@ -421,7 +428,9 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
 		pos = mp_encode_uint(pos, IPROTO_DATA);
 		if (port_tuple_vtab.dump_msgpack(port, out) < 0)
 			return -1;
-	} else {
+		break;
+	}
+	case DML_EXECUTE: {
 		int keys = 1;
 		assert(((struct port_tuple *)port)->size == 0);
 		struct stailq *autoinc_id_list =
@@ -470,6 +479,11 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
 				      mp_encode_int(buf, id_entry->id);
 			}
 		}
+		break;
+	}
+	default: {
+		unreachable();
+	}
 	}
 	return 0;
 }
@@ -520,7 +534,9 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 	if (sql_stmt_compile(sql, len, NULL, &stmt, NULL) != 0)
 		return -1;
 	assert(stmt != NULL);
-	port_sql_create(port, stmt);
+	enum sql_serialization_format format = sql_column_count(stmt) > 0 ?
+					   DQL_EXECUTE : DML_EXECUTE;
+	port_sql_create(port, stmt, format, true);
 	if (sql_bind(stmt, bind, bind_count) == 0 &&
 	    sql_execute(stmt, port, region) == 0)
 		return 0;

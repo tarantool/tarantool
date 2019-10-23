@@ -46,6 +46,17 @@ enum sql_info_key {
 	sql_info_key_MAX,
 };
 
+/**
+ * One of possible formats used to dump msgpack/Lua.
+ * For details see port_sql_dump_msgpack() and port_sql_dump_lua().
+ */
+enum sql_serialization_format {
+	DQL_EXECUTE = 0,
+	DML_EXECUTE = 1,
+	DQL_PREPARE = 2,
+	DML_PREPARE = 3,
+};
+
 extern const char *sql_info_key_strs[];
 
 struct region;
@@ -85,6 +96,16 @@ struct port_sql {
 	struct port_tuple port_tuple;
 	/* Prepared SQL statement. */
 	struct sql_stmt *stmt;
+	/**
+	 * Serialization format depends on type of SQL query: DML or
+	 * DQL; and on type of SQL request: execute or prepare.
+	 */
+	uint8_t serialization_format;
+	/**
+	 * There's no need in clean-up in case of PREPARE request:
+	 * statement remains in cache and will be deleted later.
+	 */
+	bool do_finalize;
 };
 
 extern const struct port_vtab port_sql_vtab;
