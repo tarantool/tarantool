@@ -55,6 +55,9 @@
 static void
 checkpoint_cancel(struct checkpoint *ckpt);
 
+static void
+replica_join_cancel(struct cord *replica_join_cord);
+
 struct PACKED memtx_tuple {
 	/*
 	 * sic: the header of the tuple is used
@@ -129,6 +132,8 @@ memtx_engine_shutdown(struct engine *engine)
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 	if (memtx->checkpoint != NULL)
 		checkpoint_cancel(memtx->checkpoint);
+	if (memtx->replica_join_cord != NULL)
+		replica_join_cancel(memtx->replica_join_cord);
 	mempool_destroy(&memtx->iterator_pool);
 	if (mempool_is_initialized(&memtx->rtree_iterator_pool))
 		mempool_destroy(&memtx->rtree_iterator_pool);
@@ -527,6 +532,18 @@ checkpoint_cancel(struct checkpoint *ckpt)
 	checkpoint_delete(ckpt);
 }
 
+static void
+replica_join_cancel(struct cord *replica_join_cord)
+{
+	/*
+	 * Cancel the thread being used to join replica if it's
+	 * running and wait for it to terminate so as to
+	 * eliminate the possibility of use-after-free.
+	 */
+	tt_pthread_cancel(replica_join_cord->id);
+	tt_pthread_join(replica_join_cord->id, NULL);
+}
+
 static int
 checkpoint_add_space(struct space *sp, void *data)
 {
@@ -848,7 +865,11 @@ memtx_engine_join(struct engine *engine, void *arg, struct xstream *stream)
 	struct cord cord;
 	if (cord_costart(&cord, "initial_join", memtx_join_f, ctx) != 0)
 		return -1;
-	return cord_cojoin(&cord);
+	struct memtx_engine *memtx = (struct memtx_engine *)engine;
+	memtx->replica_join_cord = &cord;
+	int res = cord_cojoin(&cord);
+	memtx->replica_join_cord = NULL;
+	return res;
 }
 
 static void
@@ -1029,6 +1050,8 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	memtx->state = MEMTX_INITIALIZED;
 	memtx->max_tuple_size = MAX_TUPLE_SIZE;
 	memtx->force_recovery = force_recovery;
+
+	memtx->replica_join_cord = NULL;
 
 	memtx->base.vtab = &memtx_engine_vtab;
 	memtx->base.name = "memtx";
