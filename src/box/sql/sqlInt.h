@@ -705,6 +705,12 @@ sql_bind_zeroblob64(sql_stmt *, int,
 			sql_uint64);
 
 /**
+ * Return the number of wildcards that should be bound to.
+ */
+int
+sql_bind_parameter_count(const struct sql_stmt *stmt);
+
+/**
  * Perform pointer parameter binding for the prepared sql
  * statement.
  * @param stmt Prepared statement.

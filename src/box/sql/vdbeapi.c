@@ -1035,15 +1035,11 @@ sql_bind_zeroblob64(sql_stmt * pStmt, int i, sql_uint64 n)
 	return sql_bind_zeroblob(pStmt, i, n);
 }
 
-/*
- * Return the number of wildcards that can be potentially bound to.
- * This routine is added to support DBD::sql.
- */
 int
-sql_bind_parameter_count(sql_stmt * pStmt)
+sql_bind_parameter_count(const struct sql_stmt *stmt)
 {
-	Vdbe *p = (Vdbe *) pStmt;
-	return p ? p->nVar : 0;
+	struct Vdbe *p = (struct Vdbe *) stmt;
+	return p->nVar;
 }
 
 /*
