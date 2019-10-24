@@ -88,8 +88,26 @@ luaT_key_def_set_part(struct lua_State *L, struct key_part_def *part,
 	lua_pushstring(L, "fieldno");
 	lua_gettable(L, -2);
 	if (lua_isnil(L, -1)) {
-		diag_set(IllegalParams, "fieldno must not be nil");
-		return -1;
+		lua_pop(L, 1);
+		/*
+		 * 'field' is an alias for fieldno to support the
+		 * same parts format as is used in
+		 * <space_object>.create_index() in Lua.
+		 */
+		lua_getfield(L, -1, "field");
+		if (lua_isnil(L, -1)) {
+			diag_set(IllegalParams,
+				 "fieldno or field must not be nil");
+			return -1;
+		}
+	} else {
+		lua_getfield(L, -2, "field");
+		if (! lua_isnil(L, -1)) {
+			diag_set(IllegalParams,
+				 "Conflicting options: fieldno and field");
+			return -1;
+		}
+		lua_pop(L, 1);
 	}
 	/*
 	 * Transform one-based Lua fieldno to zero-based
