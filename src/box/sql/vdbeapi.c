@@ -777,11 +777,17 @@ sql_column_is_autoincrement(sql_stmt *stmt, int n)
 }
 
 const char *
-sql_column_span(sql_stmt *stmt, int n)
-{
+sql_column_span(sql_stmt *stmt, int n) {
 	struct Vdbe *p = (struct Vdbe *) stmt;
 	assert(n < sql_column_count(stmt) && n >= 0);
 	return p->metadata[n].span;
+}
+
+uint32_t
+sql_stmt_schema_version(const struct sql_stmt *stmt)
+{
+	struct Vdbe *v = (struct Vdbe *) stmt;
+	return v->schema_ver;
 }
 
 /******************************* sql_bind_  **************************

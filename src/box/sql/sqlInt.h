@@ -586,6 +586,9 @@ sql_column_is_autoincrement(sql_stmt *stmt, int n);
 const char *
 sql_column_span(sql_stmt *stmt, int n);
 
+uint32_t
+sql_stmt_schema_version(const struct sql_stmt *stmt);
+
 int
 sql_initialize(void);
 
