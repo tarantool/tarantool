@@ -711,6 +711,14 @@ int
 sql_bind_parameter_count(const struct sql_stmt *stmt);
 
 /**
+ * Return the name of a wildcard parameter. Return NULL if the index
+ * is out of range or if the wildcard is unnamed. Parameter's index
+ * is 0-based.
+ */
+const char *
+sql_bind_parameter_name(const struct sql_stmt *stmt, int i);
+
+/**
  * Perform pointer parameter binding for the prepared sql
  * statement.
  * @param stmt Prepared statement.

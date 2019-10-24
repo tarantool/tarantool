@@ -1042,18 +1042,12 @@ sql_bind_parameter_count(const struct sql_stmt *stmt)
 	return p->nVar;
 }
 
-/*
- * Return the name of a wildcard parameter.  Return NULL if the index
- * is out of range or if the wildcard is unnamed.
- *
- * The result is always UTF-8.
- */
 const char *
-sql_bind_parameter_name(sql_stmt * pStmt, int i)
+sql_bind_parameter_name(const struct sql_stmt *stmt, int i)
 {
-	Vdbe *p = (Vdbe *) pStmt;
-	if (p == 0)
-		return 0;
+	struct Vdbe *p = (struct Vdbe *) stmt;
+	if (p == NULL)
+		return NULL;
 	return sqlVListNumToName(p->pVList, i);
 }
 
