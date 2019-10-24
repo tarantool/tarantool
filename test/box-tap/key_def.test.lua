@@ -154,6 +154,29 @@ local key_def_new_cases = {
         }},
         exp_err = nil,
     },
+    --
+    -- gh-4519: key_def should allow the same options as
+    -- <space_object>.create_index(). That is, a field number
+    -- should be allowed to be specified as `field`, not only
+    -- `fieldno`.
+    --
+    {
+        'Success case; `field` is alias to `fieldno`',
+        parts = {{
+            field = 1,
+            type = 'unsigned'
+        }},
+        exp_err = nil,
+    },
+    {
+        'Field and fieldno can not be set both',
+        parts = {{
+            field = 1,
+            fieldno = 1,
+            type = 'unsigned'
+        }},
+        exp_err = 'Conflicting options: fieldno and field',
+    }
 }
 
 local test = tap.test('key_def')
