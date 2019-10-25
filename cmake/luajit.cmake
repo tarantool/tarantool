@@ -223,12 +223,24 @@ macro(luajit_build)
     foreach(def ${defs})
         set(luajit_xcflags ${luajit_xcflags} -D${def})
     endforeach()
+
+    # Pass the same toolchain that is used for building of
+    # tarantool itself, because tools from different toolchains
+    # can be incompatible. A compiler and a linker are already set
+    # above.
+    set (luajit_ld ${CMAKE_LINKER})
+    set (luajit_ar ${CMAKE_AR} rcus)
+    set (luajit_strip ${CMAKE_STRIP})
+
     set (luajit_buildoptions
         BUILDMODE=static
         HOST_CC="${luajit_hostcc}"
         TARGET_CC="${luajit_cc}"
         TARGET_CFLAGS="${luajit_cflags}"
+        TARGET_LD="${luajit_ld}"
         TARGET_LDFLAGS="${luajit_ldflags}"
+        TARGET_AR="${luajit_ar}"
+        TARGET_STRIP="${luajit_strip}"
         TARGET_SYS="${CMAKE_SYSTEM_NAME}"
         CCOPT="${luajit_ccopt}"
         CCDEBUG="${luajit_ccdebug}"
