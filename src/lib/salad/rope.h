@@ -114,13 +114,18 @@ avl_iter_check(struct avl_iter *iter);
  * ROPE_FREE_F, optional
  */
 
+#define CONCAT_R(a, b) a##b
+#define CONCAT(a, b) CONCAT_R(a, b)
+#define CONCAT3_R(a, b, c) a##b##c
+#define CONCAT3(a, b, c) CONCAT3_R(a, b, c)
+
 #if defined(ROPE_SRC)
-	#define rope_api(x) avl_##x
+	#define rope_api(x) CONCAT(avl_, x)
 #elif defined(rope_name)
-	#define rope_api(x) rope_##rope_name##_##x
-	#define rope rope_##rope_name
+	#define rope_api(x) CONCAT3(rope_name, _rope_, x)
+	#define rope CONCAT(rope_name, _rope)
 #else
-	#define rope_api(x) rope_##x
+	#define rope_api(x) CONCAT(rope_, x)
 #endif
 
 #ifndef ROPE_FREE_F
@@ -711,6 +716,11 @@ rope_pretty_print(struct rope *rope, void (*print_leaf)(rope_data_t, size_t))
 #undef ROPE_ALLOC_F
 #undef ROPE_FREE_F
 #undef ROPE_FREE
+
+#undef CONCAT_R
+#undef CONCAT
+#undef CONCAT3_R
+#undef CONCAT3
 
 #if defined(__cplusplus)
 }
