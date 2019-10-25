@@ -1,5 +1,7 @@
 stages:
   - test
+  - perf
+  - cleanup
 
 variables:
   GITLAB_MAKE: "make -f .gitlab.mk"
@@ -25,6 +27,14 @@ variables:
     - external_pull_requests
     - merge_requests
     - /^.*-full-ci$/
+
+.perf_only_template: &perf_only_definition
+  only:
+    - "1.10"
+    - /^.*-perf$/
+  variables: &perf_vars_definition
+    IMAGE_PERF: "${CI_REGISTRY}/${CI_PROJECT_PATH}/perf/ubuntu-bionic:perf_master"
+    IMAGE_PERF_BUILT: "${CI_REGISTRY}/${CI_PROJECT_PATH}/perf_tmp/ubuntu-bionic:perf_${CI_COMMIT_SHORT_SHA}"
 
 .docker_test_template: &docker_test_definition
   image: "${CI_REGISTRY}/${CI_PROJECT_PATH}/testing/debian-stretch:latest"
@@ -76,6 +86,15 @@ variables:
     - ${GITLAB_MAKE} vms_start
   after_script:
     - ${GITLAB_MAKE} vms_shutdown
+
+.perf_docker_test_template: &perf_docker_test_definition
+  <<: *perf_only_definition
+  image: ${IMAGE_PERF_BUILT}
+  stage: perf
+  tags:
+    - docker_perf
+  script:
+    - ${GITLAB_MAKE} perf_run
 
 # Tests
 
@@ -167,6 +186,75 @@ freebsd_12_release:
     MAKE: 'gmake'
   script:
     - ${GITLAB_MAKE} vms_test_freebsd
+
+# ####
+# Perf
+# ####
+
+# Pre-testing part
+
+perf_bootstrap:
+  <<: *perf_only_definition
+  stage: test
+  tags:
+    - perf
+  script:
+    - ${GITLAB_MAKE} perf_prepare
+
+# Testing part
+
+perf_ycsb_hash:
+  <<: *perf_docker_test_definition
+  variables:
+    <<: *perf_vars_definition
+    BENCH: 'ycsb'
+    ARG: 'hash'
+
+perf_ycsb_tree:
+  <<: *perf_docker_test_definition
+  variables:
+    <<: *perf_vars_definition
+    BENCH: 'ycsb'
+    ARG: 'tree'
+
+perf_nosqlbench_hash:
+  <<: *perf_docker_test_definition
+  variables:
+    <<: *perf_vars_definition
+    BENCH: 'nosqlbench'
+    ARG: 'hash'
+
+perf_nosqlbench_tree:
+  <<: *perf_docker_test_definition
+  variables:
+    <<: *perf_vars_definition
+    BENCH: 'nosqlbench'
+    ARG: 'tree'
+
+perf_cbench:
+  <<: *perf_docker_test_definition
+  variables:
+    <<: *perf_vars_definition
+    BENCH: 'cbench'
+
+perf_linkbench_ssd:
+  <<: *perf_docker_test_definition
+  tags:
+    - docker_perf_ssd
+  variables:
+    <<: *perf_vars_definition
+    BENCH: 'linkbench'
+
+# Post-testing part
+
+remove_images:
+  <<: *perf_only_definition
+  stage: cleanup
+  when: always
+  tags:
+    - perf
+  script:
+    - ${GITLAB_MAKE} perf_cleanup
 
 # Packs
 
