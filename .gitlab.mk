@@ -78,6 +78,18 @@ docker_bootstrap:
 	docker push ${DEBIAN_STRETCH_IMAGE}:latest
 	docker push ${DEBIAN_BUSTER_IMAGE}:latest
 
+# Clone the benchmarks repository for performance testing
+perf_clone_benchs_repo:
+	git clone https://github.com/tarantool/bench-run.git
+
+# Build images for performance testing
+perf_prepare: perf_clone_benchs_repo
+	make -f bench-run/targets.mk prepare
+
+# Remove temporary performance image from the test host
+perf_cleanup: perf_clone_benchs_repo
+	make -f bench-run/targets.mk cleanup
+
 # #################################
 # Run tests under a virtual machine
 # #################################
@@ -126,3 +138,10 @@ deploy: package
 
 static_build:
 	docker build --network=host --build-arg RUN_TESTS="${RUN_TESTS}" -f Dockerfile.staticbuild .
+
+# ###################
+# Performance testing
+# ###################
+
+perf_run:
+	/opt/bench-run/benchs/${BENCH}/run.sh ${ARG}
