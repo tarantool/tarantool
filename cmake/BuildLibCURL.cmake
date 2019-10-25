@@ -45,9 +45,21 @@ macro(curl_build)
         CONFIGURE_COMMAND
             cd <SOURCE_DIR> && ./buildconf &&
             cd <BINARY_DIR> && <SOURCE_DIR>/configure
+                # Pass the same toolchain as is used to build
+                # tarantool itself, because they can be
+                # incompatible.
                 CC=${CMAKE_C_COMPILER}
+                LD=${CMAKE_LINKER}
+                AR=${CMAKE_AR}
+                RANLIB=${CMAKE_RANLIB}
+                NM=${CMAKE_NM}
+                STRIP=${CMAKE_STRIP}
+
+                # Pass -isysroot=<SDK_PATH> option on Mac OS, see
+                # above.
                 CPPFLAGS=${LIBCURL_CPPFLAGS}
                 CFLAGS=${LIBCURL_CFLAGS}
+
                 --prefix <INSTALL_DIR>
                 --enable-static
                 --enable-shared
