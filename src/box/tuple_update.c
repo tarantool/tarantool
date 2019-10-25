@@ -99,7 +99,7 @@
  */
 
 static inline void *
-update_alloc(struct region *region, size_t size)
+xrow_update_alloc(struct region *region, size_t size)
 {
 	void *ptr = region_aligned_alloc(region, size, alignof(uint64_t));
 	if (ptr == NULL)
@@ -109,10 +109,10 @@ update_alloc(struct region *region, size_t size)
 }
 
 /** Update internal state */
-struct tuple_update
+struct xrow_update
 {
-	struct rope *rope;
-	struct update_op *ops;
+	struct xrow_update_rope *rope;
+	struct xrow_update_op *ops;
 	uint32_t op_count;
 	int index_base; /* 0 for C and 1 for Lua */
 	/** A bitmask of all columns modified by this update */
@@ -120,13 +120,13 @@ struct tuple_update
 };
 
 /** Argument of SET (and INSERT) operation. */
-struct op_set_arg {
+struct xrow_update_arg_set {
 	uint32_t length;
 	const char *value;
 };
 
 /** Argument of DELETE operation. */
-struct op_del_arg {
+struct xrow_update_arg_del {
 	uint32_t count;
 };
 
@@ -134,11 +134,11 @@ struct op_del_arg {
  * MsgPack format code of an arithmetic argument or result.
  * MsgPack codes are not used to simplify type calculation.
  */
-enum arith_type {
-	AT_DECIMAL = 0, /* MP_EXT + MP_DECIMAL */
-	AT_DOUBLE = 1, /* MP_DOUBLE */
-	AT_FLOAT = 2, /* MP_FLOAT */
-	AT_INT = 3 /* MP_INT/MP_UINT */
+enum xrow_update_arith_type {
+	XUPDATE_TYPE_DECIMAL = 0, /* MP_EXT + MP_DECIMAL */
+	XUPDATE_TYPE_DOUBLE = 1, /* MP_DOUBLE */
+	XUPDATE_TYPE_FLOAT = 2, /* MP_FLOAT */
+	XUPDATE_TYPE_INT = 3 /* MP_INT/MP_UINT */
 };
 
 /**
@@ -162,8 +162,8 @@ enum arith_type {
  *   it's MP_UINT. If the result is out of bounds of (-2^63,
  *   2^64), and exception is raised for overflow.
  */
-struct op_arith_arg {
-	enum arith_type type;
+struct xrow_update_arg_arith {
+	enum xrow_update_arith_type type;
 	union {
 		double dbl;
 		float flt;
@@ -173,12 +173,12 @@ struct op_arith_arg {
 };
 
 /** Argument of AND, XOR, OR operations. */
-struct op_bit_arg {
+struct xrow_update_arg_bit {
 	uint64_t val;
 };
 
 /** Argument of SPLICE. */
-struct op_splice_arg {
+struct xrow_update_arg_splice {
 	int32_t offset;	   /** splice position */
 	int32_t cut_length;    /** cut this many bytes. */
 	const char *paste; /** paste what? */
@@ -190,47 +190,50 @@ struct op_splice_arg {
 	int32_t tail_length;
 };
 
-union update_op_arg {
-	struct op_set_arg set;
-	struct op_del_arg del;
-	struct op_arith_arg arith;
-	struct op_bit_arg bit;
-	struct op_splice_arg splice;
+union xrow_update_arg {
+	struct xrow_update_arg_set set;
+	struct xrow_update_arg_del del;
+	struct xrow_update_arg_arith arith;
+	struct xrow_update_arg_bit bit;
+	struct xrow_update_arg_splice splice;
 };
 
-struct update_field;
-struct update_op;
+struct xrow_update_field;
+struct xrow_update_op;
 
-static struct update_field *
-update_field_split(struct region *region, struct update_field *data,
-		   size_t size, size_t offset);
+static struct xrow_update_field *
+xrow_update_field_split(struct region *region, struct xrow_update_field *data,
+			size_t size, size_t offset);
 
-#define ROPE_SPLIT_F update_field_split
-#define ROPE_ALLOC_F update_alloc
-#define rope_data_t struct update_field *
+#define ROPE_SPLIT_F xrow_update_field_split
+#define ROPE_ALLOC_F xrow_update_alloc
+#define rope_data_t struct xrow_update_field *
 #define rope_ctx_t struct region *
+#define rope_name xrow_update
 
 #include "salad/rope.h"
 
-typedef int (*do_op_func)(struct tuple_update *update, struct update_op *op);
-typedef int (*read_arg_func)(int index_base, struct update_op *op,
-			     const char **expr);
-typedef void (*store_op_func)(union update_op_arg *arg, const char *in,
-			      char *out);
+typedef int (*xrow_update_op_do_f)(struct xrow_update *update,
+				   struct xrow_update_op *op);
+typedef int (*xrow_update_op_read_arg_f)(int index_base,
+					 struct xrow_update_op *op,
+					 const char **expr);
+typedef void (*xrow_update_op_store_f)(union xrow_update_arg *arg,
+				       const char *in, char *out);
 
 /** A set of functions and properties to initialize and do an op. */
-struct update_op_meta {
-	read_arg_func read_arg;
-	do_op_func do_op;
-	store_op_func store;
+struct xrow_update_op_meta {
+	xrow_update_op_read_arg_f read_arg;
+	xrow_update_op_do_f do_op;
+	xrow_update_op_store_f store;
 	/* Argument count */
 	uint32_t args;
 };
 
 /** A single UPDATE operation. */
-struct update_op {
-	const struct update_op_meta *meta;
-	union update_op_arg arg;
+struct xrow_update_op {
+	const struct xrow_update_op_meta *meta;
+	union xrow_update_arg arg;
 	/* Subject field no. */
 	int32_t field_no;
 	uint32_t new_field_len;
@@ -238,7 +241,7 @@ struct update_op {
 };
 
 static inline const char *
-update_op_field_str(const struct update_op *op)
+xrow_update_op_field_str(const struct xrow_update_op *op)
 {
 	if (op->field_no >= 0)
 		return tt_sprintf("%d", op->field_no + TUPLE_INDEX_BASE);
@@ -247,39 +250,40 @@ update_op_field_str(const struct update_op *op)
 }
 
 static inline int
-update_err_arg_type(const struct update_op *op, const char *needed_type)
+xrow_update_err_arg_type(const struct xrow_update_op *op,
+			 const char *needed_type)
 {
 	diag_set(ClientError, ER_UPDATE_ARG_TYPE, op->opcode,
-		 update_op_field_str(op), needed_type);
+		 xrow_update_op_field_str(op), needed_type);
 	return -1;
 }
 
 static inline int
-update_err_int_overflow(const struct update_op *op)
+xrow_update_err_int_overflow(const struct xrow_update_op *op)
 {
 	diag_set(ClientError, ER_UPDATE_INTEGER_OVERFLOW, op->opcode,
-		 update_op_field_str(op));
+		 xrow_update_op_field_str(op));
 	return -1;
 }
 
 static inline int
-update_err_decimal_overflow(const struct update_op *op)
+xrow_update_err_decimal_overflow(const struct xrow_update_op *op)
 {
 	diag_set(ClientError, ER_UPDATE_DECIMAL_OVERFLOW, op->opcode,
-		 update_op_field_str(op));
+		 xrow_update_op_field_str(op));
 	return -1;
 }
 
 static inline int
-update_err_splice_bound(const struct update_op *op)
+xrow_update_err_splice_bound(const struct xrow_update_op *op)
 {
-	diag_set(ClientError, ER_UPDATE_SPLICE, update_op_field_str(op),
+	diag_set(ClientError, ER_UPDATE_SPLICE, xrow_update_op_field_str(op),
 		 "offset is out of bound");
 	return -1;
 }
 
 static inline int
-update_err_no_such_field(const struct update_op *op)
+xrow_update_err_no_such_field(const struct xrow_update_op *op)
 {
 	diag_set(ClientError, ER_NO_SUCH_FIELD_NO, op->field_no >= 0 ?
 		 TUPLE_INDEX_BASE + op->field_no : op->field_no);
@@ -287,26 +291,26 @@ update_err_no_such_field(const struct update_op *op)
 }
 
 static inline int
-update_err(const struct update_op *op, const char *reason)
+xrow_update_err(const struct xrow_update_op *op, const char *reason)
 {
-	diag_set(ClientError, ER_UPDATE_FIELD, update_op_field_str(op),
+	diag_set(ClientError, ER_UPDATE_FIELD, xrow_update_op_field_str(op),
 		 reason);
 	return -1;
 }
 
 static inline int
-update_err_double(const struct update_op *op)
+xrow_update_err_double(const struct xrow_update_op *op)
 {
-	return update_err(op, "double update of the same field");
+	return xrow_update_err(op, "double update of the same field");
 }
 
 /**
  * We can have more than one operation on the same field.
  * A descriptor of one changed field.
  */
-struct update_field {
+struct xrow_update_field {
 	/** UPDATE operation against the first field in the range. */
-	struct update_op *op;
+	struct xrow_update_op *op;
 	/** Points at start of field *data* in the old tuple. */
 	const char *old;
 	/** End of the old field. */
@@ -320,8 +324,8 @@ struct update_field {
 };
 
 static void
-update_field_init(struct update_field *field,
-		  const char *old, uint32_t old_len, uint32_t tail_len)
+xrow_update_field_init(struct xrow_update_field *field, const char *old,
+		       uint32_t old_len, uint32_t tail_len)
 {
 	field->op = NULL;
 	field->old = old;
@@ -333,21 +337,23 @@ update_field_init(struct update_field *field,
 
 /** Read a field index or any other integer field. */
 static inline int
-mp_read_i32(struct update_op *op, const char **expr, int32_t *ret)
+xrow_update_mp_read_int32(struct xrow_update_op *op, const char **expr,
+			  int32_t *ret)
 {
 	if (mp_read_int32(expr, ret) == 0)
 		return 0;
-	return update_err_arg_type(op, "an integer");
+	return xrow_update_err_arg_type(op, "an integer");
 }
 
 static inline int
-mp_read_uint(struct update_op *op, const char **expr, uint64_t *ret)
+xrow_update_mp_read_uint(struct xrow_update_op *op, const char **expr,
+			 uint64_t *ret)
 {
 	if (mp_typeof(**expr) == MP_UINT) {
 		*ret = mp_decode_uint(expr);
 		return 0;
 	}
-	return update_err_arg_type(op, "a positive integer");
+	return xrow_update_err_arg_type(op, "a positive integer");
 }
 
 /**
@@ -355,27 +361,27 @@ mp_read_uint(struct update_op *op, const char **expr, uint64_t *ret)
  * or from the UPDATE command.
  */
 static inline int
-mp_read_arith_arg(struct update_op *op, const char **expr,
-		  struct op_arith_arg *ret)
+xrow_mp_read_arg_arith(struct xrow_update_op *op, const char **expr,
+		       struct xrow_update_arg_arith *ret)
 {
 	if (mp_typeof(**expr) == MP_UINT) {
-		ret->type = AT_INT;
+		ret->type = XUPDATE_TYPE_INT;
 		int96_set_unsigned(&ret->int96, mp_decode_uint(expr));
 	} else if (mp_typeof(**expr) == MP_INT) {
-		ret->type = AT_INT;
+		ret->type = XUPDATE_TYPE_INT;
 		int96_set_signed(&ret->int96, mp_decode_int(expr));
 	} else if (mp_typeof(**expr) == MP_DOUBLE) {
-		ret->type = AT_DOUBLE;
+		ret->type = XUPDATE_TYPE_DOUBLE;
 		ret->dbl = mp_decode_double(expr);
 	} else if (mp_typeof(**expr) == MP_FLOAT) {
-		ret->type = AT_FLOAT;
+		ret->type = XUPDATE_TYPE_FLOAT;
 		ret->flt = mp_decode_float(expr);
 	} else if (mp_typeof(**expr) == MP_EXT) {
 		int8_t ext_type;
 		uint32_t len = mp_decode_extl(expr, &ext_type);
 		switch (ext_type) {
 		case MP_DECIMAL:
-			ret->type = AT_DECIMAL;
+			ret->type = XUPDATE_TYPE_DECIMAL;
 			decimal_unpack(expr, len, &ret->dec);
 			break;
 		default:
@@ -383,20 +389,20 @@ mp_read_arith_arg(struct update_op *op, const char **expr,
 		}
 	} else {
 err:
-		return update_err_arg_type(op, "a number");
+		return xrow_update_err_arg_type(op, "a number");
 	}
 	return 0;
 }
 
 static inline int
-mp_read_str(struct update_op *op, const char **expr, uint32_t *len,
-	    const char **ret)
+xrow_update_mp_read_str(struct xrow_update_op *op, const char **expr,
+			uint32_t *len, const char **ret)
 {
 	if (mp_typeof(**expr) == MP_STR) {
 		*ret = mp_decode_str(expr, len); /* value */
 		return 0;
 	}
-	return update_err_arg_type(op, "a string");
+	return xrow_update_err_arg_type(op, "a string");
 }
 
 /* }}} read_arg helpers */
@@ -404,8 +410,8 @@ mp_read_str(struct update_op *op, const char **expr, uint32_t *len,
 /* {{{ read_arg */
 
 static int
-read_arg_set(int index_base, struct update_op *op,
-	     const char **expr)
+xrow_update_read_arg_set(int index_base, struct xrow_update_op *op,
+			 const char **expr)
 {
 	(void)index_base;
 	op->arg.set.value = *expr;
@@ -415,60 +421,61 @@ read_arg_set(int index_base, struct update_op *op,
 }
 
 static int
-read_arg_insert(int index_base, struct update_op *op,
-		const char **expr)
+xrow_update_read_arg_insert(int index_base, struct xrow_update_op *op,
+			    const char **expr)
 {
-	return read_arg_set(index_base, op, expr);
+	return xrow_update_read_arg_set(index_base, op, expr);
 }
 
 static int
-read_arg_delete(int index_base, struct update_op *op,
-		const char **expr)
+xrow_update_read_arg_delete(int index_base, struct xrow_update_op *op,
+			    const char **expr)
 {
 	(void) index_base;
 	if (mp_typeof(**expr) == MP_UINT) {
 		op->arg.del.count = (uint32_t) mp_decode_uint(expr);
 		if (op->arg.del.count != 0)
 			return 0;
-		return update_err(op, "cannot delete 0 fields");
+		return xrow_update_err(op, "cannot delete 0 fields");
 	}
-	return update_err_arg_type(op, "a positive integer");
+	return xrow_update_err_arg_type(op, "a positive integer");
 }
 
 static int
-read_arg_arith(int index_base, struct update_op *op,
-	       const char **expr)
+xrow_update_read_arg_arith(int index_base, struct xrow_update_op *op,
+			   const char **expr)
 {
 	(void) index_base;
-	return mp_read_arith_arg(op, expr, &op->arg.arith);
+	return xrow_mp_read_arg_arith(op, expr, &op->arg.arith);
 }
 
 static int
-read_arg_bit(int index_base, struct update_op *op,
-	     const char **expr)
+xrow_update_read_arg_bit(int index_base, struct xrow_update_op *op,
+			 const char **expr)
 {
 	(void) index_base;
-	struct op_bit_arg *arg = &op->arg.bit;
-	return mp_read_uint(op, expr, &arg->val);
+	struct xrow_update_arg_bit *arg = &op->arg.bit;
+	return xrow_update_mp_read_uint(op, expr, &arg->val);
 }
 
 static int
-read_arg_splice(int index_base, struct update_op *op,
-		const char **expr)
+xrow_update_read_arg_splice(int index_base, struct xrow_update_op *op,
+			    const char **expr)
 {
-	struct op_splice_arg *arg = &op->arg.splice;
-	if (mp_read_i32(op, expr, &arg->offset) != 0)
+	struct xrow_update_arg_splice *arg = &op->arg.splice;
+	if (xrow_update_mp_read_int32(op, expr, &arg->offset) != 0)
 		return -1;
 	if (arg->offset >= 0) {
 		if (arg->offset - index_base < 0)
-			return update_err_splice_bound(op);
+			return xrow_update_err_splice_bound(op);
 		arg->offset -= index_base;
 	}
 	/* cut length */
-	if (mp_read_i32(op, expr, &arg->cut_length) != 0)
+	if (xrow_update_mp_read_int32(op, expr, &arg->cut_length) != 0)
 		return -1;
 	 /* value */
-	return mp_read_str(op, expr, &arg->paste_length, &arg->paste);
+	return xrow_update_mp_read_str(op, expr, &arg->paste_length,
+				       &arg->paste);
 }
 
 /* }}} read_arg */
@@ -476,7 +483,7 @@ read_arg_splice(int index_base, struct update_op *op,
 /* {{{ do_op helpers */
 
 static inline int
-op_adjust_field_no(struct update_op *op, int32_t field_max)
+xrow_update_op_adjust_field_no(struct xrow_update_op *op, int32_t field_max)
 {
 	if (op->field_no >= 0) {
 		if (op->field_no < field_max)
@@ -485,18 +492,18 @@ op_adjust_field_no(struct update_op *op, int32_t field_max)
 		op->field_no += field_max;
 		return 0;
 	}
-	return update_err_no_such_field(op);
+	return xrow_update_err_no_such_field(op);
 }
 
 static inline double
-cast_arith_arg_to_double(struct op_arith_arg arg)
+xrow_update_arg_arith_to_double(struct xrow_update_arg_arith arg)
 {
-	if (arg.type == AT_DOUBLE) {
+	if (arg.type == XUPDATE_TYPE_DOUBLE) {
 		return arg.dbl;
-	} else if (arg.type == AT_FLOAT) {
+	} else if (arg.type == XUPDATE_TYPE_FLOAT) {
 		return arg.flt;
 	} else {
-		assert(arg.type == AT_INT);
+		assert(arg.type == XUPDATE_TYPE_INT);
 		if (int96_is_uint64(&arg.int96)) {
 			return int96_extract_uint64(&arg.int96);
 		} else {
@@ -507,18 +514,19 @@ cast_arith_arg_to_double(struct op_arith_arg arg)
 }
 
 static inline decimal_t *
-cast_arith_arg_to_decimal(struct op_arith_arg arg, decimal_t *dec)
+xrow_update_arg_arith_to_decimal(struct xrow_update_arg_arith arg,
+				 decimal_t *dec)
 {
 	decimal_t *ret;
-	if (arg.type == AT_DECIMAL) {
+	if (arg.type == XUPDATE_TYPE_DECIMAL) {
 		*dec = arg.dec;
 		return dec;
-	} else if (arg.type == AT_DOUBLE) {
+	} else if (arg.type == XUPDATE_TYPE_DOUBLE) {
 		ret = decimal_from_double(dec, arg.dbl);
-	} else if (arg.type == AT_FLOAT) {
+	} else if (arg.type == XUPDATE_TYPE_FLOAT) {
 		ret = decimal_from_double(dec, arg.flt);
 	} else {
-		assert(arg.type == AT_INT);
+		assert(arg.type == XUPDATE_TYPE_INT);
 		if (int96_is_uint64(&arg.int96)) {
 			uint64_t val = int96_extract_uint64(&arg.int96);
 			ret = decimal_from_uint64(dec, val);
@@ -534,9 +542,9 @@ cast_arith_arg_to_decimal(struct op_arith_arg arg, decimal_t *dec)
 
 /** Return the MsgPack size of an arithmetic operation result. */
 static inline uint32_t
-mp_sizeof_op_arith_arg(struct op_arith_arg arg)
+xrow_update_arg_arith_sizeof(struct xrow_update_arg_arith arg)
 {
-	if (arg.type == AT_INT) {
+	if (arg.type == XUPDATE_TYPE_INT) {
 		if (int96_is_uint64(&arg.int96)) {
 			uint64_t val = int96_extract_uint64(&arg.int96);
 			return mp_sizeof_uint(val);
@@ -544,28 +552,29 @@ mp_sizeof_op_arith_arg(struct op_arith_arg arg)
 			int64_t val = int96_extract_neg_int64(&arg.int96);
 			return mp_sizeof_int(val);
 		}
-	} else if (arg.type == AT_DOUBLE) {
+	} else if (arg.type == XUPDATE_TYPE_DOUBLE) {
 		return mp_sizeof_double(arg.dbl);
-	} else if (arg.type == AT_FLOAT) {
+	} else if (arg.type == XUPDATE_TYPE_FLOAT) {
 		return mp_sizeof_float(arg.flt);
 	} else {
-		assert(arg.type == AT_DECIMAL);
+		assert(arg.type == XUPDATE_TYPE_DECIMAL);
 		return mp_sizeof_decimal(&arg.dec);
 	}
 }
 
 static inline int
-make_arith_operation(struct update_op *op, struct op_arith_arg arg,
-		     struct op_arith_arg *ret)
+xrow_update_arith_make(struct xrow_update_op *op,
+		       struct xrow_update_arg_arith arg,
+		       struct xrow_update_arg_arith *ret)
 {
-	struct op_arith_arg arg1 = arg;
-	struct op_arith_arg arg2 = op->arg.arith;
-	enum arith_type lowest_type = arg1.type;
+	struct xrow_update_arg_arith arg1 = arg;
+	struct xrow_update_arg_arith arg2 = op->arg.arith;
+	enum xrow_update_arith_type lowest_type = arg1.type;
 	char opcode = op->opcode;
 	if (arg1.type > arg2.type)
 		lowest_type = arg2.type;
 
-	if (lowest_type == AT_INT) {
+	if (lowest_type == XUPDATE_TYPE_INT) {
 		switch(opcode) {
 		case '+':
 			int96_add(&arg1.int96, &arg2.int96);
@@ -580,13 +589,13 @@ make_arith_operation(struct update_op *op, struct op_arith_arg arg,
 		}
 		if (!int96_is_uint64(&arg1.int96) &&
 		    !int96_is_neg_int64(&arg1.int96))
-			return update_err_int_overflow(op);
+			return xrow_update_err_int_overflow(op);
 		*ret = arg1;
 		return 0;
-	} else if (lowest_type >= AT_DOUBLE) {
+	} else if (lowest_type >= XUPDATE_TYPE_DOUBLE) {
 		/* At least one of operands is double or float */
-		double a = cast_arith_arg_to_double(arg1);
-		double b = cast_arith_arg_to_double(arg2);
+		double a = xrow_update_arg_arith_to_double(arg1);
+		double b = xrow_update_arg_arith_to_double(arg2);
 		double c;
 		switch(opcode) {
 		case '+': c = a + b; break;
@@ -595,38 +604,39 @@ make_arith_operation(struct update_op *op, struct op_arith_arg arg,
 			unreachable();
 			break;
 		}
-		if (lowest_type == AT_DOUBLE) {
+		if (lowest_type == XUPDATE_TYPE_DOUBLE) {
 			/* result is DOUBLE */
-			ret->type = AT_DOUBLE;
+			ret->type = XUPDATE_TYPE_DOUBLE;
 			ret->dbl = c;
 		} else {
 			/* result is FLOAT */
-			assert(lowest_type == AT_FLOAT);
-			ret->type = AT_FLOAT;
+			assert(lowest_type == XUPDATE_TYPE_FLOAT);
+			ret->type = XUPDATE_TYPE_FLOAT;
 			ret->flt = (float)c;
 		}
 	} else {
 		/* At least one of the operands is decimal. */
 		decimal_t a, b, c;
-		if (! cast_arith_arg_to_decimal(arg1, &a) ||
-		    ! cast_arith_arg_to_decimal(arg2, &b)) {
-			return update_err_arg_type(op, "a number convertible "\
-						   "to decimal.");
+		if (! xrow_update_arg_arith_to_decimal(arg1, &a) ||
+		    ! xrow_update_arg_arith_to_decimal(arg2, &b)) {
+			return xrow_update_err_arg_type(op, "a number "\
+							"convertible to "\
+							"decimal.");
 		}
 		switch(opcode) {
 		case '+':
 			if (decimal_add(&c, &a, &b) == NULL)
-				return update_err_decimal_overflow(op);
+				return xrow_update_err_decimal_overflow(op);
 			break;
 		case '-':
 			if (decimal_sub(&c, &a, &b) == NULL)
-				return update_err_decimal_overflow(op);
+				return xrow_update_err_decimal_overflow(op);
 			break;
 		default:
 			unreachable();
 			break;
 		}
-		ret->type = AT_DECIMAL;
+		ret->type = XUPDATE_TYPE_DECIMAL;
 		ret->dec = c;
 	}
 	return 0;
@@ -637,27 +647,31 @@ make_arith_operation(struct update_op *op, struct op_arith_arg arg,
 /* {{{ do_op */
 
 static int
-do_op_insert(struct tuple_update *update, struct update_op *op)
+xrow_update_op_do_insert(struct xrow_update *update, struct xrow_update_op *op)
 {
-	if (op_adjust_field_no(op, rope_size(update->rope) + 1) != 0)
+	uint32_t size = xrow_update_rope_size(update->rope);
+	if (xrow_update_op_adjust_field_no(op, size + 1) != 0)
 		return -1;
-	struct update_field *field = (struct update_field *)
-		update_alloc(&fiber()->gc, sizeof(*field));
+	struct xrow_update_field *field = (struct xrow_update_field *)
+		xrow_update_alloc(&fiber()->gc, sizeof(*field));
 	if (field == NULL)
 		return -1;
-	update_field_init(field, op->arg.set.value, op->arg.set.length, 0);
-	return rope_insert(update->rope, op->field_no, field, 1);
+	xrow_update_field_init(field, op->arg.set.value, op->arg.set.length, 0);
+	return xrow_update_rope_insert(update->rope, op->field_no, field, 1);
 }
 
 static int
-do_op_set(struct tuple_update *update, struct update_op *op)
+xrow_update_op_do_set(struct xrow_update *update, struct xrow_update_op *op)
 {
 	/* intepret '=' for n +1 field as insert */
-	if (op->field_no == (int32_t) rope_size(update->rope))
-		return do_op_insert(update, op);
-	if (op_adjust_field_no(op, rope_size(update->rope)) != 0)
+	if (op->field_no == (int32_t) xrow_update_rope_size(update->rope))
+		return xrow_update_op_do_insert(update, op);
+
+	uint32_t size = xrow_update_rope_size(update->rope);
+	if (xrow_update_op_adjust_field_no(op, size) != 0)
 		return -1;
-	struct update_field *field = rope_extract(update->rope, op->field_no);
+	struct xrow_update_field *field =
+		xrow_update_rope_extract(update->rope, op->field_no);
 	if (field == NULL)
 		return -1;
 	/* Ignore the previous op, if any. */
@@ -667,58 +681,63 @@ do_op_set(struct tuple_update *update, struct update_op *op)
 }
 
 static int
-do_op_delete(struct tuple_update *update, struct update_op *op)
+xrow_update_op_do_delete(struct xrow_update *update, struct xrow_update_op *op)
 {
-	if (op_adjust_field_no(op, rope_size(update->rope)) != 0)
+	uint32_t size = xrow_update_rope_size(update->rope);
+	if (xrow_update_op_adjust_field_no(op, size) != 0)
 		return -1;
 	uint32_t delete_count = op->arg.del.count;
 
-	if ((uint64_t) op->field_no + delete_count > rope_size(update->rope))
-		delete_count = rope_size(update->rope) - op->field_no;
+	if ((uint64_t) op->field_no + delete_count > size)
+		delete_count = size - op->field_no;
 
 	assert(delete_count > 0);
 	for (uint32_t u = 0; u < delete_count; u++)
-		rope_erase(update->rope, op->field_no);
+		xrow_update_rope_erase(update->rope, op->field_no);
 	return 0;
 }
 
 static int
-do_op_arith(struct tuple_update *update, struct update_op *op)
+xrow_update_op_do_arith(struct xrow_update *update, struct xrow_update_op *op)
 {
-	if (op_adjust_field_no(op, rope_size(update->rope)) != 0)
+	uint32_t size = xrow_update_rope_size(update->rope);
+	if (xrow_update_op_adjust_field_no(op, size) != 0)
 		return -1;
 
-	struct update_field *field = rope_extract(update->rope, op->field_no);
+	struct xrow_update_field *field =
+		xrow_update_rope_extract(update->rope, op->field_no);
 	if (field == NULL)
 		return -1;
 	if (field->op != NULL)
-		return update_err_double(op);
+		return xrow_update_err_double(op);
 	const char *old = field->old;
-	struct op_arith_arg left_arg;
-	if (mp_read_arith_arg(op, &old, &left_arg) != 0)
+	struct xrow_update_arg_arith left_arg;
+	if (xrow_mp_read_arg_arith(op, &old, &left_arg) != 0)
 		return -1;
 
-	if (make_arith_operation(op, left_arg, &op->arg.arith) != 0)
+	if (xrow_update_arith_make(op, left_arg, &op->arg.arith) != 0)
 		return -1;
 	field->op = op;
-	op->new_field_len = mp_sizeof_op_arith_arg(op->arg.arith);
+	op->new_field_len = xrow_update_arg_arith_sizeof(op->arg.arith);
 	return 0;
 }
 
 static int
-do_op_bit(struct tuple_update *update, struct update_op *op)
+xrow_update_op_do_bit(struct xrow_update *update, struct xrow_update_op *op)
 {
-	if (op_adjust_field_no(op, rope_size(update->rope)) != 0)
+	uint32_t size =  xrow_update_rope_size(update->rope);
+	if (xrow_update_op_adjust_field_no(op, size) != 0)
 		return -1;
-	struct update_field *field = rope_extract(update->rope, op->field_no);
+	struct xrow_update_field *field =
+		xrow_update_rope_extract(update->rope, op->field_no);
 	if (field == NULL)
 		return -1;
-	struct op_bit_arg *arg = &op->arg.bit;
+	struct xrow_update_arg_bit *arg = &op->arg.bit;
 	if (field->op != NULL)
-		return update_err_double(op);
+		return xrow_update_err_double(op);
 	const char *old = field->old;
 	uint64_t val = 0;
-	if (mp_read_uint(op, &old, &val) != 0)
+	if (xrow_update_mp_read_uint(op, &old, &val) != 0)
 		return -1;
 	switch (op->opcode) {
 	case '&':
@@ -739,26 +758,28 @@ do_op_bit(struct tuple_update *update, struct update_op *op)
 }
 
 static int
-do_op_splice(struct tuple_update *update, struct update_op *op)
+xrow_update_op_do_splice(struct xrow_update *update, struct xrow_update_op *op)
 {
-	if (op_adjust_field_no(op, rope_size(update->rope)) != 0)
+	uint32_t size = xrow_update_rope_size(update->rope);
+	if (xrow_update_op_adjust_field_no(op, size) != 0)
 		return -1;
-	struct update_field *field = rope_extract(update->rope, op->field_no);
+	struct xrow_update_field *field =
+		xrow_update_rope_extract(update->rope, op->field_no);
 	if (field == NULL)
 		return -1;
 	if (field->op != NULL)
-		return update_err_double(op);
+		return xrow_update_err_double(op);
 
-	struct op_splice_arg *arg = &op->arg.splice;
+	struct xrow_update_arg_splice *arg = &op->arg.splice;
 
 	const char *in = field->old;
 	int32_t str_len = 0;
-	if (mp_read_str(op, &in, (uint32_t *) &str_len, &in) != 0)
+	if (xrow_update_mp_read_str(op, &in, (uint32_t *) &str_len, &in) != 0)
 		return -1;
 
 	if (arg->offset < 0) {
 		if (-arg->offset > str_len + 1)
-			return update_err_splice_bound(op);
+			return xrow_update_err_splice_bound(op);
 		arg->offset = arg->offset + str_len + 1;
 	} else if (arg->offset > str_len) {
 		arg->offset = str_len;
@@ -794,49 +815,54 @@ do_op_splice(struct tuple_update *update, struct update_op *op)
 /* {{{ store_op */
 
 static void
-store_op_set(struct op_set_arg *arg, const char *in, char *out)
+xrow_update_op_store_set(struct xrow_update_arg_set *arg, const char *in,
+			 char *out)
 {
 	(void)in;
 	memcpy(out, arg->value, arg->length);
 }
 
 static void
-store_op_insert(struct op_set_arg *arg, const char *in, char *out)
+xrow_update_op_store_insert(struct xrow_update_arg_set *arg, const char *in,
+			    char *out)
 {
 	(void)in;
 	memcpy(out, arg->value, arg->length);
 }
 
 static void
-store_op_arith(struct op_arith_arg *arg, const char *in, char *out)
+xrow_update_op_store_arith(struct xrow_update_arg_arith *arg, const char *in,
+			   char *out)
 {
 	(void)in;
-	if (arg->type == AT_INT) {
+	if (arg->type == XUPDATE_TYPE_INT) {
 		if (int96_is_uint64(&arg->int96)) {
 			mp_encode_uint(out, int96_extract_uint64(&arg->int96));
 		} else {
 			assert(int96_is_neg_int64(&arg->int96));
 			mp_encode_int(out, int96_extract_neg_int64(&arg->int96));
 		}
-	} else if (arg->type == AT_DOUBLE) {
+	} else if (arg->type == XUPDATE_TYPE_DOUBLE) {
 		mp_encode_double(out, arg->dbl);
-	} else if (arg->type == AT_FLOAT) {
+	} else if (arg->type == XUPDATE_TYPE_FLOAT) {
 		mp_encode_float(out, arg->flt);
 	} else {
-		assert (arg->type == AT_DECIMAL);
+		assert (arg->type == XUPDATE_TYPE_DECIMAL);
 		mp_encode_decimal(out, &arg->dec);
 	}
 }
 
 static void
-store_op_bit(struct op_bit_arg *arg, const char *in, char *out)
+xrow_update_op_store_bit(struct xrow_update_arg_bit *arg, const char *in,
+			 char *out)
 {
 	(void)in;
 	mp_encode_uint(out, arg->val);
 }
 
 static void
-store_op_splice(struct op_splice_arg *arg, const char *in, char *out)
+xrow_update_op_store_splice(struct xrow_update_arg_splice *arg, const char *in,
+			    char *out)
 {
 	uint32_t new_str_len = arg->offset + arg->paste_length
 		+ arg->tail_length;
@@ -853,29 +879,41 @@ store_op_splice(struct op_splice_arg *arg, const char *in, char *out)
 
 /* }}} store_op */
 
-static const struct update_op_meta op_set =
-	{ read_arg_set, do_op_set, (store_op_func) store_op_set, 3 };
-static const struct update_op_meta op_insert =
-	{ read_arg_insert, do_op_insert, (store_op_func) store_op_insert, 3 };
-static const struct update_op_meta op_arith =
-	{ read_arg_arith, do_op_arith, (store_op_func) store_op_arith, 3 };
-static const struct update_op_meta op_bit =
-	{ read_arg_bit, do_op_bit, (store_op_func) store_op_bit, 3 };
-static const struct update_op_meta op_splice =
-	{ read_arg_splice, do_op_splice, (store_op_func) store_op_splice, 5 };
-static const struct update_op_meta op_delete =
-	{ read_arg_delete, do_op_delete, (store_op_func) NULL, 3 };
+static const struct xrow_update_op_meta op_set = {
+	xrow_update_read_arg_set, xrow_update_op_do_set,
+	(xrow_update_op_store_f) xrow_update_op_store_set, 3
+};
+static const struct xrow_update_op_meta op_insert = {
+	xrow_update_read_arg_insert, xrow_update_op_do_insert,
+	(xrow_update_op_store_f) xrow_update_op_store_insert, 3
+};
+static const struct xrow_update_op_meta op_arith = {
+	xrow_update_read_arg_arith, xrow_update_op_do_arith,
+	(xrow_update_op_store_f) xrow_update_op_store_arith, 3
+};
+static const struct xrow_update_op_meta op_bit = {
+	xrow_update_read_arg_bit, xrow_update_op_do_bit,
+	(xrow_update_op_store_f) xrow_update_op_store_bit, 3
+};
+static const struct xrow_update_op_meta op_splice = {
+	xrow_update_read_arg_splice, xrow_update_op_do_splice,
+	(xrow_update_op_store_f) xrow_update_op_store_splice, 5
+};
+static const struct xrow_update_op_meta op_delete = {
+	xrow_update_read_arg_delete, xrow_update_op_do_delete,
+	(xrow_update_op_store_f) NULL, 3
+};
 
 /** Split a range of fields in two, allocating update_field
  * context for the new range.
  */
-static struct update_field *
-update_field_split(struct region *region, struct update_field *prev,
-		   size_t size, size_t offset)
+static struct xrow_update_field *
+xrow_update_field_split(struct region *region, struct xrow_update_field *prev,
+			size_t size, size_t offset)
 {
 	(void) size;
-	struct update_field *next =
-		(struct update_field *) update_alloc(region, sizeof(*next));
+	struct xrow_update_field *next = (struct xrow_update_field *)
+		xrow_update_alloc(region, sizeof(*next));
 	if (next == NULL)
 		return NULL;
 	assert(offset > 0 && prev->tail_len > 0);
@@ -892,7 +930,7 @@ update_field_split(struct region *region, struct update_field *prev,
 	mp_next(&f);
 	uint32_t field_len = f - field;
 
-	update_field_init(next, field, field_len, end - field - field_len);
+	xrow_update_field_init(next, field, field_len, end - field - field_len);
 	return next;
 }
 
@@ -906,17 +944,17 @@ update_field_split(struct region *region, struct update_field *prev,
  * @retval  0 Success.
  * @retval -1 Error.
  */
-struct rope *
-tuple_rope_new(const char *tuple_data, const char *tuple_data_end,
-	       uint32_t field_count)
+struct xrow_update_rope *
+xrow_update_rope_new_by_tuple(const char *tuple_data,
+			      const char *tuple_data_end, uint32_t field_count)
 {
 	struct region *region = &fiber()->gc;
-	struct rope *rope = rope_new(region);
+	struct xrow_update_rope *rope = xrow_update_rope_new(region);
 	if (rope == NULL)
 		return NULL;
 	/* Initialize the rope with the old tuple. */
-	struct update_field *first =
-		(struct update_field *) update_alloc(region, sizeof(*first));
+	struct xrow_update_field *first = (struct xrow_update_field *)
+		xrow_update_alloc(region, sizeof(*first));
 	if (first == NULL)
 		return NULL;
 	const char *field = tuple_data;
@@ -927,21 +965,25 @@ tuple_rope_new(const char *tuple_data, const char *tuple_data_end,
 	/* Add first field to rope */
 	mp_next(&tuple_data);
 	uint32_t field_len = tuple_data - field;
-	update_field_init(first, field, field_len, end - field - field_len);
+	xrow_update_field_init(first, field, field_len,
+			       end - field - field_len);
 
-	return rope_append(rope, first, field_count) != 0 ? NULL : rope;
+	return xrow_update_rope_append(rope, first, field_count) != 0 ?
+	       NULL : rope;
 }
 
 static uint32_t
-update_calc_tuple_length(struct tuple_update *update)
+xrow_update_calc_tuple_length(struct xrow_update *update)
 {
-	uint32_t res = mp_sizeof_array(rope_size(update->rope));
-	struct rope_iter it;
-	struct rope_node *node;
+	uint32_t res = mp_sizeof_array(xrow_update_rope_size(update->rope));
+	struct xrow_update_rope_iter it;
+	struct xrow_update_rope_node *node;
 
-	rope_iter_create(&it, update->rope);
-	for (node = rope_iter_start(&it); node; node = rope_iter_next(&it)) {
-		struct update_field *field = rope_leaf_data(node);
+	xrow_update_rope_iter_create(&it, update->rope);
+	for (node = xrow_update_rope_iter_start(&it); node;
+	     node = xrow_update_rope_iter_next(&it)) {
+		struct xrow_update_field *field =
+			xrow_update_rope_leaf_data(node);
 		uint32_t field_len = (field->op ? field->op->new_field_len :
 				      (uint32_t)(field->tail - field->old));
 		res += field_len + field->tail_len;
@@ -951,24 +993,28 @@ update_calc_tuple_length(struct tuple_update *update)
 }
 
 static uint32_t
-update_write_tuple(struct tuple_update *update, char *buffer, char *buffer_end)
+xrow_update_write_tuple(struct xrow_update *update, char *buffer,
+			char *buffer_end)
 {
 	char *new_data = buffer;
-	new_data = mp_encode_array(new_data, rope_size(update->rope));
+	new_data = mp_encode_array(new_data,
+				   xrow_update_rope_size(update->rope));
 
 	(void) buffer_end;
 
 	uint32_t total_field_count = 0;
 
-	struct rope_iter it;
-	struct rope_node *node;
+	struct xrow_update_rope_iter it;
+	struct xrow_update_rope_node *node;
 
-	rope_iter_create(&it, update->rope);
-	for (node = rope_iter_start(&it); node; node = rope_iter_next(&it)) {
-		struct update_field *field = rope_leaf_data(node);
-		uint32_t field_count = rope_leaf_size(node);
+	xrow_update_rope_iter_create(&it, update->rope);
+	for (node = xrow_update_rope_iter_start(&it); node;
+	     node = xrow_update_rope_iter_next(&it)) {
+		struct xrow_update_field *field =
+			xrow_update_rope_leaf_data(node);
+		uint32_t field_count = xrow_update_rope_leaf_size(node);
 		const char *old_field = field->old;
-		struct update_op *op = field->op;
+		struct xrow_update_op *op = field->op;
 		if (op) {
 			op->meta->store(&op->arg, old_field, new_data);
 			new_data += op->new_field_len;
@@ -986,13 +1032,13 @@ update_write_tuple(struct tuple_update *update, char *buffer, char *buffer_end)
 		total_field_count += field_count;
 	}
 
-	assert(rope_size(update->rope) == total_field_count);
+	assert(xrow_update_rope_size(update->rope) == total_field_count);
 	assert(new_data <= buffer_end);
 	return new_data - buffer; /* real_tuple_size */
 }
 
-static const struct update_op_meta *
-update_op_by(char opcode)
+static const struct xrow_update_op_meta *
+xrow_update_op_by(char opcode)
 {
 	switch (opcode) {
 	case '=':
@@ -1027,8 +1073,8 @@ update_op_by(char opcode)
  * @retval -1 Client error.
  */
 static inline int
-update_op_decode(struct update_op *op, int index_base,
-		 struct tuple_dictionary *dict, const char **expr)
+xrow_update_op_decode(struct xrow_update_op *op, int index_base,
+		      struct tuple_dictionary *dict, const char **expr)
 {
 	if (mp_typeof(**expr) != MP_ARRAY) {
 		diag_set(ClientError, ER_ILLEGAL_PARAMS, "update operation "
@@ -1047,7 +1093,7 @@ update_op_decode(struct update_op *op, int index_base,
 		return -1;
 	}
 	op->opcode = *mp_decode_str(expr, &len);
-	op->meta = update_op_by(op->opcode);
+	op->meta = xrow_update_op_by(op->opcode);
 	if (op->meta == NULL)
 		return -1;
 	if (args != op->meta->args) {
@@ -1058,7 +1104,7 @@ update_op_decode(struct update_op *op, int index_base,
 	switch(mp_typeof(**expr)) {
 	case MP_INT:
 	case MP_UINT: {
-		if (mp_read_i32(op, expr, &field_no) != 0)
+		if (xrow_update_mp_read_int32(op, expr, &field_no) != 0)
 			return -1;
 		if (field_no - index_base >= 0) {
 			op->field_no = field_no - index_base;
@@ -1109,9 +1155,9 @@ update_op_decode(struct update_op *op, int index_base,
  * @retval -1 Error.
  */
 static int
-update_read_ops(struct tuple_update *update, const char *expr,
-		const char *expr_end, struct tuple_dictionary *dict,
-		int32_t field_count_hint)
+xrow_update_read_ops(struct xrow_update *update, const char *expr,
+		     const char *expr_end, struct tuple_dictionary *dict,
+		     int32_t field_count_hint)
 {
 	if (mp_typeof(*expr) != MP_ARRAY) {
 		diag_set(ClientError, ER_ILLEGAL_PARAMS,
@@ -1130,18 +1176,19 @@ update_read_ops(struct tuple_update *update, const char *expr,
 	}
 
 	int size = update->op_count * sizeof(update->ops[0]);
-	update->ops = (struct update_op *)
+	update->ops = (struct xrow_update_op *)
 		region_aligned_alloc(&fiber()->gc, size,
-				     alignof(struct update_op));
+				     alignof(struct xrow_update_op));
 	if (update->ops == NULL) {
 		diag_set(OutOfMemory, size, "region_aligned_alloc",
 			 "update->ops");
 		return -1;
 	}
-	struct update_op *op = update->ops;
-	struct update_op *ops_end = op + update->op_count;
+	struct xrow_update_op *op = update->ops;
+	struct xrow_update_op *ops_end = op + update->op_count;
 	for (; op < ops_end; op++) {
-		if (update_op_decode(op, update->index_base, dict, &expr) != 0)
+		if (xrow_update_op_decode(op, update->index_base, dict,
+					  &expr) != 0)
 			return -1;
 		/*
 		 * Continue collecting the changed columns
@@ -1236,14 +1283,15 @@ update_read_ops(struct tuple_update *update, const char *expr,
  * @retval -1 Error.
  */
 static int
-update_do_ops(struct tuple_update *update, const char *old_data,
-	      const char *old_data_end, uint32_t part_count)
+xrow_update_do_ops(struct xrow_update *update, const char *old_data,
+		   const char *old_data_end, uint32_t part_count)
 {
-	update->rope = tuple_rope_new(old_data, old_data_end, part_count);
+	update->rope = xrow_update_rope_new_by_tuple(old_data, old_data_end,
+						     part_count);
 	if (update->rope == NULL)
 		return -1;
-	struct update_op *op = update->ops;
-	struct update_op *ops_end = op + update->op_count;
+	struct xrow_update_op *op = update->ops;
+	struct xrow_update_op *ops_end = op + update->op_count;
 	for (; op < ops_end; op++) {
 		if (op->meta->do_op(update, op))
 			return -1;
@@ -1257,15 +1305,16 @@ update_do_ops(struct tuple_update *update, const char *old_data,
  *        and it is enough to simply write the error to the log.
  */
 static int
-upsert_do_ops(struct tuple_update *update, const char *old_data,
-	      const char *old_data_end, uint32_t part_count,
-	      bool suppress_error)
+xrow_upsert_do_ops(struct xrow_update *update, const char *old_data,
+		   const char *old_data_end, uint32_t part_count,
+		   bool suppress_error)
 {
-	update->rope = tuple_rope_new(old_data, old_data_end, part_count);
+	update->rope = xrow_update_rope_new_by_tuple(old_data, old_data_end,
+						     part_count);
 	if (update->rope == NULL)
 		return -1;
-	struct update_op *op = update->ops;
-	struct update_op *ops_end = op + update->op_count;
+	struct xrow_update_op *op = update->ops;
+	struct xrow_update_op *ops_end = op + update->op_count;
 	for (; op < ops_end; op++) {
 		if (op->meta->do_op(update, op) == 0)
 			continue;
@@ -1281,7 +1330,7 @@ upsert_do_ops(struct tuple_update *update, const char *old_data,
 }
 
 static void
-update_init(struct tuple_update *update, int index_base)
+xrow_update_init(struct xrow_update *update, int index_base)
 {
 	memset(update, 0, sizeof(*update));
 	/*
@@ -1291,16 +1340,17 @@ update_init(struct tuple_update *update, int index_base)
 	update->index_base = index_base;
 }
 
-const char *
-update_finish(struct tuple_update *update, uint32_t *p_tuple_len)
+static const char *
+xrow_update_finish(struct xrow_update *update, uint32_t *p_tuple_len)
 {
-	uint32_t tuple_len = update_calc_tuple_length(update);
+	uint32_t tuple_len = xrow_update_calc_tuple_length(update);
 	char *buffer = (char *) region_alloc(&fiber()->gc, tuple_len);
 	if (buffer == NULL) {
 		diag_set(OutOfMemory, tuple_len, "region_alloc", "buffer");
 		return NULL;
 	}
-	*p_tuple_len = update_write_tuple(update, buffer, buffer + tuple_len);
+	*p_tuple_len = xrow_update_write_tuple(update, buffer,
+					       buffer + tuple_len);
 	return buffer;
 }
 
@@ -1308,9 +1358,9 @@ int
 tuple_update_check_ops(const char *expr, const char *expr_end,
 		       struct tuple_dictionary *dict, int index_base)
 {
-	struct tuple_update update;
-	update_init(&update, index_base);
-	return update_read_ops(&update, expr, expr_end, dict, 0);
+	struct xrow_update update;
+	xrow_update_init(&update, index_base);
+	return xrow_update_read_ops(&update, expr, expr_end, dict, 0);
 }
 
 const char *
@@ -1319,18 +1369,19 @@ tuple_update_execute(const char *expr,const char *expr_end,
 		     struct tuple_dictionary *dict, uint32_t *p_tuple_len,
 		     int index_base, uint64_t *column_mask)
 {
-	struct tuple_update update;
-	update_init(&update, index_base);
+	struct xrow_update update;
+	xrow_update_init(&update, index_base);
 	uint32_t field_count = mp_decode_array(&old_data);
 
-	if (update_read_ops(&update, expr, expr_end, dict, field_count) != 0)
+	if (xrow_update_read_ops(&update, expr, expr_end, dict,
+				 field_count) != 0)
 		return NULL;
-	if (update_do_ops(&update, old_data, old_data_end, field_count))
+	if (xrow_update_do_ops(&update, old_data, old_data_end, field_count))
 		return NULL;
 	if (column_mask)
 		*column_mask = update.column_mask;
 
-	return update_finish(&update, p_tuple_len);
+	return xrow_update_finish(&update, p_tuple_len);
 }
 
 const char *
@@ -1339,19 +1390,20 @@ tuple_upsert_execute(const char *expr,const char *expr_end,
 		     struct tuple_dictionary *dict, uint32_t *p_tuple_len,
 		     int index_base, bool suppress_error, uint64_t *column_mask)
 {
-	struct tuple_update update;
-	update_init(&update, index_base);
+	struct xrow_update update;
+	xrow_update_init(&update, index_base);
 	uint32_t field_count = mp_decode_array(&old_data);
 
-	if (update_read_ops(&update, expr, expr_end, dict, field_count) != 0)
+	if (xrow_update_read_ops(&update, expr, expr_end, dict,
+				 field_count) != 0)
 		return NULL;
-	if (upsert_do_ops(&update, old_data, old_data_end, field_count,
-			  suppress_error))
+	if (xrow_upsert_do_ops(&update, old_data, old_data_end, field_count,
+			       suppress_error))
 		return NULL;
 	if (column_mask)
 		*column_mask = update.column_mask;
 
-	return update_finish(&update, p_tuple_len);
+	return xrow_update_finish(&update, p_tuple_len);
 }
 
 const char *
@@ -1362,16 +1414,16 @@ tuple_upsert_squash(const char *expr1, const char *expr1_end,
 {
 	const char *expr[2] = {expr1, expr2};
 	const char *expr_end[2] = {expr1_end, expr2_end};
-	struct tuple_update update[2];
+	struct xrow_update update[2];
 	for (int j = 0; j < 2; j++) {
-		update_init(&update[j], index_base);
-		if (update_read_ops(&update[j], expr[j], expr_end[j],
-				    dict, 0) != 0)
+		xrow_update_init(&update[j], index_base);
+		if (xrow_update_read_ops(&update[j], expr[j], expr_end[j],
+					 dict, 0) != 0)
 			return NULL;
 		mp_decode_array(&expr[j]);
 		int32_t prev_field_no = index_base - 1;
 		for (uint32_t i = 0; i < update[j].op_count; i++) {
-			struct update_op *op = &update[j].ops[i];
+			struct xrow_update_op *op = &update[j].ops[i];
 			if (op->opcode != '+' && op->opcode != '-' &&
 			    op->opcode != '=')
 				return NULL;
@@ -1397,8 +1449,8 @@ tuple_upsert_squash(const char *expr1, const char *expr1_end,
 	uint32_t op_no[2] = {0, 0};
 	while (op_no[0] < op_count[0] || op_no[1] < op_count[1]) {
 		res_count++;
-		struct update_op *op[2] = {update[0].ops + op_no[0],
-					   update[1].ops + op_no[1]};
+		struct xrow_update_op *op[2] = {update[0].ops + op_no[0],
+						update[1].ops + op_no[1]};
 		/*
 		 * from:
 		 * 0 - take op from first update,
@@ -1442,8 +1494,8 @@ tuple_upsert_squash(const char *expr1, const char *expr1_end,
 			op[0]->opcode = '+';
 			int96_invert(&op[0]->arg.arith.int96);
 		}
-		struct op_arith_arg res;
-		if (make_arith_operation(op[1], op[0]->arg.arith, &res) != 0)
+		struct xrow_update_arg_arith res;
+		if (xrow_update_arith_make(op[1], op[0]->arg.arith, &res) != 0)
 			return NULL;
 		res_ops = mp_encode_array(res_ops, 3);
 		res_ops = mp_encode_str(res_ops,
@@ -1451,8 +1503,8 @@ tuple_upsert_squash(const char *expr1, const char *expr1_end,
 		res_ops = mp_encode_uint(res_ops,
 					 op[0]->field_no +
 						 update[0].index_base);
-		store_op_arith(&res, NULL, res_ops);
-		res_ops += mp_sizeof_op_arith_arg(res);
+		xrow_update_op_store_arith(&res, NULL, res_ops);
+		res_ops += xrow_update_arg_arith_sizeof(res);
 		mp_next(&expr[0]);
 		mp_next(&expr[1]);
 		op_no[0]++;
