@@ -321,7 +321,8 @@ sqlVdbeMemStringify(Mem * pMem)
 		sql_snprintf(nByte, pMem->z, "%llu", pMem->u.u);
 		pMem->flags &= ~MEM_UInt;
 	} else if ((fg & MEM_Bool) != 0) {
-		sql_snprintf(nByte, pMem->z, "%s", pMem->u.b ? "true" : "false");
+		sql_snprintf(nByte, pMem->z, "%s",
+			     SQL_TOKEN_BOOLEAN(pMem->u.b));
 		pMem->flags &= ~MEM_Bool;
 	} else if (mem_has_msgpack_subtype(pMem)) {
 		sql_snprintf(nByte, pMem->z, "%s", value);
@@ -645,10 +646,11 @@ str_cast_to_boolean(const char *str, bool *result)
 {
 	assert(str != NULL);
 	for (; *str == ' '; str++);
-	if (strncasecmp(str, "true", 4) == 0) {
+	if (strncasecmp(str, SQL_TOKEN_TRUE, strlen(SQL_TOKEN_TRUE)) == 0) {
 		*result = true;
 		str += 4;
-	} else if (strncasecmp(str, "false", 5) == 0) {
+	} else if (strncasecmp(str, SQL_TOKEN_FALSE,
+			       strlen(SQL_TOKEN_FALSE)) == 0) {
 		*result = false;
 		str += 5;
 	} else {
@@ -753,7 +755,7 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 		assert(type == FIELD_TYPE_STRING);
 		assert(MEM_Str == (MEM_Blob >> 3));
 		if ((pMem->flags & MEM_Bool) != 0) {
-			const char *str_bool = pMem->u.b ? "TRUE" : "FALSE";
+			const char *str_bool = SQL_TOKEN_BOOLEAN(pMem->u.b);
 			sqlVdbeMemSetStr(pMem, str_bool, strlen(str_bool), 1,
 					 SQL_TRANSIENT);
 			return 0;

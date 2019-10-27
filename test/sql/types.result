@@ -1232,7 +1232,7 @@ box.execute("INSERT INTO t VALUES(1, 1.123);")
 box.execute("INSERT INTO t VALUES(1, true);")
 ---
 - null
-- 'Type mismatch: can not convert true to varbinary'
+- 'Type mismatch: can not convert TRUE to varbinary'
 ...
 box.execute("INSERT INTO t VALUES(1, 'asd');")
 ---
@@ -1464,7 +1464,7 @@ box.execute("SELECT CAST(1.123 AS VARBINARY);")
 box.execute("SELECT CAST(true AS VARBINARY);")
 ---
 - null
-- 'Type mismatch: can not convert true to varbinary'
+- 'Type mismatch: can not convert TRUE to varbinary'
 ...
 box.execute("SELECT CAST('asd' AS VARBINARY);")
 ---

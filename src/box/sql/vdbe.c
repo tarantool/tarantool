@@ -536,7 +536,7 @@ memTracePrint(Mem *p)
 	} else if (p->flags & MEM_Real) {
 		printf(" r:%g", p->u.r);
 	} else if (p->flags & MEM_Bool) {
-		printf(" bool:%s", p->u.b ? "true" : "false");
+		printf(" bool:%s", SQL_TOKEN_BOOLEAN(p->u.b));
 	} else {
 		char zBuf[200];
 		sqlVdbeMemPrettyPrint(p, zBuf);

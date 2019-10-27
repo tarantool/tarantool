@@ -1411,8 +1411,9 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 			break;
 		}
 	case MP_BOOL: {
-		sql_result_text(context, sql_value_boolean(argv[0]) ?
-				"true" : "false", -1, SQL_TRANSIENT);
+		sql_result_text(context,
+				SQL_TOKEN_BOOLEAN(sql_value_boolean(argv[0])),
+				-1, SQL_TRANSIENT);
 		break;
 	}
 	default:{

@@ -306,6 +306,15 @@ struct sql_vfs {
 	*/
 };
 
+/**
+ * Canonical string representation of SQL BOOLEAN values.
+ * According to the standard it should be uppercase. See the 2011
+ * standard, cast specification 6.13, general rules 11.e.
+ */
+#define SQL_TOKEN_TRUE "TRUE"
+#define SQL_TOKEN_FALSE "FALSE"
+#define SQL_TOKEN_BOOLEAN(v) ({(v) ? SQL_TOKEN_TRUE : SQL_TOKEN_FALSE;})
+
 #define SQL_LIMIT_LENGTH                    0
 #define SQL_LIMIT_SQL_LENGTH                1
 #define SQL_LIMIT_COLUMN                    2

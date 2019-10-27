@@ -129,6 +129,7 @@ INSERT INTO t3 VALUES (4, false)
 -- Check CAST from BOOLEAN to the other types.
 SELECT cast(true AS INTEGER), cast(false AS INTEGER);
 SELECT cast(true AS NUMBER), cast(false AS NUMBER);
+-- gh-4462: ensure that text representation is uppercase.
 SELECT cast(true AS TEXT), cast(false AS TEXT);
 SELECT cast(true AS BOOLEAN), cast(false AS BOOLEAN);
 

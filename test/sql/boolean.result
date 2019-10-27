@@ -161,7 +161,7 @@ SELECT s FROM ts WHERE s IN (true, 1, 'abcd');
 INSERT INTO ts VALUES (true, 12345);
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 
 -- Check that we can create index on field of type BOOLEAN.
@@ -306,8 +306,8 @@ SELECT quote(a) FROM t0;
  |   - name: quote(a)
  |     type: string
  |   rows:
- |   - ['false']
- |   - ['true']
+ |   - ['FALSE']
+ |   - ['TRUE']
  |   - ['NULL']
  |   - ['NULL']
  | ...
@@ -339,7 +339,7 @@ SELECT typeof(a) FROM t0;
 SELECT AVG(a) FROM t0;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to number'
+ | - 'Type mismatch: can not convert FALSE to number'
  | ...
 SELECT MIN(a) FROM t0;
  | ---
@@ -360,7 +360,7 @@ SELECT MAX(a) FROM t0;
 SELECT SUM(a) FROM t0;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to number'
+ | - 'Type mismatch: can not convert FALSE to number'
  | ...
 SELECT COUNT(a) FROM t0;
  | ---
@@ -373,7 +373,7 @@ SELECT COUNT(a) FROM t0;
 SELECT TOTAL(a) FROM t0;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to number'
+ | - 'Type mismatch: can not convert FALSE to number'
  | ...
 SELECT GROUP_CONCAT(a, ' +++ ') FROM t0;
  | ---
@@ -381,7 +381,7 @@ SELECT GROUP_CONCAT(a, ' +++ ') FROM t0;
  |   - name: GROUP_CONCAT(a, ' +++ ')
  |     type: string
  |   rows:
- |   - ['false +++ true']
+ |   - ['FALSE +++ TRUE']
  | ...
 
 -- Check BOOLEAN as binding parameter.
@@ -511,8 +511,9 @@ SELECT cast(true AS INTEGER), cast(false AS INTEGER);
 SELECT cast(true AS NUMBER), cast(false AS NUMBER);
  | ---
  | - null
- | - 'Type mismatch: can not convert true to number'
+ | - 'Type mismatch: can not convert TRUE to number'
  | ...
+-- gh-4462: ensure that text representation is uppercase.
 SELECT cast(true AS TEXT), cast(false AS TEXT);
  | ---
  | - metadata:
@@ -1114,438 +1115,438 @@ SELECT a, a1, a OR a1 FROM t, t6;
 SELECT -true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT -false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT -a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 
 SELECT true + true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT true + false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT false + true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false + false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT true - true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT true - false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT false - true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false - false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT true * true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT true * false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT false * true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false * false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT true / true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT true / false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT false / true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false / false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT true % true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT true % false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT false % true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false % false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 
 SELECT a, true + a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, false + a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, true - a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, false - a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, true * a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, false * a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, true / a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, false / a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, true % a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, false % a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, a + true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a, a + false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, a - true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a, a - false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, a * true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a, a * false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, a / true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a, a / false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, a % true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a, a % false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 
 SELECT a, a1, a + a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, a1, a - a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, a1, a * a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, a1, a / a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a, a1, a % a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 
 SELECT ~true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT ~false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT true & true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT true & false;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT false & true;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT false & false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT true | true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT true | false;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT false | true;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT false | false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT true << true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT true << false;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT false << true;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT false << false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT true >> true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT true >> false;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT false >> true;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT false >> false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 
 SELECT a, true & a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a, false & a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a, true | a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a, false | a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a, true << a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a, false << a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a, true >> a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a, false >> a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a, a & true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a, a & false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a, a | true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a, a | false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a, a << true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a, a << false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a, a >> true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a, a >> false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 
 SELECT a, a1, a & a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a, a1, a | a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a, a1, a << a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a, a1, a >> a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 
 -- Check concatenate.
@@ -2635,729 +2636,729 @@ SELECT a2, b, b OR a2 FROM t6, t7;
 SELECT true + 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false + 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT true - 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false - 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT true * 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false * 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT true / 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false / 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT true % 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false % 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT 2 + true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT 2 + false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT 2 - true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT 2 - false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT 2 * true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT 2 * false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT 2 / true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT 2 / false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT 2 % true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT 2 % false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 
 SELECT a1, a1 + 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, a1 - 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, a1 * 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, a1 / 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, a1 % 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, 2 + a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, 2 - a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, 2 * a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, 2 / a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, 2 % a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a2, a2 + 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, a2 - 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, a2 * 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, a2 / 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, a2 % 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, 2 + a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, 2 - a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, 2 * a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, 2 / a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, 2 % a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 
 SELECT b, true + b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT b, false + b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT b, true - b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT b, false - b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT b, true * b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT b, false * b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT b, true / b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT b, false / b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT b, true % b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT b, false % b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT b, b + true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT b, b + false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT b, b - true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT b, b - false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT b, b * true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT b, b * false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT b, b / true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT b, b / false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT b, b % true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT b, b % false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 
 SELECT a1, b, a1 + b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, b, a1 - b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, b, a1 * b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, b, a1 / b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, b, a1 % b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, b, b + a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, b, b - a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, b, b * a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, b, b / a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, b, b % a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a2, b, a2 + b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, b, a2 - b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, b, a2 * b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, b, a2 / b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, b, a2 % b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, b, b + a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, b, b - a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, b, b * a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, b, b / a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, b, b % a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 
 SELECT true & 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT false & 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT true | 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT false | 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT true << 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT false << 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT true >> 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT false >> 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT 2 & true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT 2 & false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT 2 | true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT 2 | false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT 2 << true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT 2 << false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT 2 >> true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT 2 >> false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 
 SELECT a1, a1 & 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, a1 | 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, a1 << 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, a1 >> 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, 2 & a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, 2 | a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, 2 << a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, 2 >> a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a2, a2 & 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a2, a2 | 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a2, a2 << 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a2, a2 >> 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a2, 2 & a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a2, 2 | a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a2, 2 << a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a2, 2 >> a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 
 SELECT b, true & b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT b, false & b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT b, true | b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT b, false | b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT b, true << b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT b, false << b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT b, true >> b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT b, false >> b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT b, b & true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT b, b & false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT b, b | true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT b, b | false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT b, b << true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT b, b << false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT b, b >> true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT b, b >> false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 
 SELECT a1, b, a1 & b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, b, a1 | b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, b, a1 << b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, b, a1 >> b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, b, b & a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, b, b | a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, b, b << a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, b, b >> a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a2, b, a2 & b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a2, b, a2 | b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a2, b, a2 << b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a2, b, a2 >> b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a2, b, b & a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a2, b, b | a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a2, b, b << a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT a2, b, b >> a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 
 SELECT true > 2;
@@ -3871,12 +3872,12 @@ SELECT false IN (0, 1, 2, 3);
 SELECT true IN (SELECT b FROM t7);
  | ---
  | - null
- | - 'Type mismatch: can not convert true to integer'
+ | - 'Type mismatch: can not convert TRUE to integer'
  | ...
 SELECT false IN (SELECT b FROM t7);
  | ---
  | - null
- | - 'Type mismatch: can not convert false to integer'
+ | - 'Type mismatch: can not convert FALSE to integer'
  | ...
 SELECT a1, a1 IN (0, 1, 2, 3) FROM t6
  | ---
@@ -4104,405 +4105,405 @@ SELECT a2, c, c OR a2 FROM t6, t8;
 SELECT true + 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false + 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT true - 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false - 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT true * 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false * 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT true / 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false / 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT true % 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT false % 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT 2.3 + true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT 2.3 + false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT 2.3 - true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT 2.3 - false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT 2.3 * true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT 2.3 * false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT 2.3 / true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT 2.3 / false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT 2.3 % true;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT 2.3 % false;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 
 SELECT a1, a1 + 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, a1 - 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, a1 * 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, a1 / 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, a1 % 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, 2.3 + a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, 2.3 - a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, 2.3 * a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, 2.3 / a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, 2.3 % a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a2, a2 + 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, a2 - 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, a2 * 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, a2 / 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, a2 % 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, 2.3 + a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, 2.3 - a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, 2.3 * a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, 2.3 / a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, 2.3 % a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 
 SELECT c, true + c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT c, false + c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT c, true - c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT c, false - c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT c, true * c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT c, false * c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT c, true / c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT c, false / c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT c, true % c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT c, false % c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT c, c + true FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT c, c + false FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT c, c - true FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT c, c - false FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT c, c * true FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT c, c * false FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT c, c / true FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT c, c / false FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT c, c % true FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT c, c % false FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 
 SELECT a1, c, a1 + c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, c, a1 - c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, c, a1 * c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, c, a1 / c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, c, a1 % c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, c, c + a1 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, c, c - a1 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, c, c * a1 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, c, c / a1 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a1, c, c % a1 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to numeric'
+ | - 'Type mismatch: can not convert FALSE to numeric'
  | ...
 SELECT a2, c, a2 + c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, c, a2 - c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, c, a2 * c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, c, a2 / c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, c, a2 % c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, c, c + a2 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, c, c - a2 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, c, c * a2 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, c, c / a2 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 SELECT a2, c, c % a2 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to numeric'
+ | - 'Type mismatch: can not convert TRUE to numeric'
  | ...
 
 SELECT true > 2.3;
@@ -5032,22 +5033,22 @@ SELECT a2 IN (0.1, 1.2, 2.3, 3.4) FROM t6 LIMIT 1;
 SELECT true IN (SELECT c FROM t8);
  | ---
  | - null
- | - 'Type mismatch: can not convert true to number'
+ | - 'Type mismatch: can not convert TRUE to number'
  | ...
 SELECT false IN (SELECT c FROM t8);
  | ---
  | - null
- | - 'Type mismatch: can not convert false to number'
+ | - 'Type mismatch: can not convert FALSE to number'
  | ...
 SELECT a1 IN (SELECT c FROM t8) FROM t6 LIMIT 1;
  | ---
  | - null
- | - 'Type mismatch: can not convert false to number'
+ | - 'Type mismatch: can not convert FALSE to number'
  | ...
 SELECT a2 IN (SELECT c FROM t8) FROM t6 LIMIT 1;
  | ---
  | - null
- | - 'Type mismatch: can not convert true to number'
+ | - 'Type mismatch: can not convert TRUE to number'
  | ...
 
 SELECT true BETWEEN 0.1 and 9.9;
