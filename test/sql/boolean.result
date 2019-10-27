@@ -311,14 +311,15 @@ SELECT quote(a) FROM t0;
  |   - ['NULL']
  |   - ['NULL']
  | ...
+-- gh-4462: LENGTH didn't take BOOLEAN arguments.
 SELECT length(a) FROM t0;
  | ---
  | - metadata:
  |   - name: length(a)
  |     type: integer
  |   rows:
- |   - [null]
- |   - [null]
+ |   - [5]
+ |   - [4]
  |   - [null]
  |   - [null]
  | ...

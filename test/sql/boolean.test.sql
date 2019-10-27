@@ -82,6 +82,7 @@ SELECT abs(a) FROM t0;
 SELECT lower(a) FROM t0;
 SELECT upper(a) FROM t0;
 SELECT quote(a) FROM t0;
+-- gh-4462: LENGTH didn't take BOOLEAN arguments.
 SELECT length(a) FROM t0;
 SELECT typeof(a) FROM t0;
 

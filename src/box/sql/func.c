@@ -458,6 +458,7 @@ lengthFunc(sql_context * context, int argc, sql_value ** argv)
 	case MP_BIN:
 	case MP_INT:
 	case MP_UINT:
+	case MP_BOOL:
 	case MP_DOUBLE:{
 			sql_result_uint(context, sql_value_bytes(argv[0]));
 			break;
