@@ -559,7 +559,8 @@ position_func(struct sql_context *context, int argc, struct Mem **argv)
 	if (haystack_type != MP_STR && haystack_type != MP_BIN)
 		inconsistent_type_arg = haystack;
 	if (inconsistent_type_arg != NULL) {
-		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT or VARBINARY",
+		diag_set(ClientError, ER_INCONSISTENT_TYPES,
+			 "text or varbinary",
 			 mem_type_to_str(inconsistent_type_arg));
 		context->is_aborted = true;
 		return;
@@ -889,8 +890,8 @@ case_type##ICUFunc(sql_context *context, int argc, sql_value **argv)   \
 	UNUSED_PARAMETER(argc);                                                \
 	int arg_type = sql_value_type(argv[0]);                                \
 	if (arg_type == MP_BIN) {                                              \
-		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT",           \
-			 "VARBINARY");                                         \
+		diag_set(ClientError, ER_INCONSISTENT_TYPES, "text",           \
+			 "varbinary");                                         \
 		context->is_aborted = true;                                    \
 		return;                                                        \
 	}                                                                      \
@@ -1225,7 +1226,7 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 		char *inconsistent_type = rhs_type != MP_STR ?
 					  mem_type_to_str(argv[0]) :
 					  mem_type_to_str(argv[1]);
-		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT",
+		diag_set(ClientError, ER_INCONSISTENT_TYPES, "text",
 			 inconsistent_type);
 		context->is_aborted = true;
 		return;
@@ -1860,7 +1861,7 @@ soundexFunc(sql_context * context, int argc, sql_value ** argv)
 	assert(argc == 1);
 	if (sql_value_type(argv[0]) == MP_BIN) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 sql_value_to_diag_str(argv[0]), "TEXT");
+			 sql_value_to_diag_str(argv[0]), "text");
 		context->is_aborted = true;
 		return;
 	}

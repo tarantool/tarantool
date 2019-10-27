@@ -296,13 +296,13 @@ box.execute("EXPLAIN QUERY PLAN INSERT INTO t1 VALUES ('b'), ('c'), ('d');")
 ---
 - metadata:
   - name: selectid
-    type: INTEGER
+    type: integer
   - name: order
-    type: INTEGER
+    type: integer
   - name: from
-    type: INTEGER
+    type: integer
   - name: detail
-    type: TEXT
+    type: text
   rows:
   - [0, 0, 0, 'SCAN TABLE T2 (~262144 rows)']
 ...
@@ -318,7 +318,7 @@ box.execute('PRAGMA recursive_triggers')
 ---
 - metadata:
   - name: recursive_triggers
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...

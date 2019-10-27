@@ -374,11 +374,11 @@ cn:execute('select $2, $1, $3', parameters)
 ---
 - metadata:
   - name: $2
-    type: INTEGER
+    type: integer
   - name: $1
-    type: INTEGER
+    type: integer
   - name: $3
-    type: INTEGER
+    type: integer
   rows:
   - [22, 11, 33]
 ...
@@ -683,17 +683,17 @@ res = cn:execute("PRAGMA table_info(t1)")
 res.metadata
 ---
 - - name: cid
-    type: INTEGER
+    type: integer
   - name: name
-    type: TEXT
+    type: text
   - name: type
-    type: TEXT
+    type: text
   - name: notnull
-    type: INTEGER
+    type: integer
   - name: dflt_value
-    type: TEXT
+    type: text
   - name: pk
-    type: INTEGER
+    type: integer
 ...
 -- EXPLAIN
 res = cn:execute("EXPLAIN SELECT 1")
@@ -702,21 +702,21 @@ res = cn:execute("EXPLAIN SELECT 1")
 res.metadata
 ---
 - - name: addr
-    type: INTEGER
+    type: integer
   - name: opcode
-    type: TEXT
+    type: text
   - name: p1
-    type: INTEGER
+    type: integer
   - name: p2
-    type: INTEGER
+    type: integer
   - name: p3
-    type: INTEGER
+    type: integer
   - name: p4
-    type: TEXT
+    type: text
   - name: p5
-    type: TEXT
+    type: text
   - name: comment
-    type: TEXT
+    type: text
 ...
 res = cn:execute("EXPLAIN QUERY PLAN SELECT COUNT(*) FROM t1")
 ---
@@ -724,13 +724,13 @@ res = cn:execute("EXPLAIN QUERY PLAN SELECT COUNT(*) FROM t1")
 res.metadata
 ---
 - - name: selectid
-    type: INTEGER
+    type: integer
   - name: order
-    type: INTEGER
+    type: integer
   - name: from
-    type: INTEGER
+    type: integer
   - name: detail
-    type: TEXT
+    type: text
 ...
 -- When pragma count_changes is on, statements INSERT, REPLACE and
 -- UPDATE returns number of changed columns. Make sure that this
@@ -743,7 +743,7 @@ cn:execute("INSERT INTO t1 VALUES (1), (2), (3);")
 ---
 - metadata:
   - name: rows inserted
-    type: INTEGER
+    type: integer
   rows:
   - [3]
 ...
@@ -751,7 +751,7 @@ cn:execute("REPLACE INTO t1 VALUES (2), (3), (4), (5);")
 ---
 - metadata:
   - name: rows replaced
-    type: INTEGER
+    type: integer
   rows:
   - [4]
 ...
@@ -759,7 +759,7 @@ cn:execute("UPDATE t1 SET id = id + 100 WHERE id > 10;")
 ---
 - metadata:
   - name: rows updated
-    type: INTEGER
+    type: integer
   rows:
   - [0]
 ...

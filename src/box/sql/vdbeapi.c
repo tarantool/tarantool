@@ -893,7 +893,7 @@ bindText(sql_stmt * pStmt,	/* The statement to bind against */
 	pVar = &p->aVar[i - 1];
 	if (sqlVdbeMemSetStr(pVar, zData, nData, 1, xDel) != 0)
 		return -1;
-	return sql_bind_type(p, i, "TEXT");
+	return sql_bind_type(p, i, "text");
 }
 
 /*
@@ -915,7 +915,7 @@ sql_bind_blob(sql_stmt * pStmt,
 	struct Mem *var = &p->aVar[i - 1];
 	if (sqlVdbeMemSetStr(var, zData, nData, 0, xDel) != 0)
 		return -1;
-	return sql_bind_type(p, i, "VARBINARY");
+	return sql_bind_type(p, i, "varbinary");
 }
 
 int
@@ -939,7 +939,7 @@ sql_bind_double(sql_stmt * pStmt, int i, double rValue)
 	Vdbe *p = (Vdbe *) pStmt;
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
-	int rc = sql_bind_type(p, i, "NUMERIC");
+	int rc = sql_bind_type(p, i, "numeric");
 	sqlVdbeMemSetDouble(&p->aVar[i - 1], rValue);
 	return rc;
 }
@@ -950,7 +950,7 @@ sql_bind_boolean(struct sql_stmt *stmt, int i, bool value)
 	struct Vdbe *p = (struct Vdbe *) stmt;
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
-	int rc = sql_bind_type(p, i, "BOOLEAN");
+	int rc = sql_bind_type(p, i, "boolean");
 	mem_set_bool(&p->aVar[i - 1], value);
 	return rc;
 }
@@ -967,7 +967,7 @@ sql_bind_int64(sql_stmt * pStmt, int i, sql_int64 iValue)
 	Vdbe *p = (Vdbe *) pStmt;
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
-	int rc = sql_bind_type(p, i, "INTEGER");
+	int rc = sql_bind_type(p, i, "integer");
 	assert(iValue < 0);
 	mem_set_int(&p->aVar[i - 1], iValue, true);
 	return rc;
@@ -979,7 +979,7 @@ sql_bind_uint64(struct sql_stmt *stmt, int i, uint64_t value)
 	struct Vdbe *p = (struct Vdbe *) stmt;
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
-	int rc = sql_bind_type(p, i, "INTEGER");
+	int rc = sql_bind_type(p, i, "integer");
 	mem_set_u64(&p->aVar[i - 1], value);
 	return rc;
 }
@@ -990,7 +990,7 @@ sql_bind_null(sql_stmt * pStmt, int i)
 	Vdbe *p = (Vdbe *) pStmt;
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
-	return sql_bind_type(p, i, "BOOLEAN");
+	return sql_bind_type(p, i, "boolean");
 }
 
 int
@@ -999,7 +999,7 @@ sql_bind_ptr(struct sql_stmt *stmt, int i, void *ptr)
 	struct Vdbe *p = (struct Vdbe *) stmt;
 	int rc = vdbeUnbind(p, i);
 	if (rc == 0) {
-		rc = sql_bind_type(p, i, "VARBINARY");
+		rc = sql_bind_type(p, i, "varbinary");
 		mem_set_ptr(&p->aVar[i - 1], ptr);
 	}
 	return rc;

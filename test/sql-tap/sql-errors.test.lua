@@ -765,7 +765,7 @@ test:do_catchsql_test(
 		SELECT X'ff' >= false;
 	]], {
 		-- <sql-errors-2.8>
-		1, "Type mismatch: can not convert VARBINARY to BOOLEAN"
+		1, "Type mismatch: can not convert varbinary to boolean"
 		-- </sql-errors-2.8>
 	})
 
@@ -775,7 +775,7 @@ test:do_catchsql_test(
 		SELECT X'ff' <= false;
 	]], {
 		-- <sql-errors-2.9>
-		1, "Type mismatch: can not convert VARBINARY to BOOLEAN"
+		1, "Type mismatch: can not convert varbinary to boolean"
 		-- </sql-errors-2.9>
 	})
 

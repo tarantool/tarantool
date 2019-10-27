@@ -612,17 +612,17 @@ mem_type_to_str(const struct Mem *p)
 	case MEM_Null:
 		return "NULL";
 	case MEM_Str:
-		return "TEXT";
+		return "text";
 	case MEM_Int:
-		return "INTEGER";
+		return "integer";
 	case MEM_UInt:
-		return "UNSIGNED";
+		return "unsigned";
 	case MEM_Real:
-		return "REAL";
+		return "real";
 	case MEM_Blob:
-		return "VARBINARY";
+		return "varbinary";
 	case MEM_Bool:
-		return "BOOLEAN";
+		return "boolean";
 	default:
 		unreachable();
 	}
@@ -1507,8 +1507,8 @@ case OP_Concat: {           /* same as TK_CONCAT, in1, in2, out3 */
 		char *inconsistent_type = str_type_p1 == 0 ?
 					  mem_type_to_str(pIn1) :
 					  mem_type_to_str(pIn2);
-		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT or VARBINARY",
-			 inconsistent_type);
+		diag_set(ClientError, ER_INCONSISTENT_TYPES,
+			 "text or varbinary", inconsistent_type);
 		goto abort_due_to_error;
 	}
 

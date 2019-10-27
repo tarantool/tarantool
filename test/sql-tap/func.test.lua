@@ -2938,7 +2938,7 @@ test:do_catchsql_test(
         SELECT SOUNDEX(X'FF')
     ]], {
         -- <func-76.3>
-        1, "Type mismatch: can not convert varbinary to TEXT"
+        1, "Type mismatch: can not convert varbinary to text"
         -- </func-76.3>
     })
 

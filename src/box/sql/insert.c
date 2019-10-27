@@ -786,7 +786,7 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		else
 			column_name = "rows inserted";
 		sqlVdbeSetColName(v, 0, COLNAME_NAME, column_name, SQL_STATIC);
-		sqlVdbeSetColName(v, 0, COLNAME_DECLTYPE, "INTEGER",
+		sqlVdbeSetColName(v, 0, COLNAME_DECLTYPE, "integer",
 				  SQL_STATIC);
 	}
 

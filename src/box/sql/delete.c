@@ -420,7 +420,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		sqlVdbeSetNumCols(v, 1);
 		sqlVdbeSetColName(v, 0, COLNAME_NAME, "rows deleted",
 				      SQL_STATIC);
-		sqlVdbeSetColName(v, 0, COLNAME_DECLTYPE, "INTEGER",
+		sqlVdbeSetColName(v, 0, COLNAME_DECLTYPE, "integer",
 				  SQL_STATIC);
 	}
 

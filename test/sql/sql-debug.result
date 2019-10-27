@@ -19,7 +19,7 @@ box.execute('PRAGMA parser_trace')
 ---
 - metadata:
   - name: parser_trace
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -34,9 +34,9 @@ box.execute('PRAGMA')
 ---
 - metadata:
   - name: pragma_name
-    type: TEXT
+    type: text
   - name: pragma_value
-    type: INTEGER
+    type: integer
   rows:
   - ['count_changes', 0]
   - ['defer_foreign_keys', 0]
