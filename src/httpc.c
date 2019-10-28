@@ -404,16 +404,12 @@ httpc_execute(struct httpc_request *req, double timeout)
 		break;
 	case CURLE_COULDNT_RESOLVE_HOST:
 	case CURLE_COULDNT_CONNECT:
+	case CURLE_WRITE_ERROR:
 		/* 595 Connection Problem (AnyEvent non-standard) */
 		req->status = 595;
 		req->reason = curl_easy_strerror(req->curl_request.code);
 		++env->stat.failed_requests;
 		break;
-	case CURLE_WRITE_ERROR:
-		/* Diag is already set by curl_write_cb() */
-		assert(!diag_is_empty(&fiber()->diag));
-		++env->stat.failed_requests;
-		return -1;
 	case CURLE_OUT_OF_MEMORY:
 		diag_set(OutOfMemory, 0, "curl", "internal");
 		++env->stat.failed_requests;
