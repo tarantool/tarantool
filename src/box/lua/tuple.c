@@ -560,12 +560,13 @@ tuple_serializer_update_options(void)
 	tuple_serializer.encode_sparse_ratio = 0;
 }
 
-static void
+static int
 on_msgpack_serializer_update(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	(void) event;
 	tuple_serializer_update_options();
+	return 0;
 }
 
 void
