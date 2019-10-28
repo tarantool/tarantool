@@ -10,7 +10,9 @@
 
 https://tarantool.io/en/
 
-Patch submissions and discussion of particular patches https://lists.tarantool.org/pipermail/tarantool-patches/
+Patch submissions and discussion of particular patches https://lists.tarantool.org/mailman/listinfo/tarantool-patches/
+
+General development discussions https://lists.tarantool.org/mailman/listinfo/tarantool-discussions/
 
 Tarantool is an in-memory database and application server.
 
