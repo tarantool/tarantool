@@ -71,7 +71,7 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 		char **azVals = 0;
 
 		pStmt = 0;
-		rc = sql_prepare(zSql, -1, &pStmt, &zLeftover);
+		rc = sql_stmt_compile(zSql, -1, NULL, &pStmt, &zLeftover);
 		assert(rc == 0 || pStmt == NULL);
 		if (rc != 0)
 			continue;

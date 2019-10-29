@@ -39,18 +39,11 @@
 #include "box/space.h"
 #include "box/session.h"
 
-/*
- * Compile the UTF-8 encoded SQL statement zSql into a statement handle.
- */
-static int
-sqlPrepare(sql * db,	/* Database handle. */
-	       const char *zSql,	/* UTF-8 encoded SQL statement. */
-	       int nBytes,	/* Length of zSql in bytes. */
-	       Vdbe * pReprepare,	/* VM being reprepared */
-	       sql_stmt ** ppStmt,	/* OUT: A pointer to the prepared statement */
-	       const char **pzTail	/* OUT: End of parsed string */
-    )
+int
+sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
+		 sql_stmt **ppStmt, const char **pzTail)
 {
+	struct sql *db = sql_get();
 	int rc = 0;	/* Result code */
 	Parse sParse;		/* Parsing context */
 	sql_parser_create(&sParse, db, current_session()->sql_flags);
@@ -184,12 +177,10 @@ sqlReprepare(Vdbe * p)
 {
 	sql_stmt *pNew;
 	const char *zSql;
-	sql *db;
 
 	zSql = sql_sql((sql_stmt *) p);
 	assert(zSql != 0);
-	db = sqlVdbeDb(p);
-	if (sqlPrepare(db, zSql, -1, p, &pNew, 0) != 0) {
+	if (sql_stmt_compile(zSql, -1, p, &pNew, 0) != 0) {
 		assert(pNew == 0);
 		return -1;
 	}
@@ -205,7 +196,7 @@ int
 sql_prepare(const char *sql, int length, struct sql_stmt **stmt,
 	    const char **sql_tail)
 {
-	int rc = sqlPrepare(sql_get(), sql, length, 0, stmt, sql_tail);
+	int rc = sql_stmt_compile(sql, length, 0, stmt, sql_tail);
 	assert(rc == 0 || stmt == NULL || *stmt == NULL);
 	return rc;
 }

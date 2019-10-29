@@ -1359,7 +1359,7 @@ load_stat_from_space(const char *sql_select_prepare,
 		}
 	}
 	sql_stmt *stmt = NULL;
-	int rc = sql_prepare(sql_select_prepare, -1, &stmt, 0);
+	int rc = sql_stmt_compile(sql_select_prepare, -1, NULL, &stmt, 0);
 	if (rc)
 		goto finalize;
 	uint32_t current_idx_count = 0;
@@ -1427,7 +1427,7 @@ load_stat_from_space(const char *sql_select_prepare,
 	rc = sql_finalize(stmt);
 	if (rc)
 		goto finalize;
-	rc = sql_prepare(sql_select_load, -1, &stmt, 0);
+	rc = sql_stmt_compile(sql_select_load, -1, NULL, &stmt, 0);
 	if (rc)
 		goto finalize;
 	struct index *prev_index = NULL;
@@ -1509,7 +1509,7 @@ load_stat_to_index(const char *sql_select_load, struct index_stat **stats)
 {
 	assert(stats != NULL && *stats != NULL);
 	struct sql_stmt *stmt = NULL;
-	if (sql_prepare(sql_select_load, -1, &stmt, 0) != 0)
+	if (sql_stmt_compile(sql_select_load, -1, NULL, &stmt, 0) != 0)
 		return -1;
 	uint32_t current_idx_count = 0;
 	while (sql_step(stmt) == SQL_ROW) {
