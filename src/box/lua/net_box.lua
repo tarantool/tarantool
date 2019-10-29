@@ -890,14 +890,18 @@ local function new_sm(host, port, opts, connection, greeting)
     local function callback(what, ...)
         if what == 'state_changed' then
             local state, errno, err = ...
-            if (remote.state == 'active' or remote.state == 'fetch_schema') and
-               (state == 'error' or state == 'closed' or
-                state == 'error_reconnect') then
-               remote._on_disconnect:run(remote)
-            end
-            if remote.state ~= 'error' and remote.state ~= 'error_reconnect' and
-               state == 'active' then
-                remote._on_connect:run(remote)
+            local was_connected = remote._is_connected
+            if state == 'active' then
+                if not was_connected then
+                    remote._is_connected = true
+                    remote._on_connect:run(remote)
+                end
+            elseif state == 'error' or state == 'error_reconnect' or
+                   state == 'closed' then
+                if was_connected then
+                    remote._is_connected = false
+                    remote._on_disconnect:run(remote)
+                end
             end
             remote.state, remote.error = state, err
             if state == 'error_reconnect' then
@@ -952,6 +956,7 @@ local function new_sm(host, port, opts, connection, greeting)
     remote._on_schema_reload = trigger.new("on_schema_reload")
     remote._on_disconnect = trigger.new("on_disconnect")
     remote._on_connect = trigger.new("on_connect")
+    remote._is_connected = false
     remote._transport = create_transport(host, port, user, password, callback,
                                          connection, greeting)
     remote._transport.start()
