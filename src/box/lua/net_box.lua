@@ -923,20 +923,33 @@ local space_metatable, index_metatable
 local function new_sm(host, port, opts, connection, greeting)
     local user, password = opts.user, opts.password; opts.password = nil
     local last_reconnect_error
-    local remote = {host = host, port = port, opts = opts, state = 'initial'}
+
+    local remote = {
+        host = host,
+        port = port,
+        opts = opts,
+        state = 'initial',
+        prev_state = 'initial' }
+
     local function callback(what, ...)
         if what == 'state_changed' then
             local state, errno, err = ...
+
             if (remote.state == 'active' or remote.state == 'fetch_schema') and
                (state == 'error' or state == 'closed' or
                 state == 'error_reconnect') then
                remote._on_disconnect:run(remote)
             end
+
             if remote.state ~= 'error' and remote.state ~= 'error_reconnect' and
-               state == 'active' then
+               remote.prev_state ~= 'active' and state == 'active' then
                 remote._on_connect:run(remote)
             end
-            remote.state, remote.error = state, err
+
+            remote.prev_state = remote.state
+            remote.state = state
+            remote.error = err
+
             if state == 'error_reconnect' then
                 -- Repeat the same error in verbose log only.
                 -- Else the error clogs the log. See gh-3175.
