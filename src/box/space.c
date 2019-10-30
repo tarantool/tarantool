@@ -39,7 +39,7 @@
 #include "session.h"
 #include "txn.h"
 #include "tuple.h"
-#include "tuple_update.h"
+#include "xrow_update.h"
 #include "request.h"
 #include "xrow.h"
 #include "iproto_constants.h"

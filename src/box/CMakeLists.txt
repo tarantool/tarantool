@@ -40,7 +40,7 @@ add_library(tuple STATIC
     tuple.c
     field_map.c
     tuple_format.c
-    tuple_update.c
+    xrow_update.c
     tuple_compare.cc
     tuple_extract_key.cc
     tuple_hash.cc

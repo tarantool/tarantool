@@ -58,7 +58,7 @@
 #include "coio_task.h"
 #include "cbus.h"
 #include "histogram.h"
-#include "tuple_update.h"
+#include "xrow_update.h"
 #include "txn.h"
 #include "xrow.h"
 #include "xlog.h"

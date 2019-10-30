@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_TUPLE_UPDATE_H_INCLUDED
-#define TARANTOOL_BOX_TUPLE_UPDATE_H_INCLUDED
+#ifndef TARANTOOL_BOX_XROW_UPDATE_H_INCLUDED
+#define TARANTOOL_BOX_XROW_UPDATE_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -83,4 +83,4 @@ tuple_upsert_squash(const char *expr1, const char *expr1_end,
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_BOX_TUPLE_UPDATE_H_INCLUDED */
+#endif /* TARANTOOL_BOX_XROW_UPDATE_H_INCLUDED */

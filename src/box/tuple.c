@@ -35,8 +35,7 @@
 #include "fiber.h"
 #include "small/quota.h"
 #include "small/small.h"
-
-#include "tuple_update.h"
+#include "xrow_update.h"
 #include "coll_id_cache.h"
 
 static struct mempool tuple_iterator_pool;

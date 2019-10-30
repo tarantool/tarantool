@@ -1115,7 +1115,7 @@ tuple_to_buf(struct tuple *tuple, char *buf, size_t size);
 #if defined(__cplusplus)
 } /* extern "C" */
 
-#include "tuple_update.h"
+#include "xrow_update.h"
 #include "errinj.h"
 
 /* @copydoc tuple_field_with_type() */

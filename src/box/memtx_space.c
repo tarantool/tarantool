@@ -33,7 +33,7 @@
 #include "iproto_constants.h"
 #include "txn.h"
 #include "tuple.h"
-#include "tuple_update.h"
+#include "xrow_update.h"
 #include "xrow.h"
 #include "memtx_hash.h"
 #include "memtx_tree.h"

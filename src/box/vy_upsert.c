@@ -34,7 +34,7 @@
 #include <small/region.h>
 #include <msgpuck/msgpuck.h>
 #include "vy_stmt.h"
-#include "tuple_update.h"
+#include "xrow_update.h"
 #include "fiber.h"
 #include "column_mask.h"
 

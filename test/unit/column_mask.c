@@ -1,5 +1,5 @@
 #include "column_mask.h"
-#include "tuple_update.h"
+#include "xrow_update.h"
 #include "unit.h"
 #include "msgpuck.h"
 #include "trivia/util.h"

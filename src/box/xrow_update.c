@@ -28,8 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include "tuple_update.h"
+#include "xrow_update.h"
 #include <stdbool.h>
 
 #include "say.h"
