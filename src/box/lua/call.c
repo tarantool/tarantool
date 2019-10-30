@@ -734,6 +734,7 @@ func_lua_destroy(struct func *func)
 {
 	assert(func != NULL && func->def->language == FUNC_LANGUAGE_LUA);
 	assert(func->vtab == &func_lua_vtab);
+	TRASH(func);
 	free(func);
 }
 
