@@ -482,5 +482,6 @@ func_delete(struct func *func)
 	func_unload(func);
 	credentials_destroy(&func->owner_credentials);
 	free(func->def);
+	TRASH(func);
 	free(func);
 }
