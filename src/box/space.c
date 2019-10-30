@@ -395,11 +395,11 @@ space_before_replace(struct space *space, struct txn *txn,
 		}
 		old_data = tuple_data_range(old_tuple, &old_size);
 		old_data_end = old_data + old_size;
-		new_data = tuple_update_execute(request->tuple,
-						request->tuple_end, old_data,
-						old_data_end,
-						space->format->dict, &new_size,
-						request->index_base, NULL);
+		new_data = xrow_update_execute(request->tuple,
+					       request->tuple_end, old_data,
+					       old_data_end,
+					       space->format->dict, &new_size,
+					       request->index_base, NULL);
 		if (new_data == NULL)
 			return -1;
 		new_data_end = new_data + new_size;
@@ -419,20 +419,20 @@ space_before_replace(struct space *space, struct txn *txn,
 			 */
 			new_data = request->tuple;
 			new_data_end = request->tuple_end;
-			if (tuple_update_check_ops(request->ops,
-						   request->ops_end,
-						   space->format->dict,
-						   request->index_base) != 0)
+			if (xrow_update_check_ops(request->ops,
+						  request->ops_end,
+						  space->format->dict,
+						  request->index_base) != 0)
 				return -1;
 			break;
 		}
 		old_data = tuple_data_range(old_tuple, &old_size);
 		old_data_end = old_data + old_size;
-		new_data = tuple_upsert_execute(request->ops, request->ops_end,
-						old_data, old_data_end,
-						space->format->dict, &new_size,
-						request->index_base, false,
-						NULL);
+		new_data = xrow_upsert_execute(request->ops, request->ops_end,
+					       old_data, old_data_end,
+					       space->format->dict, &new_size,
+					       request->index_base, false,
+					       NULL);
 		new_data_end = new_data + new_size;
 		break;
 	default:

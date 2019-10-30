@@ -1354,8 +1354,8 @@ xrow_update_finish(struct xrow_update *update, uint32_t *p_tuple_len)
 }
 
 int
-tuple_update_check_ops(const char *expr, const char *expr_end,
-		       struct tuple_dictionary *dict, int index_base)
+xrow_update_check_ops(const char *expr, const char *expr_end,
+		      struct tuple_dictionary *dict, int index_base)
 {
 	struct xrow_update update;
 	xrow_update_init(&update, index_base);
@@ -1363,10 +1363,10 @@ tuple_update_check_ops(const char *expr, const char *expr_end,
 }
 
 const char *
-tuple_update_execute(const char *expr,const char *expr_end,
-		     const char *old_data, const char *old_data_end,
-		     struct tuple_dictionary *dict, uint32_t *p_tuple_len,
-		     int index_base, uint64_t *column_mask)
+xrow_update_execute(const char *expr,const char *expr_end,
+		    const char *old_data, const char *old_data_end,
+		    struct tuple_dictionary *dict, uint32_t *p_tuple_len,
+		    int index_base, uint64_t *column_mask)
 {
 	struct xrow_update update;
 	xrow_update_init(&update, index_base);
@@ -1384,10 +1384,10 @@ tuple_update_execute(const char *expr,const char *expr_end,
 }
 
 const char *
-tuple_upsert_execute(const char *expr,const char *expr_end,
-		     const char *old_data, const char *old_data_end,
-		     struct tuple_dictionary *dict, uint32_t *p_tuple_len,
-		     int index_base, bool suppress_error, uint64_t *column_mask)
+xrow_upsert_execute(const char *expr,const char *expr_end,
+		    const char *old_data, const char *old_data_end,
+		    struct tuple_dictionary *dict, uint32_t *p_tuple_len,
+		    int index_base, bool suppress_error, uint64_t *column_mask)
 {
 	struct xrow_update update;
 	xrow_update_init(&update, index_base);
@@ -1406,10 +1406,10 @@ tuple_upsert_execute(const char *expr,const char *expr_end,
 }
 
 const char *
-tuple_upsert_squash(const char *expr1, const char *expr1_end,
-		    const char *expr2, const char *expr2_end,
-		    struct tuple_dictionary *dict, size_t *result_size,
-		    int index_base)
+xrow_upsert_squash(const char *expr1, const char *expr1_end,
+		   const char *expr2, const char *expr2_end,
+		   struct tuple_dictionary *dict, size_t *result_size,
+		   int index_base)
 {
 	const char *expr[2] = {expr1, expr2};
 	const char *expr_end[2] = {expr1_end, expr2_end};

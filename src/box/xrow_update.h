@@ -47,21 +47,21 @@ enum {
 struct tuple_dictionary;
 
 int
-tuple_update_check_ops(const char *expr, const char *expr_end,
-		       struct tuple_dictionary *dict, int index_base);
+xrow_update_check_ops(const char *expr, const char *expr_end,
+		      struct tuple_dictionary *dict, int index_base);
 
 const char *
-tuple_update_execute(const char *expr,const char *expr_end,
-		     const char *old_data, const char *old_data_end,
-		     struct tuple_dictionary *dict, uint32_t *p_new_size,
-		     int index_base, uint64_t *column_mask);
+xrow_update_execute(const char *expr,const char *expr_end,
+		    const char *old_data, const char *old_data_end,
+		    struct tuple_dictionary *dict, uint32_t *p_new_size,
+		    int index_base, uint64_t *column_mask);
 
 const char *
-tuple_upsert_execute(const char *expr, const char *expr_end,
-		     const char *old_data, const char *old_data_end,
-		     struct tuple_dictionary *dict, uint32_t *p_new_size,
-		     int index_base, bool suppress_error,
-		     uint64_t *column_mask);
+xrow_upsert_execute(const char *expr, const char *expr_end,
+		    const char *old_data, const char *old_data_end,
+		    struct tuple_dictionary *dict, uint32_t *p_new_size,
+		    int index_base, bool suppress_error,
+		    uint64_t *column_mask);
 
 /**
  * Try to merge two update/upsert expressions to an equivalent one.
@@ -74,10 +74,10 @@ tuple_upsert_execute(const char *expr, const char *expr_end,
  * If it isn't possible to merge expressions NULL is returned.
  */
 const char *
-tuple_upsert_squash(const char *expr1, const char *expr1_end,
-		    const char *expr2, const char *expr2_end,
-		    struct tuple_dictionary *dict, size_t *result_size,
-		    int index_base);
+xrow_upsert_squash(const char *expr1, const char *expr1_end,
+		   const char *expr2, const char *expr2_end,
+		   struct tuple_dictionary *dict, size_t *result_size,
+		   int index_base);
 
 #if defined(__cplusplus)
 } /* extern "C" */

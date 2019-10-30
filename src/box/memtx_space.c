@@ -391,9 +391,9 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	struct tuple_format *format = space->format;
 	const char *old_data = tuple_data_range(old_tuple, &bsize);
 	const char *new_data =
-		tuple_update_execute(request->tuple, request->tuple_end,
-				     old_data, old_data + bsize, format->dict,
-				     &new_size, request->index_base, NULL);
+		xrow_update_execute(request->tuple, request->tuple_end,
+				    old_data, old_data + bsize, format->dict,
+				    &new_size, request->index_base, NULL);
 	if (new_data == NULL)
 		return -1;
 
@@ -461,9 +461,9 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		 *   we get it here, it's also OK to throw it
 		 * @sa https://github.com/tarantool/tarantool/issues/1156
 		 */
-		if (tuple_update_check_ops(request->ops, request->ops_end,
-					   format->dict,
-					   request->index_base) != 0) {
+		if (xrow_update_check_ops(request->ops, request->ops_end,
+					  format->dict,
+					  request->index_base) != 0) {
 			return -1;
 		}
 		stmt->new_tuple = memtx_tuple_new(format, request->tuple,
@@ -476,17 +476,17 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		const char *old_data = tuple_data_range(old_tuple, &bsize);
 		/*
 		 * Update the tuple.
-		 * tuple_upsert_execute() fails on totally wrong
+		 * xrow_upsert_execute() fails on totally wrong
 		 * tuple ops, but ignores ops that not suitable
 		 * for the tuple.
 		 */
 		uint64_t column_mask = COLUMN_MASK_FULL;
 		const char *new_data =
-			tuple_upsert_execute(request->ops, request->ops_end,
-					     old_data, old_data + bsize,
-					     format->dict, &new_size,
-					     request->index_base, false,
-					     &column_mask);
+			xrow_upsert_execute(request->ops, request->ops_end,
+					    old_data, old_data + bsize,
+					    format->dict, &new_size,
+					    request->index_base, false,
+					    &column_mask);
 		if (new_data == NULL)
 			return -1;
 
