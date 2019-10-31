@@ -790,6 +790,73 @@ sql_stmt_schema_version(const struct sql_stmt *stmt)
 	return v->schema_ver;
 }
 
+static size_t
+sql_metadata_size(const struct sql_column_metadata *metadata)
+{
+	size_t size = sizeof(*metadata);
+	if (metadata->type != NULL)
+		size += strlen(metadata->type);
+	if (metadata->name != NULL)
+		size += strlen(metadata->name);
+	if (metadata->collation != NULL)
+		size += strlen(metadata->collation);
+	return size;
+}
+
+size_t
+sql_stmt_est_size(const struct sql_stmt *stmt)
+{
+	struct Vdbe *v = (struct Vdbe *) stmt;
+	size_t size = sizeof(*v);
+	/* Names and types of result set columns */
+	for (int i = 0; i < v->nResColumn; ++i)
+		size += sql_metadata_size(&v->metadata[i]);
+	/* Opcodes */
+	size += sizeof(struct VdbeOp) * v->nOp;
+	/* Memory cells */
+	size += sizeof(struct Mem) * v->nMem;
+	/* Bindings */
+	size += sizeof(struct Mem) * v->nVar;
+	/* Bindings included in the result set */
+	size += sizeof(uint32_t) * v->res_var_count;
+	/* Cursors */
+	size += sizeof(struct VdbeCursor *) * v->nCursor;
+
+	for (int i = 0; i < v->nOp; ++i) {
+		/* Estimate size of p4 operand. */
+		if (v->aOp[i].p4type == P4_NOTUSED)
+			continue;
+		switch (v->aOp[i].p4type) {
+		case P4_DYNAMIC:
+		case P4_STATIC:
+			if (v->aOp[i].opcode == OP_Blob ||
+			    v->aOp[i].opcode == OP_String)
+				size += v->aOp[i].p1;
+			else if (v->aOp[i].opcode == OP_String8)
+				size += strlen(v->aOp[i].p4.z);
+			break;
+		case P4_BOOL:
+			size += sizeof(v->aOp[i].p4.b);
+			break;
+		case P4_INT32:
+			size += sizeof(v->aOp[i].p4.i);
+			break;
+		case P4_UINT64:
+		case P4_INT64:
+			size += sizeof(*v->aOp[i].p4.pI64);
+			break;
+		case P4_REAL:
+			size += sizeof(*v->aOp[i].p4.pReal);
+			break;
+		default:
+			size += sizeof(v->aOp[i].p4.p);
+			break;
+		}
+	}
+	size += strlen(v->zSql);
+	return size;
+}
+
 /******************************* sql_bind_  **************************
  *
  * Routines used to attach values to wildcards in a compiled SQL statement.
