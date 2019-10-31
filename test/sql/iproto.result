@@ -118,7 +118,7 @@ cn:execute('select id as identifier from test where a = 5;')
 -- netbox API errors.
 cn:execute(100)
 ---
-- error: Syntax error at line 1 near '100'
+- error: Prepared statement with id 100 does not exist
 ...
 cn:execute('select 1', nil, {dry_run = true})
 ---

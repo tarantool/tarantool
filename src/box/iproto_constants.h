@@ -110,6 +110,8 @@ enum iproto_key {
 	 * ]
 	 */
 	IPROTO_METADATA = 0x32,
+	IPROTO_BIND_METADATA = 0x33,
+	IPROTO_BIND_COUNT = 0x34,
 
 	/* Leave a gap between response keys and SQL keys. */
 	IPROTO_SQL_TEXT = 0x40,
@@ -120,6 +122,7 @@ enum iproto_key {
 	 * }
 	 */
 	IPROTO_SQL_INFO = 0x42,
+	IPROTO_STMT_ID = 0x43,
 	/* Leave a gap between SQL keys and additional request keys */
 	IPROTO_REPLICA_ANON = 0x50,
 	IPROTO_KEY_MAX
@@ -209,6 +212,8 @@ enum iproto_type {
 	IPROTO_EXECUTE = 11,
 	/** No operation. Treated as DML, used to bump LSN. */
 	IPROTO_NOP = 12,
+	/** Prepare SQL statement. */
+	IPROTO_PREPARE = 13,
 	/** The maximum typecode used for box.stat() */
 	IPROTO_TYPE_STAT_MAX,
 

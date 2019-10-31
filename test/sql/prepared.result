@@ -12,34 +12,49 @@ fiber = require('fiber')
 -- Wrappers to make remote and local execution interface return
 -- same result pattern.
 --
+is_remote = test_run:get_cfg('remote') == 'true'
+ | ---
+ | ...
+execute = nil
+ | ---
+ | ...
+prepare = nil
+ | ---
+ | ...
+
 test_run:cmd("setopt delimiter ';'")
  | ---
  | - true
  | ...
-execute = function(...)
-    local res, err = box.execute(...)
-    if err ~= nil then
-        error(err)
+if is_remote then
+    box.schema.user.grant('guest','read, write, execute', 'universe')
+    box.schema.user.grant('guest', 'create', 'space')
+    cn = remote.connect(box.cfg.listen)
+    execute = function(...) return cn:execute(...) end
+    prepare = function(...) return cn:prepare(...) end
+    unprepare = function(...) return cn:unprepare(...) end
+else
+    execute = function(...)
+        local res, err = box.execute(...)
+        if err ~= nil then
+            error(err)
+        end
+        return res
     end
-    return res
-end;
- | ---
- | ...
-prepare = function(...)
-    local res, err = box.prepare(...)
-    if err ~= nil then
-        error(err)
+    prepare = function(...)
+        local res, err = box.prepare(...)
+        if err ~= nil then
+            error(err)
+        end
+        return res
     end
-    return res
-end;
- | ---
- | ...
-unprepare = function(...)
-    local res, err = box.unprepare(...)
-    if err ~= nil then
-        error(err)
+    unprepare = function(...)
+        local res, err = box.unprepare(...)
+        if err ~= nil then
+            error(err)
+        end
+        return res
     end
-    return res
 end;
  | ---
  | ...
@@ -128,31 +143,26 @@ execute(s.stmt_id, {1, 3})
  |     type: string
  |   rows: []
  | ...
-s:execute({1, 2})
+
+test_run:cmd("setopt delimiter ';'")
  | ---
- | - metadata:
- |   - name: ID
- |     type: integer
- |   - name: A
- |     type: number
- |   - name: B
- |     type: string
- |   rows:
- |   - [1, 2, '3']
+ | - true
  | ...
-s:execute({1, 3})
+if not is_remote then
+    res = s:execute({1, 2})
+    assert(res ~= nil)
+    res = s:execute({1, 3})
+    assert(res ~= nil)
+end;
  | ---
- | - metadata:
- |   - name: ID
- |     type: integer
- |   - name: A
- |     type: number
- |   - name: B
- |     type: string
- |   rows: []
  | ...
-s:unprepare()
+test_run:cmd("setopt delimiter ''");
  | ---
+ | - true
+ | ...
+unprepare(s.stmt_id)
+ | ---
+ | - null
  | ...
 
 -- Test preparation of different types of queries.
@@ -338,6 +348,7 @@ _ = prepare("SELECT a FROM test WHERE b = '3';")
 s = prepare("SELECT a FROM test WHERE b = '3';")
  | ---
  | ...
+
 execute(s.stmt_id)
  | ---
  | - metadata:
@@ -354,21 +365,21 @@ execute(s.stmt_id)
  |   rows:
  |   - [2]
  | ...
-s:execute()
+test_run:cmd("setopt delimiter ';'")
  | ---
- | - metadata:
- |   - name: A
- |     type: number
- |   rows:
- |   - [2]
+ | - true
  | ...
-s:execute()
+if not is_remote then
+    res = s:execute()
+    assert(res ~= nil)
+    res = s:execute()
+    assert(res ~= nil)
+end;
  | ---
- | - metadata:
- |   - name: A
- |     type: number
- |   rows:
- |   - [2]
+ | ...
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
  | ...
 unprepare(s.stmt_id)
  | ---
@@ -636,6 +647,12 @@ res;
 -- Check that after fiber is dead, its session gets rid of
 -- all prepared statements.
 --
+if is_remote then
+    cn:close()
+    cn = remote.connect(box.cfg.listen)
+end;
+ | ---
+ | ...
 box.cfg{sql_cache_size = 0};
  | ---
  | ...
@@ -712,6 +729,13 @@ f2:join();
  | - true
  | ...
 
+if is_remote then
+    cn:close()
+    box.schema.user.revoke('guest', 'read, write, execute', 'universe')
+    box.schema.user.revoke('guest', 'create', 'space')
+end;
+ | ---
+ | ...
 test_run:cmd("setopt delimiter ''");
  | ---
  | - true

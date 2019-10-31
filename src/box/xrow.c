@@ -576,9 +576,11 @@ error:
 	uint32_t map_size = mp_decode_map(&data);
 	request->sql_text = NULL;
 	request->bind = NULL;
+	request->stmt_id = NULL;
 	for (uint32_t i = 0; i < map_size; ++i) {
 		uint8_t key = *data;
-		if (key != IPROTO_SQL_BIND && key != IPROTO_SQL_TEXT) {
+		if (key != IPROTO_SQL_BIND && key != IPROTO_SQL_TEXT &&
+		    key != IPROTO_STMT_ID) {
 			mp_check(&data, end);   /* skip the key */
 			mp_check(&data, end);   /* skip the value */
 			continue;
@@ -588,12 +590,23 @@ error:
 			goto error;
 		if (key == IPROTO_SQL_BIND)
 			request->bind = value;
-		else
+		else if (key == IPROTO_SQL_TEXT)
 			request->sql_text = value;
+		else
+			request->stmt_id = value;
 	}
-	if (request->sql_text == NULL) {
-		xrow_on_decode_err(row->body[0].iov_base, end, ER_MISSING_REQUEST_FIELD,
-			 iproto_key_name(IPROTO_SQL_TEXT));
+	if (request->sql_text != NULL && request->stmt_id != NULL) {
+		xrow_on_decode_err(row->body[0].iov_base, end, ER_INVALID_MSGPACK,
+				   "SQL text and statement id are incompatible "\
+				   "options in one request: choose one");
+		return -1;
+	}
+	if (request->sql_text == NULL && request->stmt_id == NULL) {
+		xrow_on_decode_err(row->body[0].iov_base, end,
+				   ER_MISSING_REQUEST_FIELD,
+				   tt_sprintf("%s or %s",
+					      iproto_key_name(IPROTO_SQL_TEXT),
+					      iproto_key_name(IPROTO_STMT_ID)));
 		return -1;
 	}
 	if (data != end)

@@ -250,6 +250,7 @@ t;
   - EVAL
   - CALL
   - ERROR
+  - PREPARE
   - REPLACE
   - UPSERT
   - AUTH

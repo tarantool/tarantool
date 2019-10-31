@@ -5,27 +5,40 @@ fiber = require('fiber')
 -- Wrappers to make remote and local execution interface return
 -- same result pattern.
 --
+is_remote = test_run:get_cfg('remote') == 'true'
+execute = nil
+prepare = nil
+
 test_run:cmd("setopt delimiter ';'")
-execute = function(...)
-    local res, err = box.execute(...)
-    if err ~= nil then
-        error(err)
+if is_remote then
+    box.schema.user.grant('guest','read, write, execute', 'universe')
+    box.schema.user.grant('guest', 'create', 'space')
+    cn = remote.connect(box.cfg.listen)
+    execute = function(...) return cn:execute(...) end
+    prepare = function(...) return cn:prepare(...) end
+    unprepare = function(...) return cn:unprepare(...) end
+else
+    execute = function(...)
+        local res, err = box.execute(...)
+        if err ~= nil then
+            error(err)
+        end
+        return res
     end
-    return res
-end;
-prepare = function(...)
-    local res, err = box.prepare(...)
-    if err ~= nil then
-        error(err)
+    prepare = function(...)
+        local res, err = box.prepare(...)
+        if err ~= nil then
+            error(err)
+        end
+        return res
     end
-    return res
-end;
-unprepare = function(...)
-    local res, err = box.unprepare(...)
-    if err ~= nil then
-        error(err)
+    unprepare = function(...)
+        local res, err = box.unprepare(...)
+        if err ~= nil then
+            error(err)
+        end
+        return res
     end
-    return res
 end;
 
 test_run:cmd("setopt delimiter ''");
@@ -46,9 +59,16 @@ s.params
 s.param_count
 execute(s.stmt_id, {1, 2})
 execute(s.stmt_id, {1, 3})
-s:execute({1, 2})
-s:execute({1, 3})
-s:unprepare()
+
+test_run:cmd("setopt delimiter ';'")
+if not is_remote then
+    res = s:execute({1, 2})
+    assert(res ~= nil)
+    res = s:execute({1, 3})
+    assert(res ~= nil)
+end;
+test_run:cmd("setopt delimiter ''");
+unprepare(s.stmt_id)
 
 -- Test preparation of different types of queries.
 -- Let's start from DDL. It doesn't make much sense since
@@ -111,10 +131,17 @@ space:replace{4, 5, '6'}
 space:replace{7, 8.5, '9'}
 _ = prepare("SELECT a FROM test WHERE b = '3';")
 s = prepare("SELECT a FROM test WHERE b = '3';")
+
 execute(s.stmt_id)
 execute(s.stmt_id)
-s:execute()
-s:execute()
+test_run:cmd("setopt delimiter ';'")
+if not is_remote then
+    res = s:execute()
+    assert(res ~= nil)
+    res = s:execute()
+    assert(res ~= nil)
+end;
+test_run:cmd("setopt delimiter ''");
 unprepare(s.stmt_id)
 
 s = prepare("SELECT count(*), count(a - 3), max(b), abs(id) FROM test WHERE b = '3';")
@@ -211,6 +238,10 @@ res;
 -- Check that after fiber is dead, its session gets rid of
 -- all prepared statements.
 --
+if is_remote then
+    cn:close()
+    cn = remote.connect(box.cfg.listen)
+end;
 box.cfg{sql_cache_size = 0};
 box.cfg{sql_cache_size = 3000};
 
@@ -259,6 +290,11 @@ f2:set_joinable(true)
 f1:join();
 f2:join();
 
+if is_remote then
+    cn:close()
+    box.schema.user.revoke('guest', 'read, write, execute', 'universe')
+    box.schema.user.revoke('guest', 'create', 'space')
+end;
 test_run:cmd("setopt delimiter ''");
 
 box.cfg{sql_cache_size = 5 * 1024 * 1024}

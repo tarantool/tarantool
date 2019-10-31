@@ -107,6 +107,7 @@ const char *iproto_type_strs[] =
 	"CALL",
 	"EXECUTE",
 	NULL, /* NOP */
+	"PREPARE",
 };
 
 #define bit(c) (1ULL<<IPROTO_##c)
@@ -124,6 +125,7 @@ const uint64_t iproto_body_key_map[IPROTO_TYPE_STAT_MAX] = {
 	0,                                                     /* CALL */
 	0,                                                     /* EXECUTE */
 	0,                                                     /* NOP */
+	0,                                                     /* PREPARE */
 };
 #undef bit
 
@@ -179,8 +181,8 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"data",             /* 0x30 */
 	"error",            /* 0x31 */
 	"metadata",         /* 0x32 */
-	NULL,               /* 0x33 */
-	NULL,               /* 0x34 */
+	"bind meta",        /* 0x33 */
+	"bind count",       /* 0x34 */
 	NULL,               /* 0x35 */
 	NULL,               /* 0x36 */
 	NULL,               /* 0x37 */
@@ -195,6 +197,7 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"SQL text",         /* 0x40 */
 	"SQL bind",         /* 0x41 */
 	"SQL info",         /* 0x42 */
+	"stmt id",          /* 0x43 */
 };
 
 const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {

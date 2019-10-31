@@ -570,16 +570,48 @@ netbox_encode_execute(lua_State *L)
 
 	mpstream_encode_map(&stream, 3);
 
-	size_t len;
-	const char *query = lua_tolstring(L, 3, &len);
-	mpstream_encode_uint(&stream, IPROTO_SQL_TEXT);
-	mpstream_encode_strn(&stream, query, len);
+	if (lua_type(L, 3) == LUA_TNUMBER) {
+		uint32_t query_id = lua_tointeger(L, 3);
+		mpstream_encode_uint(&stream, IPROTO_STMT_ID);
+		mpstream_encode_uint(&stream, query_id);
+	} else {
+		size_t len;
+		const char *query = lua_tolstring(L, 3, &len);
+		mpstream_encode_uint(&stream, IPROTO_SQL_TEXT);
+		mpstream_encode_strn(&stream, query, len);
+	}
 
 	mpstream_encode_uint(&stream, IPROTO_SQL_BIND);
 	luamp_encode_tuple(L, cfg, &stream, 4);
 
 	mpstream_encode_uint(&stream, IPROTO_OPTIONS);
 	luamp_encode_tuple(L, cfg, &stream, 5);
+
+	netbox_encode_request(&stream, svp);
+	return 0;
+}
+
+static int
+netbox_encode_prepare(lua_State *L)
+{
+	if (lua_gettop(L) < 3)
+		return luaL_error(L, "Usage: netbox.encode_prepare(ibuf, "\
+				     "sync, query)");
+	struct mpstream stream;
+	size_t svp = netbox_prepare_request(L, &stream, IPROTO_PREPARE);
+
+	mpstream_encode_map(&stream, 1);
+
+	if (lua_type(L, 3) == LUA_TNUMBER) {
+		uint32_t query_id = lua_tointeger(L, 3);
+		mpstream_encode_uint(&stream, IPROTO_STMT_ID);
+		mpstream_encode_uint(&stream, query_id);
+	} else {
+		size_t len;
+		const char *query = lua_tolstring(L, 3, &len);
+		mpstream_encode_uint(&stream, IPROTO_SQL_TEXT);
+		mpstream_encode_strn(&stream, query, len);
+	};
 
 	netbox_encode_request(&stream, svp);
 	return 0;
@@ -796,6 +828,62 @@ netbox_decode_execute(struct lua_State *L)
 	return 2;
 }
 
+static int
+netbox_decode_prepare(struct lua_State *L)
+{
+	uint32_t ctypeid;
+	const char *data = *(const char **)luaL_checkcdata(L, 1, &ctypeid);
+	assert(mp_typeof(*data) == MP_MAP);
+	uint32_t map_size = mp_decode_map(&data);
+	int stmt_id_idx = 0, meta_idx = 0, bind_meta_idx = 0,
+	    bind_count_idx = 0;
+	uint32_t stmt_id = 0;
+	for (uint32_t i = 0; i < map_size; ++i) {
+		uint32_t key = mp_decode_uint(&data);
+		switch(key) {
+		case IPROTO_STMT_ID: {
+			stmt_id = mp_decode_uint(&data);
+			luaL_pushuint64(L, stmt_id);
+			stmt_id_idx = i - map_size;
+			break;
+		}
+		case IPROTO_METADATA: {
+			netbox_decode_metadata(L, &data);
+			meta_idx = i - map_size;
+			break;
+		}
+		case IPROTO_BIND_METADATA: {
+			netbox_decode_metadata(L, &data);
+			bind_meta_idx = i - map_size;
+			break;
+		}
+		default: {
+			assert(key == IPROTO_BIND_COUNT);
+			uint32_t bind_count = mp_decode_uint(&data);
+			luaL_pushuint64(L, bind_count);
+			bind_count_idx = i - map_size;
+			break;
+		}}
+	}
+	/* These fields must be present in response. */
+	assert(stmt_id_idx * bind_meta_idx * bind_count_idx != 0);
+	/* General meta is presented only in DQL responses. */
+	lua_createtable(L, 0, meta_idx != 0 ? 4 : 3);
+	lua_pushvalue(L, stmt_id_idx - 1);
+	lua_setfield(L, -2, "stmt_id");
+	lua_pushvalue(L, bind_count_idx - 1);
+	lua_setfield(L, -2, "param_count");
+	lua_pushvalue(L, bind_meta_idx - 1);
+	lua_setfield(L, -2, "params");
+	if (meta_idx != 0) {
+		lua_pushvalue(L, meta_idx - 1);
+		lua_setfield(L, -2, "metadata");
+	}
+
+	*(const char **)luaL_pushcdata(L, ctypeid) = data;
+	return 2;
+}
+
 int
 luaopen_net_box(struct lua_State *L)
 {
@@ -811,11 +899,13 @@ luaopen_net_box(struct lua_State *L)
 		{ "encode_update",  netbox_encode_update },
 		{ "encode_upsert",  netbox_encode_upsert },
 		{ "encode_execute", netbox_encode_execute},
+		{ "encode_prepare", netbox_encode_prepare},
 		{ "encode_auth",    netbox_encode_auth },
 		{ "decode_greeting",netbox_decode_greeting },
 		{ "communicate",    netbox_communicate },
 		{ "decode_select",  netbox_decode_select },
 		{ "decode_execute", netbox_decode_execute },
+		{ "decode_prepare", netbox_decode_prepare },
 		{ NULL, NULL}
 	};
 	/* luaL_register_module polutes _G */

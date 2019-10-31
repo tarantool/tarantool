@@ -104,6 +104,8 @@ local method_encoder = {
     upsert  = internal.encode_upsert,
     select  = internal.encode_select,
     execute = internal.encode_execute,
+    prepare = internal.encode_prepare,
+    unprepare = internal.encode_prepare,
     get     = internal.encode_select,
     min     = internal.encode_select,
     max     = internal.encode_select,
@@ -128,6 +130,8 @@ local method_decoder = {
     upsert  = decode_nil,
     select  = internal.decode_select,
     execute = internal.decode_execute,
+    prepare = internal.decode_prepare,
+    unprepare = decode_nil,
     get     = decode_get,
     min     = decode_get,
     max     = decode_get,
@@ -1194,6 +1198,29 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
         box.error(box.error.UNSUPPORTED, "execute", "options")
     end
     return self:_request('execute', netbox_opts, nil, query, parameters or {},
+                         sql_opts or {})
+end
+
+function remote_methods:prepare(query, parameters, sql_opts, netbox_opts)
+    check_remote_arg(self, "prepare")
+    if type(query) ~= "string" then
+        box.error(box.error.SQL_PREPARE, "expected string as SQL statement")
+    end
+    if sql_opts ~= nil then
+        box.error(box.error.UNSUPPORTED, "prepare", "options")
+    end
+    return self:_request('prepare', netbox_opts, nil, query)
+end
+
+function remote_methods:unprepare(query, parameters, sql_opts, netbox_opts)
+    check_remote_arg(self, "unprepare")
+    if type(query) ~= "number" then
+        box.error("query id is expected to be numeric")
+    end
+    if sql_opts ~= nil then
+        box.error(box.error.UNSUPPORTED, "unprepare", "options")
+    end
+    return self:_request('unprepare', netbox_opts, nil, query, parameters or {},
                          sql_opts or {})
 end
 
