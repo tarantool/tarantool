@@ -189,14 +189,13 @@ lbox_session_su(struct lua_State *L)
 		fiber_set_user(fiber(), &session->credentials);
 		return 0; /* su */
 	}
+	luaL_checktype(L, 2, LUA_TFUNCTION);
 
 	struct credentials su_credentials;
 	struct credentials *old_credentials = fiber()->storage.credentials;
 	credentials_create(&su_credentials, user);
 	fiber()->storage.credentials = &su_credentials;
 
-	/* sudo */
-	luaL_checktype(L, 2, LUA_TFUNCTION);
 	int error = lua_pcall(L, top - 2, LUA_MULTRET, 0);
 	/* Restore the original credentials. */
 	fiber_set_user(fiber(), old_credentials);
