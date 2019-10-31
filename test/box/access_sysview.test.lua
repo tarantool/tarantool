@@ -287,7 +287,7 @@ box.space._vcollation:select{0}
 box.session.su('admin')
 
 -- _vcollation is readable anyway.
-box.schema.user.revoke("guest", "read", "space", "_collation")
+box.schema.user.revoke("guest", "read, write, alter, execute", "space", "_collation")
 box.session.su("guest")
 #box.space._vcollation:select{}
 session.su('admin')
