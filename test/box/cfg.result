@@ -73,6 +73,8 @@ cfg_filter(box.cfg)
  |     - 1
  |   - - slab_alloc_factor
  |     - 1.05
+ |   - - sql_cache_size
+ |     - 5242880
  |   - - strip_core
  |     - true
  |   - - too_long_threshold
@@ -174,6 +176,8 @@ cfg_filter(box.cfg)
  |     - 1
  |   - - slab_alloc_factor
  |     - 1.05
+ |   - - sql_cache_size
+ |     - 5242880
  |   - - strip_core
  |     - true
  |   - - too_long_threshold
@@ -317,6 +321,9 @@ box.cfg{memtx_memory = box.cfg.memtx_memory}
  | ---
  | ...
 box.cfg{vinyl_memory = box.cfg.vinyl_memory}
+ | ---
+ | ...
+box.cfg{sql_cache_size = box.cfg.sql_cache_size}
  | ---
  | ...
 

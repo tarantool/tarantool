@@ -51,6 +51,7 @@ box.cfg{replicaset_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
 
 box.cfg{memtx_memory = box.cfg.memtx_memory}
 box.cfg{vinyl_memory = box.cfg.vinyl_memory}
+box.cfg{sql_cache_size = box.cfg.sql_cache_size}
 
 --------------------------------------------------------------------------------
 -- Test of default cfg options

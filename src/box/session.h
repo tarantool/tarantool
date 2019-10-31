@@ -101,6 +101,11 @@ struct session {
 	const struct session_vtab *vtab;
 	/** Session metadata. */
 	union session_meta meta;
+	/**
+	 * ID of statements prepared in current session.
+	 * This map is allocated on demand.
+	 */
+	struct mh_i32ptr_t *sql_stmts;
 	/** Session user id and global grants */
 	struct credentials credentials;
 	/** Trigger for fiber on_stop to cleanup created on-demand session */
@@ -266,6 +271,18 @@ session_storage_cleanup(int sid);
  */
 struct session *
 session_create(enum session_type type);
+
+/** Return true if given statement id belongs to the session. */
+bool
+session_check_stmt_id(struct session *session, uint32_t stmt_id);
+
+/** Add prepared statement ID to the session hash. */
+int
+session_add_stmt_id(struct session *session, uint32_t stmt_id);
+
+/** Remove prepared statement ID from the session hash. */
+void
+session_remove_stmt_id(struct session *session, uint32_t stmt_id);
 
 /**
  * Destroy a session.

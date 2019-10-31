@@ -54,6 +54,7 @@
 #include "iproto_constants.h"
 #include "fk_constraint.h"
 #include "mpstream.h"
+#include "sql_stmt_cache.h"
 
 static sql *db = NULL;
 
@@ -77,6 +78,8 @@ sql_init()
 
 	if (sql_init_db(&db) != 0)
 		panic("failed to initialize SQL subsystem");
+
+	sql_stmt_cache_init();
 
 	assert(db != NULL);
 }

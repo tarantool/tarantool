@@ -85,6 +85,8 @@ cfg_filter(box.cfg)
     - 1
   - - slab_alloc_factor
     - 1.05
+  - - sql_cache_size
+    - 5242880
   - - strip_core
     - true
   - - too_long_threshold

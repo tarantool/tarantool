@@ -558,6 +558,7 @@ t;
   207: box.error.REPLICA_NOT_ANON
   208: box.error.CANNOT_REGISTER
   209: box.error.SESSION_SETTING_INVALID_VALUE
+  210: box.error.SQL_PREPARE
 ...
 test_run:cmd("setopt delimiter ''");
 ---

@@ -75,6 +75,7 @@
 #include "call.h"
 #include "func.h"
 #include "sequence.h"
+#include "sql_stmt_cache.h"
 
 static char status[64] = "unknown";
 
@@ -630,6 +631,17 @@ box_check_vinyl_options(void)
 	}
 }
 
+static int
+box_check_sql_cache_size(int size)
+{
+	if (size < 0) {
+		diag_set(ClientError, ER_CFG, "sql_cache_size",
+			 "must be non-negative");
+		return -1;
+	}
+	return 0;
+}
+
 void
 box_check_config()
 {
@@ -651,6 +663,7 @@ box_check_config()
 	box_check_memtx_memory(cfg_geti64("memtx_memory"));
 	box_check_memtx_min_tuple_size(cfg_geti64("memtx_min_tuple_size"));
 	box_check_vinyl_options();
+	box_check_sql_cache_size(cfg_geti("sql_cache_size"));
 }
 
 /*
@@ -971,6 +984,17 @@ box_set_net_msg_max(void)
 	fiber_pool_set_max_size(&tx_fiber_pool,
 				new_iproto_msg_max *
 				IPROTO_FIBER_POOL_SIZE_FACTOR);
+}
+
+int
+box_set_prepared_stmt_cache_size(void)
+{
+	int cache_sz = cfg_geti("sql_cache_size");
+	if (box_check_sql_cache_size(cache_sz) != 0)
+		return -1;
+	if (sql_stmt_cache_set_size(cache_sz) != 0)
+		return -1;
+	return 0;
 }
 
 /* }}} configuration bindings */
@@ -2335,6 +2359,8 @@ box_cfg_xc(void)
 	box_check_instance_uuid(&instance_uuid);
 	box_check_replicaset_uuid(&replicaset_uuid);
 
+	if (box_set_prepared_stmt_cache_size() != 0)
+		diag_raise();
 	box_set_net_msg_max();
 	box_set_readahead();
 	box_set_too_long_threshold();
