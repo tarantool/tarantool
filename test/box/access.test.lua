@@ -100,6 +100,12 @@ session.su('admin')
 box.schema.user.drop('tester')
 session.user()
 
+-- Invalid user.
+session.su('does not exist')
+-- The point of this test is to try a name > max
+-- allowed name.
+session.su(string.rep('a', 66000))
+
 --------------------------------------------------------------------------------
 -- Check if identifiers obey the common constraints
 --------------------------------------------------------------------------------

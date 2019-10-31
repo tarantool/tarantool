@@ -239,6 +239,17 @@ session.user()
 ---
 - admin
 ...
+-- Invalid user.
+session.su('does not exist')
+---
+- error: User 'does not exist' is not found
+...
+-- The point of this test is to try a name > max
+-- allowed name.
+session.su(string.rep('a', 66000))
+---
+- error: name length 66000 is greater than BOX_NAME_MAX
+...
 --------------------------------------------------------------------------------
 -- Check if identifiers obey the common constraints
 --------------------------------------------------------------------------------
