@@ -172,11 +172,6 @@ session_create_on_demand()
 	/* Add a trigger to destroy session on fiber stop */
 	trigger_add(&fiber()->on_stop, &s->fiber_on_stop);
 	credentials_reset(&s->credentials, admin_user);
-	/*
-	 * At bootstrap, admin user access is not loaded yet (is
-	 * 0), force global access. @sa comment in session_init()
-	 */
-	s->credentials.universal_access = ~(user_access_t) 0;
 	fiber_set_session(fiber(), s);
 	fiber_set_user(fiber(), &s->credentials);
 	return s;
@@ -252,24 +247,6 @@ session_init()
 		panic("out of memory");
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
 	credentials_create(&admin_credentials, admin_user);
-	/*
-	 * For performance reasons, we do not always explicitly
-	 * look at user id in access checks, while still need to
-	 * ensure 'admin' user has full access to all objects in
-	 * the universe.
-	 *
-	 * This is why  _priv table contains a record with grants
-	 * of full access to universe to 'admin' user.
-	 *
-	 * Making a record in _priv table is, however,
-	 * insufficient, since some checks are done at bootstrap,
-	 * before _priv table is read (e.g. when we're
-	 * bootstrapping a replica in applier fiber).
-	 *
-	 * When session_init() is called, admin user access is not
-	 * loaded yet (is 0), force global access.
-	 */
-	admin_credentials.universal_access = ~((user_access_t) 0);
 }
 
 void

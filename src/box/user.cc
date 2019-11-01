@@ -49,6 +49,10 @@ static struct user_map user_map_nil;
 
 struct mh_i32ptr_t *user_registry;
 
+enum {
+	USER_ACCESS_FULL = (user_access_t)~0,
+};
+
 /* {{{ user_map */
 
 static inline int
@@ -545,6 +549,24 @@ user_cache_init()
 	def->type = SC_USER;
 	user = user_cache_replace(def);
 	admin_def_guard.is_active = false;
+	/*
+	 * For performance reasons, we do not always explicitly
+	 * look at user id in access checks, while still need to
+	 * ensure 'admin' user has full access to all objects in
+	 * the universe.
+	 *
+	 * This is why  _priv table contains a record with grants
+	 * of full access to universe to 'admin' user.
+	 *
+	 * Making a record in _priv table is, however,
+	 * insufficient, since some checks are done at bootstrap,
+	 * before _priv table is read (e.g. when we're
+	 * bootstrapping a replica in applier fiber).
+	 *
+	 * When user_cache_init() is called, admin user access is
+	 * not loaded yet (is 0), force global access.
+	 */
+	universe.access[ADMIN].effective = USER_ACCESS_FULL;
 	/* ADMIN is both the auth token and user id for 'admin' user. */
 	assert(user->def->uid == ADMIN && user->auth_token == ADMIN);
 }
