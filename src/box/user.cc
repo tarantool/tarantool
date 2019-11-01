@@ -764,6 +764,12 @@ priv_grant(struct user *grantee, struct priv_def *priv)
 	struct access *object = access_find(priv->object_type, priv->object_id);
 	if (object == NULL)
 		return 0;
+	if (grantee->auth_token == ADMIN && priv->object_type == SC_UNIVERSE &&
+	    priv->access != USER_ACCESS_FULL) {
+		diag_set(ClientError, ER_GRANT,
+			 "can't revoke universe from the admin user");
+		return -1;
+	}
 	struct access *access = &object[grantee->auth_token];
 	access->granted = priv->access;
 	if (rebuild_effective_grants(grantee) != 0)

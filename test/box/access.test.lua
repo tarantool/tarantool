@@ -800,3 +800,9 @@ box.space._user:select{}
 box.schema.user.drop("user1")
 box.schema.user.drop("user2")
 box.schema.user.drop("user3")
+
+--
+-- Check that admin user privileges can't be removed. Otherwise an
+-- instance could not bootstrap nor recovery.
+--
+box.space._priv:delete{1, 'universe', 0}
