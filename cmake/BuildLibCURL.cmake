@@ -98,6 +98,7 @@ macro(curl_build)
                 --enable-http-auth
                 --enable-mime
                 --enable-dateparse
+                --enable-smtp
 
                 --disable-ares
                 --disable-ftp
@@ -111,7 +112,6 @@ macro(curl_build)
                 --disable-pop3
                 --disable-imap
                 --disable-smb
-                --disable-smtp
                 --disable-gopher
                 --disable-manual
                 --disable-sspi
@@ -137,10 +137,22 @@ macro(curl_build)
         set(CURL_LIBRARIES ${CURL_LIBRARIES} rt)
     endif()
 
+    set(CURL_DYNAMIC_LIBRARY ${LIBCURL_INSTALL_DIR}/lib/libcurl${CMAKE_SHARED_LIBRARY_SUFFIX})
+
     unset(LIBCURL_CPPFLAGS)
     unset(LIBCURL_CFLAGS)
     unset(FOUND_OPENSSL_ROOT_DIR)
     unset(LIBCURL_INSTALL_DIR)
     unset(LIBCURL_BINARY_DIR)
     unset(LIBCURL_SOURCE_DIR)
+
+    install (FILES ${CURL_INCLUDE_DIRS}/curl/curl.h
+        ${CURL_INCLUDE_DIRS}/curl/curlver.h
+        ${CURL_INCLUDE_DIRS}/curl/easy.h
+        ${CURL_INCLUDE_DIRS}/curl/mprintf.h
+        ${CURL_INCLUDE_DIRS}/curl/multi.h
+        ${CURL_INCLUDE_DIRS}/curl/system.h
+        ${CURL_INCLUDE_DIRS}/curl/urlapi.h
+        ${CURL_INCLUDE_DIRS}/curl/typecheck-gcc.h
+        DESTINATION ${MODULE_INCLUDEDIR}/curl)
 endmacro(curl_build)

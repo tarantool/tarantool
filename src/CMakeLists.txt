@@ -228,7 +228,7 @@ if(BUILD_STATIC)
             # set variable to allow rescan (CMake depended)
             set(SYMBOLS_LIB "SYMBOLS_LIB-NOTFOUND")
         elseif (${libstatic} STREQUAL bundled-libcurl)
-            message("We don't need to export symbols from statically linked libcurl, skipped")
+            list(APPEND EXPORT_LIST ${CURL_DYNAMIC_LIBRARY})
         else()
             message(WARNING "${libstatic} should be a static")
         endif()
@@ -246,7 +246,7 @@ endif()
 # Exports syntax is toolchain-dependent, preprocessing is necessary
 set(exports_file ${CMAKE_BINARY_DIR}/extra/exports.${CMAKE_SYSTEM_NAME})
 add_custom_target(preprocess_exports
-                  DEPENDS ${exports_file})
+                  DEPENDS ${exports_file} bundled-libcurl)
 add_custom_command(
     OUTPUT  ${exports_file}
     DEPENDS ${CMAKE_SOURCE_DIR}/extra/exports
