@@ -311,9 +311,8 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 	       const char *name, uint32_t len, uint32_t *object_id)
 {
 	if (len > BOX_NAME_MAX) {
-		diag_set(SystemError,
-			 "name length %d is greater than BOX_NAME_MAX", len);
-		return -1;
+		*object_id = BOX_ID_NIL;
+		return 0;
 	}
 	struct space *space = space_cache_find(system_space_id);
 	if (space == NULL)

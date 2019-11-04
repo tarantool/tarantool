@@ -248,7 +248,8 @@ session.su('does not exist')
 -- allowed name.
 session.su(string.rep('a', 66000))
 ---
-- error: name length 66000 is greater than BOX_NAME_MAX
+- error: User 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' is
+    not found
 ...
 --------------------------------------------------------------------------------
 -- Check if identifiers obey the common constraints
