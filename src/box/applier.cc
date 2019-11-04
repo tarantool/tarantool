@@ -367,7 +367,9 @@ applier_connect(struct applier *applier)
 	/* Authenticate */
 	applier_set_state(applier, APPLIER_AUTH);
 	xrow_encode_auth_xc(&row, greeting.salt, greeting.salt_len, uri->login,
-			    uri->login_len, uri->password, uri->password_len);
+			    uri->login_len,
+			    uri->password != NULL ? uri->password : "",
+			    uri->password_len);
 	coio_write_xrow(coio, &row);
 	coio_read_xrow(coio, ibuf, &row);
 	applier->last_row_time = ev_monotonic_now(loop());
