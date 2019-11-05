@@ -43,8 +43,8 @@ int luaL_array_metatable_ref = LUA_REFNIL;
 
 static uint32_t CTID_STRUCT_IBUF;
 static uint32_t CTID_STRUCT_IBUF_PTR;
-uint32_t CTID_CHAR_PTR;
-uint32_t CTID_CONST_CHAR_PTR;
+static uint32_t CTID_CHAR_PTR;
+static uint32_t CTID_CONST_CHAR_PTR;
 uint32_t CTID_DECIMAL;
 
 
@@ -1135,7 +1135,8 @@ luaL_checkibuf(struct lua_State *L, int idx)
 }
 
 int
-luaL_checkconstchar(struct lua_State *L, int idx, const char **res)
+luaL_checkconstchar(struct lua_State *L, int idx, const char **res,
+		    uint32_t *cdata_type_p)
 {
 	if (lua_type(L, idx) != LUA_TCDATA)
 		return -1;
@@ -1144,6 +1145,7 @@ luaL_checkconstchar(struct lua_State *L, int idx, const char **res)
 	if (cdata_type != CTID_CHAR_PTR && cdata_type != CTID_CONST_CHAR_PTR)
 		return -1;
 	*res = cdata != NULL ? *(const char **) cdata : NULL;
+	*cdata_type_p = cdata_type;
 	return 0;
 }
 

@@ -437,6 +437,64 @@ local function test_depth(test, s)
     s.cfg({encode_deep_as_nil = deep_as_nil, encode_max_depth = max_depth})
 end
 
+-- gh-3926: Ensure that a returned pointer has the same cdata type
+-- as passed argument.
+--
+-- The test case is applicable for msgpack and msgpackffi.
+local function test_decode_buffer(test, s)
+    local cases = {
+        {
+            'decode(cdata<const char *>, number)',
+            func = s.decode,
+            args = {ffi.cast('const char *', '\x93\x01\x02\x03'), 4},
+            exp_res = {1, 2, 3},
+            exp_rewind = 4,
+        },
+        {
+            'decode(cdata<char *>, number)',
+            func = s.decode,
+            args = {ffi.cast('char *', '\x93\x01\x02\x03'), 4},
+            exp_res = {1, 2, 3},
+            exp_rewind = 4,
+        },
+        {
+            'decode_unchecked(cdata<const char *>)',
+            func = s.decode_unchecked,
+            args = {ffi.cast('const char *', '\x93\x01\x02\x03')},
+            exp_res = {1, 2, 3},
+            exp_rewind = 4,
+        },
+        {
+            'decode_unchecked(cdata<char *>)',
+            func = s.decode_unchecked,
+            args = {ffi.cast('char *', '\x93\x01\x02\x03')},
+            exp_res = {1, 2, 3},
+            exp_rewind = 4,
+        },
+    }
+
+    test:plan(#cases)
+
+    for _, case in ipairs(cases) do
+        test:test(case[1], function(test)
+            test:plan(4)
+            local args_len = table.maxn(case.args)
+            local res, res_buf = case.func(unpack(case.args, 1, args_len))
+            test:is_deeply(res, case.exp_res, 'verify result')
+            local buf = case.args[1]
+            local rewind = res_buf - buf
+            test:is(rewind, case.exp_rewind, 'verify resulting buffer')
+            -- test:iscdata() is not sufficient here, because it
+            -- ignores 'const' qualifier (because of using
+            -- ffi.istype()).
+            test:is(type(res_buf), 'cdata', 'verify resulting buffer type')
+            local buf_ctype = tostring(ffi.typeof(buf))
+            local res_buf_ctype = tostring(ffi.typeof(res_buf))
+            test:is(res_buf_ctype, buf_ctype, 'verify resulting buffer ctype')
+        end)
+    end
+end
+
 return {
     test_unsigned = test_unsigned;
     test_signed = test_signed;
@@ -448,4 +506,5 @@ return {
     test_ucdata = test_ucdata;
     test_decimal = test_decimal;
     test_depth = test_depth;
+    test_decode_buffer = test_decode_buffer;
 }
