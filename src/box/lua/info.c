@@ -50,6 +50,7 @@
 #include "box/box.h"
 #include "lua/utils.h"
 #include "fiber.h"
+#include "tt_static.h"
 
 static void
 lbox_pushvclock(struct lua_State *L, const struct vclock *vclock)
@@ -63,6 +64,20 @@ lbox_pushvclock(struct lua_State *L, const struct vclock *vclock)
 		lua_settable(L, -3);
 	}
 	luaL_setmaphint(L, -1); /* compact flow */
+}
+
+static inline void
+lbox_push_replication_error_message(struct lua_State *L, struct error *e,
+				    int idx)
+{
+	lua_pushstring(L, "message");
+	lua_pushstring(L, e->errmsg);
+	lua_settable(L, idx - 2);
+	if (e->saved_errno == 0)
+		return;
+	lua_pushstring(L, "system_message");
+	lua_pushstring(L, strerror(e->saved_errno));
+	lua_settable(L, idx - 2);
 }
 
 static void
@@ -103,11 +118,8 @@ lbox_pushapplier(lua_State *L, struct applier *applier)
 		lua_settable(L, -3);
 
 		struct error *e = diag_last_error(&applier->reader->diag);
-		if (e != NULL) {
-			lua_pushstring(L, "message");
-			lua_pushstring(L, e->errmsg);
-			lua_settable(L, -3);
-		}
+		if (e != NULL)
+			lbox_push_replication_error_message(L, e, -1);
 	}
 }
 
@@ -135,11 +147,8 @@ lbox_pushrelay(lua_State *L, struct relay *relay)
 		lua_settable(L, -3);
 
 		struct error *e = diag_last_error(relay_get_diag(relay));
-		if (e != NULL) {
-			lua_pushstring(L, "message");
-			lua_pushstring(L, e->errmsg);
-			lua_settable(L, -3);
-		}
+		if (e != NULL)
+			lbox_push_replication_error_message(L, e, -1);
 		break;
 	}
 	default: unreachable();
