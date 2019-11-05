@@ -361,6 +361,22 @@ httpc_set_follow_location(struct httpc_request *req, long follow)
 			 follow);
 }
 
+void
+httpc_set_accept_encoding(struct httpc_request *req, const char *encoding)
+{
+/*
+* CURLOPT_ACCEPT_ENCODING was called CURLOPT_ENCODING before
+* libcurl 7.21.6.
+*/
+#if LIBCURL_VERSION_NUM >= 0x071506
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_ACCEPT_ENCODING,
+			 encoding);
+#else
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_ENCODING,
+			 encoding);
+#endif
+}
+
 int
 httpc_execute(struct httpc_request *req, double timeout)
 {

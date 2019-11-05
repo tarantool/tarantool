@@ -373,6 +373,36 @@ void
 httpc_set_follow_location(struct httpc_request *req, long follow);
 
 /**
+ * Enable automatic decompression of HTTP responses: set the
+ * contents of the Accept-Encoding header sent in a HTTP request
+ * and enable decoding of a response when a Content-Encoding
+ * header is received.
+ *
+ * This is a request, not an order; the server may or may not do
+ * it. Servers might respond with Content-Encoding even without
+ * getting an Accept-Encoding in the request. Servers might
+ * respond with a different Content-Encoding than what was asked
+ * for in the request.
+ *
+ * @param req request
+ * @param encoding - specify what encoding you'd like. This param
+ * can be an empty string which means Accept-Encoding header will
+ * contain all built-in supported encodings. This param can be
+ * comma-separated list of accepted encodings, like:
+ * "br, gzip, deflate".
+ *
+ * Bundled libcurl supports "identity", meaning non-compressed,
+ * "deflate" which requests the server to compress its response
+ * using the zlib algorithm and "gzip" which requests the gzip
+ * algorithm. System libcurl also possibly supports "br" which
+ * is brotli.
+ *
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_ACCEPT_ENCODING.html
+ */
+void
+httpc_set_accept_encoding(struct httpc_request *req, const char *encoding);
+
+/**
  * This function does async HTTP request
  * @param request - reference to request object with filled fields
  * @param timeout - timeout of waiting for libcurl api

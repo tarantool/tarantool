@@ -315,6 +315,11 @@ luaT_httpc_request(lua_State *L)
 		httpc_set_follow_location(req, lua_toboolean(L, -1));
 	lua_pop(L, 1);
 
+	lua_getfield(L, 5, "accept_encoding");
+	if (!lua_isnil(L, -1))
+		httpc_set_accept_encoding(req, lua_tostring(L, -1));
+	lua_pop(L, 1);
+
 	if (httpc_execute(req, timeout) != 0) {
 		httpc_request_delete(req);
 		return luaT_error(L);
