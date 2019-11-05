@@ -260,7 +260,7 @@ s:drop()
 box.execute("CREATE TABLE T2(ID INT PRIMARY KEY, CONSTRAINT CK1 CHECK(ID > 0), CONSTRAINT CK1 CHECK(ID < 0))")
 ---
 - null
-- Constraint CK1 already exists
+- CHECK constraint 'CK1' already exists in space 'T2'
 ...
 box.space.T2
 ---

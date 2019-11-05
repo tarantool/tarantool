@@ -57,6 +57,7 @@
 #include "box/tuple_format.h"
 #include "box/coll_id_cache.h"
 #include "box/user.h"
+#include "box/constraint_id.h"
 
 void
 sql_finish_coding(struct Parse *parse_context)
@@ -585,7 +586,7 @@ trim_space_snprintf(char *wptr, const char *str, uint32_t str_len)
 static void
 vdbe_emit_ck_constraint_create(struct Parse *parser,
 			       const struct ck_constraint_def *ck_def,
-			       uint32_t reg_space_id);
+			       uint32_t reg_space_id, const char *space_name);
 
 void
 sql_create_check_contraint(struct Parse *parser)
@@ -665,7 +666,8 @@ sql_create_check_contraint(struct Parse *parser)
 		struct Vdbe *v = sqlGetVdbe(parser);
 		sqlVdbeAddOp2(v, OP_Integer, space->def->id,
 			      space_id_reg);
-		vdbe_emit_ck_constraint_create(parser, ck_def, space_id_reg);
+		vdbe_emit_ck_constraint_create(parser, ck_def, space_id_reg,
+					       space->def->name);
 		assert(sqlVdbeGetOp(v, v->nOp - 1)->opcode == OP_SInsert);
 		sqlVdbeCountChanges(v);
 		sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
@@ -970,11 +972,13 @@ emitNewSysSpaceSequenceRecord(Parse *pParse, int reg_space_id, int reg_seq_id)
  * @param parser Parsing context.
  * @param ck_def Check constraint definition to be serialized.
  * @param reg_space_id The VDBE register containing space id.
-*/
+ * @param space_name Name of the space owning the CHECK. For error
+ *     message.
+ */
 static void
 vdbe_emit_ck_constraint_create(struct Parse *parser,
 			       const struct ck_constraint_def *ck_def,
-			       uint32_t reg_space_id)
+			       uint32_t reg_space_id, const char *space_name)
 {
 	struct sql *db = parser->db;
 	struct Vdbe *v = sqlGetVdbe(parser);
@@ -997,7 +1001,8 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 		      ck_constraint_reg + 6);
 	const char *error_msg =
 		tt_sprintf(tnt_errcode_desc(ER_CONSTRAINT_EXISTS),
-					    ck_def->name);
+			   constraint_type_strs[CONSTRAINT_TYPE_CK],
+			   ck_def->name, space_name);
 	if (vdbe_emit_halt_with_presence_test(parser, BOX_CK_CONSTRAINT_ID, 0,
 					      ck_constraint_reg, 2,
 					      ER_CONSTRAINT_EXISTS, error_msg,
@@ -1015,10 +1020,13 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
  *
  * @param parse_context Parsing context.
  * @param fk Foreign key to be created.
+ * @param space_name Name of the space owning the FOREIGN KEY. For
+ *     error message.
  */
 static void
 vdbe_emit_fk_constraint_create(struct Parse *parse_context,
-			       const struct fk_constraint_def *fk)
+			       const struct fk_constraint_def *fk,
+			       const char *space_name)
 {
 	assert(parse_context != NULL);
 	assert(fk != NULL);
@@ -1059,7 +1067,9 @@ vdbe_emit_fk_constraint_create(struct Parse *parse_context,
 	 * been created before.
 	 */
 	const char *error_msg =
-		tt_sprintf(tnt_errcode_desc(ER_CONSTRAINT_EXISTS), name_copy);
+		tt_sprintf(tnt_errcode_desc(ER_CONSTRAINT_EXISTS),
+			   constraint_type_strs[CONSTRAINT_TYPE_FK], name_copy,
+			   space_name);
 	if (vdbe_emit_halt_with_presence_test(parse_context,
 					      BOX_FK_CONSTRAINT_ID, 0,
 					      constr_tuple_reg, 2,
@@ -1273,13 +1283,13 @@ sqlEndTable(struct Parse *pParse)
 			fk_def->parent_id = reg_space_id;
 		}
 		fk_def->child_id = reg_space_id;
-		vdbe_emit_fk_constraint_create(pParse, fk_def);
+		vdbe_emit_fk_constraint_create(pParse, fk_def, space_name_copy);
 	}
 	struct ck_constraint_parse *ck_parse;
 	rlist_foreach_entry(ck_parse, &pParse->create_table_def.new_check,
 			    link) {
 		vdbe_emit_ck_constraint_create(pParse, ck_parse->ck_def,
-					       reg_space_id);
+					       reg_space_id, space_name_copy);
 	}
 }
 
@@ -2012,7 +2022,8 @@ sql_create_foreign_key(struct Parse *parse_context)
 					  struct fk_constraint_parse, link);
 		fk_parse->fk_def = fk_def;
 	} else {
-		vdbe_emit_fk_constraint_create(parse_context, fk_def);
+		vdbe_emit_fk_constraint_create(parse_context, fk_def,
+					       child_space->def->name);
 	}
 
 exit_create_fk:

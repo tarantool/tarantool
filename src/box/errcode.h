@@ -222,7 +222,7 @@ struct errcode_record {
 	/*167 */_(ER_CREATE_FK_CONSTRAINT,	"Failed to create foreign key constraint '%s': %s") \
 	/*168 */_(ER_DROP_FK_CONSTRAINT,	"Failed to drop foreign key constraint '%s': %s") \
 	/*169 */_(ER_NO_SUCH_CONSTRAINT,	"Constraint %s does not exist") \
-	/*170 */_(ER_CONSTRAINT_EXISTS,		"Constraint %s already exists") \
+	/*170 */_(ER_CONSTRAINT_EXISTS,		"%s constraint '%s' already exists in space '%s'") \
 	/*171 */_(ER_SQL_TYPE_MISMATCH,		"Type mismatch: can not convert %s to %s") \
 	/*172 */_(ER_ROWID_OVERFLOW,            "Rowid is overflowed: too many entries in ephemeral space") \
 	/*173 */_(ER_DROP_COLLATION,		"Can't drop collation %s : %s") \

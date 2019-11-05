@@ -246,7 +246,7 @@ test:do_catchsql_test(
         ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (a) REFERENCES child;
     ]], {
         -- <alter2-5.1>
-        1, "Constraint FK already exists"
+        1, "FOREIGN KEY constraint 'FK' already exists in space 'CHILD'"
         -- </alter2-5.1>
     })
 
@@ -278,7 +278,7 @@ test:do_catchsql_test(
     "alter2-6.2",
     [[
         ALTER TABLE t1 ADD CONSTRAINT ck CHECK(id > 0);
-    ]], { 1, "Constraint CK already exists" })
+    ]], { 1, "CHECK constraint 'CK' already exists in space 'T1'" })
 
 -- Make sure that CHECK constraint can be created only on empty space.
 --

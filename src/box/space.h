@@ -52,6 +52,7 @@ struct port;
 struct tuple;
 struct tuple_format;
 struct ck_constraint;
+struct constraint_id;
 
 struct space_vtab {
 	/** Free a space instance. */
@@ -234,6 +235,10 @@ struct space {
 	 * of parent constraints as well as child ones.
 	 */
 	uint64_t fk_constraint_mask;
+	/**
+	 * Hash table with constraint identifiers hashed by name.
+	 */
+	struct mh_strnptr_t *constraint_ids;
 };
 
 /** Initialize a base space instance. */
@@ -515,6 +520,25 @@ space_add_ck_constraint(struct space *space, struct ck_constraint *ck);
  */
 void
 space_remove_ck_constraint(struct space *space, struct ck_constraint *ck);
+
+/** Find a constraint identifier by name. */
+struct constraint_id *
+space_find_constraint_id(struct space *space, const char *name);
+
+/**
+ * Add a new constraint id to the space's hash table of all
+ * constraints. That is used to prevent existence of constraints
+ * with equal names.
+ */
+int
+space_add_constraint_id(struct space *space, struct constraint_id *id);
+
+/**
+ * Remove a given name from the hash of all constraint
+ * identifiers of the given space.
+ */
+struct constraint_id *
+space_pop_constraint_id(struct space *space, const char *name);
 
 /*
  * Virtual method stubs.

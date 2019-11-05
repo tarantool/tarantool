@@ -1,0 +1,305 @@
+-- test-run result file version 2
+test_run = require('test_run').new()
+ | ---
+ | ...
+engine = test_run:get_cfg('engine')
+ | ---
+ | ...
+box.execute('pragma sql_default_engine=\''..engine..'\'')
+ | ---
+ | - row_count: 0
+ | ...
+
+--
+-- Check a constraint name for duplicate within a single
+-- <CREATE TABLE> statement.
+--
+box.execute('CREATE TABLE t1 (i INT PRIMARY KEY);')
+ | ---
+ | - row_count: 1
+ | ...
+test_run:cmd("setopt delimiter ';'");
+ | ---
+ | - true
+ | ...
+box.execute([[CREATE TABLE t2 (i INT, CONSTRAINT c CHECK (i > 0),
+                               CONSTRAINT c PRIMARY KEY (i));]]);
+ | ---
+ | - null
+ | - PRIMARY KEY constraint 'C' already exists in space 'T2'
+ | ...
+box.execute([[CREATE TABLE t2 (i INT,
+                               CONSTRAINT c FOREIGN KEY(i) REFERENCES t1(i),
+                               CONSTRAINT c PRIMARY KEY (i));]]);
+ | ---
+ | - null
+ | - PRIMARY KEY constraint 'C' already exists in space 'T2'
+ | ...
+box.execute([[CREATE TABLE t2 (i INT PRIMARY KEY,
+                               CONSTRAINT c CHECK (i > 0),
+                               CONSTRAINT c UNIQUE (i));]]);
+ | ---
+ | - null
+ | - UNIQUE constraint 'C' already exists in space 'T2'
+ | ...
+box.execute([[CREATE TABLE t2 (i INT PRIMARY KEY,
+                               CONSTRAINT c FOREIGN KEY(i) REFERENCES t1(i),
+                               CONSTRAINT c UNIQUE (i));]]);
+ | ---
+ | - null
+ | - UNIQUE constraint 'C' already exists in space 'T2'
+ | ...
+box.execute([[CREATE TABLE t2 (i INT PRIMARY KEY,
+                               CONSTRAINT c CHECK (i > 0),
+                               CONSTRAINT c CHECK (i < 0));]]);
+ | ---
+ | - null
+ | - CHECK constraint 'C' already exists in space 'T2'
+ | ...
+box.execute([[CREATE TABLE t2 (i INT PRIMARY KEY,
+                               CONSTRAINT c FOREIGN KEY(i) REFERENCES t1(i),
+                               CONSTRAINT c CHECK (i > 0));]]);
+ | ---
+ | - null
+ | - FOREIGN KEY constraint 'C' already exists in space 'T2'
+ | ...
+box.execute([[CREATE TABLE t2 (i INT PRIMARY KEY CONSTRAINT c REFERENCES t1(i),
+                               CONSTRAINT c FOREIGN KEY(i) REFERENCES t1(i))]]);
+ | ---
+ | - null
+ | - FOREIGN KEY constraint 'C' already exists in space 'T2'
+ | ...
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
+ | ...
+
+--
+-- Check a constraint name for duplicate using <ALTER TABLE>
+-- statement.
+--
+box.execute('CREATE TABLE t2 (i INT CONSTRAINT c PRIMARY KEY);')
+ | ---
+ | - row_count: 1
+ | ...
+box.execute('ALTER TABLE t2 ADD CONSTRAINT c CHECK(i > 0);')
+ | ---
+ | - null
+ | - PRIMARY KEY constraint 'C' already exists in space 'T2'
+ | ...
+box.execute('ALTER TABLE t2 ADD CONSTRAINT c UNIQUE(i);')
+ | ---
+ | - null
+ | - Index 'C' already exists in space 'T2'
+ | ...
+box.execute('ALTER TABLE t2 ADD CONSTRAINT c FOREIGN KEY(i) REFERENCES t1(i);')
+ | ---
+ | - null
+ | - PRIMARY KEY constraint 'C' already exists in space 'T2'
+ | ...
+
+--
+-- Make sure that a constraint's name isn't kept after the
+-- constraint drop.
+--
+box.execute('CREATE UNIQUE INDEX d ON t2(i);')
+ | ---
+ | - row_count: 1
+ | ...
+box.execute('DROP INDEX d ON t2;')
+ | ---
+ | - row_count: 1
+ | ...
+box.execute('ALTER TABLE t2 ADD CONSTRAINT d CHECK(i > 0);')
+ | ---
+ | - row_count: 1
+ | ...
+box.space.T2.ck_constraint.D:drop()
+ | ---
+ | ...
+box.execute('ALTER TABLE t2 ADD CONSTRAINT d FOREIGN KEY(i) REFERENCES t1(i);')
+ | ---
+ | - row_count: 1
+ | ...
+box.execute('ALTER TABLE t2 DROP CONSTRAINT d;')
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- The same inside a transaction.
+--
+box.begin()                                                                     \
+box.execute('CREATE UNIQUE INDEX d ON t2(i);')                                  \
+box.execute('DROP INDEX d ON t2;')                                              \
+box.execute('ALTER TABLE t2 ADD CONSTRAINT d CHECK(i > 0);')                    \
+box.space.T2.ck_constraint.D:drop()                                             \
+box.execute('ALTER TABLE t2 ADD CONSTRAINT d FOREIGN KEY(i) REFERENCES t1(i);') \
+box.execute('ALTER TABLE t2 DROP CONSTRAINT d;')                                \
+box.commit()
+ | ---
+ | ...
+
+--
+-- Circle renaming in a transaction.
+--
+box.execute('CREATE UNIQUE INDEX d ON t2(i);')
+ | ---
+ | - row_count: 1
+ | ...
+box.execute('ALTER TABLE t2 ADD CONSTRAINT e CHECK (i > 0);')
+ | ---
+ | - row_count: 1
+ | ...
+box.begin()                                                                     \
+-- Rename CHECK E to F. Note, CHECK can't be properly renamed,                  \
+-- because CHECK name is a primary key of _ck_constraint.                       \
+-- It can be only dropped and created again with a new name.                    \
+box.space.T2.ck_constraint.E:drop()                                             \
+box.execute('ALTER TABLE t2 ADD CONSTRAINT f CHECK (i > 0);')                   \
+-- Rename UNIQUE D to E.                                                        \
+box.space.T2.index.D:rename('E')                                                \
+-- Now E and F are occupied, and D is free. Check this.                         \
+_, err1 = box.execute('ALTER TABLE t2 ADD CONSTRAINT e CHECK (i > 0);')         \
+_, err2 = box.execute('CREATE UNIQUE INDEX f ON t2(i);')                        \
+_, err3 = box.execute('CREATE UNIQUE INDEX d ON t2(i);')                        \
+box.rollback()
+ | ---
+ | ...
+-- Fail. E and F were occupied in the end of the transaction. The
+-- error messages say that E was an index, not a CHECK, like it
+-- was before the transaction.
+err1, err2
+ | ---
+ | - UNIQUE constraint 'E' already exists in space 'T2'
+ | - CHECK constraint 'F' already exists in space 'T2'
+ | ...
+-- Success, D was free in the end.
+err3
+ | ---
+ | - null
+ | ...
+-- After rollback ensure, that the names E and D are occupied both
+-- again.
+box.execute('ALTER TABLE t2 ADD CONSTRAINT d CHECK (i > 0);')
+ | ---
+ | - null
+ | - UNIQUE constraint 'D' already exists in space 'T2'
+ | ...
+box.execute('CREATE UNIQUE INDEX e ON t2(i);')
+ | ---
+ | - null
+ | - CHECK constraint 'E' already exists in space 'T2'
+ | ...
+-- F is free after rollback.
+box.execute('CREATE UNIQUE INDEX f ON t2(i);')
+ | ---
+ | - row_count: 1
+ | ...
+-- Cleanup after the test case.
+box.execute('DROP INDEX f ON t2;')
+ | ---
+ | - row_count: 1
+ | ...
+box.execute('DROP INDEX d ON t2;')
+ | ---
+ | - row_count: 1
+ | ...
+box.space.T2.ck_constraint.E:drop()
+ | ---
+ | ...
+
+--
+-- Make sure, that altering of an index name affects its record
+-- in the space's constraint hash table.
+--
+box.execute('CREATE UNIQUE INDEX d ON t2(i);')
+ | ---
+ | - row_count: 1
+ | ...
+box.space.T2.index.D:rename('E')
+ | ---
+ | ...
+box.execute('ALTER TABLE t2 ADD CONSTRAINT e CHECK(i > 0);')
+ | ---
+ | - null
+ | - UNIQUE constraint 'E' already exists in space 'T2'
+ | ...
+
+--
+-- Try rename to an already occupied name.
+--
+box.execute('ALTER TABLE t2 ADD CONSTRAINT f CHECK(i > 0);')
+ | ---
+ | - row_count: 1
+ | ...
+box.execute('CREATE UNIQUE INDEX g ON t2(i);')
+ | ---
+ | - row_count: 1
+ | ...
+box.space.T2.index.G:rename('F')
+ | ---
+ | - error: CHECK constraint 'F' already exists in space 'T2'
+ | ...
+box.execute('DROP INDEX g ON t2;')
+ | ---
+ | - row_count: 1
+ | ...
+box.space.T2.ck_constraint.F:drop()
+ | ---
+ | ...
+
+--
+-- Make sure, that altering of an index uniqueness puts/drops
+-- its name to/from the space's constraint hash table.
+--
+box.space.T2.index.E:alter({unique = false})
+ | ---
+ | ...
+box.execute('ALTER TABLE t2 ADD CONSTRAINT e CHECK(i > 0);')
+ | ---
+ | - row_count: 1
+ | ...
+box.space.T2.index.E:alter({unique = true})
+ | ---
+ | - error: CHECK constraint 'E' already exists in space 'T2'
+ | ...
+box.space.T2.ck_constraint.E:drop()
+ | ---
+ | ...
+box.space.T2.index.E:alter({unique = true})
+ | ---
+ | ...
+box.execute('ALTER TABLE t2 ADD CONSTRAINT e CHECK(i > 0);')
+ | ---
+ | - null
+ | - UNIQUE constraint 'E' already exists in space 'T2'
+ | ...
+
+-- Alter name and uniqueness of an unique index simultaneously.
+box.space.T2.index.E:alter({name = 'D', unique = false})
+ | ---
+ | ...
+box.execute('CREATE UNIQUE INDEX e ON t2(i);')
+ | ---
+ | - row_count: 1
+ | ...
+-- The existing D index is not unique, but regardless of
+-- uniqueness, index names should be unique in a space.
+box.execute('CREATE UNIQUE INDEX d ON t2(i);')
+ | ---
+ | - null
+ | - Index 'D' already exists in space 'T2'
+ | ...
+
+--
+-- Cleanup.
+--
+box.execute('DROP TABLE t2;')
+ | ---
+ | - row_count: 1
+ | ...
+box.execute('DROP TABLE t1;')
+ | ---
+ | - row_count: 1
+ | ...

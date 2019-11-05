@@ -177,7 +177,7 @@ box.execute("DROP TABLE zoobar")
 box.execute("CREATE TABLE t1(id INT PRIMARY KEY, CONSTRAINT ck1 CHECK(id > 0), CONSTRAINT ck1 CHECK(id < 0));")
 ---
 - null
-- Constraint CK1 already exists
+- CHECK constraint 'CK1' already exists in space 'T1'
 ...
 box.space.t1
 ---
@@ -190,7 +190,7 @@ box.space._ck_constraint:select()
 box.execute("CREATE TABLE t2(id INT PRIMARY KEY, CONSTRAINT fk1 FOREIGN KEY(id) REFERENCES t2, CONSTRAINT fk1 FOREIGN KEY(id) REFERENCES t2);")
 ---
 - null
-- Constraint FK1 already exists
+- FOREIGN KEY constraint 'FK1' already exists in space 'T2'
 ...
 box.space.t2
 ---
@@ -207,7 +207,7 @@ box.space._fk_constraint:select()
 box.execute("CREATE TABLE t3(id INT PRIMARY KEY, CONSTRAINT ck1 CHECK(id > 0), CONSTRAINT ck1 FOREIGN KEY(id) REFERENCES t3, CONSTRAINT fk1 FOREIGN KEY(id) REFERENCES t3, CONSTRAINT ck1 CHECK(id < 0));")
 ---
 - null
-- Constraint CK1 already exists
+- FOREIGN KEY constraint 'CK1' already exists in space 'T3'
 ...
 box.space.t1
 ---

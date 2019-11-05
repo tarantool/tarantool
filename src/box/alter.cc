@@ -57,6 +57,7 @@
 #include "version.h"
 #include "sequence.h"
 #include "sql.h"
+#include "constraint_id.h"
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -703,6 +704,12 @@ space_swap_fk_constraints(struct space *new_space, struct space *old_space)
 	SWAP(new_space->fk_constraint_mask, old_space->fk_constraint_mask);
 }
 
+static void
+space_swap_constraint_ids(struct space *new_space, struct space *old_space)
+{
+	SWAP(new_space->constraint_ids, old_space->constraint_ids);
+}
+
 /**
  * True if the space has records identified by key 'uid'.
  * Uses 'iid' index.
@@ -1033,10 +1040,12 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	space_fill_index_map(alter->old_space);
 	space_fill_index_map(alter->new_space);
 	/*
-	 * Don't forget about space triggers and foreign keys.
+	 * Don't forget about space triggers, foreign keys and
+	 * constraints.
 	 */
 	space_swap_triggers(alter->new_space, alter->old_space);
 	space_swap_fk_constraints(alter->new_space, alter->old_space);
+	space_swap_constraint_ids(alter->new_space, alter->old_space);
 	space_cache_replace(alter->new_space, alter->old_space);
 	alter_space_delete(alter);
 	return 0;
@@ -1143,10 +1152,12 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	space_fill_index_map(alter->old_space);
 	space_fill_index_map(alter->new_space);
 	/*
-	 * Don't forget about space triggers and foreign keys.
+	 * Don't forget about space triggers, foreign keys and
+	 * constraints.
 	 */
 	space_swap_triggers(alter->new_space, alter->old_space);
 	space_swap_fk_constraints(alter->new_space, alter->old_space);
+	space_swap_constraint_ids(alter->new_space, alter->old_space);
 	/*
 	 * The new space is ready. Time to update the space
 	 * cache with it.
@@ -1408,14 +1419,14 @@ ModifyIndex::~ModifyIndex()
 /** CreateIndex - add a new index to the space. */
 class CreateIndex: public AlterSpaceOp
 {
-public:
-	CreateIndex(struct alter_space *alter)
-		:AlterSpaceOp(alter), new_index(NULL), new_index_def(NULL)
-	{}
 	/** New index. */
 	struct index *new_index;
 	/** New index index_def. */
 	struct index_def *new_index_def;
+public:
+	CreateIndex(struct alter_space *alter, struct index_def *def)
+		:AlterSpaceOp(alter), new_index(NULL), new_index_def(def)
+	{}
 	virtual void alter_def(struct alter_space *alter);
 	virtual void prepare(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter, int64_t lsn);
@@ -1762,6 +1773,145 @@ void
 MoveCkConstraints::rollback(struct alter_space *alter)
 {
 	space_swap_ck_constraint(alter->new_space, alter->old_space);
+}
+
+/**
+ * Check if a constraint name is not occupied in @a space. Treat
+ * existence as an error.
+ */
+static inline int
+space_ensure_constraint_name_is_available(struct space *space, const char *name)
+{
+	struct constraint_id *id = space_find_constraint_id(space, name);
+	if (id == NULL)
+		return 0;
+	diag_set(ClientError, ER_CONSTRAINT_EXISTS,
+		 constraint_type_strs[id->type], name, space_name(space));
+	return -1;
+}
+
+/**
+ * Put a new constraint name into the space's namespace of
+ * constraints, with duplicate check.
+ */
+static int
+space_insert_constraint_id(struct space *space, enum constraint_type type,
+			   const char *name)
+{
+	if (space_ensure_constraint_name_is_available(space, name) != 0)
+		return -1;
+	struct constraint_id *id = constraint_id_new(type, name);
+	if (id == NULL)
+		return -1;
+	if (space_add_constraint_id(space, id) != 0) {
+		constraint_id_delete(id);
+		return -1;
+	}
+	return 0;
+}
+
+static inline void
+space_delete_constraint_id(struct space *space, const char *name)
+{
+	constraint_id_delete(space_pop_constraint_id(space, name));
+}
+
+/** CreateConstraintID - add a new constraint id to a space. */
+class CreateConstraintID: public AlterSpaceOp
+{
+	struct constraint_id *new_id;
+public:
+	CreateConstraintID(struct alter_space *alter, enum constraint_type type,
+			   const char *name)
+		:AlterSpaceOp(alter), new_id(NULL)
+	{
+		new_id = constraint_id_new(type, name);
+		if (new_id == NULL)
+			diag_raise();
+	}
+	virtual void prepare(struct alter_space *alter);
+	virtual void alter(struct alter_space *alter);
+	virtual void rollback(struct alter_space *alter);
+	virtual void commit(struct alter_space *alter, int64_t signature);
+	virtual ~CreateConstraintID();
+};
+
+void
+CreateConstraintID::prepare(struct alter_space *alter)
+{
+	if (space_ensure_constraint_name_is_available(alter->old_space,
+						      new_id->name) != 0)
+		diag_raise();
+}
+
+void
+CreateConstraintID::alter(struct alter_space *alter)
+{
+	/* Alter() can't fail, so can't just throw an error. */
+	if (space_add_constraint_id(alter->old_space, new_id) != 0)
+		panic("Can't add a new constraint id, out of memory");
+}
+
+void
+CreateConstraintID::rollback(struct alter_space *alter)
+{
+	space_delete_constraint_id(alter->new_space, new_id->name);
+	new_id = NULL;
+}
+
+void
+CreateConstraintID::commit(struct alter_space *alter, int64_t signature)
+{
+	(void) alter;
+	(void) signature;
+	/*
+	 * Constraint id is added to the space, and should not be
+	 * deleted from now on.
+	 */
+	new_id = NULL;
+}
+
+CreateConstraintID::~CreateConstraintID()
+{
+	if (new_id != NULL)
+		constraint_id_delete(new_id);
+}
+
+/** DropConstraintID - drop a constraint id from the space. */
+class DropConstraintID: public AlterSpaceOp
+{
+	struct constraint_id *old_id;
+	const char *name;
+public:
+	DropConstraintID(struct alter_space *alter, const char *name)
+		:AlterSpaceOp(alter), old_id(NULL), name(name)
+	{}
+	virtual void alter(struct alter_space *alter);
+	virtual void commit(struct alter_space *alter , int64_t signature);
+	virtual void rollback(struct alter_space *alter);
+};
+
+void
+DropConstraintID::alter(struct alter_space *alter)
+{
+	old_id = space_pop_constraint_id(alter->old_space, name);
+}
+
+void
+DropConstraintID::commit(struct alter_space *alter, int64_t signature)
+{
+	(void) alter;
+	(void) signature;
+	constraint_id_delete(old_id);
+}
+
+void
+DropConstraintID::rollback(struct alter_space *alter)
+{
+	if (space_add_constraint_id(alter->new_space, old_id) != 0) {
+		panic("Can't recover after constraint drop rollback (out of "
+		      "memory)");
+	}
 }
 
 /* }}} */
@@ -2428,6 +2578,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			 old_space->def->uid, SC_SPACE, priv_type) != 0)
 		return -1;
 	struct index *old_index = space_index(old_space, iid);
+	struct index_def *old_def = old_index != NULL ? old_index->def : NULL;
 
 	/*
 	 * Deal with various cases of dropping of the primary key.
@@ -2501,6 +2652,10 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		if (alter_space_move_indexes(alter, 0, iid) != 0)
 			return -1;
 		try {
+			if (old_index->def->opts.is_unique) {
+				(void) new DropConstraintID(alter,
+							    old_def->name);
+			}
 			(void) new DropIndex(alter, old_index);
 		} catch (Exception *e) {
 			return -1;
@@ -2510,18 +2665,22 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	if (old_index == NULL && new_tuple != NULL) {
 		if (alter_space_move_indexes(alter, 0, iid))
 			return -1;
-		CreateIndex *create_index;
+		struct index_def *def =
+			index_def_new_from_tuple(new_tuple, old_space);
+		if (def == NULL)
+			return -1;
+		index_def_update_optionality(def, alter->new_min_field_count);
 		try {
-			create_index = new CreateIndex(alter);
+			if (def->opts.is_unique) {
+				(void) new CreateConstraintID(
+					alter, iid == 0 ? CONSTRAINT_TYPE_PK :
+					CONSTRAINT_TYPE_UNIQUE, def->name);
+			}
+			(void) new CreateIndex(alter, def);
 		} catch (Exception *e) {
+			index_def_delete(def);
 			return -1;
 		}
-		create_index->new_index_def =
-			index_def_new_from_tuple(new_tuple, old_space);
-		if (create_index->new_index_def == NULL)
-			return -1;
-		index_def_update_optionality(create_index->new_index_def,
-					     alter->new_min_field_count);
 	}
 	/* Case 3 and 4: check if we need to rebuild index data. */
 	if (old_index != NULL && new_tuple != NULL) {
@@ -2531,6 +2690,34 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			return -1;
 		auto index_def_guard =
 			make_scoped_guard([=] { index_def_delete(index_def); });
+		/*
+		 * We put a new name when either an index is
+		 * becoming unique (i.e. constraint), or when a
+		 * unique index's name is under change.
+		 */
+		bool do_new_constraint_id =
+			!old_def->opts.is_unique && index_def->opts.is_unique;
+		bool do_drop_constraint_id =
+			old_def->opts.is_unique && !index_def->opts.is_unique;
+
+		if (old_def->opts.is_unique && index_def->opts.is_unique &&
+		    strcmp(index_def->name, old_def->name) != 0) {
+			do_new_constraint_id = true;
+			do_drop_constraint_id = true;
+		}
+		try {
+			if (do_new_constraint_id) {
+				(void) new CreateConstraintID(
+					alter, CONSTRAINT_TYPE_UNIQUE,
+					index_def->name);
+			}
+			if (do_drop_constraint_id) {
+				(void) new DropConstraintID(alter,
+							    old_def->name);
+			}
+		} catch (Exception *e) {
+			return -1;
+		}
 		/*
 		 * To detect which key parts are optional,
 		 * min_field_count is required. But
@@ -4997,8 +5184,11 @@ on_create_fk_constraint_rollback(struct trigger *trigger, void *event)
 	struct fk_constraint *fk = (struct fk_constraint *)trigger->data;
 	rlist_del_entry(fk, in_parent_space);
 	rlist_del_entry(fk, in_child_space);
+	struct space *child = space_by_id(fk->def->child_id);
+	assert(child != NULL);
+	space_delete_constraint_id(child, fk->def->name);
 	space_reset_fk_constraint_mask(space_by_id(fk->def->parent_id));
-	space_reset_fk_constraint_mask(space_by_id(fk->def->child_id));
+	space_reset_fk_constraint_mask(child);
 	fk_constraint_delete(fk);
 	return 0;
 }
@@ -5030,6 +5220,11 @@ on_drop_fk_constraint_rollback(struct trigger *trigger, void *event)
 	struct fk_constraint *old_fk = (struct fk_constraint *)trigger->data;
 	struct space *parent = space_by_id(old_fk->def->parent_id);
 	struct space *child = space_by_id(old_fk->def->child_id);
+	if (space_insert_constraint_id(child, CONSTRAINT_TYPE_FK,
+				       old_fk->def->name) != 0) {
+		panic("Can't recover after FK constraint drop rollback (out of "
+		      "memory)");
+	}
 	rlist_add_entry(&child->child_fk_constraint, old_fk, in_child_space);
 	rlist_add_entry(&parent->parent_fk_constraint, old_fk, in_parent_space);
 	fk_constraint_set_mask(old_fk, &child->fk_constraint_mask,
@@ -5211,15 +5406,19 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 		fk->def = fk_def;
 		fk->index_id = fk_index->def->iid;
 		if (old_tuple == NULL) {
-			rlist_add_entry(&child_space->child_fk_constraint,
-					fk, in_child_space);
-			rlist_add_entry(&parent_space->parent_fk_constraint,
-					fk, in_parent_space);
 			struct trigger *on_rollback =
 				txn_alter_trigger_new(on_create_fk_constraint_rollback,
 						      fk);
 			if (on_rollback == NULL)
 				return -1;
+			if (space_insert_constraint_id(child_space,
+						       CONSTRAINT_TYPE_FK,
+						       fk_def->name) != 0)
+				return -1;
+			rlist_add_entry(&child_space->child_fk_constraint,
+					fk, in_child_space);
+			rlist_add_entry(&parent_space->parent_fk_constraint,
+					fk, in_parent_space);
 			txn_stmt_on_rollback(stmt, on_rollback);
 			fk_constraint_set_mask(fk,
 					       &parent_space->fk_constraint_mask,
@@ -5280,6 +5479,7 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 					      old_fk);
 		if (on_rollback == NULL)
 			return -1;
+		space_delete_constraint_id(child_space, fk_def->name);
 		txn_stmt_on_rollback(stmt, on_rollback);
 		space_reset_fk_constraint_mask(child_space);
 		space_reset_fk_constraint_mask(parent_space);
@@ -5346,9 +5546,10 @@ on_create_ck_constraint_rollback(struct trigger *trigger, void * /* event */)
 	assert(ck != NULL);
 	struct space *space = space_by_id(ck->def->space_id);
 	assert(space != NULL);
-	assert(space_ck_constraint_by_name(space, ck->def->name,
-					   strlen(ck->def->name)) != NULL);
+	const char *name = ck->def->name;
+	assert(space_ck_constraint_by_name(space, name, strlen(name)) != NULL);
 	space_remove_ck_constraint(space, ck);
+	space_delete_constraint_id(space, name);
 	ck_constraint_delete(ck);
 	if (trigger_run(&on_alter_space, space) != 0)
 		return -1;
@@ -5373,9 +5574,10 @@ on_drop_ck_constraint_rollback(struct trigger *trigger, void * /* event */)
 	assert(ck != NULL);
 	struct space *space = space_by_id(ck->def->space_id);
 	assert(space != NULL);
-	assert(space_ck_constraint_by_name(space, ck->def->name,
-					   strlen(ck->def->name)) == NULL);
-	if (space_add_ck_constraint(space, ck) != 0)
+	const char *name = ck->def->name;
+	assert(space_ck_constraint_by_name(space, name, strlen(name)) == NULL);
+	if (space_add_ck_constraint(space, ck) != 0 ||
+	    space_insert_constraint_id(space, CONSTRAINT_TYPE_CK, name) != 0)
 		panic("Can't recover after CK constraint drop rollback");
 	if (trigger_run(&on_alter_space, space) != 0)
 		return -1;
@@ -5461,7 +5663,8 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 		const char *name = ck_def->name;
 		struct ck_constraint *old_ck_constraint =
 			space_ck_constraint_by_name(space, name, strlen(name));
-		if (old_ck_constraint != NULL) {
+		bool is_insert = old_ck_constraint == NULL;
+		if (!is_insert) {
 			struct ck_constraint_def *old_def =
 						old_ck_constraint->def;
 			assert(old_def->space_id == ck_def->space_id);
@@ -5493,18 +5696,24 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 		auto ck_guard = make_scoped_guard([=] {
 			ck_constraint_delete(new_ck_constraint);
 		});
-		if (old_ck_constraint != NULL)
-			rlist_del_entry(old_ck_constraint, link);
 		if (space_add_ck_constraint(space, new_ck_constraint) != 0)
 			return -1;
-		ck_guard.is_active = false;
-		if (old_tuple != NULL) {
+		if (!is_insert) {
+			rlist_del_entry(old_ck_constraint, link);
 			on_rollback->data = old_ck_constraint;
 			on_rollback->run = on_replace_ck_constraint_rollback;
 		} else {
+			if (space_insert_constraint_id(space,
+						       CONSTRAINT_TYPE_CK,
+						       name) != 0) {
+				space_remove_ck_constraint(space,
+							   new_ck_constraint);
+				return -1;
+			}
 			on_rollback->data = new_ck_constraint;
 			on_rollback->run = on_create_ck_constraint_rollback;
 		}
+		ck_guard.is_active = false;
 		on_commit->data = old_ck_constraint;
 		on_commit->run = on_replace_ck_constraint_commit;
 	} else {
@@ -5518,6 +5727,7 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 		struct ck_constraint *old_ck_constraint =
 			space_ck_constraint_by_name(space, name, name_len);
 		assert(old_ck_constraint != NULL);
+		space_delete_constraint_id(space, old_ck_constraint->def->name);
 		space_remove_ck_constraint(space, old_ck_constraint);
 		on_commit->data = old_ck_constraint;
 		on_commit->run = on_drop_ck_constraint_commit;
