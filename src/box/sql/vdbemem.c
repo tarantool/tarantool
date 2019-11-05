@@ -568,10 +568,15 @@ sqlVdbeMemIntegerify(struct Mem *pMem)
 	double d;
 	if (sqlVdbeRealValue(pMem, &d) != 0)
 		return -1;
-	if (d >= INT64_MAX || d < INT64_MIN)
-		return -1;
-	mem_set_int(pMem, d, d <= -1);
-	return 0;
+	if (d < INT64_MAX && d >= INT64_MIN) {
+		mem_set_int(pMem, d, d <= -1);
+		return 0;
+	}
+	if (d >= INT64_MAX && d < UINT64_MAX) {
+		mem_set_u64(pMem, d);
+		return 0;
+	}
+	return -1;
 }
 
 /*

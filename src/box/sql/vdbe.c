@@ -322,10 +322,13 @@ mem_apply_type(struct Mem *record, enum field_type type)
 		if ((record->flags & MEM_UInt) == MEM_UInt)
 			return 0;
 		if ((record->flags & MEM_Real) == MEM_Real) {
-			int64_t i = (int64_t) record->u.r;
-			if (i == record->u.r)
-				mem_set_int(record, record->u.r,
-					    record->u.r <= -1);
+			double d = record->u.r;
+			int64_t i = (int64_t) d;
+			uint64_t u = (uint64_t) d;
+			if (i == d)
+				mem_set_int(record, i, i <= -1);
+			else if (u == d)
+				mem_set_u64(record, u);
 			return 0;
 		}
 		if (sqlVdbeMemIntegerify(record) != 0)

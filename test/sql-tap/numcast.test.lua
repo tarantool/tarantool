@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(11)
+test:plan(20)
 
 --!./tcltestrunner.lua
 -- 2013 March 20
@@ -65,5 +65,86 @@ for _, enc in ipairs({"utf8"}) do
     end
 end
 
+--
+-- gh-4526: make sure that DOUBLE values that more than
+-- 9223372036854775296 and less than 18446744073709551616 can be
+-- converted to INTEGER or UNSIGNED.
+--
+test:do_execsql_test(
+    "cast-2.1",
+    [[
+        SELECT CAST((9223372036854775297.01) AS INTEGER);
+    ]], {
+        9223372036854775808ULL
+    })
+
+test:do_execsql_test(
+    "cast-2.2",
+    [[
+        SELECT CAST((18000000000000000000.) AS INTEGER);
+    ]], {
+        18000000000000000000ULL
+    })
+
+test:do_execsql_test(
+    "cast-2.3",
+    [[
+        SELECT CAST((9223372036854775297.01) AS UNSIGNED);
+    ]], {
+        9223372036854775808ULL
+    })
+
+test:do_execsql_test(
+    "cast-2.4",
+    [[
+        SELECT CAST((18000000000000000000.) AS UNSIGNED);
+    ]], {
+        18000000000000000000ULL
+    })
+
+test:do_catchsql_test(
+    "cast-2.5",
+    [[
+        SELECT CAST((20000000000000000000.) AS UNSIGNED);
+    ]], {
+        1,"Type mismatch: can not convert 2.0e+19 to unsigned"
+    })
+
+test:do_execsql_test(
+    "cast-2.6",
+    [[
+        CREATE TABLE t (i INTEGER PRIMARY KEY);
+        INSERT INTO t VALUES(9223372036854775297.01);
+        SELECT * FROM t;
+    ]], {
+        9223372036854775808ULL
+    })
+
+test:do_execsql_test(
+    "cast-2.7",
+    [[
+        INSERT INTO t VALUES(18000000000000000000.01);
+        SELECT * FROM t;
+    ]], {
+        9223372036854775808ULL,18000000000000000000ULL
+    })
+
+test:do_catchsql_test(
+    "cast-2.8",
+    [[
+        INSERT INTO t VALUES(20000000000000000000.01);
+        SELECT * FROM t;
+    ]], {
+        1,"Tuple field 1 type does not match one required by operation: expected integer"
+    })
+
+test:do_catchsql_test(
+    "cast-2.9",
+    [[
+        INSERT INTO t VALUES(2.1);
+        SELECT * FROM t;
+    ]], {
+        1,"Tuple field 1 type does not match one required by operation: expected integer"
+    })
 
 test:finish_test()

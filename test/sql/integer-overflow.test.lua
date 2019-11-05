@@ -27,12 +27,12 @@ box.execute('SELECT 18446744073709551616;')
 box.execute('SELECT CAST(\'9223372036854775808\' AS INTEGER);')
 box.execute('SELECT CAST(\'18446744073709551616\' AS INTEGER);')
 -- Due to inexact represantation of large integers in terms of
--- floating point numbers, numerics with value < INT64_MAX
--- have INT64_MAX + 1 value in integer representation:
--- float 9223372036854775800 -> int (9223372036854775808),
--- with error due to conversion = 8.
+-- floating point numbers, numerics with value < UINT64_MAX
+-- have UINT64_MAX + 1 value in integer representation:
+-- float 18446744073709551600 -> int (18446744073709551616),
+-- with error due to conversion = 16.
 --
-box.execute('SELECT CAST(9223372036854775807.0 AS INTEGER);')
+box.execute('SELECT CAST(18446744073709551600. AS INTEGER);')
 -- gh-3810: make sure that if space contains integers in range
 -- [INT64_MAX, UINT64_MAX], they are handled inside SQL in a
 -- proper way, which now means that an error is raised.
