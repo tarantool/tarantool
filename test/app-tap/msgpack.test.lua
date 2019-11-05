@@ -136,6 +136,27 @@ local function test_decode_array_map_header(test, s)
             size = 4,
             exp_err = end_of_buffer_err,
         },
+        -- gh-3926: Ensure that a returned pointer has the same
+        -- cdata type as passed argument.
+        --
+        -- cdata<char *> arguments are passed in the cases above,
+        -- so only cdata<const char *> argument is checked here.
+        {
+            'fixarray (const char *)',
+            func = s.decode_array_header,
+            data = ffi.cast('const char *', '\x94'),
+            size = 1,
+            exp_len = 4,
+            exp_rewind = 1,
+        },
+        {
+            'fixmap (const char *)',
+            func = s.decode_map_header,
+            data = ffi.cast('const char *', '\x84'),
+            size = 1,
+            exp_len = 4,
+            exp_rewind = 1,
+        },
     }
 
     local bad_api_cases = {
@@ -206,9 +227,14 @@ local function test_decode_array_map_header(test, s)
         else
             local len, new_buf = case.func(case.data, case.size)
             local rewind = new_buf - case.data
+
+            -- gh-3926: Verify cdata type of a returned buffer.
+            local data_ctype = tostring(ffi.typeof(case.data))
+            local new_buf_ctype = tostring(ffi.typeof(new_buf))
+
             local description = ('good; %s'):format(case[1])
-            test:is_deeply({len, rewind}, {case.exp_len, case.exp_rewind},
-                description)
+            test:is_deeply({len, rewind, new_buf_ctype}, {case.exp_len,
+                case.exp_rewind, data_ctype}, description)
         end
     end
 
@@ -231,7 +257,7 @@ end
 
 tap.test("msgpack", function(test)
     local serializer = require('msgpack')
-    test:plan(12)
+    test:plan(13)
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
     test:test("double", common.test_double, serializer)
@@ -244,4 +270,5 @@ tap.test("msgpack", function(test)
     test:test("offsets", test_offsets, serializer)
     test:test("misc", test_misc, serializer)
     test:test("decode_array_map", test_decode_array_map_header, serializer)
+    test:test("decode_buffer", common.test_decode_buffer, serializer)
 end)

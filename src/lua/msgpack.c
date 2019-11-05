@@ -339,7 +339,8 @@ static int
 lua_msgpack_decode_cdata(lua_State *L, bool check)
 {
 	const char *data;
-	if (luaL_checkconstchar(L, 1, &data) != 0) {
+	uint32_t cdata_type;
+	if (luaL_checkconstchar(L, 1, &data, &cdata_type) != 0) {
 		return luaL_error(L, "msgpack.decode: "
 				  "a Lua string or 'char *' expected");
 	}
@@ -355,7 +356,7 @@ lua_msgpack_decode_cdata(lua_State *L, bool check)
 	}
 	struct luaL_serializer *cfg = luaL_checkserializer(L);
 	luamp_decode(L, cfg, &data);
-	*(const char **)luaL_pushcdata(L, CTID_CHAR_PTR) = data;
+	*(const char **)luaL_pushcdata(L, cdata_type) = data;
 	return 2;
 }
 
@@ -437,7 +438,8 @@ lua_ibuf_msgpack_decode(lua_State *L)
  */
 static int
 verify_decode_header_args(lua_State *L, const char *func_name,
-			  const char **data_p, ptrdiff_t *size_p)
+			  const char **data_p, uint32_t *cdata_type_p,
+			  ptrdiff_t *size_p)
 {
 	/* Verify arguments count. */
 	if (lua_gettop(L) != 2)
@@ -445,7 +447,8 @@ verify_decode_header_args(lua_State *L, const char *func_name,
 
 	/* Verify ptr type. */
 	const char *data;
-	if (luaL_checkconstchar(L, 1, &data) != 0)
+	uint32_t cdata_type;
+	if (luaL_checkconstchar(L, 1, &data, &cdata_type) != 0)
 		return luaL_error(L, "%s: 'char *' expected", func_name);
 
 	/* Verify size type and value. */
@@ -455,6 +458,7 @@ verify_decode_header_args(lua_State *L, const char *func_name,
 
 	*data_p = data;
 	*size_p = size;
+	*cdata_type_p = cdata_type;
 
 	return 0;
 }
@@ -468,8 +472,9 @@ lua_decode_array_header(lua_State *L)
 {
 	const char *func_name = "msgpack.decode_array_header";
 	const char *data;
+	uint32_t cdata_type;
 	ptrdiff_t size;
-	verify_decode_header_args(L, func_name, &data, &size);
+	verify_decode_header_args(L, func_name, &data, &cdata_type, &size);
 
 	if (mp_typeof(*data) != MP_ARRAY)
 		return luaL_error(L, "%s: unexpected msgpack type", func_name);
@@ -480,7 +485,7 @@ lua_decode_array_header(lua_State *L)
 	uint32_t len = mp_decode_array(&data);
 
 	lua_pushinteger(L, len);
-	*(const char **) luaL_pushcdata(L, CTID_CHAR_PTR) = data;
+	*(const char **) luaL_pushcdata(L, cdata_type) = data;
 	return 2;
 }
 
@@ -493,8 +498,9 @@ lua_decode_map_header(lua_State *L)
 {
 	const char *func_name = "msgpack.decode_map_header";
 	const char *data;
+	uint32_t cdata_type;
 	ptrdiff_t size;
-	verify_decode_header_args(L, func_name, &data, &size);
+	verify_decode_header_args(L, func_name, &data, &cdata_type, &size);
 
 	if (mp_typeof(*data) != MP_MAP)
 		return luaL_error(L, "%s: unexpected msgpack type", func_name);
@@ -505,7 +511,7 @@ lua_decode_map_header(lua_State *L)
 	uint32_t len = mp_decode_map(&data);
 
 	lua_pushinteger(L, len);
-	*(const char **) luaL_pushcdata(L, CTID_CHAR_PTR) = data;
+	*(const char **) luaL_pushcdata(L, cdata_type) = data;
 	return 2;
 }
 
