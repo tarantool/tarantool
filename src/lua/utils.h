@@ -67,9 +67,6 @@ struct error;
 extern struct lua_State *tarantool_L;
 extern struct ibuf *tarantool_lua_ibuf;
 
-extern uint32_t CTID_CONST_CHAR_PTR;
-extern uint32_t CTID_CHAR_PTR;
-
 /** \cond public */
 
 /**
@@ -585,7 +582,8 @@ luaL_checkibuf(struct lua_State *L, int idx);
  * char pointer.
  */
 int
-luaL_checkconstchar(struct lua_State *L, int idx, const char **res);
+luaL_checkconstchar(struct lua_State *L, int idx, const char **res,
+		    uint32_t *cdata_type_p);
 
 /**
  * @brief A wrapper for lua_newthread() to pass it into luaT_cpcall

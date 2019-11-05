@@ -474,7 +474,8 @@ static int
 lua_msgpack_decode_cdata(lua_State *L, bool check)
 {
 	const char *data;
-	if (luaL_checkconstchar(L, 1, &data) != 0) {
+	uint32_t cdata_type;
+	if (luaL_checkconstchar(L, 1, &data, &cdata_type) != 0) {
 		return luaL_error(L, "msgpack.decode: "
 				  "a Lua string or 'char *' expected");
 	}
@@ -490,7 +491,7 @@ lua_msgpack_decode_cdata(lua_State *L, bool check)
 	}
 	struct luaL_serializer *cfg = luaL_checkserializer(L);
 	luamp_decode(L, cfg, &data);
-	*(const char **)luaL_pushcdata(L, CTID_CHAR_PTR) = data;
+	*(const char **)luaL_pushcdata(L, cdata_type) = data;
 	return 2;
 }
 
