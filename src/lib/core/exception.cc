@@ -129,27 +129,21 @@ Exception::log() const
 	say_file_line(S_ERROR, file, line, errmsg, "%s", type->name);
 }
 
-static const struct method_info systemerror_methods[] = {
-	make_method(&type_SystemError, "errno", &SystemError::get_errno),
-	METHODS_SENTINEL
-};
-
 const struct type_info type_SystemError =
-	make_type("SystemError", &type_Exception, systemerror_methods);
+	make_type("SystemError", &type_Exception);
 
 SystemError::SystemError(const struct type_info *type,
 			 const char *file, unsigned line)
-	:Exception(type, file, line),
-	m_errno(errno)
+	:Exception(type, file, line)
 {
-	/* nothing */
+	saved_errno = errno;
 }
 
 SystemError::SystemError(const char *file, unsigned line,
 			 const char *format, ...)
-	: Exception(&type_SystemError, file, line),
-	m_errno(errno)
+	: Exception(&type_SystemError, file, line)
 {
+	saved_errno = errno;
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(this, format, ap);
@@ -159,7 +153,7 @@ SystemError::SystemError(const char *file, unsigned line,
 void
 SystemError::log() const
 {
-	say_file_line(S_SYSERROR, file, line, strerror(m_errno),
+	say_file_line(S_SYSERROR, file, line, strerror(saved_errno),
 		      "SystemError %s", errmsg);
 }
 
@@ -192,7 +186,7 @@ OutOfMemory::OutOfMemory(const char *file, unsigned line,
 			 const char *object)
 	: SystemError(&type_OutOfMemory, file, line)
 {
-	m_errno = ENOMEM;
+	saved_errno = ENOMEM;
 	error_format_msg(this, "Failed to allocate %u bytes in %s for %s",
 			 (unsigned) amount, allocator, object);
 }
@@ -203,7 +197,7 @@ const struct type_info type_TimedOut =
 TimedOut::TimedOut(const char *file, unsigned line)
 	: SystemError(&type_TimedOut, file, line)
 {
-	m_errno = ETIMEDOUT;
+	saved_errno = ETIMEDOUT;
 	error_format_msg(this, "timed out");
 }
 

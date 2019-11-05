@@ -17,6 +17,7 @@ struct error {
     error_f _log;
     const struct type_info *_type;
     int _refs;
+    int _saved_errno;
     /** Line number. */
     unsigned _line;
     /* Source file name. */
@@ -86,10 +87,19 @@ local function error_trace(err)
     }
 end
 
+local function error_errno(err)
+    local e = err._saved_errno
+    if e == 0 then
+        return nil
+    end
+    return e
+end
+
 local error_fields = {
     ["type"]        = error_type;
     ["message"]     = error_message;
     ["trace"]       = error_trace;
+    ["errno"]       = error_errno;
 }
 
 local function error_unpack(err)

@@ -196,6 +196,25 @@ box.error.new()
 ---
 - error: 'Usage: box.error.new(code, args)'
 ...
+--
+-- System errors expose errno as a field.
+--
+_, err = require('fio').open('not_existing_file')
+---
+...
+type(err.errno)
+---
+- number
+...
+-- Errors not related to the standard library do
+-- not expose errno.
+err = box.error.new(box.error.PROC_LUA, "errno")
+---
+...
+type(err.errno)
+---
+- nil
+...
 ----------------
 -- # box.stat
 ----------------

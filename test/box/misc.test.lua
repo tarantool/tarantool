@@ -59,6 +59,16 @@ e = box.error.new(box.error.CREATE_SPACE, "space", "error")
 e
 box.error.new()
 
+--
+-- System errors expose errno as a field.
+--
+_, err = require('fio').open('not_existing_file')
+type(err.errno)
+-- Errors not related to the standard library do
+-- not expose errno.
+err = box.error.new(box.error.PROC_LUA, "errno")
+type(err.errno)
+
 ----------------
 -- # box.stat
 ----------------

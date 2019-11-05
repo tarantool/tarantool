@@ -86,17 +86,12 @@ class SystemError: public Exception {
 public:
 	virtual void raise() { throw this; }
 
-	int get_errno() const { return m_errno; }
-
 	virtual void log() const;
 
 	SystemError(const char *file, unsigned line,
 		    const char *format, ...);
 protected:
 	SystemError(const struct type_info *type, const char *file, unsigned line);
-protected:
-	/* system errno */
-	int m_errno;
 };
 
 extern const struct type_info type_SocketError;

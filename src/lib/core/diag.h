@@ -72,6 +72,12 @@ struct error {
 	error_f log;
 	const struct type_info *type;
 	int refs;
+	/**
+	 * Errno at the moment of the error
+	 * creation. If the error is not related
+	 * to the standard library, then it is 0.
+	 */
+	int saved_errno;
 	/** Line number. */
 	unsigned line;
 	/* Source file name. */
