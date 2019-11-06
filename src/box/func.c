@@ -209,12 +209,12 @@ module_cache_find(const char *name, const char *name_end)
  * Save module to the module cache.
  */
 static inline int
-module_cache_put(const char *name, const char *name_end, struct module *module)
+module_cache_put(struct module *module)
 {
-	size_t name_len = name_end - name;
-	uint32_t name_hash = mh_strn_hash(name, name_len);
+	size_t package_len = strlen(module->package);
+	uint32_t name_hash = mh_strn_hash(module->package, package_len);
 	const struct mh_strnptr_node_t strnode = {
-		name, name_len, name_hash, module};
+		module->package, package_len, name_hash, module};
 
 	if (mh_strnptr_put(modules, &strnode, NULL, NULL) == mh_end(modules)) {
 		diag_set(OutOfMemory, sizeof(strnode), "malloc", "modules");
@@ -248,12 +248,16 @@ module_load(const char *package, const char *package_end)
 	if (module_find(package, package_end, path, sizeof(path)) != 0)
 		return NULL;
 
-	struct module *module = (struct module *) malloc(sizeof(*module));
+	int package_len = package_end - package;
+	struct module *module = (struct module *)
+		malloc(sizeof(*module) + package_len + 1);
 	if (module == NULL) {
-		diag_set(OutOfMemory, sizeof(struct module), "malloc",
-			 "struct module");
+		diag_set(OutOfMemory, sizeof(struct module) + package_len + 1,
+			 "malloc", "struct module");
 		return NULL;
 	}
+	memcpy(module->package, package, package_len);
+	module->package[package_len] = 0;
 	rlist_create(&module->funcs);
 	module->calls = 0;
 	module->is_unloading = false;
@@ -264,7 +268,7 @@ module_load(const char *package, const char *package_end)
 	}
 	char load_name[PATH_MAX + 1];
 	snprintf(load_name, sizeof(load_name), "%s/%.*s." TARANTOOL_LIBEXT,
-		 dir_name, (int)(package_end - package), package);
+		 dir_name, package_len, package);
 	if (symlink(path, load_name) < 0) {
 		diag_set(SystemError, "failed to create dso link");
 		goto error;
@@ -275,7 +279,6 @@ module_load(const char *package, const char *package_end)
 	if (rmdir(dir_name) != 0)
 		say_warn("failed to delete temporary dir %s", dir_name);
 	if (module->handle == NULL) {
-		int package_len = (int) (package_end - package_end);
 		diag_set(ClientError, ER_LOAD_MODULE, package_len,
 			  package, dlerror());
 		goto error;
@@ -346,7 +349,7 @@ module_reload(const char *package, const char *package_end, struct module **modu
 		rlist_move(&new_module->funcs, &func->item);
 	}
 	module_cache_del(package, package_end);
-	if (module_cache_put(package, package_end, new_module) != 0)
+	if (module_cache_put(new_module) != 0)
 		goto restore;
 	old_module->is_unloading = true;
 	module_gc(old_module);
@@ -515,7 +518,7 @@ func_c_load(struct func_c *func)
 		module = module_load(name.package, name.package_end);
 		if (module == NULL)
 			return -1;
-		if (module_cache_put(name.package, name.package_end, module)) {
+		if (module_cache_put(module)) {
 			module_delete(module);
 			return -1;
 		}
