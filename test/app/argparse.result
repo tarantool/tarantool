@@ -137,13 +137,13 @@ argparse({'--verh=42'}, {'verh'})
 ...
 argparse({'--verh=42'}, {{'verh', 'boolean'}})
 ---
-- error: 'builtin/internal.argparse.lua:<line>"]: Bad value for parameter "verh". Expected
-    boolean, got "42"'
+- error: 'builtin/internal.argparse.lua:<line>"]: Bad value for parameter "verh". No value
+    expected, got "42"'
 ...
 argparse({'--verh=42'}, {{'verh', 'boolean+'}})
 ---
-- error: 'builtin/internal.argparse.lua:<line>"]: Bad value for parameter "verh". Expected
-    boolean, got "42"'
+- error: 'builtin/internal.argparse.lua:<line>"]: Bad value for parameter "verh". No value
+    expected, got "42"'
 ...
 argparse({'--verh=42'}, {'niz'})
 ---
