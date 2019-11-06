@@ -74,6 +74,12 @@
 #include "call.h"
 #include "func.h"
 #include "sequence.h"
+#include "uuid/tt_uuid.h"
+#include <sched.h>
+#include "core/shmem.h"
+#include <sys/sysinfo.h>
+
+static const int CPU_COUNT = get_nprocs();
 
 static char status[64] = "unknown";
 
@@ -2026,6 +2032,48 @@ on_wal_checkpoint_threshold(void)
 }
 
 void
+box_bind_cpu(struct tt_uuid *uuid)
+{
+	char uuid_str[UUID_STR_LEN + 1];
+	tt_uuid_to_string(uuid, uuid_str);
+	int res;
+	cpu_set_t set;
+	shm_t thrd_sm;
+
+	thrd_sm.name = (char*)malloc(sizeof(uuid_str));
+	memcpy(thrd_sm.name, uuid_str, sizeof(uuid_str));
+	thrd_sm.mmap_size = sizeof(node_t) * CPU_COUNT;
+
+	if ((res = shmem_open(&thrd_sm)) != 0) {
+		say_error("shmem_open");
+		diag_log();
+	}
+
+	node_t *node = shmem_get(&thrd_sm, uuid_str);
+	if (node == NULL) {
+		const int cpu_id = sched_getcpu();
+		const pid_t pid = getpid();
+		CPU_ZERO(&set);
+
+		if ((res = sched_getaffinity(pid, sizeof(cpu_set_t), &set) )!= 0) {
+			say_error("sched_getaffinity");
+			diag_log();
+		}
+		if (!CPU_ISSET(cpu_id, &set)) {
+			CPU_SET(cpu_id, &set);
+			if ((res = sched_setaffinity(pid, CPU_SETSIZE, &set))!= 0) {
+				say_error("sched_setaffinity");
+				diag_log();
+			}
+		}
+		if ((res = shmem_put(&thrd_sm, uuid_str, cpu_id)) != 0) {
+			say_error("shmem_put");
+			diag_log();
+		}
+	}
+}
+
+void
 box_init(void)
 {
 	fiber_cond_create(&ro_cond);
@@ -2087,6 +2135,7 @@ box_cfg_xc(void)
 	struct tt_uuid instance_uuid, replicaset_uuid;
 	box_check_instance_uuid(&instance_uuid);
 	box_check_replicaset_uuid(&replicaset_uuid);
+	box_bind_cpu(&instance_uuid);
 
 	box_set_net_msg_max();
 	box_set_readahead();
