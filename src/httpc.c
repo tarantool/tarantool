@@ -446,6 +446,7 @@ httpc_execute(struct httpc_request *req, double timeout)
 	case CURLE_COULDNT_RESOLVE_HOST:
 	case CURLE_COULDNT_CONNECT:
 	case CURLE_WRITE_ERROR:
+	case CURLE_BAD_CONTENT_ENCODING:
 		/* 595 Connection Problem (AnyEvent non-standard) */
 		req->status = 595;
 		req->reason = curl_easy_strerror(req->curl_request.code);
