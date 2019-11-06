@@ -9,13 +9,44 @@ params = {}
 params[1] = {'flag1', 'boolean'}
 params[2] = {'flag2', 'boolean'}
 params[3] = {'flag3', 'boolean'}
-params[4] = {'flag4', 'boolean'}
-params[5] = {'flag5', 'boolean'}
-args = {'--flag1', 'true', '--flag2', '1', '--flag3', 'false', '--flag4', '0', '--flag5', 'TrUe'}
+args = {'--flag1', 'positional value', '--flag2'}
 argparse(args, params)
 
-args = {'--flag1', 'abc'}
+--
+-- When several 'boolean' arguments are passed, the result will be
+-- `true` (just as for one such argument).
+--
+params = {}
+params[1] = {'foo', 'boolean'}
+args = {'--foo', '--foo'}
 argparse(args, params)
+
+--
+-- When several 'boolean+' arguments are passed, the result will
+-- be a list of `true` values.
+--
+params = {}
+params[1] = {'foo', 'boolean+'}
+args = {'--foo', '--foo'}
+argparse(args, params)
+
+params = {}
+params[1] = {'foo', 'boolean+'}
+args = {'--foo', 'positional value', '--foo'}
+argparse(args, params)
+
+--
+-- When a value is provided for a 'boolean' / 'boolean+' option
+-- using --foo=bar syntax, the error should state that a value is
+-- not expected for this option.
+--
+params = {}
+params[1] = {'foo', 'boolean'}
+argparse({'--foo=bar'}, params)
+
+params = {}
+params[1] = {'foo', 'boolean+'}
+argparse({'--foo=bar'}, params)
 
 --
 -- When parameter value was omitted, it was replaced internally
@@ -26,7 +57,26 @@ params = {}
 params[1] = {'value', 'number'}
 argparse({'--value'}, params)
 
-params[1][2] = 'string'
+params = {}
+params[1] = {'value', 'string'}
 argparse({'--value'}, params)
+
+--
+-- Verify that short 'boolean' and 'boolean+' options behaviour
+-- is the same as for long options.
+--
+params = {}
+params[1] = {'f', 'boolean'}
+args = {'-f'}
+argparse(args, params)
+args = {'-f', '-f'}
+argparse(args, params)
+
+params = {}
+params[1] = {'f', 'boolean+'}
+args = {'-f'}
+argparse(args, params)
+args = {'-f', '-f'}
+argparse(args, params)
 
 test_run:cmd("clear filter")

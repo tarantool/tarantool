@@ -8,6 +8,16 @@ local function parse_param_prefix(param)
     return is_long, is_short, is_dash
 end
 
+-- Determine whether a value should be provided for a parameter.
+--
+-- The value can be passed after '=' within the same argument or
+-- in a next argument.
+--
+-- @param convert_to a type of the parameter
+local function parameter_has_value(convert_to)
+    return convert_to ~= 'boolean' and convert_to ~= 'boolean+'
+end
+
 local function result_set_add(t_out, key, val)
     if val == nil then
         table.insert(t_out, key)
@@ -21,13 +31,18 @@ local function result_set_add(t_out, key, val)
 end
 
 local function err_bad_parameter_value(name, got, expected)
-    if type(got) ~= 'string' then
-        got = 'nothing'
+    assert(type(got) == 'boolean' or type(got) == 'string')
+    assert(type(got) ~= expected)
+
+    local reason
+    if type(got) == 'boolean' then
+        reason = ('Expected %s, got nothing'):format(expected)
+    elseif not parameter_has_value(expected) then
+        reason = ('No value expected, got "%s"'):format(got)
     else
-        got = string.format('"%s"', got)
+        reason = ('Expected %s, got "%s"'):format(expected, got)
     end
-    error(string.format('Bad value for parameter "%s". Expected %s, got %s',
-                        name, expected, got))
+    error(string.format('Bad value for parameter "%s". %s', name, reason))
 end
 
 local function convert_parameter_simple(name, convert_from, convert_to)
@@ -38,17 +53,9 @@ local function convert_parameter_simple(name, convert_from, convert_to)
         end
         return converted
     elseif convert_to == 'boolean' then
-        if type(convert_from) == 'boolean' then
-            return convert_from
+        if type(convert_from) ~= 'boolean' then
+            return err_bad_parameter_value(name, convert_from, convert_to)
         end
-        convert_from = string.lower(convert_from)
-        if convert_from == '0' or convert_from == 'false' then
-            return false
-        end
-        if convert_from == '1' or convert_from == 'true' then
-            return true
-        end
-        return err_bad_parameter_value(name, convert_from, convert_to)
     elseif convert_to == 'string' then
         if type(convert_from) ~= 'string' then
             return err_bad_parameter_value(name, convert_from, convert_to)
@@ -85,6 +92,20 @@ end
 
 local function parameters_parse(t_in, options)
     local t_out, t_in = {}, t_in or {}
+
+    -- Prepare a lookup table for options. An option name -> a
+    -- type name to convert a parameter into or true (which means
+    -- returning a value as is).
+    local lookup = {}
+    if options then
+        for _, v in ipairs(options) do
+            if type(v) ~= 'table' then
+                v = {v}
+            end
+            lookup[v[1]] = (v[2] or true)
+        end
+    end
+
     local skip_param = false
     for i, v in ipairs(t_in) do
         -- we've used this parameter as value
@@ -108,13 +129,20 @@ local function parameters_parse(t_in, options)
                 if key == nil or val == nil then
                     error(("bad argument #%d: ID not valid"):format(i))
                 end
+                -- Disallow an explicit value after '=' for a
+                -- 'boolean' or 'boolean+' argument.
+                if not parameter_has_value(lookup[key]) then
+                    return err_bad_parameter_value(key, val, lookup[key])
+                end
                 result_set_add(t_out, key, val)
             else
                 if command:match("^([%a_][%w_-]+)$") == nil then
                     error(("bad argument #%d: ID not valid"):format(i))
                 end
                 local val = true
-                do
+                -- Don't consume a value after a 'boolean' or
+                -- 'boolean+' argument.
+                if parameter_has_value(lookup[command]) then
                     -- in case next argument is value of this key (not --arg)
                     local next_arg = t_in[i + 1]
                     local is_long, is_short, is_dash = parse_param_prefix(next_arg)
@@ -133,13 +161,7 @@ local function parameters_parse(t_in, options)
 ::nextparam::
     end
     if options then
-        local lookup, unknown = {}, {}
-        for _, v in ipairs(options) do
-            if type(v) ~= 'table' then
-                v = {v}
-            end
-            lookup[v[1]] = (v[2] or true)
-        end
+        local unknown = {}
         for k, v in pairs(t_out) do
             if lookup[k] == nil and type(k) == "string" then
                 table.insert(unknown, k)
