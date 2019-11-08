@@ -21,7 +21,7 @@ local EOL = "\n...\n"
 
 test = tap.test("console")
 
-test:plan(72)
+test:plan(73)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -290,6 +290,20 @@ client = socket.tcp_connect("unix/", CONSOLE_SOCKET)
 _ = client:read(128)
 client:write("box.session.type();\n")
 test:is(yaml.decode(client:read(EOL))[1], "console", "session type")
+client:close()
+
+--
+-- An unknown backslash started command causes abnormal exit of
+-- a console.
+--
+local cmd = '\\unknown_command'
+local exp_res = {error = string.format(
+    'Invalid command %s. Type \\help for help.', cmd)}
+client = socket.tcp_connect("unix/", CONSOLE_SOCKET)
+client:read(128)
+client:write(('%s\n'):format(cmd))
+local res = yaml.decode(client:read(EOL))[1]
+test:is_deeply(res, exp_res, 'unknown command')
 client:close()
 
 server:close()

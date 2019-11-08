@@ -323,7 +323,7 @@ local function preprocess(storage, line)
     end
     if items == nil then
         local msg = "Invalid command \\%s. Type \\help for help."
-        return format(false, msg:format(items[1]))
+        return format(false, msg:format(line))
     end
     return operators[items[1]](storage, unpack(items))
 end
