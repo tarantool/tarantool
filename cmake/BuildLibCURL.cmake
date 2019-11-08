@@ -57,8 +57,19 @@ macro(curl_build)
 
                 # Pass -isysroot=<SDK_PATH> option on Mac OS, see
                 # above.
+                # Note: Passing of CPPFLAGS / CFLAGS explicitly
+                # discards using of corresponsing environment
+                # variables.
                 CPPFLAGS=${LIBCURL_CPPFLAGS}
                 CFLAGS=${LIBCURL_CFLAGS}
+
+                # Pass empty LDFLAGS to discard using of
+                # corresponding environment variable.
+                # It is possible that a linker flag assumes that
+                # some compilation flag is set. We don't pass
+                # CFLAGS from environment, so we should not do it
+                # for LDFLAGS too.
+                LDFLAGS=
 
                 --prefix <INSTALL_DIR>
                 --enable-static
