@@ -59,6 +59,7 @@ const uint32_t field_mp_type[] = {
 	/* [FIELD_TYPE_STRING]   =  */ 1U << MP_STR,
 	/* [FIELD_TYPE_NUMBER]   =  */ (1U << MP_UINT) | (1U << MP_INT) |
 		(1U << MP_FLOAT) | (1U << MP_DOUBLE),
+	/* [FIELD_TYPE_DOUBLE]   =  */ 1U << MP_DOUBLE,
 	/* [FIELD_TYPE_INTEGER]  =  */ (1U << MP_UINT) | (1U << MP_INT),
 	/* [FIELD_TYPE_BOOLEAN]  =  */ 1U << MP_BOOL,
 	/* [FIELD_TYPE_VARBINARY] =  */ 1U << MP_BIN,
@@ -75,6 +76,7 @@ const uint32_t field_ext_type[] = {
 	/* [FIELD_TYPE_UNSIGNED]  = */ 0,
 	/* [FIELD_TYPE_STRING]    = */ 0,
 	/* [FIELD_TYPE_NUMBER]    = */ 1U << MP_DECIMAL,
+	/* [FIELD_TYPE_DOUBLE]    = */ 0,
 	/* [FIELD_TYPE_INTEGER]   = */ 0,
 	/* [FIELD_TYPE_BOOLEAN]   = */ 0,
 	/* [FIELD_TYPE_VARBINARY] = */ 0,
@@ -89,6 +91,7 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_UNSIGNED] = */ "unsigned",
 	/* [FIELD_TYPE_STRING]   = */ "string",
 	/* [FIELD_TYPE_NUMBER]   = */ "number",
+	/* [FIELD_TYPE_DOUBLE]   = */ "double",
 	/* [FIELD_TYPE_INTEGER]  = */ "integer",
 	/* [FIELD_TYPE_BOOLEAN]  = */ "boolean",
 	/* [FIELD_TYPE_VARBINARY] = */"varbinary",
@@ -120,18 +123,19 @@ field_type_by_name_wrapper(const char *str, uint32_t len)
  * values can be stored in the j type.
  */
 static const bool field_type_compatibility[] = {
-	   /*   ANY   UNSIGNED  STRING   NUMBER  INTEGER  BOOLEAN VARBINARY SCALAR  DECIMAL  ARRAY    MAP  */
-/*   ANY    */ true,   false,   false,   false,   false,   false,   false,  false,  false,  false,   false,
-/* UNSIGNED */ true,   true,    false,   true,    true,    false,   false,  true,   false,  false,   false,
-/*  STRING  */ true,   false,   true,    false,   false,   false,   false,  true,   false,  false,   false,
-/*  NUMBER  */ true,   false,   false,   true,    false,   false,   false,  true,   false,  false,   false,
-/*  INTEGER */ true,   false,   false,   true,    true,    false,   false,  true,   false,  false,   false,
-/*  BOOLEAN */ true,   false,   false,   false,   false,   true,    false,  true,   false,  false,   false,
-/* VARBINARY*/ true,   false,   false,   false,   false,   false,   true,   true,   false,  false,   false,
-/*  SCALAR  */ true,   false,   false,   false,   false,   false,   false,  true,   false,  false,   false,
-/*  DECIMAL */ true,   false,   false,   true,    false,   false,   false,  true,   true,   false,   false,
-/*   ARRAY  */ true,   false,   false,   false,   false,   false,   false,  false,  false,  true,    false,
-/*    MAP   */ true,   false,   false,   false,   false,   false,   false,  false,  false,  false,   true,
+	   /*   ANY   UNSIGNED  STRING   NUMBER  DOUBLE  INTEGER  BOOLEAN VARBINARY SCALAR  DECIMAL  ARRAY    MAP  */
+/*   ANY    */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  false,   false,
+/* UNSIGNED */ true,   true,    false,   true,    false,   true,    false,   false,  true,   false,  false,   false,
+/*  STRING  */ true,   false,   true,    false,   false,   false,   false,   false,  true,   false,  false,   false,
+/*  NUMBER  */ true,   false,   false,   true,    false,   false,   false,   false,  true,   false,  false,   false,
+/*  DOUBLE  */ true,   false,   false,   true,    true,    false,   false,   false,  true,   false,  false,   false,
+/*  INTEGER */ true,   false,   false,   true,    false,   true,    false,   false,  true,   false,  false,   false,
+/*  BOOLEAN */ true,   false,   false,   false,   false,   false,   true,    false,  true,   false,  false,   false,
+/* VARBINARY*/ true,   false,   false,   false,   false,   false,   false,   true,   true,   false,  false,   false,
+/*  SCALAR  */ true,   false,   false,   false,   false,   false,   false,   false,  true,   false,  false,   false,
+/*  DECIMAL */ true,   false,   false,   true,    false,   false,   false,   false,  true,   true,   false,   false,
+/*   ARRAY  */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  true,    false,
+/*    MAP   */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  false,   true,
 };
 
 bool
