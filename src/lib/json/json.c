@@ -291,7 +291,7 @@ json_path_cmp(const char *a, int a_len, const char *b, int b_len,
 			return rc;
 	}
 	/* Paths a and b must be valid. */
-	assert(rc_b == 0 && rc_b == 0);
+	assert(rc_a == 0 && rc_b == 0);
 	/*
 	 * The parser stopped because the end of one of the paths
 	 * was reached. As JSON_TOKEN_END > JSON_TOKEN_{NUM, STR},
