@@ -130,6 +130,23 @@ unsigned iproto_readahead = 16320;
 static int iproto_msg_max = IPROTO_MSG_MAX_MIN;
 
 /**
+ * Address the iproto listens for, stored in TX
+ * thread. Is kept in TX to be shown in box.info.
+ */
+static struct sockaddr_storage iproto_bound_address_storage;
+/** 0 means that no address is listened. */
+static socklen_t iproto_bound_address_len;
+
+const char *
+iproto_bound_address(void)
+{
+	if (iproto_bound_address_len == 0)
+		return NULL;
+	return sio_strfaddr((struct sockaddr *) &iproto_bound_address_storage,
+			    iproto_bound_address_len);
+}
+
+/**
  * How big is a buffer which needs to be shrunk before
  * it is put back into buffer cache.
  */
@@ -2203,8 +2220,14 @@ struct iproto_cfg_msg: public cbus_call_msg
 	/** Operation to execute in iproto thread. */
 	enum iproto_cfg_op op;
 	union {
-		/** New URI to bind to. */
-		const char *uri;
+		struct {
+			/** New URI to bind to. */
+			const char *uri;
+			/** Result address. */
+			struct sockaddr_storage addr;
+			/** Address length. */
+			socklen_t addrlen;
+		};
 
 		/** New iproto max message count. */
 		int iproto_msg_max;
@@ -2240,6 +2263,8 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 			    (evio_service_bind(&binary, cfg_msg->uri) != 0 ||
 			     evio_service_listen(&binary) != 0))
 				diag_raise();
+			cfg_msg->addrlen = binary.addr_len;
+			cfg_msg->addr = binary.addrstorage;
 			break;
 		default:
 			unreachable();
@@ -2265,6 +2290,8 @@ iproto_listen(const char *uri)
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_LISTEN);
 	cfg_msg.uri = uri;
 	iproto_do_cfg(&cfg_msg);
+	iproto_bound_address_storage = cfg_msg.addr;
+	iproto_bound_address_len = cfg_msg.addrlen;
 }
 
 size_t

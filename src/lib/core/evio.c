@@ -269,6 +269,13 @@ evio_service_bind_addr(struct evio_service *service)
 		}
 	}
 
+	/*
+	 * After binding a result address may be different. For
+	 * example, if a port was 0.
+	 */
+	if (sio_getsockname(fd, &service->addr, &service->addr_len) != 0)
+		goto error;
+
 	say_info("%s: bound to %s", evio_service_name(service),
 		 sio_strfaddr(&service->addr, service->addr_len));
 
@@ -400,6 +407,7 @@ evio_service_stop(struct evio_service *service)
 
 	if (ev_is_active(&service->ev)) {
 		ev_io_stop(service->loop, &service->ev);
+		service->addr_len = 0;
 	}
 
 	if (service->ev.fd >= 0) {

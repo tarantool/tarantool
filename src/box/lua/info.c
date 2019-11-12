@@ -518,6 +518,14 @@ lbox_info_sql(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_info_listen(struct lua_State *L)
+{
+	/* NULL is ok, no need to check. */
+	lua_pushstring(L, iproto_bound_address());
+	return 1;
+}
+
 static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"id", lbox_info_id},
 	{"uuid", lbox_info_uuid},
@@ -534,6 +542,7 @@ static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"gc", lbox_info_gc},
 	{"vinyl", lbox_info_vinyl},
 	{"sql", lbox_info_sql},
+	{"listen", lbox_info_listen},
 	{NULL, NULL}
 };
 

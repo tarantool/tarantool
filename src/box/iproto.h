@@ -80,6 +80,13 @@ iproto_request_count(void);
 void
 iproto_reset_stat(void);
 
+/**
+ * String representation of the address served by
+ * iproto. To be shown in box.info.
+ */
+const char *
+iproto_bound_address(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
