@@ -5265,12 +5265,13 @@ ck_constraint_def_new_from_tuple(struct tuple *tuple)
 	const char *expr_str =
 		tuple_field_str_xc(tuple, BOX_CK_CONSTRAINT_FIELD_CODE,
 				   &expr_str_len);
-	bool out;
-	if (tuple_field_bool(tuple, BOX_CK_CONSTRAINT_FIELD_IS_ENABLED,
-			     &out) != 0)
-		diag_raise();
-	bool is_enabled =
-		tuple_field_count(tuple) <= BOX_CK_CONSTRAINT_FIELD_IS_ENABLED || out;
+	bool is_enabled = true;
+	if (tuple_field_count(tuple) > BOX_CK_CONSTRAINT_FIELD_IS_ENABLED) {
+		if (tuple_field_bool(tuple,
+				     BOX_CK_CONSTRAINT_FIELD_IS_ENABLED,
+				     &is_enabled) != 0)
+			diag_raise();
+	}
 	struct ck_constraint_def *ck_def =
 		ck_constraint_def_new(name, name_len, expr_str, expr_str_len,
 				      space_id, language, is_enabled);
