@@ -1118,27 +1118,6 @@ tuple_to_buf(struct tuple *tuple, char *buf, size_t size);
 #include "xrow_update.h"
 #include "errinj.h"
 
-/* @copydoc tuple_field_with_type() */
-static inline const char *
-tuple_field_with_type_xc(struct tuple *tuple, uint32_t fieldno,
-		         enum mp_type type)
-{
-	const char *out = tuple_field_with_type(tuple, fieldno, type);
-	if (out == NULL)
-		diag_raise();
-	return out;
-}
-
-/* @copydoc tuple_field_bool() */
-static inline bool
-tuple_field_bool_xc(struct tuple *tuple, uint32_t fieldno)
-{
-	bool out;
-	if (tuple_field_bool(tuple, fieldno, &out) != 0)
-		diag_raise();
-	return out;
-}
-
 /* @copydoc tuple_field_u32() */
 static inline uint32_t
 tuple_field_u32_xc(struct tuple *tuple, uint32_t fieldno)

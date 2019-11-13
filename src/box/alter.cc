@@ -4748,38 +4748,45 @@ decode_fk_links(struct tuple *tuple, uint32_t *out_count,
 		const char *constraint_name, uint32_t constraint_len,
 		uint32_t errcode)
 {
-	const char *parent_cols =
-		tuple_field_with_type_xc(tuple,
-					 BOX_FK_CONSTRAINT_FIELD_PARENT_COLS,
-					 MP_ARRAY);
+	const char *parent_cols = tuple_field_with_type(tuple,
+		BOX_FK_CONSTRAINT_FIELD_PARENT_COLS, MP_ARRAY);
+	if (parent_cols == NULL)
+		return NULL;
 	uint32_t count = mp_decode_array(&parent_cols);
 	if (count == 0) {
-		tnt_raise(ClientError, errcode,
+		diag_set(ClientError, errcode,
 			  tt_cstr(constraint_name, constraint_len),
 			  "at least one link must be specified");
+		return NULL;
 	}
-	const char *child_cols =
-		tuple_field_with_type_xc(tuple,
-					 BOX_FK_CONSTRAINT_FIELD_CHILD_COLS,
-					 MP_ARRAY);
+	const char *child_cols = tuple_field_with_type(tuple,
+		BOX_FK_CONSTRAINT_FIELD_CHILD_COLS, MP_ARRAY);
+	if (child_cols == NULL)
+		return NULL;
 	if (mp_decode_array(&child_cols) != count) {
-		tnt_raise(ClientError, errcode,
+		diag_set(ClientError, errcode,
 			  tt_cstr(constraint_name, constraint_len),
 			  "number of referenced and referencing fields "
 			  "must be the same");
+		return NULL;
 	}
 	*out_count = count;
 	size_t size = count * sizeof(struct field_link);
 	struct field_link *region_links =
-		(struct field_link *) region_alloc_xc(&fiber()->gc, size);
+		(struct field_link *)region_alloc(&fiber()->gc, size);
+	if (region_links == NULL) {
+		diag_set(OutOfMemory, size, "region", "new slab");
+		return NULL;
+	}
 	memset(region_links, 0, size);
 	for (uint32_t i = 0; i < count; ++i) {
 		if (mp_typeof(*parent_cols) != MP_UINT ||
 		    mp_typeof(*child_cols) != MP_UINT) {
-			tnt_raise(ClientError, errcode,
+			diag_set(ClientError, errcode,
 				  tt_cstr(constraint_name, constraint_len),
 				  tt_sprintf("value of %d link is not unsigned",
 					     i));
+			return NULL;
 		}
 		region_links[i].parent_field = mp_decode_uint(&parent_cols);
 		region_links[i].child_field = mp_decode_uint(&child_cols);
@@ -4792,24 +4799,30 @@ static struct fk_constraint_def *
 fk_constraint_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 {
 	uint32_t name_len;
-	const char *name =
-		tuple_field_str_xc(tuple, BOX_FK_CONSTRAINT_FIELD_NAME,
-				   &name_len);
+	const char *name = tuple_field_str(tuple,
+		BOX_FK_CONSTRAINT_FIELD_NAME, &name_len);
+	if (name == NULL)
+		return NULL;
 	if (name_len > BOX_NAME_MAX) {
-		tnt_raise(ClientError, errcode,
+		diag_set(ClientError, errcode,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  "constraint name is too long");
+		return NULL;
 	}
-	identifier_check_xc(name, name_len);
+	if (identifier_check(name, name_len) != 0)
+		return NULL;
 	uint32_t link_count;
 	struct field_link *links = decode_fk_links(tuple, &link_count, name,
 						   name_len, errcode);
+	if (links == NULL)
+		return NULL;
 	size_t fk_def_sz = fk_constraint_def_sizeof(link_count, name_len);
 	struct fk_constraint_def *fk_def =
 		(struct fk_constraint_def *) malloc(fk_def_sz);
 	if (fk_def == NULL) {
-		tnt_raise(OutOfMemory, fk_def_sz, "malloc",
+		diag_set(OutOfMemory, fk_def_sz, "malloc",
 			  "struct fk_constraint_def");
+		return NULL;
 	}
 	auto def_guard = make_scoped_guard([=] { free(fk_def); });
 	memcpy(fk_def->name, name, name_len);
@@ -4818,37 +4831,46 @@ fk_constraint_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 					      name_len + 1);
 	memcpy(fk_def->links, links, link_count * sizeof(struct field_link));
 	fk_def->field_count = link_count;
-	fk_def->child_id = tuple_field_u32_xc(tuple,
-					      BOX_FK_CONSTRAINT_FIELD_CHILD_ID);
-	fk_def->parent_id =
-		tuple_field_u32_xc(tuple, BOX_FK_CONSTRAINT_FIELD_PARENT_ID);
-	fk_def->is_deferred =
-		tuple_field_bool_xc(tuple, BOX_FK_CONSTRAINT_FIELD_DEFERRED);
-	const char *match = tuple_field_str_xc(tuple,
-					       BOX_FK_CONSTRAINT_FIELD_MATCH,
-					       &name_len);
+	if (tuple_field_u32(tuple, BOX_FK_CONSTRAINT_FIELD_CHILD_ID,
+			    &(fk_def->child_id )) != 0)
+		return NULL;
+	if (tuple_field_u32(tuple, BOX_FK_CONSTRAINT_FIELD_PARENT_ID,
+			    &(fk_def->parent_id)) != 0)
+		return NULL;
+	if (tuple_field_bool(tuple, BOX_FK_CONSTRAINT_FIELD_DEFERRED,
+			     &(fk_def->is_deferred)) != 0)
+		return NULL;
+	const char *match = tuple_field_str(tuple,
+		BOX_FK_CONSTRAINT_FIELD_MATCH, &name_len);
+	if (match == NULL)
+		return NULL;
 	fk_def->match = STRN2ENUM(fk_constraint_match, match, name_len);
 	if (fk_def->match == fk_constraint_match_MAX) {
-		tnt_raise(ClientError, errcode, fk_def->name,
+		diag_set(ClientError, errcode, fk_def->name,
 			  "unknown MATCH clause");
+		return NULL;
 	}
-	const char *on_delete_action =
-		tuple_field_str_xc(tuple, BOX_FK_CONSTRAINT_FIELD_ON_DELETE,
-				   &name_len);
+	const char *on_delete_action = tuple_field_str(tuple,
+		BOX_FK_CONSTRAINT_FIELD_ON_DELETE, &name_len);
+	if (on_delete_action == NULL)
+		return NULL;
 	fk_def->on_delete = STRN2ENUM(fk_constraint_action,
 				      on_delete_action, name_len);
 	if (fk_def->on_delete == fk_constraint_action_MAX) {
-		tnt_raise(ClientError, errcode, fk_def->name,
+		diag_set(ClientError, errcode, fk_def->name,
 			  "unknown ON DELETE action");
+		return NULL;
 	}
-	const char *on_update_action =
-		tuple_field_str_xc(tuple, BOX_FK_CONSTRAINT_FIELD_ON_UPDATE,
-				   &name_len);
+	const char *on_update_action = tuple_field_str(tuple,
+		BOX_FK_CONSTRAINT_FIELD_ON_UPDATE, &name_len);
+	if (on_update_action == NULL)
+		return NULL;
 	fk_def->on_update = STRN2ENUM(fk_constraint_action,
 				      on_update_action, name_len);
 	if (fk_def->on_update == fk_constraint_action_MAX) {
-		tnt_raise(ClientError, errcode, fk_def->name,
+		diag_set(ClientError, errcode, fk_def->name,
 			  "unknown ON UPDATE action");
+		return NULL;
 	}
 	def_guard.is_active = false;
 	return fk_def;
@@ -5032,6 +5054,8 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 		struct fk_constraint_def *fk_def =
 			fk_constraint_def_new_from_tuple(new_tuple,
 							 ER_CREATE_FK_CONSTRAINT);
+		if (fk_def == NULL)
+			return -1;
 		auto fk_def_guard = make_scoped_guard([=] { free(fk_def); });
 		struct space *child_space = space_cache_find(fk_def->child_id);
 		if (child_space == NULL)
@@ -5185,6 +5209,8 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 		struct fk_constraint_def *fk_def =
 			fk_constraint_def_new_from_tuple(old_tuple,
 						ER_DROP_FK_CONSTRAINT);
+		if (fk_def == NULL)
+			return -1;
 		auto fk_def_guard = make_scoped_guard([=] { free(fk_def); });
 		struct space *child_space = space_cache_find(fk_def->child_id);
 		struct space *parent_space = space_cache_find(fk_def->parent_id);
@@ -5239,9 +5265,12 @@ ck_constraint_def_new_from_tuple(struct tuple *tuple)
 	const char *expr_str =
 		tuple_field_str_xc(tuple, BOX_CK_CONSTRAINT_FIELD_CODE,
 				   &expr_str_len);
+	bool out;
+	if (tuple_field_bool(tuple, BOX_CK_CONSTRAINT_FIELD_IS_ENABLED,
+			     &out) != 0)
+		diag_raise();
 	bool is_enabled =
-		tuple_field_count(tuple) <= BOX_CK_CONSTRAINT_FIELD_IS_ENABLED ||
-		tuple_field_bool_xc(tuple, BOX_CK_CONSTRAINT_FIELD_IS_ENABLED);
+		tuple_field_count(tuple) <= BOX_CK_CONSTRAINT_FIELD_IS_ENABLED || out;
 	struct ck_constraint_def *ck_def =
 		ck_constraint_def_new(name, name_len, expr_str, expr_str_len,
 				      space_id, language, is_enabled);
