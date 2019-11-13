@@ -857,6 +857,13 @@ sql_stmt_est_size(const struct sql_stmt *stmt)
 	return size;
 }
 
+const char *
+sql_stmt_query_str(const struct sql_stmt *stmt)
+{
+	const struct Vdbe *v = (const struct Vdbe *) stmt;
+	return v->zSql;
+}
+
 /******************************* sql_bind_  **************************
  *
  * Routines used to attach values to wildcards in a compiled SQL statement.

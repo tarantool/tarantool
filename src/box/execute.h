@@ -122,6 +122,12 @@ size_t
 sql_stmt_est_size(const struct sql_stmt *stmt);
 
 /**
+ * Return string of SQL query.
+ */
+const char *
+sql_stmt_query_str(const struct sql_stmt *stmt);
+
+/**
  * Prepare (compile into VDBE byte-code) statement.
  *
  * @param sql UTF-8 encoded SQL statement.
