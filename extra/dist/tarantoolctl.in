@@ -945,6 +945,10 @@ local function rocks()
     end
     table.insert(positional_arguments, key)
 
+    if positional_arguments[1] == "search" and keyword_arguments["all"] then
+        table.insert(positional_arguments, "--all")
+    end
+
     -- Tweak help messages
     util.see_help = function(command, program)
         -- TODO: print extended help message here
@@ -1400,6 +1404,7 @@ local function populate_arguments()
         { 'only-server', 'string'  },
         { 'server',      'string'  },
         { 'language',    'string'  },
+        { 'all',         'boolean' },
     })
 
     local cmd_name
