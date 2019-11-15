@@ -21,7 +21,6 @@ ffi.cdef[[
 int kill(int pid, int sig);
 int isatty(int fd);
 int getppid(void);
-int chdir(const char *path);
 ]]
 
 local TIMEOUT_INFINITY = 100 * 365 * 86400
@@ -936,50 +935,42 @@ local function rocks()
     cfg.init()
     local util = require("luarocks.util")
     local command_line = require("luarocks.cmd")
-    local options = keyword_arguments
-    local key = nil
-    if options["only-server"] ~= nil then
-        key = find_arg("only%-server")
-    else
-        key = find_arg("server")
-    end
-    table.insert(positional_arguments, key)
-
-    if positional_arguments[1] == "search" and keyword_arguments["all"] then
-        table.insert(positional_arguments, "--all")
-    end
-
-    if positional_arguments[1] == "remove" and keyword_arguments["force"] then
-        table.insert(positional_arguments, "--force")
-    end
-
     -- Tweak help messages
     util.see_help = function(command, program)
         -- TODO: print extended help message here
         return "See Tarantool documentation for help."
     end
 
-    -- Enable only useful commands
+    -- Disabled: path, upload
     local rocks_commands = {
-        install = "luarocks.cmd.install",
-        search = "luarocks.cmd.search",
-        list = "luarocks.cmd.list",
-        remove = "luarocks.cmd.remove",
-        show = "luarocks.cmd.show",
-        make = "luarocks.cmd.make",
-        pack = "luarocks.cmd.pack",
-        unpack = "luarocks.cmd.unpack",
+        build = "luarocks.cmd.build",
+        config = "luarocks.cmd.config",
         doc = "luarocks.cmd.doc",
+        download = "luarocks.cmd.download",
         help = "luarocks.cmd.help",
-        test = "luarocks.cmd.test",
+        init = "luarocks.cmd.init",
+        install = "luarocks.cmd.install",
+        lint = "luarocks.cmd.lint",
+        list = "luarocks.cmd.list",
+        make = "luarocks.cmd.make",
         make_manifest = "luarocks.admin.cmd.make_manifest",
+        new_version = "luarocks.cmd.new_version",
+        pack = "luarocks.cmd.pack",
+        purge = "luarocks.cmd.purge",
+        remove = "luarocks.cmd.remove",
+        search = "luarocks.cmd.search",
+        show = "luarocks.cmd.show",
+        test = "luarocks.cmd.test",
+        unpack = "luarocks.cmd.unpack",
+        which = "luarocks.cmd.which",
+        write_rockspec = "luarocks.cmd.write_rockspec",
     }
 
-    if keyword_arguments.chdir then
-        ffi.C.chdir(keyword_arguments.chdir)
-    end
-    -- Call LuaRocks
-    command_line.run_command('', rocks_commands, nil, unpack(positional_arguments))
+    -- Prepare arguments for luarocks.
+    shift_argv(lua_arguments, 0, 1)
+    -- Call LuaRocks.
+    command_line.run_command('LuaRocks main command-line interface',
+                             rocks_commands, nil, unpack(lua_arguments))
 end
 
 local function exit_wrapper(func)
@@ -1194,117 +1185,20 @@ local commands = setmetatable({
     }, rocks = {
         func = exit_wrapper(rocks), process = process_remote, help = {
             header =
-                "%s rocks [install|make|remove|show|search|list|pack|unpack|doc|test|make_manifest|help]",
+                "%s rocks [OPTIONS] COMMAND",
             description =
 [=[
-        Package management.
+        Tarantool package manager. To pack/unpack/install/remove
+        LuaRocks packages, and many more other actions. For more
+        information see
+
+            tarantoolctl rocks --help
 ]=],
             weight = 100,
             deprecated = false,
         },
-        subcommands = {
-            install = {
-                weight = 100,
-                help = {
-                    header = "%s rocks install {<rock>|<name> [<version>]}",
-                    description = [=[
-        Install a rock.
-]=],
-                }
-            },
-            make = {
-                weight = 101,
-                help = {
-                    header = "%s rocks make [<rockspec>]",
-                    description = [=[
-        Compile package in current directory using a rockspec.
-]=],
-                }
-            },
-            remove = {
-                weight = 101,
-                help = {
-                    header = "%s rocks remove <name> [<version>]",
-                    description = [=[
-        Uninstall a rock.
-]=],
-                }
-            },
-            show = {
-                weight = 110,
-                help = {
-                    header = "%s rocks list <filter>",
-                    description = [=[
-        Show information about an installed rock
-]=],
-                }
-            },
-            search = {
-                weight = 120,
-                help = {
-                    header = "%s rocks search <name> [<version>]",
-                    description = [=[
-        Search the rocks list for a pattern.
-]=],
-                }
-            },
-            list = {
-                weight = 121,
-                help = {
-                    header = "%s rocks list <filter>",
-                    description = [=[
-        List all installed rocks.
-]=],
-                }
-            },
-            pack = {
-                weight = 131,
-                help = {
-                    header = "%s rocks pack {<rockspec>|<name> [<version>]}",
-                    description = [=[
-        Create a rock, packing sources or binaries.
-]=],
-                }
-            },
-            unpack = {
-                weight = 131,
-                help = {
-                    header = "%s rocks unpack {<rock>|<name> [<version>]}",
-                    description = [=[
-        Unpack the contents of a rock.
-]=],
-                }
-            },
-            test = {
-                weight = 141,
-                help = {
-                    header = "%s rocks test [<rockspec>]",
-                    description = [=[
-        Run the test suite in the current directory.
-]=],
-                }
-            },
-            doc = {
-                weight = 151,
-                help = {
-                    header = "%s rocks doc <rockname>",
-                    description = [=[
-        Show documentation for an installed rock.
-]=],
-                }
-            },
-            make_manifest = {
-                weight = 161,
-                help = {
-                    header = "%s rocks make_manifest <argument>",
-                    description = [=[
-        Compile a manifest file for a repository.
-
-        <argument>, if given, is a local repository pathname.
-]=],
-                }
-            },
-        }
+        -- LuaRocks parse arguments themselves
+        is_self_sufficient = true
     }
 }, {
     __index = function()
@@ -1404,12 +1298,7 @@ local function populate_arguments()
         { 'help',        'boolean' },
         { 'format',      'string'  },
         { 'replica',     'number+' },
-        { 'chdir',       'string'  },
-        { 'only-server', 'string'  },
-        { 'server',      'string'  },
         { 'language',    'string'  },
-        { 'all',         'boolean' },
-        { 'force',       'boolean' },
     })
 
     local cmd_name
@@ -1421,8 +1310,15 @@ local function populate_arguments()
 end
 
 local function main()
-    populate_arguments()
+
     local cmd_pair = commands[command_name]
+
+    -- Don't call populate arguments() for modules
+    -- that parse arguments themselves.
+    if not cmd_pair.is_self_sufficient then
+        populate_arguments()
+    end
+
     if #arg < 2 then
         log.error("Not enough arguments for '%s' command\n", command_name)
         usage(command_name)
