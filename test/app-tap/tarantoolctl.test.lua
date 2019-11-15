@@ -189,8 +189,13 @@ do
 
     local status, err = pcall(function()
         test:test("basic test", function(test_i)
-            test_i:plan(18)
-            check_ok(test_i, dir, 'start', 'delayed_box_cfg', 0, nil, "Starting instance")
+            test_i:plan(20)
+            local script = 'delayed_box_cfg'
+            check_ok(test_i, dir, 'start', script, 0, nil, "Starting instance")
+            tctl_wait_start(dir, script)
+            check_ok(test_i, dir, 'stop', script, 0, nil, "Stopping")
+            tctl_wait_stop(dir, script)
+
             check_ok(test_i, dir, 'start',  'script', 0, nil, "Starting instance")
             tctl_wait_start(dir, 'script')
             check_ok(test_i, dir, 'status', 'script', 0, nil, "is running")
