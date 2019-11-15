@@ -918,6 +918,10 @@ local function rocks()
     end
     table.insert(positional_arguments, key)
 
+    if positional_arguments[1] == "remove" and keyword_arguments["force"] then
+        table.insert(positional_arguments, "--force")
+    end
+
     -- Tweak help messages
     util.see_help = function(command, program)
         -- TODO: print extended help message here
@@ -1308,6 +1312,7 @@ do
         { 'chdir',       'string'  },
         { 'only-server', 'string'  },
         { 'server',      'string'  },
+        { 'force',       'boolean' },
     })
 
     local cmd_name
