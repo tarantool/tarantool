@@ -296,8 +296,13 @@ static const struct cmsg_hop destroy_route[] = {
 static void
 tx_process_disconnect(struct cmsg *m);
 
+/** Send destroy message to tx thread. */
+static void
+net_finish_disconnect(struct cmsg *m);
+
 static const struct cmsg_hop disconnect_route[] = {
-	{ tx_process_disconnect, NULL }
+	{ tx_process_disconnect, &net_pipe },
+	{ net_finish_disconnect, NULL }
 };
 
 /**
@@ -326,6 +331,32 @@ static const struct cmsg_hop push_route[] = {
 /* }}} */
 
 /* {{{ iproto_connection - declaration and definition */
+
+/** Connection life cycle stages. */
+enum iproto_connection_state {
+	/**
+	 * A connection is always alive in the beginning because
+	 * takes an already active socket in a constructor.
+	 */
+	IPROTO_CONNECTION_ALIVE,
+	/**
+	 * Socket was closed, a notification is sent to the TX
+	 * thread to close the session.
+	 */
+	IPROTO_CONNECTION_CLOSED,
+	/**
+	 * TX thread was notified about close, but some requests
+	 * are still not finished. That state may be skipped in
+	 * case the connection was already idle (not having
+	 * unfinished requests) at the moment of closing.
+	 */
+	IPROTO_CONNECTION_PENDING_DESTROY,
+	/**
+	 * All requests are finished, a destroy request is sent to
+	 * the TX thread.
+	 */
+	IPROTO_CONNECTION_DESTROYED,
+};
 
 /**
  * Context of a single client connection.
@@ -430,8 +461,12 @@ struct iproto_connection
 	 * connection.
 	 */
 	struct cmsg destroy_msg;
-	/** True if destroy message is sent. Debug-only. */
-	bool is_destroy_sent;
+	/**
+	 * Connection state. Mainly it is used to determine when
+	 * the connection can be destroyed, and for debug purposes
+	 * to assert on a double destroy, for example.
+	 */
+	enum iproto_connection_state state;
 	struct rlist in_stop_list;
 	/**
 	 * Kharon is used to implement box.session.push().
@@ -573,6 +608,35 @@ iproto_connection_stop_msg_max_limit(struct iproto_connection *con)
 }
 
 /**
+ * Send a destroy message to TX thread in case all requests are
+ * finished.
+ */
+static inline void
+iproto_connection_try_to_start_destroy(struct iproto_connection *con)
+{
+	assert(con->state == IPROTO_CONNECTION_CLOSED ||
+	       con->state == IPROTO_CONNECTION_PENDING_DESTROY);
+	if (!iproto_connection_is_idle(con)) {
+		/*
+		 * Not all requests are finished. Let the last
+		 * finished request destroy the connection.
+		 */
+		con->state = IPROTO_CONNECTION_PENDING_DESTROY;
+		return;
+	}
+	/*
+	 * If the connection has no outstanding requests in the
+	 * input buffer, then no one (e.g. tx thread) is referring
+	 * to it, so it must be destroyed. Firstly queue a msg to
+	 * destroy the session and other resources owned by TX
+	 * thread. When it is done, iproto thread will destroy
+	 * other parts of the connection.
+	 */
+	con->state = IPROTO_CONNECTION_DESTROYED;
+	cpipe_push(&tx_pipe, &con->destroy_msg);
+}
+
+/**
  * Initiate a connection shutdown. This method may
  * be invoked many times, and does the internal
  * bookkeeping to only cleanup resources once.
@@ -597,23 +661,12 @@ iproto_connection_close(struct iproto_connection *con)
 		 */
 		con->p_ibuf->wpos -= con->parse_size;
 		cpipe_push(&tx_pipe, &con->disconnect_msg);
-	}
-	/*
-	 * If the connection has no outstanding requests in the
-	 * input buffer, then no one (e.g. tx thread) is referring
-	 * to it, so it must be destroyed at once. Queue a msg to
-	 * run on_disconnect() trigger and destroy the connection.
-	 *
-	 * Otherwise, it will be destroyed by the last request on
-	 * this connection that has finished processing.
-	 *
-	 * The check is mandatory to not destroy a connection
-	 * twice.
-	 */
-	if (iproto_connection_is_idle(con)) {
-		assert(! con->is_destroy_sent);
-		con->is_destroy_sent = true;
-		cpipe_push(&tx_pipe, &con->destroy_msg);
+		assert(con->state == IPROTO_CONNECTION_ALIVE);
+		con->state = IPROTO_CONNECTION_CLOSED;
+	} else if (con->state == IPROTO_CONNECTION_PENDING_DESTROY) {
+		iproto_connection_try_to_start_destroy(con);
+	} else {
+		assert(con->state == IPROTO_CONNECTION_CLOSED);
 	}
 	rlist_del(&con->in_stop_list);
 }
@@ -1048,7 +1101,7 @@ iproto_connection_new(int fd)
 	/* It may be very awkward to allocate at close. */
 	cmsg_init(&con->destroy_msg, destroy_route);
 	cmsg_init(&con->disconnect_msg, disconnect_route);
-	con->is_destroy_sent = false;
+	con->state = IPROTO_CONNECTION_ALIVE;
 	con->tx.is_push_pending = false;
 	con->tx.is_push_sent = false;
 	rmean_collect(rmean_net, IPROTO_CONNECTIONS, 1);
@@ -1063,6 +1116,7 @@ iproto_connection_delete(struct iproto_connection *con)
 	assert(!evio_has_fd(&con->output));
 	assert(!evio_has_fd(&con->input));
 	assert(con->session == NULL);
+	assert(con->state == IPROTO_CONNECTION_DESTROYED);
 	/*
 	 * The output buffers must have been deleted
 	 * in tx thread.
@@ -1279,6 +1333,14 @@ tx_process_disconnect(struct cmsg *m)
 			session_run_on_disconnect_triggers(con->session);
 		}
 	}
+}
+
+static void
+net_finish_disconnect(struct cmsg *m)
+{
+	struct iproto_connection *con =
+		container_of(m, struct iproto_connection, disconnect_msg);
+	iproto_connection_try_to_start_destroy(con);
 }
 
 /**
