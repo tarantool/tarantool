@@ -58,10 +58,7 @@ clock_stat_add_delta(struct clock_stat *stat, uint64_t clock_delta)
 static inline uint64_t
 clock_diff_accumulate(uint64_t acc, uint64_t delta)
 {
-	if (acc > 0)
-		return delta / 16 + 15 * acc / 16;
-	else
-		return delta;
+	return delta / 16 + 15 * acc / 16;
 }
 
 static inline void
