@@ -56,14 +56,61 @@
 #define ENABLE_FIBER_TOP 1
 #endif
 
-#if ENABLE_FIBER_TOP
-/* A fiber reports used up CPU time with nanosecond resolution. */
-#define FIBER_TIME_RES 1000000000
-#endif /* ENABLE_FIBER_TOP */
-
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+#if ENABLE_FIBER_TOP
+/* A fiber reports used up CPU time with nanosecond resolution. */
+#define FIBER_TIME_RES 1000000000
+
+/**
+ * A struct containing all the info gathered for current fiber or
+ * thread as a whole when fiber.top() is enabled.
+ */
+struct clock_stat {
+	/**
+	 * Accumulated clock value calculated using exponential
+	 * moving average.
+	 */
+	uint64_t acc;
+	/**
+	 * Clock delta counter used on current event loop
+	 * iteration.
+	 */
+	uint64_t delta;
+	/**
+	 * Clock delta calculated on previous event loop
+	 * iteration.
+	 */
+	uint64_t prev_delta;
+	/**
+	 * Total processor time this fiber (or cord as a whole)
+	 * has spent with 1 / FIBER_TIME_RES second precision.
+	 */
+	uint64_t cputime;
+};
+
+/**
+ * A struct encapsulating all knowledge this cord has about cpu
+ * clocks and their state.
+ */
+struct cpu_stat {
+	uint64_t prev_clock;
+	/**
+	 * This thread's CPU time at the beginning of event loop
+	 * iteration. Used to calculate how much cpu time has
+	 * each loop iteration consumed and update fiber cpu
+	 * times propotionally. The resolution is
+	 * 1 / FIBER_TIME_RES seconds.
+	 */
+	uint64_t prev_cputime;
+	uint32_t prev_cpu_id;
+	uint32_t cpu_miss_count;
+	uint32_t prev_cpu_miss_count;
+};
+
+#endif /* ENABLE_FIBER_TOP */
 
 enum { FIBER_NAME_MAX = 32 };
 
@@ -402,21 +449,7 @@ struct fiber {
 	/** Fiber flags */
 	uint32_t flags;
 #if ENABLE_FIBER_TOP
-	/**
-	 * Accumulated clock value calculated using exponential
-	 * moving average.
-	 */
-	uint64_t clock_acc;
-	/**
-	 * Total processor time this fiber has spent with
-	 * 1 / FIBER_TIME_RES second precision.
-	 */
-	uint64_t cputime;
-	/**
-	 * Clock delta calculated on previous event loop iteration.
-	 */
-	uint64_t clock_delta_last;
-	uint64_t clock_delta;
+	struct clock_stat clock_stat;
 #endif /* ENABLE_FIBER_TOP */
 	/** Link in cord->alive or cord->dead list. */
 	struct rlist link;
@@ -490,21 +523,8 @@ struct cord {
 	 */
 	uint32_t max_fid;
 #if ENABLE_FIBER_TOP
-	uint64_t clock_acc;
-	uint64_t clock_delta;
-	uint64_t clock_delta_last;
-	uint64_t clock_last;
-	uint32_t cpu_id_last;
-	uint32_t cpu_miss_count;
-	uint32_t cpu_miss_count_last;
-	/**
-	 * This thread's CPU time at the beginning of event loop
-	 * iteration. Used to calculate how much cpu time has
-	 * each loop iteration consumed and update fiber cpu
-	 * times propotionally. The resolution is
-	 * 1 / FIBER_TIME_RES seconds.
-	 */
-	uint64_t cputime_last;
+	struct clock_stat clock_stat;
+	struct cpu_stat cpu_stat;
 #endif /* ENABLE_FIBER_TOP */
 	pthread_t id;
 	const struct cord_on_exit *on_exit;

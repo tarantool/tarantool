@@ -44,6 +44,112 @@
 
 #if ENABLE_FIBER_TOP
 #include <x86intrin.h> /* __rdtscp() */
+
+static inline void
+clock_stat_add_delta(struct clock_stat *stat, uint64_t clock_delta)
+{
+	stat->delta += clock_delta;
+}
+
+/**
+ * Calculate the exponential moving average for the clock deltas
+ * per loop iteration. The coeffitient is 1/16.
+ */
+static inline uint64_t
+clock_diff_accumulate(uint64_t acc, uint64_t delta)
+{
+	if (acc > 0)
+		return delta / 16 + 15 * acc / 16;
+	else
+		return delta;
+}
+
+static inline void
+clock_stat_update(struct clock_stat *stat, double nsec_per_clock)
+{
+	stat->acc = clock_diff_accumulate(stat->acc, stat->delta);
+	stat->prev_delta = stat->delta;
+	stat->cputime += stat->delta * nsec_per_clock;
+	stat->delta = 0;
+}
+
+static inline void
+clock_stat_reset(struct clock_stat *stat)
+{
+	stat->acc = 0;
+	stat->delta = 0;
+	stat->prev_delta = 0;
+	stat->cputime = 0;
+}
+
+static void
+cpu_stat_start(struct cpu_stat *stat)
+{
+	stat->prev_clock = __rdtscp(&stat->prev_cpu_id);
+	stat->cpu_miss_count = 0;
+	/*
+	 * We want to measure thread cpu time here to calculate
+	 * each fiber's cpu time, so don't use libev's ev_now() or
+	 * ev_time() since they use either monotonic or realtime
+	 * system clocks.
+	 */
+	struct timespec ts;
+	if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) != 0) {
+		say_debug("clock_gettime(): failed to get this thread's"
+			  " cpu time.");
+		return;
+	}
+	stat->prev_cputime = (uint64_t) ts.tv_sec * FIBER_TIME_RES + ts.tv_nsec;
+}
+
+static inline void
+cpu_stat_reset(struct cpu_stat *stat)
+{
+	stat->prev_cpu_miss_count = 0;
+	cpu_stat_start(stat);
+}
+
+static uint64_t
+cpu_stat_on_csw(struct cpu_stat *stat)
+{
+	uint32_t cpu_id;
+	uint64_t delta, clock = __rdtscp(&cpu_id);
+
+	if (cpu_id == stat->prev_cpu_id) {
+		delta = clock - stat->prev_clock;
+	} else {
+		delta = 0;
+		stat->prev_cpu_id = cpu_id;
+		stat->cpu_miss_count++;
+	}
+	stat->prev_clock = clock;
+
+	return delta;
+}
+
+static double
+cpu_stat_end(struct cpu_stat *stat, struct clock_stat *cord_clock_stat)
+{
+	stat->prev_cpu_miss_count = stat->cpu_miss_count;
+	stat->cpu_miss_count = 0;
+
+	struct timespec ts;
+	uint64_t delta_time;
+	double nsec_per_clock = 0;
+	if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) != 0) {
+		say_debug("clock_gettime(): failed to get this thread's"
+			  " cpu time.");
+	} else {
+		delta_time = (uint64_t) ts.tv_sec * FIBER_TIME_RES +
+			     ts.tv_nsec;
+		if (delta_time > stat->prev_cputime && cord_clock_stat->delta > 0) {
+			delta_time -= stat->prev_cputime;
+			nsec_per_clock = (double) delta_time / cord()->clock_stat.delta;
+		}
+	}
+	return nsec_per_clock;
+}
+
 #endif /* ENABLE_FIBER_TOP */
 
 #include "third_party/valgrind/memcheck.h"
@@ -103,18 +209,10 @@ clock_set_on_csw(struct fiber *caller)
 	if (!fiber_top_enabled)
 		return;
 
-	uint64_t clock;
-	uint32_t cpu_id;
-	clock = __rdtscp(&cpu_id);
+	uint64_t delta = cpu_stat_on_csw(&cord()->cpu_stat);
 
-	if (cpu_id == cord()->cpu_id_last) {
-		caller->clock_delta += clock - cord()->clock_last;
-		cord()->clock_delta += clock - cord()->clock_last;
-	} else {
-		cord()->cpu_id_last = cpu_id;
-		cord()->cpu_miss_count++;
-	}
-	cord()->clock_last = clock;
+	clock_stat_add_delta(&cord()->clock_stat, delta);
+	clock_stat_add_delta(&caller->clock_stat, delta);
 #endif /* ENABLE_FIBER_TOP */
 
 }
@@ -695,9 +793,7 @@ fiber_reset(struct fiber *fiber)
 	rlist_create(&fiber->on_stop);
 	fiber->flags = FIBER_DEFAULT_FLAGS;
 #if ENABLE_FIBER_TOP
-	fiber->cputime = 0;
-	fiber->clock_acc = 0;
-	fiber->clock_delta = 0;
+	clock_stat_reset(&fiber->clock_stat);
 #endif /* ENABLE_FIBER_TOP */
 }
 
@@ -1095,38 +1191,7 @@ loop_on_iteration_start(ev_loop *loop, ev_check *watcher, int revents)
 	(void) watcher;
 	(void) revents;
 
-	cord()->clock_last = __rdtscp(&cord()->cpu_id_last);
-	cord()->cpu_miss_count = 0;
-
-	/*
-	 * We want to measure thread cpu time here to calculate
-	 * each fiber's cpu time, so don't use libev's ev_now() or
-	 * ev_time() since they use either monotonic or realtime
-	 * system clocks.
-	 */
-	struct timespec ts;
-	if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) != 0) {
-		say_debug("clock_gettime(): failed to get this"
-			  "thread's cpu time.");
-		return;
-	}
-	cord()->cputime_last = (uint64_t) ts.tv_sec * FIBER_TIME_RES +
-					  ts.tv_nsec;
-}
-
-
-/**
- * Calculate the exponential moving average for the clock deltas
- * per loop iteration. The coeffitient is 1/16.
- */
-static inline uint64_t
-clock_diff_accumulate(uint64_t acc, uint64_t delta)
-{
-	if (acc > 0) {
-		return delta / 16 + 15 * acc / 16;
-	} else {
-		return delta;
-	}
+	cpu_stat_start(&cord()->cpu_stat);
 }
 
 static void
@@ -1145,40 +1210,14 @@ loop_on_iteration_end(ev_loop *loop, ev_prepare *watcher, int revents)
 	 */
 	clock_set_on_csw(&cord()->sched);
 
-	cord()->cpu_miss_count_last = cord()->cpu_miss_count;
-	cord()->cpu_miss_count = 0;
+	double nsec_per_clock = cpu_stat_end(&cord()->cpu_stat,
+					     &cord()->clock_stat);
 
-	struct timespec ts;
-	uint64_t delta_time;
-	double nsec_per_clock = 0;
-
-	if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) != 0) {
-		say_debug("clock_gettime(): failed to get this"
-			  "thread's cpu time.");
-	} else {
-		delta_time = (uint64_t) ts.tv_sec * FIBER_TIME_RES +
-			     ts.tv_nsec;
-		assert(delta_time > cord()->cputime_last);
-		delta_time -= cord()->cputime_last;
-
-		if (cord()->clock_delta > 0)
-			nsec_per_clock = (double) delta_time / cord()->clock_delta;
-	}
-
-	cord()->clock_acc = clock_diff_accumulate(cord()->clock_acc, cord()->clock_delta);
-	cord()->clock_delta_last = cord()->clock_delta;
-	cord()->clock_delta = 0;
-
-	cord()->sched.clock_acc = clock_diff_accumulate(cord()->sched.clock_acc, cord()->sched.clock_delta);
-	cord()->sched.clock_delta_last = cord()->sched.clock_delta;
-	cord()->sched.cputime += cord()->sched.clock_delta * nsec_per_clock;
-	cord()->sched.clock_delta = 0;
+	clock_stat_update(&cord()->clock_stat, nsec_per_clock);
+	clock_stat_update(&cord()->sched.clock_stat, nsec_per_clock);
 
 	rlist_foreach_entry(fiber, &cord()->alive, link) {
-		fiber->clock_acc = clock_diff_accumulate(fiber->clock_acc, fiber->clock_delta);
-		fiber->clock_delta_last = fiber->clock_delta;
-		fiber->cputime += fiber->clock_delta * nsec_per_clock;
-		fiber->clock_delta = 0;
+		clock_stat_update(&fiber->clock_stat, nsec_per_clock);
 	}
 }
 
@@ -1203,17 +1242,14 @@ fiber_top_enable()
 		ev_check_start(cord()->loop, &cord()->check_event);
 		fiber_top_enabled = true;
 
-		cord()->clock_acc = 0;
-		cord()->cpu_miss_count_last = 0;
-		cord()->clock_delta_last = 0;
-		struct timespec ts;
-		if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) != 0) {
-			say_debug("clock_gettime(): failed to get this"
-				  "thread's cpu time.");
-			return;
+		cpu_stat_reset(&cord()->cpu_stat);
+		clock_stat_reset(&cord()->clock_stat);
+		clock_stat_reset(&cord()->sched.clock_stat);
+
+		struct fiber *fiber;
+		rlist_foreach_entry(fiber, &cord()->alive, link) {
+			clock_stat_reset(&fiber->clock_stat);
 		}
-		cord()->cputime_last = (uint64_t) ts.tv_sec * FIBER_TIME_RES +
-						  ts.tv_nsec;
 	}
 }
 

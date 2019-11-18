@@ -278,7 +278,7 @@ lbox_fiber_statof(struct fiber *f, void *cb_ctx, bool backtrace)
 	lua_settable(L, -3);
 
 	lua_pushliteral(L, "time");
-	lua_pushnumber(L, f->cputime / (double) FIBER_TIME_RES);
+	lua_pushnumber(L, f->clock_stat.cputime / (double) FIBER_TIME_RES);
 	lua_settable(L, -3);
 
 	lua_pushliteral(L, "memory");
@@ -335,13 +335,23 @@ lbox_fiber_top_entry(struct fiber *f, void *cb_ctx)
 	lua_newtable(L);
 
 	lua_pushliteral(L, "average");
-	lua_pushnumber(L, f->clock_acc / (double)cord()->clock_acc * 100);
+	if (cord()->clock_stat.acc != 0) {
+		lua_pushnumber(L, f->clock_stat.acc /
+				  (double)cord()->clock_stat.acc * 100);
+	} else {
+		lua_pushnumber(L, 0);
+	}
 	lua_settable(L, -3);
 	lua_pushliteral(L, "instant");
-	lua_pushnumber(L, f->clock_delta_last / (double)cord()->clock_delta_last * 100);
+	if (cord()->clock_stat.prev_delta != 0) {
+		lua_pushnumber(L, f->clock_stat.prev_delta /
+				  (double)cord()->clock_stat.prev_delta * 100);
+	} else {
+		lua_pushnumber(L, 0);
+	}
 	lua_settable(L, -3);
 	lua_pushliteral(L, "time");
-	lua_pushnumber(L, f->cputime / (double) FIBER_TIME_RES);
+	lua_pushnumber(L, f->clock_stat.cputime / (double) FIBER_TIME_RES);
 	lua_settable(L, -3);
 	lua_settable(L, -3);
 
@@ -357,7 +367,7 @@ lbox_fiber_top(struct lua_State *L)
 	}
 	lua_newtable(L);
 	lua_pushliteral(L, "cpu_misses");
-	lua_pushnumber(L, cord()->cpu_miss_count_last);
+	lua_pushnumber(L, cord()->cpu_stat.prev_cpu_miss_count);
 	lua_settable(L, -3);
 
 	lua_pushliteral(L, "cpu");
