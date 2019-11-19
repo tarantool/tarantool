@@ -40,3 +40,6 @@
 [submodule "third_party/curl"]
 	path = third_party/curl
 	url = https://github.com/tarantool/curl.git
+[submodule "third_party/c-ares"]
+	path = third_party/c-ares
+	url = https://github.com/tarantool/c-ares.git

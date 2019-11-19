@@ -345,7 +345,13 @@ endif()
 # Curl
 #
 option(ENABLE_BUNDLED_LIBCURL "Enable building of the bundled libcurl" ON)
+option(BUNDLED_LIBCURL_USE_ARES "Build curl with bundled c-ares"
+       ${ENABLE_BUNDLED_LIBCURL})
 if (ENABLE_BUNDLED_LIBCURL)
+    if(BUNDLED_LIBCURL_USE_ARES)
+        include(BuildAres)
+        ares_build()
+    endif()
     include(BuildLibCURL)
     curl_build()
     add_dependencies(build_bundled_libs bundled-libcurl)
