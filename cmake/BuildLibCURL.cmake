@@ -19,6 +19,21 @@ macro(curl_build)
     get_filename_component(FOUND_OPENSSL_ROOT_DIR ${OPENSSL_INCLUDE_DIR} DIRECTORY)
     set(LIBCURL_OPENSSL_OPT "--with-ssl=${FOUND_OPENSSL_ROOT_DIR}")
 
+    # Use either c-ares bundled with tarantool or
+    # libcurl-default threaded resolver.
+    if(BUNDLED_LIBCURL_USE_ARES)
+        set(ASYN_DNS_USED "ares")
+        set(ASYN_DNS_UNUSED "threaded-resolver")
+        set(ASYN_DNS_PATH "=${ARES_INSTALL_DIR}")
+    else()
+        set(ASYN_DNS_USED "threaded-resolver")
+        set(ASYN_DNS_UNUSED "ares")
+        set(ASYN_DNS_PATH "")
+    endif()
+
+    set(ENABLED_DNS_OPT "--enable-${ASYN_DNS_USED}${ASYN_DNS_PATH}")
+    set(DISABLED_DNS_OPT "--disable-${ASYN_DSN_UNUSED}")
+
     # Pass -isysroot=<SDK_PATH> option on Mac OS to a preprocessor
     # and a C compiler to find header files installed with an SDK.
     #
@@ -100,17 +115,17 @@ macro(curl_build)
                 --without-zsh-functions-dir
                 --without-fish-functions-dir
 
+                ${ENABLED_DNS_OPT}
                 --enable-http
                 --enable-proxy
                 --enable-ipv6
-                --enable-threaded-resolver
                 --enable-unix-sockets
                 --enable-cookies
                 --enable-http-auth
                 --enable-mime
                 --enable-dateparse
 
-                --disable-ares
+                ${DISABLED_DNS_OPT}
                 --disable-ftp
                 --disable-file
                 --disable-ldap
@@ -140,14 +155,26 @@ macro(curl_build)
     add_library(bundled-libcurl STATIC IMPORTED GLOBAL)
     set_target_properties(bundled-libcurl PROPERTIES IMPORTED_LOCATION
         ${LIBCURL_INSTALL_DIR}/lib/libcurl.a)
+    if (BUNDLED_LIBCURL_USE_ARES)
+        # Need to build ares first
+        add_dependencies(bundled-libcurl-project bundled-ares)
+    endif()
     add_dependencies(bundled-libcurl bundled-libcurl-project)
 
     set(CURL_INCLUDE_DIRS ${LIBCURL_INSTALL_DIR}/include)
     set(CURL_LIBRARIES bundled-libcurl ${LIBZ_LIBRARY})
+    if (BUNDLED_LIBCURL_USE_ARES)
+        set(CURL_LIBRARIES ${CURL_LIBRARIES} ${ARES_LIBRARIES})
+    endif()
     if (TARGET_OS_LINUX OR TARGET_OS_FREEBSD)
         set(CURL_LIBRARIES ${CURL_LIBRARIES} rt)
     endif()
 
+    unset(ASYN_DNS_USED)
+    unset(ASYN_DNS_UNUSED)
+    unset(ASYN_DNS_PATH)
+    unset(ENABLED_DNS_OPT)
+    unset(DISABLED_DNS_OPT)
     unset(LIBCURL_CPPFLAGS)
     unset(LIBCURL_CFLAGS)
     unset(FOUND_OPENSSL_ROOT_DIR)
