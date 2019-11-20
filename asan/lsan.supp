@@ -1,0 +1,108 @@
+# All exceptions are under control of the issue:
+# https://github.com/tarantool/tarantool/issues/4360
+#
+# File format:
+#leak:*
+
+# test: app/crypto.test.lua
+# source: /usr/lib/x86_64-linux-gnu/libcrypto.so
+leak:CRYPTO_zalloc
+
+# test: app-tap/http_client.test.lua
+# source: src/tarantool
+leak:Curl_setstropt
+leak:create_conn
+leak:Curl_conncache_add_conn
+leak:alloc_addbyter
+leak:Curl_getaddrinfo_ex
+leak:Curl_cache_addr
+leak:Curl_hash_init
+leak:Curl_hash_add
+leak:Curl_he2ai
+leak:Curl_open
+leak:Curl_resolver_init
+
+# test: app-tap/iconv.test.lua
+# source: /usr/lib/x86_64-linux-gnu/gconv/UTF-16.so
+leak:gconv_init
+
+# test: box*/
+# source: third_party/luajit
+leak:lj_BC_FUNCC
+
+# test: box/access.test.lua
+# test: box/access_bin.test.lua
+# test: box/access_misc.test.lua
+# source: src/box/error.cc
+leak:AccessDeniedError::AccessDeniedError
+
+# test: box/bitset.test.lua
+# source: src/lib/bitset/iterator.c
+leak:tt_bitset_iterator_init
+
+# test: box-py/args.test.py
+# source: /lib/x86_64-linux-gnu/libc.so*
+leak:libc.so*
+
+# test: box-tap/schema-mt.test.lua
+# source: src/lib/core/coio_task.c
+leak:coio_on_start
+# source: src/lib/salad/mhash.h
+leak:mh_i32ptr_new
+
+# test: replication/misc.test.lua
+# source: src/box/vy_log.c
+leak:vy_recovery_new_f
+# source: src/lib/salad/mhash.h
+leak:mh_i64ptr_new
+
+# test: sql-tap/gh2250-trigger-chain-limit.test.lua
+# source: src/lib/core/exception.cc
+leak:Exception::operator new
+
+# test: sql-tap/trigger9.test.lua
+# source: src/lib/core/fiber.c
+leak:cord_start
+
+# test: sql-tap/tkt-7bbfb7d442.test.lua
+# test: sql-tap/view.test.lua
+# test: sql-tap/with1.test.lua
+# test: sql-tap/with2.test.lua
+# source: src/box/sql/malloc.c
+leak:sql_sized_malloc
+
+# test: swim/errinj.test.lua
+# test: swim/swim.test.lua
+# source: src/lib/swim/swim.c
+leak:swim_member_new
+leak:swim_update_member_payload
+
+# !test: unit/bps_tree.test.lua
+# source: src/lib/salad/bps_tree.h
+leak:bps_tree_test_create_leaf
+leak:bps_tree_test_process_insert_leaf
+
+# !test: unit/heap.test.lua
+# source: test/unit/heap.c
+leak:test_random_delete_workload
+leak:test_delete_last_node
+
+# !test: unit/heap_iterator.test.lua
+# source: src/lib/salad/heap.h
+leak:test_heap_reserve
+
+# !test: unit/swim.test.lua
+# source: src/lib/swim/swim_io.c
+leak:swim_scheduler_set_codec
+
+# test: vinyl/errinj.test.lua
+# source: src/lib/core/fiber.h
+leak:fiber_cxx_invoke
+
+# test: vinyl/errinj_ddl.test.lua
+# source: src/box/vy_stmt.c
+leak:vy_stmt_alloc
+
+# test: vinyl/recover.test.lua
+# source: src/lib/core/fiber.c
+leak:cord_costart_thread_func

@@ -112,15 +112,20 @@ coverage_debian: deps_debian test_coverage_debian_no_deps
 # ASAN
 
 build_asan_debian:
-	CC=clang-8 CXX=clang++-8 cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
-	CC=clang-8 CXX=clang++-8 cmake . -DENABLE_ASAN=ON ${CMAKE_EXTRA_PARAMS}
+	CC=clang-8 CXX=clang++-8 cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DENABLE_WERROR=ON -DENABLE_ASAN=ON ${CMAKE_EXTRA_PARAMS}
 	make -j
 
 test_asan_debian_no_deps: build_asan_debian
-	# temporary excluded engine/ and replication/ suites with some tests from other suites by issue #4360
-	cd test && ASAN=ON ASAN_OPTIONS=detect_leaks=0 ./test-run.py --force $(TEST_RUN_EXTRA_PARAMS) \
-		app/ app-tap/ box/ box-py/ box-tap/ engine_long/ long_run-py/ luajit-tap/ \
-		replication-py/ small/ sql/ sql-tap/ swim/ unit/ vinyl/ wal_off/ xlog/ xlog-py/
+	# Temporary excluded some tests by issue #4360:
+	#  - To exclude tests from ASAN checks the asan/asan.supp file
+	#    was set at the build time in cmake/profile.cmake file.
+	#  - To exclude tests from LSAN checks the asan/lsan.supp file
+	#    was set in environment options to be used at run time.
+	cd test && ASAN=ON \
+		LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
+		ASAN_OPTIONS=heap_profile=0:unmap_shadow_on_exit=1:detect_invalid_pointer_pairs=1:symbolize=1:detect_leaks=1:dump_instruction_bytes=1:print_suppressions=0 \
+		./test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_asan_debian: deps_debian deps_buster_clang_8 test_asan_debian_no_deps
 
