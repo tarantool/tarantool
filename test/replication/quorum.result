@@ -27,7 +27,7 @@ test_run:cmd('switch quorum2')
 ---
 - true
 ...
-test_run:cmd('restart server quorum2 with args="0.1 0.5"')
+test_run:cmd('restart server quorum2 with args="0.1"')
 box.info.status -- orphan
 ---
 - orphan
@@ -55,7 +55,7 @@ box.info.status -- running
 ---
 - running
 ...
-test_run:cmd('restart server quorum2 with args="0.1 0.5"')
+test_run:cmd('restart server quorum2 with args="0.1"')
 box.info.status -- orphan
 ---
 - orphan
@@ -86,7 +86,7 @@ box.info.status -- running
 ---
 - running
 ...
-test_run:cmd('restart server quorum2 with args="0.1 0.5"')
+test_run:cmd('restart server quorum2 with args="0.1"')
 box.info.status -- orphan
 ---
 - orphan
@@ -103,7 +103,7 @@ box.space.test:replace{100} -- error
 ---
 - error: Can't modify data because this instance is in read-only mode.
 ...
-test_run:cmd('start server quorum1 with args="0.1 0.5"')
+test_run:cmd('start server quorum1 with args="0.1"')
 ---
 - true
 ...
@@ -166,7 +166,7 @@ fiber = require('fiber')
 fiber.sleep(0.1)
 ---
 ...
-test_run:cmd('start server quorum1 with args="0.1  0.5"')
+test_run:cmd('start server quorum1 with args="0.1"')
 ---
 - true
 ...
@@ -204,7 +204,7 @@ test_run:cmd('switch quorum1')
 ---
 - true
 ...
-test_run:cmd('restart server quorum1 with cleanup=1, args="0.1 0.5"')
+test_run:cmd('restart server quorum1 with cleanup=1, args="0.1"')
 test_run:wait_cond(function() return box.space.test:count() == 100 end, 20)
 ---
 - true
@@ -419,10 +419,9 @@ test_run:cmd('create server replica_quorum with script="replication/replica_quor
 - true
 ...
 -- Arguments are: replication_connect_quorum, replication_timeout
--- replication_connect_timeout.
 -- If replication_connect_quorum was ignored here, the instance
 -- would exit with an error.
-test_run:cmd('start server replica_quorum with wait=True, wait_load=True, args="1 0.05 0.1"')
+test_run:cmd('start server replica_quorum with wait=True, wait_load=True, args="1 0.05"')
 ---
 - true
 ...

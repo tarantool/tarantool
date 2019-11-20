@@ -86,7 +86,7 @@ box.space.test_u:select()
 -- Rebootstrap one node and check that others follow.
 --
 _ = test_run:cmd("switch autobootstrap1")
-_ = test_run:cmd("restart server autobootstrap1 with cleanup=1, args ='0.1 0.5'")
+_ = test_run:cmd("restart server autobootstrap1 with cleanup=1, args ='0.1'")
 
 _ = box.space.test_u:replace({5, 6, 7, 8})
 box.space.test_u:select()

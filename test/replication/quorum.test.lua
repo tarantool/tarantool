@@ -18,7 +18,7 @@ test_run:cmd('stop server quorum1')
 
 test_run:cmd('switch quorum2')
 
-test_run:cmd('restart server quorum2 with args="0.1 0.5"')
+test_run:cmd('restart server quorum2 with args="0.1"')
 box.info.status -- orphan
 box.ctl.wait_rw(0.001) -- timeout
 box.info.ro -- true
@@ -27,7 +27,7 @@ box.space.test:replace{100} -- error
 box.cfg{replication={}}
 box.info.status -- running
 
-test_run:cmd('restart server quorum2 with args="0.1 0.5"')
+test_run:cmd('restart server quorum2 with args="0.1"')
 box.info.status -- orphan
 box.ctl.wait_rw(0.001) -- timeout
 box.info.ro -- true
@@ -37,12 +37,12 @@ box.ctl.wait_rw()
 box.info.ro -- false
 box.info.status -- running
 
-test_run:cmd('restart server quorum2 with args="0.1 0.5"')
+test_run:cmd('restart server quorum2 with args="0.1"')
 box.info.status -- orphan
 box.ctl.wait_rw(0.001) -- timeout
 box.info.ro -- true
 box.space.test:replace{100} -- error
-test_run:cmd('start server quorum1 with args="0.1 0.5"')
+test_run:cmd('start server quorum1 with args="0.1"')
 box.ctl.wait_rw()
 box.info.ro -- false
 box.info.status -- running
@@ -65,7 +65,7 @@ for i = 1, 100 do box.space.test:insert{i} end
 fiber = require('fiber')
 fiber.sleep(0.1)
 
-test_run:cmd('start server quorum1 with args="0.1  0.5"')
+test_run:cmd('start server quorum1 with args="0.1"')
 test_run:cmd('switch quorum1')
 test_run:wait_cond(function() return box.space.test:count() == 100 end, 20)
 
@@ -81,7 +81,7 @@ test_run:cmd('switch quorum2')
 box.snapshot()
 
 test_run:cmd('switch quorum1')
-test_run:cmd('restart server quorum1 with cleanup=1, args="0.1 0.5"')
+test_run:cmd('restart server quorum1 with cleanup=1, args="0.1"')
 
 test_run:wait_cond(function() return box.space.test:count() == 100 end, 20)
 
@@ -157,10 +157,9 @@ test_run:drop_cluster(SERVERS)
 box.schema.user.grant('guest', 'replication')
 test_run:cmd('create server replica_quorum with script="replication/replica_quorum.lua"')
 -- Arguments are: replication_connect_quorum, replication_timeout
--- replication_connect_timeout.
 -- If replication_connect_quorum was ignored here, the instance
 -- would exit with an error.
-test_run:cmd('start server replica_quorum with wait=True, wait_load=True, args="1 0.05 0.1"')
+test_run:cmd('start server replica_quorum with wait=True, wait_load=True, args="1 0.05"')
 test_run:cmd('switch replica_quorum')
 -- If replication_connect_quorum was ignored here, the instance
 -- would exit with an error.
