@@ -1,0 +1,20 @@
+# All exceptions are under control of the issue:
+# https://github.com/tarantool/tarantool/issues/4360
+#
+# File format:
+#fun:*
+#src:*
+
+# !test: app-tap/json.test.lua
+# source: third_party/lua-cjson/lua_cjson.c
+fun:json_decode
+
+# test: unit/base64.test.lua
+# source: third_party/base64.c
+fun:base64_decode_block
+# source: test/unit/base64.c
+fun:base64_test
+
+# !test: unit/msgpack.test
+# source: src/lib/msgpuck/test/msgpuck.c
+fun:test_mp_print
