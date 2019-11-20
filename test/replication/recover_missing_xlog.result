@@ -69,7 +69,7 @@ fio.unlink(list[#list])
 ---
 - true
 ...
-test_run:cmd('start server autobootstrap1 with args="0.1 0.5"')
+test_run:cmd('start server autobootstrap1 with args="0.1"')
 ---
 - true
 ...

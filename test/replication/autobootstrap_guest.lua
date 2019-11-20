@@ -6,7 +6,6 @@ local INSTANCE_ID = string.match(arg[0], "%d")
 local SOCKET_DIR = require('fio').cwd()
 
 local TIMEOUT = tonumber(arg[1])
-local CON_TIMEOUT = arg[2] and tonumber(arg[2]) or 30.0
 
 local function instance_uri(instance_id)
     --return 'localhost:'..(3310 + instance_id)
@@ -25,7 +24,6 @@ box.cfg({
         instance_uri(3);
     };
     replication_timeout = TIMEOUT;
-    replication_connect_timeout = CON_TIMEOUT;
 })
 
 box.once("bootstrap", function()

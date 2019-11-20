@@ -65,16 +65,16 @@ vclock2 = test_run:wait_cluster_vclock(SERVERS, vclock)
 -- and the state persists after restart.
 test_run:cmd("switch autobootstrap1")
 box.space.test:select()
-test_run:cmd('restart server autobootstrap1 with args="0.1 0.5"')
+test_run:cmd('restart server autobootstrap1 with args="0.1"')
 box.space.test:select()
 test_run:cmd("switch autobootstrap2")
 box.space.test:select()
-test_run:cmd('restart server autobootstrap2 with args="0.1 0.5"')
+test_run:cmd('restart server autobootstrap2 with args="0.1"')
 box.space.test:select()
 test_run:cmd("switch autobootstrap3")
 box.space.test:select()
 push_err
-test_run:cmd('restart server autobootstrap3 with args="0.1 0.5"')
+test_run:cmd('restart server autobootstrap3 with args="0.1"')
 box.space.test:select()
 
 -- Cleanup.

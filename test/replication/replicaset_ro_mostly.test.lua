@@ -12,7 +12,7 @@ function sort(t) table.sort(t, sort_cmp) return t end
 UUID = sort({uuid1, uuid2}, sort_cmp)
 
 create_cluster_cmd1 = 'create server %s with script="replication/%s.lua"'
-create_cluster_cmd2 = 'start server %s with args="%s %s", wait_load=False, wait=False'
+create_cluster_cmd2 = 'start server %s with args="%s", wait_load=False, wait=False'
 
 test_run:cmd("setopt delimiter ';'")
 function create_cluster_uuid(servers, uuids)
