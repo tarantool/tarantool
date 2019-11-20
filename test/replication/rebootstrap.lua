@@ -6,7 +6,6 @@ local INSTANCE_ID = string.match(arg[0], "%d")
 local SOCKET_DIR = require('fio').cwd()
 
 local TIMEOUT = tonumber(arg[1])
-local CON_TIMEOUT = arg[2] and tonumber(arg[2]) or 30.0
 
 local function instance_uri(instance_id)
     return SOCKET_DIR..'/rebootstrap'..instance_id..'.sock';
@@ -19,7 +18,6 @@ box.cfg({
     listen = instance_uri(INSTANCE_ID),
     instance_uuid = '12345678-abcd-1234-abcd-123456789ef' .. INSTANCE_ID,
     replication_timeout = TIMEOUT,
-    replication_connect_timeout = CON_TIMEOUT,
     replication = {
         instance_uri(1);
         instance_uri(2);

@@ -138,7 +138,7 @@ box.space.test:select()
   - [9, 90]
   - [10, 100]
 ...
-test_run:cmd('restart server autobootstrap1 with args="0.1 0.5"')
+test_run:cmd('restart server autobootstrap1 with args="0.1"')
 box.space.test:select()
 ---
 - - [1, 10]
@@ -169,7 +169,7 @@ box.space.test:select()
   - [9, 90]
   - [10, 100]
 ...
-test_run:cmd('restart server autobootstrap2 with args="0.1 0.5"')
+test_run:cmd('restart server autobootstrap2 with args="0.1"')
 box.space.test:select()
 ---
 - - [1, 10]
@@ -204,7 +204,7 @@ push_err
 ---
 - Session 'applier' does not support push()
 ...
-test_run:cmd('restart server autobootstrap3 with args="0.1 0.5"')
+test_run:cmd('restart server autobootstrap3 with args="0.1"')
 box.space.test:select()
 ---
 - - [1, 10]
