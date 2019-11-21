@@ -5,7 +5,6 @@ local buffer   = require('buffer')
 local socket   = require('socket')
 local fiber    = require('fiber')
 local msgpack  = require('msgpack')
-local errno    = require('errno')
 local urilib   = require('uri')
 local internal = require('net.box.lib')
 local trigger  = require('internal.trigger')
@@ -185,9 +184,9 @@ local function next_id(id) return band(id + 1, 0x7FFFFFFF) end
 local function establish_connection(host, port, timeout)
     local timeout = timeout or DEFAULT_CONNECT_TIMEOUT
     local begin = fiber.clock()
-    local s = socket.tcp_connect(host, port, timeout)
+    local s, err = socket.tcp_connect(host, port, timeout)
     if not s then
-        return nil, errno.strerror(errno())
+        return nil, err
     end
     local msg = s:read({chunk = IPROTO_GREETING_SIZE},
                         timeout - (fiber.clock() - begin))

@@ -775,6 +775,18 @@ lbox_getaddrinfo_result_wrapper(struct lua_State *L)
 	return 1;
 }
 
+/**
+ * Wrap coio_getaddrinfo() and call it. Push returned values onto
+ * @a L Lua stack.
+ *
+ * @param L Lua stack.
+ *
+ * @retval 1 Number of returned values by Lua function if
+ * coio_getaddrinfo() success.
+ * @retval 2 Number of returned values by Lua function if
+ * coio_getaddrinfo() is failed (first is nil, second is error
+ * message).
+ */
 static int
 lbox_socket_getaddrinfo(struct lua_State *L)
 {
@@ -817,7 +829,9 @@ lbox_socket_getaddrinfo(struct lua_State *L)
 
 	if (dns_res != 0) {
 		lua_pushnil(L);
-		return 1;
+		struct error *err = diag_get()->last;
+		lua_pushstring(L, err->errmsg);
+		return 2;
 	}
 
 	/* no results */

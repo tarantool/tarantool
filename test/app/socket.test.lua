@@ -300,8 +300,16 @@ sc:close()
 
 -- tcp_connect
 
--- test timeout
-socket.tcp_connect('127.0.0.1', 80, 0.00000000001)
+-- Test timeout. In this test, tcp_connect can return the second
+-- output value from internal.getaddrinfo (usually on Mac OS, but
+-- theoretically it can happen on Linux too). Sometimes
+-- getaddrinfo() is timed out, sometimes connect. On Linux however
+-- getaddrinfo is fast enough to never give timeout error in
+-- the case. So, there are two sources of timeout errors that are
+-- reported differently. This difference has appeared after
+-- gh-4138 patch.
+s, err = socket.tcp_connect('127.0.0.1', 80, 0.00000000001)
+s == nil
 
 -- AF_INET
 s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
