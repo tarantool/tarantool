@@ -4365,8 +4365,10 @@ on_replace_dd_sequence_data(struct trigger * /* trigger */, void *event)
 			    &id) != 0)
 		return -1;
 	struct sequence *seq = sequence_by_id(id);
-	if (seq == NULL)
+	if (seq == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_SEQUENCE, int2str(id));
 		return -1;
+	}
 	if (new_tuple != NULL) {			/* INSERT, UPDATE */
 		int64_t value;
 		if (tuple_field_i64(new_tuple, BOX_SEQUENCE_DATA_FIELD_VALUE,
@@ -4520,8 +4522,10 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 	if (space == NULL)
 		return -1;
 	struct sequence *seq = sequence_by_id(sequence_id);
-	if (seq == NULL)
+	if (seq == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_SEQUENCE, int2str(sequence_id));
 		return -1;
+	}
 
 	enum priv_type priv_type = stmt->new_tuple ? PRIV_C : PRIV_D;
 	if (stmt->new_tuple && stmt->old_tuple)
