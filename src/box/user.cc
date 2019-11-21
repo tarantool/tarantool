@@ -530,7 +530,7 @@ user_find_by_name(const char *name, uint32_t len)
 			return user;
 	}
 	diag_set(ClientError, ER_NO_SUCH_USER,
-		 tt_cstr(name, MIN(BOX_INVALID_NAME_MAX, len)));
+		 tt_cstr(name, MIN((uint32_t) BOX_INVALID_NAME_MAX, len)));
 	return NULL;
 }
 
