@@ -540,7 +540,7 @@ space_format_decode(const char *data, uint32_t *out_count,
 	struct field_def *region_defs =
 		(struct field_def *) region_alloc(region, size);
 	if (region_defs == NULL) {
-		diag_set(OutOfMemory, size, "region", "new slab");
+		diag_set(OutOfMemory, size, "region", "struct field_def");
 		return -1;
 	}
 	/*
@@ -810,7 +810,7 @@ txn_alter_trigger_new(trigger_f run, void *data)
 		region_aligned_alloc(&in_txn()->region, size,
 				     alignof(struct trigger));
 	if (trigger == NULL) {
-		diag_set(OutOfMemory, size, "region", "new slab");
+		diag_set(OutOfMemory, size, "region", "struct trigger");
 		return NULL;
 	}
 	trigger = (struct trigger *)memset(trigger, 0, size);
@@ -861,7 +861,7 @@ alter_space_new(struct space *old_space)
 		region_aligned_alloc(&in_txn()->region, size,
 				     alignof(struct alter_space));
 	if (alter == NULL) {
-		diag_set(OutOfMemory, size, "region", "new slab");
+		diag_set(OutOfMemory, size, "region", "struct alter_space");
 		return NULL;
 	}
 	alter = (struct alter_space *)memset(alter, 0, size);
@@ -4824,7 +4824,7 @@ decode_fk_links(struct tuple *tuple, uint32_t *out_count,
 	struct field_link *region_links =
 		(struct field_link *)region_alloc(&fiber()->gc, size);
 	if (region_links == NULL) {
-		diag_set(OutOfMemory, size, "region", "new slab");
+		diag_set(OutOfMemory, size, "region", "struct field_link");
 		return NULL;
 	}
 	memset(region_links, 0, size);

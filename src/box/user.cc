@@ -196,7 +196,7 @@ user_grant_priv(struct user *user, struct priv_def *def)
 		old = (struct priv_def *)
 			region_alloc(&user->pool, size);
 		if (old == NULL) {
-			diag_set(OutOfMemory, size, "region", "new slab");
+			diag_set(OutOfMemory, size, "region", "struct priv_def");
 			return -1;
 		}
 		*old = *def;
