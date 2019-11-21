@@ -1747,15 +1747,18 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 	sqlVdbeResolveLabel(v, addrBreak);
 }
 
-/*
+/**
  * Generate code that will tell the VDBE the names of columns
- * in the result set.  This information is used to provide the
- * azCol[] values in the callback.
+ * in the result set. This information is used to provide the
+ * metadata during/after statement execution.
+ *
+ * @param pParse Parsing context.
+ * @param pTabList List of tables.
+ * @param pEList Expressions defining the result set.
  */
 static void
-generateColumnNames(Parse * pParse,	/* Parser context */
-		    SrcList * pTabList,	/* List of tables */
-		    ExprList * pEList)	/* Expressions defining the result set */
+generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
+			 struct ExprList *pEList)
 {
 	Vdbe *v = pParse->pVdbe;
 	int i, j;
@@ -1789,13 +1792,9 @@ generateColumnNames(Parse * pParse,	/* Parser context */
 			continue;
 		if (p->op == TK_VARIABLE)
 			var_pos[var_count++] = i;
-		sqlVdbeSetColName(v, i, COLNAME_DECLTYPE,
-				  field_type_strs[sql_expr_type(p)], SQL_TRANSIENT);
-		if (pEList->a[i].zName) {
-			char *zName = pEList->a[i].zName;
-			sqlVdbeSetColName(v, i, COLNAME_NAME, zName,
-					      SQL_TRANSIENT);
-		} else if (p->op == TK_COLUMN || p->op == TK_AGG_COLUMN) {
+		vdbe_metadata_set_col_type(v, i,
+					   field_type_strs[sql_expr_type(p)]);
+		if (p->op == TK_COLUMN || p->op == TK_AGG_COLUMN) {
 			char *zCol;
 			int iCol = p->iColumn;
 			for (j = 0; ALWAYS(j < pTabList->nSrc); j++) {
@@ -1806,28 +1805,30 @@ generateColumnNames(Parse * pParse,	/* Parser context */
 			struct space_def *space_def = pTabList->a[j].space->def;
 			assert(iCol >= 0 && iCol < (int)space_def->field_count);
 			zCol = space_def->fields[iCol].name;
-			if (!shortNames && !fullNames) {
-				sqlVdbeSetColName(v, i, COLNAME_NAME,
-						      sqlDbStrDup(db,
-								      pEList->a[i].zSpan),
-						      SQL_DYNAMIC);
-			} else if (fullNames) {
-				char *zName = 0;
-				zName = sqlMPrintf(db, "%s.%s",
-						       space_def->name, zCol);
-				sqlVdbeSetColName(v, i, COLNAME_NAME, zName,
-						      SQL_DYNAMIC);
+			const char *name = NULL;
+			if (pEList->a[i].zName != NULL) {
+				name = pEList->a[i].zName;
 			} else {
-				sqlVdbeSetColName(v, i, COLNAME_NAME, zCol,
-						      SQL_TRANSIENT);
+				if (!shortNames && !fullNames) {
+					name = pEList->a[i].zSpan;
+				} else if (fullNames) {
+					name = tt_sprintf("%s.%s",
+							  space_def->name,
+							  zCol);
+				} else {
+					name = zCol;
+				}
 			}
+			vdbe_metadata_set_col_name(v, i, name);
 		} else {
-			const char *z = pEList->a[i].zSpan;
-			z = z == 0 ? sqlMPrintf(db, "column%d",
-						    i + 1) : sqlDbStrDup(db,
-									     z);
-			sqlVdbeSetColName(v, i, COLNAME_NAME, z,
-					      SQL_DYNAMIC);
+			const char *z = NULL;
+			if (pEList->a[i].zName != NULL)
+				z = pEList->a[i].zName;
+			else if (pEList->a[i].zSpan != NULL)
+				z = pEList->a[i].zSpan;
+			else
+				z = tt_sprintf("column%d", i + 1);
+			vdbe_metadata_set_col_name(v, i, z);
 		}
 	}
 	if (var_count == 0)
@@ -2828,9 +2829,9 @@ multiSelect(Parse * pParse,	/* Parsing context */
 						Select *pFirst = p;
 						while (pFirst->pPrior)
 							pFirst = pFirst->pPrior;
-						generateColumnNames(pParse,
-								    pFirst->pSrc,
-								    pFirst->pEList);
+						generate_column_metadata(pParse,
+									 pFirst->pSrc,
+									 pFirst->pEList);
 					}
 					iBreak = sqlVdbeMakeLabel(v);
 					iCont = sqlVdbeMakeLabel(v);
@@ -2927,9 +2928,9 @@ multiSelect(Parse * pParse,	/* Parsing context */
 					Select *pFirst = p;
 					while (pFirst->pPrior)
 						pFirst = pFirst->pPrior;
-					generateColumnNames(pParse,
-							    pFirst->pSrc,
-							    pFirst->pEList);
+					generate_column_metadata(pParse,
+								 pFirst->pSrc,
+								 pFirst->pEList);
 				}
 				iBreak = sqlVdbeMakeLabel(v);
 				iCont = sqlVdbeMakeLabel(v);
@@ -3575,7 +3576,7 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 		Select *pFirst = pPrior;
 		while (pFirst->pPrior)
 			pFirst = pFirst->pPrior;
-		generateColumnNames(pParse, pFirst->pSrc, pFirst->pEList);
+		generate_column_metadata(pParse, pFirst->pSrc, pFirst->pEList);
 	}
 
 	/* Reassembly the compound query so that it will be freed correctly
@@ -6433,7 +6434,7 @@ sqlSelect(Parse * pParse,		/* The parser context */
 	/* Identify column names if results of the SELECT are to be output.
 	 */
 	if (rc == 0 && pDest->eDest == SRT_Output) {
-		generateColumnNames(pParse, pTabList, pEList);
+		generate_column_metadata(pParse, pTabList, pEList);
 	}
 
 	sqlDbFree(db, sAggInfo.aCol);

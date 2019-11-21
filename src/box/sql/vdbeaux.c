@@ -1827,6 +1827,18 @@ Cleanup(Vdbe * p)
 	p->pResultSet = 0;
 }
 
+void
+vdbe_metadata_delete(struct Vdbe *v)
+{
+	if (v->metadata != NULL) {
+		for (int i = 0; i < v->nResColumn; ++i) {
+			free(v->metadata[i].name);
+			free(v->metadata[i].type);
+		}
+		free(v->metadata);
+	}
+}
+
 /*
  * Set the number of result columns that will be returned by this SQL
  * statement. This is now set at compile time, rather than during
@@ -1836,50 +1848,44 @@ Cleanup(Vdbe * p)
 void
 sqlVdbeSetNumCols(Vdbe * p, int nResColumn)
 {
-	int n;
-	sql *db = p->db;
-
-	releaseMemArray(p->aColName, p->nResColumn * COLNAME_N);
-	sqlDbFree(db, p->aColName);
-	n = nResColumn * COLNAME_N;
+	vdbe_metadata_delete(p);
 	p->nResColumn = (u16) nResColumn;
-	p->aColName = (Mem *) sqlDbMallocRawNN(db, sizeof(Mem) * n);
-	if (p->aColName == 0)
+	p->metadata = (struct sql_column_metadata *)
+		calloc(nResColumn, sizeof(struct sql_column_metadata));
+	if (p->metadata == NULL) {
+		diag_set(OutOfMemory,
+			 nResColumn * sizeof(struct sql_column_metadata),
+			 "calloc", "metadata");
 		return;
-	initMemArray(p->aColName, n, p->db, MEM_Null);
+	}
 }
 
-/*
- * Set the name of the idx'th column to be returned by the SQL statement.
- * zName must be a pointer to a nul terminated string.
- *
- * This call must be made after a call to sqlVdbeSetNumCols().
- *
- * The final parameter, xDel, must be one of SQL_DYNAMIC, SQL_STATIC
- * or SQL_TRANSIENT. If it is SQL_DYNAMIC, then the buffer pointed
- * to by zName will be freed by sqlDbFree() when the vdbe is destroyed.
- */
 int
-sqlVdbeSetColName(Vdbe * p,			/* Vdbe being configured */
-		      int idx,			/* Index of column zName applies to */
-		      int var,			/* One of the COLNAME_* constants */
-		      const char *zName,	/* Pointer to buffer containing name */
-		      void (*xDel) (void *))	/* Memory management strategy for zName */
+vdbe_metadata_set_col_name(struct Vdbe *p, int idx, const char *name)
 {
-	int rc;
-	Mem *pColName;
 	assert(idx < p->nResColumn);
-	assert(var < COLNAME_N);
-	if (p->db->mallocFailed) {
-		assert(!zName || xDel != SQL_DYNAMIC);
+	if (p->metadata[idx].name != NULL)
+		free(p->metadata[idx].name);
+	p->metadata[idx].name = strdup(name);
+	if (p->metadata[idx].name == NULL) {
+		diag_set(OutOfMemory, strlen(name) + 1, "strdup", "name");
 		return -1;
 	}
-	assert(p->aColName != 0);
-	assert(var == COLNAME_NAME || var == COLNAME_DECLTYPE);
-	pColName = &(p->aColName[idx + var * p->nResColumn]);
-	rc = sqlVdbeMemSetStr(pColName, zName, -1, 1, xDel);
-	assert(rc != 0 || !zName || (pColName->flags & MEM_Term) != 0);
-	return rc;
+	return 0;
+}
+
+int
+vdbe_metadata_set_col_type(struct Vdbe *p, int idx, const char *type)
+{
+	assert(idx < p->nResColumn);
+	if (p->metadata[idx].type != NULL)
+		free(p->metadata[idx].type);
+	p->metadata[idx].type = strdup(type);
+	if (p->metadata[idx].type == NULL) {
+		diag_set(OutOfMemory, strlen(type) + 1, "strdup", "type");
+		return -1;
+	}
+	return 0;
 }
 
 /*
@@ -2230,7 +2236,7 @@ sqlVdbeClearObject(sql * db, Vdbe * p)
 {
 	SubProgram *pSub, *pNext;
 	assert(p->db == 0 || p->db == db);
-	releaseMemArray(p->aColName, p->nResColumn * COLNAME_N);
+	vdbe_metadata_delete(p);
 	for (pSub = p->pProgram; pSub; pSub = pNext) {
 		pNext = pSub->pNext;
 		vdbeFreeOpArray(db, pSub->aOp, pSub->nOp);
@@ -2242,7 +2248,6 @@ sqlVdbeClearObject(sql * db, Vdbe * p)
 		sqlDbFree(db, p->pFree);
 	}
 	vdbeFreeOpArray(db, p->aOp, p->nOp);
-	sqlDbFree(db, p->aColName);
 	sqlDbFree(db, p->zSql);
 }
 

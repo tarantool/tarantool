@@ -120,10 +120,8 @@ vdbe_set_pragma_result_columns(struct Vdbe *v, const struct PragmaName *pragma)
 	assert(n > 0);
 	sqlVdbeSetNumCols(v, n);
 	for (int i = 0, j = pragma->iPragCName; i < n; ++i) {
-		sqlVdbeSetColName(v, i, COLNAME_NAME, pragCName[j++],
-				  SQL_STATIC);
-		sqlVdbeSetColName(v, i, COLNAME_DECLTYPE, pragCName[j++],
-				  SQL_STATIC);
+		vdbe_metadata_set_col_name(v, i, pragCName[j++]);
+		vdbe_metadata_set_col_type(v, i, pragCName[j++]);
 	}
 }
 
@@ -168,10 +166,10 @@ vdbe_emit_pragma_status(struct Parse *parse)
 	struct session *user_session = current_session();
 
 	sqlVdbeSetNumCols(v, 2);
-	sqlVdbeSetColName(v, 0, COLNAME_NAME, "pragma_name", SQL_STATIC);
-	sqlVdbeSetColName(v, 0, COLNAME_DECLTYPE, "text", SQL_STATIC);
-	sqlVdbeSetColName(v, 1, COLNAME_NAME, "pragma_value", SQL_STATIC);
-	sqlVdbeSetColName(v, 1, COLNAME_DECLTYPE, "integer", SQL_STATIC);
+	vdbe_metadata_set_col_name(v, 0, "pragma_name");
+	vdbe_metadata_set_col_type(v, 0, "text");
+	vdbe_metadata_set_col_name(v, 1, "pragma_value");
+	vdbe_metadata_set_col_type(v, 1, "integer");
 
 	parse->nMem = 2;
 	for (int i = 0; i < ArraySize(aPragmaName); ++i) {

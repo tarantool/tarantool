@@ -498,10 +498,8 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	    pParse->triggered_space == NULL) {
 		sqlVdbeAddOp2(v, OP_ResultRow, regRowCount, 1);
 		sqlVdbeSetNumCols(v, 1);
-		sqlVdbeSetColName(v, 0, COLNAME_NAME, "rows updated",
-				      SQL_STATIC);
-		sqlVdbeSetColName(v, 0, COLNAME_DECLTYPE, "integer",
-				  SQL_STATIC);
+		vdbe_metadata_set_col_name(v, 0, "rows updated");
+		vdbe_metadata_set_col_type(v, 0, "integer");
 	}
 
  update_cleanup:

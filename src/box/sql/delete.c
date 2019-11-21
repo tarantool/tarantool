@@ -418,10 +418,8 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	    parse->triggered_space != NULL) {
 		sqlVdbeAddOp2(v, OP_ResultRow, reg_count, 1);
 		sqlVdbeSetNumCols(v, 1);
-		sqlVdbeSetColName(v, 0, COLNAME_NAME, "rows deleted",
-				      SQL_STATIC);
-		sqlVdbeSetColName(v, 0, COLNAME_DECLTYPE, "integer",
-				  SQL_STATIC);
+		vdbe_metadata_set_col_name(v, 0, "rows deleted");
+		vdbe_metadata_set_col_type(v, 0, "integer");
 	}
 
  delete_from_cleanup:

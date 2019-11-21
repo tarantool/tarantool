@@ -346,6 +346,11 @@ struct ScanStatus {
 	char *zName;		/* Name of table or index */
 };
 
+struct sql_column_metadata {
+	char *name;
+	char *type;
+};
+
 /*
  * An instance of the virtual machine.  This structure contains the complete
  * state of the virtual machine.
@@ -394,7 +399,8 @@ struct Vdbe {
 	Op *aOp;		/* Space to hold the virtual machine's program */
 	Mem *aMem;		/* The memory locations */
 	Mem **apArg;		/* Arguments to currently executing user function */
-	Mem *aColName;		/* Column names to return */
+	/** SQL metadata for DML/DQL queries. */
+	struct sql_column_metadata *metadata;
 	Mem *pResultSet;	/* Pointer to an array of results */
 	VdbeCursor **apCsr;	/* One element of this array for each open cursor */
 	Mem *aVar;		/* Values for the OP_Variable opcode. */

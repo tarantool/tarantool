@@ -146,11 +146,10 @@ sqlPrepare(sql * db,	/* Database handle. */
 		sqlVdbeSetNumCols(sParse.pVdbe, name_count);
 		for (int i = 0; i < name_count; i++) {
 			int name_index = 2 * i + name_first;
-			sqlVdbeSetColName(sParse.pVdbe, i, COLNAME_NAME,
-					  azColName[name_index], SQL_STATIC);
-			sqlVdbeSetColName(sParse.pVdbe, i, COLNAME_DECLTYPE,
-					  azColName[name_index + 1],
-					  SQL_STATIC);
+			vdbe_metadata_set_col_name(sParse.pVdbe, i,
+						   azColName[name_index]);
+			vdbe_metadata_set_col_type(sParse.pVdbe, i,
+						   azColName[name_index + 1]);
 		}
 	}
 

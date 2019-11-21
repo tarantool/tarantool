@@ -103,7 +103,7 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 						    (char *)
 						    sql_column_name(pStmt,
 									i);
-						/* sqlVdbeSetColName() installs column names as UTF8
+						/* vdbe_metadata_set_col_name() installs column names as UTF8
 						 * strings so there is no way for sql_column_name() to fail.
 						 */
 						assert(azCols[i] != 0);

@@ -149,17 +149,6 @@ struct SubProgram {
 #define P5_ConstraintFK      4
 
 /*
- * The Vdbe.aColName array contains 5n Mem structures, where n is the
- * number of columns of data returned by the statement.
- */
-#define COLNAME_NAME     0
-#define COLNAME_DECLTYPE 1
-#define COLNAME_DATABASE 2
-#define COLNAME_TABLE    3
-#define COLNAME_COLUMN   4
-#define COLNAME_N        2	/* Store the name and decltype */
-
-/*
  * The following macro converts a relative address in the p2 field
  * of a VdbeOp structure into a negative number.
  */
@@ -238,6 +227,10 @@ sql_vdbe_set_p4_key_def(struct Parse *parse, struct key_def *key_def);
 VdbeOp *sqlVdbeGetOp(Vdbe *, int);
 int sqlVdbeMakeLabel(Vdbe *);
 void sqlVdbeRunOnlyOnce(Vdbe *);
+
+void
+vdbe_metadata_delete(struct Vdbe *v);
+
 void sqlVdbeDelete(Vdbe *);
 void sqlVdbeClearObject(sql *, Vdbe *);
 void sqlVdbeMakeReady(Vdbe *, Parse *);
@@ -248,7 +241,18 @@ void sqlVdbeResetStepResult(Vdbe *);
 void sqlVdbeRewind(Vdbe *);
 int sqlVdbeReset(Vdbe *);
 void sqlVdbeSetNumCols(Vdbe *, int);
-int sqlVdbeSetColName(Vdbe *, int, int, const char *, void (*)(void *));
+
+/**
+ * Set the name of the idx'th column to be returned by the SQL
+ * statement. @name must be a pointer to a nul terminated string.
+ * This call must be made after a call to sqlVdbeSetNumCols().
+ */
+int
+vdbe_metadata_set_col_name(struct Vdbe *v, int col_idx, const char *name);
+
+int
+vdbe_metadata_set_col_type(struct Vdbe *v, int col_idx, const char *type);
+
 void sqlVdbeCountChanges(Vdbe *);
 sql *sqlVdbeDb(Vdbe *);
 void sqlVdbeSetSql(Vdbe *, const char *z, int n, int);

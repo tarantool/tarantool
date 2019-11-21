@@ -726,76 +726,23 @@ sql_column_subtype(struct sql_stmt *stmt, int i)
 }
 
 /*
- * Convert the N-th element of pStmt->pColName[] into a string using
- * xFunc() then return that string.  If N is out of range, return 0.
- *
- * There are up to 5 names for each column.  useType determines which
- * name is returned.  Here are the names:
- *
- *    0      The column name as it should be displayed for output
- *    1      The datatype name for the column
- *    2      The name of the database that the column derives from
- *    3      The name of the table that the column derives from
- *    4      The name of the table column that the result column derives from
- *
- * If the result is not a simple column reference (if it is an expression
- * or a constant) then useTypes 2, 3, and 4 return NULL.
- */
-static const void *
-columnName(sql_stmt * pStmt,
-	   int N, const void *(*xFunc) (Mem *), int useType)
-{
-	const void *ret;
-	Vdbe *p;
-	int n;
-	sql *db;
-	ret = 0;
-	p = (Vdbe *) pStmt;
-	db = p->db;
-	assert(db != 0);
-	n = sql_column_count(pStmt);
-	if (N < n && N >= 0) {
-		N += useType * n;
-		assert(db->mallocFailed == 0);
-		ret = xFunc(&p->aColName[N]);
-		/* A malloc may have failed inside of the xFunc() call. If this
-		 * is the case, clear the mallocFailed flag and return NULL.
-		 */
-		if (db->mallocFailed) {
-			sqlOomClear(db);
-			ret = 0;
-		}
-	}
-	return ret;
-}
-
-/*
  * Return the name of the Nth column of the result set returned by SQL
  * statement pStmt.
  */
 const char *
-sql_column_name(sql_stmt * pStmt, int N)
+sql_column_name(sql_stmt *stmt, int n)
 {
-	return columnName(pStmt, N, (const void *(*)(Mem *))sql_value_text,
-			  COLNAME_NAME);
+	struct Vdbe *p = (struct Vdbe *) stmt;
+	assert(n < sql_column_count(stmt) && n >= 0);
+	return p->metadata[n].name;
 }
 
 const char *
-sql_column_datatype(sql_stmt *pStmt, int N)
+sql_column_datatype(sql_stmt *stmt, int n)
 {
-	return columnName(pStmt, N, (const void *(*)(Mem *))sql_value_text,
-			  COLNAME_DECLTYPE);
-}
-
-/*
- * Return the column declaration type (if applicable) of the 'i'th column
- * of the result set of SQL statement pStmt.
- */
-const char *
-sql_column_decltype(sql_stmt * pStmt, int N)
-{
-	return columnName(pStmt, N, (const void *(*)(Mem *))sql_value_text,
-			  COLNAME_DECLTYPE);
+	struct Vdbe *p = (struct Vdbe *) stmt;
+	assert(n < sql_column_count(stmt) && n >= 0);
+	return p->metadata[n].type;
 }
 
 /******************************* sql_bind_  **************************
@@ -853,17 +800,15 @@ sql_bind_type(struct Vdbe *v, uint32_t position, const char *type)
 	if (v->res_var_count < position)
 		return 0;
 	int rc = 0;
-	if (sqlVdbeSetColName(v, v->var_pos[position - 1], COLNAME_DECLTYPE,
-			      type, SQL_TRANSIENT) != 0)
+	if (vdbe_metadata_set_col_type(v, v->var_pos[position - 1], type) != 0)
 		rc = -1;
-	const char *bind_name = v->aColName[position - 1].z;
+	const char *bind_name = v->metadata[position - 1].name;
 	if (strcmp(bind_name, "?") == 0)
 		return rc;
 	for (uint32_t i = position; i < v->res_var_count; ++i) {
-		if (strcmp(bind_name,  v->aColName[i].z) == 0) {
-			if (sqlVdbeSetColName(v, v->var_pos[i],
-					      COLNAME_DECLTYPE, type,
-					      SQL_TRANSIENT) != 0)
+		if (strcmp(bind_name, v->metadata[i].name) == 0) {
+			if (vdbe_metadata_set_col_type(v, v->var_pos[i],
+						       type) != 0)
 				return -1;
 		}
 	}
