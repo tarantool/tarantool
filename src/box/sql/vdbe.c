@@ -1418,34 +1418,7 @@ case OP_ResultRow: {
 	assert(p->nResColumn==pOp->p2);
 	assert(pOp->p1>0);
 	assert(pOp->p1+pOp->p2<=(p->nMem+1 - p->nCursor)+1);
-
-	/* If this statement has violated immediate foreign key constraints, do
-	 * not return the number of rows modified. And do not RELEASE the statement
-	 * transaction. It needs to be rolled back.
-	 */
-	if (sqlVdbeCheckFk(p, 0) != 0) {
-		assert((p->sql_flags & SQL_CountRows) != 0);
-		goto abort_due_to_error;
-	}
-
-	/* If the SQL_CountRows flag is set in sql.flags mask, then
-	 * DML statements invoke this opcode to return the number of rows
-	 * modified to the user. This is the only way that a VM that
-	 * opens a statement transaction may invoke this opcode.
-	 *
-	 * In case this is such a statement, close any statement transaction
-	 * opened by this VM before returning control to the user. This is to
-	 * ensure that statement-transactions are always nested, not overlapping.
-	 * If the open statement-transaction is not closed here, then the user
-	 * may step another VM that opens its own statement transaction. This
-	 * may lead to overlapping statement transactions.
-	 *
-	 * The statement transaction is never a top-level transaction.  Hence
-	 * the RELEASE call below can never fail.
-	 */
-	assert(p->iStatement == 0 || (p->sql_flags & SQL_CountRows) != 0);
-	rc = sqlVdbeCloseStatement(p, SAVEPOINT_RELEASE);
-	assert(rc==0);
+	assert(p->iStatement == 0 && p->anonymous_savepoint == NULL);
 
 	/* Invalidate all ephemeral cursor row caches */
 	p->cacheCtr = (p->cacheCtr + 2)|1;

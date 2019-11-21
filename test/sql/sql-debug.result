@@ -38,7 +38,6 @@ box.execute('PRAGMA')
   - name: pragma_value
     type: integer
   rows:
-  - ['count_changes', 0]
   - ['defer_foreign_keys', 0]
   - ['full_column_names', 0]
   - ['full_metadata', 0]

@@ -251,7 +251,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 
 	/* Register allocations */
 	int regFromSelect = 0;	/* Base register for data coming from SELECT */
-	int regRowCount = 0;	/* Memory cell used for the row counter */
 	int regIns;		/* Block of regs holding data being inserted */
 	int regTupleid;		/* registers holding insert tupleid */
 	int regData;		/* register holding first column to insert */
@@ -334,7 +333,7 @@ sqlInsert(Parse * pParse,	/* Parser context */
 	    xferOptimization(pParse, space, pSelect, on_error)) {
 		assert(trigger == NULL);
 		assert(pList == 0);
-		goto insert_end;
+		goto insert_cleanup;
 	}
 
 	/*
@@ -512,12 +511,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		goto insert_cleanup;
 	}
 
-	/* Initialize the count of rows to be inserted
-	 */
-	if ((pParse->sql_flags & SQL_CountRows) != 0) {
-		regRowCount = ++pParse->nMem;
-		sqlVdbeAddOp2(v, OP_Integer, 0, regRowCount);
-	}
 	/* This is the top of the main insertion loop */
 	if (useTempTable) {
 		/* This block codes the top of loop only.  The complete loop is the
@@ -745,12 +738,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 					       on_error, autoinc_reg);
 	}
 
-	/* Update the count of rows that are inserted
-	 */
-	if ((pParse->sql_flags & SQL_CountRows) != 0) {
-		sqlVdbeAddOp2(v, OP_AddImm, regRowCount, 1);
-	}
-
 	if (trigger != NULL) {
 		/* Code AFTER triggers */
 		vdbe_code_row_trigger(pParse, trigger, TK_INSERT, 0,
@@ -771,22 +758,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 	} else if (pSelect) {
 		sqlVdbeGoto(v, addrCont);
 		sqlVdbeJumpHere(v, addrInsTop);
-	}
-
- insert_end:
-
-	/* Return the number of rows inserted. */
-	if ((pParse->sql_flags & SQL_CountRows) != 0 &&
-	    pParse->triggered_space == NULL) {
-		sqlVdbeAddOp2(v, OP_ResultRow, regRowCount, 1);
-		sqlVdbeSetNumCols(v, 1);
-		const char *column_name;
-		if (on_error == ON_CONFLICT_ACTION_REPLACE)
-			column_name = "rows replaced";
-		else
-			column_name = "rows inserted";
-		vdbe_metadata_set_col_name(v, 0, column_name);
-		vdbe_metadata_set_col_type(v, 0, "integer");
 	}
 
  insert_cleanup:
@@ -1181,9 +1152,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	 */
 	if (!rlist_empty(&dest->child_fk_constraint))
 		return 0;
-	if ((pParse->sql_flags & SQL_CountRows) != 0) {
-		return 0;	/* xfer opt does not play well with PRAGMA count_changes */
-	}
 
 	/* If we get this far, it means that the xfer optimization is at
 	 * least a possibility, though it might only work if the destination

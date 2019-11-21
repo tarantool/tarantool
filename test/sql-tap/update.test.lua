@@ -21,6 +21,11 @@ test:plan(111)
 -- ["source",[["testdir"],"\/tester.tcl"]]
 -- Try to update an non-existent table
 --
+
+local function update_row_count(sql)
+    return box.execute(sql).row_count
+end
+
 test:do_catchsql_test("update-1.1", [[
   UPDATE test1 SET f2=5 WHERE f1<1
 ]], {
@@ -124,13 +129,12 @@ test:do_execsql_test("update-3.6", [[
 })
 
 test:do_test("update-3.7", function()
-  test:execsql "PRAGMA count_changes=on"
-  return test:execsql "UPDATE test1 SET f2=f2/3 WHERE f1<=5"
-end, {
+    return update_row_count("UPDATE test1 SET f2 = f2 / 3 WHERE f1 <= 5")
+  end,
   -- <update-3.7>
   5
   -- </update-3.7>
-})
+)
 
 test:do_execsql_test("update-3.8", [[
   SELECT f1,f2 FROM test1 ORDER BY f1
@@ -140,13 +144,13 @@ test:do_execsql_test("update-3.8", [[
   -- </update-3.8>
 })
 
-test:do_execsql_test("update-3.9", [[
-  UPDATE test1 SET f2=f2/3 WHERE f1>5
-]], {
+test:do_test("update-3.9", function()
+    return update_row_count("UPDATE test1 SET f2 = f2 / 3 WHERE f1 > 5")
+  end,
   -- <update-3.9>
   5
   -- </update-3.9>
-})
+)
 
 test:do_execsql_test("update-3.10", [[
   SELECT f1,f2 FROM test1 ORDER BY f1
@@ -158,13 +162,13 @@ test:do_execsql_test("update-3.10", [[
 
 -- Swap the values of f1 and f2 for all elements
 --
-test:do_execsql_test("update-3.11", [[
-  UPDATE test1 SET F2=f1, F1=f2
-]], {
+test:do_test("update-3.11", function()
+    return update_row_count("UPDATE test1 SET F2 = f1, F1 = f2")
+  end,
   -- <update-3.11>
   10
   -- </update-3.11>
-})
+)
 
 test:do_execsql_test("update-3.12", [[
   SELECT f1,f2 FROM test1 ORDER BY F1
@@ -175,7 +179,6 @@ test:do_execsql_test("update-3.12", [[
 })
 
 test:do_test("update-3.13", function()
-  test:execsql "PRAGMA count_changes=off"
   return test:execsql "UPDATE test1 SET F2=f1, F1=f2"
 end, {
   -- <update-3.13>
@@ -254,17 +257,15 @@ end, {
   -- </update-4.5>
 })
 
-test:do_execsql_test("update-4.6", [[
-  PRAGMA count_changes=on;
-  UPDATE test1 SET f1=f1-1 WHERE f1<=100 and f2==128;
-]], {
+test:do_test("update-4.6", function()
+    return update_row_count("UPDATE test1 SET f1 = f1 - 1 WHERE f1 <= 100 and f2 == 128;")
+  end,
   -- <update-4.6>
   2
   -- </update-4.6>
-})
+)
 
 test:do_execsql_test("update-4.7", [[
-  PRAGMA count_changes=off;
   SELECT f1,f2 FROM test1 ORDER BY f1,f2
 ]], {
   -- <update-4.7>
@@ -391,17 +392,15 @@ test:do_execsql_test("update-5.5.5", [[
   -- </update-5.5.5>
 })
 
-test:do_execsql_test("update-5.6", [[
-  PRAGMA count_changes=on;
-  UPDATE test1 SET f1=f1-1 WHERE f1<=100 and f2==128;
-]], {
+test:do_test("update-5.6", function()
+    return update_row_count("UPDATE test1 SET f1 = f1 - 1 WHERE f1 <= 100 and f2 == 128;")
+  end,
   -- <update-5.6>
   2
   -- </update-5.6>
-})
+)
 
 test:do_execsql_test("update-5.6.1", [[
-  PRAGMA count_changes=off;
   SELECT f1,f2 FROM test1 ORDER BY f1,f2
 ]], {
   -- <update-5.6.1>

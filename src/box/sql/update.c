@@ -76,7 +76,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	int aiCurOnePass[2];	/* The write cursors opened by WHERE_ONEPASS */
 
 	/* Register Allocations */
-	int regRowCount = 0;	/* A count of rows changed */
 	int regOldPk = 0;
 	int regNewPk = 0;
 	int regNew = 0;		/* Content of the NEW.* table in triggers */
@@ -268,14 +267,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	 */
 	sqlWhereEnd(pWInfo);
 
-
-	/* Initialize the count of updated rows
-	 */
-	if ((pParse->sql_flags & SQL_CountRows) != 0 &&
-	    pParse->triggered_space == NULL) {
-		regRowCount = ++pParse->nMem;
-		sqlVdbeAddOp2(v, OP_Integer, 0, regRowCount);
-	}
 	labelBreak = sqlVdbeMakeLabel(v);
 	/* Top of the update loop */
 	if (okOnePass) {
@@ -470,13 +461,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 			fk_constraint_emit_actions(pParse, space, regOldPk, aXRef);
 	}
 
-	/* Increment the row counter
-	 */
-	if ((pParse->sql_flags & SQL_CountRows) != 0 &&
-	     pParse->triggered_space == NULL) {
-		sqlVdbeAddOp2(v, OP_AddImm, regRowCount, 1);
-	}
-
 	vdbe_code_row_trigger(pParse, trigger, TK_UPDATE, pChanges,
 			      TRIGGER_AFTER, space, regOldPk, on_error,
 			      labelContinue);
@@ -492,15 +476,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		VdbeCoverage(v);
 	}
 	sqlVdbeResolveLabel(v, labelBreak);
-
-	/* Return the number of rows that were changed. */
-	if ((pParse->sql_flags & SQL_CountRows) != 0 &&
-	    pParse->triggered_space == NULL) {
-		sqlVdbeAddOp2(v, OP_ResultRow, regRowCount, 1);
-		sqlVdbeSetNumCols(v, 1);
-		vdbe_metadata_set_col_name(v, 0, "rows updated");
-		vdbe_metadata_set_col_type(v, 0, "integer");
-	}
 
  update_cleanup:
 	sqlSrcListDelete(db, pTabList);
