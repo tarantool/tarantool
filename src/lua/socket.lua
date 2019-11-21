@@ -968,7 +968,7 @@ local function getaddrinfo(host, port, timeout, opts)
             local itype = get_ivalue(internal.SO_TYPE, opts.type)
             if itype == nil then
                 boxerrno(boxerrno.EINVAL)
-                return nil
+                return nil, boxerrno.strerror()
             end
             ga_opts.type = itype
         end
@@ -977,7 +977,7 @@ local function getaddrinfo(host, port, timeout, opts)
             local ifamily = get_ivalue(internal.DOMAIN, opts.family)
             if ifamily == nil then
                 boxerrno(boxerrno.EINVAL)
-                return nil
+                return nil, boxerrno.strerror()
             end
             ga_opts.family = ifamily
         end
@@ -985,7 +985,7 @@ local function getaddrinfo(host, port, timeout, opts)
         if opts.protocol ~= nil then
             local p = getprotobyname(opts.protocol)
             if p == nil then
-                return nil
+                return nil, boxerrno.strerror()
             end
             ga_opts.protocol = p
         end
@@ -995,7 +995,7 @@ local function getaddrinfo(host, port, timeout, opts)
                 get_iflags(internal.AI_FLAGS, opts.flags)
             if ga_opts.flags == nil then
                 boxerrno(boxerrno.EINVAL)
-                return nil
+                return nil, boxerrno.strerror()
             end
         end
 
@@ -1033,30 +1033,33 @@ local function tcp_connect(host, port, timeout)
         local s = socket_new('AF_UNIX', 'SOCK_STREAM', 0)
         if not s then
             -- Address family is not supported by the host
-            return nil
+            return nil, boxerrno.strerror()
         end
         if not socket_tcp_connect(s, host, port, timeout) then
             local save_errno = s._errno
             s:close()
             boxerrno(save_errno)
-            return nil
+            return nil, boxerrno.strerror()
         end
         boxerrno(0)
         return s
     end
     local timeout = timeout or TIMEOUT_INFINITY
     local stop = fiber.clock() + timeout
-    local dns = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
+    local dns, err = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
         protocol = 'tcp' })
-    if dns == nil or #dns == 0 then
+    if dns == nil then
+        return nil, err
+    end
+    if #dns == 0 then
         boxerrno(boxerrno.EINVAL)
-        return nil
+        return nil, boxerrno.strerror()
     end
     for _, remote in pairs(dns) do
         timeout = stop - fiber.clock()
         if timeout <= 0 then
             boxerrno(boxerrno.ETIMEDOUT)
-            return nil
+            return nil, boxerrno.strerror()
         end
         local s = socket_new(remote.family, remote.type, remote.protocol)
         if s then
@@ -1070,7 +1073,7 @@ local function tcp_connect(host, port, timeout)
         end
     end
     -- errno is set by socket_tcp_connect()
-    return nil
+    return nil, boxerrno.strerror()
 end
 
 local function tcp_server_handler(server, sc, from)
@@ -1168,15 +1171,15 @@ end
 
 local function tcp_server_bind(host, port, prepare, timeout)
     timeout = timeout and tonumber(timeout) or TIMEOUT_INFINITY
-    local dns
+    local dns, err
     if host == 'unix/' then
         dns = {{host = host, port = port, family = 'AF_UNIX', protocol = 0,
             type = 'SOCK_STREAM' }}
     else
-        dns = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
+        dns, err = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
             flags = 'AI_PASSIVE'})
         if dns == nil then
-            return nil
+            return nil, err
         end
     end
 
@@ -1193,14 +1196,14 @@ local function tcp_server_bind(host, port, prepare, timeout)
                 local save_errno = boxerrno()
                 socket_close(s)
                 boxerrno(save_errno)
-                return nil
+                return nil, boxerrno.strerror()
             end
             return s, addr
        end
     end
     -- DNS resolved successfully, but addresss family is not supported
     boxerrno(boxerrno.EAFNOSUPPORT)
-    return nil
+    return nil, boxerrno.strerror()
 end
 
 local function tcp_server(host, port, opts, timeout)
@@ -1221,7 +1224,8 @@ local function tcp_server(host, port, opts, timeout)
     server.name = server.name or 'server'
     local s, addr = tcp_server_bind(host, port, server.prepare, timeout)
     if not s then
-        return nil
+        -- addr is error message now.
+        return nil, addr
     end
     fiber.create(tcp_server_loop, server, s, addr)
     return s, addr
@@ -1368,8 +1372,12 @@ local function lsocket_tcp_connect(self, host, port)
     -- This function is broken by design
     local ga_opts = { family = 'AF_INET', type = 'SOCK_STREAM' }
     local timeout = deadline - fiber.clock()
-    local dns = getaddrinfo(host, port, timeout, ga_opts)
-    if dns == nil or #dns == 0 then
+    local dns, err = getaddrinfo(host, port, timeout, ga_opts)
+    if dns == nil then
+        self._errno = boxerrno.EINVAL
+        return nil, err
+    end
+    if #dns == 0 then
         self._errno = boxerrno.EINVAL
         return nil, socket_error(self)
     end
@@ -1555,9 +1563,9 @@ local function lsocket_connect(host, port)
     if host == nil or port == nil then
         error("Usage: luasocket.connect(host, port)")
     end
-    local s = tcp_connect(host, port)
+    local s, err = tcp_connect(host, port)
     if not s then
-        return nil, boxerrno.strerror()
+        return nil, err
     end
     setmetatable(s, lsocket_tcp_client_mt)
     return s
@@ -1568,9 +1576,9 @@ local function lsocket_bind(host, port, backlog)
         error("Usage: luasocket.bind(host, port [, backlog])")
     end
     local function prepare(s) return backlog end -- luacheck: no unused args
-    local s = tcp_server_bind(host, port, prepare)
+    local s, err = tcp_server_bind(host, port, prepare)
     if not s then
-        return nil, boxerrno.strerror()
+        return nil, err
     end
     return setmetatable(s, lsocket_tcp_server_mt)
 end
