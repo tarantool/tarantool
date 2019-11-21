@@ -3621,9 +3621,8 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 int
 priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 {
-	if (tuple_field_u32(tuple, BOX_PRIV_FIELD_ID, &(priv->grantor_id)) != 0)
-		return -1;
-	if (tuple_field_u32(tuple, BOX_PRIV_FIELD_UID, &(priv->grantee_id)) != 0)
+	if (tuple_field_u32(tuple, BOX_PRIV_FIELD_ID, &(priv->grantor_id)) != 0 ||
+	    tuple_field_u32(tuple, BOX_PRIV_FIELD_UID, &(priv->grantee_id)) != 0)
 		return -1;
 
 	const char *object_type =
@@ -3882,9 +3881,8 @@ modify_priv(struct trigger *trigger, void *event)
 	(void) event;
 	struct tuple *tuple = (struct tuple *)trigger->data;
 	struct priv_def priv;
-	if (priv_def_create_from_tuple(&priv, tuple) != 0)
-		return -1;
-	if (grant_or_revoke(&priv) != 0)
+	if (priv_def_create_from_tuple(&priv, tuple) != 0 ||
+	    grant_or_revoke(&priv) != 0)
 		return -1;
 	return 0;
 }
@@ -3903,11 +3901,9 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 	struct priv_def priv;
 
 	if (new_tuple != NULL && old_tuple == NULL) {	/* grant */
-		if (priv_def_create_from_tuple(&priv, new_tuple) != 0)
-			return -1;
-		if (priv_def_check(&priv, PRIV_GRANT) != 0)
-			return -1;
-		if (grant_or_revoke(&priv) != 0)
+		if (priv_def_create_from_tuple(&priv, new_tuple) != 0 ||
+		    priv_def_check(&priv, PRIV_GRANT) != 0 ||
+		    grant_or_revoke(&priv) != 0)
 			return -1;
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(revoke_priv, new_tuple);
@@ -3916,9 +3912,8 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 		txn_stmt_on_rollback(stmt, on_rollback);
 	} else if (new_tuple == NULL) {                /* revoke */
 		assert(old_tuple);
-		if (priv_def_create_from_tuple(&priv, old_tuple) != 0)
-			return -1;
-		if (priv_def_check(&priv, PRIV_REVOKE) != 0)
+		if (priv_def_create_from_tuple(&priv, old_tuple) != 0 ||
+		    priv_def_check(&priv, PRIV_REVOKE) != 0)
 			return -1;
 		priv.access = 0;
 		if (grant_or_revoke(&priv) != 0)
@@ -3929,11 +3924,9 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 			return -1;
 		txn_stmt_on_rollback(stmt, on_rollback);
 	} else {                                       /* modify */
-		if (priv_def_create_from_tuple(&priv, new_tuple) != 0)
-			return -1;
-		if (priv_def_check(&priv, PRIV_GRANT) != 0)
-			return -1;
-		if (grant_or_revoke(&priv) != 0)
+		if (priv_def_create_from_tuple(&priv, new_tuple) != 0 ||
+		    priv_def_check(&priv, PRIV_GRANT) != 0 ||
+		    grant_or_revoke(&priv) != 0)
 			return -1;
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(modify_priv, old_tuple);
@@ -5264,8 +5257,10 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 			return -1;
 		auto fk_def_guard = make_scoped_guard([=] { free(fk_def); });
 		struct space *child_space = space_cache_find(fk_def->child_id);
+		if (child_space == NULL)
+			return -1;
 		struct space *parent_space = space_cache_find(fk_def->parent_id);
-		if (child_space == NULL or parent_space == NULL)
+		if (parent_space == NULL)
 			return -1;
 		struct fk_constraint *old_fk=
 			fk_constraint_remove(&child_space->child_fk_constraint,
