@@ -59,8 +59,7 @@ static sql *db = NULL;
 
 static const char nil_key[] = { 0x90 }; /* Empty MsgPack array. */
 
-static const uint32_t default_sql_flags = SQL_ShortColNames
-					  | SQL_EnableTrigger
+static const uint32_t default_sql_flags = SQL_EnableTrigger
 					  | SQL_AutoIndex
 					  | SQL_RecTriggers;
 

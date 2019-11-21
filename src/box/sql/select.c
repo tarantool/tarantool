@@ -1763,7 +1763,6 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 	Vdbe *v = pParse->pVdbe;
 	int i, j;
 	sql *db = pParse->db;
-	int fullNames, shortNames;
 	/* If this is an EXPLAIN, skip this step */
 	if (pParse->explain) {
 		return;
@@ -1781,8 +1780,6 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 	}
 	assert(pTabList != 0);
 	pParse->colNamesSet = 1;
-	fullNames = (pParse->sql_flags & SQL_FullColNames) != 0;
-	shortNames = (pParse->sql_flags & SQL_ShortColNames) != 0;
 	bool is_full_meta = (pParse->sql_flags & SQL_FullMetadata) != 0;
 	sqlVdbeSetNumCols(v, pEList->nExpr);
 	uint32_t var_count = 0;
@@ -1830,9 +1827,8 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 			zCol = space_def->fields[iCol].name;
 			const char *name = colname;
 			if (name == NULL) {
-				if (!shortNames && !fullNames) {
-					name = span;
-				} else if (fullNames) {
+				int flags = pParse->sql_flags;
+				if ((flags & SQL_FullColNames) != 0) {
 					name = tt_sprintf("%s.%s",
 							  space_def->name,
 							  zCol);
@@ -2057,8 +2053,7 @@ sqlResultSetOfSelect(Parse * pParse, Select * pSelect)
 	sql *db = pParse->db;
 
 	uint32_t saved_flags = pParse->sql_flags;
-	pParse->sql_flags |= ~SQL_FullColNames;
-	pParse->sql_flags &= SQL_ShortColNames;
+	pParse->sql_flags = 0;
 	sqlSelectPrep(pParse, pSelect, 0);
 	if (pParse->is_aborted)
 		return NULL;
@@ -4962,8 +4957,7 @@ selectExpander(Walker * pWalker, Select * p)
 		struct ExprList_item *a = pEList->a;
 		ExprList *pNew = 0;
 		uint32_t flags = pParse->sql_flags;
-		int longNames = (flags & SQL_FullColNames) != 0
-		    && (flags & SQL_ShortColNames) == 0;
+		int longNames = (flags & SQL_FullColNames) != 0;
 
 		for (k = 0; k < pEList->nExpr; k++) {
 			pE = a[k].pExpr;

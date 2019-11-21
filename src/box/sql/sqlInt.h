@@ -1190,7 +1190,6 @@ struct sql {
 /* Debug print info about SQL query as it parsed */
 #define PARSER_TRACE_FLAG  0x00000002
 #define SQL_FullColNames   0x00000004	/* Show full column names on SELECT */
-#define SQL_ShortColNames  0x00000040	/* Show short columns names */
 #define SQL_SqlTrace       0x00000200	/* Debug print SQL as it executes */
 #define SQL_SelectTrace    0x00000800       /* Debug info about select statement */
 #define SQL_WhereTrace     0x00008000       /* Debug info about optimizer's work */

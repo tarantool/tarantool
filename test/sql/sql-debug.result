@@ -45,7 +45,6 @@ box.execute('PRAGMA')
   - ['recursive_triggers', 1]
   - ['reverse_unordered_selects', 0]
   - ['select_trace', 0]
-  - ['short_column_names', 1]
   - ['sql_trace', 0]
   - ['vdbe_addoptrace', 0]
   - ['vdbe_debug', 0]
