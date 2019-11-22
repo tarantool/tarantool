@@ -77,6 +77,7 @@
 #include "box/session.h"
 #include "systemd.h"
 #include "crypto/crypto.h"
+#include "core/popen.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -642,6 +643,8 @@ tarantool_free(void)
 
 	title_free(main_argc, main_argv);
 
+	popen_free();
+
 	/* unlink pidfile. */
 	if (pid_file_handle != NULL && pidfile_remove(pid_file_handle) == -1)
 		say_syserror("failed to remove pid file '%s'", pid_file);
@@ -816,6 +819,7 @@ main(int argc, char **argv)
 	exception_init();
 
 	fiber_init(fiber_cxx_invoke);
+	popen_init();
 	coio_init();
 	coio_enable();
 	signal_init();
