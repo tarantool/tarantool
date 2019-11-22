@@ -217,6 +217,7 @@ macro(luajit_build)
         add_definitions(-DLUAJIT_USE_ASAN=1)
         set (luajit_ldflags ${luajit_ldflags} -fsanitize=address)
     endif()
+    add_definitions(-DLUAJIT_ENABLE_PAIRSMM=1)
     add_definitions(-DLUAJIT_SMART_STRINGS=1)
     # Add all COMPILE_DEFINITIONS to xcflags
     get_property(defs DIRECTORY PROPERTY COMPILE_DEFINITIONS)
