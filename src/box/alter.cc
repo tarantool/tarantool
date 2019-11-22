@@ -159,7 +159,7 @@ index_def_check_sequence(struct index_def *index_def, uint32_t sequence_fieldno,
 
 /**
  * Support function for index_def_new_from_tuple(..)
- * Checks tuple (of _index space) and sets a nice diag if it is invalid
+ * Checks tuple (of _index space) and returns an error if it is invalid
  * Checks only types of fields and their count!
  */
 static int
