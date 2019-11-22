@@ -79,7 +79,7 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	if (fiber()->storage.lua.stack == NULL) {
 		L = luaT_newthread(tarantool_L);
 		if (L == NULL)
-			diag_raise();
+			return -1;
 		coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	} else {
 		L = fiber()->storage.lua.stack;

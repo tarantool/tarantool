@@ -5468,7 +5468,8 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 			if (old_def->language == ck_def->language &&
 			    strcmp(old_def->expr_str, ck_def->expr_str) == 0) {
 				old_def->is_enabled = ck_def->is_enabled;
-				trigger_run_xc(&on_alter_space, space);
+				if (trigger_run(&on_alter_space, space) != 0)
+					return -1;
 				return 0;
 			}
 		}
