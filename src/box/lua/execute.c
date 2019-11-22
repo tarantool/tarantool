@@ -20,9 +20,11 @@ lua_sql_get_metadata(struct sql_stmt *stmt, struct lua_State *L,
 	assert(column_count > 0);
 	lua_createtable(L, column_count, 0);
 	for (int i = 0; i < column_count; ++i) {
-		lua_createtable(L, 0, 2);
+		const char *coll = sql_column_coll(stmt, i);
 		const char *name = sql_column_name(stmt, i);
 		const char *type = sql_column_datatype(stmt, i);
+		size_t table_sz = 2 + (coll != NULL);
+		lua_createtable(L, 0, table_sz);
 		/*
 		 * Can not fail, since all column names are
 		 * preallocated during prepare phase and the
@@ -34,6 +36,10 @@ lua_sql_get_metadata(struct sql_stmt *stmt, struct lua_State *L,
 		lua_setfield(L, -2, "name");
 		lua_pushstring(L, type);
 		lua_setfield(L, -2, "type");
+		if (coll != NULL) {
+			lua_pushstring(L, coll);
+			lua_setfield(L, -2, "collation");
+		}
 		lua_rawseti(L, -2, i + 1);
 	}
 }

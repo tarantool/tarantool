@@ -638,6 +638,23 @@ netbox_decode_select(struct lua_State *L)
 	return 2;
 }
 
+/** Decode optional (i.e. may be present in response) metadata fields. */
+static void
+decode_metadata_optional(struct lua_State *L, const char **data,
+			 uint32_t map_size)
+{
+	/* 2 is default metadata map size (field name + field size). */
+	while (map_size-- > 2) {
+		uint32_t key = mp_decode_uint(data);
+		uint32_t len;
+		if (key == IPROTO_FIELD_COLL) {
+			const char *coll = mp_decode_str(data, &len);
+			lua_pushlstring(L, coll, len);
+			lua_setfield(L, -2, "collation");
+		}
+	}
+}
+
 /**
  * Decode IPROTO_METADATA into array of maps.
  * @param L Lua stack to push result on.
@@ -650,12 +667,11 @@ netbox_decode_metadata(struct lua_State *L, const char **data)
 	lua_createtable(L, count, 0);
 	for (uint32_t i = 0; i < count; ++i) {
 		uint32_t map_size = mp_decode_map(data);
-		assert(map_size == 2);
-		(void) map_size;
+		assert(map_size == 2 || map_size == 3);
 		uint32_t key = mp_decode_uint(data);
 		assert(key == IPROTO_FIELD_NAME);
 		(void) key;
-		lua_createtable(L, 0, 1);
+		lua_createtable(L, 0, map_size);
 		uint32_t len;
 		const char *str = mp_decode_str(data, &len);
 		lua_pushlstring(L, str, len);
@@ -665,6 +681,7 @@ netbox_decode_metadata(struct lua_State *L, const char **data)
 		const char *type = mp_decode_str(data, &len);
 		lua_pushlstring(L, type, len);
 		lua_setfield(L, -2, "type");
+		decode_metadata_optional(L, data, map_size);
 		lua_rawseti(L, -2, i + 1);
 	}
 }

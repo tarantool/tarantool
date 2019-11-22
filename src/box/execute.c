@@ -268,6 +268,40 @@ error:
 	return -1;
 }
 
+static inline size_t
+metadata_map_sizeof(const char *name, const char *type, const char *coll)
+{
+	uint32_t members_count = 2;
+	size_t map_size = 0;
+	if (coll != NULL) {
+		members_count++;
+		map_size += mp_sizeof_uint(IPROTO_FIELD_COLL);
+		map_size += mp_sizeof_str(strlen(coll));
+	}
+	map_size += mp_sizeof_uint(IPROTO_FIELD_NAME);
+	map_size += mp_sizeof_uint(IPROTO_FIELD_TYPE);
+	map_size += mp_sizeof_str(strlen(name));
+	map_size += mp_sizeof_str(strlen(type));
+	map_size += mp_sizeof_map(members_count);
+	return map_size;
+}
+
+static inline void
+metadata_map_encode(char *buf, const char *name, const char *type,
+		    const char *coll)
+{
+	uint32_t map_sz = 2 + (coll != NULL);
+	buf = mp_encode_map(buf, map_sz);
+	buf = mp_encode_uint(buf, IPROTO_FIELD_NAME);
+	buf = mp_encode_str(buf, name, strlen(name));
+	buf = mp_encode_uint(buf, IPROTO_FIELD_TYPE);
+	buf = mp_encode_str(buf, type, strlen(type));
+	if (coll != NULL) {
+		buf = mp_encode_uint(buf, IPROTO_FIELD_COLL);
+		buf = mp_encode_str(buf, coll, strlen(coll));
+	}
+}
+
 /**
  * Serialize a description of the prepared statement.
  * @param stmt Prepared statement.
@@ -291,9 +325,7 @@ sql_get_metadata(struct sql_stmt *stmt, struct obuf *out, int column_count)
 	pos = mp_encode_uint(pos, IPROTO_METADATA);
 	pos = mp_encode_array(pos, column_count);
 	for (int i = 0; i < column_count; ++i) {
-		size_t size = mp_sizeof_map(2) +
-			      mp_sizeof_uint(IPROTO_FIELD_NAME) +
-			      mp_sizeof_uint(IPROTO_FIELD_TYPE);
+		const char *coll = sql_column_coll(stmt, i);
 		const char *name = sql_column_name(stmt, i);
 		const char *type = sql_column_datatype(stmt, i);
 		/*
@@ -303,18 +335,13 @@ sql_get_metadata(struct sql_stmt *stmt, struct obuf *out, int column_count)
 		 */
 		assert(name != NULL);
 		assert(type != NULL);
-		size += mp_sizeof_str(strlen(name));
-		size += mp_sizeof_str(strlen(type));
+		size = metadata_map_sizeof(name, type, coll);
 		char *pos = (char *) obuf_alloc(out, size);
 		if (pos == NULL) {
 			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
 			return -1;
 		}
-		pos = mp_encode_map(pos, 2);
-		pos = mp_encode_uint(pos, IPROTO_FIELD_NAME);
-		pos = mp_encode_str(pos, name, strlen(name));
-		pos = mp_encode_uint(pos, IPROTO_FIELD_TYPE);
-		pos = mp_encode_str(pos, type, strlen(type));
+		metadata_map_encode(pos, name, type, coll);
 	}
 	return 0;
 }

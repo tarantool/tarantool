@@ -131,6 +131,7 @@ enum iproto_key {
 enum iproto_metadata_key {
 	IPROTO_FIELD_NAME = 0,
 	IPROTO_FIELD_TYPE = 1,
+	IPROTO_FIELD_COLL = 2,
 };
 
 enum iproto_ballot_key {

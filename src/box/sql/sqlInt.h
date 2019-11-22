@@ -576,6 +576,9 @@ sql_column_name(sql_stmt *, int N);
 const char *
 sql_column_datatype(sql_stmt *, int N);
 
+const char *
+sql_column_coll(sql_stmt *stmt, int n);
+
 int
 sql_initialize(void);
 
@@ -1181,6 +1184,10 @@ struct sql {
 #define SQL_EnableTrigger  0x01000000	/* True to enable triggers */
 #define SQL_DeferFKs       0x02000000	/* Defer all FK constraints */
 #define SQL_VdbeEQP        0x08000000	/* Debug EXPLAIN QUERY PLAN */
+#define SQL_FullMetadata   0x04000000	/* Display optional properties
+					 * (nullability, autoincrement, alias)
+					 * in metadata.
+					 */
 
 /* Bits of the sql.dbOptFlags field. */
 #define SQL_QueryFlattener 0x0001	/* Query flattening */

@@ -1834,6 +1834,7 @@ vdbe_metadata_delete(struct Vdbe *v)
 		for (int i = 0; i < v->nResColumn; ++i) {
 			free(v->metadata[i].name);
 			free(v->metadata[i].type);
+			free(v->metadata[i].collation);
 		}
 		free(v->metadata);
 	}
@@ -1883,6 +1884,21 @@ vdbe_metadata_set_col_type(struct Vdbe *p, int idx, const char *type)
 	p->metadata[idx].type = strdup(type);
 	if (p->metadata[idx].type == NULL) {
 		diag_set(OutOfMemory, strlen(type) + 1, "strdup", "type");
+		return -1;
+	}
+	return 0;
+}
+
+int
+vdbe_metadata_set_col_collation(struct Vdbe *p, int idx, const char *coll,
+				size_t coll_len)
+{
+	assert(idx < p->nResColumn);
+	if (p->metadata[idx].collation != NULL)
+		free(p->metadata[idx].collation);
+	p->metadata[idx].collation = strndup(coll, coll_len);
+	if (p->metadata[idx].collation == NULL) {
+		diag_set(OutOfMemory, coll_len + 1, "strndup", "collation");
 		return -1;
 	}
 	return 0;

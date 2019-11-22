@@ -253,6 +253,10 @@ vdbe_metadata_set_col_name(struct Vdbe *v, int col_idx, const char *name);
 int
 vdbe_metadata_set_col_type(struct Vdbe *v, int col_idx, const char *type);
 
+int
+vdbe_metadata_set_col_collation(struct Vdbe *p, int idx, const char *coll,
+				size_t coll_len);
+
 void sqlVdbeCountChanges(Vdbe *);
 sql *sqlVdbeDb(Vdbe *);
 void sqlVdbeSetSql(Vdbe *, const char *z, int n, int);

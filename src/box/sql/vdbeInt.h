@@ -349,6 +349,7 @@ struct ScanStatus {
 struct sql_column_metadata {
 	char *name;
 	char *type;
+	char *collation;
 };
 
 /*

@@ -1783,6 +1783,7 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 	pParse->colNamesSet = 1;
 	fullNames = (pParse->sql_flags & SQL_FullColNames) != 0;
 	shortNames = (pParse->sql_flags & SQL_ShortColNames) != 0;
+	bool is_full_meta = (pParse->sql_flags & SQL_FullMetadata) != 0;
 	sqlVdbeSetNumCols(v, pEList->nExpr);
 	uint32_t var_count = 0;
 	for (i = 0; i < pEList->nExpr; i++) {
@@ -1794,6 +1795,24 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 			var_pos[var_count++] = i;
 		vdbe_metadata_set_col_type(v, i,
 					   field_type_strs[sql_expr_type(p)]);
+		if (is_full_meta && sql_expr_type(p) == FIELD_TYPE_STRING) {
+			bool unused;
+			uint32_t id = 0;
+			struct coll *coll = NULL;
+			/*
+			 * If sql_expr_coll fails then it fails somewhere
+			 * above the call stack.
+			 */
+			int rc =  sql_expr_coll(pParse, p, &unused, &id, &coll);
+			assert(rc == 0);
+			(void) rc;
+			if (id != COLL_NONE) {
+				struct coll_id *coll_id = coll_by_id(id);
+				vdbe_metadata_set_col_collation(v, i,
+								coll_id->name,
+								coll_id->name_len);
+			}
+		}
 		if (p->op == TK_COLUMN || p->op == TK_AGG_COLUMN) {
 			char *zCol;
 			int iCol = p->iColumn;

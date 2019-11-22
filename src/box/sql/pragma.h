@@ -144,6 +144,9 @@ static const char *const pragCName[] = {
 	/* Used by: where_trace */
 	/*  90 */ "where_trace",
 	/*  91 */ "integer",
+	/* Used by: full_metadata */
+	/*  92 */ "full_metadata",
+	/*  93 */ "integer",
 };
 
 /* Definitions of all built-in pragmas */
@@ -186,6 +189,11 @@ static const PragmaName aPragmaName[] = {
 	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
 	 /* ColNames:  */ 64, 1,
 	 /* iArg:      */ SQL_FullColNames},
+	{ /* zName:     */ "full_metadata",
+	  /* ePragTyp:  */ PragTyp_FLAG,
+	  /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
+	  /* ColNames:  */ 92, 1,
+	  /* iArg:      */ SQL_FullMetadata},
 	{ /* zName:     */ "index_info",
 	 /* ePragTyp:  */ PragTyp_INDEX_INFO,
 	 /* ePragFlg:  */

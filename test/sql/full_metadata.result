@@ -1,0 +1,106 @@
+-- test-run result file version 2
+netbox = require('net.box')
+ | ---
+ | ...
+test_run = require('test_run').new()
+ | ---
+ | ...
+
+box.execute("CREATE TABLE t (id INT PRIMARY KEY AUTOINCREMENT, a INT NOT NULL, c TEXT COLLATE \"unicode_ci\");")
+ | ---
+ | - row_count: 1
+ | ...
+box.execute("INSERT INTO t VALUES (1, 1, 'aSd');")
+ | ---
+ | - row_count: 1
+ | ...
+
+remote = test_run:get_cfg('remote') == 'true'
+ | ---
+ | ...
+execute = nil
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ';'")
+ | ---
+ | - true
+ | ...
+if remote then
+    box.schema.user.grant('guest','read, write, execute', 'universe')
+    box.schema.user.grant('guest', 'create', 'space')
+    cn = netbox.connect(box.cfg.listen)
+    execute = function(...) return cn:execute(...) end
+else
+    execute = function(...)
+        local res, err = box.execute(...)
+        if err ~= nil then
+            error(err)
+        end
+        return res
+    end
+end;
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
+ | ...
+
+execute("PRAGMA full_metadata = true;")
+ | ---
+ | - row_count: 0
+ | ...
+-- Make sure collation is presented in extended metadata.
+--
+execute("SELECT 'aSd' COLLATE \"unicode_ci\";")
+ | ---
+ | - metadata:
+ |   - type: string
+ |     name: '''aSd'' COLLATE "unicode_ci"'
+ |     collation: unicode_ci
+ |   rows:
+ |   - ['aSd']
+ | ...
+execute("SELECT c FROM t;")
+ | ---
+ | - metadata:
+ |   - type: string
+ |     name: C
+ |     collation: unicode_ci
+ |   rows:
+ |   - ['aSd']
+ | ...
+execute("SELECT c COLLATE \"unicode\" FROM t;")
+ | ---
+ | - metadata:
+ |   - type: string
+ |     name: c COLLATE "unicode"
+ |     collation: unicode
+ |   rows:
+ |   - ['aSd']
+ | ...
+
+execute("PRAGMA full_metadata = false;")
+ | ---
+ | - row_count: 0
+ | ...
+
+test_run:cmd("setopt delimiter ';'")
+ | ---
+ | - true
+ | ...
+if remote then
+    cn:close()
+    box.schema.user.revoke('guest', 'read, write, execute', 'universe')
+    box.schema.user.revoke('guest', 'create', 'space')
+end;
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
+ | ...
+
+box.space.T:drop()
+ | ---
+ | ...
