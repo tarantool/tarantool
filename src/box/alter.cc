@@ -816,7 +816,6 @@ txn_alter_trigger_new(trigger_f run, void *data)
 	trigger = (struct trigger *)memset(trigger, 0, size);
 	trigger->run = run;
 	trigger->data = data;
-	trigger->destroy = NULL;
 	return trigger;
 }
 
