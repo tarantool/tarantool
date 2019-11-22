@@ -802,7 +802,8 @@ replicaset_follow(void)
 		if (replica->applier != NULL)
 			applier_resume(replica->applier);
 	}
-	rlist_foreach_entry(replica, &replicaset.anon, in_anon) {
+	struct replica *tmp;
+	rlist_foreach_entry_safe(replica, &replicaset.anon, in_anon, tmp) {
 		/* Restart appliers that failed to connect. */
 		applier_start(replica->applier);
 	}
