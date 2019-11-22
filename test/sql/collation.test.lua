@@ -80,6 +80,11 @@ box.execute("SELECT * FROM t WHERE b = c;")
 box.execute("SELECT * FROM t WHERE b COLLATE \"binary\" = c;")
 box.execute("SELECT * FROM t WHERE a = c;")
 box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = c COLLATE \"unicode\";")
+-- Make sure that using function featuring variable arguemnts
+-- length  and resulting collation which depends on arguments
+-- is processed correctly.
+--
+box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = substr();")
 
 -- Compound queries perform implicit comparisons between values.
 -- Hence, rules for collations compatibilities are the same.

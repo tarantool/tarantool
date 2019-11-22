@@ -332,7 +332,8 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 				sql_func_by_signature(p->u.zToken, arg_count);
 			if (func == NULL)
 				break;
-			if (sql_func_flag_is_set(func, SQL_FUNC_DERIVEDCOLL)) {
+			if (sql_func_flag_is_set(func, SQL_FUNC_DERIVEDCOLL) &&
+			    arg_count > 0) {
 				/*
 				 * Now we use quite straightforward
 				 * approach assuming that resulting
