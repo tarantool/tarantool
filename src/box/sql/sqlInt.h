@@ -2789,7 +2789,22 @@ void sqlExprListSetSpan(Parse *, ExprList *, ExprSpan *);
 u32 sqlExprListFlags(const ExprList *);
 int sqlInit(sql *);
 
-void sqlPragma(Parse *, Token *, Token *, Token *, int);
+/*
+ * Process a pragma statement.
+ *
+ * Pragmas are of this form:
+ * PRAGMA <pragma_name>;
+ * PRAGMA <pragma_name>(<table_name>);
+ * PRAGMA <pragma_name>(<table_name>.<index_name>);
+ *
+ * @param pParse Parse context.
+ * @param pragma Name of the pragma.
+ * @param table Name of the table.
+ * @param index Name of the index.
+ */
+void
+sqlPragma(struct Parse *pParse, struct Token *pragma, struct Token *table,
+	  struct Token *index);
 
 /**
  * Return true if given column is part of primary key.

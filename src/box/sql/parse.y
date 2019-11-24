@@ -1544,40 +1544,14 @@ cmd ::= DROP INDEX ifexists(E) nm(X) ON fullname(Y).   {
 ///////////////////////////// The PRAGMA command /////////////////////////////
 //
 cmd ::= PRAGMA nm(X).                        {
-    sqlPragma(pParse,&X,0,0,0);
+    sqlPragma(pParse,&X,0,0);
 }
-cmd ::= PRAGMA nm(X) EQ nmnum(Y).  {
-    sqlPragma(pParse,&X,&Y,0,0);
-}
-cmd ::= PRAGMA nm(X) LP nmnum(Y) RP.         {
-    sqlPragma(pParse,&X,&Y,0,0);
-}
-cmd ::= PRAGMA nm(X) EQ minus_num(Y).        {
-    sqlPragma(pParse,&X,&Y,0,1);
-}
-cmd ::= PRAGMA nm(X) LP minus_num(Y) RP.     {
-    sqlPragma(pParse,&X,&Y,0,1);
+cmd ::= PRAGMA nm(X) LP nm(Y) RP.         {
+    sqlPragma(pParse,&X,&Y,0);
 }
 cmd ::= PRAGMA nm(X) LP nm(Z) DOT nm(Y) RP.  {
-    sqlPragma(pParse,&X,&Y,&Z,0);
+    sqlPragma(pParse,&X,&Y,&Z);
 }
-cmd ::= PRAGMA .                            {
-    sqlPragma(pParse, 0,0,0,0);
-}
-
-nmnum(A) ::= plus_num(A).
-nmnum(A) ::= STRING(A).
-nmnum(A) ::= TRUE(A).
-nmnum(A) ::= FALSE(A).
-nmnum(A) ::= nm(A).
-nmnum(A) ::= ON(A).
-nmnum(A) ::= DELETE(A).
-nmnum(A) ::= DEFAULT(A).
-
-%token_class number INTEGER|FLOAT.
-plus_num(A) ::= PLUS number(X).       {A = X;}
-plus_num(A) ::= number(A).
-minus_num(A) ::= MINUS number(X).     {A = X;}
 //////////////////////////// The CREATE TRIGGER command /////////////////////
 
 cmd ::= createkw trigger_decl(A) BEGIN trigger_cmd_list(S) END(Z). {
