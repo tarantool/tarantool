@@ -143,6 +143,7 @@ backtrace()
 	char *p = backtrace_buf;
 	char *end = p + sizeof(backtrace_buf) - 1;
 	int unw_status;
+	*p = '\0';
 	while ((unw_status = unw_step(&unw_cur)) > 0) {
 		const char *proc;
 		old_sp = sp;
@@ -173,7 +174,6 @@ backtrace()
 		say_debug("unwinding error: %i", unw_status);
 #endif
 out:
-	*p = '\0';
 	return backtrace_buf;
 }
 
