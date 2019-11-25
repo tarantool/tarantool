@@ -22,6 +22,7 @@ test_run:cmd('restart server quorum2 with args="0.1 0.5"')
 box.info.status -- orphan
 box.ctl.wait_rw(0.001) -- timeout
 box.info.ro -- true
+test_run:wait_cond(function() return box.space.test ~= nil end, 20)
 box.space.test:replace{100} -- error
 box.cfg{replication={}}
 box.info.status -- running
@@ -47,9 +48,9 @@ box.info.ro -- false
 box.info.status -- running
 
 -- Check that the replica follows all masters.
-box.info.id == 1 or box.info.replication[1].upstream.status == 'follow'
-box.info.id == 2 or box.info.replication[2].upstream.status == 'follow'
-box.info.id == 3 or box.info.replication[3].upstream.status == 'follow'
+box.info.id == 1 or test_run:wait_cond(function() return box.info.replication[1].upstream.status == 'follow' end, 20)
+box.info.id == 2 or test_run:wait_cond(function() return box.info.replication[2].upstream.status == 'follow' end, 20)
+box.info.id == 3 or test_run:wait_cond(function() return box.info.replication[3].upstream.status == 'follow' end, 20)
 
 -- Check that box.cfg() doesn't return until the instance
 -- catches up with all configured replicas.
@@ -59,13 +60,14 @@ test_run:cmd('switch quorum2')
 box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.001)
 test_run:cmd('stop server quorum1')
 
+test_run:wait_cond(function() return box.space.test.index.primary ~= nil end, 20)
 for i = 1, 100 do box.space.test:insert{i} end
 fiber = require('fiber')
 fiber.sleep(0.1)
 
 test_run:cmd('start server quorum1 with args="0.1  0.5"')
 test_run:cmd('switch quorum1')
-box.space.test:count() -- 100
+test_run:wait_cond(function() return box.space.test:count() == 100 end, 20)
 
 -- Rebootstrap one node of the cluster and check that others follow.
 -- Note, due to ERRINJ_RELAY_TIMEOUT there is a substantial delay
@@ -81,17 +83,16 @@ box.snapshot()
 test_run:cmd('switch quorum1')
 test_run:cmd('restart server quorum1 with cleanup=1, args="0.1 0.5"')
 
-box.space.test:count() -- 100
+test_run:wait_cond(function() return box.space.test:count() == 100 end, 20)
 
 -- The rebootstrapped replica will be assigned id = 4,
 -- because ids 1..3 are busy.
 test_run:cmd('switch quorum2')
-fiber = require('fiber')
-while box.info.replication[4].upstream.status ~= 'follow' do fiber.sleep(0.001) end
+test_run:wait_cond(function() return box.info.replication[4].upstream.status == 'follow' end, 20)
 box.info.replication[4].upstream.status
 test_run:cmd('switch quorum3')
-fiber = require('fiber')
-while box.info.replication[4].upstream.status ~= 'follow' do fiber.sleep(0.001) end
+test_run:wait_cond(function() return box.info.replication ~= nil end, 20)
+test_run:wait_cond(function() return box.info.replication[4].upstream.status == 'follow' end, 20)
 box.info.replication[4].upstream.status
 
 -- Cleanup.
