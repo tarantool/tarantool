@@ -516,6 +516,16 @@ replicaset_update(struct applier **appliers, int count)
 	 */
 
 	/* Prune old appliers */
+	while (!rlist_empty(&replicaset.anon)) {
+		replica = rlist_first_entry(&replicaset.anon,
+					    typeof(*replica), in_anon);
+		applier = replica->applier;
+		replica_clear_applier(replica);
+		rlist_del_entry(replica, in_anon);
+		replica_delete(replica);
+		applier_stop(applier);
+		applier_delete(applier);
+	}
 	replicaset_foreach(replica) {
 		if (replica->applier == NULL)
 			continue;
@@ -525,14 +535,6 @@ replicaset_update(struct applier **appliers, int count)
 		applier_stop(applier);
 		applier_delete(applier);
 	}
-	rlist_foreach_entry_safe(replica, &replicaset.anon, in_anon, next) {
-		applier = replica->applier;
-		replica_clear_applier(replica);
-		replica_delete(replica);
-		applier_stop(applier);
-		applier_delete(applier);
-	}
-	rlist_create(&replicaset.anon);
 
 	/* Save new appliers */
 	replicaset.applier.total = count;
