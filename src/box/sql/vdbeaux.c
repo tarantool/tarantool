@@ -1914,6 +1914,13 @@ vdbe_metadata_set_col_nullability(struct Vdbe *p, int idx, int nullable)
 	p->metadata[idx].nullable = nullable;
 }
 
+void
+vdbe_metadata_set_col_autoincrement(struct Vdbe *p, int idx)
+{
+	assert(idx < p->nResColumn);
+	p->metadata[idx].is_actoincrement = true;
+}
+
 /*
  * This routine checks that the sql.nVdbeActive count variable
  * matches the number of vdbe's in the list sql.pVdbe that are

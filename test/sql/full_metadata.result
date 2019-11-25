@@ -81,12 +81,13 @@ execute("SELECT c COLLATE \"unicode\" FROM t;")
  |   - ['aSd']
  | ...
 
--- Make sure that nullability is presented.
+-- Make sure that nullability/autoincrement are presented.
 --
 execute("SELECT id, a, c FROM t;")
  | ---
  | - metadata:
  |   - type: integer
+ |     is_autoincrement: true
  |     name: ID
  |     is_nullable: false
  |   - type: integer
@@ -103,6 +104,7 @@ execute("SELECT * FROM t;")
  | ---
  | - metadata:
  |   - type: integer
+ |     is_autoincrement: true
  |     name: ID
  |     is_nullable: false
  |   - type: integer

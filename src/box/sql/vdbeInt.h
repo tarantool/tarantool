@@ -355,6 +355,8 @@ struct sql_column_metadata {
 	 * columns: all other expressions are nullable by default.
 	 */
 	int8_t nullable;
+	/** True if column features autoincrement property. */
+	bool is_actoincrement;
 };
 
 /*

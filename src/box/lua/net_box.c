@@ -651,11 +651,15 @@ decode_metadata_optional(struct lua_State *L, const char **data,
 			const char *coll = mp_decode_str(data, &len);
 			lua_pushlstring(L, coll, len);
 			lua_setfield(L, -2, "collation");
-		} else {
-			assert(key == IPROTO_FIELD_IS_NULLABLE);
+		} else if (key == IPROTO_FIELD_IS_NULLABLE) {
 			bool is_nullable = mp_decode_bool(data);
 			lua_pushboolean(L, is_nullable);
 			lua_setfield(L, -2, "is_nullable");
+		} else {
+			assert(key == IPROTO_FIELD_IS_AUTOINCREMENT);
+			bool is_autoincrement = mp_decode_bool(data);
+			lua_pushboolean(L, is_autoincrement);
+			lua_setfield(L, -2, "is_autoincrement");
 		}
 	}
 }
@@ -672,7 +676,7 @@ netbox_decode_metadata(struct lua_State *L, const char **data)
 	lua_createtable(L, count, 0);
 	for (uint32_t i = 0; i < count; ++i) {
 		uint32_t map_size = mp_decode_map(data);
-		assert(map_size >= 2 && map_size <= 4);
+		assert(map_size >= 2 && map_size <= 5);
 		uint32_t key = mp_decode_uint(data);
 		assert(key == IPROTO_FIELD_NAME);
 		(void) key;

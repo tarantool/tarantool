@@ -761,6 +761,14 @@ sql_column_nullable(sql_stmt *stmt, int n)
 	return p->metadata[n].nullable;
 }
 
+bool
+sql_column_is_autoincrement(sql_stmt *stmt, int n)
+{
+	struct Vdbe *p = (struct Vdbe *) stmt;
+	assert(n < sql_column_count(stmt) && n >= 0);
+	return p->metadata[n].is_actoincrement;
+}
+
 /******************************* sql_bind_  **************************
  *
  * Routines used to attach values to wildcards in a compiled SQL statement.

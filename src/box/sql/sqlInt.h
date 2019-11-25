@@ -582,6 +582,9 @@ sql_column_coll(sql_stmt *stmt, int n);
 int
 sql_column_nullable(sql_stmt *stmt, int n);
 
+bool
+sql_column_is_autoincrement(sql_stmt *stmt, int n);
+
 int
 sql_initialize(void);
 

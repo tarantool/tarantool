@@ -270,7 +270,7 @@ error:
 
 static inline size_t
 metadata_map_sizeof(const char *name, const char *type, const char *coll,
-		    int nullable)
+		    int nullable, bool is_autoincrement)
 {
 	uint32_t members_count = 2;
 	size_t map_size = 0;
@@ -284,6 +284,11 @@ metadata_map_sizeof(const char *name, const char *type, const char *coll,
 		map_size += mp_sizeof_uint(IPROTO_FIELD_IS_NULLABLE);
 		map_size += mp_sizeof_bool(nullable);
 	}
+	if (is_autoincrement) {
+		members_count++;
+		map_size += mp_sizeof_uint(IPROTO_FIELD_IS_AUTOINCREMENT);
+		map_size += mp_sizeof_bool(true);
+	}
 	map_size += mp_sizeof_uint(IPROTO_FIELD_NAME);
 	map_size += mp_sizeof_uint(IPROTO_FIELD_TYPE);
 	map_size += mp_sizeof_str(strlen(name));
@@ -294,9 +299,10 @@ metadata_map_sizeof(const char *name, const char *type, const char *coll,
 
 static inline void
 metadata_map_encode(char *buf, const char *name, const char *type,
-		    const char *coll, int nullable)
+		    const char *coll, int nullable, bool is_autoincrement)
 {
-	uint32_t map_sz = 2 + (coll != NULL) + (nullable != -1);
+	uint32_t map_sz = 2 + (coll != NULL) + (nullable != -1) +
+			  is_autoincrement;
 	buf = mp_encode_map(buf, map_sz);
 	buf = mp_encode_uint(buf, IPROTO_FIELD_NAME);
 	buf = mp_encode_str(buf, name, strlen(name));
@@ -309,6 +315,10 @@ metadata_map_encode(char *buf, const char *name, const char *type,
 	if (nullable != -1) {
 		buf = mp_encode_uint(buf, IPROTO_FIELD_IS_NULLABLE);
 		buf = mp_encode_bool(buf, nullable);
+	}
+	if (is_autoincrement) {
+		buf = mp_encode_uint(buf, IPROTO_FIELD_IS_AUTOINCREMENT);
+		buf = mp_encode_bool(buf, true);
 	}
 }
 
@@ -339,6 +349,7 @@ sql_get_metadata(struct sql_stmt *stmt, struct obuf *out, int column_count)
 		const char *name = sql_column_name(stmt, i);
 		const char *type = sql_column_datatype(stmt, i);
 		int nullable = sql_column_nullable(stmt, i);
+		bool is_autoincrement = sql_column_is_autoincrement(stmt, i);
 		/*
 		 * Can not fail, since all column names and types
 		 * are preallocated during prepare phase and the
@@ -346,13 +357,15 @@ sql_get_metadata(struct sql_stmt *stmt, struct obuf *out, int column_count)
 		 */
 		assert(name != NULL);
 		assert(type != NULL);
-		size = metadata_map_sizeof(name, type, coll, nullable);
+		size = metadata_map_sizeof(name, type, coll, nullable,
+					   is_autoincrement);
 		char *pos = (char *) obuf_alloc(out, size);
 		if (pos == NULL) {
 			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
 			return -1;
 		}
-		metadata_map_encode(pos, name, type, coll, nullable);
+		metadata_map_encode(pos, name, type, coll, nullable,
+				    is_autoincrement);
 	}
 	return 0;
 }

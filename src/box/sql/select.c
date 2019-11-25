@@ -1822,7 +1822,8 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 					break;
 			}
 			assert(j < pTabList->nSrc);
-			struct space_def *space_def = pTabList->a[j].space->def;
+			struct space *space = pTabList->a[j].space;
+			struct space_def *space_def = space->def;
 			assert(iCol >= 0 && iCol < (int)space_def->field_count);
 			zCol = space_def->fields[iCol].name;
 			const char *name = NULL;
@@ -1845,6 +1846,9 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 					space_def->fields[iCol].is_nullable;
 				vdbe_metadata_set_col_nullability(v, i,
 								  is_nullable);
+				if (space->sequence != NULL &&
+				    space->sequence_fieldno == (uint32_t) iCol)
+					vdbe_metadata_set_col_autoincrement(v, i);
 			}
 		} else {
 			const char *z = NULL;
