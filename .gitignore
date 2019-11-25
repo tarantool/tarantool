@@ -23,6 +23,7 @@ CTestTestfile.cmake
 Testing/
 ./build
 /build
+.idea/
 # Ignore Makefile in the stupid way for `tar --exclude-vcs-ignores`
 /Makefile
 ./Makefile
