@@ -40,6 +40,10 @@ box.info.ro -- true
 ---
 - true
 ...
+test_run:wait_cond(function() return box.space.test ~= nil end, 20)
+---
+- true
+...
 box.space.test:replace{100} -- error
 ---
 - error: Can't modify data because this instance is in read-only mode.
@@ -115,15 +119,15 @@ box.info.status -- running
 - running
 ...
 -- Check that the replica follows all masters.
-box.info.id == 1 or box.info.replication[1].upstream.status == 'follow'
+box.info.id == 1 or test_run:wait_cond(function() return box.info.replication[1].upstream.status == 'follow' end, 20)
 ---
 - true
 ...
-box.info.id == 2 or box.info.replication[2].upstream.status == 'follow'
+box.info.id == 2 or test_run:wait_cond(function() return box.info.replication[2].upstream.status == 'follow' end, 20)
 ---
 - true
 ...
-box.info.id == 3 or box.info.replication[3].upstream.status == 'follow'
+box.info.id == 3 or test_run:wait_cond(function() return box.info.replication[3].upstream.status == 'follow' end, 20)
 ---
 - true
 ...
@@ -149,6 +153,10 @@ test_run:cmd('stop server quorum1')
 ---
 - true
 ...
+test_run:wait_cond(function() return box.space.test.index.primary ~= nil end, 20)
+---
+- true
+...
 for i = 1, 100 do box.space.test:insert{i} end
 ---
 ...
@@ -166,9 +174,9 @@ test_run:cmd('switch quorum1')
 ---
 - true
 ...
-box.space.test:count() -- 100
+test_run:wait_cond(function() return box.space.test:count() == 100 end, 20)
 ---
-- 100
+- true
 ...
 -- Rebootstrap one node of the cluster and check that others follow.
 -- Note, due to ERRINJ_RELAY_TIMEOUT there is a substantial delay
@@ -197,9 +205,9 @@ test_run:cmd('switch quorum1')
 - true
 ...
 test_run:cmd('restart server quorum1 with cleanup=1, args="0.1 0.5"')
-box.space.test:count() -- 100
+test_run:wait_cond(function() return box.space.test:count() == 100 end, 20)
 ---
-- 100
+- true
 ...
 -- The rebootstrapped replica will be assigned id = 4,
 -- because ids 1..3 are busy.
@@ -207,11 +215,9 @@ test_run:cmd('switch quorum2')
 ---
 - true
 ...
-fiber = require('fiber')
+test_run:wait_cond(function() return box.info.replication[4].upstream.status == 'follow' end, 20)
 ---
-...
-while box.info.replication[4].upstream.status ~= 'follow' do fiber.sleep(0.001) end
----
+- true
 ...
 box.info.replication[4].upstream.status
 ---
@@ -221,11 +227,13 @@ test_run:cmd('switch quorum3')
 ---
 - true
 ...
-fiber = require('fiber')
+test_run:wait_cond(function() return box.info.replication ~= nil end, 20)
 ---
+- true
 ...
-while box.info.replication[4].upstream.status ~= 'follow' do fiber.sleep(0.001) end
+test_run:wait_cond(function() return box.info.replication[4].upstream.status == 'follow' end, 20)
 ---
+- true
 ...
 box.info.replication[4].upstream.status
 ---
