@@ -580,6 +580,9 @@ const char *
 sql_column_coll(sql_stmt *stmt, int n);
 
 int
+sql_column_nullable(sql_stmt *stmt, int n);
+
+int
 sql_initialize(void);
 
 #define SQL_TRACE_STMT       0x01

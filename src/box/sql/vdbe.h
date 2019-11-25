@@ -257,6 +257,9 @@ int
 vdbe_metadata_set_col_collation(struct Vdbe *p, int idx, const char *coll,
 				size_t coll_len);
 
+void
+vdbe_metadata_set_col_nullability(struct Vdbe *p, int idx, int nullable);
+
 void sqlVdbeCountChanges(Vdbe *);
 sql *sqlVdbeDb(Vdbe *);
 void sqlVdbeSetSql(Vdbe *, const char *z, int n, int);

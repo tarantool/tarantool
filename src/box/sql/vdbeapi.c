@@ -753,6 +753,14 @@ sql_column_coll(sql_stmt *stmt, int n)
 	return p->metadata[n].collation;
 }
 
+int
+sql_column_nullable(sql_stmt *stmt, int n)
+{
+	struct Vdbe *p = (struct Vdbe *) stmt;
+	assert(n < sql_column_count(stmt) && n >= 0);
+	return p->metadata[n].nullable;
+}
+
 /******************************* sql_bind_  **************************
  *
  * Routines used to attach values to wildcards in a compiled SQL statement.

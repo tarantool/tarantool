@@ -1859,6 +1859,9 @@ sqlVdbeSetNumCols(Vdbe * p, int nResColumn)
 			 "calloc", "metadata");
 		return;
 	}
+	for (int i = 0; i < nResColumn; ++i)
+		p->metadata[i].nullable = -1;
+
 }
 
 int
@@ -1902,6 +1905,13 @@ vdbe_metadata_set_col_collation(struct Vdbe *p, int idx, const char *coll,
 		return -1;
 	}
 	return 0;
+}
+
+void
+vdbe_metadata_set_col_nullability(struct Vdbe *p, int idx, int nullable)
+{
+	assert(idx < p->nResColumn);
+	p->metadata[idx].nullable = nullable;
 }
 
 /*

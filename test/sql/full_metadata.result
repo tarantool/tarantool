@@ -65,6 +65,7 @@ execute("SELECT c FROM t;")
  | ---
  | - metadata:
  |   - type: string
+ |     is_nullable: true
  |     name: C
  |     collation: unicode_ci
  |   rows:
@@ -78,6 +79,41 @@ execute("SELECT c COLLATE \"unicode\" FROM t;")
  |     collation: unicode
  |   rows:
  |   - ['aSd']
+ | ...
+
+-- Make sure that nullability is presented.
+--
+execute("SELECT id, a, c FROM t;")
+ | ---
+ | - metadata:
+ |   - type: integer
+ |     name: ID
+ |     is_nullable: false
+ |   - type: integer
+ |     name: A
+ |     is_nullable: false
+ |   - type: string
+ |     is_nullable: true
+ |     name: C
+ |     collation: unicode_ci
+ |   rows:
+ |   - [1, 1, 'aSd']
+ | ...
+execute("SELECT * FROM t;")
+ | ---
+ | - metadata:
+ |   - type: integer
+ |     name: ID
+ |     is_nullable: false
+ |   - type: integer
+ |     name: A
+ |     is_nullable: false
+ |   - type: string
+ |     is_nullable: true
+ |     name: C
+ |     collation: unicode_ci
+ |   rows:
+ |   - [1, 1, 'aSd']
  | ...
 
 execute("PRAGMA full_metadata = false;")

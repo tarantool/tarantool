@@ -1813,6 +1813,7 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 								coll_id->name_len);
 			}
 		}
+		vdbe_metadata_set_col_nullability(v, i, -1);
 		if (p->op == TK_COLUMN || p->op == TK_AGG_COLUMN) {
 			char *zCol;
 			int iCol = p->iColumn;
@@ -1839,6 +1840,12 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 				}
 			}
 			vdbe_metadata_set_col_name(v, i, name);
+			if (is_full_meta) {
+				bool is_nullable =
+					space_def->fields[iCol].is_nullable;
+				vdbe_metadata_set_col_nullability(v, i,
+								  is_nullable);
+			}
 		} else {
 			const char *z = NULL;
 			if (pEList->a[i].zName != NULL)

@@ -350,6 +350,11 @@ struct sql_column_metadata {
 	char *name;
 	char *type;
 	char *collation;
+	/**
+	 * -1 is for any member of result set except for pure
+	 * columns: all other expressions are nullable by default.
+	 */
+	int8_t nullable;
 };
 
 /*

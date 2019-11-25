@@ -30,6 +30,11 @@ execute("SELECT 'aSd' COLLATE \"unicode_ci\";")
 execute("SELECT c FROM t;")
 execute("SELECT c COLLATE \"unicode\" FROM t;")
 
+-- Make sure that nullability is presented.
+--
+execute("SELECT id, a, c FROM t;")
+execute("SELECT * FROM t;")
+
 execute("PRAGMA full_metadata = false;")
 
 test_run:cmd("setopt delimiter ';'")
