@@ -603,3 +603,20 @@ box.session.su('admin')
 box.error.injection.set('ERRINJ_WAL_IO', false)
 box.schema.user.drop('testg')
 box.space.testg:drop()
+
+--
+-- Errinj:get().
+--
+box.error.injection.get('bad name')
+box.error.injection.set('ERRINJ_WAL_IO', true)
+box.error.injection.get('ERRINJ_WAL_IO')
+box.error.injection.set('ERRINJ_WAL_IO', false)
+box.error.injection.get('ERRINJ_WAL_IO')
+box.error.injection.set('ERRINJ_TUPLE_FORMAT_COUNT', 20)
+box.error.injection.get('ERRINJ_TUPLE_FORMAT_COUNT')
+box.error.injection.set('ERRINJ_TUPLE_FORMAT_COUNT', -1)
+box.error.injection.get('ERRINJ_TUPLE_FORMAT_COUNT')
+box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0.5)
+box.error.injection.get('ERRINJ_RELAY_TIMEOUT')
+box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0)
+box.error.injection.get('ERRINJ_RELAY_TIMEOUT')
