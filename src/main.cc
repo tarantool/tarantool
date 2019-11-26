@@ -589,6 +589,34 @@ load_cfg()
 }
 
 void
+free_rl_state(void)
+{
+	/* tarantool_lua_free() was formerly reponsible for terminal reset,
+	 * but it is no longer called
+	 */
+	if (isatty(STDIN_FILENO)) {
+		/*
+		 * Restore terminal state. Doesn't hurt if exiting not
+		 * due to a signal.
+		 */
+		rl_cleanup_after_signal();
+	}
+}
+
+void
+tarantool_atexit(void)
+{
+	/* Same checks as in tarantool_free() */
+	if (getpid() != master_pid)
+		return;
+
+	if (!cord_is_main())
+		return;
+
+	free_rl_state();
+}
+
+void
 tarantool_free(void)
 {
 	/*
@@ -622,16 +650,6 @@ tarantool_free(void)
 #ifdef ENABLE_GCOV
 	__gcov_flush();
 #endif
-	/* tarantool_lua_free() was formerly reponsible for terminal reset,
-	 * but it is no longer called
-	 */
-	if (isatty(STDIN_FILENO)) {
-		/*
-		 * Restore terminal state. Doesn't hurt if exiting not
-		 * due to a signal.
-		 */
-		rl_cleanup_after_signal();
-	}
 	cbus_free();
 #if 0
 	/*
@@ -834,6 +852,15 @@ main(int argc, char **argv)
 		 */
 		trigger_create(&break_loop_trigger, break_loop, NULL, NULL);
 		trigger_add(&box_on_shutdown, &break_loop_trigger);
+
+		/*
+		 * The call to tarantool_free() below, thanks to
+		 * on_shutdown triggers, works all the time
+		 * except when we panic. So leave the ever-
+		 * necessary cleanups in atexit handler, which
+		 * is executed always.
+		 */
+		atexit(tarantool_atexit);
 
 		if (!loop())
 			panic("%s", "can't init event loop");
