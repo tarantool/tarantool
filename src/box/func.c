@@ -33,6 +33,7 @@
 #include "assoc.h"
 #include "lua/utils.h"
 #include "error.h"
+#include "errinj.h"
 #include "diag.h"
 #include "user.h"
 #include <dlfcn.h>
@@ -238,7 +239,6 @@ module_load(const char *package, const char *package_end)
 	module->package[package_len] = 0;
 	rlist_create(&module->funcs);
 	module->calls = 0;
-	module->is_unloading = false;
 	char dir_name[] = "/tmp/tntXXXXXX";
 	if (mkdtemp(dir_name) == NULL) {
 		diag_set(SystemError, "failed to create unique dir name");
@@ -261,7 +261,9 @@ module_load(const char *package, const char *package_end)
 			  package, dlerror());
 		goto error;
 	}
-
+	struct errinj *e = errinj(ERRINJ_DYN_MODULE_COUNT, ERRINJ_INT);
+	if (e != NULL)
+		++e->iparam;
 	return module;
 error:
 	free(module);
@@ -271,6 +273,9 @@ error:
 static void
 module_delete(struct module *module)
 {
+	struct errinj *e = errinj(ERRINJ_DYN_MODULE_COUNT, ERRINJ_INT);
+	if (e != NULL)
+		--e->iparam;
 	dlclose(module->handle);
 	TRASH(module);
 	free(module);
@@ -282,10 +287,8 @@ module_delete(struct module *module)
 static void
 module_gc(struct module *module)
 {
-	if (!module->is_unloading || !rlist_empty(&module->funcs) ||
-	     module->calls != 0)
-		return;
-	module_delete(module);
+	if (rlist_empty(&module->funcs) && module->calls == 0)
+		module_delete(module);
 }
 
 /*
@@ -332,7 +335,6 @@ module_reload(const char *package, const char *package_end, struct module **modu
 	module_cache_del(package, package_end);
 	if (module_cache_put(new_module) != 0)
 		goto restore;
-	old_module->is_unloading = true;
 	module_gc(old_module);
 	*module = new_module;
 	return 0;

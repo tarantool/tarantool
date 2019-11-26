@@ -177,3 +177,42 @@ test_yield(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	printf("ok - yield\n");
 	return 0;
 }
+
+int
+test_sleep(box_function_ctx_t *ctx, const char *args, const char *args_end)
+{
+	/*
+	 * Insert a string key into a given space and sleep until
+	 * the key is deleted from the space. Purpose of this
+	 * function - test module unloading prevention while at
+	 * least one of its functions is being executed. Such a
+	 * strange exit condition is chosen because C functions
+	 * in old Tarantool versions can be executed only via
+	 * IProto. And from C it is not possible to expose that
+	 * fiber to a global namespace where it could be, for
+	 * example, canceled. So the only possible information
+	 * channel is storage.
+	 */
+	(void) ctx;
+	(void) args_end;
+	uint32_t len = mp_decode_array(&args);
+	assert(len == 2 && mp_typeof(*args) == MP_UINT);
+	uint32_t space_id = mp_decode_uint(&args);
+	assert(mp_typeof(*args) == MP_STR);
+	const char *key = mp_decode_str(&args, &len);
+	char *tuple = (char *) malloc(mp_sizeof_array(1) + mp_sizeof_str(len));
+	assert(tuple != NULL);
+	char *tuple_end = mp_encode_array(tuple, 1);
+	tuple_end = mp_encode_str(tuple_end, key, len);
+	int rc = box_replace(space_id, tuple, tuple_end, NULL);
+	assert(rc == 0);
+	(void) rc;
+	box_tuple_t *result = NULL;
+	do {
+		fiber_sleep(0);
+		rc = box_index_get(space_id, 0, tuple, tuple_end, &result);
+		assert(rc == 0);
+	} while (result != NULL);
+	free(tuple);
+	return 0;
+}

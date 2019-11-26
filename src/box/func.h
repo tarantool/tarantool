@@ -52,8 +52,6 @@ struct module {
 	struct rlist funcs;
 	/** Count of active calls. */
 	size_t calls;
-	/** True if module is being unloaded. */
-	bool is_unloading;
 	/** Module's package name. */
 	char package[0];
 };

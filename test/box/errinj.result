@@ -42,12 +42,14 @@ errinj.info()
     state: false
   ERRINJ_PORT_DUMP:
     state: false
+  ERRINJ_LOG_ROTATE:
+    state: false
   ERRINJ_WAL_IO:
     state: false
   ERRINJ_WAL_FALLOCATE:
     state: 0
-  ERRINJ_LOG_ROTATE:
-    state: false
+  ERRINJ_DYN_MODULE_COUNT:
+    state: 0
   ERRINJ_VY_DUMP_DELAY:
     state: false
   ERRINJ_WAL_BREAK_LSN:
