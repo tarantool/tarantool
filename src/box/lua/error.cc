@@ -184,6 +184,36 @@ lbox_errinj_set(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_errinj_push_value(struct lua_State *L, const struct errinj *e)
+{
+	switch (e->type) {
+	case ERRINJ_BOOL:
+		lua_pushboolean(L, e->bparam);
+		return 1;
+	case ERRINJ_INT:
+		luaL_pushint64(L, e->iparam);
+		return 1;
+	case ERRINJ_DOUBLE:
+		lua_pushnumber(L, e->dparam);
+		return 1;
+	default:
+		unreachable();
+		return 0;
+	}
+}
+
+static int
+lbox_errinj_get(struct lua_State *L)
+{
+	char *name = (char*)luaL_checkstring(L, 1);
+	struct errinj *e = errinj_by_name(name);
+	if (e != NULL)
+		return lbox_errinj_push_value(L, e);
+	lua_pushfstring(L, "error: can't find error injection '%s'", name);
+	return 1;
+}
+
 static inline int
 lbox_errinj_cb(struct errinj *e, void *cb_ctx)
 {
@@ -191,19 +221,7 @@ lbox_errinj_cb(struct errinj *e, void *cb_ctx)
 	lua_pushstring(L, e->name);
 	lua_newtable(L);
 	lua_pushstring(L, "state");
-	switch (e->type) {
-	case ERRINJ_BOOL:
-		lua_pushboolean(L, e->bparam);
-		break;
-	case ERRINJ_INT:
-		luaL_pushint64(L, e->iparam);
-		break;
-	case ERRINJ_DOUBLE:
-		lua_pushnumber(L, e->dparam);
-		break;
-	default:
-		unreachable();
-	}
+	lbox_errinj_push_value(L, e);
 	lua_settable(L, -3);
 	lua_settable(L, -3);
 	return 0;
@@ -259,6 +277,7 @@ box_lua_error_init(struct lua_State *L) {
 	static const struct luaL_Reg errinjlib[] = {
 		{"info", lbox_errinj_info},
 		{"set", lbox_errinj_set},
+		{"get", lbox_errinj_get},
 		{NULL, NULL}
 	};
 	/* box.error.injection is not set by register_module */

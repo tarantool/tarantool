@@ -1672,3 +1672,58 @@ fio = require('fio')
 box.space.test:drop()
 ---
 ...
+--
+-- Errinj:get().
+--
+box.error.injection.get('bad name')
+---
+- 'error: can''t find error injection ''bad name'''
+...
+box.error.injection.set('ERRINJ_WAL_IO', true)
+---
+- ok
+...
+box.error.injection.get('ERRINJ_WAL_IO')
+---
+- true
+...
+box.error.injection.set('ERRINJ_WAL_IO', false)
+---
+- ok
+...
+box.error.injection.get('ERRINJ_WAL_IO')
+---
+- false
+...
+box.error.injection.set('ERRINJ_VY_INDEX_DUMP', 20)
+---
+- ok
+...
+box.error.injection.get('ERRINJ_VY_INDEX_DUMP')
+---
+- 20
+...
+box.error.injection.set('ERRINJ_VY_INDEX_DUMP', -1)
+---
+- ok
+...
+box.error.injection.get('ERRINJ_VY_INDEX_DUMP')
+---
+- -1
+...
+box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0.5)
+---
+- ok
+...
+box.error.injection.get('ERRINJ_RELAY_TIMEOUT')
+---
+- 0.5
+...
+box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0)
+---
+- ok
+...
+box.error.injection.get('ERRINJ_RELAY_TIMEOUT')
+---
+- 0
+...

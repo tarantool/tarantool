@@ -587,3 +587,20 @@ fio = require('fio')
 #fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*.index.inprogress')) == 0
 
 box.space.test:drop()
+
+--
+-- Errinj:get().
+--
+box.error.injection.get('bad name')
+box.error.injection.set('ERRINJ_WAL_IO', true)
+box.error.injection.get('ERRINJ_WAL_IO')
+box.error.injection.set('ERRINJ_WAL_IO', false)
+box.error.injection.get('ERRINJ_WAL_IO')
+box.error.injection.set('ERRINJ_VY_INDEX_DUMP', 20)
+box.error.injection.get('ERRINJ_VY_INDEX_DUMP')
+box.error.injection.set('ERRINJ_VY_INDEX_DUMP', -1)
+box.error.injection.get('ERRINJ_VY_INDEX_DUMP')
+box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0.5)
+box.error.injection.get('ERRINJ_RELAY_TIMEOUT')
+box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0)
+box.error.injection.get('ERRINJ_RELAY_TIMEOUT')
