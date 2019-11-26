@@ -229,3 +229,19 @@ test_yield(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	printf("ok - yield\n");
 	return 0;
 }
+
+int
+test_sleep(box_function_ctx_t *ctx, const char *args, const char *args_end)
+{
+	(void) ctx;
+	(void) args;
+	(void) args_end;
+	/*
+	 * Sleep until a cancellation. Purpose of this function -
+	 * test module unloading prevention while at least one of
+	 * its functions is being executed.
+	 */
+	while (!fiber_is_cancelled())
+		fiber_sleep(0);
+	return 0;
+}
