@@ -67,7 +67,7 @@ int systemd_init() {
 		.sun_path = { '\0' }
 	};
 	if (strlen(sd_unix_path) >= sizeof(sa.sun_path)) {
-		say_error("systemd: NOTIFY_SOCKET is longer that MAX_UNIX_PATH");
+		say_error("systemd: NOTIFY_SOCKET is longer than MAX_UNIX_PATH");
 		goto error;
 	}
 	if ((systemd_fd = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
@@ -117,7 +117,7 @@ int systemd_notify(const char *message) {
 		.sun_family = AF_UNIX,
 	};
 
-	strncpy(sa.sun_path, sd_unix_path, sizeof(sa.sun_path));
+	strncpy(sa.sun_path, sd_unix_path, sizeof(sa.sun_path) - 1);
 	if (sa.sun_path[0] == '@')
 		sa.sun_path[0] = '\0';
 
