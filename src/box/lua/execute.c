@@ -173,9 +173,8 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 		bind->bytes = 1;
 		break;
 	case MP_BOOL:
-		/* SQLite doesn't support boolean. Use int instead. */
-		bind->i64 = field.bval ? 1 : 0;
-		bind->bytes = sizeof(bind->i64);
+		bind->b = field.bval;
+		bind->bytes = sizeof(bind->b);
 		break;
 	case MP_BIN:
 		bind->s = mp_decode_bin(&field.sval.data, &bind->bytes);
