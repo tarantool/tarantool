@@ -1201,7 +1201,6 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	assert(tuple->refs == 0);
 	size_t total = sizeof(struct memtx_tuple) + format->field_map_size +
 		tuple->bsize;
-	tuple_format_unref(format);
 	struct memtx_tuple *memtx_tuple =
 		container_of(tuple, struct memtx_tuple, base);
 	if (memtx->alloc.free_mode != SMALL_DELAYED_FREE ||
@@ -1210,6 +1209,7 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 		smfree(&memtx->alloc, memtx_tuple, total);
 	else
 		smfree_delayed(&memtx->alloc, memtx_tuple, total);
+	tuple_format_unref(format);
 }
 
 struct tuple_format_vtab memtx_tuple_format_vtab = {
