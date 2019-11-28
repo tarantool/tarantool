@@ -548,6 +548,9 @@ local function load_cfg(cfg)
                 fun()
             end
             if not compare_cfg(val, default_cfg[key]) then
+                if log_cfg_option[key] ~= nil then
+                    val = log_cfg_option[key](val)
+                end
                 log.info("set '%s' configuration option to %s", key, json.encode(val))
             end
         end
