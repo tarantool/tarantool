@@ -1105,7 +1105,6 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
-	tuple_format_unref(format);
 	struct memtx_tuple *memtx_tuple =
 		container_of(tuple, struct memtx_tuple, base);
 	size_t total = tuple_size(tuple) + offsetof(struct memtx_tuple, base);
@@ -1115,6 +1114,7 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 		smfree(&memtx->alloc, memtx_tuple, total);
 	else
 		smfree_delayed(&memtx->alloc, memtx_tuple, total);
+	tuple_format_unref(format);
 }
 
 void
