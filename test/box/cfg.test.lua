@@ -132,3 +132,15 @@ box.cfg{net_msg_max = old + 1000}
 box.cfg{net_msg_max = old}
 
 test_run:cmd("clear filter")
+
+--
+-- gh-4493: Replication user password may leak to logs
+--
+test_run:cmd('create server cfg_tester7 with script = "box/lua/cfg_test6.lua"')
+test_run:cmd("start server cfg_tester7")
+-- test there is replication log in log
+test_run:grep_log('cfg_tester7', 'set \'replication\' configuration option to', 1000)
+-- test there is no password in log
+test_run:grep_log('cfg_tester7', 'test%-cluster%-cookie', 1000)
+test_run:cmd("stop server cfg_tester7")
+test_run:cmd("cleanup server cfg_tester7")
