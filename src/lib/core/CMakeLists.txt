@@ -46,3 +46,11 @@ target_link_libraries(core salad small uri decNumber ${LIBEV_LIBRARIES}
 if (ENABLE_BACKTRACE AND NOT TARGET_OS_DARWIN)
     target_link_libraries(core gcc_s ${UNWIND_LIBRARIES})
 endif()
+
+# Since fiber.top() introduction, fiber.cc, which is part of core
+# library, depends on clock_gettime() syscall, so we should set
+# -lrt when it is appropriate. See a comment for
+# HAVE_CLOCK_GETTIME_WITHOUT_RT in ${REPO}/CMakeLists.txt.
+if ("${HAVE_CLOCK_GETTIME}" AND NOT "${HAVE_CLOCK_GETTIME_WITHOUT_RT}")
+    target_link_libraries(core rt)
+endif()

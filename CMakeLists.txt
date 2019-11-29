@@ -116,6 +116,12 @@ else ()
     set(HAVE_CLOCK_GETTIME ${HAVE_CLOCK_GETTIME_DECL})
 endif ()
 set(CMAKE_REQUIRED_LIBRARIES "")
+# According to `man 2 clockgettime` the glibc wrapper requires
+# -lrt on glibc versions before 2.17. We need to check whether
+# the function is available without -lrt to set this linker option
+# conditionally.
+check_function_exists(clock_gettime HAVE_CLOCK_GETTIME_WITHOUT_RT)
+
 check_symbol_exists(__get_cpuid cpuid.h HAVE_CPUID)
 
 # Checks for libev
