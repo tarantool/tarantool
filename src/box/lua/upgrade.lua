@@ -943,6 +943,19 @@ local function upgrade_to_2_3_0()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 2.3.1
+--------------------------------------------------------------------------------
+
+local function drop_func_collation()
+    local _func = box.space[box.schema.FUNC_ID]
+    _func.index.name:alter({parts = {{'name', 'string'}}})
+end
+
+local function upgrade_to_2_3_1()
+    drop_func_collation()
+end
+
+--------------------------------------------------------------------------------
 
 local function get_version()
     local version = box.space._schema:get{'version'}
@@ -977,6 +990,7 @@ local function upgrade(options)
         {version = mkversion(2, 1, 3), func = upgrade_to_2_1_3, auto = true},
         {version = mkversion(2, 2, 1), func = upgrade_to_2_2_1, auto = true},
         {version = mkversion(2, 3, 0), func = upgrade_to_2_3_0, auto = true},
+        {version = mkversion(2, 3, 1), func = upgrade_to_2_3_1, auto = true},
     }
 
     for _, handler in ipairs(handlers) do
