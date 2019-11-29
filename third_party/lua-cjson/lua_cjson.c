@@ -990,10 +990,10 @@ static int json_decode(lua_State *l)
                   "expected 1 or 2 arguments");
 
     if (lua_gettop(l) == 2) {
-        struct luaL_serializer user_cfg = *luaL_checkserializer(l);
-        luaL_serializer_parse_options(l, &user_cfg);
+        struct luaL_serializer *user_cfg = luaL_checkserializer(l);
+        luaL_serializer_parse_options(l, user_cfg);
         lua_pop(l, 1);
-        json.cfg = &user_cfg;
+        json.cfg = user_cfg;
     } else {
         json.cfg = luaL_checkserializer(l);
     }
