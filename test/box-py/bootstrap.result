@@ -96,6 +96,8 @@ box.space._space:select{}
         'type': 'boolean'}]]
   - [372, 1, '_func_index', 'memtx', 0, {}, [{'name': 'space_id', 'type': 'unsigned'},
       {'name': 'index_id', 'type': 'unsigned'}, {'name': 'func_id', 'type': 'unsigned'}]]
+  - [380, 1, '_session_settings', 'service', 2, {'temporary': true}, [{'name': 'name',
+        'type': 'string'}, {'name': 'value', 'type': 'any'}]]
 ...
 box.space._index:select{}
 ---
@@ -153,6 +155,7 @@ box.space._index:select{}
   - [364, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'string']]]
   - [372, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'unsigned']]]
   - [372, 1, 'fid', 'tree', {'unique': false}, [[2, 'unsigned']]]
+  - [380, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
 ...
 box.space._user:select{}
 ---

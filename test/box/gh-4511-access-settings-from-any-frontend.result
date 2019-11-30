@@ -6,5 +6,111 @@ test_run = require('test_run').new()
 -- User cannot create spaces with this engine.
 s = box.schema.space.create('test', {engine = 'service'})
  | ---
- | - error: Tarantool does not support spaces with 'service' engine.
+ | - error: Tarantool does not support non-system space with 'service' engine.
+ | ...
+
+-- Check _session_settings space.
+s = box.space._session_settings
+ | ---
+ | ...
+s:format()
+ | ---
+ | - [{'name': 'name', 'type': 'string'}, {'name': 'value', 'type': 'any'}]
+ | ...
+
+-- Make sure that we cannot drop space.
+s:drop()
+ | ---
+ | - error: Can't drop the primary key in a system space, space '_session_settings'
+ | ...
+
+--
+-- Make sure, that session_settings space doesn't support
+-- create_index(), insert(), replace() and delete() methods.
+--
+s:create_index('a')
+ | ---
+ | - error: Session_settings space does not support create_index()
+ | ...
+s:insert({'a', 1})
+ | ---
+ | - error: Session_settings space does not support replace()
+ | ...
+s:delete({'b'})
+ | ---
+ | - error: Session_settings space does not support delete()
+ | ...
+s:replace({'sql_defer_foreign_keys', true})
+ | ---
+ | - error: Session_settings space does not support replace()
+ | ...
+
+-- Check get() and select(). They should return nothing for now.
+s:get({'a'})
+ | ---
+ | ...
+s:select()
+ | ---
+ | - []
+ | ...
+s:select({}, {iterator='EQ'})
+ | ---
+ | - []
+ | ...
+s:select({}, {iterator='ALL'})
+ | ---
+ | - []
+ | ...
+s:select({}, {iterator='GE'})
+ | ---
+ | - []
+ | ...
+s:select({}, {iterator='GT'})
+ | ---
+ | - []
+ | ...
+s:select({}, {iterator='REQ'})
+ | ---
+ | - []
+ | ...
+s:select({}, {iterator='LE'})
+ | ---
+ | - []
+ | ...
+s:select({}, {iterator='LT'})
+ | ---
+ | - []
+ | ...
+s:select({'a'}, {iterator='EQ'})
+ | ---
+ | - []
+ | ...
+s:select({'a'}, {iterator='ALL'})
+ | ---
+ | - []
+ | ...
+s:select({'a'}, {iterator='GE'})
+ | ---
+ | - []
+ | ...
+s:select({'a'}, {iterator='GT'})
+ | ---
+ | - []
+ | ...
+s:select({'a'}, {iterator='REQ'})
+ | ---
+ | - []
+ | ...
+s:select({'a'}, {iterator='LE'})
+ | ---
+ | - []
+ | ...
+s:select({'a'}, {iterator='LT'})
+ | ---
+ | - []
+ | ...
+
+-- Currently there is nothing to update, but update() should work.
+s:update('some_option', {{'=', 'value', true}})
+ | ---
  | ...

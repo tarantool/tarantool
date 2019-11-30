@@ -29,7 +29,10 @@
  * SUCH DAMAGE.
  */
 #include "service_engine.h"
+#include "tuple.h"
 #include "schema.h"
+
+extern const struct space_vtab session_settings_space_vtab;
 
 static void
 service_engine_shutdown(struct engine *engine)
@@ -41,13 +44,50 @@ static struct space *
 service_engine_create_space(struct engine *engine, struct space_def *def,
 			    struct rlist *key_list)
 {
-	(void)engine;
-	(void)def;
-	(void)key_list;
-	/* There are currently no spaces with this engine. */
-	diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
-		 "spaces with 'service' engine.");
-	return NULL;
+	/*
+	 * At the moment the only space that have this engine is
+	 * _session_sessings.
+	 */
+	if (def->id != BOX_SESSION_SETTINGS_ID) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
+			 "non-system space with 'service' engine.");
+		return NULL;
+	}
+	const struct space_vtab *space_vtab = &session_settings_space_vtab;
+
+	struct space *space = (struct space *)calloc(1, sizeof(*space));
+	if (space == NULL) {
+		diag_set(OutOfMemory, sizeof(*space), "calloc", "space");
+		return NULL;
+	}
+	int key_count = 0;
+	struct key_def **keys = index_def_to_key_def(key_list, &key_count);
+	if (keys == NULL) {
+		free(space);
+		return NULL;
+	}
+	struct tuple_format *format =
+		tuple_format_new(&tuple_format_runtime->vtab, NULL, keys,
+				 key_count, def->fields, def->field_count,
+				 def->exact_field_count, def->dict,
+				 def->opts.is_temporary,
+				 def->opts.is_ephemeral);
+	if (format == NULL) {
+		free(space);
+		return NULL;
+	}
+	tuple_format_ref(format);
+	int rc = space_create(space, engine, space_vtab, def, key_list, format);
+	/*
+	 * Format is now referenced by the space if space has beed
+	 * created.
+	 */
+	tuple_format_unref(format);
+	if (rc != 0) {
+		free(space);
+		return NULL;
+	}
+	return space;
 }
 
 static const struct engine_vtab service_engine_vtab = {

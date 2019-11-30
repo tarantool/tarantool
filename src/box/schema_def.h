@@ -114,6 +114,8 @@ enum {
 	BOX_CK_CONSTRAINT_ID = 364,
 	/** Space id of _func_index. */
 	BOX_FUNC_INDEX_ID = 372,
+	/** Space id of _session_settings. */
+	BOX_SESSION_SETTINGS_ID = 380,
 	/** End of the reserved range of system spaces. */
 	BOX_SYSTEM_ID_MAX = 511,
 	BOX_ID_NIL = 2147483647
@@ -275,6 +277,12 @@ enum {
 	BOX_FUNC_INDEX_FIELD_SPACE_ID = 0,
 	BOX_FUNC_INDEX_FIELD_INDEX_ID = 1,
 	BOX_FUNC_INDEX_FUNCTION_ID = 2,
+};
+
+/** _session_settings fields. */
+enum {
+	BOX_SESSION_SETTINGS_FIELD_NAME = 0,
+	BOX_SESSION_SETTINGS_FIELD_VALUE = 1,
 };
 
 /*

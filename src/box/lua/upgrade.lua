@@ -951,8 +951,23 @@ local function drop_func_collation()
     _func.index.name:alter({parts = {{'name', 'string'}}})
 end
 
+local function create_session_settings_space()
+    local _space = box.space[box.schema.SPACE_ID]
+    local _index = box.space[box.schema.INDEX_ID]
+    local format = {}
+    format[1] = {name='name', type='string'}
+    format[2] = {name='value', type='any'}
+    log.info("create space _session_settings")
+    _space:insert{box.schema.SESSION_SETTINGS_ID, ADMIN, '_session_settings',
+                  'service', 2, {temporary = true}, format}
+    log.info("create index _session_settings:primary")
+    _index:insert{box.schema.SESSION_SETTINGS_ID, 0, 'primary', 'tree',
+                  {unique = true}, {{0, 'string'}}}
+end
+
 local function upgrade_to_2_3_1()
     drop_func_collation()
+    create_session_settings_space()
 end
 
 --------------------------------------------------------------------------------

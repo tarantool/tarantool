@@ -82,6 +82,7 @@ add_library(box STATIC
     sysview.c
     blackhole.c
     service_engine.c
+    session_settings.c
     vinyl.c
     vy_stmt.c
     vy_mem.c
