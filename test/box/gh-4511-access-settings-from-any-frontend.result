@@ -1,0 +1,10 @@
+-- test-run result file version 2
+test_run = require('test_run').new()
+ | ---
+ | ...
+
+-- User cannot create spaces with this engine.
+s = box.schema.space.create('test', {engine = 'service'})
+ | ---
+ | - error: Tarantool does not support spaces with 'service' engine.
+ | ...

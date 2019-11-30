@@ -81,6 +81,7 @@ add_library(box STATIC
     memtx_space.c
     sysview.c
     blackhole.c
+    service_engine.c
     vinyl.c
     vy_stmt.c
     vy_mem.c

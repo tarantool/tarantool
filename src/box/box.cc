@@ -53,6 +53,7 @@
 #include "memtx_engine.h"
 #include "sysview.h"
 #include "blackhole.h"
+#include "service_engine.h"
 #include "vinyl.h"
 #include "space.h"
 #include "index.h"
@@ -1921,6 +1922,9 @@ engine_init()
 
 	struct sysview_engine *sysview = sysview_engine_new_xc();
 	engine_register((struct engine *)sysview);
+
+	struct engine *service_engine = service_engine_new_xc();
+	engine_register(service_engine);
 
 	struct engine *blackhole = blackhole_engine_new_xc();
 	engine_register(blackhole);
