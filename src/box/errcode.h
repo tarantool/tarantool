@@ -261,6 +261,7 @@ struct errcode_record {
 	/*206 */_(ER_SQL_PARSER_GENERIC_WITH_POS,"At line %d at or near position %d: %s") \
 	/*207 */_(ER_REPLICA_NOT_ANON, "Replica '%s' is not anonymous and cannot register.") \
 	/*208 */_(ER_CANNOT_REGISTER, "Couldn't find an instance to register this replica on.") \
+	/*209 */_(ER_SESSION_SETTING_INVALID_VALUE,	"Session setting %s expected a value of type %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

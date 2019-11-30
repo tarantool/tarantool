@@ -19,23 +19,90 @@ s:insert({'a', 1})
 s:delete({'b'})
 s:replace({'sql_defer_foreign_keys', true})
 
--- Check get() and select(). They should return nothing for now.
-s:get({'a'})
+--
+-- Check select() method of session_settings space. Should work
+-- the same way as an ordinary space with an index of the type
+-- "TREE".
+--
 s:select()
-s:select({}, {iterator='EQ'})
-s:select({}, {iterator='ALL'})
-s:select({}, {iterator='GE'})
-s:select({}, {iterator='GT'})
-s:select({}, {iterator='REQ'})
-s:select({}, {iterator='LE'})
-s:select({}, {iterator='LT'})
-s:select({'a'}, {iterator='EQ'})
-s:select({'a'}, {iterator='ALL'})
-s:select({'a'}, {iterator='GE'})
-s:select({'a'}, {iterator='GT'})
-s:select({'a'}, {iterator='REQ'})
-s:select({'a'}, {iterator='LE'})
-s:select({'a'}, {iterator='LT'})
 
--- Currently there is nothing to update, but update() should work.
-s:update('some_option', {{'=', 'value', true}})
+t = box.schema.space.create('settings', {format = s:format()})
+_ = t:create_index('primary')
+for _,value in s:pairs() do t:insert(value) end
+
+test_run:cmd('setopt delimiter ";"')
+function check_sorting(ss, ts, key)
+    local iterators_list = {'ALL', 'REQ', 'EQ', 'GE', 'GT', 'LE', 'LT'}
+    for _, it in pairs(iterators_list) do
+        local view_space = ss:select({key}, {iterator = it})
+        local test_space = ts:select({key}, {iterator = it})
+        for key, value in pairs(view_space) do
+            if test_space[key].name ~= value.name then
+                return {
+                    err = 'bad sorting', type = it,
+                    exp = test_space[key].name, got = value.name
+                }
+            end
+        end
+    end
+end;
+test_run:cmd('setopt delimiter ""');
+
+check_sorting(s, t)
+check_sorting(s, t, 'abcde')
+check_sorting(s, t, 'sql_d')
+check_sorting(s, t, 'sql_v')
+check_sorting(s, t, 'sql_defer_foreign_keys')
+
+t:drop()
+
+-- Check get() method of session_settings space.
+s:get({'sql_defer_foreign_keys'})
+s:get({'sql_recursive_triggers'})
+s:get({'sql_reverse_unordered_selects'})
+s:get({'sql_default_engine'})
+s:get({'abcd'})
+
+-- Check pairs() method of session_settings space.
+t = {}
+for key, value in s:pairs() do table.insert(t, {key, value}) end
+#t == s:count()
+
+-- Check update() method of session_settings space.
+
+-- Correct updates.
+s:update('sql_defer_foreign_keys', {{'=', 'value', true}})
+s:update({'sql_defer_foreign_keys'}, {{'=', 2, false}})
+s:update('sql_default_engine', {{'=', 2, 'vinyl'}})
+s:update('sql_default_engine', {{':', 'value', 1, 5, 'memtx'}})
+s:update('a', {{'=', 2, 1}})
+
+-- Inorrect updates.
+s:update({{'sql_defer_foreign_keys'}}, {{'=', 'value', true}})
+
+s:update('sql_defer_foreign_keys', {'=', 'value', true})
+s:update('sql_defer_foreign_keys', {{'=', 'value', true}, {'=', 2, true}})
+s:update('sql_defer_foreign_keys', {{}})
+s:update('sql_defer_foreign_keys', {{'='}})
+s:update('sql_defer_foreign_keys', {{'=', 'value'}})
+s:update('sql_defer_foreign_keys', {{'=', 'value', true, 1}})
+
+s:update('sql_defer_foreign_keys', {{'+', 'value', 2}})
+s:update('sql_defer_foreign_keys', {{'-', 'value', 2}})
+s:update('sql_defer_foreign_keys', {{'&', 'value', 2}})
+s:update('sql_defer_foreign_keys', {{'|', 'value', 2}})
+s:update('sql_defer_foreign_keys', {{'^', 'value', 2}})
+s:update('sql_defer_foreign_keys', {{'!', 'value', 2}})
+s:update('sql_defer_foreign_keys', {{'#', 'value', 2}})
+s:update('sql_defer_foreign_keys', {{1, 'value', true}})
+s:update('sql_defer_foreign_keys', {{{1}, 'value', true}})
+
+s:update('sql_defer_foreign_keys', {{'=', {'value'}, true}})
+s:update('sql_defer_foreign_keys', {{'=', 1, 'new_key'}})
+s:update('sql_defer_foreign_keys', {{'=', 'name', 'new_key'}})
+s:update('sql_defer_foreign_keys', {{'=', 3, true}})
+s:update('sql_defer_foreign_keys', {{'=', 'some text', true}})
+
+s:update('sql_defer_foreign_keys', {{'=', 'value', 1}})
+s:update('sql_defer_foreign_keys', {{'=', 'value', {1}}})
+s:update('sql_defer_foreign_keys', {{'=', 'value', '1'}})

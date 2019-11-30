@@ -45,72 +45,242 @@ s:replace({'sql_defer_foreign_keys', true})
  | - error: Session_settings space does not support replace()
  | ...
 
--- Check get() and select(). They should return nothing for now.
-s:get({'a'})
- | ---
- | ...
+--
+-- Check select() method of session_settings space. Should work
+-- the same way as an ordinary space with an index of the type
+-- "TREE".
+--
 s:select()
  | ---
- | - []
- | ...
-s:select({}, {iterator='EQ'})
- | ---
- | - []
- | ...
-s:select({}, {iterator='ALL'})
- | ---
- | - []
- | ...
-s:select({}, {iterator='GE'})
- | ---
- | - []
- | ...
-s:select({}, {iterator='GT'})
- | ---
- | - []
- | ...
-s:select({}, {iterator='REQ'})
- | ---
- | - []
- | ...
-s:select({}, {iterator='LE'})
- | ---
- | - []
- | ...
-s:select({}, {iterator='LT'})
- | ---
- | - []
- | ...
-s:select({'a'}, {iterator='EQ'})
- | ---
- | - []
- | ...
-s:select({'a'}, {iterator='ALL'})
- | ---
- | - []
- | ...
-s:select({'a'}, {iterator='GE'})
- | ---
- | - []
- | ...
-s:select({'a'}, {iterator='GT'})
- | ---
- | - []
- | ...
-s:select({'a'}, {iterator='REQ'})
- | ---
- | - []
- | ...
-s:select({'a'}, {iterator='LE'})
- | ---
- | - []
- | ...
-s:select({'a'}, {iterator='LT'})
- | ---
- | - []
+ | - - ['sql_default_engine', 'memtx']
+ |   - ['sql_defer_foreign_keys', false]
+ |   - ['sql_full_column_names', false]
+ |   - ['sql_full_metadata', false]
+ |   - ['sql_parser_debug', false]
+ |   - ['sql_recursive_triggers', true]
+ |   - ['sql_reverse_unordered_selects', false]
+ |   - ['sql_select_debug', false]
+ |   - ['sql_vdbe_debug', false]
  | ...
 
--- Currently there is nothing to update, but update() should work.
-s:update('some_option', {{'=', 'value', true}})
+t = box.schema.space.create('settings', {format = s:format()})
  | ---
+ | ...
+_ = t:create_index('primary')
+ | ---
+ | ...
+for _,value in s:pairs() do t:insert(value) end
+ | ---
+ | ...
+
+test_run:cmd('setopt delimiter ";"')
+ | ---
+ | - true
+ | ...
+function check_sorting(ss, ts, key)
+    local iterators_list = {'ALL', 'REQ', 'EQ', 'GE', 'GT', 'LE', 'LT'}
+    for _, it in pairs(iterators_list) do
+        local view_space = ss:select({key}, {iterator = it})
+        local test_space = ts:select({key}, {iterator = it})
+        for key, value in pairs(view_space) do
+            if test_space[key].name ~= value.name then
+                return {
+                    err = 'bad sorting', type = it,
+                    exp = test_space[key].name, got = value.name
+                }
+            end
+        end
+    end
+end;
+ | ---
+ | ...
+test_run:cmd('setopt delimiter ""');
+ | ---
+ | - true
+ | ...
+
+check_sorting(s, t)
+ | ---
+ | ...
+check_sorting(s, t, 'abcde')
+ | ---
+ | ...
+check_sorting(s, t, 'sql_d')
+ | ---
+ | ...
+check_sorting(s, t, 'sql_v')
+ | ---
+ | ...
+check_sorting(s, t, 'sql_defer_foreign_keys')
+ | ---
+ | ...
+
+t:drop()
+ | ---
+ | ...
+
+-- Check get() method of session_settings space.
+s:get({'sql_defer_foreign_keys'})
+ | ---
+ | - ['sql_defer_foreign_keys', false]
+ | ...
+s:get({'sql_recursive_triggers'})
+ | ---
+ | - ['sql_recursive_triggers', true]
+ | ...
+s:get({'sql_reverse_unordered_selects'})
+ | ---
+ | - ['sql_reverse_unordered_selects', false]
+ | ...
+s:get({'sql_default_engine'})
+ | ---
+ | - ['sql_default_engine', 'memtx']
+ | ...
+s:get({'abcd'})
+ | ---
+ | ...
+
+-- Check pairs() method of session_settings space.
+t = {}
+ | ---
+ | ...
+for key, value in s:pairs() do table.insert(t, {key, value}) end
+ | ---
+ | ...
+#t == s:count()
+ | ---
+ | - true
+ | ...
+
+-- Check update() method of session_settings space.
+
+-- Correct updates.
+s:update('sql_defer_foreign_keys', {{'=', 'value', true}})
+ | ---
+ | - ['sql_defer_foreign_keys', true]
+ | ...
+s:update({'sql_defer_foreign_keys'}, {{'=', 2, false}})
+ | ---
+ | - ['sql_defer_foreign_keys', false]
+ | ...
+s:update('sql_default_engine', {{'=', 2, 'vinyl'}})
+ | ---
+ | - ['sql_default_engine', 'vinyl']
+ | ...
+s:update('sql_default_engine', {{':', 'value', 1, 5, 'memtx'}})
+ | ---
+ | - ['sql_default_engine', 'memtx']
+ | ...
+s:update('a', {{'=', 2, 1}})
+ | ---
+ | ...
+
+-- Inorrect updates.
+s:update({{'sql_defer_foreign_keys'}}, {{'=', 'value', true}})
+ | ---
+ | - error: 'Supplied key type of part 0 does not match index part type: expected string'
+ | ...
+
+s:update('sql_defer_foreign_keys', {'=', 'value', true})
+ | ---
+ | - error: Illegal parameters, update operation must be an array {op,..}
+ | ...
+s:update('sql_defer_foreign_keys', {{'=', 'value', true}, {'=', 2, true}})
+ | ---
+ | - ['sql_defer_foreign_keys', true]
+ | ...
+s:update('sql_defer_foreign_keys', {{}})
+ | ---
+ | - error: Illegal parameters, update operation must be an array {op,..}, got empty
+ |     array
+ | ...
+s:update('sql_defer_foreign_keys', {{'='}})
+ | ---
+ | - error: Unknown UPDATE operation
+ | ...
+s:update('sql_defer_foreign_keys', {{'=', 'value'}})
+ | ---
+ | - error: Unknown UPDATE operation
+ | ...
+s:update('sql_defer_foreign_keys', {{'=', 'value', true, 1}})
+ | ---
+ | - error: Unknown UPDATE operation
+ | ...
+
+s:update('sql_defer_foreign_keys', {{'+', 'value', 2}})
+ | ---
+ | - error: 'Argument type in operation ''+'' on field ''value'' does not match field
+ |     type: expected a number'
+ | ...
+s:update('sql_defer_foreign_keys', {{'-', 'value', 2}})
+ | ---
+ | - error: 'Argument type in operation ''-'' on field ''value'' does not match field
+ |     type: expected a number'
+ | ...
+s:update('sql_defer_foreign_keys', {{'&', 'value', 2}})
+ | ---
+ | - error: 'Argument type in operation ''&'' on field ''value'' does not match field
+ |     type: expected a positive integer'
+ | ...
+s:update('sql_defer_foreign_keys', {{'|', 'value', 2}})
+ | ---
+ | - error: 'Argument type in operation ''|'' on field ''value'' does not match field
+ |     type: expected a positive integer'
+ | ...
+s:update('sql_defer_foreign_keys', {{'^', 'value', 2}})
+ | ---
+ | - error: 'Argument type in operation ''^'' on field ''value'' does not match field
+ |     type: expected a positive integer'
+ | ...
+s:update('sql_defer_foreign_keys', {{'!', 'value', 2}})
+ | ---
+ | - error: Tuple field count 3 does not match space field count 2
+ | ...
+s:update('sql_defer_foreign_keys', {{'#', 'value', 2}})
+ | ---
+ | - error: Tuple field count 1 does not match space field count 2
+ | ...
+s:update('sql_defer_foreign_keys', {{1, 'value', true}})
+ | ---
+ | - error: Illegal parameters, update operation name must be a string
+ | ...
+s:update('sql_defer_foreign_keys', {{{1}, 'value', true}})
+ | ---
+ | - error: Illegal parameters, update operation name must be a string
+ | ...
+
+s:update('sql_defer_foreign_keys', {{'=', {'value'}, true}})
+ | ---
+ | - error: Illegal parameters, field id must be a number or a string
+ | ...
+s:update('sql_defer_foreign_keys', {{'=', 1, 'new_key'}})
+ | ---
+ | - error: Attempt to modify a tuple field which is part of index 'primary' in space
+ |     '_session_settings'
+ | ...
+s:update('sql_defer_foreign_keys', {{'=', 'name', 'new_key'}})
+ | ---
+ | - error: Attempt to modify a tuple field which is part of index 'primary' in space
+ |     '_session_settings'
+ | ...
+s:update('sql_defer_foreign_keys', {{'=', 3, true}})
+ | ---
+ | - error: Tuple field count 3 does not match space field count 2
+ | ...
+s:update('sql_defer_foreign_keys', {{'=', 'some text', true}})
+ | ---
+ | - error: Field 'some text' was not found in the tuple
+ | ...
+
+s:update('sql_defer_foreign_keys', {{'=', 'value', 1}})
+ | ---
+ | - error: Session setting sql_defer_foreign_keys expected a value of type boolean
+ | ...
+s:update('sql_defer_foreign_keys', {{'=', 'value', {1}}})
+ | ---
+ | - error: Session setting sql_defer_foreign_keys expected a value of type boolean
+ | ...
+s:update('sql_defer_foreign_keys', {{'=', 'value', '1'}})
+ | ---
+ | - error: Session setting sql_defer_foreign_keys expected a value of type boolean
  | ...
