@@ -105,7 +105,7 @@ test:do_catchsql_test(
         SELECT count(*) FROM t1, t2 USING (a) ON (t1.a=t2.a)
     ]], {
         -- <e_select-0.1.5>
-        1, [[Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.]]
+        1, [[At line 1 at or near position 47: keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.]]
         -- </e_select-0.1.5>
     })
 
@@ -805,9 +805,9 @@ test:do_select_tests(
 -- FROM clause.
 --
 data = {
-    {"1.1", "SELECT a, b, c FROM z1 WHERE *",  "Syntax error near '*'"},
-    {"1.2", "SELECT a, b, c FROM z1 GROUP BY *", "Syntax error near '*'"},
-    {"1.3", "SELECT 1 + * FROM z1",  "Syntax error near '*'"},
+    {"1.1", "SELECT a, b, c FROM z1 WHERE *",  "Syntax error at line 1 near '*'"},
+    {"1.2", "SELECT a, b, c FROM z1 GROUP BY *", "Syntax error at line 1 near '*'"},
+    {"1.3", "SELECT 1 + * FROM z1",  "Syntax error at line 1 near '*'"},
     {"1.4", "SELECT * + 1 FROM z1", "Failed to expand '*' in SELECT statement without FROM clause"},
     {"2.1", "SELECT *", "Failed to expand '*' in SELECT statement without FROM clause"},
     {"2.2", "SELECT * WHERE 1", "Failed to expand '*' in SELECT statement without FROM clause"},

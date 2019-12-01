@@ -396,22 +396,26 @@ box.execute('CREATE TABLE t1 (id INT PRIMARY KEY);')
 box.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON DELETE RESTRICT);')
 ---
 - null
-- Keyword 'DELETE' is reserved. Please use double quotes if 'DELETE' is an identifier.
+- 'At line 1 at or near position 72: keyword ''DELETE'' is reserved. Please use double
+  quotes if ''DELETE'' is an identifier.'
 ...
 box.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON DELETE CASCADE);')
 ---
 - null
-- Keyword 'DELETE' is reserved. Please use double quotes if 'DELETE' is an identifier.
+- 'At line 1 at or near position 72: keyword ''DELETE'' is reserved. Please use double
+  quotes if ''DELETE'' is an identifier.'
 ...
 box.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON UPDATE RESTRICT ON DELETE RESTRICT);')
 ---
 - null
-- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- 'At line 1 at or near position 88: keyword ''ON'' is reserved. Please use double
+  quotes if ''ON'' is an identifier.'
 ...
 box.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE MATCH FULL);')
 ---
 - null
-- Keyword 'MATCH' is reserved. Please use double quotes if 'MATCH' is an identifier.
+- 'At line 1 at or near position 69: keyword ''MATCH'' is reserved. Please use double
+  quotes if ''MATCH'' is an identifier.'
 ...
 box.space.T1:drop()
 ---

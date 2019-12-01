@@ -577,7 +577,7 @@ test:do_catchsql_test(
 --   catchsql {
 --     SELECT count(a) AS cn FROM tkt2526 GROUP BY a HAVING cn<max(cn)
 --   }
--- } {1 {misuse of aliased aggregate cn}}
+-- } {1 {Syntax error: misuse of aliased aggregate cn}}
 -- WHERE clause expressions
 --
 test:do_catchsql_test(
@@ -1406,7 +1406,7 @@ test:do_catchsql_test(
         SELECT f1 FROM test1 WHERE f2=;
     ]], {
         -- <select1-7.1>
-        1, [[Syntax error near ';']]
+        1, [[Syntax error at line 1 near ';']]
         -- </select1-7.1>
     })
 
@@ -1416,7 +1416,7 @@ test:do_catchsql_test(
             SELECT f1 FROM test1 UNION SELECT WHERE;
         ]], {
             -- <select1-7.2>
-            1, [[Keyword 'WHERE' is reserved. Please use double quotes if 'WHERE' is an identifier.]]
+            1, [[At line 1 at or near position 47: keyword 'WHERE' is reserved. Please use double quotes if 'WHERE' is an identifier.]]
             -- </select1-7.2>
         })
 
@@ -1428,7 +1428,7 @@ test:do_catchsql_test(
     [[
         SELECT f1 FROM test1 as "hi", test2 as]], {
         -- <select1-7.3>
-        1, [[Keyword 'as' is reserved. Please use double quotes if 'as' is an identifier.]]
+        1, [[At line 1 at or near position 47: keyword 'as' is reserved. Please use double quotes if 'as' is an identifier.]]
         -- </select1-7.3>
     })
 
@@ -1438,7 +1438,7 @@ test:do_catchsql_test(
         SELECT f1 FROM test1 ORDER BY;
     ]], {
         -- <select1-7.4>
-        1, [[Syntax error near ';']]
+        1, [[Syntax error at line 1 near ';']]
         -- </select1-7.4>
     })
 
@@ -1448,7 +1448,7 @@ test:do_catchsql_test(
         SELECT f1 FROM test1 ORDER BY f1 desc, f2 where;
     ]], {
         -- <select1-7.5>
-        1, [[Keyword 'where' is reserved. Please use double quotes if 'where' is an identifier.]]
+        1, [[At line 1 at or near position 51: keyword 'where' is reserved. Please use double quotes if 'where' is an identifier.]]
         -- </select1-7.5>
     })
 
@@ -1458,7 +1458,7 @@ test:do_catchsql_test(
         SELECT count(f1,f2 FROM test1;
     ]], {
         -- <select1-7.6>
-        1, [[Keyword 'FROM' is reserved. Please use double quotes if 'FROM' is an identifier.]]
+        1, [[At line 1 at or near position 28: keyword 'FROM' is reserved. Please use double quotes if 'FROM' is an identifier.]]
         -- </select1-7.6>
     })
 
@@ -1468,7 +1468,7 @@ test:do_catchsql_test(
         SELECT count(f1,f2+) FROM test1;
     ]], {
         -- <select1-7.7>
-        1, [[Syntax error near ')']]
+        1, [[Syntax error at line 1 near ')']]
         -- </select1-7.7>
     })
 
@@ -1478,7 +1478,7 @@ test:do_catchsql_test(
         SELECT f1 FROM test1 ORDER BY f2, f1+;
     ]], {
         -- <select1-7.8>
-        1, [[Syntax error near ';']]
+        1, [[Syntax error at line 1 near ';']]
         -- </select1-7.8>
     })
 
@@ -1488,7 +1488,7 @@ test:do_catchsql_test(
         SELECT f1 FROM test1 LIMIT 5+3 OFFSET 11 ORDER BY f2;
     ]], {
         -- <select1-7.9>
-        1, [[Keyword 'ORDER' is reserved. Please use double quotes if 'ORDER' is an identifier.]]
+        1, [[At line 1 at or near position 50: keyword 'ORDER' is reserved. Please use double quotes if 'ORDER' is an identifier.]]
         -- </select1-7.9>
     })
 

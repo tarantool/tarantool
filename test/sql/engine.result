@@ -104,12 +104,12 @@ box.space.T2_MEMTX:drop()
 box.execute("CREATE TABLE t1_vinyl (id INT PRIMARY KEY) WITH ENGINE = VINYL")
 ---
 - null
-- Syntax error near 'VINYL'
+- Syntax error at line 1 near 'VINYL'
 ...
 box.execute("CREATE TABLE t1_vinyl (id INT PRIMARY KEY) WITH ENGINE = vinyl")
 ---
 - null
-- Syntax error near 'vinyl'
+- Syntax error at line 1 near 'vinyl'
 ...
 box.execute("CREATE TABLE t1_vinyl (id INT PRIMARY KEY) WITH ENGINE = 'VINYL'")
 ---
@@ -119,7 +119,7 @@ box.execute("CREATE TABLE t1_vinyl (id INT PRIMARY KEY) WITH ENGINE = 'VINYL'")
 box.execute("CREATE TABLE t1_vinyl (id INT PRIMARY KEY) WITH ENGINE = \"vinyl\"")
 ---
 - null
-- Syntax error near '"vinyl"'
+- Syntax error at line 1 near '"vinyl"'
 ...
 -- Make sure that wrong engine name is handled properly.
 --

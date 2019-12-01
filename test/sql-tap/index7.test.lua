@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(11)
+test:plan(12)
 
 --!./tcltestrunner.lua
 -- 2013-11-04
@@ -286,13 +286,18 @@ test:do_eqp_test(
 -- gh-2165 Currently, Tarantool lacks support of partial indexes,
 -- so temporary we removed processing of their syntax from parser.
 --
-test:do_catchsql_test(
+test:do_execsql_test(
     "index7-7.1",
     [[
         CREATE TABLE t1 (a INTEGER PRIMARY KEY, b INTEGER);
+    ]])
+
+test:do_catchsql_test(
+    "index7-7.1",
+    [[
         CREATE UNIQUE INDEX i ON t1 (a) WHERE a = 3;
     ]], {
-        1, "Keyword 'WHERE' is reserved. Please use double quotes if 'WHERE' is an identifier."
+        1, "At line 1 at or near position 41: keyword 'WHERE' is reserved. Please use double quotes if 'WHERE' is an identifier."
     })
 
 -- Currently, when a user tries to create index (or primary key,

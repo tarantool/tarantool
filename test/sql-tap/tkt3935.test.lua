@@ -57,7 +57,7 @@ test:do_catchsql_test(
         SELECT a FROM (t1) AS t ON b USING(a) 
     ]], {
         -- <tkt3935.4>
-        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 52: a JOIN clause is required before ON and USING"
         -- </tkt3935.4>
     })
 
@@ -67,7 +67,7 @@ test:do_catchsql_test(
         SELECT a FROM (t1) AS t ON b 
     ]], {
         -- <tkt3935.5>
-        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 43: a JOIN clause is required before ON and USING"
         -- </tkt3935.5>
     })
 
@@ -77,7 +77,7 @@ test:do_catchsql_test(
         SELECT a FROM (SELECT * FROM t1) AS t ON b USING(a) 
     ]], {
         -- <tkt3935.6>
-        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 66: a JOIN clause is required before ON and USING"
         -- </tkt3935.6>
     })
 
@@ -87,7 +87,7 @@ test:do_catchsql_test(
         SELECT a FROM (SELECT * FROM t1) AS t ON b 
     ]], {
         -- <tkt3935.7>
-        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 57: a JOIN clause is required before ON and USING"
         -- </tkt3935.7>
     })
 
@@ -97,7 +97,7 @@ test:do_catchsql_test(
         SELECT a FROM t1 AS t ON b 
     ]], {
         -- <tkt3935.8>
-        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 41: a JOIN clause is required before ON and USING"
         -- </tkt3935.8>
     })
 
@@ -107,7 +107,7 @@ test:do_catchsql_test(
         SELECT a FROM t1 AS t ON b USING(a) 
     ]], {
         -- <tkt3935.9>
-        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 50: a JOIN clause is required before ON and USING"
         -- </tkt3935.9>
     })
 
@@ -117,7 +117,7 @@ test:do_catchsql_test(
         SELECT a FROM t1 AS t USING(a) 
     ]], {
         -- <tkt3935.10>
-        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 45: a JOIN clause is required before ON and USING"
         -- </tkt3935.10>
     })
 

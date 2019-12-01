@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14)
+test:plan(16)
 
 --!./tcltestrunner.lua
 -- 2008 July 7
@@ -26,7 +26,7 @@ test:do_catchsql_test(
         SELECT 1.0e+
     ]], {
         -- <tokenize-1.1>
-        1, [[Syntax error: unrecognized token: '1.0e']]
+        1, [[At line 1 at or near position 16: unrecognized token '1.0e']]
         -- </tokenize-1.1>
     })
 
@@ -36,7 +36,7 @@ test:do_catchsql_test(
         SELECT 1.0E+
     ]], {
         -- <tokenize-1.2>
-        1, [[Syntax error: unrecognized token: '1.0E']]
+        1, [[At line 1 at or near position 16: unrecognized token '1.0E']]
         -- </tokenize-1.2>
     })
 
@@ -46,7 +46,7 @@ test:do_catchsql_test(
         SELECT 1.0e-
     ]], {
         -- <tokenize-1.3>
-        1, [[Syntax error: unrecognized token: '1.0e']]
+        1, [[At line 1 at or near position 16: unrecognized token '1.0e']]
         -- </tokenize-1.3>
     })
 
@@ -56,7 +56,7 @@ test:do_catchsql_test(
         SELECT 1.0E-
     ]], {
         -- <tokenize-1.4>
-        1, [[Syntax error: unrecognized token: '1.0E']]
+        1, [[At line 1 at or near position 16: unrecognized token '1.0E']]
         -- </tokenize-1.4>
     })
 
@@ -66,7 +66,7 @@ test:do_catchsql_test(
         SELECT 1.0e+/
     ]], {
         -- <tokenize-1.5>
-        1, [[Syntax error: unrecognized token: '1.0e']]
+        1, [[At line 1 at or near position 16: unrecognized token '1.0e']]
         -- </tokenize-1.5>
     })
 
@@ -76,7 +76,7 @@ test:do_catchsql_test(
         SELECT 1.0E+:
     ]], {
         -- <tokenize-1.6>
-        1, [[Syntax error: unrecognized token: '1.0E']]
+        1, [[At line 1 at or near position 16: unrecognized token '1.0E']]
         -- </tokenize-1.6>
     })
 
@@ -86,7 +86,7 @@ test:do_catchsql_test(
         SELECT 1.0e-:
     ]], {
         -- <tokenize-1.7>
-        1, [[Syntax error: unrecognized token: '1.0e']]
+        1, [[At line 1 at or near position 16: unrecognized token '1.0e']]
         -- </tokenize-1.7>
     })
 
@@ -96,7 +96,7 @@ test:do_catchsql_test(
         SELECT 1.0E-/
     ]], {
         -- <tokenize-1.8>
-        1, [[Syntax error: unrecognized token: '1.0E']]
+        1, [[At line 1 at or near position 16: unrecognized token '1.0E']]
         -- </tokenize-1.8>
     })
 
@@ -106,7 +106,7 @@ test:do_catchsql_test(
         SELECT 1.0F+5
     ]], {
         -- <tokenize-1.9>
-        1, [[Syntax error: unrecognized token: '1.0F']]
+        1, [[At line 1 at or near position 16: unrecognized token '1.0F']]
         -- </tokenize-1.9>
     })
 
@@ -116,7 +116,7 @@ test:do_catchsql_test(
         SELECT 1.0d-10
     ]], {
         -- <tokenize-1.10>
-        1, [[Syntax error: unrecognized token: '1.0d']]
+        1, [[At line 1 at or near position 16: unrecognized token '1.0d']]
         -- </tokenize-1.10>
     })
 
@@ -126,7 +126,7 @@ test:do_catchsql_test(
         SELECT 1.0e,5
     ]], {
         -- <tokenize-1.11>
-        1, [[Syntax error: unrecognized token: '1.0e']]
+        1, [[At line 1 at or near position 16: unrecognized token '1.0e']]
         -- </tokenize-1.11>
     })
 
@@ -136,7 +136,7 @@ test:do_catchsql_test(
         SELECT 1.0E.10
     ]], {
         -- <tokenize-1.12>
-        1, [[Syntax error: unrecognized token: '1.0E']]
+        1, [[At line 1 at or near position 16: unrecognized token '1.0E']]
         -- </tokenize-1.12>
     })
 
@@ -145,7 +145,7 @@ test:do_catchsql_test(
     [[
         SELECT 1, 2 /*]], {
         -- <tokenize-2.1>
-        1, [[Syntax error near '*']]
+        1, [[Syntax error at line 1 near '*']]
         -- </tokenize-2.1>
     })
 
@@ -159,6 +159,29 @@ test:do_catchsql_test(
         -- </tokenize-2.2>
     })
 
+--
+--gh-2611 Check the correct parsing of single-line comments.
+--
+test:do_execsql_test(
+    "tokenize-3.1",
+    [[
+        SELECT 1 + -- 1 + 1.
+        1
+    ]], {
+        -- <tokenize-2.2>
+        2
+        -- </tokenize-2.2>
+    })
 
+test:do_catchsql_test(
+    "tokenize-3.2",
+    [[
+        SELECT 1 + -- Syntax error.
+        *
+    ]], {
+        -- <tokenize-2.2>
+        1,"Syntax error at line 2 near '*'"
+        -- </tokenize-2.2>
+    })
 
 test:finish_test()

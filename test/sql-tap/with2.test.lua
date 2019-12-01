@@ -317,7 +317,7 @@ test:do_catchsql_test(4.1, [[
     SELECT * FROM x;
 ]], {
     -- <4.1>
-    1, [[Syntax error near ')']]
+    1, [[Syntax error at line 1 near ')']]
     -- </4.1>
 })
 
@@ -519,7 +519,7 @@ test:do_catchsql_test(6.2, [[
     INSERT INTO t2 VALUES(1, 2,);
 ]], {
     -- <6.2>
-    1, [[Syntax error near ')']]
+    1, [[Syntax error at line 2 near ')']]
     -- </6.2>
 })
 
@@ -528,7 +528,7 @@ test:do_catchsql_test("6.3.1", [[
     INSERT INTO t2 SELECT a, b, FROM t1;
 ]], {
     -- <6.3>
-    1, [[Keyword 'FROM' is reserved. Please use double quotes if 'FROM' is an identifier.]]
+    1, [[At line 2 at or near position 33: keyword 'FROM' is reserved. Please use double quotes if 'FROM' is an identifier.]]
     -- </6.3>
 })
 
@@ -546,7 +546,7 @@ test:do_catchsql_test(6.4, [[
     INSERT INTO t2 SELECT a, b, FROM t1 a a a;
 ]], {
     -- <6.4>
-    1, [[Keyword 'FROM' is reserved. Please use double quotes if 'FROM' is an identifier.]]
+    1, [[At line 2 at or near position 33: keyword 'FROM' is reserved. Please use double quotes if 'FROM' is an identifier.]]
     -- </6.4>
 })
 
@@ -555,7 +555,7 @@ test:do_catchsql_test(6.5, [[
     DELETE FROM t2 WHERE;
 ]], {
     -- <6.5>
-    1, [[Syntax error near ';']]
+    1, [[Syntax error at line 2 near ';']]
     -- </6.5>
 })
 
@@ -563,7 +563,7 @@ test:do_catchsql_test(6.6, [[
     WITH x AS (SELECT * FROM t1) DELETE FROM t2 WHERE
 ]], {
     -- <6.6>
-    1, "Syntax error near '\n'"
+    1, "Syntax error at line 2 near '\n'"
     -- </6.6>
 })
 
@@ -571,7 +571,7 @@ test:do_catchsql_test(6.7, [[
     WITH x AS (SELECT * FROM t1) DELETE FROM t2 WHRE 1;
 ]], {
     -- <6.7>
-    1, "Syntax error near 'WHRE'"
+    1, "Syntax error at line 1 near 'WHRE'"
     -- </6.7>
 })
 
@@ -579,7 +579,7 @@ test:do_catchsql_test(6.8, [[
     WITH x AS (SELECT * FROM t1) UPDATE t2 SET a = 10, b = ;
 ]], {
     -- <6.8>
-    1, "Syntax error near ';'"
+    1, "Syntax error at line 1 near ';'"
     -- </6.8>
 })
 
@@ -587,7 +587,7 @@ test:do_catchsql_test(6.9, [[
     WITH x AS (SELECT * FROM t1) UPDATE t2 SET a = 10, b = 1 WHERE a===b;
 ]], {
     -- <6.9>
-    1, "Syntax error near '='"
+    1, "Syntax error at line 1 near '='"
     -- </6.9>
 })
 

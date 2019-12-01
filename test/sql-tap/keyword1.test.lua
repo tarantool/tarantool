@@ -240,11 +240,25 @@ end
 
 for _, kw in ipairs(bannedkws) do
     query = 'CREATE TABLE '..kw..'(a INT PRIMARY KEY);'
-    test:do_catchsql_test(
+    if kw == 'end' or kw == 'match' or kw == 'release' or kw == 'rename' or
+       kw == 'replace' or kw == 'binary' or kw == 'character' or
+       kw == 'smallint' then
+        test:do_catchsql_test(
         "bannedkw1-"..kw..".1",
         query, {
-            1, "Keyword '"..kw.."' is reserved. Please use double quotes if '"..kw.."' is an identifier."
+            1, "At line 1 at or near position "..14 + string.len(kw)..
+            ": keyword '"..kw.."' is reserved. Please use double quotes if '"
+            ..kw.."' is an identifier."
         })
+    else
+        test:do_catchsql_test(
+        "bannedkw1-"..kw..".1",
+        query, {
+            1, "At line 1 at or near position 14: keyword '"..kw..
+            "' is reserved. Please use double quotes if '"..kw..
+            "' is an identifier."
+        })
+    end
 end
 
 

@@ -293,7 +293,7 @@ test:do_catchsql_test(
         CREATE VIEW v1err(x,y DESC,z) AS SELECT a, b+c, c-b FROM t1;
     ]], {
         -- <view-3.3.4>
-        1, [[Keyword 'DESC' is reserved. Please use double quotes if 'DESC' is an identifier.]]
+        1, [[At line 1 at or near position 31: keyword 'DESC' is reserved. Please use double quotes if 'DESC' is an identifier.]]
         -- </view-3.3.4>
     })
 

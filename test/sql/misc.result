@@ -20,12 +20,14 @@ box.execute('select 1;')
 box.execute('select 1; select 2;')
 ---
 - null
-- Keyword 'select' is reserved. Please use double quotes if 'select' is an identifier.
+- 'At line 1 at or near position 11: keyword ''select'' is reserved. Please use double
+  quotes if ''select'' is an identifier.'
 ...
 box.execute('create table t1 (id INT primary key); select 100;')
 ---
 - null
-- Keyword 'select' is reserved. Please use double quotes if 'select' is an identifier.
+- 'At line 1 at or near position 39: keyword ''select'' is reserved. Please use double
+  quotes if ''select'' is an identifier.'
 ...
 box.space.t1 == nil
 ---
@@ -56,17 +58,20 @@ box.execute('\n\n\n\t\t\t   ')
 box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b INTEGER CONSTRAINT c1 NULL)')
 ---
 - null
-- Keyword 'NULL' is reserved. Please use double quotes if 'NULL' is an identifier.
+- 'At line 1 at or near position 68: keyword ''NULL'' is reserved. Please use double
+  quotes if ''NULL'' is an identifier.'
 ...
 box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b INTEGER CONSTRAINT c1 DEFAULT 300)')
 ---
 - null
-- Keyword 'DEFAULT' is reserved. Please use double quotes if 'DEFAULT' is an identifier.
+- 'At line 1 at or near position 68: keyword ''DEFAULT'' is reserved. Please use double
+  quotes if ''DEFAULT'' is an identifier.'
 ...
 box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b TEXT CONSTRAINT c1 COLLATE "binary")')
 ---
 - null
-- Keyword 'COLLATE' is reserved. Please use double quotes if 'COLLATE' is an identifier.
+- 'At line 1 at or near position 65: keyword ''COLLATE'' is reserved. Please use double
+  quotes if ''COLLATE'' is an identifier.'
 ...
 -- Make sure that type of literals in meta complies with its real
 -- type. For instance, typeof(0.5) is number, not integer.

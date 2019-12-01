@@ -18,23 +18,23 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 box.execute('VALUES(scalar)')
 ---
 - null
-- Syntax error near 'scalar'
+- Syntax error at line 1 near 'scalar'
 ...
 box.execute('VALUES(float)')
 ---
 - null
-- Syntax error near 'float'
+- Syntax error at line 1 near 'float'
 ...
 -- check 'SELECT' against typedef keywords (should fail)
 box.execute('SELECT scalar')
 ---
 - null
-- Syntax error near 'scalar'
+- Syntax error at line 1 near 'scalar'
 ...
 box.execute('SELECT float')
 ---
 - null
-- Syntax error near 'float'
+- Syntax error at line 1 near 'float'
 ...
 -- check 'VALUES' against ID (should fail)
 box.execute('VALUES(TheColumnName)')

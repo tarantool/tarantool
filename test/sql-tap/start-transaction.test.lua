@@ -21,7 +21,7 @@ test:do_catchsql_test(
 		COMMIT;
 	]], {
 		-- <start-transaction-1.0>
-		1, "Syntax error near 'BEGIN'"
+		1, "Syntax error at line 2 near 'BEGIN'"
 		-- <start-transaction-1.0>
 	})
 
@@ -46,7 +46,7 @@ test:do_catchsql_test(
 		COMMIT;
 	]], {
 		-- <start-transaction-1.1>
-		1, "Syntax error near 'BEGIN'"
+		1, "Syntax error at line 2 near 'BEGIN'"
 		-- <start-transaction-1.1>
 	})
 
@@ -94,7 +94,7 @@ test:do_catchsql_test(
 		COMMIT TRANSACTION;
 	]], {
 		-- <start-transaction-1.6>
-		1, "Keyword 'TRANSACTION' is reserved. Please use double quotes if 'TRANSACTION' is an identifier."
+		1, "At line 2 at or near position 10: keyword 'TRANSACTION' is reserved. Please use double quotes if 'TRANSACTION' is an identifier."
 		-- <start-transaction-1.6>
 	})
 
@@ -119,7 +119,7 @@ test:do_catchsql_test(
 		END;
 	]], {
 		-- <start-transaction-1.8>
-		1, "Keyword 'END' is reserved. Please use double quotes if 'END' is an identifier."
+		1, "At line 2 at or near position 3: keyword 'END' is reserved. Please use double quotes if 'END' is an identifier."
 		-- <start-transaction-1.8>
 	})
 
@@ -144,7 +144,7 @@ test:do_catchsql_test(
 		END TRANSACTION;
 	]], {
 		-- <start-transaction-1.10>
-		1, "Keyword 'END' is reserved. Please use double quotes if 'END' is an identifier."
+		1, "At line 2 at or near position 3: keyword 'END' is reserved. Please use double quotes if 'END' is an identifier."
 		-- <start-transaction-1.10>
 	})
 
@@ -193,7 +193,7 @@ test:do_catchsql_test(
 		COMMIT;
 	]], {
 		-- <start-transaction-1.14>
-		1, "Keyword 'TRANSACTION' is reserved. Please use double quotes if 'TRANSACTION' is an identifier."
+		1, "At line 2 at or near position 13: keyword 'TRANSACTION' is reserved. Please use double quotes if 'TRANSACTION' is an identifier."
 		-- <start-transaction-1.14>
 	})
 
@@ -246,7 +246,7 @@ test:do_catchsql_test(
 		COMMIT;
 	]], {
 		-- <start-transaction-1.18>
-		1, "Keyword 'TRANSACTION' is reserved. Please use double quotes if 'TRANSACTION' is an identifier."
+		1, "At line 2 at or near position 13: keyword 'TRANSACTION' is reserved. Please use double quotes if 'TRANSACTION' is an identifier."
 		-- <start-transaction-1.18>
 	})
 

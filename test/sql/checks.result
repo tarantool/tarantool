@@ -39,8 +39,8 @@ _ = box.space.test:create_index('pk')
 -- Invalid expression test.
 box.space._ck_constraint:insert({513, 'CK_CONSTRAINT_01', false, 'SQL', 'X><5', true})
 ---
-- error: 'Failed to create check constraint ''CK_CONSTRAINT_01'': Syntax error near
-    ''<'''
+- error: 'Failed to create check constraint ''CK_CONSTRAINT_01'': Syntax error at
+    line 1 near ''<'''
 ...
 -- Non-existent space test.
 box.space._ck_constraint:insert({550, 'CK_CONSTRAINT_01', false, 'SQL', 'X<5', true})
@@ -160,7 +160,7 @@ box.execute("DROP TABLE t1")
 box.execute("CREATE TABLE first (id NUMBER PRIMARY KEY CHECK(id < 5), a INT CONSTRAINT ONE CHECK(a >< 5));")
 ---
 - null
-- Syntax error near '<'
+- Syntax error at line 1 near '<'
 ...
 box.space.FIRST == nil
 ---
@@ -290,8 +290,8 @@ box.execute("DROP TABLE w2;")
 box.execute("CREATE TABLE t5(x INT PRIMARY KEY, y INT, CHECK( x*y < ? ));")
 ---
 - null
-- 'Failed to create check constraint ''ck_unnamed_T5_1'': bindings are not allowed
-  in DDL'
+- 'Failed to create check constraint ''ck_unnamed_T5_1'': At line 1 at or near position
+  8: bindings are not allowed in DDL'
 ...
 -- Test trim CK constraint code correctness.
 box.execute("CREATE TABLE t1(x TEXT PRIMARY KEY CHECK(x    LIKE     '1  a'))")

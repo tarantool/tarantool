@@ -240,7 +240,7 @@ test:do_catchsql_test(
 data = {
     { 1,  [[ 'a' < 'b' collate binary ]], {1, "Collation 'BINARY' does not exist"}},
     { 2,  [[ 'a' < 'b' collate "binary" ]], {0, {true}}},
-    { 3,  [[ 'a' < 'b' collate 'binary' ]], {1, [[Syntax error near ''binary'']]}},
+    { 3,  [[ 'a' < 'b' collate 'binary' ]], {1, [[Syntax error at line 1 near ''binary'']]}},
     { 4,  [[ 'a' < 'b' collate "unicode" ]], {0, {true}}},
     { 5,  [[ 5 < 'b' collate "unicode" ]], {0, {true}}},
     { 6,  [[ 5 < 'b' collate unicode ]], {1,"Collation 'UNICODE' does not exist"}},

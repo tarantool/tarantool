@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(58)
+test:plan(59)
 
 --!./tcltestrunner.lua
 -- 2001 September 15.
@@ -262,17 +262,26 @@ test:do_execsql_test(
 -- before executing a command.  Thus if "WHERE" is misspelled on an UPDATE,
 -- the user won't accidently update every record.
 --
-test:do_catchsql_test(
-    "misc1-5.1",
+
+test:do_execsql_test(
+    "misc1-5.1.1",
     [[
         CREATE TABLE t3(a  INT primary key,b INT );
         INSERT INTO t3 VALUES(1,2);
         INSERT INTO t3 VALUES(3,4);
+    ]], {
+        -- <misc1-5.1.1>
+        -- </misc1-5.1.1>
+    })
+
+test:do_catchsql_test(
+    "misc1-5.1.2",
+    [[
         UPDATE t3 SET a=0 WHEREwww b=2;
     ]], {
-        -- <misc1-5.1>
-        1, [[Syntax error near 'WHEREwww']]
-        -- </misc1-5.1>
+        -- <misc1-5.1.2>
+        1, [[Syntax error at line 1 near 'WHEREwww']]
+        -- </misc1-5.1.2>
     })
 
 test:do_execsql_test(
@@ -1037,7 +1046,7 @@ test:do_catchsql_test(
         select''like''like''like#0;
     ]], {
         -- <misc1-21.1>
-        1, [[Syntax error near '#0']]
+        1, [[Syntax error at line 1 near '#0']]
         -- </misc1-21.1>
     })
 
@@ -1047,7 +1056,7 @@ test:do_catchsql_test(
         VALUES(0,0x0MATCH#0;
     ]], {
         -- <misc1-21.2>
-        1, [[Syntax error near '#0']]
+        1, [[Syntax error at line 1 near '#0']]
         -- </misc1-21.2>
     })
 

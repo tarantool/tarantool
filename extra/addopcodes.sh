@@ -50,6 +50,7 @@ extras="            \
     ASTERISK        \
     SPAN            \
     ANALYZE         \
+    LINEFEED        \
     SPACE           \
     ILLEGAL         \
 "

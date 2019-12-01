@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(2)
+test:plan(3)
 
 test:do_catchsql_test(
 	"trigger2-10.1",
@@ -8,23 +8,32 @@ test:do_catchsql_test(
 		CREATE TEMP TABLE tmp1 (id INTEGER PRIMARY KEY);
 	]], {
 		-- <trigger2-10.1>
-	1, "Syntax error near 'TEMP'"
+	1, "Syntax error at line 1 near 'TEMP'"
 		-- <trigger2-10.1>
 });
 
 -- TEMP triggers are removed now, check it
-test:do_catchsql_test(
-	"trigger2-10.1",
+
+test:do_execsql_test(
+	"trigger2-10.2",
 	[[
 		CREATE TABLE t1 (id INTEGER PRIMARY KEY);
+	]], {
+		-- <trigger2-10.2>
+		-- <trigger2-10.2>
+});
+
+test:do_catchsql_test(
+	"trigger2-10.3",
+	[[
 		CREATE TEMP TRIGGER ttmp1 BEFORE UPDATE ON t1
 		BEGIN
 			SELECT 1;
 		END;
 	]], {
-		-- <trigger2-10.1>
-	1, "Syntax error near 'TEMP'"
-		-- <trigger2-10.1>
+		-- <trigger2-10.3>
+	1, "Syntax error at line 1 near 'TEMP'"
+		-- <trigger2-10.3>
 });
 
 

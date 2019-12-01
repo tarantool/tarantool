@@ -2146,8 +2146,9 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 		if((p->pLimit->flags & EP_Collate) != 0 ||
 		   (p->pOffset != NULL &&
 		   (p->pOffset->flags & EP_Collate) != 0)) {
-			diag_set(ClientError, ER_SQL_UNRECOGNIZED_SYNTAX,
-				 sizeof("COLLATE"), "COLLATE");
+			diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN,
+				 pParse->line_count, sizeof("COLLATE"),
+				 "COLLATE");
 			pParse->is_aborted = true;
 			return;
 		}

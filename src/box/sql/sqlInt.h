@@ -2195,6 +2195,13 @@ struct Parse {
   ***********************************************************************/
 
 	Token sLastToken;	/* The last token parsed */
+	/** The line counter. */
+	uint32_t line_count;
+	/**
+	 * The position in a line. Line and position are used
+	 * for detailed error diagnostics.
+	 */
+	int line_pos;
 	ynVar nVar;		/* Number of '?' variables seen in the SQL so far */
 	u8 explain;		/* True if the EXPLAIN flag is found on the query */
 	int nHeight;		/* Expression tree height of current sub-select */

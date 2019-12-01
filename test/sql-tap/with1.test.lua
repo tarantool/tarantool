@@ -178,7 +178,7 @@ test:do_catchsql_test(3.6, [[
   SELECT * FROM tmp;
 ]], {
   -- <3.6>
-  1, [[Keyword 'SELECT' is reserved. Please use double quotes if 'SELECT' is an identifier.]]
+  1, [[At line 2 at or near position 3: keyword 'SELECT' is reserved. Please use double quotes if 'SELECT' is an identifier.]]
   -- </3.6>
 })
 

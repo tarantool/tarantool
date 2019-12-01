@@ -231,13 +231,13 @@ struct errcode_record {
 	/*176 */_(ER_SQL_CANT_RESOLVE_FIELD,	"Can’t resolve field '%s'") \
 	/*177 */_(ER_INDEX_EXISTS_IN_SPACE,	"Index '%s' already exists in space '%s'") \
 	/*178 */_(ER_INCONSISTENT_TYPES,	"Inconsistent types: expected %s got %s") \
-	/*179 */_(ER_SQL_SYNTAX,		"Syntax error in %s: %s") \
+	/*179 */_(ER_SQL_SYNTAX_WITH_POS,	"Syntax error at line %d at or near position %d: %s") \
 	/*180 */_(ER_SQL_STACK_OVERFLOW,	"Failed to parse SQL statement: parser stack limit reached") \
 	/*181 */_(ER_SQL_SELECT_WILDCARD,	"Failed to expand '*' in SELECT statement without FROM clause") \
 	/*182 */_(ER_SQL_STATEMENT_EMPTY,	"Failed to execute an empty SQL statement") \
-	/*183 */_(ER_SQL_KEYWORD_IS_RESERVED,	"Keyword '%.*s' is reserved. Please use double quotes if '%.*s' is an identifier.") \
-	/*184 */_(ER_SQL_UNRECOGNIZED_SYNTAX,	"Syntax error near '%.*s'") \
-	/*185 */_(ER_SQL_UNKNOWN_TOKEN,		"Syntax error: unrecognized token: '%.*s'") \
+	/*183 */_(ER_SQL_KEYWORD_IS_RESERVED,	"At line %d at or near position %d: keyword '%.*s' is reserved. Please use double quotes if '%.*s' is an identifier.") \
+	/*184 */_(ER_SQL_SYNTAX_NEAR_TOKEN,	"Syntax error at line %d near '%.*s'") \
+	/*185 */_(ER_SQL_UNKNOWN_TOKEN,		"At line %d at or near position %d: unrecognized token '%.*s'") \
 	/*186 */_(ER_SQL_PARSER_GENERIC,	"%s") \
 	/*187 */_(ER_SQL_ANALYZE_ARGUMENT,	"ANALYZE statement argument %s is not a base table") \
 	/*188 */_(ER_SQL_COLUMN_COUNT_MAX,	"Failed to create space '%s': space column count %d exceeds the limit (%d)") \
@@ -258,6 +258,7 @@ struct errcode_record {
 	/*203 */_(ER_BOOTSTRAP_READONLY,	"Trying to bootstrap a local read-only instance as master") \
 	/*204 */_(ER_SQL_FUNC_WRONG_RET_COUNT,	"SQL expects exactly one argument returned from %s, got %d")\
 	/*205 */_(ER_FUNC_INVALID_RETURN_TYPE,	"Function '%s' returned value of invalid type: expected %s got %s") \
+	/*186 */_(ER_SQL_PARSER_GENERIC_WITH_POS,"At line %d at or near position %d: %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

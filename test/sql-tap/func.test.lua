@@ -1882,7 +1882,7 @@ test:do_catchsql_test(
         SELECT trim(1,2,3)
     ]], {
         -- <func-22.1>
-        1, "Syntax error near ','"
+        1, "Syntax error at line 1 near ','"
         -- </func-22.1>
     })
 
@@ -2228,7 +2228,7 @@ test:do_catchsql_test(
         SELECT TRIM(FROM 'xyxzy');
     ]], {
         -- <func-22.38>
-        1, "Syntax error near 'FROM'"
+        1, "Syntax error at line 1 near 'FROM'"
         -- </func-22.38>
     })
 

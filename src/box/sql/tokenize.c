@@ -81,10 +81,11 @@
 #define CC_TILDA     25		/* '~' */
 #define CC_DOT       26		/* '.' */
 #define CC_ILLEGAL   27		/* Illegal character */
+#define CC_LINEFEED  28		/* '\n' */
 
 static const char sql_ascii_class[] = {
 /*       x0  x1  x2  x3  x4  x5  x6  x7  x8 x9  xa xb  xc xd xe  xf */
-/* 0x */ 27, 27, 27, 27, 27, 27, 27, 27, 27, 7,  7, 7, 7, 7, 27, 27,
+/* 0x */ 27, 27, 27, 27, 27, 27, 27, 27, 27, 7, 28, 7, 7, 7, 27, 27,
 /* 1x */ 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27,
 /* 2x */ 7, 15, 9, 5, 4, 22, 24, 8, 17, 18, 21, 20, 23, 11, 26, 16,
 /* 3x */ 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 5, 19, 12, 14, 13, 6,
@@ -191,12 +192,24 @@ sql_token(const char *z, int *type, bool *is_reserved)
 		i = 1 + sql_skip_spaces(z+1);
 		*type = TK_SPACE;
 		return i;
+	case CC_LINEFEED:
+		*type = TK_LINEFEED;
+		return 1;
 	case CC_MINUS:
+		/*
+		 * Ignore single-line comment started with "--"
+		 * till the end of parsing string or next line.
+		 */
 		if (z[1] == '-') {
-			for (i = 2; (c = z[i]) != 0 && c != '\n'; i++) {
+			for (i = 2; true; i++) {
+				if (z[i] == '\0') {
+					*type = TK_SPACE;
+					return i;
+				} else if (z[i] == '\n') {
+					*type = TK_LINEFEED;
+					return ++i;
+				}
 			}
-			*type = TK_SPACE;
-			return i;
 		}
 		*type = TK_MINUS;
 		return 1;
@@ -499,11 +512,16 @@ sqlRunParser(Parse * pParse, const char *zSql)
 			       || tokenType == TK_ILLEGAL);
 			if (tokenType == TK_ILLEGAL) {
 				diag_set(ClientError, ER_SQL_UNKNOWN_TOKEN,
+					 pParse->line_count, pParse->line_pos,
 					 pParse->sLastToken.n,
 					 pParse->sLastToken.z);
 				pParse->is_aborted = true;
 				break;
 			}
+		} else if (tokenType == TK_LINEFEED) {
+			pParse->line_count++;
+			pParse->line_pos = 1;
+			continue;
 		} else {
 			sqlParser(pEngine, tokenType, pParse->sLastToken,
 				      pParse);
@@ -511,6 +529,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 			if (pParse->is_aborted || db->mallocFailed)
 				break;
 		}
+		pParse->line_pos += pParse->sLastToken.n;
 	}
 	pParse->zTail = &zSql[i];
 	sqlParserFree(pEngine, sql_free);
@@ -536,6 +555,12 @@ sql_expr_compile(sql *db, const char *expr, int expr_len)
 
 	struct Parse parser;
 	sql_parser_create(&parser, db, default_flags);
+	/*
+	 * Since SELECT token is added to the original expression,
+	 * to make error message display correct position we should
+	 * account its length.
+	 */
+	parser.line_pos -= strlen(outer);
 	parser.parse_only = true;
 
 	struct Expr *expression = NULL;

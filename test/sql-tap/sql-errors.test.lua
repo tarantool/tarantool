@@ -17,7 +17,7 @@ test:do_catchsql_test(
 		ANALYZE v0;
 	]], {
 		-- <sql-errors-1.1>
-		1,"Syntax error near 'ANALYZE'"
+		1,"Syntax error at line 1 near 'ANALYZE'"
 		-- </sql-errors-1.1>
 	})
 
@@ -422,7 +422,7 @@ test:do_catchsql_test(
 		CREATE TRIGGER r0 AFTER INSERT ON t0 FOR EACH ROW BEGIN INSERT INTO t0.i VALUES (2); END;
 	]], {
 		-- <sql-errors-1.37>
-		1,"qualified table names are not allowed on INSERT, UPDATE, and DELETE statements within triggers"
+		1,"At line 1 at or near position 76: qualified table names are not allowed on INSERT, UPDATE, and DELETE statements within triggers"
 		-- </sql-errors-1.37>
 	})
 
@@ -482,7 +482,7 @@ test:do_catchsql_test(
 		SELECT (i,a) AS m FROM t0 WHERE m < 1;
 	]], {
 		-- <sql-errors-1.43>
-		1,"row value misused"
+		1, "row value misused"
 		-- </sql-errors-1.43>
 	})
 
@@ -522,7 +522,7 @@ test:do_catchsql_test(
 		DROP TABLE IF EXISTS END;
 	]], {
 		-- <sql-errors-1.47>
-		1, "Keyword 'END' is reserved. Please use double quotes if 'END' is an identifier."
+		1, "At line 1 at or near position 27: keyword 'END' is reserved. Please use double quotes if 'END' is an identifier."
 		-- </sql-errors-1.47>
 	})
 

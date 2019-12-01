@@ -880,7 +880,7 @@ test:do_catchsql_test(
     [[
         CREATE TABLE t11_7 (i INT AUTOINCREMENT, a INT AUTOINCREMENT, PRIMARY KEY(a, i));
     ]], {
-        1, "Syntax error in CREATE TABLE: Table must feature at most one AUTOINCREMENT field"
+        1, "Syntax error at line 1 at or near position 69: table must feature at most one AUTOINCREMENT field"
     })
 
 test:do_catchsql_test(
@@ -888,7 +888,7 @@ test:do_catchsql_test(
     [[
         CREATE TABLE t11_8 (i INT, a INT, PRIMARY KEY(a AUTOINCREMENT, i AUTOINCREMENT));
     ]], {
-        1, "Syntax error in CREATE TABLE: Table must feature at most one AUTOINCREMENT field"
+        1, "Syntax error at line 1 at or near position 87: table must feature at most one AUTOINCREMENT field"
     })
 
 test:do_catchsql_test(

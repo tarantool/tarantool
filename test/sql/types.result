@@ -9,27 +9,30 @@ test_run = env.new()
 box.execute("CREATE TABLE t1 (id PRIMARY KEY);")
 ---
 - null
-- Keyword 'PRIMARY' is reserved. Please use double quotes if 'PRIMARY' is an identifier.
+- 'At line 1 at or near position 21: keyword ''PRIMARY'' is reserved. Please use double
+  quotes if ''PRIMARY'' is an identifier.'
 ...
 box.execute("CREATE TABLE t1 (a, id INT PRIMARY KEY);")
 ---
 - null
-- Syntax error near ','
+- Syntax error at line 1 near ','
 ...
 box.execute("CREATE TABLE t1 (id PRIMARY KEY, a INT);")
 ---
 - null
-- Keyword 'PRIMARY' is reserved. Please use double quotes if 'PRIMARY' is an identifier.
+- 'At line 1 at or near position 21: keyword ''PRIMARY'' is reserved. Please use double
+  quotes if ''PRIMARY'' is an identifier.'
 ...
 box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a);")
 ---
 - null
-- Syntax error near ')'
+- Syntax error at line 1 near ')'
 ...
 box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT, b UNIQUE);")
 ---
 - null
-- Keyword 'UNIQUE' is reserved. Please use double quotes if 'UNIQUE' is an identifier.
+- 'At line 1 at or near position 47: keyword ''UNIQUE'' is reserved. Please use double
+  quotes if ''UNIQUE'' is an identifier.'
 ...
 -- gh-3104: real type is stored in space format.
 --

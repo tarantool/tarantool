@@ -528,11 +528,11 @@ t;
   176: box.error.SQL_CANT_RESOLVE_FIELD
   177: box.error.INDEX_EXISTS_IN_SPACE
   178: box.error.INCONSISTENT_TYPES
-  179: box.error.SQL_SYNTAX
+  179: box.error.SQL_SYNTAX_WITH_POS
   180: box.error.SQL_STACK_OVERFLOW
   181: box.error.SQL_SELECT_WILDCARD
   182: box.error.SQL_STATEMENT_EMPTY
-  184: box.error.SQL_UNRECOGNIZED_SYNTAX
+  184: box.error.SQL_SYNTAX_NEAR_TOKEN
   185: box.error.SQL_UNKNOWN_TOKEN
   186: box.error.SQL_PARSER_GENERIC
   187: box.error.SQL_ANALYZE_ARGUMENT
@@ -554,6 +554,7 @@ t;
   203: box.error.BOOTSTRAP_READONLY
   204: box.error.SQL_FUNC_WRONG_RET_COUNT
   205: box.error.FUNC_INVALID_RETURN_TYPE
+  206: box.error.SQL_PARSER_GENERIC_WITH_POS
 ...
 test_run:cmd("setopt delimiter ''");
 ---

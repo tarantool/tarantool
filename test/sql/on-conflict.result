@@ -15,44 +15,52 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 box.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v INTEGER UNIQUE ON CONFLICT ABORT)")
 ---
 - null
-- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- 'At line 1 at or near position 58: keyword ''ON'' is reserved. Please use double
+  quotes if ''ON'' is an identifier.'
 ...
 box.execute("CREATE TABLE q (id INTEGER PRIMARY KEY, v INTEGER UNIQUE ON CONFLICT FAIL)")
 ---
 - null
-- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- 'At line 1 at or near position 58: keyword ''ON'' is reserved. Please use double
+  quotes if ''ON'' is an identifier.'
 ...
 box.execute("CREATE TABLE p (id INTEGER PRIMARY KEY, v INTEGER UNIQUE ON CONFLICT IGNORE)")
 ---
 - null
-- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- 'At line 1 at or near position 58: keyword ''ON'' is reserved. Please use double
+  quotes if ''ON'' is an identifier.'
 ...
 box.execute("CREATE TABLE g (id INTEGER PRIMARY KEY, v INTEGER UNIQUE ON CONFLICT REPLACE)")
 ---
 - null
-- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- 'At line 1 at or near position 58: keyword ''ON'' is reserved. Please use double
+  quotes if ''ON'' is an identifier.'
 ...
 box.execute("CREATE TABLE e (id INTEGER PRIMARY KEY ON CONFLICT REPLACE, v INTEGER)")
 ---
 - null
-- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- 'At line 1 at or near position 40: keyword ''ON'' is reserved. Please use double
+  quotes if ''ON'' is an identifier.'
 ...
 box.execute("CREATE TABLE t1(a INT PRIMARY KEY ON CONFLICT REPLACE)")
 ---
 - null
-- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- 'At line 1 at or near position 35: keyword ''ON'' is reserved. Please use double
+  quotes if ''ON'' is an identifier.'
 ...
 box.execute("CREATE TABLE t2(a INT PRIMARY KEY ON CONFLICT IGNORE)")
 ---
 - null
-- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- 'At line 1 at or near position 35: keyword ''ON'' is reserved. Please use double
+  quotes if ''ON'' is an identifier.'
 ...
 -- CHECK constraint is illegal with REPLACE option.
 --
 box.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, a INTEGER CHECK (a > 5) ON CONFLICT REPLACE);")
 ---
 - null
-- Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
+- 'At line 1 at or near position 65: keyword ''ON'' is reserved. Please use double
+  quotes if ''ON'' is an identifier.'
 ...
 --
 -- gh-3473: Primary key can't be declared with NULL.

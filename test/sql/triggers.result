@@ -487,14 +487,14 @@ space_id = box.space.T1.id
 box.execute("CREATE TRIGGER tr1 AFTER INSERT ON t1 FOR EACH ROW WHEN new.a = ? BEGIN SELECT 1; END;")
 ---
 - null
-- bindings are not allowed in DDL
+- 'At line 1 at or near position 67: bindings are not allowed in DDL'
 ...
 tuple = {"TR1", space_id, {sql = [[CREATE TRIGGER tr1 AFTER INSERT ON t1 FOR EACH ROW WHEN new.a = ? BEGIN SELECT 1; END;]]}}
 ---
 ...
 box.space._trigger:insert(tuple)
 ---
-- error: bindings are not allowed in DDL
+- error: 'At line 1 at or near position 67: bindings are not allowed in DDL'
 ...
 box.execute("DROP TABLE t1;")
 ---
@@ -513,7 +513,8 @@ space_id = box.space.T1.id
 box.execute("CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN ; END;")
 ---
 - null
-- FOR EACH STATEMENT triggers are not implemented, please supply FOR EACH ROW clause
+- 'At line 1 at or near position 39: FOR EACH STATEMENT triggers are not implemented,
+  please supply FOR EACH ROW clause'
 ...
 box.execute("DROP TABLE t1;")
 ---

@@ -282,7 +282,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-2.10>
-        1,"Syntax error near ','"
+        1,"Syntax error at line 2 near ','"
         -- </check-2.10>
     })
 
@@ -296,7 +296,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-2.10>
-        1,"Syntax error near ','"
+        1,"Syntax error at line 3 near ','"
         -- </check-2.10>
     })
 
@@ -517,7 +517,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-5.1>
-        1, "Failed to create check constraint 'ck_unnamed_T5_1': bindings are not allowed in DDL"
+        1, "Failed to create check constraint 'ck_unnamed_T5_1': At line 1 at or near position 9: bindings are not allowed in DDL"
         -- </check-5.1>
     })
 
@@ -529,7 +529,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-5.2>
-        1, "Failed to create check constraint 'ck_unnamed_T5_1': bindings are not allowed in DDL"
+        1, "Failed to create check constraint 'ck_unnamed_T5_1': At line 1 at or near position 6: bindings are not allowed in DDL"
         -- </check-5.2>
     })
 
@@ -783,7 +783,7 @@ test:do_catchsql_test(
         ON CONFLICT REPLACE)
     ]], {
         -- <9.1>
-        1, "Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier."
+        1, "At line 2 at or near position 9: keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier."
         -- </9.1>
     })
 
@@ -794,7 +794,7 @@ test:do_catchsql_test(
         ON CONFLICT ABORT)
     ]], {
         -- <9.2>
-        1, "Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier."
+        1, "At line 2 at or near position 9: keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier."
         -- </9.2>
     })
 
@@ -805,7 +805,7 @@ test:do_catchsql_test(
         ON CONFLICT ROLLBACK)
     ]], {
         -- <9.3>
-        1, "Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier."
+        1, "At line 2 at or near position 9: keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier."
         -- </9.3>
     })
 
