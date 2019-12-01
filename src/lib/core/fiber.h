@@ -34,7 +34,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <unistd.h>
 #include "tt_pthread.h"
 #include "third_party/tarantool_ev.h"
 #include "diag.h"

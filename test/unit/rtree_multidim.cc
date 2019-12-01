@@ -1,11 +1,6 @@
-#include <algorithm>
-
-#include <stdlib.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <inttypes.h>
 #include <time.h>
+#include <algorithm>
 
 #include "unit.h"
 #include "salad/rtree.h"

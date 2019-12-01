@@ -1,4 +1,3 @@
-#include <stdlib.h>
 #include <time.h>
 
 #include "unit.h"

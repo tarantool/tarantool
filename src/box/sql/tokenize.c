@@ -36,7 +36,6 @@
  * individual tokens and sends those tokens one-by-one over to the
  * parser for analysis.
  */
-#include <stdlib.h>
 #include <unicode/utf8.h>
 #include <unicode/uchar.h>
 

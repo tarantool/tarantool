@@ -42,7 +42,6 @@
  *
  * Author: Hans-J. Boehm (boehm@parc.xerox.com)
  */
-#include <stdlib.h>
 
 /**
  * This macro helps to implement some common rope functions, not
@@ -53,6 +52,8 @@
 #define rope_data_t void *
 #define rope_ctx_t void *
 #include "rope.h"
+
+#include <stdlib.h>
 
 static inline int
 avl_node_height(struct avl_node *node)

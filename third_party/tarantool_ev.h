@@ -32,7 +32,6 @@
 #include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 #define EV_MULTIPLICITY 1
 #define EV_COMPAT3 0

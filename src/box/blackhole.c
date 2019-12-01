@@ -30,8 +30,6 @@
  */
 #include "blackhole.h"
 
-#include <stddef.h>
-#include <stdlib.h>
 #include <small/rlist.h>
 
 #include "diag.h"
