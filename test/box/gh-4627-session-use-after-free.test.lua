@@ -15,16 +15,34 @@
 net_box = require('net.box')
 fiber = require('fiber')
 
+box.schema.user.grant('guest', 'execute', 'universe')
+
+-- This is a workaround for flakiness of the test
+-- appearing when test-run does reconnects to the
+-- instance and therefore creates multiple
+-- sessions. By setting a flag for only one
+-- session, others won't interfere in
+-- session.on_disconnect().
+function enable_on_disconnect()                 \
+    box.session.storage.is_enabled = true       \
+end
+
 sid_before_yield = nil
 sid_after_yield = nil
 func = box.session.on_disconnect(function()     \
+    if not box.session.storage.is_enabled then  \
+        return                                  \
+    end                                         \
     sid_before_yield = box.session.id()         \
     fiber.yield()                               \
     sid_after_yield = box.session.id()          \
 end)
 
 connection = net_box.connect(box.cfg.listen)
-connection:ping()
+-- Connections, not related to this one, won't
+-- call this function, and therefore won't do
+-- anything in session.on_disconnect() trigger.
+connection:call('enable_on_disconnect')
 connection:close()
 
 while not sid_after_yield do fiber.yield() end
@@ -33,3 +51,5 @@ sid_after_yield == sid_before_yield and sid_after_yield ~= 0 or \
     {sid_after_yield, sid_before_yield}
 
 box.session.on_disconnect(nil, func)
+
+box.schema.user.revoke('guest', 'execute', 'universe')
