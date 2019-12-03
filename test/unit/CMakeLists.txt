@@ -96,6 +96,11 @@ target_link_libraries(cbus_stress.test core stat)
 add_executable(cbus.test cbus.c)
 target_link_libraries(cbus.test core unit stat)
 
+if (${CMAKE_HOST_SYSTEM_NAME} MATCHES "Linux")
+    add_executable(cbus_hang.test cbus_hang.c)
+    target_link_libraries(cbus_hang.test core unit stat)
+endif ()
+
 add_executable(coio.test coio.cc)
 target_link_libraries(coio.test core eio bit uri unit)
 
