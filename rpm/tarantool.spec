@@ -77,7 +77,7 @@ BuildRequires: python-six >= 1.9.0
 BuildRequires: python-gevent >= 1.0
 BuildRequires: python-yaml >= 3.0.9
 %endif
-%if 0%{?rhel} >= 8
+%if (0%{?fedora} >= 31 || 0%{?rhel} >= 8)
 BuildRequires: python2 >= 2.7
 BuildRequires: python2-six >= 1.9.0
 BuildRequires: python2-gevent >= 1.0
