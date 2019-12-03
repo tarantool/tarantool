@@ -176,6 +176,12 @@ fedora_30:
     OS: 'fedora'
     DIST: '30'
 
+fedora_31:
+  <<: *deploy_test_definition
+  variables:
+    OS: 'fedora'
+    DIST: '31'
+
 ubuntu_14_04:
   <<: *deploy_definition
   variables:
