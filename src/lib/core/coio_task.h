@@ -131,8 +131,7 @@ coio_task_post(struct coio_task *task);
 
 /**
  * Create new eio task with specified function and
- * arguments. Yield and wait until the task is complete
- * or a timeout occurs.
+ * arguments. Yield and wait until the task is complete.
  *
  * This function doesn't throw exceptions to avoid double error
  * checking: in most cases it's also necessary to check the return
@@ -150,7 +149,7 @@ coio_task_post(struct coio_task *task);
  *	         return open(filename, flags);
  *	}
  *
- *	if (coio_call(openfile_cb, 0.10, "/tmp/file", 0) == -1)
+ *	if (coio_call(openfile_cb, "/tmp/file", 0) == -1)
  *		// handle errors.
  *	...
  * @endcode
