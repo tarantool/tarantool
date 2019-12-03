@@ -300,6 +300,11 @@
 
 #define tt_pthread_getspecific(key) pthread_getspecific(key)
 
+#define tt_pthread_setcancelstate(state, oldstate)	\
+({	int e__ = pthread_setcancelstate(state, oldstate);\
+	tt_pthread_error(e__);				\
+})
+
 /** Set the current thread's name
  */
 static inline void
