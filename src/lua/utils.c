@@ -234,7 +234,7 @@ static struct {
 	OPTION(LUA_TBOOLEAN, encode_sparse_convert, 1),
 	OPTION(LUA_TNUMBER,  encode_sparse_ratio, 2),
 	OPTION(LUA_TNUMBER,  encode_sparse_safe, 10),
-	OPTION(LUA_TNUMBER,  encode_max_depth, 32),
+	OPTION(LUA_TNUMBER,  encode_max_depth, 128),
 	OPTION(LUA_TBOOLEAN, encode_deep_as_nil, 0),
 	OPTION(LUA_TBOOLEAN, encode_invalid_numbers, 1),
 	OPTION(LUA_TNUMBER,  encode_number_precision, 14),
@@ -243,7 +243,7 @@ static struct {
 	OPTION(LUA_TBOOLEAN, encode_invalid_as_nil, 0),
 	OPTION(LUA_TBOOLEAN, decode_invalid_numbers, 1),
 	OPTION(LUA_TBOOLEAN, decode_save_metatables, 1),
-	OPTION(LUA_TNUMBER,  decode_max_depth, 32),
+	OPTION(LUA_TNUMBER,  decode_max_depth, 128),
 	{ NULL, 0, 0, 0},
 };
 
