@@ -667,7 +667,7 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 		} else if (num >= 0 && num < exp2(64)) {
 			field->type = MP_UINT;
 			field->ival = (uint64_t) num;
-		} else if (num > -exp2(63) && num < exp2(63)) {
+		} else if (num >= -exp2(63) && num < exp2(63)) {
 			field->type = MP_INT;
 			field->ival = (int64_t) num;
 		} else {

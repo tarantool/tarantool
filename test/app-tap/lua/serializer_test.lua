@@ -101,7 +101,7 @@ local function test_unsigned(test, s)
 end
 
 local function test_signed(test, s)
-    test:plan(52)
+    test:plan(53)
 
     rt(test, s, -1, 'number')
     rt(test, s, -1LL, 'number')
@@ -143,6 +143,10 @@ local function test_signed(test, s)
 
     rt(test, s, ffi.new('short', -128), 'number')
     rt(test, s, ffi.new('int', -128), 'number')
+
+    -- gh-4672: Make sure that -2^63 encoded as INTEGER.
+    test:ok(s.encode(-9223372036854775808LL) == s.encode(-2^63),
+            '-2^63 encoded as INTEGER')
 end
 
 local function test_double(test, s)
