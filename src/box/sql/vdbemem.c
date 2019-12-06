@@ -554,7 +554,7 @@ mem_apply_integer_type(Mem *pMem)
  * Convert pMem to type integer.  Invalidate any prior representations.
  */
 int
-sqlVdbeMemIntegerify(Mem * pMem, bool is_forced)
+sqlVdbeMemIntegerify(struct Mem *pMem)
 {
 	assert(EIGHT_BYTE_ALIGNMENT(pMem));
 
@@ -562,11 +562,6 @@ sqlVdbeMemIntegerify(Mem * pMem, bool is_forced)
 	bool is_neg;
 	if (sqlVdbeIntValue(pMem, &i, &is_neg) == 0) {
 		mem_set_int(pMem, i, is_neg);
-		return 0;
-	} else if ((pMem->flags & MEM_Real) != 0 && is_forced) {
-		if (pMem->u.r >= INT64_MAX || pMem->u.r < INT64_MIN)
-			return -1;
-		mem_set_int(pMem, pMem->u.r, pMem->u.r <= -1);
 		return 0;
 	}
 
@@ -735,7 +730,7 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 			MemSetTypeFlag(pMem, MEM_UInt);
 			return 0;
 		}
-		if (sqlVdbeMemIntegerify(pMem, true) != 0)
+		if (sqlVdbeMemIntegerify(pMem) != 0)
 			return -1;
 		if (type == FIELD_TYPE_UNSIGNED &&
 		    (pMem->flags & MEM_UInt) == 0)

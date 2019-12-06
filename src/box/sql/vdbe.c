@@ -328,7 +328,7 @@ mem_apply_type(struct Mem *record, enum field_type type)
 					    record->u.r <= -1);
 			return 0;
 		}
-		if (sqlVdbeMemIntegerify(record, false) != 0)
+		if (sqlVdbeMemIntegerify(record) != 0)
 			return -1;
 		if ((record->flags & MEM_Int) == MEM_Int) {
 			if (type == FIELD_TYPE_UNSIGNED)
