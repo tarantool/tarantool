@@ -445,7 +445,7 @@ lua_fiber_run_f(MAYBE_UNUSED va_list ap)
 	/* Destroy local storage */
 	int storage_ref = f->storage.lua.ref;
 	if (storage_ref > 0)
-		luaL_unref(L, LUA_REGISTRYINDEX, storage_ref);
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, storage_ref);
 	/*
 	 * If fiber is not joinable
 	 * We can unref child stack here,
