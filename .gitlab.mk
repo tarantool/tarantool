@@ -132,13 +132,6 @@ deploy: package
 			-b="${RELEASE_REPO_S3_DIR}/${BUCKET}" build ; \
 	fi
 
-# ############
-# Static build
-# ############
-
-static_build:
-	docker build --network=host --build-arg RUN_TESTS="${RUN_TESTS}" -f Dockerfile.staticbuild .
-
 # ###################
 # Performance testing
 # ###################
