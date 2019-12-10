@@ -64,12 +64,11 @@ RUN set -x && \
 
 COPY . /tarantool
 
+WORKDIR /tarantool
+
 RUN set -x && \
-    cd tarantool && \
     git submodule init && \
     git submodule update
-
-WORKDIR /tarantool
 
 RUN set -x && \
     find . -name 'CMakeFiles' -type d -exec rm -rf {} + && \
@@ -77,17 +76,14 @@ RUN set -x && \
 
 RUN pip install -r /tarantool/test-run/requirements.txt
 
-RUN set -x \
-    && (cd /tarantool; \
-       cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-             -DENABLE_DIST:BOOL=ON \
-             -DBUILD_STATIC=ON \
-             -DOPENSSL_USE_STATIC_LIBS=ON \
-             -DOPENSSL_ROOT_DIR=/usr/local \
-             .) \
-    && make -C /tarantool -j
-
-RUN cd /tarantool && make install
+RUN set -x && \
+    cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+         -DENABLE_DIST:BOOL=ON \
+         -DBUILD_STATIC=ON \
+         -DOPENSSL_USE_STATIC_LIBS=ON \
+         -DOPENSSL_ROOT_DIR=/usr/local \
+         . && \
+    make -j && make install
 
 ARG RUN_TESTS
 RUN if [ -n "${RUN_TESTS}" ]; then \
