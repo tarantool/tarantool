@@ -44,7 +44,7 @@ RUN set -x && \
     tar -xvf openssl-1.1.0h.tar.gz && \
     cd openssl-1.1.0h && \
     ./config --libdir=lib && \
-    make && make install
+    make -j && make install
 
 RUN set -x && \
     cd / && \
@@ -52,7 +52,7 @@ RUN set -x && \
     tar -xvf icu4c-62_1-src.tgz && \
     cd icu/source && \
     ./configure --with-data-packaging=static --enable-static --enable-shared && \
-    make && make install
+    make -j && make install
 
 RUN set -x && \
     cd / && \
@@ -60,7 +60,7 @@ RUN set -x && \
     tar -xvf libunwind-1.3-rc1.tar.gz && \
     cd libunwind-1.3-rc1 && \
     ./configure --enable-static --enable-shared && \
-    make && make install
+    make -j && make install
 
 COPY . /tarantool
 
