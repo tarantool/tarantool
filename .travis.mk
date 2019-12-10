@@ -129,6 +129,22 @@ test_asan_debian_no_deps: build_asan_debian
 
 test_asan_debian: deps_debian deps_buster_clang_8 test_asan_debian_no_deps
 
+# Static build
+
+deps_debian_static:
+	# Found that in Debian OS libunwind library built with dependencies to
+	# liblzma library, but there is no liblzma static library installed,
+	# while liblzma dynamic library exists. So the build dynamicaly has no
+	# issues, while static build fails. To fix it we need to install
+	# liblzma-dev package with static library only for static build.
+	apt-get install -y -f liblzma-dev
+
+test_static_build: deps_debian_static
+	CMAKE_EXTRA_PARAMS=-DBUILD_STATIC=ON make -f .travis.mk test_debian_no_deps
+
+test_static_docker_build:
+	docker build --network=host --build-arg RUN_TESTS=ON -f Dockerfile.staticbuild .
+
 #######
 # OSX #
 #######

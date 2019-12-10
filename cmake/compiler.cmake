@@ -171,6 +171,17 @@ if (ENABLE_BACKTRACE)
             NAMES ${UNWIND_PLATFORM_LIB_NAME})
         set(UNWIND_LIBRARIES ${UNWIND_PLATFORM_LIBRARY} ${UNWIND_LIBRARY})
     endif()
+    if (BUILD_STATIC)
+        # some versions of libunwind need liblzma, and we don't use pkg-config
+        # so we just look whether liblzma is installed, and add it if it is.
+        # It might not be actually needed, but doesn't hurt if it is not.
+        # We don't need any headers, just the lib, as it's privately needed.
+        find_library(LZMA_LIBRARY PATH_SUFFIXES system NAMES liblzma.a)
+        if (NOT LZMA_LIBRARY STREQUAL "LZMA_LIBRARY-NOTFOUND")
+            message(STATUS "liblzma found")
+            set(UNWIND_LIBRARIES ${UNWIND_LIBRARIES} ${LZMA_LIBRARY})
+        endif()
+    endif()
     find_package_message(UNWIND_LIBRARIES "Found unwind" "${UNWIND_LIBRARIES}")
 endif()
 
