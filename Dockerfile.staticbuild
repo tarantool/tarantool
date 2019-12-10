@@ -70,9 +70,12 @@ RUN set -x && \
     git submodule init && \
     git submodule update
 
+# Cleanup for 'build' directory added, because it purges all artefacts
+# produced for curl build, including the old configuration in build/curl
 RUN set -x && \
     find . -name 'CMakeFiles' -type d -exec rm -rf {} + && \
-    find . -name 'CMakeCache.txt' -type f -delete
+    find . -name 'CMakeCache.txt' -type f -delete && \
+    rm -rf build
 
 RUN pip install -r /tarantool/test-run/requirements.txt
 
