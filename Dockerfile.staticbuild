@@ -56,7 +56,7 @@ RUN set -x && \
 
 RUN set -x && \
     cd / && \
-    LD_LIBRARY_PATH=/usr/local/lib64 curl -O -L http://download.savannah.nongnu.org/releases/libunwind/libunwind-1.3-rc1.tar.gz && \
+    curl -O -L http://download.savannah.nongnu.org/releases/libunwind/libunwind-1.3-rc1.tar.gz && \
     tar -xvf libunwind-1.3-rc1.tar.gz && \
     cd libunwind-1.3-rc1 && \
     ./configure --enable-static --enable-shared && \
