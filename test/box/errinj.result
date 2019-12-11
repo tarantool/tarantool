@@ -25,6 +25,8 @@ errinj.info()
     state: 0
   ERRINJ_WAL_WRITE:
     state: false
+  ERRINJ_RELAY_BREAK_LSN:
+    state: -1
   ERRINJ_HTTPC_EXECUTE:
     state: false
   ERRINJ_VYRUN_DATA_READ:
@@ -73,8 +75,8 @@ errinj.info()
     state: false
   ERRINJ_WAL_FALLOCATE:
     state: 0
-  ERRINJ_RELAY_BREAK_LSN:
-    state: -1
+  ERRINJ_DYN_MODULE_COUNT:
+    state: 0
   ERRINJ_VY_INDEX_FILE_RENAME:
     state: false
   ERRINJ_TUPLE_FORMAT_COUNT:
