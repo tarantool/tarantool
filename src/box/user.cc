@@ -517,6 +517,13 @@ user_find(uint32_t uid)
 	return user;
 }
 
+/* Find a user by authentication token. */
+struct user *
+user_find_by_token(uint8_t auth_token)
+{
+    return &users[auth_token];
+}
+
 /** Find user by name. */
 struct user *
 user_find_by_name(const char *name, uint32_t len)

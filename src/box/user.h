@@ -112,6 +112,10 @@ user_find_by_name(const char *name, uint32_t len);
 struct user *
 user_find(uint32_t uid);
 
+/* Find a user by authentication token. */
+struct user *
+user_find_by_token(uint8_t auth_token);
+
 /** Create a cache of user's privileges in @a cr. */
 void
 credentials_create(struct credentials *cr, struct user *user);

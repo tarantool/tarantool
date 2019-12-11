@@ -56,6 +56,7 @@
 #include "box/schema.h"
 #include "box/tuple_format.h"
 #include "box/coll_id_cache.h"
+#include "box/user.h"
 
 void
 sql_finish_coding(struct Parse *parse_context)
@@ -1524,6 +1525,45 @@ vdbe_emit_ck_constraint_drop(struct Parse *parser, const char *ck_name,
 }
 
 /**
+ * Generate VDBE program to revoke all
+ * privileges associated with the given object.
+ *
+ * @param parser Parsing context.
+ * @param object_type Object type.
+ * @param object_id Object id.
+ * @param access Access array associated with an object.
+ */
+static void
+vdbe_emit_revoke_object(struct Parse *parser, const char *object_type,
+			uint32_t object_id, struct access *access)
+{
+	struct Vdbe *v = sqlGetVdbe(parser);
+	assert(v != NULL);
+	/*
+	 * Get uid of users through access array
+	 * and generate code to delete corresponding
+	 * entries from _priv.
+	 */
+	int key_reg = sqlGetTempRange(parser, 4);
+	bool had_grants = false;
+	for (uint8_t token = 0; token < BOX_USER_MAX; ++token) {
+		if (!access[token].granted)
+			continue;
+		had_grants = true;
+		const struct user *user = user_find_by_token(token);
+		sqlVdbeAddOp2(v, OP_Integer, user->def->uid, key_reg);
+		sqlVdbeAddOp4(v, OP_String8, 0, key_reg + 1, 0,
+			      object_type, P4_STATIC);
+		sqlVdbeAddOp2(v, OP_Integer, object_id, key_reg + 2);
+		sqlVdbeAddOp3(v, OP_MakeRecord, key_reg, 3, key_reg + 3);
+		sqlVdbeAddOp2(v, OP_SDelete, BOX_PRIV_ID, key_reg + 3);
+	}
+	if (had_grants)
+		VdbeComment((v, "Remove %s grants", object_type));
+	sqlReleaseTempRange(parser, key_reg, 4);
+}
+
+/**
  * Generate code to drop a table.
  * This routine includes dropping triggers, sequences,
  * all indexes and entry from _space space.
@@ -1538,6 +1578,12 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 {
 	struct Vdbe *v = sqlGetVdbe(parse_context);
 	assert(v != NULL);
+	/*
+	 * Remove all grants associated with
+	 * the table being dropped.
+	 */
+	vdbe_emit_revoke_object(parse_context, "space", space->def->id,
+				space->access);
 	/*
 	 * Drop all triggers associated with the table being
 	 * dropped. Code is generated to remove entries from
