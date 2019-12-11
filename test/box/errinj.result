@@ -20,6 +20,8 @@ errinj.info()
     state: false
   ERRINJ_VYRUN_DATA_READ:
     state: false
+  ERRINJ_WAL_BREAK_LSN:
+    state: -1
   ERRINJ_SQL_NAME_NORMALIZATION:
     state: false
   ERRINJ_VY_SCHED_TIMEOUT:
@@ -62,8 +64,8 @@ errinj.info()
     state: false
   ERRINJ_WAL_FALLOCATE:
     state: 0
-  ERRINJ_WAL_BREAK_LSN:
-    state: -1
+  ERRINJ_DYN_MODULE_COUNT:
+    state: 0
   ERRINJ_RELAY_BREAK_LSN:
     state: -1
   ERRINJ_TUPLE_FORMAT_COUNT:
