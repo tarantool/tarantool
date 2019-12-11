@@ -973,6 +973,21 @@ end
 
 --------------------------------------------------------------------------------
 
+local handlers = {
+    {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = true},
+    {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7, auto = true},
+    {version = mkversion(1, 10, 0), func = upgrade_to_1_10_0, auto = true},
+    {version = mkversion(1, 10, 2), func = upgrade_to_1_10_2, auto = true},
+    {version = mkversion(2, 1, 0), func = upgrade_to_2_1_0, auto = true},
+    {version = mkversion(2, 1, 1), func = upgrade_to_2_1_1, auto = true},
+    {version = mkversion(2, 1, 2), func = upgrade_to_2_1_2, auto = true},
+    {version = mkversion(2, 1, 3), func = upgrade_to_2_1_3, auto = true},
+    {version = mkversion(2, 2, 1), func = upgrade_to_2_2_1, auto = true},
+    {version = mkversion(2, 3, 0), func = upgrade_to_2_3_0, auto = true},
+    {version = mkversion(2, 3, 1), func = upgrade_to_2_3_1, auto = true},
+}
+
+-- Schema version of the snapshot.
 local function get_version()
     local version = box.space._schema:get{'version'}
     if version == nil then
@@ -982,7 +997,19 @@ local function get_version()
     local minor = version[3]
     local patch = version[4] or 0
 
-    return mkversion(major, minor, patch)
+    return mkversion(major, minor, patch),
+           string.format("%s.%s.%s", major, minor, patch)
+end
+
+local function schema_needs_upgrade()
+    -- Schema needs upgrade if current schema version is greater
+    -- than schema version of the snapshot.
+    local schema_version, schema_version_str = get_version()
+    if schema_version ~= nil and
+        handlers[#handlers].version > schema_version then
+        return true, schema_version_str
+    end
+    return false
 end
 
 local function upgrade(options)
@@ -994,20 +1021,6 @@ local function upgrade(options)
         log.warn('can upgrade from 1.7.5 only')
         return
     end
-
-    local handlers = {
-        {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = true},
-        {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7, auto = true},
-        {version = mkversion(1, 10, 0), func = upgrade_to_1_10_0, auto = true},
-        {version = mkversion(1, 10, 2), func = upgrade_to_1_10_2, auto = true},
-        {version = mkversion(2, 1, 0), func = upgrade_to_2_1_0, auto = true},
-        {version = mkversion(2, 1, 1), func = upgrade_to_2_1_1, auto = true},
-        {version = mkversion(2, 1, 2), func = upgrade_to_2_1_2, auto = true},
-        {version = mkversion(2, 1, 3), func = upgrade_to_2_1_3, auto = true},
-        {version = mkversion(2, 2, 1), func = upgrade_to_2_2_1, auto = true},
-        {version = mkversion(2, 3, 0), func = upgrade_to_2_3_0, auto = true},
-        {version = mkversion(2, 3, 1), func = upgrade_to_2_3_1, auto = true},
-    }
 
     for _, handler in ipairs(handlers) do
         if version >= handler.version then
@@ -1047,3 +1060,4 @@ end
 
 box.schema.upgrade = upgrade;
 box.internal.bootstrap = bootstrap;
+box.internal.schema_needs_upgrade = schema_needs_upgrade;

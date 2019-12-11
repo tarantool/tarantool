@@ -656,3 +656,53 @@ test_run:cmd("cleanup server cfg_tester7")
  | ---
  | - true
  | ...
+
+--
+-- gh-4574: Check schema version after Tarantool update.
+--
+test_run:cmd('create server cfg_tester8 with script = "box/lua/cfg_test8.lua", workdir="sql/upgrade/2.1.0/"')
+ | ---
+ | - true
+ | ...
+test_run:cmd("start server cfg_tester8")
+ | ---
+ | - true
+ | ...
+--- Check that the warning is printed.
+version_warning = "Please, consider using box.schema.upgrade()."
+ | ---
+ | ...
+test_run:wait_log('cfg_tester8', version_warning, 1000, 1.0) ~= nil
+ | ---
+ | - true
+ | ...
+test_run:cmd("stop server cfg_tester8")
+ | ---
+ | - true
+ | ...
+test_run:cmd("cleanup server cfg_tester8")
+ | ---
+ | - true
+ | ...
+
+test_run:cmd('create server cfg_tester9 with script = "box/lua/cfg_test1.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd("start server cfg_tester9")
+ | ---
+ | - true
+ | ...
+--- Check that the warning isn't printed.
+test_run:wait_log('cfg_tester9', version_warning, 1000, 1.0) == nil
+ | ---
+ | - true
+ | ...
+test_run:cmd("stop server cfg_tester9")
+ | ---
+ | - true
+ | ...
+test_run:cmd("cleanup server cfg_tester9")
+ | ---
+ | - true
+ | ...

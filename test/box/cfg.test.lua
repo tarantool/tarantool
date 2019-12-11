@@ -159,3 +159,21 @@ test_run:grep_log('cfg_tester7', 'set \'replication\' configuration option to', 
 test_run:grep_log('cfg_tester7', 'test%-cluster%-cookie', 1000)
 test_run:cmd("stop server cfg_tester7")
 test_run:cmd("cleanup server cfg_tester7")
+
+--
+-- gh-4574: Check schema version after Tarantool update.
+--
+test_run:cmd('create server cfg_tester8 with script = "box/lua/cfg_test8.lua", workdir="sql/upgrade/2.1.0/"')
+test_run:cmd("start server cfg_tester8")
+--- Check that the warning is printed.
+version_warning = "Please, consider using box.schema.upgrade()."
+test_run:wait_log('cfg_tester8', version_warning, 1000, 1.0) ~= nil
+test_run:cmd("stop server cfg_tester8")
+test_run:cmd("cleanup server cfg_tester8")
+
+test_run:cmd('create server cfg_tester9 with script = "box/lua/cfg_test1.lua"')
+test_run:cmd("start server cfg_tester9")
+--- Check that the warning isn't printed.
+test_run:wait_log('cfg_tester9', version_warning, 1000, 1.0) == nil
+test_run:cmd("stop server cfg_tester9")
+test_run:cmd("cleanup server cfg_tester9")
