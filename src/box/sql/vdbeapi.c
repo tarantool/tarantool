@@ -89,7 +89,7 @@ sql_stmt_finalize(sql_stmt * pStmt)
 }
 
 int
-sql_reset(sql_stmt * pStmt)
+sql_stmt_reset(sql_stmt *pStmt)
 {
 	assert(pStmt != NULL);
 	struct Vdbe *v = (Vdbe *) pStmt;
@@ -421,7 +421,7 @@ sqlStep(Vdbe * p)
 
 	assert(p);
 	if (p->magic != VDBE_MAGIC_RUN)
-		sql_reset((sql_stmt *) p);
+		sql_stmt_reset((sql_stmt *) p);
 
 	/* Check that malloc() has not failed. If it has, return early. */
 	db = p->db;

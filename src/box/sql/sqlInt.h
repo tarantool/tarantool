@@ -532,7 +532,7 @@ sql_stmt_finalize(sql_stmt * pStmt);
  * @retval sql_ret_code Error code on error.
  */
 int
-sql_reset(struct sql_stmt *stmt);
+sql_stmt_reset(struct sql_stmt *stmt);
 
 bool
 sql_metadata_is_full();
