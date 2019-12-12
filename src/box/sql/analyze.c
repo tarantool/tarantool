@@ -1424,7 +1424,7 @@ load_stat_from_space(const char *sql_select_prepare,
 		current_idx_count++;
 
 	}
-	rc = sql_finalize(stmt);
+	rc = sql_stmt_finalize(stmt);
 	if (rc)
 		goto finalize;
 	rc = sql_stmt_compile(sql_select_load, -1, NULL, &stmt, 0);
@@ -1475,7 +1475,7 @@ load_stat_from_space(const char *sql_select_prepare,
 		sample->sample_key = region_alloc(&fiber()->gc,
 						  sample->key_size);
 		if (sample->sample_key == NULL) {
-			sql_finalize(stmt);
+			sql_stmt_finalize(stmt);
 			rc = -1;
 			diag_set(OutOfMemory, sample->key_size,
 				 "region", "sample_key");
@@ -1488,7 +1488,7 @@ load_stat_from_space(const char *sql_select_prepare,
 		}
 		stats[current_idx_count].sample_count++;
 	}
-	rc = sql_finalize(stmt);
+	rc = sql_stmt_finalize(stmt);
 	if (rc == 0 && prev_index != NULL)
 		init_avg_eq(prev_index, &stats[current_idx_count]);
 	assert(current_idx_count <= index_count);

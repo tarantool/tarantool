@@ -100,7 +100,7 @@ static void
 port_sql_destroy(struct port *base)
 {
 	port_tuple_vtab.destroy(base);
-	sql_finalize(((struct port_sql *)base)->stmt);
+	sql_stmt_finalize(((struct port_sql *)base)->stmt);
 }
 
 const struct port_vtab port_sql_vtab = {

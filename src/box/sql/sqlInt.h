@@ -521,7 +521,7 @@ sql_column_value(sql_stmt *,
 		     int iCol);
 
 int
-sql_finalize(sql_stmt * pStmt);
+sql_stmt_finalize(sql_stmt * pStmt);
 
 /*
  * Terminate the current execution of an SQL statement and reset

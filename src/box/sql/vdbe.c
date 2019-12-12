@@ -1091,7 +1091,7 @@ case OP_Yield: {            /* in1, jump */
  * automatically.
  *
  * P1 is the result code returned by sql_exec(),
- * sql_reset(), or sql_finalize().  For a normal halt,
+ * sql_reset(), or sql_stmt_finalize().  For a normal halt,
  * this should be 0.
  * For errors, it can be some other value.  If P1!=0 then P2 will
  * determine whether or not to rollback the current transaction.
@@ -2894,7 +2894,7 @@ case OP_MakeRecord: {
 	 * memory shouldn't be reused until it is written into WAL.
 	 *
 	 * However, if memory for ephemeral space is allocated
-	 * on region, it will be freed only in sql_finalize()
+	 * on region, it will be freed only in sql_stmt_finalize()
 	 * routine.
 	 */
 	if (bIsEphemeral) {

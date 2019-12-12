@@ -77,7 +77,7 @@ invokeProfileCallback(sql * db, Vdbe * p)
  * machine.
  */
 int
-sql_finalize(sql_stmt * pStmt)
+sql_stmt_finalize(sql_stmt * pStmt)
 {
 	if (pStmt == NULL)
 		return 0;

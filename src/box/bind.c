@@ -180,7 +180,7 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 		 * Parameters are allocated within message pack,
 		 * received from the iproto thread. IProto thread
 		 * now is waiting for the response and it will not
-		 * free the packet until sql_finalize. So
+		 * free the packet until sql_stmt_finalize. So
 		 * there is no need to copy the packet and we can
 		 * use SQL_STATIC.
 		 */

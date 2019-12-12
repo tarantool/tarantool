@@ -243,7 +243,7 @@ lua_sql_bind_list_decode(struct lua_State *L, struct sql_bind **out_bind,
 	size_t size = sizeof(struct sql_bind) * bind_count;
 	/*
 	 * Memory allocated here will be freed in
-	 * sql_finalize() or in txn_commit()/txn_rollback() if
+	 * sql_stmt_finalize() or in txn_commit()/txn_rollback() if
 	 * there is an active transaction.
 	 */
 	struct sql_bind *bind = (struct sql_bind *) region_alloc(region, size);

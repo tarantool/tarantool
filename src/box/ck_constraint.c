@@ -141,7 +141,7 @@ ck_constraint_program_compile(struct ck_constraint_def *ck_constraint_def,
 		diag_set(ClientError, ER_CREATE_CK_CONSTRAINT,
 			 ck_constraint_def->name,
 			 box_error_message(box_error_last()));
-		sql_finalize((struct sql_stmt *) v);
+		sql_stmt_finalize((struct sql_stmt *) v);
 		return NULL;
 	}
 	return (struct sql_stmt *) v;
@@ -254,7 +254,7 @@ error:
 void
 ck_constraint_delete(struct ck_constraint *ck_constraint)
 {
-	sql_finalize(ck_constraint->stmt);
+	sql_stmt_finalize(ck_constraint->stmt);
 	ck_constraint_def_delete(ck_constraint->def);
 	TRASH(ck_constraint);
 	free(ck_constraint);
