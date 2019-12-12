@@ -22,7 +22,7 @@ end
 
 tap.test("json", function(test)
     local serializer = require('json')
-    test:plan(51)
+    test:plan(57)
 
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
@@ -184,4 +184,22 @@ tap.test("json", function(test)
     test:ok(string.find(err_msg, 'comma') ~= nil, 'comma instead of T_COMMA')
     _, err_msg = pcall(serializer.decode, '{')
     test:ok(string.find(err_msg, 'end') ~= nil, 'end instead of T_END')
+
+    --
+    -- gh-4339: Make sure that context is printed.
+    --
+    _, err_msg = pcall(serializer.decode, '{{: "world"}')
+    test:ok(string.find(err_msg, '{ >> {: "worl') ~= nil, 'context #1')
+    _, err_msg = pcall(serializer.decode, '{"a": "world"}}')
+    test:ok(string.find(err_msg, '"world"} >> }') ~= nil, 'context #2')
+    _, err_msg = pcall(serializer.decode, '{1: "world"}')
+    test:ok(string.find(err_msg, '{ >> 1: "worl') ~= nil, 'context #3')
+    _, err_msg = pcall(serializer.decode, '{')
+    test:ok(string.find(err_msg, '{ >> ') ~= nil, 'context #4')
+    _, err_msg = pcall(serializer.decode, '}')
+    test:ok(string.find(err_msg, ' >> }') ~= nil, 'context #5')
+    serializer.cfg{decode_max_depth = 1}
+    _, err_msg = pcall(serializer.decode, '{"a": {a = {}}}')
+    test:ok(string.find(err_msg, '{"a":  >> {a = {}}') ~= nil, 'context #6')
+
 end)
