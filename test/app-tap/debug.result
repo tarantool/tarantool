@@ -15,15 +15,15 @@ nil
 Exec: tarantool -e "print(debug.__dir__); os.exit(0)"
 .
 Exec: tarantool -e "print(require('net.box').self:call('debug.sourcefile')); os.exit(0)"
-nil
+
 Exec: tarantool -e "print(require('net.box').self:call('debug.sourcedir')); os.exit(0)"
 .
 Exec: tarantool -e "fn = function() return debug.__file__ end; print(require('net.box').self:call('fn')); os.exit(0)"
-nil
+
 Exec: tarantool -e "fn = function() return debug.__dir__ end; print(require('net.box').self:call('fn')); os.exit(0)"
 .
 Exec: tarantool -e "fn = function() local res = debug.sourcefile(); return res end; print(require('net.box').self:call('fn')); os.exit(0)"
-nil
+
 Exec: tarantool -e "fn = function() local res = debug.sourcedir(); return res end; print(require('net.box').self:call('fn')); os.exit(0)"
 .
 Exec: tarantool -e "print(loadstring('return debug.sourcefile()')()); os.exit(0)"
@@ -52,7 +52,7 @@ debug/test.lua
 Source: print(debug.__dir__)
 debug
 Source: print(require('net.box').self:call('debug.sourcefile'))
-nil
+
 Source: print(require('net.box').self:call('debug.sourcedir'))
 .
 Source: fn = function() return debug.__file__ end; print(require('net.box').self:call('fn'))

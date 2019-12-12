@@ -1550,7 +1550,13 @@ local function handle_eval_result(status, ...)
         rollback()
         return box.error(E_PROC_LUA, (...))
     end
-    return ...
+    local results = {...}
+    for i = 1, select('#', ...) do
+        if type(results[i]) == 'cdata' then
+            results[i] = msgpack.decode(msgpack.encode(results[i]))
+        end
+    end
+    return unpack(results)
 end
 
 this_module.self = {
