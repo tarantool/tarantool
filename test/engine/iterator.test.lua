@@ -400,7 +400,9 @@ gen,param,state = i:pairs({35})
 state, value = gen(param,state)
 value
 s:replace{35}
-state, value = gen(param,state)
+f = function() return gen(param, state) end
+_, errmsg = pcall(f)
+errmsg:match('usage: next%(param, state%)')
 value
 
 s:drop()
