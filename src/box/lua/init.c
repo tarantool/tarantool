@@ -63,6 +63,8 @@
 #include "box/lua/key_def.h"
 #include "box/lua/merger.h"
 
+static uint32_t CTID_STRUCT_TXN_SAVEPOINT_PTR = 0;
+
 extern char session_lua[],
 	tuple_lua[],
 	key_def_lua[],
@@ -104,6 +106,101 @@ lbox_rollback(lua_State *L)
 	(void)L;
 	if (box_txn_rollback() != 0)
 		return luaT_error(L);
+	return 0;
+}
+
+/**
+ * Extract <struct txn_savepoint *> from a cdata value on the Lua
+ * stack.
+ *
+ * The function is a helper for extracting 'csavepoint' field from
+ * a Lua table created using box.savepoint().
+ */
+static struct txn_savepoint *
+luaT_check_txn_savepoint_cdata(struct lua_State *L, int idx)
+{
+	if (lua_type(L, idx) != LUA_TCDATA)
+		return NULL;
+
+	uint32_t cdata_type;
+	struct txn_savepoint **svp_ptr = luaL_checkcdata(L, idx, &cdata_type);
+	if (svp_ptr == NULL || cdata_type != CTID_STRUCT_TXN_SAVEPOINT_PTR)
+		return NULL;
+	return *svp_ptr;
+}
+
+/**
+ * Extract a savepoint from the Lua stack.
+ *
+ * Expected a value that is created using box.savepoint():
+ *
+ * {
+ *     csavepoint = <cdata<struct txn_savepoint *>>,
+ *     txn_id = <cdata<int64_t>>,
+ * }
+ */
+static struct txn_savepoint *
+luaT_check_txn_savepoint(struct lua_State *L, int idx, int64_t *svp_txn_id_ptr)
+{
+	/* Verify passed value type. */
+	if (lua_type(L, idx) != LUA_TTABLE)
+		return NULL;
+
+	/* Extract and verify csavepoint. */
+	lua_getfield(L, idx, "csavepoint");
+	struct txn_savepoint *svp = luaT_check_txn_savepoint_cdata(L, -1);
+	lua_pop(L, 1);
+	if (svp == NULL)
+		return NULL;
+
+	/* Extract and verify transaction id from savepoint. */
+	lua_getfield(L, idx, "txn_id");
+	int64_t svp_txn_id = luaL_toint64(L, -1);
+	lua_pop(L, 1);
+	if (svp_txn_id == 0)
+		return NULL;
+	*svp_txn_id_ptr = svp_txn_id;
+
+	return svp;
+}
+
+/**
+ * Rollback to a savepoint.
+ *
+ * At success push nothing to the Lua stack.
+ *
+ * At any error raise a Lua error.
+ */
+static int
+lbox_rollback_to_savepoint(struct lua_State *L)
+{
+	int64_t svp_txn_id;
+	struct txn_savepoint *svp;
+
+	if (lua_gettop(L) != 1 ||
+	    (svp = luaT_check_txn_savepoint(L, 1, &svp_txn_id)) == NULL)
+		return luaL_error(L,
+			"Usage: box.rollback_to_savepoint(savepoint)");
+
+	/*
+	 * Verify that we're in a transaction and that it is the
+	 * same transaction as one where the savepoint was
+	 * created.
+	 */
+	struct txn *txn = in_txn();
+	if (txn == NULL || svp_txn_id != txn->id) {
+		diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
+		return luaT_error(L);
+	}
+
+	/*
+	 * All checks have been passed: try to rollback to the
+	 * savepoint.
+	 */
+	int rc = box_txn_rollback_to_savepoint(svp);
+	if (rc != 0)
+		return luaT_error(L);
+
 	return 0;
 }
 
@@ -279,6 +376,7 @@ static const struct luaL_Reg boxlib[] = {
 	{"on_commit", lbox_on_commit},
 	{"on_rollback", lbox_on_rollback},
 	{"snapshot", lbox_snapshot},
+	{"rollback_to_savepoint", lbox_rollback_to_savepoint},
 	{NULL, NULL}
 };
 
@@ -293,6 +391,10 @@ static const struct luaL_Reg boxlib_backup[] = {
 void
 box_lua_init(struct lua_State *L)
 {
+	luaL_cdef(L, "struct txn_savepoint;");
+	CTID_STRUCT_TXN_SAVEPOINT_PTR = luaL_ctypeid(L,
+						     "struct txn_savepoint*");
+
 	/* Use luaL_register() to set _G.box */
 	luaL_register(L, "box", boxlib);
 	lua_pop(L, 1);
