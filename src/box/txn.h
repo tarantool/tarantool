@@ -166,6 +166,8 @@ struct txn {
 	 * A sequentially growing transaction id, assigned when
 	 * a transaction is initiated. Used to identify
 	 * a transaction after it has possibly been destroyed.
+	 *
+	 * Valid IDs start from 1.
 	 */
 	int64_t id;
 	/** List of statements in a transaction. */
