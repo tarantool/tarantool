@@ -1162,7 +1162,7 @@ static void
 net_send_error(struct cmsg *msg);
 
 static void
-tx_process_join_subscribe(struct cmsg *msg);
+tx_process_replication(struct cmsg *msg);
 
 static void
 net_end_join(struct cmsg *msg);
@@ -1212,12 +1212,12 @@ static const struct cmsg_hop *dml_route[IPROTO_TYPE_STAT_MAX] = {
 };
 
 static const struct cmsg_hop join_route[] = {
-	{ tx_process_join_subscribe, &net_pipe },
+	{ tx_process_replication, &net_pipe },
 	{ net_end_join, NULL },
 };
 
 static const struct cmsg_hop subscribe_route[] = {
-	{ tx_process_join_subscribe, &net_pipe },
+	{ tx_process_replication, &net_pipe },
 	{ net_end_subscribe, NULL },
 };
 
@@ -1272,6 +1272,8 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 		cmsg_init(&msg->base, misc_route);
 		break;
 	case IPROTO_JOIN:
+	case IPROTO_FETCH_SNAPSHOT:
+	case IPROTO_REGISTER:
 		cmsg_init(&msg->base, join_route);
 		*stop_input = true;
 		break;
@@ -1752,7 +1754,7 @@ error:
 }
 
 static void
-tx_process_join_subscribe(struct cmsg *m)
+tx_process_replication(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct iproto_connection *con = msg->connection;
@@ -1767,6 +1769,12 @@ tx_process_join_subscribe(struct cmsg *m)
 			 * will re-activate the watchers for us.
 			 */
 			box_process_join(&io, &msg->header);
+			break;
+		case IPROTO_FETCH_SNAPSHOT:
+			box_process_fetch_snapshot(&io, &msg->header);
+			break;
+		case IPROTO_REGISTER:
+			box_process_register(&io, &msg->header);
 			break;
 		case IPROTO_SUBSCRIBE:
 			/*

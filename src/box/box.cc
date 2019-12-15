@@ -223,9 +223,13 @@ error:
 	return -1;
 }
 
+static bool
+box_check_ro(void);
+
 void
-box_set_ro(bool ro)
+box_set_ro()
 {
+	bool ro = box_check_ro();
 	if (ro == is_ro)
 		return; /* nothing to do */
 	if (ro)
@@ -486,6 +490,32 @@ box_check_uuid(struct tt_uuid *uuid, const char *name)
 	}
 }
 
+static bool
+box_check_ro()
+{
+	bool ro = cfg_geti("read_only") != 0;
+	bool anon = cfg_geti("replication_anon") != 0;
+	if (anon && !ro) {
+		tnt_raise(ClientError, ER_CFG, "read_only",
+			  "the value may be set to false only when "
+			  "replication_anon is false");
+	}
+	return ro;
+}
+
+static bool
+box_check_replication_anon(void)
+{
+	bool anon = cfg_geti("replication_anon") != 0;
+	bool ro = cfg_geti("read_only") != 0;
+	if (anon && !ro) {
+		tnt_raise(ClientError, ER_CFG, "replication_anon",
+			  "the value may be set to true only when "
+			  "the instance is read-only");
+	}
+	return anon;
+}
+
 static void
 box_check_instance_uuid(struct tt_uuid *uuid)
 {
@@ -738,6 +768,62 @@ void
 box_set_replication_skip_conflict(void)
 {
 	replication_skip_conflict = cfg_geti("replication_skip_conflict");
+}
+
+void
+box_set_replication_anon(void)
+{
+	bool anon = box_check_replication_anon();
+	if (anon == replication_anon)
+		return;
+
+	if (!anon) {
+		auto guard = make_scoped_guard([&]{
+			replication_anon = !anon;
+		});
+		/* Turn anonymous instance into a normal one. */
+		replication_anon = anon;
+		/*
+		 * Reset all appliers. This will interrupt
+		 * anonymous follow they're in so that one of
+		 * them can register and others resend a
+		 * non-anonymous subscribe.
+		 */
+		box_sync_replication(false);
+		/*
+		 * Wait until the master has registered this
+		 * instance.
+		 */
+		struct replica *master = replicaset_leader();
+		if (master == NULL || master->applier == NULL ||
+		    master->applier->state != APPLIER_CONNECTED) {
+			tnt_raise(ClientError, ER_CANNOT_REGISTER);
+		}
+		struct applier *master_applier = master->applier;
+
+		applier_resume_to_state(master_applier, APPLIER_REGISTERED,
+					TIMEOUT_INFINITY);
+		applier_resume_to_state(master_applier, APPLIER_READY,
+					TIMEOUT_INFINITY);
+		/**
+		 * Resume other appliers to
+		 * resend non-anonymous subscribe.
+		 */
+		replicaset_follow();
+		replicaset_sync();
+		guard.is_active = false;
+	} else if (!is_box_configured) {
+		replication_anon = anon;
+	} else {
+		/*
+		 * It is forbidden to turn a normal replica into
+		 * an anonymous one.
+		 */
+		tnt_raise(ClientError, ER_CFG, "replication_anon",
+			  "cannot be turned on after bootstrap"
+			  " has finished");
+	}
+
 }
 
 void
@@ -1380,6 +1466,132 @@ box_process_auth(struct auth_request *request, const char *salt)
 }
 
 void
+box_process_fetch_snapshot(struct ev_io *io, struct xrow_header *header)
+{
+	assert(header->type == IPROTO_FETCH_SNAPSHOT);
+
+	/* Check that bootstrap has been finished */
+	if (!is_box_configured)
+		tnt_raise(ClientError, ER_LOADING);
+
+	/* Check permissions */
+	access_check_universe_xc(PRIV_R);
+
+	/* Forbid replication with disabled WAL */
+	if (wal_mode() == WAL_NONE) {
+		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
+			  "wal_mode = 'none'");
+	}
+
+	say_info("sending current read-view to replica at %s", sio_socketname(io->fd));
+
+	/* Send the snapshot data to the instance. */
+	struct vclock start_vclock;
+	relay_initial_join(io->fd, header->sync, &start_vclock);
+	say_info("read-view sent.");
+
+	/* Remember master's vclock after the last request */
+	struct vclock stop_vclock;
+	vclock_copy(&stop_vclock, &replicaset.vclock);
+
+	/* Send end of snapshot data marker */
+	struct xrow_header row;
+	xrow_encode_vclock_xc(&row, &stop_vclock);
+	row.sync = header->sync;
+	coio_write_xrow(io, &row);
+}
+
+void
+box_process_register(struct ev_io *io, struct xrow_header *header)
+{
+	assert(header->type == IPROTO_REGISTER);
+
+	struct tt_uuid instance_uuid = uuid_nil;
+	struct vclock vclock;
+	xrow_decode_register_xc(header, &instance_uuid, &vclock);
+
+	if (!is_box_configured)
+		tnt_raise(ClientError, ER_LOADING);
+
+	if (tt_uuid_is_equal(&instance_uuid, &INSTANCE_UUID))
+		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
+
+	/* Forbid replication from an anonymous instance. */
+	if (replication_anon) {
+		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
+			  "replicating from an anonymous instance.");
+	}
+
+	access_check_universe_xc(PRIV_R);
+	/* We only get register requests from anonymous instances. */
+	struct replica *replica = replica_by_uuid(&instance_uuid);
+	if (replica && replica->id != REPLICA_ID_NIL) {
+		tnt_raise(ClientError, ER_REPLICA_NOT_ANON,
+			  tt_uuid_str(&instance_uuid));
+	}
+	/* See box_process_join() */
+	box_check_writable_xc();
+	struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
+	access_check_space_xc(space, PRIV_W);
+
+	/* Forbid replication with disabled WAL */
+	if (wal_mode() == WAL_NONE) {
+		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
+			  "wal_mode = 'none'");
+	}
+
+	struct gc_consumer *gc = gc_consumer_register(&replicaset.vclock,
+				"replica %s", tt_uuid_str(&instance_uuid));
+	if (gc == NULL)
+		diag_raise();
+	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
+
+	say_info("registering replica %s at %s",
+		 tt_uuid_str(&instance_uuid), sio_socketname(io->fd));
+
+	struct vclock start_vclock;
+	vclock_copy(&start_vclock, &replicaset.vclock);
+
+	/**
+	 * Call the server-side hook which stores the replica uuid
+	 * in _cluster space.
+	 */
+	box_on_join(&instance_uuid);
+
+	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
+
+	/* Remember master's vclock after the last request */
+	struct vclock stop_vclock;
+	vclock_copy(&stop_vclock, &replicaset.vclock);
+
+	/*
+	 * Feed replica with WALs in range
+	 * (start_vclock, stop_vclock) so that it gets its
+	 * registration.
+	 */
+	relay_final_join(io->fd, header->sync, &start_vclock, &stop_vclock);
+	say_info("final data sent.");
+
+	struct xrow_header row;
+	/* Send end of WAL stream marker */
+	xrow_encode_vclock_xc(&row, &replicaset.vclock);
+	row.sync = header->sync;
+	coio_write_xrow(io, &row);
+
+	/*
+	 * Advance the WAL consumer state to the position where
+	 * registration was complete and assign it to the
+	 * replica.
+	 */
+	gc_consumer_advance(gc, &stop_vclock);
+	replica = replica_by_uuid(&instance_uuid);
+	if (replica->gc != NULL)
+		gc_consumer_unregister(replica->gc);
+	replica->gc = gc;
+	gc_guard.is_active = false;
+}
+
+void
 box_process_join(struct ev_io *io, struct xrow_header *header)
 {
 	/*
@@ -1437,6 +1649,12 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	/* Forbid connection to itself */
 	if (tt_uuid_is_equal(&instance_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
+
+	/* Forbid replication from an anonymous instance. */
+	if (replication_anon) {
+		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
+			  "replicating from an anonymous instance.");
+	}
 
 	/* Check permissions */
 	access_check_universe_xc(PRIV_R);
@@ -1537,23 +1755,33 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	struct vclock replica_clock;
 	uint32_t replica_version_id;
 	vclock_create(&replica_clock);
+	bool anon;
 	xrow_decode_subscribe_xc(header, NULL, &replica_uuid,
-				 &replica_clock, &replica_version_id);
+				 &replica_clock, &replica_version_id, &anon);
 
 	/* Forbid connection to itself */
 	if (tt_uuid_is_equal(&replica_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
+
+	/* Forbid replication from an anonymous instance. */
+	if (replication_anon) {
+		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
+			  "replicating from an anonymous instance.");
+	}
 
 	/* Check permissions */
 	access_check_universe_xc(PRIV_R);
 
 	/* Check replica uuid */
 	struct replica *replica = replica_by_uuid(&replica_uuid);
-	if (replica == NULL || replica->id == REPLICA_ID_NIL) {
+
+	if (!anon && (replica == NULL || replica->id == REPLICA_ID_NIL)) {
 		tnt_raise(ClientError, ER_UNKNOWN_REPLICA,
 			  tt_uuid_str(&replica_uuid),
 			  tt_uuid_str(&REPLICASET_UUID));
 	}
+	if (replica == NULL)
+		replica = replicaset_add_anon(&replica_uuid);
 
 	/* Don't allow multiple relays for the same replica */
 	if (relay_get_state(replica->relay) == RELAY_FOLLOW) {
@@ -1774,13 +2002,17 @@ bootstrap_from_master(struct replica *master)
 	 */
 
 	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
-	applier_resume_to_state(applier, APPLIER_INITIAL_JOIN, TIMEOUT_INFINITY);
-
+	enum applier_state wait_state = replication_anon ?
+					APPLIER_FETCH_SNAPSHOT :
+					APPLIER_INITIAL_JOIN;
+	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
 	/*
 	 * Process initial data (snapshot or dirty disk data).
 	 */
 	engine_begin_initial_recovery_xc(NULL);
-	applier_resume_to_state(applier, APPLIER_FINAL_JOIN, TIMEOUT_INFINITY);
+	wait_state = replication_anon ? APPLIER_FETCHED_SNAPSHOT :
+					APPLIER_FINAL_JOIN;
+	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
 
 	/*
 	 * Process final data (WALs).
@@ -1790,8 +2022,10 @@ bootstrap_from_master(struct replica *master)
 	recovery_journal_create(&journal, &replicaset.vclock);
 	journal_set(&journal.base);
 
-	applier_resume_to_state(applier, APPLIER_JOINED, TIMEOUT_INFINITY);
-
+	if (!replication_anon) {
+		applier_resume_to_state(applier, APPLIER_JOINED,
+					TIMEOUT_INFINITY);
+	}
 	/* Finalize the new replica */
 	engine_end_recovery_xc();
 
@@ -2106,6 +2340,7 @@ box_cfg_xc(void)
 	box_set_replication_sync_lag();
 	box_set_replication_sync_timeout();
 	box_set_replication_skip_conflict();
+	box_set_replication_anon();
 
 	struct gc_checkpoint *checkpoint = gc_last_checkpoint();
 
@@ -2136,14 +2371,20 @@ box_cfg_xc(void)
 	}
 	fiber_gc();
 
-	/* Check for correct registration of the instance in _cluster */
-	{
-		struct replica *self = replica_by_uuid(&INSTANCE_UUID);
+	/*
+	 * Check for correct registration of the instance in _cluster
+	 * The instance won't exist in _cluster space if it is an
+	 * anonymous replica, add it manually.
+	 */
+	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
+	if (!replication_anon) {
 		if (self == NULL || self->id == REPLICA_ID_NIL) {
 			tnt_raise(ClientError, ER_UNKNOWN_REPLICA,
 				  tt_uuid_str(&INSTANCE_UUID),
 				  tt_uuid_str(&REPLICASET_UUID));
 		}
+	} else if (self == NULL) {
+		replicaset_add_anon(&INSTANCE_UUID);
 	}
 
 	rmean_cleanup(rmean_box);

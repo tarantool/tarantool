@@ -555,6 +555,8 @@ t;
   204: box.error.SQL_FUNC_WRONG_RET_COUNT
   205: box.error.FUNC_INVALID_RETURN_TYPE
   206: box.error.SQL_PARSER_GENERIC_WITH_POS
+  207: box.error.REPLICA_NOT_ANON
+  208: box.error.CANNOT_REGISTER
 ...
 test_run:cmd("setopt delimiter ''");
 ---

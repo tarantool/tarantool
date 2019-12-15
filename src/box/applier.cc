@@ -400,7 +400,7 @@ applier_wait_snapshot(struct applier *applier)
 	 * response, but a stream of rows from checkpoint.
 	 */
 	if (applier->version_id >= version_id(1, 7, 0)) {
-		/* Decode JOIN response */
+		/* Decode JOIN/FETCH_SNAPSHOT response */
 		coio_read_xrow(coio, ibuf, &row);
 		if (iproto_type_is_error(row.type)) {
 			xrow_decode_error_xc(&row); /* re-throw error */
@@ -452,6 +452,23 @@ applier_wait_snapshot(struct applier *applier)
 	return row_count;
 }
 
+static void
+applier_fetch_snapshot(struct applier *applier)
+{
+	/* Send FETCH SNAPSHOT request */
+	struct ev_io *coio = &applier->io;
+	struct xrow_header row;
+
+	memset(&row, 0, sizeof(row));
+	row.type = IPROTO_FETCH_SNAPSHOT;
+	coio_write_xrow(coio, &row);
+
+	applier_set_state(applier, APPLIER_FETCH_SNAPSHOT);
+	applier_wait_snapshot(applier);
+	applier_set_state(applier, APPLIER_FETCHED_SNAPSHOT);
+	applier_set_state(applier, APPLIER_READY);
+}
+
 static uint64_t
 applier_wait_register(struct applier *applier, uint64_t row_count)
 {
@@ -495,6 +512,28 @@ applier_wait_register(struct applier *applier, uint64_t row_count)
 	}
 
 	return row_count;
+}
+
+static void
+applier_register(struct applier *applier)
+{
+	/* Send REGISTER request */
+	struct ev_io *coio = &applier->io;
+	struct xrow_header row;
+
+	memset(&row, 0, sizeof(row));
+	/*
+	 * Send this instance's current vclock together
+	 * with REGISTER request.
+	 */
+	xrow_encode_register(&row, &INSTANCE_UUID, box_vclock);
+	row.type = IPROTO_REGISTER;
+	coio_write_xrow(coio, &row);
+
+	applier_set_state(applier, APPLIER_REGISTER);
+	applier_wait_register(applier, 0);
+	applier_set_state(applier, APPLIER_REGISTERED);
+	applier_set_state(applier, APPLIER_READY);
 }
 
 /**
@@ -828,7 +867,7 @@ applier_subscribe(struct applier *applier)
 	vclock_create(&vclock);
 	vclock_copy(&vclock, &replicaset.vclock);
 	xrow_encode_subscribe_xc(&row, &REPLICASET_UUID, &INSTANCE_UUID,
-				 &vclock);
+				 &vclock, replication_anon);
 	coio_write_xrow(coio, &row);
 
 	/* Read SUBSCRIBE response */
@@ -996,10 +1035,25 @@ applier_f(va_list ap)
 			if (tt_uuid_is_nil(&REPLICASET_UUID)) {
 				/*
 				 * Execute JOIN if this is a bootstrap.
+				 * In case of anonymous replication, don't
+				 * join but just fetch master's snapshot.
+				 *
 				 * The join will pause the applier
 				 * until WAL is created.
 				 */
-				applier_join(applier);
+				if (replication_anon)
+					applier_fetch_snapshot(applier);
+				else
+					applier_join(applier);
+			}
+			if (instance_id == REPLICA_ID_NIL &&
+			    !replication_anon) {
+				/*
+				 * The instance transitioned
+				 * from anonymous. Register it
+				 * now.
+				 */
+				applier_register(applier);
 			}
 			applier_subscribe(applier);
 			/*

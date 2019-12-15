@@ -258,7 +258,9 @@ struct errcode_record {
 	/*203 */_(ER_BOOTSTRAP_READONLY,	"Trying to bootstrap a local read-only instance as master") \
 	/*204 */_(ER_SQL_FUNC_WRONG_RET_COUNT,	"SQL expects exactly one argument returned from %s, got %d")\
 	/*205 */_(ER_FUNC_INVALID_RETURN_TYPE,	"Function '%s' returned value of invalid type: expected %s got %s") \
-	/*186 */_(ER_SQL_PARSER_GENERIC_WITH_POS,"At line %d at or near position %d: %s") \
+	/*206 */_(ER_SQL_PARSER_GENERIC_WITH_POS,"At line %d at or near position %d: %s") \
+	/*207 */_(ER_REPLICA_NOT_ANON, "Replica '%s' is not anonymous and cannot register.") \
+	/*208 */_(ER_CANNOT_REGISTER, "Couldn't find an instance to register this replica on.") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

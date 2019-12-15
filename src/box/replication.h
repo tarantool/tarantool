@@ -138,6 +138,12 @@ extern double replication_sync_timeout;
 extern bool replication_skip_conflict;
 
 /**
+ * Whether this replica will be anonymous or not, e.g. be preset
+ * in _cluster table and have a non-zero id.
+ */
+extern bool replication_anon;
+
+/**
  * Wait for the given period of time before trying to reconnect
  * to a master.
  */
@@ -265,6 +271,12 @@ struct replica {
 	 * registered in the _cluster space yet.
 	 */
 	uint32_t id;
+	/**
+	 * Whether this is an anonymous replica, e.g. a read-only
+	 * replica that doesn't have an id and isn't present in
+	 * _cluster table.
+	 */
+	bool anon;
 	/** Applier fiber. */
 	struct applier *applier;
 	/** Relay thread. */
@@ -343,6 +355,12 @@ replica_set_id(struct replica *replica, uint32_t id);
 void
 replica_clear_id(struct replica *replica);
 
+void
+replica_clear_applier(struct replica *replica);
+
+void
+replica_set_applier(struct replica * replica, struct applier * applier);
+
 /**
  * Unregister \a relay from the \a replica.
  */
@@ -363,6 +381,9 @@ replica_check_id(uint32_t replica_id);
  */
 struct replica *
 replicaset_add(uint32_t replica_id, const struct tt_uuid *instance_uuid);
+
+struct replica *
+replicaset_add_anon(const struct tt_uuid *replica_uuid);
 
 /**
  * Try to connect appliers to remote peers and receive UUID.

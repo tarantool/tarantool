@@ -77,6 +77,7 @@ local default_cfg = {
     replication_connect_timeout = 30,
     replication_connect_quorum = nil, -- connect all
     replication_skip_conflict = false,
+    replication_anon      = false,
     feedback_enabled      = true,
     feedback_host         = "https://feedback.tarantool.io",
     feedback_interval     = 3600,
@@ -140,6 +141,7 @@ local template_cfg = {
     replication_connect_timeout = 'number',
     replication_connect_quorum = 'number',
     replication_skip_conflict = 'boolean',
+    replication_anon      = 'boolean',
     feedback_enabled      = 'boolean',
     feedback_host         = 'string',
     feedback_interval     = 'number',
@@ -247,6 +249,7 @@ local dynamic_cfg = {
     replication_sync_lag    = private.cfg_set_replication_sync_lag,
     replication_sync_timeout = private.cfg_set_replication_sync_timeout,
     replication_skip_conflict = private.cfg_set_replication_skip_conflict,
+    replication_anon        = private.cfg_set_replication_anon,
     instance_uuid           = check_instance_uuid,
     replicaset_uuid         = check_replicaset_uuid,
     net_msg_max             = private.cfg_set_net_msg_max,
@@ -277,6 +280,15 @@ local dynamic_cfg_order = {
     replication_connect_timeout = 150,
     replication_connect_quorum  = 150,
     replication             = 200,
+    -- Anon is set after `replication` as a temporary workaround
+    -- for the problem, that `replication` and `replication_anon`
+    -- depend on each other. If anon would be configured before
+    -- `replication`, it could lead to a bug, when anon is changed
+    -- from true to false together with `replication`, and it
+    -- would try to deanon the old `replication` before applying
+    -- the new one. This should be fixed when box.cfg is able to
+    -- apply some parameters together and atomically.
+    replication_anon        = 250,
 }
 
 local function sort_cfg_cb(l, r)
@@ -301,6 +313,7 @@ local dynamic_cfg_skip_at_load = {
     replication_sync_lag    = true,
     replication_sync_timeout = true,
     replication_skip_conflict = true,
+    replication_anon        = true,
     wal_dir_rescan_delay    = true,
     custom_proc_title       = true,
     force_recovery          = true,

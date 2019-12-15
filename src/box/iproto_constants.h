@@ -120,6 +120,8 @@ enum iproto_key {
 	 * }
 	 */
 	IPROTO_SQL_INFO = 0x42,
+	/* Leave a gap between SQL keys and additional request keys */
+	IPROTO_REPLICA_ANON = 0x50,
 	IPROTO_KEY_MAX
 };
 
@@ -220,6 +222,10 @@ enum iproto_type {
 	IPROTO_VOTE_DEPRECATED = 67,
 	/** Vote request command for master election */
 	IPROTO_VOTE = 68,
+	/** Anonymous replication FETCH SNAPSHOT. */
+	IPROTO_FETCH_SNAPSHOT = 69,
+	/** REGISTER request to leave anonymous replication. */
+	IPROTO_REGISTER = 70,
 
 	/** Vinyl run info stored in .index file */
 	VY_INDEX_RUN_INFO = 100,

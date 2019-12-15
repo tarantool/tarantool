@@ -100,7 +100,7 @@ void
 box_atfork(void);
 
 void
-box_set_ro(bool ro);
+box_set_ro();
 
 bool
 box_is_ro(void);
@@ -179,6 +179,14 @@ box_reset_stat(void);
 void
 box_process_auth(struct auth_request *request, const char *salt);
 
+/** Send current read view to the replica. */
+void
+box_process_fetch_snapshot(struct ev_io *io, struct xrow_header *header);
+
+/** Register a replica */
+void
+box_process_register(struct ev_io *io, struct xrow_header *header);
+
 /**
  * Join a replica.
  *
@@ -234,6 +242,7 @@ void box_set_replication_connect_quorum(void);
 void box_set_replication_sync_lag(void);
 void box_set_replication_sync_timeout(void);
 void box_set_replication_skip_conflict(void);
+void box_set_replication_anon(void);
 void box_set_net_msg_max(void);
 
 extern "C" {

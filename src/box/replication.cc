@@ -53,6 +53,7 @@ int replication_connect_quorum = REPLICATION_CONNECT_QUORUM_ALL;
 double replication_sync_lag = 10.0; /* seconds */
 double replication_sync_timeout = 300.0; /* seconds */
 bool replication_skip_conflict = false;
+bool replication_anon = false;
 
 struct replicaset replicaset;
 
@@ -172,6 +173,7 @@ replica_new(void)
 		diag_raise();
 	}
 	replica->id = 0;
+	replica->anon = false;
 	replica->uuid = uuid_nil;
 	replica->applier = NULL;
 	replica->gc = NULL;
@@ -209,6 +211,19 @@ replicaset_add(uint32_t replica_id, const struct tt_uuid *replica_uuid)
 	return replica;
 }
 
+struct replica *
+replicaset_add_anon(const struct tt_uuid *replica_uuid)
+{
+	assert(!tt_uuid_is_nil(replica_uuid));
+	assert(replica_by_uuid(replica_uuid) == NULL);
+
+	struct replica *replica = replica_new();
+	replica->uuid = *replica_uuid;
+	replica_hash_insert(&replicaset.hash, replica);
+	replica->anon = true;
+	return replica;
+}
+
 void
 replica_set_id(struct replica *replica, uint32_t replica_id)
 {
@@ -220,11 +235,21 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		/* Assign local replica id */
 		assert(instance_id == REPLICA_ID_NIL);
 		instance_id = replica_id;
+	} else if (replica->anon) {
+		/*
+		 * Set replica gc on its transition from
+		 * anonymous to a normal one.
+		 */
+		assert(replica->gc == NULL);
+		replica->gc = gc_consumer_register(&replicaset.vclock,
+						   "replica %s",
+						   tt_uuid_str(&replica->uuid));
 	}
 	replicaset.replica_by_id[replica_id] = replica;
 
 	say_info("assigned id %d to replica %s",
 		 replica->id, tt_uuid_str(&replica->uuid));
+	replica->anon = false;
 }
 
 void
@@ -268,7 +293,7 @@ replica_clear_id(struct replica *replica)
 	}
 }
 
-static void
+void
 replica_set_applier(struct replica *replica, struct applier *applier)
 {
 	assert(replica->applier == NULL);
@@ -277,7 +302,7 @@ replica_set_applier(struct replica *replica, struct applier *applier)
 		    &replica->on_applier_state);
 }
 
-static void
+void
 replica_clear_applier(struct replica *replica)
 {
 	assert(replica->applier != NULL);
@@ -865,14 +890,23 @@ void
 replica_on_relay_stop(struct replica *replica)
 {
 	/*
-	 * If the replica was evicted from the cluster, we don't
-	 * need to keep WALs for it anymore. Unregister it with
-	 * the garbage collector then. See also replica_clear_id.
+	 * If the replica was evicted from the cluster, or was not
+	 * even added there (anon replica), we don't need to keep
+	 * WALs for it anymore. Unregister it with the garbage
+	 * collector then. See also replica_clear_id.
 	 */
-	assert(replica->gc != NULL);
 	if (replica->id == REPLICA_ID_NIL) {
-		gc_consumer_unregister(replica->gc);
-		replica->gc = NULL;
+		if (!replica->anon) {
+			gc_consumer_unregister(replica->gc);
+			replica->gc = NULL;
+		} else {
+			assert(replica->gc == NULL);
+			/*
+			 * We do not replicate from anonymous
+			 * replicas.
+			 */
+			assert(replica->applier == NULL);
+		}
 	}
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);

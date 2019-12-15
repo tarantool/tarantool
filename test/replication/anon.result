@@ -1,0 +1,385 @@
+-- test-run result file version 2
+env = require('test_run')
+ | ---
+ | ...
+vclock_diff = require('fast_replica').vclock_diff
+ | ---
+ | ...
+test_run = env.new()
+ | ---
+ | ...
+
+
+--
+-- gh-3186 Anonymous replicas.
+--
+-- Prepare master.
+box.schema.user.grant('guest', 'replication')
+ | ---
+ | ...
+_ = box.schema.space.create('loc', {is_local=true})
+ | ---
+ | ...
+_ = box.schema.space.create('temp', {temporary=true})
+ | ---
+ | ...
+_ = box.schema.space.create('test')
+ | ---
+ | ...
+_ = box.space.loc:create_index('pk')
+ | ---
+ | ...
+_ = box.space.temp:create_index('pk')
+ | ---
+ | ...
+_ = box.space.test:create_index('pk')
+ | ---
+ | ...
+box.space.test:insert{1}
+ | ---
+ | - [1]
+ | ...
+
+test_run:cmd('create server replica_anon with rpl_master=default, script="replication/anon1.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server replica_anon')
+ | ---
+ | - true
+ | ...
+test_run:cmd('switch replica_anon')
+ | ---
+ | - true
+ | ...
+
+box.info.status
+ | ---
+ | - running
+ | ...
+box.info.id
+ | ---
+ | - 0
+ | ...
+box.info.lsn
+ | ---
+ | - 0
+ | ...
+test_run:wait_upstream(1, {status='follow'})
+ | ---
+ | - true
+ | ...
+
+-- Temporary spaces are accessible as read / write.
+for i = 1,10 do box.space.temp:insert{i} end
+ | ---
+ | ...
+box.space.temp:select{}
+ | ---
+ | - - [1]
+ |   - [2]
+ |   - [3]
+ |   - [4]
+ |   - [5]
+ |   - [6]
+ |   - [7]
+ |   - [8]
+ |   - [9]
+ |   - [10]
+ | ...
+
+box.info.lsn
+ | ---
+ | - 0
+ | ...
+
+-- Same for local spaces.
+for i = 1,10 do box.space.loc:insert{i} end
+ | ---
+ | ...
+box.space.loc:select{}
+ | ---
+ | - - [1]
+ |   - [2]
+ |   - [3]
+ |   - [4]
+ |   - [5]
+ |   - [6]
+ |   - [7]
+ |   - [8]
+ |   - [9]
+ |   - [10]
+ | ...
+
+-- Replica-local changes are accounted for in 0 vclock component.
+box.info.lsn
+ | ---
+ | - 10
+ | ...
+box.info.vclock[0]
+ | ---
+ | - 10
+ | ...
+
+-- Replica is read-only.
+box.cfg.read_only
+ | ---
+ | - true
+ | ...
+box.cfg{read_only=false}
+ | ---
+ | - error: 'Incorrect value for option ''read_only'': the value may be set to false
+ |     only when replication_anon is false'
+ | ...
+
+box.space.test:insert{2}
+ | ---
+ | - error: Can't modify data because this instance is in read-only mode.
+ | ...
+
+box.space.loc:drop()
+ | ---
+ | - error: Can't modify data because this instance is in read-only mode.
+ | ...
+box.space.loc:truncate()
+ | ---
+ | - error: Can't modify data because this instance is in read-only mode.
+ | ...
+
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+
+-- Replica isn't visible on master.
+#box.info.replication
+ | ---
+ | - 1
+ | ...
+
+-- Test that replication (even anonymous) from an anonymous
+-- instance is forbidden. An anonymous replica will fetch
+-- a snapshot though.
+test_run:cmd([[create server replica_anon2 with rpl_master=replica_anon,\
+             script="replication/anon2.lua"]])
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server replica_anon2')
+ | ---
+ | - true
+ | ...
+test_run:wait_log('replica_anon2',\
+                  'Replication does not support replicating from an anonymous instance',\
+                  nil, 10)
+ | ---
+ | - Replication does not support replicating from an anonymous instance
+ | ...
+test_run:cmd('switch replica_anon2')
+ | ---
+ | - true
+ | ...
+a = box.info.vclock[1]
+ | ---
+ | ...
+-- The instance did fetch a snapshot.
+a > 0
+ | ---
+ | - true
+ | ...
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+box.space.test:insert{2}
+ | ---
+ | - [2]
+ | ...
+test_run:cmd("switch replica_anon2")
+ | ---
+ | - true
+ | ...
+-- Second replica doesn't follow master through the
+-- 1st one. Replication from an anonymous instance
+-- is forbidden indeed.
+box.info.vclock[1] == a or box.info.vclock[1]
+ | ---
+ | - true
+ | ...
+
+test_run:cmd('switch replica_anon')
+ | ---
+ | - true
+ | ...
+
+test_run:cmd('stop server replica_anon2')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server replica_anon2')
+ | ---
+ | - true
+ | ...
+
+-- Promote anonymous replica.
+box.cfg{replication_anon=false}
+ | ---
+ | ...
+-- Cannot switch back after becoming "normal".
+box.cfg{replication_anon=true}
+ | ---
+ | - error: 'Incorrect value for option ''replication_anon'': cannot be turned on after
+ |     bootstrap has finished'
+ | ...
+
+box.info.id
+ | ---
+ | - 2
+ | ...
+#box.info.replication
+ | ---
+ | - 2
+ | ...
+test_run:wait_upstream(1, {status='follow'})
+ | ---
+ | - true
+ | ...
+box.info.replication.downstream
+ | ---
+ | - null
+ | ...
+
+old_lsn = box.info.vclock[2] or 0
+ | ---
+ | ...
+
+-- Now read_only can be turned off.
+box.cfg{read_only=false}
+ | ---
+ | ...
+box.space.test:insert{3}
+ | ---
+ | - [3]
+ | ...
+-- New changes are tracked under freshly assigned id.
+box.info.vclock[2] == old_lsn + 1
+ | ---
+ | - true
+ | ...
+
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+
+-- Other instances may replicate from a previously-anonymous one.
+test_run:cmd("set variable repl_source to 'replica_anon.listen'")
+ | ---
+ | - true
+ | ...
+box.cfg{replication=repl_source}
+ | ---
+ | ...
+#box.info.replication
+ | ---
+ | - 2
+ | ...
+test_run:wait_upstream(2, {status='follow'})
+ | ---
+ | - true
+ | ...
+test_run:wait_downstream(2, {status='follow'})
+ | ---
+ | - true
+ | ...
+#box.info.vclock
+ | ---
+ | - 2
+ | ...
+
+-- Cleanup.
+box.cfg{replication=""}
+ | ---
+ | ...
+test_run:cmd('stop server replica_anon')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server replica_anon')
+ | ---
+ | - true
+ | ...
+box.space.test:drop()
+ | ---
+ | ...
+box.space.temp:drop()
+ | ---
+ | ...
+box.space.loc:drop()
+ | ---
+ | ...
+box.schema.user.revoke('guest', 'replication')
+ | ---
+ | ...
+test_run:cleanup_cluster()
+ | ---
+ | ...
+
+--
+-- Check that in case of a master absence an anon replica can't
+-- deanonymize itself, regardless of quorum value.
+--
+test_run:cmd('create server master with script="replication/master1.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server master')
+ | ---
+ | - true
+ | ...
+test_run:switch('master')
+ | ---
+ | - true
+ | ...
+box.schema.user.grant('guest', 'replication')
+ | ---
+ | ...
+test_run:cmd('create server replica_anon with rpl_master=master, script="replication/anon1.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server replica_anon')
+ | ---
+ | - true
+ | ...
+test_run:switch('replica_anon')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_connect_quorum = 0}
+ | ---
+ | ...
+test_run:cmd('stop server master')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server master')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_anon = false}
+ | ---
+ | - error: Couldn't find an instance to register this replica on.
+ | ...
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server replica_anon')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server replica_anon')
+ | ---
+ | - true
+ | ...

@@ -569,11 +569,16 @@ relay_subscribe_f(va_list ap)
 	cbus_pair("tx", relay->endpoint.name, &relay->tx_pipe,
 		  &relay->relay_pipe, NULL, NULL, cbus_process);
 
-	/* Setup garbage collection trigger. */
+	/*
+	 * Setup garbage collection trigger.
+	 * Not needed for anonymous replicas, since they
+	 * aren't registered with gc at all.
+	 */
 	struct trigger on_close_log = {
 		RLIST_LINK_INITIALIZER, relay_on_close_log_f, relay, NULL
 	};
-	trigger_add(&r->on_close_log, &on_close_log);
+	if (!relay->replica->anon)
+		trigger_add(&r->on_close_log, &on_close_log);
 
 	/* Setup WAL watcher for sending new rows to the replica. */
 	wal_set_watcher(&relay->wal_watcher, relay->endpoint.name,
@@ -652,7 +657,8 @@ relay_subscribe_f(va_list ap)
 	say_crit("exiting the relay loop");
 
 	/* Clear garbage collector trigger and WAL watcher. */
-	trigger_clear(&on_close_log);
+	if (!relay->replica->anon)
+		trigger_clear(&on_close_log);
 	wal_clear_watcher(&relay->wal_watcher, cbus_process);
 
 	/* Join ack reader fiber. */
@@ -673,7 +679,7 @@ void
 relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 		struct vclock *replica_clock, uint32_t replica_version_id)
 {
-	assert(replica->id != REPLICA_ID_NIL);
+	assert(replica->anon || replica->id != REPLICA_ID_NIL);
 	struct relay *relay = replica->relay;
 	assert(relay->state != RELAY_FOLLOW);
 	/*
@@ -681,7 +687,7 @@ relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 	 * unless it has already been registered by initial
 	 * join.
 	 */
-	if (replica->gc == NULL) {
+	if (replica->gc == NULL && !replica->anon) {
 		replica->gc = gc_consumer_register(replica_clock, "replica %s",
 						   tt_uuid_str(&replica->uuid));
 		if (replica->gc == NULL)
@@ -747,6 +753,13 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 	 * any data.
 	 */
 	if (packet->group_id == GROUP_LOCAL) {
+		/*
+		 * Replica-local requests generated while replica
+		 * was anonymous have a zero instance id. Just
+		 * skip all these rows.
+		 */
+		if (packet->replica_id == REPLICA_ID_NIL)
+			return;
 		packet->type = IPROTO_NOP;
 		packet->group_id = GROUP_DEFAULT;
 		packet->bodycnt = 0;

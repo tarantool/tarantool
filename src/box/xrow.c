@@ -1149,10 +1149,39 @@ err:
 }
 
 int
+xrow_encode_register(struct xrow_header *row,
+		     const struct tt_uuid *instance_uuid,
+		     const struct vclock *vclock)
+{
+	memset(row, 0, sizeof(*row));
+	size_t size = mp_sizeof_map(2) +
+		      mp_sizeof_uint(IPROTO_INSTANCE_UUID) +
+		      mp_sizeof_str(UUID_STR_LEN) +
+		      mp_sizeof_uint(IPROTO_VCLOCK) + mp_sizeof_vclock(vclock);
+	char *buf = (char *) region_alloc(&fiber()->gc, size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "buf");
+		return -1;
+	}
+	char *data = buf;
+	data = mp_encode_map(data, 2);
+	data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
+	data = xrow_encode_uuid(data, instance_uuid);
+	data = mp_encode_uint(data, IPROTO_VCLOCK);
+	data = mp_encode_vclock(data, vclock);
+	assert(data <= buf + size);
+	row->body[0].iov_base = buf;
+	row->body[0].iov_len = (data - buf);
+	row->bodycnt = 1;
+	row->type = IPROTO_REGISTER;
+	return 0;
+}
+
+int
 xrow_encode_subscribe(struct xrow_header *row,
 		      const struct tt_uuid *replicaset_uuid,
 		      const struct tt_uuid *instance_uuid,
-		      const struct vclock *vclock)
+		      const struct vclock *vclock, bool anon)
 {
 	memset(row, 0, sizeof(*row));
 	size_t size = XROW_BODY_LEN_MAX + mp_sizeof_vclock(vclock);
@@ -1162,7 +1191,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 		return -1;
 	}
 	char *data = buf;
-	data = mp_encode_map(data, 4);
+	data = mp_encode_map(data, 5);
 	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
 	data = xrow_encode_uuid(data, replicaset_uuid);
 	data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
@@ -1171,6 +1200,8 @@ xrow_encode_subscribe(struct xrow_header *row,
 	data = mp_encode_vclock(data, vclock);
 	data = mp_encode_uint(data, IPROTO_SERVER_VERSION);
 	data = mp_encode_uint(data, tarantool_version_id());
+	data = mp_encode_uint(data, IPROTO_REPLICA_ANON);
+	data = mp_encode_bool(data, anon);
 	assert(data <= buf + size);
 	row->body[0].iov_base = buf;
 	row->body[0].iov_len = (data - buf);
@@ -1182,7 +1213,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 int
 xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		      struct tt_uuid *instance_uuid, struct vclock *vclock,
-		      uint32_t *version_id)
+		      uint32_t *version_id, bool *anon)
 {
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
@@ -1198,6 +1229,8 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		return -1;
 	}
 
+	if (anon)
+		*anon = false;
 	d = data;
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
@@ -1244,6 +1277,16 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 				return -1;
 			}
 			*version_id = mp_decode_uint(&d);
+			break;
+		case IPROTO_REPLICA_ANON:
+			if (anon == NULL)
+				goto skip;
+			if (mp_typeof(*d) != MP_BOOL) {
+				xrow_on_decode_err(data, end, ER_INVALID_MSGPACK,
+						   "invalid REPLICA_ANON flag");
+				return -1;
+			}
+			*anon = mp_decode_bool(&d);
 			break;
 		default: skip:
 			mp_next(&d); /* value */

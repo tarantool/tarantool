@@ -930,6 +930,10 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 		if ((*row)->replica_id == 0) {
 			(*row)->lsn = vclock_inc(vclock_diff, instance_id) +
 				      vclock_get(base, instance_id);
+			/*
+			 * Note, an anonymous replica signs local
+			 * rows whith a zero instance id.
+			 */
 			(*row)->replica_id = instance_id;
 			/* Use lsn of the first local row as transaction id. */
 			tsn = tsn == 0 ? (*row)->lsn : tsn;
