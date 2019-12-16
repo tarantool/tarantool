@@ -32,8 +32,15 @@
  */
 #include "fiber.h"
 #include "trivia/util.h"
-#if defined(__cplusplus)
+
 #include "evio.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+struct sockaddr;
+struct uri;
 
 /**
  * Co-operative I/O
@@ -70,8 +77,12 @@ coio_accept(struct ev_io *coio, struct sockaddr *addr, socklen_t addrlen,
 void
 coio_create(struct ev_io *coio, int fd);
 
+/*
+ * Due to name conflict with coio_close in API_EXPORT
+ * we have to use coio_close_io() instead of plain coio_close().
+ */
 static inline void
-coio_close(ev_loop *loop, struct ev_io *coio)
+coio_close_io(ev_loop *loop, struct ev_io *coio)
 {
 	return evio_close(loop, coio);
 }
@@ -184,9 +195,6 @@ coio_stat_stat_timeout(ev_stat *stat, ev_tstamp delay);
  */
 int
 coio_waitpid(pid_t pid);
-
-extern "C" {
-#endif /* defined(__cplusplus) */
 
 /** \cond public */
 
