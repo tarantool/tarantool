@@ -43,6 +43,7 @@
 #include "sqlInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
+#include "box/execute.h"
 
 /*
  * Create a new virtual database engine.

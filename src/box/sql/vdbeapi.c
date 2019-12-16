@@ -1187,14 +1187,12 @@ sql_db_handle(sql_stmt * pStmt)
 	return pStmt ? ((Vdbe *) pStmt)->db : 0;
 }
 
-/*
- * Return true if the prepared statement is in need of being reset.
- */
 int
-sql_stmt_busy(sql_stmt * pStmt)
+sql_stmt_busy(const struct sql_stmt *stmt)
 {
-	Vdbe *v = (Vdbe *) pStmt;
-	return v != 0 && v->magic == VDBE_MAGIC_RUN && v->pc >= 0;
+	assert(stmt != NULL);
+	const struct Vdbe *v = (const struct Vdbe *) stmt;
+	return v->magic == VDBE_MAGIC_RUN && v->pc >= 0;
 }
 
 /*

@@ -127,6 +127,10 @@ sql_stmt_est_size(const struct sql_stmt *stmt);
 const char *
 sql_stmt_query_str(const struct sql_stmt *stmt);
 
+/** Return true if statement executes right now. */
+int
+sql_stmt_busy(const struct sql_stmt *stmt);
+
 /**
  * Prepare (compile into VDBE byte-code) statement.
  *

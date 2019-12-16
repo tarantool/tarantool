@@ -734,9 +734,6 @@ int
 sql_bind_ptr(struct sql_stmt *stmt, int i, void *ptr);
 
 int
-sql_stmt_busy(sql_stmt *);
-
-int
 sql_init_db(sql **db);
 
 
