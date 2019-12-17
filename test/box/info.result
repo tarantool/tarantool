@@ -84,6 +84,7 @@ t
   - replication
   - ro
   - signature
+  - sql
   - status
   - uptime
   - uuid

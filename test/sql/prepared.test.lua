@@ -43,6 +43,11 @@ end;
 
 test_run:cmd("setopt delimiter ''");
 
+-- Check default cache statistics.
+--
+box.info.sql()
+box.info:sql()
+
 -- Test local interface and basic capabilities of prepared statements.
 --
 execute('CREATE TABLE test (id INT PRIMARY KEY, a NUMBER, b TEXT)')
@@ -59,6 +64,9 @@ s.params
 s.param_count
 execute(s.stmt_id, {1, 2})
 execute(s.stmt_id, {1, 3})
+
+assert(box.info.sql().cache.stmt_count ~= 0)
+assert(box.info.sql().cache.size ~= 0)
 
 test_run:cmd("setopt delimiter ';'")
 if not is_remote then
@@ -214,7 +222,9 @@ unprepare(s.stmt_id)
 -- Setting cache size to 0 is possible only in case if
 -- there's no any prepared statements right now .
 --
-box.cfg{sql_cache_size = 0}
+box.cfg{sql_cache_size = 0 }
+assert(box.info.sql().cache.stmt_count == 0)
+assert(box.info.sql().cache.size == 0)
 prepare("SELECT a FROM test;")
 box.cfg{sql_cache_size = 0}
 

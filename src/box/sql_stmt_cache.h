@@ -41,6 +41,7 @@ extern "C" {
 
 struct sql_stmt;
 struct mh_i64ptr_t;
+struct info_handler;
 
 struct stmt_cache_entry {
 	/** Prepared statement itself. */
@@ -89,6 +90,13 @@ struct sql_stmt_cache {
  */
 void
 sql_stmt_cache_init();
+
+/**
+ * Store statistics concerning cache (current size and number
+ * of statements in it) into info handler @h.
+ */
+void
+sql_stmt_cache_stat(struct info_handler *h);
 
 /**
  * Erase session local hash: unref statements belong to this
