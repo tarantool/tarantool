@@ -359,7 +359,11 @@ fio.mktree = function(path, mode)
         local stat = fio.stat(current_dir)
         if stat == nil then
             local st, err = fio.mkdir(current_dir, mode)
-            if err ~= nil  then
+            -- fio.stat() and fio.mkdir() above are separate calls
+            -- and a file system may be changed between them. So
+            -- if the error here is due to an existing directory,
+            -- the function should not report an error.
+            if err ~= nil and not fio.path.is_dir(current_dir) then
                 return false, string.format("Error creating directory %s: %s",
                     current_dir, tostring(err))
             end
