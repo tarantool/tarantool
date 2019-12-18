@@ -1871,7 +1871,7 @@ case OP_FunctionByName: {
 	if (mem == NULL)
 		goto abort_due_to_error;
 	enum mp_type type = sql_value_type((sql_value *)pOut);
-	if (!field_mp_plain_type_is_compatible(returns, type, false)) {
+	if (!field_mp_plain_type_is_compatible(returns, type, true)) {
 		diag_set(ClientError, ER_FUNC_INVALID_RETURN_TYPE, pOp->p4.z,
 			 field_type_strs[returns], mp_type_strs[type]);
 		goto abort_due_to_error;
