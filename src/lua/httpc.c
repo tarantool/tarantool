@@ -302,7 +302,7 @@ luaT_httpc_request(lua_State *L)
 
 	lua_getfield(L, 5, "verbose");
 	if (!lua_isnil(L, -1) && lua_isboolean(L, -1))
-		httpc_set_verbose(req, true);
+		httpc_set_verbose(req, lua_toboolean(L, -1));
 	lua_pop(L, 1);
 
 	lua_getfield(L, 5, "interface");
