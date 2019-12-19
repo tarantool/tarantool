@@ -14,9 +14,9 @@ _ = s:create_index('ii')
 s:insert({1, -2^63})
 s:insert({2, -9223372036854775808LL})
 s:insert({3, 0})
-s:update(3, {{'=', 'i', -2^63}})
+s:update(3, {{'=', 2, -2^63}})
 s:insert({4, 0})
-s:update(4, {{'=', 'i', -9223372036854775808LL}})
+s:update(4, {{'=', 2, -9223372036854775808LL}})
 
 box.schema.user.grant('guest', 'read, write', 'space', 'serializer_test_space')
 
@@ -26,9 +26,9 @@ s = cn.space.serializer_test_space
 s:insert({11, -2^63})
 s:insert({12, -9223372036854775808LL})
 s:insert({13, 0})
-s:update(13, {{'=', 'i', -2^63}})
+s:update(13, {{'=', 2, -2^63}})
 s:insert({14, 0})
-s:update(14, {{'=', 'i', -9223372036854775808LL}})
+s:update(14, {{'=', 2, -9223372036854775808LL}})
 
 cn:close()
 box.schema.user.revoke('guest', 'read, write', 'space', 'serializer_test_space')
