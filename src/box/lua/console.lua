@@ -1,4 +1,6 @@
 -- console.lua -- internal file
+--
+-- vim: ts=4 sw=4 et
 
 local serpent = require('serpent')
 local internal = require('console')
@@ -75,7 +77,27 @@ local serpent_map_symbols = function(tag, head, body, tail, level)
     return tag..head..body..tail
 end
 
+--
+-- Format a Lua value.
+local function format_lua_value(value, opts)
+    for k,v in pairs(lua_map_direct_symbols) do
+        if k == value then
+            return v
+        end
+    end
+    local serpent_opts = {
+        custom  = serpent_map_symbols,
+        comment = false,
+        nocode  = true,
+    }
+    if opts == "block" then
+        return serpent.block(value, serpent_opts)
+    end
+    return serpent.line(value, serpent_opts)
+end
+
 output_handlers["lua"] = function(status, opts, ...)
+    local collect = {}
     --
     -- If no data present at least EOS should be put,
     -- otherwise wire readers won't be able to find
@@ -83,20 +105,10 @@ output_handlers["lua"] = function(status, opts, ...)
     if not ... then
         return output_eos["lua"]
     end
-    for k,v in pairs(lua_map_direct_symbols) do
-        if k == ... then
-            return v .. output_eos["lua"]
-        end
+    for i = 1, select('#', ...) do
+        collect[i] = format_lua_value(select(i, ...), opts)
     end
-    local serpent_opts = {
-        custom  = serpent_map_symbols,
-        comment = false,
-        nocode = true,
-    }
-    if opts == "block" then
-        return serpent.block(..., serpent_opts) .. output_eos["lua"]
-    end
-    return serpent.line(..., serpent_opts) .. output_eos["lua"]
+    return table.concat(collect, ', ') .. output_eos["lua"]
 end
 
 local function output_verify_opts(fmt, opts)
