@@ -62,6 +62,14 @@ extern const char *sql_info_key_strs[];
 struct region;
 struct sql_bind;
 
+int
+sql_unprepare(uint32_t stmt_id);
+
+int
+sql_execute_prepared(uint32_t query_id, const struct sql_bind *bind,
+		     uint32_t bind_count, struct port *port,
+		     struct region *region);
+
 /**
  * Prepare and execute an SQL statement.
  * @param sql SQL statement.
@@ -135,13 +143,11 @@ sql_stmt_busy(const struct sql_stmt *stmt);
  * Prepare (compile into VDBE byte-code) statement.
  *
  * @param sql UTF-8 encoded SQL statement.
- * @param length Length of @param sql in bytes.
- * @param[out] stmt A pointer to the prepared statement.
- * @param[out] sql_tail End of parsed string.
+ * @param len Length of @param sql in bytes.
+ * @param port Port to store request response.
  */
 int
-sql_prepare(const char *sql, int length, struct sql_stmt **stmt,
-	    const char **sql_tail);
+sql_prepare(const char *sql, int len, struct port *port);
 
 #if defined(__cplusplus)
 } /* extern "C" { */

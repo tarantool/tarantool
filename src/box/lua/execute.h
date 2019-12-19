@@ -66,6 +66,6 @@ lua_sql_bind_list_decode(struct lua_State *L, struct sql_bind **out_bind,
 			 int idx);
 
 void
-box_lua_execute_init(struct lua_State *L);
+box_lua_sql_init(struct lua_State *L);
 
 #endif /* INCLUDES_TARANTOOL_LUA_EXECUTE_H */

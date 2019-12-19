@@ -30,6 +30,7 @@
  */
 #include "execute.h"
 
+#include "assoc.h"
 #include "bind.h"
 #include "iproto_constants.h"
 #include "sql/sqlInt.h"
@@ -45,6 +46,8 @@
 #include "tuple.h"
 #include "sql/vdbe.h"
 #include "box/lua/execute.h"
+#include "box/sql_stmt_cache.h"
+#include "session.h"
 
 const char *sql_info_key_strs[] = {
 	"row_count",
@@ -488,6 +491,82 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
 	return 0;
 }
 
+static bool
+sql_stmt_schema_version_is_valid(struct sql_stmt *stmt)
+{
+	return sql_stmt_schema_version(stmt) == box_schema_version();
+}
+
+/**
+ * Re-compile statement and refresh global prepared statement
+ * cache with the newest value.
+ */
+static int
+sql_reprepare(struct sql_stmt **stmt)
+{
+	const char *sql_str = sql_stmt_query_str(*stmt);
+	struct sql_stmt *new_stmt;
+	if (sql_stmt_compile(sql_str, strlen(sql_str), NULL,
+			     &new_stmt, NULL) != 0)
+		return -1;
+	if (sql_stmt_cache_update(*stmt, new_stmt) != 0)
+		return -1;
+	*stmt = new_stmt;
+	return 0;
+}
+
+/**
+ * Compile statement and save it to the global holder;
+ * update session hash with prepared statement ID (if
+ * it's not already there).
+ */
+int
+sql_prepare(const char *sql, int len, struct port *port)
+{
+	uint32_t stmt_id = sql_stmt_calculate_id(sql, len);
+	struct sql_stmt *stmt = sql_stmt_cache_find(stmt_id);
+	if (stmt == NULL) {
+		if (sql_stmt_compile(sql, len, NULL, &stmt, NULL) != 0)
+			return -1;
+		if (sql_stmt_cache_insert(stmt) != 0) {
+			sql_stmt_finalize(stmt);
+			return -1;
+		}
+	} else {
+		if (!sql_stmt_schema_version_is_valid(stmt) &&
+		    !sql_stmt_busy(stmt)) {
+			if (sql_reprepare(&stmt) != 0)
+				return -1;
+		}
+	}
+	assert(stmt != NULL);
+	/* Add id to the list of available statements in session. */
+	if (!session_check_stmt_id(current_session(), stmt_id))
+		session_add_stmt_id(current_session(), stmt_id);
+	enum sql_serialization_format format = sql_column_count(stmt) > 0 ?
+					   DQL_PREPARE : DML_PREPARE;
+	port_sql_create(port, stmt, format, false);
+
+	return 0;
+}
+
+/**
+ * Deallocate prepared statement from current session:
+ * remove its ID from session-local hash and unref entry
+ * in global holder.
+ */
+int
+sql_unprepare(uint32_t stmt_id)
+{
+	if (!session_check_stmt_id(current_session(), stmt_id)) {
+		diag_set(ClientError, ER_WRONG_QUERY_ID, stmt_id);
+		return -1;
+	}
+	session_remove_stmt_id(current_session(), stmt_id);
+	sql_stmt_unref(stmt_id);
+	return 0;
+}
+
 /**
  * Execute prepared SQL statement.
  *
@@ -522,6 +601,42 @@ sql_execute(struct sql_stmt *stmt, struct port *port, struct region *region)
 	}
 	if (rc != SQL_DONE)
 		return -1;
+	return 0;
+}
+
+int
+sql_execute_prepared(uint32_t stmt_id, const struct sql_bind *bind,
+		     uint32_t bind_count, struct port *port,
+		     struct region *region)
+{
+
+	if (!session_check_stmt_id(current_session(), stmt_id)) {
+		diag_set(ClientError, ER_WRONG_QUERY_ID, stmt_id);
+		return -1;
+	}
+	struct sql_stmt *stmt = sql_stmt_cache_find(stmt_id);
+	assert(stmt != NULL);
+	if (!sql_stmt_schema_version_is_valid(stmt)) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "statement has expired");
+		return -1;
+	}
+	if (sql_stmt_busy(stmt)) {
+		const char *sql_str = sql_stmt_query_str(stmt);
+		return sql_prepare_and_execute(sql_str, strlen(sql_str), bind,
+					       bind_count, port, region);
+	}
+	if (sql_bind(stmt, bind, bind_count) != 0)
+		return -1;
+	enum sql_serialization_format format = sql_column_count(stmt) > 0 ?
+					       DQL_EXECUTE : DML_EXECUTE;
+	port_sql_create(port, stmt, format, false);
+	if (sql_execute(stmt, port, region) != 0) {
+		port_destroy(port);
+		sql_stmt_reset(stmt);
+		return -1;
+	}
+	sql_stmt_reset(stmt);
+
 	return 0;
 }
 

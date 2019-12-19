@@ -263,6 +263,7 @@ struct errcode_record {
 	/*208 */_(ER_CANNOT_REGISTER, "Couldn't find an instance to register this replica on.") \
 	/*209 */_(ER_SESSION_SETTING_INVALID_VALUE,	"Session setting %s expected a value of type %s") \
 	/*210 */_(ER_SQL_PREPARE,		"Failed to prepare SQL statement: %s") \
+	/*211 */_(ER_WRONG_QUERY_ID,		"Prepared statement with id %u does not exist") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

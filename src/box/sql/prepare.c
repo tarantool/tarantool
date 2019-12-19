@@ -192,15 +192,6 @@ sqlReprepare(Vdbe * p)
 	return 0;
 }
 
-int
-sql_prepare(const char *sql, int length, struct sql_stmt **stmt,
-	    const char **sql_tail)
-{
-	int rc = sql_stmt_compile(sql, length, 0, stmt, sql_tail);
-	assert(rc == 0 || stmt == NULL || *stmt == NULL);
-	return rc;
-}
-
 void
 sql_parser_create(struct Parse *parser, struct sql *db, uint32_t sql_flags)
 {

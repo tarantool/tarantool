@@ -5,6 +5,8 @@
 #include "box/port.h"
 #include "box/execute.h"
 #include "box/bind.h"
+#include "box/sql_stmt_cache.h"
+#include "box/schema.h"
 
 /**
  * Serialize a description of the prepared statement.
@@ -64,6 +66,101 @@ lua_sql_get_metadata(struct sql_stmt *stmt, struct lua_State *L,
 	}
 }
 
+static inline void
+lua_sql_get_params_metadata(struct sql_stmt *stmt, struct lua_State *L)
+{
+	int bind_count = sql_bind_parameter_count(stmt);
+	lua_createtable(L, bind_count, 0);
+	for (int i = 0; i < bind_count; ++i) {
+		lua_createtable(L, 0, 2);
+		const char *name = sql_bind_parameter_name(stmt, i);
+		if (name == NULL)
+			name = "?";
+		const char *type = "ANY";
+		lua_pushstring(L, name);
+		lua_setfield(L, -2, "name");
+		lua_pushstring(L, type);
+		lua_setfield(L, -2, "type");
+		lua_rawseti(L, -2, i + 1);
+	}
+}
+
+/** Forward declaration to avoid code movement. */
+static int
+lbox_execute(struct lua_State *L);
+
+/**
+ * Prepare SQL statement: compile it and save to the cache.
+ * In fact it is wrapper around box.execute() which unfolds
+ * it to box.execute(stmt.query_id).
+ */
+static int
+lbox_execute_prepared(struct lua_State *L)
+{
+	int top = lua_gettop(L);
+
+	if ((top != 1 && top != 2) || ! lua_istable(L, 1))
+		return luaL_error(L, "Usage: statement:execute([, params])");
+	lua_getfield(L, 1, "stmt_id");
+	if (!lua_isnumber(L, -1))
+		return luaL_error(L, "Query id is expected to be numeric");
+	lua_remove(L, 1);
+	if (top == 2) {
+		/*
+		 * Stack state (before remove operation):
+		 * 1 Prepared statement object (Lua table)
+		 * 2 Bindings (Lua table)
+		 * 3 Statement ID(fetched from PS table) - top of stack
+		 *
+		 * We should make it suitable to pass arguments to
+		 * lbox_execute(), i.e. after manipulations stack
+		 * should look like:
+		 * 1 Statement ID
+		 * 2 Bindings - top of stack
+		 * Since there's no swap operation, we firstly remove
+		 * PS object, then copy table of values to be bound to
+		 * the top of stack (push), and finally remove original
+		 * bindings from stack.
+		 */
+		lua_pushvalue(L, 1);
+		lua_remove(L, 1);
+	}
+	return lbox_execute(L);
+}
+
+/**
+ * Unprepare statement: remove it from prepared statements cache.
+ * This function can be called in two ways: as member of prepared
+ * statement handle (stmt:unprepare()) or as box.unprepare(stmt_id).
+ */
+static int
+lbox_unprepare(struct lua_State *L)
+{
+	int top = lua_gettop(L);
+
+	if (top != 1 || (! lua_istable(L, 1) && ! lua_isnumber(L, 1))) {
+		return luaL_error(L, "Usage: statement:unprepare() or "\
+				     "box.unprepare(stmt_id)");
+	}
+	lua_Integer stmt_id;
+	if (lua_istable(L, 1)) {
+		lua_getfield(L, -1, "stmt_id");
+		if (! lua_isnumber(L, -1)) {
+			return luaL_error(L, "Statement id is expected "\
+					     "to be numeric");
+		}
+		stmt_id = lua_tointeger(L, -1);
+		lua_pop(L, 1);
+	} else {
+		stmt_id = lua_tonumber(L, 1);
+	}
+	if (stmt_id < 0)
+		return luaL_error(L, "Statement id can't be negative");
+	if (sql_unprepare((uint32_t) stmt_id) != 0)
+		return luaT_push_nil_and_error(L);
+	return 0;
+}
+
 void
 port_sql_dump_lua(struct port *port, struct lua_State *L, bool is_flat)
 {
@@ -108,7 +205,66 @@ port_sql_dump_lua(struct port *port, struct lua_State *L, bool is_flat)
 		}
 		break;
 	}
-	default: {
+	case DQL_PREPARE: {
+		/* Format is following:
+		 * stmt_id,
+		 * param_count,
+		 * params {name, type},
+		 * metadata {name, type}
+		 * execute(), unprepare()
+		 */
+		lua_createtable(L, 0, 6);
+		/* query_id */
+		const char *sql_str = sql_stmt_query_str(port_sql->stmt);
+		luaL_pushuint64(L, sql_stmt_calculate_id(sql_str,
+							 strlen(sql_str)));
+		lua_setfield(L, -2, "stmt_id");
+		/* param_count */
+		luaL_pushuint64(L, sql_bind_parameter_count(stmt));
+		lua_setfield(L, -2, "param_count");
+		/* params map */
+		lua_sql_get_params_metadata(stmt, L);
+		lua_setfield(L, -2, "params");
+		/* metadata */
+		lua_sql_get_metadata(stmt, L, sql_column_count(stmt));
+		lua_setfield(L, -2, "metadata");
+		/* execute function */
+		lua_pushcfunction(L, lbox_execute_prepared);
+		lua_setfield(L, -2, "execute");
+		/* unprepare function */
+		lua_pushcfunction(L, lbox_unprepare);
+		lua_setfield(L, -2, "unprepare");
+		break;
+	}
+	case DML_PREPARE : {
+		assert(((struct port_tuple *) port)->size == 0);
+		/* Format is following:
+		 * stmt_id,
+		 * param_count,
+		 * params {name, type},
+		 * execute(), unprepare()
+		 */
+		lua_createtable(L, 0, 5);
+		/* query_id */
+		const char *sql_str = sql_stmt_query_str(port_sql->stmt);
+		luaL_pushuint64(L, sql_stmt_calculate_id(sql_str,
+							 strlen(sql_str)));
+		lua_setfield(L, -2, "stmt_id");
+		/* param_count */
+		luaL_pushuint64(L, sql_bind_parameter_count(stmt));
+		lua_setfield(L, -2, "param_count");
+		/* params map */
+		lua_sql_get_params_metadata(stmt, L);
+		lua_setfield(L, -2, "params");
+		/* execute function */
+		lua_pushcfunction(L, lbox_execute_prepared);
+		lua_setfield(L, -2, "execute");
+		/* unprepare function */
+		lua_pushcfunction(L, lbox_unprepare);
+		lua_setfield(L, -2, "unprepare");
+		break;
+	}
+	default:{
 		unreachable();
 	}
 	}
@@ -279,9 +435,8 @@ lbox_execute(struct lua_State *L)
 	int top = lua_gettop(L);
 
 	if ((top != 1 && top != 2) || ! lua_isstring(L, 1))
-		return luaL_error(L, "Usage: box.execute(sqlstring[, params])");
-
-	const char *sql = lua_tolstring(L, 1, &length);
+		return luaL_error(L, "Usage: box.execute(sqlstring[, params]) "
+				  "or box.execute(stmt_id[, params])");
 
 	if (top == 2) {
 		if (! lua_istable(L, 2))
@@ -290,9 +445,44 @@ lbox_execute(struct lua_State *L)
 		if (bind_count < 0)
 			return luaT_push_nil_and_error(L);
 	}
+	/*
+	 * lua_isstring() returns true for numeric values as well,
+	 * so test explicit type instead.
+	 */
+	if (lua_type(L, 1) == LUA_TSTRING) {
+		const char *sql = lua_tolstring(L, 1, &length);
+		if (sql_prepare_and_execute(sql, length, bind, bind_count, &port,
+					    &fiber()->gc) != 0)
+			return luaT_push_nil_and_error(L);
+	} else {
+		assert(lua_type(L, 1) == LUA_TNUMBER);
+		lua_Integer query_id = lua_tointeger(L, 1);
+		if (query_id < 0)
+			return luaL_error(L, "Statement id can't be negative");
+		if (sql_execute_prepared(query_id, bind, bind_count, &port,
+					 &fiber()->gc) != 0)
+			return luaT_push_nil_and_error(L);
+	}
+	port_dump_lua(&port, L, false);
+	port_destroy(&port);
+	return 1;
+}
 
-	if (sql_prepare_and_execute(sql, length, bind, bind_count, &port,
-				    &fiber()->gc) != 0)
+/**
+ * Prepare SQL statement: compile it and save to the cache.
+ */
+static int
+lbox_prepare(struct lua_State *L)
+{
+	size_t length;
+	struct port port;
+	int top = lua_gettop(L);
+
+	if ((top != 1 && top != 2) || ! lua_isstring(L, 1))
+		return luaL_error(L, "Usage: box.prepare(sqlstring)");
+
+	const char *sql = lua_tolstring(L, 1, &length);
+	if (sql_prepare(sql, length, &port) != 0)
 		return luaT_push_nil_and_error(L);
 	port_dump_lua(&port, L, false);
 	port_destroy(&port);
@@ -300,11 +490,20 @@ lbox_execute(struct lua_State *L)
 }
 
 void
-box_lua_execute_init(struct lua_State *L)
+box_lua_sql_init(struct lua_State *L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 	lua_pushstring(L, "execute");
 	lua_pushcfunction(L, lbox_execute);
 	lua_settable(L, -3);
+
+	lua_pushstring(L, "prepare");
+	lua_pushcfunction(L, lbox_prepare);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "unprepare");
+	lua_pushcfunction(L, lbox_unprepare);
+	lua_settable(L, -3);
+
 	lua_pop(L, 1);
 }
