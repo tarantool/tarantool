@@ -126,6 +126,9 @@ end
 
 local function parse_output(value)
     local fmt, opts
+    if not value then
+        return 'Specify output format: lua or yaml.'
+    end
     if value:match("([^,]+),([^,]+)") ~= nil then
         fmt, opts = value:match("([^,]+),([^,]+)")
     else
