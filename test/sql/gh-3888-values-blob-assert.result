@@ -53,7 +53,7 @@ box.execute('VALUES(-0.5e-2)')
 ---
 - metadata:
   - name: column1
-    type: number
+    type: double
   rows:
   - [-0.005]
 ...
@@ -70,7 +70,7 @@ box.execute('SELECT 3.14')
 ---
 - metadata:
   - name: '3.14'
-    type: number
+    type: double
   rows:
   - [3.14]
 ...

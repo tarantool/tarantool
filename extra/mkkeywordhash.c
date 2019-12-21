@@ -202,7 +202,7 @@ static Keyword aKeywordTable[] = {
   { "DENSE_RANK",             "TK_STANDARD",    true  },
   { "DESCRIBE",               "TK_STANDARD",    true  },
   { "DETERMINISTIC",          "TK_STANDARD",    true  },
-  { "DOUBLE",                 "TK_STANDARD",    true  },
+  { "DOUBLE",                 "TK_DOUBLE",      true  },
   { "ELSEIF",                 "TK_STANDARD",    true  },
   { "ENABLE",                 "TK_ENABLE",      false },
   { "FETCH",                  "TK_STANDARD",    true  },

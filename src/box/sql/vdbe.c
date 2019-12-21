@@ -347,6 +347,10 @@ mem_apply_type(struct Mem *record, enum field_type type)
 		if ((record->flags & (MEM_Real | MEM_Int | MEM_UInt)) != 0)
 			return 0;
 		return sqlVdbeMemRealify(record);
+	case FIELD_TYPE_DOUBLE:
+		if ((record->flags & MEM_Real) != 0)
+			return 0;
+		return sqlVdbeMemRealify(record);
 	case FIELD_TYPE_STRING:
 		/*
 		 * Only attempt the conversion to TEXT if there is

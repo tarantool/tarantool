@@ -388,9 +388,11 @@ sql_type_result(enum field_type lhs, enum field_type rhs)
 	if (sql_type_is_numeric(lhs) || sql_type_is_numeric(rhs)) {
 		if (lhs == FIELD_TYPE_NUMBER || rhs == FIELD_TYPE_NUMBER)
 			return FIELD_TYPE_NUMBER;
+		if (lhs == FIELD_TYPE_DOUBLE || rhs == FIELD_TYPE_DOUBLE)
+			return FIELD_TYPE_DOUBLE;
 		if (lhs == FIELD_TYPE_INTEGER || rhs == FIELD_TYPE_INTEGER)
 			return FIELD_TYPE_INTEGER;
-		assert(lhs == FIELD_TYPE_UNSIGNED ||
+		assert(lhs == FIELD_TYPE_UNSIGNED &&
 		       rhs == FIELD_TYPE_UNSIGNED);
 		return FIELD_TYPE_UNSIGNED;
 	}
@@ -2260,7 +2262,7 @@ sql_expr_needs_no_type_change(const struct Expr *p, enum field_type type)
 	case TK_INTEGER:
 		return type == FIELD_TYPE_INTEGER;
 	case TK_FLOAT:
-		return type == FIELD_TYPE_NUMBER;
+		return type == FIELD_TYPE_DOUBLE;
 	case TK_STRING:
 		return type == FIELD_TYPE_STRING;
 	case TK_BLOB:

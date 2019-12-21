@@ -309,7 +309,7 @@ box.execute('SELECT 1 + 1.1;')
 ---
 - metadata:
   - name: 1 + 1.1
-    type: number
+    type: double
   rows:
   - [2.1]
 ...
@@ -1688,6 +1688,394 @@ s:drop()
 ---
 ...
 box.execute('DROP TABLE t1;')
+---
+- row_count: 1
+...
+-- gh-3812: Make sure DOUBLE type works correctly.
+box.execute("SELECT 1.0;")
+---
+- metadata:
+  - name: '1.0'
+    type: double
+  rows:
+  - [1]
+...
+box.execute("SELECT .01;")
+---
+- metadata:
+  - name: '.01'
+    type: double
+  rows:
+  - [0.01]
+...
+box.execute("SELECT CAST(1 AS DOUBLE);")
+---
+- metadata:
+  - name: CAST(1 AS DOUBLE)
+    type: double
+  rows:
+  - [1]
+...
+box.execute("SELECT CAST(1.123 AS DOUBLE);")
+---
+- metadata:
+  - name: CAST(1.123 AS DOUBLE)
+    type: double
+  rows:
+  - [1.123]
+...
+box.execute("SELECT CAST(true AS DOUBLE);")
+---
+- null
+- 'Type mismatch: can not convert TRUE to double'
+...
+box.execute("SELECT CAST('asd' AS DOUBLE);")
+---
+- null
+- 'Type mismatch: can not convert asd to double'
+...
+box.execute("SELECT CAST('1' AS DOUBLE);")
+---
+- metadata:
+  - name: CAST('1' AS DOUBLE)
+    type: double
+  rows:
+  - [1]
+...
+box.execute("SELECT CAST('1.123' AS DOUBLE);")
+---
+- metadata:
+  - name: CAST('1.123' AS DOUBLE)
+    type: double
+  rows:
+  - [1.123]
+...
+box.execute("SELECT CAST(x'' AS DOUBLE);")
+---
+- null
+- 'Type mismatch: can not convert varbinary to double'
+...
+box.execute("SELECT CAST(x'35' AS DOUBLE);")
+---
+- null
+- 'Type mismatch: can not convert varbinary to double'
+...
+box.execute("SELECT CAST(CAST(x'35' AS STRING) AS DOUBLE);")
+---
+- metadata:
+  - name: CAST(CAST(x'35' AS STRING) AS DOUBLE)
+    type: double
+  rows:
+  - [5]
+...
+box.execute('CREATE TABLE t (i INT PRIMARY KEY AUTOINCREMENT, d DOUBLE);')
+---
+- row_count: 1
+...
+box.execute('INSERT INTO t(d) VALUES (10), (-2.0), (3.3), (18000000000000000000);')
+---
+- autoincrement_ids:
+  - 1
+  - 2
+  - 3
+  - 4
+  row_count: 4
+...
+box.execute('SELECT * FROM t;')
+---
+- metadata:
+  - name: I
+    type: integer
+  - name: D
+    type: double
+  rows:
+  - [1, 10]
+  - [2, -2]
+  - [3, 3.3]
+  - [4, 18000000000000000000]
+...
+box.execute('SELECT d / 100 FROM t;')
+---
+- metadata:
+  - name: d / 100
+    type: double
+  rows:
+  - [0.1]
+  - [-0.02]
+  - [0.033]
+  - [180000000000000000]
+...
+box.execute('SELECT * from t WHERE d < 15;')
+---
+- metadata:
+  - name: I
+    type: integer
+  - name: D
+    type: double
+  rows:
+  - [1, 10]
+  - [2, -2]
+  - [3, 3.3]
+...
+box.execute('SELECT * from t WHERE d = 3.3;')
+---
+- metadata:
+  - name: I
+    type: integer
+  - name: D
+    type: double
+  rows:
+  - [3, 3.3]
+...
+box.execute("SELECT sum(d) FROM t;")
+---
+- metadata:
+  - name: sum(d)
+    type: number
+  rows:
+  - [18000000000000000000]
+...
+box.execute("SELECT avg(d) FROM t;")
+---
+- metadata:
+  - name: avg(d)
+    type: number
+  rows:
+  - [4500000000000000000]
+...
+box.execute("SELECT total(d) FROM t;")
+---
+- metadata:
+  - name: total(d)
+    type: number
+  rows:
+  - [18000000000000000000]
+...
+box.execute("SELECT min(d) FROM t;")
+---
+- metadata:
+  - name: min(d)
+    type: scalar
+  rows:
+  - [-2]
+...
+box.execute("SELECT max(d) FROM t;")
+---
+- metadata:
+  - name: max(d)
+    type: scalar
+  rows:
+  - [18000000000000000000]
+...
+box.execute("SELECT count(d) FROM t;")
+---
+- metadata:
+  - name: count(d)
+    type: integer
+  rows:
+  - [4]
+...
+box.execute("SELECT group_concat(d) FROM t;")
+---
+- metadata:
+  - name: group_concat(d)
+    type: string
+  rows:
+  - ['10.0,-2.0,3.3,1.8e+19']
+...
+box.execute("SELECT lower(d) FROM t;")
+---
+- metadata:
+  - name: lower(d)
+    type: string
+  rows:
+  - ['10.0']
+  - ['-2.0']
+  - ['3.3']
+  - ['1.8e+19']
+...
+box.execute("SELECT upper(d) FROM t;")
+---
+- metadata:
+  - name: upper(d)
+    type: string
+  rows:
+  - ['10.0']
+  - ['-2.0']
+  - ['3.3']
+  - ['1.8E+19']
+...
+box.execute("SELECT abs(d) FROM t;")
+---
+- metadata:
+  - name: abs(d)
+    type: number
+  rows:
+  - [10]
+  - [2]
+  - [3.3]
+  - [18000000000000000000]
+...
+box.execute("SELECT typeof(d) FROM t;")
+---
+- metadata:
+  - name: typeof(d)
+    type: string
+  rows:
+  - ['double']
+  - ['double']
+  - ['double']
+  - ['double']
+...
+box.execute("SELECT quote(d) FROM t;")
+---
+- metadata:
+  - name: quote(d)
+    type: string
+  rows:
+  - ['10.0']
+  - ['-2.0']
+  - ['3.3']
+  - ['1.8e+19']
+...
+box.execute("SELECT LEAST(d, 0) FROM t;")
+---
+- metadata:
+  - name: LEAST(d, 0)
+    type: scalar
+  rows:
+  - [0]
+  - [-2]
+  - [0]
+  - [0]
+...
+box.execute("CREATE INDEX dd ON t(d);")
+---
+- row_count: 1
+...
+box.execute("SELECT d FROM t WHERE d < 0;")
+---
+- metadata:
+  - name: D
+    type: double
+  rows:
+  - [-2]
+...
+box.execute("SELECT d FROM t ORDER BY d;")
+---
+- metadata:
+  - name: D
+    type: double
+  rows:
+  - [-2]
+  - [3.3]
+  - [10]
+  - [18000000000000000000]
+...
+box.execute("UPDATE t SET d = 1 WHERE d = 10;")
+---
+- row_count: 1
+...
+box.execute("SELECT d FROM t;")
+---
+- metadata:
+  - name: D
+    type: double
+  rows:
+  - [1]
+  - [-2]
+  - [3.3]
+  - [18000000000000000000]
+...
+box.execute("DROP TABLE t;")
+---
+- row_count: 1
+...
+box.execute("CREATE TABLE t1 (d DOUBLE PRIMARY KEY);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t1 VALUES (1), (2.2), (3.5);")
+---
+- row_count: 3
+...
+box.execute("INSERT INTO t1 VALUES (1);")
+---
+- null
+- Duplicate key exists in unique index 'pk_unnamed_T1_1' in space 'T1'
+...
+box.execute("CREATE TABLE t2 (i INT PRIMARY KEY, d DOUBLE REFERENCES t1);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t2 VALUES (1,1), (2,2.2), (100, 3.5), (4, 1);")
+---
+- row_count: 4
+...
+box.execute("INSERT INTO t2 VALUES (5,10);")
+---
+- null
+- 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+...
+box.execute("DROP TABLE t2;")
+---
+- row_count: 1
+...
+box.execute("DROP TABLE t1;")
+---
+- row_count: 1
+...
+box.execute("CREATE TABLE t3 (i INT PRIMARY KEY, d DOUBLE CHECK (d < 10));")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t3 VALUES (1, 1);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t3 VALUES (2, 9.999999);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t3 VALUES (3, 10.0000001);")
+---
+- null
+- 'Check constraint failed ''ck_unnamed_T3_1'': d < 10'
+...
+box.execute("SELECT * FROM t3;")
+---
+- metadata:
+  - name: I
+    type: integer
+  - name: D
+    type: double
+  rows:
+  - [1, 1]
+  - [2, 9.999999]
+...
+box.execute("DROP TABLE t3;")
+---
+- row_count: 1
+...
+box.execute("CREATE TABLE t4 (i INT PRIMARY KEY, d DOUBLE DEFAULT 1.2345);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t4(i) VALUES (1);")
+---
+- row_count: 1
+...
+box.execute("SELECT * FROM t4;")
+---
+- metadata:
+  - name: I
+    type: integer
+  - name: D
+    type: double
+  rows:
+  - [1, 1.2345]
+...
+box.execute("DROP TABLE t4;")
 ---
 - row_count: 1
 ...

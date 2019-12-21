@@ -83,7 +83,7 @@ box.execute('SELECT 1.5;')
 ---
 - metadata:
   - name: '1.5'
-    type: number
+    type: double
   rows:
   - [1.5]
 ...
@@ -91,7 +91,7 @@ box.execute('SELECT 1.0;')
 ---
 - metadata:
   - name: '1.0'
-    type: number
+    type: double
   rows:
   - [1]
 ...

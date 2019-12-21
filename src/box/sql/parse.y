@@ -981,7 +981,7 @@ idlist(A) ::= nm(Y). {
         p->type = FIELD_TYPE_INTEGER;
         break;
       case TK_FLOAT:
-        p->type = FIELD_TYPE_NUMBER;
+        p->type = FIELD_TYPE_DOUBLE;
         break;
       case TK_TRUE:
       case TK_FALSE:
@@ -1846,6 +1846,7 @@ typedef(A) ::= VARCHAR char_len(B) . {
 %type number_typedef {struct type_def}
 typedef(A) ::= number_typedef(A) .
 number_typedef(A) ::= NUMBER . { A.type = FIELD_TYPE_NUMBER; }
+number_typedef(A) ::= DOUBLE . { A.type = FIELD_TYPE_DOUBLE; }
 number_typedef(A) ::= INT|INTEGER_KW . { A.type = FIELD_TYPE_INTEGER; }
 number_typedef(A) ::= UNSIGNED . { A.type = FIELD_TYPE_UNSIGNED; }
 
