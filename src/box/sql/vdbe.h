@@ -293,9 +293,9 @@ void sqlVdbeNoopComment(Vdbe *, const char *, ...);
 #define VdbeModuleComment(X)
 #endif
 #else
-#define VdbeComment(X)
-#define VdbeNoopComment(X)
-#define VdbeModuleComment(X)
+#define VdbeComment(X) (void) 0
+#define VdbeNoopComment(X) (void) 0
+#define VdbeModuleComment(X) (void) 0
 #endif
 
 /*
