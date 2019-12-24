@@ -519,21 +519,27 @@ wal_free(void)
 	wal_writer_destroy(writer);
 }
 
+struct wal_vclock_msg {
+    struct cbus_call_msg base;
+    struct vclock vclock;
+};
+
 static int
-wal_sync_f(struct cbus_call_msg *msg)
+wal_sync_f(struct cbus_call_msg *data)
 {
-	(void)msg;
+	struct wal_vclock_msg *msg = (struct wal_vclock_msg *) data;
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->in_rollback.route != NULL) {
 		/* We're rolling back a failed write. */
 		diag_set(ClientError, ER_WAL_IO);
 		return -1;
 	}
+	vclock_copy(&msg->vclock, &writer->vclock);
 	return 0;
 }
 
 int
-wal_sync(void)
+wal_sync(struct vclock *vclock)
 {
 	ERROR_INJECT(ERRINJ_WAL_SYNC, {
 		diag_set(ClientError, ER_INJECTION, "wal sync");
@@ -541,18 +547,23 @@ wal_sync(void)
 	});
 
 	struct wal_writer *writer = &wal_writer_singleton;
-	if (writer->wal_mode == WAL_NONE)
+	if (writer->wal_mode == WAL_NONE) {
+		if (vclock != NULL)
+			vclock_copy(vclock, &writer->vclock);
 		return 0;
+	}
 	if (!stailq_empty(&writer->rollback)) {
 		/* We're rolling back a failed write. */
 		diag_set(ClientError, ER_WAL_IO);
 		return -1;
 	}
 	bool cancellable = fiber_set_cancellable(false);
-	struct cbus_call_msg msg;
+	struct wal_vclock_msg msg;
 	int rc = cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe,
-			   &msg, wal_sync_f, NULL, TIMEOUT_INFINITY);
+			   &msg.base, wal_sync_f, NULL, TIMEOUT_INFINITY);
 	fiber_set_cancellable(cancellable);
+	if (vclock != NULL)
+		vclock_copy(vclock, &msg.vclock);
 	return rc;
 }
 

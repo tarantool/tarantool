@@ -1087,7 +1087,7 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	 */
 	int rc;
 	if (need_wal_sync) {
-		rc = wal_sync();
+		rc = wal_sync(NULL);
 		if (rc != 0)
 			goto out;
 	}
@@ -4180,7 +4180,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	 */
 	int rc;
 	if (need_wal_sync) {
-		rc = wal_sync();
+		rc = wal_sync(NULL);
 		if (rc != 0)
 			goto out;
 	}

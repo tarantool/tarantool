@@ -307,12 +307,11 @@ relay_initial_join(int fd, uint64_t sync, struct vclock *vclock)
 
 	/*
 	 * Sync WAL to make sure that all changes visible from
-	 * the frozen read view are successfully committed.
+	 * the frozen read view are successfully committed and
+	 * obtain corresponding vclock.
 	 */
-	if (wal_sync() != 0)
+	if (wal_sync(vclock) != 0)
 		diag_raise();
-
-	vclock_copy(vclock, &replicaset.vclock);
 
 	/* Respond to the JOIN request with the current vclock. */
 	struct xrow_header row;
