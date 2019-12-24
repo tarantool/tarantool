@@ -1611,26 +1611,33 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	sqlVdbeAddOp2(v, OP_Integer, space_id, space_id_reg);
 	sqlVdbeAddOp1(v, OP_CheckViewReferences, space_id_reg);
 	if (space->sequence != NULL) {
-		/* Delete entry from _sequence_data. */
-		int sequence_id_reg = ++parse_context->nMem;
-		sqlVdbeAddOp2(v, OP_Integer, space->sequence->def->id,
-				  sequence_id_reg);
-		sqlVdbeAddOp3(v, OP_MakeRecord, sequence_id_reg, 1,
-				  idx_rec_reg);
-		sqlVdbeAddOp2(v, OP_SDelete, BOX_SEQUENCE_DATA_ID,
-				  idx_rec_reg);
-		VdbeComment((v, "Delete entry from _sequence_data"));
 		/* Delete entry from _space_sequence. */
 		sqlVdbeAddOp3(v, OP_MakeRecord, space_id_reg, 1,
 				  idx_rec_reg);
 		sqlVdbeAddOp2(v, OP_SDelete, BOX_SPACE_SEQUENCE_ID,
 				  idx_rec_reg);
 		VdbeComment((v, "Delete entry from _space_sequence"));
-		/* Delete entry by id from _sequence. */
-		sqlVdbeAddOp3(v, OP_MakeRecord, sequence_id_reg, 1,
-				  idx_rec_reg);
-		sqlVdbeAddOp2(v, OP_SDelete, BOX_SEQUENCE_ID, idx_rec_reg);
-		VdbeComment((v, "Delete entry from _sequence"));
+		if (space->sequence->is_generated) {
+			/* Delete entry from _sequence_data. */
+			int sequence_id_reg = ++parse_context->nMem;
+			sqlVdbeAddOp2(v, OP_Integer, space->sequence->def->id,
+				      sequence_id_reg);
+			sqlVdbeAddOp3(v, OP_MakeRecord, sequence_id_reg, 1,
+				      idx_rec_reg);
+			sqlVdbeAddOp2(v, OP_SDelete, BOX_SEQUENCE_DATA_ID,
+				      idx_rec_reg);
+			VdbeComment((v, "Delete entry from _sequence_data"));
+			/* Delete entries from _priv */
+		        vdbe_emit_revoke_object(parse_context, "sequence",
+						space->sequence->def->id,
+						space->sequence->access);
+			/* Delete entry by id from _sequence. */
+			sqlVdbeAddOp3(v, OP_MakeRecord, sequence_id_reg, 1,
+				      idx_rec_reg);
+			sqlVdbeAddOp2(v, OP_SDelete, BOX_SEQUENCE_ID,
+				      idx_rec_reg);
+			VdbeComment((v, "Delete entry from _sequence"));
+		}
 	}
 	/* Delete all child FK constraints. */
 	struct fk_constraint *child_fk;
