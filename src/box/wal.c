@@ -97,6 +97,13 @@ struct wal_writer
 	struct cpipe wal_pipe;
 	/** A memory pool for messages. */
 	struct mempool msg_pool;
+	/**
+	 * A last journal entry submitted to write. This is a
+	 * 'rollback border'. When rollback starts, all
+	 * transactions keep being rolled back until this one is
+	 * rolled back too.
+	 */
+	struct journal_entry *last_entry;
 	/* ----------------- wal ------------------- */
 	/** A setting from instance configuration - wal_max_size */
 	int64_t wal_max_size;
@@ -153,7 +160,7 @@ struct wal_writer
 	 * keep adding all incoming requests to the rollback
 	 * queue, until the tx thread has recovered.
 	 */
-	struct cmsg in_rollback;
+	bool is_in_rollback;
 	/**
 	 * WAL watchers, i.e. threads that should be alerted
 	 * whenever there are new records appended to the journal.
@@ -198,11 +205,11 @@ static void
 wal_write_to_disk(struct cmsg *msg);
 
 static void
-tx_schedule_commit(struct cmsg *msg);
+tx_complete_batch(struct cmsg *msg);
 
 static struct cmsg_hop wal_request_route[] = {
 	{wal_write_to_disk, &wal_writer_singleton.tx_prio_pipe},
-	{tx_schedule_commit, NULL},
+	{tx_complete_batch, NULL},
 };
 
 static void
@@ -266,13 +273,82 @@ tx_schedule_queue(struct stailq *queue)
 }
 
 /**
+ * Rollback happens, when disk write fails. In that case all next
+ * transactions, sent to WAL, also should be rolled back. Because
+ * they could make their statements based on what they saw in the
+ * failed transaction. Also rollback of the failed transaction
+ * without rollback of the next ones can actually rewrite what
+ * they committed.
+ * So when rollback is started, *all* pending transactions should
+ * be rolled back. However if they would keep coming, the rollback
+ * would be infinite. This means to complete a rollback it is
+ * necessary to stop sending new transactions to WAL, then
+ * rollback all already sent. In the end allow new transactions
+ * again.
+ *
+ * First step is stop accepting all new transactions. For that WAL
+ * thread sets a global flag. No rocket science here. All new
+ * transactions, if see the flag set, are added to the rollback
+ * queue immediately.
+ *
+ * Second step - tell TX thread to stop sending new transactions
+ * to WAL. So as the rollback queue would stop growing.
+ *
+ * Third step - rollback all transactions in reverse order.
+ *
+ * Fourth step - allow transactions again. Unset the global flag
+ * in WAL thread.
+ */
+static inline void
+wal_begin_rollback(void)
+{
+	/* Signal WAL-thread stop accepting new transactions. */
+	wal_writer_singleton.is_in_rollback = true;
+}
+
+static void
+wal_complete_rollback(struct cmsg *base)
+{
+	(void) base;
+	/* WAL-thread can try writing transactions again. */
+	wal_writer_singleton.is_in_rollback = false;
+}
+
+static void
+tx_complete_rollback(void)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	/*
+	 * Despite records are sent in batches, the last entry to
+	 * commit can't be in the middle of a batch. After all
+	 * transactions to rollback are collected, the last entry
+	 * will be exactly, well, the last entry.
+	 */
+	if (stailq_last_entry(&writer->rollback, struct journal_entry,
+			      fifo) != writer->last_entry)
+		return;
+	stailq_reverse(&writer->rollback);
+	tx_schedule_queue(&writer->rollback);
+	/* TX-thread can try sending transactions to WAL again. */
+	stailq_create(&writer->rollback);
+	static struct cmsg_hop route[] = {
+		{wal_complete_rollback, NULL}
+	};
+	static struct cmsg msg;
+	cmsg_init(&msg, route);
+	cpipe_push(&writer->wal_pipe, &msg);
+}
+
+/**
  * Complete execution of a batch of WAL write requests:
  * schedule all committed requests, and, should there
  * be any requests to be rolled back, append them to
- * the rollback queue.
+ * the rollback queue. In case this is a rollback and the batch
+ * contains the last transaction to rollback, the rollback is
+ * performed and normal processing is allowed again.
  */
 static void
-tx_schedule_commit(struct cmsg *msg)
+tx_complete_batch(struct cmsg *msg)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	struct wal_msg *batch = (struct wal_msg *) msg;
@@ -282,36 +358,14 @@ tx_schedule_commit(struct cmsg *msg)
 	 * iteration of tx_schedule_queue loop.
 	 */
 	if (! stailq_empty(&batch->rollback)) {
-		/* Closes the input valve. */
 		stailq_concat(&writer->rollback, &batch->rollback);
+		tx_complete_rollback();
 	}
 	/* Update the tx vclock to the latest written by wal. */
 	vclock_copy(&replicaset.vclock, &batch->vclock);
 	tx_schedule_queue(&batch->commit);
 	mempool_free(&writer->msg_pool, container_of(msg, struct wal_msg, base));
 }
-
-static void
-tx_schedule_rollback(struct cmsg *msg)
-{
-	(void) msg;
-	struct wal_writer *writer = &wal_writer_singleton;
-	/*
-	 * Perform a cascading abort of all transactions which
-	 * depend on the transaction which failed to get written
-	 * to the write ahead log. Abort transactions
-	 * in reverse order, performing a playback of the
-	 * in-memory database state.
-	 */
-	stailq_reverse(&writer->rollback);
-	/* Must not yield. */
-	tx_schedule_queue(&writer->rollback);
-	stailq_create(&writer->rollback);
-	if (msg != &writer->in_rollback)
-		mempool_free(&writer->msg_pool,
-			     container_of(msg, struct wal_msg, base));
-}
-
 
 /**
  * This message is sent from WAL to TX when the WAL thread hits
@@ -374,7 +428,7 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 		writer->wal_dir.open_wflags |= O_SYNC;
 
 	stailq_create(&writer->rollback);
-	cmsg_init(&writer->in_rollback, NULL);
+	writer->is_in_rollback = false;
 
 	writer->checkpoint_wal_size = 0;
 	writer->checkpoint_threshold = INT64_MAX;
@@ -543,7 +597,7 @@ wal_sync_f(struct cbus_call_msg *data)
 {
 	struct wal_vclock_msg *msg = (struct wal_vclock_msg *) data;
 	struct wal_writer *writer = &wal_writer_singleton;
-	if (writer->in_rollback.route != NULL) {
+	if (writer->is_in_rollback) {
 		/* We're rolling back a failed write. */
 		diag_set(ClientError, ER_WAL_IO);
 		return -1;
@@ -586,7 +640,7 @@ wal_begin_checkpoint_f(struct cbus_call_msg *data)
 {
 	struct wal_checkpoint *msg = (struct wal_checkpoint *) data;
 	struct wal_writer *writer = &wal_writer_singleton;
-	if (writer->in_rollback.route != NULL) {
+	if (writer->is_in_rollback) {
 		/*
 		 * We're rolling back a failed write and so
 		 * can't make a checkpoint - see the comment
@@ -892,54 +946,6 @@ out:
 	return rc;
 }
 
-static void
-wal_writer_clear_bus(struct cmsg *msg)
-{
-	(void) msg;
-}
-
-static void
-wal_writer_end_rollback(struct cmsg *msg)
-{
-	(void) msg;
-	struct wal_writer *writer = &wal_writer_singleton;
-	cmsg_init(&writer->in_rollback, NULL);
-}
-
-static void
-wal_writer_begin_rollback(struct wal_writer *writer)
-{
-	static struct cmsg_hop rollback_route[4] = {
-		/*
-		 * Step 1: clear the bus, so that it contains
-		 * no WAL write requests. This is achieved as a
-		 * side effect of an empty message travelling
-		 * through both bus pipes, while writer input
-		 * valve is closed by non-empty writer->rollback
-		 * list.
-		 */
-		{ wal_writer_clear_bus, &wal_writer_singleton.wal_pipe },
-		{ wal_writer_clear_bus, &wal_writer_singleton.tx_prio_pipe },
-		/*
-		 * Step 2: writer->rollback queue contains all
-		 * messages which need to be rolled back,
-		 * perform the rollback.
-		 */
-		{ tx_schedule_rollback, &wal_writer_singleton.wal_pipe },
-		/*
-		 * Step 3: re-open the WAL for writing.
-		 */
-		{ wal_writer_end_rollback, NULL }
-	};
-
-	/*
-	 * Make sure the WAL writer rolls back
-	 * all input until rollback mode is off.
-	 */
-	cmsg_init(&writer->in_rollback, rollback_route);
-	cpipe_push(&writer->tx_prio_pipe, &writer->in_rollback);
-}
-
 /*
  * Assign lsn and replica identifier for local writes and track
  * row into vclock_diff.
@@ -1006,7 +1012,7 @@ wal_write_to_disk(struct cmsg *msg)
 
 	ERROR_INJECT_SLEEP(ERRINJ_WAL_DELAY);
 
-	if (writer->in_rollback.route != NULL) {
+	if (writer->is_in_rollback) {
 		/* We're rolling back a failed write. */
 		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
 		vclock_copy(&wal_msg->vclock, &writer->vclock);
@@ -1017,14 +1023,14 @@ wal_write_to_disk(struct cmsg *msg)
 	if (wal_opt_rotate(writer) != 0) {
 		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
 		vclock_copy(&wal_msg->vclock, &writer->vclock);
-		return wal_writer_begin_rollback(writer);
+		return wal_begin_rollback();
 	}
 
 	/* Ensure there's enough disk space before writing anything. */
 	if (wal_fallocate(writer, wal_msg->approx_len) != 0) {
 		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
 		vclock_copy(&wal_msg->vclock, &writer->vclock);
-		return wal_writer_begin_rollback(writer);
+		return wal_begin_rollback();
 	}
 
 	/*
@@ -1130,7 +1136,7 @@ done:
 			entry->res = -1;
 		/* Rollback unprocessed requests */
 		stailq_concat(&wal_msg->rollback, &rollback);
-		wal_writer_begin_rollback(writer);
+		wal_begin_rollback();
 	}
 	fiber_gc();
 	wal_notify_watchers(writer, WAL_EVENT_WRITE);
@@ -1234,6 +1240,12 @@ wal_write_async(struct journal *journal, struct journal_entry *entry)
 		stailq_add_tail_entry(&batch->commit, entry, fifo);
 		cpipe_push(&writer->wal_pipe, &batch->base);
 	}
+	/*
+	 * Remember last entry sent to WAL. In case of rollback
+	 * WAL will use this entry as an anchor to rollback all
+	 * transactions until and including this one.
+	 */
+	writer->last_entry = entry;
 	batch->approx_len += entry->approx_len;
 	writer->wal_pipe.n_input += entry->n_rows * XROW_IOVMAX;
 	cpipe_flush_input(&writer->wal_pipe);
