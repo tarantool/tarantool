@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14)
+test:plan(9)
 
 -- box.cfg{wal_mode='none'}
 
@@ -60,49 +60,6 @@ test:do_catchsql_test(
         -- <gh2548-select-compound-limit-2>
         1, "The number of UNION or EXCEPT or INTERSECT operations 31 exceeds the limit (30)"
         -- </gh2548-select-compound-limit-2>
-    })
-
-test:do_execsql_test(
-    "gh2548-select-compound-limit-3.1", [[
-        pragma sql_compound_select_limit
-    ]], {
-        -- <gh2548-select-compound-limit-3.1>
-        30
-        -- </gh2548-select-compound-limit-3.1>
-    })
-
-test:do_execsql_test(
-    "gh2548-select-compound-limit-3.2", [[
-        pragma sql_compound_select_limit=31
-    ]], {
-        -- <gh2548-select-compound-limit-3.2>
-        31
-        -- </gh2548-select-compound-limit-3.2>
-})
-
-test:do_execsql_test(
-    "gh2548-select-compound-limit-3.3",
-    select_string_last, {
-        -- <gh2548-select-compound-limit-3.3>
-        0, 1
-        -- </gh2548-select-compound-limit-3.3>
-    })
-
-test:do_execsql_test(
-    "gh2548-select-compound-limit-3.4", [[
-        pragma sql_compound_select_limit=0
-    ]], {
-        -- <gh2548-select-compound-limit-3.4>
-        0
-        -- </gh2548-select-compound-limit-3.4>
-    })
-
-test:do_execsql_test(
-    "gh2548-select-compound-limit-3.3",
-    select_string_last, {
-        -- <gh2548-select-compound-limit-3.3>
-        0, 1
-        -- </gh2548-select-compound-limit-3.3>
     })
 
 test:finish_test()

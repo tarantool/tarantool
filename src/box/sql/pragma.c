@@ -586,17 +586,6 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		break;
 	}
 
-	case PragTyp_COMPOUND_SELECT_LIMIT: {
-		if (zRight != NULL) {
-			sql_limit(db, SQL_LIMIT_COMPOUND_SELECT,
-				      sqlAtoi(zRight));
-		}
-		int retval =
-			sql_limit(db, SQL_LIMIT_COMPOUND_SELECT, -1);
-		returnSingleInt(v, retval);
-		break;
-	}
-
 	default:
 		unreachable();
 	}			/* End of the PRAGMA switch */
