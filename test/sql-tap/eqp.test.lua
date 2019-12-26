@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(68)
+test:plan(70)
 
 --!./tcltestrunner.lua
 -- 2010 November 6
@@ -772,6 +772,9 @@ test:do_execsql_test(
     [[
         CREATE TABLE t1(a INT , b INT , c INT , PRIMARY KEY(b, c));
         CREATE TABLE t2(id  INT primary key, a INT , b INT , c INT );
+        CREATE TABLE t(id INT PRIMARY KEY, r_d TEXT, s INTEGER);
+        CREATE INDEX i1 ON t (r_d, s);
+        CREATE INDEX i2 ON t (s);
     ]])
 
 test:do_eqp_test("8.1.1", "SELECT * FROM t2", {
@@ -796,5 +799,19 @@ test:do_eqp_test("8.2.4", "SELECT count(*) FROM t1", {
     {0, 0, 0, "B+tree count T1"},
 })
 
+-- Verify that INDEXED BY clause forces specified index.
+-- Test case (in simplified form) is taken from customer.
+--
+test:do_eqp_test(
+    "8.2.5.1",
+    [[ SELECT r_d, s FROM t INDEXED BY i1 WHERE r_d > '10' LIMIT 10; ]], {
+    {0, 0, 0, "SEARCH TABLE T USING COVERING INDEX I1 (R_D>?) (~262144 rows)"},
+})
+
+test:do_eqp_test(
+    "8.2.5.2",
+    [[ SELECT r_d, s FROM t INDEXED BY i1 WHERE r_d > '10' AND s = 0 LIMIT 10; ]], {
+    { 0, 0, 0, "SEARCH TABLE T USING COVERING INDEX I1 (R_D>?) (~245760 rows)" },
+})
 
 test:finish_test()

@@ -2867,8 +2867,11 @@ tnt_error:
 	 * If there was an INDEXED BY clause, then only that one
 	 * index is considered.
 	 */
-	uint32_t idx_count = fake_index == NULL || pSrc->pIBIndex != NULL ?
-			     space->index_count : 1;
+	uint32_t idx_count = 0;
+	if (pSrc->pIBIndex != NULL || fake_index != NULL)
+		idx_count = 1;
+	else
+		idx_count = space->index_count;
 	for (uint32_t i = 0; i < idx_count; iSortIdx++, i++) {
 		if (i > 0)
 			probe = space->index[i]->def;
