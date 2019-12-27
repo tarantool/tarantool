@@ -1,7 +1,7 @@
 env = require('test_run')
 test_run = env.new()
 engine = test_run:get_cfg('engine')
-box.execute('pragma sql_default_engine=\''..engine..'\'')
+_ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 
 -- Get invariant part of the tuple; name and opts don't change.
  function immutable_part(data) local r = {} for i, l in pairs(data) do table.insert(r, {l.name, l.opts}) end return r end
@@ -100,10 +100,10 @@ box.execute("DROP TABLE T1;")
 -- gh-3531: Assertion with trigger and two storage engines
 --
 -- Case 1: Src 'vinyl' table; Dst 'memtx' table
-box.execute("PRAGMA sql_default_engine ('vinyl');")
+box.space._session_settings:update('sql_default_engine', {{'=', 2, 'vinyl'}})
 box.execute("CREATE TABLE m (s0 INT PRIMARY KEY, s1 TEXT UNIQUE);")
 box.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 'now'; END;")
-box.execute("PRAGMA sql_default_engine('memtx');")
+box.space._session_settings:update('sql_default_engine', {{'=', 2, 'memtx'}})
 box.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 NUMBER);")
 box.execute("INSERT INTO m VALUES (0, '0');")
 box.execute("INSERT INTO n VALUES (0, '',null);")
@@ -116,10 +116,10 @@ box.execute("DROP TABLE n;")
 
 
 -- Case 2: Src 'memtx' table; Dst 'vinyl' table
-box.execute("PRAGMA sql_default_engine ('memtx');")
+box.space._session_settings:update('sql_default_engine', {{'=', 2, 'memtx'}})
 box.execute("CREATE TABLE m (s0 INT PRIMARY KEY, s1 TEXT UNIQUE);")
 box.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 'now'; END;")
-box.execute("PRAGMA sql_default_engine('vinyl');")
+box.space._session_settings:update('sql_default_engine', {{'=', 2, 'vinyl'}})
 box.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 NUMBER);")
 box.execute("INSERT INTO m VALUES (0, '0');")
 box.execute("INSERT INTO n VALUES (0, '',null);")
@@ -131,9 +131,9 @@ box.execute("DROP TABLE m;")
 box.execute("DROP TABLE n;")
 
 -- Test SQL Transaction with LUA
-box.execute("PRAGMA sql_default_engine ('memtx');")
+box.space._session_settings:update('sql_default_engine', {{'=', 2, 'memtx'}})
 box.execute("CREATE TABLE test (id INT PRIMARY KEY)")
-box.execute("PRAGMA sql_default_engine='vinyl'")
+box.space._session_settings:update('sql_default_engine', {{'=', 2, 'vinyl'}})
 box.execute("CREATE TABLE test2 (id INT PRIMARY KEY)")
 box.execute("INSERT INTO test2 VALUES (2)")
 box.execute("START TRANSACTION")

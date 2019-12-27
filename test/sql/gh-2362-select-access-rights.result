@@ -4,12 +4,11 @@ test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 ---
 ...
-nb = require('net.box')
+_ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 ---
 ...
-box.execute("PRAGMA sql_default_engine='"..engine.."'")
+nb = require('net.box')
 ---
-- row_count: 0
 ...
 box.execute("CREATE TABLE t1 (s1 INT PRIMARY KEY, s2 INT UNIQUE);")
 ---

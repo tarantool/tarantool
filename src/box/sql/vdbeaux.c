@@ -519,24 +519,6 @@ sqlVdbeCurrentAddr(Vdbe * p)
 }
 
 /*
- * Verify that the VM passed as the only argument does not contain
- * an OP_ResultRow opcode. Fail an assert() if it does. This is used
- * by code in pragma.c to ensure that the implementation of certain
- * pragmas comports with the flags specified in the mkpragmatab.tcl
- * script.
- */
-#if defined(SQL_DEBUG) && !defined(SQL_TEST_REALLOC_STRESS)
-void
-sqlVdbeVerifyNoResultRow(Vdbe * p)
-{
-	int i;
-	for (i = 0; i < p->nOp; i++) {
-		assert(p->aOp[i].opcode != OP_ResultRow);
-	}
-}
-#endif
-
-/*
  * This function returns a pointer to the array of opcodes associated with
  * the Vdbe passed as the first argument. It is the callers responsibility
  * to arrange for the returned array to be eventually freed using the

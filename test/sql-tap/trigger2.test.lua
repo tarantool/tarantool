@@ -58,7 +58,8 @@ test:plan(26)
 -- The tests in this file were written before sql supported recursive
 -- trigger invocation, and some tests depend on that to pass. So disable
 -- recursive triggers for this file.
-test:catchsql " pragma recursive_triggers = off "
+
+box.space._session_settings:update('sql_recursive_triggers', {{'=', 2, false}})
 -- 1.
 ii = 0
 tbl_definitions = { "CREATE TABLE tbl (id INT PRIMARY KEY AUTOINCREMENT, a INTEGER UNIQUE, b INT );",

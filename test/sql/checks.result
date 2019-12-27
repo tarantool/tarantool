@@ -11,9 +11,8 @@ test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
 engine = test_run:get_cfg('engine')
 ---
 ...
-box.execute('pragma sql_default_engine=\''..engine..'\'')
+_ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 ---
-- row_count: 0
 ...
 --
 -- gh-3272: Move SQL CHECK into server
@@ -733,13 +732,6 @@ physics_ck:drop()
 -- Make sure that ck constraints are turned on/off with
 -- :enable configurator.
 --
-engine = test_run:get_cfg('engine')
----
-...
-box.execute('pragma sql_default_engine=\''..engine..'\'')
----
-- row_count: 0
-...
 box.execute("CREATE TABLE test(a INT PRIMARY KEY);");
 ---
 - row_count: 1

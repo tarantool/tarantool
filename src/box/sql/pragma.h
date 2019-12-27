@@ -6,18 +6,14 @@
 
 /* The various pragma types */
 #define PragTyp_COLLATION_LIST                 3
-#define PragTyp_FLAG                           5
 #define PragTyp_FOREIGN_KEY_LIST               9
 #define PragTyp_INDEX_INFO                    10
 #define PragTyp_INDEX_LIST                    11
 #define PragTyp_STATS                         15
 #define PragTyp_TABLE_INFO                    17
-#define PragTyp_DEFAULT_ENGINE                25
 
 /* Property flags associated with various pragma. */
 #define PragFlg_NeedSchema 0x01	/* Force schema load before running */
-#define PragFlg_NoColumns  0x02	/* OP_ResultRow called with zero columns */
-#define PragFlg_NoColumns1 0x04	/* zero columns if RHS argument is present */
 #define PragFlg_Result0    0x10	/* Acts as query when no argument */
 #define PragFlg_Result1    0x20	/* Acts as query when has one argument */
 #define PragFlg_SchemaOpt  0x40	/* Schema restricts name search if present */
@@ -92,48 +88,6 @@ static const char *const pragCName[] = {
 	/*  55 */ "text",
 	/*  56 */ "match",
 	/*  57 */ "text",
-	/* Used by: defer_foreign_keys */
-	/*  58 */ "defer_foreign_keys",
-	/*  59 */ "integer",
-	/* Used by: full_column_names */
-	/*  60 */ "full_column_names",
-	/*  61 */ "integer",
-	/* Used by: parser_trace */
-	/*  62 */ "parser_trace",
-	/*  63 */ "integer",
-	/* Used by: recursive_triggers */
-	/*  64 */ "recursive_triggers",
-	/*  65 */ "integer",
-	/* Used by: reverse_unordered_selects */
-	/*  66 */ "reverse_unordered_selects",
-	/*  67 */ "integer",
-	/* Used by: select_trace */
-	/*  68 */ "select_trace",
-	/*  69 */ "integer",
-	/* Used by: sql_default_engine */
-	/*  70 */ "sql_default_engine",
-	/*  71 */ "text",
-	/* Used by: sql_trace */
-	/*  72 */ "sql_trace",
-	/*  73 */ "integer",
-	/* Used by: vdbe_debug */
-	/*  74 */ "vdbe_debug",
-	/*  75 */ "integer",
-	/* Used by: vdbe_eqp */
-	/*  76 */ "vdbe_eqp",
-	/*  77 */ "integer",
-	/* Used by: vdbe_listing */
-	/*  78 */ "vdbe_listing",
-	/*  79 */ "integer",
-	/* Used by: vdbe_trace */
-	/*  80 */ "vdbe_trace",
-	/*  81 */ "integer",
-	/* Used by: where_trace */
-	/*  82 */ "where_trace",
-	/*  83 */ "integer",
-	/* Used by: full_metadata */
-	/*  84 */ "full_metadata",
-	/*  85 */ "integer",
 };
 
 /* Definitions of all built-in pragmas */
@@ -155,27 +109,12 @@ static const PragmaName aPragmaName[] = {
 	 /* ePragFlg:  */ PragFlg_Result0,
 	 /* ColNames:  */ 38, 2,
 	 /* iArg:      */ 0},
-	{ /* zName:     */ "defer_foreign_keys",
-	 /* ePragTyp:  */ PragTyp_FLAG,
-	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 58, 1,
-	 /* iArg:      */ SQL_DeferFKs},
 	{ /* zName:     */ "foreign_key_list",
 	 /* ePragTyp:  */ PragTyp_FOREIGN_KEY_LIST,
 	 /* ePragFlg:  */
 	 PragFlg_NeedSchema | PragFlg_Result1 | PragFlg_SchemaOpt,
 	 /* ColNames:  */ 42, 8,
 	 /* iArg:      */ 0},
-	{ /* zName:     */ "full_column_names",
-	 /* ePragTyp:  */ PragTyp_FLAG,
-	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 60, 1,
-	 /* iArg:      */ SQL_FullColNames},
-	{ /* zName:     */ "full_metadata",
-	  /* ePragTyp:  */ PragTyp_FLAG,
-	  /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	  /* ColNames:  */ 84, 1,
-	  /* iArg:      */ SQL_FullMetadata},
 	{ /* zName:     */ "index_info",
 	 /* ePragTyp:  */ PragTyp_INDEX_INFO,
 	 /* ePragFlg:  */
@@ -188,42 +127,6 @@ static const PragmaName aPragmaName[] = {
 	 PragFlg_NeedSchema | PragFlg_Result1 | PragFlg_SchemaOpt,
 	 /* ColNames:  */ 32, 3,
 	 /* iArg:      */ 0},
-#if defined(SQL_DEBUG)
-	{ /* zName:     */ "parser_trace",
-	 /* ePragTyp:  */ PragTyp_FLAG,
-	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 62, 1,
-	 /* iArg:      */ PARSER_TRACE_FLAG},
-#endif
-	{ /* zName:     */ "recursive_triggers",
-	 /* ePragTyp:  */ PragTyp_FLAG,
-	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 64, 1,
-	 /* iArg:      */ SQL_RecTriggers},
-	{ /* zName:     */ "reverse_unordered_selects",
-	 /* ePragTyp:  */ PragTyp_FLAG,
-	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 66, 1,
-	 /* iArg:      */ SQL_ReverseOrder},
-#if defined(SQL_DEBUG)
-	{ /* zName:     */ "select_trace",
-	/* ePragTyp:  */ PragTyp_FLAG,
-	/* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	/* ColNames:  */ 68, 1,
-	/* iArg:      */ SQL_SelectTrace},
-#endif
-	{ /* zName:     */ "sql_default_engine",
-	 /* ePragTyp:  */ PragTyp_DEFAULT_ENGINE,
-	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 70, 1,
-	 /* iArg:      */ 0},
-#if defined(SQL_DEBUG)
-	{ /* zName:     */ "sql_trace",
-	 /* ePragTyp:  */ PragTyp_FLAG,
-	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 72, 1,
-	 /* iArg:      */ SQL_SqlTrace},
-#endif
 	{ /* zName:     */ "stats",
 	 /* ePragTyp:  */ PragTyp_STATS,
 	 /* ePragFlg:  */
@@ -236,33 +139,5 @@ static const PragmaName aPragmaName[] = {
 	 PragFlg_NeedSchema | PragFlg_Result1 | PragFlg_SchemaOpt,
 	 /* ColNames:  */ 0, 6,
 	 /* iArg:      */ 0},
-#if defined(SQL_DEBUG)
-	{ /* zName:     */ "vdbe_debug",
-	 /* ePragTyp:  */ PragTyp_FLAG,
-	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 74, 1,
-	 /* iArg:      */
-	 SQL_SqlTrace | SQL_VdbeListing | SQL_VdbeTrace},
-	{ /* zName:     */ "vdbe_eqp",
-	 /* ePragTyp:  */ PragTyp_FLAG,
-	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 76, 1,
-	 /* iArg:      */ SQL_VdbeEQP},
-	{ /* zName:     */ "vdbe_listing",
-	 /* ePragTyp:  */ PragTyp_FLAG,
-	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 78, 1,
-	 /* iArg:      */ SQL_VdbeListing},
-	{ /* zName:     */ "vdbe_trace",
-	 /* ePragTyp:  */ PragTyp_FLAG,
-	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 80, 1,
-	 /* iArg:      */ SQL_VdbeTrace},
-	{ /* zName:     */ "where_trace",
-	/* ePragTyp:  */ PragTyp_FLAG,
-	/* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	/* ColNames:  */ 82, 1,
-	/* iArg:      */ SQL_WhereTrace},
-#endif
 };
 /* Number of pragmas: 36 on by default, 47 total. */

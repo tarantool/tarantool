@@ -1,6 +1,6 @@
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
-box.execute('pragma sql_default_engine=\''..engine..'\'')
+_ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 
 -- gh-3735: make sure that integer overflows errors are
 -- handled during VDBE execution.

@@ -1,6 +1,6 @@
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
-box.execute("pragma sql_default_engine=\'"..engine.."\'")
+_ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 test_run:cmd("setopt delimiter ';'")
 
 -- These tests are aimed at checking transitive transactions
@@ -45,7 +45,7 @@ fk_violation_3();
 box.space.CHILD:select();
 box.space.PARENT:select();
 
--- Make sure that 'PRAGMA defer_foreign_keys' works.
+-- Make sure that setting 'defer_foreign_keys' works.
 --
 box.execute('DROP TABLE child;')
 box.execute('CREATE TABLE child(id INT PRIMARY KEY, x INT REFERENCES parent(y))')
@@ -62,13 +62,12 @@ end;
 fk_defer();
 box.space.CHILD:select();
 box.space.PARENT:select();
-box.execute('PRAGMA defer_foreign_keys = 1;')
+box.space._session_settings:update('sql_defer_foreign_keys', {{'=', 2, true}})
 box.rollback()
 fk_defer();
 box.space.CHILD:select();
 box.space.PARENT:select();
-
-box.execute('PRAGMA defer_foreign_keys = 0;')
+box.space._session_settings:update('sql_defer_foreign_keys', {{'=', 2, false}})
 
 -- Cleanup
 box.execute('DROP TABLE child;');

@@ -450,7 +450,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "fkey2-4.2",
     [[
-        PRAGMA recursive_triggers = off;
+        UPDATE "_session_settings" SET "value" = false WHERE "name" = 'sql_recursive_triggers';
         DELETE FROM t1 WHERE node = 1;
         SELECT node FROM t1;
     ]], {
@@ -473,7 +473,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "fkey2-4.4",
     [[
-        PRAGMA recursive_triggers = on;
+        UPDATE "_session_settings" SET "value" = true WHERE "name" = 'sql_recursive_triggers';
         DROP TABLE t2;
         DROP TABLE t1;
         CREATE TABLE t1(

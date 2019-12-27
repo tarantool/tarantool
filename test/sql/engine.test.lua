@@ -1,11 +1,11 @@
 env = require('test_run')
 test_run = env.new()
 
-box.execute("pragma sql_default_engine='vinyl'")
+box.space._session_settings:update('sql_default_engine', {{'=', 2, 'vinyl'}})
 box.execute("CREATE TABLE t1_vinyl(a INT PRIMARY KEY, b INT, c INT);")
 box.execute("CREATE TABLE t2_vinyl(a INT PRIMARY KEY, b INT, c INT);")
 
-box.execute("pragma sql_default_engine='memtx'")
+box.space._session_settings:update('sql_default_engine', {{'=', 2, 'memtx'}})
 box.execute("CREATE TABLE t3_memtx(a INT PRIMARY KEY, b INT, c INT);")
 
 assert(box.space.T1_VINYL.engine == 'vinyl')
@@ -22,7 +22,7 @@ box.execute("CREATE TABLE t1_vinyl (id INT PRIMARY KEY) WITH ENGINE = 'vinyl'")
 assert(box.space.T1_VINYL.engine == 'vinyl')
 box.execute("CREATE TABLE t1_memtx (id INT PRIMARY KEY) WITH ENGINE = 'memtx'")
 assert(box.space.T1_MEMTX.engine == 'memtx')
-box.execute("pragma sql_default_engine='vinyl'")
+box.space._session_settings:update('sql_default_engine', {{'=', 2, 'vinyl'}})
 box.execute("CREATE TABLE t2_vinyl (id INT PRIMARY KEY) WITH ENGINE = 'vinyl'")
 assert(box.space.T2_VINYL.engine == 'vinyl')
 box.execute("CREATE TABLE t2_memtx (id INT PRIMARY KEY) WITH ENGINE = 'memtx'")

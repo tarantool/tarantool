@@ -4,9 +4,8 @@ test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 ---
 ...
-box.execute("pragma sql_default_engine=\'"..engine.."\'")
+_ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 ---
-- row_count: 0
 ...
 test_run:cmd("setopt delimiter ';'")
 ---
@@ -88,7 +87,7 @@ box.space.PARENT:select();
 ---
 - - [1, 1]
 ...
--- Make sure that 'PRAGMA defer_foreign_keys' works.
+-- Make sure that setting 'defer_foreign_keys' works.
 --
 box.execute('DROP TABLE child;')
 box.execute('CREATE TABLE child(id INT PRIMARY KEY, x INT REFERENCES parent(y))')
@@ -116,7 +115,7 @@ box.space.PARENT:select();
 ---
 - - [1, 1]
 ...
-box.execute('PRAGMA defer_foreign_keys = 1;')
+box.space._session_settings:update('sql_defer_foreign_keys', {{'=', 2, true}})
 box.rollback()
 fk_defer();
 ---
@@ -131,7 +130,7 @@ box.space.PARENT:select();
   - [2, 2]
 ...
 -- Cleanup
-box.execute('PRAGMA defer_foreign_keys = 0;')
+box.space._session_settings:update('sql_defer_foreign_keys', {{'=', 2, false}})
 
 box.execute('DROP TABLE child;');
 ---

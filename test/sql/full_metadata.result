@@ -46,9 +46,9 @@ test_run:cmd("setopt delimiter ''");
  | - true
  | ...
 
-execute("PRAGMA full_metadata = true;")
+execute([[UPDATE "_session_settings" SET "value" = true WHERE "name" = 'sql_full_metadata';]])
  | ---
- | - row_count: 0
+ | - row_count: 1
  | ...
 -- Make sure collation is presented in extended metadata.
 --
@@ -204,9 +204,9 @@ execute("SELECT x, y FROM v;")
  |   - [2, 1]
  | ...
 
-execute("PRAGMA full_metadata = false;")
+execute([[UPDATE "_session_settings" SET "value" = false WHERE "name" = 'sql_full_metadata';]])
  | ---
- | - row_count: 0
+ | - row_count: 1
  | ...
 
 test_run:cmd("setopt delimiter ';'")

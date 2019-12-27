@@ -3793,7 +3793,6 @@ sql_space_def_check_format(const struct space_def *space_def);
 void sqlDetach(Parse *, Expr *);
 int sqlAtoF(const char *z, double *, int);
 int sqlGetInt32(const char *, int *);
-int sqlAtoi(const char *);
 
 /**
  * Return number of symbols in the given string.
@@ -3980,8 +3979,6 @@ sql_div_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
 int
 sql_rem_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
 	    int64_t *res, bool *is_res_neg);
-
-u8 sqlGetBoolean(const char *z, u8);
 
 const void *sqlValueText(sql_value *);
 int sqlValueBytes(sql_value *);

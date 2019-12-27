@@ -1,6 +1,6 @@
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
-box.execute('pragma sql_default_engine=\''..engine..'\'')
+_ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 
 -- box.cfg()
 
@@ -9,9 +9,6 @@ box.execute("CREATE TABLE zzoobar (c1 NUMBER, c2 INT PRIMARY KEY, c3 TEXT, c4 NU
 
 box.execute("CREATE UNIQUE INDEX zoobar2 ON zzoobar(c1, c4)")
 box.execute("CREATE        INDEX zoobar3 ON zzoobar(c3)")
-
--- Debug
--- box.execute("PRAGMA vdbe_debug=ON ; INSERT INTO zzoobar VALUES (111, 222, 'c3', 444)")
 
 -- Dummy entry
 box.execute("INSERT INTO zzoobar VALUES (111, 222, 'c3', 444)")

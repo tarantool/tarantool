@@ -495,8 +495,6 @@ sql_atoi64(const char *z, int64_t *val, bool *is_neg, int length)
  * This routine accepts both decimal and hexadecimal notation for integers.
  *
  * Any non-numeric characters that following zNum are ignored.
- * This is different from sqlAtoi64() which requires the
- * input number to be zero-terminated.
  */
 int
 sqlGetInt32(const char *zNum, int *pValue)
@@ -551,19 +549,6 @@ sqlGetInt32(const char *zNum, int *pValue)
 	}
 	*pValue = (int)v;
 	return 1;
-}
-
-/*
- * Return a 32-bit integer value extracted from a string.  If the
- * string is not an integer, just return 0.
- */
-int
-sqlAtoi(const char *z)
-{
-	int x = 0;
-	if (z)
-		sqlGetInt32(z, &x);
-	return x;
 }
 
 /*

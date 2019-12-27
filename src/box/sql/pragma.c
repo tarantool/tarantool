@@ -62,56 +62,6 @@
 #include "pragma.h"
 #include "tarantoolInt.h"
 
-/*
- * Interpret the given string as a safety level.  Return 0 for OFF,
- * 1 for ON or NORMAL, 2 for FULL, and 3 for EXTRA.  Return 1 for an empty or
- * unrecognized string argument.  The FULL and EXTRA option is disallowed
- * if the omitFull parameter it 1.
- *
- * Note that the values returned are one less that the values that
- * should be passed into sqlBtreeSetSafetyLevel().  The is done
- * to support legacy SQL code.  The safety level used to be boolean
- * and older scripts may have used numbers 0 for OFF and 1 for ON.
- */
-static u8
-getSafetyLevel(const char *z, int omitFull, u8 dflt)
-{
-	/* 123456789 123456789 123 */
-	static const char zText[] = "onoffalseyestruextrafull";
-	static const u8 iOffset[] = { 0, 1, 2, 4, 9, 12, 15, 20 };
-	static const u8 iLength[] = { 2, 2, 3, 5, 3, 4, 5, 4 };
-	static const u8 iValue[] = { 1, 0, 0, 0, 1, 1, 3, 2 };
-	/* on no off false yes true extra full */
-	int i, n;
-	if (sqlIsdigit(*z)) {
-		return (u8) sqlAtoi(z);
-	}
-	n = sqlStrlen30(z);
-	for (i = 0; i < ArraySize(iLength); i++) {
-		if (iLength[i] == n
-		    && sqlStrNICmp(&zText[iOffset[i]], z, n) == 0
-		    && (!omitFull || iValue[i] <= 1)
-		    ) {
-			return iValue[i];
-		}
-	}
-	return dflt;
-}
-
-/*
- * Interpret the given string as a boolean value.
- */
-u8
-sqlGetBoolean(const char *z, u8 dflt)
-{
-	return getSafetyLevel(z, 1, dflt) != 0;
-}
-
-/* The sqlGetBoolean() function is used by other modules but the
- * remainder of this file is specific to PRAGMA processing.  So omit
- * the rest of the file if PRAGMAs are omitted from the build.
- */
-
 /** Set result column names and types for a pragma. */
 static void
 vdbe_set_pragma_result_columns(struct Vdbe *v, const struct PragmaName *pragma)
@@ -123,17 +73,6 @@ vdbe_set_pragma_result_columns(struct Vdbe *v, const struct PragmaName *pragma)
 		vdbe_metadata_set_col_name(v, i, pragCName[j++]);
 		vdbe_metadata_set_col_type(v, i, pragCName[j++]);
 	}
-}
-
-/*
- * Generate code to return a single integer value.
- */
-static void
-returnSingleInt(Vdbe * v, i64 value)
-{
-	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, 1, 0, (const u8 *)&value,
-			  value < 0 ? P4_INT64 : P4_UINT64);
-	sqlVdbeAddOp2(v, OP_ResultRow, 1, 1);
 }
 
 /*
@@ -157,53 +96,6 @@ pragmaLocate(const char *zName)
 		}
 	}
 	return lwr > upr ? 0 : &aPragmaName[mid];
-}
-
-static void
-vdbe_emit_pragma_status(struct Parse *parse)
-{
-	struct Vdbe *v = sqlGetVdbe(parse);
-	struct session *user_session = current_session();
-
-	sqlVdbeSetNumCols(v, 2);
-	vdbe_metadata_set_col_name(v, 0, "pragma_name");
-	vdbe_metadata_set_col_type(v, 0, "text");
-	vdbe_metadata_set_col_name(v, 1, "pragma_value");
-	vdbe_metadata_set_col_type(v, 1, "integer");
-
-	parse->nMem = 2;
-	for (int i = 0; i < ArraySize(aPragmaName); ++i) {
-		if (aPragmaName[i].ePragTyp != PragTyp_FLAG)
-			continue;
-		sqlVdbeAddOp4(v, OP_String8, 0, 1, 0, aPragmaName[i].zName, 0);
-		int val = (user_session->sql_flags & aPragmaName[i].iArg) != 0;
-		sqlVdbeAddOp2(v, OP_Integer, val, 2);
-		sqlVdbeAddOp2(v, OP_ResultRow, 1, 2);
-	}
-}
-
-/**
- * Set tarantool backend default engine for SQL interface.
- * @param engine_name to set default.
- * @retval -1 on error.
- * @retval 0 on success.
- */
-static int
-sql_default_engine_set(const char *engine_name)
-{
-	if (engine_name == NULL) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
-			 "'sql_default_engine' was not specified");
-		return -1;
-	}
-	enum sql_storage_engine engine =
-		STR2ENUM(sql_storage_engine, engine_name);
-	if (engine == sql_storage_engine_MAX) {
-		diag_set(ClientError, ER_NO_SUCH_ENGINE, engine_name);
-		return -1;
-	}
-	current_session()->sql_default_engine = engine;
-	return 0;
 }
 
 /**
@@ -371,22 +263,6 @@ sql_pragma_index_list(struct Parse *parse, const char *tbl_name)
 }
 
 /*
- * @brief Check whether the specified token is a string or ID.
- * @param token - token to be examined
- * @return true - if the token value is enclosed into quotes (')
- * @return false in other cases
- * The empty value is considered to be a string.
- */
-static bool
-token_is_string(const struct Token* token)
-{
-	if (!token || token->n == 0)
-		return true;
-	return token->n >= 2 && token->z[0] == '\'' &&
-	       token->z[token->n - 1] == '\'';
-}
-
-/*
  * Process a pragma statement.
  *
  * Pragmas are of this form:
@@ -414,17 +290,12 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	sql *db = pParse->db;	/* The database connection */
 	Vdbe *v = sqlGetVdbe(pParse);	/* Prepared statement */
 	const PragmaName *pPragma;	/* The pragma */
-	struct session *user_session = current_session();
 
 	if (v == 0)
 		return;
 	sqlVdbeRunOnlyOnce(v);
 	pParse->nMem = 2;
 
-	if (pId == NULL) {
-		vdbe_emit_pragma_status(pParse);
-		return;
-	}
 	zLeft = sql_name_from_token(db, pId);
 	if (zLeft == NULL) {
 		pParse->is_aborted = true;
@@ -454,37 +325,9 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		goto pragma_out;
 	}
 	/* Register the result column names for pragmas that return results */
-	if ((pPragma->mPragFlg & PragFlg_NoColumns) == 0 &&
-	    ((pPragma->mPragFlg & PragFlg_NoColumns1) == 0 || zRight == NULL))
-		vdbe_set_pragma_result_columns(v, pPragma);
+	vdbe_set_pragma_result_columns(v, pPragma);
 	/* Jump to the appropriate pragma handler */
 	switch (pPragma->ePragTyp) {
-
-	case PragTyp_FLAG:{
-		if (zRight == NULL) {
-			vdbe_set_pragma_result_columns(v, pPragma);
-			returnSingleInt(v, (user_session->sql_flags &
-					    pPragma->iArg) != 0);
-		} else {
-			/* Mask of bits to set or clear. */
-			int mask = pPragma->iArg;
-			bool is_pragma_set = sqlGetBoolean(zRight, 0);
-
-			if (is_pragma_set)
-				user_session->sql_flags |= mask;
-			else
-				user_session->sql_flags &= ~mask;
-#if defined(SQL_DEBUG)
-			if (mask == PARSER_TRACE_FLAG) {
-				if (is_pragma_set)
-					sqlParserTrace(stdout, "parser: ");
-				else
-					sqlParserTrace(0, 0);
-			}
-#endif
-		}
-		break;
-	}
 
 	case PragTyp_TABLE_INFO:
 		sql_pragma_table_info(pParse, zRight);
@@ -563,43 +406,10 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		break;
 	}
 
-	case PragTyp_DEFAULT_ENGINE: {
-		if (!token_is_string(pValue)) {
-			diag_set(ClientError, ER_ILLEGAL_PARAMS,
-				 "string value is expected");
-			pParse->is_aborted = true;
-			goto pragma_out;
-		}
-		if (zRight == NULL) {
-			const char *engine_name =
-				sql_storage_engine_strs[current_session()->
-							sql_default_engine];
-			sqlVdbeLoadString(v, 1, engine_name);
-			sqlVdbeAddOp2(v, OP_ResultRow, 1, 1);
-		} else {
-			if (sql_default_engine_set(zRight) != 0) {
-				pParse->is_aborted = true;
-				goto pragma_out;
-			}
-			sqlVdbeAddOp0(v, OP_Expire);
-		}
-		break;
-	}
-
 	default:
 		unreachable();
 	}			/* End of the PRAGMA switch */
 
-	/* The following block is a no-op unless SQL_DEBUG is
-	 * defined. Its only * purpose is to execute assert()
-	 * statements to verify that if the * PragFlg_NoColumns1 flag
-	 * is set and the caller specified an argument * to the PRAGMA,
-	 * the implementation has not added any OP_ResultRow *
-	 * instructions to the VM.
-	 */
-	if ((pPragma->mPragFlg & PragFlg_NoColumns1) && zRight) {
-		sqlVdbeVerifyNoResultRow(v);
-	}
  pragma_out:
 	sqlDbFree(db, zLeft);
 	sqlDbFree(db, zRight);

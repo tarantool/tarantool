@@ -45,12 +45,12 @@ end
 test:do_test(
     "colname-1.1",
     function()
-        return test:execsql "PRAGMA full_column_names"
-    end, {
+        return box.space._session_settings:get("sql_full_column_names").value
+    end,
         -- <colname-1.2>
-        0
+        false
         -- </colname-1.2>
-    })
+    )
 
 -- Tests for then short=ON and full=any
 --
@@ -163,7 +163,7 @@ test:do_test(
     "colname-3.1",
     function()
         test:execsql [[
-            PRAGMA full_column_names='OFF';
+            UPDATE "_session_settings" SET "value" = false WHERE "name" = 'sql_full_column_names';
             CREATE VIEW v3 AS SELECT tabC.a, txyZ.x, *
               FROM tabc, txyz ORDER BY 1 LIMIT 1;
             CREATE VIEW v4 AS SELECT tabC.a, txyZ.x, tboTh.a, tbotH.x, * 
@@ -283,7 +283,7 @@ test:do_test(
     "colname-4.1",
     function()
         test:execsql [[
-            PRAGMA full_column_names='ON';
+            UPDATE "_session_settings" SET "value" = true WHERE "name" = 'sql_full_column_names';
             CREATE VIEW v5 AS SELECT tabC.a, txyZ.x, *
               FROM tabc, txyz ORDER BY 1 LIMIT 1;
             CREATE VIEW v6 AS SELECT tabC.a, txyZ.x, tboTh.a, tbotH.x, * 
@@ -440,7 +440,7 @@ test:do_test(
         -- instead of reconnect to database
         -- we are just turning settings to default state
         test:execsql([[
-            PRAGMA full_column_names='OFF';
+            UPDATE "_session_settings" SET "value" = false WHERE "name" = 'sql_full_column_names';
             ]])
         test:execsql [=[
             CREATE TABLE t6(a INT primary key, "'a'" INT, """a""" INT, "[a]" INT,  "`a`" INT);

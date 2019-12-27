@@ -4782,8 +4782,8 @@ case OP_Program: {        /* jump */
 
 	/* If the p5 flag is clear, then recursive invocation of triggers is
 	 * disabled for backwards compatibility (p5 is set if this sub-program
-	 * is really a trigger, not a foreign key action, and the flag set
-	 * and cleared by the "PRAGMA recursive_triggers" command is clear).
+	 * is really a trigger, not a foreign key action, and the setting
+	 * 'recursive_triggers' is not set).
 	 *
 	 * It is recursive invocation of triggers, at the SQL level, that is
 	 * disabled. In some cases a single trigger may generate more than one

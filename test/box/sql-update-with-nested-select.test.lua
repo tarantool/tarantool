@@ -5,9 +5,6 @@ test_run = require('test_run').new()
 -- create space
 box.execute("CREATE TABLE t1(a integer primary key, b int UNIQUE, e int);");
 
--- Debug
--- box.execute("PRAGMA vdbe_debug=ON ; INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")
-
 -- Seed entries
 box.execute("INSERT INTO t1 VALUES(1,4,6);");
 box.execute("INSERT INTO t1 VALUES(2,5,7);");

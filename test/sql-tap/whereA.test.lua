@@ -39,7 +39,7 @@ test:do_test(
     "whereA-1.2",
     function()
         return test:execsql [[
-            PRAGMA reverse_unordered_selects=1;
+            UPDATE "_session_settings" SET "value" = true WHERE "name" = 'sql_reverse_unordered_selects';
             SELECT * FROM t1;
         ]]
     end, {
@@ -55,7 +55,7 @@ test:do_test(
         --db close
         --sql db test.db
         return test:execsql [[
-            PRAGMA reverse_unordered_selects=1;
+            UPDATE "_session_settings" SET "value" = true WHERE "name" = 'sql_reverse_unordered_selects';
             SELECT * FROM t1;
         ]]
     end, {
@@ -75,14 +75,12 @@ test:do_test(
 test:do_test(
     "whereA-1.6",
     function()
-        return test:execsql [[
-            PRAGMA reverse_unordered_selects;
-        ]]
-    end, {
+        return box.space._session_settings:get('sql_reverse_unordered_selects').value
+    end,
         -- <whereA-1.6>
-        1
+        true
         -- </whereA-1.6>
-    })
+    )
 
 test:do_execsql_test(
     "whereA-1.8",
@@ -108,7 +106,7 @@ test:do_test(
     "whereA-2.1",
     function()
         return test:execsql [[
-            PRAGMA reverse_unordered_selects=0;
+            UPDATE "_session_settings" SET "value" = false WHERE "name" = 'sql_reverse_unordered_selects';
             SELECT * FROM t1 WHERE a>0;
         ]]
     end, {
@@ -121,7 +119,7 @@ test:do_test(
     "whereA-2.2",
     function()
         return test:execsql [[
-            PRAGMA reverse_unordered_selects=1;
+            UPDATE "_session_settings" SET "value" = true WHERE "name" = 'sql_reverse_unordered_selects';
             SELECT * FROM t1 WHERE a>0;
         ]]
     end, {
@@ -140,7 +138,7 @@ test:do_test(
     "whe:reA-3.1",
     function()
         return test:execsql [[
-            PRAGMA reverse_unordered_selects=0;
+            UPDATE "_session_settings" SET "value" = false WHERE "name" = 'sql_reverse_unordered_selects';
             SELECT * FROM t1 WHERE b>0;
         ]]
     end, {
@@ -153,7 +151,7 @@ test:do_test(
     "whereA-3.2",
     function()
         return test:execsql [[
-            PRAGMA reverse_unordered_selects=1;
+            UPDATE "_session_settings" SET "value" = true WHERE "name" = 'sql_reverse_unordered_selects';
             SELECT * FROM t1 WHERE b>0;
         ]]
     end, {
@@ -166,7 +164,7 @@ test:do_test(
     "whereA-3.3",
     function()
         return test:execsql [[
-            PRAGMA reverse_unordered_selects=1;
+            UPDATE "_session_settings" SET "value" = true WHERE "name" = 'sql_reverse_unordered_selects';
             SELECT * FROM t1 WHERE b>0 ORDER BY b;
         ]]
     end, {

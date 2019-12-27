@@ -640,7 +640,8 @@ test:do_test(
         -- </autoinc-10.3>
     })
 
-test:catchsql(" pragma recursive_triggers = off ")
+box.space._session_settings:update('sql_recursive_triggers', {{'=', 2, false}})
+
 -- Ticket #3928.  Make sure that triggers to not make extra slots in
 -- the sql_SEQUENCE table.
 --

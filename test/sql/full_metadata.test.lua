@@ -23,7 +23,7 @@ else
 end;
 test_run:cmd("setopt delimiter ''");
 
-execute("PRAGMA full_metadata = true;")
+execute([[UPDATE "_session_settings" SET "value" = true WHERE "name" = 'sql_full_metadata';]])
 -- Make sure collation is presented in extended metadata.
 --
 execute("SELECT 'aSd' COLLATE \"unicode_ci\";")
@@ -45,7 +45,7 @@ box.execute("CREATE VIEW v AS SELECT id + 1 AS x, a AS y, c || 'abc' FROM t;")
 execute("SELECT * FROM v;")
 execute("SELECT x, y FROM v;")
 
-execute("PRAGMA full_metadata = false;")
+execute([[UPDATE "_session_settings" SET "value" = false WHERE "name" = 'sql_full_metadata';]])
 
 test_run:cmd("setopt delimiter ';'")
 if remote then

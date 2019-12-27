@@ -199,11 +199,6 @@ int sqlVdbeAddOp4(Vdbe *, int, int, int, int, const char *zP4, int);
 int sqlVdbeAddOp4Dup8(Vdbe *, int, int, int, int, const u8 *, int);
 int sqlVdbeAddOp4Int(Vdbe *, int, int, int, int, int);
 void sqlVdbeEndCoroutine(Vdbe *, int);
-#if defined(SQL_DEBUG) && !defined(SQL_TEST_REALLOC_STRESS)
-void sqlVdbeVerifyNoResultRow(Vdbe * p);
-#else
-#define sqlVdbeVerifyNoResultRow(A)
-#endif
 void sqlVdbeChangeOpcode(Vdbe *, u32 addr, u8);
 void sqlVdbeChangeP1(Vdbe *, u32 addr, int P1);
 void sqlVdbeChangeP2(Vdbe *, u32 addr, int P2);

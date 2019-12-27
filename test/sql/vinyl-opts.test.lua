@@ -3,7 +3,7 @@ test_run:cmd("create server test with script='sql/vinyl-opts-cfg.lua'")
 test_run:cmd("start server test")
 test_run:cmd("switch test")
 
-box.execute('pragma sql_default_engine= \'vinyl\'')
+box.space._session_settings:update('sql_default_engine', {{'=', 2, 'vinyl'}})
 box.execute('CREATE TABLE v1 (id INT PRIMARY KEY, b INT);')
 box.space.V1.index[0].options
 

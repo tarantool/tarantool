@@ -4,9 +4,8 @@ test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 ---
 ...
-box.execute('pragma sql_default_engine=\''..engine..'\'')
+_ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 ---
-- row_count: 0
 ...
 test_run:cmd("setopt delimiter ';'")
 ---

@@ -22,7 +22,7 @@ test:plan(3)
 -- The tests in this file were written before sql supported recursive
 -- trigger invocation, and some tests depend on that to pass. So disable
 -- recursive triggers for this file.
-test:catchsql " pragma recursive_triggers = off "
+box.space._session_settings:update('sql_recursive_triggers', {{'=', 2, false}})
 test:do_execsql_test(
     "tkt3731-1.1",
     [[

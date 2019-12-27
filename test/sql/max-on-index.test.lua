@@ -1,6 +1,6 @@
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
-box.execute('pragma sql_default_engine=\''..engine..'\'')
+_ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 
 -- box.cfg()
 
@@ -11,9 +11,6 @@ box.execute("CREATE INDEX test1_index ON test1 (f2)")
 
 -- integer affinity
 box.execute("CREATE TABLE test2 (f1 INT, f2 INT, PRIMARY KEY(f1))")
-
--- Debug
--- box.execute("PRAGMA vdbe_debug=ON ; INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")
 
 -- Seed entries
 box.execute("INSERT INTO test1 VALUES(1, 2)");
