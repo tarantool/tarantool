@@ -42,7 +42,7 @@ test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
 ---
 - true
 ...
-WAIT_COND_TIME = 10
+TIMEOUT = 100
 ---
 ...
 socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
@@ -107,11 +107,11 @@ s:nonblock(true)
 ---
 - true
 ...
-s:readable(.1)
+s:readable(TIMEOUT)
 ---
 - true
 ...
-s:wait(.1)
+s:wait(TIMEOUT)
 ---
 - RW
 ...
@@ -183,7 +183,7 @@ s:writable(0)
 ---
 - true
 ...
-s:wait(.01)
+s:wait(TIMEOUT)
 ---
 - RW
 ...
@@ -227,11 +227,11 @@ s:syswrite(ffi.cast('const char *', ping), #ping)
 ---
 - 6
 ...
-s:readable(1)
+s:readable(TIMEOUT)
 ---
 - true
 ...
-s:wait(.01)
+s:wait(TIMEOUT)
 ---
 - RW
 ...
@@ -308,7 +308,7 @@ sc:nonblock(true)
 ---
 - true
 ...
-sc:readable(.5)
+sc:readable(TIMEOUT)
 ---
 - true
 ...
@@ -451,7 +451,7 @@ sc:sysconnect('127.0.0.1', s:name().port) or errno() == errno.EINPROGRESS
 ---
 - true
 ...
-sc:writable(10)
+sc:writable(TIMEOUT)
 ---
 - true
 ...
@@ -570,7 +570,7 @@ sc:send("\\nnew line")
 ---
 - 10
 ...
-sa:read('\\n', 1)
+sa:read('\\n', TIMEOUT)
 ---
 - Hello, world\n
 ...
@@ -578,7 +578,7 @@ sa:read({ chunk = 1, delimiter = 'ine'}, 1)
 ---
 - n
 ...
-sa:read('ine', 1)
+sa:read('ine', TIMEOUT)
 ---
 - ew line
 ...
@@ -590,7 +590,7 @@ sc:send('Hello, world')
 ---
 - 12
 ...
-sa:read(',', 1)
+sa:read(',', TIMEOUT)
 ---
 - Hello,
 ...
@@ -830,7 +830,7 @@ sc:sendto('127.0.0.1', s:name().port, 'Hello, world')
 ---
 - 12
 ...
-s:readable(10)
+s:readable(TIMEOUT)
 ---
 - true
 ...
@@ -842,7 +842,7 @@ sc:sendto('127.0.0.1', s:name().port, 'Hello, world, 2')
 ---
 - 15
 ...
-s:readable(10)
+s:readable(TIMEOUT)
 ---
 - true
 ...
@@ -898,7 +898,7 @@ sc:sendto('127.0.0.1', s:name().port, 'Hello, World!')
 ---
 - 13
 ...
-s:readable(1)
+s:readable(TIMEOUT)
 ---
 - true
 ...
@@ -913,7 +913,7 @@ s:sendto(from.host, from.port, 'Hello, hello!')
 ---
 - 13
 ...
-sc:readable(1)
+sc:readable(TIMEOUT)
 ---
 - true
 ...
@@ -1070,29 +1070,18 @@ s = nil
 master = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
-master:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+master:bind('127.0.0.1', 0)
 ---
 - true
 ...
-port = 32768 + math.random(0, 32767)
+port = master:name().port
 ---
 ...
--- SO_REUSEADDR allows to bind to the same source addr:port twice,
--- so listen() can return EADDRINUSE and so we check it within
--- wait_cond().
+master:listen()
+---
+- true
+...
 test_run:cmd("setopt delimiter ';'")
----
-- true
-...
-test_run:wait_cond(function()
-    local ok = master:bind('127.0.0.1', port)
-    local ok = ok and master:listen()
-    if not ok then
-        port = 32768 + math.random(32768)
-        return false, master:error()
-    end
-    return true
-end, WAIT_COND_TIME);
 ---
 - true
 ...
@@ -1322,7 +1311,7 @@ test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
-server, addr = socket.tcp_server('localhost', 0, { handler = function(s)
+server, addr = socket.tcp_server('127.0.0.1', 0, { handler = function(s)
     s:read(2)
     s:write('Hello, world')
 end, name = 'testserv'});
@@ -1823,7 +1812,16 @@ test_run:cmd("setopt delimiter ';'")
 - true
 ...
 cfiber = fiber.create(function(sc, rch, wch)
-    while sc:send(wch:get()) and rch:put(sc:receive("*l")) do end
+    while true do
+        local outgoing_data = wch:get()
+        if outgoing_data == nil then
+            sc:close()
+            break
+        end
+        sc:send(outgoing_data)
+        local incoming_data = sc:receive("*l")
+        rch:put(incoming_data)
+    end
 end, sc, rch, wch);
 ---
 ...
@@ -1936,6 +1934,10 @@ c:receive("*l")
 ---
 - 
 ...
+rch:get()
+---
+- $250 OK
+...
 wch:put("Fu")
 ---
 - true
@@ -1944,9 +1946,9 @@ c:send("354 Please type your message\n")
 ---
 - 29
 ...
-sc:close()
+wch:put(nil) -- EOF
 ---
-- 1
+- true
 ...
 c:receive("*l", "Line: ")
 ---
@@ -2155,7 +2157,7 @@ s:close()
 - 1
 ...
 -- socket.bind / socket.connect
-s = socket.bind('0.0.0.0', 0)
+s = socket.bind('127.0.0.1', 0)
 ---
 ...
 s
@@ -2292,6 +2294,10 @@ sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
 ---
 - 0
 ...
+receiving_socket:readable(TIMEOUT)
+---
+- true
+...
 received_message = receiving_socket:recv()
 ---
 ...
@@ -2314,6 +2320,10 @@ e == 0 -- expected true
 sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
 ---
 - 0
+...
+receiving_socket:readable(TIMEOUT)
+---
+- true
 ...
 received_message, from = receiving_socket:recvfrom()
 ---
@@ -2392,6 +2402,10 @@ sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
 ---
 - 0
 ...
+receiving_socket:readable(TIMEOUT)
+---
+- true
+...
 received_message = receiving_socket:recv(512)
 ---
 ...
@@ -2414,6 +2428,10 @@ e == 0 -- expected true
 sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
 ---
 - 0
+...
+receiving_socket:readable(TIMEOUT)
+---
+- true
 ...
 received_message, from = receiving_socket:recvfrom(512)
 ---
@@ -2452,6 +2470,10 @@ sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
 ---
 - 1025
 ...
+receiving_socket:readable(TIMEOUT)
+---
+- true
+...
 received_message = receiving_socket:recv()
 ---
 ...
@@ -2483,6 +2505,10 @@ e
 sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
 ---
 - 1025
+...
+receiving_socket:readable(TIMEOUT)
+---
+- true
 ...
 received_message, from = receiving_socket:recvfrom()
 ---
@@ -2522,6 +2548,10 @@ e
 sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
 ---
 - 1025
+...
+receiving_socket:readable(TIMEOUT)
+---
+- true
 ...
 received_message = receiving_socket:recv(512)
 ---
@@ -2565,6 +2595,10 @@ message = string.rep('y', message_len)
 sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
 ---
 - 1025
+...
+receiving_socket:readable(TIMEOUT)
+---
+- true
 ...
 received_message, from = receiving_socket:recvfrom(512)
 ---
@@ -2643,6 +2677,10 @@ sending_socket:sysconnect('127.0.0.1', listening_socket_port) or errno() == errn
 ---
 - true
 ...
+listening_socket:readable(TIMEOUT)
+---
+- true
+...
 receiving_socket = listening_socket:accept()
 ---
 ...
@@ -2651,6 +2689,10 @@ sending_socket:write(message)
 - 513
 ...
 -- case: recvfrom reads first 512 bytes from the message with tcp
+receiving_socket:readable(TIMEOUT)
+---
+- true
+...
 received_message, from = receiving_socket:recvfrom()
 ---
 ...
@@ -2747,7 +2789,7 @@ test_run:cmd("setopt delimiter ';'")
 ...
 echo_fiber = nil
 channel = fiber.channel()
-server = socket.tcp_server('localhost', 0, { handler = function(s)
+server = socket.tcp_server('127.0.0.1', 0, { handler = function(s)
     echo_fiber = fiber.self()
     channel:put(true)
     while true do
@@ -2781,7 +2823,7 @@ client:write('hello')
 ---
 - 5
 ...
-client:read(5, 5) == 'hello'
+client:read(5, TIMEOUT) == 'hello'
 ---
 - true
 ...
@@ -2796,7 +2838,7 @@ client:write('world')
 ---
 - 5
 ...
-client:read(5, 5) == 'world'
+client:read(5, TIMEOUT) == 'world'
 ---
 - true
 ...
@@ -2804,7 +2846,7 @@ client:read(5, 5) == 'world'
 fiber.cancel(echo_fiber)
 ---
 ...
-client:read(1, 5) == ''
+client:read(1, TIMEOUT) == ''
 ---
 - true
 ...
