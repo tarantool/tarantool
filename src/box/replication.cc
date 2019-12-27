@@ -918,8 +918,8 @@ replicaset_round(bool skip_ro)
 		 * with the same vclock, prefer the one with
 		 * the lowest uuid.
 		 */
-		int cmp = vclock_compare(&applier->ballot.vclock,
-				&leader->applier->ballot.vclock);
+		int cmp = vclock_compare_ignore0(&applier->ballot.vclock,
+						 &leader->applier->ballot.vclock);
 		if (cmp < 0)
 			continue;
 		if (cmp == 0 && tt_uuid_compare(&replica->uuid,

@@ -269,22 +269,30 @@ enum { VCLOCK_ORDER_UNDEFINED = INT_MAX };
  * \brief Compare vclocks
  * \param a vclock
  * \param b vclock
+ * \param ignore_zero Whether to order by 0-th component or not.
+ *        The 0 component is ignored on anonymous replicas when
+ *        they apply rows from remote master. Because anon
+ *        replicas use the component for local purposes.
+ *
  * \retval 1 if \a vclock is ordered after \a other
  * \retval -1 if \a vclock is ordered before than \a other
  * \retval 0 if vclocks are equal
  * \retval VCLOCK_ORDER_UNDEFINED if vclocks are concurrent
  */
 static inline int
-vclock_compare(const struct vclock *a, const struct vclock *b)
+vclock_compare_generic(const struct vclock *a, const struct vclock *b,
+		       bool ignore_zero)
 {
 	bool le = true, ge = true;
 	vclock_map_t map = a->map | b->map;
 	struct bit_iterator it;
 	bit_iterator_init(&it, &map, sizeof(map), true);
 
-	for (size_t replica_id = bit_iterator_next(&it); replica_id < VCLOCK_MAX;
-	     replica_id = bit_iterator_next(&it)) {
+	size_t replica_id = bit_iterator_next(&it);
+	if (replica_id == 0 && ignore_zero)
+		replica_id = bit_iterator_next(&it);
 
+	for (; replica_id < VCLOCK_MAX; replica_id = bit_iterator_next(&it)) {
 		int64_t lsn_a = vclock_get(a, replica_id);
 		int64_t lsn_b = vclock_get(b, replica_id);
 		le = le && lsn_a <= lsn_b;
@@ -297,6 +305,24 @@ vclock_compare(const struct vclock *a, const struct vclock *b)
 	if (le && !ge)
 		return -1;
 	return 0;
+}
+
+/**
+ * \sa vclock_compare_generic
+ */
+static inline int
+vclock_compare(const struct vclock *a, const struct vclock *b)
+{
+	return vclock_compare_generic(a, b, false);
+}
+
+/**
+ * \sa vclock_compare_generic
+ */
+static inline int
+vclock_compare_ignore0(const struct vclock *a, const struct vclock *b)
+{
+	return vclock_compare_generic(a, b, true);
 }
 
 /**

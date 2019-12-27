@@ -494,8 +494,8 @@ applier_subscribe(struct applier *applier)
 		 */
 		if (applier->state == APPLIER_SYNC &&
 		    applier->lag <= replication_sync_lag &&
-		    vclock_compare(&remote_vclock_at_subscribe,
-				   &replicaset.vclock) <= 0) {
+		    vclock_compare_ignore0(&remote_vclock_at_subscribe,
+					   &replicaset.vclock) <= 0) {
 			/* Applier is synced, switch to "follow". */
 			applier_set_state(applier, APPLIER_FOLLOW);
 		}
