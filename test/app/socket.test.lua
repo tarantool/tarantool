@@ -13,7 +13,7 @@ env = require('test_run')
 test_run = env.new()
 test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
 
-WAIT_COND_TIME = 10
+TIMEOUT = 100
 
 socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
 
@@ -39,8 +39,8 @@ s:nonblock(false)
 s:nonblock()
 s:nonblock(true)
 
-s:readable(.1)
-s:wait(.1)
+s:readable(TIMEOUT)
+s:wait(TIMEOUT)
 socket.iowait(s:fd(), 'RW')
 socket.iowait(s:fd(), 3)
 socket.iowait(s:fd(), 'R')
@@ -58,7 +58,7 @@ s:errno() > 0
 s:error()
 s:writable(.00000000000001)
 s:writable(0)
-s:wait(.01)
+s:wait(TIMEOUT)
 socket.iowait(nil, nil, -1)
 socket.iowait(nil, nil, 0.0001)
 socket.iowait(-1, nil, 0.0001)
@@ -75,8 +75,8 @@ ping = msgpack.encode(string.len(ping)) .. ping
 
 -- test syswrite with char *
 s:syswrite(ffi.cast('const char *', ping), #ping)
-s:readable(1)
-s:wait(.01)
+s:readable(TIMEOUT)
+s:wait(TIMEOUT)
 
 pong = s:sysread()
 string.len(pong)
@@ -100,7 +100,7 @@ sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 sc:nonblock(false)
 sc:sysconnect('127.0.0.1', s:name().port)
 sc:nonblock(true)
-sc:readable(.5)
+sc:readable(TIMEOUT)
 sc:sysread()
 string.match(tostring(sc), ', peer') ~= nil
 #sevres
@@ -140,7 +140,7 @@ s:listen(128)
 sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 
 sc:sysconnect('127.0.0.1', s:name().port) or errno() == errno.EINPROGRESS
-sc:writable(10)
+sc:writable(TIMEOUT)
 sc:write('Hello, world')
 
 sa, addr = s:accept()
@@ -177,13 +177,13 @@ sa:recv()
 sc:send('Hello')
 sc:send(', world')
 sc:send("\\nnew line")
-sa:read('\\n', 1)
+sa:read('\\n', TIMEOUT)
 sa:read({ chunk = 1, delimiter = 'ine'}, 1)
-sa:read('ine', 1)
+sa:read('ine', TIMEOUT)
 sa:read('ine', 0.1)
 
 sc:send('Hello, world')
-sa:read(',', 1)
+sa:read(',', TIMEOUT)
 sc:shutdown('W')
 sa:close()
 sc:close()
@@ -266,11 +266,11 @@ s = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 s:bind('127.0.0.1', 0)
 sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 sc:sendto('127.0.0.1', s:name().port, 'Hello, world')
-s:readable(10)
+s:readable(TIMEOUT)
 s:recv()
 
 sc:sendto('127.0.0.1', s:name().port, 'Hello, world, 2')
-s:readable(10)
+s:readable(TIMEOUT)
 d, from = s:recvfrom()
 from.port > 0
 from.port = 'Random port'
@@ -286,11 +286,11 @@ sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 sc:nonblock(true)
 sc:sendto('127.0.0.1', s:name().port)
 sc:sendto('127.0.0.1', s:name().port, 'Hello, World!')
-s:readable(1)
+s:readable(TIMEOUT)
 data, from = s:recvfrom(10)
 data
 s:sendto(from.host, from.port, 'Hello, hello!')
-sc:readable(1)
+sc:readable(TIMEOUT)
 data_r, from_r = sc:recvfrom()
 data_r
 from_r.host
@@ -342,21 +342,10 @@ s = nil
 
 -- random port
 master = socket('PF_INET', 'SOCK_STREAM', 'tcp')
-master:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
-port = 32768 + math.random(0, 32767)
--- SO_REUSEADDR allows to bind to the same source addr:port twice,
--- so listen() can return EADDRINUSE and so we check it within
--- wait_cond().
+master:bind('127.0.0.1', 0)
+port = master:name().port
+master:listen()
 test_run:cmd("setopt delimiter ';'")
-test_run:wait_cond(function()
-    local ok = master:bind('127.0.0.1', port)
-    local ok = ok and master:listen()
-    if not ok then
-        port = 32768 + math.random(32768)
-        return false, master:error()
-    end
-    return true
-end, WAIT_COND_TIME);
 function gh361()
     local s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
     s:sysconnect('127.0.0.1', port)
@@ -434,7 +423,7 @@ server:close()
 while fio.stat(path) ~= nil do fiber.sleep(0.001) end
 
 test_run:cmd("setopt delimiter ';'")
-server, addr = socket.tcp_server('localhost', 0, { handler = function(s)
+server, addr = socket.tcp_server('127.0.0.1', 0, { handler = function(s)
     s:read(2)
     s:write('Hello, world')
 end, name = 'testserv'});
@@ -620,7 +609,16 @@ rch, wch = fiber.channel(1), fiber.channel(1)
 sc = socket.connect(host, port)
 test_run:cmd("setopt delimiter ';'")
 cfiber = fiber.create(function(sc, rch, wch)
-    while sc:send(wch:get()) and rch:put(sc:receive("*l")) do end
+    while true do
+        local outgoing_data = wch:get()
+        if outgoing_data == nil then
+            sc:close()
+            break
+        end
+        sc:send(outgoing_data)
+        local incoming_data = sc:receive("*l")
+        rch:put(incoming_data)
+    end
 end, sc, rch, wch);
 test_run:cmd("setopt delimiter ''");
 
@@ -651,9 +649,10 @@ rch:get()
 wch:put("DATA\n")
 c:receive(4)
 c:receive("*l")
+rch:get()
 wch:put("Fu")
 c:send("354 Please type your message\n")
-sc:close()
+wch:put(nil) -- EOF
 c:receive("*l", "Line: ")
 c:receive()
 c:receive(10)
@@ -713,7 +712,7 @@ sc:close()
 s:close()
 
 -- socket.bind / socket.connect
-s = socket.bind('0.0.0.0', 0)
+s = socket.bind('127.0.0.1', 0)
 s
 host, port, family = s:getsockname()
 sc = socket.connect(host, port)
@@ -778,6 +777,7 @@ e == errno.EAGAIN -- expected true
 
 -- case: recv, zero datagram
 sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
+receiving_socket:readable(TIMEOUT)
 received_message = receiving_socket:recv()
 e = receiving_socket:errno()
 received_message == '' -- expected true
@@ -786,6 +786,7 @@ e == 0 -- expected true
 
 -- case: recvfrom, zero datagram
 sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
+receiving_socket:readable(TIMEOUT)
 received_message, from = receiving_socket:recvfrom()
 e = receiving_socket:errno()
 received_message == '' -- expected true
@@ -812,6 +813,7 @@ e == errno.EAGAIN -- expected true
 
 -- case: recv, zero datagram, explicit size
 sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
+receiving_socket:readable(TIMEOUT)
 received_message = receiving_socket:recv(512)
 e = receiving_socket:errno()
 received_message == '' -- expected true
@@ -820,6 +822,7 @@ e == 0 -- expected true
 
 -- case: recvfrom, zero datagram, explicit size
 sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
+receiving_socket:readable(TIMEOUT)
 received_message, from = receiving_socket:recvfrom(512)
 e = receiving_socket:errno()
 received_message == '' -- expected true
@@ -833,6 +836,7 @@ message = string.rep('x', message_len)
 
 -- case: recv, non-zero length datagram, the buffer size should be evaluated
 sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
+receiving_socket:readable(TIMEOUT)
 received_message = receiving_socket:recv()
 e = receiving_socket:errno()
 received_message == message -- expected true
@@ -844,6 +848,7 @@ e
 -- case: recvfrom, non-zero length datagram, the buffer size should be
 -- evaluated
 sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
+receiving_socket:readable(TIMEOUT)
 received_message, from = receiving_socket:recvfrom()
 e = receiving_socket:errno()
 received_message == message -- expected true
@@ -856,6 +861,7 @@ e
 
 -- case: recv truncates a datagram larger then the buffer of an explicit size
 sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
+receiving_socket:readable(TIMEOUT)
 received_message = receiving_socket:recv(512)
 e = receiving_socket:errno()
 received_message == message:sub(1, 512) -- expected true
@@ -872,6 +878,7 @@ message = string.rep('y', message_len)
 
 -- case: recvfrom truncates a datagram larger then the buffer of an explicit size
 sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
+receiving_socket:readable(TIMEOUT)
 received_message, from = receiving_socket:recvfrom(512)
 e = receiving_socket:errno()
 received_message == message:sub(1, 512) -- expected true
@@ -896,10 +903,12 @@ listening_socket:listen()
 listening_socket_port = listening_socket:name().port
 sending_socket = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 sending_socket:sysconnect('127.0.0.1', listening_socket_port) or errno() == errno.EINPROGRESS
+listening_socket:readable(TIMEOUT)
 receiving_socket = listening_socket:accept()
 sending_socket:write(message)
 
 -- case: recvfrom reads first 512 bytes from the message with tcp
+receiving_socket:readable(TIMEOUT)
 received_message, from = receiving_socket:recvfrom()
 e = receiving_socket:errno()
 received_message == message:sub(1, 512) -- expected true
@@ -931,7 +940,7 @@ listening_socket:close()
 test_run:cmd("setopt delimiter ';'")
 echo_fiber = nil
 channel = fiber.channel()
-server = socket.tcp_server('localhost', 0, { handler = function(s)
+server = socket.tcp_server('127.0.0.1', 0, { handler = function(s)
     echo_fiber = fiber.self()
     channel:put(true)
     while true do
@@ -947,25 +956,25 @@ client = socket.tcp_connect(addr.host, addr.port)
 channel:get()
 echo_fiber ~= nil
 client:write('hello')
-client:read(5, 5) == 'hello'
+client:read(5, TIMEOUT) == 'hello'
 -- send spurious wakeup
 fiber.wakeup(echo_fiber)
 fiber.sleep(0)
 client:write('world')
-client:read(5, 5) == 'world'
+client:read(5, TIMEOUT) == 'world'
 -- cancel fiber
 fiber.cancel(echo_fiber)
-client:read(1, 5) == ''
+client:read(1, TIMEOUT) == ''
 server:close()
 
 test_run:cmd("clear filter")
 
--- case: sicket receive inconsistent behavior
+-- case: socket receive inconsistent behavior
 chan = fiber.channel()
 counter = 0
 fn = function(s) counter = 0; while true do s:write((tostring(counter)):rep(chan:get())); counter = counter + 1 end end
-srv = socket.tcp_server('0.0.0.0', 8888, fn)
-s = socket.connect('localhost', 8888)
+srv = socket.tcp_server('127.0.0.1', 0, fn)
+s = socket.connect('127.0.0.1', srv:name().port)
 chan:put(5)
 chan:put(5)
 s:receive(5)
