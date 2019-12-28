@@ -23,10 +23,12 @@ lua_sql_get_metadata(struct sql_stmt *stmt, struct lua_State *L,
 		const char *coll = sql_column_coll(stmt, i);
 		const char *name = sql_column_name(stmt, i);
 		const char *type = sql_column_datatype(stmt, i);
+		const char *span = sql_column_span(stmt, i);
 		int nullable = sql_column_nullable(stmt, i);
 		bool is_autoincrement = sql_column_is_autoincrement(stmt, i);
+		bool is_full = sql_metadata_is_full();
 		size_t table_sz = 2 + (coll != NULL) + (nullable != -1) +
-				  is_autoincrement;
+				  is_autoincrement + is_full;
 		lua_createtable(L, 0, table_sz);
 		/*
 		 * Can not fail, since all column names are
@@ -50,6 +52,13 @@ lua_sql_get_metadata(struct sql_stmt *stmt, struct lua_State *L,
 		if (is_autoincrement) {
 			lua_pushboolean(L, true);
 			lua_setfield(L, -2, "is_autoincrement");
+		}
+		if (sql_metadata_is_full()) {
+			if (span != NULL)
+				lua_pushstring(L, span);
+			else
+				lua_pushstring(L, name);
+			lua_setfield(L, -2, "span");
 		}
 		lua_rawseti(L, -2, i + 1);
 	}

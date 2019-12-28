@@ -134,6 +134,7 @@ enum iproto_metadata_key {
 	IPROTO_FIELD_COLL = 2,
 	IPROTO_FIELD_IS_NULLABLE = 3,
 	IPROTO_FIELD_IS_AUTOINCREMENT = 4,
+	IPROTO_FIELD_SPAN = 5,
 };
 
 enum iproto_ballot_key {

@@ -641,7 +641,7 @@ netbox_decode_select(struct lua_State *L)
 /** Decode optional (i.e. may be present in response) metadata fields. */
 static void
 decode_metadata_optional(struct lua_State *L, const char **data,
-			 uint32_t map_size)
+			 uint32_t map_size, const char *name, uint32_t name_len)
 {
 	/* 2 is default metadata map size (field name + field size). */
 	while (map_size-- > 2) {
@@ -655,6 +655,24 @@ decode_metadata_optional(struct lua_State *L, const char **data,
 			bool is_nullable = mp_decode_bool(data);
 			lua_pushboolean(L, is_nullable);
 			lua_setfield(L, -2, "is_nullable");
+		} else if (key == IPROTO_FIELD_SPAN) {
+			/*
+			 * There's an agreement: if span is not
+			 * presented in metadata (encoded as NIL),
+			 * then it is the same as name. It allows
+			 * avoid sending the same string twice.
+			 */
+			const char *span = NULL;
+			if (mp_typeof(**data) == MP_STR) {
+				span = mp_decode_str(data, &len);
+			} else {
+				assert(mp_typeof(**data) == MP_NIL);
+				mp_decode_nil(data);
+				span = name;
+				len = name_len;
+			}
+			lua_pushlstring(L, span, len);
+			lua_setfield(L, -2, "span");
 		} else {
 			assert(key == IPROTO_FIELD_IS_AUTOINCREMENT);
 			bool is_autoincrement = mp_decode_bool(data);
@@ -676,21 +694,21 @@ netbox_decode_metadata(struct lua_State *L, const char **data)
 	lua_createtable(L, count, 0);
 	for (uint32_t i = 0; i < count; ++i) {
 		uint32_t map_size = mp_decode_map(data);
-		assert(map_size >= 2 && map_size <= 5);
+		assert(map_size >= 2 && map_size <= 6);
 		uint32_t key = mp_decode_uint(data);
 		assert(key == IPROTO_FIELD_NAME);
 		(void) key;
 		lua_createtable(L, 0, map_size);
-		uint32_t len;
-		const char *str = mp_decode_str(data, &len);
-		lua_pushlstring(L, str, len);
+		uint32_t name_len, type_len;
+		const char *str = mp_decode_str(data, &name_len);
+		lua_pushlstring(L, str, name_len);
 		lua_setfield(L, -2, "name");
 		key = mp_decode_uint(data);
 		assert(key == IPROTO_FIELD_TYPE);
-		const char *type = mp_decode_str(data, &len);
-		lua_pushlstring(L, type, len);
+		const char *type = mp_decode_str(data, &type_len);
+		lua_pushlstring(L, type, type_len);
 		lua_setfield(L, -2, "type");
-		decode_metadata_optional(L, data, map_size);
+		decode_metadata_optional(L, data, map_size, str, name_len);
 		lua_rawseti(L, -2, i + 1);
 	}
 }

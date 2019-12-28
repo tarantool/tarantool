@@ -263,6 +263,9 @@ vdbe_metadata_set_col_nullability(struct Vdbe *p, int idx, int nullable);
 void
 vdbe_metadata_set_col_autoincrement(struct Vdbe *p, int idx);
 
+int
+vdbe_metadata_set_col_span(struct Vdbe *p, int idx, const char *span);
+
 void sqlVdbeCountChanges(Vdbe *);
 sql *sqlVdbeDb(Vdbe *);
 void sqlVdbeSetSql(Vdbe *, const char *z, int n, int);

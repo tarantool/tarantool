@@ -357,6 +357,12 @@ struct sql_column_metadata {
 	int8_t nullable;
 	/** True if column features autoincrement property. */
 	bool is_actoincrement;
+	/**
+	 * Span is an original expression forming result set
+	 * column. In most cases it is the same as name; it is
+	 * different only in case of presence of AS clause.
+	 */
+	char *span;
 };
 
 /*

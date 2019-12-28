@@ -36,6 +36,7 @@
  */
 #include "sqlInt.h"
 #include "vdbeInt.h"
+#include "box/session.h"
 
 /*
  * Invoke the profile callback.  This routine is only called if we already
@@ -113,6 +114,12 @@ sql_clear_bindings(sql_stmt * pStmt)
 		p->aVar[i].flags = MEM_Null;
 	}
 	return rc;
+}
+
+bool
+sql_metadata_is_full()
+{
+	return current_session()->sql_flags & SQL_FullMetadata;
 }
 
 /**************************** sql_value_  ******************************
@@ -767,6 +774,14 @@ sql_column_is_autoincrement(sql_stmt *stmt, int n)
 	struct Vdbe *p = (struct Vdbe *) stmt;
 	assert(n < sql_column_count(stmt) && n >= 0);
 	return p->metadata[n].is_actoincrement;
+}
+
+const char *
+sql_column_span(sql_stmt *stmt, int n)
+{
+	struct Vdbe *p = (struct Vdbe *) stmt;
+	assert(n < sql_column_count(stmt) && n >= 0);
+	return p->metadata[n].span;
 }
 
 /******************************* sql_bind_  **************************

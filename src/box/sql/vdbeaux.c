@@ -1835,6 +1835,7 @@ vdbe_metadata_delete(struct Vdbe *v)
 			free(v->metadata[i].name);
 			free(v->metadata[i].type);
 			free(v->metadata[i].collation);
+			free(v->metadata[i].span);
 		}
 		free(v->metadata);
 	}
@@ -1919,6 +1920,24 @@ vdbe_metadata_set_col_autoincrement(struct Vdbe *p, int idx)
 {
 	assert(idx < p->nResColumn);
 	p->metadata[idx].is_actoincrement = true;
+}
+
+int
+vdbe_metadata_set_col_span(struct Vdbe *p, int idx, const char *span)
+{
+	assert(idx < p->nResColumn);
+	if (p->metadata[idx].span != NULL)
+		free((void *)p->metadata[idx].span);
+	if (span == NULL) {
+		p->metadata[idx].span = NULL;
+		return 0;
+	}
+	p->metadata[idx].span = strdup(span);
+	if (p->metadata[idx].span == NULL) {
+		diag_set(OutOfMemory, strlen(span) + 1, "strdup", "span");
+		return -1;
+	}
+	return 0;
 }
 
 /*

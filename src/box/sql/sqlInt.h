@@ -536,6 +536,9 @@ sql_finalize(sql_stmt * pStmt);
 int
 sql_reset(struct sql_stmt *stmt);
 
+bool
+sql_metadata_is_full();
+
 int
 sql_exec(sql *,	/* An open database */
 	     const char *sql,	/* SQL to be evaluated */
@@ -584,6 +587,9 @@ sql_column_nullable(sql_stmt *stmt, int n);
 
 bool
 sql_column_is_autoincrement(sql_stmt *stmt, int n);
+
+const char *
+sql_column_span(sql_stmt *stmt, int n);
 
 int
 sql_initialize(void);

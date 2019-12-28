@@ -1814,6 +1814,8 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 			}
 		}
 		vdbe_metadata_set_col_nullability(v, i, -1);
+		const char *colname = pEList->a[i].zName;
+		const char *span = pEList->a[i].zSpan;
 		if (p->op == TK_COLUMN || p->op == TK_AGG_COLUMN) {
 			char *zCol;
 			int iCol = p->iColumn;
@@ -1826,12 +1828,10 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 			struct space_def *space_def = space->def;
 			assert(iCol >= 0 && iCol < (int)space_def->field_count);
 			zCol = space_def->fields[iCol].name;
-			const char *name = NULL;
-			if (pEList->a[i].zName != NULL) {
-				name = pEList->a[i].zName;
-			} else {
+			const char *name = colname;
+			if (name == NULL) {
 				if (!shortNames && !fullNames) {
-					name = pEList->a[i].zSpan;
+					name = span;
 				} else if (fullNames) {
 					name = tt_sprintf("%s.%s",
 							  space_def->name,
@@ -1849,16 +1849,20 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 				if (space->sequence != NULL &&
 				    space->sequence_fieldno == (uint32_t) iCol)
 					vdbe_metadata_set_col_autoincrement(v, i);
+				if (colname != NULL)
+					vdbe_metadata_set_col_span(v, i, span);
 			}
 		} else {
 			const char *z = NULL;
-			if (pEList->a[i].zName != NULL)
-				z = pEList->a[i].zName;
-			else if (pEList->a[i].zSpan != NULL)
-				z = pEList->a[i].zSpan;
+			if (colname != NULL)
+				z = colname;
+			else if (span != NULL)
+				z = span;
 			else
 				z = tt_sprintf("column%d", i + 1);
 			vdbe_metadata_set_col_name(v, i, z);
+			if (is_full_meta && colname != NULL)
+				vdbe_metadata_set_col_span(v, i, span);
 		}
 	}
 	if (var_count == 0)

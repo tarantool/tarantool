@@ -35,6 +35,16 @@ execute("SELECT c COLLATE \"unicode\" FROM t;")
 execute("SELECT id, a, c FROM t;")
 execute("SELECT * FROM t;")
 
+-- Span is always set in extended metadata. Span is an original
+-- expression forming result set column.
+--
+execute("SELECT 1 AS x;")
+execute("SELECT *, id + 1 AS x, a AS y, c || 'abc' FROM t;")
+
+box.execute("CREATE VIEW v AS SELECT id + 1 AS x, a AS y, c || 'abc' FROM t;")
+execute("SELECT * FROM v;")
+execute("SELECT x, y FROM v;")
+
 execute("PRAGMA full_metadata = false;")
 
 test_run:cmd("setopt delimiter ';'")
@@ -45,4 +55,5 @@ if remote then
 end;
 test_run:cmd("setopt delimiter ''");
 
+box.space.V:drop()
 box.space.T:drop()
