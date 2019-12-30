@@ -257,10 +257,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.26",
     [[
-        SELECT typeof(CAST(123 AS NUMBER))
+        SELECT typeof(CAST(123 AS DOUBLE))
     ]], {
         -- <cast-1.26>
-        "number"
+        "double"
         -- </cast-1.26>
     })
 
@@ -320,7 +320,7 @@ test:do_execsql_test(
         SELECT typeof(123.456)
     ]], {
         -- <cast-1.32>
-        "number"
+        "double"
         -- </cast-1.32>
     })
 
@@ -357,10 +357,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.36",
     [[
-        SELECT typeof(CAST(123.456 AS NUMBER))
+        SELECT typeof(CAST(123.456 AS DOUBLE))
     ]], {
         -- <cast-1.36>
-        "number"
+        "double"
         -- </cast-1.36>
     })
 
@@ -380,7 +380,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(123.456 AS SCALAR))
     ]], {
         -- <cast-1.38>
-        "number"
+        "double"
         -- </cast-1.38>
     })
 

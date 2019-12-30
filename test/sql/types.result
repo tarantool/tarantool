@@ -2082,3 +2082,54 @@ box.execute("DROP TABLE t4;")
 ---
 - row_count: 1
 ...
+-- Make sure the typeof() function works correctly with DOUBLE.
+box.execute("SELECT 1.0, typeof(1.0);")
+---
+- metadata:
+  - name: '1.0'
+    type: double
+  - name: typeof(1.0)
+    type: string
+  rows:
+  - [1, 'double']
+...
+box.execute("SELECT CAST(2 AS DOUBLE), typeof(CAST(2 AS DOUBLE));")
+---
+- metadata:
+  - name: CAST(2 AS DOUBLE)
+    type: double
+  - name: typeof(CAST(2 AS DOUBLE))
+    type: string
+  rows:
+  - [2, 'double']
+...
+box.execute("SELECT 3e3, typeof(3e3);")
+---
+- metadata:
+  - name: '3e3'
+    type: double
+  - name: typeof(3e3)
+    type: string
+  rows:
+  - [3000, 'double']
+...
+box.execute("CREATE TABLE t5 (d DOUBLE PRIMARY KEY);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t5 VALUES (4), (5.5), (6e6);")
+---
+- row_count: 3
+...
+box.execute("SELECT d, TYPEOF(d) FROM t5;")
+---
+- metadata:
+  - name: D
+    type: double
+  - name: TYPEOF(d)
+    type: string
+  rows:
+  - [4, 'double']
+  - [5.5, 'double']
+  - [6000000, 'double']
+...

@@ -376,9 +376,9 @@ test:do_execsql_test("select3-7.2", [[
 test:do_execsql_test("select3-8.1", [[
   DROP TABLE IF EXISTS A;
   CREATE TABLE A (
-    A1 NUMBER,
+    A1 DOUBLE,
     A2 TEXT,
-    A3 NUMBER,
+    A3 DOUBLE,
     id int primary key
   );
   INSERT INTO A VALUES(39136,'ABC',1201900000, 1);
@@ -386,7 +386,7 @@ test:do_execsql_test("select3-8.1", [[
   SELECT typeof(sum(a3)) FROM a;
 ]], {
   -- <select3-8.1>
-  "number"
+  "double"
   -- </select3-8.1>
 })
 
@@ -394,7 +394,7 @@ test:do_execsql_test("select3-8.2", [[
   SELECT typeof(sum(a3)) FROM a GROUP BY a1;
 ]], {
   -- <select3-8.2>
-  "number"
+  "double"
   -- </select3-8.2>
 })
 

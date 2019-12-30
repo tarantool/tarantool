@@ -518,7 +518,7 @@ test:do_execsql_test(
         SELECT typeof(round(5.1,1));
     ]], {
         -- <func-4.14>
-        "number"
+        "double"
         -- </func-4.14>
     })
 
@@ -528,7 +528,7 @@ test:do_execsql_test(
         SELECT typeof(round(5.1));
     ]], {
         -- <func-4.15>
-        "number"
+        "double"
         -- </func-4.15>
     })
 

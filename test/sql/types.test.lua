@@ -465,3 +465,12 @@ box.execute("CREATE TABLE t4 (i INT PRIMARY KEY, d DOUBLE DEFAULT 1.2345);")
 box.execute("INSERT INTO t4(i) VALUES (1);")
 box.execute("SELECT * FROM t4;")
 box.execute("DROP TABLE t4;")
+
+-- Make sure the typeof() function works correctly with DOUBLE.
+box.execute("SELECT 1.0, typeof(1.0);")
+box.execute("SELECT CAST(2 AS DOUBLE), typeof(CAST(2 AS DOUBLE));")
+box.execute("SELECT 3e3, typeof(3e3);")
+
+box.execute("CREATE TABLE t5 (d DOUBLE PRIMARY KEY);")
+box.execute("INSERT INTO t5 VALUES (4), (5.5), (6e6);")
+box.execute("SELECT d, TYPEOF(d) FROM t5;")

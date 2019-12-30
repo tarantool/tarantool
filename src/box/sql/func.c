@@ -428,7 +428,7 @@ typeofFunc(sql_context * context, int NotUsed, sql_value ** argv)
 		z = "string";
 		break;
 	case MP_DOUBLE:
-		z = "number";
+		z = "double";
 		break;
 	case MP_BIN:
 		z = "varbinary";
