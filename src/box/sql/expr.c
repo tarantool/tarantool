@@ -3466,11 +3466,6 @@ sqlExprCachePush(Parse * pParse)
 {
 	struct session MAYBE_UNUSED *user_session;
 	pParse->iCacheLevel++;
-#ifdef SQL_DEBUG
-	if ((pParse->sql_flags & SQL_VdbeAddopTrace) != 0) {
-		printf("PUSH to %d\n", pParse->iCacheLevel);
-	}
-#endif
 }
 
 /*
@@ -3486,11 +3481,6 @@ sqlExprCachePop(Parse * pParse)
 	user_session = current_session();
 	assert(pParse->iCacheLevel >= 1);
 	pParse->iCacheLevel--;
-#ifdef SQL_DEBUG
-	if ((pParse->sql_flags & SQL_VdbeAddopTrace) != 0) {
-		printf("POP  to %d\n", pParse->iCacheLevel);
-	}
-#endif
 	while (i < pParse->nColCache) {
 		if (pParse->aColCache[i].iLevel > pParse->iCacheLevel) {
 			cacheEntryClear(pParse, i);
@@ -3562,11 +3552,6 @@ sqlExprCacheClear(Parse * pParse)
 	struct session MAYBE_UNUSED *user_session;
 	user_session = current_session();
 
-#if SQL_DEBUG
-	if ((pParse->sql_flags & SQL_VdbeAddopTrace) != 0) {
-		printf("CLEAR\n");
-	}
-#endif
 	for (i = 0; i < pParse->nColCache; i++) {
 		if (pParse->aColCache[i].tempReg
 		    && pParse->nTempReg < ArraySize(pParse->aTempReg)

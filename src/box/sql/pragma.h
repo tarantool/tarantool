@@ -116,27 +116,24 @@ static const char *const pragCName[] = {
 	/* Used by: sql_trace */
 	/*  72 */ "sql_trace",
 	/*  73 */ "integer",
-	/* Used by: vdbe_addoptrace */
-	/*  74 */ "vdbe_addoptrace",
-	/*  75 */ "integer",
 	/* Used by: vdbe_debug */
-	/*  76 */ "vdbe_debug",
-	/*  77 */ "integer",
+	/*  74 */ "vdbe_debug",
+	/*  75 */ "integer",
 	/* Used by: vdbe_eqp */
-	/*  78 */ "vdbe_eqp",
-	/*  79 */ "integer",
+	/*  76 */ "vdbe_eqp",
+	/*  77 */ "integer",
 	/* Used by: vdbe_listing */
-	/*  80 */ "vdbe_listing",
-	/*  81 */ "integer",
+	/*  78 */ "vdbe_listing",
+	/*  79 */ "integer",
 	/* Used by: vdbe_trace */
-	/*  82 */ "vdbe_trace",
-	/*  83 */ "integer",
+	/*  80 */ "vdbe_trace",
+	/*  81 */ "integer",
 	/* Used by: where_trace */
-	/*  84 */ "where_trace",
-	/*  85 */ "integer",
+	/*  82 */ "where_trace",
+	/*  83 */ "integer",
 	/* Used by: full_metadata */
-	/*  86 */ "full_metadata",
-	/*  87 */ "integer",
+	/*  84 */ "full_metadata",
+	/*  85 */ "integer",
 };
 
 /* Definitions of all built-in pragmas */
@@ -177,7 +174,7 @@ static const PragmaName aPragmaName[] = {
 	{ /* zName:     */ "full_metadata",
 	  /* ePragTyp:  */ PragTyp_FLAG,
 	  /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	  /* ColNames:  */ 86, 1,
+	  /* ColNames:  */ 84, 1,
 	  /* iArg:      */ SQL_FullMetadata},
 	{ /* zName:     */ "index_info",
 	 /* ePragTyp:  */ PragTyp_INDEX_INFO,
@@ -240,36 +237,31 @@ static const PragmaName aPragmaName[] = {
 	 /* ColNames:  */ 0, 6,
 	 /* iArg:      */ 0},
 #if defined(SQL_DEBUG)
-	{ /* zName:     */ "vdbe_addoptrace",
-	 /* ePragTyp:  */ PragTyp_FLAG,
-	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 74, 1,
-	 /* iArg:      */ SQL_VdbeAddopTrace},
 	{ /* zName:     */ "vdbe_debug",
 	 /* ePragTyp:  */ PragTyp_FLAG,
 	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 76, 1,
+	 /* ColNames:  */ 74, 1,
 	 /* iArg:      */
 	 SQL_SqlTrace | SQL_VdbeListing | SQL_VdbeTrace},
 	{ /* zName:     */ "vdbe_eqp",
 	 /* ePragTyp:  */ PragTyp_FLAG,
 	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 78, 1,
+	 /* ColNames:  */ 76, 1,
 	 /* iArg:      */ SQL_VdbeEQP},
 	{ /* zName:     */ "vdbe_listing",
 	 /* ePragTyp:  */ PragTyp_FLAG,
 	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 80, 1,
+	 /* ColNames:  */ 78, 1,
 	 /* iArg:      */ SQL_VdbeListing},
 	{ /* zName:     */ "vdbe_trace",
 	 /* ePragTyp:  */ PragTyp_FLAG,
 	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 82, 1,
+	 /* ColNames:  */ 80, 1,
 	 /* iArg:      */ SQL_VdbeTrace},
 	{ /* zName:     */ "where_trace",
 	/* ePragTyp:  */ PragTyp_FLAG,
 	/* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	/* ColNames:  */ 84, 1,
+	/* ColNames:  */ 82, 1,
 	/* iArg:      */ SQL_WhereTrace},
 #endif
 };

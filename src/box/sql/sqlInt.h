@@ -1194,7 +1194,6 @@ struct sql {
 #define SQL_SelectTrace    0x00000800       /* Debug info about select statement */
 #define SQL_WhereTrace     0x00008000       /* Debug info about optimizer's work */
 #define SQL_VdbeListing    0x00000400	/* Debug listings of VDBE programs */
-#define SQL_VdbeAddopTrace 0x00001000	/* Trace sqlVdbeAddOp() calls */
 #define SQL_ReverseOrder   0x00020000	/* Reverse unordered SELECTs */
 #define SQL_RecTriggers    0x00040000	/* Enable recursive triggers */
 #define SQL_AutoIndex      0x00100000	/* Enable automatic indexes */

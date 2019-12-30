@@ -46,7 +46,6 @@ box.execute('PRAGMA')
   - ['reverse_unordered_selects', 0]
   - ['select_trace', 0]
   - ['sql_trace', 0]
-  - ['vdbe_addoptrace', 0]
   - ['vdbe_debug', 0]
   - ['vdbe_eqp', 0]
   - ['vdbe_listing', 0]

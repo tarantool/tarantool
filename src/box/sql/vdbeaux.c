@@ -165,9 +165,9 @@ growOpArray(Vdbe * v, int nOp)
 }
 
 #ifdef SQL_DEBUG
-/* This routine is just a convenient place to set a breakpoint that will
- * fire after each opcode is inserted and displayed using
- * "PRAGMA vdbe_addoptrace=on".
+/*
+ * This routine is just a convenient place to set a breakpoint
+ * that will fire after each opcode is inserted in debug build.
  */
 static void
 test_addop_breakpoint(void)
@@ -230,20 +230,7 @@ sqlVdbeAddOp3(Vdbe * p, int op, int p1, int p2, int p3)
 	pOp->zComment = 0;
 #endif
 #ifdef SQL_DEBUG
-	if (user_session->sql_flags & SQL_VdbeAddopTrace) {
-		int jj, kk;
-		Parse *pParse = p->pParse;
-		for (jj = kk = 0; jj < pParse->nColCache; jj++) {
-			struct yColCache *x = pParse->aColCache + jj;
-			printf(" r[%d]={%d:%d}", x->iReg, x->iTable,
-			       x->iColumn);
-			kk++;
-		}
-		if (kk)
-			printf("\n");
-		sqlVdbePrintOp(0, i, &p->aOp[i]);
-		test_addop_breakpoint();
-	}
+	test_addop_breakpoint();
 #endif
 #ifdef VDBE_PROFILE
 	pOp->cycles = 0;
