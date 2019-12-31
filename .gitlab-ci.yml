@@ -9,7 +9,7 @@ variables:
 .release_only_template: &release_only_definition
   only:
     refs:
-      - master
+      - "2.3"
       - /^.*-full-ci$/
 
 .docker_test_template: &docker_test_definition
