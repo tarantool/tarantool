@@ -132,6 +132,34 @@ box.execute('CREATE UNIQUE INDEX e ON t2(i);')
 box.execute('CREATE UNIQUE INDEX d ON t2(i);')
 
 --
+-- gh-4120: Ensure that <ALTER TABLE DROP CONSTRAINT> works
+-- correctly for each type of constraint.
+--
+-- Drop non-constraint object (non-unique index).
+box.execute('CREATE INDEX non_constraint ON t2(i);')
+box.execute('ALTER TABLE t2 DROP CONSTRAINT non_constraint;')
+-- Drop UNIQUE constraint.
+box.space.T2.index.E ~= nil
+box.execute('ALTER TABLE t2 DROP CONSTRAINT e;')
+box.space.T2.index.E == nil
+-- Drop PRIMARY KEY constraint named "C".
+box.execute('DROP INDEX non_constraint ON t2;')
+box.execute('DROP INDEX d ON t2;')
+box.space.T2.index.C ~= nil
+box.execute('ALTER TABLE t2 DROP CONSTRAINT c;')
+box.space.T2.index.C == nil
+-- Drop CHECK constraint.
+box.execute('ALTER TABLE t2 ADD CONSTRAINT ck_constraint CHECK(i > 0);')
+box.space.T2.ck_constraint.CK_CONSTRAINT ~= nil
+box.execute('ALTER TABLE t2 DROP CONSTRAINT ck_constraint;')
+box.space.T2.ck_constraint.CK_CONSTRAINT == nil
+-- Drop FOREIGN KEY constraint.
+box.execute('ALTER TABLE t2 ADD CONSTRAINT fk FOREIGN KEY(i) REFERENCES t1(i);')
+box.execute('ALTER TABLE t2 DROP CONSTRAINT fk;')
+-- Drop non-existing constraint.
+box.execute('ALTER TABLE t2 DROP CONSTRAINT non_existing_constraint;')
+
+--
 -- Cleanup.
 --
 box.execute('DROP TABLE t2;')

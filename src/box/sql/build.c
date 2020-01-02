@@ -1489,18 +1489,18 @@ vdbe_emit_index_drop(struct Parse *parse_context, const char *name,
  *
  * @param parse_context Parsing context.
  * @param constraint_name Name of FK constraint to be dropped.
- *        Must be allocated on head by sqlDbMalloc().
- *        It will be freed in VDBE.
  * @param child_def Def of table which constraint belongs to.
  */
 static void
-vdbe_emit_fk_constraint_drop(struct Parse *parse_context, char *constraint_name,
+vdbe_emit_fk_constraint_drop(struct Parse *parse_context,
+			     const char *constraint_name,
 			     struct space_def *child_def)
 {
 	struct Vdbe *vdbe = sqlGetVdbe(parse_context);
 	assert(vdbe != NULL);
 	int key_reg = sqlGetTempRange(parse_context, 3);
-	sqlVdbeAddOp4(vdbe, OP_String8, 0, key_reg, 0, constraint_name,
+	const char *name_copy = sqlDbStrDup(parse_context->db, constraint_name);
+	sqlVdbeAddOp4(vdbe, OP_String8, 0, key_reg, 0, name_copy,
 			  P4_DYNAMIC);
 	sqlVdbeAddOp2(vdbe, OP_Integer, child_def->id, key_reg + 1);
 	const char *error_msg =
@@ -1510,10 +1510,8 @@ vdbe_emit_fk_constraint_drop(struct Parse *parse_context, char *constraint_name,
 					      BOX_FK_CONSTRAINT_ID, 0,
 					      key_reg, 2, ER_NO_SUCH_CONSTRAINT,
 					      error_msg, false,
-					      OP_Found) != 0) {
-		sqlDbFree(parse_context->db, constraint_name);
+					      OP_Found) != 0)
 		return;
-	}
 	sqlVdbeAddOp3(vdbe, OP_MakeRecord, key_reg, 2, key_reg + 2);
 	sqlVdbeAddOp2(vdbe, OP_SDelete, BOX_FK_CONSTRAINT_ID, key_reg + 2);
 	VdbeComment((vdbe, "Delete FK constraint %s", constraint_name));
@@ -1670,11 +1668,7 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	struct fk_constraint *child_fk;
 	rlist_foreach_entry(child_fk, &space->child_fk_constraint,
 			    in_child_space) {
-
-		char *fk_name_dup = sqlDbStrDup(v->db, child_fk->def->name);
-		if (fk_name_dup == NULL)
-			return;
-		vdbe_emit_fk_constraint_drop(parse_context, fk_name_dup,
+		vdbe_emit_fk_constraint_drop(parse_context, child_fk->def->name,
 					     space->def);
 	}
 	/* Delete all CK constraints. */
@@ -2067,28 +2061,38 @@ fk_constraint_change_defer_mode(struct Parse *parse_context, bool is_deferred)
 		is_deferred;
 }
 
+/**
+ * Emit code to drop the entry from _index or _ck_contstraint or
+ * _fk_constraint space corresponding with the constraint type.
+ */
 void
-sql_drop_foreign_key(struct Parse *parse_context)
+sql_drop_constraint(struct Parse *parse_context)
 {
-	struct drop_entity_def *drop_def = &parse_context->drop_fk_def.base;
-	assert(drop_def->base.entity_type == ENTITY_TYPE_FK);
+	struct drop_entity_def *drop_def =
+		&parse_context->drop_constraint_def.base;
+	assert(drop_def->base.entity_type == ENTITY_TYPE_CONSTRAINT);
 	assert(drop_def->base.alter_action == ALTER_ACTION_DROP);
 	const char *table_name = drop_def->base.entity_name->a[0].zName;
 	assert(table_name != NULL);
-	struct space *child = space_by_name(table_name);
-	if (child == NULL) {
+	struct space *space = space_by_name(table_name);
+	if (space == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
 		parse_context->is_aborted = true;
 		return;
 	}
-	char *constraint_name =
-		sql_name_from_token(parse_context->db, &drop_def->name);
-	if (constraint_name == NULL) {
+	char *name = sql_normalized_name_region_new(&parse_context->region,
+						    drop_def->name.z,
+						    drop_def->name.n);
+	if (name == NULL) {
 		parse_context->is_aborted = true;
 		return;
 	}
-	vdbe_emit_fk_constraint_drop(parse_context, constraint_name,
-				     child->def);
+	struct constraint_id *id = space_find_constraint_id(space, name);
+	if (id == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_CONSTRAINT, name, table_name);
+		parse_context->is_aborted = true;
+		return;
+	}
 	/*
 	 * We account changes to row count only if drop of
 	 * foreign keys take place in a separate
@@ -2096,6 +2100,24 @@ sql_drop_foreign_key(struct Parse *parse_context)
 	 * DROP TABLE always returns 1 (one) as a row count.
 	 */
 	struct Vdbe *v = sqlGetVdbe(parse_context);
+	assert(v != NULL);
+	assert(id->type < constraint_type_MAX);
+	switch (id->type) {
+	case CONSTRAINT_TYPE_PK:
+	case CONSTRAINT_TYPE_UNIQUE: {
+		vdbe_emit_index_drop(parse_context, name, space->def,
+				     ER_NO_SUCH_CONSTRAINT, false);
+		break;
+	}
+	case CONSTRAINT_TYPE_FK:
+		vdbe_emit_fk_constraint_drop(parse_context, name, space->def);
+		break;
+	case CONSTRAINT_TYPE_CK:
+		vdbe_emit_ck_constraint_drop(parse_context, name, space->def);
+		break;
+	default:
+		unreachable();
+	}
 	sqlVdbeCountChanges(v);
 	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 }

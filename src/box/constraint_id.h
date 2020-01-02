@@ -40,6 +40,7 @@ enum constraint_type {
 	CONSTRAINT_TYPE_UNIQUE,
 	CONSTRAINT_TYPE_FK,
 	CONSTRAINT_TYPE_CK,
+	constraint_type_MAX,
 };
 
 extern const char *constraint_type_strs[];
