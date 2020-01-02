@@ -273,6 +273,7 @@ struct errcode_record {
 	/*218 */_(ER_TUPLE_METADATA_IS_TOO_BIG,	"Can't create tuple: metadata size %u is too big") \
 	/*219 */_(ER_XLOG_GAP,			"%s") \
 	/*220 */_(ER_TOO_EARLY_SUBSCRIBE,	"Can't subscribe non-anonymous replica %s until join is done") \
+	/*221 */_(ER_SQL_CANT_ADD_AUTOINC,	"Can't add AUTOINCREMENT: space %s can't feature more than one AUTOINCREMENT field") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

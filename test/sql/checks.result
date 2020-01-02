@@ -856,6 +856,26 @@ box.execute("DROP TABLE t6")
 ---
 - row_count: 1
 ...
+--
+-- gh-3075: Check the auto naming of CHECK constraints in
+-- <ALTER TABLE ADD COLUMN>.
+--
+box.execute("CREATE TABLE check_naming (a INT PRIMARY KEY CHECK (a > 0))")
+---
+- row_count: 1
+...
+box.execute("ALTER TABLE check_naming ADD b INT CHECK (b > 0)")
+---
+- row_count: 1
+...
+box.execute("ALTER TABLE check_naming DROP CONSTRAINT \"ck_unnamed_CHECK_NAMING_2\"")
+---
+- row_count: 1
+...
+box.execute("DROP TABLE check_naming")
+---
+- row_count: 1
+...
 test_run:cmd("clear filter")
 ---
 - true

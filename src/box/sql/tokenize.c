@@ -40,6 +40,7 @@
 #include <unicode/uchar.h>
 
 #include "box/session.h"
+#include "box/schema.h"
 #include "say.h"
 #include "sqlInt.h"
 #include "tarantoolInt.h"
@@ -431,8 +432,8 @@ sql_token(const char *z, int *type, bool *is_reserved)
 
 /**
  * This function is called to release parsing artifacts
- * during table creation. The only objects allocated using
- * malloc are index defs and check constraints.
+ * during table creation or column addition. The only objects
+ * allocated using malloc are index defs.
  * Note that this functions can't be called on ordinary
  * space object. It's purpose is to clean-up parser->new_space.
  *
@@ -445,7 +446,15 @@ parser_space_delete(struct sql *db, struct space *space)
 	if (space == NULL || db == NULL)
 		return;
 	assert(space->def->opts.is_ephemeral);
-	for (uint32_t i = 0; i < space->index_count; ++i)
+	struct space *altered_space = space_by_name(space->def->name);
+	uint32_t i = 0;
+	/*
+	 * Don't delete already existing defs and start from new
+	 * ones.
+	 */
+	if (altered_space != NULL)
+		i = altered_space->index_count;
+	for (; i < space->index_count; ++i)
 		index_def_delete(space->index[i]->def);
 }
 
@@ -539,7 +548,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 		sqlVdbeDelete(pParse->pVdbe);
 		pParse->pVdbe = 0;
 	}
-	parser_space_delete(db, pParse->create_table_def.new_space);
+	parser_space_delete(db, pParse->create_column_def.space);
 
 	if (pParse->pWithToFree)
 		sqlWithDelete(db, pParse->pWithToFree);

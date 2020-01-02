@@ -439,6 +439,7 @@ t;
  |   218: box.error.TUPLE_METADATA_IS_TOO_BIG
  |   219: box.error.XLOG_GAP
  |   220: box.error.TOO_EARLY_SUBSCRIBE
+ |   221: box.error.SQL_CANT_ADD_AUTOINC
  | ...
 
 test_run:cmd("setopt delimiter ''");

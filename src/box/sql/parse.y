@@ -228,19 +228,24 @@ create_table_end ::= . { sqlEndTable(pParse); }
  */
 
 columnlist ::= columnlist COMMA tcons.
-columnlist ::= columnlist COMMA columnname carglist autoinc(I). {
-  uint32_t fieldno = pParse->create_table_def.new_space->def->field_count - 1;
-  if (I == 1 && sql_add_autoincrement(pParse, fieldno) != 0)
-    return;
+columnlist ::= columnlist COMMA column_def create_column_end.
+columnlist ::= column_def create_column_end.
+
+column_def ::= column_name_and_type carglist.
+
+column_name_and_type ::= nm(A) typedef(Y). {
+  create_column_def_init(&pParse->create_column_def, NULL, &A, &Y);
+  sql_create_column_start(pParse);
 }
 
-columnlist ::= columnname carglist autoinc(I). {
-  uint32_t fieldno = pParse->create_table_def.new_space->def->field_count - 1;
+create_column_end ::= autoinc(I). {
+  uint32_t fieldno = pParse->create_column_def.space->def->field_count - 1;
   if (I == 1 && sql_add_autoincrement(pParse, fieldno) != 0)
     return;
+  if (pParse->create_table_def.new_space == NULL)
+    sql_create_column_end(pParse);
 }
 columnlist ::= tcons.
-columnname(A) ::= nm(A) typedef(Y). {sqlAddColumn(pParse,&A,&Y);}
 
 // An IDENTIFIER can be a generic identifier, or one of several
 // keywords.  Any non-standard keyword can also be an identifier.
@@ -283,9 +288,11 @@ nm(A) ::= id(A). {
   }
 }
 
-// "carglist" is a list of additional constraints that come after the
-// column name and column type in a CREATE TABLE statement.
-//
+/**
+ * "carglist" is a list of additional constraints and clauses that
+ * come after the column name and column type in a <CREATE TABLE>
+ * or <ALTER TABLE ADD COLUMN> statement.
+ */
 carglist ::= carglist ccons.
 carglist ::= .
 %type cconsname { struct Token }
@@ -1737,9 +1744,28 @@ alter_table_start(A) ::= ALTER TABLE fullname(T) . { A = T; }
 
 %type alter_add_constraint {struct alter_args}
 alter_add_constraint(A) ::= alter_table_start(T) ADD CONSTRAINT nm(N). {
+   A.table_name = T;
+   A.name = N;
+   pParse->initiateTTrans = true;
+ }
+
+%type alter_add_column {struct alter_args}
+alter_add_column(A) ::= alter_table_start(T) ADD column_name(N). {
   A.table_name = T;
   A.name = N;
   pParse->initiateTTrans = true;
+}
+
+column_name(N) ::= COLUMN nm(A). { N = A; }
+column_name(N) ::= nm(A). { N = A; }
+
+cmd ::= alter_column_def carglist create_column_end.
+
+alter_column_def ::= alter_add_column(N) typedef(Y). {
+  create_column_def_init(&pParse->create_column_def, N.table_name, &N.name, &Y);
+  create_ck_constraint_parse_def_init(&pParse->create_ck_constraint_parse_def);
+  create_fk_constraint_parse_def_init(&pParse->create_fk_constraint_parse_def);
+  sql_create_column_start(pParse);
 }
 
 cmd ::= alter_add_constraint(N) FOREIGN KEY LP eidlist(FA) RP REFERENCES

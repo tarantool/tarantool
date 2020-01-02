@@ -209,5 +209,16 @@ box.space.T:select()
 box.space.S:drop()
 box.space.T:drop()
 
+--
+-- gh-3075: Check the auto naming of FOREIGN KEY constraints in
+-- <ALTER TABLE ADD COLUMN>.
+--
+box.execute("CREATE TABLE t1 (a INT PRIMARY KEY)")
+box.execute("CREATE TABLE check_naming (a INT PRIMARY KEY REFERENCES t1(a))")
+box.execute("ALTER TABLE check_naming ADD b INT REFERENCES t1(a)")
+box.execute("ALTER TABLE check_naming DROP CONSTRAINT \"fk_unnamed_CHECK_NAMING_2\"")
+box.execute("DROP TABLE check_naming")
+box.execute("DROP TABLE t1")
+
 --- Clean-up SQL DD hash.
 -test_run:cmd('restart server default with cleanup=1')

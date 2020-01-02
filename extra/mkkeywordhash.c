@@ -76,7 +76,7 @@ static Keyword aKeywordTable[] = {
   { "CHECK",                  "TK_CHECK",       true  },
   { "COLLATE",                "TK_COLLATE",     true  },
   { "COLUMN_REF",             "TK_COLUMN_REF",  true  },
-  { "COLUMN",                 "TK_STANDARD",    true  },
+  { "COLUMN",                 "TK_COLUMN",      true  },
   { "COMMIT",                 "TK_COMMIT",      true  },
   { "CONFLICT",               "TK_CONFLICT",    false },
   { "CONSTRAINT",             "TK_CONSTRAINT",  true  },

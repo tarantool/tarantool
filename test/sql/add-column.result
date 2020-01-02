@@ -1,0 +1,529 @@
+-- test-run result file version 2
+--
+-- gh-3075: Check <ALTER TABLE table ADD COLUMN column> statement.
+--
+CREATE TABLE t1 (a INT PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- COLUMN keyword is optional. Check it here, but omit it below.
+--
+ALTER TABLE t1 ADD COLUMN b INT;
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- A column with the same name already exists.
+--
+ALTER TABLE t1 ADD b SCALAR;
+ | ---
+ | - null
+ | - Space field 'B' is duplicate
+ | ...
+
+--
+-- Can't add column to a view.
+--
+CREATE VIEW v AS SELECT * FROM t1;
+ | ---
+ | - row_count: 1
+ | ...
+ALTER TABLE v ADD c INT;
+ | ---
+ | - null
+ | - 'Can''t modify space ''V'': view can not be altered'
+ | ...
+
+\set language lua
+ | ---
+ | - true
+ | ...
+view = box.space._space.index[2]:select('V')[1]:totable()
+ | ---
+ | ...
+view_format = view[7]
+ | ---
+ | ...
+f = {type = 'string', nullable_action = 'none', name = 'C', is_nullable = true}
+ | ---
+ | ...
+table.insert(view_format, f)
+ | ---
+ | ...
+view[5] = 3
+ | ---
+ | ...
+view[7] = view_format
+ | ---
+ | ...
+box.space._space:replace(view)
+ | ---
+ | - error: 'Can''t modify space ''V'': view can not be altered'
+ | ...
+\set language sql
+ | ---
+ | - true
+ | ...
+
+DROP VIEW v;
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- Check PRIMARY KEY constraint works with an added column.
+--
+CREATE TABLE pk_check (a INT CONSTRAINT pk PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+ALTER TABLE pk_check DROP CONSTRAINT pk;
+ | ---
+ | - row_count: 1
+ | ...
+ALTER TABLE pk_check ADD b INT PRIMARY KEY;
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO pk_check VALUES (1, 1);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO pk_check VALUES (1, 1);
+ | ---
+ | - null
+ | - Duplicate key exists in unique index 'pk_unnamed_PK_CHECK_1' in space 'PK_CHECK'
+ | ...
+DROP TABLE pk_check;
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- Check UNIQUE constraint works with an added column.
+--
+CREATE TABLE unique_check (a INT PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+ALTER TABLE unique_check ADD b INT UNIQUE;
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO unique_check VALUES (1, 1);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO unique_check VALUES (2, 1);
+ | ---
+ | - null
+ | - Duplicate key exists in unique index 'unique_unnamed_UNIQUE_CHECK_2' in space 'UNIQUE_CHECK'
+ | ...
+DROP TABLE unique_check;
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- Check CHECK constraint works with an added column.
+--
+CREATE TABLE ck_check (a INT PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+ALTER TABLE ck_check ADD b INT CHECK (b > 0);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO ck_check VALUES (1, 0);
+ | ---
+ | - null
+ | - 'Check constraint failed ''ck_unnamed_CK_CHECK_1'': b > 0'
+ | ...
+INSERT INTO ck_check VALUES (1, 1);
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE ck_check;
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- Check FOREIGN KEY constraint works with an added column.
+--
+CREATE TABLE fk_check (a INT PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+ALTER TABLE fk_check ADD b INT REFERENCES t1(a);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO fk_check VALUES (0, 1);
+ | ---
+ | - null
+ | - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+ | ...
+INSERT INTO fk_check VALUES (2, 0);
+ | ---
+ | - null
+ | - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+ | ...
+INSERT INTO fk_check VALUES (2, 1);
+ | ---
+ | - null
+ | - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+ | ...
+INSERT INTO t1 VALUES (1, 1);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO fk_check VALUES (2, 1);
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE fk_check;
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE t1;
+ | ---
+ | - row_count: 1
+ | ...
+--
+-- Check FOREIGN KEY (self-referenced) constraint works with an
+-- added column.
+--
+CREATE TABLE self (id INT PRIMARY KEY AUTOINCREMENT, a INT UNIQUE)
+ | ---
+ | - row_count: 1
+ | ...
+ALTER TABLE self ADD b INT REFERENCES self(a)
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO self(a,b) VALUES(1, 1);
+ | ---
+ | - autoincrement_ids:
+ |   - 1
+ |   row_count: 1
+ | ...
+UPDATE self SET a = 2, b = 2;
+ | ---
+ | - row_count: 1
+ | ...
+UPDATE self SET b = 3;
+ | ---
+ | - null
+ | - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+ | ...
+UPDATE self SET a = 3;
+ | ---
+ | - null
+ | - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+ | ...
+DROP TABLE self;
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- Check AUTOINCREMENT works with an added column.
+--
+CREATE TABLE autoinc_check (a INT CONSTRAINT pk PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+ALTER TABLE autoinc_check DROP CONSTRAINT pk;
+ | ---
+ | - row_count: 1
+ | ...
+ALTER TABLE autoinc_check ADD b INT PRIMARY KEY AUTOINCREMENT;
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO autoinc_check(a) VALUES(1);
+ | ---
+ | - autoincrement_ids:
+ |   - 1
+ |   row_count: 1
+ | ...
+INSERT INTO autoinc_check(a) VALUES(1);
+ | ---
+ | - autoincrement_ids:
+ |   - 2
+ |   row_count: 1
+ | ...
+TRUNCATE TABLE autoinc_check;
+ | ---
+ | - row_count: 0
+ | ...
+
+--
+-- Can't add second column with AUTOINCREMENT.
+--
+ALTER TABLE autoinc_check ADD c INT AUTOINCREMENT;
+ | ---
+ | - null
+ | - 'Can''t add AUTOINCREMENT: space AUTOINC_CHECK can''t feature more than one AUTOINCREMENT
+ |   field'
+ | ...
+DROP TABLE autoinc_check;
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- Check COLLATE clause works with an added column.
+--
+CREATE TABLE collate_check (a INT PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+ALTER TABLE collate_check ADD b TEXT COLLATE "unicode_ci";
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO collate_check VALUES (1, 'a');
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO collate_check VALUES (2, 'A');
+ | ---
+ | - row_count: 1
+ | ...
+SELECT * FROM collate_check WHERE b LIKE 'a';
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: integer
+ |   - name: B
+ |     type: string
+ |   rows:
+ |   - [1, 'a']
+ |   - [2, 'A']
+ | ...
+DROP TABLE collate_check;
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- Check DEFAULT clause works with an added column.
+--
+CREATE TABLE default_check (a INT PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+ALTER TABLE default_check ADD b TEXT DEFAULT ('a');
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO default_check(a) VALUES (1);
+ | ---
+ | - row_count: 1
+ | ...
+SELECT * FROM default_check;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: integer
+ |   - name: B
+ |     type: string
+ |   rows:
+ |   - [1, 'a']
+ | ...
+DROP TABLE default_check;
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- Check NULL constraint works with an added column.
+--
+CREATE TABLE null_check (a INT PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+ALTER TABLE null_check ADD b TEXT NULL;
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO null_check(a) VALUES (1);
+ | ---
+ | - row_count: 1
+ | ...
+SELECT * FROM null_check;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: integer
+ |   - name: B
+ |     type: string
+ |   rows:
+ |   - [1, null]
+ | ...
+DROP TABLE null_check;
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- Check NOT NULL constraint works with an added column.
+--
+CREATE TABLE notnull_check (a INT PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+ALTER TABLE notnull_check ADD b TEXT NOT NULL;
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO notnull_check(a) VALUES (1);
+ | ---
+ | - null
+ | - 'Failed to execute SQL statement: NOT NULL constraint failed: NOTNULL_CHECK.B'
+ | ...
+INSERT INTO notnull_check VALUES (1, 'not null');
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE notnull_check;
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- Can't add a column with DEAFULT or NULL to a non-empty space.
+-- This ability isn't implemented yet.
+--
+CREATE TABLE non_empty (a INT PRIMARY KEY);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO non_empty VALUES (1);
+ | ---
+ | - row_count: 1
+ | ...
+ALTER TABLE non_empty ADD b INT NULL;
+ | ---
+ | - null
+ | - Tuple field count 1 does not match space field count 2
+ | ...
+ALTER TABLE non_empty ADD b INT DEFAULT (1);
+ | ---
+ | - null
+ | - Tuple field count 1 does not match space field count 2
+ | ...
+DROP TABLE non_empty;
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- Add to a no-SQL adjusted space without format.
+--
+\set language lua
+ | ---
+ | - true
+ | ...
+_ = box.schema.space.create('WITHOUT_FORMAT')
+ | ---
+ | ...
+\set language sql
+ | ---
+ | - true
+ | ...
+ALTER TABLE without_format ADD a INT PRIMARY KEY;
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO without_format VALUES (1);
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE without_format;
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- Add to a no-SQL adjusted space with format.
+--
+\set language lua
+ | ---
+ | - true
+ | ...
+with_format = box.schema.space.create('WITH_FORMAT')
+ | ---
+ | ...
+with_format:format{{name = 'A', type = 'unsigned'}}
+ | ---
+ | ...
+\set language sql
+ | ---
+ | - true
+ | ...
+ALTER TABLE with_format ADD b INT PRIMARY KEY;
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO with_format VALUES (1, 1);
+ | ---
+ | - row_count: 1
+ | ...
+DROP TABLE with_format;
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- Add multiple columns (with a constraint) inside a transaction.
+--
+CREATE TABLE t2 (a INT PRIMARY KEY)
+ | ---
+ | - row_count: 1
+ | ...
+\set language lua
+ | ---
+ | - true
+ | ...
+box.begin()                                                                     \
+box.execute('ALTER TABLE t2 ADD b INT')                                         \
+box.execute('ALTER TABLE t2 ADD c INT UNIQUE')                                  \
+box.commit()
+ | ---
+ | ...
+\set language sql
+ | ---
+ | - true
+ | ...
+INSERT INTO t2 VALUES (1, 1, 1);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO t2 VALUES (2, 1, 1);
+ | ---
+ | - null
+ | - Duplicate key exists in unique index 'unique_unnamed_T2_2' in space 'T2'
+ | ...
+SELECT * FROM t2;
+ | ---
+ | - metadata:
+ |   - name: A
+ |     type: integer
+ |   - name: B
+ |     type: integer
+ |   - name: C
+ |     type: integer
+ |   rows:
+ |   - [1, 1, 1]
+ | ...
+DROP TABLE t2;
+ | ---
+ | - row_count: 1
+ | ...
