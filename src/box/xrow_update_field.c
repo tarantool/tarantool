@@ -595,9 +595,11 @@ static const struct xrow_update_op_meta op_delete = {
 };
 
 static inline const struct xrow_update_op_meta *
-xrow_update_op_by(char opcode, int op_num)
+xrow_update_op_by(const char *opcode, uint32_t len, int op_num)
 {
-	switch (opcode) {
+	if (len != 1)
+		goto error;
+	switch (*opcode) {
 	case '=':
 		return &op_set;
 	case '+':
@@ -618,7 +620,7 @@ xrow_update_op_by(char opcode, int op_num)
 	}
 error:
 	diag_set(ClientError, ER_UNKNOWN_UPDATE_OP, op_num,
-		 tt_sprintf("\"%c\"", opcode));
+		 tt_sprintf("\"%.*s\"", len, opcode));
 	return NULL;
 }
 
@@ -659,10 +661,11 @@ xrow_update_op_decode(struct xrow_update_op *op, int op_num, int index_base,
 			 "update operation name must be a string");
 		return -1;
 	}
-	op->opcode = *mp_decode_str(expr, &len);
-	op->meta = xrow_update_op_by(op->opcode, op_num);
+	const char *opcode = mp_decode_str(expr, &len);
+	op->meta = xrow_update_op_by(opcode, len, op_num);
 	if (op->meta == NULL)
 		return -1;
+	op->opcode = *opcode;
 	if (arg_count != op->meta->arg_count) {
 		const char *str = tt_sprintf("wrong number of arguments, "\
 					     "expected %u, got %u",

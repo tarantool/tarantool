@@ -834,6 +834,18 @@ s:update({0}, {{'+', 0}})
 - error: 'Unknown UPDATE operation #1: wrong number of arguments, expected 3, got
     2'
 ...
+s:update({0}, {{'', 2, 1}})
+---
+- error: 'Unknown UPDATE operation #1: ""'
+...
+s:update({0}, {{'more than 1 character', 2, 1}})
+---
+- error: 'Unknown UPDATE operation #1: "more than 1 character"'
+...
+s:update({0}, {{'same as previous'}})
+---
+- error: 'Unknown UPDATE operation #1: "same as previous"'
+...
 s:update({0}, {{'+', '+', '+'}})
 ---
 - error: 'Field ''+'' UPDATE error: invalid JSON in position 1'
