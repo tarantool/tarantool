@@ -196,15 +196,18 @@ s:update('sql_defer_foreign_keys', {{}})
  | ...
 s:update('sql_defer_foreign_keys', {{'='}})
  | ---
- | - error: Unknown UPDATE operation
+ | - error: 'Unknown UPDATE operation #1: wrong number of arguments, expected 3, got
+ |     1'
  | ...
 s:update('sql_defer_foreign_keys', {{'=', 'value'}})
  | ---
- | - error: Unknown UPDATE operation
+ | - error: 'Unknown UPDATE operation #1: wrong number of arguments, expected 3, got
+ |     2'
  | ...
 s:update('sql_defer_foreign_keys', {{'=', 'value', true, 1}})
  | ---
- | - error: Unknown UPDATE operation
+ | - error: 'Unknown UPDATE operation #1: wrong number of arguments, expected 3, got
+ |     4'
  | ...
 
 s:update('sql_defer_foreign_keys', {{'+', 'value', 2}})

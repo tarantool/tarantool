@@ -369,7 +369,8 @@ s:select()
 ...
 s:upsert({1, 'test', 'failed'}, {{'=', 3, 33}, {'=', 4, nil}})
 ---
-- error: Unknown UPDATE operation
+- error: 'Unknown UPDATE operation #2: wrong number of arguments, expected 3, got
+    2'
 ...
 s:select()
 ---

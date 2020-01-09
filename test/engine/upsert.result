@@ -1809,7 +1809,7 @@ space:upsert({1}, {{'!', 2, 100}}) -- must fail on checking tuple
 ...
 space:upsert({'a'}, {{'a', 2, 100}}) -- must fail on checking ops
 ---
-- error: Unknown UPDATE operation
+- error: 'Unknown UPDATE operation #1: "a"'
 ...
 space:upsert({'a'}, {{'!', 2, 'ups1'}}) -- 'fast' upsert via insert in one index
 ---
@@ -2117,19 +2117,22 @@ test(t, {{'+', 3, 3}, {'&', 3, 'a'}}, {{1, '1', 1, '1'}})
 ...
 test(t, {{'+', 3}, {'&', 3, 'a'}}, {{1, '1', 1, '1'}})
 ---
-- error: Unknown UPDATE operation
+- error: 'Unknown UPDATE operation #1: wrong number of arguments, expected 3, got
+    2'
 ...
 test(t, {{':', 3, 3}}, {{1, '1', 1, '1'}})
 ---
-- error: Unknown UPDATE operation
+- error: 'Unknown UPDATE operation #1: wrong number of arguments, expected 5, got
+    3'
 ...
 test(t, {{':', 3, 3, 3}}, {{1, '1', 1, '1'}})
 ---
-- error: Unknown UPDATE operation
+- error: 'Unknown UPDATE operation #1: wrong number of arguments, expected 5, got
+    4'
 ...
 test(t, {{'?', 3, 3}}, {{1, '1', 1, '1'}})
 ---
-- error: Unknown UPDATE operation
+- error: 'Unknown UPDATE operation #1: "?"'
 ...
 'dump ' .. anything_to_string(box.space.s:select{})
 ---

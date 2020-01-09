@@ -80,7 +80,7 @@ struct errcode_record {
 	/* 25 */_(ER_UPDATE_SPLICE,		"SPLICE error on field %s: %s") \
 	/* 26 */_(ER_UPDATE_ARG_TYPE,		"Argument type in operation '%c' on field %s does not match field type: expected %s") \
 	/* 27 */_(ER_FORMAT_MISMATCH_INDEX_PART, "Field %s has type '%s' in space format, but type '%s' in index definition") \
-	/* 28 */_(ER_UNKNOWN_UPDATE_OP,		"Unknown UPDATE operation") \
+	/* 28 */_(ER_UNKNOWN_UPDATE_OP,		"Unknown UPDATE operation #%d: %s") \
 	/* 29 */_(ER_UPDATE_FIELD,		"Field %s UPDATE error: %s") \
 	/* 30 */_(ER_FUNCTION_TX_ACTIVE,	"Transaction is active at return from function") \
 	/* 31 */_(ER_KEY_PART_COUNT,		"Invalid key part count (expected [0..%u], got %u)") \

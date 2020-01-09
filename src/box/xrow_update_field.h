@@ -223,6 +223,7 @@ xrow_update_op_next_token(struct xrow_update_op *op);
 /**
  * Decode an update operation from MessagePack.
  * @param[out] op Update operation.
+ * @param op_num Ordinal number of the operation.
  * @param index_base Field numbers base: 0 or 1.
  * @param dict Dictionary to lookup field number by a name.
  * @param expr MessagePack.
@@ -231,7 +232,7 @@ xrow_update_op_next_token(struct xrow_update_op *op);
  * @retval -1 Client error.
  */
 int
-xrow_update_op_decode(struct xrow_update_op *op, int index_base,
+xrow_update_op_decode(struct xrow_update_op *op, int op_num, int index_base,
 		      struct tuple_dictionary *dict, const char **expr);
 
 /**

@@ -826,11 +826,13 @@ s:update({0}, {{}})
 ...
 s:update({0}, {{'+'}})
 ---
-- error: Unknown UPDATE operation
+- error: 'Unknown UPDATE operation #1: wrong number of arguments, expected 3, got
+    1'
 ...
 s:update({0}, {{'+', 0}})
 ---
-- error: Unknown UPDATE operation
+- error: 'Unknown UPDATE operation #1: wrong number of arguments, expected 3, got
+    2'
 ...
 s:update({0}, {{'+', '+', '+'}})
 ---

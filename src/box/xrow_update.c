@@ -177,8 +177,8 @@ xrow_update_read_ops(struct xrow_update *update, const char *expr,
 	}
 	struct xrow_update_op *op = update->ops;
 	struct xrow_update_op *ops_end = op + update->op_count;
-	for (; op < ops_end; op++) {
-		if (xrow_update_op_decode(op, update->index_base, dict,
+	for (int i = 1; op < ops_end; op++, i++) {
+		if (xrow_update_op_decode(op, i, update->index_base, dict,
 					  &expr) != 0)
 			return -1;
 		/*
