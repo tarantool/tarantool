@@ -47,15 +47,14 @@
 #include <libunwind.h>
 
 #include "small/region.h"
+#include "small/static.h"
 /*
- * We use a global static buffer because it is too late to do any
+ * We use a static buffer interface because it is too late to do any
  * allocation when we are printing backtrace and fiber stack is
  * small.
  */
 
 #define BACKTRACE_NAME_MAX 200
-
-static char backtrace_buf[4096 * 4];
 
 static __thread struct region cache_region;
 static __thread struct mh_i64ptr_t *proc_cache = NULL;
@@ -140,8 +139,9 @@ backtrace()
 	unw_getcontext(&unw_context);
 	unw_cursor_t unw_cur;
 	unw_init_local(&unw_cur, &unw_context);
+	char *backtrace_buf = (char *)static_alloc(SMALL_STATIC_SIZE);
 	char *p = backtrace_buf;
-	char *end = p + sizeof(backtrace_buf) - 1;
+	char *end = p + SMALL_STATIC_SIZE - 1;
 	int unw_status;
 	*p = '\0';
 	while ((unw_status = unw_step(&unw_cur)) > 0) {
