@@ -98,8 +98,9 @@ box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 -- gh-3857 "PRAGMA collation_list" invokes segmentation fault.
 box.schema.user.create('tmp')
 box.session.su('tmp')
--- Error: read access to space is denied.
-box.execute("pragma collation_list")
+-- gh-4713 "PRAGMA collation_list" is not accessible to all users
+_, err = box.execute('pragma collation_list')
+assert(err == nil)
 box.session.su('admin')
 box.schema.user.drop('tmp')
 

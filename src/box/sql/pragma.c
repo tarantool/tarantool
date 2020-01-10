@@ -503,7 +503,7 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 
 	case PragTyp_COLLATION_LIST:{
 		int i = 0;
-		struct space *space = space_by_name("_collation");
+		struct space *space = space_by_name("_vcollation");
 		char key_buf[16]; /* 16 is enough to encode 0 len array */
 		char *key_end = key_buf;
 		key_end = mp_encode_array(key_end, 0);
