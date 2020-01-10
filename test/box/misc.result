@@ -199,6 +199,79 @@ box.error.new()
 - error: 'Usage: box.error.new(code, args)'
 ...
 --
+-- gh-4489: box.error has __concat metamethod
+--
+test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
+---
+- true
+...
+e = box.error.new(box.error.UNKNOWN)
+---
+...
+'left side: ' .. e
+---
+- 'left side: Unknown error'
+...
+e .. ': right side'
+---
+- 'Unknown error: right side'
+...
+e .. nil
+---
+- error: 'builtin/error.lua: attempt to concatenate local ''rhs'' (a nil value)'
+...
+nil .. e
+---
+- error: 'builtin/error.lua: attempt to concatenate local ''lhs'' (a nil value)'
+...
+e .. box.NULL
+---
+- error: 'builtin/error.lua: attempt to concatenate ''string'' and ''void *'''
+...
+box.NULL .. e
+---
+- error: 'builtin/error.lua: attempt to concatenate ''void *'' and ''string'''
+...
+123 .. e
+---
+- 123Unknown error
+...
+e .. 123
+---
+- Unknown error123
+...
+e .. e
+---
+- Unknown errorUnknown error
+...
+e .. {}
+---
+- error: 'builtin/error.lua: attempt to concatenate local ''rhs'' (a table value)'
+...
+{} .. e
+---
+- error: 'builtin/error.lua: attempt to concatenate local ''lhs'' (a table value)'
+...
+-1ULL .. e
+---
+- error: 'builtin/error.lua: attempt to concatenate ''uint64_t'' and ''string'''
+...
+e .. -1ULL
+---
+- error: 'builtin/error.lua: attempt to concatenate ''string'' and ''uint64_t'''
+...
+1LL .. e
+---
+- error: 'builtin/error.lua: attempt to concatenate ''int64_t'' and ''string'''
+...
+e .. 1LL
+---
+- error: 'builtin/error.lua: attempt to concatenate ''string'' and ''int64_t'''
+...
+e = nil
+---
+...
+--
 -- System errors expose errno as a field.
 --
 _, err = require('fio').open('not_existing_file')
@@ -1065,7 +1138,7 @@ error()
 ---
 - error: null
 ...
---  A test case for bitwise operations 
+--  A test case for bitwise operations
 bit.lshift(1, 32)
 ---
 - 1
