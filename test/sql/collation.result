@@ -360,11 +360,13 @@ box.schema.user.create('tmp')
 box.session.su('tmp')
 ---
 ...
--- Error: read access to space is denied.
-box.execute("pragma collation_list")
+-- gh-4713 "PRAGMA collation_list" is not accessible to all users
+_, err = box.execute('pragma collation_list')
 ---
-- null
-- Read access to space '_collation' is denied for user 'tmp'
+...
+assert(err == nil)
+---
+- true
 ...
 box.session.su('admin')
 ---
