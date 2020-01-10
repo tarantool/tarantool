@@ -135,6 +135,8 @@ struct errinj {
 	_(ERRINJ_COIO_SENDFILE_CHUNK, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_SWIM_FD_ONLY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_DYN_MODULE_COUNT, ERRINJ_INT, {.iparam = 0}) \
+	_(ERRINJ_FIBER_MADVISE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_FIBER_MPROTECT, ERRINJ_INT, {.iparam = -1})
 
 ENUM0(errinj_id, ERRINJ_LIST);
 extern struct errinj errinjs[];
