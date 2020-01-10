@@ -241,7 +241,7 @@ sql_pragma_collation_list(struct Parse *parse_context)
 	char key_buf[16];
 	char *key_end = mp_encode_array(key_buf, 0);
 	box_tuple_t *tuple;
-	box_iterator_t *it = box_index_iterator(BOX_COLLATION_ID, 0, ITER_ALL,
+	box_iterator_t *it = box_index_iterator(BOX_VCOLLATION_ID, 0, ITER_ALL,
 						key_buf, key_end);
 	if (it == NULL) {
 		parse_context->is_aborted = true;
