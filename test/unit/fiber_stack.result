@@ -1,0 +1,8 @@
+SystemError fiber mprotect failed: Cannot allocate memory
+	*** main_f ***
+1..4
+ok 1 - mprotect: failed to setup fiber guard page
+ok 2 - mprotect: diag is armed after error
+ok 3 - madvise: non critical error on madvise hint
+ok 4 - madvise: diag is armed after error
+	*** main_f: done ***
