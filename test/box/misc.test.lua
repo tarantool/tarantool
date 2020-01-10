@@ -60,6 +60,28 @@ e
 box.error.new()
 
 --
+-- gh-4489: box.error has __concat metamethod
+--
+test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
+e = box.error.new(box.error.UNKNOWN)
+'left side: ' .. e
+e .. ': right side'
+e .. nil
+nil .. e
+e .. box.NULL
+box.NULL .. e
+123 .. e
+e .. 123
+e .. e
+e .. {}
+{} .. e
+-1ULL .. e
+e .. -1ULL
+1LL .. e
+e .. 1LL
+e = nil
+
+--
 -- System errors expose errno as a field.
 --
 _, err = require('fio').open('not_existing_file')
@@ -281,7 +303,7 @@ dostring('return abc')
 dostring('return ...', 1, 2, 3)
 --  A test case for Bug#1043804 lua error() -> server crash
 error()
---  A test case for bitwise operations 
+--  A test case for bitwise operations
 bit.lshift(1, 32)
 bit.band(1, 3)
 bit.bor(1, 2)

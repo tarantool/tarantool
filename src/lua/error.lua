@@ -160,9 +160,20 @@ local function error_index(err, key)
     return error_methods[key]
 end
 
+local function error_concat(lhs, rhs)
+    if ffi.istype('struct error', lhs) then
+        return tostring(lhs) .. rhs
+    elseif ffi.istype('struct error', rhs) then
+        return lhs .. tostring(rhs)
+    else
+       error('error_mt.__concat(): neither of args is an error')
+    end
+end
+
 local error_mt = {
     __index = error_index;
     __tostring = error_message;
+    __concat = error_concat;
 };
 
 ffi.metatype('struct error', error_mt);
