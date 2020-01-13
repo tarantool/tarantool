@@ -78,6 +78,9 @@ end;
 test_run:cmd("setopt delimiter ''");
 unprepare(s.stmt_id)
 
+assert(box.info.sql().cache.stmt_count == 0)
+assert(box.info.sql().cache.size == 0)
+
 -- Test preparation of different types of queries.
 -- Let's start from DDL. It doesn't make much sense since
 -- any prepared DDL statement can be executed once, but

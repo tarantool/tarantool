@@ -92,7 +92,6 @@ sql_stmt_cache_delete(struct stmt_cache_entry *entry)
 	if (sql_stmt_cache.last_found == entry)
 		sql_stmt_cache.last_found = NULL;
 	rlist_del(&entry->link);
-	sql_stmt_cache.mem_used -= sql_cache_entry_sizeof(entry->stmt);
 	sql_cache_entry_delete(entry);
 }
 
@@ -175,6 +174,7 @@ sql_stmt_cache_entry_unref(struct stmt_cache_entry *entry)
 		assert(i != mh_end(cache->hash));
 		mh_i32ptr_del(cache->hash, i, NULL);
 		rlist_add(&sql_stmt_cache.gc_queue, &entry->link);
+		sql_stmt_cache.mem_used -= sql_cache_entry_sizeof(entry->stmt);
 		if (sql_stmt_cache.last_found == entry)
 			sql_stmt_cache.last_found = NULL;
 	}
