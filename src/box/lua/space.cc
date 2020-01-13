@@ -580,14 +580,18 @@ lbox_space_frommap(struct lua_State *L)
 		}
 		lua_rawseti(L, -3, fieldno+1);
 	}
-	if (table)
-		return 1;
 
 	lua_replace(L, 1);
 	lua_settop(L, 1);
 	tuple = luaT_tuple_new(L, -1, space->format);
-	if (tuple == NULL)
-		return luaT_error(L);
+	if (tuple == NULL) {
+		struct error *e = diag_last_error(&fiber()->diag);
+		lua_pushnil(L);
+		lua_pushstring(L, e->errmsg);
+		return 2;
+	}
+	if (table)
+		return 1;
 	luaT_pushtuple(L, tuple);
 	return 1;
 usage_error:
