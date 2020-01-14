@@ -461,6 +461,7 @@ lbox_space_frommap(struct lua_State *L)
 	struct tuple_dictionary *dict = NULL;
 	uint32_t id = 0;
 	struct space *space = NULL;
+	struct tuple *tuple = NULL;
 	int argc = lua_gettop(L);
 	bool table = false;
 	if (argc < 2 || argc > 3 || !lua_istable(L, 2))
@@ -503,12 +504,19 @@ lbox_space_frommap(struct lua_State *L)
 		}
 		lua_rawseti(L, -3, fieldno+1);
 	}
-	if (table)
-		return 1;
 
 	lua_replace(L, 1);
 	lua_settop(L, 1);
-	return luaT_tuple_new(L, space->format);
+	tuple = luaT_tuple_new(L, space->format);
+	if (tuple == NULL) {
+		struct error *e = diag_last_error(diag_get());
+		lua_pushnil(L);
+		lua_pushstring(L, e->errmsg);
+		return 2;
+	}
+	if (!table)
+		luaT_pushtuple(L, tuple);
+	return 1;
 usage_error:
 	return luaL_error(L, "Usage: space:frommap(map, opts)");
 }

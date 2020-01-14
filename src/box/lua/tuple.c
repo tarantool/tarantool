@@ -97,7 +97,7 @@ luaT_istuple(struct lua_State *L, int narg)
 	return *(struct tuple **) data;
 }
 
-int
+struct tuple *
 luaT_tuple_new(struct lua_State *L, struct tuple_format *format)
 {
 	int argc = lua_gettop(L);
@@ -127,17 +127,20 @@ luaT_tuple_new(struct lua_State *L, struct tuple_format *format)
 	struct tuple *tuple = box_tuple_new(format, buf->buf,
 					   buf->buf + ibuf_used(buf));
 	if (tuple == NULL)
-		return luaT_error(L);
+		return NULL;
 	/* box_tuple_new() doesn't leak on exception, see public API doc */
-	luaT_pushtuple(L, tuple);
 	ibuf_reinit(tarantool_lua_ibuf);
-	return 1;
+	return tuple;
 }
 
 static int
 lbox_tuple_new(lua_State *L)
 {
-	return luaT_tuple_new(L, box_tuple_format_default());
+	struct tuple *tuple = luaT_tuple_new(L, box_tuple_format_default());
+	if (tuple == NULL)
+		return luaT_error(L);
+	luaT_pushtuple(L, tuple);
+	return 1;
 }
 
 static int

@@ -67,7 +67,7 @@ luaT_istuple(struct lua_State *L, int idx);
 
 /** \endcond public */
 
-int
+struct tuple *
 luaT_tuple_new(struct lua_State *L, struct tuple_format *format);
 
 static inline int
