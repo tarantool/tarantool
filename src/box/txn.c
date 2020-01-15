@@ -72,12 +72,19 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 		/* Initialize members explicitly to save time on memset() */
 		row->type = request->type;
 		row->replica_id = 0;
-		row->group_id = stmt->space != NULL ?
-				space_group_id(stmt->space) : 0;
 		row->lsn = 0;
 		row->sync = 0;
 		row->tm = 0;
 	}
+	/*
+	 * Group ID should be set both for requests not having a
+	 * header, and for the ones who have it. This is because
+	 * even if a request has a header, the group id could be
+	 * omitted in it, and is default - 0. Even if the space's
+	 * real group id is different.
+	 */
+	struct space *space = stmt->space;
+	row->group_id = space != NULL ? space_group_id(space) : 0;
 	row->bodycnt = xrow_encode_dml(request, &txn->region, row->body);
 	if (row->bodycnt < 0)
 		return -1;
