@@ -53,7 +53,7 @@ output_handlers["yaml"] = function(status, opts, ...)
     local err
     if status then
         -- serializer can raise an exception
-        status, err = pcall(internal.format, ...)
+        status, err = pcall(internal.format_yaml, ...)
         if status then
             return err
         else
@@ -66,7 +66,7 @@ output_handlers["yaml"] = function(status, opts, ...)
             err = box.NULL
         end
     end
-    return internal.format({ error = err })
+    return internal.format_yaml({ error = err })
 end
 
 -- A map for internal symbols in case if they

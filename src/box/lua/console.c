@@ -352,7 +352,7 @@ lbox_console_add_history(struct lua_State *L)
  *         parameter.
  */
 static int
-lbox_console_format(struct lua_State *L)
+lbox_console_format_yaml(struct lua_State *L)
 {
 	int arg_count = lua_gettop(L);
 	if (arg_count == 0) {
