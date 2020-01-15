@@ -465,3 +465,16 @@ box.execute("CREATE TABLE t4 (i INT PRIMARY KEY, d DOUBLE DEFAULT 1.2345);")
 box.execute("INSERT INTO t4(i) VALUES (1);")
 box.execute("SELECT * FROM t4;")
 box.execute("DROP TABLE t4;")
+
+-- gh-4728: make sure that given query doesn't result in
+-- assertion fault.
+--
+s = box.schema.space.create('s')
+_ = s:create_index('pk')
+s:format({ \
+    [1] = {name = 'id', type = 'unsigned'}, \
+    [2] = {name = 'v', type = 'string', is_nullable = true}, \
+})
+
+box.execute([[SELECT * FROM "s" WHERE "id" = ?;]])
+s:drop()

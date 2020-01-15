@@ -2082,3 +2082,30 @@ box.execute("DROP TABLE t4;")
 ---
 - row_count: 1
 ...
+-- gh-4728: make sure that given query doesn't result in
+-- assertion fault.
+--
+s = box.schema.space.create('s')
+---
+...
+_ = s:create_index('pk')
+---
+...
+s:format({ \
+    [1] = {name = 'id', type = 'unsigned'}, \
+    [2] = {name = 'v', type = 'string', is_nullable = true}, \
+})
+---
+...
+box.execute([[SELECT * FROM "s" WHERE "id" = ?;]])
+---
+- metadata:
+  - name: id
+    type: unsigned
+  - name: v
+    type: string
+  rows: []
+...
+s:drop()
+---
+...
