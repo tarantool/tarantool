@@ -474,3 +474,16 @@ box.execute("SELECT 3e3, typeof(3e3);")
 box.execute("CREATE TABLE t5 (d DOUBLE PRIMARY KEY);")
 box.execute("INSERT INTO t5 VALUES (4), (5.5), (6e6);")
 box.execute("SELECT d, TYPEOF(d) FROM t5;")
+
+-- gh-4728: make sure that given query doesn't result in
+-- assertion fault.
+--
+s = box.schema.space.create('s')
+_ = s:create_index('pk')
+s:format({ \
+    [1] = {name = 'id', type = 'unsigned'}, \
+    [2] = {name = 'v', type = 'string', is_nullable = true}, \
+})
+
+box.execute([[SELECT * FROM "s" WHERE "id" = ?;]])
+s:drop()
