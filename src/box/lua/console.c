@@ -582,9 +582,9 @@ tarantool_lua_console_init(struct lua_State *L)
 	 */
 	lua_setfield(L, -2, "formatter");
 	struct session_vtab console_session_vtab = {
-		/* .push = */ console_session_push,
-		/* .fd = */ console_session_fd,
-		/* .sync = */ generic_session_sync,
+		.push	= console_session_push,
+		.fd	= console_session_fd,
+		.sync	= generic_session_sync,
 	};
 	session_vtab_registry[SESSION_TYPE_CONSOLE] = console_session_vtab;
 	session_vtab_registry[SESSION_TYPE_REPL] = console_session_vtab;
