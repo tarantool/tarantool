@@ -325,6 +325,25 @@ fiber_attr_getstacksize(struct fiber_attr *fiber_attr)
 				    fiber_attr_default.stack_size;
 }
 
+void
+fiber_on_stop(struct fiber *f)
+{
+	/*
+	 * The most common case is when the list is empty. Do an
+	 * inlined check before calling trigger_run().
+	 */
+	if (rlist_empty(&f->on_stop))
+		return;
+	if (trigger_run(&f->on_stop, f) != 0)
+		panic("On_stop triggers can't fail");
+	/*
+	 * All on_stop triggers are supposed to remove themselves.
+	 * So as no to waste time on that here, and to make them
+	 * all work uniformly.
+	 */
+	assert(rlist_empty(&f->on_stop));
+}
+
 static void
 fiber_recycle(struct fiber *fiber);
 
@@ -856,8 +875,7 @@ fiber_loop(MAYBE_UNUSED void *data)
 		       assert(f != fiber);
 		       fiber_wakeup(f);
 	        }
-		if (! rlist_empty(&fiber->on_stop))
-			trigger_run(&fiber->on_stop, fiber);
+		fiber_on_stop(fiber);
 		/* reset pending wakeups */
 		rlist_del(&fiber->state);
 		if (! (fiber->flags & FIBER_IS_JOINABLE))
@@ -1525,8 +1543,8 @@ cord_cojoin(struct cord *cord)
 int
 break_ev_loop_f(struct trigger *trigger, void *event)
 {
-	(void) trigger;
 	(void) event;
+	trigger_clear(trigger);
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 }

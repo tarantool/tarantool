@@ -457,7 +457,15 @@ struct fiber {
 
 	/** Triggers invoked before this fiber yields. Must not throw. */
 	struct rlist on_yield;
-	/** Triggers invoked before this fiber stops.  Must not throw. */
+	/**
+	 * Triggers invoked before this fiber is stopped/reset/
+	 * recycled/destroyed/reused. In other words, each time
+	 * when the fiber has finished execution of a request.
+	 * In particular, for fibers not from a fiber pool the
+	 * stop event is emitted before destruction and death.
+	 * Pooled fibers receive the stop event after each
+	 * request, even if they are never destroyed.
+	 */
 	struct rlist on_stop;
 	/**
 	 * The list of fibers awaiting for this fiber's timely
@@ -504,6 +512,10 @@ struct fiber {
 	struct diag diag;
 	char name[FIBER_NAME_MAX + 1];
 };
+
+/** Invoke on_stop triggers and delete them. */
+void
+fiber_on_stop(struct fiber *f);
 
 struct cord_on_exit;
 
