@@ -852,6 +852,7 @@ txn_on_stop(struct trigger *trigger, void *event)
 	(void) trigger;
 	(void) event;
 	txn_rollback(in_txn());                 /* doesn't yield or fail */
+	fiber_gc();
 }
 
 /**
