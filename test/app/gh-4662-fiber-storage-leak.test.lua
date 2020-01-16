@@ -1,0 +1,43 @@
+fiber = require('fiber')
+netbox = require('net.box')
+
+--
+-- gh-4662: fiber.storage was not deleted when created in a fiber
+-- started from the fiber pool used by IProto requests. The
+-- problem was that fiber.storage was created and deleted in Lua
+-- land only, assuming that only Lua-born fibers could have it.
+-- But in fact any fiber can create a Lua storage. Including the
+-- ones used to serve IProto requests.
+-- The test checks if fiber.storage is really deleted, and is not
+-- shared between requests.
+--
+
+box.schema.user.grant('guest', 'execute', 'universe')
+storage = nil
+i = 0
+weak_table = setmetatable({}, {__mode = 'v'})
+object = {'object'}
+weak_table.object = object
+function ref_object_in_fiber()                  \
+    storage = fiber.self().storage              \
+    assert(next(storage) == nil)                \
+    i = i + 1                                   \
+    fiber.self().storage.key = i                \
+    fiber.self().storage.object = object        \
+end
+
+c = netbox.connect(box.cfg.listen)
+c:call('ref_object_in_fiber') c:call('ref_object_in_fiber')
+storage
+i
+object = nil
+storage = nil
+collectgarbage('collect')
+-- The weak table should be empty, because the only two hard
+-- references were in the fibers used to serve
+-- ref_object_in_fiber() requests. And their storages should be
+-- cleaned up.
+weak_table
+
+c:close()
+box.schema.user.revoke('guest', 'execute', 'universe')
