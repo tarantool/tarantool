@@ -1310,6 +1310,11 @@ static void
 tx_fiber_init(struct session *session, uint64_t sync)
 {
 	struct fiber *f = fiber();
+	/*
+	 * There should not be any not executed on_stop triggers
+	 * from a previous request executed in that fiber.
+	 */
+	assert(rlist_empty(&f->on_stop));
 	f->storage.net.sync = sync;
 	/*
 	 * We do not cleanup fiber keys at the end of each request.
@@ -1715,8 +1720,6 @@ tx_process_sql(struct cmsg *m)
 	const char *sql;
 	uint32_t len;
 	bool is_unprepare = false;
-
-	tx_fiber_init(msg->connection->session, msg->header.sync);
 
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;

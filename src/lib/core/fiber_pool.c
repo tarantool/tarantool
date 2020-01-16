@@ -62,6 +62,16 @@ restart:
 			assert(f->caller->caller == &cord->sched);
 		}
 		cmsg_deliver(msg);
+		/*
+		 * Normally fibers die after their function
+		 * returns, and they call on_stop() triggers. The
+		 * pool optimization interferes into that logic
+		 * and a fiber doesn't die after its function
+		 * returns. But on_stop triggers still should be
+		 * called so that the pool wouldn't affect fiber's
+		 * visible lifecycle.
+		 */
+		fiber_on_stop(f);
 	}
 	/** Put the current fiber into a fiber cache. */
 	if (!fiber_is_cancelled(fiber()) && (msg != NULL ||
