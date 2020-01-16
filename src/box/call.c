@@ -122,23 +122,13 @@ box_process_call(struct call_request *request, struct port *port)
 				SC_FUNCTION, tt_cstr(name, name_len))) == 0) {
 		rc = box_lua_call(name, name_len, &args, port);
 	}
-
-	struct txn *txn = in_txn();
-	if (rc != 0) {
-		if (txn != NULL)
-			txn_rollback(txn);
-		fiber_gc();
+	if (rc != 0)
 		return -1;
-	}
-
-	if (txn != NULL) {
+	if (in_txn() != NULL) {
 		diag_set(ClientError, ER_FUNCTION_TX_ACTIVE);
 		port_destroy(port);
-		txn_rollback(txn);
-		fiber_gc();
 		return -1;
 	}
-
 	return 0;
 }
 
@@ -154,21 +144,11 @@ box_process_eval(struct call_request *request, struct port *port)
 			    request->args_end - request->args);
 	const char *expr = request->expr;
 	uint32_t expr_len = mp_decode_strl(&expr);
-	struct txn *txn;
-	if (box_lua_eval(expr, expr_len, &args, port) != 0) {
-		txn = in_txn();
-		if (txn != NULL)
-			txn_rollback(txn);
-		fiber_gc();
+	if (box_lua_eval(expr, expr_len, &args, port) != 0)
 		return -1;
-	}
-
-	txn = in_txn();
-	if (txn != NULL) {
+	if (in_txn() != 0) {
 		diag_set(ClientError, ER_FUNCTION_TX_ACTIVE);
 		port_destroy(port);
-		txn_rollback(txn);
-		fiber_gc();
 		return -1;
 	}
 	return 0;
