@@ -109,8 +109,10 @@ request_create_from_tuple(struct request *request, struct space *space,
 		 * the tuple data to WAL on commit.
 		 */
 		char *buf = region_alloc(&fiber()->gc, size);
-		if (buf == NULL)
+		if (buf == NULL) {
+			diag_set(OutOfMemory, size, "region_alloc", "tuple");
 			return -1;
+		}
 		memcpy(buf, data, size);
 		request->tuple = buf;
 		request->tuple_end = buf + size;
@@ -199,8 +201,10 @@ request_handle_sequence(struct request *request, struct space *space)
 		size_t buf_size = (request->tuple_end - request->tuple) +
 						mp_sizeof_uint(UINT64_MAX);
 		char *tuple = region_alloc(&fiber()->gc, buf_size);
-		if (tuple == NULL)
+		if (tuple == NULL) {
+			diag_set(OutOfMemory, buf_size, "region_alloc", "tuple");
 			return -1;
+		}
 		char *tuple_end = mp_encode_array(tuple, len);
 
 		if (unlikely(key != data)) {
