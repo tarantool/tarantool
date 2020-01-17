@@ -796,8 +796,11 @@ applier_apply_tx(struct stailq *rows)
 						     sizeof(struct trigger));
 	on_commit = (struct trigger *)region_alloc(&txn->region,
 						   sizeof(struct trigger));
-	if (on_rollback == NULL || on_commit == NULL)
+	if (on_rollback == NULL || on_commit == NULL) {
+		diag_set(OutOfMemory, sizeof(struct trigger),
+			 "region_alloc", "on_rollback/on_commit");
 		goto rollback;
+	}
 
 	trigger_create(on_rollback, applier_txn_rollback_cb, NULL, NULL);
 	txn_on_rollback(txn, on_rollback);
