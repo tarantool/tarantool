@@ -87,6 +87,23 @@ lua_pushdecimal(struct lua_State *L)
 	return res;
 }
 
+/**
+ * Returns true if a value at a given index is a decimal
+ * and false otherwise
+ */
+bool
+lua_isdecimal(struct lua_State *L, int index)
+{
+	if (lua_type(L, index) != LUA_TCDATA)
+		return false;
+
+	uint32_t ctypeid;
+	luaL_checkcdata(L, index, &ctypeid);
+	if (ctypeid != CTID_DECIMAL)
+		return false;
+	return true;
+}
+
 /** Check whether a value at a given index is a decimal. */
 static decimal_t *
 lua_checkdecimal(struct lua_State *L, int index)
@@ -273,6 +290,16 @@ ldecimal_new(struct lua_State *L)
 }
 
 static int
+ldecimal_isdecimal(struct lua_State *L)
+{
+	if (lua_gettop(L) < 1)
+		luaL_error(L, "usage: decimal.is_decimal(value)");
+	bool is_decimal = lua_isdecimal(L, 1);
+	lua_pushboolean(L, is_decimal);
+	return 1;
+}
+
+static int
 ldecimal_round(struct lua_State *L)
 {
 	if (lua_gettop(L) < 2)
@@ -378,6 +405,7 @@ static const luaL_Reg ldecimal_lib[] = {
 	{"precision", ldecimal_precision},
 	{"abs", ldecimal_abs},
 	{"new", ldecimal_new},
+	{"is_decimal", ldecimal_isdecimal},
 	{NULL, NULL}
 };
 

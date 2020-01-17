@@ -177,3 +177,12 @@ a % 100
 a % 173
 a % 72
 720 % a
+
+-- gh-4623 is_decimal function
+decimal_value = decimal.new(1)
+decimal.is_decimal(decimal_value)
+decimal.is_decimal('string')
+decimal.is_decimal(0)
+decimal.is_decimal(-1ULL)
+decimal.is_decimal(box.error.new(box.error.UNKNOWN))
+decimal.is_decimal(ffi.cast('char*', '42.42'))

@@ -625,3 +625,32 @@ a % 72
  | ---
  | - 29.96
  | ...
+
+-- gh-4623 is_decimal function
+decimal_value = decimal.new(1)
+ | ---
+ | ...
+decimal.is_decimal(decimal_value)
+ | ---
+ | - true
+ | ...
+decimal.is_decimal('string')
+ | ---
+ | - false
+ | ...
+decimal.is_decimal(0)
+ | ---
+ | - false
+ | ...
+decimal.is_decimal(-1ULL)
+ | ---
+ | - false
+ | ...
+decimal.is_decimal(box.error.new(box.error.UNKNOWN))
+ | ---
+ | - false
+ | ...
+decimal.is_decimal(ffi.cast('char*', '42.42'))
+ | ---
+ | - false
+ | ...
