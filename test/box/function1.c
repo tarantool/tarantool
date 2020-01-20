@@ -245,3 +245,10 @@ test_sleep(box_function_ctx_t *ctx, const char *args, const char *args_end)
 		fiber_sleep(0);
 	return 0;
 }
+
+int
+test_push(box_function_ctx_t *ctx, const char *args, const char *args_end)
+{
+	(void)ctx;
+	return box_session_push(args, args_end);
+}

@@ -1455,6 +1455,20 @@ box_sequence_reset(uint32_t seq_id)
 	return sequence_data_delete(seq_id);
 }
 
+int
+box_session_push(const char *data, const char *data_end)
+{
+	struct session *session = current_session();
+	if (session == NULL)
+		return -1;
+	struct port_msgpack port;
+	struct port *base = (struct port *)&port;
+	port_msgpack_create(base, data, data_end - data);
+	int rc = session_push(session, session_sync(session), base);
+	port_msgpack_destroy(base);
+	return rc;
+}
+
 static inline void
 box_register_replica(uint32_t id, const struct tt_uuid *uuid)
 {

@@ -563,3 +563,124 @@ box.schema.func.drop('do_long_and_push')
 box.session.on_disconnect(nil, on_disconnect)
 ---
 ...
+--
+-- gh-4734: C API for session push.
+--
+build_path = os.getenv("BUILDDIR")
+---
+...
+old_cpath = package.cpath
+---
+...
+package.cpath = build_path..'/test/box/?.so;'..build_path..'/test/box/?.dylib;'..old_cpath
+---
+...
+box.schema.func.create('function1.test_push', {language = 'C'})
+---
+...
+box.schema.user.grant('guest', 'super')
+---
+...
+c = netbox.connect(box.cfg.listen)
+---
+...
+messages = {}
+---
+...
+c:call('function1.test_push',   \
+       {1, 2, 3},               \
+       {on_push = table.insert, \
+        on_push_ctx = messages})
+---
+- []
+...
+messages
+---
+- - [1, 2, 3]
+...
+c:close()
+---
+...
+--
+-- C can push to the console.
+--
+-- A string having 0 byte inside. Check that it is handled fine.
+s = '\x41\x00\x43'
+---
+...
+console = require('console')
+---
+...
+fio = require('fio')
+---
+...
+socket = require('socket')
+---
+...
+sock_path = fio.pathjoin(fio.cwd(), 'console.sock')
+---
+...
+_ = fio.unlink(sock_path)
+---
+...
+server = console.listen(sock_path)
+---
+...
+client = socket.tcp_connect('unix/', sock_path)
+---
+...
+_ = client:read({chunk = 128})
+---
+...
+_ = client:write("box.func['function1.test_push']:call({1, 2, 3, s})\n")
+---
+...
+client:read("\n...\n")
+---
+- '%TAG !push! tag:tarantool.io/push,2018
+
+  --- [1, 2, 3, "A\0C"]
+
+  ...
+
+  '
+...
+_ = client:read("\n...\n")
+---
+...
+-- Lua output format is supported too.
+_ = client:write("\\set output lua\n")
+---
+...
+_ = client:read(";")
+---
+...
+_ = client:write("box.func['function1.test_push']:call({1, 2, 3, s})\n")
+---
+...
+client:read(";")
+---
+- '-- Push
+
+  {1, 2, 3, "A\0C"};'
+...
+_ = client:read(";")
+---
+...
+client:close()
+---
+- true
+...
+server:close()
+---
+- true
+...
+box.schema.user.revoke('guest', 'super')
+---
+...
+box.schema.func.drop('function1.test_push')
+---
+...
+package.cpath = old_cpath
+---
+...

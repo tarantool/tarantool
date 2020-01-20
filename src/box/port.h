@@ -86,6 +86,11 @@ struct port_msgpack {
 	const struct port_vtab *vtab;
 	const char *data;
 	uint32_t data_sz;
+	/**
+	 * Buffer for dump_plain() function. It is created during
+	 * dump on demand and is deleted together with the port.
+	 */
+	char *plain;
 };
 
 static_assert(sizeof(struct port_msgpack) <= sizeof(struct port),
@@ -94,6 +99,16 @@ static_assert(sizeof(struct port_msgpack) <= sizeof(struct port),
 /** Initialize a port to dump raw data. */
 void
 port_msgpack_create(struct port *port, const char *data, uint32_t data_sz);
+
+/** Destroy a MessagePack port. */
+void
+port_msgpack_destroy(struct port *base);
+
+/**
+ * Set plain text version of data in the given port. It is copied.
+ */
+int
+port_msgpack_set_plain(struct port *base, const char *plain, uint32_t len);
 
 /** Port for storing the result of a Lua CALL/EVAL. */
 struct port_lua {

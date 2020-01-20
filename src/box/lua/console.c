@@ -37,6 +37,7 @@
 #include "lua/fiber.h"
 #include "fiber.h"
 #include "coio.h"
+#include "lua/msgpack.h"
 #include "lua-yaml/lyaml.h"
 #include <lua.h>
 #include <lauxlib.h>
@@ -390,19 +391,17 @@ console_set_output_format(enum output_format output_format)
 }
 
 /**
- * Dump port lua data with respect to output format:
+ * Dump Lua data to text with respect to output format:
  * YAML document tagged with !push! global tag or Lua string.
- * @param port Port lua.
+ * @param L Lua state.
  * @param[out] size Size of the result.
  *
- * @retval not NULL Tagged YAML document.
+ * @retval not NULL Tagged YAML document or Lua text.
  * @retval NULL Error.
  */
-const char *
-port_lua_dump_plain(struct port *port, uint32_t *size)
+static const char *
+console_dump_plain(struct lua_State *L, uint32_t *size)
 {
-	struct port_lua *port_lua = (struct port_lua *) port;
-	struct lua_State *L = port_lua->L;
 	enum output_format fmt = console_get_output_format();
 	if (fmt == OUTPUT_FORMAT_YAML) {
 		int rc = lua_yaml_encode(L, luaL_yaml_default, "!push!",
@@ -433,6 +432,78 @@ port_lua_dump_plain(struct port *port, uint32_t *size)
 	const char *result = lua_tolstring(L, -1, &len);
 	*size = (uint32_t) len;
 	return result;
+}
+
+/** Plain text converter for port Lua data. */
+const char *
+port_lua_dump_plain(struct port *base, uint32_t *size)
+{
+	return console_dump_plain(((struct port_lua *)base)->L, size);
+}
+
+/**
+ * A helper for port_msgpack_dump_plain() to execute it safely
+ * regarding Lua errors.
+ */
+static int
+port_msgpack_dump_plain_via_lua(struct lua_State *L)
+{
+	void **ctx = (void **)lua_touserdata(L, 1);
+	struct port_msgpack *port = (struct port_msgpack *)ctx[0];
+	uint32_t *size = (uint32_t *)ctx[1];
+	const char *data = port->data;
+	/*
+	 * Need to pop, because YAML decoder will consume all what
+	 * can be found on the stack.
+	 */
+	lua_pop(L, 1);
+	/*
+	 * MessagePack -> Lua object -> YAML/Lua text. The middle
+	 * is not really needed here, but there is no
+	 * MessagePack -> YAML encoder yet. Neither
+	 * MessagePack -> Lua text.
+	 */
+	luamp_decode(L, luaL_msgpack_default, &data);
+	data = console_dump_plain(L, size);
+	if (data == NULL) {
+		assert(port->plain == NULL);
+	} else {
+		/*
+		 * Result is ignored, because in case of an error
+		 * port->plain will stay NULL. And it will be
+		 * returned by port_msgpack_dump_plain() as is.
+		 */
+		port_msgpack_set_plain((struct port *)port, data, *size);
+	}
+	return 0;
+ }
+
+/** Plain text converter for raw MessagePack. */
+const char *
+port_msgpack_dump_plain(struct port *base, uint32_t *size)
+{
+	struct lua_State *L = tarantool_L;
+	void *ctx[2] = {(void *)base, (void *)size};
+	/*
+	 * lua_cpcall() protects from errors thrown from Lua which
+	 * may break a caller, not knowing about Lua and not
+	 * expecting any exceptions.
+	 */
+	if (lua_cpcall(L, port_msgpack_dump_plain_via_lua, ctx) != 0) {
+		/*
+		 * Error string is pushed in case it was a Lua
+		 * error.
+		 */
+		assert(lua_isstring(L, -1));
+		diag_set(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
+		lua_pop(L, 1);
+		return NULL;
+	}
+	/*
+	 * If there was an error, port->plain stayed NULL with
+	 * installed diag.
+	 */
+	return ((struct port_msgpack *)base)->plain;
 }
 
 /**

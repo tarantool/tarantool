@@ -223,6 +223,7 @@ box_sequence_next
 box_sequence_current
 box_sequence_set
 box_sequence_reset
+box_session_push
 box_index_iterator
 box_iterator_next
 box_iterator_free

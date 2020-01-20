@@ -457,6 +457,20 @@ box_sequence_set(uint32_t seq_id, int64_t value);
 API_EXPORT int
 box_sequence_reset(uint32_t seq_id);
 
+/**
+ * Push MessagePack data into a session data channel - socket,
+ * console or whatever is behind the session. Note, that
+ * successful push does not guarantee delivery in case it was sent
+ * into the network. Just like with write()/send() system calls.
+ *
+ * \param data begin of MessagePack to push
+ * \param data_end end of MessagePack to push
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ */
+API_EXPORT int
+box_session_push(const char *data, const char *data_end);
+
 /** \endcond public */
 
 /**

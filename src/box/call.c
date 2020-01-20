@@ -64,17 +64,55 @@ port_msgpack_get_msgpack(struct port *base, uint32_t *size)
 	return port->data;
 }
 
+static int
+port_msgpack_dump_msgpack(struct port *base, struct obuf *out)
+{
+	struct port_msgpack *port = (struct port_msgpack *)base;
+	assert(port->vtab == &port_msgpack_vtab);
+	size_t size = port->data_sz;
+	if (obuf_dup(out, port->data, size) == size)
+		return 0;
+	diag_set(OutOfMemory, size, "obuf_dup", "port->data");
+	return -1;
+}
+
 extern void
 port_msgpack_dump_lua(struct port *base, struct lua_State *L, bool is_flat);
 
+extern const char *
+port_msgpack_dump_plain(struct port *base, uint32_t *size);
+
+void
+port_msgpack_destroy(struct port *base)
+{
+	struct port_msgpack *port = (struct port_msgpack *)base;
+	assert(port->vtab == &port_msgpack_vtab);
+	free(port->plain);
+}
+
+int
+port_msgpack_set_plain(struct port *base, const char *plain, uint32_t len)
+{
+	struct port_msgpack *port = (struct port_msgpack *)base;
+	assert(port->plain == NULL);
+	port->plain = (char *)malloc(len + 1);
+	if (port->plain == NULL) {
+		diag_set(OutOfMemory, len + 1, "malloc", "port->plain");
+		return -1;
+	}
+	memcpy(port->plain, plain, len);
+	port->plain[len] = 0;
+	return 0;
+}
+
 static const struct port_vtab port_msgpack_vtab = {
-	.dump_msgpack = NULL,
+	.dump_msgpack = port_msgpack_dump_msgpack,
 	.dump_msgpack_16 = NULL,
 	.dump_lua = port_msgpack_dump_lua,
-	.dump_plain = NULL,
+	.dump_plain = port_msgpack_dump_plain,
 	.get_msgpack = port_msgpack_get_msgpack,
 	.get_vdbemem = NULL,
-	.destroy = NULL,
+	.destroy = port_msgpack_destroy,
 };
 
 int
