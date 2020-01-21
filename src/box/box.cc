@@ -1455,7 +1455,7 @@ box_sequence_reset(uint32_t seq_id)
 	return sequence_data_delete(seq_id);
 }
 
-int
+API_EXPORT int
 box_session_push(const char *data, const char *data_end)
 {
 	struct session *session = current_session();

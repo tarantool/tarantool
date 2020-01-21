@@ -144,32 +144,28 @@ release_asan_clang8:
   script:
     - ${GITLAB_MAKE} test_asan_debian_no_deps
 
-osx_13_release:
-  <<: *release_only_definition
-  <<: *vbox_definition
-  tags:
-    - vms_osx_13
-  variables:
-    VMS_NAME: 'osx_13'
-    VMS_USER: 'tarantool'
-    VMS_PORT: '2212'
-  script:
-    - ${GITLAB_MAKE} vms_test_osx
-
 osx_14_release:
-  <<: *docker_test_definition
+  <<: *release_only_definition
+  stage: test
   tags:
     - osx_14
   script:
     - ${GITLAB_MAKE} test_osx
 
-osx_14_release_lto:
-  <<: *release_only_definition
-  <<: *docker_test_definition
+osx_15_release:
+  stage: test
   tags:
-    - osx_14
+    - osx_15
+  script:
+    - ${GITLAB_MAKE} test_osx
+
+osx_15_release_lto:
+  <<: *release_only_definition
+  stage: test
+  tags:
+    - osx_15
   variables:
-    EXTRA_ENV: "export CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON ;"
+    EXTRA_ENV: 'export CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON ;'
   script:
     - ${GITLAB_MAKE} test_osx
 
