@@ -1075,7 +1075,7 @@ box_return_tuple(box_function_ctx_t *ctx, box_tuple_t *tuple)
 	return port_c_add_tuple(ctx->port, tuple);
 }
 
-int
+API_EXPORT int
 box_return_mp(box_function_ctx_t *ctx, const char *mp, const char *mp_end)
 {
 	return port_c_add_mp(ctx->port, mp, mp_end);
@@ -1461,7 +1461,7 @@ box_sequence_reset(uint32_t seq_id)
 	return sequence_data_delete(seq_id);
 }
 
-int
+API_EXPORT int
 box_session_push(const char *data, const char *data_end)
 {
 	struct session *session = current_session();
