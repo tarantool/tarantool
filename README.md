@@ -1,64 +1,130 @@
-# Tarantool
+<p align="left">
+  <a href="https://tarantool.io/en/">
+    <img
+      alt="Tarantool"
+      src="https://i.imgur.com/BUYqImx.png"
+      width="400"
+    />
+  </a>
+</p>
 
-[![Build Status][travis-badge]][travis-url]
 [![Build Status][gitlab-ci-badge]][gitlab-ci-url]
 [![Code Coverage][coverage-badge]][coverage-url]
 [![Telegram][telegram-badge]][telegram-url]
-[![Slack][slack-badge]][slack-url]
-[![Gitter][gitter-badge]][gitter-url]
 [![Google Groups][groups-badge]][groups-url]
+[![Stackoverflow][stackoverflow-badge]][stackoverflow-url]
 
-https://tarantool.io/en/
+**A feature-rich in-memory database.** Our features set:
 
-Patch submissions and discussion of particular patches https://lists.tarantool.org/mailman/listinfo/tarantool-patches/
+* ACID
+* primary and secondary indexes
+* in-memory and disk engine
+* stored procedures
+* SQL
+* replication
+* sharding (as an external module)
+* and a wealth of modules and connectors from popular languages
 
-General development discussions https://lists.tarantool.org/mailman/listinfo/tarantool-discussions/
+Another Tarantool feature is the ability to write code in Lua, a general purpose
+programming language, right inside the database. You can write custom expiration
+strategies and any business logic, and synchronize data with other data sources.
 
-Tarantool is an in-memory database and application server.
+You can use Tarantool to replace Redis when
+you need secondary indexes, a different structure of storage data, SQL, etc.
 
-Key features of the application server:
- * 100% compatible drop-in replacement for Lua 5.1,
-   based on LuaJIT 2.1.
-   Simply use `#!/usr/bin/tarantool` instead of
-   `#!/usr/bin/lua` in your script.
- * full support for Lua modules and a rich set of
-   own modules, including cooperative multitasking,
-   non-blocking I/O, access to external databases, etc
+For more details, please see the
+[Tarantool documentation](https://www.tarantool.io/en/doc/2.2/).
 
-Key features of the database:
- * ANSI SQL, including views, joins, referential
-   and check constraints
- * MsgPack data format and MsgPack based
-   client-server protocol
- * two data engines: 100% in-memory with
-   optional persistence and an own implementation of LSM-tree, 
-   to use with large data sets
- * multiple index types: HASH, TREE, RTREE, BITSET
- * asynchronous master-master replication
- * authentication and access control
- * the database is just a C extension to the
-   application server and can be turned off
+## Getting started
 
-Supported platforms are Linux/x86 and FreeBSD/x86, Mac OS X.
+### Get hold of Tarantool
 
-Tarantool is ideal for data-enriched components of
-scalable Web architecture: queue servers, caches,
-stateful Web applications.
+* Try online:
 
-To download and install Tarantool as a binary package for your OS, please visit
-https://tarantool.io/en/download/.
+  Visit our playground at https://www.tarantool.io/en/try-dev/
 
-To build Tarantool from source, see detailed instructions in the Tarantool
-documentation at https://tarantool.io/en/doc/2.1/dev_guide/building_from_source/.
+* Use a Docker image:
 
-Please report bugs at https://github.com/tarantool/tarantool/issues
-We also warmly welcome your feedback in the discussion mailing
-list, tarantool@googlegroups.com.
+  ```bash
+  docker run -d -p 3301:3301 -v $(pwd):/var/lib/tarantool tarantool/tarantool:2
+  ```
 
-Thank you for your interest in Tarantool!
+* Install locally:
 
-[travis-badge]: https://api.travis-ci.org/tarantool/tarantool.svg?branch=master
-[travis-url]: https://travis-ci.org/tarantool/tarantool
+  * On Ubuntu/Fedora/Debian/Centos:
+
+    ```bash
+    curl -L http://tarantool.io/installer.sh | VER=2.2 sudo bash
+    ```
+
+  * On Mac OS using [Homebrew](https://brew.sh):
+
+    ```bash
+    brew install tarantool
+    ```
+
+  For more details, please visit https://tarantool.io/download.
+
+* Build from source:
+
+  Please see
+  [detailed instructions](https://tarantool.io/doc/2.2/dev_guide/building_from_source/)
+  in the Tarantool documentation.
+
+### Connectors
+
+We have connectors for many popular languages:
+
+* [Python](https://github.com/igorcoding/asynctnt)
+* [PHP](https://github.com/tarantool-php/client)
+* [Java](http://github.com/tarantool/tarantool-java/)
+* [Go](https://github.com/tarantool/go-tarantool)
+
+[Check out connector details for other languages](https://www.tarantool.io/doc/2.2/book/connectors/)
+and connect to your current instance of Tarantool.
+
+## Use cases
+
+* Transactional cache
+* Persistent queues
+* ETL
+* Base for IoT platform
+
+## Ready-made examples
+
+We have a frawework for creating of distributed apps called [Tarantool Cartridge](https://github.com/tarantool/cartridge).
+See the [tarantool/examples](https://github.com/tarantool/examples) repository
+with source code of typical projects based on this framework.
+
+## Who uses Tarantool
+
+* Nokia uses Tarantool as part of their IoT platform
+  (in-memory database + Lua scripting)
+* Russian Enterprise: banks, telecoms, retails
+* Mail.Ru, a major Russian Internet company, uses Tarantool for its email
+  service, ad systems, social services, media projects
+* Mastercard
+* Avito, Russian largest classified advertisements website
+* and many other companies
+
+## Community
+
+Join our Telegram [news channel](https://t.me/tarantool_news) and chats:
+
+* in [Russian](https://teleg.run/tarantoolru)
+* in [English](https://teleg.run/tarantool)
+
+## Hacking
+
+Report bugs at [here](https://github.com/tarantool/tarantool/issues).
+
+Submit your patches as instructed
+[here](https://www.tarantool.io/en/doc/2.2/dev_guide/developer_guidelines/#how-to-submit-a-patch-for-review).
+
+Ask your questions in tarantool@googlegroups.com.
+
+Discuss development issues (architecture, features, and other implementation details) at [mailing lists](https://lists.tarantool.org/mailman/listinfo/tarantool-discussions/).
+
 [gitlab-ci-badge]: https://gitlab.com/tarantool/tarantool/badges/master/pipeline.svg
 [gitlab-ci-url]: https://gitlab.com/tarantool/tarantool/commits/master
 [coverage-badge]: https://coveralls.io/repos/github/tarantool/tarantool/badge.svg?branch=master
@@ -66,8 +132,6 @@ Thank you for your interest in Tarantool!
 [groups-badge]: https://img.shields.io/badge/Google-Groups-orange.svg
 [groups-url]: https://groups.google.com/forum/#!forum/tarantool
 [telegram-badge]: https://img.shields.io/badge/Telegram-join%20chat-blue.svg
-[telegram-url]: http://telegram.me/tarantool
-[slack-badge]: https://img.shields.io/badge/Slack-join%20chat-lightgrey.svg
-[slack-url]: http://slack.tarantool.org/
-[gitter-badge]: https://badges.gitter.im/Join%20Chat.svg
-[gitter-url]: https://gitter.im/tarantool/tarantool
+[telegram-url]: https://teleg.run/tarantool
+[stackoverflow-badge]: https://img.shields.io/badge/stackoverflow-tarantool-orange.svg
+[stackoverflow-url]: https://stackoverflow.com/questions/tagged/tarantool
