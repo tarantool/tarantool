@@ -231,7 +231,25 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		int eph_cursor = parse->nTab++;
 		int addr_eph_open = sqlVdbeCurrentAddr(v);
 		if (is_view) {
-			pk_len = space->def->field_count;
+			/*
+			 * At this stage SELECT is already materialized
+			 * into ephemeral table, which has one additional
+			 * tail field (except for ones specified in view
+			 * format) which contains sequential ids. These ids
+			 * are required since selected values may turn out to
+			 * be non-unique. For instance:
+			 * CREATE TABLE t (id INT PRIMARY KEY, a INT);
+			 * INSERT INTO t VALUES (1, 1), (2, 1), (3, 1);
+			 * CREATE VIEW v AS SELECT a FROM t;
+			 * Meanwhile ephemeral tables feature PK covering ALL
+			 * fields of format, so without id materialization
+			 * processing is impossible. Then, results of
+			 * materialization are transferred to the table being
+			 * created below. So to fit tuples in it we must
+			 * account that id field as well. That's why pk_len
+			 * has one field more than view format.
+			 */
+			pk_len = space->def->field_count + 1;
 			parse->nMem += pk_len;
 			sqlVdbeAddOp2(v, OP_OpenTEphemeral, reg_eph,
 					  pk_len);

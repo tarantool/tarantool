@@ -120,3 +120,21 @@ box.space.T2:drop()
 -- Cleanup
 box.execute("DROP VIEW v1;");
 box.execute("DROP TABLE t1;");
+
+--
+-- gh-4740: make sure INSTEAD OF DELETE and INSTEAD OF UPDATE
+-- triggers work for each row of view.
+--
+box.cfg{}
+box.execute('CREATE TABLE t (i INT PRIMARY KEY AUTOINCREMENT, a INT);')
+box.execute('CREATE TABLE t1 (i INT PRIMARY KEY AUTOINCREMENT, a INT);')
+box.execute('CREATE VIEW v AS SELECT a FROM t;')
+box.execute('CREATE TRIGGER r1 INSTEAD OF DELETE ON v FOR EACH ROW BEGIN INSERT INTO t1 VALUES (NULL, 1); END;')
+box.execute('CREATE TRIGGER r2 INSTEAD OF UPDATE ON v FOR EACH ROW BEGIN INSERT INTO t1 VALUES (NULL, 2); END;')
+box.execute('INSERT INTO t VALUES (NULL, 1), (NULL, 1), (NULL, 1), (NULL, 2), (NULL, 3), (NULL, 3);')
+box.execute('DELETE FROM v;')
+box.execute('UPDATE v SET a = 10;')
+box.execute('SELECT * FROM t1;')
+box.execute('DROP VIEW v;')
+box.execute('DROP TABLE t;')
+box.execute('DROP TABLE t1;')
