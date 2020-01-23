@@ -330,13 +330,44 @@ sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 			return NULL;
 	}
 
-	struct key_part_def *ephemer_key_parts = region_alloc(&fiber()->gc,
-				sizeof(*ephemer_key_parts) * field_count);
-	if (ephemer_key_parts == NULL) {
-		diag_set(OutOfMemory, sizeof(*ephemer_key_parts) * field_count,
-			 "region", "key parts");
+	struct region *region = &fiber()->gc;
+	/*
+	 * Name of the fields will be "_COLUMN_1", "_COLUMN_2"
+	 * and so on. Due to this, length of each name is no more
+	 * than strlen("_COLUMN_") plus length of UINT32_MAX
+	 * turned to string, which is 10 and plus 1 for \0.
+	 */
+	uint32_t name_len = strlen("_COLUMN_") + 11;
+	uint32_t size = field_count * (sizeof(struct field_def) + name_len +
+				       sizeof(struct key_part_def));
+	struct field_def *fields = region_alloc(region, size);
+	if (fields == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "fields");
 		return NULL;
 	}
+	struct key_part_def *ephemer_key_parts =
+		(void *)fields + field_count * sizeof(struct field_def);
+	char *names = (char *)ephemer_key_parts +
+		      field_count * sizeof(struct key_part_def);
+	for (uint32_t i = 0; i < field_count; ++i) {
+		struct field_def *field = &fields[i];
+		field->name = names;
+		names += name_len;
+		sprintf(field->name, "_COLUMN_%d", i);
+		field->is_nullable = true;
+		field->nullable_action = ON_CONFLICT_ACTION_NONE;
+		field->default_value = NULL;
+		field->default_value_expr = NULL;
+		if (def != NULL && i < def->part_count) {
+			assert(def->parts[i].type < field_type_MAX);
+			field->type = def->parts[i].type;
+			field->coll_id = def->parts[i].coll_id;
+		} else {
+			field->coll_id = COLL_NONE;
+			field->type = FIELD_TYPE_SCALAR;
+		}
+	}
+
 	for (uint32_t i = 0; i < field_count; ++i) {
 		struct key_part_def *part = &ephemer_key_parts[i];
 		part->fieldno = i;
@@ -344,14 +375,8 @@ sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 		part->is_nullable = true;
 		part->sort_order = SORT_ORDER_ASC;
 		part->path = NULL;
-		if (def != NULL && i < def->part_count) {
-			assert(def->parts[i].type < field_type_MAX);
-			part->type = def->parts[i].type;
-			part->coll_id = def->parts[i].coll_id;
-		} else {
-			part->coll_id = COLL_NONE;
-			part->type = FIELD_TYPE_SCALAR;
-		}
+		part->type = fields[i].type;
+		part->coll_id = fields[i].coll_id;
 	}
 	struct key_def *ephemer_key_def = key_def_new(ephemer_key_parts,
 						      field_count, false);
@@ -370,7 +395,7 @@ sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 	rlist_add_entry(&key_list, ephemer_index_def, link);
 
 	struct space_def *ephemer_space_def =
-		space_def_new_ephemeral(field_count, NULL);
+		space_def_new_ephemeral(field_count, fields);
 	if (ephemer_space_def == NULL) {
 		index_def_delete(ephemer_index_def);
 		return NULL;
