@@ -30,29 +30,44 @@
  * SUCH DAMAGE.
  */
 
+#include "field_def.h"
+
 /**
- * Session has settings. Settings belong to different subsystems,
- * such as SQL. Each subsystem registers here its session setting
- * type and a set of settings with getter and setter functions.
- * The self-registration of modules allows session setting code
- * not to depend on all the subsystems.
+ * Identifiers of all session settings. The identifier of the
+ * option is equal to its place in the sorted list of session
+ * options.
  *
- * The types should be ordered in alphabetical order, because the
- * type list is used by setting iterators.
+ * It is IMPORTANT that these options are sorted by name. If this
+ * is not the case, the result returned by the _session_settings
+ * space iterator will not be sorted properly.
  */
-enum session_setting_type {
-	SESSION_SETTING_SQL,
-	session_setting_type_MAX,
+enum {
+	SESSION_SETTING_SQL_BEGIN,
+	SESSION_SETTING_SQL_DEFAULT_ENGINE = SESSION_SETTING_SQL_BEGIN,
+	SESSION_SETTING_SQL_DEFER_FOREIGN_KEYS,
+	SESSION_SETTING_SQL_FULL_COLUMN_NAMES,
+	SESSION_SETTING_SQL_FULL_METADATA,
+	SESSION_SETTING_SQL_PARSER_DEBUG,
+	SESSION_SETTING_SQL_RECURSIVE_TRIGGERS,
+	SESSION_SETTING_SQL_REVERSE_UNORDERED_SELECTS,
+	SESSION_SETTING_SQL_SELECT_DEBUG,
+	SESSION_SETTING_SQL_VDBE_DEBUG,
+	SESSION_SETTING_SQL_END,
+	/**
+	 * Follow the pattern for groups of settings:
+	 * SESSION_SETTING_<N>_BEGIN = SESSION_SETTING_<N-1>_END,
+	 * ...
+	 * SESSION_SETTING_<N>_END,
+	 */
+	SESSION_SETTING_COUNT = SESSION_SETTING_SQL_END,
 };
 
-struct session_setting_module {
+struct session_setting {
 	/**
-	 * An array of setting names. All of them should have the
-	 * same prefix.
+	 * Setting's value type. Used for error checking and
+	 * reporting only.
 	 */
-	const char **settings;
-	/** Count of settings. */
-	int setting_count;
+	enum field_type field_type;
 	/**
 	 * Get a MessagePack encoded pair [name, value] for a
 	 * setting having index @a id. Index is from the settings
@@ -67,4 +82,5 @@ struct session_setting_module {
 	int (*set)(int id, const char *mp_value);
 };
 
-extern struct session_setting_module session_setting_modules[];
+extern struct session_setting session_settings[SESSION_SETTING_COUNT];
+extern const char *session_setting_strs[SESSION_SETTING_COUNT];

@@ -3323,40 +3323,6 @@ sql_fieldno_by_name(struct Parse *parse_context, struct Expr *field_name,
 }
 
 /**
- * Identifiers of all SQL session setings. The identifier of the
- * option is equal to its place in the sorted list of session
- * options of current module.
- *
- * It is IMPORTANT that these options are sorted by name. If this
- * is not the case, the result returned by the _session_settings
- * space iterator will not be sorted properly.
- */
-enum {
-	SQL_SESSION_SETTING_DEFAULT_ENGINE = 0,
-	SQL_SESSION_SETTING_DEFER_FOREIGN_KEYS,
-	SQL_SESSION_SETTING_FULL_COLUMN_NAMES,
-	SQL_SESSION_SETTING_FULL_METADATA,
-	SQL_SESSION_SETTING_PARSER_DEBUG,
-	SQL_SESSION_SETTING_RECURSIVE_TRIGGERS,
-	SQL_SESSION_SETTING_REVERSE_UNORDERED_SELECTS,
-	SQL_SESSION_SETTING_SELECT_DEBUG,
-	SQL_SESSION_SETTING_VDBE_DEBUG,
-	sql_session_setting_MAX,
-};
-
-static const char *sql_session_setting_strs[sql_session_setting_MAX] = {
-	"sql_default_engine",
-	"sql_defer_foreign_keys",
-	"sql_full_column_names",
-	"sql_full_metadata",
-	"sql_parser_debug",
-	"sql_recursive_triggers",
-	"sql_reverse_unordered_selects",
-	"sql_select_debug",
-	"sql_vdbe_debug",
-};
-
-/**
  * A local structure that allows to establish a connection between
  * parameter and its field type and mask, if it has one.
  */
@@ -3373,24 +3339,24 @@ struct sql_option_metadata
  * It is IMPORTANT that these options sorted by name.
  */
 static struct sql_option_metadata sql_session_opts[] = {
-	/** SQL_SESSION_SETTING_DEFAULT_ENGINE */
+	/** SESSION_SETTING_SQL_DEFAULT_ENGINE */
 	{FIELD_TYPE_STRING, 0},
-	/** SQL_SESSION_SETTING_DEFER_FOREIGN_KEYS */
+	/** SESSION_SETTING_SQL_DEFER_FOREIGN_KEYS */
 	{FIELD_TYPE_BOOLEAN, SQL_DeferFKs},
-	/** SQL_SESSION_SETTING_FULL_COLUMN_NAMES */
+	/** SESSION_SETTING_SQL_FULL_COLUMN_NAMES */
 	{FIELD_TYPE_BOOLEAN, SQL_FullColNames},
-	/** SQL_SESSION_SETTING_FULL_METADATA */
+	/** SESSION_SETTING_SQL_FULL_METADATA */
 	{FIELD_TYPE_BOOLEAN, SQL_FullMetadata},
-	/** SQL_SESSION_SETTING_PARSER_DEBUG */
+	/** SESSION_SETTING_SQL_PARSER_DEBUG */
 	{FIELD_TYPE_BOOLEAN, SQL_SqlTrace | PARSER_TRACE_FLAG},
-	/** SQL_SESSION_SETTING_RECURSIVE_TRIGGERS */
+	/** SESSION_SETTING_SQL_RECURSIVE_TRIGGERS */
 	{FIELD_TYPE_BOOLEAN, SQL_RecTriggers},
-	/** SQL_SESSION_SETTING_REVERSE_UNORDERED_SELECTS */
+	/** SESSION_SETTING_SQL_REVERSE_UNORDERED_SELECTS */
 	{FIELD_TYPE_BOOLEAN, SQL_ReverseOrder},
-	/** SQL_SESSION_SETTING_SELECT_DEBUG */
+	/** SESSION_SETTING_SQL_SELECT_DEBUG */
 	{FIELD_TYPE_BOOLEAN,
 	 SQL_SqlTrace | SQL_SelectTrace | SQL_WhereTrace},
-	/** SQL_SESSION_SETTING_VDBE_DEBUG */
+	/** SESSION_SETTING_SQL_VDBE_DEBUG */
 	{FIELD_TYPE_BOOLEAN,
 	 SQL_SqlTrace | SQL_VdbeListing | SQL_VdbeTrace},
 };
@@ -3398,12 +3364,12 @@ static struct sql_option_metadata sql_session_opts[] = {
 static void
 sql_session_setting_get(int id, const char **mp_pair, const char **mp_pair_end)
 {
-	assert(id >= 0 && id < sql_session_setting_MAX);
+	assert(id >= SESSION_SETTING_SQL_BEGIN && id < SESSION_SETTING_SQL_END);
 	struct session *session = current_session();
 	uint32_t flags = session->sql_flags;
 	struct sql_option_metadata *opt = &sql_session_opts[id];
 	uint32_t mask = opt->mask;
-	const char *name = sql_session_setting_strs[id];
+	const char *name = session_setting_strs[id];
 	size_t name_len = strlen(name);
 	size_t engine_len;
 	const char *engine;
@@ -3416,7 +3382,7 @@ sql_session_setting_get(int id, const char **mp_pair, const char **mp_pair_end)
 	if (is_bool) {
 		size += mp_sizeof_bool(true);
 	} else {
-		assert(id == SQL_SESSION_SETTING_DEFAULT_ENGINE);
+		assert(id == SESSION_SETTING_SQL_DEFAULT_ENGINE);
 		engine = sql_storage_engine_strs[session->sql_default_engine];
 		engine_len = strlen(engine);
 		size += mp_sizeof_str(engine_len);
@@ -3452,7 +3418,7 @@ sql_set_boolean_option(int id, bool value)
 		session->sql_flags |= option->mask;
 	else
 		session->sql_flags &= ~option->mask;
-	if (id == SQL_SESSION_SETTING_PARSER_DEBUG) {
+	if (id == SESSION_SETTING_SQL_PARSER_DEBUG) {
 		if (value)
 			sqlParserTrace(stdout, "parser: ");
 		else
@@ -3466,7 +3432,7 @@ static int
 sql_set_string_option(int id, const char *value)
 {
 	assert(sql_session_opts[id].field_type = FIELD_TYPE_STRING);
-	assert(id == SQL_SESSION_SETTING_DEFAULT_ENGINE);
+	assert(id == SESSION_SETTING_SQL_DEFAULT_ENGINE);
 	(void)id;
 	enum sql_storage_engine engine = STR2ENUM(sql_storage_engine, value);
 	if (engine == sql_storage_engine_MAX) {
@@ -3480,7 +3446,7 @@ sql_set_string_option(int id, const char *value)
 static int
 sql_session_setting_set(int id, const char *mp_value)
 {
-	assert(id >= 0 && id < sql_session_setting_MAX);
+	assert(id >= SESSION_SETTING_SQL_BEGIN && id < SESSION_SETTING_SQL_END);
 	enum mp_type mtype = mp_typeof(*mp_value);
 	enum field_type stype = sql_session_opts[id].field_type;
 	uint32_t len;
@@ -3500,17 +3466,18 @@ sql_session_setting_set(int id, const char *mp_value)
 		unreachable();
 	}
 	diag_set(ClientError, ER_SESSION_SETTING_INVALID_VALUE,
-		 sql_session_setting_strs[id], field_type_strs[stype]);
+		 session_setting_strs[id], field_type_strs[stype]);
 	return -1;
 }
 
 void
 sql_session_settings_init()
 {
-	struct session_setting_module *module =
-		&session_setting_modules[SESSION_SETTING_SQL];
-	module->settings = sql_session_setting_strs;
-	module->setting_count = sql_session_setting_MAX;
-	module->get = sql_session_setting_get;
-	module->set = sql_session_setting_set;
+	for (int id = SESSION_SETTING_SQL_BEGIN; id < SESSION_SETTING_SQL_END;
+	     ++id) {
+		struct session_setting *setting = &session_settings[id];
+		setting->field_type = sql_session_opts[id].field_type;
+		setting->get = sql_session_setting_get;
+		setting->set = sql_session_setting_set;
+	}
 }

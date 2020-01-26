@@ -38,8 +38,20 @@
 #include "xrow.h"
 #include "sql.h"
 
-struct session_setting_module
-	session_setting_modules[session_setting_type_MAX] = {};
+struct session_setting session_settings[SESSION_SETTING_COUNT] = {};
+
+/** Corresponding names of session settings. */
+const char *session_setting_strs[SESSION_SETTING_COUNT] = {
+	"sql_default_engine",
+	"sql_defer_foreign_keys",
+	"sql_full_column_names",
+	"sql_full_metadata",
+	"sql_parser_debug",
+	"sql_recursive_triggers",
+	"sql_reverse_unordered_selects",
+	"sql_select_debug",
+	"sql_vdbe_debug",
+};
 
 struct session_settings_index {
 	/** Base index. Must be the first member. */
@@ -61,12 +73,7 @@ struct session_settings_iterator {
 	 * a format for selected tuples.
 	 */
 	struct tuple_format *format;
-	/**
-	 * ID of the current session settings module in the global
-	 * list of the modules.
-	 */
-	int module_id;
-	/** ID of the setting in current module. */
+	/** ID of the setting. */
 	int setting_id;
 	/** Decoded key. */
 	char *key;
@@ -86,46 +93,40 @@ session_settings_iterator_free(struct iterator *ptr)
 }
 
 static int
-session_settings_next_in_module(const struct session_setting_module *module,
-				int *sid, const char *key, bool is_eq,
-				bool is_including)
+session_settings_next(int *sid, const char *key, bool is_eq, bool is_including)
 {
 	int i = *sid;
-	int count = module->setting_count;
-	if (i >= count)
+	if (i >= SESSION_SETTING_COUNT)
 		return -1;
 	if (key == NULL)
 		return 0;
 	assert(i >= 0);
-	const char **name = &module->settings[i];
-	for (; i < count; ++i, ++name) {
-		int cmp = strcmp(*name, key);
+	for (; i < SESSION_SETTING_COUNT; ++i) {
+		const char *name = session_setting_strs[i];
+		int cmp = strcmp(name, key);
 		if ((cmp == 0 && is_including) ||
 		    (cmp > 0 && !is_eq)) {
 			*sid = i;
 			return 0;
 		}
 	}
-	*sid = count;
+	*sid = SESSION_SETTING_COUNT;
 	return -1;
 }
 
 static int
-session_settings_prev_in_module(const struct session_setting_module *module,
-				int *sid, const char *key, bool is_eq,
-				bool is_including)
+session_settings_prev(int *sid, const char *key, bool is_eq, bool is_including)
 {
 	int i = *sid;
-	int count = module->setting_count;
 	if (i < 0)
 		return -1;
 	if (key == NULL)
 		return 0;
-	if (i >= count)
-		i = count - 1;
-	const char **name = &module->settings[i];
-	for (; i >= 0; --i, --name) {
-		int cmp = strcmp(*name, key);
+	if (i >= SESSION_SETTING_COUNT)
+		i = SESSION_SETTING_COUNT - 1;
+	for (; i >= 0; --i) {
+		const char *name = session_setting_strs[i];
+		int cmp = strcmp(name, key);
 		if ((cmp == 0 && is_including) ||
 		    (cmp < 0 && !is_eq)) {
 			*sid = i;
@@ -141,27 +142,19 @@ session_settings_iterator_next(struct iterator *iterator, struct tuple **result)
 {
 	struct session_settings_iterator *it =
 		(struct session_settings_iterator *)iterator;
-	int mid = it->module_id, sid = it->setting_id;
-	struct session_setting_module *module;
+	int sid = it->setting_id;
 	const char *key = it->key;
 	bool is_including = it->is_including, is_eq = it->is_eq;
 	bool is_found = false;
-	for (; mid < session_setting_type_MAX; ++mid, sid = 0) {
-		module = &session_setting_modules[mid];
-		if (session_settings_next_in_module(module, &sid, key, is_eq,
-						    is_including) == 0) {
-			is_found = true;
-			break;
-		}
-	}
-	it->module_id = mid;
+	if (session_settings_next(&sid, key, is_eq, is_including) == 0)
+		is_found = true;
 	it->setting_id = sid + 1;
 	if (!is_found) {
 		*result = NULL;
 		return 0;
 	}
 	const char *mp_pair, *mp_pair_end;
-	module->get(sid, &mp_pair, &mp_pair_end);
+	session_settings[sid].get(sid, &mp_pair, &mp_pair_end);
 	*result = box_tuple_new(it->format, mp_pair, mp_pair_end);
 	return *result != NULL ? 0 : -1;
 }
@@ -171,27 +164,19 @@ session_settings_iterator_prev(struct iterator *iterator, struct tuple **result)
 {
 	struct session_settings_iterator *it =
 		(struct session_settings_iterator *)iterator;
-	int mid = it->module_id, sid = it->setting_id;
-	struct session_setting_module *module;
+	int sid = it->setting_id;
 	const char *key = it->key;
 	bool is_including = it->is_including, is_eq = it->is_eq;
 	bool is_found = false;
-	for (; mid >= 0; --mid, sid = INT_MAX) {
-		module = &session_setting_modules[mid];
-		if (session_settings_prev_in_module(module, &sid, key, is_eq,
-						    is_including) == 0) {
-			is_found = true;
-			break;
-		}
-	}
-	it->module_id = mid;
+	if (session_settings_prev(&sid, key, is_eq, is_including) == 0)
+		is_found = true;
 	it->setting_id = sid - 1;
 	if (!is_found) {
 		*result = NULL;
 		return 0;
 	}
 	const char *mp_pair, *mp_pair_end;
-	module->get(sid, &mp_pair, &mp_pair_end);
+	session_settings[sid].get(sid, &mp_pair, &mp_pair_end);
 	*result = box_tuple_new(it->format, mp_pair, mp_pair_end);
 	return *result != NULL ? 0 : -1;
 }
@@ -239,14 +224,10 @@ session_settings_index_create_iterator(struct index *base,
 	it->format = index->format;
 	if (!iterator_type_is_reverse(type)) {
 		it->base.next = session_settings_iterator_next;
-		it->module_id = 0;
 		it->setting_id = 0;
 	} else {
 		it->base.next = session_settings_iterator_prev;
-		it->module_id = session_setting_type_MAX - 1;
-		struct session_setting_module *module =
-			&session_setting_modules[it->module_id];
-		it->setting_id = module->setting_count - 1;
+		it->setting_id = SESSION_SETTING_COUNT - 1;
 	}
 	return (struct iterator *)it;
 }
@@ -262,20 +243,14 @@ session_settings_index_get(struct index *base, const char *key,
 	uint32_t len;
 	key = mp_decode_str(&key, &len);
 	key = tt_cstr(key, len);
-	struct session_setting_module *module = &session_setting_modules[0];
-	struct session_setting_module *end = module + session_setting_type_MAX;
 	int sid = 0;
-	for (; module < end; ++module, sid = 0) {
-		if (session_settings_next_in_module(module, &sid, key, true,
-						    true) == 0)
-			goto found;
+	if (session_settings_next(&sid, key, true, true) != 0) {
+		*result = NULL;
+		return 0;
 	}
-	*result = NULL;
-	return 0;
-found:;
 	const char *mp_pair;
 	const char *mp_pair_end;
-	module->get(sid, &mp_pair, &mp_pair_end);
+	session_settings[sid].get(sid, &mp_pair, &mp_pair_end);
 	*result = box_tuple_new(index->format, mp_pair, mp_pair_end);
 	return *result != NULL ? 0 : -1;
 }
@@ -370,17 +345,11 @@ session_settings_space_execute_update(struct space *space, struct txn *txn,
 	}
 	key = mp_decode_str(&key, &key_len);
 	key = tt_cstr(key, key_len);
-	struct session_setting_module *module = &session_setting_modules[0];
-	struct session_setting_module *end = module + session_setting_type_MAX;
-	for (; module < end; ++module, sid = 0) {
-		if (session_settings_next_in_module(module, &sid, key, true,
-						    true) == 0)
-			goto found;
+	if (session_settings_next(&sid, key, true, true) != 0) {
+		*result = NULL;
+		return 0;
 	}
-	*result = NULL;
-	return 0;
-found:
-	module->get(sid, &old_data, &old_data_end);
+	session_settings[sid].get(sid, &old_data, &old_data_end);
 	new_data = xrow_update_execute(request->tuple, request->tuple_end,
 				       old_data, old_data_end, format,
 				       &new_size, request->index_base,
@@ -402,7 +371,7 @@ found:
 			goto finish;
 		}
 	}
-	if (module->set(sid, new_data) != 0)
+	if (session_settings[sid].set(sid, new_data) != 0)
 		goto finish;
 	rc = 0;
 finish:
