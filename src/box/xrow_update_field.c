@@ -32,6 +32,8 @@
 #include "tuple_format.h"
 #include "mp_extension_types.h"
 
+#include <float.h>
+
 /* {{{ Error helpers. */
 
 /** Take a string identifier of a field being updated by @a op. */
@@ -400,13 +402,15 @@ xrow_update_arith_make(struct xrow_update_op *op,
 			unreachable();
 			break;
 		}
-		if (lowest_type == XUPDATE_TYPE_DOUBLE) {
+		float fc = (float) c;
+		if ((lowest_type == XUPDATE_TYPE_DOUBLE && c != (double) fc) ||
+		    (lowest_type == XUPDATE_TYPE_FLOAT &&
+		     (c >= FLT_MAX || c <= -FLT_MAX))) {
 			ret->type = XUPDATE_TYPE_DOUBLE;
 			ret->dbl = c;
 		} else {
-			assert(lowest_type == XUPDATE_TYPE_FLOAT);
 			ret->type = XUPDATE_TYPE_FLOAT;
-			ret->flt = (float)c;
+			ret->flt = fc;
 		}
 	} else {
 		decimal_t a, b, c;

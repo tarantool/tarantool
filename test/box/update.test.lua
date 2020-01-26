@@ -597,3 +597,48 @@ t:update({{'=', '[2].d.g', 6000}, {'=', '[2].d.new.new', -1}})
 t:update({{'=', '[2].d.g', 6000}, {'#', '[2].d.old.old', 1}})
 
 s:drop()
+
+--
+-- gh-4701: arith operations should not truncate result when
+-- float + float fits double.
+--
+msgpackffi = require('msgpackffi')
+mp_array_1 = 0x91
+mp_double = 0xcb
+mp_float = 0xca
+flt_max = 3.402823466e+38
+uint_max = 18446744073709551615ULL
+tests = {                                                                       \
+-- Double + double is float if result fits.                                     \
+    {{'double', 1}, {'double', 1}, mp_float},                                   \
+-- Double + double is double if result does not fit float.                      \
+    {{'double', flt_max}, {'double', flt_max}, mp_double},                      \
+-- Double + float is float if result fits.                                      \
+    {{'double', 1}, {'float', 1}, mp_float},                                    \
+-- Double + float is double if result does not fit float.                       \
+    {{'double', flt_max}, {'float', flt_max}, mp_double},                       \
+-- Float + float is float when no overflow.                                     \
+    {{'float', 1}, {'float', 1}, mp_float},                                     \
+-- Float + float is double when overflow.                                       \
+    {{'float', flt_max}, {'float', flt_max}, mp_double},                        \
+    {{'float', -flt_max}, {'float', -flt_max}, mp_double},                      \
+-- Float + int is float when fits the float range.                              \
+    {{'float', 1}, {'int', 1}, mp_float},                                       \
+    {{'float', flt_max}, {'uint64_t', uint_max}, mp_double},                    \
+-- Precision matters too. Double is used when need to avoid                     \
+-- precision loss.                                                              \
+    {{'float', 1.0001}, {'double', 1.0000000000001}, mp_double},                \
+}
+err = nil
+for i, test in pairs(tests) do                                                  \
+    local val1 = ffi.cast(test[1][1], test[1][2])                               \
+    local val2 = ffi.cast(test[2][1], test[2][2])                               \
+    local t = box.tuple.new({val1})                                             \
+    t = t:update({{'+', 1, val2}})                                              \
+    local m = msgpackffi.encode(t)                                              \
+    if m:byte(1) ~= mp_array_1 or m:byte(2) ~= test[3] then                     \
+        err = {i, test, t, m:byte(1), m:byte(2)}                                   \
+        break                                                                   \
+    end                                                                         \
+end
+err
