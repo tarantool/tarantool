@@ -130,7 +130,7 @@ check_update_result(const struct tuple_template *original,
 	struct region *region = &fiber()->gc;
 	const char *actual =
 		xrow_update_execute(ops, ops_end, old, old_end,
-				    box_tuple_format_default()->dict,
+				    box_tuple_format_default(),
 				    &actual_len, 1, &column_mask);
 	fail_if(actual == NULL);
 	is((int32_t)actual_len, new_end - new, "check result length");
@@ -266,7 +266,7 @@ test_paths(void)
 	uint64_t column_mask;
 	const char *result =
 		xrow_update_execute(buffer2, pos2, buffer1, pos1,
-				    box_tuple_format_default()->dict,
+				    box_tuple_format_default(),
 				    &result_size, 1, &column_mask);
 	isnt(result, NULL, "JSON update works");
 

@@ -454,7 +454,7 @@ lbox_tuple_transform(struct lua_State *L)
 	 */
 	const char *new_data =
 		xrow_update_execute(buf->buf, buf->buf + ibuf_used(buf),
-				    old_data, old_data + bsize, format->dict,
+				    old_data, old_data + bsize, format,
 				    &new_size, 1, NULL);
 	if (new_data != NULL)
 		new_tuple = tuple_new(box_tuple_format_default(),

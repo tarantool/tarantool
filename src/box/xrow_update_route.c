@@ -377,14 +377,21 @@ xrow_update_route_sizeof(struct xrow_update_field *field)
 }
 
 uint32_t
-xrow_update_route_store(struct xrow_update_field *field, char *out,
-			char *out_end)
+xrow_update_route_store(struct xrow_update_field *field,
+			struct json_tree *format_tree,
+			struct json_token *this_node, char *out, char *out_end)
 {
+	if (this_node != NULL) {
+		this_node = json_tree_lookup_path(
+			format_tree, this_node, field->route.path,
+			field->route.path_len, 0);
+	}
 	char *saved_out = out;
 	int before_hop = field->route.next_hop->data - field->data;
 	memcpy(out, field->data, before_hop);
 	out += before_hop;
-	out += xrow_update_field_store(field->route.next_hop, out, out_end);
+	out += xrow_update_field_store(field->route.next_hop, format_tree,
+				       this_node, out, out_end);
 	int after_hop = before_hop + field->route.next_hop->size;
 	memcpy(out, field->data + after_hop, field->size - after_hop);
 	return out + field->size - after_hop - saved_out;

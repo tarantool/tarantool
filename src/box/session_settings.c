@@ -382,7 +382,7 @@ session_settings_space_execute_update(struct space *space, struct txn *txn,
 found:
 	module->get(sid, &old_data, &old_data_end);
 	new_data = xrow_update_execute(request->tuple, request->tuple_end,
-				       old_data, old_data_end, format->dict,
+				       old_data, old_data_end, format,
 				       &new_size, request->index_base,
 				       &column_mask);
 	if (new_data == NULL)

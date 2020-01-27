@@ -692,7 +692,7 @@ box_tuple_update(box_tuple_t *tuple, const char *expr, const char *expr_end)
 	struct tuple_format *format = tuple_format(tuple);
 	const char *new_data =
 		xrow_update_execute(expr, expr_end, old_data, old_data + bsize,
-				    format->dict, &new_size, 1, NULL);
+				    format, &new_size, 1, NULL);
 	if (new_data == NULL) {
 		region_truncate(region, used);
 		return NULL;
@@ -714,7 +714,7 @@ box_tuple_upsert(box_tuple_t *tuple, const char *expr, const char *expr_end)
 	struct tuple_format *format = tuple_format(tuple);
 	const char *new_data =
 		xrow_upsert_execute(expr, expr_end, old_data, old_data + bsize,
-				    format->dict, &new_size, 1, false, NULL);
+				    format, &new_size, 1, false, NULL);
 	if (new_data == NULL) {
 		region_truncate(region, used);
 		return NULL;

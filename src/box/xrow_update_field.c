@@ -127,8 +127,9 @@ xrow_update_field_sizeof(struct xrow_update_field *field)
 }
 
 uint32_t
-xrow_update_field_store(struct xrow_update_field *field, char *out,
-			char *out_end)
+xrow_update_field_store(struct xrow_update_field *field,
+			struct json_tree *format_tree,
+			struct json_token *this_node, char *out, char *out_end)
 {
 	struct xrow_update_op *op;
 	uint32_t size;
@@ -141,16 +142,20 @@ xrow_update_field_store(struct xrow_update_field *field, char *out,
 		op = field->scalar.op;
 		size = op->new_field_len;
 		assert(out_end - out >= size);
-		op->meta->store(op, field->data, out);
+		op->meta->store(op, format_tree, this_node, field->data, out);
 		return size;
 	case XUPDATE_ARRAY:
-		return xrow_update_array_store(field, out, out_end);
+		return xrow_update_array_store(field, format_tree, this_node,
+					       out, out_end);
 	case XUPDATE_BAR:
-		return xrow_update_bar_store(field, out, out_end);
+		return xrow_update_bar_store(field, format_tree, this_node, out,
+					     out_end);
 	case XUPDATE_ROUTE:
-		return xrow_update_route_store(field, out, out_end);
+		return xrow_update_route_store(field, format_tree, this_node,
+					       out, out_end);
 	case XUPDATE_MAP:
-		return xrow_update_map_store(field, out, out_end);
+		return xrow_update_map_store(field, format_tree, this_node, out,
+					     out_end);
 	default:
 		unreachable();
 	}
@@ -512,15 +517,25 @@ xrow_update_op_do_splice(struct xrow_update_op *op, const char *old)
 /* {{{ store_op */
 
 static void
-xrow_update_op_store_set(struct xrow_update_op *op, const char *in, char *out)
+xrow_update_op_store_set(struct xrow_update_op *op,
+			 struct json_tree *format_tree,
+			 struct json_token *this_node, const char *in,
+			 char *out)
 {
+	(void) format_tree;
+	(void) this_node;
 	(void) in;
 	memcpy(out, op->arg.set.value, op->arg.set.length);
 }
 
 void
-xrow_update_op_store_arith(struct xrow_update_op *op, const char *in, char *out)
+xrow_update_op_store_arith(struct xrow_update_op *op,
+			   struct json_tree *format_tree,
+			   struct json_token *this_node, const char *in,
+			   char *out)
 {
+	(void) format_tree;
+	(void) this_node;
 	(void) in;
 	struct xrow_update_arg_arith *arg = &op->arg.arith;
 	switch (arg->type) {
@@ -546,16 +561,25 @@ xrow_update_op_store_arith(struct xrow_update_op *op, const char *in, char *out)
 }
 
 static void
-xrow_update_op_store_bit(struct xrow_update_op *op, const char *in, char *out)
+xrow_update_op_store_bit(struct xrow_update_op *op,
+			 struct json_tree *format_tree,
+			 struct json_token *this_node, const char *in,
+			 char *out)
 {
+	(void) format_tree;
+	(void) this_node;
 	(void) in;
 	mp_encode_uint(out, op->arg.bit.val);
 }
 
 static void
-xrow_update_op_store_splice(struct xrow_update_op *op, const char *in,
+xrow_update_op_store_splice(struct xrow_update_op *op,
+			    struct json_tree *format_tree,
+			    struct json_token *this_node, const char *in,
 			    char *out)
 {
+	(void) format_tree;
+	(void) this_node;
 	struct xrow_update_arg_splice *arg = &op->arg.splice;
 	uint32_t new_str_len = arg->offset + arg->paste_length +
 			       arg->tail_length;

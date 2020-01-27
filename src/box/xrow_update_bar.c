@@ -370,7 +370,9 @@ xrow_update_bar_sizeof(struct xrow_update_field *field)
 }
 
 uint32_t
-xrow_update_bar_store(struct xrow_update_field *field, char *out, char *out_end)
+xrow_update_bar_store(struct xrow_update_field *field,
+		      struct json_tree *format_tree,
+		      struct json_token *this_node, char *out, char *out_end)
 {
 	assert(field->type == XUPDATE_BAR);
 	(void) out_end;
@@ -431,6 +433,11 @@ xrow_update_bar_store(struct xrow_update_field *field, char *out, char *out_end)
 		return out + size - out_saved;
 	}
 	default: {
+		if (this_node != NULL) {
+			this_node = json_tree_lookup_path(
+				format_tree, this_node, field->bar.path,
+				field->bar.path_len, 0);
+		}
 		uint32_t before_point = field->bar.point - field->data;
 		const char *field_end = field->data + field->size;
 		const char *point_end =
@@ -439,7 +446,8 @@ xrow_update_bar_store(struct xrow_update_field *field, char *out, char *out_end)
 
 		memcpy(out, field->data, before_point);
 		out += before_point;
-		op->meta->store(op, field->bar.point, out);
+		op->meta->store(op, format_tree, this_node, field->bar.point,
+				out);
 		out += op->new_field_len;
 		memcpy(out, point_end, after_point);
 		return out + after_point - out_saved;
