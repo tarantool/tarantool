@@ -760,7 +760,7 @@ test:do_execsql_test(
         INSERT INTO z1 VALUES(6, 63, '0', -26);
 
         INSERT INTO z2 VALUES(1, NULL, 21);
-        INSERT INTO z2 VALUES(2, 36, 6);
+        INSERT INTO z2 VALUES(2, 36.0, 6.0);
 
         INSERT INTO z3 VALUES(1, 123.21, 123.12);
         INSERT INTO z3 VALUES(2, 49.17, -67);

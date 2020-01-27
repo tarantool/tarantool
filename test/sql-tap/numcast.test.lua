@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(20)
+test:plan(25)
 
 --!./tcltestrunner.lua
 -- 2013 March 20
@@ -145,6 +145,50 @@ test:do_catchsql_test(
         SELECT * FROM t;
     ]], {
         1,"Tuple field 1 type does not match one required by operation: expected integer"
+    })
+
+--
+-- gh-4233: Make sure that NUMBER can contain UNSIGNED, INTEGER
+-- and DOUBLE and is not automatically converted to DOUBLE.
+--
+test:do_execsql_test(
+    "numcast-3.1",
+    [[
+        SELECT CAST(x'3131313131313131313131313131313131313131' AS NUMBER);
+    ]], {
+        11111111111111111111ULL
+    })
+
+test:do_execsql_test(
+    "numcast-3.2",
+    [[
+        SELECT CAST(x'31313131313131313131313131313131313131312E' AS NUMBER);
+    ]], {
+        11111111111111110656
+    })
+
+test:do_execsql_test(
+    "numcast-3.3",
+    [[
+        SELECT CAST('11111111111111111111' AS NUMBER);
+    ]], {
+        11111111111111111111ULL
+    })
+
+test:do_execsql_test(
+    "numcast-3.4",
+    [[
+        SELECT CAST('101' AS NUMBER) / 10, CAST('101.' AS NUMBER) / 10;
+    ]], {
+        10, 10.1
+    })
+
+test:do_execsql_test(
+    "numcast-3.5",
+    [[
+        SELECT CAST('101     ' AS NUMBER) / 10, CAST('      101' AS NUMBER) / 10;
+    ]], {
+        10, 10
     })
 
 test:finish_test()

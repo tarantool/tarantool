@@ -510,8 +510,13 @@ SELECT cast(true AS INTEGER), cast(false AS INTEGER);
  | ...
 SELECT cast(true AS NUMBER), cast(false AS NUMBER);
  | ---
- | - null
- | - 'Type mismatch: can not convert TRUE to number'
+ | - metadata:
+ |   - name: cast(true AS NUMBER)
+ |     type: number
+ |   - name: cast(false AS NUMBER)
+ |     type: number
+ |   rows:
+ |   - [1, 0]
  | ...
 -- gh-4462: ensure that text representation is uppercase.
 SELECT cast(true AS TEXT), cast(false AS TEXT);

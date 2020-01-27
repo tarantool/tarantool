@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(85)
+test:plan(79)
 
 --!./tcltestrunner.lua
 -- 2005 June 25
@@ -628,14 +628,9 @@ test:do_execsql_test(
         SELECT CAST(9223372036854774800 AS NUMBER)
     ]], {
         -- <cast-3.2>
-        9223372036854774784
+        9223372036854774800LL
         -- </cast-3.2>
     })
-
-test:do_execsql_test(
-    "cast-3.3",
-    "SELECT CAST(9223372036854774800 AS NUMBER)",
-    {9.22337203685477e+18})
 
 test:do_execsql_test(
     "cast-3.4",
@@ -643,18 +638,8 @@ test:do_execsql_test(
         SELECT CAST(CAST(9223372036854774800 AS NUMBER) AS integer)
     ]], {
         -- <cast-3.4>
-        9223372036854774784LL
+        9223372036854774800LL
         -- </cast-3.4>
-    })
-
-test:do_execsql_test(
-    "cast-3.5",
-    [[
-        SELECT CAST(-9223372036854774800 AS integer)
-    ]], {
-        -- <cast-3.5>
-        -9223372036854774800LL
-        -- </cast-3.5>
     })
 
 test:do_execsql_test(
@@ -663,14 +648,9 @@ test:do_execsql_test(
         SELECT CAST(-9223372036854774800 AS NUMBER)
     ]], {
         -- <cast-3.6>
-        -9223372036854774784
+        -9223372036854774800LL
         -- </cast-3.6>
     })
-
-test:do_execsql_test(
-    "cast-3.7",
-    "SELECT CAST(-9223372036854774800 AS NUMBER)",
-    {-9.22337203685477e+18})
 
 test:do_execsql_test(
     "cast-3.8",
@@ -678,7 +658,7 @@ test:do_execsql_test(
         SELECT CAST(CAST(-9223372036854774800 AS NUMBER) AS integer)
     ]], {
         -- <cast-3.8>
-        -9223372036854774784LL
+        -9223372036854774800LL
         -- </cast-3.8>
     })
 
@@ -695,7 +675,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-3.12",
     [[
-        SELECT CAST('9223372036854774800' AS NUMBER)
+        SELECT CAST('9223372036854774800.' AS NUMBER)
     ]], {
         -- <cast-3.12>
         9223372036854774784
@@ -703,14 +683,9 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "cast-3.13",
-    "SELECT CAST(9223372036854774800 AS NUMBER)",
-    {9.22337203685477e+18})
-
-test:do_execsql_test(
     "cast-3.14",
     [[
-        SELECT CAST(CAST('9223372036854774800' AS NUMBER) AS integer)
+        SELECT CAST(CAST('9223372036854774800.' AS NUMBER) AS integer)
     ]], {
         -- <cast-3.14>
         9223372036854774784LL
@@ -732,7 +707,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-3.16",
     [[
-        SELECT CAST('-9223372036854774800' AS NUMBER)
+        SELECT CAST('-9223372036854774800.' AS NUMBER)
     ]], {
         -- <cast-3.16>
         -9223372036854774784
@@ -740,14 +715,9 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "cast-3.17",
-    "SELECT CAST('-9223372036854774800' AS NUMBER)",
-    {-9.22337203685477e+18})
-
-test:do_execsql_test(
     "cast-3.18",
     [[
-        SELECT CAST(CAST('-9223372036854774800' AS NUMBER) AS integer)
+        SELECT CAST(CAST('-9223372036854774800.' AS NUMBER) AS integer)
     ]], {
         -- <cast-3.18>
         -9223372036854774784LL
@@ -770,16 +740,12 @@ if true then --test:execsql("PRAGMA encoding")[1][1]=="UTF-8" then
     test:do_execsql_test(
         "cast-3.22",
         [[
-            SELECT CAST(x'39323233333732303336383534373734383030' AS NUMBER)
+            SELECT CAST(x'393232333337323033363835343737343830302E' AS NUMBER)
         ]], {
             -- <cast-3.22>
             9223372036854774784
             -- </cast-3.22>
         })
-    test:do_execsql_test(
-        "cast-3.23",
-        "SELECT CAST(x'39323233333732303336383534373734383030' AS NUMBER)",
-        {9.22337203685477e+18})
 
     test:do_execsql_test(
         "cast-3.24",
@@ -788,7 +754,7 @@ if true then --test:execsql("PRAGMA encoding")[1][1]=="UTF-8" then
                         AS integer)
         ]], {
             -- <cast-3.24>
-            9223372036854774784LL
+            9223372036854774800LL
             -- </cast-3.24>
         })
 end
@@ -796,7 +762,7 @@ end
 test:do_execsql_test(
     "case-3.25",
     [[
-        SELECT CAST(x'3138343436373434303733373039353531363135' AS NUMBER);
+        SELECT CAST(x'31383434363734343037333730393535313631352E' AS NUMBER);
     ]], { 1.844674407371e+19 } )
 
 test:do_execsql_test(

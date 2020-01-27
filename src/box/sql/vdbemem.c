@@ -668,22 +668,6 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 	assert(type < field_type_MAX);
 	if (pMem->flags & MEM_Null)
 		return 0;
-	if ((pMem->flags & MEM_Blob) != 0 && type == FIELD_TYPE_NUMBER) {
-		bool is_neg;
-		if (sql_atoi64(pMem->z,  (int64_t *) &pMem->u.i, &is_neg,
-			       pMem->n) == 0) {
-			MemSetTypeFlag(pMem, MEM_Real);
-			if (is_neg)
-				pMem->u.r = pMem->u.i;
-			else
-				pMem->u.r = pMem->u.u;
-			return 0;
-		}
-		if (sqlAtoF(pMem->z, &pMem->u.r, pMem->n) == 0)
-			return -1;
-		MemSetTypeFlag(pMem, MEM_Real);
-		return 0;
-	}
 	switch (type) {
 	case FIELD_TYPE_SCALAR:
 		return 0;
@@ -734,8 +718,9 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 			return -1;
 		return 0;
 	case FIELD_TYPE_DOUBLE:
-	case FIELD_TYPE_NUMBER:
 		return sqlVdbeMemRealify(pMem);
+	case FIELD_TYPE_NUMBER:
+		return vdbe_mem_numerify(pMem);
 	case FIELD_TYPE_VARBINARY:
 		if ((pMem->flags & MEM_Blob) != 0)
 			return 0;
