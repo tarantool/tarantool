@@ -170,7 +170,7 @@ box.execute("SELECT * FROM t;")
   - name: A
     type: number
   rows:
-  - [1, 1.844674407371e+19]
+  - [1, 18446744073709551615]
   - [2, -1]
 ...
 box.space.T:drop()

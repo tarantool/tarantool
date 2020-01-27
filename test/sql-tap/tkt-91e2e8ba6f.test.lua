@@ -35,7 +35,7 @@ test:do_execsql_test(
         SELECT x/10, y/10 FROM t1;
     ]], {
         -- <1.2>
-        1, 1.1
+        1, 1
         -- </1.2>
     })
 
@@ -45,7 +45,7 @@ test:do_execsql_test(
         SELECT x/10, y/10 FROM (SELECT * FROM t1);
     ]], {
         -- <1.3>
-        1, 1.1
+        1, 1
         -- </1.3>
     })
 
@@ -55,7 +55,7 @@ test:do_execsql_test(
         SELECT x/10, y/10 FROM (SELECT * FROM t1 LIMIT 5 OFFSET 0);
     ]], {
         -- <1.4>
-        1, 1.1
+        1, 1
         -- </1.4>
     })
 
@@ -65,7 +65,7 @@ test:do_execsql_test(
         SELECT x/10, y/10 FROM (SELECT * FROM t1 LIMIT 5 OFFSET 0) LIMIT 5 OFFSET 0;
     ]], {
         -- <1.5>
-        1, 1.1
+        1, 1
         -- </1.5>
     })
 
@@ -77,7 +77,7 @@ test:do_execsql_test(
         LIMIT 5 OFFSET 0;
     ]], {
         -- <1.6>
-        1, 1.1
+        1, 1
         -- </1.6>
     })
 
@@ -92,7 +92,7 @@ test:do_execsql_test(
         SELECT a.x/10, a.y/10 FROM v1 AS a, t1 AS b WHERE a.x = b.x LIMIT 5 OFFSET 0;
     ]], {
         -- <1.7>
-        1, 1.1
+        1, 1
         -- </1.7>
     })
 

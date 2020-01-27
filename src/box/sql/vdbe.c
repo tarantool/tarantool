@@ -2721,14 +2721,6 @@ case OP_Column: {
 	    default_val_mem != NULL) {
 		sqlVdbeMemShallowCopy(pDest, default_val_mem, MEM_Static);
 	}
-	if ((pDest->flags & (MEM_Int | MEM_UInt)) != 0) {
-		if (field_type == FIELD_TYPE_NUMBER) {
-			if ((pDest->flags & MEM_Int) != 0)
-				sqlVdbeMemSetDouble(pDest, pDest->u.i);
-			else
-				sqlVdbeMemSetDouble(pDest, pDest->u.u);
-		}
-	}
 	pDest->field_type = field_type;
 op_column_out:
 	REGISTER_TRACE(p, pOp->p3, pDest);

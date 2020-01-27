@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(25)
+test:plan(31)
 
 --!./tcltestrunner.lua
 -- 2013 March 20
@@ -190,5 +190,65 @@ test:do_execsql_test(
     ]], {
         10, 10
     })
+
+test:do_execsql_test(
+    "numcast-3.6",
+    [[
+        CREATE TABLE t1 (id INT PRIMARY KEY, n NUMBER);
+        INSERT INTO t1 VALUES (1, 9223372036854775807);
+        INSERT INTO t1 VALUES (2, -9223372036854775807);
+        INSERT INTO t1 VALUES (3, 9007199254740992.0);
+        SELECT n, n/100 FROM t1;
+    ]], {
+        9223372036854775807ULL, 92233720368547758ULL,
+        -9223372036854775807LL, -92233720368547758LL,
+        9007199254740992, 90071992547409.92
+    })
+
+test:do_execsql_test(
+    "numcast-3.7",
+    [[
+        CREATE TABLE t2(a NUMBER primary key);
+        INSERT INTO t2 VALUES(-56);
+        INSERT INTO t2 VALUES(44.0);
+        INSERT INTO t2 VALUES(46);
+        INSERT INTO t2 VALUES(56.0);
+        SELECT (a + 25) / 50 FROM t2;
+    ]], {
+        0,1.38,1,1.62
+})
+
+
+test:do_execsql_test(
+    "numcast-3.8",
+    [[
+        SELECT (1 + 0) / 3, (1 + 0.) / 3, (1 + 0) / 3.;
+    ]], {
+        0, 0.33333333333333, 0.33333333333333
+})
+
+test:do_execsql_test(
+    "numcast-3.9",
+    [[
+        SELECT (1 - 0) / 3, (1 - 0.) / 3, (1 - 0) / 3.;
+    ]], {
+        0, 0.33333333333333, 0.33333333333333
+})
+
+test:do_execsql_test(
+    "numcast-3.10",
+    [[
+        SELECT (1 * 1) / 3, (1 * 1.) / 3, (1 * 1) / 3.;
+    ]], {
+        0, 0.33333333333333, 0.33333333333333
+})
+
+test:do_execsql_test(
+    "numcast-3.11",
+    [[
+        SELECT (1 / 1) / 3, (1 / 1.) / 3, (1 / 1) / 3.;
+    ]], {
+        0 , 0.33333333333333, 0.33333333333333
+})
 
 test:finish_test()
