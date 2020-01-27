@@ -392,7 +392,7 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	const char *old_data = tuple_data_range(old_tuple, &bsize);
 	const char *new_data =
 		xrow_update_execute(request->tuple, request->tuple_end,
-				    old_data, old_data + bsize, format->dict,
+				    old_data, old_data + bsize, format,
 				    &new_size, request->index_base, NULL);
 	if (new_data == NULL)
 		return -1;
@@ -462,8 +462,7 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		 * @sa https://github.com/tarantool/tarantool/issues/1156
 		 */
 		if (xrow_update_check_ops(request->ops, request->ops_end,
-					  format->dict,
-					  request->index_base) != 0) {
+					  format, request->index_base) != 0) {
 			return -1;
 		}
 		stmt->new_tuple = memtx_tuple_new(format, request->tuple,
@@ -484,7 +483,7 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		const char *new_data =
 			xrow_upsert_execute(request->ops, request->ops_end,
 					    old_data, old_data + bsize,
-					    format->dict, &new_size,
+					    format, &new_size,
 					    request->index_base, false,
 					    &column_mask);
 		if (new_data == NULL)

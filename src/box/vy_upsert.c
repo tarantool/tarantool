@@ -58,7 +58,7 @@ vy_upsert_try_to_squash(struct tuple_format *format,
 	size_t squashed_size;
 	const char *squashed =
 		xrow_upsert_squash(old_serie, old_serie_end,
-				   new_serie, new_serie_end, format->dict,
+				   new_serie, new_serie_end, format,
 				   &squashed_size, 0);
 	if (squashed == NULL)
 		return 0;
@@ -119,7 +119,7 @@ vy_apply_upsert(struct tuple *new_stmt, struct tuple *old_stmt,
 	uint8_t old_type = vy_stmt_type(old_stmt);
 	uint64_t column_mask = COLUMN_MASK_FULL;
 	result_mp = xrow_upsert_execute(new_ops, new_ops_end, result_mp,
-					result_mp_end, format->dict, &mp_size,
+					result_mp_end, format, &mp_size,
 					0, suppress_error, &column_mask);
 	result_mp_end = result_mp + mp_size;
 	if (old_type != IPROTO_UPSERT) {

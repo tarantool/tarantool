@@ -428,7 +428,9 @@ xrow_update_map_sizeof(struct xrow_update_field *field)
 }
 
 uint32_t
-xrow_update_map_store(struct xrow_update_field *field, char *out, char *out_end)
+xrow_update_map_store(struct xrow_update_field *field,
+		      struct json_tree *format_tree,
+		      struct json_token *this_node, char *out, char *out_end)
 {
 	assert(field->type == XUPDATE_MAP);
 	char *out_begin = out;
@@ -438,10 +440,32 @@ xrow_update_map_store(struct xrow_update_field *field, char *out, char *out_end)
 	 * This is the trick about saving updated keys before
 	 * others. The first cycle doesn't save unchanged tails.
 	 */
-	stailq_foreach_entry(i, &field->map.items, in_items) {
-		if (i->key != NULL) {
-			out = mp_encode_str(out, i->key, i->key_len);
-			out += xrow_update_field_store(&i->field, out, out_end);
+	if (this_node == NULL) {
+		stailq_foreach_entry(i, &field->map.items, in_items) {
+			if (i->key != NULL) {
+				out = mp_encode_str(out, i->key, i->key_len);
+				out += xrow_update_field_store(&i->field, NULL,
+							       NULL, out,
+							       out_end);
+			}
+		}
+	} else {
+		struct json_token token;
+		token.type = JSON_TOKEN_STR;
+		struct json_token *next_node;
+		stailq_foreach_entry(i, &field->map.items, in_items) {
+			if (i->key != NULL) {
+				token.str = i->key;
+				token.len = i->key_len;
+				next_node = json_tree_lookup(format_tree,
+							     this_node,
+							     &token);
+				out = mp_encode_str(out, i->key, i->key_len);
+				out += xrow_update_field_store(&i->field,
+							       format_tree,
+							       next_node, out,
+							       out_end);
+			}
 		}
 	}
 	stailq_foreach_entry(i, &field->map.items, in_items) {

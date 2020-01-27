@@ -152,7 +152,10 @@ typedef int
 		       struct xrow_update_field *field);
 
 typedef void
-(*xrow_update_op_store_f)(struct xrow_update_op *op, const char *in, char *out);
+(*xrow_update_op_store_f)(struct xrow_update_op *op,
+			  struct json_tree *format_tree,
+			  struct json_token *this_node, const char *in,
+			  char *out);
 
 /**
  * A set of functions and properties to initialize, do and store
@@ -470,8 +473,9 @@ xrow_update_field_sizeof(struct xrow_update_field *field);
 
 /** Save the updated field, including all children recursively. */
 uint32_t
-xrow_update_field_store(struct xrow_update_field *field, char *out,
-			char *out_end);
+xrow_update_field_store(struct xrow_update_field *field,
+			struct json_tree *format_tree,
+			struct json_token *this_node, char *out, char *out_end);
 
 /**
  * Generate declarations for a concrete field type: array, bar
@@ -507,7 +511,9 @@ uint32_t									\
 xrow_update_##type##_sizeof(struct xrow_update_field *field);			\
 										\
 uint32_t									\
-xrow_update_##type##_store(struct xrow_update_field *field, char *out,		\
+xrow_update_##type##_store(struct xrow_update_field *field,			\
+			   struct json_tree *format_tree,			\
+			   struct json_token *this_node, char *out,		\
 			   char *out_end);
 
 /* }}} xrow_update_field */
@@ -706,7 +712,9 @@ xrow_update_arith_make(struct xrow_update_op *op,
 		       struct xrow_update_arg_arith *ret);
 
 void
-xrow_update_op_store_arith(struct xrow_update_op *op, const char *in,
+xrow_update_op_store_arith(struct xrow_update_op *op,
+			   struct json_tree *format_tree,
+			   struct json_token *this_node, const char *in,
 			   char *out);
 
 uint32_t

@@ -31,6 +31,7 @@
 #include "xrow_update_field.h"
 #include "msgpuck.h"
 #include "fiber.h"
+#include "tuple_format.h"
 
 /**
  * Make sure @a op contains a valid field number to where the
@@ -259,26 +260,49 @@ xrow_update_array_sizeof(struct xrow_update_field *field)
 }
 
 uint32_t
-xrow_update_array_store(struct xrow_update_field *field, char *out,
-			char *out_end)
+xrow_update_array_store(struct xrow_update_field *field,
+			struct json_tree *format_tree,
+			struct json_token *this_node, char *out, char *out_end)
 {
 	assert(field->type == XUPDATE_ARRAY);
 	char *out_begin = out;
 	out = mp_encode_array(out, xrow_update_rope_size(field->array.rope));
-	uint32_t total_field_count = 0;
 	struct xrow_update_rope_iter it;
 	xrow_update_rope_iter_create(&it, field->array.rope);
 	struct xrow_update_rope_node *node = xrow_update_rope_iter_start(&it);
-	for (; node != NULL; node = xrow_update_rope_iter_next(&it)) {
-		struct xrow_update_array_item *item =
-			xrow_update_rope_leaf_data(node);
-		uint32_t field_count = xrow_update_rope_leaf_size(node);
-		out += xrow_update_field_store(&item->field, out, out_end);
-		assert(item->tail_size == 0 || field_count > 1);
-		memcpy(out, item->field.data + item->field.size,
-		       item->tail_size);
-		out += item->tail_size;
-		total_field_count += field_count;
+	uint32_t total_field_count = 0;
+	if (this_node == NULL) {
+		for (; node != NULL; node = xrow_update_rope_iter_next(&it)) {
+			struct xrow_update_array_item *item =
+				xrow_update_rope_leaf_data(node);
+			uint32_t field_count = xrow_update_rope_leaf_size(node);
+			out += xrow_update_field_store(&item->field, NULL, NULL,
+						       out, out_end);
+			assert(item->tail_size == 0 || field_count > 1);
+			memcpy(out, item->field.data + item->field.size,
+			       item->tail_size);
+			out += item->tail_size;
+			total_field_count += field_count;
+		}
+	} else {
+		struct json_token token;
+		token.type = JSON_TOKEN_NUM;
+		token.num = 0;
+		struct json_token *next_node;
+		for (; node != NULL; node = xrow_update_rope_iter_next(&it)) {
+			struct xrow_update_array_item *item =
+				xrow_update_rope_leaf_data(node);
+			next_node = json_tree_lookup(format_tree, this_node, &token);
+			uint32_t field_count = xrow_update_rope_leaf_size(node);
+			out += xrow_update_field_store(&item->field, format_tree,
+						       next_node, out, out_end);
+			assert(item->tail_size == 0 || field_count > 1);
+			memcpy(out, item->field.data + item->field.size,
+			       item->tail_size);
+			out += item->tail_size;
+			token.num += field_count;
+			total_field_count += field_count;
+		}
 	}
 	(void) total_field_count;
 	assert(xrow_update_rope_size(field->array.rope) == total_field_count);

@@ -38,6 +38,7 @@
 #include "column_mask.h"
 #include "fiber.h"
 #include "xrow_update_field.h"
+#include "tuple_format.h"
 
 /**
  * UPDATE is represented by a sequence of operations, each
@@ -344,7 +345,8 @@ xrow_update_init(struct xrow_update *update, int index_base)
 }
 
 static const char *
-xrow_update_finish(struct xrow_update *update, uint32_t *p_tuple_len)
+xrow_update_finish(struct xrow_update *update, struct tuple_format *format,
+		   uint32_t *p_tuple_len)
 {
 	uint32_t tuple_len = xrow_update_array_sizeof(&update->root);
 	char *buffer = (char *) region_alloc(&fiber()->gc, tuple_len);
@@ -352,7 +354,8 @@ xrow_update_finish(struct xrow_update *update, uint32_t *p_tuple_len)
 		diag_set(OutOfMemory, tuple_len, "region_alloc", "buffer");
 		return NULL;
 	}
-	*p_tuple_len = xrow_update_array_store(&update->root, buffer,
+	*p_tuple_len = xrow_update_array_store(&update->root, &format->fields,
+					       &format->fields.root, buffer,
 					       buffer + tuple_len);
 	assert(*p_tuple_len == tuple_len);
 	return buffer;
@@ -360,17 +363,17 @@ xrow_update_finish(struct xrow_update *update, uint32_t *p_tuple_len)
 
 int
 xrow_update_check_ops(const char *expr, const char *expr_end,
-		      struct tuple_dictionary *dict, int index_base)
+		      struct tuple_format *format, int index_base)
 {
 	struct xrow_update update;
 	xrow_update_init(&update, index_base);
-	return xrow_update_read_ops(&update, expr, expr_end, dict, 0);
+	return xrow_update_read_ops(&update, expr, expr_end, format->dict, 0);
 }
 
 const char *
 xrow_update_execute(const char *expr,const char *expr_end,
 		    const char *old_data, const char *old_data_end,
-		    struct tuple_dictionary *dict, uint32_t *p_tuple_len,
+		    struct tuple_format *format, uint32_t *p_tuple_len,
 		    int index_base, uint64_t *column_mask)
 {
 	struct xrow_update update;
@@ -378,7 +381,7 @@ xrow_update_execute(const char *expr,const char *expr_end,
 	const char *header = old_data;
 	uint32_t field_count = mp_decode_array(&old_data);
 
-	if (xrow_update_read_ops(&update, expr, expr_end, dict,
+	if (xrow_update_read_ops(&update, expr, expr_end, format->dict,
 				 field_count) != 0)
 		return NULL;
 	if (xrow_update_do_ops(&update, header, old_data, old_data_end,
@@ -387,13 +390,13 @@ xrow_update_execute(const char *expr,const char *expr_end,
 	if (column_mask)
 		*column_mask = update.column_mask;
 
-	return xrow_update_finish(&update, p_tuple_len);
+	return xrow_update_finish(&update, format, p_tuple_len);
 }
 
 const char *
 xrow_upsert_execute(const char *expr,const char *expr_end,
 		    const char *old_data, const char *old_data_end,
-		    struct tuple_dictionary *dict, uint32_t *p_tuple_len,
+		    struct tuple_format *format, uint32_t *p_tuple_len,
 		    int index_base, bool suppress_error, uint64_t *column_mask)
 {
 	struct xrow_update update;
@@ -401,7 +404,7 @@ xrow_upsert_execute(const char *expr,const char *expr_end,
 	const char *header = old_data;
 	uint32_t field_count = mp_decode_array(&old_data);
 
-	if (xrow_update_read_ops(&update, expr, expr_end, dict,
+	if (xrow_update_read_ops(&update, expr, expr_end, format->dict,
 				 field_count) != 0)
 		return NULL;
 	if (xrow_upsert_do_ops(&update, header, old_data, old_data_end,
@@ -410,18 +413,19 @@ xrow_upsert_execute(const char *expr,const char *expr_end,
 	if (column_mask)
 		*column_mask = update.column_mask;
 
-	return xrow_update_finish(&update, p_tuple_len);
+	return xrow_update_finish(&update, format, p_tuple_len);
 }
 
 const char *
 xrow_upsert_squash(const char *expr1, const char *expr1_end,
 		   const char *expr2, const char *expr2_end,
-		   struct tuple_dictionary *dict, size_t *result_size,
+		   struct tuple_format *format, size_t *result_size,
 		   int index_base)
 {
 	const char *expr[2] = {expr1, expr2};
 	const char *expr_end[2] = {expr1_end, expr2_end};
 	struct xrow_update update[2];
+	struct tuple_dictionary *dict = format->dict;
 	for (int j = 0; j < 2; j++) {
 		xrow_update_init(&update[j], index_base);
 		if (xrow_update_read_ops(&update[j], expr[j], expr_end[j],
@@ -463,6 +467,10 @@ xrow_upsert_squash(const char *expr1, const char *expr1_end,
 
 	uint32_t op_count[2] = {update[0].op_count, update[1].op_count};
 	uint32_t op_no[2] = {0, 0};
+	struct json_tree *format_tree = &format->fields;
+	struct json_token *root = &format_tree->root;
+	struct json_token token;
+	token.type = JSON_TOKEN_NUM;
 	while (op_no[0] < op_count[0] || op_no[1] < op_count[1]) {
 		res_count++;
 		struct xrow_update_op *op[2] = {update[0].ops + op_no[0],
@@ -517,10 +525,13 @@ xrow_upsert_squash(const char *expr1, const char *expr1_end,
 		res_ops = mp_encode_array(res_ops, 3);
 		res_ops = mp_encode_str(res_ops,
 					(const char *)&op[0]->opcode, 1);
-		res_ops = mp_encode_uint(res_ops,
-					 op[0]->field_no +
-						 update[0].index_base);
-		xrow_update_op_store_arith(&res, NULL, res_ops);
+		token.num = op[0]->field_no;
+		res_ops = mp_encode_uint(res_ops, token.num +
+					 update[0].index_base);
+		struct json_token *this_node =
+			json_tree_lookup(format_tree, root, &token);
+		xrow_update_op_store_arith(&res, format_tree, this_node, NULL,
+					   res_ops);
 		res_ops += xrow_update_arg_arith_sizeof(&res.arg.arith);
 		mp_next(&expr[0]);
 		mp_next(&expr[1]);

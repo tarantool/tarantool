@@ -44,22 +44,22 @@ enum {
 	BOX_UPDATE_OP_CNT_MAX = 4000,
 };
 
-struct tuple_dictionary;
+struct tuple_format;
 
 int
 xrow_update_check_ops(const char *expr, const char *expr_end,
-		      struct tuple_dictionary *dict, int index_base);
+		      struct tuple_format *format, int index_base);
 
 const char *
 xrow_update_execute(const char *expr,const char *expr_end,
 		    const char *old_data, const char *old_data_end,
-		    struct tuple_dictionary *dict, uint32_t *p_new_size,
+		    struct tuple_format *format, uint32_t *p_new_size,
 		    int index_base, uint64_t *column_mask);
 
 const char *
 xrow_upsert_execute(const char *expr, const char *expr_end,
 		    const char *old_data, const char *old_data_end,
-		    struct tuple_dictionary *dict, uint32_t *p_new_size,
+		    struct tuple_format *format, uint32_t *p_new_size,
 		    int index_base, bool suppress_error,
 		    uint64_t *column_mask);
 
@@ -76,7 +76,7 @@ xrow_upsert_execute(const char *expr, const char *expr_end,
 const char *
 xrow_upsert_squash(const char *expr1, const char *expr1_end,
 		   const char *expr2, const char *expr2_end,
-		   struct tuple_dictionary *dict, size_t *result_size,
+		   struct tuple_format *format, size_t *result_size,
 		   int index_base);
 
 #if defined(__cplusplus)
