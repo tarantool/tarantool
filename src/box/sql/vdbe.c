@@ -1566,7 +1566,6 @@ case OP_Subtract:              /* same as TK_MINUS, in1, in2, out3 */
 case OP_Multiply:              /* same as TK_STAR, in1, in2, out3 */
 case OP_Divide:                /* same as TK_SLASH, in1, in2, out3 */
 case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
-	char bIntint;   /* Started out as two integer operands */
 	u32 flags;      /* Combined MEM_* flags from both inputs */
 	u16 type1;      /* Numeric type of left operand */
 	u16 type2;      /* Numeric type of right operand */
@@ -1589,7 +1588,6 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 		bool is_lhs_neg = pIn1->flags & MEM_Int;
 		bool is_rhs_neg = pIn2->flags & MEM_Int;
 		bool is_res_neg;
-		bIntint = 1;
 		switch( pOp->opcode) {
 		case OP_Add: {
 			if (sql_add_int(iA, is_lhs_neg, iB, is_rhs_neg,
@@ -1629,7 +1627,6 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 		}
 		mem_set_int(pOut, iB, is_res_neg);
 	} else {
-		bIntint = 0;
 		if (sqlVdbeRealValue(pIn1, &rA) != 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 				 sql_value_to_diag_str(pIn1), "numeric");
@@ -1640,6 +1637,7 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 				 sql_value_to_diag_str(pIn2), "numeric");
 			goto abort_due_to_error;
 		}
+		assert(((type1 | type2) & MEM_Real) != 0);
 		switch( pOp->opcode) {
 		case OP_Add:         rB += rA;       break;
 		case OP_Subtract:    rB -= rA;       break;
@@ -1665,9 +1663,6 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 		}
 		pOut->u.r = rB;
 		MemSetTypeFlag(pOut, MEM_Real);
-		if (((type1|type2)&MEM_Real)==0 && !bIntint) {
-			mem_apply_integer_type(pOut);
-		}
 	}
 	break;
 
