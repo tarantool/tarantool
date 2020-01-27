@@ -112,10 +112,10 @@ sql_pragma_table_info(struct Parse *parse, const char *tbl_name)
 	struct Vdbe *v = sqlGetVdbe(parse);
 	struct field_def *field = space->def->fields;
 	for (uint32_t i = 0, k; i < space->def->field_count; ++i, ++field) {
-		if (!sql_space_column_is_in_pk(space, i)) {
-			k = 0;
-		} else if (pk == NULL) {
+		if (pk == NULL) {
 			k = 1;
+		} else if (!sql_space_column_is_in_pk(space, i)) {
+			k = 0;
 		} else {
 			struct key_def *kdef = pk->def->key_def;
 			k = key_def_find_by_fieldno(kdef, i) - kdef->parts + 1;
