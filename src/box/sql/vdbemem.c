@@ -596,34 +596,26 @@ sqlVdbeMemRealify(Mem * pMem)
 	return 0;
 }
 
-/*
- * Convert pMem so that it has types MEM_Real or MEM_Int or both.
- * Invalidate any prior representations.
- *
- * Every effort is made to force the conversion, even if the input
- * is a string that does not look completely like a number.  Convert
- * as much of the string as we can and ignore the rest.
- */
 int
-sqlVdbeMemNumerify(Mem * pMem)
+vdbe_mem_numerify(struct Mem *mem)
 {
-	if ((pMem->flags & (MEM_Int | MEM_UInt | MEM_Real | MEM_Null)) == 0) {
-		assert((pMem->flags & (MEM_Blob | MEM_Str)) != 0);
-		bool is_neg;
-		int64_t i;
-		if (sql_atoi64(pMem->z, &i, &is_neg, pMem->n) == 0) {
-			mem_set_int(pMem, i, is_neg);
-		} else {
-			double v;
-			if (sqlVdbeRealValue(pMem, &v))
-				return -1;
-			pMem->u.r = v;
-			MemSetTypeFlag(pMem, MEM_Real);
-			mem_apply_integer_type(pMem);
-		}
+	if ((mem->flags & (MEM_Int | MEM_UInt | MEM_Real | MEM_Null)) != 0)
+		return 0;
+	if ((mem->flags & MEM_Bool) != 0) {
+		mem->u.u = mem->u.b;
+		MemSetTypeFlag(mem, MEM_UInt);
+		return 0;
 	}
-	assert((pMem->flags & (MEM_Int | MEM_UInt | MEM_Real | MEM_Null)) != 0);
-	pMem->flags &= ~(MEM_Str | MEM_Blob | MEM_Zero);
+	assert((mem->flags & (MEM_Blob | MEM_Str)) != 0);
+	bool is_neg;
+	int64_t i;
+	if (sql_atoi64(mem->z, &i, &is_neg, mem->n) == 0) {
+		mem_set_int(mem, i, is_neg);
+	} else {
+		if (sqlAtoF(mem->z, &mem->u.r, mem->n) == 0)
+			return -1;
+		MemSetTypeFlag(mem, MEM_Real);
+	}
 	return 0;
 }
 
@@ -1472,7 +1464,7 @@ valueFromExpr(sql * db,	/* The database connection */
 		if (0 ==
 		    sqlValueFromExpr(db, pExpr->pLeft, type, &pVal)
 		    && pVal != 0) {
-			if ((rc = sqlVdbeMemNumerify(pVal)) != 0)
+			if ((rc = vdbe_mem_numerify(pVal)) != 0)
 				return rc;
 			if (pVal->flags & MEM_Real) {
 				pVal->u.r = -pVal->u.r;
@@ -1499,7 +1491,7 @@ valueFromExpr(sql * db,	/* The database connection */
 		pVal = valueNew(db, pCtx);
 		if (pVal == 0)
 			goto no_mem;
-		if ((rc = sqlVdbeMemNumerify(pVal)) != 0)
+		if ((rc = vdbe_mem_numerify(pVal)) != 0)
 			return rc;
 	}
 #ifndef SQL_OMIT_BLOB_LITERAL
