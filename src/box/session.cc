@@ -283,6 +283,7 @@ session_init()
 		panic("out of memory");
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
 	credentials_create(&admin_credentials, admin_user);
+	sql_session_settings_init();
 }
 
 void

@@ -63,14 +63,9 @@ static const uint32_t default_sql_flags = SQL_EnableTrigger
 					  | SQL_AutoIndex
 					  | SQL_RecTriggers;
 
-extern void
-sql_session_settings_init();
-
 void
 sql_init()
 {
-	sql_session_settings_init();
-
 	default_flags |= default_sql_flags;
 
 	current_session()->sql_flags |= default_sql_flags;

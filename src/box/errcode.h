@@ -265,6 +265,7 @@ struct errcode_record {
 	/*210 */_(ER_SQL_PREPARE,		"Failed to prepare SQL statement: %s") \
 	/*211 */_(ER_WRONG_QUERY_ID,		"Prepared statement with id %u does not exist") \
 	/*212 */_(ER_SEQUENCE_NOT_STARTED,		"Sequence '%s' is not started") \
+	/*213 */_(ER_NO_SUCH_SESSION_SETTING,	"Session setting %s doesn't exist") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

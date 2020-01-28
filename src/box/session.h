@@ -41,6 +41,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+extern void sql_session_settings_init();
+
 struct port;
 struct session_vtab;
 

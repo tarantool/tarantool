@@ -84,3 +84,6 @@ struct session_setting {
 
 extern struct session_setting session_settings[SESSION_SETTING_COUNT];
 extern const char *session_setting_strs[SESSION_SETTING_COUNT];
+
+int
+session_setting_find(const char *name);

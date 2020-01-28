@@ -287,3 +287,64 @@ s:update('sql_defer_foreign_keys', {{'=', 'value', '1'}})
  | ---
  | - error: Session setting sql_defer_foreign_keys expected a value of type boolean
  | ...
+
+-- gh-4711: Provide a user-friendly frontend for accessing session settings.
+settings = box.session.settings
+ | ---
+ | ...
+assert(settings ~= nil)
+ | ---
+ | - true
+ | ...
+
+s:update('sql_default_engine', {{'=', 2, 'vinyl'}})
+ | ---
+ | - ['sql_default_engine', 'vinyl']
+ | ...
+settings.sql_default_engine
+ | ---
+ | - vinyl
+ | ...
+settings.sql_default_engine = 'memtx'
+ | ---
+ | ...
+s:get('sql_default_engine').value
+ | ---
+ | - memtx
+ | ...
+settings.sql_defer_foreign_keys = true
+ | ---
+ | ...
+s:get('sql_defer_foreign_keys').value
+ | ---
+ | - true
+ | ...
+s:update('sql_defer_foreign_keys', {{'=', 2, false}})
+ | ---
+ | - ['sql_defer_foreign_keys', false]
+ | ...
+settings.sql_defer_foreign_keys
+ | ---
+ | - false
+ | ...
+
+settings.sql_default_engine = true
+ | ---
+ | - error: Session setting sql_default_engine expected a value of type string
+ | ...
+settings.sql_defer_foreign_keys = 'false'
+ | ---
+ | - error: Session setting sql_defer_foreign_keys expected a value of type boolean
+ | ...
+settings.sql_parser_debug = 'string'
+ | ---
+ | - error: Session setting sql_parser_debug expected a value of type boolean
+ | ...
+
+str = string.rep('a', 20 * 1024)
+ | ---
+ | ...
+box.session.settings.sql_default_engine = str
+ | ---
+ | - error: Failed to allocate 20483 bytes in static_alloc for mp_value
+ | ...
