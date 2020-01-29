@@ -42,6 +42,10 @@ box.space.test.index.primary:select{}
 box.space.test.index.secondary:select{}
 box.space.test:drop()
 
+-- Hard way to flush garbage slabs in the fiber's region. See
+-- gh-4750.
+test_run:cmd('restart server default')
+
 -- Check that box.snapshot() doesn't leave garbage one the region.
 -- https://github.com/tarantool/tarantool/issues/3732
 fiber = require('fiber')

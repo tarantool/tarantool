@@ -1,7 +1,6 @@
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 _ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
-fiber = require('fiber')
 
 -- This test checks that no leaks of region memory happens during
 -- executing SQL queries.
@@ -9,6 +8,10 @@ fiber = require('fiber')
 
 -- box.cfg()
 
+-- Hard way to flush garbage slabs in the fiber's region. See
+-- gh-4750.
+test_run:cmd('restart server default')
+fiber = require('fiber')
 
 box.execute('CREATE TABLE test (id INT PRIMARY KEY, x INTEGER, y INTEGER)')
 box.execute('INSERT INTO test VALUES (1, 1, 1), (2, 2, 2)')
