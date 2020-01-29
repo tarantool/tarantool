@@ -8,13 +8,16 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
 - row_count: 0
 ...
-fiber = require('fiber')
----
-...
 -- This test checks that no leaks of region memory happens during
 -- executing SQL queries.
 --
 -- box.cfg()
+-- Hard way to flush garbage slabs in the fiber's region. See
+-- gh-4750.
+test_run:cmd('restart server default')
+fiber = require('fiber')
+---
+...
 box.execute('CREATE TABLE test (id INT PRIMARY KEY, x INTEGER, y INTEGER)')
 ---
 - row_count: 1
