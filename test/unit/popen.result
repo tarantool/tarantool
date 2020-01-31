@@ -1,0 +1,28 @@
+# write 5 bytes '12345'
+# read 9 bytes '1 2 3 4 5'
+
+1..7
+	*** popen_write_exit ***
+ok 1 - popen_new
+ok 2 - popen_state
+ok 3 - state alive
+ok 4 - write flag check
+ok 5 - write 12345 (5 bytes)
+ok 6 - child exited
+ok 7 - popen_delete
+	*** popen_write_exit: done ***
+1..5
+	*** popen_read_exit ***
+ok 1 - popen_new
+ok 2 - child exited
+ok 3 - read flag check
+ok 4 - read 1 2 3 4 5 (9 bytes)
+ok 5 - popen_delete
+	*** popen_read_exit: done ***
+1..4
+	*** popen_kill ***
+ok 1 - popen_new
+ok 2 - popen_send_signal
+ok 3 - child terminated
+ok 4 - popen_delete
+	*** popen_kill: done ***
