@@ -182,6 +182,31 @@ vclock_inc(struct vclock *vclock, uint32_t replica_id)
 	return ++vclock->lsn[replica_id];
 }
 
+/**
+ * Set vclock component represented by replica id to the desired
+ * value. Can be used to decrease stored LSN value for the given
+ * replica id while maintaining a valid signature or in the same
+ * manner as vclock_follow.
+ *
+ * @param vclock Vector clock.
+ * @param replica_id Replica identifier.
+ * @param lsn Lsn to set
+ */
+static inline void
+vclock_reset(struct vclock *vclock, uint32_t replica_id, int64_t lsn)
+{
+	assert(lsn >= 0);
+	assert(replica_id < VCLOCK_MAX);
+	vclock->signature -= vclock_get(vclock, replica_id);
+	if (lsn == 0) {
+		vclock->map &= ~(1 << replica_id);
+		return;
+	}
+	vclock->lsn[replica_id] = lsn;
+	vclock->map |= 1 << replica_id;
+	vclock->signature += lsn;
+}
+
 static inline void
 vclock_copy(struct vclock *dst, const struct vclock *src)
 {
@@ -328,6 +353,66 @@ static inline int
 vclock_compare_ignore0(const struct vclock *a, const struct vclock *b)
 {
 	return vclock_compare_generic(a, b, true);
+}
+
+/**
+ * Compare vclocks lexicographically.
+ * The following affirmation holds: if a < b in terms of
+ * vclock_compare, then a < b in terms of vclock_lex_compare.
+ * However, a < b in terms of vclock_lex_compare doesn't mean
+ * than a < b in terms of vclock_compare. Example:
+ * {1:5, 2:10} < {1:7, 2:3} (vclock_lex_compare), but the vclocks
+ * are incomparable in terms of vclock_compare.
+ * All vclocks are comparable lexicographically.
+ *
+ * @param a Vclock.
+ * @param b Vclock.
+ * @retval 1 If @a a is lexicographically greater than @a b.
+ * @retval -1 If @a a is lexicographically less than @a b.
+ * @retval 0 If vclocks are equal.
+ */
+static inline int
+vclock_lex_compare(const struct vclock *a, const struct vclock *b)
+{
+	vclock_map_t map = a->map | b->map;
+	struct bit_iterator it;
+	bit_iterator_init(&it, &map, sizeof(map), true);
+	for(size_t replica_id = bit_iterator_next(&it); replica_id < VCLOCK_MAX;
+	    replica_id = bit_iterator_next(&it)) {
+		int64_t lsn_a = vclock_get(a, replica_id);
+		int64_t lsn_b = vclock_get(b, replica_id);
+		if (lsn_a < lsn_b)
+			return -1;
+		if (lsn_a > lsn_b)
+			return 1;
+	}
+	return 0;
+}
+
+/**
+ * Return a vclock, which is a componentwise minimum between
+ * vclocks @a a and @a b. Do not take vclock[0] into account.
+ *
+ * @param[in,out] a Vclock containing the minimum components.
+ * @param b Vclock to compare with.
+ */
+static inline void
+vclock_min_ignore0(struct vclock *a, const struct vclock *b)
+{
+	vclock_map_t map = a->map | b->map;
+	struct bit_iterator it;
+	bit_iterator_init(&it, &map, sizeof(map), true);
+	size_t replica_id = bit_iterator_next(&it);
+	if (replica_id == 0)
+		replica_id = bit_iterator_next(&it);
+
+	for( ; replica_id < VCLOCK_MAX; replica_id = bit_iterator_next(&it)) {
+		int64_t lsn_a = vclock_get(a, replica_id);
+		int64_t lsn_b = vclock_get(b, replica_id);
+		if (lsn_a <= lsn_b)
+			continue;
+		vclock_reset(a, replica_id, lsn_b);
+	}
 }
 
 /**
