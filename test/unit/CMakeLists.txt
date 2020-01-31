@@ -240,3 +240,6 @@ target_link_libraries(swim_errinj.test unit swim)
 
 add_executable(merger.test merger.test.c)
 target_link_libraries(merger.test unit core box)
+
+add_executable(popen.test popen.c)
+target_link_libraries(popen.test misc unit core)
