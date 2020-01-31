@@ -55,16 +55,15 @@
 struct gc_state gc;
 
 /**
- * Comparator used for ordering gc_consumer objects by signature
- * in a binary tree.
+ * Comparator used for ordering gc_consumer objects
+ * lexicographically by their vclock in a binary tree.
  */
 static inline int
 gc_consumer_cmp(const struct gc_consumer *a, const struct gc_consumer *b)
 {
-	if (vclock_sum(&a->vclock) < vclock_sum(&b->vclock))
-		return -1;
-	if (vclock_sum(&a->vclock) > vclock_sum(&b->vclock))
-		return 1;
+	int rc = vclock_lex_compare(&a->vclock, &b->vclock);
+	if (rc != 0)
+		return rc;
 	if ((intptr_t)a < (intptr_t)b)
 		return -1;
 	if ((intptr_t)a > (intptr_t)b)
@@ -182,19 +181,29 @@ gc_run(void)
 	/* At least one checkpoint must always be available. */
 	assert(checkpoint != NULL);
 
+	/* Find the vclock of the oldest WAL row to keep. */
+	struct vclock min_vclock;
+	struct gc_consumer *consumer = gc_tree_first(&gc.consumers);
 	/*
-	 * Find the vclock of the oldest WAL row to keep.
+	 * Vclock of the oldest WAL row to keep is a by-component
+	 * minimum of all consumer vclocks and the oldest
+	 * checkpoint vclock. This ensures that all rows needed by
+	 * at least one consumer are kept.
 	 * Note, we must keep all WALs created after the
 	 * oldest checkpoint, even if no consumer needs them.
 	 */
-	const struct vclock *vclock = (gc_tree_empty(&gc.consumers) ? NULL :
-				       &gc_tree_first(&gc.consumers)->vclock);
-	if (vclock == NULL ||
-	    vclock_sum(vclock) > vclock_sum(&checkpoint->vclock))
-		vclock = &checkpoint->vclock;
+	vclock_copy(&min_vclock, &checkpoint->vclock);
+	while (consumer != NULL) {
+		/*
+		 * Consumers will never need rows signed
+		 * with a zero instance id (local rows).
+		 */
+		vclock_min_ignore0(&min_vclock, &consumer->vclock);
+		consumer = gc_tree_next(&gc.consumers, consumer);
+	}
 
-	if (vclock_sum(vclock) > vclock_sum(&gc.vclock)) {
-		vclock_copy(&gc.vclock, vclock);
+	if (vclock_sum(&min_vclock) > vclock_sum(&gc.vclock)) {
+		vclock_copy(&gc.vclock, &min_vclock);
 		run_wal_gc = true;
 	}
 
@@ -228,7 +237,7 @@ gc_run(void)
 	 * delete any WAL files, because we have to apprise
 	 * the WAL thread of the oldest checkpoint signature.
 	 */
-	wal_collect_garbage(vclock, &checkpoint->vclock);
+	wal_collect_garbage(&min_vclock, &checkpoint->vclock);
 	latch_unlock(&gc.latch);
 }
 
@@ -241,10 +250,19 @@ gc_process_wal_event(struct wal_watcher_msg *msg)
 	assert((msg->events & WAL_EVENT_GC) != 0);
 
 	struct gc_consumer *consumer = gc_tree_first(&gc.consumers);
-	while (consumer != NULL &&
-	       vclock_sum(&consumer->vclock) < vclock_sum(&msg->gc_vclock)) {
+	while (consumer != NULL) {
 		struct gc_consumer *next = gc_tree_next(&gc.consumers,
 							consumer);
+		/*
+		 * Remove all the consumers whose vclocks are
+		 * either less than or incomparable with the wal
+		 * gc vclock.
+		 */
+		if (vclock_compare_ignore0(&msg->gc_vclock,
+					   &consumer->vclock) <= 0) {
+			consumer = next;
+			continue;
+		}
 		assert(!consumer->is_inactive);
 		consumer->is_inactive = true;
 		gc_tree_remove(&gc.consumers, consumer);
@@ -365,7 +383,7 @@ gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock)
 	 */
 	struct gc_consumer *next = gc_tree_next(&gc.consumers, consumer);
 	bool update_tree = (next != NULL &&
-			    signature >= vclock_sum(&next->vclock));
+			    vclock_lex_compare(vclock, &next->vclock) >= 0);
 
 	if (update_tree)
 		gc_tree_remove(&gc.consumers, consumer);
