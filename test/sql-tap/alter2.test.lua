@@ -256,7 +256,7 @@ test:do_catchsql_test(
         ALTER TABLE child DROP CONSTRAINT fake;
     ]], {
         -- <alter2-5.2>
-        1, "Constraint FAKE does not exist"
+        1, "Constraint 'FAKE' does not exist in space 'CHILD'"
         -- </alter2-5.2>
     })
 

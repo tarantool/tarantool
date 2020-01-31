@@ -1476,21 +1476,21 @@ vdbe_emit_stat_space_clear(struct Parse *parse, const char *stat_table_name,
  * @param constraint_name Name of FK constraint to be dropped.
  *        Must be allocated on head by sqlDbMalloc().
  *        It will be freed in VDBE.
- * @param child_id Id of table which constraint belongs to.
+ * @param child_def Def of table which constraint belongs to.
  */
 static void
 vdbe_emit_fk_constraint_drop(struct Parse *parse_context, char *constraint_name,
-		    uint32_t child_id)
+			     struct space_def *child_def)
 {
 	struct Vdbe *vdbe = sqlGetVdbe(parse_context);
 	assert(vdbe != NULL);
 	int key_reg = sqlGetTempRange(parse_context, 3);
 	sqlVdbeAddOp4(vdbe, OP_String8, 0, key_reg, 0, constraint_name,
 			  P4_DYNAMIC);
-	sqlVdbeAddOp2(vdbe, OP_Integer, child_id,  key_reg + 1);
+	sqlVdbeAddOp2(vdbe, OP_Integer, child_def->id, key_reg + 1);
 	const char *error_msg =
 		tt_sprintf(tnt_errcode_desc(ER_NO_SUCH_CONSTRAINT),
-			   constraint_name);
+			   constraint_name, child_def->name);
 	if (vdbe_emit_halt_with_presence_test(parse_context,
 					      BOX_FK_CONSTRAINT_ID, 0,
 					      key_reg, 2, ER_NO_SUCH_CONSTRAINT,
@@ -1510,21 +1510,22 @@ vdbe_emit_fk_constraint_drop(struct Parse *parse_context, char *constraint_name,
  *
  * @param parser Parsing context.
  * @param ck_name Name of CK constraint to be dropped.
- * @param space_id Id of table which constraint belongs to.
+ * @param space_def Def of table which constraint belongs to.
  */
 static void
 vdbe_emit_ck_constraint_drop(struct Parse *parser, const char *ck_name,
-			     uint32_t space_id)
+			     struct space_def *space_def)
 {
 	struct Vdbe *v = sqlGetVdbe(parser);
 	struct sql *db = v->db;
 	assert(v != NULL);
 	int key_reg = sqlGetTempRange(parser, 3);
-	sqlVdbeAddOp2(v, OP_Integer, space_id,  key_reg);
+	sqlVdbeAddOp2(v, OP_Integer, space_def->id, key_reg);
 	sqlVdbeAddOp4(v, OP_String8, 0, key_reg + 1, 0,
 		      sqlDbStrDup(db, ck_name), P4_DYNAMIC);
 	const char *error_msg =
-		tt_sprintf(tnt_errcode_desc(ER_NO_SUCH_CONSTRAINT), ck_name);
+		tt_sprintf(tnt_errcode_desc(ER_NO_SUCH_CONSTRAINT), ck_name,
+			   space_def->name);
 	if (vdbe_emit_halt_with_presence_test(parser, BOX_CK_CONSTRAINT_ID, 0,
 					      key_reg, 2, ER_NO_SUCH_CONSTRAINT,
 					      error_msg, false, OP_Found) != 0)
@@ -1658,14 +1659,15 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 		char *fk_name_dup = sqlDbStrDup(v->db, child_fk->def->name);
 		if (fk_name_dup == NULL)
 			return;
-		vdbe_emit_fk_constraint_drop(parse_context, fk_name_dup, space_id);
+		vdbe_emit_fk_constraint_drop(parse_context, fk_name_dup,
+					     space->def);
 	}
 	/* Delete all CK constraints. */
 	struct ck_constraint *ck_constraint;
 	rlist_foreach_entry(ck_constraint, &space->ck_constraint, link) {
 		vdbe_emit_ck_constraint_drop(parse_context,
 					     ck_constraint->def->name,
-					     space_id);
+					     space->def);
 	}
 	/*
 	 * Drop all _space and _index entries that refer to the
@@ -2071,7 +2073,7 @@ sql_drop_foreign_key(struct Parse *parse_context)
 		return;
 	}
 	vdbe_emit_fk_constraint_drop(parse_context, constraint_name,
-				     child->def->id);
+				     child->def);
 	/*
 	 * We account changes to row count only if drop of
 	 * foreign keys take place in a separate

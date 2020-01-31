@@ -121,7 +121,7 @@ sql_alter_ck_constraint_enable(struct Parse *parse)
 	int addr = sqlVdbeAddOp4Int(v, OP_Found, cursor, 0, key_reg, 2);
 	sqlVdbeAddOp4(v, OP_SetDiag, ER_NO_SUCH_CONSTRAINT, 0, 0,
 		      sqlMPrintf(db, tnt_errcode_desc(ER_NO_SUCH_CONSTRAINT),
-				 constraint_name), P4_DYNAMIC);
+				 constraint_name, tbl_name), P4_DYNAMIC);
 	sqlVdbeAddOp2(v, OP_Halt, -1, ON_CONFLICT_ACTION_ABORT);
 	sqlVdbeJumpHere(v, addr);
 

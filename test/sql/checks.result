@@ -801,7 +801,7 @@ box.execute('ALTER TABLE test ADD CONSTRAINT \"some_ck\" CHECK(a < 10);')
 box.execute("ALTER TABLE test DISABLE CHECK CONSTRAINT \"falsch\"")
 ---
 - null
-- Constraint falsch does not exist
+- Constraint 'falsch' does not exist in space 'TEST'
 ...
 box.execute("ALTER TABLE test DISABLE CHECK CONSTRAINT \"some_ck\"")
 ---
