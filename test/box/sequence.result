@@ -188,7 +188,15 @@ sq.step, sq.min, sq.max, sq.start, sq.cycle
 - 1
 - false
 ...
+sq:current()  -- error
+---
+- error: Sequence 'test' is not started
+...
 sq:next() -- 1
+---
+- 1
+...
+sq:current()  -- 1
 ---
 - 1
 ...
@@ -198,6 +206,10 @@ sq:next() -- 2
 ...
 sq:set(100)
 ---
+...
+sq:current()  -- 100
+---
+- 100
 ...
 sq:next() -- 101
 ---
@@ -209,6 +221,10 @@ sq:next() -- 102
 ...
 sq:reset()
 ---
+...
+sq:current()  -- error
+---
+- error: Sequence 'test' is not started
 ...
 sq:next() -- 1
 ---
@@ -233,7 +249,15 @@ sq.step, sq.min, sq.max, sq.start, sq.cycle
 - -1
 - false
 ...
+sq:current()  -- error
+---
+- error: Sequence 'test' is not started
+...
 sq:next() -- -1
+---
+- -1
+...
+sq:current()  -- -1
 ---
 - -1
 ...
@@ -243,6 +267,10 @@ sq:next() -- -2
 ...
 sq:set(-100)
 ---
+...
+sq:current()  -- -100
+---
+- -100
 ...
 sq:next() -- -101
 ---
@@ -254,6 +282,10 @@ sq:next() -- -102
 ...
 sq:reset()
 ---
+...
+sq:current()  -- error
+---
+- error: Sequence 'test' is not started
 ...
 sq:next() -- -1
 ---
@@ -2304,5 +2336,46 @@ box.space._space_sequence:update({s.id}, {{'=', 2, t[2]}})
 - error: space "_space_sequence" does not support update
 ...
 s:drop()
+---
+...
+--
+-- gh-4752: introduce sequence:current() method which
+-- fetches current sequence value but doesn't modify
+-- sequence itself.
+--
+sq = box.schema.sequence.create('test')
+---
+...
+sq:current()
+---
+- error: Sequence 'test' is not started
+...
+sq:next()
+---
+- 1
+...
+sq:current()
+---
+- 1
+...
+sq:set(42)
+---
+...
+sq:current()
+---
+- 42
+...
+sq:current()
+---
+- 42
+...
+sq:reset()
+---
+...
+sq:current()
+---
+- error: Sequence 'test' is not started
+...
+sq:drop()
 ---
 ...

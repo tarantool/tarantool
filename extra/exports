@@ -215,6 +215,7 @@ box_update
 box_upsert
 box_truncate
 box_sequence_next
+box_sequence_current
 box_sequence_set
 box_sequence_reset
 box_index_iterator

@@ -636,6 +636,7 @@ t;
   209: box.error.SESSION_SETTING_INVALID_VALUE
   210: box.error.SQL_PREPARE
   211: box.error.WRONG_QUERY_ID
+  212: box.error.SEQUENCE_NOT_STARTED
 ...
 test_run:cmd("setopt delimiter ''");
 ---

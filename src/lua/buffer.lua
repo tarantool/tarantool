@@ -63,6 +63,7 @@ union c_register {
     uint32_t u32;
     uint64_t u64;
     int64_t i64;
+    int64_t ai64[1];
 };
 ]]
 

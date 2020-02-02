@@ -4328,7 +4328,9 @@ case OP_IdxInsert: {
 		p->nChange++;
 	if (pOp->p3 > 0 && ((aMem[pOp->p3].flags) & MEM_Null) != 0) {
 		assert(space->sequence != NULL);
-		int64_t value = sequence_get_value(space->sequence);
+		int64_t value;
+		if (sequence_get_value(space->sequence, &value) != 0)
+			goto abort_due_to_error;
 		if (vdbe_add_new_autoinc_id(p, value) != 0)
 			goto abort_due_to_error;
 	}

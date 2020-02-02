@@ -1414,6 +1414,20 @@ box_sequence_next(uint32_t seq_id, int64_t *result)
 	*result = value;
 	return 0;
 }
+
+int
+box_sequence_current(uint32_t seq_id, int64_t *result)
+{
+	struct sequence *seq = sequence_cache_find(seq_id);
+	if (seq == NULL)
+		return -1;
+	if (access_check_sequence(seq) != 0)
+		return -1;
+	if (sequence_get_value(seq, result) != 0)
+		return -1;
+	return 0;
+}
+
 int
 box_sequence_set(uint32_t seq_id, int64_t value)
 {

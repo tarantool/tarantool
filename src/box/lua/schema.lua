@@ -7,7 +7,7 @@ local fun = require('fun')
 local log = require('log')
 local fio = require('fio')
 local json = require('json')
-local static_alloc = require('buffer').static_alloc
+local buffer = require('buffer')
 local session = box.session
 local internal = require('box.internal')
 local function setmap(table)
@@ -71,6 +71,10 @@ ffi.cdef[[
     box_txn_id();
     int
     box_txn_begin();
+    /** \endcond public */
+    /** \cond public */
+    int
+    box_sequence_current(uint32_t seq_id, int64_t *result);
     /** \endcond public */
     typedef struct txn_savepoint box_txn_savepoint_t;
 
@@ -1812,6 +1816,15 @@ sequence_mt.next = function(self)
     return internal.sequence.next(self.id)
 end
 
+sequence_mt.current = function(self)
+    local ai64 = buffer.reg1.ai64
+    local rc = builtin.box_sequence_current(self.id, ai64)
+    if rc < 0 then
+        box.error(box.error.last())
+    end
+    return ai64[0]
+end
+
 sequence_mt.set = function(self, value)
     return internal.sequence.set(self.id, value)
 end
@@ -2295,7 +2308,7 @@ box.schema.user = {}
 
 box.schema.user.password = function(password)
     local BUF_SIZE = 128
-    local buf = static_alloc('char', BUF_SIZE)
+    local buf = buffer.static_alloc('char', BUF_SIZE)
     builtin.password_prepare(password, #password, buf, BUF_SIZE)
     return ffi.string(buf)
 end

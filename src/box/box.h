@@ -424,6 +424,18 @@ API_EXPORT int
 box_sequence_next(uint32_t seq_id, int64_t *result);
 
 /**
+ * Get the last value returned by a sequence.
+ *
+ * \param seq_id sequence identifier
+ * \param[out] result pointer to a variable where the current sequence
+ * value will be stored on success
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ */
+API_EXPORT int
+box_sequence_current(uint32_t seq_id, int64_t *result);
+
+/**
  * Set a sequence value.
  *
  * \param seq_id sequence identifier

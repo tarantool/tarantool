@@ -58,12 +58,16 @@ box.sequence.test == nil
 -- Default ascending sequence.
 sq = box.schema.sequence.create('test')
 sq.step, sq.min, sq.max, sq.start, sq.cycle
+sq:current()  -- error
 sq:next() -- 1
+sq:current()  -- 1
 sq:next() -- 2
 sq:set(100)
+sq:current()  -- 100
 sq:next() -- 101
 sq:next() -- 102
 sq:reset()
+sq:current()  -- error
 sq:next() -- 1
 sq:next() -- 2
 sq:drop()
@@ -71,12 +75,16 @@ sq:drop()
 -- Default descending sequence.
 sq = box.schema.sequence.create('test', {step = -1})
 sq.step, sq.min, sq.max, sq.start, sq.cycle
+sq:current()  -- error
 sq:next() -- -1
+sq:current()  -- -1
 sq:next() -- -2
 sq:set(-100)
+sq:current()  -- -100
 sq:next() -- -101
 sq:next() -- -102
 sq:reset()
+sq:current()  -- error
 sq:next() -- -1
 sq:next() -- -2
 sq:drop()
@@ -788,3 +796,19 @@ pk = s:create_index('pk', {sequence = true})
 t = box.space._space_sequence:get({s.id})
 box.space._space_sequence:update({s.id}, {{'=', 2, t[2]}})
 s:drop()
+
+--
+-- gh-4752: introduce sequence:current() method which
+-- fetches current sequence value but doesn't modify
+-- sequence itself.
+--
+sq = box.schema.sequence.create('test')
+sq:current()
+sq:next()
+sq:current()
+sq:set(42)
+sq:current()
+sq:current()
+sq:reset()
+sq:current()
+sq:drop()
