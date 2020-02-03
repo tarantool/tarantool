@@ -639,3 +639,20 @@ for i, test in pairs(tests) do                                                  
     end                                                                         \
 end
 err
+
+-- Check that if a field has 'double' field type, it won't use
+-- float, even when the value fits float range.
+s = box.schema.create_space('test', {                                           \
+    format = {{'field1', 'unsigned'}, {'field2', 'double'}, {'field3', 'any'}}  \
+})
+_ = s:create_index('pk')
+dbl1 = ffi.cast('double', 1)
+_ = s:replace{1, dbl1, 1}
+s:update({1}, {{'+', 2, dbl1}})
+_ = s:delete{1}
+-- Check deep fields.
+_ = s:create_index('deep_sk', {'field3', 'double', path = '[1].key1.key2[2]'})
+_ = s:replace{1, dbl1, {{key1 = {key2 = {1, dbl1}}}}}
+s:update({1}, {{'+', 'field3[1].key1.key2[2]', dbl1}})
+
+s:drop()
