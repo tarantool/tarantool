@@ -112,6 +112,9 @@ _ = s1:insert{3}
 _ = s2:insert{3}
 _ = s3:insert{3}
 vclock = test_run:get_vclock('default')
+
+-- Ignore 0-th component when waiting. They don't match.
+vclock[0] = nil
 _ = test_run:wait_vclock('replica', vclock)
 
 test_run:cmd("switch replica")

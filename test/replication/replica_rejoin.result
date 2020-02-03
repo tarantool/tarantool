@@ -144,6 +144,9 @@ for i = 10, 30, 10 do box.space.test:update(i, {{'!', 1, i}}) end
 vclock = test_run:get_vclock('default')
 ---
 ...
+vclock[0] = nil
+---
+...
 _ = test_run:wait_vclock('replica', vclock)
 ---
 ...
@@ -295,6 +298,9 @@ for i = 1, 10 do box.space.test:replace{2} end
 vclock = test_run:get_vclock('replica')
 ---
 ...
+vclock[0] = nil
+---
+...
 _ = test_run:wait_vclock('default', vclock)
 ---
 ...
@@ -343,6 +349,9 @@ for i = 1, 10 do box.space.test:replace{2} end
 ---
 ...
 vclock = test_run:get_vclock('replica')
+---
+...
+vclock[0] = nil
 ---
 ...
 _ = test_run:wait_vclock('default', vclock)

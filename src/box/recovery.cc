@@ -261,11 +261,9 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 			continue; /* already applied, skip */
 
 		/*
-		 * All rows in xlog files have an assigned
-		 * replica id. The only exception is anonymous
-		 * replica, which has a zero instance id.
-		 * In this case the only rows from such an instance
-		 * can be for the local spaces.
+		 * All rows in xlog files have an assigned replica
+		 * id. The only exception are local rows, which
+		 * are signed with a zero replica id.
 		 */
 		assert(row.replica_id != 0 || row.group_id == GROUP_LOCAL);
 		/*

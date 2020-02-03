@@ -953,13 +953,19 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 	/** Assign LSN to all local rows. */
 	for ( ; row < end; row++) {
 		if ((*row)->replica_id == 0) {
-			(*row)->lsn = vclock_inc(vclock_diff, instance_id) +
-				      vclock_get(base, instance_id);
 			/*
-			 * Note, an anonymous replica signs local
-			 * rows whith a zero instance id.
+			 * All rows representing local space data
+			 * manipulations are signed wth a zero
+			 * instance id. This is also true for
+			 * anonymous replicas, since they are
+			 * only capable of writing to local and
+			 * temporary spaces.
 			 */
-			(*row)->replica_id = instance_id;
+			if ((*row)->group_id != GROUP_LOCAL)
+				(*row)->replica_id = instance_id;
+
+			(*row)->lsn = vclock_inc(vclock_diff, (*row)->replica_id) +
+				      vclock_get(base, (*row)->replica_id);
 			/* Use lsn of the first local row as transaction id. */
 			tsn = tsn == 0 ? (*row)->lsn : tsn;
 			(*row)->tsn = tsn;

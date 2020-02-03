@@ -756,16 +756,15 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 {
 	struct relay *relay = container_of(stream, struct relay, stream);
 	assert(iproto_type_is_dml(packet->type));
-	/*
-	 * Transform replica local requests to IPROTO_NOP so as to
-	 * promote vclock on the replica without actually modifying
-	 * any data.
-	 */
 	if (packet->group_id == GROUP_LOCAL) {
 		/*
-		 * Replica-local requests generated while replica
-		 * was anonymous have a zero instance id. Just
-		 * skip all these rows.
+		 * We do not relay replica-local rows to other
+		 * instances, since we started signing them with
+		 * a zero instance id. However, if replica-local
+		 * rows, signed with a non-zero id are present in
+		 * our WAL, we still need to relay them as NOPs in
+		 * order to correctly promote the vclock on the
+		 * replica.
 		 */
 		if (packet->replica_id == REPLICA_ID_NIL)
 			return;
