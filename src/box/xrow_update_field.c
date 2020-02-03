@@ -352,9 +352,8 @@ xrow_update_arg_arith_sizeof(const struct xrow_update_arg_arith *arg)
 		}
 		break;
 	case XUPDATE_TYPE_DOUBLE:
-		return mp_sizeof_double(arg->dbl);
 	case XUPDATE_TYPE_FLOAT:
-		return mp_sizeof_float(arg->flt);
+		return mp_sizeof_double(arg->dbl);
 	default:
 		assert(arg->type == XUPDATE_TYPE_DECIMAL);
 		return mp_sizeof_decimal(&arg->dec);
@@ -534,7 +533,6 @@ xrow_update_op_store_arith(struct xrow_update_op *op,
 			   char *out)
 {
 	(void) format_tree;
-	(void) this_node;
 	(void) in;
 	char *begin = out;
 	struct xrow_update_arg_arith *arg = &op->arg.arith;
@@ -553,6 +551,15 @@ xrow_update_op_store_arith(struct xrow_update_op *op,
 		out = mp_encode_double(out, arg->dbl);
 		break;
 	case XUPDATE_TYPE_FLOAT:
+		if (this_node != NULL) {
+			enum field_type type =
+				json_tree_entry(this_node, struct tuple_field,
+						token)->type;
+			if (type == FIELD_TYPE_DOUBLE) {
+				out = mp_encode_double(out, arg->flt);
+				break;
+			}
+		}
 		out = mp_encode_float(out, arg->flt);
 		break;
 	default:
