@@ -261,10 +261,11 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 			continue; /* already applied, skip */
 
 		/*
-		 * All rows in xlog files have an assigned
-		 * replica id.
+		 * All rows in xlog files have an assigned replica
+		 * id. The only exception are local rows, which
+		 * are signed with a zero replica id.
 		 */
-		assert(row.replica_id != 0);
+		assert(row.replica_id != 0 || row.group_id == GROUP_LOCAL);
 		/*
 		 * We can promote the vclock either before or
 		 * after xstream_write(): it only makes any impact

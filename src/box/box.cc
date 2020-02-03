@@ -1630,6 +1630,23 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 		 vclock_to_string(&replica_clock), vclock_to_string(&vclock));
 
 	/*
+	 * Replica clock is used in gc state and recovery
+	 * initialization, so we need to replace the remote 0-th
+	 * component with our own one. This doesn't break
+	 * recovery: it finds the WAL with a vclock strictly less
+	 * than replia clock in all components except the 0th one.
+	 * This leads to finding the correct WAL, if it exists,
+	 * since we do not need to recover local rows (the ones,
+	 * that contribute to the 0-th vclock component).
+	 * Note, that it would be bad to set 0-th vclock component
+	 * to a smaller value, since it would unnecessarily
+	 * require additional WALs, which may have already been
+	 * deleted.
+	 * Speaking of gc, remote instances' local vclock
+	 * components are not used by consumers at all.
+	 */
+	vclock_reset(&replica_clock, 0, vclock_get(&replicaset.vclock, 0));
+	/*
 	 * Process SUBSCRIBE request via replication relay
 	 * Send current recovery vector clock as a marker
 	 * of the "current" state of the master. When

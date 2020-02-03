@@ -162,6 +162,9 @@ box.schema.user.revoke('test_u', 'create', 'space')
 vclock = test_run:get_vclock('autobootstrap1')
 ---
 ...
+vclock[0] = nil
+---
+...
 _ = test_run:wait_vclock("autobootstrap2", vclock)
 ---
 ...
@@ -204,6 +207,9 @@ test_run:wait_fullmesh(SERVERS)
 ---
 ...
 vclock = test_run:get_vclock("autobootstrap1")
+---
+...
+vclock[0] = nil
 ---
 ...
 _ = test_run:wait_vclock("autobootstrap2", vclock)

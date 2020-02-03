@@ -914,9 +914,16 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 	/** Assign LSN to all local rows. */
 	for ( ; row < end; row++) {
 		if ((*row)->replica_id == 0) {
-			(*row)->lsn = vclock_inc(vclock_diff, instance_id) +
-				      vclock_get(base, instance_id);
-			(*row)->replica_id = instance_id;
+			/*
+			 * All rows representing local space data
+			 * manipulations are signed wth a zero
+			 * instance id.
+			 */
+			if ((*row)->group_id != GROUP_LOCAL)
+				(*row)->replica_id = instance_id;
+
+			(*row)->lsn = vclock_inc(vclock_diff, (*row)->replica_id) +
+				      vclock_get(base, (*row)->replica_id);
 			/* Use lsn of the first local row as transaction id. */
 			tsn = tsn == 0 ? (*row)->lsn : tsn;
 			(*row)->tsn = tsn;
