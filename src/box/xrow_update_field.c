@@ -132,7 +132,6 @@ xrow_update_field_store(struct xrow_update_field *field,
 			struct json_token *this_node, char *out, char *out_end)
 {
 	struct xrow_update_op *op;
-	uint32_t size;
 	switch(field->type) {
 	case XUPDATE_NOP:
 		assert(out_end - out >= field->size);
@@ -140,10 +139,9 @@ xrow_update_field_store(struct xrow_update_field *field,
 		return field->size;
 	case XUPDATE_SCALAR:
 		op = field->scalar.op;
-		size = op->new_field_len;
-		assert(out_end - out >= size);
-		op->meta->store(op, format_tree, this_node, field->data, out);
-		return size;
+		assert(out_end - out >= op->new_field_len);
+		return op->meta->store(op, format_tree, this_node, field->data,
+				       out);
 	case XUPDATE_ARRAY:
 		return xrow_update_array_store(field, format_tree, this_node,
 					       out, out_end);
@@ -516,7 +514,7 @@ xrow_update_op_do_splice(struct xrow_update_op *op, const char *old)
 
 /* {{{ store_op */
 
-static void
+static uint32_t
 xrow_update_op_store_set(struct xrow_update_op *op,
 			 struct json_tree *format_tree,
 			 struct json_token *this_node, const char *in,
@@ -526,9 +524,10 @@ xrow_update_op_store_set(struct xrow_update_op *op,
 	(void) this_node;
 	(void) in;
 	memcpy(out, op->arg.set.value, op->arg.set.length);
+	return op->arg.set.length;
 }
 
-void
+uint32_t
 xrow_update_op_store_arith(struct xrow_update_op *op,
 			   struct json_tree *format_tree,
 			   struct json_token *this_node, const char *in,
@@ -537,30 +536,34 @@ xrow_update_op_store_arith(struct xrow_update_op *op,
 	(void) format_tree;
 	(void) this_node;
 	(void) in;
+	char *begin = out;
 	struct xrow_update_arg_arith *arg = &op->arg.arith;
 	switch (arg->type) {
 	case XUPDATE_TYPE_INT:
 		if (int96_is_uint64(&arg->int96)) {
-			mp_encode_uint(out, int96_extract_uint64(&arg->int96));
+			out = mp_encode_uint(
+				out, int96_extract_uint64(&arg->int96));
 		} else {
 			assert(int96_is_neg_int64(&arg->int96));
-			mp_encode_int(out, int96_extract_neg_int64(&arg->int96));
+			out = mp_encode_int(
+				out, int96_extract_neg_int64( &arg->int96));
 		}
 		break;
 	case XUPDATE_TYPE_DOUBLE:
-		mp_encode_double(out, arg->dbl);
+		out = mp_encode_double(out, arg->dbl);
 		break;
 	case XUPDATE_TYPE_FLOAT:
-		mp_encode_float(out, arg->flt);
+		out = mp_encode_float(out, arg->flt);
 		break;
 	default:
 		assert(arg->type == XUPDATE_TYPE_DECIMAL);
-		mp_encode_decimal(out, &arg->dec);
+		out = mp_encode_decimal(out, &arg->dec);
 		break;
 	}
+	return out - begin;
 }
 
-static void
+static uint32_t
 xrow_update_op_store_bit(struct xrow_update_op *op,
 			 struct json_tree *format_tree,
 			 struct json_token *this_node, const char *in,
@@ -569,10 +572,11 @@ xrow_update_op_store_bit(struct xrow_update_op *op,
 	(void) format_tree;
 	(void) this_node;
 	(void) in;
-	mp_encode_uint(out, op->arg.bit.val);
+	char *end = mp_encode_uint(out, op->arg.bit.val);
+	return end - out;
 }
 
-static void
+static uint32_t
 xrow_update_op_store_splice(struct xrow_update_op *op,
 			    struct json_tree *format_tree,
 			    struct json_token *this_node, const char *in,
@@ -583,6 +587,7 @@ xrow_update_op_store_splice(struct xrow_update_op *op,
 	struct xrow_update_arg_splice *arg = &op->arg.splice;
 	uint32_t new_str_len = arg->offset + arg->paste_length +
 			       arg->tail_length;
+	char *begin = out;
 	(void) mp_decode_strl(&in);
 	out = mp_encode_strl(out, new_str_len);
 	/* Copy field head. */
@@ -593,6 +598,8 @@ xrow_update_op_store_splice(struct xrow_update_op *op,
 	out = out + arg->paste_length;
 	/* Copy tail. */
 	memcpy(out, in + arg->tail_offset, arg->tail_length);
+	out = out + arg->tail_length;
+	return out - begin;
 }
 
 /* }}} store_op */

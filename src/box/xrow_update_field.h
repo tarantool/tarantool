@@ -151,7 +151,7 @@ typedef int
 (*xrow_update_op_do_f)(struct xrow_update_op *op,
 		       struct xrow_update_field *field);
 
-typedef void
+typedef uint32_t
 (*xrow_update_op_store_f)(struct xrow_update_op *op,
 			  struct json_tree *format_tree,
 			  struct json_token *this_node, const char *in,
@@ -711,7 +711,7 @@ xrow_update_arith_make(struct xrow_update_op *op,
 		       struct xrow_update_arg_arith arg,
 		       struct xrow_update_arg_arith *ret);
 
-void
+uint32_t
 xrow_update_op_store_arith(struct xrow_update_op *op,
 			   struct json_tree *format_tree,
 			   struct json_token *this_node, const char *in,
