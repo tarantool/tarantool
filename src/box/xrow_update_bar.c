@@ -446,9 +446,8 @@ xrow_update_bar_store(struct xrow_update_field *field,
 
 		memcpy(out, field->data, before_point);
 		out += before_point;
-		op->meta->store(op, format_tree, this_node, field->bar.point,
-				out);
-		out += op->new_field_len;
+		out += op->meta->store(op, format_tree, this_node,
+				       field->bar.point, out);
 		memcpy(out, point_end, after_point);
 		return out + after_point - out_saved;
 	}

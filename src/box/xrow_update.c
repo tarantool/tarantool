@@ -357,7 +357,7 @@ xrow_update_finish(struct xrow_update *update, struct tuple_format *format,
 	*p_tuple_len = xrow_update_array_store(&update->root, &format->fields,
 					       &format->fields.root, buffer,
 					       buffer + tuple_len);
-	assert(*p_tuple_len == tuple_len);
+	assert(*p_tuple_len <= tuple_len);
 	return buffer;
 }
 
