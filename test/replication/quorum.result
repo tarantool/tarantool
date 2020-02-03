@@ -325,6 +325,9 @@ space:insert{2}
 vclock = test_run:get_vclock("default")
 ---
 ...
+vclock[0] = nil
+---
+...
 _ = test_run:wait_vclock("replica", vclock)
 ---
 ...
@@ -388,6 +391,9 @@ box.cfg{replication = repl}
 ---
 ...
 vclock = test_run:get_vclock("master_quorum1")
+---
+...
+vclock[0] = nil
 ---
 ...
 _ = test_run:wait_vclock("master_quorum2", vclock)

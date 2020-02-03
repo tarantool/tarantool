@@ -55,6 +55,7 @@ test_run:cmd("switch default")
 -- Make sure the replica follows new changes.
 for i = 10, 30, 10 do box.space.test:update(i, {{'!', 1, i}}) end
 vclock = test_run:get_vclock('default')
+vclock[0] = nil
 _ = test_run:wait_vclock('replica', vclock)
 test_run:cmd("switch replica")
 box.space.test:select()
@@ -109,6 +110,7 @@ box.space.test:replace{1}
 test_run:cmd("switch replica")
 for i = 1, 10 do box.space.test:replace{2} end
 vclock = test_run:get_vclock('replica')
+vclock[0] = nil
 _ = test_run:wait_vclock('default', vclock)
 -- Restart the master and force garbage collection.
 test_run:cmd("switch default")
@@ -126,6 +128,7 @@ test_run:wait_cond(function() return #fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.
 test_run:cmd("switch replica")
 for i = 1, 10 do box.space.test:replace{2} end
 vclock = test_run:get_vclock('replica')
+vclock[0] = nil
 _ = test_run:wait_vclock('default', vclock)
 -- Restart the replica. It should successfully rebootstrap.
 test_run:cmd("restart server replica with args='true'")

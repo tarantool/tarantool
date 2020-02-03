@@ -455,6 +455,10 @@ box.cfg{read_only = true}
 
 test_run:cmd("switch default")
 vclock = test_run:get_vclock("default")
+
+-- Ignore 0-th vclock component. They don't match between
+-- replicas.
+vclock[0] = nil
 _ = test_run:wait_vclock("replica", vclock)
 
 test_run:cmd("stop server replica")

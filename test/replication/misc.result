@@ -214,6 +214,9 @@ box.space.space1:select{}
 vclock = test_run:get_vclock("autobootstrap1")
 ---
 ...
+vclock[0] = nil
+---
+...
 _ = test_run:wait_vclock("autobootstrap2", vclock)
 ---
 ...
@@ -412,6 +415,9 @@ while box.info.replication[2] == nil do fiber.sleep(0.01) end
 ---
 ...
 vclock = test_run:get_vclock('default')
+---
+...
+vclock[0] = nil
 ---
 ...
 _ = test_run:wait_vclock('replica_auth', vclock)

@@ -88,6 +88,7 @@ c.space.space1:insert{box.NULL, "data"} -- fails, but bumps sequence value
 c.space.space1:insert{box.NULL, 1, "data"}
 box.space.space1:select{}
 vclock = test_run:get_vclock("autobootstrap1")
+vclock[0] = nil
 _ = test_run:wait_vclock("autobootstrap2", vclock)
 test_run:cmd("switch autobootstrap2")
 box.space.space1:select{}
@@ -172,6 +173,7 @@ box.schema.user.grant('cluster', 'replication')
 
 while box.info.replication[2] == nil do fiber.sleep(0.01) end
 vclock = test_run:get_vclock('default')
+vclock[0] = nil
 _ = test_run:wait_vclock('replica_auth', vclock)
 
 test_run:cmd("stop server replica_auth")

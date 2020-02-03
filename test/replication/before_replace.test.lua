@@ -101,7 +101,9 @@ _ = box.space.test:before_replace(function(old, new) return new:update{{'+', 2, 
 test_run:cmd("switch default")
 box.space.test:replace{1, 1}
 
-_ = test_run:wait_vclock('replica', test_run:get_vclock('default'))
+vclock = test_run:get_vclock('default')
+vclock[0] = nil
+_ = test_run:wait_vclock('replica', vclock)
 
 -- Check that replace{1, 2} coming from the master was suppressed
 -- by the before_replace trigger on the replica.
