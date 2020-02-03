@@ -19,6 +19,7 @@ space:insert{2}
 box.info.status
 
 vclock = test_run:get_vclock('default')
+vclock[0] = nil
 _ = test_run:wait_vclock("replica", vclock)
 test_run:cmd("switch replica")
 box.info.replication[1].upstream.message

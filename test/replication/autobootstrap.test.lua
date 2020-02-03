@@ -72,6 +72,7 @@ box.schema.user.revoke('test_u', 'create', 'space')
 
 -- Synchronize
 vclock = test_run:get_vclock('autobootstrap1')
+vclock[0] = nil
 _ = test_run:wait_vclock("autobootstrap2", vclock)
 _ = test_run:wait_vclock("autobootstrap3", vclock)
 
@@ -93,6 +94,7 @@ _ = test_run:cmd("switch default")
 test_run:wait_fullmesh(SERVERS)
 
 vclock = test_run:get_vclock("autobootstrap1")
+vclock[0] = nil
 _ = test_run:wait_vclock("autobootstrap2", vclock)
 _ = test_run:wait_vclock("autobootstrap3", vclock)
 

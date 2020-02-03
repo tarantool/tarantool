@@ -125,6 +125,7 @@ test_run:cmd("switch default")
 box.cfg{listen = listen}
 space:insert{2}
 vclock = test_run:get_vclock("default")
+vclock[0] = nil
 _ = test_run:wait_vclock("replica", vclock)
 test_run:cmd("switch replica")
 box.info.status -- running
@@ -145,6 +146,7 @@ box.cfg{replication = ""}
 box.space.test:insert{1}
 box.cfg{replication = repl}
 vclock = test_run:get_vclock("master_quorum1")
+vclock[0] = nil
 _ = test_run:wait_vclock("master_quorum2", vclock)
 test_run:cmd("switch master_quorum2")
 box.space.test:select()
