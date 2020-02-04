@@ -1128,7 +1128,7 @@ sql_bind_parameter_name(const struct sql_stmt *stmt, int i)
 	struct Vdbe *p = (struct Vdbe *) stmt;
 	if (p == NULL)
 		return NULL;
-	return sqlVListNumToName(p->pVList, i);
+	return sqlVListNumToName(p->pVList, i+1);
 }
 
 /*
