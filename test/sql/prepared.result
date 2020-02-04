@@ -514,6 +514,64 @@ unprepare(s.stmt_id)
  | - null
  | ...
 
+-- gh-4760: make sure that names of all bindings are parsed correctly.
+--
+s = prepare("SELECT a FROM test WHERE id = :id AND b = :name")
+ | ---
+ | ...
+s.params[1]
+ | ---
+ | - name: :id
+ |   type: ANY
+ | ...
+s.params[2]
+ | ---
+ | - name: :name
+ |   type: ANY
+ | ...
+unprepare(s.stmt_id)
+ | ---
+ | - null
+ | ...
+
+s = prepare("SELECT ?, :id, :name, ?, @name2, ?")
+ | ---
+ | ...
+s.params[1]
+ | ---
+ | - name: '?'
+ |   type: ANY
+ | ...
+s.params[2]
+ | ---
+ | - name: :id
+ |   type: ANY
+ | ...
+s.params[3]
+ | ---
+ | - name: :name
+ |   type: ANY
+ | ...
+s.params[4]
+ | ---
+ | - name: '?'
+ |   type: ANY
+ | ...
+s.params[5]
+ | ---
+ | - name: '@name2'
+ |   type: ANY
+ | ...
+s.params[6]
+ | ---
+ | - name: '?'
+ |   type: ANY
+ | ...
+unprepare(s.stmt_id)
+ | ---
+ | - null
+ | ...
+
 -- DML
 s = prepare("INSERT INTO test VALUES (?, ?, ?);")
  | ---

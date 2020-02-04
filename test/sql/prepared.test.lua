@@ -189,6 +189,22 @@ execute(s.stmt_id, {'6'})
 execute(s.stmt_id, {'9'})
 unprepare(s.stmt_id)
 
+-- gh-4760: make sure that names of all bindings are parsed correctly.
+--
+s = prepare("SELECT a FROM test WHERE id = :id AND b = :name")
+s.params[1]
+s.params[2]
+unprepare(s.stmt_id)
+
+s = prepare("SELECT ?, :id, :name, ?, @name2, ?")
+s.params[1]
+s.params[2]
+s.params[3]
+s.params[4]
+s.params[5]
+s.params[6]
+unprepare(s.stmt_id)
+
 -- DML
 s = prepare("INSERT INTO test VALUES (?, ?, ?);")
 execute(s.stmt_id, {5, 6, '7'})
