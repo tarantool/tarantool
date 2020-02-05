@@ -1,0 +1,12 @@
+-- test-run result file version 2
+-- Check that error is raised when collation doesn't exists.
+format = {}
+ | ---
+ | ...
+format[1] = {'field1', 'unsigend', collation = 'test_coll'}
+ | ---
+ | ...
+s = box.schema.create_space('test', {format = format})
+ | ---
+ | - error: 'Illegal parameters, format[1]: collation was not found by name ''test_coll'''
+ | ...
