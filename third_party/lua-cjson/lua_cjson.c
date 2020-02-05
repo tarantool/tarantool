@@ -1004,13 +1004,27 @@ static int json_decode(lua_State *l)
     luaL_argcheck(l, lua_gettop(l) == 2 || lua_gettop(l) == 1, 1,
                   "expected 1 or 2 arguments");
 
+    struct luaL_serializer *cfg = luaL_checkserializer(l);
+
+    /*
+     * user_cfg is per-call local version of serializer instance
+     * options: it is used if a user passes custom options to
+     * :decode() method within a separate argument. In this case
+     * it is required to avoid modifying options of the instance.
+     * Life span of user_cfg is restricted by the scope of
+     * :decode() so it is enough to allocate it on the stack.
+     */
+    struct luaL_serializer user_cfg;
+    json.cfg = cfg;
     if (lua_gettop(l) == 2) {
-        struct luaL_serializer *user_cfg = luaL_checkserializer(l);
-        luaL_serializer_parse_options(l, user_cfg);
+        /*
+         * on_update triggers are left uninitialized for user_cfg.
+         * The decoding code don't (and shouldn't) run them.
+         */
+        luaL_serializer_copy_options(&user_cfg, cfg);
+        luaL_serializer_parse_options(l, &user_cfg);
         lua_pop(l, 1);
-        json.cfg = user_cfg;
-    } else {
-        json.cfg = luaL_checkserializer(l);
+        json.cfg = &user_cfg;
     }
 
     json.data = luaL_checklstring(l, 1, &json_len);
