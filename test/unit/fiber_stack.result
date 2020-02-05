@@ -1,8 +1,11 @@
 SystemError fiber mprotect failed: Cannot allocate memory
+fiber: Can't put guard page to slab. Leak 57344 bytes: Cannot allocate memory
 	*** main_f ***
-1..4
+1..6
 ok 1 - mprotect: failed to setup fiber guard page
 ok 2 - mprotect: diag is armed after error
 ok 3 - madvise: non critical error on madvise hint
 ok 4 - madvise: diag is armed after error
+ok 5 - fiber with custom stack
+ok 6 - expected leak detected
 	*** main_f: done ***
