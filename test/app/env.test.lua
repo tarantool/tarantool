@@ -9,13 +9,32 @@ do os.getenv('location') end
 
 env_dict = os.environ()
 type(env_dict)
+err = nil
 test_run:cmd("setopt delimiter ';'")
 do
     for k, v in pairs(env_dict) do
         if type(k) ~= 'string' or type(v) ~= 'string' then
-            return false
+            err = {k, v}
+            break
         end
     end
-    return true
-end;
-test_run:cmd("setopt delimiter ''")
+end
+test_run:cmd("setopt delimiter ''");
+err
+
+--
+-- gh-4733: os.setenv() should affect os.environ
+--
+size = 0
+for _, __ in pairs(os.environ()) do size = size + 1 end
+for i = 1, size do os.setenv('gh-4733-test-var'..i, tostring(i)) end
+env = os.environ()
+err = nil
+for i = 1, size do                                                  \
+    local value = env['gh-4733-test-var'..i]                        \
+    if value ~= tostring(i) then                                    \
+        err = {i, value}                                            \
+        break                                                       \
+    end                                                             \
+end
+err

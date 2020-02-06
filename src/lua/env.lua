@@ -9,9 +9,8 @@ ffi.cdef[[
     int   unsetenv(const char *name);
 ]]
 
-local environ = ffi.C.environ
-
 os.environ = function()
+    local environ = ffi.C.environ
     if not environ then
         return nil
     end
