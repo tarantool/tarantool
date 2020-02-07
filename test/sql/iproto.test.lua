@@ -242,5 +242,18 @@ box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.schema.user.revoke('guest', 'create', 'space')
 space = nil
 
+--
+-- gh-4756: PREPARE and EXECUTE statistics should be present in box.stat()
+--
+p = box.stat().PREPARE.total
+e = box.stat().EXECUTE.total
+
+s = box.prepare([[ SELECT ?; ]])
+s:execute({42})
+res, err = box.unprepare(s)
+
+assert(box.stat().PREPARE.total == p + 1)
+assert(box.stat().EXECUTE.total == e + 1)
+
 -- Cleanup xlog
 box.snapshot()
