@@ -5,11 +5,16 @@ local ffi = require('ffi')
 local buffer = require('buffer')
 local fiber = require('fiber')
 local errno = require('errno')
+local schedule_task = fiber._internal.schedule_task
 
 ffi.cdef[[
     int umask(int mask);
     char *dirname(char *path);
     int chdir(const char *path);
+
+    struct fio_handle {
+        int fh;
+    };
 ]]
 
 local const_char_ptr_t = ffi.typeof('const char *')
@@ -160,7 +165,22 @@ fio_methods.stat = function(self)
     return internal.fstat(self.fh)
 end
 
-local fio_mt = { __index = fio_methods }
+fio_methods.__serialize = function(self)
+    return {fh = self.fh}
+end
+
+local fio_mt = {
+    __index = fio_methods,
+    __gc = function(obj)
+        if obj.fh >= 0 then
+            -- FFI GC can't yield. Internal.close() yields.
+            -- Collect the garbage later, in a worker fiber.
+            schedule_task(internal.close, obj.fh)
+        end
+    end,
+}
+
+ffi.metatype('struct fio_handle', fio_mt)
 
 fio.open = function(path, flags, mode)
     local iflag = 0
@@ -202,10 +222,13 @@ fio.open = function(path, flags, mode)
     if err ~= nil then
         return nil, err
     end
-
-    fh = { fh = fh }
-    setmetatable(fh, fio_mt)
-    return fh
+    local ok, res = pcall(ffi.new, 'struct fio_handle', fh)
+    if not ok then
+        internal.close(fh)
+        -- This is OOM.
+        return error(res)
+    end
+    return res
 end
 
 fio.pathjoin = function(...)
