@@ -951,9 +951,20 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 			(*row)->tsn = tsn;
 			(*row)->is_commit = row == end - 1;
 		} else {
-			vclock_follow(vclock_diff, (*row)->replica_id,
-				      (*row)->lsn - vclock_get(base,
-							       (*row)->replica_id));
+			int64_t diff = (*row)->lsn - vclock_get(base, (*row)->replica_id);
+			if (diff <= vclock_get(vclock_diff,
+					       (*row)->replica_id)) {
+				say_crit("Attempt to write a broken LSN to WAL:"
+					 " replica id: %d, confirmed lsn: %d,"
+					 " new lsn %d", (*row)->replica_id,
+					 vclock_get(base, (*row)->replica_id) +
+					 vclock_get(vclock_diff,
+						    (*row)->replica_id),
+						    (*row)->lsn);
+				assert(false);
+			} else {
+				vclock_follow(vclock_diff, (*row)->replica_id, diff);
+			}
 		}
 	}
 }
