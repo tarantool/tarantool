@@ -141,7 +141,7 @@ struct errcode_record {
 	/* 86 */_(ER_SESSION_CLOSED,		"Session is closed") \
 	/* 87 */_(ER_ROLE_LOOP,			"Granting role '%s' to role '%s' would create a loop") \
 	/* 88 */_(ER_GRANT,			"Incorrect grant arguments: %s") \
-	/* 89 */_(ER_PRIV_GRANTED,		"User '%s' already has %s access on %s '%s'") \
+	/* 89 */_(ER_PRIV_GRANTED,		"User '%s' already has %s access on %s%s") \
 	/* 90 */_(ER_ROLE_GRANTED,		"User '%s' already has role '%s'") \
 	/* 91 */_(ER_PRIV_NOT_GRANTED,		"User '%s' does not have %s access on %s '%s'") \
 	/* 92 */_(ER_ROLE_NOT_GRANTED,		"User '%s' does not have role '%s'") \

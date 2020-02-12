@@ -2408,6 +2408,9 @@ local function grant(uid, name, privilege, object_type,
                privilege == 'execute' then
                 box.error(box.error.ROLE_GRANTED, name, object_name)
             else
+                if object_type ~= 'universe' then
+                    object_name = string.format(" '%s'", object_name)
+                end
                 box.error(box.error.PRIV_GRANTED, name, privilege,
                           object_type, object_name)
             end

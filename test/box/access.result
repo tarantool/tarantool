@@ -532,7 +532,7 @@ box.space._priv:select{id}
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
-- error: User 'user' already has read access on universe ''
+- error: User 'user' already has read access on universe
 ...
 box.space._priv:select{id}
 ---
@@ -738,7 +738,7 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ...
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---
-- error: User 'guest' already has read,write,execute access on universe ''
+- error: User 'guest' already has read,write,execute access on universe
 ...
 box.schema.user.grant('guest', 'read,write,execute', 'universe', '', { if_not_exists = true })
 ---
@@ -2107,4 +2107,30 @@ box.schema.user.drop("user3")
 box.space._priv:delete{1, 'universe', 0}
 ---
 - error: 'Incorrect grant arguments: can''t revoke universe from the admin user'
+...
+--
+-- gh-714: box.schema.user.grant error should be versatile,
+-- i.e. error on universally granted privileges shouldn't
+-- include any redundant details and/or symbols.
+--
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+- error: User 'guest' already has read,write,execute access on universe
+...
+-- Expected behavior of grant() error shouldn't change otherwise.
+sp = box.schema.create_space('not_universe')
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'space', 'not_universe')
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'space', 'not_universe')
+---
+- error: User 'guest' already has read,write,execute access on space 'not_universe'
+...
+sp:drop()
+---
 ...

@@ -806,3 +806,17 @@ box.schema.user.drop("user3")
 -- instance could not bootstrap nor recovery.
 --
 box.space._priv:delete{1, 'universe', 0}
+
+--
+-- gh-714: box.schema.user.grant error should be versatile,
+-- i.e. error on universally granted privileges shouldn't
+-- include any redundant details and/or symbols.
+--
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+
+-- Expected behavior of grant() error shouldn't change otherwise.
+sp = box.schema.create_space('not_universe')
+box.schema.user.grant('guest', 'read,write,execute', 'space', 'not_universe')
+box.schema.user.grant('guest', 'read,write,execute', 'space', 'not_universe')
+sp:drop()
