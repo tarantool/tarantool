@@ -19,136 +19,92 @@ space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 ---
 ...
-errinj.info()
+--
+-- Print all error keys in sorted order to minimize diff output
+-- when new ones are merged in.
+ekeys = {}
 ---
-- ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT:
-    state: 0
-  ERRINJ_WAL_WRITE:
-    state: false
-  ERRINJ_RELAY_BREAK_LSN:
-    state: -1
-  ERRINJ_HTTPC_EXECUTE:
-    state: false
-  ERRINJ_VYRUN_DATA_READ:
-    state: false
-  ERRINJ_SWIM_FD_ONLY:
-    state: false
-  ERRINJ_SQL_NAME_NORMALIZATION:
-    state: false
-  ERRINJ_VY_SCHED_TIMEOUT:
-    state: 0
-  ERRINJ_COIO_SENDFILE_CHUNK:
-    state: -1
-  ERRINJ_HTTP_RESPONSE_ADD_WAIT:
-    state: false
-  ERRINJ_WAL_WRITE_PARTIAL:
-    state: -1
-  ERRINJ_VY_GC:
-    state: false
-  ERRINJ_WAL_DELAY:
-    state: false
-  ERRINJ_INDEX_ALLOC:
-    state: false
-  ERRINJ_WAL_WRITE_EOF:
-    state: false
-  ERRINJ_WAL_SYNC:
-    state: false
-  ERRINJ_BUILD_INDEX:
-    state: -1
-  ERRINJ_BUILD_INDEX_DELAY:
-    state: false
-  ERRINJ_VY_RUN_FILE_RENAME:
-    state: false
-  ERRINJ_VY_COMPACTION_DELAY:
-    state: false
-  ERRINJ_VY_DUMP_DELAY:
-    state: false
-  ERRINJ_VY_DELAY_PK_LOOKUP:
-    state: false
-  ERRINJ_VY_TASK_COMPLETE:
-    state: false
-  ERRINJ_PORT_DUMP:
-    state: false
-  ERRINJ_WAL_BREAK_LSN:
-    state: -1
-  ERRINJ_WAL_IO:
-    state: false
-  ERRINJ_WAL_FALLOCATE:
-    state: 0
-  ERRINJ_DYN_MODULE_COUNT:
-    state: 0
-  ERRINJ_VY_INDEX_FILE_RENAME:
-    state: false
-  ERRINJ_TUPLE_FORMAT_COUNT:
-    state: -1
-  ERRINJ_TUPLE_ALLOC:
-    state: false
-  ERRINJ_VY_RUN_WRITE_DELAY:
-    state: false
-  ERRINJ_VY_READ_PAGE:
-    state: false
-  ERRINJ_RELAY_REPORT_INTERVAL:
-    state: 0
-  ERRINJ_VY_LOG_FILE_RENAME:
-    state: false
-  ERRINJ_VY_READ_PAGE_TIMEOUT:
-    state: 0
-  ERRINJ_XLOG_META:
-    state: false
-  ERRINJ_SIO_READ_MAX:
-    state: -1
-  ERRINJ_SNAP_COMMIT_DELAY:
-    state: false
-  ERRINJ_WAL_WRITE_DISK:
-    state: false
-  ERRINJ_SNAP_WRITE_DELAY:
-    state: false
-  ERRINJ_LOG_ROTATE:
-    state: false
-  ERRINJ_VY_RUN_WRITE:
-    state: false
-  ERRINJ_CHECK_FORMAT_DELAY:
-    state: false
-  ERRINJ_VY_LOG_FLUSH_DELAY:
-    state: false
-  ERRINJ_RELAY_FINAL_JOIN:
-    state: false
-  ERRINJ_REPLICA_JOIN_DELAY:
-    state: false
-  ERRINJ_RELAY_FINAL_SLEEP:
-    state: false
-  ERRINJ_VY_RUN_DISCARD:
-    state: false
-  ERRINJ_WAL_ROTATE:
-    state: false
-  ERRINJ_RELAY_EXIT_DELAY:
-    state: 0
-  ERRINJ_VY_POINT_ITER_WAIT:
-    state: false
-  ERRINJ_MEMTX_DELAY_GC:
-    state: false
-  ERRINJ_IPROTO_TX_DELAY:
-    state: false
-  ERRINJ_XLOG_READ:
-    state: -1
-  ERRINJ_TUPLE_FIELD:
-    state: false
-  ERRINJ_XLOG_GARBAGE:
-    state: false
-  ERRINJ_VY_INDEX_DUMP:
-    state: -1
-  ERRINJ_VY_READ_PAGE_DELAY:
-    state: false
-  ERRINJ_TESTING:
-    state: false
-  ERRINJ_RELAY_SEND_DELAY:
-    state: false
-  ERRINJ_VY_SQUASH_TIMEOUT:
-    state: 0
-  ERRINJ_VY_LOG_FLUSH:
-    state: false
-  ERRINJ_RELAY_TIMEOUT:
-    state: 0
+...
+evals = {}
+---
+...
+for k, v in pairs(errinj.info()) do table.insert(ekeys, k) end
+---
+...
+table.sort(ekeys)
+---
+...
+for i, k in ipairs(ekeys) do         \
+    evals[i] = {[k] = errinj.get(k)} \
+end
+---
+...
+evals
+---
+- - ERRINJ_BUILD_INDEX: -1
+  - ERRINJ_BUILD_INDEX_DELAY: false
+  - ERRINJ_CHECK_FORMAT_DELAY: false
+  - ERRINJ_COIO_SENDFILE_CHUNK: -1
+  - ERRINJ_DYN_MODULE_COUNT: 0
+  - ERRINJ_HTTPC_EXECUTE: false
+  - ERRINJ_HTTP_RESPONSE_ADD_WAIT: false
+  - ERRINJ_INDEX_ALLOC: false
+  - ERRINJ_IPROTO_TX_DELAY: false
+  - ERRINJ_LOG_ROTATE: false
+  - ERRINJ_MEMTX_DELAY_GC: false
+  - ERRINJ_PORT_DUMP: false
+  - ERRINJ_RELAY_BREAK_LSN: -1
+  - ERRINJ_RELAY_EXIT_DELAY: 0
+  - ERRINJ_RELAY_FINAL_JOIN: false
+  - ERRINJ_RELAY_FINAL_SLEEP: false
+  - ERRINJ_RELAY_REPORT_INTERVAL: 0
+  - ERRINJ_RELAY_SEND_DELAY: false
+  - ERRINJ_RELAY_TIMEOUT: 0
+  - ERRINJ_REPLICA_JOIN_DELAY: false
+  - ERRINJ_SIO_READ_MAX: -1
+  - ERRINJ_SNAP_COMMIT_DELAY: false
+  - ERRINJ_SNAP_WRITE_DELAY: false
+  - ERRINJ_SQL_NAME_NORMALIZATION: false
+  - ERRINJ_SWIM_FD_ONLY: false
+  - ERRINJ_TESTING: false
+  - ERRINJ_TUPLE_ALLOC: false
+  - ERRINJ_TUPLE_FIELD: false
+  - ERRINJ_TUPLE_FORMAT_COUNT: -1
+  - ERRINJ_VYRUN_DATA_READ: false
+  - ERRINJ_VY_COMPACTION_DELAY: false
+  - ERRINJ_VY_DELAY_PK_LOOKUP: false
+  - ERRINJ_VY_DUMP_DELAY: false
+  - ERRINJ_VY_GC: false
+  - ERRINJ_VY_INDEX_DUMP: -1
+  - ERRINJ_VY_INDEX_FILE_RENAME: false
+  - ERRINJ_VY_LOG_FILE_RENAME: false
+  - ERRINJ_VY_LOG_FLUSH: false
+  - ERRINJ_VY_LOG_FLUSH_DELAY: false
+  - ERRINJ_VY_POINT_ITER_WAIT: false
+  - ERRINJ_VY_READ_PAGE: false
+  - ERRINJ_VY_READ_PAGE_DELAY: false
+  - ERRINJ_VY_READ_PAGE_TIMEOUT: 0
+  - ERRINJ_VY_RUN_DISCARD: false
+  - ERRINJ_VY_RUN_FILE_RENAME: false
+  - ERRINJ_VY_RUN_WRITE: false
+  - ERRINJ_VY_RUN_WRITE_DELAY: false
+  - ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT: 0
+  - ERRINJ_VY_SCHED_TIMEOUT: 0
+  - ERRINJ_VY_SQUASH_TIMEOUT: 0
+  - ERRINJ_VY_TASK_COMPLETE: false
+  - ERRINJ_WAL_BREAK_LSN: -1
+  - ERRINJ_WAL_DELAY: false
+  - ERRINJ_WAL_FALLOCATE: 0
+  - ERRINJ_WAL_IO: false
+  - ERRINJ_WAL_ROTATE: false
+  - ERRINJ_WAL_SYNC: false
+  - ERRINJ_WAL_WRITE: false
+  - ERRINJ_WAL_WRITE_DISK: false
+  - ERRINJ_WAL_WRITE_EOF: false
+  - ERRINJ_WAL_WRITE_PARTIAL: -1
+  - ERRINJ_XLOG_GARBAGE: false
+  - ERRINJ_XLOG_META: false
+  - ERRINJ_XLOG_READ: -1
 ...
 errinj.set("some-injection", true)
 ---
