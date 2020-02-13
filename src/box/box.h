@@ -105,6 +105,9 @@ box_set_ro();
 bool
 box_is_ro(void);
 
+bool
+box_is_orphan(void);
+
 /**
  * Wait until the instance switches to a desired mode.
  * \param ro wait read-only if set or read-write if unset

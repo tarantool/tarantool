@@ -247,6 +247,12 @@ box_is_ro(void)
 	return is_ro || is_orphan;
 }
 
+bool
+box_is_orphan(void)
+{
+	return is_orphan;
+}
+
 int
 box_wait_ro(bool ro, double timeout)
 {
