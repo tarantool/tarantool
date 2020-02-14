@@ -71,6 +71,15 @@ struct error {
 	error_f raise;
 	error_f log;
 	const struct type_info *type;
+	/**
+	 * Reference counting is basically required since
+	 * instances of this structure are available in Lua
+	 * as well (as cdata with overloaded fields and methods
+	 * by the means of introspection). Thus, it may turn
+	 * out that Lua's GC attempts at releasing object
+	 * meanwhile it is still used in C internals or vice
+	 * versa. For details see luaT_pusherror().
+	 */
 	int refs;
 	/**
 	 * Errno at the moment of the error
