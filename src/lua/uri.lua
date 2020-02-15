@@ -77,8 +77,8 @@ local function format(uri, write_password)
     uribuf.fragment = uri.fragment
     uribuf.fragment_len = string.len(uri.fragment or '')
     local str = static_alloc('char', 1024)
-    builtin.uri_format(str, 1024, uribuf, write_password and 1 or 0)
-    return ffi.string(str)
+    local len = builtin.uri_format(str, 1024, uribuf, write_password and 1 or 0)
+    return ffi.string(str, len)
 end
 
 return {
