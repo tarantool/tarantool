@@ -342,7 +342,17 @@ ffi.metatype(tuple_iterator_t, {
     __tostring = function(it) return "<tuple iterator>" end;
 })
 
+-- Free methods, which are not needed anymore.
+internal.tuple.slice = nil
+internal.tuple.transform = nil
+internal.tuple.tuple_to_map = nil
+internal.tuple.tostring = nil
+
 -- internal api for box.select and iterators
-box.tuple.bless = tuple_bless
-box.tuple.encode = tuple_encode
+internal.tuple.bless = tuple_bless
+internal.tuple.encode = tuple_encode
+
+-- The function is internal in a sense that it is not documented.
+-- But it is safe and widely used in the tests. Keep it here at
+-- least for test code.
 box.tuple.is = is_tuple
