@@ -496,4 +496,18 @@ while tuple ~= nil do level = level + 1 tuple = tuple[1] end
 -- serializer allows deeper tables.
 level == max_depth + 5 or {level, max_depth}
 
+-- gh-4684: some box.tuple.* methods were private and could be
+-- used by customers to shoot in their own legs. Some of them
+-- were moved to a more secret place. box.tuple.is() was moved to
+-- the public API, legally.
+box.tuple.is()
+box.tuple.is(nil)
+box.tuple.is(box.NULL)
+box.tuple.is({})
+box.tuple.is(ffi.new('char[1]'))
+box.tuple.is(1)
+box.tuple.is('1')
+box.tuple.is(box.tuple.new())
+box.tuple.is(box.tuple.new({1}))
+
 msgpack.cfg({encode_max_depth = max_depth, encode_deep_as_nil = deep_as_nil})
