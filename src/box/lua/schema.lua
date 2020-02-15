@@ -17,8 +17,8 @@ end
 local builtin = ffi.C
 
 -- performance fixup for hot functions
-local tuple_encode = box.tuple.encode
-local tuple_bless = box.tuple.bless
+local tuple_encode = box.internal.tuple.encode
+local tuple_bless = box.internal.tuple.bless
 local is_tuple = box.tuple.is
 assert(tuple_encode ~= nil and tuple_bless ~= nil and is_tuple ~= nil)
 
