@@ -352,7 +352,8 @@ internal.tuple.tostring = nil
 internal.tuple.bless = tuple_bless
 internal.tuple.encode = tuple_encode
 
--- The function is internal in a sense that it is not documented.
--- But it is safe and widely used in the tests. Keep it here at
--- least for test code.
+-- Public API, additional to implemented in C.
+
+-- is() is implemented in Lua, because then it is
+-- easy to be JITed.
 box.tuple.is = is_tuple

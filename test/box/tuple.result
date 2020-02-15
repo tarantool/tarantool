@@ -1450,6 +1450,46 @@ level == max_depth + 5 or {level, max_depth}
 ---
 - true
 ...
+-- gh-4684: some box.tuple.* methods were private and could be
+-- used by customers to shoot in their own legs. Some of them
+-- were moved to a more secret place. box.tuple.is() was moved to
+-- the public API, legally.
+box.tuple.is()
+---
+- false
+...
+box.tuple.is(nil)
+---
+- false
+...
+box.tuple.is(box.NULL)
+---
+- false
+...
+box.tuple.is({})
+---
+- false
+...
+box.tuple.is(ffi.new('char[1]'))
+---
+- false
+...
+box.tuple.is(1)
+---
+- false
+...
+box.tuple.is('1')
+---
+- false
+...
+box.tuple.is(box.tuple.new())
+---
+- true
+...
+box.tuple.is(box.tuple.new({1}))
+---
+- true
+...
 msgpack.cfg({encode_max_depth = max_depth, encode_deep_as_nil = deep_as_nil})
 ---
 ...
