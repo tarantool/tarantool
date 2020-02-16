@@ -767,7 +767,12 @@ local function upgrade_sequence_to_2_2_1()
         local part = pk[6][1]
         local field = part.field or part[1]
         local path = part.path or ''
-        _space_sequence:update(v[1], {{'!', 4, field}, {'!', 5, path}})
+        local t = _space_sequence:get(v[1])
+        -- Update in-place is banned due to complexity of its
+        -- handling. Delete + insert still work.
+        t = t:update({{'!', 4, field}, {'!', 5, path}})
+        _space_sequence:delete({v[1]})
+        _space_sequence:insert(t)
         ::continue::
     end
     local format = _space_sequence:format()
