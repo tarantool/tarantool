@@ -1,0 +1,78 @@
+-- test-run result file version 2
+test_run = require('test_run').new()
+ | ---
+ | ...
+
+test_run:cmd('create server upgrade with script="xlog/upgrade.lua", '..		\
+             'workdir="xlog/upgrade/2.1.3/gh-4771-upgrade-sequence"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server upgrade')
+ | ---
+ | - true
+ | ...
+test_run:switch('upgrade')
+ | ---
+ | - true
+ | ...
+
+box.schema.upgrade()
+ | ---
+ | ...
+
+s = box.space.test1
+ | ---
+ | ...
+box.space._sequence:select{}
+ | ---
+ | - - [1, 1, 'test1_seq', 1, 1, 9223372036854775807, 1, 0, false]
+ |   - [2, 1, 'seq2', 1, 1, 9223372036854775807, 1, 0, false]
+ |   - [3, 1, 'seq3', 1, 1, 9223372036854775807, 1, 0, false]
+ | ...
+box.space._sequence_data:select{}
+ | ---
+ | - - [1, 1]
+ |   - [2, 1]
+ |   - [3, 1]
+ | ...
+box.space._space_sequence:select{}
+ | ---
+ | - - [512, 1, true, 0, '']
+ |   - [513, 2, false, 0, '']
+ | ...
+s:select{}
+ | ---
+ | - - [1]
+ | ...
+_ = s:replace{box.NULL}
+ | ---
+ | ...
+s:select{}
+ | ---
+ | - - [1]
+ |   - [2]
+ | ...
+
+box.space.test2:select{}
+ | ---
+ | - - [1]
+ | ...
+
+box.sequence.seq3:next()
+ | ---
+ | - 2
+ | ...
+
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server upgrade')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server upgrade')
+ | ---
+ | - true
+ | ...
