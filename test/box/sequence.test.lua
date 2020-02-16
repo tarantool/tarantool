@@ -771,3 +771,12 @@ sq:next() -- 1
 box.begin() box.space._sequence_data:delete{sq.id} box.rollback()
 sq:next() -- 2
 sq:drop()
+
+--
+-- Update on _space_sequence is forbidden.
+--
+s = box.schema.create_space('test')
+pk = s:create_index('pk', {sequence = true})
+t = box.space._space_sequence:get({s.id})
+box.space._space_sequence:update({s.id}, {{'=', 2, t[2]}})
+s:drop()

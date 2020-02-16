@@ -3834,9 +3834,17 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 	struct space *space = space_cache_find_xc(space_id);
 	struct sequence *seq = sequence_cache_find(sequence_id);
 
+	if (stmt->new_tuple != NULL && stmt->old_tuple != NULL) {
+		/*
+		 * Makes no sense to support update, it would
+		 * complicate the code, and won't simplify
+		 * anything else.
+		 */
+		tnt_raise(ClientError, ER_UNSUPPORTED,
+			  "space \"_space_sequence\"", "update");
+	}
+
 	enum priv_type priv_type = stmt->new_tuple ? PRIV_C : PRIV_D;
-	if (stmt->new_tuple && stmt->old_tuple)
-		priv_type = PRIV_A;
 
 	/* Check we have the correct access type on the sequence.  * */
 	if (is_generated || !stmt->new_tuple) {
