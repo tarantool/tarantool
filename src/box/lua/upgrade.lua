@@ -63,18 +63,28 @@ local function truncate(space)
     end
 end
 
+local function foreach_system_space(cb)
+    local max = box.schema.SYSTEM_ID_MAX
+    for id, space in pairs(box.space) do
+        -- Check for number, because box.space contains each space
+        -- twice - by ID and by name. Here IDs are selected.
+        -- Engine is checked to be a 'native' space, because other
+        -- engines does not support DML, and does not have
+        -- triggers to turn off/on. These are 'service',
+        -- 'blackhole', and more may be added.
+        -- When id > max system id is met, break is not done,
+        -- because box.space is not an array, and it is not safe
+        -- to assume all its numeric indexes are returned in
+        -- ascending order.
+        if type(id) == 'number' and id <= max and
+           (space.engine == 'memtx' or space.engine == 'vinyl') then
+            cb(space)
+        end
+    end
+end
+
 local function set_system_triggers(val)
-    box.space._space:run_triggers(val)
-    box.space._index:run_triggers(val)
-    box.space._user:run_triggers(val)
-    box.space._func:run_triggers(val)
-    box.space._priv:run_triggers(val)
-    box.space._trigger:run_triggers(val)
-    box.space._collation:run_triggers(val)
-    box.space._schema:run_triggers(val)
-    box.space._cluster:run_triggers(val)
-    box.space._fk_constraint:run_triggers(val)
-    box.space._ck_constraint:run_triggers(val)
+    foreach_system_space(function(s) s:run_triggers(val) end)
 end
 
 --------------------------------------------------------------------------------
@@ -82,20 +92,7 @@ end
 --------------------------------------------------------------------------------
 
 local function erase()
-    truncate(box.space._space)
-    truncate(box.space._index)
-    truncate(box.space._user)
-    truncate(box.space._func)
-    truncate(box.space._priv)
-    truncate(box.space._sequence_data)
-    truncate(box.space._sequence)
-    truncate(box.space._truncate)
-    truncate(box.space._collation)
-    truncate(box.space._trigger)
-    truncate(box.space._schema)
-    truncate(box.space._cluster)
-    truncate(box.space._fk_constraint)
-    truncate(box.space._ck_constraint)
+    foreach_system_space(function(s) truncate(s) end)
 end
 
 local function create_sysview(source_id, target_id)
