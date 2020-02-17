@@ -32,6 +32,7 @@ extern "C" {
 #include "unit.h"
 } /* extern "C" */
 #include "trivia/util.h"
+#include "box/error.h"
 #include "box/xrow.h"
 #include "box/iproto_constants.h"
 #include "uuid/tt_uuid.h"
@@ -241,6 +242,186 @@ test_xrow_header_encode_decode()
 	check_plan();
 }
 
+static char *
+error_stack_entry_encode(char *pos, const char *err_str)
+{
+	pos = mp_encode_map(pos, 2);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_CODE);
+	pos = mp_encode_uint(pos, 159);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_MESSAGE);
+	pos = mp_encode_str(pos, err_str, strlen(err_str));
+	return pos;
+}
+
+void
+test_xrow_error_stack_decode()
+{
+	plan(21);
+	char buffer[2048];
+	/*
+	 * To start with, let's test the simplest and obsolete
+	 * way of setting errors.
+	 */
+	char *pos = mp_encode_map(buffer, 1);
+	pos = mp_encode_uint(pos, IPROTO_ERROR);
+	pos = mp_encode_str(pos, "e1", strlen("e1"));
+
+	struct xrow_header header;
+	header.bodycnt = 666;
+	header.type = 159 | IPROTO_TYPE_ERROR;
+	header.body[0].iov_base = buffer;
+	header.body[0].iov_len = pos - buffer;
+
+	xrow_decode_error(&header);
+	struct error *last = diag_last_error(diag_get());
+	isnt(last, NULL, "xrow_decode succeed: diag has been set");
+	is(strcmp(last->errmsg, "e1"), 0,
+	   "xrow_decode succeed: error is parsed");
+
+	pos = mp_encode_map(buffer, 1);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_STACK);
+	pos = mp_encode_array(pos, 2);
+	pos = error_stack_entry_encode(pos, "e1");
+	pos = error_stack_entry_encode(pos, "e2");
+	header.body[0].iov_base = buffer;
+	header.body[0].iov_len = pos - buffer;
+
+	diag_clear(diag_get());
+	xrow_decode_error(&header);
+	last = diag_last_error(diag_get());
+	isnt(last, NULL, "xrow_decode succeed: diag has been set");
+	is(strcmp(last->errmsg, "e2"), 0, "xrow_decode error stack suceed: "
+	   "e2 at the top of stack");
+	last = last->cause;
+	isnt(last, NULL, "xrow_decode succeed: 'cause' is present in stack")
+	is(strcmp(last->errmsg, "e1"), 0, "xrow_decode succeed: "
+	   "stack has been parsed");
+	last = last->cause;
+	is(last, NULL, "xrow_decode succeed: only two errors in the stack")
+	/*
+	 * Let's try decode broken stack. Variations:
+	 * 1. Stack is not encoded as an array;
+	 * 2. Stack doesn't contain maps;
+	 * 3. Stack's map keys are not uints;
+	 * 4. Stack's map values have wrong types;
+	 * 5. Stack's map key is broken (doesn't fit into u8);
+	 * 6. Stack's map contains overflowed (> 2^32) error code;
+	 * In all these cases diag_last should contain empty err.
+	 */
+	/* Stack is encoded as map. */
+	pos = mp_encode_map(buffer, 1);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_STACK);
+	pos = mp_encode_map(pos, 1);
+	pos = error_stack_entry_encode(pos, "e1");
+	header.body[0].iov_base = buffer;
+	header.body[0].iov_len = pos - buffer;
+
+	diag_clear(diag_get());
+	xrow_decode_error(&header);
+	last = diag_last_error(diag_get());
+	isnt(last, NULL, "xrow_decode succeed: diag has been set");
+	is(strcmp(last->errmsg, ""), 0, "xrow_decode corrupted stack: "
+	   "stack contains map instead of array");
+
+	/* Stack doesn't containt map(s) - array instead. */
+	pos = mp_encode_map(buffer, 1);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_STACK);
+	pos = mp_encode_array(pos, 2);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_CODE);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_MESSAGE);
+	header.body[0].iov_base = buffer;
+	header.body[0].iov_len = pos - buffer;
+
+	diag_clear(diag_get());
+	xrow_decode_error(&header);
+	last = diag_last_error(diag_get());
+	isnt(last, NULL, "xrow_decode succeed: diag has been set");
+	is(strcmp(last->errmsg, ""), 0, "xrow_decode corrupted stack: "
+	   "stack contains array values instead of maps");
+
+	/* Stack's map keys are not uints. */
+	pos = mp_encode_map(buffer, 1);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_STACK);
+	pos = mp_encode_array(pos, 1);
+	pos = mp_encode_map(pos, 2);
+	pos = mp_encode_str(pos, "string instead of uint",
+			    strlen("string instead of uint"));
+	pos = mp_encode_uint(pos, IPROTO_ERROR_MESSAGE);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_CODE);
+	pos = mp_encode_uint(pos, 159);
+	header.body[0].iov_base = buffer;
+	header.body[0].iov_len = pos - buffer;
+
+	diag_clear(diag_get());
+	xrow_decode_error(&header);
+	last = diag_last_error(diag_get());
+	isnt(last, NULL, "xrow_decode succeed: diag has been set");
+	is(strcmp(last->errmsg, ""), 0, "xrow_decode corrupted stack: "
+	   "stack's map keys are not uints");
+
+	/* Stack's map values have wrong types. */
+	pos = mp_encode_map(buffer, 1);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_STACK);
+	pos = mp_encode_array(pos, 1);
+	pos = mp_encode_map(pos, 2);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_CODE);
+	pos = mp_encode_uint(pos, 159);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_MESSAGE);
+	pos = mp_encode_uint(pos, 666);
+	header.body[0].iov_base = buffer;
+	header.body[0].iov_len = pos - buffer;
+
+	diag_clear(diag_get());
+	xrow_decode_error(&header);
+	last = diag_last_error(diag_get());
+	isnt(last, NULL, "xrow_decode succeed: diag has been set");
+	is(strcmp(last->errmsg, ""), 0, "xrow_decode corrupted stack: "
+	   "stack's map wrong value type");
+
+	/* Bad key in the packet. */
+	pos = mp_encode_map(buffer, 1);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_STACK);
+	pos = mp_encode_array(pos, 1);
+	pos = mp_encode_map(pos, 2);
+	pos = mp_encode_uint(pos, 0xff00000000 | IPROTO_ERROR_CODE);
+	pos = mp_encode_uint(pos, 159);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_MESSAGE);
+	pos = mp_encode_str(pos, "test msg", strlen("test msg"));
+	header.body[0].iov_base = buffer;
+	header.body[0].iov_len = pos - buffer;
+
+	diag_clear(diag_get());
+	xrow_decode_error(&header);
+	last = diag_last_error(diag_get());
+	isnt(last, NULL, "xrow_decode succeed: diag has been set");
+	is(box_error_code(last), 0, "xrow_decode last error code is default 0");
+	is(strcmp(last->errmsg, "test msg"), 0, "xrow_decode corrupted stack: "
+	   "stack's map wrong key");
+
+	/* Overflow error code. */
+	pos = mp_encode_map(buffer, 1);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_STACK);
+	pos = mp_encode_array(pos, 1);
+	pos = mp_encode_map(pos, 2);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_CODE);
+	pos = mp_encode_uint(pos, (uint64_t)1 << 40);
+	pos = mp_encode_uint(pos, IPROTO_ERROR_MESSAGE);
+	pos = mp_encode_str(pos, "test msg", strlen("test msg"));
+	header.body[0].iov_base = buffer;
+	header.body[0].iov_len = pos - buffer;
+
+	diag_clear(diag_get());
+	xrow_decode_error(&header);
+	last = diag_last_error(diag_get());
+	isnt(last, NULL, "xrow_decode succeed: diag has been set");
+	is(box_error_code(last), 159, "xrow_decode failed, took code from "
+	   "header");
+	is(strcmp(last->errmsg, ""), 0, "xrow_decode failed, message is not "
+	   "decoded");
+
+	check_plan();
+}
+
 void
 test_request_str()
 {
@@ -279,13 +460,14 @@ main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	plan(3);
+	plan(4);
 
 	random_init();
 
 	test_iproto_constants();
 	test_greeting();
 	test_xrow_header_encode_decode();
+	test_xrow_error_stack_decode();
 	test_request_str();
 
 	random_free();

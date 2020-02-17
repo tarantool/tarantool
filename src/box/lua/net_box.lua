@@ -44,6 +44,9 @@ local SQL_INFO_ROW_COUNT_KEY = 0
 local IPROTO_FIELD_NAME_KEY = 0
 local IPROTO_DATA_KEY      = 0x30
 local IPROTO_ERROR_KEY     = 0x31
+local IPROTO_ERROR_STACK   = 0x52
+local IPROTO_ERROR_CODE    = 0x01
+local IPROTO_ERROR_MESSAGE = 0x02
 local IPROTO_GREETING_SIZE = 128
 local IPROTO_CHUNK_KEY     = 128
 local IPROTO_OK_KEY        = 0
@@ -277,8 +280,22 @@ local function create_transport(host, port, user, password, callback,
     --
     function request_index:result()
         if self.errno then
-            return nil, box.error.new({code = self.errno,
-                                       reason = self.response})
+            if type(self.response) == 'table' then
+                -- Decode and fill in error stack.
+                local prev = nil
+                for i = #self.response, 1, -1 do
+                    local error = self.response[i]
+                    local code = error[IPROTO_ERROR_CODE]
+                    local msg = error[IPROTO_ERROR_MESSAGE]
+                    local new_err = box.error.new({code = code, reason = msg})
+                    new_err:set_prev(prev)
+                    prev = new_err
+                end
+                return nil, prev
+            else
+                return nil, box.error.new({code = self.errno,
+                                           reason = self.response})
+            end
         elseif not self.id then
             return self.response
         elseif not worker_fiber then
@@ -559,7 +576,14 @@ local function create_transport(host, port, user, password, callback,
             body, body_end_check = decode(body_rpos)
             assert(body_end == body_end_check, "invalid xrow length")
             request.errno = band(status, IPROTO_ERRNO_MASK)
-            request.response = body[IPROTO_ERROR_KEY]
+            -- IPROTO_ERROR_STACK comprises error encoded with
+            -- IPROTO_ERROR_KEY, so we may ignore content of that key.
+            if body[IPROTO_ERROR_STACK] ~= nil then
+                request.response = body[IPROTO_ERROR_STACK]
+                assert(type(request.response) == 'table')
+            else
+                request.response = body[IPROTO_ERROR_KEY]
+            end
             request.cond:broadcast()
             return
         end

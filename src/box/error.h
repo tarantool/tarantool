@@ -138,6 +138,22 @@ box_error_set(const char *file, unsigned line, uint32_t code,
 /** \endcond public */
 
 /**
+ * Add error to the diagnostic area. In contrast to box_error_set()
+ * it does not replace previous error being set, but rather link
+ * them into list.
+ *
+ * \param code IPROTO error code (enum \link box_error_code \endlink)
+ * \param format (const char * ) - printf()-like format string
+ * \param ... - format arguments
+ * \returns -1 for convention use
+ *
+ * \sa enum box_error_code
+ */
+int
+box_error_add(const char *file, unsigned line, uint32_t code,
+	      const char *fmt, ...);
+
+/**
  * Construct error object without setting it in the diagnostics
  * area. On the memory allocation fail returns NULL.
  */

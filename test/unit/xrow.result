@@ -1,4 +1,4 @@
-1..3
+1..4
     1..40
     ok 1 - round trip
     ok 2 - roundtrip.version_id
@@ -53,6 +53,29 @@ ok 1 - subtests
     ok 9 - decoded sync
     ok 10 - decoded bodycnt
 ok 2 - subtests
+    1..21
+    ok 1 - xrow_decode succeed: diag has been set
+    ok 2 - xrow_decode succeed: error is parsed
+    ok 3 - xrow_decode succeed: diag has been set
+    ok 4 - xrow_decode error stack suceed: e2 at the top of stack
+    ok 5 - xrow_decode succeed: 'cause' is present in stack
+    ok 6 - xrow_decode succeed: stack has been parsed
+    ok 7 - xrow_decode succeed: only two errors in the stack
+    ok 8 - xrow_decode succeed: diag has been set
+    ok 9 - xrow_decode corrupted stack: stack contains map instead of array
+    ok 10 - xrow_decode succeed: diag has been set
+    ok 11 - xrow_decode corrupted stack: stack contains array values instead of maps
+    ok 12 - xrow_decode succeed: diag has been set
+    ok 13 - xrow_decode corrupted stack: stack's map keys are not uints
+    ok 14 - xrow_decode succeed: diag has been set
+    ok 15 - xrow_decode corrupted stack: stack's map wrong value type
+    ok 16 - xrow_decode succeed: diag has been set
+    ok 17 - xrow_decode last error code is default 0
+    ok 18 - xrow_decode corrupted stack: stack's map wrong key
+    ok 19 - xrow_decode succeed: diag has been set
+    ok 20 - xrow_decode failed, took code from header
+    ok 21 - xrow_decode failed, message is not decoded
+ok 3 - subtests
     1..1
     ok 1 - request_str
-ok 3 - subtests
+ok 4 - subtests

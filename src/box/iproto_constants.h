@@ -126,6 +126,7 @@ enum iproto_key {
 	/* Leave a gap between SQL keys and additional request keys */
 	IPROTO_REPLICA_ANON = 0x50,
 	IPROTO_ID_FILTER = 0x51,
+	IPROTO_ERROR_STACK = 0x52,
 	IPROTO_KEY_MAX
 };
 
@@ -148,6 +149,11 @@ enum iproto_ballot_key {
 	IPROTO_BALLOT_VCLOCK = 0x02,
 	IPROTO_BALLOT_GC_VCLOCK = 0x03,
 	IPROTO_BALLOT_IS_LOADING = 0x04,
+};
+
+enum iproto_error_key {
+	IPROTO_ERROR_CODE = 0x01,
+	IPROTO_ERROR_MESSAGE = 0x02,
 };
 
 #define bit(c) (1ULL<<IPROTO_##c)

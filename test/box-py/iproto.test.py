@@ -355,15 +355,15 @@ s = c._socket
 header = { "hello": "world"}
 body = { "bug": 272 }
 resp = test_request(header, body)
-print 'sync=%d, %s' % (resp['header'][IPROTO_SYNC], resp['body'])
+print 'sync=%d, %s' % (resp['header'][IPROTO_SYNC], resp['body'].get(IPROTO_ERROR))
 header = { IPROTO_CODE : REQUEST_TYPE_SELECT }
 header[IPROTO_SYNC] = 1234
 resp = test_request(header, body)
-print 'sync=%d, %s' % (resp['header'][IPROTO_SYNC], resp['body'])
+print 'sync=%d, %s' % (resp['header'][IPROTO_SYNC], resp['body'].get(IPROTO_ERROR))
 header[IPROTO_SYNC] = 5678
 body = { IPROTO_SPACE_ID: 304, IPROTO_KEY: [], IPROTO_LIMIT: 1 }
 resp = test_request(header, body)
-print 'sync=%d, %s' % (resp['header'][IPROTO_SYNC], resp['body'])
+print 'sync=%d, %s' % (resp['header'][IPROTO_SYNC], resp['body'].get(IPROTO_ERROR))
 c.close()
 
 

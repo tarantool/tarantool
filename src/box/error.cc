@@ -102,6 +102,27 @@ box_error_new(const char *file, unsigned line, uint32_t code,
 	return e;
 }
 
+int
+box_error_add(const char *file, unsigned line, uint32_t code,
+	      const char *fmt, ...)
+{
+	struct error *e = BuildClientError(file, line, ER_UNKNOWN);
+	ClientError *client_error = type_cast(ClientError, e);
+	if (client_error) {
+		client_error->m_errcode = code;
+		va_list ap;
+		va_start(ap, fmt);
+		error_vformat_msg(e, fmt, ap);
+		va_end(ap);
+	}
+	struct diag *d = &fiber()->diag;
+	if (diag_is_empty(d))
+		diag_set_error(d, e);
+	else
+		diag_add_error(d, e);
+	return -1;
+}
+
 /* }}} */
 
 struct rmean *rmean_error = NULL;
