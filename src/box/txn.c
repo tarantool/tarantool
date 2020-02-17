@@ -173,7 +173,7 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
  * Return a txn from cache or create a new one if cache is empty.
  */
 inline static struct txn *
-txn_new()
+txn_new(void)
 {
 	if (!stailq_empty(&txn_cache))
 		return stailq_shift_entry(&txn_cache, struct txn, in_txn_cache);
@@ -209,7 +209,7 @@ txn_free(struct txn *txn)
 }
 
 struct txn *
-txn_begin()
+txn_begin(void)
 {
 	static int64_t tsn = 0;
 	assert(! in_txn());
@@ -670,13 +670,13 @@ box_txn_id(void)
 }
 
 bool
-box_txn()
+box_txn(void)
 {
 	return in_txn() != NULL;
 }
 
 int
-box_txn_begin()
+box_txn_begin(void)
 {
 	if (in_txn()) {
 		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
@@ -688,7 +688,7 @@ box_txn_begin()
 }
 
 int
-box_txn_commit()
+box_txn_commit(void)
 {
 	struct txn *txn = in_txn();
 	/**
@@ -709,7 +709,7 @@ box_txn_commit()
 }
 
 int
-box_txn_rollback()
+box_txn_rollback(void)
 {
 	struct txn *txn = in_txn();
 	if (txn == NULL)
@@ -788,7 +788,7 @@ txn_savepoint_by_name(struct txn *txn, const char *name)
 }
 
 box_txn_savepoint_t *
-box_txn_savepoint()
+box_txn_savepoint(void)
 {
 	struct txn *txn = in_txn();
 	if (txn == NULL) {

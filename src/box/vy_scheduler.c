@@ -895,7 +895,7 @@ vy_deferred_delete_batch_process_f(struct cmsg *cmsg)
 	deferred_delete_space = space_by_id(BOX_VINYL_DEFERRED_DELETE_ID);
 	assert(deferred_delete_space != NULL);
 
-	struct txn *txn = txn_begin(false);
+	struct txn *txn = txn_begin();
 	if (txn == NULL)
 		goto fail;
 

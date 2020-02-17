@@ -251,7 +251,7 @@ txn_clear_flag(struct txn *txn, enum txn_flag flag)
 
 /* Pointer to the current transaction (if any) */
 static inline struct txn *
-in_txn()
+in_txn(void)
 {
 	return fiber()->storage.txn;
 }
@@ -261,7 +261,7 @@ in_txn()
  * @pre no transaction is active
  */
 struct txn *
-txn_begin();
+txn_begin(void);
 
 /**
  * Commit a transaction.
