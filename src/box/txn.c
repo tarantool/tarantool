@@ -469,7 +469,7 @@ txn_complete(struct txn *txn)
 }
 
 static void
-txn_entry_done_cb(struct journal_entry *entry, void *data)
+txn_entry_complete_cb(struct journal_entry *entry, void *data)
 {
 	struct txn *txn = data;
 	txn->signature = entry->res;
@@ -493,7 +493,7 @@ txn_write_to_wal(struct txn *txn)
 	struct journal_entry *req = journal_entry_new(txn->n_new_rows +
 						      txn->n_applier_rows,
 						      &txn->region,
-						      txn_entry_done_cb,
+						      txn_entry_complete_cb,
 						      txn);
 	if (req == NULL) {
 		txn_rollback(txn);
