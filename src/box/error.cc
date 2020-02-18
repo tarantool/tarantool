@@ -86,6 +86,22 @@ box_error_set(const char *file, unsigned line, uint32_t code,
 	return -1;
 }
 
+struct error *
+box_error_new(const char *file, unsigned line, uint32_t code,
+	      const char *fmt, ...)
+{
+	struct error *e = BuildClientError(file, line, ER_UNKNOWN);
+	ClientError *client_error = type_cast(ClientError, e);
+	if (client_error != NULL) {
+		client_error->m_errcode = code;
+		va_list ap;
+		va_start(ap, fmt);
+		error_vformat_msg(e, fmt, ap);
+		va_end(ap);
+	}
+	return e;
+}
+
 /* }}} */
 
 struct rmean *rmean_error = NULL;

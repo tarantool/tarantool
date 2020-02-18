@@ -91,5 +91,21 @@ box.error.set(1)
 box.error.set(nil)
 box.error.set(box.error.last())
 assert(box.error.last() == err)
+-- Check that box.error.new() does not set error to diag.
+--
+box.error.clear()
+err = box.error.new(1, "cause")
+assert(box.error.last() == nil)
+
+-- box.error.new() does not accept error objects.
+--
+box.error.new(err)
+
+-- box.error() is supposed to re-throw last diagnostic error.
+-- Make sure it does not fail if there's no errors at all
+-- (in diagnostics area).
+--
+box.error.clear()
+box.error()
 
 space:drop()

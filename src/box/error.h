@@ -137,6 +137,14 @@ box_error_set(const char *file, unsigned line, uint32_t code,
 
 /** \endcond public */
 
+/**
+ * Construct error object without setting it in the diagnostics
+ * area. On the memory allocation fail returns NULL.
+ */
+struct error *
+box_error_new(const char *file, unsigned line, uint32_t code,
+	      const char *fmt, ...);
+
 extern const struct type_info type_ClientError;
 extern const struct type_info type_XlogError;
 extern const struct type_info type_AccessDeniedError;

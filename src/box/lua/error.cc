@@ -42,7 +42,14 @@ extern "C" {
 #include "lua/utils.h"
 #include "box/error.h"
 
-static void
+/**
+ * Parse Lua arguments (they can come as single table
+ * f({code : number, reason : string}) or as separate members
+ * f(code, reason)) and construct struct error with given values.
+ * In case one of arguments is missing its corresponding field
+ * in struct error is filled with default value.
+ */
+static struct error *
 luaT_error_create(lua_State *L, int top_base)
 {
 	uint32_t code = 0;
@@ -69,25 +76,19 @@ luaT_error_create(lua_State *L, int top_base)
 			reason = lua_tostring(L, -1);
 		} else if (strchr(reason, '%') != NULL) {
 			/* Missing arguments to format string */
-			luaL_error(L, "box.error(): bad arguments");
+			return NULL;
 		}
-	} else if (top == top_base) {
-		if (lua_istable(L, top_base)) {
-			/* A special case that rethrows raw error (used by net.box) */
-			lua_getfield(L, top_base, "code");
-			code = lua_tonumber(L, -1);
-			lua_pop(L, 1);
-			lua_getfield(L, top_base, "reason");
-			reason = lua_tostring(L, -1);
-			if (reason == NULL)
-				reason = "";
-			lua_pop(L, 1);
-		} else if (luaL_iserror(L, top_base)) {
-			lua_error(L);
-			return;
-		}
+	} else if (top == top_base && lua_istable(L, top_base)) {
+		lua_getfield(L, top_base, "code");
+		code = lua_tonumber(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, top_base, "reason");
+		reason = lua_tostring(L, -1);
+		if (reason == NULL)
+			reason = "";
+		lua_pop(L, 1);
 	} else {
-		luaL_error(L, "box.error(): bad arguments");
+		return NULL;
 	}
 
 raise:
@@ -101,8 +102,7 @@ raise:
 		}
 		line = info.currentline;
 	}
-	say_debug("box.error() at %s:%i", file, line);
-	box_error_set(file, line, code, "%s", reason);
+	return box_error_new(file, line, code, "%s", reason);
 }
 
 static int
@@ -111,10 +111,15 @@ luaT_error_call(lua_State *L)
 	if (lua_gettop(L) <= 1) {
 		/* Re-throw saved exceptions if any. */
 		if (box_error_last())
-			luaT_error(L);
+			return luaT_error(L);
 		return 0;
 	}
-	luaT_error_create(L, 2);
+	if (lua_gettop(L) == 2 && luaL_iserror(L, 2))
+		return lua_error(L);
+	struct error *e = luaT_error_create(L, 2);
+	if (e == NULL)
+		return luaL_error(L, "box.error(): bad arguments");
+	diag_set_error(&fiber()->diag, e);
 	return luaT_error(L);
 }
 
@@ -139,9 +144,12 @@ luaT_error_new(lua_State *L)
 {
 	if (lua_gettop(L) == 0)
 		return luaL_error(L, "Usage: box.error.new(code, args)");
-	luaT_error_create(L, 1);
+	struct error *e = luaT_error_create(L, 1);
+	if (e == NULL)
+		return luaL_error(L, "Usage: box.error.new(code, args)");
 	lua_settop(L, 0);
-	return luaT_error_last(L);
+	luaT_pusherror(L, e);
+	return 1;
 }
 
 static int

@@ -445,7 +445,7 @@ err = box.error.new({code = 111, reason = "cause"})
  | ...
 assert(box.error.last() ~= err)
  | ---
- | - error: assertion failed!
+ | - true
  | ...
 box.error.set(err)
  | ---
@@ -470,6 +470,36 @@ box.error.set(box.error.last())
 assert(box.error.last() == err)
  | ---
  | - true
+ | ...
+-- Check that box.error.new() does not set error to diag.
+--
+box.error.clear()
+ | ---
+ | ...
+err = box.error.new(1, "cause")
+ | ---
+ | ...
+assert(box.error.last() == nil)
+ | ---
+ | - true
+ | ...
+
+-- box.error.new() does not accept error objects.
+--
+box.error.new(err)
+ | ---
+ | - error: 'Usage: box.error.new(code, args)'
+ | ...
+
+-- box.error() is supposed to re-throw last diagnostic error.
+-- Make sure it does not fail if there's no errors at all
+-- (in diagnostics area).
+--
+box.error.clear()
+ | ---
+ | ...
+box.error()
+ | ---
  | ...
 
 space:drop()
