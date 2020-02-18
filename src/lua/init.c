@@ -557,7 +557,7 @@ run_script_f(va_list ap)
 	const char *path = va_arg(ap, const char *);
 	bool interactive = va_arg(ap, int);
 	int optc = va_arg(ap, int);
-	char **optv = va_arg(ap, char **);
+	const char **optv = va_arg(ap, const char **);
 	int argc = va_arg(ap, int);
 	char **argv = va_arg(ap, char **);
 	/*
@@ -660,7 +660,7 @@ error:
 
 int
 tarantool_lua_run_script(char *path, bool interactive,
-			 int optc, char **optv, int argc, char **argv)
+			 int optc, const char **optv, int argc, char **argv)
 {
 	const char *title = path ? basename(path) : "interactive";
 	/*
