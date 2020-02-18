@@ -722,7 +722,7 @@ main(int argc, char **argv)
 	bool interactive = false;
 	/* Lua interpeter options, e.g. -e and -l */
 	int optc = 0;
-	char **optv = NULL;
+	const char **optv = NULL;
 	auto guard = make_scoped_guard([=]{ if (optc) free(optv); });
 
 	static struct option longopts[] = {
@@ -750,16 +750,13 @@ main(int argc, char **argv)
 		case 'e':
 			/* Save Lua interepter options to optv as is */
 			if (optc == 0) {
-				optv = (char **) calloc(argc, sizeof(char *));
+				optv = (const char **) calloc(argc,
+							      sizeof(optv[0]));
 				if (optv == NULL)
 					panic_syserror("No enough memory for arguments");
 			}
-			/*
-			 * The variable optind is the index of the next
-			 * element to be processed in argv.
-			 */
-			optv[optc++] = argv[optind - 2];
-			optv[optc++] = argv[optind - 1];
+			optv[optc++] = ch == 'l' ? "-l" : "-e";
+			optv[optc++] = optarg;
 			break;
 		default:
 			/* "invalid option" is printed by getopt */

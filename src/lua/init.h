@@ -72,7 +72,7 @@ tarantool_lua_free();
  */
 int
 tarantool_lua_run_script(char *path, bool force_interactive,
-			 int optc, char **optv,
+			 int optc, const char **optv,
 			 int argc, char **argv);
 
 extern char *history;
