@@ -149,9 +149,6 @@ if [ -n "$option_dist" ] && ! echo $alldists | grep -F -q -w $option_dist ; then
     exit 1
 fi
 
-# set the subpath with binaries based on literal character of the product name
-proddir=$(echo $product | head -c 1)
-
 # set bucket path of the given OS in options
 bucket_path="$bucket/$os"
 
@@ -228,14 +225,15 @@ function update_deb_metadata {
 }
 
 # The 'pack_deb' function especialy created for DEB packages. It works
-# with DEB packing OS like Ubuntu, Debian. It is based on globaly known
+# with DEB packing OS like Ubuntu, Debian. It is based on globally known
 # tool 'reprepro' from:
 #     https://wiki.debian.org/DebianRepository/SetupWithReprepro
 # This tool works with complete number of distributions of the given OS.
-# Result of the routine is the debian package for APT repository with
-# file structure equal to the Debian/Ubuntu:
-#     http://ftp.am.debian.org/debian/pool/main/t/tarantool/
-#     http://ftp.am.debian.org/ubuntu/pool/main/t/
+#
+# The DEB packages structure must pass the documented instructions at
+# at the Tarantool web site:
+#   https://www.tarantool.io/en/download/os-installation/debian/
+#   https://www.tarantool.io/en/download/os-installation/ubuntu/
 function pack_deb {
     # we need to push packages into 'main' repository only
     component=main
@@ -252,6 +250,9 @@ function pack_deb {
 
     # prepare the workspace
     prepare_ws ${os}
+
+    # set the subpath with binaries based on literal character of the product name
+    proddir=$(echo $product | head -c 1)
 
     # copy single distribution with binaries packages
     repopath=$ws/pool/${option_dist}/$component/$proddir/$product
@@ -273,7 +274,7 @@ Codename: $loop_dist
 Architectures: amd64 source
 Components: $component
 Description: Tarantool DBMS and Tarantool modules
-SignWith: 91B625E5
+SignWith: $GPG_SIGN_KEY
 DebIndices: Packages Release . .gz .bz2
 UDebIndices: Packages . .gz .bz2
 DscIndices: Sources Release .gz .bz2
@@ -391,7 +392,7 @@ EOF
         gpg --clearsign -o InRelease Release
         # resign the Release file
         $rm_file Release.gpg
-        gpg -abs -o Release.gpg Release
+        gpg -u $GPG_SIGN_KEY -abs -o Release.gpg Release
         popd
 
         # 4. sync the latest distribution path changes to S3
@@ -405,17 +406,22 @@ EOF
 }
 
 # The 'pack_rpm' function especialy created for RPM packages. It works
-# with RPM packing OS like Centos, Fedora. It is based on globaly known
+# with RPM packing OS like CentOS, Fedora. It is based on globally known
 # tool 'createrepo' from:
-#     https://linux.die.net/man/8/createrepo
+#   https://linux.die.net/man/8/createrepo
 # This tool works with single distribution of the given OS.
-# Result of the routine is the rpm package for YUM repository with
-# file structure equal to the Centos/Fedora:
-#     http://mirror.centos.org/centos/7/os/x86_64/Packages/
-#     http://mirrors.kernel.org/fedora/releases/30/Everything/x86_64/os/Packages/t/
+#
+# The RPM packages structure must pass the documented instructions at
+# at the Tarantool web site:
+#   https://www.tarantool.io/en/download/os-installation/rhel-centos/
+#   https://www.tarantool.io/en/download/os-installation/fedora/
 function pack_rpm {
-    if ! ls $repo/*.rpm >/dev/null ; then
-        echo "ERROR: Current '$repo' path doesn't have RPM packages in path"
+    pack_subdir=$1
+    pack_patterns=$2
+
+    pack_rpms=$(cd $repo && ls $pack_patterns 2>/dev/null || true)
+    if [ -z "$pack_rpms" ]; then
+        echo "ERROR: Current '$repo' path doesn't have '$pack_patterns' packages in path"
         usage
         exit 1
     fi
@@ -424,23 +430,18 @@ function pack_rpm {
     prepare_ws ${os}_${option_dist}
 
     # copy the needed package binaries to the workspace
-    cp $repo/*.rpm $ws/.
+    ( cd $repo && cp $pack_rpms $ws/. )
 
     pushd $ws
 
     # set the paths
-    if [ "$os" == "el" ]; then
-        repopath=$option_dist/os/x86_64
-        rpmpath=Packages
-    elif [ "$os" == "fedora" ]; then
-        repopath=releases/$option_dist/Everything/x86_64/os
-        rpmpath=Packages/$proddir
-    fi
+    repopath=$option_dist/$pack_subdir
+    rpmpath=Packages
     packpath=$repopath/$rpmpath
 
     # prepare local repository with packages
     $mk_dir $packpath
-    mv *.rpm $packpath/.
+    mv $pack_rpms $packpath/.
     cd $repopath
 
     # copy the current metadata files from S3
@@ -547,8 +548,8 @@ EOF
     gpg --detach-sign --armor repodata/repomd.xml
 
     # copy the packages to S3
-    for file in $rpmpath/*.rpm ; do
-        $aws_cp_public $file "$bucket_path/$repopath/$file"
+    for file in $pack_rpms ; do
+        $aws_cp_public $rpmpath/$file "$bucket_path/$repopath/$rpmpath/$file"
     done
 
     # update the metadata at the S3
@@ -563,7 +564,12 @@ EOF
 if [ "$os" == "ubuntu" -o "$os" == "debian" ]; then
     pack_deb
 elif [ "$os" == "el" -o "$os" == "fedora" ]; then
-    pack_rpm
+    # RPM packages structure needs different paths for binaries and sources
+    # packages, in this way it is needed to call the packages registering
+    # script twice with the given format:
+    # pack_rpm <packages store subpath> <patterns of the packages to register>
+    pack_rpm x86_64 "*.x86_64.rpm *.noarch.rpm"
+    pack_rpm SRPMS "*.src.rpm"
 else
     echo "USAGE: given OS '$os' is not supported, use any single from the list: $alloss"
     usage
