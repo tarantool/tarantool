@@ -53,7 +53,7 @@ luaL_iserror(struct lua_State *L, int narg)
 	return e;
 }
 
-static struct error *
+struct error *
 luaL_checkerror(struct lua_State *L, int narg)
 {
 	struct error *error = luaL_iserror(L, narg);

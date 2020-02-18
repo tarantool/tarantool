@@ -77,4 +77,19 @@ end;
 t;
 
 test_run:cmd("setopt delimiter ''");
+
+-- gh-4778: don't add created via box.error.new() errors to
+-- Tarantool's diagnostic area.
+--
+err = box.error.new({code = 111, reason = "cause"})
+assert(box.error.last() ~= err)
+box.error.set(err)
+assert(box.error.last() == err)
+-- Consider wrong or tricky inputs to box.error.set()
+--
+box.error.set(1)
+box.error.set(nil)
+box.error.set(box.error.last())
+assert(box.error.last() == err)
+
 space:drop()

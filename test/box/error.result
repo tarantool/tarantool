@@ -436,6 +436,42 @@ test_run:cmd("setopt delimiter ''");
  | ---
  | - true
  | ...
+
+-- gh-4778: don't add created via box.error.new() errors to
+-- Tarantool's diagnostic area.
+--
+err = box.error.new({code = 111, reason = "cause"})
+ | ---
+ | ...
+assert(box.error.last() ~= err)
+ | ---
+ | - error: assertion failed!
+ | ...
+box.error.set(err)
+ | ---
+ | ...
+assert(box.error.last() == err)
+ | ---
+ | - true
+ | ...
+-- Consider wrong or tricky inputs to box.error.set()
+--
+box.error.set(1)
+ | ---
+ | - error: 'Invalid argument #1 (error expected, got number)'
+ | ...
+box.error.set(nil)
+ | ---
+ | - error: 'Invalid argument #1 (error expected, got nil)'
+ | ...
+box.error.set(box.error.last())
+ | ---
+ | ...
+assert(box.error.last() == err)
+ | ---
+ | - true
+ | ...
+
 space:drop()
  | ---
  | ...
