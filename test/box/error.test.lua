@@ -109,3 +109,115 @@ box.error.clear()
 box.error()
 
 space:drop()
+
+-- gh-1148: errors can be arranged into list (so called
+-- stacked diagnostics).
+--
+e1 = box.error.new({code = 111, reason = "cause"})
+assert(e1.prev == nil)
+e1:set_prev(e1)
+assert(e1.prev == nil)
+e2 = box.error.new({code = 111, reason = "cause of cause"})
+e1:set_prev(e2)
+assert(e1.prev == e2)
+e2:set_prev(e1)
+assert(e2.prev == nil)
+-- At this point stack is following: e1 -> e2
+-- Let's test following cases:
+-- 1. e3 -> e2, e1 -> NULL (e3:set_prev(e2))
+-- 2. e1 -> e3, e2 -> NULL (e1:set_prev(e3))
+-- 3. e3 -> e1 -> e2 (e3:set_prev(e1))
+-- 4. e1 -> e2 -> e3 (e2:set_prev(e3))
+--
+e3 = box.error.new({code = 111, reason = "another cause"})
+e3:set_prev(e2)
+assert(e3.prev == e2)
+assert(e2.prev == nil)
+assert(e1.prev == nil)
+
+-- Reset stack to e1 -> e2 and test case 2.
+--
+e1:set_prev(e2)
+assert(e2.prev == nil)
+assert(e3.prev == nil)
+e1:set_prev(e3)
+assert(e2.prev == nil)
+assert(e1.prev == e3)
+assert(e3.prev == nil)
+
+-- Reset stack to e1 -> e2 and test case 3.
+--
+e1:set_prev(e2)
+assert(e1.prev == e2)
+assert(e2.prev == nil)
+assert(e3.prev == nil)
+e3:set_prev(e1)
+assert(e1.prev == e2)
+assert(e2.prev == nil)
+assert(e3.prev == e1)
+
+-- Unlink errors and test case 4.
+--
+e1:set_prev(nil)
+e2:set_prev(nil)
+e3:set_prev(nil)
+e1:set_prev(e2)
+e2:set_prev(e3)
+assert(e1.prev == e2)
+assert(e2.prev == e3)
+assert(e3.prev == nil)
+
+-- Test circle detecting. At the moment stack is
+-- following: e1 -> e2 -> e3
+--
+e3:set_prev(e1)
+assert(e3.prev == nil)
+e3:set_prev(e2)
+assert(e3.prev == nil)
+
+-- Test splitting list into two ones.
+-- After that we will get two lists: e1->e2->e5 and e3->e4
+--
+e4 = box.error.new({code = 111, reason = "yet another cause"})
+e5 = box.error.new({code = 111, reason = "and another one"})
+e3:set_prev(e4)
+e2:set_prev(e5)
+assert(e1.prev == e2)
+assert(e2.prev == e5)
+assert(e3.prev == e4)
+assert(e5.prev == nil)
+assert(e4.prev == nil)
+
+-- Another splitting option: e1->e2 and e5->e3->e4
+-- But firstly restore to one single list e1->e2->e3->e4
+--
+e2:set_prev(e3)
+e5:set_prev(e3)
+assert(e1.prev == e2)
+assert(e2.prev == nil)
+assert(e5.prev == e3)
+assert(e3.prev == e4)
+assert(e4.prev == nil)
+
+-- In case error is destroyed, it unrefs reference counter
+-- of its previous error. In turn, box.error.clear() refs/unrefs
+-- only head and doesn't touch other errors.
+--
+e2:set_prev(nil)
+box.error.set(e1)
+assert(box.error.last() == e1)
+assert(box.error.last().prev == e2)
+box.error.clear()
+assert(box.error.last() == nil)
+assert(e1.prev == e2)
+assert(e2.code == 111)
+box.error.set(e1)
+box.error.clear()
+assert(e1.prev == e2)
+
+-- Set middle of an error stack into the diagnostics area.
+e1:set_prev(e2)
+e2:set_prev(e3)
+box.error.set(e2)
+assert(e1.prev == nil)
+assert(e2.prev == e3)

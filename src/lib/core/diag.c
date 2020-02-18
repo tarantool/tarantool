@@ -31,6 +31,51 @@
 #include "diag.h"
 #include "fiber.h"
 
+int
+error_set_prev(struct error *e, struct error *prev)
+{
+	/*
+	 * Make sure that adding error won't result in cycles.
+	 * Don't bother with sophisticated cycle-detection
+	 * algorithms, simple iteration is OK since as a rule
+	 * list contains a dozen errors at maximum.
+	 */
+	if (prev != NULL) {
+		if (e == prev)
+			return -1;
+		if (prev->effect != NULL || e->effect != NULL) {
+			/*
+			 * e and prev are already compared, so start
+			 * from prev->cause.
+			 */
+			struct error *tmp = prev->cause;
+			while (tmp != NULL) {
+				 if (tmp == e)
+					return -1;
+				tmp = tmp->cause;
+			}
+			/*
+			 * Unlink new 'effect' node from its old
+			 * list of 'cause' errors.
+			 */
+			error_unlink_effect(prev);
+		}
+		error_ref(prev);
+		prev->effect = e;
+	}
+	/*
+	 * At once error can feature only one reason.
+	 * So unlink previous 'cause' node.
+	 */
+	if (e->cause != NULL) {
+		e->cause->effect = NULL;
+		error_unref(e->cause);
+	}
+	/* Set new 'prev' node. */
+	e->cause = prev;
+	return 0;
+}
+
 void
 error_create(struct error *e,
 	     error_f destroy, error_f raise, error_f log,
@@ -50,6 +95,8 @@ error_create(struct error *e,
 		e->line = 0;
 	}
 	e->errmsg[0] = '\0';
+	e->cause = NULL;
+	e->effect = NULL;
 }
 
 struct diag *

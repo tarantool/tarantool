@@ -84,6 +84,23 @@ struct error {
 	char file[DIAG_FILENAME_MAX];
 	/* Error description. */
 	char errmsg[DIAG_ERRMSG_MAX];
+	/**
+	 * Link to the cause and effect of given error. The cause
+	 * creates the effect:
+	 * e1 = box.error.new({code = 0, reason = 'e1'})
+	 * e2 = box.error.new({code = 0, reason = 'e2'})
+	 * e1:set_prev(e2) -- Now e2 is the cause of e1 and e1 is
+	 * the effect of e2.
+	 * Only cause keeps reference to avoid cyclic dependence.
+	 * RLIST implementation is not really suitable here
+	 * since it is organized as circular list. In such
+	 * a case it is impossible to start an iteration
+	 * from any node and finish at the logical end of the
+	 * list. Double-linked list is required to allow deletion
+	 * from the middle of the list.
+	 */
+	struct error *cause;
+	struct error *effect;
 };
 
 static inline void
@@ -96,10 +113,55 @@ static inline void
 error_unref(struct error *e)
 {
 	assert(e->refs > 0);
-	--e->refs;
-	if (e->refs == 0)
-		e->destroy(e);
+	struct error *to_delete = e;
+	while (--to_delete->refs == 0) {
+		/* Unlink error from lists completely.*/
+		struct error *cause = to_delete->cause;
+		assert(to_delete->effect == NULL);
+		if (to_delete->cause != NULL) {
+			to_delete->cause->effect = NULL;
+			to_delete->cause = NULL;
+		}
+		to_delete->destroy(to_delete);
+		if (cause == NULL)
+			return;
+		to_delete = cause;
+	}
 }
+
+/**
+ * Unlink error from its effect. For instance:
+ * e1 -> e2 -> e3 -> e4 (e1:set_prev(e2); e2:set_prev(e3) ...)
+ * unlink(e3): e1 -> e2 -> NULL; e3 -> e4 -> NULL
+ */
+static inline void
+error_unlink_effect(struct error *e)
+{
+	if (e->effect != NULL) {
+		assert(e->refs > 1);
+		error_unref(e);
+		e->effect->cause = NULL;
+	}
+	e->effect = NULL;
+}
+
+/**
+ * Set previous error: cut @a prev from its previous 'tail' of
+ * causes and link to the one @a e belongs to. Note that all
+ * previous errors starting from @a prev->cause are transferred
+ * with it as well (i.e. causes for given error are not erased).
+ * For instance:
+ * e1 -> e2 -> NULL; e3 -> e4 -> NULL;
+ * e2:set_effect(e3): e1 -> e2 -> e3 -> e4 -> NULL
+ *
+ * @a effect can be NULL. To be used as ffi method in
+ * lua/error.lua.
+ *
+ * @retval -1 in case adding @a effect results in list cycles;
+ *          0 otherwise.
+ */
+int
+error_set_prev(struct error *e, struct error *prev);
 
 NORETURN static inline void
 error_raise(struct error *e)
@@ -178,6 +240,31 @@ diag_set_error(struct diag *diag, struct error *e)
 	assert(e != NULL);
 	error_ref(e);
 	diag_clear(diag);
+	error_unlink_effect(e);
+	diag->last = e;
+}
+
+/**
+ * Add a new error to the diagnostics area. It is added to the
+ * tail, so that list forms stack.
+ * @param diag Diagnostics area.
+ * @param e Error to be added.
+ */
+static inline void
+diag_add_error(struct diag *diag, struct error *e)
+{
+	assert(e != NULL);
+	/* diag_set_error() should be called before. */
+	assert(diag->last != NULL);
+	/*
+	 * e should be the bottom of its own stack.
+	 * Otherwise some errors may be lost.
+	 */
+	assert(e->effect == NULL);
+	assert(diag->last->effect == NULL);
+	error_ref(e);
+	e->cause = diag->last;
+	diag->last->effect = e;
 	diag->last = e;
 }
 
@@ -278,6 +365,15 @@ BuildSocketError(const char *file, unsigned line, const char *socketname,
 	diag_set_error(diag_get(), e);					\
 	/* Restore the errno which might have been reset.  */           \
 	errno = save_errno;                                             \
+} while (0)
+
+#define diag_add(class, ...) do {					\
+	int save_errno = errno;						\
+	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
+	struct error *e;						\
+	e = Build##class(__FILE__, __LINE__, ##__VA_ARGS__);		\
+	diag_add_error(diag_get(), e);					\
+	errno = save_errno;						\
 } while (0)
 
 #if defined(__cplusplus)

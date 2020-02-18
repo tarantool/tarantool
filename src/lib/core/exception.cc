@@ -114,6 +114,7 @@ Exception::~Exception()
 	if (this != &out_of_memory) {
 		assert(refs == 0);
 	}
+	TRASH((struct error *) this);
 }
 
 Exception::Exception(const struct type_info *type_arg, const char *file,

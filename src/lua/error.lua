@@ -24,12 +24,17 @@ struct error {
     char _file[DIAG_FILENAME_MAX];
     /* Error description. */
     char _errmsg[DIAG_ERRMSG_MAX];
+    struct error *_cause;
+    struct error *_effect;
 };
 
 char *
 exception_get_string(struct error *e, const struct method_info *method);
 int
 exception_get_int(struct error *e, const struct method_info *method);
+
+int
+error_set_prev(struct error *e, struct error *prev);
 ]]
 
 local REFLECTION_CACHE = {}
@@ -95,11 +100,37 @@ local function error_errno(err)
     return e
 end
 
+local function error_prev(err)
+    local e = err._cause;
+    if e ~= nil then
+        return e
+    else
+        return nil
+    end
+end
+
+local function error_set_prev(err, prev)
+    -- First argument must be error.
+    if not ffi.istype('struct error', err) then
+        error("Usage: error1:set_prev(error2)")
+    end
+    -- Second argument must be error or nil.
+    if not ffi.istype('struct error', prev) and prev ~= nil then
+        error("Usage: error1:set_prev(error2)")
+    end
+    local ok = ffi.C.error_set_prev(err, prev);
+    if ok ~= 0 then
+        error("Cycles are not allowed")
+    end
+
+end
+
 local error_fields = {
     ["type"]        = error_type;
     ["message"]     = error_message;
     ["trace"]       = error_trace;
     ["errno"]       = error_errno;
+    ["prev"]        = error_prev;
 }
 
 local function error_unpack(err)
@@ -143,6 +174,7 @@ local error_methods = {
     ["raise"] = error_raise;
     ["match"] = error_match; -- Tarantool 1.6 backward compatibility
     ["__serialize"] = error_serialize;
+    ["set_prev"] = error_set_prev;
 }
 
 local function error_index(err, key)
