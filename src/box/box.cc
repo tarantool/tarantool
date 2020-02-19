@@ -310,7 +310,7 @@ struct recovery_journal {
  * exact same signature during local recovery to properly mark
  * min/max LSN of created LSM levels.
  */
-static int64_t
+static int
 recovery_journal_write(struct journal *base,
 		       struct journal_entry *entry)
 {

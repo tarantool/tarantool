@@ -36,7 +36,7 @@
  * Used to load from a memtx snapshot. LSN is not used,
  * but txn_commit() must work.
  */
-static int64_t
+static int
 dummy_journal_write(struct journal *journal, struct journal_entry *entry)
 {
 	(void) journal;

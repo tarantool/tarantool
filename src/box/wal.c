@@ -60,10 +60,10 @@ const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 
 int wal_dir_lock = -1;
 
-static int64_t
+static int
 wal_write(struct journal *, struct journal_entry *);
 
-static int64_t
+static int
 wal_write_in_wal_mode_none(struct journal *, struct journal_entry *);
 
 /*
@@ -1157,7 +1157,7 @@ wal_writer_f(va_list ap)
  * WAL writer main entry point: queue a single request
  * to be written to disk.
  */
-static int64_t
+static int
 wal_write(struct journal *journal, struct journal_entry *entry)
 {
 	struct wal_writer *writer = (struct wal_writer *) journal;
@@ -1213,7 +1213,7 @@ fail:
 	return -1;
 }
 
-static int64_t
+static int
 wal_write_in_wal_mode_none(struct journal *journal,
 			   struct journal_entry *entry)
 {

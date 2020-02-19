@@ -112,8 +112,8 @@ journal_entry_complete(struct journal_entry *entry)
  * synchronous replication.
  */
 struct journal {
-	int64_t (*write)(struct journal *journal,
-			 struct journal_entry *req);
+	int (*write)(struct journal *journal,
+		     struct journal_entry *req);
 	void (*destroy)(struct journal *journal);
 };
 
@@ -128,7 +128,7 @@ extern struct journal *current_journal;
  *
  * @return 0 if write was scheduled or -1 in case of an error.
  */
-static inline int64_t
+static inline int
 journal_write(struct journal_entry *entry)
 {
 	return current_journal->write(current_journal, entry);
@@ -165,7 +165,7 @@ journal_set(struct journal *new_journal)
 
 static inline void
 journal_create(struct journal *journal,
-	       int64_t (*write)(struct journal *, struct journal_entry *),
+	       int (*write)(struct journal *, struct journal_entry *),
 	       void (*destroy)(struct journal *))
 {
 	journal->write = write;
