@@ -646,7 +646,7 @@ sequence_cache_find(uint32_t id)
 {
 	struct sequence *seq = sequence_by_id(id);
 	if (seq == NULL)
-		tnt_raise(ClientError, ER_NO_SUCH_SEQUENCE, int2str(id));
+		diag_set(ClientError, ER_NO_SUCH_SEQUENCE, int2str(id));
 	return seq;
 }
 
