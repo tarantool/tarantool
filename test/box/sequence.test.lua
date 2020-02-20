@@ -711,6 +711,14 @@ s:replace{{a = {b = {box.NULL}}}} -- ok
 s:drop()
 
 --
+-- gh-4753: accessing dropped sequence should yield correct error
+--
+s = box.schema.sequence.create('s')
+s:drop()
+s:next()
+s:reset()
+
+--
 -- Check that altering parts of a primary index with a sequence
 -- attached requires sequence update. Renaming fields does not.
 --
