@@ -531,6 +531,10 @@ socket.getaddrinfo('host', 'port', { family = 'WRONG' }) == nil and errno() == e
 socket.getaddrinfo('host', 'port', { protocol = 'WRONG' }) == nil and errno() == errno.EPROTOTYPE
 socket.getaddrinfo('host', 'port', { flags = 'WRONG' }) == nil and errno() == errno.EINVAL
 
+-- gh-4634: verify socket path length in socket.tcp_server.
+long_port = string.rep('a', 110)
+socket.tcp_server('unix/', long_port, function(s) end) == nil and errno() == errno.ENOBUFS
+
 -- gh-574: check that fiber with getaddrinfo can be safely cancelled
 test_run:cmd("setopt delimiter ';'")
 f = fiber.create(function()
