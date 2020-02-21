@@ -125,6 +125,7 @@ enum iproto_key {
 	IPROTO_STMT_ID = 0x43,
 	/* Leave a gap between SQL keys and additional request keys */
 	IPROTO_REPLICA_ANON = 0x50,
+	IPROTO_ID_FILTER = 0x51,
 	IPROTO_KEY_MAX
 };
 

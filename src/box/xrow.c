@@ -1194,7 +1194,8 @@ int
 xrow_encode_subscribe(struct xrow_header *row,
 		      const struct tt_uuid *replicaset_uuid,
 		      const struct tt_uuid *instance_uuid,
-		      const struct vclock *vclock, bool anon)
+		      const struct vclock *vclock, bool anon,
+		      uint32_t id_filter)
 {
 	memset(row, 0, sizeof(*row));
 	size_t size = XROW_BODY_LEN_MAX + mp_sizeof_vclock(vclock);
@@ -1204,7 +1205,8 @@ xrow_encode_subscribe(struct xrow_header *row,
 		return -1;
 	}
 	char *data = buf;
-	data = mp_encode_map(data, 5);
+	int filter_size = __builtin_popcount(id_filter);
+	data = mp_encode_map(data, filter_size != 0 ? 6 : 5);
 	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
 	data = xrow_encode_uuid(data, replicaset_uuid);
 	data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
@@ -1215,6 +1217,17 @@ xrow_encode_subscribe(struct xrow_header *row,
 	data = mp_encode_uint(data, tarantool_version_id());
 	data = mp_encode_uint(data, IPROTO_REPLICA_ANON);
 	data = mp_encode_bool(data, anon);
+	if (filter_size != 0) {
+		data = mp_encode_uint(data, IPROTO_ID_FILTER);
+		data = mp_encode_array(data, filter_size);
+		struct bit_iterator it;
+		bit_iterator_init(&it, &id_filter, sizeof(id_filter),
+				  true);
+		for (size_t id = bit_iterator_next(&it); id < VCLOCK_MAX;
+		     id = bit_iterator_next(&it)) {
+			data = mp_encode_uint(data, id);
+		}
+	}
 	assert(data <= buf + size);
 	row->body[0].iov_base = buf;
 	row->body[0].iov_len = (data - buf);
@@ -1226,7 +1239,8 @@ xrow_encode_subscribe(struct xrow_header *row,
 int
 xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		      struct tt_uuid *instance_uuid, struct vclock *vclock,
-		      uint32_t *version_id, bool *anon)
+		      uint32_t *version_id, bool *anon,
+		      uint32_t *id_filter)
 {
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
@@ -1244,6 +1258,8 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 
 	if (anon)
 		*anon = false;
+	if (id_filter)
+		*id_filter = 0;
 	d = data;
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
@@ -1300,6 +1316,24 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 				return -1;
 			}
 			*anon = mp_decode_bool(&d);
+			break;
+		case IPROTO_ID_FILTER:
+			if (id_filter == NULL)
+				goto skip;
+			if (mp_typeof(*d) != MP_ARRAY) {
+id_filter_decode_err:		xrow_on_decode_err(data, end, ER_INVALID_MSGPACK,
+						   "invalid ID_FILTER");
+				return -1;
+			}
+			uint32_t len = mp_decode_array(&d);
+			for (uint32_t i = 0; i < len; ++i) {
+				if (mp_typeof(*d) != MP_UINT)
+					goto id_filter_decode_err;
+				uint64_t val = mp_decode_uint(&d);
+				if (val >= VCLOCK_MAX)
+					goto id_filter_decode_err;
+				*id_filter |= 1 << val;
+			}
 			break;
 		default: skip:
 			mp_next(&d); /* value */

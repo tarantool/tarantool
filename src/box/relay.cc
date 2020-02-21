@@ -110,6 +110,13 @@ struct relay {
 	/** Replicatoin slave version. */
 	uint32_t version_id;
 	/**
+	 * A filter of replica ids whose rows should be ignored.
+	 * Each set filter bit corresponds to a replica id whose
+	 * rows shouldn't be relayed. The list of ids to ignore
+	 * is passed by the replica on subscribe.
+	 */
+	uint32_t id_filter;
+	/**
 	 * Local vclock at the moment of subscribe, used to check
 	 * dataset on the other side and send missing data rows if any.
 	 */
@@ -676,7 +683,8 @@ relay_subscribe_f(va_list ap)
 /** Replication acceptor fiber handler. */
 void
 relay_subscribe(struct replica *replica, int fd, uint64_t sync,
-		struct vclock *replica_clock, uint32_t replica_version_id)
+		struct vclock *replica_clock, uint32_t replica_version_id,
+		uint32_t replica_id_filter)
 {
 	assert(replica->anon || replica->id != REPLICA_ID_NIL);
 	struct relay *relay = replica->relay;
@@ -704,6 +712,8 @@ relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 			        replica_clock);
 	vclock_copy(&relay->tx.vclock, replica_clock);
 	relay->version_id = replica_version_id;
+
+	relay->id_filter = replica_id_filter;
 
 	int rc = cord_costart(&relay->cord, "subscribe",
 			      relay_subscribe_f, relay);
@@ -763,6 +773,9 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 		packet->group_id = GROUP_DEFAULT;
 		packet->bodycnt = 0;
 	}
+	/* Check if the rows from the instance are filtered. */
+	if ((1 << packet->replica_id & relay->id_filter) != 0)
+		return;
 	/*
 	 * We're feeding a WAL, thus responding to FINAL JOIN or SUBSCRIBE
 	 * request. If this is FINAL JOIN (i.e. relay->replica is NULL),
