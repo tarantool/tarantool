@@ -403,7 +403,8 @@ lbox_socket_local_resolve(const char *host, const char *port,
 {
 	if (strcmp(host, "unix/") == 0) {
 		struct sockaddr_un *uaddr = (struct sockaddr_un *) addr;
-		if (*socklen < sizeof(*uaddr)) {
+		if (*socklen < sizeof(*uaddr) ||
+		    strlen(port) >= sizeof(uaddr->sun_path)) {
 			errno = ENOBUFS;
 			return -1;
 		}

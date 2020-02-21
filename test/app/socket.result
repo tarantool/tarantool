@@ -1614,6 +1614,14 @@ socket.getaddrinfo('host', 'port', { flags = 'WRONG' }) == nil and errno() == er
 ---
 - true
 ...
+-- gh-4634: verify socket path length in socket.tcp_server.
+long_port = string.rep('a', 110)
+---
+...
+socket.tcp_server('unix/', long_port, function(s) end) == nil and errno() == errno.ENOBUFS
+---
+- true
+...
 -- gh-574: check that fiber with getaddrinfo can be safely cancelled
 test_run:cmd("setopt delimiter ';'")
 ---
