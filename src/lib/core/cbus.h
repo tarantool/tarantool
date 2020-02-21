@@ -176,6 +176,13 @@ cpipe_set_max_input(struct cpipe *pipe, int max_input)
 	pipe->max_input = max_input;
 }
 
+static inline void
+cpipe_deliver_now(struct cpipe *pipe)
+{
+	if (pipe->n_input > 0)
+		ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
+}
+
 /**
  * Flush all staged messages into the pipe and eventually to the
  * consumer.
