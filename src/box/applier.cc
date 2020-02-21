@@ -783,7 +783,7 @@ applier_subscribe(struct applier *applier)
 	vclock_create(&vclock);
 	vclock_copy(&vclock, &replicaset.vclock);
 	xrow_encode_subscribe_xc(&row, &REPLICASET_UUID, &INSTANCE_UUID,
-				 &vclock);
+				 &vclock, 0);
 	coio_write_xrow(coio, &row);
 
 	/* Read SUBSCRIBE response */

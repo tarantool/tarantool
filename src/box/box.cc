@@ -1564,8 +1564,10 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	struct vclock replica_clock;
 	uint32_t replica_version_id;
 	vclock_create(&replica_clock);
+	uint32_t id_filter;
 	xrow_decode_subscribe_xc(header, &replicaset_uuid, &replica_uuid,
-				 &replica_clock, &replica_version_id);
+				 &replica_clock, &replica_version_id,
+				 &id_filter);
 
 	/* Forbid connection to itself */
 	if (tt_uuid_is_equal(&replica_uuid, &INSTANCE_UUID))
@@ -1639,7 +1641,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * indefinitely).
 	 */
 	relay_subscribe(replica, io->fd, header->sync, &replica_clock,
-			replica_version_id);
+			replica_version_id, id_filter);
 }
 
 void

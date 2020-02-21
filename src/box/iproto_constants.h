@@ -120,6 +120,8 @@ enum iproto_key {
 	 * }
 	 */
 	IPROTO_SQL_INFO = 0x42,
+	/* Leave a gap between SQL keys and additional request keys */
+	IPROTO_ID_FILTER = 0x51,
 	IPROTO_KEY_MAX
 };
 

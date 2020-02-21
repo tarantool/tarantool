@@ -48,7 +48,7 @@ enum {
 	XROW_BODY_IOVMAX = 2,
 	XROW_IOVMAX = XROW_HEADER_IOVMAX + XROW_BODY_IOVMAX,
 	XROW_HEADER_LEN_MAX = 52,
-	XROW_BODY_LEN_MAX = 128,
+	XROW_BODY_LEN_MAX = 256,
 	IPROTO_HEADER_LEN = 28,
 	/** 7 = sizeof(iproto_body_bin). */
 	IPROTO_SELECT_HEADER_LEN = IPROTO_HEADER_LEN + 7,
@@ -307,6 +307,8 @@ xrow_encode_vote(struct xrow_header *row);
  * @param replicaset_uuid Replica set uuid.
  * @param instance_uuid Instance uuid.
  * @param vclock Replication clock.
+ * @param id_filter A List of replica ids to skip rows from
+ *		    when feeding a replica.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
@@ -315,7 +317,7 @@ int
 xrow_encode_subscribe(struct xrow_header *row,
 		      const struct tt_uuid *replicaset_uuid,
 		      const struct tt_uuid *instance_uuid,
-		      const struct vclock *vclock);
+		      const struct vclock *vclock, uint32_t id_filter);
 
 /**
  * Decode SUBSCRIBE command.
@@ -324,6 +326,8 @@ xrow_encode_subscribe(struct xrow_header *row,
  * @param[out] instance_uuid.
  * @param[out] vclock.
  * @param[out] version_id.
+ * @param[out] id_filter A list of ids to skip rows from when
+ *			 feeding a replica.
  *
  * @retval  0 Success.
  * @retval -1 Memory or format error.
@@ -331,7 +335,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 int
 xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		      struct tt_uuid *instance_uuid, struct vclock *vclock,
-		      uint32_t *version_id);
+		      uint32_t *version_id, uint32_t *id_filter);
 
 /**
  * Encode JOIN command.
@@ -355,7 +359,8 @@ xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid);
 static inline int
 xrow_decode_join(struct xrow_header *row, struct tt_uuid *instance_uuid)
 {
-	return xrow_decode_subscribe(row, NULL, instance_uuid, NULL, NULL);
+	return xrow_decode_subscribe(row, NULL, instance_uuid, NULL, NULL,
+				     NULL);
 }
 
 /**
@@ -380,7 +385,7 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
 static inline int
 xrow_decode_vclock(struct xrow_header *row, struct vclock *vclock)
 {
-	return xrow_decode_subscribe(row, NULL, NULL, vclock, NULL);
+	return xrow_decode_subscribe(row, NULL, NULL, vclock, NULL, NULL);
 }
 
 /**
@@ -411,7 +416,8 @@ xrow_decode_subscribe_response(struct xrow_header *row,
 			       struct tt_uuid *replicaset_uuid,
 			       struct vclock *vclock)
 {
-	return xrow_decode_subscribe(row, replicaset_uuid, NULL, vclock, NULL);
+	return xrow_decode_subscribe(row, replicaset_uuid, NULL, vclock, NULL,
+				     NULL);
 }
 
 /**
@@ -774,10 +780,10 @@ static inline void
 xrow_encode_subscribe_xc(struct xrow_header *row,
 			 const struct tt_uuid *replicaset_uuid,
 			 const struct tt_uuid *instance_uuid,
-			 const struct vclock *vclock)
+			 const struct vclock *vclock, uint32_t id_filter)
 {
-	if (xrow_encode_subscribe(row, replicaset_uuid, instance_uuid,
-				  vclock) != 0)
+	if (xrow_encode_subscribe(row, replicaset_uuid, instance_uuid, vclock,
+				  id_filter) != 0)
 		diag_raise();
 }
 
@@ -785,11 +791,11 @@ xrow_encode_subscribe_xc(struct xrow_header *row,
 static inline void
 xrow_decode_subscribe_xc(struct xrow_header *row,
 			 struct tt_uuid *replicaset_uuid,
-		         struct tt_uuid *instance_uuid, struct vclock *vclock,
-			 uint32_t *replica_version_id)
+			 struct tt_uuid *instance_uuid, struct vclock *vclock,
+			 uint32_t *replica_version_id, uint32_t *id_filter)
 {
 	if (xrow_decode_subscribe(row, replicaset_uuid, instance_uuid,
-				  vclock, replica_version_id) != 0)
+				  vclock, replica_version_id, id_filter) != 0)
 		diag_raise();
 }
 
