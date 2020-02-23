@@ -33,6 +33,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <float.h>
 
 #include "say.h"
 #include "error.h"
@@ -484,15 +485,15 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 				 err_fieldno, "a positive integer");
 			return -1;
 		}
-		if (lowest_type == AT_DOUBLE) {
-			/* result is DOUBLE */
+		float fc = (float)c;
+		if ((lowest_type == AT_DOUBLE && c != (double) fc) ||
+		    (lowest_type == AT_FLOAT &&
+		     (c >= FLT_MAX || c <= -FLT_MAX))) {
 			ret->type = AT_DOUBLE;
 			ret->dbl = c;
 		} else {
-			/* result is FLOAT */
-			assert(lowest_type == AT_FLOAT);
 			ret->type = AT_FLOAT;
-			ret->flt = (float)c;
+			ret->flt = fc;
 		}
 	}
 	return 0;
