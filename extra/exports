@@ -162,6 +162,7 @@ luaL_checkuint64
 luaL_checkint64
 luaL_touint64
 luaL_toint64
+luaT_checktuple
 luaT_pushtuple
 luaT_istuple
 luaT_error

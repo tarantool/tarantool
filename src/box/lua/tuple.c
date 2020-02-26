@@ -69,13 +69,13 @@ extern char tuple_lua[]; /* Lua source */
 
 uint32_t CTID_STRUCT_TUPLE_REF;
 
-static inline box_tuple_t *
-lua_checktuple(struct lua_State *L, int narg)
+box_tuple_t *
+luaT_checktuple(struct lua_State *L, int idx)
 {
-	struct tuple *tuple = luaT_istuple(L, narg);
+	struct tuple *tuple = luaT_istuple(L, idx);
 	if (tuple == NULL)  {
 		luaL_error(L, "Invalid argument #%d (box.tuple expected, got %s)",
-		   narg, lua_typename(L, lua_type(L, narg)));
+		   idx, lua_typename(L, lua_type(L, idx)));
 	}
 
 	return tuple;
@@ -162,7 +162,7 @@ lbox_tuple_new(lua_State *L)
 static int
 lbox_tuple_gc(struct lua_State *L)
 {
-	struct tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = luaT_checktuple(L, 1);
 	box_tuple_unref(tuple);
 	return 0;
 }
@@ -191,7 +191,7 @@ lbox_tuple_slice_wrapper(struct lua_State *L)
 static int
 lbox_tuple_slice(struct lua_State *L)
 {
-	struct tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = luaT_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
 	uint32_t start, end;
 	int32_t offset;
@@ -325,7 +325,7 @@ lbox_tuple_to_map(struct lua_State *L)
 		names_only = lua_toboolean(L, -1);
 	}
 
-	struct tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = luaT_checktuple(L, 1);
 	struct tuple_format *format = tuple_format(tuple);
 	const char *pos = tuple_data(tuple);
 	int field_count = (int)mp_decode_array(&pos);
@@ -375,7 +375,7 @@ error:
 static int
 lbox_tuple_transform(struct lua_State *L)
 {
-	struct tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = luaT_checktuple(L, 1);
 	int argc = lua_gettop(L);
 	if (argc < 3)
 		luaL_error(L, "tuple.transform(): bad arguments");
@@ -506,7 +506,7 @@ lbox_tuple_field_by_path(struct lua_State *L)
 static int
 lbox_tuple_to_string(struct lua_State *L)
 {
-	struct tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = luaT_checktuple(L, 1);
 	size_t used = region_used(&fiber()->gc);
 	char *res = tuple_to_yaml(tuple);
 	if (res == NULL) {

@@ -48,6 +48,18 @@ typedef struct tuple_format box_tuple_format_t;
 /** \cond public */
 
 /**
+ * Checks whether the argument idx is a tuple and
+ * returns it.
+ *
+ * @param L Lua State
+ * @param idx the stack index
+ * @retval non-NULL argument is tuple
+ * @throws error if the argument is not a tuple.
+ */
+box_tuple_t *
+luaT_checktuple(struct lua_State *L, int idx);
+
+/**
  * Push a tuple onto the stack.
  * @param L Lua State
  * @sa luaT_istuple
@@ -57,7 +69,7 @@ void
 luaT_pushtuple(struct lua_State *L, box_tuple_t *tuple);
 
 /**
- * Checks whether argument idx is a tuple
+ * Checks whether argument idx is a tuple.
  *
  * @param L Lua State
  * @param idx the stack index
