@@ -819,4 +819,8 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 sp = box.schema.create_space('not_universe')
 box.schema.user.grant('guest', 'read,write,execute', 'space', 'not_universe')
 box.schema.user.grant('guest', 'read,write,execute', 'space', 'not_universe')
+
+-- Clean up.
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.user.revoke('guest', 'read,write,execute', 'space', 'not_universe')
 sp:drop()

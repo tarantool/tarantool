@@ -2131,6 +2131,13 @@ box.schema.user.grant('guest', 'read,write,execute', 'space', 'not_universe')
 ---
 - error: User 'guest' already has read,write,execute access on space 'not_universe'
 ...
+-- Clean up.
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...
+box.schema.user.revoke('guest', 'read,write,execute', 'space', 'not_universe')
+---
+...
 sp:drop()
 ---
 ...
