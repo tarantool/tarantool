@@ -47,7 +47,6 @@
 #include "sqlInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
-#include "box/box.h"
 #include "box/ck_constraint.h"
 #include "box/fk_constraint.h"
 #include "box/sequence.h"
@@ -115,24 +114,6 @@ sql_finish_coding(struct Parse *parse_context)
 	} else {
 		parse_context->is_aborted = true;
 	}
-}
-/**
- * Find index by its name.
- *
- * @param space Space index belongs to.
- * @param name Name of index to be found.
- *
- * @retval NULL in case index doesn't exist.
- */
-static struct index *
-sql_space_index_by_name(struct space *space, const char *name)
-{
-	for (uint32_t i = 0; i < space->index_count; ++i) {
-		struct index *idx = space->index[i];
-		if (strcmp(name, idx->def->name) == 0)
-			return idx;
-	}
-	return NULL;
 }
 
 bool
@@ -1470,6 +1451,40 @@ vdbe_emit_stat_space_clear(struct Parse *parse, const char *stat_table_name,
 }
 
 /**
+ * Generate VDBE program to remove entry from _index space.
+ *
+ * @param parse_context Parsing context.
+ * @param name Index name.
+ * @param space_def Def of table which index belongs to.
+ * @param errcode Type of printing error: "no such index" or
+ *                "no such constraint".
+ * @param if_exist True if there was <IF EXISTS> in the query.
+ */
+static void
+vdbe_emit_index_drop(struct Parse *parse_context, const char *name,
+		     struct space_def *space_def, int errcode, bool if_exist)
+{
+	assert(errcode == ER_NO_SUCH_INDEX_NAME ||
+	       errcode == ER_NO_SUCH_CONSTRAINT);
+	struct Vdbe *vdbe = sqlGetVdbe(parse_context);
+	assert(vdbe != NULL);
+	assert(parse_context->db != NULL);
+	int key_reg = sqlGetTempRange(parse_context, 3);
+	sqlVdbeAddOp2(vdbe, OP_Integer, space_def->id, key_reg);
+	sqlVdbeAddOp4(vdbe, OP_String8, 0, key_reg + 1, 0,
+		      sqlDbStrDup(parse_context->db, name), P4_DYNAMIC);
+	const char *error_msg =
+		tt_sprintf(tnt_errcode_desc(errcode), name, space_def->name);
+	if (vdbe_emit_halt_with_presence_test(parse_context, BOX_INDEX_ID, 2,
+					      key_reg, 2, errcode, error_msg,
+					      if_exist, OP_Found) != 0)
+		return;
+	sqlVdbeAddOp3(vdbe, OP_MakeRecord, key_reg, 2, key_reg + 2);
+	sqlVdbeAddOp3(vdbe, OP_SDelete, BOX_INDEX_ID, key_reg + 2, 2);
+	sqlReleaseTempRange(parse_context, key_reg, 3);
+}
+
+/**
  * Generate VDBE program to remove entry from _fk_constraint space.
  *
  * @param parse_context Parsing context.
@@ -2401,7 +2416,7 @@ sql_create_index(struct Parse *parse) {
 			parse->is_aborted = true;
 			goto exit_create_index;
 		}
-		if (sql_space_index_by_name(space, name) != NULL) {
+		if (space_index_by_name(space, name) != NULL) {
 			if (! create_entity_def->if_not_exist) {
 				diag_set(ClientError, ER_INDEX_EXISTS_IN_SPACE,
 					 name, def->name);
@@ -2695,29 +2710,9 @@ sql_drop_index(struct Parse *parse_context)
 		parse_context->is_aborted = true;
 		goto exit_drop_index;
 	}
-	uint32_t index_id = box_index_id_by_name(space->def->id, index_name,
-						 strlen(index_name));
-	if (index_id == BOX_ID_NIL) {
-		if (!if_exists) {
-			diag_set(ClientError, ER_NO_SUCH_INDEX_NAME,
-				 index_name, table_name);
-			parse_context->is_aborted = true;
-		}
-		goto exit_drop_index;
-	}
 
-	/*
-	 * Generate code to remove entry from _index space
-	 * But firstly, delete statistics since schema
-	 * changes after DDL.
-	 */
-	int record_reg = ++parse_context->nMem;
-	int space_id_reg = ++parse_context->nMem;
-	int index_id_reg = ++parse_context->nMem;
-	sqlVdbeAddOp2(v, OP_Integer, space->def->id, space_id_reg);
-	sqlVdbeAddOp2(v, OP_Integer, index_id, index_id_reg);
-	sqlVdbeAddOp3(v, OP_MakeRecord, space_id_reg, 2, record_reg);
-	sqlVdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID, record_reg);
+	vdbe_emit_index_drop(parse_context, index_name, space->def,
+			     ER_NO_SUCH_INDEX_NAME, if_exists);
 	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
  exit_drop_index:
 	sqlSrcListDelete(db, table_list);

@@ -288,6 +288,25 @@ space_index(struct space *space, uint32_t id)
 }
 
 /**
+ * Get index by index name.
+ *
+ * @param space Space index belongs to.
+ * @param index_name Name of index to be found.
+ *
+ * @retval NULL if the index is not found.
+ */
+static inline struct index *
+space_index_by_name(struct space *space, const char *index_name)
+{
+	for(uint32_t i = 0; i < space->index_count; i++) {
+		struct index *index = space->index[i];
+		if (strcmp(index_name, index->def->name) == 0)
+			return index;
+	}
+	return NULL;
+}
+
+/**
  * Return true if the unique constraint must be checked for
  * the index with the given id before inserting a tuple into
  * the space.

@@ -4460,11 +4460,12 @@ case OP_SInsert: {
 	break;
 }
 
-/* Opcode: SDelete P1 P2 * * P5
- * Synopsis: space id = P1, key = r[P2]
+/* Opcode: SDelete P1 P2 P3 * P5
+ * Synopsis: space id = P1, key = r[P2], searching index id = P3
  *
  * This opcode is used only during DDL routine.
- * Delete entry with given key from system space.
+ * Delete entry with given key from system space. P3 is the index
+ * number by which to search for the key.
  *
  * If P5 is set to OPFLAG_NCHANGE, account overall changes
  * made to database.
@@ -4472,13 +4473,14 @@ case OP_SInsert: {
 case OP_SDelete: {
 	assert(pOp->p1 > 0);
 	assert(pOp->p2 >= 0);
+	assert(pOp->p3 >= 0);
 
 	pIn2 = &aMem[pOp->p2];
 	struct space *space = space_by_id(pOp->p1);
 	assert(space != NULL);
 	assert(space_is_system(space));
 	assert(p->errorAction == ON_CONFLICT_ACTION_ABORT);
-	if (sql_delete_by_key(space, 0, pIn2->z, pIn2->n) != 0)
+	if (sql_delete_by_key(space, pOp->p3, pIn2->z, pIn2->n) != 0)
 		goto abort_due_to_error;
 	if (pOp->p5 & OPFLAG_NCHANGE)
 		p->nChange++;

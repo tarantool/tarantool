@@ -33,7 +33,6 @@
  * This file contains code used to implement the PRAGMA command.
  */
 #include "box/index.h"
-#include "box/box.h"
 #include "box/tuple.h"
 #include "box/fk_constraint.h"
 #include "box/schema.h"
@@ -192,12 +191,9 @@ sql_pragma_index_info(struct Parse *parse,
 	struct space *space = space_by_name(tbl_name);
 	if (space == NULL)
 		return;
-	uint32_t iid = box_index_id_by_name(space->def->id, idx_name,
-					    strlen(idx_name));
-	if (iid == BOX_ID_NIL)
+	struct index *idx = space_index_by_name(space, idx_name);
+	if (idx == NULL)
 		return;
-	struct index *idx = space_index(space, iid);
-	assert(idx != NULL);
 	parse->nMem = 6;
 	struct Vdbe *v = sqlGetVdbe(parse);
 	assert(v != NULL);
