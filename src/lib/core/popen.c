@@ -612,7 +612,7 @@ get_envp(struct popen_opts *opts)
 		if (!said)
 			say_warn("popen: Environment inheritance "
 				 "unsupported, passing empty");
-		return (char *)empty_envp;
+		return (char **)empty_envp;
 #endif
 	}
 	return opts->env;
