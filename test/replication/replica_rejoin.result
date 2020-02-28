@@ -37,7 +37,7 @@ test_run:cmd("create server replica with rpl_master=default, script='replication
 ---
 - true
 ...
-test_run:cmd("start server replica")
+test_run:cmd("start server replica with args='true'")
 ---
 - true
 ...
@@ -111,7 +111,7 @@ box.cfg{checkpoint_count = checkpoint_count}
 ...
 -- Restart the replica. Since xlogs have been removed,
 -- it is supposed to rejoin without changing id.
-test_run:cmd("start server replica")
+test_run:cmd("start server replica with args='true'")
 ---
 - true
 ...
@@ -158,7 +158,7 @@ box.space.test:select()
   - [30, 30]
 ...
 -- Check that restart works as usual.
-test_run:cmd("restart server replica")
+test_run:cmd("restart server replica with args='true'")
 box.info.replication[1].upstream.status == 'follow' or box.info
 ---
 - true
@@ -210,7 +210,7 @@ test_run:wait_cond(function() return #fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.
 box.cfg{checkpoint_count = checkpoint_count}
 ---
 ...
-test_run:cmd("start server replica")
+test_run:cmd("start server replica with args='true'")
 ---
 - true
 ...
@@ -252,7 +252,7 @@ test_run:cleanup_cluster()
 box.space.test:truncate()
 ---
 ...
-test_run:cmd("start server replica")
+test_run:cmd("start server replica with args='true'")
 ---
 - true
 ...
@@ -349,7 +349,7 @@ _ = test_run:wait_vclock('default', vclock)
 ---
 ...
 -- Restart the replica. It should successfully rebootstrap.
-test_run:cmd("restart server replica")
+test_run:cmd("restart server replica with args='true'")
 box.space.test:select()
 ---
 - - [1]
