@@ -17,7 +17,7 @@ _ = box.space.test:insert{3}
 
 -- Join a replica, then stop it.
 test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
-test_run:cmd("start server replica")
+test_run:cmd("start server replica with args='true'")
 test_run:cmd("switch replica")
 box.info.replication[1].upstream.status == 'follow' or box.info
 box.space.test:select()
@@ -45,7 +45,7 @@ box.cfg{checkpoint_count = checkpoint_count}
 
 -- Restart the replica. Since xlogs have been removed,
 -- it is supposed to rejoin without changing id.
-test_run:cmd("start server replica")
+test_run:cmd("start server replica with args='true'")
 box.info.replication[2].downstream.vclock ~= nil or box.info
 test_run:cmd("switch replica")
 box.info.replication[1].upstream.status == 'follow' or box.info
@@ -60,7 +60,7 @@ test_run:cmd("switch replica")
 box.space.test:select()
 
 -- Check that restart works as usual.
-test_run:cmd("restart server replica")
+test_run:cmd("restart server replica with args='true'")
 box.info.replication[1].upstream.status == 'follow' or box.info
 box.space.test:select()
 
@@ -78,7 +78,7 @@ for i = 1, 3 do box.space.test:insert{i * 100} end
 fio = require('fio')
 test_run:wait_cond(function() return #fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog')) == 1 end) or fio.pathjoin(box.cfg.wal_dir, '*.xlog')
 box.cfg{checkpoint_count = checkpoint_count}
-test_run:cmd("start server replica")
+test_run:cmd("start server replica with args='true'")
 test_run:cmd("switch replica")
 box.info.status -- orphan
 box.space.test:select()
@@ -94,7 +94,7 @@ test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
 test_run:cleanup_cluster()
 box.space.test:truncate()
-test_run:cmd("start server replica")
+test_run:cmd("start server replica with args='true'")
 -- Subscribe the master to the replica.
 replica_listen = test_run:cmd("eval replica 'return box.cfg.listen'")
 replica_listen ~= nil
@@ -128,7 +128,7 @@ for i = 1, 10 do box.space.test:replace{2} end
 vclock = test_run:get_vclock('replica')
 _ = test_run:wait_vclock('default', vclock)
 -- Restart the replica. It should successfully rebootstrap.
-test_run:cmd("restart server replica")
+test_run:cmd("restart server replica with args='true'")
 box.space.test:select()
 box.snapshot()
 box.space.test:replace{2}

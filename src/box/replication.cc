@@ -768,7 +768,12 @@ replicaset_needs_rejoin(struct replica **master)
 	struct replica *leader = NULL;
 	replicaset_foreach(replica) {
 		struct applier *applier = replica->applier;
-		if (applier == NULL)
+		/*
+		 * Skip the local instance, we shouldn't perform a
+		 * check against our own gc vclock.
+		 */
+		if (applier == NULL || tt_uuid_is_equal(&replica->uuid,
+							&INSTANCE_UUID))
 			continue;
 
 		const struct ballot *ballot = &applier->ballot;
