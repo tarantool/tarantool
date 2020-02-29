@@ -1071,6 +1071,7 @@ done:
 	}
 	fiber_gc();
 	wal_notify_watchers(writer, WAL_EVENT_WRITE);
+	ERROR_INJECT_SLEEP(ERRINJ_RELAY_FASTER_THAN_TX);
 }
 
 /** WAL writer main loop.  */
@@ -1282,6 +1283,8 @@ wal_watcher_notify(struct wal_watcher *watcher, unsigned events)
 	msg->events = events;
 	cmsg_init(&msg->cmsg, watcher->route);
 	cpipe_push(&watcher->watcher_pipe, &msg->cmsg);
+	ERROR_INJECT(ERRINJ_RELAY_FASTER_THAN_TX,
+		     cpipe_deliver_now(&watcher->watcher_pipe));
 }
 
 static void

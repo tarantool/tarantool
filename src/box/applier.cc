@@ -782,8 +782,13 @@ applier_subscribe(struct applier *applier)
 	struct vclock vclock;
 	vclock_create(&vclock);
 	vclock_copy(&vclock, &replicaset.vclock);
+	/*
+	 * Stop accepting local rows coming from a remote
+	 * instance as soon as local WAL starts accepting writes.
+	 */
+	uint32_t id_filter = box_is_orphan() ? 0 : 1 << instance_id;
 	xrow_encode_subscribe_xc(&row, &REPLICASET_UUID, &INSTANCE_UUID,
-				 &vclock, 0);
+				 &vclock, id_filter);
 	coio_write_xrow(coio, &row);
 
 	/* Read SUBSCRIBE response */
