@@ -1456,3 +1456,71 @@ fio.mktree('/dev/null/dir')
 - false
 - 'Error creating directory /dev/null: File exists'
 ...
+--
+-- gh-4794: fio.tempdir() should use $TMPDIR.
+--
+cwd = fio.cwd()
+---
+...
+old_tmpdir = os.getenv('TMPDIR')
+---
+...
+tmpdir = cwd..'/tmp'
+---
+...
+fio.mkdir(tmpdir)
+---
+- true
+...
+os.setenv('TMPDIR', tmpdir)
+---
+...
+dir = fio.tempdir()
+---
+...
+dir:find(tmpdir) ~= nil or {dir, tmpdir}
+---
+- true
+...
+fio.stat(dir) ~= nil or fio.stat(dir)
+---
+- true
+...
+tmpdir = cwd..'/tmp2'
+---
+...
+os.setenv('TMPDIR', tmpdir)
+---
+...
+fio.tempdir()
+---
+- null
+- 'fio: No such file or directory'
+...
+os.setenv('TMPDIR', nil)
+---
+...
+dir = fio.tempdir()
+---
+...
+dir:find('/tmp') ~= nil or dir
+---
+- true
+...
+tmpdir = cwd..'/'..string.rep('t', 5000)
+---
+...
+os.setenv('TMPDIR', tmpdir)
+---
+...
+fio.tempdir()
+---
+- null
+- 'fio: Cannot allocate memory'
+...
+tmpdir = nil
+---
+...
+os.setenv('TMPDIR', old_tmpdir)
+---
+...

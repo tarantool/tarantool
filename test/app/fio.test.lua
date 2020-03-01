@@ -474,3 +474,31 @@ test_run:cmd("clear filter")
 --
 fio.mktree('/dev/null')
 fio.mktree('/dev/null/dir')
+
+--
+-- gh-4794: fio.tempdir() should use $TMPDIR.
+--
+cwd = fio.cwd()
+old_tmpdir = os.getenv('TMPDIR')
+
+tmpdir = cwd..'/tmp'
+fio.mkdir(tmpdir)
+os.setenv('TMPDIR', tmpdir)
+dir = fio.tempdir()
+dir:find(tmpdir) ~= nil or {dir, tmpdir}
+fio.stat(dir) ~= nil or fio.stat(dir)
+
+tmpdir = cwd..'/tmp2'
+os.setenv('TMPDIR', tmpdir)
+fio.tempdir()
+
+os.setenv('TMPDIR', nil)
+dir = fio.tempdir()
+dir:find('/tmp') ~= nil or dir
+
+tmpdir = cwd..'/'..string.rep('t', 5000)
+os.setenv('TMPDIR', tmpdir)
+fio.tempdir()
+tmpdir = nil
+
+os.setenv('TMPDIR', old_tmpdir)

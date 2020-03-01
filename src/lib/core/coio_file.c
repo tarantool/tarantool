@@ -466,13 +466,16 @@ coio_tempdir(char *path, size_t path_len)
 {
 	INIT_COEIO_FILE(eio);
 
-	if (path_len < sizeof("/tmp/XXXXXX") + 1) {
+	const char *tmpdir = getenv("TMPDIR");
+	if (tmpdir == NULL)
+		tmpdir = "/tmp";
+	int rc = snprintf(path, path_len, "%s/XXXXXX", tmpdir);
+	if (rc < 0)
+		return -1;
+	if ((size_t) rc >= path_len) {
 		errno = ENOMEM;
 		return -1;
 	}
-
-	snprintf(path, path_len, "/tmp/XXXXXX");
-
 	eio.tempdir.tpl = path;
 	eio_req *req =
 		eio_custom(coio_do_tempdir, 0, coio_complete, &eio);
