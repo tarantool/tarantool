@@ -168,6 +168,12 @@ log_type()
 	return log_default->type;
 }
 
+int
+log_get_fd(void)
+{
+	return log_default->fd;
+}
+
 void
 log_set_level(struct log *log, enum say_level level)
 {

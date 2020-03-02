@@ -144,6 +144,7 @@ typedef int (*log_format_func_t)(struct log *log, char *buf, int len, int level,
  * A log object. There is a singleton for the default log.
  */
 struct log {
+	/** The current file descriptor. */
 	int fd;
 	/** The current log level. */
 	int level;
@@ -201,6 +202,12 @@ log_say(struct log *log, int level, const char *filename,
  */
 enum say_logger_type
 log_type();
+
+/**
+ * Default logger file descriptor.
+ */
+int
+log_get_fd(void);
 
 /**
  * Set log level. Can be used dynamically.
