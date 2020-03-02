@@ -81,36 +81,6 @@ script:
 before_deploy:
   - ls -l build/
 
-deploy:
-  # Deploy packages to PackageCloud from master branch (w/o tagged revisions)
-  - provider: packagecloud
-    username: "tarantool"
-    repository: "1_10"
-    token: "${PACKAGECLOUD_TOKEN}"
-    dist: "${OS}/${DIST}"
-    package_glob: build/*.{rpm,deb,dsc}
-    skip_cleanup: true
-    on:
-      repo: tarantool/tarantool
-      branch: "1.10" # releases
-      condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
-  # Deploy packages to PackageCloud from tagged revisions
-  # https://github.com/travis-ci/travis-ci/issues/7780#issuecomment-302389370
-  - provider: packagecloud
-    username: "tarantool"
-    repository: "1_10"
-    token: "${PACKAGECLOUD_TOKEN}"
-    dist: "${OS}/${DIST}"
-    package_glob: build/*.{rpm,deb,dsc}
-    skip_cleanup: true
-    on:
-      repo: tarantool/tarantool
-      tags: true
-      condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
-
-notifications:
-  email:
-    recipients:
-      - build@tarantool.org
-    on_success: change
-    on_failure: always
+after_success:
+  - pip install --user paramiko
+  - python tools/upload_packages.py
