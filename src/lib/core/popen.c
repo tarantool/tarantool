@@ -948,6 +948,7 @@ exit_child:
 	return handle;
 
 out_err:
+	diag_log();
 	saved_errno = errno;
 	popen_delete(handle);
 	for (i = 0; i < lengthof(pfd); i++) {
