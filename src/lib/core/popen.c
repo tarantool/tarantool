@@ -591,9 +591,7 @@ close_inherited_fds(int *skip_fds, size_t nr_skip_fds)
 	return 0;
 }
 
-#ifdef TARGET_OS_LINUX
 extern char **environ;
-#endif
 
 /**
  * Get pointer to environment variables to use in
@@ -603,17 +601,8 @@ static inline char **
 get_envp(struct popen_opts *opts)
 {
 	if (!opts->env) {
-#ifdef TARGET_OS_LINUX
 		/* Inherit existing ones if not specified */
 		return environ;
-#else
-		static const char **empty_envp[] = { NULL };
-		static bool said = false;
-		if (!said)
-			say_warn("popen: Environment inheritance "
-				 "unsupported, passing empty");
-		return (char **)empty_envp;
-#endif
 	}
 	return opts->env;
 }
