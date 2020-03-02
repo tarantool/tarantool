@@ -623,13 +623,17 @@ signal_reset(void)
 	    sigaction(SIGHUP, &sa, NULL) == -1 ||
 	    sigaction(SIGWINCH, &sa, NULL) == -1 ||
 	    sigaction(SIGSEGV, &sa, NULL) == -1 ||
-	    sigaction(SIGFPE, &sa, NULL) == -1)
+	    sigaction(SIGFPE, &sa, NULL) == -1) {
+		say_error("child: sigaction failed");
 		_exit(errno);
+	}
 
 	/* Unblock any signals blocked by libev */
 	sigfillset(&sigset);
-	if (sigprocmask(SIG_UNBLOCK, &sigset, NULL) == -1)
+	if (sigprocmask(SIG_UNBLOCK, &sigset, NULL) == -1) {
+		say_error("child: SIG_UNBLOCK failed");
 		_exit(errno);
+	}
 }
 
 /**
@@ -725,9 +729,10 @@ popen_new(struct popen_opts *opts)
 	};
 	/*
 	 * At max we could be skipping each pipe end
-	 * plus dev/null variants.
+	 * plus dev/null variants and logfd
 	 */
-	int skip_fds[POPEN_FLAG_FD_STDEND_BIT * 2 + 2];
+	int skip_fds[POPEN_FLAG_FD_STDEND_BIT * 2 + 2 + 1];
+	int log_fd = log_get_fd();
 	size_t nr_skip_fds = 0;
 
 	/*
@@ -755,6 +760,8 @@ popen_new(struct popen_opts *opts)
 	if (!handle)
 		return NULL;
 
+	if (log_fd >= 0)
+		skip_fds[nr_skip_fds++] = log_fd;
 	skip_fds[nr_skip_fds++] = dev_null_fd_ro;
 	skip_fds[nr_skip_fds++] = dev_null_fd_wr;
 	assert(nr_skip_fds <= lengthof(skip_fds));
@@ -831,13 +838,17 @@ popen_new(struct popen_opts *opts)
 		 * won't be able to kill a group of children.
 		 */
 		if (opts->flags & POPEN_FLAG_SETSID) {
-			if (setsid() == -1)
+			if (setsid() == -1) {
+				say_syserror("child: setsid failed");
 				goto exit_child;
+			}
 		}
 
 		if (opts->flags & POPEN_FLAG_CLOSE_FDS) {
-			if (close_inherited_fds(skip_fds, nr_skip_fds))
+			if (close_inherited_fds(skip_fds, nr_skip_fds)) {
+				say_syserror("child: close inherited fds");
 				goto exit_child;
+			}
 		}
 
 		for (i = 0; i < lengthof(pfd_map); i++) {
@@ -849,13 +860,19 @@ popen_new(struct popen_opts *opts)
 				int child_idx = pfd_map[i].child_idx;
 
 				/* put child peer end at known place */
-				if (dup2(pfd[i][child_idx], fileno) < 0)
+				if (dup2(pfd[i][child_idx], fileno) < 0) {
+					say_syserror("child: dup %d -> %d",
+						     pfd[i][child_idx], fileno);
 					goto exit_child;
+				}
 
 				/* parent's pipe no longer needed */
 				if (close(pfd[i][0]) ||
-				    close(pfd[i][1]))
+				    close(pfd[i][1])) {
+					say_syserror("child: close %d %d",
+						     pfd[i][0], pfd[i][1]);
 					goto exit_child;
+				}
 				continue;
 			}
 
@@ -863,8 +880,10 @@ popen_new(struct popen_opts *opts)
 			 * Use /dev/null if requested.
 			 */
 			if (opts->flags & pfd_map[i].mask_devnull) {
-				if (dup2(*pfd_map[i].dev_null_fd,
-					 fileno) < 0) {
+				if (dup2(*pfd_map[i].dev_null_fd, fileno) < 0) {
+					say_syserror("child: dup2 %d -> %d",
+						     *pfd_map[i].dev_null_fd,
+						     fileno);
 					goto exit_child;
 				}
 				continue;
@@ -877,8 +896,11 @@ popen_new(struct popen_opts *opts)
 			 * EBADF happens.
 			 */
 			if (opts->flags & pfd_map[i].mask_close) {
-				if (close(fileno) && errno != EBADF)
+				if (close(fileno) && errno != EBADF) {
+					say_syserror("child: can't close %d",
+						     fileno);
 					goto exit_child;
+				}
 				continue;
 			}
 
@@ -888,8 +910,19 @@ popen_new(struct popen_opts *opts)
 			 */
 		}
 
-		if (close(dev_null_fd_ro) || close(dev_null_fd_wr))
+		if (close(dev_null_fd_ro) || close(dev_null_fd_wr)) {
+			say_error("child: can't close %d or %d",
+				  dev_null_fd_ro, dev_null_fd_wr);
 			goto exit_child;
+		}
+
+		if (log_fd >= 0) {
+			if (close(log_fd)) {
+				say_error("child: can't close logfd %d",
+					  log_fd);
+				goto exit_child;
+			}
+		}
 
 		if (opts->flags & POPEN_FLAG_SHELL)
 			execve(_PATH_BSHELL, opts->argv, envp);
