@@ -828,6 +828,19 @@ lbox_fiber_set_joinable(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * Alternative to fiber.sleep(infinite) which does not participate
+ * in an event loop at all until an explicit wakeup. This is less
+ * overhead. Useful for fibers sleeping most of the time.
+ */
+static int
+lbox_fiber_stall(struct lua_State *L)
+{
+	(void) L;
+	fiber_yield();
+	return 0;
+}
+
 static const struct luaL_Reg lbox_fiber_meta [] = {
 	{"id", lbox_fiber_id},
 	{"name", lbox_fiber_name},
@@ -865,6 +878,8 @@ static const struct luaL_Reg fiberlib[] = {
 	{"new", lbox_fiber_new},
 	{"status", lbox_fiber_status},
 	{"name", lbox_fiber_name},
+	/* Internal functions, to hide in fiber.lua. */
+	{"stall", lbox_fiber_stall},
 	{NULL, NULL}
 };
 

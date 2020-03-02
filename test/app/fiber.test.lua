@@ -688,6 +688,47 @@ tbl.time > 0
 fiber.top_disable()
 fiber.top()
 
+--
+-- fiber._internal.schedule_task() - API for internal usage for
+-- delayed execution of a function.
+--
+glob_arg = {}
+count = 0
+function task_f(arg)                                                            \
+    count = count + 1                                                           \
+    table.insert(glob_arg, arg)                                                 \
+    arg = arg + 1                                                               \
+    if arg <= 3 then                                                            \
+        fiber._internal.schedule_task(task_f, arg)                              \
+    else                                                                        \
+        fiber.self():cancel()                                                   \
+        error('Worker is broken')                                               \
+    end                                                                         \
+end
+for i = 1, 3 do                                                                 \
+    local csw1 = fiber.info()[fiber.id()].csw                                   \
+    fiber._internal.schedule_task(task_f, i)                                    \
+    local csw2 = fiber.info()[fiber.id()].csw                                   \
+    assert(csw1 == csw2 and type(csw1) == 'number')                             \
+end
+old_count = count
+test_run:wait_cond(function()                                                   \
+    fiber.yield()                                                               \
+    if count == old_count then                                                  \
+        return true                                                             \
+    end                                                                         \
+    old_count = count                                                           \
+end)
+glob_arg
+count
+
+-- Ensure, that after all tasks are finished, the worker didn't
+-- stuck somewhere.
+glob_arg = nil
+fiber._internal.schedule_task(function(arg) glob_arg = arg end, 100)
+fiber.yield()
+glob_arg
+
 -- cleanup
 test_run:cmd("clear filter")
 
