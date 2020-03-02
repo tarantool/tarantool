@@ -34,9 +34,6 @@ jobs:
       - name: "Debug build + test + coverage (Linux, gcc)"
         env: TARGET=coverage
       # Deploy targets (they also catch distro-specific problems).
-      - name: "Create and deploy tarball"
-        env: TARGET=source
-        if: branch = "1.10"
       - name: "CentOS 6 build + deploy RPM"
         env: OS=el DIST=6
         if: branch = "1.10"
@@ -70,9 +67,6 @@ jobs:
       - name: "Ubuntu Disco (19.04) build + deploy DEB"
         env: OS=ubuntu DIST=disco
         if: branch = "1.10"
-      - name: "Ubuntu Eoan (19.10) build + deploy DEB"
-        env: OS=ubuntu DIST=eoan
-        if: branch = "1.10"
       - name: "Debian Jessie (8) build + deploy DEB"
         env: OS=debian DIST=jessie
         if: branch = "1.10"
@@ -89,53 +83,6 @@ script:
 before_deploy:
   - ls -l build/
 
-deploy:
-  # Deploy packages to PackageCloud from master branch (w/o tagged revisions)
-  - provider: packagecloud
-    username: "tarantool"
-    repository: "1_10"
-    token: "${PACKAGECLOUD_TOKEN}"
-    dist: "${OS}/${DIST}"
-    package_glob: build/*.{rpm,deb,dsc}
-    skip_cleanup: true
-    on:
-      repo: tarantool/tarantool
-      branch: "1.10" # releases
-      condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
-  # Deploy source tarballs to S3 from master branch (w/o tagged revisions)
-  - provider: script
-    script: make -f .travis.mk source_deploy
-    skip_cleanup: true
-    on:
-      repo: tarantool/tarantool
-      branch: "1.10" # releases
-      condition: "x${TARGET} = xsource"
-  # Deploy packages to PackageCloud from tagged revisions
-  # https://github.com/travis-ci/travis-ci/issues/7780#issuecomment-302389370
-  - provider: packagecloud
-    username: "tarantool"
-    repository: "1_10"
-    token: "${PACKAGECLOUD_TOKEN}"
-    dist: "${OS}/${DIST}"
-    package_glob: build/*.{rpm,deb,dsc}
-    skip_cleanup: true
-    on:
-      repo: tarantool/tarantool
-      tags: true
-      condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
-  # Deploy source tarballs to S3 from tagged revisions
-  # https://github.com/travis-ci/travis-ci/issues/7780#issuecomment-302389370
-  - provider: script
-    script: make -f .travis.mk source_deploy
-    skip_cleanup: true
-    on:
-      repo: tarantool/tarantool
-      tags: true
-      condition: "x${TARGET} = xsource"
-
-notifications:
-  email:
-    recipients:
-      - build@tarantool.org
-    on_success: change
-    on_failure: always
+after_success:
+  - pip install --user paramiko
+  - python tools/upload_packages.py
