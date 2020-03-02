@@ -529,8 +529,11 @@ make_pipe(int pfd[2])
 static int
 close_inherited_fds(int *skip_fds, size_t nr_skip_fds)
 {
-#ifdef TARGET_OS_LINUX
+# if defined(TARGET_OS_LINUX)
 	static const char path[] = "/proc/self/fd";
+# else
+	static const char path[] = "/dev/fd";
+# endif
 	struct dirent *de;
 	int fd_no, fd_dir;
 	DIR *dir;
@@ -577,17 +580,6 @@ close_inherited_fds(int *skip_fds, size_t nr_skip_fds)
 		diag_set(SystemError, "fdin: Can't close %s", path);
 		return -1;
 	}
-#else
-	/* FIXME: What about FreeBSD/MachO? */
-	(void)skip_fds;
-	(void)nr_skip_fds;
-
-	static bool said = false;
-	if (!said) {
-		say_warn("popen: fdin: Skip closing inherited");
-		said = true;
-	}
-#endif
 	return 0;
 }
 
