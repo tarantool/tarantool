@@ -5,6 +5,7 @@ local msgpack = require('msgpack')
 local crypto = require('crypto')
 local fiber = require('fiber')
 local internal = require('swim')
+local schedule_task = fiber._internal.schedule_task
 
 ffi.cdef[[
     struct swim;
@@ -954,14 +955,12 @@ local cache_table_mt = { __mode = 'v' }
 -- instance immediately, because it is invoked by Lua GC. Firstly,
 -- it is not safe to yield in FFI - Jit can't survive a yield.
 -- Secondly, it is not safe to yield in any GC function, because
--- it stops garbage collection. Instead, here a new fiber is
--- created without yields, which works at the end of the event
--- loop, and deletes the instance asynchronously.
+-- it stops garbage collection. Instead, here GC is delayed, works
+-- at the end of the event loop, and deletes the instance
+-- asynchronously.
 --
 local function swim_gc(ptr)
-    fiber.new(function()
-        internal.swim_delete(ptr)
-    end)
+    schedule_task(internal.swim_delete, ptr)
 end
 
 --
