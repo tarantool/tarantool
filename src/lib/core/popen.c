@@ -16,6 +16,10 @@
 #include "coio.h"
 #include "say.h"
 
+#ifdef TARGET_OS_DARWIN
+# include <sys/ioctl.h>
+#endif
+
 /* A mapping to find popens by their pids in a signal handler */
 static struct mh_i32ptr_t *popen_pids_map = NULL;
 
@@ -833,15 +837,29 @@ popen_new(struct popen_opts *opts)
 		if (opts->flags & POPEN_FLAG_RESTORE_SIGNALS)
 			signal_reset();
 
-		/*
-		 * We have to be a session leader otherwise
-		 * won't be able to kill a group of children.
-		 */
 		if (opts->flags & POPEN_FLAG_SETSID) {
+#ifndef TARGET_OS_DARWIN
 			if (setsid() == -1) {
 				say_syserror("child: setsid failed");
 				goto exit_child;
 			}
+#else
+			/*
+			 * Note that on MacOS we're not allowed to
+			 * set sid after vfork (it is OS specific)
+			 * thus use ioctl instead.
+			 */
+			int ttyfd = open("/dev/tty", O_RDWR, 0);
+			if (ttyfd >= 0) {
+				ioctl(ttyfd, TIOCNOTTY, 0);
+				close(ttyfd);
+			}
+
+			if (setpgrp() == -1) {
+				say_syserror("child: setpgrp failed");
+				goto exit_child;
+			}
+#endif
 		}
 
 		if (opts->flags & POPEN_FLAG_CLOSE_FDS) {
