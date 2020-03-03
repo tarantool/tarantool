@@ -250,5 +250,13 @@ box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.schema.user.revoke('guest', 'create', 'space')
 space = nil
 
+--
+-- gh-4756: EXECUTE statistics should be present in box.stat()
+--
+e = box.stat().EXECUTE.total
+box.execute('SELECT 1')
+
+assert(box.stat().EXECUTE.total == e + 1)
+
 -- Cleanup xlog
 box.snapshot()
