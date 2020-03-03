@@ -735,7 +735,6 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 	if (sql_stmt_compile(sql, len, NULL, &stmt, NULL) != 0)
 		return -1;
 	assert(stmt != NULL);
-	rmean_collect(rmean_box, IPROTO_EXECUTE, 1);
 	enum sql_serialization_format format = sql_column_count(stmt) > 0 ?
 					   DQL_EXECUTE : DML_EXECUTE;
 	port_sql_create(port, stmt, format, true);
