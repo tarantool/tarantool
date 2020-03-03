@@ -250,10 +250,11 @@ e = box.stat().EXECUTE.total
 
 s = box.prepare([[ SELECT ?; ]])
 s:execute({42})
+box.execute('SELECT 1;')
 res, err = box.unprepare(s)
 
 assert(box.stat().PREPARE.total == p + 1)
-assert(box.stat().EXECUTE.total == e + 1)
+assert(box.stat().EXECUTE.total == e + 2)
 
 -- Cleanup xlog
 box.snapshot()

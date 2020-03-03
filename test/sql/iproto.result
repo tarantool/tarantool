@@ -808,6 +808,14 @@ s:execute({42})
   rows:
   - [42]
 ...
+box.execute('SELECT 1;')
+---
+- metadata:
+  - name: '1'
+    type: integer
+  rows:
+  - [1]
+...
 res, err = box.unprepare(s)
 ---
 ...
@@ -815,7 +823,7 @@ assert(box.stat().PREPARE.total == p + 1)
 ---
 - true
 ...
-assert(box.stat().EXECUTE.total == e + 1)
+assert(box.stat().EXECUTE.total == e + 2)
 ---
 - true
 ...
