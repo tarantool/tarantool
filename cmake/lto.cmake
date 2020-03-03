@@ -90,8 +90,39 @@ if (NOT TARGET_OS_DARWIN)
     endif()
 endif()
 
-# gh-3742: investigate LTO warnings.
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wno-lto-type-mismatch")
+# {{{ Expose build tools and flags
+#
+# It is convenient for building non-cmake targets with the same
+# flags as we use for sources under CMake control.
+#
+# It leans on uncodumented variables that are set in the following
+# CMake modules: Compiler/GNU.cmake and Compiler/Clang.cmake.
 
+# CFLAGS_LTO (list)
+set(CFLAGS_LTO ${CMAKE_C_COMPILE_OPTIONS_IPO})
+message(STATUS "CFLAGS_LTO: ${CFLAGS_LTO}")
+
+# LDFLAGS_LTO (list)
+set(LDFLAGS_LTO ${CMAKE_C_LINK_OPTIONS_IPO})
+# FIXME: gh-3742: investigate LTO warnings.
+list(APPEND LDFLAGS_LTO -Wno-lto-type-mismatch)
+message(STATUS "LDFLAGS_LTO: ${LDFLAGS_LTO}")
+
+# AR_LTO (string)
+#
+# Note: Platform/Linux-Intel.cmake and Platform/Windows-MSVC.cmake
+# set CMAKE_C_CREATE_STATIC_LIBRARY_IPO, but not
+# CMAKE_C_ARCHIVE_CREATE_IPO. So this snippet is only for GCC and
+# clang.
+set(_ar_command ${CMAKE_C_ARCHIVE_CREATE_IPO})
+separate_arguments(_ar_command)
+list(GET _ar_command 0 AR_LTO)
+unset(_ar_command)
+message(STATUS "AR_LTO: ${AR_LTO}")
+
+# }}}
+
+# Set build tools and flags for files that are built using CMake.
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wno-lto-type-mismatch")
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 message(STATUS "Enabling LTO: TRUE")

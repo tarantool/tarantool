@@ -230,6 +230,16 @@ macro(luajit_build)
     # above.
     set (luajit_ld ${CMAKE_LINKER})
     set (luajit_ar ${CMAKE_AR} rcus)
+    # Enablibg LTO for luajit if DENABLE_LTO set.
+    if (ENABLE_LTO)
+        message(STATUS "Enable LTO for luajit")
+        set (luajit_ldflags ${luajit_ldflags} ${LDFLAGS_LTO})
+        message(STATUS "ld: " ${luajit_ldflags})
+        set (luajit_cflags ${luajit_cflags} ${CFLAGS_LTO})
+        message(STATUS "cflags: " ${luajit_cflags})
+        set (luajit_ar  ${AR_LTO} rcus)
+        message(STATUS "ar: " ${luajit_ar})
+    endif()
     set (luajit_strip ${CMAKE_STRIP})
 
     set (luajit_buildoptions
