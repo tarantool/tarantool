@@ -28,6 +28,11 @@ box.cfg{memtx_memory = -1}
 box.cfg{vinyl_memory = -1}
 box.cfg{vinyl = "vinyl"}
 box.cfg{vinyl_write_threads = "threads"}
+--
+-- gh-4705: too big memory size led to an assertion.
+--
+box.cfg{memtx_memory = 5000000000000}
+box.cfg{vinyl_memory = 5000000000000}
 
 --------------------------------------------------------------------------------
 -- Dynamic configuration check
