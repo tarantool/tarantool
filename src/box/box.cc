@@ -669,7 +669,8 @@ box_check_config()
 	box_check_memtx_memory(cfg_geti64("memtx_memory"));
 	box_check_memtx_min_tuple_size(cfg_geti64("memtx_min_tuple_size"));
 	box_check_vinyl_options();
-	box_check_sql_cache_size(cfg_geti("sql_cache_size"));
+	if (box_check_sql_cache_size(cfg_geti("sql_cache_size")) != 0)
+		diag_raise();
 }
 
 /*
