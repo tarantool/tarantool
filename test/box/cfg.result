@@ -246,11 +246,13 @@ box.cfg{memtx_memory = "100500"}
  | ...
 box.cfg{memtx_memory = -1}
  | ---
- | - error: 'Incorrect value for option ''memtx_memory'': must not be less than 0'
+ | - error: 'Incorrect value for option ''memtx_memory'': must be >= 0 and <= 4398046510080,
+ |     but it is -1'
  | ...
 box.cfg{vinyl_memory = -1}
  | ---
- | - error: 'Incorrect value for option ''vinyl_memory'': must not be less than 0'
+ | - error: 'Incorrect value for option ''vinyl_memory'': must be >= 0 and <= 4398046510080,
+ |     but it is -1'
  | ...
 box.cfg{vinyl = "vinyl"}
  | ---
@@ -259,6 +261,19 @@ box.cfg{vinyl = "vinyl"}
 box.cfg{vinyl_write_threads = "threads"}
  | ---
  | - error: 'Incorrect value for option ''vinyl_write_threads'': should be of type number'
+ | ...
+--
+-- gh-4705: too big memory size led to an assertion.
+--
+box.cfg{memtx_memory = 5000000000000}
+ | ---
+ | - error: 'Incorrect value for option ''memtx_memory'': must be >= 0 and <= 4398046510080,
+ |     but it is 5000000000000'
+ | ...
+box.cfg{vinyl_memory = 5000000000000}
+ | ---
+ | - error: 'Incorrect value for option ''vinyl_memory'': must be >= 0 and <= 4398046510080,
+ |     but it is 5000000000000'
  | ...
 
 --------------------------------------------------------------------------------
