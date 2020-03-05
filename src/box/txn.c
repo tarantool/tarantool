@@ -555,6 +555,8 @@ txn_prepare(struct txn *txn)
 	trigger_clear(&txn->fiber_on_stop);
 	if (!txn_has_flag(txn, TXN_CAN_YIELD))
 		trigger_clear(&txn->fiber_on_yield);
+
+	txn->start_tm = ev_monotonic_now(loop());
 	return 0;
 }
 
@@ -582,7 +584,6 @@ txn_commit_async(struct txn *txn)
 	 * After this point the transaction must not be used
 	 * so reset the corresponding key in the fiber storage.
 	 */
-	txn->start_tm = ev_monotonic_now(loop());
 	if (txn->n_new_rows + txn->n_applier_rows == 0) {
 		/* Nothing to do. */
 		txn->signature = 0;
