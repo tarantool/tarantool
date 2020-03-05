@@ -300,7 +300,7 @@ txn_rollback(struct txn *txn);
  * freed.
  */
 int
-txn_write(struct txn *txn);
+txn_commit_async(struct txn *txn);
 
 /**
  * Most txns don't have triggers, and txn objects
