@@ -331,6 +331,7 @@ recovery_journal_create(struct recovery_journal *journal, struct vclock *v)
 {
 	journal_create(&journal->base, recovery_journal_write, NULL);
 	journal->vclock = v;
+	journal_set(&journal->base);
 }
 
 static void
@@ -2054,7 +2055,6 @@ bootstrap_from_master(struct replica *master)
 	engine_begin_final_recovery_xc();
 	struct recovery_journal journal;
 	recovery_journal_create(&journal, &replicaset.vclock);
-	journal_set(&journal.base);
 
 	if (!replication_anon) {
 		applier_resume_to_state(applier, APPLIER_JOINED,
@@ -2220,7 +2220,6 @@ local_recovery(const struct tt_uuid *instance_uuid,
 
 	struct recovery_journal journal;
 	recovery_journal_create(&journal, &recovery->vclock);
-	journal_set(&journal.base);
 
 	/*
 	 * We explicitly request memtx to recover its
