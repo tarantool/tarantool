@@ -1465,7 +1465,7 @@ cwd = fio.cwd()
 old_tmpdir = os.getenv('TMPDIR')
 ---
 ...
-tmpdir = cwd..'/tmp'
+tmpdir = cwd..'/tmp-.dot.-'
 ---
 ...
 fio.mkdir(tmpdir)
@@ -1478,7 +1478,7 @@ os.setenv('TMPDIR', tmpdir)
 dir = fio.tempdir()
 ---
 ...
-dir:find(tmpdir) ~= nil or {dir, tmpdir}
+dir:startswith(tmpdir) or {dir, tmpdir}
 ---
 - true
 ...
@@ -1503,7 +1503,7 @@ os.setenv('TMPDIR', nil)
 dir = fio.tempdir()
 ---
 ...
-dir:find('/tmp') ~= nil or dir
+dir:startswith('/tmp') or dir
 ---
 - true
 ...

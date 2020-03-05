@@ -481,11 +481,11 @@ fio.mktree('/dev/null/dir')
 cwd = fio.cwd()
 old_tmpdir = os.getenv('TMPDIR')
 
-tmpdir = cwd..'/tmp'
+tmpdir = cwd..'/tmp-.dot.-'
 fio.mkdir(tmpdir)
 os.setenv('TMPDIR', tmpdir)
 dir = fio.tempdir()
-dir:find(tmpdir) ~= nil or {dir, tmpdir}
+dir:startswith(tmpdir) or {dir, tmpdir}
 fio.stat(dir) ~= nil or fio.stat(dir)
 
 tmpdir = cwd..'/tmp2'
@@ -494,7 +494,7 @@ fio.tempdir()
 
 os.setenv('TMPDIR', nil)
 dir = fio.tempdir()
-dir:find('/tmp') ~= nil or dir
+dir:startswith('/tmp') or dir
 
 tmpdir = cwd..'/'..string.rep('t', 5000)
 os.setenv('TMPDIR', tmpdir)
