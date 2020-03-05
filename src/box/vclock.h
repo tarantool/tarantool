@@ -45,6 +45,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+typedef uint32_t vclock_map_t;
+
 enum {
 	/**
 	 * The maximum number of components in vclock, should be power of two.
@@ -82,7 +84,7 @@ enum {
 /** Cluster vector clock */
 struct vclock {
 	/** Map of used components in lsn array */
-	unsigned int map;
+	vclock_map_t map;
 	/** Sum of all components of vclock. */
 	int64_t signature;
 	int64_t lsn[VCLOCK_MAX];
@@ -195,7 +197,7 @@ vclock_copy(struct vclock *dst, const struct vclock *src)
 static inline uint32_t
 vclock_size(const struct vclock *vclock)
 {
-	return __builtin_popcount(vclock->map);
+	return bit_count_u32(vclock->map);
 }
 
 static inline int64_t
@@ -281,7 +283,7 @@ vclock_compare_generic(const struct vclock *a, const struct vclock *b,
 		       bool ignore_zero)
 {
 	bool le = true, ge = true;
-	unsigned int map = a->map | b->map;
+	vclock_map_t map = a->map | b->map;
 	struct bit_iterator it;
 	bit_iterator_init(&it, &map, sizeof(map), true);
 
