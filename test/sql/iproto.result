@@ -372,11 +372,11 @@ parameters[3] = 33
 cn:execute('select $2, $1, $3', parameters)
 ---
 - metadata:
-  - name: $2
+  - name: COLUMN_1
     type: integer
-  - name: $1
+  - name: COLUMN_2
     type: integer
-  - name: $3
+  - name: COLUMN_3
     type: integer
   rows:
   - [22, 11, 33]
@@ -736,7 +736,7 @@ res.metadata
 cn:execute("SELECT zeroblob(1);")
 ---
 - metadata:
-  - name: zeroblob(1)
+  - name: COLUMN_1
     type: varbinary
   rows:
   - ["\0"]
@@ -749,7 +749,7 @@ res = cn:execute("SELECT randomblob(1);")
 ...
 res.metadata
 ---
-- - name: randomblob(1)
+- - name: COLUMN_1
     type: varbinary
 ...
 -- Type set during compilation stage, and since min/max are accept
@@ -759,7 +759,7 @@ res.metadata
 cn:execute("SELECT LEAST(1, 2, 3);")
 ---
 - metadata:
-  - name: LEAST(1, 2, 3)
+  - name: COLUMN_1
     type: scalar
   rows:
   - [1]
@@ -767,7 +767,7 @@ cn:execute("SELECT LEAST(1, 2, 3);")
 cn:execute("SELECT GREATEST(1, 2, 3);")
 ---
 - metadata:
-  - name: GREATEST(1, 2, 3)
+  - name: COLUMN_1
     type: scalar
   rows:
   - [3]
@@ -803,7 +803,7 @@ s = box.prepare([[ SELECT ?; ]])
 s:execute({42})
 ---
 - metadata:
-  - name: '?'
+  - name: COLUMN_1
     type: integer
   rows:
   - [42]
@@ -811,7 +811,7 @@ s:execute({42})
 box.execute('SELECT 1;')
 ---
 - metadata:
-  - name: '1'
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]

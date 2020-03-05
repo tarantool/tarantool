@@ -11,7 +11,7 @@ _ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 box.execute('select 1;')
 ---
 - metadata:
-  - name: '1'
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -78,7 +78,7 @@ box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b TEXT CONSTRAINT c1 COL
 box.execute('SELECT 1;')
 ---
 - metadata:
-  - name: '1'
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -86,7 +86,7 @@ box.execute('SELECT 1;')
 box.execute('SELECT 1.5;')
 ---
 - metadata:
-  - name: '1.5'
+  - name: COLUMN_1
     type: double
   rows:
   - [1.5]
@@ -94,7 +94,7 @@ box.execute('SELECT 1.5;')
 box.execute('SELECT 1.0;')
 ---
 - metadata:
-  - name: '1.0'
+  - name: COLUMN_1
     type: double
   rows:
   - [1]
@@ -102,7 +102,7 @@ box.execute('SELECT 1.0;')
 box.execute('SELECT \'abc\';')
 ---
 - metadata:
-  - name: '''abc'''
+  - name: COLUMN_1
     type: string
   rows:
   - ['abc']
@@ -110,7 +110,7 @@ box.execute('SELECT \'abc\';')
 box.execute('SELECT X\'4D6564766564\'')
 ---
 - metadata:
-  - name: X'4D6564766564'
+  - name: COLUMN_1
     type: varbinary
   rows:
   - ['Medved']

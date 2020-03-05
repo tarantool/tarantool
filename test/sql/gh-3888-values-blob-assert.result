@@ -51,7 +51,7 @@ box.execute('SELECT TheColumnName')
 box.execute('VALUES(-0.5e-2)')
 ---
 - metadata:
-  - name: column1
+  - name: COLUMN_1
     type: double
   rows:
   - [-0.005]
@@ -59,7 +59,7 @@ box.execute('VALUES(-0.5e-2)')
 box.execute('SELECT X\'507265766564\'')
 ---
 - metadata:
-  - name: X'507265766564'
+  - name: COLUMN_1
     type: varbinary
   rows:
   - ['Preved']
@@ -68,7 +68,7 @@ box.execute('SELECT X\'507265766564\'')
 box.execute('SELECT 3.14')
 ---
 - metadata:
-  - name: '3.14'
+  - name: COLUMN_1
     type: double
   rows:
   - [3.14]
@@ -76,7 +76,7 @@ box.execute('SELECT 3.14')
 box.execute('SELECT X\'4D6564766564\'')
 ---
 - metadata:
-  - name: X'4D6564766564'
+  - name: COLUMN_1
     type: varbinary
   rows:
   - ['Medved']

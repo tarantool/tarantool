@@ -1032,7 +1032,7 @@ test:do_catchsql2_test(
         SELECT f1+F2 FROM test1 ORDER BY f2
     ]], {
         -- <select1-6.4a>
-        0, {"f1+F2", 33, "f1+F2", 77}
+        0, {"COLUMN_1",33,"COLUMN_1",77}
         -- </select1-6.4a>
     })
 
@@ -1042,7 +1042,7 @@ test:do_catchsql2_test(
         SELECT test1.f1+F2 FROM test1 ORDER BY f2
     ]], {
         -- <select1-6.5>
-        0, {"test1.f1+F2", 33, "test1.f1+F2", 77}
+        0, {"COLUMN_1",33,"COLUMN_1",77}
         -- </select1-6.5>
     })
 
@@ -1059,7 +1059,7 @@ test:do_test(
         return table.insert(v,msg) or v
     end, {
         -- <select1-6.5.1>
-        0, {'test1.f1+F2', 33, 'test1.f1+F2', 77}
+        0, {"COLUMN_1",33,"COLUMN_1",77}
         -- </select1-6.5.1>
     })
 
@@ -1068,7 +1068,7 @@ test:do_catchsql2_test(
     [[SELECT test1.f1+F2, t1 FROM test1, test2 
          ORDER BY f2]], {
         -- <select1-6.6>
-        0, {"test1.f1+F2", 33, "T1", "abc", "test1.f1+F2", 77, "T1", "abc"}
+        0, {"COLUMN_1",33,"T1","abc","COLUMN_1",77,"T1","abc"}
         -- </select1-6.6>
     })
 
@@ -1161,7 +1161,7 @@ test:do_test(
         ]]
     end, {
         -- <select1-6.9.5>
-        "123.45", 123.45
+        "COLUMN_1",123.45
         -- </select1-6.9.5>
     })
 
@@ -1189,7 +1189,8 @@ test:do_test(
         return x
     end, {
         -- <select1-6.9.7>
-        "A.F1", 11, "A.F2", 22, "sql_subquery.5", 5, "sql_subquery.6", 6
+        "A.F1", 11, "A.F2", 22, "sql_subquery.COLUMN_1", 5,
+        "sql_subquery.COLUMN_2", 6
         -- </select1-6.9.7>
     })
 
@@ -1816,7 +1817,7 @@ test:do_execsql2_test(
             SELECT * FROM t3, (SELECT max(a), max(b) FROM t4) as "tx"
         ]], {
             -- <select1-11.14>
-            "ID", 0, "A", "1", "B", "2", "max(a)", 3, "max(b)", "4"
+            "ID", 0, "A", "1", "B", "2", "COLUMN_1", 3, "COLUMN_2", "4"
             -- </select1-11.14>
         })
 
@@ -1826,7 +1827,7 @@ test:do_execsql2_test(
             SELECT y.*, t3.* FROM t3, (SELECT max(a), max(b) FROM t4) AS y
         ]], {
             -- <select1-11.15>
-            "max(a)", 3, "max(b)", "4", "ID", 0, "A", "1", "B", "2"
+            "COLUMN_1", 3, "COLUMN_2", "4", "ID", 0, "A", "1", "B", "2"
             -- </select1-11.15>
         })
 
@@ -1850,7 +1851,7 @@ test:do_execsql2_test(
         SELECT 1+2+3
     ]], {
         -- <select1-12.1>
-        "1+2+3", 6
+        "COLUMN_1",6
         -- </select1-12.1>
     })
 
@@ -1860,7 +1861,7 @@ test:do_execsql2_test(
         SELECT 1,'hello',2
     ]], {
         -- <select1-12.2>
-        '1', 1, "'hello'", "hello", '2', 2
+        "COLUMN_1",1,"COLUMN_2","hello","COLUMN_3",2
         -- </select1-12.2>
     })
 

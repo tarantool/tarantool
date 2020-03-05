@@ -16,7 +16,7 @@ box.execute("CREATE TABLE t1 (s1 VARCHAR(10) PRIMARY KEY);")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -24,7 +24,7 @@ box.execute("SELECT ROW_COUNT();")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [0]
@@ -36,7 +36,7 @@ box.execute("CREATE TABLE t2 (s1 VARCHAR(10) PRIMARY KEY, s2 VARCHAR(10) REFEREN
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -52,7 +52,7 @@ box.execute("INSERT INTO t3 VALUES (0, 0, 0);")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -64,7 +64,7 @@ box.execute("CREATE TRIGGER x AFTER DELETE ON t1 FOR EACH ROW BEGIN UPDATE t3 SE
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -76,7 +76,7 @@ box.execute("INSERT INTO t1 VALUES ('a');")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -88,7 +88,7 @@ box.execute("INSERT INTO t2 VALUES ('a','a');")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -100,7 +100,7 @@ box.execute("INSERT INTO t1 VALUES ('b'), ('c'), ('d');")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [3]
@@ -113,7 +113,7 @@ box.execute("REPLACE INTO t2 VALUES('a', 'c');")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [2]
@@ -125,7 +125,7 @@ box.execute("DELETE FROM t1;")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [4]
@@ -141,7 +141,7 @@ box.execute("TRUNCATE TABLE t3;")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [0]
@@ -157,7 +157,7 @@ box.execute("UPDATE t3 SET i2 = 666;")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [3]
@@ -172,7 +172,7 @@ box.execute("DELETE FROM t3 WHERE 0 = 0;")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [3]
@@ -188,7 +188,7 @@ box.execute("DELETE FROM t3")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [3]
@@ -222,7 +222,7 @@ box.execute("DELETE FROM tt1 WHERE id = 2;")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -252,7 +252,7 @@ box.execute("START TRANSACTION;")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [0]
@@ -264,7 +264,7 @@ box.execute("COMMIT;")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [0]
@@ -277,7 +277,7 @@ box.execute("COMMIT;")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [0]
@@ -286,7 +286,7 @@ box.execute("SELECT ROW_COUNT();")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [0]
@@ -308,7 +308,7 @@ box.execute("EXPLAIN QUERY PLAN INSERT INTO t1 VALUES ('b'), ('c'), ('d');")
 box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
-  - name: ROW_COUNT()
+  - name: COLUMN_1
     type: integer
   rows:
   - [0]

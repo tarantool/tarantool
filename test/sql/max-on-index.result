@@ -48,7 +48,7 @@ box.execute("INSERT INTO test2 VALUES(1, 2)");
 box.execute("SELECT MAX(f1) FROM test1")
 ---
 - metadata:
-  - name: MAX(f1)
+  - name: COLUMN_1
     type: scalar
   rows:
   - [4]
@@ -56,7 +56,7 @@ box.execute("SELECT MAX(f1) FROM test1")
 box.execute("SELECT MAX(f2) FROM test1")
 ---
 - metadata:
-  - name: MAX(f2)
+  - name: COLUMN_1
     type: scalar
   rows:
   - [3]
@@ -64,7 +64,7 @@ box.execute("SELECT MAX(f2) FROM test1")
 box.execute("SELECT MAX(f1) FROM test2")
 ---
 - metadata:
-  - name: MAX(f1)
+  - name: COLUMN_1
     type: scalar
   rows:
   - [1]

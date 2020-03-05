@@ -120,7 +120,7 @@ insert_res
 select_res
 ---
 - metadata:
-  - name: '1'
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]

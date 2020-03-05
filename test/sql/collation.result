@@ -111,7 +111,7 @@ box.execute([[SELECT descriptor, upper(letter), letter FROM tu where UPPER(lette
 - metadata:
   - name: DESCRIPTOR
     type: string
-  - name: upper(letter)
+  - name: COLUMN_1
     type: string
   - name: LETTER
     type: string
@@ -124,7 +124,7 @@ box.execute([[SELECT descriptor, upper(letter COLLATE "GERMAN"), letter FROM tu 
 - metadata:
   - name: DESCRIPTOR
     type: string
-  - name: upper(letter COLLATE "GERMAN")
+  - name: COLUMN_1
     type: string
   - name: LETTER
     type: string
@@ -335,14 +335,14 @@ box.execute("SELECT a FROM t UNION SELECT c FROM t;")
 box.execute("SELECT c COLLATE \"binary\" FROM t UNION SELECT a FROM t;")
 ---
 - metadata:
-  - name: c COLLATE "binary"
+  - name: COLUMN_1
     type: string
   rows: []
 ...
 box.execute("SELECT b COLLATE \"unicode\" FROM t UNION SELECT a FROM t;")
 ---
 - metadata:
-  - name: b COLLATE "unicode"
+  - name: COLUMN_1
     type: string
   rows: []
 ...
@@ -1128,7 +1128,7 @@ box.execute("INSERT INTO jj VALUES (1,'A'), (2,'a')")
 box.execute("SELECT DISTINCT trim(s2) FROM jj;")
 ---
 - metadata:
-  - name: trim(s2)
+  - name: COLUMN_1
     type: string
   rows:
   - ['A']
@@ -1140,7 +1140,7 @@ box.execute("INSERT INTO jj VALUES (3, 'aS'), (4, 'AS');")
 box.execute("SELECT DISTINCT replace(s2, 'S', 's') FROM jj;")
 ---
 - metadata:
-  - name: replace(s2, 'S', 's')
+  - name: COLUMN_1
     type: string
   rows:
   - ['A']
@@ -1149,7 +1149,7 @@ box.execute("SELECT DISTINCT replace(s2, 'S', 's') FROM jj;")
 box.execute("SELECT DISTINCT substr(s2, 1, 1) FROM jj;")
 ---
 - metadata:
-  - name: substr(s2, 1, 1)
+  - name: COLUMN_1
     type: string
   rows:
   - ['A']

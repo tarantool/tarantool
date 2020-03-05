@@ -48,7 +48,7 @@ test_run:cmd("setopt delimiter ''");
 ch:get()
 ---
 - metadata:
-  - name: WAITFOR(0.2)
+  - name: COLUMN_1
     type: number
   rows:
   - [0.2]

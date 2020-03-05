@@ -357,7 +357,7 @@ box.execute('ALTER TABLE tc ADD CONSTRAINT fk1 FOREIGN KEY (id) REFERENCES tp(id
 box.execute('SELECT row_count();')
 ---
 - metadata:
-  - name: row_count()
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -374,7 +374,7 @@ box.execute('ALTER TABLE tc DROP CONSTRAINT fk1;')
 box.execute('SELECT row_count();')
 ---
 - metadata:
-  - name: row_count()
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]

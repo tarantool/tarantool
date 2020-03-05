@@ -265,7 +265,7 @@ test:do_execsql2_test(
         SELECT * FROM v1 LIMIT 1
     ]], {
         -- <view-3.3.1>
-        "XYZ", 2, "PQR", 7, "c-b", 1
+        "XYZ", 2, "PQR", 7, "COLUMN_1", 1
         -- </view-3.3.1>
     })
 
@@ -276,7 +276,7 @@ test:do_execsql2_test(
         SELECT * FROM v1b LIMIT 1
     ]], {
         -- <view-3.3.2>
-        "A", 2, "b+c", 7, "C", 4
+        "A", 2, "COLUMN_1", 7, "C", 4
         -- </view-3.3.2>
     })
 

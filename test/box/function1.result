@@ -449,7 +449,7 @@ box.execute('SELECT "function1.divide"(6, 3, 3)')
 box.execute('SELECT "function1.divide"(6, 3)')
 ---
 - metadata:
-  - name: '"function1.divide"(6, 3)'
+  - name: COLUMN_1
     type: number
   rows:
   - [2]
@@ -457,7 +457,7 @@ box.execute('SELECT "function1.divide"(6, 3)')
 box.execute('SELECT "function1.divide"(5, 2)')
 ---
 - metadata:
-  - name: '"function1.divide"(5, 2)'
+  - name: COLUMN_1
     type: number
   rows:
   - [2.5]
@@ -482,7 +482,7 @@ test_run:cmd("setopt delimiter ''");
 box.execute('SELECT summarize(1, 2)')
 ---
 - metadata:
-  - name: summarize(1, 2)
+  - name: COLUMN_1
     type: number
   rows:
   - [3]
@@ -505,7 +505,7 @@ test_run:cmd("setopt delimiter ''");
 box.execute('SELECT summarize(1, 2)')
 ---
 - metadata:
-  - name: summarize(1, 2)
+  - name: COLUMN_1
     type: number
   rows:
   - [3]
@@ -519,7 +519,7 @@ box.func.SUMMARIZE:drop()
 box.execute('SELECT lua(\'return 1 + 1\')')
 ---
 - metadata:
-  - name: lua('return 1 + 1')
+  - name: COLUMN_1
     type: any
   rows:
   - [2]
@@ -537,7 +537,7 @@ box.execute('SELECT lua(\'return box.cfg()\')')
 box.execute('SELECT lua(\'return box.cfg.memtx_memory\')')
 ---
 - metadata:
-  - name: lua('return box.cfg.memtx_memory')
+  - name: COLUMN_1
     type: any
   rows:
   - [107374182]

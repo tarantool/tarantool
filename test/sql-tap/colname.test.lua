@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(62)
+test:plan(79)
 
 --!./tcltestrunner.lua
 -- 2008 July 15
@@ -94,7 +94,7 @@ test:do_execsql2_test(
         SELECT +tabc.a, -tabc.b, tabc.c, * FROM tabc
     ]], {
         -- <colname-2.3>
-        "+tabc.a",1,"-tabc.b",-2,"C",3,"A",1,"B",2,"C",3
+        "COLUMN_1",1,"COLUMN_2",-2,"C",3,"A",1,"B",2,"C",3
         -- </colname-2.3>
     })
 
@@ -194,7 +194,7 @@ test:do_execsql2_test(
         SELECT +tabc.a, -tabc.b, tabc.c FROM tabc
     ]], {
         -- <colname-3.3>
-        "+tabc.a", 1, "-tabc.b", -2, "C", 3
+        "COLUMN_1",1,"COLUMN_2",-2,"C",3
         -- </colname-3.3>
     })
 
@@ -314,7 +314,7 @@ test:do_execsql2_test(
         SELECT +tabc.a, -tabc.b, tabc.c FROM tabc
     ]], {
         -- <colname-4.3>
-        "+tabc.a", 1, "-tabc.b", -2, "TABC.C", 3
+        "COLUMN_1",1,"COLUMN_2",-2,"TABC.C",3
         -- </colname-4.3>
     })
 
@@ -634,5 +634,158 @@ test:do_catchsql_test(
     "colname-11.3",
     [[ CREATE INDEX t1c ON table1('c'); ]],
     {1, "/Tarantool does not support functional indexes/"})
+
+--
+-- gh-3962: Check auto generated names in different selects.
+--
+test:do_execsql2_test(
+    "colname-12.1",
+    [[
+        VALUES(1, 2, 'aaa');
+    ]], {
+        "COLUMN_1",1,"COLUMN_2",2,"COLUMN_3","aaa"
+    })
+
+test:do_execsql2_test(
+    "colname-12.2",
+    [[
+        SELECT * FROM (VALUES (1+1, 1+1, 'aaa'));
+    ]], {
+        "COLUMN_1",2,"COLUMN_2",2,"COLUMN_3","aaa"
+    })
+
+test:do_execsql2_test(
+    "colname-12.3",
+    [[
+        SELECT 1+1, 1+1, 'aaa';
+    ]], {
+        "COLUMN_1",2,"COLUMN_2",2,"COLUMN_3","aaa"
+    })
+
+test:do_execsql2_test(
+    "colname-12.4",
+    [[
+        SELECT * FROM (SELECT * FROM (VALUES(1, 2, 'aaa'))),
+                      (SELECT * FROM (VALUES(1, 2, 'aaa')))
+    ]], {
+        "COLUMN_1",1,"COLUMN_2",2,"COLUMN_3","aaa","COLUMN_4",1,"COLUMN_5",2,
+        "COLUMN_6","aaa"
+    })
+
+test:do_execsql2_test(
+    "colname-12.5",
+    [[
+        CREATE TABLE j (s1 SCALAR PRIMARY KEY);
+        INSERT INTO j VALUES(1);
+    ]], {})
+
+--
+-- Column named as 'COLUMN_1', because 's1 + 1' is a expression.
+--
+test:do_execsql2_test(
+    "colname-12.6",
+    [[
+        SELECT s1 + 1 FROM j;
+    ]], {
+        "COLUMN_1",2
+    })
+
+test:do_execsql2_test(
+    "colname-12.7",
+    [[
+        SELECT s1 + 1 FROM j ORDER BY column_1;
+    ]], {
+        "COLUMN_1",2
+    })
+
+test:do_execsql2_test(
+    "colname-12.8",
+    [[
+        SELECT * FROM (SELECT s1 + 1 FROM j
+                       ORDER BY column_1) ORDER BY column_1;
+    ]], {
+        "COLUMN_1",2
+    })
+
+test:do_execsql2_test(
+    "colname-12.9",
+    [[
+        SELECT s1 + 1 FROM j GROUP BY column_1;
+    ]], {
+        "COLUMN_1",2
+    })
+
+test:do_execsql2_test(
+    "colname-12.10",
+    [[
+        SELECT * FROM (SELECT s1 + 1 FROM j
+                       ORDER BY column_1) GROUP BY column_1;
+    ]], {
+        "COLUMN_1",2
+    })
+
+test:do_execsql2_test(
+    "colname-12.11",
+    [[
+        SELECT * FROM (SELECT s1 + 1 FROM j
+                       ORDER BY column_1) WHERE column_1 = 2;
+    ]], {
+        "COLUMN_1",2
+    })
+
+test:do_execsql2_test(
+    "colname-12.12",
+    [[
+        SELECT *, s1 + 1 FROM j ORDER BY column_1;
+    ]], {
+        "S1",1,"COLUMN_1",2
+    })
+
+test:do_execsql2_test(
+    "colname-12.13",
+    [[
+        SELECT s1 + 1, * FROM j ORDER BY column_1;
+    ]], {
+        "COLUMN_1",2,"S1",1
+    })
+
+test:do_execsql2_test(
+    "colname-12.14",
+    [[
+        CREATE TABLE j_1 (column_1 SCALAR PRIMARY KEY, column_2 SCALAR);
+        INSERT INTO j_1 VALUES(1, 1);
+    ]], {})
+
+test:do_execsql2_test(
+    "colname-12.15",
+    [[
+        SELECT column_1, column_1 + 1, column_2, 2 FROM j_1;
+    ]], {
+        "COLUMN_1",1,"COLUMN_1",2,"COLUMN_2",1,"COLUMN_2",2
+    })
+
+--
+-- The result order is different, because in the second case
+-- expression "-column_1" with the auto generated name "column_1"
+-- is used for sorting. Auto generated names are considered as
+-- aliases. In the process of resolving an identifier from
+-- <ORDER BY>, it first checks for matching with aliases.
+--
+test:do_execsql2_test(
+    "colname-12.16",
+    [[
+        INSERT INTO j_1 VALUES(2, 2);
+        SELECT column_1 FROM j_1 ORDER BY column_1;
+    ]], {
+        "COLUMN_1",1,"COLUMN_1",2
+    })
+
+test:do_execsql2_test(
+    "colname-12.17",
+    [[
+        SELECT column_1, -column_1 FROM j_1 ORDER BY column_1;
+    ]], {
+        "COLUMN_1",2,"COLUMN_1",-2,"COLUMN_1",1,"COLUMN_1",-1
+    })
 
 test:finish_test()

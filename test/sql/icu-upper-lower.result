@@ -23,11 +23,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     Zəfər, jaketini də, papağını da götür, bu axşam hava çox soyuq
-      olacaq. ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     Zəfər, jaketini də, papağını da götür, bu axşam hava çox soyuq
-      olacaq. ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     zəfər, jaketini də, papağını da götür, bu axşam hava çox soyuq olacaq. ',
@@ -38,9 +36,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     The quick brown fox jumps over the lazy dog. ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     The quick brown fox jumps over the lazy dog. ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     the quick brown fox jumps over the lazy dog. ', '     THE QUICK BROWN FOX
@@ -52,9 +50,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     The quick brown fox jumps over the lazy dog. ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     The quick brown fox jumps over the lazy dog. ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     the quick brown fox jumps over the lazy dog. ', '     THE QUICK BROWN FOX
@@ -66,11 +64,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     Բել դղյակի ձախ ժամն օֆ ազգությանը ցպահանջ չճշտած վնաս էր եւ
-      փառք ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     Բել դղյակի ձախ ժամն օֆ ազգությանը ցպահանջ չճշտած վնաս էր եւ
-      փառք ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     բել դղյակի ձախ ժամն օֆ ազգությանը ցպահանջ չճշտած վնաս էր եւ փառք ', '     ԲԵԼ
@@ -82,11 +78,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     У Іўі худы жвавы чорт у зялёнай камізэльцы пабег пад’есці фаршу
-      з юшкай ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     У Іўі худы жвавы чорт у зялёнай камізэльцы пабег пад’есці фаршу
-      з юшкай ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     у іўі худы жвавы чорт у зялёнай камізэльцы пабег пад’есці фаршу з юшкай ',
@@ -98,11 +92,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     Τάχιστη αλώπηξ βαφής ψημένη γη, δρασκελίζει υπέρ νωθρού κυνός
-      ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     Τάχιστη αλώπηξ βαφής ψημένη γη, δρασκελίζει υπέρ νωθρού κυνός
-      ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     τάχιστη αλώπηξ βαφής ψημένη γη, δρασκελίζει υπέρ νωθρού κυνός ', '     ΤΆΧΙΣΤΗ
@@ -114,11 +106,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     Chuaigh bé mhórshách le dlúthspád fíorfhinn trí hata mo dhea-phorcáin
-      bhig ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     Chuaigh bé mhórshách le dlúthspád fíorfhinn trí hata mo dhea-phorcáin
-      bhig ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     chuaigh bé mhórshách le dlúthspád fíorfhinn trí hata mo dhea-phorcáin bhig ',
@@ -130,9 +120,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     Quiere la boca exhausta vid, kiwi, piña y fugaz jamón ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     Quiere la boca exhausta vid, kiwi, piña y fugaz jamón ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     quiere la boca exhausta vid, kiwi, piña y fugaz jamón ', '     QUIERE LA
@@ -144,9 +134,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     키스의 고유조건은 입술끼리 만나야 하고 특별한 기술은 필요치 않다 ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     키스의 고유조건은 입술끼리 만나야 하고 특별한 기술은 필요치 않다 ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     키스의 고유조건은 입술끼리 만나야 하고 특별한 기술은 필요치 않다 ', '     키스의 고유조건은 입술끼리 만나야 하고 특별한
@@ -158,9 +148,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     Glāžšķūņa rūķīši dzērumā čiepj Baha koncertflīģeļu vākus ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     Glāžšķūņa rūķīši dzērumā čiepj Baha koncertflīģeļu vākus ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     glāžšķūņa rūķīši dzērumā čiepj baha koncertflīģeļu vākus ', '     GLĀŽŠĶŪŅA
@@ -172,11 +162,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     Zwölf große Boxkämpfer jagen Viktor quer über den Sylter Deich
-      ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     Zwölf große Boxkämpfer jagen Viktor quer über den Sylter Deich
-      ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     zwölf große boxkämpfer jagen viktor quer über den sylter deich ', '     ZWÖLF
@@ -188,9 +176,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     Pchnąć w tę łódź jeża lub ośm skrzyń fig. ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     Pchnąć w tę łódź jeża lub ośm skrzyń fig. ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     pchnąć w tę łódź jeża lub ośm skrzyń fig. ', '     PCHNĄĆ W TĘ ŁÓDŹ JEŻA
@@ -202,9 +190,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     Чуєш їх, доцю, га? Кумедна ж ти, прощайся без ґольфів! ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     Чуєш їх, доцю, га? Кумедна ж ти, прощайся без ґольфів! ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     чуєш їх, доцю, га? кумедна ж ти, прощайся без ґольфів! ', '     ЧУЄШ ЇХ,
@@ -216,9 +204,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     Příliš žluťoučký kůň úpěl ďábelské ódy ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     Příliš žluťoučký kůň úpěl ďábelské ódy ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     příliš žluťoučký kůň úpěl ďábelské ódy ', '     PŘÍLIŠ ŽLUŤOUČKÝ KŮŇ ÚPĚL
@@ -230,11 +218,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     Laŭ Ludoviko Zamenhof bongustas freŝa ĉeĥa manĝaĵo kun spicoj
-      ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     Laŭ Ludoviko Zamenhof bongustas freŝa ĉeĥa manĝaĵo kun spicoj
-      ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     laŭ ludoviko zamenhof bongustas freŝa ĉeĥa manĝaĵo kun spicoj ', '     LAŬ
@@ -246,9 +232,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: lower('     いろはにほへと ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす ')
+  - name: COLUMN_1
     type: string
-  - name: upper('     いろはにほへと ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす ')
+  - name: COLUMN_2
     type: string
   rows:
   - ['     いろはにほへと ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす ', '     いろはにほへと
@@ -260,9 +246,9 @@ upper_lower_test([[
 ]]);
 ---
 - metadata:
-  - name: 'lower(''     Pijamalı hasta yağız şoföre çabucak güvendi. EXTRA: İ '')'
+  - name: COLUMN_1
     type: string
-  - name: 'upper(''     Pijamalı hasta yağız şoföre çabucak güvendi. EXTRA: İ '')'
+  - name: COLUMN_2
     type: string
   rows:
   - ['     pijamalı hasta yağız şoföre çabucak güvendi. extra: i̇ ', '     PIJAMALI

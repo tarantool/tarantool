@@ -1854,14 +1854,14 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 			}
 		} else {
 			const char *z = NULL;
-			if (colname != NULL)
+			if (colname != NULL) {
 				z = colname;
-			else if (span != NULL)
-				z = span;
-			else
-				z = tt_sprintf("column%d", i + 1);
+			} else {
+				uint32_t idx = ++pParse->autoname_i;
+				z = sql_generate_column_name(idx);
+			}
 			vdbe_metadata_set_col_name(v, i, z);
-			if (is_full_meta && colname != NULL)
+			if (is_full_meta)
 				vdbe_metadata_set_col_span(v, i, span);
 		}
 	}
@@ -1897,7 +1897,6 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 	/* Database connection */
 	sql *db = parse->db;
 	u32 cnt;		/* Index added to make the name unique */
-	Expr *p;		/* Expression for a single result column */
 	char *zName;		/* Column name */
 	int nName;		/* Size of name in zName[] */
 	Hash ht;		/* Hash table of column names */
@@ -1929,13 +1928,12 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 	space_def->field_count = column_count;
 
 	for (uint32_t i = 0; i < column_count; i++) {
-		/* Get an appropriate name for the column
+		/*
+		 * Check if the column contains an "AS <name>"
+		 * phrase.
 		 */
-		p = sqlExprSkipCollate(expr_list->a[i].pExpr);
-		if ((zName = expr_list->a[i].zName) != 0) {
-			/* If the column contains an "AS <name>" phrase, use <name> as the name */
-		} else {
-			Expr *pColExpr = p;	/* The expression that is the result column name */
+		if ((zName = expr_list->a[i].zName) == 0) {
+			struct Expr *pColExpr = expr_list->a[i].pExpr;
 			struct space_def *space_def = NULL;
 			while (pColExpr->op == TK_DOT) {
 				pColExpr = pColExpr->pRight;
@@ -1951,14 +1949,14 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 			} else if (pColExpr->op == TK_ID) {
 				assert(!ExprHasProperty(pColExpr, EP_IntValue));
 				zName = pColExpr->u.zToken;
-			} else {
-				/* Use the original text of the column expression as its name */
-				zName = expr_list->a[i].zSpan;
 			}
 		}
-		if (zName == NULL)
-			zName = "_auto_field_";
-		zName = sqlMPrintf(db, "%s", zName);
+		if (zName == NULL) {
+			uint32_t idx = ++parse->autoname_i;
+			zName = sqlDbStrDup(db, sql_generate_column_name(idx));
+		} else {
+			zName = sqlDbStrDup(db, zName);
+		}
 
 		/* Make sure the column name is unique.  If the name is not unique,
 		 * append an integer to the name so that it becomes unique.
@@ -4792,6 +4790,24 @@ selectPopWith(Walker * pWalker, Select * p)
 	}
 }
 
+/**
+ * Determine whether to generate a name for @a expr or not.
+ *
+ * Auto generated names is needed for every item in  a <SELECT>
+ * expression list except asterisks, dots and column names (also
+ * if this item hasn't alias).
+ *
+ * @param expr Expression from expression list to analyze.
+ *
+ * @retval true If item has to be named with auto-generated name.
+ */
+static bool
+expr_autoname_is_required(struct Expr *expr)
+{
+	return (expr->op != TK_ASTERISK && expr->op != TK_DOT &&
+		expr->op != TK_ID);
+}
+
 /*
  * This routine is a Walker callback for "expanding" a SELECT statement.
  * "Expanding" means to do the following:
@@ -4941,19 +4957,27 @@ selectExpander(Walker * pWalker, Select * p)
 	 * all tables.
 	 *
 	 * The first loop just checks to see if there are any "*" operators
-	 * that need expanding.
+	 * that need expanding and names items of the expression
+	 * list if needed.
 	 */
+	bool has_asterisk = false;
 	for (k = 0; k < pEList->nExpr; k++) {
 		pE = pEList->a[k].pExpr;
 		if (pE->op == TK_ASTERISK)
-			break;
+			has_asterisk = true;
 		assert(pE->op != TK_DOT || pE->pRight != 0);
 		assert(pE->op != TK_DOT
 		       || (pE->pLeft != 0 && pE->pLeft->op == TK_ID));
 		if (pE->op == TK_DOT && pE->pRight->op == TK_ASTERISK)
-			break;
+			has_asterisk = true;
+		if (pEList->a[k].zName == NULL &&
+		    expr_autoname_is_required(pE)) {
+			uint32_t idx = ++pParse->autoname_i;
+			pEList->a[k].zName =
+				sqlDbStrDup(db, sql_generate_column_name(idx));
+		}
 	}
-	if (k < pEList->nExpr) {
+	if (has_asterisk) {
 		/*
 		 * If we get here it means the result set contains one or more "*"
 		 * operators that need to be expanded.  Loop through each expression

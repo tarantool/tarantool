@@ -19,7 +19,7 @@ box.execute('SELECT (2147483647 * 2147483647 * 2147483647);')
 box.execute('SELECT (-9223372036854775808 / -1);')
 ---
 - metadata:
-  - name: (-9223372036854775808 / -1)
+  - name: COLUMN_1
     type: integer
   rows:
   - [9223372036854775808]
@@ -32,7 +32,7 @@ box.execute('SELECT (-9223372036854775808 - 1);')
 box.execute('SELECT (9223372036854775807 + 1);')
 ---
 - metadata:
-  - name: (9223372036854775807 + 1)
+  - name: COLUMN_1
     type: integer
   rows:
   - [9223372036854775808]
@@ -50,7 +50,7 @@ box.execute('SELECT 18446744073709551615 * 2;')
 box.execute('SELECT (-9223372036854775807 * (-2));')
 ---
 - metadata:
-  - name: (-9223372036854775807 * (-2))
+  - name: COLUMN_1
     type: integer
   rows:
   - [18446744073709551614]
@@ -60,7 +60,7 @@ box.execute('SELECT (-9223372036854775807 * (-2));')
 box.execute('SELECT 9223372036854775808;')
 ---
 - metadata:
-  - name: '9223372036854775808'
+  - name: COLUMN_1
     type: integer
   rows:
   - [9223372036854775808]
@@ -74,7 +74,7 @@ box.execute('SELECT -9223372036854775809;')
 box.execute('SELECT 9223372036854775808 - 1;')
 ---
 - metadata:
-  - name: 9223372036854775808 - 1
+  - name: COLUMN_1
     type: integer
   rows:
   - [9223372036854775807]
@@ -82,7 +82,7 @@ box.execute('SELECT 9223372036854775808 - 1;')
 box.execute('SELECT 18446744073709551615;')
 ---
 - metadata:
-  - name: '18446744073709551615'
+  - name: COLUMN_1
     type: integer
   rows:
   - [18446744073709551615]
@@ -98,7 +98,7 @@ box.execute('SELECT 18446744073709551616;')
 box.execute('SELECT CAST(\'9223372036854775808\' AS INTEGER);')
 ---
 - metadata:
-  - name: CAST('9223372036854775808' AS INTEGER)
+  - name: COLUMN_1
     type: integer
   rows:
   - [9223372036854775808]

@@ -77,11 +77,11 @@ execute('SELECT * FROM test WHERE id = :value', parameters)
 execute('SELECT ?, ?, ?', {1, 2, 3})
 ---
 - metadata:
-  - name: '?'
+  - name: COLUMN_1
     type: integer
-  - name: '?'
+  - name: COLUMN_2
     type: integer
-  - name: '?'
+  - name: COLUMN_3
     type: integer
   rows:
   - [1, 2, 3]
@@ -107,11 +107,11 @@ parameters[3][':value1'] = 11
 execute('SELECT ?, :value1, @value2', parameters)
 ---
 - metadata:
-  - name: '?'
+  - name: COLUMN_1
     type: integer
-  - name: :value1
+  - name: COLUMN_2
     type: integer
-  - name: '@value2'
+  - name: COLUMN_3
     type: integer
   rows:
   - [10, 11, 12]
@@ -149,22 +149,22 @@ parameters[6]['@value2'] = 6
 execute('SELECT :value3, ?, :value1, ?, ?, @value2, ?, :value3', parameters)
 ---
 - metadata:
-  - name: :value3
+  - name: COLUMN_1
     type: integer
-  - name: '?'
+  - name: COLUMN_2
     type: integer
-  - name: :value1
+  - name: COLUMN_3
     type: integer
-  - name: '?'
+  - name: COLUMN_4
     type: integer
-  - name: '?'
+  - name: COLUMN_5
     type: integer
-  - name: '@value2'
+  - name: COLUMN_6
     type: integer
-  - name: '?'
+  - name: COLUMN_7
     type: boolean
-  - name: :value3
-    type: integer
+  - name: COLUMN_8
+    type: boolean
   rows:
   - [1, 2, 3, 4, 5, 6, null, 1]
 ...
@@ -175,15 +175,15 @@ msgpack = require('msgpack')
 execute('SELECT ?, ?, ?, ?, ?', {'abc', -123.456, msgpack.NULL, true, false})
 ---
 - metadata:
-  - name: '?'
+  - name: COLUMN_1
     type: text
-  - name: '?'
+  - name: COLUMN_2
     type: numeric
-  - name: '?'
+  - name: COLUMN_3
     type: boolean
-  - name: '?'
+  - name: COLUMN_4
     type: boolean
-  - name: '?'
+  - name: COLUMN_5
     type: boolean
   rows:
   - ['abc', -123.456, null, true, false]
@@ -290,7 +290,7 @@ execute('SELECT :value', parameters)
 execute('SELECT ? ', {18446744073709551615ULL})
 ---
 - metadata:
-  - name: '?'
+  - name: COLUMN_1
     type: integer
   rows:
   - [18446744073709551615]

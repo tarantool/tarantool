@@ -32,7 +32,7 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
     type: integer
   - name: Y
     type: integer
-  - name: x + y
+  - name: COLUMN_1
     type: integer
   rows:
   - [1, 1, 2]
@@ -49,7 +49,7 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
     type: integer
   - name: Y
     type: integer
-  - name: x + y
+  - name: COLUMN_1
     type: integer
   rows:
   - [1, 1, 2]
@@ -62,7 +62,7 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
     type: integer
   - name: Y
     type: integer
-  - name: x + y
+  - name: COLUMN_1
     type: integer
   rows:
   - [1, 1, 2]
@@ -75,7 +75,7 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
     type: integer
   - name: Y
     type: integer
-  - name: x + y
+  - name: COLUMN_1
     type: integer
   rows:
   - [1, 1, 2]
@@ -88,7 +88,7 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
     type: integer
   - name: Y
     type: integer
-  - name: x + y
+  - name: COLUMN_1
     type: integer
   rows:
   - [1, 1, 2]
@@ -115,7 +115,7 @@ box.execute('SELECT a, id + 2, b FROM test2 WHERE b < id * 2 ORDER BY a ')
 - metadata:
   - name: A
     type: string
-  - name: id + 2
+  - name: COLUMN_1
     type: integer
   - name: B
     type: integer
@@ -134,7 +134,7 @@ box.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
 - metadata:
   - name: A
     type: string
-  - name: id + 2 * b
+  - name: COLUMN_1
     type: integer
   - name: A
     type: string
@@ -149,7 +149,7 @@ box.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
 - metadata:
   - name: A
     type: string
-  - name: id + 2 * b
+  - name: COLUMN_1
     type: integer
   - name: A
     type: string
@@ -164,7 +164,7 @@ box.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
 - metadata:
   - name: A
     type: string
-  - name: id + 2 * b
+  - name: COLUMN_1
     type: integer
   - name: A
     type: string
@@ -183,7 +183,7 @@ box.execute('SELECT x, y + 3 * b, b FROM test2, test WHERE b = x')
 - metadata:
   - name: X
     type: integer
-  - name: y + 3 * b
+  - name: COLUMN_1
     type: integer
   - name: B
     type: integer
@@ -196,7 +196,7 @@ box.execute('SELECT x, y + 3 * b, b FROM test2, test WHERE b = x')
 - metadata:
   - name: X
     type: integer
-  - name: y + 3 * b
+  - name: COLUMN_1
     type: integer
   - name: B
     type: integer
@@ -209,7 +209,7 @@ box.execute('SELECT x, y + 3 * b, b FROM test2, test WHERE b = x')
 - metadata:
   - name: X
     type: integer
-  - name: y + 3 * b
+  - name: COLUMN_1
     type: integer
   - name: B
     type: integer

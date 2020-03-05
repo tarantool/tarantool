@@ -41,9 +41,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
     type: string
   - name: FOO
     type: integer
-  - name: '42'
+  - name: COLUMN_1
     type: integer
-  - name: '''awesome'''
+  - name: COLUMN_2
     type: string
   rows:
   - ['foo', 1, 42, 'awesome']
@@ -57,9 +57,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar LIMIT 2")
     type: string
   - name: FOO
     type: integer
-  - name: '42'
+  - name: COLUMN_1
     type: integer
-  - name: '''awesome'''
+  - name: COLUMN_2
     type: string
   rows:
   - ['foo', 1, 42, 'awesome']
@@ -72,9 +72,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=2")
     type: string
   - name: FOO
     type: integer
-  - name: '42'
+  - name: COLUMN_1
     type: integer
-  - name: '''awesome'''
+  - name: COLUMN_2
     type: string
   rows:
   - ['bar', 2, 42, 'awesome']
@@ -86,9 +86,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>2")
     type: string
   - name: FOO
     type: integer
-  - name: '42'
+  - name: COLUMN_1
     type: integer
-  - name: '''awesome'''
+  - name: COLUMN_2
     type: string
   rows:
   - ['foobar', 1000, 42, 'awesome']
@@ -100,9 +100,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>=2")
     type: string
   - name: FOO
     type: integer
-  - name: '42'
+  - name: COLUMN_1
     type: integer
-  - name: '''awesome'''
+  - name: COLUMN_2
     type: string
   rows:
   - ['bar', 2, 42, 'awesome']
@@ -115,9 +115,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=10000")
     type: string
   - name: FOO
     type: integer
-  - name: '42'
+  - name: COLUMN_1
     type: integer
-  - name: '''awesome'''
+  - name: COLUMN_2
     type: string
   rows: []
 ...
@@ -128,9 +128,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>10000")
     type: string
   - name: FOO
     type: integer
-  - name: '42'
+  - name: COLUMN_1
     type: integer
-  - name: '''awesome'''
+  - name: COLUMN_2
     type: string
   rows: []
 ...
@@ -141,9 +141,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2")
     type: string
   - name: FOO
     type: integer
-  - name: '42'
+  - name: COLUMN_1
     type: integer
-  - name: '''awesome'''
+  - name: COLUMN_2
     type: string
   rows:
   - ['foo', 1, 42, 'awesome']
@@ -155,9 +155,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2.001")
     type: string
   - name: FOO
     type: integer
-  - name: '42'
+  - name: COLUMN_1
     type: integer
-  - name: '''awesome'''
+  - name: COLUMN_2
     type: string
   rows:
   - ['foo', 1, 42, 'awesome']
@@ -170,9 +170,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<=2")
     type: string
   - name: FOO
     type: integer
-  - name: '42'
+  - name: COLUMN_1
     type: integer
-  - name: '''awesome'''
+  - name: COLUMN_2
     type: string
   rows:
   - ['foo', 1, 42, 'awesome']
@@ -185,9 +185,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<100")
     type: string
   - name: FOO
     type: integer
-  - name: '42'
+  - name: COLUMN_1
     type: integer
-  - name: '''awesome'''
+  - name: COLUMN_2
     type: string
   rows:
   - ['foo', 1, 42, 'awesome']
@@ -200,9 +200,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE bar='foo'")
     type: string
   - name: FOO
     type: integer
-  - name: '42'
+  - name: COLUMN_1
     type: integer
-  - name: '''awesome'''
+  - name: COLUMN_2
     type: string
   rows:
   - ['foo', 1, 42, 'awesome']
@@ -210,7 +210,7 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE bar='foo'")
 box.execute("SELECT count(*) FROM foobar")
 ---
 - metadata:
-  - name: count(*)
+  - name: COLUMN_1
     type: integer
   rows:
   - [3]
@@ -218,7 +218,7 @@ box.execute("SELECT count(*) FROM foobar")
 box.execute("SELECT count(*) FROM foobar WHERE bar='foo'")
 ---
 - metadata:
-  - name: count(*)
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -230,9 +230,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar")
     type: string
   - name: FOO
     type: integer
-  - name: '42'
+  - name: COLUMN_1
     type: integer
-  - name: '''awesome'''
+  - name: COLUMN_2
     type: string
   rows:
   - ['bar', 2, 42, 'awesome']
@@ -246,9 +246,9 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar DESC")
     type: string
   - name: FOO
     type: integer
-  - name: '42'
+  - name: COLUMN_1
     type: integer
-  - name: '''awesome'''
+  - name: COLUMN_2
     type: string
   rows:
   - ['foobar', 1000, 42, 'awesome']
@@ -263,7 +263,7 @@ box.execute("REPLACE INTO foobar VALUES (1, 'cacodaemon')")
 box.execute("SELECT COUNT(*) FROM foobar WHERE foo=1")
 ---
 - metadata:
-  - name: COUNT(*)
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -271,7 +271,7 @@ box.execute("SELECT COUNT(*) FROM foobar WHERE foo=1")
 box.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 ---
 - metadata:
-  - name: COUNT(*)
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -283,7 +283,7 @@ box.execute("DELETE FROM foobar WHERE bar='cacodaemon'")
 box.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 ---
 - metadata:
-  - name: COUNT(*)
+  - name: COLUMN_1
     type: integer
   rows:
   - [0]

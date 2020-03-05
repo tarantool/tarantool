@@ -57,7 +57,7 @@ execute("SELECT 'aSd' COLLATE \"unicode_ci\";")
  | - metadata:
  |   - type: string
  |     span: '''aSd'' COLLATE "unicode_ci"'
- |     name: '''aSd'' COLLATE "unicode_ci"'
+ |     name: COLUMN_1
  |     collation: unicode_ci
  |   rows:
  |   - ['aSd']
@@ -78,7 +78,7 @@ execute("SELECT c COLLATE \"unicode\" FROM t;")
  | - metadata:
  |   - type: string
  |     span: c COLLATE "unicode"
- |     name: c COLLATE "unicode"
+ |     name: COLUMN_1
  |     collation: unicode
  |   rows:
  |   - ['aSd']
@@ -165,7 +165,7 @@ execute("SELECT *, id + 1 AS x, a AS y, c || 'abc' FROM t;")
  |     is_nullable: false
  |   - type: string
  |     span: c || 'abc'
- |     name: c || 'abc'
+ |     name: COLUMN_1
  |   rows:
  |   - [1, 1, 'aSd', 2, 1, 'aSdabc']
  | ...
@@ -185,8 +185,8 @@ execute("SELECT * FROM v;")
  |     name: Y
  |     is_nullable: false
  |   - type: string
- |     span: c || 'abc'
- |     name: c || 'abc'
+ |     span: COLUMN_1
+ |     name: COLUMN_1
  |   rows:
  |   - [2, 1, 'aSdabc']
  | ...

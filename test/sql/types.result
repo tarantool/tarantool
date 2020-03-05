@@ -54,8 +54,8 @@ box.execute("CREATE VIEW v1 AS SELECT b + a, b - a FROM t1;")
 ...
 box.space.V1:format()
 ---
-- [{'type': 'number', 'nullable_action': 'none', 'name': 'b + a', 'is_nullable': true},
-  {'type': 'number', 'nullable_action': 'none', 'name': 'b - a', 'is_nullable': true}]
+- [{'type': 'number', 'nullable_action': 'none', 'name': 'COLUMN_1', 'is_nullable': true},
+  {'type': 'number', 'nullable_action': 'none', 'name': 'COLUMN_2', 'is_nullable': true}]
 ...
 -- gh-2494: index's part also features correct declared type.
 --
@@ -197,7 +197,7 @@ box.execute("SELECT randomblob(5) || 'x';")
 box.execute("VALUES (TYPEOF(randomblob(5) || zeroblob(5)));")
 ---
 - metadata:
-  - name: column1
+  - name: COLUMN_1
     type: string
   rows:
   - ['varbinary']
@@ -230,7 +230,7 @@ box.execute("SELECT * FROM t1 WHERE 'blob' LIKE x'0000';")
 box.execute("SELECT s LIKE NULL FROM t1;")
 ---
 - metadata:
-  - name: s LIKE NULL
+  - name: COLUMN_1
     type: integer
   rows:
   - [null]
@@ -256,7 +256,7 @@ box.execute("SELECT * FROM t1 WHERE 'int' LIKE 4;")
 box.execute("SELECT NULL LIKE s FROM t1;")
 ---
 - metadata:
-  - name: NULL LIKE s
+  - name: COLUMN_1
     type: integer
   rows:
   - [null]
@@ -295,7 +295,7 @@ box.space.T1:drop()
 box.execute('SELECT 1 + 1;')
 ---
 - metadata:
-  - name: 1 + 1
+  - name: COLUMN_1
     type: integer
   rows:
   - [2]
@@ -303,7 +303,7 @@ box.execute('SELECT 1 + 1;')
 box.execute('SELECT 1 + 1.1;')
 ---
 - metadata:
-  - name: 1 + 1.1
+  - name: COLUMN_1
     type: double
   rows:
   - [2.1]
@@ -311,7 +311,7 @@ box.execute('SELECT 1 + 1.1;')
 box.execute('SELECT \'9223372036854\' + 1;')
 ---
 - metadata:
-  - name: '''9223372036854'' + 1'
+  - name: COLUMN_1
     type: integer
   rows:
   - [9223372036855]
@@ -320,7 +320,7 @@ box.execute('SELECT \'9223372036854\' + 1;')
 box.execute('SELECT ?', {true})
 ---
 - metadata:
-  - name: '?'
+  - name: COLUMN_1
     type: boolean
   rows:
   - [true]
@@ -481,7 +481,7 @@ s:drop()
 box.execute("SELECT 18446744073709551615 > 18446744073709551614;")
 ---
 - metadata:
-  - name: 18446744073709551615 > 18446744073709551614
+  - name: COLUMN_1
     type: boolean
   rows:
   - [true]
@@ -489,7 +489,7 @@ box.execute("SELECT 18446744073709551615 > 18446744073709551614;")
 box.execute("SELECT 18446744073709551615 > -9223372036854775808;")
 ---
 - metadata:
-  - name: 18446744073709551615 > -9223372036854775808
+  - name: COLUMN_1
     type: boolean
   rows:
   - [true]
@@ -497,7 +497,7 @@ box.execute("SELECT 18446744073709551615 > -9223372036854775808;")
 box.execute("SELECT -1 < 18446744073709551615;")
 ---
 - metadata:
-  - name: -1 < 18446744073709551615
+  - name: COLUMN_1
     type: boolean
   rows:
   - [true]
@@ -505,7 +505,7 @@ box.execute("SELECT -1 < 18446744073709551615;")
 box.execute("SELECT 1.5 < 18446744073709551615")
 ---
 - metadata:
-  - name: 1.5 < 18446744073709551615
+  - name: COLUMN_1
     type: boolean
   rows:
   - [true]
@@ -513,7 +513,7 @@ box.execute("SELECT 1.5 < 18446744073709551615")
 box.execute("SELECT 1.5 > 18446744073709551615")
 ---
 - metadata:
-  - name: 1.5 > 18446744073709551615
+  - name: COLUMN_1
     type: boolean
   rows:
   - [false]
@@ -521,7 +521,7 @@ box.execute("SELECT 1.5 > 18446744073709551615")
 box.execute("SELECT 18446744073709551615 > 1.5")
 ---
 - metadata:
-  - name: 18446744073709551615 > 1.5
+  - name: COLUMN_1
     type: boolean
   rows:
   - [true]
@@ -529,7 +529,7 @@ box.execute("SELECT 18446744073709551615 > 1.5")
 box.execute("SELECT 18446744073709551615 < 1.5")
 ---
 - metadata:
-  - name: 18446744073709551615 < 1.5
+  - name: COLUMN_1
     type: boolean
   rows:
   - [false]
@@ -537,7 +537,7 @@ box.execute("SELECT 18446744073709551615 < 1.5")
 box.execute("SELECT 18446744073709551615 = 18446744073709551615;")
 ---
 - metadata:
-  - name: 18446744073709551615 = 18446744073709551615
+  - name: COLUMN_1
     type: boolean
   rows:
   - [true]
@@ -545,7 +545,7 @@ box.execute("SELECT 18446744073709551615 = 18446744073709551615;")
 box.execute("SELECT 18446744073709551615 > -9223372036854775808;")
 ---
 - metadata:
-  - name: 18446744073709551615 > -9223372036854775808
+  - name: COLUMN_1
     type: boolean
   rows:
   - [true]
@@ -553,7 +553,7 @@ box.execute("SELECT 18446744073709551615 > -9223372036854775808;")
 box.execute("SELECT 18446744073709551615 < -9223372036854775808;")
 ---
 - metadata:
-  - name: 18446744073709551615 < -9223372036854775808
+  - name: COLUMN_1
     type: boolean
   rows:
   - [false]
@@ -561,7 +561,7 @@ box.execute("SELECT 18446744073709551615 < -9223372036854775808;")
 box.execute("SELECT -1 < 18446744073709551615;")
 ---
 - metadata:
-  - name: -1 < 18446744073709551615
+  - name: COLUMN_1
     type: boolean
   rows:
   - [true]
@@ -569,7 +569,7 @@ box.execute("SELECT -1 < 18446744073709551615;")
 box.execute("SELECT -1 > 18446744073709551615;")
 ---
 - metadata:
-  - name: -1 > 18446744073709551615
+  - name: COLUMN_1
     type: boolean
   rows:
   - [false]
@@ -577,7 +577,7 @@ box.execute("SELECT -1 > 18446744073709551615;")
 box.execute("SELECT 18446744073709551610 - 18446744073709551615;")
 ---
 - metadata:
-  - name: 18446744073709551610 - 18446744073709551615
+  - name: COLUMN_1
     type: integer
   rows:
   - [-5]
@@ -585,7 +585,7 @@ box.execute("SELECT 18446744073709551610 - 18446744073709551615;")
 box.execute("SELECT 18446744073709551615 = null;")
 ---
 - metadata:
-  - name: 18446744073709551615 = null
+  - name: COLUMN_1
     type: boolean
   rows:
   - [null]
@@ -593,7 +593,7 @@ box.execute("SELECT 18446744073709551615 = null;")
 box.execute("SELECT 18446744073709551615 = 18446744073709551615.0;")
 ---
 - metadata:
-  - name: 18446744073709551615 = 18446744073709551615.0
+  - name: COLUMN_1
     type: boolean
   rows:
   - [false]
@@ -601,7 +601,7 @@ box.execute("SELECT 18446744073709551615 = 18446744073709551615.0;")
 box.execute("SELECT 18446744073709551615.0 > 18446744073709551615")
 ---
 - metadata:
-  - name: 18446744073709551615.0 > 18446744073709551615
+  - name: COLUMN_1
     type: boolean
   rows:
   - [true]
@@ -609,7 +609,7 @@ box.execute("SELECT 18446744073709551615.0 > 18446744073709551615")
 box.execute("SELECT 18446744073709551615 IN ('18446744073709551615', 18446744073709551615.0)")
 ---
 - metadata:
-  - name: 18446744073709551615 IN ('18446744073709551615', 18446744073709551615.0)
+  - name: COLUMN_1
     type: boolean
   rows:
   - [true]
@@ -617,7 +617,7 @@ box.execute("SELECT 18446744073709551615 IN ('18446744073709551615', 18446744073
 box.execute("SELECT 1 LIMIT 18446744073709551615;")
 ---
 - metadata:
-  - name: '1'
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -625,7 +625,7 @@ box.execute("SELECT 1 LIMIT 18446744073709551615;")
 box.execute("SELECT 1 LIMIT 1 OFFSET 18446744073709551614;")
 ---
 - metadata:
-  - name: '1'
+  - name: COLUMN_1
     type: integer
   rows: []
 ...
@@ -637,7 +637,7 @@ box.execute("SELECT CAST('18446744073' || '709551616' AS INTEGER);")
 box.execute("SELECT CAST('18446744073' || '709551615' AS INTEGER);")
 ---
 - metadata:
-  - name: CAST('18446744073' || '709551615' AS INTEGER)
+  - name: COLUMN_1
     type: integer
   rows:
   - [18446744073709551615]
@@ -645,7 +645,7 @@ box.execute("SELECT CAST('18446744073' || '709551615' AS INTEGER);")
 box.execute("SELECT 18446744073709551610 + 5;")
 ---
 - metadata:
-  - name: 18446744073709551610 + 5
+  - name: COLUMN_1
     type: integer
   rows:
   - [18446744073709551615]
@@ -653,7 +653,7 @@ box.execute("SELECT 18446744073709551610 + 5;")
 box.execute("SELECT 18446744073709551615 * 1;")
 ---
 - metadata:
-  - name: 18446744073709551615 * 1
+  - name: COLUMN_1
     type: integer
   rows:
   - [18446744073709551615]
@@ -661,7 +661,7 @@ box.execute("SELECT 18446744073709551615 * 1;")
 box.execute("SELECT 1 / 18446744073709551615;")
 ---
 - metadata:
-  - name: 1 / 18446744073709551615
+  - name: COLUMN_1
     type: integer
   rows:
   - [0]
@@ -669,7 +669,7 @@ box.execute("SELECT 1 / 18446744073709551615;")
 box.execute("SELECT 18446744073709551615 / 18446744073709551615;")
 ---
 - metadata:
-  - name: 18446744073709551615 / 18446744073709551615
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -677,7 +677,7 @@ box.execute("SELECT 18446744073709551615 / 18446744073709551615;")
 box.execute("SELECT 18446744073709551615 / -9223372036854775808;")
 ---
 - metadata:
-  - name: 18446744073709551615 / -9223372036854775808
+  - name: COLUMN_1
     type: integer
   rows:
   - [-1]
@@ -771,7 +771,7 @@ box.execute("INSERT INTO t VALUES (2, -1);")
 box.execute("SELECT sum(i) FROM t;")
 ---
 - metadata:
-  - name: sum(i)
+  - name: COLUMN_1
     type: number
   rows:
   - [18446744073709551613]
@@ -779,7 +779,7 @@ box.execute("SELECT sum(i) FROM t;")
 box.execute("SELECT avg(i) FROM t;")
 ---
 - metadata:
-  - name: avg(i)
+  - name: COLUMN_1
     type: number
   rows:
   - [6148914691236516864]
@@ -787,7 +787,7 @@ box.execute("SELECT avg(i) FROM t;")
 box.execute("SELECT total(i) FROM t;")
 ---
 - metadata:
-  - name: total(i)
+  - name: COLUMN_1
     type: number
   rows:
   - [1.844674407371e+19]
@@ -795,7 +795,7 @@ box.execute("SELECT total(i) FROM t;")
 box.execute("SELECT min(i) FROM t;")
 ---
 - metadata:
-  - name: min(i)
+  - name: COLUMN_1
     type: scalar
   rows:
   - [-1]
@@ -803,7 +803,7 @@ box.execute("SELECT min(i) FROM t;")
 box.execute("SELECT max(i) FROM t;")
 ---
 - metadata:
-  - name: max(i)
+  - name: COLUMN_1
     type: scalar
   rows:
   - [18446744073709551613]
@@ -811,7 +811,7 @@ box.execute("SELECT max(i) FROM t;")
 box.execute("SELECT count(i) FROM t;")
 ---
 - metadata:
-  - name: count(i)
+  - name: COLUMN_1
     type: integer
   rows:
   - [3]
@@ -819,7 +819,7 @@ box.execute("SELECT count(i) FROM t;")
 box.execute("SELECT group_concat(i) FROM t;")
 ---
 - metadata:
-  - name: group_concat(i)
+  - name: COLUMN_1
     type: string
   rows:
   - ['1,-1,18446744073709551613']
@@ -831,7 +831,7 @@ box.execute("DELETE FROM t WHERE i < 18446744073709551613;")
 box.execute("SELECT lower(i) FROM t;")
 ---
 - metadata:
-  - name: lower(i)
+  - name: COLUMN_1
     type: string
   rows:
   - ['18446744073709551613']
@@ -839,7 +839,7 @@ box.execute("SELECT lower(i) FROM t;")
 box.execute("SELECT upper(i) FROM t;")
 ---
 - metadata:
-  - name: upper(i)
+  - name: COLUMN_1
     type: string
   rows:
   - ['18446744073709551613']
@@ -847,7 +847,7 @@ box.execute("SELECT upper(i) FROM t;")
 box.execute("SELECT abs(i) FROM t;")
 ---
 - metadata:
-  - name: abs(i)
+  - name: COLUMN_1
     type: number
   rows:
   - [18446744073709551613]
@@ -855,7 +855,7 @@ box.execute("SELECT abs(i) FROM t;")
 box.execute("SELECT typeof(i) FROM t;")
 ---
 - metadata:
-  - name: typeof(i)
+  - name: COLUMN_1
     type: string
   rows:
   - ['integer']
@@ -863,7 +863,7 @@ box.execute("SELECT typeof(i) FROM t;")
 box.execute("SELECT quote(i) FROM t;")
 ---
 - metadata:
-  - name: quote(i)
+  - name: COLUMN_1
     type: string
   rows:
   - [18446744073709551613]
@@ -871,7 +871,7 @@ box.execute("SELECT quote(i) FROM t;")
 box.execute("SELECT LEAST(-1, i) FROM t;")
 ---
 - metadata:
-  - name: LEAST(-1, i)
+  - name: COLUMN_1
     type: scalar
   rows:
   - [-1]
@@ -879,7 +879,7 @@ box.execute("SELECT LEAST(-1, i) FROM t;")
 box.execute("SELECT quote(i) FROM t;")
 ---
 - metadata:
-  - name: quote(i)
+  - name: COLUMN_1
     type: string
   rows:
   - [18446744073709551613]
@@ -1012,7 +1012,7 @@ box.space.T1:drop()
 box.execute("SELECT CAST(18446744073709551615 AS NUMBER);")
 ---
 - metadata:
-  - name: CAST(18446744073709551615 AS NUMBER)
+  - name: COLUMN_1
     type: number
   rows:
   - [18446744073709551615]
@@ -1020,7 +1020,7 @@ box.execute("SELECT CAST(18446744073709551615 AS NUMBER);")
 box.execute("SELECT CAST(18446744073709551615 AS TEXT);")
 ---
 - metadata:
-  - name: CAST(18446744073709551615 AS TEXT)
+  - name: COLUMN_1
     type: string
   rows:
   - ['18446744073709551615']
@@ -1028,7 +1028,7 @@ box.execute("SELECT CAST(18446744073709551615 AS TEXT);")
 box.execute("SELECT CAST(18446744073709551615 AS SCALAR);")
 ---
 - metadata:
-  - name: CAST(18446744073709551615 AS SCALAR)
+  - name: COLUMN_1
     type: scalar
   rows:
   - [18446744073709551615]
@@ -1036,7 +1036,7 @@ box.execute("SELECT CAST(18446744073709551615 AS SCALAR);")
 box.execute("SELECT CAST(18446744073709551615 AS BOOLEAN);")
 ---
 - metadata:
-  - name: CAST(18446744073709551615 AS BOOLEAN)
+  - name: COLUMN_1
     type: boolean
   rows:
   - [true]
@@ -1044,7 +1044,7 @@ box.execute("SELECT CAST(18446744073709551615 AS BOOLEAN);")
 box.execute("SELECT CAST('18446744073709551615' AS INTEGER);")
 ---
 - metadata:
-  - name: CAST('18446744073709551615' AS INTEGER)
+  - name: COLUMN_1
     type: integer
   rows:
   - [18446744073709551615]
@@ -1077,7 +1077,7 @@ box.execute("SELECT id FROM t1;")
 box.execute("SELECT CAST(123 AS UNSIGNED);")
 ---
 - metadata:
-  - name: CAST(123 AS UNSIGNED)
+  - name: COLUMN_1
     type: unsigned
   rows:
   - [123]
@@ -1090,7 +1090,7 @@ box.execute("SELECT CAST(-123 AS UNSIGNED);")
 box.execute("SELECT CAST(1.5 AS UNSIGNED);")
 ---
 - metadata:
-  - name: CAST(1.5 AS UNSIGNED)
+  - name: COLUMN_1
     type: unsigned
   rows:
   - [1]
@@ -1098,7 +1098,7 @@ box.execute("SELECT CAST(1.5 AS UNSIGNED);")
 box.execute("SELECT CAST(-1.5 AS UNSIGNED);")
 ---
 - metadata:
-  - name: CAST(-1.5 AS UNSIGNED)
+  - name: COLUMN_1
     type: unsigned
   rows:
   - [-1]
@@ -1106,7 +1106,7 @@ box.execute("SELECT CAST(-1.5 AS UNSIGNED);")
 box.execute("SELECT CAST(true AS UNSIGNED);")
 ---
 - metadata:
-  - name: CAST(true AS UNSIGNED)
+  - name: COLUMN_1
     type: unsigned
   rows:
   - [1]
@@ -1114,7 +1114,7 @@ box.execute("SELECT CAST(true AS UNSIGNED);")
 box.execute("SELECT CAST('123' AS UNSIGNED);")
 ---
 - metadata:
-  - name: CAST('123' AS UNSIGNED)
+  - name: COLUMN_1
     type: unsigned
   rows:
   - [123]
@@ -1146,7 +1146,7 @@ box.space.T:drop()
 box.execute("SELECT CASE 1 WHEN 1 THEN x'0000000000' WHEN 2 THEN 'str' END")
 ---
 - metadata:
-  - name: CASE 1 WHEN 1 THEN x'0000000000' WHEN 2 THEN 'str' END
+  - name: COLUMN_1
     type: scalar
   rows:
   - ["\0\0\0\0\0"]
@@ -1154,7 +1154,7 @@ box.execute("SELECT CASE 1 WHEN 1 THEN x'0000000000' WHEN 2 THEN 'str' END")
 box.execute("SELECT CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 END")
 ---
 - metadata:
-  - name: CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 END
+  - name: COLUMN_1
     type: integer
   rows:
   - [666]
@@ -1162,7 +1162,7 @@ box.execute("SELECT CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 END")
 box.execute("SELECT CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 ELSE 321 END")
 ---
 - metadata:
-  - name: CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 ELSE 321 END
+  - name: COLUMN_1
     type: integer
   rows:
   - [666]
@@ -1170,7 +1170,7 @@ box.execute("SELECT CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 ELSE 321 END")
 box.execute("SELECT CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 ELSE 'asd' END")
 ---
 - metadata:
-  - name: CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 ELSE 'asd' END
+  - name: COLUMN_1
     type: scalar
   rows:
   - [666]
@@ -1178,8 +1178,7 @@ box.execute("SELECT CASE 1 WHEN 1 THEN 666 WHEN 2 THEN 123 ELSE 'asd' END")
 box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4 WHEN 'e' THEN 5 WHEN 'f' THEN 6 END;")
 ---
 - metadata:
-  - name: CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4
-      WHEN 'e' THEN 5 WHEN 'f' THEN 6 END
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -1187,8 +1186,7 @@ box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHE
 box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4 WHEN 'e' THEN 5 WHEN 'f' THEN 'asd' END;")
 ---
 - metadata:
-  - name: CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4
-      WHEN 'e' THEN 5 WHEN 'f' THEN 'asd' END
+  - name: COLUMN_1
     type: scalar
   rows:
   - [1]
@@ -1196,8 +1194,7 @@ box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHE
 box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4 WHEN 'e' THEN 5 WHEN 'f' THEN 6 ELSE 'asd' END;")
 ---
 - metadata:
-  - name: CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4
-      WHEN 'e' THEN 5 WHEN 'f' THEN 6 ELSE 'asd' END
+  - name: COLUMN_1
     type: scalar
   rows:
   - [1]
@@ -1205,8 +1202,7 @@ box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHE
 box.execute("SELECT CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4 WHEN 'e' THEN 5 WHEN 'f' THEN 6 ELSE 7 END;")
 ---
 - metadata:
-  - name: CASE 'a' WHEN 'a' THEN 1 WHEN 'b' THEN 2 WHEN 'c' THEN 3 WHEN 'd' THEN 4
-      WHEN 'e' THEN 5 WHEN 'f' THEN 6 ELSE 7 END
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -1284,7 +1280,7 @@ box.execute("SELECT total(v) FROM t;")
 box.execute("SELECT min(v) FROM t;")
 ---
 - metadata:
-  - name: min(v)
+  - name: COLUMN_1
     type: scalar
   rows:
   - ['abc']
@@ -1292,7 +1288,7 @@ box.execute("SELECT min(v) FROM t;")
 box.execute("SELECT max(v) FROM t;")
 ---
 - metadata:
-  - name: max(v)
+  - name: COLUMN_1
     type: scalar
   rows:
   - ['abc']
@@ -1300,7 +1296,7 @@ box.execute("SELECT max(v) FROM t;")
 box.execute("SELECT count(v) FROM t;")
 ---
 - metadata:
-  - name: count(v)
+  - name: COLUMN_1
     type: integer
   rows:
   - [1]
@@ -1308,7 +1304,7 @@ box.execute("SELECT count(v) FROM t;")
 box.execute("SELECT group_concat(v) FROM t;")
 ---
 - metadata:
-  - name: group_concat(v)
+  - name: COLUMN_1
     type: string
   rows:
   - ['abc']
@@ -1331,7 +1327,7 @@ box.execute("SELECT abs(v) FROM t;")
 box.execute("SELECT typeof(v) FROM t;")
 ---
 - metadata:
-  - name: typeof(v)
+  - name: COLUMN_1
     type: string
   rows:
   - ['varbinary']
@@ -1339,7 +1335,7 @@ box.execute("SELECT typeof(v) FROM t;")
 box.execute("SELECT quote(v) FROM t;")
 ---
 - metadata:
-  - name: quote(v)
+  - name: COLUMN_1
     type: string
   rows:
   - ['X''616263''']
@@ -1347,7 +1343,7 @@ box.execute("SELECT quote(v) FROM t;")
 box.execute("SELECT LEAST(v, x'') FROM t;")
 ---
 - metadata:
-  - name: LEAST(v, x'')
+  - name: COLUMN_1
     type: scalar
   rows:
   - ['']
@@ -1467,7 +1463,7 @@ box.execute("SELECT CAST(true AS VARBINARY);")
 box.execute("SELECT CAST('asd' AS VARBINARY);")
 ---
 - metadata:
-  - name: CAST('asd' AS VARBINARY)
+  - name: COLUMN_1
     type: varbinary
   rows:
   - ['asd']
@@ -1475,7 +1471,7 @@ box.execute("SELECT CAST('asd' AS VARBINARY);")
 box.execute("SELECT CAST(x'' AS VARBINARY);")
 ---
 - metadata:
-  - name: CAST(x'' AS VARBINARY)
+  - name: COLUMN_1
     type: varbinary
   rows:
   - ['']
@@ -1494,9 +1490,9 @@ box.execute("INSERT INTO t VALUES (1, 1, 1), (2, NULL, NULL);")
 box.execute("SELECT typeof(a), typeof(s) FROM t;")
 ---
 - metadata:
-  - name: typeof(a)
+  - name: COLUMN_1
     type: string
-  - name: typeof(s)
+  - name: COLUMN_2
     type: string
   rows:
   - ['integer', 'integer']
@@ -1513,7 +1509,7 @@ box.execute('INSERT INTO t1 VALUES (1, NULL, NULL);')
 box.execute('SELECT typeof(a & b) FROM t1;')
 ---
 - metadata:
-  - name: typeof(a & b)
+  - name: COLUMN_1
     type: string
   rows:
   - ['integer']
@@ -1521,11 +1517,11 @@ box.execute('SELECT typeof(a & b) FROM t1;')
 box.execute('SELECT typeof(a), typeof(b), typeof(a & b) FROM t1')
 ---
 - metadata:
-  - name: typeof(a)
+  - name: COLUMN_1
     type: string
-  - name: typeof(b)
+  - name: COLUMN_2
     type: string
-  - name: typeof(a & b)
+  - name: COLUMN_3
     type: string
   rows:
   - ['integer', 'integer', 'integer']
@@ -1533,7 +1529,7 @@ box.execute('SELECT typeof(a), typeof(b), typeof(a & b) FROM t1')
 box.execute("SELECT typeof(CAST(0 AS UNSIGNED));")
 ---
 - metadata:
-  - name: typeof(CAST(0 AS UNSIGNED))
+  - name: COLUMN_1
     type: string
   rows:
   - ['unsigned']
@@ -1693,7 +1689,7 @@ box.execute('DROP TABLE t1;')
 box.execute("SELECT 1.0;")
 ---
 - metadata:
-  - name: '1.0'
+  - name: COLUMN_1
     type: double
   rows:
   - [1]
@@ -1701,7 +1697,7 @@ box.execute("SELECT 1.0;")
 box.execute("SELECT .01;")
 ---
 - metadata:
-  - name: '.01'
+  - name: COLUMN_1
     type: double
   rows:
   - [0.01]
@@ -1709,7 +1705,7 @@ box.execute("SELECT .01;")
 box.execute("SELECT CAST(1 AS DOUBLE);")
 ---
 - metadata:
-  - name: CAST(1 AS DOUBLE)
+  - name: COLUMN_1
     type: double
   rows:
   - [1]
@@ -1717,7 +1713,7 @@ box.execute("SELECT CAST(1 AS DOUBLE);")
 box.execute("SELECT CAST(1.123 AS DOUBLE);")
 ---
 - metadata:
-  - name: CAST(1.123 AS DOUBLE)
+  - name: COLUMN_1
     type: double
   rows:
   - [1.123]
@@ -1735,7 +1731,7 @@ box.execute("SELECT CAST('asd' AS DOUBLE);")
 box.execute("SELECT CAST('1' AS DOUBLE);")
 ---
 - metadata:
-  - name: CAST('1' AS DOUBLE)
+  - name: COLUMN_1
     type: double
   rows:
   - [1]
@@ -1743,7 +1739,7 @@ box.execute("SELECT CAST('1' AS DOUBLE);")
 box.execute("SELECT CAST('1.123' AS DOUBLE);")
 ---
 - metadata:
-  - name: CAST('1.123' AS DOUBLE)
+  - name: COLUMN_1
     type: double
   rows:
   - [1.123]
@@ -1761,7 +1757,7 @@ box.execute("SELECT CAST(x'35' AS DOUBLE);")
 box.execute("SELECT CAST(CAST(x'35' AS STRING) AS DOUBLE);")
 ---
 - metadata:
-  - name: CAST(CAST(x'35' AS STRING) AS DOUBLE)
+  - name: COLUMN_1
     type: double
   rows:
   - [5]
@@ -1795,7 +1791,7 @@ box.execute('SELECT * FROM t;')
 box.execute('SELECT d / 100 FROM t;')
 ---
 - metadata:
-  - name: d / 100
+  - name: COLUMN_1
     type: double
   rows:
   - [0.1]
@@ -1828,7 +1824,7 @@ box.execute('SELECT * from t WHERE d = 3.3;')
 box.execute("SELECT sum(d) FROM t;")
 ---
 - metadata:
-  - name: sum(d)
+  - name: COLUMN_1
     type: number
   rows:
   - [18000000000000000000]
@@ -1836,7 +1832,7 @@ box.execute("SELECT sum(d) FROM t;")
 box.execute("SELECT avg(d) FROM t;")
 ---
 - metadata:
-  - name: avg(d)
+  - name: COLUMN_1
     type: number
   rows:
   - [4500000000000000000]
@@ -1844,7 +1840,7 @@ box.execute("SELECT avg(d) FROM t;")
 box.execute("SELECT total(d) FROM t;")
 ---
 - metadata:
-  - name: total(d)
+  - name: COLUMN_1
     type: number
   rows:
   - [18000000000000000000]
@@ -1852,7 +1848,7 @@ box.execute("SELECT total(d) FROM t;")
 box.execute("SELECT min(d) FROM t;")
 ---
 - metadata:
-  - name: min(d)
+  - name: COLUMN_1
     type: scalar
   rows:
   - [-2]
@@ -1860,7 +1856,7 @@ box.execute("SELECT min(d) FROM t;")
 box.execute("SELECT max(d) FROM t;")
 ---
 - metadata:
-  - name: max(d)
+  - name: COLUMN_1
     type: scalar
   rows:
   - [18000000000000000000]
@@ -1868,7 +1864,7 @@ box.execute("SELECT max(d) FROM t;")
 box.execute("SELECT count(d) FROM t;")
 ---
 - metadata:
-  - name: count(d)
+  - name: COLUMN_1
     type: integer
   rows:
   - [4]
@@ -1876,7 +1872,7 @@ box.execute("SELECT count(d) FROM t;")
 box.execute("SELECT group_concat(d) FROM t;")
 ---
 - metadata:
-  - name: group_concat(d)
+  - name: COLUMN_1
     type: string
   rows:
   - ['10.0,-2.0,3.3,1.8e+19']
@@ -1884,7 +1880,7 @@ box.execute("SELECT group_concat(d) FROM t;")
 box.execute("SELECT lower(d) FROM t;")
 ---
 - metadata:
-  - name: lower(d)
+  - name: COLUMN_1
     type: string
   rows:
   - ['10.0']
@@ -1895,7 +1891,7 @@ box.execute("SELECT lower(d) FROM t;")
 box.execute("SELECT upper(d) FROM t;")
 ---
 - metadata:
-  - name: upper(d)
+  - name: COLUMN_1
     type: string
   rows:
   - ['10.0']
@@ -1906,7 +1902,7 @@ box.execute("SELECT upper(d) FROM t;")
 box.execute("SELECT abs(d) FROM t;")
 ---
 - metadata:
-  - name: abs(d)
+  - name: COLUMN_1
     type: number
   rows:
   - [10]
@@ -1917,7 +1913,7 @@ box.execute("SELECT abs(d) FROM t;")
 box.execute("SELECT typeof(d) FROM t;")
 ---
 - metadata:
-  - name: typeof(d)
+  - name: COLUMN_1
     type: string
   rows:
   - ['double']
@@ -1928,7 +1924,7 @@ box.execute("SELECT typeof(d) FROM t;")
 box.execute("SELECT quote(d) FROM t;")
 ---
 - metadata:
-  - name: quote(d)
+  - name: COLUMN_1
     type: string
   rows:
   - ['10.0']
@@ -1939,7 +1935,7 @@ box.execute("SELECT quote(d) FROM t;")
 box.execute("SELECT LEAST(d, 0) FROM t;")
 ---
 - metadata:
-  - name: LEAST(d, 0)
+  - name: COLUMN_1
     type: scalar
   rows:
   - [0]
@@ -2081,9 +2077,9 @@ box.execute("DROP TABLE t4;")
 box.execute("SELECT 1.0, typeof(1.0);")
 ---
 - metadata:
-  - name: '1.0'
+  - name: COLUMN_1
     type: double
-  - name: typeof(1.0)
+  - name: COLUMN_2
     type: string
   rows:
   - [1, 'double']
@@ -2091,9 +2087,9 @@ box.execute("SELECT 1.0, typeof(1.0);")
 box.execute("SELECT CAST(2 AS DOUBLE), typeof(CAST(2 AS DOUBLE));")
 ---
 - metadata:
-  - name: CAST(2 AS DOUBLE)
+  - name: COLUMN_1
     type: double
-  - name: typeof(CAST(2 AS DOUBLE))
+  - name: COLUMN_2
     type: string
   rows:
   - [2, 'double']
@@ -2101,9 +2097,9 @@ box.execute("SELECT CAST(2 AS DOUBLE), typeof(CAST(2 AS DOUBLE));")
 box.execute("SELECT 3e3, typeof(3e3);")
 ---
 - metadata:
-  - name: '3e3'
+  - name: COLUMN_1
     type: double
-  - name: typeof(3e3)
+  - name: COLUMN_2
     type: string
   rows:
   - [3000, 'double']
@@ -2121,7 +2117,7 @@ box.execute("SELECT d, TYPEOF(d) FROM t5;")
 - metadata:
   - name: D
     type: double
-  - name: TYPEOF(d)
+  - name: COLUMN_1
     type: string
   rows:
   - [4, 'double']

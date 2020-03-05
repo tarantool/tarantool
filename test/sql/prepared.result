@@ -425,13 +425,13 @@ s = prepare("SELECT count(*), count(a - 3), max(b), abs(id) FROM test WHERE b = 
 execute(s.stmt_id)
  | ---
  | - metadata:
- |   - name: count(*)
+ |   - name: COLUMN_1
  |     type: integer
- |   - name: count(a - 3)
+ |   - name: COLUMN_2
  |     type: integer
- |   - name: max(b)
+ |   - name: COLUMN_3
  |     type: scalar
- |   - name: abs(id)
+ |   - name: COLUMN_4
  |     type: number
  |   rows:
  |   - [1, 1, '3', 1]
@@ -439,13 +439,13 @@ execute(s.stmt_id)
 execute(s.stmt_id)
  | ---
  | - metadata:
- |   - name: count(*)
+ |   - name: COLUMN_1
  |     type: integer
- |   - name: count(a - 3)
+ |   - name: COLUMN_2
  |     type: integer
- |   - name: max(b)
+ |   - name: COLUMN_3
  |     type: scalar
- |   - name: abs(id)
+ |   - name: COLUMN_4
  |     type: number
  |   rows:
  |   - [1, 1, '3', 1]
@@ -480,7 +480,7 @@ res = execute(s.stmt_id)
  | ...
 res.metadata
  | ---
- | - - name: group_concat(TRIM(TRAILING FROM t),x'0a')
+ | - - name: COLUMN_13
  |     type: string
  | ...
 unprepare(s.stmt_id)
@@ -838,11 +838,11 @@ s = prepare('SELECT :a, :b, :c');
 execute(s.stmt_id, {{[':a'] = 1}, {[':b'] = 2}, {[':c'] = 3}});
  | ---
  | - metadata:
- |   - name: :a
+ |   - name: COLUMN_1
  |     type: integer
- |   - name: :b
+ |   - name: COLUMN_2
  |     type: integer
- |   - name: :c
+ |   - name: COLUMN_3
  |     type: integer
  |   rows:
  |   - [1, 2, 3]
@@ -850,11 +850,11 @@ execute(s.stmt_id, {{[':a'] = 1}, {[':b'] = 2}, {[':c'] = 3}});
 execute(s.stmt_id, {{[':a'] = 1}, {[':b'] = 2}});
  | ---
  | - metadata:
- |   - name: :a
+ |   - name: COLUMN_1
  |     type: integer
- |   - name: :b
+ |   - name: COLUMN_2
  |     type: integer
- |   - name: :c
+ |   - name: COLUMN_3
  |     type: boolean
  |   rows:
  |   - [1, 2, null]
@@ -862,11 +862,11 @@ execute(s.stmt_id, {{[':a'] = 1}, {[':b'] = 2}});
 execute(s.stmt_id);
  | ---
  | - metadata:
- |   - name: :a
+ |   - name: COLUMN_1
  |     type: boolean
- |   - name: :b
+ |   - name: COLUMN_2
  |     type: boolean
- |   - name: :c
+ |   - name: COLUMN_3
  |     type: boolean
  |   rows:
  |   - [null, null, null]

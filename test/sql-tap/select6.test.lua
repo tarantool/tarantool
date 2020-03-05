@@ -128,9 +128,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-1.7",
     [=[
-        SELECT a.y, a."count(*)", "max(x)", "count(*)"
-        FROM (SELECT count(*),y FROM t1 GROUP BY y) AS a,
-             (SELECT max(x),y FROM t1 GROUP BY y) as b
+        SELECT a.y, a.COLUMN_1, COLUMN_2, COLUMN_1
+        FROM (SELECT count(*), y FROM t1 GROUP BY y) AS a,
+             (SELECT max(x), y FROM t1 GROUP BY y) as b
         WHERE a.y=b.y ORDER BY a.y
     ]=], {
         -- <select6-1.7>
@@ -154,9 +154,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-1.9",
     [=[
-        SELECT q, p, r, b."min(x)+y"
+        SELECT q, p, r, min
         FROM (SELECT count(*) as p , y as q FROM t1 GROUP BY y) AS a,
-             (SELECT max(x) as r, y as s, min(x)+y FROM t1 GROUP BY y) as b
+             (SELECT max(x) as r, y as s, min(x)+y AS min FROM t1 GROUP BY y) as b
         WHERE q=s ORDER BY s
     ]=], {
         -- <select6-1.9>
@@ -247,9 +247,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-2.7",
     [=[
-        SELECT a.b, a."count(*)", "max(a)", "count(*)"
-        FROM (SELECT count(*),b FROM t2 GROUP BY b) AS a,
-             (SELECT max(a),b FROM t2 GROUP BY b) as b
+        SELECT a.b, a.count, max, count
+        FROM (SELECT count(*) AS count, b FROM t2 GROUP BY b) AS a,
+             (SELECT max(a) AS max, b FROM t2 GROUP BY b) as b
         WHERE a.b=b.b ORDER BY a.b
     ]=], {
         -- <select6-2.7>
@@ -432,8 +432,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.14",
     [=[
-        SELECT "count(*)",y FROM (SELECT count(*), y FROM t1 GROUP BY y)
-        ORDER BY "count(*)"
+        SELECT count, y FROM (SELECT count(*) AS count, y FROM t1 GROUP BY y)
+        ORDER BY count
     ]=], {
         -- <select6-3.14>
         1, 1, 2, 2, 4, 3, 5, 5, 8, 4
@@ -443,7 +443,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.15",
     [=[
-        SELECT "count(*)",y FROM (SELECT count(*), y FROM t1 GROUP BY y)
+        SELECT count, y FROM (SELECT count(*) AS count, y FROM t1 GROUP BY y)
         ORDER BY y
     ]=], {
         -- <select6-3.15>
