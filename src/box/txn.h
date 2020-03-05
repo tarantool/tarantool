@@ -256,6 +256,13 @@ in_txn(void)
 	return fiber()->storage.txn;
 }
 
+/* Set to the current transaction (if any) */
+static inline void
+fiber_set_txn(struct fiber *fiber, struct txn *txn)
+{
+	fiber->storage.txn = txn;
+}
+
 /**
  * Start a transaction explicitly.
  * @pre no transaction is active
