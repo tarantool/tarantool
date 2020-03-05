@@ -559,7 +559,7 @@ txn_prepare(struct txn *txn)
 }
 
 int
-txn_write(struct txn *txn)
+txn_commit_async(struct txn *txn)
 {
 	ERROR_INJECT(ERRINJ_TXN_COMMIT_ASYNC, {
 		diag_set(ClientError, ER_INJECTION,
@@ -599,7 +599,7 @@ txn_commit(struct txn *txn)
 {
 	txn->fiber = fiber();
 
-	if (txn_write(txn) != 0)
+	if (txn_commit_async(txn) != 0)
 		return -1;
 	/*
 	 * In case of non-yielding journal the transaction could already
