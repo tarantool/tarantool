@@ -50,12 +50,6 @@ txn_on_yield(struct trigger *trigger, void *event);
 static void
 txn_run_rollback_triggers(struct txn *txn, struct rlist *triggers);
 
-static inline void
-fiber_set_txn(struct fiber *fiber, struct txn *txn)
-{
-	fiber->storage.txn = txn;
-}
-
 static int
 txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 {
