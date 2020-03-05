@@ -559,6 +559,22 @@ txn_prepare(struct txn *txn)
 	return 0;
 }
 
+/**
+ * Complete transaction early if it is barely nop.
+ */
+static bool
+txn_commit_nop(struct txn *txn)
+{
+	if (txn->n_new_rows + txn->n_applier_rows == 0) {
+		txn->signature = 0;
+		txn_complete(txn);
+		fiber_set_txn(fiber(), NULL);
+		return true;
+	}
+
+	return false;
+}
+
 int
 txn_commit_async(struct txn *txn)
 {
@@ -567,17 +583,13 @@ txn_commit_async(struct txn *txn)
 		return -1;
 	}
 
+	if (txn_commit_nop(txn))
+		return 0;
+
 	/*
 	 * After this point the transaction must not be used
 	 * so reset the corresponding key in the fiber storage.
 	 */
-	if (txn->n_new_rows + txn->n_applier_rows == 0) {
-		/* Nothing to do. */
-		txn->signature = 0;
-		txn_complete(txn);
-		fiber_set_txn(fiber(), NULL);
-		return 0;
-	}
 	fiber_set_txn(fiber(), NULL);
 	return txn_write_to_wal(txn);
 }
