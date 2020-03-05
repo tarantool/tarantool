@@ -612,8 +612,21 @@ txn_commit(struct txn *txn)
 {
 	txn->fiber = fiber();
 
-	if (txn_commit_async(txn) != 0)
+	if (txn_prepare(txn) != 0) {
+		txn_rollback(txn);
+		txn_free(txn);
 		return -1;
+	}
+
+	if (txn_commit_nop(txn)) {
+		txn_free(txn);
+		return 0;
+	}
+
+	fiber_set_txn(fiber(), NULL);
+	if (txn_write_to_wal(txn) != 0)
+		return -1;
+
 	/*
 	 * In case of non-yielding journal the transaction could already
 	 * be done and there is nothing to wait in such cases.
