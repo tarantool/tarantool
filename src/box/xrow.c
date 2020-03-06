@@ -1205,7 +1205,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 		return -1;
 	}
 	char *data = buf;
-	int filter_size = __builtin_popcount(id_filter);
+	int filter_size = bit_count_u32(id_filter);
 	data = mp_encode_map(data, filter_size != 0 ? 6 : 5);
 	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
 	data = xrow_encode_uuid(data, replicaset_uuid);
