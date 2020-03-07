@@ -145,6 +145,56 @@ void
 port_vdbemem_create(struct port *base, struct sql_value *mem,
 		    uint32_t mem_count);
 
+/**
+ * The struct is PACKED to avoid unnecessary 4 byte padding
+ * after mp_size. These objects are never stored on stack, neither
+ * allocated as an array, so the padding is not needed.
+ */
+struct PACKED port_c_entry {
+	struct port_c_entry *next;
+	union {
+		/** Valid if mp_size is 0. */
+		struct tuple *tuple;
+		/**
+		 * Valid if mp_size is > 0. MessagePack is
+		 * allocated either on heap or on the port entry
+		 * mempool, if it fits into a pool object.
+		 */
+		char *mp;
+	};
+	uint32_t mp_size;
+};
+
+static_assert(sizeof(struct port_c_entry) == 20,
+	      "port_c_entry is expected to be perfectly aligned and packed");
+
+/**
+ * C port is used by C functions from the public API. They can
+ * return tuples and arbitrary MessagePack.
+ */
+struct port_c {
+	const struct port_vtab *vtab;
+	struct port_c_entry *first;
+	struct port_c_entry *last;
+	struct port_c_entry first_entry;
+	int size;
+};
+
+static_assert(sizeof(struct port_c) <= sizeof(struct port),
+	      "sizeof(struct port_c) must be <= sizeof(struct port)");
+
+/** Create a C port object. */
+void
+port_c_create(struct port *base);
+
+/** Append a tuple to the port. Tuple is referenced. */
+int
+port_c_add_tuple(struct port *port, struct tuple *tuple);
+
+/** Append raw MessagePack to the port. It is copied. */
+int
+port_c_add_mp(struct port *port, const char *mp, const char *mp_end);
+
 void
 port_init(void);
 

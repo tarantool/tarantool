@@ -1072,7 +1072,7 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 API_EXPORT int
 box_return_tuple(box_function_ctx_t *ctx, box_tuple_t *tuple)
 {
-	return port_tuple_add(ctx->port, tuple);
+	return port_c_add_tuple(ctx->port, tuple);
 }
 
 /* schema_find_id()-like method using only public API */

@@ -302,9 +302,9 @@ error:
 }
 
 struct sql_value *
-port_tuple_get_vdbemem(struct port *base, uint32_t *size)
+port_c_get_vdbemem(struct port *base, uint32_t *size)
 {
-	struct port_tuple *port = (struct port_tuple *)base;
+	struct port_c *port = (struct port_c *)base;
 	*size = port->size;
 	if (*size == 0 || *size > 1) {
 		diag_set(ClientError, ER_SQL_FUNC_WRONG_RET_COUNT, "C", *size);
@@ -318,14 +318,18 @@ port_tuple_get_vdbemem(struct port *base, uint32_t *size)
 	if (val == NULL)
 		return NULL;
 	int i = 0;
-	struct port_tuple_entry *pe;
+	const char *data;
+	struct port_c_entry *pe;
 	for (pe = port->first; pe != NULL; pe = pe->next) {
-		const char *data = tuple_data(pe->tuple);
-		if (mp_typeof(*data) != MP_ARRAY ||
-			mp_decode_array(&data) != 1) {
-			diag_set(ClientError, ER_SQL_EXECUTE,
-				 "Unsupported type passed from C");
-			goto error;
+		if (pe->mp_size == 0) {
+			data = tuple_data(pe->tuple);
+			if (mp_decode_array(&data) != 1) {
+				diag_set(ClientError, ER_SQL_EXECUTE,
+					 "Unsupported type passed from C");
+				goto error;
+			}
+		} else {
+			data = pe->mp;
 		}
 		uint32_t len;
 		const char *str;
