@@ -79,6 +79,26 @@ port_tuple_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 }
 
 extern "C" void
+port_c_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
+{
+	struct port_c *port = (struct port_c *)base;
+	if (!is_flat)
+		lua_createtable(L, port->size, 0);
+	struct port_c_entry *pe = port->first;
+	const char *mp;
+	for (int i = 0; pe != NULL; pe = pe->next) {
+		if (pe->mp_size == 0) {
+			luaT_pushtuple(L, pe->tuple);
+		} else {
+			mp = pe->mp;
+			luamp_decode(L, luaL_msgpack_default, &mp);
+		}
+		if (!is_flat)
+			lua_rawseti(L, -2, ++i);
+	}
+}
+
+extern "C" void
 port_msgpack_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 {
 	(void) is_flat;

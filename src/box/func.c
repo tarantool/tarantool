@@ -523,7 +523,7 @@ func_c_call(struct func *base, struct port *args, struct port *ret)
 	if (data == NULL)
 		return -1;
 
-	port_tuple_create(ret);
+	port_c_create(ret);
 	box_function_ctx_t ctx = { ret };
 
 	/* Module can be changed after function reload. */
