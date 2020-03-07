@@ -84,7 +84,7 @@ ffi.cdef[[
 
     struct port_tuple {
         const struct port_vtab *vtab;
-        size_t size;
+        int size;
         struct port_tuple_entry *first;
         struct port_tuple_entry *last;
         struct port_tuple_entry first_entry;
