@@ -210,6 +210,7 @@ box_tuple_extract_key
 box_tuple_compare
 box_tuple_compare_with_key
 box_return_tuple
+box_return_mp
 box_space_id_by_name
 box_index_id_by_name
 box_select

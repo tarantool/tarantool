@@ -252,3 +252,40 @@ test_push(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	(void)ctx;
 	return box_session_push(args, args_end);
 }
+
+int
+test_return_mp(box_function_ctx_t *ctx, const char *args, const char *args_end)
+{
+	(void) args;
+	(void) args_end;
+	char buf[512];
+	char *pos = mp_encode_uint(buf, 1);
+	int rc = box_return_mp(ctx, buf, pos);
+	if (rc != 0)
+		return rc;
+
+	pos = mp_encode_int(buf, -1);
+	rc = box_return_mp(ctx, buf, pos);
+	if (rc != 0)
+		return rc;
+
+	pos = mp_encode_uint(buf, UINT64_MAX);
+	rc = box_return_mp(ctx, buf, pos);
+	if (rc != 0)
+		return rc;
+
+	const char *str = "123456789101112131415";
+	pos = mp_encode_str(buf, str, strlen(str));
+	rc = box_return_mp(ctx, buf, pos);
+	if (rc != 0)
+		return rc;
+
+	pos = mp_encode_array(buf, 1);
+	pos = mp_encode_uint(pos, 2);
+	box_tuple_t *tuple = box_tuple_new(box_tuple_format_default(),
+					   buf, pos);
+	if (tuple == NULL)
+		return -1;
+	rc = box_return_tuple(ctx, tuple);
+	return rc;
+}

@@ -1075,6 +1075,12 @@ box_return_tuple(box_function_ctx_t *ctx, box_tuple_t *tuple)
 	return port_c_add_tuple(ctx->port, tuple);
 }
 
+int
+box_return_mp(box_function_ctx_t *ctx, const char *mp, const char *mp_end)
+{
+	return port_c_add_mp(ctx->port, mp, mp_end);
+}
+
 /* schema_find_id()-like method using only public API */
 uint32_t
 box_space_id_by_name(const char *name, uint32_t len)

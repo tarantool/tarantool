@@ -285,6 +285,25 @@ API_EXPORT int
 box_return_tuple(box_function_ctx_t *ctx, box_tuple_t *tuple);
 
 /**
+ * Return MessagePack from a stored C procedure. The MessagePack
+ * is copied, so it is safe to free/reuse the passed arguments
+ * after the call.
+ * MessagePack is not validated, for the sake of speed. It is
+ * expected to be a single encoded object. An attempt to encode
+ * and return multiple objects without wrapping them into an
+ * MP_ARRAY or MP_MAP is undefined behaviour.
+ *
+ * \param ctx An opaque structure passed to the stored C procedure
+ *        by Tarantool.
+ * \param mp Begin of MessagePack.
+ * \param mp_end End of MessagePack.
+ * \retval -1 Error.
+ * \retval 0 Success.
+ */
+API_EXPORT int
+box_return_mp(box_function_ctx_t *ctx, const char *mp, const char *mp_end);
+
+/**
  * Find space id by name.
  *
  * This function performs SELECT request to _vspace system space.
