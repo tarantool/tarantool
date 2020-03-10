@@ -733,6 +733,13 @@ int
 generic_index_build_next(struct index *index, struct tuple *tuple)
 {
 	struct tuple *unused;
+	/*
+	 * Note this is not no-op call in case of rtee index:
+	 * reserving 0 bytes is required during rtree recovery.
+	 * For details see memtx_rtree_index_reserve().
+	 */
+	if (index_reserve(index, 0) != 0)
+		return -1;
 	return index_replace(index, NULL, tuple, DUP_INSERT, &unused);
 }
 
