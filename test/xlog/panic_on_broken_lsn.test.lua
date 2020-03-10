@@ -5,26 +5,6 @@ test_run = env.new()
 test_run:cleanup_cluster()
 
 fio = require('fio')
-test_run:cmd("setopt delimiter ';'")
-function grep_file_tail(filepath, bytes, pattern)
-    local fh = fio.open(filepath, {'O_RDONLY'})
-    local size = fh:seek(0, 'SEEK_END')
-    if size < bytes then
-        bytes = size
-    end
-    fh:seek(-bytes, 'SEEK_END')
-    local line = fh:read(bytes)
-    fh:close()
-    return string.match(line, pattern)
-end;
-function grep_broken_lsn(logpath, lsn)
-    local msg = grep_file_tail(logpath, 256,
-        string.format("LSN for 1 is used twice or COMMIT order is broken: " ..
-                      "confirmed: %d, new: %d, req: ({.*})", lsn, lsn))
-    msg = string.gsub(msg, string.format('lsn: %d, ', lsn), '')
-    return msg
-end;
-test_run:cmd("setopt delimiter ''");
 
 -- Testing case of panic on recovery
 test_run:cmd('create server panic with script="xlog/panic.lua"')
@@ -47,7 +27,10 @@ fio.unlink(xlogs[#xlogs])
 test_run:cmd('start server panic with crash_expected=True')
 
 -- Check that log contains the mention of broken LSN and the request printout
-grep_broken_lsn(fio.pathjoin(fio.cwd(), 'panic.log'), 1)
+filename = fio.pathjoin(fio.cwd(), 'panic.log')
+str = string.format("LSN for 1 is used twice or COMMIT order is broken: confirmed: 1, new: 1, req: .*")
+found = test_run:grep_log(nil, str, 256, {filename = filename})
+(found:gsub('^.*, req: ', ''):gsub('lsn: %d+', 'lsn: <lsn>'))
 
 test_run:cmd('cleanup server panic')
 test_run:cmd('delete server panic')
@@ -78,7 +61,10 @@ test_run:cmd('start server replica with crash_expected=True')
 box.error.injection.set("ERRINJ_RELAY_BREAK_LSN", -1)
 
 -- Check that log contains the mention of broken LSN and the request printout
-grep_broken_lsn(fio.pathjoin(fio.cwd(), 'replica.log'), lsn)
+filename = fio.pathjoin(fio.cwd(), 'replica.log')
+str = string.format("LSN for 1 is used twice or COMMIT order is broken: confirmed: %d, new: %d, req: .*", lsn, lsn)
+found = test_run:grep_log(nil, str, 256, {filename = filename})
+(found:gsub('^.*, req: ', ''):gsub('lsn: %d+', 'lsn: <lsn>'))
 
 test_run:cmd('cleanup server replica')
 test_run:cmd('delete server replica')
