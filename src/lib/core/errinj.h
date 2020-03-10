@@ -137,6 +137,7 @@ struct errinj {
 	_(ERRINJ_FIBER_MADVISE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_FIBER_MPROTECT, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_RELAY_FASTER_THAN_TX, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_INDEX_RESERVE, ERRINJ_BOOL, {.bparam = false})\
 
 ENUM0(errinj_id, ERRINJ_LIST);
 extern struct errinj errinjs[];

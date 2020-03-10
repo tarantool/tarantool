@@ -242,6 +242,24 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 	return 0;
 }
 
+static int
+memtx_rtree_index_reserve(struct index *base, uint32_t size_hint)
+{
+	/*
+         * In case of rtree we use reserve to make sure that
+         * memory allocation will not fail during any operation
+         * on rtree, because there is no error handling in the
+         * rtree lib.
+         */
+	(void)size_hint;
+	ERROR_INJECT(ERRINJ_INDEX_RESERVE, {
+		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE, "mempool", "new slab");
+		return -1;
+	});
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+	return memtx_index_extent_reserve(memtx, RESERVE_EXTENTS_BEFORE_REPLACE);
+}
+
 static struct iterator *
 memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
 				  const char *key, uint32_t part_count)
@@ -333,7 +351,7 @@ static const struct index_vtab memtx_rtree_index_vtab = {
 	/* .compact = */ generic_index_compact,
 	/* .reset_stat = */ generic_index_reset_stat,
 	/* .begin_build = */ generic_index_begin_build,
-	/* .reserve = */ generic_index_reserve,
+	/* .reserve = */ memtx_rtree_index_reserve,
 	/* .build_next = */ generic_index_build_next,
 	/* .end_build = */ generic_index_end_build,
 };

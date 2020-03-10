@@ -103,18 +103,6 @@ memtx_space_replace_no_keys(struct space *space, struct tuple *old_tuple,
 	return -1;
 }
 
-enum {
-	/**
-	 * This number is calculated based on the
-	 * max (realistic) number of insertions
-	 * a deletion from a B-tree or an R-tree
-	 * can lead to, and, as a result, the max
-	 * number of new block allocations.
-	 */
-	RESERVE_EXTENTS_BEFORE_DELETE = 8,
-	RESERVE_EXTENTS_BEFORE_REPLACE = 16
-};
-
 /**
  * A short-cut version of replace() used during bulk load
  * from snapshot.
