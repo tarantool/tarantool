@@ -633,3 +633,32 @@ box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0.5)
 box.error.injection.get('ERRINJ_RELAY_TIMEOUT')
 box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0)
 box.error.injection.get('ERRINJ_RELAY_TIMEOUT')
+
+
+--
+-- gh-4619: make sure that if OOM takes place during rtree recovery,
+-- Tarantool instance will fail gracefully.
+--
+test_run:cmd('create server rtree with script = "box/lua/cfg_rtree.lua"')
+test_run:cmd("start server rtree")
+test_run:cmd('switch rtree')
+math = require("math")
+rtreespace = box.schema.create_space('rtree', {if_not_exists = true})
+rtreespace:create_index('pk', {if_not_exists = true})
+rtreespace:create_index('target', {type='rtree', dimension = 3, parts={2, 'array'},unique = false, if_not_exists = true,})
+count = 10
+for i = 1, count do box.space.rtree:insert{i, {(i + 1) -\
+    math.floor((i + 1)/7000) * 7000, (i + 2) - math.floor((i + 2)/7000) * 7000,\
+    (i + 3) - math.floor((i + 3)/7000) * 7000}} end
+rtreespace:count()
+box.snapshot()
+test_run:cmd('switch default')
+test_run:cmd("stop server rtree")
+test_run:cmd("start server rtree with crash_expected=True")
+fio = require('fio')
+fh = fio.open(fio.pathjoin(fio.cwd(), 'cfg_rtree.log'), {'O_RDONLY'})
+size = fh:seek(0, 'SEEK_END')
+fh:seek(-256, 'SEEK_END') ~= nil
+line = fh:read(256)
+fh:close()
+string.match(line, 'Failed to allocate') ~= nil

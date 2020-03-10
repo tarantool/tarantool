@@ -87,6 +87,18 @@ enum memtx_recovery_state {
 /** Memtx extents pool, available to statistics. */
 extern struct mempool memtx_index_extent_pool;
 
+enum memtx_reserve_extents_num {
+	/**
+	 * This number is calculated based on the
+	 * max (realistic) number of insertions
+	 * a deletion from a B-tree or an R-tree
+	 * can lead to, and, as a result, the max
+	 * number of new block allocations.
+	 */
+	RESERVE_EXTENTS_BEFORE_DELETE = 8,
+	RESERVE_EXTENTS_BEFORE_REPLACE = 16
+};
+
 /**
  * The size of the biggest memtx iterator. Used with
  * mempool_create. This is the size of the block that will be
