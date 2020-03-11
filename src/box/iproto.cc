@@ -1780,21 +1780,24 @@ tx_process_sql(struct cmsg *m)
 	 * become out of date during yield.
 	 */
 	out = msg->connection->tx.p_obuf;
+	if (is_unprepare) {
+		if (iproto_reply_ok(out, msg->header.sync, schema_version) != 0)
+			goto error;
+		iproto_wpos_create(&msg->wpos, out);
+		return;
+	}
 	struct obuf_svp header_svp;
 	/* Prepare memory for the iproto header. */
 	if (iproto_prepare_header(out, &header_svp, IPROTO_HEADER_LEN) != 0) {
 		port_destroy(&port);
 		goto error;
 	}
-	/* Nothing to dump in case of UNPREPARE request. */
-	if (!is_unprepare) {
-		if (port_dump_msgpack(&port, out) != 0) {
-			port_destroy(&port);
-			obuf_rollback_to_svp(out, &header_svp);
-			goto error;
-		}
+	if (port_dump_msgpack(&port, out) != 0) {
 		port_destroy(&port);
+		obuf_rollback_to_svp(out, &header_svp);
+		goto error;
 	}
+	port_destroy(&port);
 	iproto_reply_sql(out, &header_svp, msg->header.sync, schema_version);
 	iproto_wpos_create(&msg->wpos, out);
 	return;
