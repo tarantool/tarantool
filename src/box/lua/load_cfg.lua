@@ -571,6 +571,14 @@ setmetatable(box, {
 local box_is_configured = false
 
 local function load_cfg(cfg)
+    -- A user may save box.cfg (this function) before box loading
+    -- and call it afterwards. We should reconfigure box in the
+    -- case.
+    if box_is_configured then
+        reload_cfg(box.cfg, cfg)
+        return
+    end
+
     cfg = upgrade_cfg(cfg, translate_cfg)
     cfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
     apply_default_cfg(cfg, default_cfg);
