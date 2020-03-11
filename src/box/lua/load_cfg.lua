@@ -514,7 +514,25 @@ setmetatable(box, {
      end
 })
 
+-- Whether box is loaded.
+--
+-- `false` when box is not configured or when the initialization
+-- is in progress.
+--
+-- `true` when box is configured.
+--
+-- Use locked() wrapper to obtain reliable results.
+local box_is_configured = false
+
 local function load_cfg(cfg)
+    -- A user may save box.cfg (this function) before box loading
+    -- and call it afterwards. We should reconfigure box in the
+    -- case.
+    if box_is_configured then
+        reload_cfg(box.cfg, cfg)
+        return
+    end
+
     box.internal.schema.init()
     cfg = upgrade_cfg(cfg, translate_cfg)
     cfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
@@ -525,6 +543,16 @@ local function load_cfg(cfg)
         box.cfg = locked(load_cfg) -- restore original box.cfg
         return box.error() -- re-throw exception from check_cfg()
     end
+
+    -- NB: After this point the function should not raise an
+    -- error.
+    --
+    -- This is important to have right <box_is_configured> (this
+    -- file) and <is_box_configured> (box.cc) values.
+    --
+    -- It also would be counter-intuitive to receive an error from
+    -- box.cfg({<...>}), but find that box is actually configured.
+
     -- Restore box members after initial configuration
     for k, v in pairs(box_configured) do
         box[k] = v
@@ -538,7 +566,13 @@ local function load_cfg(cfg)
             end,
             __call = locked(reload_cfg),
         })
+
+    -- This call either succeeds or calls panic() / exit().
     private.cfg_load()
+
+    -- This block does not raise an error: all necessary checks
+    -- already performed in private.cfg_check(). See <dynamic_cfg>
+    -- comment.
     for key, fun in pairs(dynamic_cfg) do
         local val = cfg[key]
         if val ~= nil and not dynamic_cfg_skip_at_load[key] then
@@ -551,10 +585,13 @@ local function load_cfg(cfg)
             end
         end
     end
+
     if not box.cfg.read_only and not box.cfg.replication and
        not box.error.injection.get('ERRINJ_AUTO_UPGRADE') then
         box.schema.upgrade{auto = true}
     end
+
+    box_is_configured = true
 end
 box.cfg = locked(load_cfg)
 
