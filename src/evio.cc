@@ -143,6 +143,7 @@ evio_setsockopt_server(int fd, int family, int type)
 		       &on, sizeof(on)))
 		diag_raise();
 
+#ifndef TARANTOOL_WSL1_WORKAROUND_ENABLED
 	/* Send all buffered messages on socket before take
 	 * control out from close(2) or shutdown(2). */
 	struct linger linger = { 0, 0 };
@@ -150,6 +151,7 @@ evio_setsockopt_server(int fd, int family, int type)
 	if (sio_setsockopt(fd, SOL_SOCKET, SO_LINGER,
 		       &linger, sizeof(linger)))
 		diag_raise();
+#endif
 	if (type == SOCK_STREAM && family != AF_UNIX)
 		evio_setsockopt_keepalive(fd);
 }
