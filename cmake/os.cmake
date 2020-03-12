@@ -11,6 +11,15 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 # (see man page for feature_test_macros).
     add_definitions("-D_FILE_OFFSET_BITS=64")
     find_package_message(PLATFORM "Building for Linux" "${CMAKE_SYSTEM_NAME}")
+
+    # There are some subtle differences in Linux kernel calls
+    # implementation under WSL1 (which should go away with WSL2 kernel)
+    # so for a moment we introduce a way to distinguish Linux and
+    # Microsoft/WSL1
+    if (${CMAKE_SYSTEM} MATCHES "Linux-.*-Microsoft")
+        add_definitions("-DTARANTOOL_WSL1_WORKAROUND_ENABLED=1")
+    endif()
+
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "kFreeBSD")
     set(TARGET_OS_FREEBSD 1)
     set(TARGET_OS_DEBIAN_FREEBSD 1)
