@@ -59,6 +59,12 @@ enum session_type {
 	session_type_MAX,
 };
 
+enum output_format {
+	OUTPUT_FORMAT_YAML = 0,
+	OUTPUT_FORMAT_LUA_LINE,
+	OUTPUT_FORMAT_LUA_BLOCK,
+};
+
 extern const char *session_type_strs[];
 
 /**
@@ -73,11 +79,15 @@ extern uint32_t default_flags;
  * types, and allows to do not store attributes in struct session,
  * that are used only by a session of particular type.
  */
-union session_meta {
-	/** IProto connection. */
-	void *connection;
-	/** Console file/socket descriptor. */
-	int fd;
+struct session_meta {
+	union {
+		/** IProto connection. */
+		void *connection;
+		/** Console file/socket descriptor. */
+		int fd;
+	};
+	/** Console output format. */
+	enum output_format output_format;
 };
 
 /**
@@ -100,7 +110,7 @@ struct session {
 	/** Session virtual methods. */
 	const struct session_vtab *vtab;
 	/** Session metadata. */
-	union session_meta meta;
+	struct session_meta meta;
 	/**
 	 * ID of statements prepared in current session.
 	 * This map is allocated on demand.

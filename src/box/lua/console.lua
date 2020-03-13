@@ -2,6 +2,21 @@
 --
 -- vim: ts=4 sw=4 et
 
+local ffi = require('ffi')
+ffi.cdef[[
+    enum output_format {
+        OUTPUT_FORMAT_YAML = 0,
+        OUTPUT_FORMAT_LUA_LINE,
+        OUTPUT_FORMAT_LUA_BLOCK,
+    };
+
+    enum output_format
+    console_get_output_format();
+
+    void
+    console_set_output_format(enum output_format output_format);
+]]
+
 local serpent = require('serpent')
 local internal = require('console')
 local session_internal = require('box.internal.session')
@@ -173,17 +188,24 @@ local function output_save(fmt, opts)
     -- Output format descriptors are saved per
     -- session thus each console may specify
     -- own mode.
-    box.session.storage.console_output_format = {
-        ["fmt"] = fmt, ["opts"] = opts
-    }
+    if fmt == "yaml" then
+        ffi.C.console_set_output_format(ffi.C.OUTPUT_FORMAT_YAML)
+    elseif fmt == "lua" and opts == "block" then
+        ffi.C.console_set_output_format(ffi.C.OUTPUT_FORMAT_LUA_BLOCK)
+    else
+        ffi.C.console_set_output_format(ffi.C.OUTPUT_FORMAT_LUA_LINE)
+    end
 end
 
 local function current_output()
-    local d = box.session.storage.console_output_format
-    if d == nil then
-        return default_output_format
+    local fmt = ffi.C.console_get_output_format()
+    if fmt == ffi.C.OUTPUT_FORMAT_YAML then
+        return { ["fmt"] = "yaml", ["opts"] = nil }
+    elseif fmt == ffi.C.OUTPUT_FORMAT_LUA_LINE then
+        return { ["fmt"] = "lua", ["opts"] = "line" }
+    elseif fmt == ffi.C.OUTPUT_FORMAT_LUA_BLOCK then
+        return { ["fmt"] = "lua", ["opts"] = "block" }
     end
-    return d
 end
 
 -- Used by console_session_push.
