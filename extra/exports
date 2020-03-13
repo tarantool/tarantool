@@ -43,6 +43,8 @@ tnt_iconv_close
 tnt_iconv
 exception_get_string
 exception_get_int
+console_get_output_format
+console_set_output_format
 
 tarantool_lua_ibuf
 uuid_nil
