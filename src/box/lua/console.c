@@ -378,8 +378,8 @@ console_session_fd(struct session *session)
 }
 
 /**
- * Dump port lua data as a YAML document tagged with !push! global
- * tag.
+ * Dump port lua data with respect to output format:
+ * YAML document tagged with !push! global tag or Lua string.
  * @param port Port lua.
  * @param[out] size Size of the result.
  *
@@ -391,18 +391,31 @@ port_lua_dump_plain(struct port *port, uint32_t *size)
 {
 	struct port_lua *port_lua = (struct port_lua *) port;
 	struct lua_State *L = port_lua->L;
-	int rc = lua_yaml_encode(L, luaL_yaml_default, "!push!",
-				 "tag:tarantool.io/push,2018");
-	if (rc == 2) {
-		/*
-		 * Nil and error object are pushed onto the stack.
-		 */
-		assert(lua_isnil(L, -2));
-		assert(lua_isstring(L, -1));
-		diag_set(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
-		return NULL;
+	enum output_format fmt = console_get_output_format();
+	if (fmt == OUTPUT_FORMAT_YAML) {
+		int rc = lua_yaml_encode(L, luaL_yaml_default, "!push!",
+					 "tag:tarantool.io/push,2018");
+		if (rc == 2) {
+			/*
+			 * Nil and error object are pushed onto the stack.
+			 */
+			assert(lua_isnil(L, -2));
+			assert(lua_isstring(L, -1));
+			diag_set(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
+			return NULL;
+		}
+		assert(rc == 1);
+	} else {
+		assert(fmt == OUTPUT_FORMAT_LUA_LINE ||
+		       fmt == OUTPUT_FORMAT_LUA_BLOCK);
+		luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 1);
+		lua_getfield(L, -1, "format_lua_push");
+		lua_pushvalue(L, -3);
+		if (lua_pcall(L, 1, 1, 0) != 0) {
+			diag_set(LuajitError, lua_tostring(L, -1));
+			return NULL;
+		}
 	}
-	assert(rc == 1);
 	assert(lua_isstring(L, -1));
 	size_t len;
 	const char *result = lua_tolstring(L, -1, &len);
@@ -411,10 +424,11 @@ port_lua_dump_plain(struct port *port, uint32_t *size)
 }
 
 /**
- * Push a tagged YAML document into a console socket.
+ * Push a tagged YAML document or a Lua string into a console
+ * socket.
  * @param session Console session.
  * @param sync Unused request sync.
- * @param port Port with YAML to push.
+ * @param port Port with the data to push.
  *
  * @retval  0 Success.
  * @retval -1 Error.
