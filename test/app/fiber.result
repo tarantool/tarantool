@@ -1186,7 +1186,7 @@ fiber = nil
 ---
 ...
 --
--- gh-2622, gh-4011: fiber.name() truncates new name.
+-- gh-2622, gh-4011, gh-4394: fiber.name() truncates new name.
 --
 fiber = require('fiber')
 ---
@@ -1214,14 +1214,14 @@ fiber.name(long_name, {truncate = true})
 ...
 fiber.name()
 ---
-- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ...
 f = fiber.self()
 ---
 ...
 fiber.name(f)
 ---
-- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ...
 fiber.name(f, 'new_name')
 ---
@@ -1239,7 +1239,7 @@ fiber.name(f, long_name, {truncate = true})
 ...
 fiber.name(f)
 ---
-- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ...
 --
 -- gh-3493 fiber.create() does not roll back memtx transaction

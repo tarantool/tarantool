@@ -912,8 +912,27 @@ fiber_loop(MAYBE_UNUSED void *data)
 void
 fiber_set_name(struct fiber *fiber, const char *name)
 {
-	assert(name != NULL);
-	snprintf(fiber->name, sizeof(fiber->name), "%s", name);
+	size_t size = strlen(name) + 1;
+	if (size <= FIBER_NAME_INLINE) {
+		if (fiber->name != fiber->inline_name) {
+			free(fiber->name);
+			fiber->name = fiber->inline_name;
+		}
+	} else {
+		if (size > FIBER_NAME_MAX)
+			size = FIBER_NAME_MAX;
+		char *new_name;
+		if (fiber->name != fiber->inline_name)
+			new_name = realloc(fiber->name, size);
+		else
+			new_name = malloc(size);
+		if (new_name == NULL)
+			panic("fiber_set_name() failed with OOM");
+		fiber->name = new_name;
+	}
+	--size;
+	memcpy(fiber->name, name, size);
+	fiber->name[size] = 0;
 }
 
 static inline void *
@@ -1242,6 +1261,9 @@ fiber_destroy(struct cord *cord, struct fiber *f)
 	region_destroy(&f->gc);
 	fiber_stack_destroy(f, &cord->slabc);
 	diag_destroy(&f->diag);
+	if (f->name != f->inline_name)
+		free(f->name);
+	f->name = NULL;
 }
 
 void
@@ -1357,6 +1379,7 @@ cord_create(struct cord *cord, const char *name)
 	fiber_reset(&cord->sched);
 	diag_create(&cord->sched.diag);
 	region_create(&cord->sched.gc, &cord->slabc);
+	cord->sched.name = NULL;
 	fiber_set_name(&cord->sched, "sched");
 	cord->fiber = &cord->sched;
 
@@ -1405,6 +1428,8 @@ cord_destroy(struct cord *cord)
 	}
 	region_destroy(&cord->sched.gc);
 	diag_destroy(&cord->sched.diag);
+	if (cord->sched.name != cord->sched.inline_name)
+		free(cord->sched.name);
 	slab_cache_destroy(&cord->slabc);
 }
 

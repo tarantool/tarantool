@@ -171,9 +171,9 @@ fiber_name_test()
 
 	note("set new fiber name: %s.\n", fiber_name(fiber()));
 
-	const char *long_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"\
-		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+	char long_name[FIBER_NAME_MAX + 30];
+	memset(long_name, 'a', sizeof(long_name));
+	long_name[sizeof(long_name) - 1] = 0;
 
 	fiber_set_name(fiber(), long_name);
 

@@ -504,7 +504,7 @@ test_run:cmd("setopt delimiter ''");
 fiber = nil
 
 --
--- gh-2622, gh-4011: fiber.name() truncates new name.
+-- gh-2622, gh-4011, gh-4394: fiber.name() truncates new name.
 --
 fiber = require('fiber')
 long_name = string.rep('a', 300)

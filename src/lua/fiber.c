@@ -582,16 +582,16 @@ lbox_fiber_name(struct lua_State *L)
 	if (top == name_index || top == opts_index) {
 		/* Set name. */
 		const char *name = luaL_checkstring(L, name_index);
-		int name_len = strlen(name);
+		int name_size = strlen(name) + 1;
 		if (top == opts_index && lua_istable(L, opts_index)) {
 			lua_getfield(L, opts_index, "truncate");
 			/* Truncate the name if needed. */
 			if (lua_isboolean(L, -1) && lua_toboolean(L, -1) &&
-			    name_len > FIBER_NAME_MAX)
-				name_len = FIBER_NAME_MAX;
+			    name_size > FIBER_NAME_MAX)
+				name_size = FIBER_NAME_MAX;
 			lua_pop(L, 1);
 		}
-		if (name_len > FIBER_NAME_MAX)
+		if (name_size > FIBER_NAME_MAX)
 			luaL_error(L, "Fiber name is too long");
 		fiber_set_name(f, name);
 		return 0;

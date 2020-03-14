@@ -111,7 +111,11 @@ struct cpu_stat {
 
 #endif /* ENABLE_FIBER_TOP */
 
-enum { FIBER_NAME_MAX = 32 };
+enum {
+	/** Both limits include terminating 0. */
+	FIBER_NAME_INLINE = 40,
+	FIBER_NAME_MAX = 256
+};
 
 /**
  * Fiber ids [0; 100] are reserved.
@@ -510,7 +514,12 @@ struct fiber {
 	struct ipc_wait_pad *wait_pad;
 	/** Exception which caused this fiber's death. */
 	struct diag diag;
-	char name[FIBER_NAME_MAX + 1];
+	/**
+	 * Name points at inline_name in case it is short. Long
+	 * name is allocated on the heap.
+	 */
+	char *name;
+	char inline_name[FIBER_NAME_INLINE];
 };
 
 /** Invoke on_stop triggers and delete them. */
@@ -578,7 +587,7 @@ struct cord {
 	struct slab_cache slabc;
 	/** The "main" fiber of this cord, the scheduler. */
 	struct fiber sched;
-	char name[FIBER_NAME_MAX];
+	char name[FIBER_NAME_INLINE];
 };
 
 extern __thread struct cord *cord_ptr;
