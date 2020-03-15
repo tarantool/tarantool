@@ -324,13 +324,6 @@ sqlAddColumn(Parse * pParse, Token * pName, struct type_def *type_def)
 		pParse->is_aborted = true;
 		return;
 	}
-	for (uint32_t i = 0; i < def->field_count; i++) {
-		if (strcmp(z, def->fields[i].name) == 0) {
-			diag_set(ClientError, ER_SPACE_FIELD_IS_DUPLICATE, z);
-			pParse->is_aborted = true;
-			return;
-		}
-	}
 	struct field_def *column_def = &def->fields[def->field_count];
 	memcpy(column_def, &field_def_default, sizeof(field_def_default));
 	column_def->name = z;
