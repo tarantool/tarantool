@@ -696,7 +696,7 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 		return -1;
 	case FIELD_TYPE_INTEGER:
 	case FIELD_TYPE_UNSIGNED:
-		if ((pMem->flags & MEM_Blob) != 0) {
+		if ((pMem->flags & (MEM_Blob | MEM_Str)) != 0) {
 			bool is_neg;
 			int64_t val;
 			if (sql_atoi64(pMem->z, &val, &is_neg, pMem->n) != 0)
@@ -711,8 +711,20 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 			MemSetTypeFlag(pMem, MEM_UInt);
 			return 0;
 		}
-		if (sqlVdbeMemIntegerify(pMem) != 0)
+		if ((pMem->flags & MEM_Real) != 0) {
+			double d;
+			if (sqlVdbeRealValue(pMem, &d) != 0)
+				return -1;
+			if (d < INT64_MAX && d >= INT64_MIN) {
+				mem_set_int(pMem, d, d <= -1);
+				return 0;
+			}
+			if (d >= INT64_MAX && d < UINT64_MAX) {
+				mem_set_u64(pMem, d);
+				return 0;
+			}
 			return -1;
+		}
 		if (type == FIELD_TYPE_UNSIGNED &&
 		    (pMem->flags & MEM_UInt) == 0)
 			return -1;

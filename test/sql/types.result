@@ -269,11 +269,8 @@ box.space.T1:drop()
 --
 box.execute("SELECT CAST('1.123' AS INTEGER);")
 ---
-- metadata:
-  - name: CAST('1.123' AS INTEGER)
-    type: integer
-  rows:
-  - [1]
+- null
+- 'Type mismatch: can not convert 1.123 to integer'
 ...
 box.execute("CREATE TABLE t1 (f TEXT PRIMARY KEY);")
 ---
@@ -285,13 +282,8 @@ box.execute("INSERT INTO t1 VALUES('0.0'), ('1.5'), ('3.9312453');")
 ...
 box.execute("SELECT CAST(f AS INTEGER) FROM t1;")
 ---
-- metadata:
-  - name: CAST(f AS INTEGER)
-    type: integer
-  rows:
-  - [0]
-  - [1]
-  - [3]
+- null
+- 'Type mismatch: can not convert 0.0 to integer'
 ...
 box.space.T1:drop()
 ---
@@ -1105,8 +1097,11 @@ box.execute("SELECT CAST(1.5 AS UNSIGNED);")
 ...
 box.execute("SELECT CAST(-1.5 AS UNSIGNED);")
 ---
-- null
-- 'Type mismatch: can not convert -1 to unsigned'
+- metadata:
+  - name: CAST(-1.5 AS UNSIGNED)
+    type: unsigned
+  rows:
+  - [-1]
 ...
 box.execute("SELECT CAST(true AS UNSIGNED);")
 ---
