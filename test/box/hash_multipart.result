@@ -131,13 +131,6 @@ hash.index['unique']:select{1, 'baz'}
 - error: 'Supplied key type of part 1 does not match index part type: expected unsigned'
 ...
 -- cleanup
-hash:truncate()
----
-...
-hash:len()
----
-- 0
-...
 hash:drop()
 ---
 ...

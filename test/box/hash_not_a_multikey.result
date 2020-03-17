@@ -1,0 +1,17 @@
+-- test-run result file version 2
+-- Hash index cannot be multikey.
+
+s = box.schema.space.create('test')
+ | ---
+ | ...
+_ = s:create_index('primary')
+ | ---
+ | ...
+_ = s:create_index('hash', {type = 'hash', parts = {{'[2][*]', 'unsigned'}}})
+ | ---
+ | - error: 'Can''t create or modify index ''hash'' in space ''test'': HASH index cannot
+ |     be multikey'
+ | ...
+s:drop()
+ | ---
+ | ...

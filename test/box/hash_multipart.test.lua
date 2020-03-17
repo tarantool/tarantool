@@ -53,6 +53,4 @@ hash.index['unique']:get{1}
 hash.index['unique']:select{1, 'baz'}
 
 -- cleanup
-hash:truncate()
-hash:len()
 hash:drop()
