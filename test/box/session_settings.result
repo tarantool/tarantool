@@ -328,6 +328,39 @@ settings.sql_defer_foreign_keys
  | - false
  | ...
 
+box.execute([[set session "sql_default_engine" = 'vinyl']])
+ | ---
+ | - row_count: 1
+ | ...
+s:get('sql_default_engine').value
+ | ---
+ | - vinyl
+ | ...
+box.execute([[set session "sql_default_engine" = 'memtx']])
+ | ---
+ | - row_count: 1
+ | ...
+s:get('sql_default_engine').value
+ | ---
+ | - memtx
+ | ...
+box.execute([[set session "sql_defer_foreign_keys" = true]])
+ | ---
+ | - row_count: 1
+ | ...
+s:get('sql_defer_foreign_keys').value
+ | ---
+ | - true
+ | ...
+box.execute([[set session "sql_defer_foreign_keys" = false]])
+ | ---
+ | - row_count: 1
+ | ...
+s:get('sql_defer_foreign_keys').value
+ | ---
+ | - false
+ | ...
+
 settings.sql_default_engine = true
  | ---
  | - error: Session setting sql_default_engine expected a value of type string
@@ -347,4 +380,20 @@ str = string.rep('a', 20 * 1024)
 box.session.settings.sql_default_engine = str
  | ---
  | - error: Failed to allocate 20483 bytes in static_alloc for mp_value
+ | ...
+
+box.execute([[set session "sql_def_engine" = true]])
+ | ---
+ | - null
+ | - Session setting sql_def_engine doesn't exist
+ | ...
+box.execute([[set session "sql_default_engine" = true]])
+ | ---
+ | - null
+ | - Session setting sql_default_engine expected a value of type string
+ | ...
+box.execute([[set session "sql_defer_foreign_keys" = 'true']])
+ | ---
+ | - null
+ | - Session setting sql_defer_foreign_keys expected a value of type boolean
  | ...

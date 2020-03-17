@@ -4517,4 +4517,15 @@ int
 sql_fieldno_by_name(struct Parse *parse_context, struct Expr *field_name,
 		    uint32_t *fieldno);
 
+/**
+ * Create VDBE instructions to set the new value of the session setting.
+ *
+ * @param parse_context Parsing context.
+ * @param name Name of the session setting.
+ * @param value New value of the session setting.
+ */
+void
+sql_setting_set(struct Parse *parse_context, struct Token *name,
+		struct Expr *value);
+
 #endif				/* sqlINT_H */

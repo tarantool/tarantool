@@ -158,6 +158,7 @@ static Keyword aKeywordTable[] = {
   { "SAVEPOINT",              "TK_SAVEPOINT",   true  },
   { "SCALAR",                 "TK_SCALAR",      true  },
   { "SELECT",                 "TK_SELECT",      true  },
+  { "SESSION",                "TK_SESSION",     false },
   { "SET",                    "TK_SET",         true  },
   { "SIMPLE",                 "TK_SIMPLE",      true  },
   { "START",                  "TK_START",       true  },

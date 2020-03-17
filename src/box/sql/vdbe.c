@@ -55,6 +55,7 @@
 #include "box/schema.h"
 #include "box/space.h"
 #include "box/sequence.h"
+#include "box/session_settings.h"
 
 /*
  * Invoke this macro on memory cells just prior to changing the
@@ -5249,6 +5250,59 @@ case OP_IncMaxid: {
 	if (tarantoolsqlIncrementMaxid(&pOut->u.u) != 0)
 		goto abort_due_to_error;
 	pOut->flags = MEM_UInt;
+	break;
+}
+
+/* Opcode: SetSession P1 * * P4 *
+ *
+ * Set new value of the session setting. P4 is the name of the
+ * setting being updated, P1 is the register holding a value.
+ */
+case OP_SetSession: {
+	assert(pOp->p4type == P4_DYNAMIC);
+	const char *setting_name = pOp->p4.z;
+	int sid = session_setting_find(setting_name);
+	if (sid < 0) {
+		diag_set(ClientError, ER_NO_SUCH_SESSION_SETTING, setting_name);
+		goto abort_due_to_error;
+	}
+	pIn1 = &aMem[pOp->p1];
+	struct session_setting *setting = &session_settings[sid];
+	switch (setting->field_type) {
+	case FIELD_TYPE_BOOLEAN: {
+		if ((pIn1->flags & MEM_Bool) == 0)
+			goto invalid_type;
+		bool value = pIn1->u.b;
+		size_t size = mp_sizeof_bool(value);
+		char *mp_value = (char *) static_alloc(size);
+		mp_encode_bool(mp_value, value);
+		if (setting->set(sid, mp_value) != 0)
+			goto abort_due_to_error;
+		break;
+	}
+	case FIELD_TYPE_STRING: {
+		if ((pIn1->flags & MEM_Str) == 0)
+			goto invalid_type;
+		const char *str = pIn1->z;
+		uint32_t size = mp_sizeof_str(pIn1->n);
+		char *mp_value = (char *) static_alloc(size);
+		if (mp_value == NULL) {
+			diag_set(OutOfMemory, size, "static_alloc", "mp_value");
+			goto abort_due_to_error;
+		}
+		mp_encode_str(mp_value, str, pIn1->n);
+		if (setting->set(sid, mp_value) != 0)
+			goto abort_due_to_error;
+		break;
+	}
+	default:
+	invalid_type:
+		diag_set(ClientError, ER_SESSION_SETTING_INVALID_VALUE,
+			 session_setting_strs[sid],
+			 field_type_strs[setting->field_type]);
+		goto abort_due_to_error;
+	}
+	p->nChange++;
 	break;
 }
 

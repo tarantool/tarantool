@@ -3481,3 +3481,23 @@ sql_session_settings_init()
 		setting->set = sql_session_setting_set;
 	}
 }
+
+void
+sql_setting_set(struct Parse *parse_context, struct Token *name,
+		struct Expr *expr)
+{
+	struct Vdbe *vdbe = sqlGetVdbe(parse_context);
+	if (vdbe == NULL)
+		goto abort;
+	sqlVdbeCountChanges(vdbe);
+	char *key = sql_name_from_token(parse_context->db, name);
+	if (key == NULL)
+		goto abort;
+	int target = ++parse_context->nMem;
+	sqlExprCode(parse_context, expr, target);
+	sqlVdbeAddOp4(vdbe, OP_SetSession, target, 0, 0, key, P4_DYNAMIC);
+	return;
+abort:
+	parse_context->is_aborted = true;
+	return;
+}
