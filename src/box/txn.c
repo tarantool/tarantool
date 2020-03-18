@@ -463,9 +463,9 @@ txn_complete(struct txn *txn)
 }
 
 void
-txn_complete_async(struct journal_entry *entry, void *complete_data)
+txn_complete_async(struct journal_entry *entry)
 {
-	struct txn *txn = complete_data;
+	struct txn *txn = entry->complete_data;
 	txn->signature = entry->res;
 	/*
 	 * Some commit/rollback triggers require for in_txn fiber
@@ -487,7 +487,7 @@ txn_journal_entry_new(struct txn *txn)
 	assert(txn->n_new_rows + txn->n_applier_rows > 0);
 
 	req = journal_entry_new(txn->n_new_rows + txn->n_applier_rows,
-				&txn->region, txn_complete_async, txn);
+				&txn->region, txn);
 	if (req == NULL)
 		return NULL;
 
@@ -516,24 +516,6 @@ txn_journal_entry_new(struct txn *txn)
 	assert(local_row == remote_row + txn->n_new_rows);
 
 	return req;
-}
-
-static int64_t
-txn_write_to_wal(struct journal_entry *req)
-{
-	/*
-	 * Send the entry to the journal.
-	 *
-	 * After this point the transaction must not be used
-	 * so reset the corresponding key in the fiber storage.
-	 */
-	fiber_set_txn(fiber(), NULL);
-	if (journal_write(req) < 0) {
-		diag_set(ClientError, ER_WAL_IO);
-		diag_log();
-		return -1;
-	}
-	return 0;
 }
 
 /*
@@ -608,7 +590,17 @@ txn_commit_async(struct txn *txn)
 		return -1;
 	}
 
-	return txn_write_to_wal(req);
+	fiber_set_txn(fiber(), NULL);
+	if (journal_write_async(req) != 0) {
+		fiber_set_txn(fiber(), txn);
+		txn_rollback(txn);
+
+		diag_set(ClientError, ER_WAL_IO);
+		diag_log();
+		return -1;
+	}
+
+	return 0;
 }
 
 int
@@ -636,21 +628,27 @@ txn_commit(struct txn *txn)
 		return -1;
 	}
 
-	if (txn_write_to_wal(req) != 0)
-		return -1;
+	fiber_set_txn(fiber(), NULL);
+	if (journal_write(req) != 0) {
+		fiber_set_txn(fiber(), txn);
+		txn_rollback(txn);
+		txn_free(txn);
 
-	/*
-	 * In case of non-yielding journal the transaction could already
-	 * be done and there is nothing to wait in such cases.
-	 */
-	if (!txn_has_flag(txn, TXN_IS_DONE)) {
-		bool cancellable = fiber_set_cancellable(false);
-		fiber_yield();
-		fiber_set_cancellable(cancellable);
-	}
-	int res = txn->signature >= 0 ? 0 : -1;
-	if (res != 0)
 		diag_set(ClientError, ER_WAL_IO);
+		diag_log();
+		return -1;
+	}
+
+	if (!txn_has_flag(txn, TXN_IS_DONE)) {
+		txn->signature = req->res;
+		txn_complete(txn);
+	}
+
+	int res = txn->signature >= 0 ? 0 : -1;
+	if (res != 0) {
+		diag_set(ClientError, ER_WAL_IO);
+		diag_log();
+	}
 
 	/* Synchronous transactions are freed by the calling fiber. */
 	txn_free(txn);
