@@ -1,0 +1,101 @@
+net = require('net.box')
+---
+...
+--
+-- gh-2978: field names for tuples received from netbox.
+--
+_ = box.schema.create_space("named", {format = {{name = "id"}, {name="abc"}}})
+---
+...
+_ = box.space.named:create_index('id', {parts = {{1, 'unsigned'}}})
+---
+...
+box.space.named:insert({1, 1})
+---
+- [1, 1]
+...
+box.schema.user.grant('guest', 'read, write, execute', 'space')
+---
+...
+cn = net.connect(box.cfg.listen)
+---
+...
+s = cn.space.named
+---
+...
+s:get{1}.id
+---
+- 1
+...
+s:get{1}:tomap()
+---
+- 1: 1
+  2: 1
+  abc: 1
+  id: 1
+...
+s:insert{2,3}:tomap()
+---
+- 1: 2
+  2: 3
+  abc: 3
+  id: 2
+...
+s:replace{2,14}:tomap()
+---
+- 1: 2
+  2: 14
+  abc: 14
+  id: 2
+...
+s:update(1, {{'+', 2, 10}}):tomap()
+---
+- 1: 1
+  2: 11
+  abc: 11
+  id: 1
+...
+s:select()[1]:tomap()
+---
+- 1: 1
+  2: 11
+  abc: 11
+  id: 1
+...
+s:delete({2}):tomap()
+---
+- 1: 2
+  2: 14
+  abc: 14
+  id: 2
+...
+-- Check that formats changes after reload.
+box.space.named:format({{name = "id2"}, {name="abc2"}})
+---
+...
+s:select()[1]:tomap()
+---
+- 1: 1
+  2: 11
+  abc: 11
+  id: 1
+...
+cn:reload_schema()
+---
+...
+s:select()[1]:tomap()
+---
+- 1: 1
+  2: 11
+  id2: 1
+  abc2: 11
+...
+cn:close()
+---
+...
+box.space.named:drop()
+---
+...
+box.schema.user.revoke('guest', 'read, write, execute', 'space')
+---
+...
