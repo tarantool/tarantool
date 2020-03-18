@@ -514,7 +514,13 @@ txn_write_to_wal(struct txn *txn)
 	assert(remote_row == req->rows + txn->n_applier_rows);
 	assert(local_row == remote_row + txn->n_new_rows);
 
-	/* Send the entry to the journal. */
+	/*
+	 * Send the entry to the journal.
+	 *
+	 * After this point the transaction must not be used
+	 * so reset the corresponding key in the fiber storage.
+	 */
+	fiber_set_txn(fiber(), NULL);
 	if (journal_write(req) < 0) {
 		diag_set(ClientError, ER_WAL_IO);
 		diag_log();
@@ -599,11 +605,6 @@ txn_commit_async(struct txn *txn)
 	if (txn_commit_nop(txn))
 		return 0;
 
-	/*
-	 * After this point the transaction must not be used
-	 * so reset the corresponding key in the fiber storage.
-	 */
-	fiber_set_txn(fiber(), NULL);
 	return txn_write_to_wal(txn);
 }
 
@@ -623,7 +624,6 @@ txn_commit(struct txn *txn)
 		return 0;
 	}
 
-	fiber_set_txn(fiber(), NULL);
 	if (txn_write_to_wal(txn) != 0)
 		return -1;
 
