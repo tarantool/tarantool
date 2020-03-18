@@ -44,6 +44,7 @@ extern "C" {
 /** box statistics */
 extern struct rmean *rmean_box;
 
+struct journal_entry;
 struct engine;
 struct space;
 struct tuple;
@@ -286,6 +287,12 @@ txn_commit(struct txn *txn);
  */
 void
 txn_rollback(struct txn *txn);
+
+/**
+ * Complete asynchronous transaction.
+ */
+void
+txn_complete_async(struct journal_entry *entry, void *complete_data);
 
 /**
  * Submit a transaction to the journal.
