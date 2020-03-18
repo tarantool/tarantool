@@ -320,12 +320,14 @@ recovery_journal_write(struct journal *base,
 	return 0;
 }
 
-static inline void
-recovery_journal_create(struct recovery_journal *journal, struct vclock *v)
+static void
+recovery_journal_create(struct vclock *v)
 {
-	journal_create(&journal->base, recovery_journal_write, NULL);
-	journal->vclock = v;
-	journal_set(&journal->base);
+	static struct recovery_journal journal;
+
+	journal_create(&journal.base, recovery_journal_write, NULL);
+	journal.vclock = v;
+	journal_set(&journal.base);
 }
 
 static void
@@ -1814,8 +1816,7 @@ bootstrap_from_master(struct replica *master)
 	 * Process final data (WALs).
 	 */
 	engine_begin_final_recovery_xc();
-	struct recovery_journal journal;
-	recovery_journal_create(&journal, &replicaset.vclock);
+	recovery_journal_create(&replicaset.vclock);
 
 	applier_resume_to_state(applier, APPLIER_JOINED, TIMEOUT_INFINITY);
 
@@ -1977,8 +1978,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 	assert(memtx != NULL);
 
-	struct recovery_journal journal;
-	recovery_journal_create(&journal, &recovery->vclock);
+	recovery_journal_create(&recovery->vclock);
 
 	/*
 	 * We explicitly request memtx to recover its
