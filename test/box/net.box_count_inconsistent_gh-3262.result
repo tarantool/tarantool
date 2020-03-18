@@ -1,0 +1,488 @@
+remote = require 'net.box'
+---
+...
+fiber = require 'fiber'
+---
+...
+test_run = require('test_run').new()
+---
+...
+LISTEN = require('uri').parse(box.cfg.listen)
+---
+...
+space = box.schema.space.create('net_box_test_space')
+---
+...
+index = space:create_index('primary', { type = 'tree' })
+---
+...
+box.schema.user.grant('guest', 'read,write', 'space', 'net_box_test_space')
+---
+...
+box.schema.user.grant('guest', 'execute', 'universe')
+---
+...
+cn = remote.connect(box.cfg.listen)
+---
+...
+cn.space[space.id]  ~= nil
+---
+- true
+...
+cn.space.net_box_test_space ~= nil
+---
+- true
+...
+cn.space.net_box_test_space ~= nil
+---
+- true
+...
+cn.space.net_box_test_space.index ~= nil
+---
+- true
+...
+cn.space.net_box_test_space.index.primary ~= nil
+---
+- true
+...
+cn.space.net_box_test_space.index[space.index.primary.id] ~= nil
+---
+- true
+...
+cn.space.net_box_test_space:insert{234, 1,2,3}
+---
+- [234, 1, 2, 3]
+...
+cn.space.net_box_test_space:replace{354, 1,2,4}
+---
+- [354, 1, 2, 4]
+...
+cn.space.net_box_test_space.index.primary:min(354)
+---
+- [354, 1, 2, 4]
+...
+cn.space.net_box_test_space.index.primary:max(234)
+---
+- [234, 1, 2, 3]
+...
+cn.space.net_box_test_space.index.primary:count(354)
+---
+- 1
+...
+box.schema.user.create('netbox', { password  = 'test' })
+---
+...
+box.schema.user.grant('netbox', 'read,write', 'space', 'net_box_test_space')
+---
+...
+box.schema.user.grant('netbox', 'execute', 'universe')
+---
+...
+cn = remote.connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = 'test' })
+---
+...
+cn.state
+---
+- active
+...
+cn.error
+---
+- null
+...
+cn:ping()
+---
+- true
+...
+function ret_after(to) fiber.sleep(to) return {{to}} end
+---
+...
+cn:ping({timeout = 1.00})
+---
+- true
+...
+cn:ping({timeout = 1e-9})
+---
+- false
+...
+cn:ping()
+---
+- true
+...
+remote_space = cn.space.net_box_test_space
+---
+...
+remote_pk = remote_space.index.primary
+---
+...
+remote_space:insert({0}, { timeout = 1.00 })
+---
+- [0]
+...
+remote_space:insert({1}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+remote_space:insert({2})
+---
+- [2]
+...
+remote_space:replace({0}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+remote_space:replace({1})
+---
+- [1]
+...
+remote_space:replace({2}, { timeout = 1.00 })
+---
+- [2]
+...
+remote_space:upsert({3}, {}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+remote_space:upsert({4}, {})
+---
+...
+remote_space:upsert({5}, {}, { timeout = 1.00 })
+---
+...
+remote_space:upsert({3}, {})
+---
+...
+remote_space:update({3}, {}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+remote_space:update({4}, {})
+---
+- [4]
+...
+remote_space:update({5}, {}, { timeout = 1.00 })
+---
+- [5]
+...
+remote_space:update({3}, {})
+---
+- [3]
+...
+remote_pk:update({5}, {}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+remote_pk:update({4}, {})
+---
+- [4]
+...
+remote_pk:update({3}, {}, { timeout = 1.00 })
+---
+- [3]
+...
+remote_pk:update({5}, {})
+---
+- [5]
+...
+remote_space:get({0})
+---
+- [0]
+...
+remote_space:get({1}, { timeout = 1.00 })
+---
+- [1]
+...
+remote_space:get({2}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+remote_pk:get({3}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+remote_pk:get({4})
+---
+- [4]
+...
+remote_pk:get({5}, { timeout = 1.00 })
+---
+- [5]
+...
+remote_space:select({2}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+remote_space:select({2}, { timeout = 1.00 })
+---
+- - [2]
+...
+remote_space:select({2})
+---
+- - [2]
+...
+remote_pk:select({2}, { timeout = 1.00 })
+---
+- - [2]
+...
+remote_pk:select({2}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+remote_pk:select({2})
+---
+- - [2]
+...
+remote_space:select({5}, { timeout = 1.00, iterator = 'LE', limit = 5 })
+---
+- - [5]
+  - [4]
+  - [3]
+  - [2]
+  - [1]
+...
+remote_space:select({5}, { iterator = 'LE', limit = 5})
+---
+- - [5]
+  - [4]
+  - [3]
+  - [2]
+  - [1]
+...
+remote_space:select({5}, { timeout = 1e-9, iterator = 'LE', limit = 5 })
+---
+- error: Timeout exceeded
+...
+remote_pk:select({2}, { timeout = 1.00, iterator = 'LE', limit = 5 })
+---
+- - [2]
+  - [1]
+  - [0]
+...
+remote_pk:select({2}, { iterator = 'LE', limit = 5})
+---
+- - [2]
+  - [1]
+  - [0]
+...
+remote_pk:select({2}, { timeout = 1e-9, iterator = 'LE', limit = 5 })
+---
+- error: Timeout exceeded
+...
+remote_pk:count({2}, { timeout = 1.00})
+---
+- 1
+...
+remote_pk:count({2}, { timeout = 1e-9})
+---
+- error: Timeout exceeded
+...
+remote_pk:count({2})
+---
+- 1
+...
+remote_pk:count({2}, { timeout = 1.00, iterator = 'LE' })
+---
+- 3
+...
+remote_pk:count({2}, { iterator = 'LE'})
+---
+- 3
+...
+remote_pk:count({2}, { timeout = 1e-9, iterator = 'LE' })
+---
+- error: Timeout exceeded
+...
+remote_pk:min(nil, { timeout = 1.00 })
+---
+- [0]
+...
+remote_pk:min(nil, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+remote_pk:min(nil)
+---
+- [0]
+...
+remote_pk:min({0}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+remote_pk:min({1})
+---
+- [1]
+...
+remote_pk:min({2}, { timeout = 1.00 })
+---
+- [2]
+...
+remote_pk:max(nil)
+---
+- [354, 1, 2, 4]
+...
+remote_pk:max(nil, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+remote_pk:max(nil, { timeout = 1.00 })
+---
+- [354, 1, 2, 4]
+...
+remote_pk:max({0}, { timeout = 1.00 })
+---
+- [0]
+...
+remote_pk:max({1}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+remote_pk:max({2})
+---
+- [2]
+...
+--
+-- gh-3262: index:count() inconsistent results
+--
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function do_count_test(min, it)
+    local r1 = remote_pk:count(min, {iterator = it} )
+    local r2 = box.space.net_box_test_space.index.primary:count(min, {iterator = it} )
+    local r3 = remote.self.space.net_box_test_space.index.primary:count(min, {iterator = it} )
+    return r1 == r2 and r2 == r3
+end;
+---
+...
+data = remote_pk:select();
+---
+...
+for _, v in pairs(data) do
+    local itrs = {'GE', 'GT', 'LE', 'LT' }
+    for _, it in pairs(itrs) do
+        assert(do_count_test(v[0], it) == true)
+    end
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+_ = remote_space:delete({0}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+_ = remote_pk:delete({0}, { timeout = 1.00 })
+---
+...
+_ = remote_space:delete({1}, { timeout = 1.00 })
+---
+...
+_ = remote_pk:delete({1}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+_ = remote_space:delete({2}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+_ = remote_pk:delete({2})
+---
+...
+_ = remote_pk:delete({3})
+---
+...
+_ = remote_pk:delete({4})
+---
+...
+_ = remote_pk:delete({5})
+---
+...
+remote_space:get(0)
+---
+...
+remote_space:get(1)
+---
+...
+remote_space:get(2)
+---
+...
+remote_space = nil
+---
+...
+cn:call('ret_after', {0.01}, { timeout = 1.00 })
+---
+- [[0.01]]
+...
+cn:call('ret_after', {1.00}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+cn:eval('return ret_after(...)', {0.01}, { timeout = 1.00 })
+---
+- [[0.01]]
+...
+cn:eval('return ret_after(...)', {1.00}, { timeout = 1e-9 })
+---
+- error: Timeout exceeded
+...
+--
+-- :timeout()
+-- @deprecated since 1.7.4
+--
+cn:timeout(1).space.net_box_test_space.index.primary:select{234}
+---
+- - [234, 1, 2, 3]
+...
+cn:call('ret_after', {.01})
+---
+- [[0.01]]
+...
+cn:timeout(1):call('ret_after', {.01})
+---
+- [[0.01]]
+...
+cn:timeout(.01):call('ret_after', {1})
+---
+- error: Timeout exceeded
+...
+cn = remote:timeout(0.0000000001):connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
+---
+...
+cn:close()
+---
+...
+cn = remote:timeout(1):connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
+---
+...
+remote.self:ping()
+---
+- true
+...
+remote.self.space.net_box_test_space:select{234}
+---
+- - [234, 1, 2, 3]
+...
+remote.self:timeout(123).space.net_box_test_space:select{234}
+---
+- - [234, 1, 2, 3]
+...
+remote.self:is_connected()
+---
+- true
+...
+remote.self:wait_connected()
+---
+- true
+...
+cn:close()
+---
+...
+-- cleanup database after tests
+space:drop()
+---
+...
+box.schema.user.revoke('guest', 'execute', 'universe')
+---
+...
