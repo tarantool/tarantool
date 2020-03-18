@@ -1,0 +1,527 @@
+msgpack = require 'msgpack'
+---
+...
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
+---
+- true
+...
+net = require('net.box')
+---
+...
+-- CALL vs CALL_16 in connect options
+function echo(...) return ... end
+---
+...
+box.schema.user.grant('guest', 'execute', 'universe')
+---
+...
+c = net.connect(box.cfg.listen)
+---
+...
+c:call('echo', {42})
+---
+- 42
+...
+c:eval('return echo(...)', {42})
+---
+- 42
+...
+-- invalid arguments
+c:call('echo', 42)
+---
+- error: 'builtin/box/net_box.lua..."]:<line>: Use remote:call(func_name, {arg1, arg2, ...},
+    opts) instead of remote:call(func_name, arg1, arg2, ...)'
+...
+c:eval('return echo(...)', 42)
+---
+- error: 'builtin/box/net_box.lua..."]:<line>: Use remote:eval(expression, {arg1, arg2, ...},
+    opts) instead of remote:eval(expression, arg1, arg2, ...)'
+...
+c:close()
+---
+...
+c = net.connect(box.cfg.listen, {call_16 = true})
+---
+...
+c:call('echo', 42)
+---
+- - [42]
+...
+c:eval('return echo(...)', 42)
+---
+- 42
+...
+c:close()
+---
+...
+box.schema.user.revoke('guest', 'execute', 'universe')
+---
+...
+--
+-- gh-2195 export pure msgpack from net.box
+--
+space = box.schema.space.create('test')
+---
+...
+_ = box.space.test:create_index('primary')
+---
+...
+box.schema.user.grant('guest', 'read,write', 'space', 'test')
+---
+...
+box.schema.user.grant('guest', 'execute', 'universe')
+---
+...
+c = net.connect(box.cfg.listen)
+---
+...
+ibuf = require('buffer').ibuf()
+---
+...
+c:ping()
+---
+- true
+...
+c.space.test ~= nil
+---
+- true
+...
+c.space.test:replace({1, 'hello'})
+---
+- [1, 'hello']
+...
+-- replace
+c.space.test:replace({2}, {buffer = ibuf})
+---
+- 9
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- {48: [[2]]}
+...
+-- replace + skip_header
+c.space.test:replace({2}, {buffer = ibuf, skip_header = true})
+---
+- 7
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- [[2]]
+...
+-- insert
+c.space.test:insert({3}, {buffer = ibuf})
+---
+- 9
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- {48: [[3]]}
+...
+-- insert + skip_header
+_ = space:delete({3})
+---
+...
+c.space.test:insert({3}, {buffer = ibuf, skip_header = true})
+---
+- 7
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- [[3]]
+...
+-- update
+c.space.test:update({3}, {}, {buffer = ibuf})
+---
+- 9
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- {48: [[3]]}
+...
+c.space.test.index.primary:update({3}, {}, {buffer = ibuf})
+---
+- 9
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- {48: [[3]]}
+...
+-- update + skip_header
+c.space.test:update({3}, {}, {buffer = ibuf, skip_header = true})
+---
+- 7
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- [[3]]
+...
+c.space.test.index.primary:update({3}, {}, {buffer = ibuf, skip_header = true})
+---
+- 7
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- [[3]]
+...
+-- upsert
+c.space.test:upsert({4}, {}, {buffer = ibuf})
+---
+- 7
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- {48: []}
+...
+-- upsert + skip_header
+c.space.test:upsert({4}, {}, {buffer = ibuf, skip_header = true})
+---
+- 5
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- []
+...
+-- delete
+c.space.test:upsert({4}, {}, {buffer = ibuf})
+---
+- 7
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- {48: []}
+...
+-- delete + skip_header
+c.space.test:upsert({4}, {}, {buffer = ibuf, skip_header = true})
+---
+- 5
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- []
+...
+-- select
+c.space.test.index.primary:select({3}, {iterator = 'LE', buffer = ibuf})
+---
+- 19
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- {48: [[3], [2], [1, 'hello']]}
+...
+-- select + skip_header
+c.space.test.index.primary:select({3}, {iterator = 'LE', buffer = ibuf, skip_header = true})
+---
+- 17
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- [[3], [2], [1, 'hello']]
+...
+-- select
+len = c.space.test:select({}, {buffer = ibuf})
+---
+...
+ibuf.rpos + len == ibuf.wpos
+---
+- true
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+ibuf.rpos == ibuf.wpos
+---
+- true
+...
+len
+---
+- 21
+...
+result
+---
+- {48: [[1, 'hello'], [2], [3], [4]]}
+...
+-- select + skip_header
+len = c.space.test:select({}, {buffer = ibuf, skip_header = true})
+---
+...
+ibuf.rpos + len == ibuf.wpos
+---
+- true
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+ibuf.rpos == ibuf.wpos
+---
+- true
+...
+len
+---
+- 19
+...
+result
+---
+- [[1, 'hello'], [2], [3], [4]]
+...
+-- call
+c:call("echo", {1, 2, 3}, {buffer = ibuf})
+---
+- 10
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- {48: [1, 2, 3]}
+...
+c:call("echo", {}, {buffer = ibuf})
+---
+- 7
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- {48: []}
+...
+c:call("echo", nil, {buffer = ibuf})
+---
+- 7
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- {48: []}
+...
+-- call + skip_header
+c:call("echo", {1, 2, 3}, {buffer = ibuf, skip_header = true})
+---
+- 8
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- [1, 2, 3]
+...
+c:call("echo", {}, {buffer = ibuf, skip_header = true})
+---
+- 5
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- []
+...
+c:call("echo", nil, {buffer = ibuf, skip_header = true})
+---
+- 5
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- []
+...
+-- eval
+c:eval("echo(...)", {1, 2, 3}, {buffer = ibuf})
+---
+- 7
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- {48: []}
+...
+c:eval("echo(...)", {}, {buffer = ibuf})
+---
+- 7
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- {48: []}
+...
+c:eval("echo(...)", nil, {buffer = ibuf})
+---
+- 7
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- {48: []}
+...
+-- eval + skip_header
+c:eval("echo(...)", {1, 2, 3}, {buffer = ibuf, skip_header = true})
+---
+- 5
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- []
+...
+c:eval("echo(...)", {}, {buffer = ibuf, skip_header = true})
+---
+- 5
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- []
+...
+c:eval("echo(...)", nil, {buffer = ibuf, skip_header = true})
+---
+- 5
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- []
+...
+-- make several request into a buffer with skip_header, then read
+-- results
+c:call("echo", {1, 2, 3}, {buffer = ibuf, skip_header = true})
+---
+- 8
+...
+c:call("echo", {1, 2, 3}, {buffer = ibuf, skip_header = true})
+---
+- 8
+...
+c:call("echo", {1, 2, 3}, {buffer = ibuf, skip_header = true})
+---
+- 8
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- [1, 2, 3]
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- [1, 2, 3]
+...
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+---
+...
+result
+---
+- [1, 2, 3]
+...
+-- unsupported methods
+c.space.test:get({1}, { buffer = ibuf})
+---
+- error: 'builtin/box/net_box.lua..."]:<line>: index:get() doesn''t support `buffer` argument'
+...
+c.space.test.index.primary:min({}, { buffer = ibuf})
+---
+- error: 'builtin/box/net_box.lua..."]:<line>: index:min() doesn''t support `buffer` argument'
+...
+c.space.test.index.primary:max({}, { buffer = ibuf})
+---
+- error: 'builtin/box/net_box.lua..."]:<line>: index:max() doesn''t support `buffer` argument'
+...
+c.space.test.index.primary:count({}, { buffer = ibuf})
+---
+- error: 'builtin/box/net_box.lua..."]:<line>: index:count() doesn''t support `buffer` argument'
+...
+c.space.test.index.primary:get({1}, { buffer = ibuf})
+---
+- error: 'builtin/box/net_box.lua..."]:<line>: index:get() doesn''t support `buffer` argument'
+...
+-- error handling
+rpos, wpos = ibuf.rpos, ibuf.wpos
+---
+...
+c.space.test:insert({1}, {buffer = ibuf})
+---
+- error: Duplicate key exists in unique index 'primary' in space 'test'
+...
+ibuf.rpos == rpos, ibuf.wpos == wpos
+---
+- true
+- true
+...
+ibuf = nil
+---
+...
+c:close()
+---
+...
+space:drop()
+---
+...
+box.schema.user.revoke('guest', 'execute', 'universe')
+---
+...
