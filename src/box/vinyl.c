@@ -4086,6 +4086,16 @@ vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
 		tuple_unref(stmt);
 		return -1;
 	}
+	/*
+	 * Despite the fact that we protected mem from being
+	 * dumped, its generation still may bump due to rotation
+	 * in vy_tx_write_prepare() (insertions during index build
+	 * are still handled by on_replace_trigger). This may happen
+	 * if dump process is triggered (vy_scheduler_trigger_dump()).
+	 * Hence, to get right mem (during mem rotation it becomes
+	 * sealed i.e. read-only) we should fetch it from lsm again.
+	 */
+	mem = lsm->mem;
 
 	/* Insert the new tuple into the in-memory index. */
 	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
