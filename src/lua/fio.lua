@@ -146,10 +146,10 @@ end
 
 fio_methods.close = function(self)
     local res, err = internal.close(self.fh)
-    self.fh = -1
     if err ~= nil then
         return false, err
     end
+    self.fh = -1
     return res
 end
 
