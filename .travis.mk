@@ -5,6 +5,7 @@
 DOCKER_IMAGE?=packpack/packpack:debian-stretch
 TEST_RUN_EXTRA_PARAMS?=
 MAX_FILES?=65534
+MAX_PROC?=2500
 
 all: package
 
@@ -127,13 +128,22 @@ test_asan_debian: deps_debian deps_buster_clang_8 test_asan_debian_no_deps
 # OSX #
 #######
 
+# since Python 2 is EOL it's latest commit from tapped local formula is used
+OSX_PKGS=openssl readline curl icu4c libiconv zlib autoconf automake libtool \
+	cmake file://$${PWD}/tools/brew_taps/tntpython2.rb
+
 deps_osx:
-	brew update
-	brew install openssl readline curl icu4c libiconv zlib autoconf automake libtool --force
-	python2 -V || brew install python2 --force
-	curl --silent --show-error --retry 5 https://bootstrap.pypa.io/get-pip.py >get-pip.py
-	python get-pip.py --user
-	pip install --user --force-reinstall -r test-run/requirements.txt
+	# install brew using command from Homebrew repository instructions:
+	#   https://github.com/Homebrew/install
+	# NOTE: 'echo' command below is required since brew installation
+	# script obliges the one to enter a newline for confirming the
+	# installation via Ruby script.
+	brew update || echo | /usr/bin/ruby -e \
+		"$$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+	# try to install the packages either upgrade it to avoid of fails
+	# if the package already exists with the previous version
+	brew install --force ${OSX_PKGS} || brew upgrade ${OSX_PKGS}
+	pip install --force-reinstall -r test-run/requirements.txt
 
 build_osx:
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
@@ -148,11 +158,16 @@ test_osx_no_deps: build_osx
 	# call as tests runs call.
 	# Tests: Temporary excluded replication/ suite with some tests
 	#        from other suites by issues #4357 and #4370
-	echo tarantool | sudo -S launchctl limit maxfiles ${MAX_FILES} || : ; \
+	sudo -S launchctl limit maxfiles ${MAX_FILES} || : ; \
 		launchctl limit maxfiles || : ; \
 		ulimit -n ${MAX_FILES} || : ; \
 		ulimit -n ; \
-		cd test && ./test-run.py --force $(TEST_RUN_EXTRA_PARAMS) \
+		sudo -S launchctl limit maxproc ${MAX_PROC} || : ; \
+		launchctl limit maxproc || : ; \
+		ulimit -u ${MAX_PROC} || : ; \
+		ulimit -u ; \
+		rm -rf /tmp/tnt ; \
+		cd test && ./test-run.py --vardir /tmp/tnt --force $(TEST_RUN_EXTRA_PARAMS) \
 			app/ app-tap/ box/ box-py/ box-tap/ engine/ engine_long/ long_run-py/ luajit-tap/ \
 			replication-py/ small/ sql/ sql-tap/ swim/ unit/ vinyl/ wal_off/ xlog/ xlog-py/
 
