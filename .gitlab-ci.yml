@@ -152,28 +152,21 @@ osx_13_release:
     - ${GITLAB_MAKE} vms_test_osx
 
 osx_14_release:
-  <<: *vbox_definition
+  <<: *docker_test_definition
   tags:
-    - vms_osx_14
-  variables:
-    VMS_NAME: 'osx_14'
-    VMS_USER: 'tarantool'
-    VMS_PORT: '2222'
+    - osx_14
   script:
-    - ${GITLAB_MAKE} vms_test_osx
+    - ${GITLAB_MAKE} test_osx
 
 osx_14_release_lto:
   <<: *release_only_definition
-  <<: *vbox_definition
+  <<: *docker_test_definition
   tags:
-    - vms_osx_14
+    - osx_14
   variables:
     EXTRA_ENV: "export CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON ;"
-    VMS_NAME: 'osx_14'
-    VMS_USER: 'tarantool'
-    VMS_PORT: '2222'
   script:
-    - ${GITLAB_MAKE} vms_test_osx
+    - ${GITLAB_MAKE} test_osx
 
 freebsd_12_release:
   <<: *vbox_definition

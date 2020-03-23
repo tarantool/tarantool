@@ -14,7 +14,7 @@ git_submodule_update:
 		git submodule update --recursive --init
 
 # Pass *_no_deps goals to .travis.mk.
-test_%_no_deps: git_submodule_update
+test_%: git_submodule_update
 	${TRAVIS_MAKE} $@
 
 # #######################################################
