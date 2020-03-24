@@ -92,6 +92,7 @@ test/unit/fiob
 test/small
 test/var
 test/luajit-tap
+test/unit/popen-child
 third_party/luajit/src/luajit
 third_party/luajit/lib/vmdef.lua
 third_party/luajit/src/buildvm

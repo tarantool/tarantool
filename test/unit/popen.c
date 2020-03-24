@@ -11,9 +11,10 @@
 #include "popen.h"
 #include "say.h"
 
+static char popen_child_path[PATH_MAX];
+
 #define TEST_POPEN_COMMON_FLAGS			\
 	(POPEN_FLAG_SETSID		|	\
-	POPEN_FLAG_SHELL		|	\
 	POPEN_FLAG_RESTORE_SIGNALS)
 
 /**
@@ -40,8 +41,8 @@ popen_write_exit(void)
 {
 	struct popen_handle *handle;
 	char *child_argv[] = {
-		"/bin/sh", "-c",
-		"prompt=''; read -n 5 prompt; echo $prompt",
+		popen_child_path,
+		"read", "-n", "5",
 		NULL,
 	};
 
@@ -108,8 +109,8 @@ popen_read_exit(void)
 {
 	struct popen_handle *handle;
 	char *child_argv[] = {
-		"/bin/sh", "-c",
-		"echo 1 2 3 4 5",
+		popen_child_path,
+		"echo", "1 2 3 4 5",
 		NULL,
 	};
 
@@ -165,8 +166,8 @@ popen_kill(void)
 {
 	struct popen_handle *handle;
 	char *child_argv[] = {
-		"/bin/sh", "-c",
-		"while [ 1 ]; do sleep 10; done",
+		popen_child_path,
+		"loop",
 		NULL,
 	};
 
@@ -234,8 +235,19 @@ main_f(va_list ap)
 int
 main(int argc, char *argv[])
 {
-	//say_logger_init(NULL, S_DEBUG, 0, "plain", 0);
+#if 0
+	say_logger_init(NULL, S_DEBUG, 0, "plain", 0);
+#endif
 	memory_init();
+
+	if (getenv("BUILDDIR") == NULL) {
+		size_t size = sizeof(popen_child_path);
+		strncpy(popen_child_path, "./test/unit/popen-child", size);
+		popen_child_path[size-1] = '\0';
+	} else {
+		snprintf(popen_child_path, sizeof(popen_child_path),
+			 "%s/test/unit/popen-child", getenv("BUILDDIR"));
+	}
 
 	fiber_init(fiber_c_invoke);
 	popen_init();
