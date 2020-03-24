@@ -945,7 +945,7 @@ popen_new(struct popen_opts *opts)
 		if (opts->flags & POPEN_FLAG_SHELL)
 			execve(_PATH_BSHELL, opts->argv, envp);
 		else
-			execve(opts->argv[2], &opts->argv[2], envp);
+			execve(opts->argv[0], opts->argv, envp);
 exit_child:
 		_exit(errno);
 		unreachable();
