@@ -63,9 +63,9 @@ key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
 	if (rc != 0) {
 		/* Can't evaluate function. */
 		struct space *space = space_by_id(index_def->space_id);
-		diag_set(ClientError, ER_FUNC_INDEX_FUNC, index_def->name,
+		diag_add(ClientError, ER_FUNC_INDEX_FUNC, index_def->name,
 			 space ? space_name(space) : "",
-			 diag_last_error(diag_get())->errmsg);
+			 "can't evaluate function");
 		return -1;
 	}
 	uint32_t key_data_sz;
@@ -74,9 +74,9 @@ key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
 	if (key_data == NULL) {
 		struct space *space = space_by_id(index_def->space_id);
 		/* Can't get a result returned by function . */
-		diag_set(ClientError, ER_FUNC_INDEX_FUNC, index_def->name,
+		diag_add(ClientError, ER_FUNC_INDEX_FUNC, index_def->name,
 			 space ? space_name(space) : "",
-			 diag_last_error(diag_get())->errmsg);
+			 "can't get a value returned by function");
 		return -1;
 	}
 
@@ -170,9 +170,9 @@ key_list_iterator_next(struct key_list_iterator *it, const char **value)
 		 * The key doesn't follow functional index key
 		 * definition.
 		 */
-		diag_set(ClientError, ER_FUNC_INDEX_FORMAT, it->index_def->name,
+		diag_add(ClientError, ER_FUNC_INDEX_FORMAT, it->index_def->name,
 			 space ? space_name(space) : "",
-			 diag_last_error(diag_get())->errmsg);
+			 "key does not follow functional index definition");
 		return -1;
 	}
 

@@ -5,6 +5,14 @@ test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
  | ---
  | ...
+test_run:cmd("push filter \"file: .*\" to \"file: <filename>\"")
+ | ---
+ | - true
+ | ...
+test_run:cmd("push filter \"line: .*\" to \"line: <line>\"")
+ | ---
+ | - true
+ | ...
 
 --
 -- gh-1260: Func index.
@@ -158,8 +166,7 @@ idx = s:create_index('idx', {func = box.func.invalidreturn1.id, parts = {{1, 'un
 s:insert({1})
  | ---
  | - error: 'Key format doesn''t match one defined in functional index ''idx'' of space
- |     ''withdata'': Supplied key type of part 0 does not match index part type: expected
- |     unsigned'
+ |     ''withdata'': key does not follow functional index definition'
  | ...
 idx:drop()
  | ---
@@ -197,8 +204,7 @@ idx = s:create_index('idx', {func = box.func.invalidreturn3.id, parts = {{1, 'un
 s:insert({1})
  | ---
  | - error: 'Key format doesn''t match one defined in functional index ''idx'' of space
- |     ''withdata'': Supplied key type of part 0 does not match index part type: expected
- |     unsigned'
+ |     ''withdata'': key does not follow functional index definition'
  | ...
 idx:drop()
  | ---
@@ -217,8 +223,7 @@ idx = s:create_index('idx', {func = box.func.invalidreturn4.id, parts = {{1, 'un
 s:insert({1})
  | ---
  | - error: 'Key format doesn''t match one defined in functional index ''idx'' of space
- |     ''withdata'': Supplied key type of part 0 does not match index part type: expected
- |     unsigned'
+ |     ''withdata'': key does not follow functional index definition'
  | ...
 idx:drop()
  | ---
@@ -264,8 +269,41 @@ idx = s:create_index('idx', {func = box.func.runtimeerror.id, parts = {{1, 'stri
 s:insert({1})
  | ---
  | - error: 'Failed to build a key for functional index ''idx'' of space ''withdata'':
- |     [string "return function(tuple)                 local ..."]:1: attempt to call
- |     global ''require'' (a nil value)'
+ |     can''t evaluate function'
+ | ...
+e = box.error.last()
+ | ---
+ | ...
+e:unpack()
+ | ---
+ | - code: 198
+ |   trace:
+ |   - file: <filename>
+ |     line: <line>
+ |   type: ClientError
+ |   message: 'Failed to build a key for functional index ''idx'' of space ''withdata'':
+ |     can''t evaluate function'
+ |   prev: '[string "return function(tuple)                 local ..."]:1: attempt to
+ |     call global ''require'' (a nil value)'
+ | ...
+e = e.prev
+ | ---
+ | ...
+e:unpack()
+ | ---
+ | - type: LuajitError
+ |   message: '[string "return function(tuple)                 local ..."]:1: attempt
+ |     to call global ''require'' (a nil value)'
+ |   trace:
+ |   - file: <filename>
+ |     line: <line>
+ | ...
+e = e.prev
+ | ---
+ | ...
+e == nil
+ | ---
+ | - true
  | ...
 idx:drop()
  | ---

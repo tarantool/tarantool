@@ -687,9 +687,9 @@ func_persistent_lua_load(struct func_lua *func)
 	if (func->base.def->is_sandboxed) {
 		if (prepare_lua_sandbox(tarantool_L, default_sandbox_exports,
 					nelem(default_sandbox_exports)) != 0) {
-			diag_set(ClientError, ER_LOAD_FUNCTION,
-				func->base.def->name,
-				diag_last_error(diag_get())->errmsg);
+			diag_add(ClientError, ER_LOAD_FUNCTION,
+				 func->base.def->name,
+				 "can't prepare a Lua sandbox");
 			goto end;
 		}
 	} else {
