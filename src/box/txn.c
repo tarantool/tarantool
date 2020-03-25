@@ -34,6 +34,7 @@
 #include "journal.h"
 #include <fiber.h>
 #include "xrow.h"
+#include "errinj.h"
 
 double too_long_threshold;
 
@@ -575,6 +576,18 @@ int
 txn_commit_async(struct txn *txn)
 {
 	struct journal_entry *req;
+
+	ERROR_INJECT(ERRINJ_TXN_COMMIT_ASYNC, {
+		diag_set(ClientError, ER_INJECTION,
+			 "txn commit async injection");
+		/*
+		 * Log it for the testing sake: we grep
+		 * output to mark this event.
+		 */
+		diag_log();
+		txn_rollback(txn);
+		return -1;
+	});
 
 	if (txn_prepare(txn) != 0) {
 		txn_rollback(txn);
