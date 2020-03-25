@@ -467,14 +467,21 @@ sql_atoi64(const char *z, int64_t *val, bool *is_neg, int length)
 	if (*z == '-')
 		*is_neg = true;
 
+	/*
+	 * BLOB data may not end with '\0'. Because of this, the
+	 * strtoll() and strtoull() functions may return an
+	 * incorrect result. To fix this, let's copy the value for
+	 * decoding into static memory and add '\0' to it.
+	 */
+	if (length > SMALL_STATIC_SIZE - 1)
+		return -1;
+	const char *str_value = tt_cstr(z, length);
 	char *end = NULL;
 	errno = 0;
-	if (*z == '-') {
-		*is_neg = true;
-		*val = strtoll(z, &end, 10);
+	if (*is_neg) {
+		*val = strtoll(str_value, &end, 10);
 	} else {
-		*is_neg = false;
-		uint64_t u_val = strtoull(z, &end, 10);
+		uint64_t u_val = strtoull(str_value, &end, 10);
 		*val = u_val;
 	}
 	/* Overflow and underflow errors. */
