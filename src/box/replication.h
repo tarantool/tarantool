@@ -251,7 +251,7 @@ struct replicaset {
 		struct diag diag;
 	} applier;
 	/** Map of all known replica_id's to correspponding replica's. */
-	struct replica **replica_by_id;
+	struct replica *replica_by_id[VCLOCK_MAX];
 };
 extern struct replicaset replicaset;
 
