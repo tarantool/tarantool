@@ -89,7 +89,6 @@ replication_init(void)
 	rlist_create(&replicaset.anon);
 	vclock_create(&replicaset.vclock);
 	fiber_cond_create(&replicaset.applier.cond);
-	replicaset.replica_by_id = (struct replica **)calloc(VCLOCK_MAX, sizeof(struct replica *));
 	latch_create(&replicaset.applier.order_latch);
 
 	vclock_create(&replicaset.applier.vclock);
@@ -112,7 +111,6 @@ replication_free(void)
 		relay_cancel(replica->relay);
 
 	diag_destroy(&replicaset.applier.diag);
-	free(replicaset.replica_by_id);
 }
 
 int
