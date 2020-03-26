@@ -525,7 +525,6 @@ int sqlVdbeMemMakeWriteable(Mem *);
 int sqlVdbeMemStringify(Mem *);
 int sqlVdbeIntValue(Mem *, int64_t *, bool *is_neg);
 
-int sqlVdbeMemIntegerify(struct Mem *pMem);
 int sqlVdbeRealValue(Mem *, double *);
 
 int

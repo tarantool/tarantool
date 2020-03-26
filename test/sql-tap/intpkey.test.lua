@@ -788,7 +788,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "intpkey-13.2",
     [[
-        INSERT INTO t1 VALUES('1.0',2,3);
+        INSERT INTO t1 VALUES('1',2,3);
         SELECT * FROM t1 WHERE a=1;
     ]], {
         -- <intpkey-13.2>

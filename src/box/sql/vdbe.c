@@ -320,6 +320,8 @@ mem_apply_type(struct Mem *record, enum field_type type)
 	switch (type) {
 	case FIELD_TYPE_INTEGER:
 	case FIELD_TYPE_UNSIGNED:
+		if ((record->flags & (MEM_Bool | MEM_Blob)) != 0)
+			return -1;
 		if ((record->flags & MEM_UInt) == MEM_UInt)
 			return 0;
 		if ((record->flags & MEM_Real) == MEM_Real) {
@@ -332,8 +334,13 @@ mem_apply_type(struct Mem *record, enum field_type type)
 				mem_set_u64(record, u);
 			return 0;
 		}
-		if (sqlVdbeMemIntegerify(record) != 0)
-			return -1;
+		if ((record->flags & MEM_Str) != 0) {
+			bool is_neg;
+			int64_t i;
+			if (sql_atoi64(record->z, &i, &is_neg, record->n) != 0)
+				return -1;
+			mem_set_int(record, i, is_neg);
+		}
 		if ((record->flags & MEM_Int) == MEM_Int) {
 			if (type == FIELD_TYPE_UNSIGNED)
 				return -1;

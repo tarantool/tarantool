@@ -342,7 +342,7 @@ test:do_execsql_test(
         INSERT INTO t3 VALUES(10);
 
         CREATE TABLE t4(x TEXT PRIMARY KEY);
-        INSERT INTO t4 VALUES('10.0');
+        INSERT INTO t4 VALUES('10');
     ]], {
         -- <subquery-2.5.1>
         
@@ -363,7 +363,7 @@ test:do_test(
         ]]
     end, {
         -- <subquery-2.5.2>
-        "10.0"
+        "10"
         -- </subquery-2.5.2>
     })
 
@@ -378,7 +378,7 @@ test:do_test(
         ]]
     end, {
         -- <subquery-2.5.3.1>
-        "10.0"
+        "10"
         -- </subquery-2.5.3.1>
     })
 

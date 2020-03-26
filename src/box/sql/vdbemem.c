@@ -551,35 +551,6 @@ mem_apply_integer_type(Mem *pMem)
 }
 
 /*
- * Convert pMem to type integer.  Invalidate any prior representations.
- */
-int
-sqlVdbeMemIntegerify(struct Mem *pMem)
-{
-	assert(EIGHT_BYTE_ALIGNMENT(pMem));
-
-	int64_t i;
-	bool is_neg;
-	if (sqlVdbeIntValue(pMem, &i, &is_neg) == 0) {
-		mem_set_int(pMem, i, is_neg);
-		return 0;
-	}
-
-	double d;
-	if (sqlVdbeRealValue(pMem, &d) != 0)
-		return -1;
-	if (d < INT64_MAX && d >= INT64_MIN) {
-		mem_set_int(pMem, d, d <= -1);
-		return 0;
-	}
-	if (d >= INT64_MAX && d < UINT64_MAX) {
-		mem_set_u64(pMem, d);
-		return 0;
-	}
-	return -1;
-}
-
-/*
  * Convert pMem so that it is of type MEM_Real.
  * Invalidate any prior representations.
  */

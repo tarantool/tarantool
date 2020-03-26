@@ -196,7 +196,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     3.4,
     [[
-        SELECT x FROM t2 WHERE x IN ('1.0');
+        SELECT x FROM t2 WHERE x IN ('1');
     ]], {
         -- <3.4>
         1
@@ -236,7 +236,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     3.8,
     [[
-        SELECT x FROM t2 WHERE '1.0' IN (x);
+        SELECT x FROM t2 WHERE '1' IN (x);
     ]], {
         -- <3.8>
         1

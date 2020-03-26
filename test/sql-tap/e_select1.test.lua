@@ -2195,7 +2195,7 @@ test:do_select_tests(
         {"1", "SELECT b FROM f1 ORDER BY a LIMIT 0 ", {}},
         {"2", "SELECT b FROM f1 ORDER BY a DESC LIMIT 4 ", {"z", "y", "x", "w"}},
         {"3", "SELECT b FROM f1 ORDER BY a DESC LIMIT 8 ", {"z", "y", "x", "w", "v", "u", "t", "s"}},
-        {"4", "SELECT b FROM f1 ORDER BY a DESC LIMIT '12.0' ", {"z", y, "x", "w", "v", "u", "t", "s", "r", "q", "p", "o"}},
+        {"4", "SELECT b FROM f1 ORDER BY a DESC LIMIT '12' ", {"z", y, "x", "w", "v", "u", "t", "s", "r", "q", "p", "o"}},
     })
 
 -- EVIDENCE-OF: R-54935-19057 Or, if the SELECT statement would return
