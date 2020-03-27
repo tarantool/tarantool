@@ -171,20 +171,25 @@ function update_deb_packfile {
     # to have all sources avoid reprepro set DEB/DSC file to its own registry
     $rm_dir db
 
+    psources=dists/$loop_dist/$component/source/Sources
+
     # WORKAROUND: unknown why, but reprepro doesn`t save the Sources file,
     #             let`s recreate it manualy from it's zipped version
-    gunzip -c dists/$loop_dist/$component/source/Sources.gz \
-        >dists/$loop_dist/$component/source/Sources
+    [ ! -f $psources ] || gunzip -c $psources.gz >$psources
 
     # WORKAROUND: unknown why, but reprepro creates paths w/o distribution in
     #             it and no solution using configuration setup neither options
     #             found to set it there, let's set it here manually
     for packpath in dists/$loop_dist/$component/binary-* ; do
-        sed "s#Filename: $debdir/$component/#Filename: $debdir/$loop_dist/$component/#g" \
-            -i $packpath/Packages
+        if [ -f $packpath/Packages ]; then
+            sed "s#Filename: $debdir/$component/#Filename: $debdir/$loop_dist/$component/#g" \
+                -i $packpath/Packages
+        fi
     done
-    sed "s#Directory: $debdir/$component/#Directory: $debdir/$loop_dist/$component/#g" \
-        -i dists/$loop_dist/$component/source/Sources
+    if [ -f $psources ]; then
+        sed "s#Directory: $debdir/$component/#Directory: $debdir/$loop_dist/$component/#g" \
+            -i $psources
+    fi
 }
 
 function update_deb_metadata {
@@ -320,20 +325,24 @@ function pack_deb {
     # debian has special directory 'pool' for packages
     debdir=pool
 
-    # get packages from pointed location
-    if ! ls $repo/*.deb $repo/*.dsc $repo/*.tar.*z >/dev/null ; then
-        echo "ERROR: files $repo/*.deb $repo/*.dsc $repo/*.tar.*z not found"
-        usage
-        exit 1
-    fi
-
     # set the subpath with binaries based on literal character of the product name
     proddir=$(echo $product | head -c 1)
 
     # copy single distribution with binaries packages
     repopath=$ws/pool/${option_dist}/$component/$proddir/$product
     $mk_dir ${repopath}
-    cp $repo/*.deb $repo/*.dsc $repo/*.tar.*z $repopath/.
+    file_found=0
+    for file in $repo/*.deb $repo/*.dsc $repo/*.tar.*z ; do
+        [ -f $file ] || continue
+        file_found=1
+        cp $file $repopath/.
+    done
+    # check that any files found
+    if [ "$file_found" == "0" ]; then
+        echo "ERROR: files $repo/*.deb $repo/*.dsc $repo/*.tar.*z not found"
+        usage
+        exit 1
+    fi
     pushd $ws
 
     # create the configuration file for 'reprepro' tool
@@ -410,27 +419,31 @@ EOF
 
         # finalize the Packages file
         for packages in dists/$loop_dist/$component/binary-*/Packages ; do
-            mv $packages.saved $packages
+            [ ! -f $packages.saved ] || mv $packages.saved $packages
         done
 
         # finalize the Sources file
         sources=dists/$loop_dist/$component/source/Sources
-        mv $sources.saved $sources
+        [ ! -f $sources.saved ] || mv $sources.saved $sources
 
         # 2(binaries). update Packages file archives
         for packpath in dists/$loop_dist/$component/binary-* ; do
             pushd $packpath
-            sed -i '/./,$!d' Packages
-            bzip2 -c Packages >Packages.bz2
-            gzip -c Packages >Packages.gz
+            if [ -f Packages ]; then
+                sed -i '/./,$!d' Packages
+                bzip2 -c Packages >Packages.bz2
+                gzip -c Packages >Packages.gz
+            fi
             popd
         done
 
         # 2(sources). update Sources file archives
         pushd dists/$loop_dist/$component/source
-        sed -i '/./,$!d' Sources
-        bzip2 -c Sources >Sources.bz2
-        gzip -c Sources >Sources.gz
+        if [ -f Sources ]; then
+            sed -i '/./,$!d' Sources
+            bzip2 -c Sources >Sources.bz2
+            gzip -c Sources >Sources.gz
+        fi
         popd
 
         # 3. update checksums entries of the Packages* files in *Release files
@@ -449,6 +462,7 @@ EOF
         #       'sha1' - at the 2nd and 'sha256' at the 3rd
         pushd dists/$loop_dist
         for file in $(grep " $component/" Release | awk '{print $3}' | sort -u) ; do
+            [ -f $file ] || continue
             sz=$(stat -c "%s" $file)
             md5=$(md5sum $file | awk '{print $1}')
             sha1=$(sha1sum $file | awk '{print $1}')
