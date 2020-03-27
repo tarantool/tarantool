@@ -2414,7 +2414,7 @@ box_cfg_xc(void)
 		local_recovery(&instance_uuid, &replicaset_uuid,
 			       &checkpoint->vclock);
 	} else {
-		/* Bootstrap a new master */
+		/* Bootstrap a new instance */
 		bootstrap(&instance_uuid, &replicaset_uuid,
 			  &is_bootstrap_leader);
 	}
