@@ -13,6 +13,13 @@ function(build_module module files)
     endif(TARGET_OS_DARWIN)
 endfunction()
 
+function(build_lualib lib sources)
+    add_library(${lib} SHARED ${sources})
+    set_target_properties(${lib} PROPERTIES PREFIX "")
+    if(TARGET_OS_DARWIN)
+        set_target_properties(${lib} PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
+    endif(TARGET_OS_DARWIN)
+endfunction()
 
 add_compile_flags("C;CXX"
     "-Wno-unused-parameter")
@@ -21,13 +28,9 @@ if(POLICY CMP0037)
     cmake_policy(SET CMP0037 OLD)
 endif(POLICY CMP0037)
 
-add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/luajit-tap
-    COMMAND ${CMAKE_COMMAND} -E create_symlink
+execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink
         ${PROJECT_SOURCE_DIR}/third_party/luajit/test
-        ${CMAKE_CURRENT_BINARY_DIR}/luajit-tap
-        COMMENT Create a symlink for luajit test dir to fix out-of-source tests)
-add_custom_target(symlink_luajit_tests ALL
-   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/luajit-tap)
+        ${CMAKE_CURRENT_BINARY_DIR}/luajit-tap)
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/small
     COMMAND ${CMAKE_COMMAND} -E create_symlink
@@ -56,6 +59,8 @@ add_subdirectory(app)
 add_subdirectory(app-tap)
 add_subdirectory(box)
 add_subdirectory(unit)
+add_subdirectory(luajit-tap/gh-4427-ffi-sandwich)
+add_subdirectory(luajit-tap/lj-flush-on-trace)
 
 # Move tarantoolctl config
 if (NOT ${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR})
