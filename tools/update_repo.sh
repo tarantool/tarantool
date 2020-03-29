@@ -80,7 +80,27 @@ EOF
     done
     cat <<EOF
     -p|--product
-         Product name to be packed with, default name is 'tarantool'
+         Product name to be packed with, default name is 'tarantool'.
+	 Product name value may affect location of *.deb, *.rpm and
+         related files relative to a base repository URL. It can be
+         provided or not: the script will generate correct repository
+         metainfo anyway.
+         However providing meaningful value for this option enables
+         grouping of related set of packages into a subdirectory
+         named as '${product}' (only for Deb repositories at moment
+         of writing this).
+         It is enabled here for consistency with locations of other
+         Deb packages in our repositories, but in fact it is the
+         internal detail, which does not lead to any change in the
+         user experience.
+         Example of usage on 'tarantool-queue' product:
+           - for DEB packages:
+             ./$0 -b=s3://<target repository> -o=debian -d=stretch \\
+               <DEB repository>/debian/pool/stretch/main/t/tarantool-queue \\
+               -p=tarantool-queue
+           - for RPM packages:
+             # prepare local path with needed "tarantool-queue-*" packages only
+             ./$0 -b=s3://<target repository> -o=fedora -d=30 <local path>
     -f|--force
          Force updating the remote package with the local one despite the checksum difference
     -s|--skip_errors
