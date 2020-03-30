@@ -695,8 +695,10 @@ applier_txn_rollback_cb(struct trigger *trigger, void *event)
 	/* Setup shared applier diagnostic area. */
 	diag_set(ClientError, ER_WAL_IO);
 	diag_move(&fiber()->diag, &replicaset.applier.diag);
+
 	/* Broadcast the rollback event across all appliers. */
 	trigger_run(&replicaset.applier.on_rollback, event);
+
 	/* Rollback applier vclock to the committed one. */
 	vclock_copy(&replicaset.applier.vclock, &replicaset.vclock);
 	return 0;
