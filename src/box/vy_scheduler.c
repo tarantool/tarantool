@@ -1846,9 +1846,20 @@ retry:
 	/*
 	 * Dump is in progress, but all eligible LSM trees are
 	 * already being dumped. Wait until the current round
-	 * is complete.
+	 * is complete. But if there's no any other tasks
+	 * in progress, it may mean that dump_generation does
+	 * not catch up with current generation. This may happen
+	 * due to failed dump process (i.e. generation is bumped
+	 * but dump_generation is not). In turn, after dump is failed,
+	 * next dump will be throttled which opens a window for DDL
+	 * operations. For instance, index dropping and creation of
+	 * new one results in mentioned situation.
 	 */
-	assert(scheduler->dump_task_count > 0);
+	if (scheduler->dump_task_count == 0) {
+		assert(scheduler->dump_generation < vy_lsm_generation(lsm));
+		scheduler->dump_generation = vy_lsm_generation(lsm);
+		goto retry;
+	}
 no_task:
 	if (worker != NULL)
 		vy_worker_pool_put(worker);
