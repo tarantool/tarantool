@@ -5,15 +5,6 @@ local static_alloc = require('buffer').static_alloc
 local builtin = ffi.C
 
 ffi.cdef[[
-struct tt_uuid {
-    uint32_t time_low;
-    uint16_t time_mid;
-    uint16_t time_hi_and_version;
-    uint8_t clock_seq_hi_and_reserved;
-    uint8_t clock_seq_low;
-    uint8_t node[6];
-};
-
 void
 tt_uuid_create(struct tt_uuid *uu);
 int

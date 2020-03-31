@@ -1490,6 +1490,87 @@ box.tuple.is(box.tuple.new({1}))
 ---
 - true
 ...
+--
+-- gh-4268 UUID in tuple
+--
+uuid = require("uuid")
+---
+...
+-- Fixed randomly generated uuids to avoid problems with test
+-- output comparison.
+a = uuid.fromstr("c8f0fa1f-da29-438c-a040-393f1126ad39")
+---
+...
+b = uuid.fromstr("83eb4959-3de6-49fb-8890-6fb4423dd186")
+---
+...
+t = box.tuple.new(a, 2, b, "string")
+---
+...
+state, val = t:next()
+---
+...
+state
+---
+- 1
+...
+val == a
+---
+- true
+...
+state, val = t:next(state)
+---
+...
+state
+---
+- 2
+...
+val
+---
+- 2
+...
+state, val = t:next(state)
+---
+...
+state
+---
+- 3
+...
+val == b
+---
+- true
+...
+t:slice(1)
+---
+- 2
+- 83eb4959-3de6-49fb-8890-6fb4423dd186
+- string
+...
+t:slice(-1)
+---
+- string
+...
+t:slice(-2)
+---
+- 83eb4959-3de6-49fb-8890-6fb4423dd186
+- string
+...
+msgpack.decode(msgpack.encode(t))
+---
+- [c8f0fa1f-da29-438c-a040-393f1126ad39, 2, 83eb4959-3de6-49fb-8890-6fb4423dd186,
+  'string']
+- 46
+...
+msgpackffi.decode(msgpackffi.encode(t))
+---
+- [c8f0fa1f-da29-438c-a040-393f1126ad39, 2, 83eb4959-3de6-49fb-8890-6fb4423dd186,
+  'string']
+- 46
+...
+t:bsize()
+---
+- 45
+...
 msgpack.cfg({encode_max_depth = max_depth, encode_deep_as_nil = deep_as_nil})
 ---
 ...

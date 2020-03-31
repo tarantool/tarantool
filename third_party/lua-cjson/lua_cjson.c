@@ -48,6 +48,9 @@
 #include "strbuf.h"
 
 #include "lua/utils.h"
+#include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID */
+#include "tt_static.h"
+#include "uuid/tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
 
 #define DEFAULT_ENCODE_KEEP_BUFFER 1
 
@@ -421,15 +424,18 @@ static void json_append_data(lua_State *l, struct luaL_serializer *cfg,
     json_append_array(l, cfg, current_depth + 1, json, field.size);
     return;
     case MP_EXT:
-	switch (field.ext_type) {
-	case MP_DECIMAL:
-	{
-	    const char *str = decimal_to_string(field.decval);
-	    return json_append_string(cfg, json, str, strlen(str));
-	}
-	default:
-	    assert(false);
-	}
+        switch (field.ext_type) {
+        case MP_DECIMAL:
+        {
+            const char *str = decimal_to_string(field.decval);
+            return json_append_string(cfg, json, str, strlen(str));
+        }
+        case MP_UUID:
+            return json_append_string(cfg, json, tt_uuid_str(field.uuidval),
+                                      UUID_STR_LEN);
+        default:
+            assert(false);
+        }
     }
 }
 

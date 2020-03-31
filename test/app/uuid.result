@@ -2,6 +2,13 @@
 uuid = require('uuid')
 ---
 ...
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua '")
+---
+- true
+...
 --
 -- RFC4122 compliance
 --
@@ -106,7 +113,7 @@ uu.node[5]
 -- invalid values
 uuid.fromstr(nil)
 ---
-- error: 'builtin/uuid.lua:47: fromstr(str)'
+- error: 'builtin/uuid.lua fromstr(str)'
 ...
 uuid.fromstr('')
 ---
@@ -267,4 +274,8 @@ uu = nil
 ...
 uuid = nil
 ---
+...
+test_run:cmd("clear filter")
+---
+- true
 ...

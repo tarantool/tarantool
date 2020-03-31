@@ -34,6 +34,7 @@
 #include <stdint.h>
 #include "msgpuck.h"
 #include "mp_decimal.h"
+#include "uuid/mp_uuid.h"
 
 void
 mpstream_reserve_slow(struct mpstream *stream, size_t size)
@@ -194,6 +195,16 @@ mpstream_encode_decimal(struct mpstream *stream, const decimal_t *val)
 	if (data == NULL)
 		return;
 	char *pos = mp_encode_decimal(data, val);
+	mpstream_advance(stream, pos - data);
+}
+
+void
+mpstream_encode_uuid(struct mpstream *stream, const struct tt_uuid *uuid)
+{
+	char *data = mpstream_reserve(stream, mp_sizeof_uuid());
+	if (data == NULL)
+		return;
+	char *pos = mp_encode_uuid(data, uuid);
 	mpstream_advance(stream, pos - data);
 }
 

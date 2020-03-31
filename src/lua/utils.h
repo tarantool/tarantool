@@ -61,6 +61,7 @@ extern "C" {
 
 struct lua_State;
 struct ibuf;
+struct tt_uuid;
 
 /**
  * Single global lua_State shared by core and modules.
@@ -70,6 +71,9 @@ struct ibuf;
  */
 extern struct lua_State *tarantool_L;
 extern struct ibuf *tarantool_lua_ibuf;
+
+struct tt_uuid *
+luaL_pushuuid(struct lua_State *L);
 
 /** \cond public */
 
@@ -320,6 +324,7 @@ struct luaL_field {
 		/* Array or map. */
 		uint32_t size;
 		decimal_t *decval;
+		struct tt_uuid *uuidval;
 	};
 	enum mp_type type;
 	/* subtypes of MP_EXT */

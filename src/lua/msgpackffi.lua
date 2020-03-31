@@ -20,6 +20,10 @@ char *
 mp_encode_decimal(char *data, decimal_t *dec);
 uint32_t
 mp_sizeof_decimal(const decimal_t *dec);
+char *
+mp_encode_uuid(char *data, const struct tt_uuid *uuid);
+uint32_t
+mp_sizeof_uuid();
 float
 mp_decode_float(const char **data);
 double
@@ -28,6 +32,8 @@ uint32_t
 mp_decode_extl(const char **data, int8_t *type);
 decimal_t *
 decimal_unpack(const char **data, uint32_t len, decimal_t *dec);
+struct tt_uuid *
+uuid_unpack(const char **data, uint32_t len, struct tt_uuid *uuid);
 ]])
 
 local strict_alignment = (jit.arch == 'arm')
@@ -127,6 +133,11 @@ end
 local function encode_decimal(buf, num)
     local p = buf:alloc(builtin.mp_sizeof_decimal(num))
     builtin.mp_encode_decimal(p, num)
+end
+
+local function encode_uuid(buf, uuid)
+    local p = buf:alloc(builtin.mp_sizeof_uuid())
+    builtin.mp_encode_uuid(p, uuid)
 end
 
 local function encode_int(buf, num)
@@ -311,6 +322,7 @@ on_encode(ffi.typeof('bool'), encode_bool_cdata)
 on_encode(ffi.typeof('float'), encode_float)
 on_encode(ffi.typeof('double'), encode_double)
 on_encode(ffi.typeof('decimal_t'), encode_decimal)
+on_encode(ffi.typeof('struct tt_uuid'), encode_uuid)
 
 --------------------------------------------------------------------------------
 -- Decoder
@@ -495,6 +507,8 @@ local ext_decoder = {
     [0] = function(data, len) error("unsupported extension type") end,
     -- MP_DECIMAL
     [1] = function(data, len) local num = ffi.new("decimal_t") builtin.decimal_unpack(data, len, num) return num end,
+    -- MP_UUID
+    [2] = function(data, len) local uuid = ffi.new("struct tt_uuid") builtin.uuid_unpack(data, len, uuid) return uuid end,
 }
 
 local function decode_ext(data)

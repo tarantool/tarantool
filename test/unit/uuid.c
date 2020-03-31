@@ -1,5 +1,7 @@
 #include "unit.h"
 #include "uuid/tt_uuid.h"
+#include "uuid/mp_uuid.h"
+#include "core/random.h"
 #include <string.h>
 
 static void
@@ -27,10 +29,29 @@ uuid_test(struct tt_uuid a, struct tt_uuid b, int expected_result)
            "%s %s %s", a_str, sign, b_str);
 }
 
+static void
+mp_uuid_test()
+{
+        plan(4);
+        char buf[18];
+        char *data = buf;
+        const char *data1 = buf;
+        struct tt_uuid uu, ret;
+        random_init();
+        tt_uuid_create(&uu);
+        char *end = mp_encode_uuid(data, &uu);
+        is(end - data, mp_sizeof_uuid(), "mp_sizeof_uuid() == encoded length");
+        struct tt_uuid *rc = mp_decode_uuid(&data1, &ret);
+        is(rc, &ret, "mp_decode_uuid() return code");
+        is(data1, end, "mp_sizeof_uuid() == decoded length");
+        is(tt_uuid_compare(&uu, &ret), 0, "mp_decode_uuid(mp_encode_uuid(uu)) == uu");
+        check_plan();
+}
+
 int
 main(void)
 {
-        plan(2);
+        plan(3);
 
         uuid_test(
                 (struct tt_uuid){.time_low = 1712399963,
@@ -62,6 +83,8 @@ main(void)
                                 .clock_seq_low = 54,
                                 .node = "v\025Oo9I"},
                 -1);
+
+        mp_uuid_test();
 
         return check_plan();
 }

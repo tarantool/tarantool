@@ -50,6 +50,9 @@ extern "C" {
 } /* extern "C" */
 #include "lua/utils.h"
 #include "lib/core/decimal.h"
+#include "tt_static.h"
+#include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID */
+#include "uuid/tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
 
 #define LUAYAML_TAG_PREFIX "tag:yaml.org,2002:"
 
@@ -697,10 +700,14 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       switch (field.ext_type) {
       case MP_DECIMAL:
          str = decimal_to_string(field.decval);
-	 len = strlen(str);
-	 break;
+         len = strlen(str);
+         break;
+      case MP_UUID:
+         str = tt_uuid_str(field.uuidval);
+         len = UUID_STR_LEN;
+         break;
       default:
-	 assert(0); /* checked by luaL_checkfield() */
+         assert(0); /* checked by luaL_checkfield() */
       }
       break;
     }

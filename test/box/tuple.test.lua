@@ -510,4 +510,29 @@ box.tuple.is('1')
 box.tuple.is(box.tuple.new())
 box.tuple.is(box.tuple.new({1}))
 
+--
+-- gh-4268 UUID in tuple
+--
+uuid = require("uuid")
+-- Fixed randomly generated uuids to avoid problems with test
+-- output comparison.
+a = uuid.fromstr("c8f0fa1f-da29-438c-a040-393f1126ad39")
+b = uuid.fromstr("83eb4959-3de6-49fb-8890-6fb4423dd186")
+t = box.tuple.new(a, 2, b, "string")
+state, val = t:next()
+state
+val == a
+state, val = t:next(state)
+state
+val
+state, val = t:next(state)
+state
+val == b
+t:slice(1)
+t:slice(-1)
+t:slice(-2)
+msgpack.decode(msgpack.encode(t))
+msgpackffi.decode(msgpackffi.encode(t))
+t:bsize()
+
 msgpack.cfg({encode_max_depth = max_depth, encode_deep_as_nil = deep_as_nil})

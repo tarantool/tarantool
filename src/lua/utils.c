@@ -45,6 +45,7 @@ static uint32_t CTID_STRUCT_IBUF;
 static uint32_t CTID_STRUCT_IBUF_PTR;
 static uint32_t CTID_CHAR_PTR;
 static uint32_t CTID_CONST_CHAR_PTR;
+static uint32_t CTID_UUID;
 uint32_t CTID_DECIMAL;
 
 
@@ -99,6 +100,12 @@ luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
 
 	lj_gc_check(L);
 	return cdataptr(cd);
+}
+
+struct tt_uuid *
+luaL_pushuuid(struct lua_State *L)
+{
+	return luaL_pushcdata(L, CTID_UUID);
 }
 
 void *
@@ -746,6 +753,9 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 			if (cd->ctypeid == CTID_DECIMAL) {
 				field->ext_type = MP_DECIMAL;
 				field->decval = (decimal_t *) cdata;
+			} else if (cd->ctypeid == CTID_UUID) {
+				field->ext_type = MP_UUID;
+				field->uuidval = (struct tt_uuid *) cdata;
 			} else {
 				field->ext_type = MP_UNKNOWN_EXTENSION;
 			}
@@ -1277,7 +1287,6 @@ tarantool_lua_utils_init(struct lua_State *L)
 
 	int rc = luaL_cdef(L, "struct ibuf;");
 	assert(rc == 0);
-	(void) rc;
 	CTID_STRUCT_IBUF = luaL_ctypeid(L, "struct ibuf");
 	assert(CTID_STRUCT_IBUF != 0);
 	CTID_STRUCT_IBUF_PTR = luaL_ctypeid(L, "struct ibuf *");
@@ -1286,5 +1295,17 @@ tarantool_lua_utils_init(struct lua_State *L)
 	assert(CTID_CHAR_PTR != 0);
 	CTID_CONST_CHAR_PTR = luaL_ctypeid(L, "const char *");
 	assert(CTID_CONST_CHAR_PTR != 0);
+	rc = luaL_cdef(L, "struct tt_uuid {"
+				  "uint32_t time_low;"
+				  "uint16_t time_mid;"
+				  "uint16_t time_hi_and_version;"
+				  "uint8_t clock_seq_hi_and_reserved;"
+				  "uint8_t clock_seq_low;"
+				  "uint8_t node[6];"
+			  "};");
+	assert(rc == 0);
+	(void) rc;
+	CTID_UUID = luaL_ctypeid(L, "struct tt_uuid");
+	assert(CTID_UUID != 0);
 	return 0;
 }

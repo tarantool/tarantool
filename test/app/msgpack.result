@@ -293,3 +293,24 @@ msgpack.decode(msgpack.encode(e)) == e
 ---
 - true
 ...
+--
+-- gh-4268: msgpack encode/decode UUID
+--
+uuid = require('uuid')
+---
+...
+fail = nil
+---
+...
+for i = 1,10 do\
+    local a = uuid.new()\
+    if msgpack.decode(msgpack.encode(a)) ~= a then\
+        fail = a\
+    end\
+end
+---
+...
+fail
+---
+- null
+...

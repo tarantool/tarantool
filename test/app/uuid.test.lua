@@ -1,6 +1,9 @@
 -- box.uuid
 uuid = require('uuid')
 
+test_run = require('test_run').new()
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua '")
+
 --
 -- RFC4122 compliance
 --
@@ -96,3 +99,5 @@ uu.str()
 
 uu = nil
 uuid = nil
+
+test_run:cmd("clear filter")

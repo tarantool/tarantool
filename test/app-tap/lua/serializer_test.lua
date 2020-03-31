@@ -204,6 +204,13 @@ local function test_decimal(test, s)
     rt(test, s, decimal.new('-1234567891234567890.0987654321987654321'), 'cdata')
 end
 
+local function test_uuid(test, s)
+    local uuid = require('uuid')
+    test:plan(2)
+
+    rt(test, s, uuid.new(), 'cdata')
+end
+
 local function test_boolean(test, s)
     test:plan(4)
 
@@ -505,6 +512,7 @@ return {
     test_table = test_table;
     test_ucdata = test_ucdata;
     test_decimal = test_decimal;
+    test_uuid = test_uuid;
     test_depth = test_depth;
     test_decode_buffer = test_decode_buffer;
 }

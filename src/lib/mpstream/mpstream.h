@@ -38,6 +38,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct tt_uuid;
+
 /**
 * Ask the allocator to reserve at least size bytes. It can reserve
 * more, and update *size with the new size.
@@ -139,6 +141,9 @@ mpstream_encode_binl(struct mpstream *stream, uint32_t len);
 
 void
 mpstream_encode_decimal(struct mpstream *stream, const decimal_t *val);
+
+void
+mpstream_encode_uuid(struct mpstream *stream, const struct tt_uuid *uuid);
 
 /** Copies n bytes from memory area src to stream. */
 void

@@ -99,3 +99,16 @@ msgpack.decode(msgpack.encode(b)) == b
 msgpack.decode(msgpack.encode(c)) == c
 msgpack.decode(msgpack.encode(d)) == d
 msgpack.decode(msgpack.encode(e)) == e
+
+--
+-- gh-4268: msgpack encode/decode UUID
+--
+uuid = require('uuid')
+fail = nil
+for i = 1,10 do\
+    local a = uuid.new()\
+    if msgpack.decode(msgpack.encode(a)) ~= a then\
+        fail = a\
+    end\
+end
+fail
