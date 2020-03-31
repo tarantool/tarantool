@@ -579,6 +579,8 @@ close_inherited_fds(int *skip_fds, size_t nr_skip_fds)
 		if (fd_no == -1)
 			continue;
 
+		say_debug("popen: close inherited fd [%s:%d]",
+			  stdX_str(fd_no), fd_no);
 		if (close(fd_no)) {
 			int saved_errno = errno;
 			diag_set(SystemError, "fdin: Can't close %d", fd_no);
