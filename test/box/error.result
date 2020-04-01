@@ -808,3 +808,25 @@ assert(e2.prev == e3)
  | ---
  | - true
  | ...
+
+-- gh-4829: always promote error created via box.error() to
+-- diagnostic area.
+e1 = box.error.new({code = 111, reason = "cause"})
+ | ---
+ | ...
+box.error({code = 111, reason = "err"})
+ | ---
+ | - error: err
+ | ...
+box.error.last()
+ | ---
+ | - err
+ | ...
+box.error(e1)
+ | ---
+ | - error: cause
+ | ...
+assert(box.error.last() == e1)
+ | ---
+ | - true
+ | ...

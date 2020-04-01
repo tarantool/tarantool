@@ -114,9 +114,16 @@ luaT_error_call(lua_State *L)
 			return luaT_error(L);
 		return 0;
 	}
-	if (lua_gettop(L) == 2 && luaL_iserror(L, 2))
-		return lua_error(L);
-	struct error *e = luaT_error_create(L, 2);
+	struct error *e = NULL;
+	if (lua_gettop(L) == 2) {
+		e = luaL_iserror(L, 2);
+		if (e != NULL) {
+			/* Re-set error to diag area. */
+			diag_set_error(&fiber()->diag, e);
+			return lua_error(L);
+		}
+	}
+	e = luaT_error_create(L, 2);
 	if (e == NULL)
 		return luaL_error(L, "box.error(): bad arguments");
 	diag_set_error(&fiber()->diag, e);

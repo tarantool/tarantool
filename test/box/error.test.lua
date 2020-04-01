@@ -221,3 +221,11 @@ e2:set_prev(e3)
 box.error.set(e2)
 assert(e1.prev == nil)
 assert(e2.prev == e3)
+
+-- gh-4829: always promote error created via box.error() to
+-- diagnostic area.
+e1 = box.error.new({code = 111, reason = "cause"})
+box.error({code = 111, reason = "err"})
+box.error.last()
+box.error(e1)
+assert(box.error.last() == e1)
