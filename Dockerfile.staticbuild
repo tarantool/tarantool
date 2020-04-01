@@ -40,9 +40,9 @@ RUN yum -y install python-devel python-pip
 
 RUN set -x && \
     cd / && \
-    curl -O -L https://www.openssl.org/source/openssl-1.1.0h.tar.gz && \
-    tar -xvf openssl-1.1.0h.tar.gz && \
-    cd openssl-1.1.0h && \
+    curl -O -L https://www.openssl.org/source/openssl-1.1.1f.tar.gz && \
+    tar -xvf openssl-1.1.1f.tar.gz && \
+    cd openssl-1.1.1f && \
     ./config --libdir=lib && \
     make && make install
 
