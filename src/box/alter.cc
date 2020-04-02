@@ -820,9 +820,7 @@ txn_alter_trigger_new(trigger_f run, void *data)
 		diag_set(OutOfMemory, size, "region", "struct trigger");
 		return NULL;
 	}
-	trigger = (struct trigger *)memset(trigger, 0, size);
-	trigger->run = run;
-	trigger->data = data;
+	trigger_create(trigger, run, data, NULL);
 	return trigger;
 }
 
