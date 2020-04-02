@@ -457,6 +457,27 @@ sqlInsert(Parse * pParse,	/* Parser context */
 			regCopy = sqlGetTempRange(pParse, nColumn + 1);
 			sqlVdbeAddOp2(v, OP_OpenTEphemeral, reg_eph,
 					  nColumn + 1);
+			/*
+			 * This key_info is used to show that
+			 * rowid should be the first part of PK in
+			 * case we used AUTOINCREMENT feature.
+			 * This way we will save initial order of
+			 * the inserted values. The order is
+			 * important if we use the AUTOINCREMENT
+			 * feature, since changing the order can
+			 * change the number inserted instead of
+			 * NULL.
+			 */
+			if (space->sequence != NULL) {
+				struct sql_key_info *key_info =
+					sql_key_info_new(pParse->db,
+							 nColumn + 1);
+				key_info->parts[nColumn].type =
+					FIELD_TYPE_UNSIGNED;
+				key_info->is_pk_rowid = true;
+				sqlVdbeChangeP4(v, -1, (void *)key_info,
+					        P4_KEYINFO);
+			}
 			addrL = sqlVdbeAddOp1(v, OP_Yield, dest.iSDParm);
 			VdbeCoverage(v);
 			sqlVdbeAddOp2(v, OP_NextIdEphemeral, reg_eph,

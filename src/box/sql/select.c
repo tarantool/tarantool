@@ -1382,6 +1382,7 @@ sql_key_info_new(sql *db, uint32_t part_count)
 	key_info->key_def = NULL;
 	key_info->refs = 1;
 	key_info->part_count = part_count;
+	key_info->is_pk_rowid = false;
 	for (uint32_t i = 0; i < part_count; i++) {
 		struct key_part_def *part = &key_info->parts[i];
 		part->fieldno = i;
@@ -1408,6 +1409,7 @@ sql_key_info_new_from_key_def(sql *db, const struct key_def *key_def)
 	key_info->key_def = NULL;
 	key_info->refs = 1;
 	key_info->part_count = key_def->part_count;
+	key_info->is_pk_rowid = false;
 	key_def_dump_parts(key_def, key_info->parts, NULL);
 	return key_info;
 }
