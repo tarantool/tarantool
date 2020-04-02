@@ -318,10 +318,17 @@ struct space *
 sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 {
 	struct key_def *def = NULL;
+	uint32_t part_count = field_count;
 	if (key_info != NULL) {
 		def = sql_key_info_to_key_def(key_info);
 		if (def == NULL)
 			return NULL;
+		/*
+		 * In case is_pk_rowid is true we can use rowid
+		 * as the only part of the key.
+		 */
+		if (key_info->is_pk_rowid)
+			part_count = 1;
 	}
 
 	struct region *region = &fiber()->gc;
@@ -332,8 +339,8 @@ sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 	 * turned to string, which is 10 and plus 1 for \0.
 	 */
 	uint32_t name_len = strlen("_COLUMN_") + 11;
-	uint32_t size = field_count * (sizeof(struct field_def) + name_len +
-				       sizeof(struct key_part_def));
+	uint32_t size = field_count * (sizeof(struct field_def) + name_len) +
+			part_count * sizeof(struct key_part_def);
 	struct field_def *fields = region_alloc(region, size);
 	if (fields == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc", "fields");
@@ -342,7 +349,7 @@ sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 	struct key_part_def *ephemer_key_parts =
 		(void *)fields + field_count * sizeof(struct field_def);
 	char *names = (char *)ephemer_key_parts +
-		      field_count * sizeof(struct key_part_def);
+		       part_count * sizeof(struct key_part_def);
 	for (uint32_t i = 0; i < field_count; ++i) {
 		struct field_def *field = &fields[i];
 		field->name = names;
@@ -362,18 +369,27 @@ sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 		}
 	}
 
-	for (uint32_t i = 0; i < field_count; ++i) {
+	for (uint32_t i = 0; i < part_count; ++i) {
 		struct key_part_def *part = &ephemer_key_parts[i];
-		part->fieldno = i;
+		/*
+		 * In case we need to save initial order of
+		 * inserted into ephemeral space rows we use rowid
+		 * as the only part of PK. If ephemeral space has
+		 * a rowid, it is always the last column.
+		 */
+		uint32_t j = i;
+		if (key_info != NULL && key_info->is_pk_rowid)
+			j = field_count - 1;
+		part->fieldno = j;
 		part->nullable_action = ON_CONFLICT_ACTION_NONE;
 		part->is_nullable = true;
 		part->sort_order = SORT_ORDER_ASC;
 		part->path = NULL;
-		part->type = fields[i].type;
-		part->coll_id = fields[i].coll_id;
+		part->type = fields[j].type;
+		part->coll_id = fields[j].coll_id;
 	}
 	struct key_def *ephemer_key_def = key_def_new(ephemer_key_parts,
-						      field_count, false);
+						      part_count, false);
 	if (ephemer_key_def == NULL)
 		return NULL;
 

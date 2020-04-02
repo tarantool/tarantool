@@ -2702,23 +2702,10 @@ case OP_Column: {
 		pC->cacheStatus = p->cacheCtr;
 	}
 	enum field_type field_type = field_type_MAX;
-	if (pC->eCurType == CURTYPE_TARANTOOL) {
-		/*
-		 * Ephemeral spaces feature only one index
-		 * covering all fields, but ephemeral spaces
-		 * lack format. So, we can fetch type from
-		 * key parts.
-		 */
-		if (pC->uc.pCursor->curFlags & BTCF_TEphemCursor) {
-			field_type = pC->uc.pCursor->index->def->
-					key_def->parts[p2].type;
-		} else if (pC->uc.pCursor->curFlags & BTCF_TaCursor) {
-			field_type = pC->uc.pCursor->space->def->
-					fields[p2].type;
-		}
-	} else if (pC->eCurType == CURTYPE_SORTER) {
+	if (pC->eCurType == CURTYPE_TARANTOOL)
+		field_type = pC->uc.pCursor->space->def->fields[p2].type;
+	else if (pC->eCurType == CURTYPE_SORTER)
 		field_type = vdbe_sorter_get_field_type(pC->uc.pSorter, p2);
-	}
 	struct Mem *default_val_mem =
 		pOp->p4type == P4_MEM ? pOp->p4.pMem : NULL;
 	if (vdbe_field_ref_fetch(&pC->field_ref, p2, pDest) != 0)
