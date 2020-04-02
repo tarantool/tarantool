@@ -4115,6 +4115,8 @@ struct sql_key_info {
 	struct key_def *key_def;
 	/** Reference counter. */
 	uint32_t refs;
+	/** Rowid should be the only part of PK, if true. */
+	bool is_pk_rowid;
 	/** Number of parts in the key. */
 	uint32_t part_count;
 	/** Definition of the key parts. */
