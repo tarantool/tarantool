@@ -2295,7 +2295,7 @@ index_fill_def(struct Parse *parse, struct index *index,
 			goto cleanup;
 
 		struct Expr *column_expr = sqlExprSkipCollate(expr);
-		if (column_expr->op != TK_COLUMN) {
+		if (column_expr->op != TK_COLUMN_REF) {
 			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
 				 "functional indexes");
 			goto tnt_error;

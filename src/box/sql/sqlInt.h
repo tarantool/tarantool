@@ -1517,7 +1517,7 @@ typedef int ynVar;
  * valid.
  *
  * An expression of the form ID or ID.ID refers to a column in a table.
- * For such expressions, Expr.op is set to TK_COLUMN and Expr.iTable is
+ * For such expressions, Expr.op is set to TK_COLUMN_REF and Expr.iTable is
  * the integer cursor number of a VDBE cursor pointing to that table and
  * Expr.iColumn is the column number for the specific column.  If the
  * expression is used as a result in an aggregate SELECT, then the
@@ -1587,20 +1587,20 @@ struct Expr {
 #if SQL_MAX_EXPR_DEPTH>0
 	int nHeight;		/* Height of the tree headed by this node */
 #endif
-	int iTable;		/* TK_COLUMN: cursor number of table holding column
+	int iTable;		/* TK_COLUMN_REF: cursor number of table holding column
 				 * TK_REGISTER: register number
 				 * TK_TRIGGER: 1 -> new, 0 -> old
 				 * EP_Unlikely:  134217728 times likelihood
 				 * TK_SELECT: 1st register of result vector
 				 */
-	ynVar iColumn;		/* TK_COLUMN: column index.
+	ynVar iColumn;		/* TK_COLUMN_REF: column index.
 				 * TK_VARIABLE: variable number (always >= 1).
 				 * TK_SELECT_COLUMN: column of the result vector
 				 */
 	i16 iAgg;		/* Which entry in pAggInfo->aCol[] or ->aFunc[] */
 	i16 iRightJoinTable;	/* If EP_FromJoin, the right table of the join */
 	u8 op2;			/* TK_REGISTER: original value of Expr.op
-				 * TK_COLUMN: the value of p5 for OP_Column
+				 * TK_COLUMN_REF: the value of p5 for OP_Column
 				 * TK_AGG_FUNCTION: nesting depth
 				 */
 	AggInfo *pAggInfo;	/* Used by TK_AGG_COLUMN and TK_AGG_FUNCTION */

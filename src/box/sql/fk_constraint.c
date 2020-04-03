@@ -338,7 +338,7 @@ static struct Expr *
 sql_expr_new_column_by_cursor(struct sql *db, struct space_def *def,
 			      int cursor, int column)
 {
-	struct Expr *expr = sql_expr_new_anon(db, TK_COLUMN);
+	struct Expr *expr = sql_expr_new_anon(db, TK_COLUMN_REF);
 	if (expr == NULL)
 		return NULL;
 	expr->space_def = def;

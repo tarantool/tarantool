@@ -39,7 +39,7 @@ extras="            \
     END_OF_FILE     \
     UNCLOSED_STRING \
     FUNCTION        \
-    COLUMN          \
+    COLUMN_REF      \
     AGG_FUNCTION    \
     AGG_COLUMN      \
     UMINUS          \

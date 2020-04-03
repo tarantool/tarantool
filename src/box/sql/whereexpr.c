@@ -279,7 +279,7 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 	pList = pExpr->x.pList;
 	pLeft = pList->a[1].pExpr;
 	/* Value might be numeric */
-	if (pLeft->op != TK_COLUMN ||
+	if (pLeft->op != TK_COLUMN_REF ||
 	    sql_expr_type(pLeft) != FIELD_TYPE_STRING) {
 		/* IMP: R-02065-49465 The left-hand side of the
 		 * LIKE operator must be the name of an indexed
@@ -928,7 +928,7 @@ exprSelectUsage(WhereMaskSet * pMaskSet, Select * pS)
  * number of the table that is indexed and *piColumn to the column number
  * of the column that is indexed.
  *
- * If pExpr is a TK_COLUMN column reference, then this routine always returns
+ * If pExpr is a TK_COLUMN_REF column reference, then this routine always returns
  * true even if that particular column is not indexed, because the column
  * might be added to an automatic index later.
  */
@@ -950,7 +950,7 @@ exprMightBeIndexed(int op,	/* The specific comparison operator */
 		pExpr = pExpr->x.pList->a[0].pExpr;
 	}
 
-	if (pExpr->op == TK_COLUMN) {
+	if (pExpr->op == TK_COLUMN_REF) {
 		*piCur = pExpr->iTable;
 		*piColumn = pExpr->iColumn;
 		return 1;
@@ -1272,7 +1272,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	 * Note that the virtual term must be tagged with TERM_VNULL.
 	 */
 	if (pExpr->op == TK_NOTNULL
-	    && pExpr->pLeft->op == TK_COLUMN
+	    && pExpr->pLeft->op == TK_COLUMN_REF
 	    && pExpr->pLeft->iColumn >= 0) {
 		Expr *pNewExpr;
 		Expr *pLeft = pExpr->pLeft;
@@ -1397,7 +1397,7 @@ sqlWhereExprUsage(WhereMaskSet * pMaskSet, Expr * p)
 	Bitmask mask;
 	if (p == 0)
 		return 0;
-	if (p->op == TK_COLUMN) {
+	if (p->op == TK_COLUMN_REF) {
 		mask = sqlWhereGetMask(pMaskSet, p->iTable);
 		return mask;
 	}
@@ -1475,7 +1475,7 @@ sqlWhereTabFuncArgs(Parse * pParse,	/* Parsing context */
 		 * unused.
 		 */
 		assert(k < (int)space_def->field_count);
-		pColRef = sql_expr_new_anon(pParse->db, TK_COLUMN);
+		pColRef = sql_expr_new_anon(pParse->db, TK_COLUMN_REF);
 		if (pColRef == NULL) {
 			pParse->is_aborted = true;
 			return;

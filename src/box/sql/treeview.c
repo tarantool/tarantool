@@ -327,7 +327,7 @@ sqlTreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 					    zFlgs);
 			break;
 		}
-	case TK_COLUMN:{
+	case TK_COLUMN_REF:{
 			if (pExpr->iTable < 0) {
 				/* This only happens when coding check constraints */
 				sqlTreeViewLine(pView, "COLUMN(%d)%s",

@@ -62,7 +62,7 @@ sql_expr_type(struct Expr *pExpr)
 		assert(!ExprHasProperty(pExpr, EP_IntValue));
 		return pExpr->type;
 	case TK_AGG_COLUMN:
-	case TK_COLUMN:
+	case TK_COLUMN_REF:
 	case TK_TRIGGER:
 		assert(pExpr->iColumn >= 0);
 		return pExpr->space_def->fields[pExpr->iColumn].type;
@@ -262,13 +262,13 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 			*is_explicit_coll = true;
 			break;
 		}
-		if ((op == TK_AGG_COLUMN || op == TK_COLUMN ||
+		if ((op == TK_AGG_COLUMN || op == TK_COLUMN_REF ||
 		     op == TK_REGISTER || op == TK_TRIGGER) &&
 		    p->space_def != NULL) {
 			/*
 			 * op==TK_REGISTER && p->space_def!=0
 			 * happens when pExpr was originally
-			 * a TK_COLUMN but was previously
+			 * a TK_COLUMN_REF but was previously
 			 * evaluated and cached in a register.
 			 */
 			int j = p->iColumn;
@@ -2061,11 +2061,11 @@ exprNodeIsConstant(Walker * pWalker, Expr * pExpr)
 			return WRC_Abort;
 		}
 	case TK_ID:
-	case TK_COLUMN:
+	case TK_COLUMN_REF:
 	case TK_AGG_FUNCTION:
 	case TK_AGG_COLUMN:
 		testcase(pExpr->op == TK_ID);
-		testcase(pExpr->op == TK_COLUMN);
+		testcase(pExpr->op == TK_COLUMN_REF);
 		testcase(pExpr->op == TK_AGG_FUNCTION);
 		testcase(pExpr->op == TK_AGG_COLUMN);
 		if (pWalker->eCode == 3 && pExpr->iTable == pWalker->u.iCur) {
@@ -2236,7 +2236,7 @@ sqlExprCanBeNull(const Expr * p)
 	case TK_FLOAT:
 	case TK_BLOB:
 		return 0;
-	case TK_COLUMN:
+	case TK_COLUMN_REF:
 		assert(p->space_def != 0);
 		return ExprHasProperty(p, EP_CanBeNull) ||
 		       (p->iColumn >= 0
@@ -2267,7 +2267,7 @@ sql_expr_needs_no_type_change(const struct Expr *p, enum field_type type)
 		return type == FIELD_TYPE_STRING;
 	case TK_BLOB:
 		return type == FIELD_TYPE_VARBINARY;
-	case TK_COLUMN:
+	case TK_COLUMN_REF:
 		/* p cannot be part of a CHECK constraint. */
 		assert(p->iTable >= 0);
 		return p->iColumn < 0 && sql_type_is_numeric(type);
@@ -2324,7 +2324,7 @@ isCandidateForInOpt(Expr * pX)
 	/* All SELECT results must be columns. */
 	for (i = 0; i < pEList->nExpr; i++) {
 		Expr *pRes = pEList->a[i].pExpr;
-		if (pRes->op != TK_COLUMN)
+		if (pRes->op != TK_COLUMN_REF)
 			return 0;
 		assert(pRes->iTable == pSrc->a[0].iCursor);	/* Not a correlated subquery */
 	}
@@ -3707,10 +3707,13 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				}
 				return target;
 			}
-			/* Otherwise, fall thru into the TK_COLUMN case */
+			/*
+			 * Otherwise, fall thru into the
+			 * TK_COLUMN_REF case.
+			 */
 			FALLTHROUGH;
 		}
-	case TK_COLUMN:{
+	case TK_COLUMN_REF:{
 			int iTab = pExpr->iTable;
 			int col = pExpr->iColumn;
 			if (iTab < 0) {
@@ -4102,7 +4105,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					assert(nFarg == 1);
 					assert(pFarg->a[0].pExpr != 0);
 					exprOp = pFarg->a[0].pExpr->op;
-					if (exprOp == TK_COLUMN
+					if (exprOp == TK_COLUMN_REF
 					    || exprOp == TK_AGG_COLUMN) {
 						assert(SQL_FUNC_LENGTH ==
 						       OPFLAG_LENGTHARG);
@@ -4319,7 +4322,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			endLabel = sqlVdbeMakeLabel(v);
 			if ((pX = pExpr->pLeft) != 0) {
 				tempX = *pX;
-				testcase(pX->op == TK_COLUMN);
+				testcase(pX->op == TK_COLUMN_REF);
 				exprToRegister(&tempX,
 					       exprCodeVector(pParse, &tempX,
 							      &regFree1));
@@ -4344,11 +4347,11 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					pTest = aListelem[i].pExpr;
 				}
 				nextCase = sqlVdbeMakeLabel(v);
-				testcase(pTest->op == TK_COLUMN);
+				testcase(pTest->op == TK_COLUMN_REF);
 				sqlExprIfFalse(pParse, pTest, nextCase,
 						   SQL_JUMPIFNULL);
 				testcase(aListelem[i + 1].pExpr->op ==
-					 TK_COLUMN);
+					 TK_COLUMN_REF);
 				sqlExprCode(pParse, aListelem[i + 1].pExpr,
 						target);
 				sqlVdbeGoto(v, endLabel);
@@ -5081,7 +5084,8 @@ sqlExprCompare(Expr * pA, Expr * pB, int iTab)
 		}
 		return 2;
 	}
-	if (pA->op != TK_COLUMN && pA->op != TK_AGG_COLUMN && pA->u.zToken) {
+	if (pA->op != TK_COLUMN_REF && pA->op != TK_AGG_COLUMN &&
+	    pA->u.zToken) {
 		if (pA->op == TK_FUNCTION) {
 			if (sqlStrICmp(pA->u.zToken, pB->u.zToken) != 0)
 				return 2;
@@ -5161,8 +5165,8 @@ sqlExprListCompare(ExprList * pA, ExprList * pB, int iTab)
  *     pE1: x IS NULL  pE2: x IS NOT NULL    Result: false
  *     pE1: x IS ?2    pE2: x IS NOT NULL    Reuslt: false
  *
- * When comparing TK_COLUMN nodes between pE1 and pE2, if pE2 has
- * Expr.iTable<0 then assume a table number given by iTab.
+ * When comparing TK_COLUMN_REF nodes between pE1 and pE2, if
+ * pE2 has Expr.iTable<0 then assume a table number given by iTab.
  *
  * When in doubt, return false.  Returning true might give a performance
  * improvement.  Returning false might cause a performance reduction, but
@@ -5209,11 +5213,11 @@ exprSrcCount(Walker * pWalker, Expr * pExpr)
 {
 	/* The NEVER() on the second term is because sqlFunctionUsesThisSrc()
 	 * is always called before sqlExprAnalyzeAggregates() and so the
-	 * TK_COLUMNs have not yet been converted into TK_AGG_COLUMN.  If
+	 * TK_COLUMN_REFs have not yet been converted into TK_AGG_COLUMN. If
 	 * sqlFunctionUsesThisSrc() is used differently in the future, the
 	 * NEVER() will need to be removed.
 	 */
-	if (pExpr->op == TK_COLUMN || NEVER(pExpr->op == TK_AGG_COLUMN)) {
+	if (pExpr->op == TK_COLUMN_REF || NEVER(pExpr->op == TK_AGG_COLUMN)) {
 		int i;
 		struct SrcCount *p = pWalker->u.pSrcCount;
 		SrcList *pSrc = p->pSrc;
@@ -5299,9 +5303,9 @@ analyzeAggregate(Walker * pWalker, Expr * pExpr)
 
 	switch (pExpr->op) {
 	case TK_AGG_COLUMN:
-	case TK_COLUMN:{
+	case TK_COLUMN_REF:{
 			testcase(pExpr->op == TK_AGG_COLUMN);
-			testcase(pExpr->op == TK_COLUMN);
+			testcase(pExpr->op == TK_COLUMN_REF);
 			/* Check to see if the column is in one of the tables in the FROM
 			 * clause of the aggregate query
 			 */
@@ -5370,7 +5374,7 @@ analyzeAggregate(Walker * pWalker, Expr * pExpr)
 									if (pE->
 									    op
 									    ==
-									    TK_COLUMN
+									    TK_COLUMN_REF
 									    &&
 									    pE->
 									    iTable

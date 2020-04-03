@@ -1817,7 +1817,7 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 		vdbe_metadata_set_col_nullability(v, i, -1);
 		const char *colname = pEList->a[i].zName;
 		const char *span = pEList->a[i].zSpan;
-		if (p->op == TK_COLUMN || p->op == TK_AGG_COLUMN) {
+		if (p->op == TK_COLUMN_REF || p->op == TK_AGG_COLUMN) {
 			char *zCol;
 			int iCol = p->iColumn;
 			for (j = 0; ALWAYS(j < pTabList->nSrc); j++) {
@@ -1939,7 +1939,7 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 				pColExpr = pColExpr->pRight;
 				assert(pColExpr != 0);
 			}
-			if (pColExpr->op == TK_COLUMN
+			if (pColExpr->op == TK_COLUMN_REF
 			    && ALWAYS(pColExpr->space_def != NULL)) {
 				/* For columns use the column name name */
 				int iCol = pColExpr->iColumn;
@@ -3653,7 +3653,7 @@ substExpr(Parse * pParse,	/* Report errors here */
 	sql *db = pParse->db;
 	if (pExpr == 0)
 		return 0;
-	if (pExpr->op == TK_COLUMN && pExpr->iTable == iTable) {
+	if (pExpr->op == TK_COLUMN_REF && pExpr->iTable == iTable) {
 		if (pExpr->iColumn < 0) {
 			pExpr->op = TK_NULL;
 		} else {
@@ -6044,7 +6044,7 @@ sqlSelect(Parse * pParse,		/* The parser context */
 		/* Create a label to jump to when we want to abort the query */
 		addrEnd = sqlVdbeMakeLabel(v);
 
-		/* Convert TK_COLUMN nodes into TK_AGG_COLUMN and make entries in
+		/* Convert TK_COLUMN_REF nodes into TK_AGG_COLUMN and make entries in
 		 * sAggInfo for all TK_AGG_FUNCTION nodes in expressions of the
 		 * SELECT statement.
 		 */
@@ -6416,7 +6416,7 @@ sqlSelect(Parse * pParse,		/* The parser context */
 						    flag !=
 						    WHERE_ORDERBY_MIN ? 1 : 0;
 						pMinMax->a[0].pExpr->op =
-						    TK_COLUMN;
+						    TK_COLUMN_REF;
 					}
 				}
 

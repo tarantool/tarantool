@@ -189,7 +189,7 @@ sqlMatchSpanName(const char *zSpan,
  *    pExpr->space_def     Points to the space_def structure of X.Y
  *                         (even if X and/or Y are implied.)
  *    pExpr->iColumn       Set to the column number within the table.
- *    pExpr->op            Set to TK_COLUMN.
+ *    pExpr->op            Set to TK_COLUMN_REF.
  *    pExpr->pLeft         Any expression this points to is deleted
  *    pExpr->pRight        Any expression this points to is deleted.
  *
@@ -461,7 +461,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 	pExpr->pLeft = 0;
 	sql_expr_delete(db, pExpr->pRight, false);
 	pExpr->pRight = 0;
-	pExpr->op = (isTrigger ? TK_TRIGGER : TK_COLUMN);
+	pExpr->op = (isTrigger ? TK_TRIGGER : TK_COLUMN_REF);
  lookupname_end:
 	if (cnt == 1) {
 		assert(pNC != 0);
@@ -485,7 +485,7 @@ struct Expr *
 sql_expr_new_column(struct sql *db, struct SrcList *src_list, int src_idx,
 		    int column)
 {
-	struct Expr *expr = sql_expr_new_anon(db, TK_COLUMN);
+	struct Expr *expr = sql_expr_new_anon(db, TK_COLUMN_REF);
 	if (expr == NULL)
 		return NULL;
 	struct SrcList_item *item = &src_list->a[src_idx];
@@ -518,7 +518,7 @@ exprProbability(Expr * p)
 /*
  * This routine is callback for sqlWalkExpr().
  *
- * Resolve symbolic names into TK_COLUMN operators for the current
+ * Resolve symbolic names into TK_COLUMN_REF operators for the current
  * node in the expression tree.  Return 0 to continue the search down
  * the tree or 2 to abort the tree walk.
  *
@@ -1451,7 +1451,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
  *
  * The node at the root of the subtree is modified as follows:
  *
- *    Expr.op        Changed to TK_COLUMN
+ *    Expr.op        Changed to TK_COLUMN_REF
  *    Expr.pTab      Points to the Table object for X.Y
  *    Expr.iColumn   The column index in X.Y.  -1 for the rowid.
  *    Expr.iTable    The VDBE cursor number for X.Y
