@@ -31,9 +31,6 @@
 #include "diag.h"
 #include "fiber.h"
 
-/* Must be set by the library user */
-struct error_factory *error_factory = NULL;
-
 void
 error_create(struct error *e,
 	     error_f destroy, error_f raise, error_f log,
