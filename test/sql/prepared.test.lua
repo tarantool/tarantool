@@ -319,6 +319,16 @@ f2:set_joinable(true)
 f1:join();
 f2:join();
 
+-- gh-4825: make sure that values to be bound are erased after
+-- execution, so that they don't appear in the next statement
+-- execution.
+--
+s = prepare('SELECT :a, :b, :c');
+execute(s.stmt_id, {{[':a'] = 1}, {[':b'] = 2}, {[':c'] = 3}});
+execute(s.stmt_id, {{[':a'] = 1}, {[':b'] = 2}});
+execute(s.stmt_id);
+unprepare(s.stmt_id);
+
 if is_remote then
     cn:close()
     box.schema.user.revoke('guest', 'read, write, execute', 'universe')

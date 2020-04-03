@@ -934,6 +934,23 @@ sql_bind_type(struct Vdbe *v, uint32_t position, const char *type)
 	return 0;
 }
 
+void
+sql_unbind(struct sql_stmt *stmt)
+{
+	struct Vdbe *v = (struct Vdbe *) stmt;
+	for (int i = 1; i < v->nVar + 1; ++i) {
+		int rc = vdbeUnbind(v, i);
+		assert(rc == 0);
+		(void) rc;
+		/*
+		 * We should re-set boolean type - unassigned
+		 * binding slots are assumed to contain NULL
+		 * value, which has boolean type.
+		 */
+		sql_bind_type(v, i, "boolean");
+	}
+}
+
 /*
  * Bind a text or BLOB value.
  */

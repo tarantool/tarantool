@@ -828,6 +828,54 @@ f2:join();
  | - true
  | ...
 
+-- gh-4825: make sure that values to be bound are erased after
+-- execution, so that they don't appear in the next statement
+-- execution.
+--
+s = prepare('SELECT :a, :b, :c');
+ | ---
+ | ...
+execute(s.stmt_id, {{[':a'] = 1}, {[':b'] = 2}, {[':c'] = 3}});
+ | ---
+ | - metadata:
+ |   - name: :a
+ |     type: integer
+ |   - name: :b
+ |     type: integer
+ |   - name: :c
+ |     type: integer
+ |   rows:
+ |   - [1, 2, 3]
+ | ...
+execute(s.stmt_id, {{[':a'] = 1}, {[':b'] = 2}});
+ | ---
+ | - metadata:
+ |   - name: :a
+ |     type: integer
+ |   - name: :b
+ |     type: integer
+ |   - name: :c
+ |     type: boolean
+ |   rows:
+ |   - [1, 2, null]
+ | ...
+execute(s.stmt_id);
+ | ---
+ | - metadata:
+ |   - name: :a
+ |     type: boolean
+ |   - name: :b
+ |     type: boolean
+ |   - name: :c
+ |     type: boolean
+ |   rows:
+ |   - [null, null, null]
+ | ...
+unprepare(s.stmt_id);
+ | ---
+ | - null
+ | ...
+
 if is_remote then
     cn:close()
     box.schema.user.revoke('guest', 'read, write, execute', 'universe')

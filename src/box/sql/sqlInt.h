@@ -658,6 +658,10 @@ sql_vfs_register(sql_vfs *, int makeDflt);
 #define SQL_STMTSTATUS_AUTOINDEX         3
 #define SQL_STMTSTATUS_VM_STEP           4
 
+/** Unbind all parameters of given prepared statement. */
+void
+sql_unbind(struct sql_stmt *stmt);
+
 int
 sql_bind_blob(sql_stmt *, int, const void *,
 		  int n, void (*)(void *));
