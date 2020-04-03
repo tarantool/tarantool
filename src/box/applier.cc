@@ -692,9 +692,22 @@ static int
 applier_txn_rollback_cb(struct trigger *trigger, void *event)
 {
 	(void) trigger;
-	/* Setup shared applier diagnostic area. */
+
+	/*
+	 * Setup shared applier diagnostic area.
+	 *
+	 * FIXME: We should consider redesign this
+	 * moment and instead of carrying one shared
+	 * diag use per-applier diag instead all the time
+	 * (which actually already present in the structure).
+	 *
+	 * But remember that transactions are asynchronous
+	 * and rollback may happen a way latter after it
+	 * passed to the journal engine.
+	 */
 	diag_set(ClientError, ER_WAL_IO);
-	diag_move(&fiber()->diag, &replicaset.applier.diag);
+	diag_set_error(&replicaset.applier.diag,
+		       diag_last_error(diag_get()));
 
 	/* Broadcast the rollback event across all appliers. */
 	trigger_run(&replicaset.applier.on_rollback, event);
