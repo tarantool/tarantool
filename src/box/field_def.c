@@ -33,6 +33,8 @@
 #include "trivia/util.h"
 #include "key_def.h"
 #include "mp_extension_types.h"
+#include "uuid/mp_uuid.h"
+#include "uuid/tt_uuid.h"
 
 const char *mp_type_strs[] = {
 	/* .MP_NIL    = */ "nil",
@@ -67,6 +69,7 @@ const uint32_t field_mp_type[] = {
 		(1U << MP_FLOAT) | (1U << MP_DOUBLE) | (1U << MP_STR) |
 		(1U << MP_BIN) | (1U << MP_BOOL),
 	/* [FIELD_TYPE_DECIMAL]  =  */ 0, /* only MP_DECIMAL is supported */
+	/* [FIELD_TYPE_UUID]     =  */ 0, /* only MP_UUID is supported */
 	/* [FIELD_TYPE_ARRAY]    =  */ 1U << MP_ARRAY,
 	/* [FIELD_TYPE_MAP]      =  */ (1U << MP_MAP),
 };
@@ -82,6 +85,7 @@ const uint32_t field_ext_type[] = {
 	/* [FIELD_TYPE_VARBINARY] = */ 0,
 	/* [FIELD_TYPE_SCALAR]    = */ 1U << MP_DECIMAL,
 	/* [FIELD_TYPE_DECIMAL]   = */ 1U << MP_DECIMAL,
+	/* [FIELD_TYPE_UUID]      = */ 1U << MP_UUID,
 	/* [FIELD_TYPE_ARRAY]     = */ 0,
 	/* [FIELD_TYPE_MAP]       = */ 0,
 };
@@ -97,6 +101,7 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_VARBINARY] = */"varbinary",
 	/* [FIELD_TYPE_SCALAR]   = */ "scalar",
 	/* [FIELD_TYPE_DECIMAL]  = */ "decimal",
+	/* [FIELD_TYPE_UUID]     = */ "uuid",
 	/* [FIELD_TYPE_ARRAY]    = */ "array",
 	/* [FIELD_TYPE_MAP]      = */ "map",
 };
@@ -123,19 +128,20 @@ field_type_by_name_wrapper(const char *str, uint32_t len)
  * values can be stored in the j type.
  */
 static const bool field_type_compatibility[] = {
-	   /*   ANY   UNSIGNED  STRING   NUMBER  DOUBLE  INTEGER  BOOLEAN VARBINARY SCALAR  DECIMAL  ARRAY    MAP  */
-/*   ANY    */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  false,   false,
-/* UNSIGNED */ true,   true,    false,   true,    false,   true,    false,   false,  true,   false,  false,   false,
-/*  STRING  */ true,   false,   true,    false,   false,   false,   false,   false,  true,   false,  false,   false,
-/*  NUMBER  */ true,   false,   false,   true,    false,   false,   false,   false,  true,   false,  false,   false,
-/*  DOUBLE  */ true,   false,   false,   true,    true,    false,   false,   false,  true,   false,  false,   false,
-/*  INTEGER */ true,   false,   false,   true,    false,   true,    false,   false,  true,   false,  false,   false,
-/*  BOOLEAN */ true,   false,   false,   false,   false,   false,   true,    false,  true,   false,  false,   false,
-/* VARBINARY*/ true,   false,   false,   false,   false,   false,   false,   true,   true,   false,  false,   false,
-/*  SCALAR  */ true,   false,   false,   false,   false,   false,   false,   false,  true,   false,  false,   false,
-/*  DECIMAL */ true,   false,   false,   true,    false,   false,   false,   false,  true,   true,   false,   false,
-/*   ARRAY  */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  true,    false,
-/*    MAP   */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  false,   true,
+	   /*   ANY   UNSIGNED  STRING   NUMBER  DOUBLE  INTEGER  BOOLEAN VARBINARY SCALAR  DECIMAL   UUID    ARRAY    MAP  */
+/*   ANY    */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  false,   false,   false,
+/* UNSIGNED */ true,   true,    false,   true,    false,   true,    false,   false,  true,   false,  false,   false,   false,
+/*  STRING  */ true,   false,   true,    false,   false,   false,   false,   false,  true,   false,  false,   false,   false,
+/*  NUMBER  */ true,   false,   false,   true,    false,   false,   false,   false,  true,   false,  false,   false,   false,
+/*  DOUBLE  */ true,   false,   false,   true,    true,    false,   false,   false,  true,   false,  false,   false,   false,
+/*  INTEGER */ true,   false,   false,   true,    false,   true,    false,   false,  true,   false,  false,   false,   false,
+/*  BOOLEAN */ true,   false,   false,   false,   false,   false,   true,    false,  true,   false,  false,   false,   false,
+/* VARBINARY*/ true,   false,   false,   false,   false,   false,   false,   true,   true,   false,  false,   false,   false,
+/*  SCALAR  */ true,   false,   false,   false,   false,   false,   false,   false,  true,   false,  false,   false,   false,
+/*  DECIMAL */ true,   false,   false,   true,    false,   false,   false,   false,  true,   true,   false,   false,   false,
+/*   UUID   */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  true,    false,   false,
+/*   ARRAY  */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  false,   true,    false,
+/*    MAP   */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  false,   false,   true,
 };
 
 bool

@@ -356,6 +356,7 @@ s:drop()
 --
 
 decimal = require('decimal')
+uuid = require('uuid')
 
 -- Ensure that vinyl correctly process field count change.
 s = box.schema.space.create('test', {engine = engine, field_count = 2})
@@ -379,10 +380,11 @@ format[8] = {name = 'field8', type = 'scalar'}
 format[9] = {name = 'field9', type = 'array'}
 format[10] = {name = 'field10', type = 'map'}
 format[11] = {name = 'field11', type = 'decimal'}
+format[12] = {name = 'field12', type = 'uuid'}
 
 s = box.schema.space.create('test', {engine = engine, format = format})
 pk = s:create_index('pk')
-t = s:replace{1, {2}, 3, '4', 5.5, -6, true, -8, {9, 9}, {val = 10}, decimal.new(-11.11)}
+t = s:replace{1, {2}, 3, '4', 5.5, -6, true, -8, {9, 9}, {val = 10}, decimal.new(-11.11), uuid.new()}
 
 inspector:cmd("setopt delimiter ';'")
 function fail_format_change(fieldno, new_type)
@@ -421,6 +423,8 @@ ok_format_change(3, 'scalar')
 fail_format_change(3, 'map')
 -- unsigned --X--> decimal
 fail_format_change(3, 'decimal')
+-- unsigned --X--> uuid
+fail_format_change(3, 'uuid')
 
 -- string -----> any
 ok_format_change(4, 'any')
@@ -430,6 +434,8 @@ ok_format_change(4, 'scalar')
 fail_format_change(4, 'boolean')
 -- string --X--> decimal
 fail_format_change(4, 'decimal')
+-- string --X--> uuid
+fail_format_change(4, 'uuid')
 
 -- number -----> any
 ok_format_change(5, 'any')
@@ -439,6 +445,8 @@ ok_format_change(5, 'scalar')
 fail_format_change(5, 'integer')
 -- number --X--> decimal
 fail_format_change(5, 'decimal')
+-- number --X--> uuid
+fail_format_change(5, 'uuid')
 
 -- integer -----> any
 ok_format_change(6, 'any')
@@ -450,6 +458,8 @@ ok_format_change(6, 'scalar')
 fail_format_change(6, 'unsigned')
 -- integer --X--> decimal
 fail_format_change(6, 'decimal')
+-- integer --X--> uuid
+fail_format_change(6, 'uuid')
 
 -- boolean -----> any
 ok_format_change(7, 'any')
@@ -459,6 +469,8 @@ ok_format_change(7, 'scalar')
 fail_format_change(7, 'string')
 -- boolead --X--> decimal
 fail_format_change(7, 'decimal')
+-- boolean --X--> uuid
+fail_format_change(7, 'uuid')
 
 -- scalar -----> any
 ok_format_change(8, 'any')
@@ -466,6 +478,8 @@ ok_format_change(8, 'any')
 fail_format_change(8, 'unsigned')
 -- scalar --X--> decimal
 fail_format_change(8, 'decimal')
+-- scalar --X--> uuid
+fail_format_change(8, 'uuid')
 
 -- array -----> any
 ok_format_change(9, 'any')
@@ -473,6 +487,8 @@ ok_format_change(9, 'any')
 fail_format_change(9, 'scalar')
 -- arary --X--> decimal
 fail_format_change(9, 'decimal')
+-- array --X--> uuid
+fail_format_change(9, 'uuid')
 
 -- map -----> any
 ok_format_change(10, 'any')
@@ -480,6 +496,8 @@ ok_format_change(10, 'any')
 fail_format_change(10, 'scalar')
 -- map --X--> decimal
 fail_format_change(10, 'decimal')
+-- map --X--> uuid
+fail_format_change(10, 'uuid')
 
 -- decimal ----> any
 ok_format_change(11, 'any')
@@ -497,6 +515,28 @@ fail_format_change(11, 'unsigned')
 fail_format_change(11, 'map')
 -- decimal --X--> array
 fail_format_change(11, 'array')
+-- decimal --X--> uuid
+fail_format_change(11, 'uuid')
+
+-- uuid ----> any
+ok_format_change(12, 'any')
+-- uuid --X--> number
+fail_format_change(12, 'number')
+-- uuid --X--> scalar
+fail_format_change(12, 'scalar')
+-- uuid --X--> string
+fail_format_change(12, 'string')
+-- uuid --X--> integer
+fail_format_change(12, 'integer')
+-- uuid --X--> unsigned
+fail_format_change(12, 'unsigned')
+-- uuid --X--> map
+fail_format_change(12, 'map')
+-- uuid --X--> array
+fail_format_change(12, 'array')
+-- uuid --X--> decimal
+fail_format_change(12, 'decimal')
+
 s:drop()
 
 -- Check new fields adding.

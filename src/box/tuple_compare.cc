@@ -35,6 +35,7 @@
 #include <math.h>
 #include "lib/core/decimal.h"
 #include "lib/core/mp_decimal.h"
+#include "uuid/mp_uuid.h"
 #include "lib/core/mp_extension_types.h"
 
 /* {{{ tuple_compare */
@@ -74,6 +75,7 @@ enum mp_class {
 	MP_CLASS_NUMBER,
 	MP_CLASS_STR,
 	MP_CLASS_BIN,
+	MP_CLASS_UUID,
 	MP_CLASS_ARRAY,
 	MP_CLASS_MAP,
 	mp_class_max,
@@ -96,6 +98,7 @@ static enum mp_class mp_classes[] = {
 static enum mp_class mp_ext_classes[] = {
 	/* .MP_UNKNOWN_EXTENSION = */ mp_class_max, /* unsupported */
 	/* .MP_DECIMAL		 = */ MP_CLASS_NUMBER,
+	/* .MP_UUID		 = */ MP_CLASS_UUID,
 };
 
 static enum mp_class
@@ -110,6 +113,7 @@ mp_extension_class(const char *data)
 	assert(mp_typeof(*data) == MP_EXT);
 	int8_t type;
 	mp_decode_extl(&data, &type);
+	assert(type >= 0 && type < mp_extension_type_MAX);
 	return mp_ext_classes[type];
 }
 
@@ -378,6 +382,19 @@ mp_compare_bin(const char *field_a, const char *field_b)
 	return COMPARE_RESULT(size_a, size_b);
 }
 
+static inline int
+mp_compare_uuid(const char *field_a, const char *field_b)
+{
+	/*
+	 * Packed uuid fields are in the right order for
+	 * comparison and are big-endian, so memcmp is
+	 * the same as tt_uuid_compare() and lets us
+	 * spare 2 mp_uuid_unpack() calls.
+	 * "field_a + 2" to skip the uuid header.
+	 */
+	return memcmp(field_a + 2, field_b + 2, UUID_PACKED_LEN);
+}
+
 typedef int (*mp_compare_f)(const char *, const char *);
 static mp_compare_f mp_class_comparators[] = {
 	/* .MP_CLASS_NIL    = */ NULL,
@@ -385,6 +402,7 @@ static mp_compare_f mp_class_comparators[] = {
 	/* .MP_CLASS_NUMBER = */ mp_compare_number,
 	/* .MP_CLASS_STR    = */ mp_compare_str,
 	/* .MP_CLASS_BIN    = */ mp_compare_bin,
+	/* .MP_CLASS_UUID   = */ NULL,
 	/* .MP_CLASS_ARRAY  = */ NULL,
 	/* .MP_CLASS_MAP    = */ NULL,
 };
@@ -463,6 +481,8 @@ tuple_compare_field(const char *field_a, const char *field_b,
 		       mp_compare_scalar(field_a, field_b);
 	case FIELD_TYPE_DECIMAL:
 		return mp_compare_decimal(field_a, field_b);
+	case FIELD_TYPE_UUID:
+		return mp_compare_uuid(field_a, field_b);
 	default:
 		unreachable();
 		return 0;
@@ -501,6 +521,8 @@ tuple_compare_field_with_type(const char *field_a, enum mp_type a_type,
 	case FIELD_TYPE_DECIMAL:
 		return mp_compare_number_with_type(field_a, a_type,
 						   field_b, b_type);
+	case FIELD_TYPE_UUID:
+		return mp_compare_uuid(field_a, field_b);
 	default:
 		unreachable();
 		return 0;
@@ -1578,6 +1600,21 @@ hint_decimal(decimal_t *dec)
 	return hint_create(MP_CLASS_NUMBER, val);
 }
 
+static inline hint_t
+hint_uuid_raw(const char *data)
+{
+	/*
+	 * Packed UUID fields are big-endian and are stored in the
+	 * order allowing lexicographical comparison, so the first
+	 * 8 bytes of the packed representation constitute a big
+	 * endian unsigned integer. Use it as a hint.
+	 */
+	uint64_t val = mp_load_u64(&data);
+	/* Make space for class representation. */
+	val >>= HINT_CLASS_BITS;
+	return hint_create(MP_CLASS_UUID, val);
+}
+
 static inline uint64_t
 hint_str_raw(const char *s, uint32_t len)
 {
@@ -1699,6 +1736,17 @@ field_hint_decimal(const char *field)
 }
 
 static inline hint_t
+field_hint_uuid(const char *field)
+{
+	assert(mp_typeof(*field) == MP_EXT);
+	int8_t type;
+	uint32_t len;
+	const char *data = mp_decode_ext(&field, &type, &len);
+	assert(type == MP_UUID && len == UUID_PACKED_LEN);
+	return hint_uuid_raw(data);
+}
+
+static inline hint_t
 field_hint_string(const char *field, struct coll *coll)
 {
 	assert(mp_typeof(*field) == MP_STR);
@@ -1782,6 +1830,8 @@ field_hint(const char *field, struct coll *coll)
 		return field_hint_scalar(field, coll);
 	case FIELD_TYPE_DECIMAL:
 		return field_hint_decimal(field);
+	case FIELD_TYPE_UUID:
+		return field_hint_uuid(field);
 	default:
 		unreachable();
 	}
@@ -1892,6 +1942,9 @@ key_def_set_hint_func(struct key_def *def)
 		break;
 	case FIELD_TYPE_DECIMAL:
 		key_def_set_hint_func<FIELD_TYPE_DECIMAL>(def);
+		break;
+	case FIELD_TYPE_UUID:
+		key_def_set_hint_func<FIELD_TYPE_UUID>(def);
 		break;
 	default:
 		/* Invalid key definition. */
