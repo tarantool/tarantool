@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -ue
 
 rm_file='rm -f'
 rm_dir='rm -rf'
@@ -8,6 +8,7 @@ ws_prefix=/tmp/tarantool_repo_s3
 
 alloss='ubuntu debian el fedora'
 product=tarantool
+remove=
 force=
 skip_errors=
 # the path with binaries either repository
@@ -40,6 +41,7 @@ function prepare_ws {
     ws_suffix=$1
     ws=${ws_prefix}_${ws_suffix}
     ws_lockfile=${ws}.lock
+    old_proc=""
     if [ -f $ws_lockfile ]; then
         old_proc=$(cat $ws_lockfile)
     fi
@@ -61,6 +63,9 @@ Usage for store package binaries from the given path:
 
 Usage for mirroring Debian|Ubuntu OS repositories:
     $0 -o=<OS name> -d=<OS distribuition> -b=<S3 bucket> [-p=<product>] <path to packages binaries>
+
+Usage for removing specific package from S3 repository:
+    $0 -o=<OS name> -d=<OS distribuition> -b=<S3 bucket> [-p=<product>] -r <package version> <path to packages binaries>
 
 Arguments:
     <path>
@@ -101,6 +106,24 @@ EOF
            - for RPM packages:
              # prepare local path with needed "tarantool-queue-*" packages only
              ./$0 -b=s3://<target repository> -o=fedora -d=30 <local path>
+    -r|--remove
+         Remove package specified by version from S3 repository. It will remove
+         all found appropriate source and binaries packages from the given S3
+         repository, also the meta files will be corrected there.
+         Example of usage on 'tarantool-2.2.2.0' version:
+           ./tools/update_repo.sh -o=<OS> -d=<DIST> -b=<S3 repo> \\
+               -r=tarantool-2.2.2.0
+         It will search and try to remove packages:
+           - for DEB repositories:
+             tarantool-2.2.2.0-1_all.deb
+             tarantool-2.2.2.0-1_amd64.deb
+             tarantool-2.2.2.0-1.dsc
+             tarantool-2.2.2.0-1.debian.tar.xz
+             tarantool-2.2.2.0.orig.tar.xz
+           - for RPM repositories:
+             x86_64/tarantool-2.2.2.0-1.*.x86_64.rpm
+             x86_64/tarantool-2.2.2.0-1.*.noarch.rpm
+             SRPMS/tarantool-2.2.2.0--1.*.src.rpm
     -f|--force
          Force updating the remote package with the local one despite the checksum difference
     -s|--skip_errors
@@ -134,6 +157,10 @@ case $i in
     product="${i#*=}"
     shift # past argument=value
     ;;
+    -r=*|--remove=*)
+    remove="${i#*=}"
+    shift # past argument=value
+    ;;
     -f|--force)
     force=1
     ;;
@@ -146,11 +173,14 @@ case $i in
     ;;
     *)
     repo="${i#*=}"
-    pushd $repo >/dev/null ; repo=$PWD ; popd >/dev/null
     shift # past argument=value
     ;;
 esac
 done
+
+if [ "$remove" == "" ]; then
+    pushd $repo >/dev/null ; repo=$PWD ; popd >/dev/null
+fi
 
 # check that all needed options were set and correct
 if [ "$bucket" == "" ]; then
@@ -195,7 +225,7 @@ function update_deb_packfile {
 
     # WORKAROUND: unknown why, but reprepro doesn`t save the Sources file,
     #             let`s recreate it manualy from it's zipped version
-    [ ! -f $psources ] || gunzip -c $psources.gz >$psources
+    gunzip -c $psources.gz >$psources
 
     # WORKAROUND: unknown why, but reprepro creates paths w/o distribution in
     #             it and no solution using configuration setup neither options
@@ -225,6 +255,8 @@ function update_deb_metadata {
             $aws cp "$bucket_path/$packpath" $packpath.saved || \
             touch $packpath.saved
     fi
+
+    [ "$remove" == "" ] || cp $packpath.saved $packpath
 
     if [ "$packtype" == "dsc" ]; then
         # check if the DSC hash already exists in old Sources file from S3
@@ -328,6 +360,135 @@ function update_deb_metadata {
     cat $packpath >>$packpath.saved
 }
 
+function update_deb_dists {
+    # 2(binaries). update Packages file archives
+    for packpath in dists/$loop_dist/$component/binary-* ; do
+        pushd $packpath
+        if [ -f Packages ]; then
+            sed -i '/./,$!d' Packages
+            bzip2 -c Packages >Packages.bz2
+            gzip -c Packages >Packages.gz
+        fi
+        popd
+    done
+
+    # 2(sources). update Sources file archives
+    pushd dists/$loop_dist/$component/source
+    if [ -f Sources ]; then
+        sed -i '/./,$!d' Sources
+        bzip2 -c Sources >Sources.bz2
+        gzip -c Sources >Sources.gz
+    fi
+    popd
+
+    # 3. update checksums entries of the Packages* files in *Release files
+    # NOTE: it is stable structure of the *Release files when the checksum
+    #       entries in it in the following way:
+    # MD5Sum:
+    #  <checksum> <size> <file orig>
+    #  <checksum> <size> <file debian>
+    # SHA1:
+    #  <checksum> <size> <file orig>
+    #  <checksum> <size> <file debian>
+    # SHA256:
+    #  <checksum> <size> <file orig>
+    #  <checksum> <size> <file debian>
+    #       The script bellow puts 'md5' value at the 1st found file entry,
+    #       'sha1' - at the 2nd and 'sha256' at the 3rd
+    pushd dists/$loop_dist
+    for file in $(grep " $component/" Release | awk '{print $3}' | sort -u) ; do
+        [ -f $file ] || continue
+        sz=$(stat -c "%s" $file)
+        md5=$(md5sum $file | awk '{print $1}')
+        sha1=$(sha1sum $file | awk '{print $1}')
+        sha256=$(sha256sum $file | awk '{print $1}')
+        awk 'BEGIN{c = 0} ; {
+            if ($3 == p) {
+                c = c + 1
+                if (c == 1) {print " " md  " " s " " p}
+                if (c == 2) {print " " sh1 " " s " " p}
+                if (c == 3) {print " " sh2 " " s " " p}
+            } else {print $0}
+        }' p="$file" s="$sz" md="$md5" sh1="$sha1" sh2="$sha256" \
+                Release >Release.new
+        mv Release.new Release
+    done
+    # resign the selfsigned InRelease file
+    $rm_file InRelease
+    gpg --clearsign -o InRelease Release
+    # resign the Release file
+    $rm_file Release.gpg
+    gpg -u $GPG_SIGN_KEY -abs -o Release.gpg Release
+    popd
+
+    # 4. sync the latest distribution path changes to S3
+    $aws_sync_public dists/$loop_dist "$bucket_path/dists/$loop_dist"
+}
+
+function remove_deb {
+    pushd $ws
+
+    # get Release file
+    relpath=dists/$option_dist
+    $mk_dir $relpath
+    $aws cp $bucket_path/$relpath/Release $relpath/
+
+    # get Packages files
+    for bindirs in $($aws ls $bucket_path/dists/$option_dist/$component/ \
+            | awk '{print $2}' | grep -v 'source/' | sed 's#/##g') ; do
+        packpath=$relpath/$component/$bindirs
+        $mk_dir $packpath
+        pushd $packpath
+        $aws cp $bucket_path/$packpath/Packages .
+
+        hashes_old=$(grep -e "^Filename: " -e "^SHA256: " Packages | \
+            grep -A1 "$remove" | grep "^SHA256: " | awk '{print $2}')
+        # NOTE: for the single file name may exists more than one
+        #       entry in damaged file, to fix it all found entries
+        #       of this file need to be removed
+        # find and remove all package blocks for the bad hashes
+        for hash_rm in $hashes_old ; do
+            echo "Removing from Packages file old hash: $hash_rm"
+            sed -i '1s/^/\n/' Packages
+            pcregrep -Mi -v "(?s)Package: (\N+\n)+(?=SHA256: ${hash_rm}).*?^$" \
+                Packages >Packages.new
+            mv Packages.new Packages
+        done
+        popd
+    done
+
+    # get Sources file
+    packpath=$relpath/$component/source
+    $mk_dir $packpath
+    pushd $packpath
+    $aws cp $bucket_path/$packpath/Sources .
+
+    hashes_old=$(grep '^Checksums-Sha256:' -A3 Sources | \
+        grep " .* .* $remove" | awk '{print $1}')
+    # NOTE: for the single file name may exists more than one
+    #       entry in damaged file, to fix it all found entries
+    #       of this file need to be removed
+    # find and remove all package blocks for the bad hashes
+    for hash_rm in $hashes_old ; do
+        echo "Removing from Sources file old hash: $hash_rm"
+        sed -i '1s/^/\n/' Sources
+        pcregrep -Mi -v "(?s)Package: (\N+\n)+(?=^ ${hash_rm}).*?^$" \
+            Sources >Sources.new
+        mv Sources.new Sources
+    done
+    popd
+
+    # call DEB dists path updater
+    loop_dist=$option_dist
+    update_deb_dists
+
+    # remove all found file by the given pattern in options
+    for suffix in '-1_all.deb' '-1_amd64.deb' '-1.dsc' '-1.debian.tar.xz' '.orig.tar.xz' ; do
+        $aws ls "$bucket_path/$poolpath/${remove}$suffix" || continue
+        $aws rm "$bucket_path/$poolpath/${remove}$suffix"
+    done
+}
+
 # The 'pack_deb' function especialy created for DEB packages. It works
 # with DEB packing OS like Ubuntu, Debian. It is based on globally known
 # tool 'reprepro' from:
@@ -339,18 +500,7 @@ function update_deb_metadata {
 #   https://www.tarantool.io/en/download/os-installation/debian/
 #   https://www.tarantool.io/en/download/os-installation/ubuntu/
 function pack_deb {
-    # we need to push packages into 'main' repository only
-    component=main
-
-    # debian has special directory 'pool' for packages
-    debdir=pool
-
-    # set the subpath with binaries based on literal character of the product name
-    proddir=$(echo $product | head -c 1)
-
     # copy single distribution with binaries packages
-    repopath=$ws/pool/${option_dist}/$component/$proddir/$product
-    $mk_dir ${repopath}
     file_found=0
     for file in $repo/*.deb $repo/*.dsc $repo/*.tar.*z ; do
         [ -f $file ] || continue
@@ -446,68 +596,8 @@ EOF
         sources=dists/$loop_dist/$component/source/Sources
         [ ! -f $sources.saved ] || mv $sources.saved $sources
 
-        # 2(binaries). update Packages file archives
-        for packpath in dists/$loop_dist/$component/binary-* ; do
-            pushd $packpath
-            if [ -f Packages ]; then
-                sed -i '/./,$!d' Packages
-                bzip2 -c Packages >Packages.bz2
-                gzip -c Packages >Packages.gz
-            fi
-            popd
-        done
-
-        # 2(sources). update Sources file archives
-        pushd dists/$loop_dist/$component/source
-        if [ -f Sources ]; then
-            sed -i '/./,$!d' Sources
-            bzip2 -c Sources >Sources.bz2
-            gzip -c Sources >Sources.gz
-        fi
-        popd
-
-        # 3. update checksums entries of the Packages* files in *Release files
-        # NOTE: it is stable structure of the *Release files when the checksum
-        #       entries in it in the following way:
-        # MD5Sum:
-        #  <checksum> <size> <file orig>
-        #  <checksum> <size> <file debian>
-        # SHA1:
-        #  <checksum> <size> <file orig>
-        #  <checksum> <size> <file debian>
-        # SHA256:
-        #  <checksum> <size> <file orig>
-        #  <checksum> <size> <file debian>
-        #       The script bellow puts 'md5' value at the 1st found file entry,
-        #       'sha1' - at the 2nd and 'sha256' at the 3rd
-        pushd dists/$loop_dist
-        for file in $(grep " $component/" Release | awk '{print $3}' | sort -u) ; do
-            [ -f $file ] || continue
-            sz=$(stat -c "%s" $file)
-            md5=$(md5sum $file | awk '{print $1}')
-            sha1=$(sha1sum $file | awk '{print $1}')
-            sha256=$(sha256sum $file | awk '{print $1}')
-            awk 'BEGIN{c = 0} ; {
-                if ($3 == p) {
-                    c = c + 1
-                    if (c == 1) {print " " md  " " s " " p}
-                    if (c == 2) {print " " sh1 " " s " " p}
-                    if (c == 3) {print " " sh2 " " s " " p}
-                } else {print $0}
-            }' p="$file" s="$sz" md="$md5" sh1="$sha1" sh2="$sha256" \
-                    Release >Release.new
-            mv Release.new Release
-        done
-        # resign the selfsigned InRelease file
-        $rm_file InRelease
-        gpg --clearsign -o InRelease Release
-        # resign the Release file
-        $rm_file Release.gpg
-        gpg -u $GPG_SIGN_KEY -abs -o Release.gpg Release
-        popd
-
-        # 4. sync the latest distribution path changes to S3
-        $aws_sync_public dists/$loop_dist "$bucket_path/dists/$loop_dist"
+        # call DEB dists path updater
+        update_deb_dists
     done
 }
 
@@ -521,6 +611,7 @@ EOF
 # at the Tarantool web site:
 #   https://www.tarantool.io/en/download/os-installation/rhel-centos/
 #   https://www.tarantool.io/en/download/os-installation/fedora/
+
 function pack_rpm {
     pack_subdir=$1
     pack_patterns=$2
@@ -632,7 +723,7 @@ function pack_rpm {
                     sed 's#.* packages="\([0-9]*\)".*#\1#g')-${packs_rm}))
                 sed "s# packages=\"[0-9]*\"# packages=\"${packs}\"#g" \
                     -i ${metafile}.xml
-                gzip ${metafile}.xml
+                gzip -f ${metafile}.xml
             done
         fi
     done
@@ -707,10 +798,142 @@ EOF
     $aws_sync_public repodata "$bucket_path/$repopath/repodata"
 }
 
+function remove_rpm {
+    pack_subdir=$1
+    pack_patterns=$2
+
+    pushd $ws
+
+    # set the paths
+    repopath=$option_dist/$pack_subdir
+    rpmpath=Packages
+    packpath=$repopath/$rpmpath
+
+    # prepare local repository with packages
+    $mk_dir $packpath
+    cd $repopath
+
+    # copy the current metadata files from S3
+    mkdir repodata
+    pushd repodata
+    for file in $($aws ls $bucket_path/$repopath/repodata/ | awk '{print $NF}') ; do
+        $aws ls $bucket_path/$repopath/repodata/$file || continue
+        $aws cp $bucket_path/$repopath/repodata/$file $file
+        [[ ! $file =~ .*.gz ]] || gunzip $file
+    done
+
+    updated_rpms=0
+    # loop by the new hashes from the new meta file
+    for hash in $(grep "<package pkgid=" other.xml | awk -F'"' '{print $2}') ; do
+        updated_rpm=0
+        file_exists=''
+        name=$(grep "<package pkgid=\"$hash\"" other.xml | awk -F'"' '{print $4}')
+        file=$(grep -e "<checksum type=" -e "<location href=" primary.xml | \
+            grep "$hash" -A1 | grep "<location href=" | \
+            awk -F'"' '{print $2}')
+        for pack_pattern in $pack_patterns ; do
+            [[ $file =~ Packages/$remove$pack_pattern ]] || continue
+
+            # check if the file already exists in S3
+            ! $aws ls "$bucket_path/$repopath/$file" || \
+                $aws rm "$bucket_path/$repopath/$file"
+
+            # search the new hash in the old meta file from S3
+            grep "pkgid=\"$hash\"" filelists.xml | grep "name=\"$name\"" || continue
+            updated_rpms=1
+            hashes_old=$(grep -e "<checksum type=" -e "<location href=" primary.xml | \
+                grep -B1 "$file" | grep "<checksum type=" | \
+                awk -F'>' '{print $2}' | sed 's#<.*##g')
+            # NOTE: for the single file name may exists more than one
+            #       entry in damaged file, to fix it all found entries
+            #       of this file need to be removed
+            for metafile in other filelists primary ; do
+                up_lines=''
+                if [ "$metafile" == "primary" ]; then
+                    up_full_lines='(\N+\n)*'
+                fi
+                packs_rm=0
+                # find and remove all <package> tags for the bad hashes
+                for hash_rm in $hashes_old ; do
+                    echo "Removing from ${metafile}.xml file old hash: $hash_rm"
+                    sed -i '1s/^/\n/' ${metafile}.xml
+                    pcregrep -Mi -v "(?s)<package ${up_full_lines}\N+(?=${hash_rm}).*?package>" \
+                        ${metafile}.xml >${metafile}_tmp.xml
+                    sed '/./,$!d' ${metafile}_tmp.xml >${metafile}.xml
+                    rm ${metafile}_tmp.xml
+                    packs_rm=$(($packs_rm+1))
+                done
+                # reduce number of packages in metafile counter
+                packs=$(($(grep " packages=" ${metafile}.xml | \
+                    sed 's#.* packages="\([0-9]*\)".*#\1#g')-${packs_rm}))
+                sed "s# packages=\"[0-9]*\"# packages=\"${packs}\"#g" \
+                    -i ${metafile}.xml
+            done
+        done
+    done
+
+    # check if any RPM files were newly registered
+    [ "$updated_rpms" == "0" ] && \
+        return || echo "Updating dists"
+
+    # merge metadata files
+    mv repomd.xml repomd_saved.xml
+    head -n 2 repomd_saved.xml >repomd.xml
+    for file in filelists.xml other.xml primary.xml ; do
+        # get the new data
+        chsnew=$(sha256sum $file | awk '{print $1}')
+        sz=$(stat --printf="%s" $file)
+        gzip $file
+        chsgznew=$(sha256sum $file.gz | awk '{print $1}')
+        szgz=$(stat --printf="%s" $file.gz)
+        timestamp=$(date +%s -r $file.gz)
+
+        # add info to repomd.xml file
+        name=$(echo $file | sed 's#\.xml$##g')
+        cat <<EOF >>repomd.xml
+<data type="$name">
+  <checksum type="sha256">$chsgznew</checksum>
+  <open-checksum type="sha256">$chsnew</open-checksum>
+  <location href="repodata/$file.gz"/>
+  <timestamp>$timestamp</timestamp>
+  <size>$szgz</size>
+  <open-size>$sz</open-size>
+</data>"
+EOF
+    done
+    tail -n 1 repomd_saved.xml >>repomd.xml
+    rm -f repomd_saved.xml repomd.xml.asc
+    popd
+    gpg --detach-sign --armor repodata/repomd.xml
+
+    # update the metadata at the S3
+    $aws_sync_public repodata "$bucket_path/$repopath/repodata"
+}
+
 if [ "$os" == "ubuntu" -o "$os" == "debian" ]; then
     # prepare the workspace
     prepare_ws ${os}
-    pack_deb
+
+    # we need to push packages into 'main' repository only
+    component=main
+
+    # debian has special directory 'pool' for packages
+    debdir=pool
+
+    # set the subpath with binaries based on literal character of the product name
+    proddir=$(echo $product | head -c 1)
+
+    # copy single distribution with binaries packages
+    poolpath=pool/${option_dist}/$component/$proddir/$product
+    repopath=$ws/$poolpath
+    $mk_dir ${repopath}
+
+    if [ "$remove" != "" ]; then
+        remove_deb
+    else
+        pack_deb
+    fi
+
     # unlock the publishing
     $rm_file $ws_lockfile
     popd
@@ -722,14 +945,22 @@ elif [ "$os" == "el" -o "$os" == "fedora" ]; then
 
     # prepare the workspace
     prepare_ws ${os}_${option_dist}
-    pack_rpm x86_64 "*.x86_64.rpm *.noarch.rpm"
+    if [ "$remove" != "" ]; then
+        remove_rpm x86_64 "-1.*.x86_64.rpm -1.*.noarch.rpm"
+    else
+        pack_rpm x86_64 "*.x86_64.rpm *.noarch.rpm"
+    fi
     # unlock the publishing
     $rm_file $ws_lockfile
     popd
 
     # prepare the workspace
     prepare_ws ${os}_${option_dist}
-    pack_rpm SRPMS "*.src.rpm"
+    if [ "$remove" != "" ]; then
+        remove_rpm SRPMS "-1.*.src.rpm"
+    else
+        pack_rpm SRPMS "*.src.rpm"
+    fi
     # unlock the publishing
     $rm_file $ws_lockfile
     popd
