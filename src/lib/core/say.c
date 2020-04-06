@@ -175,6 +175,12 @@ log_get_fd(void)
 }
 
 void
+log_set_fd(int new_fd)
+{
+	log_default->fd = new_fd;
+}
+
+void
 log_set_level(struct log *log, enum say_level level)
 {
 	log->level = level;

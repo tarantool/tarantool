@@ -204,10 +204,18 @@ enum say_logger_type
 log_type();
 
 /**
- * Default logger file descriptor.
+ * Accessors for default logger file descriptor.
+ *
+ * It is needed for decoupling of a logger file descriptor from
+ * stderr in the popen implementation.
+ *
+ * Those functions break logger incapsulation, so use them with
+ * caution.
  */
 int
 log_get_fd(void);
+void
+log_set_fd(int new_fd);
 
 /**
  * Set log level. Can be used dynamically.
