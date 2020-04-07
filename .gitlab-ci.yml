@@ -442,6 +442,8 @@ static_build:
 
 static_docker_build:
   <<: *release_only_definition
-  <<: *pack_test_definition
+  stage: test
+  tags:
+    - deploy_test
   script:
     - ${GITLAB_MAKE} test_static_docker_build
