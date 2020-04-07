@@ -75,6 +75,58 @@ popen_unregister(struct popen_handle *handle)
 }
 
 /**
+ * Duplicate a file descriptor, but not to std{in,out,err}.
+ *
+ * Return a new fd at success, otherwise return -1 and set a diag.
+ */
+static int
+dup_not_std_streams(int fd)
+{
+	int res = -1;
+	int save_errno = 0;
+
+	/*
+	 * We will call dup() in a loop until it will return
+	 * fd > STDERR_FILENO. The array `discarded_fds` stores
+	 * intermediate fds to close them after all dup() calls.
+	 */
+	int discarded_fds[POPEN_FLAG_FD_STDEND_BIT] = {-1, -1, -1};
+
+	for (size_t i = 0; i < lengthof(discarded_fds) + 1; ++i) {
+		int new_fd = dup(fd);
+		if (new_fd < 0) {
+			save_errno = errno;
+			break;
+		}
+
+		/* Found wanted fd. */
+		if (new_fd > STDERR_FILENO) {
+			res = new_fd;
+			break;
+		}
+
+		/* Save to close then. */
+		assert(i < lengthof(discarded_fds));
+		discarded_fds[i] = new_fd;
+	}
+
+	/* Close all intermediate fds (if any). */
+	for (size_t i = 0; i < lengthof(discarded_fds); ++i) {
+		if (discarded_fds[i] >= 0)
+			close(discarded_fds[i]);
+	}
+
+	/* Report an error if it occurs. */
+	if (res < 0) {
+		errno = save_errno;
+		diag_set(SystemError, "Unable to duplicate an fd %d", fd);
+		return -1;
+	}
+
+	return res;
+}
+
+/**
  * Allocate new popen hanldle with flags specified.
  */
 static struct popen_handle *
@@ -746,8 +798,33 @@ popen_new(struct popen_opts *opts)
 	 * plus dev/null variants and logfd
 	 */
 	int skip_fds[POPEN_FLAG_FD_STDEND_BIT * 2 + 2 + 1];
-	int log_fd = log_get_fd();
 	size_t nr_skip_fds = 0;
+
+	/*
+	 * We must decouple log file descriptor from stderr in order to
+	 * close or redirect stderr, but keep logging as is until
+	 * execve() call.
+	 *
+	 * The new file descriptor should not have the same number as
+	 * stdin, stdout or stderr.
+	 *
+	 * NB: It is better to acquire it from the parent to catch
+	 * possible error sooner and don't ever call vfork() if we
+	 * reached a file descriptor limit.
+	 */
+	int old_log_fd = log_get_fd();
+	int log_fd = -1;
+	if (old_log_fd >= 0) {
+		log_fd = dup_not_std_streams(old_log_fd);
+		if (log_fd < 0)
+			return NULL;
+		if (fcntl(log_fd, F_SETFL, O_CLOEXEC) != 0) {
+			diag_set(SystemError,
+				 "Unable to set O_CLOEXEC on temporary logfd");
+			close(log_fd);
+			return NULL;
+		}
+	}
 
 	/*
 	 * A caller must preserve space for this.
@@ -771,8 +848,11 @@ popen_new(struct popen_opts *opts)
 		      "Popen flags do not match stdX");
 
 	handle = handle_new(opts);
-	if (!handle)
+	if (!handle) {
+		if (log_fd >= 0)
+			close(log_fd);
 		return NULL;
+	}
 
 	if (log_fd >= 0)
 		skip_fds[nr_skip_fds++] = log_fd;
@@ -838,6 +918,20 @@ popen_new(struct popen_opts *opts)
 		 * file descriptors we use for piping. Thus don't
 		 * do anything special.
 		 */
+
+		/*
+		 * Replace the logger fd to its duplicate. It
+		 * should be done before we'll close inherited
+		 * fds: old logger fd may be stderr and stderr may
+		 * be subject to close.
+		 *
+		 * We should also do it before a first call to a
+		 * say_*() function, because otherwise a user may
+		 * capture our debug logs as stderr of the child
+		 * process.
+		 */
+		if (log_fd >= 0)
+			log_set_fd(log_fd);
 
 		/*
 		 * Also don't forget to drop signal handlers
@@ -944,19 +1038,21 @@ popen_new(struct popen_opts *opts)
 			goto exit_child;
 		}
 
-		if (log_fd >= 0) {
-			if (close(log_fd)) {
-				say_error("child: can't close logfd %d",
-					  log_fd);
-				goto exit_child;
-			}
-		}
+		/*
+		 * Return the logger back, because we're in the
+		 * same virtual memory address space as the
+		 * parent.
+		 */
+		if (log_fd >= 0)
+			log_set_fd(old_log_fd);
 
 		if (opts->flags & POPEN_FLAG_SHELL)
 			execve(_PATH_BSHELL, opts->argv, envp);
 		else
 			execve(opts->argv[0], opts->argv, envp);
 exit_child:
+		if (log_fd >= 0)
+			log_set_fd(old_log_fd);
 		_exit(errno);
 		unreachable();
 	}
@@ -985,6 +1081,13 @@ exit_child:
 
 			pfd[i][child_idx] = -1;
 		}
+	}
+
+	/* Close the temporary logger fd. */
+	if (log_fd >= 0 && close(log_fd) != 0) {
+		diag_set(SystemError, "Can't close temporary logfd %d", log_fd);
+		log_fd = -1;
+		goto out_err;
 	}
 
 	/*
@@ -1018,6 +1121,8 @@ out_err:
 		if (pfd[i][1] != -1)
 			close(pfd[i][1]);
 	}
+	if (log_fd >= 0)
+		close(log_fd);
 	errno = saved_errno;
 	return NULL;
 }
