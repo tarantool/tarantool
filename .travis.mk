@@ -140,7 +140,7 @@ test_static_build: deps_debian_static
 	CMAKE_EXTRA_PARAMS=-DBUILD_STATIC=ON make -f .travis.mk test_debian_no_deps
 
 test_static_docker_build:
-	docker build --network=host --build-arg RUN_TESTS=ON -f Dockerfile.staticbuild .
+	docker build --no-cache --network=host --build-arg RUN_TESTS=ON -f Dockerfile.staticbuild .
 
 #######
 # OSX #
