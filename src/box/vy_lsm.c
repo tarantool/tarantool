@@ -1069,7 +1069,7 @@ vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range)
 
 	/* Split a range in two parts. */
 	const int n_parts = 2;
-
+	struct vy_range *parts[2] = { NULL, NULL };
 	/*
 	 * Determine new ranges' boundaries.
 	 */
@@ -1088,7 +1088,7 @@ vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range)
 	 * the old range's runs for them.
 	 */
 	struct vy_slice *slice, *new_slice;
-	struct vy_range *part, *parts[2] = {NULL, };
+	struct vy_range *part = NULL;
 	for (int i = 0; i < n_parts; i++) {
 		part = vy_range_new(vy_log_next_id(), keys[i], keys[i + 1],
 				    lsm->cmp_def);

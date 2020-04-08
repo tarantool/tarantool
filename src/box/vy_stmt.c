@@ -140,6 +140,16 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t bsize)
 		error_log(diag_last_error(diag_get()));
 		return NULL;
 	}
+#ifndef NDEBUG
+	struct errinj *inj = errinj(ERRINJ_VY_STMT_ALLOC, ERRINJ_INT);
+	if (inj != NULL && inj->iparam >= 0) {
+		if (inj->iparam-- == 0) {
+			diag_set(OutOfMemory, total_size, "malloc",
+				 "struct vy_stmt");
+			return NULL;
+		}
+	}
+#endif
 	struct tuple *tuple = malloc(total_size);
 	if (unlikely(tuple == NULL)) {
 		diag_set(OutOfMemory, total_size, "malloc", "struct vy_stmt");
