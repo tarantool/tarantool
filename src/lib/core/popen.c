@@ -190,22 +190,20 @@ handle_free(struct popen_handle *handle)
 }
 
 /**
- * Test if the handle can run io operation.
+ * Test if the handle can run a requested IO operation.
+ *
+ * Returns 0 if so and -1 otherwise (and set a diag).
  */
-static inline bool
+static inline int
 popen_may_io(struct popen_handle *handle, unsigned int io_flags)
 {
-	if (!handle) {
-		errno = ESRCH;
-		return false;
-	}
-
 	if (!(io_flags & handle->flags)) {
-		errno = EINVAL;
-		return false;
+		diag_set(IllegalParams, "popen: handle does not support the "
+			 "requested IO operation");
+		return -1;
 	}
 
-	return true;
+	return 0;
 }
 
 /**
@@ -272,6 +270,27 @@ stdX_str(unsigned int index)
 
 /**
  * Write data to the child stdin.
+ *
+ * Yield until all @a count bytes will be written.
+ *
+ * Returns @a count at success, otherwise returns -1 and set a
+ * diag.
+ *
+ * Possible errors:
+ *
+ * - IllegalParams: a parameter check fails:
+ *   - count: data is too big.
+ *   - flags: POPEN_FLAG_FD_STDIN bit is unset.
+ *   - handle: handle does not support the requested IO operation.
+ * - SocketError: an IO error occurs at write().
+ * - TimedOut: @a timeout quota is exceeded.
+ * - FiberIsCancelled: cancelled by an outside code.
+ *
+ * An error may occur after a partial write. There is not way to
+ * enquire amount of written bytes in the case.
+ *
+ * FIXME: Provide an info re amount written bytes in the case.
+ *        Say, return -(written) in the case.
  */
 int
 popen_write_timeout(struct popen_handle *handle, const void *buf,
@@ -280,20 +299,21 @@ popen_write_timeout(struct popen_handle *handle, const void *buf,
 {
 	assert(handle != NULL);
 
-	int idx = STDIN_FILENO;
+	if (count > (size_t)SSIZE_MAX) {
+		diag_set(IllegalParams, "popen: data is too big");
+		return -1;
+	}
 
 	if (!(flags & POPEN_FLAG_FD_STDIN)) {
-	    errno = EINVAL;
-	    return -1;
-	}
-
-	if (!popen_may_io(handle, flags))
-		return -1;
-
-	if (count > (size_t)SSIZE_MAX) {
-		errno = E2BIG;
+		diag_set(IllegalParams,
+			 "popen: POPEN_FLAG_FD_STDIN bit is unset");
 		return -1;
 	}
+
+	if (popen_may_io(handle, flags) != 0)
+		return -1;
+
+	int idx = STDIN_FILENO;
 
 	say_debug("popen: %d: write idx [%s:%d] buf %p count %zu "
 		  "fds %d timeout %.9g",
@@ -306,6 +326,26 @@ popen_write_timeout(struct popen_handle *handle, const void *buf,
 
 /**
  * Read data from a child's peer with timeout.
+ *
+ * Yield until some data will be available for read.
+ *
+ * Returns amount of read bytes at success, otherwise returns -1
+ * and set a diag.
+ *
+ * Zero return value means EOF.
+ *
+ * Note: Less then @a count bytes may be available for read at a
+ * moment, so a return value less then @a count does not mean EOF.
+ *
+ * Possible errors:
+ *
+ * - IllegalParams: a parameter check fails:
+ *   - count: buffer is too big.
+ *   - flags: POPEN_FLAG_FD_STD{OUT,ERR} are unset both.
+ *   - handle: handle does not support the requested IO operation.
+ * - SocketError: an IO error occurs at read().
+ * - TimedOut: @a timeout quota is exceeded.
+ * - FiberIsCancelled: cancelled by an outside code.
  */
 ssize_t
 popen_read_timeout(struct popen_handle *handle, void *buf,
@@ -314,24 +354,28 @@ popen_read_timeout(struct popen_handle *handle, void *buf,
 {
 	assert(handle != NULL);
 
-	int idx = flags & POPEN_FLAG_FD_STDOUT ?
-		STDOUT_FILENO : STDERR_FILENO;
+	if (count > (size_t)SSIZE_MAX) {
+		diag_set(IllegalParams, "popen: buffer is too big");
+		return -1;
+	}
 
 	if (!(flags & (POPEN_FLAG_FD_STDOUT | POPEN_FLAG_FD_STDERR))) {
-	    errno = EINVAL;
-	    return -1;
-	}
-
-	if (!popen_may_io(handle, flags))
-		return -1;
-
-	if (count > (size_t)SSIZE_MAX) {
-		errno = E2BIG;
+		diag_set(IllegalParams, "popen: POPEN_FLAG_FD_STD{OUT,ERR} are "
+			 "unset both");
 		return -1;
 	}
 
-	if (timeout < 0.)
-		timeout = TIMEOUT_INFINITY;
+	if (flags & POPEN_FLAG_FD_STDOUT && flags & POPEN_FLAG_FD_STDERR) {
+		diag_set(IllegalParams, "popen: reading from both stdout and "
+			 "stderr at one call is not supported");
+		return -1;
+	}
+
+	if (popen_may_io(handle, flags) != 0)
+		return -1;
+
+	int idx = flags & POPEN_FLAG_FD_STDOUT ?
+		STDOUT_FILENO : STDERR_FILENO;
 
 	say_debug("popen: %d: read idx [%s:%d] buf %p count %zu "
 		  "fds %d timeout %.9g",
