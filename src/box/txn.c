@@ -463,10 +463,10 @@ txn_complete(struct txn *txn)
 	}
 }
 
-static void
-txn_entry_done_cb(struct journal_entry *entry, void *data)
+void
+txn_complete_async(struct journal_entry *entry, void *complete_data)
 {
-	struct txn *txn = data;
+	struct txn *txn = complete_data;
 	txn->signature = entry->res;
 	/*
 	 * Some commit/rollback triggers require for in_txn fiber
@@ -488,7 +488,7 @@ txn_write_to_wal(struct txn *txn)
 	struct journal_entry *req = journal_entry_new(txn->n_new_rows +
 						      txn->n_applier_rows,
 						      &txn->region,
-						      txn_entry_done_cb,
+						      txn_complete_async,
 						      txn);
 	if (req == NULL) {
 		txn_rollback(txn);
