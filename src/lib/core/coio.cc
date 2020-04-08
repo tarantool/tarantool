@@ -388,8 +388,8 @@ coio_readn_ahead_timeout(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz
  * fiber until the socket becomes ready, until
  * all data is written.
  *
- * @retval the number of bytes written. Can be less than
- * requested only in case of timeout.
+ * @retval the number of bytes written. Always
+ * equal to @a sz.
  */
 ssize_t
 coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
