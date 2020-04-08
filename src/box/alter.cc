@@ -672,9 +672,7 @@ txn_alter_trigger_new(trigger_f run, void *data)
 {
 	struct trigger *trigger = (struct trigger *)
 		region_calloc_object_xc(&in_txn()->region, struct trigger);
-	trigger->run = run;
-	trigger->data = data;
-	trigger->destroy = NULL;
+	trigger_create(trigger, run, data, NULL);
 	return trigger;
 }
 
