@@ -60,11 +60,17 @@ const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 
 int wal_dir_lock = -1;
 
-static int64_t
+static int
+wal_write_async(struct journal *, struct journal_entry *);
+
+static int
 wal_write(struct journal *, struct journal_entry *);
 
-static int64_t
-wal_write_in_wal_mode_none(struct journal *, struct journal_entry *);
+static int
+wal_write_none_async(struct journal *, struct journal_entry *);
+
+static int
+wal_write_none(struct journal *, struct journal_entry *);
 
 /*
  * WAL writer - maintain a Write Ahead Log for every change
@@ -253,9 +259,10 @@ xlog_write_entry(struct xlog *l, struct journal_entry *entry)
 static void
 tx_schedule_queue(struct stailq *queue)
 {
+	struct wal_writer *writer = &wal_writer_singleton;
 	struct journal_entry *req, *tmp;
 	stailq_foreach_entry_safe(req, tmp, queue, fifo)
-		journal_entry_complete(req);
+		journal_async_complete(&writer->base, req);
 }
 
 /**
@@ -342,6 +349,7 @@ tx_notify_checkpoint(struct cmsg *msg)
  */
 static void
 wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
+		  void (*wall_async_cb)(struct journal_entry *entry),
 		  const char *wal_dirname,
 		  int64_t wal_max_size, const struct tt_uuid *instance_uuid,
 		  wal_on_garbage_collection_f on_garbage_collection,
@@ -349,8 +357,14 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 {
 	writer->wal_mode = wal_mode;
 	writer->wal_max_size = wal_max_size;
-	journal_create(&writer->base, wal_mode == WAL_NONE ?
-		       wal_write_in_wal_mode_none : wal_write, NULL);
+
+	journal_create(&writer->base,
+		       wal_mode == WAL_NONE ?
+		       wal_write_none_async : wal_write_async,
+		       wall_async_cb,
+		       wal_mode == WAL_NONE ?
+		       wal_write_none : wal_write,
+		       NULL);
 
 	struct xlog_opts opts = xlog_opts_default;
 	opts.sync_is_async = true;
@@ -458,14 +472,14 @@ wal_open(struct wal_writer *writer)
 }
 
 int
-wal_init(enum wal_mode wal_mode, const char *wal_dirname,
-	 int64_t wal_max_size, const struct tt_uuid *instance_uuid,
+wal_init(enum wal_mode wal_mode, void (*wall_async_cb)(struct journal_entry *entry),
+	 const char *wal_dirname, int64_t wal_max_size, const struct tt_uuid *instance_uuid,
 	 wal_on_garbage_collection_f on_garbage_collection,
 	 wal_on_checkpoint_threshold_f on_checkpoint_threshold)
 {
 	/* Initialize the state. */
 	struct wal_writer *writer = &wal_writer_singleton;
-	wal_writer_create(writer, wal_mode, wal_dirname,
+	wal_writer_create(writer, wal_mode, wall_async_cb, wal_dirname,
 			  wal_max_size, instance_uuid, on_garbage_collection,
 			  on_checkpoint_threshold);
 
@@ -1126,8 +1140,8 @@ wal_writer_f(va_list ap)
  * WAL writer main entry point: queue a single request
  * to be written to disk.
  */
-static int64_t
-wal_write(struct journal *journal, struct journal_entry *entry)
+static int
+wal_write_async(struct journal *journal, struct journal_entry *entry)
 {
 	struct wal_writer *writer = (struct wal_writer *) journal;
 
@@ -1178,24 +1192,47 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 
 fail:
 	entry->res = -1;
-	journal_entry_complete(entry);
 	return -1;
 }
 
-static int64_t
-wal_write_in_wal_mode_none(struct journal *journal,
-			   struct journal_entry *entry)
+static int
+wal_write(struct journal *journal, struct journal_entry *entry)
+{
+	/*
+	 * We can reuse async WAL engine transparently
+	 * to the caller.
+	 */
+	if (wal_write_async(journal, entry) != 0)
+		return -1;
+
+	bool cancellable = fiber_set_cancellable(false);
+	fiber_yield();
+	fiber_set_cancellable(cancellable);
+
+	return 0;
+}
+
+static int
+wal_write_none_async(struct journal *journal,
+		     struct journal_entry *entry)
 {
 	struct wal_writer *writer = (struct wal_writer *) journal;
 	struct vclock vclock_diff;
+
 	vclock_create(&vclock_diff);
 	wal_assign_lsn(&vclock_diff, &writer->vclock, entry->rows,
 		       entry->rows + entry->n_rows);
 	vclock_merge(&writer->vclock, &vclock_diff);
 	vclock_copy(&replicaset.vclock, &writer->vclock);
 	entry->res = vclock_sum(&writer->vclock);
-	journal_entry_complete(entry);
+
 	return 0;
+}
+
+static int
+wal_write_none(struct journal *journal, struct journal_entry *entry)
+{
+	return wal_write_none_async(journal, entry);
 }
 
 void

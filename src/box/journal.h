@@ -42,9 +42,6 @@ extern "C" {
 struct xrow_header;
 struct journal_entry;
 
-/** Journal entry finalization callback typedef. */
-typedef void (*journal_entry_done_cb)(struct journal_entry *entry, void *data);
-
 /**
  * An entry for an abstract journal.
  * Simply put, a write ahead log request.
@@ -61,16 +58,9 @@ struct journal_entry {
 	 */
 	int64_t res;
 	/**
-	 * A journal entry finalization callback which is going to be called
-	 * after the entry processing was finished in both cases: success
-	 * or fail. Entry->res is set to a result value before the callback
-	 * is fired.
-	 */
-	journal_entry_done_cb on_done_cb;
-	/**
 	 * A journal entry completion callback argument.
 	 */
-	void *on_done_cb_data;
+	void *complete_data;
 	/**
 	 * Approximate size of this request when encoded.
 	 */
@@ -94,17 +84,7 @@ struct region;
  */
 struct journal_entry *
 journal_entry_new(size_t n_rows, struct region *region,
-		  journal_entry_done_cb on_done_cb,
-		  void *on_done_cb_data);
-
-/**
- * Finalize a single entry.
- */
-static inline void
-journal_entry_complete(struct journal_entry *entry)
-{
-	entry->on_done_cb(entry, entry->on_done_cb_data);
-}
+		  void *complete_data);
 
 /**
  * An API for an abstract journal for all transactions of this
@@ -112,10 +92,30 @@ journal_entry_complete(struct journal_entry *entry)
  * synchronous replication.
  */
 struct journal {
-	int64_t (*write)(struct journal *journal,
-			 struct journal_entry *req);
+	/** Asynchronous write */
+	int (*write_async)(struct journal *journal,
+			   struct journal_entry *entry);
+
+	/** Asynchronous write completion */
+	void (*write_async_cb)(struct journal_entry *entry);
+
+	/** Synchronous write */
+	int (*write)(struct journal *journal,
+		     struct journal_entry *entry);
+
+	/** Journal destroy */
 	void (*destroy)(struct journal *journal);
 };
+
+/**
+ * Finalize a single entry.
+ */
+static inline void
+journal_async_complete(struct journal *journal, struct journal_entry *entry)
+{
+	assert(journal->write_async_cb != NULL);
+	journal->write_async_cb(entry);
+}
 
 /**
  * Depending on the step of recovery and instance configuration
@@ -124,14 +124,25 @@ struct journal {
 extern struct journal *current_journal;
 
 /**
- * Send a single entry to write.
+ * Write a single entry to the journal in synchronous way.
  *
- * @return 0 if write was scheduled or -1 in case of an error.
+ * @return 0 if write was processed by a backend or -1 in case of an error.
  */
 static inline int64_t
 journal_write(struct journal_entry *entry)
 {
 	return current_journal->write(current_journal, entry);
+}
+
+/**
+ * Queue a single entry to the journal in asynchronous way.
+ *
+ * @return 0 if write was queued to a backend or -1 in case of an error.
+ */
+static inline int
+journal_write_async(struct journal_entry *entry)
+{
+	return current_journal->write_async(current_journal, entry);
 }
 
 /**
@@ -165,12 +176,29 @@ journal_set(struct journal *new_journal)
 
 static inline void
 journal_create(struct journal *journal,
-	       int64_t (*write)(struct journal *, struct journal_entry *),
-	       void (*destroy)(struct journal *))
+	       int (*write_async)(struct journal *journal,
+				  struct journal_entry *entry),
+	       void (*write_async_cb)(struct journal_entry *entry),
+	       int (*write)(struct journal *journal,
+			    struct journal_entry *entry),
+	       void (*destroy)(struct journal *journal))
 {
-	journal->write = write;
-	journal->destroy = destroy;
+	journal->write_async	= write_async;
+	journal->write_async_cb	= write_async_cb;
+	journal->write		= write;
+	journal->destroy	= destroy;
 }
+
+/**
+ * A stub to issue an error in case if asynchronous
+ * write is diabled in the backend.
+ */
+extern int
+journal_no_write_async(struct journal *journal,
+		       struct journal_entry *entry);
+
+extern void
+journal_no_write_async_cb(struct journal_entry *entry);
 
 static inline bool
 journal_is_initialized(struct journal *journal)
