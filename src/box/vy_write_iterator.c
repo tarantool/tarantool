@@ -153,9 +153,11 @@ vy_read_view_stmt_destroy(struct vy_read_view_stmt *rv)
 	if (rv->entry.stmt != NULL)
 		vy_stmt_unref_if_possible(rv->entry.stmt);
 	rv->entry = vy_entry_none();
-	if (rv->history != NULL)
-		vy_write_history_destroy(rv->history);
-	rv->history = NULL;
+	/*
+	 * History must be already cleaned up in
+	 * vy_write_iterator_build_read_views().
+	 */
+	assert(rv->history == NULL);
 }
 
 /* @sa vy_write_iterator.h */
@@ -838,6 +840,15 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct vy_entry prev,
 		rv->history = NULL;
 		return 0;
 	}
+#ifndef NDEBUG
+	struct errinj *inj =
+		errinj(ERRINJ_VY_READ_VIEW_MERGE_FAIL, ERRINJ_BOOL);
+	if (inj != NULL && inj->bparam) {
+		inj->bparam = false;
+		diag_set(OutOfMemory, 666, "malloc", "struct vy_stmt");
+		return -1;
+	}
+#endif
 	/*
 	 * Two possible hints to remove the current UPSERT.
 	 * 1. If the stream is working on the last level, we
@@ -948,6 +959,25 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct vy_entry prev,
 }
 
 /**
+ * Clean up all histories related to given write iterator.
+ * Particular history is allocated using region, so single
+ * region truncation is enough to release all memory at once.
+ * Before that we should also unref tuples stored in those
+ * histories (which is done in vy_write_history_destroy()).
+ */
+static void
+vy_write_iterator_history_destroy(struct vy_write_iterator *stream,
+				  struct region *region, size_t used)
+{
+	for (int i = 0; i < stream->rv_count; ++i) {
+		if (stream->read_views[i].history != NULL)
+			vy_write_history_destroy(stream->read_views[i].history);
+		stream->read_views[i].history = NULL;
+	}
+	region_truncate(region, used);
+}
+
+/**
  * Split the current key into a sequence of read view
  * statements. @sa struct vy_write_iterator comment for details
  * about the algorithm and optimizations.
@@ -967,9 +997,12 @@ vy_write_iterator_build_read_views(struct vy_write_iterator *stream, int *count)
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
 	stream->rv_used_count = 0;
+	int rc = 0;
 	if (vy_write_iterator_build_history(stream, &raw_count,
-					    &is_first_insert) != 0)
-		goto error;
+					    &is_first_insert) != 0) {
+		rc = -1;
+		goto cleanup;
+	}
 	if (raw_count == 0) {
 		/* A key is fully optimized. */
 		region_truncate(region, used);
@@ -989,8 +1022,10 @@ vy_write_iterator_build_read_views(struct vy_write_iterator *stream, int *count)
 	for (; rv >= &stream->read_views[0]; --rv) {
 		if (rv->history == NULL)
 			continue;
-		if (vy_read_view_merge(stream, prev, rv, is_first_insert) != 0)
-			goto error;
+		if (vy_read_view_merge(stream, prev, rv, is_first_insert) != 0) {
+			rc = -1;
+			goto cleanup;
+		}
 		assert(rv->history == NULL);
 		if (rv->entry.stmt == NULL)
 			continue;
@@ -998,11 +1033,10 @@ vy_write_iterator_build_read_views(struct vy_write_iterator *stream, int *count)
 		++*count;
 		prev = rv->entry;
 	}
-	region_truncate(region, used);
-	return 0;
-error:
-	region_truncate(region, used);
-	return -1;
+
+cleanup:
+	vy_write_iterator_history_destroy(stream, region, used);
+	return rc;
 }
 
 /**

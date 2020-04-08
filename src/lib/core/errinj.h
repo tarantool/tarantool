@@ -141,6 +141,7 @@ struct errinj {
 	_(ERRINJ_INDEX_RESERVE, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_TXN_COMMIT_ASYNC, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_VY_STMT_ALLOC, ERRINJ_INT, {.iparam = -1})\
+	_(ERRINJ_VY_READ_VIEW_MERGE_FAIL, ERRINJ_BOOL, {.bparam = false})\
 
 ENUM0(errinj_id, ERRINJ_LIST);
 extern struct errinj errinjs[];
