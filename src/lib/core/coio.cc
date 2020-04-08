@@ -381,6 +381,26 @@ coio_readn_ahead_timeout(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz
 	return nrd;
 }
 
+/*
+ * FIXME: Rewrite coio_read_ahead_timeout() w/o C++ exceptions and
+ * drop this function.
+ */
+ssize_t
+coio_read_ahead_timeout_noxc(struct ev_io *coio, void *buf, size_t sz,
+			     size_t bufsiz, ev_tstamp timeout)
+{
+	try {
+		return coio_read_ahead_timeout(coio, buf, sz, bufsiz, timeout);
+	} catch (Exception *) {
+		/*
+		 * The exception is already in the diagnostics
+		 * area. Nothing to do.
+		 */
+	}
+	return -1;
+}
+
+
 /** Write sz bytes to socket.
  *
  * Throws SocketError in case of write error. If
@@ -435,6 +455,25 @@ coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
 			tnt_raise(TimedOut);
 		coio_timeout_update(&start, &delay);
 	}
+}
+
+/*
+ * FIXME: Rewrite coio_write_timeout() w/o C++ exceptions and drop
+ * this function.
+ */
+ssize_t
+coio_write_timeout_noxc(struct ev_io *coio, const void *buf, size_t sz,
+			ev_tstamp timeout)
+{
+	try {
+		return coio_write_timeout(coio, buf, sz, timeout);
+	} catch (Exception *) {
+		/*
+		 * The exception is already in the diagnostics
+		 * area. Nothing to do.
+		 */
+	}
+	return -1;
 }
 
 /*
