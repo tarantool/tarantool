@@ -82,11 +82,13 @@ target_link_libraries(stat core)
 add_library(scramble STATIC scramble.c)
 target_link_libraries(scramble core misc)
 
+add_library(cpu_feature STATIC cpu_feature.c)
+
 add_library(crc32 STATIC
     crc32.c
-    cpu_feature.c
     ${PROJECT_SOURCE_DIR}/third_party/crc32.c
 )
+target_link_libraries(crc32 cpu_feature)
 
 set (server_sources
      find_path.c
@@ -94,7 +96,6 @@ set (server_sources
      httpc.c
      pickle.c
      cfg.c
-     cpu_feature.c
      title.c
      proc_title.c
      path_lock.c
@@ -171,7 +172,7 @@ set_source_files_compile_flags(${server_sources})
 add_library(server STATIC ${server_sources})
 add_dependencies(server build_bundled_libs)
 target_link_libraries(server core coll http_parser bit uri uuid swim swim_udp
-                      swim_ev crypto mpstream)
+                      swim_ev crypto mpstream crc32)
 
 # Rule of thumb: if exporting a symbol from a static library, list the
 # library here.

@@ -33,11 +33,11 @@ set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 include_directories(${ZSTD_INCLUDE_DIRS})
 include_directories(${CMAKE_BINARY_DIR}/src/box/sql)
 
-add_library(box_error STATIC error.cc errcode.c vclock.c mp_error.cc)
-target_link_libraries(box_error core stat mpstream)
-
 add_library(vclock STATIC vclock.c)
 target_link_libraries(vclock core)
+
+add_library(box_error STATIC error.cc errcode.c mp_error.cc)
+target_link_libraries(box_error core stat mpstream vclock)
 
 add_library(xrow STATIC xrow.c iproto_constants.c)
 target_link_libraries(xrow server core small vclock misc box_error
@@ -72,7 +72,6 @@ target_link_libraries(xlog core box_error crc32 ${ZSTD_LIBRARIES})
 
 add_library(box STATIC
     iproto.cc
-    error.cc
     xrow_io.cc
     tuple_convert.c
     identifier.c
