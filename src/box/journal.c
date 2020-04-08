@@ -32,30 +32,54 @@
 #include <small/region.h>
 #include <diag.h>
 
+int
+journal_no_write_async(struct journal *journal,
+		       struct journal_entry *entry)
+{
+	(void)journal;
+	assert(true);
+
+	errno = EINVAL;
+	diag_set(SystemError, "write_async wrong context");
+
+	entry->res = -1;
+	return -1;
+}
+
+void
+journal_no_write_async_cb(struct journal_entry *entry)
+{
+	assert(true);
+
+	errno = EINVAL;
+	diag_set(SystemError, "write_async_cb wrong context");
+
+	entry->res = -1;
+}
+
 /**
  * Used to load from a memtx snapshot. LSN is not used,
  * but txn_commit() must work.
  */
-static int64_t
+static int
 dummy_journal_write(struct journal *journal, struct journal_entry *entry)
 {
 	(void) journal;
 	entry->res = 0;
-	journal_entry_complete(entry);
 	return 0;
 }
 
 static struct journal dummy_journal = {
-	dummy_journal_write,
-	NULL,
+	.write_async	= journal_no_write_async,
+	.write_async_cb	= journal_no_write_async_cb,
+	.write		= dummy_journal_write,
 };
 
 struct journal *current_journal = &dummy_journal;
 
 struct journal_entry *
 journal_entry_new(size_t n_rows, struct region *region,
-		  journal_entry_done_cb on_done_cb,
-		  void *on_done_cb_data)
+		  void *complete_data)
 {
 	struct journal_entry *entry;
 
@@ -68,11 +92,11 @@ journal_entry_new(size_t n_rows, struct region *region,
 		diag_set(OutOfMemory, size, "region", "struct journal_entry");
 		return NULL;
 	}
+
+	entry->complete_data = complete_data;
 	entry->approx_len = 0;
 	entry->n_rows = n_rows;
 	entry->res = -1;
-	entry->on_done_cb = on_done_cb;
-	entry->on_done_cb_data = on_done_cb_data;
+
 	return entry;
 }
-

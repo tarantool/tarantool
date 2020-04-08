@@ -292,7 +292,7 @@ txn_rollback(struct txn *txn);
  * Complete asynchronous transaction.
  */
 void
-txn_complete_async(struct journal_entry *entry, void *complete_data);
+txn_complete_async(struct journal_entry *entry);
 
 /**
  * Submit a transaction to the journal.

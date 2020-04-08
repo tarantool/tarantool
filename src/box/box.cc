@@ -316,13 +316,12 @@ struct recovery_journal {
  * exact same signature during local recovery to properly mark
  * min/max LSN of created LSM levels.
  */
-static int64_t
+static int
 recovery_journal_write(struct journal *base,
 		       struct journal_entry *entry)
 {
 	struct recovery_journal *journal = (struct recovery_journal *) base;
 	entry->res = vclock_sum(journal->vclock);
-	journal_entry_complete(entry);
 	return 0;
 }
 
@@ -330,8 +329,9 @@ static void
 recovery_journal_create(struct vclock *v)
 {
 	static struct recovery_journal journal;
-
-	journal_create(&journal.base, recovery_journal_write, NULL);
+	journal_create(&journal.base, journal_no_write_async,
+		       journal_no_write_async_cb,
+		       recovery_journal_write, NULL);
 	journal.vclock = v;
 	journal_set(&journal.base);
 }
@@ -2352,7 +2352,7 @@ box_cfg_xc(void)
 
 	int64_t wal_max_size = box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
-	if (wal_init(wal_mode, cfg_gets("wal_dir"),
+	if (wal_init(wal_mode, txn_complete_async, cfg_gets("wal_dir"),
 		     wal_max_size, &INSTANCE_UUID, on_wal_garbage_collection,
 		     on_wal_checkpoint_threshold) != 0) {
 		diag_raise();
