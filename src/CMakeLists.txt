@@ -114,6 +114,7 @@ set (server_sources
      lua/socket.c
      lua/pickle.c
      lua/fio.c
+     lua/popen.c
      lua/httpc.c
      lua/utf8.c
      lua/info.c

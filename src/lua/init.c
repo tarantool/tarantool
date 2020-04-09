@@ -56,6 +56,7 @@
 #include "lua/msgpack.h"
 #include "lua/pickle.h"
 #include "lua/fio.h"
+#include "lua/popen.h"
 #include "lua/httpc.h"
 #include "lua/utf8.h"
 #include "lua/swim.h"
@@ -455,6 +456,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_errno_init(L);
 	tarantool_lua_error_init(L);
 	tarantool_lua_fio_init(L);
+	tarantool_lua_popen_init(L);
 	tarantool_lua_socket_init(L);
 	tarantool_lua_pickle_init(L);
 	tarantool_lua_digest_init(L);
