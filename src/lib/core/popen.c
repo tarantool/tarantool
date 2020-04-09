@@ -138,6 +138,19 @@ handle_new(struct popen_opts *opts)
 
 	assert(opts->argv != NULL && opts->nr_argv > 0);
 
+	/*
+	 * Killing group of signals allowed for a new
+	 * session only where it makes sense, otherwise
+	 * child gonna inherit group and we will be killing
+	 * ourself.
+	 */
+	if (opts->flags & POPEN_FLAG_GROUP_SIGNAL &&
+	    (opts->flags & POPEN_FLAG_SETSID) == 0) {
+		diag_set(IllegalParams,
+			 "popen: group signal without setting sid");
+		return NULL;
+	}
+
 	for (i = 0; i < opts->nr_argv; i++) {
 		if (opts->argv[i] == NULL)
 			continue;
@@ -526,6 +539,9 @@ popen_state_str(unsigned int state)
 int
 popen_send_signal(struct popen_handle *handle, int signo)
 {
+	static const char *killops[] = { "kill", "killpg" };
+	const char *killop = handle->flags & POPEN_FLAG_GROUP_SIGNAL ?
+		killops[1] : killops[0];
 	int ret;
 
 	assert(handle != NULL);
@@ -535,17 +551,21 @@ popen_send_signal(struct popen_handle *handle, int signo)
 	 */
 	ret = popen_may_pidop(handle);
 	if (ret == 0) {
-		say_debug("popen: kill %d signo %d", handle->pid, signo);
+		say_debug("popen: %s %d signo %d", killop,
+			  handle->pid, signo);
 		assert(handle->pid != -1);
-		ret = kill(handle->pid, signo);
+		if (handle->flags & POPEN_FLAG_GROUP_SIGNAL)
+			ret = killpg(handle->pid, signo);
+		else
+			ret = kill(handle->pid, signo);
 	}
 	if (ret < 0 && errno == ESRCH) {
 		diag_set(SystemError, "Attempt to send a signal %d to a "
 			 "process that does not exist anymore", signo);
 		return -1;
 	} else if (ret < 0) {
-		diag_set(SystemError, "Unable to kill %d signo %d",
-			 handle->pid, signo);
+		diag_set(SystemError, "Unable to %s %d signo %d",
+			 killop, handle->pid, signo);
 		return -1;
 	}
 	return 0;

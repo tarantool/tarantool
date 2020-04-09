@@ -96,6 +96,12 @@ enum popen_flag_bits {
 	 */
 	POPEN_FLAG_RESTORE_SIGNALS_BIT	= 15,
 	POPEN_FLAG_RESTORE_SIGNALS	= (1 << POPEN_FLAG_RESTORE_SIGNALS_BIT),
+
+	/*
+	 * Send signal to a process group.
+	 */
+	POPEN_FLAG_GROUP_SIGNAL_BIT	= 16,
+	POPEN_FLAG_GROUP_SIGNAL		= (1 << POPEN_FLAG_GROUP_SIGNAL_BIT),
 };
 
 /**
