@@ -275,6 +275,9 @@ session_find(uint64_t sid)
 		mh_i64ptr_node(session_registry, k)->val;
 }
 
+extern "C" void
+session_settings_init(void);
+
 void
 session_init()
 {
@@ -283,7 +286,7 @@ session_init()
 		panic("out of memory");
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
 	credentials_create(&admin_credentials, admin_user);
-	sql_session_settings_init();
+	session_settings_init();
 }
 
 void

@@ -52,7 +52,8 @@ s:replace({'sql_defer_foreign_keys', true})
 --
 s:select()
  | ---
- | - - ['sql_default_engine', 'memtx']
+ | - - ['error_marshaling_enabled', false]
+ |   - ['sql_default_engine', 'memtx']
  |   - ['sql_defer_foreign_keys', false]
  |   - ['sql_full_column_names', false]
  |   - ['sql_full_metadata', false]

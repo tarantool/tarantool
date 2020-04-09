@@ -46,6 +46,7 @@
 #include "small/obuf.h"
 #include "trivia/util.h"
 #include "mpstream/mpstream.h"
+#include "box/session.h"
 
 /**
  * A helper to find a Lua function by name and put it
@@ -174,7 +175,7 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 		 */
 		for (int i = 1; i <= nrets; ++i) {
 			struct luaL_field field;
-			if (luaL_tofield(L, cfg, i, &field) < 0)
+			if (luaL_tofield(L, cfg, NULL, i, &field) < 0)
 				return luaT_error(L);
 			struct tuple *tuple;
 			if (field.type == MP_EXT &&
@@ -188,11 +189,11 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 				 */
 				lua_pushvalue(L, i);
 				mpstream_encode_array(stream, 1);
-				luamp_encode_r(L, cfg, stream, &field, 0);
+				luamp_encode_r(L, cfg, NULL, stream, &field, 0);
 				lua_pop(L, 1);
 			} else {
 				/* `return ..., array, ...` */
-				luamp_encode(L, cfg, stream, i);
+				luamp_encode(L, cfg, NULL, stream, i);
 			}
 		}
 		return nrets;
@@ -203,7 +204,7 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 	 * Inspect the first result
 	 */
 	struct luaL_field root;
-	if (luaL_tofield(L, cfg, 1, &root) < 0)
+	if (luaL_tofield(L, cfg, NULL, 1, &root) < 0)
 		return luaT_error(L);
 	struct tuple *tuple;
 	if (root.type == MP_EXT && (tuple = luaT_istuple(L, 1)) != NULL) {
@@ -217,7 +218,7 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 		 */
 		mpstream_encode_array(stream, 1);
 		assert(lua_gettop(L) == 1);
-		luamp_encode_r(L, cfg, stream, &root, 0);
+		luamp_encode_r(L, cfg, NULL, stream, &root, 0);
 		return 1;
 	}
 
@@ -233,7 +234,7 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 	for (uint32_t t = 1; t <= root.size; t++) {
 		lua_rawgeti(L, 1, t);
 		struct luaL_field field;
-		if (luaL_tofield(L, cfg, -1, &field) < 0)
+		if (luaL_tofield(L, cfg, NULL, -1, &field) < 0)
 			return luaT_error(L);
 		if (field.type == MP_EXT && (tuple = luaT_istuple(L, -1))) {
 			tuple_to_mpstream(tuple, stream);
@@ -249,13 +250,13 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 				 * Encode the first field of tuple using
 				 * existing information from luaL_tofield
 				 */
-				luamp_encode_r(L, cfg, stream, &field, 0);
+				luamp_encode_r(L, cfg, NULL, stream, &field, 0);
 				lua_pop(L, 1);
 				assert(lua_gettop(L) == 1);
 				/* Encode remaining fields as usual */
 				for (uint32_t f = 2; f <= root.size; f++) {
 					lua_rawgeti(L, 1, f);
-					luamp_encode(L, cfg, stream, -1);
+					luamp_encode(L, cfg, NULL, stream, -1);
 					lua_pop(L, 1);
 				}
 				return 1;
@@ -265,10 +266,10 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 			 *         { tuple/array, ..., { scalar }, ... }`
 			 */
 			mpstream_encode_array(stream, 1);
-			luamp_encode_r(L, cfg, stream, &field, 0);
+			luamp_encode_r(L, cfg, NULL, stream, &field, 0);
 		} else {
 			/* `return { tuple/array, ..., tuple/array, ... }` */
-			luamp_encode_r(L, cfg, stream, &field, 0);
+			luamp_encode_r(L, cfg, NULL, stream, &field, 0);
 		}
 		lua_pop(L, 1);
 		assert(lua_gettop(L) == 1);
@@ -392,9 +393,11 @@ encode_lua_call(lua_State *L)
 	 * TODO: forbid explicit yield from __serialize or __index here
 	 */
 	struct luaL_serializer *cfg = luaL_msgpack_default;
+	const struct serializer_opts *opts =
+		&current_session()->meta.serializer_opts;
 	int size = lua_gettop(ctx->port->L);
 	for (int i = 1; i <= size; ++i)
-		luamp_encode(ctx->port->L, cfg, ctx->stream, i);
+		luamp_encode(ctx->port->L, cfg, opts, ctx->stream, i);
 	ctx->port->size = size;
 	mpstream_flush(ctx->stream);
 	return 0;

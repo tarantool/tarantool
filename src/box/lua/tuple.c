@@ -120,7 +120,7 @@ luaT_tuple_new(struct lua_State *L, int idx, box_tuple_format_t *format)
 		int argc = lua_gettop(L);
 		mpstream_encode_array(&stream, argc);
 		for (int k = 1; k <= argc; ++k) {
-			luamp_encode(L, luaL_msgpack_default, &stream, k);
+			luamp_encode(L, luaL_msgpack_default, NULL, &stream, k);
 		}
 	} else {
 		/* Create the tuple from a Lua table. */
@@ -252,18 +252,18 @@ luamp_convert_key(struct lua_State *L, struct luaL_serializer *cfg,
 		return tuple_to_mpstream(tuple, stream);
 
 	struct luaL_field field;
-	if (luaL_tofield(L, cfg, index, &field) < 0)
+	if (luaL_tofield(L, cfg, NULL, index, &field) < 0)
 		luaT_error(L);
 	if (field.type == MP_ARRAY) {
 		lua_pushvalue(L, index);
-		luamp_encode_r(L, cfg, stream, &field, 0);
+		luamp_encode_r(L, cfg, NULL, stream, &field, 0);
 		lua_pop(L, 1);
 	} else if (field.type == MP_NIL) {
 		mpstream_encode_array(stream, 0);
 	} else {
 		mpstream_encode_array(stream, 1);
 		lua_pushvalue(L, index);
-		luamp_encode_r(L, cfg, stream, &field, 0);
+		luamp_encode_r(L, cfg, NULL, stream, &field, 0);
 		lua_pop(L, 1);
 	}
 }
@@ -275,7 +275,7 @@ luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
 	struct tuple *tuple = luaT_istuple(L, index);
 	if (tuple != NULL) {
 		return tuple_to_mpstream(tuple, stream);
-	} else if (luamp_encode(L, cfg, stream, index) != MP_ARRAY) {
+	} else if (luamp_encode(L, cfg, NULL, stream, index) != MP_ARRAY) {
 		diag_set(ClientError, ER_TUPLE_NOT_ARRAY);
 		luaT_error(L);
 	}
@@ -435,7 +435,7 @@ lbox_tuple_transform(struct lua_State *L)
 		mpstream_encode_array(&stream, 3);
 		mpstream_encode_str(&stream, "!");
 		mpstream_encode_uint(&stream, offset);
-		luamp_encode(L, luaL_msgpack_default, &stream, i);
+		luamp_encode(L, luaL_msgpack_default, NULL, &stream, i);
 	}
 	mpstream_flush(&stream);
 

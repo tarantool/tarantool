@@ -43,6 +43,7 @@ extern "C" {
 
 struct luaL_serializer;
 struct mpstream;
+struct serializer_opts;
 
 /**
  * Default instance of msgpack serializer (msgpack = require('msgpack')).
@@ -63,12 +64,13 @@ enum { LUAMP_ALLOC_FACTOR = 256 };
 /* low-level function needed for execute_lua_call() */
 enum mp_type
 luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg,
-	       struct mpstream *stream, struct luaL_field *field,
-	       int level);
+	       const struct serializer_opts *opts, struct mpstream *stream,
+	       struct luaL_field *field, int level);
 
 enum mp_type
 luamp_encode(struct lua_State *L, struct luaL_serializer *cfg,
-	     struct mpstream *stream, int index);
+	     const struct serializer_opts *opts, struct mpstream *stream,
+	     int index);
 
 void
 luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,

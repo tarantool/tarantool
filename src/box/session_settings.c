@@ -42,6 +42,7 @@ struct session_setting session_settings[SESSION_SETTING_COUNT] = {};
 
 /** Corresponding names of session settings. */
 const char *session_setting_strs[SESSION_SETTING_COUNT] = {
+	"error_marshaling_enabled",
 	"sql_default_engine",
 	"sql_defer_foreign_keys",
 	"sql_full_column_names",
@@ -448,4 +449,59 @@ session_setting_find(const char *name) {
 		return sid;
 	else
 		return -1;
+}
+
+/* Module independent session settings. */
+
+static void
+session_setting_error_marshaling_enabled_get(int id, const char **mp_pair,
+					     const char **mp_pair_end)
+{
+	assert(id == SESSION_SETTING_ERROR_MARSHALING_ENABLED);
+	struct session *session = current_session();
+	const char *name = session_setting_strs[id];
+	size_t name_len = strlen(name);
+	bool value = session->meta.serializer_opts.error_marshaling_enabled;
+	size_t size = mp_sizeof_array(2) + mp_sizeof_str(name_len) +
+		      mp_sizeof_bool(value);
+
+	char *pos = (char*)static_alloc(size);
+	assert(pos != NULL);
+	char *pos_end = mp_encode_array(pos, 2);
+	pos_end = mp_encode_str(pos_end, name, name_len);
+	pos_end = mp_encode_bool(pos_end, value);
+	*mp_pair = pos;
+	*mp_pair_end = pos_end;
+}
+
+static int
+session_setting_error_marshaling_enabled_set(int id, const char *mp_value)
+{
+	assert(id == SESSION_SETTING_ERROR_MARSHALING_ENABLED);
+	enum mp_type mtype = mp_typeof(*mp_value);
+	enum field_type stype = session_settings[id].field_type;
+	if (mtype != MP_BOOL) {
+		diag_set(ClientError, ER_SESSION_SETTING_INVALID_VALUE,
+			 session_setting_strs[id], field_type_strs[stype]);
+		return -1;
+	}
+	struct session *session = current_session();
+	session->meta.serializer_opts.error_marshaling_enabled =
+		mp_decode_bool(&mp_value);
+	return 0;
+}
+
+extern void
+sql_session_settings_init();
+
+void
+session_settings_init(void)
+{
+	struct session_setting *s =
+		&session_settings[SESSION_SETTING_ERROR_MARSHALING_ENABLED];
+	s->field_type = FIELD_TYPE_BOOLEAN;
+	s->get = session_setting_error_marshaling_enabled_get;
+	s->set = session_setting_error_marshaling_enabled_set;
+
+	sql_session_settings_init();
 }
