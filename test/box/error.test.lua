@@ -229,3 +229,18 @@ box.error({code = 111, reason = "err"})
 box.error.last()
 box.error(e1)
 assert(box.error.last() == e1)
+--
+-- gh-4398: custom error type.
+--
+-- Try no code.
+e = box.error.new({type = 'TestType', reason = 'Test reason'})
+e:unpack()
+-- Try code not the same as used by default.
+e = box.error.new({type = 'TestType', reason = 'Test reason', code = 123})
+e:unpack()
+-- Try to omit message.
+e = box.error.new({type = 'TestType'})
+e:unpack()
+-- Try too long type name.
+e = box.error.new({type = string.rep('a', 128)})
+#e.type

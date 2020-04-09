@@ -86,35 +86,52 @@ box_error_set(const char *file, unsigned line, uint32_t code,
 	return -1;
 }
 
+static struct error *
+box_error_new_va(const char *file, unsigned line, uint32_t code,
+		 const char *custom_type, const char *fmt, va_list ap)
+{
+	if (custom_type == NULL) {
+		struct error *e = BuildClientError(file, line, ER_UNKNOWN);
+		ClientError *client_error = type_cast(ClientError, e);
+		if (client_error != NULL) {
+			client_error->m_errcode = code;
+			error_vformat_msg(e, fmt, ap);
+		}
+		return e;
+	} else {
+		struct error *e = BuildCustomError(file, line, custom_type,
+						   code);
+		CustomError *custom_error = type_cast(CustomError, e);
+		if (custom_error != NULL) {
+			error_vformat_msg(e, fmt, ap);
+		}
+
+		return e;
+	}
+}
+
 struct error *
 box_error_new(const char *file, unsigned line, uint32_t code,
-	      const char *fmt, ...)
+	      const char *custom_type, const char *fmt, ...)
 {
-	struct error *e = BuildClientError(file, line, ER_UNKNOWN);
-	ClientError *client_error = type_cast(ClientError, e);
-	if (client_error != NULL) {
-		client_error->m_errcode = code;
-		va_list ap;
-		va_start(ap, fmt);
-		error_vformat_msg(e, fmt, ap);
-		va_end(ap);
-	}
+	va_list ap;
+	va_start(ap, fmt);
+	struct error *e = box_error_new_va(file, line, code, custom_type,
+					   fmt, ap);
+	va_end(ap);
 	return e;
 }
 
 int
 box_error_add(const char *file, unsigned line, uint32_t code,
-	      const char *fmt, ...)
+	      const char *custom_type, const char *fmt, ...)
 {
-	struct error *e = BuildClientError(file, line, ER_UNKNOWN);
-	ClientError *client_error = type_cast(ClientError, e);
-	if (client_error) {
-		client_error->m_errcode = code;
-		va_list ap;
-		va_start(ap, fmt);
-		error_vformat_msg(e, fmt, ap);
-		va_end(ap);
-	}
+	va_list ap;
+	va_start(ap, fmt);
+	struct error *e = box_error_new_va(file, line, code, custom_type,
+					   fmt, ap);
+	va_end(ap);
+
 	struct diag *d = &fiber()->diag;
 	if (diag_is_empty(d))
 		diag_set_error(d, e);
@@ -124,6 +141,16 @@ box_error_add(const char *file, unsigned line, uint32_t code,
 }
 
 /* }}} */
+
+const char *
+box_error_custom_type(const struct error *e)
+{
+	CustomError *custom_error = type_cast(CustomError, e);
+	if (custom_error)
+		return custom_error->custom_type();
+
+	return NULL;
+}
 
 struct rmean *rmean_error = NULL;
 
@@ -286,6 +313,40 @@ BuildAccessDeniedError(const char *file, unsigned int line,
 		return new AccessDeniedError(file, line, access_type,
 					     object_type, object_name,
 					     user_name);
+	} catch (OutOfMemory *e) {
+		return e;
+	}
+}
+
+static struct method_info customerror_methods[] = {
+	make_method(&type_CustomError, "custom_type", &CustomError::custom_type),
+	METHODS_SENTINEL
+};
+
+const struct type_info type_CustomError =
+	make_type("CustomError", &type_ClientError, customerror_methods);
+
+CustomError::CustomError(const char *file, unsigned int line,
+			 const char *custom_type, uint32_t errcode)
+	:ClientError(&type_CustomError, file, line, errcode)
+{
+	strncpy(m_custom_type, custom_type, sizeof(m_custom_type) - 1);
+	m_custom_type[sizeof(m_custom_type) - 1] = '\0';
+}
+
+void
+CustomError::log() const
+{
+	say_file_line(S_ERROR, file, line, errmsg, "%s",
+		      "Custom type %s", m_custom_type);
+}
+
+struct error *
+BuildCustomError(const char *file, unsigned int line, const char *custom_type,
+		 uint32_t errcode)
+{
+	try {
+		return new CustomError(file, line, custom_type, errcode);
 	} catch (OutOfMemory *e) {
 		return e;
 	}

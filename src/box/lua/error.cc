@@ -46,6 +46,13 @@ extern "C" {
  * Parse Lua arguments (they can come as single table
  * f({code : number, reason : string}) or as separate members
  * f(code, reason)) and construct struct error with given values.
+ *
+ * Instead of 'code' it is possible to specify a string name of
+ * the error object's type:
+ *
+ *     box.error(type, reason, ...)
+ *     box.error({type = string, reason = string, ...})
+ *
  * In case one of arguments is missing its corresponding field
  * in struct error is filled with default value.
  */
@@ -53,14 +60,22 @@ static struct error *
 luaT_error_create(lua_State *L, int top_base)
 {
 	uint32_t code = 0;
+	const char *custom_type = NULL;
 	const char *reason = NULL;
 	const char *file = "";
 	unsigned line = 0;
 	lua_Debug info;
 	int top = lua_gettop(L);
-	if (top >= top_base && lua_type(L, top_base) == LUA_TNUMBER) {
-		code = lua_tonumber(L, top_base);
-		reason = tnt_errcode_desc(code);
+	int top_type = lua_type(L, top_base);
+	if (top >= top_base && (top_type == LUA_TNUMBER ||
+				top_type == LUA_TSTRING)) {
+		if (top_type == LUA_TNUMBER) {
+			code = lua_tonumber(L, top_base);
+			reason = tnt_errcode_desc(code);
+		} else {
+			custom_type = lua_tostring(L, top_base);
+			reason = "%s";
+		}
 		if (top > top_base) {
 			/* Call string.format(reason, ...) to format message */
 			lua_getglobal(L, "string");
@@ -78,14 +93,17 @@ luaT_error_create(lua_State *L, int top_base)
 			/* Missing arguments to format string */
 			return NULL;
 		}
-	} else if (top == top_base && lua_istable(L, top_base)) {
+	} else if (top == top_base && top_type == LUA_TTABLE) {
 		lua_getfield(L, top_base, "code");
-		code = lua_tonumber(L, -1);
-		lua_pop(L, 1);
+		if (!lua_isnil(L, -1))
+			code = lua_tonumber(L, -1);
 		lua_getfield(L, top_base, "reason");
 		reason = lua_tostring(L, -1);
 		if (reason == NULL)
 			reason = "";
+		lua_getfield(L, top_base, "type");
+		if (!lua_isnil(L, -1))
+			custom_type = lua_tostring(L, -1);
 		lua_pop(L, 1);
 	} else {
 		return NULL;
@@ -102,7 +120,7 @@ raise:
 		}
 		line = info.currentline;
 	}
-	return box_error_new(file, line, code, "%s", reason);
+	return box_error_new(file, line, code, custom_type, "%s", reason);
 }
 
 static int
@@ -149,11 +167,11 @@ luaT_error_last(lua_State *L)
 static int
 luaT_error_new(lua_State *L)
 {
-	if (lua_gettop(L) == 0)
-		return luaL_error(L, "Usage: box.error.new(code, args)");
-	struct error *e = luaT_error_create(L, 1);
-	if (e == NULL)
-		return luaL_error(L, "Usage: box.error.new(code, args)");
+	struct error *e;
+	if (lua_gettop(L) == 0 || (e = luaT_error_create(L, 1)) == NULL) {
+		return luaL_error(L, "Usage: box.error.new(code, args) or "\
+				  "box.error.new(type, args)");
+	}
 	lua_settop(L, 0);
 	luaT_pusherror(L, e);
 	return 1;

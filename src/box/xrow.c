@@ -1133,7 +1133,7 @@ iproto_decode_error_stack(const char **pos)
 				continue;
 			}
 		}
-		box_error_add(__FILE__, __LINE__, code, reason);
+		box_error_add(__FILE__, __LINE__, code, NULL, reason);
 	}
 	return 0;
 }

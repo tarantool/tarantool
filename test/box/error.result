@@ -34,8 +34,9 @@ e
  | ...
 e:unpack()
  | ---
- | - type: ClientError
- |   code: 1
+ | - code: 1
+ |   base_type: ClientError
+ |   type: ClientError
  |   message: Illegal parameters, bla bla
  |   trace:
  |   - file: '[C]'
@@ -105,7 +106,7 @@ e
  | ...
 box.error.new()
  | ---
- | - error: 'Usage: box.error.new(code, args)'
+ | - error: 'Usage: box.error.new(code, args) or box.error.new(type, args)'
  | ...
 
 --
@@ -489,7 +490,7 @@ assert(box.error.last() == nil)
 --
 box.error.new(err)
  | ---
- | - error: 'Usage: box.error.new(code, args)'
+ | - error: 'Usage: box.error.new(code, args) or box.error.new(type, args)'
  | ...
 
 -- box.error() is supposed to re-throw last diagnostic error.
@@ -830,4 +831,60 @@ box.error(e1)
 assert(box.error.last() == e1)
  | ---
  | - true
+ | ...
+--
+-- gh-4398: custom error type.
+--
+-- Try no code.
+e = box.error.new({type = 'TestType', reason = 'Test reason'})
+ | ---
+ | ...
+e:unpack()
+ | ---
+ | - code: 0
+ |   base_type: CustomError
+ |   type: TestType
+ |   custom_type: TestType
+ |   message: Test reason
+ |   trace:
+ |   - file: '[string "e = box.error.new({type = ''TestType'', reason ..."]'
+ |     line: 1
+ | ...
+-- Try code not the same as used by default.
+e = box.error.new({type = 'TestType', reason = 'Test reason', code = 123})
+ | ---
+ | ...
+e:unpack()
+ | ---
+ | - code: 123
+ |   base_type: CustomError
+ |   type: TestType
+ |   custom_type: TestType
+ |   message: Test reason
+ |   trace:
+ |   - file: '[string "e = box.error.new({type = ''TestType'', reason ..."]'
+ |     line: 1
+ | ...
+-- Try to omit message.
+e = box.error.new({type = 'TestType'})
+ | ---
+ | ...
+e:unpack()
+ | ---
+ | - code: 0
+ |   base_type: CustomError
+ |   type: TestType
+ |   custom_type: TestType
+ |   message: 
+ |   trace:
+ |   - file: '[string "e = box.error.new({type = ''TestType''}) "]'
+ |     line: 1
+ | ...
+-- Try too long type name.
+e = box.error.new({type = string.rep('a', 128)})
+ | ---
+ | ...
+#e.type
+ | ---
+ | - 63
  | ...

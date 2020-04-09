@@ -35,6 +35,9 @@ exception_get_int(struct error *e, const struct method_info *method);
 
 int
 error_set_prev(struct error *e, struct error *prev);
+
+const char *
+box_error_custom_type(const struct error *e);
 ]]
 
 local REFLECTION_CACHE = {}
@@ -75,8 +78,16 @@ local function reflection_get(err, method)
     end
 end
 
-local function error_type(err)
+local function error_base_type(err)
     return ffi.string(err._type.name)
+end
+
+local function error_type(err)
+    local res = ffi.C.box_error_custom_type(err)
+    if res ~= nil then
+        return ffi.string(res)
+    end
+    return error_base_type(err)
 end
 
 local function error_message(err)
@@ -131,6 +142,7 @@ local error_fields = {
     ["trace"]       = error_trace;
     ["errno"]       = error_errno;
     ["prev"]        = error_prev;
+    ["base_type"]   = error_base_type
 }
 
 local function error_unpack(err)
