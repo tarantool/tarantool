@@ -163,13 +163,13 @@ popen_may_io(struct popen_handle *handle, unsigned int idx,
 }
 
 /**
- * Test if the handle is not nil and still have
- * a living child process.
+ * Test if the handle still have a living child process.
  */
 static inline bool
 popen_may_pidop(struct popen_handle *handle)
 {
-	if (!handle || handle->pid == -1) {
+	assert(handle != NULL);
+	if (handle->pid == -1) {
 		errno = ESRCH;
 		return false;
 	}
@@ -182,10 +182,7 @@ popen_may_pidop(struct popen_handle *handle)
 int
 popen_stat(struct popen_handle *handle, struct popen_stat *st)
 {
-	if (!handle) {
-		errno = ESRCH;
-		return -1;
-	}
+	assert(handle != NULL);
 
 	st->pid		= handle->pid;
 	st->flags	= handle->flags;
@@ -204,11 +201,7 @@ popen_stat(struct popen_handle *handle, struct popen_stat *st)
 const char *
 popen_command(struct popen_handle *handle)
 {
-	if (!handle) {
-		errno = ESRCH;
-		return NULL;
-	}
-
+	assert(handle != NULL);
 	return (const char *)handle->command;
 }
 
@@ -236,6 +229,8 @@ popen_write_timeout(struct popen_handle *handle, void *buf,
 		    size_t count, unsigned int flags,
 		    ev_tstamp timeout)
 {
+	assert(handle != NULL);
+
 	int idx = STDIN_FILENO;
 
 	if (!(flags & POPEN_FLAG_FD_STDIN)) {
@@ -268,6 +263,8 @@ popen_read_timeout(struct popen_handle *handle, void *buf,
 		   size_t count, unsigned int flags,
 		   ev_tstamp timeout)
 {
+	assert(handle != NULL);
+
 	int idx = flags & POPEN_FLAG_FD_STDOUT ?
 		STDOUT_FILENO : STDERR_FILENO;
 
@@ -380,10 +377,7 @@ popen_sigchld_handler(EV_P_ ev_child *w, int revents)
 int
 popen_state(struct popen_handle *handle, int *state, int *exit_code)
 {
-	if (!handle) {
-		errno = ESRCH;
-		return -1;
-	}
+	assert(handle != NULL);
 
 	if (handle->pid != -1) {
 		*state = POPEN_STATE_ALIVE;
@@ -437,6 +431,8 @@ popen_send_signal(struct popen_handle *handle, int signo)
 {
 	int ret;
 
+	assert(handle != NULL);
+
 	/*
 	 * A child may be killed or exited already.
 	 */
@@ -464,10 +460,7 @@ popen_delete(struct popen_handle *handle)
 {
 	size_t i;
 
-	if (!handle) {
-		errno = ESRCH;
-		return -1;
-	}
+	assert(handle != NULL);
 
 	if (popen_send_signal(handle, SIGKILL) && errno != ESRCH)
 		return -1;
