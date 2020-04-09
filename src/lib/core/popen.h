@@ -102,6 +102,12 @@ enum popen_flag_bits {
 	 */
 	POPEN_FLAG_GROUP_SIGNAL_BIT	= 16,
 	POPEN_FLAG_GROUP_SIGNAL		= (1 << POPEN_FLAG_GROUP_SIGNAL_BIT),
+
+	/*
+	 * Keep child running on delete.
+	 */
+	POPEN_FLAG_KEEP_CHILD_BIT	= 17,
+	POPEN_FLAG_KEEP_CHILD		= (1 << POPEN_FLAG_KEEP_CHILD_BIT),
 };
 
 /**

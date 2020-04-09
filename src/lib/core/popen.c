@@ -585,12 +585,15 @@ popen_delete(struct popen_handle *handle)
 
 	assert(handle != NULL);
 
-	/*
-	 * Unable to kill the process -- give an error.
-	 * The process is not exist already -- pass over.
-	 */
-	if (popen_send_signal(handle, SIGKILL) != 0 && errno != ESRCH)
-		return -1;
+	if ((handle->flags & POPEN_FLAG_KEEP_CHILD) == 0) {
+		/*
+		 * Unable to kill the process -- give an error.
+		 * The process is not exist already -- pass over.
+		 */
+		if (popen_send_signal(handle, SIGKILL) != 0 &&
+		    errno != ESRCH)
+			return -1;
+	}
 
 	for (i = 0; i < lengthof(handle->ios); i++) {
 		if (handle->ios[i].fd != -1)
