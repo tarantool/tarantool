@@ -40,7 +40,7 @@
 #include "box/tuple.h"
 #include "box/tuple_format.h"
 #include "box/lua/tuple.h"
-#include "mpstream.h"
+#include "mpstream/mpstream.h"
 
 static uint32_t CTID_STRUCT_TUPLE_FORMAT_PTR;
 

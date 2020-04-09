@@ -25,7 +25,6 @@ set(core_sources
     util.c
     random.c
     trigger.cc
-    mpstream.c
     port.c
     decimal.c
     mp_decimal.c

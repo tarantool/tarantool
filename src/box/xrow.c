@@ -42,7 +42,7 @@
 #include "vclock.h"
 #include "scramble.h"
 #include "iproto_constants.h"
-#include "mpstream.h"
+#include "mpstream/mpstream.h"
 
 static_assert(IPROTO_DATA < 0x7f && IPROTO_METADATA < 0x7f &&
 	      IPROTO_SQL_INFO < 0x7f, "encoded IPROTO_BODY keys must fit into "\

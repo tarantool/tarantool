@@ -34,7 +34,7 @@ target_link_libraries(vclock core)
 
 add_library(xrow STATIC xrow.c iproto_constants.c)
 target_link_libraries(xrow server core small vclock misc box_error
-                      scramble ${MSGPUCK_LIBRARIES})
+                      scramble mpstream ${MSGPUCK_LIBRARIES})
 
 add_library(tuple STATIC
     tuple.c

@@ -45,7 +45,7 @@
 #include "box/lua/tuple.h"
 #include "small/obuf.h"
 #include "trivia/util.h"
-#include "mpstream.h"
+#include "mpstream/mpstream.h"
 
 /**
  * A helper to find a Lua function by name and put it

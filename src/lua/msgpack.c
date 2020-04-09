@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "lua/msgpack.h"
-#include "mpstream.h"
+#include "mpstream/mpstream.h"
 #include "lua/utils.h"
 
 #if defined(LUAJIT)

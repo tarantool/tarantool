@@ -35,7 +35,6 @@
 #include "sql/sqlInt.h"
 #include "sql/tarantoolInt.h"
 #include "sql/vdbeInt.h"
-#include "mpstream.h"
 
 #include "index.h"
 #include "info/info.h"
@@ -53,7 +52,7 @@
 #include "xrow.h"
 #include "iproto_constants.h"
 #include "fk_constraint.h"
-#include "mpstream.h"
+#include "mpstream/mpstream.h"
 #include "sql_stmt_cache.h"
 
 static sql *db = NULL;

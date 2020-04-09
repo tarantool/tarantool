@@ -51,7 +51,7 @@
 #include "box/tuple.h"
 #include "lua/msgpack.h"
 #include "lua/utils.h"
-#include "mpstream.h"
+#include "mpstream/mpstream.h"
 
 /*
  * Return the collating function associated with a function.

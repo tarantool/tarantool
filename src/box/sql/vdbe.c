@@ -50,7 +50,7 @@
 #include "tarantoolInt.h"
 
 #include "msgpuck/msgpuck.h"
-#include "mpstream.h"
+#include "mpstream/mpstream.h"
 
 #include "box/schema.h"
 #include "box/space.h"

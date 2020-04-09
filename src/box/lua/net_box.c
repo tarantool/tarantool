@@ -47,7 +47,7 @@
 #include "coio.h"
 #include "box/errcode.h"
 #include "lua/fiber.h"
-#include "mpstream.h"
+#include "mpstream/mpstream.h"
 #include "misc.h" /* lbox_check_tuple_format() */
 
 #define cfg luaL_msgpack_default

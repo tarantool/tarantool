@@ -41,7 +41,7 @@
 #include "tarantoolInt.h"
 #include "box/schema.h"
 #include "box/tuple.h"
-#include "mpstream.h"
+#include "mpstream/mpstream.h"
 
 #ifdef SQL_DEBUG
 /*
