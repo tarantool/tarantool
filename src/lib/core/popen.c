@@ -164,16 +164,19 @@ popen_may_io(struct popen_handle *handle, unsigned int idx,
 
 /**
  * Test if the handle still have a living child process.
+ *
+ * Return -1 and set errno to ESRCH when a process does not
+ * exist. Otherwise return 0.
  */
-static inline bool
+static inline int
 popen_may_pidop(struct popen_handle *handle)
 {
 	assert(handle != NULL);
 	if (handle->pid == -1) {
 		errno = ESRCH;
-		return false;
+		return -1;
 	}
-	return true;
+	return 0;
 }
 
 /**
@@ -423,6 +426,10 @@ popen_state_str(unsigned int state)
 
 /**
  * Send a signal to a child process.
+ *
+ * Return 0 at success or -1 at failure (and set a diag).
+ *
+ * Set errno to ESRCH when a process does not exist.
  */
 int
 popen_send_signal(struct popen_handle *handle, int signo)
@@ -434,16 +441,22 @@ popen_send_signal(struct popen_handle *handle, int signo)
 	/*
 	 * A child may be killed or exited already.
 	 */
-	if (!popen_may_pidop(handle))
+	ret = popen_may_pidop(handle);
+	if (ret == 0) {
+		say_debug("popen: kill %d signo %d", handle->pid, signo);
+		assert(handle->pid != -1);
+		ret = kill(handle->pid, signo);
+	}
+	if (ret < 0 && errno == ESRCH) {
+		diag_set(SystemError, "Attempt to send a signal %d to a "
+			 "process that does not exist anymore", signo);
 		return -1;
-
-	say_debug("popen: kill %d signo %d", handle->pid, signo);
-	ret = kill(handle->pid, signo);
-	if (ret < 0) {
+	} else if (ret < 0) {
 		diag_set(SystemError, "Unable to kill %d signo %d",
 			 handle->pid, signo);
+		return -1;
 	}
-	return ret;
+	return 0;
 }
 
 /**
@@ -460,7 +473,11 @@ popen_delete(struct popen_handle *handle)
 
 	assert(handle != NULL);
 
-	if (popen_send_signal(handle, SIGKILL) && errno != ESRCH)
+	/*
+	 * Unable to kill the process -- give an error.
+	 * The process is not exist already -- pass over.
+	 */
+	if (popen_send_signal(handle, SIGKILL) != 0 && errno != ESRCH)
 		return -1;
 
 	for (i = 0; i < lengthof(handle->ios); i++) {
