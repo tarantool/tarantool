@@ -26,8 +26,7 @@ static int
 wait_exit(struct popen_handle *handle, int *state, int *exit_code)
 {
 	for (;;) {
-		if (popen_state(handle, state, exit_code))
-			return -1;
+		popen_state(handle, state, exit_code);
 		if (*state == POPEN_STATE_EXITED ||
 		    *state == POPEN_STATE_SIGNALED)
 			break;
@@ -61,7 +60,7 @@ popen_write_exit(void)
 	};
 	int rc;
 
-	plan(7);
+	plan(6);
 	header();
 
 	handle = popen_new(&opts);
@@ -69,8 +68,7 @@ popen_write_exit(void)
 	if (handle == NULL)
 		goto out;
 
-	rc = popen_state(handle, &state, &exit_code);
-	ok(rc == 0, "popen_state");
+	popen_state(handle, &state, &exit_code);
 
 	ok(state == POPEN_STATE_ALIVE, "state %s",
 	   popen_state_str(state));

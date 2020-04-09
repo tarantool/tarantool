@@ -1,14 +1,13 @@
 1..3
 	*** main_f ***
-    1..7
+    1..6
 	*** popen_write_exit ***
     ok 1 - popen_new
-    ok 2 - popen_state
-    ok 3 - state alive
-    ok 4 - write flag check
-    ok 5 - write to pipe
-    ok 6 - child exited
-    ok 7 - popen_delete
+    ok 2 - state alive
+    ok 3 - write flag check
+    ok 4 - write to pipe
+    ok 5 - child exited
+    ok 6 - popen_delete
 	*** popen_write_exit: done ***
 ok 1 - subtests
     1..5
