@@ -803,7 +803,18 @@ signal_reset(void)
  * process will run with all files inherited from a parent.
  *
  * Returns pointer to a new popen handle on success,
- * otherwise NULL returned setting @a errno.
+ * otherwise NULL returned and an error is set to the
+ * diagnostics area.
+ *
+ * Possible errors:
+ *
+ * - IllegalParams: a parameter check fails:
+ *   - group signal is set, while setsid is not.
+ * - SystemError: dup(), fcntl(), pipe(), vfork() or close() fails
+ *   in the parent process.
+ * - SystemError: (temporary restriction) one of std{in,out,err}
+ *   is closed in the parent process.
+ * - OutOfMemory: unable to allocate handle.
  */
 struct popen_handle *
 popen_new(struct popen_opts *opts)
@@ -972,6 +983,7 @@ popen_new(struct popen_opts *opts)
 	 */
 	handle->pid = vfork();
 	if (handle->pid < 0) {
+		diag_set(SystemError, "vfork() fails");
 		goto out_err;
 	} else if (handle->pid == 0) {
 		/*
@@ -1180,6 +1192,16 @@ exit_child:
 out_err:
 	diag_log();
 	saved_errno = errno;
+
+	/*
+	 * Save a reason of failure, because popen_delete() may
+	 * clobber the diagnostics area.
+	 */
+	struct diag *diag = diag_get();
+	struct error *e = diag_last_error(diag);
+	assert(e != NULL);
+	error_ref(e);
+
 	popen_delete(handle);
 	for (i = 0; i < lengthof(pfd); i++) {
 		if (pfd[i][0] != -1)
@@ -1189,6 +1211,11 @@ out_err:
 	}
 	if (log_fd >= 0)
 		close(log_fd);
+
+	/* Restore the diagnostics area entry. */
+	diag_set_error(diag, e);
+	error_unref(e);
+
 	errno = saved_errno;
 	return NULL;
 }
