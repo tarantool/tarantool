@@ -66,6 +66,8 @@ test_run:cmd('switch replica_anon2')
 a = box.info.vclock[1]
 -- The instance did fetch a snapshot.
 a > 0
+-- 0-th vclock component isn't propagated across the cluster.
+box.info.vclock[0]
 test_run:cmd('switch default')
 box.space.test:insert{2}
 test_run:cmd("switch replica_anon2")
