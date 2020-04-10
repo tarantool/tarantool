@@ -239,7 +239,7 @@ popen_may_pidop(struct popen_handle *handle)
 /**
  * Fill popen object statistics.
  */
-int
+void
 popen_stat(struct popen_handle *handle, struct popen_stat *st)
 {
 	assert(handle != NULL);
@@ -252,7 +252,6 @@ popen_stat(struct popen_handle *handle, struct popen_stat *st)
 
 	for (size_t i = 0; i < lengthof(handle->ios); i++)
 		st->fds[i] = handle->ios[i].fd;
-	return 0;
 }
 
 /**

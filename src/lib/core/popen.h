@@ -159,7 +159,7 @@ struct popen_stat {
 	int			fds[POPEN_FLAG_FD_STDEND_BIT];
 };
 
-extern int
+extern void
 popen_stat(struct popen_handle *handle, struct popen_stat *st);
 
 extern const char *
