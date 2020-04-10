@@ -193,8 +193,7 @@ handle_free(struct popen_handle *handle)
  * Test if the handle can run io operation.
  */
 static inline bool
-popen_may_io(struct popen_handle *handle, unsigned int idx,
-	     unsigned int io_flags)
+popen_may_io(struct popen_handle *handle, unsigned int io_flags)
 {
 	if (!handle) {
 		errno = ESRCH;
@@ -203,11 +202,6 @@ popen_may_io(struct popen_handle *handle, unsigned int idx,
 
 	if (!(io_flags & handle->flags)) {
 		errno = EINVAL;
-		return false;
-	}
-
-	if (handle->ios[idx].fd < 0) {
-		errno = EPIPE;
 		return false;
 	}
 
@@ -293,7 +287,7 @@ popen_write_timeout(struct popen_handle *handle, const void *buf,
 	    return -1;
 	}
 
-	if (!popen_may_io(handle, STDIN_FILENO, flags))
+	if (!popen_may_io(handle, flags))
 		return -1;
 
 	if (count > (size_t)SSIZE_MAX) {
@@ -328,7 +322,7 @@ popen_read_timeout(struct popen_handle *handle, void *buf,
 	    return -1;
 	}
 
-	if (!popen_may_io(handle, idx, flags))
+	if (!popen_may_io(handle, flags))
 		return -1;
 
 	if (count > (size_t)SSIZE_MAX) {
