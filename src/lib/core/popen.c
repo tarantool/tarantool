@@ -652,6 +652,8 @@ make_pipe(int pfd[2])
  *
  * @a skip_fds is an array of @a nr_skip_fds elements
  * with descriptors which should be kept opened.
+ *
+ * Returns 0 at success, otherwise -1 and set a diag.
  */
 static int
 close_inherited_fds(int *skip_fds, size_t nr_skip_fds)
@@ -1030,7 +1032,8 @@ popen_new(struct popen_opts *opts)
 		}
 
 		if (opts->flags & POPEN_FLAG_CLOSE_FDS) {
-			if (close_inherited_fds(skip_fds, nr_skip_fds)) {
+			if (close_inherited_fds(skip_fds, nr_skip_fds) != 0) {
+				diag_log();
 				say_syserror("child: close inherited fds");
 				goto exit_child;
 			}
