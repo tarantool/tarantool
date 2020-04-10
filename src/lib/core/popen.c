@@ -320,8 +320,10 @@ popen_write_timeout(struct popen_handle *handle, const void *buf,
 		  handle->pid, stdX_str(idx), idx, buf, count,
 		  handle->ios[idx].fd, timeout);
 
-	return coio_write_timeout(&handle->ios[idx], buf,
-				  count, timeout);
+	int rc = coio_write_timeout_noxc(&handle->ios[idx], buf, count,
+					 timeout);
+	assert(rc < 0 || rc == (ssize_t)count);
+	return rc;
 }
 
 /**
@@ -382,8 +384,8 @@ popen_read_timeout(struct popen_handle *handle, void *buf,
 		  handle->pid, stdX_str(idx), idx, buf, count,
 		  handle->ios[idx].fd, timeout);
 
-	return coio_read_ahead_timeout(&handle->ios[idx], buf, 1, count,
-				       timeout);
+	return coio_read_ahead_timeout_noxc(&handle->ios[idx], buf, 1, count,
+					    timeout);
 }
 
 /**
