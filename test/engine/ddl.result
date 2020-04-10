@@ -2461,20 +2461,23 @@ ch:get()
 ---
 - true
 ...
-box.space.test.index.pk:count() == box.space.test.index.sk:count()
+inspector:wait_cond(function() return box.space.test.index.pk:count() == box.space.test.index.sk:count() end)
 ---
 - true
 ...
-box.space.test.index.pk:count() == box.space.test.index.tk:count()
+inspector:wait_cond(function() return box.space.test.index.pk:count() == box.space.test.index.tk:count() end)
 ---
 - true
 ...
 inspector:cmd("restart server default")
-box.space.test.index.pk:count() == box.space.test.index.sk:count()
+inspector = require('test_run').new()
+---
+...
+inspector:wait_cond(function() return box.space.test.index.pk:count() == box.space.test.index.sk:count() end)
 ---
 - true
 ...
-box.space.test.index.pk:count() == box.space.test.index.tk:count()
+inspector:wait_cond(function() return box.space.test.index.pk:count() == box.space.test.index.tk:count() end)
 ---
 - true
 ...
@@ -2482,11 +2485,11 @@ box.snapshot()
 ---
 - ok
 ...
-box.space.test.index.pk:count() == box.space.test.index.sk:count()
+inspector:wait_cond(function() return box.space.test.index.pk:count() == box.space.test.index.sk:count() end)
 ---
 - true
 ...
-box.space.test.index.pk:count() == box.space.test.index.tk:count()
+inspector:wait_cond(function() return box.space.test.index.pk:count() == box.space.test.index.tk:count() end)
 ---
 - true
 ...
