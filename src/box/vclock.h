@@ -200,6 +200,12 @@ vclock_size(const struct vclock *vclock)
 	return bit_count_u32(vclock->map);
 }
 
+static inline uint32_t
+vclock_size_ignore0(const struct vclock *vclock)
+{
+	return bit_count_u32(vclock->map & ~1);
+}
+
 static inline int64_t
 vclock_calc_sum(const struct vclock *vclock)
 {

@@ -48,20 +48,24 @@ static_assert(IPROTO_DATA < 0x7f && IPROTO_METADATA < 0x7f &&
 	      "one byte");
 
 static inline uint32_t
-mp_sizeof_vclock(const struct vclock *vclock)
+mp_sizeof_vclock_ignore0(const struct vclock *vclock)
 {
-	uint32_t size = vclock_size(vclock);
+	uint32_t size = vclock_size_ignore0(vclock);
 	return mp_sizeof_map(size) + size * (mp_sizeof_uint(UINT32_MAX) +
 					     mp_sizeof_uint(UINT64_MAX));
 }
 
 static inline char *
-mp_encode_vclock(char *data, const struct vclock *vclock)
+mp_encode_vclock_ignore0(char *data, const struct vclock *vclock)
 {
-	data = mp_encode_map(data, vclock_size(vclock));
+	data = mp_encode_map(data, vclock_size_ignore0(vclock));
 	struct vclock_iterator it;
 	vclock_iterator_init(&it, vclock);
-	vclock_foreach(&it, replica) {
+	struct vclock_c replica;
+	replica = vclock_iterator_next(&it);
+	if (replica.id == 0)
+		replica = vclock_iterator_next(&it);
+	for ( ; replica.id < VCLOCK_MAX; replica = vclock_iterator_next(&it)) {
 		data = mp_encode_uint(data, replica.id);
 		data = mp_encode_uint(data, replica.lsn);
 	}
@@ -69,7 +73,7 @@ mp_encode_vclock(char *data, const struct vclock *vclock)
 }
 
 static int
-mp_decode_vclock(const char **data, struct vclock *vclock)
+mp_decode_vclock_ignore0(const char **data, struct vclock *vclock)
 {
 	vclock_create(vclock);
 	if (mp_typeof(**data) != MP_MAP)
@@ -82,7 +86,11 @@ mp_decode_vclock(const char **data, struct vclock *vclock)
 		if (mp_typeof(**data) != MP_UINT)
 			return -1;
 		int64_t lsn = mp_decode_uint(data);
-		if (lsn > 0)
+		/*
+		 * Skip vclock[0] coming from the remote
+		 * instances.
+		 */
+		if (lsn > 0 && id != 0)
 			vclock_follow(vclock, id, lsn);
 	}
 	return 0;
@@ -411,7 +419,7 @@ iproto_reply_vclock(struct obuf *out, const struct vclock *vclock,
 		    uint64_t sync, uint32_t schema_version)
 {
 	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_map(1) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock(vclock);
+		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock_ignore0(vclock);
 
 	char *buf = obuf_reserve(out, max_size);
 	if (buf == NULL) {
@@ -423,7 +431,7 @@ iproto_reply_vclock(struct obuf *out, const struct vclock *vclock,
 	char *data = buf + IPROTO_HEADER_LEN;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_vclock(data, vclock);
+	data = mp_encode_vclock_ignore0(data, vclock);
 	size_t size = data - buf;
 	assert(size <= max_size);
 
@@ -444,8 +452,10 @@ iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_map(4) +
 		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_bool(ballot->is_ro) +
 		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_bool(ballot->is_loading) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock(&ballot->vclock) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock(&ballot->gc_vclock);
+		mp_sizeof_uint(UINT32_MAX) +
+		mp_sizeof_vclock_ignore0(&ballot->vclock) +
+		mp_sizeof_uint(UINT32_MAX) +
+		mp_sizeof_vclock_ignore0(&ballot->gc_vclock);
 
 	char *buf = obuf_reserve(out, max_size);
 	if (buf == NULL) {
@@ -463,9 +473,9 @@ iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_LOADING);
 	data = mp_encode_bool(data, ballot->is_loading);
 	data = mp_encode_uint(data, IPROTO_BALLOT_VCLOCK);
-	data = mp_encode_vclock(data, &ballot->vclock);
+	data = mp_encode_vclock_ignore0(data, &ballot->vclock);
 	data = mp_encode_uint(data, IPROTO_BALLOT_GC_VCLOCK);
-	data = mp_encode_vclock(data, &ballot->gc_vclock);
+	data = mp_encode_vclock_ignore0(data, &ballot->gc_vclock);
 	size_t size = data - buf;
 	assert(size <= max_size);
 
@@ -1144,11 +1154,13 @@ xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 			ballot->is_loading = mp_decode_bool(&data);
 			break;
 		case IPROTO_BALLOT_VCLOCK:
-			if (mp_decode_vclock(&data, &ballot->vclock) != 0)
+			if (mp_decode_vclock_ignore0(&data,
+						     &ballot->vclock) != 0)
 				goto err;
 			break;
 		case IPROTO_BALLOT_GC_VCLOCK:
-			if (mp_decode_vclock(&data, &ballot->gc_vclock) != 0)
+			if (mp_decode_vclock_ignore0(&data,
+						     &ballot->gc_vclock) != 0)
 				goto err;
 			break;
 		default:
@@ -1170,7 +1182,8 @@ xrow_encode_register(struct xrow_header *row,
 	size_t size = mp_sizeof_map(2) +
 		      mp_sizeof_uint(IPROTO_INSTANCE_UUID) +
 		      mp_sizeof_str(UUID_STR_LEN) +
-		      mp_sizeof_uint(IPROTO_VCLOCK) + mp_sizeof_vclock(vclock);
+		      mp_sizeof_uint(IPROTO_VCLOCK) +
+		      mp_sizeof_vclock_ignore0(vclock);
 	char *buf = (char *) region_alloc(&fiber()->gc, size);
 	if (buf == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc", "buf");
@@ -1181,7 +1194,7 @@ xrow_encode_register(struct xrow_header *row,
 	data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
 	data = xrow_encode_uuid(data, instance_uuid);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_vclock(data, vclock);
+	data = mp_encode_vclock_ignore0(data, vclock);
 	assert(data <= buf + size);
 	row->body[0].iov_base = buf;
 	row->body[0].iov_len = (data - buf);
@@ -1198,7 +1211,8 @@ xrow_encode_subscribe(struct xrow_header *row,
 		      uint32_t id_filter)
 {
 	memset(row, 0, sizeof(*row));
-	size_t size = XROW_BODY_LEN_MAX + mp_sizeof_vclock(vclock);
+	size_t size = XROW_BODY_LEN_MAX +
+		      mp_sizeof_vclock_ignore0(vclock);
 	char *buf = (char *) region_alloc(&fiber()->gc, size);
 	if (buf == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc", "buf");
@@ -1212,7 +1226,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 	data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
 	data = xrow_encode_uuid(data, instance_uuid);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_vclock(data, vclock);
+	data = mp_encode_vclock_ignore0(data, vclock);
 	data = mp_encode_uint(data, IPROTO_SERVER_VERSION);
 	data = mp_encode_uint(data, tarantool_version_id());
 	data = mp_encode_uint(data, IPROTO_REPLICA_ANON);
@@ -1291,7 +1305,7 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		case IPROTO_VCLOCK:
 			if (vclock == NULL)
 				goto skip;
-			if (mp_decode_vclock(&d, vclock) != 0) {
+			if (mp_decode_vclock_ignore0(&d, vclock) != 0) {
 				xrow_on_decode_err(data, end, ER_INVALID_MSGPACK,
 						   "invalid VCLOCK");
 				return -1;
@@ -1373,7 +1387,7 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 	memset(row, 0, sizeof(*row));
 
 	/* Add vclock to response body */
-	size_t size = 8 + mp_sizeof_vclock(vclock);
+	size_t size = 8 + mp_sizeof_vclock_ignore0(vclock);
 	char *buf = (char *) region_alloc(&fiber()->gc, size);
 	if (buf == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc", "buf");
@@ -1382,7 +1396,7 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 	char *data = buf;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_vclock(data, vclock);
+	data = mp_encode_vclock_ignore0(data, vclock);
 	assert(data <= buf + size);
 	row->body[0].iov_base = buf;
 	row->body[0].iov_len = (data - buf);
@@ -1398,7 +1412,8 @@ xrow_encode_subscribe_response(struct xrow_header *row,
 {
 	memset(row, 0, sizeof(*row));
 	size_t size = mp_sizeof_map(2) +
-		      mp_sizeof_uint(IPROTO_VCLOCK) + mp_sizeof_vclock(vclock) +
+		      mp_sizeof_uint(IPROTO_VCLOCK) +
+		      mp_sizeof_vclock_ignore0(vclock) +
 		      mp_sizeof_uint(IPROTO_CLUSTER_UUID) +
 		      mp_sizeof_str(UUID_STR_LEN);
 	char *buf = (char *) region_alloc(&fiber()->gc, size);
@@ -1409,7 +1424,7 @@ xrow_encode_subscribe_response(struct xrow_header *row,
 	char *data = buf;
 	data = mp_encode_map(data, 2);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_vclock(data, vclock);
+	data = mp_encode_vclock_ignore0(data, vclock);
 	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
 	data = xrow_encode_uuid(data, replicaset_uuid);
 	assert(data <= buf + size);

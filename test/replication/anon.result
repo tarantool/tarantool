@@ -187,6 +187,11 @@ a > 0
  | ---
  | - true
  | ...
+-- 0-th vclock component isn't propagated across the cluster.
+box.info.vclock[0]
+ | ---
+ | - null
+ | ...
 test_run:cmd('switch default')
  | ---
  | - true
