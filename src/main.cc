@@ -898,6 +898,12 @@ main(int argc, char **argv)
 
 	if (start_loop)
 		say_crit("exiting the event loop");
+	/*
+	 * If Tarantool was stopped using Ctrl+D, then we need to
+	 * call on_shutdown triggers, because Ctrl+D  causes not
+	 * any signals.
+	 */
+	tarantool_exit(exit_code);
 	/* freeing resources */
 	tarantool_free();
 	return exit_code;
