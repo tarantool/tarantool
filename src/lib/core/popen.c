@@ -784,10 +784,11 @@ struct popen_handle *
 popen_new(struct popen_opts *opts)
 {
 	/*
-	 * Without volatile compiler claims that
-	 * handle might be clobbered from vfork.
+	 * Without volatile compiler claims that those
+	 * variables might be clobbered from vfork.
 	 */
 	struct popen_handle * volatile handle;
+	int volatile log_fd = -1;
 
 	int pfd[POPEN_FLAG_FD_STDEND_BIT][2] = {
 		{-1, -1}, {-1, -1}, {-1, -1},
@@ -853,7 +854,6 @@ popen_new(struct popen_opts *opts)
 	 * reached a file descriptor limit.
 	 */
 	int old_log_fd = log_get_fd();
-	int log_fd = -1;
 	if (old_log_fd >= 0) {
 		log_fd = dup_not_std_streams(old_log_fd);
 		if (log_fd < 0)
