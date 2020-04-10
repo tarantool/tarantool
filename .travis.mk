@@ -185,9 +185,7 @@ test_osx_no_deps: build_osx
 		ulimit -u ${MAX_PROC} || : ; \
 		ulimit -u ; \
 		rm -rf /tmp/tnt ; \
-		cd test && ./test-run.py --vardir /tmp/tnt --force $(TEST_RUN_EXTRA_PARAMS) \
-			app/ app-tap/ box/ box-py/ box-tap/ engine/ engine_long/ long_run-py/ luajit-tap/ \
-			replication-py/ small/ sql/ sql-tap/ swim/ unit/ vinyl/ wal_off/ xlog/ xlog-py/
+		cd test && ./test-run.py --vardir /tmp/tnt --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_osx: deps_osx test_osx_no_deps
 
