@@ -280,7 +280,7 @@ stdX_str(unsigned int index)
  * Write data to the child stdin.
  */
 int
-popen_write_timeout(struct popen_handle *handle, void *buf,
+popen_write_timeout(struct popen_handle *handle, const void *buf,
 		    size_t count, unsigned int flags,
 		    ev_tstamp timeout)
 {
