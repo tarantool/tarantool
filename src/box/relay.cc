@@ -580,9 +580,8 @@ relay_subscribe_f(va_list ap)
 	 * Not needed for anonymous replicas, since they
 	 * aren't registered with gc at all.
 	 */
-	struct trigger on_close_log = {
-		RLIST_LINK_INITIALIZER, relay_on_close_log_f, relay, NULL
-	};
+	struct trigger on_close_log;
+	trigger_create(&on_close_log, relay_on_close_log_f, relay, NULL);
 	if (!relay->replica->anon)
 		trigger_add(&r->on_close_log, &on_close_log);
 
@@ -662,9 +661,12 @@ relay_subscribe_f(va_list ap)
 	diag_log();
 	say_crit("exiting the relay loop");
 
-	/* Clear garbage collector trigger and WAL watcher. */
-	if (!relay->replica->anon)
-		trigger_clear(&on_close_log);
+	/*
+	 * Clear garbage collector trigger and WAL watcher.
+	 * trigger_clear() does nothing in case the triggers
+	 * aren't set (the replica is anonymous).
+	 */
+	trigger_clear(&on_close_log);
 	wal_clear_watcher(&relay->wal_watcher, cbus_process);
 
 	/* Join ack reader fiber. */
