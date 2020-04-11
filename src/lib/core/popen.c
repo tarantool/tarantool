@@ -154,7 +154,7 @@ handle_new(struct popen_opts *opts)
 	for (i = 0; i < opts->nr_argv; i++) {
 		if (opts->argv[i] == NULL)
 			continue;
-		size += strlen(opts->argv[i]) + 1;
+		size += strlen(opts->argv[i]) + 3;
 	}
 
 	handle = malloc(sizeof(*handle) + size);
@@ -168,8 +168,13 @@ handle_new(struct popen_opts *opts)
 	for (i = 0; i < opts->nr_argv-1; i++) {
 		if (opts->argv[i] == NULL)
 			continue;
+		bool is_multiword = strchr(opts->argv[i], ' ') != NULL;
+		if (is_multiword)
+			*pos++ = '\'';
 		strcpy(pos, opts->argv[i]);
 		pos += strlen(opts->argv[i]);
+		if (is_multiword)
+			*pos++ = '\'';
 		*pos++ = ' ';
 	}
 	pos[-1] = '\0';
