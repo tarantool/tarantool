@@ -246,56 +246,19 @@ if(BUILD_STATIC)
     endif()
 endif()
 
-# Exports syntax is toolchain-dependent, preprocessing is necessary
-set(exports_file ${CMAKE_BINARY_DIR}/extra/exports.${CMAKE_SYSTEM_NAME})
-add_custom_target(preprocess_exports
-                  DEPENDS ${exports_file})
-add_custom_command(
-    OUTPUT  ${exports_file}
-    DEPENDS ${CMAKE_SOURCE_DIR}/extra/exports
-    COMMAND ${CMAKE_SOURCE_DIR}/extra/mkexports
-            ${CMAKE_SOURCE_DIR}/extra/exports
-            ${exports_file} ${CMAKE_SYSTEM_NAME}
-            ${EXPORT_LIST}
-)
-
 add_executable(
-    tarantool main.cc
+    tarantool main.cc exports.c
     ${LIBUTIL_FREEBSD_SRC}/flopen.c
     ${LIBUTIL_FREEBSD_SRC}/pidfile.c)
 
-add_dependencies(tarantool build_bundled_libs preprocess_exports sql)
+add_dependencies(tarantool build_bundled_libs sql)
+target_link_libraries(tarantool box ${common_libraries})
 
-# Re-link if exports changed
-set_target_properties(tarantool PROPERTIES LINK_DEPENDS ${exports_file})
-
-# A note about linkers:
-# [GNU linker] When linking an *executable* visibility is ignored, and
-#              either nothing is exported (default), or any non-static
-#              symbol is exported (-rdynamic), or explicitly listed
-#              symbols are exported (--dynamic-list).
-#
-#              However, if a symbol listed lives in a static library it
-#              won't be automatically pulled, hence --whole-archive
-#              option.
-#
-# [Apple linker] One can provide an explicit export list; pulls symbols
-#                from static libraries.
-#
-if (TARGET_OS_DARWIN)
-    target_link_libraries(tarantool box ${common_libraries})
-    set_target_properties(tarantool PROPERTIES
-        LINK_FLAGS "-Wl,-exported_symbols_list,${exports_file}")
-else ()
-    target_link_libraries(tarantool
-                          -Wl,--whole-archive box ${reexport_libraries}
-                          salad -Wl,--no-whole-archive
-                          ${common_libraries}
-                          ${generic_libraries})
-    set_target_properties(tarantool PROPERTIES
-        LINK_FLAGS "-Wl,--dynamic-list,${exports_file}")
-    # get rid of -rdynamic
-    set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
+if (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD)
+    # Without rdynamic FreeBSD does not export some symbols even
+    # when they are used in the final executable and their
+    # addresses are accessed explicitly.
+    set_target_properties(tarantool PROPERTIES LINK_FLAGS "-rdynamic")
 endif()
 
 install (TARGETS tarantool DESTINATION bin)

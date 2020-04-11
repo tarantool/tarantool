@@ -711,6 +711,9 @@ break_loop(struct trigger *, void *)
 	return 0;
 }
 
+extern "C" void **
+export_syms(void);
+
 int
 main(int argc, char **argv)
 {
@@ -807,6 +810,8 @@ main(int argc, char **argv)
 		script = argv[0];
 		title_set_script_name(argv[0]);
 	}
+
+	export_syms();
 
 	random_init();
 
