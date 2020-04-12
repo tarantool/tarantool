@@ -638,8 +638,8 @@ make_pipe(int pfd[2])
 		diag_set(SystemError, "Can't create pipe");
 		return -1;
 	}
-	if (fcntl(pfd[0], F_SETFL, O_CLOEXEC) ||
-	    fcntl(pfd[1], F_SETFL, O_CLOEXEC)) {
+	if (fcntl(pfd[0], F_SETFD, FD_CLOEXEC) ||
+	    fcntl(pfd[1], F_SETFD, FD_CLOEXEC)) {
 		int saved_errno = errno;
 		diag_set(SystemError, "Can't unblock pipe");
 		close(pfd[0]), pfd[0] = -1;
@@ -899,9 +899,9 @@ popen_new(struct popen_opts *opts)
 		say_debug("popen: duplicate logfd: %d", log_fd);
 		if (log_fd < 0)
 			return NULL;
-		if (fcntl(log_fd, F_SETFL, O_CLOEXEC) != 0) {
+		if (fcntl(log_fd, F_SETFD, FD_CLOEXEC) != 0) {
 			diag_set(SystemError,
-				 "Unable to set O_CLOEXEC on temporary logfd");
+				 "Unable to set FD_CLOEXEC on temporary logfd");
 			close(log_fd);
 			return NULL;
 		}
