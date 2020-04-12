@@ -896,6 +896,7 @@ popen_new(struct popen_opts *opts)
 	int old_log_fd = log_get_fd();
 	if (old_log_fd >= 0) {
 		log_fd = dup_not_std_streams(old_log_fd);
+		say_debug("popen: duplicate logfd: %d", log_fd);
 		if (log_fd < 0)
 			return NULL;
 		if (fcntl(log_fd, F_SETFL, O_CLOEXEC) != 0) {
