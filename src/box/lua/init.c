@@ -432,10 +432,10 @@ box_lua_init(struct lua_State *L)
 		const char *modsrc = *(s + 1);
 		const char *modfile = lua_pushfstring(L,
 			"@builtin/%s.lua", modname);
-		if (luaL_loadbuffer(L, modsrc, strlen(modsrc), modfile))
+		if (luaL_loadbuffer(L, modsrc, strlen(modsrc), modfile) != 0 ||
+		    lua_pcall(L, 0, 0, 0) != 0)
 			panic("Error loading Lua module %s...: %s",
 			      modname, lua_tostring(L, -1));
-		lua_call(L, 0, 0);
 		lua_pop(L, 1); /* modfile */
 	}
 
