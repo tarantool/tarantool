@@ -2481,8 +2481,21 @@ box_cfg_xc(void)
 	if (!is_bootstrap_leader)
 		replicaset_sync();
 
-	/* If anyone is waiting for ro mode to go away */
+	/* box.cfg.read_only is not read yet. */
+	assert(box_is_ro());
+	/* If anyone is waiting for ro mode. */
 	fiber_cond_broadcast(&ro_cond);
+	/*
+	 * Yield to let ro condition waiters to handle the event.
+	 * Without yield it may happen there won't be a context
+	 * switch until the ro state is changed again, and as a
+	 * result, some ro waiters may sleep forever. For example,
+	 * when Tarantool is just started, it is expected it will
+	 * enter ro=true state, and then ro=false. Without the
+	 * yield the ro=true event may be lost. This affects
+	 * box.ctl.wait_ro() call.
+	 */
+	fiber_sleep(0);
 }
 
 void
