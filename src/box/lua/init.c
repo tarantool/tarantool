@@ -71,7 +71,9 @@ extern char session_lua[],
 	schema_lua[],
 	load_cfg_lua[],
 	xlog_lua[],
+#if ENABLE_FEEDBACK_DAEMON
 	feedback_daemon_lua[],
+#endif
 	net_box_lua[],
 	upgrade_lua[],
 	console_lua[],
@@ -81,7 +83,14 @@ static const char *lua_sources[] = {
 	"box/session", session_lua,
 	"box/tuple", tuple_lua,
 	"box/schema", schema_lua,
+#if ENABLE_FEEDBACK_DAEMON
+	/*
+	 * It is important to initialize the daemon before
+	 * load_cfg, because the latter picks up some values
+	 * from the feedback daemon.
+	 */
 	"box/feedback_daemon", feedback_daemon_lua,
+#endif
 	"box/upgrade", upgrade_lua,
 	"box/net_box", net_box_lua,
 	"box/console", console_lua,

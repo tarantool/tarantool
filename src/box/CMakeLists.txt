@@ -1,5 +1,11 @@
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/box/lua)
 
+# Sometimes 'spying' code is not acceptable even if it would be
+# disabled by default. That option allows to remove the feedback
+# daemon from the build completely.
+option(ENABLE_FEEDBACK_DAEMON "Feedback daemon which reports debug data to \
+the Tarantool team" ON)
+
 add_subdirectory(sql)
 
 set(lua_sources)
@@ -7,7 +13,9 @@ lua_source(lua_sources lua/load_cfg.lua)
 lua_source(lua_sources lua/schema.lua)
 lua_source(lua_sources lua/tuple.lua)
 lua_source(lua_sources lua/session.lua)
-lua_source(lua_sources lua/feedback_daemon.lua)
+if (ENABLE_FEEDBACK_DAEMON)
+    lua_source(lua_sources lua/feedback_daemon.lua)
+endif()
 lua_source(lua_sources lua/net_box.lua)
 lua_source(lua_sources lua/upgrade.lua)
 lua_source(lua_sources lua/console.lua)

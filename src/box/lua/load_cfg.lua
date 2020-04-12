@@ -21,6 +21,20 @@ local function locked(f)
     end
 end
 
+--
+-- When feedback is disabled, every single mentioning of it should
+-- be eliminated. Even box.cfg{} should not accept any
+-- 'feedback_*' parameters as valid. This is why they are set to
+-- nil, when the daemon does not exist.
+--
+local function ifdef_feedback(value)
+    return private.feedback_daemon ~= nil and value or nil
+end
+
+local ifdef_feedback_set_params =
+    private.feedback_daemon ~= nil and
+    private.feedback_daemon.set_feedback_params or nil
+
 -- all available options
 local default_cfg = {
     listen              = nil,
@@ -143,9 +157,9 @@ local template_cfg = {
     replication_connect_quorum = 'number',
     replication_skip_conflict = 'boolean',
     replication_anon      = 'boolean',
-    feedback_enabled      = 'boolean',
-    feedback_host         = 'string',
-    feedback_interval     = 'number',
+    feedback_enabled      = ifdef_feedback('boolean'),
+    feedback_host         = ifdef_feedback('string'),
+    feedback_interval     = ifdef_feedback('number'),
     net_msg_max           = 'number',
     sql_cache_size        = 'number',
 }
@@ -236,9 +250,9 @@ local dynamic_cfg = {
     checkpoint_interval     = private.cfg_set_checkpoint_interval,
     checkpoint_wal_threshold = private.cfg_set_checkpoint_wal_threshold,
     worker_pool_threads     = private.cfg_set_worker_pool_threads,
-    feedback_enabled        = private.feedback_daemon.set_feedback_params,
-    feedback_host           = private.feedback_daemon.set_feedback_params,
-    feedback_interval       = private.feedback_daemon.set_feedback_params,
+    feedback_enabled        = ifdef_feedback_set_params,
+    feedback_host           = ifdef_feedback_set_params,
+    feedback_interval       = ifdef_feedback_set_params,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = function() end,
     custom_proc_title       = function()
@@ -257,6 +271,9 @@ local dynamic_cfg = {
     net_msg_max             = private.cfg_set_net_msg_max,
     sql_cache_size          = private.cfg_set_sql_cache_size,
 }
+
+ifdef_feedback = nil
+ifdef_feedback_set_params = nil
 
 --
 -- For some options it is important in which order they are set.

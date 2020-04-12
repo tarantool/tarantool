@@ -17,8 +17,21 @@ index = space:create_index('primary', { type = 'hash' })
 -- Test Lua from admin console. Whenever producing output,
 -- make sure it's a valid YAML.
 '  lua says: hello'
+
+--
+-- gh-3308: feedback daemon is an optional pre-compile time
+-- defined feature, depending on CMake flags. It is not present
+-- always.
+--
+optional = {feedback = true}
 -- # What's in the box?
-t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
+t = {}
+for n in pairs(box) do                                                          \
+    if not optional[n] then                                                     \
+        table.insert(t, tostring(n))                                            \
+    end                                                                         \
+end                                                                             \
+table.sort(t)
 t
 t = nil
 

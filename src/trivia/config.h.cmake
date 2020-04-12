@@ -251,6 +251,8 @@
 /* Cacheline size to calculate alignments */
 #define CACHELINE_SIZE 64
 
+#cmakedefine ENABLE_FEEDBACK_DAEMON 1
+
 /*
  * vim: syntax=c
  */

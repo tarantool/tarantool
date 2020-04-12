@@ -8,8 +8,6 @@ local fiber = require('fiber')
 local test = tap.test('feedback_daemon')
 local socket = require('socket')
 
-test:plan(11)
-
 box.cfg{log = 'report.log', log_level = 6}
 
 local feedback_save = nil
@@ -49,10 +47,27 @@ local server = socket.tcp_server("127.0.0.1", 0, http_handle)
 local port = server:name().port
 
 local interval = 0.01
-box.cfg{
+local ok, err = pcall(box.cfg, {
     feedback_host = string.format("127.0.0.1:%i", port),
     feedback_interval = interval,
-}
+})
+
+if not ok then
+    --
+    -- gh-3308: feedback daemon is an optional pre-compile time
+    -- defined feature, depending on CMake flags. It is not
+    -- present always. When it is disabled, is should not be
+    -- visible anywhere.
+    --
+    test:plan(2)
+    test:diag('Feedback daemon is supposed to be disabled')
+    test:like(err, 'unexpected option', 'Feedback options are undefined')
+    test:isnil(box.feedback, 'No feedback daemon - no its API')
+    test:check()
+    os.exit(0)
+end
+
+test:plan(11)
 
 local function check(message)
     while feedback_count < 1 do
