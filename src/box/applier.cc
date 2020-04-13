@@ -636,11 +636,12 @@ applier_read_tx(struct applier *applier, struct stailq *rows)
 			xrow_decode_error_xc(row);
 
 		/* Replication request. */
-		if (row->replica_id == REPLICA_ID_NIL ||
-		    row->replica_id >= VCLOCK_MAX) {
+		if (row->replica_id >= VCLOCK_MAX) {
 			/*
 			 * A safety net, this can only occur
 			 * if we're fed a strangely broken xlog.
+			 * row->replica_id == 0, when reading
+			 * heartbeats from an anonymous instance.
 			 */
 			tnt_raise(ClientError, ER_UNKNOWN_REPLICA,
 				  int2str(row->replica_id),

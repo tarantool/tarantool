@@ -1583,12 +1583,6 @@ box_process_register(struct ev_io *io, struct xrow_header *header)
 	if (tt_uuid_is_equal(&instance_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
-	/* Forbid replication from an anonymous instance. */
-	if (replication_anon) {
-		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
-			  "replicating from an anonymous instance.");
-	}
-
 	access_check_universe_xc(PRIV_R);
 	/* We only get register requests from anonymous instances. */
 	struct replica *replica = replica_by_uuid(&instance_uuid);
@@ -1717,12 +1711,6 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	if (tt_uuid_is_equal(&instance_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
-	/* Forbid replication from an anonymous instance. */
-	if (replication_anon) {
-		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
-			  "replicating from an anonymous instance.");
-	}
-
 	/* Check permissions */
 	access_check_universe_xc(PRIV_R);
 
@@ -1831,10 +1819,13 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	if (tt_uuid_is_equal(&replica_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
-	/* Forbid replication from an anonymous instance. */
-	if (replication_anon) {
-		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
-			  "replicating from an anonymous instance.");
+	/*
+	 * Do not allow non-anonymous followers for anonymous
+	 * instances.
+	 */
+	if (replication_anon && !anon) {
+		tnt_raise(ClientError, ER_UNSUPPORTED, "Anonymous replica",
+			  "non-anonymous followers.");
 	}
 
 	/* Check permissions */

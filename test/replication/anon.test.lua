@@ -60,34 +60,7 @@ require("uuid").fromstr(uuid) ~= nil
 -- normal replicas.
 tbl.downstream.status
 
--- Test that replication (even anonymous) from an anonymous
--- instance is forbidden. An anonymous replica will fetch
--- a snapshot though.
-test_run:cmd([[create server replica_anon2 with rpl_master=replica_anon,\
-             script="replication/anon2.lua"]])
-test_run:cmd('start server replica_anon2')
-test_run:wait_log('replica_anon2',\
-                  'Replication does not support replicating from an anonymous instance',\
-                  nil, 10)
-test_run:cmd('switch replica_anon2')
-a = box.info.vclock[1]
--- The instance did fetch a snapshot.
-a > 0
--- 0-th vclock component isn't propagated across the cluster.
-box.info.vclock[0]
-test_run:cmd('switch default')
-box.space.test:insert{2}
-test_run:cmd("switch replica_anon2")
--- Second replica doesn't follow master through the
--- 1st one. Replication from an anonymous instance
--- is forbidden indeed.
-box.info.vclock[1] == a or box.info.vclock[1]
-
 test_run:cmd('switch replica_anon')
-
-test_run:cmd('stop server replica_anon2')
-test_run:cmd('delete server replica_anon2')
-
 -- Promote anonymous replica.
 box.cfg{replication_anon=false}
 -- Cannot switch back after becoming "normal".
@@ -144,3 +117,55 @@ box.cfg{replication_anon = false}
 test_run:switch('default')
 test_run:cmd('stop server replica_anon')
 test_run:cmd('delete server replica_anon')
+
+--
+-- gh-4696. Following an anonymous replica.
+--
+box.schema.user.grant('guest', 'replication')
+_ = box.schema.space.create('test')
+_ = box.space.test:create_index('pk')
+
+test_run:cmd([[create server replica_anon1 with rpl_master=default,\
+             script="replication/anon1.lua"]])
+test_run:cmd([[create server replica_anon2 with rpl_master=replica_anon1,\
+             script="replication/anon2.lua"]])
+test_run:cmd('start server replica_anon1')
+test_run:cmd('start server replica_anon2')
+
+box.space.test:insert{1}
+
+-- Check that master's changes are propagated to replica2,
+-- following an anonymous replica1.
+test_run:cmd('switch replica_anon2')
+test_run:wait_cond(function() return box.space.test:get{1} ~= nil end, 10)
+
+test_run:cmd('switch default')
+test_run:cmd('stop server replica_anon2')
+test_run:cmd('delete server replica_anon2')
+
+-- Check that joining to an anonymous replica is prohibited.
+test_run:cmd([[create server replica with rpl_master=replica_anon1,\
+             script="replication/replica.lua"]])
+test_run:cmd('start server replica with crash_expected=True')
+test_run:cmd('delete server replica')
+
+-- A normal instance (already joined) can't follow an anonymous
+-- replica.
+test_run:cmd([[create server replica with rpl_master=default,\
+             script="replication/replica.lua"]])
+test_run:cmd('start server replica')
+test_run:cmd('switch replica')
+test_run:wait_upstream(1, {status='follow'})
+box.info.id
+test_run:cmd('set variable repl_source to "replica_anon1.listen"')
+box.cfg{replication=repl_source}
+test_run:wait_log('replica', 'ER_UNSUPPORTED: Anonymous replica does not support non.anonymous followers.', nil, 10)
+test_run:cmd('switch default')
+
+-- Cleanup.
+test_run:cmd('stop server replica')
+test_run:cmd('stop server replica_anon1')
+test_run:cmd('delete server replica')
+test_run:cmd('delete server replica_anon1')
+box.space.test:drop()
+box.schema.user.revoke('guest', 'replication')
