@@ -1,0 +1,53 @@
+-- test-run result file version 2
+CREATE TABLE test (s1 INTEGER PRIMARY KEY, s2 SCALAR UNIQUE, s3 SCALAR);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO test VALUES (0, 1, 1);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO test VALUES (1, 1.1, 1.1);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO test VALUES (2, true, true);
+ | ---
+ | - row_count: 1
+ | ...
+INSERT INTO test VALUES (3, NULL, NULL);
+ | ---
+ | - row_count: 1
+ | ...
+
+--
+-- gh-4679: Make sure that boolean precedes any number within
+-- scalar. Result with order by indexed (using index) and
+-- non-indexed (using no index) must be the same.
+--
+SELECT s2, typeof(s2) FROM test ORDER BY s2;
+ | ---
+ | - metadata:
+ |   - name: S2
+ |     type: scalar
+ |   - name: typeof(s2)
+ |     type: string
+ |   rows:
+ |   - [null, 'boolean']
+ |   - [true, 'boolean']
+ |   - [1, 'integer']
+ |   - [1.1, 'number']
+ | ...
+SELECT s3, typeof(s3) FROM test ORDER BY s3;
+ | ---
+ | - metadata:
+ |   - name: S3
+ |     type: scalar
+ |   - name: typeof(s3)
+ |     type: string
+ |   rows:
+ |   - [null, 'boolean']
+ |   - [true, 'boolean']
+ |   - [1, 'integer']
+ |   - [1.1, 'number']
+ | ...

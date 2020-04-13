@@ -3053,8 +3053,12 @@ sqlVdbeCompareMsgpack(const char **key1,
 			} else if ((pKey2->flags & MEM_Real) != 0) {
 				rc = double_compare_uint64(pKey2->u.r,
 							   mem1.u.u, -1);
+			} else if ((pKey2->flags & MEM_Null) != 0) {
+				rc = 1;
+			} else if ((pKey2->flags & MEM_Bool) != 0) {
+				rc = 1;
 			} else {
-				rc = (pKey2->flags & MEM_Null) ? +1 : -1;
+				rc = -1;
 			}
 			break;
 		}
@@ -3071,8 +3075,12 @@ sqlVdbeCompareMsgpack(const char **key1,
 			} else if (pKey2->flags & MEM_Real) {
 				rc = double_compare_uint64(-pKey2->u.r,
 							   -mem1.u.i, 1);
+			} else if ((pKey2->flags & MEM_Null) != 0) {
+				rc = 1;
+			} else if ((pKey2->flags & MEM_Bool) != 0) {
+				rc = 1;
 			} else {
-				rc = (pKey2->flags & MEM_Null) ? +1 : -1;
+				rc = -1;
 			}
 			break;
 		}
@@ -3095,8 +3103,12 @@ sqlVdbeCompareMsgpack(const char **key1,
 				} else if (mem1.u.r > pKey2->u.r) {
 					rc = +1;
 				}
+			} else if ((pKey2->flags & MEM_Null) != 0) {
+				rc = 1;
+			} else if ((pKey2->flags & MEM_Bool) != 0) {
+				rc = 1;
 			} else {
-				rc = (pKey2->flags & MEM_Null) ? +1 : -1;
+				rc = -1;
 			}
 			break;
 		}
