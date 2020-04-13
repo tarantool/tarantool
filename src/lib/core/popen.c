@@ -297,7 +297,7 @@ stdX_str(unsigned int index)
  *
  * - IllegalParams: a parameter check fails:
  *   - count: data is too big.
- *   - flags: POPEN_FLAG_FD_STDIN bit is unset.
+ *   - flags: stdin is not set.
  *   - handle: handle does not support the requested IO operation.
  * - SocketError: an IO error occurs at write().
  * - TimedOut: @a timeout quota is exceeded.
@@ -322,8 +322,7 @@ popen_write_timeout(struct popen_handle *handle, const void *buf,
 	}
 
 	if (!(flags & POPEN_FLAG_FD_STDIN)) {
-		diag_set(IllegalParams,
-			 "popen: POPEN_FLAG_FD_STDIN bit is unset");
+		diag_set(IllegalParams, "popen: stdin is not set");
 		return -1;
 	}
 
@@ -360,7 +359,7 @@ popen_write_timeout(struct popen_handle *handle, const void *buf,
  *
  * - IllegalParams: a parameter check fails:
  *   - count: buffer is too big.
- *   - flags: POPEN_FLAG_FD_STD{OUT,ERR} are set or unset both.
+ *   - flags: stdout and stdrr are both set or both missed.
  *   - handle: handle does not support the requested IO operation.
  * - SocketError: an IO error occurs at read().
  * - TimedOut: @a timeout quota is exceeded.
@@ -379,8 +378,8 @@ popen_read_timeout(struct popen_handle *handle, void *buf,
 	}
 
 	if (!(flags & (POPEN_FLAG_FD_STDOUT | POPEN_FLAG_FD_STDERR))) {
-		diag_set(IllegalParams, "popen: POPEN_FLAG_FD_STD{OUT,ERR} are "
-			 "unset both");
+		diag_set(IllegalParams,
+			 "popen: neither stdout nor stderr is set");
 		return -1;
 	}
 
