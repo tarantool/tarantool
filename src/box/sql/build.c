@@ -3367,7 +3367,8 @@ sql_session_setting_get(int id, const char **mp_pair, const char **mp_pair_end)
 	assert(id >= SESSION_SETTING_SQL_BEGIN && id < SESSION_SETTING_SQL_END);
 	struct session *session = current_session();
 	uint32_t flags = session->sql_flags;
-	struct sql_option_metadata *opt = &sql_session_opts[id];
+	struct sql_option_metadata *opt =
+		&sql_session_opts[id - SESSION_SETTING_SQL_BEGIN];
 	uint32_t mask = opt->mask;
 	const char *name = session_setting_strs[id];
 	size_t name_len = strlen(name);
@@ -3404,7 +3405,8 @@ static int
 sql_set_boolean_option(int id, bool value)
 {
 	struct session *session = current_session();
-	struct sql_option_metadata *option = &sql_session_opts[id];
+	struct sql_option_metadata *option =
+		&sql_session_opts[id - SESSION_SETTING_SQL_BEGIN];
 	assert(option->field_type == FIELD_TYPE_BOOLEAN);
 #ifdef NDEBUG
 	if ((session->sql_flags & SQL_SqlTrace) == 0) {
@@ -3431,7 +3433,8 @@ sql_set_boolean_option(int id, bool value)
 static int
 sql_set_string_option(int id, const char *value)
 {
-	assert(sql_session_opts[id].field_type = FIELD_TYPE_STRING);
+	assert(sql_session_opts[id - SESSION_SETTING_SQL_BEGIN].field_type =
+	       FIELD_TYPE_STRING);
 	assert(id == SESSION_SETTING_SQL_DEFAULT_ENGINE);
 	(void)id;
 	enum sql_storage_engine engine = STR2ENUM(sql_storage_engine, value);
@@ -3448,7 +3451,8 @@ sql_session_setting_set(int id, const char *mp_value)
 {
 	assert(id >= SESSION_SETTING_SQL_BEGIN && id < SESSION_SETTING_SQL_END);
 	enum mp_type mtype = mp_typeof(*mp_value);
-	enum field_type stype = sql_session_opts[id].field_type;
+	enum field_type stype =
+		sql_session_opts[id - SESSION_SETTING_SQL_BEGIN].field_type;
 	uint32_t len;
 	const char *tmp;
 	switch(stype) {
@@ -3473,10 +3477,10 @@ sql_session_setting_set(int id, const char *mp_value)
 void
 sql_session_settings_init()
 {
-	for (int id = SESSION_SETTING_SQL_BEGIN; id < SESSION_SETTING_SQL_END;
-	     ++id) {
+	for (int i = 0, id = SESSION_SETTING_SQL_BEGIN;
+	     id < SESSION_SETTING_SQL_END; ++id, ++i) {
 		struct session_setting *setting = &session_settings[id];
-		setting->field_type = sql_session_opts[id].field_type;
+		setting->field_type = sql_session_opts[i].field_type;
 		setting->get = sql_session_setting_get;
 		setting->set = sql_session_setting_set;
 	}
