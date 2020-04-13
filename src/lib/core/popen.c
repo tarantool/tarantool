@@ -360,7 +360,7 @@ popen_write_timeout(struct popen_handle *handle, const void *buf,
  *
  * - IllegalParams: a parameter check fails:
  *   - count: buffer is too big.
- *   - flags: POPEN_FLAG_FD_STD{OUT,ERR} are unset both.
+ *   - flags: POPEN_FLAG_FD_STD{OUT,ERR} are set or unset both.
  *   - handle: handle does not support the requested IO operation.
  * - SocketError: an IO error occurs at read().
  * - TimedOut: @a timeout quota is exceeded.
@@ -536,7 +536,17 @@ popen_state_str(unsigned int state)
 /**
  * Send a signal to a child process.
  *
+ * When POPEN_FLAG_GROUP_SIGNAL is set the function sends
+ * a signal to a process group rather than a process.
+ *
  * Return 0 at success or -1 at failure (and set a diag).
+ *
+ * Possible errors:
+ *
+ * - SystemError: a process does not exists anymore
+ * - SystemError: invalid signal number
+ * - SystemError: no permission to send a signal to
+ *                a process or a process group
  *
  * Set errno to ESRCH when a process does not exist.
  */
@@ -578,9 +588,21 @@ popen_send_signal(struct popen_handle *handle, int signo)
 /**
  * Delete a popen handle.
  *
- * The function kills a child process and
- * close all fds and remove the handle from
- * a living list and finally frees the handle.
+ * The function performs the following actions:
+ *
+ * - Kill a child process or a process group depending of
+ *   POPEN_FLAG_GROUP_SIGNAL (if the process is alive and
+ *   POPEN_FLAG_KEEP_CHILD flag is not set).
+ * - Close all fds occupied by the handle.
+ * - Remove the handle from a living list.
+ * - Free all occupied memory.
+ *
+ * Return 0 at success and -1 at failure (and set a diag).
+ *
+ * Possible errors:
+ *
+ * - SystemError: no permission to send a signal to
+ *                a process or a process group
  */
 int
 popen_delete(struct popen_handle *handle)
