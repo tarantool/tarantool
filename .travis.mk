@@ -96,9 +96,10 @@ build_coverage_debian:
 test_coverage_debian_no_deps: build_coverage_debian
 	# Enable --long tests for coverage
 	cd test && /usr/bin/python test-run.py --force $(TEST_RUN_EXTRA_PARAMS) --long
-	lcov --compat-libtool --directory src/ --capture --output-file coverage.info.tmp
+	lcov --compat-libtool --directory src/ --capture --output-file coverage.info.tmp \
+		--rc lcov_branch_coverage=1 --rc lcov_function_coverage=1
 	lcov --compat-libtool --remove coverage.info.tmp 'tests/*' 'third_party/*' '/usr/*' \
-		--output-file coverage.info
+		--rc lcov_branch_coverage=1 --rc lcov_function_coverage=1 --output-file coverage.info
 	lcov --list coverage.info
 	@if [ -n "$(COVERALLS_TOKEN)" ]; then \
 		echo "Exporting code coverage information to coveralls.io"; \
