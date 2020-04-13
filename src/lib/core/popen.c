@@ -539,6 +539,13 @@ popen_state_str(unsigned int state)
  * When POPEN_FLAG_GROUP_SIGNAL is set the function sends
  * a signal to a process group rather than a process.
  *
+ * A signal will not be sent if the child process is already
+ * dead: otherwise we might kill another process that occupies
+ * the same PID later. This means that if the child process
+ * dies before its own childs, the function will not send a
+ * signal to the process group even when ..._SETSID and
+ * ..._GROUP_SIGNAL are set.
+ *
  * Return 0 at success or -1 at failure (and set a diag).
  *
  * Possible errors:
@@ -596,6 +603,8 @@ popen_send_signal(struct popen_handle *handle, int signo)
  * - Close all fds occupied by the handle.
  * - Remove the handle from a living list.
  * - Free all occupied memory.
+ *
+ * @see popen_send_signal() for note about ..._GROUP_SIGNAL.
  *
  * Return 0 at success and -1 at failure (and set a diag).
  *

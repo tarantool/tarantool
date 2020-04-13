@@ -99,6 +99,8 @@ enum popen_flag_bits {
 
 	/*
 	 * Send signal to a process group.
+	 *
+	 * @see popen_send_signal() for details.
 	 */
 	POPEN_FLAG_GROUP_SIGNAL_BIT	= 16,
 	POPEN_FLAG_GROUP_SIGNAL		= (1 << POPEN_FLAG_GROUP_SIGNAL_BIT),
