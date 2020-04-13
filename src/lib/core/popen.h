@@ -177,6 +177,9 @@ popen_read_timeout(struct popen_handle *handle, void *buf,
 		   size_t count, unsigned int flags,
 		   ev_tstamp timeout);
 
+extern int
+popen_shutdown(struct popen_handle *handle, unsigned int flags);
+
 extern void
 popen_state(struct popen_handle *handle, int *state, int *exit_code);
 

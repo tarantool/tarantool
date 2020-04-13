@@ -34,6 +34,43 @@ static RLIST_HEAD(popen_head);
 static int dev_null_fd_ro = -1;
 static int dev_null_fd_wr = -1;
 
+static const struct {
+	unsigned int	mask;
+	unsigned int	mask_devnull;
+	unsigned int	mask_close;
+	int		fileno;
+	int		*dev_null_fd;
+	int		parent_idx;
+	int		child_idx;
+	bool		nonblock;
+} pfd_map[POPEN_FLAG_FD_STDEND_BIT] = {
+	{
+		.mask		= POPEN_FLAG_FD_STDIN,
+		.mask_devnull	= POPEN_FLAG_FD_STDIN_DEVNULL,
+		.mask_close	= POPEN_FLAG_FD_STDIN_CLOSE,
+		.fileno		= STDIN_FILENO,
+		.dev_null_fd	= &dev_null_fd_ro,
+		.parent_idx	= 1,
+		.child_idx	= 0,
+	}, {
+		.mask		= POPEN_FLAG_FD_STDOUT,
+		.mask_devnull	= POPEN_FLAG_FD_STDOUT_DEVNULL,
+		.mask_close	= POPEN_FLAG_FD_STDOUT_CLOSE,
+		.fileno		= STDOUT_FILENO,
+		.dev_null_fd	= &dev_null_fd_wr,
+		.parent_idx	= 0,
+		.child_idx	= 1,
+	}, {
+		.mask		= POPEN_FLAG_FD_STDERR,
+		.mask_devnull	= POPEN_FLAG_FD_STDERR_DEVNULL,
+		.mask_close	= POPEN_FLAG_FD_STDERR_CLOSE,
+		.fileno		= STDERR_FILENO,
+		.dev_null_fd	= &dev_null_fd_wr,
+		.parent_idx	= 0,
+		.child_idx	= 1,
+	},
+};
+
 /**
  * Register popen handle in a pids map.
  */
@@ -208,16 +245,32 @@ handle_free(struct popen_handle *handle)
 }
 
 /**
+ * Generate an error about IO operation that is not supported by
+ * a popen handle.
+ */
+static inline int
+popen_set_unsupported_io_error(void)
+{
+	diag_set(IllegalParams, "popen: handle does not support the "
+		 "requested IO operation");
+	return -1;
+}
+
+/**
  * Test if the handle can run a requested IO operation.
  *
  * Returns 0 if so and -1 otherwise (and set a diag).
  */
 static inline int
-popen_may_io(struct popen_handle *handle, unsigned int io_flags)
+popen_may_io(struct popen_handle *handle, unsigned int idx,
+	     unsigned int io_flags)
 {
-	if (!(io_flags & handle->flags)) {
-		diag_set(IllegalParams, "popen: handle does not support the "
-			 "requested IO operation");
+	if (!(io_flags & handle->flags))
+		return popen_set_unsupported_io_error();
+
+	if (handle->ios[idx].fd < 0) {
+		diag_set(IllegalParams, "popen: attempt to operate "
+			 "on a closed file descriptor");
 		return -1;
 	}
 
@@ -299,6 +352,7 @@ stdX_str(unsigned int index)
  *   - count: data is too big.
  *   - flags: stdin is not set.
  *   - handle: handle does not support the requested IO operation.
+ *   - handle: attempt to operate on a closed fd.
  * - SocketError: an IO error occurs at write().
  * - TimedOut: @a timeout quota is exceeded.
  * - FiberIsCancelled: cancelled by an outside code.
@@ -326,10 +380,10 @@ popen_write_timeout(struct popen_handle *handle, const void *buf,
 		return -1;
 	}
 
-	if (popen_may_io(handle, flags) != 0)
-		return -1;
-
 	int idx = STDIN_FILENO;
+
+	if (popen_may_io(handle, idx, flags) != 0)
+		return -1;
 
 	say_debug("popen: %d: write idx [%s:%d] buf %p count %zu "
 		  "fds %d timeout %.9g",
@@ -361,6 +415,7 @@ popen_write_timeout(struct popen_handle *handle, const void *buf,
  *   - count: buffer is too big.
  *   - flags: stdout and stdrr are both set or both missed.
  *   - handle: handle does not support the requested IO operation.
+ *   - handle: attempt to operate on a closed fd.
  * - SocketError: an IO error occurs at read().
  * - TimedOut: @a timeout quota is exceeded.
  * - FiberIsCancelled: cancelled by an outside code.
@@ -389,11 +444,11 @@ popen_read_timeout(struct popen_handle *handle, void *buf,
 		return -1;
 	}
 
-	if (popen_may_io(handle, flags) != 0)
-		return -1;
-
 	int idx = flags & POPEN_FLAG_FD_STDOUT ?
 		STDOUT_FILENO : STDERR_FILENO;
+
+	if (popen_may_io(handle, idx, flags) != 0)
+		return -1;
 
 	say_debug("popen: %d: read idx [%s:%d] buf %p count %zu "
 		  "fds %d timeout %.9g",
@@ -402,6 +457,82 @@ popen_read_timeout(struct popen_handle *handle, void *buf,
 
 	return coio_read_ahead_timeout_noxc(&handle->ios[idx], buf, 1, count,
 					    timeout);
+}
+
+/**
+ * Close parent's ends of std* fds.
+ *
+ * The following @a flags controls which fds should be closed:
+ *
+ *  POPEN_FLAG_FD_STDIN   close parent's end of child's stdin
+ *  POPEN_FLAG_FD_STDOUT  close parent's end of child's stdout
+ *  POPEN_FLAG_FD_STDERR  close parent's end of child's stderr
+ *
+ * The main reason to use this function is to send EOF to
+ * child's stdin. However parent's end of stdout / stderr
+ * may be closed too.
+ *
+ * The function does not fail on already closed fds (idempotence).
+ * However it fails on attempt to close the end of a pipe that was
+ * never exist. In other words, a subset of ..._FD_STD{IN,OUT,ERR}
+ * flags used at a handle creation may be used here.
+ *
+ * The function does not close any fds on a failure: either all
+ * requested fds are closed or neither of them.
+ *
+ * Returns 0 at success, otherwise -1 and set a diag.
+ *
+ * Possible errors:
+ *
+ * - IllegalParams: a parameter check fails:
+ *   - flags: neither stdin, stdout nor stderr is set.
+ *   - handle: handle does not support the requested IO operation
+ *             (one of fds is not piped).
+ */
+int
+popen_shutdown(struct popen_handle *handle, unsigned int flags)
+{
+	assert(handle != NULL);
+
+	/* Ignore irrelevant flags. */
+	flags &= POPEN_FLAG_FD_STDIN	|
+		 POPEN_FLAG_FD_STDOUT	|
+		 POPEN_FLAG_FD_STDERR;
+
+	/* At least one ..._FD_STDx flag should be set. */
+	if (flags == 0) {
+		diag_set(IllegalParams,
+			 "popen: neither stdin, stdout nor stderr is set");
+		return -1;
+	}
+
+	/*
+	 * The handle should have all std*, which are asked to
+	 * close, be piped.
+	 *
+	 * Otherwise the operation has no sense: we should close
+	 * parent's end of a pipe, but it was not created at all.
+	 */
+	if ((handle->flags & flags) != flags)
+		return popen_set_unsupported_io_error();
+
+	for (size_t idx = 0; idx < lengthof(pfd_map); ++idx) {
+		/* Operate only on asked fds. */
+		unsigned int op_mask = pfd_map[idx].mask;
+		if ((flags & op_mask) == 0)
+			continue;
+
+		/* Skip already closed fds. */
+		if (handle->ios[idx].fd < 0)
+			continue;
+
+		say_debug("popen: %d: shutdown idx [%s:%d] fd %s",
+			  handle->pid, stdX_str(idx), idx,
+			  handle->ios[idx].fd);
+		coio_close_io(loop(), &handle->ios[idx]);
+	}
+
+	return 0;
 }
 
 /**
@@ -868,42 +999,6 @@ popen_new(struct popen_opts *opts)
 	int saved_errno;
 	size_t i;
 
-	static const struct {
-		unsigned int	mask;
-		unsigned int	mask_devnull;
-		unsigned int	mask_close;
-		int		fileno;
-		int		*dev_null_fd;
-		int		parent_idx;
-		int		child_idx;
-		bool		nonblock;
-	} pfd_map[POPEN_FLAG_FD_STDEND_BIT] = {
-		{
-			.mask		= POPEN_FLAG_FD_STDIN,
-			.mask_devnull	= POPEN_FLAG_FD_STDIN_DEVNULL,
-			.mask_close	= POPEN_FLAG_FD_STDIN_CLOSE,
-			.fileno		= STDIN_FILENO,
-			.dev_null_fd	= &dev_null_fd_ro,
-			.parent_idx	= 1,
-			.child_idx	= 0,
-		}, {
-			.mask		= POPEN_FLAG_FD_STDOUT,
-			.mask_devnull	= POPEN_FLAG_FD_STDOUT_DEVNULL,
-			.mask_close	= POPEN_FLAG_FD_STDOUT_CLOSE,
-			.fileno		= STDOUT_FILENO,
-			.dev_null_fd	= &dev_null_fd_wr,
-			.parent_idx	= 0,
-			.child_idx	= 1,
-		}, {
-			.mask		= POPEN_FLAG_FD_STDERR,
-			.mask_devnull	= POPEN_FLAG_FD_STDERR_DEVNULL,
-			.mask_close	= POPEN_FLAG_FD_STDERR_CLOSE,
-			.fileno		= STDERR_FILENO,
-			.dev_null_fd	= &dev_null_fd_wr,
-			.parent_idx	= 0,
-			.child_idx	= 1,
-		},
-	};
 	/*
 	 * At max we could be skipping each pipe end
 	 * plus dev/null variants and logfd
