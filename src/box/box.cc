@@ -1069,14 +1069,14 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 	return box_process_rw(&request, space, NULL);
 }
 
-int
+API_EXPORT int
 box_return_tuple(box_function_ctx_t *ctx, box_tuple_t *tuple)
 {
 	return port_tuple_add(ctx->port, tuple);
 }
 
 /* schema_find_id()-like method using only public API */
-uint32_t
+API_EXPORT uint32_t
 box_space_id_by_name(const char *name, uint32_t len)
 {
 	if (len > BOX_NAME_MAX)
@@ -1101,7 +1101,7 @@ box_space_id_by_name(const char *name, uint32_t len)
 	return result;
 }
 
-uint32_t
+API_EXPORT uint32_t
 box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
 {
 	if (len > BOX_NAME_MAX)
@@ -1143,7 +1143,7 @@ box_process1(struct request *request, box_tuple_t **result)
 	return box_process_rw(request, space, result);
 }
 
-int
+API_EXPORT int
 box_select(uint32_t space_id, uint32_t index_id,
 	   int iterator, uint32_t offset, uint32_t limit,
 	   const char *key, const char *key_end,
@@ -1218,7 +1218,7 @@ box_select(uint32_t space_id, uint32_t index_id,
 	return 0;
 }
 
-int
+API_EXPORT int
 box_insert(uint32_t space_id, const char *tuple, const char *tuple_end,
 	   box_tuple_t **result)
 {
@@ -1232,7 +1232,7 @@ box_insert(uint32_t space_id, const char *tuple, const char *tuple_end,
 	return box_process1(&request, result);
 }
 
-int
+API_EXPORT int
 box_replace(uint32_t space_id, const char *tuple, const char *tuple_end,
 	    box_tuple_t **result)
 {
@@ -1246,7 +1246,7 @@ box_replace(uint32_t space_id, const char *tuple, const char *tuple_end,
 	return box_process1(&request, result);
 }
 
-int
+API_EXPORT int
 box_delete(uint32_t space_id, uint32_t index_id, const char *key,
 	   const char *key_end, box_tuple_t **result)
 {
@@ -1261,7 +1261,7 @@ box_delete(uint32_t space_id, uint32_t index_id, const char *key,
 	return box_process1(&request, result);
 }
 
-int
+API_EXPORT int
 box_update(uint32_t space_id, uint32_t index_id, const char *key,
 	   const char *key_end, const char *ops, const char *ops_end,
 	   int index_base, box_tuple_t **result)
@@ -1282,7 +1282,7 @@ box_update(uint32_t space_id, uint32_t index_id, const char *key,
 	return box_process1(&request, result);
 }
 
-int
+API_EXPORT int
 box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 	   const char *tuple_end, const char *ops, const char *ops_end,
 	   int index_base, box_tuple_t **result)
@@ -1334,7 +1334,7 @@ space_truncate(struct space *space)
 		diag_raise();
 }
 
-int
+API_EXPORT int
 box_truncate(uint32_t space_id)
 {
 	try {
@@ -1400,7 +1400,7 @@ sequence_data_delete(uint32_t seq_id)
 	return rc;
 }
 
-int
+API_EXPORT int
 box_sequence_next(uint32_t seq_id, int64_t *result)
 {
 	struct sequence *seq = sequence_cache_find(seq_id);
@@ -1417,7 +1417,7 @@ box_sequence_next(uint32_t seq_id, int64_t *result)
 	return 0;
 }
 
-int
+API_EXPORT int
 box_sequence_current(uint32_t seq_id, int64_t *result)
 {
 	struct sequence *seq = sequence_cache_find(seq_id);
@@ -1430,7 +1430,7 @@ box_sequence_current(uint32_t seq_id, int64_t *result)
 	return 0;
 }
 
-int
+API_EXPORT int
 box_sequence_set(uint32_t seq_id, int64_t value)
 {
 	struct sequence *seq = sequence_cache_find(seq_id);
@@ -1443,7 +1443,7 @@ box_sequence_set(uint32_t seq_id, int64_t value)
 	return sequence_data_update(seq_id, value);
 }
 
-int
+API_EXPORT int
 box_sequence_reset(uint32_t seq_id)
 {
 	struct sequence *seq = sequence_cache_find(seq_id);
