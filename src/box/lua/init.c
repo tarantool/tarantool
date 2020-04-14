@@ -42,6 +42,8 @@
 #include "box/txn.h"
 #include "box/func.h"
 #include "box/vclock.h"
+#include "box/session.h"
+#include "box/mp_error.h"
 
 #include "box/lua/error.h"
 #include "box/lua/tuple.h"
@@ -63,6 +65,8 @@
 #include "box/lua/execute.h"
 #include "box/lua/key_def.h"
 #include "box/lua/merger.h"
+
+#include "mpstream/mpstream.h"
 
 static uint32_t CTID_STRUCT_TXN_SAVEPOINT_PTR = 0;
 
@@ -408,7 +412,38 @@ luamp_encode_extension_box(struct lua_State *L, int idx,
 		tuple_to_mpstream(tuple, stream);
 		return MP_ARRAY;
 	}
+	struct error *err = luaL_iserror(L, idx);
+	struct serializer_opts *opts = &current_session()->meta.serializer_opts;
+	if (err != NULL && opts->error_marshaling_enabled)
+		error_to_mpstream(err, stream);
+
 	return MP_EXT;
+}
+
+/**
+ * A MsgPack extensions handler that supports errors decode.
+ */
+static void
+luamp_decode_extension_box(struct lua_State *L, const char **data)
+{
+	assert(mp_typeof(**data) == MP_EXT);
+	int8_t ext_type;
+	uint32_t len = mp_decode_extl(data, &ext_type);
+
+	if (ext_type != MP_ERROR) {
+		luaL_error(L, "Unsuported MsgPack extension type: %u",
+			   ext_type);
+		return;
+	}
+
+	struct error *err = error_unpack(data, len);
+	if (err == NULL) {
+		luaL_error(L, "Can not parse an error from MsgPack");
+		return;
+	}
+
+	luaT_pusherror(L, err);
+	return;
 }
 
 #include "say.h"
@@ -452,6 +487,7 @@ box_lua_init(struct lua_State *L)
 	lua_pop(L, 1);
 
 	luamp_set_encode_extension(luamp_encode_extension_box);
+	luamp_set_decode_extension(luamp_decode_extension_box);
 
 	/* Load Lua extension */
 	for (const char **s = lua_sources; *s; s += 2) {

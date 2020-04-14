@@ -69,6 +69,8 @@ add_executable(xrow.test xrow.cc)
 target_link_libraries(xrow.test xrow unit)
 add_executable(decimal.test decimal.c)
 target_link_libraries(decimal.test core unit)
+add_executable(mp_error.test mp_error.cc)
+target_link_libraries(mp_error.test box_error core unit)
 
 add_executable(fiber.test fiber.cc)
 set_source_files_properties(fiber.cc PROPERTIES COMPILE_FLAGS -O0)

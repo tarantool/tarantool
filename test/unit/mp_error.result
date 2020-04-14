@@ -1,0 +1,44 @@
+	*** main ***
+1..5
+	*** test_stack_error_decode ***
+    1..17
+    ok 1 - check CustomError
+    ok 2 - check AccessDeniedError
+    ok 3 - check ClientError
+    ok 4 - check XlogError
+    ok 5 - check XlogGapError
+    ok 6 - check SystemError
+    ok 7 - check SocketError
+    ok 8 - check OutOfMemory
+    ok 9 - check TimedOut
+    ok 10 - check ChannelIsClosed
+    ok 11 - check FiberIsCancelled
+    ok 12 - check LuajitError
+    ok 13 - check IllegalParams
+    ok 14 - check CollationError
+    ok 15 - check SwimError
+    ok 16 - check CryptoError
+    ok 17 - stack size
+ok 1 - subtests
+	*** test_stack_error_decode: done ***
+	*** test_decode_unknown_type ***
+    1..1
+    ok 1 - check SomeNewError
+ok 2 - subtests
+	*** test_decode_unknown_type: done ***
+	*** test_fail_not_enough_fields ***
+    1..2
+    ok 1 - check not enough additional fields
+    ok 2 - error about parsing problem is set
+ok 3 - subtests
+	*** test_fail_not_enough_fields: done ***
+	*** test_unknown_fields ***
+    1..1
+    ok 1 - check unknown fields
+ok 4 - subtests
+	*** test_unknown_additional_fields ***
+    1..1
+    ok 1 - check unknown additional field
+ok 5 - subtests
+	*** test_unknown_additional_fields: done ***
+	*** main: done ***

@@ -195,6 +195,8 @@ restart: /* used by MP_EXT of unidentified subtype */
 		case MP_UUID:
 			mpstream_encode_uuid(stream, field->uuidval);
 			break;
+		case MP_ERROR:
+			return luamp_encode_extension(L, top, stream);
 		default:
 			/* Run trigger if type can't be encoded */
 			type = luamp_encode_extension(L, top, stream);

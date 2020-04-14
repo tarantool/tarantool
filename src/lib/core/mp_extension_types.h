@@ -43,6 +43,7 @@ enum mp_extension_type {
     MP_UNKNOWN_EXTENSION = 0,
     MP_DECIMAL = 1,
     MP_UUID = 2,
+    MP_ERROR = 3,
     mp_extension_type_MAX,
 };
 
