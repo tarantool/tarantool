@@ -241,11 +241,14 @@ class AccessDeniedError: public ClientError
 public:
 	AccessDeniedError(const char *file, unsigned int line,
 			  const char *access_type, const char *object_type,
-			  const char *object_name, const char *user_name);
+			  const char *object_name, const char *user_name,
+			  bool run_trigers = true);
 
 	~AccessDeniedError()
 	{
 		free(m_object_name);
+		free(m_object_type);
+		free(m_access_type);
 	}
 
 	const char *
@@ -268,11 +271,11 @@ public:
 
 private:
 	/** Type of object the required access was denied to */
-	const char *m_object_type;
+	char *m_object_type;
 	/** Name of object the required access was denied to */
 	char *m_object_name;
 	/** Type of declined access */
-	const char *m_access_type;
+	char *m_access_type;
 };
 
 /**
@@ -302,6 +305,8 @@ struct XlogGapError: public XlogError
 {
 	XlogGapError(const char *file, unsigned line,
 		     const struct vclock *from, const struct vclock *to);
+	XlogGapError(const char *file, unsigned line,
+		     const char *msg);
 
 	virtual void raise() { throw this; }
 };

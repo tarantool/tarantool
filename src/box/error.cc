@@ -255,6 +255,13 @@ XlogGapError::XlogGapError(const char *file, unsigned line,
 		 (long long) vclock_sum(to), s_to ? s_to : "");
 }
 
+XlogGapError::XlogGapError(const char *file, unsigned line,
+			   const char *msg)
+		: XlogError(&type_XlogGapError, file, line)
+{
+	error_format_msg(this, "%s", msg);
+}
+
 struct error *
 BuildXlogGapError(const char *file, unsigned line,
 		  const struct vclock *from, const struct vclock *to)
@@ -283,23 +290,22 @@ AccessDeniedError::AccessDeniedError(const char *file, unsigned int line,
 				     const char *access_type,
 				     const char *object_type,
 				     const char *object_name,
-				     const char *user_name)
+				     const char *user_name,
+				     bool run_trigers)
 	:ClientError(&type_AccessDeniedError, file, line, ER_ACCESS_DENIED)
 {
 	error_format_msg(this, tnt_errcode_desc(m_errcode),
 			 access_type, object_type, object_name, user_name);
 
 	struct on_access_denied_ctx ctx = {access_type, object_type, object_name};
-	trigger_run(&on_access_denied, (void *) &ctx);
 	/*
-	 * We want to use ctx parameters as error parameters
-	 * later, so we have to alloc space for it.
-	 * As m_access_type and m_object_type are constant
-	 * literals they are statically  allocated. We must copy
-	 * only m_object_name.
+	 * Don't run the triggers when create after marshaling
+	 * through network.
 	 */
-	m_object_type = object_type;
-	m_access_type = access_type;
+	if (run_trigers)
+		trigger_run(&on_access_denied, (void *) &ctx);
+	m_object_type = strdup(object_type);
+	m_access_type = strdup(access_type);
 	m_object_name = strdup(object_name);
 }
 
