@@ -347,7 +347,7 @@ end
 -- box.commit yields, so it's defined as Lua/C binding
 -- box.rollback and box.rollback_to_savepoint yields as well
 
-function update_format(format)
+local function update_format(format)
     local result = {}
     for i, given in ipairs(format) do
         local field = {}
@@ -2318,7 +2318,7 @@ box.schema.role.drop = function(name, opts)
     return drop(uid)
 end
 
-function role_check_grant_revoke_of_sys_priv(priv)
+local function role_check_grant_revoke_of_sys_priv(priv)
     priv = string.lower(priv)
     if (type(priv) == 'string' and (priv:match("session") or priv:match("usage"))) or
         (type(priv) == "number" and (bit.band(priv, 8) ~= 0 or bit.band(priv, 16) ~= 0)) then
