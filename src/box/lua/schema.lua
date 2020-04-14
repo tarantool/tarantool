@@ -1208,7 +1208,7 @@ box.schema.index.alter = function(space_id, index_id, options)
                    index_opts, parts}
     if index_opts.func ~= nil then
         local _func_index = box.space[box.schema.FUNC_INDEX_ID]
-        _func_index:insert{space_id, iid, index_opts.func}
+        _func_index:insert{space_id, index_id, index_opts.func}
     end
     space_sequence_alter_commit(sequence_proxy)
 end
