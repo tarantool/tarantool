@@ -364,7 +364,7 @@ sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 	rlist_add_entry(&key_list, ephemer_index_def, link);
 
 	struct space_def *ephemer_space_def =
-		space_def_new_ephemeral(field_count);
+		space_def_new_ephemeral(field_count, NULL);
 	if (ephemer_space_def == NULL) {
 		index_def_delete(ephemer_index_def);
 		return NULL;
