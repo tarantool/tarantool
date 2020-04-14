@@ -294,3 +294,17 @@ idx:get({3})
 
 s:drop()
 box.func.extr:drop()
+
+--
+-- Function is added at alter.
+--
+s = box.schema.space.create('withdata', {engine = engine})
+lua_code = [[function(tuple) return {tuple[2] >= 0 and tuple[2] or -tuple[2]} end]]
+box.schema.func.create('second_field_module', {body = lua_code, is_deterministic = true, is_sandboxed = true})
+pk = s:create_index('pk')
+sk = s:create_index('sk', {parts = {{2, 'unsigned'}}})
+sk:alter({func = 'second_field_module', parts = {{1, 'unsigned'}}})
+s:insert({1, -3})
+sk:get{3}
+s:drop()
+box.schema.func.drop('second_field_module')
