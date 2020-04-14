@@ -261,7 +261,12 @@ remove_images:
   script:
     - ${GITLAB_MAKE} perf_cleanup
 
-# Packs
+# Packages and sources
+
+sources:
+  <<: *pack_definition
+  script:
+    - ${GITLAB_MAKE} source
 
 centos_6:
   <<: *pack_definition
@@ -348,6 +353,11 @@ debian_10:
     DIST: 'buster'
 
 # Deploy
+
+sources_deploy:
+  <<: *deploy_definition
+  script:
+    - ${GITLAB_MAKE} source_deploy
 
 centos_6_deploy:
   <<: *deploy_definition

@@ -110,17 +110,21 @@ vms_test_%:
 vms_shutdown:
 	VBoxManage controlvm ${VMS_NAME} poweroff
 
-# ########
-# Packages
-# ########
+# ######
+# Deploy
+# ######
 
 GIT_DESCRIBE=$(shell git describe HEAD)
 MAJOR_VERSION=$(word 1,$(subst ., ,$(GIT_DESCRIBE)))
 MINOR_VERSION=$(word 2,$(subst ., ,$(GIT_DESCRIBE)))
 BUCKET="$(MAJOR_VERSION).$(MINOR_VERSION)"
 
-package: git_submodule_update
-	git clone https://github.com/packpack/packpack.git packpack
+deploy_prepare: git_submodule_update
+	[ -d packpack ] || \
+		git clone https://github.com/packpack/packpack.git packpack
+	rm -rf build
+
+package: deploy_prepare
 	PACKPACK_EXTRA_DOCKER_RUN_PARAMS='--network=host' ./packpack/packpack
 
 deploy: package
@@ -131,6 +135,13 @@ deploy: package
 		./tools/update_repo.sh -o=${OS} -d=${DIST} \
 			-b="${RELEASE_REPO_S3_DIR}/${BUCKET}" build ; \
 	fi
+
+source: deploy_prepare
+	TARBALL_COMPRESSOR=gz packpack/packpack tarball
+
+source_deploy: source
+	aws --endpoint-url "${AWS_S3_ENDPOINT_URL}" s3 cp build/*.tar.gz \
+		"s3://tarantool.${BUCKET}.src/" --acl public-read
 
 # ###################
 # Performance testing
