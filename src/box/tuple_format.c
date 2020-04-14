@@ -698,6 +698,12 @@ tuple_format_destroy(struct tuple_format *format)
  * dictionary will never be altered. If it can, then alter can
  * affect another space, which shares a format with one which is
  * altered.
+ *
+ * The only way to change the format of the space is to recreate
+ * space with the new format inside of BOX. Since there is no
+ * mechanism for recreating the ephemeral space, we need not worry
+ * about changing the format of the ephemeral space.
+ *
  * @param p_format Double pointer to format. It is updated with
  * 		   hashed value, if corresponding format was found
  * 		   in hash table
@@ -709,13 +715,7 @@ static bool
 tuple_format_reuse(struct tuple_format **p_format)
 {
 	struct tuple_format *format = *p_format;
-	if (!format->is_ephemeral)
-		return false;
-	/*
-	 * These fields do not participate in hashing.
-	 * Make sure they're unset.
-	 */
-	assert(format->dict->name_count == 0);
+	assert(format->is_ephemeral);
 	assert(format->is_temporary);
 	mh_int_t key = mh_tuple_format_find(tuple_formats_hash, format,
 					    NULL);
@@ -739,9 +739,7 @@ tuple_format_reuse(struct tuple_format **p_format)
 static int
 tuple_format_add_to_hash(struct tuple_format *format)
 {
-	if(!format->is_ephemeral)
-		return 0;
-	assert(format->dict->name_count == 0);
+	assert(format->is_ephemeral);
 	assert(format->is_temporary);
 	mh_int_t key = mh_tuple_format_put(tuple_formats_hash,
 					   (const struct tuple_format **)&format,
@@ -795,11 +793,11 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 	if (tuple_format_create(format, keys, key_count, space_fields,
 				space_field_count) < 0)
 		goto err;
-	if (tuple_format_reuse(&format))
+	if (is_ephemeral && tuple_format_reuse(&format))
 		return format;
 	if (tuple_format_register(format) < 0)
 		goto err;
-	if (tuple_format_add_to_hash(format) < 0) {
+	if (is_ephemeral && tuple_format_add_to_hash(format) < 0) {
 		tuple_format_deregister(format);
 		goto err;
 	}
