@@ -34,9 +34,6 @@ jobs:
       - name: "Debug build + test + coverage (Linux, gcc)"
         env: TARGET=coverage
       # Deploy targets (they also catch distro-specific problems).
-      - name: "Create and deploy tarball"
-        env: TARGET=source
-        if: branch = "master"
       - name: "CentOS 6 build + deploy RPM"
         env: OS=el DIST=6
         if: branch = "master"
@@ -99,14 +96,6 @@ deploy:
       repo: tarantool/tarantool
       branch: "master"
       condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
-  # Deploy source tarballs to S3 from master branch (w/o tagged revisions)
-  - provider: script
-    script: make -f .travis.mk source_deploy
-    skip_cleanup: true
-    on:
-      repo: tarantool/tarantool
-      branch: "master"
-      condition: "x${TARGET} = xsource"
   # Deploy packages to PackageCloud from tagged revisions
   # https://github.com/travis-ci/travis-ci/issues/7780#issuecomment-302389370
   - provider: packagecloud
@@ -120,15 +109,6 @@ deploy:
       repo: tarantool/tarantool
       tags: true
       condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
-  # Deploy source tarballs to S3 from tagged revisions
-  # https://github.com/travis-ci/travis-ci/issues/7780#issuecomment-302389370
-  - provider: script
-    script: make -f .travis.mk source_deploy
-    skip_cleanup: true
-    on:
-      repo: tarantool/tarantool
-      tags: true
-      condition: "x${TARGET} = xsource"
 
 notifications:
   email:
