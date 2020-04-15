@@ -67,9 +67,6 @@ jobs:
       - name: "Ubuntu Bionic (18.04) build + deploy DEB"
         env: OS=ubuntu DIST=bionic
         if: branch = "master"
-      - name: "Ubuntu Disco (19.04) build + deploy DEB"
-        env: OS=ubuntu DIST=disco
-        if: branch = "master"
       - name: "Ubuntu Eoan (19.10) build + deploy DEB"
         env: OS=ubuntu DIST=eoan
         if: branch = "master"
