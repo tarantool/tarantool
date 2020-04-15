@@ -244,3 +244,29 @@ e:unpack()
 -- Try too long type name.
 e = box.error.new({type = string.rep('a', 128)})
 #e.type
+
+-- gh-4887: accessing 'prev' member also refs it so that after
+-- error is gone, its 'prev' is staying alive.
+--
+lua_code = [[function(tuple) local json = require('json') return json.encode(tuple) end]]
+box.schema.func.create('runtimeerror', {body = lua_code, is_deterministic = true, is_sandboxed = true})
+s = box.schema.space.create('withdata')
+pk = s:create_index('pk')
+idx = s:create_index('idx', {func = box.func.runtimeerror.id, parts = {{1, 'string'}}})
+
+function test_func() return pcall(s.insert, s, {1}) end
+ok, err = test_func()
+preve = err.prev
+gc_err = setmetatable({preve}, {__mode = 'v'})
+err:set_prev(nil)
+err.prev
+collectgarbage('collect')
+--  Still one reference to err.prev so it should not be collected.
+--
+gc_err
+preve = nil
+collectgarbage('collect')
+gc_err
+
+s:drop()
+box.schema.func.drop('runtimeerror')

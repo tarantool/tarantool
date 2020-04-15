@@ -38,6 +38,9 @@ error_set_prev(struct error *e, struct error *prev);
 
 const char *
 box_error_custom_type(const struct error *e);
+
+void
+error_unref(struct error *e);
 ]]
 
 local REFLECTION_CACHE = {}
@@ -114,6 +117,12 @@ end
 local function error_prev(err)
     local e = err._cause;
     if e ~= nil then
+        local INT32_MAX = 2147483647
+        if e._refs >= INT32_MAX then
+            error("Too many references to error object")
+        end
+        e._refs = e._refs + 1
+        e = ffi.gc(e, ffi.C.error_unref)
         return e
     else
         return nil
