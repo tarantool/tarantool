@@ -323,12 +323,6 @@ ubuntu_18_04:
     OS: 'ubuntu'
     DIST: 'bionic'
 
-ubuntu_19_04:
-  <<: *pack_definition
-  variables:
-    OS: 'ubuntu'
-    DIST: 'disco'
-
 ubuntu_19_10:
   <<: *pack_definition
   variables:
@@ -414,12 +408,6 @@ ubuntu_18_04_deploy:
   variables:
     OS: 'ubuntu'
     DIST: 'bionic'
-
-ubuntu_19_04_deploy:
-  <<: *deploy_definition
-  variables:
-    OS: 'ubuntu'
-    DIST: 'disco'
 
 ubuntu_19_10_deploy:
   <<: *deploy_definition
