@@ -259,12 +259,19 @@ popen_set_unsupported_io_error(void)
 /**
  * Test if the handle can run a requested IO operation.
  *
+ * NB: Expects @a io_flags to be a ..._FD_STDx flag rather
+ * then a mask with several flags: otherwise it'll check
+ * that one (any) of @a io_flags is set.
+ *
  * Returns 0 if so and -1 otherwise (and set a diag).
  */
 static inline int
 popen_may_io(struct popen_handle *handle, unsigned int idx,
 	     unsigned int io_flags)
 {
+	assert(io_flags == POPEN_FLAG_FD_STDIN	||
+	       io_flags == POPEN_FLAG_FD_STDOUT	||
+	       io_flags == POPEN_FLAG_FD_STDERR);
 	if (!(io_flags & handle->flags))
 		return popen_set_unsupported_io_error();
 
