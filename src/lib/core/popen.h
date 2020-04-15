@@ -167,7 +167,7 @@ popen_stat(struct popen_handle *handle, struct popen_stat *st);
 extern const char *
 popen_command(struct popen_handle *handle);
 
-extern int
+extern ssize_t
 popen_write_timeout(struct popen_handle *handle, const void *buf,
 		    size_t count, unsigned int flags,
 		    ev_tstamp timeout);

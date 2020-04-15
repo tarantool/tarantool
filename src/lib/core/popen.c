@@ -370,7 +370,7 @@ stdX_str(unsigned int index)
  * FIXME: Provide an info re amount written bytes in the case.
  *        Say, return -(written) in the case.
  */
-int
+ssize_t
 popen_write_timeout(struct popen_handle *handle, const void *buf,
 		    size_t count, unsigned int flags,
 		    ev_tstamp timeout)
@@ -397,8 +397,8 @@ popen_write_timeout(struct popen_handle *handle, const void *buf,
 		  handle->pid, stdX_str(idx), idx, buf, count,
 		  handle->ios[idx].fd, timeout);
 
-	int rc = coio_write_timeout_noxc(&handle->ios[idx], buf, count,
-					 timeout);
+	ssize_t rc = coio_write_timeout_noxc(&handle->ios[idx], buf,
+					     count, timeout);
 	assert(rc < 0 || rc == (ssize_t)count);
 	return rc;
 }
