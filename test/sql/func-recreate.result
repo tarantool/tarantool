@@ -12,31 +12,34 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 fiber = require('fiber')
 ---
 ...
-box.internal.sql_create_function('WAITFOR', 'INT', function (n) fiber.sleep(n) return n end)
+flag = true
+---
+...
+box.internal.sql_create_function('WAITFOR', 'INT', function () while flag do fiber.sleep(0.01) end return 0 end)
 ---
 ...
 ch = fiber.channel(1)
 ---
 ...
-_ = fiber.create(function () ch:put(box.execute('select WAITFOR(0.2)')) end)
+_ = fiber.create(function () ch:put(box.execute('select WAITFOR()')) end)
 ---
 ...
-fiber.sleep(0.1)
----
-...
-box.internal.sql_create_function('WAITFOR', 'INT', function (n) require('fiber').sleep(n) return n end)
+box.internal.sql_create_function('WAITFOR', 'INT', function () while flag do fiber.sleep(0.01) end return 0 end)
 ---
 - error: 'Failed to create function ''WAITFOR'': unable to create function due to
     active statements'
 ...
+flag = false
+---
+...
 ch:get()
 ---
 - metadata:
-  - name: WAITFOR(0.2)
+  - name: WAITFOR()
     type: integer
   rows:
-  - [0.2]
+  - [0]
 ...
-box.internal.sql_create_function('WAITFOR', 'INT', function (n) require('fiber').sleep(n) return n end)
+box.internal.sql_create_function('WAITFOR', 'INT', function () while flag do fiber.sleep(0.01) end return 0 end)
 ---
 ...
