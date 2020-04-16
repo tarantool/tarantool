@@ -435,7 +435,7 @@ relay_schedule_pending_gc(struct relay *relay, const struct vclock *vclock)
 		 * the greater signatures is due to changes pulled
 		 * from other members of the cluster.
 		 */
-		if (vclock_compare(&curr->vclock, vclock) > 0)
+		if (vclock_compare_ignore0(&curr->vclock, vclock) > 0)
 			break;
 		stailq_shift(&relay->pending_gc);
 		free(gc_msg);
@@ -609,6 +609,10 @@ relay_subscribe_f(va_list ap)
 			send_vclock = &r->vclock;
 		else
 			send_vclock = &relay->recv_vclock;
+
+		/* Collect xlog files received by the replica. */
+		relay_schedule_pending_gc(relay, send_vclock);
+
 		if (vclock_sum(&relay->status_msg.vclock) ==
 		    vclock_sum(send_vclock))
 			continue;
@@ -619,8 +623,6 @@ relay_subscribe_f(va_list ap)
 		vclock_copy(&relay->status_msg.vclock, send_vclock);
 		relay->status_msg.relay = relay;
 		cpipe_push(&relay->tx_pipe, &relay->status_msg.msg);
-		/* Collect xlog files received by the replica. */
-		relay_schedule_pending_gc(relay, send_vclock);
 	}
 
 	/*
