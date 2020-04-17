@@ -1,0 +1,52 @@
+-- test-run result file version 2
+env = require('test_run')
+ | ---
+ | ...
+test_run = env.new()
+ | ---
+ | ...
+
+--
+-- gh-4755: collation in metadata must be displayed for both
+-- string and scalar field types.
+--
+test_run:cmd("setopt delimiter ';'");
+ | ---
+ | - true
+ | ...
+box.execute([[SET SESSION "sql_full_metadata" = true;]]);
+ | ---
+ | - row_count: 1
+ | ...
+box.execute([[CREATE TABLE test (a SCALAR COLLATE "unicode_ci" PRIMARY KEY,
+                                 b STRING COLLATE "unicode_ci");]]);
+ | ---
+ | - row_count: 1
+ | ...
+box.execute("SELECT * FROM test;");
+ | ---
+ | - metadata:
+ |   - span: A
+ |     type: scalar
+ |     is_nullable: false
+ |     name: A
+ |     collation: unicode_ci
+ |   - span: B
+ |     type: string
+ |     is_nullable: true
+ |     name: B
+ |     collation: unicode_ci
+ |   rows: []
+ | ...
+
+--
+-- Cleanup.
+--
+box.execute([[SET SESSION "sql_full_metadata" = false;]]);
+ | ---
+ | - row_count: 1
+ | ...
+box.execute("DROP TABLE test;");
+ | ---
+ | - row_count: 1
+ | ...
