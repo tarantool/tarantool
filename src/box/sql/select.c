@@ -1792,9 +1792,10 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 			continue;
 		if (p->op == TK_VARIABLE)
 			var_pos[var_count++] = i;
-		vdbe_metadata_set_col_type(v, i,
-					   field_type_strs[sql_expr_type(p)]);
-		if (is_full_meta && sql_expr_type(p) == FIELD_TYPE_STRING) {
+		enum field_type type = sql_expr_type(p);
+		vdbe_metadata_set_col_type(v, i, field_type_strs[type]);
+		if (is_full_meta && (type == FIELD_TYPE_STRING ||
+		    type == FIELD_TYPE_SCALAR)) {
 			bool unused;
 			uint32_t id = 0;
 			struct coll *coll = NULL;
