@@ -129,6 +129,10 @@ local function error_set_prev(err, prev)
     if not ffi.istype('struct error', prev) and prev ~= nil then
         error("Usage: error1:set_prev(error2)")
     end
+    local INT32_MAX = 2147483647
+    if err._refs >= INT32_MAX then
+        error("Too many references to error object")
+    end
     local ok = ffi.C.error_set_prev(err, prev);
     if ok ~= 0 then
         error("Cycles are not allowed")

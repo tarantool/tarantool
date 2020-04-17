@@ -80,6 +80,7 @@ error_set_prev(struct error *e, struct error *prev)
 			 */
 			error_unlink_effect(prev);
 		}
+		assert(prev->refs < INT32_MAX);
 		error_ref(prev);
 		prev->effect = e;
 	}
