@@ -688,11 +688,27 @@ popen_state_str(unsigned int state)
  * Possible errors:
  *
  * - SystemError: a process does not exists anymore
+ *
+ *                Aside of a non-exist process it is also
+ *                set for a zombie process or when all
+ *                processes in a group are zombies (but
+ *                see note re Mac OS below).
+ *
  * - SystemError: invalid signal number
+ *
  * - SystemError: no permission to send a signal to
  *                a process or a process group
  *
- * Set errno to ESRCH when a process does not exist.
+ *                It is set on Mac OS when a signal is sent
+ *                to a process group, where a group leader
+ *                is zombie (or when all processes in it
+ *                are zombies, don't sure).
+ *
+ *                Whether it may appear due to other
+ *                reasons is unclear.
+ *
+ * Set errno to ESRCH when a process does not exist or is
+ * zombie.
  */
 int
 popen_send_signal(struct popen_handle *handle, int signo)
@@ -732,39 +748,74 @@ popen_send_signal(struct popen_handle *handle, int signo)
 /**
  * Delete a popen handle.
  *
- * The function performs the following actions:
+ * Send SIGKILL and free the handle.
  *
- * - Kill a child process or a process group depending of
- *   POPEN_FLAG_GROUP_SIGNAL (if the process is alive and
- *   POPEN_FLAG_KEEP_CHILD flag is not set).
- * - Close all fds occupied by the handle.
- * - Remove the handle from a living list.
- * - Free all occupied memory.
+ * Details about signaling:
  *
- * @see popen_send_signal() for note about ..._GROUP_SIGNAL.
+ * - The signal is sent only when ...KEEP_CHILD is not set.
+ * - The signal is sent only when a process is alive according
+ *   to the information available on current even loop iteration.
+ *   (There is a gap here: a zombie may be signaled; it is
+ *   harmless.)
+ * - The signal is sent to a process or a grocess group depending
+ *   of ..._GROUP_SIGNAL flag. @see popen_send_signal() for note
+ *   about ..._GROUP_SIGNAL.
  *
- * Return 0 at success and -1 at failure (and set a diag).
+ * Resources are released disregarding of whether a signal
+ * sending succeeds: all fds occupied by the handle are closed,
+ * the handle is removed from a living list, all occupied memory
+ * is freed.
  *
- * Possible errors:
+ * The function may return 0 or -1 (and set a diag) as usual,
+ * but it always frees the handle resources. So any return
+ * value usually means success for a caller. The return
+ * value and diagnostics are purely informational: it is
+ * for logging or same kind of reporting.
+ *
+ * Possible diagnostics (don't consider them as errors):
  *
  * - SystemError: no permission to send a signal to
  *                a process or a process group
+ *
+ *                This error may appear due to Mac OS
+ *                behaviour on zombies when
+ *                ..._GROUP_SIGNAL is set,
+ *                @see popen_send_signal().
+ *
+ *                Whether it may appear due to other
+ *                reasons is unclear.
+ *
+ * Always return 0 when a process is known as dead: no signal
+ * will be send, so no 'failure' may appear.
  */
 int
 popen_delete(struct popen_handle *handle)
 {
+	/*
+	 * Save a result and a failure reason of the
+	 * popen_send_signal() call.
+	 */
+	int rc = 0;
+	struct diag *diag = diag_get();
+	struct error *e = NULL;
+
 	size_t i;
 
 	assert(handle != NULL);
 
 	if ((handle->flags & POPEN_FLAG_KEEP_CHILD) == 0) {
 		/*
-		 * Unable to kill the process -- give an error.
+		 * Unable to kill the process -- save the error
+		 * and pass over.
 		 * The process is not exist already -- pass over.
 		 */
 		if (popen_send_signal(handle, SIGKILL) != 0 &&
-		    errno != ESRCH)
-			return -1;
+		    errno != ESRCH) {
+			rc = -1;
+			e = diag_last_error(diag);
+			assert(e != NULL);
+			error_ref(e);
+		}
 	}
 
 	for (i = 0; i < lengthof(handle->ios); i++) {
@@ -787,7 +838,14 @@ popen_delete(struct popen_handle *handle)
 
 	rlist_del(&handle->list);
 	handle_free(handle);
-	return 0;
+
+	/* Restore an error from popen_send_signal() if any. */
+	if (rc != 0) {
+		diag_set_error(diag, e);
+		error_unref(e);
+	}
+
+	return rc;
 }
 
 /**
