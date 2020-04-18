@@ -16,6 +16,7 @@ local fiber_clock       = fiber.clock
 local fiber_self        = fiber.self
 local decode            = msgpack.decode_unchecked
 local decode_map_header = msgpack.decode_map_header
+local buffer_reg        = buffer.reg1
 
 local table_new           = require('table.new')
 local check_iterator_type = box.internal.check_iterator_type
@@ -45,8 +46,6 @@ local IPROTO_FIELD_NAME_KEY = 0
 local IPROTO_DATA_KEY      = 0x30
 local IPROTO_ERROR_KEY     = 0x31
 local IPROTO_ERROR_STACK   = 0x52
-local IPROTO_ERROR_CODE    = 0x01
-local IPROTO_ERROR_MESSAGE = 0x02
 local IPROTO_GREETING_SIZE = 128
 local IPROTO_CHUNK_KEY     = 128
 local IPROTO_OK_KEY        = 0
@@ -57,6 +56,14 @@ local E_NO_CONNECTION        = box.error.NO_CONNECTION
 local E_TIMEOUT              = box.error.TIMEOUT
 local E_PROC_LUA             = box.error.PROC_LUA
 local E_NO_SUCH_SPACE        = box.error.NO_SUCH_SPACE
+
+ffi.cdef[[
+struct error *
+error_unpack_unsafe(const char **data);
+
+void
+error_unref(struct error *e);
+]]
 
 -- utility tables
 local is_final_state         = {closed = 1, error = 1}
@@ -142,6 +149,30 @@ local method_decoder = {
     count   = decode_count,
     inject  = decode_data,
     push    = decode_push,
+}
+
+local function decode_error_stack(raw_data)
+    local ptr = buffer_reg.acucp
+    ptr[0] = raw_data
+    local err = ffi.C.error_unpack_unsafe(ptr)
+    if err ~= nil then
+        err._refs = err._refs + 1
+        err = ffi.gc(err, ffi.C.error_unref)
+        -- From FFI it is returned as 'struct error *', which is
+        -- not considered equal to 'const struct error &', and is
+        -- is not accepted by functions like box.error(). Need to
+        -- cast explicitly.
+        err = ffi.cast('const struct error &', err)
+    else
+        -- Error unpacker installs fail reason into diag.
+        box.error()
+    end
+    return err, ptr[0]
+end
+
+local response_decoder = {
+    [IPROTO_ERROR_KEY] = decode,
+    [IPROTO_ERROR_STACK] = decode_error_stack,
 }
 
 local function next_id(id) return band(id + 1, 0x7FFFFFFF) end
@@ -281,22 +312,14 @@ local function create_transport(host, port, user, password, callback,
     --
     function request_index:result()
         if self.errno then
-            if type(self.response) == 'table' then
-                -- Decode and fill in error stack.
-                local prev = nil
-                for i = #self.response, 1, -1 do
-                    local error = self.response[i]
-                    local code = error[IPROTO_ERROR_CODE]
-                    local msg = error[IPROTO_ERROR_MESSAGE]
-                    local new_err = box.error.new({code = code, reason = msg})
-                    new_err:set_prev(prev)
-                    prev = new_err
-                end
-                return nil, prev
-            else
-                return nil, box.error.new({code = self.errno,
-                                           reason = self.response})
+            if type(self.response) ~= 'cdata' then
+                -- Error could be set by the connection state
+                -- machine, and it is usually a string explaining
+                -- a reason.
+                self.response = box.error.new({code = self.errno,
+                                               reason = self.response})
             end
+            return nil, self.response
         elseif not self.id then
             return self.response
         elseif not worker_fiber then
@@ -568,22 +591,40 @@ local function create_transport(host, port, user, password, callback,
             return
         end
         local status = hdr[IPROTO_STATUS_KEY]
-        local body, body_end_check
+        local body
+        local body_len = body_end - body_rpos
 
         if status > IPROTO_CHUNK_KEY then
             -- Handle errors
             requests[id] = nil
             request.id = nil
-            body, body_end_check = decode(body_rpos)
-            assert(body_end == body_end_check, "invalid xrow length")
+            local map_len, key, skip
+            map_len, body_rpos = decode_map_header(body_rpos, body_len)
+            -- Reserve for 2 keys and 2 array indexes. Because no
+            -- any guarantees how Lua will decide to save the
+            -- sparse table.
+            body = table_new(2, 2)
+            for _ = 1, map_len do
+                key, body_rpos = decode(body_rpos)
+                local rdec = response_decoder[key]
+                if rdec then
+                    body[key], body_rpos = rdec(body_rpos)
+                else
+                    skip, body_rpos = decode(body_rpos)
+                end
+            end
+            assert(body_end == body_rpos, "invalid xrow length")
             request.errno = band(status, IPROTO_ERRNO_MASK)
             -- IPROTO_ERROR_STACK comprises error encoded with
             -- IPROTO_ERROR_KEY, so we may ignore content of that key.
             if body[IPROTO_ERROR_STACK] ~= nil then
                 request.response = body[IPROTO_ERROR_STACK]
-                assert(type(request.response) == 'table')
+                assert(type(request.response) == 'cdata')
             else
-                request.response = body[IPROTO_ERROR_KEY]
+                request.response = box.error.new({
+                    code = request.errno,
+                    reason = body[IPROTO_ERROR_KEY]
+                })
             end
             request.cond:broadcast()
             return
@@ -592,7 +633,6 @@ local function create_transport(host, port, user, password, callback,
         local buffer = request.buffer
         if buffer ~= nil then
             -- Copy xrow.body to user-provided buffer
-            local body_len = body_end - body_rpos
             if request.skip_header then
                 -- Skip {[IPROTO_DATA_KEY] = ...} wrapper.
                 local map_len, key

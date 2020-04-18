@@ -52,15 +52,4 @@ sock:close()
 assert(response.body[IPROTO_ERROR_STACK] ~= nil)
 assert(response.body[IPROTO_ERROR] ~= nil)
 
-err = response.body[IPROTO_ERROR_STACK][1]
-assert(err[IPROTO_ERROR_MESSAGE] == response.body[IPROTO_ERROR])
-assert(err[IPROTO_ERROR_MESSAGE] == 'e3')
-assert(err[IPROTO_ERROR_CODE] == 111)
-err = response.body[IPROTO_ERROR_STACK][2]
-assert(err[IPROTO_ERROR_MESSAGE] == 'e2')
-assert(err[IPROTO_ERROR_CODE] == 111)
-err = response.body[IPROTO_ERROR_STACK][3]
-assert(err[IPROTO_ERROR_MESSAGE] == 'e1')
-assert(err[IPROTO_ERROR_CODE] == 111)
-
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')

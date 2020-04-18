@@ -35,6 +35,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 #include <stdint.h>
+#include <assert.h>
 
 struct mpstream;
 
@@ -46,14 +47,27 @@ struct mpstream;
 void
 error_to_mpstream(const struct error *error, struct mpstream *stream);
 
+void
+error_to_mpstream_noext(const struct error *error, struct mpstream *stream);
+
+struct error *
+error_unpack_unsafe(const char **data);
+
 /**
  * @brief Unpack MP_ERROR to error.
  * @param data pointer to MP_ERROR.
  * @param len data size.
  * @return struct error * or NULL if failed.
  */
-struct error *
-error_unpack(const char **data, uint32_t len);
+static inline struct error *
+error_unpack(const char **data, uint32_t len)
+{
+	const char *end = *data + len;
+	struct error *e = error_unpack_unsafe(data);
+	(void)end;
+	assert(*data == end);
+	return e;
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */

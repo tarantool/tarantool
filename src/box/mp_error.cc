@@ -453,6 +453,31 @@ error:
 }
 
 void
+error_to_mpstream_noext(const struct error *error, struct mpstream *stream)
+{
+	uint32_t err_cnt = 0;
+	uint32_t data_size = mp_sizeof_map(1);
+	data_size += mp_sizeof_uint(MP_ERROR_STACK);
+	for (const struct error *it = error; it != NULL; it = it->cause) {
+		err_cnt++;
+		data_size += mp_sizeof_error(it);
+	}
+
+	data_size += mp_sizeof_array(err_cnt);
+	char *ptr = mpstream_reserve(stream, data_size);
+	char *data = ptr;
+	data = mp_encode_map(data, 1);
+	data = mp_encode_uint(data, MP_ERROR_STACK);
+	data = mp_encode_array(data, err_cnt);
+	for (const struct error *it = error; it != NULL; it = it->cause) {
+		mp_encode_error_one(it, &data);
+	}
+
+	assert(data == ptr + data_size);
+	mpstream_advance(stream, data_size);
+}
+
+void
 error_to_mpstream(const struct error *error, struct mpstream *stream)
 {
 	uint32_t err_cnt = 0;
@@ -480,9 +505,8 @@ error_to_mpstream(const struct error *error, struct mpstream *stream)
 }
 
 struct error *
-error_unpack(const char **data, uint32_t len)
+error_unpack_unsafe(const char **data)
 {
-	const char *end = *data + len;
 	struct error *err = NULL;
 
 	if (mp_typeof(**data) != MP_MAP) {
@@ -526,8 +550,5 @@ error_unpack(const char **data, uint32_t len)
 			mp_next(data);
 		}
 	}
-
-	(void)end;
-	assert(*data == end);
 	return err;
 }

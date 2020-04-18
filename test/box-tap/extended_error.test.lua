@@ -30,10 +30,14 @@ box.schema.func.drop('forbidden_function')
 box.session.su(user)
 
 local test = tap.test('Error marshaling')
-test:plan(6)
+test:plan(12)
 
 function error_new(...)
     return box.error.new(...)
+end
+
+function error_throw(...)
+    box.error(error_new(...))
 end
 
 function error_new_stacked(args1, args2)
@@ -43,8 +47,16 @@ function error_new_stacked(args1, args2)
     return e1
 end
 
+function error_throw_stacked(...)
+    box.error(error_new_stacked(...))
+end
+
 function error_access_denied()
     return access_denied_error
+end
+
+function error_throw_access_denied()
+    box.error(access_denied_error)
 end
 
 local function check_error(err, check_list)
@@ -64,7 +76,8 @@ end
 box.schema.user.grant('guest', 'super')
 local c = netbox.connect(box.cfg.listen)
 c:eval('box.session.settings.error_marshaling_enabled = true')
-local err = c:call('error_new', {{code = 1000, reason = 'Reason'}})
+local args = {{code = 1000, reason = 'Reason'}}
+local err = c:call('error_new', args)
 local checks = {
     code = 1000,
     message = 'Reason',
@@ -72,10 +85,11 @@ local checks = {
     type = 'ClientError',
 }
 test:ok(check_error(err, checks), "ClientError marshaling")
+tmp, err = pcall(c.call, c, 'error_throw', args)
+test:ok(check_error(err, checks), "ClientError marshaling in iproto fields")
 
-err = c:call('error_new', {{
-    code = 1001, reason = 'Reason2', type = 'MyError'
-}})
+args = {{code = 1001, reason = 'Reason2', type = 'MyError'}}
+err = c:call('error_new', args)
 checks = {
     code = 1001,
     message = 'Reason2',
@@ -83,6 +97,8 @@ checks = {
     type = 'MyError',
 }
 test:ok(check_error(err, checks), "CustomError marshaling")
+tmp, err = pcall(c.call, c, 'error_throw', args)
+test:ok(check_error(err, checks), "CustomError marshaling in iproto fields")
 
 err = c:call('error_access_denied')
 checks = {
@@ -95,28 +111,38 @@ checks = {
     access_type = 'Execute',
 }
 test:ok(check_error(err, checks), "AccessDeniedError marshaling")
+tmp, err = pcall(c.call, c, 'error_throw_access_denied')
+test:ok(check_error(err, checks), "AccessDeniedError marshaling in iproto fields")
 
-err = c:call('error_new_stacked', {
+args = {
     {code = 1003, reason = 'Reason3', type = 'MyError2'},
     {code = 1004, reason = 'Reason4'}
-})
+}
+err = c:call('error_new_stacked', args)
 local err1 = err
 local err2 = err.prev
 test:isnt(err2, nil, 'Stack is received')
-checks = {
+local checks1 = {
     code = 1003,
     message = 'Reason3',
     base_type = 'CustomError',
     type = 'MyError2'
 }
-test:ok(check_error(err1, checks), "First error in the stack")
-checks = {
+test:ok(check_error(err1, checks1), "First error in the stack")
+local checks2 = {
     code = 1004,
     message = 'Reason4',
     base_type = 'ClientError',
     type = 'ClientError'
 }
-test:ok(check_error(err2, checks), "Second error in the stack")
+test:ok(check_error(err2, checks2), "Second error in the stack")
+
+tmp, err = pcall(c.call, c, 'error_throw_stacked', args)
+err1 = err
+err2 = err.prev
+test:isnt(err2, nil, 'Stack is received via iproto fields')
+test:ok(check_error(err1, checks1), "First error in the stack in iproto fields")
+test:ok(check_error(err2, checks2), "Second error in the stack in iproto fields")
 
 c:close()
 box.schema.user.revoke('guest', 'super')

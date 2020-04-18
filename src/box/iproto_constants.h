@@ -151,11 +151,6 @@ enum iproto_ballot_key {
 	IPROTO_BALLOT_IS_LOADING = 0x04,
 };
 
-enum iproto_error_key {
-	IPROTO_ERROR_CODE = 0x01,
-	IPROTO_ERROR_MESSAGE = 0x02,
-};
-
 #define bit(c) (1ULL<<IPROTO_##c)
 
 #define IPROTO_HEAD_BMAP (bit(REQUEST_TYPE) | bit(SYNC) | bit(REPLICA_ID) |\
