@@ -290,20 +290,6 @@ tuple_to_mpstream(struct tuple *tuple, struct mpstream *stream)
 	mpstream_advance(stream, bsize);
 }
 
-/* A MsgPack extensions handler that supports tuples */
-static enum mp_type
-luamp_encode_extension_box(struct lua_State *L, int idx,
-			   struct mpstream *stream)
-{
-	struct tuple *tuple = luaT_istuple(L, idx);
-	if (tuple != NULL) {
-		tuple_to_mpstream(tuple, stream);
-		return MP_ARRAY;
-	}
-
-	return MP_EXT;
-}
-
 /**
  * Convert a tuple into lua table. Named fields are stored as
  * {name = value} pairs. Not named fields are stored as
@@ -581,8 +567,6 @@ box_lua_tuple_init(struct lua_State *L)
 			   lbox_tuple_iterator_meta);
 	luaL_register_module(L, tuplelib_name, lbox_tuplelib);
 	lua_pop(L, 1);
-
-	luamp_set_encode_extension(luamp_encode_extension_box);
 
 	tuple_serializer_update_options();
 	trigger_create(&tuple_serializer.update_trigger,

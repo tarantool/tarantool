@@ -36,6 +36,7 @@
 
 #include "lua/utils.h" /* luaT_error() */
 #include "lua/trigger.h"
+#include "lua/msgpack.h"
 
 #include "box/box.h"
 #include "box/txn.h"
@@ -395,6 +396,21 @@ static const struct luaL_Reg boxlib_backup[] = {
 	{NULL, NULL}
 };
 
+/**
+ * A MsgPack extensions handler, for types defined in box.
+ */
+static enum mp_type
+luamp_encode_extension_box(struct lua_State *L, int idx,
+			   struct mpstream *stream)
+{
+	struct tuple *tuple = luaT_istuple(L, idx);
+	if (tuple != NULL) {
+		tuple_to_mpstream(tuple, stream);
+		return MP_ARRAY;
+	}
+	return MP_EXT;
+}
+
 #include "say.h"
 
 void
@@ -434,6 +450,8 @@ box_lua_init(struct lua_State *L)
 	lua_pop(L, 1);
 	luaopen_merger(L);
 	lua_pop(L, 1);
+
+	luamp_set_encode_extension(luamp_encode_extension_box);
 
 	/* Load Lua extension */
 	for (const char **s = lua_sources; *s; s += 2) {
