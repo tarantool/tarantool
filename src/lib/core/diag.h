@@ -118,25 +118,8 @@ error_ref(struct error *e)
 	e->refs++;
 }
 
-static inline void
-error_unref(struct error *e)
-{
-	assert(e->refs > 0);
-	struct error *to_delete = e;
-	while (--to_delete->refs == 0) {
-		/* Unlink error from lists completely.*/
-		struct error *cause = to_delete->cause;
-		assert(to_delete->effect == NULL);
-		if (to_delete->cause != NULL) {
-			to_delete->cause->effect = NULL;
-			to_delete->cause = NULL;
-		}
-		to_delete->destroy(to_delete);
-		if (cause == NULL)
-			return;
-		to_delete = cause;
-	}
-}
+void
+error_unref(struct error *e);
 
 /**
  * Unlink error from its effect. For instance:

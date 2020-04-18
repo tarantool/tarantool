@@ -242,6 +242,7 @@ box_error_last
 box_error_clear
 box_error_set
 error_set_prev
+error_unref
 box_latch_new
 box_latch_delete
 box_latch_lock
