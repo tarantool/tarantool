@@ -9,8 +9,8 @@ IPROTO_SYNC           = 0x01
 IPROTO_CALL           = 0x0A
 IPROTO_FUNCTION_NAME  = 0x22
 IPROTO_TUPLE          = 0x21
-IPROTO_ERROR          = 0x31
-IPROTO_ERROR_STACK    = 0x52
+IPROTO_ERROR_24       = 0x31
+IPROTO_ERROR          = 0x52
 IPROTO_ERROR_CODE     = 0x01
 IPROTO_ERROR_MESSAGE  = 0x02
 
@@ -49,7 +49,7 @@ sock:close()
 
 -- Both keys (obsolete and stack ones) are present in response.
 --
-assert(response.body[IPROTO_ERROR_STACK] ~= nil)
 assert(response.body[IPROTO_ERROR] ~= nil)
+assert(response.body[IPROTO_ERROR_24] ~= nil)
 
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')

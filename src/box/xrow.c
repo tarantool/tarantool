@@ -379,7 +379,7 @@ iproto_header_encode(char *out, uint32_t type, uint64_t sync,
 
 struct PACKED iproto_body_bin {
 	uint8_t m_body;                    /* MP_MAP */
-	uint8_t k_data;                    /* IPROTO_DATA or IPROTO_ERROR */
+	uint8_t k_data;                    /* IPROTO_DATA or errors */
 	uint8_t m_data;                    /* MP_STR or MP_ARRAY */
 	uint32_t v_data_len;               /* string length of array size */
 };
@@ -496,9 +496,9 @@ static void
 mpstream_iproto_encode_error(struct mpstream *stream, const struct error *error)
 {
 	mpstream_encode_map(stream, 2);
-	mpstream_encode_uint(stream, IPROTO_ERROR);
+	mpstream_encode_uint(stream, IPROTO_ERROR_24);
 	mpstream_encode_str(stream, error->errmsg);
-	mpstream_encode_uint(stream, IPROTO_ERROR_STACK);
+	mpstream_encode_uint(stream, IPROTO_ERROR);
 	error_to_mpstream_noext(error, stream);
 }
 
@@ -1109,7 +1109,7 @@ xrow_decode_error(struct xrow_header *row)
 			continue;
 		}
 		uint8_t key = mp_decode_uint(&pos);
-		if (key == IPROTO_ERROR && mp_typeof(*pos) == MP_STR) {
+		if (key == IPROTO_ERROR_24 && mp_typeof(*pos) == MP_STR) {
 			/*
 			 * Obsolete way of sending error responses.
 			 * To be deprecated but still should be supported
@@ -1119,7 +1119,7 @@ xrow_decode_error(struct xrow_header *row)
 			const char *str = mp_decode_str(&pos, &len);
 			snprintf(error, sizeof(error), "%.*s", len, str);
 			box_error_set(__FILE__, __LINE__, code, error);
-		} else if (key == IPROTO_ERROR_STACK) {
+		} else if (key == IPROTO_ERROR) {
 			struct error *e = error_unpack_unsafe(&pos);
 			if (e == NULL)
 				goto error;

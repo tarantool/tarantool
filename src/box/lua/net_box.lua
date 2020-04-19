@@ -44,8 +44,8 @@ local IPROTO_SQL_INFO_KEY = 0x42
 local SQL_INFO_ROW_COUNT_KEY = 0
 local IPROTO_FIELD_NAME_KEY = 0
 local IPROTO_DATA_KEY      = 0x30
-local IPROTO_ERROR_KEY     = 0x31
-local IPROTO_ERROR_STACK   = 0x52
+local IPROTO_ERROR_24      = 0x31
+local IPROTO_ERROR         = 0x52
 local IPROTO_GREETING_SIZE = 128
 local IPROTO_CHUNK_KEY     = 128
 local IPROTO_OK_KEY        = 0
@@ -151,7 +151,7 @@ local method_decoder = {
     push    = decode_push,
 }
 
-local function decode_error_stack(raw_data)
+local function decode_error(raw_data)
     local ptr = buffer_reg.acucp
     ptr[0] = raw_data
     local err = ffi.C.error_unpack_unsafe(ptr)
@@ -171,8 +171,8 @@ local function decode_error_stack(raw_data)
 end
 
 local response_decoder = {
-    [IPROTO_ERROR_KEY] = decode,
-    [IPROTO_ERROR_STACK] = decode_error_stack,
+    [IPROTO_ERROR_24] = decode,
+    [IPROTO_ERROR] = decode_error,
 }
 
 local function next_id(id) return band(id + 1, 0x7FFFFFFF) end
@@ -615,15 +615,16 @@ local function create_transport(host, port, user, password, callback,
             end
             assert(body_end == body_rpos, "invalid xrow length")
             request.errno = band(status, IPROTO_ERRNO_MASK)
-            -- IPROTO_ERROR_STACK comprises error encoded with
-            -- IPROTO_ERROR_KEY, so we may ignore content of that key.
-            if body[IPROTO_ERROR_STACK] ~= nil then
-                request.response = body[IPROTO_ERROR_STACK]
+            -- IPROTO_ERROR comprises error encoded with
+            -- IPROTO_ERROR_24, so we may ignore content of that
+            -- key.
+            if body[IPROTO_ERROR] ~= nil then
+                request.response = body[IPROTO_ERROR]
                 assert(type(request.response) == 'cdata')
             else
                 request.response = box.error.new({
                     code = request.errno,
-                    reason = body[IPROTO_ERROR_KEY]
+                    reason = body[IPROTO_ERROR_24]
                 })
             end
             request.cond:broadcast()
@@ -801,7 +802,7 @@ local function create_transport(host, port, user, password, callback,
         if hdr[IPROTO_STATUS_KEY] ~= 0 then
             local body
             body, body_end = decode(body_rpos)
-            return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_KEY])
+            return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_24])
         end
         set_state('fetch_schema')
         return iproto_schema_sm(hdr[IPROTO_SCHEMA_VERSION_KEY])
@@ -853,7 +854,7 @@ local function create_transport(host, port, user, password, callback,
                     end
                     local body
                     body, body_end = decode(body_rpos)
-                    return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_KEY])
+                    return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_24])
                 end
                 if schema_version == nil then
                     schema_version = response_schema_version

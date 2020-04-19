@@ -101,7 +101,7 @@ enum iproto_key {
 
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
-	IPROTO_ERROR = 0x31,
+	IPROTO_ERROR_24 = 0x31,
 	/**
 	 * IPROTO_METADATA: [
 	 *      { IPROTO_FIELD_NAME: name },
@@ -126,7 +126,7 @@ enum iproto_key {
 	/* Leave a gap between SQL keys and additional request keys */
 	IPROTO_REPLICA_ANON = 0x50,
 	IPROTO_ID_FILTER = 0x51,
-	IPROTO_ERROR_STACK = 0x52,
+	IPROTO_ERROR = 0x52,
 	IPROTO_KEY_MAX
 };
 
