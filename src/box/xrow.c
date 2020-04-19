@@ -1102,6 +1102,7 @@ xrow_decode_error(struct xrow_header *row)
 	if (mp_typeof(*pos) != MP_MAP)
 		goto error;
 	map_size = mp_decode_map(&pos);
+	bool is_stack_parsed = false;
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(*pos) != MP_UINT) {
 			mp_next(&pos); /* key */
@@ -1117,12 +1118,15 @@ xrow_decode_error(struct xrow_header *row)
 			 */
 			uint32_t len;
 			const char *str = mp_decode_str(&pos, &len);
-			snprintf(error, sizeof(error), "%.*s", len, str);
-			box_error_set(__FILE__, __LINE__, code, error);
+			if (!is_stack_parsed) {
+				snprintf(error, sizeof(error), "%.*s", len, str);
+				box_error_set(__FILE__, __LINE__, code, error);
+			}
 		} else if (key == IPROTO_ERROR) {
 			struct error *e = error_unpack_unsafe(&pos);
 			if (e == NULL)
 				goto error;
+			is_stack_parsed = true;
 			diag_set_error(diag_get(), e);
 		} else {
 			mp_next(&pos);
