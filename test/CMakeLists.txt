@@ -59,8 +59,8 @@ add_subdirectory(app)
 add_subdirectory(app-tap)
 add_subdirectory(box)
 add_subdirectory(unit)
-add_subdirectory(luajit-tap/gh-4427-ffi-sandwich)
-add_subdirectory(luajit-tap/lj-flush-on-trace)
+add_subdirectory(${PROJECT_SOURCE_DIR}/third_party/luajit/test/gh-4427-ffi-sandwich ${PROJECT_BINARY_DIR}/third_party/luajit/test/gh-4427-ffi-sandwich)
+add_subdirectory(${PROJECT_SOURCE_DIR}/third_party/luajit/test/lj-flush-on-trace ${PROJECT_BINARY_DIR}/third_party/luajit/test/lj-flush-on-trace)
 
 # Move tarantoolctl config
 if (NOT ${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR})
