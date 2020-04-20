@@ -1370,7 +1370,7 @@ lbox_popen_new(struct lua_State *L)
 						   "table or nil");
 
 	/* Parse opts and argv. */
-	struct popen_opts opts = {};
+	struct popen_opts opts = { .argv = NULL, };
 	int rc = luaT_popen_parse_opts(L, 2, &opts, region);
 	if (rc != 0)
 		goto err;
@@ -2153,7 +2153,7 @@ lbox_popen_info(struct lua_State *L)
 	if (is_closed)
 		return luaT_popen_handle_closed_error(L);
 
-	struct popen_stat st = {};
+	struct popen_stat st;
 
 	popen_stat(handle, &st);
 
