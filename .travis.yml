@@ -36,46 +36,46 @@ jobs:
       # Deploy targets (they also catch distro-specific problems).
       - name: "CentOS 6 build + deploy RPM"
         env: OS=el DIST=6
-        if: branch = "master"
+        if: branch = "2.4"
       - name: "CentOS 7 build + test + deploy RPM"
         env: OS=el DIST=7
-        if: branch = "master"
+        if: branch = "2.4"
       - name: "CentOS 8 build + test + deploy RPM"
         env: OS=el DIST=8
-        if: branch = "master"
+        if: branch = "2.4"
       - name: "Fedora 28 build + test + deploy RPM"
         env: OS=fedora DIST=28
-        if: branch = "master"
+        if: branch = "2.4"
       - name: "Fedora 29 build + test + deploy RPM"
         env: OS=fedora DIST=29
-        if: branch = "master"
+        if: branch = "2.4"
       - name: "Fedora 30 build + test + deploy RPM"
         env: OS=fedora DIST=30
-        if: branch = "master"
+        if: branch = "2.4"
       - name: "Fedora 31 build + test + deploy RPM"
         env: OS=fedora DIST=31
-        if: branch = "master"
+        if: branch = "2.4"
       - name: "Ubuntu Trusty (14.04) build + deploy DEB"
         env: OS=ubuntu DIST=trusty
-        if: branch = "master"
+        if: branch = "2.4"
       - name: "Ubuntu Xenial (16.04) build + deploy DEB"
         env: OS=ubuntu DIST=xenial
-        if: branch = "master"
+        if: branch = "2.4"
       - name: "Ubuntu Bionic (18.04) build + deploy DEB"
         env: OS=ubuntu DIST=bionic
-        if: branch = "master"
+        if: branch = "2.4"
       - name: "Ubuntu Eoan (19.10) build + deploy DEB"
         env: OS=ubuntu DIST=eoan
-        if: branch = "master"
+        if: branch = "2.4"
       - name: "Debian Jessie (8) build + deploy DEB"
         env: OS=debian DIST=jessie
-        if: branch = "master"
+        if: branch = "2.4"
       - name: "Debian Stretch (9) build + deploy DEB"
         env: OS=debian DIST=stretch
-        if: branch = "master"
+        if: branch = "2.4"
       - name: "Debian Buster (10) build + deploy DEB"
         env: OS=debian DIST=buster
-        if: branch = "master"
+        if: branch = "2.4"
 
 script:
   - make -f .travis.mk ${TARGET}
@@ -94,7 +94,7 @@ deploy:
     skip_cleanup: true
     on:
       repo: tarantool/tarantool
-      branch: "master"
+      branch: "2.4"
       condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
   # Deploy packages to PackageCloud from tagged revisions
   # https://github.com/travis-ci/travis-ci/issues/7780#issuecomment-302389370

@@ -10,12 +10,12 @@ variables:
 
 .release_only_template: &release_only_definition
   only:
-    - master
+    - "2.4"
     - /^.*-full-ci$/
 
 .deploy_only_template: &deploy_only_definition
   only:
-    - master
+    - "2.4"
   except:
     - schedules
     - external_pull_requests
@@ -30,7 +30,7 @@ variables:
 
 .perf_only_template: &perf_only_definition
   only:
-    - master
+    - "2.4"
     - /^.*-perf$/
   variables: &perf_vars_definition
     IMAGE_PERF: "${CI_REGISTRY}/${CI_PROJECT_PATH}/perf/ubuntu-bionic:perf_master"
