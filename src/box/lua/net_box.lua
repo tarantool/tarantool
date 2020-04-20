@@ -53,6 +53,7 @@ local E_UNKNOWN              = box.error.UNKNOWN
 local E_NO_CONNECTION        = box.error.NO_CONNECTION
 local E_TIMEOUT              = box.error.TIMEOUT
 local E_PROC_LUA             = box.error.PROC_LUA
+local E_NO_SUCH_SPACE        = box.error.NO_SUCH_SPACE
 
 -- utility tables
 local is_final_state         = {closed = 1, error = 1}
@@ -775,6 +776,13 @@ local function create_transport(host, port, user, password, callback,
                 local status = hdr[IPROTO_STATUS_KEY]
                 local response_schema_version = hdr[IPROTO_SCHEMA_VERSION_KEY]
                 if status ~= 0 then
+                    -- No _vcollation space (server has an old
+                    -- schema version).
+                    local errno = band(status, IPROTO_ERRNO_MASK)
+                    if id == select3_id and errno == E_NO_SUCH_SPACE then
+                        peer_has_vcollation = false
+                        goto continue
+                    end
                     local body
                     body, body_end = decode(body_rpos)
                     return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_KEY])
@@ -789,6 +797,7 @@ local function create_transport(host, port, user, password, callback,
                 body, body_end = decode(body_rpos)
                 response[id] = body[IPROTO_DATA_KEY]
             end
+            ::continue::
         until response[select1_id] and response[select2_id] and
               (not peer_has_vcollation or response[select3_id])
         -- trick: response[select3_id] is nil when the key is nil
