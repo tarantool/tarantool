@@ -52,7 +52,7 @@ enum {
 	MP_ERROR_FIELDS = 0x06
 };
 
-struct mp_error {
+struct mp_test_error {
 	uint32_t code;
 	uint32_t line;
 	int32_t saved_errno;
@@ -96,7 +96,7 @@ mp_encode_str0(char *data, const char *str)
 
 /** Note, not the same as mp_encode_error(). */
 static char *
-mp_encode_mp_error(const struct mp_error *e, char *data)
+mp_encode_mp_error(const struct mp_test_error *e, char *data)
 {
 	uint32_t fields_num = 6;
 	int field_count = (e->custom_type != NULL) +
@@ -167,7 +167,7 @@ mp_encode_test_error_stack(char *data)
 	/*
 	 * CustomError
 	 */
-	struct mp_error err;
+	struct mp_test_error err;
 	memset(&err, 0, sizeof(err));
 	err.code = 123;
 	err.line = 1;
@@ -221,7 +221,7 @@ mp_encode_test_error_stack(char *data)
 }
 
 static bool
-error_is_eq_mp_error(struct error *err, struct mp_error *check)
+error_is_eq_mp_error(struct error *err, struct mp_test_error *check)
 {
 	if (err->saved_errno != check->saved_errno)
 		return false;
@@ -270,7 +270,7 @@ test_stack_error_decode()
 	struct error *err2 = err1->cause;
 	struct error *err3 = err2->cause;
 
-	struct mp_error check;
+	struct mp_test_error check;
 	memset(&check, 0, sizeof(check));
 	check.code = 123;
 	check.line = 1;
@@ -332,7 +332,7 @@ test_decode_unknown_type()
 	memset(buffer, 0, sizeof(buffer));
 
 	char *data = mp_encode_error_header(buffer, 1);
-	struct mp_error err;
+	struct mp_test_error err;
 	memset(&err, 0, sizeof(err));
 	err.code = 1;
 	err.line = 2;
@@ -364,7 +364,7 @@ test_fail_not_enough_fields()
 	memset(buffer, 0, sizeof(buffer));
 
 	char *data = mp_encode_error_header(buffer, 1);
-	struct mp_error err;
+	struct mp_test_error err;
 	memset(&err, 0, sizeof(err));
 	err.code = 42;
 	err.line = 3;
@@ -395,7 +395,7 @@ test_unknown_fields()
 	memset(buffer, 0, sizeof(buffer));
 
 	char *data = mp_encode_error_header(buffer, 1);
-	struct mp_error err;
+	struct mp_test_error err;
 	memset(&err, 0, sizeof(err));
 	err.code = 0;
 	err.line = 1;
@@ -426,7 +426,7 @@ test_unknown_additional_fields()
 	memset(buffer, 0, sizeof(buffer));
 
 	char *data = mp_encode_error_header(buffer, 1);
-	struct mp_error err;
+	struct mp_test_error err;
 	memset(&err, 0, sizeof(err));
 	err.code = 42;
 	err.line = 3;
