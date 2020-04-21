@@ -71,9 +71,11 @@ set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 #
 # Always links pthread and dl dynamically.
 set(generic_libraries pthread)
-find_library(DL_LIBRARY NAMES dl)
-if(NOT "${DL_LIBRARY}" STREQUAL "DL_LIBRARY-NOTFOUND")
-    set(generic_libraries ${generic_libraries} dl)
+if(NOT TARGET_OS_OPENBSD)
+    find_library(DL_LIBRARY NAMES dl)
+    if(NOT "${DL_LIBRARY}" STREQUAL "DL_LIBRARY-NOTFOUND")
+        set(generic_libraries ${generic_libraries} dl)
+    endif()
 endif()
 
 add_library(stat STATIC rmean.c latency.c histogram.c)

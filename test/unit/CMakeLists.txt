@@ -5,6 +5,10 @@ endif()
 file(GLOB all_sources *.c *.cc)
 set_source_files_compile_flags(${all_sources})
 
+if(NOT TARGET_OS_OPENBSD)
+    set(LIB_DL "dl")
+endif()
+
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src/box)
@@ -161,7 +165,7 @@ target_link_libraries(luaT_tuple_new.test unit box server core misc
 add_executable(luaL_iterator.test luaL_iterator.c)
 target_link_libraries(luaL_iterator.test unit server coll core misc
     ${CURL_LIBRARIES} ${LIBYAML_LIBRARIES} ${READLINE_LIBRARIES}
-    ${ICU_LIBRARIES} ${LUAJIT_LIBRARIES} dl)
+    ${ICU_LIBRARIES} ${LUAJIT_LIBRARIES} ${LIB_DL})
 
 add_executable(say.test say.c)
 target_link_libraries(say.test core unit)
@@ -176,7 +180,7 @@ set(ITERATOR_TEST_SOURCES
 set(ITERATOR_TEST_LIBS core tuple xrow unit)
 
 add_executable(vy_mem.test vy_mem.c ${ITERATOR_TEST_SOURCES})
-target_link_libraries(vy_mem.test ${ITERATOR_TEST_LIBS} dl)
+target_link_libraries(vy_mem.test ${ITERATOR_TEST_LIBS} ${LIB_DL})
 
 add_executable(vy_point_lookup.test
     vy_point_lookup.c
@@ -198,7 +202,7 @@ add_executable(vy_point_lookup.test
     ${PROJECT_SOURCE_DIR}/src/box/schema_def.c
     ${PROJECT_SOURCE_DIR}/src/box/identifier.c
 )
-target_link_libraries(vy_point_lookup.test core tuple xrow xlog unit dl)
+target_link_libraries(vy_point_lookup.test core tuple xrow xlog unit ${LIB_DL})
 
 add_executable(column_mask.test
     column_mask.c)
@@ -211,13 +215,13 @@ add_executable(vy_write_iterator.test
     ${PROJECT_SOURCE_DIR}/src/box/vy_write_iterator.c
     ${ITERATOR_TEST_SOURCES}
 )
-target_link_libraries(vy_write_iterator.test xlog ${ITERATOR_TEST_LIBS} dl)
+target_link_libraries(vy_write_iterator.test xlog ${ITERATOR_TEST_LIBS} ${LIB_DL})
 
 add_executable(vy_cache.test vy_cache.c ${ITERATOR_TEST_SOURCES})
-target_link_libraries(vy_cache.test ${ITERATOR_TEST_LIBS} dl)
+target_link_libraries(vy_cache.test ${ITERATOR_TEST_LIBS} ${LIB_DL})
 
 add_executable(coll.test coll.cpp)
-target_link_libraries(coll.test coll unit misc dl)
+target_link_libraries(coll.test coll unit misc ${LIB_DL})
 
 add_executable(tuple_bigref.test tuple_bigref.c)
 target_link_libraries(tuple_bigref.test tuple unit)
