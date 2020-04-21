@@ -32,6 +32,17 @@ function (do_pthread_checks)
         ${INCLUDE_MISC_PTHREAD_HEADERS}
         int main() { pthread_attr_t a; pthread_getattr_np(pthread_self(), &a); }
         " HAVE_PTHREAD_GETATTR_NP)
+    # pthread_stackseg_np - OpenBSD
+    check_c_source_compiles("
+        #include <pthread.h>
+        #ifdef __OpenBSD__
+        #include <sys/signal.h>
+        #include <pthread_np.h>
+        #endif
+        ${INCLUDE_MISC_PTHREAD_HEADERS}
+        stack_t ss;
+        int main() { pthread_stackseg_np(pthread_self(), &ss);
+        " HAVE_PTHREAD_STACKSEG_NP)
     # pthread_attr_get_np - xBSD/macOS
     check_c_source_compiles("
         #include <pthread.h>
