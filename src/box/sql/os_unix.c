@@ -1102,7 +1102,7 @@ unixRemapfile(unixFile * pFd,	/* File descriptor object */
 		/* Unmap any pages of the existing mapping that cannot be reused. */
 		if (nReuse != nOrig)
 			munmap(pReq, nOrig - nReuse);
-		#if !defined(__APPLE__) && !defined(__FreeBSD__)
+		#if !defined(__APPLE__) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
 		pNew = mremap(pOrig, nReuse, nNew, MREMAP_MAYMOVE);
 		#else
 		pNew = mmap(pReq, nNew - nReuse, flags, MAP_SHARED, h, nReuse);
