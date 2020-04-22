@@ -736,6 +736,7 @@ applier_apply_tx(struct stailq *rows)
 {
 	struct xrow_header *first_row = &stailq_first_entry(rows,
 					struct applier_tx_row, next)->row;
+	struct xrow_header *last_row;
 	struct replica *replica = replica_by_id(first_row->replica_id);
 	/*
 	 * In a full mesh topology, the same set of changes
@@ -826,9 +827,16 @@ applier_apply_tx(struct stailq *rows)
 	if (txn_commit_async(txn) < 0)
 		goto fail;
 
-	/* Transaction was sent to journal so promote vclock. */
-	vclock_follow(&replicaset.applier.vclock,
-		      first_row->replica_id, first_row->lsn);
+	/*
+	 * The transaction was sent to journal so promote vclock.
+	 *
+	 * Use the lsn of the last row to guard from 1.10
+	 * instances, which send every single tx row as a separate
+	 * transaction.
+	 */
+	last_row = &stailq_last_entry(rows, struct applier_tx_row, next)->row;
+	vclock_follow(&replicaset.applier.vclock, last_row->replica_id,
+		      last_row->lsn);
 	latch_unlock(latch);
 	return 0;
 rollback:
