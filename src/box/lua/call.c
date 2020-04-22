@@ -49,6 +49,24 @@
 #include "box/session.h"
 
 /**
+ * Handlers identifiers to obtain lua_Cfunction reference from
+ * Lua registry table. These handlers are initialized on Tarantool
+ * startup and are used until the Lua universe is destroyed.
+ * Such approach reduces Lua GC usage since there is no need to
+ * create short-lived GCfunc objects for the corresponding C
+ * function on each iproto CALL/EVAL request or stored Lua
+ * procedure call.
+ */
+enum handlers {
+	HANDLER_CALL,
+	HANDLER_CALL_BY_REF,
+	HANDLER_EVAL,
+	HANDLER_MAX,
+};
+
+static int execute_lua_refs[HANDLER_MAX];
+
+/**
  * A helper to find a Lua function by name and put it
  * on top of the stack.
  */
@@ -527,7 +545,7 @@ static const struct port_vtab port_lua_vtab = {
 };
 
 static inline int
-box_process_lua(lua_CFunction handler, struct execute_lua_ctx *ctx,
+box_process_lua(enum handlers handler, struct execute_lua_ctx *ctx,
 		struct port *ret)
 {
 	lua_State *L = luaT_newthread(tarantool_L);
@@ -537,7 +555,8 @@ box_process_lua(lua_CFunction handler, struct execute_lua_ctx *ctx,
 	port_lua_create(ret, L);
 	((struct port_lua *) ret)->ref = coro_ref;
 
-	lua_pushcfunction(L, handler);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, execute_lua_refs[handler]);
+	assert(lua_isfunction(L, -1));
 	lua_pushlightuserdata(L, ctx);
 	if (luaT_call(L, 1, LUA_MULTRET) != 0) {
 		port_lua_destroy(ret);
@@ -554,7 +573,7 @@ box_lua_call(const char *name, uint32_t name_len,
 	ctx.name = name;
 	ctx.name_len = name_len;
 	ctx.args = args;
-	return box_process_lua(execute_lua_call, &ctx, ret);
+	return box_process_lua(HANDLER_CALL, &ctx, ret);
 }
 
 int
@@ -565,7 +584,7 @@ box_lua_eval(const char *expr, uint32_t expr_len,
 	ctx.name = expr;
 	ctx.name_len = expr_len;
 	ctx.args = args;
-	return box_process_lua(execute_lua_eval, &ctx, ret);
+	return box_process_lua(HANDLER_EVAL, &ctx, ret);
 }
 
 struct func_lua {
@@ -781,7 +800,7 @@ func_persistent_lua_call(struct func *base, struct port *args, struct port *ret)
 	struct execute_lua_ctx ctx;
 	ctx.lua_ref = func->lua_ref;
 	ctx.args = args;
-	return box_process_lua(execute_lua_call_by_ref, &ctx, ret);
+	return box_process_lua(HANDLER_CALL_BY_REF, &ctx, ret);
 
 }
 
@@ -998,6 +1017,18 @@ box_lua_call_init(struct lua_State *L)
 	 */
 	on_alter_func_in_lua.data = L;
 	trigger_add(&on_alter_func, &on_alter_func_in_lua);
+
+	lua_CFunction handles[] = {
+		[HANDLER_CALL] = execute_lua_call,
+		[HANDLER_CALL_BY_REF] = execute_lua_call_by_ref,
+		[HANDLER_EVAL] = execute_lua_eval,
+	};
+
+	for (int i = 0; i < HANDLER_MAX; i++) {
+		lua_pushcfunction(L, handles[i]);
+		execute_lua_refs[i] = luaL_ref(L, LUA_REGISTRYINDEX);
+	}
+
 #if 0
 	/* Get CTypeID for `struct port *' */
 	int rc = luaL_cdef(L, "struct port;");
