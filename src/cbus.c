@@ -234,7 +234,6 @@ cbus_endpoint_create(struct cbus_endpoint *endpoint, const char *name,
 	ev_async_start(endpoint->consumer, &endpoint->async);
 
 	rlist_add_tail(&cbus.endpoints, &endpoint->in_cbus);
-	tt_pthread_mutex_unlock(&cbus.mutex);
 	/*
 	 * Alert all waiting producers.
 	 *
@@ -243,6 +242,7 @@ cbus_endpoint_create(struct cbus_endpoint *endpoint, const char *name,
 	 * blocked on cond.
 	 */
 	tt_pthread_cond_broadcast(&cbus.cond);
+	tt_pthread_mutex_unlock(&cbus.mutex);
 	return 0;
 }
 
