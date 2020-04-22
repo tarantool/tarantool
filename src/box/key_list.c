@@ -56,8 +56,8 @@ key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
 	struct func *func = index_def->key_def->func_index_func;
 
 	struct port out_port, in_port;
-	port_tuple_create(&in_port);
-	port_tuple_add(&in_port, tuple);
+	port_c_create(&in_port);
+	port_c_add_tuple(&in_port, tuple);
 	int rc = func_call(func, &in_port, &out_port);
 	port_destroy(&in_port);
 	if (rc != 0) {

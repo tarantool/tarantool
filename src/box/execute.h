@@ -91,17 +91,16 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 /**
  * Port implementation that is used to store SQL responses and
  * output them to obuf or Lua. This port implementation is
- * inherited from the port_tuple structure. This allows us to use
- * this structure in the port_tuple methods instead of port_tuple
- * itself.
+ * inherited from the port_c structure. This allows us to use
+ * this structure in the port_c methods instead of port_c itself.
  *
- * The methods of port_tuple are called via explicit access to
- * port_tuple_vtab just like C++ does with BaseClass::method, when
+ * The methods of port_c are called via explicit access to
+ * port_c_vtab just like C++ does with BaseClass::method, when
  * it is called in a child method.
  */
 struct port_sql {
-	/* port_tuple to inherit from. */
-	struct port_tuple port_tuple;
+	/** Base port struct. To be able to use port_c methods. */
+	struct port_c base;
 	/* Prepared SQL statement. */
 	struct sql_stmt *stmt;
 	/**

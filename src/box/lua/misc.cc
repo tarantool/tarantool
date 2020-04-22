@@ -60,24 +60,6 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 	return (char *) region_join_xc(gc, *p_len);
 }
 
-/**
- * Dump port_tuple content to Lua as a table. Used in box/port.c,
- * but implemented here to eliminate port.c dependency on Lua.
- */
-extern "C" void
-port_tuple_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
-{
-	struct port_tuple *port = port_tuple(base);
-	if (!is_flat)
-		lua_createtable(L, port->size, 0);
-	struct port_tuple_entry *pe = port->first;
-	for (int i = 0; pe != NULL; pe = pe->next) {
-		luaT_pushtuple(L, pe->tuple);
-		if (!is_flat)
-			lua_rawseti(L, -2, ++i);
-	}
-}
-
 extern "C" void
 port_c_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 {

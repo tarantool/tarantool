@@ -40,46 +40,7 @@ extern "C" {
 
 struct tuple;
 
-struct port_tuple_entry {
-	struct port_tuple_entry *next;
-	struct tuple *tuple;
-};
-
-/**
- * Port implementation used for storing tuples.
- */
-struct port_tuple {
-	const struct port_vtab *vtab;
-	int size;
-	struct port_tuple_entry *first;
-	struct port_tuple_entry *last;
-	struct port_tuple_entry first_entry;
-};
-static_assert(sizeof(struct port_tuple) <= sizeof(struct port),
-	      "sizeof(struct port_tuple) must be <= sizeof(struct port)");
-
-extern const struct port_vtab port_tuple_vtab;
-
-/**
- * Convert an abstract port instance to a tuple port.
- */
-static inline struct port_tuple *
-port_tuple(struct port *port)
-{
-	return (struct port_tuple *)port;
-}
-
-/**
- * Create a port for storing tuples.
- */
-void
-port_tuple_create(struct port *port);
-
-/**
- * Append a tuple to a port.
- */
-int
-port_tuple_add(struct port *port, struct tuple *tuple);
+extern const struct port_vtab port_c_vtab;
 
 /** Port implementation used for storing raw data. */
 struct port_msgpack {

@@ -38,105 +38,14 @@
 #include "errinj.h"
 
 /**
- * The pool is used both by port_c and port_tuple, since their
- * entires are almost of the same size. Also port_c can use
- * objects from the pool to store result data in their memory,
- * when it fits.
+ * The pool is used by port_c to allocate entries and to store
+ * result data when it fits into an object from the pool.
  */
 static struct mempool port_entry_pool;
 
 enum {
-	PORT_ENTRY_SIZE = MAX(sizeof(struct port_c_entry),
-			      sizeof(struct port_tuple_entry)),
+	PORT_ENTRY_SIZE = sizeof(struct port_c_entry),
 };
-
-int
-port_tuple_add(struct port *base, struct tuple *tuple)
-{
-	struct port_tuple *port = port_tuple(base);
-	struct port_tuple_entry *e;
-	if (port->size == 0) {
-		tuple_ref(tuple);
-		e = &port->first_entry;
-		port->first = port->last = e;
-	} else {
-		e = mempool_alloc(&port_entry_pool);
-		if (e == NULL) {
-			diag_set(OutOfMemory, sizeof(*e), "mempool_alloc", "e");
-			return -1;
-		}
-		tuple_ref(tuple);
-		port->last->next = e;
-		port->last = e;
-	}
-	e->tuple = tuple;
-	e->next = NULL;
-	++port->size;
-	return 0;
-}
-
-void
-port_tuple_create(struct port *base)
-{
-	struct port_tuple *port = (struct port_tuple *)base;
-	port->vtab = &port_tuple_vtab;
-	port->size = 0;
-	port->first = NULL;
-	port->last = NULL;
-}
-
-static void
-port_tuple_destroy(struct port *base)
-{
-	struct port_tuple *port = port_tuple(base);
-	struct port_tuple_entry *e = port->first;
-	if (e == NULL)
-		return;
-	tuple_unref(e->tuple);
-	e = e->next;
-	while (e != NULL) {
-		struct port_tuple_entry *cur = e;
-		e = e->next;
-		tuple_unref(cur->tuple);
-		mempool_free(&port_entry_pool, cur);
-	}
-}
-
-static int
-port_tuple_dump_msgpack_16(struct port *base, struct obuf *out)
-{
-	struct port_tuple *port = port_tuple(base);
-	struct port_tuple_entry *pe;
-	for (pe = port->first; pe != NULL; pe = pe->next) {
-		if (tuple_to_obuf(pe->tuple, out) != 0)
-			return -1;
-		ERROR_INJECT(ERRINJ_PORT_DUMP, {
-			diag_set(OutOfMemory, tuple_size(pe->tuple), "obuf_dup",
-				 "data");
-			return -1;
-		});
-	}
-	return port->size;
-}
-
-static int
-port_tuple_dump_msgpack(struct port *base, struct obuf *out)
-{
-	struct port_tuple *port = port_tuple(base);
-	char *size_buf = obuf_alloc(out, mp_sizeof_array(port->size));
-	if (size_buf == NULL) {
-		diag_set(OutOfMemory, mp_sizeof_array(port->size), "obuf_alloc",
-			 "size_buf");
-		return -1;
-	}
-	mp_encode_array(size_buf, port->size);
-	if (port_tuple_dump_msgpack_16(base, out) < 0)
-		return -1;
-	return 1;
-}
-
-extern void
-port_tuple_dump_lua(struct port *base, struct lua_State *L, bool is_flat);
 
 static inline void
 port_c_destroy_entry(struct port_c_entry *pe)
@@ -297,7 +206,7 @@ port_c_dump_lua(struct port *port, struct lua_State *L, bool is_flat);
 extern struct sql_value *
 port_c_get_vdbemem(struct port *base, uint32_t *size);
 
-static const struct port_vtab port_c_vtab = {
+const struct port_vtab port_c_vtab = {
 	.dump_msgpack = port_c_dump_msgpack,
 	.dump_msgpack_16 = port_c_dump_msgpack_16,
 	.dump_lua = port_c_dump_lua,
@@ -328,13 +237,3 @@ port_free(void)
 {
 	mempool_destroy(&port_entry_pool);
 }
-
-const struct port_vtab port_tuple_vtab = {
-	.dump_msgpack = port_tuple_dump_msgpack,
-	.dump_msgpack_16 = port_tuple_dump_msgpack_16,
-	.dump_lua = port_tuple_dump_lua,
-	.dump_plain = NULL,
-	.get_msgpack = NULL,
-	.get_vdbemem = NULL,
-	.destroy = port_tuple_destroy,
-};

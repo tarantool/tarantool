@@ -79,17 +79,21 @@ ffi.cdef[[
     box_txn_savepoint_t *
     box_txn_savepoint();
 
-    struct port_tuple_entry {
-        struct port_tuple_entry *next;
-        struct tuple *tuple;
+    struct __attribute__((packed)) port_c_entry {
+        struct port_c_entry *next;
+        union {
+            struct tuple *tuple;
+            char *mp;
+        };
+        uint32_t mp_size;
     };
 
-    struct port_tuple {
+    struct port_c {
         const struct port_vtab *vtab;
+        struct port_c_entry *first;
+        struct port_c_entry *last;
+        struct port_c_entry first_entry;
         int size;
-        struct port_tuple_entry *first;
-        struct port_tuple_entry *last;
-        struct port_tuple_entry first_entry;
     };
 
     void
@@ -1278,8 +1282,7 @@ local iterator_gen_luac = function(param, state)
 end
 
 -- global struct port instance to use by select()/get()
-local port_tuple = ffi.new('struct port_tuple')
-local port_tuple_entry_t = ffi.typeof('struct port_tuple_entry')
+local port_c = ffi.new('struct port_c')
 
 -- Helper function to check space:method() usage
 local function check_space_arg(space, method)
@@ -1533,7 +1536,7 @@ base_index_mt.select_ffi = function(index, key, opts)
     local key, key_end = tuple_encode(key)
     local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
 
-    local port = ffi.cast('struct port *', port_tuple)
+    local port = ffi.cast('struct port *', port_c)
 
     if builtin.box_select(index.space_id, index.id,
         iterator, offset, limit, key, key_end, port) ~= 0 then
@@ -1541,8 +1544,8 @@ base_index_mt.select_ffi = function(index, key, opts)
     end
 
     local ret = {}
-    local entry = port_tuple.first
-    for i=1,tonumber(port_tuple.size),1 do
+    local entry = port_c.first
+    for i=1,tonumber(port_c.size),1 do
         ret[i] = tuple_bless(entry.tuple)
         entry = entry.next
     end
