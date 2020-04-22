@@ -113,7 +113,7 @@ struct port_vtab {
 
 /**
  * Abstract port instance. It is supposed to be converted to
- * a concrete port realization, e.g. port_tuple.
+ * a concrete port realization, e.g. port_c.
  */
 struct port {
 	/** Virtual method table. */

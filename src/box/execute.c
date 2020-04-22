@@ -103,7 +103,7 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out);
 static void
 port_sql_destroy(struct port *base)
 {
-	port_tuple_vtab.destroy(base);
+	port_c_vtab.destroy(base);
 	struct port_sql *port_sql = (struct port_sql *) base;
 	if (port_sql->do_finalize)
 		sql_stmt_finalize(((struct port_sql *)base)->stmt);
@@ -123,7 +123,7 @@ static void
 port_sql_create(struct port *port, struct sql_stmt *stmt,
 		enum sql_serialization_format format, bool do_finalize)
 {
-	port_tuple_create(port);
+	port_c_create(port);
 	port->vtab = &port_sql_vtab;
 	struct port_sql *port_sql = (struct port_sql *) port;
 	port_sql->stmt = stmt;
@@ -271,7 +271,7 @@ sql_row_to_port(struct sql_stmt *stmt, int column_count,
 	if (tuple == NULL)
 		goto error;
 	region_truncate(region, svp);
-	return port_tuple_add(port, tuple);
+	return port_c_add_tuple(port, tuple);
 
 error:
 	region_truncate(region, svp);
@@ -492,13 +492,13 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
 			return -1;
 		}
 		pos = mp_encode_uint(pos, IPROTO_DATA);
-		if (port_tuple_vtab.dump_msgpack(port, out) < 0)
+		if (port_c_vtab.dump_msgpack(port, out) < 0)
 			return -1;
 		break;
 	}
 	case DML_EXECUTE: {
 		int keys = 1;
-		assert(((struct port_tuple *)port)->size == 0);
+		assert(((struct port_c *)port)->size == 0);
 		struct stailq *autoinc_id_list =
 			vdbe_autoinc_id_list((struct Vdbe *)stmt);
 		uint32_t map_size = stailq_empty(autoinc_id_list) ? 1 : 2;
