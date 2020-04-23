@@ -37,8 +37,12 @@
 #include <stdio.h>
 #include <errno.h>
 #include <pthread.h>
-#if HAVE_PTHREAD_NP_H
+#if HAVE_PTHREAD_NP_H || (__OpenBSD__)
 #include <pthread_np.h>
+#endif
+#if (__OpenBSD__)
+#include <signal.h>
+#include <sys/signal.h>
 #endif
 #include "say.h"
 
@@ -358,6 +362,11 @@ tt_pthread_attr_getstack(pthread_t thread, void **stackaddr, size_t *stacksize)
 	/* Old macOS */
 	*stacksize = pthread_get_stacksize_np(thread);
 	*stackaddr = pthread_get_stackaddr_np(thread);
+#elif (__OpenBSD__)
+	stack_t *sinfo = (stack_t*)malloc(sizeof(stack_t));
+	pthread_stackseg_np(thread, sinfo);
+	*stacksize = sinfo->ss_size;
+	*stackaddr = sinfo->ss_sp;
 #else
 #error Unable to get thread stack
 #endif
