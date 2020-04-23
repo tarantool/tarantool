@@ -215,6 +215,55 @@ lbox_info_replication(struct lua_State *L)
 }
 
 static int
+lbox_info_replication_anon_call(struct lua_State *L)
+{
+	lua_newtable(L);
+
+	/* Metatable. */
+	lua_newtable(L);
+	lua_pushliteral(L, "mapping");
+	lua_setfield(L, -2, "__serialize");
+	lua_setmetatable(L, -2);
+
+	replicaset_foreach(replica) {
+		if (!replica->anon)
+			continue;
+
+		lua_pushstring(L, tt_uuid_str(&replica->uuid));
+		lbox_pushreplica(L, replica);
+
+		lua_settable(L, -3);
+	}
+
+	return 1;
+}
+
+static int
+lbox_info_replication_anon(struct lua_State *L)
+{
+	/*
+	 * Make the .replication_anon field callable in order to
+	 * not flood the output with possibly lots of anonymous
+	 * replicas on box.info call.
+	 */
+	lua_newtable(L);
+
+	lua_pushliteral(L, "count");
+	lua_pushinteger(L, replicaset.anon_count);
+	lua_settable(L, -3);
+
+	/* Metatable. */
+	lua_newtable(L);
+
+	lua_pushstring(L, "__call");
+	lua_pushcfunction(L, lbox_info_replication_anon_call);
+	lua_settable(L, -3);
+
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
+static int
 lbox_info_id(struct lua_State *L)
 {
 	/*
@@ -534,6 +583,7 @@ static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"vclock", lbox_info_vclock},
 	{"ro", lbox_info_ro},
 	{"replication", lbox_info_replication},
+	{"replication_anon", lbox_info_replication_anon},
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
 	{"pid", lbox_info_pid},

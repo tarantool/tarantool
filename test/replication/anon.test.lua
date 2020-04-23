@@ -50,8 +50,15 @@ box.space.loc:truncate()
 
 test_run:cmd('switch default')
 
--- Replica isn't visible on master.
-#box.info.replication
+-- Test box.info.replication_anon.
+box.info.replication_anon
+#box.info.replication_anon()
+uuid, tbl = next(box.info.replication_anon())
+-- Anonymous replicas are indexed by uuid strings.
+require("uuid").fromstr(uuid) ~= nil
+-- Anonymous replicas share box.info representation with
+-- normal replicas.
+tbl.downstream.status
 
 -- Test that replication (even anonymous) from an anonymous
 -- instance is forbidden. An anonymous replica will fetch

@@ -151,10 +151,28 @@ test_run:cmd('switch default')
  | - true
  | ...
 
--- Replica isn't visible on master.
-#box.info.replication
+-- Test box.info.replication_anon.
+box.info.replication_anon
  | ---
- | - 1
+ | - count: 1
+ | ...
+#box.info.replication_anon()
+ | ---
+ | - 0
+ | ...
+uuid, tbl = next(box.info.replication_anon())
+ | ---
+ | ...
+-- Anonymous replicas are indexed by uuid strings.
+require("uuid").fromstr(uuid) ~= nil
+ | ---
+ | - true
+ | ...
+-- Anonymous replicas share box.info representation with
+-- normal replicas.
+tbl.downstream.status
+ | ---
+ | - follow
  | ...
 
 -- Test that replication (even anonymous) from an anonymous

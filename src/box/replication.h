@@ -203,6 +203,8 @@ struct replicaset {
 	 * from a remote master.
 	 */
 	bool is_joining;
+	/* A number of anonymous replicas following this instance. */
+	int anon_count;
 	/** Applier state. */
 	struct {
 		/**

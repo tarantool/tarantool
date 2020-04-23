@@ -83,6 +83,7 @@ t
   - package
   - pid
   - replication
+  - replication_anon
   - ro
   - signature
   - sql

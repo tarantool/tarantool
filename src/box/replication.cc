@@ -219,6 +219,7 @@ replicaset_add_anon(const struct tt_uuid *replica_uuid)
 	replica->uuid = *replica_uuid;
 	replica_hash_insert(&replicaset.hash, replica);
 	replica->anon = true;
+	replicaset.anon_count++;
 	return replica;
 }
 
@@ -909,6 +910,8 @@ replica_on_relay_stop(struct replica *replica)
 			 * replicas.
 			 */
 			assert(replica->applier == NULL);
+			assert(replicaset.anon_count > 0);
+			replicaset.anon_count--;
 		}
 	}
 	if (replica_is_orphan(replica)) {
