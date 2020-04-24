@@ -405,6 +405,15 @@ vy_write_iterator_start(struct vy_stmt_stream *vstream)
 	rlist_foreach_entry(src, &stream->src_list, in_src_list) {
 		if (vy_write_iterator_add_src(stream, src) != 0)
 			goto fail;
+#ifndef NDEBUG
+		struct errinj *inj =
+			errinj(ERRINJ_VY_WRITE_ITERATOR_START_FAIL, ERRINJ_BOOL);
+		if (inj != NULL && inj->bparam) {
+			inj->bparam = false;
+			diag_set(OutOfMemory, 666, "malloc", "struct vy_stmt");
+			goto fail;
+		}
+#endif
 	}
 	return 0;
 fail:
