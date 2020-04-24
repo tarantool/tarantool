@@ -663,6 +663,11 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 		diag_set(ClientError, ER_VIEW_MISSING_SQL);
 		return NULL;
 	}
+	if (opts.is_sync && opts.group_id == GROUP_LOCAL) {
+		diag_set(ClientError, errcode, tt_cstr(name, name_len),
+			 "local space can't be synchronous");
+		return NULL;
+	}
 	struct space_def *def =
 		space_def_new(id, uid, exact_field_count, name, name_len,
 			      engine_name, engine_name_len, &opts, fields,

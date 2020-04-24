@@ -41,6 +41,7 @@ const struct space_opts space_opts_default = {
 	/* .is_temporary = */ false,
 	/* .is_ephemeral = */ false,
 	/* .view = */ false,
+	/* .is_sync = */ false,
 	/* .sql        = */ NULL,
 };
 
@@ -48,6 +49,7 @@ const struct opt_def space_opts_reg[] = {
 	OPT_DEF("group_id", OPT_UINT32, struct space_opts, group_id),
 	OPT_DEF("temporary", OPT_BOOL, struct space_opts, is_temporary),
 	OPT_DEF("view", OPT_BOOL, struct space_opts, is_view),
+	OPT_DEF("is_sync", OPT_BOOL, struct space_opts, is_sync),
 	OPT_DEF("sql", OPT_STRPTR, struct space_opts, sql),
 	OPT_DEF_LEGACY("checks"),
 	OPT_END,

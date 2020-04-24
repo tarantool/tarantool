@@ -253,6 +253,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	lua_pushstring(L, space->def->engine_name);
 	lua_settable(L, i);
 
+	/* space.is_sync */
+	lua_pushstring(L, "is_sync");
+	lua_pushboolean(L, space->def->opts.is_sync);
+	lua_settable(L, i);
+
 	lua_pushstring(L, "enabled");
 	lua_pushboolean(L, space_index(space, 0) != 0);
 	lua_settable(L, i);

@@ -1344,6 +1344,7 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
         s.enabled = true
         s.index = {}
         s.temporary = false
+        s.is_sync = false
         s._format = format
         s._format_cdata = box.internal.new_tuple_format(format)
         s.connection = self
@@ -1352,6 +1353,7 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
             if type(opts) == 'table' then
                 -- Tarantool >= 1.7.0
                 s.temporary = not not opts.temporary
+                s.is_sync = not not opts.is_sync
             elseif type(opts) == 'string' then
                 -- Tarantool < 1.7.0
                 s.temporary = string.match(opts, 'temporary') ~= nil

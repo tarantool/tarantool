@@ -413,6 +413,7 @@ box.schema.space.create = function(name, options)
         format = 'table',
         is_local = 'boolean',
         temporary = 'boolean',
+        is_sync = 'boolean',
     }
     local options_defaults = {
         engine = 'memtx',
@@ -457,6 +458,7 @@ box.schema.space.create = function(name, options)
     local space_options = setmap({
         group_id = options.is_local and 1 or nil,
         temporary = options.temporary and true or nil,
+        is_sync = options.is_sync
     })
     _space:insert{id, uid, name, options.engine, options.field_count,
         space_options, format}
@@ -2704,6 +2706,7 @@ local function box_space_mt(tab)
                 engine = v.engine,
                 is_local = v.is_local,
                 temporary = v.temporary,
+                is_sync = v.is_sync,
             }
         end
     end

@@ -67,6 +67,12 @@ struct space_opts {
 	 * this flag can't be changed after space creation.
 	 */
 	bool is_view;
+	/**
+	 * Synchronous space makes all transactions, affecting its
+	 * data, synchronous. That means they are not applied
+	 * until replicated to a quorum of replicas.
+	 */
+	bool is_sync;
 	/** SQL statement that produced this space. */
 	char *sql;
 };
