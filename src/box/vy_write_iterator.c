@@ -402,9 +402,23 @@ vy_write_iterator_start(struct vy_stmt_stream *vstream)
 	struct vy_write_src *src, *tmp;
 	rlist_foreach_entry_safe(src, &stream->src_list, in_src_list, tmp) {
 		if (vy_write_iterator_add_src(stream, src) != 0)
-			return -1;
+			goto fail;
+#ifndef NDEBUG
+		struct errinj *inj =
+			errinj(ERRINJ_VY_WRITE_ITERATOR_START_FAIL, ERRINJ_BOOL);
+		if (inj != NULL && inj->bparam) {
+			inj->bparam = false;
+			diag_set(OutOfMemory, 666, "malloc", "struct vy_stmt");
+			goto fail;
+		}
+#endif
 	}
 	return 0;
+fail:
+	/* Clean-up all previously added sources. */
+	rlist_foreach_entry_safe(src, &stream->src_list, in_src_list, tmp)
+		vy_write_iterator_delete_src(stream, src);
+	return -1;
 }
 
 /**
