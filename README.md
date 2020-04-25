@@ -39,7 +39,7 @@ Key features of the database:
  * the database is just a C extension to the
    application server and can be turned off
 
-Supported platforms are Linux/x86 and FreeBSD/x86, Mac OS X.
+Supported platforms are Linux/x86, FreeBSD/x86 and OpenBSD/x86, Mac OS X.
 
 Tarantool is ideal for data-enriched components of
 scalable Web architecture: queue servers, caches,
