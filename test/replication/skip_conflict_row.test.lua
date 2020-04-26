@@ -22,8 +22,7 @@ vclock = test_run:get_vclock('default')
 vclock[0] = nil
 _ = test_run:wait_vclock("replica", vclock)
 test_run:cmd("switch replica")
-box.info.replication[1].upstream.message
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'follow', message_re = box.NULL})
 box.space.test:select()
 
 test_run:cmd("switch default")
@@ -41,12 +40,11 @@ box.space.test:insert{4}
 test_run:cmd("switch replica")
 -- lsn is not promoted
 lsn1 == box.info.vclock[1]
-box.info.replication[1].upstream.message
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'stopped', message_re = "Duplicate key exists in unique index 'primary' in space 'test'"})
 test_run:cmd("switch default")
 test_run:cmd("restart server replica")
 -- applier is not in follow state
-box.info.replication[1].upstream.message
+test_run:wait_upstream(1, {status = 'stopped', message_re = "Duplicate key exists in unique index 'primary' in space 'test'"})
 
 --
 -- gh-3977: check that NOP is written instead of conflicting row.
@@ -60,7 +58,7 @@ test_run:cmd("switch default")
 box.space.test:truncate()
 test_run:cmd("restart server replica")
 test_run:cmd("switch replica")
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'follow'})
 -- write some conflicting records on slave
 for i = 1, 10 do box.space.test:insert({i, 'r'}) end
 box.cfg{replication_skip_conflict = true}
@@ -72,9 +70,9 @@ for i = 1, 10 do box.space.test:insert({i, 'm'}) end
 
 test_run:cmd("switch replica")
 -- lsn should be incremented
-v1 == box.info.vclock[1] - 10
+test_run:wait_cond(function() return v1 == box.info.vclock[1] - 10 end)
 -- and state is follow
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'follow'})
 
 -- restart server and check replication continues from nop-ed vclock
 test_run:cmd("switch default")
@@ -82,7 +80,7 @@ test_run:cmd("stop server replica")
 for i = 11, 20 do box.space.test:insert({i, 'm'}) end
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'follow'})
 box.space.test:select({11}, {iterator = "GE"})
 
 test_run:cmd("switch default")
