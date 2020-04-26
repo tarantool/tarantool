@@ -64,13 +64,9 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-box.info.replication[1].upstream.message
+test_run:wait_upstream(1, {status = 'follow', message_re = box.NULL})
 ---
-- null
-...
-box.info.replication[1].upstream.status
----
-- follow
+- true
 ...
 box.space.test:select()
 ---
@@ -123,13 +119,9 @@ lsn1 == box.info.vclock[1]
 ---
 - true
 ...
-box.info.replication[1].upstream.message
+test_run:wait_upstream(1, {status = 'stopped', message_re = "Duplicate key exists in unique index 'primary' in space 'test'"})
 ---
-- Duplicate key exists in unique index 'primary' in space 'test'
-...
-box.info.replication[1].upstream.status
----
-- stopped
+- true
 ...
 test_run:cmd("switch default")
 ---
@@ -140,9 +132,9 @@ test_run:cmd("restart server replica")
 - true
 ...
 -- applier is not in follow state
-box.info.replication[1].upstream.message
+test_run:wait_upstream(1, {status = 'stopped', message_re = "Duplicate key exists in unique index 'primary' in space 'test'"})
 ---
-- Duplicate key exists in unique index 'primary' in space 'test'
+- true
 ...
 --
 -- gh-3977: check that NOP is written instead of conflicting row.
@@ -172,9 +164,9 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'follow'})
 ---
-- follow
+- true
 ...
 -- write some conflicting records on slave
 for i = 1, 10 do box.space.test:insert({i, 'r'}) end
@@ -199,14 +191,14 @@ test_run:cmd("switch replica")
 - true
 ...
 -- lsn should be incremented
-v1 == box.info.vclock[1] - 10
+test_run:wait_cond(function() return v1 == box.info.vclock[1] - 10 end)
 ---
 - true
 ...
 -- and state is follow
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'follow'})
 ---
-- follow
+- true
 ...
 -- restart server and check replication continues from nop-ed vclock
 test_run:cmd("switch default")
@@ -228,9 +220,9 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'follow'})
 ---
-- follow
+- true
 ...
 box.space.test:select({11}, {iterator = "GE"})
 ---
