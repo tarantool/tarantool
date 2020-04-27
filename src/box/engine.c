@@ -129,11 +129,11 @@ engine_end_recovery(void)
 }
 
 int
-engine_begin_checkpoint(void)
+engine_begin_checkpoint(bool is_scheduled)
 {
 	struct engine *engine;
 	engine_foreach(engine) {
-		if (engine->vtab->begin_checkpoint(engine) < 0)
+		if (engine->vtab->begin_checkpoint(engine, is_scheduled) < 0)
 			return -1;
 	}
 	return 0;
@@ -356,9 +356,10 @@ generic_engine_end_recovery(struct engine *engine)
 }
 
 int
-generic_engine_begin_checkpoint(struct engine *engine)
+generic_engine_begin_checkpoint(struct engine *engine, bool is_scheduled)
 {
 	(void)engine;
+	(void)is_scheduled;
 	return 0;
 }
 

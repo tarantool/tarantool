@@ -2728,8 +2728,9 @@ vinyl_engine_set_snap_io_rate_limit(struct engine *engine, double limit)
 /* {{{ Checkpoint */
 
 static int
-vinyl_engine_begin_checkpoint(struct engine *engine)
+vinyl_engine_begin_checkpoint(struct engine *engine, bool is_scheduled)
 {
+	(void) is_scheduled;
 	struct vy_env *env = vy_env(engine);
 	assert(env->status == VINYL_ONLINE);
 	/*

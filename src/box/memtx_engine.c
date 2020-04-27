@@ -619,8 +619,9 @@ fail:
 }
 
 static int
-memtx_engine_begin_checkpoint(struct engine *engine)
+memtx_engine_begin_checkpoint(struct engine *engine, bool is_scheduled)
 {
+	(void) is_scheduled;
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 
 	assert(memtx->checkpoint == NULL);

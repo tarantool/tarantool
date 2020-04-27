@@ -157,7 +157,7 @@ struct engine_vtab {
 	 * engine (snapshot is a memtx idea of a checkpoint).
 	 * Must not yield.
 	 */
-	int (*begin_checkpoint)(struct engine *);
+	int (*begin_checkpoint)(struct engine *, bool is_scheduled);
 	/**
 	 * Wait for a checkpoint to complete.
 	 */
@@ -354,7 +354,7 @@ void
 engine_complete_join(struct engine_join_ctx *ctx);
 
 int
-engine_begin_checkpoint(void);
+engine_begin_checkpoint(bool is_scheduled);
 
 /**
  * Create a checkpoint.
@@ -396,7 +396,7 @@ int generic_engine_begin_initial_recovery(struct engine *,
 					  const struct vclock *);
 int generic_engine_begin_final_recovery(struct engine *);
 int generic_engine_end_recovery(struct engine *);
-int generic_engine_begin_checkpoint(struct engine *);
+int generic_engine_begin_checkpoint(struct engine *, bool);
 int generic_engine_wait_checkpoint(struct engine *, const struct vclock *);
 void generic_engine_commit_checkpoint(struct engine *, const struct vclock *);
 void generic_engine_abort_checkpoint(struct engine *);

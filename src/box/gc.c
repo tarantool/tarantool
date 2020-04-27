@@ -377,7 +377,7 @@ gc_add_checkpoint(const struct vclock *vclock)
 }
 
 static int
-gc_do_checkpoint(void)
+gc_do_checkpoint(bool is_scheduled)
 {
 	int rc;
 	struct wal_checkpoint checkpoint;
@@ -389,7 +389,7 @@ gc_do_checkpoint(void)
 	 * Rotate WAL and call engine callbacks to create a checkpoint
 	 * on disk for each registered engine.
 	 */
-	rc = engine_begin_checkpoint();
+	rc = engine_begin_checkpoint(is_scheduled);
 	if (rc != 0)
 		goto out;
 	rc = wal_begin_checkpoint(&checkpoint);
@@ -436,7 +436,7 @@ gc_checkpoint(void)
 				gc.checkpoint_schedule.interval);
 	fiber_wakeup(gc.checkpoint_fiber);
 
-	if (gc_do_checkpoint() != 0)
+	if (gc_do_checkpoint(false) != 0)
 		return -1;
 
 	/*
@@ -506,7 +506,7 @@ gc_checkpoint_fiber_f(va_list ap)
 			 */
 			continue;
 		}
-		if (gc_do_checkpoint() != 0)
+		if (gc_do_checkpoint(true) != 0)
 			diag_log();
 	}
 	return 0;
