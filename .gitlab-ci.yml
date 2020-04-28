@@ -322,6 +322,12 @@ ubuntu_19_10:
     OS: 'ubuntu'
     DIST: 'eoan'
 
+ubuntu_20_04:
+  <<: *pack_definition
+  variables:
+    OS: 'ubuntu'
+    DIST: 'focal'
+
 debian_8:
   <<: *pack_definition
   variables:
@@ -412,6 +418,12 @@ ubuntu_19_10_deploy:
   variables:
     OS: 'ubuntu'
     DIST: 'eoan'
+
+ubuntu_20_04_deploy:
+  <<: *deploy_definition
+  variables:
+    OS: 'ubuntu'
+    DIST: 'focal'
 
 debian_8_deploy:
   <<: *deploy_definition
