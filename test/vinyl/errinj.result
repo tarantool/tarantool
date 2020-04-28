@@ -10,10 +10,6 @@ fiber = require('fiber')
 errinj = box.error.injection
 ---
 ...
-errinj.set("ERRINJ_VY_SCHED_TIMEOUT", 0.040)
----
-- ok
-...
 --
 -- Lost data in case of dump error
 --
@@ -360,10 +356,6 @@ box.snapshot();
 ...
 s:drop()
 ---
-...
-errinj.set("ERRINJ_VY_SCHED_TIMEOUT", 0)
----
-- ok
 ...
 --
 -- Check that upsert squash fiber does not crash if index or

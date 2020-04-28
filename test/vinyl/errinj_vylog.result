@@ -52,13 +52,6 @@ _ = s:create_index('pk')
 _ = s:insert{1, 'x'}
 ---
 ...
-SCHED_TIMEOUT = 0.05
----
-...
-box.error.injection.set('ERRINJ_VY_SCHED_TIMEOUT', SCHED_TIMEOUT)
----
-- ok
-...
 box.error.injection.set('ERRINJ_VY_LOG_FLUSH', true);
 ---
 - ok
@@ -68,13 +61,6 @@ box.snapshot()
 - error: Error injection 'vinyl log flush'
 ...
 box.error.injection.set('ERRINJ_VY_LOG_FLUSH', false);
----
-- ok
-...
-fiber.sleep(2 * SCHED_TIMEOUT)
----
-...
-box.error.injection.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
 ---
 - ok
 ...
@@ -161,23 +147,9 @@ s2.index.pk:drop()
 ---
 ...
 -- pending records must not be rolled back on error
-SCHED_TIMEOUT = 0.05
----
-...
-box.error.injection.set('ERRINJ_VY_SCHED_TIMEOUT', SCHED_TIMEOUT)
----
-- ok
-...
 box.snapshot() -- error
 ---
 - error: Error injection 'vinyl log flush'
-...
-fiber.sleep(2 * SCHED_TIMEOUT)
----
-...
-box.error.injection.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
----
-- ok
 ...
 box.error.injection.set('ERRINJ_VY_LOG_FLUSH', false);
 ---

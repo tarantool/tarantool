@@ -66,14 +66,12 @@ stat.tasks_inprogress == 0
 stat.tasks_completed == 1
 stat.tasks_failed == 0
 errinj.set('ERRINJ_VY_RUN_WRITE', true)
-errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0.01)
 s:replace{2}
 box.snapshot()
 stat = box.stat.vinyl().scheduler
 stat.tasks_completed == 1
 stat.tasks_failed > 0
 errinj.set('ERRINJ_VY_RUN_WRITE', false)
-errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
 test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_completed > 1 end)
 box.snapshot()
 i:compact()

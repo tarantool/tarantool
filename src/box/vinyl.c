@@ -2740,7 +2740,7 @@ vinyl_engine_begin_checkpoint(struct engine *engine, bool is_scheduled)
 	 */
 	if (lsregion_used(&env->mem_env.allocator) == 0)
 		return 0;
-	if (vy_scheduler_begin_checkpoint(&env->scheduler) != 0)
+	if (vy_scheduler_begin_checkpoint(&env->scheduler, is_scheduled) != 0)
 		return -1;
 	return 0;
 }

@@ -681,22 +681,29 @@ vy_scheduler_complete_dump(struct vy_scheduler *scheduler)
 }
 
 int
-vy_scheduler_begin_checkpoint(struct vy_scheduler *scheduler)
+vy_scheduler_begin_checkpoint(struct vy_scheduler *scheduler, bool is_scheduled)
 {
 	assert(!scheduler->checkpoint_in_progress);
 
 	/*
-	 * If the scheduler is throttled due to errors, do not wait
+	 * If checkpoint is manually launched (via box.snapshot())
+	 * then ignore throttling and force dump process. Otherwise,
+	 * if the scheduler is throttled due to errors, do not wait
 	 * until it wakes up as it may take quite a while. Instead
 	 * fail checkpoint immediately with the last error seen by
 	 * the scheduler.
 	 */
 	if (scheduler->is_throttled) {
-		struct error *e = diag_last_error(&scheduler->diag);
-		diag_set_error(diag_get(), e);
-		say_error("cannot checkpoint vinyl, "
-			  "scheduler is throttled with: %s", e->errmsg);
-		return -1;
+		if (is_scheduled) {
+			struct error *e = diag_last_error(&scheduler->diag);
+			diag_set_error(diag_get(), e);
+			say_error("cannot checkpoint vinyl, "
+				  "scheduler is throttled with: %s", e->errmsg);
+			return -1;
+		}
+		say_info("scheduler is unthrottled due to manual checkpoint "
+			 "process");
+		scheduler->is_throttled = false;
 	}
 
 	if (!vy_scheduler_dump_in_progress(scheduler)) {

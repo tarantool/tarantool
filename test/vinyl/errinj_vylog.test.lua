@@ -27,15 +27,11 @@ s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk')
 _ = s:insert{1, 'x'}
 
-SCHED_TIMEOUT = 0.05
-box.error.injection.set('ERRINJ_VY_SCHED_TIMEOUT', SCHED_TIMEOUT)
 box.error.injection.set('ERRINJ_VY_LOG_FLUSH', true);
 
 box.snapshot()
 
 box.error.injection.set('ERRINJ_VY_LOG_FLUSH', false);
-fiber.sleep(2 * SCHED_TIMEOUT)
-box.error.injection.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
 
 _ = s:insert{2, 'y'}
 
@@ -79,11 +75,7 @@ _ = s1:insert{3, 'c'}
 s2.index.pk:drop()
 
 -- pending records must not be rolled back on error
-SCHED_TIMEOUT = 0.05
-box.error.injection.set('ERRINJ_VY_SCHED_TIMEOUT', SCHED_TIMEOUT)
 box.snapshot() -- error
-fiber.sleep(2 * SCHED_TIMEOUT)
-box.error.injection.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
 
 box.error.injection.set('ERRINJ_VY_LOG_FLUSH', false);
 

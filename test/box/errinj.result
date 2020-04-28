@@ -1589,10 +1589,6 @@ errinj.set('ERRINJ_VY_GC', true)
 ---
 - ok
 ...
-errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0.001)
----
-- ok
-...
 errinj.set('ERRINJ_VY_RUN_FILE_RENAME', true)
 ---
 - ok
@@ -1626,10 +1622,6 @@ box.snapshot() -- error
 - error: Error injection 'vinyl index file rename'
 ...
 errinj.set('ERRINJ_VY_INDEX_FILE_RENAME', false)
----
-- ok
-...
-errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
 ---
 - ok
 ...

@@ -225,7 +225,7 @@ vy_scheduler_force_compaction(struct vy_scheduler *scheduler,
  * after that.
  */
 int
-vy_scheduler_begin_checkpoint(struct vy_scheduler *);
+vy_scheduler_begin_checkpoint(struct vy_scheduler *, bool);
 
 /**
  * Wait for checkpoint. Please call vy_scheduler_end_checkpoint()

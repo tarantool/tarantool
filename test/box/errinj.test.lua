@@ -575,7 +575,6 @@ box.snapshot()
 errinj.set('ERRINJ_VY_LOG_FILE_RENAME', false)
 
 errinj.set('ERRINJ_VY_GC', true)
-errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0.001)
 
 errinj.set('ERRINJ_VY_RUN_FILE_RENAME', true)
 box.space.test:insert{1}
@@ -590,7 +589,6 @@ box.space.test:insert{2}
 box.snapshot() -- error
 errinj.set('ERRINJ_VY_INDEX_FILE_RENAME', false)
 
-errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
 errinj.set('ERRINJ_VY_GC', false)
 
 test_run:cmd('restart server default')
