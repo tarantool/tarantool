@@ -67,6 +67,9 @@ jobs:
       - name: "Ubuntu Eoan (19.10) build + deploy DEB"
         env: OS=ubuntu DIST=eoan
         if: branch = "2.3"
+      - name: "Ubuntu Focal (20.04) build + deploy DEB"
+        env: OS=ubuntu DIST=focal
+        if: branch = "2.3"
       - name: "Debian Jessie (8) build + deploy DEB"
         env: OS=debian DIST=jessie
         if: branch = "2.3"
