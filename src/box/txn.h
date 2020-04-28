@@ -66,6 +66,27 @@ enum txn_flag {
 	TXN_CAN_YIELD,
 	/** on_commit and/or on_rollback list is not empty. */
 	TXN_HAS_TRIGGERS,
+	/**
+	 * Synchronous transaction touched sync spaces, or an
+	 * asynchronous transaction blocked by a sync one until it
+	 * is confirmed.
+	 */
+	TXN_WAIT_SYNC,
+	/**
+	 * Synchronous transaction 'waiting for ACKs' state before
+	 * commit. In this state it waits until it is replicated
+	 * onto a quorum of replicas, and only then finishes
+	 * commit and returns success to a user.
+	 * TXN_WAIT_SYNC is always set, if TXN_WAIT_ACK is set.
+	 */
+	TXN_WAIT_ACK,
+	/**
+	 * A transaction may be forced to be asynchronous, not
+	 * wait for any ACKs, and not depend on prepending sync
+	 * transactions. This happens in a few special cases. For
+	 * example, when applier receives snapshot from master.
+	 */
+	TXN_FORCE_ASYNC,
 };
 
 enum {

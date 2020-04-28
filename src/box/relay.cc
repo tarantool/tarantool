@@ -53,6 +53,7 @@
 #include "xrow_io.h"
 #include "xstream.h"
 #include "wal.h"
+#include "txn_limbo.h"
 
 /**
  * Cbus message to send status updates from relay to tx thread.
@@ -399,6 +400,16 @@ tx_status_update(struct cmsg *msg)
 {
 	struct relay_status_msg *status = (struct relay_status_msg *)msg;
 	vclock_copy(&status->relay->tx.vclock, &status->vclock);
+	/*
+	 * Let pending synchronous transactions know, which of
+	 * them were successfully sent to the replica. Acks are
+	 * collected only by the transactions originator (which is
+	 * the single master in 100% so far).
+	 */
+	if (txn_limbo.instance_id == instance_id) {
+		txn_limbo_ack(&txn_limbo, status->relay->replica->id,
+			      vclock_get(&status->vclock, instance_id));
+	}
 	static const struct cmsg_hop route[] = {
 		{relay_status_update, NULL}
 	};

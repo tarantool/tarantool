@@ -432,6 +432,7 @@ t;
  |   211: box.error.WRONG_QUERY_ID
  |   212: box.error.SEQUENCE_NOT_STARTED
  |   213: box.error.NO_SUCH_SESSION_SETTING
+ |   214: box.error.UNCOMMITTED_FOREIGN_SYNC_TXNS
  | ...
 
 test_run:cmd("setopt delimiter ''");

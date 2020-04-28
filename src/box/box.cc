@@ -59,6 +59,7 @@
 #include "index.h"
 #include "port.h"
 #include "txn.h"
+#include "txn_limbo.h"
 #include "user.h"
 #include "cfg.h"
 #include "coio.h"
@@ -2413,6 +2414,7 @@ box_init(void)
 	if (tuple_init(lua_hash) != 0)
 		diag_raise();
 
+	txn_limbo_init();
 	sequence_init();
 }
 

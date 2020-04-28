@@ -266,6 +266,7 @@ struct errcode_record {
 	/*211 */_(ER_WRONG_QUERY_ID,		"Prepared statement with id %u does not exist") \
 	/*212 */_(ER_SEQUENCE_NOT_STARTED,		"Sequence '%s' is not started") \
 	/*213 */_(ER_NO_SUCH_SESSION_SETTING,	"Session setting %s doesn't exist") \
+	/*214 */_(ER_UNCOMMITTED_FOREIGN_SYNC_TXNS, "Found uncommitted sync transactions from other instance with id %u") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

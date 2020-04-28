@@ -845,6 +845,9 @@ applier_apply_tx(struct stailq *rows)
 	trigger_create(on_commit, applier_txn_commit_cb, NULL, NULL);
 	txn_on_commit(txn, on_commit);
 
+	/* Applier does not wait for ACK. It sends ACK. */
+	txn_set_flag(txn, TXN_FORCE_ASYNC);
+
 	if (txn_commit_async(txn) < 0)
 		goto fail;
 
