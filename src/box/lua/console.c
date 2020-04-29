@@ -49,7 +49,7 @@
 
 extern char serpent_lua[];
 
-static struct luaL_serializer *luaL_yaml_default = NULL;
+static struct luaL_serializer *serializer_yaml;
 
 /*
  * Completion engine (Mike Paul's).
@@ -369,7 +369,7 @@ lbox_console_format_yaml(struct lua_State *L)
 	}
 	lua_replace(L, 1);
 	lua_settop(L, 1);
-	return lua_yaml_encode(L, luaL_yaml_default, NULL, NULL);
+	return lua_yaml_encode(L, serializer_yaml, NULL, NULL);
 }
 
 int
@@ -404,7 +404,7 @@ console_dump_plain(struct lua_State *L, uint32_t *size)
 {
 	enum output_format fmt = console_get_output_format();
 	if (fmt == OUTPUT_FORMAT_YAML) {
-		int rc = lua_yaml_encode(L, luaL_yaml_default, "!push!",
+		int rc = lua_yaml_encode(L, serializer_yaml, "!push!",
 					 "tag:tarantool.io/push,2018");
 		if (rc == 2) {
 			/*
@@ -566,11 +566,11 @@ tarantool_lua_console_init(struct lua_State *L)
 	lua_pushcclosure(L, lbox_console_readline, 1);
 	lua_setfield(L, -2, "readline");
 
-	luaL_yaml_default = lua_yaml_new_serializer(L);
-	luaL_yaml_default->encode_invalid_numbers = 1;
-	luaL_yaml_default->encode_load_metatables = 1;
-	luaL_yaml_default->encode_use_tostring = 1;
-	luaL_yaml_default->encode_invalid_as_nil = 1;
+	serializer_yaml = lua_yaml_new_serializer(L);
+	serializer_yaml->encode_invalid_numbers = 1;
+	serializer_yaml->encode_load_metatables = 1;
+	serializer_yaml->encode_use_tostring = 1;
+	serializer_yaml->encode_invalid_as_nil = 1;
 	/*
 	 * Hold reference to the formatter in module local
 	 * variable.
