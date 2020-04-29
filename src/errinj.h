@@ -152,6 +152,7 @@ errinj_foreach(errinj_cb cb, void *cb_ctx);
 #ifdef NDEBUG
 #  define ERROR_INJECT(ID, CODE)
 #  define errinj(ID, TYPE) ((struct errinj *) NULL)
+#  define ERROR_INJECT_COUNTDOWN(ID, CODE)
 #else
 #  /* Returns the error injection by id */
 #  define errinj(ID, TYPE) \
@@ -164,6 +165,12 @@ errinj_foreach(errinj_cb cb, void *cb_ctx);
 	do { \
 		if (errinj(ID, ERRINJ_BOOL)->bparam) \
 			CODE; \
+	} while (0)
+#  define ERROR_INJECT_COUNTDOWN(ID, CODE)				\
+	do {								\
+		if (errinj(ID, ERRINJ_INT)->iparam-- == 0) {		\
+			CODE;						\
+		}							\
 	} while (0)
 #endif
 
