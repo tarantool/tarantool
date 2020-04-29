@@ -22,8 +22,7 @@ vclock = test_run:get_vclock('default')
 vclock[0] = nil
 _ = test_run:wait_vclock("replica", vclock)
 test_run:cmd("switch replica")
-box.info.replication[1].upstream.message
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'follow', message_re = box.NULL})
 box.space.test:select()
 
 test_run:cmd("switch default")
@@ -41,12 +40,11 @@ box.space.test:insert{4}
 test_run:cmd("switch replica")
 -- lsn is not promoted
 lsn1 == box.info.vclock[1]
-box.info.replication[1].upstream.message
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'stopped', message_re = "Duplicate key exists in unique index 'primary' in space 'test'"})
 test_run:cmd("switch default")
 test_run:cmd("restart server replica")
 -- applier is not in follow state
-box.info.replication[1].upstream.message
+test_run:wait_upstream(1, {status = 'stopped', message_re = "Duplicate key exists in unique index 'primary' in space 'test'"})
 test_run:cmd("switch default")
 
 -- cleanup

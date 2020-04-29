@@ -64,13 +64,9 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-box.info.replication[1].upstream.message
+test_run:wait_upstream(1, {status = 'follow', message_re = box.NULL})
 ---
-- null
-...
-box.info.replication[1].upstream.status
----
-- follow
+- true
 ...
 box.space.test:select()
 ---
@@ -123,13 +119,9 @@ lsn1 == box.info.vclock[1]
 ---
 - true
 ...
-box.info.replication[1].upstream.message
+test_run:wait_upstream(1, {status = 'stopped', message_re = "Duplicate key exists in unique index 'primary' in space 'test'"})
 ---
-- Duplicate key exists in unique index 'primary' in space 'test'
-...
-box.info.replication[1].upstream.status
----
-- stopped
+- true
 ...
 test_run:cmd("switch default")
 ---
@@ -140,9 +132,9 @@ test_run:cmd("restart server replica")
 - true
 ...
 -- applier is not in follow state
-box.info.replication[1].upstream.message
+test_run:wait_upstream(1, {status = 'stopped', message_re = "Duplicate key exists in unique index 'primary' in space 'test'"})
 ---
-- Duplicate key exists in unique index 'primary' in space 'test'
+- true
 ...
 test_run:cmd("switch default")
 ---
