@@ -22,14 +22,6 @@ case "$1" in
         install -d -o$SYSUSER -gadm -m2750 /var/log/tarantool
         install -d -o$SYSUSER -g$SYSUSER -m750 /var/run/tarantool
         install -d -o$SYSUSER -g$SYSUSER -m750 /var/lib/tarantool
-
-        # Enable example.lua by default
-        if [ -z $2 ] && [ ! -e /etc/tarantool/instances.enabled/example.lua ] &&
-           [ -d /etc/tarantool/instances.enabled ] &&
-           [ -d /etc/tarantool/instances.available/ ]; then
-          ln -s /etc/tarantool/instances.available/example.lua \
-                /etc/tarantool/instances.enabled/example.lua
-        fi
     ;;
 esac
 
