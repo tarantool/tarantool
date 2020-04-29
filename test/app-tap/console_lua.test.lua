@@ -102,29 +102,29 @@ local cases = {
         prepare     = 'a = {1, 2, 3}',
         opts        = {block = false},
         input       = '1, 2, nil, a',
-        expected    = '1, 2, box.NULL, {1, 2, 3}',
+        expected    = '1, 2, nil, {1, 2, 3}',
         cleanup     = 'a = nil',
     }, {
         name        = 'multireturn block mode',
         prepare     = 'a = {1, 2, 3}',
         opts        = {block = true},
         input       = '1, 2, nil, a',
-        expected    = '1, 2, box.NULL, {\n  1,\n  2,\n  3\n}',
+        expected    = '1, 2, nil, {\n  1,\n  2,\n  3\n}',
         cleanup     = 'a = nil',
     }, {
-        name        = 'trailing nils, line mode',
+        name        = 'trailing nils, box.NULL, line mode',
         opts        = {block = false},
-        input       = '1, nil, nil, nil',
-        expected    = '1, box.NULL, box.NULL, box.NULL',
+        input       = '1, nil, box.NULL, nil',
+        expected    = '1, nil, box.NULL, nil',
     }, {
-        name        = 'trailing nils, block mode',
+        name        = 'trailing nils, box.NULL, block mode',
         opts        = {block = true},
-        input       = '1, nil, nil, nil',
-        expected    = '1, box.NULL, box.NULL, box.NULL',
+        input       = '1, nil, box.NULL, nil',
+        expected    = '1, nil, box.NULL, nil',
     }, {
         name        = 'empty output',
         input       = '\\set output',
-        expected    = '"Specify output format: lua or yaml."',
+        expected    = '{error = \"Specify output format: lua or yaml.\"}',
     }
 }
 

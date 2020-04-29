@@ -69,60 +69,50 @@ output_handlers["yaml"] = function(status, opts, ...)
     return internal.format_yaml({ error = err })
 end
 
--- A map for internal symbols in case if they
--- are not inside tables and serpent won't be
--- able to handle them properly.
-local lua_map_direct_symbols = {
-    [box.NULL]      = 'box.NULL',
-}
-
--- A map for internal symbols in case if they
--- are coming from tables and we need to depict
--- them into user known values.
-local lua_map_table_symbols = {
-    ['"cdata<void %*>: NULL"']  = 'box.NULL'
-}
-
 --
--- Map internal symbols which serpent doesn't
--- know about to a known representation.
-local serpent_map_symbols = function(tag, head, body, tail, level)
-    for k,v in pairs(lua_map_table_symbols) do
-        body = body:gsub(k, v)
+-- Format a Lua value.
+local function format_lua_value(status, internal_opts, value)
+    local err
+    if status then
+        status, err = pcall(internal.format_lua, internal_opts, value)
+        if status then
+            return err
+        else
+            local m = 'console: exception while formatting output: "%s"'
+            err = m:format(tostring(err))
+        end
+    else
+        err = value
+        if err == nil then
+            err = box.NULL
+        end
     end
-    return tag..head..body..tail
+    return internal.format_lua(internal_opts, { error = err })
 end
 
 --
--- Format a Lua value.
-local function format_lua_value(value, opts)
-    for k,v in pairs(lua_map_direct_symbols) do
-        if k == value then
-            return v
-        end
-    end
-    local serpent_opts = {
-        custom  = serpent_map_symbols,
-        comment = false,
-        nocode  = true,
-    }
+-- Convert options from user form to the internal format.
+local function gen_lua_opts(opts)
     if opts == "block" then
-        return serpent.block(value, serpent_opts)
+        return {block=true, indent=2}
+    else
+        return {block=false, indent=2}
     end
-    return serpent.line(value, serpent_opts)
 end
 
 output_handlers["lua"] = function(status, opts, ...)
     local collect = {}
     --
-    -- If no data present at least EOS should be put,
-    -- otherwise wire readers won't be able to find
-    -- where the end of string is.
-    if not ... then
-        return output_eos["lua"]
-    end
+    -- Convert options to internal dictionary.
+    local internal_opts = gen_lua_opts(opts)
     for i = 1, select('#', ...) do
-        collect[i] = format_lua_value(select(i, ...), opts)
+        collect[i] = format_lua_value(status, internal_opts, select(i, ...))
+        if collect[i] == nil then
+            --
+            -- table.concat doesn't work for nil
+            -- so convert it explicitly.
+            collect[i] = "nil"
+        end
     end
     return table.concat(collect, ', ') .. output_eos["lua"]
 end
@@ -210,8 +200,8 @@ end
 
 -- Used by console_session_push.
 box_internal.format_lua_push = function(value)
-    local opts = current_output()["opts"]
-    value = format_lua_value(value, opts)
+    local internal_opts = gen_lua_opts(current_output()["opts"])
+    value = format_lua_value(true, internal_opts, value)
     return '-- Push\n' .. value .. ';'
 end
 
