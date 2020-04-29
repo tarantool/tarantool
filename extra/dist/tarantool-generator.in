@@ -13,6 +13,7 @@ mkdir -p "$wantdir"
 
 for file in @TARANTOOL_ENABLEDDIR@/*.lua; do
 	instance=`basename $file .lua`
+	[ "${instance}" = "*" ] && break  # skip empty directory
 	ln -s "$service" "$wantdir/tarantool@$instance.service"
 done
 
