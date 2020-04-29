@@ -39,6 +39,7 @@
 #include "coio.h"
 #include "lua/msgpack.h"
 #include "lua-yaml/lyaml.h"
+#include "serialize_lua.h"
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
@@ -50,6 +51,7 @@
 extern char serpent_lua[];
 
 static struct luaL_serializer *serializer_yaml;
+static struct luaL_serializer *serializer_lua;
 
 /*
  * Completion engine (Mike Paul's).
@@ -67,6 +69,54 @@ lua_rl_complete(lua_State *L, const char *text, int start, int end);
  * Two concurrent readline() calls never happen.
  */
 static struct lua_State *readline_L;
+
+/**
+ * Encode Lua object into Lua form.
+ */
+static int
+lbox_console_format_lua(struct lua_State *L)
+{
+	lua_dumper_opts_t opts;
+	int arg_count;
+
+	/* Parse options and remove them */
+	lua_parse_opts(L, &opts);
+	lua_remove(L, 1);
+
+	arg_count = lua_gettop(L);
+
+	/* If nothing to process just exit early */
+	if (arg_count == 0)
+		return 0;
+
+	/*
+	 * When processing arguments we might
+	 * need to modify reference (for example
+	 * when __index references to object itself)
+	 * thus make a copy of incoming data.
+	 *
+	 * Note that in yaml there is no map for
+	 * Lua's "nil" value so for yaml encoder
+	 * we do
+	 *
+	 * if (lua_isnil(L, i + 1))
+	 *     luaL_pushnull(L);
+	 * else
+	 *     lua_pushvalue(L, i + 1);
+	 *
+	 *
+	 * For lua mode we have to preserve "nil".
+	 */
+	lua_createtable(L, arg_count, 0);
+	for (int i = 0; i < arg_count; ++i) {
+		lua_pushvalue(L, i + 1);
+		lua_rawseti(L, -2, i + 1);
+	}
+
+	lua_replace(L, 1);
+	lua_settop(L, 1);
+	return lua_encode(L, serializer_lua, &opts);
+}
 
 /*
  * console_completion_handler()
@@ -557,6 +607,7 @@ tarantool_lua_console_init(struct lua_State *L)
 		{"add_history",		lbox_console_add_history},
 		{"completion_handler",	lbox_console_completion_handler},
 		{"format_yaml",		lbox_console_format_yaml},
+		{"format_lua",		lbox_console_format_lua},
 		{NULL, NULL}
 	};
 	luaL_register_module(L, "console", consolelib);
@@ -581,6 +632,32 @@ tarantool_lua_console_init(struct lua_State *L)
 	 * load_history work the same way.
 	 */
 	lua_setfield(L, -2, "formatter");
+
+	/*
+	 * We don't export it as a module
+	 * for a while, so the library
+	 * is kept empty.
+	 */
+	static const luaL_Reg lualib[] = {
+		{ .name = NULL },
+	};
+
+	serializer_lua = luaL_newserializer(L, NULL, lualib);
+	serializer_lua->has_compact		= 1;
+	serializer_lua->encode_invalid_numbers	= 1;
+	serializer_lua->encode_load_metatables	= 1;
+	serializer_lua->encode_use_tostring	= 1;
+	serializer_lua->encode_invalid_as_nil	= 1;
+
+	/*
+	 * Keep a reference to this module so it
+	 * won't be unloaded.
+	 */
+	lua_setfield(L, -2, "formatter_lua");
+
+	/* Output formatter in Lua mode */
+	lua_serializer_init(L);
+
 	struct session_vtab console_session_vtab = {
 		.push	= console_session_push,
 		.fd	= console_session_fd,
