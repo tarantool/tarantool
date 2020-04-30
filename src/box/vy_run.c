@@ -1676,6 +1676,10 @@ vy_run_recover(struct vy_run *run, const char *dir,
 			    space_id, iid, run->id, VY_FILE_INDEX);
 
 	struct xlog_cursor cursor;
+	ERROR_INJECT_COUNTDOWN(ERRINJ_VY_RUN_OPEN, {
+		diag_set(SystemError, "failed to open '%s' file", path);
+		goto fail;
+	});
 	if (xlog_cursor_open(&cursor, path))
 		goto fail;
 

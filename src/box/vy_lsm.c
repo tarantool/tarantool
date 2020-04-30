@@ -604,9 +604,18 @@ vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 	 * of each recovered run. We need to drop the extra
 	 * references once we are done.
 	 */
-	struct vy_run *run;
-	rlist_foreach_entry(run, &lsm->runs, in_lsm) {
-		assert(run->refs > 1);
+	struct vy_run *run, *next_run;
+	rlist_foreach_entry_safe(run, &lsm->runs, in_lsm, next_run) {
+		/*
+		 * In case vy_lsm_recover_range() failed, slices
+		 * are already deleted and runs are unrefed. So
+		 * we have nothing to do but finish run clean-up.
+		 */
+		if (run->refs == 1) {
+			assert(rc != 0);
+			assert(run->slice_count == 0);
+			vy_lsm_remove_run(lsm, run);
+		}
 		vy_run_unref(run);
 	}
 
