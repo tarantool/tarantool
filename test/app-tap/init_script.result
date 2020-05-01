@@ -30,6 +30,8 @@ replication_connect_timeout:30
 replication_skip_conflict:false
 replication_sync_lag:10
 replication_sync_timeout:300
+replication_synchro_quorum:1
+replication_synchro_timeout:5
 replication_timeout:1
 slab_alloc_factor:1.05
 sql_cache_size:5242880

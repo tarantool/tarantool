@@ -81,6 +81,10 @@ cfg_filter(box.cfg)
     - 10
   - - replication_sync_timeout
     - 300
+  - - replication_synchro_quorum
+    - 1
+  - - replication_synchro_timeout
+    - 5
   - - replication_timeout
     - 1
   - - slab_alloc_factor

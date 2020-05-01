@@ -243,6 +243,8 @@ void box_set_replication_timeout(void);
 void box_set_replication_connect_timeout(void);
 void box_set_replication_connect_quorum(void);
 void box_set_replication_sync_lag(void);
+int box_set_replication_synchro_quorum(void);
+int box_set_replication_synchro_timeout(void);
 void box_set_replication_sync_timeout(void);
 void box_set_replication_skip_conflict(void);
 void box_set_replication_anon(void);
