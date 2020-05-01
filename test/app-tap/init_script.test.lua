@@ -36,7 +36,7 @@ for k,v in pairs(box.cfg) do
 end
 table.sort(t)
 print('box.cfg')
-for k,v in pairs(t) do print(k, v) end
+for k,v in pairs(t) do print(v) end
 --
 -- Insert tests
 --

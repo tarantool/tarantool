@@ -3,54 +3,54 @@
 --
 
 box.cfg
-1	background:false
-2	checkpoint_count:2
-3	checkpoint_interval:3600
-4	checkpoint_wal_threshold:1e+18
-5	coredump:false
-6	feedback_enabled:true
-7	feedback_host:https://feedback.tarantool.io
-8	feedback_interval:3600
-9	force_recovery:false
-10	hot_standby:false
-11	listen:port
-12	log:tarantool.log
-13	log_format:plain
-14	log_level:5
-15	memtx_dir:.
-16	memtx_max_tuple_size:1048576
-17	memtx_memory:107374182
-18	memtx_min_tuple_size:16
-19	net_msg_max:768
-20	pid_file:box.pid
-21	read_only:false
-22	readahead:16320
-23	replication_anon:false
-24	replication_connect_timeout:30
-25	replication_skip_conflict:false
-26	replication_sync_lag:10
-27	replication_sync_timeout:300
-28	replication_timeout:1
-29	slab_alloc_factor:1.05
-30	sql_cache_size:5242880
-31	strip_core:true
-32	too_long_threshold:0.5
-33	vinyl_bloom_fpr:0.05
-34	vinyl_cache:134217728
-35	vinyl_dir:.
-36	vinyl_max_tuple_size:1048576
-37	vinyl_memory:134217728
-38	vinyl_page_size:8192
-39	vinyl_read_threads:1
-40	vinyl_run_count_per_level:2
-41	vinyl_run_size_ratio:3.5
-42	vinyl_timeout:60
-43	vinyl_write_threads:4
-44	wal_dir:.
-45	wal_dir_rescan_delay:2
-46	wal_max_size:268435456
-47	wal_mode:write
-48	worker_pool_threads:4
+background:false
+checkpoint_count:2
+checkpoint_interval:3600
+checkpoint_wal_threshold:1e+18
+coredump:false
+feedback_enabled:true
+feedback_host:https://feedback.tarantool.io
+feedback_interval:3600
+force_recovery:false
+hot_standby:false
+listen:port
+log:tarantool.log
+log_format:plain
+log_level:5
+memtx_dir:.
+memtx_max_tuple_size:1048576
+memtx_memory:107374182
+memtx_min_tuple_size:16
+net_msg_max:768
+pid_file:box.pid
+read_only:false
+readahead:16320
+replication_anon:false
+replication_connect_timeout:30
+replication_skip_conflict:false
+replication_sync_lag:10
+replication_sync_timeout:300
+replication_timeout:1
+slab_alloc_factor:1.05
+sql_cache_size:5242880
+strip_core:true
+too_long_threshold:0.5
+vinyl_bloom_fpr:0.05
+vinyl_cache:134217728
+vinyl_dir:.
+vinyl_max_tuple_size:1048576
+vinyl_memory:134217728
+vinyl_page_size:8192
+vinyl_read_threads:1
+vinyl_run_count_per_level:2
+vinyl_run_size_ratio:3.5
+vinyl_timeout:60
+vinyl_write_threads:4
+wal_dir:.
+wal_dir_rescan_delay:2
+wal_max_size:268435456
+wal_mode:write
+worker_pool_threads:4
 --
 -- Test insert from detached fiber
 --
