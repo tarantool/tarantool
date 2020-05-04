@@ -387,6 +387,8 @@ lbox_session_push(struct lua_State *L)
 		sync = luaL_touint64(L, 2);
 		if (sync != 0 || (lua_isnumber(L, 2) &&
 				  lua_tonumber(L, 2) == 0)) {
+			say_warn_ratelimited("box.session.push() 'sync' "
+					     "parameter is deprecated");
 			lua_pop(L, 1);
 			break;
 		}
