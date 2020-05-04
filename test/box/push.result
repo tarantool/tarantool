@@ -6,14 +6,15 @@ test_run = require('test_run').new()
 --
 --
 -- Usage.
+-- gh-4689: sync is deprecated, accepts only 'data' parameter.
 --
 box.session.push()
 ---
-- error: 'Usage: box.session.push(data, sync)'
+- error: 'Usage: box.session.push(data)'
 ...
 box.session.push(1, 'a')
 ---
-- error: 'Usage: box.session.push(data, sync)'
+- error: 'Usage: box.session.push(data)'
 ...
 fiber = require('fiber')
 ---
@@ -95,20 +96,18 @@ test_run:cmd("setopt delimiter ';'")
 - true
 ...
 function dml_push_and_dml(key)
-    local sync = box.session.sync()
-    box.session.push('started dml', sync)
+    box.session.push('started dml')
     s:replace{key}
-    box.session.push('continued dml', sync)
+    box.session.push('continued dml')
     s:replace{-key}
-    box.session.push('finished dml', sync)
+    box.session.push('finished dml')
     return key
 end;
 ---
 ...
 function do_pushes(val)
-    local sync = box.session.sync()
     for i = 1, 5 do
-        box.session.push(i, sync)
+        box.session.push(i)
         fiber.yield()
     end
     return val
@@ -374,9 +373,8 @@ test_run:cmd("setopt delimiter ';'")
 - true
 ...
 function do_pushes()
-    local sync = box.session.sync()
     for i = 1, 5 do
-        box.session.push(i + 100, sync)
+        box.session.push(i + 100)
         cond:wait()
     end
     return true

@@ -560,16 +560,14 @@ port_msgpack_dump_plain(struct port *base, uint32_t *size)
  * Push a tagged YAML document or a Lua string into a console
  * socket.
  * @param session Console session.
- * @param sync Unused request sync.
  * @param port Port with the data to push.
  *
  * @retval  0 Success.
  * @retval -1 Error.
  */
 static int
-console_session_push(struct session *session, uint64_t sync, struct port *port)
+console_session_push(struct session *session, struct port *port)
 {
-	(void) sync;
 	assert(session_vtab_registry[session->type].push ==
 	       console_session_push);
 	uint32_t text_len;

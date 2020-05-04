@@ -378,25 +378,11 @@ static int
 lbox_session_push(struct lua_State *L)
 {
 	struct session *session = current_session();
-	uint64_t sync;
-	switch(lua_gettop(L)) {
-	case 1:
-		sync = session_sync(session);
-		break;
-	case 2:
-		sync = luaL_touint64(L, 2);
-		if (sync != 0 || (lua_isnumber(L, 2) &&
-				  lua_tonumber(L, 2) == 0)) {
-			lua_pop(L, 1);
-			break;
-		}
-		FALLTHROUGH;
-	default:
-		return luaL_error(L, "Usage: box.session.push(data, sync)");
-	}
+	if (lua_gettop(L) != 1)
+		return luaL_error(L, "Usage: box.session.push(data)");
 	struct port port;
 	port_lua_create(&port, L);
-	if (session_push(session, sync, &port) != 0)
+	if (session_push(session, &port) != 0)
 		return luaT_push_nil_and_error(L);
 	lua_pushboolean(L, true);
 	return 1;

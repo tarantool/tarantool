@@ -5,6 +5,7 @@ test_run = require('test_run').new()
 
 --
 -- Usage.
+-- gh-4689: sync is deprecated, accepts only 'data' parameter.
 --
 box.session.push()
 box.session.push(1, 'a')
@@ -44,18 +45,16 @@ pk = s:create_index('pk')
 c:reload_schema()
 test_run:cmd("setopt delimiter ';'")
 function dml_push_and_dml(key)
-    local sync = box.session.sync()
-    box.session.push('started dml', sync)
+    box.session.push('started dml')
     s:replace{key}
-    box.session.push('continued dml', sync)
+    box.session.push('continued dml')
     s:replace{-key}
-    box.session.push('finished dml', sync)
+    box.session.push('finished dml')
     return key
 end;
 function do_pushes(val)
-    local sync = box.session.sync()
     for i = 1, 5 do
-        box.session.push(i, sync)
+        box.session.push(i)
         fiber.yield()
     end
     return val
@@ -191,9 +190,8 @@ c = netbox.connect(box.cfg.listen)
 cond = fiber.cond()
 test_run:cmd("setopt delimiter ';'")
 function do_pushes()
-    local sync = box.session.sync()
     for i = 1, 5 do
-        box.session.push(i + 100, sync)
+        box.session.push(i + 100)
         cond:wait()
     end
     return true

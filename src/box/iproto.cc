@@ -2153,7 +2153,6 @@ tx_end_push(struct cmsg *m)
 /**
  * Push a message from @a port to a remote client.
  * @param session iproto session.
- * @param sync Request sync in scope of which to send the push.
  * @param port Port with data to send.
  *
  * @retval -1 Memory error.
@@ -2162,7 +2161,7 @@ tx_end_push(struct cmsg *m)
  *            client: the output buffer is flushed asynchronously.
  */
 static int
-iproto_session_push(struct session *session, uint64_t sync, struct port *port)
+iproto_session_push(struct session *session, struct port *port)
 {
 	struct iproto_connection *con =
 		(struct iproto_connection *) session->meta.connection;
@@ -2173,7 +2172,8 @@ iproto_session_push(struct session *session, uint64_t sync, struct port *port)
 		obuf_rollback_to_svp(con->tx.p_obuf, &svp);
 		return -1;
 	}
-	iproto_reply_chunk(con->tx.p_obuf, &svp, sync, ::schema_version);
+	iproto_reply_chunk(con->tx.p_obuf, &svp, iproto_session_sync(session),
+			   ::schema_version);
 	if (! con->tx.is_push_sent)
 		tx_begin_push(con);
 	else

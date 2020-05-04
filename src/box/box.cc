@@ -1470,7 +1470,7 @@ box_session_push(const char *data, const char *data_end)
 	struct port_msgpack port;
 	struct port *base = (struct port *)&port;
 	port_msgpack_create(base, data, data_end - data);
-	int rc = session_push(session, session_sync(session), base);
+	int rc = session_push(session, base);
 	port_msgpack_destroy(base);
 	return rc;
 }
