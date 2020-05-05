@@ -552,11 +552,11 @@ void
 tarantool_lua_console_init(struct lua_State *L)
 {
 	static const struct luaL_Reg consolelib[] = {
-		{"load_history",       lbox_console_load_history},
-		{"save_history",       lbox_console_save_history},
-		{"add_history",        lbox_console_add_history},
-		{"completion_handler", lbox_console_completion_handler},
-		{"format",             lbox_console_format},
+		{"load_history",	lbox_console_load_history},
+		{"save_history",	lbox_console_save_history},
+		{"add_history",		lbox_console_add_history},
+		{"completion_handler",	lbox_console_completion_handler},
+		{"format_yaml",		lbox_console_format_yaml},
 		{NULL, NULL}
 	};
 	luaL_register_module(L, "console", consolelib);
