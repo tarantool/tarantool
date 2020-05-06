@@ -617,11 +617,8 @@ function pack_rpm {
     pack_patterns=$2
 
     pack_rpms=$(cd $repo && ls $pack_patterns 2>/dev/null || true)
-    if [ -z "$pack_rpms" ]; then
-        echo "ERROR: Current '$repo' path doesn't have '$pack_patterns' packages in path"
-        usage
-        exit 1
-    fi
+    [ -n "$pack_rpms" ] || return 0
+    packed_rpms=pack_rpms
 
     # copy the needed package binaries to the workspace
     ( cd $repo && cp $pack_rpms $ws/. )
@@ -952,7 +949,7 @@ elif [ "$os" == "el" -o "$os" == "fedora" ]; then
     fi
     # unlock the publishing
     $rm_file $ws_lockfile
-    popd
+    popd 2>/dev/null || true
 
     # prepare the workspace
     prepare_ws ${os}_${option_dist}
@@ -963,7 +960,13 @@ elif [ "$os" == "el" -o "$os" == "fedora" ]; then
     fi
     # unlock the publishing
     $rm_file $ws_lockfile
-    popd
+    popd 2>/dev/null || true
+
+    if [ -z "$packed_rpms" ]; then
+        echo "ERROR: Current '$repo' path doesn't have '*.x86_64.rpm *.noarch.rpm *.src.rpm' packages in path"
+        usage
+        exit 1
+    fi
 else
     echo "USAGE: given OS '$os' is not supported, use any single from the list: $alloss"
     usage
