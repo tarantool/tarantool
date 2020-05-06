@@ -93,6 +93,11 @@ variables:
   stage: perf
   tags:
     - docker_perf
+  artifacts:
+    when: always
+    paths:
+      - "*_result.txt"
+      - "*_t_version.txt"
   script:
     - ${GITLAB_MAKE} perf_run
 
