@@ -63,13 +63,12 @@ end
 
 local function check_user_level()
     local uid = os.getenv('UID')
-    local udir = nil
     if uid == 0 or os.getenv("NOTIFY_SOCKET") then
         return nil
     end
     -- local dir configuration
     local pwd = os.getenv('PWD')
-    udir = pwd and pwd .. '/.tarantoolctl'
+    local udir = pwd and pwd .. '/.tarantoolctl'
     udir = udir and fio.stat(udir) and udir or nil
     -- or home dir configuration
     local homedir = os.getenv('HOME')
@@ -789,7 +788,7 @@ end
 local function eval()
     local console_sock_path = uri.parse(console_sock).service
     local filename = arg[3]
-    local code = nil
+    local code
     if filename == nil then
         if stdin_isatty() then
             log.error("Usage:")
@@ -847,7 +846,6 @@ end
 -- xlog / snap file, so even when it stops on LSN >= @a opts.to on
 -- a current file a next file will be processed.
 local function filter_xlog(gen, param, state, opts, cb)
-    local spaces = opts.spaces
     local from, to, spaces = opts.from, opts.to, opts.space
     local show_system, replicas = opts['show-system'], opts.replica
 
@@ -861,7 +859,7 @@ local function filter_xlog(gen, param, state, opts, cb)
         elseif (lsn < from) or (lsn >= to) or
            (not spaces and sid and sid < 512 and not show_system) or
            (spaces and (sid == nil or not find_in_list(sid, spaces))) or
-           (replicas and not find_in_list(rid, replicas)) then
+           (replicas and not find_in_list(rid, replicas)) then -- luacheck: ignore
             -- pass this tuple
         else
             cb(record)
@@ -874,7 +872,7 @@ local function cat()
     local cat_format = opts.format
     local format_cb = cat_formats[cat_format]
     local is_printed = false
-    for id, file in ipairs(positional_arguments) do
+    for _, file in ipairs(positional_arguments) do
         log.error("Processing file '%s'", file)
         local gen, param, state = xlog.pairs(file)
         filter_xlog(gen, param, state, opts, function(record)
@@ -900,7 +898,7 @@ local function play()
     if not remote:wait_connected() then
         error(("Error while connecting to host '%s'"):format(uri))
     end
-    for id, file in ipairs(positional_arguments) do
+    for _, file in ipairs(positional_arguments) do
         log.info(("Processing file '%s'"):format(file))
         local gen, param, state = xlog.pairs(file)
         filter_xlog(gen, param, state, opts, function(record)
@@ -921,22 +919,13 @@ local function play()
     remote:close()
 end
 
-local function find_arg(name_arg)
-    for i, key in ipairs(arg) do
-        if key:find(name_arg) ~= nil then
-            return key
-        end
-    end
-    return nil
-end
-
 local function rocks()
     local cfg = require("luarocks.core.cfg")
     cfg.init()
     local util = require("luarocks.util")
     local command_line = require("luarocks.cmd")
     -- Tweak help messages
-    util.see_help = function(command, program)
+    util.see_help = function(command, program) -- luacheck: no unused args
         -- TODO: print extended help message here
         return "See Tarantool documentation for help."
     end
@@ -1215,7 +1204,7 @@ local function usage_command(name, cmd)
     if type(header) == 'string' then
         header = { header }
     end
-    for no, line in ipairs(header) do
+    for _, line in ipairs(header) do
         log.error("    " .. line, name)
     end
 end
