@@ -2,6 +2,12 @@ import sys
 import os
 import re
 
+# Disabled on OpenBSD due to fail #XXXX.
+import platform
+
+if platform.system() == 'OpenBSD':
+    self.skip = 1
+
 # mask BFD warnings: https://bugs.launchpad.net/tarantool/+bug/1018356
 sys.stdout.push_filter("unable to read unknown load command 0x2\d+", "")
 server.test_option("--help")
