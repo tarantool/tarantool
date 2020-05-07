@@ -95,4 +95,4 @@ RUN if [ -n "${RUN_TESTS}" ]; then \
         /usr/bin/python test-run.py --force; \
     fi
 
-ENTRYPOINT /bin/bash
+ENTRYPOINT ["/bin/bash"]
