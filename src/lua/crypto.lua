@@ -81,7 +81,7 @@ for class, name in pairs({
     sha256 = 'SHA256', sha384 = 'SHA384', sha512 = 'SHA512',
     sha3_224 = 'SHA3-224', sha3_256 = 'SHA3-256', sha3_384 = 'SHA3-384', sha3_512 = 'SHA3-512',
     dss = 'DSS', dss1 = 'DSS1', mdc2 = 'MDC2', ripemd160 = 'RIPEMD160'}) do
-    local digest = ffi.C.EVP_get_digestbyname(class)
+    local digest = ffi.C.EVP_get_digestbyname(name)
     if digest ~= nil then
         digests[class] = digest
     end
