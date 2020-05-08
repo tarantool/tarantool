@@ -117,10 +117,25 @@ local cases = {
         input       = '1, nil, box.NULL, nil',
         expected    = '1, nil, box.NULL, nil',
     }, {
+        name        = 'leading nils, box.NULL, line mode',
+        opts        = {block = false},
+        input       = 'nil, 1, nil, box.NULL, nil',
+        expected    = 'nil, 1, nil, box.NULL, nil',
+    }, {
         name        = 'trailing nils, box.NULL, block mode',
         opts        = {block = true},
         input       = '1, nil, box.NULL, nil',
         expected    = '1, nil, box.NULL, nil',
+    }, {
+        name        = 'ULL constants, multireturn',
+        opts        = {block = false},
+        input       = '-1ULL, -2ULL, 1ULL, 2ULL',
+        expected    = '18446744073709551615, 18446744073709551614, 1, 2',
+    }, {
+        name        = 'ULL key',
+        opts        = {block = false},
+        input       = '{[-1ULL] = 1}',
+        expected    = '{[18446744073709551615] = 1}',
     }, {
         name        = 'empty output',
         input       = '\\set output',
