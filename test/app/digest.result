@@ -46,6 +46,22 @@ digest.sha512()
 ---
 - error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha512(string)'
 ...
+digest.sha3_224()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha3_224(string)'
+...
+digest.sha3_256()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha3_256(string)'
+...
+digest.sha3_384()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha3_384(string)'
+...
+digest.sha3_512()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha3_512(string)'
+...
 digest.md4_hex()
 ---
 - error: 'builtin/digest.lua:<line>"]: Usage: digest.md4_hex(string)'
@@ -73,6 +89,22 @@ digest.sha384_hex()
 digest.sha512_hex()
 ---
 - error: 'builtin/digest.lua:<line>"]: Usage: digest.sha512_hex(string)'
+...
+digest.sha3_224_hex()
+---
+- error: 'builtin/digest.lua:<line>"]: Usage: digest.sha3_224_hex(string)'
+...
+digest.sha3_256_hex()
+---
+- error: 'builtin/digest.lua:<line>"]: Usage: digest.sha3_256_hex(string)'
+...
+digest.sha3_384_hex()
+---
+- error: 'builtin/digest.lua:<line>"]: Usage: digest.sha3_384_hex(string)'
+...
+digest.sha3_512_hex()
+---
+- error: 'builtin/digest.lua:<line>"]: Usage: digest.sha3_512_hex(string)'
 ...
 --
 -- gh-1561: Bad checksum on non-string types
@@ -105,6 +137,22 @@ digest.sha512(12345LL)
 ---
 - error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha512(string)'
 ...
+digest.sha3_224(12345LL)
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha3_224(string)'
+...
+digest.sha3_256(12345LL)
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha3_256(string)'
+...
+digest.sha3_384(12345LL)
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha3_384(string)'
+...
+digest.sha3_512(12345LL)
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha3_512(string)'
+...
 --
 -- Empty string
 --
@@ -136,6 +184,22 @@ digest.sha512('')
 ---
 - !!binary z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==
 ...
+digest.sha3_224('')
+---
+- !!binary a04DQjZn27c7bhVFTw6xq9RZf5obB44/W1prxw==
+...
+digest.sha3_256('')
+---
+- !!binary p//G+L8e12ZRwUdWoGHWYvWA/03kO0n6gtgKS4D4Q0o=
+...
+digest.sha3_384('')
+---
+- !!binary DGOnW4ReT30BEH2FLkwkhcUaUKqqlPxhmV5xu+6YOirDcTgxJkrbR/tr0eBY1fAE
+...
+digest.sha3_512('')
+---
+- !!binary pp9zzKI6msXItWfcGFp1bpfJghZP4lhZ4NHcwUdcgKYVshI68fX5TBHj6UAsOsVY9QAZnZW20+MBdYWGKB3NJg==
+...
 digest.md4_hex('')
 ---
 - 31d6cfe0d16ae931b73c59d7e0c089c0
@@ -163,6 +227,22 @@ digest.sha384_hex('')
 digest.sha512_hex('')
 ---
 - cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e
+...
+digest.sha3_224_hex('')
+---
+- 6b4e03423667dbb73b6e15454f0eb1abd4597f9a1b078e3f5b5a6bc7
+...
+digest.sha3_256_hex('')
+---
+- a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a
+...
+digest.sha3_384_hex('')
+---
+- 0c63a75b845e4f7d01107d852e4c2485c51a50aaaa94fc61995e71bbee983a2ac3713831264adb47fb6bd1e058d5f004
+...
+digest.sha3_512_hex('')
+---
+- a69f73cca23a9ac5c8b567dc185a756e97c982164fe25859e0d1dcc1475c80a615b2123af1f5f94c11e3e9402c3ac558f500199d95b6d3e301758586281dcd26
 ...
 --
 -- Non-empty string
@@ -195,6 +275,22 @@ digest.sha512('tarantool')
 ---
 - !!binary 3YAs+oTeL2V3n8mEVDLy8+GylBX65B0219kFEES9Tku4x7G8+W0Eh3QfGolEtMSJVne7k082Exxpk4Ggf5vNug==
 ...
+digest.sha3_224('tarantool')
+---
+- !!binary yq6XJOGMkAeohQJZQPHAZcl0NRHRaG7+u/TKng==
+...
+digest.sha3_256('tarantool')
+---
+- !!binary 69d8DWVE9E3NDfOyF4i1D2+37/X6vutQL2ecNPXZZHc=
+...
+digest.sha3_384('tarantool')
+---
+- !!binary rwHRhuD6vjTevrKtLsvKNvekzfwo/Zcon9Kj1WUbIfjfY1F7iOKxFbgMtKtxQhFh
+...
+digest.sha3_512('tarantool')
+---
+- !!binary cglFFyb7av5BXTgdQX1upqccjYtdGEfTbaGlJJ6ivUNusqfKYimqGhDfx78YtEAQ7E9utpogS6srhALtBzIZHQ==
+...
 digest.md4_hex('tarantool')
 ---
 - c7eb52e6ded7ce718ee8da48d9de5c49
@@ -222,6 +318,22 @@ digest.sha384_hex('tarantool')
 digest.sha512_hex('tarantool')
 ---
 - dd802cfa84de2f65779fc9845432f2f3e1b29415fae41d36d7d9051044bd4e4bb8c7b1bcf96d0487741f1a8944b4c4895677bb934f36131c699381a07f9bcdba
+...
+digest.sha3_224_hex('tarantool')
+---
+- caae9724e18c9007a885025940f1c065c9743511d1686efebbf4ca9e
+...
+digest.sha3_256_hex('tarantool')
+---
+- ebd77c0d6544f44dcd0df3b21788b50f6fb7eff5fabeeb502f679c34f5d96477
+...
+digest.sha3_384_hex('tarantool')
+---
+- af01d186e0fabe34debeb2ad2ecbca36f7a4cdfc28fd97289fd2a3d5651b21f8df63517b88e2b115b80cb4ab71421161
+...
+digest.sha3_512_hex('tarantool')
+---
+- 7209451726fb6afe415d381d417d6ea6a71c8d8b5d1847d36da1a5249ea2bd436eb2a7ca6229aa1a10dfc7bf18b44010ec4f6eb69a204bab2b8402ed0732191d
 ...
 digest.md5_hex(123)
 ---

@@ -15,6 +15,10 @@ crypto.hmac.sha224()
 crypto.hmac.sha256()
 crypto.hmac.sha384()
 crypto.hmac.sha512()
+crypto.hmac.sha3_224()
+crypto.hmac.sha3_256()
+crypto.hmac.sha3_384()
+crypto.hmac.sha3_512()
 
 crypto.hmac.nodigest
 
@@ -36,6 +40,10 @@ crypto.hmac.sha224(key, message)
 crypto.hmac.sha256(key, message)
 crypto.hmac.sha384(key, message)
 crypto.hmac.sha512(key, message)
+crypto.hmac.sha3_224(key, message)
+crypto.hmac.sha3_256(key, message)
+crypto.hmac.sha3_384(key, message)
+crypto.hmac.sha3_512(key, message)
 
 
 --
