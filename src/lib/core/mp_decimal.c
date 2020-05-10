@@ -70,3 +70,21 @@ mp_encode_decimal(char *data, const decimal_t *dec)
 	data = decimal_pack(data, dec);
 	return data;
 }
+
+int
+mp_snprint_decimal(char *buf, int size, const char **data, uint32_t len)
+{
+	decimal_t d;
+	if (decimal_unpack(data, len, &d) == NULL)
+		return -1;
+	return snprintf(buf, size, "%s", decimal_to_string(&d));
+}
+
+int
+mp_fprint_decimal(FILE *file, const char **data, uint32_t len)
+{
+	decimal_t d;
+	if (decimal_unpack(data, len, &d) == NULL)
+		return -1;
+	return fprintf(file, "%s", decimal_to_string(&d));
+}

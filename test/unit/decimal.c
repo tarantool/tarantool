@@ -254,10 +254,70 @@ test_to_int(void)
 	return check_plan();
 }
 
+static int
+mp_fprint_ext_test(FILE *file, const char **data, int depth)
+{
+	(void)depth;
+	int8_t type;
+	uint32_t len = mp_decode_extl(data, &type);
+	if (type != MP_DECIMAL)
+		return fprintf(file, "undefined");
+	return mp_fprint_decimal(file, data, len);
+}
+
+static int
+mp_snprint_ext_test(char *buf, int size, const char **data, int depth)
+{
+	(void)depth;
+	int8_t type;
+	uint32_t len = mp_decode_extl(data, &type);
+	if (type != MP_DECIMAL)
+		return snprintf(buf, size, "undefined");
+	return mp_snprint_decimal(buf, size, data, len);
+}
+
+static void
+test_mp_print(void)
+{
+	plan(5);
+	header();
+
+	mp_snprint_ext = mp_snprint_ext_test;
+	mp_fprint_ext = mp_fprint_ext_test;
+
+	char buffer[1024];
+	char str[1024];
+	const char *expected = "1.234";
+	const int len = strlen(expected);
+	decimal_t d;
+	decimal_from_string(&d, expected);
+	mp_encode_decimal(buffer, &d);
+	int rc = mp_snprint(NULL, 0, buffer);
+	is(rc, len, "correct mp_snprint size with empty buffer");
+	rc = mp_snprint(str, sizeof(str), buffer);
+	is(rc, len, "correct mp_snprint size");
+	is(strcmp(str, expected), 0, "correct mp_snprint result");
+
+	FILE *f = tmpfile();
+	rc = mp_fprint(f, buffer);
+	is(rc, len, "correct mp_fprint size");
+	rewind(f);
+	rc = fread(str, 1, sizeof(str), f);
+	str[rc] = 0;
+	is(strcmp(str, expected), 0, "correct mp_fprint result");
+	fclose(f);
+
+	mp_snprint_ext = mp_snprint_ext_default;
+	mp_fprint_ext = mp_fprint_ext_default;
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(281);
+	plan(282);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -322,6 +382,7 @@ main(void)
 	test_pack_unpack();
 
 	test_mp_decimal();
+	test_mp_print();
 
 	return check_plan();
 }

@@ -1,4 +1,4 @@
-1..281
+1..282
 ok 1 - decimal(314)
 ok 2 - decimal(271)
 ok 3 - decimal(314) + decimal(271)
@@ -698,3 +698,12 @@ ok 280 - subtests
     ok 197 - decimal_unpack() after mp_decode_extl() value
     ok 198 - decimal_unpack() after mp_decode_extl() len
 ok 281 - subtests
+    1..5
+	*** test_mp_print ***
+    ok 1 - correct mp_snprint size with empty buffer
+    ok 2 - correct mp_snprint size
+    ok 3 - correct mp_snprint result
+    ok 4 - correct mp_fprint size
+    ok 5 - correct mp_fprint result
+	*** test_mp_print: done ***
+ok 282 - subtests

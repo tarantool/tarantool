@@ -63,6 +63,33 @@ mp_decode_decimal(const char **data, decimal_t *dec);
 char *
 mp_encode_decimal(char *data, const decimal_t *dec);
 
+/**
+ * Print decimal's string representation into a given buffer.
+ * @param buf Target buffer to write string to.
+ * @param size Buffer size.
+ * @param data MessagePack encoded decimal, without MP_EXT header.
+ * @param len Length of @a data. If not all data is used, it is
+ *        an error.
+ * @retval <0 Error. Couldn't decode decimal.
+ * @retval >=0 How many bytes were written, or would have been
+ *        written, if there was enough buffer space.
+ */
+int
+mp_snprint_decimal(char *buf, int size, const char **data, uint32_t len);
+
+/**
+ * Print decimal's string representation into a stream.
+ * @param file Target stream to write string to.
+ * @param data MessagePack encoded decimal, without MP_EXT header.
+ * @param len Length of @a data. If not all data is used, it is
+ *        an error.
+ * @retval <0 Error. Couldn't decode decimal, or couldn't write to
+ *        the stream.
+ * @retval >=0 How many bytes were written.
+ */
+int
+mp_fprint_decimal(FILE *file, const char **data, uint32_t len);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
