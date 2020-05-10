@@ -1,4 +1,4 @@
-1..22
+1..23
     1..135
     # *** test_uints ***
     # uint 0U
@@ -2103,6 +2103,15 @@ ok 18 - subtests
     ok 12 - mp_snprint max nesting depth result
     # *** test_mp_print: done ***
 ok 19 - subtests
+    1..5
+    # *** test_mp_print_ext ***
+    ok 1 - mp_snrpint size match
+    ok 2 - str is correct
+    ok 3 - mp_fprint size match
+    ok 4 - mp_fprint written correct number of bytes
+    ok 5 - str is correct
+    # *** test_mp_print_ext: done ***
+ok 20 - subtests
     1..65
     # *** test_mp_check ***
     ok 1 - invalid fixmap 1
@@ -2171,7 +2180,7 @@ ok 19 - subtests
     ok 64 - invalid map32 2
     ok 65 - invalid map32 3
     # *** test_mp_check: done ***
-ok 20 - subtests
+ok 21 - subtests
     1..96
     # *** test_numbers ***
     ok 1 - mp_read_int32(mp_encode_uint(123)) check success
@@ -2271,7 +2280,7 @@ ok 20 - subtests
     ok 95 - mp_read_double(mp_encode_strl(100)) check fail
     ok 96 - mp_read_double(mp_encode_strl(100)) check pos unchanged
     # *** test_numbers: done ***
-ok 21 - subtests
+ok 22 - subtests
     1..4
     # *** test_overflow ***
     ok 1 - mp_check array overflow
@@ -2279,4 +2288,4 @@ ok 21 - subtests
     ok 3 - mp_check str overflow
     ok 4 - mp_check bin overflow
     # *** test_overflow: done ***
-ok 22 - subtests
+ok 23 - subtests
