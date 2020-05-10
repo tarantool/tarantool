@@ -33,7 +33,10 @@
 #include "fiber.h"
 #include "memory.h"
 #include "msgpuck.h"
+#include "mp_extension_types.h"
 #include "tt_static.h"
+#include "small/ibuf.h"
+#include "mpstream/mpstream.h"
 
 #include "box/error.h"
 #include "box/mp_error.h"
@@ -452,11 +455,275 @@ test_unknown_additional_fields()
 	footer();
 }
 
+static int
+mp_fprint_ext_test(FILE *file, const char **data, int depth)
+{
+	int8_t type;
+	mp_decode_extl(data, &type);
+	if (type != MP_ERROR)
+		return fprintf(file, "undefined");
+	return mp_fprint_error(file, data, depth);
+}
+
+static int
+mp_snprint_ext_test(char *buf, int size, const char **data, int depth)
+{
+	int8_t type;
+	mp_decode_extl(data, &type);
+	if (type != MP_ERROR)
+		return snprintf(buf, size, "undefined");
+	return mp_snprint_error(buf, size, data, depth);
+}
+
+static void
+test_mp_print_check_str(int depth, const char *str, int len,
+			const char *expected, const char *method)
+{
+	is(len, (int) strlen(str), "%s depth %d correct returned value", method,
+	   depth);
+	int expected_len = strlen(expected);
+	is(len, depth * 2 + expected_len, "%s depth %d correct length", method,
+	   depth);
+	bool is_error = false;
+	/*
+	 * Deep encoding is simulated with a number of nested
+	 * arrays. In string representation they look like:
+	 *
+	 *   [[[[[[[ ... object ... ]]]]]]]
+	 *
+	 */
+	for (int i = 0; i < depth && !is_error; ++i)
+		is_error = str[i] != '[' || str[len - 1 - i] != ']';
+	ok(!is_error, "%s depth %d correct prefix and suffix", method, depth);
+	str += depth;
+	is(strncmp(str, expected, expected_len), 0, "%s depth %d correct "
+	   "object in the middle", method, depth);
+}
+
+static void
+mpstream_error_test(void *ctx)
+{
+	*((bool *)ctx) = true;
+}
+
+static void
+test_mp_print_encode_error(struct ibuf *buf, struct error *e, int depth)
+{
+	struct mpstream stream;
+	bool is_error = false;
+	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb,
+		      mpstream_error_test, &is_error);
+	for (int i = 0; i < depth; ++i)
+		mpstream_encode_array(&stream, 1);
+	error_to_mpstream(e, &stream);
+	mpstream_flush(&stream);
+	fail_if(is_error);
+}
+
+static void
+test_mp_print_check(const char *data, int depth, const char *expected)
+{
+	char str[2048];
+	int rc = mp_snprint(str, sizeof(str), data);
+	test_mp_print_check_str(depth, str, rc, expected, "mp_snprint");
+	int rc2 = mp_snprint(NULL, 0, data);
+	is(rc, rc2, "mp_snprint depth %d correct with NULL buffer", depth);
+
+	FILE *f = tmpfile();
+	rc = mp_fprint(f, data);
+	rewind(f);
+	rc2 = fread(str, 1, TT_STATIC_BUF_LEN, f);
+	is(rc, rc2, "mp_fprint depth %d result and the actual file size "
+	   "are equal", depth);
+	str[rc] = 0;
+	fclose(f);
+	test_mp_print_check_str(depth, str, rc, expected, "mp_fprint");
+}
+
+static void
+test_mp_print(void)
+{
+	header();
+	plan(60);
+
+	mp_snprint_ext = mp_snprint_ext_test;
+	mp_fprint_ext = mp_fprint_ext_test;
+
+	struct error *e1 = BuildClientError("file1", 1, 0);
+	error_ref(e1);
+	struct error *e2 = BuildCustomError("file2", 4, "type", 5);
+	struct error *e3 = BuildAccessDeniedError("file3", 6, "field1",
+						  "field2", "field3", "field4");
+	error_set_prev(e1, e2);
+	error_set_prev(e2, e3);
+
+	struct ibuf buf;
+	ibuf_create(&buf, &cord()->slabc, 1024);
+
+	note("zero depth, normal error");
+	int depth = 0;
+	const char *expected = "{"
+		"\"stack\": ["
+			"{"
+				"\"type\": \"ClientError\", "
+				"\"line\": 1, "
+				"\"file\": \"file1\", "
+				"\"message\": \"Unknown error\", "
+				"\"errno\": 0, "
+				"\"code\": 0"
+			"}, "
+			"{"
+				"\"type\": \"CustomError\", "
+				"\"line\": 4, "
+				"\"file\": \"file2\", "
+				"\"message\": \"\", "
+				"\"errno\": 0, "
+				"\"code\": 5, "
+				"\"fields\": {"
+					"\"custom_type\": \"type\""
+				"}"
+			"}, "
+			"{"
+				"\"type\": \"AccessDeniedError\", "
+				"\"line\": 6, "
+				"\"file\": \"file3\", "
+				"\"message\": \"field1 access to field2 "
+					"'field3' is denied for user "
+					"'field4'\", "
+				"\"errno\": 0, "
+				"\"code\": 42, "
+				"\"fields\": {"
+					"\"object_type\": \"field2\", "
+					"\"object_name\": \"field3\", "
+					"\"access_type\": \"field1\""
+				"}"
+			"}"
+		"]"
+	"}";
+	test_mp_print_encode_error(&buf, e1, depth);
+	test_mp_print_check(buf.rpos, depth, expected);
+	ibuf_reset(&buf);
+
+	note("max depth, all is truncated");
+	depth = MP_PRINT_MAX_DEPTH;
+	expected = "{...}";
+	test_mp_print_encode_error(&buf, e1, depth);
+	test_mp_print_check(buf.rpos, depth, expected);
+	ibuf_reset(&buf);
+
+	note("max depth - 1, top level of keys is visible");
+	depth = MP_PRINT_MAX_DEPTH - 1;
+	expected = "{\"stack\": [...]}";
+	test_mp_print_encode_error(&buf, e1, depth);
+	test_mp_print_check(buf.rpos, depth, expected);
+	ibuf_reset(&buf);
+
+	note("max depth - 2, top level of keys and error count are visible");
+	depth = MP_PRINT_MAX_DEPTH - 2;
+	expected = "{\"stack\": [{...}, {...}, {...}]}";
+	test_mp_print_encode_error(&buf, e1, depth);
+	test_mp_print_check(buf.rpos, depth, expected);
+	ibuf_reset(&buf);
+
+	note("max depth - 3, all except additional fields is visible");
+	depth = MP_PRINT_MAX_DEPTH - 3;
+	expected = "{"
+		"\"stack\": ["
+			"{"
+				"\"type\": \"ClientError\", "
+				"\"line\": 1, "
+				"\"file\": \"file1\", "
+				"\"message\": \"Unknown error\", "
+				"\"errno\": 0, "
+				"\"code\": 0"
+			"}, "
+			"{"
+				"\"type\": \"CustomError\", "
+				"\"line\": 4, "
+				"\"file\": \"file2\", "
+				"\"message\": \"\", "
+				"\"errno\": 0, "
+				"\"code\": 5, "
+				"\"fields\": {...}"
+			"}, "
+			"{"
+				"\"type\": \"AccessDeniedError\", "
+				"\"line\": 6, "
+				"\"file\": \"file3\", "
+				"\"message\": \"field1 access to field2 "
+					"'field3' is denied for user "
+					"'field4'\", "
+				"\"errno\": 0, "
+				"\"code\": 42, "
+				"\"fields\": {...}"
+			"}"
+		"]"
+	"}";
+	test_mp_print_encode_error(&buf, e1, depth);
+	test_mp_print_check(buf.rpos, depth, expected);
+	ibuf_reset(&buf);
+
+	note("zero depth, error with unknown fields");
+	ibuf_reserve(&buf, 2048);
+	char *begin = buf.rpos + 10;
+	char *data = mp_encode_map(begin, 2);
+	data = mp_encode_uint(data, 4096);
+	data = mp_encode_double(data, 1.234);
+	data = mp_encode_uint(data, MP_ERROR_STACK);
+	data = mp_encode_array(data, 1);
+	struct mp_test_error err;
+	memset(&err, 0, sizeof(err));
+	err.code = 42;
+	err.line = 3;
+	err.saved_errno = 4;
+	err.type = "AccessDeniedError";
+	err.file = "File";
+	err.message = "Message";
+	err.ad_object_type = "ObjectType";
+	err.ad_object_name = "ObjectName";
+	err.ad_access_type = "AccessType";
+	err.unknown_uint_field = 300;
+	err.unknown_str_field = "unknown_field";
+	data = mp_encode_mp_error(&err, data);
+	uint32_t size = data - begin;
+	begin -= mp_sizeof_extl(size);
+	mp_encode_extl(begin, MP_ERROR, size);
+	expected = "{"
+		"4096: 1.234, "
+		"\"stack\": ["
+			"{"
+				"\"type\": \"AccessDeniedError\", "
+				"\"file\": \"File\", "
+				"\"line\": 3, "
+				"\"message\": \"Message\", "
+				"\"errno\": 4, "
+				"\"code\": 42, "
+				"18446744073709551615: 300, "
+				"\"fields\": {"
+					"\"object_type\": \"ObjectType\", "
+					"\"object_name\": \"ObjectName\", "
+					"\"access_type\": \"AccessType\", "
+					"\"unknown_field\": \"unknown_field\""
+				"}"
+			"}"
+		"]"
+	"}";
+	test_mp_print_check(begin, 0, expected);
+
+	error_unref(e1);
+	ibuf_destroy(&buf);
+	mp_snprint_ext = mp_snprint_ext_default;
+	mp_fprint_ext = mp_fprint_ext_default;
+
+	check_plan();
+	footer();
+}
+
 int
 main(void)
 {
 	header();
-	plan(5);
+	plan(6);
 	memory_init();
 	fiber_init(fiber_c_invoke);
 
@@ -465,6 +732,7 @@ main(void)
 	test_fail_not_enough_fields();
 	test_unknown_fields();
 	test_unknown_additional_fields();
+	test_mp_print();
 
 	fiber_free();
 	memory_free();

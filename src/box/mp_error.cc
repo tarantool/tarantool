@@ -28,6 +28,13 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/**
+ * When this macros is defined, it means the file included self in
+ * order to customize some templates. Skip everything except them
+ * then.
+ */
+#ifndef MP_ERROR_PRINT_DEFINITION
+
 #include "box/mp_error.h"
 #include "box/error.h"
 #include "mpstream/mpstream.h"
@@ -86,7 +93,8 @@ enum {
 	 * Type-specific fields stored as a map
 	 * {string key = value}.
 	 */
-	MP_ERROR_FIELDS = 0x06
+	MP_ERROR_FIELDS = 0x06,
+	MP_ERROR_MAX,
 };
 
 /**
@@ -552,3 +560,186 @@ error_unpack_unsafe(const char **data)
 	}
 	return err;
 }
+
+static const char *const mp_error_field_to_json_key[MP_ERROR_MAX] = {
+	[MP_ERROR_TYPE] =	"\"type\": ",
+	[MP_ERROR_FILE] =	"\"file\": ",
+	[MP_ERROR_LINE] =	"\"line\": ",
+	[MP_ERROR_MESSAGE] =	"\"message\": ",
+	[MP_ERROR_ERRNO] =	"\"errno\": ",
+	[MP_ERROR_CODE] =	"\"code\": ",
+	[MP_ERROR_FIELDS] =	"\"fields\": ",
+};
+
+/**
+ * Include this file into self with a few template parameters
+ * to create mp_snprint_error() and mp_fprint_error() functions
+ * and their helpers from a printer template.
+ */
+#define MP_ERROR_PRINT_DEFINITION
+#define MP_PRINT_FUNC snprintf
+#define MP_PRINT_SUFFIX snprint
+#define MP_PRINT_2(total, func, ...)						\
+	SNPRINT(total, func, buf, size, __VA_ARGS__)
+#define MP_PRINT_ARGS_DECL char *buf, int size
+#include __FILE__
+
+#define MP_ERROR_PRINT_DEFINITION
+#define MP_PRINT_FUNC fprintf
+#define MP_PRINT_SUFFIX fprint
+#define MP_PRINT_2(total, func, ...) do {							\
+	int bytes = func(file, __VA_ARGS__);					\
+	if (bytes < 0)								\
+		return -1;							\
+	total += bytes;								\
+} while (0)
+#define MP_PRINT_ARGS_DECL FILE *file
+#include __FILE__
+
+/* !defined(MP_ERROR_PRINT_DEFINITION) */
+#else
+/* defined(MP_ERROR_PRINT_DEFINITION) */
+
+/**
+ * MP_ERROR extension string serializer.
+ * There are two applications for string serialization - into a
+ * buffer, and into a file. Structure of both is exactly the same
+ * except for the copying/writing itself. To avoid code
+ * duplication the code is templated and expects some macros to do
+ * the actual output.
+ *
+ * Templates are defined similarly to the usual C trick, when all
+ * the code is in one file and relies on some external macros to
+ * define customizable types, functions, parameters. Then other
+ * code can include this file with the macros defined. Even
+ * multiple times, in case structure and function names also are
+ * customizable.
+ *
+ * The tricky thing here is that the templates are defined in the
+ * same file, which needs them. So the file needs to include
+ * *self* with a few macros defined beforehand. That allows to
+ * hide this template from any external access, use mp_error
+ * internal functions, and keep all the code in one place without
+ * necessity to split it into different files just to be able to
+ * turn it into a template.
+ */
+
+#define MP_CONCAT4_R(a, b, c, d)	a##b##c##d
+#define MP_CONCAT4(a, b, c, d)		MP_CONCAT4_R(a, b, c, d)
+#define MP_PRINT(total, ...)		MP_PRINT_2(total, MP_PRINT_FUNC,	\
+						   __VA_ARGS__)
+
+#define mp_func_name(name)	MP_CONCAT4(mp_, MP_PRINT_SUFFIX, _, name)
+#define mp_print_error_one	mp_func_name(error_one)
+#define mp_print_error_stack	mp_func_name(error_stack)
+#define mp_print_error		mp_func_name(error)
+#define mp_print_common		mp_func_name(recursion)
+
+static int
+mp_print_error_one(MP_PRINT_ARGS_DECL, const char **data, int depth)
+{
+	int total = 0;
+	MP_PRINT(total, "{");
+	if (depth <= 0) {
+		MP_PRINT(total, "...}");
+		return total;
+	}
+	--depth;
+	if (mp_typeof(**data) != MP_MAP)
+		return -1;
+	uint32_t map_size = mp_decode_map(data);
+	for (uint32_t i = 0; i < map_size; ++i) {
+		if (i != 0)
+			MP_PRINT(total, ", ");
+		if (mp_typeof(**data) != MP_UINT)
+			return -1;
+		uint64_t key = mp_decode_uint(data);
+		if (key < MP_ERROR_MAX)
+			MP_PRINT(total, "%s", mp_error_field_to_json_key[key]);
+		else
+			MP_PRINT(total, "%llu: ", (unsigned long long)key);
+		MP_PRINT_2(total, mp_print_common, data, depth);
+	}
+	MP_PRINT(total, "}");
+	return total;
+}
+
+static int
+mp_print_error_stack(MP_PRINT_ARGS_DECL, const char **data, int depth)
+{
+	int total = 0;
+	MP_PRINT(total, "[");
+	if (depth <= 0) {
+		MP_PRINT(total, "...]");
+		return total;
+	}
+	--depth;
+	if (mp_typeof(**data) != MP_ARRAY)
+		return -1;
+	uint32_t arr_size = mp_decode_array(data);
+	for (uint32_t i = 0; i < arr_size; ++i) {
+		if (i != 0)
+			MP_PRINT(total, ", ");
+		MP_PRINT_2(total, mp_print_error_one, data, depth);
+	}
+	MP_PRINT(total, "]");
+	return total;
+}
+
+/**
+ * The main printer template. Depending on template parameters it
+ * is turned into mp_snprint_error() with snprintf() semantics or
+ * into mp_fprint_error() with fprintf() semantics.
+ */
+int
+mp_print_error(MP_PRINT_ARGS_DECL, const char **data, int depth)
+{
+	int total = 0;
+	MP_PRINT(total, "{");
+	if (depth <= 0) {
+		MP_PRINT(total, "...}");
+		return total;
+	}
+	--depth;
+	if (mp_typeof(**data) != MP_MAP)
+		return -1;
+	uint32_t map_size = mp_decode_map(data);
+	for (uint32_t i = 0; i < map_size; ++i) {
+		if (i != 0)
+			MP_PRINT(total, ", ");
+		if (mp_typeof(**data) != MP_UINT)
+			return -1;
+		uint64_t key = mp_decode_uint(data);
+		switch(key) {
+		case MP_ERROR_STACK: {
+			MP_PRINT(total, "\"stack\": ");
+			MP_PRINT_2(total, mp_print_error_stack, data, depth);
+			break;
+		}
+		default:
+			MP_PRINT(total, "%llu: ", (unsigned long long)key);
+			MP_PRINT_2(total, mp_print_common, data, depth);
+			break;
+		}
+	}
+	MP_PRINT(total, "}");
+	return total;
+}
+
+#undef MP_PRINT
+#undef MP_CONCAT4_R
+#undef MP_CONCAT4
+
+#undef mp_func_name
+#undef mp_print_error_one
+#undef mp_print_error_stack
+#undef mp_print_error
+#undef mp_print_common
+
+#undef MP_ERROR_PRINT_DEFINITION
+#undef MP_PRINT_FUNC
+#undef MP_PRINT_SUFFIX
+#undef MP_PRINT_2
+#undef MP_PRINT_ARGS_DECL
+
+#endif /* defined(MP_ERROR_PRINT_DEFINITION) */
