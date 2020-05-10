@@ -164,11 +164,6 @@ rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
 
 %check
 %if (0%{?fedora} >= 22 || 0%{?rhel} >= 7)
-# https://github.com/tarantool/tarantool/issues/1227
-echo "self.skip = True" > ./test/app/socket.skipcond
-# https://github.com/tarantool/tarantool/issues/1322
-echo "self.skip = True" > ./test/app/digest.skipcond
-# run a safe subset of the test suite
 cd test && ./test-run.py --force -j 1 unit/ app/ app-tap/ box/ box-tap/ engine/ vinyl/
 %endif
 
