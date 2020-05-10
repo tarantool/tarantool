@@ -95,3 +95,21 @@ mp_encode_uuid(char *data, const struct tt_uuid *uuid)
 	data = mp_encode_extl(data, MP_UUID, UUID_PACKED_LEN);
 	return uuid_pack(data, uuid);
 }
+
+int
+mp_snprint_uuid(char *buf, int size, const char **data, uint32_t len)
+{
+	struct tt_uuid uuid;
+	if (uuid_unpack(data, len, &uuid) == NULL)
+		return -1;
+	return snprintf(buf, size, "%s", tt_uuid_str(&uuid));
+}
+
+int
+mp_fprint_uuid(FILE *file, const char **data, uint32_t len)
+{
+	struct tt_uuid uuid;
+	if (uuid_unpack(data, len, &uuid) == NULL)
+		return -1;
+	return fprintf(file, "%s", tt_uuid_str(&uuid));
+}

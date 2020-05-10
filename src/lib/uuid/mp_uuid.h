@@ -85,6 +85,33 @@ mp_decode_uuid(const char **data, struct tt_uuid *uuid);
 char *
 mp_encode_uuid(char *data, const struct tt_uuid *uuid);
 
+/**
+ * Print uuid's string representation into a given buffer.
+ * @param buf Target buffer to write string to.
+ * @param size Buffer size.
+ * @param data MessagePack encoded uuid, without MP_EXT header.
+ * @param len Length of @a data. If not all data is used, it is
+ *        an error.
+ * @retval <0 Error. Couldn't decode uuid.
+ * @retval >=0 How many bytes were written, or would have been
+ *        written, if there was enough buffer space.
+ */
+int
+mp_snprint_uuid(char *buf, int size, const char **data, uint32_t len);
+
+/**
+ * Print uuid's string representation into a stream.
+ * @param file Target stream to write string to.
+ * @param data MessagePack encoded uuid, without MP_EXT header.
+ * @param len Length of @a data. If not all data is used, it is
+ *        an error.
+ * @retval <0 Error. Couldn't decode uuid, or couldn't write to
+ *        the stream.
+ * @retval >=0 How many bytes were written.
+ */
+int
+mp_fprint_uuid(FILE *file, const char **data, uint32_t len);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
