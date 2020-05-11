@@ -71,6 +71,7 @@ add_library(xlog STATIC xlog.c)
 target_link_libraries(xlog core box_error crc32 ${ZSTD_LIBRARIES})
 
 add_library(box STATIC
+    msgpack.c
     iproto.cc
     xrow_io.cc
     tuple_convert.c
