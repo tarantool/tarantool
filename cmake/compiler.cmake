@@ -276,11 +276,17 @@ macro(enable_tnt_compile_flags)
         add_compile_flags("C;CXX" "-Wno-format-truncation")
     endif()
 
-    if (CMAKE_COMPILER_IS_GNUCXX)
+    if (CMAKE_COMPILER_IS_CLANG OR CMAKE_COMPILER_IS_GNUCXX)
         # G++ bug. http://gcc.gnu.org/bugzilla/show_bug.cgi?id=31488
+        # Also offsetof() is widely used in Tarantool source code
+        # for classes and structs to implement intrusive lists and
+        # some other data structures. G++ and clang++ both
+        # complain about classes, having a virtual table. They
+        # complain fair, but this can't be fixed for now.
         add_compile_flags("CXX"
             "-Wno-invalid-offsetof"
         )
+        add_compile_flags("C;CXX" "-Wno-gnu-alignof-expression")
     endif()
 
     if (CMAKE_COMPILER_IS_GNUCC)
