@@ -23,6 +23,7 @@ find_program(CAT cat)
 find_program(GIT git)
 find_program(LD ld)
 find_program(CTAGS ctags)
+find_program(LUACHECK luacheck ENV PATH)
 
 # Define PACKAGE macro in tarantool/config.h
 set(PACKAGE "Tarantool" CACHE STRING "Package name.")
@@ -150,6 +151,16 @@ list(APPEND tagsExclude "--exclude=patches/*")
 add_custom_target(tags COMMAND ${CTAGS} -R ${tagsExclude} -f tags
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_custom_target(ctags DEPENDS tags)
+
+#
+# Enable 'make luacheck' target.
+#
+
+add_custom_target(luacheck)
+add_custom_command(TARGET luacheck
+    COMMAND ${LUACHECK} --codes --config "${PROJECT_SOURCE_DIR}/.luacheckrc" "${PROJECT_SOURCE_DIR}"
+    COMMENT "Perform static analysis of Lua code"
+)
 
 #
 # Get version
