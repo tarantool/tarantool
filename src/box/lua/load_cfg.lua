@@ -538,6 +538,11 @@ local box_cfg_guard_whitelist = {
     NULL = true;
 };
 
+-- List of box members that requires full box loading.
+local box_restore_after_full_load_list = {
+    execute = true,
+}
+
 local box = require('box')
 -- Move all box members except the whitelisted to box_configured
 local box_configured = {}
@@ -585,12 +590,13 @@ local function load_cfg(cfg)
     -- It also would be counter-intuitive to receive an error from
     -- box.cfg({<...>}), but find that box is actually configured.
 
-    -- Restore box members after initial configuration
+    -- Restore box members after initial configuration.
     for k, v in pairs(box_configured) do
-        box[k] = v
+        if not box_restore_after_full_load_list[k] then
+            box[k] = v
+        end
     end
     setmetatable(box, nil)
-    box_configured = nil
     box.cfg = setmetatable(cfg,
         {
             __newindex = function(table, index)
@@ -624,6 +630,14 @@ local function load_cfg(cfg)
        not box.error.injection.get('ERRINJ_AUTO_UPGRADE') then
         box.schema.upgrade{auto = true}
     end
+
+    -- Restore box members that requires full box loading.
+    for k, v in pairs(box_configured) do
+        if box_restore_after_full_load_list[k] then
+            box[k] = v
+        end
+    end
+    box_configured = nil
 
     box_is_configured = true
 end
