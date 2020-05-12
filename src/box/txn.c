@@ -54,11 +54,11 @@ static int
 txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 {
 	/* Create a redo log row. */
+	int size;
 	struct xrow_header *row;
-	row = region_alloc_object(&txn->region, struct xrow_header);
+	row = region_alloc_object(&txn->region, struct xrow_header, &size);
 	if (row == NULL) {
-		diag_set(OutOfMemory, sizeof(*row),
-			 "region", "struct xrow_header");
+		diag_set(OutOfMemory, size, "region_alloc_object", "row");
 		return -1;
 	}
 	if (request->header != NULL) {
@@ -91,11 +91,11 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 static struct txn_stmt *
 txn_stmt_new(struct region *region)
 {
+	int size;
 	struct txn_stmt *stmt;
-	stmt = region_alloc_object(region, struct txn_stmt);
+	stmt = region_alloc_object(region, struct txn_stmt, &size);
 	if (stmt == NULL) {
-		diag_set(OutOfMemory, sizeof(*stmt),
-			 "region", "struct txn_stmt");
+		diag_set(OutOfMemory, size, "region_alloc_object", "stmt");
 		return NULL;
 	}
 
@@ -178,9 +178,10 @@ txn_new()
 	region_create(&region, &cord()->slabc);
 
 	/* Place txn structure on the region. */
-	struct txn *txn = region_alloc_object(&region, struct txn);
+	int size;
+	struct txn *txn = region_alloc_object(&region, struct txn, &size);
 	if (txn == NULL) {
-		diag_set(OutOfMemory, sizeof(*txn), "region", "struct txn");
+		diag_set(OutOfMemory, size, "region_alloc_object", "txn");
 		return NULL;
 	}
 	assert(region_used(&region) == sizeof(*txn));

@@ -102,9 +102,12 @@ static inline struct vy_write_history *
 vy_write_history_new(struct vy_entry entry, struct vy_write_history *next)
 {
 	struct vy_write_history *h;
-	h = region_alloc_object(&fiber()->gc, struct vy_write_history);
-	if (h == NULL)
+	int size;
+	h = region_alloc_object(&fiber()->gc, struct vy_write_history, &size);
+	if (h == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc_object", "h");
 		return NULL;
+	}
 	h->entry = entry;
 	assert(next == NULL || (next->entry.stmt != NULL &&
 	       vy_stmt_lsn(next->entry.stmt) > vy_stmt_lsn(entry.stmt)));
