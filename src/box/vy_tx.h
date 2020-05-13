@@ -54,7 +54,7 @@ extern "C" {
 
 struct space;
 struct tuple;
-struct tx_manager;
+struct vy_tx_manager;
 struct vy_mem;
 struct vy_tx;
 struct vy_history;
@@ -140,16 +140,16 @@ write_set_search_key(write_set_t *tree, struct vy_lsm *lsm,
 
 /** Transaction object. */
 struct vy_tx {
-	/** Link in tx_manager::writers. */
+	/** Link in vy_tx_manager::writers. */
 	struct rlist in_writers;
 	/** Transaction manager. */
-	struct tx_manager *xm;
+	struct vy_tx_manager *xm;
 	/**
 	 * Pointer to the space affected by the last prepared statement.
 	 * We need it so that we can abort a transaction on DDL even
 	 * if it hasn't inserted anything into the write set yet (e.g.
 	 * yielded on unique check) and therefore would otherwise be
-	 * ignored by tx_manager_abort_writers_for_ddl().
+	 * ignored by vy_tx_manager_abort_writers_for_ddl().
 	 */
 	struct space *last_stmt_space;
 	/**
@@ -209,7 +209,7 @@ vy_tx_read_view(struct vy_tx *tx)
 }
 
 /** Transaction manager object. */
-struct tx_manager {
+struct vy_tx_manager {
 	/**
 	 * The last committed log sequence number known to
 	 * vinyl. Updated in vy_commit().
@@ -278,24 +278,25 @@ struct tx_manager {
 };
 
 /** Allocate a tx manager object. */
-struct tx_manager *
-tx_manager_new(void);
+struct vy_tx_manager *
+vy_tx_manager_new(void);
 
 /** Delete a tx manager object. */
 void
-tx_manager_delete(struct tx_manager *xm);
+vy_tx_manager_delete(struct vy_tx_manager *xm);
 
 /** Return total amount of memory used by active transactions. */
 size_t
-tx_manager_mem_used(struct tx_manager *xm);
+vy_tx_manager_mem_used(struct vy_tx_manager *xm);
 
 /** Create or reuse an instance of a read view. */
 struct vy_read_view *
-tx_manager_read_view(struct tx_manager *xm);
+vy_tx_manager_read_view(struct vy_tx_manager *xm);
 
 /** Dereference and possibly destroy a read view. */
 void
-tx_manager_destroy_read_view(struct tx_manager *xm, struct vy_read_view *rv);
+vy_tx_manager_destroy_read_view(struct vy_tx_manager *xm,
+                                struct vy_read_view *rv);
 
 /**
  * Abort all rw transactions that affect the given space
@@ -307,19 +308,19 @@ tx_manager_destroy_read_view(struct tx_manager *xm, struct vy_read_view *rv);
  * to call wal_sync() to flush them.
  */
 void
-tx_manager_abort_writers_for_ddl(struct tx_manager *xm, struct space *space,
-				 bool *need_wal_sync);
+vy_tx_manager_abort_writers_for_ddl(struct vy_tx_manager *xm,
+                                    struct space *space, bool *need_wal_sync);
 
 /**
  * Abort all local rw transactions that haven't reached WAL yet.
  * Called before switching to read-only mode.
  */
 void
-tx_manager_abort_writers_for_ro(struct tx_manager *xm);
+vy_tx_manager_abort_writers_for_ro(struct vy_tx_manager *xm);
 
 /** Initialize a tx object. */
 void
-vy_tx_create(struct tx_manager *xm, struct vy_tx *tx);
+vy_tx_create(struct vy_tx_manager *xm, struct vy_tx *tx);
 
 /** Destroy a tx object. */
 void
@@ -327,7 +328,7 @@ vy_tx_destroy(struct vy_tx *tx);
 
 /** Begin a new transaction. */
 struct vy_tx *
-vy_tx_begin(struct tx_manager *xm);
+vy_tx_begin(struct vy_tx_manager *xm);
 
 /** Prepare a transaction to be committed. */
 int

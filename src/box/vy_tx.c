@@ -98,13 +98,13 @@ vy_global_read_view_create(struct vy_read_view *rv, int64_t lsn)
 	rv->refs = 0;
 }
 
-struct tx_manager *
-tx_manager_new(void)
+struct vy_tx_manager *
+vy_tx_manager_new(void)
 {
-	struct tx_manager *xm = calloc(1, sizeof(*xm));
+	struct vy_tx_manager *xm = calloc(1, sizeof(*xm));
 	if (xm == NULL) {
 		diag_set(OutOfMemory, sizeof(*xm),
-			 "malloc", "struct tx_manager");
+			 "malloc", "struct vy_tx_manager");
 		return NULL;
 	}
 
@@ -128,7 +128,7 @@ tx_manager_new(void)
 }
 
 void
-tx_manager_delete(struct tx_manager *xm)
+vy_tx_manager_delete(struct vy_tx_manager *xm)
 {
 	mempool_destroy(&xm->read_view_mempool);
 	mempool_destroy(&xm->read_interval_mempool);
@@ -138,7 +138,7 @@ tx_manager_delete(struct tx_manager *xm)
 }
 
 size_t
-tx_manager_mem_used(struct tx_manager *xm)
+vy_tx_manager_mem_used(struct vy_tx_manager *xm)
 {
 	struct mempool_stats mstats;
 	size_t ret = 0;
@@ -157,7 +157,7 @@ tx_manager_mem_used(struct tx_manager *xm)
 }
 
 struct vy_read_view *
-tx_manager_read_view(struct tx_manager *xm)
+vy_tx_manager_read_view(struct vy_tx_manager *xm)
 {
 	struct vy_read_view *rv;
 	/*
@@ -195,7 +195,8 @@ tx_manager_read_view(struct tx_manager *xm)
 }
 
 void
-tx_manager_destroy_read_view(struct tx_manager *xm, struct vy_read_view *rv)
+vy_tx_manager_destroy_read_view(struct vy_tx_manager *xm,
+                                struct vy_read_view *rv)
 {
 	if (rv == xm->p_global_read_view)
 		return;
@@ -209,7 +210,7 @@ tx_manager_destroy_read_view(struct tx_manager *xm, struct vy_read_view *rv)
 static struct txv *
 txv_new(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 {
-	struct tx_manager *xm = tx->xm;
+	struct vy_tx_manager *xm = tx->xm;
 	struct txv *v = mempool_alloc(&xm->txv_mempool);
 	if (v == NULL) {
 		diag_set(OutOfMemory, sizeof(*v), "mempool", "struct txv");
@@ -234,7 +235,7 @@ txv_new(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 static void
 txv_delete(struct txv *v)
 {
-	struct tx_manager *xm = v->tx->xm;
+	struct vy_tx_manager *xm = v->tx->xm;
 	xm->write_set_size -= tuple_size(v->entry.stmt);
 	vy_stmt_counter_unacct_tuple(&v->lsm->stat.txw.count, v->entry.stmt);
 	tuple_unref(v->entry.stmt);
@@ -248,7 +249,7 @@ txv_delete(struct txv *v)
 static void
 vy_read_interval_acct(struct vy_read_interval *interval)
 {
-	struct tx_manager *xm = interval->tx->xm;
+	struct vy_tx_manager *xm = interval->tx->xm;
 	xm->read_set_size += tuple_size(interval->left.stmt);
 	if (interval->left.stmt != interval->right.stmt)
 		xm->read_set_size += tuple_size(interval->right.stmt);
@@ -260,7 +261,7 @@ vy_read_interval_acct(struct vy_read_interval *interval)
 static void
 vy_read_interval_unacct(struct vy_read_interval *interval)
 {
-	struct tx_manager *xm = interval->tx->xm;
+	struct vy_tx_manager *xm = interval->tx->xm;
 	xm->read_set_size -= tuple_size(interval->left.stmt);
 	if (interval->left.stmt != interval->right.stmt)
 		xm->read_set_size -= tuple_size(interval->right.stmt);
@@ -271,7 +272,7 @@ vy_read_interval_new(struct vy_tx *tx, struct vy_lsm *lsm,
 		     struct vy_entry left, bool left_belongs,
 		     struct vy_entry right, bool right_belongs)
 {
-	struct tx_manager *xm = tx->xm;
+	struct vy_tx_manager *xm = tx->xm;
 	struct vy_read_interval *interval;
 	interval = mempool_alloc(&xm->read_interval_mempool);
 	if (interval == NULL) {
@@ -296,7 +297,7 @@ vy_read_interval_new(struct vy_tx *tx, struct vy_lsm *lsm,
 static void
 vy_read_interval_delete(struct vy_read_interval *interval)
 {
-	struct tx_manager *xm = interval->tx->xm;
+	struct vy_tx_manager *xm = interval->tx->xm;
 	vy_read_interval_unacct(interval);
 	vy_lsm_unref(interval->lsm);
 	tuple_unref(interval->left.stmt);
@@ -316,7 +317,7 @@ vy_tx_read_set_free_cb(vy_tx_read_set_t *read_set,
 }
 
 void
-vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
+vy_tx_create(struct vy_tx_manager *xm, struct vy_tx *tx)
 {
 	tx->last_stmt_space = NULL;
 	stailq_create(&tx->log);
@@ -339,7 +340,7 @@ vy_tx_destroy(struct vy_tx *tx)
 	trigger_run(&tx->on_destroy, NULL);
 	trigger_destroy(&tx->on_destroy);
 
-	tx_manager_destroy_read_view(tx->xm, tx->read_view);
+	vy_tx_manager_destroy_read_view(tx->xm, tx->read_view);
 
 	struct txv *v, *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log)
@@ -392,7 +393,7 @@ vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 		/* already in (earlier) read view */
 		if (vy_tx_is_in_read_view(abort))
 			continue;
-		struct vy_read_view *rv = tx_manager_read_view(tx->xm);
+		struct vy_read_view *rv = vy_tx_manager_read_view(tx->xm);
 		if (rv == NULL)
 			return -1;
 		abort->read_view = rv;
@@ -422,7 +423,7 @@ vy_tx_abort_readers(struct vy_tx *tx, struct txv *v)
 }
 
 struct vy_tx *
-vy_tx_begin(struct tx_manager *xm)
+vy_tx_begin(struct vy_tx_manager *xm)
 {
 	struct vy_tx *tx = mempool_alloc(&xm->tx_mempool);
 	if (unlikely(tx == NULL)) {
@@ -662,7 +663,7 @@ vy_tx_handle_deferred_delete(struct vy_tx *tx, struct txv *v)
 int
 vy_tx_prepare(struct vy_tx *tx)
 {
-	struct tx_manager *xm = tx->xm;
+	struct vy_tx_manager *xm = tx->xm;
 
 	if (tx->state == VINYL_TX_ABORT) {
 		/* Conflict is already accounted - see vy_tx_abort(). */
@@ -793,7 +794,7 @@ void
 vy_tx_commit(struct vy_tx *tx, int64_t lsn)
 {
 	assert(tx->state == VINYL_TX_COMMIT);
-	struct tx_manager *xm = tx->xm;
+	struct vy_tx_manager *xm = tx->xm;
 
 	xm->stat.commit++;
 
@@ -833,7 +834,7 @@ vy_tx_rollback_after_prepare(struct vy_tx *tx)
 {
 	assert(tx->state == VINYL_TX_COMMIT);
 
-	struct tx_manager *xm = tx->xm;
+	struct vy_tx_manager *xm = tx->xm;
 
 	/*
 	 * There are two reasons of rollback_after_prepare:
@@ -878,7 +879,7 @@ vy_tx_rollback_after_prepare(struct vy_tx *tx)
 void
 vy_tx_rollback(struct vy_tx *tx)
 {
-	struct tx_manager *xm = tx->xm;
+	struct vy_tx_manager *xm = tx->xm;
 
 	xm->stat.rollback++;
 
@@ -1140,8 +1141,8 @@ vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 }
 
 void
-tx_manager_abort_writers_for_ddl(struct tx_manager *xm, struct space *space,
-				 bool *need_wal_sync)
+vy_tx_manager_abort_writers_for_ddl(struct vy_tx_manager *xm,
+				    struct space *space, bool *need_wal_sync)
 {
 	*need_wal_sync = false;
 	if (space->index_count == 0)
@@ -1166,7 +1167,7 @@ tx_manager_abort_writers_for_ddl(struct tx_manager *xm, struct space *space,
 }
 
 void
-tx_manager_abort_writers_for_ro(struct tx_manager *xm)
+vy_tx_manager_abort_writers_for_ro(struct vy_tx_manager *xm)
 {
 	struct vy_tx *tx;
 	rlist_foreach_entry(tx, &xm->writers, in_writers) {

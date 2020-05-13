@@ -98,7 +98,7 @@ struct vy_env {
 	/** Recovery status */
 	enum vy_status status;
 	/** TX manager */
-	struct tx_manager   *xm;
+	struct vy_tx_manager *xm;
 	/** Upsert squash queue */
 	struct vy_squash_queue *squash_queue;
 	/** Memory pool for index iterator. */
@@ -267,7 +267,7 @@ vy_info_append_regulator(struct vy_env *env, struct info_handler *h)
 static void
 vy_info_append_tx(struct vy_env *env, struct info_handler *h)
 {
-	struct tx_manager *xm = env->xm;
+	struct vy_tx_manager *xm = env->xm;
 
 	info_table_begin(h, "tx");
 
@@ -292,7 +292,7 @@ static void
 vy_info_append_memory(struct vy_env *env, struct info_handler *h)
 {
 	info_table_begin(h, "memory");
-	info_append_int(h, "tx", tx_manager_mem_used(env->xm));
+	info_append_int(h, "tx", vy_tx_manager_mem_used(env->xm));
 	info_append_int(h, "level0", lsregion_used(&env->mem_env.allocator));
 	info_append_int(h, "tuple_cache", env->cache_env.mem_used);
 	info_append_int(h, "page_index", env->lsm_env.page_index_size);
@@ -509,7 +509,7 @@ vinyl_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 	stat->index += env->lsm_env.bloom_size;
 	stat->index += env->lsm_env.page_index_size;
 	stat->cache += env->cache_env.mem_used;
-	stat->tx += tx_manager_mem_used(env->xm);
+	stat->tx += vy_tx_manager_mem_used(env->xm);
 }
 
 static void
@@ -517,7 +517,7 @@ vinyl_engine_reset_stat(struct engine *engine)
 {
 	struct vy_env *env = vy_env(engine);
 
-	struct tx_manager *xm = env->xm;
+	struct vy_tx_manager *xm = env->xm;
 	memset(&xm->stat, 0, sizeof(xm->stat));
 
 	vy_scheduler_reset_stat(&env->scheduler);
@@ -999,7 +999,7 @@ vinyl_space_invalidate(struct space *space)
 	 * request bail out early, without dereferencing the space.
 	 */
 	bool unused;
-	tx_manager_abort_writers_for_ddl(env->xm, space, &unused);
+	vy_tx_manager_abort_writers_for_ddl(env->xm, space, &unused);
 }
 
 /** Argument passed to vy_check_format_on_replace(). */
@@ -1067,7 +1067,7 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	 * be checked with on_replace trigger so we abort them.
 	 */
 	bool need_wal_sync;
-	tx_manager_abort_writers_for_ddl(env->xm, space, &need_wal_sync);
+	vy_tx_manager_abort_writers_for_ddl(env->xm, space, &need_wal_sync);
 
 	if (!need_wal_sync && vy_lsm_is_empty(pk))
 		return 0; /* space is empty, nothing to do */
@@ -2489,7 +2489,7 @@ static void
 vinyl_engine_switch_to_ro(struct engine *engine)
 {
 	struct vy_env *env = vy_env(engine);
-	tx_manager_abort_writers_for_ro(env->xm);
+	vy_tx_manager_abort_writers_for_ro(env->xm);
 }
 
 /* }}} Public API of transaction control */
@@ -2576,7 +2576,7 @@ vy_env_new(const char *path, size_t memory,
 		goto error_path;
 	}
 
-	e->xm = tx_manager_new();
+	e->xm = vy_tx_manager_new();
 	if (e->xm == NULL)
 		goto error_xm;
 	e->squash_queue = vy_squash_queue_new();
@@ -2612,7 +2612,7 @@ error_lsm_env:
 	vy_scheduler_destroy(&e->scheduler);
 	vy_squash_queue_delete(e->squash_queue);
 error_squash_queue:
-	tx_manager_delete(e->xm);
+	vy_tx_manager_delete(e->xm);
 error_xm:
 	free(e->path);
 error_path:
@@ -2626,7 +2626,7 @@ vy_env_delete(struct vy_env *e)
 	vy_regulator_destroy(&e->regulator);
 	vy_scheduler_destroy(&e->scheduler);
 	vy_squash_queue_delete(e->squash_queue);
-	tx_manager_delete(e->xm);
+	vy_tx_manager_delete(e->xm);
 	free(e->path);
 	mempool_destroy(&e->iterator_pool);
 	vy_run_env_destroy(&e->run_env);
@@ -2885,7 +2885,7 @@ vinyl_engine_end_recovery(struct engine *engine)
 		/*
 		 * During recovery we skip statements that have
 		 * been dumped to disk - see vy_is_committed() -
-		 * so it may turn out that tx_manager::lsn stays
+		 * so it may turn out that vy_tx_manager::lsn stays
 		 * behind the instance vclock while we need it
 		 * to be up-to-date once recovery is complete,
 		 * because we use it while building an index to
@@ -3709,7 +3709,7 @@ vinyl_snapshot_iterator_free(struct snapshot_iterator *base)
 	struct vy_lsm *lsm = it->iterator.lsm;
 	struct vy_env *env = vy_env(lsm->base.engine);
 	vy_read_iterator_close(&it->iterator);
-	tx_manager_destroy_read_view(env->xm, it->rv);
+	vy_tx_manager_destroy_read_view(env->xm, it->rv);
 	vy_lsm_unref(lsm);
 	free(it);
 }
@@ -3729,7 +3729,7 @@ vinyl_index_create_snapshot_iterator(struct index *base)
 	it->base.next = vinyl_snapshot_iterator_next;
 	it->base.free = vinyl_snapshot_iterator_free;
 
-	it->rv = tx_manager_read_view(env->xm);
+	it->rv = vy_tx_manager_read_view(env->xm);
 	if (it->rv == NULL) {
 		free(it);
 		return NULL;
@@ -4152,7 +4152,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	 * be checked with on_replace trigger so we abort them.
 	 */
 	bool need_wal_sync;
-	tx_manager_abort_writers_for_ddl(env->xm, src_space, &need_wal_sync);
+	vy_tx_manager_abort_writers_for_ddl(env->xm, src_space, &need_wal_sync);
 
 	if (!need_wal_sync && vy_lsm_is_empty(pk))
 		return 0; /* space is empty, nothing to do */

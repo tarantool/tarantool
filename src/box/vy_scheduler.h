@@ -148,7 +148,7 @@ struct vy_scheduler {
 	 * by the dump.
 	 */
 	vy_scheduler_dump_complete_f dump_complete_cb;
-	/** List of read views, see tx_manager::read_views. */
+	/** List of read views, see vy_tx_manager::read_views. */
 	struct rlist *read_views;
 	/** Context needed for writing runs. */
 	struct vy_run_env *run_env;
