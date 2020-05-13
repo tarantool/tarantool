@@ -150,19 +150,6 @@ tt_uuid_bswap(struct tt_uuid *uu)
 }
 
 /**
- * \brief Test that uuid is nil
- * \param uu UUID
- * \retval true if all members of \a uu 0
- * \retval false otherwise
- */
-inline bool
-tt_uuid_is_nil(const struct tt_uuid *uu)
-{
-	const uint64_t *p = (const uint64_t *) uu;
-	return !p[0] && !p[1];
-}
-
-/**
  * \brief Test that \a lhs equal \a rhs
  * \param lhs UUID
  * \param rhs UUID
@@ -172,12 +159,22 @@ tt_uuid_is_nil(const struct tt_uuid *uu)
 inline bool
 tt_uuid_is_equal(const struct tt_uuid *lhs, const struct tt_uuid *rhs)
 {
-	const uint64_t *lp = (const uint64_t *) lhs;
-	const uint64_t *rp = (const uint64_t *) rhs;
-	return lp[0] == rp[0] && lp[1] == rp[1];
+	return memcmp(lhs, rhs, sizeof(*lhs)) == 0;
 }
 
 extern const struct tt_uuid uuid_nil;
+
+/**
+ * \brief Test that uuid is nil.
+ * \param uu UUID.
+ * \retval true If all members of \a uu 0.
+ * \retval false Otherwise.
+ */
+inline bool
+tt_uuid_is_nil(const struct tt_uuid *uu)
+{
+	return tt_uuid_is_equal(uu, &uuid_nil);
+}
 
 char *
 tt_uuid_str(const struct tt_uuid *uu);
