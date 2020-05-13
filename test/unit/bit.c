@@ -80,7 +80,7 @@ test_rotl_rotr_one(int rot)
 		printf("bit_rotr_u64(%" PRIu64 ", %d) => %" PRIu64 "\n",
 		       val64, rot, bit_rotr_u64(val64, rot));
 
-		if (vals[i] > UINT32_MAX || rot > 32)
+		if (vals[i] > UINT32_MAX || rot >= 32)
 			continue;
 
 		printf("bit_rotl_u32(%" PRIu32 ", %d) => %" PRIu32 "\n",
@@ -95,7 +95,7 @@ test_rotl_rotr(void)
 {
 	header();
 
-	int rots[] = { 0, 1, 15, 16, 31, 32, 63, 64 };
+	int rots[] = { 1, 15, 16, 31, 32, 63 };
 	for (unsigned r = 0; r < sizeof(rots) / sizeof(rots[0]); r++) {
 		test_rotl_rotr_one(rots[r]);
 	}
