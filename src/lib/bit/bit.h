@@ -202,10 +202,10 @@ bitmap_size(size_t bit_count)
 inline bool
 bit_test(const void *data, size_t pos)
 {
-	size_t chunk = pos / (CHAR_BIT * sizeof(unsigned long));
-	size_t offset = pos % (CHAR_BIT * sizeof(unsigned long));
+	size_t chunk = pos / CHAR_BIT;
+	size_t offset = pos % CHAR_BIT;
 
-	const unsigned long *ldata = (const unsigned long  *) data;
+	const uint8_t *ldata = (const uint8_t *)data;
 	return (ldata[chunk] >> offset) & 0x1;
 }
 
@@ -222,10 +222,10 @@ bit_test(const void *data, size_t pos)
 inline bool
 bit_set(void *data, size_t pos)
 {
-	size_t chunk = pos / (CHAR_BIT * sizeof(unsigned long));
-	size_t offset = pos % (CHAR_BIT * sizeof(unsigned long));
+	size_t chunk = pos / CHAR_BIT;
+	size_t offset = pos % CHAR_BIT;
 
-	unsigned long *ldata = (unsigned long  *) data;
+	uint8_t *ldata = (uint8_t *)data;
 	bool prev = (ldata[chunk] >> offset) & 0x1;
 	ldata[chunk] |= (1UL << offset);
 	return prev;
@@ -244,10 +244,10 @@ bit_set(void *data, size_t pos)
 inline bool
 bit_clear(void *data, size_t pos)
 {
-	size_t chunk = pos / (CHAR_BIT * sizeof(unsigned long));
-	size_t offset = pos % (CHAR_BIT * sizeof(unsigned long));
+	size_t chunk = pos / CHAR_BIT;
+	size_t offset = pos % CHAR_BIT;
 
-	unsigned long *ldata = (unsigned long *) data;
+	uint8_t *ldata = (uint8_t *)data;
 	bool prev = (ldata[chunk] >> offset) & 0x1;
 	ldata[chunk] &= ~(1UL << offset);
 	return prev;
@@ -413,6 +413,7 @@ bit_count_u64(uint64_t x)
 inline uint32_t
 bit_rotl_u32(uint32_t x, int r)
 {
+	assert(r > 0 && r < 32);
 	/* gcc recognises this code and generates a rotate instruction */
 	return ((x << r) | (x >> (32 - r)));
 }
@@ -423,6 +424,7 @@ bit_rotl_u32(uint32_t x, int r)
 inline uint64_t
 bit_rotl_u64(uint64_t x, int r)
 {
+	assert(r > 0 && r < 64);
 	/* gcc recognises this code and generates a rotate instruction */
 	return ((x << r) | (x >> (64 - r)));
 }
@@ -433,6 +435,7 @@ bit_rotl_u64(uint64_t x, int r)
 __attribute__ ((const)) inline uintmax_t
 bit_rotl_umax(uintmax_t x, int r)
 {
+	assert(r > 0 && r < (int)(sizeof(uintmax_t) * CHAR_BIT));
 	/* gcc recognises this code and generates a rotate instruction */
 	return ((x << r) | (x >> (sizeof(uintmax_t) * CHAR_BIT - r)));
 }
@@ -446,6 +449,7 @@ bit_rotl_umax(uintmax_t x, int r)
 inline uint32_t
 bit_rotr_u32(uint32_t x, int r)
 {
+	assert(r > 0 && r < 32);
 	/* gcc recognises this code and generates a rotate instruction */
 	return ((x >> r) | (x << (32 - r)));
 }
@@ -456,6 +460,7 @@ bit_rotr_u32(uint32_t x, int r)
 inline uint64_t
 bit_rotr_u64(uint64_t x, int r)
 {
+	assert(r > 0 && r < 64);
 	/* gcc recognises this code and generates a rotate instruction */
 	return ((x >> r) | (x << (64 - r)));
 }
@@ -538,9 +543,11 @@ bit_index_u64(uint64_t x, int *indexes, int offset);
 /* Use bigger words on x86_64 */
 #define ITER_UINT uint64_t
 #define ITER_CTZ bit_ctz_u64
+#define ITER_LOAD load_u64
 #else
 #define ITER_UINT uint32_t
 #define ITER_CTZ bit_ctz_u32
+#define ITER_LOAD load_u32
 #endif
 /** @endcond **/
 
@@ -589,7 +596,7 @@ bit_iterator_init(struct bit_iterator *it, const void *data, size_t size,
 	/* Check if size is a multiple of sizeof(ITER_UINT) */
 	const char *e = it->next + size % sizeof(ITER_UINT);
 	if (bit_likely(it->next == e)) {
-		it->word = *(ITER_UINT *) it->next;
+		it->word = ITER_LOAD(it->next);
 		it->next += sizeof(ITER_UINT);
 	} else {
 		it->word = it->word_xor;
@@ -615,7 +622,7 @@ bit_iterator_next(struct bit_iterator *it)
 			return SIZE_MAX;
 
 		/* Extract the next word from memory */
-		it->word = *(ITER_UINT *) it->next;
+		it->word = ITER_LOAD(it->next);
 		it->word ^= it->word_xor;
 		it->word_base = (it->next - it->start) * CHAR_BIT;
 		it->next += sizeof(ITER_UINT);
@@ -629,6 +636,7 @@ bit_iterator_next(struct bit_iterator *it)
 	return it->word_base + bit;
 }
 
+#undef ITER_LOAD
 #undef ITER_CTZ
 #undef ITER_UINT
 
