@@ -32,6 +32,8 @@ variables:
   only:
     - master
     - /^.*-perf$/
+  except:
+    - schedules
   variables: &perf_vars_definition
     IMAGE_PERF: "${CI_REGISTRY}/${CI_PROJECT_PATH}/perf/ubuntu-bionic:perf_master"
     IMAGE_PERF_BUILT: "${CI_REGISTRY}/${CI_PROJECT_PATH}/perf_tmp/ubuntu-bionic:perf_${CI_COMMIT_SHORT_SHA}"
