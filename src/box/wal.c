@@ -950,12 +950,14 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 	       struct xrow_header **end)
 {
 	int64_t tsn = 0;
+	struct xrow_header **start = row;
+	struct xrow_header **first_glob_row = row;
 	/** Assign LSN to all local rows. */
 	for ( ; row < end; row++) {
 		if ((*row)->replica_id == 0) {
 			/*
 			 * All rows representing local space data
-			 * manipulations are signed wth a zero
+			 * manipulations are signed with a zero
 			 * instance id. This is also true for
 			 * anonymous replicas, since they are
 			 * only capable of writing to local and
@@ -966,9 +968,18 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 
 			(*row)->lsn = vclock_inc(vclock_diff, (*row)->replica_id) +
 				      vclock_get(base, (*row)->replica_id);
-			/* Use lsn of the first local row as transaction id. */
-			tsn = tsn == 0 ? (*row)->lsn : tsn;
-			(*row)->tsn = tsn;
+			/*
+			 * Use lsn of the first global row as
+			 * transaction id.
+			 */
+			if ((*row)->group_id != GROUP_LOCAL && tsn == 0) {
+				tsn = (*row)->lsn;
+				/*
+				 * Remember the tail being processed.
+				 */
+				first_glob_row = row;
+			}
+			(*row)->tsn = tsn == 0 ? (*start)->lsn : tsn;
 			(*row)->is_commit = row == end - 1;
 		} else {
 			int64_t diff = (*row)->lsn - vclock_get(base, (*row)->replica_id);
@@ -987,6 +998,14 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 			}
 		}
 	}
+
+	/*
+	 * Fill transaction id for all the local rows preceding
+	 * the first global row. tsn was yet unknown when those
+	 * rows were processed.
+	 */
+	for (row = start; row < first_glob_row; row++)
+		(*row)->tsn = tsn;
 }
 
 static void
