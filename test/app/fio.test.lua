@@ -251,6 +251,8 @@ file3 = fio.pathjoin(tree, 'file.3')
 file4 = fio.pathjoin(tree, 'file.4')
 file5 = fio.pathjoin(tree, 'file.5')
 file6 = fio.pathjoin(tree, 'file.6')
+file7 = fio.pathjoin(tree, 'file.7')
+file8 = fio.pathjoin(tree, 'file.8')
 
 fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
 fh1:write("gogo")
@@ -279,6 +281,27 @@ fio.copyfile(file5, file6)
 fh6:seek(0)
 fh6:read()
 fh6:close()
+
+--
+-- gh-4651: Test partial write/pwrite via one byte transfer.
+--
+fh7 = fio.open(file7, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0644', 8))
+errinj.set('ERRINJ_COIO_WRITE_CHUNK', true)
+fh7:write("one byte transfer, write")
+errinj.set('ERRINJ_COIO_WRITE_CHUNK', false)
+fh7:seek(0)
+fh7:read()
+fh7:close()
+fh8 = fio.open(file8, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0644', 8))
+errinj.set('ERRINJ_COIO_WRITE_CHUNK', true)
+fh8:pwrite("one byte transfer, ", 0)
+fh8:seek(0)
+fh8:read()
+fh8:pwrite("pwrite", 19)
+errinj.set('ERRINJ_COIO_WRITE_CHUNK', false)
+fh8:seek(0)
+fh8:read()
+fh8:close()
 
 res, err = fio.copyfile(fio.pathjoin(tmp1, 'not_exists.txt'), tmp1)
 res
