@@ -349,7 +349,7 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 		return;
 	struct space *space = stmt->space;
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
-	int index_count;
+	uint32_t index_count;
 
 	/* Only roll back the changes if they were made. */
 	if (stmt->engine_savepoint == NULL)
@@ -362,7 +362,7 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	else
 		panic("transaction rolled back during snapshot recovery");
 
-	for (int i = 0; i < index_count; i++) {
+	for (uint32_t i = 0; i < index_count; i++) {
 		struct tuple *unused;
 		struct index *index = space->index[i];
 		/* Rollback must not fail. */
