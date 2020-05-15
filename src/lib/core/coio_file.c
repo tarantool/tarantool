@@ -164,10 +164,30 @@ coio_file_close(int fd)
 ssize_t
 coio_pwrite(int fd, const void *buf, size_t count, off_t offset)
 {
-	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_write(fd, (void *) buf, count, offset,
-				 0, coio_complete, &eio);
-	return coio_wait_done(req, &eio);
+	ssize_t left = count, pos = 0, res, chunk;
+	eio_req *req;
+
+	while (left > 0) {
+		INIT_COEIO_FILE(eio);
+		chunk = left;
+
+		ERROR_INJECT(ERRINJ_COIO_WRITE_CHUNK, {
+			chunk = 1;
+		});
+
+		req = eio_write(fd, (char *)buf + pos, chunk,
+				offset + pos, EIO_PRI_DEFAULT,
+				coio_complete, &eio);
+		res = coio_wait_done(req, &eio);
+		if (res < 0) {
+			pos = -1;
+			break;
+		} else {
+			left -= res;
+			pos += res;
+		}
+	}
+	return pos;
 }
 
 ssize_t
@@ -201,6 +221,11 @@ static void
 coio_do_write(eio_req *req)
 {
 	struct coio_file_task *eio = (struct coio_file_task *)req->data;
+
+	ERROR_INJECT(ERRINJ_COIO_WRITE_CHUNK, {
+		eio->write.count = 1;
+	});
+
 	req->result = write(eio->write.fd, eio->write.buf, eio->write.count);
 	eio->errorno = errno;
 }
@@ -208,13 +233,28 @@ coio_do_write(eio_req *req)
 ssize_t
 coio_write(int fd, const void *buf, size_t count)
 {
-	INIT_COEIO_FILE(eio);
-	eio.write.buf = buf;
-	eio.write.count = count;
-	eio.write.fd = fd;
-	eio_req *req = eio_custom(coio_do_write, 0,
-				  coio_complete, &eio);
-	return coio_wait_done(req, &eio);
+	ssize_t left = count, pos = 0, res;
+	eio_req *req;
+
+	while (left > 0) {
+		INIT_COEIO_FILE(eio);
+
+		eio.write.buf	= (char *)buf + pos;
+		eio.write.count	= left;
+		eio.write.fd	= fd;
+
+		req = eio_custom(coio_do_write, EIO_PRI_DEFAULT,
+				 coio_complete, &eio);
+		res = coio_wait_done(req, &eio);
+		if (res < 0) {
+			pos = -1;
+			break;
+		} else {
+			left -= res;
+			pos += res;
+		}
+	}
+	return pos;
 }
 
 static void
