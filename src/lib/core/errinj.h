@@ -145,6 +145,7 @@ struct errinj {
 	_(ERRINJ_VY_WRITE_ITERATOR_START_FAIL, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_VY_RUN_OPEN, ERRINJ_INT, {.iparam = -1})\
 	_(ERRINJ_AUTO_UPGRADE, ERRINJ_BOOL, {.bparam = false})\
+	_(ERRINJ_COIO_WRITE_CHUNK, ERRINJ_BOOL, {.bparam = false}) \
 
 ENUM0(errinj_id, ERRINJ_LIST);
 extern struct errinj errinjs[];
