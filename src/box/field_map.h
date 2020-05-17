@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stddef.h>
+#include "bit/bit.h"
 
 struct region;
 struct field_map_builder_slot;
@@ -151,20 +152,22 @@ static inline uint32_t
 field_map_get_offset(const uint32_t *field_map, int32_t offset_slot,
 		     int multikey_idx)
 {
-	uint32_t offset;
-	if (multikey_idx != MULTIKEY_NONE &&
-	    (int32_t) field_map[offset_slot] < 0) {
+	/*
+	 * Can not access field_map as a normal uint32 array
+	 * because its alignment may be < 4 bytes. Need to use
+	 * unaligned store-load operations explicitly.
+	 */
+	uint32_t offset = load_u32(&field_map[offset_slot]);
+	if (multikey_idx != MULTIKEY_NONE && (int32_t)offset < 0) {
 		/**
 		 * The field_map extent has the following
 		 * structure: [size=N|slot1|slot2|..|slotN]
 		 */
-		uint32_t *extent = (uint32_t *)((char *)field_map +
-					(int32_t)field_map[offset_slot]);
-		if ((uint32_t)multikey_idx >= extent[0])
+		const uint32_t *extent = (const uint32_t *)
+			((const char *)field_map + (int32_t)offset);
+		if ((uint32_t)multikey_idx >= load_u32(&extent[0]))
 			return 0;
-		offset = extent[multikey_idx + 1];
-	} else {
-		offset = field_map[offset_slot];
+		offset = load_u32(&extent[multikey_idx + 1]);
 	}
 	return offset;
 }

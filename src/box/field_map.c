@@ -101,16 +101,21 @@ field_map_build(struct field_map_builder *builder, char *buffer)
 		(uint32_t *)(buffer + field_map_build_size(builder));
 	char *extent_wptr = buffer;
 	for (int32_t i = -1; i >= -(int32_t)builder->slot_count; i--) {
+		/*
+		 * Can not access field_map as a normal uint32
+		 * array because its alignment may be < 4 bytes.
+		 * Need to use unaligned store-load operations
+		 * explicitly.
+		 */
 		if (!builder->slots[i].has_extent) {
-			field_map[i] = builder->slots[i].offset;
+			store_u32(&field_map[i], builder->slots[i].offset);
 			continue;
 		}
 		struct field_map_builder_slot_extent *extent =
 						builder->slots[i].extent;
 		/** Retrive memory for the extent. */
-		field_map[i] =
-			(uint32_t)((char *)extent_wptr - (char *)field_map);
-		*(uint32_t *)extent_wptr = extent->size;
+		store_u32(&field_map[i], extent_wptr - (char *)field_map);
+		store_u32(extent_wptr, extent->size);
 		uint32_t extent_offset_sz = extent->size * sizeof(uint32_t);
 		memcpy(&((uint32_t *) extent_wptr)[1], extent->offset,
 			extent_offset_sz);
