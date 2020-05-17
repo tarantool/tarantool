@@ -1,4 +1,4 @@
 
-#self.skip = 1
+self.skip = 1
 
 # vim: set ft=python:
