@@ -271,6 +271,10 @@ crypto_codec_decrypt(struct crypto_codec *c, const char *iv,
 void
 crypto_codec_delete(struct crypto_codec *c);
 
+/** Retrieve SSL library name and version */
+const char*
+crypto_ssl_version(void);
+
 void
 crypto_init(void);
 

@@ -323,6 +323,12 @@ crypto_codec_delete(struct crypto_codec *c)
 	free(c);
 }
 
+const char*
+crypto_ssl_version(void)
+{
+	return OpenSSL_version(OPENSSL_VERSION);
+}
+
 void
 crypto_init(void)
 {
