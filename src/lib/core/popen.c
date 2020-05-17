@@ -683,6 +683,11 @@ popen_state_str(unsigned int state)
  * signal to the process group even when ..._SETSID and
  * ..._GROUP_SIGNAL are set.
  *
+ * Mac OS may don't deliver a signal to a processes in a group
+ * when ..._SETSID and ..._GROUP_SIGNAL are set. It seems there
+ * is a race here: when a process is just forked it may be not
+ * signaled.
+ *
  * Return 0 at success or -1 at failure (and set a diag).
  *
  * Possible errors:

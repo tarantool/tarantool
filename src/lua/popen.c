@@ -1502,6 +1502,11 @@ lbox_popen_shell(struct lua_State *L)
  * Note: The module offers popen.signal.SIG* constants, because
  * some signals have different numbers on different platforms.
  *
+ * Note: Mac OS may don't deliver a signal to a process in a
+ * group when opts.setsid and opts.group_signal are set. It
+ * seems there is a race here: when a process is just forked it
+ * may be not signaled.
+ *
  * Raise an error on incorrect parameters:
  *
  * - IllegalParams:    an incorrect handle parameter.
@@ -2207,6 +2212,8 @@ lbox_popen_info(struct lua_State *L)
  * - The signal is sent to a process or a grocess group depending
  *   of opts.group_signal. (@see lbox_popen_new() for details of
  *   group signaling).
+ * - There are peculiars in group signaling on Mac OS,
+ *   @see lbox_popen_signal() for details.
  *
  * Resources are released disregarding of whether a signal
  * sending succeeds: fds are closed, memory is released,
