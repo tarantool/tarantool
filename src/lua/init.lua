@@ -38,6 +38,8 @@ double
 tarantool_uptime(void);
 typedef int32_t pid_t;
 pid_t getpid(void);
+const char*
+crypto_ssl_version(void);
 void
 tarantool_exit(int);
 ]]
@@ -95,6 +97,10 @@ end
 
 local function pid()
     return tonumber(ffi.C.getpid())
+end
+
+local function ssl_version()
+    return ffi.string(ffi.C.crypto_ssl_version(), nil)
 end
 
 local function mksymname(name)
@@ -228,4 +234,5 @@ package.setsearchroot = setsearchroot
 return {
     uptime = uptime;
     pid = pid;
+    ssl_version = ssl_version;
 }

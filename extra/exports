@@ -95,6 +95,7 @@ crypto_stream_begin
 crypto_stream_append
 crypto_stream_commit
 crypto_stream_delete
+crypto_ssl_version
 
 lua_static_aligned_alloc
 

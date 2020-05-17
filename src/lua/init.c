@@ -62,6 +62,7 @@
 #include "lua/swim.h"
 #include "lua/decimal.h"
 #include "digest.h"
+#include "crypto/crypto.h"
 #include <small/ibuf.h>
 
 #include <ctype.h>
