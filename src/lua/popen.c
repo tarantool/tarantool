@@ -2258,10 +2258,10 @@ lbox_popen_close(struct lua_State *L)
 		return 1;
 	}
 
+	luaT_mark_popen_handle_closed(L, 1);
+
 	if (popen_delete(handle) != 0)
 		return luaT_push_nil_and_error(L);
-
-	luaT_mark_popen_handle_closed(L, 1);
 
 	lua_pushboolean(L, true);
 	return 1;
