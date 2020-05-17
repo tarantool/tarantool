@@ -778,11 +778,12 @@ luaT_popen_parse_env(struct lua_State *L, int idx, struct region *region)
 		idx = lua_gettop(L) + idx + 1;
 
 	size_t capacity = POPEN_LUA_ENV_CAPACITY_DEFAULT;
-	size_t size = capacity * sizeof(char *);
 	size_t region_svp = region_used(region);
-	char **env = region_alloc(region, size);
+	size_t size;
+	char **env = region_alloc_array(region, typeof(env[0]), capacity,
+					&size);
 	if (env == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "env array");
+		diag_set(OutOfMemory, size, "region_alloc_array", "env");
 		return NULL;
 	}
 	size_t nr_env = 0;
@@ -829,10 +830,10 @@ luaT_popen_parse_env(struct lua_State *L, int idx, struct region *region)
 	 * the traverse again and fill `env` array.
 	 */
 	capacity = nr_env + 1;
-	size = capacity * sizeof(char *);
-	if ((env = region_alloc(region, size)) == NULL) {
+	env = region_alloc_array(region, typeof(env[0]), capacity, &size);
+	if (env == NULL) {
 		region_truncate(region, region_svp);
-		diag_set(OutOfMemory, size, "region_alloc", "env array");
+		diag_set(OutOfMemory, size, "region_alloc_array", "env");
 		return NULL;
 	}
 	nr_env = 0;
@@ -1039,10 +1040,11 @@ luaT_popen_parse_argv(struct lua_State *L, int idx, struct popen_opts *opts,
 	if (opts->flags & POPEN_FLAG_SHELL)
 		opts->nr_argv += 2;
 
-	size_t size = sizeof(char *) * opts->nr_argv;
-	opts->argv = region_alloc(region, size);
+	size_t size;
+	opts->argv = region_alloc_array(region, typeof(opts->argv[0]),
+					opts->nr_argv, &size);
 	if (opts->argv == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "argv");
+		diag_set(OutOfMemory, size, "region_alloc_array", "opts->argv");
 		return -1;
 	}
 

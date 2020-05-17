@@ -438,13 +438,14 @@ lbox_key_def_new(struct lua_State *L)
 				  "[, collation = <string>]}, ...}");
 
 	uint32_t part_count = lua_objlen(L, 1);
-	const ssize_t parts_size = sizeof(struct key_part_def) * part_count;
 
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	struct key_part_def *parts = region_alloc(region, parts_size);
+	size_t size;
+	struct key_part_def *parts =
+		region_alloc_array(region, typeof(parts[0]), part_count, &size);
 	if (parts == NULL) {
-		diag_set(OutOfMemory, parts_size, "region", "parts");
+		diag_set(OutOfMemory, size, "region_alloc_array", "parts");
 		return luaT_error(L);
 	}
 	if (part_count == 0) {

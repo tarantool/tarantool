@@ -244,10 +244,11 @@ xrow_update_route_branch(struct xrow_update_field *field,
 	bool transform_root = (saved_old_offset == 0);
 	struct xrow_update_field *next_hop;
 	if (!transform_root) {
-		next_hop = (struct xrow_update_field *)
-			region_alloc(&fiber()->gc, sizeof(*next_hop));
+		size_t size;
+		next_hop = region_alloc_object(&fiber()->gc, typeof(*next_hop),
+					       &size);
 		if (next_hop == NULL) {
-			diag_set(OutOfMemory, sizeof(*next_hop), "region_alloc",
+			diag_set(OutOfMemory, size, "region_alloc_object",
 				 "next_hop");
 			return NULL;
 		}

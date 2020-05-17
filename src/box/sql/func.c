@@ -85,10 +85,11 @@ static struct Mem *
 vdbemem_alloc_on_region(uint32_t count)
 {
 	struct region *region = &fiber()->gc;
-	struct Mem *ret = region_alloc(region, count * sizeof(*ret));
+	size_t size;
+	struct Mem *ret = region_alloc_array(region, typeof(*ret), count,
+					     &size);
 	if (ret == NULL) {
-		diag_set(OutOfMemory, count * sizeof(*ret),
-			 "region_alloc", "ret");
+		diag_set(OutOfMemory, size, "region_alloc_array", "ret");
 		return NULL;
 	}
 	memset(ret, 0, count * sizeof(*ret));

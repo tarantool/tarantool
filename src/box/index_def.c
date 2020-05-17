@@ -255,11 +255,12 @@ index_def_to_key_def(struct rlist *index_defs, int *size)
 	struct index_def *index_def;
 	rlist_foreach_entry(index_def, index_defs, link)
 		key_count++;
-	size_t sz = sizeof(struct key_def *) * key_count;
-	struct key_def **keys = (struct key_def **) region_alloc(&fiber()->gc,
-								 sz);
+	size_t bsize;
+	struct key_def **keys =
+		region_alloc_array(&fiber()->gc, typeof(keys[0]), key_count,
+				   &bsize);
 	if (keys == NULL) {
-		diag_set(OutOfMemory, sz, "region_alloc", "keys");
+		diag_set(OutOfMemory, bsize, "region_alloc_array", "keys");
 		return NULL;
 	}
 	*size = key_count;

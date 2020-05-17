@@ -110,9 +110,9 @@ get_proc_name(unw_cursor_t *unw_cur, unw_word_t *offset, bool skip_cache)
 	}  else {
 		unw_get_proc_name(unw_cur, proc_name, sizeof(proc_name),
 				  offset);
-
-		entry = (struct proc_cache_entry *)
-			region_alloc(&cache_region, sizeof(struct proc_cache_entry));
+		size_t size;
+		entry = region_alloc_object(&cache_region, typeof(*entry),
+					    &size);
 		if (entry == NULL)
 			goto error;
 		node.key = ip;

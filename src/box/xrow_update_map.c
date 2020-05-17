@@ -63,10 +63,11 @@ struct xrow_update_map_item {
 static inline struct xrow_update_map_item *
 xrow_update_map_item_alloc(void)
 {
-	struct xrow_update_map_item *item = (struct xrow_update_map_item *)
-		region_alloc(&fiber()->gc, sizeof(*item));
+	size_t size;
+	struct xrow_update_map_item *item =
+		region_alloc_object(&fiber()->gc, typeof(*item), &size);
 	if (item == NULL)
-		diag_set(OutOfMemory, sizeof(*item), "region_alloc", "item");
+		diag_set(OutOfMemory, size, "region_alloc_object", "item");
 	return item;
 }
 

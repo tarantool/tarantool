@@ -981,7 +981,8 @@ tuple_format_iterator_create(struct tuple_format_iterator *it,
 	if (validate)
 		it->required_fields_sz = bitmap_size(format->total_field_count);
 	uint32_t total_sz = frames_sz + 2 * it->required_fields_sz;
-	struct mp_frame *frames = region_alloc(region, total_sz);
+	struct mp_frame *frames = region_aligned_alloc(region, total_sz,
+						       alignof(frames[0]));
 	if (frames == NULL) {
 		diag_set(OutOfMemory, total_sz, "region",
 			 "tuple_format_iterator");

@@ -190,12 +190,13 @@ ck_constraint_on_replace_trigger(struct trigger *trigger, void *event)
 
 	struct space *space = stmt->space;
 	assert(space != NULL);
-	uint32_t field_ref_sz = sizeof(struct vdbe_field_ref) +
-				sizeof(uint32_t) * space->def->field_count;
-	struct vdbe_field_ref *field_ref =
-		region_alloc(&fiber()->gc, field_ref_sz);
+	struct vdbe_field_ref *field_ref;
+	size_t size = sizeof(field_ref->slots[0]) * space->def->field_count +
+		      sizeof(*field_ref);
+	field_ref = (struct vdbe_field_ref *)
+		region_aligned_alloc(&fiber()->gc, size, alignof(*field_ref));
 	if (field_ref == NULL) {
-		diag_set(OutOfMemory, field_ref_sz, "region_alloc",
+		diag_set(OutOfMemory, size, "region_aligned_alloc",
 			 "field_ref");
 		return -1;
 	}
