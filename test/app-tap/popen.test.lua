@@ -269,7 +269,29 @@ local function test_read_chunk(test)
 
     local payload = 'hello'
     local script = ('printf "%s"; sleep 120'):format(payload)
-    local ph = popen.shell(script, 'r')
+
+    -- It is important to close stderr here.
+    --
+    -- killpg() on Mac OS may don't deliver a signal to a process
+    -- that is just forked at killpg() call. So :close() at end of
+    -- the test does not guarantee that 'sleep 120' will be
+    -- signaled.
+    --
+    -- test-run captures stdout and stderr for a 'core = app' test
+    -- (like this one) using pipes and waits EOF on its side for
+    -- both. If `sleep 120` process inherits stderr, it will not
+    -- close it and the file descriptor will remain open for
+    -- writing. In this case EOF situation will not occur on the
+    -- reading end of pipe even despite that the test process
+    -- itself already exited.
+    local ph = popen.new({script}, {
+        shell = true,
+        setsid = true,
+        group_signal = true,
+        stdin = popen.opts.CLOSE,
+        stdout = popen.opts.PIPE,
+        stderr = popen.opts.CLOSE,
+    })
 
     -- When a first byte is available, read() should return all
     -- bytes arrived at the time.
