@@ -43,22 +43,6 @@ crypto.hmac.sha512()
 ---
 - error: 'builtin/crypto.lua:<line>"]: Usage: hmac.sha512(key, string)'
 ...
-crypto.hmac.sha3_224()
----
-- error: 'builtin/crypto.lua:<line>"]: Usage: hmac.sha3_224(key, string)'
-...
-crypto.hmac.sha3_256()
----
-- error: 'builtin/crypto.lua:<line>"]: Usage: hmac.sha3_256(key, string)'
-...
-crypto.hmac.sha3_384()
----
-- error: 'builtin/crypto.lua:<line>"]: Usage: hmac.sha3_384(key, string)'
-...
-crypto.hmac.sha3_512()
----
-- error: 'builtin/crypto.lua:<line>"]: Usage: hmac.sha3_512(key, string)'
-...
 crypto.hmac.nodigest
 ---
 - error: '[string "return crypto.hmac.nodigest "]:1: HMAC method "nodigest" is not
@@ -113,22 +97,6 @@ crypto.hmac.sha384(key, message)
 crypto.hmac.sha512(key, message)
 ---
 - !!binary Q4PL+6f9bpLtXmGBaoq2aT4arwCoA0YmcOZ612jzZ0FgZ63CRMIa6JZ92t4cj+PQ8wojXj8jbo658ir/5BvPOg==
-...
-crypto.hmac.sha3_224(key, message)
----
-- !!binary ExqQvjOYA7FhcOV2zQEKA+bJfR15zKtHvNgxVw==
-...
-crypto.hmac.sha3_256(key, message)
----
-- !!binary xTdNowowXJwzGTYlueq6tMFjrBafajM3nB5c8xpud2w=
-...
-crypto.hmac.sha3_384(key, message)
----
-- !!binary DmuUv1Ctbv+jiraP8PtxJ8rNuwDD2v1pPzcsXoUQAlwArETFJIQnNF0u4Dd1SNvJ
-...
-crypto.hmac.sha3_512(key, message)
----
-- !!binary 0ukVMoLFNQYgFAX9nJnGYIEhDYzcKaz5V7RGqh0fzbsRTHhHxrYTGJlYCY7904tdNNFIAQhC/syA2HjmtOY4tg==
 ...
 --
 -- Incremental update
