@@ -537,11 +537,13 @@ space_format_decode(const char *data, uint32_t *out_count,
 		*fields = NULL;
 		return 0;
 	}
-	size_t size = count * sizeof(struct field_def);
+	size_t size;
 	struct field_def *region_defs =
-		(struct field_def *) region_alloc(region, size);
+		region_alloc_array(region, typeof(region_defs[0]), count,
+				   &size);
 	if (region_defs == NULL) {
-		diag_set(OutOfMemory, size, "region", "struct field_def");
+		diag_set(OutOfMemory, size, "region_alloc_array",
+			 "region_defs");
 		return -1;
 	}
 	/*
@@ -2452,10 +2454,12 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * comparators must be updated.
 		 */
 		struct key_def **keys;
-		size_t bsize = old_space->index_count * sizeof(keys[0]);
-		keys = (struct key_def **) region_alloc(&fiber()->gc, bsize);
+		size_t bsize;
+		keys = region_alloc_array(&fiber()->gc, typeof(keys[0]),
+					  old_space->index_count, &bsize);
 		if (keys == NULL) {
-			diag_set(OutOfMemory, bsize, "region", "new slab");
+			diag_set(OutOfMemory, bsize, "region_alloc_array",
+				 "keys");
 			return -1;
 		}
 		for (uint32_t i = 0; i < old_space->index_count; ++i)
@@ -2733,10 +2737,12 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		 * index and a space format, defined by a user.
 		 */
 		struct key_def **keys;
-		size_t bsize = old_space->index_count * sizeof(keys[0]);
-		keys = (struct key_def **) region_alloc(&fiber()->gc, bsize);
+		size_t bsize;
+		keys = region_alloc_array(&fiber()->gc, typeof(keys[0]),
+					  old_space->index_count, &bsize);
 		if (keys == NULL) {
-			diag_set(OutOfMemory, bsize, "region", "new slab");
+			diag_set(OutOfMemory, bsize, "region_alloc_array",
+				 "keys");
 			return -1;
 		}
 		for (uint32_t i = 0, j = 0; i < old_space->index_count; ++i) {
@@ -5009,11 +5015,13 @@ decode_fk_links(struct tuple *tuple, uint32_t *out_count,
 		return NULL;
 	}
 	*out_count = count;
-	size_t size = count * sizeof(struct field_link);
+	size_t size;
 	struct field_link *region_links =
-		(struct field_link *)region_alloc(&fiber()->gc, size);
+		region_alloc_array(&fiber()->gc, typeof(region_links[0]), count,
+				   &size);
 	if (region_links == NULL) {
-		diag_set(OutOfMemory, size, "region", "struct field_link");
+		diag_set(OutOfMemory, size, "region_alloc_array",
+			 "region_links");
 		return NULL;
 	}
 	memset(region_links, 0, size);
@@ -5054,7 +5062,9 @@ fk_constraint_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 						   name_len, errcode);
 	if (links == NULL)
 		return NULL;
-	size_t fk_def_sz = fk_constraint_def_sizeof(link_count, name_len);
+	uint32_t links_offset;
+	size_t fk_def_sz = fk_constraint_def_sizeof(link_count, name_len,
+						    &links_offset);
 	struct fk_constraint_def *fk_def =
 		(struct fk_constraint_def *) malloc(fk_def_sz);
 	if (fk_def == NULL) {
@@ -5065,8 +5075,7 @@ fk_constraint_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 	auto def_guard = make_scoped_guard([=] { free(fk_def); });
 	memcpy(fk_def->name, name, name_len);
 	fk_def->name[name_len] = '\0';
-	fk_def->links = (struct field_link *)((char *)&fk_def->name +
-					      name_len + 1);
+	fk_def->links = (struct field_link *)((char *)fk_def + links_offset);
 	memcpy(fk_def->links, links, link_count * sizeof(struct field_link));
 	fk_def->field_count = link_count;
 	if (tuple_field_u32(tuple, BOX_FK_CONSTRAINT_FIELD_CHILD_ID,

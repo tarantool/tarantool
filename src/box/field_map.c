@@ -43,10 +43,12 @@ field_map_builder_create(struct field_map_builder *builder,
 		builder->slots = NULL;
 		return 0;
 	}
-	uint32_t sz = builder->slot_count * sizeof(builder->slots[0]);
-	builder->slots = region_alloc(region, sz);
+	uint32_t sz;
+	builder->slots = region_alloc_array(region, typeof(builder->slots[0]),
+					    builder->slot_count, &sz);
 	if (builder->slots == NULL) {
-		diag_set(OutOfMemory, sz, "region_alloc", "field_map");
+		diag_set(OutOfMemory, sz, "region_alloc_array",
+			 "builder->slots");
 		return -1;
 	}
 	memset((char *)builder->slots, 0, sz);
@@ -61,11 +63,12 @@ field_map_builder_slot_extent_new(struct field_map_builder *builder,
 {
 	struct field_map_builder_slot_extent *extent;
 	assert(!builder->slots[offset_slot].has_extent);
-	uint32_t sz = sizeof(struct field_map_builder_slot_extent) +
-		      multikey_count * sizeof(uint32_t);
-	extent = region_alloc(region, sz);
+	uint32_t sz = sizeof(*extent) +
+		      multikey_count * sizeof(extent->offset[0]);
+	extent = (struct field_map_builder_slot_extent *)
+		region_aligned_alloc(region, sz, alignof(*extent));
 	if (extent == NULL) {
-		diag_set(OutOfMemory, sz, "region", "extent");
+		diag_set(OutOfMemory, sz, "region_aligned_alloc", "extent");
 		return NULL;
 	}
 	memset(extent, 0, sz);

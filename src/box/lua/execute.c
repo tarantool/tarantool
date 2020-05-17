@@ -404,15 +404,16 @@ lua_sql_bind_list_decode(struct lua_State *L, struct sql_bind **out_bind,
 	}
 	struct region *region = &fiber()->gc;
 	uint32_t used = region_used(region);
-	size_t size = sizeof(struct sql_bind) * bind_count;
+	size_t size;
 	/*
 	 * Memory allocated here will be freed in
 	 * sql_stmt_finalize() or in txn_commit()/txn_rollback() if
 	 * there is an active transaction.
 	 */
-	struct sql_bind *bind = (struct sql_bind *) region_alloc(region, size);
+	struct sql_bind *bind = region_alloc_array(region, typeof(bind[0]),
+						   bind_count, &size);
 	if (bind == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "bind");
+		diag_set(OutOfMemory, size, "region_alloc_array", "bind");
 		return -1;
 	}
 	for (uint32_t i = 0; i < bind_count; ++i) {

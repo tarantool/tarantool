@@ -1084,10 +1084,13 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 		 * predicates, so we consider term as sequence
 		 * of AND'ed predicates.
 		 */
-		size_t addrs_sz = sizeof(int) * nEq;
-		int *seek_addrs = region_alloc(&pParse->region, addrs_sz);
+		size_t addrs_sz;
+		int *seek_addrs = region_alloc_array(&pParse->region,
+						     typeof(seek_addrs[0]), nEq,
+						     &addrs_sz);
 		if (seek_addrs == NULL) {
-			diag_set(OutOfMemory, addrs_sz, "region", "seek_addrs");
+			diag_set(OutOfMemory, addrs_sz, "region_alloc_array",
+				 "seek_addrs");
 			pParse->is_aborted = true;
 			return 0;
 		}

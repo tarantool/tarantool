@@ -621,12 +621,13 @@ vy_log_record_decode(struct vy_log_record *record,
 		case VY_LOG_KEY_DEF: {
 			struct region *region = &fiber()->gc;
 			uint32_t part_count = mp_decode_array(&pos);
-			struct key_part_def *parts = region_alloc(region,
-						sizeof(*parts) * part_count);
+			size_t size;
+			struct key_part_def *parts =
+				region_alloc_array(region, typeof(parts[0]),
+						   part_count, &size);
 			if (parts == NULL) {
-				diag_set(OutOfMemory,
-					 sizeof(*parts) * part_count,
-					 "region", "struct key_part_def");
+				diag_set(OutOfMemory, size,
+					 "region_alloc_array", "parts");
 				return -1;
 			}
 			if (key_def_decode_parts(parts, part_count, &pos,
@@ -701,18 +702,18 @@ static struct vy_log_record *
 vy_log_record_dup(struct region *pool, const struct vy_log_record *src)
 {
 	size_t used = region_used(pool);
-
-	struct vy_log_record *dst = region_alloc(pool, sizeof(*dst));
+	size_t size;
+	struct vy_log_record *dst = region_alloc_object(pool, typeof(*dst),
+							&size);
 	if (dst == NULL) {
-		diag_set(OutOfMemory, sizeof(*dst),
-			 "region", "struct vy_log_record");
+		diag_set(OutOfMemory, size, "region_alloc_object", "dst");
 		goto err;
 	}
 	*dst = *src;
 	if (src->begin != NULL) {
 		const char *data = src->begin;
 		mp_next(&data);
-		size_t size = data - src->begin;
+		size = data - src->begin;
 		dst->begin = region_alloc(pool, size);
 		if (dst->begin == NULL) {
 			diag_set(OutOfMemory, size, "region",
@@ -724,7 +725,7 @@ vy_log_record_dup(struct region *pool, const struct vy_log_record *src)
 	if (src->end != NULL) {
 		const char *data = src->end;
 		mp_next(&data);
-		size_t size = data - src->end;
+		size = data - src->end;
 		dst->end = region_alloc(pool, size);
 		if (dst->end == NULL) {
 			diag_set(OutOfMemory, size, "region",
@@ -734,12 +735,12 @@ vy_log_record_dup(struct region *pool, const struct vy_log_record *src)
 		memcpy((char *)dst->end, src->end, size);
 	}
 	if (src->key_def != NULL) {
-		size_t size = src->key_def->part_count *
-				sizeof(struct key_part_def);
-		dst->key_parts = region_alloc(pool, size);
+		dst->key_parts =
+			region_alloc_array(pool, typeof(dst->key_parts[0]),
+					   src->key_def->part_count, &size);
 		if (dst->key_parts == NULL) {
-			diag_set(OutOfMemory, size, "region",
-				 "struct key_part_def");
+			diag_set(OutOfMemory, size, "region_alloc_array",
+				 "def->key_parts");
 			goto err;
 		}
 		if (key_def_dump_parts(src->key_def, dst->key_parts, pool) != 0)

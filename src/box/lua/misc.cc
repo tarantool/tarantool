@@ -182,13 +182,13 @@ lbox_tuple_format_new(struct lua_State *L)
 	uint32_t count = lua_objlen(L, 1);
 	if (count == 0)
 		return lbox_push_tuple_format(L, tuple_format_runtime);
-	size_t size = count * sizeof(struct field_def);
+	size_t size;
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	struct field_def *fields =
-		(struct field_def *)region_alloc(region, size);
+	struct field_def *fields = region_alloc_array(region, typeof(fields[0]),
+						      count, &size);
 	if (fields == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "fields");
+		diag_set(OutOfMemory, size, "region_alloc_array", "fields");
 		return luaT_error(L);
 	}
 	for (uint32_t i = 0; i < count; ++i) {

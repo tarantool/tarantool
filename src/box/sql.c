@@ -341,13 +341,17 @@ sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 	uint32_t name_len = strlen("_COLUMN_") + 11;
 	uint32_t size = field_count * (sizeof(struct field_def) + name_len) +
 			part_count * sizeof(struct key_part_def);
-	struct field_def *fields = region_alloc(region, size);
+	struct field_def *fields = region_aligned_alloc(region, size,
+							alignof(fields[0]));
 	if (fields == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "fields");
+		diag_set(OutOfMemory, size, "region_aligned_alloc", "fields");
 		return NULL;
 	}
 	struct key_part_def *ephemer_key_parts =
 		(void *)fields + field_count * sizeof(struct field_def);
+	static_assert(alignof(*fields) == alignof(*ephemer_key_parts),
+		      "allocated in one block, and should have the same "
+		      "alignment");
 	char *names = (char *)ephemer_key_parts +
 		       part_count * sizeof(struct key_part_def);
 	for (uint32_t i = 0; i < field_count; ++i) {
@@ -1234,9 +1238,10 @@ sql_ephemeral_space_def_new(struct Parse *parser, const char *name)
 	uint32_t dummy;
 	size_t size = space_def_sizeof(name_len, NULL, 0, &dummy, &dummy,
 				       &dummy);
-	def = (struct space_def *)region_alloc(&parser->region, size);
+	def = (struct space_def *)region_aligned_alloc(&parser->region, size,
+						       alignof(*def));
 	if (def == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc",
+		diag_set(OutOfMemory, size, "region_aligned_alloc",
 			 "sql_ephemeral_space_def_new");
 		parser->is_aborted = true;
 		return NULL;
@@ -1252,10 +1257,11 @@ sql_ephemeral_space_def_new(struct Parse *parser, const char *name)
 struct space *
 sql_ephemeral_space_new(Parse *parser, const char *name)
 {
-	size_t sz = sizeof(struct space);
-	struct space *space = (struct space *) region_alloc(&parser->region, sz);
+	size_t sz;
+	struct space *space = region_alloc_object(&parser->region,
+						  typeof(*space), &sz);
 	if (space == NULL) {
-		diag_set(OutOfMemory, sz, "region", "space");
+		diag_set(OutOfMemory, sz, "region_alloc_object", "space");
 		parser->is_aborted = true;
 		return NULL;
 	}

@@ -120,10 +120,10 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	int pk_cursor = pParse->nTab++;
 	pTabList->a[0].iCursor = pk_cursor;
 	struct index *pPk = space_index(space, 0);
-	i = sizeof(int) * def->field_count;
-	aXRef = (int *) region_alloc(&pParse->region, i);
+	aXRef = region_alloc_array(&pParse->region, typeof(aXRef[0]),
+				   def->field_count, &i);
 	if (aXRef == NULL) {
-		diag_set(OutOfMemory, i, "region_alloc", "aXRef");
+		diag_set(OutOfMemory, i, "region_alloc_array", "aXRef");
 		goto update_cleanup;
 	}
 	memset(aXRef, -1, i);

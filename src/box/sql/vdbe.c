@@ -605,11 +605,11 @@ static int
 vdbe_add_new_autoinc_id(struct Vdbe *vdbe, int64_t id)
 {
 	assert(vdbe != NULL);
-	struct autoinc_id_entry *id_entry = region_alloc(&fiber()->gc,
-							 sizeof(*id_entry));
+	size_t size;
+	struct autoinc_id_entry *id_entry =
+		region_alloc_object(&fiber()->gc, typeof(*id_entry), &size);
 	if (id_entry == NULL) {
-		diag_set(OutOfMemory, sizeof(*id_entry), "region_alloc",
-			 "id_entry");
+		diag_set(OutOfMemory, size, "region_alloc_object", "id_entry");
 		return -1;
 	}
 	id_entry->id = id;

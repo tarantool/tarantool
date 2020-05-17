@@ -847,11 +847,12 @@ key_def_find_pk_in_cmp_def(const struct key_def *cmp_def,
 	size_t region_svp = region_used(region);
 
 	/* First, dump primary key parts as is. */
-	struct key_part_def *parts = region_alloc(region,
-			pk_def->part_count * sizeof(*parts));
+	size_t size;
+	struct key_part_def *parts =
+		region_alloc_array(region, typeof(parts[0]), pk_def->part_count,
+				   &size);
 	if (parts == NULL) {
-		diag_set(OutOfMemory, pk_def->part_count * sizeof(*parts),
-			 "region", "key def parts");
+		diag_set(OutOfMemory, size, "region_alloc_array", "parts");
 		goto out;
 	}
 	if (key_def_dump_parts(pk_def, parts, region) != 0)

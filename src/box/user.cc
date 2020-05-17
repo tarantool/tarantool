@@ -192,11 +192,11 @@ user_grant_priv(struct user *user, struct priv_def *def)
 {
 	struct priv_def *old = privset_search(&user->privs, def);
 	if (old == NULL) {
-		size_t size = sizeof(struct priv_def);
-		old = (struct priv_def *)
-			region_alloc(&user->pool, size);
+		size_t size;
+		old = region_alloc_object(&user->pool, typeof(*old), &size);
 		if (old == NULL) {
-			diag_set(OutOfMemory, size, "region", "struct priv_def");
+			diag_set(OutOfMemory, size, "region_alloc_object",
+				 "old");
 			return -1;
 		}
 		*old = *def;

@@ -827,13 +827,15 @@ struct txn_savepoint *
 txn_savepoint_new(struct txn *txn, const char *name)
 {
 	assert(txn == in_txn());
-	size_t svp_sz = sizeof(struct txn_savepoint);
 	int name_len = name != NULL ? strlen(name) : 0;
-	svp_sz += name_len;
-	struct txn_savepoint *svp =
-		(struct txn_savepoint *) region_alloc(&txn->region, svp_sz);
+	struct txn_savepoint *svp;
+	static_assert(sizeof(svp->name) == 1,
+		      "name member already has 1 byte for 0 termination");
+	size_t size = sizeof(*svp) + name_len;
+	svp = (struct txn_savepoint *)region_aligned_alloc(&txn->region, size,
+							   alignof(*svp));
 	if (svp == NULL) {
-		diag_set(OutOfMemory, svp_sz, "region", "svp");
+		diag_set(OutOfMemory, size, "region_aligned_alloc", "svp");
 		return NULL;
 	}
 	svp->stmt = stailq_last(&txn->stmts);

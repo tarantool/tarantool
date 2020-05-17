@@ -603,10 +603,11 @@ vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 	rlist_foreach_entry(index_def, key_list, link)
 		key_count++;
 	struct key_def **keys;
-	size_t size = sizeof(*keys) * key_count;
-	keys = region_alloc(&fiber()->gc, size);
+	size_t size;
+	keys = region_alloc_array(&fiber()->gc, typeof(keys[0]), key_count,
+				  &size);
 	if (keys == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "keys");
+		diag_set(OutOfMemory, size, "region_alloc_array", "keys");
 		free(space);
 		return NULL;
 	}
@@ -4447,19 +4448,22 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 		 * which will propagate the WAL row LSN to
 		 * the LSM tree.
 		 */
-		struct trigger *on_commit = region_alloc(&txn->region,
-							 sizeof(*on_commit));
+		size_t size;
+		struct trigger *on_commit =
+			region_alloc_object(&txn->region, typeof(*on_commit),
+					    &size);
 		if (on_commit == NULL) {
-			diag_set(OutOfMemory, sizeof(*on_commit),
-				 "region", "struct trigger");
+			diag_set(OutOfMemory, size, "region_alloc_object",
+				 "on_commit");
 			rc = -1;
 			break;
 		}
-		struct trigger *on_rollback = region_alloc(&txn->region,
-							   sizeof(*on_commit));
+		struct trigger *on_rollback =
+			region_alloc_object(&txn->region, typeof(*on_rollback),
+					    &size);
 		if (on_rollback == NULL) {
-			diag_set(OutOfMemory, sizeof(*on_commit),
-				 "region", "struct trigger");
+			diag_set(OutOfMemory, size, "region_alloc_object",
+				 "on_rollback");
 			rc = -1;
 			break;
 		}

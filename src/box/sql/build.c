@@ -260,12 +260,12 @@ sql_field_retrieve(Parse *parser, struct space_def *space_def, uint32_t id)
 		uint32_t columns_new = space_def->exact_field_count;
 		columns_new = (columns_new > 0) ? 2 * columns_new : 1;
 		struct region *region = &parser->region;
-		field = region_alloc(region, columns_new *
-				     sizeof(space_def->fields[0]));
+		size_t size;
+		field = region_alloc_array(region, typeof(field[0]),
+					   columns_new, &size);
 		if (field == NULL) {
-			diag_set(OutOfMemory, columns_new *
-				sizeof(space_def->fields[0]),
-				"region_alloc", "sql_field_retrieve");
+			diag_set(OutOfMemory, size, "region_alloc_array",
+				 "field");
 			parser->is_aborted = true;
 			return NULL;
 		}
@@ -609,10 +609,12 @@ sql_create_check_contraint(struct Parse *parser)
 	uint32_t expr_str_offset;
 	uint32_t ck_def_sz = ck_constraint_def_sizeof(name_len, expr_str_len,
 						      &expr_str_offset);
-	struct ck_constraint_parse *ck_parse =
-		region_alloc(region, sizeof(*ck_parse) + ck_def_sz);
+	struct ck_constraint_parse *ck_parse;
+	size_t total = sizeof(*ck_parse) + ck_def_sz;
+	ck_parse = (struct ck_constraint_parse *)
+		region_aligned_alloc(region, total, alignof(*ck_parse));
 	if (ck_parse == NULL) {
-		diag_set(OutOfMemory, sizeof(*ck_parse) + ck_def_sz, "region",
+		diag_set(OutOfMemory, total, "region_aligned_alloc",
 			 "ck_parse");
 		parser->is_aborted = true;
 		return;
@@ -620,6 +622,9 @@ sql_create_check_contraint(struct Parse *parser)
 	struct ck_constraint_def *ck_def =
 		(struct ck_constraint_def *)((char *)ck_parse +
 					     sizeof(*ck_parse));
+	static_assert(alignof(*ck_def) == alignof(*ck_parse),
+		      "allocated in one block and should have the same "
+		      "alignment");
 	ck_parse->ck_def = ck_def;
 	rlist_create(&ck_parse->link);
 
@@ -1878,11 +1883,13 @@ sql_create_foreign_key(struct Parse *parse_context)
 			goto tnt_error;
 		}
 	} else {
+		size_t size;
 		struct fk_constraint_parse *fk_parse =
-			region_alloc(&parse_context->region, sizeof(*fk_parse));
+			region_alloc_object(&parse_context->region,
+					    typeof(*fk_parse), &size);
 		if (fk_parse == NULL) {
-			diag_set(OutOfMemory, sizeof(*fk_parse), "region_alloc",
-				 "struct fk_constraint_parse");
+			diag_set(OutOfMemory, size, "region_alloc_object",
+				 "fk_parse");
 			goto tnt_error;
 		}
 		memset(fk_parse, 0, sizeof(*fk_parse));
@@ -1966,12 +1973,15 @@ sql_create_foreign_key(struct Parse *parse_context)
 		}
 	}
 	int name_len = strlen(constraint_name);
-	size_t fk_def_sz = fk_constraint_def_sizeof(child_cols_count, name_len);
-	struct fk_constraint_def *fk_def = region_alloc(&parse_context->region,
-							fk_def_sz);
+	uint32_t links_offset;
+	size_t fk_def_sz = fk_constraint_def_sizeof(child_cols_count, name_len,
+						    &links_offset);
+	struct fk_constraint_def *fk_def = (struct fk_constraint_def *)
+		region_aligned_alloc(&parse_context->region, fk_def_sz,
+				     alignof(*fk_def));
 	if (fk_def == NULL) {
-		diag_set(OutOfMemory, fk_def_sz, "region",
-			 "struct fk_constraint_def");
+		diag_set(OutOfMemory, fk_def_sz, "region_aligned_alloc",
+			 "fk_def");
 		goto tnt_error;
 	}
 	int actions = create_fk_def->actions;
@@ -1982,7 +1992,7 @@ sql_create_foreign_key(struct Parse *parse_context)
 	fk_def->match = (enum fk_constraint_match) (create_fk_def->match);
 	fk_def->on_update = (enum fk_constraint_action) ((actions >> 8) & 0xff);
 	fk_def->on_delete = (enum fk_constraint_action) (actions & 0xff);
-	fk_def->links = (struct field_link *) ((char *) fk_def->name + name_len + 1);
+	fk_def->links = (struct field_link *)((char *)fk_def + links_offset);
 	/* Fill links map. */
 	for (uint32_t i = 0; i < fk_def->field_count; ++i) {
 		if (!is_self_referenced && parent_cols == NULL) {
@@ -2269,11 +2279,13 @@ index_fill_def(struct Parse *parse, struct index *index,
 	int rc = -1;
 
 	struct key_def *key_def = NULL;
-	struct key_part_def *key_parts = region_alloc(&fiber()->gc,
-				sizeof(*key_parts) * expr_list->nExpr);
+	size_t size;
+	struct key_part_def *key_parts =
+		region_alloc_array(&fiber()->gc, typeof(key_parts[0]),
+				   expr_list->nExpr, &size);
 	if (key_parts == NULL) {
-		diag_set(OutOfMemory, sizeof(*key_parts) * expr_list->nExpr,
-			 "region", "key parts");
+		diag_set(OutOfMemory, size, "region_alloc_array",
+			 "key_parts");
 		goto tnt_error;
 	}
 	for (int i = 0; i < expr_list->nExpr; i++) {
@@ -2523,10 +2535,10 @@ sql_create_index(struct Parse *parse) {
 			parse->is_aborted = true;
 		}
 	}
-
-	index = (struct index *) region_alloc(&parse->region, sizeof(*index));
+	size_t size;
+	index = region_alloc_object(&parse->region, typeof(*index), &size);
 	if (index == NULL) {
-		diag_set(OutOfMemory, sizeof(*index), "region", "index");
+		diag_set(OutOfMemory, size, "region_alloc_object", "index");
 		parse->is_aborted = true;
 		goto exit_create_index;
 	}

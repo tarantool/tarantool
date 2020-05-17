@@ -1773,11 +1773,12 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 	if (pParse->colNamesSet || db->mallocFailed)
 		return;
 	assert(v != 0);
-	size_t var_pos_sz =  pParse->nVar * sizeof(uint32_t);
-	uint32_t *var_pos = (uint32_t *) region_alloc(&pParse->region,
-						      var_pos_sz);
+	size_t size;
+	uint32_t *var_pos =
+		region_alloc_array(&pParse->region, typeof(var_pos[0]),
+				   pParse->nVar, &size);
 	if (var_pos == NULL) {
-		diag_set(OutOfMemory, var_pos_sz, "region", "var_pos");
+		diag_set(OutOfMemory, size, "region_alloc_array", "var_pos");
 		return;
 	}
 	assert(pTabList != 0);
@@ -1911,9 +1912,10 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 	 */
 	assert(space_def->fields == NULL);
 	struct region *region = &parse->region;
+	size_t size;
 	space_def->fields =
-		region_alloc(region,
-			     column_count * sizeof(space_def->fields[0]));
+		region_alloc_array(region, typeof(space_def->fields[0]),
+				   column_count, &size);
 	if (space_def->fields == NULL) {
 		sqlOomFault(db);
 		goto cleanup;
