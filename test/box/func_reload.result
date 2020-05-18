@@ -46,7 +46,7 @@ box.schema.user.grant('guest', 'read,write', 'space', 'test')
 _ = fio.unlink(reload_path)
 ---
 ...
-fio.symlink(reload1_path, reload_path)
+fio.copyfile(reload1_path, reload_path)
 ---
 - true
 ...
@@ -68,10 +68,7 @@ box.space.test:delete{0}
 ---
 - [0]
 ...
-_ = fio.unlink(reload_path)
----
-...
-fio.symlink(reload2_path, reload_path)
+fio.copyfile(reload2_path, reload_path)
 ---
 - true
 ...
@@ -92,10 +89,7 @@ box.space.test:truncate()
 ---
 ...
 -- test case with hanging calls
-_ = fio.unlink(reload_path)
----
-...
-fio.symlink(reload1_path, reload_path)
+fio.copyfile(reload1_path, reload_path)
 ---
 - true
 ...
@@ -115,10 +109,7 @@ while box.space.test:count() < fibers do fiber.sleep(0.001) end
 box.schema.func.reload("reload")
 ---
 ...
-_ = fio.unlink(reload_path)
----
-...
-fio.symlink(reload2_path, reload_path)
+fio.copyfile(reload2_path, reload_path)
 ---
 - true
 ...
@@ -162,10 +153,7 @@ box.schema.func.drop("reload.foo")
 box.space.test:drop()
 ---
 ...
-_ = fio.unlink(reload_path)
----
-...
-fio.symlink(reload1_path, reload_path)
+fio.copyfile(reload1_path, reload_path)
 ---
 - true
 ...
@@ -196,10 +184,7 @@ s:delete({1})
 ---
 - [1, 2]
 ...
-_ = fio.unlink(reload_path)
----
-...
-fio.symlink(reload2_path, reload_path)
+fio.copyfile(reload2_path, reload_path)
 ---
 - true
 ...
@@ -236,10 +221,7 @@ c:call("reload.test_reload_fail")
 ---
 - [[2]]
 ...
-_ = fio.unlink(reload_path)
----
-...
-fio.symlink(reload1_path, reload_path)
+fio.copyfile(reload1_path, reload_path)
 ---
 - true
 ...
