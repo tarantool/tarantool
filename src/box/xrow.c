@@ -892,7 +892,7 @@ xrow_to_iovec(const struct xrow_header *row, struct iovec *out)
 	/* Encode length */
 	char *data = (char *) out[0].iov_base;
 	*(data++) = 0xce; /* MP_UINT32 */
-	*(uint32_t *) data = mp_bswap_u32(len);
+	store_u32(data, mp_bswap_u32(len));
 
 	assert(iovcnt <= XROW_IOVMAX);
 	return iovcnt;
