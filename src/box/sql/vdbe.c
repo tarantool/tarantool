@@ -3503,9 +3503,9 @@ case OP_SeekGT: {       /* jump, in3 */
 			i = pIn3->u.u;
 			is_neg = false;
 		} else if ((pIn3->flags & MEM_Real) == MEM_Real) {
-			if (pIn3->u.r > INT64_MAX)
+			if (pIn3->u.r > (double)INT64_MAX)
 				i = INT64_MAX;
-			else if (pIn3->u.r < INT64_MIN)
+			else if (pIn3->u.r < (double)INT64_MIN)
 				i = INT64_MIN;
 			else
 				i = pIn3->u.r;
