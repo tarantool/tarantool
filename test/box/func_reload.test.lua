@@ -17,7 +17,7 @@ _ = box.schema.space.create('test')
 _ = box.space.test:create_index('primary', {parts = {1, "integer"}})
 box.schema.user.grant('guest', 'read,write', 'space', 'test')
 _ = fio.unlink(reload_path)
-fio.symlink(reload1_path, reload_path)
+fio.copyfile(reload1_path, reload_path)
 
 --check not fail on non-load func
 box.schema.func.reload("reload")
@@ -26,8 +26,7 @@ box.schema.func.reload("reload")
 box.space.test:insert{0}
 c:call("reload.foo", {1})
 box.space.test:delete{0}
-_ = fio.unlink(reload_path)
-fio.symlink(reload2_path, reload_path)
+fio.copyfile(reload2_path, reload_path)
 
 box.schema.func.reload("reload")
 c:call("reload.foo")
@@ -35,8 +34,7 @@ box.space.test:select{}
 box.space.test:truncate()
 
 -- test case with hanging calls
-_ = fio.unlink(reload_path)
-fio.symlink(reload1_path, reload_path)
+fio.copyfile(reload1_path, reload_path)
 box.schema.func.reload("reload")
 
 fibers = 10
@@ -46,8 +44,7 @@ while box.space.test:count() < fibers do fiber.sleep(0.001) end
 -- double reload doesn't fail waiting functions
 box.schema.func.reload("reload")
 
-_ = fio.unlink(reload_path)
-fio.symlink(reload2_path, reload_path)
+fio.copyfile(reload2_path, reload_path)
 box.schema.func.reload("reload")
 c:call("reload.foo")
 
@@ -55,9 +52,8 @@ while box.space.test:count() < 2 * fibers + 1 do fiber.sleep(0.001) end
 box.space.test:select{}
 box.schema.func.drop("reload.foo")
 box.space.test:drop()
-_ = fio.unlink(reload_path)
 
-fio.symlink(reload1_path, reload_path)
+fio.copyfile(reload1_path, reload_path)
 box.schema.func.create('reload.test_reload', {language = "C"})
 box.schema.user.grant('guest', 'execute', 'function', 'reload.test_reload')
 s = box.schema.space.create('test_reload')
@@ -67,8 +63,7 @@ ch = fiber.channel(2)
 -- call first time to load function
 c:call("reload.test_reload")
 s:delete({1})
-_ = fio.unlink(reload_path)
-fio.symlink(reload2_path, reload_path)
+fio.copyfile(reload2_path, reload_path)
 _ = fiber.create(function() ch:put(c:call("reload.test_reload")) end)
 while s:get({1}) == nil do fiber.yield(0.0001) end
 box.schema.func.reload("reload")
@@ -80,8 +75,7 @@ s:drop()
 box.schema.func.create('reload.test_reload_fail', {language = "C"})
 box.schema.user.grant('guest', 'execute', 'function', 'reload.test_reload_fail')
 c:call("reload.test_reload_fail")
-_ = fio.unlink(reload_path)
-fio.symlink(reload1_path, reload_path)
+fio.copyfile(reload1_path, reload_path)
 c:call("reload.test_reload")
 c:call("reload.test_reload_fail")
 

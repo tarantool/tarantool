@@ -40,6 +40,8 @@
 #include "port.h"
 #include "schema.h"
 #include "session.h"
+#include "libeio/eio.h"
+#include <fcntl.h>
 #include <dlfcn.h>
 
 /**
@@ -269,10 +271,45 @@ module_load(const char *package, const char *package_end)
 	char load_name[PATH_MAX + 1];
 	snprintf(load_name, sizeof(load_name), "%s/%.*s." TARANTOOL_LIBEXT,
 		 dir_name, package_len, package);
-	if (symlink(path, load_name) < 0) {
-		diag_set(SystemError, "failed to create dso link");
+
+	struct stat st;
+	if (stat(path, &st) < 0) {
+		diag_set(SystemError, "failed to stat() module %s", path);
 		goto error;
 	}
+
+	int source_fd = open(path, O_RDONLY);
+	if (source_fd < 0) {
+		diag_set(SystemError, "failed to open module %s file for" \
+			 " reading", path);
+		goto error;
+	}
+	int dest_fd = open(load_name, O_WRONLY|O_CREAT|O_TRUNC,
+			   st.st_mode & 0777);
+	if (dest_fd < 0) {
+		diag_set(SystemError, "failed to open file %s for writing ",
+			 load_name);
+		close(source_fd);
+		goto error;
+	}
+
+	off_t pos, left;
+	for (left = st.st_size, pos = 0; left > 0;) {
+		off_t ret = eio_sendfile_sync(dest_fd, source_fd, pos,
+					      st.st_size);
+		if (ret < 0) {
+			diag_set(SystemError, "failed to copy DSO %s to %s",
+				 path, load_name);
+			close(source_fd);
+			close(dest_fd);
+			goto error;
+		}
+		pos += ret;
+		left -= ret;
+	}
+	close(source_fd);
+	close(dest_fd);
+
 	module->handle = dlopen(load_name, RTLD_NOW | RTLD_LOCAL);
 	if (unlink(load_name) != 0)
 		say_warn("failed to unlink dso link %s", load_name);
