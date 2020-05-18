@@ -233,6 +233,30 @@ c:call("reload.test_reload_fail")
 ---
 - [[2]]
 ...
+box.schema.func.reload()
+---
+- error: 'bad argument #1 to ''?'' (string expected, got no value)'
+...
+box.schema.func.reload("non-existing")
+---
+- error: Module 'non-existing' does not exist
+...
+-- Make sure that $TMPDIR env variable is used to generate temporary
+-- path for DSO copy
+os.setenv("TMPDIR", "/dev/null")
+---
+...
+_, err = pcall(box.schema.func.reload, "reload")
+---
+...
+tostring(err):gsub(': [/%w]+$', '')
+---
+- failed to create unique dir name
+- 1
+...
+os.setenv("TMPDIR", nil)
+---
+...
 box.schema.func.drop("reload.test_reload")
 ---
 ...
@@ -241,12 +265,4 @@ box.schema.func.drop("reload.test_reload_fail")
 ...
 _ = fio.unlink(reload_path)
 ---
-...
-box.schema.func.reload()
----
-- error: 'bad argument #1 to ''?'' (string expected, got no value)'
-...
-box.schema.func.reload("non-existing")
----
-- error: Module 'non-existing' does not exist
 ...
