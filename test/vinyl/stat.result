@@ -761,7 +761,7 @@ put(1)
 ...
 stat_diff(gstat(), st, 'memory.level0')
 ---
-- 1061
+- 1064
 ...
 -- use cache
 st = gstat()
@@ -1130,7 +1130,7 @@ gstat()
   memory:
     tuple_cache: 14417
     tx: 0
-    level0: 262583
+    level0: 263210
     page_index: 1250
     bloom_filter: 140
   disk:

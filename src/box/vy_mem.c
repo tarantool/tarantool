@@ -75,11 +75,12 @@ vy_mem_tree_extent_alloc(void *ctx)
 {
 	struct vy_mem *mem = (struct vy_mem *) ctx;
 	struct vy_mem_env *env = mem->env;
-	void *ret = lsregion_alloc(&env->allocator, VY_MEM_TREE_EXTENT_SIZE,
-				   mem->generation);
+	void *ret = lsregion_aligned_alloc(&env->allocator,
+					   VY_MEM_TREE_EXTENT_SIZE,
+					   alignof(void *), mem->generation);
 	if (ret == NULL) {
-		diag_set(OutOfMemory, VY_MEM_TREE_EXTENT_SIZE, "lsregion_alloc",
-			 "ret");
+		diag_set(OutOfMemory, VY_MEM_TREE_EXTENT_SIZE,
+			 "lsregion_aligned_alloc", "ret");
 		return NULL;
 	}
 	mem->tree_extent_size += VY_MEM_TREE_EXTENT_SIZE;
