@@ -231,20 +231,23 @@ vy_stmt_dup_lsregion(struct tuple *stmt, struct lsregion *lsregion,
 	size_t size = tuple_size(stmt);
 	size_t alloc_size = size;
 	struct tuple *mem_stmt;
+	const size_t align = alignof(struct vy_stmt);
 
 	/* Reserve one byte for UPSERT counter. */
 	if (type == IPROTO_UPSERT)
-		alloc_size++;
+		alloc_size += align;
 
-	mem_stmt = lsregion_alloc(lsregion, alloc_size, alloc_id);
+	mem_stmt = lsregion_aligned_alloc(lsregion, alloc_size, align,
+					  alloc_id);
 	if (mem_stmt == NULL) {
-		diag_set(OutOfMemory, size, "lsregion_alloc", "mem_stmt");
+		diag_set(OutOfMemory, alloc_size, "lsregion_aligned_alloc",
+			 "mem_stmt");
 		return NULL;
 	}
 
 	if (type == IPROTO_UPSERT) {
-		*(uint8_t *)mem_stmt = 0;
-		mem_stmt = (struct tuple *)((uint8_t *)mem_stmt + 1);
+		memset(mem_stmt, 0, align);
+		mem_stmt = (struct tuple *)((uint8_t *)mem_stmt + align);
 	}
 
 	memcpy(mem_stmt, stmt, size);

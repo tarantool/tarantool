@@ -31,7 +31,7 @@ space:insert({1, 1})
 ...
 box.stat.vinyl().memory.level0
 ---
-- 98343
+- 98344
 ...
 space:insert({1, 1})
 ---
@@ -39,7 +39,7 @@ space:insert({1, 1})
 ...
 box.stat.vinyl().memory.level0
 ---
-- 98343
+- 98344
 ...
 space:update({1}, {{'!', 1, 100}}) -- try to modify the primary key
 ---
@@ -47,7 +47,7 @@ space:update({1}, {{'!', 1, 100}}) -- try to modify the primary key
 ...
 box.stat.vinyl().memory.level0
 ---
-- 98343
+- 98344
 ...
 space:insert({2, 2})
 ---
@@ -63,7 +63,7 @@ space:insert({4, 4})
 ...
 box.stat.vinyl().memory.level0
 ---
-- 98460
+- 98463
 ...
 box.snapshot()
 ---
@@ -89,7 +89,7 @@ _ = space:replace{1, 1, string.rep('a', 1024 * 1024 * 5)}
 ...
 box.stat.vinyl().memory.level0
 ---
-- 5292076
+- 5292080
 ...
 space:drop()
 ---
