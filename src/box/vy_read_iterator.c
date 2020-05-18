@@ -168,9 +168,9 @@ vy_read_iterator_range_is_done(struct vy_read_iterator *itr,
  * Compare two tuples from the read iterator perspective.
  *
  * Returns:
- *  -1 if statement @a precedes statement @b in the iterator output
- *   0 if statements @a and @b are at the same position
- *   1 if statement @a supersedes statement @b
+ *  < 0 if statement @a precedes statement @b in the iterator output
+ * == 0 if statements @a and @b are at the same position
+ *  > 0 if statement @a supersedes statement @b
  *
  * NULL denotes the statement following the last one.
  */
