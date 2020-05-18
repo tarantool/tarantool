@@ -234,10 +234,9 @@ allocateCursor(
 	 */
 	Mem *pMem = iCur>0 ? &p->aMem[p->nMem-iCur] : p->aMem;
 
-	int nByte;
 	VdbeCursor *pCx = 0;
-	nByte =
-		ROUND8(sizeof(VdbeCursor)) + sizeof(u32)*nField +
+	int bt_offset = ROUND8(sizeof(VdbeCursor) + sizeof(uint32_t) * nField);
+	int nByte = bt_offset +
 		(eCurType==CURTYPE_TARANTOOL ? ROUND8(sizeof(BtCursor)) : 0);
 
 	assert(iCur>=0 && iCur<p->nCursor);
@@ -251,8 +250,7 @@ allocateCursor(
 		pCx->eCurType = eCurType;
 		pCx->nField = nField;
 		if (eCurType==CURTYPE_TARANTOOL) {
-			pCx->uc.pCursor = (BtCursor*)
-				&pMem->z[ROUND8(sizeof(VdbeCursor))+sizeof(u32)*nField];
+			pCx->uc.pCursor = (BtCursor*)&pMem->z[bt_offset];
 			sqlCursorZero(pCx->uc.pCursor);
 		}
 	}
