@@ -104,7 +104,7 @@ vy_rate_limit_refill(struct vy_rate_limit *rl, double time)
 	double value = rl->value + size;
 	/* Allow bursts up to 2x rate. */
 	value = MIN(value, size * 2);
-	rl->value = MIN(value, SSIZE_MAX);
+	rl->value = MIN((ssize_t)value, SSIZE_MAX);
 }
 
 typedef void
