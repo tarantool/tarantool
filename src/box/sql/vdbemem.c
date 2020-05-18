@@ -712,11 +712,11 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 			double d;
 			if (sqlVdbeRealValue(pMem, &d) != 0)
 				return -1;
-			if (d < INT64_MAX && d >= INT64_MIN) {
+			if (d < (double)INT64_MAX && d >= (double)INT64_MIN) {
 				mem_set_int(pMem, d, d <= -1);
 				return 0;
 			}
-			if (d >= INT64_MAX && d < UINT64_MAX) {
+			if (d >= (double)INT64_MAX && d < (double)UINT64_MAX) {
 				mem_set_u64(pMem, d);
 				return 0;
 			}
