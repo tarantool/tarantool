@@ -79,9 +79,16 @@ fio.copyfile(reload1_path, reload_path)
 c:call("reload.test_reload")
 c:call("reload.test_reload_fail")
 
+box.schema.func.reload()
+box.schema.func.reload("non-existing")
+
+-- Make sure that $TMPDIR env variable is used to generate temporary
+-- path for DSO copy
+os.setenv("TMPDIR", "/dev/null")
+_, err = pcall(box.schema.func.reload, "reload")
+tostring(err):gsub(': [/%w]+$', '')
+os.setenv("TMPDIR", nil)
+
 box.schema.func.drop("reload.test_reload")
 box.schema.func.drop("reload.test_reload_fail")
 _ = fio.unlink(reload_path)
-
-box.schema.func.reload()
-box.schema.func.reload("non-existing")

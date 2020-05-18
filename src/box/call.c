@@ -129,10 +129,12 @@ box_module_reload(const char *name)
 		return -1;
 	}
 	struct module *module = NULL;
-	if (module_reload(name, name + strlen(name), &module) == 0 &&
-	    module != NULL)
-		return 0;
-	diag_set(ClientError, ER_NO_SUCH_MODULE, name);
+	if (module_reload(name, name + strlen(name), &module) == 0) {
+		if (module != NULL)
+			return 0;
+		else
+			diag_set(ClientError, ER_NO_SUCH_MODULE, name);
+	}
 	return -1;
 }
 
