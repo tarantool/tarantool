@@ -79,7 +79,7 @@ ffi.cdef[[
     box_txn_savepoint_t *
     box_txn_savepoint();
 
-    struct __attribute__((packed)) port_c_entry {
+    struct port_c_entry {
         struct port_c_entry *next;
         union {
             struct tuple *tuple;
