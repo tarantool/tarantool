@@ -857,9 +857,9 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 	 * handle the rounding directly,
 	 * otherwise use printf.
 	 */
-	if (n == 0 && r >= 0 && r < LARGEST_INT64 - 1) {
+	if (n == 0 && r >= 0 && r < (double)(LARGEST_INT64 - 1)) {
 		r = (double)((sql_int64) (r + 0.5));
-	} else if (n == 0 && r < 0 && (-r) < LARGEST_INT64 - 1) {
+	} else if (n == 0 && r < 0 && (-r) < (double)(LARGEST_INT64 - 1)) {
 		r = -(double)((sql_int64) ((-r) + 0.5));
 	} else {
 		const char *rounded_value = tt_sprintf("%.*f", n, r);
