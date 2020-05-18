@@ -106,12 +106,7 @@ void
 port_vdbemem_create(struct port *base, struct sql_value *mem,
 		    uint32_t mem_count);
 
-/**
- * The struct is PACKED to avoid unnecessary 4 byte padding
- * after mp_size. These objects are never stored on stack, neither
- * allocated as an array, so the padding is not needed.
- */
-struct PACKED port_c_entry {
+struct port_c_entry {
 	struct port_c_entry *next;
 	union {
 		/** Valid if mp_size is 0. */
@@ -125,9 +120,6 @@ struct PACKED port_c_entry {
 	};
 	uint32_t mp_size;
 };
-
-static_assert(sizeof(struct port_c_entry) == 20,
-	      "port_c_entry is expected to be perfectly aligned and packed");
 
 /**
  * C port is used by C functions from the public API. They can
