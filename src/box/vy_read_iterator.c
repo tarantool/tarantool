@@ -380,56 +380,6 @@ vy_read_iterator_scan_disk(struct vy_read_iterator *itr, uint32_t disk_src,
 	return 0;
 }
 
-/**
- * Restore the position of the active in-memory tree iterator
- * after a yield caused by a disk read and update 'next_key'
- * if necessary.
- */
-static NODISCARD int
-vy_read_iterator_restore_mem(struct vy_read_iterator *itr,
-			     struct tuple **next_key)
-{
-	int rc;
-	int cmp;
-	struct vy_read_src *src = &itr->src[itr->mem_src];
-
-	rc = vy_mem_iterator_restore(&src->mem_iterator,
-				     itr->last_stmt, &src->history);
-	if (rc < 0)
-		return -1; /* memory allocation error */
-	if (rc == 0)
-		return 0; /* nothing changed */
-
-	struct tuple *stmt = vy_history_last_stmt(&src->history);
-	cmp = vy_read_iterator_cmp_stmt(itr, stmt, *next_key);
-	if (cmp > 0) {
-		/*
-		 * Memory trees are append-only so if the
-		 * source is not on top of the heap after
-		 * restoration, it was not before.
-		 */
-		assert(src->front_id < itr->front_id);
-		return 0;
-	}
-	if (cmp < 0) {
-		/*
-		 * The new statement precedes the current
-		 * candidate for the next key.
-		 */
-		*next_key = stmt;
-		itr->front_id++;
-	} else {
-		/*
-		 * The new statement updates the next key.
-		 * Make sure we don't read the old value
-		 * from the cache while applying UPSERTs.
-		 */
-		itr->src[itr->cache_src].front_id = 0;
-	}
-	src->front_id = itr->front_id;
-	return 0;
-}
-
 static void
 vy_read_iterator_restore(struct vy_read_iterator *itr);
 
@@ -529,8 +479,11 @@ rescan_disk:
 	 * as it is owned exclusively by the current fiber so the only
 	 * source to check is the active in-memory tree.
 	 */
-	if (vy_read_iterator_restore_mem(itr, &next_key) != 0)
-		return -1;
+	struct vy_mem_iterator *mem_itr = &itr->src[itr->mem_src].mem_iterator;
+	if (mem_itr->version != mem_itr->mem->version) {
+		vy_read_iterator_restore(itr);
+		goto restart;
+	}
 	/*
 	 * Scan the next range in case we transgressed the current
 	 * range's boundaries.
