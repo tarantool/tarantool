@@ -987,4 +987,9 @@ s:settimeout(1)
 s:receive('*a')
 s:close()
 srv:close()
-
+--
+-- gh-4087: fix error while closing socket.tcp_server
+--
+srv = socket.tcp_server('127.0.0.1', 0, function() end)
+srv:close()
+test_run:wait_log('default', 'stopped', 1024, 0.01)
