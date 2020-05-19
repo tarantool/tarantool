@@ -248,6 +248,19 @@ if(BUILD_STATIC)
     endif()
 endif()
 
+if (ENABLE_LTO)
+    # Exports compilation unit is entirely a hack. It references
+    # symbols among static libraries and object files declaring
+    # them all as functions. To avoid header dependencies. This is
+    # not detected by the compilers, since they never see
+    # conflicting definitions in one compilation unit. But this
+    # makes LTO mad, because the linker sees all the definitions,
+    # and is especially angry when a variable is declared as a
+    # function. To get rid of these false positive errors the
+    # exports file is not link-time optimized.
+    set_source_files_properties(exports.c PROPERTIES COMPILE_FLAGS -fno-lto)
+endif()
+
 add_executable(
     tarantool main.cc exports.c
     ${LIBUTIL_FREEBSD_SRC}/flopen.c
