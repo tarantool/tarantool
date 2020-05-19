@@ -73,12 +73,17 @@ local gc_socket_t = ffi.metatype(ffi.typeof('struct gc_socket'), {
 
 local socket_mt
 
+local function socket_is_closed(socket)
+    -- The type of 'socket' is not checked because the function
+    -- is internal and the type must be checked outside if needed.
+    return socket._gc_socket.fd < 0
+end
+
 local function check_socket(socket)
     local gc_socket = type(socket) == 'table' and socket._gc_socket
     if ffi.istype(gc_socket_t, gc_socket) then
-        local fd = gc_socket.fd
-        if fd >= 0 then
-            return fd
+        if not socket_is_closed(socket) then
+            return gc_socket.fd
         else
             error("attempt to use closed socket")
         end
@@ -1082,6 +1087,9 @@ local function tcp_server_loop(server, s, addr)
     fiber.name(format("%s/%s:%s", server.name, addr.host, addr.port), {truncate = true})
     log.info("started")
     while socket_readable(s) do
+        if socket_is_closed(s) then
+            break
+        end
         local sc, from = socket_accept(s)
         if sc == nil then
             local errno = s._errno
