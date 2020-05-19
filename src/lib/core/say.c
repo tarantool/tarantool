@@ -244,11 +244,6 @@ say_format_by_name(const char *format)
 	return STR2ENUM(say_format, format);
 }
 
-static void
-write_to_file(struct log *log, int total);
-static void
-write_to_syslog(struct log *log, int total);
-
 /**
  * Sets O_NONBLOCK flag in case if lognonblock is set.
  */
