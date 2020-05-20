@@ -4,4 +4,8 @@ import platform
 if platform.system() == 'OpenBSD':
     self.skip = 1
 
+# Disabled on FreeBSD due to flaky fail #4271.
+if platform.system() == 'FreeBSD':
+    self.skip = 1
+
 # vim: set ft=python:
