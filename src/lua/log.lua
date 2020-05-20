@@ -22,6 +22,12 @@ ffi.cdef[[
     void
     say_set_log_format(enum say_format format);
 
+    extern void
+    say_logger_init(const char *init_str, int level, int nonblock,
+                    const char *format, int background);
+
+    extern bool
+    say_logger_initialized(void);
 
     extern sayfunc_t _say;
     extern struct ev_loop;
