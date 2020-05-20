@@ -278,10 +278,6 @@ say_logger_init(const char *init_str,
 void
 say_logger_free();
 
-CFORMAT(printf, 5, 0) void
-vsay(int level, const char *filename, int line, const char *error,
-     const char *format, va_list ap);
-
 /** \cond public */
 typedef void (*sayfunc_t)(int, const char *, int, const char *,
 		    const char *, ...);
