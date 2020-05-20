@@ -684,10 +684,23 @@ log_create(struct log *log, const char *init_str, int nonblock)
 	return 0;
 }
 
+bool
+say_logger_initialized(void)
+{
+	return log_default == &log_std;
+}
+
 void
 say_logger_init(const char *init_str, int level, int nonblock,
 		const char *format, int background)
 {
+	/*
+	 * The logger may be early configured
+	 * by hands without configuing the whole box.
+	 */
+	if (say_logger_initialized())
+		return;
+
 	if (log_create(&log_std, init_str, nonblock) < 0)
 		goto fail;
 

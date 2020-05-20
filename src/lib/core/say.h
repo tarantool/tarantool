@@ -274,6 +274,10 @@ say_logger_init(const char *init_str,
 		const char *log_format,
 		int background);
 
+/** Test if logger is initialized. */
+bool
+say_logger_initialized(void);
+
 /** Free default logger */
 void
 say_logger_free();
