@@ -8,11 +8,6 @@ variables:
 
 # Jobs templates
 
-.release_only_template: &release_only_definition
-  only:
-    - "1.10"
-    - /^.*-full-ci$/
-
 .deploy_only_template: &deploy_only_definition
   only:
     - "1.10"
@@ -22,11 +17,8 @@ variables:
     - merge_requests
 
 .pack_only_template: &pack_only_definition
-  only:
-    - schedules
-    - external_pull_requests
-    - merge_requests
-    - /^.*-full-ci$/
+  except:
+    - master
 
 .perf_only_template: &perf_only_definition
   only:
@@ -128,7 +120,6 @@ release_clang:
     - ${GITLAB_MAKE} test_debian_no_deps
 
 release_lto:
-  <<: *release_only_definition
   <<: *docker_test_clang8_definition
   variables:
     CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
@@ -136,7 +127,6 @@ release_lto:
     - ${GITLAB_MAKE} test_debian_no_deps
 
 release_lto_clang8:
-  <<: *release_only_definition
   <<: *docker_test_clang8_definition
   variables:
     CC: clang-8
@@ -151,7 +141,6 @@ release_asan_clang8:
     - ${GITLAB_MAKE} test_asan_debian_no_deps
 
 osx_14_release:
-  <<: *release_only_definition
   stage: test
   tags:
     - osx_14
@@ -166,7 +155,6 @@ osx_15_release:
     - ${GITLAB_MAKE} test_osx
 
 osx_15_release_lto:
-  <<: *release_only_definition
   stage: test
   tags:
     - osx_15
@@ -481,7 +469,6 @@ static_build:
     - ${GITLAB_MAKE} test_static_build
 
 static_docker_build:
-  <<: *release_only_definition
   stage: test
   tags:
     - deploy_test
