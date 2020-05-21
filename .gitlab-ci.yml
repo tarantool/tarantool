@@ -103,6 +103,12 @@ variables:
   script:
     - ${GITLAB_MAKE} perf_run
 
+.perf_cleanup_definition: &perf_cleanup_definition
+   <<: *perf_only_definition
+   stage: cleanup
+   script:
+     - ${GITLAB_MAKE} perf_cleanup
+
 # Tests
 
 release:
@@ -196,6 +202,8 @@ perf_bootstrap:
     - perf
   script:
     - ${GITLAB_MAKE} perf_prepare
+  after_script:
+    - ${GITLAB_MAKE} perf_cleanup_image
 
 # Testing part
 
@@ -255,14 +263,25 @@ perf_linkbench_ssd:
 
 # Post-testing part
 
-remove_images:
-  <<: *perf_only_definition
-  stage: cleanup
-  when: always
+remove_images_sh1:
+  <<: *perf_cleanup_definition
   tags:
-    - perf
-  script:
-    - ${GITLAB_MAKE} perf_cleanup
+    - sh1_shell
+
+remove_images_sh2:
+  <<: *perf_cleanup_definition
+  tags:
+    - sh2_shell
+
+remove_images_sh3:
+  <<: *perf_cleanup_definition
+  tags:
+    - sh3_shell
+
+remove_images_sh9:
+  <<: *perf_cleanup_definition
+  tags:
+    - sh9_shell
 
 # Packages and sources
 
