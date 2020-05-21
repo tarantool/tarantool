@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "trivia/config.h"
+#include "trivia/util.h"
 #include <sys/types.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -50,7 +51,7 @@
 
 
 static uint32_t
-crc32c_hw_byte(uint32_t crc, unsigned char const *data, unsigned int length)
+crc32c_hw_byte(uint32_t crc, char const *data, unsigned int length)
 {
 	while (length--) {
 		__asm__ __volatile__(
@@ -68,6 +69,25 @@ crc32c_hw_byte(uint32_t crc, unsigned char const *data, unsigned int length)
 uint32_t
 crc32c_hw(uint32_t crc, const char *buf, unsigned int len)
 {
+	const unsigned int align = alignof(unsigned long);
+	unsigned int not_aligned_prefix =
+		(align - (unsigned long)buf % align) % align;
+	/*
+	 * Calculate CRC32 for the prefix byte-by-byte so as to
+	 * then use aligned words to calculate the rest. This is
+	 * twice less loads, because every load takes exactly one
+	 * word from memory. Not 2 words, which would need to be
+	 * partially merged then.
+	 * But the main reason is that unaligned loads are just
+	 * unsafe, because this is an undefined behaviour.
+	 */
+	if (not_aligned_prefix < len) {
+		crc = crc32c_hw_byte(crc, buf, not_aligned_prefix);
+		buf += not_aligned_prefix;
+		len -= not_aligned_prefix;
+	} else {
+		return crc32c_hw_byte(crc, buf, len);
+	}
 	unsigned int iquotient = len / SCALE_F;
 	unsigned int iremainder = len % SCALE_F;
 	unsigned long *ptmp = (unsigned long *)buf;
@@ -80,13 +100,7 @@ crc32c_hw(uint32_t crc, const char *buf, unsigned int len)
 		);
 		ptmp++;
 	}
-
-	if (iremainder) {
-		crc = crc32c_hw_byte(crc, (unsigned char const*)ptmp,
-							iremainder);
-	}
-
-	return crc;
+	return crc32c_hw_byte(crc, (const char *)ptmp, iremainder);
 }
 
 bool

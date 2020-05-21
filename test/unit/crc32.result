@@ -1,0 +1,11 @@
+	*** main ***
+1..1
+	*** test_alignment ***
+    1..4
+    ok 1 - aligned crc32 buffer without a tail
+    ok 2 - aligned crc32 buffer with a tail
+    ok 3 - not aligned crc32 buffer with a tail
+    ok 4 - not aligned buffer less than a word
+ok 1 - subtests
+	*** test_alignment: done ***
+	*** main: done ***
