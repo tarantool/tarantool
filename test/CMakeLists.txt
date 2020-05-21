@@ -24,7 +24,15 @@ add_compile_flags("C;CXX"
     "-Wno-unused-parameter")
 
 if(POLICY CMP0037)
-    cmake_policy(SET CMP0037 OLD)
+    if(CMAKE_VERSION VERSION_LESS 3.11)
+        # cmake below 3.11 reserves name test. Use old policy.
+        # https://cmake.org/cmake/help/v3.11/release/3.11.html#other-changes
+        cmake_policy(SET CMP0037 OLD)
+    else()
+        # Starting from cmake 3.11 name test reserved in special
+        # cases and can be used as target name.
+        cmake_policy(SET CMP0037 NEW)
+    endif()
 endif(POLICY CMP0037)
 
 execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink
