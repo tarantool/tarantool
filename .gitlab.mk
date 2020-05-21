@@ -86,9 +86,12 @@ perf_clone_benchs_repo:
 perf_prepare: perf_clone_benchs_repo
 	make -f bench-run/targets.mk prepare
 
-# Remove temporary performance image from the test host
-perf_cleanup: perf_clone_benchs_repo
+# Remove temporary performance image
+perf_cleanup_image:
 	make -f bench-run/targets.mk cleanup
+
+# Remove temporary performance image from the test host
+perf_cleanup: perf_clone_benchs_repo perf_cleanup_image
 
 # #################################
 # Run tests under a virtual machine
