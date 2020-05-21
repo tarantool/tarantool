@@ -160,8 +160,11 @@ local function log_format(name)
     end
 
     if fmt_str2num[name] == ffi.C.SF_JSON then
-        if ffi.C.log_type() == ffi.C.SAY_LOGGER_SYSLOG then
-            error("log_format: 'json' can't be used with syslog logger")
+        if ffi.C.log_type() == ffi.C.SAY_LOGGER_SYSLOG or
+            ffi.C.log_type() == ffi.C.SAY_LOGGER_BOOT then
+            local m = "log_format: %s can't be used with " ..
+                    "syslog or boot-time logger"
+            error(m:format(fmt_num2str[ffi.C.SF_JSON]))
         end
         ffi.C.say_set_log_format(ffi.C.SF_JSON)
     else

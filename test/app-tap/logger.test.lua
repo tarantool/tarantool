@@ -1,12 +1,13 @@
 #!/usr/bin/env tarantool
 
 local test = require('tap').test('log')
-test:plan(24)
+test:plan(25)
 
 -- gh-3946: Assertion failure when using log_format() before box.cfg()
 local log = require('log')
-log.log_format('json')
 log.log_format('plain')
+_, err = pcall(log.log_format, 'json')
+test:ok(err:find("log_format: json can\'t be used") ~= nil)
 
 --
 -- Check that Tarantool creates ADMIN session for #! script
