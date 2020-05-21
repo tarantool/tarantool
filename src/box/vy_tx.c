@@ -510,7 +510,11 @@ vy_tx_write(struct vy_lsm *lsm, struct vy_mem *mem,
 					mem->cmp_def, mem->format, false);
 			tuple_unref(deleted);
 			if (applied != NULL) {
-				assert(vy_stmt_type(applied) == IPROTO_REPLACE);
+				enum iproto_type applied_type =
+					vy_stmt_type(applied);
+				assert(applied_type == IPROTO_REPLACE ||
+				       applied_type == IPROTO_INSERT);
+				(void) applied_type;;
 				int rc = vy_lsm_set(lsm, mem, applied,
 						    region_stmt);
 				tuple_unref(applied);
