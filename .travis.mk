@@ -114,7 +114,8 @@ coverage_debian: deps_debian test_coverage_debian_no_deps
 
 build_asan_debian:
 	CC=clang-8 CXX=clang++-8 cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-		-DENABLE_WERROR=ON -DENABLE_ASAN=ON ${CMAKE_EXTRA_PARAMS}
+		-DENABLE_WERROR=ON -DENABLE_ASAN=ON -DENABLE_UB_SANITIZER=ON \
+		${CMAKE_EXTRA_PARAMS}
 	make -j
 
 test_asan_debian_no_deps: build_asan_debian
