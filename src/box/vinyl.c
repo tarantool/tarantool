@@ -602,9 +602,11 @@ vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 	struct index_def *index_def;
 	rlist_foreach_entry(index_def, key_list, link)
 		key_count++;
-	struct key_def **keys = region_alloc(&fiber()->gc,
-					     sizeof(*keys) * key_count);
+	struct key_def **keys;
+	size_t size = sizeof(*keys) * key_count;
+	keys = region_alloc(&fiber()->gc, size);
 	if (keys == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "keys");
 		free(space);
 		return NULL;
 	}
