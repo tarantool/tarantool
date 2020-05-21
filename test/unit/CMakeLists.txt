@@ -138,6 +138,9 @@ target_link_libraries(scramble.test scramble)
 add_executable(guava.test guava.c)
 target_link_libraries(guava.test salad small)
 
+add_executable(crc32.test crc32.c)
+target_link_libraries(crc32.test unit crc32)
+
 add_executable(find_path.test find_path.c
     ${CMAKE_SOURCE_DIR}/src/find_path.c
 )
