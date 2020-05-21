@@ -238,6 +238,8 @@ endif()
 
 option(ENABLE_WERROR "Make all compiler warnings into errors" OFF)
 
+option(ENABLE_UB_SANITIZER "Make the compiler generate runtime code to perform undefined behaviour checks" OFF)
+
 macro(enable_tnt_compile_flags)
     # Tarantool code is written in GNU C dialect.
     # Additionally, compile it with more strict flags than the rest
@@ -262,6 +264,14 @@ macro(enable_tnt_compile_flags)
         "-Wextra"
         "-Wno-strict-aliasing"
     )
+
+    if (ENABLE_UB_SANITIZER)
+        if (NOT CMAKE_COMPILER_IS_CLANG)
+            message(FATAL_ERROR "Undefined behaviour sanitizer only available for clang")
+        else()
+            add_compile_flags("C;CXX" "-fsanitize=alignment -fno-sanitize-recover=alignment")
+        endif()
+    endif()
 
     if (CMAKE_COMPILER_IS_CLANG AND CC_HAS_WNO_UNUSED_VALUE)
         # False-positive warnings for ({ xx = ...; x; }) macroses
