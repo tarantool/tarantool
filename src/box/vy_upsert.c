@@ -133,6 +133,10 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 					 new_ops_end, result_mp, result_mp_end,
 					 &mp_size, 0, suppress_error,
 					 &column_mask);
+	if (result_mp == NULL) {
+		region_truncate(region, region_svp);
+		return NULL;
+	}
 	result_mp_end = result_mp + mp_size;
 	if (old_type != IPROTO_UPSERT) {
 		assert(old_type == IPROTO_INSERT ||
