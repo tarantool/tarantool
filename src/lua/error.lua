@@ -16,7 +16,7 @@ struct error {
     error_f _raise;
     error_f _log;
     const struct type_info *_type;
-    int _refs;
+    int64_t _refs;
     int _saved_errno;
     /** Line number. */
     unsigned _line;
@@ -38,6 +38,9 @@ error_set_prev(struct error *e, struct error *prev);
 
 const char *
 box_error_custom_type(const struct error *e);
+
+void
+error_ref(struct error *e);
 
 void
 error_unref(struct error *e);
@@ -117,11 +120,7 @@ end
 local function error_prev(err)
     local e = err._cause;
     if e ~= nil then
-        local INT32_MAX = 2147483647
-        if e._refs >= INT32_MAX then
-            error("Too many references to error object")
-        end
-        e._refs = e._refs + 1
+        ffi.C.error_ref(e)
         e = ffi.gc(e, ffi.C.error_unref)
         return e
     else
@@ -138,10 +137,7 @@ local function error_set_prev(err, prev)
     if not ffi.istype('struct error', prev) and prev ~= nil then
         error("Usage: error1:set_prev(error2)")
     end
-    local INT32_MAX = 2147483647
-    if err._refs >= INT32_MAX then
-        error("Too many references to error object")
-    end
+    ffi.C.error_ref(err)
     local ok = ffi.C.error_set_prev(err, prev);
     if ok ~= 0 then
         error("Cycles are not allowed")
