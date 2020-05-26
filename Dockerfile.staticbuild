@@ -75,7 +75,7 @@ RUN set -x && \
 RUN set -x && \
     find . -name 'CMakeFiles' -type d -exec rm -rf {} + && \
     find . -name 'CMakeCache.txt' -type f -delete && \
-    rm -rf build
+    rm -rf build test/small test/luajit-tap
 
 RUN pip install -r /tarantool/test-run/requirements.txt
 
