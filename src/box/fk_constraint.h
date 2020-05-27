@@ -131,7 +131,7 @@ struct fk_constraint {
 static inline size_t
 fk_constraint_def_sizeof(uint32_t link_count, uint32_t name_len)
 {
-	return sizeof(struct fk_constraint) +
+	return sizeof(struct fk_constraint_def) +
 		link_count * sizeof(struct field_link) +
 		name_len + 1;
 }
