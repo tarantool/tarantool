@@ -36,7 +36,7 @@ local test6_ans = "|23|\t|456|\t|abcac|\t|'multiword field 4'|\t\n|none|" ..
                   "lag[ flag ])|\t\n||\t||\t||\t\n"
 
 test = tap.test("csv")
-test:plan(12)
+test:plan(13)
 
 readable = {}
 readable.read = myread
@@ -134,3 +134,6 @@ local exp = {{'929', 'N1XDN', '', 'Enfield, CT', ''}}
 test:is_deeply(res, exp, 'gh-3489')
 
 test:check()
+
+-- gh-5026: treat `box.NULL` in csv.dump as an empty field
+test:is(csv.dump({{1, box.NULL, 2}, {box.NULL}}), '1,,2\n\n', "gh-5026")

@@ -192,7 +192,10 @@ module.dump = function(t, opts, writable)
         local first = true
         local output_tuple = {}
         for k2, field in pairs(line) do
-            local strf = tostring(field)
+            local strf = ''
+            if field ~= nil then
+                strf = tostring(field)
+            end
             local buf_new_size = (strf:len() + 1) * 2
             if buf_new_size > bufsz then
                 bufsz = buf_new_size
