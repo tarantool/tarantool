@@ -34,9 +34,9 @@ test:do_test(
         end
         cmd = cmd .. ")"
         test:execsql(cmd)
-        cmd = "INSERT INTO manycol VALUES(1, 0"
+        cmd = "INSERT INTO manycol VALUES(1, '0'"
         for i = 1, 99, 1 do
-            cmd = cmd .. ","..i..""
+            cmd = cmd .. ",'"..i.."'"
         end
         cmd = cmd .. ")"
         test:execsql(cmd)
@@ -61,9 +61,9 @@ test:do_test(
     "misc1-1.3.1",
     function()
         for j = 100, 1000, 100 do
-            local cmd = string.format("INSERT INTO manycol VALUES(%s, %s", j, j)
+            local cmd = string.format("INSERT INTO manycol VALUES(%s, '%s'", j, j)
             for i = 1, 99, 1 do
-                cmd = cmd .. ","..(i + j)..""
+                cmd = cmd .. ",'"..(i + j).."'"
             end
             cmd = cmd .. ")"
             test:execsql(cmd)
@@ -176,7 +176,7 @@ test:do_test(
     "misc1-2.1",
     function()
         test:execsql([[
-            CREATE TABLE agger(one text primary key, two text, three text, four text);
+            CREATE TABLE agger(one int primary key, two text, three text, four text);
             START TRANSACTION;
             INSERT INTO agger VALUES(1, 'one', 'hello', 'yes');
             INSERT INTO agger VALUES(2, 'two', 'howdy', 'no');
@@ -531,7 +531,7 @@ test:do_test(
     "misc1-10.7",
     function()
         where = string.gsub(where, "x0=0", "x0=100")
-        return test:catchsql("UPDATE manycol SET x1=x1+1 "..where.."")
+        return test:catchsql("UPDATE manycol SET x1=CAST(x1+1 AS STRING) "..where.."")
     end, {
         -- <misc1-10.7>
         0
@@ -553,7 +553,7 @@ test:do_execsql_test(
 -- } {0 {}}
 test:do_execsql_test(
     "misc1-10.9",
-    "UPDATE manycol SET x1=x1+1 "..where
+    "UPDATE manycol SET x1=CAST(x1+1 AS STRING) "..where
         --"UPDATE manycol SET x1=x1+1 $::where AND rowid>0"
     , {})
 
@@ -665,7 +665,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc1-12.6",
     [[
-        INSERT OR IGNORE INTO t6 VALUES('y',0);
+        INSERT OR IGNORE INTO t6 VALUES('y','0');
         SELECT * FROM t6;
     ]], {
         -- <misc1-12.6>
@@ -679,10 +679,10 @@ test:do_execsql_test(
     "misc1-12.7",
     [[
         CREATE TABLE t7(x INTEGER, y TEXT, z  INT primary key);
-        INSERT INTO t7 VALUES(0,0,1);
-        INSERT INTO t7 VALUES(0.0,0,2);
-        INSERT INTO t7 VALUES(0,0.0,3);
-        INSERT INTO t7 VALUES(0.0,0.0,4);
+        INSERT INTO t7 VALUES(0,'0',1);
+        INSERT INTO t7 VALUES(0.0,'0',2);
+        INSERT INTO t7 VALUES(0,'0.0',3);
+        INSERT INTO t7 VALUES(0.0,'0.0',4);
         SELECT DISTINCT x, y FROM t7 ORDER BY z;
     ]], {
         -- <misc1-12.7>

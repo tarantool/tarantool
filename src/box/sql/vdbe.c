@@ -417,6 +417,111 @@ sql_value_apply_type(
 	mem_apply_type((Mem *) pVal, type);
 }
 
+/**
+ * Check that MEM_type of the mem is compatible with given type.
+ *
+ * @param mem The MEM that contains the value to check.
+ * @param type The type to check.
+ * @retval TRUE if the MEM_type of the value and the given type
+ *         are compatible, FALSE otherwise.
+ */
+static bool
+mem_is_type_compatible(struct Mem *mem, enum field_type type)
+{
+	enum mp_type mp_type = mem_mp_type(mem);
+	assert(mp_type < MP_EXT);
+	return field_mp_plain_type_is_compatible(type, mp_type, true);
+}
+
+/**
+ * Convert the numeric value contained in MEM to double.
+ *
+ * @param mem The MEM that contains the numeric value.
+ * @retval 0 if the conversion was successful, -1 otherwise.
+ */
+static int
+mem_convert_to_double(struct Mem *mem)
+{
+	if ((mem->flags & MEM_Real) != 0)
+		return 0;
+	if ((mem->flags & (MEM_Int | MEM_UInt)) == 0)
+		return -1;
+	double d;
+	if ((mem->flags & MEM_Int) != 0)
+		d = (double)mem->u.i;
+	else
+		d = (double)mem->u.u;
+	mem_set_double(mem, d);
+	return 0;
+}
+
+/**
+ * Convert the numeric value contained in MEM to unsigned.
+ *
+ * @param mem The MEM that contains the numeric value.
+ * @retval 0 if the conversion was successful, -1 otherwise.
+ */
+static int
+mem_convert_to_unsigned(struct Mem *mem)
+{
+	if ((mem->flags & MEM_UInt) != 0)
+		return 0;
+	if ((mem->flags & MEM_Int) != 0)
+		return -1;
+	if ((mem->flags & MEM_Real) == 0)
+		return -1;
+	double d = mem->u.r;
+	if (d < 0.0 || d >= (double)UINT64_MAX)
+		return -1;
+	mem_set_u64(mem, (uint64_t) d);
+	return 0;
+}
+
+/**
+ * Convert the numeric value contained in MEM to integer.
+ *
+ * @param mem The MEM that contains the numeric value.
+ * @retval 0 if the conversion was successful, -1 otherwise.
+ */
+static int
+mem_convert_to_integer(struct Mem *mem)
+{
+	if ((mem->flags & (MEM_UInt | MEM_Int)) != 0)
+		return 0;
+	if ((mem->flags & MEM_Real) == 0)
+		return -1;
+	double d = mem->u.r;
+	if (d >= (double)UINT64_MAX || d < (double)INT64_MIN)
+		return -1;
+	if (d < (double)INT64_MAX)
+		mem_set_int(mem, (int64_t) d, d < 0);
+	else
+		mem_set_int(mem, (uint64_t) d, false);
+	return 0;
+}
+
+/**
+ * Convert the numeric value contained in MEM to another numeric
+ * type.
+ *
+ * @param mem The MEM that contains the numeric value.
+ * @param type The type to convert to.
+ * @retval 0 if the conversion was successful, -1 otherwise.
+ */
+static int
+mem_convert_to_numeric(struct Mem *mem, enum field_type type)
+{
+	assert(mp_type_is_numeric(mem_mp_type(mem)) &&
+	       sql_type_is_numeric(type));
+	assert(type != FIELD_TYPE_NUMBER);
+	if (type == FIELD_TYPE_DOUBLE)
+		return mem_convert_to_double(mem);
+	if (type == FIELD_TYPE_UNSIGNED)
+		return mem_convert_to_unsigned(mem);
+	assert(type == FIELD_TYPE_INTEGER);
+	return mem_convert_to_integer(mem);
+}
+
 /*
  * pMem currently only holds a string type (or maybe a BLOB that we can
  * interpret as a string if we want to).  Compute its corresponding
@@ -2747,11 +2852,11 @@ case OP_Fetch: {
 /* Opcode: ApplyType P1 P2 * P4 *
  * Synopsis: type(r[P1@P2])
  *
- * Apply types to a range of P2 registers starting with P1.
- *
- * P4 is a string that is P2 characters long. The nth character of the
- * string indicates the column type that should be used for the nth
- * memory cell in the range.
+ * Check that types of P2 registers starting from register P1 are
+ * compatible with given field types in P4. If the MEM_type of the
+ * value and the given type are incompatible according to
+ * field_mp_plain_type_is_compatible(), but both are numeric,
+ * this opcode attempts to convert the value to the type.
  */
 case OP_ApplyType: {
 	enum field_type *types = pOp->p4.types;
@@ -2762,13 +2867,23 @@ case OP_ApplyType: {
 	while((type = *(types++)) != field_type_MAX) {
 		assert(pIn1 <= &p->aMem[(p->nMem+1 - p->nCursor)]);
 		assert(memIsValid(pIn1));
-		if (mem_apply_type(pIn1, type) != 0) {
-			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-				 sql_value_to_diag_str(pIn1),
-				 field_type_strs[type]);
-			goto abort_due_to_error;
+		if (!mem_is_type_compatible(pIn1, type)) {
+			/* Implicit cast is allowed only to numeric type. */
+			if (!sql_type_is_numeric(type))
+				goto type_mismatch;
+			/* Implicit cast is allowed only from numeric type. */
+			if (!mp_type_is_numeric(mem_mp_type(pIn1)))
+				goto type_mismatch;
+			/* Try to convert numeric-to-numeric. */
+			if (mem_convert_to_numeric(pIn1, type) != 0)
+				goto type_mismatch;
 		}
 		pIn1++;
+		continue;
+type_mismatch:
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+			 sql_value_to_diag_str(pIn1), field_type_strs[type]);
+		goto abort_due_to_error;
 	}
 	break;
 }

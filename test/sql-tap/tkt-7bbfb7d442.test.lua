@@ -109,13 +109,13 @@ if (1 > 0)
                     T1.Variant AS Variant,
                     T1.ControlDate AS ControlDate,
                     1 AS ControlState,
-                    COALESCE(T2.DeliveredQty,0) AS DeliveredQty
+                    CAST(COALESCE(T2.DeliveredQty,0) AS STRING) AS DeliveredQty
                 FROM (
                     SELECT
                         NEW.InventoryControlId AS InventoryControlId,
                         II.SKU AS SKU,
                         II.Variant AS Variant,
-                        COALESCE(LastClosedIC.ControlDate,NEW.ControlDate) AS ControlDate
+                        CAST(COALESCE(LastClosedIC.ControlDate,NEW.ControlDate) AS STRING) AS ControlDate
                     FROM
                         InventoryItem II
                     LEFT JOIN

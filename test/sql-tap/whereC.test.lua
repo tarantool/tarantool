@@ -55,9 +55,9 @@ test:do_execsql_test(
 test:test("main", function()
     local data = {{"SELECT i FROM t1 WHERE a=1 AND b=2 AND i>3",         {4, 5}},
                   -- {"SELECT i FROM t1 WHERE rowid='12'",                  {12}},
-                  {"SELECT i FROM t1 WHERE a=1 AND b='2'",               {3, 4, 5}},
-                  {"SELECT i FROM t1 WHERE a=1 AND b='2' AND i>'3'",     {4, 5}},
-                  {"SELECT i FROM t1 WHERE a=1 AND b='2' AND i<5",       {3, 4}},
+                  {"SELECT i FROM t1 WHERE a=1 AND b=2",               {3, 4, 5}},
+                  {"SELECT i FROM t1 WHERE a=1 AND b=2 AND i>3",     {4, 5}},
+                  {"SELECT i FROM t1 WHERE a=1 AND b=2 AND i<5",       {3, 4}},
                   {"SELECT i FROM t1 WHERE a=2 AND b=2 AND i<12",        {10, 11}},
                   {"SELECT i FROM t1 WHERE a IN(1, 2) AND b=2 AND i<11", {3, 4, 5, 10}},
                   {"SELECT i FROM t1 WHERE a=2 AND b=2 AND i BETWEEN 10 AND 12", {10, 11, 12}},
@@ -66,7 +66,7 @@ test:test("main", function()
                   {"SELECT i FROM t1 WHERE a=2 AND b=2 AND i BETWEEN 12 AND 10", {}},
                   {"SELECT i FROM t1 WHERE a=2 AND b=2 AND i<NULL",      {}},
                   {"SELECT i FROM t1 WHERE a=2 AND b=2 AND i>=NULL",     {}},
-                  {"SELECT i FROM t1 WHERE a=1 AND b='2' AND i<4.5",     {3, 4}}}
+                  {"SELECT i FROM t1 WHERE a=1 AND b=2 AND i<4.5",     {3, 4}}}
                   -- {"SELECT i FROM t1 WHERE rowid IS '12'",               {12}}}
 
     for tn, t in ipairs(data) do

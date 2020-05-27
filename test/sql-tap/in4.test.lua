@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(61)
+test:plan(52)
 
 --!./tcltestrunner.lua
 -- 2008 September 1
@@ -140,7 +140,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in4-2.7",
     [[
-        SELECT b FROM t2 WHERE a IN ('1', '2') 
+        SELECT b FROM t2 WHERE a IN (1, 2)
     ]], {
         -- <in4-2.7>
         "one", "two"
@@ -583,98 +583,6 @@ test:do_execsql_test(
         -- <in4-4.6>
         1, 3
         -- </in4-4.6>
-    })
-
-test:do_execsql_test(
-    "in4-4.11",
-    [[
-        CREATE TABLE t4b(a TEXT, b NUMBER, c  INT PRIMARY KEY);
-        INSERT INTO t4b VALUES('1.0',1,4);
-        SELECT c FROM t4b WHERE a=b;
-    ]], {
-        -- <in4-4.11>
-        4
-        -- </in4-4.11>
-    })
-
-test:do_execsql_test(
-    "in4-4.12",
-    [[
-        SELECT c FROM t4b WHERE b=a;
-    ]], {
-        -- <in4-4.12>
-        4
-        -- </in4-4.12>
-    })
-
-test:do_execsql_test(
-    "in4-4.13",
-    [[
-        SELECT c FROM t4b WHERE +a=b;
-    ]], {
-        -- <in4-4.13>
-        4
-        -- </in4-4.13>
-    })
-
-test:do_execsql_test(
-    "in4-4.14",
-    [[
-        SELECT c FROM t4b WHERE a=+b;
-    ]], {
-        -- <in4-4.14>
-        4
-        -- </in4-4.14>
-    })
-
-test:do_execsql_test(
-    "in4-4.15",
-    [[
-        SELECT c FROM t4b WHERE +b=a;
-    ]], {
-        -- <in4-4.15>
-        4
-        -- </in4-4.15>
-    })
-
-test:do_execsql_test(
-    "in4-4.16",
-    [[
-        SELECT c FROM t4b WHERE b=+a;
-    ]], {
-        -- <in4-4.16>
-        4
-        -- </in4-4.16>
-    })
-
-test:do_execsql_test(
-    "in4-4.17",
-    [[
-        SELECT c FROM t4b WHERE a IN (b);
-    ]], {
-        -- <in4-4.17>
-        4
-        -- </in4-4.17>
-    })
-
-test:do_execsql_test(
-    "in4-4.18",
-    [[
-        SELECT c FROM t4b WHERE b IN (a);
-    ]], {
-        -- <in4-4.18>
-        4
-        -- </in4-4.18>
-    })
-
-test:do_execsql_test(
-    "in4-4.19",
-    [[
-        SELECT c FROM t4b WHERE +b IN (a);
-    ]], {
-        -- <in4-4.19>
-        4
-        -- </in4-4.19>
     })
 
 -- MUST_WORK_TEST

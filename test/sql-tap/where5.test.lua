@@ -27,11 +27,11 @@ test:do_test("where5-1.0", function()
         CREATE TABLE t1(x TEXT primary key);
         CREATE TABLE t2(x integer primary key);
         CREATE TABLE t3(x integer PRIMARY KEY);
-        INSERT INTO t1 VALUES(-1);
-        INSERT INTO t1 VALUES(0);
-        INSERT INTO t1 VALUES(1);
-        INSERT INTO t2 SELECT * FROM t1;
-        INSERT INTO t3 SELECT * FROM t1;
+        INSERT INTO t1 VALUES('-1');
+        INSERT INTO t1 VALUES('0');
+        INSERT INTO t1 VALUES('1');
+        INSERT INTO t2 SELECT CAST(x AS INTEGER) FROM t1;
+        INSERT INTO t3 SELECT CAST(x AS INTEGER) FROM t1;
     ]]
     return test:execsql [[
         SELECT * FROM t1 WHERE x<0

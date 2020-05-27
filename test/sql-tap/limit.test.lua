@@ -441,7 +441,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "limit-6.5.2",
     [[
-        SELECT * FROM t6 LIMIT '12'
+        SELECT * FROM t6 LIMIT 12
     ]], {
     -- <limit-6.5>
     1, 2, 3, 4

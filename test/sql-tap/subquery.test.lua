@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(73)
+test:plan(69)
 
 --!./tcltestrunner.lua
 -- 2005 January 19
@@ -333,73 +333,6 @@ test:do_execsql_test(
         -- <subquery-2.4.3>
         
         -- </subquery-2.4.3>
-    })
-
-test:do_execsql_test(
-    "subquery-2.5.1",
-    [[
-        CREATE TABLE t3(a INTEGER PRIMARY KEY);
-        INSERT INTO t3 VALUES(10);
-
-        CREATE TABLE t4(x TEXT PRIMARY KEY);
-        INSERT INTO t4 VALUES('10');
-    ]], {
-        -- <subquery-2.5.1>
-        
-        -- </subquery-2.5.1>
-    })
-
-test:do_test(
-    "subquery-2.5.2",
-    function()
-        -- In the expr "x IN (SELECT a FROM t3)" the RHS of the IN operator
-        -- has text affinity and the LHS has integer affinity.  The rule is
-        -- that we try to convert both sides to an integer before doing the
-        -- comparision. Hence, the integer value 10 in t3 will compare equal
-        -- to the string value '10.0' in t4 because the t4 value will be
-        -- converted into an integer.
-        return test:execsql [[
-            SELECT * FROM t4 WHERE x IN (SELECT a FROM t3);
-        ]]
-    end, {
-        -- <subquery-2.5.2>
-        "10"
-        -- </subquery-2.5.2>
-    })
-
-test:do_test(
-    "subquery-2.5.3.1",
-    function()
-        -- The t4i index cannot be used to resolve the "x IN (...)" constraint
-        -- because the constraint has integer affinity but t4i has text affinity.
-        return test:execsql [[
-            CREATE INDEX t4i ON t4(x);
-            SELECT * FROM t4 WHERE x IN (SELECT a FROM t3);
-        ]]
-    end, {
-        -- <subquery-2.5.3.1>
-        "10"
-        -- </subquery-2.5.3.1>
-    })
-
--- Tarantool: no-rowid is implied for the table, so query plan contains
--- scan over t4i. Verified w/ vanilla sql. Comment this case
---do_test subquery-2.5.3.2 {
--- Verify that the t4i index was not used in the previous query
---  execsql {
---    EXPLAIN QUERY PLAN
---    SELECT * FROM t4 WHERE x IN (SELECT a FROM t3);
---  }
---} {~/t4i/}
-test:do_execsql_test(
-    "subquery-2.5.4",
-    [[
-        DROP TABLE t3;
-        DROP TABLE t4;
-    ]], {
-        -- <subquery-2.5.4>
-        
-        -- </subquery-2.5.4>
     })
 
 --------------------------------------------------------------------

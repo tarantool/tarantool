@@ -62,10 +62,10 @@ test:do_execsql_test(
     "1.2",
     [[
         CREATE TABLE t4(id INT primary key, a TEXT, b TEXT, c TEXT);
-        INSERT INTO t4 VALUES(1, 'a', 1, 'one');
-        INSERT INTO t4 VALUES(2, 'a', 2, 'two');
-        INSERT INTO t4 VALUES(3, 'b', 1, 'three');
-        INSERT INTO t4 VALUES(4, 'b', 2, 'four');
+        INSERT INTO t4 VALUES(1, 'a', '1', 'one');
+        INSERT INTO t4 VALUES(2, 'a', '2', 'two');
+        INSERT INTO t4 VALUES(3, 'b', '1', 'three');
+        INSERT INTO t4 VALUES(4, 'b', '2', 'four');
         SELECT ( 
           SELECT c FROM (
             SELECT a,b,c FROM t4 WHERE a=output.a ORDER BY b LIMIT 10 OFFSET 1

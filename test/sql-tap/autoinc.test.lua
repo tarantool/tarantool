@@ -694,7 +694,7 @@ test:do_test(
                  INSERT INTO t3928(b) VALUES('after-int-' || CAST(new.b AS TEXT));
             END;
             DELETE FROM t3928 WHERE a!=1;
-            UPDATE t3928 SET b=456 WHERE a=1;
+            UPDATE t3928 SET b='456' WHERE a=1;
             SELECT * FROM t3928 ORDER BY a;
         ]])
     end, {

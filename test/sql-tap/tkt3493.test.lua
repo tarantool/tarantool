@@ -29,8 +29,8 @@ test:do_execsql_test(
         START TRANSACTION;
         INSERT INTO A VALUES(1,'123');
         INSERT INTO A VALUES(2,'456');
-        INSERT INTO B VALUES(1,1);
-        INSERT INTO B VALUES(2,2);
+        INSERT INTO B VALUES(1,'1');
+        INSERT INTO B VALUES(2,'2');
         INSERT INTO A_B VALUES(1,1);
         INSERT INTO A_B VALUES(2,2);
         COMMIT;
@@ -116,7 +116,7 @@ test:do_execsql_test(
     "tkt3493-2.1",
     [[
         CREATE TABLE t1(a TEXT PRIMARY KEY, b INT);
-        INSERT INTO t1 VALUES(123, 456);
+        INSERT INTO t1 VALUES('123', 456);
     ]], {
         -- <tkt3493-2.1>
         

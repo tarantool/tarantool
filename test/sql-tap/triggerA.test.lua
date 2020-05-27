@@ -283,7 +283,7 @@ test:do_test(
             CREATE TABLE result2(id INTEGER PRIMARY KEY, a TEXT,b INT);
             CREATE TRIGGER r5d INSTEAD OF DELETE ON v5 FOR EACH ROW BEGIN
               INSERT INTO result2(id, a,b) VALUES((SELECT coalesce(max(id),0) + 1 FROM result2),
-                                                  old.x, old.b);
+                                                  CAST(old.x AS STRING), old.b);
             END;
             DELETE FROM v5 WHERE x=5;
             SELECT a, b FROM result2;
@@ -301,7 +301,7 @@ test:do_test(
             DELETE FROM result4;
             CREATE TRIGGER r5u INSTEAD OF UPDATE ON v5 FOR EACH ROW BEGIN
               INSERT INTO result4(id, a,b,c,d) VALUES((SELECT coalesce(max(id),0) + 1 FROM result4),
-                                                      old.x, old.b, new.x, new.b);
+                                                      CAST(old.x AS STRING), old.b, CAST(new.x AS STRING), new.b);
             END;
             UPDATE v5 SET b = b+9900000 WHERE x BETWEEN 3 AND 5;
             SELECT a,b,c,d FROM result4 ORDER BY a;

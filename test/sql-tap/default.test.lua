@@ -109,16 +109,12 @@ test:do_execsql_test(
 	f VARCHAR(15), --COLLATE RTRIM,
 	g INTEGER DEFAULT( 3600*12 )
 	);
-	INSERT INTO t3 VALUES(null, 5, 'row1', 5.25, 8.67, 321, 432);
+	INSERT INTO t3 VALUES(null, 5, 'row1', 5.25, 8.67, '321', 432);
 	SELECT a, typeof(a), b, typeof(b), c, typeof(c), 
 	d, typeof(d), e, typeof(e), f, typeof(f),
 	g, typeof(g) FROM t3;
 	]], {
 	-- <default-3.1>
-	-- TODO: In original test "321" is not a string, its a value.
-	-- In current situation I don't know what to do, need Kirill's
-	-- advice.
-	-- Bulat
 	1, "integer", 5, "integer", "row1", "string", 5.25, "number", 8.67, "number", "321", "string", 432, "integer"
 	-- </default-3.1>
 })

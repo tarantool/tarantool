@@ -593,25 +593,17 @@ test:do_test(
         -- </index-11.1>
     })
 end
--- integrity_check index-11.2
--- Numeric strings should compare as if they were numbers.  So even if the
--- strings are not character-by-character the same, if they represent the
--- same number they should compare equal to one another.  Verify that this
--- is true in indices.
---
--- Updated for sql v3: sql will now store these values as numbers
--- (because the affinity of column a is NUMERIC) so the quirky
--- representations are not retained. i.e. '+1.0' becomes '1'.
+
 test:do_execsql_test(
     "index-12.1",
     [[
         CREATE TABLE t4(id  INT primary key, a NUMBER,b INT );
-        INSERT INTO t4 VALUES(1, '0.0',1);
-        INSERT INTO t4 VALUES(2, '0.00',2);
-        INSERT INTO t4 VALUES(4, '-1.0',4);
-        INSERT INTO t4 VALUES(5, '+1.0',5);
-        INSERT INTO t4 VALUES(6, '0',6);
-        INSERT INTO t4 VALUES(7, '00000',7);
+        INSERT INTO t4 VALUES(1, 0.0, 1);
+        INSERT INTO t4 VALUES(2, 0.00, 2);
+        INSERT INTO t4 VALUES(4, -1.0, 4);
+        INSERT INTO t4 VALUES(5, +1.0, 5);
+        INSERT INTO t4 VALUES(6, 0, 6);
+        INSERT INTO t4 VALUES(7, 00000, 7);
         SELECT a FROM t4 ORDER BY b;
     ]], {
         -- <index-12.1>
@@ -692,7 +684,7 @@ test:do_execsql_test(
            c  TEXT,
            UNIQUE(a,c)
         );
-        INSERT INTO t5 VALUES(1,2,3);
+        INSERT INTO t5 VALUES(1,2,'3');
         SELECT * FROM t5;
     ]], {
         -- <index-13.1>

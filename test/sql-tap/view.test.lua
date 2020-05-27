@@ -757,7 +757,7 @@ test:do_execsql_test(
     "view-10.1",
     [=[
         CREATE TABLE t3("9" integer primary key, "4" text);
-        INSERT INTO t3 VALUES(1,2);
+        INSERT INTO t3 VALUES(1,'2');
         CREATE VIEW v_t3_a AS SELECT a."9" FROM t3 AS a;
         CREATE VIEW v_t3_b AS SELECT "4" FROM t3;
         SELECT * FROM v_t3_a;

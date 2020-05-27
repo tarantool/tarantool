@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(29)
+test:plan(28)
 
 --!./tcltestrunner.lua
 -- 2007 November 29
@@ -320,18 +320,6 @@ test:do_test(
         -- <in3-3.2>
         0, true
         -- </in3-3.2>
-    })
-
-test:do_test(
-    "in3-3.3",
-    function()
-        -- Logically, numeric affinity is applied to both sides before
-        -- the comparison, but index can't be used.
-        return exec_neph(" SELECT x IN (SELECT b FROM t1) FROM t2 ")
-    end, {
-        -- <in3-3.3>
-        1, true
-        -- </in3-3.3>
     })
 
 test:do_test(

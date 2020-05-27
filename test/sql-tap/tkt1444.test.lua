@@ -30,8 +30,8 @@ test:do_execsql_test(
     [[
         CREATE TABLE DemoTable (id  INT primary key, x INTEGER, TextKey TEXT, DKey NUMBER);
         CREATE INDEX DemoTableIdx ON DemoTable (TextKey);
-        INSERT INTO DemoTable VALUES(1, 9,8,7);
-        INSERT INTO DemoTable VALUES(2, 1,2,3);
+        INSERT INTO DemoTable VALUES(1, 9,'8',7);
+        INSERT INTO DemoTable VALUES(2, 1,'2',3);
         CREATE VIEW DemoView AS SELECT x, TextKey, DKey FROM DemoTable ORDER BY TextKey;
         SELECT x,TextKey,DKey FROM DemoTable UNION ALL SELECT * FROM DemoView ORDER BY 1;
     ]], {

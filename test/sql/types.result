@@ -2155,3 +2155,647 @@ box.execute([[SELECT * FROM "s" WHERE "id" = ?;]])
 s:drop()
 ---
 ...
+--
+-- gh-3809: Make sure there are no implicit casts during
+-- assignment, except for the implicit cast between numeric
+-- values.
+--
+-- Check INSERT.
+box.execute([[CREATE TABLE ti (a INT PRIMARY KEY AUTOINCREMENT, i INTEGER);]])
+---
+- row_count: 1
+...
+box.execute([[CREATE TABLE td (a INT PRIMARY KEY AUTOINCREMENT, d DOUBLE);]])
+---
+- row_count: 1
+...
+box.execute([[CREATE TABLE tb (a INT PRIMARY KEY AUTOINCREMENT, b BOOLEAN);]])
+---
+- row_count: 1
+...
+box.execute([[CREATE TABLE tt (a INT PRIMARY KEY AUTOINCREMENT, t TEXT);]])
+---
+- row_count: 1
+...
+box.execute([[CREATE TABLE tv (a INT PRIMARY KEY AUTOINCREMENT, v VARBINARY);]])
+---
+- row_count: 1
+...
+box.execute([[CREATE TABLE ts (a INT PRIMARY KEY AUTOINCREMENT, s SCALAR);]])
+---
+- row_count: 1
+...
+box.execute([[INSERT INTO ti(i) VALUES (NULL);]])
+---
+- autoincrement_ids:
+  - 1
+  row_count: 1
+...
+box.execute([[INSERT INTO ti(i) VALUES (11);]])
+---
+- autoincrement_ids:
+  - 2
+  row_count: 1
+...
+box.execute([[INSERT INTO ti(i) VALUES (100000000000000000000000000000000.1);]])
+---
+- null
+- 'Type mismatch: can not convert 1.0e+32 to integer'
+...
+box.execute([[INSERT INTO ti(i) VALUES (33.0);]])
+---
+- autoincrement_ids:
+  - 3
+  row_count: 1
+...
+box.execute([[INSERT INTO ti(i) VALUES (true);]])
+---
+- null
+- 'Type mismatch: can not convert TRUE to integer'
+...
+box.execute([[INSERT INTO ti(i) VALUES ('33');]])
+---
+- null
+- 'Type mismatch: can not convert 33 to integer'
+...
+box.execute([[INSERT INTO ti(i) VALUES (X'3434');]])
+---
+- null
+- 'Type mismatch: can not convert varbinary to integer'
+...
+box.execute([[SELECT * FROM ti;]])
+---
+- metadata:
+  - name: A
+    type: integer
+  - name: I
+    type: integer
+  rows:
+  - [1, null]
+  - [2, 11]
+  - [3, 33]
+...
+box.execute([[INSERT INTO td(d) VALUES (NULL);]])
+---
+- autoincrement_ids:
+  - 1
+  row_count: 1
+...
+box.execute([[INSERT INTO td(d) VALUES (11);]])
+---
+- autoincrement_ids:
+  - 2
+  row_count: 1
+...
+box.execute([[INSERT INTO td(d) VALUES (100000000000000001);;]])
+---
+- null
+- Syntax error at line 1 near ';'
+...
+box.execute([[INSERT INTO td(d) VALUES (22.2);]])
+---
+- autoincrement_ids:
+  - 3
+  row_count: 1
+...
+box.execute([[INSERT INTO td(d) VALUES (true);]])
+---
+- null
+- 'Type mismatch: can not convert TRUE to double'
+...
+box.execute([[INSERT INTO td(d) VALUES ('33');]])
+---
+- null
+- 'Type mismatch: can not convert 33 to double'
+...
+box.execute([[INSERT INTO td(d) VALUES (X'3434');]])
+---
+- null
+- 'Type mismatch: can not convert varbinary to double'
+...
+box.execute([[SELECT * FROM td;]])
+---
+- metadata:
+  - name: A
+    type: integer
+  - name: D
+    type: double
+  rows:
+  - [1, null]
+  - [2, 11]
+  - [3, 22.2]
+...
+box.execute([[INSERT INTO tb(b) VALUES (NULL);]])
+---
+- autoincrement_ids:
+  - 1
+  row_count: 1
+...
+box.execute([[INSERT INTO tb(b) VALUES (11);]])
+---
+- null
+- 'Type mismatch: can not convert 11 to boolean'
+...
+box.execute([[INSERT INTO tb(b) VALUES (22.2);]])
+---
+- null
+- 'Type mismatch: can not convert 22.2 to boolean'
+...
+box.execute([[INSERT INTO tb(b) VALUES (true);]])
+---
+- autoincrement_ids:
+  - 2
+  row_count: 1
+...
+box.execute([[INSERT INTO tb(b) VALUES ('33');]])
+---
+- null
+- 'Type mismatch: can not convert 33 to boolean'
+...
+box.execute([[INSERT INTO tb(b) VALUES (X'3434');]])
+---
+- null
+- 'Type mismatch: can not convert varbinary to boolean'
+...
+box.execute([[SELECT * FROM tb;]])
+---
+- metadata:
+  - name: A
+    type: integer
+  - name: B
+    type: boolean
+  rows:
+  - [1, null]
+  - [2, true]
+...
+box.execute([[INSERT INTO tt(t) VALUES (NULL);]])
+---
+- autoincrement_ids:
+  - 1
+  row_count: 1
+...
+box.execute([[INSERT INTO tt(t) VALUES (11);]])
+---
+- null
+- 'Type mismatch: can not convert 11 to string'
+...
+box.execute([[INSERT INTO tt(t) VALUES (22.2);]])
+---
+- null
+- 'Type mismatch: can not convert 22.2 to string'
+...
+box.execute([[INSERT INTO tt(t) VALUES (true);]])
+---
+- null
+- 'Type mismatch: can not convert TRUE to string'
+...
+box.execute([[INSERT INTO tt(t) VALUES ('33');]])
+---
+- autoincrement_ids:
+  - 2
+  row_count: 1
+...
+box.execute([[INSERT INTO tt(t) VALUES (X'3434');]])
+---
+- null
+- 'Type mismatch: can not convert varbinary to string'
+...
+box.execute([[SELECT * FROM tt;]])
+---
+- metadata:
+  - name: A
+    type: integer
+  - name: T
+    type: string
+  rows:
+  - [1, null]
+  - [2, '33']
+...
+box.execute([[INSERT INTO tv(v) VALUES (NULL);]])
+---
+- autoincrement_ids:
+  - 1
+  row_count: 1
+...
+box.execute([[INSERT INTO tv(v) VALUES (11);]])
+---
+- null
+- 'Type mismatch: can not convert 11 to varbinary'
+...
+box.execute([[INSERT INTO tv(v) VALUES (22.2);]])
+---
+- null
+- 'Type mismatch: can not convert 22.2 to varbinary'
+...
+box.execute([[INSERT INTO tv(v) VALUES (true);]])
+---
+- null
+- 'Type mismatch: can not convert TRUE to varbinary'
+...
+box.execute([[INSERT INTO tv(v) VALUES ('33');]])
+---
+- null
+- 'Type mismatch: can not convert 33 to varbinary'
+...
+box.execute([[INSERT INTO tv(v) VALUES (X'3434');]])
+---
+- autoincrement_ids:
+  - 2
+  row_count: 1
+...
+box.execute([[SELECT * FROM tv;]])
+---
+- metadata:
+  - name: A
+    type: integer
+  - name: V
+    type: varbinary
+  rows:
+  - [1, null]
+  - [2, '44']
+...
+box.execute([[INSERT INTO ts(s) VALUES (NULL);]])
+---
+- autoincrement_ids:
+  - 1
+  row_count: 1
+...
+box.execute([[INSERT INTO ts(s) VALUES (11);]])
+---
+- autoincrement_ids:
+  - 2
+  row_count: 1
+...
+box.execute([[INSERT INTO ts(s) VALUES (22.2);]])
+---
+- autoincrement_ids:
+  - 3
+  row_count: 1
+...
+box.execute([[INSERT INTO ts(s) VALUES (true);]])
+---
+- autoincrement_ids:
+  - 4
+  row_count: 1
+...
+box.execute([[INSERT INTO ts(s) VALUES ('33');]])
+---
+- autoincrement_ids:
+  - 5
+  row_count: 1
+...
+box.execute([[INSERT INTO ts(s) VALUES (X'3434');]])
+---
+- autoincrement_ids:
+  - 6
+  row_count: 1
+...
+box.execute([[SELECT * FROM ts;]])
+---
+- metadata:
+  - name: A
+    type: integer
+  - name: S
+    type: scalar
+  rows:
+  - [1, null]
+  - [2, 11]
+  - [3, 22.2]
+  - [4, true]
+  - [5, '33']
+  - [6, '44']
+...
+-- Check for UPDATE.
+box.execute([[DELETE FROM ti;]])
+---
+- row_count: 3
+...
+box.execute([[DELETE FROM td;]])
+---
+- row_count: 3
+...
+box.execute([[DELETE FROM tb;]])
+---
+- row_count: 2
+...
+box.execute([[DELETE FROM tt;]])
+---
+- row_count: 2
+...
+box.execute([[DELETE FROM tv;]])
+---
+- row_count: 2
+...
+box.execute([[DELETE FROM ts;]])
+---
+- row_count: 6
+...
+box.execute([[INSERT INTO ti VALUES(1, NULL);]])
+---
+- row_count: 1
+...
+box.execute([[INSERT INTO td VALUES(1, NULL);]])
+---
+- row_count: 1
+...
+box.execute([[INSERT INTO tb VALUES(1, NULL);]])
+---
+- row_count: 1
+...
+box.execute([[INSERT INTO tt VALUES(1, NULL);]])
+---
+- row_count: 1
+...
+box.execute([[INSERT INTO tv VALUES(1, NULL);]])
+---
+- row_count: 1
+...
+box.execute([[INSERT INTO ts VALUES(1, NULL);]])
+---
+- row_count: 1
+...
+box.execute([[SELECT * FROM ti, td, tb, tt, tv, ts;]])
+---
+- metadata:
+  - name: A
+    type: integer
+  - name: I
+    type: integer
+  - name: A
+    type: integer
+  - name: D
+    type: double
+  - name: A
+    type: integer
+  - name: B
+    type: boolean
+  - name: A
+    type: integer
+  - name: T
+    type: string
+  - name: A
+    type: integer
+  - name: V
+    type: varbinary
+  - name: A
+    type: integer
+  - name: S
+    type: scalar
+  rows:
+  - [1, null, 1, null, 1, null, 1, null, 1, null, 1, null]
+...
+box.execute([[UPDATE ti SET i = NULL WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE ti SET i = 11 WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE ti SET i = 100000000000000000000000000000000.1 WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert 1.0e+32 to integer'
+...
+box.execute([[UPDATE ti SET i = 33.0 WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE ti SET i = true WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert TRUE to integer'
+...
+box.execute([[UPDATE ti SET i = '33' WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert 33 to integer'
+...
+box.execute([[UPDATE ti SET i = X'3434' WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert varbinary to integer'
+...
+box.execute([[SELECT * FROM ti;]])
+---
+- metadata:
+  - name: A
+    type: integer
+  - name: I
+    type: integer
+  rows:
+  - [1, 33]
+...
+box.execute([[UPDATE td SET d = NULL WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE td SET d = 11 WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE td SET d = 100000000000000001 WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE td SET d = 22.2 WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE td SET d = true WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert TRUE to double'
+...
+box.execute([[UPDATE td SET d = '33' WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert 33 to double'
+...
+box.execute([[UPDATE td SET d = X'3434' WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert varbinary to double'
+...
+box.execute([[SELECT * FROM td;]])
+---
+- metadata:
+  - name: A
+    type: integer
+  - name: D
+    type: double
+  rows:
+  - [1, 22.2]
+...
+box.execute([[UPDATE tb SET b = NULL WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE tb SET b = 11 WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert 11 to boolean'
+...
+box.execute([[UPDATE tb SET b = 22.2 WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert 22.2 to boolean'
+...
+box.execute([[UPDATE tb SET b = true WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE tb SET b = '33' WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert 33 to boolean'
+...
+box.execute([[UPDATE tb SET b = X'3434' WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert varbinary to boolean'
+...
+box.execute([[SELECT * FROM tb;]])
+---
+- metadata:
+  - name: A
+    type: integer
+  - name: B
+    type: boolean
+  rows:
+  - [1, true]
+...
+box.execute([[UPDATE tt SET t = NULL WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE tt SET t = 11 WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert 11 to string'
+...
+box.execute([[UPDATE tt SET t = 22.2 WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert 22.2 to string'
+...
+box.execute([[UPDATE tt SET t = true WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert TRUE to string'
+...
+box.execute([[UPDATE tt SET t = '33' WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE tt SET t = X'3434' WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert varbinary to string'
+...
+box.execute([[SELECT * FROM tt;]])
+---
+- metadata:
+  - name: A
+    type: integer
+  - name: T
+    type: string
+  rows:
+  - [1, '33']
+...
+box.execute([[UPDATE tv SET v = NULL WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE tv SET v = 11 WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert 11 to varbinary'
+...
+box.execute([[UPDATE tv SET v = 22.2 WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert 22.2 to varbinary'
+...
+box.execute([[UPDATE tv SET v = true WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert TRUE to varbinary'
+...
+box.execute([[UPDATE tv SET v = '33' WHERE a = 1;]])
+---
+- null
+- 'Type mismatch: can not convert 33 to varbinary'
+...
+box.execute([[UPDATE tv SET v = X'3434' WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[SELECT * FROM tv;]])
+---
+- metadata:
+  - name: A
+    type: integer
+  - name: V
+    type: varbinary
+  rows:
+  - [1, '44']
+...
+box.execute([[UPDATE ts SET s = NULL WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE ts SET s = 11 WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE ts SET s = 22.2 WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE ts SET s = true WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE ts SET s = '33' WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[UPDATE ts SET s = X'3434' WHERE a = 1;]])
+---
+- row_count: 1
+...
+box.execute([[SELECT * FROM ts;]])
+---
+- metadata:
+  - name: A
+    type: integer
+  - name: S
+    type: scalar
+  rows:
+  - [1, '44']
+...
+box.execute([[DROP TABLE ti;]])
+---
+- row_count: 1
+...
+box.execute([[DROP TABLE td;]])
+---
+- row_count: 1
+...
+box.execute([[DROP TABLE tb;]])
+---
+- row_count: 1
+...
+box.execute([[DROP TABLE tt;]])
+---
+- row_count: 1
+...
+box.execute([[DROP TABLE tv;]])
+---
+- row_count: 1
+...
+box.execute([[DROP TABLE ts;]])
+---
+- row_count: 1
+...

@@ -52,7 +52,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "unique-1.2",
     [[
-        INSERT INTO t1(a,b,c) VALUES(1,2,3)
+        INSERT INTO t1(a,b,c) VALUES(1,2,'3')
     ]], {
         -- <unique-1.2>
         0
@@ -62,7 +62,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "unique-1.3",
     [[
-        INSERT INTO t1(a,b,c) VALUES(1,3,4)
+        INSERT INTO t1(a,b,c) VALUES(1,3,'4')
     ]], {
         -- <unique-1.3>
         1, "Duplicate key exists in unique index 'pk_unnamed_T1_1' in space 'T1'"
@@ -83,7 +83,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "unique-1.5",
     [[
-        INSERT INTO t1(a,b,c) VALUES(3,2,4)
+        INSERT INTO t1(a,b,c) VALUES(3,2,'4')
     ]], {
         -- <unique-1.5>
         1, "Duplicate key exists in unique index 'unique_unnamed_T1_2' in space 'T1'"
@@ -104,7 +104,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "unique-1.7",
     [[
-        INSERT INTO t1(a,b,c) VALUES(3,4,5)
+        INSERT INTO t1(a,b,c) VALUES(3,4,'5')
     ]], {
         -- <unique-1.7>
         0

@@ -135,16 +135,16 @@ test:do_catchsql_test(
         INSERT INTO t VALUES(20000000000000000000.01);
         SELECT * FROM t;
     ]], {
-        1,"Tuple field 1 type does not match one required by operation: expected integer"
+        1,"Type mismatch: can not convert 2.0e+19 to integer"
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "cast-2.9",
     [[
         INSERT INTO t VALUES(2.1);
         SELECT * FROM t;
     ]], {
-        1,"Tuple field 1 type does not match one required by operation: expected integer"
+        2, 9223372036854775808ULL, 18000000000000000000ULL
     })
 
 --

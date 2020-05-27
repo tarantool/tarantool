@@ -338,7 +338,7 @@ test:do_execsql_test(
                    ON tvshow.idshow = episode.idshow
                  LEFT JOIN seasons
                         ON seasons.idshow = episode.idshow
-                           AND seasons.season = episode.c12
+                           AND seasons.season = CAST(episode.c12 AS INTEGER)
                  JOIN path
                    ON files.idpath = path.idpath
                  LEFT JOIN bookmark
@@ -378,7 +378,7 @@ test:do_execsql_test(
         FROM episodeview
             JOIN tvshowview ON tvshowview.idShow = episodeview.idShow
             JOIN seasons ON (seasons.idShow = tvshowview.idShow
-                             AND seasons.season = episodeview.c12)
+                             AND seasons.season = CAST(episodeview.c12 AS INTEGER))
             JOIN files ON files.idFile = episodeview.idFile
             JOIN tvshowlinkpath ON tvshowlinkpath.idShow = tvshowview.idShow
             JOIN path ON path.idPath = tvshowlinkpath.idPath

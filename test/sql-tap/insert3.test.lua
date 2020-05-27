@@ -60,7 +60,7 @@ test:do_execsql_test(
             CREATE TABLE log2(rowid INTEGER PRIMARY KEY AUTOINCREMENT, x TEXT UNIQUE,y INT );
             CREATE TRIGGER r2 BEFORE INSERT ON t1 FOR EACH ROW BEGIN
               UPDATE log2 SET y=y+1 WHERE x=new.b;
-              INSERT OR IGNORE INTO log2(x, y) VALUES(new.b,1);
+              INSERT OR IGNORE INTO log2(x, y) VALUES(CAST(new.b AS STRING),1);
             END;
             INSERT INTO t1(a, b) VALUES('hi', 453);
             SELECT x,y FROM log ORDER BY x;
@@ -129,8 +129,8 @@ test:do_execsql_test(
               INSERT INTO t2dup(a,b,c) VALUES(new.a,new.b,new.c);
             END;
             INSERT INTO t2(a) VALUES(123);
-            INSERT INTO t2(b) VALUES(234);
-            INSERT INTO t2(c) VALUES(345);
+            INSERT INTO t2(b) VALUES('234');
+            INSERT INTO t2(c) VALUES('345');
             SELECT * FROM t2dup;
     ]], {
         -- <insert3-2.1>
@@ -143,8 +143,8 @@ test:do_execsql_test(
     [[
             DELETE FROM t2dup;
             INSERT INTO t2(a) SELECT 1 FROM t1 LIMIT 1;
-            INSERT INTO t2(b) SELECT 987 FROM t1 LIMIT 1;
-            INSERT INTO t2(c) SELECT 876 FROM t1 LIMIT 1;
+            INSERT INTO t2(b) SELECT '987' FROM t1 LIMIT 1;
+            INSERT INTO t2(c) SELECT '876' FROM t1 LIMIT 1;
             SELECT * FROM t2dup;
     ]], {
         -- <insert3-2.2>

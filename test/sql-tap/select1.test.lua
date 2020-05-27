@@ -231,7 +231,7 @@ string.format([[
         CREATE TABLE t3(id INT, a TEXT, b TEXT, PRIMARY KEY(id));
         INSERT INTO t3 VALUES(1, 'abc',NULL);
         INSERT INTO t3 VALUES(2, NULL,'xyz');
-        INSERT INTO t3 SELECT f1, * FROM test1;
+        INSERT INTO t3 SELECT f1, CAST(f1 AS STRING), CAST(f2 AS STRING) FROM test1;
         DROP TABLE IF EXISTS t4;
         CREATE TABLE t4(id INT, a INT , b TEXT , PRIMARY KEY(id));
         INSERT INTO t4 VALUES(1, NULL,'%s');
@@ -1671,8 +1671,8 @@ test:do_execsql_test(
     [[
         DELETE FROM t3;
         DELETE FROM t4;
-        INSERT INTO t3 VALUES(0,1,2);
-        INSERT INTO t4 VALUES(0,3,4);
+        INSERT INTO t3 VALUES(0,'1','2');
+        INSERT INTO t4 VALUES(0,3,'4');
         SELECT * FROM t3, t4;
     ]], {
         -- <select1-11.1>
@@ -1878,7 +1878,7 @@ test:do_execsql_test(
     "select1-12.4",
     [[
         DELETE FROM t3;
-        INSERT INTO t3 VALUES(0,1,2);
+        INSERT INTO t3 VALUES(0,'1','2');
     ]], {
         -- <select1-12.4>
         
