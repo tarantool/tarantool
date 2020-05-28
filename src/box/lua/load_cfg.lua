@@ -551,7 +551,8 @@ local function load_cfg(cfg)
             end
         end
     end
-    if not box.cfg.read_only and not box.cfg.replication then
+    if not box.cfg.read_only and not box.cfg.replication and
+       not box.error.injection.get('ERRINJ_AUTO_UPGRADE') then
         box.schema.upgrade{auto = true}
     end
 end
