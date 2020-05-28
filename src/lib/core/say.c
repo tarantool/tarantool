@@ -749,7 +749,7 @@ fail:
 void
 say_logger_free()
 {
-	if (log_default == &log_std)
+	if (say_logger_initialized())
 		log_destroy(&log_std);
 }
 
