@@ -43,15 +43,18 @@ extern "C" {
 #include "box/error.h"
 
 /**
- * Parse Lua arguments (they can come as single table
- * f({code : number, reason : string}) or as separate members
- * f(code, reason)) and construct struct error with given values.
+ * Parse Lua arguments (they can come as single table or as
+ * separate members) and construct struct error with given values.
  *
- * Instead of 'code' it is possible to specify a string name of
- * the error object's type:
+ * Can be used either the 'code' (numeric) for create a ClientError
+ * error with corresponding message (the format is predefined)
+ * and type or the 'type' (string) for create a CustomError error
+ * with custom type and desired message.
  *
- *     box.error(type, reason, ...)
- *     box.error({type = string, reason = string, ...})
+ *     box.error(code, reason args)
+ *     box.error({code = num, reason = string, ...})
+ *     box.error(type, reason format string, reason args)
+ *     box.error({type = string, code = num, reason = string, ...})
  *
  * In case one of arguments is missing its corresponding field
  * in struct error is filled with default value.
@@ -69,12 +72,21 @@ luaT_error_create(lua_State *L, int top_base)
 	int top_type = lua_type(L, top_base);
 	if (top >= top_base && (top_type == LUA_TNUMBER ||
 				top_type == LUA_TSTRING)) {
+		/* Shift of the "reason args". */
+		int shift = 1;
 		if (top_type == LUA_TNUMBER) {
 			code = lua_tonumber(L, top_base);
 			reason = tnt_errcode_desc(code);
 		} else {
 			custom_type = lua_tostring(L, top_base);
-			reason = "%s";
+			/*
+			 * For the CustomError, the message format
+			 * must be set via a function argument.
+			 */
+			if (lua_type(L, top_base + 1) != LUA_TSTRING)
+				return NULL;
+			reason = lua_tostring(L, top_base + 1);
+			shift = 2;
 		}
 		if (top > top_base) {
 			/* Call string.format(reason, ...) to format message */
@@ -85,9 +97,10 @@ luaT_error_create(lua_State *L, int top_base)
 			if (lua_isnil(L, -1))
 				goto raise;
 			lua_pushstring(L, reason);
-			for (int i = top_base + 1; i <= top; i++)
+			int nargs = 1;
+			for (int i = top_base + shift; i <= top; ++i, ++nargs)
 				lua_pushvalue(L, i);
-			lua_call(L, top - top_base + 1, 1);
+			lua_call(L, nargs, 1);
 			reason = lua_tostring(L, -1);
 		} else if (strchr(reason, '%') != NULL) {
 			/* Missing arguments to format string */
