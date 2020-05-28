@@ -270,3 +270,8 @@ gc_err
 
 s:drop()
 box.schema.func.drop('runtimeerror')
+
+-- gh-4903: add format string usage for a CustomError message
+--
+err = box.error.new('TestType', 'Message arg1: %s. Message arg2: %u', '1', 2)
+err.message
