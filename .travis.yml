@@ -8,8 +8,6 @@ language: cpp
 os: linux
 compiler: gcc
 
-osx_image: xcode10.2
-
 cache:
     directories:
       - $HOME/.cache
@@ -28,9 +26,6 @@ jobs:
       - name: "RelWithDebInfo build + test (Linux, clang)"
         env: TARGET=test
         compiler: clang
-      - name: "RelWithDebInfo build + test (OS X Mojave 10.14)"
-        env: TARGET=test
-        os: osx
       - name: "Debug build + test + coverage (Linux, gcc)"
         env: TARGET=coverage
 
