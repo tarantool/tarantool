@@ -1,7 +1,5 @@
 #!/usr/bin/env tarantool
 
-require('suite')
-
 os.execute("rm -rf vinyl_test")
 os.execute("mkdir -p vinyl_test")
 
