@@ -495,12 +495,18 @@ struct fiber {
 		struct session *session;
 		struct credentials *credentials;
 		struct txn *txn;
-		/**
-		 * Lua stack and the optional
-		 * fiber.storage Lua reference.
-		 */
+		/** Fields related to Lua code execution. */
 		struct {
+			/**
+			 * Optional Lua state (may be NULL).
+			 * Useful as a temporary Lua state to save
+			 * time and resources on creating it.
+			 * Should not be used in other fibers.
+			 */
 			struct lua_State *stack;
+			/**
+			 * Optional fiber.storage Lua reference.
+			 */
 			int ref;
 		} lua;
 		/**

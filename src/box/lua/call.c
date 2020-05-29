@@ -555,13 +555,40 @@ box_process_lua(enum handlers handler, struct execute_lua_ctx *ctx,
 	port_lua_create(ret, L);
 	((struct port_lua *) ret)->ref = coro_ref;
 
+	/*
+	 * A code that need a temporary fiber-local Lua state may
+	 * save some time and resources for creating a new state
+	 * and use this one.
+	 */
+	bool has_lua_stack = fiber()->storage.lua.stack != NULL;
+	if (!has_lua_stack)
+		fiber()->storage.lua.stack = L;
+
 	lua_rawgeti(L, LUA_REGISTRYINDEX, execute_lua_refs[handler]);
 	assert(lua_isfunction(L, -1));
 	lua_pushlightuserdata(L, ctx);
 	if (luaT_call(L, 1, LUA_MULTRET) != 0) {
+		if (!has_lua_stack)
+			fiber()->storage.lua.stack = NULL;
 		port_lua_destroy(ret);
 		return -1;
 	}
+
+	/*
+	 * Since this field is optional we're not obligated to
+	 * keep it until the Lua state will be unreferenced in
+	 * port_lua_destroy().
+	 *
+	 * There is no much sense to keep it beyond the Lua call,
+	 * so let's zap now.
+	 *
+	 * But: keep the stack if it was present before the call,
+	 * because it would be counter-intuitive if the existing
+	 * state pointer would be zapped after this function call.
+	 */
+	if (!has_lua_stack)
+		fiber()->storage.lua.stack = NULL;
+
 	return 0;
 }
 
