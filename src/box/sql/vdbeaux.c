@@ -2876,8 +2876,8 @@ sqlMemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
 		}
 		if ((f1 & MEM_Int) != 0) {
 			if ((f2 & MEM_Real) != 0) {
-				return double_compare_uint64(-pMem2->u.r,
-							     -pMem1->u.i, 1);
+				return double_compare_nint64(pMem2->u.r,
+							     pMem1->u.i, -1);
 			} else {
 				return -1;
 			}
@@ -2894,8 +2894,8 @@ sqlMemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
 		}
 		if ((f1 & MEM_Real) != 0) {
 			if ((f2 & MEM_Int) != 0) {
-				return double_compare_uint64(-pMem1->u.r,
-							     -pMem2->u.i, -1);
+				return double_compare_nint64(pMem1->u.r,
+							     pMem2->u.i, 1);
 			} else if ((f2 & MEM_UInt) != 0) {
 				return double_compare_uint64(pMem1->u.r,
 							     pMem2->u.u, 1);
@@ -3073,8 +3073,8 @@ sqlVdbeCompareMsgpack(const char **key1,
 					rc = +1;
 				}
 			} else if (pKey2->flags & MEM_Real) {
-				rc = double_compare_uint64(-pKey2->u.r,
-							   -mem1.u.i, 1);
+				rc = double_compare_nint64(pKey2->u.r, mem1.u.i,
+							   -1);
 			} else if ((pKey2->flags & MEM_Null) != 0) {
 				rc = 1;
 			} else if ((pKey2->flags & MEM_Bool) != 0) {
@@ -3092,8 +3092,8 @@ sqlVdbeCompareMsgpack(const char **key1,
 			mem1.u.r = mp_decode_double(&aKey1);
  do_float:
 			if ((pKey2->flags & MEM_Int) != 0) {
-				rc = double_compare_uint64(-mem1.u.r,
-							   -pKey2->u.i, -1);
+				rc = double_compare_nint64(mem1.u.r, pKey2->u.i,
+							   1);
 			} else if (pKey2->flags & MEM_UInt) {
 				rc = double_compare_uint64(mem1.u.r,
 							   pKey2->u.u, 1);

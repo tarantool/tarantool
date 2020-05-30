@@ -515,6 +515,28 @@ json_escape(char *buf, int size, const char *data);
 int
 double_compare_uint64(double lhs, uint64_t rhs, int k);
 
+/**
+ * The same as double_compare_uint64(), but for negative int64_t
+ * value. To avoid unnecessary negation for cast to uint64_t to
+ * be able to use the other function, and to avoid the undefined
+ * behaviour in it, because "(uint64_t)-value" is UB, if value is
+ * INT64_MIN.
+ */
+int
+double_compare_nint64(double lhs, int64_t rhs, int k);
+
+/**
+ * A shortcut to automatically choose a needed double vs
+ * int64/uint64 function.
+ */
+static inline int
+double_compare_int64(double lhs, int64_t rhs, int k)
+{
+	if (rhs >= 0)
+		return double_compare_uint64(lhs, (uint64_t)rhs, k);
+	return double_compare_nint64(lhs, rhs, k);
+}
+
 #if !defined(__cplusplus) && !defined(static_assert)
 # define static_assert _Static_assert
 #endif
