@@ -168,13 +168,8 @@ static int
 mp_compare_double_any_int(double lhs, const char *rhs, enum mp_type rhs_type,
 			  int k)
 {
-	if (rhs_type == MP_INT) {
-		int64_t v = mp_decode_int(&rhs);
-		if (v < 0) {
-			return double_compare_uint64(-lhs, (uint64_t)-v, -k);
-		}
-		return double_compare_uint64(lhs, (uint64_t)v, k);
-	}
+	if (rhs_type == MP_INT)
+		return double_compare_int64(lhs, mp_decode_int(&rhs), k);
 	assert(rhs_type == MP_UINT);
 	return double_compare_uint64(lhs, mp_decode_uint(&rhs), k);
 }

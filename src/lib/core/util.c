@@ -327,6 +327,7 @@ fpconv_check()
 }
 
 #define EXP2_53 9007199254740992.0      /* 2.0 ^ 53 */
+#define EXP2_63 9223372036854775808.0   /* 2.0 ^ 63 */
 #define EXP2_64 1.8446744073709552e+19  /* 2.0 ^ 64 */
 
 int
@@ -378,12 +379,31 @@ double_compare_uint64(double lhs, uint64_t rhs, int k)
 		 * rounding happens.
 		 */
 		assert(lhs < EXP2_53);
-		assert((uint64_t)(double)rhs == rhs || rhs > (uint64_t)EXP2_53);
+		assert(rhs > (uint64_t)EXP2_53 || (uint64_t)(double)rhs == rhs);
 		return k*COMPARE_RESULT(lhs, (double)rhs);
 	}
 	/*
 	 * Lhs is NaN. We assume all NaNs to be less than any
 	 * number.
 	 */
+	return -k;
+}
+
+int
+double_compare_nint64(double lhs, int64_t rhs, int k)
+{
+	assert(rhs < 0);
+	assert(k==1 || k==-1);
+	if (lhs <= -EXP2_53) {
+		assert((int64_t)-EXP2_63 == INT64_MIN);
+		if (lhs < -EXP2_63)
+			return -k;
+		assert((double)(int64_t)lhs == lhs);
+		return k*COMPARE_RESULT((int64_t)lhs, rhs);
+	}
+	if (!isnan(lhs)) {
+		assert(rhs < (int64_t)-EXP2_53 || (int64_t)(double)rhs == rhs);
+		return k*COMPARE_RESULT(lhs, (double)rhs);
+	}
 	return -k;
 }
