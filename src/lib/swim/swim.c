@@ -874,11 +874,6 @@ swim_delete_member(struct swim *swim, struct swim_member *member)
 {
 	say_verbose("SWIM %d: member %s is deleted", swim_fd(swim),
 		    tt_uuid_str(&member->uuid));
-	struct mh_swim_table_key key = {member->hash, &member->uuid};
-	mh_int_t rc = mh_swim_table_find(swim->members, key, NULL);
-	assert(rc != mh_end(swim->members));
-	mh_swim_table_del(swim->members, rc, NULL);
-	rlist_del_entry(member, in_round_queue);
 
 	/* Failure detection component. */
 	if (! heap_node_is_stray(&member->in_wait_ack_heap))
@@ -888,6 +883,11 @@ swim_delete_member(struct swim *swim, struct swim_member *member)
 	swim_on_member_update(swim, member, SWIM_EV_DROP);
 	rlist_del_entry(member, in_dissemination_queue);
 
+	struct mh_swim_table_key key = {member->hash, &member->uuid};
+	mh_int_t rc = mh_swim_table_find(swim->members, key, NULL);
+	assert(rc != mh_end(swim->members));
+	mh_swim_table_del(swim->members, rc, NULL);
+	rlist_del_entry(member, in_round_queue);
 	swim_member_delete(member);
 }
 
