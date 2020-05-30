@@ -39,7 +39,7 @@ extern "C" {
 #endif
 
 int32_t
-guava(int64_t state, int32_t buckets);
+guava(uint64_t state, int32_t buckets);
 
 #if defined(__cplusplus)
 } /* extern C */
