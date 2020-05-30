@@ -291,9 +291,11 @@ vy_regulator_dump_complete(struct vy_regulator *regulator,
 	vy_quota_set_rate_limit(regulator->quota, VY_QUOTA_RESOURCE_MEMORY,
 				regulator->dump_bandwidth);
 
-	say_info("dumped %zu bytes in %.1f s, rate %.1f MB/s",
-		 mem_dumped, dump_duration,
-		 mem_dumped / dump_duration / 1024 / 1024);
+	if (dump_duration > 0) {
+		say_info("dumped %zu bytes in %.1f s, rate %.1f MB/s",
+			 mem_dumped, dump_duration,
+			 mem_dumped / dump_duration / 1024 / 1024);
+	}
 }
 
 void
@@ -420,7 +422,7 @@ vy_regulator_update_rate_limit(struct vy_regulator *regulator,
 	double compaction_time = stat->compaction_time - last->compaction_time;
 	*last = *stat;
 
-	if (dump_input < (ssize_t)VY_DUMP_SIZE_ACCT_MIN)
+	if (dump_input < (ssize_t)VY_DUMP_SIZE_ACCT_MIN || compaction_time == 0)
 		return;
 
 	recent->dump_count += dump_count;
