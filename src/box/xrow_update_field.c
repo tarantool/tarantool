@@ -404,16 +404,17 @@ xrow_update_arith_make(struct xrow_update_op *op,
 			unreachable();
 			break;
 		}
-		float fc = (float) c;
-		if ((lowest_type == XUPDATE_TYPE_DOUBLE && c != (double) fc) ||
-		    (lowest_type == XUPDATE_TYPE_FLOAT &&
-		     (c >= FLT_MAX || c <= -FLT_MAX))) {
-			ret->type = XUPDATE_TYPE_DOUBLE;
-			ret->dbl = c;
-		} else {
-			ret->type = XUPDATE_TYPE_FLOAT;
-			ret->flt = fc;
+		if (c <= FLT_MAX && c >= -FLT_MAX) {
+			float fc = (float)c;
+			if (c == (double)fc) {
+				ret->type = XUPDATE_TYPE_FLOAT;
+				ret->flt = fc;
+				return 0;
+			}
 		}
+		ret->type = XUPDATE_TYPE_DOUBLE;
+		ret->dbl = c;
+		return 0;
 	} else {
 		decimal_t a, b, c;
 		if (! xrow_update_arg_arith_to_decimal(arg1, &a) ||
