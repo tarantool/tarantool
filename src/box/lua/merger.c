@@ -149,6 +149,78 @@ luaT_gettuple(struct lua_State *L, int idx, struct tuple_format *format)
 	return tuple;
 }
 
+/**
+ * Get a temporary Lua state.
+ *
+ * Use case: a function does not accept a Lua state as an argument
+ * to allow using from C code, but uses a Lua value, which is
+ * referenced in LUA_REGISTRYINDEX. A temporary Lua stack is needed
+ * to get and process the value.
+ *
+ * The resulting Lua state has a separate Lua stack, but the same
+ * globals and registry as `tarantool_L` (and all Lua states in
+ * tarantool at the moment of writing this).
+ *
+ * This Lua state should be used only from one fiber: otherwise
+ * one fiber may change the stack and another one will access a
+ * wrong stack slot when it will be scheduled for execution after
+ * yield.
+ *
+ * Return a Lua state on success and set @a coro_ref. This
+ * reference should be passed to `luaT_release_temp_luastate()`,
+ * when the state is not needed anymore.
+ *
+ * Return NULL and set a diag at failure.
+ */
+static struct lua_State *
+luaT_temp_luastate(int *coro_ref)
+{
+	if (fiber()->storage.lua.stack != NULL) {
+		*coro_ref = LUA_NOREF;
+		return fiber()->storage.lua.stack;
+	}
+
+	/* Popped by luaL_ref(). */
+	struct lua_State *L = luaT_newthread(tarantool_L);
+	if (L == NULL)
+		return NULL;
+	/*
+	 * We should remove the reference to the newly created Lua
+	 * thread from tarantool_L, because of two reasons:
+	 *
+	 * First, if we'll push something to tarantool_L and
+	 * yield, then another fiber will not know that a stack
+	 * top is changed and may operate on a wrong slot.
+	 *
+	 * Second, many requests that push a value to tarantool_L
+	 * and yield may exhaust available slots on the stack. It
+	 * is limited by LUAI_MAXSTACK build time constant (~65K).
+	 *
+	 * We cannot just pop the value, but should keep the
+	 * reference in the registry while it is in use.
+	 * Otherwise it may be garbage collected.
+	 */
+	*coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
+	return L;
+}
+
+/**
+ * Release a temporary Lua state.
+ *
+ * It complements `luaT_temp_luastate()`.
+ */
+static void
+luaT_release_temp_luastate(int coro_ref)
+{
+	/*
+	 * FIXME: The reusable fiber-local Lua state is not
+	 * unreferenced here (coro_ref == LUA_NOREF), but
+	 * it must be truncated to its past top to prevent
+	 * stack overflow.
+	 */
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+}
+
 /* }}} */
 
 /* {{{ Create, destroy structures from Lua */
@@ -396,16 +468,12 @@ luaL_merge_source_buffer_new(struct lua_State *L)
 }
 
 /**
- * Call a user provided function to get a next data chunk (a
- * buffer).
- *
- * Return 1 when a new buffer is received, 0 when a buffers
- * iterator ends and -1 at error and set a diag.
+ * Helper for `luaL_merge_source_buffer_fetch()`.
  */
 static int
-luaL_merge_source_buffer_fetch(struct merge_source_buffer *source)
+luaL_merge_source_buffer_fetch_impl(struct merge_source_buffer *source,
+				    struct lua_State *L)
 {
-	struct lua_State *L = fiber()->storage.lua.stack;
 	int nresult = luaL_iterator_next(L, source->fetch_it);
 
 	/* Handle a Lua error in a gen function. */
@@ -446,8 +514,32 @@ luaL_merge_source_buffer_fetch(struct merge_source_buffer *source)
 	return 1;
 }
 
+/**
+ * Call a user provided function to get a next data chunk (a
+ * buffer).
+ *
+ * Return 1 when a new buffer is received, 0 when a buffers
+ * iterator ends and -1 at error and set a diag.
+ */
+static int
+luaL_merge_source_buffer_fetch(struct merge_source_buffer *source)
+{
+	int coro_ref = LUA_NOREF;
+	struct lua_State *L = luaT_temp_luastate(&coro_ref);
+	if (L == NULL)
+		return -1;
+	int rc = luaL_merge_source_buffer_fetch_impl(source, L);
+	luaT_release_temp_luastate(coro_ref);
+	return rc;
+}
+
 /* Virtual methods */
 
+/**
+ * destroy() virtual method implementation for a buffer source.
+ *
+ * @see struct merge_source_vtab
+ */
 static void
 luaL_merge_source_buffer_destroy(struct merge_source *base)
 {
@@ -462,6 +554,11 @@ luaL_merge_source_buffer_destroy(struct merge_source *base)
 	free(source);
 }
 
+/**
+ * next() virtual method implementation for a buffer source.
+ *
+ * @see struct merge_source_vtab
+ */
 static int
 luaL_merge_source_buffer_next(struct merge_source *base,
 			      struct tuple_format *format,
@@ -586,9 +683,9 @@ luaL_merge_source_table_new(struct lua_State *L)
  * received and -1 at an error (set a diag).
  */
 static int
-luaL_merge_source_table_fetch(struct merge_source_table *source)
+luaL_merge_source_table_fetch(struct merge_source_table *source,
+			      struct lua_State *L)
 {
-	struct lua_State *L = fiber()->storage.lua.stack;
 	int nresult = luaL_iterator_next(L, source->fetch_it);
 
 	/* Handle a Lua error in a gen function. */
@@ -625,6 +722,11 @@ luaL_merge_source_table_fetch(struct merge_source_table *source)
 
 /* Virtual methods */
 
+/**
+ * destroy() virtual method implementation for a table source.
+ *
+ * @see struct merge_source_vtab
+ */
 static void
 luaL_merge_source_table_destroy(struct merge_source *base)
 {
@@ -639,12 +741,15 @@ luaL_merge_source_table_destroy(struct merge_source *base)
 	free(source);
 }
 
+/**
+ * Helper for `luaL_merge_source_table_next()`.
+ */
 static int
-luaL_merge_source_table_next(struct merge_source *base,
-			     struct tuple_format *format,
-			     struct tuple **out)
+luaL_merge_source_table_next_impl(struct merge_source *base,
+				  struct tuple_format *format,
+				  struct tuple **out,
+				  struct lua_State *L)
 {
-	struct lua_State *L = fiber()->storage.lua.stack;
 	struct merge_source_table *source = container_of(base,
 		struct merge_source_table, base);
 
@@ -659,7 +764,7 @@ luaL_merge_source_table_next(struct merge_source *base,
 	while (source->ref == 0 || lua_isnil(L, -1)) {
 		if (source->ref > 0)
 			lua_pop(L, 2);
-		int rc = luaL_merge_source_table_fetch(source);
+		int rc = luaL_merge_source_table_fetch(source, L);
 		if (rc < 0)
 			return -1;
 		if (rc == 0) {
@@ -685,6 +790,25 @@ luaL_merge_source_table_next(struct merge_source *base,
 	tuple_ref(tuple);
 	*out = tuple;
 	return 0;
+}
+
+/**
+ * next() virtual method implementation for a table source.
+ *
+ * @see struct merge_source_vtab
+ */
+static int
+luaL_merge_source_table_next(struct merge_source *base,
+			     struct tuple_format *format,
+			     struct tuple **out)
+{
+	int coro_ref = LUA_NOREF;
+	struct lua_State *L = luaT_temp_luastate(&coro_ref);
+	if (L == NULL)
+		return -1;
+	int rc = luaL_merge_source_table_next_impl(base, format, out, L);
+	luaT_release_temp_luastate(coro_ref);
+	return rc;
 }
 
 /* Lua functions */
@@ -792,6 +916,11 @@ luaL_merge_source_tuple_fetch(struct merge_source_tuple *source,
 
 /* Virtual methods */
 
+/**
+ * destroy() virtual method implementation for a tuple source.
+ *
+ * @see struct merge_source_vtab
+ */
 static void
 luaL_merge_source_tuple_destroy(struct merge_source *base)
 {
@@ -804,12 +933,15 @@ luaL_merge_source_tuple_destroy(struct merge_source *base)
 	free(source);
 }
 
+/**
+ * Helper for `luaL_merge_source_tuple_next()`.
+ */
 static int
-luaL_merge_source_tuple_next(struct merge_source *base,
-			     struct tuple_format *format,
-			     struct tuple **out)
+luaL_merge_source_tuple_next_impl(struct merge_source *base,
+				  struct tuple_format *format,
+				  struct tuple **out,
+				  struct lua_State *L)
 {
-	struct lua_State *L = fiber()->storage.lua.stack;
 	struct merge_source_tuple *source = container_of(base,
 		struct merge_source_tuple, base);
 
@@ -832,6 +964,25 @@ luaL_merge_source_tuple_next(struct merge_source *base,
 	tuple_ref(tuple);
 	*out = tuple;
 	return 0;
+}
+
+/**
+ * next() virtual method implementation for a tuple source.
+ *
+ * @see struct merge_source_vtab
+ */
+static int
+luaL_merge_source_tuple_next(struct merge_source *base,
+			     struct tuple_format *format,
+			     struct tuple **out)
+{
+	int coro_ref = LUA_NOREF;
+	struct lua_State *L = luaT_temp_luastate(&coro_ref);
+	if (L == NULL)
+		return -1;
+	int rc = luaL_merge_source_tuple_next_impl(base, format, out, L);
+	luaT_release_temp_luastate(coro_ref);
+	return rc;
 }
 
 /* Lua functions */
