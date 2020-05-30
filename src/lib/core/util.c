@@ -407,3 +407,20 @@ double_compare_nint64(double lhs, int64_t rhs, int k)
 	}
 	return -k;
 }
+
+void
+thread_sleep(double sec)
+{
+	uint64_t ns = (uint64_t)(sec * 1000000000);
+	assert(ns > 0);
+	struct timespec req;
+	struct timespec next;
+	req.tv_sec = ns / 1000000000;
+	req.tv_nsec = ns % 1000000000;
+	assert(req.tv_nsec < 1000000000);
+	int rc;
+	while ((rc = nanosleep(&req, &next)) == -1 && errno == EINTR)
+		req = next;
+	assert(rc == 0);
+	(void)rc;
+}

@@ -914,7 +914,7 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info,
 
 	struct errinj *inj = errinj(ERRINJ_VY_READ_PAGE_TIMEOUT, ERRINJ_DOUBLE);
 	if (inj != NULL && inj->dparam > 0)
-		usleep(inj->dparam * 1000000);
+		thread_sleep(inj->dparam);
 
 	ERROR_INJECT_SLEEP(ERRINJ_VY_READ_PAGE_DELAY);
 
