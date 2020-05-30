@@ -537,6 +537,13 @@ double_compare_int64(double lhs, int64_t rhs, int k)
 	return double_compare_nint64(lhs, rhs, k);
 }
 
+/**
+ * Put the current thread in sleep for the given number of
+ * seconds.
+ */
+void
+thread_sleep(double sec);
+
 #if !defined(__cplusplus) && !defined(static_assert)
 # define static_assert _Static_assert
 #endif

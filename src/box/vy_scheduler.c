@@ -1072,7 +1072,7 @@ vy_task_write_run(struct vy_task *task, bool no_compression)
 		struct errinj *inj = errinj(ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT,
 					    ERRINJ_DOUBLE);
 		if (inj != NULL && inj->dparam > 0)
-			usleep(inj->dparam * 1000000);
+			thread_sleep(inj->dparam);
 
 		rc = vy_run_writer_append_stmt(&writer, entry);
 		if (rc != 0)
