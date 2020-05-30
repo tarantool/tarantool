@@ -742,7 +742,7 @@ tests = {                                                                       
     {{'float', -flt_max}, {'float', -flt_max}, mp_double},                      \
 -- Float + int is float when fits the float range.                              \
     {{'float', 1}, {'int', 1}, mp_float},                                       \
-    {{'float', flt_max}, {'uint64_t', uint_max}, mp_double},                    \
+    {{'float', flt_max}, {'uint64_t', uint_max}, mp_float},                     \
 -- Precision matters too. Double is used when need to avoid                     \
 -- precision loss.                                                              \
     {{'float', 1.0001}, {'double', 1.0000000000001}, mp_double},                \
