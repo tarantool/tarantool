@@ -357,7 +357,7 @@ digest.base64_decode(123)
 ...
 digest.guava('hello', 0)
 ---
-- error: 'bad argument #1 to ''?'' (cannot convert ''string'' to ''int64_t'')'
+- error: 'bad argument #1 to ''?'' (cannot convert ''string'' to ''uint64_t'')'
 ...
 digest.guava(1, 'nope_')
 ---

@@ -39,22 +39,26 @@
  * John Lamping, Eric Veach
  */
 
-static const int64_t K = 2862933555777941757;
+static const uint64_t K = 2862933555777941757ULL;
 static const double  D = 0x1.0p31;
 
-static inline double lcg(int64_t *state)
+static inline double lcg(uint64_t *state)
 {
-	return (double )((int32_t)(((uint64_t )*state >> 33) + 1)) / D;
+	return (double)((int32_t)((*state >> 33) + 1)) / D;
 }
 
+/**
+ * The function does not conform to the original paper, and
+ * therefore has incorrect behaviour. It should be deprecated.
+ */
 int32_t
-guava(int64_t state, int32_t buckets)
+guava(uint64_t state, int32_t buckets)
 {
-	int32_t candidate = 0;
-	int32_t next;
+	int64_t candidate = 0;
+	int64_t next;
 	while (1) {
 		state = K * state + 1;
-		next = (int32_t)((candidate + 1) / lcg(&state));
+		next = (candidate + 1) / lcg(&state);
 		if (next >= 0 && next < buckets)
 			candidate = next;
 		else

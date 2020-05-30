@@ -14,7 +14,7 @@ ffi.cdef[[
 
     typedef uint32_t (*crc32_func)(uint32_t crc,
         const unsigned char *buf, unsigned int len);
-    extern int32_t guava(int64_t state, int32_t buckets);
+    extern int32_t guava(uint64_t state, int32_t buckets);
     extern crc32_func crc32_calc;
 
     /* base64 */
