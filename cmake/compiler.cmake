@@ -269,7 +269,21 @@ macro(enable_tnt_compile_flags)
         if (NOT CMAKE_COMPILER_IS_CLANG)
             message(FATAL_ERROR "Undefined behaviour sanitizer only available for clang")
         else()
-            add_compile_flags("C;CXX" "-fsanitize=alignment -fno-sanitize-recover=alignment")
+            set(SANITIZE_FLAGS "-fsanitize=undefined -fno-sanitize-recover=undefined")
+            # Stailq data structure subtracts a positive value from NULL.
+            set(SANITIZE_FLAGS ${SANITIZE_FLAGS} -fno-sanitize=pointer-overflow)
+            # Intrusive data structures may abuse '&obj->member' on pointer
+            # 'obj' which is not really a pointer at an object of its type.
+            # For example, rlist uses '&item->member' expression in macro cycles
+            # to check end of cycle, but on the last iteration 'item' points at
+            # the list metadata head, not at an object of type stored in this
+            # list.
+            set(SANITIZE_FLAGS ${SANITIZE_FLAGS} -fno-sanitize=vptr)
+            # Integer overflow and truncation are disabled due to extensive
+            # usage of this UB in SQL code to 'implement' some kind of int65_t.
+            set(SANITIZE_FLAGS ${SANITIZE_FLAGS} -fno-sanitize=implicit-signed-integer-truncation -fno-sanitize=implicit-integer-sign-change -fno-sanitize=signed-integer-overflow)
+
+            add_compile_flags("C;CXX" "${SANITIZE_FLAGS}")
         endif()
     endif()
 
