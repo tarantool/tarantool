@@ -86,7 +86,7 @@ ffi.cdef[[
 
 -- {{{ Error handling
 
-local pwgr_errstr = "get%s failed [errno %d]: %s"
+local pwgr_errstr = "%s failed [errno %d]: %s"
 
 -- Use it in the following way: set errno to zero, call a passwd /
 -- group function, then call this function to check whether there
