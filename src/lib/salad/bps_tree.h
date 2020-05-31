@@ -2654,7 +2654,7 @@ bps_tree_move_elems_to_right_inner(struct bps_tree *tree,
 	if (!move_to_empty)
 		BPS_TREE_DATAMOVE(b->elems + num, b->elems,
 				  b->header.size - 1, b, b);
-	BPS_TREE_DATAMOVE(b->elems, a->elems + a->header.size - num,
+	BPS_TREE_DATAMOVE(b->elems, a->elems + (a->header.size - num),
 			  num - 1, b, a);
 	if (move_to_empty)
 		*b_inner_path_elem->max_elem_copy =
@@ -2866,7 +2866,7 @@ bps_tree_insert_and_move_elems_to_right_inner(struct bps_tree *tree,
 				  mid_part_size - num, a, a);
 		a->child_ids[pos] = block_id;
 
-		BPS_TREE_DATAMOVE(b->elems, a->elems + a->header.size - num,
+		BPS_TREE_DATAMOVE(b->elems, a->elems + (a->header.size - num),
 				  num - 1, b, a);
 		if (move_to_empty)
 			*b_inner_path_elem->max_elem_copy =
@@ -2888,7 +2888,7 @@ bps_tree_insert_and_move_elems_to_right_inner(struct bps_tree *tree,
 				  mid_part_size - num, a, a);
 		a->child_ids[pos] = block_id;
 
-		BPS_TREE_DATAMOVE(b->elems, a->elems + a->header.size - num,
+		BPS_TREE_DATAMOVE(b->elems, a->elems + (a->header.size - num),
 				  num - 1, b, a);
 		if (move_to_empty)
 			*b_inner_path_elem->max_elem_copy =
@@ -2916,8 +2916,8 @@ bps_tree_insert_and_move_elems_to_right_inner(struct bps_tree *tree,
 			if (num > 1) {
 				/* +(num - 2) */
 				BPS_TREE_DATAMOVE(b->elems,
-						  a->elems + a->header.size
-						   - num + 1, num - 2, b, a);
+						  a->elems + (a->header.size
+						   - num + 1), num - 2, b, a);
 				/* +1 */
 				b->elems[num - 2] =
 					*a_inner_path_elem->max_elem_copy;
@@ -2930,7 +2930,7 @@ bps_tree_insert_and_move_elems_to_right_inner(struct bps_tree *tree,
 			assert(num > 1);
 
 			BPS_TREE_DATAMOVE(b->elems,
-					  a->elems + a->header.size - num + 1,
+					  a->elems + (a->header.size - num + 1),
 					  num - mid_part_size - 1, b, a);
 			b->elems[new_pos] = max_elem;
 			BPS_TREE_DATAMOVE(b->elems + new_pos + 1,
@@ -3142,7 +3142,7 @@ bps_tree_insert_and_move_elems_to_left_inner(struct bps_tree *tree,
 					b->elems[num - 2];
 		}
 		if (!move_all)
-			BPS_TREE_DATAMOVE(b->elems, b->elems + num - 1,
+			BPS_TREE_DATAMOVE(b->elems, b->elems + (num - 1),
 					  b->header.size - num, b, b);
 	}
 
