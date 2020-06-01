@@ -255,7 +255,7 @@ local function guard_loop(self)
             self.fiber = fiber.create(feedback_loop, self)
             log.verbose("%s restarted", PREFIX)
         end
-        local st, err = pcall(fiber.sleep, self.interval)
+        local st = pcall(fiber.sleep, self.interval)
         if not st then
             -- fiber was cancelled
             break

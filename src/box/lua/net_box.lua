@@ -39,10 +39,6 @@ local IPROTO_STATUS_KEY    = 0x00
 local IPROTO_ERRNO_MASK    = 0x7FFF
 local IPROTO_SYNC_KEY      = 0x01
 local IPROTO_SCHEMA_VERSION_KEY = 0x05
-local IPROTO_METADATA_KEY = 0x32
-local IPROTO_SQL_INFO_KEY = 0x42
-local SQL_INFO_ROW_COUNT_KEY = 0
-local IPROTO_FIELD_NAME_KEY = 0
 local IPROTO_DATA_KEY      = 0x30
 local IPROTO_ERROR_24      = 0x31
 local IPROTO_ERROR         = 0x52
@@ -68,18 +64,18 @@ error_unref(struct error *e);
 -- utility tables
 local is_final_state         = {closed = 1, error = 1}
 
-local function decode_nil(raw_data, raw_data_end)
+local function decode_nil(raw_data, raw_data_end) -- luacheck: no unused args
     return nil, raw_data_end
 end
 local function decode_data(raw_data)
     local response, raw_end = decode(raw_data)
     return response[IPROTO_DATA_KEY], raw_end
 end
-local function decode_tuple(raw_data, raw_data_end, format)
+local function decode_tuple(raw_data, raw_data_end, format) -- luacheck: no unused args
     local response, raw_end = internal.decode_select(raw_data, nil, format)
     return response[1], raw_end
 end
-local function decode_get(raw_data, raw_data_end, format)
+local function decode_get(raw_data, raw_data_end, format) -- luacheck: no unused args
     local body, raw_end = internal.decode_select(raw_data, nil, format)
     if body[2] then
         return nil, raw_end, box.error.MORE_THAN_ONE_TUPLE
@@ -122,7 +118,7 @@ local method_encoder = {
     max     = internal.encode_select,
     count   = internal.encode_call,
     -- inject raw data into connection, used by console and tests
-    inject = function(buf, id, bytes)
+    inject = function(buf, id, bytes) -- luacheck: no unused args
         local ptr = buf:reserve(#bytes)
         ffi.copy(ptr, bytes, #bytes)
         buf.wpos = ptr + #bytes
@@ -212,7 +208,7 @@ end
 -- Default action on push during a synchronous request -
 -- ignore.
 --
-local function on_push_sync_default(...) end
+local function on_push_sync_default() end
 
 --
 -- Basically, *transport* is a TCP connection speaking one of
@@ -253,7 +249,7 @@ local function on_push_sync_default(...) end
 --
 -- The following events are delivered, with arguments:
 --
---  'state_changed', state, errno, error
+--  'state_changed', state, error
 --  'handshake', greeting -> nil (accept) / errno, error (reject)
 --  'will_fetch_schema'   -> true (approve) / false (skip fetch)
 --  'did_fetch_schema', schema_version, spaces, indices
@@ -449,7 +445,7 @@ local function create_transport(host, port, user, password, callback,
         state = new_state
         last_errno = new_errno
         last_error = new_error
-        callback('state_changed', new_state, new_errno, new_error)
+        callback('state_changed', new_state, new_error)
         state_cond:broadcast()
         if state == 'error' or state == 'error_reconnect' or
            state == 'closed' then
@@ -598,7 +594,7 @@ local function create_transport(host, port, user, password, callback,
             -- Handle errors
             requests[id] = nil
             request.id = nil
-            local map_len, key, skip
+            local map_len, key
             map_len, body_rpos = decode_map_header(body_rpos, body_len)
             -- Reserve for 2 keys and 2 array indexes. Because no
             -- any guarantees how Lua will decide to save the
@@ -610,7 +606,7 @@ local function create_transport(host, port, user, password, callback,
                 if rdec then
                     body[key], body_rpos = rdec(body_rpos)
                 else
-                    skip, body_rpos = decode(body_rpos)
+                    _, body_rpos = decode(body_rpos)
                 end
             end
             assert(body_end == body_rpos, "invalid xrow length")
@@ -689,7 +685,7 @@ local function create_transport(host, port, user, password, callback,
 
     local function send_and_recv_iproto(timeout)
         local data_len = recv_buf.wpos - recv_buf.rpos
-        local required = 0
+        local required
         if data_len < 5 then
             required = 5
         else
@@ -771,7 +767,6 @@ local function create_transport(host, port, user, password, callback,
     end
 
     console_sm = function(rid)
-        local delim = '\n...\n'
         local err, response = send_and_recv_console()
         if err then
             return error_sm(err, response)
@@ -795,13 +790,12 @@ local function create_transport(host, port, user, password, callback,
             return iproto_schema_sm()
         end
         encode_auth(send_buf, new_request_id(), user, password, salt)
-        local err, hdr, body_rpos, body_end = send_and_recv_iproto()
+        local err, hdr, body_rpos = send_and_recv_iproto()
         if err then
             return error_sm(err, hdr)
         end
         if hdr[IPROTO_STATUS_KEY] ~= 0 then
-            local body
-            body, body_end = decode(body_rpos)
+            local body = decode(body_rpos)
             return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_24])
         end
         set_state('fetch_schema')
@@ -852,8 +846,7 @@ local function create_transport(host, port, user, password, callback,
                         peer_has_vcollation = false
                         goto continue
                     end
-                    local body
-                    body, body_end = decode(body_rpos)
+                    local body = decode(body_rpos)
                     return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_24])
                 end
                 if schema_version == nil then
@@ -862,8 +855,7 @@ local function create_transport(host, port, user, password, callback,
                     -- schema changed while fetching schema; restart loader
                     return iproto_schema_sm()
                 end
-                local body
-                body, body_end = decode(body_rpos)
+                local body = decode(body_rpos)
                 response[id] = body[IPROTO_DATA_KEY]
             end
             ::continue::
@@ -880,14 +872,11 @@ local function create_transport(host, port, user, password, callback,
         local err, hdr, body_rpos, body_end = send_and_recv_iproto()
         if err then return error_sm(err, hdr) end
         dispatch_response_iproto(hdr, body_rpos, body_end)
-        local status = hdr[IPROTO_STATUS_KEY]
         local response_schema_version = hdr[IPROTO_SCHEMA_VERSION_KEY]
         if response_schema_version > 0 and
            response_schema_version ~= schema_version then
             -- schema_version has been changed - start to load a new version.
             -- Sic: self.schema_version will be updated only after reload.
-            local body
-            body, body_end = decode(body_rpos)
             set_state('fetch_schema')
             return iproto_schema_sm(schema_version)
         end
@@ -1004,7 +993,7 @@ local function new_sm(host, port, opts, connection, greeting)
     local remote = {host = host, port = port, opts = opts, state = 'initial'}
     local function callback(what, ...)
         if what == 'state_changed' then
-            local state, errno, err = ...
+            local state, err = ...
             local was_connected = remote._is_connected
             if state == 'active' then
                 if not was_connected then
@@ -1275,7 +1264,7 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
                          sql_opts or {})
 end
 
-function remote_methods:prepare(query, parameters, sql_opts, netbox_opts)
+function remote_methods:prepare(query, parameters, sql_opts, netbox_opts) -- luacheck: no unused args
     check_remote_arg(self, "prepare")
     if type(query) ~= "string" then
         box.error(box.error.SQL_PREPARE, "expected string as SQL statement")
@@ -1642,7 +1631,7 @@ this_module.self = {
     timeout = function(self) return self end,
     wait_connected = function(self) return true end,
     is_connected = function(self) return true end,
-    call = function(_box, proc_name, args, opts)
+    call = function(_box, proc_name, args)
         check_remote_arg(_box, 'call')
         check_call_args(args)
         args = args or {}
@@ -1653,14 +1642,13 @@ this_module.self = {
             rollback()
             return box.error() -- re-throw
         end
-        local result
         if obj ~= nil then
             return handle_eval_result(pcall(proc, obj, unpack(args)))
         else
             return handle_eval_result(pcall(proc, unpack(args)))
         end
     end,
-    eval = function(_box, expr, args, opts)
+    eval = function(_box, expr, args)
         check_remote_arg(_box, 'eval')
         check_eval_args(args)
         args = args or {}

@@ -52,10 +52,9 @@ end
 local function truncate(space)
     local pk = space.index[0]
     while pk:len() > 0 do
-        local state, t
-        for state, t in pk:pairs() do
+        for _, t in pk:pairs() do
             local key = {}
-            for _k2, parts in ipairs(pk.parts) do
+            for _, parts in ipairs(pk.parts) do
                 table.insert(key, t[parts.fieldno])
             end
             space:delete(key)
@@ -173,7 +172,7 @@ local function initial_1_7_5()
     format[5] = {name='field_count', type='unsigned'}
     format[6] = {name='flags', type='map'}
     format[7] = {name='format', type='array'}
-    local def = _space:insert{_space.id, ADMIN, '_space', 'memtx', 0, MAP, format}
+    _space:insert{_space.id, ADMIN, '_space', 'memtx', 0, MAP, format}
     -- space name is unique
     log.info("create index primary on _space")
     _index:insert{_space.id, 0, 'primary', 'tree', { unique = true }, {{0, 'unsigned'}}}
@@ -194,7 +193,7 @@ local function initial_1_7_5()
     format[4] = {name = 'type', type = 'string'}
     format[5] = {name = 'opts', type = 'map'}
     format[6] = {name = 'parts', type = 'array'}
-    def = _space:insert{_index.id, ADMIN, '_index', 'memtx', 0, MAP, format}
+    _space:insert{_index.id, ADMIN, '_index', 'memtx', 0, MAP, format}
     -- index name is unique within a space
     log.info("create index primary on _index")
     _index:insert{_index.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
@@ -211,7 +210,7 @@ local function initial_1_7_5()
     format[2] = {name='owner', type='unsigned'}
     format[3] = {name='name', type='string'}
     format[4] = {name='setuid', type='unsigned'}
-    def = _space:insert{_func.id, ADMIN, '_func', 'memtx', 0, MAP, format}
+    _space:insert{_func.id, ADMIN, '_func', 'memtx', 0, MAP, format}
     -- function name and id are unique
     log.info("create index _func:primary")
     _index:insert{_func.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
@@ -231,7 +230,7 @@ local function initial_1_7_5()
     format[3] = {name='name', type='string'}
     format[4] = {name='type', type='string'}
     format[5] = {name='auth', type='map'}
-    def = _space:insert{_user.id, ADMIN, '_user', 'memtx', 0, MAP, format}
+    _space:insert{_user.id, ADMIN, '_user', 'memtx', 0, MAP, format}
     -- user name and id are unique
     log.info("create index _func:primary")
     _index:insert{_user.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
@@ -251,7 +250,7 @@ local function initial_1_7_5()
     format[3] = {name='object_type', type='string'}
     format[4] = {name='object_id', type='unsigned'}
     format[5] = {name='privilege', type='unsigned'}
-    def = _space:insert{_priv.id, ADMIN, '_priv', 'memtx', 0, MAP, format}
+    _space:insert{_priv.id, ADMIN, '_priv', 'memtx', 0, MAP, format}
     -- user id, object type and object id are unique
     log.info("create index primary on _priv")
     _index:insert{_priv.id, 0, 'primary', 'tree', {unique = true}, {{1, 'unsigned'}, {2, 'string'}, {3, 'unsigned'}}}
@@ -734,7 +733,7 @@ local function upgrade_collation_to_2_1_3()
 
     local id = 4
     for _, collation in ipairs(coll_lst) do
-        for i, strength in ipairs(coll_strengths) do
+        for _, strength in ipairs(coll_strengths) do
             local coll_name = 'unicode_' .. collation.name .. "_" .. strength.s
             log.info("creating collation %s", coll_name)
             box.space._collation:replace{id, coll_name, ADMIN, "ICU", collation.loc_str, strength.opt }

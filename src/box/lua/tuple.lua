@@ -1,7 +1,6 @@
 -- tuple.lua (internal file)
 
 local ffi = require('ffi')
-local yaml = require('yaml')
 local msgpackffi = require('msgpackffi')
 local fun = require('fun')
 local buffer = require('buffer')
@@ -81,7 +80,6 @@ local tuple_encode = function(obj)
         encode_r(tmpbuf, obj, 1)
     elseif type(obj) == "table" then
         encode_array(tmpbuf, #obj)
-        local i
         for i = 1, #obj, 1 do
             encode_r(tmpbuf, obj[i], 1)
         end
@@ -339,7 +337,7 @@ ffi.metatype(tuple_t, {
 
 ffi.metatype(tuple_iterator_t, {
     __call = tuple_iterator_next;
-    __tostring = function(it) return "<tuple iterator>" end;
+    __tostring = function(self) return "<tuple iterator>" end;
 })
 
 -- Free methods, which are not needed anymore.

@@ -28,7 +28,8 @@ include_files = {
 
 exclude_files = {
     "build/**/*.lua",
-    "src/box/**/*.lua",
+    -- Third-party source code.
+    "src/box/lua/serpent.lua",
     "test-run/**/*.lua",
     "test/**/*.lua",
     "third_party/**/*.lua",
@@ -49,4 +50,10 @@ files["src/lua/help.lua"] = {
 files["src/lua/init.lua"] = {
     -- Miscellaneous global function definition.
     globals = {"dostring"},
+}
+files["src/box/lua/console.lua"] = {
+    ignore = {
+        -- https://github.com/tarantool/tarantool/issues/5032
+        "212",
+    }
 }

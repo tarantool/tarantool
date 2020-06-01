@@ -2,7 +2,6 @@
 --
 local ffi = require('ffi')
 local msgpack = require('msgpack')
-local msgpackffi = require('msgpackffi')
 local fun = require('fun')
 local log = require('log')
 local buffer = require('buffer')
@@ -212,7 +211,7 @@ local function revoke_object_privs(object_type, object_id)
     local _vpriv = box.space[box.schema.VPRIV_ID]
     local _priv = box.space[box.schema.PRIV_ID]
     local privs = _vpriv.index.object:select{object_type, object_id}
-    for k, tuple in pairs(privs) do
+    for _, tuple in pairs(privs) do
         local uid = tuple.grantee
         _priv:delete{uid, object_type, object_id}
     end
@@ -262,7 +261,7 @@ local function check_param_table(table, template)
         if template[k] == nil then
             box.error(box.error.ILLEGAL_PARAMS,
                       "unexpected option '" .. k .. "'")
-        elseif template[k] == 'any' then
+        elseif template[k] == 'any' then -- luacheck: ignore
             -- any type is ok
         elseif (string.find(template[k], ',') == nil) then
             -- one type
@@ -276,7 +275,6 @@ local function check_param_table(table, template)
             local haystack = ',' .. good_types .. ','
             local needle = ',' .. param_type(v) .. ','
             if (string.find(haystack, needle) == nil) then
-                good_types = string.gsub(good_types, ',', ', ')
                 box.error(box.error.ILLEGAL_PARAMS,
                           "options parameter '" .. k ..
                           "' should be one of types: " .. template[k])
@@ -586,9 +584,9 @@ end
 --
 local function format_field_resolve(format, path, what)
     assert(type(path) == 'number' or type(path) == 'string')
-    local idx = nil
+    local idx
     local relative_path = nil
-    local field_name = nil
+    local field_name
     -- Path doesn't require resolve.
     if type(path) == 'number' then
         idx = path
@@ -1148,7 +1146,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         local can_update_field = {id = true, name = true, type = true }
         local can_update = true
         local cant_update_fields = ''
-        for k,v in pairs(options) do
+        for k, _ in pairs(options) do
             if not can_update_field[k] then
                 can_update = false
                 cant_update_fields = cant_update_fields .. ' ' .. k
@@ -1192,7 +1190,7 @@ box.schema.index.alter = function(space_id, index_id, options)
     if options.type == nil then
         options.type = tuple.type
     end
-    for k, t in pairs(index_options) do
+    for k, _ in pairs(index_options) do
         if options[k] ~= nil then
             index_opts[k] = options[k]
         end
@@ -1235,12 +1233,12 @@ end
 
 local iterator_t = ffi.typeof('struct iterator')
 ffi.metatype(iterator_t, {
-    __tostring = function(iterator)
+    __tostring = function(self)
         return "<iterator state>"
     end;
 })
 
-local iterator_gen = function(param, state)
+local iterator_gen = function(param, state) -- luacheck: no unused args
     --[[
         index:pairs() mostly conforms to the Lua for-in loop conventions and
         tries to follow the best practices of Lua community.
@@ -1274,7 +1272,7 @@ local iterator_gen = function(param, state)
     end
 end
 
-local iterator_gen_luac = function(param, state)
+local iterator_gen_luac = function(param, state) -- luacheck: no unused args
     local tuple = internal.iterator_next(state)
     if tuple ~= nil then
         return state, tuple -- new state, value
@@ -1777,9 +1775,9 @@ local function wrap_schema_object_mt(name)
         __pairs = global_mt.__pairs
     }
     local mt_mt = {}
-    mt_mt.__newindex = function(t, k, v)
+    mt_mt.__newindex = function(self, k, v)
         mt_mt.__newindex = nil
-        mt.__index = function(t, k)
+        mt.__index = function(self, k)
             return mt[k] or box.schema[name][k]
         end
         rawset(mt, k, v)
@@ -2488,24 +2486,24 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
     end
 end
 
-local function drop(uid, opts)
+local function drop(uid)
     -- recursive delete of user data
     local _vpriv = box.space[box.schema.VPRIV_ID]
     local spaces = box.space[box.schema.VSPACE_ID].index.owner:select{uid}
-    for k, tuple in pairs(spaces) do
+    for _, tuple in pairs(spaces) do
         box.space[tuple.id]:drop()
     end
     local funcs = box.space[box.schema.VFUNC_ID].index.owner:select{uid}
-    for k, tuple in pairs(funcs) do
+    for _, tuple in pairs(funcs) do
         box.schema.func.drop(tuple.id)
     end
     -- if this is a role, revoke this role from whoever it was granted to
     local grants = _vpriv.index.object:select{'role', uid}
-    for k, tuple in pairs(grants) do
+    for _, tuple in pairs(grants) do
         revoke(tuple.grantee, tuple.grantee, uid)
     end
     local sequences = box.space[box.schema.VSEQUENCE_ID].index.owner:select{uid}
-    for k, tuple in pairs(sequences) do
+    for _, tuple in pairs(sequences) do
         box.schema.sequence.drop(tuple.id)
     end
     -- xxx: hack, we have to revoke session and usage privileges
@@ -2517,7 +2515,7 @@ local function drop(uid, opts)
     end
     local privs = _vpriv.index.primary:select{uid}
 
-    for k, tuple in pairs(privs) do
+    for _, tuple in pairs(privs) do
         -- we need an additional box.session.su() here, because of
         -- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
         box.session.su("admin", revoke, uid, uid, tuple.privilege,
@@ -2567,7 +2565,7 @@ box.schema.user.drop = function(name, opts)
             box.error(box.error.DROP_USER, name,
                       "the user is active in the current session")
         end
-        return drop(uid, opts)
+        return drop(uid)
     end
     if not opts.if_exists then
         box.error(box.error.NO_SUCH_USER, name)

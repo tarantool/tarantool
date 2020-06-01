@@ -15,5 +15,5 @@ ffi.metatype(key_def_t, {
     __index = function(self, key)
         return methods[key]
     end,
-    __tostring = function(key_def) return "<struct key_def &>" end,
+    __tostring = function(self) return "<struct key_def &>" end,
 })
