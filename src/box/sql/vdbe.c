@@ -324,12 +324,18 @@ mem_apply_type(struct Mem *record, enum field_type type)
 			return 0;
 		if ((record->flags & MEM_Real) == MEM_Real) {
 			double d = record->u.r;
-			int64_t i = (int64_t) d;
-			uint64_t u = (uint64_t) d;
-			if (i == d)
-				mem_set_int(record, i, i <= -1);
-			else if (u == d)
-				mem_set_u64(record, u);
+			if (d >= 0) {
+				if (double_compare_uint64(d, UINT64_MAX,
+							  1) > 0)
+					return 0;
+				if ((double)(uint64_t)d == d)
+					mem_set_u64(record, (uint64_t)d);
+			} else {
+				if (double_compare_nint64(d, INT64_MIN, 1) < 0)
+					return 0;
+				if ((double)(int64_t)d == d)
+					mem_set_int(record, (int64_t)d, true);
+			}
 			return 0;
 		}
 		if ((record->flags & MEM_Str) != 0) {
