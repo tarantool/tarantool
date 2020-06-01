@@ -1,4 +1,5 @@
 stages:
+  - static_analysis
   - test
   - perf
   - cleanup
@@ -123,6 +124,16 @@ variables:
   <<: *shell_cleanup_script
   script:
     - ${GITLAB_MAKE} perf_cleanup
+
+# Static Analysis
+
+luacheck:
+  <<: *docker_test_definition
+  stage: static_analysis
+  tags:
+    - deploy_test
+  script:
+    - ${GITLAB_MAKE} test_debian_docker_luacheck
 
 # Tests
 

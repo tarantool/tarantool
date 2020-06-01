@@ -3,9 +3,11 @@
 #
 
 DOCKER_IMAGE?=packpack/packpack:debian-stretch
+DOCKER_IMAGE_TARANTOOL="registry.gitlab.com/tarantool/tarantool/testing/debian-stretch:latest"
 TEST_RUN_EXTRA_PARAMS?=
 MAX_FILES?=65534
 MAX_PROC?=2500
+OOS_SRC_PATH="/source"
 
 all: package
 
@@ -76,8 +78,10 @@ deps_buster_clang_8: deps_debian
 
 # Release
 
-build_debian:
+configure_debian:
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
+
+build_debian: configure_debian
 	make -j
 
 test_debian_no_deps: build_debian
@@ -146,6 +150,23 @@ test_static_build: deps_debian_static
 
 test_static_docker_build:
 	docker build --no-cache --network=host --build-arg RUN_TESTS=ON -f Dockerfile.staticbuild .
+
+# ###################
+# Static Analysis
+# ###################
+
+test_debian_docker_luacheck:
+	docker run -w ${OOS_SRC_PATH} -v ${PWD}:${OOS_SRC_PATH} --privileged \
+		--cap-add=sys_nice --network=host -i ${DOCKER_IMAGE_TARANTOOL} \
+		make -f .travis.mk test_debian_luacheck
+
+test_debian_install_luacheck:
+	apt update -y
+	apt install -y lua5.1 luarocks
+	luarocks install luacheck
+
+test_debian_luacheck: test_debian_install_luacheck configure_debian
+	make luacheck
 
 #######
 # OSX #
