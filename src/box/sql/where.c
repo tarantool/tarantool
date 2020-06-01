@@ -2794,9 +2794,9 @@ tnt_error:
 		fake_index->iid = UINT32_MAX;
 		int size = sizeof(struct index_stat) + sizeof(log_est_t) * 2;
 
-		struct index_stat *stat = (struct index_stat *) malloc(size);
+		struct index_stat *stat = (struct index_stat *) calloc(1, size);
 		if (stat == NULL) {
-			diag_set(OutOfMemory, size, "malloc", "stat");
+			diag_set(OutOfMemory, size, "calloc", "stat");
 			goto tnt_error;
 		}
 		stat->tuple_log_est = (log_est_t *) ((char *) (stat + 1));
