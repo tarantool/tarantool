@@ -129,6 +129,8 @@ struct txn_stmt {
 
 	/** A linked list of all statements. */
 	struct stailq_entry next;
+	/** Owner of that statement. */
+	struct txn *txn;
 	/** Undo info. */
 	struct space *space;
 	struct tuple *old_tuple;

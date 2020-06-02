@@ -109,6 +109,7 @@ txn_stmt_new(struct region *region)
 	}
 
 	/* Initialize members explicitly to save time on memset() */
+	stmt->txn = in_txn();
 	stmt->space = NULL;
 	stmt->old_tuple = NULL;
 	stmt->new_tuple = NULL;
