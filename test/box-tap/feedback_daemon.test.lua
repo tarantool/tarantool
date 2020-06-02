@@ -67,7 +67,7 @@ if not ok then
     os.exit(0)
 end
 
-test:plan(11)
+test:plan(14)
 
 local function check(message)
     while feedback_count < 1 do
@@ -130,6 +130,15 @@ local daemon = box.internal.feedback_daemon
 daemon.start()
 daemon.send_test()
 daemon.stop()
+
+--
+-- gh-3608: OS version and containerization detection in feedback daemon
+--
+
+local actual = daemon.generate_feedback()
+test:is(type(actual.os), 'string', 'feedback contains "os" key')
+test:is(type(actual.arch), 'string', 'feedback contains "arch" key')
+test:is(type(actual.cgroup), 'string', 'feedback contains "cgroup" key')
 
 test:check()
 os.exit(0)
