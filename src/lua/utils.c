@@ -461,90 +461,72 @@ lua_field_inspect_ucdata(struct lua_State *L, struct luaL_serializer *cfg,
 }
 
 /**
- * A helper structure to simplify safe call of __serialize method.
- * It passes some arguments into the serializer called via pcall,
- * and carries out some results.
- */
-struct lua_serialize_status {
-	/**
-	 * True if an attempt to call __serialize has failed. A
-	 * diag message is set.
-	 */
-	bool is_error;
-	/**
-	 * True, if __serialize exists. Otherwise an ordinary
-	 * default serialization is used.
-	 */
-	bool is_serialize_used;
-	/**
-	 * True, if __serialize not only exists, but also returned
-	 * a new value which should replace the original one. On
-	 * the contrary __serialize could be a string like 'array'
-	 * or 'map' and do not push anything but rather say how to
-	 * interpret the target table. In such a case there is
-	 * nothing to replace with.
-	 */
-	bool is_value_returned;
-	/** Parameters, passed originally to luaL_tofield. */
-	struct luaL_serializer *cfg;
-	struct luaL_field *field;
-};
-
-/**
- * Call __serialize method of a table object if the former exists.
- * The function expects 2 values pushed onto the Lua stack: a
- * value to serialize, and a pointer at a struct
- * lua_serialize_status object. If __serialize exists, is correct,
- * and is a function then one value is pushed as a result of
- * serialization. If it is correct, but just a serialization hint
- * like 'array' or 'map', then nothing is pushed. Otherwise it is
- * an error. All the described outcomes can be distinguished via
- * lua_serialize_status attributes.
+ * Call __serialize method of a table object by index
+ * if the former exists.
+ *
+ * If __serialize does not exist then function does nothing
+ * and the function returns 1;
+ *
+ * If __serialize exists, is a function (which doesn't
+ * raise any error) then a result of serialization
+ * replaces old value by the index and the function returns 0;
+ *
+ * If the serialization is a hint string (like 'array' or 'map'),
+ * then field->type, field->size and field->compact
+ * are set if necessary and the function returns 0;
+ *
+ * Otherwise it is an error, set diag and the funciton returns -1;
+ *
+ * Return values:
+ * -1 - error occurs, diag is set, the top of guest stack
+ *      is undefined.
+ *  0 - __serialize field is available in the metatable,
+ *      the result value is put in the origin slot,
+ *      encoding is finished.
+ *  1 - __serialize field is not available in the metatable,
+ *      proceed with default table encoding.
  */
 static int
-lua_field_try_serialize(struct lua_State *L)
+lua_field_try_serialize(struct lua_State *L, struct luaL_serializer *cfg,
+			int idx, struct luaL_field *field)
 {
-	struct lua_serialize_status *s =
-		(struct lua_serialize_status *) lua_touserdata(L, 2);
-	s->is_serialize_used = (luaL_getmetafield(L, 1, LUAL_SERIALIZE) != 0);
-	s->is_error = false;
-	s->is_value_returned = false;
-	if (! s->is_serialize_used)
-		return 0;
-	struct luaL_serializer *cfg = s->cfg;
-	struct luaL_field *field = s->field;
+	if (luaL_getmetafield(L, idx, LUAL_SERIALIZE) == 0)
+		return 1;
 	if (lua_isfunction(L, -1)) {
 		/* copy object itself */
-		lua_pushvalue(L, 1);
-		lua_call(L, 1, 1);
-		s->is_error = (luaL_tofield(L, cfg, NULL, -1, field) != 0);
-		s->is_value_returned = true;
-		return 1;
+		lua_pushvalue(L, idx);
+		if (lua_pcall(L, 1, 1, 0) != 0) {
+			diag_set(LuajitError, lua_tostring(L, -1));
+			return -1;
+		}
+		if (luaL_tofield(L, cfg, NULL, -1, field) != 0)
+			return -1;
+		lua_replace(L, idx);
+		return 0;
 	}
 	if (!lua_isstring(L, -1)) {
 		diag_set(LuajitError, "invalid " LUAL_SERIALIZE " value");
-		s->is_error = true;
-		lua_pop(L, 1);
-		return 0;
+		return -1;
 	}
 	const char *type = lua_tostring(L, -1);
 	if (strcmp(type, "array") == 0 || strcmp(type, "seq") == 0 ||
 	    strcmp(type, "sequence") == 0) {
 		field->type = MP_ARRAY; /* Override type */
-		field->size = luaL_arrlen(L, 1);
+		field->size = luaL_arrlen(L, idx);
 		/* YAML: use flow mode if __serialize == 'seq' */
 		if (cfg->has_compact && type[3] == '\0')
 			field->compact = true;
 	} else if (strcmp(type, "map") == 0 || strcmp(type, "mapping") == 0) {
 		field->type = MP_MAP;   /* Override type */
-		field->size = luaL_maplen(L, 1);
+		field->size = luaL_maplen(L, idx);
 		/* YAML: use flow mode if __serialize == 'map' */
 		if (cfg->has_compact && type[3] == '\0')
 			field->compact = true;
 	} else {
 		diag_set(LuajitError, "invalid " LUAL_SERIALIZE " value");
-		s->is_error = true;
+		return -1;
 	}
+	/* Remove value set by luaL_getmetafield. */
 	lua_pop(L, 1);
 	return 0;
 }
@@ -559,36 +541,14 @@ lua_field_inspect_table(struct lua_State *L, struct luaL_serializer *cfg,
 
 	if (cfg->encode_load_metatables) {
 		int top = lua_gettop(L);
-		struct lua_serialize_status s;
-		s.cfg = cfg;
-		s.field = field;
-		lua_pushcfunction(L, lua_field_try_serialize);
-		lua_pushvalue(L, idx);
-		lua_pushlightuserdata(L, &s);
-		if (lua_pcall(L, 2, 1, 0) != 0) {
-			diag_set(LuajitError, lua_tostring(L, -1));
+		int res = lua_field_try_serialize(L, cfg, idx, field);
+		if (res == -1)
 			return -1;
-		}
-		if (s.is_error)
-			return -1;
-		/*
-		 * lua_call/pcall always returns the specified
-		 * number of values. Even if the function returned
-		 * less - others are filled with nils. So when a
-		 * nil is not needed, it should be popped
-		 * manually.
-		 */
-		assert(lua_gettop(L) == top + 1);
-		(void) top;
-		if (s.is_serialize_used) {
-			if (s.is_value_returned)
-				lua_replace(L, idx);
-			else
-				lua_pop(L, 1);
+		assert(lua_gettop(L) == top);
+		(void)top;
+		if (res == 0)
 			return 0;
-		}
-		assert(! s.is_value_returned);
-		lua_pop(L, 1);
+		/* Fallthrough with res == 1 */
 	}
 
 	field->type = MP_ARRAY;
