@@ -26,13 +26,55 @@ local function get_fiber_id(f)
     return fid
 end
 
-local function fill_in_feedback(feedback)
+local function determine_cgroup_env_impl()
+    local fh = fio.open('/proc/1/cgroup', {'O_RDONLY'})
+    if not fh then
+        return ''
+    end
+
+    -- fh:read() doesn't read empty "proc" files
+    local big_enough_chunk = 4096
+    local s = fh:read(big_enough_chunk)
+    fh:close()
+
+    if s:find('docker') then
+        return 'docker'
+    elseif s:find('lxc') then
+        return 'lxc'
+    end
+
+    return ''
+end
+
+local cached_determine_cgroup_env
+
+local function determine_cgroup_env()
+    if cached_determine_cgroup_env == nil then
+        cached_determine_cgroup_env = determine_cgroup_env_impl()
+    end
+
+    return cached_determine_cgroup_env
+end
+
+local function fill_in_base_info(feedback)
     if box.info.status ~= "running" then
         return nil, "not running"
     end
     feedback.tarantool_version = box.info.version
     feedback.server_id         = box.info.uuid
     feedback.cluster_id        = box.info.cluster.uuid
+end
+
+local function fill_in_platform_info(feedback)
+    feedback.os     = jit.os
+    feedback.arch   = jit.arch
+    feedback.cgroup = determine_cgroup_env()
+end
+
+local function fill_in_feedback(feedback)
+    fill_in_base_info(feedback)
+    fill_in_platform_info(feedback)
+
     return feedback
 end
 
