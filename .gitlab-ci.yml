@@ -5,6 +5,16 @@ stages:
 
 variables:
   GITLAB_MAKE: "make -f .gitlab.mk"
+  GIT_CLEAN_COMMAND: "git clean -ffdx -e packpack && git submodule foreach git clean -ffdx && git submodule foreach git status"
+  GIT_CLEAN_FLAGS: none
+
+.shell_before_script_template: &shell_cleanup_script
+  before_script:
+    - /bin/bash -c "${GIT_CLEAN_COMMAND}"
+
+.docker_before_script_template: &docker_cleanup_script
+  before_script:
+    - docker run -w /source -v ${PWD}:/source -i packpack/packpack:el-7 /bin/bash -c "${GIT_CLEAN_COMMAND}"
 
 # Jobs templates
 
@@ -35,18 +45,21 @@ variables:
   stage: test
   tags:
     - docker_test
+  <<: *shell_cleanup_script
 
 .docker_test_clang8_template: &docker_test_clang8_definition
   image: "${CI_REGISTRY}/${CI_PROJECT_PATH}/testing/debian-buster:latest"
   stage: test
   tags:
     - docker_test
+  <<: *shell_cleanup_script
 
 .pack_template: &pack_definition
   <<: *pack_only_definition
   stage: test
   tags:
     - deploy
+  <<: *docker_cleanup_script
   script:
     - ${GITLAB_MAKE} package
 
@@ -55,6 +68,7 @@ variables:
   stage: test
   tags:
     - deploy_test
+  <<: *docker_cleanup_script
   script:
     - ${GITLAB_MAKE} package
 
@@ -63,6 +77,7 @@ variables:
   stage: test
   tags:
     - deploy
+  <<: *docker_cleanup_script
   script:
     - ${GITLAB_MAKE} deploy
 
@@ -71,12 +86,20 @@ variables:
   stage: test
   tags:
     - deploy_test
+  <<: *docker_cleanup_script
   script:
     - ${GITLAB_MAKE} deploy
+
+.osx_template: &osx_definition
+  stage: test
+  <<: *shell_cleanup_script
+  script:
+    - ${GITLAB_MAKE} test_osx
 
 .vbox_template: &vbox_definition
   stage: test
   before_script:
+    - /bin/bash -c "${GIT_CLEAN_COMMAND}"
     - ${GITLAB_MAKE} vms_start
   after_script:
     - ${GITLAB_MAKE} vms_shutdown
@@ -90,6 +113,7 @@ variables:
     paths:
       - "*_result.txt"
       - "*_t_version.txt"
+  <<: *shell_cleanup_script
   script:
     - ${GITLAB_MAKE} perf_run
 
@@ -141,27 +165,21 @@ release_asan_clang8:
     - ${GITLAB_MAKE} test_asan_debian_no_deps
 
 osx_14_release:
-  stage: test
   tags:
     - osx_14
-  script:
-    - ${GITLAB_MAKE} test_osx
+  <<: *osx_definition
 
 osx_15_release:
-  stage: test
   tags:
     - osx_15
-  script:
-    - ${GITLAB_MAKE} test_osx
+  <<: *osx_definition
 
 osx_15_release_lto:
-  stage: test
   tags:
     - osx_15
   variables:
     EXTRA_ENV: 'export CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON ;'
-  script:
-    - ${GITLAB_MAKE} test_osx
+  <<: *osx_definition
 
 freebsd_12_release:
   <<: *vbox_definition
@@ -472,5 +490,6 @@ static_docker_build:
   stage: test
   tags:
     - deploy_test
+  <<: *docker_cleanup_script
   script:
     - ${GITLAB_MAKE} test_static_docker_build
