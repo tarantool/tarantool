@@ -208,6 +208,56 @@ xrow_encode_dml(const struct request *request, struct region *region,
 		struct iovec *iov);
 
 /**
+ * Encode the CONFIRM to row body and set row type to
+ * IPROTO_CONFIRM.
+ * @param row xrow header.
+ * @param region Region to use to encode the confirmation body.
+ * @param replica_id master's instance id.
+ * @param lsn last confirmed lsn.
+ * @retval -1 on error.
+ * @retval 0 success.
+ */
+int
+xrow_encode_confirm(struct xrow_header *row, struct region *region,
+		    uint32_t replica_id, int64_t lsn);
+
+/**
+ * Decode the CONFIRM request body.
+ * @param row xrow header.
+ * @param[out] replica_id master's instance id.
+ * @param[out] lsn last confirmed lsn.
+ * @retval -1 on error.
+ * @retval 0 success.
+ */
+int
+xrow_decode_confirm(struct xrow_header *row, uint32_t *replica_id, int64_t *lsn);
+
+/**
+ * Encode the ROLLBACK row body and set row type to
+ * IPROTO_ROLLBACK.
+ * @param row xrow header.
+ * @param region Region to use to encode the rollback body.
+ * @param replica_id master's instance id.
+ * @param lsn lsn to rollback from, including it.
+ * @retval -1  on error.
+ * @retval 0 success.
+ */
+int
+xrow_encode_rollback(struct xrow_header *row, struct region *region,
+		     uint32_t replica_id, int64_t lsn);
+
+/**
+ * Decode the ROLLBACK row body.
+ * @param row xrow header.
+ * @param[out] replica_id master's instance id.
+ * @param[out] lsn lsn to rollback from, including it.
+ * @retval -1 on error.
+ * @retval 0 success.
+ */
+int
+xrow_decode_rollback(struct xrow_header *row, uint32_t *replica_id, int64_t *lsn);
+
+/**
  * CALL/EVAL request.
  */
 struct call_request {

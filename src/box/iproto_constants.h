@@ -219,6 +219,11 @@ enum iproto_type {
 	/** The maximum typecode used for box.stat() */
 	IPROTO_TYPE_STAT_MAX,
 
+	/** A confirmation message for synchronous transactions. */
+	IPROTO_CONFIRM = 40,
+	/** A rollback message for synchronous transactions. */
+	IPROTO_ROLLBACK = 41,
+
 	/** PING request */
 	IPROTO_PING = 64,
 	/** Replication JOIN command */
@@ -314,6 +319,13 @@ dml_request_key_map(uint32_t type)
 	assert(iproto_type_is_dml(type));
 	extern const uint64_t iproto_body_key_map[];
 	return iproto_body_key_map[type];
+}
+
+/** CONFIRM/ROLLBACK entries for synchronous replication. */
+static inline bool
+iproto_type_is_synchro_request(uint32_t type)
+{
+	return type == IPROTO_CONFIRM || type == IPROTO_ROLLBACK;
 }
 
 /** This is an error. */
