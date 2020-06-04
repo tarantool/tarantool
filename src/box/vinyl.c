@@ -3959,6 +3959,12 @@ vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
 	 * Hence, to get right mem (during mem rotation it becomes
 	 * sealed i.e. read-only) we should fetch it from lsm again.
 	 */
+	if (lsm->mem->generation != *lsm->env->p_generation) {
+		if (vy_lsm_rotate_mem(lsm) != 0) {
+			tuple_unref(stmt);
+			return -1;
+		}
+	}
 	mem = lsm->mem;
 
 	/* Insert the new tuple into the in-memory index. */
