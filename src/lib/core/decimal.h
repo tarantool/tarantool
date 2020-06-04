@@ -110,11 +110,11 @@ decimal_to_string(const decimal_t *dec);
  * \param[out] num - the result
  * @return NULL if \a dec doesn't fit into int64_t
  */
-decimal_t *
+const decimal_t *
 decimal_to_int64(const decimal_t *dec, int64_t *num);
 
 /** \sa decimal_to_int64 */
-decimal_t *
+const decimal_t *
 decimal_to_uint64(const decimal_t *dec, uint64_t *num);
 
 /**
