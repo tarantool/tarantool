@@ -176,24 +176,24 @@ decimal_to_integer(decimal_t *dec)
 	return decimal_check_status(dec, &decimal_context);
 }
 
-decimal_t *
+const decimal_t *
 decimal_to_int64(const decimal_t *dec, int64_t *num)
 {
 	decimal_t d = *dec;
 	if (decimal_to_integer(&d) == NULL)
 		return NULL;
 	*num = decNumberToInt64(&d, &decimal_context);
-	return decimal_check_status(&d, &decimal_context);
+	return decimal_check_status(&d, &decimal_context) != NULL ? dec : NULL;
 }
 
-decimal_t *
+const decimal_t *
 decimal_to_uint64(const decimal_t *dec, uint64_t *num)
 {
 	decimal_t d = *dec;
 	if (decimal_to_integer(&d) == NULL)
 		return NULL;
 	*num = decNumberToUInt64(&d, &decimal_context);
-	return decimal_check_status(&d, &decimal_context);
+	return decimal_check_status(&d, &decimal_context) != NULL ? dec : NULL;
 }
 
 int
