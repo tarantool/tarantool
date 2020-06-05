@@ -56,6 +56,51 @@ local function determine_cgroup_env()
     return cached_determine_cgroup_env
 end
 
+local function is_system_space(space)
+    return box.schema.SYSTEM_ID_MIN <= space.id and
+           space.id <= box.schema.SYSTEM_ID_MAX
+end
+
+local function jsonpaths_from_idx_parts(idx)
+    local paths = {}
+
+    for _, part in pairs(idx.parts) do
+        if type(part.path) == 'string' then
+            table.insert(paths, part.path)
+        end
+    end
+
+    return paths
+end
+
+local function is_jsonpath_index(idx)
+    return #jsonpaths_from_idx_parts(idx) > 0
+end
+
+local function is_jp_multikey_index(idx)
+    for _, path in pairs(jsonpaths_from_idx_parts(idx)) do
+        if path:find('[*]', 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function is_functional_index(idx)
+    return idx.func ~= nil
+end
+
+local function is_func_multikey_index(idx)
+    if is_functional_index(idx) then
+        local fid = idx.func.fid
+        local func = fid and box.func[fid]
+        return func and func.is_multikey or false
+    end
+
+    return false
+end
+
 local function fill_in_base_info(feedback)
     if box.info.status ~= "running" then
         return nil, "not running"
@@ -71,9 +116,116 @@ local function fill_in_platform_info(feedback)
     feedback.cgroup = determine_cgroup_env()
 end
 
+local function fill_in_indices_stats(space, stats)
+    for name, idx in pairs(space.index) do
+        if type(name) == 'number' then
+            local idx_type = idx.type
+            if idx_type == 'TREE' then
+                if is_functional_index(idx) then
+                    stats.functional = stats.functional + 1
+                    if is_func_multikey_index(idx) then
+                        stats.functional_multikey = stats.functional_multikey + 1
+                    end
+                elseif is_jsonpath_index(idx) then
+                    stats.jsonpath = stats.jsonpath + 1
+                    if is_jp_multikey_index(idx) then
+                        stats.jsonpath_multikey = stats.jsonpath_multikey + 1
+                    end
+                end
+                stats.tree = stats.tree + 1
+            elseif idx_type == 'HASH' then
+                stats.hash = stats.hash + 1
+            elseif idx_type == 'RTREE' then
+                stats.rtree = stats.rtree + 1
+            elseif idx_type == 'BITSET' then
+                stats.bitset = stats.bitset + 1
+            end
+        end
+    end
+end
+
+local function fill_in_schema_stats_impl(schema)
+    local spaces = {
+        memtx     = 0,
+        vinyl     = 0,
+        temporary = 0,
+        ['local'] = 0,
+    }
+
+    local indices = {
+        hash                = 0,
+        tree                = 0,
+        rtree               = 0,
+        bitset              = 0,
+        jsonpath            = 0,
+        jsonpath_multikey   = 0,
+        functional          = 0,
+        functional_multikey = 0,
+    }
+
+    local space_ids = {}
+    for name, space in pairs(box.space) do
+        local is_system = is_system_space(space)
+        if not is_system and type(name) == 'number' then
+            table.insert(space_ids, name)
+        end
+    end
+
+    for _, id in pairs(space_ids) do
+        local space = box.space[id]
+        if space == nil then
+            goto continue;
+        end
+
+        if space.engine == 'vinyl' then
+            spaces.vinyl = spaces.vinyl + 1
+        elseif space.engine == 'memtx' then
+            if space.temporary then
+                spaces.temporary = spaces.temporary + 1
+            end
+            spaces.memtx = spaces.memtx + 1
+        end
+        if space.is_local then
+            spaces['local'] = spaces['local'] + 1
+        end
+        fill_in_indices_stats(space, indices)
+
+        fiber.yield()
+        ::continue::
+    end
+
+    for k, v in pairs(spaces) do
+        schema[k..'_spaces'] = v
+    end
+
+    for k, v in pairs(indices) do
+        schema[k..'_indices'] = v
+    end
+end
+
+local cached_schema_version = 0
+local cached_schema_features = {}
+
+local function fill_in_schema_stats(features)
+    local schema_version = box.internal.schema_version()
+    if cached_schema_version < schema_version then
+        local schema = {}
+        fill_in_schema_stats_impl(schema)
+        cached_schema_version = schema_version
+        cached_schema_features = schema
+    end
+    features.schema = cached_schema_features
+end
+
+local function fill_in_features(feedback)
+    feedback.features = {}
+    fill_in_schema_stats(feedback.features)
+end
+
 local function fill_in_feedback(feedback)
     fill_in_base_info(feedback)
     fill_in_platform_info(feedback)
+    fill_in_features(feedback)
 
     return feedback
 end
@@ -155,7 +307,7 @@ setmetatable(daemon, {
         end,
         -- this function is used in saving feedback in file
         generate_feedback = function()
-            return fill_in_feedback({ feedback_type = "version", feedback_version = 1 })
+            return fill_in_feedback({ feedback_version = 2 })
         end,
         start = function()
             start(daemon)
