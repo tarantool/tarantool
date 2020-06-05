@@ -67,7 +67,7 @@ if not ok then
     os.exit(0)
 end
 
-test:plan(14)
+test:plan(19)
 
 local function check(message)
     while feedback_count < 1 do
@@ -139,6 +139,86 @@ local actual = daemon.generate_feedback()
 test:is(type(actual.os), 'string', 'feedback contains "os" key')
 test:is(type(actual.arch), 'string', 'feedback contains "arch" key')
 test:is(type(actual.cgroup), 'string', 'feedback contains "cgroup" key')
+
+--
+-- gh-4943: Collect engines and indices statistics.
+--
+
+local actual = daemon.generate_feedback()
+test:is(type(actual.features), 'table', 'features field is present')
+test:is(type(actual.features.schema), 'table', 'schema stats are present')
+local expected = {
+    memtx_spaces = 0,
+    vinyl_spaces = 0,
+    temporary_spaces = 0,
+    local_spaces = 0,
+    tree_indices = 0,
+    rtree_indices = 0,
+    hash_indices = 0,
+    bitset_indices = 0,
+    jsonpath_indices = 0,
+    jsonpath_multikey_indices = 0,
+    functional_indices = 0,
+    functional_multikey_indices = 0,
+}
+test:is_deeply(actual.features.schema, expected,
+        'schema stats are empty at the moment')
+
+box.schema.create_space('features_vinyl', {engine = 'vinyl'})
+box.schema.create_space('features_memtx_empty')
+box.schema.create_space('features_memtx',
+        {engine = 'memtx', is_local = true, temporary = true})
+box.space.features_vinyl:create_index('vinyl_pk', {type = 'tree'})
+box.space.features_memtx:create_index('memtx_pk', {type = 'tree'})
+box.space.features_memtx:create_index('memtx_hash', {type = 'hash'})
+box.space.features_memtx:create_index('memtx_bitset', {type = 'bitset'})
+box.space.features_memtx:create_index('memtx_rtree',
+        {type = 'rtree', parts = {{field = 3, type = 'array'}}})
+box.space.features_memtx:create_index('memtx_jpath',
+        {parts = {{field = 4, type = 'str', path = 'data.name'}}})
+box.space.features_memtx:create_index('memtx_multikey',
+        {parts = {{field = 5, type = 'str', path = 'data[*].name'}}})
+box.schema.func.create('features_func', {
+    body = "function(tuple) return {string.sub(tuple[2], 1, 1)} end",
+    is_deterministic = true,
+    is_sandboxed = true})
+box.schema.func.create('features_func_multikey', {
+    body = "function(tuple) return {1, 2} end",
+    is_deterministic = true,
+    is_sandboxed = true,
+    opts = {is_multikey = true}})
+box.space.features_memtx:create_index('functional',
+        {parts = {{field = 1, type = 'number'}}, func = 'features_func'})
+box.space.features_memtx:create_index('functional_multikey',
+        {parts = {{field = 1, type = 'number'}}, func = 'features_func_multikey'})
+
+actual = daemon.generate_feedback()
+local schema_stats = actual.features.schema
+test:test('features.schema', function(t)
+    t:plan(12)
+    t:is(schema_stats.memtx_spaces, 2, 'memtx engine usage gathered')
+    t:is(schema_stats.vinyl_spaces, 1, 'vinyl engine usage gathered')
+    t:is(schema_stats.temporary_spaces, 1, 'temporary space usage gathered')
+    t:is(schema_stats.local_spaces, 1, 'local space usage gathered')
+    t:is(schema_stats.tree_indices, 6, 'tree index gathered')
+    t:is(schema_stats.hash_indices, 1, 'hash index gathered')
+    t:is(schema_stats.rtree_indices, 1, 'rtree index gathered')
+    t:is(schema_stats.bitset_indices, 1, 'bitset index gathered')
+    t:is(schema_stats.jsonpath_indices, 2, 'jsonpath index gathered')
+    t:is(schema_stats.jsonpath_multikey_indices, 1, 'jsonpath multikey index gathered')
+    t:is(schema_stats.functional_indices, 2, 'functional index gathered')
+    t:is(schema_stats.functional_multikey_indices, 1, 'functional multikey index gathered')
+end)
+
+box.space.features_memtx:create_index('memtx_sec', {type = 'hash'})
+
+actual = daemon.generate_feedback()
+test:is(actual.features.schema.hash_indices, 2,
+        'internal cache invalidates when schema changes')
+
+box.space.features_vinyl:drop()
+box.space.features_memtx_empty:drop()
+box.space.features_memtx:drop()
 
 test:check()
 os.exit(0)
