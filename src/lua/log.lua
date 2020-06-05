@@ -101,6 +101,155 @@ local function fmt_list()
     return table.concat(keyset, ',')
 end
 
+-- Logging levels symbolic representation.
+local log_level_keys = {
+    ['fatal']       = ffi.C.S_FATAL,
+    ['syserror']    = ffi.C.S_SYSERROR,
+    ['error']       = ffi.C.S_ERROR,
+    ['crit']        = ffi.C.S_CRIT,
+    ['warn']        = ffi.C.S_WARN,
+    ['info']        = ffi.C.S_INFO,
+    ['verbose']     = ffi.C.S_VERBOSE,
+    ['debug']       = ffi.C.S_DEBUG,
+}
+
+local function log_level_list()
+    local keyset = {}
+    for k in pairs(log_level_keys) do
+        keyset[#keyset + 1] = k
+    end
+    return table.concat(keyset, ',')
+end
+
+-- Default options. The keys are part of
+-- user API , so change with caution.
+local log_cfg = {
+    log             = nil,
+    nonblock        = nil,
+    level           = S_INFO,
+    format          = fmt_num2str[ffi.C.SF_PLAIN],
+}
+
+-- Name mapping from box to log module and
+-- back. Make sure all required fields
+-- are covered!
+local log2box_keys = {
+    ['log']             = 'log',
+    ['nonblock']        = 'log_nonblock',
+    ['level']           = 'log_level',
+    ['format']          = 'log_format',
+}
+
+local box2log_keys = {
+    ['log']             = 'log',
+    ['log_nonblock']    = 'nonblock',
+    ['log_level']       = 'level',
+    ['log_format']      = 'format',
+}
+
+-- Update cfg value(s) in box.cfg instance conditionally
+local function box_cfg_update(log_key)
+    -- if it is not yet even exist just exit early
+    if type(box.cfg) ~= 'table' then
+        return
+    end
+
+    local update = function(log_key, box_key)
+        -- the box entry may be under configuration
+        -- process thus equal to nil, skip it then
+        if log_cfg[log_key] ~= nil and
+            box.cfg[box_key] ~= nil and
+            box.cfg[box_key] ~= log_cfg[log_key] then
+            box.cfg[box_key] = log_cfg[log_key]
+        end
+    end
+
+    if log_key == nil then
+        for k, v in pairs(log2box_keys) do
+            update(k, v)
+        end
+    else
+        assert(log2box_keys[log_key] ~= nil)
+        update(log_key, log2box_keys[log_key])
+    end
+end
+
+-- Log options which can be set ony once.
+local cfg_static_keys = {
+    log         = true,
+    nonblock    = true,
+}
+
+-- Test if static key is not changed.
+local function verify_static(k, v)
+    assert(cfg_static_keys[k] ~= nil)
+
+    if ffi.C.say_logger_initialized() == true then
+        if log_cfg[k] ~= v then
+            return false, "can't be set dynamically"
+        end
+    end
+
+    return true
+end
+
+-- Test if format is valid.
+local function verify_format(key, name)
+    assert(log_cfg[key] ~= nil)
+
+    if not fmt_str2num[name] then
+        local m = "expected %s"
+        return false, m:format(fmt_list())
+    end
+
+    if fmt_str2num[name] == ffi.C.SF_JSON then
+        if ffi.C.log_type() == ffi.C.SAY_LOGGER_SYSLOG or
+            ffi.C.log_type() == ffi.C.SAY_LOGGER_BOOT then
+            local m = "%s can't be used with " ..
+            "syslog or boot-time logger"
+            return false, m:format(fmt_num2str[ffi.C.SF_JSON])
+        end
+    end
+
+    return true
+end
+
+-- Test if level is a valid string. The
+-- number may be any for to backward compatibility.
+local function verify_level(key, level)
+    assert(log_cfg[key] ~= nil)
+
+    if type(level) == 'string' then
+        if not log_level_keys[level] then
+            local m = "expected %s"
+            return false, m:format(log_level_list())
+        end
+    elseif type(level) ~= 'number' then
+            return false, "must be a number or a string"
+    end
+
+    return true
+end
+
+local verify_ops = {
+    ['log']         = verify_static,
+    ['nonblock']    = verify_static,
+    ['format']      = verify_format,
+    ['level']       = verify_level,
+}
+
+-- Verify a value for the particular key.
+local function verify_option(k, v)
+    assert(k ~= nil)
+
+    if verify_ops[k] ~= nil then
+        return verify_ops[k](k, v)
+    end
+
+    return true
+end
+
+-- Main routine which pass data to C logging code.
 local function say(level, fmt, ...)
     if ffi.C.log_level < level then
         -- don't waste cycles on debug.getinfo()
@@ -139,41 +288,232 @@ local function say(level, fmt, ...)
     ffi.C._say(level, file, line, nil, format, fmt)
 end
 
+-- Just a syntactic sugar over say routine.
 local function say_closure(lvl)
     return function (fmt, ...)
         say(lvl, fmt, ...)
     end
 end
 
+-- Rotate log (basically reopen the log file and
+-- start writting into it).
 local function log_rotate()
     ffi.C.say_logrotate(nil, nil, 0)
 end
 
-local function log_level(level)
-    return ffi.C.say_set_log_level(level)
-end
+-- Set new logging level, the level must be valid!
+local function set_log_level(level, update_box_cfg)
+    assert(type(level) == 'number')
 
-local function log_format(name)
-    if not fmt_str2num[name] then
-        local m = "log_format: expected %s"
-        error(m:format(fmt_list()))
+    ffi.C.say_set_log_level(level)
+
+    rawset(log_cfg, 'level', level)
+
+    if update_box_cfg then
+        box_cfg_update('level')
     end
 
+    local m = "log: level set to %s"
+    say(S_DEBUG, m:format(level))
+end
+
+-- Tries to set a new level, or print an error.
+local function log_level(level, update_box_cfg)
+    local ok, msg = verify_option('level', level)
+    if not ok then
+        error(msg)
+    end
+
+    if type(level) == 'string' then
+        level = log_level_keys[level]
+    end
+
+    set_log_level(level, true)
+end
+
+-- Set a new logging format, the name must be valid!
+local function set_log_format(name, update_box_cfg)
+    assert(fmt_str2num[name] ~= nil)
+
     if fmt_str2num[name] == ffi.C.SF_JSON then
-        if ffi.C.log_type() == ffi.C.SAY_LOGGER_SYSLOG or
-            ffi.C.log_type() == ffi.C.SAY_LOGGER_BOOT then
-            local m = "log_format: %s can't be used with " ..
-                    "syslog or boot-time logger"
-            error(m:format(fmt_num2str[ffi.C.SF_JSON]))
-        end
         ffi.C.say_set_log_format(ffi.C.SF_JSON)
     else
         ffi.C.say_set_log_format(ffi.C.SF_PLAIN)
     end
+
+    rawset(log_cfg, 'format', name)
+
+    if update_box_cfg then
+        box_cfg_update('format')
+    end
+
+    local m = "log: format set to '%s'"
+    say(S_DEBUG, m:format(name))
 end
 
+-- Tries to set a new format, or print an error.
+local function log_format(name)
+    local ok, msg = verify_option('format', name)
+    if not ok then
+        error(msg)
+    end
+
+    set_log_format(name, true)
+end
+
+-- Returns pid of a pipe process.
 local function log_pid()
     return tonumber(ffi.C.log_pid)
+end
+
+-- Fetch a value from log to box.cfg{}.
+local function box_api_cfg_get(key)
+    return log_cfg[box2log_keys[key]]
+end
+
+-- Set value to log from box.cfg{}.
+local function box_api_cfg_set(key, value)
+    local log_key = box2log_keys[key]
+
+    local ok, msg = verify_option(log_key, value)
+    if not ok then
+        return false, msg
+    end
+
+    log_cfg[log_key] = value
+    return true
+end
+
+-- Set logging level from reloading box.cfg{}
+local function box_api_cfg_set_log_level()
+    local log_key = box2log_keys['log_level']
+    local v = box.cfg['log_level']
+
+    local ok, msg = verify_option(log_key, v)
+    if not ok then
+        return false, msg
+    end
+
+    if type(v) == 'string' then
+        v = log_level_keys[v]
+    end
+
+    set_log_level(v, false)
+    return true
+end
+
+-- Set logging format from reloading box.cfg{}
+local function box_api_set_log_format()
+    local log_key = box2log_keys['log_format']
+    local v = box.cfg['log_format']
+
+    local ok, msg = verify_option(log_key, v)
+    if not ok then
+        return false, msg
+    end
+
+    set_log_format(v, false)
+    return true
+end
+
+-- Reload dynamic options.
+local function reload_cfg(cfg)
+    for k in pairs(cfg_static_keys) do
+        if cfg[k] ~= nil then
+            local ok, msg = verify_static(k, cfg[k])
+            if not ok then
+                local m = "log.cfg: \'%s\' %s"
+                error(m:format(k, msg))
+            end
+        end
+    end
+
+    if cfg.level ~= nil then
+        log_level(cfg.level)
+    end
+
+    if cfg.format ~= nil then
+        log_format(cfg.format)
+    end
+end
+
+-- Load or reload configuration via log.cfg({}) call.
+local function load_cfg(oldcfg, cfg)
+    cfg = cfg or {}
+
+    -- log option might be zero length string, which
+    -- is fine, we should treat it as nil.
+    if cfg.log ~= nil then
+        if type(cfg.log) == 'string' and cfg.log:len() == 0 then
+            cfg.log = nil
+        end
+    end
+
+    if cfg.format ~= nil then
+        local ok, msg = verify_option('format', cfg.format)
+        if not ok then
+            local m = "log.cfg: \'%s\' %s"
+            error(m:format('format', msg))
+        end
+    end
+
+    if cfg.level ~= nil then
+        local ok, msg = verify_option('level', cfg.level)
+        if not ok then
+            local m = "log.cfg: \'%s\' %s"
+            error(m:format('level', msg))
+        end
+    end
+
+    if cfg.nonblock ~= nil then
+        if type(cfg.nonblock) ~= 'boolean' then
+            error("log.cfg: 'nonblock' option must be 'true' or 'false'")
+        end
+    end
+
+    if ffi.C.say_logger_initialized() == true then
+        return reload_cfg(cfg)
+    end
+
+    cfg.level = cfg.level or log_cfg.level
+    cfg.format = cfg.format or log_cfg.format
+    cfg.nonblock = cfg.nonblock or log_cfg.nonblock
+
+    -- nonblock is special: it has to become integer
+    -- for ffi call but in config we have to save
+    -- true value only for backward compatibility!
+    local nonblock = cfg.nonblock
+
+    if nonblock == nil or nonblock == false then
+        nonblock = 0
+    else
+        nonblock = 1
+    end
+
+    -- We never allow confgure the logger in background
+    -- mode since we don't know how the box will be configured
+    -- later.
+    ffi.C.say_logger_init(cfg.log, cfg.level,
+                          nonblock, cfg.format, 0)
+
+    if nonblock == 1 then
+        nonblock = true
+    else
+        nonblock = nil
+    end
+
+    -- Update log_cfg vars to show them in module
+    -- configuration output.
+    rawset(log_cfg, 'log', cfg.log)
+    rawset(log_cfg, 'level', cfg.level)
+    rawset(log_cfg, 'nonblock', nonblock)
+    rawset(log_cfg, 'format', cfg.format)
+
+    -- and box.cfg output as well.
+    box_cfg_update()
+
+    local m = "log.cfg({log=%s,level=%s,nonblock=%s,format=\'%s\'})"
+    say(S_DEBUG, m:format(cfg.log, cfg.level, cfg.nonblock, cfg.format))
 end
 
 local compat_warning_said = false
@@ -187,16 +527,34 @@ local compat_v16 = {
     end;
 }
 
-return setmetatable({
-    warn = say_closure(S_WARN);
-    info = say_closure(S_INFO);
-    verbose = say_closure(S_VERBOSE);
-    debug = say_closure(S_DEBUG);
-    error = say_closure(S_ERROR);
-    rotate = log_rotate;
-    pid = log_pid;
-    level = log_level;
-    log_format = log_format;
-}, {
+local log = {
+    warn = say_closure(S_WARN),
+    info = say_closure(S_INFO),
+    verbose = say_closure(S_VERBOSE),
+    debug = say_closure(S_DEBUG),
+    error = say_closure(S_ERROR),
+    rotate = log_rotate,
+    pid = log_pid,
+    level = log_level,
+    log_format = log_format,
+    cfg = setmetatable(log_cfg, {
+        __call = load_cfg,
+    }),
+    box_api = {
+        cfg_get = box_api_cfg_get,
+        cfg_set = box_api_cfg_set,
+        cfg_set_log_level = box_api_cfg_set_log_level,
+        cfg_set_log_format = box_api_set_log_format,
+    },
+}
+
+setmetatable(log, {
+    __serialize = function(self)
+        local res = table.copy(self)
+        res.box_api = nil
+        return setmetatable(res, {})
+    end,
     __index = compat_v16;
 })
+
+return log

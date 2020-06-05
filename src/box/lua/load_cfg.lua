@@ -59,10 +59,11 @@ local default_cfg = {
     vinyl_range_size          = nil, -- set automatically
     vinyl_page_size           = 8 * 1024,
     vinyl_bloom_fpr           = 0.05,
-    log                 = nil,
-    log_nonblock        = nil,
-    log_level           = 5,
-    log_format          = "plain",
+
+    -- logging options are covered by
+    -- a separate log module; they are
+    -- 'log_' prefixed
+
     io_collect_interval = nil,
     readahead           = 16320,
     snap_io_rate_limit  = nil, -- no limit
@@ -99,6 +100,15 @@ local default_cfg = {
     sql_cache_size        = 5 * 1024 * 1024,
 }
 
+-- cfg variables which are covered by modules
+local module_cfg = {
+    -- logging
+    log                 = log.box_api,
+    log_nonblock        = log.box_api,
+    log_level           = log.box_api,
+    log_format          = log.box_api,
+}
+
 -- types of available options
 -- could be comma separated lua types or 'any' if any type is allowed
 local template_cfg = {
@@ -124,10 +134,11 @@ local template_cfg = {
     vinyl_page_size           = 'number',
     vinyl_bloom_fpr           = 'number',
 
-    log              = 'string',
-    log_nonblock     = 'boolean',
-    log_level           = 'number',
-    log_format          = 'string',
+    log                 = 'module',
+    log_nonblock        = 'module',
+    log_level           = 'module',
+    log_format          = 'module',
+
     io_collect_interval = 'number',
     readahead           = 'number',
     snap_io_rate_limit  = 'number',
@@ -233,8 +244,8 @@ end
 local dynamic_cfg = {
     listen                  = private.cfg_set_listen,
     replication             = private.cfg_set_replication,
-    log_level               = private.cfg_set_log_level,
-    log_format              = private.cfg_set_log_format,
+    log_level               = log.box_api.cfg_set_log_level,
+    log_format              = log.box_api.cfg_set_log_format,
     io_collect_interval     = private.cfg_set_io_collect_interval,
     readahead               = private.cfg_set_readahead,
     too_long_threshold      = private.cfg_set_too_long_threshold,
@@ -408,7 +419,8 @@ local function upgrade_cfg(cfg, translate_cfg)
     return result_cfg
 end
 
-local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg, prefix)
+local function prepare_cfg(cfg, default_cfg, template_cfg,
+                           module_cfg, modify_cfg, prefix)
     if cfg == nil then
         return {}
     end
@@ -424,6 +436,7 @@ local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg, prefix)
         readable_prefix = prefix .. '.'
     end
     local new_cfg = {}
+    local module_cfg_backup = {}
     for k,v in pairs(cfg) do
         local readable_name = readable_prefix .. k;
         if template_cfg[k] == nil then
@@ -437,7 +450,20 @@ local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg, prefix)
             if type(v) ~= 'table' then
                 box.error(box.error.CFG, readable_name, "should be a table")
             end
-            v = prepare_cfg(v, default_cfg[k], template_cfg[k], modify_cfg[k], readable_name)
+            v = prepare_cfg(v, default_cfg[k], template_cfg[k],
+                            module_cfg[k], modify_cfg[k], readable_name)
+        elseif template_cfg[k] == 'module' then
+            local old_value = module_cfg[k].cfg_get(k, v)
+            module_cfg_backup[k] = old_value
+
+            local ok, msg = module_cfg[k].cfg_set(k, v)
+            if not ok then
+                -- restore back the old values for modules
+                for module_k, module_v in pairs(module_cfg_backup) do
+                    module_cfg[module_k].cfg_set(module_k, module_v)
+                end
+                box.error(box.error.CFG, readable_name, msg)
+            end
         elseif (string.find(template_cfg[k], ',') == nil) then
             -- one type
             if type(v) ~= template_cfg[k] then
@@ -460,12 +486,17 @@ local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg, prefix)
     return new_cfg
 end
 
-local function apply_default_cfg(cfg, default_cfg)
+local function apply_default_cfg(cfg, default_cfg, module_cfg)
     for k,v in pairs(default_cfg) do
         if cfg[k] == nil then
             cfg[k] = v
         elseif type(v) == 'table' then
             apply_default_cfg(cfg[k], v)
+        end
+    end
+    for k, v in pairs(module_cfg) do
+        if cfg[k] == nil then
+            cfg[k] = module_cfg[k].cfg_get(k)
         end
     end
 end
@@ -491,7 +522,8 @@ end
 
 local function reload_cfg(oldcfg, cfg)
     cfg = upgrade_cfg(cfg, translate_cfg)
-    local newcfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
+    local newcfg = prepare_cfg(cfg, default_cfg, template_cfg,
+                               module_cfg, modify_cfg)
     local ordered_cfg = {}
     -- iterate over original table because prepare_cfg() may store NILs
     for key, val in pairs(cfg) do
@@ -552,8 +584,9 @@ setmetatable(box, {
 
 local function load_cfg(cfg)
     cfg = upgrade_cfg(cfg, translate_cfg)
-    cfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
-    apply_default_cfg(cfg, default_cfg);
+    cfg = prepare_cfg(cfg, default_cfg, template_cfg,
+                      module_cfg, modify_cfg)
+    apply_default_cfg(cfg, default_cfg, module_cfg);
     -- Save new box.cfg
     box.cfg = cfg
     if not pcall(private.cfg_check)  then
