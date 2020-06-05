@@ -1,13 +1,92 @@
 #!/usr/bin/env tarantool
 
 local test = require('tap').test('log')
-test:plan(25)
+test:plan(54)
 
 -- gh-3946: Assertion failure when using log_format() before box.cfg()
 local log = require('log')
 log.log_format('plain')
 _, err = pcall(log.log_format, 'json')
-test:ok(err:find("log_format: json can\'t be used") ~= nil)
+test:ok(err:find("json can\'t be used") ~= nil)
+
+--
+-- gh-689: various settings change from box.cfg/log.cfg interfaces
+--
+--
+local box2log_keys = {
+    ['log']             = 'log',
+    ['log_nonblock']    = 'nonblock',
+    ['log_level']       = 'level',
+    ['log_format']      = 'format',
+}
+
+local function verify_keys(prefix)
+    for k, v in pairs(box2log_keys) do
+        local m = "%s: %s/%s (%s %s) are equal"
+        test:ok(box.cfg[k] == log.cfg[v],
+                m:format(prefix, k, v,
+                         box.cfg[k], log.cfg[v]))
+    end
+end
+
+-- Make sure the configuration defaults are fetched
+-- correctly from log module
+test:ok(log.cfg.log == nil, "log.cfg.log is nil")
+test:ok(log.cfg.format == 'plain', "log.cfg.format is 'plain'")
+test:ok(log.cfg.level == 5, "log.cfg.level is 5")
+test:ok(log.cfg.nonblock == nil , "log.cfg.nonblock is nil")
+
+-- Configure logging from log module
+local filename = "1.log"
+
+_, err = pcall(log.cfg, {log=filename, format='plain', level=6})
+test:ok(err == nil, "valid log.cfg call")
+test:ok(log.cfg.log == filename, "log.cfg.log ok")
+test:ok(log.cfg.format == 'plain', "log.cfg.format is ok")
+test:ok(log.cfg.level == 6, "log.cfg.level is 6")
+
+-- switch to json mode
+_, err = pcall(log.cfg, {format='json', level='verbose'})
+test:ok(err == nil, "switch to json")
+
+local message = "json message"
+local json = require('json')
+local file = io.open(filename)
+while file:read() do
+end
+
+log.verbose(message)
+local line = file:read()
+local s = json.decode(line)
+test:ok(s['message'] == message, "message match")
+
+-- Now switch to box.cfg interface
+box.cfg{
+    log = filename,
+    log_level = 6,
+    memtx_memory = 107374182,
+}
+test:ok(box.cfg.log == filename, "filename match")
+test:ok(box.cfg.log_level == 6, "loglevel match")
+verify_keys("box.cfg")
+
+-- Now try to change a static field.
+_, err = pcall(box.cfg, {log_level = 5, log = "2.txt"})
+test:ok(tostring(err):find("can\'t be set dynamically") ~= nil)
+test:ok(box.cfg.log == filename, "filename match")
+test:ok(box.cfg.log_level == 6, "loglevel match")
+verify_keys("box.cfg static error")
+
+-- Change format and levels.
+_, err = pcall(log.log_format, 'json')
+test:ok(err == nil, "change to json")
+_, err = pcall(log.level, 1)
+test:ok(err == nil, "change log level")
+verify_keys("log change json and level")
+
+-- Restore defaults
+log.log_format('plain')
+log.level(5)
 
 --
 -- Check that Tarantool creates ADMIN session for #! script
