@@ -386,6 +386,12 @@ fedora_31:
     OS: 'fedora'
     DIST: '31'
 
+fedora_32:
+  <<: *pack_test_definition
+  variables:
+    OS: 'fedora'
+    DIST: '32'
+
 ubuntu_14_04:
   <<: *pack_definition
   variables:
@@ -488,6 +494,12 @@ fedora_31_deploy:
   variables:
     OS: 'fedora'
     DIST: '31'
+
+fedora_32_deploy:
+  <<: *deploy_test_definition
+  variables:
+    OS: 'fedora'
+    DIST: '32'
 
 ubuntu_14_04_deploy:
   <<: *deploy_definition
