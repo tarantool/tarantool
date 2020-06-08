@@ -80,7 +80,7 @@ struct error {
 	 * meanwhile it is still used in C internals or vice
 	 * versa. For details see luaT_pusherror().
 	 */
-	int refs;
+	int64_t refs;
 	/**
 	 * Errno at the moment of the error
 	 * creation. If the error is not related
@@ -112,15 +112,8 @@ struct error {
 	struct error *effect;
 };
 
-static inline int
-error_ref(struct error *e)
-{
-	assert(e->refs >= 0);
-	if (e->refs >= INT32_MAX)
-		return -1;
-	e->refs++;
-	return 0;
-}
+void
+error_ref(struct error *e);
 
 void
 error_unref(struct error *e);
@@ -234,7 +227,6 @@ static inline void
 diag_set_error(struct diag *diag, struct error *e)
 {
 	assert(e != NULL);
-	assert(e->refs < INT32_MAX);
 	error_ref(e);
 	diag_clear(diag);
 	error_unlink_effect(e);
@@ -259,7 +251,6 @@ diag_add_error(struct diag *diag, struct error *e)
 	 */
 	assert(e->effect == NULL);
 	assert(diag->last->effect == NULL);
-	assert(e->refs < INT32_MAX);
 	error_ref(e);
 	e->cause = diag->last;
 	diag->last->effect = e;

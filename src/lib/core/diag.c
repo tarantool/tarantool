@@ -32,6 +32,15 @@
 #include "fiber.h"
 
 void
+error_ref(struct error *e)
+{
+	assert(e->refs >= 0);
+	if (e->refs >= INT64_MAX)
+		panic("too many references to error object");
+	e->refs++;
+}
+
+void
 error_unref(struct error *e)
 {
 	assert(e->refs > 0);
@@ -80,7 +89,6 @@ error_set_prev(struct error *e, struct error *prev)
 			 */
 			error_unlink_effect(prev);
 		}
-		assert(prev->refs < INT32_MAX);
 		error_ref(prev);
 		prev->effect = e;
 	}
