@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 
 local test = require('tap').test('log')
-test:plan(54)
+test:plan(62)
 
 -- gh-3946: Assertion failure when using log_format() before box.cfg()
 local log = require('log')
@@ -69,6 +69,30 @@ box.cfg{
 test:ok(box.cfg.log == filename, "filename match")
 test:ok(box.cfg.log_level == 6, "loglevel match")
 verify_keys("box.cfg")
+
+-- Test symbolic names for loglevels
+log.cfg({level='fatal'})
+test:ok(log.cfg.level == 0 and box.cfg.log_level == 0, 'both got fatal')
+log.cfg({level='syserror'})
+test:ok(log.cfg.level == 1 and box.cfg.log_level == 1, 'both got syserror')
+log.cfg({level='error'})
+test:ok(log.cfg.level == 2 and box.cfg.log_level == 2, 'both got error')
+log.cfg({level='crit'})
+test:ok(log.cfg.level == 3 and box.cfg.log_level == 3, 'both got crit')
+log.cfg({level='warn'})
+test:ok(log.cfg.level == 4 and box.cfg.log_level == 4, 'both got warn')
+log.cfg({level='info'})
+test:ok(log.cfg.level == 5 and box.cfg.log_level == 5, 'both got info')
+log.cfg({level='verbose'})
+test:ok(log.cfg.level == 6 and box.cfg.log_level == 6, 'both got verbose')
+log.cfg({level='debug'})
+test:ok(log.cfg.level == 7 and box.cfg.log_level == 7, 'both got debug')
+
+box.cfg{
+    log = filename,
+    log_level = 6,
+    memtx_memory = 107374182,
+}
 
 -- Now try to change a static field.
 _, err = pcall(box.cfg, {log_level = 5, log = "2.txt"})
