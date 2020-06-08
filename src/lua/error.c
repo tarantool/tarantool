@@ -84,8 +84,7 @@ luaT_pusherror(struct lua_State *L, struct error *e)
 	 * It also important to reference the error first and only
 	 * then set the finalizer.
 	 */
-	if (error_ref(e) != 0)
-		luaL_error(L, "Too many references to error object");
+	error_ref(e);
 	assert(CTID_CONST_STRUCT_ERROR_REF != 0);
 	struct error **ptr = (struct error **)
 		luaL_pushcdata(L, CTID_CONST_STRUCT_ERROR_REF);
