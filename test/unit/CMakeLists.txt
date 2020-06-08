@@ -257,6 +257,9 @@ target_link_libraries(swim_errinj.test unit swim)
 add_executable(merger.test merger.test.c)
 target_link_libraries(merger.test unit core box)
 
+add_executable(snap_quorum_delay.test snap_quorum_delay.cc)
+target_link_libraries(snap_quorum_delay.test box core unit)
+
 #
 # Client for popen.test
 add_executable(popen-child popen-child.c)

@@ -310,6 +310,87 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 	}
 }
 
+double
+txn_limbo_confirm_timeout(struct txn_limbo *limbo)
+{
+	(void)limbo;
+	return replication_synchro_timeout;
+}
+
+/**
+ * Waitpoint stores information about the progress of confirmation.
+ * In the case of multimaster support, it will store a bitset
+ * or array instead of the boolean.
+ */
+struct confirm_waitpoint {
+	/**
+	 * Variable for wake up the fiber that is waiting for
+	 * the end of confirmation.
+	 */
+	struct fiber_cond confirm_cond;
+	/**
+	 * Result flag.
+	 */
+	bool is_confirm;
+};
+
+static int
+txn_commit_cb(struct trigger *trigger, void *event)
+{
+	(void)event;
+	struct confirm_waitpoint *cwp =
+		(struct confirm_waitpoint *)trigger->data;
+	cwp->is_confirm = true;
+	fiber_cond_signal(&cwp->confirm_cond);
+	return 0;
+}
+
+static int
+txn_rollback_cb(struct trigger *trigger, void *event)
+{
+	(void)event;
+	struct confirm_waitpoint *cwp =
+		(struct confirm_waitpoint *)trigger->data;
+	fiber_cond_signal(&cwp->confirm_cond);
+	return 0;
+}
+
+int
+txn_limbo_wait_confirm(struct txn_limbo *limbo)
+{
+	if (txn_limbo_is_empty(limbo))
+		return 0;
+
+	/* initialization of a waitpoint. */
+	struct confirm_waitpoint cwp;
+	fiber_cond_create(&cwp.confirm_cond);
+	cwp.is_confirm = false;
+
+	/* Set triggers for the last limbo transaction. */
+	struct trigger on_complete;
+	trigger_create(&on_complete, txn_commit_cb, &cwp, NULL);
+	struct trigger on_rollback;
+	trigger_create(&on_rollback, txn_rollback_cb, &cwp, NULL);
+	struct txn_limbo_entry *tle = txn_limbo_last_entry(limbo);
+	txn_on_commit(tle->txn, &on_complete);
+	txn_on_rollback(tle->txn, &on_rollback);
+
+	int rc = fiber_cond_wait_timeout(&cwp.confirm_cond,
+					 txn_limbo_confirm_timeout(limbo));
+	fiber_cond_destroy(&cwp.confirm_cond);
+	if (rc != 0) {
+		/* Clear the triggers if the timeout has been reached. */
+		trigger_clear(&on_complete);
+		trigger_clear(&on_rollback);
+		return -1;
+	}
+	if (!cwp.is_confirm) {
+		/* The transaction has been rolled back. */
+		return -1;
+	}
+	return 0;
+}
+
 void
 txn_limbo_init(void)
 {

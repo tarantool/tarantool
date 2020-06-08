@@ -57,6 +57,7 @@
 #include "engine.h"		/* engine_collect_garbage() */
 #include "wal.h"		/* wal_collect_garbage() */
 #include "checkpoint_schedule.h"
+#include "txn_limbo.h"
 
 struct gc_state gc;
 
@@ -395,6 +396,15 @@ gc_do_checkpoint(bool is_scheduled)
 	rc = wal_begin_checkpoint(&checkpoint);
 	if (rc != 0)
 		goto out;
+
+	/*
+	 * Wait the confirms on all "sync" transactions before
+	 * create a snapshot.
+	 */
+	rc = txn_limbo_wait_confirm(&txn_limbo);
+	if (rc != 0)
+		goto out;
+
 	rc = engine_commit_checkpoint(&checkpoint.vclock);
 	if (rc != 0)
 		goto out;

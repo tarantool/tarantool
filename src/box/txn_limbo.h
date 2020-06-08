@@ -194,6 +194,16 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry);
 void
 txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn);
 
+double
+txn_limbo_confirm_timeout(struct txn_limbo *limbo);
+
+/**
+ * Waiting for confirmation of all "sync" transactions
+ * during confirm timeout or fail.
+ */
+int
+txn_limbo_wait_confirm(struct txn_limbo *limbo);
+
 void
 txn_limbo_init();
 
