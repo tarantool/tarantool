@@ -494,7 +494,7 @@ local function apply_default_cfg(cfg, default_cfg, module_cfg)
             apply_default_cfg(cfg[k], v)
         end
     end
-    for k, v in pairs(module_cfg) do
+    for k in pairs(module_cfg) do
         if cfg[k] == nil then
             cfg[k] = module_cfg[k].cfg_get(k)
         end
