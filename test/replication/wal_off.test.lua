@@ -31,8 +31,7 @@ replication_sync_timeout = box.cfg.replication_sync_timeout
 box.cfg { replication_sync_timeout = 0.01 }
 box.cfg { replication = wal_off_uri }
 box.cfg { replication_sync_timeout = replication_sync_timeout }
-check = "Read access to universe"
-while string.find(box.info.replication[wal_off_id].upstream.message, check) == nil do fiber.sleep(0.01) end
+test_run:wait_upstream(wal_off_id, {status = 'loading', message_re = "Read access to universe"})
 box.cfg { replication = "" }
 
 test_run:cmd("stop server wal_off")
