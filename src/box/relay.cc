@@ -404,7 +404,8 @@ tx_status_update(struct cmsg *msg)
 	 * Let pending synchronous transactions know, which of
 	 * them were successfully sent to the replica. Acks are
 	 * collected only by the transactions originator (which is
-	 * the single master in 100% so far).
+	 * the single master in 100% so far). Other instances wait
+	 * for master's CONFIRM message instead.
 	 */
 	if (txn_limbo.instance_id == instance_id) {
 		txn_limbo_ack(&txn_limbo, status->relay->replica->id,
@@ -770,7 +771,8 @@ static void
 relay_send_row(struct xstream *stream, struct xrow_header *packet)
 {
 	struct relay *relay = container_of(stream, struct relay, stream);
-	assert(iproto_type_is_dml(packet->type));
+	assert(iproto_type_is_dml(packet->type) ||
+	       packet->type == IPROTO_CONFIRM);
 	if (packet->group_id == GROUP_LOCAL) {
 		/*
 		 * We do not relay replica-local rows to other

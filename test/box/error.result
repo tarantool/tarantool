@@ -433,6 +433,7 @@ t;
  |   212: box.error.SEQUENCE_NOT_STARTED
  |   213: box.error.NO_SUCH_SESSION_SETTING
  |   214: box.error.UNCOMMITTED_FOREIGN_SYNC_TXNS
+ |   215: box.error.SYNC_MASTER_MISMATCH
  | ...
 
 test_run:cmd("setopt delimiter ''");

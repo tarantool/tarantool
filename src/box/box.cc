@@ -342,6 +342,9 @@ static void
 apply_wal_row(struct xstream *stream, struct xrow_header *row)
 {
 	struct request request;
+	// TODO: process confirmation during recovery.
+	if (row->type == IPROTO_CONFIRM)
+		return;
 	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));
 	if (request.type != IPROTO_NOP) {
 		struct space *space = space_cache_find_xc(request.space_id);

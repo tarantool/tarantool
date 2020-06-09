@@ -316,6 +316,12 @@ struct txn *
 txn_begin(void);
 
 /**
+ * Complete transaction processing.
+ */
+void
+txn_complete(struct txn *txn);
+
+/**
  * Commit a transaction.
  * @pre txn == in_txn()
  *

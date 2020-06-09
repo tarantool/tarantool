@@ -142,6 +142,14 @@ xrow_header_decode(struct xrow_header *header, const char **pos,
 		   const char *end, bool end_is_exact);
 
 /**
+ * Duplicate the xrow's body onto the given region.
+ * @retval -1 Error.
+ * @retval >= 0 Iov count in the body.
+ */
+int
+xrow_header_dup_body(struct xrow_header *header, struct region *region);
+
+/**
  * DML request.
  */
 struct request {

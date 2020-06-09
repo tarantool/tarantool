@@ -220,6 +220,21 @@ error:
 	return 0;
 }
 
+int
+xrow_header_dup_body(struct xrow_header *row, struct region *region)
+{
+	assert(row->bodycnt == 1);
+	size_t size = row->body[0].iov_len;
+	char *copy = (char *)region_alloc(region, size);
+	if (copy == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "copy");
+		return -1;
+	}
+	memcpy(copy, row->body[0].iov_base, size);
+	row->body[0].iov_base = copy;
+	return 1;
+}
+
 /**
  * @pre pos points at a valid msgpack
  */

@@ -188,6 +188,12 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn);
 void
 txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry);
 
+/**
+ * Confirm all the entries up to the given master's LSN.
+ */
+void
+txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn);
+
 void
 txn_limbo_init();
 

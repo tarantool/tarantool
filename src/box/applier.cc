@@ -51,6 +51,7 @@
 #include "txn.h"
 #include "box.h"
 #include "scoped_guard.h"
+#include "txn_limbo.h"
 
 STRS(applier_state, applier_STATE);
 
@@ -214,6 +215,11 @@ apply_snapshot_row(struct xrow_header *row)
 	struct txn *txn = txn_begin();
 	if (txn == NULL)
 		return -1;
+	/*
+	 * Do not wait for confirmation when fetching a snapshot.
+	 * Master only sends confirmed rows during join.
+	 */
+	txn_set_flag(txn, TXN_FORCE_ASYNC);
 	if (txn_begin_stmt(txn, space) != 0)
 		goto rollback;
 	/* no access checks here - applier always works with admin privs */
@@ -249,10 +255,55 @@ process_nop(struct request *request)
 	return txn_commit_stmt(txn, request);
 }
 
+/*
+ * CONFIRM rows aren't dml requests  and require special
+ * handling: instead of performing some operations on spaces,
+ * processing these requests required txn_limbo to confirm some
+ * of its entries.
+ */
+static int
+process_confirm(struct request *request)
+{
+	assert(request->header->type == IPROTO_CONFIRM);
+	uint32_t replica_id;
+	struct txn *txn = in_txn();
+	int64_t lsn = 0;
+	if (xrow_decode_confirm(request->header, &replica_id, &lsn) != 0)
+		return -1;
+
+	if (replica_id != txn_limbo.instance_id) {
+		diag_set(ClientError, ER_SYNC_MASTER_MISMATCH, replica_id,
+			 txn_limbo.instance_id);
+		return -1;
+	}
+	assert(txn->n_applier_rows == 0);
+	/*
+	 * This is not really a transaction. It just uses txn API
+	 * to put the data into WAL. And obviously it should not
+	 * go to the limbo and block on the very same sync
+	 * transaction which it tries to confirm now.
+	 */
+	txn_set_flag(txn, TXN_FORCE_ASYNC);
+
+	if (txn_begin_stmt(txn, NULL) != 0)
+		return -1;
+
+	if (txn_commit_stmt(txn, request) == 0) {
+		txn_limbo_read_confirm(&txn_limbo, lsn);
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
 static int
 apply_row(struct xrow_header *row)
 {
 	struct request request;
+	if (row->type == IPROTO_CONFIRM) {
+		request.header = row;
+		return process_confirm(&request);
+	}
 	if (xrow_decode_dml(row, &request, dml_request_key_map(row->type)) != 0)
 		return -1;
 	if (request.type == IPROTO_NOP)
@@ -270,9 +321,20 @@ apply_row(struct xrow_header *row)
 static int
 apply_final_join_row(struct xrow_header *row)
 {
+	/*
+	 * Confirms are ignored during join. All the data master
+	 * sends us is valid.
+	 */
+	if (row->type == IPROTO_CONFIRM)
+		return 0;
 	struct txn *txn = txn_begin();
 	if (txn == NULL)
 		return -1;
+	/*
+	 * Do not wait for confirmation while processing final
+	 * join rows. See apply_snapshot_row().
+	 */
+	txn_set_flag(txn, TXN_FORCE_ASYNC);
 	if (apply_row(row) != 0) {
 		txn_rollback(txn);
 		fiber_gc();
@@ -844,9 +906,6 @@ applier_apply_tx(struct stailq *rows)
 
 	trigger_create(on_commit, applier_txn_commit_cb, NULL, NULL);
 	txn_on_commit(txn, on_commit);
-
-	/* Applier does not wait for ACK. It sends ACK. */
-	txn_set_flag(txn, TXN_FORCE_ASYNC);
 
 	if (txn_commit_async(txn) < 0)
 		goto fail;
