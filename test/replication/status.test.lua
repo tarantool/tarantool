@@ -110,9 +110,7 @@ box.space._schema:insert({'dup'})
 test_run:cmd('switch default')
 box.space._schema:insert({'dup'})
 test_run:cmd('switch replica')
-r = box.info.replication[1]
-r.upstream.status == "stopped"
-r.upstream.message:match('Duplicate') ~= nil
+test_run:wait_upstream(1, {status = 'stopped', message_re = 'Duplicate'})
 test_run:cmd('switch default')
 box.space._schema:delete({'dup'})
 test_run:cmd("push filter ', lsn: [0-9]+' to ', lsn: <number>'")

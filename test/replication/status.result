@@ -302,14 +302,7 @@ test_run:cmd('switch replica')
 ---
 - true
 ...
-r = box.info.replication[1]
----
-...
-r.upstream.status == "stopped"
----
-- true
-...
-r.upstream.message:match('Duplicate') ~= nil
+test_run:wait_upstream(1, {status = 'stopped', message_re = 'Duplicate'})
 ---
 - true
 ...
