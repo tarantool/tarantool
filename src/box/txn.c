@@ -110,6 +110,9 @@ txn_stmt_new(struct region *region)
 	stmt->space = NULL;
 	stmt->old_tuple = NULL;
 	stmt->new_tuple = NULL;
+	stmt->add_story = NULL;
+	stmt->del_story = NULL;
+	stmt->next_in_del_list = NULL;
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 	stmt->has_triggers = false;
@@ -194,6 +197,7 @@ txn_new(void)
 	}
 	assert(region_used(&region) == sizeof(*txn));
 	txn->region = region;
+	rlist_create(&txn->read_set);
 	rlist_create(&txn->conflict_list);
 	rlist_create(&txn->conflicted_by_list);
 	rlist_create(&txn->in_read_view_txs);
@@ -206,6 +210,14 @@ txn_new(void)
 inline static void
 txn_free(struct txn *txn)
 {
+	struct tx_read_tracker *tracker, *tmp;
+	rlist_foreach_entry_safe(tracker, &txn->read_set,
+				 in_read_set, tmp) {
+		rlist_del(&tracker->in_reader_list);
+		rlist_del(&tracker->in_read_set);
+	}
+	assert(rlist_empty(&txn->read_set));
+
 	struct tx_conflict_tracker *entry, *next;
 	rlist_foreach_entry_safe(entry, &txn->conflict_list,
 				 in_conflict_list, next) {

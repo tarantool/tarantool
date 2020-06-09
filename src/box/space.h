@@ -239,6 +239,10 @@ struct space {
 	 * Hash table with constraint identifiers hashed by name.
 	 */
 	struct mh_strnptr_t *constraint_ids;
+	/**
+	 * List of all tx stories in the space.
+	 */
+	struct rlist memtx_stories;
 };
 
 /** Initialize a base space instance. */

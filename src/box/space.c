@@ -38,6 +38,7 @@
 #include "user.h"
 #include "session.h"
 #include "txn.h"
+#include "memtx_tx.h"
 #include "tuple.h"
 #include "xrow_update.h"
 #include "request.h"
@@ -210,6 +211,7 @@ space_create(struct space *space, struct engine *engine,
 			 "constraint_ids");
 		goto fail;
 	}
+	rlist_create(&space->memtx_stories);
 	return 0;
 
 fail_free_indexes:
@@ -252,6 +254,7 @@ space_new_ephemeral(struct space_def *def, struct rlist *key_list)
 void
 space_delete(struct space *space)
 {
+	memtx_tx_on_space_delete(space);
 	assert(space->ck_constraint_trigger == NULL);
 	for (uint32_t j = 0; j <= space->index_id_max; j++) {
 		struct index *index = space->index_map[j];
