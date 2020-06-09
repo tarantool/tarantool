@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "txn.h"
+#include "memtx_tx.h"
 #include "txn_limbo.h"
 #include "engine.h"
 #include "tuple.h"
@@ -193,6 +194,9 @@ txn_new(void)
 	}
 	assert(region_used(&region) == sizeof(*txn));
 	txn->region = region;
+	rlist_create(&txn->conflict_list);
+	rlist_create(&txn->conflicted_by_list);
+	rlist_create(&txn->in_read_view_txs);
 	return txn;
 }
 
@@ -202,6 +206,22 @@ txn_new(void)
 inline static void
 txn_free(struct txn *txn)
 {
+	struct tx_conflict_tracker *entry, *next;
+	rlist_foreach_entry_safe(entry, &txn->conflict_list,
+				 in_conflict_list, next) {
+		rlist_del(&entry->in_conflict_list);
+		rlist_del(&entry->in_conflicted_by_list);
+	}
+	rlist_foreach_entry_safe(entry, &txn->conflicted_by_list,
+				 in_conflicted_by_list, next) {
+		rlist_del(&entry->in_conflict_list);
+		rlist_del(&entry->in_conflicted_by_list);
+	}
+	assert(rlist_empty(&txn->conflict_list));
+	assert(rlist_empty(&txn->conflicted_by_list));
+
+	rlist_del(&txn->in_read_view_txs);
+
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next)
 		txn_stmt_destroy(stmt);
@@ -219,6 +239,8 @@ txn_begin(void)
 	struct txn *txn = txn_new();
 	if (txn == NULL)
 		return NULL;
+	assert(rlist_empty(&txn->conflict_list));
+	assert(rlist_empty(&txn->conflicted_by_list));
 
 	/* Initialize members explicitly to save time on memset() */
 	stailq_create(&txn->stmts);
@@ -229,6 +251,7 @@ txn_begin(void)
 	txn->in_sub_stmt = 0;
 	txn->id = ++tsn;
 	txn->psn = 0;
+	txn->rv_psn = 0;
 	txn->status = TXN_INPROGRESS;
 	txn->signature = TXN_SIGNATURE_ROLLBACK;
 	txn->engine = NULL;
@@ -277,6 +300,15 @@ txn_begin_stmt(struct txn *txn, struct space *space)
 		diag_set(ClientError, ER_SUB_STMT_MAX);
 		return -1;
 	}
+
+	/*
+	 * A conflict have happened; there is no reason to continue the TX.
+	 */
+	if (txn->status == TXN_CONFLICTED) {
+		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		return -1;
+	}
+
 	struct txn_stmt *stmt = txn_stmt_new(&txn->region);
 	if (stmt == NULL)
 		return -1;
@@ -669,6 +701,17 @@ txn_prepare(struct txn *txn)
 		diag_set(ClientError, ER_FOREIGN_KEY_CONSTRAINT);
 		return -1;
 	}
+
+	/*
+	 * Somebody else has written some value that we have read.
+	 * The RW transaction is not possible.
+	 */
+	if (txn->status == TXN_CONFLICTED ||
+	    (txn->status == TXN_IN_READ_VIEW && !stailq_empty(&txn->stmts))) {
+		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		return -1;
+	}
+
 	/*
 	 * Perform transaction conflict resolution. Engine == NULL when
 	 * we have a bunch of IPROTO_NOP statements.
@@ -677,6 +720,26 @@ txn_prepare(struct txn *txn)
 		if (engine_prepare(txn->engine, txn) != 0)
 			return -1;
 	}
+
+	struct tx_conflict_tracker *entry, *next;
+	/* Handle conflicts. */
+	rlist_foreach_entry_safe(entry, &txn->conflict_list,
+				 in_conflict_list, next) {
+		assert(entry->breaker == txn);
+		memtx_tx_handle_conflict(txn, entry->victim);
+		rlist_del(&entry->in_conflict_list);
+		rlist_del(&entry->in_conflicted_by_list);
+	}
+	/* Just free conflict list - we don't need it anymore. */
+	rlist_foreach_entry_safe(entry, &txn->conflicted_by_list,
+				 in_conflicted_by_list, next) {
+		assert(entry->victim == txn);
+		rlist_del(&entry->in_conflict_list);
+		rlist_del(&entry->in_conflicted_by_list);
+	}
+	assert(rlist_empty(&txn->conflict_list));
+	assert(rlist_empty(&txn->conflicted_by_list));
+
 	trigger_clear(&txn->fiber_on_stop);
 	if (!txn_has_flag(txn, TXN_CAN_YIELD))
 		trigger_clear(&txn->fiber_on_yield);

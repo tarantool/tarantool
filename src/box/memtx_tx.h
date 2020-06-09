@@ -32,6 +32,8 @@
 
 #include <stdbool.h>
 
+#include "small/rlist.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -42,6 +44,21 @@ extern "C" {
  * and tx manager itself transaction reads in order to detect conflicts.
  */
 extern bool memtx_tx_manager_use_mvcc_engine;
+
+/**
+ * Record that links two transactions, breaker and victim.
+ * See memtx_tx_cause_conflict for details.
+ */
+struct tx_conflict_tracker {
+	/** TX that aborts victim on commit. */
+	struct txn *breaker;
+	/** TX that will be aborted on breaker's commit. */
+	struct txn *victim;
+	/** Link in breaker->conflict_list. */
+	struct rlist in_conflict_list;
+	/** Link in victim->conflicted_by_list. */
+	struct rlist in_conflicted_by_list;
+};
 
 /**
  * Initialize memtx transaction manager.
@@ -55,6 +72,30 @@ memtx_tx_manager_init();
 void
 memtx_tx_manager_free();
 
+/**
+ * Notify TX manager that if transaction @a breaker is committed then the
+ * transaction @a victim must be aborted due to conflict. It is achieved
+ * by adding corresponding entry (of tx_conflict_tracker type) to @a breaker
+ * conflict list. In case there's already such entry, then move it to the head
+ * of the list in order to optimize next invocations of this function.
+ * For example: there's two rw transaction in progress, one have read
+ * some value while the second is about to overwrite it. If the second
+ * is committed first, the first must be aborted.
+ * @return 0 on success, -1 on memory error.
+ */
+int
+memtx_tx_cause_conflict(struct txn *breaker, struct txn *victim);
+
+/**
+ * Handle conflict when @a breaker transaction is prepared.
+ * The conflict is happened if @a victim have read something that @a breaker
+ * overwrites.
+ * If @a victim is read-only or hasn't made any changes, it should be sent
+ * to read view, in which is will not see @a breaker.
+ * Otherwise @a victim must be marked as conflicted and aborted on occasion.
+ */
+void
+memtx_tx_handle_conflict(struct txn *breaker, struct txn *victim);
 
 #if defined(__cplusplus)
 } /* extern "C" */
