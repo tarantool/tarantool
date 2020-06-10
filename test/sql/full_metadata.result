@@ -65,7 +65,7 @@ execute("SELECT 'aSd' COLLATE \"unicode_ci\";")
 execute("SELECT c FROM t;")
  | ---
  | - metadata:
- |   - span: C
+ |   - span: c
  |     type: string
  |     is_nullable: true
  |     name: C
@@ -89,16 +89,16 @@ execute("SELECT c COLLATE \"unicode\" FROM t;")
 execute("SELECT id, a, c FROM t;")
  | ---
  | - metadata:
- |   - span: ID
+ |   - span: id
  |     type: integer
  |     is_autoincrement: true
  |     name: ID
  |     is_nullable: false
  |   - type: integer
- |     span: A
+ |     span: a
  |     name: A
  |     is_nullable: false
- |   - span: C
+ |   - span: c
  |     type: string
  |     is_nullable: true
  |     name: C

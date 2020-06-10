@@ -1849,7 +1849,7 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 				if (space->sequence != NULL &&
 				    space->sequence_fieldno == (uint32_t) iCol)
 					vdbe_metadata_set_col_autoincrement(v, i);
-				if (colname != NULL)
+				if (span != NULL)
 					vdbe_metadata_set_col_span(v, i, span);
 			}
 		} else {
