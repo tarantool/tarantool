@@ -650,7 +650,7 @@ const char *
 xdir_format_filename(struct xdir *dir, int64_t signature,
 		enum log_suffix suffix)
 {
-	return tt_snprintf(PATH_MAX + 1, "%s/%020lld%s%s",
+	return tt_snprintf(PATH_MAX, "%s/%020lld%s%s",
 			   dir->dirname, (long long) signature,
 			   dir->filename_ext, suffix == INPROGRESS ?
 					      inprogress_suffix : "");
