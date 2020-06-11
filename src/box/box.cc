@@ -2373,7 +2373,7 @@ box_is_configured(void)
 	return is_box_configured;
 }
 
-static inline void
+static void
 box_cfg_xc(void)
 {
 	/* Join the cord interconnect as "tx" endpoint. */
