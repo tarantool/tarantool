@@ -975,10 +975,16 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 						    DUP_REPLACE_OR_INSERT;
 	state->rc = index_replace(state->index, stmt->old_tuple,
 				  stmt->new_tuple, mode, &delete);
-
 	if (state->rc != 0) {
 		diag_move(diag_get(), &state->diag);
+		return 0;
 	}
+	/*
+	 * All tuples stored in a memtx space must be
+	 * referenced by the primary index.
+	 */
+	if (state->index->def->iid == 0 && stmt->new_tuple != NULL)
+		tuple_ref(stmt->new_tuple);
 	return 0;
 }
 
