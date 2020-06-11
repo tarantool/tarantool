@@ -335,7 +335,7 @@ xdir_create(struct xdir *dir, const char *dirname, enum xdir_type type,
 	/* Default mode. */
 	dir->mode = 0660;
 	dir->instance_uuid = instance_uuid;
-	snprintf(dir->dirname, PATH_MAX, "%s", dirname);
+	snprintf(dir->dirname, sizeof(dir->dirname), "%s", dirname);
 	dir->open_wflags = 0;
 	switch (type) {
 	case SNAP:

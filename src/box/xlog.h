@@ -162,7 +162,7 @@ struct xdir {
 	/**
 	 * Directory path.
 	 */
-	char dirname[PATH_MAX+1];
+	char dirname[PATH_MAX];
 	/** Snapshots or xlogs */
 	enum xdir_type type;
 };
