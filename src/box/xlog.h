@@ -352,7 +352,7 @@ struct xlog {
 	 */
 	int64_t tx_rows;
 	/** Log file name. */
-	char filename[PATH_MAX + 1];
+	char filename[PATH_MAX];
 	/** Whether this file has .inprogress suffix. */
 	bool is_inprogress;
 	/*

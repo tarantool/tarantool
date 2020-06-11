@@ -822,7 +822,7 @@ xlog_create(struct xlog *xlog, const char *name, int flags,
 
 	xlog->meta = *meta;
 	xlog->is_inprogress = true;
-	snprintf(xlog->filename, PATH_MAX, "%s%s", name, inprogress_suffix);
+	snprintf(xlog->filename, sizeof(xlog->filename), "%s%s", name, inprogress_suffix);
 
 	flags |= O_RDWR | O_CREAT | O_EXCL;
 
@@ -881,7 +881,9 @@ xlog_open(struct xlog *xlog, const char *name, const struct xlog_opts *opts)
 	if (xlog_init(xlog, opts) != 0)
 		goto err;
 
-	strncpy(xlog->filename, name, PATH_MAX);
+	strncpy(xlog->filename, name, sizeof(xlog->filename));
+	xlog->filename[sizeof(xlog->filename) - 1] = '\0';
+
 	xlog->fd = open(xlog->filename, O_RDWR);
 	if (xlog->fd < 0) {
 		say_syserror("open, [%s]", name);
