@@ -649,13 +649,13 @@ enum xlog_cursor_state {
 /**
  * Xlog cursor, read rows from xlog
  */
-struct xlog_cursor
-{
+struct xlog_cursor {
+	/** cursor current state */
 	enum xlog_cursor_state state;
-	/** xlog meta info */
-	struct xlog_meta meta;
 	/** file descriptor or -1 for in memory */
 	int fd;
+	/** xlog meta info */
+	struct xlog_meta meta;
 	/** associated file name */
 	char name[PATH_MAX];
 	/** file read buffer */
