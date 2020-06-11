@@ -1,0 +1,32 @@
+test_run = require('test_run').new()
+errinj = box.error.injection
+
+space = box.schema.space.create('gh-4973-alter', {engine = 'memtx'})
+space:format({ {'key', 'unsigned'}, {'value', 'string'}, {'key_new', 'unsigned'} })
+index = space:create_index('primary', {parts = {'key'}})
+
+N = 10000
+value = string.rep('a', 10)
+box.atomic(function() for i = 1, N do space:insert({i, value, i}) end end)
+
+test_run:cmd("setopt delimiter ';'")
+function random_update()
+    local x = space.index.primary:random(math.random(N))
+    local op = math.random(10)
+    if op < 10 then space:update({x[1]}, {{'=', 2, string.rep('b', 10)}}) end
+    if op == 10 then space:delete({x[1]}) end
+end;
+
+finished_updates = false;
+fiber = require('fiber');
+updater = fiber.create(function()
+    for _ = 1, N do random_update() end
+    finished_updates = true
+end)
+test_run:cmd("setopt delimiter ''");
+
+space.index.primary:alter({parts = {'key_new'}})
+errinj.set('ERRINJ_BUILD_INDEX_DELAY', true)
+test_run:wait_cond(function() return finished_updates end, 5)
+errinj.set('ERRINJ_BUILD_INDEX_DELAY', false)
+box.snapshot()
