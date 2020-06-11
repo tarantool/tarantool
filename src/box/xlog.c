@@ -1970,7 +1970,7 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 		diag_set(XlogError, "Unexpected end of file, run with 'force_recovery = true'");
 		goto error;
 	}
-	snprintf(i->name, PATH_MAX, "%s", name);
+	snprintf(i->name, sizeof(i->name), "%s", name);
 	i->zdctx = ZSTD_createDStream();
 	if (i->zdctx == NULL) {
 		diag_set(ClientError, ER_DECOMPRESSION,
@@ -2027,7 +2027,7 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 		diag_set(XlogError, "Unexpected end of file");
 		goto error;
 	}
-	snprintf(i->name, PATH_MAX, "%s", name);
+	snprintf(i->name, sizeof(i->name), "%s", name);
 	i->zdctx = ZSTD_createDStream();
 	if (i->zdctx == NULL) {
 		diag_set(ClientError, ER_DECOMPRESSION,
