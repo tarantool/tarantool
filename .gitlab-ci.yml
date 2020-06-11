@@ -18,7 +18,7 @@ variables:
 
 .pack_only_template: &pack_only_definition
   except:
-    - master
+    - "2.3"
 
 .perf_only_template: &perf_only_definition
   only:
