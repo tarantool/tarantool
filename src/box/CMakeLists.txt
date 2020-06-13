@@ -1,11 +1,10 @@
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/box/lua)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/box/sql)
 
 # Sometimes 'spying' code is not acceptable even if it would be
 # disabled by default. That option allows to remove the feedback
 # daemon from the build completely.
 option(ENABLE_FEEDBACK_DAEMON "Feedback daemon which reports debug data to the Tarantool team" ON)
-
-add_subdirectory(sql)
 
 set(lua_sources)
 lua_source(lua_sources lua/load_cfg.lua)
@@ -24,6 +23,52 @@ lua_source(lua_sources lua/key_def.lua)
 lua_source(lua_sources lua/merger.lua)
 set(bin_sources)
 bin_source(bin_sources bootstrap.snap bootstrap.h)
+
+set(sql_sources
+    sql/opcodes.c
+    sql/parse.c
+    sql/alter.c
+    sql/analyze.c
+    sql/cursor.c
+    sql/build.c
+    sql/callback.c
+    sql/date.c
+    sql/delete.c
+    sql/expr.c
+    sql/fk_constraint.c
+    sql/func.c
+    sql/global.c
+    sql/hash.c
+    sql/insert.c
+    sql/legacy.c
+    sql/main.c
+    sql/malloc.c
+    sql/os.c
+    sql/os_unix.c
+    sql/parse_def.c
+    sql/pragma.c
+    sql/prepare.c
+    sql/printf.c
+    sql/random.c
+    sql/resolve.c
+    sql/select.c
+    sql/tokenize.c
+    sql/treeview.c
+    sql/trigger.c
+    sql/utf.c
+    sql/update.c
+    sql/util.c
+    sql/vdbe.c
+    sql/vdbeapi.c
+    sql/vdbeaux.c
+    sql/vdbemem.c
+    sql/vdbesort.c
+    sql/vdbetrace.c
+    sql/walker.c
+    sql/where.c
+    sql/wherecode.c
+    sql/whereexpr.c
+)
 
 add_custom_target(box_generate_lua_sources
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box
@@ -143,6 +188,7 @@ add_library(box STATIC
     wal.c
     call.c
     merger.c
+    ${sql_sources}
     ${lua_sources}
     lua/init.c
     lua/call.c
@@ -167,6 +213,53 @@ add_library(box STATIC
     lua/merger.c
     ${bin_sources})
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_definitions(-DSQL_DEBUG=1)
+endif()
+add_definitions(-DSQL_OMIT_AUTOMATIC_INDEX=1 -DSQL_TEST=1)
+
+set(EXT_SRC_DIR ${CMAKE_SOURCE_DIR}/extra)
+set(EXT_BIN_DIR ${CMAKE_BINARY_DIR}/extra)
+set(SQL_SRC_DIR ${CMAKE_SOURCE_DIR}/src/box/sql)
+set(SQL_BIN_DIR ${CMAKE_BINARY_DIR}/src/box/sql)
+
+include_directories(${SQL_SRC_DIR})
+include_directories(${SQL_BIN_DIR})
+
+add_custom_target(generate_sql_files DEPENDS
+    sql/parse.h
+    sql/keywordhash.h
+    sql/parse.y
+    sql/parse.c
+    sql/opcodes.c)
+
+add_custom_command(OUTPUT ${SQL_BIN_DIR}/keywordhash.h
+    COMMAND ${EXT_BIN_DIR}/mkkeywordhash > keywordhash.h.tmp
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different keywordhash.h.tmp keywordhash.h
+    COMMAND ${CMAKE_COMMAND} -E remove keywordhash.h.tmp
+    WORKING_DIRECTORY "${SQL_BIN_DIR}"
+    DEPENDS mkkeywordhash)
+
+add_custom_command(OUTPUT ${SQL_BIN_DIR}/parse.h ${SQL_BIN_DIR}/parse.c
+    COMMAND ${EXT_BIN_DIR}/lemon -T${EXT_SRC_DIR}/lempar.c -o${SQL_BIN_DIR}/parse.c ${SQL_SRC_DIR}/parse.y
+    COMMAND ${CMAKE_COMMAND} -E copy parse.h parse.h.tmp
+    COMMAND ${EXT_SRC_DIR}/addopcodes.sh parse.h.tmp > parse.h
+    COMMAND ${CMAKE_COMMAND} -E remove parse.h.tmp parse.out
+    WORKING_DIRECTORY "${SQL_BIN_DIR}"
+    DEPENDS lemon ${SQL_SRC_DIR}/parse.y)
+
+add_custom_command(OUTPUT ${SQL_BIN_DIR}/opcodes.h
+    COMMAND cat parse.h ${SQL_SRC_DIR}/vdbe.c | ${EXT_SRC_DIR}/mkopcodeh.sh > opcodes.h
+    WORKING_DIRECTORY "${SQL_BIN_DIR}"
+    DEPENDS ${SQL_SRC_DIR}/vdbe.c ${EXT_SRC_DIR}/mkopcodeh.sh ${SQL_BIN_DIR}/parse.h)
+
+add_custom_command(OUTPUT ${SQL_BIN_DIR}/opcodes.c
+    COMMAND ${EXT_SRC_DIR}/mkopcodec.sh opcodes.h > opcodes.c
+    WORKING_DIRECTORY "${SQL_BIN_DIR}"
+    DEPENDS ${SQL_SRC_DIR}/vdbe.c ${EXT_SRC_DIR}/mkopcodec.sh ${SQL_BIN_DIR}/parse.h
+        ${SQL_BIN_DIR}/opcodes.h)
+
 target_link_libraries(box box_error tuple stat xrow xlog vclock crc32 scramble
-                      sql ${common_libraries})
-add_dependencies(box build_bundled_libs)
+                      ${common_libraries})
+
+add_dependencies(box build_bundled_libs generate_sql_files)

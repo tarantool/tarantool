@@ -266,7 +266,7 @@ add_executable(
     ${LIBUTIL_FREEBSD_SRC}/flopen.c
     ${LIBUTIL_FREEBSD_SRC}/pidfile.c)
 
-add_dependencies(tarantool build_bundled_libs sql)
+add_dependencies(tarantool build_bundled_libs)
 target_link_libraries(tarantool box ${common_libraries})
 
 if (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD)
