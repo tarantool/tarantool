@@ -269,19 +269,45 @@ macro(enable_tnt_compile_flags)
         if (NOT CMAKE_COMPILER_IS_CLANG)
             message(FATAL_ERROR "Undefined behaviour sanitizer only available for clang")
         else()
-            set(SANITIZE_FLAGS "-fsanitize=undefined -fno-sanitize-recover=undefined")
+            string(JOIN "," SANITIZE_FLAGS
+                alignment bool bounds builtin enum float-cast-overflow
+                float-divide-by-zero function integer-divide-by-zero return
+                shift unreachable vla-bound
+            )
+
+            # Exclude "object-size".
+            # Gives compilation warnings when -O0 is used, which is always,
+            # because some tests build with -O0.
+
+            # Exclude "pointer-overflow".
             # Stailq data structure subtracts a positive value from NULL.
-            set(SANITIZE_FLAGS ${SANITIZE_FLAGS} -fno-sanitize=pointer-overflow)
+
+            # Exclude "vptr".
             # Intrusive data structures may abuse '&obj->member' on pointer
             # 'obj' which is not really a pointer at an object of its type.
             # For example, rlist uses '&item->member' expression in macro cycles
             # to check end of cycle, but on the last iteration 'item' points at
             # the list metadata head, not at an object of type stored in this
             # list.
-            set(SANITIZE_FLAGS ${SANITIZE_FLAGS} -fno-sanitize=vptr)
+
+            # Exclude "implicit-signed-integer-truncation",
+            # "implicit-integer-sign-change", "signed-integer-overflow".
             # Integer overflow and truncation are disabled due to extensive
             # usage of this UB in SQL code to 'implement' some kind of int65_t.
-            set(SANITIZE_FLAGS ${SANITIZE_FLAGS} -fno-sanitize=implicit-signed-integer-truncation -fno-sanitize=implicit-integer-sign-change -fno-sanitize=signed-integer-overflow)
+
+            # Exclude "null", "nonnull-attribute", "nullability-arg",
+            # "returns-nonnull-attribute", "nullability-assign",
+            # "nullability-return".
+            # NULL checking is disabled, because this is not a UB and raises
+            # lots of false-positive fails such as typeof(*obj) with
+            # obj == NULL, or memcpy() with NULL argument and 0 size. All
+            # nullability sanitations are disabled, because from the tests it
+            # seems they implicitly turn each other on, when one is used. For
+            # example, having "returns-nonnull-attribute" may lead to fail in
+            # the typeof(*obj) when obj is NULL, even though there is nothing
+            # related to return.
+
+            set(SANITIZE_FLAGS "-fsanitize=${SANITIZE_FLAGS} -fno-sanitize-recover=${SANITIZE_FLAGS}")
 
             add_compile_flags("C;CXX" "${SANITIZE_FLAGS}")
         endif()
