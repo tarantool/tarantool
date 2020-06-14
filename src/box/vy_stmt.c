@@ -198,6 +198,7 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t data_offset, uint32_t bsize)
 		tuple_format_ref(format);
 	tuple->bsize = bsize;
 	tuple->data_offset = data_offset;
+	tuple->is_dirty = false;
 	vy_stmt_set_lsn(tuple, 0);
 	vy_stmt_set_type(tuple, 0);
 	vy_stmt_set_flags(tuple, 0);
