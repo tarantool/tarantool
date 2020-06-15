@@ -790,7 +790,7 @@ vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
  * Binary search in page
  * In terms of STL, makes lower_bound for EQ,GE,LT and upper_bound for GT,LE
  * Additionally *equal_key argument is set to true if the found value is
- * equal to given key (untouched otherwise)
+ * equal to given key (set to false otherwise).
  * @retval position in the page
  */
 static uint32_t
@@ -800,6 +800,7 @@ vy_page_find_key(struct vy_page *page, struct vy_entry key,
 {
 	uint32_t beg = 0;
 	uint32_t end = page->row_count;
+	*equal_key = false;
 	/* for upper bound we change zero comparison result to -1 */
 	int zero_cmp = (iterator_type == ITER_GT ||
 			iterator_type == ITER_LE ? -1 : 0);
