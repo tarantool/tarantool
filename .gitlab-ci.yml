@@ -213,6 +213,21 @@ perf_bootstrap:
 
 # Testing part
 
+perf_tpch:
+  <<: *perf_docker_test_definition
+  tags:
+    - docker_sh2_perf
+  image: ${IMAGE_PERF_BUILT}_tpch
+  variables:
+    <<: *perf_vars_definition
+    BENCH: 'tpch'
+  artifacts:
+    when: always
+    paths:
+      - "bench-*.csv"
+      - "*_t_version.txt"
+      - "*_result.txt"
+
 perf_sysbench:
   <<: *perf_docker_test_definition
   tags:
