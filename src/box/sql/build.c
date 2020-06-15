@@ -743,6 +743,15 @@ vdbe_emit_open_cursor(struct Parse *parse_context, int cursor, int index_id,
 		      struct space *space)
 {
 	assert(space != NULL);
+	struct index *idx = index_find(space, index_id);
+	assert(idx != NULL);
+	if (idx->def->type != TREE) {
+		diag_set(ClientError, ER_UNSUPPORTED, "SQL",
+			 "using non-TREE index type. Please, use " \
+			 "INDEXED BY clause to force using proper index.");
+		parse_context->is_aborted = true;
+		return -1;
+	}
 	return sqlVdbeAddOp4(parse_context->pVdbe, OP_IteratorOpen, cursor,
 				 index_id, 0, (void *) space, P4_SPACEPTR);
 }
