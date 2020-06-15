@@ -1,7 +1,7 @@
 test_run = require('test_run').new()
 
 --
--- gh-3893: Replication failure: relay may report that an xlog
+-- gh-3883: Replication failure: relay may report that an xlog
 -- is corrupted if it it currently being written to.
 --
 s = box.schema.space.create('test')
@@ -38,7 +38,9 @@ test_run:cmd("setopt delimiter ''");
 -- are running in different threads, there shouldn't be any rw errors.
 test_run:cmd("switch replica")
 box.cfg{replication = replication}
-box.info.replication[1].downstream.status ~= 'stopped' or box.info
+test_run:wait_cond(function()                                     \
+    return box.info.replication[1].downstream.status ~= 'stopped' \
+end) or box.info
 test_run:cmd("switch default")
 
 -- Cleanup.
