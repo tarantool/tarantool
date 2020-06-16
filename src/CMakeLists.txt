@@ -21,6 +21,7 @@ include_directories(${LIBUTIL_FREEBSD_SRC})
 # Compile src/lua/*.lua files into src/lua/*.lua.c sources
 set(lua_sources)
 lua_source(lua_sources lua/init.lua)
+lua_source(lua_sources lua/require.lua)
 lua_source(lua_sources lua/debug.lua)
 lua_source(lua_sources lua/string.lua)
 lua_source(lua_sources lua/fiber.lua)

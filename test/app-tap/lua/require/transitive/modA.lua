@@ -1,0 +1,1 @@
+require('transitive.modB')
