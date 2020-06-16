@@ -14,7 +14,8 @@ test_run:cmd("setopt delimiter ';'");
  | ---
  | - true
  | ...
-box.execute([[SET SESSION "sql_full_metadata" = true;]]);
+box.execute([[update "_session_settings" set "value" = true
+              where "name" = 'sql_full_metadata';]]);
  | ---
  | - row_count: 1
  | ...
@@ -42,7 +43,8 @@ box.execute("SELECT * FROM test;");
 --
 -- Cleanup.
 --
-box.execute([[SET SESSION "sql_full_metadata" = false;]]);
+box.execute([[update "_session_settings" set "value" = false
+              where "name" = 'sql_full_metadata';]]);
  | ---
  | - row_count: 1
  | ...

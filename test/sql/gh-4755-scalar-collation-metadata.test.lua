@@ -6,7 +6,8 @@ test_run = env.new()
 -- string and scalar field types.
 --
 test_run:cmd("setopt delimiter ';'");
-box.execute([[SET SESSION "sql_full_metadata" = true;]]);
+box.execute([[update "_session_settings" set "value" = true
+              where "name" = 'sql_full_metadata';]]);
 box.execute([[CREATE TABLE test (a SCALAR COLLATE "unicode_ci" PRIMARY KEY,
                                  b STRING COLLATE "unicode_ci");]]);
 box.execute("SELECT * FROM test;");
@@ -14,5 +15,6 @@ box.execute("SELECT * FROM test;");
 --
 -- Cleanup.
 --
-box.execute([[SET SESSION "sql_full_metadata" = false;]]);
+box.execute([[update "_session_settings" set "value" = false
+              where "name" = 'sql_full_metadata';]]);
 box.execute("DROP TABLE test;");
