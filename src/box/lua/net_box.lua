@@ -483,8 +483,11 @@ local function create_transport(host, port, user, password, callback,
     local function perform_async_request(buffer, method, on_push, on_push_ctx,
                                          ...)
         if state ~= 'active' and state ~= 'fetch_schema' then
-            return nil, box.error.new({code = last_errno or E_NO_CONNECTION,
-                                       reason = last_error})
+            local code = last_errno or E_NO_CONNECTION
+            local msg = last_error or
+                string.format('Connection is not established, state is "%s"',
+                              state)
+            return nil, box.error.new({code = code, reason = msg})
         end
         -- alert worker to notify it of the queued outgoing data;
         -- if the buffer wasn't empty, assume the worker was already alerted
