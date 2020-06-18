@@ -184,8 +184,12 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn);
 /**
  * Block the current fiber until the transaction in the limbo
  * entry is either committed or rolled back.
+ * If timeout is reached before acks are collected, the tx is
+ * rolled back as well as all the txs in the limbo following it.
+ * Returns -1 when rollback was performed and tx has to be freed.
+ *          0 when tx processing can go on.
  */
-void
+int
 txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry);
 
 /**
@@ -193,6 +197,12 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry);
  */
 void
 txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn);
+
+/**
+ * Rollback all the entries  starting with given master's LSN.
+ */
+void
+txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn);
 
 double
 txn_limbo_confirm_timeout(struct txn_limbo *limbo);

@@ -343,7 +343,7 @@ apply_wal_row(struct xstream *stream, struct xrow_header *row)
 {
 	struct request request;
 	// TODO: process confirmation during recovery.
-	if (row->type == IPROTO_CONFIRM)
+	if (iproto_type_is_synchro_request(row->type))
 		return;
 	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));
 	if (request.type != IPROTO_NOP) {

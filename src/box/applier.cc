@@ -256,19 +256,25 @@ process_nop(struct request *request)
 }
 
 /*
- * CONFIRM rows aren't dml requests  and require special
+ * CONFIRM/ROLLBACK rows aren't dml requests  and require special
  * handling: instead of performing some operations on spaces,
- * processing these requests required txn_limbo to confirm some
- * of its entries.
+ * processing these requests requires txn_limbo to either confirm
+ * or rollback some of its entries.
  */
 static int
-process_confirm(struct request *request)
+process_confirm_rollback(struct request *request, bool is_confirm)
 {
-	assert(request->header->type == IPROTO_CONFIRM);
+	assert(iproto_type_is_synchro_request(request->header->type));
 	uint32_t replica_id;
 	struct txn *txn = in_txn();
 	int64_t lsn = 0;
-	if (xrow_decode_confirm(request->header, &replica_id, &lsn) != 0)
+
+	int res = 0;
+	if (is_confirm)
+		res = xrow_decode_confirm(request->header, &replica_id, &lsn);
+	else
+		res = xrow_decode_rollback(request->header, &replica_id, &lsn);
+	if (res == -1)
 		return -1;
 
 	if (replica_id != txn_limbo.instance_id) {
@@ -289,7 +295,10 @@ process_confirm(struct request *request)
 		return -1;
 
 	if (txn_commit_stmt(txn, request) == 0) {
-		txn_limbo_read_confirm(&txn_limbo, lsn);
+		if (is_confirm)
+			txn_limbo_read_confirm(&txn_limbo, lsn);
+		else
+			txn_limbo_read_rollback(&txn_limbo, lsn);
 		return 0;
 	} else {
 		return -1;
@@ -300,9 +309,10 @@ static int
 apply_row(struct xrow_header *row)
 {
 	struct request request;
-	if (row->type == IPROTO_CONFIRM) {
+	if (iproto_type_is_synchro_request(row->type)) {
 		request.header = row;
-		return process_confirm(&request);
+		return process_confirm_rollback(&request,
+						row->type == IPROTO_CONFIRM);
 	}
 	if (xrow_decode_dml(row, &request, dml_request_key_map(row->type)) != 0)
 		return -1;
@@ -325,7 +335,7 @@ apply_final_join_row(struct xrow_header *row)
 	 * Confirms are ignored during join. All the data master
 	 * sends us is valid.
 	 */
-	if (row->type == IPROTO_CONFIRM)
+	if (iproto_type_is_synchro_request(row->type))
 		return 0;
 	struct txn *txn = txn_begin();
 	if (txn == NULL)
@@ -754,6 +764,14 @@ static int
 applier_txn_rollback_cb(struct trigger *trigger, void *event)
 {
 	(void) trigger;
+	struct txn *txn = (struct txn *) event;
+	/*
+	 * Synchronous transaction rollback due to receiving a
+	 * ROLLBACK entry is a normal event and requires no
+	 * special handling.
+	 */
+	if (txn->signature == TXN_SIGNATURE_SYNC_ROLLBACK)
+		return 0;
 
 	/*
 	 * Setup shared applier diagnostic area.

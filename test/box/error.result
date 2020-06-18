@@ -434,6 +434,8 @@ t;
  |   213: box.error.NO_SUCH_SESSION_SETTING
  |   214: box.error.UNCOMMITTED_FOREIGN_SYNC_TXNS
  |   215: box.error.SYNC_MASTER_MISMATCH
+ |   216: box.error.SYNC_QUORUM_TIMEOUT
+ |   217: box.error.SYNC_ROLLBACK
  | ...
 
 test_run:cmd("setopt delimiter ''");
