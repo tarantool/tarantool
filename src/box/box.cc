@@ -118,6 +118,8 @@ static struct gc_checkpoint_ref backup_gc;
 static bool is_box_configured = false;
 static bool is_ro = true;
 static fiber_cond ro_cond;
+/** Set to true during recovery from local files. */
+static bool is_local_recovery = false;
 
 /**
  * The following flag is set if the instance failed to
@@ -206,7 +208,24 @@ box_process_rw(struct request *request, struct space *space,
 		goto rollback;
 
 	if (is_autocommit) {
-		if (txn_commit(txn) != 0)
+		int res = 0;
+		/*
+		 * During local recovery the commit procedure
+		 * should be async, otherwise the only fiber
+		 * processing recovery will get stuck on the first
+		 * synchronous tx it meets until confirm timeout
+		 * is reached and the tx is rolled back, yielding
+		 * an error.
+		 * Moreover, txn_commit_async() doesn't hurt at
+		 * all during local recovery, since journal_write
+		 * is faked at this stage and returns immediately.
+		 */
+		if (is_local_recovery) {
+			res = txn_commit_async(txn);
+		} else {
+			res = txn_commit(txn);
+		}
+		if (res < 0)
 			goto error;
 	        fiber_gc();
 	}
@@ -327,13 +346,25 @@ recovery_journal_write(struct journal *base,
 	return 0;
 }
 
+static int
+recovery_journal_write_async(struct journal *base,
+			     struct  journal_entry *entry)
+{
+	recovery_journal_write(base, entry);
+	/*
+	 * Since there're no actual writes, fire a
+	 * journal_async_complete callback right away.
+	 */
+	journal_async_complete(base, entry);
+	return 0;
+}
+
 static void
 recovery_journal_create(struct vclock *v)
 {
 	static struct recovery_journal journal;
-	journal_create(&journal.base, journal_no_write_async,
-		       journal_no_write_async_cb,
-		       recovery_journal_write);
+	journal_create(&journal.base, recovery_journal_write_async,
+		       txn_complete_async, recovery_journal_write);
 	journal.vclock = v;
 	journal_set(&journal.base);
 }
@@ -2315,6 +2346,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 	assert(memtx != NULL);
 
+	is_local_recovery = true;
 	recovery_journal_create(&recovery->vclock);
 
 	/*
@@ -2356,6 +2388,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		box_sync_replication(false);
 	}
 	recovery_finalize(recovery);
+	is_local_recovery = false;
 
 	/*
 	 * We must enable WAL before finalizing engine recovery,
