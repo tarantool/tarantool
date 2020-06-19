@@ -37,7 +37,7 @@ journal_no_write_async(struct journal *journal,
 		       struct journal_entry *entry)
 {
 	(void)journal;
-	assert(true);
+	assert(false);
 
 	errno = EINVAL;
 	diag_set(SystemError, "write_async wrong context");
@@ -49,7 +49,7 @@ journal_no_write_async(struct journal *journal,
 void
 journal_no_write_async_cb(struct journal_entry *entry)
 {
-	assert(true);
+	assert(false);
 
 	errno = EINVAL;
 	diag_set(SystemError, "write_async_cb wrong context");
