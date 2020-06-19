@@ -373,9 +373,25 @@ static void
 apply_wal_row(struct xstream *stream, struct xrow_header *row)
 {
 	struct request request;
-	// TODO: process confirmation during recovery.
-	if (iproto_type_is_synchro_request(row->type))
+	if (iproto_type_is_synchro_request(row->type)) {
+		uint32_t replica_id;
+		int64_t lsn;
+		switch(row->type) {
+		case IPROTO_CONFIRM:
+			if (xrow_decode_confirm(row, &replica_id, &lsn) < 0)
+				diag_raise();
+			assert(txn_limbo.instance_id == replica_id);
+			txn_limbo_read_confirm(&txn_limbo, lsn);
+			break;
+		case IPROTO_ROLLBACK:
+			if (xrow_decode_rollback(row, &replica_id, &lsn) < 0)
+				diag_raise();
+			assert(txn_limbo.instance_id == replica_id);
+			txn_limbo_read_rollback(&txn_limbo, lsn);
+			break;
+		}
 		return;
+	}
 	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));
 	if (request.type != IPROTO_NOP) {
 		struct space *space = space_cache_find_xc(request.space_id);
