@@ -4,6 +4,14 @@ local tap = require('tap')
 local ffi = require('ffi')
 local json = require('json')
 local fun = require('fun')
+
+-- XXX fix for gh-4252: to prevent invalid trace assembling (see
+-- https://github.com/LuaJIT/LuaJIT/issues/584) disable JIT for
+-- <fun.chain> iterator (i.e. <chain_gen_r1>). Since the function
+-- is local, the dummy chain generator is created to obtain the
+-- function GC object.
+jit.off(fun.chain({}).gen)
+
 local key_def_lib = require('key_def')
 
 local usage_error = 'Bad params, use: key_def.new({' ..
