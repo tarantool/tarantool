@@ -97,6 +97,29 @@ enum {
 	TXN_SUB_STMT_MAX = 3
 };
 
+enum {
+	/** Signature set for empty transactions. */
+	TXN_SIGNATURE_NOP = 0,
+	/**
+	 * The default signature value for failed transactions.
+	 * Indicates either write failure or any other failure
+	 * not caused by synchronous transaction processing.
+	 */
+	TXN_SIGNATURE_ROLLBACK = -1,
+	/**
+	 * A value set for failed synchronous transactions
+	 * on master, when not enough acks were collected.
+	 */
+	TXN_SIGNATURE_QUORUM_TIMEOUT = -2,
+	/**
+	 * A value set for failed synchronous transactions
+	 * on replica (or any instance during recovery), when a
+	 * transaction is rolled back because ROLLBACK message was
+	 * read.
+	 */
+	TXN_SIGNATURE_SYNC_ROLLBACK = -3,
+};
+
 /**
  * A single statement of a multi-statement
  * transaction: undo and redo info.

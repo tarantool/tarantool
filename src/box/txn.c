@@ -223,7 +223,7 @@ txn_begin(void)
 	txn->flags = 0;
 	txn->in_sub_stmt = 0;
 	txn->id = ++tsn;
-	txn->signature = -1;
+	txn->signature = TXN_SIGNATURE_ROLLBACK;
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
 	txn->fk_deferred_count = 0;
@@ -620,7 +620,7 @@ static bool
 txn_commit_nop(struct txn *txn)
 {
 	if (txn->n_new_rows + txn->n_applier_rows == 0) {
-		txn->signature = 0;
+		txn->signature = TXN_SIGNATURE_NOP;
 		txn_complete(txn);
 		fiber_set_txn(fiber(), NULL);
 		return true;
@@ -774,7 +774,7 @@ txn_rollback(struct txn *txn)
 	trigger_clear(&txn->fiber_on_stop);
 	if (!txn_has_flag(txn, TXN_CAN_YIELD))
 		trigger_clear(&txn->fiber_on_yield);
-	txn->signature = -1;
+	txn->signature = TXN_SIGNATURE_ROLLBACK;
 	txn_complete(txn);
 	fiber_set_txn(fiber(), NULL);
 }
