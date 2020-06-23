@@ -561,9 +561,7 @@ sqlVdbeMemRealify(Mem * pMem)
 	double v;
 	if (sqlVdbeRealValue(pMem, &v))
 		return -1;
-
-	pMem->u.r = v;
-	MemSetTypeFlag(pMem, MEM_Real);
+	mem_set_double(pMem, v);
 	return 0;
 }
 
@@ -583,9 +581,10 @@ vdbe_mem_numerify(struct Mem *mem)
 	if (sql_atoi64(mem->z, &i, &is_neg, mem->n) == 0) {
 		mem_set_int(mem, i, is_neg);
 	} else {
-		if (sqlAtoF(mem->z, &mem->u.r, mem->n) == 0)
+		double d;
+		if (sqlAtoF(mem->z, &d, mem->n) == 0)
 			return -1;
-		MemSetTypeFlag(mem, MEM_Real);
+		mem_set_double(mem, d);
 	}
 	return 0;
 }
@@ -839,18 +838,14 @@ mem_set_int(struct Mem *mem, int64_t value, bool is_neg)
 	}
 }
 
-/*
- * Delete any previous value and set the value stored in *pMem to val,
- * manifest type REAL.
- */
 void
-sqlVdbeMemSetDouble(Mem * pMem, double val)
+mem_set_double(struct Mem *mem, double value)
 {
-	sqlVdbeMemSetNull(pMem);
-	if (!sqlIsNaN(val)) {
-		pMem->u.r = val;
-		pMem->flags = MEM_Real;
-	}
+	sqlVdbeMemSetNull(mem);
+	if (sqlIsNaN(value))
+		return;
+	mem->u.r = value;
+	MemSetTypeFlag(mem, MEM_Real);
 }
 
 /*

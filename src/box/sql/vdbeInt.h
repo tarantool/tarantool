@@ -517,7 +517,10 @@ mem_set_u64(struct Mem *mem, uint64_t value);
 void
 mem_set_int(struct Mem *mem, int64_t value, bool is_neg);
 
-void sqlVdbeMemSetDouble(Mem *, double);
+/** Set double value and MEM_Real flag. */
+void
+mem_set_double(struct Mem *mem, double value);
+
 void sqlVdbeMemInit(Mem *, sql *, u32);
 void sqlVdbeMemSetNull(Mem *);
 void sqlVdbeMemSetZeroBlob(Mem *, int);

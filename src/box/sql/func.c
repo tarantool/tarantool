@@ -267,10 +267,10 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 			mem_set_bool(&val[i], field.bval);
 			break;
 		case MP_FLOAT:
-			sqlVdbeMemSetDouble(&val[i], field.fval);
+			mem_set_double(&val[i], field.fval);
 			break;
 		case MP_DOUBLE:
-			sqlVdbeMemSetDouble(&val[i], field.dval);
+			mem_set_double(&val[i], field.dval);
 			break;
 		case MP_INT:
 			mem_set_i64(&val[i], field.ival);
@@ -338,10 +338,10 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 			mem_set_bool(&val[i], mp_decode_bool(&data));
 			break;
 		case MP_FLOAT:
-			sqlVdbeMemSetDouble(&val[i], mp_decode_float(&data));
+			mem_set_double(&val[i], mp_decode_float(&data));
 			break;
 		case MP_DOUBLE:
-			sqlVdbeMemSetDouble(&val[i], mp_decode_double(&data));
+			mem_set_double(&val[i], mp_decode_double(&data));
 			break;
 		case MP_INT:
 			mem_set_i64(&val[i], mp_decode_int(&data));

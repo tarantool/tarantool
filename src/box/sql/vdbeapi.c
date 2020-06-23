@@ -330,7 +330,7 @@ sql_result_blob64(sql_context * pCtx,
 void
 sql_result_double(sql_context * pCtx, double rVal)
 {
-	sqlVdbeMemSetDouble(pCtx->pOut, rVal);
+	mem_set_double(pCtx->pOut, rVal);
 }
 
 void
@@ -1021,7 +1021,7 @@ sql_bind_double(sql_stmt * pStmt, int i, double rValue)
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	int rc = sql_bind_type(p, i, "numeric");
-	sqlVdbeMemSetDouble(&p->aVar[i - 1], rValue);
+	mem_set_double(&p->aVar[i - 1], rValue);
 	return rc;
 }
 

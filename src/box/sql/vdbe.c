@@ -271,8 +271,7 @@ mem_apply_numeric_type(struct Mem *record)
 	double float_value;
 	if (sqlAtoF(record->z, &float_value, record->n) == 0)
 		return -1;
-	record->u.r = float_value;
-	MemSetTypeFlag(record, MEM_Real);
+	mem_set_double(record, float_value);
 	return 0;
 }
 
@@ -1198,9 +1197,8 @@ case OP_Int64: {           /* out2 */
  */
 case OP_Real: {            /* same as TK_FLOAT, out2 */
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
-	pOut->flags = MEM_Real;
 	assert(!sqlIsNaN(*pOp->p4.pReal));
-	pOut->u.r = *pOp->p4.pReal;
+	mem_set_double(pOut, *pOp->p4.pReal);
 	break;
 }
 
@@ -1673,8 +1671,7 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 		if (sqlIsNaN(rB)) {
 			goto arithmetic_result_is_null;
 		}
-		pOut->u.r = rB;
-		MemSetTypeFlag(pOut, MEM_Real);
+		mem_set_double(pOut, rB);
 	}
 	break;
 
