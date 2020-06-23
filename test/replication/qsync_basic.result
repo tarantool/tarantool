@@ -69,3 +69,135 @@ box.schema.create_space('test', {is_sync = true, is_local = true})
  | ---
  | - error: 'Failed to create space ''test'': local space can''t be synchronous'
  | ...
+
+--
+-- gh-4847, gh-4848: CONFIRM and ROLLBACK entries in WAL.
+--
+env = require('test_run')
+ | ---
+ | ...
+test_run = env.new()
+ | ---
+ | ...
+fiber = require('fiber')
+ | ---
+ | ...
+engine = test_run:get_cfg('engine')
+ | ---
+ | ...
+
+box.schema.user.grant('guest', 'replication')
+ | ---
+ | ...
+-- Set up synchronous replication options.
+quorum = box.cfg.replication_synchro_quorum
+ | ---
+ | ...
+timeout = box.cfg.replication_synchro_timeout
+ | ---
+ | ...
+box.cfg{replication_synchro_quorum=2, replication_synchro_timeout=0.1}
+ | ---
+ | ...
+
+test_run:cmd('create server replica with rpl_master=default,\
+                                         script="replication/replica.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server replica with wait=True, wait_load=True')
+ | ---
+ | - true
+ | ...
+
+_ = box.schema.space.create('sync', {is_sync=true, engine=engine})
+ | ---
+ | ...
+_ = box.space.sync:create_index('pk')
+ | ---
+ | ...
+
+lsn = box.info.lsn
+ | ---
+ | ...
+box.space.sync:insert{1}
+ | ---
+ | - [1]
+ | ...
+-- 1 for insertion, 1 for CONFIRM message.
+box.info.lsn - lsn
+ | ---
+ | - 2
+ | ...
+-- Raise quorum so that master has to issue a ROLLBACK.
+box.cfg{replication_synchro_quorum=3}
+ | ---
+ | ...
+t = fiber.time()
+ | ---
+ | ...
+box.space.sync:insert{2}
+ | ---
+ | - error: Quorum collection for a synchronous transaction is timed out
+ | ...
+-- Check that master waited for acks.
+fiber.time() - t > box.cfg.replication_synchro_timeout
+ | ---
+ | - true
+ | ...
+box.cfg{replication_synchro_quorum=2}
+ | ---
+ | ...
+box.space.sync:insert{3}
+ | ---
+ | - [3]
+ | ...
+box.space.sync:select{}
+ | ---
+ | - - [1]
+ |   - [3]
+ | ...
+
+-- Check consistency on replica.
+test_run:cmd('switch replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:select{}
+ | ---
+ | - - [1]
+ |   - [3]
+ | ...
+
+-- Check consistency in recovered data.
+test_run:cmd('restart server replica')
+ | 
+box.space.sync:select{}
+ | ---
+ | - - [1]
+ |   - [3]
+ | ...
+
+-- Cleanup.
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+
+box.cfg{replication_synchro_quorum=quorum, replication_synchro_timeout=timeout}
+ | ---
+ | ...
+test_run:cmd('stop server replica')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:drop()
+ | ---
+ | ...
+box.schema.user.revoke('guest', 'replication')
+ | ---
+ | ...
