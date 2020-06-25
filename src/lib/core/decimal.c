@@ -112,7 +112,19 @@ decimal_zero(decimal_t *dec)
 decimal_t *
 decimal_from_string(decimal_t *dec, const char *str)
 {
-	decNumberFromString(dec, str, &decimal_context);
+	const char *end = decNumberFromString(dec, str, &decimal_context);
+	if (*end != '\0') {
+		decContextZeroStatus(&decimal_context);
+		return NULL;
+	}
+	return decimal_check_status(dec, &decimal_context);
+}
+
+decimal_t *
+strtodec(decimal_t *dec, const char *str, const char **endptr) {
+	const char *end = decNumberFromString(dec, str, &decimal_context);
+	if (endptr != NULL)
+		*endptr = end;
 	return decimal_check_status(dec, &decimal_context);
 }
 

@@ -78,6 +78,21 @@ decimal_t *
 decimal_from_string(decimal_t *dec, const char *str);
 
 /**
+ * Initialize a decimal with a value from the valid beginning
+ * of the string.
+ * If \a endptr is not NULL, store the address of the first
+ * invalid character in *endptr.
+ *
+ * If the number is less, than 10^DECIMAL_MAX_DIGITS,
+ * but has excess digits in fractional part, it will be rounded.
+ *
+ * @return NULL if string is invalid or
+ * the number is too big (>= 10^DECIMAL_MAX_DIGITS)
+ */
+decimal_t *
+strtodec(decimal_t *dec, const char *str, const char **endptr);
+
+/**
  * Initialize a decimal from double.
  *
  * @return NULL is double is NaN or Infinity,

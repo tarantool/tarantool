@@ -73,6 +73,15 @@
 	is(decimal_##op(&b, &a), NULL, "decimal_"#op"("#stra") - error on wrong operands.");\
 })
 
+#define test_strtodec(str, end, expect) ({\
+	decimal_t dec;\
+	const char *endptr;\
+	is(strtodec(&dec, str, &endptr), expect(&dec), "strtodec("#str") "\
+							#expect);\
+	is(*endptr, end, "strtodec("#str") - expected end of valid string at "\
+			  #end);\
+})
+
 char buf[32];
 
 #define test_mpdec(str) ({\
@@ -317,7 +326,7 @@ test_mp_print(void)
 int
 main(void)
 {
-	plan(282);
+	plan(298);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -383,6 +392,15 @@ main(void)
 
 	test_mp_decimal();
 	test_mp_print();
+
+	test_strtodec("15.e", 'e', success);
+	test_strtodec("15.e+", 'e', success);
+	test_strtodec(".0e-1", '\0', success);
+	test_strtodec("1.1003 2.2", ' ', success);
+	test_strtodec("cCC", 'c', failure);
+	test_strtodec(".e--", '.', failure);
+	test_strtodec("NaN", 'N', failure);
+	test_strtodec("inf", 'i', failure);
 
 	return check_plan();
 }

@@ -1,4 +1,4 @@
-1..282
+1..298
 ok 1 - decimal(314)
 ok 2 - decimal(271)
 ok 3 - decimal(314) + decimal(271)
@@ -707,3 +707,19 @@ ok 281 - subtests
     ok 5 - correct mp_fprint result
 	*** test_mp_print: done ***
 ok 282 - subtests
+ok 283 - strtodec("15.e") success
+ok 284 - strtodec("15.e") - expected end of valid string at 'e'
+ok 285 - strtodec("15.e+") success
+ok 286 - strtodec("15.e+") - expected end of valid string at 'e'
+ok 287 - strtodec(".0e-1") success
+ok 288 - strtodec(".0e-1") - expected end of valid string at '\0'
+ok 289 - strtodec("1.1003 2.2") success
+ok 290 - strtodec("1.1003 2.2") - expected end of valid string at ' '
+ok 291 - strtodec("cCC") failure
+ok 292 - strtodec("cCC") - expected end of valid string at 'c'
+ok 293 - strtodec(".e--") failure
+ok 294 - strtodec(".e--") - expected end of valid string at '.'
+ok 295 - strtodec("NaN") failure
+ok 296 - strtodec("NaN") - expected end of valid string at 'N'
+ok 297 - strtodec("inf") failure
+ok 298 - strtodec("inf") - expected end of valid string at 'i'
