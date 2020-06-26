@@ -343,3 +343,32 @@ s:upsert({10, 10}, {{'+', 2, 10}})
 test_run:cmd("setopt delimiter ''");
 ch:get() -- should see the UPSERT and return [10, 20]
 s:drop()
+
+-- gh-5106: upsert squash doesn't handle arithmetic operation
+-- applied on the set operation.
+--
+s = box.schema.space.create('test', { engine = 'vinyl'})
+_ = s:create_index('pk')
+s:replace{1, 1}
+box.snapshot()
+
+s:upsert({1, 0}, {{'=', 2, 2}})
+s:upsert({1, 0}, {{'-', 2, 1}})
+box.snapshot()
+s:select()
+
+for i = 0, 11 do if i%2 == 0 then s:upsert({1, 0}, {{'=', 2, i}}) else s:upsert({1, 0}, {{'+', 2, i}}) end end
+box.snapshot()
+s:select()
+
+-- Operations won't squash (owing to incompatible types), so
+-- during applying resulting upsert on the top of replace
+-- statement we will get 'double update' error and ignored
+-- second upsert.
+--
+s:upsert({1, 0}, {{'=', 2, 'abc'}})
+s:upsert({1, 0}, {{'-', 2, 1}})
+box.snapshot()
+s:select()
+
+s:drop()
