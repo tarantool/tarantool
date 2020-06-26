@@ -723,6 +723,10 @@ int
 xrow_update_op_do_arith(struct xrow_update_op *op, const char *old);
 
 int
+xrow_mp_read_arg_arith(struct xrow_update_op *op, const char **expr,
+		       struct xrow_update_arg_arith *ret);
+
+int
 xrow_update_op_do_bit(struct xrow_update_op *op, const char *old);
 
 int

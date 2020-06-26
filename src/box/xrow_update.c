@@ -518,8 +518,22 @@ xrow_upsert_squash(const char *expr1, const char *expr1_end,
 			op[0]->opcode = '+';
 			int96_invert(&op[0]->arg.arith.int96);
 		}
+		struct xrow_update_arg_arith arith;
+		/*
+		 * If we apply + or - on top of the set operation ('='),
+		 * then resulting operation is {'=', op1.val + op2.val}.
+		 * To continue processing arithmetic operation we should
+		 * firstly extract value from set operation holder.
+		 */
+		if (op[0]->opcode == '=') {
+			if (xrow_mp_read_arg_arith(op[0], &op[0]->arg.set.value,
+					           &arith) != 0)
+				return NULL;
+		} else {
+			arith = op[0]->arg.arith;
+		}
 		struct xrow_update_op res;
-		if (xrow_update_arith_make(op[1], op[0]->arg.arith,
+		if (xrow_update_arith_make(op[1], arith,
 					   &res.arg.arith) != 0)
 			return NULL;
 		res_ops = mp_encode_array(res_ops, 3);
