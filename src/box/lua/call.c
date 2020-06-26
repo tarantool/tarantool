@@ -43,6 +43,22 @@
 #include "trivia/util.h"
 
 /**
+ * Handlers identifiers to obtain lua_Cfunction reference from
+ * Lua registry table. These handlers are initialized on Tarantool
+ * startup and are used until the Lua universe is destroyed.
+ * Such approach reduces Lua GC usage since there is no need to
+ * create short-lived GCfunc objects for the corresponding C
+ * function on each iproto CALL/EVAL request.
+ */
+enum handlers {
+	HANDLER_CALL,
+	HANDLER_EVAL,
+	HANDLER_MAX,
+};
+
+static int execute_lua_refs[HANDLER_MAX];
+
+/**
  * A helper to find a Lua function by name and put it
  * on top of the stack.
  */
@@ -428,7 +444,7 @@ static const struct port_vtab port_lua_vtab = {
 
 static inline int
 box_process_lua(struct call_request *request, struct port *base,
-		lua_CFunction handler)
+		enum handlers handler)
 {
 	lua_State *L = luaT_newthread(tarantool_L);
 	if (L == NULL)
@@ -437,7 +453,8 @@ box_process_lua(struct call_request *request, struct port *base,
 	port_lua_create(base, L);
 	((struct port_lua *) base)->ref = coro_ref;
 
-	lua_pushcfunction(L, handler);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, execute_lua_refs[handler]);
+	assert(lua_isfunction(L, -1));
 	lua_pushlightuserdata(L, request);
 	if (luaT_call(L, 1, LUA_MULTRET) != 0) {
 		port_lua_destroy(base);
@@ -449,13 +466,13 @@ box_process_lua(struct call_request *request, struct port *base,
 int
 box_lua_call(struct call_request *request, struct port *port)
 {
-	return box_process_lua(request, port, execute_lua_call);
+	return box_process_lua(request, port, HANDLER_CALL);
 }
 
 int
 box_lua_eval(struct call_request *request, struct port *port)
 {
-	return box_process_lua(request, port, execute_lua_eval);
+	return box_process_lua(request, port, HANDLER_EVAL);
 }
 
 static int
@@ -478,6 +495,16 @@ box_lua_call_init(struct lua_State *L)
 {
 	luaL_register(L, "box.internal", boxlib_internal);
 	lua_pop(L, 1);
+
+	lua_CFunction handles[] = {
+		[HANDLER_CALL] = execute_lua_call,
+		[HANDLER_EVAL] = execute_lua_eval,
+	};
+
+	for (int i = 0; i < HANDLER_MAX; i++) {
+		lua_pushcfunction(L, handles[i]);
+		execute_lua_refs[i] = luaL_ref(L, LUA_REGISTRYINDEX);
+	}
 
 #if 0
 	/* Get CTypeID for `struct port *' */
