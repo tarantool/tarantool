@@ -1322,8 +1322,23 @@ tuple_upsert_squash(tuple_update_alloc_func alloc, void *alloc_ctx,
 			op[0]->opcode = '+';
 			int96_invert(&op[0]->arg.arith.int96);
 		}
+		struct op_arith_arg arith;
+		/*
+		 * If we apply + or - on top of the set operation ('='),
+		 * then resulting operation is {'=', op1.val + op2.val}.
+		 * To continue processing arithmetic operation we should
+		 * firstly extract value from set operation holder.
+		 */
+		if (op[0]->opcode == '=') {
+			if (mp_read_arith_arg(update[0].index_base, op[0],
+					      &op[0]->arg.set.value,
+					      &arith) != 0)
+				return NULL;
+			} else {
+				arith = op[0]->arg.arith;
+			}
 		struct op_arith_arg res;
-		if (make_arith_operation(op[0]->arg.arith, op[1]->arg.arith,
+		if (make_arith_operation(arith, op[1]->arg.arith,
 					 op[1]->opcode,
 					 update[0].index_base +
 					 op[0]->field_no, &res))
