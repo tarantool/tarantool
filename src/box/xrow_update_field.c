@@ -182,7 +182,7 @@ xrow_update_mp_read_uint(struct xrow_update_op *op, const char **expr,
 	return xrow_update_err_arg_type(op, "a positive integer");
 }
 
-static inline int
+int
 xrow_mp_read_arg_arith(struct xrow_update_op *op, const char **expr,
 		       struct xrow_update_arg_arith *ret)
 {
