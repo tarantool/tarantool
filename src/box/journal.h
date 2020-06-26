@@ -102,9 +102,6 @@ struct journal {
 	/** Synchronous write */
 	int (*write)(struct journal *journal,
 		     struct journal_entry *entry);
-
-	/** Journal destroy */
-	void (*destroy)(struct journal *journal);
 };
 
 /**
@@ -169,8 +166,6 @@ journal_write_async(struct journal_entry *entry)
 static inline void
 journal_set(struct journal *new_journal)
 {
-	if (current_journal && current_journal->destroy)
-		current_journal->destroy(current_journal);
 	current_journal = new_journal;
 }
 
@@ -180,13 +175,11 @@ journal_create(struct journal *journal,
 				  struct journal_entry *entry),
 	       void (*write_async_cb)(struct journal_entry *entry),
 	       int (*write)(struct journal *journal,
-			    struct journal_entry *entry),
-	       void (*destroy)(struct journal *journal))
+			    struct journal_entry *entry))
 {
 	journal->write_async	= write_async;
 	journal->write_async_cb	= write_async_cb;
 	journal->write		= write;
-	journal->destroy	= destroy;
 }
 
 /**
