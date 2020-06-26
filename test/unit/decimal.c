@@ -73,6 +73,13 @@
 	is(decimal_##op(&b, &a), NULL, "decimal_"#op"("#stra") - error on wrong operands.");\
 })
 
+#define dectest_is(op, stra, expect) ({\
+	decimal_t a;\
+	is(decimal_from_string(&a, #stra), &a, "decimal_from_string("#stra")");\
+	is(decimal_##op(&a), expect, "decimal_"#op"("#stra") - expected "\
+				      #expect);\
+})
+
 #define test_strtodec(str, end, expect) ({\
 	decimal_t dec;\
 	const char *endptr;\
@@ -326,7 +333,7 @@ test_mp_print(void)
 int
 main(void)
 {
-	plan(298);
+	plan(304);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -401,6 +408,10 @@ main(void)
 	test_strtodec(".e--", '.', failure);
 	test_strtodec("NaN", 'N', failure);
 	test_strtodec("inf", 'i', failure);
+
+	dectest_is(is_int, 1, true);
+	dectest_is(is_int, 1.0000, true);
+	dectest_is(is_int, 1.0000001, false);
 
 	return check_plan();
 }

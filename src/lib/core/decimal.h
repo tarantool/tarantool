@@ -36,6 +36,7 @@
 #define DECNUMDIGITS DECIMAL_MAX_DIGITS
 #include "third_party/decNumber/decNumber.h"
 #include <stdint.h>
+#include <stdbool.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -64,6 +65,13 @@ decimal_scale(const decimal_t *dec);
  */
 decimal_t *
 decimal_zero(decimal_t *dec);
+
+/**
+ * @return true if the fractional part of the number is 0,
+ * false otherwise.
+ */
+bool
+decimal_is_int(decimal_t *dec);
 
 /**
  * Initialize a decimal with a value from the string.

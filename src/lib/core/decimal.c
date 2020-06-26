@@ -109,6 +109,12 @@ decimal_zero(decimal_t *dec)
 	return dec;
 }
 
+bool
+decimal_is_int(decimal_t *dec)
+{
+	return decNumberIsInt(dec);
+}
+
 decimal_t *
 decimal_from_string(decimal_t *dec, const char *str)
 {

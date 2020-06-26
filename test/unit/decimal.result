@@ -1,4 +1,4 @@
-1..298
+1..304
 ok 1 - decimal(314)
 ok 2 - decimal(271)
 ok 3 - decimal(314) + decimal(271)
@@ -723,3 +723,9 @@ ok 295 - strtodec("NaN") failure
 ok 296 - strtodec("NaN") - expected end of valid string at 'N'
 ok 297 - strtodec("inf") failure
 ok 298 - strtodec("inf") - expected end of valid string at 'i'
+ok 299 - decimal_from_string(1)
+ok 300 - decimal_is_int(1) - expected true
+ok 301 - decimal_from_string(1.0000)
+ok 302 - decimal_is_int(1.0000) - expected true
+ok 303 - decimal_from_string(1.0000001)
+ok 304 - decimal_is_int(1.0000001) - expected false
