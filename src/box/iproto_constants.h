@@ -316,17 +316,6 @@ dml_request_key_map(uint32_t type)
 	return iproto_body_key_map[type];
 }
 
-/**
- * A read only request, CALL is included since it
- * may be read-only, and there are separate checks
- * for all database requests issues from CALL.
- */
-static inline bool
-iproto_type_is_select(uint32_t type)
-{
-	return type <= IPROTO_SELECT || type == IPROTO_CALL || type == IPROTO_EVAL;
-}
-
 /** A common request with a mandatory and simple body (key, tuple, ops)  */
 static inline bool
 iproto_type_is_request(uint32_t type)
