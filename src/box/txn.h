@@ -44,6 +44,9 @@ extern "C" {
 /** box statistics */
 extern struct rmean *rmean_box;
 
+/** Last prepare-sequence-number that was assigned to prepared TX. */
+extern int64_t txn_last_psn;
+
 struct journal_entry;
 struct engine;
 struct space;
@@ -264,6 +267,11 @@ struct txn {
 	 * Valid IDs start from 1.
 	 */
 	int64_t id;
+	/**
+	 * A sequential ID that is assigned when the TX becomes prepared.
+	 * Transactions are committed in that order.
+	 */
+	int64_t psn;
 	/** Status of the TX */
 	enum txn_status status;
 	/** List of statements in a transaction. */

@@ -40,6 +40,9 @@
 
 double too_long_threshold;
 
+/** Last prepare-sequence-number that was assigned to prepared TX. */
+int64_t txn_last_psn = 0;
+
 /* Txn cache. */
 static struct stailq txn_cache = {NULL, &txn_cache.first};
 
@@ -225,6 +228,7 @@ txn_begin(void)
 	txn->flags = 0;
 	txn->in_sub_stmt = 0;
 	txn->id = ++tsn;
+	txn->psn = 0;
 	txn->status = TXN_INPROGRESS;
 	txn->signature = TXN_SIGNATURE_ROLLBACK;
 	txn->engine = NULL;
@@ -648,6 +652,8 @@ txn_journal_entry_new(struct txn *txn)
 static int
 txn_prepare(struct txn *txn)
 {
+	txn->psn = ++txn_last_psn;
+
 	if (txn_has_flag(txn, TXN_IS_ABORTED_BY_YIELD)) {
 		assert(!txn_has_flag(txn, TXN_CAN_YIELD));
 		diag_set(ClientError, ER_TRANSACTION_YIELD);
