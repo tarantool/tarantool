@@ -92,6 +92,32 @@ box.space.sync:replace{4}
 test_run:switch('replica')
 box.space.sync:select{4}
 
+--
+-- Async transactions should wait for existing sync transactions
+-- finish.
+--
+test_run:switch('default')
+-- Start 2 fibers, which will execute one right after the other
+-- in the same event loop iteration.
+f = fiber.create(box.space.sync.replace, box.space.sync, {5}) s:replace{5}
+f:status()
+s:select{5}
+box.space.sync:select{5}
+test_run:switch('replica')
+box.space.test:select{5}
+box.space.sync:select{5}
+-- Ensure sync rollback will affect all pending async transactions
+-- too.
+test_run:switch('default')
+box.cfg{replication_synchro_timeout = 0.001, replication_synchro_quorum = 3}
+f = fiber.create(box.space.sync.replace, box.space.sync, {6}) s:replace{6}
+f:status()
+s:select{6}
+box.space.sync:select{6}
+test_run:switch('replica')
+box.space.test:select{6}
+box.space.sync:select{6}
+
 -- Cleanup.
 test_run:cmd('switch default')
 
