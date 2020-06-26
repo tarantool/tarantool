@@ -316,13 +316,6 @@ dml_request_key_map(uint32_t type)
 	return iproto_body_key_map[type];
 }
 
-/** A common request with a mandatory and simple body (key, tuple, ops)  */
-static inline bool
-iproto_type_is_request(uint32_t type)
-{
-	return type > IPROTO_OK && type <= IPROTO_TYPE_STAT_MAX;
-}
-
 /** This is an error. */
 static inline bool
 iproto_type_is_error(uint32_t type)
