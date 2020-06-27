@@ -123,7 +123,7 @@ void
 key_def_copy(struct key_def *dest, const struct key_def *src)
 {
 	size_t sz = key_def_copy_size(src);
-	assert(sz = key_def_copy_size(dest));
+	assert(sz == key_def_copy_size(dest));
 	key_def_copy_impl(dest, src, sz);
 }
 
