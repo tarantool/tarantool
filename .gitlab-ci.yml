@@ -5,7 +5,7 @@ stages:
 
 variables:
   GITLAB_MAKE: "make -f .gitlab.mk"
-  GIT_CLEAN_COMMAND: "git clean -ffdx -e packpack && git submodule foreach git clean -ffdx && git submodule foreach git status"
+  GIT_CLEAN_COMMAND: "git clean -ffdx && git submodule foreach git clean -ffdx && git submodule foreach git status"
   GIT_CLEAN_FLAGS: none
 
 .shell_before_script_template: &shell_cleanup_script
@@ -118,10 +118,11 @@ variables:
     - ${GITLAB_MAKE} perf_run
 
 .perf_cleanup_definition: &perf_cleanup_definition
-   <<: *perf_only_definition
-   stage: cleanup
-   script:
-     - ${GITLAB_MAKE} perf_cleanup
+  <<: *perf_only_definition
+  stage: cleanup
+  <<: *shell_cleanup_script
+  script:
+    - ${GITLAB_MAKE} perf_cleanup
 
 # Tests
 
@@ -204,6 +205,7 @@ perf_bootstrap:
   stage: test
   tags:
     - deploy
+  <<: *shell_cleanup_script
   script:
     - ${GITLAB_MAKE} perf_prepare
   after_script:
