@@ -436,6 +436,7 @@ t;
  |   215: box.error.SYNC_MASTER_MISMATCH
  |   216: box.error.SYNC_QUORUM_TIMEOUT
  |   217: box.error.SYNC_ROLLBACK
+ |   218: box.error.TUPLE_METADATA_IS_TOO_BIG
  | ...
 
 test_run:cmd("setopt delimiter ''");

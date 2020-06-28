@@ -270,6 +270,7 @@ struct errcode_record {
 	/*215 */_(ER_SYNC_MASTER_MISMATCH,	"CONFIRM message arrived for an unknown master id %d, expected %d") \
         /*216 */_(ER_SYNC_QUORUM_TIMEOUT,       "Quorum collection for a synchronous transaction is timed out") \
         /*217 */_(ER_SYNC_ROLLBACK,             "A rollback for a synchronous transaction is received") \
+	/*218 */_(ER_TUPLE_METADATA_IS_TOO_BIG,	"Can't create tuple: metadata size %u is too big") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
