@@ -132,8 +132,15 @@ size_t vy_max_tuple_size = 1024 * 1024;
 static struct tuple *
 vy_stmt_alloc(struct tuple_format *format, uint32_t bsize)
 {
-	uint32_t total_size = sizeof(struct vy_stmt) + format->field_map_size +
-		bsize;
+	uint32_t data_offset = sizeof(struct vy_stmt) + format->field_map_size;
+	if (data_offset > UINT16_MAX) {
+		/* tuple->data_offset is 16 bits */
+		diag_set(ClientError, ER_TUPLE_METADATA_IS_TOO_BIG,
+			 data_offset);
+		return NULL;
+	}
+
+	uint32_t total_size = data_offset + bsize;
 	if (unlikely(total_size > vy_max_tuple_size)) {
 		diag_set(ClientError, ER_VINYL_MAX_TUPLE_SIZE,
 			 (unsigned) total_size);

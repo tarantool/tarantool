@@ -209,6 +209,7 @@ struct errcode_record {
 	/*154 */_(ER_TRANSACTION_YIELD,		"Transaction has been aborted by a fiber yield") \
 	/*155 */_(ER_NO_SUCH_GROUP,		"Replication group '%s' does not exist") \
 	/*156 */_(ER_BOOTSTRAP_READONLY,	"Trying to bootstrap a local read-only instance as master") \
+	/*157 */_(ER_TUPLE_METADATA_IS_TOO_BIG,	"Can't create tuple: metadata size %u is too big") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

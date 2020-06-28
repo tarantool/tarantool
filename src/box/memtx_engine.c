@@ -1144,6 +1144,19 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	assert(mp_typeof(*data) == MP_ARRAY);
+	/*
+	 * Data offset is calculated from the begin of the struct
+	 * tuple base, not from memtx_tuple, because the struct
+	 * tuple is not the first field of the memtx_tuple.
+	 */
+	uint32_t data_offset = sizeof(struct tuple) + format->field_map_size;
+	if (data_offset > UINT16_MAX) {
+		/* tuple->data_offset is 16 bits */
+		diag_set(ClientError, ER_TUPLE_METADATA_IS_TOO_BIG,
+			 data_offset);
+		return NULL;
+	}
+
 	size_t tuple_len = end - data;
 	size_t total = sizeof(struct memtx_tuple) + format->field_map_size +
 		tuple_len;
@@ -1176,12 +1189,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	tuple->bsize = tuple_len;
 	tuple->format_id = tuple_format_id(format);
 	tuple_format_ref(format);
-	/*
-	 * Data offset is calculated from the begin of the struct
-	 * tuple base, not from memtx_tuple, because the struct
-	 * tuple is not the first field of the memtx_tuple.
-	 */
-	tuple->data_offset = sizeof(struct tuple) + format->field_map_size;
+	tuple->data_offset = data_offset;
 	char *raw = (char *) tuple + tuple->data_offset;
 	uint32_t *field_map = (uint32_t *) raw;
 	memcpy(raw, data, tuple_len);

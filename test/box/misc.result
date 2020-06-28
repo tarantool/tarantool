@@ -477,8 +477,9 @@ t;
   - 'box.error.FUNCTION_EXISTS : 52'
   - 'box.error.UPDATE_ARG_TYPE : 26'
   - 'box.error.CROSS_ENGINE_TRANSACTION : 81'
-  - 'box.error.FORMAT_MISMATCH_INDEX_PART : 27'
   - 'box.error.injection : table: <address>
+  - 'box.error.FORMAT_MISMATCH_INDEX_PART : 27'
+  - 'box.error.TUPLE_METADATA_IS_TOO_BIG : 157'
   - 'box.error.FUNCTION_TX_ACTIVE : 30'
   - 'box.error.BOOTSTRAP_READONLY : 156'
   - 'box.error.ITERATOR_TYPE : 72'

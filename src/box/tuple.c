@@ -96,9 +96,16 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 	assert(format->vtab.tuple_delete == tuple_format_runtime_vtab.tuple_delete);
 
 	mp_tuple_assert(data, end);
+	uint32_t data_offset = sizeof(struct tuple) + format->field_map_size;
+	if (data_offset > UINT16_MAX) {
+		/* tuple->data_offset is 16 bits */
+		diag_set(ClientError, ER_TUPLE_METADATA_IS_TOO_BIG,
+			 data_offset);
+		return NULL;
+	}
+
 	size_t data_len = end - data;
-	size_t total = sizeof(struct tuple) + format->field_map_size +
-		data_len;
+	size_t total = data_offset + data_len;
 
 	struct tuple *tuple = (struct tuple *) smalloc(&runtime_alloc, total);
 	if (tuple == NULL) {
@@ -111,7 +118,7 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 	tuple->bsize = data_len;
 	tuple->format_id = tuple_format_id(format);
 	tuple_format_ref(format);
-	tuple->data_offset = sizeof(struct tuple) + format->field_map_size;
+	tuple->data_offset = data_offset;
 	char *raw = (char *) tuple + tuple->data_offset;
 	uint32_t *field_map = (uint32_t *) raw;
 	memcpy(raw, data, data_len);
