@@ -499,10 +499,12 @@ txn_limbo_wait_confirm(struct txn_limbo *limbo)
 		/* Clear the triggers if the timeout has been reached. */
 		trigger_clear(&on_complete);
 		trigger_clear(&on_rollback);
+		diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
 		return -1;
 	}
 	if (!cwp.is_confirm) {
 		/* The transaction has been rolled back. */
+		diag_set(ClientError, ER_SYNC_ROLLBACK);
 		return -1;
 	}
 	return 0;
