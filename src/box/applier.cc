@@ -1228,6 +1228,15 @@ applier_f(va_list ap)
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_LOADING);
 				goto reconnect;
+			} else if (e->errcode() == ER_SYNC_QUORUM_TIMEOUT ||
+				   e->errcode() == ER_SYNC_ROLLBACK) {
+				/*
+				 * Join failure due to synchronous
+				 * transaction rollback.
+				 */
+				applier_log_error(applier, e);
+				applier_disconnect(applier, APPLIER_LOADING);
+				goto reconnect;
 			} else if (e->errcode() == ER_CFG ||
 				   e->errcode() == ER_ACCESS_DENIED ||
 				   e->errcode() == ER_NO_SUCH_USER ||

@@ -321,6 +321,13 @@ relay_initial_join(int fd, uint64_t sync, struct vclock *vclock)
 	if (wal_sync(vclock) != 0)
 		diag_raise();
 
+	/*
+	 * Start sending data only when the latest sync
+	 * transaction is confirmed.
+	 */
+	if (txn_limbo_wait_confirm(&txn_limbo) != 0)
+		diag_raise();
+
 	/* Respond to the JOIN request with the current vclock. */
 	struct xrow_header row;
 	xrow_encode_vclock_xc(&row, vclock);
