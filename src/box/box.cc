@@ -1711,6 +1711,8 @@ box_process_register(struct ev_io *io, struct xrow_header *header)
 	say_info("registering replica %s at %s",
 		 tt_uuid_str(&instance_uuid), sio_socketname(io->fd));
 
+	/* See box_process_join() */
+	int64_t limbo_rollback_count = txn_limbo.rollback_count;
 	struct vclock start_vclock;
 	vclock_copy(&start_vclock, &replicaset.vclock);
 
@@ -1725,6 +1727,12 @@ box_process_register(struct ev_io *io, struct xrow_header *header)
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
 	vclock_copy(&stop_vclock, &replicaset.vclock);
+
+	if (txn_limbo.rollback_count != limbo_rollback_count)
+		tnt_raise(ClientError, ER_SYNC_ROLLBACK);
+
+	if (txn_limbo_wait_confirm(&txn_limbo) != 0)
+		diag_raise();
 
 	/*
 	 * Feed replica with WALs in range
@@ -1848,6 +1856,15 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 		 tt_uuid_str(&instance_uuid), sio_socketname(io->fd));
 
 	/*
+	 * In order to join a replica, master has to make sure it
+	 * doesn't send unconfirmed data. We have to check that
+	 * there are no rolled back transactions between
+	 * start_vclock and stop_vclock, and that the data right
+	 * before stop_vclock is confirmed, before we can proceed
+	 * to final join.
+	 */
+	int64_t limbo_rollback_count = txn_limbo.rollback_count;
+	/*
 	 * Initial stream: feed replica with dirty data from engines.
 	 */
 	struct vclock start_vclock;
@@ -1867,6 +1884,12 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
 	vclock_copy(&stop_vclock, &replicaset.vclock);
+
+	if (txn_limbo.rollback_count != limbo_rollback_count)
+		tnt_raise(ClientError, ER_SYNC_ROLLBACK);
+
+	if (txn_limbo_wait_confirm(&txn_limbo) != 0)
+		diag_raise();
 
 	/* Send end of initial stage data marker */
 	struct xrow_header row;

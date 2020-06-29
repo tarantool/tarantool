@@ -117,6 +117,13 @@ struct txn_limbo {
 	 * transactions, created on the limbo's owner node.
 	 */
 	struct vclock vclock;
+	/**
+	 * Total number of performed rollbacks. It used as a guard
+	 * to do some actions assuming all limbo transactions will
+	 * be confirmed, and to check that there were no rollbacks
+	 * in the end.
+	 */
+	int64_t rollback_count;
 };
 
 /**
