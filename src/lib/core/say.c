@@ -206,17 +206,14 @@ say_set_log_format(enum say_format format)
 {
 	log_format_func_t format_func;
 	/*
-	 * When logger type is SAY_LOGGER_BOOT it simply prints
-	 * every message to stdout intact and can't be formatted.
 	 * SAY_LOGGER_SYSLOG type uses the well-documented and
 	 * *recommended* format described in the RFC below:
 	 * https://tools.ietf.org/html/rfc3164#section-4.1
 	 * Thereby format can't be changed for this type either.
 	 */
-	bool unchangeable = log_default->type == SAY_LOGGER_BOOT ||
-			    log_default->type == SAY_LOGGER_SYSLOG;
-	if (unchangeable)
+	if (log_default->type == SAY_LOGGER_SYSLOG)
 		return;
+
 	switch (format) {
 	case SF_JSON:
 		format_func = say_format_json;
