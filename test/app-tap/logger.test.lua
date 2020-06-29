@@ -1,13 +1,24 @@
 #!/usr/bin/env tarantool
 
 local test = require('tap').test('log')
-test:plan(62)
+test:plan(64)
 
--- gh-3946: Assertion failure when using log_format() before box.cfg()
+--
+-- gh-5121: Allow to use 'json' output before box.cfg()
+--
 local log = require('log')
-log.log_format('plain')
 _, err = pcall(log.log_format, 'json')
-test:ok(err:find("json can\'t be used") ~= nil)
+test:ok(err == nil)
+
+-- We're not allowed to use json with syslog though.
+_, err = pcall(log.cfg, {log='syslog:', format='json'})
+test:ok(tostring(err):find("can\'t be used with syslog logger") ~= nil)
+
+_, err = pcall(box.cfg, {log='syslog:', log_format='json'})
+test:ok(tostring(err):find("can\'t be used with syslog logger") ~= nil)
+
+-- switch back to plain to next tests
+log.log_format('plain')
 
 --
 -- gh-689: various settings change from box.cfg/log.cfg interfaces
