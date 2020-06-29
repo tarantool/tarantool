@@ -381,6 +381,8 @@ lbox_info_memory_call(struct lua_State *L)
 	struct engine_memory_stat stat;
 	engine_memory_stat(&stat);
 
+	lua_createtable(L, 0, 6);
+
 	lua_pushstring(L, "data");
 	luaL_pushuint64(L, stat.data);
 	lua_settable(L, -3);
