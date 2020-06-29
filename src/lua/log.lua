@@ -194,7 +194,7 @@ local function verify_static(k, v)
 end
 
 -- Test if format is valid.
-local function verify_format(key, name)
+local function verify_format(key, name, cfg)
     assert(log_cfg[key] ~= nil)
 
     if not fmt_str2num[name] then
@@ -202,11 +202,25 @@ local function verify_format(key, name)
         return false, m:format(fmt_list())
     end
 
+    local log_type = ffi.C.log_type()
+
+    -- When comes from log.cfg{} or box.cfg{}
+    -- initial call we might be asked to setup
+    -- syslog with json which is not allowed.
+    --
+    -- Note the cfg table comes from two places:
+    -- box api interface and log module itself.
+    -- The good thing that we're only needed log
+    -- entry which is the same key for both.
+    if cfg ~= nil and cfg['log'] ~= nil then
+        if string.startswith(cfg['log'], "syslog:") then
+            log_type = ffi.C.SAY_LOGGER_SYSLOG
+        end
+    end
+
     if fmt_str2num[name] == ffi.C.SF_JSON then
-        if ffi.C.log_type() == ffi.C.SAY_LOGGER_SYSLOG or
-            ffi.C.log_type() == ffi.C.SAY_LOGGER_BOOT then
-            local m = "%s can't be used with " ..
-            "syslog or boot-time logger"
+        if log_type == ffi.C.SAY_LOGGER_SYSLOG then
+            local m = "%s can't be used with syslog logger"
             return false, m:format(fmt_num2str[ffi.C.SF_JSON])
         end
     end
@@ -239,11 +253,11 @@ local verify_ops = {
 }
 
 -- Verify a value for the particular key.
-local function verify_option(k, v)
+local function verify_option(k, v, ...)
     assert(k ~= nil)
 
     if verify_ops[k] ~= nil then
-        return verify_ops[k](k, v)
+        return verify_ops[k](k, v, ...)
     end
 
     return true
@@ -372,10 +386,17 @@ local function box_api_cfg_get(key)
 end
 
 -- Set value to log from box.cfg{}.
-local function box_api_cfg_set(key, value)
+local function box_api_cfg_set(cfg, key, value)
     local log_key = box2log_keys[key]
 
-    local ok, msg = verify_option(log_key, value)
+    -- a special case where we need to restore
+    -- nil value from previous setup attempt.
+    if value == box.NULL then
+        log_cfg[log_key] = nil
+        return true
+    end
+
+    local ok, msg = verify_option(log_key, value, cfg)
     if not ok then
         return false, msg
     end
@@ -450,7 +471,7 @@ local function load_cfg(oldcfg, cfg)
     end
 
     if cfg.format ~= nil then
-        local ok, msg = verify_option('format', cfg.format)
+        local ok, msg = verify_option('format', cfg.format, cfg)
         if not ok then
             local m = "log.cfg: \'%s\' %s"
             error(m:format('format', msg))

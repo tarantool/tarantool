@@ -459,13 +459,13 @@ local function prepare_cfg(cfg, default_cfg, template_cfg,
                             module_cfg[k], modify_cfg[k], readable_name)
         elseif template_cfg[k] == 'module' then
             local old_value = module_cfg[k].cfg_get(k, v)
-            module_cfg_backup[k] = old_value
+            module_cfg_backup[k] = old_value or box.NULL
 
-            local ok, msg = module_cfg[k].cfg_set(k, v)
+            local ok, msg = module_cfg[k].cfg_set(cfg, k, v)
             if not ok then
                 -- restore back the old values for modules
                 for module_k, module_v in pairs(module_cfg_backup) do
-                    module_cfg[module_k].cfg_set(module_k, module_v)
+                    module_cfg[module_k].cfg_set(nil, module_k, module_v)
                 end
                 box.error(box.error.CFG, readable_name, msg)
             end
