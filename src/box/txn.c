@@ -109,6 +109,7 @@ txn_stmt_new(struct region *region)
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 	stmt->has_triggers = false;
+	stmt->does_require_old_tuple = false;
 	return stmt;
 }
 
@@ -351,27 +352,43 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 * - perhaps we should run triggers even for deletes which
 	 *   doesn't find any rows
 	 */
-	if (stmt->space != NULL && !rlist_empty(&stmt->space->on_replace) &&
-	    stmt->space->run_triggers && (stmt->old_tuple || stmt->new_tuple)) {
-		int rc = 0;
-		if(!space_is_temporary(stmt->space)) {
-			rc = trigger_run(&stmt->space->on_replace, txn);
-		} else {
+	if (stmt->space != NULL && stmt->space->run_triggers &&
+	    (stmt->old_tuple || stmt->new_tuple)) {
+		if (!rlist_empty(&stmt->space->before_replace)) {
 			/*
-			 * There is no row attached to txn_stmt for
-			 * temporary spaces, since DML operations on them
-			 * are not written to WAL. Fake a row to pass operation
-			 * type to lua on_replace triggers.
+			 * Triggers see old_tuple and that tuple
+			 * must remain the same
 			 */
-			assert(stmt->row == NULL);
-			struct xrow_header temp_header;
-			temp_header.type = request->type;
-			stmt->row = &temp_header;
-			rc = trigger_run(&stmt->space->on_replace, txn);
-			stmt->row = NULL;
+			stmt->does_require_old_tuple = true;
 		}
-		if (rc != 0)
-			goto fail;
+		if (!rlist_empty(&stmt->space->on_replace)) {
+			/*
+			 * Triggers see old_tuple and that tuple
+			 * must remain the same
+			 */
+			stmt->does_require_old_tuple = true;
+
+			int rc = 0;
+			if(!space_is_temporary(stmt->space)) {
+				rc = trigger_run(&stmt->space->on_replace, txn);
+			} else {
+				/*
+				 * There is no row attached to txn_stmt for
+				 * temporary spaces, since DML operations on
+				 * them are not written to WAL.
+				 * Fake a row to pass operation type to lua
+				 * on_replace triggers.
+				 */
+				assert(stmt->row == NULL);
+				struct xrow_header temp_header;
+				temp_header.type = request->type;
+				stmt->row = &temp_header;
+				rc = trigger_run(&stmt->space->on_replace, txn);
+				stmt->row = NULL;
+			}
+			if (rc != 0)
+				goto fail;
+		}
 	}
 	--txn->in_sub_stmt;
 	return 0;
