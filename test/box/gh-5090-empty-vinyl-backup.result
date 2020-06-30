@@ -1,0 +1,82 @@
+-- test-run result file version 2
+test_run = require('test_run').new()
+ | ---
+ | ...
+
+test_run:cmd('create server vinyl with script="box/lua/simple_instance.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server vinyl')
+ | ---
+ | - true
+ | ...
+test_run:cmd('switch vinyl')
+ | ---
+ | - true
+ | ...
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+ | ---
+ | ...
+index = s:create_index('primary', {parts={1, 'unsigned'}})
+ | ---
+ | ...
+
+box.snapshot()
+ | ---
+ | - ok
+ | ...
+backup_files = box.backup.start()
+ | ---
+ | ...
+
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+
+backup_files = test_run:eval('vinyl', 'backup_files')[1]
+ | ---
+ | ...
+for _, file in pairs(backup_files) do os.execute('cp ' .. file .. ' .') end
+ | ---
+ | ...
+
+test_run:drop_cluster({'vinyl'})
+ | ---
+ | ...
+
+test_run:cmd("create server vinyl with script='box/lua/simple_instance.lua'")
+ | ---
+ | - true
+ | ...
+for _, file in pairs(backup_files) do os.execute('mv ' .. file:match('.*/(.*)') .. ' simple_instance/') end
+ | ---
+ | ...
+test_run:cmd('start server vinyl')
+ | ---
+ | - true
+ | ...
+test_run:cmd('switch vinyl')
+ | ---
+ | - true
+ | ...
+
+box.space.test:insert{1}
+ | ---
+ | - [1]
+ | ...
+box.snapshot()
+ | ---
+ | - ok
+ | ...
+
+-- Cleanup.
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+test_run:drop_cluster({'vinyl'})
+ | ---
+ | ...
