@@ -119,7 +119,7 @@ txn_stmt_new(struct region *region)
 }
 
 static inline void
-txn_stmt_unref_tuples(struct txn_stmt *stmt)
+txn_stmt_destroy(struct txn_stmt *stmt)
 {
 	if (stmt->old_tuple != NULL)
 		tuple_unref(stmt->old_tuple);
@@ -167,7 +167,7 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 			assert(txn->n_applier_rows > 0);
 			txn->n_applier_rows--;
 		}
-		txn_stmt_unref_tuples(stmt);
+		txn_stmt_destroy(stmt);
 		stmt->space = NULL;
 		stmt->row = NULL;
 	}
@@ -206,7 +206,7 @@ txn_free(struct txn *txn)
 {
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next)
-		txn_stmt_unref_tuples(stmt);
+		txn_stmt_destroy(stmt);
 
 	/* Truncate region up to struct txn size. */
 	region_truncate(&txn->region, sizeof(struct txn));
