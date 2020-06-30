@@ -1,0 +1,765 @@
+-- test-run result file version 2
+env = require('test_run')
+ | ---
+ | ...
+test_run = env.new()
+ | ---
+ | ...
+engine = test_run:get_cfg('engine')
+ | ---
+ | ...
+fiber = require('fiber')
+ | ---
+ | ...
+
+orig_synchro_quorum = box.cfg.replication_synchro_quorum
+ | ---
+ | ...
+orig_synchro_timeout = box.cfg.replication_synchro_timeout
+ | ---
+ | ...
+
+NUM_INSTANCES = 2
+ | ---
+ | ...
+BROKEN_QUORUM = NUM_INSTANCES + 1
+ | ---
+ | ...
+
+test_run:cmd("setopt delimiter ';'")
+ | ---
+ | - true
+ | ...
+disable_sync_mode = function()
+    local s = box.space._space:get(box.space.sync.id)
+    local new_s = s:update({{'=', 6, {is_sync=false}}})
+    box.space._space:replace(new_s)
+end;
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
+ | ...
+
+box.schema.user.grant('guest', 'replication')
+ | ---
+ | ...
+
+-- Setup an async cluster with two instances.
+test_run:cmd('create server replica with rpl_master=default,\
+                                         script="replication/replica.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server replica with wait=True, wait_load=True')
+ | ---
+ | - true
+ | ...
+
+-- Successful write.
+-- Testcase setup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+ | ---
+ | ...
+_ = box.schema.space.create('sync', {is_sync=true, engine=engine})
+ | ---
+ | ...
+_ = box.space.sync:create_index('pk')
+ | ---
+ | ...
+-- Testcase body.
+box.space.sync:insert{1} -- success
+ | ---
+ | - [1]
+ | ...
+test_run:cmd('switch replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:select{} -- 1
+ | ---
+ | - - [1]
+ | ...
+-- Testcase cleanup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.space.sync:drop()
+ | ---
+ | ...
+
+-- Unsuccessfull write.
+-- Testcase setup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=0.1}
+ | ---
+ | ...
+_ = box.schema.space.create('sync', {is_sync=true, engine=engine})
+ | ---
+ | ...
+_ = box.space.sync:create_index('pk')
+ | ---
+ | ...
+-- Testcase body.
+box.space.sync:insert{1}
+ | ---
+ | - error: Quorum collection for a synchronous transaction is timed out
+ | ...
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:select{} -- none
+ | ---
+ | - []
+ | ...
+-- Testcase cleanup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.space.sync:drop()
+ | ---
+ | ...
+
+-- [RFC, quorum commit] attempt to write multiple transactions, expected the
+-- same order as on client in case of achieved quorum.
+-- Testcase setup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+ | ---
+ | ...
+_ = box.schema.space.create('sync', {is_sync=true, engine=engine})
+ | ---
+ | ...
+_ = box.space.sync:create_index('pk')
+ | ---
+ | ...
+-- Testcase body.
+box.space.sync:insert{1}
+ | ---
+ | - [1]
+ | ...
+box.space.sync:insert{2}
+ | ---
+ | - [2]
+ | ...
+box.space.sync:insert{3}
+ | ---
+ | - [3]
+ | ...
+box.space.sync:select{} -- 1, 2, 3
+ | ---
+ | - - [1]
+ |   - [2]
+ |   - [3]
+ | ...
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:select{} -- 1, 2, 3
+ | ---
+ | - - [1]
+ |   - [2]
+ |   - [3]
+ | ...
+-- Testcase cleanup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.space.sync:drop()
+ | ---
+ | ...
+
+-- Synchro timeout is not bigger than replication_synchro_timeout value.
+-- Testcase setup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=orig_synchro_timeout}
+ | ---
+ | ...
+_ = box.schema.space.create('sync', {is_sync=true, engine=engine})
+ | ---
+ | ...
+_ = box.space.sync:create_index('pk')
+ | ---
+ | ...
+-- Testcase body.
+start = os.time()
+ | ---
+ | ...
+box.space.sync:insert{1}
+ | ---
+ | - error: Quorum collection for a synchronous transaction is timed out
+ | ...
+(os.time() - start) == box.cfg.replication_synchro_timeout -- true
+ | ---
+ | - true
+ | ...
+-- Testcase cleanup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.space.sync:drop()
+ | ---
+ | ...
+
+-- replication_synchro_quorum
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+INT_MIN = -2147483648
+ | ---
+ | ...
+INT_MAX = 2147483648
+ | ---
+ | ...
+box.cfg{replication_synchro_quorum=INT_MAX} -- error
+ | ---
+ | - error: 'Incorrect value for option ''replication_synchro_quorum'': the value must
+ |     be greater than zero and less than maximal number of replicas'
+ | ...
+box.cfg.replication_synchro_quorum -- old value
+ | ---
+ | - 3
+ | ...
+box.cfg{replication_synchro_quorum=INT_MIN} -- error
+ | ---
+ | - error: 'Incorrect value for option ''replication_synchro_quorum'': the value must
+ |     be greater than zero and less than maximal number of replicas'
+ | ...
+box.cfg.replication_synchro_quorum -- old value
+ | ---
+ | - 3
+ | ...
+
+-- replication_synchro_timeout
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+DOUBLE_MAX = 9007199254740992
+ | ---
+ | ...
+box.cfg{replication_synchro_timeout=DOUBLE_MAX}
+ | ---
+ | ...
+box.cfg.replication_synchro_timeout -- DOUBLE_MAX
+ | ---
+ | - 9007199254740992
+ | ...
+box.cfg{replication_synchro_timeout=DOUBLE_MAX+1}
+ | ---
+ | ...
+box.cfg.replication_synchro_timeout -- DOUBLE_MAX
+ | ---
+ | - 9007199254740992
+ | ...
+box.cfg{replication_synchro_timeout=-1} -- error
+ | ---
+ | - error: 'Incorrect value for option ''replication_synchro_timeout'': the value must
+ |     be greater than zero'
+ | ...
+box.cfg.replication_synchro_timeout -- old value
+ | ---
+ | - 9007199254740992
+ | ...
+box.cfg{replication_synchro_timeout=0} -- error
+ | ---
+ | - error: 'Incorrect value for option ''replication_synchro_timeout'': the value must
+ |     be greater than zero'
+ | ...
+box.cfg.replication_synchro_timeout -- old value
+ | ---
+ | - 9007199254740992
+ | ...
+
+-- TX is in synchronous replication.
+-- Testcase setup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+ | ---
+ | ...
+_ = box.schema.space.create('sync', {is_sync=true, engine=engine})
+ | ---
+ | ...
+_ = box.space.sync:create_index('pk')
+ | ---
+ | ...
+-- Testcase body.
+box.begin() box.space.sync:insert({1}) box.commit()
+ | ---
+ | ...
+box.begin() box.space.sync:insert({2}) box.commit()
+ | ---
+ | ...
+-- Testcase cleanup.
+box.space.sync:drop()
+ | ---
+ | ...
+
+-- [RFC, summary] switch sync replicas into async ones, expected success and
+-- data consistency on a leader and replicas.
+-- Testcase setup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+ | ---
+ | ...
+_ = box.schema.space.create('sync', {is_sync=true, engine=engine})
+ | ---
+ | ...
+_ = box.space.sync:create_index('pk')
+ | ---
+ | ...
+-- Testcase body.
+box.space.sync:insert{1}
+ | ---
+ | - [1]
+ | ...
+box.space.sync:select{} -- 1
+ | ---
+ | - - [1]
+ | ...
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:select{} -- 1
+ | ---
+ | - - [1]
+ | ...
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+-- Disable synchronous mode.
+disable_sync_mode()
+ | ---
+ | ...
+-- Space is in async mode now.
+box.cfg{replication_synchro_quorum=NUM_INSTANCES}
+ | ---
+ | ...
+box.space.sync:insert{2} -- success
+ | ---
+ | - [2]
+ | ...
+box.space.sync:insert{3} -- success
+ | ---
+ | - [3]
+ | ...
+box.cfg{replication_synchro_quorum=BROKEN_QUORUM}
+ | ---
+ | ...
+box.space.sync:insert{4} -- success
+ | ---
+ | - [4]
+ | ...
+box.cfg{replication_synchro_quorum=NUM_INSTANCES}
+ | ---
+ | ...
+box.space.sync:insert{5} -- success
+ | ---
+ | - [5]
+ | ...
+box.space.sync:select{} -- 1, 2, 3, 4, 5
+ | ---
+ | - - [1]
+ |   - [2]
+ |   - [3]
+ |   - [4]
+ |   - [5]
+ | ...
+test_run:cmd('switch replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:select{} -- 1, 2, 3, 4, 5
+ | ---
+ | - - [1]
+ |   - [2]
+ |   - [3]
+ |   - [4]
+ |   - [5]
+ | ...
+-- Testcase cleanup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.space.sync:drop()
+ | ---
+ | ...
+
+-- Warn user when setting `replication_synchro_quorum` to a value
+-- greater than number of instances in a cluster, see gh-5122.
+box.cfg{replication_synchro_quorum=BROKEN_QUORUM} -- warning
+ | ---
+ | ...
+
+-- [RFC, summary] switch from leader to replica and vice versa, expected
+-- success and data consistency on a leader and replicas (gh-5124).
+-- Testcase setup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+ | ---
+ | ...
+_ = box.schema.space.create('sync', {is_sync=true, engine=engine})
+ | ---
+ | ...
+_ = box.space.sync:create_index('pk')
+ | ---
+ | ...
+-- Testcase body.
+box.space.sync:insert{1}
+ | ---
+ | - [1]
+ | ...
+box.space.sync:select{} -- 1
+ | ---
+ | - - [1]
+ | ...
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:select{} -- 1
+ | ---
+ | - - [1]
+ | ...
+box.cfg{read_only=false} -- promote replica to master
+ | ---
+ | ...
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.cfg{read_only=true} -- demote master to replica
+ | ---
+ | ...
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:insert{2}
+ | ---
+ | - [2]
+ | ...
+box.space.sync:select{} -- 1, 2
+ | ---
+ | - - [1]
+ |   - [2]
+ | ...
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.space.sync:select{} -- 1, 2
+ | ---
+ | - - [1]
+ | ...
+-- Revert cluster configuration.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.cfg{read_only=false}
+ | ---
+ | ...
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.cfg{read_only=true}
+ | ---
+ | ...
+-- Testcase cleanup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.space.sync:drop()
+ | ---
+ | ...
+
+-- Check behaviour with failed write to WAL on master (ERRINJ_WAL_IO).
+-- Testcase setup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+ | ---
+ | ...
+_ = box.schema.space.create('sync', {is_sync=true, engine=engine})
+ | ---
+ | ...
+_ = box.space.sync:create_index('pk')
+ | ---
+ | ...
+-- Testcase body.
+box.space.sync:insert{1}
+ | ---
+ | - [1]
+ | ...
+box.space.sync:select{} -- 1
+ | ---
+ | - - [1]
+ | ...
+box.error.injection.set('ERRINJ_WAL_IO', true)
+ | ---
+ | - ok
+ | ...
+box.space.sync:insert{2}
+ | ---
+ | - error: Failed to write to disk
+ | ...
+box.error.injection.set('ERRINJ_WAL_IO', false)
+ | ---
+ | - ok
+ | ...
+box.space.sync:select{} -- 1
+ | ---
+ | - - [1]
+ | ...
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:select{} -- 1
+ | ---
+ | - - [1]
+ | ...
+-- Testcase cleanup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.space.sync:drop()
+ | ---
+ | ...
+
+-- [RFC, quorum commit] check behaviour with failure answer from a replica
+-- (ERRINJ_WAL_SYNC) during write, expected disconnect from the replication
+-- (gh-5123, set replication_synchro_quorum to 1).
+-- Testcase setup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_synchro_quorum=2, replication_synchro_timeout=0.1}
+ | ---
+ | ...
+_ = box.schema.space.create('sync', {is_sync=true, engine=engine})
+ | ---
+ | ...
+_ = box.space.sync:create_index('pk')
+ | ---
+ | ...
+-- Testcase body.
+box.space.sync:insert{1}
+ | ---
+ | - [1]
+ | ...
+box.space.sync:select{} -- 1
+ | ---
+ | - - [1]
+ | ...
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.error.injection.set('ERRINJ_WAL_IO', true)
+ | ---
+ | - ok
+ | ...
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.space.sync:insert{2}
+ | ---
+ | - error: Quorum collection for a synchronous transaction is timed out
+ | ...
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.error.injection.set('ERRINJ_WAL_IO', false)
+ | ---
+ | - ok
+ | ...
+box.space.sync:select{} -- 1
+ | ---
+ | - - [1]
+ | ...
+-- Testcase cleanup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.space.sync:drop()
+ | ---
+ | ...
+
+-- Teardown.
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server replica')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server replica')
+ | ---
+ | - true
+ | ...
+test_run:cleanup_cluster()
+ | ---
+ | ...
+box.schema.user.revoke('guest', 'replication')
+ | ---
+ | ...
+box.cfg{                                                                        \
+    replication_synchro_quorum = orig_synchro_quorum,                           \
+    replication_synchro_timeout = orig_synchro_timeout,                         \
+}
+ | ---
+ | ...
+
+-- Setup an async cluster.
+box.schema.user.grant('guest', 'replication')
+ | ---
+ | ...
+test_run:cmd('create server replica with rpl_master=default,\
+                                         script="replication/replica.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server replica with wait=True, wait_load=True')
+ | ---
+ | - true
+ | ...
+
+-- [RFC, summary] switch async replica into sync one, expected
+-- success and data consistency on a leader and replica.
+-- Testcase setup.
+_ = box.schema.space.create('sync', {engine=engine})
+ | ---
+ | ...
+_ = box.space.sync:create_index('pk')
+ | ---
+ | ...
+box.space.sync:insert{1} -- success
+ | ---
+ | - [1]
+ | ...
+test_run:cmd('switch replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:select{} -- 1
+ | ---
+ | - - [1]
+ | ...
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+-- Enable synchronous mode.
+disable_sync_mode()
+ | ---
+ | ...
+-- Space is in sync mode now.
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+ | ---
+ | ...
+box.space.sync:insert{2} -- success
+ | ---
+ | - [2]
+ | ...
+box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=0.1}
+ | ---
+ | ...
+box.space.sync:insert{3} -- success
+ | ---
+ | - [3]
+ | ...
+box.space.sync:select{} -- 1, 2, 3
+ | ---
+ | - - [1]
+ |   - [2]
+ |   - [3]
+ | ...
+test_run:cmd('switch replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:select{} -- 1, 2, 3
+ | ---
+ | - - [1]
+ |   - [2]
+ |   - [3]
+ | ...
+-- Testcase cleanup.
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.space.sync:drop()
+ | ---
+ | ...
+
+-- Teardown.
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server replica')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server replica')
+ | ---
+ | - true
+ | ...
+test_run:cleanup_cluster()
+ | ---
+ | ...
+box.schema.user.revoke('guest', 'replication')
+ | ---
+ | ...
+box.cfg{                                                                        \
+    replication_synchro_quorum = orig_synchro_quorum,                           \
+    replication_synchro_timeout = orig_synchro_timeout,                         \
+}
+ | ---
+ | ...
