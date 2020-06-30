@@ -216,6 +216,32 @@ abspath(const char *filename)
 	return abspath;
 }
 
+/**
+ * Make missing directories from @a path.
+ * @a path has to be null-terminated.
+ * @a path has to be mutable. It allows to avoid copying.
+ * However it is guaranteed to be unmodified after execution.
+ */
+int
+mkdirpath(char *path)
+{
+	char *path_sep = path;
+	while (*path_sep == '/') {
+		/* Don't create root */
+		++path_sep;
+	}
+	while ((path_sep = strchr(path_sep, '/'))) {
+		/* Recursively create path hierarchy */
+		*path_sep = '\0';
+		int rc = mkdir(path, 0777);
+		*path_sep = '/';
+		if (rc == -1 && errno != EEXIST)
+			return -1;
+		++path_sep;
+	}
+	return 0;
+}
+
 char *
 int2str(long long int val)
 {

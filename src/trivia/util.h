@@ -410,6 +410,9 @@ find_path(const char *argv0);
 char *
 abspath(const char *filename);
 
+int
+mkdirpath(char *path);
+
 char *
 int2str(long long int val);
 
