@@ -32,6 +32,26 @@ test_run:switch('replica')
 box.space.sync:count()
 box.error.injection.set('ERRINJ_APPLIER_SLOW_ACK', false)
 
+--
+-- gh-5123: replica WAL fail shouldn't crash with quorum 1.
+--
+test_run:switch('default')
+box.cfg{replication_synchro_quorum = 1, replication_synchro_timeout = 5}
+box.space.sync:insert{11}
+
+test_run:switch('replica')
+box.error.injection.set('ERRINJ_WAL_IO', true)
+
+test_run:switch('default')
+box.space.sync:insert{12}
+
+test_run:switch('replica')
+test_run:wait_upstream(1, {status='stopped'})
+box.error.injection.set('ERRINJ_WAL_IO', false)
+
+test_run:cmd('restart server replica')
+box.space.sync:select{12}
+
 test_run:cmd('switch default')
 
 box.cfg{                                                                        \

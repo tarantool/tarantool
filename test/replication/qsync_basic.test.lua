@@ -118,6 +118,18 @@ test_run:switch('replica')
 box.space.test:select{6}
 box.space.sync:select{6}
 
+--
+-- gh-5123: quorum 1 still should write CONFIRM.
+--
+test_run:switch('default')
+box.cfg{replication_synchro_quorum = 1, replication_synchro_timeout = 5}
+oldlsn = box.info.lsn
+box.space.sync:replace{7}
+newlsn = box.info.lsn
+assert(newlsn >= oldlsn + 2)
+test_run:switch('replica')
+box.space.sync:select{7}
+
 -- Cleanup.
 test_run:cmd('switch default')
 

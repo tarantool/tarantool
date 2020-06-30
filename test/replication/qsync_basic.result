@@ -299,6 +299,39 @@ box.space.sync:select{6}
  | - []
  | ...
 
+--
+-- gh-5123: quorum 1 still should write CONFIRM.
+--
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_synchro_quorum = 1, replication_synchro_timeout = 5}
+ | ---
+ | ...
+oldlsn = box.info.lsn
+ | ---
+ | ...
+box.space.sync:replace{7}
+ | ---
+ | - [7]
+ | ...
+newlsn = box.info.lsn
+ | ---
+ | ...
+assert(newlsn >= oldlsn + 2)
+ | ---
+ | - true
+ | ...
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:select{7}
+ | ---
+ | - - [7]
+ | ...
+
 -- Cleanup.
 test_run:cmd('switch default')
  | ---
