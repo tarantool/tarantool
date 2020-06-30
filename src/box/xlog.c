@@ -824,6 +824,13 @@ xlog_create(struct xlog *xlog, const char *name, int flags,
 	xlog->is_inprogress = true;
 	snprintf(xlog->filename, PATH_MAX, "%s%s", name, inprogress_suffix);
 
+	/* Make directory if needed (gh-5090). */
+	if (mkdirpath(xlog->filename) != 0) {
+		diag_set(SystemError, "failed to create path '%s'",
+			 xlog->filename);
+		goto err;
+	}
+
 	flags |= O_RDWR | O_CREAT | O_EXCL;
 
 	/*
