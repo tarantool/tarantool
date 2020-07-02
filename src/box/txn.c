@@ -35,6 +35,7 @@
 #include <fiber.h>
 #include "xrow.h"
 #include "errinj.h"
+#include "iproto_constants.h"
 
 double too_long_threshold;
 
@@ -488,7 +489,8 @@ txn_journal_entry_new(struct txn *txn)
 
 	assert(txn->n_new_rows + txn->n_applier_rows > 0);
 
-	req = journal_entry_new(txn->n_new_rows + txn->n_applier_rows,
+	/* Save space for an additional NOP row just in case. */
+	req = journal_entry_new(txn->n_new_rows + txn->n_applier_rows + 1,
 				&txn->region, txn);
 	if (req == NULL)
 		return NULL;
@@ -516,6 +518,29 @@ txn_journal_entry_new(struct txn *txn)
 
 	assert(remote_row == req->rows + txn->n_applier_rows);
 	assert(local_row == remote_row + txn->n_new_rows);
+
+	/*
+	 * Append a dummy NOP statement to preserve replication tx
+	 * boundaries when the last tx row is a local one, and the
+	 * transaction has at least one global row.
+	 */
+	if (txn->n_local_rows > 0 &&
+	    (txn->n_local_rows != txn->n_new_rows || txn->n_applier_rows > 0) &&
+	    (*(local_row - 1))->group_id == GROUP_LOCAL) {
+		size_t size;
+		*local_row = region_alloc_object(&txn->region,
+						 typeof(**local_row), &size);
+		if (*local_row == NULL) {
+			diag_set(OutOfMemory, size, "region_alloc_object",
+				 "row");
+			return NULL;
+		}
+		memset(*local_row, 0, sizeof(**local_row));
+		(*local_row)->type = IPROTO_NOP;
+		(*local_row)->group_id = GROUP_DEFAULT;
+	} else {
+		--req->n_rows;
+	}
 
 	return req;
 }
