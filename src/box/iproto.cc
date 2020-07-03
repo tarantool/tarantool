@@ -243,7 +243,7 @@ iproto_msg_new(struct iproto_connection *con);
  * Resume stopped connections, if any.
  */
 static void
-iproto_resume();
+iproto_resume(void);
 
 static void
 iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
@@ -544,7 +544,7 @@ static RLIST_HEAD(stopped_connections);
  * in the message pool.
  */
 static inline bool
-iproto_check_msg_max()
+iproto_check_msg_max(void)
 {
 	size_t request_count = mempool_count(&iproto_msg_pool);
 	return request_count > (size_t) iproto_msg_max;
@@ -932,7 +932,7 @@ iproto_connection_resume(struct iproto_connection *con)
  * necessary to use up the limit.
  */
 static void
-iproto_resume()
+iproto_resume(void)
 {
 	while (!iproto_check_msg_max() && !rlist_empty(&stopped_connections)) {
 		/*
@@ -1516,7 +1516,7 @@ tx_reply_iproto_error(struct cmsg *m)
 
 /** Inject a short delay on tx request processing for testing. */
 static inline void
-tx_inject_delay()
+tx_inject_delay(void)
 {
 	ERROR_INJECT(ERRINJ_IPROTO_TX_DELAY, {
 		if (rand() % 100 < 10)
@@ -2185,7 +2185,7 @@ iproto_session_push(struct session *session, struct port *port)
 
 /** Initialize the iproto subsystem and start network io thread */
 void
-iproto_init()
+iproto_init(void)
 {
 	slab_cache_create(&net_slabc, &runtime);
 
@@ -2334,7 +2334,7 @@ iproto_set_msg_max(int new_iproto_msg_max)
 }
 
 void
-iproto_free()
+iproto_free(void)
 {
 	tt_pthread_cancel(net_cord.id);
 	tt_pthread_join(net_cord.id, NULL);

@@ -91,7 +91,7 @@ iproto_bound_address(void);
 } /* extern "C" */
 
 void
-iproto_init();
+iproto_init(void);
 
 void
 iproto_listen(const char *uri);
@@ -100,7 +100,7 @@ void
 iproto_set_msg_max(int iproto_msg_max);
 
 void
-iproto_free();
+iproto_free(void);
 
 #endif /* defined(__cplusplus) */
 
