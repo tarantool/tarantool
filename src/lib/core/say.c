@@ -163,7 +163,7 @@ level_to_syslog_priority(int level)
 }
 
 enum say_logger_type
-log_type()
+log_type(void)
 {
 	return log_default->type;
 }
@@ -744,7 +744,7 @@ fail:
 }
 
 void
-say_logger_free()
+say_logger_free(void)
 {
 	if (say_logger_initialized())
 		log_destroy(&log_std);

@@ -201,7 +201,7 @@ log_say(struct log *log, int level, const char *filename,
  * @retval say_logger_type.
  */
 enum say_logger_type
-log_type();
+log_type(void);
 
 /**
  * Accessors for default logger file descriptor.
@@ -280,7 +280,7 @@ say_logger_initialized(void);
 
 /** Free default logger */
 void
-say_logger_free();
+say_logger_free(void);
 
 /** \cond public */
 typedef void (*sayfunc_t)(int, const char *, int, const char *,
