@@ -40,7 +40,7 @@
 crc32_func crc32_calc = NULL;
 
 void
-crc32_init()
+crc32_init(void)
 {
 #if defined(HAVE_CPUID) && (defined (__x86_64__) || defined (__i386__))
 	crc32_calc = sse42_enabled_cpu() ? &crc32c_hw : &crc32c;

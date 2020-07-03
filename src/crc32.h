@@ -45,7 +45,7 @@ typedef uint32_t (*crc32_func)(uint32_t crc, const char *buf, unsigned int len);
  */
 extern crc32_func crc32_calc;
 
-void crc32_init();
+void crc32_init(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */
