@@ -43,7 +43,7 @@ void
 tarantool_exit(int);
 
 void
-load_cfg();
+load_cfg(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */

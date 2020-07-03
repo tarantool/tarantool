@@ -311,7 +311,7 @@ signal_free(void)
 
 /** Make sure the child has a default signal disposition. */
 static void
-signal_reset()
+signal_reset(void)
 {
 	for (int i = 0; i < ev_sig_count; i++)
 		ev_signal_stop(loop(), &ev_sigs[i]);
@@ -340,7 +340,7 @@ signal_reset()
 }
 
 static void
-tarantool_atfork()
+tarantool_atfork(void)
 {
 	signal_reset();
 	box_atfork();
@@ -387,7 +387,7 @@ signal_init(void)
 
 /** Run in the background. */
 static void
-daemonize()
+daemonize(void)
 {
 	pid_t pid;
 	int fd;
@@ -439,7 +439,7 @@ error:
 }
 
 extern "C" void
-load_cfg()
+load_cfg(void)
 {
 	const char *work_dir = cfg_gets("work_dir");
 	if (work_dir != NULL && chdir(work_dir) == -1)
