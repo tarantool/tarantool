@@ -49,13 +49,13 @@ extern "C" {
  * \return  0 on sucess
  */
 int
-systemd_init();
+systemd_init(void);
 
 /**
  * Close connection with systemd daemon
  */
 void
-systemd_free();
+systemd_free(void);
 
 /**
  * Send message to systemd

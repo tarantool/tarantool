@@ -50,7 +50,7 @@
 static int systemd_fd = -1;
 static const char *sd_unix_path = NULL;
 
-int systemd_init() {
+int systemd_init(void) {
 	sd_unix_path = getenv("NOTIFY_SOCKET");
 	if (sd_unix_path == NULL) {
 		/* Do nothing if the path is not set. */
@@ -104,7 +104,7 @@ error:
 	return -1;
 }
 
-void systemd_free() {
+void systemd_free(void) {
 	if (systemd_fd > 0)
 		close(systemd_fd);
 }
