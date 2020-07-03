@@ -76,7 +76,7 @@ int     coio_link(const char *oldpath, const char *newpath);
 int     coio_symlink(const char *target, const char *linkpath);
 int     coio_readlink(const char *pathname, char *buf, size_t bufsiz);
 
-int     coio_sync();
+int     coio_sync(void);
 int     coio_fsync(int fd);
 int     coio_fdatasync(int fd);
 

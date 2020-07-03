@@ -523,7 +523,7 @@ coio_tempdir(char *path, size_t path_len)
 }
 
 int
-coio_sync()
+coio_sync(void)
 {
 	INIT_COEIO_FILE(eio);
 	eio_req *req = eio_sync(0, coio_complete, &eio);
