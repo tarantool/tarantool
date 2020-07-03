@@ -244,9 +244,6 @@ cpipe_push(struct cpipe *pipe, struct cmsg *msg)
 		ev_feed_event(pipe->producer, &pipe->flush_input, EV_CUSTOM);
 }
 
-void
-cbus_init();
-
 /**
  * cbus endpoint
  */
@@ -285,11 +282,11 @@ cbus_endpoint_fetch(struct cbus_endpoint *endpoint, struct stailq *output)
 
 /** Initialize the global singleton bus. */
 void
-cbus_init();
+cbus_init(void);
 
 /** Destroy the global singleton bus. */
 void
-cbus_free();
+cbus_free(void);
 
 /**
  * Connect the cord to cbus as a named reciever.

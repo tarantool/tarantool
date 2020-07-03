@@ -322,13 +322,13 @@ cpipe_flush_cb(ev_loop *loop, struct ev_async *watcher, int events)
 }
 
 void
-cbus_init()
+cbus_init(void)
 {
 	cbus_create(&cbus);
 }
 
 void
-cbus_free()
+cbus_free(void)
 {
 	cbus_destroy(&cbus);
 }
