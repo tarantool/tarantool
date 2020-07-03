@@ -44,7 +44,7 @@ tarantool_version(void)
 }
 
 uint32_t
-tarantool_version_id()
+tarantool_version_id(void)
 {
 	return version_id(PACKAGE_VERSION_MAJOR, PACKAGE_VERSION_MINOR,
 			  PACKAGE_VERSION_PATCH);
