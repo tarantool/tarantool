@@ -46,10 +46,10 @@ extern "C" {
 extern struct slab_arena runtime;
 
 void
-memory_init();
+memory_init(void);
 
 void
-memory_free();
+memory_free(void);
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

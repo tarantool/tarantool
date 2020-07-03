@@ -34,7 +34,7 @@
 struct slab_arena runtime;
 
 void
-memory_init()
+memory_init(void)
 {
 	static struct quota runtime_quota;
 	const size_t SLAB_SIZE = 4 * 1024 * 1024;
@@ -47,7 +47,7 @@ memory_init()
 }
 
 void
-memory_free()
+memory_free(void)
 {
 	/*
 	 * If this is called from a fiber != sched, then
