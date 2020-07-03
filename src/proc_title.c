@@ -370,7 +370,7 @@ proc_title_set(const char *format, ...)
 }
 
 size_t
-proc_title_max_length()
+proc_title_max_length(void)
 {
 	return ps_buffer_size - ps_sentinel_size;
 }

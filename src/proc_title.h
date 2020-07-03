@@ -39,7 +39,7 @@ extern "C" {
 char **proc_title_init(int argc, char **argv);
 void proc_title_free(int argc, char **argv);
 CFORMAT(printf, 1, 2) void proc_title_set(const char *format, ...);
-size_t proc_title_max_length();
+size_t proc_title_max_length(void);
 
 #ifdef __cplusplus
 } /* extern "C" */
