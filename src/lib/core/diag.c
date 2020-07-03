@@ -129,7 +129,7 @@ error_create(struct error *e,
 }
 
 struct diag *
-diag_get()
+diag_get(void)
 {
 	return &fiber()->diag;
 }

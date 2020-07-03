@@ -295,7 +295,7 @@ diag_last_error(struct diag *diag)
 }
 
 struct diag *
-diag_get();
+diag_get(void);
 
 NORETURN static inline void
 diag_raise(void)
