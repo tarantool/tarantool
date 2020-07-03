@@ -46,10 +46,10 @@ struct port;
 struct session_vtab;
 
 void
-session_init();
+session_init(void);
 
 void
-session_free();
+session_free(void);
 
 enum session_type {
 	SESSION_TYPE_BACKGROUND = 0,
@@ -221,7 +221,7 @@ extern struct credentials admin_credentials;
  * trigger to destroy it when this fiber ends.
  */
 struct session *
-session_create_on_demand();
+session_create_on_demand(void);
 
 /*
  * When creating a new fiber, the database (box)
@@ -234,7 +234,7 @@ session_create_on_demand();
  * and create it otherwise.
  */
 static inline struct session *
-current_session()
+current_session(void)
 {
 	struct session *session = fiber_get_session(fiber());
 	if (session == NULL) {
@@ -252,7 +252,7 @@ current_session()
  * user on demand as in current_session() applies.
  */
 static inline struct credentials *
-effective_user()
+effective_user(void)
 {
 	struct fiber *f = fiber();
 	struct credentials *u = f->storage.credentials;

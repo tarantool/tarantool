@@ -72,7 +72,7 @@ RLIST_HEAD(session_on_disconnect);
 RLIST_HEAD(session_on_auth);
 
 static inline uint64_t
-sid_max()
+sid_max(void)
 {
 	static uint64_t sid_max = 0;
 	/* Return the next sid rolling over the reserved value of 0. */
@@ -160,7 +160,7 @@ session_create(enum session_type type)
 }
 
 struct session *
-session_create_on_demand()
+session_create_on_demand(void)
 {
 	assert(fiber_get_session(fiber()) == NULL);
 
@@ -278,7 +278,7 @@ extern "C" void
 session_settings_init(void);
 
 void
-session_init()
+session_init(void)
 {
 	session_registry = mh_i64ptr_new();
 	if (session_registry == NULL)
@@ -289,7 +289,7 @@ session_init()
 }
 
 void
-session_free()
+session_free(void)
 {
 	if (session_registry)
 		mh_i64ptr_delete(session_registry);
