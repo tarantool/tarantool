@@ -39,7 +39,7 @@
 static struct sql_stmt_cache sql_stmt_cache;
 
 void
-sql_stmt_cache_init()
+sql_stmt_cache_init(void)
 {
 	sql_stmt_cache.hash = mh_i32ptr_new();
 	if (sql_stmt_cache.hash == NULL)
@@ -119,7 +119,7 @@ stmt_cache_find_entry(uint32_t stmt_id)
 }
 
 static void
-sql_stmt_cache_gc()
+sql_stmt_cache_gc(void)
 {
 	struct stmt_cache_entry *entry, *next;
 	rlist_foreach_entry_safe(entry, &sql_stmt_cache.gc_queue, link, next)

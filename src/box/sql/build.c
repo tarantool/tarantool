@@ -3496,7 +3496,7 @@ sql_session_setting_set(int id, const char *mp_value)
 }
 
 void
-sql_session_settings_init()
+sql_session_settings_init(void)
 {
 	for (int i = 0, id = SESSION_SETTING_SQL_BEGIN;
 	     id < SESSION_SETTING_SQL_END; ++id, ++i) {

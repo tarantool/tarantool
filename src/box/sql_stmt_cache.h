@@ -89,7 +89,7 @@ struct sql_stmt_cache {
  * during database setup (in sql_init()).
  */
 void
-sql_stmt_cache_init();
+sql_stmt_cache_init(void);
 
 /**
  * Store statistics concerning cache (current size and number

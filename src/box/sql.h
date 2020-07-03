@@ -39,7 +39,7 @@ extern "C" {
 #endif
 
 void
-sql_init();
+sql_init(void);
 
 /**
  * Initialize SQL statistic system.
@@ -47,7 +47,7 @@ sql_init();
  * Currently unused.
  */
 void
-sql_load_schema();
+sql_load_schema(void);
 
 /**
  * struct sql *
@@ -62,7 +62,7 @@ sql_load_schema();
  * @retval SQL handle.
  */
 struct sql *
-sql_get();
+sql_get(void);
 
 struct Expr;
 struct Parse;

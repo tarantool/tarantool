@@ -64,7 +64,7 @@ static const uint32_t default_sql_flags = SQL_EnableTrigger
 					  | SQL_RecTriggers;
 
 void
-sql_init()
+sql_init(void)
 {
 	default_flags |= default_sql_flags;
 
@@ -79,7 +79,7 @@ sql_init()
 }
 
 void
-sql_load_schema()
+sql_load_schema(void)
 {
 	assert(db->init.busy == 0);
 	struct space *stat = space_by_name("_sql_stat1");
@@ -97,7 +97,7 @@ sql_load_schema()
 }
 
 sql *
-sql_get()
+sql_get(void)
 {
 	return db;
 }
