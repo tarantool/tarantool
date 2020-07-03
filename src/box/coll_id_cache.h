@@ -43,11 +43,11 @@ struct coll_id;
  * @return - 0 on success, -1 on memory error.
  */
 int
-coll_id_cache_init();
+coll_id_cache_init(void);
 
 /** Delete global hash tables. */
 void
-coll_id_cache_destroy();
+coll_id_cache_destroy(void);
 
 /**
  * Insert or replace a collation into collation cache.

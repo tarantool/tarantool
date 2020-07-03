@@ -39,7 +39,7 @@ static struct mh_strnptr_t *coll_cache_name = NULL;
 static struct mh_i32ptr_t *coll_id_cache = NULL;
 
 int
-coll_id_cache_init()
+coll_id_cache_init(void)
 {
 	coll_id_cache = mh_i32ptr_new();
 	if (coll_id_cache == NULL) {
@@ -58,7 +58,7 @@ coll_id_cache_init()
 }
 
 void
-coll_id_cache_destroy()
+coll_id_cache_destroy(void)
 {
 	mh_strnptr_delete(coll_cache_name);
 	mh_i32ptr_delete(coll_id_cache);
