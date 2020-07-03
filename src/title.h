@@ -76,10 +76,10 @@ char **title_init(int argc, char **argv);
 void title_free(int argc, char **argv);
 
 /** generate and update process title */
-void title_update();
+void title_update(void);
 
 /** query current title */
-const char *title_get();
+const char *title_get(void);
 
 /* parts: invoke title_update() to propagate changes */
 

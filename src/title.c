@@ -72,7 +72,7 @@ void title_free(int argc, char **argv)
 	proc_title_free(argc, argv);
 }
 
-const char *title_get()
+const char *title_get(void)
 {
 	return title_buf;
 }
@@ -99,7 +99,7 @@ my_basename(const char *name)
 	return name;
 }
 
-void title_update()
+void title_update(void)
 {
 	if (title_buf == NULL || title_buf_size == 0)
 		return;
