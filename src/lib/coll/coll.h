@@ -123,11 +123,11 @@ coll_unref(struct coll *coll);
 
 /** Initialize collations subsystem. */
 void
-coll_init();
+coll_init(void);
 
 /** Destroy collations subsystem. */
 void
-coll_free();
+coll_free(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */

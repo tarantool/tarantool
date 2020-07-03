@@ -417,7 +417,7 @@ coll_unref(struct coll *coll)
 }
 
 void
-coll_init()
+coll_init(void)
 {
 	UErrorCode err = U_ZERO_ERROR;
 	coll_cache = mh_coll_new();
@@ -429,7 +429,7 @@ coll_init()
 }
 
 void
-coll_free()
+coll_free(void)
 {
 	ucasemap_close(icu_ucase_default_map);
 	ucnv_close(icu_utf8_conv);
