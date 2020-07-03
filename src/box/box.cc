@@ -230,7 +230,7 @@ static bool
 box_check_ro(void);
 
 void
-box_set_ro()
+box_set_ro(void)
 {
 	bool ro = box_check_ro();
 	if (ro == is_ro)
@@ -369,7 +369,7 @@ wal_stream_create(struct wal_stream *ctx)
 /* {{{ configuration bindings */
 
 static void
-box_check_say()
+box_check_say(void)
 {
 	enum say_logger_type type = SAY_LOGGER_STDERR; /* default */
 	const char *log = cfg_gets("log");
@@ -503,7 +503,7 @@ box_check_uuid(struct tt_uuid *uuid, const char *name)
 }
 
 static bool
-box_check_ro()
+box_check_ro(void)
 {
 	bool ro = cfg_geti("read_only") != 0;
 	bool anon = cfg_geti("replication_anon") != 0;
@@ -646,7 +646,7 @@ box_check_sql_cache_size(int size)
 }
 
 void
-box_check_config()
+box_check_config(void)
 {
 	struct tt_uuid uuid;
 	box_check_say();
@@ -2513,13 +2513,13 @@ box_cfg(void)
  * server forks in box.cfg{} if background=true.
  */
 void
-box_atfork()
+box_atfork(void)
 {
 	wal_atfork();
 }
 
 int
-box_checkpoint()
+box_checkpoint(void)
 {
 	/* Signal arrived before box.cfg{} */
 	if (! is_box_configured)

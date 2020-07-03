@@ -100,7 +100,7 @@ void
 box_atfork(void);
 
 void
-box_set_ro();
+box_set_ro(void);
 
 bool
 box_is_ro(void);
@@ -220,7 +220,7 @@ box_process_vote(struct ballot *ballot);
  * in case of a configuration change.
  */
 void
-box_check_config();
+box_check_config(void);
 
 void box_listen(void);
 void box_set_replication(void);
