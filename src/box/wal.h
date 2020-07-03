@@ -174,10 +174,10 @@ wal_clear_watcher(struct wal_watcher *watcher,
 		  void (*process_cb)(struct cbus_endpoint *));
 
 void
-wal_atfork();
+wal_atfork(void);
 
 enum wal_mode
-wal_mode();
+wal_mode(void);
 
 /**
  * Wait until all submitted writes are successfully flushed
@@ -238,7 +238,7 @@ void
 wal_collect_garbage(const struct vclock *vclock);
 
 void
-wal_init_vy_log();
+wal_init_vy_log(void);
 
 /**
  * Write xrows to the vinyl metadata log.
@@ -250,7 +250,7 @@ wal_write_vy_log(struct journal_entry *req);
  * Rotate the vinyl metadata log.
  */
 void
-wal_rotate_vy_log();
+wal_rotate_vy_log(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */

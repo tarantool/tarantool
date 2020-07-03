@@ -196,7 +196,7 @@ static struct vy_log_writer vy_log_writer;
 static struct wal_writer wal_writer_singleton;
 
 enum wal_mode
-wal_mode()
+wal_mode(void)
 {
 	return wal_writer_singleton.wal_mode;
 }
@@ -1315,7 +1315,7 @@ wal_write_none(struct journal *journal, struct journal_entry *entry)
 }
 
 void
-wal_init_vy_log()
+wal_init_vy_log(void)
 {
 	xlog_clear(&vy_log_writer.xlog);
 }
@@ -1370,7 +1370,7 @@ wal_rotate_vy_log_f(struct cbus_call_msg *msg)
 }
 
 void
-wal_rotate_vy_log()
+wal_rotate_vy_log(void)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	struct cbus_call_msg msg;
@@ -1510,7 +1510,7 @@ wal_notify_watchers(struct wal_writer *writer, unsigned events)
  * a second EOF marker to an open file.
  */
 void
-wal_atfork()
+wal_atfork(void)
 {
 	if (xlog_is_open(&wal_writer_singleton.current_wal))
 		xlog_atfork(&wal_writer_singleton.current_wal);
