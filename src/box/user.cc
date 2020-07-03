@@ -414,7 +414,7 @@ static int min_token_idx = 0;
  * is reached (and we're out of tokens).
  */
 uint8_t
-auth_token_get()
+auth_token_get(void)
 {
 	uint8_t bit_no = 0;
 	while (min_token_idx < USER_MAP_SIZE) {
@@ -542,7 +542,7 @@ user_find_by_name(const char *name, uint32_t len)
 }
 
 void
-user_cache_init()
+user_cache_init(void)
 {
 	/** Mark all tokens as unused. */
 	memset(tokens, 0xFF, sizeof(tokens));
@@ -606,7 +606,7 @@ user_cache_init()
 }
 
 void
-user_cache_free()
+user_cache_free(void)
 {
 	if (user_registry)
 		mh_i32ptr_delete(user_registry);

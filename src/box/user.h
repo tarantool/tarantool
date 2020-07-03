@@ -192,11 +192,11 @@ user_find_by_name_xc(const char *name, uint32_t len)
 
 /** Initialize the user cache and access control subsystem. */
 void
-user_cache_init();
+user_cache_init(void);
 
 /** Cleanup the user cache and access control subsystem */
 void
-user_cache_free();
+user_cache_free(void);
 
 /* {{{ Roles */
 
