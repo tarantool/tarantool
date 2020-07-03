@@ -107,7 +107,7 @@ space_by_name(const char *name)
 
 /** Return current schema version */
 uint32_t
-box_schema_version()
+box_schema_version(void)
 {
 	return schema_version;
 }
@@ -360,7 +360,7 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
  * will get altered automatically to their actual format.
  */
 void
-schema_init()
+schema_init(void)
 {
 	struct key_part_def key_parts[3];
 	for (uint32_t i = 0; i < lengthof(key_parts); i++)

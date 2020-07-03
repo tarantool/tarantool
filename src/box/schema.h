@@ -66,7 +66,7 @@ struct space *
 space_by_name(const char *name);
 
 uint32_t
-box_schema_version();
+box_schema_version(void);
 
 static inline struct space *
 space_cache_find(uint32_t id)
@@ -164,10 +164,10 @@ void
 space_cache_replace(struct space *old_space, struct space *new_space);
 
 void
-schema_init();
+schema_init(void);
 
 void
-schema_free();
+schema_free(void);
 
 struct space *schema_space(uint32_t id);
 
