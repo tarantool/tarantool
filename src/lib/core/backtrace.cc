@@ -65,7 +65,7 @@ struct proc_cache_entry {
 };
 
 void
-backtrace_proc_cache_clear()
+backtrace_proc_cache_clear(void)
 {
 	if (proc_cache == NULL)
 		return;
@@ -131,7 +131,7 @@ error:
 }
 
 char *
-backtrace()
+backtrace(void)
 {
 	int frame_no = 0;
 	unw_word_t sp = 0, old_sp = 0, ip, offset;
@@ -434,7 +434,7 @@ out:
 }
 
 void
-print_backtrace()
+print_backtrace(void)
 {
 	fdprintf(STDERR_FILENO, "%s", backtrace());
 }

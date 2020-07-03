@@ -40,7 +40,7 @@ extern "C" {
 #ifdef ENABLE_BACKTRACE
 #include <coro.h>
 
-void print_backtrace();
+void print_backtrace(void);
 
 typedef int (backtrace_cb)(int frameno, void *frameret,
                            const char *func, size_t offset, void *cb_ctx);
@@ -50,7 +50,7 @@ void
 backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx);
 
 void
-backtrace_proc_cache_clear();
+backtrace_proc_cache_clear(void);
 
 #endif /* ENABLE_BACKTRACE */
 
