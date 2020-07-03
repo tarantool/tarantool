@@ -179,7 +179,7 @@ struct fiber_attr;
  * will not take ownership.
  */
 API_EXPORT struct fiber_attr *
-fiber_attr_new();
+fiber_attr_new(void);
 
 /**
  * Delete the fiber_attr and free all allocated resources.
@@ -219,7 +219,7 @@ typedef int (*fiber_func)(va_list);
  * Return the current fiber
  */
 API_EXPORT struct fiber *
-fiber_self();
+fiber_self(void);
 
 /**
  * Create a new fiber.
@@ -343,7 +343,7 @@ fiber_sleep(double s);
  * manually).
  */
 API_EXPORT bool
-fiber_is_cancelled();
+fiber_is_cancelled(void);
 
 /**
  * Report loop begin time as double (cheap).
@@ -666,7 +666,7 @@ cord_name(struct cord *cord)
 
 /** True if this cord represents the process main thread. */
 bool
-cord_is_main();
+cord_is_main(void);
 
 void
 fiber_init(int (*fiber_invoke)(fiber_func f, va_list ap));
@@ -689,7 +689,7 @@ fiber_name(struct fiber *f)
 }
 
 bool
-fiber_checkstack();
+fiber_checkstack(void);
 
 /**
  * @brief yield & check for timeout
@@ -699,7 +699,7 @@ bool
 fiber_yield_timeout(ev_tstamp delay);
 
 void
-fiber_destroy_all();
+fiber_destroy_all(struct cord *cord);
 
 void
 fiber_gc(void);
@@ -726,13 +726,13 @@ fiber_stat(fiber_stat_cb cb, void *cb_ctx);
 
 #if ENABLE_FIBER_TOP
 bool
-fiber_top_is_enabled();
+fiber_top_is_enabled(void);
 
 void
-fiber_top_enable();
+fiber_top_enable(void);
 
 void
-fiber_top_disable();
+fiber_top_disable(void);
 #endif /* ENABLE_FIBER_TOP */
 
 /** Useful for C unit tests */

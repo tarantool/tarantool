@@ -76,7 +76,7 @@ void
 ipc_value_delete(struct ipc_msg *msg);
 
 struct ipc_value *
-ipc_value_new();
+ipc_value_new(void);
 
 
 /**

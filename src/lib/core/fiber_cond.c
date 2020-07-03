@@ -52,7 +52,7 @@ fiber_cond_destroy(struct fiber_cond *c)
 static __thread struct mempool cond_pool;
 
 struct fiber_cond *
-fiber_cond_new()
+fiber_cond_new(void)
 {
 	struct fiber_cond *cond;
 	if (! mempool_is_initialized(&cond_pool)) {

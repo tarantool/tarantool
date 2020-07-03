@@ -303,7 +303,7 @@ fiber_attr_create(struct fiber_attr *fiber_attr)
 }
 
 struct fiber_attr *
-fiber_attr_new()
+fiber_attr_new(void)
 {
 	struct fiber_attr *fiber_attr = malloc(sizeof(*fiber_attr));
 	if (fiber_attr == NULL)  {
@@ -432,7 +432,7 @@ fiber_start(struct fiber *callee, ...)
 }
 
 bool
-fiber_checkstack()
+fiber_checkstack(void)
 {
 	return false;
 }
@@ -551,7 +551,7 @@ fiber_set_cancellable(bool yesno)
 }
 
 bool
-fiber_is_cancelled()
+fiber_is_cancelled(void)
 {
 	return fiber()->flags & FIBER_IS_CANCELLED;
 }
@@ -805,7 +805,7 @@ unregister_fid(struct fiber *fiber)
 }
 
 struct fiber *
-fiber_self()
+fiber_self(void)
 {
 	return fiber();
 }
@@ -1316,20 +1316,20 @@ loop_on_iteration_end(ev_loop *loop, ev_prepare *watcher, int revents)
 }
 
 static inline void
-fiber_top_init()
+fiber_top_init(void)
 {
 	ev_prepare_init(&cord()->prepare_event, loop_on_iteration_end);
 	ev_check_init(&cord()->check_event, loop_on_iteration_start);
 }
 
 bool
-fiber_top_is_enabled()
+fiber_top_is_enabled(void)
 {
 	return fiber_top_enabled;
 }
 
 inline void
-fiber_top_enable()
+fiber_top_enable(void)
 {
 	if (!fiber_top_enabled) {
 		ev_prepare_start(cord()->loop, &cord()->prepare_event);
@@ -1348,7 +1348,7 @@ fiber_top_enable()
 }
 
 inline void
-fiber_top_disable()
+fiber_top_disable(void)
 {
 	if (fiber_top_enabled) {
 		ev_prepare_stop(cord()->loop, &cord()->prepare_event);
@@ -1702,7 +1702,7 @@ cord_set_name(const char *name)
 }
 
 bool
-cord_is_main()
+cord_is_main(void)
 {
 	return cord() == &main_cord;
 }

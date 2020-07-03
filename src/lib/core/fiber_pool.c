@@ -46,7 +46,7 @@ fiber_pool_f(va_list ap)
 	pool->size++;
 restart:
 	msg = NULL;
-	while (!stailq_empty(output) && !fiber_is_cancelled(fiber())) {
+	while (!stailq_empty(output) && !fiber_is_cancelled()) {
 		 msg = stailq_shift_entry(output, struct cmsg, fifo);
 
 		if (f->caller == &cord->sched && ! stailq_empty(output) &&
@@ -74,7 +74,7 @@ restart:
 		fiber_on_stop(f);
 	}
 	/** Put the current fiber into a fiber cache. */
-	if (!fiber_is_cancelled(fiber()) && (msg != NULL ||
+	if (!fiber_is_cancelled() && (msg != NULL ||
 	    ev_monotonic_now(loop) - last_active_at < pool->idle_timeout)) {
 		if (msg != NULL)
 			last_active_at = ev_monotonic_now(loop);

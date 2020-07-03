@@ -223,7 +223,7 @@ fiber_channel_delete(struct fiber_channel *ch)
 static __thread struct mempool ipc_value_pool;
 
 struct ipc_value *
-ipc_value_new()
+ipc_value_new(void)
 {
 	if (! mempool_is_initialized(&ipc_value_pool)) {
 		/*
