@@ -38,8 +38,8 @@ engine = test_run:get_cfg('engine')
 
 box.schema.user.grant('guest', 'replication')
 -- Set up synchronous replication options.
-quorum = box.cfg.replication_synchro_quorum
-timeout = box.cfg.replication_synchro_timeout
+old_synchro_quorum = box.cfg.replication_synchro_quorum
+old_synchro_timeout = box.cfg.replication_synchro_timeout
 box.cfg{replication_synchro_quorum=2, replication_synchro_timeout=0.1}
 
 test_run:cmd('create server replica with rpl_master=default,\
@@ -71,11 +71,37 @@ box.space.sync:select{}
 test_run:cmd('restart server replica')
 box.space.sync:select{}
 
+--
+-- gh-5100: replica should send ACKs for sync transactions after
+-- WAL write immediately, not waiting for replication timeout or
+-- a CONFIRM.
+--
+box.cfg{replication_timeout = 1000, replication_synchro_timeout = 1000}
+test_run:switch('default')
+old_timeout = box.cfg.replication_timeout
+box.cfg{replication_timeout = 1000, replication_synchro_timeout = 1000}
+-- Commit something non-sync. So as applier writer fiber would
+-- flush the pending heartbeat and go to sleep with the new huge
+-- replication timeout.
+s = box.schema.create_space('test', {engine = engine})
+pk = s:create_index('pk')
+s:replace{1}
+-- Now commit something sync. It should return immediately even
+-- though the replication timeout is huge.
+box.space.sync:replace{4}
+test_run:switch('replica')
+box.space.sync:select{4}
+
 -- Cleanup.
 test_run:cmd('switch default')
 
-box.cfg{replication_synchro_quorum=quorum, replication_synchro_timeout=timeout}
+box.cfg{                                                                        \
+    replication_synchro_quorum = old_synchro_quorum,                            \
+    replication_synchro_timeout = old_synchro_timeout,                          \
+    replication_timeout = old_timeout,                                          \
+}
 test_run:cmd('stop server replica')
 test_run:cmd('delete server replica')
+box.space.test:drop()
 box.space.sync:drop()
 box.schema.user.revoke('guest', 'replication')

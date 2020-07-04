@@ -96,7 +96,7 @@ replication_init(void)
 	vclock_create(&replicaset.applier.vclock);
 	vclock_copy(&replicaset.applier.vclock, &replicaset.vclock);
 	rlist_create(&replicaset.applier.on_rollback);
-	rlist_create(&replicaset.applier.on_commit);
+	rlist_create(&replicaset.applier.on_wal_write);
 
 	diag_create(&replicaset.applier.diag);
 }

@@ -259,8 +259,8 @@ struct replicaset {
 		struct vclock vclock;
 		/* Trigger to fire when a replication request failed to apply. */
 		struct rlist on_rollback;
-		/* Trigget to fire a replication request commited to a wal. */
-		struct rlist on_commit;
+		/* Trigget to fire a replication request when WAL write happens. */
+		struct rlist on_wal_write;
 		/* Shared applier diagnostic area. */
 		struct diag diag;
 	} applier;

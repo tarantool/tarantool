@@ -1,0 +1,114 @@
+-- test-run result file version 2
+test_run = require('test_run').new()
+ | ---
+ | ...
+engine = test_run:get_cfg('engine')
+ | ---
+ | ...
+
+old_synchro_quorum = box.cfg.replication_synchro_quorum
+ | ---
+ | ...
+old_synchro_timeout = box.cfg.replication_synchro_timeout
+ | ---
+ | ...
+old_timeout = box.cfg.replication_timeout
+ | ---
+ | ...
+box.schema.user.grant('guest', 'super')
+ | ---
+ | ...
+
+test_run:cmd('create server replica with rpl_master=default,\
+             script="replication/replica.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server replica with wait=True, wait_load=True')
+ | ---
+ | - true
+ | ...
+
+_ = box.schema.space.create('sync', {is_sync = true, engine = engine})
+ | ---
+ | ...
+_ = box.space.sync:create_index('pk')
+ | ---
+ | ...
+
+--
+-- gh-5100: slow ACK sending shouldn't stun replica for the
+-- replication timeout seconds.
+--
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_timeout = 1000, replication_synchro_quorum = 2, replication_synchro_timeout = 1000}
+ | ---
+ | ...
+
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_timeout = 1000}
+ | ---
+ | ...
+box.error.injection.set('ERRINJ_APPLIER_SLOW_ACK', true)
+ | ---
+ | - ok
+ | ...
+
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+for i = 1, 10 do box.space.sync:replace{i} end
+ | ---
+ | ...
+box.space.sync:count()
+ | ---
+ | - 10
+ | ...
+
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:count()
+ | ---
+ | - 10
+ | ...
+box.error.injection.set('ERRINJ_APPLIER_SLOW_ACK', false)
+ | ---
+ | - ok
+ | ...
+
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+
+box.cfg{                                                                        \
+    replication_synchro_quorum = old_synchro_quorum,                            \
+    replication_synchro_timeout = old_synchro_timeout,                          \
+    replication_timeout = old_timeout,                                          \
+}
+ | ---
+ | ...
+test_run:cmd('stop server replica')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server replica')
+ | ---
+ | - true
+ | ...
+
+box.space.sync:drop()
+ | ---
+ | ...
+box.schema.user.revoke('guest', 'super')
+ | ---
+ | ...

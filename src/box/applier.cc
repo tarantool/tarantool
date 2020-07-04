@@ -45,6 +45,7 @@
 #include "trigger.h"
 #include "xrow_io.h"
 #include "error.h"
+#include "errinj.h"
 #include "session.h"
 #include "cfg.h"
 #include "schema.h"
@@ -179,6 +180,9 @@ applier_writer_f(va_list ap)
 			struct xrow_header xrow;
 			xrow_encode_vclock(&xrow, &replicaset.vclock);
 			coio_write_xrow(&io, &xrow);
+			ERROR_INJECT(ERRINJ_APPLIER_SLOW_ACK, {
+				fiber_sleep(0.01);
+			});
 			/*
 			 * Even if new ACK is requested during the
 			 * write, don't send it again right away.
@@ -807,11 +811,11 @@ applier_txn_rollback_cb(struct trigger *trigger, void *event)
 }
 
 static int
-applier_txn_commit_cb(struct trigger *trigger, void *event)
+applier_txn_wal_write_cb(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	/* Broadcast the commit event across all appliers. */
-	trigger_run(&replicaset.applier.on_commit, event);
+	trigger_run(&replicaset.applier.on_wal_write, event);
 	return 0;
 }
 
@@ -916,23 +920,23 @@ applier_apply_tx(struct stailq *rows)
 	}
 
 	/* We are ready to submit txn to wal. */
-	struct trigger *on_rollback, *on_commit;
+	struct trigger *on_rollback, *on_wal_write;
 	size_t size;
 	on_rollback = region_alloc_object(&txn->region, typeof(*on_rollback),
 					  &size);
-	on_commit = region_alloc_object(&txn->region, typeof(*on_commit),
-					&size);
-	if (on_rollback == NULL || on_commit == NULL) {
+	on_wal_write = region_alloc_object(&txn->region, typeof(*on_wal_write),
+					   &size);
+	if (on_rollback == NULL || on_wal_write == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc_object",
-			 "on_rollback/on_commit");
+			 "on_rollback/on_wal_write");
 		goto rollback;
 	}
 
 	trigger_create(on_rollback, applier_txn_rollback_cb, NULL, NULL);
 	txn_on_rollback(txn, on_rollback);
 
-	trigger_create(on_commit, applier_txn_commit_cb, NULL, NULL);
-	txn_on_commit(txn, on_commit);
+	trigger_create(on_wal_write, applier_txn_wal_write_cb, NULL, NULL);
+	txn_on_wal_write(txn, on_wal_write);
 
 	if (txn_commit_async(txn) < 0)
 		goto fail;
@@ -968,10 +972,10 @@ applier_signal_ack(struct applier *applier)
 }
 
 /*
- * A trigger to update an applier state after a replication commit.
+ * A trigger to update an applier state after WAL write.
  */
 static int
-applier_on_commit(struct trigger *trigger, void *event)
+applier_on_wal_write(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct applier *applier = (struct applier *)trigger->data;
@@ -1104,17 +1108,17 @@ applier_subscribe(struct applier *applier)
 
 	applier->lag = TIMEOUT_INFINITY;
 
-	/* Register triggers to handle replication commits and rollbacks. */
-	struct trigger on_commit;
-	trigger_create(&on_commit, applier_on_commit, applier, NULL);
-	trigger_add(&replicaset.applier.on_commit, &on_commit);
+	/* Register triggers to handle WAL writes and rollbacks. */
+	struct trigger on_wal_write;
+	trigger_create(&on_wal_write, applier_on_wal_write, applier, NULL);
+	trigger_add(&replicaset.applier.on_wal_write, &on_wal_write);
 
 	struct trigger on_rollback;
 	trigger_create(&on_rollback, applier_on_rollback, applier, NULL);
 	trigger_add(&replicaset.applier.on_rollback, &on_rollback);
 
 	auto trigger_guard = make_scoped_guard([&] {
-		trigger_clear(&on_commit);
+		trigger_clear(&on_wal_write);
 		trigger_clear(&on_rollback);
 	});
 
