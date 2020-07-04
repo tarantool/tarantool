@@ -538,6 +538,17 @@ double_compare_int64(double lhs, int64_t rhs, int k)
 }
 
 /**
+ * Compare two operands as int64_t.
+ * Needed for qsort.
+ */
+static inline int
+cmp_i64(const void *_a, const void *_b)
+{
+	const int64_t *a = (const int64_t *) _a, *b = (const int64_t *) _b;
+	return COMPARE_RESULT(*a, *b);
+}
+
+/**
  * Put the current thread in sleep for the given number of
  * seconds.
  */

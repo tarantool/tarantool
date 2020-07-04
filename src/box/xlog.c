@@ -46,6 +46,7 @@
 #include "xrow.h"
 #include "iproto_constants.h"
 #include "errinj.h"
+#include "trivia/util.h"
 
 /*
  * FALLOC_FL_KEEP_SIZE flag has existed since fallocate() was
@@ -473,15 +474,6 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
 		return -1;
 	}
 	return 0;
-}
-
-static int
-cmp_i64(const void *_a, const void *_b)
-{
-	const int64_t *a = (const int64_t *) _a, *b = (const int64_t *) _b;
-	if (*a == *b)
-		return 0;
-	return (*a > *b) ? 1 : -1;
 }
 
 /**
