@@ -32,6 +32,22 @@
 #include "tuple.h"
 
 /**
+ * Finish bar creation only when it is fully initialized and
+ * valid. Because if all this is happening inside an upsert()
+ * operation, an error in the bar won't stop the whole xrow
+ * upsert. This field will still be saved in the result tuple. But
+ * in case of an error this operation should be skipped. So this
+ * is kept 'nop' when error happens.
+ */
+static inline int
+xrow_update_bar_finish(struct xrow_update_field *field)
+{
+	assert(field->type == XUPDATE_NOP);
+	field->type = XUPDATE_BAR;
+	return 0;
+}
+
+/**
  * Locate a field to update by @a op's JSON path and initialize
  * @a field as a bar update.
  *
@@ -59,8 +75,12 @@ xrow_update_bar_locate(struct xrow_update_op *op,
 	 * terminal.
 	 */
 	assert(!xrow_update_op_is_term(op));
+	/*
+	 * Nop means this function can change field->bar and
+	 * nothing will break.
+	 */
+	assert(field->type == XUPDATE_NOP);
 	int rc;
-	field->type = XUPDATE_BAR;
 	field->bar.op = op;
 	field->bar.path = op->lexer.src + op->lexer.offset;
 	field->bar.path_len = op->lexer.src_len - op->lexer.offset;
@@ -114,8 +134,12 @@ xrow_update_bar_locate_opt(struct xrow_update_op *op,
 	 * terminal.
 	 */
 	assert(!xrow_update_op_is_term(op));
+	/*
+	 * Nop means this function can change field->bar and
+	 * nothing will break.
+	 */
+	assert(field->type == XUPDATE_NOP);
 	int rc;
-	field->type = XUPDATE_BAR;
 	field->bar.op = op;
 	field->bar.path = op->lexer.src + op->lexer.offset;
 	field->bar.path_len = op->lexer.src_len - op->lexer.offset;
@@ -231,7 +255,7 @@ xrow_update_op_do_nop_insert(struct xrow_update_op *op,
 		 */
 		op->new_field_len += mp_sizeof_str(key_len);
 	}
-	return 0;
+	return xrow_update_bar_finish(field);
 }
 
 int
@@ -250,7 +274,7 @@ xrow_update_op_do_nop_set(struct xrow_update_op *op,
 		if (mp_typeof(*field->bar.parent) == MP_MAP)
 			op->new_field_len += mp_sizeof_str(key_len);
 	}
-	return 0;
+	return xrow_update_bar_finish(field);
 }
 
 int
@@ -279,7 +303,7 @@ xrow_update_op_do_nop_delete(struct xrow_update_op *op,
 		field->bar.point -= key_len_or_index;
 		field->bar.point_size += key_len_or_index;
 	}
-	return 0;
+	return xrow_update_bar_finish(field);
 }
 
 #define DO_NOP_OP_GENERIC(op_type)						\
@@ -291,7 +315,9 @@ xrow_update_op_do_nop_##op_type(struct xrow_update_op *op,			\
 	int key_len_or_index;							\
 	if (xrow_update_bar_locate(op, field, &key_len_or_index) != 0)		\
 		return -1;							\
-	return xrow_update_op_do_##op_type(op, field->bar.point);		\
+	if (xrow_update_op_do_##op_type(op, field->bar.point) != 0)		\
+		return -1;							\
+	return xrow_update_bar_finish(field);					\
 }
 
 DO_NOP_OP_GENERIC(arith)
