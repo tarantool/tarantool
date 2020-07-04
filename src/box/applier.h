@@ -80,6 +80,13 @@ struct applier {
 	struct fiber *writer;
 	/** Writer cond. */
 	struct fiber_cond writer_cond;
+	/**
+	 * True if the applier has vclocks not sent to the remote
+	 * master. The flag is needed because during sending one
+	 * vclock (ACK), it can be updated again. So just one
+	 * condition variable is not enough.
+	 */
+	bool has_acks_to_send;
 	/** Finite-state machine */
 	enum applier_state state;
 	/** Local time of this replica when the last row has been received */

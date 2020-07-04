@@ -154,12 +154,14 @@ applier_writer_f(va_list ap)
 		 * messages so we don't need to send ACKs every
 		 * replication_timeout seconds any more.
 		 */
-		if (applier->version_id >= version_id(1, 7, 7))
-			fiber_cond_wait_timeout(&applier->writer_cond,
-						TIMEOUT_INFINITY);
-		else
-			fiber_cond_wait_timeout(&applier->writer_cond,
-						replication_timeout);
+		if (!applier->has_acks_to_send) {
+			if (applier->version_id >= version_id(1, 7, 7))
+				fiber_cond_wait_timeout(&applier->writer_cond,
+							TIMEOUT_INFINITY);
+			else
+				fiber_cond_wait_timeout(&applier->writer_cond,
+							replication_timeout);
+		}
 		/*
 		 * A writer fiber is going to be awaken after a commit or
 		 * a heartbeat message. So this is an appropriate place to
@@ -173,9 +175,16 @@ applier_writer_f(va_list ap)
 		    applier->state != APPLIER_FOLLOW)
 			continue;
 		try {
+			applier->has_acks_to_send = false;
 			struct xrow_header xrow;
 			xrow_encode_vclock(&xrow, &replicaset.vclock);
 			coio_write_xrow(&io, &xrow);
+			/*
+			 * Even if new ACK is requested during the
+			 * write, don't send it again right away.
+			 * Otherwise risk to stay in this loop for
+			 * a long time.
+			 */
 		} catch (SocketError *e) {
 			/*
 			 * There is no point trying to send ACKs if
@@ -947,6 +956,17 @@ fail:
 	return -1;
 }
 
+/**
+ * Notify the applier's write fiber that there are more ACKs to
+ * send to master.
+ */
+static inline void
+applier_signal_ack(struct applier *applier)
+{
+	fiber_cond_signal(&applier->writer_cond);
+	applier->has_acks_to_send = true;
+}
+
 /*
  * A trigger to update an applier state after a replication commit.
  */
@@ -955,7 +975,7 @@ applier_on_commit(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct applier *applier = (struct applier *)trigger->data;
-	fiber_cond_signal(&applier->writer_cond);
+	applier_signal_ack(applier);
 	return 0;
 }
 
@@ -1120,7 +1140,7 @@ applier_subscribe(struct applier *applier)
 		 */
 		if (stailq_first_entry(&rows, struct applier_tx_row,
 				       next)->row.lsn == 0)
-			fiber_cond_signal(&applier->writer_cond);
+			applier_signal_ack(applier);
 		else if (applier_apply_tx(&rows) != 0)
 			diag_raise();
 
