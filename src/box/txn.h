@@ -259,7 +259,7 @@ struct txn {
 	 */
 	struct trigger fiber_on_stop;
 	/** Commit and rollback triggers. */
-	struct rlist on_commit, on_rollback;
+	struct rlist on_commit, on_rollback, on_wal_write;
 	/**
 	 * This member represents counter of deferred foreign key
 	 * violations within transaction. DEFERRED mode means
@@ -370,6 +370,7 @@ txn_init_triggers(struct txn *txn)
 	if (!txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
 		rlist_create(&txn->on_commit);
 		rlist_create(&txn->on_rollback);
+		rlist_create(&txn->on_wal_write);
 		txn_set_flag(txn, TXN_HAS_TRIGGERS);
 	}
 }
@@ -386,6 +387,13 @@ txn_on_rollback(struct txn *txn, struct trigger *trigger)
 {
 	txn_init_triggers(txn);
 	trigger_add(&txn->on_rollback, trigger);
+}
+
+static inline void
+txn_on_wal_write(struct txn *txn, struct trigger *trigger)
+{
+	txn_init_triggers(txn);
+	trigger_add(&txn->on_wal_write, trigger);
 }
 
 /**

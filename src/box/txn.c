@@ -424,6 +424,25 @@ txn_run_rollback_triggers(struct txn *txn, struct rlist *triggers)
 	}
 }
 
+/* A helper function to process on_wal_write triggers. */
+static void
+txn_run_wal_write_triggers(struct txn *txn)
+{
+	/* Is zero during recovery. */
+	assert(txn->signature >= 0);
+	if (trigger_run(&txn->on_wal_write, txn) != 0) {
+		/*
+		 * As transaction couldn't handle a trigger error so
+		 * there is no option except panic.
+		 */
+		diag_log();
+		unreachable();
+		panic("wal_write trigger failed");
+	}
+	/* WAL write happens only once. */
+	trigger_destroy(&txn->on_wal_write);
+}
+
 /**
  * Complete transaction processing.
  */
@@ -448,8 +467,14 @@ txn_complete(struct txn *txn)
 		/* Commit the transaction. */
 		if (txn->engine != NULL)
 			engine_commit(txn->engine, txn);
-		if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
+		if (txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
 			txn_run_commit_triggers(txn, &txn->on_commit);
+			/*
+			 * For async transactions WAL write ==
+			 * commit.
+			 */
+			txn_run_wal_write_triggers(txn);
+		}
 
 		double stop_tm = ev_monotonic_now(loop());
 		if (stop_tm - txn->start_tm > too_long_threshold) {
@@ -460,6 +485,8 @@ txn_complete(struct txn *txn)
 					     stop_tm - txn->start_tm);
 		}
 	} else {
+		if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
+			txn_run_wal_write_triggers(txn);
 		/*
 		 * Complete is called on every WAL operation
 		 * authored by this transaction. And it not always
