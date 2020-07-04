@@ -343,20 +343,52 @@ t2:update({{'!', 'g[6][1]', 50}})
 t4_array:update({{'!', '[4][1]', 100}})
 t4_map:update({{'!', '[4].a', 100}})
 -- Test errors.
-t:update({{'!', 'a', 100}}) -- No such field.
-t:update({{'!', 'f.a', 300}}) -- Key already exists.
-t:update({{'!', 'f.c.f[0]', 3.5}}) -- No such index, too small.
-t:update({{'!', 'f.c.f[100]', 100}}) -- No such index, too big.
-t:update({{'!', 'g[4][100]', 700}}) -- Insert index into map.
-t:update({{'!', 'g[1][1]', 300}})
-t:update({{'!', 'f.g.a', 700}}) -- Insert key into array.
-t:update({{'!', 'f.g[1].a', 700}})
-t:update({{'!', 'f[*].k', 20}}) -- 'Any' is not considered valid JSON.
+ops = {{'!', 'a', 100}} -- No such field.
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'!', 'f.a', 300}} -- Key already exists.
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'!', 'f.c.f[0]', 3.5}} -- No such index, too small.
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'!', 'f.c.f[100]', 100}} -- No such index, too big.
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'!', 'g[4][100]', 700}} -- Insert index into map.
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'!', 'g[1][1]', 300}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'!', 'f.g.a', 700}} -- Insert key into array.
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'!', 'f.g[1].a', 700}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'!', 'f[*].k', 20}} -- 'Any' is not considered valid JSON.
+t:update(ops)
+t:upsert(ops)
+
 -- JSON error after the not existing field to insert.
-t:update({{'!', '[2].e.100000', 100}})
+ops = {{'!', '[2].e.100000', 100}}
+t:update(ops)
+t:upsert(ops)
+
 -- Correct JSON, but next to last field does not exist. '!' can't
 -- create the whole path.
-t:update({{'!', '[2].e.f', 100}})
+ops = {{'!', '[2].e.f', 100}}
+t:update(ops)
+t:upsert(ops)
 
 --
 -- =
@@ -373,11 +405,25 @@ t:update({{'=', 'f.g[1]', 0}})
 t4_array:update({{'=', '[4][1]', 100}})
 t4_map:update({{'=', '[4]["a"]', 100}})
 -- Test errors.
-t:update({{'=', 'f.a[1]', 100}})
-t:update({{'=', 'f.a.k', 100}})
-t:update({{'=', 'f.c.f[1]', 100}})
-t:update({{'=', 'f.c.f[100]', 100}})
-t:update({{'=', '[2].c.f 1 1 1 1', 100}})
+ops = {{'=', 'f.a[1]', 100}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', 'f.a.k', 100}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', 'f.c.f[1]', 100}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', 'f.c.f[100]', 100}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', '[2].c.f 1 1 1 1', 100}}
+t:update(ops)
+t:upsert(ops)
 
 --
 -- #
@@ -389,11 +435,25 @@ t:update({{'#', 'f.c.f[1]', 100}})
 t:update({{'#', 'f.c.f[5]', 1}})
 t:update({{'#', 'f.c.f[5]', 2}})
 -- Test errors.
-t:update({{'#', 'f.h', 1}})
-t:update({{'#', 'f.c.f[100]', 1}})
-t:update({{'#', 'f.b', 2}})
-t:update({{'#', 'f.b', 0}})
-t:update({{'#', 'f', 0}})
+ops = {{'#', 'f.h', 1}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'#', 'f.c.f[100]', 1}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'#', 'f.b', 2}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'#', 'f.b', 0}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'#', 'f', 0}}
+t:update(ops)
+t:upsert(ops)
 
 --
 -- Scalar operations.
@@ -404,10 +464,21 @@ t:update({{'&', 'f.c.f[2]', 4}})
 t2 = t:update({{'=', 4, {str = 'abcd'}}})
 t2:update({{':', '[4].str', 2, 2, 'e'}})
 -- Test errors.
-t:update({{'+', 'g[3]', 50}})
-t:update({{'+', '[2].b.......', 100}})
-t:update({{'+', '[2].b.c.d.e', 100}})
-t:update({{'-', '[2][*]', 20}})
+ops = {{'+', 'g[3]', 50}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'+', '[2].b.......', 100}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'+', '[2].b.c.d.e', 100}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'-', '[2][*]', 20}}
+t:update(ops)
+t:upsert(ops)
 
 -- Vinyl normalizes field numbers. It should not touch paths,
 -- and they should not affect squashing.
@@ -488,14 +559,31 @@ t:update({{'=', '[4][4][5][3][2]', 11000}, {'=', '[4][4][5][3][1]', 10000}, {'='
 -- delete the route and replace it with a full featured array.
 t:update({{'=', '[4][4][1]', 4.5}, {'=', '[4][4][2]', 5.5}, {'=', '[4][3]', 3.5}})
 -- Test errors.
-t:update({{'=', '[4][4][5][1]', 8000}, {'=', '[4][4][5].a', -1}})
-t:update({{'=', '[4][4][5][1]', 8000}, {'=', '[4][4][*].a', -1}})
-t:update({{'=', '[4][4][*].b', 8000}, {'=', '[4][4][*].a', -1}})
-t:update({{'=', '[4][4][1]', 4000}, {'=', '[4][4]-badjson', -1}})
-t:update({{'=', '[4][4][1]', 1}, {'=', '[4][4][1]', 2}})
+ops = {{'=', '[4][4][5][1]', 8000}, {'=', '[4][4][5].a', -1}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', '[4][4][5][1]', 8000}, {'=', '[4][4][*].a', -1}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', '[4][4][*].b', 8000}, {'=', '[4][4][*].a', -1}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', '[4][4][1]', 4000}, {'=', '[4][4]-badjson', -1}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', '[4][4][1]', 1}, {'=', '[4][4][1]', 2}}
+t:update(ops)
+t:upsert(ops)
+
 -- First two operations produce zero length bar update in field
 -- [4][4][5][4]. The third operation should raise an error.
-t:update({{'+', '[4][4][5][4]', 13000}, {'=', '[4][4][5][1]', 8000}, {'+', '[4][4][5][4]', 1}})
+ops = {{'+', '[4][4][5][4]', 13000}, {'=', '[4][4][5][1]', 8000}, {'+', '[4][4][5][4]', 1}}
+t:update(ops)
+t:upsert(ops)
 
 --
 -- !
@@ -516,10 +604,14 @@ t:update({{'+', '[4][3]', 0.5}, {'+', '[4][4][5][5]', 0.75}, {'+', '[4][4][3]', 
 t:update({{'!', '[4][3]', 2.5}, {'+', '[4][5][5][5]', 0.75}, {'+', '[4][5][3]', 0.25}})
 -- Error - an attempt to follow JSON path in a scalar field
 -- during branching.
-t:update({{'+', '[4][3]', 0.5}, {'+', '[4][3][2]', 0.5}})
+ops = {{'+', '[4][3]', 0.5}, {'+', '[4][3][2]', 0.5}}
+t:update(ops)
+t:upsert(ops)
 -- Error - array update should check that its token is a number.
 -- Parent field won't guarantee that.
-t:update({{'=', '[3]', {0}}, {'=', '[4][3]', 3.5}, {'=', '[4][4][1]', 4.5}, {'=', '[4][4][2]', 5.5}, {'=', '[4][4].key', 6.5}})
+ops = {{'=', '[3]', {0}}, {'=', '[4][3]', 3.5}, {'=', '[4][4][1]', 4.5}, {'=', '[4][4][2]', 5.5}, {'=', '[4][4].key', 6.5}}
+t:update(ops)
+t:upsert(ops)
 
 --
 -- Intersecting map updates.
@@ -576,25 +668,51 @@ ops = {{'=', '[2].h.i.j', 14000}, {'=', '[2].h.i.k', 15000}, {'=', '[2].h.m', 16
 -- implemented separately and tested both.
 ops[#ops] = {'+', '[2].h.i.<badjson>', -1}
 t:update(ops)
+t:upsert(ops)
+
 ops[#ops][1] = '!'
 t:update(ops)
+t:upsert(ops)
+
 ops[#ops][1] = '#'
 ops[#ops][3] = 1
 t:update(ops)
+t:upsert(ops)
+
 -- Key extractor should reject any attempt to use non-string keys.
 ops[#ops] = {'-', '[2].h.i[20]', -1}
 t:update(ops)
+t:upsert(ops)
+
 ops[#ops][1] = '='
 t:update(ops)
+t:upsert(ops)
 
-t:update({{'+', '[2].d.e', 1}, {'+', '[2].d.f', 1}, {'+', '[2].d.k', 1}})
-t:update({{'=', '[2].d.e', 6000}, {'!', '[2].d.g.h', -1}})
-t:update({{'!', '[2].d.g', 6000}, {'!', '[2].d.e', -1}})
-t:update({{'=', '[2].d.g', 6000}, {'#', '[2].d.old', 10}})
+ops = {{'+', '[2].d.e', 1}, {'+', '[2].d.f', 1}, {'+', '[2].d.k', 1}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', '[2].d.e', 6000}, {'!', '[2].d.g.h', -1}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'!', '[2].d.g', 6000}, {'!', '[2].d.e', -1}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', '[2].d.g', 6000}, {'#', '[2].d.old', 10}}
+t:update(ops)
+t:upsert(ops)
+
 -- '!'/'=' can be used to create a field, but only if it is a
 -- tail. These operations can't create the whole path.
-t:update({{'=', '[2].d.g', 6000}, {'=', '[2].d.new.new', -1}})
-t:update({{'=', '[2].d.g', 6000}, {'#', '[2].d.old.old', 1}})
+ops = {{'=', '[2].d.g', 6000}, {'=', '[2].d.new.new', -1}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', '[2].d.g', 6000}, {'#', '[2].d.old.old', 1}}
+t:update(ops)
+t:upsert(ops)
 
 s:drop()
 
