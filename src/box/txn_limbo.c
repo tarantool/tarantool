@@ -514,6 +514,32 @@ txn_limbo_wait_confirm(struct txn_limbo *limbo)
 }
 
 void
+txn_limbo_force_empty(struct txn_limbo *limbo, int64_t confirm_lsn)
+{
+	struct txn_limbo_entry *e, *last_quorum = NULL;
+	struct txn_limbo_entry *rollback = NULL;
+	rlist_foreach_entry(e, &limbo->queue, in_queue) {
+		if (txn_has_flag(e->txn, TXN_WAIT_ACK)) {
+			if (e->lsn <= confirm_lsn) {
+				last_quorum = e;
+			} else {
+				rollback = e;
+				break;
+			}
+		}
+	}
+
+	if (last_quorum != NULL) {
+		txn_limbo_write_confirm(limbo, last_quorum->lsn);
+		txn_limbo_read_confirm(limbo, last_quorum->lsn);
+	}
+	if (rollback != NULL) {
+		txn_limbo_write_rollback(limbo, rollback->lsn);
+		txn_limbo_read_rollback(limbo, rollback->lsn);
+	}
+}
+
+void
 txn_limbo_init(void)
 {
 	txn_limbo_create(&txn_limbo);

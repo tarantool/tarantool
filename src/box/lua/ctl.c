@@ -78,11 +78,20 @@ lbox_ctl_on_schema_init(struct lua_State *L)
 	return lbox_trigger_reset(L, 2, &on_schema_init, NULL, NULL);
 }
 
+static int
+lbox_ctl_clear_synchro_queue(struct lua_State *L)
+{
+	(void) L;
+	box_clear_synchro_queue();
+	return 0;
+}
+
 static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"wait_ro", lbox_ctl_wait_ro},
 	{"wait_rw", lbox_ctl_wait_rw},
 	{"on_shutdown", lbox_ctl_on_shutdown},
 	{"on_schema_init", lbox_ctl_on_schema_init},
+	{"clear_synchro_queue", lbox_ctl_clear_synchro_queue},
 	{NULL, NULL}
 };
 

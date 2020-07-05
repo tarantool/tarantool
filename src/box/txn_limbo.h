@@ -221,6 +221,16 @@ txn_limbo_confirm_timeout(struct txn_limbo *limbo);
 int
 txn_limbo_wait_confirm(struct txn_limbo *limbo);
 
+/**
+ * Make txn_limbo confirm all the entries with lsn less than or
+ * equal to the given one, and rollback all the following entries.
+ * The function makes txn_limbo write CONFIRM and ROLLBACK
+ * messages for appropriate lsns, and then process the messages
+ * immediately.
+ */
+void
+txn_limbo_force_empty(struct txn_limbo *limbo, int64_t last_confirm);
+
 void
 txn_limbo_init();
 

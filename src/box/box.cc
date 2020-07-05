@@ -78,6 +78,7 @@
 #include "sequence.h"
 #include "sql_stmt_cache.h"
 #include "msgpack.h"
+#include "trivia/util.h"
 
 static char status[64] = "unknown";
 
@@ -943,6 +944,55 @@ box_set_replication_anon(void)
 			  " has finished");
 	}
 
+}
+
+void
+box_clear_synchro_queue(void)
+{
+	if (!is_box_configured || txn_limbo_is_empty(&txn_limbo))
+		return;
+	uint32_t former_leader_id = txn_limbo.instance_id;
+	assert(former_leader_id != REPLICA_ID_NIL);
+	if (former_leader_id == instance_id)
+		return;
+
+	/* Wait until pending confirmations/rollbacks reach us. */
+	double timeout = 2 * txn_limbo_confirm_timeout(&txn_limbo);
+	double start_tm = fiber_time();
+	while (!txn_limbo_is_empty(&txn_limbo)) {
+		if (fiber_time() - start_tm > timeout)
+			break;
+		fiber_sleep(0.001);
+	}
+
+	if (!txn_limbo_is_empty(&txn_limbo)) {
+		int64_t lsns[VCLOCK_MAX];
+		int len = 0;
+		const struct vclock  *vclock;
+		replicaset_foreach(replica) {
+			if (replica->relay != NULL &&
+			    relay_get_state(replica->relay) != RELAY_OFF &&
+			    !replica->anon) {
+				assert(!tt_uuid_is_equal(&INSTANCE_UUID,
+							 &replica->uuid));
+				vclock = relay_vclock(replica->relay);
+				int64_t lsn = vclock_get(vclock,
+							 former_leader_id);
+				lsns[len++] = lsn;
+			}
+		}
+		lsns[len++] = vclock_get(box_vclock, former_leader_id);
+		assert(len < VCLOCK_MAX);
+
+		int64_t confirm_lsn = 0;
+		if (len >= replication_synchro_quorum) {
+			qsort(lsns, len, sizeof(int64_t), cmp_i64);
+			confirm_lsn = lsns[len - replication_synchro_quorum];
+		}
+
+		txn_limbo_force_empty(&txn_limbo, confirm_lsn);
+		assert(txn_limbo_is_empty(&txn_limbo));
+	}
 }
 
 void
