@@ -39,6 +39,7 @@ txn_limbo_create(struct txn_limbo *limbo)
 {
 	rlist_create(&limbo->queue);
 	limbo->instance_id = REPLICA_ID_NIL;
+	fiber_cond_create(&limbo->wait_cond);
 	vclock_create(&limbo->vclock);
 	limbo->rollback_count = 0;
 }
@@ -160,45 +161,56 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 
 	assert(!txn_has_flag(txn, TXN_IS_DONE));
 	assert(txn_has_flag(txn, TXN_WAIT_SYNC));
-	bool cancellable = fiber_set_cancellable(false);
-	bool timed_out = fiber_yield_timeout(txn_limbo_confirm_timeout(limbo));
-	fiber_set_cancellable(cancellable);
-	if (timed_out) {
-		assert(!txn_limbo_is_empty(limbo));
-		if (txn_limbo_first_entry(limbo) != entry) {
-			/*
-			 * If this is not a first entry in the
-			 * limbo, it is definitely not a first
-			 * timed out entry. And since it managed
-			 * to time out too, it means there is
-			 * currently another fiber writing
-			 * rollback. Wait when it will finish and
-			 * wake us up.
-			 */
-			bool cancellable = fiber_set_cancellable(false);
-			fiber_yield();
-			fiber_set_cancellable(cancellable);
-			assert(txn_limbo_entry_is_complete(entry));
+	double start_time = fiber_clock();
+	while (true) {
+		double deadline = start_time + txn_limbo_confirm_timeout(limbo);
+		bool cancellable = fiber_set_cancellable(false);
+		double timeout = deadline - fiber_clock();
+		bool timed_out = fiber_cond_wait_timeout(&limbo->wait_cond,
+							 timeout);
+		fiber_set_cancellable(cancellable);
+		if (txn_limbo_entry_is_complete(entry))
 			goto complete;
-		}
-
-		txn_limbo_write_rollback(limbo, entry->lsn);
-		struct txn_limbo_entry *e, *tmp;
-		rlist_foreach_entry_safe_reverse(e, &limbo->queue,
-						 in_queue, tmp) {
-			e->is_rollback = true;
-			e->txn->signature = TXN_SIGNATURE_QUORUM_TIMEOUT;
-			txn_limbo_pop(limbo, e);
-			txn_clear_flag(e->txn, TXN_WAIT_SYNC);
-			txn_clear_flag(e->txn, TXN_WAIT_ACK);
-			txn_complete(e->txn);
-			if (e == entry)
-				break;
-			fiber_wakeup(e->txn->fiber);
-		}
-		diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
-		return -1;
+		if (timed_out)
+			goto do_rollback;
 	}
+
+do_rollback:
+	assert(!txn_limbo_is_empty(limbo));
+	if (txn_limbo_first_entry(limbo) != entry) {
+		/*
+		 * If this is not a first entry in the limbo, it
+		 * is definitely not a first timed out entry. And
+		 * since it managed to time out too, it means
+		 * there is currently another fiber writing
+		 * rollback. Wait when it will finish and wake us
+		 * up.
+		 */
+		bool cancellable = fiber_set_cancellable(false);
+		do {
+			fiber_yield();
+		} while (!txn_limbo_entry_is_complete(entry));
+		fiber_set_cancellable(cancellable);
+		goto complete;
+	}
+
+	txn_limbo_write_rollback(limbo, entry->lsn);
+	struct txn_limbo_entry *e, *tmp;
+	rlist_foreach_entry_safe_reverse(e, &limbo->queue,
+					 in_queue, tmp) {
+		e->is_rollback = true;
+		e->txn->signature = TXN_SIGNATURE_QUORUM_TIMEOUT;
+		txn_limbo_pop(limbo, e);
+		txn_clear_flag(e->txn, TXN_WAIT_SYNC);
+		txn_clear_flag(e->txn, TXN_WAIT_ACK);
+		txn_complete(e->txn);
+		if (e == entry)
+			break;
+		fiber_wakeup(e->txn->fiber);
+	}
+	diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
+	return -1;
+
 complete:
 	assert(txn_limbo_entry_is_complete(entry));
 	/*
@@ -443,15 +455,13 @@ txn_limbo_confirm_timeout(struct txn_limbo *limbo)
  * or array instead of the boolean.
  */
 struct confirm_waitpoint {
-	/**
-	 * Variable for wake up the fiber that is waiting for
-	 * the end of confirmation.
-	 */
-	struct fiber_cond confirm_cond;
+	/** Fiber that is waiting for the end of confirmation. */
+	struct fiber *caller;
 	/**
 	 * Result flag.
 	 */
 	bool is_confirm;
+	bool is_rollback;
 };
 
 static int
@@ -461,7 +471,7 @@ txn_commit_cb(struct trigger *trigger, void *event)
 	struct confirm_waitpoint *cwp =
 		(struct confirm_waitpoint *)trigger->data;
 	cwp->is_confirm = true;
-	fiber_cond_signal(&cwp->confirm_cond);
+	fiber_wakeup(cwp->caller);
 	return 0;
 }
 
@@ -471,7 +481,8 @@ txn_rollback_cb(struct trigger *trigger, void *event)
 	(void)event;
 	struct confirm_waitpoint *cwp =
 		(struct confirm_waitpoint *)trigger->data;
-	fiber_cond_signal(&cwp->confirm_cond);
+	cwp->is_rollback = true;
+	fiber_wakeup(cwp->caller);
 	return 0;
 }
 
@@ -483,8 +494,9 @@ txn_limbo_wait_confirm(struct txn_limbo *limbo)
 
 	/* initialization of a waitpoint. */
 	struct confirm_waitpoint cwp;
-	fiber_cond_create(&cwp.confirm_cond);
+	cwp.caller = fiber();
 	cwp.is_confirm = false;
+	cwp.is_rollback = false;
 
 	/* Set triggers for the last limbo transaction. */
 	struct trigger on_complete;
@@ -494,17 +506,26 @@ txn_limbo_wait_confirm(struct txn_limbo *limbo)
 	struct txn_limbo_entry *tle = txn_limbo_last_entry(limbo);
 	txn_on_commit(tle->txn, &on_complete);
 	txn_on_rollback(tle->txn, &on_rollback);
-
-	int rc = fiber_cond_wait_timeout(&cwp.confirm_cond,
-					 txn_limbo_confirm_timeout(limbo));
-	fiber_cond_destroy(&cwp.confirm_cond);
-	if (rc != 0) {
-		/* Clear the triggers if the timeout has been reached. */
-		trigger_clear(&on_complete);
-		trigger_clear(&on_rollback);
-		diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
-		return -1;
+	double start_time = fiber_clock();
+	while (true) {
+		double deadline = start_time + txn_limbo_confirm_timeout(limbo);
+		bool cancellable = fiber_set_cancellable(false);
+		double timeout = deadline - fiber_clock();
+		int rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);
+		fiber_set_cancellable(cancellable);
+		if (cwp.is_confirm || cwp.is_rollback)
+			goto complete;
+		if (rc != 0)
+			goto timed_out;
 	}
+timed_out:
+	/* Clear the triggers if the timeout has been reached. */
+	trigger_clear(&on_complete);
+	trigger_clear(&on_rollback);
+	diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
+	return -1;
+
+complete:
 	if (!cwp.is_confirm) {
 		/* The transaction has been rolled back. */
 		diag_set(ClientError, ER_SYNC_ROLLBACK);
@@ -537,6 +558,39 @@ txn_limbo_force_empty(struct txn_limbo *limbo, int64_t confirm_lsn)
 		txn_limbo_write_rollback(limbo, rollback->lsn);
 		txn_limbo_read_rollback(limbo, rollback->lsn);
 	}
+}
+
+void
+txn_limbo_on_parameters_change(struct txn_limbo *limbo)
+{
+	if (rlist_empty(&limbo->queue))
+		return;
+	struct txn_limbo_entry *e;
+	int64_t confirm_lsn = -1;
+	rlist_foreach_entry(e, &limbo->queue, in_queue) {
+		assert(e->ack_count <= VCLOCK_MAX);
+		if (!txn_has_flag(e->txn, TXN_WAIT_ACK)) {
+			assert(e->lsn == -1);
+			if (confirm_lsn == -1)
+				continue;
+		} else if (e->ack_count < replication_synchro_quorum) {
+			continue;
+		} else {
+			confirm_lsn = e->lsn;
+			assert(confirm_lsn > 0);
+		}
+		e->is_commit = true;
+	}
+	if (confirm_lsn > 0 &&
+	    txn_limbo_write_confirm(limbo, confirm_lsn) != 0) {
+		panic("Couldn't write CONFIRM to WAL");
+		return;
+	}
+	/*
+	 * Wakeup all. Confirmed will be committed. Timed out will
+	 * rollback.
+	 */
+	fiber_cond_broadcast(&limbo->wait_cond);
 }
 
 void

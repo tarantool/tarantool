@@ -104,6 +104,13 @@ struct txn_limbo {
 	 */
 	uint32_t instance_id;
 	/**
+	 * Condition to wait for completion. It is supposed to be
+	 * signaled when the synchro parameters change. Allowing
+	 * the sleeping fibers to reconsider their timeouts when
+	 * the parameters are updated.
+	 */
+	struct fiber_cond wait_cond;
+	/**
 	 * All components of the vclock are versions of the limbo
 	 * owner's LSN, how it is visible on other nodes. For
 	 * example, assume instance ID of the limbo is 1. Then
@@ -230,6 +237,9 @@ txn_limbo_wait_confirm(struct txn_limbo *limbo);
  */
 void
 txn_limbo_force_empty(struct txn_limbo *limbo, int64_t last_confirm);
+
+void
+txn_limbo_on_parameters_change(struct txn_limbo *limbo);
 
 void
 txn_limbo_init();

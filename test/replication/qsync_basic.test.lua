@@ -197,6 +197,39 @@ assert(newlsn >= oldlsn + 2)
 test_run:switch('replica')
 box.space.sync:select{7}
 
+--
+-- gh-5119: dynamic limbo configuration. Updated parameters should
+-- be applied even to existing transactions.
+--
+test_run:switch('default')
+box.cfg{replication_synchro_quorum = 3, replication_synchro_timeout = 1000}
+ok, err = nil
+f = fiber.create(function()                                                     \
+    ok, err = pcall(box.space.sync.insert, box.space.sync, {11})                \
+end)
+f:status()
+box.cfg{replication_synchro_timeout = 0.001}
+test_run:wait_cond(function() return f:status() == 'dead' end)
+ok, err
+box.space.sync:select{11}
+test_run:switch('replica')
+box.space.sync:select{11}
+
+-- Test it is possible to early ACK a transaction with a new quorum.
+test_run:switch('default')
+box.cfg{replication_synchro_timeout = 1000}
+ok, err = nil
+f = fiber.create(function()                                                     \
+    ok, err = pcall(box.space.sync.insert, box.space.sync, {12})                \
+end)
+f:status()
+box.cfg{replication_synchro_quorum = 2}
+test_run:wait_cond(function() return f:status() == 'dead' end)
+ok, err
+box.space.sync:select{12}
+test_run:switch('replica')
+box.space.sync:select{12}
+
 -- Cleanup.
 test_run:cmd('switch default')
 

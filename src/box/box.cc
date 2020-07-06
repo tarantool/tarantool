@@ -865,6 +865,7 @@ box_set_replication_synchro_quorum(void)
 	if (value < 0)
 		return -1;
 	replication_synchro_quorum = value;
+	txn_limbo_on_parameters_change(&txn_limbo);
 	return 0;
 }
 
@@ -875,6 +876,7 @@ box_set_replication_synchro_timeout(void)
 	if (value < 0)
 		return -1;
 	replication_synchro_timeout = value;
+	txn_limbo_on_parameters_change(&txn_limbo);
 	return 0;
 }
 
