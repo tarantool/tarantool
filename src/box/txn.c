@@ -123,6 +123,8 @@ txn_stmt_new(struct region *region)
 static inline void
 txn_stmt_destroy(struct txn_stmt *stmt)
 {
+	assert(stmt->add_story == NULL && stmt->del_story == NULL);
+
 	if (stmt->old_tuple != NULL)
 		tuple_unref(stmt->old_tuple);
 	if (stmt->new_tuple != NULL)
@@ -993,20 +995,20 @@ txn_check_singlestatement(struct txn *txn, const char *where)
 	return 0;
 }
 
-void
+bool
 txn_can_yield(struct txn *txn, bool set)
 {
 	assert(txn == in_txn());
-	if (set) {
-		assert(!txn_has_flag(txn, TXN_CAN_YIELD));
+	bool could = txn_has_flag(txn, TXN_CAN_YIELD);
+	if (set && !could) {
 		txn_set_flag(txn, TXN_CAN_YIELD);
 		trigger_clear(&txn->fiber_on_yield);
-	} else {
-		assert(txn_has_flag(txn, TXN_CAN_YIELD));
+	} else if (!set && could) {
 		txn_clear_flag(txn, TXN_CAN_YIELD);
 		trigger_create(&txn->fiber_on_yield, txn_on_yield, NULL, NULL);
 		trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
 	}
+	return could;
 }
 
 int64_t

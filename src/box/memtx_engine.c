@@ -40,6 +40,7 @@
 #include "coio_file.h"
 #include "tuple.h"
 #include "txn.h"
+#include "memtx_tx.h"
 #include "memtx_tree.h"
 #include "iproto_constants.h"
 #include "xrow.h"
@@ -340,8 +341,36 @@ static int
 memtx_engine_begin(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
-	txn_can_yield(txn, false);
+	txn_can_yield(txn, memtx_tx_manager_use_mvcc_engine);
 	return 0;
+}
+
+static int
+memtx_engine_prepare(struct engine *engine, struct txn *txn)
+{
+	(void)engine;
+	struct txn_stmt *stmt;
+	stailq_foreach_entry(stmt, &txn->stmts, next) {
+		if (stmt->add_story != NULL || stmt->del_story != NULL)
+			memtx_tx_history_prepare_stmt(stmt);
+	}
+	return 0;
+}
+
+static void
+memtx_engine_commit(struct engine *engine, struct txn *txn)
+{
+	(void)engine;
+	struct txn_stmt *stmt;
+	stailq_foreach_entry(stmt, &txn->stmts, next) {
+		if (stmt->add_story != NULL || stmt->del_story != NULL) {
+			ssize_t bsize = memtx_tx_history_commit_stmt(stmt);
+			assert(stmt->space->engine == engine);
+			struct memtx_space *mspace =
+				(struct memtx_space *)stmt->space;
+			mspace->bsize += bsize;
+		}
+	}
 }
 
 static void
@@ -359,6 +388,9 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	/* Only roll back the changes if they were made. */
 	if (stmt->engine_savepoint == NULL)
 		return;
+
+	if (stmt->add_story != NULL || stmt->del_story != NULL)
+		return memtx_tx_history_rollback_stmt(stmt);
 
 	if (memtx_space->replace == memtx_space_replace_all_keys)
 		index_count = space->index_count;
@@ -919,8 +951,8 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .complete_join = */ memtx_engine_complete_join,
 	/* .begin = */ memtx_engine_begin,
 	/* .begin_statement = */ generic_engine_begin_statement,
-	/* .prepare = */ generic_engine_prepare,
-	/* .commit = */ generic_engine_commit,
+	/* .prepare = */ memtx_engine_prepare,
+	/* .commit = */ memtx_engine_commit,
 	/* .rollback_statement = */ memtx_engine_rollback_statement,
 	/* .rollback = */ generic_engine_rollback,
 	/* .switch_to_ro = */ generic_engine_switch_to_ro,

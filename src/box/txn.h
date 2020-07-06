@@ -619,12 +619,15 @@ txn_check_singlestatement(struct txn *txn, const char *where);
  * as aborted, which results in rolling back the transaction on
  * commit.
  *
- * This function is used by the memtx engine, because it doesn't
- * support yields inside transactions. It is also used to temporarily
- * enable yields for long DDL operations such as building an index
- * or checking a space format.
+ * This function is used only by memtx engine because there are cases
+ * when it doesn't support yields inside transactions. It is also
+ * used to temporarily enable yields for long DDL operations such as
+ * building an index or checking a space format.
+ *
+ * Return previous state of the flag: true - yields were enabled,
+ * false - yields were disabled before the function call.
  */
-void
+bool
 txn_can_yield(struct txn *txn, bool set);
 
 /**

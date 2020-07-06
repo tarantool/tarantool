@@ -1076,7 +1076,7 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 		return -1;
 
 	/* See the comment in vinyl_space_build_index(). */
-	txn_can_yield(txn, true);
+	bool could_yield = txn_can_yield(txn, true);
 
 	struct trigger on_replace;
 	struct vy_check_format_ctx ctx;
@@ -1128,7 +1128,7 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 out:
 	diag_destroy(&ctx.diag);
 	trigger_clear(&on_replace);
-	txn_can_yield(txn, false);
+	txn_can_yield(txn, could_yield);
 	return rc;
 }
 
@@ -4175,7 +4175,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	 * change the data dictionary, so there is no dirty state
 	 * that can be observed.
 	 */
-	txn_can_yield(txn, true);
+	bool could_yield = txn_can_yield(txn, true);
 
 	/*
 	 * Iterate over all tuples stored in the space and insert
@@ -4276,7 +4276,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 out:
 	diag_destroy(&ctx.diag);
 	trigger_clear(&on_replace);
-	txn_can_yield(txn, false);
+	txn_can_yield(txn, could_yield);
 	return rc;
 }
 
