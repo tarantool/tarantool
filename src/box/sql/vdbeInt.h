@@ -551,6 +551,14 @@ int sqlVdbeMemCast(Mem *, enum field_type type);
 int sqlVdbeMemFromBtree(BtCursor *, u32, u32, Mem *);
 void sqlVdbeMemRelease(Mem * p);
 
+/*
+ * Return the MP_type of the value of the MEM.
+ * Analogue of sql_value_type() but operates directly on
+ * transparent memory cell.
+ */
+enum mp_type
+mem_mp_type(struct Mem *mem);
+
 /**
  * Memory cell mem contains the context of an aggregate function.
  * This routine calls the finalize method for that function. The
