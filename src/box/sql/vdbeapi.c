@@ -213,16 +213,8 @@ sql_value_text(sql_value * pVal)
 enum mp_type
 sql_value_type(sql_value *pVal)
 {
-	switch (pVal->flags & MEM_PURE_TYPE_MASK) {
-	case MEM_Int: return MP_INT;
-	case MEM_UInt: return MP_UINT;
-	case MEM_Real: return MP_DOUBLE;
-	case MEM_Str: return MP_STR;
-	case MEM_Blob: return MP_BIN;
-	case MEM_Bool: return MP_BOOL;
-	case MEM_Null: return MP_NIL;
-	default: unreachable();
-	}
+	struct Mem *mem = (struct Mem *) pVal;
+	return mem_mp_type(mem);
 }
 
 /* Make a copy of an sql_value object

@@ -123,6 +123,8 @@ port_vdbemem_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 			lua_pushstring(L, (const char *) sql_value_text(param));
 			break;
 		case MP_BIN:
+		case MP_ARRAY:
+		case MP_MAP:
 			lua_pushlstring(L, sql_value_blob(param),
 					(size_t) sql_value_bytes(param));
 			break;
@@ -176,7 +178,9 @@ port_vdbemem_get_msgpack(struct port *base, uint32_t *size)
 			mpstream_encode_str(&stream, str);
 			break;
 		}
-		case MP_BIN: {
+		case MP_BIN:
+		case MP_ARRAY:
+		case MP_MAP: {
 			mpstream_encode_binl(&stream, sql_value_bytes(param));
 			mpstream_memcpy(&stream, sql_value_blob(param),
 					sql_value_bytes(param));
@@ -438,6 +442,8 @@ typeofFunc(sql_context * context, int NotUsed, sql_value ** argv)
 		z = "double";
 		break;
 	case MP_BIN:
+	case MP_ARRAY:
+	case MP_MAP:
 		z = "varbinary";
 		break;
 	case MP_BOOL:
@@ -463,6 +469,8 @@ lengthFunc(sql_context * context, int argc, sql_value ** argv)
 	UNUSED_PARAMETER(argc);
 	switch (sql_value_type(argv[0])) {
 	case MP_BIN:
+	case MP_ARRAY:
+	case MP_MAP:
 	case MP_INT:
 	case MP_UINT:
 	case MP_BOOL:
@@ -513,7 +521,9 @@ absFunc(sql_context * context, int argc, sql_value ** argv)
 			break;
 		}
 	case MP_BOOL:
-	case MP_BIN: {
+	case MP_BIN:
+	case MP_ARRAY:
+	case MP_MAP: {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES, "number",
 			 mem_type_to_str(argv[0]));
 		context->is_aborted = true;
@@ -835,7 +845,8 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 	}
 	if (sql_value_is_null(argv[0]))
 		return;
-	if (sql_value_type(argv[0]) == MP_BIN) {
+	enum mp_type mp_type = sql_value_type(argv[0]);
+	if (mp_type_is_bloblike(mp_type)) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 sql_value_to_diag_str(argv[0]), "numeric");
 		context->is_aborted = true;
@@ -896,7 +907,7 @@ case_type##ICUFunc(sql_context *context, int argc, sql_value **argv)   \
 	int n;                                                                 \
 	UNUSED_PARAMETER(argc);                                                \
 	int arg_type = sql_value_type(argv[0]);                                \
-	if (arg_type == MP_BIN) {                                              \
+	if (mp_type_is_bloblike(arg_type)) {                                   \
 		diag_set(ClientError, ER_INCONSISTENT_TYPES, "text",           \
 			 "varbinary");                                         \
 		context->is_aborted = true;                                    \
@@ -977,7 +988,7 @@ randomBlob(sql_context * context, int argc, sql_value ** argv)
 	unsigned char *p;
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
-	if (sql_value_type(argv[0]) == MP_BIN) {
+	if (mp_type_is_bloblike(sql_value_type(argv[0]))) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 sql_value_to_diag_str(argv[0]), "numeric");
 		context->is_aborted = true;
@@ -1364,7 +1375,9 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 			sql_result_value(context, argv[0]);
 			break;
 		}
-	case MP_BIN:{
+	case MP_BIN:
+	case MP_ARRAY:
+	case MP_MAP: {
 			char *zText = 0;
 			char const *zBlob = sql_value_blob(argv[0]);
 			int nBlob = sql_value_bytes(argv[0]);
@@ -1737,7 +1750,7 @@ trim_func_one_arg(struct sql_context *context, sql_value *arg)
 	enum mp_type val_type = sql_value_type(arg);
 	if (val_type == MP_NIL)
 		return;
-	if (val_type == MP_BIN)
+	if (mp_type_is_bloblike(val_type))
 		default_trim = (const unsigned char *) "\0";
 	else
 		default_trim = (const unsigned char *) " ";
@@ -1866,7 +1879,8 @@ soundexFunc(sql_context * context, int argc, sql_value ** argv)
 		1, 2, 6, 2, 3, 0, 1, 0, 2, 0, 2, 0, 0, 0, 0, 0,
 	};
 	assert(argc == 1);
-	if (sql_value_type(argv[0]) == MP_BIN) {
+	enum mp_type mp_type = sql_value_type(argv[0]);
+	if (mp_type_is_bloblike(mp_type)) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 sql_value_to_diag_str(argv[0]), "text");
 		context->is_aborted = true;

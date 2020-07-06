@@ -186,7 +186,9 @@ sql_column_to_messagepack(struct sql_stmt *stmt, int i,
 		mp_encode_str(pos, s, len);
 		break;
 	}
-	case MP_BIN: {
+	case MP_BIN:
+	case MP_MAP:
+	case MP_ARRAY: {
 		uint32_t len = sql_column_bytes(stmt, i);
 		const char *s =
 			(const char *)sql_column_blob(stmt, i);

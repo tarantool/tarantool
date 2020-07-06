@@ -1193,7 +1193,8 @@ sqlValueText(sql_value * pVal)
 const char *
 sql_value_to_diag_str(sql_value *value)
 {
-	if (sql_value_type(value) == MP_BIN) {
+	enum mp_type mp_type = sql_value_type(value);
+	if (mp_type_is_bloblike(mp_type)) {
 		if (mem_has_msgpack_subtype(value))
 			return sqlValueText(value);
 		return "varbinary";

@@ -560,6 +560,13 @@ enum mp_type
 mem_mp_type(struct Mem *mem);
 
 /**
+ * In terms of VDBE memory cell type, _BIN, _ARRAY and _MAP
+ * messagepacks are stored as binary string (i.e. featuring
+ * MEM_Blob internal type).
+ */
+#define mp_type_is_bloblike(X) ((X) == MP_BIN || (X) == MP_ARRAY || (X) == MP_MAP)
+
+/**
  * Memory cell mem contains the context of an aggregate function.
  * This routine calls the finalize method for that function. The
  * result of the aggregate is stored back into mem.
