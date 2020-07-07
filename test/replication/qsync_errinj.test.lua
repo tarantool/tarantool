@@ -52,6 +52,31 @@ box.error.injection.set('ERRINJ_WAL_IO', false)
 test_run:cmd('restart server replica')
 box.space.sync:select{12}
 
+--
+-- gh-5147: at local WAL write fail limbo entries should be
+-- deleted from the end of the limbo, not from the beginning.
+-- Otherwise it should crash.
+--
+test_run:switch('default')
+fiber = require('fiber')
+box.cfg{replication_synchro_quorum = 3, replication_synchro_timeout = 1000}
+box.error.injection.set("ERRINJ_WAL_DELAY", true)
+ok1, err1 = nil
+f1 = fiber.create(function()                                                    \
+    ok1, err1 = pcall(box.space.sync.replace, box.space.sync, {13})             \
+end)
+box.error.injection.set("ERRINJ_WAL_IO", true)
+box.space.sync:replace({14})
+box.error.injection.set("ERRINJ_WAL_IO", false)
+box.error.injection.set("ERRINJ_WAL_DELAY", false)
+box.cfg{replication_synchro_quorum = 2}
+box.space.sync:replace({15})
+test_run:wait_cond(function() return f1:status() == 'dead' end)
+ok1, err1
+box.space.sync:select{13}, box.space.sync:select{14}, box.space.sync:select{15}
+test_run:switch('replica')
+box.space.sync:select{13}, box.space.sync:select{14}, box.space.sync:select{15}
+
 test_run:cmd('switch default')
 
 box.cfg{                                                                        \
