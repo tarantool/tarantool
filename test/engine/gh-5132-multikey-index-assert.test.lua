@@ -1,0 +1,9 @@
+test_run = require('test_run').new()
+
+space = box.schema.space.create('gh-5132-multikey', {engine = test_run:get_cfg('engine')})
+space:format({{name = "attributes", type = "array"}, {name = "uid", type = "string"}})
+_ = space:create_index('primary', {name = "uid", parts = {{field = "uid"}}})
+
+_ = space:create_index('secondary', {name = "kv", parts = {{field = "attributes", path = "[*].key", type = "string"}}})
+
+space:drop()
