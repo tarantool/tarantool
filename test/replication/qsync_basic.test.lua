@@ -230,6 +230,24 @@ box.space.sync:select{12}
 test_run:switch('replica')
 box.space.sync:select{12}
 
+--
+-- gh-5138: synchro rows were not saved onto txns region, and
+-- could get corrupted under load.
+--
+test_run:switch('default')
+box.cfg{replication_synchro_timeout = 1000}
+for i = 1, 100 do box.space.sync:replace{i} end
+test_run:cmd('switch replica')
+box.space.sync:count()
+-- Rows could be corrupted during WAL writes. Restart should
+-- reveal the problem during recovery.
+test_run:cmd('restart server replica')
+box.space.sync:count()
+test_run:cmd('switch default')
+for i = 1, 100 do box.space.sync:delete{i} end
+test_run:cmd('switch replica')
+box.space.sync:count()
+
 -- Cleanup.
 test_run:cmd('switch default')
 
