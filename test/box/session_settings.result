@@ -30,19 +30,19 @@ s:drop()
 --
 s:create_index('a')
  | ---
- | - error: Session_settings space does not support create_index()
+ | - error: _session_settings space does not support create_index()
  | ...
 s:insert({'a', 1})
  | ---
- | - error: Session_settings space does not support replace()
+ | - error: _session_settings space does not support replace()
  | ...
 s:delete({'b'})
  | ---
- | - error: Session_settings space does not support delete()
+ | - error: _session_settings space does not support delete()
  | ...
 s:replace({'sql_defer_foreign_keys', true})
  | ---
- | - error: Session_settings space does not support replace()
+ | - error: _session_settings space does not support replace()
  | ...
 
 --

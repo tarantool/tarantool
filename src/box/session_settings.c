@@ -301,7 +301,7 @@ session_settings_space_execute_replace(struct space *space, struct txn *txn,
 	(void)txn;
 	(void)request;
 	(void)result;
-	diag_set(ClientError, ER_UNSUPPORTED, "Session_settings space",
+	diag_set(ClientError, ER_UNSUPPORTED, "_session_settings space",
 		 "replace()");
 	return -1;
 }
@@ -315,7 +315,7 @@ session_settings_space_execute_delete(struct space *space, struct txn *txn,
 	(void)txn;
 	(void)request;
 	(void)result;
-	diag_set(ClientError, ER_UNSUPPORTED, "Session_settings space",
+	diag_set(ClientError, ER_UNSUPPORTED, "_session_settings space",
 		 "delete()");
 	return -1;
 }
@@ -388,7 +388,7 @@ session_settings_space_execute_upsert(struct space *space, struct txn *txn,
 	(void)space;
 	(void)txn;
 	(void)request;
-	diag_set(ClientError, ER_UNSUPPORTED, "Session_settings space",
+	diag_set(ClientError, ER_UNSUPPORTED, "_session_settings space",
 		 "upsert()");
 	return -1;
 }
@@ -398,7 +398,7 @@ session_settings_space_create_index(struct space *space, struct index_def *def)
 {
 	assert(space->def->id == BOX_SESSION_SETTINGS_ID);
 	if (def->iid != 0) {
-		diag_set(ClientError, ER_UNSUPPORTED, "Session_settings space",
+		diag_set(ClientError, ER_UNSUPPORTED, "_session_settings space",
 			 "create_index()");
 		return NULL;
 	}
