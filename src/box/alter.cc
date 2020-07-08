@@ -3554,7 +3554,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		 * definition to support upgrade script.
 		 */
 		struct func_def *old_def = NULL, *new_def = NULL;
-		auto guard = make_scoped_guard([=] {
+		auto guard = make_scoped_guard([&old_def, &new_def] {
 			free(old_def);
 			free(new_def);
 		});
@@ -4425,7 +4425,7 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 	struct tuple *new_tuple = stmt->new_tuple;
 
 	struct sequence_def *new_def = NULL;
-	auto def_guard = make_scoped_guard([=] { free(new_def); });
+	auto def_guard = make_scoped_guard([&new_def] { free(new_def); });
 
 	struct sequence *seq;
 	if (old_tuple == NULL && new_tuple != NULL) {		/* INSERT */
