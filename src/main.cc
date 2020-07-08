@@ -729,7 +729,7 @@ main(int argc, char **argv)
 	/* Lua interpeter options, e.g. -e and -l */
 	int optc = 0;
 	const char **optv = NULL;
-	auto guard = make_scoped_guard([=]{ if (optc) free(optv); });
+	auto guard = make_scoped_guard([&optc, &optv]{ if (optc) free(optv); });
 
 	static struct option longopts[] = {
 		{"help", no_argument, 0, 'h'},
