@@ -587,6 +587,13 @@ txn_journal_entry_new(struct txn *txn)
 			txn_set_flag(txn, TXN_WAIT_SYNC);
 			txn_set_flag(txn, TXN_WAIT_ACK);
 		} else if (!txn_limbo_is_empty(&txn_limbo)) {
+			/*
+			 * There some sync entries on the
+			 * fly thus wait for their completion
+			 * even if this particular transaction
+			 * doesn't touch sync space (each sync txn
+			 * should be considered as a barrier).
+			 */
 			txn_set_flag(txn, TXN_WAIT_SYNC);
 		}
 	}
