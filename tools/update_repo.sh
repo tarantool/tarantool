@@ -699,7 +699,7 @@ function pack_rpm {
             for metafile in repodata.base/other \
                             repodata.base/filelists \
                             repodata.base/primary ; do
-                up_lines=''
+                up_full_lines=''
                 if [ "$metafile" == "repodata.base/primary" ]; then
                     up_full_lines='(\N+\n)*'
                 fi
@@ -845,7 +845,7 @@ function remove_rpm {
             #       entry in damaged file, to fix it all found entries
             #       of this file need to be removed
             for metafile in other filelists primary ; do
-                up_lines=''
+                up_full_lines=''
                 if [ "$metafile" == "primary" ]; then
                     up_full_lines='(\N+\n)*'
                 fi
@@ -940,6 +940,7 @@ elif [ "$os" == "el" -o "$os" == "fedora" ]; then
     # script twice with the given format:
     # pack_rpm <packages store subpath> <patterns of the packages to register>
 
+    packed_rpms=""
     # prepare the workspace
     prepare_ws ${os}_${option_dist}
     if [ "$remove" != "" ]; then
@@ -962,7 +963,7 @@ elif [ "$os" == "el" -o "$os" == "fedora" ]; then
     $rm_file $ws_lockfile
     popd 2>/dev/null || true
 
-    if [ -z "$packed_rpms" ]; then
+    if [ "$remove" == "" -a "$packed_rpms" == "" ]; then
         echo "ERROR: Current '$repo' path doesn't have '*.x86_64.rpm *.noarch.rpm *.src.rpm' packages in path"
         usage
         exit 1
