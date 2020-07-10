@@ -91,7 +91,7 @@ txn_limbo_pop(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	assert(!rlist_empty(&entry->in_queue));
 	assert(txn_limbo_last_entry(limbo) == entry);
 	assert(entry->is_rollback);
-	(void) limbo;
+
 	rlist_del_entry(entry, in_queue);
 	++limbo->rollback_count;
 }
