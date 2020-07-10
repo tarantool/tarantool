@@ -131,7 +131,7 @@ txn_limbo_assign_local_lsn(struct txn_limbo *limbo,
 	assert(entry->lsn == -1);
 	assert(lsn > 0);
 	assert(txn_has_flag(entry->txn, TXN_WAIT_ACK));
-	(void) limbo;
+
 	entry->lsn = lsn;
 	/*
 	 * The entry just got its LSN after a WAL write. It could
