@@ -363,8 +363,7 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 	if (last_rollback == NULL)
 		return;
 	rlist_foreach_entry_safe_reverse(e, &limbo->queue, in_queue, tmp) {
-		e->is_rollback = true;
-		txn_limbo_pop(limbo, e);
+		txn_limbo_abort(limbo, e);
 		txn_clear_flag(e->txn, TXN_WAIT_SYNC);
 		txn_clear_flag(e->txn, TXN_WAIT_ACK);
 		if (e->txn->signature >= 0) {
