@@ -111,3 +111,40 @@ index2:get{104}
 index3:get{9}
 index3:select{1235}
 space:drop()
+
+--https://github.com/tarantool/tarantool/issues/5161
+--formatted select
+s = box.schema.space.create('test', { engine = engine })
+i1 = s:create_index('test1')
+i2 = s:create_index('test2', {parts={{2, 'unsigned'}}})
+_ = s:replace{1, 2, 3, 4, box.NULL, 5}
+_ = s:replace{3, 4, true, {1, 2, 3}}
+_ = s:replace{5, 6, false, {1, 2, 3, ['key']='value'}}
+_ = s:replace{3, 4, true, {1, {3, {aa=1,bb=2}}, 3}}
+_ = s:replace{7, 8, 'asdgsdgswegg', 'sdf', 'dsgfsdgsegasges' }
+s:fselect()
+s:fselect({5}, {iterator='le'})
+s:fselect({5}, {iterator='le', fselect_max_width=40})
+i1:fselect({3})
+i2:fselect({6})
+i1:fselect({2})
+i2:fselect({5})
+s:format{{name='name', type='unsigned'}, {name='veeeeeeeery long name', type='unsigned'}}
+s:fselect()
+s:fselect({}, nil, {max_width=40})
+i1:fselect({3})
+i2:fselect({6})
+i1:fselect({2})
+i2:fselect({5})
+s:fselect({}, {fselect_type='gh'})
+s:fselect({}, nil, {type='gh'})
+s:fselect({}, nil, {fselect_type='github'})
+s:gselect{}
+fselect_type = 'gh'
+s:fselect()
+fselect_type = nil
+s:fselect()
+s:fselect({}, {fselect_type='jira'})
+s:jselect()
+s:fselect({}, {fselect_widths={8, 8, nil, 10}})
+s:fselect(nil, {fselect_use_nbsp=false})
