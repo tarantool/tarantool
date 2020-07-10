@@ -829,6 +829,7 @@ mem_set_bool(struct Mem *mem, bool value)
 	sqlVdbeMemSetNull(mem);
 	mem->u.b = value;
 	mem->flags = MEM_Bool;
+	mem->field_type = FIELD_TYPE_BOOLEAN;
 }
 
 void
@@ -839,6 +840,7 @@ mem_set_i64(struct Mem *mem, int64_t value)
 	mem->u.i = value;
 	int flag = value < 0 ? MEM_Int : MEM_UInt;
 	MemSetTypeFlag(mem, flag);
+	mem->field_type = FIELD_TYPE_INTEGER;
 }
 
 void
@@ -848,6 +850,7 @@ mem_set_u64(struct Mem *mem, uint64_t value)
 		sqlVdbeMemSetNull(mem);
 	mem->u.u = value;
 	MemSetTypeFlag(mem, MEM_UInt);
+	mem->field_type = FIELD_TYPE_UNSIGNED;
 }
 
 void
@@ -863,6 +866,7 @@ mem_set_int(struct Mem *mem, int64_t value, bool is_neg)
 		mem->u.u = value;
 		MemSetTypeFlag(mem, MEM_UInt);
 	}
+	mem->field_type = FIELD_TYPE_INTEGER;
 }
 
 void
@@ -873,6 +877,7 @@ mem_set_double(struct Mem *mem, double value)
 		return;
 	mem->u.r = value;
 	MemSetTypeFlag(mem, MEM_Real);
+	mem->field_type = FIELD_TYPE_DOUBLE;
 }
 
 /*
@@ -1068,6 +1073,11 @@ sqlVdbeMemSetStr(Mem * pMem,	/* Memory cell to set to string value */
 
 	pMem->n = nByte;
 	pMem->flags = flags;
+	assert((pMem->flags & (MEM_Str | MEM_Blob)) != 0);
+	if ((pMem->flags & MEM_Str) != 0)
+		pMem->field_type = FIELD_TYPE_STRING;
+	else
+		pMem->field_type = FIELD_TYPE_VARBINARY;
 
 	if (nByte > iLimit) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "string or binary string"\
