@@ -198,9 +198,8 @@ do_rollback:
 	struct txn_limbo_entry *e, *tmp;
 	rlist_foreach_entry_safe_reverse(e, &limbo->queue,
 					 in_queue, tmp) {
-		e->is_rollback = true;
 		e->txn->signature = TXN_SIGNATURE_QUORUM_TIMEOUT;
-		txn_limbo_pop(limbo, e);
+		txn_limbo_abort(limbo, e);
 		txn_clear_flag(e->txn, TXN_WAIT_SYNC);
 		txn_clear_flag(e->txn, TXN_WAIT_ACK);
 		txn_complete(e->txn);
