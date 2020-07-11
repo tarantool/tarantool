@@ -382,13 +382,13 @@ end
  | ---
  | - error: A rollback for a synchronous transaction is received
  | ...
-f1:status()
+test_run:wait_cond(function() return f1:status() == 'dead' end)
  | ---
- | - dead
+ | - true
  | ...
-f2:status()
+test_run:wait_cond(function() return f2:status() == 'dead' end)
  | ---
- | - dead
+ | - true
  | ...
 box.space.sync:select{9}
  | ---

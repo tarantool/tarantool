@@ -153,8 +153,8 @@ do                                                                              
     f2 = fiber.create(box.space.locallocal.replace, box.space.locallocal, {9})  \
     box.space.test:replace{9}                                                   \
 end
-f1:status()
-f2:status()
+test_run:wait_cond(function() return f1:status() == 'dead' end)
+test_run:wait_cond(function() return f2:status() == 'dead' end)
 box.space.sync:select{9}
 box.space.locallocal:select{9}
 box.space.test:select{9}
