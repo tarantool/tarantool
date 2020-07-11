@@ -756,8 +756,14 @@ txn_commit_async(struct txn *txn)
 
 		if (txn_has_flag(txn, TXN_WAIT_ACK)) {
 			int64_t lsn = req->rows[txn->n_applier_rows - 1]->lsn;
-			txn_limbo_assign_remote_lsn(&txn_limbo, limbo_entry,
-						    lsn);
+			/*
+			 * Can't tell whether it is local or not -
+			 * async commit is used both by applier
+			 * and during recovery. Use general LSN
+			 * assignment to let the limbo rule this
+			 * out.
+			 */
+			txn_limbo_assign_lsn(&txn_limbo, limbo_entry, lsn);
 		}
 
 		/*
@@ -844,6 +850,11 @@ txn_commit(struct txn *txn)
 	if (is_sync) {
 		if (txn_has_flag(txn, TXN_WAIT_ACK)) {
 			int64_t lsn = req->rows[req->n_rows - 1]->lsn;
+			/*
+			 * Use local LSN assignment. Because
+			 * blocking commit is used by local
+			 * transactions only.
+			 */
 			txn_limbo_assign_local_lsn(&txn_limbo, limbo_entry,
 						   lsn);
 			/* Local WAL write is a first 'ACK'. */

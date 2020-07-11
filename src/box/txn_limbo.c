@@ -148,6 +148,16 @@ txn_limbo_assign_local_lsn(struct txn_limbo *limbo,
 	entry->ack_count = ack_count;
 }
 
+void
+txn_limbo_assign_lsn(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
+		     int64_t lsn)
+{
+	if (limbo->instance_id == instance_id)
+		txn_limbo_assign_local_lsn(limbo, entry, lsn);
+	else
+		txn_limbo_assign_remote_lsn(limbo, entry, lsn);
+}
+
 static int
 txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn);
 

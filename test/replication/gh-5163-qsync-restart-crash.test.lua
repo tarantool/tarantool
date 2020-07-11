@@ -1,0 +1,14 @@
+test_run = require('test_run').new()
+engine = test_run:get_cfg('engine')
+
+--
+-- gh-5163: master during recovery treated local transactions as
+-- remote and crashed.
+--
+_ = box.schema.space.create('sync', {is_sync=true, engine=engine})
+_ = box.space.sync:create_index('pk')
+
+box.space.sync:replace{1}
+test_run:cmd('restart server default')
+box.space.sync:select{}
+box.space.sync:drop()
