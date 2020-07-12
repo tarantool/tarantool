@@ -347,6 +347,7 @@ space_before_replace(struct space *space, struct txn *txn,
 	const char *key = NULL;
 	uint32_t part_count = 0;
 	struct index *index = NULL;
+	struct tuple *old_tuple = NULL;
 
 	/*
 	 * Lookup the old tuple.
@@ -359,15 +360,12 @@ space_before_replace(struct space *space, struct txn *txn,
 			return -1;
 		key = request->key;
 		part_count = mp_decode_array(&key);
-		if (exact_key_validate(index->def->key_def,
-				       key, part_count) != 0)
-			return -1;
 		break;
 	case IPROTO_INSERT:
 	case IPROTO_REPLACE:
 	case IPROTO_UPSERT:
 		if (pk == NULL)
-			break;
+			goto after_old_tuple_lookup;
 		index = pk;
 		key = tuple_extract_key_raw(request->tuple, request->tuple_end,
 					    index->def->key_def, MULTIKEY_NONE,
@@ -381,10 +379,13 @@ space_before_replace(struct space *space, struct txn *txn,
 		return 0;
 	}
 
-	struct tuple *old_tuple = NULL;
-	if (index != NULL &&
-	    index_get(index, key, part_count, &old_tuple) != 0)
+	if (exact_key_validate(index->def->key_def, key, part_count) != 0)
 		return -1;
+
+	if (index_get(index, key, part_count, &old_tuple) != 0)
+		return -1;
+
+after_old_tuple_lookup:;
 
 	/*
 	 * Create the new tuple.
