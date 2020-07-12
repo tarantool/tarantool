@@ -589,7 +589,9 @@ memtx_space_ephemeral_rowid_next(struct space *space, uint64_t *rowid)
 static int
 memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 {
-	if (index_def->key_def->is_nullable) {
+	struct key_def *key_def = index_def->key_def;
+
+	if (key_def->is_nullable) {
 		if (index_def->iid == 0) {
 			diag_set(ClientError, ER_NULLABLE_PRIMARY,
 				 space_name(space));
@@ -602,6 +604,14 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 			return -1;
 		}
 	}
+	if (key_def->is_multikey &&
+	    key_def->multikey_fieldno < space->def->field_count &&
+	    space->def->fields[key_def->multikey_fieldno].is_nullable) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 "multikey index",
+			 "nullable root field");
+		return -1;
+	}
 	switch (index_def->type) {
 	case HASH:
 		if (! index_def->opts.is_unique) {
@@ -610,13 +620,13 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 				 "HASH index must be unique");
 			return -1;
 		}
-		if (index_def->key_def->is_multikey) {
+		if (key_def->is_multikey) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "HASH index cannot be multikey");
 			return -1;
 		}
-		if (index_def->key_def->for_func_index) {
+		if (key_def->for_func_index) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "HASH index can not use a function");
@@ -627,7 +637,7 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 		/* TREE index has no limitations. */
 		break;
 	case RTREE:
-		if (index_def->key_def->part_count != 1) {
+		if (key_def->part_count != 1) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "RTREE index key can not be multipart");
@@ -639,19 +649,19 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 				 "RTREE index can not be unique");
 			return -1;
 		}
-		if (index_def->key_def->parts[0].type != FIELD_TYPE_ARRAY) {
+		if (key_def->parts[0].type != FIELD_TYPE_ARRAY) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "RTREE index field type must be ARRAY");
 			return -1;
 		}
-		if (index_def->key_def->is_multikey) {
+		if (key_def->is_multikey) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "RTREE index cannot be multikey");
 			return -1;
 		}
-		if (index_def->key_def->for_func_index) {
+		if (key_def->for_func_index) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "RTREE index can not use a function");
@@ -660,7 +670,7 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 		/* no furter checks of parts needed */
 		return 0;
 	case BITSET:
-		if (index_def->key_def->part_count != 1) {
+		if (key_def->part_count != 1) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "BITSET index key can not be multipart");
@@ -672,20 +682,20 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 				 "BITSET can not be unique");
 			return -1;
 		}
-		if (index_def->key_def->parts[0].type != FIELD_TYPE_UNSIGNED &&
-		    index_def->key_def->parts[0].type != FIELD_TYPE_STRING) {
+		if (key_def->parts[0].type != FIELD_TYPE_UNSIGNED &&
+		    key_def->parts[0].type != FIELD_TYPE_STRING) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "BITSET index field type must be NUM or STR");
 			return -1;
 		}
-		if (index_def->key_def->is_multikey) {
+		if (key_def->is_multikey) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "BITSET index cannot be multikey");
 			return -1;
 		}
-		if (index_def->key_def->for_func_index) {
+		if (key_def->for_func_index) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 "BITSET index can not use a function");
@@ -700,8 +710,8 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 	}
 	/* Only HASH and TREE indexes checks parts there */
 	/* Check that there are no ANY, ARRAY, MAP parts */
-	for (uint32_t i = 0; i < index_def->key_def->part_count; i++) {
-		struct key_part *part = &index_def->key_def->parts[i];
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		struct key_part *part = &key_def->parts[i];
 		if (part->type <= FIELD_TYPE_ANY ||
 		    part->type >= FIELD_TYPE_ARRAY) {
 			diag_set(ClientError, ER_MODIFY_INDEX,

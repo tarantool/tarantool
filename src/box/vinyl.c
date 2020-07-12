@@ -650,13 +650,24 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 			 index_def->name, space_name(space));
 		return -1;
 	}
-	if (index_def->key_def->is_nullable && index_def->iid == 0) {
+
+	struct key_def *key_def = index_def->key_def;
+
+	if (key_def->is_nullable && index_def->iid == 0) {
 		diag_set(ClientError, ER_NULLABLE_PRIMARY, space_name(space));
 		return -1;
 	}
+	if (key_def->is_multikey &&
+	    key_def->multikey_fieldno < space->def->field_count &&
+	    space->def->fields[key_def->multikey_fieldno].is_nullable) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+		         "multikey index",
+		         "nullable root field");
+		return -1;
+	}
 	/* Check that there are no ANY, ARRAY, MAP parts */
-	for (uint32_t i = 0; i < index_def->key_def->part_count; i++) {
-		struct key_part *part = &index_def->key_def->parts[i];
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		struct key_part *part = &key_def->parts[i];
 		if (part->type <= FIELD_TYPE_ANY ||
 		    part->type >= FIELD_TYPE_ARRAY) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
@@ -666,7 +677,7 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 			return -1;
 		}
 	}
-	if (index_def->key_def->for_func_index) {
+	if (key_def->for_func_index) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
 			 "functional index");
 		return -1;
