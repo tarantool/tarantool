@@ -39,8 +39,8 @@ local stall = fiber.stall
 fiber.stall = nil
 
 local worker_next_task = nil
-local worker_last_task = nil
-local worker_fiber = nil
+local worker_last_task
+local worker_fiber
 
 --
 -- Worker is a singleton fiber for not urgent delayed execution of

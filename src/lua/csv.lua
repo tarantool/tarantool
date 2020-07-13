@@ -188,10 +188,10 @@ module.dump = function(t, opts, writable)
     if type(writable) == 'nil' then
         result_table = {}
     end
-    for k, line in pairs(t) do
+    for _, line in pairs(t) do
         local first = true
         local output_tuple = {}
-        for k2, field in pairs(line) do
+        for _, field in pairs(line) do
             local strf = tostring(field)
             local buf_new_size = (strf:len() + 1) * 2
             if buf_new_size > bufsz then
@@ -214,7 +214,6 @@ module.dump = function(t, opts, writable)
         else
             writable:write(table.concat(output_tuple))
         end
-        output_tuple = {}
     end
     ffi.C.csv_destroy(csv)
     csv.realloc(buf, 0)

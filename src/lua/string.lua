@@ -233,7 +233,6 @@ local function string_startswith(inp, head, _start, _end)
         return false
     end
     _start = _start - 1
-    _end = _start + head_len - 1
     return memcmp(c_char_ptr(inp) + _start, c_char_ptr(head), head_len) == 0
 end
 

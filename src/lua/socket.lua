@@ -177,7 +177,7 @@ local function get_iflags(table, flags)
     if type(flags) ~= 'table' then
         flags = { flags }
     end
-    for i, f in pairs(flags) do
+    for _, f in pairs(flags) do
         if table[f] == nil then
             return nil
         end
@@ -665,7 +665,7 @@ local function check_delimiter(self, limit, eols)
     end
 
     local shortest
-    for i, eol in ipairs(eols) do
+    for _, eol in ipairs(eols) do
         local data = ffi.C.memmem(rbuf.rpos, rbuf:size(), eol, #eol)
         if data ~= nil then
             local len = ffi.cast('char *', data) - rbuf.rpos + #eol
@@ -1052,7 +1052,7 @@ local function tcp_connect(host, port, timeout)
         boxerrno(boxerrno.EINVAL)
         return nil
     end
-    for i, remote in pairs(dns) do
+    for _, remote in pairs(dns) do
         timeout = stop - fiber.clock()
         if timeout <= 0 then
             boxerrno(boxerrno.ETIMEDOUT)
@@ -1319,7 +1319,7 @@ local function lsocket_tcp_getpeername(self)
     return peer.host, tostring(peer.port), peer.family:match("AF_(.*)"):lower()
 end
 
-local function lsocket_tcp_settimeout(self, value, mode)
+local function lsocket_tcp_settimeout(self, value)
     check_socket(self)
     self.timeout = value
     -- mode is effectively ignored
@@ -1543,7 +1543,7 @@ lsocket_tcp_mt.__index.send = lsocket_tcp_send;
 -- TCP Constructor and Shortcuts
 --
 
-local function lsocket_tcp()
+local function lsocket_tcp(self)
     local s = socket_new('AF_INET', 'SOCK_STREAM', 'tcp')
     if not s then
         return nil, socket_error(self)
@@ -1567,7 +1567,7 @@ local function lsocket_bind(host, port, backlog)
     if host == nil or port == nil then
         error("Usage: luasocket.bind(host, port [, backlog])")
     end
-    local function prepare(s) return backlog end
+    local function prepare(s) return backlog end -- luacheck: no unused args
     local s = tcp_server_bind(host, port, prepare)
     if not s then
         return nil, boxerrno.strerror()

@@ -53,7 +53,6 @@ local function ok(test, cond, message, extra)
     io.write(string.format("not ok - %s\n", message))
     extra = extra or {}
     if test.trace then
-        local frame = debug.getinfo(3, "Sl")
         extra.trace = traceback()
         extra.filename = extra.trace[#extra.trace].filename
         extra.line = extra.trace[#extra.trace].line
@@ -75,9 +74,6 @@ end
 local function skip(test, message, extra)
     ok(test, true, message.." # skip", extra)
 end
-
-
-local nan = 0/0
 
 local function cmpdeeply(got, expected, extra)
     if type(expected) == "number" or type(got) == "number" then

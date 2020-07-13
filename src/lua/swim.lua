@@ -371,7 +371,7 @@ end
 --
 local function swim_member_payload_str(m)
     local ptr = swim_check_member(m, 'member:payload_str()')
-    local cdata, size = swim_member_payload_raw(ptr)
+    local _, size = swim_member_payload_raw(ptr)
     if size > 0 then
         return ffi.string(swim_member_payload_raw(ptr))
     end
@@ -462,7 +462,7 @@ local swim_member_mt = {
         is_dropped = swim_member_is_dropped,
     },
     __serialize = swim_member_serialize,
-    __newindex = function(m)
+    __newindex = function(self)
         return error('swim_member is a read-only object')
     end
 }

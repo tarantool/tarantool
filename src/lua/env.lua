@@ -28,7 +28,7 @@ os.environ = function()
 end
 
 os.setenv = function(key, value)
-    local rv = nil
+    local rv
     if value ~= nil then
         rv = ffi.C.setenv(key, value, 1)
     else

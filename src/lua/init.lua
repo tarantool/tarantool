@@ -80,7 +80,7 @@ dostring = function(s, ...)
 end
 
 local fiber = require("fiber")
-os.exit = function(code)
+local function exit(code)
     code = (type(code) == 'number') and code or 0
     ffi.C.tarantool_exit(code)
     -- Make sure we yield even if the code after
@@ -88,6 +88,7 @@ os.exit = function(code)
     -- fiber completes, we will never wake up again.
     while true do fiber.yield() end
 end
+rawset(os, "exit", exit)
 
 local function uptime()
     return tonumber(ffi.C.tarantool_uptime());
@@ -221,9 +222,9 @@ table.insert(package.loaders, 5, gen_loader_func(search_rocks_lib, load_lib))
 -- package.cpath  7
 -- croot          8
 
-package.search = search
-package.searchroot = searchroot
-package.setsearchroot = setsearchroot
+rawset(package, "search", search)
+rawset(package, "searchroot", searchroot)
+rawset(package, "setsearchroot", setsearchroot)
 
 return {
     uptime = uptime;

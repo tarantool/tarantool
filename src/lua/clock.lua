@@ -33,7 +33,7 @@ clock.bench = function(fun, ...)
     overhead = clock.proc() - overhead
     local start_time = clock.proc()
     local res = {0, fun(...)}
-    res[1] = clock.proc() - start_time - overhead, res
+    res[1] = clock.proc() - start_time - overhead
     return res
 end
 

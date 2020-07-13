@@ -11,10 +11,7 @@ help = { doc.help }
 tutorial = {}
 tutorial[1] = help[1]
 
-local help_function_data = {};
-local help_object_data = {}
-
-local function help_call(table, param)
+local function help_call()
     return help
 end
 
@@ -22,7 +19,7 @@ setmetatable(help, { __call = help_call })
 
 local screen_id = 1;
 
-local function tutorial_call(table, action)
+local function tutorial_call(self, action)
     if action == 'start' then
         screen_id = 1;
     elseif action == 'next' or action == 'more' then

@@ -29,8 +29,6 @@
 --  SUCH DAMAGE.
 --
 
-local fiber = require('fiber')
-
 local driver = package.loaded.http.client
 package.loaded.http = nil
 
@@ -111,7 +109,6 @@ local special_characters = {
     ['['] = true,
     [']'] = true,
     ['<'] = true,
-    ['>'] = true,
     ['>'] = true,
     ['@'] = true,
     [','] = true,

@@ -246,7 +246,7 @@ local m = {
     end
 }
 
-for digest, name in pairs(digest_shortcuts) do
+for digest, _ in pairs(digest_shortcuts) do
     m[digest] = function (str)
         return crypto.digest[digest](str)
     end
