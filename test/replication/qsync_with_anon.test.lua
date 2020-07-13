@@ -19,7 +19,7 @@ test_run:cmd('switch replica_anon')
 -- replica.
 -- Testcase setup.
 test_run:switch('default')
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
 -- Testcase body.
@@ -45,7 +45,7 @@ box.space.sync:insert{1} -- failure
 test_run:cmd('switch replica_anon')
 box.space.sync:select{} -- none
 test_run:switch('default')
-box.cfg{replication_synchro_quorum=NUM_INSTANCES}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
 box.space.sync:insert{1} -- success
 test_run:cmd('switch replica_anon')
 box.space.sync:select{} -- 1

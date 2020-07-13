@@ -48,7 +48,7 @@ test_run:switch('default')
  | ---
  | - true
  | ...
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
  | ---
  | ...
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
@@ -126,7 +126,7 @@ test_run:switch('default')
  | ---
  | - true
  | ...
-box.cfg{replication_synchro_quorum=NUM_INSTANCES}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
  | ---
  | ...
 box.space.sync:insert{1} -- success
