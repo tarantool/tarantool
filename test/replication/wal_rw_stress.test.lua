@@ -38,8 +38,10 @@ test_run:cmd("setopt delimiter ''");
 -- are running in different threads, there shouldn't be any rw errors.
 test_run:cmd("switch replica")
 box.cfg{replication = replication}
-test_run:wait_cond(function()                                     \
-    return box.info.replication[1].downstream.status ~= 'stopped' \
+test_run:wait_cond(function()                    \
+    local r = box.info.replication[1]            \
+    return (r ~= nil and r.downstream ~= nil and \
+            r.downstream.status ~= 'stopped')    \
 end) or box.info
 test_run:cmd("switch default")
 
