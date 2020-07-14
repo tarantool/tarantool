@@ -1,5 +1,4 @@
-fiber = require('fiber')
-digest = require('digest')
+local digest = require('digest')
 
 local PAGE_SIZE = 1024
 local RANGE_SIZE = 64 * PAGE_SIZE
