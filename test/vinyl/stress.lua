@@ -62,7 +62,7 @@ local function t2(ch, time_limit)
         local t = math.random(16)
         local space = spaces[math.fmod(t, #spaces) + 1]
         if t < 12 then
-            local l = space:get({k})
+            space:get({k})
         else
             space:delete({k})
         end
@@ -99,19 +99,19 @@ local function stress(time_limit)
 
     math.randomseed(os.time());
 
-    for i = 1, 6 do
+    for _ = 1, 6 do
         fiber.create(t1, ch, time_limit)
     end;
 
-    for i = 1, 6 do
+    for _ = 1, 6 do
         fiber.create(t2, ch, time_limit)
     end;
 
-    for i = 1, 4 do
+    for _ = 1, 4 do
         fiber.create(t3, ch, time_limit)
     end;
 
-    for i = 1, 16 do
+    for _ = 1, 16 do
         ch:get()
     end;
 end
