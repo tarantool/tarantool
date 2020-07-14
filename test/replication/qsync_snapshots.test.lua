@@ -97,6 +97,7 @@ end)
 test_run:switch('replica')
 fiber = require('fiber')
 box.cfg{replication_synchro_timeout=1000}
+test_run:wait_cond(function() return box.space.sync:count() == 1 end)
 ok, err = nil
 f = fiber.create(function() ok, err = pcall(box.snapshot) end)
 

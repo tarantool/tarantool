@@ -204,6 +204,10 @@ fiber = require('fiber')
 box.cfg{replication_synchro_timeout=1000}
  | ---
  | ...
+test_run:wait_cond(function() return box.space.sync:count() == 1 end)
+ | ---
+ | - true
+ | ...
 ok, err = nil
  | ---
  | ...
