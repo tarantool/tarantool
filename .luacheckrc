@@ -39,7 +39,6 @@ exclude_files = {
     "test/engine_long/*.test.lua",
     "test/luajit-tap/**/*.lua",
     "test/replication/*.test.lua",
-    "test/replication-py/**/*.lua",
     "test/sql/**/*.lua",
     "test/swim/*.test.lua",
     "test/var/**/*.lua",
