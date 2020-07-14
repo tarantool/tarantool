@@ -32,7 +32,7 @@ exclude_files = {
     "build/**/*.lua",
     -- Third-party source code.
     "test-run/**/*.lua",
-    "test/app/**/*.lua",
+    "test/app/*.test.lua",
     "test/box/**/*.lua",
     "test/box-py/**/*.lua",
     "test/box-tap/**/*.lua",

@@ -70,7 +70,7 @@ end
 -- -------------------------------------------------------------------------- --
 
 -- run fiber test
-function box_fiber_run_test()
+local function box_fiber_run_test()
     -- run tester
     tester_task = fiber.create(tester_task_routine)
     while tester_task:status() ~= 'dead' do
@@ -78,3 +78,5 @@ function box_fiber_run_test()
     end
 	return result
 end
+
+return box_fiber_run_test
