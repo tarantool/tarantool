@@ -252,9 +252,15 @@ txn_limbo_wait_confirm(struct txn_limbo *limbo);
 void
 txn_limbo_force_empty(struct txn_limbo *limbo, int64_t last_confirm);
 
+/**
+ * Update qsync parameters dynamically.
+ */
 void
 txn_limbo_on_parameters_change(struct txn_limbo *limbo);
 
+/**
+ * Initialize qsync engine.
+ */
 void
 txn_limbo_init();
 
