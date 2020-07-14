@@ -1,17 +1,18 @@
-dofile('bitset.lua')
+bset = require('bitset')
 
-create_space()
+dump = bset.dump
+bset.create_space()
 
 ------------------------------------------------------------------------------
 -- BitsetIndex: insert/delete
 ------------------------------------------------------------------------------
-test_insert_delete(128)
+bset.test_insert_delete(128)
 
 ------------------------------------------------------------------------------
 -- BitsetIndex: ALL
 ------------------------------------------------------------------------------
-clear()
-fill(1, 128)
+bset.clear()
+bset.fill(1, 128)
 dump(box.index.BITS_ALL)
 box.space.tweedledum.index.bitset:count()
 ------------------------------------------------------------------------------
@@ -93,7 +94,7 @@ dump(box.index.BITS_ANY_SET, 7)
 dump(box.index.BITS_ANY_SET, 84)
 dump(box.index.BITS_ANY_SET, 113)
 
-drop_space()
+bset.drop_space()
 
 ------------------------------------------------------------------------------
 -- Misc

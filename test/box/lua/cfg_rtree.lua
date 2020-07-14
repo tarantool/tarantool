@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-os = require('os')
+local os = require('os')
 box.error.injection.set("ERRINJ_INDEX_RESERVE", true)
 box.cfg{
     listen              = os.getenv("LISTEN"),

@@ -225,7 +225,7 @@ space:drop()
 
 space = box.schema.space.create('tweedledum')
 tmp = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}, unique = true })
-dofile('push.lua')
+push_collection = require('push')
 
 push_collection(space, 0, 1038784, 'hello')
 push_collection(space, 0, 1038784, 'hello')
@@ -277,7 +277,7 @@ space:drop()
 --
 -- index:random test
 -- 
-dofile('index_random_test.lua')
+index_random_test = require('index_random_test')
 space = box.schema.space.create('tweedledum')
 tmp = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}, unique = true })
 tmp = space:create_index('secondary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
