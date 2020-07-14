@@ -27,7 +27,7 @@ test_run:cmd('start server replica with wait=True, wait_load=True')
 -- Successful write.
 -- Testcase setup.
 test_run:switch('default')
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
 -- Testcase body.
@@ -41,7 +41,7 @@ box.space.sync:drop()
 -- Unsuccessfull write.
 -- Testcase setup.
 test_run:switch('default')
-box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=0.001}
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
 -- Testcase body.
@@ -56,7 +56,7 @@ box.space.sync:drop()
 -- same order as on client in case of achieved quorum.
 -- Testcase setup.
 test_run:switch('default')
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
 -- Testcase body.
@@ -73,13 +73,14 @@ box.space.sync:drop()
 -- Synchro timeout is not bigger than replication_synchro_timeout value.
 -- Testcase setup.
 test_run:switch('default')
-box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=orig_synchro_timeout}
+box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=0.001}
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
 -- Testcase body.
-start = os.time()
+start = fiber.clock()
 box.space.sync:insert{1}
-(os.time() - start) == box.cfg.replication_synchro_timeout -- true
+duration = fiber.clock() - start
+duration >= box.cfg.replication_synchro_timeout or duration -- true
 -- Testcase cleanup.
 test_run:switch('default')
 box.space.sync:drop()
@@ -108,7 +109,7 @@ box.cfg.replication_synchro_timeout -- old value
 -- TX is in synchronous replication.
 -- Testcase setup.
 test_run:switch('default')
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
 -- Testcase body.
@@ -121,7 +122,7 @@ box.space.sync:drop()
 -- data consistency on a leader and replicas.
 -- Testcase setup.
 test_run:switch('default')
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
 -- Testcase body.
@@ -155,7 +156,12 @@ box.cfg{replication_synchro_quorum=BROKEN_QUORUM} -- warning
 -- success and data consistency on a leader and replicas (gh-5124).
 -- Testcase setup.
 test_run:switch('default')
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+test_run:cmd("set variable replica_url to 'replica.listen'")
+box.cfg{                                                                        \
+    replication_synchro_quorum = NUM_INSTANCES,                                 \
+    replication_synchro_timeout = 1000,                                         \
+    replication = replica_url,                                                  \
+}
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
 -- Testcase body.
@@ -167,6 +173,7 @@ box.cfg{read_only=false} -- promote replica to master
 test_run:switch('default')
 box.cfg{read_only=true} -- demote master to replica
 test_run:switch('replica')
+box.cfg{replication_synchro_quorum = 2, replication_synchro_timeout = 1000}
 box.space.sync:insert{2}
 box.space.sync:select{} -- 1, 2
 test_run:switch('default')
@@ -179,11 +186,12 @@ box.cfg{read_only=true}
 -- Testcase cleanup.
 test_run:switch('default')
 box.space.sync:drop()
+box.cfg{replication = {}}
 
 -- Check behaviour with failed write to WAL on master (ERRINJ_WAL_IO).
 -- Testcase setup.
 test_run:switch('default')
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
 -- Testcase body.
@@ -250,9 +258,9 @@ test_run:switch('default')
 -- Enable synchronous mode.
 disable_sync_mode()
 -- Space is in sync mode now.
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
 box.space.sync:insert{2} -- success
-box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=1000}
 box.space.sync:insert{3} -- success
 box.space.sync:select{} -- 1, 2, 3
 test_run:cmd('switch replica')

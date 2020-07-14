@@ -63,7 +63,7 @@ test_run:switch('default')
  | ---
  | - true
  | ...
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
  | ---
  | ...
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
@@ -100,7 +100,7 @@ test_run:switch('default')
  | ---
  | - true
  | ...
-box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=0.001}
  | ---
  | ...
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
@@ -138,7 +138,7 @@ test_run:switch('default')
  | ---
  | - true
  | ...
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
  | ---
  | ...
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
@@ -191,7 +191,7 @@ test_run:switch('default')
  | ---
  | - true
  | ...
-box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=orig_synchro_timeout}
+box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=0.001}
  | ---
  | ...
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
@@ -201,14 +201,17 @@ _ = box.space.sync:create_index('pk')
  | ---
  | ...
 -- Testcase body.
-start = os.time()
+start = fiber.clock()
  | ---
  | ...
 box.space.sync:insert{1}
  | ---
  | - error: Quorum collection for a synchronous transaction is timed out
  | ...
-(os.time() - start) == box.cfg.replication_synchro_timeout -- true
+duration = fiber.clock() - start
+ | ---
+ | ...
+duration >= box.cfg.replication_synchro_timeout or duration -- true
  | ---
  | - true
  | ...
@@ -298,7 +301,7 @@ test_run:switch('default')
  | ---
  | - true
  | ...
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
  | ---
  | ...
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
@@ -326,7 +329,7 @@ test_run:switch('default')
  | ---
  | - true
  | ...
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
  | ---
  | ...
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
@@ -428,7 +431,15 @@ test_run:switch('default')
  | ---
  | - true
  | ...
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+test_run:cmd("set variable replica_url to 'replica.listen'")
+ | ---
+ | - true
+ | ...
+box.cfg{                                                                        \
+    replication_synchro_quorum = NUM_INSTANCES,                                 \
+    replication_synchro_timeout = 1000,                                         \
+    replication = replica_url,                                                  \
+}
  | ---
  | ...
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
@@ -468,6 +479,9 @@ test_run:switch('replica')
  | ---
  | - true
  | ...
+box.cfg{replication_synchro_quorum = 2, replication_synchro_timeout = 1000}
+ | ---
+ | ...
 box.space.sync:insert{2}
  | ---
  | - [2]
@@ -484,6 +498,7 @@ test_run:switch('default')
 box.space.sync:select{} -- 1, 2
  | ---
  | - - [1]
+ |   - [2]
  | ...
 -- Revert cluster configuration.
 test_run:switch('default')
@@ -508,6 +523,9 @@ test_run:switch('default')
 box.space.sync:drop()
  | ---
  | ...
+box.cfg{replication = {}}
+ | ---
+ | ...
 
 -- Check behaviour with failed write to WAL on master (ERRINJ_WAL_IO).
 -- Testcase setup.
@@ -515,7 +533,7 @@ test_run:switch('default')
  | ---
  | - true
  | ...
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
  | ---
  | ...
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
@@ -699,14 +717,14 @@ disable_sync_mode()
  | ---
  | ...
 -- Space is in sync mode now.
-box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
  | ---
  | ...
 box.space.sync:insert{2} -- success
  | ---
  | - [2]
  | ...
-box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=1000}
  | ---
  | ...
 box.space.sync:insert{3} -- success
