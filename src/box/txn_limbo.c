@@ -173,7 +173,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	assert(txn_has_flag(txn, TXN_WAIT_SYNC));
 	double start_time = fiber_clock();
 	while (true) {
-		double deadline = start_time + txn_limbo_confirm_timeout(limbo);
+		double deadline = start_time + replication_synchro_timeout;
 		bool cancellable = fiber_set_cancellable(false);
 		double timeout = deadline - fiber_clock();
 		bool timed_out = fiber_cond_wait_timeout(&limbo->wait_cond,
@@ -450,13 +450,6 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 	}
 }
 
-double
-txn_limbo_confirm_timeout(struct txn_limbo *limbo)
-{
-	(void)limbo;
-	return replication_synchro_timeout;
-}
-
 /**
  * Waitpoint stores information about the progress of confirmation.
  * In the case of multimaster support, it will store a bitset
@@ -516,7 +509,7 @@ txn_limbo_wait_confirm(struct txn_limbo *limbo)
 	txn_on_rollback(tle->txn, &on_rollback);
 	double start_time = fiber_clock();
 	while (true) {
-		double deadline = start_time + txn_limbo_confirm_timeout(limbo);
+		double deadline = start_time + replication_synchro_timeout;
 		bool cancellable = fiber_set_cancellable(false);
 		double timeout = deadline - fiber_clock();
 		int rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);

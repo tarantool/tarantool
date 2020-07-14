@@ -959,7 +959,7 @@ box_clear_synchro_queue(void)
 		return;
 
 	/* Wait until pending confirmations/rollbacks reach us. */
-	double timeout = 2 * txn_limbo_confirm_timeout(&txn_limbo);
+	double timeout = 2 * replication_synchro_timeout;
 	double start_tm = fiber_time();
 	while (!txn_limbo_is_empty(&txn_limbo)) {
 		if (fiber_time() - start_tm > timeout)

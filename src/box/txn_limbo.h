@@ -232,9 +232,6 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn);
 void
 txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn);
 
-double
-txn_limbo_confirm_timeout(struct txn_limbo *limbo);
-
 /**
  * Waiting for confirmation of all "sync" transactions
  * during confirm timeout or fail.
