@@ -1,11 +1,11 @@
--- A fiber can't use multiple transactions simultaneously;  
+-- A fiber can't use multiple transactions simultaneously;
 -- i.e. [fiber] --? [transaction] in UML parlor.
 --
 -- This module provides a simple transaction proxy facility
--- to control multiple transactions at once. A proxy executes 
+-- to control multiple transactions at once. A proxy executes
 -- statements in a worker fiber in order to overcome
 -- "one transaction per fiber" limitation.
--- 
+--
 -- Ex:
 -- proxy = require('txn_proxy').new()
 -- proxy:begin()

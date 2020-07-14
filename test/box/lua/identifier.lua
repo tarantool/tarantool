@@ -1,6 +1,6 @@
-max_len_string = string.rep('a', box.schema.NAME_MAX)
+local max_len_string = string.rep('a', box.schema.NAME_MAX)
 
-valid_testcases = {
+local valid_testcases = {
     --[[ Symbols from various unicode groups ,, --]]
     "1", "_", "sd", "я", "Ё",
     ".", "@", "#" , "⁋", "☢",
@@ -13,7 +13,7 @@ valid_testcases = {
     "⧭", "⭓", max_len_string
 }
 
-invalid_testcases = {
+local invalid_testcases = {
     --[[ Invalid and non printable unicode sequences --]]
     --[[ 1-3 ASCII control, C0 --]]
     "\x01", "\x09", "\x1f",
@@ -34,8 +34,7 @@ invalid_testcases = {
     max_len_string..'1'
 }
 
-function run_test(create_func, cleanup_func)
-    local json = require("json")
+local function run_test(create_func, cleanup_func)
     local bad_tests = {}
     for i, identifier in ipairs(valid_testcases) do
         local ok, res = pcall(create_func,identifier)
@@ -48,7 +47,7 @@ function run_test(create_func, cleanup_func)
         end
     end
     for i, identifier in ipairs(invalid_testcases) do
-        local ok, res = pcall(create_func,identifier)
+        local ok = pcall(create_func,identifier)
         if ok then
             table.insert(bad_tests, "invalid_testcases: "..i)
         end

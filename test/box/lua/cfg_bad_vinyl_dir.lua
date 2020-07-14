@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-os = require('os')
+local os = require('os')
 
 box.cfg{
     listen              = os.getenv("LISTEN"),

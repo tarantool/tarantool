@@ -1,4 +1,4 @@
-function space_field_types(space_no)
+local function space_field_types(space_no)
 	local types = {};
 	for _, index in pairs(box.space[space_no].index) do
 		for _,key_def in pairs(index.parts) do
@@ -8,7 +8,7 @@ function space_field_types(space_no)
 	return types;
 end
 
-function iterate(space_no, index_no, f1, f2, iterator, ...)
+local function iterate(space_no, index_no, f1, f2, iterator, ...)
 	local sorted = (box.space[space_no].index[index_no].type == "TREE");
 	local pkeys = {};
 	local tkeys = {};
@@ -22,8 +22,7 @@ function iterate(space_no, index_no, f1, f2, iterator, ...)
 			return f
 		end
 	end
-	local state, v
-	for state, v in box.space[space_no].index[index_no]:pairs({...}, { iterator = iterator }) do
+	for _, v in box.space[space_no].index[index_no]:pairs({...}, { iterator = iterator }) do
 		local pk = get_field(v, 1);
 		local tk = '$';
 		for f = f1 + 1, f2, 1 do tk = (tk..(get_field(v, f))..'$'); end;
@@ -45,7 +44,7 @@ function iterate(space_no, index_no, f1, f2, iterator, ...)
 	return values
 end
 
-function arithmetic(d, count)
+local function arithmetic(d, count)
 	if not d then d = 1 end
 	local a = 0;
 	local i = 0;
@@ -61,7 +60,7 @@ function arithmetic(d, count)
 	end
 end
 
-function table_shuffle(t)
+local function table_shuffle(t)
 	local n = #t
 	while n >= 2 do
 		local k = math.random(n)
@@ -70,7 +69,7 @@ function table_shuffle(t)
 	end
 end
 
-function table_generate(iter)
+local function table_generate(iter)
 	local t = {};
 	for k in iter do
 		table.insert(t, k);
@@ -80,7 +79,7 @@ function table_generate(iter)
 end
 
 -- sort all rows as strings(not for tables);
-function sort(tuples)
+local function sort(tuples)
     local function compare_tables(t1, t2)
         return (tostring(t1) < tostring(t2))
     end
@@ -88,29 +87,7 @@ function sort(tuples)
     return tuples
 end;
 
--- return string tuple
-function tuple_to_string(tuple, yaml)
-    ans = '['
-    for i = 0, #tuple - 1 do
-        if #i == 4 then
-            ans = ans..i
-        elseif #i == 8 then
-            ans = ans..i
-        else
-            ans = ans..'\''..tostring(i)..'\''
-        end
-        if not #i == #tuple -1 then
-            ans = ans..', '
-        end
-    end
-    ans = ans..']'
-    if yaml then
-        ans = ' - '..ans
-    end
-    return ans
-end;
-
-function check_space(space, N)
+local function check_space(space, N)
     local errors = {}
 
     --
@@ -195,7 +172,7 @@ function check_space(space, N)
     return errors
 end
 
-function space_bsize(s)
+local function space_bsize(s)
     local bsize = 0
     for _, t in s:pairs() do
         bsize = bsize + t:bsize()
@@ -204,18 +181,17 @@ function space_bsize(s)
     return bsize
 end
 
-function create_iterator(obj, key, opts)
+local function create_iterator(obj, key, opts)
     local iter, key, state = obj:pairs(key, opts)
     local res = {iter = iter, key = key, state = state}
     res.next = function()
-        local st, tp = iter.gen(key, state)
+        local _, tp = iter.gen(key, state)
         return tp
     end
     res.iterate_over = function()
-        local tp = nil
         local ret = {}
         local i = 0
-        tp = res.next()
+        local tp = res.next()
         while tp do
             ret[i] = tp
             i = i + 1
@@ -226,18 +202,16 @@ function create_iterator(obj, key, opts)
     return res
 end
 
-function setmap(tab)
+local function setmap(tab)
     return setmetatable(tab, { __serialize = 'map' })
 end
 
 return {
-    space_field_types = space_field_types;
     iterate = iterate;
     arithmetic = arithmetic;
     table_generate = table_generate;
     table_shuffle = table_shuffle;
     sort = sort;
-    tuple_to_string = tuple_to_string;
     check_space = check_space;
     space_bsize = space_bsize;
     create_iterator = create_iterator;

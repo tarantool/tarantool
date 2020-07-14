@@ -34,7 +34,13 @@ exclude_files = {
     "src/box/lua/serpent.lua",
     "test-run/**/*.lua",
     "test/app/*.test.lua",
-    "test/box/**/*.lua",
+    "test/box/*.test.lua",
+    -- Unused source file, to be dropped (gh-5169).
+    "test/box/lua/require_init.lua",
+    -- Unused source file, to be dropped (gh-5169).
+    "test/box/lua/require_mod.lua",
+    -- Unused source file, to be dropped (gh-5169).
+    "test/box/lua/test_init.lua",
     "test/box-py/**/*.lua",
     "test/box-tap/**/*.lua",
     "test/engine/**/*.lua",
@@ -101,5 +107,12 @@ files["src/box/lua/console.lua"] = {
     ignore = {
         -- https://github.com/tarantool/tarantool/issues/5032
         "212",
+    }
+}
+files["test/box/box.lua"] = {
+    globals = {
+        "cfg_filter",
+        "sorted",
+        "iproto_request",
     }
 }
