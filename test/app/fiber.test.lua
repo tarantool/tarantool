@@ -215,9 +215,9 @@ fiber.self():name(old_name)
 space:drop()
 
 -- box.fiber test (create, resume, yield, status)
-dofile("fiber.lua")
+f = dofile("fiber.lua")
 -- print run fiber's test
-box_fiber_run_test()
+f()
 -- various...
 function testfun() while true do fiber.sleep(10) end end
 f = fiber.create(testfun)

@@ -33,7 +33,7 @@ exclude_files = {
     -- Third-party source code.
     "src/box/lua/serpent.lua",
     "test-run/**/*.lua",
-    "test/app/**/*.lua",
+    "test/app/*.test.lua",
     "test/box/**/*.lua",
     "test/box-py/**/*.lua",
     "test/box-tap/**/*.lua",

@@ -560,11 +560,11 @@ space:drop()
 ---
 ...
 -- box.fiber test (create, resume, yield, status)
-dofile("fiber.lua")
+f = dofile("fiber.lua")
 ---
 ...
 -- print run fiber's test
-box_fiber_run_test()
+f()
 ---
 - - 'A: odd  1'
   - 'tester: status(printer) = suspended'
