@@ -243,19 +243,19 @@ bit.bor(1, 2)
 
 space:truncate()
 
-dofile('fifo.lua')
-fifomax
-fifo_push(space, 1, 1)
-fifo_push(space, 1, 2)
-fifo_push(space, 1, 3)
-fifo_push(space, 1, 4)
-fifo_push(space, 1, 5)
-fifo_push(space, 1, 6)
-fifo_push(space, 1, 7)
-fifo_push(space, 1, 8)
-fifo_top(space, 1)
+fifo = require('fifo')
+fifo.fifomax
+fifo.fifo_push(space, 1, 1)
+fifo.fifo_push(space, 1, 2)
+fifo.fifo_push(space, 1, 3)
+fifo.fifo_push(space, 1, 4)
+fifo.fifo_push(space, 1, 5)
+fifo.fifo_push(space, 1, 6)
+fifo.fifo_push(space, 1, 7)
+fifo.fifo_push(space, 1, 8)
+fifo.fifo_top(space, 1)
 space:delete{1}
-fifo_top(space, 1)
+fifo.fifo_top(space, 1)
 space:delete{1}
 
 space:drop()

@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-os = require('os')
+local os = require('os')
 
 local msgpack = require('msgpack')
 
@@ -20,7 +20,7 @@ local _hide = {
 
 function cfg_filter(data)
     if type(data)~='table' then return data end
-    local keys,k,_ = {}
+    local keys = {}
     for k in pairs(data) do
         table.insert(keys, k)
     end

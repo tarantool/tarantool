@@ -1,5 +1,4 @@
-
-function push_collection(space, size, cid, ...)
+local function push_collection(space, size, cid, ...)
 	local append = { ... }
 	local tuple = space:get{cid}
 	if tuple == nil then
@@ -14,3 +13,5 @@ function push_collection(space, size, cid, ...)
 	end
 	return space:replace{tuple:unpack()}
 end
+
+return push_collection
