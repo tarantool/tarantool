@@ -47,7 +47,6 @@ exclude_files = {
     "test/vinyl/**/*.lua",
     "test/wal_off/**/*.lua",
     "test/xlog/*.test.lua",
-    "test/xlog-py/**/*.lua",
     "third_party/**/*.lua",
     ".rocks/**/*.lua",
     ".git/**/*.lua",
