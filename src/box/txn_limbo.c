@@ -176,12 +176,11 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		double deadline = start_time + replication_synchro_timeout;
 		bool cancellable = fiber_set_cancellable(false);
 		double timeout = deadline - fiber_clock();
-		bool timed_out = fiber_cond_wait_timeout(&limbo->wait_cond,
-							 timeout);
+		int rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);
 		fiber_set_cancellable(cancellable);
 		if (txn_limbo_entry_is_complete(entry))
 			goto complete;
-		if (timed_out)
+		if (rc != 0)
 			goto do_rollback;
 	}
 
