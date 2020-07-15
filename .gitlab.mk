@@ -1,20 +1,8 @@
 GITLAB_MAKE:=${MAKE} -f .gitlab.mk
 TRAVIS_MAKE:=${MAKE} -f .travis.mk
 
-# #####
-# Utils
-# #####
-
-# Update submodules.
-#
-# Note: There is no --force option for `git submodule` on git
-# 1.7.1, which is shiped in CentOS 6.
-git_submodule_update:
-	git submodule update --force --recursive --init 2>/dev/null || \
-		git submodule update --recursive --init
-
 # Pass *_no_deps goals to .travis.mk.
-test_%: git_submodule_update
+test_%:
 	${TRAVIS_MAKE} $@
 
 # #######################################################
@@ -107,7 +95,6 @@ vms_test_%:
 	ssh ${VMS_USER}@127.0.0.1 -p ${VMS_PORT} "/bin/bash -c \
 		'${EXTRA_ENV} \
 		cd tarantool && \
-		${GITLAB_MAKE} git_submodule_update && \
 		${TRAVIS_MAKE} $(subst vms_,,$@)'"
 
 vms_shutdown:
@@ -122,7 +109,7 @@ MAJOR_VERSION=$(word 1,$(subst ., ,$(GIT_DESCRIBE)))
 MINOR_VERSION=$(word 2,$(subst ., ,$(GIT_DESCRIBE)))
 BUCKET="$(MAJOR_VERSION).$(MINOR_VERSION)"
 
-deploy_prepare: git_submodule_update
+deploy_prepare:
 	[ -d packpack ] || \
 		git clone https://github.com/packpack/packpack.git packpack
 	rm -rf build
