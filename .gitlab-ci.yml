@@ -3,18 +3,34 @@ stages:
   - perf
   - cleanup
 
+# 1. Git strategy disabled as shown at:
+#    https://docs.gitlab.com/ee/ci/yaml/README.html#git-strategy
+# 2. Git clean flags disabled as shown at:
+#    https://docs.gitlab.com/ee/ci/yaml/README.html#git-clean-flags
 variables:
   GITLAB_MAKE: "make -f .gitlab.mk"
-  GIT_CLEAN_COMMAND: "git clean -ffdx && git submodule foreach git clean -ffdx && git submodule foreach git status"
+  GIT_STRATEGY: none
   GIT_CLEAN_FLAGS: none
 
-.shell_before_script_template: &shell_cleanup_script
-  before_script:
-    - /bin/bash -c "${GIT_CLEAN_COMMAND}"
-
-.docker_before_script_template: &docker_cleanup_script
-  before_script:
-    - docker run -w /source -v ${PWD}:/source -i packpack/packpack:el-7 /bin/bash -c "${GIT_CLEAN_COMMAND}"
+# 1. Git checkout strategy used from:
+#    https://docs.gitlab.com/ee/ci/yaml/README.html#git-checkout
+# 2. Submodule strategy used from:
+#    https://docs.gitlab.com/ee/ci/yaml/README.html#git-submodule-strategy
+# List of steps:
+# 1) Check/clone the Tarantool repository with submodules.
+# 2) For shell based jobs change ownership of all the sources
+#    to gitlab-runner user (NOTE: in Docker based jobs the
+#    gitlab-runner user is not known).
+# 3) Fetch Tarantool sources with branches and force checkout
+#    of the testing commit.
+# 4) Update submodules recursively (use force where supports).
+# 5) Cleanup all the sources from all files except from repository.
+before_script:
+  - /bin/bash -c "pwd && ls -d .git || git clone --recurse-submodules ${CI_REPOSITORY_URL} ."
+  - /bin/bash -c "! docker -v || (uid=`id -u` ; gid=`id -g` ; docker run -w /source -v ${PWD}:/source -i packpack/packpack:el-7 /bin/bash -c \"chown -R \$uid:\$gid * .[^.]*\")"
+  - /bin/bash -c "git fetch -p && git checkout -f ${CI_COMMIT_SHORT_SHA}"
+  - /bin/bash -c "git submodule sync --recursive && git submodule update --force --init --recursive || git submodule update --recursive --init"
+  - /bin/bash -c "git clean -ffdx && git submodule foreach git clean -ffdx && git submodule foreach git status"
 
 # Jobs templates
 
@@ -45,21 +61,18 @@ variables:
   stage: test
   tags:
     - docker_test
-  <<: *shell_cleanup_script
 
 .docker_test_clang8_template: &docker_test_clang8_definition
   image: "${CI_REGISTRY}/${CI_PROJECT_PATH}/testing/debian-buster:latest"
   stage: test
   tags:
     - docker_test
-  <<: *shell_cleanup_script
 
 .pack_template: &pack_definition
   <<: *pack_only_definition
   stage: test
   tags:
     - deploy
-  <<: *docker_cleanup_script
   script:
     - ${GITLAB_MAKE} package
 
@@ -68,7 +81,6 @@ variables:
   stage: test
   tags:
     - deploy_test
-  <<: *docker_cleanup_script
   script:
     - ${GITLAB_MAKE} package
 
@@ -77,7 +89,6 @@ variables:
   stage: test
   tags:
     - deploy
-  <<: *docker_cleanup_script
   script:
     - ${GITLAB_MAKE} deploy
 
@@ -86,21 +97,16 @@ variables:
   stage: test
   tags:
     - deploy_test
-  <<: *docker_cleanup_script
   script:
     - ${GITLAB_MAKE} deploy
 
 .osx_template: &osx_definition
   stage: test
-  <<: *shell_cleanup_script
   script:
     - ${GITLAB_MAKE} test_osx
 
 .vbox_template: &vbox_definition
   stage: test
-  before_script:
-    - /bin/bash -c "${GIT_CLEAN_COMMAND}"
-    - ${GITLAB_MAKE} vms_start
   after_script:
     - ${GITLAB_MAKE} vms_shutdown
 
@@ -113,14 +119,12 @@ variables:
     paths:
       - "*_result.txt"
       - "*_t_version.txt"
-  <<: *shell_cleanup_script
   script:
     - ${GITLAB_MAKE} perf_run
 
 .perf_cleanup_definition: &perf_cleanup_definition
   <<: *perf_only_definition
   stage: cleanup
-  <<: *shell_cleanup_script
   script:
     - ${GITLAB_MAKE} perf_cleanup
 
@@ -192,6 +196,7 @@ freebsd_12_release:
     VMS_PORT: '2232'
     MAKE: 'gmake'
   script:
+    - ${GITLAB_MAKE} vms_start
     - ${GITLAB_MAKE} vms_test_freebsd
 
 # ####
@@ -205,7 +210,6 @@ perf_bootstrap:
   stage: test
   tags:
     - deploy
-  <<: *shell_cleanup_script
   script:
     - ${GITLAB_MAKE} perf_prepare
   after_script:
@@ -523,6 +527,5 @@ static_docker_build:
   stage: test
   tags:
     - deploy_test
-  <<: *docker_cleanup_script
   script:
     - ${GITLAB_MAKE} test_static_docker_build
