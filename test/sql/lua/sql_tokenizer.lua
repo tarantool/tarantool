@@ -134,7 +134,7 @@ end
 -- @retval Token type. If the rest of the SQL request consists of
 --         spaces and comments, then return TK_EMPTY.
 local function get_next_token(context)
-    local c = ''
+    local c
     repeat
         local i = context.offset
         c = context.sql:sub(i, i)
