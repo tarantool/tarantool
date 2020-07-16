@@ -39,7 +39,7 @@ exclude_files = {
     "test/replication/**/*.lua",
     "test/replication-py/**/*.lua",
     "test/sql/**/*.lua",
-    "test/swim/**/*.lua",
+    "test/swim/*.test.lua",
     "test/var/**/*.lua",
     "test/vinyl/*.test.lua",
     "test/wal_off/*.test.lua",
@@ -123,4 +123,12 @@ files["test/box-tap/extended_error.test.lua"] = {
         "error_throw_access_denied",
         "forbidden_function",
     },
+}
+files["test/swim/box.lua"] = {
+    globals = {
+        "listen_port",
+        "listen_uri",
+        "uuid",
+        "uri",
+    }
 }

@@ -1,4 +1,5 @@
-test_run = require('test_run').new()
+fiber = require('fiber')
+swim = require('swim')
 errinj = box.error.injection
 
 --
