@@ -40,7 +40,7 @@ box.schema.user.grant('guest', 'replication')
 -- Set up synchronous replication options.
 old_synchro_quorum = box.cfg.replication_synchro_quorum
 old_synchro_timeout = box.cfg.replication_synchro_timeout
-box.cfg{replication_synchro_quorum=2, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum = 2, replication_synchro_timeout = 1000}
 
 test_run:cmd('create server replica with rpl_master=default,\
                                          script="replication/replica.lua"')
@@ -54,12 +54,12 @@ box.space.sync:insert{1}
 -- 1 for insertion, 1 for CONFIRM message.
 box.info.lsn - lsn
 -- Raise quorum so that master has to issue a ROLLBACK.
-box.cfg{replication_synchro_quorum=3}
+box.cfg{replication_synchro_quorum = 3, replication_synchro_timeout = 0.001}
 t = fiber.time()
 box.space.sync:insert{2}
 -- Check that master waited for acks.
 fiber.time() - t > box.cfg.replication_synchro_timeout
-box.cfg{replication_synchro_quorum=2}
+box.cfg{replication_synchro_quorum = 2, replication_synchro_timeout = 1000}
 box.space.sync:insert{3}
 box.space.sync:select{}
 
