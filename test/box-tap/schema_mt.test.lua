@@ -20,7 +20,7 @@ local sp1 = box.schema.create_space('test1', {engine = 'memtx'})
 local sp2 = box.schema.create_space('test2', {engine = 'vinyl'})
 test:is(getmetatable(sp1).__index, getmetatable(sp2).__index, 'spaces share metatables __index')
 
-function box.schema.space_mt.myfunc(space, args)
+function box.schema.space_mt.myfunc(space, args) -- luacheck: no unused args
   return args
 end
 test:is(sp1:myfunc(123), 123, 'space_mt can be extended')
@@ -41,13 +41,13 @@ test:isnt(getmetatable(sp1_pk).__index, getmetatable(sp2_pk).__index, 'engines d
 -- Check that there are two ways to extend index metatable:
 -- extend base index metatable, or extend engine specific.
 --
-function box.schema.index_mt.common_func(index, args)
+function box.schema.index_mt.common_func(index, args) -- luacheck: no unused args
   return args
 end
-function box.schema.vinyl_index_mt.vinyl_func(index, args)
+function box.schema.vinyl_index_mt.vinyl_func(index, args) -- luacheck: no unused args
   return args
 end
-function box.schema.memtx_index_mt.memtx_func(index, args)
+function box.schema.memtx_index_mt.memtx_func(index, args) -- luacheck: no unused args
   return args
 end
 test:is(box.schema.index_mt.common_func, box.schema.vinyl_index_mt.common_func,
@@ -77,14 +77,14 @@ test:is(sp2_sk:common_func(400), 400, 'vinyl common methods work')
 -- A space local metatable can extended so it does not affect
 -- other spaces. Same about index.
 --
-sp3 = box.schema.create_space('test3', {engine = 'memtx'})
-sp3_pk = sp3:create_index('pk')
-sp3_sk = sp3:create_index('sk')
-mt1 = getmetatable(sp1)
-mt2 = getmetatable(sp2)
+local sp3 = box.schema.create_space('test3', {engine = 'memtx'})
+local sp3_pk = sp3:create_index('pk')
+local sp3_sk = sp3:create_index('sk')
+local mt1 = getmetatable(sp1)
+local mt2 = getmetatable(sp2)
 test:isnt(mt1, mt2, 'spaces do not share metatables')
-index_mt1 = getmetatable(sp3_pk)
-index_mt2 = getmetatable(sp3_sk)
+local index_mt1 = getmetatable(sp3_pk)
+local index_mt2 = getmetatable(sp3_sk)
 test:isnt(index_mt1, index_mt2, 'indexes do not share metatables')
 
 mt1.my_func = function(a) return a end
