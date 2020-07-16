@@ -1,4 +1,4 @@
 
-dofile('conflict.lua')
+conflict = require('conflict')
 
-test_conflict()
+conflict.test_conflict()
