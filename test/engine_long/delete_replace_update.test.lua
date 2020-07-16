@@ -1,3 +1,4 @@
+delete_replace_update = require('suite').delete_replace_update
 engine_name = 'memtx'
 iterations = 100000
 
