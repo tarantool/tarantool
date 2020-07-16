@@ -96,7 +96,7 @@ old_synchro_quorum = box.cfg.replication_synchro_quorum
 old_synchro_timeout = box.cfg.replication_synchro_timeout
  | ---
  | ...
-box.cfg{replication_synchro_quorum=2, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum = 2, replication_synchro_timeout = 1000}
  | ---
  | ...
 
@@ -130,7 +130,7 @@ box.info.lsn - lsn
  | - 2
  | ...
 -- Raise quorum so that master has to issue a ROLLBACK.
-box.cfg{replication_synchro_quorum=3}
+box.cfg{replication_synchro_quorum = 3, replication_synchro_timeout = 0.001}
  | ---
  | ...
 t = fiber.time()
@@ -145,7 +145,7 @@ fiber.time() - t > box.cfg.replication_synchro_timeout
  | ---
  | - true
  | ...
-box.cfg{replication_synchro_quorum=2}
+box.cfg{replication_synchro_quorum = 2, replication_synchro_timeout = 1000}
  | ---
  | ...
 box.space.sync:insert{3}
