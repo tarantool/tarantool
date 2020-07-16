@@ -39,7 +39,6 @@ exclude_files = {
     "test/box/lua/require_mod.lua",
     -- Unused source file, to be dropped (gh-5169).
     "test/box/lua/test_init.lua",
-    "test/box-tap/**/*.lua",
     "test/engine/**/*.lua",
     "test/engine_long/**/*.lua",
     "test/long_run-py/**/*.lua",
@@ -112,4 +111,23 @@ files["test/box/box.lua"] = {
         "sorted",
         "iproto_request",
     }
+}
+files["test/box-tap/session.test.lua"] = {
+    globals = {
+        "session",
+        "space",
+        "f1",
+        "f2",
+    },
+}
+files["test/box-tap/extended_error.test.lua"] = {
+    globals = {
+        "error_access_denied",
+        "error_new",
+        "error_new_stacked",
+        "error_throw",
+        "error_throw_stacked",
+        "error_throw_access_denied",
+        "forbidden_function",
+    },
 }

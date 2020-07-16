@@ -24,7 +24,8 @@ box.schema.func.create('forbidden_function')
 box.session.su('guest')
 local tmp = box.func.forbidden_function
 local access_denied_error
-tmp, access_denied_error = pcall(tmp.call, tmp)
+local _
+_, access_denied_error = pcall(tmp.call, tmp)
 box.session.su('admin')
 box.schema.func.drop('forbidden_function')
 box.session.su(user)
@@ -85,7 +86,7 @@ local checks = {
     type = 'ClientError',
 }
 test:ok(check_error(err, checks), "ClientError marshaling")
-tmp, err = pcall(c.call, c, 'error_throw', args)
+_, err = pcall(c.call, c, 'error_throw', args)
 test:ok(check_error(err, checks), "ClientError marshaling in iproto fields")
 
 args = {{code = 1001, reason = 'Reason2', type = 'MyError'}}
@@ -97,7 +98,7 @@ checks = {
     type = 'MyError',
 }
 test:ok(check_error(err, checks), "CustomError marshaling")
-tmp, err = pcall(c.call, c, 'error_throw', args)
+_, err = pcall(c.call, c, 'error_throw', args)
 test:ok(check_error(err, checks), "CustomError marshaling in iproto fields")
 
 err = c:call('error_access_denied')
@@ -111,7 +112,7 @@ checks = {
     access_type = 'Execute',
 }
 test:ok(check_error(err, checks), "AccessDeniedError marshaling")
-tmp, err = pcall(c.call, c, 'error_throw_access_denied')
+_, err = pcall(c.call, c, 'error_throw_access_denied')
 test:ok(check_error(err, checks), "AccessDeniedError marshaling in iproto fields")
 
 args = {
@@ -137,7 +138,7 @@ local checks2 = {
 }
 test:ok(check_error(err2, checks2), "Second error in the stack")
 
-tmp, err = pcall(c.call, c, 'error_throw_stacked', args)
+_, err = pcall(c.call, c, 'error_throw_stacked', args)
 err1 = err
 err2 = err.prev
 test:isnt(err2, nil, 'Stack is received via iproto fields')

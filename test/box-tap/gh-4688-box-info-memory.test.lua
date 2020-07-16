@@ -12,7 +12,7 @@ test:plan(1)
 
 local function get_keys(t)
     local keys = {}
-    for k, v in pairs(t) do
+    for k, _ in pairs(t) do
         table.insert(keys, k)
     end
     return keys
