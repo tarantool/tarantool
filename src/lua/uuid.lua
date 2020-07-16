@@ -26,8 +26,12 @@ local uuid_t = ffi.typeof('struct tt_uuid')
 local UUID_STR_LEN = 36
 local UUID_LEN = ffi.sizeof(uuid_t)
 
+local is_uuid = function(value)
+    return ffi.istype(uuid_t, value)
+end
+
 local uuid_tostring = function(uu)
-    if not ffi.istype(uuid_t, uu) then
+    if not is_uuid(uu) then
         return error('Usage: uuid:str()')
     end
     return ffi.string(builtin.tt_uuid_str(uu), UUID_STR_LEN)
@@ -56,7 +60,7 @@ local need_bswap = function(order)
 end
 
 local uuid_tobin = function(uu, byteorder)
-    if not ffi.istype(uuid_t, uu) then
+    if not is_uuid(uu) then
         return error('Usage: uuid:bin([byteorder])')
     end
     if need_bswap(byteorder) then
@@ -81,17 +85,17 @@ local uuid_frombin = function(bin, byteorder)
 end
 
 local uuid_isnil = function(uu)
-    if not ffi.istype(uuid_t, uu) then
+    if not is_uuid(uu) then
         return error('Usage: uuid:isnil()')
     end
     return builtin.tt_uuid_is_nil(uu)
 end
 
 local uuid_eq = function(lhs, rhs)
-    if not ffi.istype(uuid_t, rhs) then
+    if not is_uuid(rhs) then
         return false
     end
-    if not ffi.istype(uuid_t, lhs) then
+    if not is_uuid(lhs) then
         return error('Usage: uuid == var')
     end
     return builtin.tt_uuid_is_equal(lhs, rhs)
@@ -133,6 +137,7 @@ return setmetatable({
     frombin     = uuid_frombin;
     bin         = uuid_new_bin;   -- optimized shortcut for new():bin()
     str         = uuid_new_str;   -- optimized shortcut for new():str()
+    is_uuid     = is_uuid;
 }, {
     __call = uuid_new; -- shortcut for new()
 })

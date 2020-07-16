@@ -98,6 +98,16 @@ uu.bin()
 uu.str()
 
 uu = nil
+
+--
+-- gh-5171: is_uuid function
+--
+
+uuid.is_uuid(uuid.new())
+uuid.is_uuid(uuid.new():str())
+uuid.is_uuid(1)
+uuid.is_uuid(require('decimal').new('123'))
+
 uuid = nil
 
 test_run:cmd("clear filter")

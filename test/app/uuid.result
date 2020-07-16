@@ -272,6 +272,25 @@ uu.str()
 uu = nil
 ---
 ...
+--
+-- gh-5171: is_uuid function
+--
+uuid.is_uuid(uuid.new())
+---
+- true
+...
+uuid.is_uuid(uuid.new():str())
+---
+- false
+...
+uuid.is_uuid(1)
+---
+- false
+...
+uuid.is_uuid(require('decimal').new('123'))
+---
+- false
+...
 uuid = nil
 ---
 ...
