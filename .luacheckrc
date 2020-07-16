@@ -39,7 +39,6 @@ exclude_files = {
     "test/box/lua/require_mod.lua",
     -- Unused source file, to be dropped (gh-5169).
     "test/box/lua/test_init.lua",
-    "test/box-py/**/*.lua",
     "test/box-tap/**/*.lua",
     "test/engine/**/*.lua",
     "test/engine_long/**/*.lua",
