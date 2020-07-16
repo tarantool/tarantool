@@ -1,11 +1,5 @@
 #!/usr/bin/env tarantool
-os = require('os')
-
-local vinyl = {
-    threads = 3,
-    range_size=1024*64,
-    page_size=1024,
-}
+local os = require('os')
 
 box.cfg{
     listen              = os.getenv("LISTEN"),
