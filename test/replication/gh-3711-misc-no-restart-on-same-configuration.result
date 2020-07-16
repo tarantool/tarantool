@@ -1,0 +1,101 @@
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("restart server default")
+--
+-- gh-3711 Do not restart replication on box.cfg in case the
+-- configuration didn't change.
+--
+box.schema.user.grant('guest', 'replication')
+---
+...
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+-- Access rights are checked only during reconnect. If the new
+-- and old configurations are equivalent, no reconnect will be
+-- issued and replication should continue working.
+box.schema.user.revoke('guest', 'replication')
+---
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+replication = box.cfg.replication[1]
+---
+...
+box.cfg{replication = {replication}}
+---
+...
+box.info.status == 'running'
+---
+- true
+...
+box.cfg{replication = replication}
+---
+...
+box.info.status == 'running'
+---
+- true
+...
+-- Check that comparison of tables works as expected as well.
+test_run:cmd("switch default")
+---
+- true
+...
+box.schema.user.grant('guest', 'replication')
+---
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+replication = box.cfg.replication
+---
+...
+table.insert(replication, box.cfg.listen)
+---
+...
+test_run:cmd("switch default")
+---
+- true
+...
+box.schema.user.revoke('guest', 'replication')
+---
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+box.cfg{replication = replication}
+---
+...
+box.info.status == 'running'
+---
+- true
+...
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+test_run:cmd("delete server replica")
+---
+- true
+...
+test_run:cleanup_cluster()
+---
+...
