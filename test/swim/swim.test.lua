@@ -1,3 +1,5 @@
+fiber = require('fiber')
+swim = require('swim')
 test_run = require('test_run').new()
 test_run:cmd("push filter '\\.lua.*:[0-9]+: ' to '.lua:<line>: '")
 test_run:cmd("push filter '127.0.0.1:[0-9]+$' to '127.0.0.1:<port>'")
