@@ -76,14 +76,14 @@ test:ok(not status and result:match('Please call box.cfg{}'),
     'exception on unconfigured box')
 
 status, result = pcall(box.error, box.error.ILLEGAL_PARAMS, 'xx')
-test:ok(result.code == box.error.ILLEGAL_PARAMS, "box.error without box.cfg")
+test:ok(not status and result.code == box.error.ILLEGAL_PARAMS, "box.error without box.cfg")
 status, result = pcall(function() return box.runtime.info() end)
 test:ok(status and type(result) == 'table', "box.runtime without box.cfg")
 status, result = pcall(function() return box.index.EQ end)
 test:ok(status and type(result) == 'number', "box.index without box.cfg")
 status, result = pcall(function() return box.NULL end)
 test:ok(status and result == msgpack.NULL, "box.NULL without box.cfg")
-status, result = pcall(box.session.id)
+status = pcall(box.session.id)
 test:ok(status, "box.session without box.cfg")
 status, result = pcall(box.tuple.new, {1, 2, 3})
 test:ok(status and result[1] == 1, "box.tuple without box.cfg")
@@ -145,13 +145,13 @@ test:is(box.cfg.too_long_threshold , 0.1, "too_long_threshold new value")
 test:is(box.cfg.read_only, false, "read_only default value")
 box.cfg{read_only = true}
 test:is(box.cfg.read_only, true, "read_only new value")
-local status, reason = pcall(function()
+local status = pcall(function()
     box.space._schema:insert({'read_only', 'test'})
 end)
 test:ok(not status and box.error.last().code == box.error.READONLY,
     "read_only = true")
 box.cfg{read_only = false}
-local status, reason = pcall(function()
+local status = pcall(function()
     box.space._schema:insert({'read_only', 'test'})
 end)
 test:ok(status, "read_only = false")
@@ -163,7 +163,7 @@ test:is(box.cfg.worker_pool_threads, 1, 'worker_pool_threads')
 
 local tarantool_bin = arg[-1]
 local PANIC = 256
-function run_script(code)
+local function run_script(code)
     local dir = fio.tempdir()
     local script_path = fio.pathjoin(dir, 'script.lua')
     local script = fio.open(script_path, {'O_CREAT', 'O_WRONLY', 'O_APPEND'},
@@ -178,7 +178,7 @@ function run_script(code)
 end
 
 -- gh-3468: should allow box.cfg with vinyl_memory=0
-code =[[
+local code =[[
 box.cfg{vinyl_memory=0}
 os.exit(box.cfg.vinyl_memory == 0 and 0 or 1)
 ]]
@@ -198,7 +198,6 @@ code = [[ box.cfg{ wal_mode = 'write' }; box.cfg { wal_mode = 'fsync'} ]]
 test:is(run_script(code), PANIC, 'wal_mode write -> fsync is not supported')
 
 -- gh-684: Inconsistency with box.cfg and directories
-local code;
 code = [[ box.cfg{ work_dir='invalid' } ]]
 test:is(run_script(code), PANIC, 'work_dir is invalid')
 
@@ -238,7 +237,7 @@ os.remove(path)
 
 path = './tarantool.sock'
 local path2 = './tarantool2.sock'
-local s = socket.tcp_server('unix/', path, function () end)
+s = socket.tcp_server('unix/', path, function () end)
 os.execute('ln ' .. path .. ' ' .. path2)
 s:close()
 box.cfg{ listen = 'unix/:'.. path2}
@@ -270,6 +269,7 @@ test:is(run_script(code), 0, "wal_mode none and ER_LOADING")
 --
 -- gh-1962: incorrect replication source
 --
+local reason
 status, reason = pcall(box.cfg, {replication="3303,3304"})
 test:ok(not status and reason:match("Incorrect"), "invalid replication")
 
@@ -298,7 +298,7 @@ test:is(run_script(code), 0, "page size equal with range")
 code = [[
 box.cfg{slab_alloc_arena = 0.2, slab_alloc_minimal = 16,
     slab_alloc_maximal = 64 * 1024}
-os.exit(box.cfg.memtx_memory == 214748364 
+os.exit(box.cfg.memtx_memory == 214748364
     and box.cfg.memtx_min_tuple_size == 16
     and box.cfg.memtx_max_tuple_size == 64 * 1024
 and 0 or 1)
@@ -384,7 +384,7 @@ test:is(run_script(code), 0, "wal_max_size xlog rotation")
 -- gh-2872 bootstrap is aborted if vinyl_dir contains vylog files
 -- left from previous runs
 --
-vinyl_dir = fio.tempdir()
+local vinyl_dir = fio.tempdir()
 run_script(string.format([[
 box.cfg{vinyl_dir = '%s'}
 s = box.schema.space.create('test', {engine = 'vinyl'})
@@ -401,8 +401,8 @@ fio.rmtree(vinyl_dir)
 --
 -- gh-2278 vinyl does not support DDL/DML if wal_mode = 'none'
 --
-dir = fio.tempdir()
-cfg = string.format("wal_dir = '%s', memtx_dir = '%s', vinyl_dir = '%s'", dir, dir, dir)
+local dir = fio.tempdir()
+local cfg = string.format("wal_dir = '%s', memtx_dir = '%s', vinyl_dir = '%s'", dir, dir, dir)
 run_script(string.format([[
 box.cfg{%s}
 s = box.schema.space.create('test', {engine = 'vinyl'})
@@ -453,9 +453,9 @@ test:is(run_script(code), 0, "check replicaset_uuid")
 -- Configuration fails on instance or replica set UUID mismatch.
 --
 dir = fio.tempdir()
-instance_uuid = uuid.new()
-replicaset_uuid = uuid.new()
-code_fmt = [[
+local instance_uuid = uuid.new()
+local replicaset_uuid = uuid.new()
+local code_fmt = [[
 box.cfg{memtx_dir = '%s', instance_uuid = '%s', replicaset_uuid = '%s'}
 os.exit(0)
 ]]
@@ -569,14 +569,14 @@ test:is(run_script(code), 0, "log_nonblock")
 -- Crash (instead of panic) when trying to recover a huge tuple.
 --
 dir = fio.tempdir()
-code1 = string.format([[
+local code1 = string.format([[
 box.cfg{wal_dir = '%s', memtx_dir = '%s', memtx_max_tuple_size = 10 * 1024 * 1024}
 box.schema.space.create('test')
 box.space.test:create_index('primary')
 box.space.test:insert{1, string.rep('x', 1024 * 1024)}
 os.exit(0)
 ]], dir, dir)
-code2 = string.format([[
+local code2 = string.format([[
 box.cfg{wal_dir = '%s', memtx_dir = '%s', memtx_max_tuple_size = 10 * 1024}
 os.exit(0)
 ]], dir, dir)

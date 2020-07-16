@@ -19,7 +19,7 @@ test:is(
 )
 
 local uri = inspector:eval('session_storage', 'box.cfg.listen')[1]
-conn1 = net_box.connect(uri)
+local conn1 = net_box.connect(uri)
 
 conn1:eval("session = box.session")
 test:is(conn1:eval("return type(session.id())"), "number", "session.id()")
@@ -34,7 +34,7 @@ conn1:eval("all = getmetatable(session).aggregate_storage")
 test:ok(conn1:eval("return all[session.id()].abc == 'cde'"), "check meta table")
 
 
-conn2 = net_box.connect(uri)
+local conn2 = net_box.connect(uri)
 
 test:is(conn2:eval("return type(session.storage)"), "table", "storage")
 test:isnil(conn2:eval("return type(session.storage.abc)"), "empty storage")
@@ -45,12 +45,12 @@ test:ok(conn1:eval("return session.storage.abc == 'cde'"), "first conn storage")
 test:ok(conn1:eval("return all[session.id()].abc == 'cde'"), "check first conn metatable")
 test:ok(conn2:eval("return all[session.id()].abc == 'def'"), "check second conn metatable")
 
-tres1 = conn1:eval("t1 = {} for k, v in pairs(all) do table.insert(t1, v.abc) end return t1")
+local tres1 = conn1:eval("t1 = {} for k, v in pairs(all) do table.insert(t1, v.abc) end return t1")
 
 conn1:close()
 conn2:close()
-conn3 = net_box.connect(uri)
-tres2 = conn3:eval("t2 = {} for k, v in pairs(all) do table.insert(t2, v.abc) end return t2")
+local conn3 = net_box.connect(uri)
+local tres2 = conn3:eval("t2 = {} for k, v in pairs(all) do table.insert(t2, v.abc) end return t2")
 table.sort(tres1)
 table.sort(tres2)
 test:is(tres1[1], "cde", "check after closing")

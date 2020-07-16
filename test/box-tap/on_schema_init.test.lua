@@ -8,7 +8,7 @@ local test = tap.test('on_schema_init')
 local str = ''
 test:plan(7)
 
-function testing_trig()
+local function testing_trig()
     test:istable(box.space._space, 'system spaces are accessible')
     test:is(type(box.space._space.before_replace), 'function', 'before_replace triggers')
     test:is(type(box.space._space.on_replace), 'function', 'on_replace triggers')
@@ -17,7 +17,7 @@ function testing_trig()
     str = str..'on_schema_init'
 end
 
-trig = box.ctl.on_schema_init(testing_trig)
+local trig = box.ctl.on_schema_init(testing_trig)
 test:is(type(trig), 'function', 'on_schema_init trigger set')
 
 box.cfg{log = 'tarantool.log'}

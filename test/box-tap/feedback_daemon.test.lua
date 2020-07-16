@@ -36,7 +36,7 @@ local function http_handle(s)
         buf = s:read('\n')
     end
     buf = s:read(length)
-    local ok, data = pcall(json.decode, buf)
+    local ok = pcall(json.decode, buf)
     if ok then
         feedback = buf
         feedback_count = feedback_count + 1
@@ -126,7 +126,7 @@ fio.unlink("feedback.json")
 
 server:close()
 -- check it does not fail without server
-local daemon = box.internal.feedback_daemon
+daemon = box.internal.feedback_daemon
 daemon.start()
 daemon.send_test()
 daemon.stop()
@@ -225,8 +225,8 @@ test:is(actual.features.schema.hash_indices, 2,
 -- collect box.cfg options: election mode, synchronous replication and tx
 -- manager.
 --
-em = box.cfg.election_mode
-quorum = box.cfg.replication_synchro_quorum
+local em = box.cfg.election_mode
+local quorum = box.cfg.replication_synchro_quorum
 box.cfg{election_mode='candidate', replication_synchro_quorum=2}
 box.on_reload_configuration = function() end
 actual = daemon.generate_feedback()
