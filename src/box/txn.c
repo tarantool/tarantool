@@ -797,11 +797,8 @@ txn_commit(struct txn *txn)
 
 	txn->fiber = fiber();
 
-	if (txn_prepare(txn) != 0) {
-		txn_rollback(txn);
-		txn_free(txn);
-		return -1;
-	}
+	if (txn_prepare(txn) != 0)
+		goto rollback;
 
 	if (txn_commit_nop(txn)) {
 		txn_free(txn);
@@ -809,11 +806,8 @@ txn_commit(struct txn *txn)
 	}
 
 	req = txn_journal_entry_new(txn);
-	if (req == NULL) {
-		txn_rollback(txn);
-		txn_free(txn);
-		return -1;
-	}
+	if (req == NULL)
+		goto rollback;
 
 	bool is_sync = txn_has_flag(txn, TXN_WAIT_SYNC);
 	if (is_sync) {
@@ -829,24 +823,17 @@ txn_commit(struct txn *txn)
 		 * wouldn't be acceptable.
 		 */
 		limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn);
-		if (limbo_entry == NULL) {
-			txn_rollback(txn);
-			txn_free(txn);
-			return -1;
-		}
+		if (limbo_entry == NULL)
+			goto rollback;
 	}
 
 	fiber_set_txn(fiber(), NULL);
-	if (journal_write(req) != 0) {
+	if (journal_write(req) != 0 || req->res < 0) {
 		if (is_sync)
 			txn_limbo_abort(&txn_limbo, limbo_entry);
-		fiber_set_txn(fiber(), txn);
-		txn_rollback(txn);
-		txn_free(txn);
-
 		diag_set(ClientError, ER_WAL_IO);
 		diag_log();
-		return -1;
+		goto rollback;
 	}
 	if (is_sync) {
 		if (txn_has_flag(txn, TXN_WAIT_ACK)) {
@@ -861,25 +848,29 @@ txn_commit(struct txn *txn)
 			/* Local WAL write is a first 'ACK'. */
 			txn_limbo_ack(&txn_limbo, txn_limbo.instance_id, lsn);
 		}
-		if (txn_limbo_wait_complete(&txn_limbo, limbo_entry) < 0) {
-			txn_free(txn);
-			return -1;
-		}
+		if (txn_limbo_wait_complete(&txn_limbo, limbo_entry) < 0)
+			goto rollback;
 	}
 	if (!txn_has_flag(txn, TXN_IS_DONE)) {
 		txn->signature = req->res;
 		txn_complete(txn);
 	}
-
-	int res = txn->signature >= 0 ? 0 : -1;
-	if (res != 0) {
-		diag_set(ClientError, ER_WAL_IO);
-		diag_log();
-	}
+	assert(txn->signature >= 0);
 
 	/* Synchronous transactions are freed by the calling fiber. */
 	txn_free(txn);
-	return res;
+	return 0;
+
+rollback:
+	assert(txn->fiber != NULL);
+	if (!txn_has_flag(txn, TXN_IS_DONE)) {
+		fiber_set_txn(fiber(), txn);
+		txn_rollback(txn);
+	} else {
+		assert(in_txn() == NULL);
+	}
+	txn_free(txn);
+	return -1;
 }
 
 void

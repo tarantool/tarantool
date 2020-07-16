@@ -77,6 +77,34 @@ box.space.sync:select{13}, box.space.sync:select{14}, box.space.sync:select{15}
 test_run:switch('replica')
 box.space.sync:select{13}, box.space.sync:select{14}, box.space.sync:select{15}
 
+--
+-- gh-5146: txn module should correctly handle errors from WAL
+-- thread, not only TX thread errors.
+--
+test_run:switch('default')
+box.cfg{replication_synchro_quorum = 3, replication_synchro_timeout = 1000}
+box.space.sync:truncate()
+-- Make a next row stuck in WAL thread.
+box.error.injection.set("ERRINJ_WAL_DELAY", true)
+ok1, err1 = nil
+f1 = fiber.create(function()                                                    \
+    ok1, err1 = pcall(box.space.sync.replace, box.space.sync, {1})              \
+end)
+-- When the suspended write will be set free, it will stumble into
+-- an error.
+box.error.injection.set("ERRINJ_WAL_ROTATE", true)
+-- Set the suspected write free. TX thread will receive success
+-- in terms of talking to WAL, but will get error inside the WAL
+-- response.
+box.error.injection.set("ERRINJ_WAL_DELAY", false)
+test_run:wait_cond(function() return f1:status() == 'dead' end)
+ok1, err1
+box.error.injection.set("ERRINJ_WAL_ROTATE", false)
+box.cfg{replication_synchro_quorum = 2}
+box.space.sync:replace{2}
+test_run:switch('replica')
+box.space.sync:select{}
+
 test_run:cmd('switch default')
 
 box.cfg{                                                                        \
