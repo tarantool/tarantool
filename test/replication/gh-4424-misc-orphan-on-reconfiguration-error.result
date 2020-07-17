@@ -65,13 +65,9 @@ box.info.ro
 box.cfg{replication_connect_quorum=1}
 ---
 ...
-box.info.status
+test_run:wait_cond(function() return box.info.status == 'running' and box.info.ro == false end)
 ---
-- running
-...
-box.info.ro
----
-- false
+- true
 ...
 box.cfg{                                                        \
     replication = {},                                           \
