@@ -21,7 +21,7 @@ variables:
 
 .deploy_only_template: &deploy_only_definition
   only:
-    - master
+    - "2.5"
   except:
     - schedules
     - external_pull_requests
@@ -29,11 +29,11 @@ variables:
 
 .pack_only_template: &pack_only_definition
   except:
-    - master
+    - "2.5"
 
 .perf_only_template: &perf_only_definition
   only:
-    - master
+    - "2.5"
     - /^.*-perf$/
   except:
     - schedules
