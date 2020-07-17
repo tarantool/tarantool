@@ -25,8 +25,7 @@ box.info.status
 box.info.ro
 -- lower quorum => leave orphan mode
 box.cfg{replication_connect_quorum=1}
-box.info.status
-box.info.ro
+test_run:wait_cond(function() return box.info.status == 'running' and box.info.ro == false end)
 
 box.cfg{                                                        \
     replication = {},                                           \
