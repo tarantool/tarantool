@@ -36,7 +36,7 @@ local function test_offsets(test, s)
 end
 
 local function test_misc(test, s)
-    test:plan(4)
+    test:plan(5)
     local ffi = require('ffi')
     local buffer = require('buffer')
     local buf = ffi.cast("const char *", "\x91\x01")
@@ -47,6 +47,9 @@ local function test_misc(test, s)
     test:is(buf + 2, bufend, 'ibuf_decode position')
     test:is_deeply(result, {1}, "ibuf_decode result")
     test:ok(not st and e:match("null"), "null ibuf")
+    st, e = pcall(s.decode, "\xd4\x0f\x00")
+    test:ok(not st and e:match("Unsuported MsgPack extension type: 15"),
+                               "unsupported extension decode")
 end
 
 local function test_decode_array_map_header(test, s)
