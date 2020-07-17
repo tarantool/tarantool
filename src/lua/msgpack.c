@@ -224,8 +224,9 @@ luamp_set_encode_extension(luamp_encode_extension_f handler)
 static void
 luamp_decode_extension_default(struct lua_State *L, const char **data)
 {
-	luaL_error(L, "msgpack.decode: unsupported extension: %u",
-		   (unsigned char) **data);
+	int8_t ext_type;
+	mp_decode_extl(data, &ext_type);
+	luaL_error(L, "msgpack.decode: unsupported extension: %u", ext_type);
 }
 
 
