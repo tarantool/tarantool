@@ -711,23 +711,18 @@ txn_commit_async(struct txn *txn)
 		 * output to mark this event.
 		 */
 		diag_log();
-		txn_rollback(txn);
-		return -1;
+		goto rollback;
 	});
 
-	if (txn_prepare(txn) != 0) {
-		txn_rollback(txn);
-		return -1;
-	}
+	if (txn_prepare(txn) != 0)
+		goto rollback;
 
 	if (txn_commit_nop(txn))
 		return 0;
 
 	req = txn_journal_entry_new(txn);
-	if (req == NULL) {
-		txn_rollback(txn);
-		return -1;
-	}
+	if (req == NULL)
+		goto rollback;
 
 	bool is_sync = txn_has_flag(txn, TXN_WAIT_SYNC);
 	struct txn_limbo_entry *limbo_entry;
@@ -741,19 +736,16 @@ txn_commit_async(struct txn *txn)
 		struct trigger *trig =
 			region_alloc_object(&txn->region, typeof(*trig), &size);
 		if (trig == NULL) {
-			txn_rollback(txn);
 			diag_set(OutOfMemory, size, "region_alloc_object",
 				 "trig");
-			return -1;
+			goto rollback;
 		}
 
 		/* See txn_commit(). */
 		uint32_t origin_id = req->rows[0]->replica_id;
 		limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn);
-		if (limbo_entry == NULL) {
-			txn_rollback(txn);
-			return -1;
-		}
+		if (limbo_entry == NULL)
+			goto rollback;
 
 		if (txn_has_flag(txn, TXN_WAIT_ACK)) {
 			int64_t lsn = req->rows[txn->n_applier_rows - 1]->lsn;
@@ -779,14 +771,17 @@ txn_commit_async(struct txn *txn)
 	fiber_set_txn(fiber(), NULL);
 	if (journal_write_async(req) != 0) {
 		fiber_set_txn(fiber(), txn);
-		txn_rollback(txn);
-
 		diag_set(ClientError, ER_WAL_IO);
 		diag_log();
-		return -1;
+		goto rollback;
 	}
 
 	return 0;
+
+rollback:
+	assert(txn->fiber == NULL);
+	txn_rollback(txn);
+	return -1;
 }
 
 int
