@@ -43,6 +43,8 @@ int luaL_nil_ref = LUA_REFNIL;
 int luaL_map_metatable_ref = LUA_REFNIL;
 int luaL_array_metatable_ref = LUA_REFNIL;
 
+static int luaT_newthread_ref = LUA_NOREF;
+
 static uint32_t CTID_STRUCT_IBUF;
 static uint32_t CTID_STRUCT_IBUF_PTR;
 static uint32_t CTID_CHAR_PTR;
@@ -1224,6 +1226,33 @@ void luaL_iterator_delete(struct luaL_iterator *it)
 
 /* }}} */
 
+/**
+ * @brief A wrapper for <lua_newthread> to be called via luaT_call
+ * in luaT_newthread. Whether new Lua coroutine is created it is
+ * returned on the top of the guest stack.
+ * @param L is a Lua state
+ * @sa <lua_newthread>
+ */
+static int
+luaT_newthread_wrapper(struct lua_State *L)
+{
+	(void)lua_newthread(L);
+	return 1;
+}
+
+struct lua_State *
+luaT_newthread(struct lua_State *L)
+{
+	assert(luaT_newthread_ref != LUA_NOREF);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, luaT_newthread_ref);
+	assert(lua_isfunction(L, -1));
+	if (luaT_call(L, 0, 1) != 0)
+		return NULL;
+	struct lua_State *L1 = lua_tothread(L, -1);
+	assert(L1 != NULL);
+	return L1;
+}
+
 int
 tarantool_lua_utils_init(struct lua_State *L)
 {
@@ -1274,5 +1303,8 @@ tarantool_lua_utils_init(struct lua_State *L)
 	(void) rc;
 	CTID_UUID = luaL_ctypeid(L, "struct tt_uuid");
 	assert(CTID_UUID != 0);
+
+	lua_pushcfunction(L, luaT_newthread_wrapper);
+	luaT_newthread_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	return 0;
 }
