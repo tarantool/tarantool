@@ -344,14 +344,6 @@ recovery_journal_write(struct journal *base,
 {
 	struct recovery_journal *journal = (struct recovery_journal *) base;
 	entry->res = vclock_sum(journal->vclock);
-	return 0;
-}
-
-static int
-recovery_journal_write_async(struct journal *base,
-			     struct  journal_entry *entry)
-{
-	recovery_journal_write(base, entry);
 	/*
 	 * Since there're no actual writes, fire a
 	 * journal_async_complete callback right away.
@@ -364,7 +356,7 @@ static void
 recovery_journal_create(struct vclock *v)
 {
 	static struct recovery_journal journal;
-	journal_create(&journal.base, recovery_journal_write_async,
+	journal_create(&journal.base, recovery_journal_write,
 		       txn_complete_async, recovery_journal_write);
 	journal.vclock = v;
 	journal_set(&journal.base);
@@ -2193,6 +2185,20 @@ engine_init()
 }
 
 /**
+ * Blindly apply whatever comes from bootstrap. This is either a
+ * local snapshot, or received from a remote master. In both cases
+ * it is not WAL - records are not sorted by their commit order,
+ * and don't have headers.
+ */
+static int
+bootstrap_journal_write(struct journal *base, struct journal_entry *entry)
+{
+	entry->res = 0;
+	journal_async_complete(base, entry);
+	return 0;
+}
+
+/**
  * Initialize the first replica of a new replica set.
  */
 static void
@@ -2620,6 +2626,15 @@ box_cfg_xc(void)
 		if (!cfg_geti("hot_standby") || checkpoint == NULL)
 			tnt_raise(ClientError, ER_ALREADY_RUNNING, cfg_gets("wal_dir"));
 	}
+
+	struct journal bootstrap_journal;
+	journal_create(&bootstrap_journal, NULL, txn_complete_async,
+		       bootstrap_journal_write);
+	journal_set(&bootstrap_journal);
+	auto bootstrap_journal_guard = make_scoped_guard([] {
+		journal_set(NULL);
+	});
+
 	bool is_bootstrap_leader = false;
 	if (checkpoint != NULL) {
 		/* Recover the instance from the local directory */
@@ -2631,6 +2646,9 @@ box_cfg_xc(void)
 			  &is_bootstrap_leader);
 	}
 	fiber_gc();
+
+	bootstrap_journal_guard.is_active = false;
+	assert(current_journal != &bootstrap_journal);
 
 	/*
 	 * Check for correct registration of the instance in _cluster

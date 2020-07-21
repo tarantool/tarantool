@@ -1304,7 +1304,7 @@ wal_write_none_async(struct journal *journal,
 	vclock_merge(&writer->vclock, &vclock_diff);
 	vclock_copy(&replicaset.vclock, &writer->vclock);
 	entry->res = vclock_sum(&writer->vclock);
-
+	journal_async_complete(journal, entry);
 	return 0;
 }
 

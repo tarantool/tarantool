@@ -32,50 +32,7 @@
 #include <small/region.h>
 #include <diag.h>
 
-int
-journal_no_write_async(struct journal *journal,
-		       struct journal_entry *entry)
-{
-	(void)journal;
-	assert(false);
-
-	errno = EINVAL;
-	diag_set(SystemError, "write_async wrong context");
-
-	entry->res = -1;
-	return -1;
-}
-
-void
-journal_no_write_async_cb(struct journal_entry *entry)
-{
-	assert(false);
-
-	errno = EINVAL;
-	diag_set(SystemError, "write_async_cb wrong context");
-
-	entry->res = -1;
-}
-
-/**
- * Used to load from a memtx snapshot. LSN is not used,
- * but txn_commit() must work.
- */
-static int
-dummy_journal_write(struct journal *journal, struct journal_entry *entry)
-{
-	(void) journal;
-	entry->res = 0;
-	return 0;
-}
-
-static struct journal dummy_journal = {
-	.write_async	= journal_no_write_async,
-	.write_async_cb	= journal_no_write_async_cb,
-	.write		= dummy_journal_write,
-};
-
-struct journal *current_journal = &dummy_journal;
+struct journal *current_journal = NULL;
 
 struct journal_entry *
 journal_entry_new(size_t n_rows, struct region *region,

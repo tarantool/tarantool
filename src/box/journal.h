@@ -182,17 +182,6 @@ journal_create(struct journal *journal,
 	journal->write		= write;
 }
 
-/**
- * A stub to issue an error in case if asynchronous
- * write is diabled in the backend.
- */
-extern int
-journal_no_write_async(struct journal *journal,
-		       struct journal_entry *entry);
-
-extern void
-journal_no_write_async_cb(struct journal_entry *entry);
-
 static inline bool
 journal_is_initialized(struct journal *journal)
 {
