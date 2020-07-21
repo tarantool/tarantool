@@ -348,7 +348,7 @@ recovery_journal_write(struct journal *base,
 	 * Since there're no actual writes, fire a
 	 * journal_async_complete callback right away.
 	 */
-	journal_async_complete(base, entry);
+	journal_async_complete(entry);
 	return 0;
 }
 
@@ -357,7 +357,7 @@ recovery_journal_create(struct vclock *v)
 {
 	static struct recovery_journal journal;
 	journal_create(&journal.base, recovery_journal_write,
-		       txn_complete_async, recovery_journal_write);
+		       recovery_journal_write);
 	journal.vclock = v;
 	journal_set(&journal.base);
 }
@@ -2182,8 +2182,10 @@ engine_init()
 static int
 bootstrap_journal_write(struct journal *base, struct journal_entry *entry)
 {
+	(void)base;
+
 	entry->res = 0;
-	journal_async_complete(base, entry);
+	journal_async_complete(entry);
 	return 0;
 }
 
@@ -2569,8 +2571,8 @@ box_cfg_xc(void)
 
 	int64_t wal_max_size = box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
-	if (wal_init(wal_mode, txn_complete_async, cfg_gets("wal_dir"),
-		     wal_max_size, &INSTANCE_UUID, on_wal_garbage_collection,
+	if (wal_init(wal_mode, cfg_gets("wal_dir"), wal_max_size,
+		     &INSTANCE_UUID, on_wal_garbage_collection,
 		     on_wal_checkpoint_threshold) != 0) {
 		diag_raise();
 	}
@@ -2617,8 +2619,7 @@ box_cfg_xc(void)
 	}
 
 	struct journal bootstrap_journal;
-	journal_create(&bootstrap_journal, NULL, txn_complete_async,
-		       bootstrap_journal_write);
+	journal_create(&bootstrap_journal, NULL, bootstrap_journal_write);
 	journal_set(&bootstrap_journal);
 	auto bootstrap_journal_guard = make_scoped_guard([] {
 		journal_set(NULL);

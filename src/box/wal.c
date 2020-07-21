@@ -266,10 +266,9 @@ xlog_write_entry(struct xlog *l, struct journal_entry *entry)
 static void
 tx_schedule_queue(struct stailq *queue)
 {
-	struct wal_writer *writer = &wal_writer_singleton;
 	struct journal_entry *req, *tmp;
 	stailq_foreach_entry_safe(req, tmp, queue, fifo)
-		journal_async_complete(&writer->base, req);
+		journal_async_complete(req);
 }
 
 /**
@@ -403,9 +402,8 @@ tx_notify_checkpoint(struct cmsg *msg)
  */
 static void
 wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
-		  void (*wall_async_cb)(struct journal_entry *entry),
-		  const char *wal_dirname,
-		  int64_t wal_max_size, const struct tt_uuid *instance_uuid,
+		  const char *wal_dirname, int64_t wal_max_size,
+		  const struct tt_uuid *instance_uuid,
 		  wal_on_garbage_collection_f on_garbage_collection,
 		  wal_on_checkpoint_threshold_f on_checkpoint_threshold)
 {
@@ -415,7 +413,6 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	journal_create(&writer->base,
 		       wal_mode == WAL_NONE ?
 		       wal_write_none_async : wal_write_async,
-		       wall_async_cb,
 		       wal_mode == WAL_NONE ?
 		       wal_write_none : wal_write);
 
@@ -525,15 +522,15 @@ wal_open(struct wal_writer *writer)
 }
 
 int
-wal_init(enum wal_mode wal_mode, void (*wall_async_cb)(struct journal_entry *entry),
-	 const char *wal_dirname, int64_t wal_max_size, const struct tt_uuid *instance_uuid,
+wal_init(enum wal_mode wal_mode, const char *wal_dirname,
+	 int64_t wal_max_size, const struct tt_uuid *instance_uuid,
 	 wal_on_garbage_collection_f on_garbage_collection,
 	 wal_on_checkpoint_threshold_f on_checkpoint_threshold)
 {
 	/* Initialize the state. */
 	struct wal_writer *writer = &wal_writer_singleton;
-	wal_writer_create(writer, wal_mode, wall_async_cb, wal_dirname,
-			  wal_max_size, instance_uuid, on_garbage_collection,
+	wal_writer_create(writer, wal_mode, wal_dirname, wal_max_size,
+			  instance_uuid, on_garbage_collection,
 			  on_checkpoint_threshold);
 
 	/* Start WAL thread. */
@@ -1314,7 +1311,7 @@ wal_write_none_async(struct journal *journal,
 	vclock_merge(&writer->vclock, &vclock_diff);
 	vclock_copy(&replicaset.vclock, &writer->vclock);
 	entry->res = vclock_sum(&writer->vclock);
-	journal_async_complete(journal, entry);
+	journal_async_complete(entry);
 	return 0;
 }
 

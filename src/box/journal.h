@@ -42,6 +42,8 @@ extern "C" {
 struct xrow_header;
 struct journal_entry;
 
+typedef void (*journal_write_async_f)(struct journal_entry *entry);
+
 /**
  * An entry for an abstract journal.
  * Simply put, a write ahead log request.
@@ -61,6 +63,10 @@ struct journal_entry {
 	 * A journal entry completion callback argument.
 	 */
 	void *complete_data;
+	/**
+	 * Asynchronous write completion function.
+	 */
+	journal_write_async_f write_async_cb;
 	/**
 	 * Approximate size of this request when encoded.
 	 */
@@ -84,6 +90,7 @@ struct region;
  */
 struct journal_entry *
 journal_entry_new(size_t n_rows, struct region *region,
+		  journal_write_async_f write_async_cb,
 		  void *complete_data);
 
 /**
@@ -96,22 +103,19 @@ struct journal {
 	int (*write_async)(struct journal *journal,
 			   struct journal_entry *entry);
 
-	/** Asynchronous write completion */
-	void (*write_async_cb)(struct journal_entry *entry);
-
 	/** Synchronous write */
 	int (*write)(struct journal *journal,
 		     struct journal_entry *entry);
 };
 
 /**
- * Finalize a single entry.
+ * Complete asynchronous write.
  */
 static inline void
-journal_async_complete(struct journal *journal, struct journal_entry *entry)
+journal_async_complete(struct journal_entry *entry)
 {
-	assert(journal->write_async_cb != NULL);
-	journal->write_async_cb(entry);
+	assert(entry->write_async_cb != NULL);
+	entry->write_async_cb(entry);
 }
 
 /**
@@ -173,12 +177,10 @@ static inline void
 journal_create(struct journal *journal,
 	       int (*write_async)(struct journal *journal,
 				  struct journal_entry *entry),
-	       void (*write_async_cb)(struct journal_entry *entry),
 	       int (*write)(struct journal *journal,
 			    struct journal_entry *entry))
 {
 	journal->write_async	= write_async;
-	journal->write_async_cb	= write_async_cb;
 	journal->write		= write;
 }
 

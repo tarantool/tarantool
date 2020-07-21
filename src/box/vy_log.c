@@ -818,7 +818,7 @@ vy_log_tx_flush(struct vy_log_tx *tx)
 	size_t used = region_used(&fiber()->gc);
 
 	struct journal_entry *entry;
-	entry = journal_entry_new(tx_size, &fiber()->gc, NULL);
+	entry = journal_entry_new(tx_size, &fiber()->gc, NULL, NULL);
 	if (entry == NULL)
 		goto err;
 
