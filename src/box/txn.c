@@ -450,6 +450,7 @@ txn_run_wal_write_triggers(struct txn *txn)
 void
 txn_complete(struct txn *txn)
 {
+	assert(!txn_has_flag(txn, TXN_IS_DONE));
 	/*
 	 * Note, engine can be NULL if transaction contains
 	 * IPROTO_NOP or IPROTO_CONFIRM statements.
@@ -846,10 +847,7 @@ txn_commit(struct txn *txn)
 		if (txn_limbo_wait_complete(&txn_limbo, limbo_entry) < 0)
 			goto rollback;
 	}
-	if (!txn_has_flag(txn, TXN_IS_DONE)) {
-		txn->signature = req->res;
-		txn_complete(txn);
-	}
+	assert(txn_has_flag(txn, TXN_IS_DONE));
 	assert(txn->signature >= 0);
 
 	/* Synchronous transactions are freed by the calling fiber. */
