@@ -149,12 +149,12 @@ stailq_empty(struct stailq *head)
  * Singly-linked Tail queue functions.
  */
 static inline void
-stailq_concat(struct stailq *head1, struct stailq *head2)
+stailq_concat(struct stailq *dest, struct stailq *src)
 {
-	if (!stailq_empty(head2)) {
-		*head1->last = head2->first;
-		head1->last = head2->last;
-		stailq_create(head2);
+	if (!stailq_empty(src)) {
+		*dest->last = src->first;
+		dest->last = src->last;
+		stailq_create(src);
 	}
 }
 
