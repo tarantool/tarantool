@@ -1972,11 +1972,15 @@ vy_lsm_upsert(struct vy_tx *tx, struct vy_lsm *lsm,
 {
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	struct tuple *vystmt;
-	struct iovec operations[1];
-	operations[0].iov_base = (void *)expr;
-	operations[0].iov_len = expr_end - expr;
+	struct iovec operations[2];
+	/* MP_ARRAY with size 1. */
+	char header = 0x91;
+	operations[0].iov_base = &header;
+	operations[0].iov_len = 1;
+	operations[1].iov_base = (void *)expr;
+	operations[1].iov_len = expr_end - expr;
 	vystmt = vy_stmt_new_upsert(lsm->mem_format, tuple, tuple_end,
-				    operations, 1);
+				    operations, 2);
 	if (vystmt == NULL)
 		return -1;
 	assert(vy_stmt_type(vystmt) == IPROTO_UPSERT);

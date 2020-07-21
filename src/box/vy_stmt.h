@@ -526,7 +526,10 @@ vy_stmt_new_delete(struct tuple_format *format, const char *tuple_begin,
  * @param tuple_end End of the array that begins from @param tuple_begin.
  * @param format Format of a tuple for offsets generating.
  * @param part_count Part count from key definition.
- * @param operations Vector of update operations.
+ * @param operations Vector of update operation pieces. Each iovec here may be
+ *     a part of an operation, or a whole operation, or something including
+ *     several operations. It is just a list of buffers. Each buffer is not
+ *     interpreted as an independent operation.
  * @param ops_cnt Length of the update operations vector.
  *
  * @retval NULL     Memory allocation error.

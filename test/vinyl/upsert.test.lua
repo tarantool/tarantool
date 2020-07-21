@@ -372,3 +372,227 @@ box.snapshot()
 s:select()
 
 s:drop()
+
+-- gh-5107: don't squash upsert operations into one array.
+--
+-- gh-5087: test upsert execution/squash referring to fields in reversed
+-- order (via negative indexing).
+--
+s = box.schema.create_space('test', {engine = 'vinyl'})
+pk = s:create_index('pk')
+s:insert({1, 1, 1})
+box.snapshot()
+
+s:upsert({1}, {{'=', 3, 100}})
+s:upsert({1}, {{'=', -1, 200}})
+box.snapshot()
+s:select() -- {1, 1, 200}
+
+s:delete({1})
+s:insert({1, 1, 1})
+box.snapshot()
+
+s:upsert({1}, {{'=', -3, 100}})
+s:upsert({1}, {{'=', -1, 200}})
+box.snapshot()
+-- gh-5105: Two upserts are NOT squashed into one, so only one (first one)
+-- is skipped, meanwhile second one is applied.
+--
+s:select() -- {1, 1, 1}
+
+s:delete({1})
+box.snapshot()
+
+s:upsert({1, 1}, {{'=', -2, 300}}) -- {1, 1}
+s:upsert({1}, {{'+', -1, 100}}) -- {1, 101}
+s:upsert({1}, {{'-', 2, 100}}) -- {1, 1}
+s:upsert({1}, {{'+', -1, 200}}) -- {1, 201}
+s:upsert({1}, {{'-', 2, 200}}) -- {1, 1}
+box.snapshot()
+s:select() -- {1, 1}
+
+s:delete({1})
+box.snapshot()
+
+s:upsert({1, 1, 1}, {{'!', -1, 300}}) -- {1, 1, 1}
+s:upsert({1}, {{'+', -2, 100}}) -- {1, 101, 1}
+s:upsert({1}, {{'=', -1, 100}}) -- {1, 101, 100}
+s:upsert({1}, {{'+', -1, 200}}) -- {1, 101, 300}
+s:upsert({1}, {{'-', -2, 100}}) -- {1, 1, 300}
+box.snapshot()
+s:select()
+
+s:drop()
+
+-- gh-1622: upsert operations which break space format are not applied.
+--
+s = box.schema.space.create('test', { engine = 'vinyl', field_count = 2 })
+pk = s:create_index('pk')
+s:replace{1, 1}
+-- Error is logged, upsert is not applied.
+--
+s:upsert({1, 1}, {{'=', 3, 5}})
+-- During read the incorrect upsert is ignored.
+--
+s:select{}
+
+-- Try to set incorrect field_count in a transaction.
+--
+box.begin()
+s:replace{2, 2}
+s:upsert({2, 2}, {{'=', 3, 2}})
+s:select{}
+box.commit()
+s:select{}
+
+-- Read incorrect upsert from a run: it should be ignored.
+--
+box.snapshot()
+s:select{}
+s:upsert({2, 2}, {{'=', 3, 20}})
+box.snapshot()
+s:select{}
+
+-- Execute replace/delete after invalid upsert.
+--
+box.snapshot()
+s:upsert({2, 2}, {{'=', 3, 30}})
+s:replace{2, 3}
+s:select{}
+
+s:upsert({1, 1}, {{'=', 3, 30}})
+s:delete{1}
+s:select{}
+
+-- Invalid upsert in a sequence of upserts is skipped meanwhile
+-- the rest are applied.
+--
+box.snapshot()
+s:upsert({2, 2}, {{'+', 2, 5}})
+s:upsert({2, 2}, {{'=', 3, 40}})
+s:upsert({2, 2}, {{'+', 2, 5}})
+s:select{}
+box.snapshot()
+s:select{}
+
+s:drop()
+
+-- Test different scenarious during which update operations squash can't
+-- take place due to format violations.
+--
+decimal = require('decimal')
+
+s = box.schema.space.create('test', { engine = 'vinyl', field_count = 5 })
+s:format({{name='id', type='unsigned'}, {name='u', type='unsigned'},\
+          {name='s', type='scalar'}, {name='f', type='double'},\
+          {name='d', type='decimal'}})
+pk = s:create_index('pk')
+s:replace{1, 1, 1, 1.1, decimal.new(1.1) }
+s:replace{2, 1, 1, 1.1, decimal.new(1.1)}
+box.snapshot()
+-- Can't assign integer to float field. First operation is still applied.
+--
+s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 4, 4}})
+s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'=', 4, 4}})
+-- Can't add floating point to integer (result is floating point).
+--
+s:upsert({2, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 2, 5}})
+s:upsert({2, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 2, 5.5}})
+box.snapshot()
+s:select()
+-- Integer overflow check.
+--
+s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 3, 9223372036854775808}})
+s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 3, 9223372036854775808}})
+-- Negative result of subtraction stored in unsigned field.
+--
+s:upsert({2, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 2, 2}})
+s:upsert({2, 1, 1, 2.5, decimal.new(1.1)}, {{'-', 2, 10}})
+box.snapshot()
+s:select()
+-- Decimals do not fit into numerics and vice versa.
+--
+s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 5, 2}})
+s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'-', 5, 1}})
+s:upsert({2, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 2, decimal.new(2.1)}})
+s:upsert({2, 1, 1, 2.5, decimal.new(1.1)}, {{'-', 2, decimal.new(1.2)}})
+box.snapshot()
+s:select()
+
+s:drop()
+
+-- Upserts leading to overflow are ignored.
+--
+format = {}
+format[1] = {name = 'f1', type = 'unsigned'}
+format[2] = {name = 'f2', type = 'unsigned'}
+s = box.schema.space.create('test', {engine = 'vinyl', format = format})
+_ = s:create_index('pk')
+uint_max = 18446744073709551615ULL
+s:replace{1, uint_max - 2}
+box.snapshot()
+
+s:upsert({1, 0}, {{'+', 2, 1}})
+s:upsert({1, 0}, {{'+', 2, 1}})
+s:upsert({1, 0}, {{'+', 2, 1}})
+box.snapshot()
+s:select()
+
+s:delete{1}
+s:replace{1, uint_max - 2, 0}
+box.snapshot()
+
+s:upsert({1, 0, 0}, {{'+', 2, 1}})
+s:upsert({1, 0, 0}, {{'+', 2, 1}})
+s:upsert({1, 0, 0}, {{'+', 2, 0.5}})
+s:upsert({1, 0, 0}, {{'+', 2, 1}})
+box.snapshot()
+s:select()
+s:drop()
+
+-- Make sure upserts satisfy associativity rule.
+--
+s = box.schema.space.create('test', {engine='vinyl'})
+i = s:create_index('pk', {parts={2, 'uint'}})
+s:replace{1, 2, 3, 'default'}
+box.snapshot()
+
+s:upsert({2, 2, 2}, {{'=', 4, 'upserted'}})
+-- Upsert will fail and thus ignored.
+--
+s:upsert({2, 2, 2}, {{'#', 1, 1}, {'!', 3, 1}})
+box.snapshot()
+
+s:select{}
+
+s:drop()
+
+-- Combination of upserts and underlying void (i.e. delete or null)
+-- statement on disk. Upsert modifying PK is skipped.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i = s:create_index('test', { run_count_per_level = 20 })
+
+for i = 101, 110 do s:replace{i, i} end
+s:replace({1, 1})
+box.snapshot()
+s:delete({1})
+box.snapshot()
+s:upsert({1, 1}, {{'=', 2, 2}})
+s:upsert({1, 1}, {{'=', 1, 0}})
+box.snapshot()
+s:select()
+
+s:drop()
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i = s:create_index('test', { run_count_per_level = 20 })
+
+for i = 101, 110 do s:replace{i, i} end
+box.snapshot()
+s:upsert({1, 1}, {{'=', 2, 2}})
+s:upsert({1, 1}, {{'=', 1, 0}})
+box.snapshot()
+s:select()
+
+s:drop()
