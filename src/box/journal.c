@@ -51,11 +51,7 @@ journal_entry_new(size_t n_rows, struct region *region,
 		return NULL;
 	}
 
-	entry->write_async_cb = write_async_cb;
-	entry->complete_data = complete_data;
-	entry->approx_len = 0;
-	entry->n_rows = n_rows;
-	entry->res = -1;
-
+	journal_entry_create(entry, n_rows, 0, write_async_cb,
+			     complete_data);
 	return entry;
 }

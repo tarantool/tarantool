@@ -84,6 +84,22 @@ struct journal_entry {
 struct region;
 
 /**
+ * Initialize a new journal entry.
+ */
+static inline void
+journal_entry_create(struct journal_entry *entry, size_t n_rows,
+		     size_t approx_len,
+		     journal_write_async_f write_async_cb,
+		     void *complete_data)
+{
+	entry->write_async_cb	= write_async_cb;
+	entry->complete_data	= complete_data;
+	entry->approx_len	= approx_len;
+	entry->n_rows		= n_rows;
+	entry->res		= -1;
+}
+
+/**
  * Create a new journal entry.
  *
  * @return NULL if out of memory, fiber diagnostics area is set
