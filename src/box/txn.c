@@ -551,7 +551,7 @@ txn_journal_entry_new(struct txn *txn)
 
 	/* Save space for an additional NOP row just in case. */
 	req = journal_entry_new(txn->n_new_rows + txn->n_applier_rows + 1,
-				&txn->region, txn);
+				&txn->region, txn_complete_async, txn);
 	if (req == NULL)
 		return NULL;
 

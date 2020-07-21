@@ -81,8 +81,8 @@ typedef void (*wal_on_checkpoint_threshold_f)(void);
  * Start WAL thread and initialize WAL writer.
  */
 int
-wal_init(enum wal_mode wal_mode, void (*wall_async_cb)(struct journal_entry *entry),
-	 const char *wal_dirname, int64_t wal_max_size, const struct tt_uuid *instance_uuid,
+wal_init(enum wal_mode wal_mode, const char *wal_dirname,
+	 int64_t wal_max_size, const struct tt_uuid *instance_uuid,
 	 wal_on_garbage_collection_f on_garbage_collection,
 	 wal_on_checkpoint_threshold_f on_checkpoint_threshold);
 
