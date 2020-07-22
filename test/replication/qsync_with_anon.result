@@ -96,7 +96,7 @@ box.space.sync:drop()
 -- [RFC, Asynchronous replication] failed transaction rolled back on async
 -- replica.
 -- Testcase setup.
-box.cfg{replication_synchro_quorum=BROKEN_QUORUM, replication_synchro_timeout=0.1}
+box.cfg{replication_synchro_quorum = NUM_INSTANCES, replication_synchro_timeout = 1000}
  | ---
  | ...
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
@@ -105,23 +105,71 @@ _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
  | ---
  | ...
--- Testcase body.
-test_run:switch('default')
+-- Write something to flush the current master's state to replica.
+_ = box.space.sync:insert{1}
  | ---
- | - true
  | ...
-box.space.sync:insert{1} -- failure
+_ = box.space.sync:delete{1}
  | ---
- | - error: Quorum collection for a synchronous transaction is timed out
  | ...
+
+box.cfg{replication_synchro_quorum = BROKEN_QUORUM, replication_synchro_timeout = 1000}
+ | ---
+ | ...
+fiber = require('fiber')
+ | ---
+ | ...
+ok, err = nil
+ | ---
+ | ...
+f = fiber.create(function()                                                     \
+    ok, err = pcall(box.space.sync.insert, box.space.sync, {1})                 \
+end)
+ | ---
+ | ...
+
 test_run:cmd('switch replica_anon')
  | ---
  | - true
  | ...
-box.space.sync:select{} -- none
+test_run:wait_cond(function() return box.space.sync:count() == 1 end)
+ | ---
+ | - true
+ | ...
+box.space.sync:select{}
+ | ---
+ | - - [1]
+ | ...
+
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_synchro_timeout = 0.001}
+ | ---
+ | ...
+test_run:wait_cond(function() return f:status() == 'dead' end)
+ | ---
+ | - true
+ | ...
+box.space.sync:select{}
  | ---
  | - []
  | ...
+
+test_run:cmd('switch replica_anon')
+ | ---
+ | - true
+ | ...
+test_run:wait_cond(function() return box.space.sync:count() == 0 end)
+ | ---
+ | - true
+ | ...
+box.space.sync:select{}
+ | ---
+ | - []
+ | ...
+
 test_run:switch('default')
  | ---
  | - true
