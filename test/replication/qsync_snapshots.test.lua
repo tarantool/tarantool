@@ -85,8 +85,10 @@ test_run:switch('default')
 box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
+-- Write something to flush the current master's state to replica.
+_ = box.space.sync:insert{1}
+_ = box.space.sync:delete{1}
 
--- Testcase body.
 test_run:switch('default')
 box.cfg{replication_synchro_quorum=BROKEN_QUORUM}
 ok, err = nil
