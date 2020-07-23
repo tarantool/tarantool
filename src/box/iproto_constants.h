@@ -276,6 +276,10 @@ iproto_type_name(uint32_t type)
 		return iproto_type_strs[type];
 
 	switch (type) {
+	case IPROTO_CONFIRM:
+		return "CONFIRM";
+	case IPROTO_ROLLBACK:
+		return "ROLLBACK";
 	case VY_INDEX_RUN_INFO:
 		return "RUNINFO";
 	case VY_INDEX_PAGE_INFO:
