@@ -8,6 +8,7 @@ TEST_RUN_EXTRA_PARAMS?=
 MAX_FILES?=65534
 MAX_PROC?=2500
 OOS_SRC_PATH="/source"
+OSX_VARDIR?=/tmp/tnt
 
 all: package
 
@@ -210,8 +211,8 @@ test_osx_no_deps: build_osx
 		launchctl limit maxproc || : ; \
 		ulimit -u ${MAX_PROC} || : ; \
 		ulimit -u ; \
-		rm -rf /tmp/tnt ; \
-		cd test && ./test-run.py --vardir /tmp/tnt --force $(TEST_RUN_EXTRA_PARAMS)
+		rm -rf ${OSX_VARDIR} ; \
+		cd test && ./test-run.py --vardir ${OSX_VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_osx: deps_osx test_osx_no_deps
 
