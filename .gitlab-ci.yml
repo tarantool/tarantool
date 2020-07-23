@@ -11,6 +11,7 @@ variables:
   GITLAB_MAKE: "make -f .gitlab.mk"
   GIT_STRATEGY: none
   GIT_CLEAN_FLAGS: none
+  OSX_VARDIR: /tmp/tnt
 
 # 1. Git checkout strategy used from:
 #    https://docs.gitlab.com/ee/ci/yaml/README.html#git-checkout
@@ -33,6 +34,15 @@ before_script:
   - /bin/bash -c "git clean -ffdx && git submodule foreach git clean -ffdx && git submodule foreach git status"
 
 # Jobs templates
+
+.artifacts_files_template: &artifacts_files_definition
+  artifacts:
+    expire_in: 1000 yrs
+    when: always
+    paths:
+      - "artifacts"
+  after_script:
+    - cp -r test/var/artifacts .
 
 .deploy_only_template: &deploy_only_definition
   only:
@@ -60,16 +70,23 @@ before_script:
     IMAGE_PERF_BUILT: "${CI_REGISTRY}/${CI_PROJECT_PATH}/perf_tmp/ubuntu-bionic:perf_${CI_COMMIT_SHORT_SHA}"
 
 .docker_test_template: &docker_test_definition
+  <<: *artifacts_files_definition
   image: "${CI_REGISTRY}/${CI_PROJECT_PATH}/testing/debian-stretch:latest"
   stage: test
   tags:
     - docker_test
 
 .docker_test_clang8_template: &docker_test_clang8_definition
+  <<: *artifacts_files_definition
   image: "${CI_REGISTRY}/${CI_PROJECT_PATH}/testing/debian-buster:latest"
   stage: test
   tags:
     - docker_test
+
+.pack_artifacts_files_template: &pack_artifacts_files_definition
+  <<: *artifacts_files_definition
+  after_script:
+    - cp -r build/usr/src/*/tarantool-*/test/var/artifacts .
 
 .pack_template: &pack_definition
   <<: *pack_only_definition
@@ -81,6 +98,7 @@ before_script:
 
 .pack_test_template: &pack_test_definition
   <<: *pack_only_definition
+  <<: *pack_artifacts_files_definition
   stage: test
   tags:
     - deploy_test
@@ -97,6 +115,7 @@ before_script:
 
 .deploy_test_template: &deploy_test_definition
   <<: *deploy_only_definition
+  <<: *pack_artifacts_files_definition
   stage: test
   tags:
     - deploy_test
@@ -104,14 +123,24 @@ before_script:
     - ${GITLAB_MAKE} deploy
 
 .osx_template: &osx_definition
+  <<: *artifacts_files_definition
   stage: test
   script:
     - ${GITLAB_MAKE} test_osx
+  after_script:
+    # Artifacts can't be used from outside the project directory, check:
+    #   https://docs.gitlab.com/ee/ci/yaml/README.html#artifactspaths
+    # "Paths are relative to the project directory ($CI_PROJECT_DIR)"
+    # "and can’t directly link outside it."
+    - cp -rf ${OSX_VARDIR}/artifacts .
 
 .vbox_template: &vbox_definition
+  <<: *artifacts_files_definition
   stage: test
   after_script:
-    - ${GITLAB_MAKE} vms_shutdown
+    - >
+      scp -r -P ${VMS_PORT} ${VMS_USER}@127.0.0.1:tarantool/test/var/artifacts . ;
+      ${GITLAB_MAKE} vms_shutdown
 
 .perf_docker_test_template: &perf_docker_test_definition
   <<: *perf_only_definition
@@ -551,7 +580,7 @@ static_build:
     - ${GITLAB_MAKE} test_static_build
 
 static_docker_build:
-  stage: test
+  <<: *osx_definition
   tags:
     - deploy_test
   script:
