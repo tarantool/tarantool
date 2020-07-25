@@ -1030,6 +1030,12 @@ wal_write_to_disk(struct cmsg *msg)
 
 	ERROR_INJECT_SLEEP(ERRINJ_WAL_DELAY);
 
+	ERROR_INJECT_COUNTDOWN(ERRINJ_WAL_DELAY_COUNTDOWN, {
+		struct errinj *e = errinj(ERRINJ_WAL_DELAY, ERRINJ_BOOL);
+		e->bparam = true;
+		ERROR_INJECT_SLEEP(ERRINJ_WAL_DELAY);
+	});
+
 	if (writer->is_in_rollback) {
 		/* We're rolling back a failed write. */
 		stailq_concat(&wal_msg->rollback, &wal_msg->commit);

@@ -131,6 +131,23 @@ struct txn_limbo {
 	 * in the end.
 	 */
 	int64_t rollback_count;
+	/**
+	 * Whether the limbo is in rollback mode. The meaning is exactly the
+	 * same as for the similar WAL flag. In theory this should be deleted
+	 * if the limbo will be ever moved to WAL thread. It would reuse the WAL
+	 * flag.
+	 * It is a sign to immediately rollback all new limbo entries, if there
+	 * is an existing rollback in progress. This technique is called
+	 * 'cascading rollback'. Cascading rollback does not allow to write to
+	 * WAL anything new so as not to violate the 'reversed rollback order'
+	 * rule.
+	 * Without cascading rollback it could happen, that the limbo would
+	 * start writing ROLLBACK to WAL, then a new transaction would be added
+	 * to limbo and sent to WAL too. In the result the new transaction would
+	 * be stored in WAL after ROLLBACK, and yet it should be rolled back too
+	 * by the 'reversed rollback order' rule - contradiction.
+	 */
+	bool is_in_rollback;
 };
 
 /**

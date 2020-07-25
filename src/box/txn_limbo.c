@@ -42,12 +42,31 @@ txn_limbo_create(struct txn_limbo *limbo)
 	fiber_cond_create(&limbo->wait_cond);
 	vclock_create(&limbo->vclock);
 	limbo->rollback_count = 0;
+	limbo->is_in_rollback = false;
 }
 
 struct txn_limbo_entry *
 txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 {
 	assert(txn_has_flag(txn, TXN_WAIT_SYNC));
+	/*
+	 * Transactions should be added to the limbo before WAL write. Limbo
+	 * needs that to be able rollback transactions, whose WAL write is in
+	 * progress.
+	 */
+	assert(txn->signature < 0);
+	if (limbo->is_in_rollback) {
+		/*
+		 * Cascading rollback. It is impossible to commit the
+		 * transaction, because if there is an existing rollback in
+		 * progress, it should rollback this one too for the sake of
+		 * 'reversed rollback order' rule. On the other hand the
+		 * rollback can't be postponed until after WAL write as well -
+		 * it should be done right now. See in the limbo comments why.
+		 */
+		diag_set(ClientError, ER_SYNC_ROLLBACK);
+		return NULL;
+	}
 	if (id == 0)
 		id = instance_id;
 	if (limbo->instance_id != id) {
@@ -186,6 +205,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 do_rollback:
 	assert(!txn_limbo_is_empty(limbo));
 	if (txn_limbo_first_entry(limbo) != entry) {
+		assert(limbo->is_in_rollback);
 		/*
 		 * If this is not a first entry in the limbo, it
 		 * is definitely not a first timed out entry. And
@@ -341,7 +361,10 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 static int
 txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 {
-	return txn_limbo_write_confirm_rollback(limbo, lsn, false);
+	limbo->is_in_rollback = true;
+	int rc = txn_limbo_write_confirm_rollback(limbo, lsn, false);
+	limbo->is_in_rollback = false;
+	return rc;
 }
 
 void
