@@ -871,6 +871,17 @@ function remove_rpm {
         done
     done
 
+    # Remove all files found by the given pattern in the options.
+    # The loop above already delete files, but only which were
+    # presented in the metadata. However it is possible that some
+    # broken update left orphan files: they are present in the
+    # storage, but does not mentioned in the metadata.
+    for suffix in 'x86_64' 'noarch' 'src'; do
+        file="$bucket_path/$packpath/${remove}-1.${os}${option_dist}.${suffix}.rpm"
+        $aws ls $file || continue
+        $aws rm $file
+    done
+
     # check if any RPM files were newly registered
     [ "$updated_rpms" == "0" ] && \
         return || echo "Updating dists"
