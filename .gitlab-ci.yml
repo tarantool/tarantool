@@ -194,7 +194,7 @@ osx_15_release_lto:
   tags:
     - osx_15
   variables:
-    EXTRA_ENV: 'export CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON ;'
+    CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
   <<: *osx_definition
 
 freebsd_12_release:
