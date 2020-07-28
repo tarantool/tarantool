@@ -41,6 +41,7 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->instance_id = REPLICA_ID_NIL;
 	fiber_cond_create(&limbo->wait_cond);
 	vclock_create(&limbo->vclock);
+	limbo->confirmed_lsn = 0;
 	limbo->rollback_count = 0;
 	limbo->is_in_rollback = false;
 }
@@ -312,6 +313,8 @@ rollback:
 static int
 txn_limbo_write_confirm(struct txn_limbo *limbo, int64_t lsn)
 {
+	assert(lsn > limbo->confirmed_lsn);
+	limbo->confirmed_lsn = lsn;
 	return txn_limbo_write_confirm_rollback(limbo, lsn, true);
 }
 
@@ -361,6 +364,8 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 static int
 txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 {
+	assert(lsn > limbo->confirmed_lsn);
+	assert(!limbo->is_in_rollback);
 	limbo->is_in_rollback = true;
 	int rc = txn_limbo_write_confirm_rollback(limbo, lsn, false);
 	limbo->is_in_rollback = false;
@@ -438,7 +443,7 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 			confirm_lsn = e->lsn;
 		}
 	}
-	if (confirm_lsn == -1)
+	if (confirm_lsn == -1 || confirm_lsn <= limbo->confirmed_lsn)
 		return;
 	if (txn_limbo_write_confirm(limbo, confirm_lsn) != 0) {
 		// TODO: what to do here?.
@@ -581,7 +586,7 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 			assert(confirm_lsn > 0);
 		}
 	}
-	if (confirm_lsn > 0) {
+	if (confirm_lsn > limbo->confirmed_lsn) {
 		if (txn_limbo_write_confirm(limbo, confirm_lsn) != 0) {
 			panic("Couldn't write CONFIRM to WAL");
 			return;

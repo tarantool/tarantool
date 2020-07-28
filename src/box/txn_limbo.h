@@ -125,6 +125,14 @@ struct txn_limbo {
 	 */
 	struct vclock vclock;
 	/**
+	 * Maximal LSN gathered quorum and either already confirmed in WAL, or
+	 * whose confirmation is in progress right now. Any attempt to confirm
+	 * something smaller than this value can be safely ignored. Moreover,
+	 * any attempt to rollback something starting from <= this LSN is
+	 * illegal.
+	 */
+	int64_t confirmed_lsn;
+	/**
 	 * Total number of performed rollbacks. It used as a guard
 	 * to do some actions assuming all limbo transactions will
 	 * be confirmed, and to check that there were no rollbacks
