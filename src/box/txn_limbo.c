@@ -185,6 +185,8 @@ int
 txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 {
 	assert(entry->lsn > 0 || !txn_has_flag(entry->txn, TXN_WAIT_ACK));
+	bool cancellable = fiber_set_cancellable(false);
+
 	if (txn_limbo_entry_is_complete(entry))
 		goto complete;
 
@@ -193,10 +195,8 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	double start_time = fiber_clock();
 	while (true) {
 		double deadline = start_time + replication_synchro_timeout;
-		bool cancellable = fiber_set_cancellable(false);
 		double timeout = deadline - fiber_clock();
 		int rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);
-		fiber_set_cancellable(cancellable);
 		if (txn_limbo_entry_is_complete(entry))
 			goto complete;
 		if (rc != 0)
@@ -215,11 +215,9 @@ do_rollback:
 		 * rollback. Wait when it will finish and wake us
 		 * up.
 		 */
-		bool cancellable = fiber_set_cancellable(false);
 		do {
 			fiber_yield();
 		} while (!txn_limbo_entry_is_complete(entry));
-		fiber_set_cancellable(cancellable);
 		goto complete;
 	}
 
@@ -236,6 +234,7 @@ do_rollback:
 			break;
 		fiber_wakeup(e->txn->fiber);
 	}
+	fiber_set_cancellable(cancellable);
 	diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
 	return -1;
 
@@ -247,6 +246,7 @@ complete:
 	 */
 	assert(rlist_empty(&entry->in_queue));
 	assert(txn_has_flag(entry->txn, TXN_IS_DONE));
+	fiber_set_cancellable(cancellable);
 	/*
 	 * The first tx to be rolled back already performed all
 	 * the necessary cleanups for us.
