@@ -105,6 +105,46 @@ box.space.sync:replace{2}
 test_run:switch('replica')
 box.space.sync:select{}
 
+--
+-- See if synchro timeout during CONFIRM WAL write won't try to rollback the
+-- confirmed transaction.
+--
+test_run:switch('default')
+box.space.sync:truncate()
+-- Write something to flush the master's state to the replica.
+_ = box.space.sync:insert({1})
+_ = box.space.sync:delete({1})
+
+test_run:switch('default')
+-- Set a trap for CONFIRM write so as the current txn won't hang, but following
+-- CONFIRM will.
+box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 1)
+ok, err = nil
+f = fiber.create(function()                                                     \
+    ok, err = pcall(box.space.sync.replace, box.space.sync, {1})                \
+end)
+
+-- Wait when got ACK from replica and started writing CONFIRM.
+test_run:wait_cond(function()                                                   \
+    return box.error.injection.get("ERRINJ_WAL_DELAY")                          \
+end)
+
+-- Let the pending synchro transaction go. It should timeout, notice the
+-- on-going confirmation, and go to sleep instead of doing rollback.
+box.cfg{replication_synchro_timeout = 0.001}
+fiber.yield()
+
+-- Let the confirmation finish.
+box.error.injection.set("ERRINJ_WAL_DELAY", false)
+
+-- Now the transaction sees the CONFIRM is ok, and it is also finished.
+test_run:wait_cond(function() return f:status() == 'dead' end)
+ok, err
+box.space.sync:select{}
+
+test_run:switch('replica')
+box.space.sync:select{}
+
 test_run:cmd('switch default')
 
 box.cfg{                                                                        \
