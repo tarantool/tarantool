@@ -936,15 +936,22 @@ fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
 			 * to setup the original protection back in
 			 * background.
 			 *
+			 * For now lets keep such slab referenced and
+			 * leaked: if mprotect failed we must not allow
+			 * to reuse such slab with PROT_NONE'ed page
+			 * inside.
+			 *
 			 * Note that in case if we're called from
 			 * fiber_stack_create() the @a mprotect_flags is
 			 * the same as the slab been created with, so
 			 * calling mprotect for VMA with same flags
 			 * won't fail.
 			 */
-			diag_log();
+			say_syserror("fiber: Can't put guard page to slab. "
+				     "Leak %zu bytes", (size_t) fiber->stack_size);
+		} else {
+			slab_put(slabc, fiber->stack_slab);
 		}
-		slab_put(slabc, fiber->stack_slab);
 	}
 }
 

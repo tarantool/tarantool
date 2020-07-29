@@ -15,11 +15,13 @@ noop_f(va_list ap)
 static int
 main_f(va_list ap)
 {
+	struct slab_cache *slabc = &cord()->slabc;
+	size_t used_before, used_after;
 	struct errinj *inj;
 	struct fiber *fiber;
 
 	header();
-	plan(4);
+	plan(6);
 
 	/*
 	 * Set non-default stack size to prevent reusing of an
@@ -47,8 +49,7 @@ main_f(va_list ap)
 	ok(diag_get() != NULL, "mprotect: diag is armed after error");
 
 	/*
-	 * Check madvise. We can't test the fiber destroy
-	 * path since it is cleaning error.
+	 * Check madvise error on fiber creation.
 	 */
 	diag_clear(diag_get());
 	inj = errinj(ERRINJ_FIBER_MADVISE, ERRINJ_BOOL);
@@ -59,6 +60,35 @@ main_f(va_list ap)
 	ok(fiber != NULL, "madvise: non critical error on madvise hint");
 	ok(diag_get() != NULL, "madvise: diag is armed after error");
 
+	/*
+	 * Check if we leak on fiber destruction.
+	 * We will print an error and result get
+	 * compared by testing engine.
+	 */
+	fiber_attr_delete(fiber_attr);
+	fiber_attr = fiber_attr_new();
+	fiber_attr->flags |= FIBER_CUSTOM_STACK;
+	fiber_attr->stack_size = 64 << 10;
+
+	diag_clear(diag_get());
+
+	used_before = slabc->allocated.stats.used;
+
+	fiber = fiber_new_ex("test_madvise", fiber_attr, noop_f);
+	ok(fiber != NULL, "fiber with custom stack");
+	fiber_set_joinable(fiber, true);
+
+	inj = errinj(ERRINJ_FIBER_MPROTECT, ERRINJ_INT);
+	inj->iparam = PROT_READ | PROT_WRITE;
+
+	fiber_start(fiber);
+	fiber_join(fiber);
+	inj->iparam = -1;
+
+	used_after = slabc->allocated.stats.used;
+	ok(used_after > used_before, "expected leak detected");
+
+	fiber_attr_delete(fiber_attr);
 	footer();
 
 	ev_break(loop(), EVBREAK_ALL);
