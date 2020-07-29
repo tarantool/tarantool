@@ -128,6 +128,8 @@ struct errinj {
 	_(ERRINJ_DYN_MODULE_COUNT, ERRINJ_INT, {.iparam = 0}) \
 	_(ERRINJ_INDEX_RESERVE, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_VY_STMT_ALLOC, ERRINJ_INT, {.iparam = -1})\
+	_(ERRINJ_FIBER_MADVISE, ERRINJ_BOOL, {.bparam = false})\
+	_(ERRINJ_FIBER_MPROTECT, ERRINJ_INT, {.iparam = -1})\
 	_(ERRINJ_VY_READ_VIEW_MERGE_FAIL, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_VY_WRITE_ITERATOR_START_FAIL, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_VY_RUN_OPEN, ERRINJ_INT, {.iparam = -1})\

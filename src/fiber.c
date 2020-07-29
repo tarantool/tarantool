@@ -41,6 +41,7 @@
 #include "assoc.h"
 #include "memory.h"
 #include "trigger.h"
+#include "errinj.h"
 
 #include "third_party/valgrind/memcheck.h"
 
@@ -66,22 +67,40 @@ static int (*fiber_invoke)(fiber_func f, va_list ap);
 #define ASAN_FINISH_SWITCH_FIBER(var_name)
 #endif
 
-#define fiber_madvise(addr, len, advice)				\
-({									\
-	int err = madvise((addr), (len), (advice));			\
-	if (err)							\
-		say_syserror("madvise");				\
-	err;								\
-})
+static inline int
+fiber_madvise(void *addr, size_t len, int advice)
+{
+	int rc = 0;
 
-#define fiber_mprotect(addr, len, prot)					\
-({									\
-	int err = mprotect((addr), (len), (prot));			\
-	if (err)							\
-		say_syserror("mprotect");				\
-	err;								\
-})
+	ERROR_INJECT(ERRINJ_FIBER_MADVISE, {
+		errno = ENOMEM;
+		rc = -1;
+	});
 
+	if (rc != 0 || madvise(addr, len, advice) != 0) {
+		diag_set(SystemError, "fiber madvise failed");
+		return -1;
+	}
+	return 0;
+}
+
+static inline int
+fiber_mprotect(void *addr, size_t len, int prot)
+{
+	int rc = 0;
+
+	struct errinj *inj = errinj(ERRINJ_FIBER_MPROTECT, ERRINJ_INT);
+	if (inj != NULL && inj->iparam == prot) {
+		errno = ENOMEM;
+		rc = -1;
+	}
+
+	if (rc != 0 || mprotect(addr, len, prot) != 0) {
+		diag_set(SystemError, "fiber mprotect failed");
+		return -1;
+	}
+	return 0;
+}
 /*
  * Defines a handler to be executed on exit from cord's thread func,
  * accessible via cord()->on_exit (normally NULL). It is used to
@@ -833,6 +852,12 @@ fiber_stack_recycle(struct fiber *fiber)
 		start = page_align_up(fiber->stack_watermark);
 		end = fiber->stack + fiber->stack_size;
 	}
+
+	/*
+	 * Ignore errors on MADV_DONTNEED because this is
+	 * just a hint for OS and not critical for
+	 * functionality.
+	 */
 	fiber_madvise(start, end - start, MADV_DONTNEED);
 	stack_put_watermark(fiber->stack_watermark);
 }
@@ -851,7 +876,9 @@ fiber_stack_watermark_create(struct fiber *fiber)
 
 	/*
 	 * We don't expect the whole stack usage in regular
-	 * loads, let's try to minimize rss pressure.
+	 * loads, let's try to minimize rss pressure. But do
+	 * not exit if MADV_DONTNEED failed, it is just a hint
+	 * for OS, not critical one.
 	 */
 	fiber_madvise(fiber->stack, fiber->stack_size, MADV_DONTNEED);
 
@@ -889,6 +916,8 @@ fiber_stack_watermark_create(struct fiber *fiber)
 static void
 fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
 {
+	static const int mprotect_flags = PROT_READ | PROT_WRITE;
+
 	if (fiber->stack != NULL) {
 		VALGRIND_STACK_DEREGISTER(fiber->stack_id);
 #if ENABLE_ASAN
@@ -899,7 +928,22 @@ fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
 			guard = page_align_down(fiber->stack - page_size);
 		else
 			guard = page_align_up(fiber->stack + fiber->stack_size);
-		fiber_mprotect(guard, page_size, PROT_READ | PROT_WRITE);
+
+		if (fiber_mprotect(guard, page_size, mprotect_flags) != 0) {
+			/*
+			 * FIXME: We need some intelligent handling:
+			 * say put this slab into a queue and retry
+			 * to setup the original protection back in
+			 * background.
+			 *
+			 * Note that in case if we're called from
+			 * fiber_stack_create() the @a mprotect_flags is
+			 * the same as the slab been created with, so
+			 * calling mprotect for VMA with same flags
+			 * won't fail.
+			 */
+			diag_log();
+		}
 		slab_put(slabc, fiber->stack_slab);
 	}
 }
@@ -946,6 +990,11 @@ fiber_stack_create(struct fiber *fiber, struct slab_cache *slabc,
 						  fiber->stack_size);
 
 	if (fiber_mprotect(guard, page_size, PROT_NONE)) {
+		/*
+		 * Write an error into the log since a guard
+		 * page is critical for functionality.
+		 */
+		diag_log();
 		fiber_stack_destroy(fiber, slabc);
 		return -1;
 	}

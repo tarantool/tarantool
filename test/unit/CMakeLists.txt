@@ -72,6 +72,10 @@ add_executable(fiber.test fiber.cc)
 set_source_files_properties(fiber.cc PROPERTIES COMPILE_FLAGS -O0)
 target_link_libraries(fiber.test core unit)
 
+add_executable(fiber_stack.test fiber_stack.c)
+set_source_files_properties(fiber_stack.c PROPERTIES COMPILE_FLAGS -O0)
+target_link_libraries(fiber_stack.test core unit)
+
 if (NOT ENABLE_GCOV)
     # This test is known to be broken with GCOV
     add_executable(guard.test guard.cc)
