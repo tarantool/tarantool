@@ -178,7 +178,7 @@ txn_limbo_assign_lsn(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
 		txn_limbo_assign_remote_lsn(limbo, entry, lsn);
 }
 
-static int
+static void
 txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn);
 
 int
@@ -258,7 +258,7 @@ complete:
 	return 0;
 }
 
-static int
+static void
 txn_limbo_write_confirm_rollback(struct txn_limbo *limbo, int64_t lsn,
 				 bool is_confirm)
 {
@@ -271,7 +271,7 @@ txn_limbo_write_confirm_rollback(struct txn_limbo *limbo, int64_t lsn,
 
 	struct txn *txn = txn_begin();
 	if (txn == NULL)
-		return -1;
+		goto rollback;
 
 	int res = 0;
 	if (is_confirm) {
@@ -299,23 +299,32 @@ txn_limbo_write_confirm_rollback(struct txn_limbo *limbo, int64_t lsn,
 		goto rollback;
 	if (txn_commit_stmt(txn, &request) != 0)
 		goto rollback;
+	if (txn_commit(txn) != 0)
+		goto rollback;
+	return;
 
-	return txn_commit(txn);
 rollback:
-	txn_rollback(txn);
-	return -1;
+	/*
+	 * XXX: the stub is supposed to be removed once it is defined what to do
+	 * when a synchro request WAL write fails. One of the possible
+	 * solutions: log the error, keep the limbo queue as is and probably put
+	 * in rollback mode. Then provide a hook to call manually when WAL
+	 * problems are fixed. Or retry automatically with some period.
+	 */
+	panic("Could not write a synchro request to WAL: lsn = %lld, type = "
+	      "%s\n", lsn, is_confirm ? "CONFIRM" : "ROLLBACK");
 }
 
 /**
  * Write a confirmation entry to WAL. After it's written all the
  * transactions waiting for confirmation may be finished.
  */
-static int
+static void
 txn_limbo_write_confirm(struct txn_limbo *limbo, int64_t lsn)
 {
 	assert(lsn > limbo->confirmed_lsn);
 	limbo->confirmed_lsn = lsn;
-	return txn_limbo_write_confirm_rollback(limbo, lsn, true);
+	txn_limbo_write_confirm_rollback(limbo, lsn, true);
 }
 
 void
@@ -361,15 +370,14 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
  * transactions following the current one and waiting for
  * confirmation must be rolled back.
  */
-static int
+static void
 txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 {
 	assert(lsn > limbo->confirmed_lsn);
 	assert(!limbo->is_in_rollback);
 	limbo->is_in_rollback = true;
-	int rc = txn_limbo_write_confirm_rollback(limbo, lsn, false);
+	txn_limbo_write_confirm_rollback(limbo, lsn, false);
 	limbo->is_in_rollback = false;
-	return rc;
 }
 
 void
@@ -445,13 +453,7 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 	}
 	if (confirm_lsn == -1 || confirm_lsn <= limbo->confirmed_lsn)
 		return;
-	if (txn_limbo_write_confirm(limbo, confirm_lsn) != 0) {
-		// TODO: what to do here?.
-		// We already failed writing the CONFIRM
-		// message. What are the chances we'll be
-		// able to write ROLLBACK?
-		return;
-	}
+	txn_limbo_write_confirm(limbo, confirm_lsn);
 	txn_limbo_read_confirm(limbo, confirm_lsn);
 }
 
@@ -587,10 +589,7 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 		}
 	}
 	if (confirm_lsn > limbo->confirmed_lsn) {
-		if (txn_limbo_write_confirm(limbo, confirm_lsn) != 0) {
-			panic("Couldn't write CONFIRM to WAL");
-			return;
-		}
+		txn_limbo_write_confirm(limbo, confirm_lsn);
 		txn_limbo_read_confirm(limbo, confirm_lsn);
 	}
 	/*
