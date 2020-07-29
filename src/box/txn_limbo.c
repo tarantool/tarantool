@@ -200,25 +200,33 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		if (txn_limbo_entry_is_complete(entry))
 			goto complete;
 		if (rc != 0)
-			goto do_rollback;
+			break;
 	}
 
-do_rollback:
 	assert(!txn_limbo_is_empty(limbo));
 	if (txn_limbo_first_entry(limbo) != entry) {
-		assert(limbo->is_in_rollback);
 		/*
 		 * If this is not a first entry in the limbo, it
 		 * is definitely not a first timed out entry. And
 		 * since it managed to time out too, it means
 		 * there is currently another fiber writing
-		 * rollback. Wait when it will finish and wake us
-		 * up.
+		 * rollback, or waiting for confirmation WAL
+		 * write. Wait when it will finish and wake us up.
 		 */
-		do {
-			fiber_yield();
-		} while (!txn_limbo_entry_is_complete(entry));
-		goto complete;
+		goto wait;
+	}
+
+	/* First in the queue is always a synchronous transaction. */
+	assert(entry->lsn > 0);
+	if (entry->lsn <= limbo->confirmed_lsn) {
+		/*
+		 * Yes, the wait timed out, but there is an on-going CONFIRM WAL
+		 * write in another fiber covering this LSN. Can't rollback it
+		 * already. All what can be done is waiting. The CONFIRM writer
+		 * will wakeup all the confirmed txns when WAL write will be
+		 * finished.
+		 */
+		goto wait;
 	}
 
 	txn_limbo_write_rollback(limbo, entry->lsn);
@@ -237,6 +245,11 @@ do_rollback:
 	fiber_set_cancellable(cancellable);
 	diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
 	return -1;
+
+wait:
+	do {
+		fiber_yield();
+	} while (!txn_limbo_entry_is_complete(entry));
 
 complete:
 	assert(txn_limbo_entry_is_complete(entry));
