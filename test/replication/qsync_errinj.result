@@ -368,6 +368,153 @@ box.space.sync:select{}
  | - - [1]
  | ...
 
+--
+-- See what happens when the quorum is collected during writing ROLLBACK.
+-- CONFIRM for the same LSN should not be written.
+--
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+box.cfg{replication_synchro_timeout = 1000, replication_synchro_quorum = 2}
+ | ---
+ | ...
+box.space.sync:truncate()
+ | ---
+ | ...
+-- Write something to flush the master's state to the replica.
+_ = box.space.sync:insert({1})
+ | ---
+ | ...
+_ = box.space.sync:delete({1})
+ | ---
+ | ...
+
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+-- Block WAL write to block ACK sending.
+box.error.injection.set("ERRINJ_WAL_DELAY", true)
+ | ---
+ | - ok
+ | ...
+
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+-- Set a trap for ROLLBACK write so as the txn itself won't hang, but ROLLBACK
+-- will.
+box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 1)
+ | ---
+ | - ok
+ | ...
+box.cfg{replication_synchro_timeout = 0.001}
+ | ---
+ | ...
+lsn = box.info.lsn
+ | ---
+ | ...
+ok, err = nil
+ | ---
+ | ...
+f = fiber.create(function()                                                     \
+    ok, err = pcall(box.space.sync.replace, box.space.sync, {1})                \
+end)
+ | ---
+ | ...
+-- Wait ROLLBACK WAL write start.
+test_run:wait_cond(function()                                                   \
+    return box.error.injection.get("ERRINJ_WAL_DELAY")                          \
+end)
+ | ---
+ | - true
+ | ...
+-- The transaction is written to WAL. ROLLBACK is not yet.
+lsn = lsn + 1
+ | ---
+ | ...
+assert(box.info.lsn == lsn)
+ | ---
+ | - true
+ | ...
+
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+-- Let ACKs go. Master will receive ACK, but shouldn't try to CONFIRM. Because
+-- ROLLBACK for the same LSN is in progress right now already.
+box.error.injection.set("ERRINJ_WAL_DELAY", false)
+ | ---
+ | - ok
+ | ...
+
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+-- Wait ACK receipt.
+function wait_lsn_ack(id, lsn)                                                  \
+    local this_id = box.info.id                                                 \
+    test_run:wait_downstream(id, {status='follow'})                             \
+    test_run:wait_cond(function()                                               \
+        return box.info.replication[id].downstream.vclock[this_id] >= lsn       \
+    end)                                                                        \
+end
+ | ---
+ | ...
+replica_id = test_run:get_server_id('replica')
+ | ---
+ | ...
+wait_lsn_ack(replica_id, lsn)
+ | ---
+ | ...
+
+-- See if parameters change will try to write CONFIRM.
+box.cfg{replication_synchro_quorum = 1}
+ | ---
+ | ...
+box.cfg{replication_synchro_quorum = 2}
+ | ---
+ | ...
+
+-- Let ROLLBACK go and finish the test.
+box.error.injection.set("ERRINJ_WAL_DELAY", false)
+ | ---
+ | - ok
+ | ...
+test_run:wait_cond(function() return f:status() == 'dead' end)
+ | ---
+ | - true
+ | ...
+ok, err
+ | ---
+ | - false
+ | - Quorum collection for a synchronous transaction is timed out
+ | ...
+box.cfg{replication_synchro_timeout = 1000}
+ | ---
+ | ...
+box.space.sync:replace{2}
+ | ---
+ | - [2]
+ | ...
+box.space.sync:select{}
+ | ---
+ | - - [2]
+ | ...
+
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.space.sync:select{}
+ | ---
+ | - - [2]
+ | ...
+
 test_run:cmd('switch default')
  | ---
  | - true
