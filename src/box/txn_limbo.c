@@ -453,6 +453,15 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 		return;
 	assert(limbo->instance_id != REPLICA_ID_NIL);
 	int64_t prev_lsn = vclock_get(&limbo->vclock, replica_id);
+	/*
+	 * One of the reasons why can happen - the remote instance is not
+	 * read-only and wrote something under its own insance_id. For qsync
+	 * that most likely means that the remote instance decided to take over
+	 * the limbo ownership, and the current node is going to become a
+	 * replica very soon.
+	 */
+	if (lsn == prev_lsn)
+		return;
 	vclock_follow(&limbo->vclock, replica_id, lsn);
 	struct txn_limbo_entry *e;
 	int64_t confirm_lsn = -1;
