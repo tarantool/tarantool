@@ -2257,6 +2257,18 @@ struct Parse {
 	 * sqlEndTable() function).
 	 */
 	struct create_table_def create_table_def;
+	/*
+	 * FK and CK constraints appeared in a <CREATE TABLE>.
+	 */
+	struct create_fk_constraint_parse_def create_fk_constraint_parse_def;
+	struct create_ck_constraint_parse_def create_ck_constraint_parse_def;
+	/*
+	 * True, if column within a <CREATE TABLE> statement to be
+	 * created has <AUTOINCREMENT>.
+	 */
+	bool has_autoinc;
+	/* Id of field with <AUTOINCREMENT>. */
+	uint32_t autoinc_fieldno;
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
 	/** If set - do not emit byte code at all, just parse.  */
 	bool parse_only;

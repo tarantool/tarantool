@@ -590,8 +590,9 @@ sql_create_check_contraint(struct Parse *parser)
 		}
 	} else {
 		assert(! is_alter);
-		uint32_t ck_idx = ++parser->create_table_def.check_count;
-		name = tt_sprintf("ck_unnamed_%s_%d", space->def->name, ck_idx);
+		uint32_t ck_idx =
+			++parser->create_ck_constraint_parse_def.count;
+		name = tt_sprintf("ck_unnamed_%s_%u", space->def->name, ck_idx);
 	}
 	size_t name_len = strlen(name);
 
@@ -652,8 +653,8 @@ sql_create_check_contraint(struct Parse *parser)
 		sqlVdbeCountChanges(v);
 		sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 	} else {
-		rlist_add_entry(&parser->create_table_def.new_check, ck_parse,
-				link);
+		rlist_add_entry(&parser->create_ck_constraint_parse_def.checks,
+				ck_parse, link);
 	}
 }
 
@@ -930,7 +931,7 @@ emitNewSysSequenceRecord(Parse *pParse, int reg_seq_id, const char *seq_name)
 static int
 emitNewSysSpaceSequenceRecord(Parse *pParse, int reg_space_id, int reg_seq_id)
 {
-	uint32_t fieldno = pParse->create_table_def.autoinc_fieldno;
+	uint32_t fieldno = pParse->autoinc_fieldno;
 
 	Vdbe *v = sqlGetVdbe(pParse);
 	int first_col = pParse->nMem + 1;
@@ -1147,6 +1148,92 @@ resolve_link(struct Parse *parse_context, const struct space_def *def,
 	return -1;
 }
 
+/**
+ * Emit code to create sequences, indexes, check and foreign key
+ * constraints appeared in <CREATE TABLE>.
+ */
+static void
+vdbe_emit_create_constraints(struct Parse *parse, int reg_space_id)
+{
+	assert(reg_space_id != 0);
+	struct space *space = parse->create_table_def.new_space;
+	assert(space != NULL);
+	uint32_t i = 0;
+	for (; i < space->index_count; ++i) {
+		struct index *idx = space->index[i];
+		vdbe_emit_create_index(parse, space->def, idx->def,
+				       reg_space_id, idx->def->iid);
+	}
+
+	/*
+	 * Check to see if we need to create an _sequence table
+	 * for keeping track of autoincrement keys.
+	 */
+	if (parse->has_autoinc) {
+		/* Do an insertion into _sequence. */
+		int reg_seq_id = ++parse->nMem;
+		struct Vdbe *v = sqlGetVdbe(parse);
+		assert(v != NULL);
+		sqlVdbeAddOp2(v, OP_NextSequenceId, 0, reg_seq_id);
+		int reg_seq_rec = emitNewSysSequenceRecord(parse, reg_seq_id,
+							   space->def->name);
+		sqlVdbeAddOp2(v, OP_SInsert, BOX_SEQUENCE_ID, reg_seq_rec);
+		/* Do an insertion into _space_sequence. */
+		int reg_space_seq_record =
+			emitNewSysSpaceSequenceRecord(parse, reg_space_id,
+						      reg_seq_id);
+		sqlVdbeAddOp2(v, OP_SInsert, BOX_SPACE_SEQUENCE_ID,
+			      reg_space_seq_record);
+	}
+
+	/* Code creation of FK constraints, if any. */
+	struct fk_constraint_parse *fk_parse;
+	rlist_foreach_entry(fk_parse,
+			    &parse->create_fk_constraint_parse_def.fkeys,
+			    link) {
+		struct fk_constraint_def *fk_def = fk_parse->fk_def;
+		if (fk_parse->selfref_cols != NULL) {
+			struct ExprList *cols = fk_parse->selfref_cols;
+			for (uint32_t i = 0; i < fk_def->field_count; ++i) {
+				if (resolve_link(parse, space->def,
+						 cols->a[i].zName,
+						 &fk_def->links[i].parent_field,
+						 fk_def->name) != 0)
+					return;
+			}
+			fk_def->parent_id = reg_space_id;
+		} else if (fk_parse->is_self_referenced) {
+			struct key_def *pk_key_def =
+				sql_space_primary_key(space)->def->key_def;
+			if (pk_key_def->part_count != fk_def->field_count) {
+				diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
+					 fk_def->name, "number of columns in "\
+					 "foreign key does not match the "\
+					 "number of columns in the primary "\
+					 "index of referenced table");
+				parse->is_aborted = true;
+				return;
+			}
+			for (uint32_t i = 0; i < fk_def->field_count; ++i) {
+				fk_def->links[i].parent_field =
+					pk_key_def->parts[i].fieldno;
+			}
+			fk_def->parent_id = reg_space_id;
+		}
+		fk_def->child_id = reg_space_id;
+		vdbe_emit_fk_constraint_create(parse, fk_def, space->def->name);
+	}
+
+	/* Code creation of CK constraints, if any. */
+	struct ck_constraint_parse *ck_parse;
+	rlist_foreach_entry(ck_parse,
+			    &parse->create_ck_constraint_parse_def.checks,
+			    link) {
+		vdbe_emit_ck_constraint_create(parse, ck_parse->ck_def,
+					       reg_space_id, space->def->name);
+	}
+}
+
 /*
  * This routine is called to report the final ")" that terminates
  * a CREATE TABLE statement.
@@ -1213,73 +1300,7 @@ sqlEndTable(struct Parse *pParse)
 
 	int reg_space_id = getNewSpaceId(pParse);
 	vdbe_emit_space_create(pParse, reg_space_id, name_reg, new_space);
-	for (uint32_t i = 0; i < new_space->index_count; ++i) {
-		struct index *idx = new_space->index[i];
-		vdbe_emit_create_index(pParse, new_space->def, idx->def,
-				       reg_space_id, idx->def->iid);
-	}
-
-	/*
-	 * Check to see if we need to create an _sequence table
-	 * for keeping track of autoincrement keys.
-	 */
-	if (pParse->create_table_def.has_autoinc) {
-		assert(reg_space_id != 0);
-		/* Do an insertion into _sequence. */
-		int reg_seq_id = ++pParse->nMem;
-		sqlVdbeAddOp2(v, OP_NextSequenceId, 0, reg_seq_id);
-		int reg_seq_record =
-			emitNewSysSequenceRecord(pParse, reg_seq_id,
-						 new_space->def->name);
-		sqlVdbeAddOp2(v, OP_SInsert, BOX_SEQUENCE_ID, reg_seq_record);
-		/* Do an insertion into _space_sequence. */
-		int reg_space_seq_record =
-			emitNewSysSpaceSequenceRecord(pParse, reg_space_id,
-						      reg_seq_id);
-		sqlVdbeAddOp2(v, OP_SInsert, BOX_SPACE_SEQUENCE_ID,
-			      reg_space_seq_record);
-	}
-	/* Code creation of FK constraints, if any. */
-	struct fk_constraint_parse *fk_parse;
-	rlist_foreach_entry(fk_parse, &pParse->create_table_def.new_fkey,
-			    link) {
-		struct fk_constraint_def *fk_def = fk_parse->fk_def;
-		if (fk_parse->selfref_cols != NULL) {
-			struct ExprList *cols = fk_parse->selfref_cols;
-			for (uint32_t i = 0; i < fk_def->field_count; ++i) {
-				if (resolve_link(pParse, new_space->def,
-						 cols->a[i].zName,
-						 &fk_def->links[i].parent_field,
-						 fk_def->name) != 0)
-					return;
-			}
-			fk_def->parent_id = reg_space_id;
-		} else if (fk_parse->is_self_referenced) {
-			struct index *pk = sql_space_primary_key(new_space);
-			if (pk->def->key_def->part_count != fk_def->field_count) {
-				diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
-					 fk_def->name, "number of columns in "\
-					 "foreign key does not match the "\
-					 "number of columns in the primary "\
-					 "index of referenced table");
-				pParse->is_aborted = true;
-				return;
-			}
-			for (uint32_t i = 0; i < fk_def->field_count; ++i) {
-				fk_def->links[i].parent_field =
-					pk->def->key_def->parts[i].fieldno;
-			}
-			fk_def->parent_id = reg_space_id;
-		}
-		fk_def->child_id = reg_space_id;
-		vdbe_emit_fk_constraint_create(pParse, fk_def, space_name_copy);
-	}
-	struct ck_constraint_parse *ck_parse;
-	rlist_foreach_entry(ck_parse, &pParse->create_table_def.new_check,
-			    link) {
-		vdbe_emit_ck_constraint_create(pParse, ck_parse->ck_def,
-					       reg_space_id, space_name_copy);
-	}
+	vdbe_emit_create_constraints(pParse, reg_space_id);
 }
 
 void
@@ -1893,7 +1914,9 @@ sql_create_foreign_key(struct Parse *parse_context)
 			goto tnt_error;
 		}
 		memset(fk_parse, 0, sizeof(*fk_parse));
-		rlist_add_entry(&table_def->new_fkey, fk_parse, link);
+		struct rlist *fkeys =
+			&parse_context->create_fk_constraint_parse_def.fkeys;
+		rlist_add_entry(fkeys, fk_parse, link);
 	}
 	struct Token *parent = create_fk_def->parent_name;
 	assert(parent != NULL);
@@ -1910,8 +1933,10 @@ sql_create_foreign_key(struct Parse *parse_context)
 	struct space *parent_space = space_by_name(parent_name);
 	if (parent_space == NULL) {
 		if (is_self_referenced) {
+			struct create_fk_constraint_parse_def *parse_def =
+				&parse_context->create_fk_constraint_parse_def;
 			struct fk_constraint_parse *fk =
-				rlist_first_entry(&table_def->new_fkey,
+				rlist_first_entry(&parse_def->fkeys,
 						  struct fk_constraint_parse,
 						  link);
 			fk->selfref_cols = parent_cols;
@@ -1923,10 +1948,11 @@ sql_create_foreign_key(struct Parse *parse_context)
 	}
 	if (!is_alter) {
 		if (create_def->name.n == 0) {
-			constraint_name =
-				sqlMPrintf(db, "fk_unnamed_%s_%d",
-					   space->def->name,
-					   ++table_def->fkey_count);
+			struct create_fk_constraint_parse_def *parse_def =
+				&parse_context->create_fk_constraint_parse_def;
+			uint32_t idx = ++parse_def->count;
+			constraint_name = sqlMPrintf(db, "fk_unnamed_%s_%u",
+						     space->def->name, idx);
 		} else {
 			constraint_name =
 				sql_name_from_token(db, &create_def->name);
@@ -2041,9 +2067,11 @@ sql_create_foreign_key(struct Parse *parse_context)
 	 * maintain list of all FK constraints inside parser.
 	 */
 	if (!is_alter) {
+		struct rlist *fkeys =
+			&parse_context->create_fk_constraint_parse_def.fkeys;
 		struct fk_constraint_parse *fk_parse =
-			rlist_first_entry(&table_def->new_fkey,
-					  struct fk_constraint_parse, link);
+			rlist_first_entry(fkeys, struct fk_constraint_parse,
+					  link);
 		fk_parse->fk_def = fk_def;
 	} else {
 		vdbe_emit_fk_constraint_create(parse_context, fk_def,
@@ -2065,12 +2093,12 @@ tnt_error:
 void
 fk_constraint_change_defer_mode(struct Parse *parse_context, bool is_deferred)
 {
-	if (parse_context->db->init.busy ||
-	    rlist_empty(&parse_context->create_table_def.new_fkey))
+	struct rlist *fkeys =
+		&parse_context->create_fk_constraint_parse_def.fkeys;
+	if (parse_context->db->init.busy || rlist_empty(fkeys))
 		return;
-	rlist_first_entry(&parse_context->create_table_def.new_fkey,
-			  struct fk_constraint_parse, link)->fk_def->is_deferred =
-		is_deferred;
+	rlist_first_entry(fkeys, struct fk_constraint_parse,
+			  link)->fk_def->is_deferred = is_deferred;
 }
 
 /**
@@ -3306,15 +3334,15 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
 int
 sql_add_autoincrement(struct Parse *parse_context, uint32_t fieldno)
 {
-	if (parse_context->create_table_def.has_autoinc) {
+	if (parse_context->has_autoinc) {
 		diag_set(ClientError, ER_SQL_SYNTAX_WITH_POS,
 			 parse_context->line_count, parse_context->line_pos,
 			 "table must feature at most one AUTOINCREMENT field");
 		parse_context->is_aborted = true;
 		return -1;
 	}
-	parse_context->create_table_def.has_autoinc = true;
-	parse_context->create_table_def.autoinc_fieldno = fieldno;
+	parse_context->has_autoinc = true;
+	parse_context->autoinc_fieldno = fieldno;
 	return 0;
 }
 
