@@ -530,7 +530,8 @@ tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
 		break;
 	}
 	default:
-		assert(token.type == JSON_TOKEN_END);
+		assert(token.type == JSON_TOKEN_END ||
+		       token.type == JSON_TOKEN_ANY);
 		return NULL;
 	}
 	return tuple_field_raw_by_path(format, tuple, field_map, fieldno,

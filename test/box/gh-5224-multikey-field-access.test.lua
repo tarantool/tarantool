@@ -63,4 +63,10 @@ t['[2][3].p1.p2']
 t['[2][3].p1']
 t['[2][3]']
 
+--
+-- Multikey path part could crash when used as a first part of the path during
+-- accessing a tuple field.
+--
+t['[*]']
+
 s:drop()
