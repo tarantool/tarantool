@@ -131,6 +131,7 @@ enum {
 	BOX_SPACE_FIELD_FIELD_COUNT = 4,
 	BOX_SPACE_FIELD_OPTS = 5,
 	BOX_SPACE_FIELD_FORMAT = 6,
+	box_space_field_MAX = 7,
 };
 
 /** _index fields. */
