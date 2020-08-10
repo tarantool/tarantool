@@ -662,6 +662,7 @@ wal_begin_checkpoint_f(struct cbus_call_msg *data)
 	}
 	vclock_copy(&msg->vclock, &writer->vclock);
 	msg->wal_size = writer->checkpoint_wal_size;
+	ERROR_INJECT_SLEEP(ERRINJ_WAL_DELAY);
 	return 0;
 }
 
@@ -1272,6 +1273,9 @@ wal_write_async(struct journal *journal, struct journal_entry *entry)
 	writer->last_entry = entry;
 	batch->approx_len += entry->approx_len;
 	writer->wal_pipe.n_input += entry->n_rows * XROW_IOVMAX;
+#ifndef NDEBUG
+	++errinj(ERRINJ_WAL_WRITE_COUNT, ERRINJ_INT)->iparam;
+#endif
 	cpipe_flush_input(&writer->wal_pipe);
 	return 0;
 
