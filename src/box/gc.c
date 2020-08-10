@@ -382,6 +382,7 @@ gc_do_checkpoint(bool is_scheduled)
 {
 	int rc;
 	struct wal_checkpoint checkpoint;
+	int64_t limbo_rollback_count = txn_limbo.rollback_count;
 
 	assert(!gc.checkpoint_is_in_progress);
 	gc.checkpoint_is_in_progress = true;
@@ -396,7 +397,16 @@ gc_do_checkpoint(bool is_scheduled)
 	rc = wal_begin_checkpoint(&checkpoint);
 	if (rc != 0)
 		goto out;
-
+	/*
+	 * Check if the checkpoint contains rolled back data. That makes the
+	 * checkpoint not self-sufficient - it needs the xlog file with
+	 * ROLLBACK. Drop it.
+	 */
+	if (txn_limbo.rollback_count != limbo_rollback_count) {
+		rc = -1;
+		diag_set(ClientError, ER_SYNC_ROLLBACK);
+		goto out;
+	}
 	/*
 	 * Wait the confirms on all "sync" transactions before
 	 * create a snapshot.
