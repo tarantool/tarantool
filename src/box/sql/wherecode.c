@@ -219,12 +219,12 @@ sqlWhereExplainOneScan(Parse * pParse,	/* Parse context */
 
 			assert(!(flags & WHERE_AUTO_INDEX)
 			       || (flags & WHERE_IDX_ONLY));
-			if (idx_def->iid == 0) {
+			if ((flags & WHERE_AUTO_INDEX) != 0) {
+				zFmt = "EPHEMERAL INDEX";
+			} else if (idx_def->iid == 0) {
 				if (isSearch) {
 					zFmt = "PRIMARY KEY";
 				}
-			} else if (flags & WHERE_AUTO_INDEX) {
-				zFmt = "AUTOMATIC COVERING INDEX";
 			} else if (flags & WHERE_IDX_ONLY) {
 				zFmt = "COVERING INDEX %s";
 			} else {
@@ -807,7 +807,8 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 	    notReady & ~sqlWhereGetMask(&pWInfo->sMaskSet, iCur);
 	bRev = (pWInfo->revMask >> iLevel) & 1;
 	omitTable = (pLoop->wsFlags & WHERE_IDX_ONLY) != 0
-	    && (pWInfo->wctrlFlags & WHERE_OR_SUBCLAUSE) == 0;
+	    && ((pWInfo->wctrlFlags & WHERE_OR_SUBCLAUSE) == 0 ||
+		(pLoop->wsFlags & WHERE_AUTO_INDEX) != 0);
 	VdbeModuleComment((v, "Begin WHERE-loop%d: %s", iLevel,
 			   pTabItem->pTab->zName));
 
@@ -1047,8 +1048,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			startEq = 0;
 			start_constraints = 1;
 		}
-		struct index_def *idx_pk = space->index[0]->def;
-		uint32_t pk_part_count = idx_pk->key_def->part_count;
 		/*
 		 * Tarantool's iterator over integer fields doesn't
 		 * tolerate floating point values. Hence, if term
@@ -1234,6 +1233,8 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 		if (omitTable) {
 			/* pIdx is a covering index.  No need to access the main table. */
 		}  else if (iCur != iIdxCur) {
+			struct index_def *idx_pk = space->index[0]->def;
+			uint32_t pk_part_count = idx_pk->key_def->part_count;
 			int iKeyReg = sqlGetTempRange(pParse, pk_part_count);
 			for (j = 0; j < (int) pk_part_count; j++) {
 				k = idx_pk->key_def->parts[j].fieldno;

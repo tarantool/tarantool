@@ -204,3 +204,33 @@ box.execute('SELECT field66, field68, field70 FROM test')
 box.space.TEST:drop()
 ---
 ...
+-- gh-4933: Make sure that autoindex optimization is used.
+box.execute('CREATE TABLE t1(i INT PRIMARY KEY, a INT);')
+---
+- row_count: 1
+...
+box.execute('CREATE TABLE t2(i INT PRIMARY KEY, b INT);')
+---
+- row_count: 1
+...
+for i = 1, 10240 do\
+	box.execute('INSERT INTO t1 VALUES ($1, $1);', {i})\
+	box.execute('INSERT INTO t2 VALUES ($1, $1);', {i})\
+end
+---
+...
+box.execute('EXPLAIN QUERY PLAN SELECT a, b FROM t1, t2 WHERE a = b;')
+---
+- metadata:
+  - name: selectid
+    type: integer
+  - name: order
+    type: integer
+  - name: from
+    type: integer
+  - name: detail
+    type: text
+  rows:
+  - [0, 0, 0, 'SCAN TABLE T1 (~1048576 rows)']
+  - [0, 1, 1, 'SEARCH TABLE T2 USING EPHEMERAL INDEX (B=?) (~20 rows)']
+...

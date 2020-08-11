@@ -64,3 +64,12 @@ box.execute('SELECT field70, field64 FROM test')
 pk:alter({parts = {66}})
 box.execute('SELECT field66, field68, field70 FROM test')
 box.space.TEST:drop()
+
+-- gh-4933: Make sure that autoindex optimization is used.
+box.execute('CREATE TABLE t1(i INT PRIMARY KEY, a INT);')
+box.execute('CREATE TABLE t2(i INT PRIMARY KEY, b INT);')
+for i = 1, 10240 do\
+	box.execute('INSERT INTO t1 VALUES ($1, $1);', {i})\
+	box.execute('INSERT INTO t2 VALUES ($1, $1);', {i})\
+end
+box.execute('EXPLAIN QUERY PLAN SELECT a, b FROM t1, t2 WHERE a = b;')

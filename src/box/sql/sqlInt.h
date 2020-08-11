@@ -3297,41 +3297,6 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 			int idx_noseek);
 
 /**
- * Generate code that will assemble an index key and stores it in
- * register reg_out. The key will be for index which is an
- * index on table. cursor is the index of a cursor open on the
- * table table and pointing to the entry that needs indexing.
- * cursor must be the cursor of the PRIMARY KEY index.
- *
- * The prev and reg_prev parameters are used to implement a
- * cache to avoid unnecessary register loads.  If prev is not
- * NULL, then it is a pointer to a different index for which an
- * index key has just been computed into register reg_prev. If the
- * current index is generating its key into the same
- * sequence of registers and if prev and index share a column in
- * common, then the register corresponding to that column already
- * holds the correct value and the loading of that register is
- * skipped. This optimization is helpful when doing a DELETE or
- * an INTEGRITY_CHECK on a table with multiple indices, and
- * especially with the PRIMARY KEY columns of the index.
- *
- * @param parse Parsing context.
- * @param index The index for which to generate a key.
- * @param cursor Cursor number from which to take column data.
- * @param reg_out Put the new key into this register if not NULL.
- * @param prev Previously generated index key
- * @param reg_prev Register holding previous generated key.
- *
- * @retval Return a register number which is the first in a block
- * of registers that holds the elements of the index key. The
- * block of registers has already been deallocated by the time
- * this routine returns.
- */
-int
-sql_generate_index_key(struct Parse *parse, struct index *index, int cursor,
-		       int reg_out, struct index *prev, int reg_prev);
-
-/**
  * Generate code to do constraint checks prior to an INSERT or
  * an UPDATE on the given table.
  *

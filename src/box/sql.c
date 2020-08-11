@@ -719,7 +719,7 @@ int
 tarantoolsqlIdxKeyCompare(struct BtCursor *cursor,
 			      struct UnpackedRecord *unpacked)
 {
-	assert(cursor->curFlags & BTCF_TaCursor);
+	assert(cursor->curFlags & (BTCF_TaCursor | BTCF_TEphemCursor));
 	assert(cursor->iter != NULL);
 	assert(cursor->last_tuple != NULL);
 

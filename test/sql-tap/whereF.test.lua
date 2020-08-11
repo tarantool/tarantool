@@ -90,10 +90,20 @@ test:do_execsql_test(
 
 -- for _ in X(0, "X!foreach", [=[["tn sql","\n  1 \"SELECT * FROM t1,           t2 WHERE t1.a>? AND t2.d>t1.c AND t1.b=t2.e\"\n  2 \"SELECT * FROM t2,           t1 WHERE t1.a>? AND t2.d>t1.c AND t1.b=t2.e\"\n  3 \"SELECT * FROM t2 CROSS JOIN t1 WHERE t1.a>? AND t2.d>t1.c AND t1.b=t2.e\"\n"]]=]) do
 for tn, sql in ipairs({"SELECT * FROM t1,           t2 WHERE t1.a>? AND t2.d>t1.c AND t1.b=t2.e",
-                       "SELECT * FROM t2,           t1 WHERE t1.a>? AND t2.d>t1.c AND t1.b=t2.e",
-                       "SELECT * FROM t2 CROSS JOIN t1 WHERE t1.a>? AND t2.d>t1.c AND t1.b=t2.e"}) do
+                       "SELECT * FROM t2,           t1 WHERE t1.a>? AND t2.d>t1.c AND t1.b=t2.e"}) do
     test:do_test(
-        "2."..tn,
+        "2.1."..tn,
+        function()
+            return test:execsql("EXPLAIN QUERY PLAN "..sql)
+        end, {
+            '/SEARCH TABLE T1/',
+            '/SEARCH TABLE T2/'
+        })
+end
+
+for tn, sql in ipairs({"SELECT * FROM t2 CROSS JOIN t1 WHERE t1.a>? AND t2.d>t1.c AND t1.b=t2.e"}) do
+    test:do_test(
+        "2.2."..tn,
         function()
             return test:execsql("EXPLAIN QUERY PLAN "..sql)
         end, {

@@ -221,7 +221,7 @@ add_library(box STATIC
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_definitions(-DSQL_DEBUG=1)
 endif()
-add_definitions(-DSQL_OMIT_AUTOMATIC_INDEX=1 -DSQL_TEST=1)
+add_definitions(-DSQL_TEST=1)
 
 set(EXT_SRC_DIR ${CMAKE_SOURCE_DIR}/extra)
 set(EXT_BIN_DIR ${CMAKE_BINARY_DIR}/extra)
