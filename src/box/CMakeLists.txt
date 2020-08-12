@@ -171,6 +171,7 @@ add_library(box STATIC
     port.c
     txn.c
     txn_limbo.c
+    raft.c
     box.cc
     gc.c
     checkpoint_schedule.c

@@ -78,6 +78,7 @@
 #include "sequence.h"
 #include "sql_stmt_cache.h"
 #include "msgpack.h"
+#include "raft.h"
 #include "trivia/util.h"
 
 static char status[64] = "unknown";
@@ -382,6 +383,13 @@ apply_wal_row(struct xstream *stream, struct xrow_header *row)
 			diag_raise();
 		if (txn_limbo_process(&txn_limbo, &syn_req) != 0)
 			diag_raise();
+		return;
+	}
+	if (iproto_type_is_raft_request(row->type)) {
+		struct raft_request raft_req;
+		if (xrow_decode_raft(row, &raft_req) != 0)
+			diag_raise();
+		raft_process_recovery(&raft_req);
 		return;
 	}
 	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));

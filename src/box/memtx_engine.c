@@ -49,6 +49,7 @@
 #include "replication.h"
 #include "schema.h"
 #include "gc.h"
+#include "raft.h"
 
 /* sync snapshot every 16MB */
 #define SNAP_SYNC_INTERVAL	(1 << 24)
@@ -202,11 +203,24 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 }
 
 static int
+memtx_engine_recover_raft(const struct xrow_header *row)
+{
+	assert(row->type == IPROTO_RAFT);
+	struct raft_request req;
+	if (xrow_decode_raft(row, &req) != 0)
+		return -1;
+	raft_process_recovery(&req);
+	return 0;
+}
+
+static int
 memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 				  struct xrow_header *row)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	if (row->type != IPROTO_INSERT) {
+		if (row->type == IPROTO_RAFT)
+			return memtx_engine_recover_raft(row);
 		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 			 (uint32_t) row->type);
 		return -1;
@@ -514,6 +528,7 @@ struct checkpoint {
 	/** The vclock of the snapshot file. */
 	struct vclock vclock;
 	struct xdir dir;
+	struct raft_request raft;
 	/**
 	 * Do nothing, just touch the snapshot file - the
 	 * checkpoint already exists.
@@ -538,6 +553,7 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 	opts.free_cache = true;
 	xdir_create(&ckpt->dir, snap_dirname, SNAP, &INSTANCE_UUID, &opts);
 	vclock_create(&ckpt->vclock);
+	raft_serialize_for_disk(&ckpt->raft);
 	ckpt->touch = false;
 	return ckpt;
 }
@@ -610,6 +626,23 @@ checkpoint_add_space(struct space *sp, void *data)
 };
 
 static int
+checkpoint_write_raft(struct xlog *l, const struct raft_request *req)
+{
+	struct xrow_header row;
+	struct region *region = &fiber()->gc;
+	uint32_t svp = region_used(region);
+	int rc = -1;
+	if (xrow_encode_raft(&row, region, req) != 0)
+		goto finish;
+	if (checkpoint_write_row(l, &row) != 0)
+		goto finish;
+	rc = 0;
+finish:
+	region_truncate(region, svp);
+	return rc;
+}
+
+static int
 checkpoint_f(va_list ap)
 {
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
@@ -644,6 +677,8 @@ checkpoint_f(va_list ap)
 		if (rc != 0)
 			goto fail;
 	}
+	if (checkpoint_write_raft(&snap, &ckpt->raft) != 0)
+		goto fail;
 	if (xlog_flush(&snap) < 0)
 		goto fail;
 

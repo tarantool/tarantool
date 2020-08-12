@@ -220,6 +220,8 @@ enum iproto_type {
 	/** The maximum typecode used for box.stat() */
 	IPROTO_TYPE_STAT_MAX,
 
+	IPROTO_RAFT = 30,
+
 	/** A confirmation message for synchronous transactions. */
 	IPROTO_CONFIRM = 40,
 	/** A rollback message for synchronous transactions. */
@@ -258,6 +260,11 @@ enum iproto_type {
 
 /** IPROTO type name by code */
 extern const char *iproto_type_strs[];
+
+enum iproto_raft_keys {
+	IPROTO_RAFT_TERM = 0,
+	IPROTO_RAFT_VOTE = 1,
+};
 
 /**
  * Returns IPROTO type name by @a type code.
@@ -331,6 +338,12 @@ static inline bool
 iproto_type_is_synchro_request(uint32_t type)
 {
 	return type == IPROTO_CONFIRM || type == IPROTO_ROLLBACK;
+}
+
+static inline bool
+iproto_type_is_raft_request(uint32_t type)
+{
+	return type == IPROTO_RAFT;
 }
 
 /** This is an error. */

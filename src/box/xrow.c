@@ -959,6 +959,62 @@ xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 }
 
 int
+xrow_encode_raft(struct xrow_header *row, struct region *region,
+		 const struct raft_request *r)
+{
+	size_t size = mp_sizeof_map(2) +
+		      mp_sizeof_uint(IPROTO_RAFT_TERM) +
+		      mp_sizeof_uint(r->term) +
+		      mp_sizeof_uint(IPROTO_RAFT_VOTE) +
+		      mp_sizeof_uint(r->vote);
+	char *buf = region_alloc(region, size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "buf");
+		return -1;
+	}
+	memset(row, 0, sizeof(*row));
+	row->type = IPROTO_RAFT;
+	row->body[0].iov_base = buf;
+	row->body[0].iov_len = size;
+	row->group_id = GROUP_LOCAL;
+	row->bodycnt = 1;
+	buf = mp_encode_map(buf, 2);
+	buf = mp_encode_uint(buf, IPROTO_RAFT_TERM);
+	buf = mp_encode_uint(buf, r->term);
+	buf = mp_encode_uint(buf, IPROTO_RAFT_VOTE);
+	buf = mp_encode_uint(buf, r->vote);
+	return 0;
+}
+
+int
+xrow_decode_raft(const struct xrow_header *row, struct raft_request *r)
+{
+	/* TODO: handle bad format. */
+	assert(row->type == IPROTO_RAFT);
+	assert(row->bodycnt == 1);
+	assert(row->group_id == GROUP_LOCAL);
+	memset(r, 0, sizeof(*r));
+	const char *pos = row->body[0].iov_base;
+	uint32_t map_size = mp_decode_map(&pos);
+	for (uint32_t i = 0; i < map_size; ++i)
+	{
+		uint64_t key = mp_decode_uint(&pos);
+		switch (key) {
+		case IPROTO_RAFT_TERM:
+			r->term = mp_decode_uint(&pos);
+			break;
+		case IPROTO_RAFT_VOTE:
+			r->vote = mp_decode_uint(&pos);
+			break;
+		default:
+			mp_next(&pos);
+			break;
+		}
+	}
+	return 0;
+}
+
+int
 xrow_to_iovec(const struct xrow_header *row, struct iovec *out)
 {
 	assert(mp_sizeof_uint(UINT32_MAX) == 5);
