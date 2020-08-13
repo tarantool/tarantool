@@ -39,6 +39,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct txn;
+struct synchro_request;
 
 /**
  * Transaction and its quorum metadata, to be stored in limbo.
@@ -245,17 +246,9 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn);
 int
 txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry);
 
-/**
- * Confirm all the entries up to the given master's LSN.
- */
-void
-txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn);
-
-/**
- * Rollback all the entries  starting with given master's LSN.
- */
-void
-txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn);
+/** Execute a synchronous replication request. */
+int
+txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req);
 
 /**
  * Waiting for confirmation of all "sync" transactions

@@ -893,13 +893,13 @@ xrow_encode_dml(const struct request *request, struct region *region,
 	return iovcnt;
 }
 
-static int
-xrow_encode_confirm_rollback(struct xrow_header *row, struct region *region,
-			     uint32_t replica_id, int64_t lsn, int type)
+int
+xrow_encode_synchro(struct xrow_header *row, struct region *region,
+		    const struct synchro_request *req)
 {
 	size_t len = mp_sizeof_map(2) + mp_sizeof_uint(IPROTO_REPLICA_ID) +
-		     mp_sizeof_uint(replica_id) + mp_sizeof_uint(IPROTO_LSN) +
-		     mp_sizeof_uint(lsn);
+		     mp_sizeof_uint(req->replica_id) +
+		     mp_sizeof_uint(IPROTO_LSN) + mp_sizeof_uint(req->lsn);
 	char *buf = (char *)region_alloc(region, len);
 	if (buf == NULL) {
 		diag_set(OutOfMemory, len, "region_alloc", "buf");
@@ -909,9 +909,9 @@ xrow_encode_confirm_rollback(struct xrow_header *row, struct region *region,
 
 	pos = mp_encode_map(pos, 2);
 	pos = mp_encode_uint(pos, IPROTO_REPLICA_ID);
-	pos = mp_encode_uint(pos, replica_id);
+	pos = mp_encode_uint(pos, req->replica_id);
 	pos = mp_encode_uint(pos, IPROTO_LSN);
-	pos = mp_encode_uint(pos, lsn);
+	pos = mp_encode_uint(pos, req->lsn);
 
 	memset(row, 0, sizeof(*row));
 
@@ -919,30 +919,13 @@ xrow_encode_confirm_rollback(struct xrow_header *row, struct region *region,
 	row->body[0].iov_len = len;
 	row->bodycnt = 1;
 
-	row->type = type;
+	row->type = req->type;
 
 	return 0;
 }
 
 int
-xrow_encode_confirm(struct xrow_header *row, struct region *region,
-		    uint32_t replica_id, int64_t lsn)
-{
-	return xrow_encode_confirm_rollback(row, region, replica_id, lsn,
-					    IPROTO_CONFIRM);
-}
-
-int
-xrow_encode_rollback(struct xrow_header *row, struct region *region,
-		     uint32_t replica_id, int64_t lsn)
-{
-	return xrow_encode_confirm_rollback(row, region, replica_id, lsn,
-					    IPROTO_ROLLBACK);
-}
-
-static int
-xrow_decode_confirm_rollback(struct xrow_header *row, uint32_t *replica_id,
-			     int64_t *lsn)
+xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 {
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
@@ -960,6 +943,7 @@ xrow_decode_confirm_rollback(struct xrow_header *row, uint32_t *replica_id,
 		return -1;
 	}
 
+	memset(req, 0, sizeof(*req));
 	d = data;
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
@@ -977,28 +961,17 @@ xrow_decode_confirm_rollback(struct xrow_header *row, uint32_t *replica_id,
 		}
 		switch (key) {
 		case IPROTO_REPLICA_ID:
-			*replica_id = mp_decode_uint(&d);
+			req->replica_id = mp_decode_uint(&d);
 			break;
 		case IPROTO_LSN:
-			*lsn = mp_decode_uint(&d);
+			req->lsn = mp_decode_uint(&d);
 			break;
 		default:
 			mp_next(&d);
 		}
 	}
+	req->type = row->type;
 	return 0;
-}
-
-int
-xrow_decode_confirm(struct xrow_header *row, uint32_t *replica_id, int64_t *lsn)
-{
-	return xrow_decode_confirm_rollback(row, replica_id, lsn);
-}
-
-int
-xrow_decode_rollback(struct xrow_header *row, uint32_t *replica_id, int64_t *lsn)
-{
-	return xrow_decode_confirm_rollback(row, replica_id, lsn);
 }
 
 int

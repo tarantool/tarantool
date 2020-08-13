@@ -275,26 +275,14 @@ process_nop(struct request *request)
  * or rollback some of its entries.
  */
 static int
-process_confirm_rollback(struct request *request, bool is_confirm)
+process_synchro_row(struct request *request)
 {
 	assert(iproto_type_is_synchro_request(request->header->type));
-	uint32_t replica_id;
 	struct txn *txn = in_txn();
-	int64_t lsn = 0;
 
-	int res = 0;
-	if (is_confirm)
-		res = xrow_decode_confirm(request->header, &replica_id, &lsn);
-	else
-		res = xrow_decode_rollback(request->header, &replica_id, &lsn);
-	if (res == -1)
+	struct synchro_request syn_req;
+	if (xrow_decode_synchro(request->header, &syn_req) != 0)
 		return -1;
-
-	if (replica_id != txn_limbo.instance_id) {
-		diag_set(ClientError, ER_SYNC_MASTER_MISMATCH, replica_id,
-			 txn_limbo.instance_id);
-		return -1;
-	}
 	assert(txn->n_applier_rows == 0);
 	/*
 	 * This is not really a transaction. It just uses txn API
@@ -306,16 +294,9 @@ process_confirm_rollback(struct request *request, bool is_confirm)
 
 	if (txn_begin_stmt(txn, NULL) != 0)
 		return -1;
-
-	if (txn_commit_stmt(txn, request) == 0) {
-		if (is_confirm)
-			txn_limbo_read_confirm(&txn_limbo, lsn);
-		else
-			txn_limbo_read_rollback(&txn_limbo, lsn);
-		return 0;
-	} else {
+	if (txn_commit_stmt(txn, request) != 0)
 		return -1;
-	}
+	return txn_limbo_process(&txn_limbo, &syn_req);
 }
 
 static int
@@ -324,8 +305,7 @@ apply_row(struct xrow_header *row)
 	struct request request;
 	if (iproto_type_is_synchro_request(row->type)) {
 		request.header = row;
-		return process_confirm_rollback(&request,
-						row->type == IPROTO_CONFIRM);
+		return process_synchro_row(&request);
 	}
 	if (xrow_decode_dml(row, &request, dml_request_key_map(row->type)) != 0)
 		return -1;
