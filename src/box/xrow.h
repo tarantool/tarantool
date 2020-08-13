@@ -216,54 +216,51 @@ xrow_encode_dml(const struct request *request, struct region *region,
 		struct iovec *iov);
 
 /**
- * Encode the CONFIRM to row body and set row type to
- * IPROTO_CONFIRM.
+ * Synchronous replication request - confirmation or rollback of
+ * pending synchronous transactions.
+ */
+struct synchro_request {
+	/** Operation type - IPROTO_ROLLBACK or IPROTO_CONFIRM. */
+	uint32_t type;
+	/**
+	 * ID of the instance owning the pending transactions.
+	 * Note, it may be not the same instance, who created this
+	 * request. An instance can make an operation on foreign
+	 * synchronous transactions in case a new master tries to
+	 * finish transactions of an old master.
+	 */
+	uint32_t replica_id;
+	/**
+	 * Operation LSN.
+	 * In case of CONFIRM it means 'confirm all
+	 * transactions with lsn <= this value'.
+	 * In case of ROLLBACK it means 'rollback all transactions
+	 * with lsn >= this value'.
+	 */
+	int64_t lsn;
+};
+
+/**
+ * Encode synchronous replication request.
  * @param row xrow header.
  * @param region Region to use to encode the confirmation body.
- * @param replica_id master's instance id.
- * @param lsn last confirmed lsn.
+ * @param req Request parameters.
  * @retval -1 on error.
  * @retval 0 success.
  */
 int
-xrow_encode_confirm(struct xrow_header *row, struct region *region,
-		    uint32_t replica_id, int64_t lsn);
+xrow_encode_synchro(struct xrow_header *row, struct region *region,
+		    const struct synchro_request *req);
 
 /**
- * Decode the CONFIRM request body.
+ * Decode synchronous replication request.
  * @param row xrow header.
- * @param[out] replica_id master's instance id.
- * @param[out] lsn last confirmed lsn.
+ * @param[out] req Request parameters.
  * @retval -1 on error.
  * @retval 0 success.
  */
 int
-xrow_decode_confirm(struct xrow_header *row, uint32_t *replica_id, int64_t *lsn);
-
-/**
- * Encode the ROLLBACK row body and set row type to
- * IPROTO_ROLLBACK.
- * @param row xrow header.
- * @param region Region to use to encode the rollback body.
- * @param replica_id master's instance id.
- * @param lsn lsn to rollback from, including it.
- * @retval -1  on error.
- * @retval 0 success.
- */
-int
-xrow_encode_rollback(struct xrow_header *row, struct region *region,
-		     uint32_t replica_id, int64_t lsn);
-
-/**
- * Decode the ROLLBACK row body.
- * @param row xrow header.
- * @param[out] replica_id master's instance id.
- * @param[out] lsn lsn to rollback from, including it.
- * @retval -1 on error.
- * @retval 0 success.
- */
-int
-xrow_decode_rollback(struct xrow_header *row, uint32_t *replica_id, int64_t *lsn);
+xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req);
 
 /**
  * CALL/EVAL request.

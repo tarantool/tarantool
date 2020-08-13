@@ -31,6 +31,7 @@
 #include "txn.h"
 #include "txn_limbo.h"
 #include "replication.h"
+#include "iproto_constants.h"
 
 struct txn_limbo txn_limbo;
 
@@ -272,10 +273,15 @@ complete:
 }
 
 static void
-txn_limbo_write_confirm_rollback(struct txn_limbo *limbo, int64_t lsn,
-				 bool is_confirm)
+txn_limbo_write_synchro(struct txn_limbo *limbo, uint32_t type, int64_t lsn)
 {
 	assert(lsn > 0);
+
+	struct synchro_request req = {
+		.type		= type,
+		.replica_id	= limbo->instance_id,
+		.lsn		= lsn,
+	};
 
 	struct xrow_header row;
 	struct request request = {
@@ -286,19 +292,7 @@ txn_limbo_write_confirm_rollback(struct txn_limbo *limbo, int64_t lsn,
 	if (txn == NULL)
 		goto rollback;
 
-	int res = 0;
-	if (is_confirm) {
-		res = xrow_encode_confirm(&row, &txn->region,
-					  limbo->instance_id, lsn);
-	} else {
-		/*
-		 * This LSN is the first to be rolled back, so
-		 * the last "safe" lsn is lsn - 1.
-		 */
-		res = xrow_encode_rollback(&row, &txn->region,
-					   limbo->instance_id, lsn);
-	}
-	if (res == -1)
+	if (xrow_encode_synchro(&row, &txn->region, &req) != 0)
 		goto rollback;
 	/*
 	 * This is not really a transaction. It just uses txn API
@@ -325,7 +319,7 @@ rollback:
 	 * problems are fixed. Or retry automatically with some period.
 	 */
 	panic("Could not write a synchro request to WAL: lsn = %lld, type = "
-	      "%s\n", lsn, is_confirm ? "CONFIRM" : "ROLLBACK");
+	      "%s\n", lsn, iproto_type_name(type));
 }
 
 /**
@@ -338,10 +332,11 @@ txn_limbo_write_confirm(struct txn_limbo *limbo, int64_t lsn)
 	assert(lsn > limbo->confirmed_lsn);
 	assert(!limbo->is_in_rollback);
 	limbo->confirmed_lsn = lsn;
-	txn_limbo_write_confirm_rollback(limbo, lsn, true);
+	txn_limbo_write_synchro(limbo, IPROTO_CONFIRM, lsn);
 }
 
-void
+/** Confirm all the entries <= @a lsn. */
+static void
 txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 {
 	assert(limbo->instance_id != REPLICA_ID_NIL);
@@ -390,11 +385,12 @@ txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 	assert(lsn > limbo->confirmed_lsn);
 	assert(!limbo->is_in_rollback);
 	limbo->is_in_rollback = true;
-	txn_limbo_write_confirm_rollback(limbo, lsn, false);
+	txn_limbo_write_synchro(limbo, IPROTO_ROLLBACK, lsn);
 	limbo->is_in_rollback = false;
 }
 
-void
+/** Rollback all the entries >= @a lsn. */
+static void
 txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 {
 	assert(limbo->instance_id != REPLICA_ID_NIL);
@@ -573,6 +569,27 @@ complete:
 		/* The transaction has been rolled back. */
 		diag_set(ClientError, ER_SYNC_ROLLBACK);
 		return -1;
+	}
+	return 0;
+}
+
+int
+txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
+{
+	if (req->replica_id != limbo->instance_id) {
+		diag_set(ClientError, ER_SYNC_MASTER_MISMATCH, req->replica_id,
+			 limbo->instance_id);
+		return -1;
+	}
+	switch (req->type) {
+	case IPROTO_CONFIRM:
+		txn_limbo_read_confirm(limbo, req->lsn);
+		break;
+	case IPROTO_ROLLBACK:
+		txn_limbo_read_rollback(limbo, req->lsn);
+		break;
+	default:
+		unreachable();
 	}
 	return 0;
 }
