@@ -120,7 +120,7 @@ recovery_new(const char *wal_dirname, bool force_recovery,
 void
 recovery_scan(struct recovery *r, struct vclock *end_vclock)
 {
-	xdir_scan_xc(&r->wal_dir);
+	xdir_scan_xc(&r->wal_dir, true);
 
 	struct vclock *vclock = vclockset_last(&r->wal_dir.index);
 	if (vclock == NULL || vclock_compare(vclock, &r->vclock) < 0) {
@@ -313,7 +313,7 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 	struct vclock *clock;
 
 	if (scan_dir)
-		xdir_scan_xc(&r->wal_dir);
+		xdir_scan_xc(&r->wal_dir, true);
 
 	if (xlog_cursor_is_open(&r->cursor)) {
 		/* If there's a WAL open, recover from it first. */
