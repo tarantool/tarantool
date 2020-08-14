@@ -32,6 +32,7 @@
 #include "txn_limbo.h"
 #include "replication.h"
 #include "iproto_constants.h"
+#include "journal.h"
 
 struct txn_limbo txn_limbo;
 
@@ -272,6 +273,17 @@ complete:
 	return 0;
 }
 
+/**
+ * A callback for synchronous write: txn_limbo_write_synchro fiber
+ * waiting to proceed once a record is written to WAL.
+ */
+static void
+txn_limbo_write_cb(struct journal_entry *entry)
+{
+	assert(entry->complete_data != NULL);
+	fiber_wakeup(entry->complete_data);
+}
+
 static void
 txn_limbo_write_synchro(struct txn_limbo *limbo, uint32_t type, int64_t lsn)
 {
@@ -285,46 +297,36 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint32_t type, int64_t lsn)
 
 	/*
 	 * This is a synchronous commit so we can
-	 * use body and row allocated on a stack.
+	 * allocate everything on a stack.
 	 */
 	struct synchro_body_bin body;
 	struct xrow_header row;
-	struct request request = {
-		.header = &row,
-	};
+	char buf[sizeof(struct journal_entry) +
+		 sizeof(struct xrow_header *)];
 
-	struct txn *txn = txn_begin();
-	if (txn == NULL)
-		goto rollback;
+	struct journal_entry *entry = (struct journal_entry *)buf;
+	entry->rows[0] = &row;
 
 	xrow_encode_synchro(&row, &body, &req);
 
-	/*
-	 * This is not really a transaction. It just uses txn API
-	 * to put the data into WAL. And obviously it should not
-	 * go to the limbo and block on the very same sync
-	 * transaction which it tries to confirm now.
-	 */
-	txn_set_flag(txn, TXN_FORCE_ASYNC);
+	journal_entry_create(entry, 1, xrow_approx_len(&row),
+			     txn_limbo_write_cb, fiber());
 
-	if (txn_begin_stmt(txn, NULL) != 0)
-		goto rollback;
-	if (txn_commit_stmt(txn, &request) != 0)
-		goto rollback;
-	if (txn_commit(txn) != 0)
-		goto rollback;
-	return;
-
-rollback:
-	/*
-	 * XXX: the stub is supposed to be removed once it is defined what to do
-	 * when a synchro request WAL write fails. One of the possible
-	 * solutions: log the error, keep the limbo queue as is and probably put
-	 * in rollback mode. Then provide a hook to call manually when WAL
-	 * problems are fixed. Or retry automatically with some period.
-	 */
-	panic("Could not write a synchro request to WAL: lsn = %lld, type = "
-	      "%s\n", lsn, iproto_type_name(type));
+	if (journal_write(entry) != 0 || entry->res < 0) {
+		diag_set(ClientError, ER_WAL_IO);
+		diag_log();
+		/*
+		 * XXX: the stub is supposed to be removed once it is defined
+		 * what to do when a synchro request WAL write fails. One of
+		 * the possible solutions: log the error, keep the limbo
+		 * queue as is and probably put in rollback mode. Then
+		 * provide a hook to call manually when WAL problems are fixed.
+		 * Or retry automatically with some period.
+		 */
+		panic("Could not write a synchro request to WAL: "
+		      "lsn = %lld, type = %s\n", lsn,
+		      iproto_type_name(type));
+	}
 }
 
 /**
