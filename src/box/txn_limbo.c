@@ -283,6 +283,11 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint32_t type, int64_t lsn)
 		.lsn		= lsn,
 	};
 
+	/*
+	 * This is a synchronous commit so we can
+	 * use body and row allocated on a stack.
+	 */
+	struct synchro_body_bin body;
 	struct xrow_header row;
 	struct request request = {
 		.header = &row,
@@ -292,8 +297,8 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint32_t type, int64_t lsn)
 	if (txn == NULL)
 		goto rollback;
 
-	if (xrow_encode_synchro(&row, &txn->region, &req) != 0)
-		goto rollback;
+	xrow_encode_synchro(&row, &body, &req);
+
 	/*
 	 * This is not really a transaction. It just uses txn API
 	 * to put the data into WAL. And obviously it should not
