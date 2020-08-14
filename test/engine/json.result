@@ -738,12 +738,11 @@ _ = s:create_index('sk', {parts = {{'[2][1].a', 'unsigned'}}})
 ...
 s:insert{1, box.NULL} -- error
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected array'
+- error: Tuple field [2][1]["a"] required by space format is missing
 ...
 s:insert{2, {box.NULL}} -- error
 ---
-- error: 'Tuple field [2][1] type does not match one required by operation: expected
-    map'
+- error: Tuple field [2][1]["a"] required by space format is missing
 ...
 s:insert{3} -- error
 ---
@@ -764,16 +763,15 @@ s:insert{6, {{a = 1}}} -- ok
 s.index.sk:alter{parts = {{'[2][1].a', 'unsigned', is_nullable = true}}}
 ---
 ...
-s:insert{7, box.NULL} -- error
+s:insert{7, box.NULL} -- ok
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected array'
+- [7, null]
 ...
-s:insert{8, {box.NULL}} -- error
+s:insert{8, {box.NULL}} -- ok
 ---
-- error: 'Tuple field [2][1] type does not match one required by operation: expected
-    map'
+- [8, [null]]
 ...
--- Skipping nullable fields is okay though.
+-- Skipping nullable fields is also okay.
 s:insert{9} -- ok
 ---
 - [9]
@@ -792,7 +790,9 @@ s:insert{12, {{a = box.NULL}}} -- ok
 ...
 s.index.sk:select()
 ---
-- - [9]
+- - [7, null]
+  - [8, [null]]
+  - [9]
   - [10, []]
   - [11, [{'b': 1}]]
   - [12, [{'a': null}]]

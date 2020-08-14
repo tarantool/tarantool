@@ -214,12 +214,12 @@ s:drop()
 s = box.schema.space.create('test', {engine = engine})
 _ = s:create_index('pk')
 _ = s:create_index('sk', {parts = {{'[2][*]', 'unsigned'}}})
-s:insert{1, box.NULL} -- error
+s:insert{1, box.NULL} -- ok
 s:insert{2, {box.NULL}} -- error
 s:insert{3, {}} -- ok
 s:insert{4, {1}} -- ok
 s.index.sk:alter{parts = {{'[2][*]', 'unsigned', is_nullable = true}}}
-s:insert{5, box.NULL} -- still error
+s:insert{5, box.NULL} -- ok
 s:insert{6, {box.NULL}} -- ok
 s:insert{7, {}} -- ok
 s:insert{8, {2}} -- ok

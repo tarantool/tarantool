@@ -604,14 +604,6 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 			return -1;
 		}
 	}
-	if (key_def->is_multikey &&
-	    key_def->multikey_fieldno < space->def->field_count &&
-	    space->def->fields[key_def->multikey_fieldno].is_nullable) {
-		diag_set(ClientError, ER_UNSUPPORTED,
-			 "multikey index",
-			 "nullable root field");
-		return -1;
-	}
 	switch (index_def->type) {
 	case HASH:
 		if (! index_def->opts.is_unique) {
