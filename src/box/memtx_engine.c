@@ -992,7 +992,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		    &xlog_opts_default);
 	memtx->snap_dir.force_recovery = force_recovery;
 
-	if (xdir_scan(&memtx->snap_dir) != 0)
+	if (xdir_scan(&memtx->snap_dir, true) != 0)
 		goto fail;
 
 	/*

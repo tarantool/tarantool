@@ -556,7 +556,7 @@ wal_enable(void)
 	 * existing WAL files. Required for garbage collection,
 	 * see wal_collect_garbage().
 	 */
-	if (xdir_scan(&writer->wal_dir))
+	if (xdir_scan(&writer->wal_dir, true))
 		return -1;
 
 	/* Open the most recent WAL file. */
