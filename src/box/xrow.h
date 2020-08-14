@@ -240,16 +240,26 @@ struct synchro_request {
 	int64_t lsn;
 };
 
+/** Synchro request xrow's body in MsgPack format. */
+struct PACKED synchro_body_bin {
+	uint8_t m_body;
+	uint8_t k_replica_id;
+	uint8_t m_replica_id;
+	uint32_t v_replica_id;
+	uint8_t k_lsn;
+	uint8_t m_lsn;
+	uint64_t v_lsn;
+};
+
 /**
  * Encode synchronous replication request.
  * @param row xrow header.
- * @param region Region to use to encode the confirmation body.
+ * @param body Desination to use to encode the confirmation body.
  * @param req Request parameters.
- * @retval -1 on error.
- * @retval 0 success.
  */
-int
-xrow_encode_synchro(struct xrow_header *row, struct region *region,
+void
+xrow_encode_synchro(struct xrow_header *row,
+		    struct synchro_body_bin *body,
 		    const struct synchro_request *req);
 
 /**

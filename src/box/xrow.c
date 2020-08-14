@@ -893,35 +893,30 @@ xrow_encode_dml(const struct request *request, struct region *region,
 	return iovcnt;
 }
 
-int
-xrow_encode_synchro(struct xrow_header *row, struct region *region,
+void
+xrow_encode_synchro(struct xrow_header *row,
+		    struct synchro_body_bin *body,
 		    const struct synchro_request *req)
 {
-	size_t len = mp_sizeof_map(2) + mp_sizeof_uint(IPROTO_REPLICA_ID) +
-		     mp_sizeof_uint(req->replica_id) +
-		     mp_sizeof_uint(IPROTO_LSN) + mp_sizeof_uint(req->lsn);
-	char *buf = (char *)region_alloc(region, len);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, len, "region_alloc", "buf");
-		return -1;
-	}
-	char *pos = buf;
-
-	pos = mp_encode_map(pos, 2);
-	pos = mp_encode_uint(pos, IPROTO_REPLICA_ID);
-	pos = mp_encode_uint(pos, req->replica_id);
-	pos = mp_encode_uint(pos, IPROTO_LSN);
-	pos = mp_encode_uint(pos, req->lsn);
+	/*
+	 * A map with two elements. We don't compress
+	 * numbers to have this structure constant in size,
+	 * which allows us to preallocate it on stack.
+	 */
+	body->m_body = 0x80 | 2;
+	body->k_replica_id = IPROTO_REPLICA_ID;
+	body->m_replica_id = 0xce;
+	body->v_replica_id = mp_bswap_u32(req->replica_id);
+	body->k_lsn = IPROTO_LSN;
+	body->m_lsn = 0xcf;
+	body->v_lsn = mp_bswap_u64(req->lsn);
 
 	memset(row, 0, sizeof(*row));
 
-	row->body[0].iov_base = buf;
-	row->body[0].iov_len = len;
-	row->bodycnt = 1;
-
 	row->type = req->type;
-
-	return 0;
+	row->body[0].iov_base = (void *)body;
+	row->body[0].iov_len = sizeof(*body);
+	row->bodycnt = 1;
 }
 
 int
