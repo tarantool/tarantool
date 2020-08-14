@@ -243,24 +243,6 @@ tuple_field_ensure_child_compatibility(struct tuple_field *parent,
 }
 
 /**
- * Tuple fields are nullable by default. However, it is not ok
- * for array/map fields, as far as their implicit nullability
- * might break field accessors expectations, provide confusing
- * error messages and cause incorrect behaviour of
- * tuple_multikey_count(). Thus array/map fields have to be
- * non-nullable by default, which means we have to update default
- * nullability for them.
- */
-static void
-tuple_field_update_nullability(struct tuple_field *field)
-{
-	if ((field->type == FIELD_TYPE_ARRAY ||
-	     field->type == FIELD_TYPE_MAP) &&
-	     tuple_field_is_nullable(field))
-		field->nullable_action = ON_CONFLICT_ACTION_DEFAULT;
-}
-
-/**
  * Given a field number and a path, add the corresponding field
  * to the tuple format, allocating intermediate fields if
  * necessary.
@@ -335,13 +317,11 @@ tuple_format_add_field(struct tuple_format *format, uint32_t fieldno,
 				parent->offset_slot = *current_slot;
 			}
 		}
-		tuple_field_update_nullability(parent);
 		parent->is_key_part = true;
 		next->is_multikey_part = is_multikey;
 		parent = next;
 		token_count++;
 	}
-	tuple_field_update_nullability(parent);
 	/*
 	 * The path has already been verified by the
 	 * key_def_decode_parts function.

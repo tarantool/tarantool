@@ -794,9 +794,9 @@ _ = s:create_index('pk')
 _ = s:create_index('sk', {parts = {{'[2][*]', 'unsigned'}}})
 ---
 ...
-s:insert{1, box.NULL} -- error
+s:insert{1, box.NULL} -- ok
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected array'
+- [1, null]
 ...
 s:insert{2, {box.NULL}} -- error
 ---
@@ -814,9 +814,9 @@ s:insert{4, {1}} -- ok
 s.index.sk:alter{parts = {{'[2][*]', 'unsigned', is_nullable = true}}}
 ---
 ...
-s:insert{5, box.NULL} -- still error
+s:insert{5, box.NULL} -- ok
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected array'
+- [5, null]
 ...
 s:insert{6, {box.NULL}} -- ok
 ---

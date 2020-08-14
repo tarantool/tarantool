@@ -220,9 +220,9 @@ s:insert{4, {}} -- error
 s:insert{5, {{b = 1}}} -- error
 s:insert{6, {{a = 1}}} -- ok
 s.index.sk:alter{parts = {{'[2][1].a', 'unsigned', is_nullable = true}}}
-s:insert{7, box.NULL} -- error
-s:insert{8, {box.NULL}} -- error
--- Skipping nullable fields is okay though.
+s:insert{7, box.NULL} -- ok
+s:insert{8, {box.NULL}} -- ok
+-- Skipping nullable fields is also okay.
 s:insert{9} -- ok
 s:insert{10, {}} -- ok
 s:insert{11, {{b = 1}}} -- ok
