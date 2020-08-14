@@ -657,14 +657,6 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 		diag_set(ClientError, ER_NULLABLE_PRIMARY, space_name(space));
 		return -1;
 	}
-	if (key_def->is_multikey &&
-	    key_def->multikey_fieldno < space->def->field_count &&
-	    space->def->fields[key_def->multikey_fieldno].is_nullable) {
-		diag_set(ClientError, ER_UNSUPPORTED,
-		         "multikey index",
-		         "nullable root field");
-		return -1;
-	}
 	/* Check that there are no ANY, ARRAY, MAP parts */
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		struct key_part *part = &key_def->parts[i];

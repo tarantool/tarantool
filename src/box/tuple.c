@@ -554,7 +554,10 @@ tuple_raw_multikey_count(struct tuple_format *format, const char *data,
 					NULL, MULTIKEY_NONE);
 	if (array_raw == NULL)
 		return 0;
-	assert(mp_typeof(*array_raw) == MP_ARRAY);
+	enum mp_type type = mp_typeof(*array_raw);
+	if (type == MP_NIL)
+		return 0;
+	assert(type == MP_ARRAY);
 	return mp_decode_array(&array_raw);
 }
 
