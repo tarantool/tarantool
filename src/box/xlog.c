@@ -487,6 +487,15 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
  * replication set (see also _cluster system space and vclock.h
  * comments).
  *
+ * @param dir - directory to scan
+ * @param is_dir_required - flag set if the directory should exist
+ *
+ * @return:
+ *   0 - on success or flag 'is_dir_required' was set to False in
+ *   xdir_scan() arguments and opendir() failed with errno ENOENT;
+ *   -1 - if opendir() failed, with other than ENOENT errno either
+ *   when 'is_dir_required' was set to True in xdir_scan() arguments.
+ *
  * This function tries to avoid re-reading a file if
  * it is already in the set of files "known" to the log
  * dir object. This is done to speed up local hot standby and
@@ -508,16 +517,17 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
  * silence conditions such as out of memory or lack of OS
  * resources.
  *
- * @return nothing.
  */
 int
-xdir_scan(struct xdir *dir)
+xdir_scan(struct xdir *dir, bool is_dir_required)
 {
 	DIR *dh = opendir(dir->dirname);        /* log dir */
 	int64_t *signatures = NULL;             /* log file names */
 	size_t s_count = 0, s_capacity = 0;
 
 	if (dh == NULL) {
+		if (!is_dir_required && errno == ENOENT)
+			return 0;
 		diag_set(SystemError, "error reading directory '%s'",
 			  dir->dirname);
 		return -1;

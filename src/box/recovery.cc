@@ -121,7 +121,7 @@ void
 recovery_scan(struct recovery *r, struct vclock *end_vclock,
 	      struct vclock *gc_vclock)
 {
-	xdir_scan_xc(&r->wal_dir);
+	xdir_scan_xc(&r->wal_dir, true);
 
 	if (xdir_last_vclock(&r->wal_dir, end_vclock) < 0 ||
 	    vclock_compare(end_vclock, &r->vclock) < 0) {
@@ -307,7 +307,7 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 	struct vclock *clock;
 
 	if (scan_dir)
-		xdir_scan_xc(&r->wal_dir);
+		xdir_scan_xc(&r->wal_dir, true);
 
 	if (xlog_cursor_is_open(&r->cursor)) {
 		/* If there's a WAL open, recover from it first. */
