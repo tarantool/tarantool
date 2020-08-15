@@ -82,14 +82,7 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 	 */
 	struct space *space = stmt->space;
 	row->group_id = space != NULL ? space_group_id(space) : 0;
-	/*
-	 * Sychronous replication entries are supplementary and
-	 * aren't valid dml requests. They're encoded manually.
-	 */
-	if (likely(!iproto_type_is_synchro_request(row->type)))
-		row->bodycnt = xrow_encode_dml(request, &txn->region, row->body);
-	else
-		row->bodycnt = xrow_header_dup_body(row, &txn->region);
+	row->bodycnt = xrow_encode_dml(request, &txn->region, row->body);
 	if (row->bodycnt < 0)
 		return -1;
 	stmt->row = row;
