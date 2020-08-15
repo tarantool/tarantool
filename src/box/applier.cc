@@ -802,8 +802,8 @@ applier_txn_rollback_cb(struct trigger *trigger, void *event)
 	diag_set_error(&replicaset.applier.diag,
 		       diag_last_error(diag_get()));
 
-	/* Broadcast the rollback event across all appliers. */
-	trigger_run(&replicaset.applier.on_rollback, event);
+	/* Broadcast the rollback across all appliers. */
+	trigger_run(&replicaset.applier.on_rollback, NULL);
 
 	/* Rollback applier vclock to the committed one. */
 	vclock_copy(&replicaset.applier.vclock, &replicaset.vclock);
@@ -814,8 +814,9 @@ static int
 applier_txn_wal_write_cb(struct trigger *trigger, void *event)
 {
 	(void) trigger;
-	/* Broadcast the commit event across all appliers. */
-	trigger_run(&replicaset.applier.on_wal_write, event);
+	(void) event;
+	/* Broadcast the WAL write across all appliers. */
+	trigger_run(&replicaset.applier.on_wal_write, NULL);
 	return 0;
 }
 
