@@ -51,6 +51,8 @@ cfg_filter(box.cfg)
  |     - 107374182
  |   - - memtx_min_tuple_size
  |     - <hidden>
+ |   - - memtx_use_mvcc_engine
+ |     - false
  |   - - net_msg_max
  |     - 768
  |   - - pid_file
@@ -158,6 +160,8 @@ cfg_filter(box.cfg)
  |     - 107374182
  |   - - memtx_min_tuple_size
  |     - <hidden>
+ |   - - memtx_use_mvcc_engine
+ |     - false
  |   - - net_msg_max
  |     - 768
  |   - - pid_file
