@@ -2444,6 +2444,31 @@ lbox_popen_gc(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_popen_check_opts(struct lua_State *L)
+{
+	if (lua_gettop(L) < 2) {
+		diag_set(IllegalParams, "Usage: __index(table, key)");
+		return luaT_error(L);
+	}
+
+	bool is_correct_opt = false;
+	const char *key = luaL_checkstring(L, 2);
+	for (int i = 0; popen_lua_actions[i].name != NULL; ++i) {
+		if (strcmp(key, popen_lua_actions[i].name) == 0)
+			is_correct_opt = true;
+	}
+
+	if (!is_correct_opt) {
+		static const char *fmt = "Incorrect option \"%s\", see: popen.opts";
+		diag_set(IllegalParams, fmt, key);
+
+		return luaT_error(L);
+	}
+
+	return 0;
+}
+
 /* }}} */
 
 /* {{{ Module initialization */
@@ -2529,6 +2554,12 @@ tarantool_lua_popen_init(struct lua_State *L)
 		lua_pushstring(L, popen_lua_actions[i].value);
 		lua_setfield(L, -2, popen_lua_actions[i].name);
 	}
+	lua_newtable(L);
+	{
+		lua_pushcfunction(L, lbox_popen_check_opts);
+		lua_setfield(L, -2, "__index");
+	}
+	lua_setmetatable(L, -2);
 	lua_setfield(L, -2, "opts");
 
 	/* Stream status. */
