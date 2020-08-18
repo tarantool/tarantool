@@ -264,6 +264,8 @@ extern const char *iproto_type_strs[];
 enum iproto_raft_keys {
 	IPROTO_RAFT_TERM = 0,
 	IPROTO_RAFT_VOTE = 1,
+	IPROTO_RAFT_STATE = 2,
+	IPROTO_RAFT_VCLOCK = 3,
 };
 
 /**

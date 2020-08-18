@@ -387,7 +387,8 @@ apply_wal_row(struct xstream *stream, struct xrow_header *row)
 	}
 	if (iproto_type_is_raft_request(row->type)) {
 		struct raft_request raft_req;
-		if (xrow_decode_raft(row, &raft_req) != 0)
+		/* Vclock is never persisted in WAL by Raft. */
+		if (xrow_decode_raft(row, &raft_req, NULL) != 0)
 			diag_raise();
 		raft_process_recovery(&raft_req);
 		return;
@@ -2146,7 +2147,19 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 		 tt_uuid_str(&replica_uuid), sio_socketname(io->fd));
 	say_info("remote vclock %s local vclock %s",
 		 vclock_to_string(&replica_clock), vclock_to_string(&vclock));
-
+	if (raft_is_enabled()) {
+		/*
+		 * Send out the current raft state of the instance. Don't do
+		 * that if Raft is disabled. It can be that a part of the
+		 * cluster still contains old versions, which can't handle Raft
+		 * messages. So when it is disabled, its network footprint
+		 * should be 0.
+		 */
+		struct raft_request req;
+		raft_serialize_for_network(&req, &vclock);
+		xrow_encode_raft(&row, &fiber()->gc, &req);
+		coio_write_xrow(io, &row);
+	}
 	/*
 	 * Replica clock is used in gc state and recovery
 	 * initialization, so we need to replace the remote 0-th

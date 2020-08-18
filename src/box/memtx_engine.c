@@ -207,7 +207,8 @@ memtx_engine_recover_raft(const struct xrow_header *row)
 {
 	assert(row->type == IPROTO_RAFT);
 	struct raft_request req;
-	if (xrow_decode_raft(row, &req) != 0)
+	/* Vclock is never persisted in WAL by Raft. */
+	if (xrow_decode_raft(row, &req, NULL) != 0)
 		return -1;
 	raft_process_recovery(&req);
 	return 0;

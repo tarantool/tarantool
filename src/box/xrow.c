@@ -962,11 +962,30 @@ int
 xrow_encode_raft(struct xrow_header *row, struct region *region,
 		 const struct raft_request *r)
 {
-	size_t size = mp_sizeof_map(2) +
-		      mp_sizeof_uint(IPROTO_RAFT_TERM) +
-		      mp_sizeof_uint(r->term) +
-		      mp_sizeof_uint(IPROTO_RAFT_VOTE) +
-		      mp_sizeof_uint(r->vote);
+	/*
+	 * Terms is encoded always. Sometimes the rest can be even ignored if
+	 * the term is too old.
+	 */
+	int map_size = 1;
+	size_t size = mp_sizeof_uint(IPROTO_RAFT_TERM) +
+		      mp_sizeof_uint(r->term);
+	if (r->vote != 0) {
+		++map_size;
+		size += mp_sizeof_uint(IPROTO_RAFT_VOTE) +
+			mp_sizeof_uint(r->vote);
+	}
+	if (r->state != 0) {
+		++map_size;
+		size += mp_sizeof_uint(IPROTO_RAFT_STATE) +
+			mp_sizeof_uint(r->state);
+	}
+	if (r->vclock != NULL) {
+		++map_size;
+		size += mp_sizeof_uint(IPROTO_RAFT_VCLOCK) +
+			mp_sizeof_vclock_ignore0(r->vclock);
+	}
+	size += mp_sizeof_map(map_size);
+
 	char *buf = region_alloc(region, size);
 	if (buf == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc", "buf");
@@ -975,36 +994,72 @@ xrow_encode_raft(struct xrow_header *row, struct region *region,
 	memset(row, 0, sizeof(*row));
 	row->type = IPROTO_RAFT;
 	row->body[0].iov_base = buf;
-	row->body[0].iov_len = size;
 	row->group_id = GROUP_LOCAL;
 	row->bodycnt = 1;
-	buf = mp_encode_map(buf, 2);
+	const char *begin = buf;
+
+	buf = mp_encode_map(buf, map_size);
 	buf = mp_encode_uint(buf, IPROTO_RAFT_TERM);
 	buf = mp_encode_uint(buf, r->term);
-	buf = mp_encode_uint(buf, IPROTO_RAFT_VOTE);
-	buf = mp_encode_uint(buf, r->vote);
+	if (r->vote != 0) {
+		buf = mp_encode_uint(buf, IPROTO_RAFT_VOTE);
+		buf = mp_encode_uint(buf, r->vote);
+	}
+	if (r->state != 0) {
+		buf = mp_encode_uint(buf, IPROTO_RAFT_STATE);
+		buf = mp_encode_uint(buf, r->state);
+	}
+	if (r->vclock != NULL) {
+		buf = mp_encode_uint(buf, IPROTO_RAFT_VCLOCK);
+		buf = mp_encode_vclock_ignore0(buf, r->vclock);
+	}
+	row->body[0].iov_len = buf - begin;
 	return 0;
 }
 
 int
-xrow_decode_raft(const struct xrow_header *row, struct raft_request *r)
+xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
+		 struct vclock *vclock)
 {
-	/* TODO: handle bad format. */
 	assert(row->type == IPROTO_RAFT);
-	assert(row->bodycnt == 1);
-	assert(row->group_id == GROUP_LOCAL);
+	if (row->bodycnt != 1 || row->group_id != GROUP_LOCAL) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "malformed raft request");
+		return -1;
+	}
 	memset(r, 0, sizeof(*r));
-	const char *pos = row->body[0].iov_base;
+
+	const char *begin = row->body[0].iov_base;
+	const char *end = begin + row->body[0].iov_len;
+	const char *pos = begin;
 	uint32_t map_size = mp_decode_map(&pos);
 	for (uint32_t i = 0; i < map_size; ++i)
 	{
+		if (mp_typeof(*pos) != MP_UINT)
+			goto bad_msgpack;
 		uint64_t key = mp_decode_uint(&pos);
 		switch (key) {
 		case IPROTO_RAFT_TERM:
+			if (mp_typeof(*pos) != MP_UINT)
+				goto bad_msgpack;
 			r->term = mp_decode_uint(&pos);
 			break;
 		case IPROTO_RAFT_VOTE:
+			if (mp_typeof(*pos) != MP_UINT)
+				goto bad_msgpack;
 			r->vote = mp_decode_uint(&pos);
+			break;
+		case IPROTO_RAFT_STATE:
+			if (mp_typeof(*pos) != MP_UINT)
+				goto bad_msgpack;
+			r->state = mp_decode_uint(&pos);
+			break;
+		case IPROTO_RAFT_VCLOCK:
+			r->vclock = vclock;
+			if (r->vclock == NULL)
+				mp_next(&pos);
+			else if (mp_decode_vclock_ignore0(&pos, r->vclock) != 0)
+				goto bad_msgpack;
 			break;
 		default:
 			mp_next(&pos);
@@ -1012,6 +1067,10 @@ xrow_decode_raft(const struct xrow_header *row, struct raft_request *r)
 		}
 	}
 	return 0;
+
+bad_msgpack:
+	xrow_on_decode_err(begin, end, ER_INVALID_MSGPACK, "raft body");
+	return -1;
 }
 
 int
