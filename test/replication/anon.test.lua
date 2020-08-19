@@ -1,6 +1,7 @@
 env = require('test_run')
 vclock_diff = require('fast_replica').vclock_diff
 test_run = env.new()
+test_run:cmd('restart server default')
 
 
 --
