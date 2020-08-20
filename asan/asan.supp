@@ -4,7 +4,3 @@
 # File format:
 #fun:*
 #src:*
-
-# !test: unit/msgpack.test
-# source: src/lib/msgpuck/test/msgpuck.c
-fun:test_mp_print
