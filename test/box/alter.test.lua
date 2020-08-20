@@ -478,3 +478,145 @@ validate_indexes()
 
 s:drop()
 box.internal.collation.drop('test')
+
+--
+-- gh-5155: space:alter(), added in order to make it possible to turn on/off
+-- is_sync, but it is handy for other options too.
+--
+s = box.schema.create_space('test')
+pk = s:create_index('pk')
+
+-- Bad usage.
+s:alter({unknown = true})
+ok, err = pcall(s.alter, {})
+assert(err:match("Use space:alter") ~= nil)
+
+-- Alter field_count.
+s:replace{1}
+-- Can't update on non-empty space.
+s:alter({field_count = 2})
+s:delete{1}
+-- Can update on empty space.
+s:alter({field_count = 2})
+s:replace{1}
+s:replace{1, 1}
+-- When not specified or nil - ignored.
+s:alter({field_count = nil})
+s:replace{2}
+s:replace{2, 2}
+-- Set to 0 drops the restriction.
+s:alter({field_count = 0})
+s:truncate()
+s:replace{1}
+s:delete{1}
+-- Invalid values.
+s:alter({field_count = box.NULL})
+s:alter({field_count = 'string'})
+
+-- Alter owner.
+owner1 = box.space._space:get{s.id}.owner
+box.schema.user.create('test')
+-- When not specified or nil - ignored.
+s:alter({user = nil})
+owner2 = box.space._space:get{s.id}.owner
+assert(owner2 == owner1)
+s:alter({user = 'test'})
+owner2 = box.space._space:get{s.id}.owner
+assert(owner2 ~= owner1)
+s:alter({user = owner1})
+owner2 = box.space._space:get{s.id}.owner
+assert(owner2 == owner1)
+box.schema.user.drop('test')
+-- Invalid values.
+s:alter({user = box.NULL})
+s:alter({user = true})
+s:alter({user = 'not_existing'})
+
+-- Alter format.
+format = {{name = 'field1', type = 'unsigned'}}
+s:alter({format = format})
+s:format()
+-- When not specified or nil - ignored.
+s:alter({format = nil})
+s:format()
+t = s:replace{1}
+assert(t.field1 == 1)
+s:alter({format = {}})
+assert(t.field1 == nil)
+s:delete{1}
+-- Invalid values.
+s:alter({format = box.NULL})
+s:alter({format = true})
+s:alter({format = {{{1, 2, 3, 4}}}})
+
+--
+-- Alter temporary.
+--
+s:alter({temporary = true})
+assert(s.temporary)
+-- When not specified or nil - ignored.
+s:alter({temporary = nil})
+assert(s.temporary)
+s:alter({temporary = false})
+assert(not s.temporary)
+-- Ensure absence is not treated like 'true'.
+s:alter({temporary = nil})
+assert(not s.temporary)
+-- Invalid values.
+s:alter({temporary = box.NULL})
+s:alter({temporary = 100})
+
+--
+-- Alter is_sync.
+--
+old_synchro_quorum = box.cfg.replication_synchro_quorum
+old_synchro_timeout = box.cfg.replication_synchro_timeout
+box.cfg{                                                                        \
+    replication_synchro_quorum = 2,                                             \
+    replication_synchro_timeout = 0.001,                                        \
+}
+s:alter({is_sync = true})
+assert(s.is_sync)
+s:replace{1}
+-- When not specified or nil - ignored.
+s:alter({is_sync = nil})
+assert(s.is_sync)
+s:alter({is_sync = false})
+assert(not s.is_sync)
+-- Ensure absence is not treated like 'true'.
+s:alter({is_sync = nil})
+assert(not s.is_sync)
+-- Invalid values.
+s:alter({is_sync = box.NULL})
+s:alter({is_sync = 100})
+s:replace{1}
+s:delete{1}
+box.cfg{                                                                        \
+    replication_synchro_quorum = old_synchro_quorum,                            \
+    replication_synchro_timeout = old_synchro_timeout,                          \
+}
+
+-- Alter name.
+s:alter({name = 'test2'})
+assert(box.space.test2 ~= nil)
+assert(box.space.test == nil)
+assert(s.name == 'test2')
+-- When not specified or nil - ignored.
+s:alter({name = nil})
+assert(box.space.test2 ~= nil)
+assert(box.space.test == nil)
+assert(s.name == 'test2')
+s:alter({name = '_space'})
+s:alter({name = 'test'})
+assert(box.space.test ~= nil)
+assert(box.space.test2 == nil)
+assert(s.name == 'test')
+-- Invalid values.
+s:alter({name = box.NULL})
+s:alter({name = 100})
+
+s:drop()
+
+s:alter({})
+ok, err = pcall(box.schema.space.alter, s.id, {})
+assert(err:match('does not exist') ~= nil)

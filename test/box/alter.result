@@ -1181,3 +1181,381 @@ s:drop()
 box.internal.collation.drop('test')
 ---
 ...
+--
+-- gh-5155: space:alter(), added in order to make it possible to turn on/off
+-- is_sync, but it is handy for other options too.
+--
+s = box.schema.create_space('test')
+---
+...
+pk = s:create_index('pk')
+---
+...
+-- Bad usage.
+s:alter({unknown = true})
+---
+- error: Illegal parameters, unexpected option 'unknown'
+...
+ok, err = pcall(s.alter, {})
+---
+...
+assert(err:match("Use space:alter") ~= nil)
+---
+- true
+...
+-- Alter field_count.
+s:replace{1}
+---
+- [1]
+...
+-- Can't update on non-empty space.
+s:alter({field_count = 2})
+---
+- error: Tuple field count 1 does not match space field count 2
+...
+s:delete{1}
+---
+- [1]
+...
+-- Can update on empty space.
+s:alter({field_count = 2})
+---
+...
+s:replace{1}
+---
+- error: Tuple field count 1 does not match space field count 2
+...
+s:replace{1, 1}
+---
+- [1, 1]
+...
+-- When not specified or nil - ignored.
+s:alter({field_count = nil})
+---
+...
+s:replace{2}
+---
+- error: Tuple field count 1 does not match space field count 2
+...
+s:replace{2, 2}
+---
+- [2, 2]
+...
+-- Set to 0 drops the restriction.
+s:alter({field_count = 0})
+---
+...
+s:truncate()
+---
+...
+s:replace{1}
+---
+- [1]
+...
+s:delete{1}
+---
+- [1]
+...
+-- Invalid values.
+s:alter({field_count = box.NULL})
+---
+- error: Illegal parameters, options parameter 'field_count' should be of type number
+...
+s:alter({field_count = 'string'})
+---
+- error: Illegal parameters, options parameter 'field_count' should be of type number
+...
+-- Alter owner.
+owner1 = box.space._space:get{s.id}.owner
+---
+...
+box.schema.user.create('test')
+---
+...
+-- When not specified or nil - ignored.
+s:alter({user = nil})
+---
+...
+owner2 = box.space._space:get{s.id}.owner
+---
+...
+assert(owner2 == owner1)
+---
+- true
+...
+s:alter({user = 'test'})
+---
+...
+owner2 = box.space._space:get{s.id}.owner
+---
+...
+assert(owner2 ~= owner1)
+---
+- true
+...
+s:alter({user = owner1})
+---
+...
+owner2 = box.space._space:get{s.id}.owner
+---
+...
+assert(owner2 == owner1)
+---
+- true
+...
+box.schema.user.drop('test')
+---
+...
+-- Invalid values.
+s:alter({user = box.NULL})
+---
+- error: 'Illegal parameters, options parameter ''user'' should be one of types: string,
+    number'
+...
+s:alter({user = true})
+---
+- error: 'Illegal parameters, options parameter ''user'' should be one of types: string,
+    number'
+...
+s:alter({user = 'not_existing'})
+---
+- error: User 'not_existing' is not found
+...
+-- Alter format.
+format = {{name = 'field1', type = 'unsigned'}}
+---
+...
+s:alter({format = format})
+---
+...
+s:format()
+---
+- [{'name': 'field1', 'type': 'unsigned'}]
+...
+-- When not specified or nil - ignored.
+s:alter({format = nil})
+---
+...
+s:format()
+---
+- [{'name': 'field1', 'type': 'unsigned'}]
+...
+t = s:replace{1}
+---
+...
+assert(t.field1 == 1)
+---
+- true
+...
+s:alter({format = {}})
+---
+...
+assert(t.field1 == nil)
+---
+- true
+...
+s:delete{1}
+---
+- [1]
+...
+-- Invalid values.
+s:alter({format = box.NULL})
+---
+- error: Illegal parameters, options parameter 'format' should be of type table
+...
+s:alter({format = true})
+---
+- error: Illegal parameters, options parameter 'format' should be of type table
+...
+s:alter({format = {{{1, 2, 3, 4}}}})
+---
+- error: 'Illegal parameters, format[1]: name (string) is expected'
+...
+--
+-- Alter temporary.
+--
+s:alter({temporary = true})
+---
+...
+assert(s.temporary)
+---
+- true
+...
+-- When not specified or nil - ignored.
+s:alter({temporary = nil})
+---
+...
+assert(s.temporary)
+---
+- true
+...
+s:alter({temporary = false})
+---
+...
+assert(not s.temporary)
+---
+- true
+...
+-- Ensure absence is not treated like 'true'.
+s:alter({temporary = nil})
+---
+...
+assert(not s.temporary)
+---
+- true
+...
+-- Invalid values.
+s:alter({temporary = box.NULL})
+---
+- error: Illegal parameters, options parameter 'temporary' should be of type boolean
+...
+s:alter({temporary = 100})
+---
+- error: Illegal parameters, options parameter 'temporary' should be of type boolean
+...
+--
+-- Alter is_sync.
+--
+old_synchro_quorum = box.cfg.replication_synchro_quorum
+---
+...
+old_synchro_timeout = box.cfg.replication_synchro_timeout
+---
+...
+box.cfg{                                                                        \
+    replication_synchro_quorum = 2,                                             \
+    replication_synchro_timeout = 0.001,                                        \
+}
+---
+...
+s:alter({is_sync = true})
+---
+...
+assert(s.is_sync)
+---
+- true
+...
+s:replace{1}
+---
+- error: Quorum collection for a synchronous transaction is timed out
+...
+-- When not specified or nil - ignored.
+s:alter({is_sync = nil})
+---
+...
+assert(s.is_sync)
+---
+- true
+...
+s:alter({is_sync = false})
+---
+...
+assert(not s.is_sync)
+---
+- true
+...
+-- Ensure absence is not treated like 'true'.
+s:alter({is_sync = nil})
+---
+...
+assert(not s.is_sync)
+---
+- true
+...
+-- Invalid values.
+s:alter({is_sync = box.NULL})
+---
+- error: Illegal parameters, options parameter 'is_sync' should be of type boolean
+...
+s:alter({is_sync = 100})
+---
+- error: Illegal parameters, options parameter 'is_sync' should be of type boolean
+...
+s:replace{1}
+---
+- [1]
+...
+s:delete{1}
+---
+- [1]
+...
+box.cfg{                                                                        \
+    replication_synchro_quorum = old_synchro_quorum,                            \
+    replication_synchro_timeout = old_synchro_timeout,                          \
+}
+---
+...
+-- Alter name.
+s:alter({name = 'test2'})
+---
+...
+assert(box.space.test2 ~= nil)
+---
+- true
+...
+assert(box.space.test == nil)
+---
+- true
+...
+assert(s.name == 'test2')
+---
+- true
+...
+-- When not specified or nil - ignored.
+s:alter({name = nil})
+---
+...
+assert(box.space.test2 ~= nil)
+---
+- true
+...
+assert(box.space.test == nil)
+---
+- true
+...
+assert(s.name == 'test2')
+---
+- true
+...
+s:alter({name = '_space'})
+---
+- error: Duplicate key exists in unique index 'name' in space '_space'
+...
+s:alter({name = 'test'})
+---
+...
+assert(box.space.test ~= nil)
+---
+- true
+...
+assert(box.space.test2 == nil)
+---
+- true
+...
+assert(s.name == 'test')
+---
+- true
+...
+-- Invalid values.
+s:alter({name = box.NULL})
+---
+- error: Illegal parameters, options parameter 'name' should be of type string
+...
+s:alter({name = 100})
+---
+- error: Illegal parameters, options parameter 'name' should be of type string
+...
+s:drop()
+---
+...
+s:alter({})
+---
+- error: Space 'test' does not exist
+...
+ok, err = pcall(box.schema.space.alter, s.id, {})
+---
+...
+assert(err:match('does not exist') ~= nil)
+---
+- true
+...

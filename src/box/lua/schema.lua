@@ -539,6 +539,64 @@ box.schema.space.rename = function(space_id, space_name)
     _space:update(space_id, {{"=", 3, space_name}})
 end
 
+local alter_space_template = {
+    field_count = 'number',
+    user = 'string, number',
+    format = 'table',
+    temporary = 'boolean',
+    is_sync = 'boolean',
+    name = 'string',
+}
+
+box.schema.space.alter = function(space_id, options)
+    local space = box.space[space_id]
+    if not space then
+        box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
+    end
+    check_param_table(options, alter_space_template)
+
+    local _space = box.space._space
+    local tuple = _space:get({space.id})
+    assert(tuple ~= nil)
+
+    local owner
+    if options.user then
+        owner = user_or_role_resolve(options.user)
+        if not owner then
+            box.error(box.error.NO_SUCH_USER, options.user)
+        end
+    else
+        owner = tuple.owner
+    end
+
+    local name = options.name or tuple.name
+    local field_count = options.field_count or tuple.field_count
+    local flags = tuple.flags
+
+    if options.temporary ~= nil then
+        flags.temporary = options.temporary
+    end
+
+    if options.is_sync ~= nil then
+        flags.is_sync = options.is_sync
+    end
+
+    local format
+    if options.format ~= nil then
+        format = update_format(options.format)
+    else
+        format = tuple.format
+    end
+
+    tuple = tuple:totable()
+    tuple[2] = owner
+    tuple[3] = name
+    tuple[5] = field_count
+    tuple[6] = flags
+    tuple[7] = format
+    _space:replace(tuple)
+end
+
 box.schema.index = {}
 
 local function update_index_parts_1_6_0(parts)
@@ -1717,6 +1775,11 @@ space_mt.rename = function(space, name)
     check_space_arg(space, 'rename')
     check_space_exists(space)
     return box.schema.space.rename(space.id, name)
+end
+space_mt.alter = function(space, options)
+    check_space_arg(space, 'alter')
+    check_space_exists(space)
+    return box.schema.space.alter(space.id, options)
 end
 space_mt.create_index = function(space, name, options)
     check_space_arg(space, 'create_index')
