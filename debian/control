@@ -2,9 +2,10 @@ Source: tarantool
 Priority: optional
 Maintainer: Roman Tsisyk <roman@tarantool.org>
 Uploaders: Dmitry E. Oboukhov <unera@debian.org>
-Build-Depends: cdbs (>= 0.4.100), debhelper (>= 9), dpkg-dev (>= 1.16.1~),
-# Enable systemd for Debian Jessie+ and Ubuntu Wily+
- dh-systemd (>= 1.22) | sysvinit (<< 2.88dsf-59) | upstart (<< 1.13),
+Build-Depends: 
+ cdbs (>= 0.4.100),
+ debhelper (>= 9.2),
+ dpkg-dev (>= 1.16.1~),
  cmake,
  libreadline-dev,
  libncurses5-dev,

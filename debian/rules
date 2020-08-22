@@ -1,10 +1,10 @@
 #!/usr/bin/make -f
 
-
+INIT_VARIANT	?= systemd
 VERSION  := $(shell dpkg-parsechangelog|grep ^Version|awk '{print $$2}')
 UVERSION := $(shell echo $(VERSION)|sed 's/-[[:digit:]]\+$$//')
 
-ifneq ($(wildcard /usr/bin/dh_systemd_start),)
+ifeq ($(INIT_VARIANT),systemd)
 WITH_SYSTEMD:=ON
 else
 WITH_SYSTEMD:=OFF
@@ -36,7 +36,7 @@ include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/class/cmake.mk
 
 debian/tarantool-common.install:
-ifneq ($(wildcard /usr/bin/dh_systemd_start),)
+ifeq ($(INIT_VARIANT),systemd)
 	cp -p debian/tarantool-common.install.systemd.in $@
 else
 	cp -p debian/tarantool-common.install.sysvinit.in $@
@@ -47,10 +47,11 @@ build-indep: debian/tarantool-common.install
 tarball: clean
 	git describe --long --always > VERSION
 	tar --exclude=.git --exclude=debian 		\
-		--exclude=doc/www					\
-		--exclude=doc/sphinx				\
+	        --exclude='*.dll' --exclude='*.exe'     \
+		--exclude=doc/www			\
+		--exclude=doc/sphinx			\
 		--exclude=src/lib/small/debian		\
-		--exclude=src/lib/msgpuck/debian    \
+		--exclude=src/lib/msgpuck/debian        \
 		--exclude=test-run/lib/tarantool-python/debian \
 		--exclude=third_party/luafun/debian \
 		--exclude=FreeBSD \

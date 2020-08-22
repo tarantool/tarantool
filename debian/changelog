@@ -1,3 +1,13 @@
+tarantool (2.6.0-1) unstable; urgency=medium
+
+  * New upstream version.
+  * Fixed debian/rules (drop dh_systemd), closes: #958615
+  * To build the package with SysV use INIT_VARIANT=sysv environment tag.
+  * Drop exe/dll from source (lintian warnings).
+  * Closes other lintian warnings (copyright).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sat, 22 Aug 2020 13:56:57 +0300
+
 tarantool (1.7.5.46.gd98815384-1) unstable; urgency=medium
 
   * Stabilization of Vinyl storage engine.
