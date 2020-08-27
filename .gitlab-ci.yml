@@ -38,6 +38,7 @@ before_script:
 .deploy_only_template: &deploy_only_definition
   only:
     - master
+    - tags
   except:
     - schedules
     - external_pull_requests
@@ -46,10 +47,12 @@ before_script:
 .pack_only_template: &pack_only_definition
   except:
     - master
+    - tags
 
 .perf_only_template: &perf_only_definition
   only:
     - master
+    - tags
     - /^.*-perf$/
   except:
     - schedules

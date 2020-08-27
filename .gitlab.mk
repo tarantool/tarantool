@@ -121,7 +121,7 @@ deploy: package
 	echo ${GPG_SECRET_KEY} | base64 -d | gpg --batch --import || true
 	./tools/update_repo.sh -o=${OS} -d=${DIST} \
 		-b="${LIVE_REPO_S3_DIR}/${BUCKET}" build
-	if git name-rev --name-only --tags --no-undefined HEAD 2>/dev/null ; then \
+	if [ "${CI_COMMIT_TAG}" != "" ]; then \
 		./tools/update_repo.sh -o=${OS} -d=${DIST} \
 			-b="${RELEASE_REPO_S3_DIR}/${BUCKET}" build ; \
 	fi
