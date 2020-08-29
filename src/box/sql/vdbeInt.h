@@ -472,10 +472,6 @@ int sqlVdbeCursorRestore(VdbeCursor *);
 #if defined(SQL_DEBUG) || defined(VDBE_PROFILE)
 void sqlVdbePrintOp(FILE *, int, Op *);
 #endif
-u32 sqlVdbeSerialTypeLen(u32);
-u32 sqlVdbeSerialType(Mem *, int, u32 *);
-u32 sqlVdbeSerialPut(unsigned char *, Mem *, u32);
-u32 sqlVdbeSerialGet(const unsigned char *, u32, Mem *);
 
 int sqlVdbeExec(Vdbe *);
 int sqlVdbeList(Vdbe *);

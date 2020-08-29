@@ -2922,9 +2922,8 @@ case OP_MakeRecord: {
 	 * and so forth.
 	 *
 	 * Each type field is a varint representing the serial type of the
-	 * corresponding data element (see sqlVdbeSerialType()). The
-	 * hdr-size field is also a varint which is the offset from the beginning
-	 * of the record to data0.
+	 * corresponding data element. The hdr-size field is also a varint which
+	 * is the offset from the beginning of the record to data0.
 	 */
 	nField = pOp->p1;
 	enum field_type *types = pOp->p4.types;
