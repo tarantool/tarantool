@@ -2,6 +2,7 @@
 
 local ffi      = require('ffi')
 local fio      = require('fio')
+local log      = require('log')
 local tap      = require('tap')
 local uuid     = require('uuid')
 local errno    = require('errno')
@@ -121,23 +122,57 @@ local function tctl_command(dir, cmd, args)
     return run_command(dir, command)
 end
 
+-- block until successful evaluation of script using wait_cond()
+local function tctl_wait_eval(dir, app)
+    local code = [[ return 1 ]]
+    local script_name = 'check_eval.lua'
+
+    if not fio.stat(fio.pathjoin(dir, script_name)) then
+        create_script(dir, script_name,  code)
+    end
+
+    local args = '%s %s'
+    args = args:format(app, script_name)
+
+    local res = nil
+    local stdout = ''
+    local stderr = ''
+    local ret = test_run:wait_cond(function()
+        res, stdout, stderr = tctl_command(dir, 'eval', args)
+        return res ~= nil and tonumber(res) == 0
+    end, 10)
+    if ret ~= true then
+        log.error("\ntctl_wait_eval()->wait_cond()->tctl_command():")
+        if res ~= nil then
+            log.error("\tresult: " .. res)
+        else
+            log.error("\tresult: nil")
+        end
+        log.error("\tstdout: " .. stdout .. "\n\tstderr: " .. stderr)
+        os.exit(1)
+    end
+end
+
 local function check_ok(test, dir, cmd, args, e_res, e_stdout, e_stderr)
     local res, stdout, stderr = tctl_command(dir, cmd, args)
     stdout, stderr = stdout or '', stderr or ''
     local ares = true
     if (e_res ~= nil) then
-        local val = test:is(res, e_res, ("check '%s' command status for '%s'"):format(cmd,args))
+        local message = ("check '%s' command status for '%s'"):format(cmd, args)
+        local val = test:is(res, e_res, message)
         ares = ares and val
     end
     if e_stdout ~= nil then
-        local val = test:is(res, e_res, ("check '%s' stdout for '%s'"):format(cmd,args))
+        local message = ("check '%s' stdout for '%s'"):format(cmd, args)
+        local val = test:ok(stdout:find(e_stdout), message)
         ares = ares and val
         if not val then
             print(("Expected to find '%s' in '%s'"):format(e_stdout, stdout))
         end
     end
     if e_stderr ~= nil then
-        local val = test:ok(stderr:find(e_stderr), ("check '%s' stderr for '%s'"):format(cmd,args))
+        local message = ("check '%s' stderr for '%s'"):format(cmd, args)
+        local val = test:ok(stderr:find(e_stderr), message)
         ares = ares and val
         if not val then
             print(("Expected to find '%s' in '%s'"):format(e_stderr, stderr))
@@ -225,6 +260,7 @@ do
             check_ok(test_i, dir, 'start', 'good_script', 0)
             tctl_wait_start(dir, 'good_script')
             -- wait here
+            tctl_wait_eval(dir, 'good_script')
             check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 3,
                      nil, nil)
             check_ok(test_i, dir, 'stop', 'good_script', 0)
@@ -256,6 +292,8 @@ do
             test_i:plan(5)
             check_ok(test_i, dir, 'start', 'good_script', 0)
             tctl_wait_start(dir, 'good_script')
+
+            tctl_wait_eval(dir, 'good_script')
             check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 3,
                      nil, nil)
             check_ok(test_i, dir, 'eval',  'good_script ok_script.lua', 0,
