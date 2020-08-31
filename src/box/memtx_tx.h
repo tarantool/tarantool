@@ -319,6 +319,44 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 void
 memtx_tx_on_space_delete(struct space *space);
 
+/**
+ * Create a snapshot cleaner.
+ * @param cleaner - cleaner to create.
+ * @param space - space for which the cleaner must be created.
+ * @param index_name - name of index for diag in case of memory error.
+ * @return 0 on success, -1 on memory erorr.
+ */
+int
+memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
+				 struct space *space, const char *index_name);
+
+/** Helper of txm_snapshot_clafify. */
+struct tuple *
+memtx_tx_snapshot_clarify_slow(struct memtx_tx_snapshot_cleaner *cleaner,
+			       struct tuple *tuple);
+
+/**
+ * Like a common clarify that function returns proper tuple if original
+ * tuple in index is dirty.
+ * @param cleaner - pre-created snapshot cleaner.
+ * @param tuple - tuple to clean.
+ * @return cleaned tuple, can be NULL.
+ */
+static inline struct tuple *
+memtx_tx_snapshot_clarify(struct memtx_tx_snapshot_cleaner *cleaner,
+			  struct tuple *tuple)
+{
+	if (cleaner->ht == NULL)
+		return tuple;
+	return memtx_tx_snapshot_clarify_slow(cleaner, tuple);
+}
+
+/**
+ * Free resources.in shapshot @cleaner.
+ */
+void
+memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
