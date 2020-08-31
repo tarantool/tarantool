@@ -130,6 +130,14 @@ static bool is_local_recovery = false;
 static bool is_orphan;
 
 /**
+ * Summary flag incorporating all the instance attributes,
+ * affecting ability to write. Currently these are:
+ * - is_ro;
+ * - is_orphan;
+ */
+static bool is_ro_summary = true;
+
+/**
  * The pool of fibers in the transaction processor thread
  * working on incoming messages from net, wal and other
  * threads.
@@ -144,11 +152,24 @@ static struct fiber_pool tx_fiber_pool;
  */
 static struct cbus_endpoint tx_prio_endpoint;
 
+void
+box_update_ro_summary(void)
+{
+	bool old_is_ro_summary = is_ro_summary;
+	is_ro_summary = is_ro || is_orphan;
+	/* In 99% nothing changes. Filter this out first. */
+	if (is_ro_summary == old_is_ro_summary)
+		return;
+
+	if (is_ro_summary)
+		engine_switch_to_ro();
+	fiber_cond_broadcast(&ro_cond);
+}
+
 static int
 box_check_writable(void)
 {
-	/* box is only writable if box.cfg.read_only == false and */
-	if (is_ro || is_orphan) {
+	if (is_ro_summary) {
 		diag_set(ClientError, ER_READONLY);
 		diag_log();
 		return -1;
@@ -253,20 +274,14 @@ box_check_ro(void);
 void
 box_set_ro(void)
 {
-	bool ro = box_check_ro();
-	if (ro == is_ro)
-		return; /* nothing to do */
-	if (ro)
-		engine_switch_to_ro();
-
-	is_ro = ro;
-	fiber_cond_broadcast(&ro_cond);
+	is_ro = box_check_ro();
+	box_update_ro_summary();
 }
 
 bool
 box_is_ro(void)
 {
-	return is_ro || is_orphan;
+	return is_ro_summary;
 }
 
 bool
@@ -293,13 +308,8 @@ box_wait_ro(bool ro, double timeout)
 void
 box_do_set_orphan(bool orphan)
 {
-	if (is_orphan == orphan)
-		return; /* nothing to do */
-	if (orphan)
-		engine_switch_to_ro();
-
 	is_orphan = orphan;
-	fiber_cond_broadcast(&ro_cond);
+	box_update_ro_summary();
 }
 
 void

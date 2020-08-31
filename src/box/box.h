@@ -138,6 +138,12 @@ void
 box_do_set_orphan(bool orphan);
 
 /**
+ * Update the final RO flag based on the instance flags and state.
+ */
+void
+box_update_ro_summary(void);
+
+/**
  * Iterate over all spaces and save them to the
  * snapshot file.
  */
