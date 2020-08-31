@@ -39,7 +39,10 @@
 #include "bitset/index.h"
 #include "fiber.h"
 #include "index.h"
+#include "schema.h"
 #include "tuple.h"
+#include "txn.h"
+#include "memtx_tx.h"
 #include "memtx_engine.h"
 
 struct memtx_bitset_index {
@@ -198,19 +201,27 @@ bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 	assert(iterator->free == bitset_index_iterator_free);
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
 
-	size_t value = tt_bitset_iterator_next(&it->bitset_it);
-	if (value == SIZE_MAX) {
-		*ret = NULL;
-		return 0;
-	}
-
+	do {
+		size_t value = tt_bitset_iterator_next(&it->bitset_it);
+		if (value == SIZE_MAX) {
+			*ret = NULL;
+			return 0;
+		}
 #ifndef OLD_GOOD_BITSET
-	struct memtx_bitset_index *index =
-		(struct memtx_bitset_index *)iterator->index;
-	*ret = memtx_bitset_index_value_to_tuple(index, value);
+		struct memtx_bitset_index *index =
+			(struct memtx_bitset_index *)iterator->index;
+		struct tuple *tuple =
+			memtx_bitset_index_value_to_tuple(index, value);
 #else /* #ifndef OLD_GOOD_BITSET */
-	*ret = value_to_tuple(value);
+		struct tuple *tuple = value_to_tuple(value);
 #endif /* #ifndef OLD_GOOD_BITSET */
+		uint32_t iid = iterator->index->def->iid;
+		struct txn *txn = in_txn();
+		struct space *space = space_by_id(iterator->space_id);
+		bool is_rw = txn != NULL;
+		*ret = memtx_tx_tuple_clarify(txn, space, tuple, iid, 0, is_rw);
+	} while (*ret == NULL);
+
 	return 0;
 }
 

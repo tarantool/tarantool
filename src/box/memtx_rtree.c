@@ -40,7 +40,10 @@
 #include "trivia/util.h"
 
 #include "tuple.h"
+#include "txn.h"
+#include "memtx_tx.h"
 #include "space.h"
+#include "schema.h"
 #include "memtx_engine.h"
 
 struct memtx_rtree_index {
@@ -148,7 +151,16 @@ static int
 index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
 {
 	struct index_rtree_iterator *itr = (struct index_rtree_iterator *)i;
-	*ret = (struct tuple *)rtree_iterator_next(&itr->impl);
+	do {
+		*ret = (struct tuple *) rtree_iterator_next(&itr->impl);
+		if (*ret == NULL)
+			break;
+		uint32_t iid = i->index->def->iid;
+		struct txn *txn = in_txn();
+		struct space *space = space_by_id(i->space_id);
+		bool is_rw = txn != NULL;
+		*ret = memtx_tx_tuple_clarify(txn, space, *ret, iid, 0, is_rw);
+	} while (*ret == NULL);
 	return 0;
 }
 
@@ -213,8 +225,22 @@ memtx_rtree_index_get(struct index *base, const char *key,
 		unreachable();
 
 	*result = NULL;
-	if (rtree_search(&index->tree, &rect, SOP_OVERLAPS, &iterator))
-		*result = (struct tuple *)rtree_iterator_next(&iterator);
+	if (!rtree_search(&index->tree, &rect, SOP_OVERLAPS, &iterator)) {
+		rtree_iterator_destroy(&iterator);
+		return 0;
+	}
+	do {
+		struct tuple *tuple = (struct tuple *)
+			rtree_iterator_next(&iterator);
+		if (tuple == NULL)
+			break;
+		uint32_t iid = base->def->iid;
+		struct txn *txn = in_txn();
+		struct space *space = space_by_id(base->def->space_id);
+		bool is_rw = txn != NULL;
+		*result = memtx_tx_tuple_clarify(txn, space, tuple, iid,
+						 0, is_rw);
+	} while (*result == NULL);
 	rtree_iterator_destroy(&iterator);
 	return 0;
 }
