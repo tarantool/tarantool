@@ -95,6 +95,8 @@ struct applier {
 	ev_tstamp lag;
 	/** The last box_error_code() logged to avoid log flooding */
 	uint32_t last_logged_errcode;
+	/** Remote instance ID. */
+	uint32_t instance_id;
 	/** Remote instance UUID */
 	struct tt_uuid uuid;
 	/** Remote URI (string) */

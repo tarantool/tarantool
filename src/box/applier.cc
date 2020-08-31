@@ -1118,6 +1118,7 @@ applier_subscribe(struct applier *applier)
 		vclock_create(&applier->remote_vclock_at_subscribe);
 		xrow_decode_subscribe_response_xc(&row, &cluster_id,
 					&applier->remote_vclock_at_subscribe);
+		applier->instance_id = row.replica_id;
 		/*
 		 * If master didn't send us its cluster id
 		 * assume that it has done all the checks.
