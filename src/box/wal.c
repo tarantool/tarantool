@@ -201,6 +201,12 @@ wal_mode(void)
 	return wal_writer_singleton.wal_mode;
 }
 
+const char *
+wal_dir(void)
+{
+	return wal_writer_singleton.wal_dir.dirname;
+}
+
 static void
 wal_write_to_disk(struct cmsg *msg);
 

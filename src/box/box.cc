@@ -2401,8 +2401,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	wal_stream_create(&wal_stream);
 
 	struct recovery *recovery;
-	recovery = recovery_new(cfg_gets("wal_dir"),
-				cfg_geti("force_recovery"),
+	recovery = recovery_new(wal_dir(), cfg_geti("force_recovery"),
 				checkpoint_vclock);
 
 	/*
@@ -2475,7 +2474,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		recovery_follow_local(recovery, &wal_stream.base, "hot_standby",
 				      cfg_getd("wal_dir_rescan_delay"));
 		while (true) {
-			if (path_lock(cfg_gets("wal_dir"), &wal_dir_lock))
+			if (path_lock(wal_dir(), &wal_dir_lock))
 				diag_raise();
 			if (wal_dir_lock >= 0)
 				break;
@@ -2622,7 +2621,7 @@ box_cfg_xc(void)
 	 * Lock the write ahead log directory to avoid multiple
 	 * instances running in the same dir.
 	 */
-	if (path_lock(cfg_gets("wal_dir"), &wal_dir_lock) < 0)
+	if (path_lock(wal_dir(), &wal_dir_lock) < 0)
 		diag_raise();
 	if (wal_dir_lock < 0) {
 		/**
@@ -2631,7 +2630,7 @@ box_cfg_xc(void)
 		 * WAL dir must contain at least one xlog.
 		 */
 		if (!cfg_geti("hot_standby") || checkpoint == NULL)
-			tnt_raise(ClientError, ER_ALREADY_RUNNING, cfg_gets("wal_dir"));
+			tnt_raise(ClientError, ER_ALREADY_RUNNING, wal_dir());
 	}
 
 	struct journal bootstrap_journal;

@@ -98,6 +98,13 @@ wal_enable(void);
 void
 wal_free(void);
 
+/**
+ * Get WAL directory path. The value never changes after box is
+ * configured first time. Safe to use from multiple threads.
+ */
+const char *
+wal_dir(void);
+
 struct wal_watcher_msg {
 	struct cmsg cmsg;
 	struct wal_watcher *watcher;
