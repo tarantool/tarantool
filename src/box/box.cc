@@ -472,6 +472,40 @@ box_check_uri(const char *source, const char *option_name)
 	}
 }
 
+static int
+box_check_election_is_enabled(void)
+{
+	int b = cfg_getb("election_is_enabled");
+	if (b < 0) {
+		diag_set(ClientError, ER_CFG, "election_is_enabled",
+			 "the value must be a boolean");
+	}
+	return b;
+}
+
+static int
+box_check_election_is_candidate(void)
+{
+	int b = cfg_getb("election_is_candidate");
+	if (b < 0) {
+		diag_set(ClientError, ER_CFG, "election_is_candidate",
+			 "the value must be a boolean");
+	}
+	return b;
+}
+
+static double
+box_check_election_timeout(void)
+{
+	double d = cfg_getd("election_timeout");
+	if (d <= 0) {
+		diag_set(ClientError, ER_CFG, "election_timeout",
+			 "the value must be a positive number");
+		return -1;
+	}
+	return d;
+}
+
 static void
 box_check_replication(void)
 {
@@ -729,6 +763,12 @@ box_check_config(void)
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_instance_uuid(&uuid);
 	box_check_replicaset_uuid(&uuid);
+	if (box_check_election_is_enabled() < 0)
+		diag_raise();
+	if (box_check_election_is_candidate() < 0)
+		diag_raise();
+	if (box_check_election_timeout() < 0)
+		diag_raise();
 	box_check_replication();
 	box_check_replication_timeout();
 	box_check_replication_connect_timeout();
@@ -749,6 +789,36 @@ box_check_config(void)
 	box_check_vinyl_options();
 	if (box_check_sql_cache_size(cfg_geti("sql_cache_size")) != 0)
 		diag_raise();
+}
+
+int
+box_set_election_is_enabled(void)
+{
+	int b = box_check_election_is_enabled();
+	if (b < 0)
+		return -1;
+	raft_cfg_is_enabled(b);
+	return 0;
+}
+
+int
+box_set_election_is_candidate(void)
+{
+	int b = box_check_election_is_candidate();
+	if (b < 0)
+		return -1;
+	raft_cfg_is_candidate(b);
+	return 0;
+}
+
+int
+box_set_election_timeout(void)
+{
+	double d = box_check_election_timeout();
+	if (d < 0)
+		return -1;
+	raft_cfg_election_timeout(d);
+	return 0;
 }
 
 /*
@@ -835,6 +905,7 @@ void
 box_set_replication_timeout(void)
 {
 	replication_timeout = box_check_replication_timeout();
+	raft_cfg_death_timeout();
 }
 
 void
@@ -865,6 +936,7 @@ box_set_replication_synchro_quorum(void)
 		return -1;
 	replication_synchro_quorum = value;
 	txn_limbo_on_parameters_change(&txn_limbo);
+	raft_cfg_election_quorum();
 	return 0;
 }
 
@@ -2686,6 +2758,26 @@ box_cfg_xc(void)
 
 	fiber_gc();
 	is_box_configured = true;
+	/*
+	 * Fill in leader election parameters after bootstrap. Before it is not
+	 * possible - there may be relevant data to recover from WAL and
+	 * snapshot. Also until recovery is done, it is not possible to write
+	 * new records into WAL. It is also totally safe, because relaying is
+	 * not started until the box is configured. So it can't happen, that
+	 * this election-enabled node will try to relay to another
+	 * election-enabled node without election actually enabled leading to
+	 * disconnect.
+	 */
+	if (box_set_election_is_candidate() != 0)
+		diag_raise();
+	if (box_set_election_timeout() != 0)
+		diag_raise();
+	/*
+	 * Election is enabled last. So as all the parameters are installed by
+	 * that time.
+	 */
+	if (box_set_election_is_enabled() != 0)
+		diag_raise();
 
 	title("running");
 	say_info("ready to accept requests");

@@ -37,6 +37,8 @@
 
 /** Raft state of this instance. */
 struct raft raft = {
+	.is_enabled = false,
+	.is_candidate = false,
 	.term = 1,
 	.vote = 0,
 };
@@ -62,4 +64,32 @@ raft_serialize_for_disk(struct raft_request *req)
 {
 	req->term = raft.term;
 	req->vote = raft.vote;
+}
+
+void
+raft_cfg_is_enabled(bool is_enabled)
+{
+	raft.is_enabled = is_enabled;
+}
+
+void
+raft_cfg_is_candidate(bool is_candidate)
+{
+	raft.is_candidate = is_candidate;
+}
+
+void
+raft_cfg_election_timeout(double timeout)
+{
+	raft.election_timeout = timeout;
+}
+
+void
+raft_cfg_election_quorum(void)
+{
+}
+
+void
+raft_cfg_death_timeout(void)
+{
 }

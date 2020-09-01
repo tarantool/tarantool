@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 #include <stdint.h>
+#include <stdbool.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -38,8 +39,11 @@ extern "C" {
 struct raft_request;
 
 struct raft {
+	bool is_enabled;
+	bool is_candidate;
 	uint64_t term;
 	uint32_t vote;
+	double election_timeout;
 };
 
 extern struct raft raft;
@@ -47,6 +51,37 @@ extern struct raft raft;
 /** Process a raft entry stored in WAL/snapshot. */
 void
 raft_process_recovery(const struct raft_request *req);
+
+/** Configure whether Raft is enabled. */
+void
+raft_cfg_is_enabled(bool is_enabled);
+
+/**
+ * Configure whether the instance can be elected as Raft leader. Even if false,
+ * the node still can vote, when Raft is enabled.
+ */
+void
+raft_cfg_is_candidate(bool is_candidate);
+
+/** Configure Raft leader election timeout. */
+void
+raft_cfg_election_timeout(double timeout);
+
+/**
+ * Configure Raft leader election quorum. There is no a separate option.
+ * Instead, synchronous replication quorum is used. Since Raft is tightly bound
+ * with synchronous replication.
+ */
+void
+raft_cfg_election_quorum(void);
+
+/**
+ * Configure Raft leader death timeout. I.e. number of seconds without
+ * heartbeats from the leader to consider it dead. There is no a separate
+ * option. Raft uses replication timeout for that.
+ */
+void
+raft_cfg_death_timeout(void);
 
 /**
  * Save complete Raft state into a request to be sent to other instances of the

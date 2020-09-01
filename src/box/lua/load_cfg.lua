@@ -87,6 +87,9 @@ local default_cfg = {
     checkpoint_wal_threshold = 1e18,
     checkpoint_count    = 2,
     worker_pool_threads = 4,
+    election_is_enabled = false,
+    election_is_candidate = true,
+    election_timeout    = 5,
     replication_timeout = 1,
     replication_sync_lag = 10,
     replication_sync_timeout = 300,
@@ -165,6 +168,9 @@ local template_cfg = {
     hot_standby         = 'boolean',
     memtx_use_mvcc_engine = 'boolean',
     worker_pool_threads = 'number',
+    election_is_enabled = 'boolean',
+    election_is_candidate = 'boolean',
+    election_timeout    = 'number',
     replication_timeout = 'number',
     replication_sync_lag = 'number',
     replication_sync_timeout = 'number',
@@ -281,6 +287,9 @@ local dynamic_cfg = {
         require('title').update(box.cfg.custom_proc_title)
     end,
     force_recovery          = function() end,
+    election_is_enabled     = private.cfg_set_election_is_enabled,
+    election_is_candidate   = private.cfg_set_election_is_candidate,
+    election_timeout        = private.cfg_set_election_timeout,
     replication_timeout     = private.cfg_set_replication_timeout,
     replication_connect_timeout = private.cfg_set_replication_connect_timeout,
     replication_connect_quorum = private.cfg_set_replication_connect_quorum,
@@ -335,6 +344,9 @@ local dynamic_cfg_order = {
     -- the new one. This should be fixed when box.cfg is able to
     -- apply some parameters together and atomically.
     replication_anon        = 250,
+    election_is_enabled     = 300,
+    election_is_candidate   = 310,
+    election_timeout        = 320,
 }
 
 local function sort_cfg_cb(l, r)
@@ -352,6 +364,9 @@ local dynamic_cfg_skip_at_load = {
     vinyl_cache             = true,
     vinyl_timeout           = true,
     too_long_threshold      = true,
+    election_is_enabled     = true,
+    election_is_candidate   = true,
+    election_timeout        = true,
     replication             = true,
     replication_timeout     = true,
     replication_connect_timeout = true,

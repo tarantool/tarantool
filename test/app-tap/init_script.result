@@ -8,6 +8,9 @@ checkpoint_count:2
 checkpoint_interval:3600
 checkpoint_wal_threshold:1e+18
 coredump:false
+election_is_candidate:true
+election_is_enabled:false
+election_timeout:5
 feedback_enabled:true
 feedback_host:https://feedback.tarantool.io
 feedback_interval:3600
