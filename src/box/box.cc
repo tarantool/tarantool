@@ -157,7 +157,7 @@ void
 box_update_ro_summary(void)
 {
 	bool old_is_ro_summary = is_ro_summary;
-	is_ro_summary = is_ro || is_orphan;
+	is_ro_summary = is_ro || is_orphan || raft_is_ro();
 	/* In 99% nothing changes. Filter this out first. */
 	if (is_ro_summary == old_is_ro_summary)
 		return;
@@ -171,6 +171,10 @@ static int
 box_check_writable(void)
 {
 	if (is_ro_summary) {
+		/*
+		 * XXX: return a special error when the node is not a leader to
+		 * reroute to the leader node.
+		 */
 		diag_set(ClientError, ER_READONLY);
 		diag_log();
 		return -1;
@@ -2648,6 +2652,7 @@ box_init(void)
 
 	txn_limbo_init();
 	sequence_init();
+	raft_init();
 }
 
 bool
@@ -2795,8 +2800,18 @@ box_cfg_xc(void)
 	title("running");
 	say_info("ready to accept requests");
 
-	if (!is_bootstrap_leader)
+	if (!is_bootstrap_leader) {
 		replicaset_sync();
+	} else {
+		/*
+		 * When the cluster is just bootstrapped and this instance is a
+		 * leader, it makes no sense to wait for a leader appearance.
+		 * There is no one. Moreover this node *is* a leader, so it
+		 * should take the control over the situation and start a new
+		 * term immediately.
+		 */
+		raft_new_term();
+	}
 
 	/* box.cfg.read_only is not read yet. */
 	assert(box_is_ro());
