@@ -313,6 +313,13 @@ memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
 	it->base.next = index_rtree_iterator_next;
 	it->base.free = index_rtree_iterator_free;
 	rtree_iterator_init(&it->impl);
+	/*
+	 * We don't care if rtree_search() does or does not find anything
+	 * as far as we are fine anyway: iterator is initialized correctly
+	 * and the case where nothing is found and rtree_iterator_next()
+	 * returns NULL should be processed in the correct way on the
+	 * caller's side.
+	 */
 	rtree_search(&index->tree, &rect, op, &it->impl);
 	return (struct iterator *)it;
 }
