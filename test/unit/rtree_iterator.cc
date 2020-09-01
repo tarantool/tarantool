@@ -274,6 +274,13 @@ iterator_invalidate_check()
 			rtree_insert(&tree, &rect, record_t(i+1));
 		}
 		rtree_set2d(&rect, 0, 0, test_size, test_size);
+		/*
+		 * We don't care if rtree_search() does or does not find
+		 * anything as far as we are fine anyway: iterator is
+		 * initialized correctly and the case where nothing is found
+		 * and rtree_iterator_next() returns NULL will be processed
+		 * correctly as fail case in check #19.
+		 */
 		rtree_search(&tree, &rect, SOP_BELONGS, &iterators[0]);
 		if (!rtree_iterator_next(&iterators[0])) {
 			fail("Integrity check failed (19)", "false");
