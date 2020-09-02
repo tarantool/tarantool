@@ -108,6 +108,7 @@ GIT_DESCRIBE=$(shell git describe HEAD)
 MAJOR_VERSION=$(word 1,$(subst ., ,$(GIT_DESCRIBE)))
 MINOR_VERSION=$(word 2,$(subst ., ,$(GIT_DESCRIBE)))
 BUCKET="$(MAJOR_VERSION).$(MINOR_VERSION)"
+S3_BUCKET_URL="s3://tarantool_repo/sources/$(BUCKET)"
 
 deploy_prepare:
 	[ -d packpack ] || \
@@ -130,8 +131,13 @@ source: deploy_prepare
 	TARBALL_COMPRESSOR=gz packpack/packpack tarball
 
 source_deploy: source
-	aws --endpoint-url "${AWS_S3_ENDPOINT_URL}" s3 cp build/*.tar.gz \
-		"s3://tarantool.${BUCKET}.src/" --acl public-read
+	( aws --endpoint-url "${AWS_S3_ENDPOINT_URL}" s3 ls "${S3_BUCKET_URL}/" || \
+		( rm -rf "${BUCKET}" ; mkdir "${BUCKET}" &&                        \
+			aws --endpoint-url "${AWS_S3_ENDPOINT_URL}"                \
+				s3 mv "${BUCKET}" "${S3_BUCKET_URL}" --recursive   \
+				--acl public-read ) ) &&                           \
+		aws --endpoint-url "${AWS_S3_ENDPOINT_URL}"                        \
+			s3 cp build/*.tar.gz "${S3_BUCKET_URL}/" --acl public-read
 
 # ###################
 # Performance testing
