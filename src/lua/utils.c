@@ -113,6 +113,12 @@ luaL_pushuuid(struct lua_State *L)
 	return luaL_pushcdata(L, CTID_UUID);
 }
 
+int
+luaL_iscdata(struct lua_State *L, int idx)
+{
+	return lua_type(L, idx) == LUA_TCDATA;
+}
+
 void *
 luaL_checkcdata(struct lua_State *L, int idx, uint32_t *ctypeid)
 {
