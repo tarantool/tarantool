@@ -2238,29 +2238,52 @@ vdbe_emit_new_sec_index_id(struct Parse *parse, uint32_t space_id,
 }
 
 /**
- * Add new index to table's indexes list.
+ * Add new index to ephemeral @a space's "index" array. Reallocate
+ * memory on @a parse's region if needed.
+ *
  * We follow convention that PK comes first in list.
  *
+ * @param parse Parsing structure.
  * @param space Space to which belongs given index.
  * @param index Index to be added to list.
  */
-static void
-table_add_index(struct space *space, struct index *index)
+static int
+sql_space_add_index(struct Parse *parse, struct space *space,
+		    struct index *index)
 {
 	uint32_t idx_count = space->index_count;
-	size_t indexes_sz = sizeof(struct index *) * (idx_count + 1);
-	struct index **idx = (struct index **) realloc(space->index,
-						       indexes_sz);
-	if (idx == NULL) {
-		diag_set(OutOfMemory, indexes_sz, "realloc", "idx");
-		return;
+	size_t size = 0;
+	struct index **idx = NULL;
+	struct region *region = &parse->region;
+	if (idx_count == 0) {
+		idx = region_alloc_array(region, typeof(struct index *), 1,
+					 &size);
+		if (idx == NULL)
+			goto alloc_error;
+	/*
+	 * Reallocate each time the idx_count becomes equal to the
+	 * power of two.
+	 */
+	} else if ((idx_count & (idx_count - 1)) == 0) {
+		idx = region_alloc_array(region, typeof(struct index *),
+					 idx_count * 2, &size);
+		if (idx == NULL)
+			goto alloc_error;
+		memcpy(idx, space->index, idx_count * sizeof(struct index *));
 	}
-	space->index = idx;
+	if (idx != NULL)
+		space->index = idx;
 	/* Make sure that PK always comes as first member. */
 	if (index->def->iid == 0 && idx_count != 0)
 		SWAP(space->index[0], index);
 	space->index[space->index_count++] = index;
 	space->index_id_max =  MAX(space->index_id_max, index->def->iid);;
+	return 0;
+
+alloc_error:
+	diag_set(OutOfMemory, size, "region_alloc_array", "idx");
+	parse->is_aborted = true;
+	return -1;
 }
 
 int
@@ -2727,9 +2750,8 @@ sql_create_index(struct Parse *parse) {
 		sqlVdbeAddOp0(vdbe, OP_Expire);
 	}
 
-	if (tbl_name != NULL)
+	if (tbl_name != NULL || sql_space_add_index(parse, space, index) != 0)
 		goto exit_create_index;
-	table_add_index(space, index);
 	index = NULL;
 
 	/* Clean up before exiting. */
