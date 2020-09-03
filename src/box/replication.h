@@ -217,6 +217,13 @@ struct replicaset {
 	bool is_joining;
 	/* A number of anonymous replicas following this instance. */
 	int anon_count;
+	/**
+	 * Number of registered replicas. That includes all of them - connected,
+	 * disconnected, connected not directly, just present in _cluster. If an
+	 * instance has an ID, has the same replicaset UUID, then it is
+	 * accounted here.
+	 */
+	int registered_count;
 	/** Applier state. */
 	struct {
 		/**
