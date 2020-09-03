@@ -49,6 +49,7 @@
 #include "main.h"
 #include "version.h"
 #include "box/box.h"
+#include "box/raft.h"
 #include "lua/utils.h"
 #include "fiber.h"
 #include "tt_static.h"
@@ -577,6 +578,21 @@ lbox_info_listen(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_info_election(struct lua_State *L)
+{
+	lua_createtable(L, 0, 4);
+	lua_pushstring(L, raft_state_strs[raft.state]);
+	lua_setfield(L, -2, "state");
+	luaL_pushuint64(L, raft.volatile_term);
+	lua_setfield(L, -2, "term");
+	lua_pushinteger(L, raft.volatile_vote);
+	lua_setfield(L, -2, "vote");
+	lua_pushinteger(L, raft.leader);
+	lua_setfield(L, -2, "leader");
+	return 1;
+}
+
 static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"id", lbox_info_id},
 	{"uuid", lbox_info_uuid},
@@ -595,6 +611,7 @@ static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"vinyl", lbox_info_vinyl},
 	{"sql", lbox_info_sql},
 	{"listen", lbox_info_listen},
+	{"election", lbox_info_election},
 	{NULL, NULL}
 };
 
