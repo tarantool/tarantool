@@ -36,8 +36,68 @@ local function test_pushcdata(test, module)
     test:is(gc_counter, 1, 'pushcdata gc')
 end
 
+local function test_iscdata(test, module)
+    local ffi = require('ffi')
+    ffi.cdef([[
+        struct foo { int bar; };
+    ]])
+
+    local cases = {
+        {
+            obj = nil,
+            exp = false,
+            description = 'nil',
+        },
+        {
+            obj = 1,
+            exp = false,
+            description = 'number',
+        },
+        {
+            obj = 'hello',
+            exp = false,
+            description = 'string',
+        },
+        {
+            obj = {},
+            exp = false,
+            description = 'table',
+        },
+        {
+            obj = function() end,
+            exp = false,
+            description = 'function',
+        },
+        {
+            obj = ffi.new('struct foo'),
+            exp = true,
+            description = 'cdata',
+        },
+        {
+            obj = ffi.new('struct foo *'),
+            exp = true,
+            description = 'cdata pointer',
+        },
+        {
+            obj = ffi.new('struct foo &'),
+            exp = true,
+            description = 'cdata reference',
+        },
+        {
+            obj = 1LL,
+            exp = true,
+            description = 'cdata number',
+        },
+    }
+
+    test:plan(#cases)
+    for _, case in ipairs(cases) do
+        test:ok(module.iscdata(case.obj, case.exp), case.description)
+    end
+end
+
 local test = require('tap').test("module_api", function(test)
-    test:plan(24)
+    test:plan(25)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -62,6 +122,7 @@ local test = require('tap').test("module_api", function(test)
     test:like(msg, 'luaT_error', 'luaT_error')
 
     test:test("pushcdata", test_pushcdata, module)
+    test:test("iscdata", test_iscdata, module)
 
     space:drop()
 end)

@@ -446,6 +446,27 @@ test_tostring(lua_State *L)
 	return 1;
 }
 
+static int
+test_iscdata(struct lua_State *L)
+{
+	assert(lua_gettop(L) == 2);
+
+	int exp = lua_toboolean(L, 2);
+
+	/* Basic test. */
+	int res = luaL_iscdata(L, 1);
+	int ok = res == exp;
+	assert(lua_gettop(L) == 2);
+
+	/* Use negative index. */
+	res = luaL_iscdata(L, -2);
+	ok = ok && res == exp;
+	assert(lua_gettop(L) == 2);
+
+	lua_pushboolean(L, ok);
+	return 1;
+}
+
 /* {{{ test_box_region */
 
 /**
@@ -552,6 +573,7 @@ luaopen_module_api(lua_State *L)
 		{"test_cpcall", test_cpcall},
 		{"test_state", test_state},
 		{"test_tostring", test_tostring},
+		{"iscdata", test_iscdata},
 		{"test_box_region", test_box_region},
 		{NULL, NULL}
 	};

@@ -117,6 +117,7 @@ coio_close
 coio_call
 coio_getaddrinfo
 luaL_pushcdata
+luaL_iscdata
 luaL_checkcdata
 luaL_setcdatagc
 luaL_ctypeid

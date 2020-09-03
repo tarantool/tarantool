@@ -70,6 +70,26 @@ extern struct ibuf *tarantool_lua_ibuf;
 /** \cond public */
 
 /**
+ * Checks whether a value on the Lua stack is a cdata.
+ *
+ * Unlike <luaL_checkcdata>() this function does not raise an
+ * error. It is useful to raise a domain specific error.
+ *
+ * Lua API and module API don't expose LUA_TCDATA constant.
+ * We have no guarantee that this constant will remain the same in
+ * future LuaJIT versions. So this function should be used in
+ * modules instead of `lua_type(L, idx) == LUA_TCDATA`.
+ *
+ * @param L    Lua state.
+ * @param idx  Acceptable index on the Lua stack.
+ *
+ * @retval 1   If the value at the given index is a cdata.
+ * @retval 0   Otherwise.
+ */
+LUA_API int
+luaL_iscdata(struct lua_State *L, int idx);
+
+/**
  * @brief Push cdata of given \a ctypeid onto the stack.
  * CTypeID must be used from FFI at least once. Allocated memory returned
  * uninitialized. Only numbers and pointers are supported.
