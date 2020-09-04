@@ -302,7 +302,7 @@ typedef struct key_def box_key_def_t;
  * \param part_count the number of key fields
  * \returns a new key definition object
  */
-box_key_def_t *
+API_EXPORT box_key_def_t *
 box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count);
 
 /**
@@ -310,7 +310,7 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count);
  *
  * \param key_def key definition to delete
  */
-void
+API_EXPORT void
 box_key_def_delete(box_key_def_t *key_def);
 
 /**
@@ -322,7 +322,7 @@ box_key_def_delete(box_key_def_t *key_def);
  * @retval <0 if key_fields(tuple_a) < key_fields(tuple_b)
  * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
  */
-int
+API_EXPORT int
 box_tuple_compare(box_tuple_t *tuple_a, box_tuple_t *tuple_b,
 		  box_key_def_t *key_def);
 
@@ -337,7 +337,7 @@ box_tuple_compare(box_tuple_t *tuple_a, box_tuple_t *tuple_b,
  * @retval >0 if key_fields(tuple) > parts(key)
  */
 
-int
+API_EXPORT int
 box_tuple_compare_with_key(box_tuple_t *tuple_a, const char *key_b,
 			   box_key_def_t *key_def);
 
