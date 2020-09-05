@@ -47,7 +47,7 @@ test_run:wait_vclock("replica", vclock)
 test_run:cmd('switch replica')
 
 box.info.status
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'follow'})
 
 box.space.glob:select{}
 
