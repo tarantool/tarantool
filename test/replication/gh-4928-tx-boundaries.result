@@ -92,9 +92,9 @@ box.info.status
  | ---
  | - running
  | ...
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'follow'})
  | ---
- | - follow
+ | - true
  | ...
 
 box.space.glob:select{}
