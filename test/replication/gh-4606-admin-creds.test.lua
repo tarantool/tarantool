@@ -16,7 +16,9 @@ test_run:cmd("create server replica_auth with rpl_master=default, script='replic
 test_run:cmd("start server replica_auth with args='admin:111 0.1'")
 test_run:switch('replica_auth')
 i = box.info
-i.replication[i.id % 2 + 1].upstream.status == 'follow' or i
+replica_id = i.id % 2 + 1
+test_run:wait_upstream(replica_id, {status = 'follow'}) or i
+
 test_run:switch('default')
 test_run:cmd("stop server replica_auth")
 test_run:cmd("cleanup server replica_auth")
