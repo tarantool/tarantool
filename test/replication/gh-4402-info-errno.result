@@ -27,10 +27,7 @@ i = box.info
 replica_id = i.id % 2 + 1
  | ---
  | ...
-d = i.replication[replica_id].downstream
- | ---
- | ...
-d ~= nil and d.status == 'follow' or i
+test_run:wait_downstream(replica_id, {status = 'follow'}) or i
  | ---
  | - true
  | ...

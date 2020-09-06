@@ -12,8 +12,7 @@ test_run:cmd('create server replica with rpl_master=default, script="replication
 test_run:cmd('start server replica')
 i = box.info
 replica_id = i.id % 2 + 1
-d = i.replication[replica_id].downstream
-d ~= nil and d.status == 'follow' or i
+test_run:wait_downstream(replica_id, {status = 'follow'}) or i
 
 test_run:cmd('stop server replica')
 test_run:cmd("cleanup server replica")
