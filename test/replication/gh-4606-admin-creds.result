@@ -34,10 +34,14 @@ test_run:switch('replica_auth')
 i = box.info
  | ---
  | ...
-i.replication[i.id % 2 + 1].upstream.status == 'follow' or i
+replica_id = i.id % 2 + 1
+ | ---
+ | ...
+test_run:wait_upstream(replica_id, {status = 'follow'}) or i
  | ---
  | - true
  | ...
+
 test_run:switch('default')
  | ---
  | - true
