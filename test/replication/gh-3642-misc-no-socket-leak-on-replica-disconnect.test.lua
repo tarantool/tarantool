@@ -28,7 +28,7 @@ for i = 1, 64 do
 end;
 test_run:cmd("setopt delimiter ''");
 
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'follow'})
 
 test_run:cmd('switch default')
 
