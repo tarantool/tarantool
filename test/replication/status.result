@@ -172,15 +172,17 @@ replica.upstream == nil
 ---
 - true
 ...
-replica.downstream.status == 'follow'
+test_run:wait_downstream(replica_id, {status == 'follow'})
 ---
 - true
 ...
-replica.downstream.vclock[master_id] == box.info.vclock[master_id]
----
-- true
-...
-replica.downstream.vclock[replica_id] == box.info.vclock[replica_id]
+-- wait for the replication vclock
+test_run:wait_cond(function()                    \
+    local r = box.info.replication[replica_id].downstream.vclock \
+    return (r ~= nil and box.info.vclock ~= nil and \
+            r[master_id] == box.info.vclock[master_id] and \
+            r[replica_id] == box.info.vclock[replica_id]) \
+    end) or box.info
 ---
 - true
 ...
@@ -222,7 +224,7 @@ master.uuid == box.space._cluster:get(master_id)[2]
 ---
 - true
 ...
-master.upstream.status == "follow"
+test_run:wait_upstream(master_id, {status == 'follow'})
 ---
 - true
 ...
