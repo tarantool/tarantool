@@ -264,15 +264,15 @@ luaT_tuple_encode(struct lua_State *L, int idx, size_t *tuple_len_ptr)
 
 /* }}} Encode a Lua table as an MsgPack array */
 
-struct tuple *
+box_tuple_t *
 luaT_tuple_new(struct lua_State *L, int idx, box_tuple_format_t *format)
 {
 	size_t tuple_len;
 	char *tuple_data = luaT_tuple_encode_on_lua_ibuf(L, idx, &tuple_len);
 	if (tuple_data == NULL)
 		return NULL;
-	struct tuple *tuple = box_tuple_new(format, tuple_data,
-					    tuple_data + tuple_len);
+	box_tuple_t *tuple = box_tuple_new(format, tuple_data,
+					   tuple_data + tuple_len);
 	if (tuple == NULL)
 		return NULL;
 	ibuf_reinit(tarantool_lua_ibuf);

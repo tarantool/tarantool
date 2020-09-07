@@ -551,6 +551,9 @@ test_box_region(struct lua_State *L)
 static void
 check_tuple_data(char *tuple_data, size_t tuple_size, int retvals)
 {
+	(void)tuple_data;
+	(void)tuple_size;
+	(void)retvals;
 	assert(tuple_size == 4);
 	assert(tuple_data != NULL);
 	assert(!strncmp(tuple_data, "\x93\x01\x02\x03", 4));
@@ -561,8 +564,13 @@ static void
 check_encode_error(char *tuple_data, int retvals, const char *exp_err_type,
 		   const char *exp_err_msg)
 {
+	(void)tuple_data;
+	(void)retvals;
+	(void)exp_err_type;
+	(void)exp_err_msg;
 	assert(tuple_data == NULL);
 	box_error_t *e = box_error_last();
+	(void)e;
 	assert(strcmp(box_error_type(e), exp_err_type) == 0);
 	assert(strcmp(box_error_message(e), exp_err_msg) == 0);
 	assert(retvals == 0);
@@ -660,6 +668,46 @@ test_tuple_encode(struct lua_State *L)
 
 /* }}} test_tuple_encode */
 
+/* {{{ test_tuple_new */
+
+/**
+ * Create a tuple from a Lua table or another tuple.
+ *
+ * Just basic test. More cases in the luaT_tuple_new.c unit test.
+ */
+static int
+test_tuple_new(struct lua_State *L)
+{
+	box_tuple_format_t *default_format = box_tuple_format_default();
+
+	/* Prepare the Lua stack. */
+	luaL_loadstring(L, "return {1, 2, 3}");
+	lua_call(L, 0, 1);
+
+	/* Create a tuple. */
+	int top = lua_gettop(L);
+	box_tuple_t *tuple = luaT_tuple_new(L, -1, default_format);
+
+	/* Verify size, data and Lua stack top. */
+	size_t region_svp = box_region_used();
+	size_t tuple_size = box_tuple_bsize(tuple);
+	char *tuple_data = box_region_alloc(tuple_size);
+	ssize_t rc = box_tuple_to_buf(tuple, tuple_data, tuple_size);
+	(void)rc;
+	assert(rc == (ssize_t)tuple_size);
+	check_tuple_data(tuple_data, tuple_size, lua_gettop(L) - top);
+
+	/* Clean up. */
+	box_region_truncate(region_svp);
+	lua_pop(L, 1);
+	assert(lua_gettop(L) == 0);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+/* }}} test_tuple_new */
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -690,6 +738,7 @@ luaopen_module_api(lua_State *L)
 		{"iscdata", test_iscdata},
 		{"test_box_region", test_box_region},
 		{"test_tuple_encode", test_tuple_encode},
+		{"test_tuple_new", test_tuple_new},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

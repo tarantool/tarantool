@@ -80,20 +80,34 @@ luaT_istuple(struct lua_State *L, int idx);
  * should call <box_region_truncate>() to release the data.
  *
  * In case of an error set a diag and return NULL.
+ *
+ * @sa luaT_tuple_new()
  */
 API_EXPORT char *
 luaT_tuple_encode(struct lua_State *L, int idx, size_t *tuple_len_ptr);
-
-/** \endcond public */
 
 /**
  * Create a new tuple with specific format from a Lua table or a
  * tuple.
  *
+ * The new tuple is referenced in the same way as one created by
+ * <box_tuple_new>(). There are two possible usage scenarious:
+ *
+ * 1. A short living tuple may not be referenced explicitly and
+ *    will be collected automatically at the next module API call
+ *    that yields or returns a tuple.
+ * 2. A long living tuple must be referenced using
+ *    <box_tuple_ref>() and unreferenced then with
+ *    <box_tuple_unref>().
+ *
+ * @sa box_tuple_ref()
+ *
  * In case of an error set a diag and return NULL.
  */
-struct tuple *
+API_EXPORT box_tuple_t *
 luaT_tuple_new(struct lua_State *L, int idx, box_tuple_format_t *format);
+
+/** \endcond public */
 
 static inline int
 luaT_pushtupleornil(struct lua_State *L, struct tuple *tuple)

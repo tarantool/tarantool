@@ -136,6 +136,7 @@ luaT_cpcall
 luaT_state
 luaT_tolstring
 luaT_tuple_encode
+luaT_tuple_new
 box_txn
 box_txn_begin
 box_txn_commit
