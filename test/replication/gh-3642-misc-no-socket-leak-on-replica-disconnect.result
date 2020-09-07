@@ -61,9 +61,9 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'follow'})
 ---
-- follow
+- true
 ...
 test_run:cmd('switch default')
 ---
