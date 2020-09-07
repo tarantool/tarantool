@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "lua/utils.h"
+#include <lj_trace.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -1349,10 +1350,49 @@ tarantool_lua_utils_init(struct lua_State *L)
 	return 0;
 }
 
+/*
+ * XXX: There is already defined <panic> macro in say.h header
+ * (included in diag.h). As a result the call below is misexpanded
+ * and compilation fails with the corresponding error. To avoid
+ * this error the macro is undefined since it's not used anymore
+ * in scope of this translation unit.
+ */
+#undef panic
+
 /**
  * This routine encloses the checks and actions to be done when
  * the running fiber yields the execution.
+ * Since Tarantool fibers don't switch-over the way Lua coroutines
+ * do the platform ought to notify JIT engine when one lua_State
+ * substitutes another one.
  */
 void cord_on_yield(void)
 {
+	struct global_State *g = G(tarantool_L);
+	/*
+	 * XXX: Switching fibers while running the trace leads to
+	 * code misbehaviour and failures, so stop its execution.
+	 */
+	if (unlikely(tvref(g->jit_base))) {
+		/*
+		 * XXX: mcode is executed only in scope of Lua
+		 * world and one can obtain the corresponding Lua
+		 * coroutine from the fiber storage.
+		 */
+		struct lua_State *L = fiber()->storage.lua.stack;
+		assert(L != NULL);
+		lua_pushfstring(L, "fiber %d is switched while running the"
+				" compiled code (it's likely a function with"
+				" a yield underneath called via LuaJIT FFI)",
+				fiber()->fid);
+		if (g->panic)
+			g->panic(L);
+		exit(EXIT_FAILURE);
+	}
+	/*
+	 * Unconditionally abort trace recording whether fibers
+	 * switch each other. Otherwise, further compilation may
+	 * lead to a failure on any next compiler phase.
+	 */
+	lj_trace_abort(g);
 }
