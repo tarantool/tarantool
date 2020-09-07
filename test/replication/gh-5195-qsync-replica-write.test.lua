@@ -41,10 +41,10 @@ replica_id = test_run:get_server_id('replica')
 replica_lsn = test_run:get_lsn('replica', replica_id)
 test_run:wait_downstream(replica_id, {status='follow'})
 test_run:wait_cond(function()                                                   \
-        local info = box.info.replication[replica_id]                           \
-        local lsn = info.downstream.vclock[replica_id]                          \
-        return lsn and lsn >= replica_lsn                                       \
-end)                                                                            \
+        local vclock = box.info.replication[replica_id].downstream.vclock       \
+        return (vclock and vclock[replica_id] and                               \
+                vclock[replica_id] >= replica_lsn)                              \
+    end) or box.info
 
 box.cfg{replication_synchro_quorum = 2}
 test_run:wait_cond(function() return f:status() == 'dead' end)
