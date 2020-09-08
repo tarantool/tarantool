@@ -29,6 +29,8 @@
  * SUCH DAMAGE.
  */
 #include "key_def.h"
+#include <msgpuck.h>
+#include "tuple.h"
 #include "tuple_compare.h"
 #include "tuple_extract_key.h"
 #include "tuple_hash.h"
@@ -399,6 +401,27 @@ box_key_def_dump_parts(const box_key_def_t *key_def, uint32_t *part_count_ptr)
 		*part_count_ptr = key_def->part_count;
 
 	return parts;
+}
+
+int
+box_key_def_validate_tuple(box_key_def_t *key_def, box_tuple_t *tuple)
+{
+	for (uint32_t idx = 0; idx < key_def->part_count; ++idx) {
+		struct key_part *part = &key_def->parts[idx];
+		const char *field = tuple_field_by_part(tuple, part);
+		if (field == NULL) {
+			if (part->is_nullable)
+				continue;
+			diag_set(ClientError, ER_NO_SUCH_FIELD,
+				 part->fieldno + TUPLE_INDEX_BASE);
+			return -1;
+		}
+		enum mp_type mp_type = mp_typeof(*field);
+		if (key_mp_type_validate(part->type, mp_type, ER_FIELD_TYPE,
+					 idx, part->is_nullable) != 0)
+			return -1;
+	}
+	return 0;
 }
 
 int
