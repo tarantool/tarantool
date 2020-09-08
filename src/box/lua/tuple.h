@@ -54,7 +54,7 @@ typedef struct tuple_format box_tuple_format_t;
  * @sa luaT_istuple
  * @throws on OOM
  */
-void
+API_EXPORT void
 luaT_pushtuple(struct lua_State *L, box_tuple_t *tuple);
 
 /**
@@ -65,7 +65,7 @@ luaT_pushtuple(struct lua_State *L, box_tuple_t *tuple);
  * @retval non-NULL argument is tuple
  * @retval NULL argument is not tuple
  */
-box_tuple_t *
+API_EXPORT box_tuple_t *
 luaT_istuple(struct lua_State *L, int idx);
 
 /**
