@@ -552,6 +552,38 @@ key_part_def_check_equal(const box_key_part_def_t *a,
 }
 
 /**
+ * Check <box_key_def_merge>() result against expected one.
+ *
+ * Allocates temporary values on the box region (a caller should
+ * release them).
+ */
+static void
+key_def_check_merge(box_key_part_def_t *a, uint32_t part_count_a,
+		    box_key_part_def_t *b, uint32_t part_count_b,
+		    box_key_part_def_t *exp, uint32_t part_count_exp)
+{
+	box_key_def_t *key_def_a = box_key_def_new_v2(a, part_count_a);
+	assert(key_def_a != NULL);
+	box_key_def_t *key_def_b = box_key_def_new_v2(b, part_count_b);
+	assert(key_def_b != NULL);
+
+	box_key_def_t *key_def_res = box_key_def_merge(key_def_a, key_def_b);
+	uint32_t part_count_res;
+	box_key_part_def_t *res = box_key_def_dump_parts(key_def_res,
+							 &part_count_res);
+	assert(res != NULL);
+
+	assert(part_count_res == part_count_exp);
+	for (uint32_t i = 0; i < part_count_exp; ++i) {
+		key_part_def_check_equal(&res[i], &exp[i]);
+	}
+
+	box_key_def_delete(key_def_res);
+	box_key_def_delete(key_def_b);
+	box_key_def_delete(key_def_a);
+}
+
+/**
  * Basic <box_key_part_def_create>() and <box_key_def_new_v2>()
  * test.
  */
@@ -839,6 +871,728 @@ test_key_def_validate_tuple(struct lua_State *L)
 	for (size_t i = 0; i < lengthof(tuples); ++i)
 		box_tuple_unref(tuples[i]);
 	box_key_def_delete(key_def);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+/**
+ * Basic <box_key_def_merge>() test.
+ */
+static int
+test_key_def_merge(struct lua_State *L)
+{
+	/*
+	 * What is the idea of <box_key_def_merge>()?
+	 *
+	 * (In my humble understanding.)
+	 *
+	 * For any given kd1 and kd2, kd3 = merge(kd1, kd2) should
+	 * impose the same order of tuples as if they would be
+	 * ordered by kd1, but all kd1-equal tuples would be
+	 * ordered by kd2.
+	 *
+	 * We could just add all key parts of kd2 to kd1 parts.
+	 * However in some cases we can skip some of kd2 parts
+	 * (the simplest case: when they are equal). That is what
+	 * <box_key_def_merge>() doing in fact.
+	 *
+	 * Should we provide a guarantee that first len(kd1) parts
+	 * of kd3 = merge(kd1, kd2) will be the same as in kd1? Or
+	 * those key parts can be strengthen with turning off
+	 * nullability, picking up more restrictive field type or
+	 * choosing of a more restrictive collation if such
+	 * restrictions are defined by kd2?
+	 *
+	 * The tuples ordering property is guaranteed by the
+	 * implementation. In particular, it leans on the fact
+	 * that a comparator for a more general type imposes the
+	 * same ordering on a more restrictive type as if when a
+	 * type-specific comparator is be used. E.g. an order of
+	 * any two given unsigned integers is the same when we
+	 * comparing them as unsigned integers, as integers, as
+	 * numbers or as scalars (note: we don't have comparators
+	 * for 'any' type).
+	 *
+	 * However <box_key_def_t> provides not only comparator
+	 * functions, but also validation and key extraction ones.
+	 *
+	 * Let's consider validation. It looks logical to expect
+	 * that the following invariant is guaranteed: for any
+	 * given kd1 and kd2, kd3 = merge(kd1, kd2) should accept
+	 * only those tuples that both kd1 and kd2 accept (kd
+	 * accepts a tuple when it is valid against kd). This is
+	 * not so now.
+	 *
+	 * If the function would impose this guarantee, it must
+	 * pay attention to field types compatibility (and which
+	 * ones are more restrictive than others) and nullability.
+	 * Not sure whether a collation may restrict a set of
+	 * possible values (in theory it may be so; at least not
+	 * any byte sequence forms a valid UTF-8 string).
+	 *
+	 * It also looks logical to expect that, when sets of
+	 * tuples that are accepted by kd1 and that are accepted
+	 * by kd2 have the empty intersection, the merge function
+	 * will give an error. It is not so now too.
+	 *
+	 * If the function would impose this guarantee, it must
+	 * handle the case, when the same field is marked with
+	 * incompatible types and both key part definitions are
+	 * non-nullable. Not sure that it is the only point that
+	 * must be taken into account here.
+	 *
+	 * Now let's consider key extraction from a tuple. For
+	 * given kd1 and kd2, a change of the merge algorithm may
+	 * change parts count in kd3 = merge(kd1, kd2) and so
+	 * parts count in a key extracted by it. It is hard to
+	 * say, which guarantees we should provide here. So,
+	 * maybe, if we'll touch the merge algorithm, we should
+	 * leave the old function as is and expose _v2() function.
+	 *
+	 * On the other hand, having two implementations of the
+	 * merge function with different guarantees, where only
+	 * the older one will be used internally is somewhat
+	 * strange and may lead to sudden inconsistencies.
+	 *
+	 * If we'll look at the <box_key_def_merge>() from the
+	 * practical point of view, the only known usage of this
+	 * function is to provide a comparator that gives exactly
+	 * same order as a secondary index in tarantool (when it
+	 * is not unique, secondary key parts are merged with the
+	 * primary ones). So, it seems, if something should be
+	 * changed, it should be changed in sync with internals.
+	 *
+	 * To sum up: current behaviour is the controversial topic
+	 * and we may want to reconsider it in some way in a
+	 * future. So let's look to some of the test cases below
+	 * as on examples of current behaviour: not as on a
+	 * commitment that it'll be the same forever (while the
+	 * main property regarding tuples ordering is hold).
+	 */
+
+	size_t region_svp = box_region_used();
+
+	/*
+	 * Causion: Don't initialize <box_key_part_def_t> directly
+	 * in a real world code. Use <box_key_part_def_create>().
+	 *
+	 * The testing code is updated in sync with tarantool, so
+	 * it may lean on the knowledge about particular set of
+	 * fields and flags.
+	 *
+	 * In contrast a module should be able to be built against
+	 * an older version of tarantool and correctly run on a
+	 * newer one. It also should be able to build against the
+	 * newer tarantool version without code changes.
+	 *
+	 * The <box_key_part_def_t> structure may be updated in a
+	 * future version of tarantool. The only permitted updates
+	 * are adding new fields or flags, or update of a default
+	 * value of a field or a flag. Let's show how it may break
+	 * non-conventional code:
+	 *
+	 * 1. Case: a new field is added.
+	 *
+	 *    As result, if brace initializer is used,
+	 *    -Wmissing-field-initializers (part of -Wextra)
+	 *    warning may be produced when building a module
+	 *    against the new tarantool version. Usage of -Werror
+	 *    for the Debug build is usual, so it may break
+	 *    compilation.
+	 *
+	 * 2. Case: a new field or flag is added with non-zero
+	 *    default value or a default value of some field or
+	 *    flag is changed.
+	 *
+	 *    As result a module will initialize the new / changed
+	 *    fields or flags with values that are not default for
+	 *    given tarantool version, but may assume that
+	 *    everything that is not set explicitly is default.
+	 */
+
+	/* Non-conventional prerequisite: no new fields. */
+	size_t padding_offset = key_part_padding_offset();
+	size_t path_field_end = offsetof(box_key_part_def_t, path) +
+		sizeof(const char *);
+	assert(padding_offset == path_field_end);
+	(void)padding_offset;
+	(void)path_field_end;
+
+	/* Non-conventional prerequisite: list of known flags. */
+	uint32_t known_flags = key_part_def_known_flags();
+	assert(known_flags == BOX_KEY_PART_DEF_IS_NULLABLE);
+	(void)known_flags;
+
+	/* Non-conventional prerequisite: certain defaults. */
+	box_key_part_def_t tmp;
+	box_key_part_def_create(&tmp);
+	assert((tmp.flags & BOX_KEY_PART_DEF_IS_NULLABLE) == 0);
+	assert(tmp.collation == NULL);
+	assert(tmp.path == NULL);
+
+	/*
+	 * The extra parentheses are necessary to initialize
+	 * <box_key_part_def_t>, because it is a union around an
+	 * anonymous structure and padding, not a structure.
+	 */
+
+	/* Case 1: all <fieldno> are different. */
+	box_key_part_def_t a_1[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "unsigned", NULL, NULL}},
+	};
+	box_key_part_def_t b_1[] = {
+		{{0, 0, "unsigned", NULL, NULL}},
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	box_key_part_def_t exp_1[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "unsigned", NULL, NULL}},
+		{{0, 0, "unsigned", NULL, NULL}},
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	key_def_check_merge(a_1, lengthof(a_1), b_1, lengthof(b_1),
+			    exp_1, lengthof(exp_1));
+
+	/* Case 2: two key parts are the same. */
+	box_key_part_def_t a_2[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "unsigned", NULL, NULL}}, /* clash */
+	};
+	box_key_part_def_t b_2[] = {
+		{{1, 0, "unsigned", NULL, NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	box_key_part_def_t exp_2[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "unsigned", NULL, NULL}}, /* coalesced */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	key_def_check_merge(a_2, lengthof(a_2), b_2, lengthof(b_2),
+			    exp_2, lengthof(exp_2));
+
+	/*
+	 * Case 3: more general field type + more restrictive one.
+	 *
+	 * Interpretation: when <a> and <b> have key parts that
+	 * are point to the same field (considering <fieldno> and
+	 * JSON paths) and collations are not present or don't
+	 * impose any restrictions, the key part from <b> is
+	 * omitted without any care to <field_type> and <flags>.
+	 */
+	box_key_part_def_t a_3[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "number",   NULL, NULL}}, /* clash */
+	};
+	box_key_part_def_t b_3[] = {
+		{{1, 0, "unsigned", NULL, NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	box_key_part_def_t exp_3[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "number",   NULL, NULL}}, /* coalesced */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	key_def_check_merge(a_3, lengthof(a_3), b_3, lengthof(b_3),
+			    exp_3, lengthof(exp_3));
+
+	/*
+	 * Case 4: more restrictive field type + more general one.
+	 *
+	 * Interpretation: the same as for the case 3.
+	 */
+	box_key_part_def_t a_4[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "unsigned", NULL, NULL}}, /* clash */
+	};
+	box_key_part_def_t b_4[] = {
+		{{1, 0, "number",   NULL, NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	box_key_part_def_t exp_4[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "unsigned", NULL, NULL}}, /* coalesced */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	key_def_check_merge(a_4, lengthof(a_4), b_4, lengthof(b_4),
+			    exp_4, lengthof(exp_4));
+
+	/*
+	 * Case 5: incompatible field types.
+	 *
+	 * Interpretation: the same as for the case 3.
+	 */
+	box_key_part_def_t a_5[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "unsigned", NULL, NULL}}, /* clash */
+	};
+	box_key_part_def_t b_5[] = {
+		{{1, 0, "string",   NULL, NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	box_key_part_def_t exp_5[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "unsigned", NULL, NULL}}, /* coalesced */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	key_def_check_merge(a_5, lengthof(a_5), b_5, lengthof(b_5),
+			    exp_5, lengthof(exp_5));
+
+	/*
+	 * Case 6: nullable + non-nullable.
+	 *
+	 * Interpretation: the same as for the case 3.
+	 */
+	box_key_part_def_t a_6[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 1, "unsigned", NULL, NULL}}, /* clash */
+	};
+	box_key_part_def_t b_6[] = {
+		{{1, 0, "unsigned", NULL, NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	box_key_part_def_t exp_6[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 1, "unsigned", NULL, NULL}}, /* coalesced */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	key_def_check_merge(a_6, lengthof(a_6), b_6, lengthof(b_6),
+			    exp_6, lengthof(exp_6));
+
+	/*
+	 * Case 7: non-nullable + nullable.
+	 *
+	 * Interpretation: the same as for the case 3.
+	 */
+	box_key_part_def_t a_7[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "unsigned", NULL, NULL}}, /* clash */
+	};
+	box_key_part_def_t b_7[] = {
+		{{1, 1, "unsigned", NULL, NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	box_key_part_def_t exp_7[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "unsigned", NULL, NULL}}, /* coalesced */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	key_def_check_merge(a_7, lengthof(a_7), b_7, lengthof(b_7),
+			    exp_7, lengthof(exp_7));
+
+	/*
+	 * Case 8: the same ICU collations.
+	 *
+	 * Interpretation: when <a> and <b> have key parts that
+	 * are point to the same field (considering <fieldno> and
+	 * JSON paths), the key part from <b> is omitted, when one
+	 * of the following conditions is true:
+	 *
+	 * 1. <a> and <b> have the same collation (or both lacks
+	 *    it).
+	 * 2. <a> has no collation.
+	 * 3. <a> has a non-ICU collation (those are 'none' and
+	 *    'binary' now).
+	 * 4. <a> has an ICU collation with UCOL_DEFAULT strength
+	 *    (but I don't know what does it mean in practice and
+	 *    unable to interpret).
+	 *
+	 * Comments around <coll_can_merge>() point the general
+	 * idea: don't coalesce when <b>'s collation may impose
+	 * a strict order on keys equal in terms of the <a>'s
+	 * collation. (And I guess 'more strict' was meant by the
+	 * word 'strict'.)
+	 *
+	 * The general rule is to don't coalesce when doubt. But
+	 * under the conditions above we're sure that the order
+	 * imposed by <a>'s collation is already strict and hence
+	 * we don't need <b>'s collation at all.
+	 *
+	 * Beware! Tarantool-1.10 does not take collations into
+	 * account at all when decide whether to coalesce a key
+	 * part or not. See gh-3537.
+	 *
+	 * Aside of this, tarantool-1.10 only have 'unicode' and
+	 * 'unicode_ci' collations.
+	 */
+	box_key_part_def_t a_8[] = {
+		{{3, 0, "unsigned", NULL,      NULL}},
+		{{1, 0, "string",   "unicode", NULL}}, /* clash */
+	};
+	box_key_part_def_t b_8[] = {
+		{{1, 0, "string",   "unicode", NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL,      NULL}},
+	};
+	box_key_part_def_t exp_8[] = {
+		{{3, 0, "unsigned", NULL,      NULL}},
+		{{1, 0, "string",   "unicode", NULL}}, /* coalesced */
+		{{2, 0, "unsigned", NULL,      NULL}},
+	};
+	key_def_check_merge(a_8, lengthof(a_8), b_8, lengthof(b_8),
+			    exp_8, lengthof(exp_8));
+
+	/*
+	 * Case 9: no collation + ICU collation.
+	 *
+	 * Interpretation: see the case 8.
+	 */
+	box_key_part_def_t a_9[] = {
+		{{3, 0, "unsigned", NULL,      NULL}},
+		{{1, 0, "string",   NULL,      NULL}}, /* clash */
+	};
+	box_key_part_def_t b_9[] = {
+		{{1, 0, "string",   "unicode", NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL,      NULL}},
+	};
+	box_key_part_def_t exp_9[] = {
+		{{3, 0, "unsigned", NULL,      NULL}},
+		{{1, 0, "string",   NULL,      NULL}}, /* coalesced */
+		{{2, 0, "unsigned", NULL,      NULL}},
+	};
+	key_def_check_merge(a_9, lengthof(a_9), b_9, lengthof(b_9),
+			    exp_9, lengthof(exp_9));
+
+	/*
+	 * Case 10: ICU collation + no collation.
+	 *
+	 * Interpretation: see the case 8.
+	 */
+	box_key_part_def_t a_10[] = {
+		{{3, 0, "unsigned", NULL,      NULL}},
+		{{1, 0, "string",   "unicode", NULL}}, /* clash */
+	};
+	box_key_part_def_t b_10[] = {
+		{{1, 0, "string",   NULL,      NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL,      NULL}},
+	};
+	box_key_part_def_t exp_10[] = {
+		{{3, 0, "unsigned", NULL,      NULL}},
+		{{1, 0, "string",   "unicode", NULL}}, /* from <a> */
+		{{1, 0, "string",   NULL,      NULL}}, /* from <b> */
+		{{2, 0, "unsigned", NULL,      NULL}},
+	};
+	key_def_check_merge(a_10, lengthof(a_10), b_10, lengthof(b_10),
+			    exp_10, lengthof(exp_10));
+
+	/*
+	 * Case 11: less strong ICU collation + more strong one,
+	 * but with the same locale.
+	 *
+	 * 'Less strong' means 'have smaller strength' here.
+	 *
+	 * Interpretation: see the case 8.
+	 */
+	box_key_part_def_t a_11[] = {
+		{{3, 0, "unsigned", NULL,         NULL}},
+		{{1, 0, "string",   "unicode_ci", NULL}}, /* clash */
+	};
+	box_key_part_def_t b_11[] = {
+		{{1, 0, "string",   "unicode",    NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL,         NULL}},
+	};
+	box_key_part_def_t exp_11[] = {
+		{{3, 0, "unsigned", NULL,         NULL}},
+		{{1, 0, "string",   "unicode_ci", NULL}}, /* from <a> */
+		{{1, 0, "string",   "unicode",    NULL}}, /* from <b> */
+		{{2, 0, "unsigned", NULL,         NULL}},
+	};
+	key_def_check_merge(a_11, lengthof(a_11), b_11, lengthof(b_11),
+			    exp_11, lengthof(exp_11));
+
+	/*
+	 * Case 12: more strong ICU collation + less strong one,
+	 * but with the same locale.
+	 *
+	 * 'More strong' means 'have bigger strength' here.
+	 *
+	 * Interpretation: see the case 8.
+	 */
+	box_key_part_def_t a_12[] = {
+		{{3, 0, "unsigned", NULL,         NULL}},
+		{{1, 0, "string",   "unicode",    NULL}}, /* clash */
+	};
+	box_key_part_def_t b_12[] = {
+		{{1, 0, "string",   "unicode_ci", NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL,         NULL}},
+	};
+	box_key_part_def_t exp_12[] = {
+		{{3, 0, "unsigned", NULL,         NULL}},
+		{{1, 0, "string",   "unicode",    NULL}}, /* from <a> */
+		{{1, 0, "string",   "unicode_ci", NULL}}, /* from <b> */
+		{{2, 0, "unsigned", NULL,         NULL}},
+	};
+	key_def_check_merge(a_12, lengthof(a_12), b_12, lengthof(b_12),
+			    exp_12, lengthof(exp_12));
+
+	/*
+	 * Case 13: ICU collations with different locales.
+	 *
+	 * Interpretation: see the case 8.
+	 */
+	box_key_part_def_t a_13[] = {
+		{{3, 0, "unsigned", NULL,            NULL}},
+		{{1, 0, "string",   "unicode_am_s3", NULL}}, /* clash */
+	};
+	box_key_part_def_t b_13[] = {
+		{{1, 0, "string",   "unicode_fi_s3", NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL,            NULL}},
+	};
+	box_key_part_def_t exp_13[] = {
+		{{3, 0, "unsigned", NULL,            NULL}},
+		{{1, 0, "string",   "unicode_am_s3", NULL}}, /* from <a> */
+		{{1, 0, "string",   "unicode_fi_s3", NULL}}, /* from <b> */
+		{{2, 0, "unsigned", NULL,            NULL}},
+	};
+	key_def_check_merge(a_13, lengthof(a_13), b_13, lengthof(b_13),
+			    exp_13, lengthof(exp_13));
+
+	/*
+	 * Case 14: 'none' collation + ICU collation.
+	 *
+	 * Interpretation: see the case 8.
+	 *
+	 * Note: 'none' collation is the same as lack of a
+	 * collation from key_def point of view. So after
+	 * dump to key parts it becomes NULL.
+	 */
+	box_key_part_def_t a_14[] = {
+		{{3, 0, "unsigned", NULL,      NULL}},
+		{{1, 0, "string",   "none",    NULL}}, /* clash */
+	};
+	box_key_part_def_t b_14[] = {
+		{{1, 0, "string",   "unicode", NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL,      NULL}},
+	};
+	box_key_part_def_t exp_14[] = {
+		{{3, 0, "unsigned", NULL,      NULL}},
+		{{1, 0, "string",   NULL,      NULL}}, /* coalesced */
+		{{2, 0, "unsigned", NULL,      NULL}},
+	};
+	key_def_check_merge(a_14, lengthof(a_14), b_14, lengthof(b_14),
+			    exp_14, lengthof(exp_14));
+
+	/*
+	 * Case 15: ICU collation + 'none' collation.
+	 *
+	 * Interpretation: see the case 8.
+	 *
+	 * Note: 'none' collation is the same as lack of a
+	 * collation from key_def point of view. So after
+	 * dump to key parts it becomes NULL.
+	 */
+	box_key_part_def_t a_15[] = {
+		{{3, 0, "unsigned", NULL,      NULL}},
+		{{1, 0, "string",   "unicode", NULL}}, /* clash */
+	};
+	box_key_part_def_t b_15[] = {
+		{{1, 0, "string",   "none",    NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL,      NULL}},
+	};
+	box_key_part_def_t exp_15[] = {
+		{{3, 0, "unsigned", NULL,      NULL}},
+		{{1, 0, "string",   "unicode", NULL}}, /* from <a> */
+		{{1, 0, "string",   NULL,      NULL}}, /* from <b> */
+		{{2, 0, "unsigned", NULL,      NULL}},
+	};
+	key_def_check_merge(a_15, lengthof(a_15), b_15, lengthof(b_15),
+			    exp_15, lengthof(exp_15));
+
+	/*
+	 * Case 16: 'binary' collation + ICU collation.
+	 *
+	 * Interpretation: see the case 8.
+	 */
+	box_key_part_def_t a_16[] = {
+		{{3, 0, "unsigned", NULL,      NULL}},
+		{{1, 0, "string",   "binary",  NULL}}, /* clash */
+	};
+	box_key_part_def_t b_16[] = {
+		{{1, 0, "string",   "unicode", NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL,      NULL}},
+	};
+	box_key_part_def_t exp_16[] = {
+		{{3, 0, "unsigned", NULL,      NULL}},
+		{{1, 0, "string",   "binary",  NULL}}, /* coalesced */
+		{{2, 0, "unsigned", NULL,      NULL}},
+	};
+	key_def_check_merge(a_16, lengthof(a_16), b_16, lengthof(b_16),
+			    exp_16, lengthof(exp_16));
+
+	/*
+	 * Case 17: ICU collation + 'binary' collation.
+	 *
+	 * Interpretation: see the case 8.
+	 */
+	box_key_part_def_t a_17[] = {
+		{{3, 0, "unsigned", NULL,      NULL}},
+		{{1, 0, "string",   "unicode", NULL}}, /* clash */
+	};
+	box_key_part_def_t b_17[] = {
+		{{1, 0, "string",   "binary",  NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL,      NULL}},
+	};
+	box_key_part_def_t exp_17[] = {
+		{{3, 0, "unsigned", NULL,      NULL}},
+		{{1, 0, "string",   "unicode", NULL}}, /* from <a> */
+		{{1, 0, "string",   "binary",  NULL}}, /* from <b> */
+		{{2, 0, "unsigned", NULL,      NULL}},
+	};
+	key_def_check_merge(a_17, lengthof(a_17), b_17, lengthof(b_17),
+			    exp_17, lengthof(exp_17));
+
+	/*
+	 * Case 18: the same JSON paths.
+	 *
+	 * Interpretation: <fieldno> and <path> are considered as
+	 * a 'pointer' to a field. JSON path are compared by its
+	 * meaning, not just byte-to-byte. See also the case 3.
+	 */
+	box_key_part_def_t a_18[] = {
+		{{0, 0, "unsigned", NULL, "moo"}},
+	};
+	box_key_part_def_t b_18[] = {
+		{{0, 0, "unsigned", NULL, "moo"}},
+	};
+	box_key_part_def_t exp_18[] = {
+		{{0, 0, "unsigned", NULL, "moo"}}, /* coalesced */
+	};
+	key_def_check_merge(a_18, lengthof(a_18), b_18, lengthof(b_18),
+			    exp_18, lengthof(exp_18));
+
+	/*
+	 * Case 19: the same JSON paths, but different <fieldno>.
+	 *
+	 * Interpretation: see the case 18.
+	 */
+	box_key_part_def_t a_19[] = {
+		{{0, 0, "unsigned", NULL, "moo"}},
+	};
+	box_key_part_def_t b_19[] = {
+		{{1, 0, "unsigned", NULL, "moo"}},
+	};
+	box_key_part_def_t exp_19[] = {
+		{{0, 0, "unsigned", NULL, "moo"}},
+		{{1, 0, "unsigned", NULL, "moo"}},
+	};
+	key_def_check_merge(a_19, lengthof(a_19), b_19, lengthof(b_19),
+			    exp_19, lengthof(exp_19));
+
+	/*
+	 * Case 20: equivalent JSON paths.
+	 *
+	 * Interpretation: see the case 18. A key part from <b>
+	 * is omitted in the case, so the JSON path from <a> is
+	 * present in the result.
+	 */
+	box_key_part_def_t a_20[] = {
+		{{0, 0, "unsigned", NULL, ".moo"}},
+	};
+	box_key_part_def_t b_20[] = {
+		{{0, 0, "unsigned", NULL, "moo" }},
+	};
+	box_key_part_def_t exp_20[] = {
+		{{0, 0, "unsigned", NULL, ".moo"}}, /* coalesced */
+	};
+	key_def_check_merge(a_20, lengthof(a_20), b_20, lengthof(b_20),
+			    exp_20, lengthof(exp_20));
+
+	/*
+	 * Case 21: no JSON path + JSON path.
+	 *
+	 * Interpretation: see the case 18.
+	 */
+	box_key_part_def_t a_21[] = {
+		{{0, 0, "unsigned", NULL, NULL }},
+	};
+	box_key_part_def_t b_21[] = {
+		{{0, 0, "unsigned", NULL, "moo"}},
+	};
+	box_key_part_def_t exp_21[] = {
+		{{0, 0, "unsigned", NULL, NULL }},
+		{{0, 0, "unsigned", NULL, "moo"}},
+	};
+	key_def_check_merge(a_21, lengthof(a_21), b_21, lengthof(b_21),
+			    exp_21, lengthof(exp_21));
+
+	/*
+	 * Case 22: JSON path + no JSON path.
+	 *
+	 * Interpretation: see the case 18.
+	 */
+	box_key_part_def_t a_22[] = {
+		{{0, 0, "unsigned", NULL, "moo"}},
+	};
+	box_key_part_def_t b_22[] = {
+		{{0, 0, "unsigned", NULL, NULL }},
+	};
+	box_key_part_def_t exp_22[] = {
+		{{0, 0, "unsigned", NULL, "moo"}},
+		{{0, 0, "unsigned", NULL, NULL }},
+	};
+	key_def_check_merge(a_22, lengthof(a_22), b_22, lengthof(b_22),
+			    exp_22, lengthof(exp_22));
+
+	/*
+	 * Case 23: different JSON paths.
+	 *
+	 * Interpretation: see the case 18.
+	 */
+	box_key_part_def_t a_23[] = {
+		{{0, 0, "unsigned", NULL, "foo"}},
+	};
+	box_key_part_def_t b_23[] = {
+		{{0, 0, "unsigned", NULL, "bar"}},
+	};
+	box_key_part_def_t exp_23[] = {
+		{{0, 0, "unsigned", NULL, "foo"}},
+		{{0, 0, "unsigned", NULL, "bar"}},
+	};
+	key_def_check_merge(a_23, lengthof(a_23), b_23, lengthof(b_23),
+			    exp_23, lengthof(exp_23));
+
+	/*
+	 * Case 24: a shorter JSON path + a longer JSON path, but
+	 * with the same prefix.
+	 *
+	 * Interpretation: see the case 18. Those JSON paths are
+	 * not equivalent.
+	 */
+	box_key_part_def_t a_24[] = {
+		{{0, 0, "unsigned", NULL, "foo"    }},
+	};
+	box_key_part_def_t b_24[] = {
+		{{0, 0, "unsigned", NULL, "foo.bar"}},
+	};
+	box_key_part_def_t exp_24[] = {
+		{{0, 0, "unsigned", NULL, "foo"    }},
+		{{0, 0, "unsigned", NULL, "foo.bar"}},
+	};
+	key_def_check_merge(a_24, lengthof(a_24), b_24, lengthof(b_24),
+			    exp_24, lengthof(exp_24));
+
+	/*
+	 * Case 25: a longer JSON path + a shorter JSON path, but
+	 * with the same prefix.
+	 *
+	 * Interpretation: see the case 18. Those JSON paths are
+	 * not equivalent.
+	 */
+	box_key_part_def_t a_25[] = {
+		{{0, 0, "unsigned", NULL, "foo.bar"}},
+	};
+	box_key_part_def_t b_25[] = {
+		{{0, 0, "unsigned", NULL, "foo"    }},
+	};
+	box_key_part_def_t exp_25[] = {
+		{{0, 0, "unsigned", NULL, "foo.bar"}},
+		{{0, 0, "unsigned", NULL, "foo"    }},
+	};
+	key_def_check_merge(a_25, lengthof(a_25), b_25, lengthof(b_25),
+			    exp_25, lengthof(exp_25));
+
+	/* Clean up. */
+	box_region_truncate(region_svp);
 
 	lua_pushboolean(L, 1);
 	return 1;
@@ -1233,6 +1987,7 @@ luaopen_module_api(lua_State *L)
 		{"test_key_def_new_v2", test_key_def_new_v2},
 		{"test_key_def_dump_parts", test_key_def_dump_parts},
 		{"test_key_def_validate_tuple", test_key_def_validate_tuple},
+		{"test_key_def_merge", test_key_def_merge},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
