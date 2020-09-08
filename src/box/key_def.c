@@ -614,6 +614,12 @@ box_tuple_compare_with_key(box_tuple_t *tuple_a, const char *key_b,
 
 }
 
+box_key_def_t *
+box_key_def_merge(const box_key_def_t *first, const box_key_def_t *second)
+{
+	return key_def_merge(first, second);
+}
+
 /* }}} Module API functions */
 
 int

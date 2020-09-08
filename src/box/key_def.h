@@ -520,6 +520,23 @@ API_EXPORT int
 box_tuple_compare_with_key(box_tuple_t *tuple_a, const char *key_b,
 			   box_key_def_t *key_def);
 
+/**
+ * Allocate a new key_def with a set union of key parts from
+ * first and second key defs.
+ *
+ * Parts of the new key_def consist of the first key_def's parts
+ * and those parts of the second key_def that were not among the
+ * first parts.
+ *
+ * @retval not NULL  Ok.
+ * @retval NULL      Memory error.
+ *
+ * In case of an error set a diag and return NULL.
+ * @sa <box_error_last>().
+ */
+API_EXPORT box_key_def_t *
+box_key_def_merge(const box_key_def_t *first, const box_key_def_t *second);
+
 /** \endcond public */
 
 /*

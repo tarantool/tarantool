@@ -177,7 +177,7 @@ local function test_iscdata(test, module)
 end
 
 local test = require('tap').test("module_api", function(test)
-    test:plan(31)
+    test:plan(32)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
