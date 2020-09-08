@@ -42,27 +42,13 @@ wal_off_id = test_run:eval('wal_off', 'return box.info.id')[1]
 box.cfg { replication = wal_off_uri }
 ---
 ...
-check = "Replication does not support wal_mode = 'none'"
----
-...
-while box.info.replication[wal_off_id].upstream.message ~= check do fiber.sleep(0) end
----
-...
-box.info.replication[wal_off_id].upstream ~= nil
+test_run:wait_upstream(wal_off_id, {status = 'stopped', message_re = "Replication does not support wal_mode = 'none'"})
 ---
 - true
 ...
 box.info.replication[wal_off_id].downstream ~= nil
 ---
 - true
-...
-box.info.replication[wal_off_id].upstream.status
----
-- stopped
-...
-box.info.replication[wal_off_id].upstream.message
----
-- Replication does not support wal_mode = 'none'
 ...
 box.cfg { replication = "" }
 ---
