@@ -149,6 +149,7 @@ box_key_def_new
 box_key_def_delete
 box_key_def_dump_parts
 box_key_def_new_v2
+box_key_def_merge
 box_key_def_validate_tuple
 box_key_part_def_create
 box_tuple_format_default
