@@ -13,8 +13,6 @@ leak:CRYPTO_zalloc
 leak:Curl_setstropt
 leak:create_conn
 leak:Curl_conncache_add_conn
-leak:alloc_addbyter
-leak:Curl_getaddrinfo_ex
 leak:Curl_cache_addr
 leak:Curl_hash_init
 leak:Curl_hash_add
