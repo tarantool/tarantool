@@ -54,6 +54,9 @@ ffi.cdef[[
     pid_t log_pid;
     extern int log_level;
     extern int log_format;
+
+    int
+    say_parse_logger_type(const char **str, enum say_logger_type *type);
 ]]
 
 local S_WARN = ffi.C.S_WARN
@@ -193,6 +196,20 @@ local function verify_static(k, v)
     return true
 end
 
+local function parse_format(log)
+    -- There is no easy way to get pointer to ponter via FFI
+    local str_p = ffi.new('const char*[1]')
+    str_p[0] = ffi.cast('char*', log)
+    local logger_type = ffi.new('enum say_logger_type[1]')
+    local rc = ffi.C.say_parse_logger_type(str_p, logger_type)
+
+    if rc ~= 0 then
+        box.error()
+    end
+
+    return logger_type[0]
+end
+
 -- Test if format is valid.
 local function verify_format(key, name, cfg)
     assert(log_cfg[key] ~= nil)
@@ -213,9 +230,7 @@ local function verify_format(key, name, cfg)
     -- The good thing that we're only needed log
     -- entry which is the same key for both.
     if cfg ~= nil and cfg['log'] ~= nil then
-        if string.startswith(cfg['log'], "syslog:") then
-            log_type = ffi.C.SAY_LOGGER_SYSLOG
-        end
+        log_type = parse_format(cfg['log'])
     end
 
     if fmt_str2num[name] == ffi.C.SF_JSON then
@@ -465,7 +480,7 @@ local function load_cfg(self, cfg)
     -- log option might be zero length string, which
     -- is fine, we should treat it as nil.
     if cfg.log ~= nil then
-        if type(cfg.log) == 'string' and cfg.log:len() == 0 then
+        if type(cfg.log) ~= 'string' or cfg.log:len() == 0 then
             cfg.log = nil
         end
     end
@@ -509,6 +524,11 @@ local function load_cfg(self, cfg)
         nonblock = 0
     else
         nonblock = 1
+    end
+
+    -- Parsing for validation purposes
+    if cfg.log ~= nil then
+        parse_format(cfg.log)
     end
 
     -- We never allow confgure the logger in background
