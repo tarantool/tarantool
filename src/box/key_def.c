@@ -592,6 +592,12 @@ box_key_def_dump_parts(const box_key_def_t *key_def, uint32_t *part_count_ptr)
 }
 
 int
+box_key_def_validate_tuple(box_key_def_t *key_def, box_tuple_t *tuple)
+{
+	return tuple_validate_key_parts(key_def, tuple);
+}
+
+int
 box_tuple_compare(box_tuple_t *tuple_a, box_tuple_t *tuple_b,
 		  box_key_def_t *key_def)
 {
