@@ -402,6 +402,8 @@ swim_scheduler_destroy(struct swim_scheduler *scheduler)
 	swim_transport_destroy(&scheduler->transport);
 	swim_ev_io_stop(swim_loop(), &scheduler->output);
 	swim_scheduler_stop_input(scheduler);
+	if (scheduler->codec != NULL)
+		crypto_codec_delete(scheduler->codec);
 	assert(scheduler_count > 0);
 	if (--scheduler_count == 0)
 		swim_task_pool_destroy();
