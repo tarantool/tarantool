@@ -56,10 +56,6 @@ leak:mh_i32ptr_new
 # source: src/lib/core/exception.cc
 leak:Exception::operator new
 
-# test: unit/swim.test.lua
-# source: src/lib/swim/swim_io.c
-leak:swim_scheduler_set_codec
-
 # test: vinyl/errinj.test.lua
 # source: src/lib/core/fiber.h
 leak:fiber_cxx_invoke
