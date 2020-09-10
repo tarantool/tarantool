@@ -107,7 +107,10 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
 
     # Latest versions of Homebrew wont 'link --force' for libraries, that were
     # preinstalled in system. So we'll use this dirty hack
-    find_program(HOMEBREW_EXECUTABLE brew)
+
+    if (NOT BUILD_STATIC)
+        find_program(HOMEBREW_EXECUTABLE brew)
+    endif()
     if(EXISTS ${HOMEBREW_EXECUTABLE})
         execute_process(COMMAND ${HOMEBREW_EXECUTABLE} --prefix
                         OUTPUT_VARIABLE HOMEBREW_PREFIX

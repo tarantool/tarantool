@@ -151,3 +151,11 @@ src/box/sql/parse.h
 src/box/sql/parse.c
 src/box/sql/opcodes.h
 src/box/sql/opcodes.c
+
+# static-build
+static-build/*-prefix
+static-build/Makefile
+static-build/build
+
+# macOS files
+.DS_Store

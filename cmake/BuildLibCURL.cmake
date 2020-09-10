@@ -4,15 +4,21 @@ macro(curl_build)
     set(LIBCURL_BINARY_DIR ${PROJECT_BINARY_DIR}/build/curl/work)
     set(LIBCURL_INSTALL_DIR ${PROJECT_BINARY_DIR}/build/curl/dest)
 
+    message(STATUS "Looking for zlib")
+    find_path(ZLIB_INCLUDE_DIR zlib.h)
+    message(STATUS "Looking for zlib.h - ${ZLIB_INCLUDE_DIR}")
     if (BUILD_STATIC)
         set(LIBZ_LIB_NAME libz.a)
     else()
         set(LIBZ_LIB_NAME z)
     endif()
     find_library(LIBZ_LIBRARY NAMES ${LIBZ_LIB_NAME})
-    if ("${LIBZ_LIBRARY}" STREQUAL "LIBZ_LIBRARY-NOTFOUND")
+    message(STATUS "Looking for libz - ${LIBZ_LIBRARY}")
+
+    if (NOT ZLIB_INCLUDE_DIR OR NOT LIBZ_LIBRARY)
         message(FATAL_ERROR "Unable to find zlib")
     endif()
+    get_filename_component(FOUND_ZLIB_ROOT_DIR ${ZLIB_INCLUDE_DIR} DIRECTORY)
 
     # Use the same OpenSSL library for libcurl as is used for
     # tarantool itself.
@@ -88,9 +94,10 @@ macro(curl_build)
 
                 --prefix <INSTALL_DIR>
                 --enable-static
-                --enable-shared
+                --disable-shared
+                --disable-symbol-hiding
 
-                --with-zlib
+                --with-zlib=${FOUND_ZLIB_ROOT_DIR}
                 ${LIBCURL_OPENSSL_OPT}
                 --with-ca-fallback
 
