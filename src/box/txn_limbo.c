@@ -281,7 +281,8 @@ static void
 txn_limbo_write_cb(struct journal_entry *entry)
 {
 	assert(entry->complete_data != NULL);
-	fiber_wakeup(entry->complete_data);
+	if (fiber() != entry->complete_data)
+		fiber_wakeup(entry->complete_data);
 }
 
 static void
