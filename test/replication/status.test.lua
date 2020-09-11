@@ -64,7 +64,7 @@ replica.uuid == box.space._cluster:get(replica_id)[2]
 -- replica.lsn == box.info.vclock[replica_id]
 replica.lsn == 0
 replica.upstream == nil
-test_run:wait_downstream(replica_id, {status == 'follow'})
+test_run:wait_downstream(replica_id, {status = 'follow'})
 -- wait for the replication vclock
 test_run:wait_cond(function()                    \
     local r = box.info.replication[replica_id].downstream.vclock \
@@ -88,7 +88,7 @@ box.info.vclock[master_id] == 2
 master = box.info.replication[master_id]
 master.id == master_id
 master.uuid == box.space._cluster:get(master_id)[2]
-test_run:wait_upstream(master_id, {status == 'follow'})
+test_run:wait_upstream(master_id, {status = 'follow'})
 master.upstream.lag < 1
 master.upstream.idle < 1
 master.upstream.peer:match("unix/")
