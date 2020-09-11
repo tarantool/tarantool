@@ -138,3 +138,54 @@ box.execute('SELECT * FROM t1;')
 box.execute('DROP VIEW v;')
 box.execute('DROP TABLE t;')
 box.execute('DROP TABLE t1;')
+
+--
+-- Make sure we can't alter a view.
+--
+box.execute("CREATE TABLE t1 (a INT PRIMARY KEY);")
+box.execute("CREATE VIEW v AS SELECT * FROM t1;")
+
+--
+-- Try to change owner.
+--
+view = box.space._space.index[2]:select('V')[1]:totable()
+view[2] = 1
+box.space._space:replace(view)
+
+--
+-- Try to rename.
+--
+view = box.space._space.index[2]:select('V')[1]:totable()
+view[3] = 'a'
+box.space._space:replace(view)
+
+--
+-- Try to change engine.
+--
+view = box.space._space.index[2]:select('V')[1]:totable()
+view[4] = 'a'
+box.space._space:replace(view)
+
+--
+-- Try to add a field.
+--
+view = box.space._space.index[2]:select('V')[1]:totable()
+view_format = box.space.V:format()
+f = {type = 'string', nullable_action = 'none', name = 'B', is_nullable = true}
+table.insert(view_format, f)
+view[5] = 2
+view[7] = view_format
+box.space._space:replace(view)
+
+--
+-- Try to modify format only.
+--
+view = box.space.V
+view:format{}
+
+view_format = box.space.V:format()
+view_format[1].name = 'B'
+view:format(view_format)
+
+box.execute("DROP VIEW v;")
+box.execute("DROP TABLE t1;")

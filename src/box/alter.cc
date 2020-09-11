@@ -2393,6 +2393,12 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		}
 	} else { /* UPDATE, REPLACE */
 		assert(old_space != NULL && new_tuple != NULL);
+		if (old_space->def->opts.is_view) {
+			diag_set(ClientError, ER_ALTER_SPACE,
+				 space_name(old_space),
+				 "view can not be altered");
+			return -1;
+		}
 		struct space_def *def =
 			space_def_new_from_tuple(new_tuple, ER_ALTER_SPACE,
 						 region);

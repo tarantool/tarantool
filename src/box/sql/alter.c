@@ -60,11 +60,6 @@ sql_alter_table_rename(struct Parse *parse)
 		diag_set(ClientError, ER_NO_SUCH_SPACE, tbl_name);
 		goto tnt_error;
 	}
-	if (space->def->opts.is_view) {
-		diag_set(ClientError, ER_ALTER_SPACE, tbl_name,
-			 "view may not be altered");
-		goto tnt_error;
-	}
 	sql_set_multi_write(parse, false);
 	/* Drop and reload the internal table schema. */
 	struct Vdbe *v = sqlGetVdbe(parse);
