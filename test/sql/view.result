@@ -44,7 +44,7 @@ v1[6]['view'] = false;
 ...
 box.space._space:replace(v1);
 ---
-- error: 'Can''t modify space ''V1'': can not convert a space to a view and vice versa'
+- error: 'Can''t modify space ''V1'': view can not be altered'
 ...
 t1 = box.space._space.index[2]:select('T1')[1]:totable();
 ---
@@ -68,7 +68,7 @@ v1[6]['view'] = true;
 ...
 box.space._space:replace(v1);
 ---
-- error: Space declared as a view must have SQL statement
+- error: 'Can''t modify space ''V1'': view can not be altered'
 ...
 -- Views can't be created via space_create().
 box.schema.create_space('view', {view = true})
@@ -397,6 +397,109 @@ box.execute('DROP TABLE t;')
 - row_count: 1
 ...
 box.execute('DROP TABLE t1;')
+---
+- row_count: 1
+...
+--
+-- Make sure we can't alter a view.
+--
+box.execute("CREATE TABLE t1 (a INT PRIMARY KEY);")
+---
+- row_count: 1
+...
+box.execute("CREATE VIEW v AS SELECT * FROM t1;")
+---
+- row_count: 1
+...
+--
+-- Try to change owner.
+--
+view = box.space._space.index[2]:select('V')[1]:totable()
+---
+...
+view[2] = 1
+---
+...
+box.space._space:replace(view)
+---
+- error: 'Can''t modify space ''V'': view can not be altered'
+...
+--
+-- Try to rename.
+--
+view = box.space._space.index[2]:select('V')[1]:totable()
+---
+...
+view[3] = 'a'
+---
+...
+box.space._space:replace(view)
+---
+- error: 'Can''t modify space ''V'': view can not be altered'
+...
+--
+-- Try to change engine.
+--
+view = box.space._space.index[2]:select('V')[1]:totable()
+---
+...
+view[4] = 'a'
+---
+...
+box.space._space:replace(view)
+---
+- error: 'Can''t modify space ''V'': view can not be altered'
+...
+--
+-- Try to add a field.
+--
+view = box.space._space.index[2]:select('V')[1]:totable()
+---
+...
+view_format = box.space.V:format()
+---
+...
+f = {type = 'string', nullable_action = 'none', name = 'B', is_nullable = true}
+---
+...
+table.insert(view_format, f)
+---
+...
+view[5] = 2
+---
+...
+view[7] = view_format
+---
+...
+box.space._space:replace(view)
+---
+- error: 'Can''t modify space ''V'': view can not be altered'
+...
+--
+-- Try to modify format only.
+--
+view = box.space.V
+---
+...
+view:format{}
+---
+- error: 'Can''t modify space ''V'': view can not be altered'
+...
+view_format = box.space.V:format()
+---
+...
+view_format[1].name = 'B'
+---
+...
+view:format(view_format)
+---
+- error: 'Can''t modify space ''V'': view can not be altered'
+...
+box.execute("DROP VIEW v;")
+---
+- row_count: 1
+...
+box.execute("DROP TABLE t1;")
 ---
 - row_count: 1
 ...
