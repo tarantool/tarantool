@@ -172,7 +172,7 @@ replica.upstream == nil
 ---
 - true
 ...
-test_run:wait_downstream(replica_id, {status == 'follow'})
+test_run:wait_downstream(replica_id, {status = 'follow'})
 ---
 - true
 ...
@@ -224,7 +224,7 @@ master.uuid == box.space._cluster:get(master_id)[2]
 ---
 - true
 ...
-test_run:wait_upstream(master_id, {status == 'follow'})
+test_run:wait_upstream(master_id, {status = 'follow'})
 ---
 - true
 ...
