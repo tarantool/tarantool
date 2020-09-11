@@ -650,10 +650,10 @@ checkpoint_add_space(struct space *sp, void *data)
 		return 0;
 	struct checkpoint *ckpt = (struct checkpoint *)data;
 	struct checkpoint_entry *entry;
-	entry = region_alloc_object(&fiber()->gc, struct checkpoint_entry);
+	int size;
+	entry = region_alloc_object(&fiber()->gc, struct checkpoint_entry, &size);
 	if (entry == NULL) {
-		diag_set(OutOfMemory, sizeof(*entry),
-			 "region", "struct checkpoint_entry");
+		diag_set(OutOfMemory, sizeof(*entry), "region", "checkpoint_entry");
 		return -1;
 	}
 	rlist_add_tail_entry(&ckpt->entries, entry, link);
@@ -715,7 +715,8 @@ memtx_engine_begin_checkpoint(struct engine *engine)
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 
 	assert(memtx->checkpoint == NULL);
-	memtx->checkpoint = region_alloc_object(&fiber()->gc, struct checkpoint);
+	int size;
+	memtx->checkpoint = region_alloc_object(&fiber()->gc, struct checkpoint, &size);
 	if (memtx->checkpoint == NULL) {
 		diag_set(OutOfMemory, sizeof(*memtx->checkpoint),
 			 "region", "struct checkpoint");

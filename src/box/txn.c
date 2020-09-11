@@ -48,10 +48,10 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 {
 	/* Create a redo log row for Lua requests */
 	struct xrow_header *row;
-	row = region_alloc_object(&fiber()->gc, struct xrow_header);
+	int size;
+	row = region_alloc_object(&fiber()->gc, struct xrow_header, &size);
 	if (row == NULL) {
-		diag_set(OutOfMemory, sizeof(*row),
-			 "region", "struct xrow_header");
+		diag_set(OutOfMemory, size, "region_alloc_object", "row");
 		return -1;
 	}
 	if (request->header != NULL) {
@@ -85,10 +85,10 @@ static struct txn_stmt *
 txn_stmt_new(struct txn *txn)
 {
 	struct txn_stmt *stmt;
-	stmt = region_alloc_object(&fiber()->gc, struct txn_stmt);
+	int size;
+	stmt = region_alloc_object(&fiber()->gc, struct txn_stmt, &size);
 	if (stmt == NULL) {
-		diag_set(OutOfMemory, sizeof(*stmt),
-			 "region", "struct txn_stmt");
+		diag_set(OutOfMemory, size, "region_alloc_object", "stmt");
 		return NULL;
 	}
 
@@ -141,9 +141,10 @@ txn_begin(bool is_autocommit)
 {
 	static int64_t txn_id = 0;
 	assert(! in_txn());
-	struct txn *txn = region_alloc_object(&fiber()->gc, struct txn);
+	int size;
+	struct txn *txn = region_alloc_object(&fiber()->gc, struct txn, &size);
 	if (txn == NULL) {
-		diag_set(OutOfMemory, sizeof(*txn), "region", "struct txn");
+		diag_set(OutOfMemory, size, "region_alloc_object", "txn");
 		return NULL;
 	}
 	/* Initialize members explicitly to save time on memset() */
@@ -512,12 +513,14 @@ box_txn_savepoint()
 		diag_set(ClientError, ER_SAVEPOINT_NO_TRANSACTION);
 		return NULL;
 	}
+	int size;
 	struct txn_savepoint *svp =
 		(struct txn_savepoint *) region_alloc_object(&fiber()->gc,
-							struct txn_savepoint);
+							struct txn_savepoint,
+							&size);
 	if (svp == NULL) {
 		diag_set(OutOfMemory, sizeof(*svp),
-			 "region", "struct txn_savepoint");
+			 "region_alloc_object", "txn_savepoint");
 		return NULL;
 	}
 	svp->stmt = stailq_last(&txn->stmts);
