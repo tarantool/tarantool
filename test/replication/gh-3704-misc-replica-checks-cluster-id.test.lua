@@ -9,7 +9,7 @@ test_run:cmd("create server replica with rpl_master=default, script='replication
 box.schema.user.grant("guest", "replication")
 test_run:cmd("start server replica")
 test_run:grep_log("replica", "REPLICASET_UUID_MISMATCH")
-box.info.replication[2].downstream.status
+test_run:wait_downstream(2, {status = 'follow'})
 -- change master's cluster uuid and check that replica doesn't connect.
 test_run:cmd("stop server replica")
 _ = box.space._schema:replace{'cluster', tostring(uuid.new())}
