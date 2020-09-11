@@ -23,9 +23,9 @@ test_run:grep_log("replica", "REPLICASET_UUID_MISMATCH")
 ---
 - null
 ...
-box.info.replication[2].downstream.status
+test_run:wait_downstream(2, {status = 'follow'})
 ---
-- follow
+- true
 ...
 -- change master's cluster uuid and check that replica doesn't connect.
 test_run:cmd("stop server replica")
