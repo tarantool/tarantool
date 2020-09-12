@@ -267,6 +267,11 @@ struct errcode_record {
 	/*212 */_(ER_SEQUENCE_NOT_STARTED,		"Sequence '%s' is not started") \
 	/*213 */_(ER_NO_SUCH_SESSION_SETTING,	"Session setting %s doesn't exist") \
 	/*214 */_(ER_TUPLE_METADATA_IS_TOO_BIG,	"Can't create tuple: metadata size %u is too big") \
+	/*215 */_(ER_UNUSED1,			"") \
+	/*216 */_(ER_UNUSED2,			"") \
+	/*217 */_(ER_UNUSED3,			"") \
+	/*218 */_(ER_UNUSED4,			"") \
+	/*219 */_(ER_XLOG_GAP,			"%s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

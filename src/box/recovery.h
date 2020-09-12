@@ -40,8 +40,6 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-extern const struct type_info type_XlogGapError;
-
 struct xrow_header;
 struct xstream;
 

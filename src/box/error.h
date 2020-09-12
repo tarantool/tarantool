@@ -178,6 +178,7 @@ box_error_new(const char *file, unsigned line, uint32_t code,
 
 extern const struct type_info type_ClientError;
 extern const struct type_info type_XlogError;
+extern const struct type_info type_XlogGapError;
 extern const struct type_info type_AccessDeniedError;
 extern const struct type_info type_CustomError;
 
