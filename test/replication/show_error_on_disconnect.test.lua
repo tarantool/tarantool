@@ -29,7 +29,7 @@ test_run:cmd("switch master_quorum1")
 box.cfg{replication = repl}
 box.space.test:select()
 other_id = box.info.id % 2 + 1
-test_run:wait_upstream(other_id, {status = 'stopped', message_re = 'Missing'})
+test_run:wait_upstream(other_id, {status = 'loading', message_re = 'Missing'})
 test_run:cmd("switch master_quorum2")
 box.space.test:select()
 other_id = box.info.id % 2 + 1
