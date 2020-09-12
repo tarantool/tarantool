@@ -437,6 +437,7 @@ t;
  |   216: box.error.SYNC_QUORUM_TIMEOUT
  |   217: box.error.SYNC_ROLLBACK
  |   218: box.error.TUPLE_METADATA_IS_TOO_BIG
+ |   219: box.error.XLOG_GAP
  | ...
 
 test_run:cmd("setopt delimiter ''");
