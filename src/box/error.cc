@@ -221,6 +221,8 @@ ClientError::get_errcode(const struct error *e)
 		return ER_SYSTEM;
 	if (type_cast(CollationError, e))
 		return ER_CANT_CREATE_COLLATION;
+	if (type_cast(XlogGapError, e))
+		return ER_XLOG_GAP;
 	return ER_PROC_LUA;
 }
 
