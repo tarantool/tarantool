@@ -27,10 +27,10 @@ fio.unlink(xlog)
 -- Check that even though box.cfg.force_recovery is set,
 -- replication will still fail due to LSN gap.
 box.cfg{force_recovery = true}
-test_run:cmd("start server test")
+test_run:cmd("start server test with wait=False")
 test_run:cmd("switch test")
+test_run:wait_upstream(1, {message_re = 'Missing %.xlog file', status = 'loading'})
 box.space.test:select()
-box.info.replication[1].upstream.status == 'stopped' or box.info
 test_run:cmd("switch default")
 box.cfg{force_recovery = false}
 

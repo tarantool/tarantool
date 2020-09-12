@@ -79,9 +79,14 @@ for i = 1, 3 do box.space.test:insert{i * 100} end
 fio = require('fio')
 test_run:wait_cond(function() return #fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog')) == 1 end) or fio.pathjoin(box.cfg.wal_dir, '*.xlog')
 box.cfg{checkpoint_count = checkpoint_count}
-test_run:cmd("start server replica with args='true'")
+test_run:cmd("start server replica with args='true', wait=False")
 test_run:cmd("switch replica")
-box.info.status -- orphan
+-- Need to wait for box.info.replication[1] defined, otherwise test-run fails to
+-- wait for the upstream status sometimes.
+test_run:wait_cond(function()                                                   \
+    return box.info ~= nil and box.info.replication[1] ~= nil                   \
+end)
+test_run:wait_upstream(1, {message_re = 'Missing %.xlog file', status = 'loading'})
 box.space.test:select()
 
 --

@@ -9,11 +9,13 @@ else
     repl_list = os.getenv("MASTER")
 end
 
+-- Start the console first to allow test-run to attach even before
+-- box.cfg is finished.
+require('console').listen(os.getenv('ADMIN'))
+
 box.cfg({
     listen              = os.getenv("LISTEN"),
     replication         = repl_list,
     memtx_memory        = 107374182,
     replication_timeout = 0.1,
 })
-
-require('console').listen(os.getenv('ADMIN'))

@@ -57,12 +57,14 @@ box.cfg.force_recovery
 -- try to start the replica, ha-ha
 -- (replication should fail, some rows are missing)
 --
-test_run:cmd("start server replica")
+test_run:cmd("start server replica with wait=False")
 test_run:cmd("switch replica")
-fiber = require('fiber')
-while box.info.replication[1].upstream.status ~= "stopped" do fiber.sleep(0.001) end
-box.info.replication[1].upstream.status
-box.info.replication[1].upstream.message
+-- Need to wait for box.info.replication[1] defined, otherwise test-run fails to
+-- wait for the upstream status sometimes.
+test_run:wait_cond(function()                                                   \
+    return box.info ~= nil and box.info.replication[1] ~= nil                   \
+end)
+test_run:wait_upstream(1, {message_re = 'Missing %.xlog file', status = 'loading'})
 box.space.test:select{}
 --
 --
