@@ -63,7 +63,7 @@ fio.unlink(xlog)
 box.cfg{force_recovery = true}
 ---
 ...
-test_run:cmd("start server test")
+test_run:cmd("start server test with wait=False")
 ---
 - true
 ...
@@ -71,13 +71,13 @@ test_run:cmd("switch test")
 ---
 - true
 ...
+test_run:wait_upstream(1, {message_re = 'Missing %.xlog file', status = 'loading'})
+---
+- true
+...
 box.space.test:select()
 ---
 - []
-...
-box.info.replication[1].upstream.status == 'stopped' or box.info
----
-- true
 ...
 test_run:cmd("switch default")
 ---

@@ -102,6 +102,7 @@ applier_log_error(struct applier *applier, struct error *e)
 	case ER_SYSTEM:
 	case ER_UNKNOWN_REPLICA:
 	case ER_PASSWORD_MISMATCH:
+	case ER_XLOG_GAP:
 		say_info("will retry every %.2lf second",
 			 replication_reconnect_interval());
 		break;
@@ -1142,6 +1143,32 @@ applier_f(va_list ap)
 				applier_disconnect(applier, APPLIER_STOPPED);
 				return -1;
 			}
+		} catch (XlogGapError *e) {
+			/*
+			 * Xlog gap error can't be a critical error. Because it
+			 * is totally normal during bootstrap. Consider the
+			 * case: node1 is a leader, it is booted with vclock
+			 * {1: 3}. Node2 connects and fetches snapshot of node1,
+			 * it also gets vclock {1: 3}. Then node1 writes
+			 * something and its vclock becomes {1: 4}. Now node3
+			 * boots from node1, and gets the same vclock. Vclocks
+			 * now look like this:
+			 *
+			 * - node1: {1: 4}, leader, has {1: 3} snap.
+			 * - node2: {1: 3}, booted from node1, has only snap.
+			 * - node3: {1: 4}, booted from node1, has only snap.
+			 *
+			 * If the cluster is a fullmesh, node2 will send
+			 * subscribe requests with vclock {1: 3}. If node3
+			 * receives it, it will respond with xlog gap error,
+			 * because it only has a snap with {1: 4}, nothing else.
+			 * In that case node2 should retry connecting to node3,
+			 * and in the meantime try to get newer changes from
+			 * node1.
+			 */
+			applier_log_error(applier, e);
+			applier_disconnect(applier, APPLIER_LOADING);
+			goto reconnect;
 		} catch (FiberIsCancelled *e) {
 			if (!diag_is_empty(&applier->diag)) {
 				diag_move(&applier->diag, &fiber()->diag);
