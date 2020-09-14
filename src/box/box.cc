@@ -1992,9 +1992,23 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	struct replica *replica = replica_by_uuid(&replica_uuid);
 
 	if (!anon && (replica == NULL || replica->id == REPLICA_ID_NIL)) {
-		tnt_raise(ClientError, ER_UNKNOWN_REPLICA,
-			  tt_uuid_str(&replica_uuid),
-			  tt_uuid_str(&REPLICASET_UUID));
+		/*
+		 * The instance is not anonymous, and is registered (at least it
+		 * claims so), but its ID is not delivered to the current
+		 * instance yet. Need to wait until its _cluster record arrives
+		 * from some third node. Likely to happen on bootstrap, when
+		 * there is a fullmesh and 1 leader doing all the _cluster
+		 * registrations. Not all of them are delivered to the other
+		 * nodes yet.
+		 * Also can happen when the replica is deleted from _cluster,
+		 * but still tries to subscribe. It won't have an ID here.
+		 */
+		tnt_raise(ClientError, ER_TOO_EARLY_SUBSCRIBE,
+			  tt_uuid_str(&replica_uuid));
+	}
+	if (anon && replica != NULL && replica->id != REPLICA_ID_NIL) {
+		tnt_raise(ClientError, ER_PROTOCOL, "Can't subscribe an "
+			  "anonymous replica having an ID assigned");
 	}
 	if (replica == NULL)
 		replica = replicaset_add_anon(&replica_uuid);
@@ -2207,15 +2221,6 @@ bootstrap_master(const struct tt_uuid *replicaset_uuid)
 	/* Register the first replica in the replica set */
 	box_register_replica(replica_id, &INSTANCE_UUID);
 	assert(replica_by_uuid(&INSTANCE_UUID)->id == 1);
-
-	/* Register other cluster members */
-	replicaset_foreach(replica) {
-		if (tt_uuid_is_equal(&replica->uuid, &INSTANCE_UUID))
-			continue;
-		assert(replica->applier != NULL);
-		box_register_replica(++replica_id, &replica->uuid);
-		assert(replica->id == replica_id);
-	}
 
 	/* Set UUID of a new replica set */
 	box_set_replicaset_uuid(replicaset_uuid);
