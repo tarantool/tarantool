@@ -748,6 +748,12 @@ box_tuple_new(box_tuple_format_t *format, const char *data, const char *end)
 	return tuple_bless(ret);
 }
 
+int
+box_tuple_validate(box_tuple_t *tuple, box_tuple_format_t *format)
+{
+	return tuple_validate(format, tuple);
+}
+
 /* }}} box_tuple_* */
 
 int
