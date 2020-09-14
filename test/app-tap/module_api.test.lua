@@ -38,6 +38,32 @@ local function test_pushcdata(test, module)
     test:is(gc_counter, 1, 'pushcdata gc')
 end
 
+local function test_tuple_validate(test, module)
+    test:plan(12)
+
+    local nottuple1 = {}
+    local nottuple2 = {true, 2}
+    local nottuple3 = {false, nil, 2}
+    local nottuple4 = {1, box.NULL, 2, 3}
+    local tuple1 = box.tuple.new(nottuple1)
+    local tuple2 = box.tuple.new(nottuple2)
+    local tuple3 = box.tuple.new(nottuple3)
+    local tuple4 = box.tuple.new(nottuple4)
+
+    test:ok(not module.tuple_validate_def(nottuple1), "not tuple 1")
+    test:ok(not module.tuple_validate_def(nottuple2), "not tuple 2")
+    test:ok(not module.tuple_validate_def(nottuple3), "not tuple 3")
+    test:ok(not module.tuple_validate_def(nottuple4), "not tuple 4")
+    test:ok(module.tuple_validate_def(tuple1), "tuple 1")
+    test:ok(module.tuple_validate_def(tuple2), "tuple 2")
+    test:ok(module.tuple_validate_def(tuple3), "tuple 3")
+    test:ok(module.tuple_validate_def(tuple4), "tuple 4")
+    test:ok(not module.tuple_validate_fmt(tuple1), "tuple 1 (fmt)")
+    test:ok(module.tuple_validate_fmt(tuple2), "tuple 2 (fmt)")
+    test:ok(module.tuple_validate_fmt(tuple3), "tuple 3 (fmt)")
+    test:ok(not module.tuple_validate_fmt(tuple4), "tuple 4 (fmt)")
+end
+
 local function test_iscdata(test, module)
     local ffi = require('ffi')
     ffi.cdef([[
@@ -177,7 +203,7 @@ local function test_iscallable(test, module)
 end
 
 local test = require('tap').test("module_api", function(test)
-    test:plan(35)
+    test:plan(36)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -204,6 +230,7 @@ local test = require('tap').test("module_api", function(test)
     test:test("pushcdata", test_pushcdata, module)
     test:test("iscdata", test_iscdata, module)
     test:test("iscallable", test_iscallable, module)
+    test:test("tuple_validate", test_tuple_validate, module)
 
     space:drop()
 end)
