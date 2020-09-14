@@ -290,6 +290,11 @@ replica_clear_id(struct replica *replica)
 	}
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);
+		/*
+		 * The replica had an ID, it couldn't be anon by
+		 * definition.
+		 */
+		assert(!replica->anon);
 		replica_delete(replica);
 	}
 }
@@ -332,6 +337,7 @@ replica_on_applier_connect(struct replica *replica)
 	assert(replica->applier_sync_state == APPLIER_DISCONNECTED);
 
 	replica->uuid = applier->uuid;
+	replica->anon = applier->ballot.is_anon;
 	replica->applier_sync_state = APPLIER_CONNECTED;
 	replicaset.applier.connected++;
 
@@ -362,6 +368,7 @@ replica_on_applier_connect(struct replica *replica)
 	} else {
 		/* Add a new struct replica */
 		replica_hash_insert(&replicaset.hash, replica);
+		replicaset.anon_count += replica->anon;
 	}
 }
 
@@ -390,7 +397,9 @@ replica_on_applier_reconnect(struct replica *replica)
 		if (orig == NULL) {
 			orig = replica_new();
 			orig->uuid = applier->uuid;
+			orig->anon = applier->ballot.is_anon;
 			replica_hash_insert(&replicaset.hash, orig);
+			replicaset.anon_count += orig->anon;
 		}
 
 		if (orig->applier != NULL) {
@@ -526,6 +535,7 @@ replicaset_update(struct applier **appliers, int count)
 
 		assert(!tt_uuid_is_nil(&applier->uuid));
 		replica->uuid = applier->uuid;
+		replica->anon = applier->ballot.is_anon;
 
 		if (replica_hash_search(&uniq, replica) != NULL) {
 			replica_clear_applier(replica);
@@ -582,6 +592,7 @@ replicaset_update(struct applier **appliers, int count)
 		} else {
 			/* Add a new struct replica */
 			replica_hash_insert(&replicaset.hash, replica);
+			replicaset.anon_count += replica->anon;
 		}
 
 		replica->applier_sync_state = APPLIER_CONNECTED;
@@ -593,6 +604,8 @@ replicaset_update(struct applier **appliers, int count)
 	replica_hash_foreach_safe(&replicaset.hash, replica, next) {
 		if (replica_is_orphan(replica)) {
 			replica_hash_remove(&replicaset.hash, replica);
+			replicaset.anon_count -= replica->anon;
+			assert(replicaset.anon_count >= 0);
 			replica_delete(replica);
 		}
 	}
@@ -907,12 +920,12 @@ replica_on_relay_stop(struct replica *replica)
 			replica->gc = NULL;
 		} else {
 			assert(replica->gc == NULL);
-			assert(replicaset.anon_count > 0);
-			replicaset.anon_count--;
 		}
 	}
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);
+		replicaset.anon_count -= replica->anon;
+		assert(replicaset.anon_count >= 0);
 		replica_delete(replica);
 	}
 }
