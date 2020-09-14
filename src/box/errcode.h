@@ -272,6 +272,7 @@ struct errcode_record {
         /*217 */_(ER_SYNC_ROLLBACK,             "A rollback for a synchronous transaction is received") \
 	/*218 */_(ER_TUPLE_METADATA_IS_TOO_BIG,	"Can't create tuple: metadata size %u is too big") \
 	/*219 */_(ER_XLOG_GAP,			"%s") \
+	/*220 */_(ER_TOO_EARLY_SUBSCRIBE,	"Can't subscribe non-anonymous replica %s until join is done") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

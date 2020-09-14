@@ -65,11 +65,14 @@ while test_run:cmd('eval replica1 "box.info.replication[1].upstream.status"')[1]
 test_run:cmd('eval replica1 "box.info.replication[1].upstream.message"')
 
 -- restart replica and check that replica isn't able to join to cluster
-test_run:cmd('restart server replica1')
+test_run:cmd('stop server replica1')
+test_run:cmd('start server replica1 with args="true 0"')
+test_run:cmd('switch replica1')
+test_run:wait_upstream(1, {message_re = "Can't subscribe non%-anonymous replica"})
 test_run:cmd('switch default')
 box.space._cluster:len() == 1
 test_run:cmd('eval replica1 "box.info.replication[1].upstream.status"')
-test_run:cmd('eval replica1 "box.info.replication[1].upstream.message"')[1]:match("is not registered with replica set") ~= nil
+test_run:cmd('eval replica1 "box.info.replication[1].upstream.message"')[1]:match("Can't subscribe non%-anonymous replica") ~= nil
 replica_set.delete(test_run, 2)
 
 box.space.test:drop()

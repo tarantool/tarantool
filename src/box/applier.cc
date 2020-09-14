@@ -107,6 +107,7 @@ applier_log_error(struct applier *applier, struct error *e)
 	case ER_UNKNOWN_REPLICA:
 	case ER_PASSWORD_MISMATCH:
 	case ER_XLOG_GAP:
+	case ER_TOO_EARLY_SUBSCRIBE:
 		say_info("will retry every %.2lf second",
 			 replication_reconnect_interval());
 		break;
@@ -1303,6 +1304,18 @@ applier_f(va_list ap)
 				return 0;
 			} else if (e->errcode() == ER_LOADING) {
 				/* Autobootstrap */
+				applier_log_error(applier, e);
+				applier_disconnect(applier, APPLIER_LOADING);
+				goto reconnect;
+			} else if (e->errcode() == ER_TOO_EARLY_SUBSCRIBE) {
+				/*
+				 * The instance is not anonymous, and is
+				 * registered, but its ID is not delivered to
+				 * all the nodes in the cluster yet, and some
+				 * nodes may ask to retry connection later,
+				 * until they receive _cluster record of this
+				 * instance. From some third node, for example.
+				 */
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_LOADING);
 				goto reconnect;
