@@ -272,6 +272,7 @@ struct errcode_record {
 	/*217 */_(ER_UNUSED3,			"") \
 	/*218 */_(ER_UNUSED4,			"") \
 	/*219 */_(ER_XLOG_GAP,			"%s") \
+	/*220 */_(ER_TOO_EARLY_SUBSCRIBE,	"Can't subscribe non-anonymous replica %s until join is done") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

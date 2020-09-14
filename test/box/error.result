@@ -434,6 +434,7 @@ t;
  |   213: box.error.NO_SUCH_SESSION_SETTING
  |   214: box.error.TUPLE_METADATA_IS_TOO_BIG
  |   219: box.error.XLOG_GAP
+ |   220: box.error.TOO_EARLY_SUBSCRIBE
  | ...
 
 test_run:cmd("setopt delimiter ''");
