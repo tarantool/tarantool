@@ -329,6 +329,7 @@ replica_on_applier_connect(struct replica *replica)
 	assert(replica->applier_sync_state == APPLIER_DISCONNECTED);
 
 	replica->uuid = applier->uuid;
+	replica->anon = applier->ballot.is_anon;
 	replica->applier_sync_state = APPLIER_CONNECTED;
 	replicaset.applier.connected++;
 
@@ -387,6 +388,7 @@ replica_on_applier_reconnect(struct replica *replica)
 		if (orig == NULL) {
 			orig = replica_new();
 			orig->uuid = applier->uuid;
+			orig->anon = applier->ballot.is_anon;
 			replica_hash_insert(&replicaset.hash, orig);
 		}
 
@@ -523,6 +525,7 @@ replicaset_update(struct applier **appliers, int count)
 
 		assert(!tt_uuid_is_nil(&applier->uuid));
 		replica->uuid = applier->uuid;
+		replica->anon = applier->ballot.is_anon;
 
 		if (replica_hash_search(&uniq, replica) != NULL) {
 			replica_clear_applier(replica);
