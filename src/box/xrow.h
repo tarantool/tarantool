@@ -333,6 +333,11 @@ struct ballot {
 	/** Set if the instance is running in read-only mode. */
 	bool is_ro;
 	/**
+	 * A flag whether the instance is anonymous, not having an
+	 * ID, and not going to request it.
+	 */
+	bool is_anon;
+	/**
 	 * Set if the instance hasn't finished bootstrap or recovery, or
 	 * is syncing with other replicas in the replicaset.
 	 */
