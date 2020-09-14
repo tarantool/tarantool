@@ -454,6 +454,16 @@ API_EXPORT box_key_def_t *
 box_key_def_new_v2(box_key_part_def_t *parts, uint32_t part_count);
 
 /**
+ * Duplicate key_def.
+ * @param key_def Original key_def.
+ *
+ * @retval not NULL Duplicate of src.
+ * @retval     NULL Memory error.
+ */
+API_EXPORT box_key_def_t *
+box_key_def_dup(const box_key_def_t *key_def);
+
+/**
  * Delete key definition
  *
  * \param key_def key definition to delete

@@ -507,6 +507,12 @@ box_key_def_new_v2(box_key_part_def_t *parts, uint32_t part_count)
 	return key_def;
 }
 
+box_key_def_t *
+box_key_def_dup(const box_key_def_t *key_def)
+{
+	return key_def_dup(key_def);
+}
+
 void
 box_key_def_delete(box_key_def_t *key_def)
 {
