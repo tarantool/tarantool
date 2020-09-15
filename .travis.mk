@@ -8,6 +8,12 @@ TEST_RUN_EXTRA_PARAMS?=
 MAX_FILES?=65534
 MAX_PROC?=2500
 OOS_SRC_PATH="/source"
+BIN_DIR=/usr/local/bin
+
+CLOJURE_URL="https://download.clojure.org/install/linux-install-1.10.1.561.sh"
+LEIN_URL="https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein"
+TERRAFORM_NAME="terraform_0.13.1_linux_amd64.zip"
+TERRAFORM_URL="https://releases.hashicorp.com/terraform/0.13.1/"$(TERRAFORM_NAME)
 
 all: package
 
@@ -75,6 +81,25 @@ deps_buster_clang_8: deps_debian
 	wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 	apt-get update
 	apt-get install -y clang-8 llvm-8-dev
+
+deps_debian_jepsen: $(BIN_DIR)/clojure $(BIN_DIR)/lein $(BIN_DIR)/terraform
+	apt-get update ${APT_EXTRA_FLAGS} && apt-get install -y -f \
+		openjdk-8-jre openjdk-8-jre-headless libjna-java gnuplot graphviz \
+		zip unzip openssh-client jq
+
+$(BIN_DIR)/clojure:
+	curl $(CLOJURE_URL) | sudo bash
+
+$(BIN_DIR)/lein:
+	curl $(LEIN_URL) > $@
+	chmod a+x $@
+
+$(BIN_DIR)/terraform:
+	apt-get update ${APT_EXTRA_FLAGS} && apt-get install -y -f \
+		unzip
+	curl -O $(TERRAFORM_URL)
+	unzip -o $(TERRAFORM_NAME) terraform -d $(dir $@)
+	rm -f $(TERRAFORM_NAME)
 
 # Release
 
@@ -262,3 +287,11 @@ test_freebsd_no_deps: build_freebsd
 	cd test && python2.7 test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_freebsd: deps_freebsd test_freebsd_no_deps
+
+# ###################
+# Jepsen testing
+# ###################
+
+test_jepsen: deps_debian_jepsen
+	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON
+	make jepsen-single
