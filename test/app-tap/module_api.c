@@ -1731,6 +1731,112 @@ test_key_def_extract_key(struct lua_State *L)
 	return 1;
 }
 
+/**
+ * Basic <box_key_def_validate_key>() test.
+ */
+static int
+test_key_def_validate_key(struct lua_State *L)
+{
+	/*
+	 * Create a key_def.
+	 *
+	 *  |              tuple
+	 *  |            [x, x, x]
+	 *  | key_def     ^     ^
+	 *  |    |        |     |
+	 *  |   (0) <-----+---- unsigned
+	 *  |    |        |
+	 *  |   (1) <---- unsigned (optional)
+	 */
+	box_key_part_def_t parts[2];
+	box_key_part_def_create(&parts[0]);
+	box_key_part_def_create(&parts[1]);
+	parts[0].fieldno = 2;
+	parts[0].field_type = "unsigned";
+	parts[1].fieldno = 0;
+	parts[1].field_type = "unsigned";
+	parts[1].flags |= BOX_KEY_PART_DEF_IS_NULLABLE;
+	box_key_def_t *key_def = box_key_def_new_v2(parts, 2);
+	assert(key_def != NULL);
+
+	/*
+	 * Create keys to validate them against given key_def.
+	 *
+	 *  | # | key            | Is valid? |
+	 *  | - | -------------- | --------- |
+	 *  | 0 | [1, 1]         | valid     |
+	 *  | 1 | [1, null]      | valid     |
+	 *  | 2 | [1]            | valid     |
+	 *  | 3 | []             | valid     |
+	 *  | 4 | [null]         | invalid   |
+	 *  | 5 | [1, 2, 3]      | invalid   |
+	 *  | 6 | [1, -1]        | invalid   |
+	 */
+	struct {
+		const char *data;
+		uint32_t size;
+	} keys[] = {
+		/* [0] = */ {"\x92\x01\x01",     3},
+		/* [1] = */ {"\x92\x01\xc0",     3},
+		/* [2] = */ {"\x91\x01",         2},
+		/* [3] = */ {"\x90",             1},
+		/* [4] = */ {"\x91\xc0",         2},
+		/* [5] = */ {"\x93\x01\x02\x03", 4},
+		/* [6] = */ {"\x92\x01\xff",     3},
+	};
+	int expected_results[] = {
+		/* [0] = */ 0,
+		/* [1] = */ 0,
+		/* [2] = */ 0,
+		/* [3] = */ 0,
+		/* [4] = */ -1,
+		/* [5] = */ -1,
+		/* [6] = */ -1,
+	};
+	uint32_t expected_error_codes[] = {
+		/* [0] = */ box_error_code_MAX,
+		/* [1] = */ box_error_code_MAX,
+		/* [2] = */ box_error_code_MAX,
+		/* [3] = */ box_error_code_MAX,
+		/* [4] = */ ER_KEY_PART_TYPE,
+		/* [5] = */ ER_KEY_PART_COUNT,
+		/* [6] = */ ER_KEY_PART_TYPE,
+	};
+
+	for (size_t i = 0; i < lengthof(keys); ++i) {
+		uint32_t key_size = 0;
+		const char *key = keys[i].data;
+		int rc = box_key_def_validate_key(key_def, key, &key_size);
+		assert(rc == expected_results[i]);
+		(void)rc;
+		(void)expected_results;
+
+		if (expected_error_codes[i] == box_error_code_MAX) {
+			/* Verify key_size. */
+			assert(key_size != 0);
+			assert(key_size == keys[i].size);
+
+			/*
+			 * Verify that no NULL pointer dereference
+			 * occurs when NULL is passed as
+			 * key_size_ptr.
+			 */
+			box_key_def_validate_key(key_def, key, NULL);
+		} else {
+			assert(rc != 0);
+			box_error_t *e = box_error_last();
+			(void)e;
+			assert(box_error_code(e) == expected_error_codes[i]);
+		}
+	}
+
+	/* Clean up. */
+	box_key_def_delete(key_def);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
 /* }}} key_def api v2 */
 
 static int
@@ -2122,6 +2228,7 @@ luaopen_module_api(lua_State *L)
 		{"test_key_def_validate_tuple", test_key_def_validate_tuple},
 		{"test_key_def_merge", test_key_def_merge},
 		{"test_key_def_extract_key", test_key_def_extract_key},
+		{"test_key_def_validate_key", test_key_def_validate_key},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
