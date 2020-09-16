@@ -134,8 +134,9 @@ key_validate(const struct index_def *index_def, enum iterator_type type,
 				 part_count);
 			return -1;
 		}
+		const char *key_end;
 		if (key_validate_parts(index_def->key_def, key,
-				       part_count, true) != 0)
+				       part_count, true, &key_end) != 0)
 			return -1;
 	}
 	return 0;
@@ -151,7 +152,8 @@ exact_key_validate(struct key_def *key_def, const char *key,
 			 part_count);
 		return -1;
 	}
-	return key_validate_parts(key_def, key, part_count, false);
+	const char *key_end;
+	return key_validate_parts(key_def, key, part_count, false, &key_end);
 }
 
 char *

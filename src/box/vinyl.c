@@ -1666,7 +1666,9 @@ vy_unique_key_validate(struct vy_lsm *lsm, const char *key,
 			 original_part_count, part_count);
 		return -1;
 	}
-	return key_validate_parts(lsm->cmp_def, key, part_count, false);
+	const char *key_end;
+	return key_validate_parts(lsm->cmp_def, key, part_count, false,
+				  &key_end);
 }
 
 /**

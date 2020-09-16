@@ -419,6 +419,32 @@ API_EXPORT char *
 box_key_def_extract_key(box_key_def_t *key_def, box_tuple_t *tuple,
 			int ignored, uint32_t *key_size_ptr);
 
+/**
+ * Check a key against given key definition.
+ *
+ * Verifies key parts against given key_def's field types with
+ * respect to nullability.
+ *
+ * A partial key (with less part than defined in @a key_def) is
+ * verified by given key parts, the omitted tail is not verified
+ * anyhow.
+ *
+ * Note: nil is accepted for nullable fields, but only for them.
+ *
+ * @param key_def       Key definition.
+ * @param key           MessagePack'ed data for matching.
+ * @param key_size_ptr  Here will be size of the validated key.
+ *
+ * @retval 0   The key is valid.
+ * @retval -1  The key is invalid.
+ *
+ * In case of an invalid key set a diag and return -1.
+ * @sa <box_error_last>().
+ */
+API_EXPORT int
+box_key_def_validate_key(const box_key_def_t *key_def, const char *key,
+			 uint32_t *key_size_ptr);
+
 /** \endcond public */
 
 /*
@@ -543,13 +569,15 @@ key_def_merge(const struct key_def *first, const struct key_def *second);
  * @param key MessagePack'ed data for matching.
  * @param part_count Field count in the key.
  * @param allow_nullable True if nullable parts are allowed.
+ * @param key_end[out] The end of the validated key.
  *
  * @retval 0  The key is valid.
  * @retval -1 The key is invalid.
  */
 int
 key_validate_parts(const struct key_def *key_def, const char *key,
-		   uint32_t part_count, bool allow_nullable);
+		   uint32_t part_count, bool allow_nullable,
+		   const char **key_end);
 
 /**
  * Return true if @a index_def defines a sequential key without
