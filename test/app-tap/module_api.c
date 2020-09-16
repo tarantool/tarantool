@@ -15,6 +15,10 @@
 #define STR2(x) #x
 #define STR(x) STR2(x)
 
+#ifndef lengthof
+#define lengthof(array) (sizeof(array) / sizeof((array)[0]))
+#endif
+
 /* Test for constants */
 static const char *consts[] = {
 	PACKAGE_VERSION,
@@ -442,6 +446,85 @@ test_tostring(lua_State *L)
 	return 1;
 }
 
+/* {{{ test_box_region */
+
+/**
+ * Verify basic usage of box region.
+ */
+static int
+test_box_region(struct lua_State *L)
+{
+	size_t region_svp_0 = box_region_used();
+
+	/* Verify allocation and box_region_used(). */
+	size_t size_arr[] = {1, 7, 19, 10 * 1024 * 1024, 1, 18, 1024};
+	size_t region_svp_arr[lengthof(size_arr)];
+	char *ptr_arr[lengthof(size_arr)];
+	for (size_t i = 0; i < lengthof(size_arr); ++i) {
+		size_t size = size_arr[i];
+		size_t region_svp = box_region_used();
+		char *ptr = box_region_alloc(size);
+
+		/* Verify box_region_used() after allocation. */
+		assert(box_region_used() - region_svp == size);
+
+		/* Verify that data is accessible. */
+		for (char *p = ptr; p < ptr + size; ++p)
+			*p = 'x';
+
+		/*
+		 * Save data pointer and savepoint to verify
+		 * truncation later.
+		 */
+		ptr_arr[i] = ptr;
+		region_svp_arr[i] = region_svp;
+	}
+
+	/* Verify truncation. */
+	for (ssize_t i = lengthof(region_svp_arr) - 1; i >= 0; --i) {
+		box_region_truncate(region_svp_arr[i]);
+		assert(box_region_used() == region_svp_arr[i]);
+
+		/*
+		 * Verify that all data before this savepoint
+		 * still accessible.
+		 */
+		for (ssize_t j = 0; j < i; ++j) {
+			size_t size = size_arr[j];
+			char *ptr = ptr_arr[j];
+			for (char *p = ptr; p < ptr + size; ++p) {
+				assert(*p == 'x' || *p == 'y');
+				*p = 'y';
+			}
+		}
+	}
+	assert(box_region_used() == region_svp_0);
+
+	/* Verify aligned allocation. */
+	size_t a_size_arr[] = {1, 3, 5, 7, 11, 13, 17, 19};
+	size_t alignment_arr[] = {1, 2, 4, 8, 16, 32, 64};
+	for (size_t s = 0; s < lengthof(a_size_arr); ++s) {
+		for (size_t a = 0; a < lengthof(alignment_arr); ++a) {
+			size_t size = a_size_arr[s];
+			size_t alignment = alignment_arr[a];
+			char *ptr = box_region_aligned_alloc(size, alignment);
+			assert((uintptr_t) ptr % alignment == 0);
+
+			/* Data is accessible. */
+			for (char *p = ptr; p < ptr + size; ++p)
+				*p = 'x';
+		}
+	}
+
+	/* Clean up. */
+	box_region_truncate(region_svp_0);
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+/* }}} test_box_region */
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -469,6 +552,7 @@ luaopen_module_api(lua_State *L)
 		{"test_cpcall", test_cpcall},
 		{"test_state", test_state},
 		{"test_tostring", test_tostring},
+		{"test_box_region", test_box_region},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

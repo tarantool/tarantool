@@ -313,6 +313,88 @@ struct slab_cache;
 API_EXPORT struct slab_cache *
 cord_slab_cache(void);
 
+/**
+ * box region allocator
+ *
+ * It is the region allocator from the small library. It is useful
+ * for allocating tons of small objects and free them at once.
+ *
+ * Typical usage is illustrated in the sketch below.
+ *
+ *  | size_t region_svp = box_region_used();
+ *  | while (<...>) {
+ *  |     char *buf = box_region_alloc(<...>);
+ *  |     <...>
+ *  | }
+ *  | box_region_truncate(region_svp);
+ *
+ * There are module API functions that return a result on
+ * this region. In this case a module is responsible to free the
+ * result:
+ *
+ *  | size_t region_svp = box_region_used();
+ *  | char *buf = box_<...>(<...>);
+ *  | <...>
+ *  | box_region_truncate(region_svp);
+ *
+ * This API provides better compatibility guarantees over using
+ * the small library directly in a module. A binary layout of
+ * internal structures may be changed in a future, but
+ * <box_region_*>() functions will remain API and ABI compatible.
+ *
+ * Data allocated on the region are guaranteed to be valid until
+ * a fiber yield or a call of a function from the certain set:
+ *
+ * - Related to transactions.
+ * - Ones that may cause box initialization (box.cfg()).
+ * - Ones that may involve SQL execution.
+ *
+ * FIXME: Provide more strict list of functions, which may
+ * invalidate the data: ones that may lead to calling of
+ * fiber_gc().
+ *
+ * It is safe to call simple box APIs around tuples, key_defs and
+ * so on -- they don't invalidate the allocated data.
+ *
+ * Don't assume this region as fiber local. This is an
+ * implementation detail and may be changed in a future.
+ */
+
+/** How much memory is used by the box region. */
+API_EXPORT size_t
+box_region_used(void);
+
+/**
+ * Allocate size bytes from the box region.
+ *
+ * Don't use this function to allocate a memory block for a value
+ * or array of values of a type with alignment requirements. A
+ * violation of alignment requirements leads to undefined
+ * behaviour.
+ *
+ * In case of a memory error set a diag and return NULL.
+ * @sa <box_error_last>().
+ */
+API_EXPORT void *
+box_region_alloc(size_t size);
+
+/**
+ * Allocate size bytes from the box region with given alignment.
+ *
+ * Alignment must be a power of 2.
+ *
+ * In case of a memory error set a diag and return NULL.
+ * @sa <box_error_last>().
+ */
+API_EXPORT void *
+box_region_aligned_alloc(size_t size, size_t alignment);
+
+/**
+ * Truncate the box region to the given size.
+ */
+API_EXPORT void
+box_region_truncate(size_t size);
+
 /** \endcond public */
 
 /**

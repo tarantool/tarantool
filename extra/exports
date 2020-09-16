@@ -209,6 +209,10 @@ clock_realtime64
 clock_monotonic64
 clock_process64
 clock_thread64
+box_region_aligned_alloc
+box_region_alloc
+box_region_truncate
+box_region_used
 
 # Lua / LuaJIT
 
