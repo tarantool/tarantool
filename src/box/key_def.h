@@ -396,6 +396,29 @@ box_tuple_compare_with_key(const box_tuple_t *tuple_a, const char *key_b,
 API_EXPORT box_key_def_t *
 box_key_def_merge(const box_key_def_t *first, const box_key_def_t *second);
 
+/**
+ * Extract key from tuple by given key definition and return
+ * buffer allocated on the box region with this key.
+ * @sa <box_region_truncate>().
+ *
+ * This function has O(n) complexity, where n is the number of key
+ * parts.
+ *
+ * @param key_def       Definition of key that need to extract.
+ * @param tuple         Tuple from which need to extract key.
+ * @param ignored       Ignored on this version of tarantool.
+ * @param key_size_ptr  Here will be size of extracted key.
+ *
+ * @retval not NULL  Success.
+ * @retval NULL      Memory allocation error.
+ *
+ * In case of an error set a diag and return NULL.
+ * @sa <box_error_last>().
+ */
+API_EXPORT char *
+box_key_def_extract_key(box_key_def_t *key_def, box_tuple_t *tuple,
+			int ignored, uint32_t *key_size_ptr);
+
 /** \endcond public */
 
 /*

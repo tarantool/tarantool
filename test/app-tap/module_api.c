@@ -1299,6 +1299,93 @@ test_key_def_merge(struct lua_State *L)
 	return 1;
 }
 
+/**
+ * Basic <box_key_def_extract_key>() test.
+ */
+static int
+test_key_def_extract_key(struct lua_State *L)
+{
+	size_t region_svp = box_region_used();
+
+	/*
+	 * Create a key_def.
+	 *
+	 *  |              tuple
+	 *  |            [x, x, x]
+	 *  | key_def     ^     ^
+	 *  |    |        |     |
+	 *  |   (0) <-----+---- string (optional)
+	 *  |    |        |
+	 *  |   (1) <---- unsigned
+	 */
+	box_key_part_def_t parts[2];
+	box_key_part_def_create(&parts[0]);
+	box_key_part_def_create(&parts[1]);
+	parts[0].fieldno = 2;
+	parts[0].field_type = "string";
+	parts[0].flags |= BOX_KEY_PART_DEF_IS_NULLABLE;
+	parts[1].fieldno = 0;
+	parts[1].field_type = "unsigned";
+	box_key_def_t *key_def = box_key_def_new_v2(parts, 2);
+	assert(key_def != NULL);
+
+	/*
+	 * Create tuples to extract keys from them.
+	 *
+	 *  | # | tuple         | key        |
+	 *  | - | ------------- | ---------- |
+	 *  | 0 | [1, 2, "moo"] | ["moo", 1] |
+	 *  | 1 | [1, 2, null]  | [null, 1]  |
+	 *  | 2 | [1, 2]        | [null, 1]  |
+	 *  | 3 | [1]           | [null, 1]  |
+	 */
+	box_tuple_t *tuples[] = {
+		/* [0] = */ new_runtime_tuple("\x93\x01\x02\xa3moo", 7),
+		/* [1] = */ new_runtime_tuple("\x93\x01\x02\xc0", 4),
+		/* [2] = */ new_runtime_tuple("\x92\x01\x02", 3),
+		/* [3] = */ new_runtime_tuple("\x91\x01", 2),
+	};
+	struct {
+		const char *key;
+		uint32_t key_size;
+	} expected_keys_1[] = {
+		/* [0] = */ {"\x92\xa3moo\x01", 6},
+		/* [1] = */ {"\x92\xc0\x01", 3},
+		/* [2] = */ {"\x92\xc0\x01", 3},
+		/* [3] = */ {"\x92\xc0\x01", 3},
+	};
+
+	for (size_t i = 0; i < lengthof(tuples); ++i) {
+		uint32_t key_size = 0;
+		char *key = box_key_def_extract_key(key_def, tuples[i], -1,
+						    &key_size);
+		assert(key != NULL);
+		uint32_t exp_key_size = expected_keys_1[i].key_size;
+		const char *exp_key = expected_keys_1[i].key;
+		assert(key_size == exp_key_size);
+		assert(memcmp(key, exp_key, exp_key_size) == 0);
+		(void)exp_key_size;
+		(void)exp_key;
+		(void)key_size;
+		(void)key;
+	}
+
+	/* Clean up. */
+	for (size_t i = 0; i < lengthof(tuples); ++i)
+		box_tuple_unref(tuples[i]);
+	box_key_def_delete(key_def);
+	box_region_truncate(region_svp);
+
+	/*
+	 * Dropped the multikey test case in the backported
+	 * version of the test, because tarantoo-1.10 does not
+	 * support it.
+	 */
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
 /* }}} key_def api v2 */
 
 static int
@@ -1679,6 +1766,7 @@ luaopen_module_api(lua_State *L)
 		{"test_key_def_dump_parts", test_key_def_dump_parts},
 		{"test_key_def_validate_tuple", test_key_def_validate_tuple},
 		{"test_key_def_merge", test_key_def_merge},
+		{"test_key_def_extract_key", test_key_def_extract_key},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
