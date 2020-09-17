@@ -281,14 +281,13 @@ tarantool_lua_errno_init(struct lua_State *L)
 #ifdef	EXDEV
 		{ "EXDEV",		EXDEV		},
 #endif
-		{ "",			0		}
 	};
 
 	static const luaL_Reg errnolib[] = {
 		{ NULL, NULL}
 	};
 	luaL_register_module(L, "errno", errnolib);
-	for (int i = 0; elist[i].name[0]; i++) {
+	for (int i = 0; i < (int)lengthof(elist); i++) {
 		lua_pushstring(L, elist[i].name);
 		lua_pushinteger(L, elist[i].value);
 		lua_rawset(L, -3);
