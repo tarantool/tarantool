@@ -452,13 +452,13 @@ debian_10:
     DIST: 'buster'
 
 opensuse_15_1:
-  <<: *pack_definition
+  <<: *pack_test_definition
   variables:
     OS: 'opensuse-leap'
     DIST: '15.1'
 
 opensuse_15_2:
-  <<: *pack_definition
+  <<: *pack_test_definition
   variables:
     OS: 'opensuse-leap'
     DIST: '15.2'
@@ -561,13 +561,13 @@ debian_10_deploy:
     DIST: 'buster'
 
 opensuse_15_1_deploy:
-  <<: *deploy_definition
+  <<: *deploy_test_definition
   variables:
     OS: 'opensuse-leap'
     DIST: '15.1'
 
 opensuse_15_2_deploy:
-  <<: *deploy_definition
+  <<: *deploy_test_definition
   variables:
     OS: 'opensuse-leap'
     DIST: '15.2'
