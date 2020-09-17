@@ -42,7 +42,7 @@ extern char errno_lua[];
 void
 tarantool_lua_errno_init(struct lua_State *L)
 {
-	static const struct { char name[32]; int value; } elist[] = {
+	static const struct { char *name; int value; } elist[] = {
 
 #ifdef	E2BIG
 		{ "E2BIG",		E2BIG		},
