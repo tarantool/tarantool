@@ -196,6 +196,44 @@ local function getpw(uid)
     return pwtotable(pw, gr)
 end
 
+--
+-- systemd v209 sets errno to ENOENT in
+-- _nss_systemd_getpwent_r and _nss_systemd_getgrent_r
+-- when there are no more entries left to enumerate.
+--
+-- This is a bug which has been fixed later in
+-- systemd code but we have to deal with buggy
+-- environment thus ignore such error if appears.
+--
+-- See the reference for details
+-- https://github.com/systemd/systemd/issues/9585
+--
+-- The issue affects getpwent/getgrent calls only
+-- thus provide own wrappings to keep workaround
+-- in one place and do not affect any other calls
+-- where ENOENT might become a valid error case.
+--
+-- Initially we observed this issue on Fedora 29
+-- when a password database is traversed for the
+-- first time.
+local function getpwent()
+    errno(0)
+    local pw = ffi.C.getpwent()
+    if pw == nil and errno() == errno.ENOENT then
+        errno(0)
+    end
+    return pw
+end
+
+local function getgrent()
+    errno(0)
+    local gr = ffi.C.getgrent()
+    if gr == nil and errno() == errno.ENOENT then
+        errno(0)
+    end
+    return gr
+end
+
 local function getpwall()
     ffi.C.setpwent()
     local pws = {}
@@ -203,8 +241,7 @@ local function getpwall()
     -- of a getpwent() current entry to a first one on CentOS 6
     -- and FreeBSD 12.
     while true do
-        errno(0)
-        local pw = ffi.C.getpwent()
+        local pw = getpwent()
         if pw == nil then
             pwgrcheck('getpwall', pw)
             break
@@ -223,8 +260,7 @@ local function getgrall()
     -- of a getgrent() current entry to a first one on CentOS 6
     -- and FreeBSD 12.
     while true do
-        errno(0)
-        local gr = ffi.C.getgrent()
+        local gr = getgrent()
         if gr == nil then
             pwgrcheck('getgrall', gr)
             break
@@ -236,14 +272,6 @@ local function getgrall()
 end
 
 -- }}}
-
--- Workaround pwd.getpwall() issue on Fedora 29: successful
--- getgrent() call that should normally return NULL and preserve
--- errno, set it to ENOENT due to systemd-nss issue [1] when a
--- password database is traversed first time.
---
--- [1]: https://github.com/systemd/systemd/issues/9585
-pcall(getpwall)
 
 return {
     getpw = getpw,
