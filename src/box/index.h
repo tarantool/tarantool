@@ -46,10 +46,11 @@ struct index_def;
 struct key_def;
 struct info_handler;
 
-/** \cond public */
-
 typedef struct tuple box_tuple_t;
 typedef struct key_def box_key_def_t;
+
+/** \cond public */
+
 typedef struct iterator box_iterator_t;
 
 /**
