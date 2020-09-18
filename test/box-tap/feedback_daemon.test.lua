@@ -164,33 +164,35 @@ local expected = {
 test:is_deeply(actual.features.schema, expected,
         'schema stats are empty at the moment')
 
-box.schema.create_space('features_vinyl', {engine = 'vinyl'})
-box.schema.create_space('features_memtx_empty')
+box.schema.create_space('features_vinyl', {engine = 'vinyl', if_not_exists = true})
+box.schema.create_space('features_memtx_empty', {if_not_exists = true})
 box.schema.create_space('features_memtx',
-        {engine = 'memtx', is_local = true, temporary = true})
-box.space.features_vinyl:create_index('vinyl_pk', {type = 'tree'})
-box.space.features_memtx:create_index('memtx_pk', {type = 'tree'})
-box.space.features_memtx:create_index('memtx_hash', {type = 'hash'})
-box.space.features_memtx:create_index('memtx_bitset', {type = 'bitset'})
+        {engine = 'memtx', is_local = true, temporary = true, if_not_exists = true})
+box.space.features_vinyl:create_index('vinyl_pk', {type = 'tree', if_not_exists = true})
+box.space.features_memtx:create_index('memtx_pk', {type = 'tree', if_not_exists = true})
+box.space.features_memtx:create_index('memtx_hash', {type = 'hash', if_not_exists = true})
+box.space.features_memtx:create_index('memtx_bitset', {type = 'bitset', if_not_exists = true})
 box.space.features_memtx:create_index('memtx_rtree',
-        {type = 'rtree', parts = {{field = 3, type = 'array'}}})
+        {type = 'rtree', parts = {{field = 3, type = 'array'}}, if_not_exists = true})
 box.space.features_memtx:create_index('memtx_jpath',
-        {parts = {{field = 4, type = 'str', path = 'data.name'}}})
+        {parts = {{field = 4, type = 'str', path = 'data.name'}}, if_not_exists = true})
 box.space.features_memtx:create_index('memtx_multikey',
-        {parts = {{field = 5, type = 'str', path = 'data[*].name'}}})
+        {parts = {{field = 5, type = 'str', path = 'data[*].name'}}, if_not_exists = true})
 box.schema.func.create('features_func', {
     body = "function(tuple) return {string.sub(tuple[2], 1, 1)} end",
     is_deterministic = true,
-    is_sandboxed = true})
+    is_sandboxed = true,
+    if_not_exists = true})
 box.schema.func.create('features_func_multikey', {
     body = "function(tuple) return {1, 2} end",
     is_deterministic = true,
     is_sandboxed = true,
-    opts = {is_multikey = true}})
+    opts = {is_multikey = true},
+    if_not_exists = true})
 box.space.features_memtx:create_index('functional',
-        {parts = {{field = 1, type = 'number'}}, func = 'features_func'})
+        {parts = {{field = 1, type = 'number'}}, func = 'features_func', if_not_exists = true})
 box.space.features_memtx:create_index('functional_multikey',
-        {parts = {{field = 1, type = 'number'}}, func = 'features_func_multikey'})
+        {parts = {{field = 1, type = 'number'}}, func = 'features_func_multikey', if_not_exists = true})
 
 actual = daemon.generate_feedback()
 local schema_stats = actual.features.schema
@@ -210,7 +212,7 @@ test:test('features.schema', function(t)
     t:is(schema_stats.functional_multikey_indices, 1, 'functional multikey index gathered')
 end)
 
-box.space.features_memtx:create_index('memtx_sec', {type = 'hash'})
+box.space.features_memtx:create_index('memtx_sec', {type = 'hash', if_not_exists = true})
 
 actual = daemon.generate_feedback()
 test:is(actual.features.schema.hash_indices, 2,
