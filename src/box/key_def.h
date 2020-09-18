@@ -167,10 +167,11 @@ key_def_swap(struct key_def *old_def, struct key_def *new_def);
 void
 key_def_delete(struct key_def *def);
 
+typedef struct tuple box_tuple_t;
+
 /** \cond public */
 
 typedef struct key_def box_key_def_t;
-typedef struct tuple box_tuple_t;
 
 /**
  * Create key definition with key fields with passed typed on passed positions.

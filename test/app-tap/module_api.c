@@ -198,6 +198,7 @@ test_toint64(lua_State *L)
 
 int fiber_test_func(va_list va)
 {
+	(void) va;
 	do {
 		fiber_set_cancellable(true);
 		fiber_sleep(0.01);
@@ -380,6 +381,7 @@ test_call(lua_State *L)
 static int
 cpcall_handler(lua_State *L)
 {
+	(void) L;
 	return 0;
 }
 
