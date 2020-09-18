@@ -217,6 +217,54 @@ local function fill_in_schema_stats(features)
     features.schema = cached_schema_features
 end
 
+local function read_first_file(pattern)
+    local path = fio.glob(pattern)[1]
+    if not path then
+        local err = string.format(
+            'Tarantool repo not installed: nothing matches "%s"',
+            pattern
+        )
+        return nil, err
+    end
+
+    local fh, err = fio.open(path, {'O_RDONLY'})
+    if not fh then
+        return nil, err
+    end
+
+    local s, err = fh:read()
+    fh:close()
+    if type(s) ~= 'string' then
+        return nil, err
+    end
+
+    return s
+end
+
+local function extract_repo_url_apt()
+    local content, err = read_first_file('/etc/apt/sources.list.d/tarantool*.list')
+    if not content then
+        return nil, err
+    end
+
+    return content:match('deb ([^ ]*)')
+end
+
+local function extract_repo_url_yum()
+    local content, err = read_first_file('/etc/yum.repos.d/tarantool*.repo')
+    if not content then
+        return nil, err
+    end
+
+    return content:match('baseurl=([^\n]*)')
+end
+
+local function fill_in_repo_url(feedback)
+    if jit.os == 'Linux' then
+        feedback.repo_url = extract_repo_url_yum() or extract_repo_url_apt()
+    end
+end
+
 local function fill_in_features(feedback)
     feedback.features = {}
     fill_in_schema_stats(feedback.features)
@@ -225,6 +273,7 @@ end
 local function fill_in_feedback(feedback)
     fill_in_base_info(feedback)
     fill_in_platform_info(feedback)
+    fill_in_repo_url(feedback)
     fill_in_features(feedback)
 
     return feedback
@@ -307,7 +356,7 @@ setmetatable(daemon, {
         end,
         -- this function is used in saving feedback in file
         generate_feedback = function()
-            return fill_in_feedback({ feedback_version = 2 })
+            return fill_in_feedback({ feedback_version = 3 })
         end,
         start = function()
             start(daemon)
