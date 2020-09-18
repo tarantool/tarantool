@@ -1,0 +1,26 @@
+name: CI
+
+on: [push]
+
+env:
+  IMAGE: "registry.gitlab.com/tarantool/tarantool/testing/debian-stretch/debian-stretch:latest"
+  GITLAB_MAKE: "make -f .gitlab.mk"
+
+jobs:
+  build:
+    runs-on: debian-stretch
+
+    strategy:
+      matrix:
+        tnt: [2.6]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      env:
+        TAG: '2.3'
+        DIR: '2.3'
+        PORT: 3323
+      run:
+        - >
+          make -f ${GITLAB_MAKE} test_debian_no_deps
