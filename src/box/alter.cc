@@ -391,9 +391,9 @@ space_opts_decode(struct space_opts *opts, const char *map,
 	if (opts->sql != NULL) {
 		char *sql = strdup(opts->sql);
 		if (sql == NULL) {
+			size_t optlen = strlen(opts->sql) + 1;
 			opts->sql = NULL;
-			diag_set(OutOfMemory, strlen(opts->sql) + 1, "strdup",
-				 "sql");
+			diag_set(OutOfMemory, optlen, "strdup", "sql");
 			return -1;
 		}
 		opts->sql = sql;
