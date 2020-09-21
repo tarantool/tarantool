@@ -379,6 +379,24 @@ test_key_def_api(lua_State *L)
  */
 
 /**
+ * Verify that two zero terminated strings are either both NULL
+ * or have equal values.
+ */
+static void
+string_check_equal(const char *a, const char *b)
+{
+	(void)a;
+	(void)b;
+	if (a == NULL) {
+		assert(b == NULL);
+	} else {
+		assert(b != NULL);
+		assert(strlen(a) == strlen(b));
+		assert(strcmp(a, b) == 0);
+	}
+}
+
+/**
  * Verify type and message of an error in the diagnostics area.
  *
  * Accepts a prefix of an actual type or a message. Pass an empty
@@ -514,6 +532,26 @@ key_part_def_check_zeros(const box_key_part_def_t *part)
 }
 
 /**
+ * Check that two key part definitions are equal.
+ *
+ * It compares only known fields and flags, but ignores padding
+ * bytes and unknown flags.
+ */
+static void
+key_part_def_check_equal(const box_key_part_def_t *a,
+			 const box_key_part_def_t *b)
+{
+	uint32_t known_flags = key_part_def_known_flags();
+	(void)known_flags;
+
+	assert(a->fieldno == b->fieldno);
+	assert((a->flags & known_flags) == (b->flags & known_flags));
+	string_check_equal(a->field_type, b->field_type);
+	string_check_equal(a->collation, b->collation);
+	string_check_equal(a->path, b->path);
+}
+
+/**
  * Basic <box_key_part_def_create>() and <box_key_def_new_v2>()
  * test.
  */
@@ -606,6 +644,105 @@ test_key_def_new_v2(struct lua_State *L)
 	box_tuple_unref(tuple_1);
 	box_tuple_unref(tuple_2);
 	box_key_def_delete(key_def);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+/**
+ * Basic <box_key_def_dump_parts>() test.
+ */
+static int
+test_key_def_dump_parts(struct lua_State *L)
+{
+	size_t region_svp = box_region_used();
+	box_key_def_t *key_def = NULL;
+	box_key_part_def_t *dump = NULL;
+	uint32_t dump_part_count = 0;
+
+	/*
+	 * Create a key_def with a single key part with all fields
+	 * and flags set to non-default values.
+	 */
+	box_key_part_def_t part;
+	key_part_def_set_nondefault(&part);
+	key_def = box_key_def_new_v2(&part, 1);
+	assert(key_def != NULL);
+
+	/*
+	 * Verify that the same values are dumped, but unknown
+	 * fields and flags are set to zeros.
+	 */
+	dump = box_key_def_dump_parts(key_def, &dump_part_count);
+	assert(dump != NULL);
+	assert(dump_part_count == 1);
+	key_part_def_check_equal(&part, &dump[0]);
+	key_part_def_check_zeros(&dump[0]);
+
+	/* We can pass NULL as <part_count_ptr>. */
+	dump = box_key_def_dump_parts(key_def, NULL);
+	assert(dump != NULL);
+
+	/* Clean up. */
+	box_key_def_delete(key_def);
+
+	/* Create a key_def from two key part definitions. */
+	box_key_part_def_t parts[2];
+	box_key_part_def_create(&parts[0]);
+	box_key_part_def_create(&parts[1]);
+	parts[0].fieldno = 19;
+	parts[0].field_type = "unsigned";
+	parts[0].path = "foo";
+	parts[1].fieldno = 7;
+	parts[1].field_type = "string";
+	parts[1].collation = "unicode";
+	parts[1].flags |= BOX_KEY_PART_DEF_IS_NULLABLE;
+	key_def = box_key_def_new_v2(parts, 2);
+	assert(key_def != NULL);
+
+	/* Verify how it'll be dumped. */
+	dump = box_key_def_dump_parts(key_def, &dump_part_count);
+	assert(dump != NULL);
+	assert(dump_part_count == 2);
+	key_part_def_check_equal(&parts[0], &dump[0]);
+	key_part_def_check_equal(&parts[1], &dump[1]);
+
+	/* Clean up. */
+	box_key_def_delete(key_def);
+
+	/* Can we again create a key_def from the dumped parts? */
+	key_def = box_key_def_new_v2(dump, dump_part_count);
+	assert(key_def != NULL);
+
+	/* Verify this dump based key_def. */
+	dump = box_key_def_dump_parts(key_def, &dump_part_count);
+	assert(dump != NULL);
+	assert(dump_part_count == 2);
+	key_part_def_check_equal(&parts[0], &dump[0]);
+	key_part_def_check_equal(&parts[1], &dump[1]);
+
+	/* Clean up. */
+	box_key_def_delete(key_def);
+
+	/*
+	 * 'none' collation is the same as lack of a collation
+	 * from key_def point of view. In the dump it is present
+	 * as NULL.
+	 */
+	parts[1].collation = "none";
+	key_def = box_key_def_new_v2(parts, 2);
+	assert(key_def != NULL);
+	dump = box_key_def_dump_parts(key_def, &dump_part_count);
+	assert(dump != NULL);
+	assert(dump_part_count == 2);
+	/* Set to NULL just for ease verification. */
+	parts[1].collation = NULL;
+	key_part_def_check_equal(&parts[0], &dump[0]);
+	key_part_def_check_equal(&parts[1], &dump[1]);
+
+	/* Clean up. */
+	box_key_def_delete(key_def);
+	box_region_truncate(region_svp);
 
 	lua_pushboolean(L, 1);
 	return 1;
@@ -998,6 +1135,7 @@ luaopen_module_api(lua_State *L)
 		{"test_tuple_encode", test_tuple_encode},
 		{"test_tuple_new", test_tuple_new},
 		{"test_key_def_new_v2", test_key_def_new_v2},
+		{"test_key_def_dump_parts", test_key_def_dump_parts},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
