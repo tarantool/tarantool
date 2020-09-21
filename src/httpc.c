@@ -185,11 +185,11 @@ httpc_set_header(struct httpc_request *req, const char *fmt, ...)
 	va_list ap;
 	va_start(ap, fmt);
 	int rc = vsnprintf(header, MAX_HEADER_LEN + 1, fmt, ap);
+	va_end(ap);
 	if (rc > MAX_HEADER_LEN) {
 		diag_set(IllegalParams, "header is too large");
 		return -1;
 	}
-	va_end(ap);
 
 	/**
 	 * Update flags for automanaged headers: no need to
