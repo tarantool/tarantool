@@ -462,6 +462,22 @@ API_EXPORT void
 box_key_def_delete(box_key_def_t *key_def);
 
 /**
+ * Dump key part definitions of given key_def.
+ *
+ * The function allocates key parts and storage for pointer fields
+ * (e.g. collation names) on the box region.
+ * @sa <box_region_truncate>().
+ *
+ * <box_key_part_def_t> fields that are unknown at given tarantool
+ * version are set to zero. The same for unknown <flags> bits.
+ *
+ * In case of an error set a diag and return NULL.
+ * @sa <box_error_last>().
+ */
+API_EXPORT box_key_part_def_t *
+box_key_def_dump_parts(const box_key_def_t *key_def, uint32_t *part_count_ptr);
+
+/**
  * Compare tuples using the key definition.
  * @param tuple_a first tuple
  * @param tuple_b second tuple
