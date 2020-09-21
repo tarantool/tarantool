@@ -169,13 +169,93 @@ key_def_delete(struct key_def *def);
 
 typedef struct tuple box_tuple_t;
 
+/* {{{ Module API */
+
 /** \cond public */
 
 typedef struct key_def box_key_def_t;
 
+/** Key part definition flags. */
+enum {
+	BOX_KEY_PART_DEF_IS_NULLABLE = 1 << 0,
+};
+
 /**
- * Create key definition with key fields with passed typed on passed positions.
+ * It is recommended to verify size of <box_key_part_def_t>
+ * against this constant on the module side at build time.
+ * Example:
+ *
+ * | #if !defined(__cplusplus) && !defined(static_assert)
+ * | #define static_assert _Static_assert
+ * | #endif
+ * |
+ * | (slash)*
+ * |  * Verify that <box_key_part_def_t> has the same size when
+ * |  * compiled within tarantool and within the module.
+ * |  *
+ * |  * It is important, because the module allocates an array of key
+ * |  * parts and passes it to <box_key_def_new_v2>() tarantool
+ * |  * function.
+ * |  *(slash)
+ * | static_assert(sizeof(box_key_part_def_t) == BOX_KEY_PART_DEF_T_SIZE,
+ * |               "sizeof(box_key_part_def_t)");
+ *
+ * This snippet is not part of module.h, because portability of
+ * static_assert() / _Static_assert() is dubious. It should be
+ * decision of a module author how portable its code should be.
+ */
+enum {
+	BOX_KEY_PART_DEF_T_SIZE = 64,
+};
+
+/**
+ * Public representation of a key part definition.
+ *
+ * Usage: Allocate an array of such key parts, initialize each
+ * key part (call <box_key_part_def_create>() and set necessary
+ * fields), pass the array into <box_key_def_new_v2>() function.
+ *
+ * Important: A module should call <box_key_part_def_create>()
+ * to initialize the structure with default values. There is no
+ * guarantee that all future default values for fields and flags
+ * will be remain the same.
+ *
+ * The idea of separation from internal <struct key_part_def> is
+ * to provide stable API and ABI for modules.
+ *
+ * New fields may be added into the end of the structure in later
+ * tarantool versions. Also new flags may be introduced within
+ * <flags> field. <collation> cannot be changed to a union (to
+ * reuse for some other value), because it is verified even for
+ * a non-string key part by <box_key_def_new_v2>().
+ *
+ * Fields that are unknown at given tarantool version are ignored
+ * in general, but filled with zeros when initialized.
+ */
+typedef union PACKED {
+	struct {
+		/** Index of a tuple field (zero based). */
+		uint32_t fieldno;
+		/** Flags, e.g. nullability. */
+		uint32_t flags;
+		/** Type of the tuple field. */
+		const char *field_type;
+		/** Collation name for string comparisons. */
+		const char *collation;
+	};
+	/**
+	 * Padding to guarantee certain size across different
+	 * tarantool versions.
+	 */
+	char padding[BOX_KEY_PART_DEF_T_SIZE];
+} box_key_part_def_t;
+
+/**
+ * Create key definition with given field numbers and field types.
+ *
  * May be used for tuple format creation and/or tuple comparison.
+ *
+ * \sa <box_key_def_new_v2>().
  *
  * \param fields array with key field identifiers
  * \param types array with key field types (see enum field_type)
@@ -184,6 +264,53 @@ typedef struct key_def box_key_def_t;
  */
 API_EXPORT box_key_def_t *
 box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count);
+
+/**
+ * Initialize a key part with default values.
+ *
+ *  | Field       | Default value   | Details |
+ *  | ----------- | --------------- | ------- |
+ *  | fieldno     | 0               |         |
+ *  | flags       | <default flags> |         |
+ *  | field_type  | NULL            | [^1]    |
+ *  | collation   | NULL            |         |
+ *
+ * Default flag values are the following:
+ *
+ *  | Flag                         | Default value |
+ *  | ---------------------------- | ------------- |
+ *  | BOX_KEY_PART_DEF_IS_NULLABLE | 0 (unset)     |
+ *
+ * Default values of fields and flags are permitted to be changed
+ * in future tarantool versions. However we should be VERY
+ * conservative here and consider any meaningful usage scenarios,
+ * when doing so. At least new defaults should be consistent with
+ * how tarantool itself doing key_def related operations:
+ * validation, key extraction, comparisons and so on.
+ *
+ * All trailing padding bytes are set to zero. The same for
+ * unknown <flags> bits.
+ *
+ * [^1]: <box_key_def_new_v2>() does not accept NULL as a
+ *       <field_type>, so it should be filled explicitly.
+ */
+API_EXPORT void
+box_key_part_def_create(box_key_part_def_t *part);
+
+/**
+ * Create a key_def from given key parts.
+ *
+ * Unlike <box_key_def_new>() this function allows to define
+ * nullability, collation and other options for each key part.
+ *
+ * <box_key_part_def_t> fields that are unknown at given tarantool
+ * version are ignored. The same for unknown <flags> bits.
+ *
+ * In case of an error set a diag and return NULL.
+ * @sa <box_error_last>().
+ */
+API_EXPORT box_key_def_t *
+box_key_def_new_v2(box_key_part_def_t *parts, uint32_t part_count);
 
 /**
  * Delete key definition
@@ -222,6 +349,16 @@ box_tuple_compare_with_key(const box_tuple_t *tuple_a, const char *key_b,
 			   box_key_def_t *key_def);
 
 /** \endcond public */
+
+/*
+ * Size of the structure should remain the same across all
+ * tarantool versions in order to allow to allocate an array of
+ * them.
+ */
+static_assert(sizeof(box_key_part_def_t) == BOX_KEY_PART_DEF_T_SIZE,
+	      "sizeof(box_key_part_def_t)");
+
+/* }}} Module API */
 
 static inline size_t
 key_def_sizeof(uint32_t part_count)

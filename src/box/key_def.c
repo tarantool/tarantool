@@ -35,6 +35,7 @@
 #include "column_mask.h"
 #include "schema_def.h"
 #include "coll_id_cache.h"
+#include "fiber.h"
 
 const struct key_part_def key_part_def_default = {
 	0,
@@ -192,6 +193,55 @@ key_def_dump_parts(const struct key_def *def, struct key_part_def *parts)
 	}
 }
 
+/* {{{ Module API helpers */
+
+static int
+key_def_set_internal_part(struct key_part_def *internal_part,
+			  box_key_part_def_t *part)
+{
+	*internal_part = key_part_def_default;
+
+	/* Set internal_part->fieldno. */
+	internal_part->fieldno = part->fieldno;
+
+	/* Set internal_part->type. */
+	if (part->field_type == NULL) {
+		diag_set(IllegalParams, "Field type is mandatory");
+		return -1;
+	}
+	size_t type_len = strlen(part->field_type);
+	internal_part->type = field_type_by_name(part->field_type, type_len);
+	if (internal_part->type == field_type_MAX) {
+		diag_set(IllegalParams, "Unknown field type: \"%s\"",
+			 part->field_type);
+		return -1;
+	}
+
+	/* Set internal_part->is_nullable. */
+	internal_part->is_nullable =
+		(part->flags & BOX_KEY_PART_DEF_IS_NULLABLE) ==
+		BOX_KEY_PART_DEF_IS_NULLABLE;
+
+	/* Set internal_part->coll_id. */
+	if (part->collation != NULL) {
+		size_t collation_len = strlen(part->collation);
+		struct coll_id *coll_id = coll_by_name(part->collation,
+						       collation_len);
+		if (coll_id == NULL) {
+			diag_set(IllegalParams, "Unknown collation: \"%s\"",
+				 part->collation);
+			return -1;
+		}
+		internal_part->coll_id = coll_id->id;
+	}
+
+	return 0;
+}
+
+/* }}} Module API helpers */
+
+/* {{{ Module API functions */
+
 box_key_def_t *
 box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
 {
@@ -211,6 +261,73 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
 				 false, NULL, COLL_NONE);
 	}
 	key_def_set_cmp(key_def);
+	return key_def;
+}
+
+void
+box_key_part_def_create(box_key_part_def_t *part)
+{
+	memset(part, 0, sizeof(*part));
+}
+
+box_key_def_t *
+box_key_def_new_v2(box_key_part_def_t *parts, uint32_t part_count)
+{
+	if (part_count == 0) {
+		diag_set(IllegalParams, "At least one key part is required");
+		return NULL;
+	}
+
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	size_t internal_parts_size;
+	struct key_part_def *internal_parts =
+		region_alloc_array(region, typeof(internal_parts[0]),
+				   part_count, &internal_parts_size);
+	if (internal_parts == NULL) {
+		diag_set(OutOfMemory, internal_parts_size, "region_alloc_array",
+			 "parts");
+		return NULL;
+	}
+
+	/*
+	 * It is possible to implement a function similar to
+	 * key_def_new() and eliminate <box_key_part_def_t> ->
+	 * <struct key_part_def> copying. However this would lead
+	 * to code duplication and would complicate maintanence,
+	 * so it worth to do so only if key_def creation will
+	 * appear on a hot path in some meaningful use case.
+	 */
+	uint32_t min_field_count = 0;
+	for (uint32_t i = 0; i < part_count; ++i) {
+		if (key_def_set_internal_part(&internal_parts[i],
+					      &parts[i]) != 0) {
+			region_truncate(region, region_svp);
+			return NULL;
+		}
+		bool is_nullable =
+			(parts[i].flags & BOX_KEY_PART_DEF_IS_NULLABLE) ==
+			BOX_KEY_PART_DEF_IS_NULLABLE;
+		if (!is_nullable && parts[i].fieldno > min_field_count)
+			min_field_count = parts[i].fieldno;
+	}
+
+	struct key_def *key_def = key_def_new(internal_parts, part_count);
+	region_truncate(region, region_svp);
+	if (key_def == NULL)
+		return NULL;
+
+	/*
+	 * Update key_def->has_optional_parts and function
+	 * pointers.
+	 *
+	 * FIXME: It seems, this call should be part of
+	 * key_def_new(), because otherwise a callee function may
+	 * obtain an incorrect key_def. However I don't know any
+	 * case that would prove this guess.
+	 */
+	key_def_update_optionality(key_def, min_field_count);
+
 	return key_def;
 }
 
@@ -235,6 +352,8 @@ box_tuple_compare_with_key(const box_tuple_t *tuple_a, const char *key_b,
 	return tuple_compare_with_key(tuple_a, key_b, part_count, key_def);
 
 }
+
+/* }}} Module API functions */
 
 int
 key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
