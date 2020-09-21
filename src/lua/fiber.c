@@ -213,7 +213,12 @@ fiber_backtrace_cb(int frameno, void *frameret, const char *func, size_t offset,
 {
 	struct lua_fiber_tb_ctx *tb_ctx = (struct lua_fiber_tb_ctx *)cb_ctx;
 	struct lua_State *L = tb_ctx->L;
-	if (strstr(func, "lj_BC_FUNCC") == func) {
+	/*
+	 * There is impossible to get func == NULL until
+	 * https://github.com/tarantool/tarantool/issues/5326
+	 * will not resolved, but is possible afterwards.
+	 */
+	if (func != NULL && strstr(func, "lj_BC_FUNCC") == func) {
 		/* We are in the LUA vm. */
 		lua_Debug ar;
 		while (tb_ctx->R && lua_getstack(tb_ctx->R, tb_ctx->lua_frame, &ar) > 0) {
