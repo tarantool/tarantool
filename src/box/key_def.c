@@ -337,6 +337,70 @@ box_key_def_delete(box_key_def_t *key_def)
 	key_def_delete(key_def);
 }
 
+box_key_part_def_t *
+box_key_def_dump_parts(const box_key_def_t *key_def, uint32_t *part_count_ptr)
+{
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	size_t size;
+	box_key_part_def_t *parts = region_alloc_array(
+		region, typeof(parts[0]), key_def->part_count, &size);
+	if (parts == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc_array", "parts");
+		return NULL;
+	}
+
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		const struct key_part *part = &key_def->parts[i];
+		box_key_part_def_t *part_def = &parts[i];
+		box_key_part_def_create(part_def);
+
+		/* Set part->{fieldno,flags,field_type}. */
+		part_def->fieldno = part->fieldno;
+		part_def->flags = 0;
+		if (part->is_nullable)
+			part_def->flags |= BOX_KEY_PART_DEF_IS_NULLABLE;
+		assert(part->type >= 0 && part->type < field_type_MAX);
+		part_def->field_type = field_type_strs[part->type];
+
+		/* Set part->collation. */
+		if (part->coll_id != COLL_NONE) {
+			struct coll_id *coll_id = coll_by_id(part->coll_id);
+			/*
+			 * A collation may be removed after
+			 * key_def creation.
+			 */
+			if (coll_id == NULL) {
+				diag_set(CollationError,
+					 "key_def holds dead collation id %d",
+					 part->coll_id);
+				region_truncate(region, region_svp);
+				return NULL;
+			}
+			/*
+			 * A collation may be removed while the
+			 * resulting key parts array is in use.
+			 */
+			char *collation = region_alloc(region,
+						       coll_id->name_len + 1);
+			if (collation == NULL) {
+				diag_set(OutOfMemory, coll_id->name_len + 1,
+					 "region_alloc", "part_def->collation");
+				region_truncate(region, region_svp);
+				return NULL;
+			}
+			memcpy(collation, coll_id->name, coll_id->name_len);
+			collation[coll_id->name_len] = '\0';
+			part_def->collation = collation;
+		}
+	}
+
+	if (part_count_ptr != NULL)
+		*part_count_ptr = key_def->part_count;
+
+	return parts;
+}
+
 int
 box_tuple_compare(const box_tuple_t *tuple_a, const box_tuple_t *tuple_b,
 		  box_key_def_t *key_def)
