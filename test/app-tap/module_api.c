@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <string.h>
 #include <module.h>
 
 #include <small/ibuf.h>
@@ -319,6 +320,8 @@ error:
 	return 1;
 }
 
+/* {{{ key_def api */
+
 static int
 test_key_def_api(lua_State *L)
 {
@@ -364,6 +367,251 @@ test_key_def_api(lua_State *L)
 	box_key_def_delete(key_defs[1]);
 	return 1;
 }
+
+/* }}} key_def api */
+
+/* {{{ key_def api v2 */
+
+/*
+ * More functions around key_def were exposed to the module API
+ * in order to implement external tuple.keydef and tuple.merger
+ * modules (gh-5273, gh-5384).
+ */
+
+/**
+ * Verify type and message of an error in the diagnostics area.
+ *
+ * Accepts a prefix of an actual type or a message. Pass an empty
+ * string if you need to verify only type or only message.
+ */
+static void
+check_diag(const char *exp_err_type, const char *exp_err_msg)
+{
+	(void)exp_err_type;
+	(void)exp_err_msg;
+	box_error_t *e = box_error_last();
+	(void)e;
+	assert(strcmp(box_error_type(e), exp_err_type) == 0);
+	assert(strcmp(box_error_message(e), exp_err_msg) == 0);
+}
+
+/**
+ * Create a tuple on runtime arena.
+ *
+ * Release this tuple using <box_tuple_unref>().
+ */
+static box_tuple_t *
+new_runtime_tuple(const char *tuple_data, size_t tuple_size)
+{
+	box_tuple_format_t *fmt = box_tuple_format_default();
+	const char *tuple_end = tuple_data + tuple_size;
+	box_tuple_t *tuple = box_tuple_new(fmt, tuple_data, tuple_end);
+	assert(tuple != NULL);
+	box_tuple_ref(tuple);
+	return tuple;
+}
+
+/**
+ * Where padding bytes starts.
+ */
+static size_t
+key_part_padding_offset(void)
+{
+	if (sizeof(void *) * CHAR_BIT == 64)
+		return 32;
+	if (sizeof(void *) * CHAR_BIT == 32)
+		return 20;
+	assert(false);
+}
+
+/**
+ * Mask of all defined flags.
+ */
+static uint32_t
+key_part_def_known_flags(void)
+{
+	return BOX_KEY_PART_DEF_IS_NULLABLE;
+}
+
+/**
+ * Default flags value.
+ *
+ * All unknown bits are set to zero.
+ */
+static uint32_t
+key_part_def_default_flags(void)
+{
+	return 0;
+}
+
+/**
+ * Set all <box_key_part_def_t> fields to nondefault values.
+ *
+ * It also set all padding bytes and unknown flags to non-zero
+ * values.
+ */
+static void
+key_part_def_set_nondefault(box_key_part_def_t *part)
+{
+	size_t padding_offset = key_part_padding_offset();
+	uint32_t default_flags = key_part_def_default_flags();
+
+	/*
+	 * Give correct non-default values for known fields and
+	 * flags. Set unknown flags to non-zero values.
+	 */
+	part->fieldno = 1;
+	part->flags = ~default_flags;
+	part->field_type = "string";
+	part->collation = "unicode_ci";
+	part->path = "foo";
+
+	/* Fill padding with non-zero bytes. */
+	char *padding = ((char *) part) + padding_offset;
+	size_t padding_size = sizeof(box_key_part_def_t) - padding_offset;
+	memset(padding, 0xff, padding_size);
+}
+
+/**
+ * Verify that all known fields and flags are set to default
+ * values.
+ */
+static void
+key_part_def_check_default(box_key_part_def_t *part)
+{
+	(void)part;
+	uint32_t known_flags = key_part_def_known_flags();
+	uint32_t default_flags = key_part_def_default_flags();
+	(void)known_flags;
+	(void)default_flags;
+
+	assert(part->fieldno == 0);
+	assert((part->flags & known_flags) == default_flags);
+	assert(part->field_type == NULL);
+	assert(part->collation == NULL);
+	assert(part->path == NULL);
+}
+
+/**
+ * Verify that all padding bytes and unknown flags are set to
+ * zeros.
+ */
+static void
+key_part_def_check_zeros(const box_key_part_def_t *part)
+{
+	size_t padding_offset = key_part_padding_offset();
+	uint32_t unknown_flags = ~key_part_def_known_flags();
+	(void)unknown_flags;
+
+	char *padding = ((char *) part) + padding_offset;
+	char *padding_end = ((char *) part) + sizeof(box_key_part_def_t);
+	for (char *p = padding; p < padding_end; ++p) {
+		(void)p;
+		assert(*p == 0);
+	}
+
+	assert((part->flags & unknown_flags) == 0);
+}
+
+/**
+ * Basic <box_key_part_def_create>() and <box_key_def_new_v2>()
+ * test.
+ */
+static int
+test_key_def_new_v2(struct lua_State *L)
+{
+	/* Verify <box_key_part_def_t> binary layout. */
+	assert(BOX_KEY_PART_DEF_T_SIZE == 64);
+	assert(sizeof(box_key_part_def_t) == BOX_KEY_PART_DEF_T_SIZE);
+	assert(offsetof(box_key_part_def_t, fieldno) == 0);
+	assert(offsetof(box_key_part_def_t, flags) == 4);
+	assert(offsetof(box_key_part_def_t, field_type) == 8);
+	if (sizeof(void *) * CHAR_BIT == 64) {
+		assert(offsetof(box_key_part_def_t, collation) == 16);
+		assert(offsetof(box_key_part_def_t, path) == 24);
+	} else if (sizeof(void *) * CHAR_BIT == 32) {
+		assert(offsetof(box_key_part_def_t, collation) == 12);
+		assert(offsetof(box_key_part_def_t, path) == 16);
+	} else {
+		assert(false);
+	}
+
+	/*
+	 * Fill key part definition with nondefault values.
+	 * Fill padding and unknown flags with non-zero values.
+	 */
+	box_key_part_def_t part;
+	key_part_def_set_nondefault(&part);
+
+	/*
+	 * Verify that all known fields are set to default values and
+	 * all unknown fields and flags are set to zeros.
+	 */
+	box_key_part_def_create(&part);
+	key_part_def_check_default(&part);
+	key_part_def_check_zeros(&part);
+
+	box_key_def_t *key_def;
+
+	/* Should not accept zero part count. */
+	key_def = box_key_def_new_v2(NULL, 0);
+	assert(key_def == NULL);
+	check_diag("IllegalParams", "At least one key part is required");
+
+	/* Should not accept NULL as a <field_type>. */
+	key_def = box_key_def_new_v2(&part, 1);
+	assert(key_def == NULL);
+	check_diag("IllegalParams", "Field type is mandatory");
+
+	/* Success case. */
+	part.field_type = "unsigned";
+	key_def = box_key_def_new_v2(&part, 1);
+	assert(key_def != NULL);
+
+	/*
+	 * Prepare tuples to do some comparisons.
+	 *
+	 * [1, 2, 3] and [3, 2, 1].
+	 */
+	box_tuple_t *tuple_1 = new_runtime_tuple("\x93\x01\x02\x03", 4);
+	box_tuple_t *tuple_2 = new_runtime_tuple("\x93\x03\x02\x01", 4);
+
+	/*
+	 * Verify that key_def actually can be used in functions
+	 * that accepts it.
+	 *
+	 * Do several comparisons. Far away from being an
+	 * exhaustive comparator test.
+	 */
+	int rc;
+	(void)rc;
+	rc = box_tuple_compare(tuple_1, tuple_1, key_def);
+	assert(rc == 0);
+	rc = box_tuple_compare(tuple_2, tuple_2, key_def);
+	assert(rc == 0);
+	rc = box_tuple_compare(tuple_1, tuple_2, key_def);
+	assert(rc < 0);
+	rc = box_tuple_compare(tuple_2, tuple_1, key_def);
+	assert(rc > 0);
+
+	/* The same idea, but perform comparisons against keys. */
+	rc = box_tuple_compare_with_key(tuple_1, "\x91\x00", key_def);
+	assert(rc > 0);
+	rc = box_tuple_compare_with_key(tuple_1, "\x91\x01", key_def);
+	assert(rc == 0);
+	rc = box_tuple_compare_with_key(tuple_1, "\x91\x02", key_def);
+	assert(rc < 0);
+
+	/* Clean up. */
+	box_tuple_unref(tuple_1);
+	box_tuple_unref(tuple_2);
+	box_key_def_delete(key_def);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+/* }}} key_def api v2 */
 
 static int
 check_error(lua_State *L)
@@ -749,6 +997,7 @@ luaopen_module_api(lua_State *L)
 		{"test_box_region", test_box_region},
 		{"test_tuple_encode", test_tuple_encode},
 		{"test_tuple_new", test_tuple_new},
+		{"test_key_def_new_v2", test_key_def_new_v2},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
