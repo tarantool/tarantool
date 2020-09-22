@@ -1348,3 +1348,11 @@ tarantool_lua_utils_init(struct lua_State *L)
 	luaT_newthread_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	return 0;
 }
+
+/**
+ * This routine encloses the checks and actions to be done when
+ * the running fiber yields the execution.
+ */
+void cord_on_yield(void)
+{
+}

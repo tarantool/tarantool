@@ -46,7 +46,7 @@ add_executable(bitset_index.test bitset_index.c)
 target_link_libraries(bitset_index.test bitset)
 add_executable(base64.test base64.c)
 target_link_libraries(base64.test misc unit)
-add_executable(uuid.test uuid.c)
+add_executable(uuid.test uuid.c core_test_utils.c)
 target_link_libraries(uuid.test uuid unit)
 
 add_executable(bps_tree.test bps_tree.cc)
@@ -65,53 +65,53 @@ add_executable(bloom.test bloom.cc)
 target_link_libraries(bloom.test salad)
 add_executable(vclock.test vclock.cc)
 target_link_libraries(vclock.test vclock unit)
-add_executable(xrow.test xrow.cc)
+add_executable(xrow.test xrow.cc core_test_utils.c)
 target_link_libraries(xrow.test xrow unit)
 add_executable(decimal.test decimal.c)
 target_link_libraries(decimal.test core unit)
-add_executable(mp_error.test mp_error.cc)
+add_executable(mp_error.test mp_error.cc core_test_utils.c)
 target_link_libraries(mp_error.test box_error core unit)
 
-add_executable(fiber.test fiber.cc)
+add_executable(fiber.test fiber.cc core_test_utils.c)
 set_source_files_properties(fiber.cc PROPERTIES COMPILE_FLAGS -O0)
 target_link_libraries(fiber.test core unit)
 
-add_executable(fiber_stack.test fiber_stack.c)
+add_executable(fiber_stack.test fiber_stack.c core_test_utils.c)
 set_source_files_properties(fiber_stack.c PROPERTIES COMPILE_FLAGS -O0)
 target_link_libraries(fiber_stack.test core unit)
 
 if (NOT ENABLE_GCOV)
     # This test is known to be broken with GCOV
-    add_executable(guard.test guard.cc)
+    add_executable(guard.test guard.cc core_test_utils.c)
     target_link_libraries(guard.test core unit)
 endif ()
 
-add_executable(fiber_stress.test fiber_stress.cc)
+add_executable(fiber_stress.test fiber_stress.cc core_test_utils.c)
 target_link_libraries(fiber_stress.test core)
 
-add_executable(fiber_cond.test fiber_cond.c unit.c)
+add_executable(fiber_cond.test fiber_cond.c unit.c core_test_utils.c)
 target_link_libraries(fiber_cond.test core)
 
-add_executable(fiber_channel.test fiber_channel.cc unit.c)
+add_executable(fiber_channel.test fiber_channel.cc unit.c core_test_utils.c)
 target_link_libraries(fiber_channel.test core)
 
-add_executable(fiber_channel_stress.test fiber_channel_stress.cc)
+add_executable(fiber_channel_stress.test fiber_channel_stress.cc core_test_utils.c)
 target_link_libraries(fiber_channel_stress.test core)
 
-add_executable(cbus_stress.test cbus_stress.c)
+add_executable(cbus_stress.test cbus_stress.c core_test_utils.c)
 target_link_libraries(cbus_stress.test core stat)
 
-add_executable(cbus.test cbus.c)
+add_executable(cbus.test cbus.c core_test_utils.c)
 target_link_libraries(cbus.test core unit stat)
 
 include(CheckSymbolExists)
 check_symbol_exists(__GLIBC__ features.h GLIBC_USED)
 if (GLIBC_USED)
-    add_executable(cbus_hang.test cbus_hang.c)
+    add_executable(cbus_hang.test cbus_hang.c core_test_utils.c)
     target_link_libraries(cbus_hang.test core unit stat)
 endif ()
 
-add_executable(coio.test coio.cc)
+add_executable(coio.test coio.cc core_test_utils.c)
 target_link_libraries(coio.test core eio bit uri unit)
 
 if (ENABLE_BUNDLED_MSGPUCK)
@@ -128,7 +128,7 @@ if (ENABLE_BUNDLED_MSGPUCK)
     target_link_libraries(msgpack.test ${MSGPUCK_LIBRARIES})
 endif ()
 
-add_executable(scramble.test scramble.c)
+add_executable(scramble.test scramble.c core_test_utils.c)
 target_link_libraries(scramble.test scramble)
 
 add_executable(guava.test guava.c)
@@ -151,7 +151,7 @@ target_link_libraries(csv.test csv)
 add_executable(json.test json.c)
 target_link_libraries(json.test json unit ${ICU_LIBRARIES})
 
-add_executable(rmean.test rmean.cc)
+add_executable(rmean.test rmean.cc core_test_utils.c)
 target_link_libraries(rmean.test stat unit)
 add_executable(histogram.test histogram.c)
 target_link_libraries(histogram.test stat unit)
@@ -166,7 +166,7 @@ target_link_libraries(luaL_iterator.test unit server coll core misc
     ${CURL_LIBRARIES} ${LIBYAML_LIBRARIES} ${READLINE_LIBRARIES}
     ${ICU_LIBRARIES} ${LUAJIT_LIBRARIES} dl)
 
-add_executable(say.test say.c)
+add_executable(say.test say.c core_test_utils.c)
 target_link_libraries(say.test core unit)
 
 set(ITERATOR_TEST_SOURCES
@@ -178,7 +178,7 @@ set(ITERATOR_TEST_SOURCES
     ${PROJECT_SOURCE_DIR}/src/box/vy_cache.c)
 set(ITERATOR_TEST_LIBS core tuple xrow unit)
 
-add_executable(vy_mem.test vy_mem.c ${ITERATOR_TEST_SOURCES})
+add_executable(vy_mem.test vy_mem.c ${ITERATOR_TEST_SOURCES} core_test_utils.c)
 target_link_libraries(vy_mem.test ${ITERATOR_TEST_LIBS} dl)
 
 add_executable(vy_point_lookup.test
@@ -200,11 +200,13 @@ add_executable(vy_point_lookup.test
     ${PROJECT_SOURCE_DIR}/src/box/index_def.c
     ${PROJECT_SOURCE_DIR}/src/box/schema_def.c
     ${PROJECT_SOURCE_DIR}/src/box/identifier.c
+    core_test_utils.c
 )
 target_link_libraries(vy_point_lookup.test core tuple xrow xlog unit dl)
 
 add_executable(column_mask.test
-    column_mask.c)
+    column_mask.c
+    core_test_utils.c)
 target_link_libraries(column_mask.test tuple unit)
 
 add_executable(vy_write_iterator.test
@@ -213,16 +215,17 @@ add_executable(vy_write_iterator.test
     ${PROJECT_SOURCE_DIR}/src/box/vy_upsert.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_write_iterator.c
     ${ITERATOR_TEST_SOURCES}
+    core_test_utils.c
 )
 target_link_libraries(vy_write_iterator.test xlog ${ITERATOR_TEST_LIBS} dl)
 
-add_executable(vy_cache.test vy_cache.c ${ITERATOR_TEST_SOURCES})
+add_executable(vy_cache.test vy_cache.c ${ITERATOR_TEST_SOURCES} core_test_utils.c)
 target_link_libraries(vy_cache.test ${ITERATOR_TEST_LIBS} dl)
 
-add_executable(coll.test coll.cpp)
+add_executable(coll.test coll.cpp core_test_utils.c)
 target_link_libraries(coll.test coll unit misc dl)
 
-add_executable(tuple_bigref.test tuple_bigref.c)
+add_executable(tuple_bigref.test tuple_bigref.c core_test_utils.c)
 target_link_libraries(tuple_bigref.test tuple unit)
 
 add_executable(checkpoint_schedule.test
@@ -231,23 +234,23 @@ add_executable(checkpoint_schedule.test
 )
 target_link_libraries(checkpoint_schedule.test m unit)
 
-add_executable(sio.test sio.c)
+add_executable(sio.test sio.c core_test_utils.c)
 target_link_libraries(sio.test unit core)
 
-add_executable(crypto.test crypto.c)
+add_executable(crypto.test crypto.c core_test_utils.c)
 target_link_libraries(crypto.test crypto unit)
 
 add_executable(swim.test swim.c swim_test_transport.c swim_test_ev.c
-               swim_test_utils.c ${PROJECT_SOURCE_DIR}/src/version.c)
+               swim_test_utils.c ${PROJECT_SOURCE_DIR}/src/version.c core_test_utils.c)
 target_link_libraries(swim.test unit swim)
 
 add_executable(swim_proto.test swim_proto.c swim_test_transport.c swim_test_ev.c
-               swim_test_utils.c ${PROJECT_SOURCE_DIR}/src/version.c)
+               swim_test_utils.c ${PROJECT_SOURCE_DIR}/src/version.c core_test_utils.c)
 target_link_libraries(swim_proto.test unit swim)
 
 add_executable(swim_errinj.test swim_errinj.c swim_test_transport.c
                swim_test_ev.c swim_test_utils.c
-               ${PROJECT_SOURCE_DIR}/src/version.c)
+               ${PROJECT_SOURCE_DIR}/src/version.c core_test_utils.c)
 target_link_libraries(swim_errinj.test unit swim)
 
 add_executable(merger.test merger.test.c)
@@ -257,5 +260,5 @@ target_link_libraries(merger.test unit core box)
 # Client for popen.test
 add_executable(popen-child popen-child.c)
 
-add_executable(popen.test popen.c)
+add_executable(popen.test popen.c core_test_utils.c)
 target_link_libraries(popen.test misc unit core)
