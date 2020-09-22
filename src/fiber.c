@@ -43,6 +43,7 @@
 #include "trigger.h"
 #include "errinj.h"
 
+extern void cord_on_yield(void);
 #include "third_party/valgrind/memcheck.h"
 
 static int (*fiber_invoke)(fiber_func f, va_list ap);
@@ -284,6 +285,10 @@ fiber_call(struct fiber *callee)
 	/** By convention, these triggers must not throw. */
 	if (! rlist_empty(&caller->on_yield))
 		trigger_run(&caller->on_yield, NULL);
+
+	if (cord_is_main())
+		cord_on_yield();
+
 	callee->caller = caller;
 	callee->flags |= FIBER_IS_READY;
 	caller->flags |= FIBER_IS_READY;
@@ -512,6 +517,9 @@ fiber_yield(void)
 	/** By convention, these triggers must not throw. */
 	if (! rlist_empty(&caller->on_yield))
 		trigger_run(&caller->on_yield, NULL);
+
+	if (cord_is_main())
+		cord_on_yield();
 
 	assert(callee->flags & FIBER_IS_READY || callee == &cord->sched);
 	assert(! (callee->flags & FIBER_IS_DEAD));
