@@ -43,6 +43,8 @@
 #include "trigger.h"
 #include "errinj.h"
 
+extern void cord_on_yield(void);
+
 #if ENABLE_FIBER_TOP
 #include <x86intrin.h> /* __rdtscp() */
 
@@ -416,6 +418,10 @@ fiber_call(struct fiber *callee)
 	/** By convention, these triggers must not throw. */
 	if (! rlist_empty(&caller->on_yield))
 		trigger_run(&caller->on_yield, NULL);
+
+	if (cord_is_main())
+		cord_on_yield();
+
 	clock_set_on_csw(caller);
 	callee->caller = caller;
 	callee->flags |= FIBER_IS_READY;
@@ -645,6 +651,10 @@ fiber_yield(void)
 	/** By convention, these triggers must not throw. */
 	if (! rlist_empty(&caller->on_yield))
 		trigger_run(&caller->on_yield, NULL);
+
+	if (cord_is_main())
+		cord_on_yield();
+
 	clock_set_on_csw(caller);
 
 	assert(callee->flags & FIBER_IS_READY || callee == &cord->sched);
