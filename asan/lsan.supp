@@ -47,8 +47,6 @@ leak:tt_bitset_iterator_init
 leak:libc.so*
 
 # test: box-tap/schema_mt.test.lua
-# source: src/lib/core/coio_task.c
-leak:coio_on_start
 # source: src/lib/salad/mhash.h
 leak:mh_i32ptr_new
 
