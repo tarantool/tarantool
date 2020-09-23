@@ -293,5 +293,5 @@ test_freebsd: deps_freebsd test_freebsd_no_deps
 # ###################
 
 test_jepsen: deps_debian_jepsen
-	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON
+	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON -DWITH_JEPSEN=ON
 	make jepsen-single

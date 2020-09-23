@@ -164,30 +164,34 @@ add_custom_command(TARGET luacheck
     COMMENT "Perform static analysis of Lua code"
 )
 
-ExternalProject_Add(
-    jepsen-tests
-    GIT_REPOSITORY https://github.com/tarantool/jepsen.tarantool
-    CONFIGURE_COMMAND ""
-    BUILD_COMMAND ""
-    INSTALL_COMMAND ""
-    TEST_COMMAND ""
-)
+if (WITH_JEPSEN)
+    ExternalProject_Add(
+        jepsen-tests
+        GIT_REPOSITORY https://github.com/tarantool/jepsen.tarantool
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ""
+        INSTALL_COMMAND ""
+        TEST_COMMAND ""
+    )
 
-#
-# Enable 'make jepsen-*' targets.
-#
+    #
+    # Enable 'make jepsen-*' targets.
+    #
 
-add_custom_target(jepsen-single DEPENDS jepsen-tests)
-add_custom_command(TARGET jepsen-single
-    COMMAND ${BASH} ${PROJECT_SOURCE_DIR}/tools/run-jepsen-tests.sh ${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR}
-    COMMENT "Running Jepsen tests on a single Tarantool instance"
-)
+    add_custom_target(jepsen-single DEPENDS jepsen-tests)
+    add_custom_command(TARGET jepsen-single
+        COMMAND ${BASH} ${PROJECT_SOURCE_DIR}/tools/run-jepsen-tests.sh
+				${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR}
+        COMMENT "Running Jepsen tests on a single Tarantool instance"
+    )
 
-add_custom_target(jepsen-cluster DEPENDS jepsen-tests)
-add_custom_command(TARGET jepsen-cluster
-    COMMAND ${BASH} ${PROJECT_SOURCE_DIR}/tools/run-jepsen-tests.sh ${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR} 5
-    COMMENT "Running Jepsen tests on a cluster with 5 Tarantool instances"
-)
+    add_custom_target(jepsen-cluster DEPENDS jepsen-tests)
+    add_custom_command(TARGET jepsen-cluster
+        COMMAND ${BASH} ${PROJECT_SOURCE_DIR}/tools/run-jepsen-tests.sh
+				${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR} 5
+        COMMENT "Running Jepsen tests on a cluster with 5 Tarantool instances"
+    )
+endif()
 
 #
 # Get version
