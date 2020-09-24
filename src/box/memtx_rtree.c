@@ -58,9 +58,11 @@ static inline int
 mp_decode_num(const char **data, uint32_t fieldno, double *ret)
 {
 	if (mp_read_double(data, ret) != 0) {
+		enum mp_type actual_type = mp_typeof(**data);
 		diag_set(ClientError, ER_FIELD_TYPE,
 			 int2str(fieldno + TUPLE_INDEX_BASE),
-			 field_type_strs[FIELD_TYPE_NUMBER]);
+			 field_type_strs[FIELD_TYPE_NUMBER],
+			 mp_type_strs[actual_type]);
 		return -1;
 	}
 	return 0;

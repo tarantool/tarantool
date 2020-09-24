@@ -3367,10 +3367,11 @@ func_def_new_from_tuple(struct tuple *tuple)
 			return NULL;
 		uint32_t cnt = mp_decode_array(&exports);
 		for (uint32_t i = 0; i < cnt; i++) {
-			if (mp_typeof(*exports) != MP_STR) {
+			enum mp_type actual_type = mp_typeof(*exports);
+			if (actual_type != MP_STR) {
 				diag_set(ClientError, ER_FIELD_TYPE,
 					  int2str(BOX_FUNC_FIELD_EXPORTS + 1),
-					 mp_type_strs[MP_STR]);
+					 mp_type_strs[MP_STR], mp_type_strs[actual_type]);
 				return NULL;
 			}
 			uint32_t len;
@@ -3404,10 +3405,11 @@ func_def_new_from_tuple(struct tuple *tuple)
 			return NULL;
 		uint32_t argc = mp_decode_array(&param_list);
 		for (uint32_t i = 0; i < argc; i++) {
-			 if (mp_typeof(*param_list) != MP_STR) {
+			enum mp_type actual_type = mp_typeof(*param_list);
+			 if (actual_type != MP_STR) {
 				diag_set(ClientError, ER_FIELD_TYPE,
-					  int2str(BOX_FUNC_FIELD_PARAM_LIST + 1),
-					 mp_type_strs[MP_STR]);
+					 int2str(BOX_FUNC_FIELD_PARAM_LIST + 1),
+					 mp_type_strs[MP_STR], mp_type_strs[actual_type]);
 				return NULL;
 			}
 			uint32_t len;
