@@ -1122,12 +1122,13 @@ s:frommap()
 s:frommap({})
 ---
 - null
-- Tuple field 1 required by space format is missing
+- Tuple field 1 (aaa) required by space format is missing
 ...
 s:frommap({ddd = 'fail', aaa = 2, ccc = 3, bbb = 4}, {table=true})
 ---
 - null
-- 'Tuple field 4 type does not match one required by operation: expected unsigned'
+- 'Tuple field 4 (ddd) type does not match one required by operation: expected unsigned,
+  got string'
 ...
 s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4}, {table = true})
 ---

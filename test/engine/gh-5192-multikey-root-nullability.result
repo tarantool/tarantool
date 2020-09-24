@@ -41,14 +41,16 @@ _ = s:create_index('i1', {parts={{1, 'unsigned'}}})
  | ...
 s:replace{1, box.NULL} -- error
  | ---
- | - error: 'Tuple field 2 type does not match one required by operation: expected array'
+ | - error: 'Tuple field 2 (data) type does not match one required by operation: expected
+ |     array, got nil'
  | ...
 _ = s:create_index('i2', {parts={{field=2, path='[*].key', type='string'}}})
  | ---
  | ...
 s:replace{2, box.NULL} -- error
  | ---
- | - error: 'Tuple field 2 type does not match one required by operation: expected array'
+ | - error: 'Tuple field 2 (data) type does not match one required by operation: expected
+ |     array, got nil'
  | ...
 s:replace{3, {}} -- ok
  | ---

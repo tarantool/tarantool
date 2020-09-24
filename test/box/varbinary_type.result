@@ -15,7 +15,7 @@ s:format({{"b", "integer"}})
 ...
 _ = s:create_index('pk', {parts = {1, "varbinary"}})
 ---
-- error: Field 1 has type 'integer' in space format, but type 'varbinary' in index
+- error: Field 1 (b) has type 'integer' in space format, but type 'varbinary' in index
     definition
 ...
 s:format({{"b", "varbinary"}})
@@ -23,7 +23,7 @@ s:format({{"b", "varbinary"}})
 ...
 _ = s:create_index('pk', {parts = {1, "integer"}})
 ---
-- error: Field 1 has type 'varbinary' in space format, but type 'integer' in index
+- error: Field 1 (b) has type 'varbinary' in space format, but type 'integer' in index
     definition
 ...
 pk = s:create_index('pk', {parts = {1, "varbinary"}})
@@ -117,7 +117,8 @@ box.execute("SELECT * FROM \"withdata\" WHERE \"b\" <= x'DEADBEAF';")
 ...
 pk:alter({parts = {1, "varbinary"}})
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected varbinary'
+- error: 'Tuple field 1 (b) type does not match one required by operation: expected
+    varbinary, got unsigned'
 ...
 s:delete({11})
 ---

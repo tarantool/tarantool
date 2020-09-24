@@ -44,7 +44,8 @@ _ = {fiber.create(insert_tuple, {1, 2, 'a'}), fiber.create(add_index), fiber.cre
 {ch:get(), ch:get(), ch:get()}
  | ---
  | - - - false
- |     - 'Tuple field 2 type does not match one required by operation: expected unsigned'
+ |     - 'Tuple field 2 type does not match one required by operation: expected unsigned,
+ |       got string'
  |   - - true
  |     - [1, 2, 'a']
  |   - true

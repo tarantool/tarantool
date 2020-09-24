@@ -50,11 +50,13 @@ i = s:create_index('secondary', { type = 'hash', parts = {2, 'unsigned'}})
 -- adding a tuple with array instead of num will fail
 i = s:insert{{1, 2, 3}, 4}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+    got array'
 ...
 i = s:insert{1, {2, 3, 4}}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got array'
 ...
 -- rtree index must be one-part
 i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {1, 'array', 2, 'array'}})
@@ -87,15 +89,18 @@ i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'arr
 -- inserting wrong values (should fail)
 s:insert{1, 2, 3}
 ---
-- error: 'Tuple field 3 type does not match one required by operation: expected array'
+- error: 'Tuple field 3 type does not match one required by operation: expected array,
+    got unsigned'
 ...
 s:insert{1, 2, "3"}
 ---
-- error: 'Tuple field 3 type does not match one required by operation: expected array'
+- error: 'Tuple field 3 type does not match one required by operation: expected array,
+    got string'
 ...
 s:insert{1, 2, nil, 3}
 ---
-- error: 'Tuple field 3 type does not match one required by operation: expected array'
+- error: 'Tuple field 3 type does not match one required by operation: expected array,
+    got nil'
 ...
 s:insert{1, 2, {}}
 ---
@@ -104,23 +109,28 @@ s:insert{1, 2, {}}
 ...
 s:insert{1, 2, {"3", "4", "5", "6"}}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected number'
+- error: 'Tuple field 1 type does not match one required by operation: expected number,
+    got string'
 ...
 s:insert{1, 2, {nil, 4, 5, 6}}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected number'
+- error: 'Tuple field 1 type does not match one required by operation: expected number,
+    got nil'
 ...
 s:insert{1, 2, {3, {4}, 5, 6}}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected number'
+- error: 'Tuple field 2 type does not match one required by operation: expected number,
+    got array'
 ...
 s:insert{1, 2, {3, 4, {}, 6}}
 ---
-- error: 'Tuple field 3 type does not match one required by operation: expected number'
+- error: 'Tuple field 3 type does not match one required by operation: expected number,
+    got array'
 ...
 s:insert{1, 2, {3, 4, 5, "6"}}
 ---
-- error: 'Tuple field 4 type does not match one required by operation: expected number'
+- error: 'Tuple field 4 type does not match one required by operation: expected number,
+    got string'
 ...
 s:insert{1, 2, {3}}
 ---
@@ -554,7 +564,8 @@ s.index.s:drop()
 -- with wrong args
 box.space._index:insert{s.id, 2, 's', 'rtree', nil, {{2, 'array'}}}
 ---
-- error: 'Tuple field 5 type does not match one required by operation: expected map'
+- error: 'Tuple field 5 (opts) type does not match one required by operation: expected
+    map, got nil'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', utils.setmap({}), {{2, 'array'}}}
 ---

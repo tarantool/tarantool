@@ -722,7 +722,8 @@ aa.VAL
 -- invalid update
 aa:update({{'=',2, 666}})
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected string'
+- error: 'Tuple field 2 (VAL) type does not match one required by operation: expected
+    string, got unsigned'
 ...
 -- test transform integrity
 aa:transform(-1, 1)
@@ -753,7 +754,8 @@ box.space.tst_sample:get(2).VAL
 -- invalid upsert
 s:upsert({2, 666}, {{'=', 2, 666}})
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected string'
+- error: 'Tuple field 2 (VAL) type does not match one required by operation: expected
+    string, got unsigned'
 ...
 s:drop()
 ---

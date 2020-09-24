@@ -65,7 +65,8 @@ errinj.set("ERRINJ_CHECK_FORMAT_DELAY", true)
 ...
 s:format(format) -- must fail
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected string'
+- error: 'Tuple field 2 (field2) type does not match one required by operation: expected
+    string, got nil'
 ...
 ch:get()
 ---
@@ -144,7 +145,8 @@ errinj.set('ERRINJ_BUILD_INDEX_DELAY', true);
 fiber.new(function() t:replace{1, 'asdf'} errinj.set('ERRINJ_BUILD_INDEX_DELAY', false) end)
 t:create_index('sk', {parts = {2, 'unsigned'}});
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got string'
 ...
 t:get{1};
 ---
@@ -165,7 +167,8 @@ errinj.set('ERRINJ_BUILD_INDEX_DELAY', true);
 fiber.new(function() t:replace{2, 'asdf'} errinj.set('ERRINJ_BUILD_INDEX_DELAY', false) end)
 t:create_index('sk', {parts = {2, 'unsigned'}});
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got string'
 ...
 t:get{2};
 ---

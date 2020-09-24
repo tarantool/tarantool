@@ -7,11 +7,13 @@ index = space:create_index('primary', { type = 'tree', parts = {1, 'string'} })
 ...
 space:insert{1}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected string'
+- error: 'Tuple field 1 type does not match one required by operation: expected string,
+    got unsigned'
 ...
 space:replace{1}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected string'
+- error: 'Tuple field 1 type does not match one required by operation: expected string,
+    got unsigned'
 ...
 space:delete{1}
 ---
@@ -23,7 +25,8 @@ space:update({1}, {{'=', 1, 101}})
 ...
 space:upsert({1}, {{'+', 1, 10}})
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected string'
+- error: 'Tuple field 1 type does not match one required by operation: expected string,
+    got unsigned'
 ...
 space:get{1}
 ---
@@ -45,11 +48,13 @@ index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} }
 ...
 space:insert{'A'}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+    got string'
 ...
 space:replace{'A'}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+    got string'
 ...
 space:delete{'A'}
 ---
@@ -61,7 +66,8 @@ space:update({'A'}, {{'=', 1, 101}})
 ...
 space:upsert({'A'}, {{'+', 1, 10}})
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+    got string'
 ...
 space:get{'A'}
 ---

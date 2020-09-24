@@ -28,11 +28,13 @@ t, t.key, t.value
 ...
 s:insert{1, 2, 3} -- error
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected string'
+- error: 'Tuple field 2 (value) type does not match one required by operation: expected
+    string, got unsigned'
 ...
 s:replace{'a', 'b', 'c'} -- error
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 1 (key) type does not match one required by operation: expected
+    unsigned, got string'
 ...
 s:format{}
 ---
