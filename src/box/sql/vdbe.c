@@ -1445,23 +1445,6 @@ case OP_MustBeInt: {            /* jump, in1 */
 	break;
 }
 
-/* Opcode: Realify P1 * * * *
- *
- * If register P1 holds an integer convert it to a real value.
- *
- * This opcode is used when extracting information from a column that
- * has float type.  Such column values may still be stored as
- * integers, for space efficiency, but after extraction we want them
- * to have only a real value.
- */
-case OP_Realify: {                  /* in1 */
-	pIn1 = &aMem[pOp->p1];
-	if (mem_is_int(pIn1)) {
-		mem_to_double(pIn1);
-	}
-	break;
-}
-
 /* Opcode: Cast P1 P2 * * *
  * Synopsis: type(r[P1])
  *
