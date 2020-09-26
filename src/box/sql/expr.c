@@ -3700,11 +3700,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				sqlVdbeAddOp3(v, OP_Column,
 						  pAggInfo->sortingIdxPTab,
 						  pCol->iSorterColumn, target);
-				if (pCol->space_def->fields[pExpr->iAgg].type ==
-				    FIELD_TYPE_NUMBER) {
-					sqlVdbeAddOp1(v, OP_Realify,
-							  target);
-				}
 				return target;
 			}
 			/*
@@ -4260,14 +4255,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				    (pExpr->iTable ? "new" : "old"),
 				    pExpr->space_def->fields[
 					pExpr->iColumn].name, target));
-
-			/* If the column has type NUMBER, it may currently be stored as an
-			 * integer. Use OP_Realify to make sure it is really real.
-			 */
-			if (pExpr->iColumn >= 0 && def->fields[
-				pExpr->iColumn].type == FIELD_TYPE_NUMBER) {
-				sqlVdbeAddOp1(v, OP_Realify, target);
-			}
 			break;
 		}
 
