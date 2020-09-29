@@ -224,14 +224,6 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
--- Need to wait for box.info.replication[1] defined, otherwise test-run fails to
--- wait for the upstream status sometimes.
-test_run:wait_cond(function()                                                   \
-    return box.info ~= nil and box.info.replication[1] ~= nil                   \
-end)
----
-- true
-...
 test_run:wait_upstream(1, {message_re = 'Missing %.xlog file', status = 'loading'})
 ---
 - true
