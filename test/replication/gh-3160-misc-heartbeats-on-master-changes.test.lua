@@ -25,7 +25,8 @@ function test_timeout()
     for i = 0, 99 do
         box.space.test_timeout:replace({1})
         if wait_not_follow(replicaA, replicaB) then
-            return error(box.info.replication)
+            require('log').error(box.info.replication)
+            return false
         end
     end
     return true
