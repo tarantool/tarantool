@@ -1,5 +1,6 @@
 env = require('test_run')
 test_run = env.new()
+log = require('log')
 engine = test_run:get_cfg('engine')
 
 test_run:cleanup_cluster()
@@ -19,7 +20,7 @@ _ = box.space.test:insert{3}
 test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
 test_run:cmd("start server replica with args='true'")
 test_run:cmd("switch replica")
-box.info.replication[1].upstream.status == 'follow' or box.info
+box.info.replication[1].upstream.status == 'follow' or log.error(box.info)
 box.space.test:select()
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")
@@ -46,9 +47,9 @@ box.cfg{checkpoint_count = checkpoint_count}
 -- Restart the replica. Since xlogs have been removed,
 -- it is supposed to rejoin without changing id.
 test_run:cmd("start server replica with args='true'")
-box.info.replication[2].downstream.vclock ~= nil or box.info
+box.info.replication[2].downstream.vclock ~= nil or log.error(box.info)
 test_run:cmd("switch replica")
-box.info.replication[1].upstream.status == 'follow' or box.info
+box.info.replication[1].upstream.status == 'follow' or log.error(box.info)
 box.space.test:select()
 test_run:cmd("switch default")
 
@@ -62,7 +63,7 @@ box.space.test:select()
 
 -- Check that restart works as usual.
 test_run:cmd("restart server replica with args='true'")
-box.info.replication[1].upstream.status == 'follow' or box.info
+box.info.replication[1].upstream.status == 'follow' or log.error(box.info)
 box.space.test:select()
 
 -- Check that rebootstrap is NOT initiated unless the replica

@@ -4,6 +4,9 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
+log = require('log')
+---
+...
 engine = test_run:get_cfg('engine')
 ---
 ...
@@ -45,7 +48,7 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-box.info.replication[1].upstream.status == 'follow' or box.info
+box.info.replication[1].upstream.status == 'follow' or log.error(box.info)
 ---
 - true
 ...
@@ -115,7 +118,7 @@ test_run:cmd("start server replica with args='true'")
 ---
 - true
 ...
-box.info.replication[2].downstream.vclock ~= nil or box.info
+box.info.replication[2].downstream.vclock ~= nil or log.error(box.info)
 ---
 - true
 ...
@@ -123,7 +126,7 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-box.info.replication[1].upstream.status == 'follow' or box.info
+box.info.replication[1].upstream.status == 'follow' or log.error(box.info)
 ---
 - true
 ...
@@ -162,7 +165,7 @@ box.space.test:select()
 ...
 -- Check that restart works as usual.
 test_run:cmd("restart server replica with args='true'")
-box.info.replication[1].upstream.status == 'follow' or box.info
+box.info.replication[1].upstream.status == 'follow' or log.error(box.info)
 ---
 - true
 ...
