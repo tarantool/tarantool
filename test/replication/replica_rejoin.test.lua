@@ -81,7 +81,7 @@ test_run:wait_cond(function() return #fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.
 box.cfg{checkpoint_count = checkpoint_count}
 test_run:cmd("start server replica with args='true'")
 test_run:cmd("switch replica")
-box.info.status -- orphan
+test_run:wait_upstream(1, {message_re = 'Missing %.xlog file', status = 'loading'})
 box.space.test:select()
 
 --

@@ -221,9 +221,9 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-box.info.status -- orphan
+test_run:wait_upstream(1, {message_re = 'Missing %.xlog file', status = 'loading'})
 ---
-- orphan
+- true
 ...
 box.space.test:select()
 ---
