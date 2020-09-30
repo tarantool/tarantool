@@ -208,6 +208,13 @@ release_asan_clang11:
   script:
     - ${GITLAB_MAKE} test_asan_debian_no_deps
 
+osx_13_release:
+  tags:
+    - osx_13
+  variables:
+    MACOSX_DEPLOYMENT_TARGET: '10.13'
+  <<: *osx_definition
+
 osx_14_release:
   tags:
     - osx_14
