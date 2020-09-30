@@ -271,7 +271,8 @@ raft_request_to_string(const struct raft_request *req)
 	int size = 1024;
 	char buf[1024];
 	char *pos = buf;
-	int rc = snprintf(pos, size, "{term: %llu", req->term);
+	int rc = snprintf(pos, size, "{term: %llu",
+			  (unsigned long long)req->term);
 	assert(rc >= 0);
 	pos += rc;
 	size -= rc;
