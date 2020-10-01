@@ -42,7 +42,7 @@ static void
 lcg_compat_check()
 {
 	header();
-	int32_t golden100[] = {
+	int64_t golden100[] = {
 		0, 55, 62, 8, 45, 59, 86, 97, 82, 59,
 		73, 37, 17, 56, 86, 21, 90, 37, 38, 83
 	};
