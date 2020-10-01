@@ -1324,7 +1324,8 @@ tarantool_lua_utils_init(struct lua_State *L)
  * the running fiber yields the execution.
  * Since Tarantool fibers don't switch-over the way Lua coroutines
  * do the platform ought to notify JIT engine when one lua_State
- * substitutes another one.
+ * substitutes another one. Furthermore fiber switch is forbidden
+ * when GC hook (i.e. __gc metamethod) is running.
  */
 void cord_on_yield(void)
 {
@@ -1355,4 +1356,27 @@ void cord_on_yield(void)
 	 * lead to a failure on any next compiler phase.
 	 */
 	lj_trace_abort(g);
+
+	/*
+	 * XXX: While running GC hook (i.e. __gc  metamethod)
+	 * garbage collector is formally "stopped" since the
+	 * memory penalty threshold is set to its maximum value,
+	 * ergo incremental GC step is not triggered. Thereby,
+	 * yielding the execution at this point leads to further
+	 * running platform with disabled LuaJIT GC. The fiber
+	 * doesn't get the execution back until it's ready, so
+	 * in pessimistic scenario LuaJIT OOM might occur
+	 * earlier. As a result fiber switch is prohibited when
+	 * GC hook is active and the platform is forced to stop.
+	 */
+	if (unlikely(g->hookmask & (HOOK_ACTIVE|HOOK_GC))) {
+		struct lua_State *L = fiber()->storage.lua.stack;
+		assert(L != NULL);
+		lua_pushfstring(L, "fiber %d is switched while running GC"
+				" finalizer (i.e. __gc metamethod)",
+				fiber()->fid);
+		if (g->panic)
+			g->panic(L);
+		exit(EXIT_FAILURE);
+	}
 }
