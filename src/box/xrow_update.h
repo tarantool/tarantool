@@ -63,22 +63,6 @@ xrow_upsert_execute(const char *expr, const char *expr_end,
 		    int index_base, bool suppress_error,
 		    uint64_t *column_mask);
 
-/**
- * Try to merge two update/upsert expressions to an equivalent one.
- * Resulting expression is allocated on given allocator.
- * Due to optimization reasons resulting expression
- * is located inside a bigger allocation. There also some hidden
- * internal allocations are made in this function.
- * Thus the only allocator that can be used in this function
- * is region allocator.
- * If it isn't possible to merge expressions NULL is returned.
- */
-const char *
-xrow_upsert_squash(const char *expr1, const char *expr1_end,
-		   const char *expr2, const char *expr2_end,
-		   struct tuple_format *format, size_t *result_size,
-		   int index_base);
-
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
