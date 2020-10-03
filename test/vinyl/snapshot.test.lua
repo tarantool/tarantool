@@ -57,7 +57,7 @@ box.backup.stop()
 
 -- Check that run files only contain statements
 -- inserted before checkpoint.
-snap_lsn == run_lsn or {snap_lsn, run_lsn}
+snap_lsn == run_lsn or require('log').error("snap_lsn = " .. snap_lsn .. ", run_lsn = " .. run_lsn)
 
 s:drop()
 
