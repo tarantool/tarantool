@@ -97,8 +97,9 @@ luaT_istuple(struct lua_State *L, int narg)
 	return *(struct tuple **) data;
 }
 
-struct tuple *
-luaT_tuple_new(struct lua_State *L, int idx, box_tuple_format_t *format)
+static char *
+luaT_tuple_encode_on_lua_ibuf(struct lua_State *L, int idx,
+			      size_t *tuple_len_ptr)
 {
 	if (idx != 0 && !lua_istable(L, idx) && !luaT_istuple(L, idx)) {
 		diag_set(IllegalParams, "A tuple or a table expected, got %s",
@@ -126,8 +127,20 @@ luaT_tuple_new(struct lua_State *L, int idx, box_tuple_format_t *format)
 		luamp_encode_tuple(L, &tuple_serializer, &stream, idx);
 	}
 	mpstream_flush(&stream);
-	struct tuple *tuple = box_tuple_new(format, buf->buf,
-					    buf->buf + ibuf_used(buf));
+	if (tuple_len_ptr != NULL)
+		*tuple_len_ptr = ibuf_used(buf);
+	return buf->buf;
+}
+
+struct tuple *
+luaT_tuple_new(struct lua_State *L, int idx, box_tuple_format_t *format)
+{
+	size_t tuple_len;
+	char *tuple_data = luaT_tuple_encode_on_lua_ibuf(L, idx, &tuple_len);
+	if (tuple_data == NULL)
+		return NULL;
+	struct tuple *tuple = box_tuple_new(format, tuple_data,
+					    tuple_data + tuple_len);
 	if (tuple == NULL)
 		return NULL;
 	ibuf_reinit(tarantool_lua_ibuf);
