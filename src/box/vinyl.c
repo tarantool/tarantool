@@ -4025,19 +4025,19 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 		insert = vy_stmt_new_insert(lsm->mem_format,
 					    data, data + data_len);
 		if (insert == NULL)
-			return -1;
+			goto err;
 	} else if (type == IPROTO_UPSERT) {
 		struct tuple *new_tuple = vy_apply_upsert(mem_stmt, old_tuple,
 							  pk->cmp_def, true);
 		if (new_tuple == NULL)
-			return -1;
+			goto err;
 		uint32_t data_len;
 		const char *data = tuple_data_range(new_tuple, &data_len);
 		insert = vy_stmt_new_insert(lsm->mem_format,
 					    data, data + data_len);
 		tuple_unref(new_tuple);
 		if (insert == NULL)
-			return -1;
+			goto err;
 	}
 
 	/* Insert DELETE + INSERT into the LSM tree. */
@@ -4054,6 +4054,11 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 			return -1;
 	}
 	return 0;
+
+err:
+	if (delete != NULL)
+		tuple_unref(delete);
+	return -1;
 }
 
 /**
