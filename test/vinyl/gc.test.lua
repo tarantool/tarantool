@@ -19,8 +19,10 @@ path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id))
 
 function ls_data() return fio.glob(fio.pathjoin(path, '*')) end
 function ls_vylog() return fio.glob(fio.pathjoin(box.cfg.vinyl_dir, '*.vylog')) end
-function gc_info() return box.info.gc() end
 function gc() temp:auto_increment{} box.snapshot() end
+function check_files_number(fnum) return (#files == fnum or \
+    (require('log').error(files) or \
+    require('log').error(box.info.gc()))) end
 
 -- Check that run files are deleted by gc.
 s:insert{1} box.snapshot() -- dump
@@ -28,17 +30,17 @@ s:insert{2} box.snapshot() -- dump + compaction
 while s.index.pk:stat().run_count > 1 do fiber.sleep(0.01) end -- wait for compaction
 gc()
 files = ls_data()
-#files == 2 or {files, gc_info()}
+check_files_number(2)
 
 -- Check that gc keeps the current and previous log files.
 files = ls_vylog()
-#files == 2 or {files, gc_info()}
+check_files_number(2)
 
 -- Check that files left from dropped indexes are deleted by gc.
 s:drop()
 gc()
 files = ls_data()
-#files == 0 or {files, gc_info()}
+check_files_number(0)
 
 --
 -- Check that vylog files are removed if vinyl is not used.
@@ -48,18 +50,18 @@ files = ls_data()
 -- dropped index records are still stored in vylog.
 gc()
 files = ls_vylog()
-#files == 2 or {files, gc_info()}
+check_files_number(2)
 
 -- All records should have been purged from the log by now
 -- so we should only keep the previous log file.
 gc()
 files = ls_vylog()
-#files == 1 or {files, gc_info()}
+check_files_number(1)
 
 -- The previous log file should be removed by the next gc.
 gc()
 files = ls_vylog()
-#files == 0 or {files, gc_info()}
+check_files_number(0)
 
 temp:drop()
 
