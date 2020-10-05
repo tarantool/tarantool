@@ -39,10 +39,12 @@ function ls_data() return fio.glob(fio.pathjoin(path, '*')) end
 function ls_vylog() return fio.glob(fio.pathjoin(box.cfg.vinyl_dir, '*.vylog')) end
 ---
 ...
-function gc_info() return box.info.gc() end
+function gc() temp:auto_increment{} box.snapshot() end
 ---
 ...
-function gc() temp:auto_increment{} box.snapshot() end
+function check_files_number(fnum) return (#files == fnum or \
+    (require('log').error(files) or \
+    require('log').error(box.info.gc()))) end
 ---
 ...
 -- Check that run files are deleted by gc.
@@ -61,7 +63,7 @@ gc()
 files = ls_data()
 ---
 ...
-#files == 2 or {files, gc_info()}
+check_files_number(2)
 ---
 - true
 ...
@@ -69,7 +71,7 @@ files = ls_data()
 files = ls_vylog()
 ---
 ...
-#files == 2 or {files, gc_info()}
+check_files_number(2)
 ---
 - true
 ...
@@ -83,7 +85,7 @@ gc()
 files = ls_data()
 ---
 ...
-#files == 0 or {files, gc_info()}
+check_files_number(0)
 ---
 - true
 ...
@@ -98,7 +100,7 @@ gc()
 files = ls_vylog()
 ---
 ...
-#files == 2 or {files, gc_info()}
+check_files_number(2)
 ---
 - true
 ...
@@ -110,7 +112,7 @@ gc()
 files = ls_vylog()
 ---
 ...
-#files == 1 or {files, gc_info()}
+check_files_number(1)
 ---
 - true
 ...
@@ -121,7 +123,7 @@ gc()
 files = ls_vylog()
 ---
 ...
-#files == 0 or {files, gc_info()}
+check_files_number(0)
 ---
 - true
 ...
