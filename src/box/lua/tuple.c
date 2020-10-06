@@ -69,6 +69,16 @@ extern char tuple_lua[]; /* Lua source */
 
 uint32_t CTID_STRUCT_TUPLE_REF;
 
+/**
+ * <luaT_tuple_encode_table>() reference in the Lua registry.
+ *
+ * Storing of the reference allows to don't create a new GCfunc
+ * object each time we call the function in the protected mode.
+ * It reduces Lua GC pressure in comparison with calling of
+ * <lua_cpcall>() or <lua_pushcfunction>() on each invocation.
+ */
+static int luaT_tuple_encode_table_ref = LUA_NOREF;
+
 box_tuple_t *
 luaT_checktuple(struct lua_State *L, int idx)
 {
@@ -98,39 +108,88 @@ luaT_istuple(struct lua_State *L, int narg)
 	return *(struct tuple **) data;
 }
 
+/**
+ * Encode a Lua values on a Lua stack as an MsgPack array.
+ *
+ * Raise a Lua error when encoding fails.
+ *
+ * Helper for <lbox_tuple_new>().
+ */
+static int
+luaT_tuple_encode_values(struct lua_State *L)
+{
+	struct ibuf *buf = tarantool_lua_ibuf;
+	ibuf_reset(buf);
+	struct mpstream stream;
+	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb, luamp_error,
+		      L);
+	int argc = lua_gettop(L);
+	mpstream_encode_array(&stream, argc);
+	for (int k = 1; k <= argc; ++k) {
+		luamp_encode(L, luaL_msgpack_default, NULL, &stream, k);
+	}
+	mpstream_flush(&stream);
+	return 0;
+}
+
+/**
+ * Encode a Lua table or a tuple as MsgPack.
+ *
+ * Raise a Lua error when encoding fails.
+ *
+ * It is a kind of critical section to be run under luaT_call().
+ */
+static int
+luaT_tuple_encode_table(struct lua_State *L)
+{
+	struct ibuf *buf = tarantool_lua_ibuf;
+	ibuf_reset(buf);
+	struct mpstream stream;
+	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb, luamp_error,
+		      L);
+	luamp_encode_tuple(L, &tuple_serializer, &stream, 1);
+	mpstream_flush(&stream);
+	return 0;
+}
+
+/**
+ * Encode a Lua table / tuple to Lua shared ibuf.
+ */
 static char *
 luaT_tuple_encode_on_lua_ibuf(struct lua_State *L, int idx,
 			      size_t *tuple_len_ptr)
 {
-	if (idx != 0 && !lua_istable(L, idx) && !luaT_istuple(L, idx)) {
+	assert(idx != 0);
+	if (!lua_istable(L, idx) && !luaT_istuple(L, idx)) {
 		diag_set(IllegalParams, "A tuple or a table expected, got %s",
 			 lua_typename(L, lua_type(L, idx)));
 		return NULL;
 	}
 
-	struct ibuf *buf = tarantool_lua_ibuf;
-	ibuf_reset(buf);
-	struct mpstream stream;
-	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb,
-		      luamp_error, L);
-	if (idx == 0) {
-		/*
-		 * Create the tuple from lua stack
-		 * objects.
-		 */
-		int argc = lua_gettop(L);
-		mpstream_encode_array(&stream, argc);
-		for (int k = 1; k <= argc; ++k) {
-			luamp_encode(L, luaL_msgpack_default, NULL, &stream, k);
-		}
-	} else {
-		/* Create the tuple from a Lua table. */
-		luamp_encode_tuple(L, &tuple_serializer, &stream, idx);
-	}
-	mpstream_flush(&stream);
+	/* To restore before leaving the function. */
+	int top = lua_gettop(L);
+
+	/*
+	 * An absolute index doesn't need to be recalculated after
+	 * the stack size change.
+	 */
+	if (idx < 0)
+		idx = top + idx + 1;
+
+	assert(luaT_tuple_encode_table_ref != LUA_NOREF);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, luaT_tuple_encode_table_ref);
+	assert(lua_isfunction(L, -1));
+
+	lua_pushvalue(L, idx);
+
+	int rc = luaT_call(L, 1, 0);
+	lua_settop(L, top);
+	if (rc != 0)
+		return NULL;
+
 	if (tuple_len_ptr != NULL)
-		*tuple_len_ptr = ibuf_used(buf);
-	return buf->buf;
+		*tuple_len_ptr = ibuf_used(tarantool_lua_ibuf);
+	return tarantool_lua_ibuf->buf;
 }
 
 struct tuple *
@@ -156,15 +215,29 @@ lbox_tuple_new(lua_State *L)
 		lua_newtable(L); /* create an empty tuple */
 		++argc;
 	}
+
 	/*
 	 * Use backward-compatible parameters format:
-	 * box.tuple.new(1, 2, 3) (idx == 0), or the new one:
-	 * box.tuple.new({1, 2, 3}) (idx == 1).
+	 * box.tuple.new(1, 2, 3).
 	 */
-	int idx = argc == 1 && (lua_istable(L, 1) ||
-		luaT_istuple(L, 1));
 	box_tuple_format_t *fmt = box_tuple_format_default();
-	struct tuple *tuple = luaT_tuple_new(L, idx, fmt);
+	if (argc != 1 || (!lua_istable(L, 1) && !luaT_istuple(L, 1))) {
+		struct ibuf *buf = tarantool_lua_ibuf;
+		luaT_tuple_encode_values(L); /* may raise */
+		struct tuple *tuple = box_tuple_new(fmt, buf->buf,
+						    buf->buf + ibuf_used(buf));
+		ibuf_reinit(buf);
+		if (tuple == NULL)
+			return luaT_error(L);
+		luaT_pushtuple(L, tuple);
+		return 1;
+	}
+
+	/*
+	 * Use the new parameters format:
+	 * box.tuple.new({1, 2, 3}).
+	 */
+	struct tuple *tuple = luaT_tuple_new(L, 1, fmt);
 	if (tuple == NULL)
 		return luaT_error(L);
 	/* box_tuple_new() doesn't leak on exception, see public API doc */
@@ -593,4 +666,7 @@ box_lua_tuple_init(struct lua_State *L)
 	(void) rc;
 	CTID_STRUCT_TUPLE_REF = luaL_ctypeid(L, "struct tuple &");
 	assert(CTID_STRUCT_TUPLE_REF != 0);
+
+	lua_pushcfunction(L, luaT_tuple_encode_table);
+	luaT_tuple_encode_table_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 }
