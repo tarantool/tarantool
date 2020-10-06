@@ -97,6 +97,16 @@ enum {
 	MP_ERROR_MAX,
 };
 
+static const char *const mp_error_field_to_json_key[MP_ERROR_MAX] = {
+	"\"type\": ",
+	"\"file\": ",
+	"\"line\": ",
+	"\"message\": ",
+	"\"errno\": ",
+	"\"code\": ",
+	"\"fields\": ",
+};
+
 /**
  * The structure is used for storing parameters
  * during decoding MP_ERROR.
@@ -560,16 +570,6 @@ error_unpack_unsafe(const char **data)
 	}
 	return err;
 }
-
-static const char *const mp_error_field_to_json_key[MP_ERROR_MAX] = {
-	[MP_ERROR_TYPE] =	"\"type\": ",
-	[MP_ERROR_FILE] =	"\"file\": ",
-	[MP_ERROR_LINE] =	"\"line\": ",
-	[MP_ERROR_MESSAGE] =	"\"message\": ",
-	[MP_ERROR_ERRNO] =	"\"errno\": ",
-	[MP_ERROR_CODE] =	"\"code\": ",
-	[MP_ERROR_FIELDS] =	"\"fields\": ",
-};
 
 /**
  * Include this file into self with a few template parameters
