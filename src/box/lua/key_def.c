@@ -371,9 +371,8 @@ lbox_key_def_compare_with_key(struct lua_State *L)
 
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	size_t key_len;
-	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
-	if (box_key_def_validate_key(key_def, key, NULL)) {
+	const char *key = luaT_tuple_encode(L, 3, NULL);
+	if (key == NULL || box_key_def_validate_key(key_def, key, NULL) != 0) {
 		region_truncate(region, region_svp);
 		tuple_unref(tuple);
 		return luaT_error(L);
