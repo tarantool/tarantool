@@ -51,20 +51,20 @@ check_tuple(const struct tuple *tuple, box_tuple_format_t *format,
 
 void
 check_error(struct lua_State *L, const struct tuple *tuple, int retvals,
+	    const struct type_info *error_type, const char *exp_err,
 	    const char *case_name)
 {
-	const char *exp_err = "A tuple or a table expected, got number";
 	is(tuple, NULL, "%s: tuple == NULL", case_name);
 	is(retvals, 0, "%s: check retvals count", case_name);
 	struct error *e = diag_last_error(diag_get());
-	is(e->type, &type_IllegalParams, "%s: check error type", case_name);
+	is(e->type, error_type, "%s: check error type", case_name);
 	ok(!strcmp(e->errmsg, exp_err), "%s: check error message", case_name);
 }
 
 int
 test_basic(struct lua_State *L)
 {
-	plan(19);
+	plan(23);
 	header();
 
 	int top;
@@ -106,14 +106,12 @@ test_basic(struct lua_State *L)
 	assert(lua_gettop(L) == 0);
 
 	/*
-	 * Case: elements on the stack (idx == 0) as an input and
-	 * a non-default format.
+	 * Case: a non-default format (a Lua table on idx == -1).
 	 */
 
 	/* Prepare the Lua stack. */
-	lua_pushinteger(L, 1);
-	lua_pushinteger(L, 2);
-	lua_pushinteger(L, 3);
+	luaL_loadstring(L, "return {1, 2, 3}");
+	lua_call(L, 0, 1);
 
 	/* Create a new format. */
 	struct key_part_def part;
@@ -127,12 +125,12 @@ test_basic(struct lua_State *L)
 
 	/* Create and check a tuple. */
 	top = lua_gettop(L);
-	tuple = luaT_tuple_new(L, 0, another_format);
+	tuple = luaT_tuple_new(L, -1, another_format);
 	check_tuple(tuple, another_format, lua_gettop(L) - top, "objects");
 
 	/* Clean up. */
 	tuple_format_delete(another_format);
-	lua_pop(L, 3);
+	lua_pop(L, 1);
 	assert(lua_gettop(L) == 0);
 
 	/*
@@ -145,7 +143,28 @@ test_basic(struct lua_State *L)
 	/* Try to create and check for the error. */
 	top = lua_gettop(L);
 	tuple = luaT_tuple_new(L, -1, default_format);
-	check_error(L, tuple, lua_gettop(L) - top, "unexpected type");
+	check_error(L, tuple, lua_gettop(L) - top, &type_IllegalParams,
+		    "A tuple or a table expected, got number",
+		    "unexpected type");
+
+	/* Clean up. */
+	lua_pop(L, 1);
+	assert(lua_gettop(L) == 0);
+
+	/*
+	 * Case: unserializable item within a Lua table.
+	 *
+	 * The function should not raise a Lua error.
+	 */
+	luaL_loadstring(L, "return {function() end}");
+	lua_call(L, 0, 1);
+
+	/* Try to create and check for the error. */
+	top = lua_gettop(L);
+	tuple = luaT_tuple_new(L, -1, default_format);
+	check_error(L, tuple, lua_gettop(L) - top, &type_LuajitError,
+		    "unsupported Lua type 'function'",
+		    "unserializable element");
 
 	/* Clean up. */
 	lua_pop(L, 1);
@@ -167,6 +186,7 @@ main()
 	luaL_openlibs(L);
 
 	box_init();
+	tarantool_lua_utils_init(L);
 	luaopen_msgpack(L);
 	box_lua_tuple_init(L);
 	lua_pop(L, 1);
