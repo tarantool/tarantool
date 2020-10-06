@@ -6,13 +6,10 @@ test_run = require('test_run').new()
 old_election_timeout = box.cfg_election_timeout
 
 -- Election is turned off by default.
-assert(not box.cfg.election_is_enabled)
--- Is candidate by default. Although it does not matter, until election is
--- turned on.
-assert(box.cfg.election_is_candidate)
+assert(box.cfg.election_mode == 'off')
 -- Ensure election options are validated.
-box.cfg{election_is_enabled = 100}
-box.cfg{election_is_candidate = 100}
+box.cfg{election_mode = 100}
+box.cfg{election_mode = '100'}
 box.cfg{election_timeout = -1}
 box.cfg{election_timeout = 0}
 
@@ -25,8 +22,7 @@ assert(box.info.election.leader == 0)
 assert(not box.info.ro)
 
 -- Turned on election blocks writes until the instance becomes a leader.
-box.cfg{election_is_candidate = false}
-box.cfg{election_is_enabled = true}
+box.cfg{election_mode = 'voter'}
 assert(box.info.election.state == 'follower')
 assert(box.info.ro)
 -- Term is not changed, because the instance can't be a candidate,
@@ -37,15 +33,14 @@ assert(box.info.election.leader == 0)
 
 -- Candidate instance votes immediately, if sees no leader.
 box.cfg{election_timeout = 1000}
-box.cfg{election_is_candidate = true}
+box.cfg{election_mode = 'candidate'}
 test_run:wait_cond(function() return box.info.election.state == 'leader' end)
 assert(box.info.election.term > term)
 assert(box.info.election.vote == box.info.id)
 assert(box.info.election.leader == box.info.id)
 
 box.cfg{                                                                        \
-    election_is_enabled = false,                                                \
-    election_is_candidate = true,                                               \
+    election_mode = 'off',                                                      \
     election_timeout = old_election_timeout                                     \
 }
 

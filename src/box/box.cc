@@ -477,26 +477,17 @@ box_check_uri(const char *source, const char *option_name)
 	}
 }
 
-static int
-box_check_election_is_enabled(void)
+static const char *
+box_check_election_mode(void)
 {
-	int b = cfg_getb("election_is_enabled");
-	if (b < 0) {
-		diag_set(ClientError, ER_CFG, "election_is_enabled",
-			 "the value must be a boolean");
+	const char *mode = cfg_gets("election_mode");
+	if (mode == NULL || (strcmp(mode, "off") != 0 &&
+	    strcmp(mode, "voter") != 0 && strcmp(mode, "candidate") != 0)) {
+		diag_set(ClientError, ER_CFG, "election_mode", "the value must "
+			 "be a string 'off' or 'voter' or 'candidate'");
+		return NULL;
 	}
-	return b;
-}
-
-static int
-box_check_election_is_candidate(void)
-{
-	int b = cfg_getb("election_is_candidate");
-	if (b < 0) {
-		diag_set(ClientError, ER_CFG, "election_is_candidate",
-			 "the value must be a boolean");
-	}
-	return b;
+	return mode;
 }
 
 static double
@@ -768,9 +759,7 @@ box_check_config(void)
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_instance_uuid(&uuid);
 	box_check_replicaset_uuid(&uuid);
-	if (box_check_election_is_enabled() < 0)
-		diag_raise();
-	if (box_check_election_is_candidate() < 0)
+	if (box_check_election_mode() == NULL)
 		diag_raise();
 	if (box_check_election_timeout() < 0)
 		diag_raise();
@@ -797,22 +786,13 @@ box_check_config(void)
 }
 
 int
-box_set_election_is_enabled(void)
+box_set_election_mode(void)
 {
-	int b = box_check_election_is_enabled();
-	if (b < 0)
+	const char *mode = box_check_election_mode();
+	if (mode == NULL)
 		return -1;
-	raft_cfg_is_enabled(b);
-	return 0;
-}
-
-int
-box_set_election_is_candidate(void)
-{
-	int b = box_check_election_is_candidate();
-	if (b < 0)
-		return -1;
-	raft_cfg_is_candidate(b);
+	raft_cfg_is_candidate(strcmp(mode, "candidate") == 0);
+	raft_cfg_is_enabled(strcmp(mode, "off") != 0);
 	return 0;
 }
 
@@ -2786,15 +2766,13 @@ box_cfg_xc(void)
 	 * election-enabled node without election actually enabled leading to
 	 * disconnect.
 	 */
-	if (box_set_election_is_candidate() != 0)
-		diag_raise();
 	if (box_set_election_timeout() != 0)
 		diag_raise();
 	/*
 	 * Election is enabled last. So as all the parameters are installed by
 	 * that time.
 	 */
-	if (box_set_election_is_enabled() != 0)
+	if (box_set_election_mode() != 0)
 		diag_raise();
 
 	title("running");

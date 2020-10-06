@@ -25,10 +25,8 @@ cfg_filter(box.cfg)
  |     - 1000000000000000000
  |   - - coredump
  |     - false
- |   - - election_is_candidate
- |     - true
- |   - - election_is_enabled
- |     - false
+ |   - - election_mode
+ |     - off
  |   - - election_timeout
  |     - 5
  |   - - feedback_enabled
@@ -140,10 +138,8 @@ cfg_filter(box.cfg)
  |     - 1000000000000000000
  |   - - coredump
  |     - false
- |   - - election_is_candidate
- |     - true
- |   - - election_is_enabled
- |     - false
+ |   - - election_mode
+ |     - off
  |   - - election_timeout
  |     - 5
  |   - - feedback_enabled

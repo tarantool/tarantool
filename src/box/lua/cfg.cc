@@ -270,17 +270,9 @@ lbox_cfg_set_worker_pool_threads(struct lua_State *L)
 }
 
 static int
-lbox_cfg_set_election_is_enabled(struct lua_State *L)
+lbox_cfg_set_election_mode(struct lua_State *L)
 {
-	if (box_set_election_is_enabled() != 0)
-		luaT_error(L);
-	return 0;
-}
-
-static int
-lbox_cfg_set_election_is_candidate(struct lua_State *L)
-{
-	if (box_set_election_is_candidate() != 0)
+	if (box_set_election_mode() != 0)
 		luaT_error(L);
 	return 0;
 }
@@ -406,8 +398,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_vinyl_max_tuple_size", lbox_cfg_set_vinyl_max_tuple_size},
 		{"cfg_set_vinyl_cache", lbox_cfg_set_vinyl_cache},
 		{"cfg_set_vinyl_timeout", lbox_cfg_set_vinyl_timeout},
-		{"cfg_set_election_is_enabled", lbox_cfg_set_election_is_enabled},
-		{"cfg_set_election_is_candidate", lbox_cfg_set_election_is_candidate},
+		{"cfg_set_election_mode", lbox_cfg_set_election_mode},
 		{"cfg_set_election_timeout", lbox_cfg_set_election_timeout},
 		{"cfg_set_replication_timeout", lbox_cfg_set_replication_timeout},
 		{"cfg_set_replication_connect_quorum", lbox_cfg_set_replication_connect_quorum},
