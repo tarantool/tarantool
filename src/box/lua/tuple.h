@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include <stddef.h>
+#include "trivia/util.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -78,6 +79,22 @@ luaT_pushtuple(struct lua_State *L, box_tuple_t *tuple);
  */
 box_tuple_t *
 luaT_istuple(struct lua_State *L, int idx);
+
+/**
+ * Encode a table or a tuple on the Lua stack as an MsgPack array.
+ *
+ * @param L              Lua state.
+ * @param idx            Acceptable index on the Lua stack.
+ * @param tuple_len_ptr  Where to store tuple data size in bytes
+ *                       (or NULL).
+ *
+ * The storage for data is allocated on the box region. A caller
+ * should call <box_region_truncate>() to release the data.
+ *
+ * In case of an error set a diag and return NULL.
+ */
+API_EXPORT char *
+luaT_tuple_encode(struct lua_State *L, int idx, size_t *tuple_len_ptr);
 
 /** \endcond public */
 
