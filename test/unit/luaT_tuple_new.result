@@ -1,4 +1,4 @@
-1..19
+1..23
 	*** test_basic ***
 ok 1 - table: tuple != NULL
 ok 2 - table: check tuple format id
@@ -19,4 +19,8 @@ ok 16 - unexpected type: tuple == NULL
 ok 17 - unexpected type: check retvals count
 ok 18 - unexpected type: check error type
 ok 19 - unexpected type: check error message
+ok 20 - unserializable element: tuple == NULL
+ok 21 - unserializable element: check retvals count
+ok 22 - unserializable element: check error type
+ok 23 - unserializable element: check error message
 	*** test_basic: done ***
