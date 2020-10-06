@@ -271,6 +271,9 @@ make_key(const char *field, uint32_t *key_len)
 	case MP_STR:
 		return mp_decode_str(&field, key_len);
 		break;
+	case MP_BIN:
+		return mp_decode_bin(&field, key_len);
+		break;
 	default:
 		*key_len = 0;
 		unreachable();

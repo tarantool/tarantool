@@ -1869,7 +1869,7 @@ _ = space:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, uniq
 _ = space:create_index('bitset', { type = 'bitset', parts = {2, 'number'}, unique = false })
 ---
 - error: 'Can''t create or modify index ''bitset'' in space ''test'': BITSET index
-    field type must be NUM or STR'
+    field type must be NUM or STR or VARBINARY'
 ...
 space:drop()
 ---

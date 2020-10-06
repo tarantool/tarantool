@@ -707,10 +707,12 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 			return -1;
 		}
 		if (key_def->parts[0].type != FIELD_TYPE_UNSIGNED &&
-		    key_def->parts[0].type != FIELD_TYPE_STRING) {
+		    key_def->parts[0].type != FIELD_TYPE_STRING &&
+		    key_def->parts[0].type != FIELD_TYPE_VARBINARY) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
-				 "BITSET index field type must be NUM or STR");
+				 "BITSET index field type must be "
+	 			 "NUM or STR or VARBINARY");
 			return -1;
 		}
 		if (key_def->is_multikey) {
