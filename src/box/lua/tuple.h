@@ -82,11 +82,8 @@ luaT_istuple(struct lua_State *L, int idx);
 /** \endcond public */
 
 /**
- * Create a new tuple with specific format from a Lua table, a
- * tuple, or objects on the lua stack.
- *
- * Set idx to zero to create the new tuple from objects on the lua
- * stack.
+ * Create a new tuple with specific format from a Lua table or a
+ * tuple.
  *
  * In case of an error set a diag and return NULL.
  */
