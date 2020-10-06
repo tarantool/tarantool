@@ -77,7 +77,7 @@ before_script:
   tags:
     - docker_test
 
-.docker_test_clang8_template: &docker_test_clang8_definition
+.docker_test_clang11_template: &docker_test_clang8_definition
   <<: *artifacts_files_definition
   image: "${CI_REGISTRY}/${CI_PROJECT_PATH}/testing/debian-buster:latest"
   stage: test
@@ -198,16 +198,16 @@ release_lto:
   script:
     - ${GITLAB_MAKE} test_debian_no_deps
 
-release_lto_clang8:
+release_lto_clang11:
   <<: *docker_test_clang8_definition
   variables:
-    CC: clang-8
-    CXX: clang++-8
+    CC: clang-11
+    CXX: clang++-11
     CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
   script:
     - ${GITLAB_MAKE} test_debian_no_deps
 
-release_asan_clang8:
+release_asan_clang11:
   <<: *docker_test_clang8_definition
   script:
     - ${GITLAB_MAKE} test_asan_debian_no_deps
