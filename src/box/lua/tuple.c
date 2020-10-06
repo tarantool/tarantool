@@ -107,6 +107,25 @@ luaT_istuple(struct lua_State *L, int narg)
 	return *(struct tuple **) data;
 }
 
+/* {{{ Encode a Lua table as an MsgPack array */
+
+/*
+ * A lot of functions are there, however the task per se looks
+ * simple. Reasons are the following.
+ *
+ * 1. box.tuple.new() supports two parameters conventions.
+ *    <luaT_tuple_encode_values>() implements the old API.
+ * 2. Serializer from Lua to MsgPack may raise a Lua error,
+ *    so it should be run under pcall. The dangerous code is
+ *    encapsulated into <luaT_tuple_encode_table>().
+ * 3. In particular <mpstream_init>() may raise an error in case
+ *    of OOM, so it also is run under pcall.
+ * 4. box.tuple.new() and <luaT_tuple_new>() use shared Lua ibuf
+ *    under the hood (because there is no strong reason to change
+ *    it), while <luaT_tuple_encode>() uses the box region
+ *    (because it is usual for the module API).
+ */
+
 /**
  * Encode a Lua values on a Lua stack as an MsgPack array.
  *
@@ -131,6 +150,22 @@ luaT_tuple_encode_values(struct lua_State *L)
 	return 0;
 }
 
+typedef void luaT_mpstream_init_f(struct mpstream *stream, struct lua_State *L);
+
+static void
+luaT_mpstream_init_lua_ibuf(struct mpstream *stream, struct lua_State *L)
+{
+	mpstream_init(stream, tarantool_lua_ibuf, ibuf_reserve_cb,
+		      ibuf_alloc_cb, luamp_error, L);
+}
+
+static void
+luaT_mpstream_init_box_region(struct mpstream *stream, struct lua_State *L)
+{
+	mpstream_init(stream, &fiber()->gc, region_reserve_cb, region_alloc_cb,
+		      luamp_error, L);
+}
+
 /**
  * Encode a Lua table or a tuple as MsgPack.
  *
@@ -141,28 +176,26 @@ luaT_tuple_encode_values(struct lua_State *L)
 static int
 luaT_tuple_encode_table(struct lua_State *L)
 {
-	struct ibuf *buf = tarantool_lua_ibuf;
-	ibuf_reset(buf);
 	struct mpstream stream;
-	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb, luamp_error,
-		      L);
-	luamp_encode_tuple(L, &tuple_serializer, &stream, 1);
+	luaT_mpstream_init_f *luaT_mpstream_init_f = lua_topointer(L, 1);
+	luaT_mpstream_init_f(&stream, L);
+	luamp_encode_tuple(L, &tuple_serializer, &stream, 2);
 	mpstream_flush(&stream);
 	return 0;
 }
 
 /**
- * Encode a Lua table / tuple to Lua shared ibuf.
+ * Encode a Lua table / tuple to given mpstream.
  */
-static char *
-luaT_tuple_encode_on_lua_ibuf(struct lua_State *L, int idx,
-			      size_t *tuple_len_ptr)
+static int
+luaT_tuple_encode_on_mpstream(struct lua_State *L, int idx,
+			      luaT_mpstream_init_f *luaT_mpstream_init_f)
 {
 	assert(idx != 0);
 	if (!lua_istable(L, idx) && !luaT_istuple(L, idx)) {
 		diag_set(IllegalParams, "A tuple or a table expected, got %s",
 			 lua_typename(L, lua_type(L, idx)));
-		return NULL;
+		return -1;
 	}
 
 	/* To restore before leaving the function. */
@@ -179,17 +212,57 @@ luaT_tuple_encode_on_lua_ibuf(struct lua_State *L, int idx,
 	lua_rawgeti(L, LUA_REGISTRYINDEX, luaT_tuple_encode_table_ref);
 	assert(lua_isfunction(L, -1));
 
+	lua_pushlightuserdata(L, luaT_mpstream_init_f);
 	lua_pushvalue(L, idx);
 
-	int rc = luaT_call(L, 1, 0);
+	int rc = luaT_call(L, 2, 0);
 	lua_settop(L, top);
-	if (rc != 0)
-		return NULL;
-
-	if (tuple_len_ptr != NULL)
-		*tuple_len_ptr = ibuf_used(tarantool_lua_ibuf);
-	return tarantool_lua_ibuf->buf;
+	return rc;
 }
+
+/**
+ * Encode a Lua table / tuple to Lua shared ibuf.
+ */
+static char *
+luaT_tuple_encode_on_lua_ibuf(struct lua_State *L, int idx,
+			      size_t *tuple_len_ptr)
+{
+	struct ibuf *buf = tarantool_lua_ibuf;
+	ibuf_reset(buf);
+	if (luaT_tuple_encode_on_mpstream(L, idx,
+					  luaT_mpstream_init_lua_ibuf) != 0)
+		return NULL;
+	if (tuple_len_ptr != NULL)
+		*tuple_len_ptr = ibuf_used(buf);
+	return buf->buf;
+}
+
+/**
+ * Encode a Lua table / tuple to box region.
+ */
+char *
+luaT_tuple_encode(struct lua_State *L, int idx, size_t *tuple_len_ptr)
+{
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	if (luaT_tuple_encode_on_mpstream(L, idx,
+					  luaT_mpstream_init_box_region) != 0) {
+		region_truncate(region, region_svp);
+		return NULL;
+	}
+	size_t tuple_len = region_used(region) - region_svp;
+	if (tuple_len_ptr != NULL)
+		*tuple_len_ptr = tuple_len;
+	char *tuple_data = region_join(region, tuple_len);
+	if (tuple_data == NULL) {
+		diag_set(OutOfMemory, tuple_len, "region", "tuple data");
+		region_truncate(region, region_svp);
+		return NULL;
+	}
+	return tuple_data;
+}
+
+/* }}} Encode a Lua table as an MsgPack array */
 
 struct tuple *
 luaT_tuple_new(struct lua_State *L, int idx, box_tuple_format_t *format)
