@@ -20,7 +20,7 @@ test: test_$(TRAVIS_OS_NAME)
 test_linux: docker_test_debian
 coverage: docker_coverage_debian
 lto: docker_test_debian
-lto_clang8: docker_test_debian_clang8
+lto_clang11: docker_test_debian_clang11
 asan: docker_test_asan_debian
 
 docker_%:
@@ -47,7 +47,7 @@ docker_%:
 
 # Depends
 
-# When dependencies in 'deps_debian' or 'deps_buster_clang_8' goal
+# When dependencies in 'deps_debian' or 'deps_buster_clang_11' goal
 # are changed, push a new docker image into GitLab Registry using
 # the following command:
 #
@@ -75,6 +75,13 @@ deps_buster_clang_8: deps_debian
 	apt-get update
 	apt-get install -y clang-8 llvm-8-dev
 
+deps_buster_clang_11: deps_debian
+	echo "deb http://apt.llvm.org/buster/ llvm-toolchain-buster-11 main" > /etc/apt/sources.list.d/clang_11.list
+	echo "deb-src http://apt.llvm.org/buster/ llvm-toolchain-buster-11 main" >> /etc/apt/sources.list.d/clang_11.list
+	wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+	apt-get update
+	apt-get install -y clang-11 llvm-11-dev
+
 # Release
 
 build_debian:
@@ -86,7 +93,7 @@ test_debian_no_deps: build_debian
 
 test_debian: deps_debian test_debian_no_deps
 
-test_debian_clang8: deps_debian deps_buster_clang_8 test_debian_no_deps
+test_debian_clang11: deps_debian deps_buster_clang_11 test_debian_no_deps
 
 # Debug with coverage
 
@@ -114,7 +121,7 @@ coverage_debian: deps_debian test_coverage_debian_no_deps
 # ASAN
 
 build_asan_debian:
-	CC=clang-8 CXX=clang++-8 cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+	CC=clang-11 CXX=clang++-11 cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DENABLE_WERROR=ON -DENABLE_ASAN=ON -DENABLE_UB_SANITIZER=ON \
 		${CMAKE_EXTRA_PARAMS}
 	make -j
@@ -130,7 +137,7 @@ test_asan_debian_no_deps: build_asan_debian
 		ASAN_OPTIONS=heap_profile=0:unmap_shadow_on_exit=1:detect_invalid_pointer_pairs=1:symbolize=1:detect_leaks=1:dump_instruction_bytes=1:print_suppressions=0 \
 		./test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
 
-test_asan_debian: deps_debian deps_buster_clang_8 test_asan_debian_no_deps
+test_asan_debian: deps_debian deps_buster_clang_11 test_asan_debian_no_deps
 
 # Static build
 
