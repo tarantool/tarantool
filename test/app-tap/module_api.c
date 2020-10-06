@@ -555,6 +555,120 @@ test_box_region(struct lua_State *L)
 
 /* }}} test_box_region */
 
+/* {{{ test_tuple_encode */
+
+static void
+check_tuple_data(char *tuple_data, size_t tuple_size, int retvals)
+{
+	assert(tuple_size == 4);
+	assert(tuple_data != NULL);
+	assert(!strncmp(tuple_data, "\x93\x01\x02\x03", 4));
+	assert(retvals == 0);
+}
+
+static void
+check_encode_error(char *tuple_data, int retvals, const char *exp_err_type,
+		   const char *exp_err_msg)
+{
+	assert(tuple_data == NULL);
+	box_error_t *e = box_error_last();
+	assert(strcmp(box_error_type(e), exp_err_type) == 0);
+	assert(strcmp(box_error_message(e), exp_err_msg) == 0);
+	assert(retvals == 0);
+}
+
+/**
+ * Encode a Lua table or a tuple into a tuple.
+ *
+ * Similar to <luaT_tuple_new>() unit test.
+ */
+static int
+test_tuple_encode(struct lua_State *L)
+{
+	int top;
+	char *tuple_data;
+	size_t tuple_size;
+
+	size_t region_svp = box_region_used();
+
+	/*
+	 * Case: a Lua table on idx == -2 as an input.
+	 */
+
+	/* Prepare the Lua stack. */
+	luaL_loadstring(L, "return {1, 2, 3}");
+	lua_call(L, 0, 1);
+	lua_pushnil(L);
+
+	/* Create and check a tuple. */
+	top = lua_gettop(L);
+	tuple_data = luaT_tuple_encode(L, -2, &tuple_size);
+	check_tuple_data(tuple_data, tuple_size, lua_gettop(L) - top);
+
+	/* Clean up. */
+	lua_pop(L, 2);
+	assert(lua_gettop(L) == 0);
+
+	/*
+	 * Case: a tuple on idx == -1 as an input.
+	 */
+
+	/* Prepare the Lua stack. */
+	luaL_loadstring(L, "return box.tuple.new({1, 2, 3})");
+	lua_call(L, 0, 1);
+
+	/* Create and check a tuple. */
+	top = lua_gettop(L);
+	tuple_data = luaT_tuple_encode(L, -1, &tuple_size);
+	check_tuple_data(tuple_data, tuple_size, lua_gettop(L) - top);
+
+	/* Clean up. */
+	lua_pop(L, 1);
+	assert(lua_gettop(L) == 0);
+
+	/*
+	 * Case: a Lua object of an unexpected type.
+	 */
+
+	/* Prepare the Lua stack. */
+	lua_pushinteger(L, 42);
+
+	/* Try to encode and check for the error. */
+	top = lua_gettop(L);
+	tuple_data = luaT_tuple_encode(L, -1, &tuple_size);
+	check_encode_error(tuple_data, lua_gettop(L) - top, "IllegalParams",
+			   "A tuple or a table expected, got number");
+
+	/* Clean up. */
+	lua_pop(L, 1);
+	assert(lua_gettop(L) == 0);
+
+	/*
+	 * Case: unserializable item within a Lua table.
+	 *
+	 * The function should not raise a Lua error.
+	 */
+	luaL_loadstring(L, "return {function() end}");
+	lua_call(L, 0, 1);
+
+	/* Try to encode and check for the error. */
+	top = lua_gettop(L);
+	tuple_data = luaT_tuple_encode(L, -1, &tuple_size);
+	check_encode_error(tuple_data, lua_gettop(L) - top, "LuajitError",
+			   "unsupported Lua type 'function'");
+
+	/* Clean up. */
+	lua_pop(L, 1);
+	assert(lua_gettop(L) == 0);
+
+	box_region_truncate(region_svp);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+/* }}} test_tuple_encode */
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -585,6 +699,7 @@ luaopen_module_api(lua_State *L)
 		{"iscallable", test_iscallable},
 		{"iscdata", test_iscdata},
 		{"test_box_region", test_box_region},
+		{"test_tuple_encode", test_tuple_encode},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
