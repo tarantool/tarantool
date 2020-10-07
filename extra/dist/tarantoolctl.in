@@ -202,19 +202,19 @@ end
 -- In case there is no explicit instance name, check whether arg[0] is a
 -- symlink. In that case, the name of the symlink is the instance name.
 --
-local function find_instance_name(arg0, arg2)
-    if arg2 ~= nil then
-        return fio.basename(arg2, '.lua')
+local function find_instance_name(arg)
+    if arg[2] ~= nil then
+        return fio.basename(arg[2], '.lua')
     end
-    local istat = fio.lstat(arg0)
+    local istat = fio.lstat(arg[0])
     if istat == nil then
-        log.error("Can't stat %s: %s", arg0, errno.strerror())
+        log.error("Can't stat %s: %s", arg[0], errno.strerror())
         os.exit(1)
     end
     if not istat:is_link() then usage(command_name) end
-    arg[2] = arg0
+    arg[2] = arg[0]
     linkmode = true
-    return fio.basename(arg0, '.lua')
+    return fio.basename(arg[0], '.lua')
 end
 
 local function mkdir(dirname)
@@ -971,7 +971,7 @@ local function process_remote(cmd_function)
 end
 
 local function process_local(cmd_function)
-    instance_name = find_instance_name(arg[0], arg[2])
+    instance_name = find_instance_name(arg)
 
     default_file = find_default_file()
     load_default_file(default_file)

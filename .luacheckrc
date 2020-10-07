@@ -37,12 +37,6 @@ exclude_files = {
     ".git/**/*.lua",
 }
 
-files["extra/dist/tarantoolctl.in"] = {
-    ignore = {
-        -- https://github.com/tarantool/tarantool/issues/4929
-        "122",
-    },
-}
 files["src/lua/help.lua"] = {
     -- Globals defined for interactive mode.
     globals = {"help", "tutorial"},
