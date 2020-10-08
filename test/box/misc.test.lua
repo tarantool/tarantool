@@ -348,3 +348,18 @@ tuple_format = box.internal.new_tuple_format(format)
 box.cfg{}
 local ffi = require'ffi' ffi.C._say(ffi.C.S_WARN, nil, 0, nil, "%s", "test log")
 test_run:grep_log('default', 'test log')
+
+--
+-- gh-2866: one more way to declare index parts
+--
+s = box.schema.space.create('test')
+i = s:create_index('test1', {parts = {{1, 'unsigned'}}})
+i = s:create_index('test2', {parts = {{2, 'string', is_nullable = true, collation = 'unicode'}}})
+i.parts
+i = s:create_index('test4', {parts = {3, 'string', is_nullable = true}})
+i.parts
+i = s:create_index('test5', {parts = {3, 'string', collation = 'unicode'}})
+i.parts
+i = s:create_index('test6', {parts = {4, 'string'}})
+i.parts
+s:drop()
