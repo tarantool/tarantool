@@ -116,7 +116,7 @@ deploy_prepare:
 	rm -rf build
 
 package: deploy_prepare
-	PACKPACK_EXTRA_DOCKER_RUN_PARAMS='--network=host' ./packpack/packpack
+	PACKPACK_EXTRA_DOCKER_RUN_PARAMS="--network=host ${PACKPACK_EXTRA_DOCKER_RUN_PARAMS}" ./packpack/packpack
 
 deploy: package
 	echo ${GPG_SECRET_KEY} | base64 -d | gpg --batch --import || true
