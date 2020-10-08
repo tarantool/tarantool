@@ -704,7 +704,11 @@ local function update_index_parts(format, parts)
         "options.parts must have at least one part")
     end
     if type(parts[1]) == 'number' and type(parts[2]) == 'string' then
-        return update_index_parts_1_6_0(parts), true
+        if parts[3] == nil then
+            parts = {parts} -- one part only
+        else
+            return update_index_parts_1_6_0(parts), true
+        end
     end
 
     local parts_can_be_simplified = true
