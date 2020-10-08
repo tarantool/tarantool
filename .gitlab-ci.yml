@@ -299,6 +299,13 @@ jepsen-cluster-txm:
     LEIN_OPT: '--nemesis standard --mvcc'
     INSTANCE_COUNT: '5'
 
+default_gcc_centos_7:
+  <<: *pack_test_definition
+  variables:
+    PACKPACK_EXTRA_DOCKER_RUN_PARAMS: '-e CC=/usr/bin/gcc -e CXX=/usr/bin/g++'
+    OS: 'el'
+    DIST: '7'
+
 # ####
 # Perf
 # ####
