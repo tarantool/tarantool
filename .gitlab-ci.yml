@@ -238,6 +238,13 @@ freebsd_12_release:
     - ${GITLAB_MAKE} vms_start
     - ${GITLAB_MAKE} vms_test_freebsd
 
+default_gcc_centos_7:
+  <<: *pack_test_definition
+  variables:
+    PACKPACK_EXTRA_DOCKER_RUN_PARAMS: '-e CC=/usr/bin/gcc -e CXX=/usr/bin/g++'
+    OS: 'el'
+    DIST: '7'
+
 # ####
 # Perf
 # ####
