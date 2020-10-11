@@ -1,10 +1,5 @@
 import platform
 
-# Disabled on FreeBSD due to fail #4271:
-#   Data segment size exceeds process limit
-if platform.system() == 'FreeBSD':
-    self.skip = 1
-
 # Disabled on OpenBSD due to fail #XXXX:
 if platform.system() == 'OpenBSD':
     self.skip = 1
