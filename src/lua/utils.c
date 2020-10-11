@@ -1146,17 +1146,17 @@ luaL_iscallable(lua_State *L, int idx)
 	return res;
 }
 
-struct ibuf *
-luaL_checkibuf(struct lua_State *L, int idx)
+box_ibuf_t *
+luaT_toibuf(struct lua_State *L, int idx)
 {
 	if (lua_type(L, idx) != LUA_TCDATA)
 		return NULL;
 	uint32_t cdata_type;
 	void *cdata = luaL_checkcdata(L, idx, &cdata_type);
 	if (cdata_type == CTID_STRUCT_IBUF)
-		return (struct ibuf *) cdata;
+		return (box_ibuf_t *) cdata;
 	if (cdata_type == CTID_STRUCT_IBUF_PTR && cdata != NULL)
-		return *(struct ibuf **) cdata;
+		return *(box_ibuf_t **) cdata;
 	return NULL;
 }
 

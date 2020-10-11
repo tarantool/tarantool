@@ -62,6 +62,7 @@ extern "C" {
 struct serializer_opts;
 struct lua_State;
 struct ibuf;
+typedef struct ibuf box_ibuf_t;
 struct tt_uuid;
 
 /**
@@ -539,6 +540,14 @@ luaT_tolstring(lua_State *L, int idx, size_t *ssize);
 LUA_API int
 luaL_iscallable(lua_State *L, int idx);
 
+/**
+ * Check if a value on @a L stack by index @a idx is an ibuf
+ * object. Both 'struct ibuf' and 'struct ibuf *' are accepted.
+ * Returns NULL, if can't convert - not an ibuf object.
+ */
+LUA_API box_ibuf_t *
+luaT_toibuf(struct lua_State *L, int idx);
+
 /** \endcond public */
 
 /**
@@ -627,14 +636,6 @@ luaL_checkfinite(struct lua_State *L, struct luaL_serializer *cfg,
  */
 struct lua_State *
 luaT_newthread(struct lua_State *L);
-
-/**
- * Check if a value on @a L stack by index @a idx is an ibuf
- * object. Both 'struct ibuf' and 'struct ibuf *' are accepted.
- * Returns NULL, if can't convert - not an ibuf object.
- */
-struct ibuf *
-luaL_checkibuf(struct lua_State *L, int idx);
 
 /**
  * Check if a value on @a L stack by index @a idx is pointer at

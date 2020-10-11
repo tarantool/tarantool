@@ -503,7 +503,7 @@ luaL_merge_source_buffer_fetch_impl(struct merge_source_buffer *source,
 		source->ref = 0;
 	}
 	lua_pushvalue(L, -nresult + 1); /* Popped by luaL_ref(). */
-	source->buf = luaL_checkibuf(L, -1);
+	source->buf = luaT_toibuf(L, -1);
 	if (source->buf == NULL) {
 		diag_set(IllegalParams, "Expected <state>, <buffer>");
 		return -1;
@@ -1225,7 +1225,7 @@ lbox_merge_source_select(struct lua_State *L)
 		lua_pushstring(L, "buffer");
 		lua_gettable(L, 2);
 		if (!lua_isnil(L, -1)) {
-			if ((output_buffer = luaL_checkibuf(L, -1)) == NULL)
+			if ((output_buffer = luaT_toibuf(L, -1)) == NULL)
 				return lbox_merge_source_select_usage(L,
 					"buffer");
 		}
