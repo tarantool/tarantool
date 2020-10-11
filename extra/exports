@@ -134,6 +134,7 @@ luaT_error
 luaT_call
 luaT_cpcall
 luaT_state
+luaT_toibuf
 luaT_tolstring
 luaT_tuple_encode
 luaT_tuple_new

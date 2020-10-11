@@ -442,7 +442,7 @@ lua_msgpack_encode(lua_State *L)
 
 	struct ibuf *buf;
 	if (index > 1) {
-		buf = luaL_checkibuf(L, 2);
+		buf = luaT_toibuf(L, 2);
 		if (buf == NULL) {
 			return luaL_error(L, "msgpack.encode: argument 2 "
 					  "must be of type 'struct ibuf'");
