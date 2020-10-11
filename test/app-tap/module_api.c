@@ -201,6 +201,15 @@ test_box_ibuf(lua_State *L)
 }
 
 static int
+test_toibuf(lua_State *L)
+{
+	box_ibuf_t *buf;
+	buf = luaT_toibuf(L, -1);
+	lua_pushboolean(L, buf != NULL);
+	return 1;
+}
+
+static int
 test_touint64(lua_State *L)
 {
 	lua_pushliteral(L, "xxx");
@@ -2337,6 +2346,7 @@ luaopen_module_api(lua_State *L)
 		{"test_pushint64", test_pushint64 },
 		{"test_checkuint64", test_checkuint64 },
 		{"test_checkint64", test_checkint64 },
+		{"toibuf", test_toibuf},
 		{"test_touint64", test_touint64 },
 		{"test_toint64", test_toint64 },
 		{"test_fiber", test_fiber },
