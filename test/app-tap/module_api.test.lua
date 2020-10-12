@@ -177,7 +177,7 @@ local function test_iscallable(test, module)
 end
 
 local test = require('tap').test("module_api", function(test)
-    test:plan(34)
+    test:plan(35)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")

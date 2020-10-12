@@ -156,6 +156,51 @@ test_checkint64(lua_State *L)
 }
 
 static int
+test_box_ibuf(lua_State *L)
+{
+	struct slab_cache *slabc = cord_slab_cache();
+	assert(slabc != NULL);
+	box_ibuf_t ibuf;
+
+	ibuf_create(&ibuf, slabc, 16320);
+	assert(ibuf_used(&ibuf) == 0);
+	void *ptr = box_ibuf_reserve(&ibuf, 65536);
+	(void)ptr;
+	assert(ptr != NULL);
+	char **rpos;
+	char **wpos;
+	box_ibuf_read_range(&ibuf, &rpos, &wpos);
+
+	ptr = ibuf_alloc(&ibuf, 10);
+	assert(ptr != NULL);
+
+	assert(ibuf_used(&ibuf) == 10);
+	assert((*wpos - *rpos) == 10);
+
+	/* let be a little bit paranoid and double check */
+	box_ibuf_read_range(&ibuf, &rpos, &wpos);
+	assert((*wpos - *rpos) == 10);
+
+	ptr = ibuf_alloc(&ibuf, 10000);
+	assert(ptr);
+	assert(ibuf_used(&ibuf) == 10010);
+	assert((*wpos - *rpos) == 10010);
+
+	size_t unused = ibuf_unused(&ibuf);
+	(void)unused;
+	char **end;
+	box_ibuf_write_range(&ibuf, &wpos, &end);
+	assert((*end - *wpos) == (ptrdiff_t)unused);
+
+	ibuf_reset(&ibuf);
+	assert(ibuf_used(&ibuf) == 0);
+	assert(*rpos == *wpos);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+static int
 test_touint64(lua_State *L)
 {
 	lua_pushliteral(L, "xxx");
@@ -1898,6 +1943,7 @@ luaopen_module_api(lua_State *L)
 		{"test_key_def_merge", test_key_def_merge},
 		{"test_key_def_extract_key", test_key_def_extract_key},
 		{"test_key_def_validate_key", test_key_def_validate_key},
+		{"test_box_ibuf", test_box_ibuf},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

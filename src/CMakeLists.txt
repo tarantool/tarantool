@@ -195,6 +195,7 @@ set(api_headers
     ${CMAKE_SOURCE_DIR}/src/fiber_cond.h
     ${CMAKE_SOURCE_DIR}/src/coio.h
     ${CMAKE_SOURCE_DIR}/src/coio_task.h
+    ${CMAKE_SOURCE_DIR}/src/box/ibuf.h
     ${CMAKE_SOURCE_DIR}/src/lua/utils.h
     ${CMAKE_SOURCE_DIR}/src/box/txn.h
     ${CMAKE_SOURCE_DIR}/src/box/tuple.h
