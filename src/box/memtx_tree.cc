@@ -126,9 +126,9 @@ memtx_tree_cmp_def(struct memtx_tree *tree)
 static int
 memtx_tree_qcompare(const void* a, const void *b, void *c)
 {
-	const struct memtx_tree_data *data_a = a;
-	const struct memtx_tree_data *data_b = b;
-	struct key_def *key_def = c;
+	const struct memtx_tree_data *data_a = (struct memtx_tree_data *)a;
+	const struct memtx_tree_data *data_b = (struct memtx_tree_data *)b;
+	struct key_def *key_def = (struct key_def *)c;
 	return tuple_compare(data_a->tuple, data_a->hint, data_b->tuple,
 			     data_b->hint, key_def);
 }
@@ -852,7 +852,7 @@ func_index_key_dummy_alloc(struct tuple *tuple, const char *key,
 {
 	(void) tuple;
 	(void) key_sz;
-	return (void*) key;
+	return key;
 }
 
 /**
@@ -1064,7 +1064,8 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 		key = NULL;
 	}
 
-	struct tree_iterator *it = mempool_alloc(&memtx->iterator_pool);
+	struct tree_iterator *it = (struct tree_iterator *)
+		mempool_alloc(&memtx->iterator_pool);
 	if (it == NULL) {
 		diag_set(OutOfMemory, sizeof(struct tree_iterator),
 			 "memtx_tree_index", "iterator");
@@ -1098,7 +1099,8 @@ memtx_tree_index_reserve(struct index *base, uint32_t size_hint)
 	if (size_hint < index->build_array_alloc_size)
 		return 0;
 	struct memtx_tree_data *tmp =
-		realloc(index->build_array, size_hint * sizeof(*tmp));
+		(struct memtx_tree_data *)
+			realloc(index->build_array, size_hint * sizeof(*tmp));
 	if (tmp == NULL) {
 		diag_set(OutOfMemory, size_hint * sizeof(*tmp),
 			 "memtx_tree_index", "reserve");
@@ -1115,7 +1117,8 @@ memtx_tree_index_build_array_append(struct memtx_tree_index *index,
 				    struct tuple *tuple, hint_t hint)
 {
 	if (index->build_array == NULL) {
-		index->build_array = malloc(MEMTX_EXTENT_SIZE);
+		index->build_array =
+			(struct memtx_tree_data *)malloc(MEMTX_EXTENT_SIZE);
 		if (index->build_array == NULL) {
 			diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
 				 "memtx_tree_index", "build_next");
@@ -1129,7 +1132,7 @@ memtx_tree_index_build_array_append(struct memtx_tree_index *index,
 		index->build_array_alloc_size = index->build_array_alloc_size +
 				DIV_ROUND_UP(index->build_array_alloc_size, 2);
 		struct memtx_tree_data *tmp =
-			realloc(index->build_array,
+			(struct memtx_tree_data *)realloc(index->build_array,
 				index->build_array_alloc_size * sizeof(*tmp));
 		if (tmp == NULL) {
 			diag_set(OutOfMemory, index->build_array_alloc_size *
