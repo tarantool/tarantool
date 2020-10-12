@@ -586,6 +586,31 @@ API_EXPORT int
 box_key_def_validate_key(const box_key_def_t *key_def, const char *key,
 			 uint32_t *key_size_ptr);
 
+/**
+ * Check a full key against given key definition.
+ *
+ * Verifies key parts against given key_def's field types with
+ * respect to nullability.
+ *
+ * Imposes the same parts count in @a key as in @a key_def.
+ * Absense of trailing key parts fails the check.
+ *
+ * Note: nil is accepted for nullable fields, but only for them.
+ *
+ * @param key_def       Key definition.
+ * @param key           MessagePack'ed data for matching.
+ * @param key_size_ptr  Here will be size of the validated key.
+ *
+ * @retval 0   The key is valid.
+ * @retval -1  The key is invalid.
+ *
+ * In case of an invalid key set a diag and return -1.
+ * @sa <box_error_last>().
+ */
+API_EXPORT int
+box_key_def_validate_full_key(const box_key_def_t *key_def, const char *key,
+			      uint32_t *key_size_ptr);
+
 /** \endcond public */
 
 /*

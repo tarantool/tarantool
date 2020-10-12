@@ -644,6 +644,23 @@ box_key_def_validate_key(const box_key_def_t *key_def, const char *key,
 	return rc;
 }
 
+int
+box_key_def_validate_full_key(const box_key_def_t *key_def, const char *key,
+			      uint32_t *key_size_ptr)
+{
+	const char *pos = key;
+	uint32_t part_count = mp_decode_array(&pos);
+	if (part_count != key_def->part_count) {
+		diag_set(ClientError, ER_EXACT_MATCH, key_def->part_count,
+			 part_count);
+		return -1;
+	}
+	int rc = key_validate_parts(key_def, pos, part_count, true, &pos);
+	if (rc == 0 && key_size_ptr != NULL)
+		*key_size_ptr = pos - key;
+	return rc;
+}
+
 /* }}} Module API functions */
 
 int
