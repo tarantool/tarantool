@@ -220,6 +220,9 @@ box_tuple_upsert
 box_tuple_extract_key
 box_tuple_compare
 box_tuple_compare_with_key
+box_ibuf_reserve
+box_ibuf_read_range
+box_ibuf_write_range
 box_return_tuple
 box_space_id_by_name
 box_index_id_by_name
