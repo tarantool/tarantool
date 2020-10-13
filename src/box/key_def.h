@@ -516,6 +516,24 @@ key_def_has_collation(const struct key_def *key_def)
 }
 
 /**
+ * Return the first field type which can't be compared if @a key_def
+ * has such. Otherwise return field_type_MAX value.
+ */
+static inline enum field_type
+key_def_incomparable_type(const struct key_def *key_def)
+{
+	for (uint32_t i = 0; i < key_def->part_count; ++i) {
+		if (key_def->parts[i].type == FIELD_TYPE_ANY ||
+		    key_def->parts[i].type == FIELD_TYPE_ARRAY ||
+		    key_def->parts[i].type == FIELD_TYPE_MAP) {
+			/* Tuple comparators don't support these types. */
+			return key_def->parts[i].type;
+		}
+	}
+	return field_type_MAX;
+}
+
+/**
  * @brief Checks if \a field_type (MsgPack) is compatible \a type (KeyDef).
  * @param type KeyDef type
  * @param key Pointer to MsgPack field to be tested.
@@ -650,6 +668,7 @@ tuple_compare(struct tuple *tuple_a, hint_t tuple_a_hint,
 	      struct tuple *tuple_b, hint_t tuple_b_hint,
 	      struct key_def *key_def)
 {
+	assert(key_def->tuple_compare != NULL);
 	return key_def->tuple_compare(tuple_a, tuple_a_hint,
 				      tuple_b, tuple_b_hint, key_def);
 }
@@ -672,6 +691,7 @@ tuple_compare_with_key(struct tuple *tuple, hint_t tuple_hint,
 		       const char *key, uint32_t part_count,
 		       hint_t key_hint, struct key_def *key_def)
 {
+	assert(key_def->tuple_compare_with_key != NULL);
 	return key_def->tuple_compare_with_key(tuple, tuple_hint, key,
 					       part_count, key_hint, key_def);
 }

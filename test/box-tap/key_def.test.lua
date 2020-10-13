@@ -215,7 +215,7 @@ end
 
 -- Case: extract_key().
 test:test('extract_key()', function(test)
-    test:plan(13)
+    test:plan(14)
 
     local key_def_a = key_def_lib.new({
         {type = 'unsigned', fieldno = 1},
@@ -244,6 +244,18 @@ test:test('extract_key()', function(test)
         {type = 'string', fieldno = 1, path = 'a.b'},
     }):extract_key({{a = {b = 'foo'}}}):totable()
     test:is_deeply(res, {'foo'}, 'JSON path (table argument)')
+
+    -- Composite types.
+    local tuple = {{{key = 'aa', data = 'aaaa'},
+                    {key = 'ab', data = 'aabb'},
+                    {key = 'bb', data = 'bbbb'}}, box.NULL,
+                    {a = 5, b = 6}}
+    local res = key_def_lib.new({
+        {type = 'array', fieldno = 1},
+        {type = 'map', fieldno = 2, is_nullable = true},
+        {type = 'any', fieldno = 3},
+    }):extract_key(tuple):totable()
+    test:is_deeply(res, tuple, 'Composite types')
 
     -- A key def has a **nullable** part with a field that is over
     -- a tuple size.
@@ -335,7 +347,7 @@ end)
 
 -- Case: compare().
 test:test('compare()', function(test)
-    test:plan(8)
+    test:plan(9)
 
     local key_def_a = key_def_lib.new({
         {type = 'unsigned', fieldno = 1},
@@ -365,11 +377,19 @@ test:test('compare()', function(test)
             'case 3: less (table argument)')
     test:is(key_def_b:compare(tuple_a:totable(), tuple_c:totable()), 0,
             'case 4: equal (table argument)')
+
+    local cmp_err = 'Unsupported field type: array'
+    local key_def = key_def_lib.new({
+        {type = 'string', fieldno = 1},
+        {type = 'array', fieldno = 2, is_nullable = true},
+    })
+    local ok, err = pcall(key_def.compare, key_def, {'aa', {}}, {'bb', box.NULL})
+    test:is_deeply({ok, tostring(err)}, {false, cmp_err}, 'no composite comparison')
 end)
 
 -- Case: compare_with_key().
 test:test('compare_with_key()', function(test)
-    test:plan(2)
+    test:plan(3)
 
     local key_def_b = key_def_lib.new({
         {type = 'number', fieldno = 2},
@@ -382,11 +402,19 @@ test:test('compare_with_key()', function(test)
 
     local key = box.tuple.new({1, 22})
     test:is(key_def_b:compare_with_key(tuple_a, key), 0, 'tuple')
+
+    local cmp_err = 'Unsupported field type: map'
+    local key_def = key_def_lib.new({
+        {type = 'string', fieldno = 1},
+        {type = 'map', fieldno = 2},
+    })
+    local ok, err = pcall(key_def.compare_with_key, key_def, {'aa', {}}, {'bb', box.NULL})
+    test:is_deeply({ok, tostring(err)}, {false, cmp_err}, 'no composite comparison')
 end)
 
 -- Case: totable().
 test:test('totable()', function(test)
-    test:plan(2)
+    test:plan(3)
 
     local parts_a = {
         {type = 'unsigned', fieldno = 1}
@@ -395,14 +423,23 @@ test:test('totable()', function(test)
         {type = 'number', fieldno = 2},
         {type = 'number', fieldno = 3},
     }
+    local parts_composite = {
+        {type = 'number', fieldno = 2},
+        {type = 'array', fieldno = 3},
+        {type = 'map', fieldno = 4, is_nullable = true},
+    }
     local key_def_a = key_def_lib.new(parts_a)
     local key_def_b = key_def_lib.new(parts_b)
+    local key_def_composite = key_def_lib.new(parts_composite)
 
     local exp = set_key_part_defaults(parts_a)
     test:is_deeply(key_def_a:totable(), exp, 'case 1')
 
     local exp = set_key_part_defaults(parts_b)
     test:is_deeply(key_def_b:totable(), exp, 'case 2')
+
+    local exp = set_key_part_defaults(parts_composite)
+    test:is_deeply(key_def_composite:totable(), exp, 'composite case')
 end)
 
 -- Case: __serialize().
@@ -447,7 +484,7 @@ end)
 
 -- Case: merge().
 test:test('merge()', function(test)
-    test:plan(6)
+    test:plan(8)
 
     local key_def_a = key_def_lib.new({
         {type = 'unsigned', fieldno = 1},
@@ -488,6 +525,37 @@ test:test('merge()', function(test)
         'case 3: verify with :totable()')
     test:is_deeply(key_def_cb:extract_key(tuple_a):totable(),
         {1, 1, box.NULL, 22}, 'case 3: verify with :extract_key()')
+
+    local parts_unsigned = {
+        {type = 'unsigned', fieldno = 1, is_nullable = false},
+    }
+    local key_def_unsigned = key_def_lib.new(parts_unsigned)
+    local key_def_string = key_def_lib.new({
+        {type = 'string', fieldno = 1},
+    })
+    local key_def_array = key_def_lib.new({
+        {type = 'array', fieldno = 1},
+        {type = 'unsigned', fieldno = 2},
+    })
+    local key_def_map = key_def_lib.new({
+        {type = 'map', fieldno = 3, is_nullable = true},
+        {type = 'unsigned', fieldno = 2},
+    })
+
+    -- This test case just shows current behavior and it's presence does not
+    -- mean that the behaviour has to remain the same in future
+    local key_def_unsigned_string = key_def_unsigned:merge(key_def_string)
+    test:is_deeply(key_def_unsigned_string:totable(), parts_unsigned,
+        'in case of conflict we just get the field from the first key_def')
+
+    local key_def_array_map = key_def_array:merge(key_def_map)
+    local exp_parts = {
+        {type = 'array', fieldno = 1, is_nullable = false},
+        {type = 'unsigned', fieldno = 2, is_nullable = false},
+        {type = 'map', fieldno = 3, is_nullable = true},
+    }
+    test:is_deeply(key_def_array_map:totable(), exp_parts,
+        'composite case')
 end)
 
 os.exit(test:check() and 0 or 1)
