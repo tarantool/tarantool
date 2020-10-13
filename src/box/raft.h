@@ -32,6 +32,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "tarantool_ev.h"
+#include "trigger.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -150,6 +151,11 @@ struct raft {
 	struct fiber *worker;
 	/** Configured election timeout in seconds. */
 	double election_timeout;
+	/**
+	 * Trigger invoked each time any of the Raft node visible attributes are
+	 * changed.
+	 */
+	struct rlist on_update;
 };
 
 extern struct raft raft;
@@ -250,6 +256,13 @@ raft_serialize_for_network(struct raft_request *req, struct vclock *vclock);
  */
 void
 raft_serialize_for_disk(struct raft_request *req);
+
+/**
+ * Add a trigger invoked each time any of the Raft node visible attributes are
+ * changed.
+ */
+void
+raft_on_update(struct trigger *trigger);
 
 /** Initialize Raft global data structures. */
 void

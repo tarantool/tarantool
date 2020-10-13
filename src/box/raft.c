@@ -643,6 +643,7 @@ raft_worker_handle_broadcast(void)
 	}
 	replicaset_foreach(replica)
 		relay_push_raft(replica->relay, &req);
+	trigger_run(&raft.on_update, NULL);
 	raft.is_broadcast_scheduled = false;
 }
 
@@ -904,6 +905,12 @@ raft_serialize_for_disk(struct raft_request *req)
 }
 
 void
+raft_on_update(struct trigger *trigger)
+{
+	trigger_add(&raft.on_update, trigger);
+}
+
+void
 raft_cfg_is_enabled(bool is_enabled)
 {
 	if (is_enabled == raft.is_enabled)
@@ -1040,4 +1047,5 @@ void
 raft_init(void)
 {
 	ev_timer_init(&raft.timer, raft_sm_schedule_new_election_cb, 0, 0);
+	rlist_create(&raft.on_update);
 }
