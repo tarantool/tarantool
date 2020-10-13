@@ -224,7 +224,11 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-test_run:wait_upstream(1, {message_re = 'Missing %.xlog file', status = 'loading'})
+test_run:wait_upstream(1, {status = 'stopped'})
+---
+- true
+...
+test_run:wait_cond(function() return box.info.status == 'orphan' end)
 ---
 - true
 ...
