@@ -67,7 +67,7 @@ if not ok then
     os.exit(0)
 end
 
-test:plan(19)
+test:plan(22)
 
 local function check(message)
     while feedback_count < 1 do
@@ -152,6 +152,7 @@ local expected = {
     vinyl_spaces = 0,
     temporary_spaces = 0,
     local_spaces = 0,
+    sync_spaces = 0,
     tree_indices = 0,
     rtree_indices = 0,
     hash_indices = 0,
@@ -172,6 +173,7 @@ box.space.features_vinyl:create_index('vinyl_pk', {type = 'tree', if_not_exists 
 box.space.features_memtx:create_index('memtx_pk', {type = 'tree', if_not_exists = true})
 box.space.features_memtx:create_index('memtx_hash', {type = 'hash', if_not_exists = true})
 box.space.features_memtx:create_index('memtx_bitset', {type = 'bitset', if_not_exists = true})
+box.schema.create_space('features_sync', {is_sync=true, if_not_exists=true})
 box.space.features_memtx:create_index('memtx_rtree',
         {type = 'rtree', parts = {{field = 3, type = 'array'}}, if_not_exists = true})
 box.space.features_memtx:create_index('memtx_jpath',
@@ -197,11 +199,12 @@ box.space.features_memtx:create_index('functional_multikey',
 actual = daemon.generate_feedback()
 local schema_stats = actual.features.schema
 test:test('features.schema', function(t)
-    t:plan(12)
-    t:is(schema_stats.memtx_spaces, 2, 'memtx engine usage gathered')
+    t:plan(13)
+    t:is(schema_stats.memtx_spaces, 3, 'memtx engine usage gathered')
     t:is(schema_stats.vinyl_spaces, 1, 'vinyl engine usage gathered')
     t:is(schema_stats.temporary_spaces, 1, 'temporary space usage gathered')
     t:is(schema_stats.local_spaces, 1, 'local space usage gathered')
+    t:is(schema_stats.sync_spaces, 1, 'sync space usage gathered')
     t:is(schema_stats.tree_indices, 6, 'tree index gathered')
     t:is(schema_stats.hash_indices, 1, 'hash index gathered')
     t:is(schema_stats.rtree_indices, 1, 'rtree index gathered')
@@ -218,9 +221,23 @@ actual = daemon.generate_feedback()
 test:is(actual.features.schema.hash_indices, 2,
         'internal cache invalidates when schema changes')
 
+--
+-- collect box.cfg options: election mode, synchronous replication and tx
+-- manager.
+--
+em = box.cfg.election_mode
+quorum = box.cfg.replication_synchro_quorum
+box.cfg{election_mode='candidate', replication_synchro_quorum=2}
+actual = daemon.generate_feedback()
+test:is(actual.options.election_mode, 'candidate', 'election_mode option reported')
+test:is(actual.options.replication_synchro_quorum, 2, 'replication_synchro_quorum option reported')
+test:is(actual.options.memtx_use_mvcc_engine, false, 'memtx_use_mvcc_engine option reported')
+box.cfg{election_mode=em, replication_synchro_quorum=quorum}
+
 box.space.features_vinyl:drop()
 box.space.features_memtx_empty:drop()
 box.space.features_memtx:drop()
+box.space.features_sync:drop()
 
 test:check()
 os.exit(0)
