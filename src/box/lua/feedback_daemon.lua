@@ -272,6 +272,8 @@ end
 local function fill_in_features(feedback)
     feedback.features = {}
     fill_in_schema_stats(feedback.features)
+    feedback.features.on_reload_configuration_used =
+        type(box.on_reload_configuration) == 'function'
 end
 
 local function fill_in_options(feedback)

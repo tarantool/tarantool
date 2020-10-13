@@ -67,7 +67,7 @@ if not ok then
     os.exit(0)
 end
 
-test:plan(22)
+test:plan(23)
 
 local function check(message)
     while feedback_count < 1 do
@@ -228,7 +228,9 @@ test:is(actual.features.schema.hash_indices, 2,
 em = box.cfg.election_mode
 quorum = box.cfg.replication_synchro_quorum
 box.cfg{election_mode='candidate', replication_synchro_quorum=2}
+box.on_reload_configuration = function() end
 actual = daemon.generate_feedback()
+test:is(actual.features.on_reload_configuration_used, true, 'on_reload_configuration reported')
 test:is(actual.options.election_mode, 'candidate', 'election_mode option reported')
 test:is(actual.options.replication_synchro_quorum, 2, 'replication_synchro_quorum option reported')
 test:is(actual.options.memtx_use_mvcc_engine, false, 'memtx_use_mvcc_engine option reported')
