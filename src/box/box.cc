@@ -152,6 +152,11 @@ static struct fiber_pool tx_fiber_pool;
  * are too many messages in flight (gh-1892).
  */
 static struct cbus_endpoint tx_prio_endpoint;
+/**
+ * A trigger executed each time the Raft state machine updates any
+ * of its visible attributes.
+ */
+static struct trigger box_raft_on_update;
 
 void
 box_update_ro_summary(void)
@@ -1005,7 +1010,7 @@ box_set_replication_anon(void)
 }
 
 void
-box_clear_synchro_queue(void)
+box_clear_synchro_queue(bool try_wait)
 {
 	if (!is_box_configured || txn_limbo_is_empty(&txn_limbo))
 		return;
@@ -1014,13 +1019,15 @@ box_clear_synchro_queue(void)
 	if (former_leader_id == instance_id)
 		return;
 
-	/* Wait until pending confirmations/rollbacks reach us. */
-	double timeout = 2 * replication_synchro_timeout;
-	double start_tm = fiber_clock();
-	while (!txn_limbo_is_empty(&txn_limbo)) {
-		if (fiber_clock() - start_tm > timeout)
-			break;
-		fiber_sleep(0.001);
+	if (try_wait) {
+		/* Wait until pending confirmations/rollbacks reach us. */
+		double timeout = 2 * replication_synchro_timeout;
+		double start_tm = fiber_clock();
+		while (!txn_limbo_is_empty(&txn_limbo)) {
+			if (fiber_clock() - start_tm > timeout)
+				break;
+			fiber_sleep(0.001);
+		}
 	}
 
 	if (!txn_limbo_is_empty(&txn_limbo)) {
@@ -1051,6 +1058,22 @@ box_clear_synchro_queue(void)
 		txn_limbo_force_empty(&txn_limbo, confirm_lsn);
 		assert(txn_limbo_is_empty(&txn_limbo));
 	}
+}
+
+static int
+box_raft_on_update_f(struct trigger *trigger, void *event)
+{
+	(void)trigger;
+	(void)event;
+	if (raft.state != RAFT_STATE_LEADER)
+		return 0;
+	/*
+	 * When the node became a leader, it means it will ignore all records
+	 * from all the other nodes, and won't get late CONFIRM messages anyway.
+	 * Can clear the queue without waiting for confirmations.
+	 */
+	box_clear_synchro_queue(false);
+	return 0;
 }
 
 void
@@ -2633,6 +2656,9 @@ box_init(void)
 	txn_limbo_init();
 	sequence_init();
 	raft_init();
+
+	trigger_create(&box_raft_on_update, box_raft_on_update_f, NULL, NULL);
+	raft_on_update(&box_raft_on_update);
 }
 
 bool

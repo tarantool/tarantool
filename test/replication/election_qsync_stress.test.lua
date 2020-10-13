@@ -57,7 +57,6 @@ for i = 1,10 do
     new_leader = 'election_replica'..new_leader_nr
     leader_port = test_run:eval(new_leader, 'box.cfg.listen')[1]
     c = netbox.connect(leader_port)
-    c:eval('box.ctl.clear_synchro_queue()')
     c:eval('box.cfg{replication_synchro_timeout=1000}')
     c.space._schema:replace{'smth'}
     c.space.test:get{i}

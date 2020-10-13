@@ -82,7 +82,7 @@ static int
 lbox_ctl_clear_synchro_queue(struct lua_State *L)
 {
 	(void) L;
-	box_clear_synchro_queue();
+	box_clear_synchro_queue(true);
 	return 0;
 }
 
