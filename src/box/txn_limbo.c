@@ -76,6 +76,7 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 		if (limbo->instance_id == REPLICA_ID_NIL ||
 		    rlist_empty(&limbo->queue)) {
 			limbo->instance_id = id;
+			limbo->confirmed_lsn = 0;
 		} else {
 			diag_set(ClientError, ER_UNCOMMITTED_FOREIGN_SYNC_TXNS,
 				 limbo->instance_id);
