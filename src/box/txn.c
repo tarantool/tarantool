@@ -782,7 +782,7 @@ int
 txn_commit(struct txn *txn)
 {
 	struct journal_entry *req;
-	struct txn_limbo_entry *limbo_entry;
+	struct txn_limbo_entry *limbo_entry = NULL;
 
 	txn->fiber = fiber();
 
