@@ -20,6 +20,7 @@ add_custom_target(box_generate_lua_sources
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
 include_directories(${ZSTD_INCLUDE_DIRS})
+include_directories(${CMAKE_BINARY_DIR}/src/box)
 
 add_library(box_error STATIC error.cc errcode.c vclock.c)
 target_link_libraries(box_error core stat)
