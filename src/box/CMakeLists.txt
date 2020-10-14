@@ -77,6 +77,7 @@ set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
 include_directories(${ZSTD_INCLUDE_DIRS})
 include_directories(${CMAKE_BINARY_DIR}/src/box/sql)
+include_directories(${CMAKE_BINARY_DIR}/src/box)
 
 add_library(vclock STATIC vclock.c)
 target_link_libraries(vclock core bit)
