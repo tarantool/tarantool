@@ -160,6 +160,7 @@ C and Lua/C modules.
          -DSYSTEMD_UNIT_DIR:PATH=%{_unitdir} \
          -DSYSTEMD_TMPFILES_DIR:PATH=%{_tmpfilesdir} \
 %endif
+         -DENABLE_WERROR:BOOL=ON \
          -DENABLE_DIST:BOOL=ON
 make %{?_smp_mflags}
 
