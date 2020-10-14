@@ -7,7 +7,9 @@ DOCKER_IMAGE_TARANTOOL="registry.gitlab.com/tarantool/tarantool/testing/debian-s
 TEST_RUN_EXTRA_PARAMS?=
 MAX_FILES?=65534
 MAX_PROC?=2500
-OOS_SRC_PATH="/source"
+OOS_SRC_PATH?=/source
+OOS_BUILD_PATH?=/rw_bins
+OOS_BUILD_RULE?=test_oos_no_deps
 BIN_DIR=/usr/local/bin
 OSX_VARDIR?=/tmp/tnt
 
@@ -206,6 +208,28 @@ test_debian_install_luacheck:
 
 test_debian_luacheck: test_debian_install_luacheck configure_debian
 	make luacheck
+
+# Out-Of-Source build
+
+build_oos:
+	mkdir ${OOS_BUILD_PATH} 2>/dev/null || : ; \
+		cd ${OOS_BUILD_PATH} && \
+		cmake ${OOS_SRC_PATH} ${CMAKE_EXTRA_PARAMS} && \
+		make -j
+
+test_oos_no_deps: build_oos
+	cd ${OOS_BUILD_PATH}/test && \
+		${OOS_SRC_PATH}/test/test-run.py \
+			--builddir ${OOS_BUILD_PATH} \
+			--vardir ${OOS_BUILD_PATH}/test/var --force
+
+test_oos: deps_debian test_oos_no_deps
+
+test_oos_build:
+	docker run --network=host -w ${OOS_SRC_PATH} \
+		--mount type=bind,source="${PWD}",target=${OOS_SRC_PATH},readonly,bind-propagation=rslave \
+		-i ${DOCKER_IMAGE_TARANTOOL} \
+		make -f .travis.mk ${OOS_BUILD_RULE}
 
 #######
 # OSX #

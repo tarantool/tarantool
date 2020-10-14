@@ -181,6 +181,13 @@ luacheck:
 
 # Tests
 
+out_of_source:
+  stage: test
+  tags:
+    - deploy_test
+  script:
+    - ${GITLAB_MAKE} test_oos_build
+
 release:
   <<: *docker_test_definition
   script:
