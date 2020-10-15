@@ -67,6 +67,6 @@ for i = 1,10 do
 end;
 test_run:cmd('setopt delimiter ""');
 -- We're connected to some leader.
-c.space.test:select{}
+#c.space.test:select{} == 10 or require('log').error(c.space.test:select{})
 
 test_run:drop_cluster(SERVERS)
