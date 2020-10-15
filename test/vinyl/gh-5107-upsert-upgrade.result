@@ -5,28 +5,15 @@ test_run = require('test_run').new()
 
 -- Upsert's internal format have changed: now update operations are stored
 -- with additional map package. Let's test backward compatibility.
--- Snapshot (i.e. run files) contain following statements:
-
--- s = box.schema.create_space('test', {engine = 'vinyl'})
--- pk = s:create_index('pk')
--- s:insert({1, 2})
--- box.snapshot()
--- s:upsert({1, 0}, {{'+', 2, 1}})
--- s:upsert({1, 0}, {{'-', 2, 2}})
--- s:upsert({2, 0}, {{'+', 2, 1}})
--- s:upsert({2, 0}, {{'-', 2, 2}})
--- s:upsert({1, 0}, {{'=', 2, 2}})
--- s:upsert({1, 0}, {{'-', 2, 2}})
--- box.snapshot()
 --
 -- Make sure that upserts will be parsed and squashed correctly.
 --
 
-dst_dir = 'vinyl/upgrade/upsert/'
+work_dir = 'vinyl/upgrade/2.5.1/gh-5107-upsert-upgrade/'
  | ---
  | ...
 
-test_run:cmd('create server upgrade with script="vinyl/upgrade.lua", workdir="' .. dst_dir .. '"')
+test_run:cmd('create server upgrade with script="vinyl/upgrade.lua", workdir="' .. work_dir .. '"')
  | ---
  | - true
  | ...
@@ -38,6 +25,10 @@ test_run:switch('upgrade')
  | ---
  | - true
  | ...
+
+-- No need to call :upgrade() since no user-visible schema changes took
+-- place, only internal format of :upserts have been changed.
+-- box.schema.upgrade()
 
 box.space.test:select()
  | ---
