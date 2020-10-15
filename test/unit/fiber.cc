@@ -1,9 +1,15 @@
+#include <unistd.h>
+
 #include "memory.h"
 #include "fiber.h"
 #include "unit.h"
 #include "trivia/util.h"
 
+static size_t stack_expand_limit;
 static struct fiber_attr default_attr;
+
+static unsigned long page_size;
+#define PAGE_4K 4096
 
 static int
 noop_f(va_list ap)
@@ -49,24 +55,38 @@ cancel_dead_f(va_list ap)
 	return 0;
 }
 
-static size_t stack_expand_limit;
-
 static void NOINLINE
-stack_expand(void *ptr)
+stack_expand(unsigned long *ret, unsigned long nr_calls)
 {
-	char buf[2048];
-	memset(buf, 0x45, 2048);
-	ptrdiff_t stack_diff = (buf - (char *)ptr);
-	stack_diff = stack_diff >= 0 ? stack_diff : -stack_diff;
-	if (stack_diff < (ptrdiff_t)stack_expand_limit)
-		stack_expand(ptr);
+	char volatile fill[PAGE_4K];
+	char volatile *p;
+
+	memset((void *)fill, (unsigned char)nr_calls, sizeof(fill));
+	p = fill;
+	p[PAGE_4K / 2] = (unsigned char)nr_calls;
+
+	if (nr_calls != 0) {
+		stack_expand(ret, nr_calls-1);
+	} else {
+		*ret = (unsigned long)&fill[0];
+	}
 }
 
 static int
 test_stack_f(va_list ap)
 {
-	char s;
-	stack_expand(&s);
+	unsigned long ret = 0;
+	unsigned long ret_addr = (unsigned long)&ret;
+
+	/*
+	 * We can't just dirty the stack in precise
+	 * way without using assembly. Thus lets do
+	 * the following trick:
+	 *  - assume 8K will be enough to carry all
+	 *    arguments passed for all calls, still
+	 *    we might need to adjust this value
+	 */
+	stack_expand(&ret, (stack_expand_limit - 2 * page_size) / page_size);
 	return 0;
 }
 
@@ -193,6 +213,11 @@ main_f(va_list ap)
 
 int main()
 {
+	page_size = sysconf(_SC_PAGESIZE);
+
+	/* Page should be at least 4K */
+	assert(page_size >= PAGE_4K);
+
 	memory_init();
 	fiber_init(fiber_cxx_invoke);
 	fiber_attr_create(&default_attr);
