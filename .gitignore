@@ -6,6 +6,10 @@ _CPack_Packages
 *.gcno
 *.gcda
 *.gcov
+patches/
+.git-ignore/
+.pc/
+coverity/
 coverage/
 coverage.info
 *.o
