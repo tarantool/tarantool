@@ -680,8 +680,9 @@ s.index.pk
   - type: unsigned
     is_nullable: false
     fieldno: 2
-  type: TREE
+  hint: true
   id: 0
+  type: TREE
   space_id: 731
   name: pk
 ...
@@ -710,9 +711,10 @@ s.index.pk
   - type: unsigned
     is_nullable: false
     fieldno: 1
-  space_id: 731
+  hint: true
   id: 0
   type: TREE
+  space_id: 731
   name: pk
 ...
 s.index.secondary
@@ -722,8 +724,9 @@ s.index.secondary
   - type: unsigned
     is_nullable: false
     fieldno: 2
-  type: TREE
+  hint: true
   id: 1
+  type: TREE
   space_id: 731
   name: secondary
 ...
@@ -1558,4 +1561,98 @@ ok, err = pcall(box.schema.space.alter, s.id, {})
 assert(err:match('does not exist') ~= nil)
 ---
 - true
+...
+-- hint
+s = box.schema.create_space('test');
+---
+...
+s:create_index('test1', {type='tree', parts={{1, 'uint'}}}).hint
+---
+- true
+...
+s:create_index('test2', {type='tree', parts={{2, 'uint'}}, hint = true}).hint
+---
+- true
+...
+s:create_index('test3', {type='tree', parts={{3, 'uint'}}, hint = false}).hint
+---
+- false
+...
+s:create_index('test4', {type='tree', parts={{4, 'string'}}, hint = false}).hint
+---
+- false
+...
+s.index.test1.hint
+---
+- true
+...
+s.index.test2.hint
+---
+- true
+...
+s.index.test3.hint
+---
+- false
+...
+s.index.test4.hint
+---
+- false
+...
+N = 1000 box.begin() for i = 1,N do s:replace{i, i, i, '' .. i} end box.commit()
+---
+...
+s.index.test1:bsize() == s.index.test2:bsize()
+---
+- true
+...
+s.index.test1:bsize() > s.index.test3:bsize()
+---
+- true
+...
+s.index.test1:bsize() > s.index.test4:bsize()
+---
+- true
+...
+s.index.test1:alter{hint=false}
+---
+...
+s.index.test2:alter{hint=true}
+---
+...
+s.index.test3:alter{name='test33', hint=false}
+---
+...
+s.index.test4:alter{hint=true}
+---
+...
+s.index.test1.hint
+---
+- false
+...
+s.index.test2.hint
+---
+- true
+...
+s.index.test33.hint
+---
+- false
+...
+s.index.test4.hint
+---
+- true
+...
+s.index.test1:bsize() < s.index.test2:bsize()
+---
+- true
+...
+s.index.test1:bsize() == s.index.test33:bsize()
+---
+- true
+...
+s.index.test1:bsize() < s.index.test4:bsize()
+---
+- true
+...
+s:drop()
+---
 ...

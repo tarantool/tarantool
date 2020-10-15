@@ -852,3 +852,317 @@ box.internal.collation.drop('test')
 box.internal.collation.drop('test-ci')
 ---
 ...
+-- hints
+s = box.schema.space.create('test')
+---
+...
+s:create_index('test', {type = 'tree', hint = 'true'} )
+---
+- error: Illegal parameters, options parameter 'hint' should be of type boolean
+...
+s:create_index('test', {type = 'hash', hint = true} )
+---
+- error: 'Can''t create or modify index ''test'' in space ''test'': hint is only reasonable
+    with memtx tree index'
+...
+s:create_index('test', {type = 'hash'}):alter({hint = true})
+---
+- error: 'Can''t create or modify index ''test'' in space ''test'': hint is only reasonable
+    with memtx tree index'
+...
+s:create_index('multikey', {hint = true, parts = {{2, 'int', path = '[*]'}}})
+---
+- error: 'Can''t create or modify index ''multikey'' in space ''test'': multikey index
+    can''t use hints'
+...
+s:create_index('multikey', {parts = {{2, 'int', path = '[*]'}}}):alter({hint = true})
+---
+- error: 'Can''t create or modify index ''multikey'' in space ''test'': multikey index
+    can''t use hints'
+...
+lua_code = [[function(tuple) return {tuple[1] + tuple[2]} end]]
+---
+...
+box.schema.func.create('s', {body = lua_code, is_deterministic = true, is_sandboxed = true})
+---
+...
+s:create_index('func', {hint = true, func = box.func.s.id, parts = {{1, 'unsigned'}}})
+---
+- error: 'Can''t create or modify index ''func'' in space ''test'': functional index
+    can''t use hints'
+...
+s:drop()
+---
+...
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+s:create_index('test', {type = 'tree', hint = true} )
+---
+- error: 'Can''t create or modify index ''test'' in space ''test'': hint is only reasonable
+    with memtx tree index'
+...
+s:drop()
+---
+...
+-- numeric hints
+s1 = box.schema.space.create('test1')
+---
+...
+s1:create_index('test', {type = 'tree', hint = false}).hint
+---
+- false
+...
+s2 = box.schema.space.create('test2')
+---
+...
+s2:create_index('test', {type = 'tree'}).hint
+---
+- true
+...
+N = 2000
+---
+...
+box.begin() for i = 1,N do local v = math.random(10 * N) s1:replace{v} s2:replace{v} end box.commit()
+---
+...
+s1:count() == s2:count()
+---
+- true
+...
+good = true r1 = s1:select{} r2 = s2:select{}
+---
+...
+if #r1 ~= #r2 then good = false end
+---
+...
+for k,v in pairs(r1) do if r2[k][1] ~= v[1] then good = false end end
+---
+...
+good
+---
+- true
+...
+r1 = nil r2 = nil
+---
+...
+function diff(t1, t2) if t1 then return t1[1] ~= t2[1] else return t2 ~= nil end end
+---
+...
+for i = 1, N * 10 do if diff(s1:get{i}, s2:get{i}) then good = false end end
+---
+...
+good
+---
+- true
+...
+s1.index[0]:bsize() < s2.index[0]:bsize()
+---
+- true
+...
+s1.index[0]:alter{hint=true}
+---
+...
+s1.index[0]:bsize() == s2.index[0]:bsize()
+---
+- true
+...
+s2.index[0]:alter{hint=false}
+---
+...
+s1.index[0]:bsize() > s2.index[0]:bsize()
+---
+- true
+...
+s1.index[0]:alter{hint=false}
+---
+...
+s1.index[0]:bsize() == s2.index[0]:bsize()
+---
+- true
+...
+s1:drop()
+---
+...
+s2:drop()
+---
+...
+-- string hints
+s1 = box.schema.space.create('test1')
+---
+...
+s1:create_index('test', {type = 'tree', parts = {1, 'str'}, hint = false}).hint
+---
+- false
+...
+s2 = box.schema.space.create('test2')
+---
+...
+s2:create_index('test', {type = 'tree', parts = {1, 'str'}}).hint
+---
+- true
+...
+N = 1000
+---
+...
+box.begin() for i = 1,N do local v = ''..math.random(10 * N) s1:replace{v} s2:replace{v} end box.commit()
+---
+...
+s1:count() == s2:count()
+---
+- true
+...
+good = true r1 = s1:select{} r2 = s2:select{}
+---
+...
+if #r1 ~= #r2 then good = false end
+---
+...
+for k,v in pairs(r1) do if r2[k][1] ~= v[1] then good = false end end
+---
+...
+good
+---
+- true
+...
+r1 = nil r2 = nil
+---
+...
+function diff(t1, t2) if t1 then return t1[1] ~= t2[1] else return t2 ~= nil end end
+---
+...
+for i = 1, N * 10 do v = ''..i if diff(s1:get{v}, s2:get{v}) then good = false end end
+---
+...
+good
+---
+- true
+...
+s1.index[0]:bsize() < s2.index[0]:bsize()
+---
+- true
+...
+s1.index[0]:alter{hint=true}
+---
+...
+s1.index[0]:bsize() == s2.index[0]:bsize()
+---
+- true
+...
+s2.index[0]:alter{hint=false}
+---
+...
+s1.index[0]:bsize() > s2.index[0]:bsize()
+---
+- true
+...
+s1.index[0]:alter{hint=false}
+---
+...
+s1.index[0]:bsize() == s2.index[0]:bsize()
+---
+- true
+...
+s1:drop()
+---
+...
+s2:drop()
+---
+...
+-- string with collation hints
+s1 = box.schema.space.create('test1')
+---
+...
+s1:create_index('test', {type = 'tree', parts = {{1, 'str', collation = 'Unicode'}}, hint = false}).hint
+---
+- false
+...
+s2 = box.schema.space.create('test2')
+---
+...
+s2:create_index('test', {type = 'tree', parts = {{1, 'str', collation = 'Unicode'}}}).hint
+---
+- true
+...
+N = 1000
+---
+...
+syms = {'a', 'B', 'c', 'D', 'ж', 'Ё', '~', '1', '%', '2'}
+---
+...
+syms_size = #syms
+---
+...
+len = 20
+---
+...
+vals = {}
+---
+...
+for i = 1,2*N do str = '' for j=1,len do str = str .. syms[math.random(syms_size)] end vals[i] = str end
+---
+...
+for i = 1,N do local v = vals[i] s1:replace{v} s2:replace{v} end
+---
+...
+s1:count() == s2:count()
+---
+- true
+...
+good = true r1 = s1:select{} r2 = s2:select{}
+---
+...
+if #r1 ~= #r2 then good = false end
+---
+...
+for k,v in pairs(r1) do if r2[k][1] ~= v[1] then good = false end end
+---
+...
+good
+---
+- true
+...
+r1 = nil r2 = nil
+---
+...
+function diff(t1, t2) if t1 then return t1[1] ~= t2[1] else return t2 ~= nil end end
+---
+...
+for i = 1, N * 2 do v = vals[i] if diff(s1:get{v}, s2:get{v}) then good = false end end
+---
+...
+good
+---
+- true
+...
+s1.index[0]:bsize() < s2.index[0]:bsize()
+---
+- true
+...
+s1.index[0]:alter{hint=true}
+---
+...
+s1.index[0]:bsize() == s2.index[0]:bsize()
+---
+- true
+...
+s2.index[0]:alter{hint=false}
+---
+...
+s1.index[0]:bsize() > s2.index[0]:bsize()
+---
+- true
+...
+s1.index[0]:alter{hint=false}
+---
+...
+s1.index[0]:bsize() == s2.index[0]:bsize()
+---
+- true
+...
+s1:drop()
+---
+...
+s2:drop()
+---
+...

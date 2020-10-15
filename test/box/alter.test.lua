@@ -620,3 +620,37 @@ s:drop()
 s:alter({})
 ok, err = pcall(box.schema.space.alter, s.id, {})
 assert(err:match('does not exist') ~= nil)
+
+-- hint
+s = box.schema.create_space('test');
+s:create_index('test1', {type='tree', parts={{1, 'uint'}}}).hint
+s:create_index('test2', {type='tree', parts={{2, 'uint'}}, hint = true}).hint
+s:create_index('test3', {type='tree', parts={{3, 'uint'}}, hint = false}).hint
+s:create_index('test4', {type='tree', parts={{4, 'string'}}, hint = false}).hint
+
+s.index.test1.hint
+s.index.test2.hint
+s.index.test3.hint
+s.index.test4.hint
+
+N = 1000 box.begin() for i = 1,N do s:replace{i, i, i, '' .. i} end box.commit()
+
+s.index.test1:bsize() == s.index.test2:bsize()
+s.index.test1:bsize() > s.index.test3:bsize()
+s.index.test1:bsize() > s.index.test4:bsize()
+
+s.index.test1:alter{hint=false}
+s.index.test2:alter{hint=true}
+s.index.test3:alter{name='test33', hint=false}
+s.index.test4:alter{hint=true}
+
+s.index.test1.hint
+s.index.test2.hint
+s.index.test33.hint
+s.index.test4.hint
+
+s.index.test1:bsize() < s.index.test2:bsize()
+s.index.test1:bsize() == s.index.test33:bsize()
+s.index.test1:bsize() < s.index.test4:bsize()
+
+s:drop()

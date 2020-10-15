@@ -168,6 +168,17 @@
 
 /* {{{ BPS-tree interface settings */
 /**
+ * Optional namespace for structs and functions.
+ * Is set, struct and functions will have BPS_TREE_NAMESPACE::  prefix.
+ * For example one can #define BPS_TREE_NAMESPACE my along with
+ * #define BPS_TREE_NAME _test, and use then
+ *  struct my::bps_tree_test my_tree;
+ *  my::bps_tree_test_create(&my_tree, ...);
+ *
+ * #define BPS_TREE_NAMESPACE
+ */
+
+/**
  * Custom name for structs and functions.
  * Struct and functions will have bps_tree##BPS_TREE_NAME name or prefix.
  * For example one can #define BPS_TREE_NAME _test, and use then
@@ -299,6 +310,10 @@
  */
 
 /* }}} */
+
+#ifdef BPS_TREE_NAMESPACE
+namespace BPS_TREE_NAMESPACE {
+#endif
 
 /* {{{ BPS-tree internal settings */
 typedef int16_t bps_tree_pos_t;
@@ -6188,3 +6203,7 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_debug_check_insert_and_move_to_left_inner
 
 /* }}} */
+
+#ifdef BPS_TREE_NAMESPACE
+} /* namespace BPS_TREE_NAMESPACE { */
+#endif

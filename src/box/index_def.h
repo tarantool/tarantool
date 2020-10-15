@@ -165,6 +165,10 @@ struct index_opts {
 	struct index_stat *stat;
 	/** Identifier of the functional index function. */
 	uint32_t func_id;
+	/**
+	 * Use hint optimization for tree index.
+	 */
+	bool hint;
 };
 
 extern const struct index_opts index_opts_default;
@@ -211,6 +215,8 @@ index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)
 		return o1->bloom_fpr < o2->bloom_fpr ? -1 : 1;
 	if (o1->func_id != o2->func_id)
 		return o1->func_id - o2->func_id;
+	if (o1->hint != o2->hint)
+		return o1->hint - o2->hint;
 	return 0;
 }
 

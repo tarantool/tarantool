@@ -1000,7 +1000,30 @@ local index_options = {
     page_size = 'number',
     bloom_fpr = 'number',
     func = 'number, string',
+    hint = 'boolean',
 }
+
+local function jsonpaths_from_idx_parts(parts)
+    local paths = {}
+
+    for _, part in pairs(parts) do
+        if type(part.path) == 'string' then
+            table.insert(paths, part.path)
+        end
+    end
+
+    return paths
+end
+
+local function is_multikey_index(parts)
+    for _, path in pairs(jsonpaths_from_idx_parts(parts)) do
+        if path:find('[*]', 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
 
 --
 -- check_param_table() template for alter index,
@@ -1076,6 +1099,15 @@ box.schema.index.create = function(space_id, name, options)
         options_defaults = {}
     end
     options = update_param_table(options, options_defaults)
+    if options.hint and
+            (options.type ~= 'tree' or box.space[space_id].engine ~= 'memtx') then
+        box.error(box.error.MODIFY_INDEX, name, space.name,
+                "hint is only reasonable with memtx tree index")
+    end
+    if options.hint and options.func then
+        box.error(box.error.MODIFY_INDEX, name, space.name,
+                "functional index can't use hints")
+    end
 
     local _index = box.space[box.schema.INDEX_ID]
     local _vindex = box.space[box.schema.VINDEX_ID]
@@ -1115,6 +1147,7 @@ box.schema.index.create = function(space_id, name, options)
             run_size_ratio = options.run_size_ratio,
             bloom_fpr = options.bloom_fpr,
             func = options.func,
+            hint = options.hint,
     }
     local field_type_aliases = {
         num = 'unsigned'; -- Deprecated since 1.7.2
@@ -1134,6 +1167,10 @@ box.schema.index.create = function(space_id, name, options)
     -- save parts in old format if possible
     if parts_can_be_simplified then
         parts = simplify_index_parts(parts)
+    end
+    if options.hint and is_multikey_index(parts) then
+        box.error(box.error.MODIFY_INDEX, name, space.name,
+                "multikey index can't use hints")
     end
     if index_opts.func ~= nil and type(index_opts.func) == 'string' then
         index_opts.func = func_id_by_name(index_opts.func)
@@ -1253,6 +1290,17 @@ box.schema.index.alter = function(space_id, index_id, options)
             index_opts[k] = options[k]
         end
     end
+    if options.hint and
+       (options.type ~= 'tree' or box.space[space_id].engine ~= 'memtx') then
+        box.error(box.error.MODIFY_INDEX, space.index[index_id].name,
+                                          space.name,
+            "hint is only reasonable with memtx tree index")
+    end
+    if options.hint and options.func then
+        box.error(box.error.MODIFY_INDEX, space.index[index_id].name,
+                                          space.name,
+                "functional index can't use hints")
+    end
     if options.parts then
         local parts_can_be_simplified
         parts, parts_can_be_simplified =
@@ -1261,6 +1309,11 @@ box.schema.index.alter = function(space_id, index_id, options)
         if parts_can_be_simplified then
             parts = simplify_index_parts(parts)
         end
+    end
+    if options.hint and is_multikey_index(parts) then
+        box.error(box.error.MODIFY_INDEX, space.index[index_id].name,
+                                          space.name,
+                "multikey index can't use hints")
     end
     if index_opts.func ~= nil and type(index_opts.func) == 'string' then
         index_opts.func = func_id_by_name(index_opts.func)

@@ -51,6 +51,7 @@ const struct index_opts index_opts_default = {
 	/* .lsn                 = */ 0,
 	/* .stat                = */ NULL,
 	/* .func                = */ 0,
+	/* .hint                = */ true,
 };
 
 const struct opt_def index_opts_reg[] = {
@@ -66,6 +67,7 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF("lsn", OPT_INT64, struct index_opts, lsn),
 	OPT_DEF("func", OPT_UINT32, struct index_opts, func_id),
 	OPT_DEF_LEGACY("sql"),
+	OPT_DEF("hint", OPT_BOOL, struct index_opts, hint),
 	OPT_END,
 };
 
