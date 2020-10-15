@@ -449,7 +449,14 @@ raft_process_msg(const struct raft_request *req, uint32_t source)
 		if (source == raft.leader) {
 			say_info("RAFT: the node %u has resigned from the "
 				 "leader role", raft.leader);
-			raft_sm_schedule_new_election();
+			/*
+			 * Candidate node clears leader implicitly when starts a
+			 * new term, but non-candidate won't do that, so clear
+			 * it manually.
+			 */
+			raft.leader = 0;
+			if (raft.is_candidate)
+				raft_sm_schedule_new_election();
 		}
 		return 0;
 	}
