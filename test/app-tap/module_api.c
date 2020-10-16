@@ -1982,6 +1982,8 @@ test_tuple_validate_formatted(lua_State *L)
 		assert(format);
 
 		valid = box_tuple_validate(tuple, format) == 0;
+		box_tuple_format_unref(format);
+		box_key_def_delete(key_defs[0]);
 	}
 	lua_pushboolean(L, valid);
 
