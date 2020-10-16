@@ -3,6 +3,7 @@ bin/tarantoolctl
 %%ETCDIR%%/default/tarantool
 %%ETCDIR%%/instances.available/example.lua
 include/tarantool/lauxlib.h
+include/tarantool/lmisclib.h
 include/tarantool/lua.h
 include/tarantool/lua.hpp
 include/tarantool/luaconf.h

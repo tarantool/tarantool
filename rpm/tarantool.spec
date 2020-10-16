@@ -250,6 +250,7 @@ fi
 %files devel
 %dir %{_includedir}/tarantool
 %{_includedir}/tarantool/lauxlib.h
+%{_includedir}/tarantool/lmisclib.h
 %{_includedir}/tarantool/luaconf.h
 %{_includedir}/tarantool/lua.h
 %{_includedir}/tarantool/lua.hpp

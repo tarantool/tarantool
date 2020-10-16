@@ -287,7 +287,7 @@ macro(luajit_build)
     unset (luajit_buildoptions)
     set (inc ${PROJECT_SOURCE_DIR}/third_party/luajit/src)
     install (FILES ${inc}/lua.h ${inc}/lualib.h ${inc}/lauxlib.h
-        ${inc}/luaconf.h ${inc}/lua.hpp ${inc}/luajit.h
+        ${inc}/luaconf.h ${inc}/lua.hpp ${inc}/luajit.h ${inc}/lmisclib.h
         DESTINATION ${MODULE_INCLUDEDIR})
 endmacro()
 
