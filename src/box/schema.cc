@@ -277,7 +277,7 @@ sc_space_new(uint32_t id, const char *name,
 						    strlen("primary"),
 						    TREE /* index type */,
 						    &index_opts_default,
-						    key_def, NULL);
+						    key_def, NULL, true);
 	if (index_def == NULL)
 		diag_raise();
 	auto index_def_guard =

@@ -2332,7 +2332,7 @@ index_fill_def(struct Parse *parse, struct index *index,
 	 * side only definition is used.
 	 */
 	index->def = index_def_new(space_def->id, 0, name, name_len, TREE,
-				   &opts, key_def, NULL);
+				   &opts, key_def, NULL, false);
 	if (index->def == NULL)
 		goto tnt_error;
 	index->def->iid = iid;

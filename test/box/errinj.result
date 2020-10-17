@@ -1774,18 +1774,20 @@ rtreespace:create_index('pk', {if_not_exists = true})
   - type: unsigned
     is_nullable: false
     fieldno: 1
+  hint: true
   id: 0
-  space_id: 512
   type: TREE
+  space_id: 512
   name: pk
 ...
 rtreespace:create_index('target', {type='rtree', dimension = 3, parts={2, 'array'},unique = false, if_not_exists = true,})
 ---
-- parts:
+- dimension: 3
+  parts:
   - type: array
     is_nullable: false
     fieldno: 2
-  dimension: 3
+  hint: false
   id: 1
   type: RTREE
   space_id: 512

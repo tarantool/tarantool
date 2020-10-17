@@ -194,3 +194,67 @@ test_run:cmd("setopt delimiter ''");
 space:drop()
 
 space = nil
+
+
+-- hints
+test_run:cmd("setopt delimiter ';'")
+function equal(res1, res2)
+    if #res1 ~= #res2 then
+        return false
+    end
+    for k,v in pairs(res1) do
+        if res2[k][1] ~= v[1] or res2[k][2] ~= v[2] then
+            return false
+        end
+    end
+    return true
+end
+test_run:cmd("setopt delimiter ''");
+
+-- num num
+N1 = 100
+t1 = {}
+for i = 1,N1*2 do t1[i] = math.random(10000) * 10000 + i end
+N2 = 5
+t2 = {}
+for i = 1,N2*2 do t2[i] = math.random(1000000) end
+
+s1 = box.schema.space.create('test1')
+s1:create_index('test', {type = 'tree', parts = {{1, 'num'}, {2, 'num'}}, hint = false}).hint
+s2 = box.schema.space.create('test2')
+s2:create_index('test', {type = 'tree', parts = {{1, 'num'}, {2, 'num'}}, hint = true}).hint
+for j = 1,N2 do for i = 1,N1 do s1:replace{t1[i], t2[j]} s2:replace{t1[i], t2[j]} end end
+s1:count() == s2:count()
+equal(s1:select{}, s2:select{})
+good = true
+for i = 1,N1*2 do good = good and equal(s1:select{t1[i]}, s2:select{t1[i]}) end
+good
+for i = 1,N1*2 do for j=1,N2*2 do good = good and equal(s1:select{t1[i], t2[j]}, s2:select{t1[i], t2[j]}) end end
+good
+
+s1:drop()
+s2:drop()
+
+-- str num
+N1 = 100
+t1 = {}
+for i = 1,N1*2 do t1[i] = ''..(math.random(10000) * 10000 + i) end
+N2 = 5
+t2 = {}
+for i = 1,N2*2 do t2[i] = math.random(1000000) end
+
+s1 = box.schema.space.create('test1')
+s1:create_index('test', {type = 'tree', parts = {{1, 'str'}, {2, 'num'}}, hint = false}).hint
+s2 = box.schema.space.create('test2')
+s2:create_index('test', {type = 'tree', parts = {{1, 'str'}, {2, 'num'}}, hint = true}).hint
+for j = 1,N2 do for i = 1,N1 do s1:replace{t1[i], t2[j]} s2:replace{t1[i], t2[j]} end end
+s1:count() == s2:count()
+equal(s1:select{}, s2:select{})
+good = true
+for i = 1,N1*2 do good = good and equal(s1:select{t1[i]}, s2:select{t1[i]}) end
+good
+for i = 1,N1*2 do for j=1,N2*2 do good = good and equal(s1:select{t1[i], t2[j]}, s2:select{t1[i], t2[j]}) end end
+good
+
+s1:drop()
+s2:drop()

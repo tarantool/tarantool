@@ -345,6 +345,9 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 			lua_setfield(L, -2, "dimension");
 		}
 
+		lua_pushboolean(L, index_opts->hint);
+		lua_setfield(L, -2, "hint");
+
 		if (index_opts->func_id > 0) {
 			lua_pushstring(L, "func");
 			lua_newtable(L);

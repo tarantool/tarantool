@@ -1385,6 +1385,7 @@ memtx_index_extent_reserve(struct memtx_engine *memtx, int num)
 
 bool
 memtx_index_def_change_requires_rebuild(struct index *index,
+
 					const struct index_def *new_def)
 {
 	struct index_def *old_def = index->def;
@@ -1397,6 +1398,8 @@ memtx_index_def_change_requires_rebuild(struct index *index,
 	if (!old_def->opts.is_unique && new_def->opts.is_unique)
 		return true;
 	if (old_def->opts.func_id != new_def->opts.func_id)
+		return true;
+	if (old_def->opts.hint != new_def->opts.hint)
 		return true;
 
 	const struct key_def *old_cmp_def, *new_cmp_def;

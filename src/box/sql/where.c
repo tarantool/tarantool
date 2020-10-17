@@ -2786,7 +2786,7 @@ tnt_error:
 		index_opts_create(&opts);
 		fake_index = index_def_new(space->def->id, 0,"fake_autoindex",
 					   sizeof("fake_autoindex") - 1,
-					   TREE, &opts, key_def, NULL);
+					   TREE, &opts, key_def, NULL, false);
 		key_def_delete(key_def);
 		if (fake_index == NULL)
 			goto tnt_error;

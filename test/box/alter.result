@@ -680,8 +680,9 @@ s.index.pk
   - type: unsigned
     is_nullable: false
     fieldno: 2
-  type: TREE
+  hint: true
   id: 0
+  type: TREE
   space_id: 731
   name: pk
 ...
@@ -710,9 +711,10 @@ s.index.pk
   - type: unsigned
     is_nullable: false
     fieldno: 1
-  space_id: 731
+  hint: true
   id: 0
   type: TREE
+  space_id: 731
   name: pk
 ...
 s.index.secondary
@@ -722,8 +724,9 @@ s.index.secondary
   - type: unsigned
     is_nullable: false
     fieldno: 2
-  type: TREE
+  hint: true
   id: 1
+  type: TREE
   space_id: 731
   name: secondary
 ...

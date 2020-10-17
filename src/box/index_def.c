@@ -51,6 +51,7 @@ const struct index_opts index_opts_default = {
 	/* .lsn                 = */ 0,
 	/* .stat                = */ NULL,
 	/* .func                = */ 0,
+	/* .hint                = */ true,
 };
 
 const struct opt_def index_opts_reg[] = {
@@ -66,6 +67,7 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF("lsn", OPT_INT64, struct index_opts, lsn),
 	OPT_DEF("func", OPT_UINT32, struct index_opts, func_id),
 	OPT_DEF_LEGACY("sql"),
+	OPT_DEF("hint", OPT_BOOL, struct index_opts, hint),
 	OPT_END,
 };
 
@@ -73,7 +75,8 @@ struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	      uint32_t name_len, enum index_type type,
 	      const struct index_opts *opts,
-	      struct key_def *key_def, struct key_def *pk_def)
+	      struct key_def *key_def, struct key_def *pk_def,
+	      bool does_engine_support_optional_hints)
 {
 	assert(name_len <= BOX_NAME_MAX);
 	/* Use calloc to make index_def_delete() safe at all times. */
@@ -113,6 +116,9 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->space_id = space_id;
 	def->iid = iid;
 	def->opts = *opts;
+	if (def->key_def->is_multikey || def->key_def->for_func_index ||
+	    type != TREE || !does_engine_support_optional_hints)
+		def->opts.hint = false;
 	/* Statistics are initialized separately. */
 	assert(opts->stat == NULL);
 	return def;

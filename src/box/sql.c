@@ -399,7 +399,7 @@ sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 
 	struct index_def *ephemer_index_def =
 		index_def_new(0, 0, "ephemer_idx", strlen("ephemer_idx"), TREE,
-			      &index_opts_default, ephemer_key_def, NULL);
+			      &index_opts_default, ephemer_key_def, NULL, true);
 	key_def_delete(ephemer_key_def);
 	if (ephemer_index_def == NULL)
 		return NULL;
