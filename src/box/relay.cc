@@ -864,8 +864,26 @@ relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row)
 static void
 relay_restart_recovery(struct relay *relay)
 {
+	/*
+	 * Need to keep the 0 component unchanged. The remote vclock has it
+	 * unset, because it is a local LSN, and it is not sent between the
+	 * instances. Nonetheless, the recovery procedures still need the local
+	 * LSN set to find a proper xlog to start from. If it is not set, the
+	 * recovery process will treat it as 0, and will try to find an xlog
+	 * file having the first local row. Which of course may not exist for a
+	 * long time already. And then it will fail with an xlog gap error.
+	 *
+	 * The currently used local LSN is ok to use, even if it is outdated a
+	 * bit. Because the existing recovery object keeps the current xlog file
+	 * not deleted thanks to xlog GC subsystem. So by using the current
+	 * local LSN and the last confirmed remote LSNs we can be sure such an
+	 * xlog file still exists.
+	 */
+	struct vclock restart_vclock;
+	vclock_copy(&restart_vclock, &relay->recv_vclock);
+	vclock_reset(&restart_vclock, 0, vclock_get(&relay->r->vclock, 0));
 	recovery_delete(relay->r);
-	relay->r = recovery_new(wal_dir(), false, &relay->recv_vclock);
+	relay->r = recovery_new(wal_dir(), false, &restart_vclock);
 	recover_remaining_wals(relay->r, &relay->stream, NULL, true);
 }
 
