@@ -50,6 +50,34 @@ test_run:switch('default')
 assert(not test_run:grep_log('default', 'XlogGapError', 1000))
 s:drop()
 
+-- Ensure the restarted recovery correctly propagates GC state. For that create
+-- some noise xlog files, snapshots, and check if the relay reports to GC that
+-- it does not use them anymore after scanning.
+fiber = require('fiber')
+s = box.schema.create_space('test')
+_ = s:create_index('pk')
+s:replace{1}
+box.snapshot()
+s:replace{2}
+box.snapshot()
+test_run:wait_lsn('replica', 'default')
+lsn = test_run:get_lsn('replica', box.info.id)
+-- Eventually GC should get the last relayed LSN as it is reported on each
+-- relayed xlog file.
+test_run:wait_cond(function()                                                   \
+    local consumers = box.info.gc().consumers                                   \
+    assert(#consumers == 1)                                                     \
+    local vclock = consumers[1].vclock                                          \
+    if vclock[box.info.id] >= lsn then                                          \
+        return true                                                             \
+    end                                                                         \
+    s:replace{3}                                                                \
+    box.snapshot()                                                              \
+    test_run:wait_lsn('replica', 'default')                                     \
+    return false                                                                \
+end)
+s:drop()
+
 test_run:cmd('stop server replica')
 test_run:cmd('delete server replica')
 box.cfg{                                                                        \

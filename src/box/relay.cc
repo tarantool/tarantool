@@ -882,8 +882,10 @@ relay_restart_recovery(struct relay *relay)
 	struct vclock restart_vclock;
 	vclock_copy(&restart_vclock, &relay->recv_vclock);
 	vclock_reset(&restart_vclock, 0, vclock_get(&relay->r->vclock, 0));
+	struct recovery *r = recovery_new(wal_dir(), false, &restart_vclock);
+	rlist_swap(&relay->r->on_close_log, &r->on_close_log);
 	recovery_delete(relay->r);
-	relay->r = recovery_new(wal_dir(), false, &restart_vclock);
+	relay->r = r;
 	recover_remaining_wals(relay->r, &relay->stream, NULL, true);
 }
 
