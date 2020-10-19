@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(79)
 
 --!./tcltestrunner.lua
@@ -789,6 +789,7 @@ if 0 > 0 then
 test:do_test(
     "cast-3.32.1",
     function()
+        local blob, DB, STMT
         blob = 1234567890
         DB = sql_connection_pointer("db")
         STMT = sql_prepare(DB, "SELECT CAST(? AS NUMBER)", -1, "TAIL")

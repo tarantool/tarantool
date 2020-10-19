@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(31)
 
 --!./tcltestrunner.lua
@@ -371,7 +371,7 @@ test:do_execsql_test(
 -- Do an SQL statement.  Append the search count to the end of the result.
 --
 local function count(sql)
-    sql_search_count = 0
+    local sql_search_count = 0
     local r = test:execsql(sql)
     table.insert(r, sql_search_count)
     return r

@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(1)
 
 --!./tcltestrunner.lua
@@ -28,7 +28,7 @@ test:plan(1)
 -- use 10000. But on symbian, which allows each application at most a 32MB
 -- heap, use 1000.
 --
-nStatement = 10000
+local nStatement = 10000
 
 test:do_test(
     "trigger8-1.1",
@@ -37,7 +37,7 @@ test:do_test(
             CREATE TABLE t1(x INT PRIMARY KEY);
             CREATE TABLE t2(y INT PRIMARY KEY);
         ]]
-        sql = string.format([[CREATE TRIGGER r%s AFTER INSERT ON t1
+        local sql = string.format([[CREATE TRIGGER r%s AFTER INSERT ON t1
         FOR EACH ROW BEGIN
 ]], nStatement)
         -- for _ in X(0, "X!for", [=[["set i 0","$i<$nStatement","incr i"]]=]) do

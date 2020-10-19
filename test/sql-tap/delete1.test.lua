@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(10)
 
 --!./tcltestrunner.lua
@@ -132,11 +132,12 @@ test:do_test(
     })
 
 -- Tests for data dictionary integration.
-format = {}
+local format = {}
 format[1] = {name = 'id', type = 'scalar'}
 format[2] = {name = 'f', type = 'scalar'}
+local s
 s = box.schema.create_space('t', {format = format})
-i = s:create_index('i', {parts = {1, 'scalar'}})
+s:create_index('i', {parts = {1, 'scalar'}})
 
 test:do_test(
     "delete1-6.0",

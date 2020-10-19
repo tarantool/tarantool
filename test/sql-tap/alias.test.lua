@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(9)
 
 --!./tcltestrunner.lua
@@ -24,7 +24,7 @@ test:plan(9)
 -- A procedure to return a sequence of increasing integers.
 --
 
-counter = 0
+_G.counter = 0
 
 -- Function is declared as deterministic deliberately.
 -- Otherwise it would be called as much as it occurs in a query.
@@ -54,7 +54,7 @@ test:do_test(
 test:do_test(
     "alias-1.2",
     function()
-        counter = 0
+        _G.counter = 0
         return test:execsql([[
             SELECT x, sequence() AS y FROM t1 WHERE y> 0 order by x desc
         ]])
@@ -67,7 +67,7 @@ test:do_test(
 test:do_test(
     "alias-1.3",
     function()
-        counter = 0
+        _G.counter = 0
         return test:execsql([[
             SELECT x, sequence() AS y FROM t1 WHERE y>0 AND y<99  order by x desc
         ]])
@@ -80,7 +80,7 @@ test:do_test(
 test:do_test(
     "alias-1.4",
     function()
-        counter = 0
+        _G.counter = 0
         return test:execsql([[
             SELECT x, sequence() AS y FROM t1 WHERE y>0 AND y<99 AND y!=55  order by x desc
         ]])
@@ -108,7 +108,7 @@ test:do_test(
 test:do_test(
     "alias-1.6",
     function()
-        counter = 0
+        _G.counter = 0
         return test:execsql([[
             SELECT x, sequence() AS y FROM t1 WHERE y BETWEEN 0 AND 99 order by x desc
         ]])
@@ -121,7 +121,7 @@ test:do_test(
 test:do_test(
     "alias-1.7",
     function()
-        counter = 0
+        _G.counter = 0
         return test:execsql([[
             SELECT x, sequence() AS y FROM t1 WHERE y BETWEEN 0 AND 99 order by x desc
         ]])
@@ -147,7 +147,7 @@ test:do_test(
 test:do_test(
     "alias-1.9",
     function()
-        counter = 0
+        _G.counter = 0
         return test:execsql([[
             SELECT x, sequence() AS y FROM t1 ORDER BY -y
         ]])

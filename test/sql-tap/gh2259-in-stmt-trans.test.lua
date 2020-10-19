@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(20)
 
 box.execute("DROP TABLE IF EXISTS t1")

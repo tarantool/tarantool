@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(4)
 
 --!./tcltestrunner.lua
@@ -21,7 +21,7 @@ test:plan(4)
 -- ["source",[["testdir"],"\/tester.tcl"]]
 
 
-testprefix = "tkt-3a77c9714e"
+local testprefix = "tkt-3a77c9714e"
 test:do_execsql_test(
     1.1,
     [[

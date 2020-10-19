@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(118)
 
 --!./tcltestrunner.lua
@@ -252,7 +252,7 @@ for i = 1, 99, 1 do
         table.insert(answer,j)
         table.insert(answer,r)
     end
-    sql = "SELECT "..table.concat(colset, ",").." FROM t2"
+    local sql = "SELECT "..table.concat(colset, ",").." FROM t2"
     test:do_test(
         "cse-2.2."..i,
         function()

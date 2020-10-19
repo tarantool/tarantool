@@ -1,12 +1,12 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(3)
 local fiber = require("fiber")
 local N = 20
 
 -- this test uses ddl which is not working concurrently
 -- see issue #2741
-ch = fiber.channel(N)
+local ch = fiber.channel(N)
 for id = 1, N do
     fiber.create(
         function ()

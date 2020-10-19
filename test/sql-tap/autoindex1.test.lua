@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(8)
 
 --
@@ -36,7 +36,7 @@ test:do_eqp_test(
         {1,0,0,"SEARCH TABLE T2 USING EPHEMERAL INDEX (C=?) (~20 rows)"}
     })
 
-result = test:execsql([[SELECT b, (SELECT d FROM t2 WHERE c = a) FROM t1;]])
+local result = test:execsql([[SELECT b, (SELECT d FROM t2 WHERE c = a) FROM t1;]])
 
 test:do_eqp_test(
     "autoindex-1.2", [[

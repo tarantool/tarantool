@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(3)
 
 --
@@ -21,7 +21,7 @@ test:do_execsql_test(
 -- Make sure that BLOB longer than 12287 bytes cannot be cast to
 -- INTEGER.
 --
-long_str = string.rep('0', 12284)
+local long_str = string.rep('0', 12284)
 test:do_execsql_test(
     "gh-4766-2",
     "SELECT CAST('" .. long_str .. "123'" .. " AS INTEGER);", {

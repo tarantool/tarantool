@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(14694)
 
 --!./tcltestrunner.lua
@@ -18,7 +18,7 @@ test:plan(14694)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-testprefix = "func"
+local testprefix = "func"
 -- Create a table to work with.
 --
 test:do_test(
@@ -1048,7 +1048,7 @@ test:do_execsql_test(
 --
 -- MUST_WORK_TEST testfunc not implemented
 if 0 > 0 then
-DB = sql_connection_pointer("db")
+local DB = sql_connection_pointer("db")
 X(525, "X!cmd", [=[["sql_register_test_function",["::DB"],"testfunc"]]=])
 test:do_catchsql_test(
     "func-10.1",
@@ -1300,6 +1300,7 @@ test:do_execsql_test(
 test:do_test(
     "func-13.7",
     function()
+        local DB, sql, STMT, res
         DB = sql_connection_pointer("db")
         sql = "SELECT test_auxdata( ? , a ) FROM t4;"
         STMT = sql_prepare(DB, sql, -1, "TAIL")
@@ -1348,7 +1349,7 @@ test:do_execsql_test(
         -- </13.8.3>
     })
 
-V = "one"
+local V = "one"
 test:do_execsql_test(
     "13.8.4",
     [[
@@ -1454,7 +1455,7 @@ test:do_test(
         test:execsql([[
             CREATE TABLE tbl2(id integer primary key, a INT, b INT);
         ]])
-        STMT = sql_prepare(DB, "INSERT INTO tbl2 VALUES(1, ?, ?)", -1, "TAIL")
+        local STMT = sql_prepare(DB, "INSERT INTO tbl2 VALUES(1, ?, ?)", -1, "TAIL")
         sql_bind_blob(STMT, 1, "abc", 3)
         sql_step(STMT)
         sql_finalize(STMT)
@@ -2341,9 +2342,9 @@ if 0>0 then
 for i = 1, sql_LIMIT_FUNCTION_ARG, 1 do
     midargs = midargs .. ",'/"..i.."'"
     midres = midres .. "/"..i
-    result = digest.md5_hex(string.format("this%sprogram%sis%sfree%ssoftware%s",
+    local result = digest.md5_hex(string.format("this%sprogram%sis%sfree%ssoftware%s",
           midres,midres,midres,midres,midres))
-    sql = "SELECT md5sum(t1"..midargs..") FROM tbl1"
+    local sql = "SELECT md5sum(t1"..midargs..") FROM tbl1"
     test:do_test(
         "func-24.7."..i,
         function()
@@ -2468,7 +2469,7 @@ test:do_test(
 test:do_test(
     "func-26.2",
     function()
-        a = ""
+        local a = ""
         for _ in X(0, "X!for", [=[["set i 1","$i<=$::sql_MAX_FUNCTION_ARG","incr i"]]=]) do
             table.insert(a,i)
         end
@@ -2484,7 +2485,7 @@ test:do_test(
 test:do_test(
     "func-26.3",
     function()
-        a = ""
+        local a = ""
         for _ in X(0, "X!for", [=[["set i 1","$i<=$::sql_MAX_FUNCTION_ARG+1","incr i"]]=]) do
             table.insert(a,i)
         end
@@ -2500,7 +2501,7 @@ test:do_test(
 test:do_test(
     "func-26.4",
     function()
-        a = ""
+        local a = ""
         for _ in X(0, "X!for", [=[["set i 1","$i<=$::sql_MAX_FUNCTION_ARG-1","incr i"]]=]) do
             table.insert(a,i)
         end
@@ -2952,7 +2953,7 @@ test:do_catchsql_test(
         -- </func-76.4>
     })
 
-ffi = require('ffi')
+_G.ffi = require('ffi')
 box.schema.func.create('TOSTRING', {language = 'Lua', is_deterministic = true,
                                     body = 'function(a) return a end',
                                     param_list = {'any'}, returns = 'string',

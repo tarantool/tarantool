@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(43)
 
 --!./tcltestrunner.lua
@@ -16,7 +16,7 @@ test:plan(43)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-testprefix = "triggerC"
+local testprefix = "triggerC"
 
 
 ---------------------------------------------------------------------------
@@ -866,7 +866,7 @@ test:do_catchsql_test(
 -- At one point, due to a bug allowing constant factoring within triggers,
 -- the following SQL would produce the wrong result.
 --
-SQL = [[
+local SQL = [[
   DROP TABLE IF EXISTS t1;
   DROP VIEW v2;
   DROP TABLE IF EXISTS t2;

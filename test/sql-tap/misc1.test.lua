@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(59)
 
 --!./tcltestrunner.lua
@@ -583,7 +583,7 @@ if (0 > 0) then
             test:execsql("START TRANSACTION")
             test:execsql("UPDATE t1 SET a=0 WHERE 0")
             sql("db2", "test.db")
-            rc = X(371, "X!cmd", [=[["catch","db2 eval {SELECT count(*) FROM t1}","msg"]]=])
+            local rc = X(371, "X!cmd", [=[["catch","db2 eval {SELECT count(*) FROM t1}","msg"]]=])
             return table.insert(rc,msg) or rc
             -- v2 result: {1 {database is locked}}
         end, {
@@ -596,7 +596,7 @@ if (0 > 0) then
         "misc1-11.2",
         function()
             test:execsql("COMMIT")
-            rc = X(377, "X!cmd", [=[["catch","db2 eval {SELECT count(*) FROM t1}","msg"]]=])
+            local rc = X(377, "X!cmd", [=[["catch","db2 eval {SELECT count(*) FROM t1}","msg"]]=])
             db2("close")
             return table.insert(rc,msg) or rc
         end, {

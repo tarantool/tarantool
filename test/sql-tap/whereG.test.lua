@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(23)
 
 --!./tcltestrunner.lua
@@ -18,7 +18,7 @@ test:plan(23)
 -- likelihood() functions.
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-testprefix = "whereG"
+local testprefix = "whereG"
 test:do_execsql_test(
     "whereG-1.0",
     [[

@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(22)
 
 --!./tcltestrunner.lua
@@ -69,7 +69,7 @@ test:do_execsql_test(
         -- </func5-2.1>
     })
 
-global_counter = 0
+_G.global_counter = 0
 
 box.schema.func.create('COUNTER1', {language = 'Lua', is_deterministic = false,
                        param_list = {'any'}, returns = 'integer',

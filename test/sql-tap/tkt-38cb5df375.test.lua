@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(293)
 
 --!./tcltestrunner.lua
@@ -321,7 +321,7 @@ for ii = 1, 9, 1 do
 
 end
 for ii = 1, 7, 1 do
-    jj = (7 - ii)
+    local jj = (7 - ii)
     test:do_execsql_test(
         "tkt-38cb5df375.51."..ii,
         [[

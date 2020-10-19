@@ -1,8 +1,8 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(18)
 
-testprefix = "analyzeF"
+local testprefix = "analyzeF"
 
 --!./tcltestrunner.lua
 -- 2015-03-12
@@ -43,10 +43,10 @@ test:do_execsql_test(
 -- without the sql_DETERMINISTIC flag set.
 --
 
-where_clauses_x = {"x = 4 AND y = 19", "x = '4' AND y = '19'", 
+local where_clauses_x = {"x = 4 AND y = 19", "x = '4' AND y = '19'",
 	"x = substr('145', 2, 1) AND y = substr('5195', 2, 2)"}
 
-where_clauses_y = {"x = 19 AND y = 4", "x = '19' AND y = '4'", 
+local where_clauses_y = {"x = 19 AND y = 4", "x = '19' AND y = '4'",
 	"x = substr('5195', 2, 2) AND y = substr('145', 2, 1)",
 	"x = substr('5195', 2, 2+0) AND y = substr('145', 2, 1+0)",
 	"x = substr('145', 2, 1+0) AND y = substr('5195', 2, 2+0)",
@@ -56,7 +56,7 @@ where_clauses_y = {"x = 19 AND y = 4", "x = '19' AND y = '4'",
 
 
 for test_number, where in ipairs(where_clauses_x) do
-    res = {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1X (X=?)"}
+    local res = {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1X (X=?)"}
     test:do_eqp_test(
         "1.1."..test_number,
         "SELECT * FROM t1 WHERE "..where.."", {
@@ -67,7 +67,7 @@ end
 
 
 for test_number, where in ipairs(where_clauses_y) do
-    res = {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1Y (Y=?)"}
+    local res = {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1Y (Y=?)"}
     test:do_eqp_test(
         "1.2."..test_number,
         "SELECT * FROM t1 WHERE "..where.."", {
@@ -113,11 +113,11 @@ box.internal.sql_create_function("det4", "NUM", det4)
 
 box.internal.sql_create_function("det19", "NUM", det19)
 
-where_clause_x = {"x = det4() AND y = det19()"}
+where_clauses_x = {"x = det4() AND y = det19()"}
 where_clauses_y = {"x = det19() AND y = det4()"}
 
 for test_number, where in ipairs(where_clauses_y) do
-    res = {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1Y (Y=?)"}
+    local res = {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1Y (Y=?)"}
     test:do_eqp_test(
         "3.1."..test_number,
         "SELECT * FROM t1 WHERE "..where.."", {
@@ -126,7 +126,7 @@ for test_number, where in ipairs(where_clauses_y) do
 end
 
 for test_number, where in ipairs(where_clauses_x) do
-    res = {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1X (X=?)"}
+    local res = {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1X (X=?)"}
     test:do_eqp_test(
         "3.2."..test_number,
         "SELECT * FROM t1 WHERE "..where.."", {

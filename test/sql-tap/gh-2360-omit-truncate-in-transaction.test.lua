@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(3)
 
 test:do_execsql_test(

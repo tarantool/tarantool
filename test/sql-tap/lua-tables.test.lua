@@ -1,22 +1,23 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(14)
 
 test:do_test(
     "lua-tables-prepare-1",
     function()
+        local format, s
         format = {}
         format[1] = { name = 'id', type = 'scalar'}
         format[2] = { name = 'f2', type = 'scalar'}
         s = box.schema.create_space('t', {format = format})
-        i = s:create_index('i', {parts={1, 'scalar'}})
+        s:create_index('i', {parts={1, 'scalar'}})
 
         s:replace{1, 4}
         s:replace{2, 2}
         s:replace{3, 3}
         s:replace{4, 3}
 
-        s1 = box.schema.create_space('t1')
+        local s1 = box.schema.create_space('t1')
         s1:create_index('i', {parts={1, 'scalar'}})
         s1:replace{1, 1}
     end,
@@ -52,6 +53,7 @@ test:do_catchsql_test(
 test:do_test(
     "lua-tables-prepare-6",
     function()
+        local format, s
         format = {{name = "CODE", type = "integer"},
             {name = "NAME", type = "scalar"}}
         s = box.schema.create_space("ELEMENT", {format = format})
@@ -130,7 +132,7 @@ test:do_execsql_test(
 test:do_test(
     "lua-tables-prepare-10",
     function()
-        sp = box.schema.space.create("TEST", {
+        local sp = box.schema.space.create("TEST", {
             engine = 'memtx',
             format = {
                 { name = 'ID', type = 'unsigned' },
@@ -165,7 +167,7 @@ test:do_eqp_test(
 test:do_test(
     "no-format-create-index-prep",
     function()
-        s = box.schema.create_space('T')
+        box.schema.create_space('T')
     end, {})
 
 test:do_catchsql_test(

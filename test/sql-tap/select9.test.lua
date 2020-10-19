@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(21157)
 -- it is bad idea to store 20k positive test results in git
 test.silent = true
@@ -47,11 +47,11 @@ test.silent = true
 --   pass to [do_test] for each individual LIMIT OFFSET test case.
 --
 
-function trim(s)
+local function trim(s)
     return s:match "^%s*(.-)%s*$"
 end
 
-function subrange(t, first, last)
+local function subrange(t, first, last)
     local sub = {}
     for i=first,last do
         sub[#sub + 1] = t[i]

@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(201)
 
 --!./tcltestrunner.lua
@@ -154,7 +154,7 @@ test:do_test(
         ]]
         -- for _ in X(0, "X!for", [=[["set i 0","$i<=65","incr i"]]=]) do
         for i=0,65 do    
-            sql = string.format([[
+            local sql = string.format([[
                     CREATE TRIGGER t3c%s AFTER UPDATE ON t3
                     FOR EACH ROW
                     WHEN old.c%s!=new.c%s

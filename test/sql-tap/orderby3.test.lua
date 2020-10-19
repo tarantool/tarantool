@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(15)
 
 --!./tcltestrunner.lua
@@ -20,7 +20,7 @@ test:plan(15)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-testprefix = "orderby3"
+local testprefix = "orderby3"
 -- Generate test data for a join.  Verify that the join gets the
 -- correct answer.
 --

@@ -1,8 +1,8 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(121)
 
-testprefix = "analyze9"
+local testprefix = "analyze9"
 
 --!./tcltestrunner.lua
 -- 2013 August 3
@@ -46,8 +46,8 @@ test:do_execsql_test(
         -- </1.1>
     })
 
-msgpack_decode_sample = function(txt)
-    msgpack = require('msgpack')
+local function msgpack_decode_sample(txt)
+    local msgpack = require('msgpack')
     local i = 1
     local decoded_str = ''
     while msgpack.decode(txt)[i] ~= nil do
@@ -63,6 +63,7 @@ msgpack_decode_sample = function(txt)
     end
     return decoded_str
 end
+_G.msgpack_decode_sample = msgpack_decode_sample
 
 box.internal.sql_create_function("msgpack_decode_sample", "TEXT", msgpack_decode_sample)
 
@@ -134,14 +135,15 @@ test:do_test(
     })
 
 -- Analogue of function from tcl
-lindex = function(str, pos)
+local function lindex(str, pos)
     return string.sub(str, pos+1, pos+1)
 end
+_G.lindex = lindex
 
 box.internal.sql_create_function("lindex", "TEXT", lindex)
 
 -- Analogue of function from tcl
-lrange = function(str, first, last)
+local function lrange(str, first, last)
     local res_tokens = ""
     local i = 1
     for token in string.gmatch(str, "[^%s]+") do
@@ -156,24 +158,27 @@ lrange = function(str, first, last)
     end
     return res_tokens
 end
+_G.lrange = lrange
 
 box.internal.sql_create_function("lrange", "TEXT", lrange)
 
-generate_tens = function(n)
-    tens = {}
+local function generate_tens(n)
+    local tens = {}
     for i = 1, n do
         tens[i] = 10
     end
     return tens
 end
+_G.generate_tens = generate_tens
 
-generate_tens_str = function(n)
-    tens = {}
+local function generate_tens_str(n)
+    local tens = {}
     for i = 1, n do
         tens[i] = "10"
     end
     return tens
 end
+_G.generate_tens_str = generate_tens_str
 
 -- Each value of "a" occurs exactly 10 times in the table.
 --
@@ -236,7 +241,7 @@ test:do_execsql_test(
         CREATE INDEX i1 ON t1(c, b, a);
     ]])
 
-insert_filler_rows_n = function(iStart, nCopy, nVal)
+local function insert_filler_rows_n(iStart, nCopy, nVal)
     for i = 0, nVal-1 do
         local iVal = iStart+i
         for j = 0, nCopy-1 do
@@ -244,6 +249,7 @@ insert_filler_rows_n = function(iStart, nCopy, nVal)
         end
     end
 end
+_G.insert_filler_rows_n = insert_filler_rows_n
 
 box.internal.sql_create_function("insert_filler_rows_n", "INT", insert_filler_rows_n)
 
@@ -718,7 +724,7 @@ test:do_test(
             else
                 a = "\"DEF\""
             end
-            b = i % 5
+            local b = i % 5
             test:execsql(string.format("INSERT INTO t4 VALUES(null, '%s', '%s')", a, b))
         test:execsql("ANALYZE")
         end
@@ -769,7 +775,7 @@ test:do_test(
             else
                 a = "\"DEF\""
             end
-            b = i % 5
+            local b = i % 5
             test:execsql(string.format("INSERT INTO t4 VALUES(null, '%s', '%s')", a, b))
         test:execsql("ANALYZE")
         end
@@ -830,7 +836,7 @@ test:do_test(
             else
                 a = "\"DEF\""
             end
-            b = i % 5
+            local b = i % 5
             test:execsql(string.format("INSERT INTO t4 VALUES(null, 'abcdef', '%s', '%s')", a, b))
         test:execsql("ANALYZE")
         end
@@ -881,7 +887,7 @@ test:do_test(
             else
                 a = "\"DEF\""
             end
-            b = i % 5
+            local b = i % 5
             test:execsql(string.format("INSERT INTO t4 VALUES(null, 'abcdef', '%s', '%s')", a, b))
         test:execsql("ANALYZE")
         end
@@ -1246,9 +1252,10 @@ test:do_test(
 
 ---------------------------------------------------------------------------
 
-r = function()
+local function r()
     return math.random(1, 15)
 end
+_G.r = r
 
 box.internal.sql_create_function("r", "NUM", r)
 
@@ -1376,7 +1383,7 @@ test:do_execsql_test(
     })
 
 
-int_to_char = function(i)
+local function int_to_char(i)
     local ret = ""
     local char = "abcdefghij"
     local divs = {1000, 100, 10, 1}
@@ -1385,6 +1392,7 @@ int_to_char = function(i)
     end
     return ret
 end
+_G.int_to_char = int_to_char
 
 box.internal.sql_create_function("int_to_char", "TEXT", int_to_char)
 

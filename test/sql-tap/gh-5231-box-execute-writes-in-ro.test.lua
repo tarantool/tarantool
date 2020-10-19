@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(9)
 
 local expected_err = "Can't modify data because this instance is in read-only mode."
