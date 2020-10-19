@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(3)
 
 --!./tcltestrunner.lua
@@ -37,7 +37,7 @@ local result = test:execsql [[
     GROUP BY LOWER(artist)      
 ]]
 
-function subrange(t, first, last)
+local function subrange(t, first, last)
     local sub = {}
     for i=first,last do
         sub[#sub + 1] = t[i]

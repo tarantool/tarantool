@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(73)
 
 --!./tcltestrunner.lua
@@ -585,7 +585,7 @@ test:do_test(
         for i = 1, 50, 1 do
             test:execsql(string.format("INSERT INTO t3 VALUES('x%sx',%s,0.%s)", i, i, i))
         end
-        sql_search_count = 0
+        local sql_search_count = 0
         return X(381, "X!cmd", [=[["concat",[["execsql","SELECT c FROM t3 WHERE b==10"]],["sql_search_count"]]]=])
     end, {
         -- <index-11.1>
@@ -1011,10 +1011,11 @@ end
 test:do_test(
     "index-22.1.0",
     function()
+        local format
         format = {}
         format[1] = { name = 'id', type = 'scalar'}
         format[2] = { name = 'f2', type = 'scalar'}
-        s = box.schema.create_space('T', {format = format})
+        box.schema.create_space('T', {format = format})
     end,
     {})
 

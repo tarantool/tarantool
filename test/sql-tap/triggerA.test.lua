@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(17)
 
 --!./tcltestrunner.lua
@@ -36,12 +36,12 @@ test:do_test(
             CREATE TABLE t1(x INTEGER PRIMARY KEY, y TEXT UNIQUE);
             CREATE TABLE t2(a INTEGER PRIMARY KEY, b INTEGER UNIQUE, c TEXT);
         ]]
-        i = 1
+        local i = 1
         local words = {"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"}
         for i, word in ipairs(words) do
         -- for _ in X(0, "X!foreach", [=[["word","one two three four five six seven eight nine ten"]]=]) do
             -- j = X(42, "X!cmd", [=[["expr","$i*100 + [string length $word]"]]=])
-            j = i * 100 + string.len(word)
+            local j = i * 100 + string.len(word)
             test:execsql(string.format([[
                 INSERT INTO t1 VALUES(%d,'%s');
                 INSERT INTO t2 VALUES(20-%d,%d,'%s');

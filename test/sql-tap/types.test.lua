@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
-NULL = require('msgpack').NULL
+local test = require("sqltester")
+local NULL = require('msgpack').NULL
 test:plan(14)
 
 --!./tcltestrunner.lua

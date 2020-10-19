@@ -1,15 +1,16 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(72)
 
 test:execsql([[
 	CREATE TABLE t0 (i INT PRIMARY KEY, a INT);
 	CREATE VIEW v0 AS SELECT * FROM t0;
 ]])
+local format, s0
 format = {}
 for i = 1, 2001 do format[i] = {name = 'A' .. i, type = 'unsigned'} end
 s0 = box.schema.space.create('S0', {format = format})
-i0 = s0:create_index('I0')
+s0:create_index('I0')
 
 test:do_catchsql_test(
 	"sql-errors-1.1",
@@ -21,7 +22,7 @@ test:do_catchsql_test(
 		-- </sql-errors-1.1>
 	})
 
-create_statement = 'CREATE TABLE t2 (i INT PRIMARY KEY'
+local create_statement = 'CREATE TABLE t2 (i INT PRIMARY KEY'
 for i = 1, 2001 do
 	create_statement = create_statement .. ', s' .. i .. ' INT'
 end
@@ -156,7 +157,7 @@ test:do_catchsql_test(
 		-- </sql-errors-1.14>
 	})
 
-select_statement = 'SELECT i FROM t0 WHERE i = 0'
+local select_statement = 'SELECT i FROM t0 WHERE i = 0'
 for i = 1, 200 do
 	select_statement = select_statement .. ' OR i = ' .. i
 end
@@ -337,7 +338,7 @@ test:do_catchsql_test(
 		-- </sql-errors-1.29>
 	})
 
-create_index_statement = 'CREATE INDEX i30 on t0(i'..string.rep(', i', 2000)..');'
+local create_index_statement = 'CREATE INDEX i30 on t0(i'..string.rep(', i', 2000)..');'
 
 test:do_catchsql_test(
 	"sql-errors-1.30",
@@ -348,7 +349,7 @@ test:do_catchsql_test(
 		-- </sql-errors-1.30>
 	})
 
-update_statement = 'UPDATE s0 SET a1 = a1 + 1'
+local update_statement = 'UPDATE s0 SET a1 = a1 + 1'
 for i = 2, 2001 do
 	update_statement = update_statement .. ', a' .. i .. ' = a' .. i .. ' + 1'
 end

@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(509)
 
 --!./tcltestrunner.lua
@@ -835,7 +835,7 @@ end
 -- MUST_WORK_TEST prepared statement
 if 0>0 then
 for _ in X(0, "X!foreach", [=[["tn select nCol","\n  1   \"SELECT a,b,c FROM z1\" 3\n  2   \"SELECT a,b,c FROM z1 NATURAL JOIN z3\"  3\n  3   \"SELECT z1.a,z1.b,z1.c FROM z1 NATURAL JOIN z3\" 3\n  4   \"SELECT z3.a,z3.b FROM z1 NATURAL JOIN z3\" 2\n  5   \"SELECT z1.a,z1.b,z1.c, z3.a,z3.b FROM z1 NATURAL JOIN z3\" 5\n  6   \"SELECT 1, 2, z1.a,z1.b,z1.c FROM z1\" 5\n  7   \"SELECT a, a,b,c, b, c FROM z1\" 6\n"]]=]) do
-    stmt = sql_prepare_v2("db", select, -1, "DUMMY")
+    local stmt = sql_prepare_v2("db", select, -1, "DUMMY")
     test:do_sql_column_count_test(
         "e_select-4.3."..tn,
         stmt, {
@@ -963,13 +963,14 @@ test:do_select_tests(
 if 0>0 then
 for _ in X(0, "X!foreach", [=[["tn select","\n  8.1  \"SELECT count(*) FROM a1\"\n  8.2  \"SELECT count(*) FROM a1 WHERE 0\"\n  8.3  \"SELECT count(*) FROM a1 WHERE 1\"\n  8.4  \"SELECT max(a1.one)+min(two), a1.one, two, * FROM a1, a2 WHERE 1\"\n  8.5  \"SELECT max(a1.one)+min(two), a1.one, two, * FROM a1, a2 WHERE 0\"\n"]]=]) do
     -- Set $nRow to the number of rows returned by $select:
+    local stmt, nRow
     stmt = sql_prepare_v2("db", select, -1, "DUMMY")
     nRow = 0
     while X(979, "X!cmd", [=[["expr","\"sql_ROW\" == [sql_step $::stmt]"]]=])
  do
         nRow = nRow + 1
     end
-    rc = sql_finalize(stmt)
+    local rc = sql_finalize(stmt)
     -- Test that $nRow==1 and that statement execution was successful
     -- (rc==sql_OK).
     X(983, "X!cmd", [=[["do_test",["e_select-4.",["tn"]],[["list","list",["rc"],["nRow"]]],"sql_OK 1"]]=])

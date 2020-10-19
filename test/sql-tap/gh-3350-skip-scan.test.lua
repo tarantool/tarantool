@@ -2,7 +2,7 @@
 
 -- gh-3350, gh-2859
 
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(4)
 
 local function lindex(str, pos)

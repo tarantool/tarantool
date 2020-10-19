@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(3)
 
 -- gh-3231: make sure that there is no redundant OP_Goto at the
@@ -21,7 +21,7 @@ test:do_execsql_test(
 test:do_test(
     "explain-1.1",
     function()
-        opcodes = test:execsql("EXPLAIN SELECT * FROM t1;")
+        local opcodes = test:execsql("EXPLAIN SELECT * FROM t1;")
         return opcodes[1]
     end,
         -- <explain-1.1>
@@ -32,7 +32,7 @@ test:do_test(
 test:do_test(
     "explain-1.2",
     function()
-        opcodes = test:execsql("EXPLAIN SELECT a + 1 FROM t1 WHERE id = 4 OR id = 5;")
+        local opcodes = test:execsql("EXPLAIN SELECT a + 1 FROM t1 WHERE id = 4 OR id = 5;")
         return opcodes[1]
     end,
         -- <explain-1.2>

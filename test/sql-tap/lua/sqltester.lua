@@ -177,7 +177,7 @@ end
 test.execsql = execsql
 
 local function catchsql(self, sql, expect)
-    r = {pcall(execsql, self, sql) }
+    local r = {pcall(execsql, self, sql) }
     if r[1] == true then
         r[1] = 0
     else
@@ -256,7 +256,7 @@ end
 test.sortsql = sortsql
 
 local function catchsql2(self, sql)
-    r = {pcall(execsql2, self, sql) }
+    local r = {pcall(execsql2, self, sql) }
     -- 0 means ok
     -- 1 means not ok
     r[1] = r[1] == true and 0 or 1
@@ -271,7 +271,7 @@ test.catchsql2 = catchsql2
 -- opcode at the beginning.  This procedure can be used to prove
 -- that different SQL statements generate exactly the same VDBE code.
 local function explain_no_trace(self, sql)
-    tr = execsql(self, "EXPLAIN "..sql)
+    local tr = execsql(self, "EXPLAIN "..sql)
     for i=1,8 do
         table.remove(tr,1)
     end

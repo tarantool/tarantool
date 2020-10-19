@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(61)
 
 --!./tcltestrunner.lua
@@ -19,7 +19,7 @@ test:plan(61)
 -- $Id: check.test,v 1.13 2009/06/05 17:09:12 drh Exp $
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-testprefix = "check"
+local testprefix = "check"
 -- Only run these tests if the build includes support for CHECK constraints
 
 

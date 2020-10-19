@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(184)
 
 --!./tcltestrunner.lua
@@ -239,7 +239,7 @@ for _, kw in ipairs(kwlist) do
 end
 
 for _, kw in ipairs(bannedkws) do
-    query = 'CREATE TABLE '..kw..'(a INT PRIMARY KEY);'
+    local query = 'CREATE TABLE '..kw..'(a INT PRIMARY KEY);'
     if kw == 'end' or kw == 'match' or kw == 'release' or kw == 'rename' or
        kw == 'replace' or kw == 'binary' or kw == 'character' or
        kw == 'smallint' then

@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(2023)
 
 --!./tcltestrunner.lua
@@ -229,7 +229,7 @@ test:do_test(
 test:do_test(
     "where7-1.20",
     function()
-        sql = "SELECT a FROM t1 WHERE a=11 OR b=11"
+        local sql = "SELECT a FROM t1 WHERE a=11 OR b=11"
         for i = 12, 100 do
             sql = sql .. string.format(" OR a=%s OR b=%s", i, i)
         end
@@ -244,7 +244,7 @@ test:do_test(
 test:do_test(
     "where7-1.21",
     function()
-        sql = "SELECT a FROM t1 WHERE b=11 OR c=11"
+        local sql = "SELECT a FROM t1 WHERE b=11 OR c=11"
         for i = 12, 100 do
             sql = sql .. string.format(" OR b=%s OR c=%s", i, i)
         end
@@ -259,7 +259,7 @@ test:do_test(
 test:do_test(
     "where7-1.22",
     function()
-        sql = "SELECT a FROM t1 WHERE (b=11 OR c=11"
+        local sql = "SELECT a FROM t1 WHERE (b=11 OR c=11"
         for i = 12, 100 do
             sql = sql .. string.format(" OR b=%s OR c=%s", i, i)
         end
@@ -274,7 +274,7 @@ test:do_test(
 test:do_test(
     "where7-1.23",
     function()
-        sql = "SELECT a FROM t1 WHERE (b=11 OR c=11"
+        local sql = "SELECT a FROM t1 WHERE (b=11 OR c=11"
         for i = 12, 100 do
             sql = sql .. string.format(" OR (b=%s AND d!=0) OR (c=%s AND d IS NOT NULL)", i, i)
         end
@@ -289,7 +289,7 @@ test:do_test(
 test:do_test(
     "where7-1.31",
     function()
-        sql = "SELECT a FROM t1 WHERE (a=11 AND b=11)"
+        local sql = "SELECT a FROM t1 WHERE (a=11 AND b=11)"
         for i = 12, 100 do
             sql = sql .. string.format(" OR (a=%s AND b=%s)", i, i)
         end
@@ -304,7 +304,7 @@ test:do_test(
 test:do_test(
     "where7-1.32",
     function()
-        sql = "SELECT a FROM t1 WHERE (b=11 AND c=11)"
+        local sql = "SELECT a FROM t1 WHERE (b=11 AND c=11)"
         for i = 12, 100 do
             sql = sql .. string.format(" OR (b=%s AND c=%s)", i, i)
         end
@@ -319,7 +319,7 @@ test:do_test(
 test:do_test(
     "where7-AST-depth-limit",
     function()
-        sql = "SELECT a FROM t1 WHERE a = 0"
+        local sql = "SELECT a FROM t1 WHERE a = 0"
         for i = 1, 199 do
             sql = sql .. string.format(" OR a = %s", i)
         end

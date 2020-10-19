@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(35)
 
 --!./tcltestrunner.lua
@@ -288,7 +288,7 @@ test:do_test(
 --
 -- gh-3929: sql: ANSI aliases for LENGTH().
 --
-suits = {}
+local suits = {}
 suits[1] = {str = '123456789', len = 9}
 suits[2] = {str = '\x80', len = 1}
 suits[3] = {str = '\x61\x62\x63', len = 3}

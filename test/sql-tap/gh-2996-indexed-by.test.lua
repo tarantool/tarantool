@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(13)
 
 -- gh-2996 - INDEXED BY clause wasn't working.
@@ -12,7 +12,7 @@ test:execsql [[
     CREATE INDEX t1ix1 on t1(b);
 ]]
 
-sample_size = 1000
+local sample_size = 1000
 local query = "INSERT INTO t1 VALUES "
 
 for i = 1, sample_size do

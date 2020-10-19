@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(1)
 
 --!./tcltestrunner.lua
@@ -19,7 +19,7 @@ test:plan(1)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-testprefix = "selectG"
+local testprefix = "selectG"
 -- Do an INSERT with a VALUES clause that contains 100,000 entries.  Verify
 -- that this insert happens quickly (in less than 10 seconds).  Actually, the
 -- insert will normally happen in less than 0.5 seconds on a workstation, but

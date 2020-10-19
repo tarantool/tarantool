@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
-identifier = require("identifier")
+local test = require("sqltester")
+local identifier = require("identifier")
 test:plan(9)
 
 local test_prefix = "identifier_char-"

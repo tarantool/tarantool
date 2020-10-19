@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(203)
 
 --!./tcltestrunner.lua
@@ -22,7 +22,7 @@ test:plan(203)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-testprefix = "orderby8"
+local testprefix = "orderby8"
 
 local rs = ""
 test:do_test(

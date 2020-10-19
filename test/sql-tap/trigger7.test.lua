@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(5)
 
 --!./tcltestrunner.lua
@@ -48,7 +48,7 @@ test:do_test(
               SELECT '___update_t1.y___';
             END;
         ]]
-        txt = test:execsql "EXPLAIN UPDATE t1 SET x=5"
+        local txt = test:execsql "EXPLAIN UPDATE t1 SET x=5"
         return arr_match(txt, "___update_t1.x___")
         -- return X(63, "X!cmd", [=[["string","match","*___update_t1.x___*",["txt"]]]=])
     end,
@@ -60,7 +60,7 @@ test:do_test(
 test:do_test(
     "trigger7-2.2",
     function()
-        txt = test:execsql "EXPLAIN UPDATE t1 SET x=5"
+        local txt = test:execsql "EXPLAIN UPDATE t1 SET x=5"
         return arr_match(txt, "___update_t1.y___")
         -- return X(67, "X!cmd", [=[["string","match","*___update_t1.y___*",["txt"]]]=])
     end,
@@ -72,7 +72,7 @@ test:do_test(
 test:do_test(
     "trigger7-2.3",
     function()
-        txt = test:execsql "EXPLAIN UPDATE t1 SET y=5"
+        local txt = test:execsql "EXPLAIN UPDATE t1 SET y=5"
         return arr_match(txt, "___update_t1.x___")
         -- return X(71, "X!cmd", [=[["string","match","*___update_t1.x___*",["txt"]]]=])
     end,
@@ -84,7 +84,7 @@ test:do_test(
 test:do_test(
     "trigger7-2.4",
     function()
-        txt = test:execsql "EXPLAIN UPDATE t1 SET y=5"
+        local txt = test:execsql "EXPLAIN UPDATE t1 SET y=5"
         return arr_match(txt, "___update_t1.y___")
         -- return X(75, "X!cmd", [=[["string","match","*___update_t1.y___*",["txt"]]]=])
     end,

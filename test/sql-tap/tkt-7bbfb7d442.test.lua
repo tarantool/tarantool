@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(5)
 
 --!./tcltestrunner.lua
@@ -20,7 +20,7 @@ test:plan(5)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-testprefix = "tkt-7bbfb7d442"
+local testprefix = "tkt-7bbfb7d442"
 -- MUST_WORK_TEST
 if (1 > 0)
  then

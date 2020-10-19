@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(60)
 
 --!./tcltestrunner.lua
@@ -794,7 +794,7 @@ box.internal.sql_create_function("cksum", cksum)
             "sort-14."..tn,
             function()
                 sql_test_control("sql_TESTCTRL_SORTER_MMAP", "db", mmap_limit)
-                prev = ""
+                local prev = ""
                 X(536, "X!cmd", [=[["db","eval"," SELECT * FROM t11 ORDER BY b ","\n         if {$b != [cksum $a]} {error \"checksum failed\"}\n         if {[string compare $b $prev] < 0} {error \"sort failed\"}\n         set prev $b\n       "]]=])
                 return X(541, "X!cmd", [=[["set","",""]]=])
             end, {
@@ -818,6 +818,7 @@ box.internal.sql_create_function("cksum", cksum)
         reset_db()
         sql_test_control("sql_TESTCTRL_SORTER_MMAP", "db", mmap_limit)
         test:execsql(string.format("PRAGMA temp_store = %s; PRAGMA threads = '%s'", tmpstore, nWorker))
+        local ten, one
         ten = string.rep("X", 10300)
         one = string.rep("y", 200)
         if softheaplimit then

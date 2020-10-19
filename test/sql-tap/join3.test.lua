@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(129)
 
 --!./tcltestrunner.lua
@@ -36,7 +36,7 @@ for N=1, bitmask_size do
         function()
             test:execsql("CREATE TABLE t"..N.."(x INT primary key);")
             test:execsql(string.format("INSERT INTO t%s VALUES(%s)", N, N))
-            sql = "SELECT * FROM t1"
+            local sql = "SELECT * FROM t1"
             -- for _ in X(0, "X!for", [=[["set i 2","$i<=$N","incr i"]]=]) do
             for i=2,N do
                 sql = sql .. ", t"..i..""
@@ -56,12 +56,12 @@ for N=1, bitmask_size do
     test:do_test(
         "join3-2."..N,
         function()
-            sql = "SELECT * FROM t1"
+            local sql = "SELECT * FROM t1"
             --for _ in X(0, "X!for", [=[["set i 2","$i<=$N","incr i"]]=]) do
             for i=2, N do
                 sql = sql .. ", t"..i..""
             end
-            sep = "WHERE"
+            local sep = "WHERE"
             --for _ in X(0, "X!for", [=[["set i 1","$i<$N","incr i"]]=]) do
             for i=1, N - 1 do
                 sql = sql .. string.format(" %s t%s.x==t%s.x+1", sep, (i + 1), i)
@@ -78,7 +78,7 @@ end
 test:do_test(
     "join3-3.1",
     function()
-        sql = "SELECT * FROM t1 AS t0, t1"
+        local sql = "SELECT * FROM t1 AS t0, t1"
         for i=2, bitmask_size do
             sql = sql .. ", t"..i..""
         end

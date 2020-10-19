@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(15)
 
 --!./tcltestrunner.lua
@@ -18,7 +18,7 @@ test:plan(15)
 -- in this file is testing the capabilities of sql_stat3.
 --
 
-testprefix = "analyze8"
+local testprefix = "analyze8"
 
 -- Scenario:
 --
@@ -39,6 +39,7 @@ test:do_test(
             CREATE INDEX t1c ON t1(c);
         ]])
         for i=0, 1000 do
+            local a, b, c
             if (i % 2 == 0)
             then
                 a = i

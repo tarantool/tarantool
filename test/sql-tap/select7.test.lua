@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(18)
 
 --!./tcltestrunner.lua
@@ -18,7 +18,7 @@ test:plan(18)
 -- $Id: select7.test,v 1.11 2007/09/12 17:01:45 danielk1977 Exp $
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-testprefix = "select7"
+local testprefix = "select7"
 -- A 3-way INTERSECT.  Ticket #875
 test:do_execsql_test(
     "select7-1.1",
@@ -171,7 +171,7 @@ test:do_catchsql_test(
 -- hardcoded define from src
 -- 30 is default value
 local SQL_MAX_COMPOUND_SELECT = 30
-sql = "SELECT 0"
+local sql = "SELECT 0"
 for i = 0, SQL_MAX_COMPOUND_SELECT + 1, 1 do
     sql = sql .. " UNION ALL SELECT "..i..""
 end

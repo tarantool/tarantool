@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(113)
 
 --!./tcltestrunner.lua
@@ -28,7 +28,7 @@ test:execsql [[
 ]]
 for i=1,32 do
     --for _ in X(0, "X!for", [=[["set i 1","$i<=32","incr i"]]=]) do
-    j = 0
+    local j = 0
     while bit.lshift(1, j) < i do
     -- for _ in X(0, "X!for", [=[["set j 0","(1<<$j)<$i","incr j"]]=]) do
         j = j + 1
@@ -694,7 +694,7 @@ test:do_catchsql_test(
 test:do_test(
     "limit-10.1",
     function()
-        limit = 10
+        local limit = 10
         return test:execsql [[
             SELECT x FROM t1 LIMIT 10;
         ]]

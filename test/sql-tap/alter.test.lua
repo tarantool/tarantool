@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(50)
 
 test:do_execsql_test(
@@ -90,11 +90,11 @@ test:do_catchsql_test(
 test:do_test(
     "alter-2.3.prepare",
     function()
-        format = {}
+        local format = {}
         format[1] = { name = 'id', type = 'integer'}
         format[2] = { name = 'f2', type = 'number'}
-        s = box.schema.create_space('t', {format = format})
-        i = s:create_index('i', {parts= {1, 'integer'}})
+        local s = box.schema.create_space('t', {format = format})
+        s:create_index('i', {parts= {1, 'integer'}})
 
         s:replace{1, 4}
         s:replace{2, 2}
@@ -520,10 +520,10 @@ test:do_catchsql_test(
 test:do_test(
     "alter-8.1.0",
     function()
-        format = {}
+        local format = {}
         format[1] = { name = 'id', type = 'scalar'}
         format[2] = { name = 'f2', type = 'scalar'}
-        s = box.schema.create_space('T', {format = format})
+        box.schema.create_space('T', {format = format})
     end,
     {})
 
@@ -560,7 +560,7 @@ test:do_catchsql_test(
 test:do_test(
     "alter-8.3.2",
     function()
-        i = box.space.T.index[1]
+        local i = box.space.T.index[1]
         return i.id
     end, 1)
 

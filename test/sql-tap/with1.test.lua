@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(64)
 
 --!./tcltestrunner.lua
@@ -18,7 +18,7 @@ test:plan(64)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-testprefix = "with1"
+local testprefix = "with1"
 -- if X(0, "X!capable", [["!cte"]]) then
 --   test:finish_test()
 --  return 
@@ -623,7 +623,7 @@ test:do_execsql_test("8.2-soduko", [[
 -- Some tests that use LIMIT and OFFSET in the definition of recursive CTEs.
 --
 -- I = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 }
-function limit_test(tn, iLimit, iOffset)
+local function limit_test(tn, iLimit, iOffset)
     local last = 20 - 1
     local result = {}
     -- if X(0, "X!expr01", [["$iOffset < 0"]]) then

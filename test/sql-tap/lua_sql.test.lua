@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
-NULL = require('msgpack').NULL
+local test = require("sqltester")
+local NULL = require('msgpack').NULL
 test:plan(24)
 
 test:do_test(
@@ -51,7 +51,7 @@ for _, val in ipairs({
         {result})
 end
 
-from_sql_to_lua = {
+_G.from_sql_to_lua = {
     [1] = {1, 1},
     [2] = {"1", 1},
     [3] = {"1.5", 1.5},
@@ -82,7 +82,7 @@ for i = 1, #from_sql_to_lua, 1 do
         {1})
 end
 
-from_lua_to_sql = {
+_G.from_lua_to_sql = {
     [1] = {1, 1},
     [2] = {"1.5", 1.5},
     [3] = {"'1'", "1"},

@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(4)
 
 -- gh-4782 - Raise an error in case space features HASH index.
@@ -8,13 +8,13 @@ test:plan(4)
 -- This is actually a stub until we are unable to employ
 -- HASH index while planning a query.
 
-f = {
+local f = {
     {'1', 'unsigned'},
     {'2', 'string'},
     {'3', 'array'}
 }
 
-s = box.schema.create_space("T1", {format = f})
+local s = box.schema.create_space("T1", {format = f})
 s:create_index('PK', {type = 'hash', parts = {'1'}})
 
 test:do_catchsql_test(

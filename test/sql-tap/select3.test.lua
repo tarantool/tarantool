@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(38)
 
 --!./tcltestrunner.lua
@@ -29,7 +29,7 @@ test:do_test("select3-1.0", function()
     START TRANSACTION;
   ]]
   for i = 1, 32-1 do -- in X(0, "X!for", [=[["set i 1","$i<32","incr i"]]=]) do
-     j = 0
+     local j = 0
      while bit.lshift(1, j) < i do
 	-- for _ in X(0, "X!for", [=[["set j 0","(1<<$j)<$i","incr j"]]=]) do
 	j = j + 1

@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(1)
 
 -- Check that OP_NextIdEphemeral generates unique ids.

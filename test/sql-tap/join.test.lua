@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
-NULL = require('msgpack').NULL
+local test = require("sqltester")
+local NULL = require('msgpack').NULL
 test:plan(92)
 
 --!./tcltestrunner.lua
@@ -1059,7 +1059,7 @@ test:do_execsql_test(
     ]])
 
 local function jointest(tn, nTbl, res)
-    sql = "SELECT 1 FROM "..string.rep("t14,", (nTbl - 1)).." t14;"
+    local sql = "SELECT 1 FROM "..string.rep("t14,", (nTbl - 1)).." t14;"
     test:do_catchsql_test(tn, sql, res)
     -- X(685, "X!cmd", [=[["uplevel",[["list","do_catchsql_test",["tn"],["sql"],["res"]]]]]=])
 end
