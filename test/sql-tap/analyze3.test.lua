@@ -1,8 +1,8 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(37)
 
-testprefix = "analyze3"
+local testprefix = "analyze3"
 
 --!./tcltestrunner.lua
 -- 2009 August 06

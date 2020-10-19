@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(33)
 
 --!./tcltestrunner.lua
@@ -482,8 +482,7 @@ test:execsql [[
 -- trigger works.  Then drop the trigger.  Make sure the table is
 -- still there.
 --
-view_v1 = ""
-view_v1 = "view v1"
+local view_v1 = "view v1"
 
 
 -- do_test trigger1-6.1 {

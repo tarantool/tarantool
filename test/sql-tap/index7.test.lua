@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(12)
 
 --!./tcltestrunner.lua
@@ -19,12 +19,6 @@ test:plan(12)
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
 
-
--- Capture the output of a pragma in a TEMP table.
---
-local function capture_pragma(db, tabname, sql)
-    once = 1
-end
 
 -- load_static_extension db wholenumber;
 -- do_test index7-1.1 {

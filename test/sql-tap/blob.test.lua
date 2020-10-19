@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(20)
 
 --!./tcltestrunner.lua
@@ -33,35 +33,35 @@ end
 test:do_test(
     "blob-1.0",
     function()
-        blob = test:execsql "SELECT X'01020304';"
+        local blob = test:execsql "SELECT X'01020304';"
         return bin_to_hex(test.lindex(blob, 0))
     end, "01020304")
 
 test:do_test(
     "blob-1.1",
     function()
-        blob = test:execsql "SELECT x'ABCDEF';"
+        local blob = test:execsql "SELECT x'ABCDEF';"
         return bin_to_hex(test.lindex(blob, 0))
     end, "ABCDEF")
 
 test:do_test(
     "blob-1.2",
     function()
-        blob = test:execsql "SELECT x'';"
+        local blob = test:execsql "SELECT x'';"
         return bin_to_hex(test.lindex(blob, 0))
     end, "")
 
 test:do_test(
     "blob-1.3",
     function()
-        blob = test:execsql "SELECT x'abcdEF12';"
+        local blob = test:execsql "SELECT x'abcdEF12';"
         return bin_to_hex(test.lindex(blob, 0))
     end, "ABCDEF12")
 
 test:do_test(
     "blob-1.3.2",
     function()
-        blob = test:execsql "SELECT x'0123456789abcdefABCDEF';"
+        local blob = test:execsql "SELECT x'0123456789abcdefABCDEF';"
         return bin_to_hex(test.lindex(blob, 0))
     end, "0123456789ABCDEFABCDEF")
 
@@ -174,6 +174,7 @@ test:do_test(
             INSERT INTO t1 VALUES(X'123456', x'7890ab');
             INSERT INTO t1 VALUES(X'CDEF12', x'345678');
         ]]
+        local blobs, blobs2
         blobs = test:execsql "SELECT * FROM t1"
         blobs2 = {  }
         for _, b in ipairs(blobs) do
@@ -193,6 +194,7 @@ test:do_test(
         test:execsql [[
             CREATE INDEX i1 ON t1(a);
         ]]
+        local blobs, blobs2
         blobs = test:execsql "SELECT * FROM t1"
         blobs2 = {  }
         for _, b in ipairs(blobs) do
@@ -208,6 +210,7 @@ test:do_test(
 test:do_test(
     "blob-2.2",
     function()
+        local blobs, blobs2
         blobs = test:execsql "SELECT * FROM t1 where a = X'123456'"
         blobs2 = {  }
         for _, b in ipairs(blobs) do
@@ -223,6 +226,7 @@ test:do_test(
 test:do_test(
     "blob-2.3",
     function()
+        local blobs, blobs2
         blobs = test:execsql "SELECT * FROM t1 where a = X'CDEF12'"
         blobs2 = {  }
         for _, b in ipairs(blobs) do
@@ -238,6 +242,7 @@ test:do_test(
 test:do_test(
     "blob-2.4",
     function()
+        local blobs, blobs2
         blobs = test:execsql "SELECT * FROM t1 where a = X'CD12'"
         blobs2 = {  }
         for _, b in ipairs(blobs) do
@@ -269,6 +274,7 @@ if (0 > 0)
     test:do_test(
         "blob-3.2",
         function()
+            local blobs, blobs2
             blobs = test:execsql "SELECT * FROM t1"
             blobs2 = {  }
             for _, b in ipairs(blobs) do

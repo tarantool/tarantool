@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(130)
 
 --!./tcltestrunner.lua
@@ -1027,7 +1027,7 @@ end
 test:do_test(
     "func2-3.1.1",
     function()
-        blob = test:execsql "SELECT x'1234'"
+        local blob = test:execsql "SELECT x'1234'"
         return bin_to_hex(test.lindex(blob, 0))
     end, "1234")
 
@@ -1065,203 +1065,203 @@ test:do_catchsql_test(
 test:do_test(
     "func2-3.2.0",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', 0, 0)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', 0, 0)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "")
 
 test:do_test(
     "func2-3.2.1",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', 0, 1)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', 0, 1)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "")
 
 test:do_test(
     "func2-3.2.2",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', 0, 2)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', 0, 2)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "12")
 
 test:do_test(
     "func2-3.2.3",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', 0, 3)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', 0, 3)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "1234")
 
 test:do_test(
     "func2-3.3.0",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', 1, 0)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', 1, 0)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "")
 
 test:do_test(
     "func2-3.3.1",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', 1, 1)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', 1, 1)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "12")
 
 test:do_test(
     "func2-3.3.2",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', 1, 2)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', 1, 2)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "1234")
 
 test:do_test(
     "func2-3.3.3",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', 1, 3)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', 1, 3)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "1234")
 
 test:do_test(
     "func2-3.4.0",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -1, 0)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -1, 0)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "")
 
 test:do_test(
     "func2-3.4.1",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -1, 1)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -1, 1)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "34")
 
 test:do_test(
     "func2-3.4.2",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -1, 2)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -1, 2)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "34")
 
 test:do_test(
     "func2-3.4.3",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -1, 3)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -1, 3)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "34")
 
 test:do_test(
     "func2-3.5.0",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -2, 0)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -2, 0)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "")
 
 test:do_test(
     "func2-3.5.1",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -2, 1)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -2, 1)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "12")
 
 test:do_test(
     "func2-3.5.2",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -2, 2)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -2, 2)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "1234")
 
 test:do_test(
     "func2-3.5.3",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -2, 3)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -2, 3)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "1234")
 
 test:do_test(
     "func2-3.6.0",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -1, 0)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -1, 0)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "")
 
 test:do_test(
     "func2-3.6.1",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -1, -1)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -1, -1)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "12")
 
 test:do_test(
     "func2-3.6.2",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -1, -2)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -1, -2)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "12")
 
 test:do_test(
     "func2-3.6.3",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -1, -3)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -1, -3)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "12")
 
 test:do_test(
     "func2-3.7.0",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -2, 0)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -2, 0)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "")
 
 test:do_test(
     "func2-3.7.1",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -2, -1)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -2, -1)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "")
 
 test:do_test(
     "func2-3.7.2",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', -2, -2)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', -2, -2)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "")
 
 test:do_test(
     "func2-3.8.0",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', 1, 0)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', 1, 0)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "")
 
 test:do_test(
     "func2-3.8.1",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', 1, -1)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', 1, -1)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "")
 
 test:do_test(
     "func2-3.8.2",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', 1, -2)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', 1, -2)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "")
 
 test:do_test(
     "func2-3.9.0",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', 2, 0)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', 2, 0)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "")
 
 test:do_test(
     "func2-3.9.1",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', 2, -1)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', 2, -1)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "12")
 
 test:do_test(
     "func2-3.9.2",
     function()
-        blob = test:execsql "SELECT SUBSTR(x'1234', 2, -2)"
+        local blob = test:execsql "SELECT SUBSTR(x'1234', 2, -2)"
         return bin_to_hex(test.lindex(blob, 0))
     end, "12")
 

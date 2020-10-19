@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(39)
 
 local function do_xfer_test(test, test_func, test_name, func, exp, opts)

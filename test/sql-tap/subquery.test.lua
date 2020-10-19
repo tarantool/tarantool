@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(69)
 
 --!./tcltestrunner.lua
@@ -643,7 +643,8 @@ test:do_execsql_test(
 -- for a matching column name did not cause an otherwise static subquery
 -- to become a dynamic (correlated) subquery.
 --
-callcnt = 0
+
+_G.callcnt = 0
 test:do_test(
     "subquery-5.1",
     function()
@@ -692,7 +693,7 @@ test:do_test(
 test:do_test(
     "subquery-6.1",
     function()
-        callcnt = 0
+        _G.callcnt = 0
         return test:execsql [[
             SELECT x FROM t4 WHERE 1 IN (SELECT callcnt(count(*)) FROM t5 WHERE a=y)
         ]]
@@ -711,7 +712,7 @@ test:do_test(
 test:do_test(
     "subquery-6.3",
     function()
-        callcnt = 0
+        _G.callcnt = 0
         return test:execsql [[
             SELECT x FROM t4 WHERE 1 IN (SELECT callcnt(count(*)) FROM t5 WHERE a=1)
         ]]

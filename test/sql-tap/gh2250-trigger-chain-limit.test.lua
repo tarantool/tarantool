@@ -1,18 +1,18 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(8)
 
 for _, table_count in ipairs({30, 31}) do
     -- Clean up, create tables, add entries
     for i = 1,table_count do
         -- First table for uniform triggers check
-        drop_string = 'DROP TABLE IF EXISTS t' .. i .. ';'
+        local drop_string = 'DROP TABLE IF EXISTS t' .. i .. ';'
         box.execute(drop_string)
 
-        create_string = 'CREATE TABLE t' .. i .. ' (s1 INT UNIQUE, s2 INT, s3 INT PRIMARY KEY);'
+        local create_string = 'CREATE TABLE t' .. i .. ' (s1 INT UNIQUE, s2 INT, s3 INT PRIMARY KEY);'
         box.execute(create_string)
 
-        insert_string = 'INSERT INTO t' .. i .. ' VALUES (0,' .. i .. ', 0);'
+        local insert_string = 'INSERT INTO t' .. i .. ' VALUES (0,' .. i .. ', 0);'
         box.execute(insert_string)
 
         -- Second table for triggers mixture check
@@ -28,7 +28,7 @@ for _, table_count in ipairs({30, 31}) do
 
     -- And ON DELETE|UPDATE|INSERT triggers
     for i = 1,table_count-1 do
-        create_string = 'CREATE TRIGGER td' .. i
+        local create_string = 'CREATE TRIGGER td' .. i
         create_string = create_string .. ' BEFORE DELETE ON t' .. i
             .. ' FOR EACH ROW '
         create_string = create_string .. ' BEGIN DELETE FROM t' .. i+1
@@ -73,8 +73,8 @@ for _, table_count in ipairs({30, 31}) do
         box.execute(create_string)
     end
 
-    function check(sql)
-        msg = ''
+    local function check(sql)
+        local msg = ''
         local _, msg = pcall(function () test:execsql(sql) end)
         msg = tostring(msg)
         test:do_test(sql,

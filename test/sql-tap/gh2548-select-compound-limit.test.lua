@@ -1,29 +1,29 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(9)
 
 -- box.cfg{wal_mode='none'}
 
-table_count = 31
+local table_count = 31
 
-select_string_last = ''
+local select_string_last = ''
 
 for _, term in ipairs({'UNION', 'UNION ALL', 'INTERSECT', 'EXCEPT'}) do
-    select_string = ''
+    local select_string = ''
     test:do_test("Positive COMPOUND "..term,
                  function()
                      for i = 1,table_count do
-                         drop_string = 'DROP TABLE IF EXISTS t' .. i .. ';\n'
+                         local drop_string = 'DROP TABLE IF EXISTS t' .. i .. ';\n'
                          test:execsql(drop_string)
                      end
 
                      for i = 1,table_count do
-                         create_string = 'CREATE TABLE t' .. i .. ' (s1 int primary key, s2 int);\n'
+                         local create_string = 'CREATE TABLE t' .. i .. ' (s1 int primary key, s2 int);\n'
                          test:execsql(create_string)
                      end
 
                      for i = 1,table_count do
-                         insert_string = 'INSERT INTO t' .. i .. ' VALUES (0,' .. i .. ');\n'
+                         local insert_string = 'INSERT INTO t' .. i .. ' VALUES (0,' .. i .. ');\n'
                          test:execsql(insert_string)
                      end
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(7)
 
 --!./tcltestrunner.lua
@@ -20,7 +20,7 @@ test:plan(7)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-testprefix = "whereI"
+local testprefix = "whereI"
 test:do_execsql_test(1.0, [[
     CREATE TABLE t1(a INT, b TEXT, c TEXT, PRIMARY KEY(a));
     INSERT INTO t1 VALUES(1, 'a', 'z');

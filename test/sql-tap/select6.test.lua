@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(88)
 
 --!./tcltestrunner.lua
@@ -23,7 +23,7 @@ test:plan(88)
 -- Omit this whole file if the library is build without subquery support.
 
 
-testprefix = "select6"
+local testprefix = "select6"
 test:do_test(
     "select6-1.0",
     function()
@@ -905,7 +905,7 @@ test:do_execsql_test(
         CREATE TABLE k(o  INT primary key);
     ]])
 
-err = { 1, "SELECTs to the left and right of UNION ALL do not have the same number of result columns" }
+local err = { 1, "SELECTs to the left and right of UNION ALL do not have the same number of result columns" }
 test:do_execsql_test(
     10.2,
     [[

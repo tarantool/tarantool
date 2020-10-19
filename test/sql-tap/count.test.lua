@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(30)
 
 --!./tcltestrunner.lua
@@ -33,7 +33,7 @@ test:plan(30)
 --      SELECT count(*) FROM sql_master;
 --   }
 -- } {0}
-iTest = 0
+local iTest = 0
 local queries = {
     "/* no-op */",
     "CREATE INDEX i1 ON t1(a);"
@@ -105,7 +105,7 @@ for _, zIndex in ipairs(queries) do
         })
 
 end
-json = require("json")
+local json = require("json")
 local function uses_op_count(sql)
     if test:lsearch(test:execsql("EXPLAIN "..sql), "Count")>0 then
         return 1

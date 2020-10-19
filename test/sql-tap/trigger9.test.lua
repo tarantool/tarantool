@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+_G.test = require("sqltester")
 test:plan(28)
 
 --!./tcltestrunner.lua
@@ -33,7 +33,7 @@ test:plan(28)
 -- ["source",[["testdir"],"\/tester.tcl"]]
 
 
-testprefix = "trigger9"
+local testprefix = "trigger9"
 
 local function has_rowdata(sql)
     local result = test:execsql('EXPLAIN '..sql)

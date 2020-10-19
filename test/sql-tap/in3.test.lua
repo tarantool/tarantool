@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(28)
 
 --!./tcltestrunner.lua
@@ -27,7 +27,7 @@ test:plan(28)
 -- implementation of the sql statement passed as a an argument.
 --
 local function nEphemeral(sql)
-    nEph = 0
+    local nEph = 0
     for _, op in ipairs(test:execsql("EXPLAIN "..sql.."")) do
         if (op == "OpenTEphemeral")
  then

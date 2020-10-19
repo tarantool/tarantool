@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(38)
 
 --!./tcltestrunner.lua
@@ -384,7 +384,7 @@ test:do_execsql_test(
         -- </analyze-5.0>
     })
 
-stat = "_sql_stat4"
+local stat = "_sql_stat4"
 
 test:do_execsql_test(
     "analyze-5.1",

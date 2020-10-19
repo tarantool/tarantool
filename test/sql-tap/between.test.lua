@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(11)
 
 --!./tcltestrunner.lua
@@ -29,6 +29,7 @@ test:do_test(
             CREATE TABLE t1(w int primary key, x int, y int, z int);
         ]])
         for i = 1, 100, 1 do
+            local w, x, y, z
             w = i
             x = math.floor((math.log(i)/math.log(2)))
             y = (((i * i) + (2 * i)) + 1)

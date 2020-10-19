@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 --test:plan(2)
 test:plan(0)
 
@@ -18,7 +18,7 @@ test:plan(0)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-testprefix = "tkt-bd484a090c"
+local testprefix = "tkt-bd484a090c"
 
 -- Disabled until #3694 is resolved.
 --

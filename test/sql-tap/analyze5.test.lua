@@ -1,8 +1,8 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(88)
 
-json = require("json")
+local json = require("json")
 
 --!./tcltestrunner.lua
 -- 2011 January 19
@@ -21,13 +21,13 @@ json = require("json")
 -- with many repeated values and only a few distinct values.
 --
 
-testprefix = "analyze5"
+local testprefix = "analyze5"
 local function eqp(sql)
     return test:execsql("EXPLAIN QUERY PLAN"..sql)
 end
 
 local function alpha(blob)
-    ret = ""
+    local ret = ""
     for _, c in ipairs(X(37, "X!cmd", [=[["split",["blob"],""]]=])) do
         if X(39, "X!cmd", [=[["string","is","alpha",["c"]]]=])
  then
@@ -64,13 +64,14 @@ test:do_test(
         -- test:execsql("CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, t INT ,u INT ,v TEXT COLLATE nocase,w INT ,x INT ,y INT ,z INT )")
         test:execsql("CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, t TEXT ,u TEXT ,v TEXT ,w TEXT ,x TEXT ,y TEXT ,z NUMBER)")
         for i=0,999 do -- _ in X(0, "X!for", [=[["set i 0","$i < 1000","incr i"]]=]) do
+            local y
             if  ((i >= 25) and (i <= 50)) then
                 y = 1
             else
                 y = 0
             end
 
-            z = 0
+            local z = 0
             if i >= 400 then
                 z = 1
             end
@@ -81,6 +82,7 @@ test:do_test(
                 z = z + 1
             end
             
+            local x, w, t, u
             x = z
             w = z
             t = (z + 0.5)
@@ -99,7 +101,7 @@ test:do_test(
             -- if X(65, "X!cmd", [=[["expr","$i%2"]]=]) then
             --    v = u
             -- end
-            v = 'NULL'
+            local v = 'NULL'
             test:execsql("INSERT INTO t1 (t,u,v,w,x,y,z) VALUES('"..t.."','"..u.."','"..v.."','"..w.."','"..x.."','"..y.."','"..z.."')")
         end
         test:execsql([[
@@ -252,6 +254,7 @@ for i, v in pairs({
     test:do_test(
         "analyze5-1."..i.."b",
         function()
+            local w2, a1, a2, res
             w2 = v[1]:gsub('y', '+y'):gsub('z', '+z')
             a1 = test:execsql("SELECT id FROM t1 NOT INDEXED WHERE "..w2.." ORDER BY +id")
             a2 = test:execsql("SELECT id FROM t1 WHERE "..v[1].." ORDER BY +id")
@@ -298,6 +301,7 @@ for i, v in pairs({
     test:do_test(
         "analyze5-1."..i.."b",
         function()
+            local a1, a2, res
             a1 = test:execsql("SELECT id FROM t1 NOT INDEXED WHERE "..v.." ORDER BY +id")
             a2 = test:execsql("SELECT id FROM t1 WHERE "..v.." ORDER BY +id")
             if (test.is_deeply_regex(a1, a1))

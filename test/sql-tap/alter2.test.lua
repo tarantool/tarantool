@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(26)
 
 -- This suite is aimed to test ALTER TABLE ADD CONSTRAINT statement.

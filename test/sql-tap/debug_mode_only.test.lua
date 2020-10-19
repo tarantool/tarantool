@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 -- This file contains testcases which can only be valudated in debug mode.
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(30)
 
 local ffi = require("ffi")

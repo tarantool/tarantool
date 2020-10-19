@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(111)
 
 --!./tcltestrunner.lua
@@ -47,7 +47,7 @@ test:do_test("update-3.1", function()
   test:execsql "CREATE TABLE test1(id  INT primary key, f1 int,f2 int)"
   -- for _ in X(0, "X!for", [=[["set i 1","$i<=10","incr i"]]=]) do
   for i = 1, 10 do    
-    sql = string.format("INSERT INTO test1 VALUES(%s,%s,%s)", i, i, bit.lshift(1, i)) -- X(0, "X!expr", [=[["<<",1,["i"]]]=]))
+    local sql = string.format("INSERT INTO test1 VALUES(%s,%s,%s)", i, i, bit.lshift(1, i)) -- X(0, "X!expr", [=[["<<",1,["i"]]]=]))
     test:execsql(sql)
   end
   return test:execsql "SELECT f1,f2 FROM test1 ORDER BY f1"

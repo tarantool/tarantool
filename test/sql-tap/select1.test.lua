@@ -1,8 +1,8 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
+local test = require("sqltester")
 test:plan(173)
 
-function set_full_column_names(value)
+local function set_full_column_names(value)
     box.space._session_settings:update('sql_full_column_names', {
         {'=', 2, value}
     })
@@ -219,7 +219,7 @@ test:do_execsql_test(
         -- </select1-1.13>
     })
 
-long = "This is a string that is too big to fit inside a NBFS buffer"
+local long = "This is a string that is too big to fit inside a NBFS buffer"
 test:do_execsql_test(
     "select1-2.0",
 string.format([[
@@ -1051,7 +1051,7 @@ test:do_test(
     function()
         set_full_column_names(true)
         local msg
-        v = pcall( function ()
+        local v = pcall( function ()
                 msg = test:execsql2 "SELECT test1.f1+F2 FROM test1 ORDER BY f2"
             end)
         v = v == true and {0} or {1}
@@ -1178,7 +1178,7 @@ test:do_execsql2_test(
 test:do_test(
     "select1-6.9.7",
     function()
-        x = test:execsql2 [[
+        local x = test:execsql2 [[
             SELECT * FROM test1 a, (select 5, 6) LIMIT 1
         ]]
         for i, tmp in ipairs(x) do
@@ -1197,7 +1197,7 @@ test:do_test(
 test:do_test(
     "select1-6.9.8",
     function()
-        x = test:execsql2 [[
+        local x = test:execsql2 [[
             SELECT * FROM test1 a, (select 5 AS x, 6 AS y) AS b LIMIT 1
         ]]
         for i, tmp in ipairs(x) do
