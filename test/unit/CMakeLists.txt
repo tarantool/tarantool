@@ -65,13 +65,9 @@ add_executable(vclock.test vclock.cc core_test_utils.c)
 target_link_libraries(vclock.test vclock unit)
 add_executable(xrow.test xrow.cc core_test_utils.c)
 target_link_libraries(xrow.test xrow unit)
-
 add_executable(fiber.test fiber.cc core_test_utils.c)
-set_source_files_properties(fiber.cc PROPERTIES COMPILE_FLAGS -O0)
 target_link_libraries(fiber.test core unit)
-
 add_executable(fiber_stack.test fiber_stack.c core_test_utils.c)
-set_source_files_properties(fiber_stack.c PROPERTIES COMPILE_FLAGS -O0)
 target_link_libraries(fiber_stack.test core unit)
 
 if (NOT ENABLE_GCOV)
