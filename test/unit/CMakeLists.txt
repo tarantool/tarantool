@@ -75,13 +75,9 @@ add_executable(decimal.test decimal.c)
 target_link_libraries(decimal.test core unit)
 add_executable(mp_error.test mp_error.cc core_test_utils.c)
 target_link_libraries(mp_error.test box_error core unit)
-
 add_executable(fiber.test fiber.cc core_test_utils.c)
-set_source_files_properties(fiber.cc PROPERTIES COMPILE_FLAGS -O0)
 target_link_libraries(fiber.test core unit)
-
 add_executable(fiber_stack.test fiber_stack.c core_test_utils.c)
-set_source_files_properties(fiber_stack.c PROPERTIES COMPILE_FLAGS -O0)
 target_link_libraries(fiber_stack.test core unit)
 
 if (NOT ENABLE_GCOV)
