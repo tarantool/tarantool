@@ -418,8 +418,8 @@ memtx_tx_story_gc_step()
 		if (link->newer_story == NULL) {
 			/*
 			 * We are at the top of the chain. That means
-			 * that story->tuple is in index. If the story is
-			 * actually delete the tuple, it must be deleted from
+			 * that story->tuple is in index. If the story
+			 * actually deletes the tuple, it must be deleted from
 			 * index.
 			 */
 			if (story->del_psn > 0 && story->space != NULL) {
@@ -432,6 +432,12 @@ memtx_tx_story_gc_step()
 					panic("failed to rollback change");
 				}
 				assert(story->tuple == unused);
+			} else if (i == 0) {
+				/*
+				 * The tuple is left clean in the space.
+				 * It now belongs to the space and must be referenced.
+				 */
+				tuple_ref(story->tuple);
 			}
 			memtx_tx_story_unlink(story, i);
 		} else {
@@ -644,6 +650,14 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 					  &replaced) != 0)
 				goto fail;
 			memtx_tx_story_link_tuple(add_story, replaced, i);
+			if (i == 0 && replaced != NULL && !replaced->is_dirty) {
+				/*
+				 * The tuple was clean and thus belonged to
+				 * the space. Now tx manager takes ownership
+				 * of it.
+				 */
+				tuple_unref(replaced);
+			}
 			add_story_linked++;
 
 			struct tuple *visible_replaced = NULL;
@@ -718,15 +732,16 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 		collected_conflicts = collected_conflicts->next;
 	}
 
-	/*
-	 * We now reference both new and old tuple because the stmt holds
-	 * pointers to them.
-	 */
-	if (stmt->new_tuple != NULL)
-		tuple_ref(stmt->new_tuple);
 	*result = old_tuple;
-	if (*result != NULL)
+	if (*result != NULL) {
+		/*
+		 * The result must be a referenced pointer. The caller must
+		 * unreference it by itself.
+		 * Actually now it goes only to stmt->old_tuple, and
+		 * stmt->old_tuple is unreferenced when stmt is destroyed.
+		 */
 		tuple_ref(*result);
+	}
 	return 0;
 
 	fail:
@@ -744,6 +759,10 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 				diag_log();
 				unreachable();
 				panic("failed to rollback change");
+			}
+			if (i == 0 && was != NULL && !was->is_dirty) {
+				/* Just rollback previous tuple_unref. */
+				tuple_ref(was);
 			}
 
 			memtx_tx_story_unlink(stmt->add_story, i);
@@ -776,6 +795,10 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 		for (uint32_t i = 0; i < story->index_count; i++) {
 			struct memtx_story_link *link = &story->link[i];
 			if (link->newer_story == NULL) {
+				/*
+				 * We are at top of story list and thus
+				 * story->tuple is in index directly.
+				 */
 				struct tuple *unused;
 				struct index *index = stmt->space->index[i];
 				struct tuple *was = memtx_tx_story_older_tuple(link);
@@ -785,6 +808,17 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 					unreachable();
 					panic("failed to rollback change");
 				}
+				if (i == 0 && was != NULL &&
+				    !link->older.is_story) {
+					/*
+					 * That was the last story in history.
+					 * The last tuple now belongs to space
+					 * and the space must hold a reference
+					 * to it.
+					 */
+					tuple_ref(was);
+				}
+
 			} else {
 				struct memtx_story *newer = link->newer_story;
 				assert(newer->link[i].older.is_story);
@@ -802,7 +836,6 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 		}
 		stmt->add_story->add_stmt = NULL;
 		stmt->add_story = NULL;
-		tuple_unref(stmt->new_tuple);
 	}
 
 	if (stmt->del_story != NULL) {
@@ -976,7 +1009,6 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
 		assert(stmt->del_story->del_stmt == stmt);
 		assert(stmt->next_in_del_list == NULL);
 		res -= stmt->del_story->tuple->bsize;
-		tuple_unref(stmt->del_story->tuple);
 		stmt->del_story->del_stmt = NULL;
 		stmt->del_story = NULL;
 	}

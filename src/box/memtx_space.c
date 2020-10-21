@@ -78,6 +78,7 @@ void
 memtx_space_update_bsize(struct space *space, struct tuple *old_tuple,
 			 struct tuple *new_tuple)
 {
+	assert(space->vtab->destroy == &memtx_space_destroy);
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	ssize_t old_bsize = old_tuple ? box_tuple_bsize(old_tuple) : 0;
 	ssize_t new_bsize = new_tuple ? box_tuple_bsize(new_tuple) : 0;
