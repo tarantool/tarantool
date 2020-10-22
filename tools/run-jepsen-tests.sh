@@ -9,14 +9,14 @@
 # 	TF_VAR_user_domain_id
 # 	TF_VAR_keypair_name
 # 	TF_VAR_ssh_key
-# and three arguments: path to a Tarantool project source directory, path to a
-# Tarantool project binary directory and number on instances (optional).
+# and two arguments: path to a Tarantool project source directory and path to a
+# Tarantool project binary directory. And optional use environment variables:
+# LEIN_OPT and INSTANCE_COUNT.
 
 set -Eeo pipefail
 
 PROJECT_SOURCE_DIR=$1
 PROJECT_BINARY_DIR=$2
-INSTANCE_COUNT=$3
 
 TESTS_DIR="$PROJECT_BINARY_DIR/jepsen-tests-prefix/src/jepsen-tests/"
 TERRAFORM_CONFIG="$PROJECT_SOURCE_DIR/extra/tf"
@@ -24,7 +24,9 @@ TERRAFORM_STATE="$PROJECT_BINARY_DIR/terraform.tfstate"
 SSH_KEY_FILENAME="$PROJECT_SOURCE_DIR/build/tf-cloud-init"
 NODES_FILENAME="$PROJECT_SOURCE_DIR/build/nodes"
 
-LEIN_OPTIONS="--nodes-file $NODES_FILENAME --username ubuntu --workload register"
+CI_COMMIT_SHA=$(git rev-parse HEAD)
+
+LEIN_OPTIONS="test-all --nodes-file $NODES_FILENAME --username ubuntu $LEIN_OPT --version $CI_COMMIT_SHA"
 
 [[ -z ${PROJECT_SOURCE_DIR} ]] && (echo "Please specify path to a project source directory"; exit 1)
 [[ -z ${PROJECT_BINARY_DIR} ]] && (echo "Please specify path to a project binary directory"; exit 1)
@@ -72,6 +74,6 @@ terraform apply -state=$TERRAFORM_STATE -auto-approve $TERRAFORM_CONFIG
 terraform providers $TERRAFORM_CONFIG
 terraform output -state=$TERRAFORM_STATE instance_names
 terraform output -state=$TERRAFORM_STATE -json instance_ips | jq --raw-output '.[]' > $NODES_FILENAME
-pushd $TESTS_DIR && lein run test $LEIN_OPTIONS
+pushd $TESTS_DIR && lein run $LEIN_OPTIONS
 popd
 cleanup

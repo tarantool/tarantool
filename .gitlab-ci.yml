@@ -169,6 +169,19 @@ before_script:
   script:
     - ${GITLAB_MAKE} perf_cleanup
 
+.jepsen_test_definition: &jepsen_test_definition
+  <<: *docker_test_definition
+  script:
+    - ${GITLAB_MAKE} test_jepsen
+  stage: long_tests
+  when: manual
+  tags:
+    - mcs_jepsen_docker
+  artifacts:
+    paths:
+      - jepsen-tests-prefix/src/jepsen-tests/store
+    expire_in: 6 month
+
 # Static Analysis
 
 luacheck:
@@ -264,18 +277,27 @@ freebsd_12_release:
     - ${GITLAB_MAKE} vms_start
     - ${GITLAB_MAKE} vms_test_freebsd
 
-jepsen:
-  <<: *docker_test_definition
-  script:
-    - ${GITLAB_MAKE} test_jepsen
-  stage: long_tests
-  when: manual
-  tags:
-    - mcs_jepsen_docker
-  artifacts:
-    paths:
-      - jepsen-tests-prefix/src/jepsen-tests/store
-    expire_in: 6 month
+jepsen-single-instance:
+  <<: *jepsen_test_definition
+  variables:
+    LEIN_OPT: '--nemesis standard'
+
+jepsen-single-instance-txm:
+  <<: *jepsen_test_definition
+  variables:
+    LEIN_OPT: '--nemesis standard --mvcc'
+
+jepsen-cluster:
+  <<: *jepsen_test_definition
+  variables:
+    LEIN_OPT: '--nemesis standard'
+    INSTANCE_COUNT: '5'
+
+jepsen-cluster-txm:
+  <<: *jepsen_test_definition
+  variables:
+    LEIN_OPT: '--nemesis standard --mvcc'
+    INSTANCE_COUNT: '5'
 
 # ####
 # Perf

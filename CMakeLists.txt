@@ -175,21 +175,15 @@ if (WITH_JEPSEN)
     )
 
     #
-    # Enable 'make jepsen-*' targets.
+    # Enable 'make run-jepsen' target.
     #
 
-    add_custom_target(jepsen-single DEPENDS jepsen-tests)
-    add_custom_command(TARGET jepsen-single
+    add_custom_target(run-jepsen DEPENDS jepsen-tests)
+    add_custom_command(TARGET run-jepsen
         COMMAND ${BASH} ${PROJECT_SOURCE_DIR}/tools/run-jepsen-tests.sh
-				${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR}
-        COMMENT "Running Jepsen tests on a single Tarantool instance"
-    )
-
-    add_custom_target(jepsen-cluster DEPENDS jepsen-tests)
-    add_custom_command(TARGET jepsen-cluster
-        COMMAND ${BASH} ${PROJECT_SOURCE_DIR}/tools/run-jepsen-tests.sh
-				${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR} 5
-        COMMENT "Running Jepsen tests on a cluster with 5 Tarantool instances"
+				${PROJECT_SOURCE_DIR}
+                                ${PROJECT_BINARY_DIR}
+        COMMENT "Running Jepsen tests"
     )
 endif()
 
