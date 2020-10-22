@@ -901,7 +901,8 @@ cursor_seek(BtCursor *pCur, int *pRes)
 
 	struct space *space = pCur->space;
 	struct txn *txn = NULL;
-	if (space->def->id != 0 && txn_begin_ro_stmt(space, &txn) != 0)
+	struct txn_ro_savepoint svp;
+	if (space->def->id != 0 && txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return -1;
 	struct iterator *it =
 		index_create_iterator(pCur->index, pCur->iter_type, key,
@@ -913,7 +914,7 @@ cursor_seek(BtCursor *pCur, int *pRes)
 		return -1;
 	}
 	if (txn != NULL)
-		txn_commit_ro_stmt(txn);
+		txn_commit_ro_stmt(txn, &svp);
 	pCur->iter = it;
 	pCur->eState = CURSOR_VALID;
 

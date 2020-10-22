@@ -239,13 +239,14 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 		return -1;
 	/* Start transaction in the engine. */
 	struct txn *txn;
-	if (txn_begin_ro_stmt(space, &txn) != 0)
+	struct txn_ro_savepoint svp;
+	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return -1;
 	if (index_get(index, key, part_count, result) != 0) {
 		txn_rollback_stmt(txn);
 		return -1;
 	}
-	txn_commit_ro_stmt(txn);
+	txn_commit_ro_stmt(txn, &svp);
 	/* Count statistics. */
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 	if (*result != NULL)
@@ -273,13 +274,14 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 		return -1;
 	/* Start transaction in the engine. */
 	struct txn *txn;
-	if (txn_begin_ro_stmt(space, &txn) != 0)
+	struct txn_ro_savepoint svp;
+	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return -1;
 	if (index_min(index, key, part_count, result) != 0) {
 		txn_rollback_stmt(txn);
 		return -1;
 	}
-	txn_commit_ro_stmt(txn);
+	txn_commit_ro_stmt(txn, &svp);
 	if (*result != NULL)
 		tuple_bless(*result);
 	return 0;
@@ -305,13 +307,14 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 		return -1;
 	/* Start transaction in the engine. */
 	struct txn *txn;
-	if (txn_begin_ro_stmt(space, &txn) != 0)
+	struct txn_ro_savepoint svp;
+	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return -1;
 	if (index_max(index, key, part_count, result) != 0) {
 		txn_rollback_stmt(txn);
 		return -1;
 	}
-	txn_commit_ro_stmt(txn);
+	txn_commit_ro_stmt(txn, &svp);
 	if (*result != NULL)
 		tuple_bless(*result);
 	return 0;
@@ -338,14 +341,15 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 		return -1;
 	/* Start transaction in the engine. */
 	struct txn *txn;
-	if (txn_begin_ro_stmt(space, &txn) != 0)
+	struct txn_ro_savepoint svp;
+	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return -1;
 	ssize_t count = index_count(index, itype, key, part_count);
 	if (count < 0) {
 		txn_rollback_stmt(txn);
 		return -1;
 	}
-	txn_commit_ro_stmt(txn);
+	txn_commit_ro_stmt(txn, &svp);
 	return count;
 }
 
@@ -374,7 +378,8 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 	if (key_validate(index->def, itype, key, part_count))
 		return NULL;
 	struct txn *txn;
-	if (txn_begin_ro_stmt(space, &txn) != 0)
+	struct txn_ro_savepoint svp;
+	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return NULL;
 	struct iterator *it = index_create_iterator(index, itype,
 						    key, part_count);
@@ -382,7 +387,7 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		txn_rollback_stmt(txn);
 		return NULL;
 	}
-	txn_commit_ro_stmt(txn);
+	txn_commit_ro_stmt(txn, &svp);
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 	return it;
 }
