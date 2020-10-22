@@ -439,9 +439,20 @@ memtx_tx_story_gc_step()
 				 */
 				tuple_ref(story->tuple);
 			}
-			memtx_tx_story_unlink(story, i);
+
+			if (link->older.is_story) {
+				struct memtx_story *older_story = link->older.story;
+				memtx_tx_story_unlink(story, i);
+				older_story->link[i].newer_story = older_story;
+			} else {
+				memtx_tx_story_unlink(story, i);
+			}
 		} else {
+			/* Just unlink from list */
 			link->newer_story->link[i].older = link->older;
+			if (link->older.is_story)
+				link->older.story->link[i].newer_story =
+					link->newer_story;
 			link->older.is_story = false;
 			link->older.story = NULL;
 			link->newer_story = NULL;
