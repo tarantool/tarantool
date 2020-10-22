@@ -952,12 +952,18 @@ raft_cfg_is_candidate(bool is_candidate)
 			 * until the new state is fully persisted.
 			 */
 		}
-	} else if (raft.state != RAFT_STATE_FOLLOWER) {
-		if (raft.state == RAFT_STATE_LEADER)
-			raft.leader = 0;
-		raft.state = RAFT_STATE_FOLLOWER;
-		/* State is visible and changed - broadcast. */
-		raft_schedule_broadcast();
+	} else {
+		if (raft.state != RAFT_STATE_LEADER) {
+			/* Do not wait for anything while being a voter. */
+			ev_timer_stop(loop(), &raft.timer);
+		}
+		if (raft.state != RAFT_STATE_FOLLOWER) {
+			if (raft.state == RAFT_STATE_LEADER)
+				raft.leader = 0;
+			raft.state = RAFT_STATE_FOLLOWER;
+			/* State is visible and changed - broadcast. */
+			raft_schedule_broadcast();
+		}
 	}
 	box_update_ro_summary();
 }

@@ -47,6 +47,21 @@ box.cfg{election_mode = 'off'}
 test_run:switch('replica')
 test_run:wait_cond(function() return box.info.election.leader == 0 end)
 
+-- A crash when follower transitions from candidate to voter.
+test_run:switch('default')
+box.cfg{election_mode='candidate'}
+test_run:wait_cond(function() return box.info.election.state == 'leader' end)
+box.cfg{replication_timeout=0.01}
+
+test_run:switch('replica')
+-- A small timeout so that the timer goes off faster and the crash happens.
+box.cfg{replication_timeout=0.01}
+test_run:wait_cond(function() return box.info.election.leader ~= 0 end)
+box.cfg{election_mode='candidate'}
+box.cfg{election_mode='voter'}
+-- Wait for the timer to go off.
+require('fiber').sleep(4 * box.cfg.replication_timeout)
+
 test_run:switch('default')
 test_run:cmd('stop server replica')
 test_run:cmd('delete server replica')
