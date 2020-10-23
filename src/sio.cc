@@ -49,33 +49,46 @@
 #include "trivia/util.h"
 #include "exception.h"
 
-/** Pretty print socket name and peer (for exceptions) */
+/**
+ * Safely print a socket description to the given buffer, with correct overflow
+ * checks and all.
+ */
+static int
+sio_socketname_to_buffer(int fd, char *buf, int size)
+{
+	int n = 0;
+	SNPRINT(n, snprintf, buf, size, "fd %d", fd);
+	if (fd < 0)
+		return 0;
+	struct sockaddr_storage addr;
+	socklen_t addrlen = sizeof(addr);
+	int rc = getsockname(fd, (struct sockaddr *) &addr, &addrlen);
+	if (rc == 0) {
+		SNPRINT(n, snprintf, buf, size, ", aka %s",
+			sio_strfaddr((struct sockaddr *)&addr, addrlen));
+	}
+	addrlen = sizeof(addr);
+	rc = getpeername(fd, (struct sockaddr *) &addr, &addrlen);
+	if (rc == 0) {
+		SNPRINT(n, snprintf, buf, size, ", peer of %s",
+			sio_strfaddr((struct sockaddr *)&addr, addrlen));
+	}
+	return 0;
+}
+
 const char *
 sio_socketname(int fd)
 {
 	/* Preserve errno */
 	int save_errno = errno;
 	static __thread char name[2 * SERVICE_NAME_MAXLEN];
-	int n = snprintf(name, sizeof(name), "fd %d", fd);
-	if (fd >= 0) {
-		struct sockaddr_storage addr;
-		socklen_t addrlen = sizeof(addr);
-		int rc = getsockname(fd, (struct sockaddr *) &addr, &addrlen);
-		if (rc == 0) {
-			n += snprintf(name + n,
-				sizeof(name) - n, ", aka %s",
-				sio_strfaddr((struct sockaddr *)&addr,
-								addrlen));
-		}
-		addrlen = sizeof(addr);
-		rc = getpeername(fd, (struct sockaddr *) &addr, &addrlen);
-		if (rc == 0) {
-			n += snprintf(name + n, sizeof(name) - n,
-				      ", peer of %s",
-				      sio_strfaddr((struct sockaddr *)&addr,
-								addrlen));
-		}
-	}
+	int rc = sio_socketname_to_buffer(fd, name, sizeof(name));
+	/*
+	 * Could fail only because of a bad format in snprintf, but it is not
+	 * bad, so should not fail.
+	 */
+	assert(rc == 0);
+	(void)rc;
 	/*
 	 * Restore the original errno, it might have been reset by
 	 * snprintf() or getsockname().
