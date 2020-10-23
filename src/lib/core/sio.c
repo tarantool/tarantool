@@ -46,6 +46,33 @@
 static_assert(SMALL_STATIC_SIZE > NI_MAXHOST + NI_MAXSERV,
 	      "static buffer should fit host name");
 
+/**
+ * Safely print a socket description to the given buffer, with correct overflow
+ * checks and all.
+ */
+static int
+sio_socketname_to_buffer(int fd, char *buf, int size)
+{
+	int n = 0;
+	SNPRINT(n, snprintf, buf, size, "fd %d", fd);
+	if (fd < 0)
+		return 0;
+	struct sockaddr_storage addr;
+	socklen_t addrlen = sizeof(addr);
+	int rc = getsockname(fd, (struct sockaddr *) &addr, &addrlen);
+	if (rc == 0) {
+		SNPRINT(n, snprintf, buf, size, ", aka %s",
+			sio_strfaddr((struct sockaddr *)&addr, addrlen));
+	}
+	addrlen = sizeof(addr);
+	rc = getpeername(fd, (struct sockaddr *) &addr, &addrlen);
+	if (rc == 0) {
+		SNPRINT(n, snprintf, buf, size, ", peer of %s",
+			sio_strfaddr((struct sockaddr *)&addr, addrlen));
+	}
+	return 0;
+}
+
 const char *
 sio_socketname(int fd)
 {
@@ -53,25 +80,13 @@ sio_socketname(int fd)
 	int save_errno = errno;
 	int name_size = 2 * SERVICE_NAME_MAXLEN;
 	char *name = static_alloc(name_size);
-	int n = snprintf(name, name_size, "fd %d", fd);
-	if (fd >= 0) {
-		struct sockaddr_storage addr;
-		socklen_t addrlen = sizeof(addr);
-		int rc = getsockname(fd, (struct sockaddr *) &addr, &addrlen);
-		if (rc == 0) {
-			n += snprintf(name + n, name_size - n, ", aka %s",
-				sio_strfaddr((struct sockaddr *)&addr,
-								addrlen));
-		}
-		addrlen = sizeof(addr);
-		rc = getpeername(fd, (struct sockaddr *) &addr, &addrlen);
-		if (rc == 0) {
-			n += snprintf(name + n, name_size - n,
-				      ", peer of %s",
-				      sio_strfaddr((struct sockaddr *)&addr,
-								addrlen));
-		}
-	}
+	int rc = sio_socketname_to_buffer(fd, name, name_size);
+	/*
+	 * Could fail only because of a bad format in snprintf, but it is not
+	 * bad, so should not fail.
+	 */
+	assert(rc == 0);
+	(void)rc;
 	/*
 	 * Restore the original errno, it might have been reset by
 	 * snprintf() or getsockname().
