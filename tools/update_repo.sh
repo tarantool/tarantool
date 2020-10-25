@@ -112,20 +112,22 @@ EOF
          Remove package specified by version from S3 repository. It will remove
          all found appropriate source and binaries packages from the given S3
          repository, also the meta files will be corrected there.
-         Example of usage on 'tarantool-2.2.2.0' version:
+         Example of usage for DEB repositories on '2.2.2.0.<hash>' version:
+           ./tools/update_repo.sh -o=<OS> -d=<DIST> -b=<S3 repo> \\
+               -r=tarantool_2.2.2.0.<hash>
+           It will search and try to remove packages:
+             tarantool_2.2.2.0.<hash>-1_all.deb
+             tarantool_2.2.2.0.<hash>-1_amd64.deb
+             tarantool_2.2.2.0.<hash>-1.dsc
+             tarantool_2.2.2.0.<hash>-1.debian.tar.xz
+             tarantool_2.2.2.0.<hash>.orig.tar.xz
+         Example of usage for RPM repositories on '2.2.2.0' version:
            ./tools/update_repo.sh -o=<OS> -d=<DIST> -b=<S3 repo> \\
                -r=tarantool-2.2.2.0
-         It will search and try to remove packages:
-           - for DEB repositories:
-             tarantool-2.2.2.0-1_all.deb
-             tarantool-2.2.2.0-1_amd64.deb
-             tarantool-2.2.2.0-1.dsc
-             tarantool-2.2.2.0-1.debian.tar.xz
-             tarantool-2.2.2.0.orig.tar.xz
-           - for RPM repositories:
+           It will search and try to remove packages:
              x86_64/tarantool-2.2.2.0-1.*.x86_64.rpm
              x86_64/tarantool-2.2.2.0-1.*.noarch.rpm
-             SRPMS/tarantool-2.2.2.0--1.*.src.rpm
+             SRPMS/tarantool-2.2.2.0-1.*.src.rpm
     -f|--force
          Force updating the remote package with the local one despite the checksum difference
     -s|--skip_errors
