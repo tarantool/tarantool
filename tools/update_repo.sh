@@ -492,8 +492,10 @@ function remove_deb {
 
     # remove all found file by the given pattern in options
     for suffix in '-1_all.deb' '-1_amd64.deb' '-1.dsc' '-1.debian.tar.xz' '.orig.tar.xz' ; do
-        $aws ls "$bucket_path/$poolpath/${remove}$suffix" || continue
-        $aws rm "$bucket_path/$poolpath/${remove}$suffix"
+        file="$bucket_path/$poolpath/${remove}$suffix"
+        echo "Searching to remove: $file"
+        $aws ls "$file" || continue
+        $aws rm "$file"
     done
 }
 
@@ -886,6 +888,7 @@ function remove_rpm {
     # storage, but does not mentioned in the metadata.
     for suffix in 'x86_64' 'noarch' 'src'; do
         file="$bucket_path/$packpath/${remove}-1.${os}${option_dist}.${suffix}.rpm"
+        echo "Searching to remove: $file"
         $aws ls $file || continue
         $aws rm $file
     done
