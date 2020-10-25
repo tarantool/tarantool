@@ -889,7 +889,16 @@ function remove_rpm {
     # broken update left orphan files: they are present in the
     # storage, but does not mentioned in the metadata.
     for suffix in 'x86_64' 'noarch' 'src'; do
-        file="$bucket_path/$packpath/${remove}-1.${os}${option_dist}.${suffix}.rpm"
+        if [ "$os" == "opensuse-leap" ]; then
+            # Open Build Service (openSUSE) does not follow the usual
+            # approach: 'Release' is like lp152.1.1, where the first
+            # '1' is $(RELEASE) RPM spec directive value and the second
+            # '1' is the number of rebuilds.
+            os_dist="lp$(echo $option_dist | sed 's#\.##g').1.1"
+        else
+            os_dist="1.${os}${option_dist}"
+        fi
+        file="$bucket_path/$packpath/${remove}-${os_dist}.${suffix}.rpm"
         echo "Searching to remove: $file"
         $aws ls $file || continue
         $aws rm $file
