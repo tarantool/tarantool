@@ -275,36 +275,36 @@ static const char *
 raft_request_to_string(const struct raft_request *req)
 {
 	assert(req->term != 0);
-	int size = 1024;
 	char buf[1024];
+	int size = sizeof(buf);
 	char *pos = buf;
 	int rc = snprintf(pos, size, "{term: %llu",
 			  (unsigned long long)req->term);
-	assert(rc >= 0);
+	assert(rc >= 0 && rc < size);
 	pos += rc;
 	size -= rc;
 	if (req->vote != 0) {
 		rc = snprintf(pos, size, ", vote: %u", req->vote);
-		assert(rc >= 0);
+		assert(rc >= 0 && rc < size);
 		pos += rc;
 		size -= rc;
 	}
 	if (req->state != 0) {
 		rc = snprintf(pos, size, ", state: %s",
 			      raft_state_strs[req->state]);
-		assert(rc >= 0);
+		assert(rc >= 0 && rc < size);
 		pos += rc;
 		size -= rc;
 	}
 	if (req->vclock != NULL) {
 		rc = snprintf(pos, size, ", vclock: %s",
 			      vclock_to_string(req->vclock));
-		assert(rc >= 0);
+		assert(rc >= 0 && rc < size);
 		pos += rc;
 		size -= rc;
 	}
 	rc = snprintf(pos, size, "}");
-	assert(rc >= 0);
+	assert(rc >= 0 && rc < size);
 	pos += rc;
 	return tt_cstr(buf, pos - buf);
 }
