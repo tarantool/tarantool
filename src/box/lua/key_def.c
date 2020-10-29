@@ -62,6 +62,11 @@ luaT_push_key_def(struct lua_State *L, const struct key_def *key_def)
 		lua_pushboolean(L, key_part_is_nullable(part));
 		lua_setfield(L, -2, "is_nullable");
 
+		if (part->exclude_null) {
+			lua_pushboolean(L, true);
+			lua_setfield(L, -2, "exclude_null");
+		}
+
 		if (part->coll_id != COLL_NONE) {
 			struct coll_id *coll_id = coll_by_id(part->coll_id);
 			assert(coll_id != NULL);
@@ -138,6 +143,13 @@ luaT_key_def_set_part(struct lua_State *L, struct key_part_def *part,
 	if (!lua_isnil(L, -1) && lua_toboolean(L, -1) != 0) {
 		part->is_nullable = true;
 		part->nullable_action = ON_CONFLICT_ACTION_NONE;
+	}
+	lua_pop(L, 1);
+
+	lua_pushstring(L, "exclude_null");
+	lua_gettable(L, -2);
+	if (!lua_isnil(L, -1) && lua_toboolean(L, -1) != 0) {
+		part->exclude_null = true;
 	}
 	lua_pop(L, 1);
 
@@ -434,6 +446,7 @@ lbox_key_def_new(struct lua_State *L)
 		return luaL_error(L, "Bad params, use: key_def.new({"
 				  "{fieldno = fieldno, type = type"
 				  "[, is_nullable = <boolean>]"
+				  "[, exclude_null = <boolean>]"
 				  "[, path = <string>]"
 				  "[, collation_id = <number>]"
 				  "[, collation = <string>]}, ...}");

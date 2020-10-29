@@ -1382,6 +1382,7 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
         else
             for k = 1, #index[PARTS] do
                 local pknullable = index[PARTS][k].is_nullable or false
+                local pkexcludenull = index[PARTS][k].exclude_null or false
                 local pkcollationid = index[PARTS][k].collation
                 local pktype = index[PARTS][k][2] or index[PARTS][k].type
                 local pkfield = index[PARTS][k][1] or index[PARTS][k].field
@@ -1395,7 +1396,8 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
                 local pk = {
                     type = pktype,
                     fieldno = pkfield + 1,
-                    is_nullable = pknullable
+                    is_nullable = pknullable,
+                    exclude_null = pkexcludenull
                 }
                 if collations == nil then
                     pk.collation_id = pkcollationid

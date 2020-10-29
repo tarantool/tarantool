@@ -57,6 +57,33 @@ s.index.sk:stat().memory.rows
 
 s:drop()
 
+-- exclude_null: correct recovering tuples from memory (vy_build_recover_stmt)
+s = box.schema.space.create('test', {engine='vinyl'})
+_ = s:create_index('pk')
+
+s:replace{1, 1}
+s:replace{2, 2}
+
+errinj.set("ERRINJ_VY_RUN_WRITE_DELAY", true)
+ch = fiber.channel(1)
+_ = fiber.create(function() s:create_index('sk', {parts = {2, 'integer', exclude_null=true}}) ch:put(true) end)
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_inprogress > 0 end)
+
+_ = s:replace{2, box.NULL}
+
+errinj.set("ERRINJ_VY_RUN_WRITE_DELAY", false)
+ch:get()
+
+test_run:cmd('restart server default')
+
+s = box.space.test
+s:select{}
+s.index.sk:select{}
+s:drop()
+
+fiber = require('fiber')
+errinj = box.error.injection
+
 --
 -- gh-3458: check that rw transactions that started before DDL are
 -- aborted.

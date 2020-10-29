@@ -1425,6 +1425,7 @@ sql_key_info_new(sql *db, uint32_t part_count)
 		part->type = FIELD_TYPE_SCALAR;
 		part->coll_id = COLL_NONE;
 		part->is_nullable = false;
+		part->exclude_null = false;
 		part->nullable_action = ON_CONFLICT_ACTION_ABORT;
 		part->sort_order = SORT_ORDER_ASC;
 		part->path = NULL;
@@ -6347,16 +6348,26 @@ sqlSelect(Parse * pParse,		/* The parser context */
 				 *
 				 * This statement is so common that it is
 				 * optimized specially. The OP_Count instruction
-				 * is executed on the primary key index,
-				 * since there is no difference which index
-				 * to choose.
+				 * is executed on the index of GROUP BY clause,
+				 * if specified, or on the primary index,
+				 * otherwise.
 				 */
+				int index_id = 0;
+				struct SrcList_item *src = &p->pSrc->a[0];
+				assert(src);
+				assert(pParse);
+				sqlIndexedByLookup(pParse, src);
+				if (src->pIBIndex != NULL)
+					index_id = src->pIBIndex->iid;
+
 				const int cursor = pParse->nTab++;
 				/*
 				 * Open the cursor, execute the OP_Count,
 				 * close the cursor.
 				 */
-				vdbe_emit_open_cursor(pParse, cursor, 0, space);
+
+				vdbe_emit_open_cursor(pParse, cursor, index_id,
+						      space);
 				sqlVdbeAddOp2(v, OP_Count, cursor,
 						  sAggInfo.aFunc[0].iMem);
 				sqlVdbeAddOp1(v, OP_Close, cursor);

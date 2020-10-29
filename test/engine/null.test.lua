@@ -612,3 +612,184 @@ s:insert{1, -1, 1}
 sk2 = s:create_index('sk2', {parts={{2, 'number', is_nullable=true}}})
 s:insert{2, nil, 2} --error
 s:drop()
+
+--
+-- gh-4480: Introduce exclude_null option
+--
+
+-- Basic functionality
+s = box.schema.space.create('test', {engine=engine})
+pk = s:create_index('primary', {parts={1, 'number'}})
+sk1 = s:create_index('sk1', {parts={{2, 'number', is_nullable=true, exclude_null=true}}})
+sk1.parts
+sk2 = s:create_index('sk2', {parts={{2, 'number', is_nullable=true, exclude_null=false}}})
+sk2.parts
+
+s:insert{1, 1}
+s:insert{2, box.NULL}
+pk:select{}
+sk1:select{} -- [1, 1] only
+sk2:select{}
+
+-- Error
+sk3 = s:create_index('sk3', {parts={{2, 'number', is_nullable=false}}})
+s:truncate()
+
+-- Ok
+sk3 = s:create_index('sk3', {parts={{2, 'number', is_nullable=false}}})
+
+s:insert{1, 1}
+s:insert{2, box.NULL} -- error
+
+s:drop()
+
+-- if exclude_null=true, then is_nullable=true (explicitly or implicitly)
+s = box.schema.space.create('test', {engine=engine})
+pk = s:create_index('primary', {parts={1, 'number'}})
+sk1 = s:create_index('sk1', {parts={{2, 'number', is_nullable=false, exclude_null=true}}})
+sk1 = s:create_index('sk1', {parts={{2, 'number', exclude_null=true}}})
+s:drop()
+
+-- Multipart
+s = box.schema.space.create('test', {engine=engine})
+pk = s:create_index('primary', {parts={1, 'number'}})
+parts = {}
+parts[1] = {2, 'number', exclude_null=true}
+parts[2] = {3, 'number', is_nullable=true}
+sk1 = s:create_index('sk1', {parts=parts})
+
+s:insert{1, 1, 1}
+s:insert{2, box.NULL, 2}
+s:insert{3, 3, box.NULL}
+s:select{}
+sk1:select{}
+s:drop()
+
+-- Insert, then create index
+s = box.schema.space.create('test', {engine=engine})
+pk = s:create_index('primary', {parts={1, 'number'}})
+
+s:insert{1, 11}
+s:insert{2, 22}
+s:insert{3, box.NULL}
+s:insert{4, box.NULL}
+
+sk1 = s:create_index('sk1', {parts={{2, 'number', exclude_null=true}}})
+sk1.parts
+s:select{}
+sk1:select{}
+
+-- Alter to exclude_null=false
+sk1:alter({parts={{2, 'number', is_nullable=true, exclude_null=false}}})
+sk1.parts
+sk1:select{}
+
+-- Alter back to exclude_null=true
+sk1:alter({parts={{2, 'number', exclude_null=true}}})
+sk1.parts
+sk1:select{}
+
+-- Alter to the wrong format
+sk1:alter({parts={{2, 'number', is_nullable=false, exclude_null=true}}})
+sk1.parts
+
+-- Check that delete doesn't crash on sk1
+s:insert{5, box.NULL}
+sk1:select{}
+_ = s:delete{5}
+sk1:select{}
+s:select{}
+
+-- Update and upsert correctness
+_ = s:update(1, {{'=', 2, box.NULL}})
+_ = s:update(3, {{'=', 2, 33}})
+s:upsert({2, 22}, {{'=', 2, box.NULL}})
+s:upsert({5, 55}, {{'=', 2, box.NULL}})
+sk1:select{}
+s:select{}
+
+-- Replace correctness
+_ = s:replace({1, 11})
+_ = s:replace({3, box.NULL})
+sk1:select{}
+s:select{}
+s:drop()
+
+-- Tuple without the field
+s = box.schema.space.create('test')
+pk = s:create_index('pk', {type='tree', parts={{1, 'uint'}}})
+sk = s:create_index('sk', {type='tree', parts={{2, 'uint', exclude_null=true}}})
+s:replace{1}
+sk:select{}
+s:select{}
+s:drop()
+
+-- Forbid creating primary key with exclude_null option
+s = box.schema.space.create('test', {engine=engine})
+pk = s:create_index('primary', {parts={1, 'number', exclude_null=true}})
+s:drop()
+
+-- Restore from snapshot
+s = box.schema.space.create('test', {engine=engine})
+pk = s:create_index('primary', {parts={1, 'number'}})
+sk = s:create_index('sk', {parts={{2, 'number', exclude_null=true}}})
+s:replace{1, box.NULL}
+s:replace{2, 2}
+s:select{}
+sk:select{}
+box.snapshot()
+test_run:cmd("restart server default")
+s = box.space.test
+sk = s.index.sk
+s:select{}
+sk:select{}
+s:drop()
+
+-- First upsert
+engine = test_run:get_cfg('engine')
+s = box.schema.space.create('test', {engine=engine})
+pk = s:create_index('pk')
+sk = s:create_index('sk', {parts={{2, 'number', exclude_null=true}}})
+
+s:replace{1, 1}
+box.snapshot()
+s:upsert({2, box.NULL}, {{'=', 2, box.NULL}})
+s:select{}
+sk:select{}
+s:drop()
+
+-- Both old and new tuple are null when creating index
+s = box.schema.space.create('test', {engine=engine})
+pk = s:create_index('pk')
+fiber = require('fiber')
+s:replace{1, box.NULL}
+sk = s:create_index('sk', {parts={{2, 'number', exclude_null=true}}})
+s:select{}
+sk:select{}
+s:drop()
+
+-- Check that vy_build_on_replace works as expected
+errinj = box.error.injection
+
+s = box.schema.space.create('test', {engine=engine})
+pk = s:create_index('primary', {parts={1, 'number'}})
+s:replace{42, 42}
+errinj.set('ERRINJ_BUILD_INDEX_DELAY', true)
+ch = fiber.channel(1)
+
+test_run:cmd("setopt delimiter ';'")
+function txn_fun()
+    box.begin()
+    s:replace{1, box.NULL}
+    errinj.set('ERRINJ_BUILD_INDEX_DELAY', false)
+    box.commit()
+    ch:put(true)
+end;
+test_run:cmd("setopt delimiter ''");
+
+_ = fiber.new(txn_fun)
+sk = s:create_index('sk', {parts={{2, 'number', exclude_null=true}}})
+ch:get()
+sk:select{}
+
+s:drop()

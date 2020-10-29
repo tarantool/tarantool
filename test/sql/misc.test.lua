@@ -79,3 +79,26 @@ box.execute('SELECT a;')
 diag = box.error.last()
 box.execute('SELECT * FROM (VALUES(true));')
 diag == box.error.last()
+
+-- exclude_null + SQL correctness
+box.execute([[CREATE TABLE j (s1 INT PRIMARY KEY, s2 STRING, s3 VARBINARY)]])
+s = box.space.J
+i = box.space.J:create_index('I3',{parts={2,'string', exclude_null=true}})
+box.execute([[INSERT INTO j VALUES (1,NULL,NULL), (2,'',X'00');]])
+
+box.execute([[SELECT * FROM j;]])
+box.execute([[SELECT * FROM j INDEXED BY I3;]])
+
+box.execute([[SELECT COUNT(*) FROM j GROUP BY s2;]])
+box.execute([[SELECT COUNT(*) FROM j INDEXED BY I3;]])
+
+box.execute([[UPDATE j INDEXED BY i3 SET s2 = NULL;]])
+box.execute([[INSERT INTO j VALUES (3, 'a', X'33');]])
+
+box.execute([[SELECT * FROM j;]])
+box.execute([[SELECT * FROM j INDEXED BY I3;]])
+
+box.execute([[UPDATE j INDEXED BY i3 SET s3 = NULL;]])
+s:select{}
+
+s:drop()

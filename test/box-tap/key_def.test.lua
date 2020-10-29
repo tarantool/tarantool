@@ -17,6 +17,7 @@ local key_def_lib = require('key_def')
 local usage_error = 'Bad params, use: key_def.new({' ..
                     '{fieldno = fieldno, type = type' ..
                     '[, is_nullable = <boolean>]' ..
+                    '[, exclude_null = <boolean>]' ..
                     '[, path = <string>]' ..
                     '[, collation_id = <number>]' ..
                     '[, collation = <string>]}, ...}'

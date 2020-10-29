@@ -50,7 +50,8 @@ const struct key_part_def key_part_def_default = {
 	false,
 	ON_CONFLICT_ACTION_DEFAULT,
 	SORT_ORDER_ASC,
-	NULL
+	NULL,
+	false
 };
 
 static int64_t
@@ -66,6 +67,7 @@ part_type_by_name_wrapper(const char *str, uint32_t len)
 #define PART_OPT_NULLABLE_ACTION "nullable_action"
 #define PART_OPT_SORT_ORDER	 "sort_order"
 #define PART_OPT_PATH		 "path"
+#define PART_OPT_EXCLUDE_NULL	 "exclude_null"
 
 const struct opt_def part_def_reg[] = {
 	OPT_DEF_ENUM(PART_OPT_TYPE, field_type, struct key_part_def, type,
@@ -79,6 +81,8 @@ const struct opt_def part_def_reg[] = {
 	OPT_DEF_ENUM(PART_OPT_SORT_ORDER, sort_order, struct key_part_def,
 		     sort_order, NULL),
 	OPT_DEF(PART_OPT_PATH, OPT_STRPTR, struct key_part_def, path),
+	OPT_DEF(PART_OPT_EXCLUDE_NULL, OPT_BOOL, struct key_part_def,
+			exclude_null),
 	OPT_END,
 };
 
@@ -232,7 +236,7 @@ key_def_set_part_path(struct key_def *def, uint32_t part_no, const char *path,
 static int
 key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 		 enum field_type type, enum on_conflict_action nullable_action,
-		 struct coll *coll, uint32_t coll_id,
+		 bool exclude_null, struct coll *coll, uint32_t coll_id,
 		 enum sort_order sort_order, const char *path,
 		 uint32_t path_len, char **path_pool, int32_t offset_slot,
 		 uint64_t format_epoch)
@@ -240,8 +244,10 @@ key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 	assert(part_no < def->part_count);
 	assert(type < field_type_MAX);
 	def->is_nullable |= (nullable_action == ON_CONFLICT_ACTION_NONE);
+	def->has_exclude_null |= exclude_null;
 	def->has_json_paths |= path != NULL;
 	def->parts[part_no].nullable_action = nullable_action;
+	def->parts[part_no].exclude_null = exclude_null;
 	def->parts[part_no].fieldno = fieldno;
 	def->parts[part_no].type = type;
 	def->parts[part_no].coll = coll;
@@ -286,7 +292,8 @@ key_def_new(const struct key_part_def *parts, uint32_t part_count,
 		}
 		uint32_t path_len = part->path != NULL ? strlen(part->path) : 0;
 		if (key_def_set_part(def, i, part->fieldno, part->type,
-				     part->nullable_action, coll, part->coll_id,
+				     part->nullable_action, part->exclude_null,
+				     coll, part->coll_id,
 				     part->sort_order, part->path, path_len,
 				     &path_pool, TUPLE_OFFSET_SLOT_NIL,
 				     0) != 0)
@@ -323,6 +330,7 @@ key_def_dump_parts(const struct key_def *def, struct key_part_def *parts,
 		part_def->fieldno = part->fieldno;
 		part_def->type = part->type;
 		part_def->is_nullable = key_part_is_nullable(part);
+		part_def->exclude_null = part->exclude_null;
 		part_def->nullable_action = part->nullable_action;
 		part_def->coll_id = part->coll_id;
 		if (part->path != NULL) {
@@ -373,6 +381,9 @@ key_def_set_internal_part(struct key_part_def *internal_part,
 		internal_part->is_nullable = is_nullable;
 		internal_part->nullable_action = ON_CONFLICT_ACTION_NONE;
 	}
+	internal_part->exclude_null =
+		(part->flags & BOX_KEY_PART_DEF_EXCLUDE_NULL)
+		== BOX_KEY_PART_DEF_EXCLUDE_NULL;
 
 	/* Set internal_part->coll_id. */
 	if (part->collation != NULL) {
@@ -428,7 +439,7 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
 	for (uint32_t item = 0; item < part_count; ++item) {
 		if (key_def_set_part(key_def, item, fields[item],
 				     (enum field_type)types[item],
-				     ON_CONFLICT_ACTION_DEFAULT, NULL,
+				     ON_CONFLICT_ACTION_DEFAULT, false, NULL,
 				     COLL_NONE, SORT_ORDER_ASC, NULL, 0, NULL,
 				     TUPLE_OFFSET_SLOT_NIL, 0) != 0) {
 			key_def_delete(key_def);
@@ -542,6 +553,8 @@ box_key_def_dump_parts(const box_key_def_t *key_def, uint32_t *part_count_ptr)
 		part_def->flags = 0;
 		if (key_part_is_nullable(part))
 			part_def->flags |= BOX_KEY_PART_DEF_IS_NULLABLE;
+		if (part->exclude_null)
+			part_def->flags |= BOX_KEY_PART_DEF_EXCLUDE_NULL;
 		assert(part->type >= 0 && part->type < field_type_MAX);
 		part_def->field_type = field_type_strs[part->type];
 
@@ -690,6 +703,8 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 		if (key_part_is_nullable(part1) != key_part_is_nullable(part2))
 			return key_part_is_nullable(part1) <
 			       key_part_is_nullable(part2) ? -1 : 1;
+		if (part1->exclude_null != part2->exclude_null)
+			return part1->exclude_null < part2->exclude_null ? -1 : 1;
 		int rc = json_path_cmp(part1->path, part1->path_len,
 				       part2->path, part2->path_len,
 				       TUPLE_INDEX_BASE);
@@ -752,6 +767,8 @@ key_def_sizeof_parts(const struct key_part_def *parts, uint32_t part_count)
 			count++;
 		if (part->is_nullable)
 			count++;
+		if (part->exclude_null)
+			count++;
 		if (part->path != NULL)
 			count++;
 		size += mp_sizeof_map(count);
@@ -767,6 +784,10 @@ key_def_sizeof_parts(const struct key_part_def *parts, uint32_t part_count)
 		if (part->is_nullable) {
 			size += mp_sizeof_str(strlen(PART_OPT_NULLABILITY));
 			size += mp_sizeof_bool(part->is_nullable);
+		}
+		if (part->exclude_null) {
+			size += mp_sizeof_str(strlen(PART_OPT_EXCLUDE_NULL));
+			size += mp_sizeof_bool(part->exclude_null);
 		}
 		if (part->path != NULL) {
 			size += mp_sizeof_str(strlen(PART_OPT_PATH));
@@ -786,6 +807,8 @@ key_def_encode_parts(char *data, const struct key_part_def *parts,
 		if (part->coll_id != COLL_NONE)
 			count++;
 		if (part->is_nullable)
+			count++;
+		if (part->exclude_null)
 			count++;
 		if (part->path != NULL)
 			count++;
@@ -807,6 +830,11 @@ key_def_encode_parts(char *data, const struct key_part_def *parts,
 			data = mp_encode_str(data, PART_OPT_NULLABILITY,
 					     strlen(PART_OPT_NULLABILITY));
 			data = mp_encode_bool(data, part->is_nullable);
+		}
+		if (part->exclude_null) {
+			data = mp_encode_str(data, PART_OPT_EXCLUDE_NULL,
+					     strlen(PART_OPT_EXCLUDE_NULL));
+			data = mp_encode_bool(data, part->exclude_null);
 		}
 		if (part->path != NULL) {
 			data = mp_encode_str(data, PART_OPT_PATH,
@@ -874,6 +902,7 @@ key_def_decode_parts_166(struct key_part_def *parts, uint32_t part_count,
 		part->is_nullable = (part->fieldno < field_count ?
 				     fields[part->fieldno].is_nullable :
 				     key_part_def_default.is_nullable);
+		part->exclude_null = false;
 		part->coll_id = COLL_NONE;
 		part->path = NULL;
 	}
@@ -1070,6 +1099,8 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	new_def->part_count = new_part_count;
 	new_def->unique_part_count = new_part_count;
 	new_def->is_nullable = first->is_nullable || second->is_nullable;
+	new_def->has_exclude_null = first->has_exclude_null ||
+				    second->has_exclude_null;
 	new_def->has_optional_parts = first->has_optional_parts ||
 				      second->has_optional_parts;
 	new_def->is_multikey = first->is_multikey || second->is_multikey;
@@ -1085,7 +1116,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	end = part + first->part_count;
 	for (; part != end; part++) {
 		if (key_def_set_part(new_def, pos++, part->fieldno, part->type,
-				     part->nullable_action, part->coll,
+				     part->nullable_action, part->exclude_null, part->coll,
 				     part->coll_id, part->sort_order,
 				     part->path, part->path_len, &path_pool,
 				     part->offset_slot_cache,
@@ -1102,7 +1133,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 		if (!key_def_can_merge(first, part))
 			continue;
 		if (key_def_set_part(new_def, pos++, part->fieldno, part->type,
-				     part->nullable_action, part->coll,
+				     part->nullable_action, part->exclude_null, part->coll,
 				     part->coll_id, part->sort_order,
 				     part->path, part->path_len, &path_pool,
 				     part->offset_slot_cache,

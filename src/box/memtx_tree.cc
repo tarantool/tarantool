@@ -1297,6 +1297,8 @@ template <bool USE_HINT>
 static int
 memtx_tree_index_build_next(struct index *base, struct tuple *tuple)
 {
+	if (index_filter_tuple(base, tuple) == NULL)
+		return 0;
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
