@@ -2,8 +2,6 @@ fiber = require('fiber')
 env = require('test_run')
 test_run = env.new()
 
-fiber.sleep(1)
-
 -- gh-283: hang after three creates and drops
 s = box.schema.space.create('space0', {engine='vinyl'})
 i = s:create_index('space0', {type = 'tree', parts = {1, 'string'}})
@@ -311,7 +309,7 @@ end;
 test_run:cmd("setopt delimiter ''");
 
 cont = false
-while finished ~= 2 do fiber.sleep(0.01) end
+test_run:wait_cond(function() return finished ~= 2 end)
 
 s:drop()
 
