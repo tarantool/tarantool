@@ -12,6 +12,9 @@ create_iterator = require('utils').create_iterator
 iterator_next = function(iter) return iter.next() end
 iterate_over = function(iter) return iter.iterate_over() end
 
+test_run:cmd("push filter 'Invalid VYLOG file: Slice [0-9]+ deleted but not registered'" .. \
+             "to 'Invalid VYLOG file: Slice <NUM> deleted but not registered'")
+
 --
 -- Following tests verify that combinations
 -- of various commands are worked correctly.
