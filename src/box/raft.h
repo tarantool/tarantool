@@ -87,7 +87,11 @@ enum raft_state {
 	RAFT_STATE_LEADER = 3,
 };
 
-extern const char *raft_state_strs[];
+/**
+ * Decode raft state into string representation.
+ */
+const char *
+raft_state_str(uint32_t state);
 
 struct raft {
 	/** Instance ID of leader of the current term. */

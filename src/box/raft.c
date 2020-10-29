@@ -44,13 +44,6 @@
  */
 #define RAFT_RANDOM_ELECTION_FACTOR 0.1
 
-const char *raft_state_strs[] = {
-	NULL,
-	"follower",
-	"candidate",
-	"leader",
-};
-
 /** Raft state of this instance. */
 struct raft raft = {
 	.leader = 0,
@@ -68,6 +61,26 @@ struct raft raft = {
 	.vote_count = 0,
 	.worker = NULL,
 	.election_timeout = 5,
+};
+
+/**
+ * When decoding we should never trust that there is
+ * a valid data incomes.
+ */
+const char *
+raft_state_str(uint32_t state)
+{
+	static const char *str[] = {
+		[0]			= "invalid (0)",
+		[RAFT_STATE_FOLLOWER]	= "follower",
+		[RAFT_STATE_CANDIDATE]	= "candidate",
+		[RAFT_STATE_LEADER]	= "leader",
+	};
+
+	if (state < lengthof(str))
+		return str[state];
+
+	return "invalid (x)";
 };
 
 /**
@@ -291,7 +304,7 @@ raft_request_to_string(const struct raft_request *req)
 	}
 	if (req->state != 0) {
 		rc = snprintf(pos, size, ", state: %s",
-			      raft_state_strs[req->state]);
+			      raft_state_str(req->state));
 		assert(rc >= 0 && rc < size);
 		pos += rc;
 		size -= rc;
