@@ -502,7 +502,7 @@ key_part_padding_offset(void)
 static uint32_t
 key_part_def_known_flags(void)
 {
-	return BOX_KEY_PART_DEF_IS_NULLABLE;
+	return BOX_KEY_PART_DEF_IS_NULLABLE | BOX_KEY_PART_DEF_EXCLUDE_NULL;
 }
 
 /**
@@ -1075,13 +1075,15 @@ test_key_def_merge(struct lua_State *L)
 
 	/* Non-conventional prerequisite: list of known flags. */
 	uint32_t known_flags = key_part_def_known_flags();
-	assert(known_flags == BOX_KEY_PART_DEF_IS_NULLABLE);
+	assert(known_flags == (BOX_KEY_PART_DEF_IS_NULLABLE |
+			       BOX_KEY_PART_DEF_EXCLUDE_NULL));
 	(void)known_flags;
 
 	/* Non-conventional prerequisite: certain defaults. */
 	box_key_part_def_t tmp;
 	box_key_part_def_create(&tmp);
 	assert((tmp.flags & BOX_KEY_PART_DEF_IS_NULLABLE) == 0);
+	assert((tmp.flags & BOX_KEY_PART_DEF_EXCLUDE_NULL) == 0);
 	assert(tmp.collation == NULL);
 	assert(tmp.path == NULL);
 
@@ -1644,6 +1646,48 @@ test_key_def_merge(struct lua_State *L)
 	};
 	key_def_check_merge(a_25, lengthof(a_25), b_25, lengthof(b_25),
 			    exp_25, lengthof(exp_25));
+
+	/*
+	 * Case 26: exclude_null=true + exclude_null=false.
+	 *
+	 * Interpretation: the same as for the case 3.
+	 */
+	box_key_part_def_t a_26[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 2, "unsigned", NULL, NULL}}, /* clash */
+	};
+	box_key_part_def_t b_26[] = {
+		{{1, 0, "unsigned", NULL, NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	box_key_part_def_t exp_26[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 2, "unsigned", NULL, NULL}}, /* coalesced */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	key_def_check_merge(a_26, lengthof(a_26), b_26, lengthof(b_26),
+			    exp_26, lengthof(exp_26));
+
+	/*
+	 * Case 27: exclude_null=false + exclude_null=true.
+	 *
+	 * Interpretation: the same as for the case 3.
+	 */
+	box_key_part_def_t a_27[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "unsigned", NULL, NULL}}, /* clash */
+	};
+	box_key_part_def_t b_27[] = {
+		{{1, 2, "unsigned", NULL, NULL}}, /* clash */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	box_key_part_def_t exp_27[] = {
+		{{3, 0, "unsigned", NULL, NULL}},
+		{{1, 0, "unsigned", NULL, NULL}}, /* coalesced */
+		{{2, 0, "unsigned", NULL, NULL}},
+	};
+	key_def_check_merge(a_27, lengthof(a_27), b_27, lengthof(b_27),
+			    exp_27, lengthof(exp_27));
 
 	/* Clean up. */
 	box_region_truncate(region_svp);

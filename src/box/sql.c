@@ -387,6 +387,7 @@ sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 		part->fieldno = j;
 		part->nullable_action = ON_CONFLICT_ACTION_NONE;
 		part->is_nullable = true;
+		part->exclude_null = false;
 		part->sort_order = SORT_ORDER_ASC;
 		part->path = NULL;
 		part->type = fields[j].type;
@@ -1096,7 +1097,7 @@ sql_encode_index_parts(struct region *region, const struct field_def *fields,
 		       action_is_nullable(fields[col].nullable_action));
 		/* Do not decode default collation. */
 		uint32_t cid = part->coll_id;
-		mpstream_encode_map(&stream, 5 + (cid != COLL_NONE));
+		mpstream_encode_map(&stream, 6 + (cid != COLL_NONE));
 		mpstream_encode_str(&stream, "type");
 		mpstream_encode_str(&stream, field_type_strs[fields[col].type]);
 		mpstream_encode_str(&stream, "field");
@@ -1118,6 +1119,8 @@ sql_encode_index_parts(struct region *region, const struct field_def *fields,
 		assert(sort_order < sort_order_MAX);
 		const char *sort_order_str = sort_order_strs[sort_order];
 		mpstream_encode_str(&stream, sort_order_str);
+		mpstream_encode_str(&stream, "exclude_null");
+		mpstream_encode_bool(&stream, false);
 	}
 	mpstream_flush(&stream);
 	if (is_error) {

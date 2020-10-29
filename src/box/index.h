@@ -623,11 +623,35 @@ index_get(struct index *index, const char *key,
 	return index->vtab->get(index, key, part_count, result);
 }
 
+/**
+ * Get tuple to be inserted in index, based on index-specific constraints
+ * (current constraint: if exclude_null = true, return NULL)
+ */
+struct tuple *
+index_filter_tuple_slow(struct index *index, struct tuple *tuple);
+
+/**
+ * @copydoc index_filter_tuple_slow()
+ */
+static inline struct tuple *
+index_filter_tuple(struct index *index, struct tuple *tuple) {
+	struct key_def* key_def = index->def->key_def;
+	if (!key_def->has_exclude_null)
+		return tuple;
+	return index_filter_tuple_slow(index, tuple);
+}
+
 static inline int
 index_replace(struct index *index, struct tuple *old_tuple,
 	      struct tuple *new_tuple, enum dup_replace_mode mode,
 	      struct tuple **result)
 {
+	old_tuple = index_filter_tuple(index, old_tuple);
+	new_tuple = index_filter_tuple(index, new_tuple);
+	if (old_tuple == NULL && new_tuple == NULL) {
+		*result = NULL;
+		return 0;
+	}
 	return index->vtab->replace(index, old_tuple, new_tuple, mode, result);
 }
 

@@ -749,6 +749,14 @@ local function update_index_parts(format, parts)
                 elseif k == 'is_nullable' then
                     part[k] = v
                     parts_can_be_simplified = false
+                elseif k == 'exclude_null' then
+                    if type(v) ~= 'boolean' then
+                        box.error(box.error.ILLEGAL_PARAMS,
+                                "options.parts[" .. i .. "]: " ..
+                                "type (boolean) is expected")
+                    end
+                    part[k] = v
+                    parts_can_be_simplified = false
                 else
                     part[k] = v
                     parts_can_be_simplified = false
@@ -785,6 +793,14 @@ local function update_index_parts(format, parts)
             box.error(box.error.ILLEGAL_PARAMS,
                       "options.parts[" .. i .. "]: type (boolean) is expected")
         end
+        if (not part.is_nullable) and part.exclude_null then
+            if part.is_nullable ~= nil then
+                box.error(box.error.ILLEGAL_PARAMS,
+                       "options.parts[" .. i .. "]: exclude_null=true and " ..
+                       "is_nullable=false are incompatible")
+            end
+            part.is_nullable = true
+        end
         if part.action == nil then
             if fmt and fmt.action ~= nil then
                 part.action = fmt.action
@@ -811,12 +827,13 @@ end
 
 --
 -- Convert index parts into 1.6.6 format if they
--- doesn't use collation and is_nullable options
+-- don't use collation, is_nullable and exclude_null options
 --
 local function simplify_index_parts(parts)
     local new_parts = {}
     for i, part in pairs(parts) do
-        assert(part.collation == nil and part.is_nullable == nil,
+        assert(part.collation == nil and part.is_nullable == nil
+                and part.exclude_null == nil,
                "part is simple")
         new_parts[i] = {part.field, part.type}
     end

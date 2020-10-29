@@ -71,6 +71,8 @@ struct key_part_def {
 	 * This sting is 0-terminated.
 	 */
 	const char *path;
+	/** True if nulls are ignored by index. */
+	bool exclude_null;
 };
 
 extern const struct key_part_def key_part_def_default;
@@ -87,6 +89,8 @@ struct key_part {
 	struct coll *coll;
 	/** Action to perform if NULL constraint failed. */
 	enum on_conflict_action nullable_action;
+	/** True if nulls are ignored by index. */
+	bool exclude_null;
 	/** Part sort order. */
 	enum sort_order sort_order;
 	/**
@@ -194,6 +198,8 @@ struct key_def {
 	uint32_t unique_part_count;
 	/** True, if at least one part can store NULL. */
 	bool is_nullable;
+	/** True if some key part has exclude_null option */
+	bool has_exclude_null;
 	/** True if some key part has JSON path. */
 	bool has_json_paths;
 	/** True if it is a multikey index definition.
@@ -298,6 +304,7 @@ typedef struct key_def box_key_def_t;
 /** Key part definition flags. */
 enum {
 	BOX_KEY_PART_DEF_IS_NULLABLE = 1 << 0,
+	BOX_KEY_PART_DEF_EXCLUDE_NULL = 1 << 1,
 };
 
 /**
@@ -418,9 +425,10 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count);
  *
  * Default flag values are the following:
  *
- *  | Flag                         | Default value |
- *  | ---------------------------- | ------------- |
- *  | BOX_KEY_PART_DEF_IS_NULLABLE | 0 (unset)     |
+ *  | Flag                          | Default value |
+ *  | ----------------------------- | ------------- |
+ *  | BOX_KEY_PART_DEF_IS_NULLABLE  | 0 (unset)     |
+ *  | BOX_KEY_PART_DEF_EXCLUDE_NULL | 0 (unset)     |
  *
  * Default values of fields and flags are permitted to be changed
  * in future tarantool versions. However we should be VERY

@@ -964,6 +964,8 @@ vinyl_index_def_change_requires_rebuild(struct index *index,
 				  new_part->path, new_part->path_len,
 				  TUPLE_INDEX_BASE) != 0)
 			return true;
+		if (old_part->exclude_null != new_part->exclude_null)
+			return true;
 	}
 	assert(old_cmp_def->is_multikey == new_cmp_def->is_multikey);
 	return false;
@@ -1838,12 +1840,14 @@ vy_perform_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return -1;
 
 	for (uint32_t i = 1; i < space->index_count; ++i) {
+		struct tuple *new_tuple = index_filter_tuple(space->index[i],
+							     stmt->new_tuple);
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
 		if (vy_is_committed(env, lsm))
 			continue;
 		if (vy_tx_set(tx, lsm, delete) != 0)
 			goto error;
-		if (vy_tx_set(tx, lsm, stmt->new_tuple) != 0)
+		if (new_tuple != NULL && vy_tx_set(tx, lsm, new_tuple) != 0)
 			goto error;
 	}
 	tuple_unref(delete);
@@ -1946,6 +1950,8 @@ vy_insert_first_upsert(struct vy_env *env, struct vy_tx *tx,
 	if (vy_tx_set(tx, pk, stmt) != 0)
 		return -1;
 	for (uint32_t i = 1; i < space->index_count; ++i) {
+		if (index_filter_tuple(space->index[i], stmt) == NULL)
+			continue;
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
 		if (vy_tx_set(tx, lsm, stmt) != 0)
 			return -1;
@@ -2217,10 +2223,12 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return -1;
 
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
+		struct tuple *new_tuple = index_filter_tuple(space->index[iid],
+							     stmt->new_tuple);
 		struct vy_lsm *lsm = vy_lsm(space->index[iid]);
 		if (vy_is_committed(env, lsm))
 			continue;
-		if (vy_tx_set(tx, lsm, stmt->new_tuple) != 0)
+		if (new_tuple != NULL && vy_tx_set(tx, lsm, new_tuple) != 0)
 			return -1;
 	}
 	return 0;
@@ -2301,6 +2309,8 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 			return -1;
 	}
 	for (uint32_t i = 1; i < space->index_count; i++) {
+		struct tuple *new_tuple = index_filter_tuple(space->index[i],
+							     stmt->new_tuple);
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
 		if (vy_is_committed(env, lsm))
 			continue;
@@ -2309,9 +2319,11 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 			if (rc != 0)
 				break;
 		}
-		rc = vy_tx_set(tx, lsm, stmt->new_tuple);
-		if (rc != 0)
-			break;
+		if (new_tuple != NULL) {
+			rc = vy_tx_set(tx, lsm, new_tuple);
+			if (rc != 0)
+				break;
+		}
 	}
 	if (delete != NULL)
 		tuple_unref(delete);
@@ -3825,6 +3837,9 @@ vy_build_on_replace(struct trigger *trigger, void *event)
 	struct tuple_format *format = ctx->format;
 	struct vy_lsm *lsm = ctx->lsm;
 
+	stmt->old_tuple = index_filter_tuple(&lsm->base, stmt->old_tuple);
+	stmt->new_tuple = index_filter_tuple(&lsm->base, stmt->new_tuple);
+
 	if (ctx->is_failed)
 		return 0; /* already failed, nothing to do */
 
@@ -4000,6 +4015,8 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 		      struct vy_entry mem_entry)
 {
 	struct tuple *mem_stmt = mem_entry.stmt;
+	if (index_filter_tuple(&lsm->base, mem_stmt) == NULL)
+		return 0;
 	int64_t lsn = vy_stmt_lsn(mem_stmt);
 	if (lsn <= lsm->dump_lsn)
 		return 0; /* statement was dumped, nothing to do */
@@ -4233,6 +4250,9 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 		struct tuple *tuple = entry.stmt;
 		if (tuple == NULL)
 			break;
+		struct tuple* new_tuple = index_filter_tuple(new_index, tuple);
+		if (new_tuple == NULL)
+			continue;
 		/*
 		 * Insert the tuple into the new index unless it
 		 * was inserted into the space after we started
@@ -4246,13 +4266,13 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 		 * could be overwritten by a concurrent transaction,
 		 * in which case we would insert an outdated tuple.
 		 */
-		if (vy_stmt_lsn(tuple) <= build_lsn) {
+		if (vy_stmt_lsn(new_tuple) <= build_lsn) {
 			rc = vy_build_insert_tuple(env, new_lsm,
 						   space_name(src_space),
 						   new_index->def->name,
 						   new_format,
 						   check_unique_constraint,
-						   tuple);
+						   new_tuple);
 			if (rc != 0)
 				break;
 		}

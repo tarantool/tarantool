@@ -2831,6 +2831,7 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		part.sort_order = SORT_ORDER_ASC;
 		part.coll_id = COLL_NONE;
 		part.path = NULL;
+		part.exclude_null = false;
 
 		struct key_def *key_def = key_def_new(&part, 1, false);
 		if (key_def == NULL) {
@@ -2926,6 +2927,9 @@ tnt_error:
 	for (uint32_t i = 0; i < idx_count; iSortIdx++, i++) {
 		if (i > 0)
 			probe = space->index[i]->def;
+		/* Such index may possibly contain not all tuples, so skip it */
+		if (pSrc->pIBIndex == NULL && probe->key_def->has_exclude_null)
+			continue;
 		rSize = index_field_tuple_est(probe, 0);
 		pNew->nEq = 0;
 		pNew->nBtm = 0;
