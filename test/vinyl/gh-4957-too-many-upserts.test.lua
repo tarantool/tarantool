@@ -1,3 +1,7 @@
+test_run = require('test_run').new()
+test_run:cmd("push filter 'Invalid VYLOG file: Slice [0-9]+ deleted but not registered'" .. \
+             "to 'Invalid VYLOG file: Slice <NUM> deleted but not registered'")
+
 s = box.schema.create_space('test', {engine = 'vinyl'})
 pk = s:create_index('pk')
 s:insert{1, 1}
@@ -36,3 +40,10 @@ box.snapshot()
 fiber.sleep(0.01)
 
 s:drop()
+
+-- restart the current server to resolve the issue #5141
+-- which reproduced in test:
+--   vinyl/gh-5141-invalid-vylog-file.test.lua
+test_run:cmd("restart server default with cleanup=True")
+
+
