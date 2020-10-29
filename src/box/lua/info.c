@@ -582,7 +582,7 @@ static int
 lbox_info_election(struct lua_State *L)
 {
 	lua_createtable(L, 0, 4);
-	lua_pushstring(L, raft_state_strs[raft.state]);
+	lua_pushstring(L, raft_state_str(raft.state));
 	lua_setfield(L, -2, "state");
 	luaL_pushuint64(L, raft.volatile_term);
 	lua_setfield(L, -2, "term");
