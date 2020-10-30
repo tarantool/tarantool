@@ -41,6 +41,8 @@
 
 #include "box/box.h"
 #include "box/schema.h"
+#include "box/engine.h"
+#include "box/memtx_engine.h"
 
 static int
 lbox_ctl_wait_ro(struct lua_State *L)
@@ -86,12 +88,23 @@ lbox_ctl_clear_synchro_queue(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_ctl_is_recovery_finished(struct lua_State *L)
+{
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	lua_pushboolean(L, (memtx ?
+		(memtx->state < MEMTX_FINAL_RECOVERY ? 0 : 1) : 0));
+	return 1;
+}
+
 static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"wait_ro", lbox_ctl_wait_ro},
 	{"wait_rw", lbox_ctl_wait_rw},
 	{"on_shutdown", lbox_ctl_on_shutdown},
 	{"on_schema_init", lbox_ctl_on_schema_init},
 	{"clear_synchro_queue", lbox_ctl_clear_synchro_queue},
+	{"is_recovery_finished", lbox_ctl_is_recovery_finished},
 	{NULL, NULL}
 };
 

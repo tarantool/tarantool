@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "space.h"
+#include "memtx_engine.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -86,6 +87,14 @@ memtx_space_replace_all_keys(struct space *, struct tuple *, struct tuple *,
 struct space *
 memtx_space_new(struct memtx_engine *memtx,
 		struct space_def *def, struct rlist *key_list);
+
+static inline bool
+memtx_space_is_recovering(struct space *space)
+{
+	assert(space_is_memtx(space));
+	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
+	return memtx->state < MEMTX_FINAL_RECOVERY;
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */
