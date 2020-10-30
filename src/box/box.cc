@@ -51,6 +51,7 @@
 #include "schema.h"
 #include "engine.h"
 #include "memtx_engine.h"
+#include "memtx_space.h"
 #include "sysview.h"
 #include "blackhole.h"
 #include "service_engine.h"
@@ -1354,6 +1355,24 @@ box_process1(struct request *request, box_tuple_t **result)
 	    space_group_id(space) != GROUP_LOCAL &&
 	    box_check_writable() != 0)
 		return -1;
+	if (space_is_memtx(space)) {
+		/*
+		 * Due to on_init_schema triggers set on system spaces,
+		 * we can insert data during recovery to local and temporary
+		 * spaces. However, until recovery is finished, we can't
+		 * check key uniqueness (since index are still not yet built).
+		 * So reject any attempts to write into these spaces.
+		 */
+		if (memtx_space_is_recovering(space)) {
+			diag_set(ClientError, ER_UNSUPPORTED, "Snapshot recovery",
+				"write requests, use "
+				"box.ctl.is_recovery_finished() "
+				"to check that snapshot recovery was completed");
+			diag_log();
+			return -1;
+		}
+	}
+
 	return box_process_rw(request, space, result);
 }
 
