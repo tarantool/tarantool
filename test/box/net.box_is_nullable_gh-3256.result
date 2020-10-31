@@ -22,8 +22,8 @@ c = net:connect(box.cfg.listen)
 c.space.test.index.sk.parts
 ---
 - - type: unsigned
-    is_nullable: true
     fieldno: 2
+    is_nullable: true
 ...
 space:drop()
 ---
