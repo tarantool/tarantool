@@ -1384,6 +1384,7 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
                 local pknullable = index[PARTS][k].is_nullable or false
                 local pkexcludenull = index[PARTS][k].exclude_null or false
                 local pkcollationid = index[PARTS][k].collation
+                local pkpath = index[PARTS][k].path
                 local pktype = index[PARTS][k][2] or index[PARTS][k].type
                 local pkfield = index[PARTS][k][1] or index[PARTS][k].field
                 -- resolve a collation name if a peer has
@@ -1397,7 +1398,8 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
                     type = pktype,
                     fieldno = pkfield + 1,
                     is_nullable = pknullable,
-                    exclude_null = pkexcludenull
+                    exclude_null = pkexcludenull,
+                    path = pkpath,
                 }
                 if collations == nil then
                     pk.collation_id = pkcollationid
