@@ -438,68 +438,13 @@ txn_run_wal_write_triggers(struct txn *txn)
 }
 
 /**
- * Complete transaction processing.
+ * If there is no fiber waiting for the transaction then the
+ * transaction could be safely freed. In the opposite case the
+ * owner fiber is in duty to free this transaction.
  */
-void
-txn_complete(struct txn *txn)
+static void
+txn_free_or_wakeup(struct txn *txn)
 {
-	assert(!txn_has_flag(txn, TXN_IS_DONE));
-	/*
-	 * Note, engine can be NULL if transaction contains
-	 * IPROTO_NOP or IPROTO_CONFIRM statements.
-	 */
-	if (txn->signature < 0) {
-		/* Undo the transaction. */
-		struct txn_stmt *stmt;
-		stailq_reverse(&txn->stmts);
-		stailq_foreach_entry(stmt, &txn->stmts, next)
-			txn_rollback_one_stmt(txn, stmt);
-		if (txn->engine)
-			engine_rollback(txn->engine, txn);
-		if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
-			txn_run_rollback_triggers(txn, &txn->on_rollback);
-	} else if (!txn_has_flag(txn, TXN_WAIT_SYNC)) {
-		/* Commit the transaction. */
-		if (txn->engine != NULL)
-			engine_commit(txn->engine, txn);
-		if (txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
-			txn_run_commit_triggers(txn, &txn->on_commit);
-			/*
-			 * For async transactions WAL write ==
-			 * commit.
-			 */
-			txn_run_wal_write_triggers(txn);
-		}
-
-		double stop_tm = ev_monotonic_now(loop());
-		if (stop_tm - txn->start_tm > too_long_threshold) {
-			int n_rows = txn->n_new_rows + txn->n_applier_rows;
-			say_warn_ratelimited("too long WAL write: %d rows at "
-					     "LSN %lld: %.3f sec", n_rows,
-					     txn->signature - n_rows + 1,
-					     stop_tm - txn->start_tm);
-		}
-	} else {
-		if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
-			txn_run_wal_write_triggers(txn);
-		/*
-		 * Complete is called on every WAL operation
-		 * authored by this transaction. And it not always
-		 * is one. And not always is enough for commit.
-		 * In case the transaction is waiting for acks, it
-		 * can't be committed right away. Give control
-		 * back to the fiber, owning the transaction so as
-		 * it could decide what to do next.
-		 */
-		if (txn->fiber != NULL && txn->fiber != fiber())
-			fiber_wakeup(txn->fiber);
-		return;
-	}
-	/*
-	 * If there is no fiber waiting for the transaction then
-	 * the transaction could be safely freed. In the opposite case
-	 * the fiber is in duty to free this transaction.
-	 */
 	if (txn->fiber == NULL)
 		txn_free(txn);
 	else {
@@ -508,6 +453,43 @@ txn_complete(struct txn *txn)
 			/* Wake a waiting fiber up. */
 			fiber_wakeup(txn->fiber);
 	}
+}
+
+void
+txn_complete_fail(struct txn *txn)
+{
+	assert(!txn_has_flag(txn, TXN_IS_DONE));
+	assert(txn->signature < 0);
+	struct txn_stmt *stmt;
+	stailq_reverse(&txn->stmts);
+	stailq_foreach_entry(stmt, &txn->stmts, next)
+		txn_rollback_one_stmt(txn, stmt);
+	if (txn->engine != NULL)
+		engine_rollback(txn->engine, txn);
+	if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
+		txn_run_rollback_triggers(txn, &txn->on_rollback);
+	txn_free_or_wakeup(txn);
+}
+
+void
+txn_complete_success(struct txn *txn)
+{
+	double stop_tm = ev_monotonic_now(loop());
+	double delta = stop_tm - txn->start_tm;
+	if (delta > too_long_threshold) {
+		int n_rows = txn->n_new_rows + txn->n_applier_rows;
+		say_warn_ratelimited("too long WAL write: %d rows at LSN %lld: "
+				     "%.3f sec", n_rows,
+				     txn->signature - n_rows + 1, delta);
+	}
+	assert(!txn_has_flag(txn, TXN_IS_DONE));
+	assert(!txn_has_flag(txn, TXN_WAIT_SYNC));
+	assert(txn->signature >= 0);
+	if (txn->engine != NULL)
+		engine_commit(txn->engine, txn);
+	if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
+		txn_run_commit_triggers(txn, &txn->on_commit);
+	txn_free_or_wakeup(txn);
 }
 
 /** Callback invoked when the transaction's journal write is finished. */
@@ -531,7 +513,17 @@ txn_on_journal_write(struct journal_entry *entry)
 	 */
 	assert(in_txn() == NULL);
 	fiber_set_txn(fiber(), txn);
-	txn_complete(txn);
+	if (txn->signature < 0) {
+		txn_complete_fail(txn);
+		goto finish;
+	}
+	if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
+		txn_run_wal_write_triggers(txn);
+	if (!txn_has_flag(txn, TXN_WAIT_SYNC))
+		txn_complete_success(txn);
+	else if (txn->fiber != NULL && txn->fiber != fiber())
+		fiber_wakeup(txn->fiber);
+finish:
 	fiber_set_txn(fiber(), NULL);
 }
 
@@ -668,7 +660,7 @@ txn_commit_nop(struct txn *txn)
 {
 	if (txn->n_new_rows + txn->n_applier_rows == 0) {
 		txn->signature = TXN_SIGNATURE_NOP;
-		txn_complete(txn);
+		txn_complete_success(txn);
 		fiber_set_txn(fiber(), NULL);
 		return true;
 	}
@@ -877,7 +869,7 @@ txn_rollback(struct txn *txn)
 	if (!txn_has_flag(txn, TXN_CAN_YIELD))
 		trigger_clear(&txn->fiber_on_yield);
 	txn->signature = TXN_SIGNATURE_ROLLBACK;
-	txn_complete(txn);
+	txn_complete_fail(txn);
 	fiber_set_txn(fiber(), NULL);
 }
 
