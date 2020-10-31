@@ -240,7 +240,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		txn_limbo_abort(limbo, e);
 		txn_clear_flag(e->txn, TXN_WAIT_SYNC);
 		txn_clear_flag(e->txn, TXN_WAIT_ACK);
-		txn_complete(e->txn);
+		txn_complete_fail(e->txn);
 		if (e == entry)
 			break;
 		fiber_wakeup(e->txn->fiber);
@@ -386,7 +386,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		 * branch won't exist.
 		 */
 		if (e->txn->signature >= 0)
-			txn_complete(e->txn);
+			txn_complete_success(e->txn);
 	}
 }
 
@@ -428,7 +428,7 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 		if (e->txn->signature >= 0) {
 			/* Rollback the transaction. */
 			e->txn->signature = TXN_SIGNATURE_SYNC_ROLLBACK;
-			txn_complete(e->txn);
+			txn_complete_fail(e->txn);
 		} else {
 			/*
 			 * Rollback the transaction, but don't free it yet. It
@@ -446,7 +446,7 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 			e->txn->signature = TXN_SIGNATURE_SYNC_ROLLBACK;
 			struct fiber *fiber = e->txn->fiber;
 			e->txn->fiber = fiber();
-			txn_complete(e->txn);
+			txn_complete_fail(e->txn);
 			e->txn->fiber = fiber;
 		}
 		if (e == last_rollback)
