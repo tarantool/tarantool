@@ -419,10 +419,19 @@ struct txn *
 txn_begin(void);
 
 /**
- * Complete transaction processing.
+ * Complete transaction processing with an error. All the changes are going to
+ * be rolled back. The transaction's signature should be set to the rollback
+ * reason.
  */
 void
-txn_complete(struct txn *txn);
+txn_complete_fail(struct txn *txn);
+
+/**
+ * Complete transaction processing successfully. All the changes are going to
+ * become committed and visible.
+ */
+void
+txn_complete_success(struct txn *txn);
 
 /**
  * Commit a transaction.
