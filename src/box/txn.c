@@ -474,14 +474,6 @@ txn_complete_fail(struct txn *txn)
 void
 txn_complete_success(struct txn *txn)
 {
-	double stop_tm = ev_monotonic_now(loop());
-	double delta = stop_tm - txn->start_tm;
-	if (delta > too_long_threshold) {
-		int n_rows = txn->n_new_rows + txn->n_applier_rows;
-		say_warn_ratelimited("too long WAL write: %d rows at LSN %lld: "
-				     "%.3f sec", n_rows,
-				     txn->signature - n_rows + 1, delta);
-	}
 	assert(!txn_has_flag(txn, TXN_IS_DONE));
 	assert(!txn_has_flag(txn, TXN_WAIT_SYNC));
 	assert(txn->signature >= 0);
@@ -516,6 +508,14 @@ txn_on_journal_write(struct journal_entry *entry)
 	if (txn->signature < 0) {
 		txn_complete_fail(txn);
 		goto finish;
+	}
+	double stop_tm = ev_monotonic_now(loop());
+	double delta = stop_tm - txn->start_tm;
+	if (delta > too_long_threshold) {
+		int n_rows = txn->n_new_rows + txn->n_applier_rows;
+		say_warn_ratelimited("too long WAL write: %d rows at LSN %lld: "
+				     "%.3f sec", n_rows,
+				     txn->signature - n_rows + 1, delta);
 	}
 	if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
 		txn_run_wal_write_triggers(txn);
