@@ -580,8 +580,9 @@ txn_complete(struct txn *txn)
 	}
 }
 
-void
-txn_complete_async(struct journal_entry *entry)
+/** Callback invoked when the transaction's journal write is finished. */
+static void
+txn_on_journal_write(struct journal_entry *entry)
 {
 	struct txn *txn = entry->complete_data;
 	/*
@@ -614,7 +615,7 @@ txn_journal_entry_new(struct txn *txn)
 
 	/* Save space for an additional NOP row just in case. */
 	req = journal_entry_new(txn->n_new_rows + txn->n_applier_rows + 1,
-				&txn->region, txn_complete_async, txn);
+				&txn->region, txn_on_journal_write, txn);
 	if (req == NULL)
 		return NULL;
 

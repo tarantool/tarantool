@@ -373,10 +373,17 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		txn_clear_flag(e->txn, TXN_WAIT_SYNC);
 		txn_clear_flag(e->txn, TXN_WAIT_ACK);
 		/*
-		 * If  txn_complete_async() was already called,
-		 * finish tx processing. Otherwise just clear the
-		 * "WAIT_ACK" flag. Tx procesing will finish once
-		 * the tx is written to WAL.
+		 * If already written to WAL by now, finish tx processing.
+		 * Otherwise just clear the sync flags. Tx procesing will finish
+		 * automatically once the tx is written to WAL.
+		 *
+		 * XXX: Normally at this point all transactions covered by this
+		 * CONFIRM should be in WAL already, but there is a bug, that
+		 * replica always processes received synchro requests *before*
+		 * writing them to WAL. So it can happen, that a CONFIRM is
+		 * 'read', but the transaction is not written yet. Should be
+		 * fixed when the replica will behave properly, and then this
+		 * branch won't exist.
 		 */
 		if (e->txn->signature >= 0)
 			txn_complete(e->txn);
@@ -424,9 +431,17 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 			txn_complete(e->txn);
 		} else {
 			/*
-			 * Rollback the transaction, but don't
-			 * free it yet. txn_complete_async() will
-			 * free it.
+			 * Rollback the transaction, but don't free it yet. It
+			 * will be freed after its WAL write is completed.
+			 *
+			 * XXX: Normally at this point all transactions covered
+			 * by this ROLLBACK should be in WAL already, but there
+			 * is a bug, that replica always processes received
+			 * synchro requests *before* writing them to WAL. So it
+			 * can happen, that a ROLLBACK is 'read', but the
+			 * transaction is not written yet. Should be fixed when
+			 * the replica will behave properly, and then this
+			 * branch won't exist.
 			 */
 			e->txn->signature = TXN_SIGNATURE_SYNC_ROLLBACK;
 			struct fiber *fiber = e->txn->fiber;
