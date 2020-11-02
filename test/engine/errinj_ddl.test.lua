@@ -49,7 +49,7 @@ test_run:cmd("setopt delimiter ';'")
 
 errinj.set('ERRINJ_BUILD_INDEX_DELAY', true);
 fiber.new(function() t:replace{1, 2} errinj.set('ERRINJ_BUILD_INDEX_DELAY',false) end)
-t:create_index('sk', {parts = {2, 'unsigned', unique=true}});
+t:create_index('sk', {parts = {2, 'unsigned'}, unique=true});
 
 t:get{1};
 t.index.sk;
@@ -58,7 +58,7 @@ t:replace{1, 1};
 
 errinj.set('ERRINJ_BUILD_INDEX_DELAY', true);
 fiber.new(function() t:replace{2, 3} errinj.set('ERRINJ_BUILD_INDEX_DELAY', false) end)
-t:create_index('sk', {parts = {2, 'unsigned', unique=true}});
+t:create_index('sk', {parts = {2, 'unsigned'}, unique=true});
 
 t:get{2};
 t.index.sk == nil;

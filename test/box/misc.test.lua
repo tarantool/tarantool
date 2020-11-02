@@ -363,3 +363,24 @@ i.parts
 i = s:create_index('test6', {parts = {4, 'string'}})
 i.parts
 s:drop()
+
+--
+-- gh-5473: forbid specifying index options in key parts
+--
+--
+s = box.schema.space.create('test')
+i = s:create_index('test1', {parts = {1, 'unsigned', unique=false}})
+i = s:create_index('test1', {parts = {1, 'unsigned', distance=3}})
+i = s:create_index('test1', {parts = {2, 'string', 3, 'string', unique=false}})
+i = s:create_index('test1', {parts = {2, 'string', 3, 'string', distance=3}})
+i = s:create_index('test1', {parts = {{1,'int', distance=3}, {field=2, type='int'}}})
+i = s:create_index('test1', {parts = {{1,'int'}, {field=2, type='int', type='hash'}}})
+i = s:create_index('test1', {parts = {{1,'int'}, {2, field=2, type='int'}}})
+i = s:create_index('test1', {parts = {{1,'int'}, {field=2, type='int', 'asd'}}})
+i = s:create_index('test1', {parts = {1,'int', 'asd'}})
+i = s:create_index('test1', {parts = {{1, 'int'}, {2, 'int', 'asd'}}})
+i = s:create_index('test1', {parts = {{2, type='unsigned', 'asd'}, {1, 'int'}}})
+i = s:create_index('test1', {parts = {{1, 'int'}, {2, 'asd', type='unsigned'}}})
+i = s:create_index('test1', {parts = {{'asd', 2, type='unsigned'}}})
+i = s:create_index('test1', {parts = {{1, 'int'}, {2, type='asd'}}})
+s:drop()

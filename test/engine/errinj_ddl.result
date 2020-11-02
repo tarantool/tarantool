@@ -100,7 +100,7 @@ errinj.set('ERRINJ_BUILD_INDEX_DELAY', true);
 - ok
 ...
 fiber.new(function() t:replace{1, 2} errinj.set('ERRINJ_BUILD_INDEX_DELAY',false) end)
-t:create_index('sk', {parts = {2, 'unsigned', unique=true}});
+t:create_index('sk', {parts = {2, 'unsigned'}, unique=true});
 ---
 - error: Duplicate key exists in unique index 'sk' in space 'space'
 ...
@@ -121,7 +121,7 @@ errinj.set('ERRINJ_BUILD_INDEX_DELAY', true);
 - ok
 ...
 fiber.new(function() t:replace{2, 3} errinj.set('ERRINJ_BUILD_INDEX_DELAY', false) end)
-t:create_index('sk', {parts = {2, 'unsigned', unique=true}});
+t:create_index('sk', {parts = {2, 'unsigned'}, unique=true});
 ---
 - error: Duplicate key exists in unique index 'sk' in space 'space'
 ...
