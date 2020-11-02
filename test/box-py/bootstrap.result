@@ -4,7 +4,7 @@ box.internal.bootstrap()
 box.space._schema:select{}
 ---
 - - ['max_id', 511]
-  - ['version', 2, 3, 1]
+  - ['version', 2, 5, 3]
 ...
 box.space._cluster:select{}
 ---
@@ -167,7 +167,7 @@ box.space._user:select{}
 ...
 for _, v in box.space._func:pairs{} do r = {} table.insert(r, v:update({{"=", 18, ""}, {"=", 19, ""}})) return r end
 ---
-- - [1, 1, 'box.schema.user.info', 1, 'LUA', '', 'function', [], 'any', 'none', 'none',
+- - [1, 1, 'box.schema.user.info', 0, 'LUA', '', 'function', [], 'any', 'none', 'none',
     false, false, true, ['LUA'], {}, '', '', '']
 ...
 box.space._priv:select{}
