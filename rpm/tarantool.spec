@@ -26,9 +26,6 @@ Requires(pre): %{_sbindir}/useradd
 Requires(pre): %{_sbindir}/groupadd
 
 # libcurl dependencies (except ones we have already).
-BuildRequires: autoconf
-BuildRequires: automake
-BuildRequires: libtool
 BuildRequires: zlib-devel
 Requires: zlib
 
