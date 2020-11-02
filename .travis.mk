@@ -290,8 +290,7 @@ test_oos_build:
 #######
 
 # since Python 2 is EOL it's latest commit from tapped local formula is used
-OSX_PKGS_MIN=openssl readline curl icu4c libiconv zlib autoconf automake libtool \
-	cmake
+OSX_PKGS_MIN=openssl readline curl icu4c libiconv zlib cmake
 OSX_PKGS=${OSX_PKGS_MIN} file://$${PWD}/tools/brew_taps/tntpython2.rb
 
 deps_osx:
@@ -347,7 +346,7 @@ test_osx_github_actions: deps_osx_github_actions test_osx_no_deps
 
 # Static macOS build
 
-STATIC_OSX_PKGS=autoconf automake libtool cmake file://$${PWD}/tools/brew_taps/tntpython2.rb
+STATIC_OSX_PKGS=cmake file://$${PWD}/tools/brew_taps/tntpython2.rb
 base_deps_osx:
 	brew update || echo | /usr/bin/ruby -e \
 		"$$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
@@ -371,8 +370,7 @@ test_static_build_cmake_osx: base_deps_osx
 
 deps_freebsd:
 	sudo pkg install -y git cmake gmake icu libiconv \
-		python27 py27-yaml py27-six py27-gevent \
-		autoconf automake libtool
+		python27 py27-yaml py27-six py27-gevent
 
 build_freebsd:
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
