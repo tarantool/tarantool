@@ -972,6 +972,35 @@ local function upgrade_to_2_3_1()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 2.6.2
+--------------------------------------------------------------------------------
+local function backport_upgrade_2_7_1_function_access()
+    local _func = box.space._func
+    local _priv = box.space._priv
+    local datetime = os.date("%Y-%m-%d %H:%M:%S")
+    local funcs_to_change = {'LUA', 'box.schema.user.info'}
+    for _, name in pairs(funcs_to_change) do
+        local func = _func.index['name']:get(name)
+        if func ~= nil and func.setuid ~= 0 then
+            local id = func.id
+            log.info('remove old function "'..name..'"')
+            _priv:delete({2, 'function', id})
+            _func:delete({id})
+            log.info('create function "'..name..'" with unset setuid')
+            local new_func = func:update({{'=', 4, 0}, {'=', 18, datetime},
+                                          {'=', 19, datetime}})
+            _func:replace(new_func)
+            log.info('grant execute on function "'..name..'" to public')
+            _priv:replace{ADMIN, PUBLIC, 'function', id, box.priv.X}
+        end
+    end
+end
+
+local function upgrade_to_2_6_2()
+    backport_upgrade_2_7_1_function_access()
+end
+
+--------------------------------------------------------------------------------
 
 local function get_version()
     local version = box.space._schema:get{'version'}
@@ -1007,6 +1036,7 @@ local function upgrade(options)
         {version = mkversion(2, 2, 1), func = upgrade_to_2_2_1, auto = true},
         {version = mkversion(2, 3, 0), func = upgrade_to_2_3_0, auto = true},
         {version = mkversion(2, 3, 1), func = upgrade_to_2_3_1, auto = true},
+        {version = mkversion(2, 6, 2), func = upgrade_to_2_6_2, auto = true},
     }
 
     for _, handler in ipairs(handlers) do
