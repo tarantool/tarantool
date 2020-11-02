@@ -605,7 +605,16 @@ local function update_index_parts_1_6_0(parts)
         box.error(box.error.ILLEGAL_PARAMS,
                   "options.parts: expected field_no (number), type (string) pairs")
     end
-    for i=1,#parts,2 do
+    local i = 0
+    for _ in pairs(parts) do
+        i = i + 1
+        if parts[i] == nil then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      "options.parts: expected field_no (number), type (string) pairs")
+        end
+        if i % 2 == 0 then
+            goto continue
+        end
         if type(parts[i]) ~= "number" then
             box.error(box.error.ILLEGAL_PARAMS,
                       "options.parts: expected field_no (number), type (string) pairs")
@@ -619,6 +628,7 @@ local function update_index_parts_1_6_0(parts)
                       "options.parts: expected field_no (number), type (string) pairs")
         end
         table.insert(result, {field = parts[i] - 1, type = parts[i + 1]})
+        ::continue::
     end
     return result
 end
@@ -779,6 +789,19 @@ local function update_index_parts(format, parts)
             if fmt and fmt.action ~= nil then
                 part.action = fmt.action
                 parts_can_be_simplified = false
+            end
+        end
+        if type(parts[i]) == "table" then
+            local first_illegal_index = 3
+            if parts[i].field ~= nil then
+                first_illegal_index = first_illegal_index - 1
+            end
+            if parts[i].type ~= nil then
+                first_illegal_index = first_illegal_index - 1
+            end
+            if parts[i][first_illegal_index] ~= nil then
+                box.error(box.error.ILLEGAL_PARAMS,
+                        "options.parts[" .. i .. "]: unexpected option " .. parts[i][first_illegal_index])
             end
         end
         table.insert(result, part)
