@@ -108,6 +108,10 @@ fiber_cond_wait_timeout(struct fiber_cond *c, double timeout)
 		diag_set(TimedOut);
 		return -1;
 	}
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
 	return 0;
 }
 
