@@ -282,10 +282,6 @@ box_wait_ro(bool ro, double timeout)
 	while (is_box_configured == false || box_is_ro() != ro) {
 		if (fiber_cond_wait_deadline(&ro_cond, deadline) != 0)
 			return -1;
-		if (fiber_is_cancelled()) {
-			diag_set(FiberIsCancelled);
-			return -1;
-		}
 	}
 	return 0;
 }
