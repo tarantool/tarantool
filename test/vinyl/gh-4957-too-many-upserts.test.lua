@@ -12,16 +12,15 @@ box.snapshot()
 --
 ups_cnt = 5000
 box.begin()
-for i = 1, ups_cnt do s:upsert({1}, {{'&', 2, 1}}) end
+for i = 1, ups_cnt do s:upsert({1}, {{'|', 2, i}}) end
 box.commit()
--- Upserts are not able to squash, so scheduler will get stuck.
--- So let's not waste much time here, just check that no crash
--- takes place.
+-- Since 2.6 update operations of single upsert are applied consistently.
+-- So despite upserts' update operations can be squashed, they are anyway
+-- applied as they come in corresponding upserts. The same concerns the
+-- second test.
 --
 box.snapshot()
-
-fiber = require('fiber')
-fiber.sleep(0.01)
+s:select()
 
 s:drop()
 
@@ -34,11 +33,23 @@ _ = s:insert(tuple)
 box.snapshot()
 
 box.begin()
-for k = 1, ups_cnt do s:upsert({1}, {{'+', k, 1}}) end
+for k = 2, ups_cnt do s:upsert({1}, {{'+', k, 1}}) end
 box.commit()
 box.snapshot()
-fiber.sleep(0.01)
+s:select()[1][ups_cnt]
 
+s:drop()
+
+-- Test that single upsert with too many (> 4000) operations doesn't
+-- pass check so it is rejected.
+--
+s = box.schema.create_space('test', {engine = 'vinyl'})
+pk = s:create_index('pk')
+
+ups_ops = {}
+for k = 2, ups_cnt do ups_ops[k] = {'+', k, 1} end
+s:upsert({1}, ups_ops)
+s:select()
 s:drop()
 
 -- restart the current server to resolve the issue #5141
