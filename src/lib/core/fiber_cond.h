@@ -114,7 +114,7 @@ fiber_cond_broadcast(struct fiber_cond *cond);
  * @param cond condition
  * @param timeout timeout in seconds
  * @retval 0 on fiber_cond_signal() call or a spurious wake up
- * @retval -1 on timeout, diag is set to TimedOut
+ * @retval -1 on timeout or fiber cancellation, diag is set
  */
 int
 fiber_cond_wait_timeout(struct fiber_cond *cond, double timeout);
