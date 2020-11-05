@@ -893,7 +893,7 @@ applier_handle_raft(struct applier *applier, struct xrow_header *row)
 	struct vclock candidate_clock;
 	if (xrow_decode_raft(row, &req, &candidate_clock) != 0)
 		return -1;
-	return raft_process_msg(&req, applier->instance_id);
+	return raft_process_msg(box_raft(), &req, applier->instance_id);
 }
 
 /**
@@ -915,7 +915,7 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 	 * anything, because won't change total number of rows sent in the
 	 * network anyway.
 	 */
-	if (!raft_is_source_allowed(applier->instance_id))
+	if (!raft_is_source_allowed(box_raft(), applier->instance_id))
 		return 0;
 	struct xrow_header *first_row = &stailq_first_entry(rows,
 					struct applier_tx_row, next)->row;
@@ -1256,7 +1256,7 @@ applier_subscribe(struct applier *applier)
 		struct xrow_header *first_row =
 			&stailq_first_entry(&rows, struct applier_tx_row,
 					    next)->row;
-		raft_process_heartbeat(applier->instance_id);
+		raft_process_heartbeat(box_raft(), applier->instance_id);
 		if (first_row->lsn == 0) {
 			if (unlikely(iproto_type_is_raft_request(
 							first_row->type))) {

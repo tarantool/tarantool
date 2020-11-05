@@ -581,14 +581,15 @@ lbox_info_listen(struct lua_State *L)
 static int
 lbox_info_election(struct lua_State *L)
 {
+	struct raft *raft = box_raft();
 	lua_createtable(L, 0, 4);
-	lua_pushstring(L, raft_state_str(raft.state));
+	lua_pushstring(L, raft_state_str(raft->state));
 	lua_setfield(L, -2, "state");
-	luaL_pushuint64(L, raft.volatile_term);
+	luaL_pushuint64(L, raft->volatile_term);
 	lua_setfield(L, -2, "term");
-	lua_pushinteger(L, raft.volatile_vote);
+	lua_pushinteger(L, raft->volatile_vote);
 	lua_setfield(L, -2, "vote");
-	lua_pushinteger(L, raft.leader);
+	lua_pushinteger(L, raft->leader);
 	lua_setfield(L, -2, "leader");
 	return 1;
 }
