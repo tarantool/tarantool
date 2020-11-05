@@ -4020,8 +4020,10 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 	if (old_tuple != NULL) {
 		delete = vy_stmt_new_surrogate_delete(lsm->mem_format,
 						      old_tuple);
-		if (delete == NULL)
+		if (delete == NULL) {
+			tuple_unref(old_tuple);
 			return -1;
+		}
 	}
 	enum iproto_type type = vy_stmt_type(mem_stmt);
 	if (type == IPROTO_REPLACE || type == IPROTO_INSERT) {
@@ -4045,6 +4047,9 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 			goto err;
 	}
 
+	if (old_tuple != NULL)
+		tuple_unref(old_tuple);
+
 	/* Insert DELETE + INSERT into the LSM tree. */
 	if (delete != NULL) {
 		int rc = vy_build_insert_stmt(lsm, lsm->mem, delete, lsn);
@@ -4061,6 +4066,8 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 	return 0;
 
 err:
+	if (old_tuple != NULL)
+		tuple_unref(old_tuple);
 	if (delete != NULL)
 		tuple_unref(delete);
 	return -1;
