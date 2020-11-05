@@ -60,7 +60,7 @@
 #include "say.h"
 #include "tt_static.h"
 #include "wal.h"
-#include "vclock.h"
+#include "vclock/vclock.h"
 #include "xlog.h"
 #include "xrow.h"
 

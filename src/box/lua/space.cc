@@ -49,11 +49,11 @@ extern "C" {
 #include "box/user_def.h"
 #include "box/tuple.h"
 #include "box/txn.h"
-#include "box/vclock.h" /* VCLOCK_MAX */
 #include "box/sequence.h"
 #include "box/coll_id_cache.h"
 #include "box/replication.h" /* GROUP_LOCAL */
 #include "box/iproto_constants.h" /* iproto_type_name */
+#include "vclock/vclock.h"
 
 /**
  * Trigger function for all spaces

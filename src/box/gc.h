@@ -36,7 +36,7 @@
 #include <small/rlist.h>
 
 #include "fiber_cond.h"
-#include "vclock.h"
+#include "vclock/vclock.h"
 #include "trivia/util.h"
 #include "checkpoint_schedule.h"
 

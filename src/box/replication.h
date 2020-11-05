@@ -38,7 +38,7 @@
 #include <small/rlist.h>
 #include "applier.h"
 #include "fiber_cond.h"
-#include "vclock.h"
+#include "vclock/vclock.h"
 #include "latch.h"
 
 /**

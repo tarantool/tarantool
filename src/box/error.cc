@@ -34,7 +34,7 @@
 #include "fiber.h"
 #include "rmean.h"
 #include "trigger.h"
-#include "vclock.h"
+#include "vclock/vclock.h"
 #include "schema.h"
 
 /* {{{ public API */

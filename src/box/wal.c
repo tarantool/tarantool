@@ -30,7 +30,6 @@
  */
 #include "wal.h"
 
-#include "vclock.h"
 #include "fiber.h"
 #include "fio.h"
 #include "errinj.h"

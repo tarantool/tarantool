@@ -40,7 +40,6 @@
 #include "gc.h"
 #include "error.h"
 #include "relay.h"
-#include "vclock.h" /* VCLOCK_MAX */
 #include "sio.h"
 
 uint32_t instance_id = REPLICA_ID_NIL;

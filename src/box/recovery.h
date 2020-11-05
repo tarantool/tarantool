@@ -34,7 +34,7 @@
 #include "trivia/util.h"
 #include "third_party/tarantool_ev.h"
 #include "xlog.h"
-#include "vclock.h"
+#include "vclock/vclock.h"
 
 #if defined(__cplusplus)
 extern "C" {

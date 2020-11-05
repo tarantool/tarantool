@@ -50,7 +50,6 @@
 #include <ctype.h>
 #include "replication.h" /* for replica_set_id() */
 #include "session.h" /* to fetch the current user. */
-#include "vclock.h" /* VCLOCK_MAX */
 #include "xrow.h"
 #include "iproto_constants.h"
 #include "identifier.h"

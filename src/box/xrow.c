@@ -40,7 +40,6 @@
 #include "tt_static.h"
 #include "error.h"
 #include "mp_error.h"
-#include "vclock.h"
 #include "scramble.h"
 #include "iproto_constants.h"
 #include "mpstream/mpstream.h"
