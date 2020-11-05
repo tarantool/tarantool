@@ -52,7 +52,6 @@
 #include "fiber_cond.h"
 #include "latch.h"
 #include "say.h"
-#include "vclock.h"
 #include "cbus.h"
 #include "engine.h"		/* engine_collect_garbage() */
 #include "wal.h"		/* wal_collect_garbage() */

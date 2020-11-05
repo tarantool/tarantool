@@ -35,7 +35,7 @@
 #include "small/rlist.h"
 #include "cbus.h"
 #include "journal.h"
-#include "vclock.h"
+#include "vclock/vclock.h"
 
 struct fiber;
 struct wal_writer;

@@ -41,7 +41,6 @@
 #include "box/box.h"
 #include "box/txn.h"
 #include "box/func.h"
-#include "box/vclock.h"
 #include "box/session.h"
 #include "box/mp_error.h"
 

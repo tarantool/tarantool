@@ -46,7 +46,7 @@
 #include "recovery.h"
 #include "replication.h"
 #include "trigger.h"
-#include "vclock.h"
+#include "vclock/vclock.h"
 #include "version.h"
 #include "xrow.h"
 #include "xrow_io.h"

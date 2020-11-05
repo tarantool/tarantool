@@ -37,7 +37,7 @@
 
 #include "uuid/tt_uuid.h"
 #include "diag.h"
-#include "vclock.h"
+#include "vclock/vclock.h"
 
 #if defined(__cplusplus)
 extern "C" {

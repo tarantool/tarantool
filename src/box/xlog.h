@@ -34,7 +34,7 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 #include "uuid/tt_uuid.h"
-#include "vclock.h"
+#include "vclock/vclock.h"
 
 #define ZSTD_STATIC_LINKING_ONLY
 #include "zstd.h"

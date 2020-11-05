@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  */
 #include "small/rlist.h"
-#include "vclock.h"
+#include "vclock/vclock.h"
 
 #include <stdint.h>
 

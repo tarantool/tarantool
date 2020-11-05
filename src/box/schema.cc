@@ -36,7 +36,7 @@
 #include "alter.h"
 #include "scoped_guard.h"
 #include "user.h"
-#include "vclock.h"
+#include "vclock/vclock.h"
 #include "fiber.h"
 
 /**

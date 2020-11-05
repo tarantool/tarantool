@@ -34,7 +34,7 @@ extern "C" {
 
 #include <stdarg.h>
 
-#include "box/vclock.h"
+#include "vclock/vclock.h"
 
 #define str2(x) #x
 #define str(x) str2(x)
