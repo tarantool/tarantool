@@ -162,66 +162,61 @@ struct raft {
 	struct rlist on_update;
 };
 
-extern struct raft raft;
-
 /**
  * A flag whether the instance is read-only according to Raft. Even if Raft
  * allows writes though, it does not mean the instance is writable. It can be
  * affected by box.cfg.read_only, connection quorum.
  */
 static inline bool
-raft_is_ro(void)
+raft_is_ro(const struct raft *raft)
 {
-	return raft.is_enabled && raft.state != RAFT_STATE_LEADER;
+	return raft->is_enabled && raft->state != RAFT_STATE_LEADER;
 }
 
 /** See if the instance can accept rows from an instance with the given ID. */
 static inline bool
-raft_is_source_allowed(uint32_t source_id)
+raft_is_source_allowed(const struct raft *raft, uint32_t source_id)
 {
-	return !raft.is_enabled || raft.leader == source_id;
+	return !raft->is_enabled || raft->leader == source_id;
 }
 
 /** Check if Raft is enabled. */
 static inline bool
-raft_is_enabled(void)
+raft_is_enabled(const struct raft *raft)
 {
-	return raft.is_enabled;
+	return raft->is_enabled;
 }
 
 /** Process a raft entry stored in WAL/snapshot. */
 void
-raft_process_recovery(const struct raft_request *req);
+raft_process_recovery(struct raft *raft, const struct raft_request *req);
 
-/**
- * Process a raft status message coming from the network.
- * @param req Raft request.
- * @param source Instance ID of the message sender.
- */
+/** Process a raft status message coming from the network. */
 int
-raft_process_msg(const struct raft_request *req, uint32_t source);
+raft_process_msg(struct raft *raft, const struct raft_request *req,
+		 uint32_t source);
 
 /**
  * Process a heartbeat message from an instance with the given ID. It is used to
  * watch leader's health and start election when necessary.
  */
 void
-raft_process_heartbeat(uint32_t source);
+raft_process_heartbeat(struct raft *raft, uint32_t source);
 
 /** Configure whether Raft is enabled. */
 void
-raft_cfg_is_enabled(bool is_enabled);
+raft_cfg_is_enabled(struct raft *raft, bool is_enabled);
 
 /**
  * Configure whether the instance can be elected as Raft leader. Even if false,
  * the node still can vote, when Raft is enabled.
  */
 void
-raft_cfg_is_candidate(bool is_candidate);
+raft_cfg_is_candidate(struct raft *raft, bool is_candidate);
 
 /** Configure Raft leader election timeout. */
 void
-raft_cfg_election_timeout(double timeout);
+raft_cfg_election_timeout(struct raft *raft, double timeout);
 
 /**
  * Configure Raft leader election quorum. There is no a separate option.
@@ -229,7 +224,7 @@ raft_cfg_election_timeout(double timeout);
  * with synchronous replication.
  */
 void
-raft_cfg_election_quorum(void);
+raft_cfg_election_quorum(struct raft *raft);
 
 /**
  * Configure Raft leader death timeout. I.e. number of seconds without
@@ -237,7 +232,7 @@ raft_cfg_election_quorum(void);
  * option. Raft uses replication timeout for that.
  */
 void
-raft_cfg_death_timeout(void);
+raft_cfg_death_timeout(struct raft *raft);
 
 /**
  * Bump the term. When it is persisted, the node checks if there is a leader,
@@ -245,32 +240,49 @@ raft_cfg_death_timeout(void);
  * be used as tool to forcefully start new election, or restart an existing.
  */
 void
-raft_new_term(void);
+raft_new_term(struct raft *raft);
 
 /**
  * Save complete Raft state into a request to be sent to other instances of the
  * cluster. It is allowed to save anything here, not only persistent state.
  */
 void
-raft_serialize_for_network(struct raft_request *req, struct vclock *vclock);
+raft_serialize_for_network(const struct raft *raft, struct raft_request *req,
+			   struct vclock *vclock);
 
 /**
  * Save complete Raft state into a request to be persisted on disk. Only term
  * and vote are being persisted.
  */
 void
-raft_serialize_for_disk(struct raft_request *req);
+raft_serialize_for_disk(const struct raft *raft, struct raft_request *req);
 
 /**
  * Add a trigger invoked each time any of the Raft node visible attributes are
  * changed.
  */
 void
-raft_on_update(struct trigger *trigger);
+raft_on_update(struct raft *raft, struct trigger *trigger);
 
-/** Initialize Raft global data structures. */
 void
-raft_init(void);
+raft_create(struct raft *raft);
+
+void
+raft_destroy(struct raft *raft);
+
+/** Raft state of this instance. */
+static inline struct raft *
+box_raft(void)
+{
+	extern struct raft box_raft_global;
+	return &box_raft_global;
+}
+
+void
+box_raft_init(void);
+
+void
+box_raft_free(void);
 
 #if defined(__cplusplus)
 }

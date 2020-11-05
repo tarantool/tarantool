@@ -162,7 +162,7 @@ void
 box_update_ro_summary(void)
 {
 	bool old_is_ro_summary = is_ro_summary;
-	is_ro_summary = is_ro || is_orphan || raft_is_ro();
+	is_ro_summary = is_ro || is_orphan || raft_is_ro(box_raft());
 	/* In 99% nothing changes. Filter this out first. */
 	if (is_ro_summary == old_is_ro_summary)
 		return;
@@ -399,7 +399,7 @@ apply_wal_row(struct xstream *stream, struct xrow_header *row)
 		/* Vclock is never persisted in WAL by Raft. */
 		if (xrow_decode_raft(row, &raft_req, NULL) != 0)
 			diag_raise();
-		raft_process_recovery(&raft_req);
+		raft_process_recovery(box_raft(), &raft_req);
 		return;
 	}
 	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));
@@ -796,8 +796,8 @@ box_set_election_mode(void)
 	const char *mode = box_check_election_mode();
 	if (mode == NULL)
 		return -1;
-	raft_cfg_is_candidate(strcmp(mode, "candidate") == 0);
-	raft_cfg_is_enabled(strcmp(mode, "off") != 0);
+	raft_cfg_is_candidate(box_raft(), strcmp(mode, "candidate") == 0);
+	raft_cfg_is_enabled(box_raft(), strcmp(mode, "off") != 0);
 	return 0;
 }
 
@@ -807,7 +807,7 @@ box_set_election_timeout(void)
 	double d = box_check_election_timeout();
 	if (d < 0)
 		return -1;
-	raft_cfg_election_timeout(d);
+	raft_cfg_election_timeout(box_raft(), d);
 	return 0;
 }
 
@@ -895,7 +895,7 @@ void
 box_set_replication_timeout(void)
 {
 	replication_timeout = box_check_replication_timeout();
-	raft_cfg_death_timeout();
+	raft_cfg_death_timeout(box_raft());
 }
 
 void
@@ -926,7 +926,7 @@ box_set_replication_synchro_quorum(void)
 		return -1;
 	replication_synchro_quorum = value;
 	txn_limbo_on_parameters_change(&txn_limbo);
-	raft_cfg_election_quorum();
+	raft_cfg_election_quorum(box_raft());
 	return 0;
 }
 
@@ -1064,8 +1064,9 @@ static int
 box_raft_on_update_f(struct trigger *trigger, void *event)
 {
 	(void)trigger;
-	(void)event;
-	if (raft.state != RAFT_STATE_LEADER)
+	struct raft *raft = (struct raft *)event;
+	assert(raft == box_raft());
+	if (raft->state != RAFT_STATE_LEADER)
 		return 0;
 	/*
 	 * When the node became a leader, it means it will ignore all records
@@ -2154,7 +2155,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 		 tt_uuid_str(&replica_uuid), sio_socketname(io->fd));
 	say_info("remote vclock %s local vclock %s",
 		 vclock_to_string(&replica_clock), vclock_to_string(&vclock));
-	if (raft_is_enabled()) {
+	if (raft_is_enabled(box_raft())) {
 		/*
 		 * Send out the current raft state of the instance. Don't do
 		 * that if Raft is disabled. It can be that a part of the
@@ -2163,7 +2164,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 		 * should be 0.
 		 */
 		struct raft_request req;
-		raft_serialize_for_network(&req, &vclock);
+		raft_serialize_for_network(box_raft(), &req, &vclock);
 		xrow_encode_raft(&row, &fiber()->gc, &req);
 		coio_write_xrow(io, &row);
 	}
@@ -2249,6 +2250,7 @@ box_free(void)
 		tuple_free();
 		port_free();
 #endif
+		box_raft_free();
 		iproto_free();
 		replication_free();
 		sequence_free();
@@ -2655,10 +2657,10 @@ box_init(void)
 
 	txn_limbo_init();
 	sequence_init();
-	raft_init();
+	box_raft_init();
 
 	trigger_create(&box_raft_on_update, box_raft_on_update_f, NULL, NULL);
-	raft_on_update(&box_raft_on_update);
+	raft_on_update(box_raft(), &box_raft_on_update);
 }
 
 bool
@@ -2814,7 +2816,7 @@ box_cfg_xc(void)
 		 * should take the control over the situation and start a new
 		 * term immediately.
 		 */
-		raft_new_term();
+		raft_new_term(box_raft());
 	}
 
 	/* box.cfg.read_only is not read yet. */
