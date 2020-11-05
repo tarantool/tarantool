@@ -565,7 +565,19 @@ struct fiber {
 	 * See http://gcc.gnu.org/bugzilla/show_bug.cgi?id=31488
 	 */
 	fiber_func f;
-	va_list f_data;
+	union {
+		/**
+		 * Argument list passed when the fiber is invoked in a blocking
+		 * way, so the caller may pass arguments from its own stack.
+		 */
+		va_list f_data;
+		/**
+		 * Fiber function argument which passed asynchronously. Can be
+		 * used not to call fiber_start to avoid yields, but still pass
+		 * something into the fiber.
+		 */
+		void *f_arg;
+	};
 	int f_ret;
 	/** Fiber local storage. */
 	struct {
