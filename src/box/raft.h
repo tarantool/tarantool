@@ -34,6 +34,7 @@
 #include <assert.h>
 #include "tarantool_ev.h"
 #include "trigger.h"
+#include "vclock/vclock.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -69,7 +70,6 @@ extern "C" {
 
 struct fiber;
 struct raft_request;
-struct vclock;
 
 enum raft_state {
 	/**
@@ -147,7 +147,7 @@ struct raft {
 	 * Bit 1 on position N means that a vote from instance with ID = N was
 	 * obtained.
 	 */
-	uint32_t vote_mask;
+	vclock_map_t vote_mask;
 	/** Number of votes for this instance. Valid only in candidate state. */
 	int vote_count;
 	/** State machine timed event trigger. */
