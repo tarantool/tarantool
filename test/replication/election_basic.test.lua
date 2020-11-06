@@ -3,7 +3,7 @@ test_run = require('test_run').new()
 -- gh-1146: Raft protocol for automated leader election.
 --
 
-old_election_timeout = box.cfg_election_timeout
+old_election_timeout = box.cfg.election_timeout
 
 -- Election is turned off by default.
 assert(box.cfg.election_mode == 'off')
