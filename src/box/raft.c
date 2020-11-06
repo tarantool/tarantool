@@ -878,6 +878,14 @@ raft_sm_start(void)
 		raft_sm_wait_leader_found();
 	}
 	box_update_ro_summary();
+	/*
+	 * Nothing changed. But when raft was stopped, its state wasn't sent to
+	 * replicas. At least this was happening at the moment of this being
+	 * written. On the other hand, this instance may have a term bigger than
+	 * any other term in the cluster. And if it wouldn't share the term, it
+	 * would ignore all the messages, including vote requests.
+	 */
+	raft_schedule_broadcast();
 }
 
 static void
