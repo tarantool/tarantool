@@ -244,6 +244,16 @@ function update_deb_packfile {
     fi
 }
 
+function initiate_deb_metadata {
+    distssuffix=$1
+
+    # get the latest Packages/Sources files from S3 either create empty files
+    mkdir -p `dirname $distssuffix` || :
+    $aws ls "$bucket_path/$distssuffix" >/dev/null 2>&1 && \
+        $aws cp "$bucket_path/$distssuffix" $distssuffix.saved || \
+        touch $distssuffix.saved
+}
+
 function update_deb_metadata {
     packpath=$1
     packtype=$2
@@ -251,12 +261,8 @@ function update_deb_metadata {
 
     file_exists=''
 
-    if [ ! -f $packpath.saved ] ; then
-        # get the latest Sources file from S3 either create empty file
-        $aws ls "$bucket_path/$packpath" >/dev/null 2>&1 && \
-            $aws cp "$bucket_path/$packpath" $packpath.saved || \
-            touch $packpath.saved
-    fi
+    # reinitiate if the new suffix used, not as used before
+    [ -f $packpath.saved ] || initiate_deb_metadata $packpath
 
     [ "$remove" == "" ] || cp $packpath.saved $packpath
 
@@ -545,6 +551,7 @@ EOF
         updated_files=0
 
         # 1(binaries). use reprepro tool to generate Packages file
+        initiate_deb_metadata dists/$loop_dist/$component/binary-amd64/Packages
         for deb in $ws/$debdir/$loop_dist/$component/*/*/*.deb ; do
             [ -f $deb ] || continue
             updated_deb=0
@@ -565,6 +572,7 @@ EOF
         done
 
         # 1(sources). use reprepro tool to generate Sources file
+        initiate_deb_metadata dists/$loop_dist/$component/source/Sources
         for dsc in $ws/$debdir/$loop_dist/$component/*/*/*.dsc ; do
             [ -f $dsc ] || continue
             updated_dsc=0
