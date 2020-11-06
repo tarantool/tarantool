@@ -2,6 +2,7 @@ test_run = require('test_run').new()
 box.schema.user.grant('guest', 'super')
 
 old_election_mode = box.cfg.election_mode
+old_election_timeout = box.cfg.election_timeout
 old_replication_synchro_timeout = box.cfg.replication_synchro_timeout
 old_replication_timeout = box.cfg.replication_timeout
 old_replication = box.cfg.replication
@@ -28,8 +29,11 @@ box.cfg{election_mode = 'voter'}
 test_run:switch('replica')
 fiber = require('fiber')
 -- Replication timeout is small to speed up a first election start.
+-- Election timeout is set to a huge value to ensure the election does not hang
+-- anywhere. Indeed, there can't be a split-vote when candidate is only one.
 box.cfg{                                                                        \
     election_mode = 'candidate',                                                \
+    election_timeout = 1000000,                                                 \
     replication_synchro_quorum = 3,                                             \
     replication_synchro_timeout = 1000000,                                      \
     replication_timeout = 0.1,                                                  \
@@ -57,8 +61,11 @@ box.cfg{replication_synchro_timeout = 1000000}
 -- Configure separately from synchro timeout not to depend on the order of
 -- synchro and election options appliance. Replication timeout is tiny to speed
 -- up notice of the old leader death.
+-- Election timeout is set to a huge value to ensure the election does not hang
+-- anywhere. Indeed, there can't be a split-vote when candidate is only one.
 box.cfg{                                                                        \
     election_mode = 'candidate',                                                \
+    election_timeout = 1000000,                                                 \
     replication_timeout = 0.01,                                                 \
 }
 
@@ -70,6 +77,7 @@ box.space.test:drop()
 test_run:cmd('delete server replica')
 box.cfg{                                                                        \
     election_mode = old_election_mode,                                          \
+    election_timeout = old_election_timeout,                                    \
     replication_timeout = old_replication_timeout,                              \
     replication = old_replication,                                              \
     replication_synchro_timeout = old_replication_synchro_timeout,              \
