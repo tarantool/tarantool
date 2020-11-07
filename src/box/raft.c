@@ -969,17 +969,17 @@ raft_cfg_is_candidate(bool is_candidate)
 
 	if (raft.is_candidate) {
 		assert(raft.state == RAFT_STATE_FOLLOWER);
-		if (raft.leader != 0) {
-			raft_sm_wait_leader_dead();
-		} else if (raft_is_fully_on_disk()) {
-			raft_sm_wait_leader_found();
-		} else {
+		if (raft.is_write_in_progress) {
 			/*
 			 * If there is an on-going WAL write, it means there was
 			 * some node who sent newer data to this node. So it is
 			 * probably a better candidate. Anyway can't do anything
 			 * until the new state is fully persisted.
 			 */
+		} else if (raft.leader != 0) {
+			raft_sm_wait_leader_dead();
+		} else {
+			raft_sm_wait_leader_found();
 		}
 	} else {
 		if (raft.state != RAFT_STATE_LEADER) {
