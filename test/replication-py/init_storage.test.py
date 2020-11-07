@@ -1,5 +1,6 @@
 import os
 import glob
+from lib.tarantool_server import TarantoolStartError
 from lib.tarantool_server import TarantoolServer
 
 # master server
@@ -64,8 +65,17 @@ replica.deploy(wait=False)
 
 print 'waiting reconnect on JOIN...'
 server.start()
-replica.wait_until_started()
-print 'ok'
+try:
+    # Replica may fail to start due connection issues may occur, check
+    # gh-4949. Also the test should have the ability to be restarted by
+    # test-run using fragile list and in this way 'crash_expected' flag
+    # should be enabled to let the test fail with exception.
+    replica.crash_expected = True
+    replica.wait_until_started()
+except TarantoolStartError:
+    print 'not ok - server failed to start'
+else:
+    print 'ok'
 
 replica.stop()
 server.stop()
@@ -73,8 +83,17 @@ server.stop()
 print 'waiting reconnect on SUBSCRIBE...'
 replica.start(wait=False)
 server.start()
-replica.wait_until_started()
-print 'ok'
+try:
+    # Replica may fail to start due connection issues may occur, check
+    # gh-4949. Also the test should have the ability to be restarted by
+    # test-run using fragile list and in this way 'crash_expected' flag
+    # should be enabled to let the test fail with exception.
+    replica.crash_expected = True
+    replica.wait_until_started()
+except TarantoolStartError:
+    print 'not ok - server failed to start'
+else:
+    print 'ok'
 
 replica.stop()
 replica.cleanup()
