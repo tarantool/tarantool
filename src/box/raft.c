@@ -858,13 +858,20 @@ raft_sm_start(void)
 {
 	say_info("RAFT: start state machine");
 	assert(!ev_is_active(&raft.timer));
-	assert(!raft.is_write_in_progress);
 	assert(!raft.is_enabled);
 	assert(raft.state == RAFT_STATE_FOLLOWER);
 	raft.is_enabled = true;
 	raft.is_candidate = raft.is_cfg_candidate;
-	if (!raft.is_candidate) {
-		/* Nop. */;
+	if (raft.is_write_in_progress) {
+		/*
+		 * Nop. If write is in progress, the state machine is frozen. It
+		 * is continued when write ends.
+		 */
+	} else if (!raft.is_candidate) {
+		/*
+		 * Nop. When a node is not a candidate, it can't initiate
+		 * elections anyway, so it does not need to monitor the leader.
+		 */
 	} else if (raft.leader != 0) {
 		raft_sm_wait_leader_dead();
 	} else {
