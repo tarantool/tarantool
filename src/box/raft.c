@@ -44,7 +44,13 @@
  */
 #define RAFT_RANDOM_ELECTION_FACTOR 0.1
 
-struct raft box_raft_global;
+struct raft box_raft_global = {
+	/*
+	 * Set an invalid state to validate in runtime the global raft node is
+	 * not used before initialization.
+	 */
+	.state = 0,
+};
 
 /**
  * When decoding we should never trust that there is
@@ -1116,4 +1122,8 @@ box_raft_free(void)
 	 */
 	box_raft_global.worker = NULL;
 	raft_destroy(&box_raft_global);
+	/*
+	 * Invalidate so as box_raft() would fail if any usage attempt happens.
+	 */
+	box_raft_global.state = 0;
 }

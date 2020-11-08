@@ -31,6 +31,7 @@
  */
 #include <stdint.h>
 #include <stdbool.h>
+#include <assert.h>
 #include "tarantool_ev.h"
 #include "trigger.h"
 
@@ -275,6 +276,11 @@ static inline struct raft *
 box_raft(void)
 {
 	extern struct raft box_raft_global;
+	/**
+	 * Ensure the raft node can be used. I.e. that it is properly
+	 * initialized. Entirely for debug purposes.
+	 */
+	assert(box_raft_global.state != 0);
 	return &box_raft_global;
 }
 
