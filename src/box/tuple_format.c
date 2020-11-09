@@ -852,6 +852,73 @@ tuple_format1_can_store_format2_tuples(struct tuple_format *format1,
 	return true;
 }
 
+static int
+tuple_format_required_fields_validate(struct tuple_format *format,
+				      void *required_fields,
+				      uint32_t required_fields_sz);
+
+static int
+tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
+			     bool validate, struct field_map_builder *builder)
+{
+	struct region *region = &fiber()->gc;
+	const char *pos = tuple;
+	uint32_t defined_field_count = mp_decode_array(&pos);
+	if (validate && format->exact_field_count > 0 &&
+	    format->exact_field_count != defined_field_count) {
+		diag_set(ClientError, ER_EXACT_FIELD_COUNT,
+			 (unsigned) defined_field_count,
+			 (unsigned) format->exact_field_count);
+		return -1;
+	}
+	defined_field_count = MIN(defined_field_count,
+				  tuple_format_field_count(format));
+
+	void *required_fields = NULL;
+	uint32_t required_fields_sz = bitmap_size(format->total_field_count);
+
+	if (unlikely(defined_field_count == 0)) {
+		required_fields = format->required_fields;
+		goto end;
+	}
+
+	if (validate) {
+		required_fields = region_alloc(region, required_fields_sz);
+		memcpy(required_fields, format->required_fields,
+		       required_fields_sz);
+	}
+
+	struct tuple_field *field;
+	struct json_token **token = format->fields.root.children;
+	for (uint32_t i = 0; i < defined_field_count; i++, token++, mp_next(&pos)) {
+		field = json_tree_entry(*token, struct tuple_field, token);
+		if (validate) {
+			bool nullable = tuple_field_is_nullable(field);
+			if(!field_mp_type_is_compatible(field->type, pos,
+							nullable)) {
+				diag_set(ClientError, ER_FIELD_TYPE,
+					 tuple_field_path(field),
+					 field_type_strs[field->type]);
+				return -1;
+			}
+			bit_clear(required_fields, field->id);
+		}
+		if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL &&
+		    field_map_builder_set_slot(builder, field->offset_slot,
+					       pos - tuple, MULTIKEY_NONE,
+					       0, NULL) != 0) {
+			return -1;
+		}
+	}
+
+end:
+	if (!validate)
+		return 0;
+
+	return tuple_format_required_fields_validate(format, required_fields,
+						     required_fields_sz);
+}
+
 /** @sa declaration for details. */
 int
 tuple_field_map_create(struct tuple_format *format, const char *tuple,
@@ -863,6 +930,15 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 		return -1;
 	if (tuple_format_field_count(format) == 0)
 		return 0; /* Nothing to initialize */
+
+	/*
+	 * In case tuple format doesn't contain fields accessed by JSON paths,
+	 * tuple field traversal may be simplified.
+	 */
+	if (format->fields_depth == 1) {
+		return tuple_field_map_create_plain(format, tuple, validate,
+						    builder);
+	}
 
 	uint32_t field_count;
 	struct tuple_format_iterator it;
