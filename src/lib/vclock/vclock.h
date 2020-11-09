@@ -169,6 +169,7 @@ vclock_get(const struct vclock *vclock, uint32_t replica_id)
 static inline int64_t
 vclock_inc(struct vclock *vclock, uint32_t replica_id)
 {
+	assert(replica_id < VCLOCK_MAX);
 	/* Easier add each time than check. */
 	if (((vclock->map >> replica_id) & 0x01) == 0) {
 		vclock->lsn[replica_id] = 0;
