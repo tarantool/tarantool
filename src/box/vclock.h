@@ -161,11 +161,7 @@ vclock_is_set(const struct vclock *vclock)
 static inline int64_t
 vclock_get(const struct vclock *vclock, uint32_t replica_id)
 {
-	/*
-	 * If replica_id does not fit in VCLOCK_MAX - 1 then
-	 * let result be undefined.
-	 */
-	replica_id &= VCLOCK_MAX - 1;
+	assert(replica_id < VCLOCK_MAX);
 	/* Evaluate a bitmask to avoid branching. */
 	int64_t mask = 0ULL - ((vclock->map >> replica_id) & 0x1);
 	return mask & vclock->lsn[replica_id];
