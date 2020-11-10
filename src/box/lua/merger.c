@@ -266,10 +266,8 @@ lbox_merge_source_new(struct lua_State *L, const char *func_name,
 		lua_pushnil(L);
 
 	struct merge_source *source = luaL_merge_source_new(L);
-	if (source == NULL) {
-		merge_source_unref(source);
+	if (source == NULL)
 		return luaT_error(L);
-	}
 	*(struct merge_source **)
 		luaL_pushcdata(L, CTID_STRUCT_MERGE_SOURCE_REF) = source;
 	lua_pushcfunction(L, lbox_merge_source_gc);
@@ -387,10 +385,8 @@ lbox_merger_new(struct lua_State *L)
 	struct merge_source *merger = merger_new(key_def, sources, source_count,
 						 reverse);
 	free(sources);
-	if (merger == NULL) {
-		merge_source_unref(merger);
+	if (merger == NULL)
 		return luaT_error(L);
-	}
 
 	*(struct merge_source **)
 		luaL_pushcdata(L, CTID_STRUCT_MERGE_SOURCE_REF) = merger;
