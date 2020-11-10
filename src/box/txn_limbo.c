@@ -40,7 +40,7 @@ static inline void
 txn_limbo_create(struct txn_limbo *limbo)
 {
 	rlist_create(&limbo->queue);
-	limbo->instance_id = REPLICA_ID_NIL;
+	limbo->owner_id = REPLICA_ID_NIL;
 	fiber_cond_create(&limbo->wait_cond);
 	vclock_create(&limbo->vclock);
 	limbo->confirmed_lsn = 0;
@@ -72,14 +72,14 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 	}
 	if (id == 0)
 		id = instance_id;
-	if (limbo->instance_id != id) {
-		if (limbo->instance_id == REPLICA_ID_NIL ||
+	if (limbo->owner_id != id) {
+		if (limbo->owner_id == REPLICA_ID_NIL ||
 		    rlist_empty(&limbo->queue)) {
-			limbo->instance_id = id;
+			limbo->owner_id = id;
 			limbo->confirmed_lsn = 0;
 		} else {
 			diag_set(ClientError, ER_UNCOMMITTED_FOREIGN_SYNC_TXNS,
-				 limbo->instance_id);
+				 limbo->owner_id);
 			return NULL;
 		}
 	}
@@ -136,8 +136,8 @@ void
 txn_limbo_assign_remote_lsn(struct txn_limbo *limbo,
 			    struct txn_limbo_entry *entry, int64_t lsn)
 {
-	assert(limbo->instance_id != REPLICA_ID_NIL);
-	assert(limbo->instance_id != instance_id);
+	assert(limbo->owner_id != REPLICA_ID_NIL);
+	assert(limbo->owner_id != instance_id);
 	assert(entry->lsn == -1);
 	assert(lsn > 0);
 	assert(txn_has_flag(entry->txn, TXN_WAIT_ACK));
@@ -149,8 +149,8 @@ void
 txn_limbo_assign_local_lsn(struct txn_limbo *limbo,
 			   struct txn_limbo_entry *entry, int64_t lsn)
 {
-	assert(limbo->instance_id != REPLICA_ID_NIL);
-	assert(limbo->instance_id == instance_id);
+	assert(limbo->owner_id != REPLICA_ID_NIL);
+	assert(limbo->owner_id == instance_id);
 	assert(entry->lsn == -1);
 	assert(lsn > 0);
 	assert(txn_has_flag(entry->txn, TXN_WAIT_ACK));
@@ -175,7 +175,7 @@ void
 txn_limbo_assign_lsn(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
 		     int64_t lsn)
 {
-	if (limbo->instance_id == instance_id)
+	if (limbo->owner_id == instance_id)
 		txn_limbo_assign_local_lsn(limbo, entry, lsn);
 	else
 		txn_limbo_assign_remote_lsn(limbo, entry, lsn);
@@ -293,7 +293,7 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint32_t type, int64_t lsn)
 
 	struct synchro_request req = {
 		.type		= type,
-		.replica_id	= limbo->instance_id,
+		.replica_id	= limbo->owner_id,
 		.lsn		= lsn,
 	};
 
@@ -348,7 +348,7 @@ txn_limbo_write_confirm(struct txn_limbo *limbo, int64_t lsn)
 static void
 txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 {
-	assert(limbo->instance_id != REPLICA_ID_NIL);
+	assert(limbo->owner_id != REPLICA_ID_NIL);
 	struct txn_limbo_entry *e, *tmp;
 	rlist_foreach_entry_safe(e, &limbo->queue, in_queue, tmp) {
 		/*
@@ -409,7 +409,7 @@ txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 static void
 txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 {
-	assert(limbo->instance_id != REPLICA_ID_NIL);
+	assert(limbo->owner_id != REPLICA_ID_NIL);
 	struct txn_limbo_entry *e, *tmp;
 	struct txn_limbo_entry *last_rollback = NULL;
 	rlist_foreach_entry_reverse(e, &limbo->queue, in_queue) {
@@ -471,7 +471,7 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 	 */
 	if (limbo->is_in_rollback)
 		return;
-	assert(limbo->instance_id != REPLICA_ID_NIL);
+	assert(limbo->owner_id != REPLICA_ID_NIL);
 	int64_t prev_lsn = vclock_get(&limbo->vclock, replica_id);
 	/*
 	 * One of the reasons why can happen - the remote instance is not
@@ -600,9 +600,9 @@ complete:
 int
 txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 {
-	if (req->replica_id != limbo->instance_id) {
-		diag_set(ClientError, ER_SYNC_MASTER_MISMATCH, req->replica_id,
-			 limbo->instance_id);
+	if (req->replica_id != limbo->owner_id) {
+		diag_set(ClientError, ER_SYNC_MASTER_MISMATCH,
+			 req->replica_id, limbo->owner_id);
 		return -1;
 	}
 	switch (req->type) {

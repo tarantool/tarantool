@@ -103,7 +103,7 @@ struct txn_limbo {
 	 * won't make sense - different nodes have own independent
 	 * LSNs in their vclock components.
 	 */
-	uint32_t instance_id;
+	uint32_t owner_id;
 	/**
 	 * Condition to wait for completion. It is supposed to be
 	 * signaled when the synchro parameters change. Allowing

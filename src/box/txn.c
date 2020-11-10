@@ -828,7 +828,7 @@ txn_commit(struct txn *txn)
 			txn_limbo_assign_local_lsn(&txn_limbo, limbo_entry,
 						   lsn);
 			/* Local WAL write is a first 'ACK'. */
-			txn_limbo_ack(&txn_limbo, txn_limbo.instance_id, lsn);
+			txn_limbo_ack(&txn_limbo, txn_limbo.owner_id, lsn);
 		}
 		if (txn_limbo_wait_complete(&txn_limbo, limbo_entry) < 0)
 			goto rollback;
