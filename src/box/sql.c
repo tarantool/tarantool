@@ -453,7 +453,7 @@ insertOrReplace(struct space *space, const char *tuple, const char *tuple_end,
 	request.space_id = space->def->id;
 	request.type = type;
 	mp_tuple_assert(request.tuple, request.tuple_end);
-	return box_process_rw(&request, space, NULL);
+	return box_process1(&request, NULL);
 }
 
 int tarantoolsqlInsert(struct space *space, const char *tuple,
@@ -531,7 +531,7 @@ sql_delete_by_key(struct space *space, uint32_t iid, char *key,
 	request.space_id = space->def->id;
 	request.index_id = iid;
 	assert(space_index(space, iid)->def->opts.is_unique);
-	return box_process_rw(&request, space, &unused);
+	return box_process1(&request, &unused);
 }
 
 /*
@@ -597,7 +597,7 @@ int tarantoolsqlClearTable(struct space *space, uint32_t *tuple_count)
 		request.key = tuple_extract_key(tuple, pk->def->key_def,
 						MULTIKEY_NONE, &key_size);
 		request.key_end = request.key + key_size;
-		rc = box_process_rw(&request, space, &unused);
+		rc = box_process1(&request, &unused);
 		if (rc != 0) {
 			iterator_delete(iter);
 			return -1;
@@ -834,7 +834,7 @@ tarantoolsqlIncrementMaxid(uint64_t *space_max_id)
 	request.key_end = key + sizeof(key);
 	request.type = IPROTO_UPDATE;
 	request.space_id = space_schema->def->id;
-	if (box_process_rw(&request, space_schema, &res) != 0 || res == NULL ||
+	if (box_process1(&request, &res) != 0 || res == NULL ||
 	    tuple_field_u64(res, 1, space_max_id) != 0)
 		return -1;
 	return 0;
