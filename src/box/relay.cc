@@ -419,7 +419,7 @@ tx_status_update(struct cmsg *msg)
 	 * the single master in 100% so far). Other instances wait
 	 * for master's CONFIRM message instead.
 	 */
-	if (txn_limbo.instance_id == instance_id) {
+	if (txn_limbo.owner_id == instance_id) {
 		txn_limbo_ack(&txn_limbo, status->relay->replica->id,
 			      vclock_get(&status->vclock, instance_id));
 	}

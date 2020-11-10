@@ -1009,7 +1009,7 @@ box_clear_synchro_queue(bool try_wait)
 {
 	if (!is_box_configured || txn_limbo_is_empty(&txn_limbo))
 		return;
-	uint32_t former_leader_id = txn_limbo.instance_id;
+	uint32_t former_leader_id = txn_limbo.owner_id;
 	assert(former_leader_id != REPLICA_ID_NIL);
 	if (former_leader_id == instance_id)
 		return;
