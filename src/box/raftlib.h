@@ -271,25 +271,6 @@ raft_create(struct raft *raft);
 void
 raft_destroy(struct raft *raft);
 
-/** Raft state of this instance. */
-static inline struct raft *
-box_raft(void)
-{
-	extern struct raft box_raft_global;
-	/**
-	 * Ensure the raft node can be used. I.e. that it is properly
-	 * initialized. Entirely for debug purposes.
-	 */
-	assert(box_raft_global.state != 0);
-	return &box_raft_global;
-}
-
-void
-box_raft_init(void);
-
-void
-box_raft_free(void);
-
 #if defined(__cplusplus)
 }
 #endif
