@@ -804,8 +804,7 @@ raft_sm_wait_leader_dead(struct raft *raft)
 	assert(raft->is_candidate);
 	assert(raft->state == RAFT_STATE_FOLLOWER);
 	assert(raft->leader != 0);
-	double death_timeout = replication_disconnect_timeout();
-	ev_timer_set(&raft->timer, death_timeout, death_timeout);
+	ev_timer_set(&raft->timer, raft->death_timeout, raft->death_timeout);
 	ev_timer_start(loop(), &raft->timer);
 }
 
@@ -817,8 +816,7 @@ raft_sm_wait_leader_found(struct raft *raft)
 	assert(raft->is_candidate);
 	assert(raft->state == RAFT_STATE_FOLLOWER);
 	assert(raft->leader == 0);
-	double death_timeout = replication_disconnect_timeout();
-	ev_timer_set(&raft->timer, death_timeout, death_timeout);
+	ev_timer_set(&raft->timer, raft->death_timeout, raft->death_timeout);
 	ev_timer_start(loop(), &raft->timer);
 }
 
@@ -1012,14 +1010,14 @@ raft_cfg_election_quorum(struct raft *raft)
 }
 
 void
-raft_cfg_death_timeout(struct raft *raft)
+raft_cfg_death_timeout(struct raft *raft, double death_timeout)
 {
+	raft->death_timeout = death_timeout;
 	if (raft->state == RAFT_STATE_FOLLOWER && raft->is_candidate &&
 	    raft->leader != 0) {
 		assert(ev_is_active(&raft->timer));
-		double death_timeout = replication_disconnect_timeout();
 		double timeout = ev_timer_remaining(loop(), &raft->timer) -
-				 raft->timer.at + death_timeout;
+				 raft->timer.at + raft->death_timeout;
 		ev_timer_stop(loop(), &raft->timer);
 		ev_timer_set(&raft->timer, timeout, timeout);
 		ev_timer_start(loop(), &raft->timer);
@@ -1080,6 +1078,7 @@ raft_create(struct raft *raft)
 		.volatile_term = 1,
 		.term =	1,
 		.election_timeout = 5,
+		.death_timeout = 5,
 	};
 	ev_timer_init(&raft->timer, raft_sm_schedule_new_election_cb, 0, 0);
 	raft->timer.data = raft;

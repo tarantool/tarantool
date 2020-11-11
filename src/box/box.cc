@@ -890,7 +890,7 @@ void
 box_set_replication_timeout(void)
 {
 	replication_timeout = box_check_replication_timeout();
-	raft_cfg_death_timeout(box_raft());
+	raft_cfg_death_timeout(box_raft(), replication_disconnect_timeout());
 }
 
 void

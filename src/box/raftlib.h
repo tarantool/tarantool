@@ -157,6 +157,11 @@ struct raft {
 	/** Configured election timeout in seconds. */
 	double election_timeout;
 	/**
+	 * Leader death timeout, after which it is considered dead and new
+	 * elections can be started.
+	 */
+	double death_timeout;
+	/**
 	 * Trigger invoked each time any of the Raft node visible attributes are
 	 * changed.
 	 */
@@ -229,11 +234,10 @@ raft_cfg_election_quorum(struct raft *raft);
 
 /**
  * Configure Raft leader death timeout. I.e. number of seconds without
- * heartbeats from the leader to consider it dead. There is no a separate
- * option. Raft uses replication timeout for that.
+ * heartbeats from the leader to consider it dead.
  */
 void
-raft_cfg_death_timeout(struct raft *raft);
+raft_cfg_death_timeout(struct raft *raft, double death_timeout);
 
 /**
  * Bump the term. When it is persisted, the node checks if there is a leader,
