@@ -88,3 +88,31 @@ function(bin_source varname srcfile dstfile)
 
 endfunction()
 
+#
+# Whether a file is descendant to a directory.
+#
+# If the file is the directory itself, the answer is FALSE.
+#
+function(file_is_in_directory varname file dir)
+    file(RELATIVE_PATH file_relative "${dir}" "${file}")
+
+    # Tricky point: one may find <STREQUAL ".."> and
+    # <MATCHES "^\\.\\./"> if-branches quite similar and coalesce
+    # them as <MATCHES "^\\.\\.">. However it'll match paths like
+    # "..." or "..foo/bar", whose are definitely descendant to
+    # the directory.
+    if (file_relative STREQUAL "")
+        # <file> and <dir> is the same directory.
+        set(${varname} FALSE PARENT_SCOPE)
+    elseif (file_relative STREQUAL "..")
+        # <dir> inside a <file> (so it is a directory too), not
+        # vice versa.
+        set(${varname} FALSE PARENT_SCOPE)
+    elseif (file_relative MATCHES "^\\.\\./")
+        # <file> somewhere outside of the <dir>.
+        set(${varname} FALSE PARENT_SCOPE)
+    else()
+        # <file> is descendant to <dir>.
+        set(${varname} TRUE PARENT_SCOPE)
+    endif()
+endfunction()
