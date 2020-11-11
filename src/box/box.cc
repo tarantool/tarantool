@@ -152,11 +152,6 @@ static struct fiber_pool tx_fiber_pool;
  * are too many messages in flight (gh-1892).
  */
 static struct cbus_endpoint tx_prio_endpoint;
-/**
- * A trigger executed each time the Raft state machine updates any
- * of its visible attributes.
- */
-static struct trigger box_raft_on_update;
 
 void
 box_update_ro_summary(void)
@@ -1058,23 +1053,6 @@ box_clear_synchro_queue(bool try_wait)
 		txn_limbo_force_empty(&txn_limbo, confirm_lsn);
 		assert(txn_limbo_is_empty(&txn_limbo));
 	}
-}
-
-static int
-box_raft_on_update_f(struct trigger *trigger, void *event)
-{
-	(void)trigger;
-	struct raft *raft = (struct raft *)event;
-	assert(raft == box_raft());
-	if (raft->state != RAFT_STATE_LEADER)
-		return 0;
-	/*
-	 * When the node became a leader, it means it will ignore all records
-	 * from all the other nodes, and won't get late CONFIRM messages anyway.
-	 * Can clear the queue without waiting for confirmations.
-	 */
-	box_clear_synchro_queue(false);
-	return 0;
 }
 
 void
@@ -2658,9 +2636,6 @@ box_init(void)
 	txn_limbo_init();
 	sequence_init();
 	box_raft_init();
-
-	trigger_create(&box_raft_on_update, box_raft_on_update_f, NULL, NULL);
-	raft_on_update(box_raft(), &box_raft_on_update);
 }
 
 bool
