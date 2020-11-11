@@ -19,6 +19,8 @@ bool
 tt_uuid_is_equal(const struct tt_uuid *lhs, const struct tt_uuid *rhs);
 char *
 tt_uuid_str(const struct tt_uuid *uu);
+int
+tt_uuid_compare(const struct tt_uuid *a, const struct tt_uuid *b);
 extern const struct tt_uuid uuid_nil;
 ]]
 
@@ -91,13 +93,20 @@ local uuid_isnil = function(uu)
     return builtin.tt_uuid_is_nil(uu)
 end
 
+local check_uuid = function(value, index, err_lvl)
+    if is_uuid(value) then
+        return value
+    end
+
+    local err_fmt = 'incorrect value to compare with uuid as %d argument'
+    error(err_fmt:format(index), err_lvl)
+end
+
 local uuid_eq = function(lhs, rhs)
     if not is_uuid(rhs) then
         return false
     end
-    if not is_uuid(lhs) then
-        return error('Usage: uuid == var')
-    end
+    lhs = check_uuid(lhs, 1, 3)
     return builtin.tt_uuid_is_equal(lhs, rhs)
 end
 
@@ -118,9 +127,23 @@ local uuid_new_str = function()
     return uuid_tostring(uuidbuf)
 end
 
+local uuid_cmp = function(lhs, rhs)
+    lhs = check_uuid(lhs, 1, 4)
+    rhs = check_uuid(rhs, 2, 4)
+    return builtin.tt_uuid_compare(lhs, rhs)
+end
+local uuid_lt = function(lhs, rhs)
+    return uuid_cmp(lhs, rhs) < 0
+end
+local uuid_le = function(lhs, rhs)
+    return uuid_cmp(lhs, rhs) <= 0
+end
+
 local uuid_mt = {
     __tostring = uuid_tostring;
     __eq = uuid_eq;
+    __lt = uuid_lt;
+    __le = uuid_le;
     __index = {
         isnil = uuid_isnil;
         bin   = uuid_tobin;    -- binary host byteorder
