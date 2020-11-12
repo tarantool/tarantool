@@ -2763,12 +2763,12 @@ box_cfg_xc(void)
 	 * Fill in leader election parameters after bootstrap. Before it is not
 	 * possible - there may be relevant data to recover from WAL and
 	 * snapshot. Also until recovery is done, it is not possible to write
-	 * new records into WAL. It is also totally safe, because relaying is
-	 * not started until the box is configured. So it can't happen, that
-	 * this election-enabled node will try to relay to another
-	 * election-enabled node without election actually enabled leading to
-	 * disconnect.
+	 * new records into WAL. Another reason - before recovery is done,
+	 * instance_id is not known, so Raft simply can't work.
 	 */
+	if (!replication_anon)
+		raft_cfg_instance_id(box_raft(), instance_id);
+
 	if (box_set_election_timeout() != 0)
 		diag_raise();
 	/*
