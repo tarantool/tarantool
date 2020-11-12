@@ -296,6 +296,8 @@ box_tuple_validate(box_tuple_t *tuple, box_tuple_format_t *format);
 
 /** \endcond public */
 
+#define MAX_TINY_DATA_OFFSET 63
+
 /**
  * An atom of Tarantool storage. Represents MsgPack Array.
  * Tuple has the following structure:
@@ -322,21 +324,46 @@ struct PACKED tuple
 	};
 	/** Format identifier. */
 	uint16_t format_id;
+	union {
+		struct {
+			/**
+			 * Offset to the MessagePack from the beginning of the
+			 * tuple in case is_tiny == false.
+			 */
+			uint16_t data_offset: 15;
+			/**
+			 * Tuple is tiny in case it's bsize fits in 1 byte,
+			 * it's data_offset fits in 6 bits and field map
+			 * offsets fit into 1 byte each.
+			 */
+			bool is_tiny : 1;
+		};
+		struct {
+			/**
+			 * In case tuple is tiny we can fit bsize, data_offset
+			 * and is_dirty bit into 15 bits. 16th bit of the union
+			 * is still is_tiny bit itself.
+			 */
+			uint8_t tiny_bsize;
+			uint8_t tiny_data_offset : 6;
+			/**
+			 * The tuple (if it's found in index for example)
+			 * could be invisible for current transactions.
+			 * The flag which means that the tuple must be
+			 * clarified by transaction engine can be
+			 * also located at the start of the bsize
+			 * byte array (in case is_tiny == false).
+			 */
+			bool is_dirty : 1;
+		};
+	};
 	/**
-	 * Length of the MessagePack data in raw part of the
-	 * tuple.
+	 * Last 31 bits are the length of the MessagePack data
+	 * in the raw part of the tuple.
+	 * First bit contains is_dirty flag.
+	 * Valid in case of is_tiny == false. Otherwise empty.
 	 */
-	uint32_t bsize;
-	/**
-	 * Offset to the MessagePack from the begin of the tuple.
-	 */
-	uint16_t data_offset : 15;
-	/**
-	 * The tuple (if it's found in index for example) could be invisible
-	 * for current transactions. The flag means that the tuple must
-	 * be clarified by transaction engine.
-	 */
-	bool is_dirty : 1;
+	uint32_t bsize[];
 	/**
 	 * Engine specific fields and offsets array concatenated
 	 * with MessagePack fields array.
@@ -344,12 +371,100 @@ struct PACKED tuple
 	 */
 };
 
+static inline void
+tuple_set_dirty_simple(struct tuple *tuple, bool is_dirty)
+{
+	tuple->is_dirty = is_dirty;
+}
+
+static inline void
+tuple_set_dirty_bit(struct tuple *tuple, bool is_dirty)
+{
+	*tuple->bsize = is_dirty ? *tuple->bsize | 0x80000000 :
+				   *tuple->bsize & 0x7fffffff;
+}
+
+static inline void
+tuple_set_dirty(struct tuple *tuple, bool is_dirty)
+{
+	assert(tuple != NULL);
+	tuple->is_tiny ? tuple_set_dirty_simple(tuple, is_dirty) :
+			 tuple_set_dirty_bit(tuple, is_dirty);
+}
+
+static inline bool
+tuple_is_dirty(struct tuple *tuple)
+{
+	assert(tuple != NULL);
+	return tuple->is_tiny ? tuple->is_dirty :
+				*tuple->bsize >> 31;
+}
+
+static inline void
+tuple_set_tiny_bsize(struct tuple *tuple, uint8_t bsize)
+{
+	tuple->tiny_bsize = bsize;
+}
+
+static inline void
+tuple_set_31bit_bsize(struct tuple *tuple, uint32_t bsize)
+{
+	bool is_dirty = *tuple->bsize >> 31;
+	*tuple->bsize = bsize;
+	tuple_set_dirty_bit(tuple, is_dirty);
+}
+
+static inline void
+tuple_set_bsize(struct tuple *tuple, uint32_t bsize)
+{
+	assert(tuple != NULL);
+	assert(bsize <= INT32_MAX);
+	tuple->is_tiny ? tuple_set_tiny_bsize(tuple, bsize) :
+			 tuple_set_31bit_bsize(tuple, bsize);
+}
+
+static inline uint32_t
+tuple_bsize(struct tuple *tuple)
+{
+	assert(tuple != NULL);
+	return tuple->is_tiny ? tuple->tiny_bsize :
+				(*tuple->bsize << 1) >> 1;
+}
+
+static inline void
+tuple_set_tiny_data_offset(struct tuple *tuple, uint8_t data_offset)
+{
+	tuple->tiny_data_offset = data_offset;
+}
+
+static inline void
+tuple_set_15bit_data_offset(struct tuple *tuple, uint16_t data_offset)
+{
+	tuple->data_offset = data_offset;
+}
+
+static inline void
+tuple_set_data_offset(struct tuple *tuple, uint16_t data_offset)
+{
+	assert(tuple != NULL);
+	tuple->is_tiny ? tuple_set_tiny_data_offset(tuple, data_offset) :
+			 tuple_set_15bit_data_offset(tuple, data_offset);
+}
+
+static inline uint16_t
+tuple_data_offset(struct tuple *tuple)
+{
+	assert(tuple != NULL);
+	return tuple->is_tiny ? tuple->tiny_data_offset :
+				tuple->data_offset;
+}
+
 /** Size of the tuple including size of struct tuple. */
 static inline size_t
 tuple_size(struct tuple *tuple)
 {
 	/* data_offset includes sizeof(struct tuple). */
-	return tuple->data_offset + tuple->bsize;
+	return tuple_data_offset(tuple) + tuple_bsize(tuple);
 }
 
 /**
@@ -360,7 +475,7 @@ tuple_size(struct tuple *tuple)
 static inline const char *
 tuple_data(struct tuple *tuple)
 {
-	return (const char *) tuple + tuple->data_offset;
+	return (const char *)tuple + tuple_data_offset(tuple);
 }
 
 /**
@@ -381,8 +496,8 @@ tuple_data_or_null(struct tuple *tuple)
 static inline const char *
 tuple_data_range(struct tuple *tuple, uint32_t *p_size)
 {
-	*p_size = tuple->bsize;
-	return (const char *) tuple + tuple->data_offset;
+	*p_size = tuple_bsize(tuple);
+	return (const char *)tuple + tuple_data_offset(tuple);
 }
 
 /**
@@ -532,10 +647,10 @@ tuple_validate(struct tuple_format *format, struct tuple *tuple)
  * @returns a field map for the tuple.
  * @sa tuple_field_map_create()
  */
-static inline const uint32_t *
+static inline const uint8_t *
 tuple_field_map(struct tuple *tuple)
 {
-	return (const uint32_t *) ((const char *) tuple + tuple->data_offset);
+	return (uint8_t *)tuple + tuple_data_offset(tuple);
 }
 
 /**
@@ -612,9 +727,10 @@ tuple_field_go_to_key(const char **field, const char *key, int len);
  */
 static inline const char *
 tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
-			const uint32_t *field_map, uint32_t fieldno,
+			const uint8_t *field_map, uint32_t fieldno,
 			const char *path, uint32_t path_len,
-			int32_t *offset_slot_hint, int multikey_idx)
+			int32_t *offset_slot_hint, int multikey_idx,
+			bool is_tiny)
 {
 	int32_t offset_slot;
 	if (offset_slot_hint != NULL &&
@@ -661,7 +777,7 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 offset_slot_access:
 		/* Indexed field */
 		offset = field_map_get_offset(field_map, offset_slot,
-					      multikey_idx);
+					      multikey_idx, is_tiny);
 		if (offset == 0)
 			return NULL;
 		tuple += offset;
@@ -695,10 +811,10 @@ parse:
  */
 static inline const char *
 tuple_field_raw(struct tuple_format *format, const char *tuple,
-		const uint32_t *field_map, uint32_t field_no)
+		const uint8_t *field_map, uint32_t field_no, bool is_tiny)
 {
 	return tuple_field_raw_by_path(format, tuple, field_map, field_no,
-				       NULL, 0, NULL, MULTIKEY_NONE);
+				       NULL, 0, NULL, MULTIKEY_NONE, is_tiny);
 }
 
 /**
@@ -713,7 +829,8 @@ static inline const char *
 tuple_field(struct tuple *tuple, uint32_t fieldno)
 {
 	return tuple_field_raw(tuple_format(tuple), tuple_data(tuple),
-			       tuple_field_map(tuple), fieldno);
+			       tuple_field_map(tuple), fieldno,
+			       tuple->is_tiny);
 }
 
 /**
@@ -733,8 +850,9 @@ tuple_field(struct tuple *tuple, uint32_t fieldno)
  */
 const char *
 tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
-			     const uint32_t *field_map, const char *path,
-			     uint32_t path_len, uint32_t path_hash);
+			     const uint8_t *field_map, const char *path,
+			     uint32_t path_len, uint32_t path_hash,
+			     bool is_tiny);
 
 /**
  * Get a tuple field pointed to by an index part and multikey
@@ -748,8 +866,8 @@ tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
  */
 static inline const char *
 tuple_field_raw_by_part(struct tuple_format *format, const char *data,
-			const uint32_t *field_map,
-			struct key_part *part, int multikey_idx)
+			const uint8_t *field_map,
+			struct key_part *part, int multikey_idx, bool is_tiny)
 {
 	if (unlikely(part->format_epoch != format->epoch)) {
 		assert(format->epoch != 0);
@@ -762,7 +880,8 @@ tuple_field_raw_by_part(struct tuple_format *format, const char *data,
 	}
 	return tuple_field_raw_by_path(format, data, field_map, part->fieldno,
 				       part->path, part->path_len,
-				       &part->offset_slot_cache, multikey_idx);
+				       &part->offset_slot_cache, multikey_idx,
+				       is_tiny);
 }
 
 /**
@@ -778,7 +897,7 @@ tuple_field_by_part(struct tuple *tuple, struct key_part *part,
 {
 	return tuple_field_raw_by_part(tuple_format(tuple), tuple_data(tuple),
 				       tuple_field_map(tuple), part,
-				       multikey_idx);
+				       multikey_idx, tuple->is_tiny);
 }
 
 /**
@@ -792,7 +911,8 @@ tuple_field_by_part(struct tuple *tuple, struct key_part *part,
  */
 uint32_t
 tuple_raw_multikey_count(struct tuple_format *format, const char *data,
-			 const uint32_t *field_map, struct key_def *key_def);
+			 const uint8_t *field_map, struct key_def *key_def,
+			 bool is_tiny);
 
 /**
  * Get count of multikey index keys in tuple by given multikey
@@ -805,7 +925,8 @@ static inline uint32_t
 tuple_multikey_count(struct tuple *tuple, struct key_def *key_def)
 {
 	return tuple_raw_multikey_count(tuple_format(tuple), tuple_data(tuple),
-					tuple_field_map(tuple), key_def);
+					tuple_field_map(tuple), key_def,
+					tuple->is_tiny);
 }
 
 /**
@@ -1118,7 +1239,7 @@ tuple_unref(struct tuple *tuple)
 	if (unlikely(tuple->is_bigref))
 		tuple_unref_slow(tuple);
 	else if (--tuple->refs == 0) {
-		assert(!tuple->is_dirty);
+		assert(!tuple_is_dirty(tuple));
 		tuple_delete(tuple);
 	}
 }

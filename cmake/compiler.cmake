@@ -348,7 +348,7 @@ macro(enable_tnt_compile_flags)
         add_compile_flags("CXX"
             "-Wno-invalid-offsetof"
         )
-        add_compile_flags("C;CXX" "-Wno-gnu-alignof-expression")
+        add_compile_flags("C;CXX" "-Wno-gnu-alignof-expression -Wno-gnu-variable-sized-type-not-at-end")
     endif()
 
     if (CMAKE_COMPILER_IS_GNUCC)

@@ -727,7 +727,7 @@ tarantoolsqlIdxKeyCompare(struct BtCursor *cursor,
 	struct tuple *tuple;
 	const char *base;
 	struct tuple_format *format;
-	const uint32_t *field_map;
+	const uint8_t *field_map;
 	uint32_t field_count, next_fieldno = 0;
 	const char *p, *field0;
 	u32 i, n;
@@ -776,7 +776,8 @@ tarantoolsqlIdxKeyCompare(struct BtCursor *cursor,
 				uint32_t field_offset =
 					field_map_get_offset(field_map,
 							     field->offset_slot,
-							     MULTIKEY_NONE);
+							     MULTIKEY_NONE,
+							     tuple->is_tiny);
 				p = base + field_offset;
 			}
 		}
@@ -1311,5 +1312,5 @@ vdbe_field_ref_prepare_tuple(struct vdbe_field_ref *field_ref,
 			     struct tuple *tuple)
 {
 	vdbe_field_ref_create(field_ref, tuple, tuple_data(tuple),
-			      tuple->bsize);
+			      tuple_bsize(tuple));
 }

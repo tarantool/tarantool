@@ -1195,24 +1195,31 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	struct field_map_builder builder;
-	if (tuple_field_map_create(format, data, true, &builder) != 0)
+	size_t tuple_len = end - data;
+	bool is_tiny = (tuple_len <= UINT8_MAX);
+	if (tuple_field_map_create(format, data, true, &builder, &is_tiny) != 0)
 		goto end;
-	uint32_t field_map_size = field_map_build_size(&builder);
+	uint32_t field_map_size = field_map_build_size(&builder, is_tiny);
 	/*
 	 * Data offset is calculated from the begin of the struct
 	 * tuple base, not from memtx_tuple, because the struct
 	 * tuple is not the first field of the memtx_tuple.
 	 */
-	uint32_t data_offset = sizeof(struct tuple) + field_map_size;
+	is_tiny = (is_tiny && (sizeof(struct tuple) +
+			       field_map_size <= MAX_TINY_DATA_OFFSET));
+	field_map_size = field_map_build_size(&builder, is_tiny);
+	uint32_t data_offset = sizeof(struct tuple) + field_map_size +
+			       !is_tiny * sizeof(uint32_t);
+	assert(!is_tiny || data_offset <= MAX_TINY_DATA_OFFSET);
 	if (data_offset > INT16_MAX) {
-		/** tuple->data_offset is 15 bits */
+		/** tuple data_offset is 15 bits */
 		diag_set(ClientError, ER_TUPLE_METADATA_IS_TOO_BIG,
 			 data_offset);
 		goto end;
 	}
 
-	size_t tuple_len = end - data;
-	size_t total = sizeof(struct memtx_tuple) + field_map_size + tuple_len;
+	size_t total = sizeof(struct memtx_tuple) + field_map_size +
+		       tuple_len + !is_tiny * sizeof(uint32_t);
 
 	ERROR_INJECT(ERRINJ_TUPLE_ALLOC, {
 		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
@@ -1238,14 +1245,14 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	tuple = &memtx_tuple->base;
 	tuple->refs = 0;
 	memtx_tuple->version = memtx->snapshot_version;
-	assert(tuple_len <= UINT32_MAX); /* bsize is UINT32_MAX */
-	tuple->bsize = tuple_len;
+	tuple->is_tiny = is_tiny;
+	tuple_set_bsize(tuple, tuple_len);
 	tuple->format_id = tuple_format_id(format);
 	tuple_format_ref(format);
-	tuple->data_offset = data_offset;
-	tuple->is_dirty = false;
-	char *raw = (char *) tuple + tuple->data_offset;
-	field_map_build(&builder, raw - field_map_size);
+	tuple_set_data_offset(tuple, data_offset);
+	tuple_set_dirty(tuple, false);
+	char *raw = (char *) tuple + data_offset;
+	field_map_build(&builder, raw - field_map_size, is_tiny);
 	memcpy(raw, data, tuple_len);
 	say_debug("%s(%zu) = %p", __func__, tuple_len, memtx_tuple);
 end:
