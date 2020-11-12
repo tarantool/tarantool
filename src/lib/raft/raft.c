@@ -674,7 +674,7 @@ raft_sm_schedule_new_term(struct raft *raft, uint64_t new_term)
 static void
 raft_sm_schedule_new_vote(struct raft *raft, uint32_t new_vote)
 {
-	say_info("RAFT: vote for %u, follow", new_vote, raft->volatile_term);
+	say_info("RAFT: vote for %u, follow", new_vote);
 	assert(raft->volatile_vote == 0);
 	assert(raft->leader == 0);
 	assert(raft->state == RAFT_STATE_FOLLOWER);
