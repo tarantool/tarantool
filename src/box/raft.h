@@ -48,6 +48,14 @@ box_raft(void)
 	return &box_raft_global;
 }
 
+/**
+ * Let the global raft know that the election quorum could change. It happens
+ * when configuration is updated, and when new nodes are added or old are
+ * deleted from the cluster.
+ */
+void
+box_raft_update_election_quorum(void);
+
 void
 box_raft_init(void);
 

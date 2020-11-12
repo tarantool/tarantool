@@ -131,50 +131,6 @@ raft_can_vote_for(const struct raft *raft, const struct vclock *v)
 }
 
 /**
- * Election quorum is not strictly equal to synchronous replication quorum.
- * Sometimes it can be lowered. That is about bootstrap.
- *
- * The problem with bootstrap is that when the replicaset boots, all the
- * instances can't write to WAL and can't recover from their initial snapshot.
- * They need one node which will boot first, and then they will replicate from
- * it.
- *
- * This one node should boot from its zero snapshot, create replicaset UUID,
- * register self with ID 1 in _cluster space, and then register all the other
- * instances here. To do that the node must be writable. It should have
- * read_only = false, connection quorum satisfied, and be a Raft leader if Raft
- * is enabled.
- *
- * To be elected a Raft leader it needs to perform election. But it can't be
- * done before at least synchronous quorum of the replicas is bootstrapped. And
- * they can't be bootstrapped because wait for a leader to initialize _cluster.
- * Cyclic dependency.
- *
- * This is resolved by truncation of the election quorum to the number of
- * registered replicas, if their count is less than synchronous quorum. That
- * helps to elect a first leader.
- *
- * It may seem that the first node could just declare itself a leader and then
- * strictly follow the protocol from now on, but that won't work, because if the
- * first node will restart after it is booted, but before quorum of replicas is
- * booted, the cluster will stuck again.
- *
- * The current solution is totally safe because
- *
- * - after all the cluster will have node count >= quorum, if user used a
- *   correct config (God help him if he didn't);
- *
- * - synchronous replication quorum is untouched - it is not truncated. Only
- *   leader election quorum is affected. So synchronous data won't be lost.
- */
-static inline int
-raft_election_quorum(const struct raft *raft)
-{
-	(void)raft;
-	return MIN(replication_synchro_quorum, replicaset.registered_count);
-}
-
-/**
  * Wakeup the Raft worker fiber in order to do some async work. If the fiber
  * does not exist yet, it is created.
  */
@@ -427,13 +383,12 @@ raft_process_msg(struct raft *raft, const struct raft_request *req,
 			 * and now was answered by some other instance.
 			 */
 			assert(raft->volatile_vote == instance_id);
-			int quorum = raft_election_quorum(raft);
 			bool was_set = bit_set(&raft->vote_mask, source);
 			raft->vote_count += !was_set;
-			if (raft->vote_count < quorum) {
+			if (raft->vote_count < raft->election_quorum) {
 				say_info("RAFT: accepted vote for self, vote "
 					 "count is %d/%d", raft->vote_count,
-					 quorum);
+					 raft->election_quorum);
 				break;
 			}
 			raft_sm_become_leader(raft);
@@ -594,7 +549,7 @@ end_dump:
 			raft_sm_wait_leader_dead(raft);
 		} else if (raft->vote == instance_id) {
 			/* Just wrote own vote. */
-			if (raft_election_quorum(raft) == 1)
+			if (raft->election_quorum == 1)
 				raft_sm_become_leader(raft);
 			else
 				raft_sm_become_candidate(raft);
@@ -692,7 +647,7 @@ raft_sm_become_leader(struct raft *raft)
 {
 	assert(raft->state != RAFT_STATE_LEADER);
 	say_info("RAFT: enter leader state with quorum %d",
-		 raft_election_quorum(raft));
+		 raft->election_quorum);
 	assert(raft->leader == 0);
 	assert(raft->is_candidate);
 	assert(!raft->is_write_in_progress);
@@ -730,7 +685,7 @@ raft_sm_become_candidate(struct raft *raft)
 	assert(raft->vote == instance_id);
 	assert(raft->is_candidate);
 	assert(!raft->is_write_in_progress);
-	assert(raft_election_quorum(raft) > 1);
+	assert(raft->election_quorum > 1);
 	raft->state = RAFT_STATE_CANDIDATE;
 	raft->vote_count = 1;
 	raft->vote_mask = 0;
@@ -999,14 +954,14 @@ raft_cfg_election_timeout(struct raft *raft, double timeout)
 }
 
 void
-raft_cfg_election_quorum(struct raft *raft)
+raft_cfg_election_quorum(struct raft *raft, int election_quorum)
 {
-	if (raft->state != RAFT_STATE_CANDIDATE ||
-	    raft->state == RAFT_STATE_LEADER)
-		return;
-	if (raft->vote_count < raft_election_quorum(raft))
-		return;
-	raft_sm_become_leader(raft);
+	/* At least self is always a part of the quorum. */
+	assert(election_quorum > 0);
+	raft->election_quorum = election_quorum;
+	if (raft->state == RAFT_STATE_CANDIDATE &&
+	    raft->vote_count >= raft->election_quorum)
+		raft_sm_become_leader(raft);
 }
 
 void
@@ -1077,6 +1032,7 @@ raft_create(struct raft *raft)
 		.state = RAFT_STATE_FOLLOWER,
 		.volatile_term = 1,
 		.term =	1,
+		.election_quorum = 1,
 		.election_timeout = 5,
 		.death_timeout = 5,
 	};
