@@ -150,6 +150,8 @@ struct raft {
 	vclock_map_t vote_mask;
 	/** Number of votes for this instance. Valid only in candidate state. */
 	int vote_count;
+	/** Number of votes necessary for successful election. */
+	int election_quorum;
 	/** State machine timed event trigger. */
 	struct ev_timer timer;
 	/** Worker fiber to execute blocking tasks like IO. */
@@ -225,12 +227,12 @@ void
 raft_cfg_election_timeout(struct raft *raft, double timeout);
 
 /**
- * Configure Raft leader election quorum. There is no a separate option.
- * Instead, synchronous replication quorum is used. Since Raft is tightly bound
- * with synchronous replication.
+ * Configure Raft leader election quorum. That may trigger immediate election,
+ * if the quorum is lowered, and this instance is a candidate having enough
+ * votes for the new quorum.
  */
 void
-raft_cfg_election_quorum(struct raft *raft);
+raft_cfg_election_quorum(struct raft *raft, int election_quorum);
 
 /**
  * Configure Raft leader death timeout. I.e. number of seconds without

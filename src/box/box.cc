@@ -921,7 +921,7 @@ box_set_replication_synchro_quorum(void)
 		return -1;
 	replication_synchro_quorum = value;
 	txn_limbo_on_parameters_change(&txn_limbo);
-	raft_cfg_election_quorum(box_raft());
+	box_raft_update_election_quorum();
 	return 0;
 }
 
