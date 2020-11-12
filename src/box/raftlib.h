@@ -95,6 +95,8 @@ const char *
 raft_state_str(uint32_t state);
 
 struct raft {
+	/** Instance ID of this node. */
+	uint32_t self;
 	/** Instance ID of leader of the current term. */
 	uint32_t leader;
 	/** State of the instance. */
@@ -240,6 +242,13 @@ raft_cfg_election_quorum(struct raft *raft, int election_quorum);
  */
 void
 raft_cfg_death_timeout(struct raft *raft, double death_timeout);
+
+/**
+ * Configure ID of the given Raft instance. The ID can't be changed after it is
+ * assigned first time.
+ */
+void
+raft_cfg_instance_id(struct raft *raft, uint32_t instance_id);
 
 /**
  * Bump the term. When it is persisted, the node checks if there is a leader,

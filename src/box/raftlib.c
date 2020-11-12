@@ -296,7 +296,7 @@ raft_process_msg(struct raft *raft, const struct raft_request *req,
 	say_info("RAFT: message %s from %u", raft_request_to_string(req),
 		 source);
 	assert(source > 0);
-	assert(source != instance_id);
+	assert(source != raft->self);
 	if (req->term == 0 || req->state == 0) {
 		diag_set(ClientError, ER_PROTOCOL, "Raft term and state can't "
 			 "be zero");
@@ -337,7 +337,7 @@ raft_process_msg(struct raft *raft, const struct raft_request *req,
 					 raft->leader);
 				break;
 			}
-			if (req->vote == instance_id) {
+			if (req->vote == raft->self) {
 				/*
 				 * This is entirely valid. This instance could
 				 * request a vote, then become a follower or
@@ -373,7 +373,7 @@ raft_process_msg(struct raft *raft, const struct raft_request *req,
 			break;
 		case RAFT_STATE_CANDIDATE:
 			/* Check if this is a vote for a competing candidate. */
-			if (req->vote != instance_id) {
+			if (req->vote != raft->self) {
 				say_info("RAFT: vote request is skipped - "
 					 "competing candidate");
 				break;
@@ -382,7 +382,7 @@ raft_process_msg(struct raft *raft, const struct raft_request *req,
 			 * Vote for self was requested earlier in this round,
 			 * and now was answered by some other instance.
 			 */
-			assert(raft->volatile_vote == instance_id);
+			assert(raft->volatile_vote == raft->self);
 			bool was_set = bit_set(&raft->vote_mask, source);
 			raft->vote_count += !was_set;
 			if (raft->vote_count < raft->election_quorum) {
@@ -547,7 +547,7 @@ end_dump:
 		} else if (raft->leader != 0) {
 			/* There is a known leader. Wait until it is dead. */
 			raft_sm_wait_leader_dead(raft);
-		} else if (raft->vote == instance_id) {
+		} else if (raft->vote == raft->self) {
 			/* Just wrote own vote. */
 			if (raft->election_quorum == 1)
 				raft_sm_become_leader(raft);
@@ -561,7 +561,7 @@ end_dump:
 			raft_sm_wait_election_end(raft);
 		} else {
 			/* No leaders, no votes. */
-			raft_sm_schedule_new_vote(raft, instance_id);
+			raft_sm_schedule_new_vote(raft, raft->self);
 		}
 	} else {
 		memset(&req, 0, sizeof(req));
@@ -596,7 +596,7 @@ raft_worker_handle_broadcast(struct raft *raft)
 	req.vote = raft->vote;
 	req.state = raft->state;
 	if (req.state == RAFT_STATE_CANDIDATE) {
-		assert(raft->vote == instance_id);
+		assert(raft->vote == raft->self);
 		req.vclock = &replicaset.vclock;
 	}
 	replicaset_foreach(replica)
@@ -652,7 +652,7 @@ raft_sm_become_leader(struct raft *raft)
 	assert(raft->is_candidate);
 	assert(!raft->is_write_in_progress);
 	raft->state = RAFT_STATE_LEADER;
-	raft->leader = instance_id;
+	raft->leader = raft->self;
 	ev_timer_stop(loop(), &raft->timer);
 	/* Make read-write (if other subsystems allow that. */
 	box_update_ro_summary();
@@ -682,14 +682,14 @@ raft_sm_become_candidate(struct raft *raft)
 	say_info("RAFT: enter candidate state with 1 self vote");
 	assert(raft->state == RAFT_STATE_FOLLOWER);
 	assert(raft->leader == 0);
-	assert(raft->vote == instance_id);
+	assert(raft->vote == raft->self);
 	assert(raft->is_candidate);
 	assert(!raft->is_write_in_progress);
 	assert(raft->election_quorum > 1);
 	raft->state = RAFT_STATE_CANDIDATE;
 	raft->vote_count = 1;
 	raft->vote_mask = 0;
-	bit_set(&raft->vote_mask, instance_id);
+	bit_set(&raft->vote_mask, raft->self);
 	raft_sm_wait_election_end(raft);
 	/* State is visible and it is changed - broadcast. */
 	raft_schedule_broadcast(raft);
@@ -736,7 +736,7 @@ raft_sm_schedule_new_election(struct raft *raft)
 	assert(raft->is_candidate);
 	/* Everyone is a follower until its vote for self is persisted. */
 	raft_sm_schedule_new_term(raft, raft->term + 1);
-	raft_sm_schedule_new_vote(raft, instance_id);
+	raft_sm_schedule_new_vote(raft, raft->self);
 	box_update_ro_summary();
 }
 
@@ -783,7 +783,7 @@ raft_sm_wait_election_end(struct raft *raft)
 	assert(raft->is_candidate);
 	assert(raft->state == RAFT_STATE_FOLLOWER ||
 	       (raft->state == RAFT_STATE_CANDIDATE &&
-		raft->volatile_vote == instance_id));
+		raft->volatile_vote == raft->self));
 	assert(raft->leader == 0);
 	double election_timeout = raft->election_timeout +
 				  raft_new_random_election_shift(raft);
@@ -977,6 +977,14 @@ raft_cfg_death_timeout(struct raft *raft, double death_timeout)
 		ev_timer_set(&raft->timer, timeout, timeout);
 		ev_timer_start(loop(), &raft->timer);
 	}
+}
+
+void
+raft_cfg_instance_id(struct raft *raft, uint32_t instance_id)
+{
+	assert(raft->self == 0);
+	assert(instance_id != 0);
+	raft->self = instance_id;
 }
 
 void
