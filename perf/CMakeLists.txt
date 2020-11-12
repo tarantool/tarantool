@@ -1,0 +1,22 @@
+add_compile_flags("C;CXX" "-Wno-unused" "-Wno-unused-result" "-std=c99")
+if(CC_HAS_WNO_TAUTOLOGICAL_COMPARE)
+    add_compile_flags("C;CXX" "-Wno-tautological-compare")
+endif()
+file(GLOB all_sources *.c *.cc)
+set_source_files_compile_flags(${all_sources})
+
+if(NOT TARGET_OS_OPENBSD)
+    set(LIB_DL "dl")
+endif()
+
+include_directories(${LUAJIT_INCLUDE_DIRS})
+include_directories(${MSGPUCK_INCLUDE_DIRS})
+include_directories(${PROJECT_SOURCE_DIR}/src)
+include_directories(${PROJECT_BINARY_DIR}/src)
+include_directories(${PROJECT_SOURCE_DIR}/src/box)
+include_directories(${CMAKE_SOURCE_DIR}/third_party)
+include_directories(${ICU_INCLUDE_DIRS})
+include_directories(${CURL_INCLUDE_DIRS})
+
+add_executable(tuple.perftest tuple.c)
+target_link_libraries(tuple.perftest core box tuple)

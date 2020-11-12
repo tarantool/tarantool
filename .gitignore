@@ -42,6 +42,7 @@ doc/*/Makefile
 extra/Makefile
 extra/*/Makefile
 extra/luarocks/hardcoded.lua
+perf/Makefile
 test/Makefile
 test/*/Makefile
 Doxyfile.API
@@ -88,6 +89,7 @@ src/box/lua/*.lua.c
 src/tarantool
 src/module.h
 tarantool-*.tar.gz
+perf/*.perftest
 test/lib/
 test/unit/*.test
 test/unit/fiob

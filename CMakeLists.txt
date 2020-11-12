@@ -539,6 +539,7 @@ include (cmake/rpm.cmake)
 add_subdirectory(src)
 add_subdirectory(extra)
 add_subdirectory(test)
+add_subdirectory(perf)
 add_subdirectory(doc)
 
 option(WITH_NOTIFY_SOCKET "Enable notifications on NOTIFY_SOCKET" ON)
