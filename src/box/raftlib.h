@@ -154,6 +154,15 @@ struct raft {
 	int vote_count;
 	/** Number of votes necessary for successful election. */
 	int election_quorum;
+	/**
+	 * Vclock of the Raft node owner. Raft never changes it, only watches,
+	 * and makes decisions based on it. The value is not stored by copy so
+	 * as to avoid frequent updates. If every transaction would need to
+	 * update several vclocks in different places, it would be too
+	 * expensive. So they update only one vclock, which is shared between
+	 * subsystems, such as Raft.
+	 */
+	const struct vclock *vclock;
 	/** State machine timed event trigger. */
 	struct ev_timer timer;
 	/** Worker fiber to execute blocking tasks like IO. */
@@ -249,6 +258,13 @@ raft_cfg_death_timeout(struct raft *raft, double death_timeout);
  */
 void
 raft_cfg_instance_id(struct raft *raft, uint32_t instance_id);
+
+/**
+ * Configure vclock of the given Raft instance. The vclock is not copied, so the
+ * caller must keep it valid.
+ */
+void
+raft_cfg_vclock(struct raft *raft, const struct vclock *vclock);
 
 /**
  * Bump the term. When it is persisted, the node checks if there is a leader,

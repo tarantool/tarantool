@@ -125,8 +125,7 @@ raft_new_random_election_shift(const struct raft *raft)
 static inline bool
 raft_can_vote_for(const struct raft *raft, const struct vclock *v)
 {
-	(void)raft;
-	int cmp = vclock_compare_ignore0(v, &replicaset.vclock);
+	int cmp = vclock_compare_ignore0(v, raft->vclock);
 	return cmp == 0 || cmp == 1;
 }
 
@@ -597,7 +596,7 @@ raft_worker_handle_broadcast(struct raft *raft)
 	req.state = raft->state;
 	if (req.state == RAFT_STATE_CANDIDATE) {
 		assert(raft->vote == raft->self);
-		req.vclock = &replicaset.vclock;
+		req.vclock = raft->vclock;
 	}
 	replicaset_foreach(replica)
 		relay_push_raft(replica->relay, &req);
@@ -865,7 +864,7 @@ raft_serialize_for_network(const struct raft *raft, struct raft_request *req)
 	 * Vclock is sent out only by candidate instances.
 	 */
 	if (req->state == RAFT_STATE_CANDIDATE)
-		req->vclock = &replicaset.vclock;
+		req->vclock = raft->vclock;
 }
 
 void
@@ -982,6 +981,14 @@ raft_cfg_instance_id(struct raft *raft, uint32_t instance_id)
 	assert(raft->self == 0);
 	assert(instance_id != 0);
 	raft->self = instance_id;
+}
+
+void
+raft_cfg_vclock(struct raft *raft, const struct vclock *vclock)
+{
+	assert(raft->vclock == NULL);
+	assert(vclock != NULL);
+	raft->vclock = vclock;
 }
 
 void
