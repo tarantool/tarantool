@@ -2768,6 +2768,7 @@ box_cfg_xc(void)
 	 */
 	if (!replication_anon)
 		raft_cfg_instance_id(box_raft(), instance_id);
+	raft_cfg_vclock(box_raft(), &replicaset.vclock);
 
 	if (box_set_election_timeout() != 0)
 		diag_raise();
