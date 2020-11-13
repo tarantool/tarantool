@@ -528,10 +528,9 @@ func_c_load(struct func_c *func)
 	struct func_name name;
 	func_split_name(func->base.def->name, &name);
 
-	struct module *module = module_cache_find(name.package,
-						  name.package_end);
-	if (module == NULL) {
-		/* Try to find loaded module in the cache */
+	struct module *cached, *module;
+	cached = module_cache_find(name.package, name.package_end);
+	if (cached == NULL) {
 		module = module_load(name.package, name.package_end);
 		if (module == NULL)
 			return -1;
@@ -539,11 +538,27 @@ func_c_load(struct func_c *func)
 			module_delete(module);
 			return -1;
 		}
+	} else {
+		module = cached;
 	}
 
 	func->func = module_sym(module, name.sym);
-	if (func->func == NULL)
+	if (func->func == NULL) {
+		if (cached == NULL) {
+			/*
+			 * In case if it was a first load we should
+			 * clean the cache immediately otherwise
+			 * the module continue being referenced even
+			 * if there will be no use of it.
+			 *
+			 * Note the module_sym set an error thus be
+			 * careful to not wipe it.
+			 */
+			module_cache_del(name.package, name.package_end);
+			module_delete(module);
+		}
 		return -1;
+	}
 	func->module = module;
 	rlist_add(&module->funcs, &func->item);
 	return 0;
