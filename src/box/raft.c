@@ -29,8 +29,12 @@
  * SUCH DAMAGE.
  */
 #include "box.h"
+#include "error.h"
+#include "journal.h"
 #include "raft.h"
+#include "relay.h"
 #include "replication.h"
+#include "xrow.h"
 
 struct raft box_raft_global = {
 	/*
@@ -114,10 +118,68 @@ box_raft_update_election_quorum(void)
 	raft_cfg_election_quorum(box_raft(), quorum);
 }
 
+static void
+box_raft_broadcast(struct raft *raft, const struct raft_request *req)
+{
+	(void)raft;
+	assert(raft == box_raft());
+	replicaset_foreach(replica)
+		relay_push_raft(replica->relay, req);
+}
+
+/** Wakeup Raft state writer fiber waiting for WAL write end. */
+static void
+box_raft_write_cb(struct journal_entry *entry)
+{
+	fiber_wakeup(entry->complete_data);
+}
+
+static void
+box_raft_write(struct raft *raft, const struct raft_request *req)
+{
+	(void)raft;
+	assert(raft == box_raft());
+	/* See Raft implementation why these fields are never written. */
+	assert(req->vclock == NULL);
+	assert(req->state == 0);
+
+	struct region *region = &fiber()->gc;
+	uint32_t svp = region_used(region);
+	struct xrow_header row;
+	char buf[sizeof(struct journal_entry) +
+		 sizeof(struct xrow_header *)];
+	struct journal_entry *entry = (struct journal_entry *)buf;
+	entry->rows[0] = &row;
+
+	if (xrow_encode_raft(&row, region, req) != 0)
+		goto fail;
+	journal_entry_create(entry, 1, xrow_approx_len(&row), box_raft_write_cb,
+			     fiber());
+
+	if (journal_write(entry) != 0 || entry->res < 0) {
+		diag_set(ClientError, ER_WAL_IO);
+		diag_log();
+		goto fail;
+	}
+
+	region_truncate(region, svp);
+	return;
+fail:
+	/*
+	 * XXX: the stub is supposed to be removed once it is defined what to do
+	 * when a raft request WAL write fails.
+	 */
+	panic("Could not write a raft request to WAL\n");
+}
+
 void
 box_raft_init(void)
 {
-	raft_create(&box_raft_global);
+	static const struct raft_vtab box_raft_vtab = {
+		.broadcast = box_raft_broadcast,
+		.write = box_raft_write,
+	};
+	raft_create(&box_raft_global, &box_raft_vtab);
 	trigger_create(&box_raft_on_update, box_raft_on_update_f, NULL, NULL);
 	raft_on_update(box_raft(), &box_raft_on_update);
 }
