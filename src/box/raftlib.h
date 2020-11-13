@@ -69,6 +69,7 @@ extern "C" {
  */
 
 struct fiber;
+struct raft;
 struct raft_request;
 
 enum raft_state {
@@ -93,6 +94,21 @@ enum raft_state {
  */
 const char *
 raft_state_str(uint32_t state);
+
+typedef void (*raft_broadcast_f)(struct raft *raft,
+				 const struct raft_request *req);
+typedef void (*raft_write_f)(struct raft *raft, const struct raft_request *req);
+
+/**
+ * Raft connection to the environment, via which it talks to other nodes and
+ * saves something to disk.
+ */
+struct raft_vtab {
+	/** Send a message to all nodes in the cluster. */
+	raft_broadcast_f broadcast;
+	/** Save a message to disk. */
+	raft_write_f write;
+};
 
 struct raft {
 	/** Instance ID of this node. */
@@ -174,6 +190,8 @@ struct raft {
 	 * elections can be started.
 	 */
 	double death_timeout;
+	/** Virtual table to perform application-specific actions. */
+	const struct raft_vtab *vtab;
 	/**
 	 * Trigger invoked each time any of the Raft node visible attributes are
 	 * changed.
@@ -295,8 +313,12 @@ raft_serialize_for_disk(const struct raft *raft, struct raft_request *req);
 void
 raft_on_update(struct raft *raft, struct trigger *trigger);
 
+/**
+ * Create a Raft node. The vtab is not copied. Its memory should stay valid even
+ * after the creation.
+ */
 void
-raft_create(struct raft *raft);
+raft_create(struct raft *raft, const struct raft_vtab *vtab);
 
 void
 raft_destroy(struct raft *raft);

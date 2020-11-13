@@ -31,11 +31,8 @@
 #include "raft.h"
 
 #include "error.h"
-#include "journal.h"
+#include "fiber.h"
 #include "xrow.h"
-#include "small/region.h"
-#include "replication.h"
-#include "relay.h"
 #include "box.h"
 #include "tt_static.h"
 
@@ -63,6 +60,20 @@ raft_state_str(uint32_t state)
 
 	return "invalid (x)";
 };
+
+/** Shortcut for vtab 'broadcast' method. */
+static inline void
+raft_broadcast(struct raft *raft, const struct raft_request *req)
+{
+	raft->vtab->broadcast(raft, req);
+}
+
+/** Shortcut for vtab 'write' method. */
+static inline void
+raft_write(struct raft *raft, const struct raft_request *req)
+{
+	raft->vtab->write(raft, req);
+}
 
 /**
  * Check if Raft is completely synced with disk. Meaning all its critical values
@@ -469,58 +480,6 @@ raft_process_heartbeat(struct raft *raft, uint32_t source)
 	raft_sm_wait_leader_dead(raft);
 }
 
-/** Wakeup Raft state writer fiber waiting for WAL write end. */
-static void
-raft_write_cb(struct journal_entry *entry)
-{
-	fiber_wakeup(entry->complete_data);
-}
-
-/** Synchronously write a Raft request into WAL. */
-static void
-raft_write_request(const struct raft_request *req)
-{
-	/*
-	 * Vclock is never persisted by Raft. It is used only to
-	 * be sent to network when vote for self.
-	 */
-	assert(req->vclock == NULL);
-	/*
-	 * State is not persisted. That would be strictly against Raft protocol.
-	 * The reason is that it does not make much sense - even if the node is
-	 * a leader now, after the node is restarted, there will be another
-	 * leader elected by that time likely.
-	 */
-	assert(req->state == 0);
-	struct region *region = &fiber()->gc;
-	uint32_t svp = region_used(region);
-	struct xrow_header row;
-	char buf[sizeof(struct journal_entry) +
-		 sizeof(struct xrow_header *)];
-	struct journal_entry *entry = (struct journal_entry *)buf;
-	entry->rows[0] = &row;
-
-	if (xrow_encode_raft(&row, region, req) != 0)
-		goto fail;
-	journal_entry_create(entry, 1, xrow_approx_len(&row), raft_write_cb,
-			     fiber());
-
-	if (journal_write(entry) != 0 || entry->res < 0) {
-		diag_set(ClientError, ER_WAL_IO);
-		diag_log();
-		goto fail;
-	}
-
-	region_truncate(region, svp);
-	return;
-fail:
-	/*
-	 * XXX: the stub is supposed to be removed once it is defined what to do
-	 * when a raft request WAL write fails.
-	 */
-	panic("Could not write a raft request to WAL\n");
-}
-
 /* Dump Raft state to WAL in a blocking way. */
 static void
 raft_worker_handle_io(struct raft *raft)
@@ -567,8 +526,17 @@ end_dump:
 		assert(raft->volatile_term >= raft->term);
 		req.term = raft->volatile_term;
 		req.vote = raft->volatile_vote;
-
-		raft_write_request(&req);
+		/*
+		 * Skip vclock. It is used only to be sent to network when vote
+		 * for self. It is a job of the vclock owner to persist it
+		 * anyhow.
+		 *
+		 * Skip state. That would be strictly against Raft protocol. The
+		 * reason is that it does not make much sense - even if the node
+		 * is a leader now, after the node is restarted, there will be
+		 * another leader elected by that time likely.
+		 */
+		raft_write(raft, &req);
 		say_info("RAFT: persisted state %s",
 			 raft_request_to_string(&req));
 
@@ -598,8 +566,7 @@ raft_worker_handle_broadcast(struct raft *raft)
 		assert(raft->vote == raft->self);
 		req.vclock = raft->vclock;
 	}
-	replicaset_foreach(replica)
-		relay_push_raft(replica->relay, &req);
+	raft_broadcast(raft, &req);
 	trigger_run(&raft->on_update, raft);
 	raft->is_broadcast_scheduled = false;
 }
@@ -1038,7 +1005,7 @@ raft_schedule_broadcast(struct raft *raft)
 }
 
 void
-raft_create(struct raft *raft)
+raft_create(struct raft *raft, const struct raft_vtab *vtab)
 {
 	*raft = (struct raft) {
 		.state = RAFT_STATE_FOLLOWER,
@@ -1047,6 +1014,7 @@ raft_create(struct raft *raft)
 		.election_quorum = 1,
 		.election_timeout = 5,
 		.death_timeout = 5,
+		.vtab = vtab,
 	};
 	ev_timer_init(&raft->timer, raft_sm_schedule_new_election_cb, 0, 0);
 	raft->timer.data = raft;
