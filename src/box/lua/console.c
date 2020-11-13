@@ -48,8 +48,6 @@
 #include <stdlib.h>
 #include <ctype.h>
 
-extern char serpent_lua[];
-
 static struct luaL_serializer *serializer_yaml;
 static struct luaL_serializer *serializer_lua;
 
@@ -578,24 +576,6 @@ console_session_push(struct session *session, struct port *port)
 				     TIMEOUT_INFINITY);
 }
 
-static void
-lua_serpent_init(struct lua_State *L)
-{
-	static const char modname[] = "serpent";
-	const char *modfile;
-
-	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-	modfile = lua_pushfstring(L, "@builtin/%s.lua", modname);
-	if (luaL_loadbuffer(L, serpent_lua, strlen(serpent_lua), modfile)) {
-		panic("Error loading Lua module %s...: %s",
-		      modname, lua_tostring(L, -1));
-	}
-
-	lua_call(L, 0, 1);
-	lua_setfield(L, -3, modname);  /* _LOADED[modname] = new table */
-	lua_pop(L, 2);
-}
-
 void
 tarantool_lua_console_init(struct lua_State *L)
 {
@@ -663,12 +643,6 @@ tarantool_lua_console_init(struct lua_State *L)
 	};
 	session_vtab_registry[SESSION_TYPE_CONSOLE] = console_session_vtab;
 	session_vtab_registry[SESSION_TYPE_REPL] = console_session_vtab;
-
-	/*
-	 * Register serpent serializer as we
-	 * need it inside console REPL mode.
-	 */
-	lua_serpent_init(L);
 }
 
 /*

@@ -29,7 +29,6 @@ include_files = {
 exclude_files = {
     "build/**/*.lua",
     -- Third-party source code.
-    "src/box/lua/serpent.lua",
     "test-run/**/*.lua",
     "test/**/*.lua",
     "third_party/**/*.lua",
