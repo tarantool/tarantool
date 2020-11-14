@@ -29,7 +29,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "raftlib.h"
+#include "raft/raft.h"
 
 #if defined(__cplusplus)
 extern "C" {

@@ -169,7 +169,6 @@ add_library(box STATIC
     port.c
     txn.c
     txn_limbo.c
-    raftlib.c
     raft.c
     box.cc
     gc.c
@@ -263,6 +262,6 @@ add_custom_command(OUTPUT ${SQL_BIN_DIR}/opcodes.c
         ${SQL_BIN_DIR}/opcodes.h)
 
 target_link_libraries(box box_error tuple stat xrow xlog vclock crc32 scramble
-                      ${common_libraries})
+                      raft ${common_libraries})
 
 add_dependencies(box build_bundled_libs generate_sql_files)
