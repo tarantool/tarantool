@@ -30,7 +30,7 @@
  */
 #include "raft.h"
 
-#include "error.h"
+#include "exception.h"
 #include "fiber.h"
 #include "tt_static.h"
 
@@ -311,14 +311,13 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 	assert(source > 0);
 	assert(source != raft->self);
 	if (req->term == 0 || req->state == 0) {
-		diag_set(ClientError, ER_PROTOCOL, "Raft term and state can't "
-			 "be zero");
+		diag_set(RaftError, "Raft term and state can't be zero");
 		return -1;
 	}
 	if (req->state == RAFT_STATE_CANDIDATE &&
 	    (req->vote != source || req->vclock == NULL)) {
-		diag_set(ClientError, ER_PROTOCOL, "Candidate should always "
-			 "vote for self and provide its vclock");
+		diag_set(RaftError, "Candidate should always vote for self and "
+			 "provide its vclock");
 		return -1;
 	}
 	/* Outdated request. */
