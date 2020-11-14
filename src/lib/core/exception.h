@@ -52,6 +52,7 @@ extern const struct type_info type_SystemError;
 extern const struct type_info type_CollationError;
 extern const struct type_info type_SwimError;
 extern const struct type_info type_CryptoError;
+extern const struct type_info type_RaftError;
 
 const char *
 exception_get_string(struct error *e, const struct method_info *method);
@@ -165,6 +166,12 @@ public:
 class CryptoError: public Exception {
 public:
 	CryptoError(const char *file, unsigned line, const char *format, ...);
+	virtual void raise() { throw this; }
+};
+
+class RaftError: public Exception {
+public:
+	RaftError(const char *file, unsigned line, const char *format, ...);
 	virtual void raise() { throw this; }
 };
 

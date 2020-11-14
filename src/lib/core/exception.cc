@@ -288,6 +288,18 @@ CryptoError::CryptoError(const char *file, unsigned line,
 	va_end(ap);
 }
 
+const struct type_info type_RaftError =
+	make_type("RaftError", &type_Exception);
+
+RaftError::RaftError(const char *file, unsigned line, const char *format, ...)
+	: Exception(&type_RaftError, file, line)
+{
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(this, format, ap);
+	va_end(ap);
+}
+
 #define BuildAlloc(type)				\
 	void *p = malloc(sizeof(type));			\
 	if (p == NULL)					\
@@ -406,6 +418,18 @@ BuildSocketError(const char *file, unsigned line, const char *socketname,
 	va_end(ap);
 	error_format_msg(e, "%s, called on %s", buf, socketname);
 	errno = save_errno;
+	return e;
+}
+
+struct error *
+BuildRaftError(const char *file, unsigned line, const char *format, ...)
+{
+	BuildAlloc(RaftError);
+	RaftError *e =  new (p) RaftError(file, line, "");
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(e, format, ap);
+	va_end(ap);
 	return e;
 }
 
