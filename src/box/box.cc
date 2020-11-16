@@ -394,7 +394,7 @@ apply_wal_row(struct xstream *stream, struct xrow_header *row)
 		/* Vclock is never persisted in WAL by Raft. */
 		if (xrow_decode_raft(row, &raft_req, NULL) != 0)
 			diag_raise();
-		raft_process_recovery(box_raft(), &raft_req);
+		box_raft_recover(&raft_req);
 		return;
 	}
 	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));
@@ -2142,7 +2142,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 		 * should be 0.
 		 */
 		struct raft_request req;
-		raft_serialize_for_network(box_raft(), &req);
+		box_raft_checkpoint_remote(&req);
 		xrow_encode_raft(&row, &fiber()->gc, &req);
 		coio_write_xrow(io, &row);
 	}

@@ -70,7 +70,6 @@ extern "C" {
 
 struct fiber;
 struct raft;
-struct raft_request;
 
 enum raft_state {
 	/**
@@ -95,9 +94,32 @@ enum raft_state {
 const char *
 raft_state_str(uint32_t state);
 
-typedef void (*raft_broadcast_f)(struct raft *raft,
-				 const struct raft_request *req);
-typedef void (*raft_write_f)(struct raft *raft, const struct raft_request *req);
+/**
+ * Basic Raft communication unit for talking to other nodes, and even to other
+ * subsystems such as disk storage.
+ */
+struct raft_msg {
+	/** Term of the instance. */
+	uint64_t term;
+	/**
+	 * Instance ID of the instance this node voted for in the current term.
+	 * 0 means the node didn't vote in this term.
+	 */
+	uint32_t vote;
+	/**
+	 * State of the instance. Can be 0 if the state does not matter for the
+	 * message. For instance, when the message is sent to disk.
+	 */
+	enum raft_state state;
+	/**
+	 * Vclock of the instance. Can be NULL, if the node is not a candidate.
+	 * Also is omitted when does not matter (when the message is for disk).
+	 */
+	const struct vclock *vclock;
+};
+
+typedef void (*raft_broadcast_f)(struct raft *raft, const struct raft_msg *req);
+typedef void (*raft_write_f)(struct raft *raft, const struct raft_msg *req);
 
 /**
  * Raft connection to the environment, via which it talks to other nodes and
@@ -226,11 +248,11 @@ raft_is_enabled(const struct raft *raft)
 
 /** Process a raft entry stored in WAL/snapshot. */
 void
-raft_process_recovery(struct raft *raft, const struct raft_request *req);
+raft_process_recovery(struct raft *raft, const struct raft_msg *req);
 
 /** Process a raft status message coming from the network. */
 int
-raft_process_msg(struct raft *raft, const struct raft_request *req,
+raft_process_msg(struct raft *raft, const struct raft_msg *req,
 		 uint32_t source);
 
 /**
@@ -297,14 +319,14 @@ raft_new_term(struct raft *raft);
  * cluster. It is allowed to save anything here, not only persistent state.
  */
 void
-raft_serialize_for_network(const struct raft *raft, struct raft_request *req);
+raft_checkpoint_remote(const struct raft *raft, struct raft_msg *req);
 
 /**
  * Save complete Raft state into a request to be persisted on disk. Only term
  * and vote are being persisted.
  */
 void
-raft_serialize_for_disk(const struct raft *raft, struct raft_request *req);
+raft_checkpoint_local(const struct raft *raft, struct raft_msg *req);
 
 /**
  * Add a trigger invoked each time any of the Raft node visible attributes are
