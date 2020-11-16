@@ -263,8 +263,7 @@ raft_new_term(struct raft *raft);
  * cluster. It is allowed to save anything here, not only persistent state.
  */
 void
-raft_serialize_for_network(const struct raft *raft, struct raft_request *req,
-			   struct vclock *vclock);
+raft_serialize_for_network(const struct raft *raft, struct raft_request *req);
 
 /**
  * Save complete Raft state into a request to be persisted on disk. Only term

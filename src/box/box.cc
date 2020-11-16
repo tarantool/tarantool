@@ -2142,7 +2142,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 		 * should be 0.
 		 */
 		struct raft_request req;
-		raft_serialize_for_network(box_raft(), &req, &vclock);
+		raft_serialize_for_network(box_raft(), &req);
 		xrow_encode_raft(&row, &fiber()->gc, &req);
 		coio_write_xrow(io, &row);
 	}
