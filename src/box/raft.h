@@ -35,6 +35,8 @@
 extern "C" {
 #endif
 
+struct raft_request;
+
 /** Raft state of this instance. */
 static inline struct raft *
 box_raft(void)
@@ -55,6 +57,28 @@ box_raft(void)
  */
 void
 box_raft_update_election_quorum(void);
+
+/**
+ * Recover a single Raft request. Raft state machine is not turned on yet, this
+ * works only during instance recovery from the journal.
+ */
+void
+box_raft_recover(const struct raft_request *req);
+
+/** Save complete Raft state into a request to be persisted on disk locally. */
+void
+box_raft_checkpoint_local(struct raft_request *req);
+
+/**
+ * Save complete Raft state into a request to be sent to other instances of the
+ * cluster.
+ */
+void
+box_raft_checkpoint_remote(struct raft_request *req);
+
+/** Handle a single Raft request from a node with instance id @a source. */
+int
+box_raft_process(struct raft_request *req, uint32_t source);
 
 void
 box_raft_init(void);

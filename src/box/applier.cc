@@ -893,7 +893,7 @@ applier_handle_raft(struct applier *applier, struct xrow_header *row)
 	struct vclock candidate_clock;
 	if (xrow_decode_raft(row, &req, &candidate_clock) != 0)
 		return -1;
-	return raft_process_msg(box_raft(), &req, applier->instance_id);
+	return box_raft_process(&req, applier->instance_id);
 }
 
 /**

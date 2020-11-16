@@ -264,6 +264,10 @@ xrow_encode_synchro(struct xrow_header *row,
 int
 xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req);
 
+/**
+ * Raft request. It repeats Raft message to the letter, but can be extended in
+ * future not depending on the Raft library.
+ */
 struct raft_request {
 	uint64_t term;
 	uint32_t vote;

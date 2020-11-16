@@ -50,6 +50,28 @@ struct raft box_raft_global = {
  */
 static struct trigger box_raft_on_update;
 
+static void
+box_raft_msg_to_request(const struct raft_msg *msg, struct raft_request *req)
+{
+	*req = (struct raft_request) {
+		.term = msg->term,
+		.vote = msg->vote,
+		.state = msg->state,
+		.vclock = msg->vclock,
+	};
+}
+
+static void
+box_raft_request_to_msg(const struct raft_request *req, struct raft_msg *msg)
+{
+	*msg = (struct raft_msg) {
+		.term = req->term,
+		.vote = req->vote,
+		.state = req->state,
+		.vclock = req->vclock,
+	};
+}
+
 static int
 box_raft_on_update_f(struct trigger *trigger, void *event)
 {
@@ -118,13 +140,47 @@ box_raft_update_election_quorum(void)
 	raft_cfg_election_quorum(box_raft(), quorum);
 }
 
+void
+box_raft_recover(const struct raft_request *req)
+{
+	struct raft_msg msg;
+	box_raft_request_to_msg(req, &msg);
+	raft_process_recovery(box_raft(), &msg);
+}
+
+void
+box_raft_checkpoint_local(struct raft_request *req)
+{
+	struct raft_msg msg;
+	raft_checkpoint_local(box_raft(), &msg);
+	box_raft_msg_to_request(&msg, req);
+}
+
+void
+box_raft_checkpoint_remote(struct raft_request *req)
+{
+	struct raft_msg msg;
+	raft_checkpoint_remote(box_raft(), &msg);
+	box_raft_msg_to_request(&msg, req);
+}
+
+int
+box_raft_process(struct raft_request *req, uint32_t source)
+{
+	struct raft_msg msg;
+	box_raft_request_to_msg(req, &msg);
+	return raft_process_msg(box_raft(), &msg, source);
+}
+
 static void
-box_raft_broadcast(struct raft *raft, const struct raft_request *req)
+box_raft_broadcast(struct raft *raft, const struct raft_msg *msg)
 {
 	(void)raft;
 	assert(raft == box_raft());
+	struct raft_request req;
+	box_raft_msg_to_request(msg, &req);
 	replicaset_foreach(replica)
-		relay_push_raft(replica->relay, req);
+		relay_push_raft(replica->relay, &req);
 }
 
 /** Wakeup Raft state writer fiber waiting for WAL write end. */
@@ -135,14 +191,16 @@ box_raft_write_cb(struct journal_entry *entry)
 }
 
 static void
-box_raft_write(struct raft *raft, const struct raft_request *req)
+box_raft_write(struct raft *raft, const struct raft_msg *msg)
 {
 	(void)raft;
 	assert(raft == box_raft());
 	/* See Raft implementation why these fields are never written. */
-	assert(req->vclock == NULL);
-	assert(req->state == 0);
+	assert(msg->vclock == NULL);
+	assert(msg->state == 0);
 
+	struct raft_request req;
+	box_raft_msg_to_request(msg, &req);
 	struct region *region = &fiber()->gc;
 	uint32_t svp = region_used(region);
 	struct xrow_header row;
@@ -151,7 +209,7 @@ box_raft_write(struct raft *raft, const struct raft_request *req)
 	struct journal_entry *entry = (struct journal_entry *)buf;
 	entry->rows[0] = &row;
 
-	if (xrow_encode_raft(&row, region, req) != 0)
+	if (xrow_encode_raft(&row, region, &req) != 0)
 		goto fail;
 	journal_entry_create(entry, 1, xrow_approx_len(&row), box_raft_write_cb,
 			     fiber());
