@@ -581,7 +581,7 @@ sql_expr_compile(sql *db, const char *expr, int expr_len)
 	sprintf(stmt, "%s%.*s", outer, expr_len, expr);
 
 	if (sqlRunParser(&parser, stmt) == 0 &&
-	    parser.parsed_ast_type == AST_TYPE_EXPR) {
+	    parser.parsed_ast.ast_type == AST_TYPE_EXPR) {
 		expression = parser.parsed_ast.expr;
 		parser.parsed_ast.expr = NULL;
 	}
@@ -600,7 +600,7 @@ sql_view_compile(struct sql *db, const char *view_stmt)
 	struct Select *select = NULL;
 
 	if (sqlRunParser(&parser, view_stmt) != 0 ||
-	    parser.parsed_ast_type != AST_TYPE_SELECT) {
+	    parser.parsed_ast.ast_type != AST_TYPE_SELECT) {
 		diag_set(ClientError, ER_SQL_EXECUTE, view_stmt);
 	} else {
 		select = parser.parsed_ast.select;
@@ -619,7 +619,7 @@ sql_trigger_compile(struct sql *db, const char *sql)
 	parser.parse_only = true;
 	struct sql_trigger *trigger = NULL;
 	if (sqlRunParser(&parser, sql) == 0 &&
-	    parser.parsed_ast_type == AST_TYPE_TRIGGER) {
+	    parser.parsed_ast.ast_type == AST_TYPE_TRIGGER) {
 		trigger = parser.parsed_ast.trigger;
 		parser.parsed_ast.trigger = NULL;
 	}

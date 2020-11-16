@@ -136,7 +136,7 @@ sql_trigger_begin(struct Parse *parse)
 		goto trigger_cleanup;
 	assert(parse->parsed_ast.trigger == NULL);
 	parse->parsed_ast.trigger = trigger;
-	parse->parsed_ast_type = AST_TYPE_TRIGGER;
+	parse->parsed_ast.ast_type = AST_TYPE_TRIGGER;
 
  trigger_cleanup:
 	sqlDbFree(db, trigger_name);
@@ -234,7 +234,7 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		sql_set_multi_write(parse, false);
 	} else {
 		parse->parsed_ast.trigger = trigger;
-		parse->parsed_ast_type = AST_TYPE_TRIGGER;
+		parse->parsed_ast.ast_type = AST_TYPE_TRIGGER;
 		trigger = NULL;
 	}
 

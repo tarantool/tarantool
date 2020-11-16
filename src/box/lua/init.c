@@ -476,6 +476,7 @@ box_lua_init(struct lua_State *L)
 	box_lua_session_init(L);
 	box_lua_xlog_init(L);
 	box_lua_sql_init(L);
+	box_lua_sqlparser_init(L);
 	luaopen_net_box(L);
 	lua_pop(L, 1);
 	tarantool_lua_console_init(L);

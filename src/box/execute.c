@@ -100,7 +100,7 @@ static_assert(sizeof(struct port_sql) <= sizeof(struct port),
 static int
 port_sql_dump_msgpack(struct port *port, struct obuf *out);
 
-static void
+void
 port_sql_destroy(struct port *base)
 {
 	port_c_vtab.destroy(base);
@@ -119,7 +119,7 @@ const struct port_vtab port_sql_vtab = {
 	/* .destroy = */ port_sql_destroy,
 };
 
-static void
+void
 port_sql_create(struct port *port, struct sql_stmt *stmt,
 		enum sql_serialization_format format, bool do_finalize)
 {
@@ -669,7 +669,7 @@ sql_unprepare(uint32_t stmt_id)
  * @retval  0 Success.
  * @retval -1 Error.
  */
-static inline int
+int
 sql_execute(struct sql_stmt *stmt, struct port *port, struct region *region)
 {
 	int rc, column_count = sql_column_count(stmt);

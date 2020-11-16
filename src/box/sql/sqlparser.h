@@ -1,7 +1,6 @@
-#ifndef INCLUDES_TARANTOOL_LUA_EXECUTE_H
-#define INCLUDES_TARANTOOL_LUA_EXECUTE_H
+#pragma once
 /*
- * Copyright 2010-2019, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2020, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -31,44 +30,45 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
+#include <stdint.h>
 
-struct port;
-struct sql_bind;
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 struct lua_State;
-
-/**
- * Dump data from port to Lua stack. Data in port contains tuples,
- * metadata, or information obtained from an executed SQL query.
- *
- * @param port Port that contains SQL response.
- * @param L Lua stack.
- */
-void
-port_sql_dump_lua(struct port *port, struct lua_State *L, bool is_flat);
-
-/**
- * Parse Lua table of SQL parameters.
- *
- * @param L Lua stack contains table with parameters. Each
- *        parameter either must have scalar type, or must be a
- *        single-row table with the following format:
- *        table[name] = value. Name - string name of the named
- *        parameter, value - scalar value of the parameter.
- *        Named and positioned parameters can be mixed.
- * @param[out] out_bind Pointer to save decoded parameters.
- * @param idx Position of table with parameters on Lua stack.
- *
- * @retval  >= 0 Number of decoded parameters.
- * @retval -1 Client or memory error.
- */
-int
-lua_sql_bind_list_decode(struct lua_State *L, struct sql_bind **out_bind,
-			 int idx);
-
-void
-box_lua_sql_init(struct lua_State *L);
+struct sql_parsed_ast;
+struct sql_stmt;
+struct Select;
+struct ibuf;
+struct Parse;
 
 void
 box_lua_sqlparser_init(struct lua_State *L);
 
-#endif /* INCLUDES_TARANTOOL_LUA_EXECUTE_H */
+struct sql_parsed_ast *
+luaT_check_sql_parsed_ast(struct lua_State *L, int idx);
+
+void
+luaT_push_sql_parsed_ast(struct lua_State *L, struct sql_parsed_ast *ast);
+
+struct sql_stmt *
+luaT_check_sql_stmt(struct lua_State *L, int idx);
+
+void
+luaT_push_sql_stmt(struct lua_State *L, struct sql_stmt *stmt);
+
+int
+sql_stmt_parse(const char *zSql, struct sql_stmt **ppStmt, struct sql_parsed_ast *ast);
+
+int
+sql_parser_ast_execute(struct lua_State *L,
+		       struct sql_parsed_ast *ast,
+		       struct sql_stmt *stmt);
+
+// to avoid session.h inclusion
+extern uint32_t default_flags;
+
+#if defined(__cplusplus)
+}
+#endif

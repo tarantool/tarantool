@@ -121,8 +121,8 @@ static void disableLookaside(Parse *pParse){
 // Input is a single SQL command
 input ::= ecmd.
 ecmd ::= explain cmdx SEMI. {
-	if (!pParse->parse_only)
-		sql_finish_coding(pParse);
+  if (!pParse->parse_only || !SQL_PARSE_VALID_AST(pParse))
+    sql_finish_coding(pParse);
 }
 ecmd ::= SEMI. {
   diag_set(ClientError, ER_SQL_STATEMENT_EMPTY);

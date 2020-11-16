@@ -68,6 +68,7 @@ struct Expr;
 struct Parse;
 struct Select;
 struct Table;
+struct sql_parsed_ast;
 struct sql_trigger;
 struct space_def;
 
@@ -300,6 +301,15 @@ sql_parser_create(struct Parse *parser, struct sql *db, uint32_t sql_flags);
  */
 void
 sql_parser_destroy(struct Parse *parser);
+
+/**
+ * Release allocated AST data structures. Usually called
+ * as part of @ref sql_parser_destroy call flow.
+ * @param db
+ * @param ast AST data structures to release
+ */
+void
+sql_parsed_ast_destroy(struct sql *db, struct sql_parsed_ast *ast);
 
 /**
  * Release memory allocated for given SELECT and all of its

@@ -6514,15 +6514,22 @@ sqlSelect(Parse * pParse,		/* The parser context */
 void
 sql_expr_extract_select(struct Parse *parser, struct Select *select)
 {
-	struct ExprList *expr_list = select->pEList;
-	assert(expr_list->nExpr == 1);
-	parser->parsed_ast_type = AST_TYPE_EXPR;
-	/*
-	 * Extract a copy of parsed expression.
-	 * We cannot use EXPRDUP_REDUCE flag in sqlExprDup call
-	 * because some compiled Expr (like Checks expressions)
-	 * may require further resolve with sqlResolveExprNames.
-	 */
-	parser->parsed_ast.expr =
-		sqlExprDup(parser->db, expr_list->a->pExpr, 0);
+	// if we need AST then we need whole select, not noly expr
+	if (parser->parsed_ast.keep_ast) {
+		parser->parsed_ast.ast_type = AST_TYPE_SELECT;
+		parser->parsed_ast.select = sqlSelectDup(sql_get(), select, 0);
+	} else {
+		struct ExprList *expr_list = select->pEList;
+		assert(expr_list->nExpr == 1);
+		parser->parsed_ast.ast_type = AST_TYPE_EXPR;
+		/*
+		* Extract a copy of parsed expression.
+		* We cannot use EXPRDUP_REDUCE flag in sqlExprDup call
+		* because some compiled Expr (like Checks expressions)
+		* may require further resolve with sqlResolveExprNames.
+		*/
+		parser->parsed_ast.expr =
+			sqlExprDup(parser->db, expr_list->a->pExpr, 0);
+
+	}
 }

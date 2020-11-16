@@ -798,6 +798,8 @@ sql_metadata_size(const struct sql_column_metadata *metadata)
 size_t
 sql_stmt_est_size(const struct sql_stmt *stmt)
 {
+	if (stmt == NULL)
+		return 0;
 	struct Vdbe *v = (struct Vdbe *) stmt;
 	size_t size = sizeof(*v);
 	/* Names and types of result set columns */
@@ -852,8 +854,12 @@ sql_stmt_est_size(const struct sql_stmt *stmt)
 const char *
 sql_stmt_query_str(const struct sql_stmt *stmt)
 {
-	const struct Vdbe *v = (const struct Vdbe *) stmt;
-	return v->zSql;
+	if (stmt != NULL) {
+		const struct Vdbe *v = (const struct Vdbe *) stmt;
+		return v->zSql;
+	}
+
+	return NULL;
 }
 
 /******************************* sql_bind_  **************************

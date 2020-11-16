@@ -33,6 +33,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "sql_ast.h"
 #include "small/rlist.h"
 
 #if defined(__cplusplus)
@@ -82,6 +83,10 @@ struct sql_stmt_cache {
 	 * times.
 	 */
 	struct stmt_cache_entry *last_found;
+	/**
+	 * saved hash id for the last_found entry
+	 */
+	uint32_t last_id; // FIXME
 };
 
 /**
@@ -141,6 +146,8 @@ sql_stmt_cache_insert(struct sql_stmt *stmt);
 struct sql_stmt *
 sql_stmt_cache_find(uint32_t stmt_id);
 
+struct stmt_cache_entry *
+stmt_cache_find_entry(uint32_t stmt_id);
 
 /** Set prepared cache size limit. */
 int
