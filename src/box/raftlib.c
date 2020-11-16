@@ -850,8 +850,7 @@ raft_sm_stop(struct raft *raft)
 }
 
 void
-raft_serialize_for_network(const struct raft *raft, struct raft_request *req,
-			   struct vclock *vclock)
+raft_serialize_for_network(const struct raft *raft, struct raft_request *req)
 {
 	memset(req, 0, sizeof(*req));
 	/*
@@ -865,10 +864,8 @@ raft_serialize_for_network(const struct raft *raft, struct raft_request *req,
 	 * Raft does not own vclock, so it always expects it passed externally.
 	 * Vclock is sent out only by candidate instances.
 	 */
-	if (req->state == RAFT_STATE_CANDIDATE) {
-		req->vclock = vclock;
-		vclock_copy(vclock, &replicaset.vclock);
-	}
+	if (req->state == RAFT_STATE_CANDIDATE)
+		req->vclock = &replicaset.vclock;
 }
 
 void

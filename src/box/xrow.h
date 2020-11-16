@@ -268,7 +268,7 @@ struct raft_request {
 	uint64_t term;
 	uint32_t vote;
 	uint32_t state;
-	struct vclock *vclock;
+	const struct vclock *vclock;
 };
 
 int

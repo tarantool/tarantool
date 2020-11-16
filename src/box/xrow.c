@@ -1057,7 +1057,7 @@ xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
 			r->vclock = vclock;
 			if (r->vclock == NULL)
 				mp_next(&pos);
-			else if (mp_decode_vclock_ignore0(&pos, r->vclock) != 0)
+			else if (mp_decode_vclock_ignore0(&pos, vclock) != 0)
 				goto bad_msgpack;
 			break;
 		default:
