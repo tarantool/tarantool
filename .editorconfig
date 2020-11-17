@@ -21,3 +21,7 @@ indent_size = 4
 [*.{h,c,cc}]
 indent_style = tab
 tab_width = 8
+
+[*.y]
+indent_style = space
+indent_size = 2
