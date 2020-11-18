@@ -57,6 +57,15 @@ cfg_geti(const char *param)
 	return val;
 }
 
+bool
+cfg_isnumber(const char *param)
+{
+	cfg_get(param);
+	bool ret = !!lua_isnumber(tarantool_L, -1);
+	lua_pop(tarantool_L, 1);
+	return ret;
+}
+
 int
 cfg_getb(const char *param)
 {
