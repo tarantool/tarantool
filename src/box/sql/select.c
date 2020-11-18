@@ -154,56 +154,52 @@ sqlSelectNew(Parse * pParse,	/* Parsing context */
 		 Expr * pLimit,		/* LIMIT value.  NULL means not used */
 		 Expr * pOffset)	/* OFFSET value.  NULL means no offset */
 {
-	Select *pNew;
 	Select standin;
 	sql *db = pParse->db;
-	pNew = sqlDbMallocRawNN(db, sizeof(*pNew));
-	if (pNew == 0) {
-		assert(db->mallocFailed);
-		pNew = &standin;
-	}
 	if (pEList == 0) {
 		struct Expr *expr = sql_expr_new_anon(db, TK_ASTERISK);
 		if (expr == NULL)
 			pParse->is_aborted = true;
 		pEList = sql_expr_list_append(db, NULL, expr);
 	}
-	pNew->pEList = pEList;
-	pNew->op = TK_SELECT;
-	pNew->selFlags = selFlags;
-	pNew->iLimit = 0;
-	pNew->iOffset = 0;
+	standin.pEList = pEList;
+	standin.op = TK_SELECT;
+	standin.selFlags = selFlags;
+	standin.iLimit = 0;
+	standin.iOffset = 0;
 #ifdef SQL_DEBUG
-	pNew->zSelName[0] = 0;
+	standin.zSelName[0] = 0;
 	if ((pParse->sql_flags & SQL_SelectTrace) != 0)
 		sqlSelectTrace = 0xfff;
 	else
 		sqlSelectTrace = 0;
 #endif
-	pNew->addrOpenEphm[0] = -1;
-	pNew->addrOpenEphm[1] = -1;
-	pNew->nSelectRow = 0;
+	standin.addrOpenEphm[0] = -1;
+	standin.addrOpenEphm[1] = -1;
+	standin.nSelectRow = 0;
 	if (pSrc == 0)
 		pSrc = sqlDbMallocZero(db, sizeof(*pSrc));
-	pNew->pSrc = pSrc;
-	pNew->pWhere = pWhere;
-	pNew->pGroupBy = pGroupBy;
-	pNew->pHaving = pHaving;
-	pNew->pOrderBy = pOrderBy;
-	pNew->pPrior = 0;
-	pNew->pNext = 0;
-	pNew->pLimit = pLimit;
-	pNew->pOffset = pOffset;
-	pNew->pWith = 0;
+	standin.pSrc = pSrc;
+	standin.pWhere = pWhere;
+	standin.pGroupBy = pGroupBy;
+	standin.pHaving = pHaving;
+	standin.pOrderBy = pOrderBy;
+	standin.pPrior = 0;
+	standin.pNext = 0;
+	standin.pLimit = pLimit;
+	standin.pOffset = pOffset;
+	standin.pWith = 0;
 	assert(pOffset == 0 || pLimit != 0 || pParse->is_aborted
 	       || db->mallocFailed != 0);
+	Select *pNew = sqlDbMallocRawNN(db, sizeof(*pNew));
 	if (db->mallocFailed) {
-		clearSelect(db, pNew, pNew != &standin);
-		pNew = 0;
-	} else {
-		assert(pNew->pSrc != 0 || pParse->is_aborted);
+		clearSelect(db, &standin, 0);
+		if (pNew != NULL)
+			sqlDbFree(db, pNew);
+		return NULL;
 	}
-	assert(pNew != &standin);
+	assert(standin.pSrc != 0 || pParse->is_aborted);
+	memcpy(pNew, &standin, sizeof(standin));
 	return pNew;
 }
 
