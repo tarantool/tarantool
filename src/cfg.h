@@ -41,6 +41,12 @@ int
 cfg_geti(const char *param);
 
 /**
+ * Test if cfg parameter is a number.
+ */
+bool
+cfg_isnumber(const char *param);
+
+/**
  * Gets boolean parameter of cfg.
  * Returns -1 in case of nil
  */
