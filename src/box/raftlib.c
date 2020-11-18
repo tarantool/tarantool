@@ -74,6 +74,20 @@ raft_write(struct raft *raft, const struct raft_msg *req)
 	raft->vtab->write(raft, req);
 }
 
+/** Shortcut for vtab 'schedule_async' method. */
+static inline void
+raft_schedule_async(struct raft *raft)
+{
+	/*
+	 * The method is called from inside of the state machine, when yields
+	 * are not allowed for its simplicity.
+	 */
+	int csw = fiber()->csw;
+	raft->vtab->schedule_async(raft);
+	assert(csw == fiber()->csw);
+	(void)csw;
+}
+
 /**
  * Check if Raft is completely synced with disk. Meaning all its critical values
  * are in WAL. Only in that state the node can become a leader or a candidate.
@@ -138,13 +152,6 @@ raft_can_vote_for(const struct raft *raft, const struct vclock *v)
 	int cmp = vclock_compare_ignore0(v, raft->vclock);
 	return cmp == 0 || cmp == 1;
 }
-
-/**
- * Wakeup the Raft worker fiber in order to do some async work. If the fiber
- * does not exist yet, it is created.
- */
-static void
-raft_worker_wakeup(struct raft *raft);
 
 /** Schedule broadcast of the complete Raft state to all the followers. */
 static void
@@ -567,13 +574,11 @@ raft_worker_handle_broadcast(struct raft *raft)
 	raft->is_broadcast_scheduled = false;
 }
 
-static int
-raft_worker_f(va_list args)
+void
+raft_process_async(struct raft *raft)
 {
-	(void)args;
-	struct raft *raft = fiber()->f_arg;
 	bool is_idle;
-	while (!fiber_is_cancelled()) {
+	do {
 		is_idle = true;
 		if (raft->is_write_in_progress) {
 			raft_worker_handle_io(raft);
@@ -583,14 +588,8 @@ raft_worker_f(va_list args)
 			raft_worker_handle_broadcast(raft);
 			is_idle = false;
 		}
-		if (is_idle) {
-			assert(raft_is_fully_on_disk(raft));
-			fiber_yield();
-		} else {
-			fiber_sleep(0);
-		}
-	}
-	return 0;
+	} while (!is_idle);
+	assert(raft_is_fully_on_disk(raft));
 }
 
 static void
@@ -600,7 +599,7 @@ raft_sm_pause_and_dump(struct raft *raft)
 	if (raft->is_write_in_progress)
 		return;
 	ev_timer_stop(loop(), &raft->timer);
-	raft_worker_wakeup(raft);
+	raft_schedule_async(raft);
 	raft->is_write_in_progress = true;
 }
 
@@ -962,44 +961,10 @@ raft_new_term(struct raft *raft)
 }
 
 static void
-raft_worker_wakeup(struct raft *raft)
-{
-	if (raft->worker == NULL) {
-		raft->worker = fiber_new("raft_worker", raft_worker_f);
-		if (raft->worker == NULL) {
-			/*
-			 * XXX: should be handled properly, no need to panic.
-			 * The issue though is that most of the Raft state
-			 * machine functions are not supposed to fail, and also
-			 * they usually wakeup the fiber when their work is
-			 * finished. So it is too late to fail. On the other
-			 * hand it looks not so good to create the fiber when
-			 * Raft is initialized. Because then it will occupy
-			 * memory even if Raft is not used.
-			 */
-			diag_log();
-			panic("Could't create Raft worker fiber");
-			return;
-		}
-		raft->worker->f_arg = raft;
-		fiber_set_joinable(raft->worker, true);
-	}
-	/*
-	 * Don't wake the fiber if it writes something (not cancellable).
-	 * Otherwise it would be a spurious wakeup breaking the WAL write not
-	 * adapted to this. Also don't wakeup the current fiber - it leads to
-	 * undefined behaviour.
-	 */
-	if ((raft->worker->flags & FIBER_IS_CANCELLABLE) != 0 &&
-	    fiber() != raft->worker)
-		fiber_wakeup(raft->worker);
-}
-
-static void
 raft_schedule_broadcast(struct raft *raft)
 {
 	raft->is_broadcast_scheduled = true;
-	raft_worker_wakeup(raft);
+	raft_schedule_async(raft);
 }
 
 void
@@ -1024,10 +989,4 @@ raft_destroy(struct raft *raft)
 {
 	ev_timer_stop(loop(), &raft->timer);
 	trigger_destroy(&raft->on_update);
-	if (raft->worker != NULL) {
-		raft_worker_wakeup(raft);
-		fiber_cancel(raft->worker);
-		fiber_join(raft->worker);
-		raft->worker = NULL;
-	}
 }

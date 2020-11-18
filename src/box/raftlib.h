@@ -68,7 +68,6 @@ extern "C" {
  * than the configured one. See more details in the code.
  */
 
-struct fiber;
 struct raft;
 
 enum raft_state {
@@ -120,16 +119,22 @@ struct raft_msg {
 
 typedef void (*raft_broadcast_f)(struct raft *raft, const struct raft_msg *req);
 typedef void (*raft_write_f)(struct raft *raft, const struct raft_msg *req);
+typedef void (*raft_schedule_async_f)(struct raft *raft);
 
 /**
- * Raft connection to the environment, via which it talks to other nodes and
- * saves something to disk.
+ * Raft connection to the environment, via which it talks to other nodes, to
+ * other subsystems, and saves something to disk.
  */
 struct raft_vtab {
 	/** Send a message to all nodes in the cluster. */
 	raft_broadcast_f broadcast;
 	/** Save a message to disk. */
 	raft_write_f write;
+	/**
+	 * Schedule asynchronous work which may yield, and it can't be done
+	 * right now.
+	 */
+	raft_schedule_async_f schedule_async;
 };
 
 struct raft {
@@ -203,8 +208,6 @@ struct raft {
 	const struct vclock *vclock;
 	/** State machine timed event trigger. */
 	struct ev_timer timer;
-	/** Worker fiber to execute blocking tasks like IO. */
-	struct fiber *worker;
 	/** Configured election timeout in seconds. */
 	double election_timeout;
 	/**
@@ -254,6 +257,10 @@ raft_process_recovery(struct raft *raft, const struct raft_msg *req);
 int
 raft_process_msg(struct raft *raft, const struct raft_msg *req,
 		 uint32_t source);
+
+/** Process all asynchronous events accumulated by Raft. */
+void
+raft_process_async(struct raft *raft);
 
 /**
  * Process a heartbeat message from an instance with the given ID. It is used to
