@@ -93,17 +93,38 @@ local uuid_isnil = function(uu)
     return builtin.tt_uuid_is_nil(uu)
 end
 
-local check_uuid = function(value, index, err_lvl)
+local fromstr = function(str)
+    local uu = static_alloc('struct tt_uuid')
+    local rc = builtin.tt_uuid_from_string(str, uu)
+    if rc ~= 0 then
+        return nil
+    end
+    return uu
+end
+
+local to_uuid = function(value)
     if is_uuid(value) then
         return value
     end
+    if type(value) == 'string' then
+        return fromstr(value)
+    end
+    return nil
+end
 
-    local err_fmt = 'incorrect value to compare with uuid as %d argument'
+local check_uuid = function(value, index, err_lvl)
+    value = to_uuid(value)
+    if value ~= nil then
+        return value
+    end
+
+    local err_fmt = 'incorrect value to convert to uuid as %d argument'
     error(err_fmt:format(index), err_lvl)
 end
 
 local uuid_eq = function(lhs, rhs)
-    if not is_uuid(rhs) then
+    rhs = to_uuid(rhs)
+    if rhs == nil then
         return false
     end
     lhs = check_uuid(lhs, 1, 3)

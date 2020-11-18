@@ -334,46 +334,113 @@ u1 < u2
 ...
 u1 < 1
 ---
-- error: '[string "return u1 < 1 "]:1: incorrect value to compare with uuid as 2 argument'
+- error: '[string "return u1 < 1 "]:1: incorrect value to convert to uuid as 2 argument'
 ...
 u1 <= 1
 ---
-- error: '[string "return u1 <= 1 "]:1: incorrect value to compare with uuid as 2
-    argument'
+- error: '[string "return u1 <= 1 "]:1: incorrect value to convert to uuid as 2 argument'
 ...
 u1 < 'abc'
 ---
-- error: '[string "return u1 < ''abc'' "]:1: incorrect value to compare with uuid
-    as 2 argument'
+- error: '[string "return u1 < ''abc'' "]:1: incorrect value to convert to uuid as
+    2 argument'
 ...
 u1 <= 'abc'
 ---
-- error: '[string "return u1 <= ''abc'' "]:1: incorrect value to compare with uuid
-    as 2 argument'
+- error: '[string "return u1 <= ''abc'' "]:1: incorrect value to convert to uuid as
+    2 argument'
 ...
 1 < u1
 ---
-- error: '[string "return 1 < u1 "]:1: incorrect value to compare with uuid as 1 argument'
+- error: '[string "return 1 < u1 "]:1: incorrect value to convert to uuid as 1 argument'
 ...
 1 <= u1
 ---
-- error: '[string "return 1 <= u1 "]:1: incorrect value to compare with uuid as 1
-    argument'
+- error: '[string "return 1 <= u1 "]:1: incorrect value to convert to uuid as 1 argument'
 ...
 'abc' < u1
 ---
-- error: '[string "return ''abc'' < u1 "]:1: incorrect value to compare with uuid
-    as 1 argument'
+- error: '[string "return ''abc'' < u1 "]:1: incorrect value to convert to uuid as
+    1 argument'
 ...
 'abc' <= u1
 ---
-- error: '[string "return ''abc'' <= u1 "]:1: incorrect value to compare with uuid
-    as 1 argument'
+- error: '[string "return ''abc'' <= u1 "]:1: incorrect value to convert to uuid as
+    1 argument'
 ...
 u1 = nil
 ---
 ...
 u2 = nil
+---
+...
+--
+-- allow to compare uuid values with strings
+--
+u1_str = 'aaaaaaaa-aaaa-4000-b000-000000000001'
+---
+...
+u1 = uuid.fromstr(u1_str)
+---
+...
+u2_str = 'bbbbbbbb-bbbb-4000-b000-000000000001'
+---
+...
+u1 == u1_str
+---
+- true
+...
+u1 == u2_str
+---
+- false
+...
+u1_str == u1
+---
+- true
+...
+u2_str == u1
+---
+- false
+...
+u1 > u1_str
+---
+- false
+...
+u1 >= u1_str
+---
+- true
+...
+u1 < u1_str
+---
+- false
+...
+u1 <= u1_str
+---
+- true
+...
+u1 > u2_str
+---
+- false
+...
+u1 >= u2_str
+---
+- false
+...
+u1 < u2_str
+---
+- true
+...
+u1 <= u2_str
+---
+- true
+...
+u1 = nil
+---
+...
+u1_str = nil
+---
+...
+u2_str = nil
 ---
 ...
 uuid = nil

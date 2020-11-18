@@ -137,6 +137,33 @@ u1 <= 'abc'
 u1 = nil
 u2 = nil
 
+--
+-- allow to compare uuid values with strings
+--
+
+u1_str = 'aaaaaaaa-aaaa-4000-b000-000000000001'
+u1 = uuid.fromstr(u1_str)
+u2_str = 'bbbbbbbb-bbbb-4000-b000-000000000001'
+
+u1 == u1_str
+u1 == u2_str
+u1_str == u1
+u2_str == u1
+
+u1 > u1_str
+u1 >= u1_str
+u1 < u1_str
+u1 <= u1_str
+
+u1 > u2_str
+u1 >= u2_str
+u1 < u2_str
+u1 <= u2_str
+
+u1 = nil
+u1_str = nil
+u2_str = nil
+
 uuid = nil
 
 test_run:cmd("clear filter")
