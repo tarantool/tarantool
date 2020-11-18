@@ -41,7 +41,7 @@ struct fiber;
 struct wal_writer;
 struct tt_uuid;
 
-enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
+enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_ASYNC, WAL_MODE_MAX };
 
 enum {
 	/**

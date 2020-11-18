@@ -1,0 +1,129 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd("create server wal_async with script='box/wal_async.lua'")
+---
+- true
+...
+test_run:cmd("start server wal_async")
+---
+- true
+...
+test_run:cmd("switch wal_async")
+---
+- true
+...
+box.cfg.wal_mode
+---
+- async
+...
+-- Check usual path
+s = box.schema.space.create('s')
+---
+...
+i = s:create_index('pk')
+---
+...
+s:insert{1}
+---
+- [1]
+...
+s:insert{2}
+---
+- [2]
+...
+s:insert{3}
+---
+- [3]
+...
+s:select{}
+---
+- - [1]
+  - [2]
+  - [3]
+...
+-- Check that write is asynchronous
+errinj = box.error.injection
+---
+...
+errinj.set("ERRINJ_WAL_DELAY", true)
+---
+- ok
+...
+s:insert{4}
+---
+- [4]
+...
+s:insert{5}
+---
+- [5]
+...
+s:select{}
+---
+- - [1]
+  - [2]
+  - [3]
+  - [4]
+  - [5]
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+box:begin()
+s:insert{6}
+box:commit();
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+errinj.set("ERRINJ_WAL_DELAY", false)
+---
+- ok
+...
+-- Check that data persisted in wal
+test_run:cmd('restart server wal_async')
+fiber = require('fiber')
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+rows = 0;
+---
+...
+while true do
+    s = box.space.s
+    if s ~= nil then
+        res = s:select{}
+        rows = #res
+    end
+    if rows == 6 then
+        break
+    end
+    fiber.sleep(0.01)
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server wal_async")
+---
+- true
+...
+test_run:cmd("cleanup server wal_async")
+---
+- true
+...

@@ -38,6 +38,7 @@
 #include "xrow.h"
 #include "errinj.h"
 #include "iproto_constants.h"
+#include "wal.h"
 
 double too_long_threshold;
 
@@ -878,6 +879,9 @@ rollback:
 int
 txn_commit(struct txn *txn)
 {
+	if (wal_mode() == WAL_ASYNC)
+		return txn_commit_async(txn);
+
 	struct journal_entry *req;
 	struct txn_limbo_entry *limbo_entry = NULL;
 
