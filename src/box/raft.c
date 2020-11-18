@@ -50,6 +50,15 @@ struct raft box_raft_global = {
  */
 static struct trigger box_raft_on_update;
 
+/**
+ * Worker fiber does all the asynchronous work, which may need yields and can be
+ * long. These are WAL writes, network broadcasts. That allows not to block the
+ * Raft state machine.
+ */
+static struct fiber *box_raft_worker = NULL;
+/** Flag installed each time when new work appears for the worker fiber. */
+static bool box_raft_has_work = false;
+
 static void
 box_raft_msg_to_request(const struct raft_msg *msg, struct raft_request *req)
 {
@@ -70,6 +79,59 @@ box_raft_request_to_msg(const struct raft_request *req, struct raft_msg *msg)
 		.state = req->state,
 		.vclock = req->vclock,
 	};
+}
+
+static int
+box_raft_worker_f(va_list args)
+{
+	(void)args;
+	struct raft *raft = fiber()->f_arg;
+	assert(raft == box_raft());
+	while (!fiber_is_cancelled()) {
+		box_raft_has_work = false;
+
+		raft_process_async(raft);
+
+		if (!box_raft_has_work)
+			fiber_yield();
+	}
+	return 0;
+}
+
+static void
+box_raft_schedule_async(struct raft *raft)
+{
+	assert(raft == box_raft());
+	if (box_raft_worker == NULL) {
+		box_raft_worker = fiber_new("raft_worker", box_raft_worker_f);
+		if (box_raft_worker == NULL) {
+			/*
+			 * XXX: should be handled properly, no need to panic.
+			 * The issue though is that most of the Raft state
+			 * machine functions are not supposed to fail, and also
+			 * they usually wakeup the fiber when their work is
+			 * finished. So it is too late to fail. On the other
+			 * hand it looks not so good to create the fiber when
+			 * Raft is initialized. Because then it will occupy
+			 * memory even if Raft is not used.
+			 */
+			diag_log();
+			panic("Could't create Raft worker fiber");
+			return;
+		}
+		box_raft_worker->f_arg = raft;
+		fiber_set_joinable(box_raft_worker, true);
+	}
+	/*
+	 * Don't wake the fiber if it writes something (not cancellable).
+	 * Otherwise it would be a spurious wakeup breaking the WAL write not
+	 * adapted to this. Also don't wakeup the current fiber - it leads to
+	 * undefined behaviour.
+	 */
+	if ((box_raft_worker->flags & FIBER_IS_CANCELLABLE) != 0 &&
+	    fiber() != box_raft_worker)
+		fiber_wakeup(box_raft_worker);
+	box_raft_has_work = true;
 }
 
 static int
@@ -243,6 +305,7 @@ box_raft_init(void)
 	static const struct raft_vtab box_raft_vtab = {
 		.broadcast = box_raft_broadcast,
 		.write = box_raft_write,
+		.schedule_async = box_raft_schedule_async,
 	};
 	raft_create(&box_raft_global, &box_raft_vtab);
 	trigger_create(&box_raft_on_update, box_raft_on_update_f, NULL, NULL);
@@ -257,7 +320,7 @@ box_raft_free(void)
 	 * Can't join the fiber, because the event loop is stopped already, and
 	 * yields are not allowed.
 	 */
-	raft->worker = NULL;
+	box_raft_worker = NULL;
 	raft_destroy(raft);
 	/*
 	 * Invalidate so as box_raft() would fail if any usage attempt happens.
