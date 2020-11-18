@@ -736,29 +736,6 @@ swim_test_payload_basic(void)
 }
 
 static void
-swim_test_indirect_ping(void)
-{
-	swim_start_test(2);
-	uint16_t cluster_size = 3;
-	struct swim_cluster *cluster = swim_cluster_new(cluster_size);
-	swim_cluster_set_ack_timeout(cluster, 1);
-	for (int i = 0; i < cluster_size; ++i) {
-		for (int j = i + 1; j < cluster_size; ++j)
-			swim_cluster_interconnect(cluster, i, j);
-	}
-	swim_cluster_set_drop_channel(cluster, 0, 1, true);
-	swim_cluster_set_drop_channel(cluster, 1, 0, true);
-	swim_run_for(10);
-	is(swim_cluster_wait_status_everywhere(cluster, 0, MEMBER_ALIVE, 3),
-	   0, "S1 is still alive everywhere");
-	is(swim_cluster_wait_status_everywhere(cluster, 1, MEMBER_ALIVE, 3),
-	   0, "as well as S2 - they communicated via S3");
-
-	swim_cluster_delete(cluster);
-	swim_finish_test();
-}
-
-static void
 swim_test_encryption(void)
 {
 	swim_start_test(3);
@@ -1097,7 +1074,7 @@ swim_test_suspect_new_members(void)
 static int
 main_f(va_list ap)
 {
-	swim_start_test(23);
+	swim_start_test(22);
 
 	(void) ap;
 	swim_test_ev_init();
@@ -1119,7 +1096,6 @@ main_f(va_list ap)
 	swim_test_uri_update();
 	swim_test_broadcast();
 	swim_test_payload_basic();
-	swim_test_indirect_ping();
 	swim_test_encryption();
 	swim_test_slow_net();
 	swim_test_triggers();
