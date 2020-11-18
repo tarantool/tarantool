@@ -171,17 +171,56 @@ swim_test_payload_refutation(void)
 	swim_finish_test();
 }
 
+static void
+swim_test_indirect_ping(void)
+{
+	swim_start_test(2);
+	uint16_t cluster_size = 3;
+	struct swim_cluster *cluster = swim_cluster_new(cluster_size);
+	swim_cluster_set_ack_timeout(cluster, 0.5);
+	for (int i = 0; i < cluster_size; ++i) {
+		for (int j = i + 1; j < cluster_size; ++j)
+			swim_cluster_interconnect(cluster, i, j);
+	}
+	swim_cluster_set_drop_channel(cluster, 0, 1, true);
+	swim_cluster_set_drop_channel(cluster, 1, 0, true);
+	/*
+	 * There are alive channels S1 <-> S3 and S2 <-> S3. Things are not
+	 * interesting when S3 can send dissemination, because even if S1 and S2
+	 * suspect each other, they will share it with S3, and S3 will refute it
+	 * via dissemination, because has access to both of them.
+	 * When only failure detection works, a suspicion can only be refuted by
+	 * pings and acks. In this test pings-acks between S1 and S2 will need
+	 * to be indirect.
+	 */
+	struct errinj *errinj = &errinjs[ERRINJ_SWIM_FD_ONLY];
+	errinj->bparam = true;
+	/*
+	 * No nodes are ever suspected. Because when a direct ping fails, the
+	 * nodes simply will use indirect pings and they will work.
+	 */
+	isnt(swim_cluster_wait_status_anywhere(cluster, 0,
+					       MEMBER_SUSPECTED, 10),
+	     0, "S1 is never suspected");
+	isnt(swim_cluster_wait_status_anywhere(cluster, 1,
+					       MEMBER_SUSPECTED, 10),
+	     0, "S2 is never suspected");
+	errinj->bparam = false;
+	swim_cluster_delete(cluster);
+	swim_finish_test();
+}
 
 static int
 main_f(va_list ap)
 {
-	swim_start_test(1);
+	swim_start_test(2);
 
 	(void) ap;
 	swim_test_ev_init();
 	swim_test_transport_init();
 
 	swim_test_payload_refutation();
+	swim_test_indirect_ping();
 
 	swim_test_transport_free();
 	swim_test_ev_free();

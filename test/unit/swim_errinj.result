@@ -1,5 +1,5 @@
 	*** main_f ***
-1..1
+1..2
 	*** swim_test_payload_refutation ***
     1..11
     ok 1 - S2 sees new version of S1
@@ -15,4 +15,10 @@
     ok 11 - S3 learns S1's payload from S2
 ok 1 - subtests
 	*** swim_test_payload_refutation: done ***
+	*** swim_test_indirect_ping ***
+    1..2
+    ok 1 - S1 is never suspected
+    ok 2 - S2 is never suspected
+ok 2 - subtests
+	*** swim_test_indirect_ping: done ***
 	*** main_f: done ***
