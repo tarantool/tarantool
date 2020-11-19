@@ -81,6 +81,19 @@ box_raft_request_to_msg(const struct raft_request *req, struct raft_msg *msg)
 	};
 }
 
+static void
+box_raft_update_synchro_queue(struct raft *raft)
+{
+	assert(raft == box_raft());
+	/*
+	 * If the node became a leader, it means it will ignore all records from
+	 * all the other nodes, and won't get late CONFIRM messages anyway. Can
+	 * clear the queue without waiting for confirmations.
+	 */
+	if (raft->state == RAFT_STATE_LEADER)
+		box_clear_synchro_queue(false);
+}
+
 static int
 box_raft_worker_f(va_list args)
 {
@@ -91,6 +104,7 @@ box_raft_worker_f(va_list args)
 		box_raft_has_work = false;
 
 		raft_process_async(raft);
+		box_raft_update_synchro_queue(raft);
 
 		if (!box_raft_has_work)
 			fiber_yield();
@@ -143,11 +157,11 @@ box_raft_on_update_f(struct trigger *trigger, void *event)
 	if (raft->state != RAFT_STATE_LEADER)
 		return 0;
 	/*
-	 * If the node became a leader, it means it will ignore all records from
-	 * all the other nodes, and won't get late CONFIRM messages anyway. Can
-	 * clear the queue without waiting for confirmations.
+	 * If the node became a leader, time to clear the synchro queue. But it
+	 * must be done in the worker fiber so as not to block the state
+	 * machine, which called this trigger.
 	 */
-	box_clear_synchro_queue(false);
+	box_raft_schedule_async(raft);
 	return 0;
 }
 
