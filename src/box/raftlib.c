@@ -985,11 +985,13 @@ raft_worker_wakeup(struct raft *raft)
 		fiber_set_joinable(raft->worker, true);
 	}
 	/*
-	 * Don't wake the fiber if it writes something. Otherwise it would be a
-	 * spurious wakeup breaking the WAL write not adapted to this. Also
-	 * don't wakeup the current fiber - it leads to undefined behaviour.
+	 * Don't wake the fiber if it writes something (not cancellable).
+	 * Otherwise it would be a spurious wakeup breaking the WAL write not
+	 * adapted to this. Also don't wakeup the current fiber - it leads to
+	 * undefined behaviour.
 	 */
-	if (!raft->is_write_in_progress && fiber() != raft->worker)
+	if ((raft->worker->flags & FIBER_IS_CANCELLABLE) != 0 &&
+	    fiber() != raft->worker)
 		fiber_wakeup(raft->worker);
 }
 

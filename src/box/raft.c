@@ -214,7 +214,14 @@ box_raft_write(struct raft *raft, const struct raft_msg *msg)
 	journal_entry_create(entry, 1, xrow_approx_len(&row), box_raft_write_cb,
 			     fiber());
 
-	if (journal_write(entry) != 0 || entry->res < 0) {
+	/*
+	 * A non-cancelable fiber is considered non-wake-able, generally. Raft
+	 * follows this pattern of 'protection'.
+	 */
+	bool cancellable = fiber_set_cancellable(false);
+	bool ok = (journal_write(entry) == 0 && entry->res >= 0);
+	fiber_set_cancellable(cancellable);
+	if (!ok) {
 		diag_set(ClientError, ER_WAL_IO);
 		diag_log();
 		goto fail;
