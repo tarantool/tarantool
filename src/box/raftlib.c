@@ -32,7 +32,6 @@
 
 #include "error.h"
 #include "fiber.h"
-#include "box.h"
 #include "tt_static.h"
 
 /**
@@ -614,8 +613,6 @@ raft_sm_become_leader(struct raft *raft)
 	raft->state = RAFT_STATE_LEADER;
 	raft->leader = raft->self;
 	ev_timer_stop(loop(), &raft->timer);
-	/* Make read-write (if other subsystems allow that. */
-	box_update_ro_summary();
 	/* State is visible and it is changed - broadcast. */
 	raft_schedule_broadcast(raft);
 }
@@ -666,7 +663,6 @@ raft_sm_schedule_new_term(struct raft *raft, uint64_t new_term)
 	raft->volatile_vote = 0;
 	raft->leader = 0;
 	raft->state = RAFT_STATE_FOLLOWER;
-	box_update_ro_summary();
 	raft_sm_pause_and_dump(raft);
 	/*
 	 * State is visible and it is changed - broadcast. Term is also visible,
@@ -697,7 +693,6 @@ raft_sm_schedule_new_election(struct raft *raft)
 	/* Everyone is a follower until its vote for self is persisted. */
 	raft_sm_schedule_new_term(raft, raft->term + 1);
 	raft_sm_schedule_new_vote(raft, raft->self);
-	box_update_ro_summary();
 }
 
 static void
@@ -782,7 +777,6 @@ raft_sm_start(struct raft *raft)
 		 */
 		raft_sm_wait_leader_found(raft);
 	}
-	box_update_ro_summary();
 	/*
 	 * Nothing changed. But when raft was stopped, its state wasn't sent to
 	 * replicas. At least this was happening at the moment of this being
@@ -804,7 +798,6 @@ raft_sm_stop(struct raft *raft)
 		raft->leader = 0;
 	raft->state = RAFT_STATE_FOLLOWER;
 	ev_timer_stop(loop(), &raft->timer);
-	box_update_ro_summary();
 	/* State is visible and changed - broadcast. */
 	raft_schedule_broadcast(raft);
 }
@@ -890,7 +883,6 @@ raft_cfg_is_candidate(struct raft *raft, bool is_candidate)
 			raft_schedule_broadcast(raft);
 		}
 	}
-	box_update_ro_summary();
 }
 
 void
