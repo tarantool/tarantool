@@ -69,7 +69,7 @@ struct tt_bitset_page {
 	size_t first_pos;
 	rb_node(struct tt_bitset_page) node;
 	size_t cardinality;
-	uint8_t data[0];
+	uint8_t data[];
 };
 
 typedef rb_tree(struct tt_bitset_page) tt_bitset_pages_t;
