@@ -570,7 +570,6 @@ raft_worker_handle_broadcast(struct raft *raft)
 		req.vclock = raft->vclock;
 	}
 	raft_broadcast(raft, &req);
-	trigger_run(&raft->on_update, raft);
 	raft->is_broadcast_scheduled = false;
 }
 
@@ -963,6 +962,17 @@ raft_new_term(struct raft *raft)
 static void
 raft_schedule_broadcast(struct raft *raft)
 {
+	/*
+	 * Broadcast works not only for network, but also for other subsystems
+	 * on the same node. The info is delivered to them via update triggers.
+	 * But the broadcast happens from inside of the state machine, so it
+	 * can't yield.
+	 */
+	int csw = fiber()->csw;
+	trigger_run(&raft->on_update, raft);
+	assert(csw == fiber()->csw);
+	(void)csw;
+
 	raft->is_broadcast_scheduled = true;
 	raft_schedule_async(raft);
 }
