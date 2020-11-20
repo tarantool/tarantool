@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import yaml
 
@@ -11,9 +13,9 @@ server.stop()
 
 data_path = os.path.join(server.vardir, server.name)
 
-print """
+print("""
 # xlog file must exist after inserts.
-"""
+""")
 filename = str(lsn).zfill(20) + ".xlog"
 wal = os.path.join(data_path, filename)
 
@@ -21,16 +23,16 @@ server.start()
 
 server.admin("space = box.schema.space.create('tweedledum')")
 if os.access(wal, os.F_OK):
-  print ".xlog exists"
+  print(".xlog exists")
 
 server.admin("index = space:create_index('primary', { type = 'hash' })")
 
 server.stop()
 lsn += 2
 
-print """
+print("""
 # a new xlog must be opened after regular termination.
-"""
+""")
 filename = str(lsn).zfill(20) + ".xlog"
 server.start()
 
@@ -39,17 +41,17 @@ wal = os.path.join(data_path, filename)
 server.admin("box.space.tweedledum:insert{3, 'third tuple'}")
 
 if os.access(wal, os.F_OK):
-  print "a new .xlog exists"
+  print("a new .xlog exists")
 
 server.stop()
 
 if os.access(wal, os.F_OK):
-  print ".xlog stays around after sutdown"
+  print(".xlog stays around after shutdown")
 lsn += 1
 
-print """
+print("""
 # An xlog file with one record during recovery.
-"""
+""")
 
 server.start()
 filename = str(lsn).zfill(20) + ".xlog"
@@ -63,7 +65,7 @@ if pid > 0:
 server.stop()
 
 if os.access(wal, os.F_OK):
-    print ".xlog exists after kill -9"
+    print(".xlog exists after kill -9")
     # Remove last byte from xlog
     f = open(wal, "a")
     size = f.tell()
@@ -73,7 +75,7 @@ if os.access(wal, os.F_OK):
 server.start()
 
 if os.access(wal, os.F_OK):
-  print "corrupt .xlog exists after start"
+  print("corrupt .xlog exists after start")
 server.stop()
 lsn += 1
 
@@ -98,4 +100,4 @@ for f in os.listdir(data_path):
 server.start()
 lsn = int(yaml.safe_load(admin("box.info.lsn", silent=True))[0])
 if lsn == orig_lsn:
-    print ".snap.inprogress is ignored"
+    print(".snap.inprogress is ignored")

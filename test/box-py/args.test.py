@@ -5,7 +5,7 @@ import re
 # Disabled on OpenBSD due to fail #XXXX.
 import platform
 
-if platform.system() == 'OpenBSD':
+if platform.system() == "OpenBSD":
     self.skip = 1
 
 # mask BFD warnings: https://bugs.launchpad.net/tarantool/+bug/1018356
@@ -13,9 +13,9 @@ sys.stdout.push_filter("unable to read unknown load command 0x2\d+", "")
 server.test_option("--help")
 server.test_option("-h")
 # Replace with the same value for case when builddir inside source dir
-sys.stdout.push_filter(re.escape(os.getenv("BUILDDIR")+'/src/tarantool'), "tarantool")
+sys.stdout.push_filter(re.escape(os.getenv("BUILDDIR")+"/src/tarantool"), "tarantool")
 sys.stdout.push_filter(re.escape(os.getenv("BUILDDIR")), "${SOURCEDIR}")
-sys.stdout.push_filter(re.escape(os.getenv("SOURCEDIR")+'/src/tarantool'), "tarantool")
+sys.stdout.push_filter(re.escape(os.getenv("SOURCEDIR")+"/src/tarantool"), "tarantool")
 sys.stdout.push_filter(re.escape(os.getenv("SOURCEDIR")), "${SOURCEDIR}")
 sys.stdout.push_filter("invalid option.*", "invalid option")
 sys.stdout.push_filter("unrecognized option.*", "unrecognized option")
@@ -44,11 +44,11 @@ server.test_option(script + " --help 1 2 3")
 server.test_option("-V " + script + " 1 2 3")
 
 # gh-3966: os.exit() hangs if called by a command from the argument list.
-server.test_option("-e \"print(1) os.exit() print(2)\"")
-server.test_option("-e \"print(1)\" -e \"os.exit()\" -e \"print(1)\" -e \"os.exit()\" -e \"print(1)\"")
+server.test_option("-e 'print(1) os.exit() print(2)'")
+server.test_option("-e 'print(1)' -e 'os.exit()' -e 'print(1)' -e 'os.exit()' -e 'print(1)'")
 
 server.test_option("-e \"print('Hello')\" " + script + " 1 2 3")
-server.test_option("-e \"a = 10\" " + \
+server.test_option("-e 'a = 10' " + \
                    "-e print(a) " + \
                    script + \
                    " 1 2 3 --help")
