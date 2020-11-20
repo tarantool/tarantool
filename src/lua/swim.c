@@ -84,7 +84,22 @@ lua_swim_delete(struct lua_State *L)
 {
 	uint32_t ctypeid;
 	struct swim *s = *(struct swim **) luaL_checkcdata(L, 1, &ctypeid);
+	assert(ctypeid == ctid_swim_ptr);
 	swim_delete(s);
+	return 0;
+}
+
+/**
+ * Gracefully leave the cluster, broadcast a notification, and delete the SWIM
+ * instance. It is not FFI, because this operation yields.
+ */
+static int
+lua_swim_quit(struct lua_State *L)
+{
+	uint32_t ctypeid;
+	struct swim *s = *(struct swim **) luaL_checkcdata(L, 1, &ctypeid);
+	assert(ctypeid == ctid_swim_ptr);
+	swim_quit(s);
 	return 0;
 }
 
@@ -98,6 +113,7 @@ tarantool_lua_swim_init(struct lua_State *L)
 	static const struct luaL_Reg lua_swim_internal_methods [] = {
 		{"swim_new", lua_swim_new},
 		{"swim_delete", lua_swim_delete},
+		{"swim_quit", lua_swim_quit},
 		{"swim_on_member_event", lua_swim_on_member_event},
 		{NULL, NULL}
 	};
