@@ -74,9 +74,6 @@ ffi.cdef[[
     int
     swim_size(const struct swim *swim);
 
-    void
-    swim_quit(struct swim *swim);
-
     struct swim_member *
     swim_self(struct swim *swim);
 
@@ -519,7 +516,7 @@ end
 --
 local function swim_quit(s)
     local ptr = swim_check_instance(s, 'swim:quit')
-    capi.swim_quit(ffi.gc(ptr, nil))
+    internal.swim_quit(ffi.gc(ptr, nil))
     s.ptr = nil
     setmetatable(s, swim_mt_deleted)
 end
