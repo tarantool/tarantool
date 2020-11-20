@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import tarantool
 
 import sys
@@ -6,7 +8,7 @@ import re
 
 log = server.get_log()
 
-admin('print("Hello, world")')
+admin("print(\"Hello, world\")")
 admin("io = require('io')")
 
 admin("""local f = require('fiber').create(
@@ -18,17 +20,18 @@ admin("""local f = require('fiber').create(
 admin("require('fiber').sleep(0.01)")
 
 print("Check log line (Hello):")
-print('---')
-if log.seek_once('Hello') >= 0:
-    print('- "logfile contains "Hello""')
+print("---")
+if log.seek_once("Hello") >= 0:
+    print("- \"logfile contains \"Hello\"\"")
 else:
-    print('- "logfile does not contain "Hello""')
-print('...')
+    print("- 'logfile does not contain 'Hello''")
+print("...")
 
 print("Check log line (Ehllo):")
-print('---')
-if log.seek_once('Ehllo') >= 0:
-    print('- "logfile contains "Ehllo""')
+print("---")
+if log.seek_once("Ehllo") >= 0:
+    print("- \"logfile contains \"Ehllo\"\"")
 else:
-    print('- "logfile does not contain "Ehllo""')
-print('...')
+    print("- \"logfile does not contain \"Ehllo\"\"")
+
+print("...")
