@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import yaml
 
@@ -26,7 +28,7 @@ server.stop()
 
 # Save wal#1
 if os.access(wal, os.F_OK):
-    print ".xlog exists"
+    print(".xlog exists")
     os.rename(wal, wal_old)
 
 # Write wal#2
@@ -37,16 +39,16 @@ server.stop()
 
 # Restore wal#1
 if not os.access(wal, os.F_OK):
-    print ".xlog does not exist"
+    print(".xlog does not exist")
     os.rename(wal_old, wal)
 
 server.start()
-line = 'Duplicate key'
-print "check log line for '%s'" % line
-print
+line = "Duplicate key"
+print("check log line for '{}'".format(line))
+print("")
 if server.logfile_pos.seek_once(line) >= 0:
-    print "'%s' exists in server log" % line
-print
+    print("'{}' exists in server log".format(line))
+print("")
 
 server.admin("box.space.test:get{1}")
 server.admin("box.space.test:get{2}")

@@ -7,9 +7,9 @@ sys.stdout.push_filter("unable to read unknown load command 0x2\d+", "")
 server.test_option("--help")
 server.test_option("-h")
 # Replace with the same value for case when builddir inside source dir
-sys.stdout.push_filter(re.escape(os.getenv("BUILDDIR")+'/src/tarantool'), "tarantool")
+sys.stdout.push_filter(re.escape(os.getenv("BUILDDIR")+"/src/tarantool"), "tarantool")
 sys.stdout.push_filter(re.escape(os.getenv("BUILDDIR")), "${SOURCEDIR}")
-sys.stdout.push_filter(re.escape(os.getenv("SOURCEDIR")+'/src/tarantool'), "tarantool")
+sys.stdout.push_filter(re.escape(os.getenv("SOURCEDIR")+"/src/tarantool"), "tarantool")
 sys.stdout.push_filter(re.escape(os.getenv("SOURCEDIR")), "${SOURCEDIR}")
 sys.stdout.push_filter("invalid option.*", "invalid option")
 sys.stdout.push_filter("unrecognized option.*", "unrecognized option")
@@ -38,7 +38,7 @@ server.test_option(script + " --help 1 2 3")
 server.test_option("-V " + script + " 1 2 3")
 
 server.test_option("-e \"print('Hello')\" " + script + " 1 2 3")
-server.test_option("-e \"a = 10\" " + \
+server.test_option("-e 'a = 10' " + \
                    "-e print(a) " + \
                    script + \
                    " 1 2 3 --help")

@@ -72,7 +72,7 @@ def read_handle(env, response):
 
 def post_handle(env, response):
     code = "200 OK"
-    body = [env['wsgi.input'].read()]
+    body = [env["wsgi.input"].read()]
     headers = []
     for key,value in env.iteritems():
         if "HTTP_" in key:
@@ -117,15 +117,15 @@ def heartbeat():
         sys.exit(1)
 
 def usage():
-    sys.stderr.write("Usage: %s { --inet HOST:PORT | --unix PATH }\n" %
-                     sys.argv[0])
+    message = "Usage: {} {{ --inet HOST:PORT | --unix PATH }}\n".format(sys.argv[0])
+    sys.stderr.write(message)
     sys.exit(1)
 
 if len(sys.argv) != 3:
     usage()
 
 if sys.argv[1] == "--inet":
-    host, port = sys.argv[2].split(':')
+    host, port = sys.argv[2].split(":")
     sock_family = socket.AF_INET
     sock_addr = (host, int(port))
 elif sys.argv[1] == "--unix":
