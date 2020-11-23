@@ -69,7 +69,7 @@ cfg_filter(box.cfg)
   - - replication_sync_lag
     - 10
   - - replication_sync_timeout
-    - 300
+    - <hidden>
   - - replication_timeout
     - 1
   - - rows_per_wal
