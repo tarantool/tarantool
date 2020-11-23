@@ -68,7 +68,7 @@ cfg_filter(box.cfg)
  |   - - replication_sync_lag
  |     - 10
  |   - - replication_sync_timeout
- |     - 300
+ |     - <hidden>
  |   - - replication_synchro_quorum
  |     - 1
  |   - - replication_synchro_timeout
@@ -175,7 +175,7 @@ cfg_filter(box.cfg)
  |   - - replication_sync_lag
  |     - 10
  |   - - replication_sync_timeout
- |     - 300
+ |     - <hidden>
  |   - - replication_synchro_quorum
  |     - 1
  |   - - replication_synchro_timeout
