@@ -39,7 +39,8 @@ box.cfg{                                                                        
     replication_timeout = 0.1,                                                  \
 }
 
-test_run:wait_cond(function() return box.info.election.state == 'leader' end)
+box.ctl.wait_rw()
+assert(box.info.election.state == 'leader')
 lsn = box.info.lsn
 _ = fiber.create(function()                                                     \
     ok, err = pcall(box.space.test.replace, box.space.test, {1})                \
@@ -69,7 +70,8 @@ box.cfg{                                                                        
     replication_timeout = 0.01,                                                 \
 }
 
-test_run:wait_cond(function() return box.info.election.state == 'leader' end)
+box.ctl.wait_rw()
+assert(box.info.election.state == 'leader')
 _ = box.space.test:replace{2}
 box.space.test:select{}
 box.space.test:drop()

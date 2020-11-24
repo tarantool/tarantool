@@ -155,11 +155,10 @@ box_raft_on_update_f(struct trigger *trigger, void *event)
 	struct raft *raft = (struct raft *)event;
 	assert(raft == box_raft());
 	/*
-	 * XXX: in case the instance became a leader, RO must be updated only
-	 * after clearing the synchro queue.
-	 *
-	 * When the instance became a follower, then on the contrary - make it
-	 * read-only ASAP, this is good.
+	 * When the instance becomes a follower, it's good to make it read-only
+	 * ASAP. This way we make sure followers don't write anything.
+	 * However, if the instance is transitioning to leader it'll become
+	 * writable only after it clears its synchro queue.
 	 */
 	box_update_ro_summary();
 	if (raft->state != RAFT_STATE_LEADER)

@@ -75,7 +75,10 @@ box.cfg{                                                                        
  | ---
  | ...
 
-test_run:wait_cond(function() return box.info.election.state == 'leader' end)
+box.ctl.wait_rw()
+ | ---
+ | ...
+assert(box.info.election.state == 'leader')
  | ---
  | - true
  | ...
@@ -130,7 +133,10 @@ box.cfg{                                                                        
  | ---
  | ...
 
-test_run:wait_cond(function() return box.info.election.state == 'leader' end)
+box.ctl.wait_rw()
+ | ---
+ | ...
+assert(box.info.election.state == 'leader')
  | ---
  | - true
  | ...
