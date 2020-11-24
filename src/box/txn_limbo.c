@@ -33,6 +33,7 @@
 #include "replication.h"
 #include "iproto_constants.h"
 #include "journal.h"
+#include "box.h"
 
 struct txn_limbo txn_limbo;
 
@@ -48,10 +49,17 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->is_in_rollback = false;
 }
 
+bool
+txn_limbo_is_ro(struct txn_limbo *limbo)
+{
+	return limbo->owner_id != instance_id && !txn_limbo_is_empty(limbo);
+}
+
 struct txn_limbo_entry *
 txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 {
 	assert(txn_has_flag(txn, TXN_WAIT_SYNC));
+	assert(limbo == &txn_limbo);
 	/*
 	 * Transactions should be added to the limbo before WAL write. Limbo
 	 * needs that to be able rollback transactions, whose WAL write is in
@@ -72,11 +80,14 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 	}
 	if (id == 0)
 		id = instance_id;
+	bool make_ro = false;
 	if (limbo->owner_id != id) {
 		if (limbo->owner_id == REPLICA_ID_NIL ||
 		    rlist_empty(&limbo->queue)) {
 			limbo->owner_id = id;
 			limbo->confirmed_lsn = 0;
+			if (id != instance_id)
+				make_ro = true;
 		} else {
 			diag_set(ClientError, ER_UNCOMMITTED_FOREIGN_SYNC_TXNS,
 				 limbo->owner_id);
@@ -96,6 +107,12 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 	e->is_commit = false;
 	e->is_rollback = false;
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
+	/*
+	 * We added new entries from a remote instance to an empty limbo.
+	 * Time to make this instance read-only.
+	 */
+	if (make_ro)
+		box_update_ro_summary();
 	return e;
 }
 
@@ -349,6 +366,7 @@ static void
 txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 {
 	assert(limbo->owner_id != REPLICA_ID_NIL);
+	assert(limbo == &txn_limbo);
 	struct txn_limbo_entry *e, *tmp;
 	rlist_foreach_entry_safe(e, &limbo->queue, in_queue, tmp) {
 		/*
@@ -388,6 +406,9 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		if (e->txn->signature >= 0)
 			txn_complete_success(e->txn);
 	}
+	/* Update is_ro once the limbo is clear. */
+	if (txn_limbo_is_empty(limbo))
+		box_update_ro_summary();
 }
 
 /**
@@ -410,6 +431,7 @@ static void
 txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 {
 	assert(limbo->owner_id != REPLICA_ID_NIL);
+	assert(limbo == &txn_limbo);
 	struct txn_limbo_entry *e, *tmp;
 	struct txn_limbo_entry *last_rollback = NULL;
 	rlist_foreach_entry_reverse(e, &limbo->queue, in_queue) {
@@ -452,6 +474,9 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 		if (e == last_rollback)
 			break;
 	}
+	/* Update is_ro once the limbo is clear. */
+	if (txn_limbo_is_empty(limbo))
+		box_update_ro_summary();
 }
 
 void

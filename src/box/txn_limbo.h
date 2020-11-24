@@ -172,6 +172,9 @@ txn_limbo_is_empty(struct txn_limbo *limbo)
 	return rlist_empty(&limbo->queue);
 }
 
+bool
+txn_limbo_is_ro(struct txn_limbo *limbo);
+
 static inline struct txn_limbo_entry *
 txn_limbo_first_entry(struct txn_limbo *limbo)
 {
