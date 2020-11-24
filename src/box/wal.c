@@ -55,7 +55,7 @@ enum {
 	WAL_FALLOCATE_LEN = 1024 * 1024,
 };
 
-const char *wal_mode_STRS[] = { "none", "write", "fsync", "async", NULL };
+const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 
 int wal_dir_lock = -1;
 
@@ -415,22 +415,10 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	writer->wal_mode = wal_mode;
 	writer->wal_max_size = wal_max_size;
 
-	int (*write_function)(struct journal *, struct journal_entry *);
-	switch (wal_mode) {
-		case WAL_ASYNC:
-			write_function = wal_write_async;
-			break;
-		case WAL_NONE:
-			write_function = wal_write_none;
-			break;
-		default:
-			write_function = wal_write;
-			break;
-	}
 	journal_create(&writer->base,
 		       wal_mode == WAL_NONE ?
 		       wal_write_none_async : wal_write_async,
-		       write_function);
+		       wal_mode == WAL_NONE ? wal_write_none : wal_write);
 
 	struct xlog_opts opts = xlog_opts_default;
 	opts.sync_is_async = true;

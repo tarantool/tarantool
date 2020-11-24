@@ -3121,7 +3121,7 @@ case OP_TransactionBegin: {
 case OP_TransactionCommit: {
 	struct txn *txn = in_txn();
 	if (txn != NULL) {
-		if (txn_commit(txn) != 0)
+		if (txn_commit(txn, false) != 0)
 			goto abort_due_to_error;
 	} else {
 		diag_set(ClientError, ER_SQL_EXECUTE, "cannot commit - no "\

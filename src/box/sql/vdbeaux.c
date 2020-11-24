@@ -2050,7 +2050,7 @@ sqlVdbeHalt(Vdbe * p)
 					 * is required.
 					 */
 					rc = (in_txn() == NULL ||
-					      txn_commit(in_txn()) == 0) ?
+							txn_commit(in_txn(), false) == 0) ?
 					      0 : -1;
 					closeCursorsAndFree(p);
 				}

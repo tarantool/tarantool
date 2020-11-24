@@ -876,19 +876,24 @@ rollback:
 	return -1;
 }
 
-int
-txn_commit(struct txn *txn)
-{
-	if (wal_mode() == WAL_ASYNC)
-		return txn_commit_async(txn);
+void txn_commit_rollback(struct txn* txn) {
+	assert(txn->fiber != NULL);
+	if (!txn_has_flag(txn, TXN_IS_DONE)) {
+		fiber_set_txn(fiber(), txn);
+		txn_rollback(txn);
+	} else {
+		assert(in_txn() == NULL);
+	}
+	txn_free(txn);
+}
 
+int
+txn_commit_impl(struct txn *txn)
+{
 	struct journal_entry *req;
 	struct txn_limbo_entry *limbo_entry = NULL;
 
 	txn->fiber = fiber();
-
-	if (txn_prepare(txn) != 0)
-		goto rollback;
 
 	if (txn_commit_nop(txn)) {
 		txn_free(txn);
@@ -949,14 +954,36 @@ txn_commit(struct txn *txn)
 	return 0;
 
 rollback:
-	assert(txn->fiber != NULL);
-	if (!txn_has_flag(txn, TXN_IS_DONE)) {
-		fiber_set_txn(fiber(), txn);
-		txn_rollback(txn);
-	} else {
-		assert(in_txn() == NULL);
+	txn_commit_rollback(txn);
+	return -1;
+}
+
+int txn_commit_is_async_routine(va_list va) {
+	struct txn* txn = va_arg(va, struct txn *);
+	assert(txn);
+	txn_commit_impl(txn);
+	return 0;
+}
+
+int
+txn_commit(struct txn *txn, bool is_async)
+{
+	txn->fiber = fiber();
+	if (txn_prepare(txn) != 0)
+		goto rollback;
+
+	if (is_async) {
+		struct fiber* f = fiber_new("commit_is_async_fiber",
+									txn_commit_is_async_routine);
+		f->f_arg = txn;
+		fiber_start(f, txn);
+		return 0;
 	}
-	txn_free(txn);
+
+	return txn_commit_impl(txn);
+
+	rollback:
+	txn_commit_rollback(txn);
 	return -1;
 }
 
@@ -1037,7 +1064,7 @@ box_txn_begin(void)
 }
 
 int
-box_txn_commit(void)
+box_txn_commit(bool is_async)
 {
 	struct txn *txn = in_txn();
 	/**
@@ -1052,7 +1079,7 @@ box_txn_commit(void)
 		diag_set(ClientError, ER_COMMIT_IN_SUB_STMT);
 		return -1;
 	}
-	int rc = txn_commit(txn);
+	int rc = txn_commit(txn, is_async);
 	fiber_gc();
 	return rc;
 }

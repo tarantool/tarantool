@@ -70,7 +70,7 @@ test_reload(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	if (box_replace(space_id, tuple_buf, tuple_end, NULL) != 0)
 		return -1;
 
-	box_txn_commit();
+	box_txn_commit(false);
 	assert(!box_txn());
 
 	fiber_sleep(0.001);

@@ -254,7 +254,7 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 	 * the synchronous transactions limbo.
 	 */
 	txn_set_flag(txn, TXN_FORCE_ASYNC);
-	rc = txn_commit(txn);
+	rc = txn_commit(txn, false);
 	/*
 	 * Don't let gc pool grow too much. Yet to
 	 * it before reading the next row, to make

@@ -441,7 +441,7 @@ txn_complete_success(struct txn *txn);
  * the transaction and return -1.
  */
 int
-txn_commit(struct txn *txn);
+txn_commit(struct txn *txn, bool is_async);
 
 /**
  * Rollback a transaction.
@@ -712,7 +712,7 @@ box_txn_begin(void);
  * started
  */
 API_EXPORT int
-box_txn_commit(void);
+box_txn_commit(bool is_async);
 
 /**
  * Rollback the current transaction.

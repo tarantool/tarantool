@@ -246,7 +246,7 @@ apply_snapshot_row(struct xrow_header *row)
 		goto rollback_stmt;
 	if (txn_commit_stmt(txn, &request))
 		goto rollback;
-	rc = txn_commit(txn);
+	rc = txn_commit(txn, false);
 	fiber_gc();
 	return rc;
 rollback_stmt:
@@ -314,7 +314,7 @@ apply_final_join_row(struct xrow_header *row)
 		fiber_gc();
 		return -1;
 	}
-	if (txn_commit(txn) != 0)
+	if (txn_commit(txn, false) != 0)
 		return -1;
 	fiber_gc();
 	return 0;

@@ -4,110 +4,41 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
-test_run:cmd("create server wal_async with script='box/wal_async.lua'")
+-- todo: check vinyl
+-- engine = test_run:get_cfg('engine')
+box.schema.user.grant('guest', 'replication')
+---
+...
+NUM_INSTANCES = 2
+---
+...
+box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
+---
+...
+_ = box.schema.space.create('sync', {is_sync=true, engine="memtx"})
+---
+...
+_ = box.space.sync:create_index('pk')
+---
+...
+test_run:cmd('create server replica with rpl_master=default,\
+                                         script="replication/replica.lua"')
 ---
 - true
 ...
-test_run:cmd("start server wal_async")
+test_run:cmd('start server replica')
 ---
 - true
 ...
-test_run:cmd("switch wal_async")
+test_run:cmd("setopt delimiter ';'");
 ---
 - true
 ...
-box.cfg.wal_mode
----
-- async
-...
--- Check usual path
-s = box.schema.space.create('s')
----
-...
-i = s:create_index('pk')
----
-...
-s:insert{1}
----
-- [1]
-...
-s:insert{2}
----
-- [2]
-...
-s:insert{3}
----
-- [3]
-...
-s:select{}
----
-- - [1]
-  - [2]
-  - [3]
-...
--- Check that write is asynchronous
-errinj = box.error.injection
----
-...
-errinj.set("ERRINJ_WAL_DELAY", true)
----
-- ok
-...
-s:insert{4}
----
-- [4]
-...
-s:insert{5}
----
-- [5]
-...
-s:select{}
----
-- - [1]
-  - [2]
-  - [3]
-  - [4]
-  - [5]
-...
-test_run:cmd("setopt delimiter ';'")
----
-- true
-...
-box:begin()
-s:insert{6}
-box:commit();
----
-...
-test_run:cmd("setopt delimiter ''");
----
-- true
-...
-errinj.set("ERRINJ_WAL_DELAY", false)
----
-- ok
-...
--- Check that data persisted in wal
-test_run:cmd('restart server wal_async')
-fiber = require('fiber')
----
-...
-test_run:cmd("setopt delimiter ';'")
----
-- true
-...
-rows = 0;
----
-...
-while true do
-    s = box.space.s
-    if s ~= nil then
-        res = s:select{}
-        rows = #res
-    end
-    if rows == 6 then
-        break
-    end
-    fiber.sleep(0.01)
+function async_tx(values)
+    box.begin()
+    box.space.sync:insert{values[1]}
+    box.space.sync:insert{values[2]}
+    box.commit({ is_async = true })
 end;
 ---
 ...
@@ -115,15 +46,144 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
+async_tx({1, 2})
+---
+...
+box.space.sync:select{}
+---
+- - [1]
+  - [2]
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+test_run:wait_cond(function() return box.space.sync:count() == 2 end, 10)
+---
+- true
+...
+box.space.sync:select{}
+---
+- - [1]
+  - [2]
+...
 test_run:cmd("switch default")
 ---
 - true
 ...
-test_run:cmd("stop server wal_async")
+errinj = box.error.injection
+---
+...
+errinj.set("ERRINJ_WAL_DELAY", true)
+---
+- ok
+...
+async_tx({3, 4})
+---
+...
+box.space.sync:select{}
+---
+- - [1]
+  - [2]
+  - [3]
+  - [4]
+...
+errinj.set("ERRINJ_WAL_DELAY", false)
+---
+- ok
+...
+test_run:cmd('restart server default')
+test_run:cmd("setopt delimiter ';'");
 ---
 - true
 ...
-test_run:cmd("cleanup server wal_async")
+function async_tx(values)
+    box.begin()
+    box.space.sync:insert{values[1]}
+    box.space.sync:insert{values[2]}
+    box.commit({ is_async = true })
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
 ---
 - true
+...
+test_run:wait_cond(function() return box.space.sync:count() == 4 end, 10)
+---
+- true
+...
+box.space.sync:select{}
+---
+- - [1]
+  - [2]
+  - [3]
+  - [4]
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+errinj = box.error.injection
+---
+...
+errinj.set('ERRINJ_RELAY_SEND_DELAY', true)
+---
+- ok
+...
+async_tx({5, 6})
+---
+...
+box.space.sync:select{}
+---
+- - [1]
+  - [2]
+  - [3]
+  - [4]
+  - [5]
+  - [6]
+...
+test_run:cmd('start server replica')
+---
+- true
+...
+errinj = box.error.injection
+---
+...
+errinj.set('ERRINJ_RELAY_SEND_DELAY', false)
+---
+- ok
+...
+test_run:switch('replica')
+---
+- true
+...
+test_run:wait_cond(function() return box.space.sync:count() == 6 end, 10)
+---
+- true
+...
+box.space.sync:select{}
+---
+- - [1]
+  - [2]
+  - [3]
+  - [4]
+  - [5]
+  - [6]
+...
+-- Teardown.
+test_run:cmd('switch default')
+---
+- true
+...
+test_run:cmd('stop server replica')
+---
+- true
+...
+test_run:cmd('delete server replica')
+---
+- true
+...
+test_run:cleanup_cluster()
+---
 ...

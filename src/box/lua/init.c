@@ -108,7 +108,27 @@ static const char *lua_sources[] = {
 static int
 lbox_commit(lua_State *L)
 {
-	if (box_txn_commit() != 0)
+	bool is_async = false;
+	if (lua_gettop(L) == 1) {
+		if (!lua_istable(L, 1)) {
+			diag_set(IllegalParams, "usage box.commit() or "
+						   "box.commit({ is_async = true/false })");
+			return luaT_error(L);
+		}
+		lua_getfield(L, 1, "is_async");
+		if (!lua_isboolean(L, -1)) {
+			diag_set(IllegalParams, "usage box.commit() or "
+						   "box.commit({ is_async = true/false })");
+			return luaT_error(L);
+		}
+		is_async = lua_toboolean(L, -1);
+	} else if (lua_gettop(L) != 0) {
+		diag_set(IllegalParams, "usage box.commit() or "
+						  "box.commit({ is_async = true/false })");
+		return luaT_error(L);
+	}
+
+	if (box_txn_commit(is_async) != 0)
 		return luaT_error(L);
 	return 0;
 }

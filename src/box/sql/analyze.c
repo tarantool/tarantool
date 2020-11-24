@@ -1681,7 +1681,7 @@ sql_analysis_load(struct sql *db)
 	if (sql_exec(db, load_stat1, analysis_loader, &info) != 0)
 		goto fail;
 	if (info.index_count == 0) {
-		box_txn_commit();
+		box_txn_commit(false);
 		return 0;
 	}
 	/*
@@ -1739,7 +1739,7 @@ sql_analysis_load(struct sql *db)
 	const char *order_query = "SELECT \"tbl\",\"idx\" FROM "
 				  "\"_sql_stat4\" GROUP BY \"tbl\",\"idx\"";
 	if (load_stat_to_index(order_query, heap_stats) == 0)
-		return box_txn_commit();
+		return box_txn_commit(false);
 fail:
 	box_txn_rollback();
 	return -1;

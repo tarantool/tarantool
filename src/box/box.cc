@@ -255,7 +255,7 @@ box_process_rw(struct request *request, struct space *space,
 		if (is_local_recovery) {
 			res = txn_commit_async(txn);
 		} else {
-			res = txn_commit(txn);
+			res = txn_commit(txn, false);
 		}
 		if (res < 0)
 			goto error;

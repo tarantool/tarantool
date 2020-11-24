@@ -136,7 +136,7 @@ txn_process_func(va_list ap)
 
 	switch (process_type) {
 	case TXN_PROCESS_COMMIT:
-		txn_commit(txn);
+		txn_commit(txn, false);
 		break;
 	case TXN_PROCESS_ROLLBACK:
 		txn_rollback(txn);
