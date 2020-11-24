@@ -40,6 +40,7 @@ old_leader_nr = get_leader(nrs)
 old_leader = 'election_replica'..old_leader_nr
 leader_port = test_run:eval(old_leader, 'box.cfg.listen')[1]
 c = netbox.connect(leader_port)
+c:eval('box.ctl.wait_rw()')
 
 _ = c:eval('box.schema.space.create("test", {is_sync=true})')
 _ = c:eval('box.space.test:create_index("pk")')
@@ -58,6 +59,7 @@ for i = 1,10 do
     leader_port = test_run:eval(new_leader, 'box.cfg.listen')[1]
     c = netbox.connect(leader_port)
     c:eval('box.cfg{replication_synchro_timeout=1000}')
+    c:eval('box.ctl.wait_rw()')
     c.space._schema:replace{'smth'}
     c.space.test:get{i}
     test_run:cmd('start server '..old_leader..' with wait=True, wait_load=True, args="2 0.4"')
