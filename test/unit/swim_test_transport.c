@@ -294,14 +294,20 @@ swim_test_transport_free(void)
 		swim_fd_close(&swim_fd[i]);
 }
 
+static void
+swim_test_close(int fd)
+{
+	assert(fd >= FAKE_FD_BASE);
+	swim_fd_close(&swim_fd[fd - FAKE_FD_BASE]);
+}
+
 /**
  * Wrap a packet and put into send queue. Packets are popped from
  * it on EV_WRITE event.
  */
-ssize_t
-swim_transport_send(struct swim_transport *transport, const void *data,
-		    size_t size, const struct sockaddr *addr,
-		    socklen_t addr_size)
+static ssize_t
+swim_test_sendto(int fd, const void *data, size_t size,
+		 const struct sockaddr *addr, socklen_t addr_size)
 {
 	/*
 	 * Create packet. Put into sending queue.
@@ -309,11 +315,11 @@ swim_transport_send(struct swim_transport *transport, const void *data,
 	(void) addr_size;
 	assert(addr->sa_family == AF_INET);
 	struct sockaddr_in src_addr;
-	swim_test_fd_to_sockaddr_in(transport->fd, &src_addr);
+	swim_test_fd_to_sockaddr_in(fd, &src_addr);
 	struct swim_test_packet *p =
 		swim_test_packet_new(data, size, &src_addr,
 				     (const struct sockaddr_in *) addr);
-	struct swim_fd *src = &swim_fd[transport->fd - FAKE_FD_BASE];
+	struct swim_fd *src = &swim_fd[fd - FAKE_FD_BASE];
 	assert(src->is_opened);
 	rlist_add_tail_entry(&src->send_queue, p, in_queue);
 	return size;
@@ -323,14 +329,14 @@ swim_transport_send(struct swim_transport *transport, const void *data,
  * Move a packet from send to recv queue. The packet is popped and
  * processed on EV_READ event.
  */
-ssize_t
-swim_transport_recv(struct swim_transport *transport, void *buffer, size_t size,
-		    struct sockaddr *addr, socklen_t *addr_size)
+static ssize_t
+swim_test_recvfrom(int fd, void *buffer, size_t size, struct sockaddr *addr,
+		   socklen_t *addr_size)
 {
 	/*
 	 * Pop a packet from a receiving queue.
 	 */
-	struct swim_fd *dst = &swim_fd[transport->fd - FAKE_FD_BASE];
+	struct swim_fd *dst = &swim_fd[fd - FAKE_FD_BASE];
 	assert(dst->is_opened);
 	struct swim_test_packet *p =
 		rlist_shift_entry(&dst->recv_queue, struct swim_test_packet,
@@ -343,24 +349,48 @@ swim_transport_recv(struct swim_transport *transport, void *buffer, size_t size,
 	return result;
 }
 
+static int
+swim_test_bind(int *fd, const struct sockaddr *addr, socklen_t addr_len)
+{
+	assert(addr->sa_family == AF_INET);
+	const struct sockaddr_in *new_addr = (const struct sockaddr_in *) addr;
+	assert(addr_len >= sizeof(*new_addr));
+	(void)addr_len;
+	int new_fd = swim_test_sockaddr_in_to_fd(new_addr);
+	int old_fd = *fd;
+	if (old_fd == new_fd)
+		return 0;
+	if (swim_fd_open(&swim_fd[new_fd - FAKE_FD_BASE]) != 0)
+		return -1;
+	if (old_fd != -1)
+		swim_test_close(old_fd);
+	*fd = new_fd;
+	return 0;
+}
+
+ssize_t
+swim_transport_send(struct swim_transport *transport, const void *data,
+		    size_t size, const struct sockaddr *addr,
+		    socklen_t addr_size)
+{
+	return swim_test_sendto(transport->fd, data, size, addr, addr_size);
+}
+
+ssize_t
+swim_transport_recv(struct swim_transport *transport, void *buffer, size_t size,
+		    struct sockaddr *addr, socklen_t *addr_size)
+{
+	return swim_test_recvfrom(transport->fd, buffer, size, addr, addr_size);
+}
+
 int
 swim_transport_bind(struct swim_transport *transport,
 		    const struct sockaddr *addr, socklen_t addr_len)
 {
 	assert(addr->sa_family == AF_INET);
-	const struct sockaddr_in *new_addr = (const struct sockaddr_in *) addr;
-	int new_fd = swim_test_sockaddr_in_to_fd(new_addr);
-	int old_fd = transport->fd;
-	if (old_fd == new_fd) {
-		transport->addr = *new_addr;
-		return 0;
-	}
-	if (swim_fd_open(&swim_fd[new_fd - FAKE_FD_BASE]) != 0)
+	if (swim_test_bind(&transport->fd, addr, addr_len) != 0)
 		return -1;
-	transport->fd = new_fd;
-	transport->addr = *new_addr;
-	if (old_fd != -1)
-		swim_fd_close(&swim_fd[old_fd - FAKE_FD_BASE]);
+	transport->addr = *(struct sockaddr_in *)addr;
 	return 0;
 }
 
@@ -368,7 +398,7 @@ void
 swim_transport_destroy(struct swim_transport *transport)
 {
 	if (transport->fd != -1)
-		swim_fd_close(&swim_fd[transport->fd - FAKE_FD_BASE]);
+		swim_test_close(transport->fd);
 }
 
 void
