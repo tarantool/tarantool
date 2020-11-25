@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "swim_test_transport.h"
+#include "fakenet.h"
 #include "swim/swim_transport.h"
 #include "swim/swim_io.h"
 #include "fiber.h"
