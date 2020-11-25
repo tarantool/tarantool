@@ -217,12 +217,12 @@ main_f(va_list ap)
 
 	(void) ap;
 	swim_test_ev_init();
-	swim_test_transport_init();
+	fakenet_init();
 
 	swim_test_payload_refutation();
 	swim_test_indirect_ping();
 
-	swim_test_transport_free();
+	fakenet_free();
 	swim_test_ev_free();
 
 	test_result = check_plan();

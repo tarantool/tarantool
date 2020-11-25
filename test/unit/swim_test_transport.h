@@ -34,10 +34,9 @@
 struct ev_loop;
 
 /**
- * SWIM test_transport implements a 'fake' file descriptors table
- * in user space in order to get the full control over UDP
- * sockets, used in core SWIM code. Fake fds are used to provide a
- * capability to set necessary loss level, delay, reorders.
+ * Fakenet implements a 'fake' file descriptors table in user space in order to
+ * get the full control over UDP sockets. Fake fds are used to provide means
+ * to set necessary loss level, delay, reorders, blocks.
  */
 
 /**
@@ -49,8 +48,8 @@ struct ev_loop;
  * parameter a sender/receiver descriptor number is passed
  * depending on @a dir.
  */
-typedef bool (*swim_test_filter_check_f)(const char *data, int size,
-					 void *udata, int dir, int peer_fd);
+typedef bool (*fakenet_filter_check_f)(const char *data, int size, void *udata,
+				       int dir, int peer_fd);
 
 /**
  * Until there are no new IO events, feed EV_WRITE event to all
@@ -59,18 +58,18 @@ typedef bool (*swim_test_filter_check_f)(const char *data, int size,
  * from send to recv queues.
  */
 void
-swim_test_transport_do_loop_step(struct ev_loop *loop);
+fakenet_loop_update(struct ev_loop *loop);
 
 /**
  * Block a file descriptor so as it can not receive nor send any
  * packets.
  */
 void
-swim_test_transport_block_fd(int fd);
+fakenet_block(int fd);
 
 /** Unblock a file descriptor. */
 void
-swim_test_transport_unblock_fd(int fd);
+fakenet_unblock(int fd);
 
 /**
  * Add a filter to the file descriptor @a fd. If a filter with
@@ -83,8 +82,7 @@ swim_test_transport_unblock_fd(int fd);
  *        invocation.
  */
 void
-swim_test_transport_add_filter(int fd, swim_test_filter_check_f check,
-			       void *udata);
+fakenet_add_filter(int fd, fakenet_filter_check_f check, void *udata);
 
 /**
  * Remove a filter having @a check function. Works just like the
@@ -92,14 +90,14 @@ swim_test_transport_add_filter(int fd, swim_test_filter_check_f check,
  * is found, then it is not an error.
  */
 void
-swim_test_transport_remove_filter(int fd, swim_test_filter_check_f check);
+fakenet_remove_filter(int fd, fakenet_filter_check_f check);
 
-/** Initialize test transport system. */
+/** Initialize fake network system. */
 void
-swim_test_transport_init(void);
+fakenet_init(void);
 
-/** Destroy test transport system, free resources. */
+/** Destroy fake network system, free resources. */
 void
-swim_test_transport_free(void);
+fakenet_free(void);
 
 #endif /* TARANTOOL_SWIM_TEST_TRANSPORT_H_INCLUDED */

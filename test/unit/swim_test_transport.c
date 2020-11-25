@@ -52,14 +52,14 @@ enum {
 };
 
 static inline int
-swim_test_sockaddr_in_to_fd(const struct sockaddr_in *addr)
+fakenet_sockaddr_in_to_fd(const struct sockaddr_in *addr)
 {
 	assert(addr->sin_family == AF_INET);
 	return ntohs(addr->sin_port) + FAKE_FD_BASE;
 }
 
 static inline void
-swim_test_fd_to_sockaddr_in(int fd, struct sockaddr_in *addr)
+fakenet_fd_to_sockaddr_in(int fd, struct sockaddr_in *addr)
 {
 	*addr = (struct sockaddr_in){
 		.sin_family = AF_INET,
@@ -71,7 +71,7 @@ swim_test_fd_to_sockaddr_in(int fd, struct sockaddr_in *addr)
 }
 
 /** UDP packet wrapper. It is stored in send/recv queues. */
-struct swim_test_packet {
+struct fakenet_packet {
 	/** Source address. */
 	struct sockaddr_in src;
 	/** Destination address. */
@@ -85,12 +85,11 @@ struct swim_test_packet {
 };
 
 /** Wrap @a data into a new packet. */
-static inline struct swim_test_packet *
-swim_test_packet_new(const char *data, int size, const struct sockaddr_in *src,
-		     const struct sockaddr_in *dst)
+static inline struct fakenet_packet *
+fakenet_packet_new(const char *data, int size, const struct sockaddr_in *src,
+		   const struct sockaddr_in *dst)
 {
-	struct swim_test_packet *p =
-		(struct swim_test_packet *) malloc(sizeof(*p) + size);
+	struct fakenet_packet *p = malloc(sizeof(*p) + size);
 	assert(p != NULL);
 	rlist_create(&p->in_queue);
 	p->src = *src;
@@ -102,18 +101,18 @@ swim_test_packet_new(const char *data, int size, const struct sockaddr_in *src,
 
 /** Free packet memory. */
 static inline void
-swim_test_packet_delete(struct swim_test_packet *p)
+fakenet_packet_delete(struct fakenet_packet *p)
 {
 	rlist_del_entry(p, in_queue);
 	free(p);
 }
 
 /** Fully duplicate a packet on new memory. */
-static inline struct swim_test_packet *
-swim_test_packet_dup(struct swim_test_packet *p)
+static inline struct fakenet_packet *
+fakenet_packet_dup(struct fakenet_packet *p)
 {
-	int size = sizeof(struct swim_test_packet) + p->size;
-	struct swim_test_packet *res = (struct swim_test_packet *) malloc(size);
+	int size = sizeof(struct fakenet_packet) + p->size;
+	struct fakenet_packet *res = malloc(size);
 	assert(res != NULL);
 	memcpy(res, p, size);
 	rlist_create(&res->in_queue);
@@ -126,9 +125,9 @@ swim_test_packet_dup(struct swim_test_packet *p)
  * filters in the list. If anyone wants to filter the packet out,
  * then the packet is dropped.
  */
-struct swim_fd_filter {
+struct fakenet_filter {
 	/** A function to decide whether to drop a packet. */
-	swim_test_filter_check_f check;
+	fakenet_filter_check_f check;
 	/**
 	 * Arbitrary user data. Passed to each call of @a check.
 	 */
@@ -138,10 +137,10 @@ struct swim_fd_filter {
 };
 
 /** Create a new filter. */
-static inline struct swim_fd_filter *
-swim_fd_filter_new(swim_test_filter_check_f check, void *udata)
+static inline struct fakenet_filter *
+fakenet_filter_new(fakenet_filter_check_f check, void *udata)
 {
-	struct swim_fd_filter *f = (struct swim_fd_filter *) malloc(sizeof(*f));
+	struct fakenet_filter *f = malloc(sizeof(*f));
 	assert(f != NULL);
 	f->udata = udata;
 	f->check = check;
@@ -151,14 +150,14 @@ swim_fd_filter_new(swim_test_filter_check_f check, void *udata)
 
 /** Delete @a filter and its data. */
 static inline void
-swim_fd_filter_delete(struct swim_fd_filter *filter)
+fakenet_filter_delete(struct fakenet_filter *filter)
 {
 	rlist_del_entry(filter, in_filters);
 	free(filter);
 }
 
 /** Fake file descriptor. */
-struct swim_fd {
+struct fakenet_fd {
 	/** File descriptor number visible to libev. */
 	int evfd;
 	/**
@@ -185,71 +184,70 @@ struct swim_fd {
 };
 
 /** Table of fake file descriptors. */
-static struct swim_fd swim_fd[FAKE_FD_NUMBER];
+static struct fakenet_fd fakenet_fd[FAKE_FD_NUMBER];
 /**
  * List of active file descriptors. Used to avoid fullscan of the
  * table.
  */
-static RLIST_HEAD(swim_fd_active);
+static RLIST_HEAD(fakenet_fd_active);
 
 /** Open a fake file descriptor. */
 static inline int
-swim_fd_open(struct swim_fd *fd)
+fakenet_fd_open(struct fakenet_fd *fd)
 {
 	if (fd->is_opened) {
 		errno = EADDRINUSE;
-		diag_set(SocketError, "test_socket:1", "bind");
+		diag_set(SocketError, "fake_socket:1", "bind");
 		return -1;
 	}
 	assert(rlist_empty(&fd->filters));
 	fd->is_opened = true;
-	rlist_add_tail_entry(&swim_fd_active, fd, in_active);
+	rlist_add_tail_entry(&fakenet_fd_active, fd, in_active);
 	return 0;
 }
 
 void
-swim_test_transport_remove_filter(int fd, swim_test_filter_check_f check)
+fakenet_remove_filter(int fd, fakenet_filter_check_f check)
 {
-	struct swim_fd *sfd = &swim_fd[fd - FAKE_FD_BASE];
+	struct fakenet_fd *sfd = &fakenet_fd[fd - FAKE_FD_BASE];
 	assert(sfd->is_opened);
-	struct swim_fd_filter *f;
+	struct fakenet_filter *f;
 	rlist_foreach_entry(f, &sfd->filters, in_filters) {
 		if (check == f->check) {
-			swim_fd_filter_delete(f);
+			fakenet_filter_delete(f);
 			return;
 		}
 	}
 }
 
 void
-swim_test_transport_add_filter(int fd, swim_test_filter_check_f check,
-			       void *udata)
+fakenet_add_filter(int fd, fakenet_filter_check_f check, void *udata)
 {
-	struct swim_fd *sfd = &swim_fd[fd - FAKE_FD_BASE];
+	struct fakenet_fd *sfd = &fakenet_fd[fd - FAKE_FD_BASE];
 	assert(sfd->is_opened);
-	struct swim_fd_filter *f = swim_fd_filter_new(check, udata);
-	swim_test_transport_remove_filter(fd, check);
+	struct fakenet_filter *f = fakenet_filter_new(check, udata);
+	fakenet_remove_filter(fd, check);
 	rlist_add_tail_entry(&sfd->filters, f, in_filters);
 }
 
 /** Send one packet to destination's recv queue. */
 static inline void
-swim_fd_send_packet(struct swim_fd *fd);
+fakenet_fd_send_packet(struct fakenet_fd *fd);
 
 /** Close a fake file descriptor. */
 static inline void
-swim_fd_close(struct swim_fd *fd)
+fakenet_fd_close(struct fakenet_fd *fd)
 {
 	if (! fd->is_opened)
 		return;
-	struct swim_fd_filter *f, *f_tmp;
+	struct fakenet_filter *f, *f_tmp;
 	rlist_foreach_entry_safe(f, &fd->filters, in_filters, f_tmp)
-		swim_fd_filter_delete(f);
-	struct swim_test_packet *i, *tmp;
+		fakenet_filter_delete(f);
+	struct fakenet_packet *i, *tmp;
 	rlist_foreach_entry_safe(i, &fd->recv_queue, in_queue, tmp)
-		swim_test_packet_delete(i);
+		fakenet_packet_delete(i);
 	while (! rlist_empty(&fd->send_queue))
-		swim_fd_send_packet(fd);
+		fakenet_fd_send_packet(fd);
 	rlist_del_entry(fd, in_active);
 	fd->is_opened = false;
 }
@@ -262,10 +260,10 @@ swim_fd_close(struct swim_fd *fd)
  * @a dir.
  */
 static inline bool
-swim_fd_test_if_drop(struct swim_fd *fd, const struct swim_test_packet *p,
+fakenet_test_if_drop(struct fakenet_fd *fd, const struct fakenet_packet *p,
 		     int dir, int peer_fd)
 {
-	struct swim_fd_filter *f;
+	struct fakenet_filter *f;
 	rlist_foreach_entry(f, &fd->filters, in_filters) {
 		if (f->check(p->data, p->size, f->udata, dir, peer_fd))
 			return true;
@@ -274,31 +272,30 @@ swim_fd_test_if_drop(struct swim_fd *fd, const struct swim_test_packet *p,
 }
 
 void
-swim_test_transport_init(void)
+fakenet_init(void)
 {
 	for (int i = 0, evfd = FAKE_FD_BASE; i < FAKE_FD_NUMBER; ++i, ++evfd) {
-		rlist_create(&swim_fd[i].filters);
-		swim_fd[i].evfd = evfd;
-		swim_fd[i].is_opened = false;
-		rlist_create(&swim_fd[i].in_active);
-		rlist_create(&swim_fd[i].recv_queue);
-		rlist_create(&swim_fd[i].send_queue);
+		rlist_create(&fakenet_fd[i].filters);
+		fakenet_fd[i].evfd = evfd;
+		fakenet_fd[i].is_opened = false;
+		rlist_create(&fakenet_fd[i].in_active);
+		rlist_create(&fakenet_fd[i].recv_queue);
+		rlist_create(&fakenet_fd[i].send_queue);
 	}
 }
 
 void
-swim_test_transport_free(void)
+fakenet_free(void)
 {
-	struct swim_test_packet *p, *tmp;
-	for (int i = 0; i < (int)lengthof(swim_fd); ++i)
-		swim_fd_close(&swim_fd[i]);
+	for (int i = 0; i < (int)lengthof(fakenet_fd); ++i)
+		fakenet_fd_close(&fakenet_fd[i]);
 }
 
 static void
-swim_test_close(int fd)
+fakenet_close(int fd)
 {
 	assert(fd >= FAKE_FD_BASE);
-	swim_fd_close(&swim_fd[fd - FAKE_FD_BASE]);
+	fakenet_fd_close(&fakenet_fd[fd - FAKE_FD_BASE]);
 }
 
 /**
@@ -306,8 +303,8 @@ swim_test_close(int fd)
  * it on EV_WRITE event.
  */
 static ssize_t
-swim_test_sendto(int fd, const void *data, size_t size,
-		 const struct sockaddr *addr, socklen_t addr_size)
+fakenet_sendto(int fd, const void *data, size_t size,
+	       const struct sockaddr *addr, socklen_t addr_size)
 {
 	/*
 	 * Create packet. Put into sending queue.
@@ -315,11 +312,11 @@ swim_test_sendto(int fd, const void *data, size_t size,
 	(void) addr_size;
 	assert(addr->sa_family == AF_INET);
 	struct sockaddr_in src_addr;
-	swim_test_fd_to_sockaddr_in(fd, &src_addr);
-	struct swim_test_packet *p =
-		swim_test_packet_new(data, size, &src_addr,
-				     (const struct sockaddr_in *) addr);
-	struct swim_fd *src = &swim_fd[fd - FAKE_FD_BASE];
+	fakenet_fd_to_sockaddr_in(fd, &src_addr);
+	struct fakenet_packet *p =
+		fakenet_packet_new(data, size, &src_addr,
+				   (const struct sockaddr_in *)addr);
+	struct fakenet_fd *src = &fakenet_fd[fd - FAKE_FD_BASE];
 	assert(src->is_opened);
 	rlist_add_tail_entry(&src->send_queue, p, in_queue);
 	return size;
@@ -330,40 +327,40 @@ swim_test_sendto(int fd, const void *data, size_t size,
  * processed on EV_READ event.
  */
 static ssize_t
-swim_test_recvfrom(int fd, void *buffer, size_t size, struct sockaddr *addr,
-		   socklen_t *addr_size)
+fakenet_recvfrom(int fd, void *buffer, size_t size, struct sockaddr *addr,
+		 socklen_t *addr_size)
 {
 	/*
 	 * Pop a packet from a receiving queue.
 	 */
-	struct swim_fd *dst = &swim_fd[fd - FAKE_FD_BASE];
+	struct fakenet_fd *dst = &fakenet_fd[fd - FAKE_FD_BASE];
 	assert(dst->is_opened);
-	struct swim_test_packet *p =
-		rlist_shift_entry(&dst->recv_queue, struct swim_test_packet,
+	struct fakenet_packet *p =
+		rlist_shift_entry(&dst->recv_queue, struct fakenet_packet,
 				  in_queue);
 	*(struct sockaddr_in *) addr = p->src;
 	*addr_size = sizeof(p->src);
 	ssize_t result = MIN((size_t) p->size, size);
 	memcpy(buffer, p->data, result);
-	swim_test_packet_delete(p);
+	fakenet_packet_delete(p);
 	return result;
 }
 
 static int
-swim_test_bind(int *fd, const struct sockaddr *addr, socklen_t addr_len)
+fakenet_bind(int *fd, const struct sockaddr *addr, socklen_t addr_len)
 {
 	assert(addr->sa_family == AF_INET);
 	const struct sockaddr_in *new_addr = (const struct sockaddr_in *) addr;
 	assert(addr_len >= sizeof(*new_addr));
 	(void)addr_len;
-	int new_fd = swim_test_sockaddr_in_to_fd(new_addr);
+	int new_fd = fakenet_sockaddr_in_to_fd(new_addr);
 	int old_fd = *fd;
 	if (old_fd == new_fd)
 		return 0;
-	if (swim_fd_open(&swim_fd[new_fd - FAKE_FD_BASE]) != 0)
+	if (fakenet_fd_open(&fakenet_fd[new_fd - FAKE_FD_BASE]) != 0)
 		return -1;
 	if (old_fd != -1)
-		swim_test_close(old_fd);
+		fakenet_close(old_fd);
 	*fd = new_fd;
 	return 0;
 }
@@ -373,14 +370,14 @@ swim_transport_send(struct swim_transport *transport, const void *data,
 		    size_t size, const struct sockaddr *addr,
 		    socklen_t addr_size)
 {
-	return swim_test_sendto(transport->fd, data, size, addr, addr_size);
+	return fakenet_sendto(transport->fd, data, size, addr, addr_size);
 }
 
 ssize_t
 swim_transport_recv(struct swim_transport *transport, void *buffer, size_t size,
 		    struct sockaddr *addr, socklen_t *addr_size)
 {
-	return swim_test_recvfrom(transport->fd, buffer, size, addr, addr_size);
+	return fakenet_recvfrom(transport->fd, buffer, size, addr, addr_size);
 }
 
 int
@@ -388,7 +385,7 @@ swim_transport_bind(struct swim_transport *transport,
 		    const struct sockaddr *addr, socklen_t addr_len)
 {
 	assert(addr->sa_family == AF_INET);
-	if (swim_test_bind(&transport->fd, addr, addr_len) != 0)
+	if (fakenet_bind(&transport->fd, addr, addr_len) != 0)
 		return -1;
 	transport->addr = *(struct sockaddr_in *)addr;
 	return 0;
@@ -398,7 +395,7 @@ void
 swim_transport_destroy(struct swim_transport *transport)
 {
 	if (transport->fd != -1)
-		swim_test_close(transport->fd);
+		fakenet_close(transport->fd);
 }
 
 void
@@ -409,19 +406,21 @@ swim_transport_create(struct swim_transport *transport)
 }
 
 void
-swim_test_transport_block_fd(int fd)
+fakenet_block(int fd)
 {
-	struct swim_fd *sfd = &swim_fd[fd - FAKE_FD_BASE];
-	assert(! rlist_empty(&sfd->in_active));
+	assert(fd >= FAKE_FD_BASE);
+	struct fakenet_fd *sfd = &fakenet_fd[fd - FAKE_FD_BASE];
+	assert(!rlist_empty(&sfd->in_active));
 	rlist_del_entry(sfd, in_active);
 }
 
 void
-swim_test_transport_unblock_fd(int fd)
+fakenet_unblock(int fd)
 {
-	struct swim_fd *sfd = &swim_fd[fd - FAKE_FD_BASE];
+	assert(fd >= FAKE_FD_BASE);
+	struct fakenet_fd *sfd = &fakenet_fd[fd - FAKE_FD_BASE];
 	if (sfd->is_opened && rlist_empty(&sfd->in_active))
-		rlist_add_tail_entry(&swim_fd_active, sfd, in_active);
+		rlist_add_tail_entry(&fakenet_fd_active, sfd, in_active);
 }
 
 /**
@@ -431,35 +430,35 @@ swim_test_transport_unblock_fd(int fd)
  * drop rate is not 0.
  */
 static inline void
-swim_move_packet(struct swim_fd *src, struct swim_fd *dst,
-		 struct swim_test_packet *p)
+fakenet_move_packet(struct fakenet_fd *src, struct fakenet_fd *dst,
+		    struct fakenet_packet *p)
 {
-	if (dst->is_opened && !swim_fd_test_if_drop(dst, p, 0, src->evfd) &&
-	    !swim_fd_test_if_drop(src, p, 1, dst->evfd))
+	if (dst->is_opened && !fakenet_test_if_drop(dst, p, 0, src->evfd) &&
+	    !fakenet_test_if_drop(src, p, 1, dst->evfd))
 		rlist_add_tail_entry(&dst->recv_queue, p, in_queue);
 	else
-		swim_test_packet_delete(p);
+		fakenet_packet_delete(p);
 }
 
 static inline void
-swim_fd_send_packet(struct swim_fd *fd)
+fakenet_fd_send_packet(struct fakenet_fd *fd)
 {
 	assert(! rlist_empty(&fd->send_queue));
-	struct swim_fd *dst;
-	struct swim_test_packet *dup, *p =
-		rlist_shift_entry(&fd->send_queue, struct swim_test_packet,
+	struct fakenet_fd *dst;
+	struct fakenet_packet *dup, *p =
+		rlist_shift_entry(&fd->send_queue, struct fakenet_packet,
 				  in_queue);
 	if (p->dst.sin_addr.s_addr == INADDR_BROADCAST &&
 	    p->dst.sin_port == 0) {
-		rlist_foreach_entry(dst, &swim_fd_active, in_active) {
-			dup = swim_test_packet_dup(p);
-			swim_move_packet(fd, dst, dup);
+		rlist_foreach_entry(dst, &fakenet_fd_active, in_active) {
+			dup = fakenet_packet_dup(p);
+			fakenet_move_packet(fd, dst, dup);
 		}
-		swim_test_packet_delete(p);
+		fakenet_packet_delete(p);
 	} else {
-		int fdnum = swim_test_sockaddr_in_to_fd(&p->dst);
-		dst = &swim_fd[fdnum - FAKE_FD_BASE];
-		swim_move_packet(fd, dst, p);
+		int fdnum = fakenet_sockaddr_in_to_fd(&p->dst);
+		dst = &fakenet_fd[fdnum - FAKE_FD_BASE];
+		fakenet_move_packet(fd, dst, p);
 	}
 }
 
@@ -468,30 +467,30 @@ swim_fd_send_packet(struct swim_fd *fd)
  * to send/recv.
  */
 static inline void
-swim_test_transport_feed_events(struct ev_loop *loop)
+fakenet_feed_events(struct ev_loop *loop)
 {
-	struct swim_fd *fd;
+	struct fakenet_fd *fd;
 	/*
 	 * Reversed because libev invokes events in reversed
 	 * order. So this reverse + libev reverse = normal order.
 	 */
-	rlist_foreach_entry_reverse(fd, &swim_fd_active, in_active) {
+	rlist_foreach_entry_reverse(fd, &fakenet_fd_active, in_active) {
 		if (! rlist_empty(&fd->send_queue))
-			swim_fd_send_packet(fd);
+			fakenet_fd_send_packet(fd);
 		ev_feed_fd_event(loop, fd->evfd, EV_WRITE);
 	}
-	rlist_foreach_entry_reverse(fd, &swim_fd_active, in_active) {
+	rlist_foreach_entry_reverse(fd, &fakenet_fd_active, in_active) {
 		if (!rlist_empty(&fd->recv_queue))
 			ev_feed_fd_event(loop, fd->evfd, EV_READ);
 	}
 }
 
 void
-swim_test_transport_do_loop_step(struct ev_loop *loop)
+fakenet_loop_update(struct ev_loop *loop)
 {
 	do {
 		ev_invoke_pending(loop);
-		swim_test_transport_feed_events(loop);
+		fakenet_feed_events(loop);
 		/*
 		 * Just a single loop + invoke is not enough. At
 		 * least two are necessary.
@@ -510,8 +509,8 @@ swim_test_transport_do_loop_step(struct ev_loop *loop)
 	} while (ev_pending_count(loop) > 0);
 }
 
-int
-swim_getifaddrs(struct ifaddrs **ifaddrs)
+static int
+fakenet_getifaddrs(struct ifaddrs **ifaddrs)
 {
 	/*
 	 * This is a fake implementation of getifaddrs. It always
@@ -519,8 +518,7 @@ swim_getifaddrs(struct ifaddrs **ifaddrs)
 	 * which is later used to send a packet to all the opened
 	 * descriptors. Second is a dummy interface leading to
 	 * nowhere. The latter is used just for testing that the
-	 * real SWIM code correctly iterates through the
-	 * interface list.
+	 * real code correctly iterates through the interface list.
 	 */
 	int size = (sizeof(struct ifaddrs) + sizeof(struct sockaddr_in)) * 2;
 	struct ifaddrs *iface = (struct ifaddrs *) calloc(1, size);
@@ -543,12 +541,24 @@ swim_getifaddrs(struct ifaddrs **ifaddrs)
 	return 0;
 }
 
-void
-swim_freeifaddrs(struct ifaddrs *ifaddrs)
+int
+swim_getifaddrs(struct ifaddrs **ifaddrs)
+{
+	return fakenet_getifaddrs(ifaddrs);
+}
+
+static void
+fakenet_freeifaddrs(struct ifaddrs *ifaddrs)
 {
 	/*
 	 * The whole list is packed into a single allocation
 	 * above.
 	 */
 	free(ifaddrs);
+}
+
+void
+swim_freeifaddrs(struct ifaddrs *ifaddrs)
+{
+	fakenet_freeifaddrs(ifaddrs);
 }
