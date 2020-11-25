@@ -30,7 +30,7 @@
  */
 #include <assert.h>
 #include <string.h>
-#include "fakenet.h"
+#include "fakesys/fakenet.h"
 #include "swim/swim_transport.h"
 
 ssize_t
