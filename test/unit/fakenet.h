@@ -1,5 +1,4 @@
-#ifndef TARANTOOL_SWIM_TEST_TRANSPORT_H_INCLUDED
-#define TARANTOOL_SWIM_TEST_TRANSPORT_H_INCLUDED
+#pragma once
 /*
  * Copyright 2010-2019, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -99,5 +98,3 @@ fakenet_init(void);
 /** Destroy fake network system, free resources. */
 void
 fakenet_free(void);
-
-#endif /* TARANTOOL_SWIM_TEST_TRANSPORT_H_INCLUDED */

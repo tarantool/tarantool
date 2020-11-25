@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 #include "swim_test_ev.h"
-#include "swim_test_transport.h"
 #include "trivia/util.h"
 #include "swim/swim_ev.h"
 #include "tarantool_ev.h"
