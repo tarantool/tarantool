@@ -30,13 +30,59 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+
 struct ev_loop;
+struct ifaddrs;
 
 /**
  * Fakenet implements a 'fake' file descriptors table in user space in order to
  * get the full control over UDP sockets. Fake fds are used to provide means
  * to set necessary loss level, delay, reorders, blocks.
  */
+
+/**
+ * Emulator of sendto().
+ * Save data to the socket output buffer. The buffer is flushed on the next loop
+ * update.
+ */
+ssize_t
+fakenet_sendto(int fd, const void *data, size_t size,
+	       const struct sockaddr *addr, socklen_t addr_size);
+
+/**
+ * Emulator of recvfrom().
+ * Try to read the input buffer of the socket.
+ */
+ssize_t
+fakenet_recvfrom(int fd, void *buffer, size_t size, struct sockaddr *addr,
+		 socklen_t *addr_size);
+
+/**
+ * Emulator of socket() + bind() + close().
+ * Fake bind will close the old descriptor, create a new one, and bind it to the
+ * given address atomically. So it either does all that successfully, or nothing
+ * of that. The created socket is connection-less and packet-oriented.
+ */
+int
+fakenet_bind(int *fd, const struct sockaddr *addr, socklen_t addr_len);
+
+/**
+ * Emulator of close().
+ * Should be called only on what was previously created via fakenet bind().
+ */
+void
+fakenet_close(int fd);
+
+/** Emulator of getifaddrs(). */
+int
+fakenet_getifaddrs(struct ifaddrs **ifaddrs);
+
+/** Emulator of freeifaddrs(). */
+void
+fakenet_freeifaddrs(struct ifaddrs *ifaddrs);
 
 /**
  * Signature of a packet filter function. It takes packet data,

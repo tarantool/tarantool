@@ -29,8 +29,6 @@
  * SUCH DAMAGE.
  */
 #include "fakenet.h"
-#include "swim/swim_transport.h"
-#include "swim/swim_io.h"
 #include "fiber.h"
 #include <errno.h>
 #include <sys/socket.h>
@@ -291,18 +289,14 @@ fakenet_free(void)
 		fakenet_fd_close(&fakenet_fd[i]);
 }
 
-static void
+void
 fakenet_close(int fd)
 {
 	assert(fd >= FAKE_FD_BASE);
 	fakenet_fd_close(&fakenet_fd[fd - FAKE_FD_BASE]);
 }
 
-/**
- * Wrap a packet and put into send queue. Packets are popped from
- * it on EV_WRITE event.
- */
-static ssize_t
+ssize_t
 fakenet_sendto(int fd, const void *data, size_t size,
 	       const struct sockaddr *addr, socklen_t addr_size)
 {
@@ -322,11 +316,7 @@ fakenet_sendto(int fd, const void *data, size_t size,
 	return size;
 }
 
-/**
- * Move a packet from send to recv queue. The packet is popped and
- * processed on EV_READ event.
- */
-static ssize_t
+ssize_t
 fakenet_recvfrom(int fd, void *buffer, size_t size, struct sockaddr *addr,
 		 socklen_t *addr_size)
 {
@@ -346,7 +336,7 @@ fakenet_recvfrom(int fd, void *buffer, size_t size, struct sockaddr *addr,
 	return result;
 }
 
-static int
+int
 fakenet_bind(int *fd, const struct sockaddr *addr, socklen_t addr_len)
 {
 	assert(addr->sa_family == AF_INET);
@@ -363,46 +353,6 @@ fakenet_bind(int *fd, const struct sockaddr *addr, socklen_t addr_len)
 		fakenet_close(old_fd);
 	*fd = new_fd;
 	return 0;
-}
-
-ssize_t
-swim_transport_send(struct swim_transport *transport, const void *data,
-		    size_t size, const struct sockaddr *addr,
-		    socklen_t addr_size)
-{
-	return fakenet_sendto(transport->fd, data, size, addr, addr_size);
-}
-
-ssize_t
-swim_transport_recv(struct swim_transport *transport, void *buffer, size_t size,
-		    struct sockaddr *addr, socklen_t *addr_size)
-{
-	return fakenet_recvfrom(transport->fd, buffer, size, addr, addr_size);
-}
-
-int
-swim_transport_bind(struct swim_transport *transport,
-		    const struct sockaddr *addr, socklen_t addr_len)
-{
-	assert(addr->sa_family == AF_INET);
-	if (fakenet_bind(&transport->fd, addr, addr_len) != 0)
-		return -1;
-	transport->addr = *(struct sockaddr_in *)addr;
-	return 0;
-}
-
-void
-swim_transport_destroy(struct swim_transport *transport)
-{
-	if (transport->fd != -1)
-		fakenet_close(transport->fd);
-}
-
-void
-swim_transport_create(struct swim_transport *transport)
-{
-	transport->fd = -1;
-	memset(&transport->addr, 0, sizeof(transport->addr));
 }
 
 void
@@ -509,7 +459,7 @@ fakenet_loop_update(struct ev_loop *loop)
 	} while (ev_pending_count(loop) > 0);
 }
 
-static int
+int
 fakenet_getifaddrs(struct ifaddrs **ifaddrs)
 {
 	/*
@@ -541,13 +491,7 @@ fakenet_getifaddrs(struct ifaddrs **ifaddrs)
 	return 0;
 }
 
-int
-swim_getifaddrs(struct ifaddrs **ifaddrs)
-{
-	return fakenet_getifaddrs(ifaddrs);
-}
-
-static void
+void
 fakenet_freeifaddrs(struct ifaddrs *ifaddrs)
 {
 	/*
@@ -555,10 +499,4 @@ fakenet_freeifaddrs(struct ifaddrs *ifaddrs)
 	 * above.
 	 */
 	free(ifaddrs);
-}
-
-void
-swim_freeifaddrs(struct ifaddrs *ifaddrs)
-{
-	fakenet_freeifaddrs(ifaddrs);
 }
