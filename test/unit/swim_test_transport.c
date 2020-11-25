@@ -51,6 +51,25 @@ enum {
 	FAKE_FD_NUMBER = 1000,
 };
 
+static inline int
+swim_test_sockaddr_in_to_fd(const struct sockaddr_in *addr)
+{
+	assert(addr->sin_family == AF_INET);
+	return ntohs(addr->sin_port) + FAKE_FD_BASE;
+}
+
+static inline void
+swim_test_fd_to_sockaddr_in(int fd, struct sockaddr_in *addr)
+{
+	*addr = (struct sockaddr_in){
+		.sin_family = AF_INET,
+		.sin_port = htons(fd) - FAKE_FD_BASE,
+		.sin_addr = {
+			.s_addr = htonl(INADDR_LOOPBACK),
+		},
+	};
+}
+
 /** UDP packet wrapper. It is stored in send/recv queues. */
 struct swim_test_packet {
 	/** Source address. */
@@ -289,8 +308,10 @@ swim_transport_send(struct swim_transport *transport, const void *data,
 	 */
 	(void) addr_size;
 	assert(addr->sa_family == AF_INET);
+	struct sockaddr_in src_addr;
+	swim_test_fd_to_sockaddr_in(transport->fd, &src_addr);
 	struct swim_test_packet *p =
-		swim_test_packet_new(data, size, &transport->addr,
+		swim_test_packet_new(data, size, &src_addr,
 				     (const struct sockaddr_in *) addr);
 	struct swim_fd *src = &swim_fd[transport->fd - FAKE_FD_BASE];
 	assert(src->is_opened);
@@ -328,7 +349,7 @@ swim_transport_bind(struct swim_transport *transport,
 {
 	assert(addr->sa_family == AF_INET);
 	const struct sockaddr_in *new_addr = (const struct sockaddr_in *) addr;
-	int new_fd = ntohs(new_addr->sin_port) + FAKE_FD_BASE;
+	int new_fd = swim_test_sockaddr_in_to_fd(new_addr);
 	int old_fd = transport->fd;
 	if (old_fd == new_fd) {
 		transport->addr = *new_addr;
@@ -406,7 +427,8 @@ swim_fd_send_packet(struct swim_fd *fd)
 		}
 		swim_test_packet_delete(p);
 	} else {
-		dst = &swim_fd[ntohs(p->dst.sin_port)];
+		int fdnum = swim_test_sockaddr_in_to_fd(&p->dst);
+		dst = &swim_fd[fdnum - FAKE_FD_BASE];
 		swim_move_packet(fd, dst, p);
 	}
 }
