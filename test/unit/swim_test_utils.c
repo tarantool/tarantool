@@ -398,14 +398,14 @@ swim_cluster_restart_node(struct swim_cluster *cluster, int i)
 void
 swim_cluster_block_io(struct swim_cluster *cluster, int i)
 {
-	swim_test_transport_block_fd(swim_fd(cluster->node[i].swim));
+	fakenet_block(swim_fd(cluster->node[i].swim));
 }
 
 void
 swim_cluster_unblock_io(struct swim_cluster *cluster, int i)
 {
 	struct swim *s = swim_cluster_member(cluster, i);
-	swim_test_transport_unblock_fd(swim_fd(s));
+	fakenet_unblock(swim_fd(s));
 }
 
 /** Create a new drop rate filter helper. */
@@ -447,12 +447,11 @@ swim_cluster_set_drop_generic(struct swim_cluster *cluster, int i,
 	struct swim_node *n = swim_cluster_node(cluster, i);
 	int fd = swim_fd(n->swim);
 	if (value == 0) {
-		swim_test_transport_remove_filter(fd, swim_filter_drop_rate);
+		fakenet_remove_filter(fd, swim_filter_drop_rate);
 		return;
 	}
 	swim_drop_rate_create(&n->drop_rate, value, is_for_in, is_for_out);
-	swim_test_transport_add_filter(fd, swim_filter_drop_rate,
-				       &n->drop_rate);
+	fakenet_add_filter(fd, swim_filter_drop_rate, &n->drop_rate);
 }
 
 void
@@ -509,9 +508,8 @@ swim_cluster_set_drop_channel(struct swim_cluster *cluster, int from_id,
 		return;
 	}
 	swim_drop_channel_add_fd(dc, to_fd);
-	swim_test_transport_add_filter(swim_fd(from_node->swim),
-				       swim_filter_drop_channel,
-				       &from_node->drop_channel);
+	fakenet_add_filter(swim_fd(from_node->swim), swim_filter_drop_channel,
+			   &from_node->drop_channel);
 }
 
 /** Check if @a s1 knows every member of @a s2's table. */
@@ -577,7 +575,7 @@ swim_wait_timeout(double timeout, struct swim_cluster *cluster,
 	 * send immediately without preliminary timeouts or
 	 * whatsoever.
 	 */
-	swim_test_transport_do_loop_step(loop);
+	fakenet_loop_update(loop);
 	if (cluster != NULL)
 		swim_cluster_run_triggers(cluster);
 	while (! check(cluster, data)) {
@@ -589,7 +587,7 @@ swim_wait_timeout(double timeout, struct swim_cluster *cluster,
 		 * some of them generated IO events. Process them
 		 * too.
 		 */
-		swim_test_transport_do_loop_step(loop);
+		fakenet_loop_update(loop);
 		if (cluster != NULL)
 			swim_cluster_run_triggers(cluster);
 	}
