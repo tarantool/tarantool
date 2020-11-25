@@ -42,6 +42,21 @@ else()
     add_definitions(-DNVALGRIND=1)
 endif()
 
+option(OSS_FUZZ "Set this option to use flags by oss-fuzz" OFF)
+option(ENABLE_FUZZER "Enable fuzzing testing" OFF)
+if(ENABLE_FUZZER)
+    if (CMAKE_COMPILER_IS_GNUCC)
+        message(FATAL_ERROR
+            "\n"
+            "Fuzzing is unsupported with GCC compiler. Use Clang:\n"
+            " $ git clean -xfd; git submodule foreach --recursive git clean -xfd\n"
+            " $ CC=clang CXX=clang++ cmake . <...> -DENABLE_FUZZER=ON && make -j\n"
+            "\n")
+    endif()
+
+    add_compile_flags("C;CXX" -fsanitize=fuzzer-no-link)
+endif()
+
 option(ENABLE_ASAN "Enable AddressSanitizer, a fast memory error detector based on compiler instrumentation" OFF)
 if (ENABLE_ASAN)
     if (CMAKE_COMPILER_IS_GNUCC)
