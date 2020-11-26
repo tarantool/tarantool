@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "swim_test_ev.h"
+#include "fakeev.h"
 #include "trivia/util.h"
 #include "swim/swim_ev.h"
 #include "tarantool_ev.h"

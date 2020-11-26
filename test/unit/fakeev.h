@@ -1,5 +1,4 @@
-#ifndef TARANTOOL_SWIM_TEST_EV_H_INCLUDED
-#define TARANTOOL_SWIM_TEST_EV_H_INCLUDED
+#pragma once
 /*
  * Copyright 2010-2019, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -110,5 +109,3 @@ fakeev_loop_update(struct ev_loop *loop);
 /** Destroy pending events, reset global watch. */
 void
 fakeev_reset(void);
-
-#endif /* TARANTOOL_SWIM_TEST_EV_H_INCLUDED */
