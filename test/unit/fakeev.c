@@ -30,7 +30,6 @@
  */
 #include "fakeev.h"
 #include "trivia/util.h"
-#include "swim/swim_ev.h"
 #include "tarantool_ev.h"
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -269,10 +268,6 @@ fakeev_time(void)
 	return watch;
 }
 
-/**
- * Start of a timer generates a delayed event. If a timer is
- * already started - nothing happens.
- */
 void
 fakeev_timer_start(struct ev_loop *loop, struct ev_timer *base)
 {
@@ -352,34 +347,4 @@ fakeev_free(void)
 	event_heap_destroy(&event_heap);
 	mh_i64ptr_delete(events_hash);
 	ev_loop_destroy(test_loop);
-}
-
-double
-swim_time(void)
-{
-	return fakeev_time();
-}
-
-void
-swim_ev_timer_start(struct ev_loop *loop, struct ev_timer *watcher)
-{
-	return fakeev_timer_start(loop, watcher);
-}
-
-void
-swim_ev_timer_again(struct ev_loop *loop, struct ev_timer *watcher)
-{
-	return fakeev_timer_again(loop, watcher);
-}
-
-void
-swim_ev_timer_stop(struct ev_loop *loop, struct ev_timer *watcher)
-{
-	return fakeev_timer_stop(loop, watcher);
-}
-
-struct ev_loop *
-swim_loop(void)
-{
-	return fakeev_loop();
 }
