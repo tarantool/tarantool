@@ -33,10 +33,9 @@
 struct ev_loop;
 
 /**
- * SWIM test_ev implements a 'fake' event loop with bogus clock to
- * speed up events processing while keeping SWIM unaware that it
- * works in a simulation. Libev is used a little, just to store
- * some IO events.
+ * Fakeev implements a 'fake' event loop with bogus clock to speed up events
+ * processing while keeping the real code unaware that it works in a simulation.
+ * Libev is used a little, just to store some IO events.
  *
  * The test event loop works as follows. It has a global watch and
  * a heap of events sorted by deadlines. An event is either a
@@ -46,7 +45,7 @@ struct ev_loop;
  * and equal deadline, and sets the global watch with the deadline
  * value. It simulates time flow. All the events with that
  * deadline are processed. An event processing usually means
- * calling a libev callback set by a SWIM instance beforehand.
+ * calling a libev callback set by real code beforehand.
  *
  * For example, if event deadlines and the watch are:
  *
@@ -82,11 +81,19 @@ struct ev_loop;
 
 /** Initialize test event processing system. */
 void
-swim_test_ev_init(void);
+fakeev_init(void);
 
 /** Destroy test event processing system, free resources. */
 void
-swim_test_ev_free(void);
+fakeev_free(void);
+
+/** Implementation of global time visible as real time in the tested code. */
+double
+fakeev_time(void);
+
+/** Global loop used by the fake events. */
+struct ev_loop *
+fakeev_loop(void);
 
 /**
  * Stop the event loop after @a delay fake seconds. It does not
@@ -94,14 +101,14 @@ swim_test_ev_free(void);
  * times.
  */
 void
-swim_ev_set_brk(double delay);
+fakeev_set_brk(double delay);
 
 /** Play one step of event loop, process generated events. */
 void
-swim_test_ev_do_loop_step(struct ev_loop *loop);
+fakeev_loop_update(struct ev_loop *loop);
 
 /** Destroy pending events, reset global watch. */
 void
-swim_test_ev_reset(void);
+fakeev_reset(void);
 
 #endif /* TARANTOOL_SWIM_TEST_EV_H_INCLUDED */

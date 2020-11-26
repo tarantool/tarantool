@@ -1077,7 +1077,7 @@ main_f(va_list ap)
 	swim_start_test(22);
 
 	(void) ap;
-	swim_test_ev_init();
+	fakeev_init();
 	fakenet_init();
 
 	swim_test_one_link();
@@ -1104,7 +1104,7 @@ main_f(va_list ap)
 	swim_test_suspect_new_members();
 
 	fakenet_free();
-	swim_test_ev_free();
+	fakeev_free();
 
 	test_result = check_plan();
 	footer();
