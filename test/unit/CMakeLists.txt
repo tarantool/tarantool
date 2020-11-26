@@ -240,16 +240,16 @@ target_link_libraries(sio.test unit core)
 add_executable(crypto.test crypto.c core_test_utils.c)
 target_link_libraries(crypto.test crypto unit)
 
-add_executable(swim.test swim.c swim_test_transport.c fakeev.c swim_test_ev.c
+add_executable(swim.test swim.c swim_test_transport.c swim_test_ev.c
                swim_test_utils.c ${PROJECT_SOURCE_DIR}/src/version.c core_test_utils.c)
 target_link_libraries(swim.test unit fakesys swim)
 
-add_executable(swim_proto.test swim_proto.c swim_test_transport.c fakeev.c swim_test_ev.c
+add_executable(swim_proto.test swim_proto.c swim_test_transport.c swim_test_ev.c
                swim_test_utils.c ${PROJECT_SOURCE_DIR}/src/version.c core_test_utils.c)
 target_link_libraries(swim_proto.test unit fakesys swim)
 
 add_executable(swim_errinj.test swim_errinj.c swim_test_transport.c
-               fakeev.c swim_test_ev.c swim_test_utils.c
+               swim_test_ev.c swim_test_utils.c
                ${PROJECT_SOURCE_DIR}/src/version.c core_test_utils.c)
 target_link_libraries(swim_errinj.test unit fakesys swim)
 
