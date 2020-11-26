@@ -565,9 +565,9 @@ static int
 swim_wait_timeout(double timeout, struct swim_cluster *cluster,
 		  swim_loop_check_f check, void *data)
 {
-	swim_ev_set_brk(timeout);
-	double deadline = swim_time() + timeout;
-	struct ev_loop *loop = swim_loop();
+	fakeev_set_brk(timeout);
+	double deadline = fakeev_time() + timeout;
+	struct ev_loop *loop = fakeev_loop();
 	/*
 	 * There can be pending out of bound IO events, affecting
 	 * the result. For example, 'quit' messages, which are
@@ -578,9 +578,9 @@ swim_wait_timeout(double timeout, struct swim_cluster *cluster,
 	if (cluster != NULL)
 		swim_cluster_run_triggers(cluster);
 	while (! check(cluster, data)) {
-		if (swim_time() >= deadline)
+		if (fakeev_time() >= deadline)
 			return -1;
-		swim_test_ev_do_loop_step(loop);
+		fakeev_loop_update(loop);
 		/*
 		 * After events are processed, it is possible that
 		 * some of them generated IO events. Process them

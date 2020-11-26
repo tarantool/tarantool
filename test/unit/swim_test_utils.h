@@ -259,7 +259,7 @@ swim_run_test(const char *log_file, fiber_func test);
 
 #define swim_finish_test() { \
 	say_verbose("-------- SWIM end test %s --------", __func__); \
-	swim_test_ev_reset(); \
+	fakeev_reset(); \
 	check_plan(); \
 	footer(); \
 }
