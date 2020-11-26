@@ -39,7 +39,7 @@
 #include "swim/swim_ev.h"
 #include "swim/swim_proto.h"
 #include "fakesys/fakenet.h"
-#include "swim_test_ev.h"
+#include "fakeev.h"
 
 struct swim_cluster;
 
