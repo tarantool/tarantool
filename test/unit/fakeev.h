@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 struct ev_loop;
+struct ev_timer;
 
 /**
  * Fakeev implements a 'fake' event loop with bogus clock to speed up events
@@ -93,6 +94,18 @@ fakeev_time(void);
 /** Global loop used by the fake events. */
 struct ev_loop *
 fakeev_loop(void);
+
+/** Emulator of ev_timer_start(). */
+void
+fakeev_timer_start(struct ev_loop *loop, struct ev_timer *base);
+
+/** Emulator of ev_timer_again(). */
+void
+fakeev_timer_again(struct ev_loop *loop, struct ev_timer *base);
+
+/** Emulator of ev_timer_stop(). */
+void
+fakeev_timer_stop(struct ev_loop *loop, struct ev_timer *base);
 
 /**
  * Stop the event loop after @a delay fake seconds. It does not
