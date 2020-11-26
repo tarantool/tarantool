@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "swim/swim_ev.h"
-#include "fakeev.h"
+#include "fakesys/fakeev.h"
 
 double
 swim_time(void)

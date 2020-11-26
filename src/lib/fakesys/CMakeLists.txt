@@ -1,5 +1,6 @@
 set(lib_sources
     fakenet.c
+    fakeev.c
 )
 
 set_source_files_compile_flags(${lib_sources})
