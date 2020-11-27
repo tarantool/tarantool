@@ -697,8 +697,34 @@ static inline const char *
 tuple_field_raw(struct tuple_format *format, const char *tuple,
 		const uint32_t *field_map, uint32_t field_no)
 {
-	return tuple_field_raw_by_path(format, tuple, field_map, field_no,
-				       NULL, 0, NULL, MULTIKEY_NONE);
+	if (likely(field_no < format->index_field_count)) {
+		int32_t offset_slot;
+		uint32_t offset = 0;
+		struct tuple_field *field;
+		if (field_no == 0) {
+			mp_decode_array(&tuple);
+			return tuple;
+		}
+		struct json_token *token = format->fields.root.children[field_no];
+		field = json_tree_entry(token, struct tuple_field, token);
+		offset_slot = field->offset_slot;
+		if (offset_slot == TUPLE_OFFSET_SLOT_NIL)
+			goto parse;
+		offset = field_map_get_offset(field_map, offset_slot,
+					      MULTIKEY_NONE);
+		if (offset == 0)
+			return NULL;
+		tuple += offset;
+	} else {
+parse:
+		ERROR_INJECT(ERRINJ_TUPLE_FIELD, return NULL);
+		uint32_t field_count = mp_decode_array(&tuple);
+		if (unlikely(field_no >= field_count))
+			return NULL;
+		for ( ; field_no > 0; field_no--)
+			mp_next(&tuple);
+	}
+	return tuple;
 }
 
 /**
