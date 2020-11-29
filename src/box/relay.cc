@@ -625,15 +625,6 @@ relay_subscribe_f(va_list ap)
 		cpipe_push(&relay->tx_pipe, &relay->status_msg.msg);
 	}
 
-	/*
-	 * Log the error that caused the relay to break the loop.
-	 * Don't clear the error for status reporting.
-	 */
-	assert(!diag_is_empty(&relay->diag));
-	diag_add_error(diag_get(), diag_last_error(&relay->diag));
-	diag_log();
-	say_crit("exiting the relay loop");
-
 	/* Clear garbage collector trigger and WAL watcher. */
 	trigger_clear(&on_close_log);
 	wal_clear_watcher(&relay->wal_watcher, cbus_process);
@@ -648,6 +639,16 @@ relay_subscribe_f(va_list ap)
 	cbus_endpoint_destroy(&relay->endpoint, cbus_process);
 
 	relay_exit(relay);
+
+	/*
+	 * Log the error that caused the relay to break the loop.
+	 * Don't clear the error for status reporting.
+	 */
+	assert(!diag_is_empty(&relay->diag));
+	diag_add_error(diag_get(), diag_last_error(&relay->diag));
+	diag_log();
+	say_crit("exiting the relay loop");
+
 	return -1;
 }
 
