@@ -40,6 +40,9 @@ extern "C" {
 #ifdef ENABLE_BACKTRACE
 #include <coro.h>
 
+char *
+backtrace(char *start, size_t size);
+
 void print_backtrace(void);
 
 typedef int (backtrace_cb)(int frameno, void *frameret,

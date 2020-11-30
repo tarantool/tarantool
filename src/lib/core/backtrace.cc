@@ -131,7 +131,7 @@ error:
 }
 
 char *
-backtrace(void)
+backtrace(char *start, size_t size)
 {
 	int frame_no = 0;
 	unw_word_t sp = 0, old_sp = 0, ip, offset;
@@ -139,10 +139,9 @@ backtrace(void)
 	unw_getcontext(&unw_context);
 	unw_cursor_t unw_cur;
 	unw_init_local(&unw_cur, &unw_context);
-	char *backtrace_buf = (char *)static_alloc(SMALL_STATIC_SIZE);
-	char *p = backtrace_buf;
-	char *end = p + SMALL_STATIC_SIZE - 1;
 	int unw_status;
+	char *p = start;
+	char *end = start + size - 1;
 	*p = '\0';
 	while ((unw_status = unw_step(&unw_cur)) > 0) {
 		const char *proc;
@@ -174,7 +173,7 @@ backtrace(void)
 		say_debug("unwinding error: %i", unw_status);
 #endif
 out:
-	return backtrace_buf;
+	return start;
 }
 
 /*
@@ -436,7 +435,8 @@ out:
 void
 print_backtrace(void)
 {
-	fdprintf(STDERR_FILENO, "%s", backtrace());
+	char *start = (char *)static_alloc(SMALL_STATIC_SIZE);
+	fdprintf(STDERR_FILENO, "%s", backtrace(start, SMALL_STATIC_SIZE));
 }
 #endif /* ENABLE_BACKTRACE */
 
