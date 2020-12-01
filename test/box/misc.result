@@ -135,11 +135,14 @@ end;
 t;
 ---
 - - DELETE
+  - COMMIT
   - SELECT
+  - ROLLBACK
   - INSERT
   - EVAL
-  - CALL
   - ERROR
+  - CALL
+  - BEGIN
   - PREPARE
   - REPLACE
   - UPSERT

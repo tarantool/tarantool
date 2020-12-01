@@ -51,6 +51,7 @@ cn:eval('box.error(0)')
 cn:eval('!invalid expression')
 
 -- box.commit() missing at return of CALL/EVAL
+-- see gh-2016 - now the behaviour is to silently rollback tx
 function no_commit() box.begin() fiber.sleep(0.001) end
 cn:call('no_commit')
 cn:eval('no_commit()')

@@ -1,0 +1,355 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd("create server tx_man with script='box/tx_man.lua'")
+---
+- true
+...
+test_run:cmd("start server tx_man")
+---
+- true
+...
+test_run:cmd("switch tx_man")
+---
+- true
+...
+engine = test_run:get_cfg('engine')
+---
+...
+LISTEN = require('uri').parse(box.cfg.listen)
+---
+...
+remote = require('net.box')
+---
+...
+fiber = require('fiber')
+---
+...
+log = require('log')
+---
+...
+local_space = box.schema.space.create('test', { engine = engine })
+---
+...
+pk = local_space:create_index('primary')
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+function local_replace(tuple) return local_space:replace(tuple) end
+---
+...
+log.info("create connection")
+---
+...
+conn = remote.connect(LISTEN.host, LISTEN.service)
+---
+...
+log.info("state is %s", conn.state)
+---
+...
+conn:ping()
+---
+- true
+...
+log.info("ping is done")
+---
+...
+remote_space = conn.space.test
+---
+...
+-- Check that a transaction isn't stored in the connection, if
+-- explicit conn:begin() wasn't called.
+conn:eval('return 2 + 2')
+---
+- 4
+...
+remote_space:replace({1})
+---
+- [1]
+...
+remote_space:select{}
+---
+- - [1]
+...
+-- Nothing to rollback, so the next select returns the same
+-- result.
+conn:rollback()
+---
+- true
+...
+remote_space:select{}
+---
+- - [1]
+...
+_ = remote_space:delete({1})
+---
+...
+remote_space:select{}
+---
+- []
+...
+--
+-- Test BEGIN of the new remote transaction.
+--
+conn:begin()
+---
+- true
+...
+-- No error: the remote transaction is stored in the connection
+-- object, so we can create also localhost transactions.
+box.begin()
+---
+...
+-- Error - this connection in this fiber already has the opened
+-- transaction.
+conn:begin()
+---
+- error: 'Operation is not permitted when there is an active transaction '
+...
+-- Commit the local transaction, but the remote is still alive, so
+-- conn:begin() returns error again.
+box.commit()
+---
+...
+conn:begin()
+---
+- error: 'Operation is not permitted when there is an active transaction '
+...
+conn:commit()
+---
+- true
+...
+--
+-- Test attaching remote requests to the connection transaction.
+--
+-- Attach space:method()
+conn:begin()
+---
+- true
+...
+remote_space:replace({1})
+---
+- [1]
+...
+remote_space:replace({2})
+---
+- [2]
+...
+remote_space:select{} -- check result of the remote select
+---
+- - [1]
+  - [2]
+...
+local_space:select{} -- result of the local select
+---
+- []
+...
+conn:commit()
+---
+- true
+...
+remote_space:select{}
+---
+- - [1]
+  - [2]
+...
+local_space:select{}
+---
+- - [1]
+  - [2]
+...
+-- Attach call/eval
+conn:begin()
+---
+- true
+...
+conn:eval('local_space:replace({1, 1})')
+---
+...
+conn:call('local_replace', {{2, 2}})
+---
+- [2, 2]
+...
+remote_space:select{}
+---
+- - [1, 1]
+  - [2, 2]
+...
+local_space:select{}
+---
+- - [1]
+  - [2]
+...
+conn:commit()
+---
+- true
+...
+remote_space:select{}
+---
+- - [1, 1]
+  - [2, 2]
+...
+local_space:select{}
+---
+- - [1, 1]
+  - [2, 2]
+...
+-- Check errors in call/eval. Error in call/eval must not rollback
+-- the entire transaction.
+conn:begin()
+---
+- true
+...
+remote_space:replace({1})
+---
+- [1]
+...
+conn:eval('box.box.box(123(456))')
+---
+- error: 'eval:1: '')'' expected near ''('''
+...
+remote_space:select{}
+---
+- - [1]
+  - [2, 2]
+...
+conn:call('error', {'1', '2', '3'})
+---
+- error: '1'
+...
+remote_space:select{}
+---
+- - [1]
+  - [2, 2]
+...
+conn:commit()
+---
+- true
+...
+remote_space:select{}
+---
+- - [1]
+  - [2, 2]
+...
+local_space:select{}
+---
+- - [1]
+  - [2, 2]
+...
+-- Check BEGIN via iproto and COMMIT via eval or call.
+conn:begin()
+---
+- true
+...
+_ = remote_space:delete({2})
+---
+...
+conn:eval('box.commit()')
+---
+...
+remote_space:select{}
+---
+- - [1]
+...
+-- We can start the new transaction, because the eval commited the
+-- previous one.
+conn:begin()
+---
+- true
+...
+remote_space:replace({2})
+---
+- [2]
+...
+conn:call('box.commit')
+---
+...
+remote_space:select{}
+---
+- - [1]
+  - [2]
+...
+-- We can start the new transaction, because the call commited the
+-- previous one.
+conn:begin()
+---
+- true
+...
+conn:commit()
+---
+- true
+...
+remote_space:select{}
+---
+- - [1]
+  - [2]
+...
+local_space:select{}
+---
+- - [1]
+  - [2]
+...
+function create_and_leave_opened() box.begin() local_space:replace({10}) end
+---
+...
+-- Check rollback of the transaction, created in eval or call.
+conn:eval('create_and_leave_opened()')
+---
+...
+remote_space:select{}
+---
+- - [1]
+  - [2]
+...
+local_space:select{}
+---
+- - [1]
+  - [2]
+...
+conn:call('create_and_leave_opened')
+---
+...
+remote_space:select{}
+---
+- - [1]
+  - [2]
+...
+local_space:select{}
+---
+- - [1]
+  - [2]
+...
+-- Check rollback on disconnect.
+conn:begin()
+---
+- true
+...
+remote_space:replace({10})
+---
+- [10]
+...
+-- All transactions are aborted after the connection closed.
+conn:close()
+---
+...
+-- Close begins in net thread, so we wait until close is finished.
+test_run:wait_cond(function() return not conn:is_connected() end, 1000)
+---
+- true
+...
+local_space:select{}
+---
+- - [1]
+  - [2]
+...
+local_space:drop()
+---
+...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...

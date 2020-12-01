@@ -217,6 +217,9 @@ enum iproto_type {
 	IPROTO_NOP = 12,
 	/** Prepare SQL statement. */
 	IPROTO_PREPARE = 13,
+	IPROTO_BEGIN = 14,
+	IPROTO_COMMIT = 15,
+	IPROTO_NET_ROLLBACK = 16,
 	/** The maximum typecode used for box.stat() */
 	IPROTO_TYPE_STAT_MAX,
 
@@ -319,7 +322,7 @@ static inline bool
 iproto_type_is_dml(uint32_t type)
 {
 	return (type >= IPROTO_SELECT && type <= IPROTO_DELETE) ||
-		type == IPROTO_UPSERT || type == IPROTO_NOP;
+		type == IPROTO_UPSERT || type == IPROTO_NOP || (type >= IPROTO_BEGIN && type <= IPROTO_NET_ROLLBACK);
 }
 
 /**

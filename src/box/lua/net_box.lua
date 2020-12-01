@@ -116,6 +116,9 @@ local method_encoder = {
     min     = internal.encode_select,
     max     = internal.encode_select,
     count   = internal.encode_call,
+    begin   = internal.encode_begin,
+    commit  = internal.encode_commit,
+    rollback = internal.encode_rollback,
     -- inject raw data into connection, used by console and tests
     inject = function(buf, id, bytes) -- luacheck: no unused args
         local ptr = buf:reserve(#bytes)
@@ -144,6 +147,9 @@ local method_decoder = {
     count   = decode_count,
     inject  = decode_data,
     push    = decode_push,
+    begin   = decode_nil,
+    commit  = decode_nil,
+    rollback = decode_nil,
 }
 
 local function decode_error(raw_data)
@@ -1418,6 +1424,30 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
     self.schema_version = schema_version
     self.space = sl
     self._on_schema_reload:run(self)
+end
+
+function remote_methods:remote_tx_manage(method)
+    check_remote_arg(self, method)
+    local deadline = self._deadlines[fiber_self()]
+    local timeout = deadline and max(0, deadline - fiber_clock())
+    local _, err = self._transport.perform_request(timeout, nil, false,
+            method, nil, nil, nil)
+    if err then
+        box.error(err)
+    end
+    return true
+end
+
+function remote_methods:begin()
+    return self:remote_tx_manage('begin')
+end
+
+function remote_methods:commit()
+    return self:remote_tx_manage('commit')
+end
+
+function remote_methods:rollback()
+    return self:remote_tx_manage('rollback')
 end
 
 -- console methods

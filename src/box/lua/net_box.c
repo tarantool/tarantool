@@ -617,6 +617,39 @@ netbox_encode_prepare(lua_State *L)
 	return 0;
 }
 
+static inline int
+netbox_encode_txn_op(lua_State *L, enum iproto_type type, const char *method)
+{
+	assert(type == IPROTO_BEGIN || type == IPROTO_NET_ROLLBACK ||
+		   type == IPROTO_COMMIT);
+	if (lua_gettop(L) != 2)
+		return luaL_error(L, "Usage: netbox.encode_%s(ibuf, sync)",
+					method);
+	struct mpstream stream;
+	size_t svp = netbox_prepare_request(L, &stream, type);
+	mpstream_encode_map(&stream, 0);
+	netbox_encode_request(&stream, svp);
+	return 0;
+}
+
+static int
+netbox_encode_begin(lua_State *L)
+{
+	return netbox_encode_txn_op(L, IPROTO_BEGIN, "begin");
+}
+
+static int
+netbox_encode_commit(lua_State *L)
+{
+	return netbox_encode_txn_op(L, IPROTO_COMMIT, "commit");
+}
+
+static int
+netbox_encode_rollback(lua_State *L)
+{
+	return netbox_encode_txn_op(L, IPROTO_NET_ROLLBACK, "rollback");
+}
+
 /**
  * Decode IPROTO_DATA into tuples array.
  * @param L Lua stack to push result on.
@@ -901,6 +934,9 @@ luaopen_net_box(struct lua_State *L)
 		{ "encode_execute", netbox_encode_execute},
 		{ "encode_prepare", netbox_encode_prepare},
 		{ "encode_auth",    netbox_encode_auth },
+		{ "encode_begin",   netbox_encode_begin },
+		{ "encode_commit",  netbox_encode_commit },
+		{ "encode_rollback", netbox_encode_rollback },
 		{ "decode_greeting",netbox_decode_greeting },
 		{ "communicate",    netbox_communicate },
 		{ "decode_select",  netbox_decode_select },

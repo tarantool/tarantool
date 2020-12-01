@@ -968,6 +968,7 @@ txn_rollback_stmt(struct txn *txn)
 void
 txn_rollback(struct txn *txn)
 {
+	assert(txn);
 	assert(txn == in_txn());
 	txn->status = TXN_ABORTED;
 	trigger_clear(&txn->fiber_on_stop);

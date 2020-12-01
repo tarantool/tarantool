@@ -108,6 +108,9 @@ const char *iproto_type_strs[] =
 	"EXECUTE",
 	NULL, /* NOP */
 	"PREPARE",
+	"BEGIN",
+	"COMMIT",
+	"ROLLBACK",
 };
 
 #define bit(c) (1ULL<<IPROTO_##c)
@@ -126,6 +129,9 @@ const uint64_t iproto_body_key_map[IPROTO_TYPE_STAT_MAX] = {
 	0,                                                     /* EXECUTE */
 	0,                                                     /* NOP */
 	0,                                                     /* PREPARE */
+	0,                                                     /* BEGIN */
+	0,                                                     /* COMMIT */
+	0,                                                     /* ROLLBACK */
 };
 #undef bit
 
