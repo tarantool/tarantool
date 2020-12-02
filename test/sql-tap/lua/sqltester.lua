@@ -2,12 +2,56 @@ local tap = require('tap')
 local json = require('json')
 local test = tap.test("errno")
 local sql_tokenizer = require('sql_tokenizer')
+--local ffi = require('ffi')
+--ffi.cdef [[ char * mp_str(char *); ]]
+
 
 -- pcall here, because we allow to run a test w/o test-run; use:
 -- LUA_PATH='test/sql-tap/lua/?.lua;test/sql/lua/?.lua;;' \
 --     ./test/sql-tap/xxx.test.lua
 local ok, test_run = pcall(require, 'test_run')
 test_run = ok and test_run.new() or nil
+
+local cfg_sqlparser = test_run and test_run:get_cfg('sqlparser') or 'box_execute'
+test.sqlparser = cfg_sqlparser
+
+local _, sqlparser = pcall(require, 'sqlparser')
+
+local handlers = {
+    -- parse via box.execute
+    box_execute = function(query)
+        return box.execute(query)
+    end,
+
+    -- parse via sqlparser.parse
+    ast_parse = function(query)
+        print (query)
+        local handle, error = sqlparser.parse(query)
+        if handle == nil then return nil, error end
+        return sqlparser.execute(handle)
+    end,
+
+    -- parse via sqlparser.parse and sqparser.serialize
+    serialize = function(query)
+        local handle, error = sqlparser.parse(query)
+        if handle == nil then return nil, error end
+
+        local mp = sqlparser.serialize(handle)
+        if mp ~= nil then
+            -- print(ffi.string(ffi.C.mp_str(ffi.cast("char*", mp))))
+            handle = sqlparser.deserialize(mp)
+        end
+        --[[local mpcheck = sqlparser.serialize(handle)
+        if mp ~= mpcheck then
+            print("mismatch: ",
+                  ffi.string(ffi.C.mp_str(ffi.cast("char*", mp))),
+                  ffi.string(ffi.C.mp_str(ffi.cast("char*", mpcheck))))
+        end
+        --]]
+        return sqlparser.execute(handle)
+    end
+}
+local execute = handlers[cfg_sqlparser]
 
 local function flatten(arr)
     local result = { }
@@ -153,7 +197,7 @@ local function execsql_one_by_one(sql)
     local last_res_rows = nil
     local last_res_metadata = nil
     for _, query in pairs(queries) do
-        local new_res, err = box.execute(query)
+        local new_res, err = execute(query)
         if err ~= nil then
             error(err)
         end
