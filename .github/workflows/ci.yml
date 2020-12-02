@@ -13,7 +13,10 @@ jobs:
 
     strategy:
       matrix:
-        tnt: [2.6]
+        tnt: [master]
+
+    container:
+            image: ghcr.io/avtikhon/tarantool/testing/debian-stretch:latest
 
     steps:
     - uses: actions/checkout@v1
@@ -22,4 +25,4 @@ jobs:
         TAG: '2.3'
         DIR: '2.3'
         PORT: 3323
-      run: make -f ${GITLAB_MAKE} test_debian
+      run: make -f ${GITLAB_MAKE} test_debian_no_deps
