@@ -4,7 +4,7 @@ on: [push]
 
 env:
   IMAGE: "registry.gitlab.com/tarantool/tarantool/testing/debian-stretch/debian-stretch:latest"
-  GITLAB_MAKE: "make -f .gitlab.mk"
+  GITLAB_MAKE: .gitlab.mk
 
 jobs:
   build:
