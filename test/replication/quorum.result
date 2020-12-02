@@ -27,7 +27,7 @@ test_run:cmd('switch quorum2')
 ---
 - true
 ...
-test_run:cmd('restart server quorum2 with args="0.1"')
+test_run:cmd('restart server quorum2 with args="0.1 10"')
 box.info.status -- orphan
 ---
 - orphan
@@ -55,7 +55,7 @@ box.info.status -- running
 ---
 - running
 ...
-test_run:cmd('restart server quorum2 with args="0.1"')
+test_run:cmd('restart server quorum2 with args="0.1 10"')
 box.info.status -- orphan
 ---
 - orphan
@@ -86,7 +86,7 @@ box.info.status -- running
 ---
 - running
 ...
-test_run:cmd('restart server quorum2 with args="0.1"')
+test_run:cmd('restart server quorum2 with args="0.1 10"')
 box.info.status -- orphan
 ---
 - orphan
@@ -427,7 +427,7 @@ test_run:cmd('create server replica_quorum with script="replication/replica_quor
 -- Arguments are: replication_connect_quorum, replication_timeout
 -- If replication_connect_quorum was ignored here, the instance
 -- would exit with an error.
-test_run:cmd('start server replica_quorum with wait=True, wait_load=True, args="1 0.05"')
+test_run:cmd('start server replica_quorum with wait=True, wait_load=True, args="1 0.05 10"')
 ---
 - true
 ...

@@ -18,7 +18,7 @@ test_run:cmd('stop server quorum1')
 
 test_run:cmd('switch quorum2')
 
-test_run:cmd('restart server quorum2 with args="0.1"')
+test_run:cmd('restart server quorum2 with args="0.1 10"')
 box.info.status -- orphan
 box.ctl.wait_rw(0.001) -- timeout
 box.info.ro -- true
@@ -27,7 +27,7 @@ box.space.test:replace{100} -- error
 box.cfg{replication={}}
 box.info.status -- running
 
-test_run:cmd('restart server quorum2 with args="0.1"')
+test_run:cmd('restart server quorum2 with args="0.1 10"')
 box.info.status -- orphan
 box.ctl.wait_rw(0.001) -- timeout
 box.info.ro -- true
@@ -37,7 +37,7 @@ box.ctl.wait_rw()
 box.info.ro -- false
 box.info.status -- running
 
-test_run:cmd('restart server quorum2 with args="0.1"')
+test_run:cmd('restart server quorum2 with args="0.1 10"')
 box.info.status -- orphan
 box.ctl.wait_rw(0.001) -- timeout
 box.info.ro -- true
@@ -161,7 +161,7 @@ test_run:cmd('create server replica_quorum with script="replication/replica_quor
 -- Arguments are: replication_connect_quorum, replication_timeout
 -- If replication_connect_quorum was ignored here, the instance
 -- would exit with an error.
-test_run:cmd('start server replica_quorum with wait=True, wait_load=True, args="1 0.05"')
+test_run:cmd('start server replica_quorum with wait=True, wait_load=True, args="1 0.05 10"')
 test_run:cmd('switch replica_quorum')
 -- If replication_connect_quorum was ignored here, the instance
 -- would exit with an error.
