@@ -79,6 +79,7 @@
 #include "systemd.h"
 #include "crypto/crypto.h"
 #include "core/popen.h"
+#include "core/crash.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -184,124 +185,6 @@ signal_sigwinch_cb(ev_loop *loop, struct ev_signal *w, int revents)
 		rl_resize_terminal();
 }
 
-#if defined(__linux__) && defined(__amd64)
-
-inline void
-dump_x86_64_register(const char *reg_name, unsigned long long val)
-{
-	fprintf(stderr, "  %-9s0x%-17llx%lld\n", reg_name, val, val);
-}
-
-void
-dump_x86_64_registers(ucontext_t *uc)
-{
-	dump_x86_64_register("rax", uc->uc_mcontext.gregs[REG_RAX]);
-	dump_x86_64_register("rbx", uc->uc_mcontext.gregs[REG_RBX]);
-	dump_x86_64_register("rcx", uc->uc_mcontext.gregs[REG_RCX]);
-	dump_x86_64_register("rdx", uc->uc_mcontext.gregs[REG_RDX]);
-	dump_x86_64_register("rsi", uc->uc_mcontext.gregs[REG_RSI]);
-	dump_x86_64_register("rdi", uc->uc_mcontext.gregs[REG_RDI]);
-	dump_x86_64_register("rsp", uc->uc_mcontext.gregs[REG_RSP]);
-	dump_x86_64_register("rbp", uc->uc_mcontext.gregs[REG_RBP]);
-	dump_x86_64_register("r8", uc->uc_mcontext.gregs[REG_R8]);
-	dump_x86_64_register("r9", uc->uc_mcontext.gregs[REG_R9]);
-	dump_x86_64_register("r10", uc->uc_mcontext.gregs[REG_R10]);
-	dump_x86_64_register("r11", uc->uc_mcontext.gregs[REG_R11]);
-	dump_x86_64_register("r12", uc->uc_mcontext.gregs[REG_R12]);
-	dump_x86_64_register("r13", uc->uc_mcontext.gregs[REG_R13]);
-	dump_x86_64_register("r14", uc->uc_mcontext.gregs[REG_R14]);
-	dump_x86_64_register("r15", uc->uc_mcontext.gregs[REG_R15]);
-	dump_x86_64_register("rip", uc->uc_mcontext.gregs[REG_RIP]);
-	dump_x86_64_register("eflags", uc->uc_mcontext.gregs[REG_EFL]);
-	dump_x86_64_register("cs", (uc->uc_mcontext.gregs[REG_CSGSFS] >> 0) & 0xffff);
-	dump_x86_64_register("gs", (uc->uc_mcontext.gregs[REG_CSGSFS] >> 16) & 0xffff);
-	dump_x86_64_register("fs", (uc->uc_mcontext.gregs[REG_CSGSFS] >> 32) & 0xffff);
-	dump_x86_64_register("cr2", uc->uc_mcontext.gregs[REG_CR2]);
-	dump_x86_64_register("err", uc->uc_mcontext.gregs[REG_ERR]);
-	dump_x86_64_register("oldmask", uc->uc_mcontext.gregs[REG_OLDMASK]);
-	dump_x86_64_register("trapno", uc->uc_mcontext.gregs[REG_TRAPNO]);
-}
-
-#endif /* defined(__linux__) && defined(__amd64) */
-
-/** Try to log as much as possible before dumping a core.
- *
- * Core files are not aways allowed and it takes an effort to
- * extract useful information from them.
- *
- * *Recursive invocation*
- *
- * Unless SIGSEGV is sent by kill(), Linux
- * resets the signal a default value before invoking
- * the handler.
- *
- * Despite that, as an extra precaution to avoid infinite
- * recursion, we count invocations of the handler, and
- * quietly _exit() when called for a second time.
- */
-static void
-sig_fatal_cb(int signo, siginfo_t *siginfo, void *context)
-{
-	static volatile sig_atomic_t in_cb = 0;
-	int fd = STDERR_FILENO;
-	struct sigaction sa;
-
-	/* Got a signal while running the handler. */
-	if (in_cb) {
-		fdprintf(fd, "Fatal %d while backtracing", signo);
-		goto end;
-	}
-
-	in_cb = 1;
-
-	if (signo == SIGSEGV) {
-		fdprintf(fd, "Segmentation fault\n");
-		const char *signal_code_repr = 0;
-		switch (siginfo->si_code) {
-		case SEGV_MAPERR:
-			signal_code_repr = "SEGV_MAPERR";
-			break;
-		case SEGV_ACCERR:
-			signal_code_repr = "SEGV_ACCERR";
-			break;
-		}
-		if (signal_code_repr)
-			fdprintf(fd, "  code: %s\n", signal_code_repr);
-		else
-			fdprintf(fd, "  code: %d\n", siginfo->si_code);
-		/*
-		 * fprintf is used insted of fdprintf, because
-		 * fdprintf does not understand %p
-		 */
-		fprintf(stderr, "  addr: %p\n", siginfo->si_addr);
-	} else
-		fdprintf(fd, "Got a fatal signal %d\n", signo);
-	fprintf(stderr, "  context: %p\n", context);
-	fprintf(stderr, "  siginfo: %p\n", siginfo);
-
-#if defined(__linux__) && defined(__amd64)
-	dump_x86_64_registers((ucontext_t *)context);
-#endif
-
-	fdprintf(fd, "Current time: %u\n", (unsigned) time(0));
-	fdprintf(fd,
-		 "Please file a bug at http://github.com/tarantool/tarantool/issues\n");
-
-#ifdef ENABLE_BACKTRACE
-	fdprintf(fd, "Attempting backtrace... Note: since the server has "
-		 "already crashed, \nthis may fail as well\n");
-	print_backtrace();
-#endif
-end:
-	/* Try to dump core. */
-	memset(&sa, 0, sizeof(sa));
-	sigemptyset(&sa.sa_mask);
-	sa.sa_handler = SIG_DFL;
-	sigaction(SIGABRT, &sa, NULL);
-
-	abort();
-}
-
 static void
 signal_free(void)
 {
@@ -328,10 +211,10 @@ signal_reset(void)
 	    sigaction(SIGINT, &sa, NULL) == -1 ||
 	    sigaction(SIGTERM, &sa, NULL) == -1 ||
 	    sigaction(SIGHUP, &sa, NULL) == -1 ||
-	    sigaction(SIGWINCH, &sa, NULL) == -1 ||
-	    sigaction(SIGSEGV, &sa, NULL) == -1 ||
-	    sigaction(SIGFPE, &sa, NULL) == -1)
+	    sigaction(SIGWINCH, &sa, NULL) == -1)
 		say_syserror("sigaction");
+
+	crash_signal_reset();
 
 	/* Unblock any signals blocked by libev. */
 	sigset_t sigset;
@@ -362,18 +245,7 @@ signal_init(void)
 	if (sigaction(SIGPIPE, &sa, 0) == -1)
 		panic_syserror("sigaction");
 
-	/*
-	 * SA_RESETHAND resets handler action to the default
-	 * one when entering handler.
-	 * SA_NODEFER allows receiving the same signal during handler.
-	 */
-	sa.sa_flags = SA_RESETHAND | SA_NODEFER | SA_SIGINFO;
-	sa.sa_sigaction = sig_fatal_cb;
-
-	if (sigaction(SIGSEGV, &sa, 0) == -1 ||
-	    sigaction(SIGFPE, &sa, 0) == -1) {
-		panic_syserror("sigaction");
-	}
+	crash_signal_init();
 
 	ev_signal_init(&ev_sigs[0], sig_checkpoint, SIGUSR1);
 	ev_signal_init(&ev_sigs[1], signal_cb, SIGINT);
