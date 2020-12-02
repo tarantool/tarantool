@@ -8,8 +8,8 @@ env:
 
 jobs:
   build:
-    #runs-on: debian-stretch
-    runs-on: self-hosted
+    runs-on: debian-stretch
+    #runs-on: self-hosted
 
     strategy:
       matrix:
