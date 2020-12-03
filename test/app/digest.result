@@ -572,13 +572,6 @@ err:match("number")
 ---
 - number
 ...
-digest = nil
----
-...
-test_run:cmd("clear filter")
----
-- true
-...
 -- gh-3396: fiber-safe pbkdf2
 res = {}
 ---
@@ -635,4 +628,192 @@ res
   - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
   - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
   - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+...
+--
+-- gh-2003 xxHash.
+--
+xxhash32 = digest.xxhash32.new()
+---
+...
+xxhash32:result()
+---
+- 46947589
+...
+xxhash64 = digest.xxhash64.new()
+---
+...
+xxhash64:result()
+---
+- 17241709254077376921ULL
+...
+-- New takes seed optionally.
+digest.xxhash32.new(1):result()
+---
+- 187479954
+...
+digest.xxhash64.new(1):result()
+---
+- 15397730242686860875ULL
+...
+-- String is expected as input value.
+digest.xxhash32(1)
+---
+- error: Usage digest.xxhash32(string[, unsigned number])
+...
+digest.xxhash64(1)
+---
+- error: Usage digest.xxhash64(string[, unsigned number])
+...
+digest.xxhash32.new():update(1)
+---
+- error: Usage xxhash32:update(string)
+...
+digest.xxhash64.new():update(1)
+---
+- error: Usage xxhash64:update(string)
+...
+-- Seed is an optional second argument (default = 0).
+digest.xxhash32('12345')
+---
+- 3003995828
+...
+digest.xxhash32('12345', 0)
+---
+- 3003995828
+...
+digest.xxhash32('12345', 1)
+---
+- 2544060598
+...
+xxhash32:result()
+---
+- 46947589
+...
+xxhash32:clear(1)
+---
+...
+xxhash32:result()
+---
+- 187479954
+...
+xxhash32:update('123')
+---
+...
+xxhash32:result()
+---
+- 2569538424
+...
+xxhash32:update('45')
+---
+...
+xxhash32:result()
+---
+- 2544060598
+...
+xxhash32:clear()
+---
+...
+xxhash32:result()
+---
+- 46947589
+...
+xxhash32_copy = xxhash32:copy()
+---
+...
+xxhash32_copy:result()
+---
+- 46947589
+...
+xxhash32_copy ~= xxhash32
+---
+- true
+...
+xxhash32_copy:clear(1ULL)
+---
+...
+xxhash32_copy:result()
+---
+- 187479954
+...
+xxhash32 = nil
+---
+...
+xxhash32_copy = nil
+---
+...
+-- Seed is an optional second argument (default = 0).
+digest.xxhash64('12345')
+---
+- 14335752410685132726ULL
+...
+digest.xxhash64('12345', 0)
+---
+- 14335752410685132726ULL
+...
+digest.xxhash64('12345', 1)
+---
+- 10037897083593476069ULL
+...
+xxhash64:result()
+---
+- 17241709254077376921ULL
+...
+xxhash64:clear(1)
+---
+...
+xxhash64:result()
+---
+- 15397730242686860875ULL
+...
+xxhash64:update('123')
+---
+...
+xxhash64:result()
+---
+- 5440451180712653975ULL
+...
+xxhash64:update('45')
+---
+...
+xxhash64:result()
+---
+- 10037897083593476069ULL
+...
+xxhash64:clear()
+---
+...
+xxhash64:result()
+---
+- 17241709254077376921ULL
+...
+xxhash64_copy = xxhash64:copy()
+---
+...
+xxhash64_copy:result()
+---
+- 17241709254077376921ULL
+...
+xxhash64_copy ~= xxhash64
+---
+- true
+...
+xxhash64_copy:clear(1ULL)
+---
+...
+xxhash64_copy:result()
+---
+- 15397730242686860875ULL
+...
+xxhash64 = nil
+---
+...
+xxhash64_copy = nil
+---
+...
+test_run:cmd("clear filter")
+---
+- true
+...
+digest = nil
+---
 ...

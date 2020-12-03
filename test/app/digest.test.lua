@@ -183,8 +183,6 @@ err:match("Usage")
 s, err = pcall(digest.pbkdf2_hex, "password", "salt", "lol", "lol")
 s
 err:match("number")
-digest = nil
-test_run:cmd("clear filter")
 
 -- gh-3396: fiber-safe pbkdf2
 res = {}
@@ -203,3 +201,66 @@ _ = fiber.create(test_pbkdf2)
 _ = sentry:get()
 _ = sentry:get()
 res
+
+--
+-- gh-2003 xxHash.
+--
+xxhash32 = digest.xxhash32.new()
+xxhash32:result()
+xxhash64 = digest.xxhash64.new()
+xxhash64:result()
+
+-- New takes seed optionally.
+digest.xxhash32.new(1):result()
+digest.xxhash64.new(1):result()
+
+-- String is expected as input value.
+digest.xxhash32(1)
+digest.xxhash64(1)
+digest.xxhash32.new():update(1)
+digest.xxhash64.new():update(1)
+
+-- Seed is an optional second argument (default = 0).
+digest.xxhash32('12345')
+digest.xxhash32('12345', 0)
+digest.xxhash32('12345', 1)
+xxhash32:result()
+xxhash32:clear(1)
+xxhash32:result()
+xxhash32:update('123')
+xxhash32:result()
+xxhash32:update('45')
+xxhash32:result()
+xxhash32:clear()
+xxhash32:result()
+xxhash32_copy = xxhash32:copy()
+xxhash32_copy:result()
+xxhash32_copy ~= xxhash32
+xxhash32_copy:clear(1ULL)
+xxhash32_copy:result()
+xxhash32 = nil
+xxhash32_copy = nil
+
+-- Seed is an optional second argument (default = 0).
+digest.xxhash64('12345')
+digest.xxhash64('12345', 0)
+digest.xxhash64('12345', 1)
+xxhash64:result()
+xxhash64:clear(1)
+xxhash64:result()
+xxhash64:update('123')
+xxhash64:result()
+xxhash64:update('45')
+xxhash64:result()
+xxhash64:clear()
+xxhash64:result()
+xxhash64_copy = xxhash64:copy()
+xxhash64_copy:result()
+xxhash64_copy ~= xxhash64
+xxhash64_copy:clear(1ULL)
+xxhash64_copy:result()
+xxhash64 = nil
+xxhash64_copy = nil
+
+test_run:cmd("clear filter")
+digest = nil

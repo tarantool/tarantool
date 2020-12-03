@@ -31,6 +31,50 @@ ffi.cdef[[
     void PMurHash32_Process(uint32_t *ph1, uint32_t *pcarry, const void *key, int len);
     uint32_t PMurHash32_Result(uint32_t h1, uint32_t carry, uint32_t total_length);
     uint32_t PMurHash32(uint32_t seed, const void *key, int len);
+
+    /* from third_party/zstd/lib/common/xxhash.c */
+    typedef enum { XXH_OK=0, XXH_ERROR } XXH_errorcode;
+    struct XXH32_state_s {
+        unsigned total_len_32;
+        unsigned large_len;
+        unsigned v1;
+        unsigned v2;
+        unsigned v3;
+        unsigned v4;
+        unsigned mem32[4];   /* buffer defined as U32 for alignment */
+        unsigned memsize;
+        unsigned reserved;   /* never read nor write, will be removed in a future version */
+    };
+
+    struct XXH64_state_s {
+        unsigned long long total_len;
+        unsigned long long v1;
+        unsigned long long v2;
+        unsigned long long v3;
+        unsigned long long v4;
+        unsigned long long mem64[4];   /* buffer defined as U64 for alignment */
+        unsigned memsize;
+        unsigned reserved[2];          /* never read nor write, will be removed in a future version */
+    };
+
+    typedef unsigned int       XXH32_hash_t;
+    typedef unsigned long long XXH64_hash_t;
+    XXH32_hash_t XXH32 (const void* input, size_t length, unsigned int seed);
+    XXH64_hash_t XXH64 (const void* input, size_t length, unsigned long long seed);
+
+    typedef struct XXH32_state_s XXH32_state_t;
+    typedef struct XXH64_state_s XXH64_state_t;
+
+    XXH_errorcode XXH32_reset  (XXH32_state_t* statePtr, unsigned int seed);
+    XXH_errorcode XXH32_update (XXH32_state_t* statePtr, const void* input, size_t length);
+    XXH32_hash_t  XXH32_digest (const XXH32_state_t* statePtr);
+
+    XXH_errorcode XXH64_reset  (XXH64_state_t* statePtr, unsigned long long seed);
+    XXH_errorcode XXH64_update (XXH64_state_t* statePtr, const void* input, size_t length);
+    XXH64_hash_t  XXH64_digest (const XXH64_state_t* statePtr);
+
+    void XXH32_copyState(XXH32_state_t* restrict dst_state, const XXH32_state_t* restrict src_state);
+    void XXH64_copyState(XXH64_state_t* restrict dst_state, const XXH64_state_t* restrict src_state);
 ]]
 
 local builtin = ffi.C
@@ -279,5 +323,74 @@ m['aes256cbc'] = {
         return crypto.cipher.aes256.cbc.decrypt(str, key, iv)
     end
 }
+
+for _, var in ipairs({'32', '64'}) do
+    local xxHash
+
+    local xxh_template = 'XXH%s_%s'
+    local update_fn_name = string.format(xxh_template, var, 'update')
+    local digest_fn_name = string.format(xxh_template, var, 'digest')
+    local reset_fn_name = string.format(xxh_template, var, 'reset')
+    local copy_fn_name = string.format(xxh_template, var, 'copyState')
+
+    local function update(self, str)
+        if type(str) ~= 'string' then
+            local message = string.format("Usage xxhash%s:update(string)", var)
+            error(message, 2)
+        end
+        builtin[update_fn_name](self.value, str, #str)
+    end
+
+    local function result(self)
+        return builtin[digest_fn_name](self.value)
+    end
+
+    local function clear(self, seed)
+        if seed == nil then
+            seed = self.default_seed
+        end
+        builtin[reset_fn_name](self.value, seed)
+    end
+
+    local function copy(self)
+        local copy = xxHash.new()
+        builtin[copy_fn_name](copy.value, self.value)
+        return copy
+    end
+
+    local state_type_name = string.format(xxh_template, var, 'state_t')
+    local XXH_state_t = ffi.typeof(state_type_name)
+
+    xxHash = {
+        new = function(seed)
+            local self = {
+                update = update,
+                result = result,
+                clear = clear,
+                copy = copy,
+                value = ffi.new(XXH_state_t),
+                default_seed = seed or 0,
+            }
+            self:clear(self.default_seed)
+            return self
+        end,
+    }
+
+    local call_fn_name = 'XXH' .. var
+    setmetatable(xxHash, {
+        __call = function(_, str, seed)
+            if type(str) ~= 'string' then
+                local message = string.format("Usage digest.xxhash%s(string[, unsigned number])", var)
+                error(message, 2)
+            end
+            if seed == nil then
+                seed = 0
+            end
+            return builtin[call_fn_name](str, #str, seed)
+        end,
+    })
+
+    m['xxhash' .. var] = xxHash
+end
 
 return m
