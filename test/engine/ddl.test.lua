@@ -1003,28 +1003,76 @@ function gen_load()
     end
 end;
 
+function check_equal(check, pk, k)
+    if pk ~= k then
+        require('log').error("Error on fiber check: failed '" .. check .. 
+	                     "' check on equal pk " .. pk .. " and k = " .. k)
+        return false
+    end
+    return true
+end;
+
+function check_fiber()
+    _ = fiber.create(function() gen_load() ch:put(true) end)
+    _ = box.space.test:create_index('sk', {unique = false, parts = {2, 'unsigned'}})
+
+    ch:get(10)
+
+    local index = box.space.test.index
+    if not check_equal("1st step secondary keys", index.pk:count(), index.sk:count()) then
+        return false
+    end
+
+    _ = fiber.create(function() gen_load() ch:put(true) end)
+    _ = box.space.test:create_index('tk', {unique = true, parts = {3, 'unsigned'}})
+
+    ch:get(10)
+
+    index = box.space.test.index
+    if not check_equal("2nd step secondary keys", index.pk:count(), index.sk:count()) or
+            not check_equal("2nd step third keys", index.pk:count(), index.tk:count()) then
+        return false
+    end
+    return true
+end;
+
 inspector:cmd("setopt delimiter ''");
 
 fiber = require('fiber')
 ch = fiber.channel(1)
-
-_ = fiber.create(function() gen_load() ch:put(true) end)
-_ = box.space.test:create_index('sk', {unique = false, parts = {2, 'unsigned'}})
-ch:get()
-
-_ = fiber.create(function() gen_load() ch:put(true) end)
-_ = box.space.test:create_index('tk', {unique = true, parts = {3, 'unsigned'}})
-ch:get()
-
-box.space.test.index.pk:count() == box.space.test.index.sk:count()
-box.space.test.index.pk:count() == box.space.test.index.tk:count()
+check_fiber()
 
 inspector:cmd("restart server default")
+inspector = require('test_run').new()
 
-box.space.test.index.pk:count() == box.space.test.index.sk:count()
-box.space.test.index.pk:count() == box.space.test.index.tk:count()
-box.snapshot()
-box.space.test.index.pk:count() == box.space.test.index.sk:count()
-box.space.test.index.pk:count() == box.space.test.index.tk:count()
+inspector:cmd("setopt delimiter ';'")
+
+function check_equal(check, pk, k)
+    if pk ~= k then
+        require('log').error("Error on server restart check: failed '" .. check ..
+                             "' check on equal pk " .. pk .. " and k = " .. k)
+        return false
+    end
+    return true
+end;
+
+function check_server_restart()
+    local index = box.space.test.index
+    if not check_equal("1rd step secondary keys", index.pk:count(), index.sk:count()) or
+            not check_equal("1rd step third keys", index.pk:count(), index.tk:count()) then
+        return false
+    end
+    box.snapshot()
+    index = box.space.test.index
+    if not check_equal("2th step secondary keys", index.pk:count(), index.sk:count()) or
+            not check_equal("2th step third keys", index.pk:count(), index.tk:count()) then
+        return false
+    end
+    return true
+end;
+
+inspector:cmd("setopt delimiter ''");
+
+check_server_restart()
 
 box.space.test:drop()
