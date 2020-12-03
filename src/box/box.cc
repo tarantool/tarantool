@@ -516,9 +516,109 @@ box_check_replication_sync_lag(void)
 	return lag;
 }
 
+/**
+ * Evaluate replication syncro quorum number from a formula.
+ */
+static int
+box_eval_replication_synchro_quorum(int nr_replicas)
+{
+	assert(nr_replicas > 0 && nr_replicas < VCLOCK_MAX);
+
+	const char fmt[] =
+		"local expr = [[%s]]\n"
+		"local f, err = loadstring('return ('..expr..')')\n"
+		"if not f then "
+			"error(string.format('Failed to load \%\%s:"
+			"\%\%s', expr, err)) "
+		"end\n"
+		"setfenv(f, {N = %d, math = {"
+			"ceil = math.ceil,"
+			"floor = math.floor,"
+			"abs = math.abs,"
+			"random = math.random,"
+			"min = math.min,"
+			"max = math.max,"
+			"sqrt = math.sqrt,"
+			"fmod = math.fmod,"
+		"}})\n"
+		"local res = f()\n"
+		"if type(res) ~= 'number' then\n"
+			"error('Expression should return a number')\n"
+		"end\n"
+		"return math.floor(res)\n";
+	const char *expr = cfg_gets("replication_synchro_quorum");
+
+	/*
+	 * cfg_gets uses static buffer as well so we need a local
+	 * one, 1K should be enough to carry arbitrary but sane
+	 * formula.
+	 */
+	char buf[1024];
+	int len = snprintf(buf, sizeof(buf), fmt, expr,
+			   nr_replicas);
+	if (len >= (int)sizeof(buf)) {
+		diag_set(ClientError, ER_CFG,
+			 "replication_synchro_quorum",
+			 "the formula is too big");
+		return -1;
+	}
+
+	luaL_loadstring(tarantool_L, buf);
+	if (lua_pcall(tarantool_L, 0, 1, 0) != 0) {
+		diag_set(ClientError, ER_CFG,
+			 "replication_synchro_quorum",
+			 lua_tostring(tarantool_L, -1));
+		return -1;
+	}
+
+	int quorum = -1;
+	if (lua_isnumber(tarantool_L, -1))
+		quorum = (int)lua_tonumber(tarantool_L, -1);
+	lua_pop(tarantool_L, 1);
+
+	/*
+	 * At least we should have 1 node to sync, the weird
+	 * formulas such as N-2 do not guarantee quorums thus
+	 * return an error.
+	 */
+	if (quorum <= 0 || quorum >= VCLOCK_MAX) {
+		const char *msg =
+			tt_sprintf("the formula is evaluated "
+				   "to the quorum %d for replica "
+				   "number %d, which is out of range "
+				   "[%d;%d]",
+				   quorum, nr_replicas, 1, VCLOCK_MAX - 1);
+		diag_set(ClientError, ER_CFG,
+			 "replication_synchro_quorum", msg);
+		return -1;
+	}
+
+	return quorum;
+}
+
 static int
 box_check_replication_synchro_quorum(void)
 {
+	if (!cfg_isnumber("replication_synchro_quorum")) {
+		/*
+		 * The formula uses symbolic name 'N' as
+		 * a number of currently registered replicas.
+		 *
+		 * When we're in "checking" mode we should walk
+		 * over all possible number of replicas to make
+		 * sure the formula is correct.
+		 *
+		 * Note that currently VCLOCK_MAX is pretty small
+		 * value but if we gonna increase this limit make
+		 * sure that the cycle won't take too much time.
+		 */
+		for (int i = 1; i < VCLOCK_MAX; i++) {
+			if (box_eval_replication_synchro_quorum(i) < 0)
+				return -1;
+		}
+		return 0;
+	}
+
 	int quorum = cfg_geti("replication_synchro_quorum");
 	if (quorum <= 0 || quorum >= VCLOCK_MAX) {
 		diag_set(ClientError, ER_CFG, "replication_synchro_quorum",
@@ -849,7 +949,32 @@ box_set_replication_sync_lag(void)
 void
 box_update_replication_synchro_quorum(void)
 {
-	int quorum = cfg_geti("replication_synchro_quorum");
+	int quorum = -1;
+
+	if (!cfg_isnumber("replication_synchro_quorum")) {
+		/*
+		 * The formula has been verified already. For bootstrap
+		 * stage pass 1 as a number of replicas to sync because
+		 * we're at early stage and registering a new replica.
+		 *
+		 * This should cover the valid case where formula is plain
+		 * "N", ie all replicas are to be synchro mode.
+		 */
+		int value = MAX(1, replicaset.registered_count);
+		quorum = box_eval_replication_synchro_quorum(value);
+		say_info("update replication_synchro_quorum = %d", quorum);
+	} else {
+		quorum = cfg_geti("replication_synchro_quorum");
+	}
+
+	/*
+	 * This should never happen because the values were
+	 * validated already but just to prevent from
+	 * unexpected changes and because the value is too
+	 * important for qsync, lets re-check (this is cheap).
+	 */
+	if (quorum <= 0 || quorum >= VCLOCK_MAX)
+		panic("failed to eval/fetch replication_synchro_quorum");
 
 	replication_synchro_quorum = quorum;
 	txn_limbo_on_parameters_change(&txn_limbo);
