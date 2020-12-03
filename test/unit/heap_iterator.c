@@ -111,15 +111,15 @@ test_iterator_small()
 		if (val < 1 || val > 5)
 			fail("from iterator returned incorrect value",
 			     "val < 1 || val > 5");
-		if (used_key[val])
+		if (used_key[val - 1])
 			fail("from iterator some value returned twice",
 			     "used[val]");
-		used_key[val] = 1;
+		used_key[val - 1] = 1;
 	}
 
 	bool f = true;
 	for (uint32_t i = 1; i < 5; ++i)
-		f = used_key[i] && f;
+		f = used_key[i - 1] && f;
 	if (!f)
 		fail("some node was skipped", "!f");
 
