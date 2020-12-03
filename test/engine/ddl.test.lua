@@ -1016,17 +1016,15 @@ _ = fiber.create(function() gen_load() ch:put(true) end)
 _ = box.space.test:create_index('tk', {unique = true, parts = {3, 'unsigned'}})
 ch:get()
 
-inspector:wait_cond(function() return box.space.test.index.pk:count() == box.space.test.index.sk:count() end)
-inspector:wait_cond(function() return box.space.test.index.pk:count() == box.space.test.index.tk:count() end)
+box.space.test.index.pk:count() == box.space.test.index.sk:count()
+box.space.test.index.pk:count() == box.space.test.index.tk:count()
 
 inspector:cmd("restart server default")
 
-inspector = require('test_run').new()
-
-inspector:wait_cond(function() return box.space.test.index.pk:count() == box.space.test.index.sk:count() end)
-inspector:wait_cond(function() return box.space.test.index.pk:count() == box.space.test.index.tk:count() end)
+box.space.test.index.pk:count() == box.space.test.index.sk:count()
+box.space.test.index.pk:count() == box.space.test.index.tk:count()
 box.snapshot()
-inspector:wait_cond(function() return box.space.test.index.pk:count() == box.space.test.index.sk:count() end)
-inspector:wait_cond(function() return box.space.test.index.pk:count() == box.space.test.index.tk:count() end)
+box.space.test.index.pk:count() == box.space.test.index.sk:count()
+box.space.test.index.pk:count() == box.space.test.index.tk:count()
 
 box.space.test:drop()
