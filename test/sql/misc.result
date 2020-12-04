@@ -234,3 +234,24 @@ box.execute('EXPLAIN QUERY PLAN SELECT a, b FROM t1, t2 WHERE a = b;')
   - [0, 0, 0, 'SCAN TABLE T1 (~1048576 rows)']
   - [0, 1, 1, 'SEARCH TABLE T2 USING EPHEMERAL INDEX (B=?) (~20 rows)']
 ...
+-- gh-5592: Make sure that diag is not changed with the correct query.
+box.execute('SELECT a;')
+---
+- null
+- Can’t resolve field 'A'
+...
+diag = box.error.last()
+---
+...
+box.execute('SELECT * FROM (VALUES(true));')
+---
+- metadata:
+  - name: COLUMN_1
+    type: boolean
+  rows:
+  - [true]
+...
+diag == box.error.last()
+---
+- true
+...

@@ -73,3 +73,9 @@ for i = 1, 10240 do\
 	box.execute('INSERT INTO t2 VALUES ($1, $1);', {i})\
 end
 box.execute('EXPLAIN QUERY PLAN SELECT a, b FROM t1, t2 WHERE a = b;')
+
+-- gh-5592: Make sure that diag is not changed with the correct query.
+box.execute('SELECT a;')
+diag = box.error.last()
+box.execute('SELECT * FROM (VALUES(true));')
+diag == box.error.last()
