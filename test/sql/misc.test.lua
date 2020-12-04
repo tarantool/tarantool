@@ -64,3 +64,9 @@ box.execute('SELECT field70, field64 FROM test')
 pk:alter({parts = {66}})
 box.execute('SELECT field66, field68, field70 FROM test')
 box.space.TEST:drop()
+
+-- gh-5592: Make sure that diag is not changed with the correct query.
+box.execute('SELECT a;')
+diag = box.error.last()
+box.execute('SELECT * FROM (VALUES(true));')
+diag == box.error.last()

@@ -204,3 +204,24 @@ box.execute('SELECT field66, field68, field70 FROM test')
 box.space.TEST:drop()
 ---
 ...
+-- gh-5592: Make sure that diag is not changed with the correct query.
+box.execute('SELECT a;')
+---
+- null
+- Can’t resolve field 'A'
+...
+diag = box.error.last()
+---
+...
+box.execute('SELECT * FROM (VALUES(true));')
+---
+- metadata:
+  - name: _auto_field_
+    type: boolean
+  rows:
+  - [true]
+...
+diag == box.error.last()
+---
+- true
+...
