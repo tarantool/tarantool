@@ -3,6 +3,12 @@ log = require 'log'
 test_run = require('test_run').new()
 net = require('net.box')
 
+test_run:cmd("push filter 'peer_uuid: .*' to 'peer_uuid: <UUID>'")
+test_run:cmd("push filter 'reconnect_after: .*' to 'reconnect_after: <NUM>'")
+test_run:cmd("push filter 'schema_version: .*' to 'schema_version: <NUM>'")
+test_run:cmd("push filter 'peer_version_id: .*' to 'peer_version_id: <ID>'")
+test_run:cmd("push filter 'port: .*' to 'port: <PORT>'")
+
 test_run:cmd('create server connecter with script = "box/proxy.lua"')
 
 --
