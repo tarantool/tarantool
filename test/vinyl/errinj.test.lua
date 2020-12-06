@@ -3,6 +3,10 @@ fio = require('fio')
 fiber = require('fiber')
 errinj = box.error.injection
 errinj.set("ERRINJ_VY_SCHED_TIMEOUT", 0.040)
+
+test_run:cmd("push filter 'Invalid VYLOG file: Slice [0-9]+ deleted but not registered'" .. \
+             " to 'Invalid VYLOG file: Slice <NUM> deleted but not registered'")
+
 --
 -- Lost data in case of dump error
 --
