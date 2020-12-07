@@ -571,8 +571,8 @@ tuple_compare_slowpath(struct tuple *tuple_a, hint_t tuple_a_hint,
 	bool was_null_met = false;
 	struct tuple_format *format_a = tuple_format(tuple_a);
 	struct tuple_format *format_b = tuple_format(tuple_b);
-	const uint32_t *field_map_a = tuple_field_map(tuple_a);
-	const uint32_t *field_map_b = tuple_field_map(tuple_b);
+	const uint8_t *field_map_a = tuple_field_map(tuple_a);
+	const uint8_t *field_map_b = tuple_field_map(tuple_b);
 	struct key_part *end;
 	const char *field_a, *field_b;
 	enum mp_type a_type, b_type;
@@ -585,22 +585,28 @@ tuple_compare_slowpath(struct tuple *tuple_a, hint_t tuple_a_hint,
 		if (is_multikey) {
 			field_a = tuple_field_raw_by_part(format_a, tuple_a_raw,
 							  field_map_a, part,
-							  (int)tuple_a_hint);
+							  (int)tuple_a_hint,
+							  tuple_is_tiny(tuple_a));
 			field_b = tuple_field_raw_by_part(format_b, tuple_b_raw,
 							  field_map_b, part,
-							  (int)tuple_b_hint);
+							  (int)tuple_b_hint,
+							  tuple_is_tiny(tuple_b));
 		} else if (has_json_paths) {
 			field_a = tuple_field_raw_by_part(format_a, tuple_a_raw,
 							  field_map_a, part,
-							  MULTIKEY_NONE);
+							  MULTIKEY_NONE,
+							  tuple_is_tiny(tuple_a));
 			field_b = tuple_field_raw_by_part(format_b, tuple_b_raw,
 							  field_map_b, part,
-							  MULTIKEY_NONE);
+							  MULTIKEY_NONE,
+							  tuple_is_tiny(tuple_b));
 		} else {
 			field_a = tuple_field_raw(format_a, tuple_a_raw,
-						  field_map_a, part->fieldno);
+						  field_map_a, part->fieldno,
+						  tuple_is_tiny(tuple_a));
 			field_b = tuple_field_raw(format_b, tuple_b_raw,
-						  field_map_b, part->fieldno);
+						  field_map_b, part->fieldno,
+						  tuple_is_tiny(tuple_b));
 		}
 		assert(has_optional_parts ||
 		       (field_a != NULL && field_b != NULL));
@@ -651,22 +657,28 @@ tuple_compare_slowpath(struct tuple *tuple_a, hint_t tuple_a_hint,
 		if (is_multikey) {
 			field_a = tuple_field_raw_by_part(format_a, tuple_a_raw,
 							  field_map_a, part,
-							  (int)tuple_a_hint);
+							  (int)tuple_a_hint,
+							  tuple_is_tiny(tuple_a));
 			field_b = tuple_field_raw_by_part(format_b, tuple_b_raw,
 							  field_map_b, part,
-							  (int)tuple_b_hint);
+							  (int)tuple_b_hint,
+							  tuple_is_tiny(tuple_b));
 		} else if (has_json_paths) {
 			field_a = tuple_field_raw_by_part(format_a, tuple_a_raw,
 							  field_map_a, part,
-							  MULTIKEY_NONE);
+							  MULTIKEY_NONE,
+							  tuple_is_tiny(tuple_a));
 			field_b = tuple_field_raw_by_part(format_b, tuple_b_raw,
 							  field_map_b, part,
-							  MULTIKEY_NONE);
+							  MULTIKEY_NONE,
+							  tuple_is_tiny(tuple_b));
 		} else {
 			field_a = tuple_field_raw(format_a, tuple_a_raw,
-						  field_map_a, part->fieldno);
+						  field_map_a, part->fieldno,
+						  tuple_is_tiny(tuple_a));
 			field_b = tuple_field_raw(format_b, tuple_b_raw,
-						  field_map_b, part->fieldno);
+						  field_map_b, part->fieldno,
+						  tuple_is_tiny(tuple_b));
 		}
 		/*
 		 * Extended parts are primary, and they can not
@@ -703,21 +715,24 @@ tuple_compare_with_key_slowpath(struct tuple *tuple, hint_t tuple_hint,
 	struct key_part *part = key_def->parts;
 	struct tuple_format *format = tuple_format(tuple);
 	const char *tuple_raw = tuple_data(tuple);
-	const uint32_t *field_map = tuple_field_map(tuple);
+	const uint8_t *field_map = tuple_field_map(tuple);
 	enum mp_type a_type, b_type;
 	if (likely(part_count == 1)) {
 		const char *field;
 		if (is_multikey) {
 			field = tuple_field_raw_by_part(format, tuple_raw,
 							field_map, part,
-							(int)tuple_hint);
+							(int)tuple_hint,
+							tuple_is_tiny(tuple));
 		} else if (has_json_paths) {
 			field = tuple_field_raw_by_part(format, tuple_raw,
 							field_map, part,
-							MULTIKEY_NONE);
+							MULTIKEY_NONE,
+							tuple_is_tiny(tuple));
 		} else {
 			field = tuple_field_raw(format, tuple_raw, field_map,
-						part->fieldno);
+						part->fieldno,
+						tuple_is_tiny(tuple));
 		}
 		if (! is_nullable) {
 			return tuple_compare_field(field, key, part->type,
@@ -745,14 +760,16 @@ tuple_compare_with_key_slowpath(struct tuple *tuple, hint_t tuple_hint,
 		if (is_multikey) {
 			field = tuple_field_raw_by_part(format, tuple_raw,
 							field_map, part,
-							(int)tuple_hint);
+							(int)tuple_hint,
+							tuple_is_tiny(tuple));
 		} else if (has_json_paths) {
 			field = tuple_field_raw_by_part(format, tuple_raw,
 							field_map, part,
-							MULTIKEY_NONE);
+							MULTIKEY_NONE,
+							tuple_is_tiny(tuple));
 		} else {
 			field = tuple_field_raw(format, tuple_raw, field_map,
-						part->fieldno);
+						part->fieldno, tuple_is_tiny(tuple));
 		}
 		if (! is_nullable) {
 			rc = tuple_compare_field(field, key, part->type,
@@ -1062,10 +1079,10 @@ struct FieldCompare<IDX, TYPE, IDX2, TYPE2, MORE_TYPES...>
 				return r;
 			field_a = tuple_field_raw(format_a, tuple_data(tuple_a),
 						  tuple_field_map(tuple_a),
-						  IDX2);
+						  IDX2, tuple_is_tiny(tuple_a));
 			field_b = tuple_field_raw(format_b, tuple_data(tuple_b),
 						  tuple_field_map(tuple_b),
-						  IDX2);
+						  IDX2, tuple_is_tiny(tuple_b));
 		}
 		return FieldCompare<IDX2, TYPE2, MORE_TYPES...>::
 			compare(tuple_a, tuple_b, format_a,
@@ -1104,9 +1121,11 @@ struct TupleCompare
 		struct tuple_format *format_b = tuple_format(tuple_b);
 		const char *field_a, *field_b;
 		field_a = tuple_field_raw(format_a, tuple_data(tuple_a),
-					  tuple_field_map(tuple_a), IDX);
+					  tuple_field_map(tuple_a), IDX,
+					  tuple_is_tiny(tuple_a));
 		field_b = tuple_field_raw(format_b, tuple_data(tuple_b),
-					  tuple_field_map(tuple_b), IDX);
+					  tuple_field_map(tuple_b), IDX,
+					  tuple_is_tiny(tuple_b));
 		return FieldCompare<IDX, TYPE, MORE_TYPES...>::
 			compare(tuple_a, tuple_b, format_a,
 				format_b, field_a, field_b);
@@ -1248,7 +1267,8 @@ struct FieldCompareWithKey<FLD_ID, IDX, TYPE, IDX2, TYPE2, MORE_TYPES...>
 			if (r || part_count == FLD_ID + 1)
 				return r;
 			field = tuple_field_raw(format, tuple_data(tuple),
-						tuple_field_map(tuple), IDX2);
+						tuple_field_map(tuple), IDX2,
+						tuple_is_tiny(tuple));
 			mp_next(&key);
 		}
 		return FieldCompareWithKey<FLD_ID + 1, IDX2, TYPE2, MORE_TYPES...>::
@@ -1290,7 +1310,7 @@ struct TupleCompareWithKey
 		struct tuple_format *format = tuple_format(tuple);
 		const char *field = tuple_field_raw(format, tuple_data(tuple),
 						    tuple_field_map(tuple),
-						    IDX);
+						    IDX, tuple_is_tiny(tuple));
 		return FieldCompareWithKey<FLD_ID, IDX, TYPE, MORE_TYPES...>::
 				compare(tuple, key, part_count,
 					key_def, format, field);
@@ -1386,17 +1406,19 @@ func_index_compare(struct tuple *tuple_a, hint_t tuple_a_hint,
 	const char *tuple_b_raw = tuple_data(tuple_b);
 	struct tuple_format *format_a = tuple_format(tuple_a);
 	struct tuple_format *format_b = tuple_format(tuple_b);
-	const uint32_t *field_map_a = tuple_field_map(tuple_a);
-	const uint32_t *field_map_b = tuple_field_map(tuple_b);
+	const uint8_t *field_map_a = tuple_field_map(tuple_a);
+	const uint8_t *field_map_b = tuple_field_map(tuple_b);
 	const char *field_a, *field_b;
 	for (uint32_t i = key_part_count; i < cmp_def->part_count; i++) {
 		struct key_part *part = &cmp_def->parts[i];
 		field_a = tuple_field_raw_by_part(format_a, tuple_a_raw,
 						  field_map_a, part,
-						  MULTIKEY_NONE);
+						  MULTIKEY_NONE,
+						  tuple_is_tiny(tuple_a));
 		field_b = tuple_field_raw_by_part(format_b, tuple_b_raw,
 						  field_map_b, part,
-						  MULTIKEY_NONE);
+						  MULTIKEY_NONE,
+						  tuple_is_tiny(tuple_b));
 		assert(field_a != NULL && field_b != NULL);
 		rc = tuple_compare_field(field_a, field_b, part->type,
 					 part->coll);

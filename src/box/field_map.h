@@ -149,15 +149,17 @@ struct field_map_builder_slot {
  * When a field is not in the data tuple, its offset is 0.
  */
 static inline uint32_t
-field_map_get_offset(const uint32_t *field_map, int32_t offset_slot,
-		     int multikey_idx)
+field_map_get_offset(const uint8_t *field_map, int32_t offset_slot,
+		     int multikey_idx, bool is_tiny)
 {
 	/*
 	 * Can not access field_map as a normal uint32 array
 	 * because its alignment may be < 4 bytes. Need to use
 	 * unaligned store-load operations explicitly.
 	 */
-	uint32_t offset = load_u32(&field_map[offset_slot]);
+	uint32_t offset = is_tiny ? load_u8(&field_map[offset_slot]) :
+				    load_u32(&field_map[offset_slot *
+							sizeof(uint32_t)]);
 	if (multikey_idx != MULTIKEY_NONE && (int32_t)offset < 0) {
 		/**
 		 * The field_map extent has the following
@@ -213,16 +215,18 @@ static inline int
 field_map_builder_set_slot(struct field_map_builder *builder,
 			   int32_t offset_slot, uint32_t offset,
 			   int32_t multikey_idx, uint32_t multikey_count,
-			   struct region *region)
+			   struct region *region, bool *is_tiny)
 {
 	assert(offset_slot < 0);
 	assert((uint32_t)-offset_slot <= builder->slot_count);
 	assert(offset > 0);
 	if (multikey_idx == MULTIKEY_NONE) {
 		builder->slots[offset_slot].offset = offset;
+		*is_tiny = ((*is_tiny) && (offset <= UINT8_MAX));
 	} else {
 		assert(multikey_idx >= 0);
 		assert(multikey_idx < (int32_t)multikey_count);
+		*is_tiny = false;
 		struct field_map_builder_slot_extent *extent;
 		if (builder->slots[offset_slot].has_extent) {
 			extent = builder->slots[offset_slot].extent;
@@ -243,9 +247,10 @@ field_map_builder_set_slot(struct field_map_builder *builder,
  * Calculate the size of tuple field_map to be built.
  */
 static inline uint32_t
-field_map_build_size(struct field_map_builder *builder)
+field_map_build_size(struct field_map_builder *builder, bool is_tiny)
 {
-	return builder->slot_count * sizeof(uint32_t) +
+	return builder->slot_count * is_tiny * sizeof(uint8_t) +
+	       builder->slot_count * !is_tiny * sizeof(uint32_t) +
 	       builder->extents_size;
 }
 
@@ -255,6 +260,6 @@ field_map_build_size(struct field_map_builder *builder)
  * The buffer must have at least field_map_build_size(builder) bytes.
  */
 void
-field_map_build(struct field_map_builder *builder, char *buffer);
+field_map_build(struct field_map_builder *builder, char *buffer, bool is_tiny);
 
 #endif /* TARANTOOL_BOX_FIELD_MAP_H_INCLUDED */
