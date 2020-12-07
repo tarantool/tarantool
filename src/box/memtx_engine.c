@@ -1197,9 +1197,9 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	size_t tuple_len = end - data;
 	bool is_tiny = (tuple_len <= UINT8_MAX);
 	struct field_map_builder builder;
-	if (tuple_field_map_create(format, data, true, &builder) != 0)
+	if (tuple_field_map_create(format, data, true, &builder, &is_tiny) != 0)
 		goto end;
-	uint32_t field_map_size = field_map_build_size(&builder);
+	uint32_t field_map_size = field_map_build_size(&builder, is_tiny);
 	/*
 	 * Data offset is calculated from the begin of the struct
 	 * tuple base, not from memtx_tuple, because the struct
@@ -1207,6 +1207,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	 */
 	is_tiny = (is_tiny && (sizeof(struct tuple) +
 			       field_map_size <= MAX_TINY_DATA_OFFSET));
+	field_map_size = field_map_build_size(&builder, is_tiny);
 	uint32_t extra_size = field_map_size +
 			      !is_tiny * sizeof(struct tuple_extra);
 	uint32_t data_offset = sizeof(struct tuple) + extra_size;
@@ -1251,7 +1252,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	tuple_set_data_offset(tuple, data_offset);
 	tuple_set_dirty_bit(tuple, false);
 	char *raw = (char *) tuple + data_offset;
-	field_map_build(&builder, raw - field_map_size);
+	field_map_build(&builder, raw - field_map_size, is_tiny);
 	memcpy(raw, data, tuple_len);
 	say_debug("%s(%zu) = %p", __func__, tuple_len, memtx_tuple);
 end:

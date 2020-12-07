@@ -345,9 +345,11 @@ vy_stmt_new_with_ops(struct tuple_format *format, const char *tuple_begin,
 	 * with tuple_validate() anyway.
 	 */
 	struct field_map_builder builder;
-	if (tuple_field_map_create(format, tuple_begin, false, &builder) != 0)
+	bool is_tiny = false;
+	if (tuple_field_map_create(format, tuple_begin, false, &builder,
+				   &is_tiny) != 0)
 		goto end;
-	uint32_t field_map_size = field_map_build_size(&builder);
+	uint32_t field_map_size = field_map_build_size(&builder, is_tiny);
 	/*
 	 * Allocate stmt. Offsets: one per key part + offset of the
 	 * statement end.
@@ -361,7 +363,7 @@ vy_stmt_new_with_ops(struct tuple_format *format, const char *tuple_begin,
 	/* Copy MsgPack data */
 	char *raw = (char *) tuple_data(stmt);
 	char *wpos = raw;
-	field_map_build(&builder, wpos - field_map_size);
+	field_map_build(&builder, wpos - field_map_size, is_tiny);
 	memcpy(wpos, tuple_begin, mpsize);
 	wpos += mpsize;
 	for (struct iovec *op = ops, *end = ops + op_count;
@@ -484,11 +486,12 @@ vy_stmt_new_surrogate_delete_raw(struct tuple_format *format,
 					    entry.field->token.len);
 		}
 		/* Initialize field_map with data offset. */
+		bool is_tiny = false;
 		uint32_t offset_slot = entry.field->offset_slot;
 		if (offset_slot != TUPLE_OFFSET_SLOT_NIL &&
 		    field_map_builder_set_slot(&builder, offset_slot,
-					pos - data, entry.multikey_idx,
-					entry.multikey_count, region) != 0)
+				pos - data, entry.multikey_idx,
+				entry.multikey_count, region, &is_tiny) != 0)
 			goto out;
 		/* Copy field data. */
 		if (entry.field->type == FIELD_TYPE_ARRAY) {
@@ -503,8 +506,9 @@ vy_stmt_new_surrogate_delete_raw(struct tuple_format *format,
 	if (entry.data != NULL)
 		goto out;
 	assert(pos <= data + src_size);
+	bool is_tiny = false;
 	uint32_t bsize = pos - data;
-	uint32_t field_map_size = field_map_build_size(&builder);
+	uint32_t field_map_size = field_map_build_size(&builder, is_tiny);
 	stmt = vy_stmt_alloc(format, size_of_struct_vy_stmt() + field_map_size,
 			     bsize);
 	if (stmt == NULL)
@@ -512,7 +516,7 @@ vy_stmt_new_surrogate_delete_raw(struct tuple_format *format,
 	char *stmt_data = (char *) tuple_data(stmt);
 	char *stmt_field_map_begin = stmt_data - field_map_size;
 	memcpy(stmt_data, data, bsize);
-	field_map_build(&builder, stmt_field_map_begin);
+	field_map_build(&builder, stmt_field_map_begin, is_tiny);
 	vy_stmt_set_type(stmt, IPROTO_DELETE);
 	mp_tuple_assert(stmt_data, stmt_data + bsize);
 out:

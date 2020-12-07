@@ -710,11 +710,10 @@ tuple_validate(struct tuple_format *format, struct tuple *tuple)
  * @returns a field map for the tuple.
  * @sa tuple_field_map_create()
  */
-static inline const uint32_t *
+static inline const uint8_t *
 tuple_field_map(struct tuple *tuple)
 {
-	return (const uint32_t *) ((const char *) tuple +
-				   tuple_data_offset(tuple));
+	return (uint8_t *)tuple + tuple_data_offset(tuple);
 }
 
 /**
@@ -791,9 +790,10 @@ tuple_field_go_to_key(const char **field, const char *key, int len);
  */
 static inline const char *
 tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
-			const uint32_t *field_map, uint32_t fieldno,
+			const uint8_t *field_map, uint32_t fieldno,
 			const char *path, uint32_t path_len,
-			int32_t *offset_slot_hint, int multikey_idx)
+			int32_t *offset_slot_hint, int multikey_idx,
+			bool is_tiny)
 {
 	int32_t offset_slot;
 	if (offset_slot_hint != NULL &&
@@ -840,7 +840,7 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 offset_slot_access:
 		/* Indexed field */
 		offset = field_map_get_offset(field_map, offset_slot,
-					      multikey_idx);
+					      multikey_idx, is_tiny);
 		if (offset == 0)
 			return NULL;
 		tuple += offset;
@@ -874,10 +874,10 @@ parse:
  */
 static inline const char *
 tuple_field_raw(struct tuple_format *format, const char *tuple,
-		const uint32_t *field_map, uint32_t field_no)
+		const uint8_t *field_map, uint32_t field_no, bool is_tiny)
 {
 	return tuple_field_raw_by_path(format, tuple, field_map, field_no,
-				       NULL, 0, NULL, MULTIKEY_NONE);
+				       NULL, 0, NULL, MULTIKEY_NONE, is_tiny);
 }
 
 /**
@@ -892,7 +892,8 @@ static inline const char *
 tuple_field(struct tuple *tuple, uint32_t fieldno)
 {
 	return tuple_field_raw(tuple_format(tuple), tuple_data(tuple),
-			       tuple_field_map(tuple), fieldno);
+			       tuple_field_map(tuple), fieldno,
+			       tuple_is_tiny(tuple));
 }
 
 /**
@@ -912,8 +913,9 @@ tuple_field(struct tuple *tuple, uint32_t fieldno)
  */
 const char *
 tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
-			     const uint32_t *field_map, const char *path,
-			     uint32_t path_len, uint32_t path_hash);
+			     const uint8_t *field_map, const char *path,
+			     uint32_t path_len, uint32_t path_hash,
+			     bool is_tiny);
 
 /**
  * Get a tuple field pointed to by an index part and multikey
@@ -927,8 +929,8 @@ tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
  */
 static inline const char *
 tuple_field_raw_by_part(struct tuple_format *format, const char *data,
-			const uint32_t *field_map,
-			struct key_part *part, int multikey_idx)
+			const uint8_t *field_map,
+			struct key_part *part, int multikey_idx, bool is_tiny)
 {
 	if (unlikely(part->format_epoch != format->epoch)) {
 		assert(format->epoch != 0);
@@ -941,7 +943,8 @@ tuple_field_raw_by_part(struct tuple_format *format, const char *data,
 	}
 	return tuple_field_raw_by_path(format, data, field_map, part->fieldno,
 				       part->path, part->path_len,
-				       &part->offset_slot_cache, multikey_idx);
+				       &part->offset_slot_cache, multikey_idx,
+				       is_tiny);
 }
 
 /**
@@ -957,7 +960,7 @@ tuple_field_by_part(struct tuple *tuple, struct key_part *part,
 {
 	return tuple_field_raw_by_part(tuple_format(tuple), tuple_data(tuple),
 				       tuple_field_map(tuple), part,
-				       multikey_idx);
+				       multikey_idx, tuple_is_tiny(tuple));
 }
 
 /**
@@ -971,7 +974,8 @@ tuple_field_by_part(struct tuple *tuple, struct key_part *part,
  */
 uint32_t
 tuple_raw_multikey_count(struct tuple_format *format, const char *data,
-			 const uint32_t *field_map, struct key_def *key_def);
+			 const uint8_t *field_map, struct key_def *key_def,
+			 bool is_tiny);
 
 /**
  * Get count of multikey index keys in tuple by given multikey
@@ -984,7 +988,8 @@ static inline uint32_t
 tuple_multikey_count(struct tuple *tuple, struct key_def *key_def)
 {
 	return tuple_raw_multikey_count(tuple_format(tuple), tuple_data(tuple),
-					tuple_field_map(tuple), key_def);
+					tuple_field_map(tuple), key_def,
+					tuple_is_tiny(tuple));
 }
 
 /**
