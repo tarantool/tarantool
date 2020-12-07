@@ -1311,5 +1311,5 @@ vdbe_field_ref_prepare_tuple(struct vdbe_field_ref *field_ref,
 			     struct tuple *tuple)
 {
 	vdbe_field_ref_create(field_ref, tuple, tuple_data(tuple),
-			      tuple->bsize);
+			      tuple_bsize(tuple));
 }
