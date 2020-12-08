@@ -32,6 +32,7 @@ box.info.status
 -- is not advanced on errors.
 test_run:cmd("restart server replica")
 test_run:cmd("switch replica")
+
 box.space.test:insert{3}
 lsn1 = box.info.vclock[1]
 test_run:cmd("switch default")
@@ -40,7 +41,10 @@ box.space.test:insert{4}
 test_run:cmd("switch replica")
 -- lsn is not promoted
 lsn1 == box.info.vclock[1]
-test_run:wait_upstream(1, {status = 'stopped', message_re = "Duplicate key exists in unique index 'primary' in space 'test'"})
+ok, instance_info = test_run:wait_upstream(1, {status = 'stopped', \
+    message_re = "Duplicate key exists in unique index 'primary' in space 'test'"})
+ok or require('log').error('test_run:wait_upstream failed with instance info: ' \
+    .. require('json').encode(instance_info))
 test_run:cmd("switch default")
 test_run:cmd("restart server replica")
 -- applier is not in follow state
