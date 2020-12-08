@@ -182,7 +182,7 @@ test_run:wait_cond(function()                    \
     return (r ~= nil and box.info.vclock ~= nil and \
             r[master_id] == box.info.vclock[master_id] and \
             r[replica_id] == box.info.vclock[replica_id]) \
-    end) or box.info
+    end) or require('log').error(box.info)
 ---
 - true
 ...

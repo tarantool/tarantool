@@ -10,6 +10,9 @@ fiber = require 'fiber'
 buffer = require 'buffer'
 ---
 ...
+log = require 'log'
+---
+...
 test_run = require('test_run').new()
 ---
 ...
@@ -1553,11 +1556,11 @@ os.setenv('TMPDIR', tmpdir)
 dir = fio.tempdir()
 ---
 ...
-dir:startswith(tmpdir) or {dir, tmpdir}
+dir:startswith(tmpdir) or log.error({dir, tmpdir})
 ---
 - true
 ...
-fio.stat(dir) ~= nil or fio.stat(dir)
+fio.stat(dir) ~= nil or log.error(fio.stat(dir))
 ---
 - true
 ...
