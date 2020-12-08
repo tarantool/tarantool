@@ -34,6 +34,7 @@
 #include "swim_ev.h"
 #include "uri/uri.h"
 #include "fiber.h"
+#include "random.h"
 #include "msgpuck.h"
 #include "assoc.h"
 #include "sio.h"
@@ -187,25 +188,6 @@ enum {
 	 */
 	INDIRECT_PING_COUNT = 2,
 };
-
-/**
- * Return a random number within given boundaries.
- *
- * Instead of blindly calculating a modulo, scale the random
- * number down the given boundaries to preserve the original
- * distribution. The result belongs to range [start, end].
- */
-static inline int
-swim_scaled_rand(int start, int end)
-{
-	assert(end >= start);
-	/*
-	 * RAND_MAX is likely to be INT_MAX - hardly SWIM will
-	 * ever be used in such a huge cluster.
-	 */
-	assert(end - start < RAND_MAX);
-	return rand() / (RAND_MAX / (end - start + 1) + 1);
-}
 
 /** Calculate UUID hash to use as a member table key. */
 static inline uint32_t
@@ -980,7 +962,7 @@ swim_shuffle_members(struct swim *swim)
 	for (mh_int_t node = mh_first(members), end = mh_end(members);
 	     node != end; node = mh_next(members, node), ++i) {
 		swim->shuffled[i] = *mh_swim_table_node(members, node);
-		int j = swim_scaled_rand(0, i);
+		int j = pseudo_random_in_range(0, i);
 		SWAP(swim->shuffled[i], swim->shuffled[j]);
 	}
 }
@@ -1069,7 +1051,7 @@ swim_encode_anti_entropy(struct swim *swim, struct swim_packet *packet)
 	swim_member_payload_bin_create(&payload_header);
 	struct mh_swim_table_t *t = swim->members;
 	int i = 0, member_count = mh_size(t);
-	int rnd = swim_scaled_rand(0, member_count - 1);
+	int rnd = pseudo_random_in_range(0, member_count - 1);
 	for (mh_int_t rc = mh_swim_table_random(t, rnd), end = mh_end(t);
 	     i < member_count; ++i) {
 		struct swim_member *m = *mh_swim_table_node(t, rc);
@@ -1380,7 +1362,7 @@ swim_send_indirect_pings(struct swim *swim, const struct swim_member *dst)
 {
 	struct mh_swim_table_t *t = swim->members;
 	int member_count = mh_size(t);
-	int rnd = swim_scaled_rand(0, member_count - 1);
+	int rnd = pseudo_random_in_range(0, member_count - 1);
 	mh_int_t rc = mh_swim_table_random(t, rnd), end = mh_end(t);
 	for (int member_i = 0, task_i = 0; member_i < member_count &&
 	     task_i < INDIRECT_PING_COUNT; ++member_i) {
