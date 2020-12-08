@@ -876,6 +876,7 @@ swim_run_test(const char *log_file, fiber_func test)
 	 * same seed.
 	 */
 	say_info("Random seed = %llu", (unsigned long long) seed);
+	say_info("xoshiro random state = %s", xoshiro_state_str());
 
 	struct fiber *main_fiber = fiber_new("main", test);
 	fiber_set_joinable(main_fiber, true);
