@@ -3,6 +3,7 @@ engine = test_run:get_cfg('engine')
 replica_set = require('fast_replica')
 fiber = require('fiber')
 fio = require('fio')
+log = require('log')
 
 test_run:cleanup_cluster()
 test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
@@ -69,8 +70,8 @@ test_run:cmd("switch default")
 
 -- Check that garbage collection removed the snapshot once
 -- the replica released the corresponding checkpoint.
-wait_gc(1) or box.info.gc()
-wait_xlog(1) or fio.listdir('./master') -- Make sure the replica will not receive data until
+wait_gc(1) or log.error(box.info.gc())
+wait_xlog(1) or log.error(fio.listdir('./master')) -- Make sure the replica will not receive data until
 -- we test garbage collection.
 box.error.injection.set("ERRINJ_RELAY_SEND_DELAY", true)
 
@@ -86,8 +87,8 @@ box.snapshot()
 -- Invoke garbage collection. Check that it doesn't remove
 -- xlogs needed by the replica.
 box.snapshot()
-wait_gc(1) or box.info.gc()
-wait_xlog(2) or fio.listdir('./master')
+wait_gc(1) or log.error(box.info.gc())
+wait_xlog(2) or log.error(fio.listdir('./master'))
 
 -- Resume replication so that the replica catches
 -- up quickly.
@@ -101,8 +102,8 @@ test_run:cmd("switch default")
 
 -- Now garbage collection should resume and delete files left
 -- from the old checkpoint.
-wait_gc(1) or box.info.gc()
-wait_xlog(0) or fio.listdir('./master')
+wait_gc(1) or log.error(box.info.gc())
+wait_xlog(0) or log.error(fio.listdir('./master'))
 --
 -- Check that the master doesn't delete xlog files sent to the
 -- replica until it receives a confirmation that the data has
@@ -120,8 +121,8 @@ fiber.sleep(0.1) -- wait for master to relay data
 -- Garbage collection must not delete the old xlog file
 -- because it is still needed by the replica, but remove
 -- the old snapshot.
-wait_gc(1) or box.info.gc()
-wait_xlog(2) or fio.listdir('./master')
+wait_gc(1) or log.error(box.info.gc())
+wait_xlog(2) or log.error(fio.listdir('./master'))
 -- Imitate the replica crash and, then, wake up.
 -- Just 'stop server replica' (SIGTERM) is not sufficient to stop
 -- a tarantool instance when ERRINJ_WAL_DELAY is set, because
@@ -134,8 +135,8 @@ test_run:wait_cond(function() return box.space.test:count() == 310 end, 10)
 box.space.test:count()
 test_run:cmd("switch default")
 -- Now it's safe to drop the old xlog.
-wait_gc(1) or box.info.gc()
-wait_xlog(1) or fio.listdir('./master')
+wait_gc(1) or log.error(box.info.gc())
+wait_xlog(1) or log.error(fio.listdir('./master'))
 -- Stop the replica.
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
@@ -149,14 +150,14 @@ _ = s:auto_increment{}
 box.snapshot()
 _ = s:auto_increment{}
 box.snapshot()
-wait_gc(1) or box.info.gc()
-wait_xlog(2) or fio.listdir('./master')
+wait_gc(1) or log.error(box.info.gc())
+wait_xlog(2) or log.error(fio.listdir('./master'))
 
 -- The xlog should only be deleted after the replica
 -- is unregistered.
 test_run:cleanup_cluster()
-wait_gc(1) or box.info.gc()
-wait_xlog(1) or fio.listdir('./master')
+wait_gc(1) or log.error(box.info.gc())
+wait_xlog(1) or log.error(fio.listdir('./master'))
 --
 -- Test that concurrent invocation of the garbage collector works fine.
 --
@@ -195,13 +196,13 @@ _ = s:auto_increment{}
 box.snapshot()
 _ = s:auto_increment{}
 box.snapshot()
-wait_xlog(3) or fio.listdir('./master')
+wait_xlog(3) or log.error(fio.listdir('./master'))
 
 -- Delete the replica from the cluster table and check that
 -- all xlog files are removed.
 test_run:cleanup_cluster()
 box.snapshot()
-wait_xlog(0, 10) or fio.listdir('./master')
+wait_xlog(0, 10) or log.error(fio.listdir('./master'))
 
 -- Restore the config.
 box.cfg{replication = {}}

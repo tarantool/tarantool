@@ -13,6 +13,9 @@ fiber = require('fiber')
 fio = require('fio')
 ---
 ...
+log = require('log')
+---
+...
 test_run:cleanup_cluster()
 ---
 ...
@@ -131,11 +134,11 @@ test_run:cmd("switch default")
 ...
 -- Check that garbage collection removed the snapshot once
 -- the replica released the corresponding checkpoint.
-wait_gc(1) or box.info.gc()
+wait_gc(1) or log.error(box.info.gc())
 ---
 - true
 ...
-wait_xlog(1) or fio.listdir('./master') -- Make sure the replica will not receive data until
+wait_xlog(1) or log.error(fio.listdir('./master')) -- Make sure the replica will not receive data until
 ---
 - true
 ...
@@ -168,11 +171,11 @@ box.snapshot()
 ---
 - ok
 ...
-wait_gc(1) or box.info.gc()
+wait_gc(1) or log.error(box.info.gc())
 ---
 - true
 ...
-wait_xlog(2) or fio.listdir('./master')
+wait_xlog(2) or log.error(fio.listdir('./master'))
 ---
 - true
 ...
@@ -201,11 +204,11 @@ test_run:cmd("switch default")
 ...
 -- Now garbage collection should resume and delete files left
 -- from the old checkpoint.
-wait_gc(1) or box.info.gc()
+wait_gc(1) or log.error(box.info.gc())
 ---
 - true
 ...
-wait_xlog(0) or fio.listdir('./master')
+wait_xlog(0) or log.error(fio.listdir('./master'))
 ---
 - true
 ...
@@ -244,11 +247,11 @@ fiber.sleep(0.1) -- wait for master to relay data
 -- Garbage collection must not delete the old xlog file
 -- because it is still needed by the replica, but remove
 -- the old snapshot.
-wait_gc(1) or box.info.gc()
+wait_gc(1) or log.error(box.info.gc())
 ---
 - true
 ...
-wait_xlog(2) or fio.listdir('./master')
+wait_xlog(2) or log.error(fio.listdir('./master'))
 ---
 - true
 ...
@@ -282,11 +285,11 @@ test_run:cmd("switch default")
 - true
 ...
 -- Now it's safe to drop the old xlog.
-wait_gc(1) or box.info.gc()
+wait_gc(1) or log.error(box.info.gc())
 ---
 - true
 ...
-wait_xlog(1) or fio.listdir('./master')
+wait_xlog(1) or log.error(fio.listdir('./master'))
 ---
 - true
 ...
@@ -318,11 +321,11 @@ box.snapshot()
 ---
 - ok
 ...
-wait_gc(1) or box.info.gc()
+wait_gc(1) or log.error(box.info.gc())
 ---
 - true
 ...
-wait_xlog(2) or fio.listdir('./master')
+wait_xlog(2) or log.error(fio.listdir('./master'))
 ---
 - true
 ...
@@ -331,11 +334,11 @@ wait_xlog(2) or fio.listdir('./master')
 test_run:cleanup_cluster()
 ---
 ...
-wait_gc(1) or box.info.gc()
+wait_gc(1) or log.error(box.info.gc())
 ---
 - true
 ...
-wait_xlog(1) or fio.listdir('./master')
+wait_xlog(1) or log.error(fio.listdir('./master'))
 ---
 - true
 ...
@@ -423,7 +426,7 @@ box.snapshot()
 ---
 - ok
 ...
-wait_xlog(3) or fio.listdir('./master')
+wait_xlog(3) or log.error(fio.listdir('./master'))
 ---
 - true
 ...
@@ -436,7 +439,7 @@ box.snapshot()
 ---
 - ok
 ...
-wait_xlog(0, 10) or fio.listdir('./master')
+wait_xlog(0, 10) or log.error(fio.listdir('./master'))
 ---
 - true
 ...
