@@ -5,6 +5,7 @@
 #include "memory.h"
 #include "unit.h"
 #include "trivia/util.h"
+#include "core/random.h"
 
 static int
 int64_cmp(const void *p1, const void *p2)
@@ -44,13 +45,6 @@ gen_rand_data(size_t *p_len)
 		data[i] = rand() % 10000;
 	*p_len = len;
 	return data;
-}
-
-static int64_t
-gen_rand_value(int64_t min, int64_t max)
-{
-	assert(max >= min);
-	return min + rand() % (max - min + 1);
 }
 
 static void
@@ -97,7 +91,7 @@ test_discard(void)
 
 	struct histogram *hist = histogram_new(buckets, n_buckets);
 
-	size_t bucket_sz = gen_rand_value(2, 10);
+	size_t bucket_sz = pseudo_random_in_range(2, 10);
 	size_t data_len = (n_buckets + 1) * bucket_sz;
 	int64_t *data = calloc(data_len, sizeof(*data));
 
@@ -105,7 +99,7 @@ test_discard(void)
 		int64_t min = (b == 0 ? INT64_MIN : buckets[b - 1] + 1);
 		int64_t max = (b == n_buckets ? INT64_MAX : buckets[b]);
 		for (size_t i = 0; i < bucket_sz; i++)
-			data[b * bucket_sz + i] = gen_rand_value(min, max);
+			data[b * bucket_sz + i] = pseudo_random_in_range(min, max);
 	}
 
 	for (size_t i = 0; i < data_len; i++)

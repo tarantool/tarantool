@@ -1,0 +1,59 @@
+1..14
+	*** test_random_in_range ***
+    1..2
+    ok 1 - pseudo random is in range -9223372036854775808 9223372036854775807
+    ok 2 - real random is in range -9223372036854775808 9223372036854775807
+ok 1 - subtests
+    1..2
+    ok 1 - pseudo random is in range -9223372036854775808 -9223372036854775808
+    ok 2 - real random is in range -9223372036854775808 -9223372036854775808
+ok 2 - subtests
+    1..2
+    ok 1 - pseudo random is in range 9223372036854775807 9223372036854775807
+    ok 2 - real random is in range 9223372036854775807 9223372036854775807
+ok 3 - subtests
+    1..2
+    ok 1 - pseudo random is in range -1 -1
+    ok 2 - real random is in range -1 -1
+ok 4 - subtests
+    1..2
+    ok 1 - pseudo random is in range 0 0
+    ok 2 - real random is in range 0 0
+ok 5 - subtests
+    1..2
+    ok 1 - pseudo random is in range 1 1
+    ok 2 - real random is in range 1 1
+ok 6 - subtests
+    1..2
+    ok 1 - pseudo random is in range -9223372036854775807 9223372036854775806
+    ok 2 - real random is in range -9223372036854775807 9223372036854775806
+ok 7 - subtests
+    1..2
+    ok 1 - pseudo random is in range -4611686018427387904 4611686018427387903
+    ok 2 - real random is in range -4611686018427387904 4611686018427387903
+ok 8 - subtests
+    1..2
+    ok 1 - pseudo random is in range -9223372036854775808 -4611686018427387904
+    ok 2 - real random is in range -9223372036854775808 -4611686018427387904
+ok 9 - subtests
+    1..2
+    ok 1 - pseudo random is in range 4611686018427387903 9223372036854775807
+    ok 2 - real random is in range 4611686018427387903 9223372036854775807
+ok 10 - subtests
+    1..2
+    ok 1 - pseudo random is in range -2 -1
+    ok 2 - real random is in range -2 -1
+ok 11 - subtests
+    1..2
+    ok 1 - pseudo random is in range 1 2
+    ok 2 - real random is in range 1 2
+ok 12 - subtests
+    1..2
+    ok 1 - pseudo random is in range -1 1
+    ok 2 - real random is in range -1 1
+ok 13 - subtests
+    1..2
+    ok 1 - pseudo random is in range 0 1
+    ok 2 - real random is in range 0 1
+ok 14 - subtests
+	*** test_random_in_range: done ***
