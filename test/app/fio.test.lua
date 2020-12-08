@@ -2,6 +2,7 @@ fio = require 'fio'
 ffi = require 'ffi'
 fiber = require 'fiber'
 buffer = require 'buffer'
+log = require 'log'
 test_run = require('test_run').new()
 -- umask
 
@@ -508,8 +509,8 @@ tmpdir = cwd..'/tmp-.dot.-'
 fio.mkdir(tmpdir)
 os.setenv('TMPDIR', tmpdir)
 dir = fio.tempdir()
-dir:startswith(tmpdir) or {dir, tmpdir}
-fio.stat(dir) ~= nil or fio.stat(dir)
+dir:startswith(tmpdir) or log.error({dir, tmpdir})
+fio.stat(dir) ~= nil or log.error(fio.stat(dir))
 
 tmpdir = cwd..'/tmp2'
 os.setenv('TMPDIR', tmpdir)
