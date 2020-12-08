@@ -569,6 +569,7 @@ run_script_f(va_list ap)
 	 * never really dead. It never returns from its function.
 	 */
 	struct diag *diag = va_arg(ap, struct diag *);
+	bool aux_loop_is_run = false;
 
 	/*
 	 * Load libraries and execute chunks passed by -l and -e
@@ -611,6 +612,7 @@ run_script_f(va_list ap)
 	 * loop and re-schedule this fiber.
 	 */
 	fiber_sleep(0.0);
+	aux_loop_is_run = true;
 
 	if (path && strcmp(path, "-") != 0 && access(path, F_OK) == 0) {
 		/* Execute script. */
@@ -650,6 +652,13 @@ run_script_f(va_list ap)
 	 * return control back to tarantool_lua_run_script.
 	 */
 end:
+	/*
+	 * Auxiliary loop in tarantool_lua_run_script
+	 * should start (ev_run()) before this fiber
+	 * invokes ev_break().
+	 */
+	if (!aux_loop_is_run)
+		fiber_sleep(0.0);
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 
