@@ -1194,6 +1194,8 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	struct tuple *tuple = NULL;
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
+	size_t tuple_len = end - data;
+	bool is_tiny = (tuple_len <= UINT8_MAX);
 	struct field_map_builder builder;
 	if (tuple_field_map_create(format, data, true, &builder) != 0)
 		goto end;
@@ -1203,7 +1205,12 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	 * tuple base, not from memtx_tuple, because the struct
 	 * tuple is not the first field of the memtx_tuple.
 	 */
-	uint32_t data_offset = sizeof(struct tuple) + field_map_size;
+	is_tiny = (is_tiny && (sizeof(struct tuple) +
+			       field_map_size <= MAX_TINY_DATA_OFFSET));
+	uint32_t extra_size = field_map_size +
+			      !is_tiny * sizeof(struct tuple_extra);
+	uint32_t data_offset = sizeof(struct tuple) + extra_size;
+	assert(!is_tiny || data_offset <= MAX_TINY_DATA_OFFSET);
 	if (data_offset > INT16_MAX) {
 		/** tuple data_offset can't be more than 15 bits */
 		diag_set(ClientError, ER_TUPLE_METADATA_IS_TOO_BIG,
@@ -1211,8 +1218,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 		goto end;
 	}
 
-	size_t tuple_len = end - data;
-	size_t total = sizeof(struct memtx_tuple) + field_map_size + tuple_len;
+	size_t total = sizeof(struct memtx_tuple) + tuple_len + extra_size;
 
 	ERROR_INJECT(ERRINJ_TUPLE_ALLOC, {
 		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
@@ -1238,6 +1244,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	tuple = &memtx_tuple->base;
 	tuple->refs = 0;
 	memtx_tuple->version = memtx->snapshot_version;
+	tuple_set_tiny_bit(tuple, is_tiny);
 	tuple_set_bsize(tuple, tuple_len);
 	tuple->format_id = tuple_format_id(format);
 	tuple_format_ref(format);
