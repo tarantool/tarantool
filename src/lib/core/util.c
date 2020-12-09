@@ -250,6 +250,20 @@ int2str(long long int val)
 	return buf;
 }
 
+#ifndef HAVE_STRLCPY
+size_t
+strlcpy(char *dst, const char *src, size_t size)
+{
+	size_t src_len = strlen(src);
+	if (size != 0) {
+		size_t len = (src_len >= size) ? size - 1 : src_len;
+		memcpy(dst, src, len);
+		dst[len] = '\0';
+	}
+	return src_len;
+}
+#endif
+
 int
 utf8_check_printable(const char *start, size_t length)
 {

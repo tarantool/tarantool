@@ -126,6 +126,7 @@ set(CMAKE_REQUIRED_LIBRARIES "")
 check_function_exists(clock_gettime HAVE_CLOCK_GETTIME_WITHOUT_RT)
 
 check_symbol_exists(__get_cpuid cpuid.h HAVE_CPUID)
+check_symbol_exists(strlcpy string.h HAVE_STRLCPY)
 
 # Checks for libev
 include(CheckStructHasMember)
