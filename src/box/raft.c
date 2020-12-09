@@ -89,9 +89,14 @@ box_raft_update_synchro_queue(struct raft *raft)
 	 * If the node became a leader, it means it will ignore all records from
 	 * all the other nodes, and won't get late CONFIRM messages anyway. Can
 	 * clear the queue without waiting for confirmations.
+	 * It's alright that the user may have called clear_synchro_queue
+	 * manually. In this case the call below will exit immediately and we'll
+	 * simply log a warning.
 	 */
-	if (raft->state == RAFT_STATE_LEADER)
-		box_clear_synchro_queue(false);
+	if (raft->state == RAFT_STATE_LEADER) {
+		if (box_clear_synchro_queue(false) != 0)
+			diag_log();
+	}
 }
 
 static int

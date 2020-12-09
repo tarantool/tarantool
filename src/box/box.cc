@@ -1134,15 +1134,24 @@ box_set_replication_anon(void)
 
 }
 
-void
+int
 box_clear_synchro_queue(bool try_wait)
 {
+	/* A guard to block multiple simultaneous function invocations. */
+	static bool in_clear_synchro_queue = false;
+	if (in_clear_synchro_queue) {
+		diag_set(ClientError, ER_UNSUPPORTED, "clear_synchro_queue",
+			 "simultaneous invocations");
+		return -1;
+	}
 	if (!is_box_configured || txn_limbo_is_empty(&txn_limbo))
-		return;
+		return 0;
 	uint32_t former_leader_id = txn_limbo.owner_id;
 	assert(former_leader_id != REPLICA_ID_NIL);
 	if (former_leader_id == instance_id)
-		return;
+		return 0;
+
+	in_clear_synchro_queue = true;
 
 	if (try_wait) {
 		/* Wait until pending confirmations/rollbacks reach us. */
@@ -1183,6 +1192,9 @@ box_clear_synchro_queue(bool try_wait)
 		txn_limbo_force_empty(&txn_limbo, confirm_lsn);
 		assert(txn_limbo_is_empty(&txn_limbo));
 	}
+
+	in_clear_synchro_queue = false;
+	return 0;
 }
 
 void
