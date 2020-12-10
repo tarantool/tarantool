@@ -1135,6 +1135,107 @@ box_set_replication_anon(void)
 
 }
 
+/** Trigger to catch ACKs from all nodes when need to wait for quorum. */
+struct box_quorum_trigger {
+	/** Inherit trigger. */
+	struct trigger base;
+	/** Minimal number of nodes who should confirm the target LSN. */
+	int quorum;
+	/** Target LSN to wait for. */
+	int64_t target_lsn;
+	/** Replica ID whose LSN is being waited. */
+	uint32_t replica_id;
+	/**
+	 * All versions of the given replica's LSN as seen by other nodes. The
+	 * same as in the txn limbo.
+	 */
+	struct vclock vclock;
+	/** Number of nodes who confirmed the LSN. */
+	int ack_count;
+	/** Fiber to wakeup when quorum is reached. */
+	struct fiber *waiter;
+};
+
+static int
+box_quorum_on_ack_f(struct trigger *trigger, void *event)
+{
+	struct replication_ack *ack = (struct replication_ack *)event;
+	struct box_quorum_trigger *t = (struct box_quorum_trigger *)trigger;
+	int64_t new_lsn = vclock_get(ack->vclock, t->replica_id);
+	int64_t old_lsn = vclock_get(&t->vclock, ack->source);
+	if (new_lsn < t->target_lsn || old_lsn >= t->target_lsn)
+		return 0;
+
+	vclock_follow(&t->vclock, ack->source, new_lsn);
+	++t->ack_count;
+	if (t->ack_count >= t->quorum) {
+		fiber_wakeup(t->waiter);
+		trigger_clear(trigger);
+	}
+	return 0;
+}
+
+/**
+ * Wait until at least @a quorum of nodes confirm @a target_lsn from the node
+ * with id @a lead_id.
+ */
+static int
+box_wait_quorum(uint32_t lead_id, int64_t target_lsn, int quorum,
+		double timeout)
+{
+	struct box_quorum_trigger t;
+	memset(&t, 0, sizeof(t));
+	vclock_create(&t.vclock);
+
+	/* Take this node into account immediately. */
+	int ack_count = vclock_get(box_vclock, lead_id) >= target_lsn;
+	replicaset_foreach(replica) {
+		if (relay_get_state(replica->relay) != RELAY_FOLLOW ||
+		    replica->anon)
+			continue;
+
+		assert(replica->id != REPLICA_ID_NIL);
+		assert(!tt_uuid_is_equal(&INSTANCE_UUID, &replica->uuid));
+
+		int64_t lsn = vclock_get(relay_vclock(replica->relay), lead_id);
+		vclock_follow(&t.vclock, replica->id, lsn);
+		if (lsn >= target_lsn) {
+			ack_count++;
+			continue;
+		}
+	}
+	if (ack_count < quorum) {
+		t.quorum = quorum;
+		t.target_lsn = target_lsn;
+		t.replica_id = lead_id;
+		t.ack_count = ack_count;
+		t.waiter = fiber();
+		trigger_create(&t.base, box_quorum_on_ack_f, NULL, NULL);
+		trigger_add(&replicaset.on_ack, &t.base);
+		fiber_sleep(timeout);
+		trigger_clear(&t.base);
+		ack_count = t.ack_count;
+	}
+	/*
+	 * No point to proceed after cancellation even if got the quorum. The
+	 * quorum is waited by limbo clear function. Emptying the limbo involves
+	 * a pair of blocking WAL writes, making the fiber sleep even longer,
+	 * which isn't appropriate when it's canceled.
+	 */
+	if (fiber_is_cancelled()) {
+		diag_set(ClientError, ER_QUORUM_WAIT, quorum,
+			 "fiber is canceled");
+		return -1;
+	}
+	if (ack_count < quorum) {
+		diag_set(ClientError, ER_QUORUM_WAIT, quorum, tt_sprintf(
+			 "timeout after %.2lf seconds, collected %d acks",
+			 timeout, ack_count, quorum));
+		return -1;
+	}
+	return 0;
+}
+
 int
 box_clear_synchro_queue(bool try_wait)
 {
@@ -1145,6 +1246,10 @@ box_clear_synchro_queue(bool try_wait)
 			 "simultaneous invocations");
 		return -1;
 	}
+	/*
+	 * XXX: we may want to write confirm + rollback even when the limbo is
+	 * empty for the sake of limbo ownership transition.
+	 */
 	if (!is_box_configured || txn_limbo_is_empty(&txn_limbo))
 		return 0;
 	uint32_t former_leader_id = txn_limbo.owner_id;
@@ -1163,39 +1268,44 @@ box_clear_synchro_queue(bool try_wait)
 				break;
 			fiber_sleep(0.001);
 		}
+		/*
+		 * Our mission was to clear the limbo from former leader's
+		 * transactions. Exit in case someone did that for us.
+		 */
+		if (txn_limbo_is_empty(&txn_limbo) ||
+		    former_leader_id != txn_limbo.owner_id) {
+			in_clear_synchro_queue = false;
+			return 0;
+		}
 	}
 
-	if (!txn_limbo_is_empty(&txn_limbo)) {
-		int64_t lsns[VCLOCK_MAX];
-		int len = 0;
-		const struct vclock  *vclock;
-		replicaset_foreach(replica) {
-			if (replica->relay != NULL &&
-			    relay_get_state(replica->relay) != RELAY_OFF &&
-			    !replica->anon) {
-				assert(!tt_uuid_is_equal(&INSTANCE_UUID,
-							 &replica->uuid));
-				vclock = relay_vclock(replica->relay);
-				int64_t lsn = vclock_get(vclock,
-							 former_leader_id);
-				lsns[len++] = lsn;
-			}
-		}
-		lsns[len++] = vclock_get(box_vclock, former_leader_id);
-		assert(len < VCLOCK_MAX);
+	/*
+	 * clear_synchro_queue() is a no-op on the limbo owner, so all the rows
+	 * in the limbo must've come through the applier meaning they already
+	 * have an lsn assigned, even if their WAL write hasn't finished yet.
+	 */
+	int64_t wait_lsn = txn_limbo_last_synchro_entry(&txn_limbo)->lsn;
+	assert(wait_lsn > 0);
 
-		int64_t confirm_lsn = 0;
-		if (len >= replication_synchro_quorum) {
-			qsort(lsns, len, sizeof(int64_t), cmp_i64);
-			confirm_lsn = lsns[len - replication_synchro_quorum];
+	int quorum = replication_synchro_quorum;
+	int rc = box_wait_quorum(former_leader_id, wait_lsn, quorum,
+				 replication_synchro_timeout);
+	if (rc == 0) {
+		if (quorum < replication_synchro_quorum) {
+			diag_set(ClientError, ER_QUORUM_WAIT, quorum,
+				 "quorum was increased while waiting");
+			rc = -1;
+		} else if (wait_lsn < txn_limbo_last_synchro_entry(&txn_limbo)->lsn) {
+			diag_set(ClientError, ER_QUORUM_WAIT, quorum,
+				 "new synchronous transactions appeared");
+			rc = -1;
+		} else {
+			txn_limbo_force_empty(&txn_limbo, wait_lsn);
+			assert(txn_limbo_is_empty(&txn_limbo));
 		}
-
-		txn_limbo_force_empty(&txn_limbo, confirm_lsn);
-		assert(txn_limbo_is_empty(&txn_limbo));
 	}
-
 	in_clear_synchro_queue = false;
-	return 0;
+	return rc;
 }
 
 void
