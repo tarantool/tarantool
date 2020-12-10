@@ -38,4 +38,3 @@ print("")
 
 # missing tuple from removed xlog
 server.admin("box.space.test:select{}")
-

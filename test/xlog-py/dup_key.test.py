@@ -3,10 +3,8 @@ from __future__ import print_function
 import os
 import yaml
 
-#print """
-#A test case for https://bugs.launchpad.net/tarantool/+bug/1052018
-#panic_on_wal_error doesn't work for duplicate key errors
-#"""
+# A test case for https://bugs.launchpad.net/tarantool/+bug/1052018
+# panic_on_wal_error doesn't work for duplicate key errors
 
 server.stop()
 server.deploy()
@@ -53,4 +51,3 @@ print("")
 server.admin("box.space.test:get{1}")
 server.admin("box.space.test:get{2}")
 server.admin("box.space.test:len()")
-
