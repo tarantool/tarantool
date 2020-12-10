@@ -40,7 +40,7 @@ s.close()
 # response map at the top level, but have the same codes as other
 # IPROTO_* constants. Exclude those names so.
 key_names = {}
-for (k,v) in globals().items():
+for (k,v) in list(globals().items()):
     if type(k) == str and k.startswith("IPROTO_") and \
             not k.startswith("IPROTO_SQL_INFO_") and type(v) == int:
         key_names[v] = k
