@@ -94,8 +94,17 @@ box_raft_update_synchro_queue(struct raft *raft)
 	 * simply log a warning.
 	 */
 	if (raft->state == RAFT_STATE_LEADER) {
-		if (box_clear_synchro_queue(false) != 0)
-			diag_log();
+		int rc = 0;
+		uint32_t errcode = 0;
+		do {
+			rc = box_clear_synchro_queue(false);
+			if (rc != 0) {
+				struct error *err = diag_last_error(diag_get());
+				errcode = box_error_code(err);
+				diag_log();
+			}
+		} while (rc != 0 && errcode == ER_QUORUM_WAIT &&
+		       !fiber_is_cancelled());
 	}
 }
 
