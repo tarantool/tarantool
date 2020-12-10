@@ -30,9 +30,9 @@ access_fields(struct tuple *tuple)
 	int sum = 0;
 	sum += tuple->refs;
 	sum += tuple->format_id;
-	sum += tuple->bsize;
-	sum += tuple->data_offset;
-	sum += tuple->is_dirty;
+	sum += tuple_bsize(tuple);
+	sum += tuple_data_offset(tuple);
+	sum += tuple_is_dirty(tuple);
 	return sum;
 }
 
