@@ -21,7 +21,7 @@ master.admin("for k = 1, 9 do space:insert{k, k*k} end")
 
 replica = TarantoolServer(server.ini)
 replica.script = "replication-py/replica.lua"
-replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
+replica.vardir = server.vardir
 replica.rpl_master = master
 replica.deploy()
 replica.admin("box.space.test:select()")
@@ -42,7 +42,7 @@ lsn = master.get_lsn(master_id)
 
 replica = TarantoolServer(server.ini)
 replica.script = "replication-py/replica.lua"
-replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
+replica.vardir = server.vardir
 replica.rpl_master = master
 replica.deploy()
 
@@ -61,7 +61,7 @@ print("-------------------------------------------------------------")
 server.stop()
 replica = TarantoolServer(server.ini)
 replica.script = "replication-py/replica.lua"
-replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
+replica.vardir = server.vardir
 replica.rpl_master = master
 replica.deploy(wait=False)
 

@@ -45,7 +45,7 @@ os.putenv("MASTER", master.uri)
 # replica server
 replica = TarantoolServer()
 replica.script = "replication-py/replica.lua"
-replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
+replica.vardir = server.vardir
 replica.deploy()
 replica.admin("while box.info.id == 0 do require('fiber').sleep(0.01) end")
 replica.uri = "{}:{}@{}".format(LOGIN, PASSWORD, replica.iproto.uri)
@@ -55,13 +55,6 @@ replica.iproto.py_con.authenticate(LOGIN, PASSWORD)
 for engine in engines:
     master.admin("s = box.schema.space.create('{}', {{ engine = '{}'}})".format(engine, engine))
     master.admin("index = s:create_index('primary', {type = 'tree'})")
-
-### gh-343: replica.cc must not add login and password to proc title
-#status = replica.get_param("status")
-#host_port = "%s:%s" % master.iproto.uri
-#m = re.search(r'replica/(.*)/.*', status)
-#if not m or m.group(1) != host_port:
-#    print 'invalid box.info.status', status, 'expected host:port', host_port
 
 master_id = master.get_param("id")
 replica_id = replica.get_param("id")
