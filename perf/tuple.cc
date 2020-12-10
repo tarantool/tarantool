@@ -10,6 +10,8 @@ size_t amount;
 char **start;
 char **end;
 struct tuple **tuples;
+struct tuple **basic_tuples;
+struct tuple **tiny_tuples;
 
 static void
 create_tuple(benchmark::State& state)
@@ -20,6 +22,10 @@ create_tuple(benchmark::State& state)
 						start[i % amount],
 						end[i % amount]);
 		tuples[i++ % amount] = tuple;
+		if (tuple_is_tiny(tuple))
+			tiny_tuples[it++ % amount] = tuple;
+		else
+			basic_tuples[ib++ % amount] = tuple;
 	}
 }
 BENCHMARK(create_tuple);
@@ -33,6 +39,7 @@ access_fields(struct tuple *tuple)
 	sum += tuple_bsize(tuple);
 	sum += tuple_data_offset(tuple);
 	sum += tuple_is_dirty(tuple);
+	sum += tuple_is_tiny(tuple);
 	return sum;
 }
 
@@ -48,6 +55,32 @@ access_tuple_fields(benchmark::State& state)
 	assert(sum > 0);
 }
 BENCHMARK(access_tuple_fields);
+
+static void
+access_tiny_tuple_fields(benchmark::State& state)
+{
+	size_t i = 0;
+	int64_t sum = 0;
+	for (auto _ : state) {
+		struct tuple *tuple = tiny_tuples[i++ % amount];
+		sum += access_fields(tuple);
+	}
+	assert(sum > 0);
+}
+BENCHMARK(access_tiny_tuple_fields);
+
+static void
+access_basic_tuple_fields(benchmark::State& state)
+{
+	size_t i = 0;
+	int64_t sum = 0;
+	for (auto _ : state) {
+		struct tuple *tuple = basic_tuples[i++ % amount];
+		sum += access_fields(tuple);
+	}
+	assert(sum > 0);
+}
+BENCHMARK(access_basic_tuple_fields);
 
 static inline int
 access_data(struct tuple *tuple)
@@ -72,6 +105,32 @@ access_tuple_data(benchmark::State& state)
 }
 BENCHMARK(access_tuple_data);
 
+static void
+access_tiny_tuple_data(benchmark::State& state)
+{
+	size_t i = 0;
+	int64_t sum = 0;
+	for (auto _ : state) {
+		struct tuple *tuple = tiny_tuples[i++ % amount];
+		access_data(tuple);
+	}
+	assert(sum == 0);
+}
+BENCHMARK(access_tiny_tuple_data);
+
+static void
+access_basic_tuple_data(benchmark::State& state)
+{
+	size_t i = 0;
+	int64_t sum = 0;
+	for (auto _ : state) {
+		struct tuple *tuple = basic_tuples[i++ % amount];
+		access_data(tuple);
+	}
+	assert(sum == 0);
+}
+BENCHMARK(access_basic_tuple_data);
+
 int main(int argc, char **argv)
 {
 	memory_init();
@@ -95,6 +154,8 @@ int main(int argc, char **argv)
 	}
 
 	tuples = (struct tuple **)calloc(amount, sizeof(struct tuple *));
+	basic_tuples = (struct tuple **)calloc(amount, sizeof(struct tuple *));
+	tiny_tuples = (struct tuple **)calloc(amount, sizeof(struct tuple *));
 
 	::benchmark::Initialize(&argc, argv);
 	if (::benchmark::ReportUnrecognizedArguments(argc, argv)) return 1;
@@ -108,6 +169,8 @@ int main(int argc, char **argv)
 		tuple_ref(tuple);
 		tuple_unref(tuple);
 	}
+	free(tiny_tuples);
+	free(basic_tuples);
 	free(tuples);
 
 	tuple_free();

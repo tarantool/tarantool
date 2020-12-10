@@ -296,6 +296,64 @@ box_tuple_validate(box_tuple_t *tuple, box_tuple_format_t *format);
 
 /** \endcond public */
 
+#define MAX_TINY_DATA_OFFSET 63
+
+/** Part of struct tuple. */
+struct tiny_tuple_props {
+	/**
+	 * Tuple is tiny in case it's bsize fits in 1 byte,
+	 * it's data_offset fits in 6 bits and field map
+	 * offsets fit into 1 byte each.
+	 */
+	bool is_tiny : 1;
+	/**
+	 * The tuple (if it's found in index for example) could be invisible
+	 * for current transactions. The flag means that the tuple must
+	 * be clarified by the transaction engine.
+	 */
+	bool is_dirty : 1;
+	/**
+	 * Offset to the MessagePack from the beginning of the
+	 * tuple. 6 bits in case tuple is tiny.
+	 */
+	uint8_t data_offset : 6;
+	/**
+	 * Length of the MessagePack data in raw part of the
+	 * tuple. 8 bits in case tuple is tiny.
+	 */
+	uint8_t bsize;
+};
+
+/** Part of struct tuple. */
+struct tuple_props {
+	/**
+	 * Tuple is tiny in case it's bsize fits in 1 byte,
+	 * it's data_offset fits in 6 bits and field map
+	 * offsets fit into 1 byte each.
+	 */
+	bool is_tiny : 1;
+	/**
+	 * Offset to the MessagePack from the beginning of the
+	 * tuple. 15 bits in case tuple is not tiny.
+	 */
+	uint16_t data_offset: 15;
+};
+
+/** Part of struct tuple. */
+struct PACKED tuple_extra {
+	/**
+	 * The tuple (if it's found in index for example) could be invisible
+	 * for current transactions. The flag means that the tuple must
+	 * be clarified by the transaction engine.
+	 */
+	bool is_dirty : 1;
+	/**
+	 * Length of the MessagePack data in raw part of the
+	 * tuple. 31 bits in case tuple is not tiny.
+	 */
+	uint32_t bsize : 31;
+};
+
 /**
  * An atom of Tarantool storage. Represents MsgPack Array.
  * Tuple has the following structure:
@@ -323,20 +381,40 @@ struct PACKED tuple
 	/** Format identifier. */
 	uint16_t format_id;
 	/**
-	 * Length of the MessagePack data in raw part of the
-	 * tuple.
+	 * Both structs in the following union contain is_tiny bit
+	 * as the first field. It is guaranteed it will be the same
+	 * for both of them in any case. Tuple is tiny in case it's
+	 * bsize fits in 1 byte, it's data_offset fits in 6 bits and
+	 * field map offsets fit into 1 byte each. In case it is tiny
+	 * we will obtain data_offset, bsize and is_dirty flag from the
+	 * struct tiny_tuple_props. Otherwise we will obtain data_offset
+	 * from struct tuple_props, while bsize and is_dirty flag will be
+	 * stored in struct tuple_extra (4 bytes at the end of the tuple).
 	 */
-	uint32_t bsize;
+	union {
+		/**
+		 * In case the tuple is tiny this struct is used to obtain
+		 * data_offset (offset to the MessagePack from the beginning
+		 * of the tuple), bsize (the length of the MessagePack data
+		 * in the raw part of the tuple) and is_dirty flag (true if
+		 * the tuple must be clarified by transaction engine).
+		 */
+		struct tiny_tuple_props tiny_props;
+		/**
+		 * In case the tuple is not tiny this struct is used to obtain
+		 * data_offset (offset to the MessagePack from the beginning of
+		 * the tuple).
+		 */
+		struct tuple_props props;
+	};
 	/**
-	 * Offset to the MessagePack from the begin of the tuple.
+	 * In case the tuple is not tiny this struct contains is_dirty
+	 * flag (true if the tuple must be clarified by transaction
+	 * engine) and bsize (the length of the MessagePack data
+	 * in the raw part of the tuple).
+	 * If the tuple is tiny, this fields is 0 bytes.
 	 */
-	uint16_t data_offset : 15;
-	/**
-	 * The tuple (if it's found in index for example) could be invisible
-	 * for current transactions. The flag means that the tuple must
-	 * be clarified by transaction engine.
-	 */
-	bool is_dirty : 1;
+	struct tuple_extra extra[];
 	/**
 	 * Engine specific fields and offsets array concatenated
 	 * with MessagePack fields array.
@@ -345,46 +423,103 @@ struct PACKED tuple
 };
 
 static inline void
+tuple_set_tiny_bit(struct tuple *tuple, bool is_tiny)
+{
+	assert(tuple != NULL);
+	tuple->props.is_tiny = is_tiny;
+}
+
+static inline bool
+tuple_is_tiny(struct tuple *tuple)
+{
+	assert(tuple != NULL);
+	return tuple->props.is_tiny;
+}
+
+static inline void
+tiny_tuple_set_dirty_bit(struct tuple *tuple, bool is_dirty)
+{
+	tuple->tiny_props.is_dirty = is_dirty;
+}
+
+static inline void
+basic_tuple_set_dirty_bit(struct tuple *tuple, bool is_dirty)
+{
+	tuple->extra->is_dirty = is_dirty;
+}
+
+static inline void
 tuple_set_dirty_bit(struct tuple *tuple, bool is_dirty)
 {
 	assert(tuple != NULL);
-	tuple->is_dirty = is_dirty;
+	tuple->props.is_tiny ? tiny_tuple_set_dirty_bit(tuple, is_dirty) :
+			       basic_tuple_set_dirty_bit(tuple, is_dirty);
 }
 
 static inline bool
 tuple_is_dirty(struct tuple *tuple)
 {
 	assert(tuple != NULL);
-	return tuple->is_dirty;
+	return tuple->props.is_tiny ? tuple->tiny_props.is_dirty :
+				      tuple->extra->is_dirty;
+}
+
+static inline void
+tiny_tuple_set_bsize(struct tuple *tuple, uint32_t bsize)
+{
+	assert(bsize <= UINT8_MAX); /* bsize has to fit in UINT8_MAX */
+	tuple->tiny_props.bsize = bsize;
+}
+
+static inline void
+basic_tuple_set_bsize(struct tuple *tuple, uint32_t bsize)
+{
+	assert(bsize <= INT32_MAX); /* bsize has to fit in INT32_MAX */
+	tuple->extra->bsize = bsize;
 }
 
 static inline void
 tuple_set_bsize(struct tuple *tuple, uint32_t bsize)
 {
 	assert(tuple != NULL);
-	assert(bsize <= UINT32_MAX); /* bsize is UINT32_MAX */
-	tuple->bsize = bsize;
+	tuple->props.is_tiny ? tiny_tuple_set_bsize(tuple, bsize) :
+			       basic_tuple_set_bsize(tuple, bsize);
 }
 
 static inline uint32_t
 tuple_bsize(struct tuple *tuple)
 {
 	assert(tuple != NULL);
-	return tuple->bsize;
+	return tuple->props.is_tiny ? tuple->tiny_props.bsize :
+				      tuple->extra->bsize;
+}
+
+static inline void
+tiny_tuple_set_data_offset(struct tuple *tuple, uint8_t data_offset)
+{
+	tuple->tiny_props.data_offset = data_offset;
+}
+
+static inline void
+basic_tuple_set_data_offset(struct tuple *tuple, uint16_t data_offset)
+{
+	tuple->props.data_offset = data_offset;
 }
 
 static inline void
 tuple_set_data_offset(struct tuple *tuple, uint16_t data_offset)
 {
 	assert(tuple != NULL);
-	tuple->data_offset = data_offset;
+	tuple->props.is_tiny ? tiny_tuple_set_data_offset(tuple, data_offset) :
+			       basic_tuple_set_data_offset(tuple, data_offset);
 }
 
 static inline uint16_t
 tuple_data_offset(struct tuple *tuple)
 {
 	assert(tuple != NULL);
-	return tuple->data_offset;
+	return tuple->props.is_tiny ? tuple->tiny_props.data_offset :
+				      tuple->props.data_offset;
 }
 
 /** Size of the tuple including size of struct tuple. */

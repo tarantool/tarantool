@@ -49,7 +49,7 @@ s:count()
 ...
 box.stat.vinyl().memory.level0
 ---
-- 748248
+- 748232
 ...
 -- Since the following operation requires more memory than configured
 -- and dump is disabled, it should fail with ER_VY_QUOTA_TIMEOUT.
@@ -63,7 +63,7 @@ s:count()
 ...
 box.stat.vinyl().memory.level0
 ---
-- 748248
+- 748232
 ...
 --
 -- Check that increasing box.cfg.vinyl_memory wakes up fibers
@@ -135,7 +135,7 @@ test_run:cmd("push filter '[0-9.]+ sec' to '<sec> sec'")
 ...
 test_run:grep_log('test', 'waited for .* quota for too long.*')
 ---
-- 'waited for 1048615 bytes of vinyl memory quota for too long: <sec> sec'
+- 'waited for 1048603 bytes of vinyl memory quota for too long: <sec> sec'
 ...
 test_run:cmd("clear filter")
 ---
@@ -167,7 +167,7 @@ pad = string.rep('x', box.cfg.vinyl_memory)
 ...
 _ = s:auto_increment{pad}
 ---
-- error: Failed to allocate 1572903 bytes in lsregion for vinyl transaction
+- error: Failed to allocate 1572891 bytes in lsregion for vinyl transaction
 ...
 s:drop()
 ---
