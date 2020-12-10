@@ -37,7 +37,7 @@ print(iproto.py_con.ping() > 0)
 s.close()
 
 key_names = {}
-for (k,v) in globals().items():
+for (k,v) in list(globals().items()):
     if type(k) == str and k.startswith("IPROTO_") and type(v) == int:
         key_names[v] = k
 
