@@ -19,6 +19,8 @@ jobs:
       - uses: actions/checkout@v1
       - name: test
         run: ${CI_MAKE} test_coverage_debian_no_deps
+        env:
+          COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
       - name: artifacts
         uses: actions/upload-artifact@v2
         if: failure()
