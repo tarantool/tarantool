@@ -236,8 +236,9 @@ test_oos_build:
 #######
 
 # since Python 2 is EOL it's latest commit from tapped local formula is used
-OSX_PKGS=openssl readline curl icu4c libiconv zlib autoconf automake libtool \
-	cmake file://$${PWD}/tools/brew_taps/tntpython2.rb
+OSX_PKGS_MIN=openssl readline curl icu4c libiconv zlib autoconf automake libtool \
+	cmake
+OSX_PKGS=${OSX_PKGS_MIN} file://$${PWD}/tools/brew_taps/tntpython2.rb
 
 deps_osx:
 	# install brew using command from Homebrew repository instructions:
@@ -250,6 +251,12 @@ deps_osx:
 	# try to install the packages either upgrade it to avoid of fails
 	# if the package already exists with the previous version
 	brew install --force ${OSX_PKGS} || brew upgrade ${OSX_PKGS}
+	pip install --force-reinstall -r test-run/requirements.txt
+
+deps_osx_github_actions:
+	# try to install the packages either upgrade it to avoid of fails
+	# if the package already exists with the previous version
+	brew install --force ${OSX_PKGS_MIN} || brew upgrade ${OSX_PKGS_MIN}
 	pip install --force-reinstall -r test-run/requirements.txt
 
 build_osx:
@@ -281,6 +288,8 @@ test_osx_no_deps: build_osx
 	cd test && ./test-run.py --vardir ${OSX_VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_osx: deps_osx test_osx_no_deps
+
+test_osx_github_actions: deps_osx_github_actions test_osx_no_deps
 
 # Static macOS build
 
