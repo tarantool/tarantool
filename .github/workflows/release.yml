@@ -1,0 +1,28 @@
+name: CI
+
+on: [push, pull_request]
+
+env:
+  CI_MAKE: make -f .travis.mk
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+
+    # image built by .gitlab.mk instructions and targets from .travis.mk
+    container: docker.io/tarantool/testing:debian-stretch
+
+    steps:
+      - uses: actions/checkout@v1
+      - name: test
+        run: ${CI_MAKE} test_debian_no_deps
+      - name: artifacts
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: release
+          retention-days: 1000000
+          path: test/var/artifacts
