@@ -641,7 +641,8 @@ lbox_tuple_field_by_path(struct lua_State *L)
 					     tuple_data(tuple),
 					     tuple_field_map(tuple),
 					     path, (uint32_t)len,
-					     lua_hashstring(L, 2));
+					     lua_hashstring(L, 2),
+					     tuple_is_tiny(tuple));
 	if (field == NULL)
 		return 0;
 	luamp_decode(L, luaL_msgpack_default, &field);

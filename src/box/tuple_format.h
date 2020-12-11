@@ -427,7 +427,8 @@ box_tuple_format_unref(box_tuple_format_t *format);
  */
 int
 tuple_field_map_create(struct tuple_format *format, const char *tuple,
-		       bool validate, struct field_map_builder *builder);
+		       bool validate, struct field_map_builder *builder,
+		       bool *is_tiny);
 
 /**
  * Initialize tuple format subsystem.

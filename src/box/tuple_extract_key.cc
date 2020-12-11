@@ -126,7 +126,7 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 	uint32_t part_count = key_def->part_count;
 	uint32_t bsize = mp_sizeof_array(part_count);
 	struct tuple_format *format = tuple_format(tuple);
-	const uint32_t *field_map = tuple_field_map(tuple);
+	const uint8_t *field_map = tuple_field_map(tuple);
 	const char *tuple_end = data + tuple_bsize(tuple);
 
 	/* Calculate the key size. */
@@ -134,15 +134,18 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 		const char *field;
 		if (!has_json_paths) {
 			field = tuple_field_raw(format, data, field_map,
-						key_def->parts[i].fieldno);
+						key_def->parts[i].fieldno,
+						tuple_is_tiny(tuple));
 		} else if (!is_multikey) {
 			field = tuple_field_raw_by_part(format, data, field_map,
 							&key_def->parts[i],
-							MULTIKEY_NONE);
+							MULTIKEY_NONE,
+							tuple_is_tiny(tuple));
 		} else {
 			field = tuple_field_raw_by_part(format, data, field_map,
 							&key_def->parts[i],
-							multikey_idx);
+							multikey_idx,
+							tuple_is_tiny(tuple));
 		}
 		if (has_optional_parts && field == NULL) {
 			bsize += mp_sizeof_nil();
@@ -186,15 +189,18 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 		const char *field;
 		if (!has_json_paths) {
 			field = tuple_field_raw(format, data, field_map,
-						key_def->parts[i].fieldno);
+						key_def->parts[i].fieldno,
+						tuple_is_tiny(tuple));
 		} else if (!is_multikey) {
 			field = tuple_field_raw_by_part(format, data, field_map,
 							&key_def->parts[i],
-							MULTIKEY_NONE);
+							MULTIKEY_NONE,
+							tuple_is_tiny(tuple));
 		} else {
 			field = tuple_field_raw_by_part(format, data, field_map,
 							&key_def->parts[i],
-							multikey_idx);
+							multikey_idx,
+							tuple_is_tiny(tuple));
 		}
 		if (has_optional_parts && field == NULL) {
 			key_buf = mp_encode_nil(key_buf);
@@ -464,12 +470,13 @@ tuple_key_contains_null(struct tuple *tuple, struct key_def *def,
 {
 	struct tuple_format *format = tuple_format(tuple);
 	const char *data = tuple_data(tuple);
-	const uint32_t *field_map = tuple_field_map(tuple);
+	const uint8_t *field_map = tuple_field_map(tuple);
 	for (struct key_part *part = def->parts, *end = part + def->part_count;
 	     part < end; ++part) {
 		const char *field = tuple_field_raw_by_part(format, data,
 							    field_map, part,
-							    multikey_idx);
+							    multikey_idx,
+							    tuple_is_tiny(tuple));
 		if (field == NULL || mp_typeof(*field) == MP_NIL)
 			return true;
 	}
