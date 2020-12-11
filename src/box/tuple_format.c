@@ -859,7 +859,8 @@ tuple_format_required_fields_validate(struct tuple_format *format,
 
 static int
 tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
-			     bool validate, struct field_map_builder *builder)
+			     bool validate, struct field_map_builder *builder,
+			     bool *is_tiny)
 {
 	struct region *region = &fiber()->gc;
 	const char *pos = tuple;
@@ -906,7 +907,7 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 		if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL &&
 		    field_map_builder_set_slot(builder, field->offset_slot,
 					       pos - tuple, MULTIKEY_NONE,
-					       0, NULL) != 0) {
+					       0, NULL, is_tiny) != 0) {
 			return -1;
 		}
 	}
@@ -922,7 +923,8 @@ end:
 /** @sa declaration for details. */
 int
 tuple_field_map_create(struct tuple_format *format, const char *tuple,
-		       bool validate, struct field_map_builder *builder)
+		       bool validate, struct field_map_builder *builder,
+		       bool *is_tiny)
 {
 	struct region *region = &fiber()->gc;
 	if (field_map_builder_create(builder, format->field_map_size,
@@ -937,7 +939,7 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 	 */
 	if (format->fields_depth == 1) {
 		return tuple_field_map_create_plain(format, tuple, validate,
-						    builder);
+						    builder, is_tiny);
 	}
 
 	uint32_t field_count;
@@ -954,7 +956,8 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 		if (entry.field->offset_slot != TUPLE_OFFSET_SLOT_NIL &&
 		    field_map_builder_set_slot(builder, entry.field->offset_slot,
 					entry.data - tuple, entry.multikey_idx,
-					entry.multikey_count, region) != 0)
+					entry.multikey_count, region,
+					is_tiny) != 0)
 			return -1;
 	}
 	return entry.data == NULL ? 0 : -1;
