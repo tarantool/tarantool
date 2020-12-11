@@ -140,11 +140,14 @@ test_coverage_debian_no_deps: build_coverage_debian
 	lcov --compat-libtool --remove coverage.info.tmp 'tests/*' 'third_party/*' '/usr/*' \
 		--rc lcov_branch_coverage=1 --rc lcov_function_coverage=1 --output-file coverage.info
 	lcov --list coverage.info
+	# coveralls API: https://docs.coveralls.io/api-reference
 	@if [ -n "$(COVERALLS_TOKEN)" ]; then \
 		echo "Exporting code coverage information to coveralls.io"; \
 		gem install coveralls-lcov; \
-		echo coveralls-lcov --service-name travis-ci --service-job-id $(TRAVIS_JOB_ID) --repo-token [FILTERED] coverage.info; \
-		coveralls-lcov --service-name travis-ci --service-job-id $(TRAVIS_JOB_ID) --repo-token $(COVERALLS_TOKEN) coverage.info; \
+		echo coveralls-lcov --service-name github-ci --service-job-id $(GITHUB_RUN_ID) \
+			--repo-token [FILTERED] coverage.info; \
+		coveralls-lcov --service-name github-ci --service-job-id $(GITHUB_RUN_ID) \
+			--repo-token $(COVERALLS_TOKEN) coverage.info; \
 	fi;
 
 coverage_debian: deps_debian test_coverage_debian_no_deps
