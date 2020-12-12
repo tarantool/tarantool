@@ -182,11 +182,16 @@ ok 9 - subtests
 ok 10 - subtests
 	*** raft_test_election_quorum: done ***
 	*** raft_test_death_timeout ***
-    1..4
+    1..9
     ok 1 - leader notification
     ok 2 - follow the leader
     ok 3 - the leader still is considered alive
     ok 4 - enter candidate state when the new death timeout expires
+    ok 5 - message from leader
+    ok 6 - leader is accepted
+    ok 7 - became follower
+    ok 8 - death is detected immediately
+    ok 9 - enter candidate state
 ok 11 - subtests
 	*** raft_test_death_timeout: done ***
 	*** raft_test_enable_disable ***
