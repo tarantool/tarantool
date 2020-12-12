@@ -85,6 +85,7 @@ enum raft_state {
 	RAFT_STATE_CANDIDATE = 2,
 	/** Election was successful. The node accepts write requests. */
 	RAFT_STATE_LEADER = 3,
+	raft_state_MAX,
 };
 
 /**
