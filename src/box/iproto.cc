@@ -1379,13 +1379,14 @@ tx_process_destroy(struct cmsg *m)
 {
 	struct iproto_connection *con =
 		container_of(m, struct iproto_connection, destroy_msg);
+	assert(con->state == IPROTO_CONNECTION_DESTROYED);
 	if (con->session) {
 		session_destroy(con->session);
 		con->session = NULL; /* safety */
 	}
 	/*
-	 * Got to be done in iproto thread since
-	 * that's where the memory is allocated.
+	 * obuf is being destroyed in tx thread cause it is where
+	 * it was allocated.
 	 */
 	obuf_destroy(&con->obuf[0]);
 	obuf_destroy(&con->obuf[1]);
