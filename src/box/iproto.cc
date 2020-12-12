@@ -565,6 +565,7 @@ iproto_msg_new(struct iproto_connection *con)
 			 "connection %s", sio_socketname(con->input.fd));
 		return NULL;
 	}
+	msg->close_connection = false;
 	msg->connection = con;
 	rmean_collect(rmean_net, IPROTO_REQUESTS, 1);
 	return msg;
@@ -2040,7 +2041,6 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 	cmsg_init(&msg->base, connect_route);
 	msg->p_ibuf = con->p_ibuf;
 	msg->wpos = con->wpos;
-	msg->close_connection = false;
 	cpipe_push(&tx_pipe, &msg->base);
 	return 0;
 }
