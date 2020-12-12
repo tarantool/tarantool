@@ -181,6 +181,8 @@ fakeev_timer_event_delete(struct fakeev_event *e)
 {
 	assert(e->type == FAKEEV_EVENT_TIMER);
 	struct fakeev_timer_event *te = (struct fakeev_timer_event *)e;
+	assert(te->watcher->active == 1);
+	te->watcher->active = 0;
 	mh_int_t rc = mh_i64ptr_find(events_hash, (uint64_t) te->watcher, NULL);
 	assert(rc != mh_end(events_hash));
 	mh_i64ptr_del(events_hash, rc, NULL);
@@ -209,6 +211,8 @@ fakeev_timer_event_process(struct fakeev_event *e, struct ev_loop *loop)
 static void
 fakeev_timer_event_new(struct ev_watcher *watcher, double delay)
 {
+	assert(watcher->active == 0);
+	watcher->active = 1;
 	struct fakeev_timer_event *e = malloc(sizeof(*e));
 	assert(e != NULL);
 	fakeev_event_create(&e->base, FAKEEV_EVENT_TIMER, delay,
