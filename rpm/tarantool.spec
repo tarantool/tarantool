@@ -108,6 +108,8 @@ BuildRequires: python-gevent >= 1.0
 BuildRequires: python-yaml >= 3.0.9
 %endif
 %endif
+# Install prove to run LuaJIT tests.
+BuildRequires: perl-Test-Harness
 
 Name: tarantool
 # ${major}.${major}.${minor}.${patch}, e.g. 1.6.8.175
