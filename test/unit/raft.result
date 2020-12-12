@@ -45,7 +45,7 @@ ok 1 - subtests
 ok 2 - subtests
 	*** raft_test_recovery: done ***
 	*** raft_test_bad_msg ***
-    1..7
+    1..9
     ok 1 - state can't be 0
     ok 2 - term from the bad message wasn't used
     ok 3 - node can't be a candidate but vote for another node
@@ -53,6 +53,8 @@ ok 2 - subtests
     ok 5 - node can't be a candidate without vclock
     ok 6 - term from the bad message wasn't used
     ok 7 - term can't be 0
+    ok 8 - bad state
+    ok 9 - term from the bad message wasn't used
 ok 3 - subtests
 	*** raft_test_bad_msg: done ***
 	*** raft_test_vote ***
