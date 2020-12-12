@@ -282,6 +282,16 @@ fakeev_timer_start(struct ev_loop *loop, struct ev_timer *base)
 	fakeev_timer_event_new((struct ev_watcher *)base, base->at);
 }
 
+double
+fakeev_timer_remaining(struct ev_loop *loop, struct ev_timer *base)
+{
+	(void)loop;
+	struct fakeev_event *e = fakeev_event_by_ev((struct ev_watcher *)base);
+	if (e == NULL)
+		return base->at;
+	return e->deadline - fakeev_time();
+}
+
 void
 fakeev_timer_again(struct ev_loop *loop, struct ev_timer *base)
 {

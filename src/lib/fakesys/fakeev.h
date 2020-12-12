@@ -99,6 +99,10 @@ fakeev_loop(void);
 void
 fakeev_timer_start(struct ev_loop *loop, struct ev_timer *base);
 
+/** Emulator of raft_ev_timer_remaining(). */
+double
+fakeev_timer_remaining(struct ev_loop *loop, struct ev_timer *base);
+
 /** Emulator of ev_timer_again(). */
 void
 fakeev_timer_again(struct ev_loop *loop, struct ev_timer *base);
