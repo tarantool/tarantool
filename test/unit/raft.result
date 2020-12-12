@@ -1,0 +1,213 @@
+	*** main_f ***
+1..13
+	*** raft_test_leader_election ***
+    1..24
+    ok 1 - 1 pending message at start
+    ok 2 - trigger worked
+    ok 3 - broadcast at start
+    ok 4 - next event is leader death
+    ok 5 - elections with a new term
+    ok 6 - single vote for self
+    ok 7 - trigger worked
+    ok 8 - 1 record in the journal
+    ok 9 - term and vote are on disk
+    ok 10 - 1 pending message
+    ok 11 - vote request is sent
+    ok 12 - vote response from 2
+    ok 13 - 2 votes - 1 self and 1 foreign
+    ok 14 - no work to do - not enough votes yet
+    ok 15 - still candidate, waiting for elections
+    ok 16 - trigger is the same
+    ok 17 - vote response from 3
+    ok 18 - 2 votes - 1 self and 2 foreign
+    ok 19 - became leader
+    ok 20 - trigger worked
+    ok 21 - no work - broadcast should be done
+    ok 22 - no new rows in the journal - state change is not persisted
+    ok 23 - 1 pending message
+    ok 24 - sent new-leader notification
+ok 1 - subtests
+	*** raft_test_leader_election: done ***
+	*** raft_test_recovery ***
+    1..12
+    ok 1 - became candidate
+    ok 2 - remote checkpoint of a candidate
+    ok 3 - local checkpoint of a candidate
+    ok 4 - vote response from 2
+    ok 5 - vote response from 3
+    ok 6 - became leader
+    ok 7 - election is finished
+    ok 8 - remote checkpoint of a leader
+    ok 9 - local checkpoint of a leader
+    ok 10 - restart always as a follower
+    ok 11 - remote checkpoint of a leader
+    ok 12 - local checkpoint of a leader
+ok 2 - subtests
+	*** raft_test_recovery: done ***
+	*** raft_test_bad_msg ***
+    1..6
+    ok 1 - state can't be 0
+    ok 2 - term from the bad message wasn't used
+    ok 3 - node can't be a candidate but vote for another node
+    ok 4 - term from the bad message wasn't used
+    ok 5 - node can't be a candidate without vclock
+    ok 6 - term from the bad message wasn't used
+ok 3 - subtests
+	*** raft_test_bad_msg: done ***
+	*** raft_test_vote ***
+    1..6
+    ok 1 - vote request from 2
+    ok 2 - voted for 2
+    ok 3 - vote request from 3
+    ok 4 - still kept vote for 2
+    ok 5 - election timeout passed
+    ok 6 - became candidate
+ok 4 - subtests
+	*** raft_test_vote: done ***
+	*** raft_test_vote_skip ***
+    1..39
+    ok 1 - became candidate
+    ok 2 - term is bumped
+    ok 3 - message is accepted
+    ok 4 - but ignored - too old term
+    ok 5 - message is accepted
+    ok 6 - but ignored - vote not for this node
+    ok 7 - this node does not give up
+    ok 8 - message is accepted
+    ok 9 - term bump to be able to vote again
+    ok 10 - message is accepted
+    ok 11 - but ignored - node is disabled
+    ok 12 - message is accepted
+    ok 13 - term is bumped, but vote request is ignored
+    ok 14 - message is accepted
+    ok 15 - but ignored - vote works only on a candidate
+    ok 16 - message is accepted
+    ok 17 - but ignored - sender != vote, so it is not a request
+    ok 18 - message is accepted
+    ok 19 - leader is accepted
+    ok 20 - message is accepted
+    ok 21 - but ignored - leader is already known
+    ok 22 - leader is not changed
+    ok 23 - vclock is bumped
+    ok 24 - message is accepted
+    ok 25 - but ignored - vclock is too small
+    ok 26 - new term
+    ok 27 - leader is dropped in the new term
+    ok 28 - message is accepted
+    ok 29 - but ignored - vclock is incomparable
+    ok 30 - message is accepted
+    ok 31 - voted
+    ok 32 - message is accepted
+    ok 33 - but ignored - already voted in the term
+    ok 34 - message is accepted
+    ok 35 - but ignored - already voted in the term
+    ok 36 - became candidate
+    ok 37 - term is bumped
+    ok 38 - message is accepted
+    ok 39 - term is bumped and became candidate
+ok 5 - subtests
+	*** raft_test_vote_skip: done ***
+	*** raft_test_leader_resign ***
+    1..15
+    ok 1 - message is accepted
+    ok 2 - leader is elected
+    ok 3 - message is accepted
+    ok 4 - leader has resigned
+    ok 5 - became candidate
+    ok 6 - message is accepted
+    ok 7 - leader is elected
+    ok 8 - message is accepted
+    ok 9 - leader has resigned
+    ok 10 - still follower
+    ok 11 - vote from 2
+    ok 12 - vote from 3
+    ok 13 - became leader
+    ok 14 - the leader has resigned
+    ok 15 - resign notification is sent
+ok 6 - subtests
+	*** raft_test_leader_resign: done ***
+	*** raft_test_split_brain ***
+    1..4
+    ok 1 - first leader notification
+    ok 2 - leader is found
+    ok 3 - second leader notification
+    ok 4 - split brain, the old leader is kept
+ok 7 - subtests
+	*** raft_test_split_brain: done ***
+	*** raft_test_heartbeat ***
+    1..12
+    ok 1 - leader notification
+    ok 2 - follow the leader after notification
+    ok 3 - leader notification
+    ok 4 - follow the leader because no candidate
+    ok 5 - follow the leader because had heartbeats
+    ok 6 - death timeout passed
+    ok 7 - enter candidate state when no heartbeats from the leader
+    ok 8 - vote from 2
+    ok 9 - vote from 3
+    ok 10 - became leader
+    ok 11 - message from leader
+    ok 12 - nothing changed - waiting for WAL write
+ok 8 - subtests
+	*** raft_test_heartbeat: done ***
+	*** raft_test_election_timeout ***
+    1..11
+    ok 1 - election is started
+    ok 2 - enter candidate state
+    ok 3 - new election is started
+    ok 4 - but not too late
+    ok 5 - re-enter candidate state
+    ok 6 - still in the same term - new election timeout didn't expire
+    ok 7 - new election timeout is respected
+    ok 8 - but not too late
+    ok 9 - re-enter candidate state
+    ok 10 - term is bumped, timeout was truly random
+    ok 11 - still candidate
+ok 9 - subtests
+	*** raft_test_election_timeout: done ***
+	*** raft_test_election_quorum ***
+    1..7
+    ok 1 - enter candidate state
+    ok 2 - still candidate
+    ok 3 - send vote response from second node
+    ok 4 - vote is accepted
+    ok 5 - but still candidate
+    ok 6 - enter leader state after another quorum lowering
+    ok 7 - became leader again immediately with 1 self vote
+ok 10 - subtests
+	*** raft_test_election_quorum: done ***
+	*** raft_test_death_timeout ***
+    1..4
+    ok 1 - leader notification
+    ok 2 - follow the leader
+    ok 3 - the leader still is considered alive
+    ok 4 - enter candidate state when the new death timeout expires
+ok 11 - subtests
+	*** raft_test_death_timeout: done ***
+	*** raft_test_enable_disable ***
+    1..10
+    ok 1 - accepted a leader notification
+    ok 2 - leader is seen
+    ok 3 - death timeout passed
+    ok 4 - became candidate
+    ok 5 - nothing changed
+    ok 6 - vote from 2
+    ok 7 - vote from 3
+    ok 8 - became leader
+    ok 9 - resigned from leader state
+    ok 10 - nothing changed
+ok 12 - subtests
+	*** raft_test_enable_disable: done ***
+	*** raft_test_too_long_wal_write ***
+    1..8
+    ok 1 - vote for 2
+    ok 2 - vote is volatile
+    ok 3 - message from leader
+    ok 4 - leader is known
+    ok 5 - nothing changed
+    ok 6 - wal write is finished
+    ok 7 - timer works again
+    ok 8 - became candidate
+ok 13 - subtests
+	*** raft_test_too_long_wal_write: done ***
+	*** main_f: done ***
