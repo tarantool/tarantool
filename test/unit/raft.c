@@ -1020,7 +1020,7 @@ raft_test_election_quorum(void)
 static void
 raft_test_death_timeout(void)
 {
-	raft_start_test(4);
+	raft_start_test(9);
 	struct raft_node node;
 	raft_node_create(&node);
 
@@ -1066,6 +1066,30 @@ raft_test_death_timeout(void)
 		1 /* Volatile vote. */,
 		"{0: 2}" /* Vclock. */
 	), "enter candidate state when the new death timeout expires");
+
+	/* Decrease timeout to earlier than now. */
+
+	is(raft_node_send_leader(&node,
+		3 /* Term. */,
+		2 /* Source. */
+	), 0, "message from leader");
+	is(node.raft.leader, 2, "leader is accepted");
+	is(node.raft.state, RAFT_STATE_FOLLOWER, "became follower");
+
+	raft_run_for(timeout / 2);
+	raft_node_cfg_death_timeout(&node, timeout / 4);
+	double ts = raft_time();
+	raft_run_next_event();
+	ok(raft_time() == ts, "death is detected immediately");
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_CANDIDATE /* State. */,
+		0 /* Leader. */,
+		4 /* Term. */,
+		1 /* Vote. */,
+		4 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 3}" /* Vclock. */
+	), "enter candidate state");
 
 	raft_node_destroy(&node);
 	raft_finish_test();
