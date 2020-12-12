@@ -241,7 +241,6 @@ raft_sm_become_candidate(struct raft *raft);
 static const char *
 raft_msg_to_string(const struct raft_msg *req)
 {
-	assert(req->term != 0);
 	char buf[1024];
 	int size = sizeof(buf);
 	char *pos = buf;
