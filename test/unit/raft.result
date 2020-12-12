@@ -154,7 +154,7 @@ ok 7 - subtests
 ok 8 - subtests
 	*** raft_test_heartbeat: done ***
 	*** raft_test_election_timeout ***
-    1..11
+    1..13
     ok 1 - election is started
     ok 2 - enter candidate state
     ok 3 - new election is started
@@ -164,8 +164,10 @@ ok 8 - subtests
     ok 7 - new election timeout is respected
     ok 8 - but not too late
     ok 9 - re-enter candidate state
-    ok 10 - term is bumped, timeout was truly random
-    ok 11 - still candidate
+    ok 10 - the new timeout acts immediately
+    ok 11 - re-enter candidate state
+    ok 12 - term is bumped, timeout was truly random
+    ok 13 - still candidate
 ok 9 - subtests
 	*** raft_test_election_timeout: done ***
 	*** raft_test_election_quorum ***

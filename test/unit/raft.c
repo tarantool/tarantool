@@ -842,7 +842,7 @@ raft_test_heartbeat(void)
 static void
 raft_test_election_timeout(void)
 {
-	raft_start_test(11);
+	raft_start_test(13);
 	struct raft_node node;
 	raft_node_create(&node);
 
@@ -912,6 +912,24 @@ raft_test_election_timeout(void)
 		4 /* Volatile term. */,
 		1 /* Volatile vote. */,
 		"{0: 3}" /* Vclock. */
+	), "re-enter candidate state");
+
+	/* Decrease election timeout to earlier than now. */
+
+	raft_run_for(election_timeout / 2);
+	raft_node_cfg_election_timeout(&node, election_timeout / 4);
+	ts = raft_time();
+	raft_run_next_event();
+
+	ok(raft_time() == ts, "the new timeout acts immediately");
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_CANDIDATE /* State. */,
+		0 /* Leader. */,
+		5 /* Term. */,
+		1 /* Vote. */,
+		5 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 4}" /* Vclock. */
 	), "re-enter candidate state");
 
 	/*

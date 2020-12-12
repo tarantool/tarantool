@@ -895,6 +895,8 @@ raft_cfg_election_timeout(struct raft *raft, double timeout)
 		struct ev_loop *loop = raft_loop();
 		double timeout = raft_ev_timer_remaining(loop, &raft->timer) -
 				 raft->timer.at + raft->election_timeout;
+		if (timeout < 0)
+			timeout = 0;
 		raft_ev_timer_stop(loop, &raft->timer);
 		raft_ev_timer_set(&raft->timer, timeout, timeout);
 		raft_ev_timer_start(loop, &raft->timer);
