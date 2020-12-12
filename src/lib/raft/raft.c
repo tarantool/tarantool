@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "raft.h"
-
+#include "raft_ev.h"
 #include "exception.h"
 #include "fiber.h"
 #include "tt_static.h"
@@ -477,8 +477,8 @@ raft_process_heartbeat(struct raft *raft, uint32_t source)
 	 * anything was heard from the leader. Then in the timer callback check
 	 * the timestamp, and restart the timer, if it is fine.
 	 */
-	assert(ev_is_active(&raft->timer));
-	ev_timer_stop(loop(), &raft->timer);
+	assert(raft_ev_is_active(&raft->timer));
+	raft_ev_timer_stop(raft_loop(), &raft->timer);
 	raft_sm_wait_leader_dead(raft);
 }
 
@@ -595,7 +595,7 @@ raft_sm_pause_and_dump(struct raft *raft)
 	assert(raft->state == RAFT_STATE_FOLLOWER);
 	if (raft->is_write_in_progress)
 		return;
-	ev_timer_stop(loop(), &raft->timer);
+	raft_ev_timer_stop(raft_loop(), &raft->timer);
 	raft_schedule_async(raft);
 	raft->is_write_in_progress = true;
 }
@@ -611,7 +611,7 @@ raft_sm_become_leader(struct raft *raft)
 	assert(!raft->is_write_in_progress);
 	raft->state = RAFT_STATE_LEADER;
 	raft->leader = raft->self;
-	ev_timer_stop(loop(), &raft->timer);
+	raft_ev_timer_stop(raft_loop(), &raft->timer);
 	/* State is visible and it is changed - broadcast. */
 	raft_schedule_broadcast(raft);
 }
@@ -625,7 +625,7 @@ raft_sm_follow_leader(struct raft *raft, uint32_t leader)
 	raft->state = RAFT_STATE_FOLLOWER;
 	raft->leader = leader;
 	if (!raft->is_write_in_progress && raft->is_candidate) {
-		ev_timer_stop(loop(), &raft->timer);
+		raft_ev_timer_stop(raft_loop(), &raft->timer);
 		raft_sm_wait_leader_dead(raft);
 	}
 	/* State is visible and it is changed - broadcast. */
@@ -701,38 +701,38 @@ raft_sm_schedule_new_election_cb(struct ev_loop *loop, struct ev_timer *timer,
 	(void)events;
 	struct raft *raft = timer->data;
 	assert(timer == &raft->timer);
-	ev_timer_stop(loop, timer);
+	raft_ev_timer_stop(loop, timer);
 	raft_sm_schedule_new_election(raft);
 }
 
 static void
 raft_sm_wait_leader_dead(struct raft *raft)
 {
-	assert(!ev_is_active(&raft->timer));
+	assert(!raft_ev_is_active(&raft->timer));
 	assert(!raft->is_write_in_progress);
 	assert(raft->is_candidate);
 	assert(raft->state == RAFT_STATE_FOLLOWER);
 	assert(raft->leader != 0);
-	ev_timer_set(&raft->timer, raft->death_timeout, raft->death_timeout);
-	ev_timer_start(loop(), &raft->timer);
+	raft_ev_timer_set(&raft->timer, raft->death_timeout, raft->death_timeout);
+	raft_ev_timer_start(raft_loop(), &raft->timer);
 }
 
 static void
 raft_sm_wait_leader_found(struct raft *raft)
 {
-	assert(!ev_is_active(&raft->timer));
+	assert(!raft_ev_is_active(&raft->timer));
 	assert(!raft->is_write_in_progress);
 	assert(raft->is_candidate);
 	assert(raft->state == RAFT_STATE_FOLLOWER);
 	assert(raft->leader == 0);
-	ev_timer_set(&raft->timer, raft->death_timeout, raft->death_timeout);
-	ev_timer_start(loop(), &raft->timer);
+	raft_ev_timer_set(&raft->timer, raft->death_timeout, raft->death_timeout);
+	raft_ev_timer_start(raft_loop(), &raft->timer);
 }
 
 static void
 raft_sm_wait_election_end(struct raft *raft)
 {
-	assert(!ev_is_active(&raft->timer));
+	assert(!raft_ev_is_active(&raft->timer));
 	assert(!raft->is_write_in_progress);
 	assert(raft->is_candidate);
 	assert(raft->state == RAFT_STATE_FOLLOWER ||
@@ -741,15 +741,15 @@ raft_sm_wait_election_end(struct raft *raft)
 	assert(raft->leader == 0);
 	double election_timeout = raft->election_timeout +
 				  raft_new_random_election_shift(raft);
-	ev_timer_set(&raft->timer, election_timeout, election_timeout);
-	ev_timer_start(loop(), &raft->timer);
+	raft_ev_timer_set(&raft->timer, election_timeout, election_timeout);
+	raft_ev_timer_start(raft_loop(), &raft->timer);
 }
 
 static void
 raft_sm_start(struct raft *raft)
 {
 	say_info("RAFT: start state machine");
-	assert(!ev_is_active(&raft->timer));
+	assert(!raft_ev_is_active(&raft->timer));
 	assert(!raft->is_enabled);
 	assert(raft->state == RAFT_STATE_FOLLOWER);
 	raft->is_enabled = true;
@@ -796,7 +796,7 @@ raft_sm_stop(struct raft *raft)
 	if (raft->state == RAFT_STATE_LEADER)
 		raft->leader = 0;
 	raft->state = RAFT_STATE_FOLLOWER;
-	ev_timer_stop(loop(), &raft->timer);
+	raft_ev_timer_stop(raft_loop(), &raft->timer);
 	/* State is visible and changed - broadcast. */
 	raft_schedule_broadcast(raft);
 }
@@ -872,7 +872,7 @@ raft_cfg_is_candidate(struct raft *raft, bool is_candidate)
 	} else {
 		if (raft->state != RAFT_STATE_LEADER) {
 			/* Do not wait for anything while being a voter. */
-			ev_timer_stop(loop(), &raft->timer);
+			raft_ev_timer_stop(raft_loop(), &raft->timer);
 		}
 		if (raft->state != RAFT_STATE_FOLLOWER) {
 			if (raft->state == RAFT_STATE_LEADER)
@@ -892,12 +892,13 @@ raft_cfg_election_timeout(struct raft *raft, double timeout)
 
 	raft->election_timeout = timeout;
 	if (raft->vote != 0 && raft->leader == 0 && raft->is_candidate) {
-		assert(ev_is_active(&raft->timer));
-		double timeout = ev_timer_remaining(loop(), &raft->timer) -
+		assert(raft_ev_is_active(&raft->timer));
+		struct ev_loop *loop = raft_loop();
+		double timeout = raft_ev_timer_remaining(loop, &raft->timer) -
 				 raft->timer.at + raft->election_timeout;
-		ev_timer_stop(loop(), &raft->timer);
-		ev_timer_set(&raft->timer, timeout, timeout);
-		ev_timer_start(loop(), &raft->timer);
+		raft_ev_timer_stop(loop, &raft->timer);
+		raft_ev_timer_set(&raft->timer, timeout, timeout);
+		raft_ev_timer_start(loop, &raft->timer);
 	}
 }
 
@@ -918,12 +919,13 @@ raft_cfg_death_timeout(struct raft *raft, double death_timeout)
 	raft->death_timeout = death_timeout;
 	if (raft->state == RAFT_STATE_FOLLOWER && raft->is_candidate &&
 	    raft->leader != 0) {
-		assert(ev_is_active(&raft->timer));
-		double timeout = ev_timer_remaining(loop(), &raft->timer) -
+		assert(raft_ev_is_active(&raft->timer));
+		struct ev_loop *loop = raft_loop();
+		double timeout = raft_ev_timer_remaining(loop, &raft->timer) -
 				 raft->timer.at + raft->death_timeout;
-		ev_timer_stop(loop(), &raft->timer);
-		ev_timer_set(&raft->timer, timeout, timeout);
-		ev_timer_start(loop(), &raft->timer);
+		raft_ev_timer_stop(loop, &raft->timer);
+		raft_ev_timer_set(&raft->timer, timeout, timeout);
+		raft_ev_timer_start(loop, &raft->timer);
 	}
 }
 
@@ -980,7 +982,8 @@ raft_create(struct raft *raft, const struct raft_vtab *vtab)
 		.death_timeout = 5,
 		.vtab = vtab,
 	};
-	ev_timer_init(&raft->timer, raft_sm_schedule_new_election_cb, 0, 0);
+	raft_ev_timer_init(&raft->timer, raft_sm_schedule_new_election_cb,
+			   0, 0);
 	raft->timer.data = raft;
 	rlist_create(&raft->on_update);
 }
@@ -988,6 +991,6 @@ raft_create(struct raft *raft, const struct raft_vtab *vtab)
 void
 raft_destroy(struct raft *raft)
 {
-	ev_timer_stop(loop(), &raft->timer);
+	raft_ev_timer_stop(raft_loop(), &raft->timer);
 	trigger_destroy(&raft->on_update);
 }
