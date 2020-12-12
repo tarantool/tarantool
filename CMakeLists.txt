@@ -159,7 +159,7 @@ add_custom_target(ctags DEPENDS tags)
 # Enable 'make luacheck' target.
 #
 
-add_custom_target(luacheck)
+add_custom_target(luacheck DEPENDS LuaJIT-luacheck)
 add_custom_command(TARGET luacheck
     COMMAND ${LUACHECK} --codes --config "${PROJECT_SOURCE_DIR}/.luacheckrc" "${PROJECT_SOURCE_DIR}"
     COMMENT "Perform static analysis of Lua code"
