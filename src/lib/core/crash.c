@@ -7,8 +7,12 @@
 #include <string.h>
 #include <signal.h>
 #include <stdint.h>
+#include <limits.h>
 #include <time.h>
+#include <sys/types.h>
+#include <sys/utsname.h>
 
+#include "small/static.h"
 #include "trivia/util.h"
 
 #include "backtrace.h"
@@ -16,8 +20,15 @@
 #include "say.h"
 
 #define pr_fmt(fmt)		"crash: " fmt
+#define pr_debug(fmt, ...)	say_debug(pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_info(fmt, ...)	say_info(pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_err(fmt, ...)	say_error(pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_syserr(fmt, ...)	say_syserror(pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_crit(fmt, ...)	fprintf(stderr, pr_fmt(fmt) "\n", ##__VA_ARGS__)
 #define pr_panic(fmt, ...)	panic(pr_fmt(fmt), ##__VA_ARGS__)
+
+/** Use strlcpy with destination as an array */
+#define strlcpy_a(dst, src) strlcpy(dst, src, sizeof(dst))
 
 #ifdef TARGET_OS_LINUX
 #ifndef __x86_64__
@@ -72,6 +83,10 @@ static struct crash_info {
 	struct crash_greg greg;
 #endif
 	/**
+	 * Timestamp in nanoseconds (realtime).
+	 */
+	uint64_t timestamp_rt;
+	/**
 	 * Faulting address.
 	 */
 	void *siaddr;
@@ -92,6 +107,72 @@ static struct crash_info {
 #endif
 } crash_info;
 
+static char tarantool_path[PATH_MAX];
+static char feedback_host[CRASH_FEEDBACK_HOST_MAX];
+static bool send_crashinfo = false;
+
+static inline uint64_t
+timespec_to_ns(struct timespec *ts)
+{
+	return (uint64_t)ts->tv_sec * 1000000000 + (uint64_t)ts->tv_nsec;
+}
+
+static char *
+ns_to_localtime(uint64_t timestamp, char *buf, ssize_t len)
+{
+	time_t sec = timestamp / 1000000000;
+	char *start = buf;
+	struct tm tm;
+
+	/*
+	 * Use similar format as say_x logger. Except plain
+	 * seconds should be enough.
+	 */
+	localtime_r(&sec, &tm);
+	ssize_t total = strftime(start, len, "%F %T %Z", &tm);
+	start += total;
+	if (total < len)
+		return buf;
+	buf[len - 1] = '\0';
+	return buf;
+}
+
+void
+crash_init(const char *tarantool_bin)
+{
+	strlcpy_a(tarantool_path, tarantool_bin);
+	if (strlen(tarantool_path) < strlen(tarantool_bin))
+		pr_panic("executable path is trimmed");
+}
+
+void
+crash_cfg(const char *host, bool is_enabled)
+{
+	if (host == NULL || !is_enabled) {
+		if (send_crashinfo) {
+			pr_debug("disable sending crashinfo feedback");
+			send_crashinfo = false;
+			feedback_host[0] = '\0';
+		}
+		return;
+	}
+
+	if (strcmp(feedback_host, host) != 0) {
+		strlcpy_a(feedback_host, host);
+		/*
+		 * The caller should have tested already
+		 * that there is enough space to keep
+		 * the host address.
+		 */
+		assert(strlen(feedback_host) == strlen(host));
+	}
+
+	if (!send_crashinfo) {
+		pr_debug("enable sending crashinfo feedback");
+		send_crashinfo = true;
+	}
+}
+
 /**
  * The routine is called inside crash signal handler so
  * be careful to not cause additional signals inside.
@@ -100,6 +181,12 @@ static struct crash_info *
 crash_collect(int signo, siginfo_t *siginfo, void *ucontext)
 {
 	struct crash_info *cinfo = &crash_info;
+	struct timespec ts;
+
+	if (clock_gettime(CLOCK_REALTIME, &ts) == 0)
+		cinfo->timestamp_rt = timespec_to_ns(&ts);
+	else
+		cinfo->timestamp_rt = 0;
 
 	cinfo->signo = signo;
 	cinfo->sicode = siginfo->si_code;
@@ -128,6 +215,164 @@ crash_collect(int signo, siginfo_t *siginfo, void *ucontext)
 #endif
 
 	return cinfo;
+}
+
+/**
+ * Report crash information to the feedback daemon
+ * (ie send it to feedback daemon).
+ */
+static int
+crash_report_feedback_daemon(struct crash_info *cinfo)
+{
+	/*
+	 * Update to a new number if the format get changed.
+	 */
+	const int crashinfo_version = 1;
+
+	char *p = static_alloc(SMALL_STATIC_SIZE);
+	char *tail = &p[SMALL_STATIC_SIZE];
+	char *e = &p[SMALL_STATIC_SIZE];
+	char *head = p;
+
+	int total = 0;
+	int size = 0;
+
+#define snprintf_safe(...) SNPRINT(total, snprintf, p, size, __VA_ARGS__)
+#define jnprintf_safe(str) SNPRINT(total, json_escape, p, size, str)
+
+	/*
+	 * Lets reuse tail of the buffer as a temp space.
+	 */
+	struct utsname *uname_ptr = (void *)&tail[-sizeof(struct utsname)];
+	if (p >= (char *)uname_ptr)
+		return -1;
+
+	if (uname(uname_ptr) != 0) {
+		pr_syserr("uname call failed, ignore");
+		memset(uname_ptr, 0, sizeof(struct utsname));
+	}
+
+	/*
+	 * Start filling the script. The "data" key value is
+	 * filled as a separate code block for easier
+	 * modifications in future.
+	 */
+	size = (char *)uname_ptr - p;
+	snprintf_safe("{");
+	snprintf_safe("\"crashdump\":{");
+	snprintf_safe("\"version\":\"%d\",", crashinfo_version);
+	snprintf_safe("\"data\":");
+
+	/* The "data" key value */
+	snprintf_safe("{");
+	snprintf_safe("\"uname\":{");
+	snprintf_safe("\"sysname\":\"");
+	jnprintf_safe(uname_ptr->sysname);
+	snprintf_safe("\",");
+	/*
+	 * nodename might contain a sensitive information, skip.
+	 */
+	snprintf_safe("\"release\":\"");
+	jnprintf_safe(uname_ptr->release);
+	snprintf_safe("\",");
+
+	snprintf_safe("\"version\":\"");
+	jnprintf_safe(uname_ptr->version);
+	snprintf_safe("\",");
+
+	snprintf_safe("\"machine\":\"");
+	jnprintf_safe(uname_ptr->machine);
+	snprintf_safe("\"");
+	snprintf_safe("},");
+
+	/* Extend size, because now uname_ptr is not needed. */
+	size = e - p;
+	snprintf_safe("\"build\":{");
+	snprintf_safe("\"version\":\"%s\",", PACKAGE_VERSION);
+	snprintf_safe("\"cmake_type\":\"%s\"", BUILD_INFO);
+	snprintf_safe("},");
+
+	snprintf_safe("\"signal\":{");
+	snprintf_safe("\"signo\":%d,", cinfo->signo);
+	snprintf_safe("\"si_code\":%d,", cinfo->sicode);
+	if (cinfo->signo == SIGSEGV) {
+		if (cinfo->sicode == SEGV_MAPERR) {
+			snprintf_safe("\"si_code_str\":\"%s\",",
+				      "SEGV_MAPERR");
+		} else if (cinfo->sicode == SEGV_ACCERR) {
+			snprintf_safe("\"si_code_str\":\"%s\",",
+				      "SEGV_ACCERR");
+		}
+		snprintf_safe("\"si_addr\":\"0x%llx\",",
+			      (long long)cinfo->siaddr);
+	}
+
+#ifdef ENABLE_BACKTRACE
+	snprintf_safe("\"backtrace\":\"");
+	jnprintf_safe(cinfo->backtrace_buf);
+	snprintf_safe("\",");
+#endif
+
+	/* 64 bytes should be enough for longest localtime */
+	const int ts_size = 64;
+	char *timestamp_rt_str = &tail[-ts_size];
+	if (p >= timestamp_rt_str)
+		return -1;
+	ns_to_localtime(cinfo->timestamp_rt, timestamp_rt_str, ts_size);
+
+	size = timestamp_rt_str - p;
+	snprintf_safe("\"timestamp\":\"");
+	jnprintf_safe(timestamp_rt_str);
+	snprintf_safe("\"");
+	snprintf_safe("}");
+	snprintf_safe("}");
+
+	/* Finalize the "data" key and the whole dump. */
+	size = e - p;
+	snprintf_safe("}");
+	snprintf_safe("}");
+
+	pr_debug("crash dump: %s", head);
+
+	char *exec_argv[7] = {
+		[0] = tarantool_path,
+		[1] = "-e",
+		/* Timeout 1 sec is taken from the feedback daemon. */
+		[2] = "require('http.client').post(arg[1],arg[2],{timeout=1});"
+		      "os.exit(1);",
+		[3] = "-",
+		[4] = feedback_host,
+		[5] = head,
+		[6] = NULL,
+	};
+
+	/*
+	 * Can't use fork here because libev has own
+	 * at_fork helpers with mutex where we might
+	 * stuck (see popen code).
+	 */
+	pid_t pid = vfork();
+	if (pid == 0) {
+		extern char **environ;
+		/*
+		 * The script must exit at the end but there
+		 * is no simple way to make sure from inside
+		 * of a signal crash handler. So just hope it
+		 * is running fine.
+		 */
+		execve(exec_argv[0], exec_argv, environ);
+		pr_crit("exec(%s,[%s,%s,%s,%s,%s,%s,%s]) failed",
+			exec_argv[0], exec_argv[0],
+			exec_argv[1], exec_argv[2],
+			exec_argv[3], exec_argv[4],
+			exec_argv[5], exec_argv[6]);
+		_exit(1);
+	} else if (pid < 0) {
+		pr_crit("unable to vfork (errno %d)", errno);
+		return -1;
+	}
+
+	return 0;
 }
 
 /**
@@ -236,6 +481,10 @@ crash_signal_cb(int signo, siginfo_t *siginfo, void *context)
 		in_cb = 1;
 		cinfo = crash_collect(signo, siginfo, context);
 		crash_report_stderr(cinfo);
+		if (send_crashinfo &&
+		    crash_report_feedback_daemon(cinfo) != 0) {
+			pr_crit("unable to send a crash report");
+		}
 	} else {
 		/* Got a signal while running the handler. */
 		fprintf(stderr, "Fatal %d while backtracing", signo);

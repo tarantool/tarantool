@@ -29,6 +29,8 @@ cfg_filter(box.cfg)
  |     - off
  |   - - election_timeout
  |     - 5
+ |   - - feedback_crashinfo
+ |     - true
  |   - - feedback_enabled
  |     - true
  |   - - feedback_host
@@ -142,6 +144,8 @@ cfg_filter(box.cfg)
  |     - off
  |   - - election_timeout
  |     - 5
+ |   - - feedback_crashinfo
+ |     - true
  |   - - feedback_enabled
  |     - true
  |   - - feedback_host

@@ -10,6 +10,7 @@ checkpoint_wal_threshold:1e+18
 coredump:false
 election_mode:off
 election_timeout:5
+feedback_crashinfo:true
 feedback_enabled:true
 feedback_host:https://feedback.tarantool.io
 feedback_interval:3600

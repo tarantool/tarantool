@@ -687,6 +687,7 @@ main(int argc, char **argv)
 		title_set_script_name(argv[0]);
 	}
 
+	crash_init(tarantool_bin);
 	export_syms();
 
 	random_init();

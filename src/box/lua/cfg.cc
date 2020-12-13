@@ -375,6 +375,14 @@ lbox_cfg_set_replication_skip_conflict(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_cfg_set_crash(struct lua_State *L)
+{
+	if (box_set_crash() != 0)
+		luaT_error(L);
+	return 0;
+}
+
 void
 box_lua_cfg_init(struct lua_State *L)
 {
@@ -411,6 +419,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_replication_anon", lbox_cfg_set_replication_anon},
 		{"cfg_set_net_msg_max", lbox_cfg_set_net_msg_max},
 		{"cfg_set_sql_cache_size", lbox_set_prepared_stmt_cache_size},
+		{"cfg_set_crash", lbox_cfg_set_crash},
 		{NULL, NULL}
 	};
 

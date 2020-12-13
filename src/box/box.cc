@@ -75,6 +75,7 @@
 #include "sql.h"
 #include "systemd.h"
 #include "call.h"
+#include "crash.h"
 #include "func.h"
 #include "sequence.h"
 #include "sql_stmt_cache.h"
@@ -1343,6 +1344,23 @@ box_set_prepared_stmt_cache_size(void)
 		return -1;
 	if (sql_stmt_cache_set_size(cache_sz) != 0)
 		return -1;
+	return 0;
+}
+
+int
+box_set_crash(void)
+{
+	const char *host = cfg_gets("feedback_host");
+	bool is_enabled_1 = cfg_getb("feedback_enabled");
+	bool is_enabled_2 = cfg_getb("feedback_crashinfo");
+
+	if (host != NULL && strlen(host) >= CRASH_FEEDBACK_HOST_MAX) {
+		diag_set(ClientError, ER_CFG, "feedback_host",
+			  "the address is too long");
+		return -1;
+	}
+
+	crash_cfg(host, is_enabled_1 && is_enabled_2);
 	return 0;
 }
 
