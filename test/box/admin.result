@@ -27,7 +27,9 @@ help()
 ...
 cfg_filter(box.cfg)
 ---
-- - - background
+- - - allocator
+    - small
+  - - background
     - false
   - - checkpoint_count
     - 2

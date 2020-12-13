@@ -40,6 +40,7 @@
 #include "engine.h"
 #include "xlog.h"
 #include "salad/stailq.h"
+#include "system_allocator.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -49,6 +50,7 @@ struct index;
 struct fiber;
 struct tuple;
 struct tuple_format;
+struct allocator_stats;
 
 /**
  * The state of memtx recovery process.
@@ -135,8 +137,12 @@ struct memtx_engine {
 	struct slab_arena arena;
 	/** Slab cache for allocating tuples. */
 	struct slab_cache slab_cache;
-	/** Tuple allocator. */
-	struct small_alloc alloc;
+	/** Small tuple allocator. */
+	struct small_alloc small_alloc;
+	/** System tuple allocator */
+	struct system_alloc system_alloc;
+	/** Tuple allocator currently used */
+	void *alloc;
 	/** Slab cache for allocating index extents. */
 	struct slab_cache index_slab_cache;
 	/** Index extent allocator. */
@@ -178,6 +184,31 @@ struct memtx_engine {
 	 * memtx_gc_task::link.
 	 */
 	struct stailq gc_queue;
+	/**
+	  * Method to create memtx allocator
+	  */
+	void (*memtx_allocator_create)(struct memtx_engine *memtx, ...);
+	/**
+	  * Method to destroy memtx allocator
+	  */
+	void (*memtx_allocator_destroy)(struct memtx_engine *memtx);
+	/**
+	  * Method to enter delayed free mode
+	  */
+	void (*memtx_enter_delayed_free_mode)(struct memtx_engine *memtx);
+	/**
+	  * Method to leave delayed free mode
+	  */
+	void (*memtx_leave_delayed_free_mode)(struct memtx_engine *memtx);
+	/**
+	  * Method to get allocation statistic
+	  */
+	void (*memtx_allocator_stats)(struct memtx_engine *memtx, 
+		struct allocator_stats *stats, ...);
+	/**
+	  * Method to memtx memory check
+	  */
+	void (*memtx_mem_check)(struct memtx_engine *memtx);
 };
 
 struct memtx_gc_task;
@@ -213,7 +244,7 @@ struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size,
 		 uint32_t objsize_min, bool dontdump,
-		 float alloc_factor);
+		 const char *allocator, float alloc_factor);
 
 int
 memtx_engine_recover_snapshot(struct memtx_engine *memtx,
@@ -299,13 +330,13 @@ static inline struct memtx_engine *
 memtx_engine_new_xc(const char *snap_dirname, bool force_recovery,
 		    uint64_t tuple_arena_max_size,
 		    uint32_t objsize_min, bool dontdump,
-		    float alloc_factor)
+		    const char *allocator, float alloc_factor)
 {
 	struct memtx_engine *memtx;
 	memtx = memtx_engine_new(snap_dirname, force_recovery,
 				 tuple_arena_max_size,
 				 objsize_min, dontdump,
-				 alloc_factor);
+				 allocator, alloc_factor);
 	if (memtx == NULL)
 		diag_raise();
 	return memtx;

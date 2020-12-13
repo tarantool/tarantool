@@ -92,6 +92,17 @@ check_symbol_exists(posix_fadvise fcntl.h HAVE_POSIX_FADVISE)
 check_symbol_exists(fallocate fcntl.h HAVE_FALLOCATE)
 check_symbol_exists(mremap sys/mman.h HAVE_MREMAP)
 
+check_function_exists(malloc_usable_size HAVE_MALLOC_USABLE_SIZE)
+check_symbol_exists(malloc_size malloc/malloc.h HAVE_MALLOC_SIZE_DARWIN)
+
+if (HAVE_MALLOC_USABLE_SIZE)
+    if (TARGET_OS_LINUX)
+        set(HAVE_MALLOC_USABLE_SIZE_LINUX 1)
+    else ()
+        set(HAVE_MALLOC_USABLE_SIZE_BSD 1)
+    endif ()
+endif ()
+
 check_function_exists(sync_file_range HAVE_SYNC_FILE_RANGE)
 check_function_exists(memmem HAVE_MEMMEM)
 check_function_exists(memrchr HAVE_MEMRCHR)

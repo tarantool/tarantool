@@ -169,6 +169,9 @@
 #cmakedefine HAVE_POSIX_FADVISE 1
 #cmakedefine HAVE_FALLOCATE 1
 #cmakedefine HAVE_MREMAP 1
+#cmakedefine HAVE_MALLOC_USABLE_SIZE_LINUX 1
+#cmakedefine HAVE_MALLOC_USABLE_SIZE_BSD 1
+#cmakedefine HAVE_MALLOC_SIZE_DARWIN 1
 #cmakedefine HAVE_SYNC_FILE_RANGE 1
 
 #cmakedefine HAVE_MSG_NOSIGNAL 1

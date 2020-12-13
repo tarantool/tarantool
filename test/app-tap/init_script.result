@@ -3,6 +3,7 @@
 --
 
 box.cfg
+allocator:small
 background:false
 checkpoint_count:2
 checkpoint_interval:3600
