@@ -228,6 +228,7 @@ test_oos: deps_debian test_oos_no_deps
 test_oos_build:
 	docker run --network=host -w ${OOS_SRC_PATH} \
 		--mount type=bind,source="${PWD}",target=${OOS_SRC_PATH},readonly,bind-propagation=rslave \
+		--tmpfs ${OOS_BUILD_PATH}:exec \
 		-i ${DOCKER_IMAGE_TARANTOOL} \
 		make -f .travis.mk ${OOS_BUILD_RULE}
 
