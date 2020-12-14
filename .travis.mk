@@ -12,6 +12,8 @@ OOS_BUILD_PATH?=/rw_bins
 OOS_BUILD_RULE?=test_oos_no_deps
 BIN_DIR=/usr/local/bin
 OSX_VARDIR?=/tmp/tnt
+GIT_DESCRIBE=$(shell git describe HEAD)
+COVERITY_BINS=/cov-analysis/bin
 
 CLOJURE_URL="https://download.clojure.org/install/linux-install-1.10.1.561.sh"
 LEIN_URL="https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein"
@@ -151,6 +153,36 @@ test_coverage_debian_no_deps: build_coverage_debian
 	fi;
 
 coverage_debian: deps_debian test_coverage_debian_no_deps
+
+# Coverity
+
+build_coverity_debian: configure_debian
+	export PATH=${PATH}:${COVERITY_BINS} ; \
+		cov-build --dir cov-int make -j
+
+test_coverity_debian_no_deps: build_coverity_debian
+	tar czvf tarantool.tgz cov-int
+	@if [ -n "$(COVERITY_TOKEN)" ]; then \
+		echo "Exporting code coverity information to scan.coverity.com"; \
+		curl --form token=$(COVERITY_TOKEN) \
+			--form email=tarantool@tarantool.org \
+			--form file=@tarantool.tgz \
+			--form version=${GIT_DESCRIBE} \
+			--form description="Tarantool Coverity" \
+			https://scan.coverity.com/builds?project=tarantool%2Ftarantool ; \
+	fi;
+
+deps_coverity_debian: deps_debian
+	# check that coverity tools installed in known place
+	@ls -al ${COVERITY_BINS} || \
+		( echo "=================== ERROR: =====================" ; \
+		  echo "Coverity binaries not found in: ${COVERITY_BINS}" ; \
+		  echo "please install it there using instructions from:" ; \
+		  echo "  https://scan.coverity.com/download?tab=cxx" ; \
+		  echo ; \
+		  exit 1 )
+
+coverity_debian: deps_coverity_debian test_coverity_debian_no_deps
 
 # ASAN
 
