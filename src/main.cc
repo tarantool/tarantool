@@ -80,6 +80,7 @@
 #include "crypto/crypto.h"
 #include "core/popen.h"
 #include "core/errinj.h"
+#include "ssl_cert_paths_discover.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -841,6 +842,12 @@ main(int argc, char **argv)
 #ifndef NDEBUG
 	errinj_set_with_environment_vars();
 #endif
+
+	const int override_cert_paths_env_vars = 0;
+	int res = ssl_cert_paths_discover(override_cert_paths_env_vars);
+	if (res != 0)
+		say_warn("No enough memory for setup ssl certificates paths");
+
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
 
 	start_time = ev_monotonic_time();
