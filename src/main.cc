@@ -80,6 +80,7 @@
 #include "crypto/crypto.h"
 #include "core/popen.h"
 #include "core/crash.h"
+#include "ssl_cert_paths_discover.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -710,6 +711,7 @@ main(int argc, char **argv)
 	memtx_tx_manager_init();
 	crypto_init();
 	systemd_init();
+	ssl_cert_paths_discover(0); // don't overwrite user defined env vars
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
 
 	start_time = ev_monotonic_time();
