@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  schedule:
+    - cron:  '0 4 * * 6'
+
+env:
+  CI_MAKE: make -f .travis.mk
+
+jobs:
+  coverity:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+
+    # Image built by .gitlab.mk instructions and targets from .travis.mk.
+    # Also additional installation of coverity tool installation check
+    # exists in target deps_coverity_debian at .travis.mk file.
+    container: docker.io/tarantool/testing:debian-buster
+
+    steps:
+      - uses: actions/checkout@v1
+      - name: test
+        run: ${CI_MAKE} test_coverity_debian_no_deps
+        env:
+          COVERITY_TOKEN: ${{ secrets.COVERITY_TOKEN }}
+      - name: artifacts
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: debug
+          retention-days: 1000000
+          path: test/var/artifacts
