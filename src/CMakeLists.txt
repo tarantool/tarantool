@@ -107,6 +107,7 @@ set (server_sources
      title.c
      proc_title.c
      path_lock.c
+     ssl_cert_paths_discover.c
      systemd.c
      version.c
      lua/digest.c
