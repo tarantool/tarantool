@@ -8,7 +8,7 @@ test:plan(2)
 
 local result = {}
 
-function test_f()
+local function test_f()
     local cond = fiber.cond()
     local res, err = pcall(cond.wait, cond)
     result.res = res

@@ -11,7 +11,7 @@ local tap = require "tap"
 --
 -- Create a root test
 --
-test = tap.test("root test")
+local test = tap.test("root test")
 -- Disable stack traces for this test because Tarantool test system also
 -- checks test output.
 test.trace = false
@@ -88,7 +88,7 @@ end)
 --
 -- Subtest without callbacks.
 --
-sub2 = test:test("subtest 2")
+local sub2 = test:test("subtest 2")
     sub2:plan(1)
     sub2:ok(true, 'true in subtest')
     sub2:diag('hello from subtest')

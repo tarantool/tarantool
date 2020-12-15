@@ -9,11 +9,11 @@ test:plan(3)
 --
 
 -- Invalid log. No panic, just error
-_, err = pcall(log.cfg, {log=' :invalid'})
+local _, err = pcall(log.cfg, {log=' :invalid'})
 test:like(err, "expecting a file name or a prefix")
 
 -- Empty string - default log (to be compatible with box.cfg)
-ok = pcall(log.cfg, {log=''})
+local ok = pcall(log.cfg, {log=''})
 test:ok(ok)
 
 -- Dynamic reconfiguration - error, no info about invalid logger type

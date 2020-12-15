@@ -42,7 +42,7 @@ local function start_server(test, sock_family, sock_addr)
     test:is(server:read("*l"), "heartbeat", "server started")
     test:diag("trying to connect to %s", url)
     local r
-    for i=1,10 do
+    for _=1,10 do
         r = client.get(url, merge(opts, {timeout = 0.01}))
         if r.status == 200 then
             break
@@ -164,7 +164,7 @@ local function test_cancel_and_errinj(test, url, opts)
     local errinj = box.error.injection
     errinj.set('ERRINJ_HTTP_RESPONSE_ADD_WAIT', true)
     local topts = merge(opts, {timeout = 1200})
-    f = fiber.create(func, topts)
+    fiber.create(func, topts)
     r = ch:get()
     test:is(r.status, 200, "No hangs in errinj")
     errinj.set('ERRINJ_HTTP_RESPONSE_ADD_WAIT', false)
@@ -180,7 +180,6 @@ local function test_post_and_get(test, url, opts)
     local my_body = { key = "value" }
     local json_body = json.encode(my_body)
     local responses = {}
-    local data = {a = 'b'}
     headers['Content-Type'] = 'application/json'
     local fibers = 7
     local ch = fiber.channel(fibers)
@@ -213,7 +212,7 @@ local function test_post_and_get(test, url, opts)
         responses.absent_get = http:get(url .. 'absent', opts)
         ch:put(1)
     end)
-    for i=1,fibers do
+    for _=1,fibers do
         ch:get()
     end
     local r = responses.good_get
@@ -270,7 +269,6 @@ local function test_errors(test)
     test:ok(not status and string.find(json.encode(err),
                         "Unsupported protocol"),
                         "POST: exception on bad protocol")
-    local r = http:get("http://do_not_exist_8ffad33e0cb01e6a01a03d00089e71e5b2b7e9930dfcba.ru")
 end
 
 -- gh-3679 Check that opts.headers values can be strings only.
@@ -355,7 +353,7 @@ local function test_request_headers(test, url, opts)
     local http = client:new()
 
     for _, case in ipairs(cases) do
-        local opts = merge(table.copy(opts), case.opts)
+        opts = merge(table.copy(opts), case.opts)
         local ok, err = pcall(http.get, http, url, opts)
         if case.postrequest_check ~= nil then
             case.postrequest_check(opts)
@@ -425,7 +423,6 @@ local function test_special_methods(test, url, opts)
     local responses = {}
     local fibers = 7
     local ch = fiber.channel(fibers)
-    local _
     fiber.create(function()
         responses.patch_data = http:patch(url, "{\"key\":\"val\"}", opts)
         ch:put(1)
@@ -454,7 +451,7 @@ local function test_special_methods(test, url, opts)
         responses.custom_data = http:request("CUSTOM", url, nil, opts)
         ch:put(1)
     end)
-    for i = 1, fibers do
+    for _ = 1, fibers do
         ch:get()
     end
 
@@ -483,10 +480,6 @@ end
 
 local function test_concurrent(test, url, opts)
     test:plan(3)
-    local http = client.new()
-    local headers = { my_header = "1", my_header2 = "2" }
-    local my_body = { key = "value" }
-    local json_body = json.encode(my_body)
     local num_test = 10
     local num_load = 10
     local curls   = { }
@@ -497,7 +490,7 @@ local function test_concurrent(test, url, opts)
         headers["My-header" .. i] = "my-value"
     end
 
-    for i = 1, num_test do
+    for _ = 1, num_test do
         table.insert(curls, {
             url = url,
             http = client.new(),
@@ -515,7 +508,7 @@ local function test_concurrent(test, url, opts)
     -- Creating concurrent clients
     for i=1,num_test do
         local obj = curls[i]
-        for j=1,num_load do
+        for _=1,num_load do
             fiber.create(function()
                 local r = obj.http:post(obj.url, obj.body, merge(opts, {
                     headers = obj.headers,
@@ -540,13 +533,11 @@ local function test_concurrent(test, url, opts)
     end
     local ok_sockets_added = true
     local ok_active = true
-    local ok_timeout = true
     local ok_req = true
 
     -- Join test
     local rest = num_test
     while true do
-        local ticks = 0
         for i = 1, num_load do
             local obj = curls[i]
             -- checking that stats in concurrent are ok
@@ -582,7 +573,7 @@ local function test_concurrent(test, url, opts)
     test:ok(ok_active, "no active requests")
 end
 
-function run_tests(test, sock_family, sock_addr)
+local function run_tests(test, sock_family, sock_addr)
     test:plan(11)
     local server, url, opts = start_server(test, sock_family, sock_addr)
     test:test("http.client", test_http_client, url, opts)

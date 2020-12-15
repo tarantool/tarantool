@@ -12,7 +12,7 @@ box.cfg{
     log="tarantool.log",
     memtx_memory=107374182,
 }
-function pcalltest()
+local function pcalltest()
     local ERRMSG = "module 'some_invalid_module' not found"
     local status, msg = pcall(require, 'some_invalid_module')
     if status == false and msg ~= nil and msg:match(ERRMSG) ~= nil then
