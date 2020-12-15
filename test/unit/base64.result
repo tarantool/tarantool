@@ -1,4 +1,4 @@
-1..29
+1..30
 	*** main ***
     1..3
     ok 1 - length
@@ -178,4 +178,7 @@ ok 28 - subtests
     1..1
     ok 1 - ignoring invalid chars
 ok 29 - subtests
+    1..1
+    ok 1 - no space in out buffer
+ok 30 - subtests
 	*** main: done ***

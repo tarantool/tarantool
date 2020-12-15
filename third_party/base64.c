@@ -202,14 +202,6 @@ base64_encode(const char *in_bin, int in_len,
 
 /* {{{ decode */
 
-enum base64_decodestep { step_a, step_b, step_c, step_d };
-
-struct base64_decodestate
-{
-	enum base64_decodestep step;
-	char result;
-};
-
 static int
 base64_decode_value(int value)
 {
@@ -231,17 +223,9 @@ base64_decode_value(int value)
 	return decoding[codepos];
 }
 
-static inline void
-base64_decodestate_init(struct base64_decodestate *state)
-{
-	state->step = step_a;
-	state->result = 0;
-}
-
-static int
-base64_decode_block(const char *in_base64, int in_len,
-		    char *out_bin, int out_len,
-		    struct base64_decodestate *state)
+int
+base64_decode(const char *in_base64, int in_len,
+	      char *out_bin, int out_len)
 {
 	const char *in_pos = in_base64;
 	const char *in_end = in_base64 + in_len;
@@ -249,76 +233,39 @@ base64_decode_block(const char *in_base64, int in_len,
 	char *out_end = out_bin + out_len;
 	int fragment;
 
-	*out_pos = state->result;
-
-	switch (state->step)
+	while (1)
 	{
-		while (1)
-		{
-	case step_a:
-			do {
-				if (in_pos == in_end || out_pos >= out_end)
-				{
-					state->step = step_a;
-					state->result = *out_pos;
-					return out_pos - out_bin;
-				}
-				fragment = base64_decode_value(*in_pos++);
-			} while (fragment < 0);
-			*out_pos    = (fragment & 0x03f) << 2;
-	case step_b:
-			do {
-				if (in_pos == in_end || out_pos >= out_end)
-				{
-					state->step = step_b;
-					state->result = *out_pos;
-					return out_pos - out_bin;
-				}
-				fragment = base64_decode_value(*in_pos++);
-			} while (fragment < 0);
-			*out_pos++ |= (fragment & 0x030) >> 4;
-			if (out_pos < out_end)
-				*out_pos = (fragment & 0x00f) << 4;
-	case step_c:
-			do {
-				if (in_pos == in_end || out_pos >= out_end)
-				{
-					state->step = step_c;
-					state->result = *out_pos;
-					return out_pos - out_bin;
-				}
-				fragment = base64_decode_value(*in_pos++);
-			} while (fragment < 0);
-			*out_pos++ |= (fragment & 0x03c) >> 2;
-			if (out_pos < out_end)
-				*out_pos = (fragment & 0x003) << 6;
-	case step_d:
-			do {
-				if (in_pos == in_end || out_pos >= out_end)
-				{
-					state->step = step_d;
-					state->result = *out_pos;
-					return out_pos - out_bin;
-				}
-				fragment = base64_decode_value(*in_pos++);
-			} while (fragment < 0);
-			*out_pos++   |= (fragment & 0x03f);
-		}
+		do {
+			if (in_pos == in_end || out_pos >= out_end)
+				return out_pos - out_bin;
+			fragment = base64_decode_value(*in_pos++);
+		} while (fragment < 0);
+		*out_pos = (fragment & 0x03f) << 2;
+		do {
+			if (in_pos == in_end || out_pos >= out_end)
+				return out_pos - out_bin;
+			fragment = base64_decode_value(*in_pos++);
+		} while (fragment < 0);
+		*out_pos++ |= (fragment & 0x030) >> 4;
+		if (out_pos < out_end)
+			*out_pos = (fragment & 0x00f) << 4;
+		do {
+			if (in_pos == in_end || out_pos >= out_end)
+				return out_pos - out_bin;
+			fragment = base64_decode_value(*in_pos++);
+		} while (fragment < 0);
+		*out_pos++ |= (fragment & 0x03c) >> 2;
+		if (out_pos < out_end)
+			*out_pos = (fragment & 0x003) << 6;
+		do {
+			if (in_pos == in_end || out_pos >= out_end)
+				return out_pos - out_bin;
+			fragment = base64_decode_value(*in_pos++);
+		} while (fragment < 0);
+		*out_pos++ |= (fragment & 0x03f);
 	}
 	/* control should not reach here */
 	return out_pos - out_bin;
-}
-
-
-
-int
-base64_decode(const char *in_base64, int in_len,
-	      char *out_bin, int out_len)
-{
-	struct base64_decodestate state;
-	base64_decodestate_init(&state);
-	return base64_decode_block(in_base64, in_len,
-				   out_bin, out_len, &state);
 }
 
 /* }}} */
