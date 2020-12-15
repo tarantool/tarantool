@@ -252,6 +252,20 @@ s:replace{1, 2 }
 
 s:drop()
 
+-- https://github.com/tarantool/tarantool/issues/5628
+s = box.schema.space.create('test')
+i = s:create_index('pk', {parts={{1, 'uint'}}})
+
+s:replace{1, 0}
+s:delete{1}
+tx1:begin()
+tx1("s:replace{1, 1}")
+s:select{}
+tx1:commit()
+s:select{}
+
+s:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
