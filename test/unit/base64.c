@@ -75,9 +75,22 @@ base64_invalid_chars_test(void)
 	check_plan();
 }
 
+static void
+base64_no_space_test(void)
+{
+	plan(1);
+
+	const char *const in = "sIIpHw==";
+	const int in_len = strlen(in);
+	const int rc = base64_decode(in, in_len, NULL, 0);
+	is(rc, 0, "no space in out buffer");
+
+	check_plan();
+}
+
 int main(int argc, char *argv[])
 {
-	plan(29);
+	plan(30);
 	header();
 
 	const char *option_tests[] = {
@@ -96,6 +109,7 @@ int main(int argc, char *argv[])
 	}
 
 	base64_invalid_chars_test();
+	base64_no_space_test();
 
 	footer();
 	return check_plan();
