@@ -869,6 +869,47 @@ s:drop()
  | ---
  | ...
 
+-- https://github.com/tarantool/tarantool/issues/5628
+s = box.schema.space.create('test')
+ | ---
+ | ...
+i = s:create_index('pk', {parts={{1, 'uint'}}})
+ | ---
+ | ...
+
+s:replace{1, 0}
+ | ---
+ | - [1, 0]
+ | ...
+s:delete{1}
+ | ---
+ | - [1, 0]
+ | ...
+tx1:begin()
+ | ---
+ | - 
+ | ...
+tx1("s:replace{1, 1}")
+ | ---
+ | - - [1, 1]
+ | ...
+s:select{}
+ | ---
+ | - []
+ | ...
+tx1:commit()
+ | ---
+ | - 
+ | ...
+s:select{}
+ | ---
+ | - - [1, 1]
+ | ...
+
+s:drop()
+ | ---
+ | ...
+
 test_run:cmd("switch default")
  | ---
  | - true
