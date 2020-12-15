@@ -2,7 +2,6 @@
 
 package.path = "lua/?.lua;"..package.path
 
-local ffi = require('ffi')
 local tap = require('tap')
 local common = require('serializer_test')
 

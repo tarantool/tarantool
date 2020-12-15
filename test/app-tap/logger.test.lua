@@ -7,7 +7,7 @@ test:plan(64)
 -- gh-5121: Allow to use 'json' output before box.cfg()
 --
 local log = require('log')
-_, err = pcall(log.log_format, 'json')
+local _, err = pcall(log.log_format, 'json')
 test:ok(err == nil)
 
 -- We're not allowed to use json with syslog though.
@@ -141,7 +141,7 @@ end
 log.info(message)
 local line = file:read()
 test:is(line:sub(-message:len()), message, "message")
-s, err = pcall(json.decode, line)
+local s = pcall(json.decode, line)
 test:ok(not s, "plain")
 --
 -- gh-700: Crash on calling log.info() with formatting characters
@@ -160,7 +160,7 @@ test:is(file:read():match('I>%s+(.*)'), '{"key":"value"}', "table is handled as 
 log.info({message="value"})
 test:is(file:read():match('I>%s+(.*)'), '{"message":"value"}', "table is handled as json")
 
-function help() log.info("gh-2340: %s %s", 'help') end
+local function help() log.info("gh-2340: %s %s", 'help') end
 
 xpcall(help, function(err)
     test:ok(err:match("bad argument #3"), "found error string")
@@ -171,14 +171,14 @@ file:close()
 
 test:ok(log.pid() >= 0, "pid()")
 
--- logger uses 'debug', try to set it to nil
+-- luacheck: ignore (logger uses 'debug', try to set it to nil)
 debug = nil
 log.info("debug is nil")
 debug = require('debug')
 
 test:ok(log.info(true) == nil, 'check tarantool crash (gh-2516)')
 
-s, err = pcall(box.cfg, {log_format='json', log="syslog:identity:tarantool"})
+s = pcall(box.cfg, {log_format='json', log="syslog:identity:tarantool"})
 test:ok(not s, "check json not in syslog")
 
 box.cfg{log=filename,
@@ -235,7 +235,7 @@ file = fio.open(filename)
 while file == nil do file = fio.open(filename) fiber.sleep(0.0001) end
 line = file:read()
 while line == nil or line == ""  do line = file:read() fiber.sleep(0.0001) end
-index = line:find('\n')
+local index = line:find('\n')
 line = line:sub(1, index)
 message = json.decode(line)
 test:is(message.message, "log file has been reopened", "check message after log.rotate()")

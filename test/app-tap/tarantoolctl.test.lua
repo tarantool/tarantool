@@ -4,7 +4,6 @@ local ffi      = require('ffi')
 local fio      = require('fio')
 local tap      = require('tap')
 local uuid     = require('uuid')
-local yaml     = require('yaml')
 local errno    = require('errno')
 local fiber    = require('fiber')
 local ok, test_run = pcall(require, 'test_run')
@@ -33,7 +32,7 @@ local function recursive_rmdir(path)
         end
     end
     if fio.rmdir(path) == false then
-        print(string.format('!!! failed to rmdir path "%s"', file))
+        print(string.format('!!! failed to rmdir path "%s"', path))
         print(string.format('!!! [errno %s]: %s', errno(), errno.strerror()))
     end
 end
@@ -51,7 +50,7 @@ int execvp(const char *file, char *const argv[]);
 ]]
 
 -- background checks
-tctlcfg_code = [[default_cfg = {
+local tctlcfg_code = [[default_cfg = {
     pid_file  = '.', wal_dir = '.', memtx_dir   = '.' ,
     vinyl_dir = '.', log  = '.', background = true,
 }
@@ -97,22 +96,12 @@ local function tctl_wait_start(dir, name)
             fiber.sleep(0.01)
         end
         ::again::
-        while true do
-            local stat, nb = pcall(require('net.box').new, path, {
-                wait_connected = true, console = true
-            })
-            if stat == false then
-                fiber.sleep(0.01)
-                goto again
-            else
-                break
-            end
-            local stat, msg = pcall(nb.eval, nb, 'require("fiber").time()')
-            if stat == false then
-                fiber.sleep(0.01)
-            else
-                break
-            end
+        local stat, _ = pcall(require('net.box').new, path, {
+            wait_connected = true, console = true
+        })
+        if stat == false then
+            fiber.sleep(0.01)
+            goto again
         end
     end
 end
@@ -124,8 +113,7 @@ local function tctl_wait_stop(dir, name)
     end
 end
 
-local function tctl_command(dir, cmd, args, name)
-    local pid = nil
+local function tctl_command(dir, cmd, args)
     if not fio.stat(fio.pathjoin(dir, '.tarantoolctl')) then
         create_script(dir, '.tarantoolctl', tctlcfg_code)
     end
@@ -330,7 +318,7 @@ do
     local function test_help(test, dir, cmd, e_stderr)
         local desc = dir and 'with config' or 'without config'
         dir = dir or './'
-        local res, stdout, stderr = run_command(dir, cmd)
+        local _, _, stderr = run_command(dir, cmd)
         if e_stderr ~= nil then
             if not test:ok(stderr:find(e_stderr), ("check stderr of '%s' %s"):format(cmd, desc)) then
                 print(("Expected to find '%s' in '%s'"):format(e_stderr, stderr))
@@ -385,7 +373,7 @@ do
         local command_base = 'tarantoolctl cat filler/00000000000000000000.xlog'
         local desc = args and "cat + " .. args or "cat"
         args = args and " " .. args or ""
-        local res, stdout, stderr = run_command(dir, command_base .. args)
+        local res, stdout, _ = run_command(dir, command_base .. args)
         test:is(res, 0, desc .. " result")
         test:is(select(2, stdout:gsub(delim, delim)), lc, desc .. " line count")
     end
@@ -394,7 +382,7 @@ do
         local command_base = 'tarantoolctl cat filler/00000000000000000000.snap'
         local desc = args and "cat + " .. args or "cat"
         args = args and " " .. args or ""
-        local res, stdout, stderr = run_command(dir, command_base .. args)
+        local res, stdout, _ = run_command(dir, command_base .. args)
         test:is(res, 0, desc .. " result")
         test:is(select(2, stdout:gsub(delim, delim)), lc, desc .. " line count")
     end
@@ -413,7 +401,8 @@ do
             check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system", "\n", 3)
             check_ctlcat_xlog(test_i, dir, "--from=6 --to=3 --format=json --show-system", "\n", 0)
             check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system --replica 1", "\n", 3)
-            check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system --replica 1 --replica 2", "\n", 3)
+            check_ctlcat_xlog(test_i, dir,
+		"--from=3 --to=6 --format=json --show-system --replica 1 --replica 2", "\n", 3)
             check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system --replica 2", "\n", 0)
             check_ctlcat_snap(test_i, dir, "--space=280", "---\n", 25)
             check_ctlcat_snap(test_i, dir, "--space=288", "---\n", 53)
@@ -475,10 +464,10 @@ else
             check_ok(test_i, dir, 'start', 'filler', 0)
             local lsn_before = test_run:get_lsn("remote", 1)
             test_i:is(lsn_before, 4, "check lsn before")
-            local res, stdout, stderr = run_command(dir, command_base)
+            local res, _, _ = run_command(dir, command_base)
             test_i:is(res, 0, "execution result")
             test_i:is(test_run:get_lsn("remote", 1), 10, "check lsn after")
-            local res, stdout, stderr = run_command(dir, command_base)
+            local res, _, _ = run_command(dir, command_base)
             test_i:is(res, 0, "execution result")
             test_i:is(test_run:get_lsn("remote", 1), 16, "check lsn after")
         end)
@@ -618,7 +607,7 @@ test:test('filter_xlog', function(test)
     local tarantoolctl = dofile(TARANTOOLCTL_PATH)
 
     -- Like xlog.pairs().
-    local function gen(param, lsn)
+    local function gen(param)
         local row = param.data[param.idx]
         if row == nil then
             return

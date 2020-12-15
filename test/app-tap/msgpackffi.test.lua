@@ -4,7 +4,6 @@ package.path = "lua/?.lua;"..package.path
 
 local tap = require('tap')
 local common = require('serializer_test')
-local ffi = require('ffi')
 
 local function is_map(s)
     local b = string.byte(string.sub(s, 1, 1))
@@ -76,7 +75,7 @@ local function test_other(test, s)
     --
     local function check_depth(depth_to_try)
         local t = nil
-        for i = 1, depth_to_try do t = {t} end
+        for _ = 1, depth_to_try do t = {t} end
         t = s.decode_unchecked(s.encode(t))
         local level = 0
         while t ~= nil do level = level + 1 t = t[1] end

@@ -1,8 +1,10 @@
 std = "luajit"
-globals = {"box", "_TARANTOOL", "tonumber64"}
+globals = {"box", "_TARANTOOL", "tonumber64", "utf8"}
 ignore = {
     -- Accessing an undefined field of a global variable <debug>.
     "143/debug",
+    -- Accessing an undefined field of a global variable <os>.
+    "143/os",
     -- Accessing an undefined field of a global variable <string>.
     "143/string",
     -- Accessing an undefined field of a global variable <table>.
@@ -32,7 +34,6 @@ exclude_files = {
     "src/box/lua/serpent.lua",
     "test-run/**/*.lua",
     "test/app/**/*.lua",
-    "test/app-tap/**/*.lua",
     "test/box/**/*.lua",
     "test/box-py/**/*.lua",
     "test/box-tap/**/*.lua",

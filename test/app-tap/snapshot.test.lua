@@ -3,7 +3,6 @@
 local math = require('math')
 local fiber = require('fiber')
 local tap = require('tap')
-local ffi = require('ffi')
 local fio = require('fio')
 
 box.cfg{ log="tarantool.log", memtx_memory=107374182}
@@ -75,14 +74,14 @@ snap_chan:get()
 test:ok(true, 'gh-695: avoid overwriting tuple data necessary for smfree()')
 
 -------------------------------------------------------------------------------
--- gh-1185: Crash in matras_touch in snapshot_daemon.test 
+-- gh-1185: Crash in matras_touch in snapshot_daemon.test
 -------------------------------------------------------------------------------
 
 local s1 = box.schema.create_space('test1', { engine = 'memtx'})
-local i1 = s1:create_index('test', { type = 'tree', parts = {1, 'unsigned'} })
+s1:create_index('test', { type = 'tree', parts = {1, 'unsigned'} })
 
 local s2 = box.schema.create_space('test2', { engine = 'memtx'})
-local i2 = s2:create_index('test', { type = 'tree', parts = {1, 'unsigned'} })
+s2:create_index('test', { type = 'tree', parts = {1, 'unsigned'} })
 
 for i = 1,1000 do s1:insert{i, i, i} end
 
@@ -126,11 +125,11 @@ local function gh1094()
             break
         end
     end
-    local sf, mf = pcall(box.snapshot)
-    for i, f in pairs(files) do
+    local sf = pcall(box.snapshot)
+    for _, f in pairs(files) do
         f:close()
     end
-    local ss, ms = pcall(box.snapshot)
+    local ss = pcall(box.snapshot)
     test:ok(not sf and ss, msg)
 end
 gh1094()
@@ -141,7 +140,7 @@ box.snapshot()
 box.snapshot()
 box.snapshot()
 test:ok(true, 'No crash for second snapshot w/o any changes')
-files = fio.glob(box.cfg.memtx_dir .. '/*.snap')
+local files = fio.glob(box.cfg.memtx_dir .. '/*.snap')
 table.sort(files)
 fio.unlink(files[#files])
 box.snapshot()

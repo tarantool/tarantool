@@ -2,7 +2,7 @@ local ffi = require('ffi')
 
 local function rt(test, s, x, t)
     local buf1 = s.encode(x)
-    local x1, offset1 = s.decode(buf1)
+    local x1 = s.decode(buf1)
     local xstr
     if type(x) == "table" then
         xstr = "table"
@@ -189,8 +189,6 @@ local function test_double(test, s)
     ss.cfg{decode_invalid_numbers = true}
     rt(test, s, nan)
     rt(test, s, inf)
-
-    ss = nil
 end
 
 local function test_decimal(test, s)
@@ -258,14 +256,14 @@ local function test_table(test, s, is_array, is_map)
     test:ok(is_map(s.encode({k1 = 'v1', k2 = 'v2', k3 = 'v3'})), "map is map")
 
     -- utf-8 pairs
-    rt(test, s, {Метапеременная = { 'Метазначение' }})
+    rt(test, s, {['Метапеременная'] = { 'Метазначение' }})
     rt(test, s, {test = { 'Результат' }})
 
     local arr = setmetatable({1, 2, 3, k1 = 'v1', k2 = 'v2', 4, 5},
         { __serialize = 'seq'})
     local map = setmetatable({1, 2, 3, 4, 5}, { __serialize = 'map'})
     local obj = setmetatable({}, {
-        __serialize = function(x) return 'serialize' end
+        __serialize = function() return 'serialize' end
     })
 
     -- __serialize on encode
@@ -306,8 +304,6 @@ local function test_table(test, s, is_array, is_map)
     -- string (from __serialize hook)
     test:is(ss.decode(ss.encode(obj)), "serialize", "object load __serialize")
 
-    ss = nil
-
     --
     -- decode_save_metatables
     --
@@ -325,14 +321,12 @@ local function test_table(test, s, is_array, is_map)
         "array save __serialize")
     test:is(getmetatable(ss.decode(ss.encode(map))).__serialize, "map",
         "map save __serialize")
-    ss = nil
-
 
     --
     -- encode_sparse_convert / encode_sparse_ratio / encode_sparse_safe
     --
 
-    local ss = s.new()
+    ss = s.new()
 
     ss.cfg{encode_sparse_ratio = 2, encode_sparse_safe = 10}
 
@@ -359,8 +353,6 @@ local function test_table(test, s, is_array, is_map)
     -- array
     test:ok(is_array(ss.encode({1, 2, 3, 4, 5, [100] = 100})),
         "sparse safe 2")
-
-    ss = nil
 end
 
 local function test_ucdata(test, s)
@@ -374,9 +366,9 @@ local function test_ucdata(test, s)
     local ctype = ffi.typeof('struct serializer_cdata_test')
     ffi.metatype(ctype, {
         __index = {
-            __serialize = function(obj) return 'unpack' end,
+            __serialize = function() return 'unpack' end,
         },
-        __tostring = function(obj) return 'tostring' end
+        __tostring = function() return 'tostring' end
     });
 
     local cdata = ffi.new(ctype)
@@ -409,8 +401,6 @@ local function test_ucdata(test, s)
     test:istable(ss.decode(ss.encode(udata)), 'udata  hook priority')
     -- gh-1226: luaL_convertfield should ignore __serialize hook for ctypes
     test:like(ss.decode(ss.encode(ctype)), 'ctype<struct', 'ctype __serialize')
-
-    ss = nil
 end
 
 local function test_depth(test, s)
@@ -433,12 +423,12 @@ local function test_depth(test, s)
     s.cfg({encode_deep_as_nil = false})
 
     local t = nil
-    for i = 1, max_depth + 1 do t = {t} end
-    local ok, err = pcall(s.encode, t)
+    for _ = 1, max_depth + 1 do t = {t} end
+    local ok = pcall(s.encode, t)
     test:ok(not ok, "too deep encode depth")
 
     s.cfg({encode_max_depth = max_depth + 1})
-    ok, err = pcall(s.encode, t)
+    ok = pcall(s.encode, t)
     test:ok(ok, "no throw in a corner case")
 
     s.cfg({encode_deep_as_nil = deep_as_nil, encode_max_depth = max_depth})

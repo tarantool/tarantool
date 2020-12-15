@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 
-clock = require("clock")
-test = require("tap").test("csv")
+local clock = require("clock")
+local test = require("tap").test("csv")
 test:plan(10)
 test:ok(clock.realtime() > 0, "realtime")
 test:ok(clock.thread() > 0, "thread")

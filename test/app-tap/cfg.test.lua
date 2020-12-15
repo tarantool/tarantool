@@ -12,7 +12,7 @@ test:plan(11)
 local nil_uuid = '00000000-0000-0000-0000-000000000000'
 local ok = pcall(box.cfg, {instance_uuid = nil_uuid})
 test:ok(not ok, 'nil instance UUID is not allowed')
-ok, err = pcall(box.cfg, {replicaset_uuid = nil_uuid})
+ok = pcall(box.cfg, {replicaset_uuid = nil_uuid})
 test:ok(not ok, 'nil replicaset UUID is not allowed')
 
 test:is(type(box.ctl), "table", "box.ctl is available before box.cfg")

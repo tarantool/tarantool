@@ -13,8 +13,8 @@ local res = tap.test('gh-4761-json-per-call-options', function(test)
     test:plan(2)
 
     -- Preparation code: call :decode() with a custom option.
-    local ok, err = pcall(json.decode, '{"foo": {"bar": 1}}',
-                          {decode_max_depth = 1})
+    local ok = pcall(json.decode, '{"foo": {"bar": 1}}',
+                     {decode_max_depth = 1})
     assert(not ok, 'expect "too many nested data structures" error')
 
     -- Verify that the instance option remains unchanged.
@@ -25,8 +25,8 @@ local res = tap.test('gh-4761-json-per-call-options', function(test)
 
     -- Same check for json.encode.
     local nan = 1/0
-    local ok, err = pcall(json.encode, {a = nan},
-                          {encode_invalid_numbers = false})
+    local ok = pcall(json.encode, {a = nan},
+                     {encode_invalid_numbers = false})
     assert(not ok, 'expected "number must not be NaN or Inf" error')
     local exp_res = '{"a":inf}'
     local ok, res = pcall(json.encode, {a = nan})
