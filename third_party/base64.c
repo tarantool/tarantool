@@ -222,7 +222,8 @@ base64_decode_value(int value)
 		32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
 		44, 45, 46, 47, 48, 49, 50, 51
 	};
-	static const int decoding_size = sizeof(decoding);
+	static const int decoding_size =
+		sizeof(decoding) / sizeof(decoding[0]);
 	int codepos = value;
 	codepos -= 43;
 	if (codepos < 0 || codepos >= decoding_size)
