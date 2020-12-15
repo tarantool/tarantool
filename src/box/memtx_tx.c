@@ -482,19 +482,22 @@ memtx_tx_story_is_visible(struct memtx_story *story, struct txn *txn,
 		rv_psn = txn->rv_psn;
 
 	struct txn_stmt *dels = story->del_stmt;
+	bool was_deleted_by_prepared = false;
 	while (dels != NULL) {
 		if (dels->txn == txn) {
 			/* Tuple is deleted by us (@txn). */
 			*own_change = true;
 			return true;
 		}
+		if (story->del_psn != 0 && dels->txn->psn == story->del_psn)
+			was_deleted_by_prepared = true;
 		dels = dels->next_in_del_list;
 	}
 	if (is_prepared_ok && story->del_psn != 0 && story->del_psn < rv_psn) {
 		/* Tuple is deleted by prepared TX. */
 		return true;
 	}
-	if (story->del_psn != 0 && story->del_stmt == NULL &&
+	if (story->del_psn != 0 && !was_deleted_by_prepared &&
 	    story->del_psn < rv_psn) {
 		/* Tuple is deleted by committed TX. */
 		return true;
