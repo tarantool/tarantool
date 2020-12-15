@@ -3,7 +3,7 @@
 local tap   = require('tap')
 local iconv = require('iconv')
 
-test = tap.test("iconv")
+local test = tap.test("iconv")
 test:plan(11)
 
 local simple_str  = 'ascii string'
@@ -34,7 +34,7 @@ test:is(c8_1251(c1251_16(c16_16be(c16be_8(cyrillic_str)))), cyrillic_str,
         'complex multi-format conversion')
 
 -- test huge string
-huge_str = string.rep(cyrillic_str, 50)
+local huge_str = string.rep(cyrillic_str, 50)
 
 test:is(c16be_8(c8_16be(huge_str)), huge_str, "huge string")
 

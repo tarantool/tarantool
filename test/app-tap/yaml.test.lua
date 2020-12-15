@@ -37,8 +37,6 @@ local function test_compact(test, s)
         "---\n- {'k': 'v'}\n...\n", "flow map")
     test:is(getmetatable(ss.decode(ss.encode({k = 'v'}))).__serialize, "map",
         "decoded __serialize is map")
-
-    ss = nil
 end
 
 local function test_output(test, s)
@@ -83,11 +81,11 @@ local function test_tagged(test, s)
     -- Test encoding tags.
     --
     local prefix = 'tag:tarantool.io/push,2018'
-    local ok, err = pcall(s.encode, 200, {tag_handle = true, tag_prefix = 100})
+    local _, err = pcall(s.encode, 200, {tag_handle = true, tag_prefix = 100})
     test:isnt(err:find('Usage'), nil, "encode usage")
-    ok, err = pcall(s.encode, 100, {tag_handle = 'handle'})
+    _, err = pcall(s.encode, 100, {tag_handle = 'handle'})
     test:isnt(err:find('Usage'), nil, "encode usage, no prefix")
-    ok, err = pcall(s.encode, 100, {tag_prefix = 'prefix'})
+    _, err = pcall(s.encode, 100, {tag_prefix = 'prefix'})
     test:isnt(err:find('Usage'), nil, "encode usage, no handle")
     local ret
     ret, err = s.encode(300, {tag_handle = '!push', tag_prefix = prefix})
@@ -100,9 +98,9 @@ local function test_tagged(test, s)
     --
     -- Test decoding tags.
     --
-    ok, err = pcall(s.decode)
+    _, err = pcall(s.decode)
     test:isnt(err:find('Usage'), nil, "decode usage")
-    ok, err = pcall(s.decode, false)
+    _, err = pcall(s.decode, false)
     test:isnt(err:find('Usage'), nil, "decode usage")
     local handle, prefix = s.decode(ret, {tag_only = true})
     test:is(handle, "!print!", "handle is decoded ok")
@@ -114,7 +112,7 @@ local function test_tagged(test, s)
 - 100
 ...
 ]]
-    ok, err = s.decode(several_tags, {tag_only = true})
+    local ok, err = s.decode(several_tags, {tag_only = true})
     test:is(ok, nil, "can not decode multiple tags")
     test:is(err, "can not decode multiple tags", "same")
     local no_tags = s.encode(100)

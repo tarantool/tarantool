@@ -9,14 +9,14 @@ box.cfg{
     log="tarantool.log"
 }
 
-yaml = require('yaml')
-fiber = require('fiber')
+local yaml = require('yaml')
+local fiber = require('fiber')
 
 if box.space.tweedledum ~= nil then
     box.space.space1:drop()
 end
 
-space = box.schema.space.create('tweedledum')
+local space = box.schema.space.create('tweedledum')
 space:create_index('primary', { type = 'hash' })
 
 print[[
@@ -24,7 +24,7 @@ print[[
 -- Access to box.cfg from init script
 --
 ]]
-t = {}
+local t = {}
 
 for k,v in pairs(box.cfg) do
     if k == 'listen' then
@@ -36,7 +36,7 @@ for k,v in pairs(box.cfg) do
 end
 table.sort(t)
 print('box.cfg')
-for k,v in pairs(t) do print(v) end
+for _,v in pairs(t) do print(v) end
 --
 -- Insert tests
 --
@@ -44,7 +44,7 @@ local function do_insert()
     space:insert{1, 2, 4, 8}
 end
 
-fiber1 = fiber.create(do_insert)
+fiber.create(do_insert)
 
 print[[
 --
@@ -71,12 +71,12 @@ print[[
 -- Check that require function(math.floor) reachable in the init script
 --
 ]]
-floor = require("math").floor
+local floor = require("math").floor
 print(floor(0.5))
 print(floor(0.9))
 print(floor(1.1))
 
-mod = require('require_mod')
+local mod = require('require_mod')
 print(mod.test(10, 15))
 --
 -- A test case for https://github.com/tarantool/tarantool/issues/53

@@ -29,8 +29,7 @@ local test = ffi.metatype('struct test', {
   __gc = function() fiber.yield() end,
 })
 
-local t = test(9)
-t = nil
+test(9)
 
 -- This call leads to the platform panic.
 collectgarbage('collect')
