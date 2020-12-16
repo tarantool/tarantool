@@ -6,6 +6,11 @@ test_run:cmd('restart server default')
 fiber = require('fiber')
 ---
 ...
+test_run:cmd("push filter 'Invalid VYLOG file: Slice [0-9]+ deleted but not registered'" .. \
+             " to 'Invalid VYLOG file: Slice <NUM> deleted but not registered'")
+---
+- true
+...
 -- optimize one index
 space = box.schema.space.create('test', { engine = 'vinyl' })
 ---
