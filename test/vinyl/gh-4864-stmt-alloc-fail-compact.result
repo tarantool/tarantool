@@ -9,6 +9,12 @@ digest = require('digest')
  | ---
  | ...
 
+test_run:cmd("push filter 'Invalid VYLOG file: Slice [0-9]+ deleted but not registered'" .. \
+             " to 'Invalid VYLOG file: Slice <NUM> deleted but not registered'")
+ | ---
+ | - true
+ | ...
+
 s = box.schema.space.create('test', {engine = 'vinyl'})
  | ---
  | ...
