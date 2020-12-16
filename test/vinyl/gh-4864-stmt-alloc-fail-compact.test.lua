@@ -2,6 +2,9 @@ test_run = require('test_run').new()
 fiber = require('fiber')
 digest = require('digest')
 
+test_run:cmd("push filter 'Invalid VYLOG file: Slice [0-9]+ deleted but not registered'" .. \
+             " to 'Invalid VYLOG file: Slice <NUM> deleted but not registered'")
+
 s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk', {run_count_per_level = 100, page_size = 128, range_size = 1024})
 
