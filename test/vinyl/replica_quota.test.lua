@@ -1,5 +1,8 @@
 test_run = require('test_run').new()
 
+test_run:cmd("push filter 'Invalid VYLOG file: Slice [0-9]+ deleted but not registered'" .. \
+             " to 'Invalid VYLOG file: Slice <NUM> deleted but not registered'")
+
 box.schema.user.grant('guest', 'replication')
 
 s = box.schema.space.create('test', { engine = 'vinyl' })
