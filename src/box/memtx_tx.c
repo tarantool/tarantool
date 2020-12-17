@@ -1051,8 +1051,8 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 			break;
 		}
 	}
-	if (!own_change)
-		memtx_tx_track_read(txn, space, tuple);
+	if (!own_change && result != NULL)
+		memtx_tx_track_read(txn, space, result);
 	if (mk_index != 0) {
 		assert(false); /* TODO: multiindex */
 		panic("multikey indexes are not supported int TX manager");
