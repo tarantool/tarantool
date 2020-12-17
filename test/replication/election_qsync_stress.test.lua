@@ -50,8 +50,13 @@ _ = c:eval('box.space.test:create_index("pk")')
 test_run:cmd('setopt delimiter ";"')
 for i = 1,10 do
     c:eval('box.cfg{replication_synchro_quorum=4, replication_synchro_timeout=1000}')
+    lsn = c:eval('return box.info.lsn')
     c.space.test:insert({i}, {is_async=true})
-    test_run:wait_cond(function() return c.space.test:get{i} ~= nil end)
+    test_run:wait_cond(function() return c:eval('return box.info.lsn') > lsn end)
+    r1_nr = old_leader_nr % 3 + 1
+    r2_nr = (old_leader_nr + 1) % 3 + 1
+    test_run:wait_lsn('election_replica'..r1_nr, 'election_replica'..old_leader_nr)
+    test_run:wait_lsn('election_replica'..r2_nr, 'election_replica'..old_leader_nr)
     test_run:cmd('stop server '..old_leader)
     nrs[old_leader_nr] = false
     new_leader_nr = get_leader(nrs)
