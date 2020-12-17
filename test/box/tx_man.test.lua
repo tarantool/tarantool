@@ -266,6 +266,22 @@ s:select{}
 
 s:drop()
 
+s = box.schema.space.create('test')
+i = s:create_index('pk', {parts={{1, 'uint'}}})
+s:replace{1, 0}
+
+tx1:begin()
+tx2:begin()
+tx1('s:select{1}')
+tx1('s:replace{1, 1}')
+tx2('s:select{1}')
+tx2('s:replace{1, 2}')
+tx1:commit()
+tx2:commit()
+s:select{}
+
+s:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
