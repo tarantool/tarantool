@@ -14,7 +14,7 @@ test_%:
 #
 # How to run:
 #
-# make GITLAB_USER=foo -f .gitlab.mk docker_bootstrap
+# make DOCKER_USER=foo -f .gitlab.mk docker_bootstrap
 #
 # The command will prompt for a password. If two-factor
 # authentication is enabled an access token with 'api' scope
@@ -27,7 +27,7 @@ test_%:
 # Keep in a mind that the resulting image is used to run tests on
 # all branches, so avoid removing packages: only add them.
 
-GITLAB_REGISTRY?=registry.gitlab.com
+DOCKER_REGISTRY?=docker.io
 DOCKER_BUILD=docker build --network=host -f - .
 
 define DEBIAN_STRETCH_DOCKERFILE
@@ -44,27 +44,27 @@ RUN make APT_EXTRA_FLAGS="--allow-releaseinfo-change-version --allow-releaseinfo
 endef
 export DEBIAN_BUSTER_DOCKERFILE
 
-IMAGE_PREFIX:=${GITLAB_REGISTRY}/tarantool/tarantool/testing
-DEBIAN_STRETCH_IMAGE:=${IMAGE_PREFIX}/debian-stretch
-DEBIAN_BUSTER_IMAGE:=${IMAGE_PREFIX}/debian-buster
+IMAGE_PREFIX:=${DOCKER_REGISTRY}/tarantool/testing
+DEBIAN_STRETCH_IMAGE:=${IMAGE_PREFIX}:debian-stretch
+DEBIAN_BUSTER_IMAGE:=${IMAGE_PREFIX}:debian-buster
 
 TRAVIS_CI_MD5SUM:=$(firstword $(shell md5sum .travis.mk))
 
 docker_bootstrap:
 	# Login.
-	docker login -u ${GITLAB_USER} ${GITLAB_REGISTRY}
+	docker login -u ${DOCKER_USER} ${DOCKER_REGISTRY}
 	# Build images.
 	echo "$${DEBIAN_STRETCH_DOCKERFILE}" | ${DOCKER_BUILD} \
-		-t ${DEBIAN_STRETCH_IMAGE}:${TRAVIS_CI_MD5SUM} \
-		-t ${DEBIAN_STRETCH_IMAGE}:latest
+		-t ${DEBIAN_STRETCH_IMAGE}_${TRAVIS_CI_MD5SUM} \
+		-t ${DEBIAN_STRETCH_IMAGE}
 	echo "$${DEBIAN_BUSTER_DOCKERFILE}" | ${DOCKER_BUILD} \
-		-t ${DEBIAN_BUSTER_IMAGE}:${TRAVIS_CI_MD5SUM} \
-		-t ${DEBIAN_BUSTER_IMAGE}:latest
+		-t ${DEBIAN_BUSTER_IMAGE}_${TRAVIS_CI_MD5SUM} \
+		-t ${DEBIAN_BUSTER_IMAGE}
 	# Push images.
-	docker push ${DEBIAN_STRETCH_IMAGE}:${TRAVIS_CI_MD5SUM}
-	docker push ${DEBIAN_BUSTER_IMAGE}:${TRAVIS_CI_MD5SUM}
-	docker push ${DEBIAN_STRETCH_IMAGE}:latest
-	docker push ${DEBIAN_BUSTER_IMAGE}:latest
+	docker push ${DEBIAN_STRETCH_IMAGE}_${TRAVIS_CI_MD5SUM}
+	docker push ${DEBIAN_BUSTER_IMAGE}_${TRAVIS_CI_MD5SUM}
+	docker push ${DEBIAN_STRETCH_IMAGE}
+	docker push ${DEBIAN_BUSTER_IMAGE}
 
 # Clone the benchmarks repository for performance testing
 perf_clone_benchs_repo:
