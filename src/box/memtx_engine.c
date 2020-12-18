@@ -159,8 +159,16 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	/* Process existing snapshot */
 	say_info("recovery start");
 	int64_t signature = vclock_sum(vclock);
-	const char *filename = xdir_format_filename(&memtx->snap_dir,
-						    signature, NONE);
+	const char *name = xdir_format_filename(&memtx->snap_dir,
+						signature, NONE);
+	/*
+	 * We need to save name in local variable because
+	 * xdir_format_filename() allocates memory in static buffer
+	 * which will be overwritten later.
+	 */
+	char filename[PATH_MAX];
+	strncpy(filename, name, PATH_MAX - 1);
+	filename[PATH_MAX - 1] = '\0';
 
 	say_info("recovering from `%s'", filename);
 	struct xlog_cursor cursor;
