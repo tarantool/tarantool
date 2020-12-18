@@ -1964,6 +1964,12 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 
 	ssize_t rc;
 	/*
+	 * xlog_cursor_ensure() in case of fail may use cursor's name
+	 * to print fine diagnostic message. So set the name of cursor
+	 * before calling it.
+	 */
+	snprintf(i->name, sizeof(i->name), "%s", name);
+	/*
 	 * we can have eof here, but this is no error,
 	 * because we don't know exact meta size
 	 */
@@ -1979,7 +1985,6 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 		diag_set(XlogError, "Unexpected end of file, run with 'force_recovery = true'");
 		goto error;
 	}
-	snprintf(i->name, sizeof(i->name), "%s", name);
 	i->zdctx = ZSTD_createDStream();
 	if (i->zdctx == NULL) {
 		diag_set(ClientError, ER_DECOMPRESSION,
