@@ -1,0 +1,7 @@
+contact_links:
+  - name: Question
+    url: https://github.com/tarantool/tarantool/discussions/new
+    about: Use GitHub Discussions to ask questions
+  - name: Commercial support
+    url: https://www.tarantool.io/en/services/
+    about: We have a paid support
