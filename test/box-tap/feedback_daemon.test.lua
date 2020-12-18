@@ -20,6 +20,9 @@ local function feedback_reset()
 end
 
 local function http_handle(s)
+    -- When data is > 1024 bytes, curl sends "Expect: 100-continue" header,
+    -- and waits for this response before sending the actual data.
+    s:write("HTTP/1.1 100 Continue\r\n\r\n")
     s:write("HTTP/1.1 200 OK\r\n")
     s:write("Accept: */*\r\n")
     s:write("Connection: keep-alive\r\n")
@@ -67,7 +70,7 @@ if not ok then
     os.exit(0)
 end
 
-test:plan(23)
+test:plan(27)
 
 local function check(message)
     while feedback_count < 1 do
@@ -120,6 +123,9 @@ local fio = require("fio")
 local fh = fio.open("feedback.json")
 test:ok(fh, "file is created")
 local file_data = fh:read()
+-- Ignore the report time. The data should be equal other than that.
+feedback_save = string.gsub(feedback_save, 'time:(%d+)', 'time:0')
+file_data = string.gsub(feedback_save, 'time:(%d+)', 'time:0')
 test:is(file_data, feedback_save, "data is equal")
 fh:close()
 fio.unlink("feedback.json")
@@ -240,6 +246,47 @@ box.space.features_vinyl:drop()
 box.space.features_memtx_empty:drop()
 box.space.features_memtx:drop()
 box.space.features_sync:drop()
+
+function check_stats(stat)
+    local sub = test:test('feedback operation stats')
+    sub:plan(18)
+    local box_stat = box.stat()
+    local net_stat = box.stat.net()
+    for op, val in pairs(box_stat) do
+        sub:is(stat.box[op].total, val.total,
+               string.format('%s total is reported', op))
+    end
+    for op, val in pairs(net_stat) do
+        sub:is(stat.net[op].total, val.total,
+               string.format('%s total is reported', op))
+        if val.current ~= nil then
+            sub:is(stat.net[op].current, val.current,
+                   string.format('%s current is reported', op))
+        end
+    end
+    sub:check()
+end
+
+actual = daemon.generate_feedback()
+test:is(fiber.time64(), actual.stats.time, "Time of report generation is correct")
+
+-- Check that all the statistics are reported.
+check_stats(actual.stats)
+
+box.schema.space.create('test')
+box.space.test:create_index('pk')
+box.space.test:insert{1}
+box.space.test:select{}
+box.space.test:update({1}, {{'=', 2, 1}})
+box.space.test:replace{2}
+box.space.test:delete{1}
+box.space.test:drop()
+
+-- Check that all the statistics are updated.
+actual = daemon.generate_feedback()
+test:is(fiber.time64(), actual.stats.time, "Time of report generation is correct")
+
+check_stats(actual.stats)
 
 test:check()
 os.exit(0)

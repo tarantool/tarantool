@@ -284,12 +284,40 @@ local function fill_in_options(feedback)
     feedback.options = options
 end
 
+local function fill_in_stats(feedback)
+    local stats = {box = {}, net = {}}
+    local box_stat = box.stat()
+    local net_stat = box.stat.net()
+
+    stats.time = fiber.time64()
+    -- Send box.stat().*.total.
+    for op, tbl in pairs(box_stat) do
+        if type(tbl) == 'table' and tbl.total ~= nil then
+            stats.box[op] = {
+                total = tbl.total
+            }
+        end
+    end
+    -- Send box.stat.net().*.total and box.stat.net().*.current.
+    for val, tbl in pairs(net_stat) do
+        if type(tbl) == 'table' and
+           (tbl.total ~= nil or tbl.current ~= nil) then
+            stats.net[val] = {
+                total = tbl.total,
+                current = tbl.current
+            }
+        end
+    end
+    feedback.stats = stats
+end
+
 local function fill_in_feedback(feedback)
     fill_in_base_info(feedback)
     fill_in_platform_info(feedback)
     fill_in_repo_url(feedback)
     fill_in_features(feedback)
     fill_in_options(feedback)
+    fill_in_stats(feedback)
 
     return feedback
 end
@@ -372,7 +400,7 @@ setmetatable(daemon, {
         end,
         -- this function is used in saving feedback in file
         generate_feedback = function()
-            return fill_in_feedback({ feedback_version = 4 })
+            return fill_in_feedback({ feedback_version = 5 })
         end,
         start = function()
             start(daemon)
