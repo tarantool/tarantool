@@ -48,7 +48,10 @@ ok or require('log').error('test_run:wait_upstream failed with instance info: ' 
 test_run:cmd("switch default")
 test_run:cmd("restart server replica")
 -- applier is not in follow state
-test_run:wait_upstream(1, {status = 'stopped', message_re = "Duplicate key exists in unique index 'primary' in space 'test'"})
+ok, instance_info = test_run:wait_upstream(1, {status = 'stopped', \
+    message_re = "Duplicate key exists in unique index 'primary' in space 'test'"})
+ok or require('log').error('test_run:wait_upstream failed with instance info: ' \
+    .. require('json').encode(instance_info))
 
 --
 -- gh-3977: check that NOP is written instead of conflicting row.
