@@ -268,6 +268,7 @@ fi
 %{_includedir}/tarantool/luajit.h
 %{_includedir}/tarantool/lualib.h
 %{_includedir}/tarantool/module.h
+%{_includedir}/tarantool/curl
 
 %changelog
 * Tue Sep 12 2017 Roman Tsisyk <roman@tarantool.org> 1.7.5.46-1
