@@ -350,6 +350,13 @@ else()
     find_package(CURL)
 endif()
 
+# Install headers.
+if (ENABLE_BUNDLED_LIBCURL)
+    install(DIRECTORY "${CURL_INCLUDE_DIRS}/curl"
+            DESTINATION ${MODULE_FULL_INCLUDEDIR}
+            FILES_MATCHING PATTERN "*.h")
+endif()
+
 #
 # Export libcurl symbols if the library is linked statically.
 #
