@@ -328,7 +328,7 @@ perf_tpch:
   <<: *perf_docker_test_definition
   tags:
     - docker_sh2_perf
-  image: ${IMAGE_PERF_BUILT}_tpch
+  image: ${IMAGE_PERF_BUILT}
   variables:
     <<: *perf_vars_definition
     BENCH: 'tpch'
