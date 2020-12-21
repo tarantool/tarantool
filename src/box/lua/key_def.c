@@ -360,17 +360,14 @@ lbox_key_def_compare_with_key(struct lua_State *L)
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	size_t key_len;
-	const char *key_end, *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
-	uint32_t part_count = mp_decode_array(&key);
-	if (key_validate_parts(key_def, key, part_count, true,
-			       &key_end) != 0) {
+	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
+	if (box_key_def_validate_key(key_def, key, NULL)) {
 		region_truncate(region, region_svp);
 		tuple_unref(tuple);
 		return luaT_error(L);
 	}
 
-	int rc = tuple_compare_with_key(tuple, HINT_NONE, key,
-					part_count, HINT_NONE, key_def);
+	int rc = box_tuple_compare_with_key(tuple, key, key_def);
 	region_truncate(region, region_svp);
 	tuple_unref(tuple);
 	lua_pushinteger(L, rc);
