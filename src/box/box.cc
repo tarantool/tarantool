@@ -526,7 +526,7 @@ box_check_replication_synchro_quorum(void)
 			 "maximal number of replicas");
 		return -1;
 	}
-	return quorum;
+	return 0;
 }
 
 static double
@@ -723,7 +723,7 @@ box_check_config(void)
 	box_check_replication_connect_timeout();
 	box_check_replication_connect_quorum();
 	box_check_replication_sync_lag();
-	if (box_check_replication_synchro_quorum() < 0)
+	if (box_check_replication_synchro_quorum() != 0)
 		diag_raise();
 	if (box_check_replication_synchro_timeout() < 0)
 		diag_raise();
@@ -846,14 +846,21 @@ box_set_replication_sync_lag(void)
 	replication_sync_lag = box_check_replication_sync_lag();
 }
 
+void
+box_update_replication_synchro_quorum(void)
+{
+	int quorum = cfg_geti("replication_synchro_quorum");
+
+	replication_synchro_quorum = quorum;
+	txn_limbo_on_parameters_change(&txn_limbo);
+}
+
 int
 box_set_replication_synchro_quorum(void)
 {
-	int value = box_check_replication_synchro_quorum();
-	if (value < 0)
+	if (box_check_replication_synchro_quorum() != 0)
 		return -1;
-	replication_synchro_quorum = value;
-	txn_limbo_on_parameters_change(&txn_limbo);
+	box_update_replication_synchro_quorum();
 	return 0;
 }
 
