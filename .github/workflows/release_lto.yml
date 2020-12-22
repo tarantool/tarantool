@@ -1,4 +1,4 @@
-name: CI
+name: release_lto
 
 on: [push, pull_request]
 

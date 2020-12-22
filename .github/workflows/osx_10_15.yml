@@ -1,4 +1,4 @@
-name: CI
+name: osx_10_15
 
 on: [push, pull_request]
 
