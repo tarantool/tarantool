@@ -20,9 +20,8 @@ replica.deploy()
 def parallel_run(cmd1, cmd2, compare):
     print("parallel send: {}".format(cmd1))
     print("parallel send: {}".format(cmd2))
-    master.admin.socket.sendall("{}\n".format(cmd1))
-    replica.admin.socket.sendall("{}\n".format(cmd2))
-
+    master.admin.socket.sendall(cmd1.encode("utf-8") + b'\n')
+    replica.admin.socket.sendall(cmd2.encode("utf-8") + b'\n')
     master.admin.socket.recv(2048)
     replica.admin.socket.recv(2048)
 
