@@ -40,9 +40,11 @@ endmacro(set_source_files_compile_flags)
 # A helper function to compile *.lua source into *.lua.c sources
 function(lua_source varname filename)
     if (IS_ABSOLUTE "${filename}")
+        string (REPLACE "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}"
+            genname "${filename}")
         set (srcfile "${filename}")
-        set (tmpfile "${filename}.new.c")
-        set (dstfile "${filename}.c")
+        set (tmpfile "${genname}.new.c")
+        set (dstfile "${genname}.c")
     else(IS_ABSOLUTE "${filename}")
         set (srcfile "${CMAKE_CURRENT_SOURCE_DIR}/${filename}")
         set (tmpfile "${CMAKE_CURRENT_BINARY_DIR}/${filename}.new.c")
