@@ -1,4 +1,4 @@
-name: CI
+name: release_clang
 
 on: [push, pull_request]
 
