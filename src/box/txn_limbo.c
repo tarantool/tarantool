@@ -56,6 +56,17 @@ txn_limbo_is_ro(struct txn_limbo *limbo)
 }
 
 struct txn_limbo_entry *
+txn_limbo_last_synchro_entry(struct txn_limbo *limbo)
+{
+	struct txn_limbo_entry *entry;
+	rlist_foreach_entry_reverse(entry, &limbo->queue, in_queue) {
+		if (txn_has_flag(entry->txn, TXN_WAIT_ACK))
+			return entry;
+	}
+	return NULL;
+}
+
+struct txn_limbo_entry *
 txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 {
 	assert(txn_has_flag(txn, TXN_WAIT_SYNC));
