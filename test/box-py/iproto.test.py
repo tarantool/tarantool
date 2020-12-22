@@ -163,7 +163,7 @@ class RawInsert(Request):
 
     def __init__(self, conn, space_no, blob):
         super(RawInsert, self).__init__(conn)
-        request_body = "\x82" + msgpack.dumps(IPROTO_SPACE_ID) + \
+        request_body = b'\x82' + msgpack.dumps(IPROTO_SPACE_ID) + \
             msgpack.dumps(space_id) + msgpack.dumps(IPROTO_TUPLE) + blob
         self._body = request_body
 
@@ -172,7 +172,7 @@ class RawSelect(Request):
 
     def __init__(self, conn, space_no, blob):
         super(RawSelect, self).__init__(conn)
-        request_body = "\x83" + msgpack.dumps(IPROTO_SPACE_ID) + \
+        request_body = b'\x83' + msgpack.dumps(IPROTO_SPACE_ID) + \
             msgpack.dumps(space_id) + msgpack.dumps(IPROTO_KEY) + blob + \
             msgpack.dumps(IPROTO_LIMIT) + msgpack.dumps(100);
         self._body = request_body
@@ -182,13 +182,13 @@ space = c.space("test")
 space_id = space.space_no
 
 TESTS = [
-    (1,     "\xa1", "\xd9\x01", "\xda\x00\x01", "\xdb\x00\x00\x00\x01"),
-    (31,    "\xbf", "\xd9\x1f", "\xda\x00\x1f", "\xdb\x00\x00\x00\x1f"),
-    (32,    "\xd9\x20", "\xda\x00\x20", "\xdb\x00\x00\x00\x20"),
-    (255,   "\xd9\xff", "\xda\x00\xff", "\xdb\x00\x00\x00\xff"),
-    (256,   "\xda\x01\x00", "\xdb\x00\x00\x01\x00"),
-    (65535, "\xda\xff\xff", "\xdb\x00\x00\xff\xff"),
-    (65536, "\xdb\x00\x01\x00\x00"),
+    (1,     b'\xa1', b'\xd9\x01', b'\xda\x00\x01', b'\xdb\x00\x00\x00\x01'),
+    (31,    b'\xbf', b'\xd9\x1f', b'\xda\x00\x1f', b'\xdb\x00\x00\x00\x1f'),
+    (32,    b'\xd9\x20', b'\xda\x00\x20', b'\xdb\x00\x00\x00\x20'),
+    (255,   b'\xd9\xff', b'\xda\x00\xff', b'\xdb\x00\x00\x00\xff'),
+    (256,   b'\xda\x01\x00', b'\xdb\x00\x00\x01\x00'),
+    (65535, b'\xda\xff\xff', b'\xdb\x00\x00\xff\xff'),
+    (65536, b'\xdb\x00\x01\x00\x00'),
 ]
 
 for test in TESTS:
@@ -197,16 +197,19 @@ for test in TESTS:
     print("STR", size)
     print("--")
     for fmt in it:
-        print("0x" + fmt.encode("hex"), "=>", end=" ")
+        if sys.version[0] == "2":
+            print("0x" + fmt.encode("hex"), "=>", end=" ")
+        else:
+            print("0x" + fmt.hex(), "=>", end=" ")
         field = "*" * size
-        c._send_request(RawInsert(c, space_id, "\x91" + fmt + field))
+        c._send_request(RawInsert(c, space_id, b'\x91' + fmt + field.encode("utf-8")))
         tuple = space.select(field)[0]
         print(len(tuple[0])== size and "ok" or "fail", end=" ")
         it2 = iter(test)
         next(it2)
         for fmt2 in it2:
             tuple = c._send_request(RawSelect(c, space_id,
-                "\x91" + fmt2 + field))[0]
+                b'\x91' + fmt2 + field.encode("utf-8")))[0]
             print(len(tuple[0]) == size and "ok" or "fail", end=" ")
         tuple = space.delete(field)[0]
         print(len(tuple[0]) == size and "ok" or "fail", end="")
@@ -357,15 +360,18 @@ s = c._socket
 header = { "hello": "world"}
 body = { "bug": 272 }
 resp = test_request(header, body)
-print("sync={}, {}".format(resp["header"][IPROTO_SYNC], resp["body"].get(IPROTO_ERROR)))
+print("sync={}, {}".format(resp["header"][IPROTO_SYNC],
+        resp["body"].get(IPROTO_ERROR).decode("utf-8")))
 header = { IPROTO_CODE : REQUEST_TYPE_SELECT }
 header[IPROTO_SYNC] = 1234
 resp = test_request(header, body)
-print("sync={}, {}".format(resp["header"][IPROTO_SYNC], resp["body"].get(IPROTO_ERROR)))
+print("sync={}, {}".format(resp["header"][IPROTO_SYNC],
+        resp["body"].get(IPROTO_ERROR).decode("utf-8")))
 header[IPROTO_SYNC] = 5678
 body = { IPROTO_SPACE_ID: 304, IPROTO_KEY: [], IPROTO_LIMIT: 1 }
 resp = test_request(header, body)
-print("sync={}, {}".format(resp["header"][IPROTO_SYNC], resp["body"].get(IPROTO_ERROR)))
+print("sync={}, {}".format(resp["header"][IPROTO_SYNC],
+        resp["body"].get(IPROTO_ERROR).decode("utf-8")))
 c.close()
 
 
@@ -424,7 +430,10 @@ header = { IPROTO_CODE: REQUEST_TYPE_CALL, IPROTO_SYNC: 100 }
 body = { IPROTO_FUNCTION_NAME: "kek" }
 resp = test_request(header, body)
 print("Sync: ", resp["header"][IPROTO_SYNC])
-print("Retcode: ", resp["body"][IPROTO_DATA])
+body = resp["body"][IPROTO_DATA]
+if sys.version[0] == "3":
+    body = [body[0].decode("utf-8")]
+print("Retcode: ", body)
 
 c.close()
 

@@ -41,7 +41,7 @@ unpacker.feed(packet)
 header = unpacker.unpack()
 body = unpacker.unpack()
 print("error code {}".format((header[IPROTO_CODE] & (REQUEST_TYPE_ERROR - 1))))
-print("error message:  {}".format(body[IPROTO_ERROR]))
+print("error message:  {}".format(body[IPROTO_ERROR].decode("utf-8")))
 print("eof: {}".format(len(s.recv(1024)) == 0))
 s.close()
 
