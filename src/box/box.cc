@@ -571,9 +571,9 @@ box_eval_replication_synchro_quorum(int nr_replicas)
 		return -1;
 	}
 
-	int quorum = -1;
+	int64_t quorum = -1;
 	if (lua_isnumber(tarantool_L, -1))
-		quorum = (int)lua_tonumber(tarantool_L, -1);
+		quorum = luaL_toint64(tarantool_L, -1);
 	lua_pop(tarantool_L, 1);
 
 	/*
@@ -619,7 +619,7 @@ box_check_replication_synchro_quorum(void)
 		return 0;
 	}
 
-	int quorum = cfg_geti("replication_synchro_quorum");
+	int64_t quorum = cfg_geti64("replication_synchro_quorum");
 	if (quorum <= 0 || quorum >= VCLOCK_MAX) {
 		diag_set(ClientError, ER_CFG, "replication_synchro_quorum",
 			 "the value must be greater than zero and less than "
