@@ -190,6 +190,13 @@ txn_limbo_last_entry(struct txn_limbo *limbo)
 }
 
 /**
+ * Return the last synchronous transaction in the limbo or NULL when it is
+ * empty.
+ */
+struct txn_limbo_entry *
+txn_limbo_last_synchro_entry(struct txn_limbo *limbo);
+
+/**
  * Allocate, create, and append a new transaction to the limbo.
  * The limbo entry is allocated on the transaction's region.
  */
