@@ -133,6 +133,7 @@ build_debian: configure_debian
 	make -j
 
 test_debian_no_deps: build_debian
+	make LuaJIT-test
 	cd test && /usr/bin/python test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_debian: deps_debian test_debian_no_deps
@@ -146,6 +147,7 @@ build_coverage_debian:
 	make -j
 
 test_coverage_debian_no_deps: build_coverage_debian
+	make LuaJIT-test
 	# Enable --long tests for coverage
 	cd test && /usr/bin/python test-run.py --force $(TEST_RUN_EXTRA_PARAMS) --long
 	lcov --compat-libtool --directory src/ --capture --output-file coverage.info.tmp \
@@ -204,6 +206,10 @@ build_asan_debian:
 	make -j
 
 test_asan_debian_no_deps: build_asan_debian
+	ASAN=ON \
+		LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
+		ASAN_OPTIONS=heap_profile=0:unmap_shadow_on_exit=1:detect_invalid_pointer_pairs=1:symbolize=1:detect_leaks=1:dump_instruction_bytes=1:print_suppressions=0 \
+		make LuaJIT-test
 	# Temporary excluded some tests by issue #4360:
 	#  - To exclude tests from ASAN checks the asan/asan.supp file
 	#    was set at the build time in cmake/profile.cmake file.
@@ -235,6 +241,7 @@ test_static_build: deps_debian_static
 test_static_build_cmake_linux:
 	cd static-build && cmake -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON" . && \
 	make -j && ctest -V
+	make -C ${PWD}/static-build/tarantool-prefix/src/tarantool-build LuaJIT-test
 	cd test && /usr/bin/python test-run.py --force \
 		--builddir ${PWD}/static-build/tarantool-prefix/src/tarantool-build $(TEST_RUN_EXTRA_PARAMS)
 
@@ -270,6 +277,7 @@ build_oos:
 		make -j
 
 test_oos_no_deps: build_oos
+	make -C ${OOS_BUILD_PATH} LuaJIT-test
 	cd ${OOS_BUILD_PATH}/test && \
 		${OOS_SRC_PATH}/test/test-run.py \
 			--builddir ${OOS_BUILD_PATH} \
@@ -342,6 +350,7 @@ INIT_TEST_ENV_OSX=\
 		rm -rf ${OSX_VARDIR}
 
 test_osx_no_deps: build_osx
+	make LuaJIT-test
 	${INIT_TEST_ENV_OSX}; \
 	cd test && ./test-run.py --vardir ${OSX_VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
@@ -370,6 +379,16 @@ base_deps_osx_github_actions:
 test_static_build_cmake_osx_no_deps:
 	cd static-build && cmake -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON" . && \
 	make -j && ctest -V
+	# FIXME: Hell with SIP on OSX: Tarantool (and also LuaJIT)
+	# is built out of sources, so the test located in the
+	# source directory fails to load the shared library built
+	# in the binary directory via dlopen(3).
+	# For more info, proceed the link below:
+	# https://developer.apple.com/library/archive/documentation/Security/Conceptual/System_Integrity_Protection_Guide/FileSystemProtections/FileSystemProtections.html
+	# Do not run LuaJIT related tests for this built until the
+	# issue is not resolved.
+	#
+	# make -C ${PWD}/static-build/tarantool-prefix/src/tarantool-build LuaJIT-test
 	${INIT_TEST_ENV_OSX}; \
 	cd test && ./test-run.py --vardir ${OSX_VARDIR} \
 		--builddir ${PWD}/static-build/tarantool-prefix/src/tarantool-build \
@@ -393,6 +412,7 @@ build_freebsd:
 	gmake -j
 
 test_freebsd_no_deps: build_freebsd
+	make LuaJIT-test
 	cd test && python2.7 test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_freebsd: deps_freebsd test_freebsd_no_deps
