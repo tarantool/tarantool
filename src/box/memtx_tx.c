@@ -110,6 +110,8 @@ memtx_tx_manager_init()
 void
 memtx_tx_manager_free()
 {
+	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
+		mempool_destroy(&txm.memtx_tx_story_pool[i]);
 }
 
 int
