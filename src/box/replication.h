@@ -190,6 +190,14 @@ extern struct tt_uuid REPLICASET_UUID;
 
 typedef rb_tree(struct replica) replica_hash_t;
 
+/** Ack which is passed to on ack triggers. */
+struct replication_ack {
+	/** Replica ID of the ACK source. */
+	uint32_t source;
+	/** Confirmed vclock. */
+	const struct vclock *vclock;
+};
+
 /**
  * Replica set state.
  *
@@ -271,6 +279,8 @@ struct replicaset {
 		/* Shared applier diagnostic area. */
 		struct diag diag;
 	} applier;
+	/** Triggers are invoked on each ACK from each replica. */
+	struct rlist on_ack;
 	/** Map of all known replica_id's to correspponding replica's. */
 	struct replica *replica_by_id[VCLOCK_MAX];
 };
