@@ -1,4 +1,4 @@
-name: CI
+name: debug_coverage
 
 on: [push, pull_request]
 
