@@ -123,12 +123,12 @@ memtx_tx_cause_conflict(struct txn *breaker, struct txn *victim)
 	while (r1 != &breaker->conflict_list &&
 	       r2 != &victim->conflicted_by_list) {
 		tracker = rlist_entry(r1, struct tx_conflict_tracker,
-		in_conflict_list);
+				      in_conflict_list);
 		assert(tracker->breaker == breaker);
 		if (tracker->victim == victim)
 			break;
 		tracker = rlist_entry(r2, struct tx_conflict_tracker,
-		in_conflicted_by_list);
+				      in_conflicted_by_list);
 		assert(tracker->victim == victim);
 		if (tracker->breaker == breaker)
 			break;
@@ -146,8 +146,8 @@ memtx_tx_cause_conflict(struct txn *breaker, struct txn *victim)
 	} else {
 		size_t size;
 		tracker = region_alloc_object(&victim->region,
-		struct tx_conflict_tracker,
-		&size);
+					      struct tx_conflict_tracker,
+					      &size);
 		if (tracker == NULL) {
 			diag_set(OutOfMemory, size, "tx region",
 				 "conflict_tracker");
@@ -596,7 +596,7 @@ memtx_tx_story_find_visible_tuple(struct memtx_story *story,
 			break;
 
 		/*
-		 * We skip the story as invisible but the corresponding TX
+		 * We skip the story as invisible but if the corresponding TX
 		 * is committed our TX can become conflicted.
 		 * The conflict will be unavoidable if this statement
 		 * relies on old_tuple. If not (it's a replace),
