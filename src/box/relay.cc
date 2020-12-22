@@ -412,6 +412,9 @@ tx_status_update(struct cmsg *msg)
 {
 	struct relay_status_msg *status = (struct relay_status_msg *)msg;
 	vclock_copy(&status->relay->tx.vclock, &status->vclock);
+	struct replication_ack ack;
+	ack.source = status->relay->replica->id;
+	ack.vclock = &status->vclock;
 	/*
 	 * Let pending synchronous transactions know, which of
 	 * them were successfully sent to the replica. Acks are
@@ -420,9 +423,11 @@ tx_status_update(struct cmsg *msg)
 	 * for master's CONFIRM message instead.
 	 */
 	if (txn_limbo.owner_id == instance_id) {
-		txn_limbo_ack(&txn_limbo, status->relay->replica->id,
-			      vclock_get(&status->vclock, instance_id));
+		txn_limbo_ack(&txn_limbo, ack.source,
+			      vclock_get(ack.vclock, instance_id));
 	}
+	trigger_run(&replicaset.on_ack, &ack);
+
 	static const struct cmsg_hop route[] = {
 		{relay_status_update, NULL}
 	};

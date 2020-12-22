@@ -98,6 +98,8 @@ replication_init(void)
 	rlist_create(&replicaset.applier.on_rollback);
 	rlist_create(&replicaset.applier.on_wal_write);
 
+	rlist_create(&replicaset.on_ack);
+
 	diag_create(&replicaset.applier.diag);
 }
 
@@ -113,6 +115,7 @@ replication_free(void)
 		relay_cancel(replica->relay);
 
 	diag_destroy(&replicaset.applier.diag);
+	trigger_destroy(&replicaset.on_ack);
 }
 
 int
