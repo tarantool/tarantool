@@ -1245,7 +1245,7 @@ void cord_on_yield(void)
 	 * earlier. As a result fiber switch is prohibited when
 	 * GC hook is active and the platform is forced to stop.
 	 */
-	if (unlikely(g->hookmask & (HOOK_ACTIVE|HOOK_GC))) {
+	if (unlikely(g->hookmask & HOOK_GC)) {
 		struct lua_State *L = fiber()->storage.lua.stack;
 		assert(L != NULL);
 		lua_pushfstring(L, "fiber %d is switched while running GC"
