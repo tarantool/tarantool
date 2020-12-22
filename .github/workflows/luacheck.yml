@@ -1,4 +1,4 @@
-name: CI
+name: luacheck
 
 on: [push, pull_request]
 
