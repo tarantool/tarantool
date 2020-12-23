@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(22)
+test:plan(25)
 
 --!./tcltestrunner.lua
 -- 2010 August 27
@@ -289,6 +289,27 @@ test:do_catchsql_test(
     [[
         SELECT LEAST();
     ]], { 1, "Wrong number of arguments is passed to LEAST(): expected at least two, got 0" } )
+
+-- Make sure that ifnull() returns type of corresponding (i.e. first
+-- non-null) argument.
+--
+test:do_execsql_test(
+    "func-6.1-ifnull",
+    [[
+        SELECT ifnull('qqq1', 'qqq2') = 'qqq2';
+    ]], { false } )
+
+test:do_execsql_test(
+    "func-6.2-ifnull",
+    [[
+        SELECT ifnull(null, 'qqq2') = 'qqq2';
+    ]], { true } )
+
+test:do_execsql_test(
+    "func-6.3-ifnull",
+    [[
+        SELECT ifnull(null, 1) = 'qqq2';
+    ]], { false } )
 
 box.func.COUNTER1:drop()
 box.func.COUNTER2:drop()
