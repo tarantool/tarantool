@@ -64,7 +64,7 @@ def read_handle(env, response):
     body = [b'Not Found']
     if env["PATH_INFO"] in paths:
         code, body, headers = paths[env["PATH_INFO"]]()
-    for key,value in env.iteritems():
+    for key,value in iter(env.items()):
         if "HTTP_" in key:
             headers.append((key[5:].lower(), value))
     response(code, headers)
