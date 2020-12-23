@@ -2466,7 +2466,7 @@ static struct {
 	}, {
 	 .name = "IFNULL",
 	 .param_count = 2,
-	 .returns = FIELD_TYPE_INTEGER,
+	 .returns = FIELD_TYPE_SCALAR,
 	 .aggregate = FUNC_AGGREGATE_NONE,
 	 .is_deterministic = true,
 	 .flags = SQL_FUNC_COALESCE,
