@@ -633,13 +633,17 @@ complete:
 	return 0;
 }
 
-int
+void
 txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 {
 	if (req->replica_id != limbo->owner_id) {
-		diag_set(ClientError, ER_SYNC_MASTER_MISMATCH,
-			 req->replica_id, limbo->owner_id);
-		return -1;
+		/*
+		 * Ignore CONFIRM/ROLLBACK messages for a foreign master.
+		 * These are most likely outdated messages for already confirmed
+		 * data from an old leader, who has just started and written
+		 * confirm right on synchronous transaction recovery.
+		 */
+		return;
 	}
 	switch (req->type) {
 	case IPROTO_CONFIRM:
@@ -651,7 +655,7 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 	default:
 		unreachable();
 	}
-	return 0;
+	return;
 }
 
 void
