@@ -257,7 +257,7 @@ int
 txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry);
 
 /** Execute a synchronous replication request. */
-int
+void
 txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req);
 
 /**

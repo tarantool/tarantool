@@ -861,8 +861,7 @@ apply_synchro_row(struct xrow_header *row)
 	if (xrow_decode_synchro(row, &req) != 0)
 		goto err;
 
-	if (txn_limbo_process(&txn_limbo, &req))
-		goto err;
+	txn_limbo_process(&txn_limbo, &req);
 
 	struct synchro_entry *entry;
 	entry = synchro_entry_new(row, &req);

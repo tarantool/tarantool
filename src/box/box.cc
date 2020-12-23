@@ -384,8 +384,7 @@ apply_wal_row(struct xstream *stream, struct xrow_header *row)
 		struct synchro_request syn_req;
 		if (xrow_decode_synchro(row, &syn_req) != 0)
 			diag_raise();
-		if (txn_limbo_process(&txn_limbo, &syn_req) != 0)
-			diag_raise();
+		txn_limbo_process(&txn_limbo, &syn_req);
 		return;
 	}
 	if (iproto_type_is_raft_request(row->type)) {
