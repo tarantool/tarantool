@@ -794,19 +794,30 @@ memtx_space_create_index(struct space *space, struct index_def *index_def)
 		return sequence_data_index_new(memtx, index_def);
 	}
 
+	struct index *index = NULL;
+
 	switch (index_def->type) {
 	case HASH:
-		return memtx_hash_index_new(memtx, index_def);
+		index = memtx_hash_index_new(memtx, index_def);
+		break;
 	case TREE:
-		return memtx_tree_index_new(memtx, index_def);
+		index = memtx_tree_index_new(memtx, index_def);
+		break;
 	case RTREE:
-		return memtx_rtree_index_new(memtx, index_def);
+		index = memtx_rtree_index_new(memtx, index_def);
+		break;
 	case BITSET:
-		return memtx_bitset_index_new(memtx, index_def);
+		index = memtx_bitset_index_new(memtx, index_def);
+		break;
 	default:
 		unreachable();
 		return NULL;
 	}
+
+	if (index != NULL)
+		memtx_index_read_set_new(&index->memtx_read_set);
+
+	return index;
 }
 
 /**

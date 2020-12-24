@@ -407,11 +407,71 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 	return 0;
 }
 
+const char *
+to_mp_array(struct txn *txn, const char *key, uint32_t part_count)
+{
+	if (!txn || !key)
+		return key;
+
+	const char *end = key;
+	for (size_t i = 0; i < part_count; ++i) {
+		mp_next(&end);
+	}
+
+	size_t size = end - key + mp_sizeof_array(part_count);
+	char *new_key = (char *) region_alloc(&txn->region, size);
+
+	char *begin = new_key;
+
+	new_key = mp_encode_array(new_key, part_count);
+	memcpy((void *) new_key, key, end - key);
+
+	return begin;
+}
+
+template <bool USE_HINT>
+static int
+memtx_read_iterator_track_read(struct txn *txn,
+			       struct tree_iterator<USE_HINT> *itr,
+			       struct memtx_entry entry)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return 0;
+	if (txn == NULL)
+		return 0;
+
+	// Point-like selects that found tuple don't need to be added in
+	// interval tree
+	if (itr->type == ITER_EQ && entry.key != NULL)
+		return 0;
+
+	memtx_entry key_entry;
+	key_entry.key = to_mp_array(txn, itr->key_data.key,
+			     itr->key_data.part_count);
+	key_entry.hint = itr->key_data.hint;
+
+	if (entry.key == NULL) {
+		if (itr->type == ITER_EQ || itr->type == ITER_REQ)
+			entry = key_entry;
+	}
+
+	int rc;
+	if (iterator_direction(itr->type) >= 0) {
+		rc = memtx_tx_track(txn, itr->base.index, key_entry,
+				    itr->type != ITER_GT,
+				    entry, true);
+	} else {
+		rc = memtx_tx_track(txn, itr->base.index, entry, true,
+				    key_entry, itr->type != ITER_LT);
+	}
+	return rc;
+}
+
 #define WRAP_ITERATOR_METHOD(name)						\
 template <bool USE_HINT>							\
 static int									\
 name(struct iterator *iterator, struct tuple **ret)				\
-{										\
+{                                       					\
 	memtx_tree_t<USE_HINT> *tree =						\
 		&((struct memtx_tree_index<USE_HINT> *)iterator->index)->tree;	\
 	struct tree_iterator<USE_HINT> *it =   					\
@@ -423,9 +483,13 @@ name(struct iterator *iterator, struct tuple **ret)				\
 	struct space *space = space_by_id(iterator->space_id);			\
 	bool is_rw = txn != NULL;						\
 	do {									\
-		int rc = name##_base<USE_HINT>(iterator, ret);			\
-		if (rc != 0 || *ret == NULL)					\
-			return rc;						\
+		int rc = name##_base<USE_HINT>(iterator, ret);       		\
+		if (rc != 0 || *ret == NULL) {         				\
+			if (rc == 0)						\
+				memtx_read_iterator_track_read(txn, it,		\
+					memtx_entry_empty());			\
+                	return rc;                           			\
+		}								\
 		uint32_t mk_index = 0;						\
 		if (is_multikey) {						\
 			struct memtx_tree_data<USE_HINT> *check =		\
@@ -434,7 +498,11 @@ name(struct iterator *iterator, struct tuple **ret)				\
 			mk_index = (uint32_t)check->hint;			\
 		}								\
 		*ret = memtx_tx_tuple_clarify(txn, space, *ret,			\
-					      iid, mk_index, is_rw);		\
+					      iid, mk_index, is_rw);       	\
+		if (*ret != NULL && it->type != ITER_EQ) {             		\
+			memtx_read_iterator_track_read(txn, it,             	\
+				memtx_entry_from_tuple(*ret));       		\
+                }								\
 	} while (*ret == NULL);							\
 	tuple_unref(it->current.tuple);						\
 	it->current.tuple = *ret;						\
@@ -503,14 +571,20 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 			it->tree_iterator =
 				memtx_tree_lower_bound(tree, &it->key_data,
 						       &exact);
-			if (type == ITER_EQ && !exact)
+			if (type == ITER_EQ && !exact) {
+				memtx_read_iterator_track_read(in_txn(), it,
+				   memtx_entry_empty());
 				return 0;
+			}
 		} else { // ITER_GT, ITER_REQ, ITER_LE
 			it->tree_iterator =
 				memtx_tree_upper_bound(tree, &it->key_data,
 						       &exact);
-			if (type == ITER_REQ && !exact)
+			if (type == ITER_REQ && !exact) {
+				memtx_read_iterator_track_read(in_txn(), it,
+				   memtx_entry_empty());
 				return 0;
+			}
 		}
 		if (iterator_type_is_reverse(type)) {
 			/*
@@ -530,8 +604,11 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_iterator_get_elem(tree, &it->tree_iterator);
-	if (!res)
+	if (res == NULL) {
+		memtx_read_iterator_track_read(in_txn(), it,
+				 memtx_entry_empty());
 		return 0;
+	}
 	*ret = res->tuple;
 	tuple_ref(*ret);
 	it->current = *res;
@@ -547,6 +624,11 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	if (*ret == NULL) {
 		return iterator->next(iterator, ret);
 	} else {
+		if (it->type != ITER_EQ) {
+			memtx_read_iterator_track_read(txn, it,
+				  memtx_entry_from_tuple(*ret));
+		}
+
 		tuple_unref(it->current.tuple);
 		it->current.tuple = *ret;
 		tuple_ref(it->current.tuple);

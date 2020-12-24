@@ -36,6 +36,7 @@
 #include "trigger.h"
 #include "fiber.h"
 #include "space.h"
+#include "memtx_read_set.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -391,6 +392,7 @@ struct txn {
 	struct rlist in_read_view_txs;
 	/** List of tx_read_trackers with stories that the TX have read. */
 	struct rlist read_set;
+	memtx_tx_read_set_t memtx_read_set;
 };
 
 static inline bool

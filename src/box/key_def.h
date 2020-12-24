@@ -943,6 +943,25 @@ key_compare(const char *key_a, hint_t key_a_hint,
 	    const char *key_b, hint_t key_b_hint,
 	    struct key_def *key_def);
 
+/** Dummy keys representing -inf and +inf accordingly. */
+extern const char min_key;
+extern const char max_key;
+
+static inline bool
+is_inf(const char *key)
+{
+	return key == &min_key || key == &max_key;
+}
+
+/**
+ * Compare keys that can be +- inf.
+ * @sa key_compare()
+ */
+int
+key_compare_ext(const char *key_a, hint_t key_a_hint,
+		const char *key_b, hint_t key_b_hint,
+		struct key_def *key_def);
+
 /**
  * Compare tuples using the key definition and comparison hints.
  * @param tuple_a first tuple

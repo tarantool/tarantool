@@ -34,6 +34,7 @@
 #include "trivia/util.h"
 #include "iterator_type.h"
 #include "index_def.h"
+#include "memtx_read_set.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -460,6 +461,8 @@ struct index {
 	int refs;
 	/* Space cache version at the time of construction. */
 	uint32_t space_cache_version;
+	/** Tree of intervals read from this index. */
+    	memtx_index_read_set_t memtx_read_set;
 };
 
 /**

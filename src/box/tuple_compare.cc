@@ -906,6 +906,46 @@ key_compare(const char *key_a, hint_t key_a_hint,
 	}
 }
 
+const char min_key = '\0';
+const char max_key = '\0';
+int
+key_compare_ext(const char *key_a, hint_t key_a_hint,
+		const char *key_b, hint_t key_b_hint, struct key_def *key_def)
+{
+	assert(key_a != NULL);
+	assert(key_b != NULL);
+
+	if (key_a == key_b && (key_a == &min_key || key_a == &max_key))
+		return 0;
+
+	if (key_a == &min_key)
+		return -1;
+	if (key_a == &max_key)
+		return 1;
+	if (key_b == &min_key)
+		return 1;
+	if (key_b == &max_key)
+		return -1;
+
+	int rc = hint_cmp(key_a_hint, key_b_hint);
+	if (rc != 0)
+		return rc;
+
+	uint32_t part_count_a = mp_decode_array(&key_a);
+	uint32_t part_count_b = mp_decode_array(&key_b);
+
+	uint32_t part_count = MIN(part_count_a, part_count_b);
+	assert(part_count >= key_def->part_count);
+	part_count = key_def->part_count;
+	if (!key_def->is_nullable) {
+		return key_compare_parts<false>(key_a, key_b, part_count,
+						key_def);
+	} else {
+		return key_compare_parts<true>(key_a, key_b, part_count,
+					       key_def);
+	}
+}
+
 template <bool is_nullable, bool has_optional_parts>
 static int
 tuple_compare_sequential(struct tuple *tuple_a, hint_t tuple_a_hint,

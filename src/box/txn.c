@@ -183,8 +183,11 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 inline static struct txn *
 txn_new(void)
 {
-	if (!stailq_empty(&txn_cache))
-		return stailq_shift_entry(&txn_cache, struct txn, in_txn_cache);
+	if (!stailq_empty(&txn_cache)) {
+		struct txn * txn = stailq_shift_entry(&txn_cache, struct txn, in_txn_cache);
+		memtx_tx_read_set_new(&txn->memtx_read_set);
+		return txn;
+	}
 
 	/* Create a region. */
 	struct region region;
@@ -203,7 +206,20 @@ txn_new(void)
 	rlist_create(&txn->conflict_list);
 	rlist_create(&txn->conflicted_by_list);
 	rlist_create(&txn->in_read_view_txs);
+	memtx_tx_read_set_new(&txn->memtx_read_set);
+
 	return txn;
+}
+
+static struct memtx_read_interval *
+memtx_tx_read_set_free_cb(memtx_tx_read_set_t *read_set,
+		       struct memtx_read_interval *interval, void *arg)
+{
+	(void)arg;
+	(void)read_set;
+	memtx_index_read_set_remove(&interval->index->memtx_read_set, interval);
+	memtx_read_interval_delete(interval);
+	return NULL;
 }
 
 /*
@@ -235,6 +251,9 @@ txn_free(struct txn *txn)
 	assert(rlist_empty(&txn->conflicted_by_list));
 
 	rlist_del(&txn->in_read_view_txs);
+
+	memtx_tx_read_set_iter(&txn->memtx_read_set,
+			       NULL, memtx_tx_read_set_free_cb, NULL);
 
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next)

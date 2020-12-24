@@ -37,6 +37,7 @@
 #include "txn.h"
 #include "schema_def.h"
 #include "small/mempool.h"
+#include "memtx_read_set.h"
 
 static uint32_t
 memtx_tx_story_key_hash(const struct tuple *a)
@@ -75,6 +76,8 @@ struct tx_manager
 	struct rlist all_stories;
 	/** Iterator that sequentially traverses all memtx_story objects. */
 	struct rlist *traverse_all_stories;
+	/** Mempool for memtx_read_interval objects inside interval trees */
+    	struct mempool read_interval_mempool;
 };
 
 enum {
@@ -105,6 +108,9 @@ memtx_tx_manager_init()
 	txm.history = mh_history_new();
 	rlist_create(&txm.all_stories);
 	txm.traverse_all_stories = &txm.all_stories;
+	struct slab_cache *slab_cache = cord_slab_cache();
+	mempool_create(&txm.read_interval_mempool, slab_cache,
+		       sizeof(struct memtx_read_interval));
 }
 
 void
@@ -112,6 +118,7 @@ memtx_tx_manager_free()
 {
 	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
 		mempool_destroy(&txm.memtx_tx_story_pool[i]);
+	mempool_destroy(&txm.read_interval_mempool);
 }
 
 int
@@ -886,6 +893,20 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
 	 * and we will not enter the loop.
 	 */
 	for (uint32_t i = 0; i < index_count; ) {
+		struct memtx_tx_conflict_iterator it;
+		memtx_index_read_set_t *read_set =
+			&stmt->space->index[i]->memtx_read_set;
+		struct memtx_entry entry =
+			memtx_entry_from_tuple(stmt->new_tuple);
+		memtx_tx_conflict_iterator_init(&it, read_set, entry);
+
+		struct txn *abort;
+		while ((abort = memtx_tx_conflict_iterator_next(&it)) != NULL) {
+			if (stmt->txn == abort)
+				continue;
+			memtx_tx_handle_conflict(stmt->txn, abort);
+		}
+
 		if (!story->link[i].older.is_story) {
 			/* tuple is old. */
 			i++;
@@ -1187,6 +1208,158 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 	}
 	rlist_add(&story->reader_list, &tracker->in_reader_list);
 	rlist_add(&txn->read_set, &tracker->in_read_set);
+	return 0;
+}
+
+struct memtx_entry memtx_key_dup(struct txn *txn, struct memtx_entry entry)
+{
+	const char* key = entry.key;
+	if (key == NULL)
+		return entry;
+
+	if (key == &min_key || key == &max_key)
+		return entry;
+
+	assert(mp_typeof(*key) == MP_ARRAY);
+	const char *end = key;
+	mp_next(&end);
+	entry.key = region_alloc(&txn->region, end - key);
+	if (entry.key == NULL) {
+		diag_set(OutOfMemory, end - key, "region_alloc", "key");
+		return entry;
+	}
+	memcpy((void*)entry.key, key, end - key);
+	return entry;
+}
+
+struct memtx_read_interval *
+memtx_read_interval_new(struct txn *tx, struct index *index,
+		     struct memtx_entry left, bool left_belongs,
+		     struct memtx_entry right, bool right_belongs)
+{
+	assert(left.key != NULL);
+	assert(right.key != NULL);
+
+	struct memtx_read_interval *interval;
+	interval = mempool_alloc(&txm.read_interval_mempool);
+	if (interval == NULL) {
+		diag_set(OutOfMemory, sizeof(*interval),
+			 "mempool", "struct memtx_read_interval");
+		return NULL;
+	}
+	interval->tx = tx;
+	index_ref(index);
+	interval->index = index;
+
+	interval->left = memtx_key_dup(tx, left);
+	interval->left_belongs = left_belongs;
+
+	interval->right = memtx_key_dup(tx, right);
+	interval->right_belongs = right_belongs;
+
+	interval->subtree_last = NULL;
+
+	return interval;
+}
+
+void
+memtx_read_interval_delete(struct memtx_read_interval *interval)
+{
+	index_unref(interval->index);
+	mempool_free(&txm.read_interval_mempool, interval);
+}
+
+int
+memtx_tx_track(struct txn *txn, struct index *index,
+	       struct memtx_entry left, bool left_belongs,
+	       struct memtx_entry right, bool right_belongs)
+{
+	assert(index != NULL);
+
+	if (left.key == NULL)
+		left.key = &min_key;
+	if (right.key == NULL)
+		right.key = &max_key;
+
+	if (index->def->space_id >= BOX_SYSTEM_ID_MIN
+		&& index->def->space_id <= BOX_SYSTEM_ID_MAX)
+		return 0;
+
+	if (txn == NULL)
+		return 0;
+
+	if (txn->status == TXN_IN_READ_VIEW) {
+		/* No point in tracking reads. */
+		return 0;
+	}
+
+	struct memtx_read_interval *new_interval;
+	new_interval = memtx_read_interval_new(txn, index, left, left_belongs,
+					    right, right_belongs);
+	if (new_interval == NULL)
+		return -1;
+
+	/*
+	 * Search for intersections in the transaction read set.
+	 */
+	struct stailq merge;
+	stailq_create(&merge);
+
+	struct memtx_tx_read_set_iterator it;
+	memtx_tx_read_set_isearch_le(&txn->memtx_read_set, new_interval, &it);
+
+	struct memtx_read_interval *interval;
+	interval = memtx_tx_read_set_inext(&it);
+
+	if (interval != NULL && interval->index == index) {
+		if (memtx_read_interval_cmpr(interval, new_interval) >= 0) {
+			/*
+			 * There is an interval in the tree spanning
+			 * the new interval. Nothing to do.
+			 */
+			memtx_read_interval_delete(new_interval);
+			return 0;
+		}
+		if (memtx_read_interval_should_merge(interval, new_interval))
+			stailq_add_tail_entry(&merge, interval, in_merge);
+	}
+
+	if (interval == NULL)
+		memtx_tx_read_set_isearch_gt(&txn->memtx_read_set, new_interval, &it);
+
+	while ((interval = memtx_tx_read_set_inext(&it)) != NULL &&
+	       interval->index == index &&
+	       memtx_read_interval_should_merge(new_interval, interval))
+		stailq_add_tail_entry(&merge, interval, in_merge);
+
+	/*
+	 * Merge intersecting intervals with the new interval and
+	 * remove them from the transaction and LSM tree read sets.
+	 */
+	if (!stailq_empty(&merge)) {
+		interval = stailq_first_entry(&merge, struct memtx_read_interval,
+					      in_merge);
+		if (memtx_read_interval_cmpl(new_interval, interval) > 0) {
+			new_interval->left = memtx_key_dup(txn, interval->left);
+			new_interval->left_belongs = interval->left_belongs;
+		}
+		interval = stailq_last_entry(&merge, struct memtx_read_interval,
+					     in_merge);
+		if (memtx_read_interval_cmpr(new_interval, interval) < 0) {
+			new_interval->right = memtx_key_dup(txn, interval->right);
+			new_interval->right_belongs = interval->right_belongs;
+		}
+		struct memtx_read_interval *next_interval;
+		stailq_foreach_entry_safe(interval, next_interval, &merge,
+					  in_merge) {
+			memtx_tx_read_set_remove(&txn->memtx_read_set, interval);
+			memtx_index_read_set_remove(&index->memtx_read_set, interval);
+			memtx_read_interval_delete(interval);
+		}
+	}
+
+	memtx_tx_read_set_insert(&txn->memtx_read_set, new_interval);
+	memtx_index_read_set_insert(&index->memtx_read_set, new_interval);
 	return 0;
 }
 

@@ -310,6 +310,12 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 					   is_prepared_ok);
 }
 
+int
+memtx_tx_track(struct txn *txn, struct index *index,
+	    struct memtx_entry left, bool left_belongs,
+	    struct memtx_entry right, bool right_belongs);
+
+
 /**
  * Notify manager the a space is deleted.
  * It's necessary because there is a chance that garbage collector hasn't
