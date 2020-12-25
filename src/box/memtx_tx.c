@@ -235,7 +235,48 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 }
 
 static void
-memtx_tx_story_delete(struct memtx_story *story);
+memtx_tx_story_delete(struct memtx_story *story)
+{
+	assert(story->add_stmt == NULL);
+	assert(story->del_stmt == NULL);
+
+	if (txm.traverse_all_stories == &story->in_all_stories)
+		txm.traverse_all_stories = rlist_next(txm.traverse_all_stories);
+	rlist_del(&story->in_all_stories);
+	rlist_del(&story->in_space_stories);
+
+	mh_int_t pos = mh_history_find(txm.history, story->tuple, 0);
+	assert(pos != mh_end(txm.history));
+	mh_history_del(txm.history, pos, 0);
+
+	story->tuple->is_dirty = false;
+	tuple_unref(story->tuple);
+
+#ifndef NDEBUG
+	/* Expecting to delete fully unlinked story. */
+	for (uint32_t i = 0; i < story->index_count; i++) {
+		assert(story->link[i].newer_story == NULL);
+		assert(story->link[i].older.is_story == false);
+		assert(story->link[i].older.tuple == NULL);
+	}
+#endif
+
+	struct mempool *pool = &txm.memtx_tx_story_pool[story->index_count];
+	mempool_free(pool, story);
+}
+
+/**
+ * Find a story of a @a tuple. The story expected to be present (assert).
+ */
+static struct memtx_story *
+memtx_tx_story_get(struct tuple *tuple)
+{
+	assert(tuple->is_dirty);
+
+	mh_int_t pos = mh_history_find(txm.history, tuple, 0);
+	assert(pos != mh_end(txm.history));
+	return *mh_history_node(txm.history, pos);
+}
 
 /**
  * Create a new story of a @a tuple that was added by @a stmt.
@@ -291,19 +332,6 @@ memtx_tx_story_delete_del_stmt(struct memtx_story *story)
 	memtx_tx_story_delete(story);
 }
 
-
-/**
- * Find a story of a @a tuple. The story expected to be present (assert).
- */
-static struct memtx_story *
-memtx_tx_story_get(struct tuple *tuple)
-{
-	assert(tuple->is_dirty);
-
-	mh_int_t pos = mh_history_find(txm.history, tuple, 0);
-	assert(pos != mh_end(txm.history));
-	return *mh_history_node(txm.history, pos);
-}
 
 /**
  * Get the older tuple, extracting it from older story if necessary.
@@ -1088,37 +1116,6 @@ memtx_tx_on_space_delete(struct space *space)
 		story->space = NULL;
 		rlist_del(&story->in_space_stories);
 	}
-}
-
-static void
-memtx_tx_story_delete(struct memtx_story *story)
-{
-	assert(story->add_stmt == NULL);
-	assert(story->del_stmt == NULL);
-
-	if (txm.traverse_all_stories == &story->in_all_stories)
-		txm.traverse_all_stories = rlist_next(txm.traverse_all_stories);
-	rlist_del(&story->in_all_stories);
-	rlist_del(&story->in_space_stories);
-
-	mh_int_t pos = mh_history_find(txm.history, story->tuple, 0);
-	assert(pos != mh_end(txm.history));
-	mh_history_del(txm.history, pos, 0);
-
-	story->tuple->is_dirty = false;
-	tuple_unref(story->tuple);
-
-#ifndef NDEBUG
-	/* Expecting to delete fully unlinked story. */
-	for (uint32_t i = 0; i < story->index_count; i++) {
-		assert(story->link[i].newer_story == NULL);
-		assert(story->link[i].older.is_story == false);
-		assert(story->link[i].older.tuple == NULL);
-	}
-#endif
-
-	struct mempool *pool = &txm.memtx_tx_story_pool[story->index_count];
-	mempool_free(pool, story);
 }
 
 int
