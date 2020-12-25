@@ -170,18 +170,12 @@ make %{?_smp_mflags}
 rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
 
 %check
-%if "%{_ci}" == "travis"
-%if (0%{?fedora} >= 22 || 0%{?rhel} >= 7 || 0%{?sle_version} >= 1500)
-cd test && ./test-run.py --force -j 1 unit/ app/ app-tap/ box/ box-tap/ engine/ vinyl/
-%endif
-%else
 %if 0%{?rhel} != 6
 # Run all available test suites except 'replication'
 # which is not currently ready for this testing and
 # has standalone issue for it's enabling:
 # https://github.com/tarantool/tarantool/issues/4798
 TEST_RUN_EXCLUDE='replication/' make test-force
-%endif
 %endif
 
 %pre
