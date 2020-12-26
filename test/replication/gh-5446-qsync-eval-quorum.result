@@ -41,12 +41,14 @@ box.cfg{replication_synchro_quorum = "N-1"}
 box.cfg{replication_synchro_quorum = '4294967296 + 1'}
  | ---
  | - error: 'Incorrect value for option ''replication_synchro_quorum'': the formula is
- |     evaluated to the quorum 1 for replica number 1, which is out of range [1;31]'
+ |     evaluated to the quorum 4294967297 for replica number 1, which is out of range
+ |     [1;31]'
  | ...
 box.cfg{replication_synchro_quorum = 'N + 4294967296'}
  | ---
  | - error: 'Incorrect value for option ''replication_synchro_quorum'': the formula is
- |     evaluated to the quorum 1 for replica number 1, which is out of range [1;31]'
+ |     evaluated to the quorum 4294967297 for replica number 1, which is out of range
+ |     [1;31]'
  | ...
 box.cfg{replication_synchro_quorum = 4294967297}
  | ---
