@@ -623,10 +623,10 @@ box_eval_replication_synchro_quorum(int nr_replicas)
 	if (quorum <= 0 || quorum >= VCLOCK_MAX) {
 		const char *msg =
 			tt_sprintf("the formula is evaluated "
-				   "to the quorum %d for replica "
+				   "to the quorum %lld for replica "
 				   "number %d, which is out of range "
-				   "[%d;%d]",
-				   quorum, nr_replicas, 1, VCLOCK_MAX - 1);
+				   "[%d;%d]", (long long)quorum,
+				   nr_replicas, 1, VCLOCK_MAX - 1);
 		diag_set(ClientError, ER_CFG,
 			 "replication_synchro_quorum", msg);
 		return -1;
