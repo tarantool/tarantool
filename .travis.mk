@@ -10,6 +10,16 @@ OSX_VARDIR?=/tmp/tnt
 GIT_DESCRIBE=$(shell git describe HEAD)
 COVERITY_BINS=/cov-analysis/bin
 
+# Transform the ${PRESERVE_ENVVARS} comma separated variables list
+# to the '-e key="value" -e key="value" <...>' string.
+#
+# Add PRESERVE_ENVVARS itself to the list to allow to use this
+# make script again from the inner environment (if there will be
+# a need).
+comma := ,
+ENVVARS := PRESERVE_ENVVARS $(subst $(comma), ,$(PRESERVE_ENVVARS))
+DOCKER_ENV := $(foreach var,$(ENVVARS),-e $(var)="$($(var))")
+
 all: package
 
 package:
@@ -37,6 +47,7 @@ docker_%:
 		-e CMAKE_EXTRA_PARAMS=${CMAKE_EXTRA_PARAMS} \
 		-e CC=${CC} \
 		-e CXX=${CXX} \
+		${DOCKER_ENV} \
 		${DOCKER_IMAGE} \
 		make -f .travis.mk $(subst docker_,,$@)
 
