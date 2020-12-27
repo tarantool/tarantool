@@ -85,6 +85,16 @@ perf_cleanup: perf_clone_benchs_repo perf_cleanup_image
 # Run tests under a virtual machine
 # #################################
 
+# Transform the ${PRESERVE_ENVVARS} comma separated variables list
+# to the 'key="value" key="value" <...>' string.
+#
+# Add PRESERVE_ENVVARS itself to the list to allow to use this
+# make script again from the inner environment (if there will be
+# a need).
+comma := ,
+ENVVARS := PRESERVE_ENVVARS $(subst $(comma), ,$(PRESERVE_ENVVARS))
+PRESERVE_ENV := $(foreach var,$(ENVVARS),$(var)="$($(var))")
+
 vms_start:
 	VBoxManage controlvm ${VMS_NAME} poweroff || true
 	VBoxManage snapshot ${VMS_NAME} restore ${VMS_NAME}
@@ -93,9 +103,7 @@ vms_start:
 vms_test_%:
 	tar czf - ../tarantool | ssh ${VMS_USER}@127.0.0.1 -p ${VMS_PORT} tar xzf -
 	ssh ${VMS_USER}@127.0.0.1 -p ${VMS_PORT} "/bin/bash -c \
-		'${EXTRA_ENV} \
-		cd tarantool && \
-		${TRAVIS_MAKE} $(subst vms_,,$@)'"
+		'cd tarantool && ${PRESERVE_ENV} ${TRAVIS_MAKE} $(subst vms_,,$@)'"
 
 vms_shutdown:
 	VBoxManage controlvm ${VMS_NAME} poweroff

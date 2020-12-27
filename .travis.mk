@@ -20,6 +20,16 @@ LEIN_URL="https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lei
 TERRAFORM_NAME="terraform_0.13.1_linux_amd64.zip"
 TERRAFORM_URL="https://releases.hashicorp.com/terraform/0.13.1/"$(TERRAFORM_NAME)
 
+# Transform the ${PRESERVE_ENVVARS} comma separated variables list
+# to the '-e key="value" -e key="value" <...>' string.
+#
+# Add PRESERVE_ENVVARS itself to the list to allow to use this
+# make script again from the inner environment (if there will be
+# a need).
+comma := ,
+ENVVARS := PRESERVE_ENVVARS $(subst $(comma), ,$(PRESERVE_ENVVARS))
+DOCKER_ENV := $(foreach var,$(ENVVARS),-e $(var)="$($(var))")
+
 all: package
 
 package:
@@ -50,6 +60,7 @@ docker_%:
 		-e APT_EXTRA_FLAGS="${APT_EXTRA_FLAGS}" \
 		-e CC=${CC} \
 		-e CXX=${CXX} \
+		${DOCKER_ENV} \
 		${DOCKER_IMAGE} \
 		make -f .travis.mk $(subst docker_,,$@)
 
@@ -232,8 +243,14 @@ test_static_build_cmake_linux:
 # ###################
 
 test_debian_docker_luacheck:
-	docker run -w ${OOS_SRC_PATH} -v ${PWD}:${OOS_SRC_PATH} --privileged \
-		--cap-add=sys_nice --network=host -i ${DOCKER_IMAGE_TARANTOOL} \
+	docker run                       \
+		-w ${OOS_SRC_PATH}           \
+		-v ${PWD}:${OOS_SRC_PATH}    \
+		--privileged                 \
+		--cap-add=sys_nice           \
+		--network=host               \
+		${DOCKER_ENV}                \
+		-i ${DOCKER_IMAGE_TARANTOOL} \
 		make -f .travis.mk test_debian_luacheck
 
 test_debian_install_luacheck:
@@ -264,6 +281,7 @@ test_oos_build:
 	docker run --network=host -w ${OOS_SRC_PATH} \
 		--mount type=bind,source="${PWD}",target=${OOS_SRC_PATH},readonly,bind-propagation=rslave \
 		--tmpfs ${OOS_BUILD_PATH}:exec \
+		${DOCKER_ENV} \
 		-i ${DOCKER_IMAGE_TARANTOOL} \
 		make -f .travis.mk ${OOS_BUILD_RULE}
 
