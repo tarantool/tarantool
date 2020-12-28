@@ -434,12 +434,12 @@ memtx_tx_story_gc_step()
 					panic("failed to rollback change");
 				}
 				assert(story->tuple == unused);
-			} else if (i == 0) {
 				/*
-				 * The tuple is left clean in the space.
-				 * It now belongs to the space and must be referenced.
+				 * All tuples in pk are referenced.
+				 * Once removed it must be unreferenced.
 				 */
-				tuple_ref(story->tuple);
+				if (i == 0)
+					tuple_unref(story->tuple);
 			}
 
 			if (link->older.is_story) {
@@ -666,14 +666,6 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 					  &replaced) != 0)
 				goto fail;
 			memtx_tx_story_link_tuple(add_story, replaced, i);
-			if (i == 0 && replaced != NULL && !replaced->is_dirty) {
-				/*
-				 * The tuple was clean and thus belonged to
-				 * the space. Now tx manager takes ownership
-				 * of it.
-				 */
-				tuple_unref(replaced);
-			}
 			add_story_linked++;
 
 			struct tuple *visible_replaced = NULL;
@@ -748,6 +740,20 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 		collected_conflicts = collected_conflicts->next;
 	}
 
+	if (new_tuple != NULL) {
+		/*
+		 * A space holds references to all his tuples.
+		 * It's made via primary index - all tuples that are physically
+		 * in primary index must be referenced (a replaces tuple must
+		 * be dereferenced).
+		 */
+		tuple_ref(new_tuple);
+		struct tuple *replaced =
+			memtx_tx_story_older_tuple(&add_story->link[0]);
+		if (replaced != NULL)
+			tuple_unref(replaced);
+	}
+
 	*result = old_tuple;
 	if (*result != NULL) {
 		/*
@@ -760,7 +766,7 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 	}
 	return 0;
 
-	fail:
+fail:
 	if (add_story != NULL) {
 		while (add_story_linked > 0) {
 			--add_story_linked;
@@ -775,10 +781,6 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 				diag_log();
 				unreachable();
 				panic("failed to rollback change");
-			}
-			if (i == 0 && was != NULL && !was->is_dirty) {
-				/* Just rollback previous tuple_unref. */
-				tuple_ref(was);
 			}
 
 			memtx_tx_story_unlink(stmt->add_story, i);
@@ -824,16 +826,16 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 					unreachable();
 					panic("failed to rollback change");
 				}
-				if (i == 0 && was != NULL &&
-				    !link->older.is_story) {
-					/*
-					 * That was the last story in history.
-					 * The last tuple now belongs to space
-					 * and the space must hold a reference
-					 * to it.
-					 */
+				/*
+				 * A space holds references to all his tuples.
+				 * It's made via primary index - all tuples that are physically
+				 * in primary index must be referenced (a replaces tuple must
+				 * be dereferenced).
+				 */
+				if (i == 0)
+					tuple_unref(story->tuple);
+				if (i == 0 && was != NULL)
 					tuple_ref(was);
-				}
 
 			} else {
 				struct memtx_story *newer = link->newer_story;
@@ -933,6 +935,14 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
 				diag_log();
 				panic("failed to rollback change");
 			}
+			/*
+			 * A space holds references to all his tuples.
+			 * It's made via primary index - all tuples that are physically
+			 * in primary index must be referenced (a replaces tuple must
+			 * be dereferenced).
+			 */
+			tuple_ref(old_story->tuple);
+			tuple_unref(story->tuple);
 		} else {
 			struct memtx_story *newer = link->newer_story;
 			assert(newer->link[i].older.is_story);
