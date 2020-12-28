@@ -6,29 +6,11 @@ env:
   CI_MAKE: make -f .travis.mk
 
 jobs:
-  # By default jobs on push and pull_request filters run duplicating each other.
-  # To avoid of it used additional external module 'skip-duplicate-actions'.
-  # Used option 'concurrent_skipping' to skip duplicating jobs. Check info:
-  # https://github.com/marketplace/actions/skip-duplicate-actions#concurrent_skipping
-  pre_job:
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    # Map a step output to a job output
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@master
-        with:
-          # avoid of duplicating runs on "push & pull_request"
-          # avoid of running previous of the updated jobs
-          concurrent_skipping: 'same_content'
-
   release_lto:
-    needs: pre_job
-    if: |
-      needs.pre_job.outputs.should_skip != 'true' ||
-      github.event_name == 'push'
+    # We want to run on external PRs, but not on our own internal PRs
+    # as they'll be run by the push to the branch.
+    if: github.event_name == 'push' ||
+        github.event.pull_request.head.repo.full_name != github.repository
 
     runs-on: ubuntu-latest
 
