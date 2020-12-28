@@ -6,42 +6,48 @@ from gevent import spawn, sleep, socket
 
 def absent():
     code = "500 Server Error"
-    headers = [('Content-Type', 'application/json')]
-    body = ["No such method"]
+    headers = [("Content-Type", "application/json")]
+    body = [b'No such method']
     return code, body, headers
 
 def hello():
     code = "200 OK"
-    body = ["hello world"]
-    headers = [('Content-Type', 'application/json')]
+    body = [b'hello world']
+    headers = [("Content-Type", "application/json")]
     return code, body, headers
 def hello1():
     code = "200 OK"
-    body = [b"abc"]
-    headers = [('Content-Type', 'application/json')]
+    body = [b'abc']
+    headers = [("Content-Type", "application/json")]
     return code, body, headers
 
 def headers():
     code = "200 OK"
-    body = [b"cookies"]
-    headers = [('Content-Type', 'application/json'),
-               ('Content-Type', 'application/yaml'),
-               ('Set-Cookie', 'likes=cheese; Expires=Wed, 21 Oct 2015 07:28:00 GMT; Secure; HttpOnly'),
-               ('Set-Cookie', 'bad@name=no;'),
-               ('Set-Cookie', 'badcookie'),
-               ('Set-Cookie', 'good_name=yes;'),
-               ('Set-Cookie', 'age = 17; NOSuchOption; EmptyOption=Value;Secure'),
-               ('my_header', 'value1'),
-               ('my_header', 'value2'),
-               ('very_very_very_long_headers_name1', 'true'),
+    body = [b'cookies']
+    headers = [("Content-Type", "application/json"),
+               ("Content-Type", "application/yaml"),
+               ("Set-Cookie", "likes=cheese; Expires=Wed, 21 Oct 2015 07:28:00 GMT; Secure; HttpOnly"),
+               ("Set-Cookie", "bad@name=no;"),
+               ("Set-Cookie", "badcookie"),
+               ("Set-Cookie", "good_name=yes;"),
+               ("Set-Cookie", "age = 17; NOSuchOption; EmptyOption=Value;Secure"),
+               ("my_header", "value1"),
+               ("my_header", "value2"),
+               ("very_very_very_long_headers_name1", "true"),
                ]
     return code, body, headers
 
 def long_query():
     sleep(0.005)
     code = "200 OK"
-    body = [b"abc"]
-    headers = [('Content-Type', 'application/json')]
+    body = [b'abc']
+    headers = [("Content-Type", "application/json")]
+    return code, body, headers
+
+def redirect():
+    code = "302 Found"
+    body = [b'redirecting']
+    headers = [("Location", "/")]
     return code, body, headers
 
 paths = {
@@ -55,7 +61,7 @@ paths = {
 def read_handle(env, response):
     code = "404 Not Found"
     headers = []
-    body = ['Not Found']
+    body = [b'Not Found']
     if env["PATH_INFO"] in paths:
         code, body, headers = paths[env["PATH_INFO"]]()
     for key,value in env.iteritems():
@@ -75,8 +81,8 @@ def post_handle(env, response):
     return body
 
 def other_handle(env, response, method, code):
-    headers = [('Content-Type', 'text/plain'), ("method", method)]
-    body = [method]
+    headers = [("Content-Type", "text/plain"), ("method", method)]
+    body = [method.encode('utf-8')]
     for key,value in env.iteritems():
         if "HTTP_" in key:
             headers.append((key[5:].lower(), value))
