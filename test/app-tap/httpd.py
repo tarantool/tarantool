@@ -7,24 +7,24 @@ from gevent import spawn, sleep, socket
 def absent():
     code = "500 Server Error"
     headers = [("Content-Type", "application/json")]
-    body = ["No such method"]
+    body = [b'No such method']
     return code, body, headers
 
 def hello():
     code = "200 OK"
-    body = ["hello world"]
+    body = [b'hello world']
     headers = [("Content-Type", "application/json")]
     return code, body, headers
 
 def hello1():
     code = "200 OK"
-    body = [b"abc"]
+    body = [b'abc']
     headers = [("Content-Type", "application/json")]
     return code, body, headers
 
 def headers():
     code = "200 OK"
-    body = [b"cookies"]
+    body = [b'cookies']
     headers = [("Content-Type", "application/json"),
                ("Content-Type", "application/yaml"),
                ("Set-Cookie", "likes=cheese; Expires=Wed, 21 Oct 2015 07:28:00 GMT; Secure; HttpOnly"),
@@ -41,13 +41,13 @@ def headers():
 def long_query():
     sleep(0.005)
     code = "200 OK"
-    body = [b"abc"]
+    body = [b'abc']
     headers = [("Content-Type", "application/json")]
     return code, body, headers
 
 def redirect():
     code = "302 Found"
-    body = ["redirecting"]
+    body = [b'redirecting']
     headers = [("Location", "/")]
     return code, body, headers
 
@@ -63,7 +63,7 @@ paths = {
 def read_handle(env, response):
     code = "404 Not Found"
     headers = []
-    body = ["Not Found"]
+    body = [b'Not Found']
     if env["PATH_INFO"] in paths:
         code, body, headers = paths[env["PATH_INFO"]]()
     for key,value in iter(env.items()):
@@ -76,7 +76,7 @@ def post_handle(env, response):
     code = "200 OK"
     body = [env["wsgi.input"].read()]
     headers = []
-    for key,value in env.iteritems():
+    for key,value in iter(env.items()):
         if "HTTP_" in key:
             headers.append((key[5:].lower(), value))
     response(code, headers)
@@ -84,8 +84,8 @@ def post_handle(env, response):
 
 def other_handle(env, response, method, code):
     headers = [("Content-Type", "text/plain"), ("method", method)]
-    body = [method]
-    for key,value in env.iteritems():
+    body = [method.encode('utf-8')]
+    for key,value in iter(env.items()):
         if "HTTP_" in key:
             headers.append((key[5:].lower(), value))
     response(code, headers)
