@@ -14,7 +14,9 @@
 
 #include "small/static.h"
 #include "trivia/util.h"
+#include "uuid/tt_uuid.h"
 
+#include "box/replication.h"
 #include "backtrace.h"
 #include "crash.h"
 #include "say.h"
@@ -110,6 +112,7 @@ static struct crash_info {
 static char tarantool_path[PATH_MAX];
 static char feedback_host[CRASH_FEEDBACK_HOST_MAX];
 static bool send_crashinfo = false;
+static uint64_t timestamp_mono = 0;
 
 static inline uint64_t
 timespec_to_ns(struct timespec *ts)
@@ -143,6 +146,19 @@ crash_init(const char *tarantool_bin)
 	strlcpy_a(tarantool_path, tarantool_bin);
 	if (strlen(tarantool_path) < strlen(tarantool_bin))
 		pr_panic("executable path is trimmed");
+
+	/*
+	 * We need to keep clock data locally to
+	 * report uptime without binding to libev
+	 * and etc. Because we're reporting information
+	 * at the moment when crash happens and we are to
+	 * be independent as much as we can.
+	 */
+	struct timespec ts;
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+		timestamp_mono = timespec_to_ns(&ts);
+	else
+		pr_syserr("Can't fetch monotonic clock, ignore");
 }
 
 void
@@ -287,6 +303,35 @@ crash_report_feedback_daemon(struct crash_info *cinfo)
 
 	/* Extend size, because now uname_ptr is not needed. */
 	size = e - p;
+
+	/*
+	 * Instance block requires uuid encoding so take it
+	 * from the tail of the buffer.
+	 */
+	snprintf_safe("\"instance\":{");
+	char *uuid_buf = &tail[-(UUID_STR_LEN+1)];
+	if (p >= uuid_buf)
+		return -1;
+	size = uuid_buf - p;
+
+	tt_uuid_to_string(&INSTANCE_UUID, uuid_buf);
+	snprintf_safe("\"server_id\":\"%s\",", uuid_buf);
+	tt_uuid_to_string(&REPLICASET_UUID, uuid_buf);
+	snprintf_safe("\"cluster_id\":\"%s\",", uuid_buf);
+
+	/* No need for uuid_buf anymore. */
+	size = e - p;
+
+	struct timespec ts;
+	uint64_t uptime_ns;
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+		uptime_ns = timespec_to_ns(&ts) - timestamp_mono;
+	else
+		uptime_ns = 0;
+	snprintf_safe("\"uptime\":\"%llu\"",
+		      (unsigned long long)uptime_ns / 1000000000);
+	snprintf_safe("},");
+
 	snprintf_safe("\"build\":{");
 	snprintf_safe("\"version\":\"%s\",", PACKAGE_VERSION);
 	snprintf_safe("\"cmake_type\":\"%s\"", BUILD_INFO);
