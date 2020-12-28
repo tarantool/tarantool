@@ -282,6 +282,12 @@ s:select{}
 
 s:drop()
 
+s = box.schema.space.create('test')
+i = s:create_index('pk')
+s:replace{1}
+collectgarbage('collect')
+s:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
