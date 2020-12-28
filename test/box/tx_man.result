@@ -962,6 +962,24 @@ s:drop()
  | ---
  | ...
 
+s = box.schema.space.create('test')
+ | ---
+ | ...
+i = s:create_index('pk')
+ | ---
+ | ...
+s:replace{1}
+ | ---
+ | - [1]
+ | ...
+collectgarbage('collect')
+ | ---
+ | - 0
+ | ...
+s:drop()
+ | ---
+ | ...
+
 test_run:cmd("switch default")
  | ---
  | - true
