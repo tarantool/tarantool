@@ -1229,7 +1229,7 @@ box_wait_quorum(uint32_t lead_id, int64_t target_lsn, int quorum,
 	if (ack_count < quorum) {
 		diag_set(ClientError, ER_QUORUM_WAIT, quorum, tt_sprintf(
 			 "timeout after %.2lf seconds, collected %d acks",
-			 timeout, ack_count, quorum));
+			 timeout, ack_count));
 		return -1;
 	}
 	return 0;
