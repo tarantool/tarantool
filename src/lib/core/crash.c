@@ -32,10 +32,11 @@
 /** Use strlcpy with destination as an array */
 #define strlcpy_a(dst, src) strlcpy(dst, src, sizeof(dst))
 
-#ifdef TARGET_OS_LINUX
-#ifndef __x86_64__
-# error "Non x86-64 architectures are not supported"
+#if defined(TARGET_OS_LINUX) && defined(__x86_64__)
+# define HAS_GREG
 #endif
+
+#ifdef HAS_GREG
 struct crash_greg {
 	uint64_t	r8;
 	uint64_t	r9;
@@ -66,7 +67,7 @@ struct crash_greg {
 	uint64_t	fpstate;
 	uint64_t	reserved1[8];
 };
-#endif /* TARGET_OS_LINUX */
+#endif /* HAS_GREG */
 
 static struct crash_info {
 	/**
@@ -78,7 +79,7 @@ static struct crash_info {
 	 */
 	void *context_addr;
 	void *siginfo_addr;
-#ifdef TARGET_OS_LINUX
+#ifdef HAS_GREG
 	/**
 	 * Registers contents.
 	 */
@@ -215,7 +216,7 @@ crash_collect(int signo, siginfo_t *siginfo, void *ucontext)
 	backtrace(start, sizeof(cinfo->backtrace_buf));
 #endif
 
-#ifdef TARGET_OS_LINUX
+#ifdef HAS_GREG
 	/*
 	 * uc_mcontext on libc level looks somehow strange,
 	 * they define an array of uint64_t where each register
@@ -456,7 +457,7 @@ crash_report_stderr(struct crash_info *cinfo)
 	fprintf(stderr, "  context: %p\n", cinfo->context_addr);
 	fprintf(stderr, "  siginfo: %p\n", cinfo->siginfo_addr);
 
-#ifdef TARGET_OS_LINUX
+#ifdef HAS_GREG
 # define fprintf_reg(__n, __v)				\
 	fprintf(stderr, "  %-9s0x%-17llx%lld\n",	\
 		__n, (long long)__v, (long long)__v)
@@ -486,7 +487,7 @@ crash_report_stderr(struct crash_info *cinfo)
 	fprintf_reg("oldmask", cinfo->greg.oldmask);
 	fprintf_reg("trapno", cinfo->greg.trapno);
 # undef fprintf_reg
-#endif /* TARGET_OS_LINUX */
+#endif /* HAS_GREG */
 
 	fprintf(stderr, "Current time: %u\n", (unsigned)time(0));
 	fprintf(stderr, "Please file a bug at "
