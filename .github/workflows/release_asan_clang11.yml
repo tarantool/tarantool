@@ -18,7 +18,12 @@ jobs:
       fail-fast: false
 
     # image built by .gitlab.mk instructions and targets from .travis.mk
-    container: docker.io/tarantool/testing:debian-buster
+    container:
+      image: docker.io/tarantool/testing:debian-buster
+      # Our testing expects that the init process (PID 1) will
+      # reap orphan processes. At least the following test leans
+      # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
+      options: '--init'
 
     steps:
       - uses: actions/checkout@v2.3.4
