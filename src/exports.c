@@ -88,6 +88,8 @@
  * below. But automatically.
  */
 
+#include "trivia/config.h"
+
 /**
  * Symbol is just an address. No need to know its definition or
  * even type to get that address. Even an integer global variable
