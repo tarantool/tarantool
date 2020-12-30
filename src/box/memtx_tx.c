@@ -935,14 +935,17 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
 				diag_log();
 				panic("failed to rollback change");
 			}
-			/*
-			 * A space holds references to all his tuples.
-			 * It's made via primary index - all tuples that are physically
-			 * in primary index must be referenced (a replaces tuple must
-			 * be dereferenced).
-			 */
-			tuple_ref(old_story->tuple);
-			tuple_unref(story->tuple);
+			if (i == 0) {
+				/*
+				 * A space holds references to all his tuples.
+				 * It's made via primary index - all tuples that
+				 * are physically in primary index must be
+				 * referenced (a replaces tuple must be
+				 * dereferenced).
+				 */
+				tuple_ref(old_story->tuple);
+				tuple_unref(story->tuple);
+			}
 		} else {
 			struct memtx_story *newer = link->newer_story;
 			assert(newer->link[i].older.is_story);
