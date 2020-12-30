@@ -62,7 +62,7 @@ local function stop_server(test, server)
 end
 
 local function test_http_client(test, url, opts)
-    test:plan(11)
+    test:plan(12)
 
     -- gh-4136: confusing httpc usage error message
     local ok, err = pcall(client.request, client)
@@ -85,9 +85,6 @@ local function test_http_client(test, url, opts)
     local r = client.request('GET', url, nil, opts)
     test:is(r.status, 200, 'request')
 
-    -- XXX: enable after resolving of gh-4180: httpc: redirects
-    -- are broken with libcurl-7.30 and older
-    --[[
     -- gh-4119: specify whether to follow 'Location' header
     test:test('gh-4119: follow location', function(test)
         test:plan(7)
@@ -111,7 +108,6 @@ local function test_http_client(test, url, opts)
         test:is(r.body, 'redirecting', 'do not follow location: body')
         test:is(r.headers['location'], '/', 'do not follow location: header')
     end)
-    ]]--
 end
 
 --
