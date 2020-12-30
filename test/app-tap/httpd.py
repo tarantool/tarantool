@@ -138,6 +138,7 @@ else:
     usage()
 
 sock = socket.socket(sock_family, socket.SOCK_STREAM)
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 sock.bind(sock_addr)
 sock.listen(10)
 
