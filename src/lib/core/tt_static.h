@@ -42,7 +42,7 @@
 #endif
 
 /** Can't be enum - used by preprocessor for static assertions. */
-#define TT_STATIC_BUF_LEN 1024
+#define TT_STATIC_BUF_LEN 2048
 
 /**
  * Return a thread-local statically allocated temporary buffer of
