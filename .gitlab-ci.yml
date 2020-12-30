@@ -55,7 +55,7 @@ before_script:
 
 .deploy_only_template: &deploy_only_definition
   only:
-    - master
+    - "2.7"
     - tags
   except:
     - schedules
@@ -64,12 +64,12 @@ before_script:
 
 .pack_only_template: &pack_only_definition
   except:
-    - master
+    - "2.7"
     - tags
 
 .perf_only_template: &perf_only_definition
   only:
-    - master
+    - "2.7"
     - tags
     - /^.*-perf$/
   except:
