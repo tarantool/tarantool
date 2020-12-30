@@ -258,6 +258,8 @@
 
 #cmakedefine ENABLE_FEEDBACK_DAEMON 1
 
+#cmakedefine EXPORT_LIBCURL_SYMBOLS 1
+
 /*
  * vim: syntax=c
  */
