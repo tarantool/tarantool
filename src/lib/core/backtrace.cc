@@ -358,7 +358,7 @@ __asm__ volatile(
 	"\tldp d14, d15, [x0, #16 * 9]\n"
 	"\tadd sp, x0, #8 * 20\n"
 	:
-	: "r" (unw_context), "r" (coro_ctx), "i" (unw_getcontext_f)
+	: "r" (unw_context), "r" (coro_ctx), "S" (unw_getcontext_f)
 	: /*"lr", "r0", "r1", "ip" */
 	 "x0", "x1", "x2", "x30"
 	);
@@ -376,22 +376,22 @@ void
 backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx)
 {
 	unw_cursor_t unw_cur;
-	unw_context_t unw_ctx;
+	unw_context_t unw_ctx_bt;
 	if (coro_ctx == NULL) {
 		/*
 		 * Current executing coroutine and simple unw_getcontext
 		 * should function.
 		 */
-		unw_getcontext(&unw_ctx);
+		unw_getcontext(&unw_ctx_bt);
 	} else {
 		/*
 		 * Execution context is stored in the coro_ctx
 		 * so use special context-switching handler to
 		 * capture an unwind context.
 		 */
-		coro_unwcontext(&unw_ctx, coro_ctx);
+		coro_unwcontext(&unw_ctx_bt, coro_ctx);
 	}
-	unw_init_local(&unw_cur, &unw_ctx);
+	unw_init_local(&unw_cur, &unw_ctx_bt);
 	int frame_no = 0;
 	unw_word_t sp = 0, old_sp = 0, ip, offset;
 	int unw_status, demangle_status;
