@@ -75,6 +75,11 @@ BuildRequires: libunwind-devel
 %endif
 
 # Set dependences for tests.
+# Since Python 2 was deprecated then new OS do not have repositories
+# with its packages. It is not good way to create all these packages
+# manually and store it as backported. Let's wait when Python 3 will
+# be used for testing.
+%if (0%{?fedora} < 33 && 0%{?rhel} < 9)
 # Do not install unused Python 3 packages which
 # is default since Fedora 31 and CentOS 8.
 %if (0%{?fedora} >= 31 || 0%{?rhel} >= 8)
@@ -87,6 +92,7 @@ BuildRequires: python >= 2.7
 BuildRequires: python-six >= 1.9.0
 BuildRequires: python-gevent >= 1.0
 BuildRequires: python-yaml >= 3.0.9
+%endif
 %endif
 
 Name: tarantool
@@ -144,7 +150,15 @@ C and Lua/C modules.
 
 %build
 # RHBZ #1301720: SYSCONFDIR an LOCALSTATEDIR must be specified explicitly
-%cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+# Must specified explicitly since Fedora 33:
+# 1. -B .
+#    because for now binary path by default value like:
+#      '-B x86_64-redhat-linux-gnu'
+# 2. -DENABLE_LTO=ON
+#    because for now LTO flags are set in CC/LD flags by default:
+#      '-flto=auto -ffat-lto-objects'
+%cmake -B . \
+         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
          -DCMAKE_INSTALL_LOCALSTATEDIR:PATH=%{_localstatedir} \
          -DCMAKE_INSTALL_SYSCONFDIR:PATH=%{_sysconfdir} \
 %if %{with backtrace}
@@ -157,6 +171,9 @@ C and Lua/C modules.
          -DSYSTEMD_UNIT_DIR:PATH=%{_unitdir} \
          -DSYSTEMD_TMPFILES_DIR:PATH=%{_tmpfilesdir} \
 %endif
+%if 0%{?fedora} >= 33
+         -DENABLE_LTO=ON \
+%endif
          -DENABLE_WERROR:BOOL=ON \
          -DENABLE_DIST:BOOL=ON
 make %{?_smp_mflags}
@@ -167,7 +184,11 @@ make %{?_smp_mflags}
 rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
 
 %check
+# Blocked testing starting from Fedora 33 while Python 3 not enabled
+# for testing, issue for switching it on is tarantool/tarantool-qa#17.
+%if 0%{?fedora} < 33
 make test-force
+%endif
 
 %pre
 /usr/sbin/groupadd -r tarantool > /dev/null 2>&1 || :
