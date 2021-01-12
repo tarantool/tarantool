@@ -36,5 +36,5 @@ jobs:
         if: failure()
         with:
           name: debug
-          retention-days: 1000000
+          retention-days: 21
           path: test/var/artifacts
