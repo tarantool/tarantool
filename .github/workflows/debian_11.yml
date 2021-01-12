@@ -54,5 +54,5 @@ jobs:
         if: failure()
         with:
           name: debian-bullseye
-          retention-days: 1000000
+          retention-days: 21
           path: test/var/artifacts

@@ -37,5 +37,5 @@ jobs:
         if: failure()
         with:
           name: release_asan_clang11
-          retention-days: 1000000
+          retention-days: 21
           path: test/var/artifacts
