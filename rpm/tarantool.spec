@@ -5,7 +5,24 @@
 %bcond_with systemd
 %endif
 
-BuildRequires: cmake >= 2.8
+# XXX: There is an old CMake (2.8.12) provided by cmake package in
+# main CentOS 7 repositories. At the same time, there is a newer
+# package cmake3 providing CMake 3+ from EPEL repository. So, one
+# need to use cmake3 package to build Tarantool on old systems.
+%define use_cmake3 0%{?rhel} == 7
+
+%if %use_cmake3
+# XXX: Unfortunately there is no way to make rpmbuild install and
+# enable EPEL repository prior to the build step. However, the
+# requirement below obligues user to enable EPEL by himself,
+# otherwise this dependency is left unmet. If there are any issues
+# with building an RPM package on RHEL/CentOS 7 read the docs:
+# https://www.tarantool.io/en/doc/latest/dev_guide/building_from_source/
+BuildRequires: cmake3 >= 3.1
+%else
+BuildRequires: cmake >= 3.1
+%endif
+
 BuildRequires: make
 %if (0%{?fedora} >= 22 || 0%{?rhel} >= 7 || 0%{?sle_version} >= 1500)
 BuildRequires: gcc >= 4.5
@@ -118,7 +135,7 @@ Requires: openssl
 # RHEL <= 7 doesn't support Recommends:
 Recommends: tarantool-devel
 Recommends: git-core
-Recommends: cmake >= 2.8
+Recommends: cmake >= 3.1
 Recommends: make
 Recommends: gcc >= 4.5
 Recommends: gcc-c++ >= 4.5
@@ -157,7 +174,14 @@ C and Lua/C modules.
 # 2. -DENABLE_LTO=ON
 #    because for now LTO flags are set in CC/LD flags by default:
 #      '-flto=auto -ffat-lto-objects'
-%cmake -B . \
+# XXX: KISS, please. I can play with RPM macros to redefine cmake
+# macro for cmake3 usage, but it totally doesn't worth it.
+%if %use_cmake3
+%cmake3 \
+%else
+%cmake \
+%endif
+       -B . \
          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
          -DCMAKE_INSTALL_LOCALSTATEDIR:PATH=%{_localstatedir} \
          -DCMAKE_INSTALL_SYSCONFDIR:PATH=%{_sysconfdir} \
