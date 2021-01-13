@@ -135,7 +135,7 @@ before_script:
   <<: *artifacts_files_definition
   stage: test
   script:
-    - ${GITLAB_MAKE} test_osx
+    - ${GITLAB_MAKE} test_osx_no_deps
   after_script:
     # Artifacts can't be used from outside the project directory, check:
     #   https://docs.gitlab.com/ee/ci/yaml/README.html#artifactspaths
