@@ -236,7 +236,7 @@ freebsd_12_release:
     MAKE: 'gmake'
   script:
     - ${GITLAB_MAKE} vms_start
-    - ${GITLAB_MAKE} vms_test_freebsd
+    - ${GITLAB_MAKE} vms_test_freebsd_no_deps
 
 default_gcc_centos_7:
   <<: *pack_test_definition
