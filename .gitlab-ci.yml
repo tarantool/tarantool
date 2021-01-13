@@ -275,7 +275,7 @@ freebsd_12_release:
     MAKE: 'gmake'
   script:
     - ${GITLAB_MAKE} vms_start
-    - ${GITLAB_MAKE} vms_test_freebsd
+    - ${GITLAB_MAKE} vms_test_freebsd_no_deps
 
 jepsen-single-instance:
   <<: *jepsen_test_definition
