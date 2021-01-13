@@ -264,6 +264,11 @@ osx_15_release_lto:
     CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
   <<: *osx_definition
 
+osx_110_release:
+  tags:
+    - osx_110
+  <<: *osx_definition
+
 freebsd_12_release:
   <<: *vbox_definition
   tags:
