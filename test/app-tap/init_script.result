@@ -15,6 +15,7 @@ feedback_enabled:true
 feedback_host:https://feedback.tarantool.io
 feedback_interval:3600
 force_recovery:false
+granularity:8
 hot_standby:false
 listen:port
 log:tarantool.log
