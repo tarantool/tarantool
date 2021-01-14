@@ -310,6 +310,7 @@ add_custom_command(
     COMMAND ${CMAKE_SOURCE_DIR}/extra/mkexports
             ${CMAKE_SOURCE_DIR}/extra/exports
             ${exports_file} ${CMAKE_SYSTEM_NAME}
+            ${EXPORT_LIBCURL_SYMBOLS}
             ${EXPORT_LIST}
 )
 

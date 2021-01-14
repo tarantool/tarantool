@@ -2,22 +2,31 @@
 # $1 - in  file
 # $2 - out file
 # $3 - os
-# $4 - export templates
+# $4 - is bundled curl on/off flag
+# $5 - export templates
 if [ "x$3x" = xDarwinx ]; then
     # _func1
     # _func2
-    sed -e 's/#.*//; /^[[:space:]]*$/d; s/^/_/;' $1 > $2
+    rm -f $2
+    while read LINE
+    do
+      if [[ $LINE == \#* || $LINE == "" || ($LINE == curl* && $4 == "OFF") ]]
+      then
+        continue
+      fi
+      echo "_$LINE" >> $2
+    done < $1
 else
     # {
     #   func1;
     #   func2;
     # };
-    echo "$4"
+    echo "$5"
     ( echo "{" && {
       # combine static defined list of functions
       cat $1 ;
       # with list of exported functions of bundled libraries
-      for so in $4 ; do {
+      for so in $5 ; do {
         # exported names from shared object
         nm -D $so ||
         # or follow patch from shared object script
