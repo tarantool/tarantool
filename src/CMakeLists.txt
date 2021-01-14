@@ -233,13 +233,12 @@ target_link_libraries(server core bit uri uuid ${ICU_LIBRARIES})
 # Rule of thumb: if exporting a symbol from a static library, list the
 # library here.
 set (reexport_libraries server core misc bitset csv
-     ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES})
+     ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES} ${CURL_LIBRARIES})
 
 set (common_libraries
     ${reexport_libraries}
     ${LIBYAML_LIBRARIES}
     ${READLINE_LIBRARIES}
-    ${CURL_LIBRARIES}
     ${ICONV_LIBRARIES}
     ${OPENSSL_LIBRARIES}
 )
@@ -302,6 +301,13 @@ if(BUILD_STATIC)
     endif()
 endif()
 
+set(exports_file_sources ${CMAKE_SOURCE_DIR}/extra/exports)
+if (EXPORT_LIBCURL_SYMBOLS)
+    set(exports_file_sources ${exports_file_sources}
+        ${CMAKE_SOURCE_DIR}/extra/exports_libcurl)
+endif()
+string(REPLACE ";" " " exports_file_sources "${exports_file_sources}")
+
 # Exports syntax is toolchain-dependent, preprocessing is necessary
 set(exports_file ${CMAKE_BINARY_DIR}/extra/exports.${CMAKE_SYSTEM_NAME})
 add_custom_target(preprocess_exports
@@ -310,7 +316,7 @@ add_custom_command(
     OUTPUT  ${exports_file}
     DEPENDS ${CMAKE_SOURCE_DIR}/extra/exports
     COMMAND ${CMAKE_SOURCE_DIR}/extra/mkexports
-            ${CMAKE_SOURCE_DIR}/extra/exports
+            ${exports_file_sources}
             ${exports_file} ${CMAKE_SYSTEM_NAME}
             ${EXPORT_LIST}
 )

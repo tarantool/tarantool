@@ -351,6 +351,16 @@ else()
 endif()
 
 #
+# Export libcurl symbols if the library is linked statically.
+#
+if (ENABLE_BUNDLED_LIBCURL)
+    set(EXPORT_LIBCURL_SYMBOLS ON)
+else()
+    set(EXPORT_LIBCURL_SYMBOLS OFF)
+endif()
+message(STATUS "EXPORT_LIBCURL_SYMBOLS: ${EXPORT_LIBCURL_SYMBOLS}")
+
+#
 # ReadLine
 #
 
