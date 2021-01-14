@@ -60,10 +60,12 @@ local TARANTOOL_PATH = arg[-1]
 local output_file = fio.abspath('out.txt')
 local line = ('%s -e "assert(false)" > %s 2>&1 & echo $!'):
         format(TARANTOOL_PATH, output_file)
-local process_waiting_timeout = 30.0
-local file_read_timeout = 30.0
+
+-- Like a default timeout for `cond_wait` in test-run
+local process_waiting_timeout = 60.0
+local file_read_timeout = 60.0
+local file_open_timeout = 60.0
 local file_read_interval = 0.2
-local file_open_timeout = 30.0
 
 local res = tap.test('gh-4983-tnt-e-assert-false-hangs', function(test)
     test:plan(2)
