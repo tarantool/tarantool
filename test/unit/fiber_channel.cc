@@ -34,7 +34,7 @@ fiber_channel_basic()
 
 	ok(fiber_channel_is_empty(channel) == false, "fiber_channel_is_empty(1)");
 
-	void *ptr;
+	void *ptr = NULL;
 
 	fiber_channel_get(channel, &ptr);
 	ok(ptr == &dummy, "fiber_channel_get()");
@@ -58,7 +58,7 @@ fiber_channel_get()
 	   "fiber_channel_put(0)");
 	ok(fiber_channel_put_timeout(channel, &dummy, 0) == -1,
 	   "fiber_channel_put_timeout(0)");
-	void *ptr;
+	void *ptr = NULL;
 	fiber_channel_get(channel, &ptr);
 	ok(ptr == &dummy, "fiber_channel_get(0)");
 	ok(fiber_channel_put_timeout(channel, &dummy, 0.01) == 0,
