@@ -39,6 +39,7 @@
 #include <unistd.h>
 #include <inttypes.h>
 #include <assert.h>
+#include <stdbool.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -561,6 +562,12 @@ cmp_i64(const void *_a, const void *_b)
 {
 	const int64_t *a = (const int64_t *) _a, *b = (const int64_t *) _b;
 	return COMPARE_RESULT(*a, *b);
+}
+
+static inline bool
+is_exp_of_two(unsigned n)
+{
+	return (n & (n - 1)) == 0;
 }
 
 /**

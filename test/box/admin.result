@@ -51,6 +51,8 @@ cfg_filter(box.cfg)
     - 3600
   - - force_recovery
     - false
+  - - granularity
+    - 8
   - - hot_standby
     - false
   - - listen

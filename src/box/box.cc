@@ -849,6 +849,30 @@ box_check_sql_cache_size(int size)
 	return 0;
 }
 
+static void
+box_check_small_alloc_options(void)
+{
+	/*
+	 * If we use the int type, we may get an incorrect
+	 * result if the user enters a large value.
+	 */
+	int64_t granularity = cfg_geti64("granularity");
+	/*
+	 * Granularity must be exponent of two and >= 4.
+	 * We can use granularity value == 4 only because we used small
+	 * memory allocator only for struct tuple, which doesn't require
+	 * aligment. Also added an upper bound for granularity, since if
+	 * the user enters too large value, he will get incomprehensible
+	 * errors later.
+	 */
+	if (granularity < 4 || granularity > 1024 * 16 ||
+	    ! is_exp_of_two(granularity))
+		tnt_raise(ClientError, ER_CFG, "granularity",
+			  "must be greater than or equal to 4,"
+			  " less than or equal"
+			  " to 1024 * 16 and exponent of two");
+}
+
 void
 box_check_config(void)
 {
@@ -878,6 +902,7 @@ box_check_config(void)
 	if (box_check_memory_quota("memtx_memory") < 0)
 		diag_raise();
 	box_check_memtx_min_tuple_size(cfg_geti64("memtx_min_tuple_size"));
+	box_check_small_alloc_options();
 	box_check_vinyl_options();
 	if (box_check_sql_cache_size(cfg_geti("sql_cache_size")) != 0)
 		diag_raise();
@@ -2541,6 +2566,7 @@ engine_init()
 				    cfg_getd("memtx_memory"),
 				    cfg_geti("memtx_min_tuple_size"),
 				    cfg_geti("strip_core"),
+				    cfg_geti("granularity"),
 				    cfg_getd("slab_alloc_factor"));
 	engine_register((struct engine *)memtx);
 	box_set_memtx_max_tuple_size();

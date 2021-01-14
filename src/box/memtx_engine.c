@@ -1064,7 +1064,7 @@ memtx_engine_gc_f(va_list va)
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
-		 bool dontdump, float alloc_factor)
+		 bool dontdump, unsigned granularity, float alloc_factor)
 {
 	struct memtx_engine *memtx = calloc(1, sizeof(*memtx));
 	if (memtx == NULL) {
@@ -1133,7 +1133,8 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	slab_cache_create(&memtx->slab_cache, &memtx->arena);
 	float actual_alloc_factor;
 	small_alloc_create(&memtx->alloc, &memtx->slab_cache,
-			   objsize_min, alloc_factor, &actual_alloc_factor);
+			   objsize_min, granularity, alloc_factor,
+			   &actual_alloc_factor);
 	say_info("Actual slab_alloc_factor calculated on the basis of desired "
 		 "slab_alloc_factor = %f", actual_alloc_factor);
 
