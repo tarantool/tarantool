@@ -2,6 +2,7 @@
 
 if arg[1] == 'replace' then
     box.ctl.on_schema_init(function()
+        -- luacheck: ignore
         box.space._index:on_replace(function(old_space, new_space)
             if new_space[1] == 512 then
                 box.space.test:on_replace(function(old_tup, new_tup)

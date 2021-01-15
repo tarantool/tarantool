@@ -1,24 +1,24 @@
 #!/usr/bin/env tarantool
 
-function none(old_space, new_space)
+local function none(old_space, new_space) -- luacheck: ignore
 end
 
-function trigger_replace(old_space, new_space)
+local function trigger_replace(old_space, new_space) -- luacheck: ignore
     box.space.temp:replace({1})
     box.space.loc:replace({1})
 end
 
-function trigger_insert(old_space, new_space)
+local function trigger_insert(old_space, new_space) -- luacheck: ignore
     box.space.temp:insert({1})
     box.space.loc:insert({1})
 end
 
-function trigger_upsert(old_space, new_space)
+local function trigger_upsert(old_space, new_space) -- luacheck: ignore
     box.space.temp:upsert({1}, {{'=', 1, 4}})
     box.space.loc:upsert({1}, {{'=', 1, 4}})
 end
 
-trigger = nil
+local trigger = nil
 
 if arg[1] == 'none' then
     trigger = none
