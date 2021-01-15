@@ -94,7 +94,7 @@ lbox_ctl_is_recovery_finished(struct lua_State *L)
 	struct memtx_engine *memtx;
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 	lua_pushboolean(L, (memtx ?
-		(memtx->state < MEMTX_FINAL_RECOVERY ? 0 : 1) : 0));
+		(memtx->state < MEMTX_OK ? 0 : 1) : 0));
 	return 1;
 }
 

@@ -32,13 +32,15 @@ end
 
 if arg[2] == 'is_recovery_finished' then
     box.ctl.on_schema_init(function()
-        if box.ctl.is_recovery_finished() then
-            box.space._user:on_replace(trigger)
-        end
+        box.space._index:on_replace(function(old_space, new_space)
+            if box.ctl.is_recovery_finished() then
+                trigger(old_space, new_space)
+            end
+        end)
     end)
 else
     box.ctl.on_schema_init(function()
-        box.space._user:on_replace(trigger)
+        box.space._index:on_replace(trigger)
     end)
 end
 
