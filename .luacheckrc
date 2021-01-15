@@ -35,12 +35,6 @@ exclude_files = {
     "test-run/**/*.lua",
     "test/app/*.test.lua",
     "test/box/*.test.lua",
-    -- Unused source file, to be dropped (gh-5169).
-    "test/box/lua/require_init.lua",
-    -- Unused source file, to be dropped (gh-5169).
-    "test/box/lua/require_mod.lua",
-    -- Unused source file, to be dropped (gh-5169).
-    "test/box/lua/test_init.lua",
     "test/engine/**/*.lua",
     "test/engine_long/**/*.lua",
     "test/luajit-tap/**/*.lua",
