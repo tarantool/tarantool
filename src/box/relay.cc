@@ -194,12 +194,22 @@ relay_send_row(struct xstream *stream, struct xrow_header *row);
 struct relay *
 relay_new(struct replica *replica)
 {
-	struct relay *relay = (struct relay *) calloc(1, sizeof(struct relay));
+	/*
+	 * We need to use aligned_alloc for this struct, because it's have
+	 * specific alignas(CACHELINE_SIZE). If we use simple malloc or same
+	 * functions, we will get member access within misaligned address
+	 * (Use clang UB Sanitizer, to make sure of this)
+	 */
+	assert((sizeof(struct relay) % alignof(struct relay)) == 0);
+	struct relay *relay = (struct relay *)
+		aligned_alloc(alignof(struct relay), sizeof(struct relay));
 	if (relay == NULL) {
-		diag_set(OutOfMemory, sizeof(struct relay), "malloc",
+		diag_set(OutOfMemory, sizeof(struct relay), "aligned_alloc",
 			  "struct relay");
 		return NULL;
 	}
+
+	memset(relay, 0, sizeof(struct relay));
 	relay->replica = replica;
 	relay->last_row_time = ev_monotonic_now(loop());
 	fiber_cond_create(&relay->reader_cond);
