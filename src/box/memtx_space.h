@@ -93,7 +93,7 @@ memtx_space_is_recovering(struct space *space)
 {
 	assert(space_is_memtx(space));
 	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
-	return memtx->state < MEMTX_FINAL_RECOVERY;
+	return memtx->state < MEMTX_OK;
 }
 
 #if defined(__cplusplus)
