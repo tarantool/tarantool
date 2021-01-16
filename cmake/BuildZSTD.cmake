@@ -6,8 +6,11 @@ macro(zstd_build)
         third_party/zstd/lib/common/pool.c
         third_party/zstd/lib/common/xxhash.c
         third_party/zstd/lib/common/fse_decompress.c
+        third_party/zstd/lib/common/debug.c
         third_party/zstd/lib/decompress/zstd_decompress.c
         third_party/zstd/lib/decompress/huf_decompress.c
+        third_party/zstd/lib/decompress/zstd_ddict.c
+        third_party/zstd/lib/decompress/zstd_decompress_block.c
         third_party/zstd/lib/compress/zstd_double_fast.c
         third_party/zstd/lib/compress/zstd_fast.c
         third_party/zstd/lib/compress/zstd_lazy.c
@@ -17,6 +20,10 @@ macro(zstd_build)
         third_party/zstd/lib/compress/zstdmt_compress.c
         third_party/zstd/lib/compress/huf_compress.c
         third_party/zstd/lib/compress/fse_compress.c
+        third_party/zstd/lib/compress/hist.c
+        third_party/zstd/lib/compress/zstd_compress_superblock.c
+        third_party/zstd/lib/compress/zstd_compress_sequences.c
+        third_party/zstd/lib/compress/zstd_compress_literals.c
     )
 
     if (CC_HAS_WNO_IMPLICIT_FALLTHROUGH)
