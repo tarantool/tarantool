@@ -129,8 +129,6 @@ local check_symbols = {
 
     'ZSTD_compress',
     'ZSTD_decompress',
-    'ZSTD_free',
-    'ZSTD_malloc',
     'ZSTD_versionString',
 }
 
