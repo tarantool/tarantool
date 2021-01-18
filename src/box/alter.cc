@@ -4538,7 +4538,7 @@ on_drop_sequence_data_rollback(struct trigger *trigger, void * /* event */)
 	uint32_t id;
 	if (tuple_field_u32(tuple, BOX_SEQUENCE_DATA_FIELD_ID, &id) != 0)
 		return -1;
-	int64_t val;
+	int64_t val = 0;
 	if (tuple_field_i64(tuple, BOX_SEQUENCE_DATA_FIELD_VALUE, &val) != 0)
 		return -1;
 	struct sequence *seq = sequence_by_id(id);
