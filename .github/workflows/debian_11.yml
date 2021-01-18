@@ -47,7 +47,7 @@ jobs:
             echo 'digest-algo sha256' >> ~/.gnupg/gpg.conf
             OS=debian DIST=bullseye ${CI_MAKE} deploy
           else
-            OS=debian DIST=bullseye ${CI_MAKE} package
+            OS=debian DIST=bullseyeALX ${CI_MAKE} package
           fi
       - name: artifacts
         uses: actions/upload-artifact@v2
@@ -56,3 +56,16 @@ jobs:
           name: debian-bullseye
           retention-days: 21
           path: test/var/artifacts
+      - uses: FranzDiebold/github-env-vars-action@v2
+      - name: send on failure Telegram notification
+        uses: appleboy/telegram-action@master
+        if: failure() || cancelled()
+        with:
+          to: ${{ secrets.TELEGRAM_CORE_TO }}
+          token: ${{ secrets.TELEGRAM_CORE_TOKEN }}
+          message: |
+            ❌ Job failed ${{ env.CI_WORKFLOW }}
+            🌐 https://github.com/${{ github.repository }}/actions/runs/${{ env.CI_RUN_ID }}
+            On ${{ github.event_name }}
+            Author ${{ github.actor }}
+            Commit ${{github.sha}}@${{ github.ref }}]
