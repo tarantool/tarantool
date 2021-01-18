@@ -17,14 +17,14 @@ mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_BUNDLED_LIBCURL=OFF ..
 gmake -j
 
-3. Set up python 2.7
+3. Set up python 3.x
 --------------------
 
 Install testing dependences either from packages or from pip.
 
 3.1. From packages:
 -------------------
-pkg_add python-2.7.16 py-gevent py-yaml py-msgpack
+pkg_add python-3.6.7 py3-gevent py3-yaml
 
 3.2. From pip:
 --------------
