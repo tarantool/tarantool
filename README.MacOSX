@@ -19,22 +19,22 @@ sudo xcode-select --install
 sudo xcode-select -switch /Applications/Xcode.app/Contents/Developer
 
 For Homebrew:
-brew install cmake readline
+brew install openssl readline curl icu4c libiconv zlib cmake python3
 
 For MacPorts:
-port install autoconf binutils cmake ncurses zlib readline
+port install autoconf binutils cmake ncurses zlib readline openssl python37
 
-2. Install test-required packages and modules for Python 2.7
+
+2. Install test-required packages and modules for Python 3.x
 -------------
 
-You need: pyYAML, python-daemon, msgpack-python, gevent, six
+You need: pyYAML, python-daemon, gevent, six
 
 To install these packages, we recommend easy_install, pip, or setup.py.
 
 For easy_install:
 sudo easy_install pyyaml
 sudo easy_install python-daemon
-sudo easy_install msgpack-python
 sudo easy_install gevent
 sudo easy_install six
 
