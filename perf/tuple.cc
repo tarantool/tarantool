@@ -34,9 +34,9 @@ access_fields(struct tuple *tuple)
 	int sum = 0;
 	sum += tuple->refs;
 	sum += tuple->format_id;
-	sum += tuple->bsize;
-	sum += tuple->data_offset;
-	sum += tuple->is_dirty;
+	sum += tuple_bsize(tuple);
+	sum += tuple_data_offset(tuple);
+	sum += tuple_is_dirty(tuple);
 	return sum;
 }
 
@@ -162,7 +162,7 @@ int main(int argc, char **argv)
 	for (size_t i = 0; i < amount; i++) {
 		struct tuple *tuple = tuple_new(format, start[i], end[i]);
 		tuple_ref(tuple);
-		if (tuple->bsize <= UINT8_MAX)
+		if (tuple_bsize(tuple) <= UINT8_MAX)
 			tiny_tuples.push_back(tuple);
 		else
 			big_tuples.push_back(tuple);

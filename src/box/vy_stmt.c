@@ -161,7 +161,7 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t data_offset, uint32_t bsize)
 	assert(data_offset >= sizeof(struct vy_stmt) + format->field_map_size);
 
 	if (data_offset > INT16_MAX) {
-		/** tuple->data_offset is 15 bits */
+		/** tuple data_offset can't be more than 15 bits */
 		diag_set(ClientError, ER_TUPLE_METADATA_IS_TOO_BIG,
 			 data_offset);
 		return NULL;
@@ -196,9 +196,9 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t data_offset, uint32_t bsize)
 	tuple->format_id = tuple_format_id(format);
 	if (cord_is_main())
 		tuple_format_ref(format);
-	tuple->bsize = bsize;
-	tuple->data_offset = data_offset;
-	tuple->is_dirty = false;
+	tuple_set_bsize(tuple, bsize);
+	tuple_set_data_offset(tuple, data_offset);
+	tuple_set_dirty_bit(tuple, false);
 	vy_stmt_set_lsn(tuple, 0);
 	vy_stmt_set_type(tuple, 0);
 	vy_stmt_set_flags(tuple, 0);
@@ -214,11 +214,12 @@ vy_stmt_dup(struct tuple *stmt)
 	 * the original tuple.
 	 */
 	struct tuple *res = vy_stmt_alloc(tuple_format(stmt),
-					  stmt->data_offset, stmt->bsize);
+					  tuple_data_offset(stmt),
+					  tuple_bsize(stmt));
 	if (res == NULL)
 		return NULL;
 	assert(tuple_size(res) == tuple_size(stmt));
-	assert(res->data_offset == stmt->data_offset);
+	assert(tuple_data_offset(res) == tuple_data_offset(stmt));
 	memcpy(res, stmt, tuple_size(stmt));
 	res->refs = 1;
 	return res;
@@ -411,17 +412,20 @@ vy_stmt_replace_from_upsert(struct tuple *upsert)
 	/* Get statement size without UPSERT operations */
 	uint32_t bsize;
 	vy_upsert_data_range(upsert, &bsize);
-	assert(bsize <= upsert->bsize);
+	assert(bsize <= tuple_bsize(upsert));
 
 	/* Copy statement data excluding UPSERT operations */
 	struct tuple_format *format = tuple_format(upsert);
-	struct tuple *replace = vy_stmt_alloc(format, upsert->data_offset, bsize);
+	struct tuple *replace = vy_stmt_alloc(format,
+					      tuple_data_offset(upsert),
+					      bsize);
 	if (replace == NULL)
 		return NULL;
 	/* Copy both data and field_map. */
 	char *dst = (char *)replace + sizeof(struct vy_stmt);
 	char *src = (char *)upsert + sizeof(struct vy_stmt);
-	memcpy(dst, src, upsert->data_offset + bsize - sizeof(struct vy_stmt));
+	memcpy(dst, src, tuple_data_offset(upsert) +
+			 bsize - sizeof(struct vy_stmt));
 	vy_stmt_set_type(replace, IPROTO_REPLACE);
 	vy_stmt_set_lsn(replace, vy_stmt_lsn(upsert));
 	return replace;

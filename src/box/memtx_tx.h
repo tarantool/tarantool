@@ -302,7 +302,7 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return tuple;
-	if (!tuple->is_dirty) {
+	if (!tuple_is_dirty(tuple)) {
 		memtx_tx_track_read(txn, space, tuple);
 		return tuple;
 	}

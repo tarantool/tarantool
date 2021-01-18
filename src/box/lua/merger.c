@@ -1115,7 +1115,7 @@ encode_result_buffer(struct lua_State *L, struct merge_source *source,
 	while (result_len < limit && (rc =
 	       merge_source_next(source, NULL, &tuple)) == 0 &&
 	       tuple != NULL) {
-		uint32_t bsize = tuple->bsize;
+		uint32_t bsize = tuple_bsize(tuple);
 		ibuf_reserve(output_buffer, bsize);
 		memcpy(output_buffer->wpos, tuple_data(tuple), bsize);
 		output_buffer->wpos += bsize;

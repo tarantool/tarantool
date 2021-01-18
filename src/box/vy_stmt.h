@@ -583,7 +583,7 @@ vy_stmt_upsert_ops(struct tuple *tuple, uint32_t *mp_size)
 	assert(vy_stmt_type(tuple) == IPROTO_UPSERT);
 	const char *mp = tuple_data(tuple);
 	mp_next(&mp);
-	*mp_size = tuple_data(tuple) + tuple->bsize - mp;
+	*mp_size = tuple_data(tuple) + tuple_bsize(tuple) - mp;
 	return mp;
 }
 
