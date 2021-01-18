@@ -194,7 +194,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	/* Free some memory. */
 	for (size_t i = 0; i < TX_MANAGER_GC_STEPS_SIZE; i++)
 		memtx_tx_story_gc_step();
-	assert(!tuple->is_dirty);
+	assert(!tuple_is_dirty(tuple));
 	uint32_t index_count = space->index_count;
 	assert(index_count < BOX_INDEX_MAX);
 	struct mempool *pool = &txm.memtx_tx_story_pool[index_count];
@@ -218,7 +218,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 			 "mh_history_node");
 		return NULL;
 	}
-	tuple->is_dirty = true;
+	tuple_set_dirty_bit(tuple, true);
 	tuple_ref(tuple);
 
 	story->space = space;
@@ -298,7 +298,7 @@ memtx_tx_story_delete_del_stmt(struct memtx_story *story)
 static struct memtx_story *
 memtx_tx_story_get(struct tuple *tuple)
 {
-	assert(tuple->is_dirty);
+	assert(tuple_is_dirty(tuple));
 
 	mh_int_t pos = mh_history_find(txm.history, tuple, 0);
 	assert(pos != mh_end(txm.history));
@@ -348,7 +348,7 @@ memtx_tx_story_link_tuple(struct memtx_story *story,
 	assert(link->older.tuple == NULL);
 	if (older_tuple == NULL)
 		return;
-	if (older_tuple->is_dirty) {
+	if (tuple_is_dirty(older_tuple)) {
 		memtx_tx_story_link_story(story,
 					  memtx_tx_story_get(older_tuple),
 					  index);
@@ -586,7 +586,7 @@ memtx_tx_story_find_visible_tuple(struct memtx_story *story,
 			/* The tuple is so old that we don't know its story. */
 			*visible_replaced = story->link[index].older.tuple;
 			assert(*visible_replaced == NULL ||
-			       !(*visible_replaced)->is_dirty);
+			       !tuple_is_dirty(*visible_replaced));
 			break;
 		}
 		story = story->link[index].older.story;
@@ -704,7 +704,7 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 		del_tuple = old_tuple;
 	}
 	if (del_tuple != NULL && del_story == NULL) {
-		if (del_tuple->is_dirty) {
+		if (tuple_is_dirty(del_tuple)) {
 			del_story = memtx_tx_story_get(del_tuple);
 		} else {
 			del_story = memtx_tx_story_new_del_stmt(del_tuple,
@@ -1030,14 +1030,14 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
 	size_t res = 0;
 	if (stmt->add_story != NULL) {
 		assert(stmt->add_story->add_stmt == stmt);
-		res += stmt->add_story->tuple->bsize;
+		res += tuple_bsize(stmt->add_story->tuple);
 		stmt->add_story->add_stmt = NULL;
 		stmt->add_story = NULL;
 	}
 	if (stmt->del_story != NULL) {
 		assert(stmt->del_story->del_stmt == stmt);
 		assert(stmt->next_in_del_list == NULL);
-		res -= stmt->del_story->tuple->bsize;
+		res -= tuple_bsize(stmt->del_story->tuple);
 		stmt->del_story->del_stmt = NULL;
 		stmt->del_story = NULL;
 	}
@@ -1049,7 +1049,7 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 			    struct tuple *tuple, uint32_t index,
 			    uint32_t mk_index, bool is_prepared_ok)
 {
-	assert(tuple->is_dirty);
+	assert(tuple_is_dirty(tuple));
 	struct memtx_story *story = memtx_tx_story_get(tuple);
 	bool own_change = false;
 	struct tuple *result = NULL;
@@ -1104,7 +1104,7 @@ memtx_tx_story_delete(struct memtx_story *story)
 	assert(pos != mh_end(txm.history));
 	mh_history_del(txm.history, pos, 0);
 
-	story->tuple->is_dirty = false;
+	tuple_set_dirty_bit(story->tuple, false);
 	tuple_unref(story->tuple);
 
 #ifndef NDEBUG
@@ -1133,7 +1133,7 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 	struct memtx_story *story;
 	struct tx_read_tracker *tracker = NULL;
 
-	if (!tuple->is_dirty) {
+	if (!tuple_is_dirty(tuple)) {
 		story = memtx_tx_story_new(space, tuple);
 		if (story == NULL)
 			return -1;

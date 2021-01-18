@@ -344,12 +344,55 @@ struct PACKED tuple
 	 */
 };
 
+static inline void
+tuple_set_dirty_bit(struct tuple *tuple, bool is_dirty)
+{
+	assert(tuple != NULL);
+	tuple->is_dirty = is_dirty;
+}
+
+static inline bool
+tuple_is_dirty(struct tuple *tuple)
+{
+	assert(tuple != NULL);
+	return tuple->is_dirty;
+}
+
+static inline void
+tuple_set_bsize(struct tuple *tuple, uint32_t bsize)
+{
+	assert(tuple != NULL);
+	assert(bsize <= UINT32_MAX); /* bsize is UINT32_MAX */
+	tuple->bsize = bsize;
+}
+
+static inline uint32_t
+tuple_bsize(struct tuple *tuple)
+{
+	assert(tuple != NULL);
+	return tuple->bsize;
+}
+
+static inline void
+tuple_set_data_offset(struct tuple *tuple, uint16_t data_offset)
+{
+	assert(tuple != NULL);
+	tuple->data_offset = data_offset;
+}
+
+static inline uint16_t
+tuple_data_offset(struct tuple *tuple)
+{
+	assert(tuple != NULL);
+	return tuple->data_offset;
+}
+
 /** Size of the tuple including size of struct tuple. */
 static inline size_t
 tuple_size(struct tuple *tuple)
 {
 	/* data_offset includes sizeof(struct tuple). */
-	return tuple->data_offset + tuple->bsize;
+	return tuple_data_offset(tuple) + tuple_bsize(tuple);
 }
 
 /**
@@ -360,7 +403,7 @@ tuple_size(struct tuple *tuple)
 static inline const char *
 tuple_data(struct tuple *tuple)
 {
-	return (const char *) tuple + tuple->data_offset;
+	return (const char *)tuple + tuple_data_offset(tuple);
 }
 
 /**
@@ -381,8 +424,8 @@ tuple_data_or_null(struct tuple *tuple)
 static inline const char *
 tuple_data_range(struct tuple *tuple, uint32_t *p_size)
 {
-	*p_size = tuple->bsize;
-	return (const char *) tuple + tuple->data_offset;
+	*p_size = tuple_bsize(tuple);
+	return (const char *)tuple + tuple_data_offset(tuple);
 }
 
 /**
@@ -535,7 +578,8 @@ tuple_validate(struct tuple_format *format, struct tuple *tuple)
 static inline const uint32_t *
 tuple_field_map(struct tuple *tuple)
 {
-	return (const uint32_t *) ((const char *) tuple + tuple->data_offset);
+	return (const uint32_t *) ((const char *) tuple +
+				   tuple_data_offset(tuple));
 }
 
 /**
@@ -1144,7 +1188,7 @@ tuple_unref(struct tuple *tuple)
 	if (unlikely(tuple->is_bigref))
 		tuple_unref_slow(tuple);
 	else if (--tuple->refs == 0) {
-		assert(!tuple->is_dirty);
+		assert(!tuple_is_dirty(tuple));
 		tuple_delete(tuple);
 	}
 }
