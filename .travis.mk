@@ -76,6 +76,7 @@ deps_debian:
 		libcurl4-openssl-dev libunwind-dev libicu-dev \
 		python python-pip python-setuptools python-dev \
 		python-msgpack python-yaml python-argparse python-six python-gevent \
+		python3 python3-gevent python3-six python3-yaml \
 		lcov ruby clang llvm llvm-dev zlib1g-dev autoconf automake libtool
 
 deps_buster_clang_8: deps_debian
@@ -100,7 +101,7 @@ build_debian:
 
 test_debian_no_deps: build_debian
 	make LuaJIT-test
-	cd test && /usr/bin/python test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
+	cd test && ./test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_debian: deps_debian test_debian_no_deps
 
@@ -115,7 +116,7 @@ build_coverage_debian:
 test_coverage_debian_no_deps: build_coverage_debian
 	make LuaJIT-test
 	# Enable --long tests for coverage
-	cd test && /usr/bin/python test-run.py --force $(TEST_RUN_EXTRA_PARAMS) --long
+	cd test && ./test-run.py --force $(TEST_RUN_EXTRA_PARAMS) --long
 	lcov --compat-libtool --directory src/ --capture --output-file coverage.info.tmp
 	lcov --compat-libtool --remove coverage.info.tmp 'tests/*' 'third_party/*' '/usr/*' \
 		--output-file coverage.info
@@ -203,17 +204,15 @@ test_static_docker_build:
 	docker build --no-cache --network=host -f Dockerfile.staticbuild -t static_build:tmp .
 	docker run --rm -v ${PWD}/artifacts:/tarantool/test/var/artifacts static_build:tmp \
 		-c "set -x && cd /tarantool/test && \
-		        /usr/bin/python test-run.py --force box/admin || \
+		        ./test-run.py --force box/admin || \
 		        ( chmod -R a+rwx var/artifacts ; exit 1 )"
 
 #######
 # OSX #
 #######
 
-# since Python 2 is EOL it's latest commit from tapped local formula is used
-OSX_PKGS_MIN=openssl readline curl icu4c libiconv zlib autoconf automake libtool \
-	cmake
-OSX_PKGS=${OSX_PKGS_MIN} file://$${PWD}/tools/brew_taps/tntpython2.rb
+OSX_PKGS=openssl readline curl icu4c libiconv zlib autoconf automake libtool \
+	cmake python3
 
 deps_osx:
 	# install brew using command from Homebrew repository instructions:
@@ -226,13 +225,13 @@ deps_osx:
 	# try to install the packages either upgrade it to avoid of fails
 	# if the package already exists with the previous version
 	brew install --force ${OSX_PKGS} || brew upgrade ${OSX_PKGS}
-	pip install --force-reinstall -r test-run/requirements.txt
+	pip3 install --force-reinstall -r test-run/requirements.txt
 
 deps_osx_github_actions:
 	# try to install the packages either upgrade it to avoid of fails
 	# if the package already exists with the previous version
-	brew install --force ${OSX_PKGS_MIN} || brew upgrade ${OSX_PKGS_MIN}
-	pip install --force-reinstall -r test-run/requirements.txt
+	brew install --force ${OSX_PKGS} || brew upgrade ${OSX_PKGS}
+	pip3 install --force-reinstall -r test-run/requirements.txt
 
 build_osx:
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}

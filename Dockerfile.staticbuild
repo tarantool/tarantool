@@ -36,7 +36,7 @@ RUN set -x \
 
 RUN yum -y install ncurses-static readline-static zlib-static pcre-static glibc-static
 
-RUN yum -y install python-devel python-pip
+RUN yum -y install python3-devel python3-pip
 
 RUN set -x && \
     cd / && \
@@ -77,7 +77,7 @@ RUN set -x && \
     find . -name 'CMakeCache.txt' -type f -delete && \
     rm -rf build test/small test/luajit-tap
 
-RUN pip install -r /tarantool/test-run/requirements.txt
+RUN pip3 install -r /tarantool/test-run/requirements.txt
 
 RUN set -x && \
     cmake3 -DCMAKE_BUILD_TYPE=RelWithDebInfo \
@@ -92,7 +92,7 @@ ARG RUN_TESTS
 RUN if [ -n "${RUN_TESTS}" ]; then \
         set -x && \
         cd test && \
-        /usr/bin/python test-run.py --force; \
+        ./test-run.py --force; \
     fi
 
 ENTRYPOINT ["/bin/bash"]
