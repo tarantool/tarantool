@@ -56,7 +56,7 @@ ffi.cdef([[
 
 local info = ffi.C.curl_version_info(7)
 local test = tap.test('curl-features')
-test:plan(3)
+test:plan(5)
 
 if test:ok(info.ssl_version ~= nil, 'Curl built with SSL support') then
     test:diag('ssl_version: ' .. ffi.string(info.ssl_version))
@@ -78,6 +78,9 @@ else
     RTLD_DEFAULT = ffi.cast("void *", 0LL)
 end
 
+--
+-- gh-5223: Check if all curl symbols are exported.
+--
 -- The following list was obtained by parsing libcurl.a static library:
 -- nm libcurl.a | grep -oP 'T \K(curl_.+)$' | sort
 local curl_symbols = {
@@ -173,5 +176,30 @@ test:test('curl_symbols', function(t)
         )
     end
 end)
+
+local function has_protocol(protocol_str)
+    local i = 0
+    -- curl_version_info_data.protocols is a null terminated array
+    -- of pointers to char.
+    -- See curl/lib/version.c:
+    --   static const char * const protocols[]
+    local info = ffi.C.curl_version_info(7)
+    local protocol = info.protocols[i]
+    while protocol ~= nil do
+        if ffi.string(protocol) == protocol_str then
+            return true
+        end
+        i = i + 1
+        protocol = info.protocols[i]
+    end
+
+    return false
+end
+
+--
+-- gh-4559: check if smtp and smtps protocols are enabled.
+--
+test:ok(has_protocol('smtp'), 'smtp protocol is supported')
+test:ok(has_protocol('smtps'), 'smtps protocol is supported')
 
 os.exit(test:check() and 0 or 1)
