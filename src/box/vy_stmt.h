@@ -171,9 +171,15 @@ enum {
  */
 struct vy_stmt {
 	struct tuple base;
-	int64_t lsn;
-	uint8_t  type; /* IPROTO_INSERT/REPLACE/UPSERT/DELETE */
-	uint8_t flags;
+	/**
+	 * Following fields are stored without direct naming
+	 * due to the fact that struct tuple has variable size.
+	 * It also allows us to store them in compact way.
+	 * Use getters and setters to access them.
+	 * int64_t lsn;
+	 * uint8_t type; IPROTO_INSERT/REPLACE/UPSERT/DELETE
+	 * uint8_t flags;
+	 */
 	/**
 	 * Offsets array concatenated with MessagePack fields
 	 * array.
@@ -181,46 +187,60 @@ struct vy_stmt {
 	 */
 };
 
+static inline size_t
+size_of_basic_tuple(void)
+{
+	return sizeof(struct tuple) + sizeof(struct tuple_extra);
+}
+
+static inline size_t
+size_of_struct_vy_stmt(void)
+{
+	return size_of_basic_tuple() + sizeof(int64_t) + 2 * sizeof(uint8_t);
+}
+
 /** Get LSN of the vinyl statement. */
 static inline int64_t
 vy_stmt_lsn(struct tuple *stmt)
 {
-	return ((struct vy_stmt *) stmt)->lsn;
+	return load_u64((void *)stmt + size_of_basic_tuple());
 }
 
 /** Set LSN of the vinyl statement. */
 static inline void
 vy_stmt_set_lsn(struct tuple *stmt, int64_t lsn)
 {
-	((struct vy_stmt *) stmt)->lsn = lsn;
+	store_u64((void *)stmt + size_of_basic_tuple(), lsn);
 }
 
 /** Get type of the vinyl statement. */
 static inline enum iproto_type
 vy_stmt_type(struct tuple *stmt)
 {
-	return (enum iproto_type)((struct vy_stmt *) stmt)->type;
+	return load_u8((void *)stmt + size_of_basic_tuple() + sizeof(int64_t));
 }
 
 /** Set type of the vinyl statement. */
 static inline void
 vy_stmt_set_type(struct tuple *stmt, enum iproto_type type)
 {
-	((struct vy_stmt *) stmt)->type = type;
+	store_u8((void *)stmt + size_of_basic_tuple() + sizeof(int64_t), type);
 }
 
 /** Get flags of the vinyl statement. */
 static inline uint8_t
 vy_stmt_flags(struct tuple *stmt)
 {
-	return ((struct vy_stmt *)stmt)->flags;
+	return load_u8((void *)stmt + size_of_basic_tuple() + sizeof(int64_t) +
+							      sizeof(uint8_t));
 }
 
 /** Set flags of the vinyl statement. */
 static inline void
 vy_stmt_set_flags(struct tuple *stmt, uint8_t flags)
 {
-	((struct vy_stmt *)stmt)->flags = flags;
+	store_u8((void *)stmt + size_of_basic_tuple() +
+				sizeof(int64_t) + sizeof(uint8_t), flags);
 }
 
 /**

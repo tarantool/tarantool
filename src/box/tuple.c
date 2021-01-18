@@ -79,11 +79,17 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 	struct tuple *tuple = NULL;
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
+	size_t data_len = end - data;
+	bool is_tiny = (data_len <= UINT8_MAX);
 	struct field_map_builder builder;
 	if (tuple_field_map_create(format, data, true, &builder) != 0)
 		goto end;
 	uint32_t field_map_size = field_map_build_size(&builder);
-	uint32_t data_offset = sizeof(struct tuple) + field_map_size;
+	is_tiny = (is_tiny && (sizeof(struct tuple) +
+			       field_map_size <= MAX_TINY_DATA_OFFSET));
+	uint32_t data_offset = sizeof(struct tuple) + field_map_size +
+			       !is_tiny * sizeof(uint32_t);
+	assert(!is_tiny || data_offset <= MAX_TINY_DATA_OFFSET);
 	if (data_offset > INT16_MAX) {
 		/** tuple data_offset can't be more than 15 bits */
 		diag_set(ClientError, ER_TUPLE_METADATA_IS_TOO_BIG,
@@ -91,9 +97,8 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 		goto end;
 	}
 
-	size_t data_len = end - data;
-	size_t total = sizeof(struct tuple) + field_map_size + data_len;
-	tuple = (struct tuple *) smalloc(&runtime_alloc, total);
+	size_t total = data_offset + data_len;
+	tuple = (struct tuple *)smalloc(&runtime_alloc, total);
 	if (tuple == NULL) {
 		diag_set(OutOfMemory, (unsigned) total,
 			 "malloc", "tuple");
@@ -101,6 +106,7 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 	}
 
 	tuple->refs = 0;
+	tuple_set_tiny_bit(tuple, is_tiny);
 	tuple_set_bsize(tuple, data_len);
 	tuple->format_id = tuple_format_id(format);
 	tuple_format_ref(format);
