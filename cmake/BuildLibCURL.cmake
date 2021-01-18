@@ -124,6 +124,7 @@ macro(curl_build)
                 --enable-http-auth
                 --enable-mime
                 --enable-dateparse
+                --enable-smtp
 
                 ${DISABLED_DNS_OPT}
                 --disable-ftp
@@ -137,7 +138,6 @@ macro(curl_build)
                 --disable-pop3
                 --disable-imap
                 --disable-smb
-                --disable-smtp
                 --disable-gopher
                 --disable-manual
                 --disable-sspi
