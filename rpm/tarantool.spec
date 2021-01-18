@@ -92,25 +92,15 @@ BuildRequires: libunwind-devel
 %endif
 
 # Set dependences for tests.
-# Since Python 2 was deprecated then new OS do not have repositories
-# with its packages. It is not good way to create all these packages
-# manually and store it as backported. Let's wait when Python 3 will
-# be used for testing.
-%if (0%{?fedora} < 33 && 0%{?rhel} < 9)
-# Do not install unused Python 3 packages which
-# is default since Fedora 31 and CentOS 8.
-%if (0%{?fedora} >= 31 || 0%{?rhel} >= 8)
-BuildRequires: python2 >= 2.7
-BuildRequires: python2-six >= 1.9.0
-BuildRequires: python2-gevent >= 1.0
-BuildRequires: python2-yaml >= 3.0.9
+BuildRequires: python3
+BuildRequires: python3-six
+BuildRequires: python3-gevent
+%if (0%{?sle_version} >= 1500)
+BuildRequires: python3-PyYAML
 %else
-BuildRequires: python >= 2.7
-BuildRequires: python-six >= 1.9.0
-BuildRequires: python-gevent >= 1.0
-BuildRequires: python-yaml >= 3.0.9
+BuildRequires: python3-pyyaml
 %endif
-%endif
+
 # Install prove to run LuaJIT tests.
 BuildRequires: perl-Test-Harness
 
@@ -210,11 +200,7 @@ make %{?_smp_mflags}
 rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
 
 %check
-# Blocked testing starting from Fedora 33 while Python 3 not enabled
-# for testing, issue for switching it on is tarantool/tarantool-qa#17.
-%if 0%{?fedora} < 33
 make test-force
-%endif
 
 %pre
 /usr/sbin/groupadd -r tarantool > /dev/null 2>&1 || :
