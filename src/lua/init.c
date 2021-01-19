@@ -59,6 +59,7 @@
 #include "lua/httpc.h"
 #include "lua/utf8.h"
 #include "digest.h"
+#include "errinj.h"
 #include <small/ibuf.h>
 
 #include <ctype.h>
@@ -555,6 +556,7 @@ run_script_f(va_list ap)
 	 */
 	struct diag *diag = va_arg(ap, struct diag *);
 	bool aux_loop_is_run = false;
+	bool is_option_e_ran = false;
 
 	/*
 	 * Load libraries and execute chunks passed by -l and -e
@@ -585,6 +587,7 @@ run_script_f(va_list ap)
 			if (luaT_call(L, 0, 0) != 0)
 				goto error;
 			lua_settop(L, 0);
+			is_option_e_ran = true;
 			break;
 		default:
 			unreachable(); /* checked by getopt() in main() */
@@ -599,25 +602,41 @@ run_script_f(va_list ap)
 	fiber_sleep(0.0);
 	aux_loop_is_run = true;
 
+	/*
+	 * Override return value of isatty(STDIN_FILENO) if
+	 * ERRINJ_STDIN_ISATTY enabled (iparam not set to default).
+	 * Use iparam in such case, standard return value otherwise.
+	 * Integer param of errinj is used in order to set different
+	 * return values.
+	*/
+	int is_a_tty;
+	struct errinj *inj = errinj(ERRINJ_STDIN_ISATTY, ERRINJ_INT);
+	if (inj != NULL && inj->iparam >= 0) {
+		is_a_tty = inj->iparam;
+	} else {
+		is_a_tty = isatty(STDIN_FILENO);
+	}
+
 	if (path && strcmp(path, "-") != 0 && access(path, F_OK) == 0) {
 		/* Execute script. */
 		if (luaL_loadfile(L, path) != 0)
 			goto luajit_error;
 		if (lua_main(L, argc, argv) != 0)
 			goto error;
-	} else if (!isatty(STDIN_FILENO) || (path && strcmp(path, "-") == 0)) {
+	} else if (!is_a_tty || (path && strcmp(path, "-") == 0)) {
 		/* Execute stdin */
 		if (luaL_loadfile(L, NULL) != 0)
 			goto luajit_error;
 		if (lua_main(L, argc, argv) != 0)
 			goto error;
-	} else {
+	} else if (!is_option_e_ran) {
 		interactive = true;
 	}
 
 	/*
-	 * Start interactive mode when it was explicitly requested
-	 * by "-i" option or stdin is TTY or there are no script.
+	 * Start interactive mode in any of the cases:
+	 * - it was explicitly requested by "-i" option;
+	 * - stdin is TTY and there are no script (-e is considered as a script).
 	 */
 	if (interactive) {
 		say_crit("%s %s\ntype 'help' for interactive help",
