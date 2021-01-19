@@ -612,3 +612,32 @@ s:insert{1, -1, 1}
 sk2 = s:create_index('sk2', {parts={{2, 'number', is_nullable=true}}})
 s:insert{2, nil, 2} --error
 s:drop()
+
+-- gh-5674: ignoring index part options when type is omitted
+s = box.schema.space.create('test', {engine=engine})
+_ = s:create_index('pk', {parts = {1, 'int'}})
+sk = s:create_index('sk', {parts = {2, is_nullable=true}})
+sk.parts
+sk:drop()
+sk = s:create_index('sk', {parts = {2, is_nullable=true, collation='unicode'}})
+sk.parts
+sk:drop()
+sk = s:create_index('sk', {parts = {2, type='string', is_nullable=true, collation='unicode'}})
+sk.parts
+sk:drop()
+sk = s:create_index('sk', {parts = {2, is_nullable=true, 3}})
+sk.parts
+sk:drop()
+sk = s:create_index('sk', {parts = {2, 3}})
+sk.parts
+sk:drop()
+sk = s:create_index('sk', {parts = {2, 3, 4}})
+sk.parts
+sk:drop()
+sk = s:create_index('sk', {parts = {{2, 'int'}, {3, 'string'}}})
+sk.parts
+sk:drop()
+sk = s:create_index('sk', {parts = {{2, is_nullable=true}, {3, collation='unicode'}}})
+sk.parts
+sk:drop()
+s:drop()

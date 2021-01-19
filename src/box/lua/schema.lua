@@ -713,7 +713,8 @@ local function update_index_parts(format, parts)
         box.error(box.error.ILLEGAL_PARAMS,
         "options.parts must have at least one part")
     end
-    if type(parts[1]) == 'number' and type(parts[2]) == 'string' then
+    if type(parts[1]) == 'number' and
+            (parts[2] == nil or type(parts[2]) == 'string') then
         if parts[3] == nil then
             parts = {parts} -- one part only
         else
@@ -723,7 +724,13 @@ local function update_index_parts(format, parts)
 
     local parts_can_be_simplified = true
     local result = {}
-    for i=1,#parts do
+    local i = 0
+    for _ in pairs(parts) do
+        i = i + 1
+        if parts[i] == nil then
+            box.error(box.error.ILLEGAL_PARAMS,
+                    "options.parts: unexpected option(s)")
+        end
         local part = {}
         if type(parts[i]) ~= "table" then
             part.field = parts[i]
