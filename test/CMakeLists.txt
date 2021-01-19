@@ -55,6 +55,3 @@ add_subdirectory(app)
 add_subdirectory(app-tap)
 add_subdirectory(box)
 add_subdirectory(unit)
-
-# Disable connector_c for 1.6
-#add_subdirectory(connector_c)
