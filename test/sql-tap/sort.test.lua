@@ -761,6 +761,9 @@ test:do_execsql_test(
 --
 -- MUST_WORK_TEST? special sql functions (sql_soft_heap_limit, sql_test_control...)
 if (0 > 0) then
+-- Legacy from the original code. Must be replaced with analogue
+-- functions from box.
+local X = nil
 local function cksum(x)
     local i1 = 1
     local i2 = 2
@@ -789,6 +792,11 @@ box.internal.sql_create_function("cksum", cksum)
             UPDATE t11 SET b = cksum(a);
         ]])
 
+    -- Legacy from the original code. Must be replaced with analogue
+    -- functions from box.
+    local tn = nil
+    local sql_test_control = nil
+    local mmap_limit = nil
     for _ in X(0, "X!foreach", [=[["tn mmap_limit","\n     1 0\n     2 1000000\n   "]]=]) do
         test:do_test(
             "sort-14."..tn,
@@ -804,6 +812,15 @@ box.internal.sql_create_function("cksum", cksum)
     end
     ---------------------------------------------------------------------------
     --
+    -- Legacy from the original code. Must be replaced with analogue
+    -- functions from box.
+    local coremutex = nil
+    local sql_config = nil
+    local sql_initialize = nil
+    local sql_soft_heap_limit = nil
+    local tmpstore = nil
+    local softheaplimit = nil
+    local nWorker = nil
     for _ in X(0, "X!foreach", [=[["tn mmap_limit nWorker tmpstore coremutex fakeheap softheaplimit","\n             1          0       3     file      true    false             0\n             2          0       3     file      true     true             0\n             3          0       0     file      true    false             0\n             4    1000000       3     file      true    false             0\n             5          0       0   memory     false     true             0\n             6          0       0     file     false     true       1000000     \n             7          0       0     file     false     true         10000\n   "]]=]) do
         if coremutex then
             sql_config("multithread")

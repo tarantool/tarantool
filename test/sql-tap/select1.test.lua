@@ -1540,6 +1540,10 @@ test:do_execsql_test(
         -- </select1-8.5>
     })
 
+-- Legacy from the original code. Must be replaced with valid values.
+local F1 = nil
+local F2 = nil
+local INTEGER = nil
 -- Check the behavior when the result set is empty
 --
 -- sql v3 always sets r(*).
@@ -1569,8 +1573,6 @@ test:do_test(
             {name = F1, type = INTEGER},{name = F2, type = INTEGER}
             -- </select1-9.3>
         })
-
-
 
 test:do_test(
     "select1-9.4",

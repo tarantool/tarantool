@@ -503,6 +503,10 @@ if (0 > 0)
     -- left-hand side of the comparison operator (=) for the purposes of
     -- collation sequence and affinity precedence.
     --
+
+    -- Legacy from the original code. Must be replaced with analogue
+    -- functions from box.
+    local X = nil
     test:do_execsql_test(
         "e_select-1.6.0",
         [[
@@ -520,6 +524,10 @@ if (0 > 0)
             -- </e_select-1.6.0>
         })
 
+    -- Legacy from the original code. Must be replaced with analogue
+    -- functions from box.
+    local res = nil
+    local tn = nil
     for _ in X(0, "X!foreach", [=[["tn select res","\n     1 { SELECT * FROM t5 JOIN_PATTERN t6 USING (a) } {AA cc cc BB dd DD}\n     2 { SELECT * FROM t6 JOIN_PATTERN t5 USING (a) } {}\n     3 { SELECT * FROM (SELECT a COLLATE "unicode_ci", b FROM t6) JOIN_PATTERN t5 USING (a) } \n       {aa cc cc bb DD dd}\n     4 { SELECT * FROM t5 JOIN_PATTERN t6 USING (a,b) } {AA cc}\n     5 { SELECT * FROM t6 JOIN_PATTERN t5 USING (a,b) } {}\n   "]]=]) do
         do_join_test("e_select-1.6."..tn, select, res)
     end
@@ -834,6 +842,13 @@ end
 
 -- MUST_WORK_TEST prepared statement
 if 0>0 then
+-- Legacy from the original code. Must be replaced with analogue
+-- functions from box.
+local X = nil
+local sql_finalize = nil
+local sql_prepare_v2 = nil
+local nCol = nil
+local tn = nil
 for _ in X(0, "X!foreach", [=[["tn select nCol","\n  1   \"SELECT a,b,c FROM z1\" 3\n  2   \"SELECT a,b,c FROM z1 NATURAL JOIN z3\"  3\n  3   \"SELECT z1.a,z1.b,z1.c FROM z1 NATURAL JOIN z3\" 3\n  4   \"SELECT z3.a,z3.b FROM z1 NATURAL JOIN z3\" 2\n  5   \"SELECT z1.a,z1.b,z1.c, z3.a,z3.b FROM z1 NATURAL JOIN z3\" 5\n  6   \"SELECT 1, 2, z1.a,z1.b,z1.c FROM z1\" 5\n  7   \"SELECT a, a,b,c, b, c FROM z1\" 6\n"]]=]) do
     local stmt = sql_prepare_v2("db", select, -1, "DUMMY")
     test:do_sql_column_count_test(
@@ -961,6 +976,11 @@ test:do_select_tests(
 --
 -- MUST_WORK_TEST prepared statements
 if 0>0 then
+-- Legacy from the original code. Must be replaced with analogue
+-- functions from box.
+local X = nil
+local sql_finalize = nil
+local sql_prepare_v2 = nil
 for _ in X(0, "X!foreach", [=[["tn select","\n  8.1  \"SELECT count(*) FROM a1\"\n  8.2  \"SELECT count(*) FROM a1 WHERE 0\"\n  8.3  \"SELECT count(*) FROM a1 WHERE 1\"\n  8.4  \"SELECT max(a1.one)+min(two), a1.one, two, * FROM a1, a2 WHERE 1\"\n  8.5  \"SELECT max(a1.one)+min(two), a1.one, two, * FROM a1, a2 WHERE 0\"\n"]]=]) do
     -- Set $nRow to the number of rows returned by $select:
     local stmt, nRow
@@ -973,6 +993,10 @@ for _ in X(0, "X!foreach", [=[["tn select","\n  8.1  \"SELECT count(*) FROM a1\"
     local rc = sql_finalize(stmt)
     -- Test that $nRow==1 and that statement execution was successful
     -- (rc==sql_OK).
+
+    -- Legacy from the original code. Must be replaced with analogue
+    -- functions from box.
+    local X = nil
     X(983, "X!cmd", [=[["do_test",["e_select-4.",["tn"]],[["list","list",["rc"],["nRow"]]],"sql_OK 1"]]=])
 end
 end
@@ -1539,6 +1563,10 @@ test:do_select_tests(
 --
 -- MUST_WORK_TEST
 if 0>0 then
+-- Legacy from the original code. Must be replaced with analogue
+-- functions and valid values.
+local db = nil
+local null = nil
 db("nullvalue", "null")
 test:do_select_tests(
     "e_select-7.9",
@@ -2195,7 +2223,7 @@ test:do_select_tests(
         {"1", "SELECT b FROM f1 ORDER BY a LIMIT 0 ", {}},
         {"2", "SELECT b FROM f1 ORDER BY a DESC LIMIT 4 ", {"z", "y", "x", "w"}},
         {"3", "SELECT b FROM f1 ORDER BY a DESC LIMIT 8 ", {"z", "y", "x", "w", "v", "u", "t", "s"}},
-        {"4", "SELECT b FROM f1 ORDER BY a DESC LIMIT 12 ", {"z", y, "x", "w", "v", "u", "t", "s", "r", "q", "p", "o"}},
+        {"4", "SELECT b FROM f1 ORDER BY a DESC LIMIT 12 ", {"z", "y", "x", "w", "v", "u", "t", "s", "r", "q", "p", "o"}},
     })
 
 -- EVIDENCE-OF: R-54935-19057 Or, if the SELECT statement would return
