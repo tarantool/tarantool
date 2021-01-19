@@ -2379,6 +2379,80 @@ test_tuple_validate_formatted(lua_State *L)
 	return 1;
 }
 
+static int
+session_check_admin(lua_State *L)
+{
+	int sess_id = box_session_id();
+	bool sess_exist = box_session_exists(sess_id);
+	assert(sess_exist);
+
+	struct sockaddr addr;
+	uint32_t addrlen = sizeof(addr);
+	int status = box_session_peer(sess_id, &addr, &addrlen);
+	bool status_is_not_ok = (status == -1);
+	assert(status_is_not_ok);
+
+	bool sess_not_exist = !box_session_exists(1234567890);
+	assert(sess_not_exist);
+
+	lua_pushboolean(L, 1);
+
+	return 1;
+}
+
+static int
+fiber_session_check_func(va_list va)
+{
+	(void) va;
+	do {
+		fiber_set_cancellable(true);
+		fiber_sleep(0.01);
+		if (fiber_is_cancelled()) {
+			int sess_id = box_session_id();
+			if (sess_id == 0) {
+				return 1;
+			} else {
+				return 0;
+			}
+		}
+		fiber_set_cancellable(false);
+	} while (1);
+}
+
+
+static int
+session_check_fiber(lua_State *L)
+{
+	int sess_id = box_session_id();
+	assert(sess_id > 0);
+
+	struct fiber *fiber = fiber_new("session check fiber", fiber_session_check_func);
+	fiber_set_joinable(fiber, true);
+	fiber_start(fiber);
+	fiber_cancel(fiber);
+	int failed = fiber_join(fiber);
+	assert(failed == 0);
+
+	lua_pushboolean(L, 1);
+
+	return 1;
+}
+
+static int
+session_check_after_cleanup(lua_State *L)
+{
+	int uid = box_session_uid();
+	assert(uid == 1);
+
+	const char* user = box_session_user();
+	bool user_is_admin = strcmp(user, "admin") == 0;
+	assert(user_is_admin);
+
+	lua_pushboolean(L, 1);
+
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -2422,6 +2496,9 @@ luaopen_module_api(lua_State *L)
 		{"tuple_validate_def", test_tuple_validate_default},
 		{"tuple_validate_fmt", test_tuple_validate_formatted},
 		{"test_key_def_dup", test_key_def_dup},
+		{"session_check_admin", session_check_admin},
+		{"session_check_fiber", session_check_fiber},
+		{"session_check_after_cleanup", session_check_after_cleanup},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

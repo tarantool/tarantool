@@ -37,6 +37,7 @@
 #include "error.h"
 #include "tt_static.h"
 #include "sql_stmt_cache.h"
+#include "sio.h"
 
 const char *session_type_strs[] = {
 	"background",
@@ -374,4 +375,71 @@ generic_session_sync(struct session *session)
 {
 	(void) session;
 	return 0;
+}
+
+API_EXPORT uint64_t
+box_session_id()
+{
+	return current_session()->id;
+}
+
+API_EXPORT bool
+box_session_exists(uint64_t sid)
+{
+	return session_find(sid) != NULL;
+}
+
+API_EXPORT int
+box_session_peer(uint64_t sid, struct sockaddr *addr, uint32_t *addrlen)
+{
+	struct session *session = session_find(sid);
+	if (session == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_SESSION);
+		return -1;
+	}
+
+	int fd = session_fd(session);
+	if (fd < 0) {
+		diag_set(ClientError, ER_SESSION_CLOSED);
+		return -1;
+	}
+
+	*addrlen = sizeof(sockaddr_storage);
+	if (sio_getpeername(fd, addr, addrlen) < 0) {
+		diag_set(SystemError, "getpeername() failed");
+		return -1;
+	}
+
+	return 0;
+}
+
+API_EXPORT const char *
+box_session_user()
+{
+	uint32_t uid = current_session()->credentials.uid;
+	struct user *user = user_by_id(uid);
+	if (user == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_USER, uid);
+		return NULL;
+	}
+
+	return user->def->name;
+}
+
+API_EXPORT const char *
+box_session_type()
+{
+	return session_type_strs[current_session()->type];
+}
+
+API_EXPORT uint32_t
+box_session_uid()
+{
+	return current_session()->credentials.uid;
+}
+
+API_EXPORT uint32_t
+box_session_euid()
+{
+	return effective_user()->uid;
 }

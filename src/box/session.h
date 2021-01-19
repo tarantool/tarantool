@@ -375,6 +375,78 @@ generic_session_fd(struct session *session);
 int64_t
 generic_session_sync(struct session *session);
 
+/** \cond public */
+
+/**
+ * Get the unique identifier (ID) for the current session.
+ *
+ * @retval session ID
+ */
+API_EXPORT uint64_t
+box_session_id(void);
+
+/**
+ * Check if session exists.
+ *
+ * @param sid session ID
+ * @retval true if sessions exists, false otherwise
+ */
+API_EXPORT bool
+box_session_exists(uint64_t sid);
+
+struct sockaddr;
+
+/**
+ * Get the address of session peer (if it exists).
+ *
+ * @param sid session ID.
+ * @param addr address of the peer.
+ * @param addrlen amount of space, pointed to by addr.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error.
+ */
+API_EXPORT int
+box_session_peer(uint64_t sid, struct sockaddr *addr, uint32_t *addrlen);
+
+/**
+ * Get user's name for current session.
+ *
+ * @retval session user on success, emtpy string on error.
+ */
+API_EXPORT const char *
+box_session_user(void);
+
+/**
+ * Get the type of connection or cause of action. Can be
+ * "binary", "console", "repl", "applier" or "background".
+ * This list is subject to change. More session type can
+ * be added in future, while some of existing type can be
+ * deleted or removed.
+ *
+ * @retval session type or cause of action
+ */
+API_EXPORT const char *
+box_session_type(void);
+
+/**
+ * Get the user ID of the current user.
+ *
+ * @retval user ID
+ */
+API_EXPORT uint32_t
+box_session_uid(void);
+
+/**
+ * Get the effective user ID of the current user.
+ *
+ * @retval effective user ID
+ */
+API_EXPORT uint32_t
+box_session_euid(void);
+
+/** \endcond public */
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
