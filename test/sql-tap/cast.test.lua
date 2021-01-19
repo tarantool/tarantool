@@ -786,13 +786,18 @@ test:do_execsql_test(
 -- Test to see if it is possible to trick sql into reading past
 -- the end of a blob when converting it to a number.
 if 0 > 0 then
+-- Legacy from the original code. Must be replaced with analogue
+-- functions from box.
+local sql_prepare = nil
+local sql_bind_blob = nil
+local sql_step = nil
+local sql_column_int = nil
+local STMT
 test:do_test(
     "cast-3.32.1",
     function()
-        local blob, DB, STMT
-        blob = 1234567890
-        DB = sql_connection_pointer("db")
-        STMT = sql_prepare(DB, "SELECT CAST(? AS NUMBER)", -1, "TAIL")
+        local blob = 1234567890
+        STMT = sql_prepare("SELECT CAST(? AS NUMBER)", -1, "TAIL")
         sql_bind_blob("-static", STMT, 1, blob, 5)
         return sql_step(STMT)
     end, {

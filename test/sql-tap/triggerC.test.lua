@@ -780,6 +780,8 @@ for testno, v in ipairs(tests11) do
     --         -- X(891, "X!cmd", [=[["concat",["defaults"],["defaults"]]]=])
     --     })
 
+    -- Legacy from the original code. Must be replaced with valid value.
+    local defaults = nil
     test:do_test(
         "triggerC-11."..testno..".3",
         function()

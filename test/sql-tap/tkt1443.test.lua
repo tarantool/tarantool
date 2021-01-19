@@ -45,8 +45,9 @@ test:plan(3)
 
 
 
+-- Legacy from the original code. Must be replaced with valid value.
+local d = nil
 -- Construct the sample database.
---
 test:do_test(
     "tkt1443-1.0",
     function()
