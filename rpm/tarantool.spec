@@ -8,7 +8,6 @@
 BuildRequires: cmake >= 2.8
 BuildRequires: make
 %if (0%{?fedora} >= 22 || 0%{?rhel} >= 7 || 0%{?sle_version} >= 1500)
-# RHEL 6 requires devtoolset
 BuildRequires: gcc >= 4.5
 BuildRequires: gcc-c++ >= 4.5
 %endif
@@ -84,12 +83,10 @@ BuildRequires: python2-six >= 1.9.0
 BuildRequires: python2-gevent >= 1.0
 BuildRequires: python2-yaml >= 3.0.9
 %else
-%if (0%{?rhel} != 6 || 0%{?sle_version} >= 1500)
 BuildRequires: python >= 2.7
 BuildRequires: python-six >= 1.9.0
 BuildRequires: python-gevent >= 1.0
 BuildRequires: python-yaml >= 3.0.9
-%endif
 %endif
 
 Name: tarantool
@@ -170,19 +167,12 @@ make %{?_smp_mflags}
 rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
 
 %check
-%if 0%{?rhel} != 6
 make test-force
-%endif
 
 %pre
 /usr/sbin/groupadd -r tarantool > /dev/null 2>&1 || :
-%if 0%{?rhel} < 6
-/usr/sbin/useradd -M -g tarantool -r -d /var/lib/tarantool -s /sbin/nologin\
+/usr/sbin/useradd -M %{?rhel:-N} -g tarantool -r -d /var/lib/tarantool -s /sbin/nologin\
     -c "Tarantool Server" tarantool > /dev/null 2>&1 || :
-%else
-/usr/sbin/useradd -M -N -g tarantool -r -d /var/lib/tarantool -s /sbin/nologin\
-    -c "Tarantool Server" tarantool > /dev/null 2>&1 || :
-%endif
 
 %post
 %if %{with systemd}
