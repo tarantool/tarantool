@@ -1078,17 +1078,31 @@ test:do_execsql_test(
 -- MUST_WORK_TEST prepared statements
 if (0>0) then
     local function parameter_test(tn, sql, params, result)
-        local stmt = sql_prepare_v2("db", sql, -1)
+        -- Legacy from the original code. Must be replaced with analogue
+        -- functions from box.
+        local X = nil
+        local sql_prepare_v2 = nil
+        local sql_bind_parameter_name = nil
+        local sql_bind_int = nil
+        local number = nil
+        local stmt = sql_prepare_v2(sql, -1)
         for _ in X(0, "X!foreach", [=[["number name",["params"]]]=]) do
             local nm = sql_bind_parameter_name(stmt, number)
             X(480, "X!cmd", [=[["do_test",[["tn"],".name.",["number"]],[["list","set","",["nm"]]],["name"]]]=])
             sql_bind_int(stmt, number, ((-1) * number))
         end
+        -- Legacy from the original code. Must be replaced with analogue
+        -- functions from box.
+        local sql_column_text = nil
+        local sql_step = nil
         sql_step(stmt)
         local res = {  }
-        for _ in X(0, "X!for", [=[["set i 0","$i < [sql_column_count $stmt]","incr i"]]=]) do
+        for i in X(0, "X!for", [=[["set i 0","$i < [sql_column_count $stmt]","incr i"]]=]) do
             table.insert(res,sql_column_text(stmt, i))
         end
+        -- Legacy from the original code. Must be replaced with analogue
+        -- functions from box.
+        local sql_finalize = nil
         local rc = sql_finalize(stmt)
         X(491, "X!cmd", [=[["do_test",[["tn"],".rc"],[["list","set","",["rc"]]],"sql_OK"]]=])
         X(492, "X!cmd", [=[["do_test",[["tn"],".res"],[["list","set","",["res"]]],["result"]]]=])
@@ -1123,10 +1137,15 @@ if (0>0) then
     -- EVIDENCE-OF: R-14068-49671 Parameters that are not assigned values
     -- using sql_bind() are treated as NULL.
     --
+    -- Legacy from the original code. Must be replaced with analogue
+    -- functions from box.
+    local sql_prepare_v2 = nil
+    local sql_column_type = nil
+    local sql_step = nil
     test:do_test(
         "e_expr-11.7.1",
         function()
-            local stmt = sql_prepare_v2("db", " SELECT ?, :a, @b, ?d ", -1)
+            local stmt = sql_prepare_v2(" SELECT ?, :a, @b, ?d ", -1)
             sql_step(stmt)
             return { sql_column_type(stmt, 0), sql_column_type(stmt, 1), sql_column_type(stmt, 2), sql_column_type(stmt, 3) }
         end, {
@@ -1135,6 +1154,9 @@ if (0>0) then
             -- </e_expr-11.7.1>
         })
 
+    -- Legacy from the original code. Must be replaced with analogue
+    -- functions from box.
+    local stmt = nil
     test:do_sql_finalize_test(
         "e_expr-11.7.1",
         stmt, {
@@ -2289,6 +2311,8 @@ test:do_execsql_test(
         -- </e_expr-17.2.3>
     })
 
+-- Legacy from the original code. Must be replaced with analogue functions.
+local db = nil
 -- MUST_WORK_TEST uses access to nullvalue... (sql parameters) and built in functions
 if 0>0 then
     db("nullvalue", "null")
@@ -2677,6 +2701,9 @@ if 0>0 then
     -- comparisons take place.
     --
 
+    -- Legacy from the original code. Must be replaced with analogue
+    -- functions from box.
+    local X = nil
     for _ in X(0, "X!foreach", [=[["a b c",[["list",[["expr","3"]],[["expr","4"]],[["expr","5"]]]]]]=]) do
         break
     end

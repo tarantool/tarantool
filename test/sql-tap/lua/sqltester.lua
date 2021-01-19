@@ -85,6 +85,9 @@ local function is_deeply_regex(got, expected)
         return (got - expected < min_delta) and (expected - got < min_delta)
     end
 
+    -- Legacy from the original code. Must be replaced with analogue
+    -- function.
+    local table_match_regex_p = nil
     if string_regex_p(expected) then
         return table_match_regex_p(got, expected)
     end

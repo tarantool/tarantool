@@ -51,7 +51,7 @@ for _, val in ipairs({
         {result})
 end
 
-_G.from_sql_to_lua = {
+local from_sql_to_lua = {
     [1] = {1, 1},
     [2] = {"1", 1},
     [3] = {"1.5", 1.5},
@@ -60,6 +60,8 @@ _G.from_sql_to_lua = {
     [6] = {"x'0500'", "\u{0005}\u{0000}"},
     [7] = {"123123123123123", 123123123123123LL},
 }
+
+_G.from_sql_to_lua = from_sql_to_lua
 
 box.schema.func.create('CHECK_FROM_SQL_TO_LUA', {language = 'Lua',
                        is_deterministic = true,
@@ -82,7 +84,7 @@ for i = 1, #from_sql_to_lua, 1 do
         {1})
 end
 
-_G.from_lua_to_sql = {
+local from_lua_to_sql = {
     [1] = {1, 1},
     [2] = {"1.5", 1.5},
     [3] = {"'1'", "1"},
@@ -90,6 +92,8 @@ _G.from_lua_to_sql = {
     [5] = {"false", false},
     [6] = {12, 12LL},
 }
+
+_G.from_lua_to_sql = from_lua_to_sql
 
 box.schema.func.create('CHECK_FROM_LUA_TO_SQL', {language = 'Lua',
                        is_deterministic = true,

@@ -49,8 +49,6 @@ exclude_files = {
 
 files["test/sql-tap/**/*.lua"] = {
     ignore = {
-        -- Accessing an undefined global variable.
-        "113",
         -- Unused local variable.
         "211",
         -- Unused argument.

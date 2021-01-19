@@ -580,6 +580,11 @@ if (0 > 0) then
     test:do_test(
         "misc1-11.1",
         function()
+            -- Legacy from the original code. Must be replaced with analogue
+            -- functions from box.
+            local sql = nil
+            local X = nil
+            local msg = nil
             test:execsql("START TRANSACTION")
             test:execsql("UPDATE t1 SET a=0 WHERE 0")
             sql("db2", "test.db")
@@ -595,9 +600,12 @@ if (0 > 0) then
     test:do_test(
         "misc1-11.2",
         function()
+            -- Legacy from the original code. Must be replaced with analogue
+            -- functions from box.
+            local X = nil
+            local msg = nil
             test:execsql("COMMIT")
             local rc = X(377, "X!cmd", [=[["catch","db2 eval {SELECT count(*) FROM t1}","msg"]]=])
-            db2("close")
             return table.insert(rc,msg) or rc
         end, {
             -- <misc1-11.2>
@@ -725,6 +733,10 @@ test:do_execsql_test(
 
 -- MUST_WORK_TEST collate
 if 0>0 then
+    -- Legacy from the original code. Must be replaced with analogue
+    -- functions from box.
+    local db = nil
+    local X = nil
     db("collate", "numeric", "numeric_collate")
     local function numeric_collate(lhs, rhs)
         if (lhs == rhs)

@@ -585,7 +585,9 @@ test:do_test(
         for i = 1, 50, 1 do
             test:execsql(string.format("INSERT INTO t3 VALUES('x%sx',%s,0.%s)", i, i, i))
         end
-        local sql_search_count = 0
+        -- Legacy from the original code. Must be replaced with analogue
+        -- functions from box.
+        local X = nil
         return X(381, "X!cmd", [=[["concat",[["execsql","SELECT c FROM t3 WHERE b==10"]],["sql_search_count"]]]=])
     end, {
         -- <index-11.1>

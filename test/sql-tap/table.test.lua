@@ -417,7 +417,10 @@ test:do_test(
 
 test:drop_all_tables()
 -- MUST_WORK_TEST
-if (0 > 0)
+-- testcase is broken
+-- https://github.com/tarantool/tarantool/issues/5742
+local is_gh_5742_closed = false
+if is_gh_5742_closed
  then
     test:do_test(
         "table-5.2.2",
@@ -437,6 +440,9 @@ if (0 > 0)
             -- </table-5.2.2>
         })
 
+    -- Legacy from the original code. Must be replaced with analogue
+    -- functions from box.
+    local X = nil
     X(313, "X!cmd", [=[["Make","sure","an","EXPLAIN","does","not","really","create","a","new","table"]]=])
 end
 test:do_test(

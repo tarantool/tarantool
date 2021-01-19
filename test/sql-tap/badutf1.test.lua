@@ -93,8 +93,11 @@ test:do_test(
     })
 
 -- commented as it uses utf16
-if 0>0 then
-sql("db2", "")
+-- testcases are broken
+-- https://github.com/tarantool/tarantool/issues/5743
+local is_gh_5743_closed = false
+if is_gh_5743_closed then
+local sql_exec = nil
 test:do_test(
     "badutf-1.10",
     function()
@@ -206,7 +209,6 @@ test:do_test(
         -- </badutf-1.20>
     })
 end
-
 
 
 test:do_test(
