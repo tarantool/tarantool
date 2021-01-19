@@ -66,6 +66,3 @@ if(ENABLE_FUZZER)
     add_subdirectory(fuzz)
 endif()
 add_subdirectory(unit)
-
-# Disable connector_c for 1.6
-#add_subdirectory(connector_c)
