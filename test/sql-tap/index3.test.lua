@@ -48,7 +48,7 @@ test:do_execsql_test(
 -- integrity_check index3-1.4
 -- Backwards compatibility test:
 --
--- Verify that CREATE INDEX statements that use strings instead of 
+-- Verify that CREATE INDEX statements that use strings instead of
 -- identifiers for the the column names continue to work correctly.
 -- This is undocumented behavior retained for backwards compatiblity.
 --
@@ -61,11 +61,11 @@ test:do_execsql_test(
         CREATE INDEX t1c ON t1(c);
         CREATE INDEX t1d ON t1(d);
         WITH RECURSIVE c(x) AS (VALUES(1) UNION SELECT x+1 FROM c WHERE x<30)
-          INSERT INTO t1(a,b,c,d,e) 
+          INSERT INTO t1(a,b,c,d,e)
             SELECT x, printf('ab%03xxy',x), x, x, x FROM c;
     ]], {
         -- <index3-2.1>
-        
+
         -- </index3-2.1>
     })
 

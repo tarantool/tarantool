@@ -16,7 +16,7 @@ test:plan(57)
 -- This file implements regression tests for sql library.
 --
 -- This file implements tests to verify that ticket #1473 has been
--- fixed.  
+-- fixed.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
@@ -101,7 +101,7 @@ test:do_execsql_test(
         SELECT 1 FROM t1 WHERE a=0 UNION ALL SELECT 2 FROM t1 WHERE b=0
     ]], {
         -- <tkt1473-1.8>
-        
+
         -- </tkt1473-1.8>
     })
 
@@ -111,7 +111,7 @@ test:do_execsql_test(
         SELECT 1 FROM t1 WHERE a=0 UNION SELECT 2 FROM t1 WHERE b=0
     ]], {
         -- <tkt1473-1.9>
-        
+
         -- </tkt1473-1.9>
     })
 
@@ -907,7 +907,7 @@ test:do_execsql_test(
         SELECT 1 FROM t2 WHERE x=1 INTERSECT SELECT 2 FROM t2 WHERE y=2
     ]], {
         -- <tkt1473-8.1>
-        
+
         -- </tkt1473-8.1>
     })
 

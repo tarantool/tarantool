@@ -15,7 +15,7 @@ test:plan(7)
 -------------------------------------------------------------------------
 -- This file implements regression tests for sql library.
 --
--- This file implements tests for processing aggregate queries with 
+-- This file implements tests for processing aggregate queries with
 -- subqueries in which the subqueries hold the aggregate functions
 -- or in which the subqueries are themselves aggregate queries
 --
@@ -74,17 +74,17 @@ test:do_execsql_test("aggnested-1.4",
 -- #
 -- do_test aggnested-2.0 {
 --   db2 eval {
---     CREATE TABLE t1 (A1 INTEGER NOT NULL,A2 INTEGER NOT NULL,A3 INTEGER NOT 
+--     CREATE TABLE t1 (A1 INTEGER NOT NULL,A2 INTEGER NOT NULL,A3 INTEGER NOT
 --     NULL,A4 INTEGER NOT NULL,PRIMARY KEY(A1));
 --     REPLACE INTO t1 VALUES(1,11,111,1111);
 --     REPLACE INTO t1 VALUES(2,22,222,2222);
 --     REPLACE INTO t1 VALUES(3,33,333,3333);
---     CREATE TABLE t2 (B1 INTEGER NOT NULL,B2 INTEGER NOT NULL,B3 INTEGER NOT 
+--     CREATE TABLE t2 (B1 INTEGER NOT NULL,B2 INTEGER NOT NULL,B3 INTEGER NOT
 --     NULL,B4 INTEGER NOT NULL,PRIMARY KEY(B1));
 --     REPLACE INTO t2 VALUES(1,88,888,8888);
 --     REPLACE INTO t2 VALUES(2,99,999,9999);
 --     SELECT (SELECT GROUP_CONCAT(CASE WHEN a1=1 THEN'A' ELSE 'B' END) FROM t2),
---             t1.* 
+--             t1.*
 --     FROM t1;
 --   }
 -- } {A,B,B 3 33 333 3333}

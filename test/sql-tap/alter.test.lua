@@ -49,7 +49,7 @@ test:do_execsql_test(
     [[
         SELECT 't1', * FROM "t1";
         SELECT 't2', * FROM t2;
-        SELECT 'space_table', * FROM SPACE_TABLE;  
+        SELECT 'space_table', * FROM SPACE_TABLE;
     ]], {
         -- <alter-1.4>
         "space_table", 1, 5, 6, 7

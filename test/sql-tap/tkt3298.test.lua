@@ -13,7 +13,7 @@ test:plan(6)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- 
+--
 -- This file tests changes to the name resolution logic that occurred
 -- in august of 2008 and where associated with tickets #3298 and #3301
 --

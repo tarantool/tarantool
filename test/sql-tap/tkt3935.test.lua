@@ -27,97 +27,97 @@ test:do_execsql_test(
         CREATE TABLE t2(c INT primary key, d INT);
     ]], {
         -- <tkt3935.1>
-        
+
         -- </tkt3935.1>
     })
 
 test:do_execsql_test(
     "tkt3935.2",
     [[
-        SELECT j1.b FROM ( SELECT * FROM t1 INNER JOIN t2 ON a=c ) AS j1 
+        SELECT j1.b FROM ( SELECT * FROM t1 INNER JOIN t2 ON a=c ) AS j1;
     ]], {
         -- <tkt3935.2>
-        
+
         -- </tkt3935.2>
     })
 
 test:do_execsql_test(
     "tkt3935.3",
     [[
-        SELECT j1.b FROM (t1 INNER JOIN t2 ON a=c) AS j1 
+        SELECT j1.b FROM (t1 INNER JOIN t2 ON a=c) AS j1;
     ]], {
         -- <tkt3935.3>
-        
+
         -- </tkt3935.3>
     })
 
 test:do_catchsql_test(
     "tkt3935.4",
     [[
-        SELECT a FROM (t1) AS t ON b USING(a) 
+        SELECT a FROM (t1) AS t ON b USING(a);
     ]], {
         -- <tkt3935.4>
-        1, "Syntax error at line 1 at or near position 52: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 46: a JOIN clause is required before ON and USING"
         -- </tkt3935.4>
     })
 
 test:do_catchsql_test(
     "tkt3935.5",
     [[
-        SELECT a FROM (t1) AS t ON b 
+        SELECT a FROM (t1) AS t ON b;
     ]], {
         -- <tkt3935.5>
-        1, "Syntax error at line 1 at or near position 43: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 37: a JOIN clause is required before ON and USING"
         -- </tkt3935.5>
     })
 
 test:do_catchsql_test(
     "tkt3935.6",
     [[
-        SELECT a FROM (SELECT * FROM t1) AS t ON b USING(a) 
+        SELECT a FROM (SELECT * FROM t1) AS t ON b USING(a);
     ]], {
         -- <tkt3935.6>
-        1, "Syntax error at line 1 at or near position 66: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 60: a JOIN clause is required before ON and USING"
         -- </tkt3935.6>
     })
 
 test:do_catchsql_test(
     "tkt3935.7",
     [[
-        SELECT a FROM (SELECT * FROM t1) AS t ON b 
+        SELECT a FROM (SELECT * FROM t1) AS t ON b;
     ]], {
         -- <tkt3935.7>
-        1, "Syntax error at line 1 at or near position 57: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 51: a JOIN clause is required before ON and USING"
         -- </tkt3935.7>
     })
 
 test:do_catchsql_test(
     "tkt3935.8",
     [[
-        SELECT a FROM t1 AS t ON b 
+        SELECT a FROM t1 AS t ON b;
     ]], {
         -- <tkt3935.8>
-        1, "Syntax error at line 1 at or near position 41: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 35: a JOIN clause is required before ON and USING"
         -- </tkt3935.8>
     })
 
 test:do_catchsql_test(
     "tkt3935.9",
     [[
-        SELECT a FROM t1 AS t ON b USING(a) 
+        SELECT a FROM t1 AS t ON b USING(a);
     ]], {
         -- <tkt3935.9>
-        1, "Syntax error at line 1 at or near position 50: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 44: a JOIN clause is required before ON and USING"
         -- </tkt3935.9>
     })
 
 test:do_catchsql_test(
     "tkt3935.10",
     [[
-        SELECT a FROM t1 AS t USING(a) 
+        SELECT a FROM t1 AS t USING(a);
     ]], {
         -- <tkt3935.10>
-        1, "Syntax error at line 1 at or near position 45: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 39: a JOIN clause is required before ON and USING"
         -- </tkt3935.10>
     })
 

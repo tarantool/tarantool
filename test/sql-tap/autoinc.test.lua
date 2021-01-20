@@ -613,7 +613,7 @@ test:do_catchsql_test(
     [[
             DROP TABLE IF EXISTS t2;
             CREATE TABLE t2(x INT PRIMARY KEY AUTOINCREMENT);
-            INSERT INTO t2 VALUES('asd'); 
+            INSERT INTO t2 VALUES('asd');
     ]], {
         -- <autoinc-10.2>
         1, "Type mismatch: can not convert asd to integer"

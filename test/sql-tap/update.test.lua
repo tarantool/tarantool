@@ -46,7 +46,7 @@ test:do_catchsql_test("update-1.1", [[
 test:do_test("update-3.1", function()
   test:execsql "CREATE TABLE test1(id  INT primary key, f1 int,f2 int)"
   -- for _ in X(0, "X!for", [=[["set i 1","$i<=10","incr i"]]=]) do
-  for i = 1, 10 do    
+  for i = 1, 10 do
     local sql = string.format("INSERT INTO test1 VALUES(%s,%s,%s)", i, i, bit.lshift(1, i)) -- X(0, "X!expr", [=[["<<",1,["i"]]]=]))
     test:execsql(sql)
   end
@@ -89,7 +89,7 @@ test:do_execsql_test("update-3.5", [[
   UPDATE test1 SET f2=f2*3
 ]], {
   -- <update-3.5>
-  
+
   -- </update-3.5>
 })
 
@@ -182,7 +182,7 @@ test:do_test("update-3.13", function()
   return test:execsql "UPDATE test1 SET F2=f1, F1=f2"
 end, {
   -- <update-3.13>
-  
+
   -- </update-3.13>
 })
 
@@ -348,7 +348,7 @@ test:do_execsql_test("update-5.5", [[
   UPDATE test1 SET f1=f1-1 WHERE f1>100 and f2==128
 ]], {
   -- <update-5.5>
-  
+
   -- </update-5.5>
 })
 
@@ -372,7 +372,7 @@ test:do_execsql_test("update-5.5.3", [[
   SELECT f1,f2 FROM test1 WHERE f1==778 ORDER BY f1,f2
 ]], {
   -- <update-5.5.3>
-  
+
   -- </update-5.5.3>
 })
 
@@ -420,7 +420,7 @@ test:do_execsql_test("update-5.6.3", [[
   SELECT f1,f2 FROM test1 WHERE f1==778 ORDER BY f1,f2
 ]], {
   -- <update-5.6.3>
-  
+
   -- </update-5.6.3>
 })
 
@@ -482,7 +482,7 @@ test:do_execsql_test("update-6.1.3", [[
   SELECT f1,f2 FROM test1 WHERE f1==88 ORDER BY f1,f2
 ]], {
   -- <update-6.1.3>
-  
+
   -- </update-6.1.3>
 })
 
@@ -516,7 +516,7 @@ test:do_execsql_test("update-6.3.2", [[
   SELECT f1,f2 FROM test1 WHERE f2==89 ORDER BY f1,f2
 ]], {
   -- <update-6.3.2>
-  
+
   -- </update-6.3.2>
 })
 
@@ -582,7 +582,7 @@ test:do_execsql_test("update-6.5.2", [[
   SELECT f1,f2 FROM test1 WHERE f1==778 ORDER BY f1,f2
 ]], {
   -- <update-6.5.2>
-  
+
   -- </update-6.5.2>
 })
 
@@ -623,7 +623,7 @@ test:do_execsql_test("update-6.6.2", [[
   SELECT f1,f2 FROM test1 WHERE f1==778 ORDER BY f1,f2
 ]], {
   -- <update-6.6.2>
-  
+
   -- </update-6.6.2>
 })
 
@@ -685,7 +685,7 @@ test:do_execsql_test("update-7.1.3", [[
   SELECT f1,f2 FROM test1 WHERE f1==88 ORDER BY f1,f2
 ]], {
   -- <update-7.1.3>
-  
+
   -- </update-7.1.3>
 })
 
@@ -720,7 +720,7 @@ test:do_execsql_test("update-7.3.2", [[
   SELECT f1,f2 FROM test1 WHERE f2==89 ORDER BY f1,f2
 ]], {
   -- <update-7.3.2>
-  
+
   -- </update-7.3.2>
 })
 
@@ -786,7 +786,7 @@ test:do_execsql_test("update-7.5.2", [[
   SELECT f1,f2 FROM test1 WHERE f1==778 ORDER BY f1,f2
 ]], {
   -- <update-7.5.2>
-  
+
   -- </update-7.5.2>
 })
 
@@ -827,7 +827,7 @@ test:do_execsql_test("update-7.6.2", [[
   SELECT f1,f2 FROM test1 WHERE f1==778 ORDER BY f1,f2
 ]], {
   -- <update-7.6.2>
-  
+
   -- </update-7.6.2>
 })
 

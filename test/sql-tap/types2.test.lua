@@ -199,7 +199,7 @@ test_bool("types2-4.26", "o1='500'", "'500' > o1", 0)
 test_bool("types2-4.27", "o1='500'", "500.0 > o1", 0)
 test_bool("types2-4.28", "o1='500'", "'500.0' > o1", 1)
 -- types2-5.* - The 'IN (x, y....)' operator with no index.
--- 
+--
 -- Compare literals against literals (no affinity applied)
 test_bool("types2-5.1", "", "(NULL IN ('10.0', 20)) IS NULL", 1)
 test_bool("types2-5.2", "", "10 IN ('10.0', 20)", 0)
@@ -254,9 +254,9 @@ test_bool("types2-5.43", "t1='010',n1=10", "n1 IN (5,t1,11)", 1)
 
 
 -- Tests named types2-6.* use the same infrastructure as the types2-2.*
--- tests. The contents of the vals array is repeated here for easy 
+-- tests. The contents of the vals array is repeated here for easy
 -- reference.
--- 
+--
 -- set vals [list 10 10.0 '10' '10.0' 20 20.0 '20' '20.0' 30 30.0 '30' '30.0']
 --                1  2    3    4      5  6    7    8      9  10   11   12
 test_boolset("types2-6.1", "o IN ('10', 30)", {3, 9, 10})
@@ -271,7 +271,7 @@ test_boolset("types2-6.8", "i IN (20.0, 30.0)", {5, 6, 7, 8, 9, 10, 11, 12})
 test_boolset("types2-6.9", "id IN (1, 6, 10)", {1, 6, 10})
 
 
--- Tests types2-7.* concentrate on expressions of the form 
+-- Tests types2-7.* concentrate on expressions of the form
 -- "x IN (SELECT...)" with no index.
 test:execsql [[
     CREATE TABLE t3(id  INT primary key, i INTEGER, n NUMERIC, t TEXT, o SCALAR);

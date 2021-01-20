@@ -48,7 +48,7 @@ local kwlist = {
 	"disable"
 }
 
-local bannedkws = { 
+local bannedkws = {
 	"all",
 	"alter",
 	"analyze",

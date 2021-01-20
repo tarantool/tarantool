@@ -18,7 +18,7 @@ test.silent = true
 -- This file implements regression tests for sql library.
 --
 -- $Id: select9.test,v 1.4 2008/07/01 14:39:35 danielk1977 Exp $
--- The tests in this file are focused on test compound SELECT statements 
+-- The tests in this file are focused on test compound SELECT statements
 -- that have any or all of an ORDER BY, LIMIT or OFFSET clauses. As of
 -- version 3.6.0, sql contains code to use SQL indexes where possible
 -- to optimize such statements.
@@ -31,18 +31,18 @@ test.silent = true
 ---------------------------------------------------------------------------
 -- test_compound_select TESTNAME SELECT RESULT
 --
---   This command is used to run multiple LIMIT/OFFSET test cases based on 
+--   This command is used to run multiple LIMIT/OFFSET test cases based on
 --   the single SELECT statement passed as the second argument. The SELECT
 --   statement may not contain a LIMIT or OFFSET clause. This proc tests
 --   many statements of the form:
---    
+--
 --     "$SELECT limit $X offset $Y"
---    
+--
 --   for various values of $X and $Y.
---    
+--
 --   The third argument, $RESULT, should contain the expected result of
 --   the command [execsql $SELECT].
---    
+--
 --   The first argument, $TESTNAME, is used as the base test case name to
 --   pass to [do_test] for each individual LIMIT OFFSET test case.
 --
@@ -164,13 +164,13 @@ test:do_execsql_test(
         COMMIT;
     ]], {
         -- <select9-1.0>
-        
+
         -- </select9-1.0>
     })
 
 -- Each iteration of this loop runs the same tests with a different set
 -- of indexes present within the database schema. The data returned by
--- the compound SELECT statements in the test cases should be the same 
+-- the compound SELECT statements in the test cases should be the same
 -- in each case.
 --
 local iOuterLoop = 1
@@ -269,7 +269,7 @@ test:do_execsql_test(
         DROP INDEX i4 ON t2;
     ]], {
         -- <select9-2.0>
-        
+
         -- </select9-2.0>
     })
 
@@ -279,7 +279,7 @@ test:do_execsql_test(
 --end
 
 --db("collate", "reverse", "reverse")
--- This loop is similar to the previous one (test cases select9-1.*) 
+-- This loop is similar to the previous one (test cases select9-1.*)
 -- except that the simple select statements have WHERE clauses attached
 -- to them. Sometimes the WHERE clause may be satisfied using the same
 -- index used for ORDER BY, sometimes not.
@@ -303,7 +303,7 @@ for _, indexes in ipairs({ [[
     test:do_execsql_test(
 "select9-2."..iOuterLoop..".1",
 indexes, {
-            
+
         })
 
     test_compound_select_flippable("select9-2."..iOuterLoop..".2", [[
@@ -344,7 +344,7 @@ test:do_execsql_test(
         DROP INDEX i3 ON t1;
     ]], {
         -- <select9-2.X>
-        
+
         -- </select9-2.X>
     })
 
@@ -369,7 +369,7 @@ test:do_execsql_test(
 --     SELECT t1.a FROM t1 UNION ALL SELECT t2.d FROM t2 ORDER BY 1
 --
 -- can use indexes to run without doing a in-memory sort operation.
--- This block of tests (select9-3.*) is used to check if the same 
+-- This block of tests (select9-3.*) is used to check if the same
 -- is possible with:
 --
 --     CREATE VIEW v1 AS SELECT a FROM t1 UNION ALL SELECT d FROM t2
@@ -522,7 +522,7 @@ test:do_test(
     })
 
 -- Full table scan if the "+x" prevents index usage.
--- 2013-07-09:  Ticket [490a4b7235624298]: 
+-- 2013-07-09:  Ticket [490a4b7235624298]:
 -- "WHERE 0" on the first element of a UNION causes an assertion fault
 --
 test:do_execsql_test(

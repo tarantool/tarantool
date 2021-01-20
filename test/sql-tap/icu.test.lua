@@ -96,7 +96,7 @@ if (0 > 0)
             INSERT INTO fruit VALUES('yamot');
         ]], {
             -- <icu-4.1>
-            
+
             -- </icu-4.1>
         })
 
@@ -130,7 +130,7 @@ if (0 > 0)
         })
 
     ---------------------------------------------------------------------------
-    -- Test that it is not possible to call the ICU regex() function with 
+    -- Test that it is not possible to call the ICU regex() function with
     -- anything other than exactly two arguments. See also:
     --
     --   http://src.chromium.org/viewvc/chrome/trunk/src/third_party/sql/icu-regexp.patch?revision=34807&view=markup
@@ -146,7 +146,7 @@ if (0 > 0)
     test:do_catchsql_test(
         "icu-5.2",
         [=[
-            SELECT regexp('a[abc]c.*') 
+            SELECT regexp('a[abc]c.*')
         ]=], {
             -- <icu-5.2>
             1, "wrong number of arguments to function REGEXP()"
@@ -156,7 +156,7 @@ if (0 > 0)
     test:do_catchsql_test(
         "icu-5.3",
         [=[
-            SELECT regexp('a[abc]c.*', 'abc', 'c') 
+            SELECT regexp('a[abc]c.*', 'abc', 'c')
         ]=], {
             -- <icu-5.3>
             1, "wrong number of arguments to function REGEXP()"

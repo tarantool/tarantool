@@ -101,7 +101,7 @@ test:do_eqp_test(
         {0, 0, 0, "SCAN TABLE T3 (~1048576 rows)"},
         {0, 0, 0, "USE TEMP B-TREE FOR GROUP BY"},
         {0, 0, 0, "USE TEMP B-TREE FOR DISTINCT"},
-        
+
         -- </1.6>
     })
 
@@ -113,7 +113,7 @@ test:do_eqp_test(
         -- <1.7>
         {0, 0, 1, "SCAN SUBQUERY 1 (~1 row)"},
         {0, 1, 0, "SCAN TABLE T3 (~1048576 rows)"},
-        
+
         -- </1.7>
     })
 
@@ -126,7 +126,7 @@ test:do_eqp_test(
         {1, 0, 0, "COMPOUND SUBQUERIES 2 AND 3 USING TEMP B-TREE (UNION)"},
         {0, 0, 1, "SCAN SUBQUERY 1 (~1 row)"},
         {0, 1, 0, "SCAN TABLE T3 (~1048576 rows)"},
-        
+
         -- </1.8>
     })
 
@@ -154,7 +154,7 @@ test:do_eqp_test(
         {1, 0, 0, "COMPOUND SUBQUERIES 2 AND 3 USING TEMP B-TREE (INTERSECT)"},
         {0, 0, 1, "SCAN SUBQUERY 1 (~1 row)"},
         {0, 1, 0, "SCAN TABLE T3 (~1048576 rows)"},
-        
+
         -- </1.10>
     })
 
@@ -168,7 +168,7 @@ test:do_eqp_test(
         {1, 0, 0, "COMPOUND SUBQUERIES 2 AND 3 (UNION ALL)"},
         {0, 0, 1, "SCAN SUBQUERY 1 (~1 row)"},
         {0, 1, 0, "SCAN TABLE T3 (~1048576 rows)"},
-        
+
         -- </1.11>
     })
 
@@ -243,7 +243,7 @@ test:do_eqp_test(
         {0, 0, 0, "SCAN TABLE T1 (~1048576 rows)"},
         {0, 0, 0, "EXECUTE SCALAR SUBQUERY 1"},
         {1, 0, 0, "SCAN TABLE T1 AS SUB (~1048576 rows)"},
-        
+
         -- </3.1.1>
     })
 
@@ -256,7 +256,7 @@ test:do_eqp_test(
         {0, 0, 0, "SCAN TABLE T1 (~1048576 rows)"},
         {0, 0, 0, "EXECUTE SCALAR SUBQUERY 1"},
         {1, 0, 0, "SCAN TABLE T1 AS SUB (~1048576 rows)"},
-        
+
         -- </3.1.2>
     })
 
@@ -270,7 +270,7 @@ test:do_eqp_test(
         {0, 0, 0, "EXECUTE SCALAR SUBQUERY 1"},
         {1, 0, 0, "SCAN TABLE T1 AS SUB (~1048576 rows)"},
         {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
-        
+
         -- </3.1.3>
     })
 
@@ -283,7 +283,7 @@ test:do_eqp_test(
         {0, 0, 0, "SCAN TABLE T1 (~1048576 rows)"},
         {0, 0, 0, "EXECUTE SCALAR SUBQUERY 1"},
         {1, 0, 0, "SCAN TABLE T2 USING COVERING INDEX T2I1 (~1048576 rows)"},
-        
+
         -- </3.1.4>
     })
 
@@ -291,18 +291,18 @@ test:do_eqp_test("3.2.1", [[
   SELECT * FROM (SELECT * FROM t1 ORDER BY x LIMIT 10) ORDER BY y LIMIT 5
 ]], {
     {1, 0, 0, "SCAN TABLE T1 (~1048576 rows)"},
-    {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"}, 
+    {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
     {0, 0, 0, "SCAN SUBQUERY 1 (~1 row)"},
     {0, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
 })
 test:do_eqp_test("3.2.2", [[
-  SELECT * FROM 
+  SELECT * FROM
     (SELECT * FROM t1 ORDER BY x LIMIT 10) AS x1,
     (SELECT * FROM t2 ORDER BY x LIMIT 10) AS x2
   ORDER BY x2.y LIMIT 5
 ]], {
     {1, 0, 0, "SCAN TABLE T1 (~1048576 rows)"},
-    {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"}, 
+    {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
     {2, 0, 0, "SCAN TABLE T2 USING COVERING INDEX T2I1 (~1048576 rows)"},
     {0, 0, 0, "SCAN SUBQUERY 1 AS X1 (~1 row)"},
     {0, 1, 1, "SCAN SUBQUERY 2 AS X2 (~1 row)"},
@@ -312,21 +312,21 @@ test:do_eqp_test("3.3.1", [[
   SELECT * FROM t1 WHERE y IN (SELECT y FROM t2)
 ]], {
     {0, 0, 0, "SCAN TABLE T1 (~983040 rows)"},
-    {0, 0, 0, "EXECUTE LIST SUBQUERY 1"}, 
+    {0, 0, 0, "EXECUTE LIST SUBQUERY 1"},
     {1, 0, 0, "SCAN TABLE T2 (~1048576 rows)"},
 })
 test:do_eqp_test("3.3.2", [[
   SELECT * FROM t1 WHERE y IN (SELECT y FROM t2 WHERE t1.x!=t2.x)
 ]], {
     {0, 0, 0, "SCAN TABLE T1 (~983040 rows)"},
-    {0, 0, 0, "EXECUTE CORRELATED LIST SUBQUERY 1"}, 
+    {0, 0, 0, "EXECUTE CORRELATED LIST SUBQUERY 1"},
     {1, 0, 0, "SCAN TABLE T2 (~983040 rows)"},
 })
 test:do_eqp_test("3.3.3", [[
   SELECT * FROM t1 WHERE EXISTS (SELECT y FROM t2 WHERE t1.x!=t2.x)
 ]], {
     {0, 0, 0, "SCAN TABLE T1 (~983040 rows)"},
-    {0, 0, 0, "EXECUTE CORRELATED SCALAR SUBQUERY 1"}, 
+    {0, 0, 0, "EXECUTE CORRELATED SCALAR SUBQUERY 1"},
     {1, 0, 0, "SCAN TABLE T2 (~983040 rows)"},
 })
 ---------------------------------------------------------------------------
@@ -341,7 +341,7 @@ test:do_eqp_test(
         {1, 0, 0, "SCAN TABLE T1 (~1048576 rows)"},
         {2, 0, 0, "SCAN TABLE T2 (~1048576 rows)"},
         {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (UNION ALL)"},
-        
+
         -- </4.1.1>
     })
 
@@ -355,7 +355,7 @@ test:do_eqp_test(
         {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
         {2, 0, 0, "SCAN TABLE T2 USING COVERING INDEX T2I1 (~1048576 rows)"},
         {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (UNION ALL)"},
-        
+
         -- </4.1.2>
     })
 
@@ -370,7 +370,7 @@ test:do_eqp_test(
         {2, 0, 0, "SCAN TABLE T2 USING COVERING INDEX T2I1 (~1048576 rows)"},
         {2, 0, 0, "USE TEMP B-TREE FOR RIGHT PART OF ORDER BY"},
         {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (UNION)"},
-        
+
         -- </4.1.3>
     })
 
@@ -385,7 +385,7 @@ test:do_eqp_test(
         {2, 0, 0, "SCAN TABLE T2 USING COVERING INDEX T2I1 (~1048576 rows)"},
         {2, 0, 0, "USE TEMP B-TREE FOR RIGHT PART OF ORDER BY"},
         {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (INTERSECT)"},
-        
+
         -- </4.1.4>
     })
 
@@ -471,7 +471,7 @@ test:do_eqp_test(
         {1, 0, 0, "SCAN TABLE T1 (~1048576 rows)"},
         {2, 0, 0, "SCAN TABLE T2 (~1048576 rows)"},
         {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 USING TEMP B-TREE (UNION)"},
-        
+
         -- </4.3.1>
     })
 
@@ -506,7 +506,7 @@ test:do_eqp_test(
     })
 
 ---------------------------------------------------------------------------
--- This next block of tests verifies that the examples on the 
+-- This next block of tests verifies that the examples on the
 -- lang_explain.html page are correct.
 --
 test:drop_all_tables()
@@ -530,7 +530,7 @@ test:do_eqp_test("5.1.1", "SELECT a, b FROM t1 WHERE a=1", {
 test:do_execsql_test(
     "5.2.0",
     [[
-        CREATE INDEX i1 ON t1(a) 
+        CREATE INDEX i1 ON t1(a)
     ]])
 
 test:do_eqp_test("5.2.1", "SELECT a, b FROM t1 WHERE a=1", {
@@ -543,7 +543,7 @@ test:do_eqp_test("5.2.1", "SELECT a, b FROM t1 WHERE a=1", {
 test:do_execsql_test(
     "5.3.0",
     [[
-        CREATE INDEX i2 ON t1(a, b) 
+        CREATE INDEX i2 ON t1(a, b)
     ]])
 
 test:do_eqp_test("5.3.1", "SELECT a, b FROM t1 WHERE a=1", {
@@ -682,9 +682,9 @@ test:do_eqp_test("5.13", "SELECT a FROM t1 EXCEPT SELECT d FROM t2 ORDER BY 1", 
     {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (EXCEPT)"},
 })
 -- #-------------------------------------------------------------------------
--- # The following tests - eqp-6.* - test that the example C code on 
+-- # The following tests - eqp-6.* - test that the example C code on
 -- # documentation page eqp.html works. The C code is duplicated in test1.c
--- # and wrapped in Tcl command [print_explain_query_plan] 
+-- # and wrapped in Tcl command [print_explain_query_plan]
 -- #
 -- set boilerplate {
 --   proc explain_query_plan {db sql} {

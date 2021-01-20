@@ -53,7 +53,7 @@ test:do_execsql_test(
 -- and it really is non-deterministic, returning a different result each
 -- time.  But counter2() is marked as deterministic, so it does get factored
 -- out of the loop.  counter2() has the same implementation as counter1(),
--- returning a different result on each invocation, but because it is 
+-- returning a different result on each invocation, but because it is
 -- only invoked once outside of the loop, it appears to return the same
 -- result multiple times.
 --

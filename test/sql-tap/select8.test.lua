@@ -32,9 +32,9 @@ test:execsql [[
     INSERT INTO songs VALUES(6,'two',11);
 ]]
 local result = test:execsql [[
-    SELECT DISTINCT artist,sum(timesplayed) AS total      
-    FROM songs      
-    GROUP BY LOWER(artist)      
+    SELECT DISTINCT artist,sum(timesplayed) AS total
+    FROM songs
+    GROUP BY LOWER(artist)
 ]]
 
 local function subrange(t, first, last)
@@ -48,27 +48,27 @@ end
 test:do_execsql_test(
     "select8-1.1",
     [[
-        SELECT DISTINCT artist,sum(timesplayed) AS total      
-        FROM songs      
-        GROUP BY LOWER(artist)      
+        SELECT DISTINCT artist,sum(timesplayed) AS total
+        FROM songs
+        GROUP BY LOWER(artist)
         LIMIT 1 OFFSET 1
     ]], subrange(result, 3, 4))
 
 test:do_execsql_test(
     "select8-1.2",
     [[
-        SELECT DISTINCT artist,sum(timesplayed) AS total      
-        FROM songs      
-        GROUP BY LOWER(artist)      
+        SELECT DISTINCT artist,sum(timesplayed) AS total
+        FROM songs
+        GROUP BY LOWER(artist)
         LIMIT 2 OFFSET 1
     ]], subrange(result, 3, 6))
 
 test:do_execsql_test(
     "select8-1.3",
     [[
-        SELECT DISTINCT artist,sum(timesplayed) AS total      
-        FROM songs      
-        GROUP BY LOWER(artist)      
+        SELECT DISTINCT artist,sum(timesplayed) AS total
+        FROM songs
+        GROUP BY LOWER(artist)
         LIMIT 1000 OFFSET 2
     ]], subrange(result, 5, #result))
 

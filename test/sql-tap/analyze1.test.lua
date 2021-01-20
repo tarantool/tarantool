@@ -252,7 +252,7 @@ test:do_execsql_test(
         DROP TABLE t2;
         SELECT "idx", "stat" FROM "_sql_stat1" ORDER BY "idx";
     ]], {
-        -- <analyze-3.8>      
+        -- <analyze-3.8>
         -- </analyze-3.8>
     })
 
@@ -348,7 +348,7 @@ test:do_execsql_test(
 
 
 
--- Verify that DROP TABLE and DROP INDEX remove entries from the 
+-- Verify that DROP TABLE and DROP INDEX remove entries from the
 -- sql_stat1, sql_stat3 and sql_stat4 tables.
 --
 test:do_execsql_test(

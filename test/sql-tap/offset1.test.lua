@@ -13,7 +13,7 @@ test:plan(22)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- 
+--
 -- This file implements test cases for the [b65cb2c8d91f6685841d7d1e13b6]
 -- bug:  Correct handling of LIMIT and OFFSET on a UNION ALL query where
 -- the right-hand SELECT contains an ORDER BY in a subquery.
@@ -162,7 +162,7 @@ test:do_execsql_test(
         LIMIT 3 OFFSET 9;
     ]], {
         -- <offset1-1.2.9>
-        
+
         -- </offset1-1.2.9>
     })
 
@@ -172,7 +172,7 @@ test:do_execsql_test(
         SELECT * FROM t1 LIMIT 0;
     ]], {
         -- <offset1-1.3.0>
-        
+
         -- </offset1-1.3.0>
     })
 
@@ -185,7 +185,7 @@ test:do_execsql_test(
         LIMIT 0 OFFSET 1;
     ]], {
         -- <offset1-1.4.0>
-        
+
         -- </offset1-1.4.0>
     })
 

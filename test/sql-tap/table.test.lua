@@ -29,7 +29,7 @@ test:do_execsql_test(
         )
     ]], {
         -- <table-1.1>
-        
+
         -- </table-1.1>
     })
 
@@ -62,7 +62,7 @@ test:do_test(
         --execsql {SELECT * FROM sql_master WHERE type!='meta'}
     end, {
         -- <table-1.5>
-        
+
         -- </table-1.5>
     })
 
@@ -83,7 +83,7 @@ test:do_test(
         --execsql {SELECT name FROM sql_master WHERE type!='meta'}
     end, {
         -- <table-1.10>
-        
+
         -- </table-1.10>
     })
 
@@ -95,7 +95,7 @@ test:do_test(
         --execsql {SELECT name FROM "sql_master" WHERE type!='meta'}
     end, {
         -- <table-1.11>
-        
+
         -- </table-1.11>
     })
 
@@ -106,7 +106,7 @@ test:do_test(
         --execsql {SELECT name as "X" FROM sql_master WHERE type!='meta'}
     end, {
         -- <table-1.12>
-        
+
         -- </table-1.12>
     })
 
@@ -118,7 +118,7 @@ test:do_test(
         --execsql {SELECT name FROM "sql_master" WHERE type!='meta'}
     end, {
         -- <table-1.13>
-        
+
         -- </table-1.13>
     })
 
@@ -171,7 +171,7 @@ test:do_execsql_test(
         DROP TABLE test2; --SELECT name FROM sql_master WHERE type!='meta'
     ]], {
         -- <table-2.1f>
-        
+
         -- </table-2.1f>
     })
 
@@ -185,7 +185,7 @@ test:do_test(
         --catchsql {CREATE TABLE test3(id primary key, two text)}
     end, {
         -- <table-2.2a>
-        
+
         -- </table-2.2a>
     })
 
@@ -220,7 +220,7 @@ test:do_test(
         --execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
     end, {
         -- <table-2.2f>
-        
+
         -- </table-2.2f>
     })
 
@@ -255,7 +255,7 @@ test:do_test(
         --execsql {SELECT sql FROM sql_master WHERE type=='table'}
     end, {
         -- <table-3.1>
-        
+
         -- </table-3.1>
     })
 
@@ -303,7 +303,7 @@ test:do_test(
         --execsql {SELECT name FROM sql_master WHERE type!='meta'}
     end, {
         -- <table-3.6>
-        
+
         -- </table-3.6>
     })
 
@@ -365,7 +365,7 @@ test:do_test(
         return test:execsql [[SELECT "name" FROM "_space" WHERE "id">500]]
     end, {
         -- <table-4.3>
-        
+
         -- </table-4.3>
     })
 
@@ -436,7 +436,7 @@ if is_gh_5742_closed
             ]]
         end, {
             -- <table-5.2.2>
-            
+
             -- </table-5.2.2>
         })
 
@@ -455,7 +455,7 @@ test:do_test(
         --execsql {SELECT name FROM sql_master WHERE type!='meta'}
     end, {
         -- <table-5.3>
-        
+
         -- </table-5.3>
     })
 
@@ -484,7 +484,7 @@ test:do_test(
 --  set list [glob -nocomplain testdb/spaces*.tbl]
 --} {testdb/spaces+in+this+name+.tbl}
 -- Try using keywords as table names or column names.
--- 
+--
 test:do_catchsql_test(
     "table-7.1",
     [=[
@@ -961,7 +961,7 @@ test:do_execsql_test(
         SELECT * FROM tablet8;
     ]], {
         -- <table-13.1>
-        
+
         -- </table-13.1>
     })
 end
@@ -1010,7 +1010,7 @@ test:do_test(
     })
 end
 -- ifcapable attach {
---   # Now attach a database and ensure that a table can be created in the 
+--   # Now attach a database and ensure that a table can be created in the
 --   # attached database whilst in a callback from a query on the main database.
 --   do_test table-14.3 {
 --     forcedelete test2.db
@@ -1022,7 +1022,7 @@ end
 --       db eval {CREATE TABLE aux.t1(a, b, c)}
 --     }
 --   } {}
---   # On the other hand, it should be impossible to drop a table when any VMs 
+--   # On the other hand, it should be impossible to drop a table when any VMs
 --   # are active. This is because VerifyCookie instructions may have already
 --   # been executed, and btree root-pages may not move after this (which a
 --   # delete table might do).
@@ -1033,7 +1033,7 @@ end
 --           db eval {DROP TABLE aux.t1;}
 --         }
 --       } msg
---     ] 
+--     ]
 --     set result [list $rc $msg]
 --   } {1 {database table is locked}}
 -- }
@@ -1053,7 +1053,7 @@ test:do_test(
         return
     end, {
         -- <table-15.1>
-        
+
         -- </table-15.1>
     })
 
@@ -1068,7 +1068,7 @@ test:do_test(
         return
     end, {
         -- <table-15.2>
-        
+
         -- </table-15.2>
     })
 

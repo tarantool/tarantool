@@ -51,7 +51,7 @@ test:do_test(
         end
         return test:execsql("ANALYZE")
     end, {
-        -- <1.0>        
+        -- <1.0>
         -- </1.0>
     })
 
@@ -60,7 +60,7 @@ test:do_test(
 
 -- But for a==99 and a==101, there are far fewer rows so choose
 -- the t1a index.
-    
+
 test:do_eqp_test(
     1.1,
     [[SELECT * FROM t1 WHERE a=100 AND b=55]],
@@ -127,12 +127,12 @@ test:do_eqp_test(
 -- There are many more values of c between 0 and 100000 than there are
 -- between 800000 and 900000.  So t1c is more selective for the latter
 -- range.
--- 
+--
 -- Test 3.2 is a little unstable. It depends on the planner estimating
 -- that (b BETWEEN 30 AND 34) will match more rows than (c BETWEEN
 -- 800000 AND 900000). Which is a pretty close call (50 vs. 32), so
 -- the planner could get it wrong with an unlucky set of samples. This
--- case happens to work, but others ("b BETWEEN 40 AND 44" for example) 
+-- case happens to work, but others ("b BETWEEN 40 AND 44" for example)
 -- will fail.
 --
 test:do_execsql_test(

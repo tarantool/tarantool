@@ -25,7 +25,7 @@ test:do_execsql_test(
         INSERT INTO t VALUES(2, 5, 4);
     ]], {
         -- <tkt-f973c7ac3-1.0>
-        
+
         -- </tkt-f973c7ac3-1.0>
     })
 
@@ -46,7 +46,7 @@ for tn, sql in ipairs(sqls) do
     test:do_execsql_test(
         "tkt-f973c7ac3-1."..tn..".2",
         [[
-            SELECT c1,c2 FROM t WHERE c1 = 5 AND c2>0 AND c2<=5 ORDER BY c2 DESC 
+            SELECT c1,c2 FROM t WHERE c1 = 5 AND c2>0 AND c2<=5 ORDER BY c2 DESC
         ]], {
             5, 5, 5, 4
         })
@@ -85,7 +85,7 @@ for tn, sql in ipairs(sqls) do
     test:do_execsql_test(
         "tkt-f973c7ac3-1."..tn..".7",
         [[
-            SELECT c1,c2 FROM t WHERE c1 = 5 AND c2>0 AND c2<=5 ORDER BY c2 ASC 
+            SELECT c1,c2 FROM t WHERE c1 = 5 AND c2>0 AND c2<=5 ORDER BY c2 ASC
         ]], {
             5, 4, 5, 5
         })

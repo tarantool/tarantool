@@ -16,7 +16,7 @@ test:plan(3)
 -- This file implements regression tests for sql library.
 --
 -- This file implements tests to verify that ticket #1433 has been
--- fixed.  
+-- fixed.
 --
 -- The problem in ticket #1433 was that the dependencies on the right-hand
 -- side of an IN operator were not being checked correctly.  So in an
@@ -26,12 +26,12 @@ test:plan(3)
 --
 -- the optimizer was missing the fact that the right-hand side of the IN
 -- depended on table t2.  It was checking dependencies based on the
--- Expr.pRight field rather than Expr.pList and Expr.pSelect.  
+-- Expr.pRight field rather than Expr.pList and Expr.pSelect.
 --
 -- Such a bug could be verifed using a less elaborate test case.  But
 -- this test case (from the original bug poster) exercises so many different
 -- parts of the system all at once, that it seemed like a good one to
--- include in the test suite. 
+-- include in the test suite.
 --
 -- NOTE:  Yes, in spite of the name of this file (tkt1443.test) this
 -- test is for ticket #1433 not #1443.  I mistyped the name when I was

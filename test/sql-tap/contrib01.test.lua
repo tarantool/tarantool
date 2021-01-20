@@ -18,7 +18,7 @@ test:plan(3)
 -- This file contains test cases that were contributed on the sql-users
 -- mailing list on 2013-06-05 by Mi Chen at mi.chen@echostar.com.
 --
--- At the time it was contributed, this test failed on trunk, but 
+-- At the time it was contributed, this test failed on trunk, but
 -- worked on the NGQP.
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
@@ -72,7 +72,7 @@ test:do_test(
         ]]
     end, {
         -- <contrib01-1.0>
-        
+
         -- </contrib01-1.0>
     })
 

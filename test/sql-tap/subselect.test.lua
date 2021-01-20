@@ -91,7 +91,7 @@ test:do_execsql_test(
         SELECT b from t1 where a = (SELECT a FROM t1 WHERE b=8)
     ]], {
         -- <subselect-1.3d>
-        
+
         -- </subselect-1.3d>
     })
 
@@ -134,7 +134,7 @@ test:do_test(
             INSERT INTO t2 VALUES(4,16);
         ]]
         return test:execsql [[
-            SELECT y from t2 
+            SELECT y from t2
             WHERE x = (SELECT sum(b) FROM t1 where a is not null) - (SELECT sum(a) FROM t1)
         ]]
     end, {

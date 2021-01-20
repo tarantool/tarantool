@@ -226,7 +226,7 @@ test:do_test(
         return test.lindex(r, 1)
     end, {
         -- <misc1-3.1>
-        
+
         -- </misc1-3.1>
     })
 
@@ -789,7 +789,7 @@ test:do_execsql_test(
 end
 
 -- There was a problem with realloc() in the OP_MemStore operation of
--- the VDBE.  A buffer was being reallocated but some pointers into 
+-- the VDBE.  A buffer was being reallocated but some pointers into
 -- the old copy of the buffer were not being moved over to the new copy.
 -- The following code tests for the problem.
 --
@@ -969,7 +969,7 @@ if (0 > 0) then
             CREATE TABLE RealTable(TestID INTEGER PRIMARY KEY, TestString TEXT);
             CREATE TABLE TempTable(TestID INTEGER PRIMARY KEY, TestString TEXT);
             CREATE TRIGGER trigTest_1 AFTER UPDATE ON TempTable BEGIN
-              INSERT INTO RealTable(TestString) 
+              INSERT INTO RealTable(TestString)
                  SELECT new.TestString FROM TempTable LIMIT 1;
             END;
             INSERT INTO TempTable(TestString) VALUES ('1');
@@ -1101,7 +1101,7 @@ test:do_catchsql_test(
 --   ROLLBACK;
 --   DROP TABLE IF EXISTS t;
 -- } {0 {}}
--- # At one point, running this would read one byte passed the end of a 
+-- # At one point, running this would read one byte passed the end of a
 -- # buffer, upsetting valgrind.
 -- #
 -- do_test misc1-24.0 {

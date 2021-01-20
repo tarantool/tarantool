@@ -324,7 +324,7 @@ test:do_execsql_test(
 test:do_execsql2_test(
     "join-1.13",
     [[
-        SELECT * FROM t1 NATURAL JOIN 
+        SELECT * FROM t1 NATURAL JOIN
           (SELECT b as c, c as d, d as e FROM t2) as t3
     ]], {
         -- <join-1.13>
@@ -567,10 +567,10 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "join-3.5",
     [[
-        SELECT * FROM t1 USING(a) 
+        SELECT * FROM t1 USING(a);
     ]], {
         -- <join-3.5>
-        1, "Syntax error at line 1 at or near position 40: a JOIN clause is required before ON and USING"
+        1, "Syntax error at line 1 at or near position 34: a JOIN clause is required before ON and USING"
         -- </join-3.5>
     })
 
@@ -770,10 +770,10 @@ test:do_execsql_test(
 --     INSERT INTO t9 VALUES(2,22);
 --     CREATE TABLE t10(x INTEGER PRIMARY KEY, y INT);
 --     INSERT INTO t10 VALUES(1,2);
---     INSERT INTO t10 VALUES(3,3);    
+--     INSERT INTO t10 VALUES(3,3);
 --     CREATE TABLE t11(p INTEGER PRIMARY KEY, q INT);
 --     INSERT INTO t11 VALUES(2,111);
---     INSERT INTO t11 VALUES(3,333);    
+--     INSERT INTO t11 VALUES(3,333);
 --     CREATE VIEW v10_11 AS SELECT x, q FROM t10, t11 WHERE t10.y=t11.p;
 --     COMMIT;
 --     SELECT * FROM t9 LEFT JOIN v10_11 ON( a=x );
@@ -825,7 +825,7 @@ test:do_execsql_test(
         COMMIT;
     ]], {
         -- <join-9.1>
-        
+
         -- </join-9.1>
     })
 
@@ -837,7 +837,7 @@ test:do_execsql_test(
         SELECT * FROM t12 NATURAL LEFT JOIN (SELECT * FROM t13 WHERE b>0);
     ]], {
         -- <join-9.1.1>
-        
+
         -- </join-9.1.1>
     })
 
@@ -870,7 +870,7 @@ test:do_execsql_test(
            (SELECT max(m.q) FROM t22 m JOIN t21 n ON n.b=m.p WHERE n.c=1);
     ]], {
         -- <join-10.1>
-        
+
         -- </join-10.1>
     })
 
@@ -965,7 +965,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join-11.4",
     [[
-        SELECT * FROM t1 NATURAL JOIN t1 
+        SELECT * FROM t1 NATURAL JOIN t1
     ]], {
         -- <join-11.4>
         1, "abc", 2, "def"
@@ -989,7 +989,7 @@ test:do_test(
         ]]
     end, {
         -- <join-11.5>
-        
+
         -- </join-11.5>
     })
 
@@ -1000,7 +1000,7 @@ test:do_test(
 test:do_execsql_test(
     "join-11.7",
     [[
-        SELECT a,b FROM t2 NATURAL JOIN t1 
+        SELECT a,b FROM t2 NATURAL JOIN t1
     ]], {
         -- <join-11.7>
         "one", 1, "two", 2
@@ -1024,14 +1024,14 @@ test:do_test(
         ]]
     end, {
         -- <join-11.8>
-        
+
         -- </join-11.8>
     })
 
 test:do_execsql_test(
     "join-11.9",
     [[
-        SELECT * FROM t1 NATURAL JOIN t2 
+        SELECT * FROM t1 NATURAL JOIN t2
     ]], {
         -- <join-11.9>
         "one", "1", "two", "2"
@@ -1041,7 +1041,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join-11.10",
     [[
-        SELECT * FROM t2 NATURAL JOIN t1 
+        SELECT * FROM t2 NATURAL JOIN t1
     ]], {
         -- <join-11.10>
         1, "one", 2, "two"

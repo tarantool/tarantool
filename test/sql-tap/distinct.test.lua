@@ -83,8 +83,8 @@ local function do_temptables_test(tn, sql, temptables)
 end
 
 ---------------------------------------------------------------------------
--- The following tests - distinct-1.* - check that the planner correctly 
--- detects cases where a UNIQUE index means that a DISTINCT clause is 
+-- The following tests - distinct-1.* - check that the planner correctly
+-- detects cases where a UNIQUE index means that a DISTINCT clause is
 -- redundant. Currently the planner only detects such cases when there
 -- is a single table in the FROM clause.
 --
@@ -147,7 +147,7 @@ for _, val in ipairs(data) do
 end
 ---------------------------------------------------------------------------
 -- The following tests - distinct-2.* - test cases where an index is
--- used to deliver results in order of the DISTINCT expressions. 
+-- used to deliver results in order of the DISTINCT expressions.
 --
 --X(143, "X!cmd", [=[["drop_all_tables"]]=])
 test:execsql([[

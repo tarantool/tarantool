@@ -13,7 +13,7 @@ test:plan(9999)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- 
+--
 -- Tests of the sqlAtoF() function.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]

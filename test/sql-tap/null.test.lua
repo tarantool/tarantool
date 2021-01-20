@@ -153,7 +153,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-3.1",
     [[
-        select count(*), count(b), count(c), sum(b), sum(c), 
+        select count(*), count(b), count(c), sum(b), sum(c),
                avg(b), avg(c), min(b), max(b) from t1;
     ]], {
         -- <null-3.1>
@@ -353,7 +353,7 @@ test:do_execsql_test(
         SELECT x FROM t4 WHERE y=NULL;
     ]], {
         -- <null-8.1>
-        
+
         -- </null-8.1>
     })
 
@@ -363,7 +363,7 @@ test:do_execsql_test(
         SELECT x FROM t4 WHERE y IN (33,NULL);
     ]], {
         -- <null-8.2>
-        
+
         -- </null-8.2>
     })
 
@@ -406,7 +406,7 @@ test:do_execsql_test(
         SELECT x FROM t4 WHERE y=NULL;
     ]], {
         -- <null-8.11>
-        
+
         -- </null-8.11>
     })
 
@@ -416,7 +416,7 @@ test:do_execsql_test(
         SELECT x FROM t4 WHERE y IN (33,NULL);
     ]], {
         -- <null-8.12>
-        
+
         -- </null-8.12>
     })
 

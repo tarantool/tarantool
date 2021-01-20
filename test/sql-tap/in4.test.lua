@@ -24,7 +24,7 @@ test:do_execsql_test(
         CREATE INDEX i1 ON t1(a);
     ]], {
         -- <in4-1.1>
-        
+
         -- </in4-1.1>
     })
 
@@ -34,7 +34,7 @@ test:do_execsql_test(
         SELECT * FROM t1 WHERE a IN ('aaa', 'bbb', 'ccc');
     ]], {
         -- <in4-1.2>
-        
+
         -- </in4-1.2>
     })
 
@@ -83,14 +83,14 @@ test:do_execsql_test(
         INSERT INTO t2 VALUES(3, 'three');
     ]], {
         -- <in4-2.1>
-        
+
         -- </in4-2.1>
     })
 
 test:do_execsql_test(
     "in4-2.2",
     [[
-        SELECT b FROM t2 WHERE a IN (0, 2) 
+        SELECT b FROM t2 WHERE a IN (0, 2)
     ]], {
         -- <in4-2.2>
         "zero", "two"
@@ -100,7 +100,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in4-2.3",
     [[
-        SELECT b FROM t2 WHERE a IN (2, 0) 
+        SELECT b FROM t2 WHERE a IN (2, 0)
     ]], {
         -- <in4-2.3>
         "zero", "two"
@@ -110,7 +110,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in4-2.4",
     [[
-        SELECT b FROM t2 WHERE a IN (2, -1) 
+        SELECT b FROM t2 WHERE a IN (2, -1)
     ]], {
         -- <in4-2.4>
         "-one", "two"
@@ -120,7 +120,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in4-2.5",
     [[
-        SELECT b FROM t2 WHERE a IN (NULL, 3) 
+        SELECT b FROM t2 WHERE a IN (NULL, 3)
     ]], {
         -- <in4-2.5>
         "three"
@@ -130,7 +130,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in4-2.6",
     [[
-        SELECT b FROM t2 WHERE a IN (1.0, 2.1) 
+        SELECT b FROM t2 WHERE a IN (1.0, 2.1)
     ]], {
         -- <in4-2.6>
         "one"
@@ -150,7 +150,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in4-2.8",
     [[
-        SELECT b FROM t2 WHERE a IN ('', '0.0.0', '2') 
+        SELECT b FROM t2 WHERE a IN ('', '0.0.0', '2')
     ]], {
         -- <in4-2.8>
         "two"
@@ -161,9 +161,9 @@ test:do_execsql_test(
 --
 --    <expr> IN ()
 --
--- i.e. IN expressions with a literal empty set. 
--- 
--- This has led to crashes on more than one occasion. Test case in4-3.2 
+-- i.e. IN expressions with a literal empty set.
+--
+-- This has led to crashes on more than one occasion. Test case in4-3.2
 -- was added in reponse to a bug reported on the mailing list on 11/7/2008.
 -- See also tickets #3602 and #185.
 --
@@ -186,7 +186,7 @@ test:do_execsql_test(
         INSERT INTO t2 VALUES(4, NULL, NULL);
     ]], {
         -- <in4-3.1>
-        
+
         -- </in4-3.1>
     })
 
@@ -196,7 +196,7 @@ test:do_execsql_test(
         SELECT x FROM t1 WHERE id IN () AND x IN (SELECT x FROM t2 WHERE id=1)
     ]], {
         -- <in4-3.2>
-        
+
         -- </in4-3.2>
     })
 
@@ -212,34 +212,34 @@ test:do_test(
         return test:execsql " SELECT * FROM t3 WHERE x IN () "
     end, {
         -- <in4-3.3>
-        
+
         -- </in4-3.3>
     })
 
 test:do_execsql_test(
     "in4-3.4",
     [[
-        SELECT * FROM t3 WHERE x = 10 AND y IN () 
+        SELECT * FROM t3 WHERE x = 10 AND y IN ()
     ]], {
         -- <in4-3.4>
-        
+
         -- </in4-3.4>
     })
 
 test:do_execsql_test(
     "in4-3.5",
     [[
-        SELECT * FROM t3 WHERE x IN () AND y = 10 
+        SELECT * FROM t3 WHERE x IN () AND y = 10
     ]], {
         -- <in4-3.5>
-        
+
         -- </in4-3.5>
     })
 
 test:do_execsql_test(
     "in4-3.6",
     [[
-        SELECT * FROM t3 WHERE x IN () OR x = 10 
+        SELECT * FROM t3 WHERE x IN () OR x = 10
     ]], {
         -- <in4-3.6>
         10, 10, 10
@@ -249,27 +249,27 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in4-3.7",
     [[
-        SELECT * FROM t3 WHERE y IN () 
+        SELECT * FROM t3 WHERE y IN ()
     ]], {
         -- <in4-3.7>
-        
+
         -- </in4-3.7>
     })
 
 test:do_execsql_test(
     "in4-3.8",
     [[
-        SELECT x IN() AS a FROM t3 WHERE a 
+        SELECT x IN() AS a FROM t3 WHERE a
     ]], {
         -- <in4-3.8>
-        
+
         -- </in4-3.8>
     })
 
 test:do_execsql_test(
     "in4-3.9",
     [[
-        SELECT x IN() AS a FROM t3 WHERE NOT a 
+        SELECT x IN() AS a FROM t3 WHERE NOT a
     ]], {
         -- <in4-3.9>
         false, false
@@ -279,10 +279,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in4-3.10",
     [[
-        SELECT * FROM t3 WHERE oid IN () 
+        SELECT * FROM t3 WHERE oid IN ()
     ]], {
         -- <in4-3.10>
-        
+
         -- </in4-3.10>
     })
 
@@ -302,7 +302,7 @@ test:do_execsql_test(
         SELECT * FROM t3 WHERE x IN (1, 2) AND y IN ()
     ]], {
         -- <in4-3.12>
-        
+
         -- </in4-3.12>
     })
 

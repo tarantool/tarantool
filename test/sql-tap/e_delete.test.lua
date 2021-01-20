@@ -14,7 +14,7 @@ test:plan(18)
 --
 -------------------------------------------------------------------------
 --
--- This file implements tests to verify that the "testable statements" in 
+-- This file implements tests to verify that the "testable statements" in
 -- the lang_delete.html document are correct.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]

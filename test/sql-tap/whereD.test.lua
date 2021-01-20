@@ -15,7 +15,7 @@ test:plan(36)
 -------------------------------------------------------------------------
 -- This file implements regression tests for sql library.  The
 -- focus of this file is testing that an index may be used as a covering
--- index when there are OR expressions in the WHERE clause. 
+-- index when there are OR expressions in the WHERE clause.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
@@ -168,7 +168,7 @@ test:do_execsql_test(
         SELECT k FROM t WHERE (i=1 AND j=2) OR (i=2 AND j=1) OR (i=3 AND j=4);
     ]], {
         -- <1.15>
-        
+
         -- </1.15>
     })
 
@@ -199,7 +199,7 @@ test:do_execsql_test(
         INSERT INTO t2 VALUES(3,4);
     ]], {
         -- <2.0>
-        
+
         -- </2.0>
     })
 
