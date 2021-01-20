@@ -26,11 +26,11 @@ local function test_transform(testname, sql1, sql2, results)
     local vdbe1 = {  }
     local vdbe2 = {  }
     local data = box.execute("explain "..sql1)
-    for i, line in ipairs(data) do
+    for _, line in ipairs(data) do
         table.insert(vdbe1, line[2])
     end
     data = box.execute("explain "..sql2)
-    for i, line in ipairs(data) do
+    for _, line in ipairs(data) do
         table.insert(vdbe2, line[2])
     end
     test:do_test(
