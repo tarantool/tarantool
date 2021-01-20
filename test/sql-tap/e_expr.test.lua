@@ -1077,7 +1077,7 @@ test:do_execsql_test(
 --
 -- MUST_WORK_TEST prepared statements
 if (0>0) then
-    local function parameter_test(tn, sql, params, result)
+    local function parameter_test(tn, sql, params, result) -- luacheck: no unused
         -- Legacy from the original code. Must be replaced with analogue
         -- functions from box.
         local X = nil
@@ -1286,7 +1286,7 @@ test:do_execsql_test(
 test:execsql [[
     CREATE TABLE tblname(cname INT PRIMARY KEY);
 ]]
-local function glob(args)
+local function glob()
     return 1
 end
 
