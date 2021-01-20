@@ -1972,7 +1972,7 @@ test:do_test(
             START TRANSACTION;
             INSERT INTO abc VALUES(1, 1, 1);
         ]]
-        for i = 0,9,1 do
+        for _ = 0,9,1 do
             test:execsql [[
                 INSERT INTO abc SELECT a+(select max(a) FROM abc), b+(select max(a) FROM abc), c+(select max(a) FROM abc) FROM abc;
             ]]

@@ -20,7 +20,7 @@ for id = 1, N do
         end
     )
 end
-for id = 1, N do
+for _ = 1, N do
     ch:get()
 end
 
@@ -46,7 +46,7 @@ for id = 1, N do
         end
     )
 end
-for id = 1, N do
+for _ = 1, N do
     ch:get()
 end
 test:do_test(
@@ -64,7 +64,7 @@ box.execute("create index i1 on t1(b);")
 for id = 1, N*N do
     box.execute(string.format("insert into t1 values(%s, %s, 3)", id, id))
 end
-for id = 1, N do
+for _ = 1, N do
     fiber.create(
         function ()
             box.execute("delete from t1")
@@ -72,7 +72,7 @@ for id = 1, N do
         end
     )
 end
-for id = 1, N do
+for _ = 1, N do
     ch:get()
 end
 test:do_test(
