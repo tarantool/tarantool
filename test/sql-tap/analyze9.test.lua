@@ -613,7 +613,7 @@ test:do_execsql_test(
 test:do_test(
     "10.1.2",
     function()
-        local a = 0
+        local a
         for i = 1, 100 do
             if i > 90 then
                 a = i
@@ -661,7 +661,7 @@ test:do_execsql_test(
 test:do_test(
     "10.2.2",
     function()
-        local a = 0
+        local a
         for i = 1, 100 do
             if i > 90 then
                 a = i
@@ -715,7 +715,7 @@ test:do_execsql_test(
 test:do_test(
     11.1,
     function()
-        local a = 0
+        local a
         for i = 0, 100 do
             if i % 10 == 0 then 
                 a = "\"ABC\""
@@ -766,7 +766,7 @@ test:do_execsql_test(
 test:do_test(
     11.5,
     function()
-        local a = 0
+        local a
         for i = 0, 100 do
             if i % 10 == 0 then 
                 a = "\"ABC\""
@@ -827,7 +827,7 @@ test:do_execsql_test(
 test:do_test(
     12.1,
     function()
-        local a = 0
+        local a
         for i = 0, 100 do
             if i % 10 == 0 then 
                 a = "\"ABC\""
@@ -878,7 +878,7 @@ test:do_execsql_test(
 test:do_test(
     12.5,
     function()
-        local a = 0
+        local a
         for i = 0, 100 do
             if i % 10 == 0 then 
                 a = "\"ABC\""
@@ -935,7 +935,7 @@ test:do_test(
         test:execsql("CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, a TEXT, b INT, c INT, d INT);")
         test:execsql("CREATE INDEX i1 ON t1(a);")
         test:execsql("CREATE INDEX i2 ON t1(b, c);")
-        local a = 0
+        local a
         for i = 0, 100 do
             if i % 2 == 1 then
                 a = "\"abc\""
@@ -1165,7 +1165,7 @@ test:do_test(
             INSERT INTO t1 SELECT null, 2*a,2*b,2*c,d FROM t1;
             INSERT INTO t1 SELECT null, 2*a,2*b,2*c,d FROM t1;
         ]])
-        local b = 0
+        local b
         for i = 0, 31 do
             if (i < 8) then
                 b = 0
