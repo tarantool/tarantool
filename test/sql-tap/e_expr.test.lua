@@ -2704,6 +2704,7 @@ if 0>0 then
     -- Legacy from the original code. Must be replaced with analogue
     -- functions from box.
     local X = nil
+    -- luacheck: ignore
     for _ in X(0, "X!foreach", [=[["a b c",[["list",[["expr","3"]],[["expr","4"]],[["expr","5"]]]]]]=]) do
         break
     end
