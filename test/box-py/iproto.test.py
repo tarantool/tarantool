@@ -34,9 +34,13 @@ print iproto.py_con.ping() > 0
 # closing connection
 s.close()
 
+# Note re IPROTO_SQL_INFO_* keys: they cannot appear in the
+# response map at the top level, but have the same codes as other
+# IPROTO_* constants. Exclude those names so.
 key_names = {}
 for (k,v) in globals().items():
-    if type(k) == str and k.startswith('IPROTO_') and type(v) == int:
+    if type(k) == str and k.startswith('IPROTO_') and \
+            not k.startswith('IPROTO_SQL_INFO_') and type(v) == int:
         key_names[v] = k
 
 def repr_dict(todump):
