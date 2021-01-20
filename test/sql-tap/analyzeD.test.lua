@@ -120,7 +120,7 @@ test:do_test(
 	end, {
         -- <1.7>
         -- </1.7>
-   	})
+        })
 
 -- Same test as 1.4, except this time the 7 rows that match the a=? condition
 -- do not feature larger values than all rows in the stat4 table. So sql
@@ -133,7 +133,7 @@ test:do_execsql_test(
         -- <1.8>
         0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1_C (C=?)"
         -- </1.8>
-   	})
+        })
 
 test:do_catchsql_test(
 	"analyzeD-1.9",
