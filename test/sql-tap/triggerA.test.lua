@@ -45,7 +45,6 @@ test:do_test(
                 INSERT INTO t1 VALUES(%d,'%s');
                 INSERT INTO t2 VALUES(20-%d,%d,'%s');
             ]], i, word, i, j, word))
-            i = i + 1
         end
         return test:execsql [[
             SELECT count(*) FROM t1 UNION ALL SELECT count(*) FROM t2;

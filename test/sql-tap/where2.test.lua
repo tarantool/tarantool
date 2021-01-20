@@ -103,7 +103,7 @@ local function queryplan(sql)
                 table.insert(data, tab)
                 table.insert(data, idx)
             else
-                as, tab = string.match(v, "TABLE (%w+ AS) (%w+)")
+                local _, tab = string.match(v, "TABLE (%w+ AS) (%w+)")
                 if tab == nil  then
                     tab = string.match(v, "TABLE (%w+)")
                 end
