@@ -314,17 +314,17 @@ test:do_execsql_test(
         SELECT min(name) FROM t61 GROUP BY lower(name);
     ]], {
         -- <resolver01-6.1>
-        
+
         -- </resolver01-6.1>
     })
 
 test:do_execsql_test(
     "resolver01-6.2",
     [[
-        SELECT min(name) AS name FROM t61 GROUP BY lower(name); 
+        SELECT min(name) AS name FROM t61 GROUP BY lower(name);
     ]], {
         -- <resolver01-6.2>
-        
+
         -- </resolver01-6.2>
     })
 
@@ -360,7 +360,7 @@ test:do_execsql_test(
         SELECT 2 AS x WHERE (SELECT x AS y WHERE 1>y);
     ]], {
         -- <resolver01-7.2>
-        
+
         -- </resolver01-7.2>
     })
 

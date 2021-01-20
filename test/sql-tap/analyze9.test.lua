@@ -23,7 +23,7 @@ test:do_execsql_test(
     1.0,
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(a TEXT PRIMARY KEY, b TEXT); 
+        CREATE TABLE t1(a TEXT PRIMARY KEY, b TEXT);
         INSERT INTO t1 VALUES('(0)', '(0)');
         INSERT INTO t1 VALUES('(1)', '(1)');
         INSERT INTO t1 VALUES('(2)', '(2)');
@@ -51,7 +51,7 @@ local function msgpack_decode_sample(txt)
     while msgpack.decode(txt)[i] ~= nil do
         if i == 1 then
             decoded_str = msgpack.decode(txt)[i]
-        else 
+        else
             decoded_str = decoded_str.." "..msgpack.decode(txt)[i]
         end
         i = i+1
@@ -71,8 +71,8 @@ test:do_execsql_test(
         SELECT "tbl","idx","neq","nlt","ndlt",msgpack_decode_sample("sample") FROM "_sql_stat4" where "idx" = 'I1';
     ]], {
         -- <1.2>
-        "T1", "I1", "1 1", "0 0", "0 0", "(0) (0)", "T1", "I1", "1 1", "1 1", "1 1", "(1) (1)", 
-        "T1", "I1", "1 1", "2 2", "2 2", "(2) (2)", "T1", "I1", "1 1", "3 3", "3 3", "(3) (3)", 
+        "T1", "I1", "1 1", "0 0", "0 0", "(0) (0)", "T1", "I1", "1 1", "1 1", "1 1", "(1) (1)",
+        "T1", "I1", "1 1", "2 2", "2 2", "(2) (2)", "T1", "I1", "1 1", "3 3", "3 3", "(3) (3)",
         "T1", "I1", "1 1", "4 4", "4 4", "(4) (4)"
         -- </1.2>
     })
@@ -84,8 +84,8 @@ test:do_execsql_test(
 
     ]], {
         -- <1.3>
-        'T1', 'T1', '1', '0', '0', '(0)', 'T1', 'T1', '1', '1', '1', '(1)', 
-        'T1', 'T1', '1', '2', '2', '(2)', 'T1', 'T1', '1', '3', '3', '(3)', 
+        'T1', 'T1', '1', '0', '0', '(0)', 'T1', 'T1', '1', '1', '1', '(1)',
+        'T1', 'T1', '1', '2', '2', '(2)', 'T1', 'T1', '1', '3', '3', '(3)',
         'T1', 'T1', '1', '4', '4', '(4)'
         -- </1.3>
     })
@@ -148,7 +148,7 @@ local function lrange(str, first, last)
         if i >= first and i <= last then
             if i == first then
                 res_tokens = token
-            else 
+            else
                 res_tokens = res_tokens.." "..token
             end
         end
@@ -187,7 +187,7 @@ test:do_execsql_test(
     ]], generate_tens(100))
 
 -- The first element in the "nEq" list of all samples should therefore be 10.
---      
+--
 test:do_execsql_test(
     "3.3.2",
     [[
@@ -196,7 +196,7 @@ test:do_execsql_test(
     ]], generate_tens_str(24))
 
 ---------------------------------------------------------------------------
--- 
+--
 test:do_execsql_test(
     3.4,
     [[
@@ -227,7 +227,7 @@ test:do_execsql_test(
     })
 
 ---------------------------------------------------------------------------
--- These tests verify that the sample selection for stat4 appears to be 
+-- These tests verify that the sample selection for stat4 appears to be
 -- working as designed.
 --
 test:do_execsql_test(
@@ -290,7 +290,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     4.3,
     [[
-        SELECT "neq", lrange("nlt", 1, 3), lrange("ndlt", 1, 3), lrange(msgpack_decode_sample("sample"), 1, 3) 
+        SELECT "neq", lrange("nlt", 1, 3), lrange("ndlt", 1, 3), lrange(msgpack_decode_sample("sample"), 1, 3)
             FROM "_sql_stat4" WHERE "idx" = 'I1' ORDER BY "sample" LIMIT 16;
     ]], {
         -- <4.3>
@@ -307,7 +307,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     4.4,
     [[
-        SELECT "neq", lrange("nlt", 1, 3), lrange("ndlt", 1, 3), lrange(msgpack_decode_sample("sample"), 1, 3) 
+        SELECT "neq", lrange("nlt", 1, 3), lrange("ndlt", 1, 3), lrange(msgpack_decode_sample("sample"), 1, 3)
         FROM "_sql_stat4" WHERE "idx" = 'I1' ORDER BY "sample" DESC LIMIT 2;
     ]], {
         -- <4.4>
@@ -318,7 +318,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     4.5,
     [[
-        SELECT count(DISTINCT c) FROM t1 WHERE c<201 
+        SELECT count(DISTINCT c) FROM t1 WHERE c<201
     ]], {
         -- <4.5>
         120
@@ -328,7 +328,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     4.6,
     [[
-        SELECT count(DISTINCT c) FROM t1 WHERE c<200 
+        SELECT count(DISTINCT c) FROM t1 WHERE c<200
     ]], {
         -- <4.6>
         119
@@ -625,7 +625,7 @@ test:do_test(
     end
         return test:execsql("ANALYZE")
     end, {
-        -- <10.1.2>      
+        -- <10.1.2>
         -- </10.1.2>
     })
 
@@ -673,7 +673,7 @@ test:do_test(
     end
         return test:execsql("ANALYZE")
     end, {
-        -- <10.2.2>    
+        -- <10.2.2>
         -- </10.2.2>
     })
 
@@ -717,7 +717,7 @@ test:do_test(
     function()
         local a
         for i = 0, 100 do
-            if i % 10 == 0 then 
+            if i % 10 == 0 then
                 a = "\"ABC\""
             else
                 a = "\"DEF\""
@@ -732,7 +732,7 @@ test:do_test(
     })
 
 test:do_execsql_test(
-    "11.2", 
+    "11.2",
     [[
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = '"def"' AND b = 3;
     ]], {
@@ -742,7 +742,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "11.3", 
+    "11.3",
     [[
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = '"abc"' AND b = 3;
     ]], {
@@ -768,7 +768,7 @@ test:do_test(
     function()
         local a
         for i = 0, 100 do
-            if i % 10 == 0 then 
+            if i % 10 == 0 then
                 a = "\"ABC\""
             else
                 a = "\"DEF\""
@@ -783,7 +783,7 @@ test:do_test(
     })
 
 test:do_execsql_test(
-    "11.6", 
+    "11.6",
     [[
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = '"def"' AND b = 3;
     ]], {
@@ -793,7 +793,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "11.7", 
+    "11.7",
     [[
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = '"abc"' COLLATE "unicode_ci" AND b = 3;
     ]], {
@@ -803,7 +803,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "11.8", 
+    "11.8",
     [[
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a COLLATE "unicode_ci" = '"abc"' AND b = 3;
     ]], {
@@ -829,7 +829,7 @@ test:do_test(
     function()
         local a
         for i = 0, 100 do
-            if i % 10 == 0 then 
+            if i % 10 == 0 then
                 a = "\"ABC\""
             else
                 a = "\"DEF\""
@@ -844,7 +844,7 @@ test:do_test(
     })
 
 test:do_execsql_test(
-    "12.2", 
+    "12.2",
     [[
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a = '"def"' AND b = 3;
     ]], {
@@ -854,7 +854,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "12.3", 
+    "12.3",
     [[
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a = '"abc"' AND b = 3;
     ]], {
@@ -880,7 +880,7 @@ test:do_test(
     function()
         local a
         for i = 0, 100 do
-            if i % 10 == 0 then 
+            if i % 10 == 0 then
                 a = "\"ABC\""
             else
                 a = "\"DEF\""
@@ -895,7 +895,7 @@ test:do_test(
     })
 
 test:do_execsql_test(
-    "12.6", 
+    "12.6",
     [[
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a = 'def' AND b = 3;
     ]], {
@@ -905,7 +905,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "12.7", 
+    "12.7",
     [[
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x= 'abcdef' AND a = '"abc"' COLLATE "unicode_ci" AND b = 3;
     ]], {
@@ -915,7 +915,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "12.8", 
+    "12.8",
     [[
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a COLLATE "unicode_ci" = '"abc"' AND b = 3;
     ]], {
@@ -991,8 +991,8 @@ test:do_execsql_test(
     })
 
 ---------------------------------------------------------------------------
--- Check also that affinities are taken into account when using stat4 data 
--- to estimate the number of rows scanned by any other constraint on a 
+-- Check also that affinities are taken into account when using stat4 data
+-- to estimate the number of rows scanned by any other constraint on a
 -- column other than the leftmost.
 --
 test:do_test(
@@ -1010,7 +1010,7 @@ test:do_test(
                 ANALYZE;
             ]])
         end, {
-        -- <14.1>    
+        -- <14.1>
         -- </14.1>
         })
 
@@ -1054,7 +1054,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     15.2,
     [[
-        SELECT * FROM x1; 
+        SELECT * FROM x1;
     ]], {
         -- <15.2>
         1, 2, 3, 4, 5, 6
@@ -1310,7 +1310,7 @@ test:do_test(
     function()
         for i = 1, 100 do
             test:execsql(string.format([[
-                INSERT INTO t2 VALUES(null, CASE WHEN %s < 80 THEN 'one' ELSE 'two' END, %s) 
+                INSERT INTO t2 VALUES(null, CASE WHEN %s < 80 THEN 'one' ELSE 'two' END, %s)
                 ]], i, i))
         end
         return test:execsql("ANALYZE")
@@ -1351,7 +1351,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     22.1,
     [[
-        WITH r(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM r WHERE x<=100) 
+        WITH r(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM r WHERE x<=100)
         INSERT INTO t3 SELECT CASE WHEN (x>45 AND x<96) THEN 'B' ELSE 'A' END,
             x, CASE WHEN (x<51) THEN 'one' ELSE 'two' END, x FROM r;
 
@@ -1436,8 +1436,8 @@ test:do_execsql_test(
     24.0,
     [[
         CREATE TABLE t5(c INT , d INT , b TEXT, e INT , a TEXT, PRIMARY KEY(a, b, c));
-        WITH data(a, b, c, d, e) AS (SELECT 'z', 'y', 0, 0, 0 UNION ALL 
-            SELECT a, CASE WHEN b='y' THEN 'n' ELSE 'y' END, c+1, e/250, e+1 FROM data WHERE e<1000) 
+        WITH data(a, b, c, d, e) AS (SELECT 'z', 'y', 0, 0, 0 UNION ALL
+            SELECT a, CASE WHEN b='y' THEN 'n' ELSE 'y' END, c+1, e/250, e+1 FROM data WHERE e<1000)
                 INSERT INTO t5(a, b, c, d, e) SELECT * FROM data;
         CREATE INDEX t5d ON t5(d);
         CREATE INDEX t5e ON t5(e);
@@ -1489,7 +1489,7 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS t6;
         DROP TABLE IF EXISTS ints;
         CREATE TABLE t6(id INTEGER PRIMARY KEY AUTOINCREMENT, a INT , b INT );
-        WITH ints(i,j) AS (SELECT 1,1 UNION ALL SELECT i+1,j+1 FROM ints WHERE i<100) 
+        WITH ints(i,j) AS (SELECT 1,1 UNION ALL SELECT i+1,j+1 FROM ints WHERE i<100)
             INSERT INTO t6 SELECT null,* FROM ints;
         CREATE INDEX aa ON t6(a);
         CREATE INDEX bb ON t6(b);
@@ -1551,7 +1551,7 @@ test:do_execsql_test(
 
 
 ---------------------------------------------------------------------------
--- Check that a problem in they way stat4 data is used has been 
+-- Check that a problem in they way stat4 data is used has been
 -- resolved (see below).
 --
 -- Commented due to assertion(#2834)
@@ -1570,7 +1570,7 @@ test:do_test(
         for i = 0, 10 do
             test:execsql(string.format(
                 "WITH cnt(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM cnt WHERE x<100) INSERT INTO t1(id, x, y) SELECT null, %s, x FROM cnt;", i+10000))
-            test:execsql(string.format("INSERT INTO t1(id, x, y) SELECT null, %s, 100;", i+10000))    
+            test:execsql(string.format("INSERT INTO t1(id, x, y) SELECT null, %s, 100;", i+10000))
         end
         test:execsql([[
                 UPDATE t1 SET z = id / 20;
@@ -1608,7 +1608,7 @@ test:do_execsql_test(
 --
 --   sample=(x=10000, y=100) nLt=(10000 10099)
 --
--- There should be no other samples that start with (x=10000). So it knows 
+-- There should be no other samples that start with (x=10000). So it knows
 -- that (x=10000 AND y<50) must match somewhere between 0 and 99 rows, but
 -- know more than that. Guessing less than 20 is therefore unreasonable.
 --
@@ -1627,19 +1627,19 @@ test:do_execsql_test(
 
 -- This test - 26.2.* - tests that another manifestation of the same problem
 -- is no longer present in the library. Assuming:
--- 
+--
 --   CREATE INDEX t1xy ON t1(x, y)
 --
 -- and that have samples for index t1xy as follows:
 --
 --
 --   sample=('A', 70)        nEq=(100, 2)        nLt=(900, 970)
---   sample=('B', 70)        nEq=(100, 2)        nLt=(1000, 1070)    
+--   sample=('B', 70)        nEq=(100, 2)        nLt=(1000, 1070)
 --
 -- the planner should estimate that (x = 'B' AND y > 25) matches 76 rows
--- (70 * 2/3 + 30). Before, due to the problem, the planner was estimating 
+-- (70 * 2/3 + 30). Before, due to the problem, the planner was estimating
 -- that this matched 100 rows.
--- 
+--
 test:do_execsql_test(
     "26.2.1",
     [[
@@ -1649,14 +1649,14 @@ test:do_execsql_test(
         CREATE INDEX i2 ON t1(z);
 
 
-        WITH cnt(y) AS (SELECT 0 UNION ALL SELECT y+1 FROM cnt WHERE y<99), 
-            letters(x) AS (SELECT 'A' UNION SELECT 'B' UNION SELECT 'C' UNION SELECT 'D') 
+        WITH cnt(y) AS (SELECT 0 UNION ALL SELECT y+1 FROM cnt WHERE y<99),
+            letters(x) AS (SELECT 'A' UNION SELECT 'B' UNION SELECT 'C' UNION SELECT 'D')
                 INSERT INTO t1(id, x, y) SELECT null, x, y FROM letters, cnt;
 
-        WITH letters(x) AS (SELECT 'A' UNION SELECT 'B' UNION SELECT 'C' UNION SELECT 'D') 
+        WITH letters(x) AS (SELECT 'A' UNION SELECT 'B' UNION SELECT 'C' UNION SELECT 'D')
             INSERT INTO t1(id, x, y) SELECT null, x, 70 FROM letters;
 
-        WITH cnt(i) AS (SELECT 407 UNION ALL SELECT i+1 FROM cnt WHERE i<9999) 
+        WITH cnt(i) AS (SELECT 407 UNION ALL SELECT i+1 FROM cnt WHERE i<9999)
             INSERT INTO t1(id, x, y) SELECT i, i, i FROM cnt;
 
         UPDATE t1 SET z = (id / 95);

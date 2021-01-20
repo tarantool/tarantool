@@ -73,7 +73,7 @@ test:do_execsql_test(
         INSERT INTO t2 VALUES(2, 21, 24, 27);
     ]], {
         -- <selectB-1.1>
-        
+
         -- </selectB-1.1>
     })
 
@@ -86,7 +86,7 @@ for ii = 1, 2, 1 do
                 CREATE INDEX i2 ON t2(d);
             ]], {
                 -- <selectB-2.1>
-                
+
                 -- </selectB-2.1>
             })
 
@@ -102,40 +102,40 @@ for ii = 1, 2, 1 do
     SELECT a FROM t1 UNION ALL SELECT d FROM t2 ORDER BY 1
   ]], { 2.0, 3.0, 8.0, 12.0, 14.0, 21.0})
     test_transform("selectB-"..ii..".4", [[
-    SELECT * FROM 
-      (SELECT a FROM t1 UNION ALL SELECT d FROM t2) 
+    SELECT * FROM
+      (SELECT a FROM t1 UNION ALL SELECT d FROM t2)
     WHERE a>10 ORDER BY 1
   ]], [[
     SELECT a FROM t1 WHERE a>10 UNION ALL SELECT d FROM t2 WHERE d>10 ORDER BY 1
   ]], { 12.0, 14.0, 21.0})
     test_transform("selectB-"..ii..".5", [[
-    SELECT * FROM 
-      (SELECT a FROM t1 UNION ALL SELECT d FROM t2) 
-    WHERE a>10 ORDER BY a
-  ]], [[
-    SELECT a FROM t1 WHERE a>10 
-      UNION ALL 
-    SELECT d FROM t2 WHERE d>10 
-    ORDER BY a
-  ]], { 12.0, 14.0, 21.0})
-    test_transform("selectB-"..ii..".6", [[
-    SELECT * FROM 
-      (SELECT a FROM t1 UNION ALL SELECT d FROM t2 WHERE d > 12) 
+    SELECT * FROM
+      (SELECT a FROM t1 UNION ALL SELECT d FROM t2)
     WHERE a>10 ORDER BY a
   ]], [[
     SELECT a FROM t1 WHERE a>10
-      UNION ALL 
+      UNION ALL
+    SELECT d FROM t2 WHERE d>10
+    ORDER BY a
+  ]], { 12.0, 14.0, 21.0})
+    test_transform("selectB-"..ii..".6", [[
+    SELECT * FROM
+      (SELECT a FROM t1 UNION ALL SELECT d FROM t2 WHERE d > 12)
+    WHERE a>10 ORDER BY a
+  ]], [[
+    SELECT a FROM t1 WHERE a>10
+      UNION ALL
     SELECT d FROM t2 WHERE d>12 AND d>10
     ORDER BY a
   ]], { 14.0, 21.0})
     test_transform("selectB-"..ii..".7", [[
-    SELECT * FROM (SELECT a FROM t1 UNION ALL SELECT d FROM t2) ORDER BY 1 
+    SELECT * FROM (SELECT a FROM t1 UNION ALL SELECT d FROM t2) ORDER BY 1
     LIMIT 2
   ]], [[
     SELECT a FROM t1 UNION ALL SELECT d FROM t2 ORDER BY 1 LIMIT 2
   ]], { 2.0, 3.0})
     test_transform("selectB-"..ii..".8", [[
-    SELECT * FROM (SELECT a FROM t1 UNION ALL SELECT d FROM t2) ORDER BY 1 
+    SELECT * FROM (SELECT a FROM t1 UNION ALL SELECT d FROM t2) ORDER BY 1
     LIMIT 2 OFFSET 3
   ]], [[
     SELECT a FROM t1 UNION ALL SELECT d FROM t2 ORDER BY 1 LIMIT 2 OFFSET 3
@@ -143,7 +143,7 @@ for ii = 1, 2, 1 do
     test_transform("selectB-"..ii..".9", [[
     SELECT * FROM (
       SELECT a FROM t1 UNION ALL SELECT d FROM t2 UNION ALL SELECT c FROM t1
-    ) 
+    )
   ]], [[
     SELECT a FROM t1 UNION ALL SELECT d FROM t2 UNION ALL SELECT c FROM t1
   ]], { 2.0, 8.0, 14.0, 3.0, 12.0, 21.0, 6.0, 12.0, 18.0})
@@ -206,7 +206,7 @@ test:do_execsql_test(
         DROP INDEX i2 ON t2;
     ]], {
         -- <selectB-3.0>
-        
+
         -- </selectB-3.0>
     })
 
@@ -228,7 +228,7 @@ for ii = 3, 6, 1 do
                 CREATE INDEX i6 ON t2(f);
             ]], {
                 -- <selectB-5.0>
-                
+
                 -- </selectB-5.0>
             })
 
@@ -239,8 +239,8 @@ for ii = 3, 6, 1 do
     test:do_execsql_test(
         "selectB-"..ii..".1",
         [[
-            SELECT DISTINCT * FROM 
-              (SELECT c FROM t1 UNION ALL SELECT e FROM t2) 
+            SELECT DISTINCT * FROM
+              (SELECT c FROM t1 UNION ALL SELECT e FROM t2)
             ORDER BY 1;
         ]], {
             6, 12, 15, 18, 24
@@ -249,8 +249,8 @@ for ii = 3, 6, 1 do
     test:do_execsql_test(
         "selectB-"..ii..".2",
         [[
-            SELECT c, count(*) FROM 
-              (SELECT c FROM t1 UNION ALL SELECT e FROM t2) 
+            SELECT c, count(*) FROM
+              (SELECT c FROM t1 UNION ALL SELECT e FROM t2)
             GROUP BY c ORDER BY 1;
         ]], {
             6, 2, 12, 1, 15, 1, 18, 1, 24, 1
@@ -259,8 +259,8 @@ for ii = 3, 6, 1 do
     test:do_execsql_test(
         "selectB-"..ii..".3",
         [[
-            SELECT c, count(*) FROM 
-              (SELECT c FROM t1 UNION ALL SELECT e FROM t2) 
+            SELECT c, count(*) FROM
+              (SELECT c FROM t1 UNION ALL SELECT e FROM t2)
             GROUP BY c HAVING count(*)>1;
         ]], {
             6, 2
@@ -269,7 +269,7 @@ for ii = 3, 6, 1 do
     test:do_execsql_test(
         "selectB-"..ii..".4",
         [[
-            SELECT t4.c, t3.a FROM 
+            SELECT t4.c, t3.a FROM
               (SELECT c FROM t1 UNION ALL SELECT e FROM t2) AS t4, t1 AS t3
             WHERE t3.a=14
             ORDER BY 1
@@ -280,28 +280,28 @@ for ii = 3, 6, 1 do
     test:do_execsql_test(
         "selectB-"..ii..".5",
         [[
-            SELECT d FROM t2 
-            EXCEPT 
+            SELECT d FROM t2
+            EXCEPT
             SELECT a FROM (SELECT a FROM t1 UNION ALL SELECT d FROM t2)
         ]], {
-            
+
         })
 
     test:do_execsql_test(
         "selectB-"..ii..".6",
         [[
             SELECT * FROM (SELECT a FROM t1 UNION ALL SELECT d FROM t2)
-            EXCEPT 
+            EXCEPT
             SELECT * FROM (SELECT a FROM t1 UNION ALL SELECT d FROM t2)
         ]], {
-            
+
         })
 
     test:do_execsql_test(
         "selectB-"..ii..".7",
         [[
             SELECT c FROM t1
-            EXCEPT 
+            EXCEPT
             SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
         ]], {
             12
@@ -311,7 +311,7 @@ for ii = 3, 6, 1 do
         "selectB-"..ii..".8",
         [[
             SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
-            EXCEPT 
+            EXCEPT
             SELECT c FROM t1
         ]], {
             9, 15, 24, 27
@@ -321,7 +321,7 @@ for ii = 3, 6, 1 do
         "selectB-"..ii..".9",
         [[
             SELECT c FROM t1
-            UNION 
+            UNION
             SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
             ORDER BY c
         ]], {
@@ -341,7 +341,7 @@ for ii = 3, 6, 1 do
         "selectB-"..ii..".11",
         [[
             SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
-            UNION 
+            UNION
             SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
             ORDER BY 1
         ]], {
@@ -352,7 +352,7 @@ for ii = 3, 6, 1 do
         "selectB-"..ii..".12",
         [[
             SELECT c FROM t1
-            INTERSECT 
+            INTERSECT
             SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
             ORDER BY 1
         ]], {
@@ -363,7 +363,7 @@ for ii = 3, 6, 1 do
         "selectB-"..ii..".13",
         [[
             SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
-            INTERSECT 
+            INTERSECT
             SELECT c FROM t1
             ORDER BY 1
         ]], {
@@ -374,7 +374,7 @@ for ii = 3, 6, 1 do
         "selectB-"..ii..".14",
         [[
             SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
-            INTERSECT 
+            INTERSECT
             SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
             ORDER BY 1
         ]], {

@@ -299,14 +299,14 @@ test:do_execsql_test(
         INSERT INTO t2 VALUES(11, 3, 3);
     ]], {
         -- <minmax3-2.1>
-        
+
         -- </minmax3-2.1>
     })
 
 test:do_execsql_test(
     "minmax3-2.2",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1; 
+        SELECT min(b) FROM t2 WHERE a = 1;
     ]], {
         -- <minmax3-2.2>
         1
@@ -316,7 +316,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-2.3",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b>1; 
+        SELECT min(b) FROM t2 WHERE a = 1 AND b>1;
     ]], {
         -- <minmax3-2.3>
         2
@@ -326,7 +326,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-2.4",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b>-1; 
+        SELECT min(b) FROM t2 WHERE a = 1 AND b>-1;
     ]], {
         -- <minmax3-2.4>
         1
@@ -336,7 +336,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-2.5",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1; 
+        SELECT min(b) FROM t2 WHERE a = 1;
     ]], {
         -- <minmax3-2.5>
         1
@@ -346,7 +346,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-2.6",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b<2; 
+        SELECT min(b) FROM t2 WHERE a = 1 AND b<2;
     ]], {
         -- <minmax3-2.6>
         1
@@ -356,7 +356,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-2.7",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b<1; 
+        SELECT min(b) FROM t2 WHERE a = 1 AND b<1;
     ]], {
         -- <minmax3-2.7>
         ""
@@ -366,7 +366,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-2.8",
     [[
-        SELECT min(b) FROM t2 WHERE a = 3 AND b<1; 
+        SELECT min(b) FROM t2 WHERE a = 3 AND b<1;
     ]], {
         -- <minmax3-2.8>
         ""
@@ -392,14 +392,14 @@ test:do_execsql_test(
         INSERT INTO t2 VALUES(11, 3, 3);
     ]], {
         -- <minmax3-3.1>
-        
+
         -- </minmax3-3.1>
     })
 
 test:do_execsql_test(
     "minmax3-3.2",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1; 
+        SELECT min(b) FROM t2 WHERE a = 1;
     ]], {
         -- <minmax3-3.2>
         1
@@ -409,7 +409,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-3.3",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b>1; 
+        SELECT min(b) FROM t2 WHERE a = 1 AND b>1;
     ]], {
         -- <minmax3-3.3>
         2
@@ -419,7 +419,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-3.4",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b>-1; 
+        SELECT min(b) FROM t2 WHERE a = 1 AND b>-1;
     ]], {
         -- <minmax3-3.4>
         1
@@ -429,7 +429,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-3.5",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1; 
+        SELECT min(b) FROM t2 WHERE a = 1;
     ]], {
         -- <minmax3-3.5>
         1
@@ -439,7 +439,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-3.6",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b<2; 
+        SELECT min(b) FROM t2 WHERE a = 1 AND b<2;
     ]], {
         -- <minmax3-3.6>
         1
@@ -449,7 +449,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-3.7",
     [[
-        SELECT min(b) FROM t2 WHERE a = 1 AND b<1; 
+        SELECT min(b) FROM t2 WHERE a = 1 AND b<1;
     ]], {
         -- <minmax3-3.7>
         ""
@@ -459,7 +459,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-3.8",
     [[
-        SELECT min(b) FROM t2 WHERE a = 3 AND b<1; 
+        SELECT min(b) FROM t2 WHERE a = 3 AND b<1;
     ]], {
         -- <minmax3-3.8>
         ""

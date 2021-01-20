@@ -29,7 +29,7 @@ local bitmask_size = 64
 
 local result = {}
 --for _ in X(0, "X!for", [=[["set N 1","$N<=$bitmask_size","incr N"]]=]) do
-for N=1, bitmask_size do 
+for N=1, bitmask_size do
     table.insert(result,N) -- or result
     test:do_test(
         "join3-1."..N,
@@ -42,7 +42,7 @@ for N=1, bitmask_size do
                 sql = sql .. ", t"..i..""
             end
             return test:execsql(sql)
-        end, 
+        end,
         result
         )
 

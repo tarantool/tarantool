@@ -185,7 +185,7 @@ test:do_execsql_test(
         SELECT x FROM t1 ORDER BY x LIMIT 50 OFFSET 50
     ]], {
         -- <limit-1.5>
-        
+
         -- </limit-1.5>
     })
 
@@ -474,7 +474,7 @@ test:do_execsql_test(
         SELECT * FROM t6 LIMIT 0
     ]], {
         -- <limit-6.7>
-        
+
         -- </limit-6.7>
     })
 
@@ -484,7 +484,7 @@ test:do_execsql_test(
         SELECT * FROM t6 LIMIT 0 OFFSET 1
     ]], {
         -- <limit-6.8>
-        
+
         -- </limit-6.8>
     })
 
@@ -570,7 +570,7 @@ test:do_execsql_test(
 -- } {31}
 -- do_test limit-7.12 {
 --   execsql {
---     SELECT a+27 FROM t6 INTERSECT SELECT x FROM t2 
+--     SELECT a+27 FROM t6 INTERSECT SELECT x FROM t2
 --        ORDER BY 1 DESC LIMIT 1 OFFSET 1;
 --   }
 -- } {30}
@@ -631,7 +631,7 @@ test:do_execsql_test(
         INSERT INTO t7 SELECT * FROM t6;
     ]], {
         -- <limit-9.2.1>
-        
+
         -- </limit-9.2.1>
     })
 
@@ -756,7 +756,7 @@ test:do_test(
         ]]
     end, {
         -- <limit-11.1>
-        
+
         -- </limit-11.1>
     })
 
@@ -805,7 +805,7 @@ test:do_catchsql_test(
     })
 
 -- Ticket [db4d96798da8b]
--- LIMIT does not work with nested views containing UNION ALL 
+-- LIMIT does not work with nested views containing UNION ALL
 --
 test:do_test(
     "limit-13.1",
@@ -819,7 +819,7 @@ test:do_test(
         ]]
     end, {
         -- <limit-13.1>
-        
+
         -- </limit-13.1>
     })
 
@@ -1269,7 +1269,7 @@ test:do_test(
         return test:execsql "SELECT z FROM v13c LIMIT 1 OFFSET 8"
     end, {
         -- <limit-13.81>
-        
+
         -- </limit-13.81>
     })
 
@@ -1289,7 +1289,7 @@ test:do_execsql_test(
         SELECT 123 LIMIT 1 OFFSET 1
     ]], {
         -- <limit-14.2>
-        
+
         -- </limit-14.2>
     })
 
@@ -1299,7 +1299,7 @@ test:do_execsql_test(
         SELECT 123 LIMIT 0 OFFSET 0
     ]], {
         -- <limit-14.3>
-        
+
         -- </limit-14.3>
     })
 
@@ -1309,7 +1309,7 @@ test:do_execsql_test(
         SELECT 123 LIMIT 0 OFFSET 1
     ]], {
         -- <limit-14.4>
-        
+
         -- </limit-14.4>
     })
 

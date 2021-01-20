@@ -26,7 +26,7 @@ test:do_execsql_test(
 	"default-1.1",
 	[[
 		CREATE TABLE t1(
-		rowid INTEGER PRIMARY KEY AUTOINCREMENT, 
+		rowid INTEGER PRIMARY KEY AUTOINCREMENT,
 		a INTEGER,
 		b SCALAR DEFAULT x'6869'
 		);
@@ -44,7 +44,7 @@ test:do_execsql_test(
 	"default-1.2",
 	[[
 	CREATE TABLE t2(
-	rowid INTEGER PRIMARY KEY AUTOINCREMENT, 
+	rowid INTEGER PRIMARY KEY AUTOINCREMENT,
 	x INTEGER,
 	y INTEGER DEFAULT NULL
 	);
@@ -60,7 +60,7 @@ test:do_catchsql_test(
 	"default-1.3",
 	[[
 	CREATE TABLE t3(
-	rowid INTEGER PRIMARY KEY AUTOINCREMENT, 
+	rowid INTEGER PRIMARY KEY AUTOINCREMENT,
 	x INTEGER,
 	y INTEGER DEFAULT (max(x,5))
 	);
@@ -74,7 +74,7 @@ test:do_execsql_test(
 	"default-2.1",
 	[[
 	CREATE TABLE t4(
-	rowid INTEGER PRIMARY KEY AUTOINCREMENT, 
+	rowid INTEGER PRIMARY KEY AUTOINCREMENT,
 	c TEXT DEFAULT 'abc'
 	);
 	PRAGMA table_info(t4);
@@ -110,7 +110,7 @@ test:do_execsql_test(
 	g INTEGER DEFAULT( 3600*12 )
 	);
 	INSERT INTO t3 VALUES(null, 5, 'row1', 5.25, 8.67, '321', 432);
-	SELECT a, typeof(a), b, typeof(b), c, typeof(c), 
+	SELECT a, typeof(a), b, typeof(b), c, typeof(c),
 	d, typeof(d), e, typeof(e), f, typeof(f),
 	g, typeof(g) FROM t3;
 	]], {
@@ -152,7 +152,7 @@ test:do_execsql_test(
 	-- </default-3.3>
 })
 
--- Do now allow bound parameters in new DEFAULT values. 
+-- Do now allow bound parameters in new DEFAULT values.
 -- Silently convert bound parameters to NULL in DEFAULT causes
 -- in the sql_master table, for backwards compatibility.
 --

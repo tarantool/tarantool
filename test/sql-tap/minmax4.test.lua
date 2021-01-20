@@ -14,11 +14,11 @@ test:plan(21)
 --
 -------------------------------------------------------------------------
 --
--- Test for queries of the form:  
+-- Test for queries of the form:
 --
 --    SELECT p, max(q) FROM t1;
 --
--- Demonstration that the value returned for p is on the same row as 
+-- Demonstration that the value returned for p is on the same row as
 -- the maximum q.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]

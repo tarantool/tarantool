@@ -32,7 +32,7 @@ test:plan(83)
 --     SELECT * FROM t1;
 --   }
 -- } {1 2 3 4 5 6 7 8 9}
--- 
+--
 test:do_execsql_test(
     "view-1.0",
     [[
@@ -232,7 +232,7 @@ test:do_execsql_test(
         -- </view-2.6>
     })
 
--- 
+--
 -- Test that column name of views are generated correctly.
 --
 test:do_execsql2_test(
@@ -1011,7 +1011,7 @@ test:do_execsql_test(
         CREATE VIEW v10 AS SELECT c1 FROM (SELECT t10.c1 FROM t10);
     ]], {
         -- <view-20.1>
-        
+
         -- </view-20.1>
     })
 
@@ -1024,7 +1024,7 @@ test:do_execsql_test(
         CREATE VIEW v10 AS SELECT c1 FROM (SELECT t10.c1 FROM t10);
     ]], {
         -- <view-20.1>
-        
+
         -- </view-20.1>
     })
 

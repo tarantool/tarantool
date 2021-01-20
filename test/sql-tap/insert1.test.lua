@@ -141,7 +141,7 @@ end, {
 -- do_test insert-2.1 {
 --   execsql {
 --     CREATE TABLE test2(
---       f1 int default -111, 
+--       f1 int default -111,
 --       f2 real default +4.32,
 --       f3 int default +222,
 --       f4 int default 7.89
@@ -165,7 +165,7 @@ end, {
 --   execsql {
 --     DROP TABLE test2;
 --     CREATE TABLE test2(
---       f1 int default 111, 
+--       f1 int default 111,
 --       f2 real default -4.32,
 --       f3 text default hi,
 --       f4 text default 'abc-123',
@@ -396,8 +396,8 @@ test:do_execsql_test("insert-4.7", [[
   -- } {}
 -- end
 
--- # Test that the special optimization for queries of the form 
--- # "SELECT max(x) FROM tbl" where there is an index on tbl(x) works with 
+-- # Test that the special optimization for queries of the form
+-- # "SELECT max(x) FROM tbl" where there is an index on tbl(x) works with
 -- # INSERT statments.
 -- do_test insert-7.1 {
 --   execsql {

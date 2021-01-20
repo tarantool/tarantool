@@ -41,7 +41,7 @@ test:do_execsql_test(
         SELECT *, '|' FROM t1, t2 WHERE a=234 AND x=555;
     ]], {
         -- <autoindex4-1.1>
-        
+
         -- </autoindex4-1.1>
     })
 
@@ -71,7 +71,7 @@ test:do_execsql_test(
         SELECT *, '|' FROM t1 LEFT JOIN t2 WHERE a=234 AND x=555;
     ]], {
         -- <autoindex4-1.4>
-        
+
         -- </autoindex4-1.4>
     })
 
@@ -97,7 +97,7 @@ test:do_execsql_test(
 -- Ticket [2326c258d02ead33d]
 -- Two joins, one with and the other without an ORDER BY clause.
 -- The one without ORDER BY correctly returns two rows of result.
--- The one with ORDER BY returns no rows. 
+-- The one with ORDER BY returns no rows.
 --
 test:do_execsql_test(
     "autoindex4-3.0",

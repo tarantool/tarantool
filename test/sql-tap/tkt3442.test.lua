@@ -16,7 +16,7 @@ test:plan(4)
 -- This file implements regression tests for sql library.
 --
 -- This file implements tests to verify that ticket #3442 has been
--- fixed.  
+-- fixed.
 --
 --
 -- $Id: tkt3442.test,v 1.2 2009/06/05 17:09:12 drh Exp $
@@ -35,7 +35,7 @@ test:do_execsql_test(
         CREATE UNIQUE INDEX ididx ON listhash(id);
     ]], {
         -- <tkt3442-1.1>
-        
+
         -- </tkt3442-1.1>
     })
 

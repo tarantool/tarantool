@@ -16,7 +16,7 @@ test:plan(4)
 -- This file implements regression tests for sql library.
 --
 -- This file implements tests to verify that ticket #3554 has been
--- fixed.  
+-- fixed.
 --
 -- $Id: tkt3554.test,v 1.2 2009/06/05 17:09:12 drh Exp $
 -- ["set","testdir",[["file","dirname",["argv0"]]]]

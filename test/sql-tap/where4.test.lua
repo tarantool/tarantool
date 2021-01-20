@@ -171,7 +171,7 @@ test:do_execsql_test(
           WHERE +t2.col1 IS NULL;
     ]], {
         -- <where4-4.1>
-        
+
         -- </where4-4.1>
     })
 
@@ -182,7 +182,7 @@ test:do_execsql_test(
           WHERE t2.col1 IS NULL;
     ]], {
         -- <where4-4.2>
-        
+
         -- </where4-4.2>
     })
 
@@ -193,7 +193,7 @@ test:do_execsql_test(
           WHERE +t1.col1 IS NULL;
     ]], {
         -- <where4-4.3>
-        
+
         -- </where4-4.3>
     })
 
@@ -204,7 +204,7 @@ test:do_execsql_test(
           WHERE t1.col1 IS NULL;
     ]], {
         -- <where4-4.4>
-        
+
         -- </where4-4.4>
     })
 
@@ -227,7 +227,7 @@ test:do_execsql_test(
                   LEFT JOIN t4 b2 ON b2.x=b1.x AND b2.y IN (b1.y);
     ]], {
         -- <where4-5.2>
-        1, '', '', '', '', '', '', 2, '', '', '', '', '', '', 3, '', '', '', '', '', '' 
+        1, '', '', '', '', '', '', 2, '', '', '', '', '', '', 3, '', '', '', '', '', ''
         -- </where4-5.2>
     })
 
@@ -242,7 +242,7 @@ test:do_execsql_test(
         INSERT INTO t4 VALUES(2,2,22);
     ]], {
         -- <where4-5.2>
-        
+
         -- </where4-5.2>
     })
 
@@ -281,7 +281,7 @@ test:do_test(
         ]]
     end, {
         -- <where4-7.1>
-        
+
         -- </where4-7.1>
     })
 
@@ -303,7 +303,7 @@ test:do_test(
 --   }
 -- } {}
 -- # At one point the sub-select inside the aggregate sum() function in the
--- # following query was leaking a couple of stack entries. This query 
+-- # following query was leaking a couple of stack entries. This query
 -- # runs the SELECT in a loop enough times that an assert() fails. Or rather,
 -- # did fail before the bug was fixed.
 -- #

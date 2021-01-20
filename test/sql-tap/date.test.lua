@@ -234,13 +234,13 @@ datetest(5.15, "datetime('1994-04-16 14:00:00 +05:00 Z')", "NULL")
 -- and in New York.)
 --
 -- On non-Vista Windows platform, '2006-03-31' is treated incorrectly as being
--- in DST giving a 4 hour offset instead of 5.  In 2007, DST was extended to 
+-- in DST giving a 4 hour offset instead of 5.  In 2007, DST was extended to
 -- start three weeks earlier (second Sunday in March) and end one week
 -- later (first Sunday in November).  Older Windows systems apply this
 -- new rule incorrectly to dates prior to 2007.
 --
 -- It might be argued that this is masking a problem on non-Vista Windows
--- platform.  A ticket has already been opened for this issue 
+-- platform.  A ticket has already been opened for this issue
 -- (http://www.sql.org/cvstrac/tktview?tn=2322).  This is just to prevent
 -- more confusion/reports of the issue.
 --

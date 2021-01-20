@@ -13,7 +13,7 @@ test:plan(0)
 -------------------------------------------------------------------------
 --
 -- This file contains tests for sql. Specifically, it tests that sql
--- does not crash and an error is returned if localhost() fails. This 
+-- does not crash and an error is returned if localhost() fails. This
 -- is the problem reported by ticket bd484a090c.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]

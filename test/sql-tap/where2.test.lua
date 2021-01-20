@@ -53,7 +53,7 @@ test:do_test(
         ]]
     end, {
         -- <where2-1.0>
-        
+
         -- </where2-1.0>
     })
 
@@ -80,7 +80,7 @@ end
 -- it appends the name of the table and index used.
 --
 
--- This procedure executes the SQL.  Then it appends 
+-- This procedure executes the SQL.  Then it appends
 -- the names of the table and index used
 --
 local function queryplan(sql)
@@ -899,7 +899,7 @@ test:do_test(
         "where2-7.4",
         function()
             test:execsql('create unique index i9y on t9(y);')
-            return cksort([[                   
+            return cksort([[
                    select * from t8, t9 where a=1 and y=3 order by b, x]])
         end, {
             -- <where2-7.4>
@@ -924,7 +924,7 @@ test:do_execsql_test(
         SELECT * FROM t1 WHERE x IN (20,21) AND y IN (1,2)
     ]], {
         -- <where2-8.1>
-        
+
         -- </where2-8.1>
     })
 
@@ -934,7 +934,7 @@ test:do_execsql_test(
         SELECT * FROM t1 WHERE x IN (1,2) AND y IN (-5,-6)
     ]], {
         -- <where2-8.2>
-        
+
         -- </where2-8.2>
     })
 
@@ -1031,7 +1031,7 @@ test:do_execsql_test(
            AND z IN (SELECT z FROM t1 WHERE w BETWEEN 2 AND 4)
     ]], {
         -- <where2-8.9>
-        
+
         -- </where2-8.9>
     })
 
@@ -1044,7 +1044,7 @@ test:do_execsql_test(
            AND z IN (SELECT z FROM t1 WHERE w BETWEEN 10 AND 20)
     ]], {
         -- <where2-8.10>
-        
+
         -- </where2-8.10>
     })
 
@@ -1057,7 +1057,7 @@ test:do_execsql_test(
            AND z IN (SELECT z FROM t1 WHERE w BETWEEN 10 AND 20)
     ]], {
         -- <where2-8.11>
-        
+
         -- </where2-8.11>
     })
 
@@ -1070,7 +1070,7 @@ test:do_execsql_test(
            AND z IN (SELECT z FROM t1 WHERE w BETWEEN -4 AND -2)
     ]], {
         -- <where2-8.12>
-        
+
         -- </where2-8.12>
     })
 
@@ -1083,7 +1083,7 @@ test:do_execsql_test(
            AND z IN (SELECT z FROM t1 WHERE w BETWEEN 10 AND 20)
     ]], {
         -- <where2-8.13>
-        
+
         -- </where2-8.13>
     })
 
@@ -1096,7 +1096,7 @@ test:do_execsql_test(
            AND z IN (SELECT z FROM t1 WHERE w BETWEEN 10 AND 20)
     ]], {
         -- <where2-8.14>
-        
+
         -- </where2-8.14>
     })
 
@@ -1109,7 +1109,7 @@ test:do_execsql_test(
            AND z IN (SELECT z FROM t1 WHERE w BETWEEN 200 AND 300)
     ]], {
         -- <where2-8.15>
-        
+
         -- </where2-8.15>
     })
 
@@ -1122,7 +1122,7 @@ test:do_execsql_test(
            AND z IN (SELECT z FROM t1 WHERE w BETWEEN 10 AND 20)
     ]], {
         -- <where2-8.16>
-        
+
         -- </where2-8.16>
     })
 
@@ -1135,7 +1135,7 @@ test:do_execsql_test(
            AND z IN (SELECT z FROM t1 WHERE w BETWEEN 10 AND 20)
     ]], {
         -- <where2-8.17>
-        
+
         -- </where2-8.17>
     })
 
@@ -1148,7 +1148,7 @@ test:do_execsql_test(
            AND z IN (SELECT z FROM t1 WHERE +w BETWEEN 200 AND 300)
     ]], {
         -- <where2-8.18>
-        
+
         -- </where2-8.18>
     })
 
@@ -1161,7 +1161,7 @@ test:do_execsql_test(
            AND z IN (SELECT z FROM t1 WHERE +w BETWEEN 10 AND 20)
     ]], {
         -- <where2-8.19>
-        
+
         -- </where2-8.19>
     })
 
@@ -1174,7 +1174,7 @@ test:do_execsql_test(
            AND z IN (SELECT z FROM t1 WHERE +w BETWEEN 10 AND 20)
     ]], {
         -- <where2-8.20>
-        
+
         -- </where2-8.20>
     })
 

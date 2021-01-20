@@ -137,7 +137,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-1.9.2",
     [[
-        SELECT a FROM t1 WHERE (SELECT (y*2)>b FROM t2 WHERE a=x); 
+        SELECT a FROM t1 WHERE (SELECT (y*2)>b FROM t2 WHERE a=x);
     ]], {
         -- <subquery-1.9.2>
         3, 5, 7
@@ -191,7 +191,7 @@ test:do_execsql_test(
         INSERT INTO t5 VALUES(5, '2003-4');
 
         SELECT period, vsum
-        FROM (SELECT 
+        FROM (SELECT
           a.period,
           (select sum(val) from t5 where period between a.period and '2002-4') vsum
           FROM t5 a where a.period between '2002-1' and '2002-4')
@@ -208,7 +208,7 @@ test:do_execsql_test(
         SELECT period, vsum from
           (select a.period,
           (select sum(val) from t5 where period between a.period and '2002-4') vsum
-        FROM t5 a where a.period between '2002-1' and '2002-4') 
+        FROM t5 a where a.period between '2002-1' and '2002-4')
         WHERE vsum < 45 ;
     ]], {
         -- <subquery-1.10.5>
@@ -222,7 +222,7 @@ test:do_execsql_test(
         DROP TABLE t5;
     ]], {
         -- <subquery-1.10.6>
-        
+
         -- </subquery-1.10.6>
     })
 
@@ -249,7 +249,7 @@ test:do_execsql_test(
         INSERT INTO t3 VALUES(3, 1);
     ]], {
         -- <subquery-2.2.1>
-        
+
         -- </subquery-2.2.1>
     })
 
@@ -269,7 +269,7 @@ test:do_execsql_test(
         DROP TABLE t3;
     ]], {
         -- <subquery-2.2.3>
-        
+
         -- </subquery-2.2.3>
     })
 
@@ -280,7 +280,7 @@ test:do_execsql_test(
         INSERT INTO t3 VALUES('10');
     ]], {
         -- <subquery-2.3.1>
-        
+
         -- </subquery-2.3.1>
     })
 
@@ -300,7 +300,7 @@ test:do_execsql_test(
         DROP TABLE t3;
     ]], {
         -- <subquery-2.3.3>
-        
+
         -- </subquery-2.3.3>
     })
 
@@ -311,7 +311,7 @@ test:do_execsql_test(
         INSERT INTO t3 VALUES('XX');
     ]], {
         -- <subquery-2.4.1>
-        
+
         -- </subquery-2.4.1>
     })
 
@@ -331,7 +331,7 @@ test:do_execsql_test(
         DROP TABLE t3;
     ]], {
         -- <subquery-2.4.3>
-        
+
         -- </subquery-2.4.3>
     })
 
@@ -582,8 +582,8 @@ test:do_execsql_test(
     })
 
 --------------------------------------------------------------------
--- These tests - subquery-4.* - use the TCL statement cache to try 
--- and expose bugs to do with re-using statements that have been 
+-- These tests - subquery-4.* - use the TCL statement cache to try
+-- and expose bugs to do with re-using statements that have been
 -- passed to sql_reset().
 --
 -- One problem was that VDBE memory cells were not being initialized
@@ -620,7 +620,7 @@ test:do_test(
         return test:execsql "INSERT INTO t3 VALUES((SELECT max(a) FROM t3)+1)"
     end, {
         -- <subquery-4.2.1>
-        
+
         -- </subquery-4.2.1>
     })
 
@@ -630,7 +630,7 @@ test:do_execsql_test(
         INSERT INTO t3 VALUES((SELECT max(a) FROM t3)+1)
     ]], {
         -- <subquery-4.2.2>
-        
+
         -- </subquery-4.2.2>
     })
 
@@ -863,7 +863,7 @@ test:do_execsql_test(
         SELECT (SELECT 0 FROM (SELECT * FROM (SELECT 0))) AS x WHERE x <> 0;
     ]], {
         -- <subquery-8.1>
-        
+
         -- </subquery-8.1>
     })
 

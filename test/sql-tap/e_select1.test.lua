@@ -14,7 +14,7 @@ test:plan(509)
 --
 -------------------------------------------------------------------------
 --
--- This file implements tests to verify that the "testable statements" in 
+-- This file implements tests to verify that the "testable statements" in
 -- the lang_select.html document are correct.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
@@ -43,7 +43,7 @@ test:do_execsql_test(
         INSERT INTO t4 VALUES('b', 2);
     ]], {
         -- <e_select-1.0>
-        
+
         -- </e_select-1.0>
     })
 

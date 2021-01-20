@@ -85,7 +85,7 @@ test:do_execsql_test(
         WITH x1 AS (SELECT a FROM t1),
              x2 AS (SELECT i FROM t2),
              x3 AS (SELECT * FROM x1, x2 WHERE x1.a IN x2 AND x2.i IN x1)
-        SELECT * FROM x3 
+        SELECT * FROM x3
     ]], {
         -- <1.5>
         2, 2
@@ -137,10 +137,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     1.11,
     [[
-        WITH 
-        i(x) AS ( 
-          WITH 
-          j(x) AS ( SELECT * FROM i ), 
+        WITH
+        i(x) AS (
+          WITH
+          j(x) AS ( SELECT * FROM i ),
           i(x) AS ( SELECT * FROM t1 )
           SELECT * FROM j
         )
@@ -191,10 +191,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     1.14,
     [[
-        WITH 
-        t4(x) AS ( 
+        WITH
+        t4(x) AS (
           VALUES(4)
-          UNION ALL 
+          UNION ALL
           SELECT x+1 FROM t4 WHERE x<10
         )
         SELECT * FROM t4;
@@ -205,10 +205,10 @@ test:do_execsql_test(
     })
 
 test:do_catchsql_test(1.16, [[
-    WITH 
-    t4(x) AS ( 
+    WITH
+    t4(x) AS (
       VALUES(4)
-      UNION ALL 
+      UNION ALL
       SELECT x+1 FROM t4, t4, t4 WHERE x<10
     )
     SELECT * FROM t4;
@@ -262,7 +262,7 @@ test:do_catchsql_test(3.1, [[
 })
 
 test:do_catchsql_test(3.2, [[
-    WITH 
+    WITH
     i(x) AS ( SELECT * FROM j ),
     j(x) AS ( SELECT * FROM k ),
     k(x) AS ( SELECT * FROM i )
@@ -274,7 +274,7 @@ test:do_catchsql_test(3.2, [[
 })
 
 test:do_catchsql_test(3.3, [[
-    WITH 
+    WITH
     i(x) AS ( SELECT * FROM (SELECT * FROM j) ),
     j(x) AS ( SELECT * FROM (SELECT * FROM i) )
     SELECT * FROM i;
@@ -285,7 +285,7 @@ test:do_catchsql_test(3.3, [[
 })
 
 test:do_catchsql_test(3.4, [[
-    WITH 
+    WITH
     i(x) AS ( SELECT * FROM (SELECT * FROM j) ),
     j(x) AS ( SELECT * FROM (SELECT * FROM i) )
     SELECT * FROM j;
@@ -296,8 +296,8 @@ test:do_catchsql_test(3.4, [[
 })
 
 test:do_catchsql_test(3.5, [[
-    WITH 
-    i(x) AS ( 
+    WITH
+    i(x) AS (
       WITH j(x) AS ( SELECT * FROM i )
       SELECT * FROM j
     )
@@ -613,10 +613,10 @@ test:do_execsql_test(
         CREATE TABLE t6(y INTEGER PRIMARY KEY);
 
         WITH s(x) AS ( VALUES(7) UNION ALL SELECT x+7 FROM s WHERE x<49 )
-        INSERT INTO t5 
+        INSERT INTO t5
         SELECT * FROM s;
 
-        INSERT INTO t6 
+        INSERT INTO t6
         WITH s(x) AS ( VALUES(2) UNION ALL SELECT x+2 FROM s WHERE x<49 )
         SELECT * FROM s;
     ]])
@@ -667,7 +667,7 @@ test:do_execsql_test(
     })
 
 ---------------------------------------------------------------------------
--- At one point the following was causing an assertion failure and a 
+-- At one point the following was causing an assertion failure and a
 -- memory leak.
 --
 test:do_execsql_test(
@@ -683,7 +683,7 @@ test:do_execsql_test(
     [[
         WITH q(a) AS (
           SELECT 1
-          UNION 
+          UNION
           SELECT a+1 FROM q, v WHERE a<5
         )
         SELECT * FROM q;

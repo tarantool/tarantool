@@ -272,7 +272,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT a, b FROM t1
-            UNION 
+            UNION
             SELECT a, b FROM t1
             ORDER BY 1
         ]]
@@ -287,7 +287,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT a, b FROM t1
-            UNION 
+            UNION
             SELECT a, abs(b) FROM t1
             ORDER BY 1
         ]]
@@ -302,7 +302,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT a, b FROM t1
-            UNION 
+            UNION
             SELECT abs(a), b FROM t1
             ORDER BY 1
         ]]
@@ -317,7 +317,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT a, b FROM t1
-            UNION 
+            UNION
             SELECT abs(a), abs(b) FROM t1
             ORDER BY 1
         ]]
@@ -332,7 +332,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT a, abs(b) FROM t1
-            UNION 
+            UNION
             SELECT a, b FROM t1
             ORDER BY 1
         ]]
@@ -347,7 +347,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT a, abs(b) FROM t1
-            UNION 
+            UNION
             SELECT a, abs(b) FROM t1
             ORDER BY 1
         ]]
@@ -362,7 +362,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT a, abs(b) FROM t1
-            UNION 
+            UNION
             SELECT abs(a), b FROM t1
             ORDER BY 1
         ]]
@@ -377,7 +377,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT a, abs(b) FROM t1
-            UNION 
+            UNION
             SELECT abs(a), abs(b) FROM t1
             ORDER BY 1
         ]]
@@ -392,7 +392,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT abs(a), b FROM t1
-            UNION 
+            UNION
             SELECT a, b FROM t1
             ORDER BY 1
         ]]
@@ -407,7 +407,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT abs(a), b FROM t1
-            UNION 
+            UNION
             SELECT a, abs(b) FROM t1
             ORDER BY 1
         ]]
@@ -422,7 +422,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT abs(a), b FROM t1
-            UNION 
+            UNION
             SELECT abs(a), b FROM t1
             ORDER BY 1
         ]]
@@ -437,7 +437,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT abs(a), b FROM t1
-            UNION 
+            UNION
             SELECT abs(a), abs(b) FROM t1
             ORDER BY 1
         ]]
@@ -452,7 +452,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT abs(a), abs(b) FROM t1
-            UNION 
+            UNION
             SELECT a, b FROM t1
             ORDER BY 1
         ]]
@@ -467,7 +467,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT abs(a), abs(b) FROM t1
-            UNION 
+            UNION
             SELECT a, abs(b) FROM t1
             ORDER BY 1
         ]]
@@ -482,7 +482,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT abs(a), abs(b) FROM t1
-            UNION 
+            UNION
             SELECT abs(a), b FROM t1
             ORDER BY 1
         ]]
@@ -497,7 +497,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT abs(a), abs(b) FROM t1
-            UNION 
+            UNION
             SELECT abs(a), abs(b) FROM t1
             ORDER BY 1
         ]]
@@ -741,7 +741,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.1>
-        
+
         -- </tkt2927-5.1>
     })
 
@@ -755,7 +755,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.2>
-        
+
         -- </tkt2927-5.2>
     })
 
@@ -769,7 +769,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.3>
-        
+
         -- </tkt2927-5.3>
     })
 
@@ -783,7 +783,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.4>
-        
+
         -- </tkt2927-5.4>
     })
 
@@ -797,7 +797,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.5>
-        
+
         -- </tkt2927-5.5>
     })
 
@@ -811,7 +811,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.6>
-        
+
         -- </tkt2927-5.6>
     })
 
@@ -825,7 +825,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.7>
-        
+
         -- </tkt2927-5.7>
     })
 
@@ -839,7 +839,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.8>
-        
+
         -- </tkt2927-5.8>
     })
 
@@ -853,7 +853,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.9>
-        
+
         -- </tkt2927-5.9>
     })
 
@@ -867,7 +867,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.10>
-        
+
         -- </tkt2927-5.10>
     })
 
@@ -881,7 +881,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.11>
-        
+
         -- </tkt2927-5.11>
     })
 
@@ -895,7 +895,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.12>
-        
+
         -- </tkt2927-5.12>
     })
 
@@ -909,7 +909,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.13>
-        
+
         -- </tkt2927-5.13>
     })
 
@@ -923,7 +923,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.14>
-        
+
         -- </tkt2927-5.14>
     })
 
@@ -937,7 +937,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.15>
-        
+
         -- </tkt2927-5.15>
     })
 
@@ -951,7 +951,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt2927-5.16>
-        
+
         -- </tkt2927-5.16>
     })
 

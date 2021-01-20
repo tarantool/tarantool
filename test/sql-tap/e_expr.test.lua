@@ -3190,14 +3190,14 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(4, NULL, NULL);
     ]], {
         -- <e_expr-34.1>
-        
+
         -- </e_expr-34.1>
     })
 
 -- EVIDENCE-OF: R-25588-27181 The EXISTS operator always evaluates to one
 -- of the integer values 0 and 1.
 --
--- This statement is not tested by itself. Instead, all e_expr-34.* tests 
+-- This statement is not tested by itself. Instead, all e_expr-34.* tests
 -- following this point explicitly test that specific invocations of EXISTS
 -- return either integer 0 or integer 1.
 --
@@ -3280,7 +3280,7 @@ test:do_execsql_test(
         INSERT INTO t22 VALUES('three', NULL);
     ]], {
         -- <e_expr-35.0>
-        
+
         -- </e_expr-35.0>
     })
 
@@ -3295,10 +3295,10 @@ do_expr_test("e_expr-35.1.1", " (SELECT 35)   ", "integer", 35)
 do_expr_test("e_expr-35.1.2", " (SELECT NULL) ", "null", "")
 do_expr_test("e_expr-35.1.3", " (SELECT count(*) FROM t22) ", "integer", 2)
 do_expr_test("e_expr-35.1.4", " (SELECT 4 FROM t22 LIMIT 1) ", "integer", 4)
-do_expr_test("e_expr-35.1.5", [[ 
+do_expr_test("e_expr-35.1.5", [[
   (SELECT b FROM t22 UNION SELECT a+1 FROM t22 LIMIT 1)
 ]], "null", "")
-do_expr_test("e_expr-35.1.6", [[ 
+do_expr_test("e_expr-35.1.6", [[
   (SELECT a FROM t22 UNION SELECT COALESCE(b, 55) FROM t22 ORDER BY 1 LIMIT 1)
 ]], "integer", 55)
 -- EVIDENCE-OF: R-46899-53765 A SELECT used as a scalar quantity must
@@ -3339,7 +3339,7 @@ test:do_execsql_test(
         INSERT INTO t4 VALUES(3, 'three');
     ]], {
         -- <e_expr-36.3.1>
-        
+
         -- </e_expr-36.3.1>
     })
 

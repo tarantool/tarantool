@@ -343,7 +343,7 @@ test:do_execsql_test(
                    ON files.idpath = path.idpath
                  LEFT JOIN bookmark
                         ON bookmark.idfile = episode.idfile
-                           AND bookmark.type = 1; 
+                           AND bookmark.type = 1;
         CREATE VIEW tvshowview
         AS
           SELECT tvshow.*,
@@ -362,7 +362,7 @@ test:do_execsql_test(
                         ON episode.idshow = tvshow.idshow
                  LEFT JOIN files
                         ON files.idfile = episode.idfile
-          GROUP  BY tvshow.idshow; 
+          GROUP  BY tvshow.idshow;
         SELECT
           episodeview.c12,
           path.strPath,

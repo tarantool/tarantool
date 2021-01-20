@@ -215,9 +215,9 @@ test:do_execsql_test("select3-4.1", [[
 })
 
 test:do_execsql_test("select3-4.2", [[
-  SELECT log, count(*) FROM t1 
-  GROUP BY log 
-  HAVING count(*)>=4 
+  SELECT log, count(*) FROM t1
+  GROUP BY log
+  HAVING count(*)>=4
   ORDER BY log
 ]], {
   -- <select3-4.2>
@@ -226,9 +226,9 @@ test:do_execsql_test("select3-4.2", [[
 })
 
 test:do_execsql_test("select3-4.3", [[
-  SELECT log, count(*) FROM t1 
-  GROUP BY log 
-  HAVING count(*)>=4 
+  SELECT log, count(*) FROM t1
+  GROUP BY log
+  HAVING count(*)>=4
   ORDER BY max(n)+0
 ]], {
   -- <select3-4.3>
@@ -237,9 +237,9 @@ test:do_execsql_test("select3-4.3", [[
 })
 
 test:do_execsql_test("select3-4.4", [[
-  SELECT log AS x, count(*) AS y FROM t1 
+  SELECT log AS x, count(*) AS y FROM t1
   GROUP BY x
-  HAVING y>=4 
+  HAVING y>=4
   ORDER BY max(n)+0
 ]], {
   -- <select3-4.4>
@@ -248,9 +248,9 @@ test:do_execsql_test("select3-4.4", [[
 })
 
 test:do_execsql_test("select3-4.5", [[
-  SELECT log AS x FROM t1 
+  SELECT log AS x FROM t1
   GROUP BY x
-  HAVING count(*)>=4 
+  HAVING count(*)>=4
   ORDER BY max(n)+0
 ]], {
   -- <select3-4.5>
@@ -259,8 +259,8 @@ test:do_execsql_test("select3-4.5", [[
 })
 
 test:do_execsql_test("select3-5.1", [[
-  SELECT log, count(*), avg(n), max(n+log*2) FROM t1 
-  GROUP BY log 
+  SELECT log, count(*), avg(n), max(n+log*2) FROM t1
+  GROUP BY log
   ORDER BY max(n+log*2)+0, avg(n)+0
 ]], {
   -- <select3-5.1>
@@ -269,8 +269,8 @@ test:do_execsql_test("select3-5.1", [[
 })
 
 test:do_execsql_test("select3-5.2", [[
-  SELECT log, count(*), avg(n), max(n+log*2) FROM t1 
-  GROUP BY log 
+  SELECT log, count(*), avg(n), max(n+log*2) FROM t1
+  GROUP BY log
   ORDER BY max(n+log*2)+0, GREATEST(log,avg(n))+0
 ]], {
   -- <select3-5.2>
@@ -355,7 +355,7 @@ test:do_execsql_test("select3-7.1", [[
   SELECT a, sum(b) FROM t2 WHERE b=5 GROUP BY a;
 ]], {
   -- <select3-7.1>
-  
+
   -- </select3-7.1>
 })
 

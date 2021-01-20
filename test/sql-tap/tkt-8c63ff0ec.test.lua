@@ -13,11 +13,11 @@ test:plan(3)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- 
+--
 -- Test cases to show that ticket [8c63ff0eca81a9132d8d67b31cd6ae9712a2cc6f]
 -- "Incorrect query result on a UNION ALL" which was caused by using the same
 -- temporary register in concurrent co-routines, as been fixed.
--- 
+--
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
 test:do_execsql_test(

@@ -26,7 +26,7 @@ test:do_execsql_test(
         INSERT INTO folders VALUES(4, 0, 'FolderC');
     ]], {
         -- <tkt2391.1>
-        
+
         -- </tkt2391.1>
     })
 
@@ -51,7 +51,7 @@ test:do_execsql_test(
     })
 
 -- This demonstrates the bug. Creating the index causes sql to ignore
--- the "COLLATE nocase" clause and use the default collation sequence 
+-- the "COLLATE nocase" clause and use the default collation sequence
 -- for column "foldername" instead (happens to be BINARY in this case).
 --
 test:do_execsql_test(

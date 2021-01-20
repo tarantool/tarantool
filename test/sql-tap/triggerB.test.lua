@@ -41,7 +41,7 @@ test:do_execsql_test(
         -- </triggerB-1.1>
     })
 
--- MUST_WORK_TEST 
+-- MUST_WORK_TEST
 -- do_test triggerB-1.2 {
 --   execsql {
 --     UPDATE vx SET y = yy;
@@ -153,7 +153,7 @@ test:do_test(
             );
         ]]
         -- for _ in X(0, "X!for", [=[["set i 0","$i<=65","incr i"]]=]) do
-        for i=0,65 do    
+        for i=0,65 do
             local sql = string.format([[
                     CREATE TRIGGER t3c%s AFTER UPDATE ON t3
                     FOR EACH ROW
@@ -169,15 +169,15 @@ test:do_test(
         ]]
     end, {
         -- <triggerB-3.1>
-        
+
         -- </triggerB-3.1>
     })
 
 -- for _ in X(0, "X!for", [=[["set i 0","$i<=64","incr i"]]=]) do
-for i=0,64 do    
+for i=0,64 do
 --    X(139, "X!cmd", [=[["do_test",["triggerB-3.2.",["i"],".1"],["\n    execsql {\n      UPDATE t3 SET c",["i"],"='b",["i"],"';\n      SELECT * FROM t3_changes ORDER BY colnum DESC LIMIT 1;\n    }\n  "],[["i"]," a",["i"]," b",["i"]]]]=])
     test:do_execsql_test("triggerB-3.2."..i..".1",
-                         string.format([[UPDATE t3 SET c%d='b%d'; 
+                         string.format([[UPDATE t3 SET c%d='b%d';
                                          SELECT * FROM t3_changes ORDER BY colnum DESC LIMIT 1; ]],
                                        i, i),
                          {i, string.format("a%d", i), string.format("b%d", i)})

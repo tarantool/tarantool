@@ -16,7 +16,7 @@ test:plan(3)
 -- This file implements regression tests for sql library.
 --
 -- This file implements tests to verify that ticket #2141 has been
--- fixed.  
+-- fixed.
 --
 --
 -- $Id: tkt2141.test,v 1.2 2007/09/12 17:01:45 danielk1977 Exp $

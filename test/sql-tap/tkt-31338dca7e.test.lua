@@ -202,7 +202,7 @@ if (1 > 0)
                 CREATE TABLE t5(a  INT primary key,b INT ,c INT ,d INT ,e INT ,f INT );
                 CREATE TABLE t6(g  INT primary key,h INT );
                 CREATE TRIGGER t6r AFTER INSERT ON t6 FOR EACH ROW BEGIN
-                  INSERT INTO t5    
+                  INSERT INTO t5
                     SELECT * FROM t3 LEFT JOIN t1 ON d=g LEFT JOIN t4 ON c=h
                      WHERE (a=1 AND h=4)
                         OR (b IN (

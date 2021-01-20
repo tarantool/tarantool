@@ -29,7 +29,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "1.1",
     [[
-        SELECT DISTINCT x, y FROM t1 
+        SELECT DISTINCT x, y FROM t1
     ]], {
         -- <1.1>
         1, "", 2, ""
@@ -45,7 +45,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "1.3",
     [[
-        SELECT DISTINCT x, y FROM t1 
+        SELECT DISTINCT x, y FROM t1
     ]], {
         -- <1.3>
         1, "", 2, ""

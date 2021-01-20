@@ -31,14 +31,14 @@ test:do_execsql_test(
         insert into b values(1, 'btest');
     ]], {
         -- <tkt3357-1.1>
-        
+
         -- </tkt3357-1.1>
     })
 
 test:do_execsql_test(
     "tkt3357-1.2",
     [[
-        SELECT cc.id, cc.b_id, cc.myvalue, dd.bvalue 
+        SELECT cc.id, cc.b_id, cc.myvalue, dd.bvalue
         FROM (
           SELECT DISTINCT a.id, a.b_id, a.myvalue FROM a
           INNER JOIN b ON a.b_id = b.id WHERE b.bvalue = 'btest'
@@ -55,7 +55,7 @@ test:do_execsql_test(
     [[
         SELECT cc.id, cc.b_id, cc.myvalue
         FROM (
-          SELECT a.id, a.b_id, a.myvalue 
+          SELECT a.id, a.b_id, a.myvalue
           FROM a, b WHERE a.b_id = b.id
         ) cc
         LEFT OUTER JOIN b dd ON cc.b_id = dd.id
@@ -70,7 +70,7 @@ test:do_execsql_test(
     [[
         SELECT cc.id, cc.b_id, cc.myvalue
         FROM (
-          SELECT DISTINCT a.id, a.b_id, a.myvalue 
+          SELECT DISTINCT a.id, a.b_id, a.myvalue
           FROM a, b WHERE a.b_id = b.id
         ) cc
         LEFT OUTER JOIN b dd ON cc.b_id = dd.id
