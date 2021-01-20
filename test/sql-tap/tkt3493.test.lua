@@ -36,20 +36,20 @@ test:do_execsql_test(
         COMMIT;
     ]], {
         -- <tkt3493-1.1>
-        
+
         -- </tkt3493-1.1>
     })
 
 test:do_execsql_test(
     "tkt3493-1.2",
     [[
-        SELECT 
-          CASE 
-             WHEN B.val = 1 THEN 'XYZ' 
-             ELSE A.val 
+        SELECT
+          CASE
+             WHEN B.val = 1 THEN 'XYZ'
+             ELSE A.val
           END AS Col1
-        FROM B  
-        LEFT OUTER JOIN A_B ON B.id = A_B.B_id  
+        FROM B
+        LEFT OUTER JOIN A_B ON B.id = A_B.B_id
         LEFT OUTER JOIN A ON A.id = A_B.A_id
         ORDER BY Col1 ASC;
     ]], {
@@ -62,12 +62,12 @@ test:do_execsql_test(
     "tkt3493-1.3",
     [[
         SELECT DISTINCT
-          CASE 
-             WHEN B.val = 1 THEN 'XYZ' 
-             ELSE A.val 
+          CASE
+             WHEN B.val = 1 THEN 'XYZ'
+             ELSE A.val
           END AS Col1
-        FROM B  
-        LEFT OUTER JOIN A_B ON B.id = A_B.B_id  
+        FROM B
+        LEFT OUTER JOIN A_B ON B.id = A_B.B_id
         LEFT OUTER JOIN A ON A.id = A_B.A_id
         ORDER BY Col1 ASC;
     ]], {
@@ -89,9 +89,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-1.5",
     [[
-        SELECT DISTINCT 
-          b.val, 
-          CASE WHEN b.val = 1 THEN 'xyz' ELSE b.val END AS col1 
+        SELECT DISTINCT
+          b.val,
+          CASE WHEN b.val = 1 THEN 'xyz' ELSE b.val END AS col1
         FROM b;
     ]], {
         -- <tkt3493-1.5>
@@ -102,9 +102,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-1.6",
     [[
-        SELECT DISTINCT 
-          b.val, 
-          CASE WHEN b.val = '1' THEN 'xyz' ELSE b.val END AS col1 
+        SELECT DISTINCT
+          b.val,
+          CASE WHEN b.val = '1' THEN 'xyz' ELSE b.val END AS col1
         FROM b;
     ]], {
         -- <tkt3493-1.6>
@@ -119,14 +119,14 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES('123', 456);
     ]], {
         -- <tkt3493-2.1>
-        
+
         -- </tkt3493-2.1>
     })
 
 test:do_execsql_test(
     "tkt3493-2.2.1",
     [[
-        SELECT a=123 FROM t1 GROUP BY a 
+        SELECT a=123 FROM t1 GROUP BY a
     ]], {
         -- <tkt3493-2.2.1>
         true
@@ -136,7 +136,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-2.2.2",
     [[
-        SELECT a=123 FROM t1 
+        SELECT a=123 FROM t1
     ]], {
         -- <tkt3493-2.2.2>
         true
@@ -146,7 +146,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-2.2.3",
     [[
-        SELECT a='123' FROM t1 
+        SELECT a='123' FROM t1
     ]], {
         -- <tkt3493-2.2.3>
         true
@@ -156,7 +156,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-2.2.4",
     [[
-        SELECT count(*), a=123 FROM t1 
+        SELECT count(*), a=123 FROM t1
     ]], {
         -- <tkt3493-2.2.4>
         1, true
@@ -166,7 +166,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-2.2.5",
     [[
-        SELECT count(*), +a=123 FROM t1 
+        SELECT count(*), +a=123 FROM t1
     ]], {
         -- <tkt3493-2.2.5>
         1, true
@@ -176,7 +176,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-2.3.3",
     [[
-        SELECT b='456' FROM t1 GROUP BY a 
+        SELECT b='456' FROM t1 GROUP BY a
     ]], {
         -- <tkt3493-2.3.3>
         true
@@ -186,7 +186,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-2.3.1",
     [[
-        SELECT b='456' FROM t1 GROUP BY b 
+        SELECT b='456' FROM t1 GROUP BY b
     ]], {
         -- <tkt3493-2.3.1>
         true
@@ -196,7 +196,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-2.3.2",
     [[
-        SELECT b='456' FROM t1 
+        SELECT b='456' FROM t1
     ]], {
         -- <tkt3493-2.3.2>
         true
@@ -206,7 +206,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-2.4.1",
     [[
-        SELECT typeof(a), a FROM t1 GROUP BY a HAVING a=123 
+        SELECT typeof(a), a FROM t1 GROUP BY a HAVING a=123
     ]], {
         -- <tkt3493-2.4.1>
         "string", "123"
@@ -216,7 +216,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-2.4.2",
     [[
-        SELECT typeof(a), a FROM t1 GROUP BY b HAVING a=123 
+        SELECT typeof(a), a FROM t1 GROUP BY b HAVING a=123
     ]], {
         -- <tkt3493-2.4.2>
         "string", "123"
@@ -226,7 +226,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-2.5.1",
     [[
-        SELECT typeof(b), b FROM t1 GROUP BY a HAVING b='456' 
+        SELECT typeof(b), b FROM t1 GROUP BY a HAVING b='456'
     ]], {
         -- <tkt3493-2.5.1>
         "integer", 456
@@ -236,7 +236,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-2.5.2",
     [[
-        SELECT typeof(b), b FROM t1 GROUP BY b HAVING b='456' 
+        SELECT typeof(b), b FROM t1 GROUP BY b HAVING b='456'
     ]], {
         -- <tkt3493-2.5.2>
         "integer", 456
@@ -250,7 +250,7 @@ test:do_execsql_test(
         INSERT INTO t2 VALUES('aBc', 'DeF');
     ]], {
         -- <tkt3493-3.1>
-        
+
         -- </tkt3493-3.1>
     })
 
@@ -258,7 +258,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-3.2.1",
     [[
-        SELECT a='abc' FROM t2 GROUP BY a 
+        SELECT a='abc' FROM t2 GROUP BY a
     ]], {
         -- <tkt3493-3.2.1>
         true
@@ -268,7 +268,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-3.2.2",
     [[
-        SELECT a='abc' FROM t2 
+        SELECT a='abc' FROM t2
     ]], {
         -- <tkt3493-3.2.2>
         true

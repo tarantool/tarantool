@@ -95,8 +95,8 @@ test:do_test(
 --     function()
 --         counter = 0
 --         return test:execsql([[
---             SELECT x, sequence() AS y FROM t1 
---              WHERE y>0 AND y<99 AND y!=55 AND y NOT IN (56,57,58) 
+--             SELECT x, sequence() AS y FROM t1
+--              WHERE y>0 AND y<99 AND y!=55 AND y NOT IN (56,57,58)
 --                AND y NOT LIKE 'abc%' AND y%10==2 order by x desc
 --         ]])
 --     end, {

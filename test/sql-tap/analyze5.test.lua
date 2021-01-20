@@ -84,7 +84,7 @@ test:do_test(
             if  i >= 875 then
                 z = z + 1
             end
-            
+
             local x, w, t, u
             x = z
             w = z
@@ -135,7 +135,7 @@ test:do_test(
 --     "analyze5-1.1",
 --     function()
 --         return test:execsql([[
---             SELECT DISTINCT lower(lindex(test_decode(sample), 0)) 
+--             SELECT DISTINCT lower(lindex(test_decode(sample), 0))
 --               FROM _sql_stat4 WHERE idx='t1v' ORDER BY 1
 --         ]])
 
@@ -246,7 +246,7 @@ for i, v in pairs({
 {'y=1',                t1y,   26},
 {'y=0.1',              t1y,    1},
 
-{'x IS NULL',          t1x,  400},        
+{'x IS NULL',          t1x,  400},
                  }) do
     -- Verify that the expected index is used with the expected row count
     -- No longer valid due to an EXPLAIN QUERY PLAN output format change

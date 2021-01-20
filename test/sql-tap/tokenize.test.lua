@@ -152,7 +152,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "tokenize-2.2",
     [[
-        SELECT 1, 2 /* 
+        SELECT 1, 2 /*
     ]], {
         -- <tokenize-2.2>
         0, {1, 2}

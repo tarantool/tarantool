@@ -13,7 +13,7 @@ test:plan(23)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- 
+--
 -- Test cases for query planning decisions and the likely(), unlikely(), and
 -- likelihood() functions.
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
@@ -65,7 +65,7 @@ test:do_execsql_test(
         INSERT INTO track VALUES(10403, 6, 104, 'Qui tollis');
     ]], {
         -- <whereG-1.0>
-        
+
         -- </whereG-1.0>
     })
 
@@ -233,7 +233,7 @@ test:do_execsql_test(
         CREATE TABLE b(b1  INT PRIMARY KEY, b2 INT );
     ]], {
         -- <whereG-3.0>
-        
+
         -- </whereG-3.0>
     })
 
@@ -269,7 +269,7 @@ test:do_execsql_test(
     })
 
 ---------------------------------------------------------------------------
--- Test that likelihood() specifications on indexed terms are taken into 
+-- Test that likelihood() specifications on indexed terms are taken into
 -- account by various forms of loops.
 --
 --   5.1.*: open ended range scans

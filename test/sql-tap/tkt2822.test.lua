@@ -25,17 +25,17 @@ test:plan(30)
 
 
 -- The ORDER BY matching algorithm is three steps:
--- 
+--
 --   (1)  If the ORDER BY term is an integer constant i, then
 --        sort by the i-th column of the result set.
--- 
+--
 --   (2)  If the ORDER BY term is an identifier (not x.y or x.y.z
 --        but simply x) then look for a column alias with the same
 --        name.  If found, then sort by that column.
--- 
+--
 --   (3)  Evaluate the term as an expression and sort by the
 --        value of the expression.
--- 
+--
 -- For a compound SELECT the rules are modified slightly.
 -- In the third rule, the expression must exactly match one
 -- of the result columns.  The sequences of three rules is
@@ -51,7 +51,7 @@ test:plan(30)
 --
 -- Rule (2) was added by the changes ticket #2822.  Prior to
 -- that changes, sql did not support rule (2), making it
--- technically in violation of standard SQL semantics.  
+-- technically in violation of standard SQL semantics.
 -- No body noticed because rule (3) has the same effect as
 -- rule (2) except in some obscure cases.
 --
@@ -74,7 +74,7 @@ test:do_execsql_test(
         INSERT INTO t2 VALUES(6, 18, 54);
     ]], {
         -- <tkt2822-0.1>
-        
+
         -- </tkt2822-0.1>
     })
 
@@ -93,9 +93,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2822-1.2",
     [[
-        SELECT a, CAST (b AS TEXT), c FROM t1 
-          UNION ALL 
-        SELECT a, b, c FROM t2 
+        SELECT a, CAST (b AS TEXT), c FROM t1
+          UNION ALL
+        SELECT a, b, c FROM t2
           ORDER BY 2;
     ]], {
         -- <tkt2822-1.2>
@@ -118,9 +118,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2822-2.2",
     [[
-        SELECT a, CAST (b AS TEXT) AS x, c FROM t1 
-          UNION ALL 
-        SELECT a, b, c FROM t2 
+        SELECT a, CAST (b AS TEXT) AS x, c FROM t1
+          UNION ALL
+        SELECT a, b, c FROM t2
           ORDER BY x;
     ]], {
         -- <tkt2822-2.2>
@@ -143,9 +143,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2822-3.1",
     [[
-        SELECT a, CAST (b AS TEXT) AS x, c FROM t1 
-          UNION ALL 
-        SELECT a, b, c FROM t2 
+        SELECT a, CAST (b AS TEXT) AS x, c FROM t1
+          UNION ALL
+        SELECT a, b, c FROM t2
           ORDER BY CAST (b AS TEXT);
     ]], {
         -- <tkt2822-3.1>
@@ -168,9 +168,9 @@ test:do_test(
     function()
         -- But the leftmost SELECT takes precedence.
         return test:execsql [[
-            SELECT a AS b, CAST (b AS TEXT) AS a, c FROM t1 
-              UNION ALL 
-            SELECT a, b, c FROM t2 
+            SELECT a AS b, CAST (b AS TEXT) AS a, c FROM t1
+              UNION ALL
+            SELECT a, b, c FROM t2
               ORDER BY a;
         ]]
     end, {
@@ -182,9 +182,9 @@ test:do_test(
 test:do_execsql_test(
     "tkt2822-3.5",
     [[
-        SELECT a, b, c FROM t2 
-          UNION ALL 
-        SELECT a AS b, CAST (b AS TEXT) AS a, c FROM t1 
+        SELECT a, b, c FROM t2
+          UNION ALL
+        SELECT a AS b, CAST (b AS TEXT) AS a, c FROM t1
           ORDER BY a;
     ]], {
         -- <tkt2822-3.5>
@@ -207,7 +207,7 @@ test:do_catchsql_test(
 -- Tests for rule (2).
 --
 -- The "ORDER BY b" should match the column alias (rule 2), not the
--- the t3.b value (rule 3).  
+-- the t3.b value (rule 3).
 --
 test:do_execsql_test(
     "tkt2822-5.1",
@@ -252,7 +252,7 @@ test:do_test(
 
 -- In "ORDER BY +b" the term is now an expression rather than
 -- a label.  It therefore matches by rule (3) instead of rule (2).
--- 
+--
 test:do_execsql_test(
     "tkt2822-5.5",
     [[

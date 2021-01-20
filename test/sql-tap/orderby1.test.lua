@@ -53,7 +53,7 @@ test:do_test(
         ]]
     end, {
         -- <1.0>
-        
+
         -- </1.0>
     })
 
@@ -271,7 +271,7 @@ test:do_test(
         -- </1.6c>
     })
 
--- ORDER BY 
+-- ORDER BY
 -- # Reconstruct the test data to use indices rather than integer primary keys.
 -- #
 -- do_test 2.0 {
@@ -440,7 +440,7 @@ test:do_test(
         ]]
     end, {
         -- <3.0>
-        
+
         -- </3.0>
     })
 
@@ -687,7 +687,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT 5 ORDER BY 1
     ]], {
         -- <5.0>
-        
+
         -- </5.0>
     })
 
@@ -733,7 +733,7 @@ test:do_execsql_test(
         INSERT INTO abc VALUES(4, 5, 6);
         INSERT INTO abc VALUES(7, 8, 9);
         SELECT (
-          SELECT 'hardware' FROM ( 
+          SELECT 'hardware' FROM (
             SELECT 'software' ORDER BY 'firmware' ASC, 'sportswear' DESC
           ) GROUP BY 1 HAVING length(b) <> 0
         )

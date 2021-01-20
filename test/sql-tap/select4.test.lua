@@ -125,7 +125,7 @@ test:do_execsql_test(
 
 -- do_test select4-1.1g {
 --   execsql {
---     CREATE TABLE t2 AS 
+--     CREATE TABLE t2 AS
 --       SELECT DISTINCT log FROM t1
 --       UNION ALL
 --       SELECT n FROM t1 WHERE log=2;
@@ -136,7 +136,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select4-1.2",
     [[
-        SELECT log FROM t1 WHERE n IN 
+        SELECT log FROM t1 WHERE n IN
           (SELECT DISTINCT log FROM t1 UNION ALL
            SELECT n FROM t1 WHERE log=3)
         ORDER BY log;
@@ -193,7 +193,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select4-2.2",
     [[
-        SELECT log FROM t1 WHERE n IN 
+        SELECT log FROM t1 WHERE n IN
           (SELECT DISTINCT log FROM t1 UNION
            SELECT n FROM t1 WHERE log=3)
         ORDER BY log;
@@ -255,7 +255,7 @@ test:do_execsql_test(
 
 -- do_test select4-3.1.2 {
 --   execsql {
---     CREATE TABLE t2 AS 
+--     CREATE TABLE t2 AS
 --       SELECT DISTINCT log FROM t1
 --       EXCEPT
 --       SELECT n FROM t1 WHERE log=3
@@ -266,7 +266,7 @@ test:do_execsql_test(
 -- execsql {DROP TABLE t2}
 -- do_test select4-3.1.3 {
 --   execsql {
---     CREATE TABLE t2 AS 
+--     CREATE TABLE t2 AS
 --       SELECT DISTINCT log FROM t1
 --       EXCEPT
 --       SELECT n FROM t1 WHERE log=3
@@ -278,7 +278,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select4-3.2",
     [[
-        SELECT log FROM t1 WHERE n IN 
+        SELECT log FROM t1 WHERE n IN
           (SELECT DISTINCT log FROM t1 EXCEPT
            SELECT n FROM t1 WHERE log=3)
         ORDER BY log;
@@ -358,7 +358,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select4-4.2",
     [[
-        SELECT log FROM t1 WHERE n IN 
+        SELECT log FROM t1 WHERE n IN
           (SELECT DISTINCT log FROM t1 INTERSECT
            SELECT n FROM t1 WHERE log=3)
         ORDER BY log;
@@ -390,7 +390,7 @@ test:do_catchsql_test(
           SELECT 0 ORDER BY 1
           INTERSECT
           SELECT 1
-          INTERSECT 
+          INTERSECT
           SELECT 2
           ORDER BY 1
         );
@@ -699,7 +699,7 @@ test:do_execsql_test(
         SELECT NULL EXCEPT SELECT NULL
     ]], {
         -- <select4-6.7>
-        
+
         -- </select4-6.7>
     })
 
@@ -714,7 +714,7 @@ INSERT INTO t2 VALUES (0, 1), (1, 1), (2, 2), (3, 4), (4, 8), (5, 15);]]
 --     CREATE TABLE t2 AS SELECT log AS 'x', count INT (*) AS 'y' FROM t1 GROUP BY log;
 --     SELECT * FROM t2 ORDER BY x;
 --   }
--- } {0 1 1 1 2 2 3 4 4 8 5 15}  
+-- } {0 1 1 1 2 2 3 4 4 8 5 15}
 test:do_execsql2_test(
     "select4-7.2",
     [[
@@ -911,7 +911,7 @@ test:do_execsql2_test(
          WHERE b=3
     ]], {
         -- <select4-9.9.2>
-        
+
         -- </select4-9.9.2>
     })
 
@@ -980,7 +980,7 @@ test:do_execsql_test(
         SELECT DISTINCT log FROM t1 ORDER BY log LIMIT 0
     ]], {
         -- <select4-10.3>
-        
+
         -- </select4-10.3>
     })
 
@@ -1038,7 +1038,7 @@ test:do_execsql_test(
         SELECT DISTINCT log FROM t1 ORDER BY +log LIMIT 3 OFFSET 20
     ]], {
         -- <select4-10.7>
-        
+
         -- </select4-10.7>
     })
 
@@ -1048,7 +1048,7 @@ test:do_execsql_test(
         SELECT DISTINCT log FROM t1 ORDER BY log LIMIT 0 OFFSET 3
     ]], {
         -- <select4-10.8>
-        
+
         -- </select4-10.8>
     })
 
@@ -1372,7 +1372,7 @@ test:do_execsql_test(
         SELECT * FROM t14 EXCEPT VALUES(1,2,3) EXCEPT VALUES(4,5,6)
     ]], {
         -- <select4-14.7>
-        
+
         -- </select4-14.7>
     })
 

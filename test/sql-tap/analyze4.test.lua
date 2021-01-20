@@ -16,7 +16,7 @@ test:plan(4)
 --
 -- This file implements regression tests for sql library. This file
 -- implements tests for ANALYZE to verify that multiple rows containing
--- a NULL value count as distinct rows for the purposes of analyze 
+-- a NULL value count as distinct rows for the purposes of analyze
 -- statistics.
 --
 -- Also include test cases for collating sequences on indices.
@@ -62,7 +62,7 @@ test:do_execsql_test(
     })
 
 -- Change half of the b values from NULL to a constant.  Verify
--- that the number of rows selected in stat1 is half the total 
+-- that the number of rows selected in stat1 is half the total
 -- number of rows.
 --
 test:do_test(
@@ -82,7 +82,7 @@ test:do_test(
     })
 
 -- Change the t1.b values all back to NULL.  Add columns t1.c and t1.d.
--- Create a multi-column indices using t1.b and verify that ANALYZE 
+-- Create a multi-column indices using t1.b and verify that ANALYZE
 -- processes them correctly.
 --
 test:do_execsql_test(

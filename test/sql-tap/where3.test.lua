@@ -113,7 +113,7 @@ test:do_test(
 
 
 
--- This procedure executes the SQL.  Then it appends 
+-- This procedure executes the SQL.  Then it appends
 -- the names of the table and index used
 --
 local function queryplan(sql)
@@ -158,8 +158,8 @@ local function queryplan(sql)
 end
 
 -- If you have a from clause of the form:   A B C left join D
--- then make sure the query optimizer is able to reorder the 
--- A B C part anyway it wants. 
+-- then make sure the query optimizer is able to reorder the
+-- A B C part anyway it wants.
 --
 -- Following the fix to ticket #1652, there was a time when
 -- the C table would not reorder.  So the following reorderings
@@ -344,7 +344,7 @@ test:do_test(
 -- If the outer loop must be a full table scan, do not let ANALYZE trick
 -- the planner into use a table for the outer loop that might be indexable
 -- if held until an inner loop.
--- 
+--
 test:do_execsql_test(
     "where3-3.0",
     [[
@@ -357,7 +357,7 @@ test:do_execsql_test(
         SELECT * FROM t302, t301 WHERE t302.x=5 AND t301.a=t302.y;
     ]], {
         -- <where3-3.0>
-        
+
         -- </where3-3.0>
     })
 
@@ -367,7 +367,7 @@ test:do_execsql_test(
         SELECT * FROM t301, t302 WHERE t302.x=5 AND t301.a=t302.y;
     ]], {
         -- <where3-3.1>
-        
+
         -- </where3-3.1>
     })
 
@@ -377,7 +377,7 @@ test:do_execsql_test(
         SELECT * FROM t301 WHERE c=3 AND a IS NULL;
     ]], {
         -- <where3-3.2>
-        
+
         -- </where3-3.2>
     })
 
@@ -459,55 +459,55 @@ test:do_execsql_test(
         CREATE INDEX bbb_222 ON bbb (parent, position);
         CREATE INDEX bbb_333 ON bbb (fk, lastModified);
 
-         SELECT bbb.title AS tag_title 
-           FROM aaa JOIN bbb ON bbb.id = aaa.parent  
+         SELECT bbb.title AS tag_title
+           FROM aaa JOIN bbb ON bbb.id = aaa.parent
           WHERE aaa.fk = 'constant'
             AND LENGTH(bbb.title) > 0
             AND bbb.parent = 4
           ORDER BY bbb.title COLLATE "unicode_ci" ASC;
     ]], {
         -- <where3-5.0>
-        
+
         -- </where3-5.0>
     })
 
 -- do_execsql_test where3-5.1 {
 --   EXPLAIN QUERY PLAN
---    SELECT bbb.title AS tag_title 
---      FROM aaa JOIN aaa AS bbb ON bbb.id = aaa.parent  
+--    SELECT bbb.title AS tag_title
+--      FROM aaa JOIN aaa AS bbb ON bbb.id = aaa.parent
 --     WHERE aaa.fk = 'constant'
 --       AND LENGTH(bbb.title) > 0
 --       AND bbb.parent = 4
 --     ORDER BY bbb.title COLLATE NOCASE ASC;
 -- } {
---   0 0 0 {SEARCH TABLE aaa USING INDEX aaa_333 (fk=?)} 
---   0 1 1 {SEARCH TABLE aaa AS bbb USING INTEGER PRIMARY KEY (rowid=?)} 
+--   0 0 0 {SEARCH TABLE aaa USING INDEX aaa_333 (fk=?)}
+--   0 1 1 {SEARCH TABLE aaa AS bbb USING INTEGER PRIMARY KEY (rowid=?)}
 --   0 0 0 {USE TEMP B-TREE FOR ORDER BY}
 -- }
 -- do_execsql_test where3-5.2 {
 --   EXPLAIN QUERY PLAN
---    SELECT bbb.title AS tag_title 
---      FROM bbb JOIN aaa ON bbb.id = aaa.parent  
+--    SELECT bbb.title AS tag_title
+--      FROM bbb JOIN aaa ON bbb.id = aaa.parent
 --     WHERE aaa.fk = 'constant'
 --       AND LENGTH(bbb.title) > 0
 --       AND bbb.parent = 4
 --     ORDER BY bbb.title COLLATE NOCASE ASC;
 -- } {
---   0 0 1 {SEARCH TABLE aaa USING INDEX aaa_333 (fk=?)} 
---   0 1 0 {SEARCH TABLE bbb USING INTEGER PRIMARY KEY (rowid=?)} 
+--   0 0 1 {SEARCH TABLE aaa USING INDEX aaa_333 (fk=?)}
+--   0 1 0 {SEARCH TABLE bbb USING INTEGER PRIMARY KEY (rowid=?)}
 --   0 0 0 {USE TEMP B-TREE FOR ORDER BY}
 -- }
 -- do_execsql_test where3-5.3 {
 --   EXPLAIN QUERY PLAN
---    SELECT bbb.title AS tag_title 
---      FROM aaa AS bbb JOIN aaa ON bbb.id = aaa.parent  
+--    SELECT bbb.title AS tag_title
+--      FROM aaa AS bbb JOIN aaa ON bbb.id = aaa.parent
 --     WHERE aaa.fk = 'constant'
 --       AND LENGTH(bbb.title) > 0
 --       AND bbb.parent = 4
 --     ORDER BY bbb.title COLLATE NOCASE ASC;
 -- } {
---   0 0 1 {SEARCH TABLE aaa USING INDEX aaa_333 (fk=?)} 
---   0 1 0 {SEARCH TABLE aaa AS bbb USING INTEGER PRIMARY KEY (rowid=?)} 
+--   0 0 1 {SEARCH TABLE aaa USING INDEX aaa_333 (fk=?)}
+--   0 1 0 {SEARCH TABLE aaa AS bbb USING INTEGER PRIMARY KEY (rowid=?)}
 --   0 0 0 {USE TEMP B-TREE FOR ORDER BY}
 -- }
 -- Name resolution with NATURAL JOIN and USING
@@ -535,7 +535,7 @@ test:do_test(
         ]]
     end, {
         -- <where3-6.setup>
-        
+
         -- </where3-6.setup>
     })
 
@@ -649,7 +649,7 @@ test:do_execsql_test(
         INSERT INTO t74 VALUES(234,678);
     ]], {
         -- <where3-7-setup>
-        
+
         -- </where3-7-setup>
     })
 
@@ -671,7 +671,7 @@ local disabled_opt = "none"
         [[
             SELECT x1 FROM t71 LEFT JOIN t72 ON x2=y1 WHERE y2 IS NULL;
         ]], {
-            
+
         })
 
     test:do_execsql_test(

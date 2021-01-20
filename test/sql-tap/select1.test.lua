@@ -351,7 +351,7 @@ test:do_test(
         local v = pcall(function()
             msg = test:execsql "SELECT LEAST(f1,f2) FROM test1"
             end)
-        v = v == true and {0} or {1} 
+        v = v == true and {0} or {1}
         return table.insert(v,table.sort(msg) or msg) or v
     end, {
         -- <select1-2.8>
@@ -416,7 +416,7 @@ test:do_test(
         local v = pcall(function()
             msg = test:execsql "SELECT GREATEST(f1,f2) FROM test1"
             end)
-        v = v == true and {0} or {1} 
+        v = v == true and {0} or {1}
         return table.insert(v,table.sort(msg) or msg) or v
     end, {
         -- <select1-2.11>
@@ -431,7 +431,7 @@ test:do_test(
         local v = pcall(function()
             msg = test:execsql "SELECT GREATEST(f1,f2)+1 FROM test1"
             end)
-        v = v == true and {0} or {1} 
+        v = v == true and {0} or {1}
         return table.insert(v,table.sort(msg) or msg) or v
     end, {
         -- <select1-2.12>
@@ -623,7 +623,7 @@ test:do_test(
         local v = pcall(function()
             msg = test:execsql "SELECT f1 FROM test1 WHERE f1>=11"
             end)
-        v = v == true and {0} or {1} 
+        v = v == true and {0} or {1}
         return table.insert(v,table.sort(msg) or msg) or v
     end, {
         -- <select1-3.4>
@@ -638,7 +638,7 @@ test:do_test(
         local v = pcall(function()
             msg = test:execsql "SELECT f1 FROM test1 WHERE f1>11"
             end)
-        v = v == true and {0} or {1} 
+        v = v == true and {0} or {1}
         return table.insert(v,table.sort(msg) or msg) or v
     end, {
         -- <select1-3.5>
@@ -653,7 +653,7 @@ test:do_test(
         local v = pcall(function()
             msg = test:execsql "SELECT f1 FROM test1 WHERE f1!=11"
             end)
-        v = v == true and {0} or {1} 
+        v = v == true and {0} or {1}
         return table.insert(v,table.sort(msg) or msg) or v
     end, {
         -- <select1-3.6>
@@ -668,7 +668,7 @@ test:do_test(
         local v = pcall(function()
             msg = test:execsql "SELECT f1 FROM test1 WHERE LEAST(f1,f2)!=11"
             end)
-        v = v == true and {0} or {1} 
+        v = v == true and {0} or {1}
         return table.insert(v,table.sort(msg) or msg) or v
     end, {
         -- <select1-3.7>
@@ -683,7 +683,7 @@ test:do_test(
         local v = pcall(function()
             msg = test:execsql "SELECT f1 FROM test1 WHERE GREATEST(f1,f2)!=11"
             end)
-        v = v == true and {0} or {1} 
+        v = v == true and {0} or {1}
         return table.insert(v,table.sort(msg) or msg) or v
     end, {
         -- <select1-3.8>
@@ -957,7 +957,7 @@ test:do_test(
         local v = pcall(function()
             msg = test:execsql2 "SELECT DISTINCT * FROM test1 WHERE f1==11"
             end)
-        v = v == true and {0} or {1} 
+        v = v == true and {0} or {1}
         set_full_column_names(false)
         return table.insert(v,msg) or v
     end, {
@@ -1065,7 +1065,7 @@ test:do_test(
 
 test:do_catchsql2_test(
     "select1-6.6",
-    [[SELECT test1.f1+F2, t1 FROM test1, test2 
+    [[SELECT test1.f1+F2, t1 FROM test1, test2
          ORDER BY f2]], {
         -- <select1-6.6>
         0, {"COLUMN_1",33,"T1","abc","COLUMN_1",77,"T1","abc"}
@@ -1074,7 +1074,7 @@ test:do_catchsql2_test(
 
 test:do_catchsql2_test(
     "select1-6.7",
-    [[SELECT A.f1, t1 FROM test1 as A, test2 
+    [[SELECT A.f1, t1 FROM test1 as A, test2
          ORDER BY f2]], {
         -- <select1-6.7>
         0, {"F1", 11, "T1", "abc", "F1", 33, "T1", "abc"}
@@ -1083,7 +1083,7 @@ test:do_catchsql2_test(
 
 test:do_catchsql2_test(
     "select1-6.8",
-    [[SELECT A.f1, f1 FROM test1 as A, test1 as B 
+    [[SELECT A.f1, f1 FROM test1 as A, test1 as B
          ORDER BY f2]], {
         -- <select1-6.8>
         1, "ambiguous column name: F1"
@@ -1092,7 +1092,7 @@ test:do_catchsql2_test(
 
 test:do_catchsql2_test(
     "select1-6.8b",
-    [[SELECT A.f1, B.f1 FROM test1 as A, test1 as B 
+    [[SELECT A.f1, B.f1 FROM test1 as A, test1 as B
          ORDER BY f2]], {
         -- <select1-6.8b>
         1, "ambiguous column name: F2"
@@ -1101,7 +1101,7 @@ test:do_catchsql2_test(
 
 test:do_catchsql2_test(
     "select1-6.8c",
-    [[SELECT A.f1, f1 FROM test1 as A, test1 as A 
+    [[SELECT A.f1, f1 FROM test1 as A, test1 as A
          ORDER BY f2]], {
         -- <select1-6.8c>
         1, "ambiguous column name: A.F1"
@@ -1110,7 +1110,7 @@ test:do_catchsql2_test(
 
 test:do_catchsql_test(
     "select1-6.9.1",
-    [[SELECT A.f1, B.f1 FROM test1 as A, test1 as B 
+    [[SELECT A.f1, B.f1 FROM test1 as A, test1 as B
          ORDER BY A.f1, B.f1]], {
         -- <select1-6.9.1>
         0, {11, 11, 11, 33, 33, 11, 33, 33}
@@ -1334,7 +1334,7 @@ test:do_catchsql2_test(
                 INSERT INTO t6 VALUES('b','1');
                 INSERT INTO t6 VALUES('c','2');
                 INSERT INTO t6 VALUES('d','3');
-                SELECT a FROM t6 WHERE b IN 
+                SELECT a FROM t6 WHERE b IN
                    (SELECT b FROM t6 WHERE a<='b' UNION SELECT '3' AS x
                             ORDER BY 1 LIMIT 1)
             ]], {
@@ -1346,7 +1346,7 @@ test:do_catchsql2_test(
         test:do_execsql_test(
             "select1-6.21",
             [[
-                SELECT a FROM t6 WHERE b IN 
+                SELECT a FROM t6 WHERE b IN
                    (SELECT b FROM t6 WHERE a<='b' UNION SELECT '3' AS x
                             ORDER BY 1 DESC LIMIT 1)
             ]], {
@@ -1358,7 +1358,7 @@ test:do_catchsql2_test(
         test:do_execsql_test(
             "select1-6.22",
             [[
-                SELECT a FROM t6 WHERE b IN 
+                SELECT a FROM t6 WHERE b IN
                    (SELECT b FROM t6 WHERE a<='b' UNION SELECT '3' AS x
                             ORDER BY b LIMIT 2)
                 ORDER BY a;
@@ -1371,7 +1371,7 @@ test:do_catchsql2_test(
         test:do_catchsql_test(
             "select1-6.23",
             [[
-                SELECT a FROM t6 WHERE b IN 
+                SELECT a FROM t6 WHERE b IN
                    (SELECT b FROM t6 WHERE a<='b' UNION SELECT '3' AS x
                             ORDER BY x DESC LIMIT 2)
                 ORDER BY a;
@@ -1885,7 +1885,7 @@ test:do_execsql_test(
         INSERT INTO t3 VALUES(0,'1','2');
     ]], {
         -- <select1-12.4>
-        
+
         -- </select1-12.4>
     })
 
@@ -1909,7 +1909,7 @@ test:do_execsql_test(
             -- </select1-12.6>
         })
 
-    -- 
+    --
 
 
 -- ifcapable compound
@@ -1999,7 +1999,7 @@ test:do_test(
 -- db close
 -- sql db test.db
 -- do_test select1-14.1 {
---   execsql { 
+--   execsql {
 --     SELECT * FROM sql_master WHERE rowid>10;
 --     SELECT * FROM sql_master WHERE rowid=10;
 --     SELECT * FROM sql_master WHERE rowid<10;
@@ -2009,7 +2009,7 @@ test:do_test(
 --   }
 -- } {}
 -- do_test select1-14.2 {
---   execsql { 
+--   execsql {
 --     SELECT 10 IN (SELECT rowid FROM sql_master);
 --   }
 -- } {0}
@@ -2032,7 +2032,7 @@ test:do_test(
             INSERT INTO t1 VALUES(3, 3);
         ]], {
             -- <select1-15.1>
-            
+
             -- </select1-15.1>
         })
 
@@ -2044,7 +2044,7 @@ test:do_test(
     test:do_execsql_test(
         "select1-15.3",
         [[
-            SELECT 2 IN (SELECT a FROM t1) 
+            SELECT 2 IN (SELECT a FROM t1)
         ]], {
             -- <select1-15.3>
             true

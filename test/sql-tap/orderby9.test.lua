@@ -14,7 +14,7 @@ test:plan(4)
 --
 -------------------------------------------------------------------------
 -- This file implements regression tests for sql library.
--- 
+--
 -- This file seeks to verify that expressions (and especially functions)
 -- that are in both the ORDER BY clause and the result set are only
 -- evaluated once.
@@ -36,7 +36,7 @@ test:do_test(
     1.0,
     function()
         -- If random() is only evaluated once and then reused for each row, then
-        -- the output should appear in sorted order.  If random() is evaluated 
+        -- the output should appear in sorted order.  If random() is evaluated
         -- separately for the result set and the ORDER BY clause, then the output
         -- order will be random.
         local l1 = test:execsql("SELECT random() AS y FROM t1 ORDER BY 1;")

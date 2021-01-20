@@ -20,9 +20,9 @@ test:plan(1)
 -- The problem described by this ticket was that the sqlExprCompare()
 -- function was saying that expressions (x='a') and (x='A') were identical
 -- because it was using sqlStrICmp() instead of strcmp() to compare string
--- literals.  That was causing the query optimizer for aggregate queries to 
--- believe that both count() operations were identical, and thus only 
--- computing the first count() and making a copy of the result for the 
+-- literals.  That was causing the query optimizer for aggregate queries to
+-- believe that both count() operations were identical, and thus only
+-- computing the first count() and making a copy of the result for the
 -- second count().
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]

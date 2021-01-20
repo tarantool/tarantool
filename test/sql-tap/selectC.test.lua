@@ -288,10 +288,10 @@ test:do_execsql_test(
 --     INSERT INTO person VALUES('lakeside', 'amy', NULL);
 --     INSERT INTO person VALUES('lake-apts', 'tom', NULL);
 --     INSERT INTO person VALUES('acorn', 'hideo', 'CQB421');
---     SELECT 
---       org_id, 
+--     SELECT
+--       org_id,
 --       count((NOT (org_id IS NULL)) AND (NOT (nickname IS NULL)))
---     FROM person 
+--     FROM person
 --     WHERE (CASE WHEN license != '' THEN 1 ELSE 0 END)
 --     GROUP BY 1;
 --   }

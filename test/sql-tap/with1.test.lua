@@ -20,7 +20,7 @@ test:plan(64)
 -- ["source",[["testdir"],"\/tester.tcl"]]
 -- if X(0, "X!capable", [["!cte"]]) then
 --   test:finish_test()
---  return 
+--  return
 -- end
 
 test:do_execsql_test(1.0, [[
@@ -44,7 +44,7 @@ test:do_execsql_test(1.2, [[
   WITH x(a) AS ( SELECT * FROM t1) INSERT INTO t1 VALUES(1,1,2);
 ]], {
   -- <1.2>
-  
+
   -- </1.2>
 })
 
@@ -52,7 +52,7 @@ test:do_execsql_test(1.3, [[
   WITH x(a) AS ( SELECT * FROM t1) DELETE FROM t1;
 ]], {
   -- <1.3>
-  
+
   -- </1.3>
 })
 
@@ -60,7 +60,7 @@ test:do_execsql_test(1.4, [[
   WITH x(a) AS ( SELECT * FROM t1) UPDATE t1 SET x = y;
 ]], {
   -- <1.4>
-  
+
   -- </1.4>
 })
 
@@ -470,7 +470,7 @@ test:do_execsql_test(7.2, [[
     SELECT i, '' FROM tree WHERE p IS NULL
     UNION ALL
     SELECT i, path || '/' || CAST(i as TEXT) FROM tree, t WHERE p = id
-  ) 
+  )
   SELECT path FROM t;
 ]], {
   -- <7.2>
@@ -483,7 +483,7 @@ test:do_execsql_test(7.3, [[
     VALUES(2)
     UNION ALL
     SELECT i FROM tree, t WHERE p = id
-  ) 
+  )
   SELECT id FROM t;
 ]], {
   -- <7.3>
@@ -496,7 +496,7 @@ test:do_catchsql_test(7.4, [[
     VALUES(2)
     UNION ALL
     SELECT i FROM tree WHERE p IN (SELECT id FROM t)
-  ) 
+  )
   SELECT id FROM t;
 ]], {
   -- <7.4>
@@ -509,7 +509,7 @@ test:do_catchsql_test(7.5, [[
     VALUES(2)
     UNION ALL
     SELECT i FROM tree, t WHERE p = id AND p IN (SELECT id FROM t)
-  ) 
+  )
   SELECT id FROM t;
 ]], {
   -- <7.5>
@@ -522,7 +522,7 @@ test:do_catchsql_test(7.6, [[
     SELECT i FROM tree WHERE 2 IN (SELECT id FROM t)
     UNION ALL
     SELECT i FROM tree, t WHERE p = id
-  ) 
+  )
   SELECT id FROM t;
 ]], {
   -- <7.6>
@@ -539,7 +539,7 @@ test:do_execsql_test("8.1-mandelbrot", [[
     m(iter, cx, cy, x, y) AS (
       SELECT 0, x, y, 0.0, 0.0 FROM xaxis, yaxis
       UNION ALL
-      SELECT iter+1, cx, cy, x*x-y*y + cx, 2.0*x*y + cy FROM m 
+      SELECT iter+1, cx, cy, x*x-y*y + cx, 2.0*x*y + cy FROM m
        WHERE (x*x + y*y) < 4.0 AND iter<28
     ),
     m2(iter, cx, cy) AS (
@@ -702,7 +702,7 @@ limit_test(9.7, 40, -1)
 --   )
 --   SELECT p FROM flat ORDER BY p;
 -- } {
---   /a /a/a /a/a/a 
+--   /a /a/a /a/a/a
 --      /a/b /a/b/c /a/b/c/d
 --           /a/b/d
 -- }
@@ -712,10 +712,10 @@ limit_test(9.7, 40, -1)
 -- proc scan_tree {bDepthFirst bReverse} {
 --   set order "ORDER BY "
 --   if {$bDepthFirst==0} { append order "2 ASC," }
---   if {$bReverse==0} { 
---     append order " 3 ASC" 
+--   if {$bReverse==0} {
+--     append order " 3 ASC"
 --   } else {
---     append order " 3 DESC" 
+--     append order " 3 DESC"
 --   }
 --   db eval "
 --     WITH flat(fid, depth, p) AS (
@@ -750,7 +750,7 @@ limit_test(9.7, 40, -1)
 --   scan_tree 1 0
 -- } [list {*}{
 --   /a /a/b /a/b/c
---      /a/d /a/d/e 
+--      /a/d /a/d/e
 --           /a/d/f
 --   /g /g/h
 -- }]
@@ -759,9 +759,9 @@ limit_test(9.7, 40, -1)
 -- do_test 10.5 {
 --   scan_tree 0 1
 -- } [list {*}{
---   /g /a 
---   /g/h /a/d /a/b 
---   /a/d/f /a/d/e /a/b/c 
+--   /g /a
+--   /g/h /a/d /a/b
+--   /a/d/f /a/d/e /a/b/c
 -- }]
 -- # Depth first, siblings in ascending order.
 -- #
@@ -769,8 +769,8 @@ limit_test(9.7, 40, -1)
 --   scan_tree 1 1
 -- } [list {*}{
 --   /g /g/h
---   /a /a/d /a/d/f 
---           /a/d/e 
+--   /a /a/d /a/d/f
+--           /a/d/e
 --      /a/b /a/b/c
 -- }]
 -- Test name resolution in ORDER BY clauses.
@@ -778,7 +778,7 @@ limit_test(9.7, 40, -1)
 test:do_catchsql_test("10.7.1", [[
   WITH t(a) AS (
     SELECT 1 AS b UNION ALL SELECT a+1 AS c FROM t WHERE a<5 ORDER BY a
-  ) 
+  )
   SELECT * FROM t
 ]], {
   -- <10.7.1>
@@ -789,7 +789,7 @@ test:do_catchsql_test("10.7.1", [[
 test:do_execsql_test("10.7.2", [[
   WITH t(a) AS (
     SELECT 1 AS b UNION ALL SELECT a+1 AS c FROM t WHERE a<5 ORDER BY b
-  ) 
+  )
   SELECT * FROM t
 ]], {
   -- <10.7.2>
@@ -824,7 +824,7 @@ test:do_execsql_test("10.7.2", [[
 -- }
 -- do_execsql_test 10.8.2 {
 --   WITH flat(fid, depth, p) AS (
---       SELECT id, 1, ('/' || payload) COLLATE nocase 
+--       SELECT id, 1, ('/' || payload) COLLATE nocase
 --       FROM tree WHERE parentid IS NULL
 --     UNION ALL
 --       SELECT id, depth+1, (p||'/'||payload)
@@ -841,7 +841,7 @@ test:do_execsql_test("10.7.2", [[
 --       SELECT id, 1, ('/' || payload)
 --       FROM tree WHERE parentid IS NULL
 --     UNION ALL
---       SELECT id, depth+1, (p||'/'||payload) COLLATE nocase 
+--       SELECT id, depth+1, (p||'/'||payload) COLLATE nocase
 --       FROM flat, tree WHERE parentid=fid
 --     ORDER BY 2, 3
 --   )
@@ -909,7 +909,7 @@ test:do_execsql_test("10.8.4.3", [[
 --   INSERT INTO org VALUES('Xia','Xaviar');
 --   INSERT INTO org VALUES('Xerxes','Xaviar');
 --   INSERT INTO org VALUES('Xena','Xia');
---   -- Find all members of Alice's group, breath-first order  
+--   -- Find all members of Alice's group, breath-first order
 --   WITH RECURSIVE
 --     under_alice(name,level) AS (
 --        VALUES('Alice','0')
@@ -997,7 +997,7 @@ test:do_execsql_test("10.8.4.3", [[
 -- .........Olivia}}
 ----------------------------------------------------------------------------
 -- Ticket [31a19d11b97088296ac104aaff113a9790394927] (2014-02-09)
--- Name resolution issue with compound SELECTs and Common Table Expressions 
+-- Name resolution issue with compound SELECTs and Common Table Expressions
 --
 test:do_execsql_test(12.1, [[
   WITH RECURSIVE
@@ -1046,7 +1046,7 @@ test:do_execsql_test(14.1, [[
   WITH x AS (SELECT * FROM t) SELECT 0 EXCEPT SELECT 0 ORDER BY 1;
 ]], {
   -- <14.1>
-  
+
   -- </14.1>
 })
 

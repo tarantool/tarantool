@@ -16,7 +16,7 @@ test:plan(1)
 -- This file implements regression tests for sql library.
 --
 -- This file implements tests to verify that ticket #1514 is
--- fixed.  
+-- fixed.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]

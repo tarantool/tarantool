@@ -90,7 +90,7 @@ test:do_execsql_test(
     "subquery2-1.21",
     [[
         SELECT a FROM t1
-         WHERE +b=(SELECT x+1 FROM 
+         WHERE +b=(SELECT x+1 FROM
                      (SELECT DISTINCT f/d AS x FROM t2 JOIN t3 ON d*a=f))
     ]], {
         -- <subquery2-1.21>
@@ -102,7 +102,7 @@ test:do_execsql_test(
     "subquery2-1.22",
     [[
         SELECT a FROM t1
-         WHERE b=(SELECT x+1 FROM 
+         WHERE b=(SELECT x+1 FROM
                      (SELECT DISTINCT f/d AS x FROM t2 JOIN t3 ON d*a=f))
     ]], {
         -- <subquery2-1.22>
@@ -129,7 +129,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     2.2,
     [[
-        SELECT * 
+        SELECT *
         FROM (SELECT * FROM t4 ORDER BY a LIMIT 1000000 OFFSET 1)
         LIMIT (SELECT a FROM t5)
     ]], {
@@ -140,7 +140,7 @@ test:do_execsql_test(
 
 -----------------------------------------------------------------------------
 -- Ticket http://www.sql.org/src/info/d11a6e908f (2014-09-20)
--- Query planner fault on three-way nested join with compound inner SELECT 
+-- Query planner fault on three-way nested join with compound inner SELECT
 --
 test:do_execsql_test(
     3.0,

@@ -12,7 +12,7 @@ test:plan(7)
 -------------------------------------------------------------------------
 --
 -- This file contains tests for sql. Specifically, it tests that sql
--- does not crash and an error is returned if localhost() fails. This 
+-- does not crash and an error is returned if localhost() fails. This
 -- is the problem reported by ticket 91e2e8ba6f.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
@@ -24,7 +24,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(11, 11);
     ]], {
         -- <1.1>
-        
+
         -- </1.1>
     })
 
@@ -71,7 +71,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     1.6,
     [[
-        SELECT a.x/10, a.y/10 FROM 
+        SELECT a.x/10, a.y/10 FROM
           (SELECT * FROM t1 LIMIT 5 OFFSET 0) AS a, t1 AS b WHERE a.x = b.x
         LIMIT 5 OFFSET 0;
     ]], {

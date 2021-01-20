@@ -18,7 +18,7 @@ test:plan(6)
 --
 -- $Id: tkt2640.test,v 1.3 2008/08/04 03:51:24 danielk1977 Exp $
 --
--- The problem in ticket #2640 was that the query optimizer was 
+-- The problem in ticket #2640 was that the query optimizer was
 -- not recognizing all uses of tables within subqueries in the
 -- WHERE clause.  If the subquery contained a compound SELECT,
 -- then tables that were used by terms of the compound other than

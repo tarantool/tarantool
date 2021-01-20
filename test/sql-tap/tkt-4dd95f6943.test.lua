@@ -139,7 +139,7 @@ for tn1, idx in ipairs(indexes) do
         test:do_execsql_test(
             string.format("2.%s.%s.5", tn1, tn2),
             string.format([[
-                SELECT a, x, y FROM t2, t3 WHERE a = 4 AND x = 1 AND y IN %s 
+                SELECT a, x, y FROM t2, t3 WHERE a = 4 AND x = 1 AND y IN %s
                 ORDER BY a, x ASC, y ASC;
             ]], inexpr), {
                 4, 1, 2, 4, 1, 4, 4, 1, 5
@@ -148,7 +148,7 @@ for tn1, idx in ipairs(indexes) do
         test:do_execsql_test(
             string.format("2.%s.%s.6", tn1, tn2),
             string.format([[
-                SELECT a, x, y FROM t2, t3 WHERE a = 2 AND x = 1 AND y IN %s 
+                SELECT a, x, y FROM t2, t3 WHERE a = 2 AND x = 1 AND y IN %s
                 ORDER BY x ASC, y ASC;
             ]], inexpr), {
                 2, 1, 2, 2, 1, 4, 2, 1, 5
@@ -157,7 +157,7 @@ for tn1, idx in ipairs(indexes) do
         test:do_execsql_test(
             string.format("2.%s.%s.7", tn1, tn2),
             string.format([[
-                SELECT a, x, y FROM t2, t3 WHERE a = 4 AND x = 1 AND y IN %s 
+                SELECT a, x, y FROM t2, t3 WHERE a = 4 AND x = 1 AND y IN %s
                 ORDER BY a, x ASC, y DESC;
             ]], inexpr), {
                 4, 1, 5, 4, 1, 4, 4, 1, 2
@@ -166,7 +166,7 @@ for tn1, idx in ipairs(indexes) do
         test:do_execsql_test(
             "2."..tn1..".8",
             string.format([[
-                SELECT a, x, y FROM t2, t3 WHERE a = 2 AND x = 1 AND y IN %s 
+                SELECT a, x, y FROM t2, t3 WHERE a = 2 AND x = 1 AND y IN %s
                 ORDER BY x ASC, y DESC;
             ]], inexpr), {
                 2, 1, 5, 2, 1, 4, 2, 1, 2
@@ -175,7 +175,7 @@ for tn1, idx in ipairs(indexes) do
         test:do_execsql_test(
             string.format("2.%s.%s.9", tn1, tn2),
             string.format([[
-                SELECT a, x, y FROM t2, t3 WHERE a = 4 AND x = 1 AND y IN %s 
+                SELECT a, x, y FROM t2, t3 WHERE a = 4 AND x = 1 AND y IN %s
                 ORDER BY a, x DESC, y ASC;
             ]], inexpr), {
                 4, 1, 2, 4, 1, 4, 4, 1, 5
@@ -184,7 +184,7 @@ for tn1, idx in ipairs(indexes) do
         test:do_execsql_test(
             "2."..tn1..".10",
             string.format([[
-                SELECT a, x, y FROM t2, t3 WHERE a = 2 AND x = 1 AND y IN %s 
+                SELECT a, x, y FROM t2, t3 WHERE a = 2 AND x = 1 AND y IN %s
                 ORDER BY x DESC, y ASC;
             ]], inexpr), {
                 2, 1, 2, 2, 1, 4, 2, 1, 5
@@ -193,7 +193,7 @@ for tn1, idx in ipairs(indexes) do
         test:do_execsql_test(
             string.format("2.%s.%s.11", tn1, tn2),
             string.format([[
-                SELECT a, x, y FROM t2, t3 WHERE a = 4 AND x = 1 AND y IN %s 
+                SELECT a, x, y FROM t2, t3 WHERE a = 4 AND x = 1 AND y IN %s
                 ORDER BY a, x DESC, y DESC;
             ]], inexpr), {
                 4, 1, 5, 4, 1, 4, 4, 1, 2
@@ -202,7 +202,7 @@ for tn1, idx in ipairs(indexes) do
         test:do_execsql_test(
             string.format("2.%s.%s.12", tn1, tn2),
             string.format([[
-                SELECT a, x, y FROM t2, t3 WHERE a = 2 AND x = 1 AND y IN %s 
+                SELECT a, x, y FROM t2, t3 WHERE a = 2 AND x = 1 AND y IN %s
                 ORDER BY x DESC, y DESC;
             ]], inexpr), {
                 2, 1, 5, 2, 1, 4, 2, 1, 2

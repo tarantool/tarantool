@@ -21,7 +21,7 @@ test:plan(31)
 -- $Id: misc5.test,v 1.22 2008/07/29 10:26:45 danielk1977 Exp $
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
--- Build records using the MakeRecord opcode such that the size of the 
+-- Build records using the MakeRecord opcode such that the size of the
 -- header is at the transition point in the size of a varint.
 --
 -- This test causes an assertion failure or a buffer overrun in version
@@ -44,7 +44,7 @@ for i = 120, 140 - 1, 1 do
             sql2 = sql2 .. ");"
             return test:execsql(string.format("%s%s", sql1, sql2))
         end, {
-            
+
         })
 
 end
@@ -160,33 +160,33 @@ test:do_execsql_test(
         INSERT INTO songs VALUES(4,'three',5);
         INSERT INTO songs VALUES(5,'one',7);
         INSERT INTO songs VALUES(6,'two',11);
-        SELECT DISTINCT artist 
-        FROM (    
-         SELECT DISTINCT artist    
-         FROM songs      
-         WHERE songid IN (    
-          SELECT songid    
-          FROM songs    
+        SELECT DISTINCT artist
+        FROM (
+         SELECT DISTINCT artist
+         FROM songs
+         WHERE songid IN (
+          SELECT songid
+          FROM songs
           WHERE LOWER(artist) IN (
-            SELECT DISTINCT LOWER(artist)    
-            FROM (      
+            SELECT DISTINCT LOWER(artist)
+            FROM (
               -- This sub-query returns the table:
               --
               --     two      14
               --     one      10
               --     three    5
               --
-              SELECT DISTINCT artist,sum(timesplayed) AS total      
-              FROM songs      
-              GROUP BY LOWER(artist)      
-              ORDER BY total DESC      
-              LIMIT 10    
-            )    
+              SELECT DISTINCT artist,sum(timesplayed) AS total
+              FROM songs
+              GROUP BY LOWER(artist)
+              ORDER BY total DESC
+              LIMIT 10
+            )
             WHERE artist <> ''
           )
          )
          LIMIT 1
-        )  
+        )
         ORDER BY LOWER(artist) ASC;
     ]], {
         -- <misc5-3.1>
@@ -217,7 +217,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc5-5.1",
     [[
-        SELECT .1 
+        SELECT .1
     ]], {
         -- <misc5-5.1>
         0.1
@@ -227,7 +227,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc5-5.2",
     [[
-        SELECT 2. 
+        SELECT 2.
     ]], {
         -- <misc5-5.2>
         2.0
@@ -237,7 +237,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc5-5.3",
     [[
-        SELECT 3.e0 
+        SELECT 3.e0
     ]], {
         -- <misc5-5.3>
         3.0
@@ -264,7 +264,7 @@ test:drop_all_tables()
 -- do_test misc5-6.1 {
 --   catchsql {
 --     SELECT * FROM sql_master
---     UNION ALL 
+--     UNION ALL
 --     SELECT * FROM sql_master
 --     LIMIT (SELECT count(*) FROM blah);
 --   }
@@ -274,9 +274,9 @@ test:drop_all_tables()
 --     CREATE TABLE logs(msg TEXT, timestamp INTEGER, dbtime TEXT);
 --   }
 --   catchsql {
---     SELECT * FROM logs WHERE logs.oid >= (SELECT head FROM logs_base) 
---     UNION ALL 
---     SELECT * FROM logs 
+--     SELECT * FROM logs WHERE logs.oid >= (SELECT head FROM logs_base)
+--     UNION ALL
+--     SELECT * FROM logs
 --     LIMIT (SELECT lmt FROM logs_base) ;
 --   }
 -- } {1 {no such table: logs_base}}
@@ -993,7 +993,7 @@ test:do_test(
             SELECT x FROM t3 ORDER BY x;
         ]]
     end, {
-        -- <misc5-11.1> 
+        -- <misc5-11.1>
     -9223372036854775808LL, -9223372036854775807LL, -9223372036854775806LL, -4611686018427387906LL,
  -4611686018427387905LL, -4611686018427387904LL, -4611686018427387903LL, -4611686018427387902LL,
  -2305843009213693954LL, -2305843009213693953LL, -2305843009213693952LL, -2305843009213693951LL,

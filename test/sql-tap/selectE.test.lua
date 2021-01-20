@@ -16,7 +16,7 @@ test:plan(7)
 -- This file implements regression tests for compound SELECT statements
 -- that have ORDER BY clauses with collating sequences that differ
 -- from the collating sequence used for comparison in the compound.
--- 
+--
 -- Ticket 6709574d2a8d8b9be3a9cb1afbf4ff2de48ea4e7:
 -- drh added on 2013-05-06 15:21:16:
 --
@@ -27,22 +27,22 @@ test:plan(7)
 -- operator. Note that the ".print" commands are instructions to the
 -- sql.exe shell program to output delimiter lines so that you can more
 -- easily tell where the output of one query ends and the next query
--- begins. 
--- 
+-- begins.
+--
 --     CREATE TABLE t1(a TEXT);
 --     INSERT INTO t1 VALUES('abc'),('def');
 --     CREATE TABLE t2(a TEXT);
 --     INSERT INTO t2 VALUES('DEF');
--- 
+--
 --     SELECT a FROM t1 EXCEPT SELECT a FROM t2 ORDER BY a;
 --     .print -----
 --     SELECT a FROM (SELECT a FROM t1 EXCEPT SELECT a FROM t2)
 --      ORDER BY a COLLATE nocase;
 --     .print -----
 --     SELECT a FROM t1 EXCEPT SELECT a FROM t2 ORDER BY a COLLATE nocase;
--- 
+--
 -- Bisecting shows that this problem was introduced in sql version 3.6.0
--- by check-in [8bbfa97837a74ef] on 2008-06-15. 
+-- by check-in [8bbfa97837a74ef] on 2008-06-15.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
@@ -118,7 +118,7 @@ test:do_test(
         ]]
     end, {
         -- <selectE-2.1>
-        
+
         -- </selectE-2.1>
     })
 
@@ -131,7 +131,7 @@ test:do_test(
         ]]
     end, {
         -- <selectE-2.2>
-        
+
         -- </selectE-2.2>
     })
 

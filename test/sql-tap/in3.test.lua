@@ -13,7 +13,7 @@ test:plan(28)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file tests the optimisations made in November 2007 of expressions 
+-- This file tests the optimisations made in November 2007 of expressions
 -- of the following form:
 --
 --     <value> IN (SELECT <column> FROM <table>)
@@ -64,7 +64,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(5, 6);
     ]], {
         -- <in3-1.1>
-        
+
         -- </in3-1.1>
     })
 
@@ -97,7 +97,7 @@ test:do_test(
     })
 
 -- Because none of the sub-select queries in the following statements
--- match the pattern ("SELECT <column> FROM <table>"), the following do 
+-- match the pattern ("SELECT <column> FROM <table>"), the following do
 -- require a temp table.
 --
 -- do_test in3-1.6 {
@@ -146,7 +146,7 @@ test:do_test(
         -- </in3-1.10>
     })
 
--- These do use the temp-table. Adding the LIMIT clause means the 
+-- These do use the temp-table. Adding the LIMIT clause means the
 -- ORDER BY cannot be ignored.
 test:do_test(
     "in3-1.11",
@@ -198,7 +198,7 @@ test:do_execsql_test(
         -- </in3-1.14>
     })
 
--- The first of these queries has to use the temp-table, because the 
+-- The first of these queries has to use the temp-table, because the
 -- collation sequence used for the index on "t1.a" does not match the
 -- collation sequence used by the "IN" comparison. The second does not
 -- require a temp-table, because the collation sequences match.
@@ -261,8 +261,8 @@ test:do_execsql_test(
 -- } {}
 -- do_test in3-2.2 {
 --   execsql {
---     SELECT rowid 
---     FROM t1 
+--     SELECT rowid
+--     FROM t1
 --     WHERE rowid IN (SELECT rowid FROM t1 WHERE rowid IN (1, 2));
 --   }
 -- } {1 2}
@@ -273,7 +273,7 @@ test:do_execsql_test(
 -- } {2 4}
 -- do_test in3-2.4 {
 --   execsql {
---     SELECT rowid FROM t1 WHERE rowid IN 
+--     SELECT rowid FROM t1 WHERE rowid IN
 --        (select rowid from t1 where rowid IN (-1,2,4))
 --   }
 -- } {2 4}
@@ -305,7 +305,7 @@ test:do_test(
         ]]
     end, {
         -- <in3-3.1>
-        
+
         -- </in3-3.1>
     })
 
@@ -349,7 +349,7 @@ test:do_test(
 test:do_test(
     "in3-3.6",
     function()
-        -- Numeric affinity is applied to both sides before 
+        -- Numeric affinity is applied to both sides before
         -- the comparison.  Therefore it is possible to use index t1_i2.
         return exec_neph(" SELECT y IN (SELECT b FROM t1) FROM t2 ")
     end, {
@@ -361,7 +361,7 @@ test:do_test(
 test:do_test(
     "in3-3.7",
     function()
-        -- Numeric affinity is applied before the comparison takes place. 
+        -- Numeric affinity is applied before the comparison takes place.
         -- Making it impossible to use index t1_i3.
         return exec_neph(" SELECT y IN (SELECT c FROM t1) FROM t2 ")
     end, {
@@ -389,7 +389,7 @@ test:do_test(
         ]]
     end, {
         -- <in3-4.1>
-        
+
         -- </in3-4.1>
     })
 
@@ -447,7 +447,7 @@ test:do_execsql_test(
         DROP INDEX t3_i2 ON t3
     ]], {
         -- <in3-4.6>
-        
+
         -- </in3-4.6>
     })
 
@@ -457,14 +457,14 @@ test:do_execsql_test(
     "in3-5.1",
     [[
         CREATE TABLE Folders(
-          folderid INTEGER PRIMARY KEY, 
-          parentid INTEGER, 
-          rootid INTEGER, 
+          folderid INTEGER PRIMARY KEY,
+          parentid INTEGER,
+          rootid INTEGER,
           path VARCHAR(255)
         );
     ]], {
         -- <in3-5.1>
-        
+
         -- </in3-5.1>
     })
 

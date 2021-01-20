@@ -354,7 +354,7 @@ test:do_execsql_test(
         WHERE a<10
     ]], {
         -- <select6-3.7>
-        
+
         -- </select6-3.7>
     })
 
@@ -376,7 +376,7 @@ test:do_execsql_test(
         WHERE a<10
     ]], {
         -- <select6-3.9>
-        
+
         -- </select6-3.9>
     })
 
@@ -394,7 +394,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.11",
     [[
-        SELECT a,b,a+b FROM 
+        SELECT a,b,a+b FROM
            (SELECT avg(x) as a, y as b FROM t1 GROUP BY b)
         WHERE b<4 ORDER BY a
     ]], {
@@ -406,7 +406,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.12",
     [[
-        SELECT a,b,a+b FROM 
+        SELECT a,b,a+b FROM
            (SELECT avg(x) as a, y as b FROM t1 GROUP BY b HAVING a>1)
         WHERE b<4 ORDER BY a
     ]], {
@@ -418,7 +418,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.13",
     [[
-        SELECT a,b,a+b FROM 
+        SELECT a,b,a+b FROM
            (SELECT avg(x) as a, y as b FROM t1 GROUP BY b HAVING a>1)
         ORDER BY a
     ]], {
@@ -452,7 +452,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-4.1",
     [[
-        SELECT a,b,c FROM 
+        SELECT a,b,c FROM
           (SELECT x AS a, y AS b, x+y AS c FROM t1 WHERE y=4)
         WHERE a<10 ORDER BY a;
     ]], {
@@ -633,7 +633,7 @@ test:do_execsql_test(
         SELECT c,b,a,* FROM (SELECT 1 AS a, 2 AS b, 'abc' AS c WHERE false)
     ]], {
         -- <select6-7.3>
-        
+
         -- </select6-7.3>
     })
 
@@ -704,7 +704,7 @@ test:do_execsql_test(
         -- </select6-8.2>
     })
 
--- If view support is omitted from the build, then so is the query 
+-- If view support is omitted from the build, then so is the query
 -- "flattener". So omit this test and test select6-8.6 in that case.
 test:do_test(
     "select6-8.3",
@@ -740,7 +740,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-8.5",
     [[
-        SELECT * FROM 
+        SELECT * FROM
           (SELECT y, p, q, r FROM
              (SELECT t1.y AS y, t2.b AS b FROM t1, t2 WHERE t1.x=t2.a) AS m,
              (SELECT t3.p AS p, t3.q AS q, t4.r AS r FROM t3 NATURAL JOIN t4) as n
@@ -757,7 +757,7 @@ test:do_test(
     "select6-8.6",
     function()
         return is_flat([[
-    SELECT * FROM 
+    SELECT * FROM
       (SELECT y, p, q, r FROM
          (SELECT t1.y AS y, t2.b AS b FROM t1, t2 WHERE t1.x=t2.a) AS m,
          (SELECT t3.p AS p, t3.q AS q, t4.r AS r FROM t3 NATURAL JOIN t4) as n
@@ -889,7 +889,7 @@ test:do_execsql_test(
 
 ---------------------------------------------------------------------------
 -- Test that if a UNION ALL sub-query that would otherwise be eligible for
--- flattening consists of two or more SELECT statements that do not all 
+-- flattening consists of two or more SELECT statements that do not all
 -- return the same number of result columns, the error is detected.
 --
 test:do_execsql_test(
@@ -938,7 +938,7 @@ test:do_catchsql_test(
     10.7,
     [[
         SELECT * FROM (
-          SELECT * FROM t UNION ALL 
+          SELECT * FROM t UNION ALL
           SELECT l,m,l FROM j UNION ALL
           SELECT * FROM k
         )
@@ -949,14 +949,14 @@ test:do_catchsql_test(
     [[
         SELECT * FROM (
           SELECT * FROM k UNION ALL
-          SELECT * FROM t UNION ALL 
-          SELECT l,m,l FROM j 
+          SELECT * FROM t UNION ALL
+          SELECT l,m,l FROM j
         )
     ]], err)
 
 -- 2015-02-09 Ticket [2f7170d73bf9abf80339187aa3677dce3dbcd5ca]
 -- "misuse of aggregate" error if aggregate column from FROM
--- subquery is used in correlated subquery 
+-- subquery is used in correlated subquery
 --
 test:do_execsql_test(
     11.1,
@@ -1023,7 +1023,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     11.5,
     [[
-        SELECT cnt, xyz, 
+        SELECT cnt, xyz,
                CASE WHEN (SELECT y FROM t2 WHERE w=cnt)=='two'
                     THEN 'aaa' ELSE 'bbb'
                 END, '|'

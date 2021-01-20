@@ -27,7 +27,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(2, 'two');
     ]], {
         -- <tkt3201-1>
-        
+
         -- </tkt3201-1>
     })
 
@@ -104,7 +104,7 @@ test:do_test(
 test:do_execsql_test(
     "tkt3201-7",
     [[
-        SELECT a, b, c, d FROM t1, t3 WHERE a < c 
+        SELECT a, b, c, d FROM t1, t3 WHERE a < c
     ]], {
         -- <tkt3201-7>
         1, "one", 2, "two"
@@ -124,7 +124,7 @@ test:do_test(
             BEGIN
               INSERT INTO t4_log(x) VALUES(new.x);
             END;
-            CREATE TRIGGER r4_2 AFTER INSERT ON t4 FOR EACH ROW 
+            CREATE TRIGGER r4_2 AFTER INSERT ON t4 FOR EACH ROW
             WHEN new.x=2 BEGIN
               INSERT INTO t4_log(x) VALUES(new.x);
             END;

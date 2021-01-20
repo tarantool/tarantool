@@ -47,7 +47,7 @@ test:plan(34)
                 INSERT INTO t1 SELECT x, x%40, x/40 FROM cnt;
             ]]
         end, {
-            
+
         })
 
     -- Run various ORDER BY queries that can benefit from block-sort.
@@ -55,10 +55,10 @@ test:plan(34)
     -- by adding + to each term of the ORDER BY clause.
     --
     test:do_execsql_test(
-        "1.2", 
+        "1.2",
         [[
             SELECT b,a,c FROM t1 ORDER BY b,a,c;
-        ]], 
+        ]],
         test:execsql "SELECT b,a,c FROM t1 ORDER BY +b,+a,+c"
         )
 
@@ -66,7 +66,7 @@ test:plan(34)
         "1.3",
         [[
             SELECT b,a,c FROM t1 ORDER BY b,c DESC,a;
-        ]], 
+        ]],
         test:execsql "SELECT b,a,c FROM t1 ORDER BY +b,+c DESC,+a"
         )
 
@@ -74,7 +74,7 @@ test:plan(34)
         "1.4",
         [[
             SELECT b,a,c FROM t1 ORDER BY b DESC,c,a;
-        ]], 
+        ]],
         test:execsql "SELECT b,a,c FROM t1 ORDER BY +b DESC,+c,+a"
         )
 
@@ -82,7 +82,7 @@ test:plan(34)
         "1.5",
         [[
             SELECT b,a,c FROM t1 ORDER BY b DESC,a,c;
-        ]], 
+        ]],
         test:execsql "SELECT b,a,c FROM t1 ORDER BY +b DESC,+a,+c"
         )
 
@@ -228,14 +228,14 @@ test:plan(34)
                                 FROM cnt;
             ]]
         end, {
-            
+
         })
 
     test:do_execsql_test(
         "1.32",
         [[
             SELECT a FROM t2 ORDER BY b,c,d,e,f;
-        ]], 
+        ]],
         test:execsql "SELECT a FROM t2 ORDER BY +b,+c,+d,+e,+f;"
         )
 
@@ -243,7 +243,7 @@ test:plan(34)
         "1.33",
         [[
             SELECT a FROM t2 ORDER BY b,c,d,e,+f;
-        ]], 
+        ]],
         test:execsql "SELECT a FROM t2 ORDER BY +b,+c,+d,+e,+f;"
         )
 
@@ -251,7 +251,7 @@ test:plan(34)
         "1.34",
         [[
             SELECT a FROM t2 ORDER BY b,c,d,+e,+f;
-        ]], 
+        ]],
         test:execsql "SELECT a FROM t2 ORDER BY +b,+c,+d,+e,+f;"
         )
 
@@ -259,7 +259,7 @@ test:plan(34)
         "1.35",
         [[
             SELECT a FROM t2 ORDER BY b,c,+d,+e,+f;
-        ]], 
+        ]],
         test:execsql "SELECT a FROM t2 ORDER BY +b,+c,+d,+e,+f;"
         )
 
@@ -267,7 +267,7 @@ test:plan(34)
         "1.36",
         [[
             SELECT a FROM t2 ORDER BY b,+c,+d,+e,+f;
-        ]], 
+        ]],
         test:execsql "SELECT a FROM t2 ORDER BY +b,+c,+d,+e,+f;"
         )
 
@@ -275,7 +275,7 @@ test:plan(34)
         "1.37",
         [[
             SELECT a FROM t2 ORDER BY b,c,d,e,f DESC;
-        ]], 
+        ]],
         test:execsql "SELECT a FROM t2 ORDER BY +b,+c,+d,+e,+f DESC;"
         )
 
@@ -283,7 +283,7 @@ test:plan(34)
         "1.38",
         [[
             SELECT a FROM t2 ORDER BY b,c,d,e DESC,f;
-        ]], 
+        ]],
         test:execsql "SELECT a FROM t2 ORDER BY +b,+c,+d,+e DESC,+f;"
         )
 
@@ -291,7 +291,7 @@ test:plan(34)
         "1.39",
         [[
             SELECT a FROM t2 ORDER BY b,c,d DESC,e,f;
-        ]], 
+        ]],
         test:execsql "SELECT a FROM t2 ORDER BY +b,+c,+d DESC,+e,+f;"
         )
 
@@ -299,7 +299,7 @@ test:plan(34)
         "1.40",
         [[
             SELECT a FROM t2 ORDER BY b,c DESC,d,e,f;
-        ]], 
+        ]],
         test:execsql "SELECT a FROM t2 ORDER BY +b,+c DESC,+d,+e,+f;"
         )
 
@@ -307,7 +307,7 @@ test:plan(34)
         "1.41",
         [[
             SELECT a FROM t2 ORDER BY b DESC,c,d,e,f;
-        ]], 
+        ]],
         test:execsql "SELECT a FROM t2 ORDER BY +b DESC,+c,+d,+e,+f;"
         )
     -- Tests are commented because of the reason described in

@@ -16,7 +16,7 @@ test:plan(5)
 -- This file implements regression tests for sql library.
 --
 -- This file implements tests to verify that ticket [7bbfb7d442] has been
--- fixed.  
+-- fixed.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
@@ -40,7 +40,7 @@ if (1 > 0)
             CREATE TRIGGER t3t AFTER INSERT ON t3 FOR EACH ROW
             WHEN new.t3_d IS NULL BEGIN
               UPDATE t3 SET t3_d = (
-                SELECT d FROM 
+                SELECT d FROM
                   (SELECT * FROM t2 WHERE (new.t3_a%2)=(id%2) LIMIT 10),
                   (SELECT * FROM t1 WHERE (new.t3_a%2)=(id%2) LIMIT 10)
                 WHERE a = new.t3_a AND b = c
@@ -64,7 +64,7 @@ if (1 > 0)
     test:do_execsql_test(
         1.3,
         [[
-            DELETE FROM t3 
+            DELETE FROM t3
         ]])
 
     test:do_execsql_test(
@@ -81,7 +81,7 @@ if (1 > 0)
 
 
     ---------------------------------------------------------------------------
-    -- The following test case - 2.* - is from the original bug report as 
+    -- The following test case - 2.* - is from the original bug report as
     -- posted to the mailing list.
     --
     test:do_execsql_test(
@@ -97,8 +97,8 @@ if (1 > 0)
             );
 
             CREATE TRIGGER TGR_InventoryControl_AfterInsert
-            AFTER INSERT ON InventoryControl 
-            FOR EACH ROW WHEN NEW.ControlState=-1 BEGIN 
+            AFTER INSERT ON InventoryControl
+            FOR EACH ROW WHEN NEW.ControlState=-1 BEGIN
 
             INSERT OR REPLACE INTO InventoryControl(
                   InventoryControlId,SKU,Variant,ControlDate,ControlState,DeliveredQty
@@ -160,7 +160,7 @@ if (1 > 0)
             INSERT INTO TransactionDetail(TransactionId, SKU, Variant) VALUES(44, 31, 0);
 
 
-            INSERT INTO InventoryControl(SKU, Variant, ControlDate) SELECT 
+            INSERT INTO InventoryControl(SKU, Variant, ControlDate) SELECT
                 II.SKU AS SKU, II.Variant AS Variant, '2011-08-30' AS ControlDate
                 FROM InventoryItem II;
         ]])

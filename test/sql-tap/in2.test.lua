@@ -25,7 +25,7 @@ test:do_execsql_test(
         CREATE TABLE a(i INTEGER PRIMARY KEY, a INT);
     ]], {
         -- <in2-1>
-        
+
         -- </in2-1>
     })
 
@@ -62,7 +62,7 @@ test:do_test(
   -- ]=])
     end, {
         -- <in2-2>
-        
+
         -- </in2-2>
     })
 
@@ -77,11 +77,11 @@ test:do_test(
 -- Records are inserted in sorted order.
 --
 -- The string of zero-length is stored in a b-tree cell with 3 bytes
--- of payload. Moving this cell from a leaf node to a internal node 
--- during b-tree balancing was causing an assertion failure. 
+-- of payload. Moving this cell from a leaf node to a internal node
+-- during b-tree balancing was causing an assertion failure.
 --
--- This bug only applied to b-trees generated to evaluate IN (..) 
--- clauses, as it is impossible for persistent b-trees (SQL tables + 
+-- This bug only applied to b-trees generated to evaluate IN (..)
+-- clauses, as it is impossible for persistent b-trees (SQL tables +
 -- indices) to contain cells smaller than 4 bytes.
 --
 for ii=3,N-1 do

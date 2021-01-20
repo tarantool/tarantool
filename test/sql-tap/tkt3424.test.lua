@@ -33,14 +33,14 @@ test:do_execsql_test(
         INSERT INTO orig VALUES(5, 'AAA','E5');
     ]], {
         -- <tkt3424-1.1>
-        
+
         -- </tkt3424-1.1>
     })
 
 test:do_execsql_test(
     "tkt3424-1.2",
     [[
-        SELECT names.id,names.data,names.code,orig.code,orig.data FROM 
+        SELECT names.id,names.data,names.code,orig.code,orig.data FROM
         names LEFT OUTER JOIN orig
         ON names.data = orig.data AND names.code = orig.code;
     ]], {
@@ -52,17 +52,17 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3424-1.3",
     [[
-        CREATE INDEX udx_orig_code_data ON orig(code, data) 
+        CREATE INDEX udx_orig_code_data ON orig(code, data)
     ]], {
         -- <tkt3424-1.3>
-        
+
         -- </tkt3424-1.3>
     })
 
 test:do_execsql_test(
     "tkt3424-1.4",
     [[
-        SELECT names.id,names.data,names.code,orig.code,orig.data FROM 
+        SELECT names.id,names.data,names.code,orig.code,orig.data FROM
         names LEFT OUTER JOIN orig
         ON names.data = orig.data AND names.code = orig.code;
     ]], {

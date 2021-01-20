@@ -123,7 +123,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(8, 'four', 'iv');
     ]], {
         -- <3.1>
-        
+
         -- </3.1>
     })
 
@@ -143,8 +143,8 @@ test:do_execsql_test(
         -- </3.3>
     })
 
--- do_execsql_test 3.4 { 
---   PRAGMA integrity_check; 
+-- do_execsql_test 3.4 {
+--   PRAGMA integrity_check;
 -- } {ok}
 -- Between 2015-09-14 and 2015-09-28, the following test cases would result
 -- in corruption (wrong # of entries in index) due to a bug in the ONEPASS
@@ -160,7 +160,7 @@ test:do_execsql_test(
         DELETE FROM t4 WHERE col0=69 OR col0>7;
     ]], {
         -- <4.1>
-        
+
         -- </4.1>
     })
 
@@ -174,7 +174,7 @@ test:do_execsql_test(
         DELETE FROM t4 WHERE col0=69 OR col0>7;
     ]], {
         -- <4.2>
-        
+
         -- </4.2>
     })
 
@@ -189,7 +189,7 @@ test:do_execsql_test(
         DELETE FROM t4 WHERE col0=69 OR col0>7;
     ]], {
         -- <4.11>
-        
+
         -- </4.11>
     })
 
@@ -204,7 +204,7 @@ test:do_execsql_test(
         DELETE FROM t4 WHERE col0=69 OR col0>7;
     ]], {
         -- <4.12>
-        
+
         -- </4.12>
     })
 

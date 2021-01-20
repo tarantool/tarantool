@@ -182,7 +182,7 @@ test:do_execsql_test(
     "insert3-3.3",
     [[
             CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, a INT ,b INT ,c INT );
-            CREATE TRIGGER t4r1 AFTER INSERT on t4 FOR EACH ROW 
+            CREATE TRIGGER t4r1 AFTER INSERT on t4 FOR EACH ROW
             WHEN nosuchcol BEGIN
               SELECT 'illegal WHEN clause';
             END;

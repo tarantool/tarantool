@@ -39,7 +39,7 @@ test:do_execsql_test(
         INSERT INTO t3 VALUES(3);
     ]], {
         -- <1.0>
-        
+
         -- </1.0>
     })
 
@@ -47,7 +47,7 @@ test:do_execsql_test(
     "1.1",
     [[
         SELECT 'test-2', t3.c, (
-              SELECT count(*) 
+              SELECT count(*)
               FROM t1 JOIN (SELECT DISTINCT t3.c AS p FROM t2) AS x ON t1.a=x.p
         )
         FROM t3;
@@ -65,7 +65,7 @@ test:do_execsql_test(
         INSERT INTO t4 VALUES(2, 'a', '2', 'two');
         INSERT INTO t4 VALUES(3, 'b', '1', 'three');
         INSERT INTO t4 VALUES(4, 'b', '2', 'four');
-        SELECT ( 
+        SELECT (
           SELECT c FROM (
             SELECT a,b,c FROM t4 WHERE a=output.a ORDER BY b LIMIT 10 OFFSET 1
           ) WHERE b=output.b

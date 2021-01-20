@@ -98,7 +98,7 @@ test:do_catchsql_test(
 -- Check that functions that accept zero arguments do not cause problems.
 --
 
-local function det4() 
+local function det4()
     return 4
 end
 

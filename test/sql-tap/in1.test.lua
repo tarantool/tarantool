@@ -200,7 +200,7 @@ test:do_execsql_test(
         SELECT a FROM t1 WHERE b IN (GREATEST(5,10),20)
     ]], {
         -- <in-2.9>
-        
+
         -- </in-2.9>
     })
 
@@ -210,7 +210,7 @@ test:do_execsql_test(
         SELECT a FROM t1 WHERE LEAST(0, CAST(b IN (a,30) AS INT)) <> 0
     ]], {
         -- <in-2.10>
-        
+
         -- </in-2.10>
     })
 
@@ -266,7 +266,7 @@ test:do_test(
     "in-4.1",
     function()
         test:execsql [[
-            UPDATE t1 SET b=b*2 
+            UPDATE t1 SET b=b*2
             WHERE b IN (SELECT b FROM t1 WHERE a>8)
         ]]
         return test:execsql "SELECT b FROM t1 ORDER BY b"
@@ -448,7 +448,7 @@ test:do_execsql_test(
         SELECT a FROM t1 WHERE a IN ();
     ]], {
         -- <in-7.1>
-        
+
         -- </in-7.1>
     })
 
@@ -478,7 +478,7 @@ test:do_execsql_test(
         SELECT a FROM t1 WHERE a IN (5) AND b IN ();
     ]], {
         -- <in-7.4>
-        
+
         -- </in-7.4>
     })
 
@@ -498,7 +498,7 @@ test:do_execsql_test(
         SELECT a FROM ta WHERE a IN ();
     ]], {
         -- <in-7.6.1>
-        
+
         -- </in-7.6.1>
     })
 
@@ -529,7 +529,7 @@ test:do_execsql_test(
         SELECT * FROM ta LEFT JOIN tb ON (ta.b=tb.b) WHERE ta.a IN ();
     ]], {
         -- <in-7.8.1>
-        
+
         -- </in-7.8.1>
     })
 
@@ -561,7 +561,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t4 (a INTEGER PRIMARY KEY);
         INSERT INTO t4 SELECT a FROM tb;
-        SELECT * FROM t4;    
+        SELECT * FROM t4;
     ]], {
         -- <in-9.1>
         1, 2, 3, 5, 7, 9, 11
@@ -665,7 +665,7 @@ test:do_execsql_test(
         CREATE TABLE t3(a  INT PRIMARY KEY, b INT , c INT );
     ]], {
         -- <in-12.1>
-        
+
         -- </in-12.1>
     })
 
@@ -843,12 +843,12 @@ test:do_catchsql_test(
 
 --ifcapable compound
 --------------------------------------------------------------------------
--- The following tests check that NULL is handled correctly when it 
+-- The following tests check that NULL is handled correctly when it
 -- appears as part of a set of values on the right-hand side of an
 -- IN or NOT IN operator.
 --
 -- When it appears in such a set, NULL is handled as an "unknown value".
--- If, because of the unknown value in the set, the result of the expression 
+-- If, because of the unknown value in the set, the result of the expression
 -- cannot be determined, then it itself evaluates to NULL.
 --
 -- Warm body test to demonstrate the principles being tested:
@@ -857,7 +857,7 @@ test:do_test(
     "in-13.1",
     function()
         --  db("nullvalue", '')
-        return test:execsql [[ SELECT 
+        return test:execsql [[ SELECT
     1 IN (NULL, 1, 2),     -- The value 1 is a member of the set, return true.
     3 IN (NULL, 1, 2),     -- Ambiguous, return NULL.
     1 NOT IN (NULL, 1, 2), -- The value 1 is a member of the set, return false.
@@ -880,14 +880,14 @@ test:do_execsql_test(
         INSERT INTO t7 VALUES(5, NULL, 5, 5);
     ]], {
         -- <in-13.2>
-        
+
         -- </in-13.2>
     })
 
 test:do_execsql_test(
     "in-13.3",
     [[
-        SELECT 2 IN (SELECT a FROM t7) 
+        SELECT 2 IN (SELECT a FROM t7)
     ]], {
         -- <in-13.3>
         true
@@ -897,7 +897,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in-13.4",
     [[
-        SELECT 6 IN (SELECT a FROM t7) 
+        SELECT 6 IN (SELECT a FROM t7)
     ]], {
         -- <in-13.4>
         ""
@@ -907,7 +907,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in-13.5",
     [[
-        SELECT 2 IN (SELECT b FROM t7) 
+        SELECT 2 IN (SELECT b FROM t7)
     ]], {
         -- <in-13.5>
         true
@@ -917,7 +917,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in-13.6",
     [[
-        SELECT 6 IN (SELECT b FROM t7) 
+        SELECT 6 IN (SELECT b FROM t7)
     ]], {
         -- <in-13.6>
         false
@@ -927,7 +927,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in-13.7",
     [[
-        SELECT 2 IN (SELECT c FROM t7) 
+        SELECT 2 IN (SELECT c FROM t7)
     ]], {
         -- <in-13.7>
         true
@@ -937,7 +937,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in-13.8",
     [[
-        SELECT 6 IN (SELECT c FROM t7) 
+        SELECT 6 IN (SELECT c FROM t7)
     ]], {
         -- <in-13.8>
         false
@@ -964,8 +964,8 @@ test:do_execsql_test(
     "in-13.10",
     [[
         SELECT b IN (
-          SELECT inside.a 
-          FROM t7 AS inside 
+          SELECT inside.a
+          FROM t7 AS inside
           WHERE inside.b BETWEEN outside.b+1 AND outside.b+2
         )
         FROM t7 AS outside ORDER BY b;
@@ -979,8 +979,8 @@ test:do_execsql_test(
     "in-13.11",
     [[
         SELECT b NOT IN (
-          SELECT inside.a 
-          FROM t7 AS inside 
+          SELECT inside.a
+          FROM t7 AS inside
           WHERE inside.b BETWEEN outside.b+1 AND outside.b+2
         )
         FROM t7 AS outside ORDER BY b;
@@ -1069,7 +1069,7 @@ test:do_catchsql_test(
 --         return db("nullvalue", "")
 --     end, {
 --         -- <in-13.X>
-        
+
 --         -- </in-13.X>
 --     })
 

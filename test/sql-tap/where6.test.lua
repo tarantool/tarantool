@@ -85,10 +85,10 @@ test:do_test(
     function()
         -- return X(58, "X!cmd", [=[["explain_no_trace","SELECT * FROM t1 LEFT JOIN t2 ON x=b WHERE 1=c"]]=])
         return test:explain_no_trace('SELECT * FROM t1 LEFT JOIN t2 ON x=b WHERE 1=c')
-    end, 
+    end,
     -- <where6-1.6>
     -- X(57, "X!cmd", [=[["explain_no_trace","SELECT * FROM t1 LEFT JOIN t2 ON b=x WHERE c=1"]]=])
-    test:explain_no_trace('SELECT * FROM t1 LEFT JOIN t2 ON b=x WHERE c=1')    
+    test:explain_no_trace('SELECT * FROM t1 LEFT JOIN t2 ON b=x WHERE c=1')
     -- </where6-1.6>
     )
 
@@ -232,7 +232,7 @@ test:do_execsql_test(
 
 -- Ticket [ebdbadade5b]:
 -- If the ON close on a LEFT JOIN is of the form x=y where both x and y
--- are indexed columns on tables to left of the join, then do not use that 
+-- are indexed columns on tables to left of the join, then do not use that
 -- term with indices to either table.
 --
 test:do_test(

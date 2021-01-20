@@ -21,15 +21,15 @@ test:plan(37)
 ------------------------------------------------------------------------
 -- Test Organization:
 --
--- analyze3-1.*: Test that the values of bound parameters are considered 
+-- analyze3-1.*: Test that the values of bound parameters are considered
 --               in the same way as constants when planning queries that
 --               use range constraints.
 --
--- analyze3-2.*: Test that the values of bound parameters are considered 
+-- analyze3-2.*: Test that the values of bound parameters are considered
 --               in the same way as constants when planning queries that
 --               use LIKE expressions in the WHERE clause.
 --
--- analyze3-3.*: Test that binding to a variable does not invalidate the 
+-- analyze3-3.*: Test that binding to a variable does not invalidate the
 --               query plan when there is no way in which replanning the
 --               query may produce a superior outcome.
 --
@@ -39,23 +39,23 @@ test:plan(37)
 -- analyze3-5.*: Check that the query plans of applicable statements are
 --               invalidated if the values of SQL parameter are modified
 --               using the clear_bindings() or transfer_bindings() APIs.
--- 
+--
 -- analyze3-6.*: Test that the problem fixed by commit [127a5b776d] is fixed.
 --
--- analyze3-7.*: Test that some memory leaks discovered by fuzz testing 
+-- analyze3-7.*: Test that some memory leaks discovered by fuzz testing
 --               have been fixed.
 --
 
 ---------------------------------------------------------------------------
 --
--- analyze3-1.1.1: 
---   Create a table with two columns. Populate the first column (affinity 
---   INTEGER) with integer values from 100 to 1100. Create an index on this 
+-- analyze3-1.1.1:
+--   Create a table with two columns. Populate the first column (affinity
+--   INTEGER) with integer values from 100 to 1100. Create an index on this
 --   column. ANALYZE the table.
 --
 -- analyze3-1.1.2 - 3.1.3
 --   Show that there are two possible plans for querying the table with
---   a range constraint on the indexed column - "full table scan" or "use 
+--   a range constraint on the indexed column - "full table scan" or "use
 --   the index". When the range is specified using literal values, sql
 --   is able to pick the best plan based on the samples in sql_stat3.
 --
@@ -63,8 +63,8 @@ test:plan(37)
 --   Show that using SQL variables produces the same results as using
 --   literal values to constrain the range scan.
 --
---   These tests also check that the compiler code considers column 
---   affinities when estimating the number of rows scanned by the "use 
+--   These tests also check that the compiler code considers column
+--   affinities when estimating the number of rows scanned by the "use
 --   index strategy".
 --
 test:do_test(
@@ -112,7 +112,7 @@ test:do_execsql_test(
     })
 
 -- The first of the following two SELECT statements visits 99 rows. So
--- it is better to use the index. But the second visits every row in 
+-- it is better to use the index. But the second visits every row in
 -- the table (1000 in total) so it is better to do a full-table scan.
 --
 test:do_eqp_test(
@@ -128,7 +128,7 @@ test:do_eqp_test(
 test:do_eqp_test(
     "analyze3-1.1.3",
     [[
-        SELECT sum(y) FROM t1 WHERE x>0 AND x<1100 
+        SELECT sum(y) FROM t1 WHERE x>0 AND x<1100
     ]], {
         -- Tarantool: index is always covering, thus there is no need to scan table.
         -- <analyze3-1.1.3>
@@ -140,7 +140,7 @@ test:do_eqp_test(
 test:do_sf_execsql_test(
     "analyze3-1.1.4",
     [[
-        SELECT sum(y) FROM t1 WHERE x>200 AND x<300 
+        SELECT sum(y) FROM t1 WHERE x>200 AND x<300
     ]], {
         -- <analyze3-1.1.4>
         -- 199, 0, 14850
@@ -173,7 +173,7 @@ test:do_test(
 test:do_sf_execsql_test(
     "analyze3-1.1.7",
     [[
-        SELECT sum(y) FROM t1 WHERE x>0 AND x<1100 
+        SELECT sum(y) FROM t1 WHERE x>0 AND x<1100
     ]], {
         -- <analyze3-1.1.7>
         1000, {499500}
@@ -215,7 +215,7 @@ test:do_execsql_test(
         ANALYZE;
     ]], {
         -- <analyze3-1.2.1>
-        
+
         -- </analyze3-1.2.1>
     })
 
@@ -267,7 +267,7 @@ test:do_eqp_test(
  test:do_sf_execsql_test(
     "analyze3-1.2.4",
     [[
-        SELECT sum(y) FROM t2 WHERE x>12 AND x<20 
+        SELECT sum(y) FROM t2 WHERE x>12 AND x<20
     ]], {
         -- <analyze3-1.2.4>
         999, {""}
@@ -297,7 +297,7 @@ test:do_test(
 test:do_sf_execsql_test(
     "analyze3-1.2.7",
     [[
-        SELECT sum(y) FROM t2 WHERE x>0 AND x<99 
+        SELECT sum(y) FROM t2 WHERE x>0 AND x<99
     ]], {
         -- <analyze3-1.2.7>
         999, {""}
@@ -339,7 +339,7 @@ test:do_execsql_test(
         ANALYZE;
     ]], {
         -- <analyze3-1.3.1>
-        
+
         -- </analyze3-1.3.1>
     })
 
@@ -389,7 +389,7 @@ test:do_eqp_test(
 test:do_sf_execsql_test(
     "analyze3-1.3.4",
     [[
-        SELECT sum(y) FROM t3 WHERE x>200 AND x<300 
+        SELECT sum(y) FROM t3 WHERE x>200 AND x<300
     ]], {
         -- <analyze3-1.3.4>
         100, {14850}
@@ -419,7 +419,7 @@ test:do_test(
 test:do_sf_execsql_test(
     "analyze3-1.3.7",
     [[
-        SELECT sum(y) FROM t3 WHERE x>0 AND x<1100 
+        SELECT sum(y) FROM t3 WHERE x>0 AND x<1100
     ]], {
         -- <analyze3-1.3.7>
         1000, {499500}
@@ -471,7 +471,7 @@ test:do_test(
 --         return test:execsql("COMMIT")
 --     end, {
 --         -- <analyze3-2.1>
-        
+
 --         -- </analyze3-2.1>
 --     })
 
@@ -498,7 +498,7 @@ test:do_test(
 -- test:do_sf_execsql_test(
 --     "analyze3-2.4",
 --     [[
---         SELECT count(*) FROM t1 WHERE b LIKE 'a%' 
+--         SELECT count(*) FROM t1 WHERE b LIKE 'a%'
 --     ]], {
 --         -- <analyze3-2.4>
 --         102, 0, 100
@@ -508,7 +508,7 @@ test:do_test(
 -- test:do_sf_execsql_test(
 --     "analyze3-2.5",
 --     [[
---         SELECT count(*) FROM t1 WHERE b LIKE '%a' 
+--         SELECT count(*) FROM t1 WHERE b LIKE '%a'
 --     ]], {
 --         -- <analyze3-2.5>
 --         999, 999, 100
@@ -601,7 +601,7 @@ test:do_test(
         return test:execsql("ANALYZE")
     end, {
         -- <analyze3-6.1>
-        
+
         -- </analyze3-6.1>
     })
 
@@ -640,7 +640,7 @@ test:do_execsql_test(
         SELECT c FROM t1 WHERE b=3 AND a BETWEEN 30 AND hex(1);
     ]], {
         -- <analyze-7.1>
-        
+
         -- </analyze-7.1>
     })
 
