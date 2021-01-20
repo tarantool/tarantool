@@ -179,7 +179,7 @@ local function execsql(self, sql)
 end
 test.execsql = execsql
 
-local function catchsql(self, sql, expect)
+local function catchsql(self, sql)
     local r = {pcall(execsql, self, sql) }
     if r[1] == true then
         r[1] = 0
