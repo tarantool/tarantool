@@ -763,7 +763,7 @@ if (0 > 0) then
 -- Legacy from the original code. Must be replaced with analogue
 -- functions from box.
 local X = nil
-local function cksum(x)
+local function cksum(x) -- luacheck: no unused
     local i1 = 1
     local i2 = 2
     X(503, "X!cmd", [=[["binary","scan",["x"],"c*","L"]]=])

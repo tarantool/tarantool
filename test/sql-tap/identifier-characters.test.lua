@@ -65,7 +65,7 @@ local testcases = {
 		test:execsql("commit")
 		if ok == false then error(res) end
 	end,
-	function (id) end},
+	function () end},
 	{"trigger name",
 		function (id)
 			test:execsql(string.format([[
