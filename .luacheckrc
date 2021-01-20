@@ -51,8 +51,6 @@ exclude_files = {
 
 files["test/sql-tap/**/*.lua"] = {
     ignore = {
-        -- Unreachable code.
-        "511",
         -- Loop can be executed at most once.
         "512",
         -- An empty if branch.
