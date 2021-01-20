@@ -51,8 +51,6 @@ exclude_files = {
 
 files["test/sql-tap/**/*.lua"] = {
     ignore = {
-        -- An empty if branch.
-        "542",
         -- A line consists of nothing but whitespace.
         "611",
         -- A line contains trailing whitespace.

@@ -212,6 +212,7 @@ test:do_execsql_test(
 
 for ii = 3, 6, 1 do
     if ii == 4 then
+        assert(ii == 4) -- added to pass luacheck
         -- TODO
         --X(2, "X!cmd", [=[["optimization_control","db","query-flattener","off"]]=])
     elseif ii == 5 then
@@ -232,6 +233,7 @@ for ii = 3, 6, 1 do
             })
 
     elseif ii == 6 then
+        assert(ii == 6) -- added to pass luacheck
         --X(2, "X!cmd", [=[["optimization_control","db","query-flattener","off"]]=])
     end
     test:do_execsql_test(
