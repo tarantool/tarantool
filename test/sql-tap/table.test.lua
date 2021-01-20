@@ -947,7 +947,8 @@ test:do_execsql_test(
 --
 --  Disabled until #3694 is resolved.
 --
-if false then
+local is_gh_3694_closed = false
+if is_gh_3694_closed then
 test:do_execsql_test(
     "table-13.1",
     [[

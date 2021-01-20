@@ -1513,7 +1513,8 @@ test:do_execsql_test(
 -- TODO: This test is failing because f1 is now being loaded off the
 -- disk as a vdbe integer, not a string. Hence the value of f1/(f1-11)
 -- changes because of rounding. Disable the test for now.
-if false
+local is_gh_5737_closed = false
+if is_gh_5737_closed
  then
     test:do_execsql_test(
         "select1-8.4",
