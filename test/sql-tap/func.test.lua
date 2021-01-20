@@ -1360,7 +1360,7 @@ test:do_execsql_test(
         -- </13.8.3>
     })
 
-local V = "one"
+local V = "one" -- luacheck: ignore
 test:do_execsql_test(
     "13.8.4",
     [[
