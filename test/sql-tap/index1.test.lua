@@ -406,7 +406,7 @@ test:do_test(
 test:do_catchsql_test(
     "index-8.1",
     [[
-    	CREATE TABLE test1(a INT PRIMARY KEY);
+        CREATE TABLE test1(a INT PRIMARY KEY);
         DROP INDEX index1 ON test1
     ]], {
         -- <index-8.1>

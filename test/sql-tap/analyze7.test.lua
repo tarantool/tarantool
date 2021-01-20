@@ -29,11 +29,11 @@ test:do_test(
 		    DROP TABLE IF EXISTS nums;
 			CREATE TABLE nums(n  INT PRIMARY KEY);
 			INSERT into nums WITH RECURSIVE cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt WHERE x<256) SELECT x FROM cnt;
- 			INSERT INTO t1 SELECT n, n, n, n/100, n FROM nums;
- 			EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=123;
+                        INSERT INTO t1 SELECT n, n, n, n/100, n FROM nums;
+                        EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=123;
 		]])
 		end, {
-        	-- <analyze7-1.0>
+               -- <analyze7-1.0>
             0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1A (A=?)"
             -- </analyze7-1.0>
         })
@@ -43,7 +43,7 @@ test:do_execsql_test(
 	[[
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE b=123;
 	]], {
-    	-- <analyze7-1.1>
+        -- <analyze7-1.1>
         0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B=?)"
         -- </analyze7-1.1>
     })
@@ -68,7 +68,7 @@ test:do_test(
 		test:execsql("ANALYZE;")
 		return test:execsql("EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=123;")
 	end, {
-       	-- <analyze7-2.0>
+        -- <analyze7-2.0>
         0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1A (A=?)"
         -- </analyze7-2.0>
     })
@@ -147,9 +147,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "analyze7-3.2.2",
     [[
-    	EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE c=2;
+        EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE c=2;
     ]], {
-    	-- <analyze7-3.2.2>
+        -- <analyze7-3.2.2>
         0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1CD (C=?)"
         -- </analyze7-3.2.2>
     })

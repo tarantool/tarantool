@@ -53,8 +53,6 @@ files["test/sql-tap/**/*.lua"] = {
     ignore = {
         -- A line consists of nothing but whitespace.
         "611",
-        -- Inconsistent indentation (SPACE followed by TAB).
-        "621",
         -- Line is too long.
         "631"
     }
