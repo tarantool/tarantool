@@ -12,7 +12,7 @@ test:do_test(
 			box.execute("insert into test(id, k) values(" .. i .. "," .. i .. ")")
 		end
 
-		for i = 1, 10000 do
+		for _ = 1, 10000 do
 			box.execute("SELECT id, k FROM test WHERE k IN (5849, 4986, 4997, 5020, 5044, 4990, 5013, 4983)")
 		end
 	end, {

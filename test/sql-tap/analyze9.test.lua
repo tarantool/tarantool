@@ -242,7 +242,7 @@ test:do_execsql_test(
 local function insert_filler_rows_n(iStart, nCopy, nVal)
     for i = 0, nVal-1 do
         local iVal = iStart+i
-        for j = 0, nCopy-1 do
+        for _ = 0, nCopy-1 do
             box.execute(string.format("INSERT INTO t1 VALUES (null, %s, %s, '%s')", iVal, iVal, iVal))
         end
     end

@@ -275,7 +275,7 @@ test.catchsql2 = catchsql2
 -- that different SQL statements generate exactly the same VDBE code.
 local function explain_no_trace(self, sql)
     local tr = execsql(self, "EXPLAIN "..sql)
-    for i=1,8 do
+    for _=1,8 do
         table.remove(tr,1)
     end
     return tr

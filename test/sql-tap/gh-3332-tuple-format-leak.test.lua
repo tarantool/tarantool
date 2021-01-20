@@ -21,7 +21,7 @@ test:do_test(
 test:do_test(
     "format-leak",
     function()
-        for i = 1, 100000 do
+        for _ = 1, 100000 do
             box.execute("SELECT id FROM t1 WHERE flags=3 ORDER BY id LIMIT 2");
         end
     end, {

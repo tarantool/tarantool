@@ -127,12 +127,12 @@ for _, tbl_defn in ipairs(tbl_definitions) do
             local raw_result = test:execsql [[
                 SELECT * FROM rlog ORDER BY idx;
             ]]
-            for k,v in pairs(raw_result) do table.insert(r, v) end
+            for _,v in pairs(raw_result) do table.insert(r, v) end
 
             raw_result = test:execsql [[
                 SELECT * FROM clog ORDER BY idx;
             ]]
-            for k,v in pairs(raw_result) do table.insert(r, v) end
+            for _,v in pairs(raw_result) do table.insert(r, v) end
             
             return r
         end, {

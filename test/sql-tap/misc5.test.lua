@@ -292,7 +292,7 @@ test:do_test(
         local sql, tail
         sql = "INSERT INTO t1 VALUES("
         tail = ""
-        for i = 0, 199, 1 do
+        for _ = 0, 199, 1 do
             sql = sql .. "(1+"
             tail = tail .. ")"
         end
