@@ -49,8 +49,6 @@ exclude_files = {
 
 files["test/sql-tap/**/*.lua"] = {
     ignore = {
-        -- Local variable is set but never accessed.
-        "231",
         -- "Value assigned to a local variable is unused."
         "311",
         -- Unreachable code.

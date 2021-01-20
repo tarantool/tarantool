@@ -2511,7 +2511,7 @@ test:do_execsql_test(
         -- </e_expr-20.2>
     })
 
-local a, b, c
+local a, b, c -- luacheck: ignore unused a b c
 a = 0
 b = 0
 c = 0
