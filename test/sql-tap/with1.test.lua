@@ -631,6 +631,7 @@ local function limit_test(tn, iLimit, iOffset)
     end
     -- if X(0, "X!expr01", [["$iLimit < 0 "]]) then
     if iLimit < 0 then
+        assert(iLimit < 0) -- added to pass luacheck
         -- result = X(467, "X!cmd", [=[["lrange",["::I"],["iOffset"],"end"]]=])
         -- last is 20
     else
