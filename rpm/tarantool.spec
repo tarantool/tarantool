@@ -171,11 +171,7 @@ rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
 
 %check
 %if 0%{?rhel} != 6
-# Run all available test suites except 'replication'
-# which is not currently ready for this testing and
-# has standalone issue for it's enabling:
-# https://github.com/tarantool/tarantool/issues/4798
-TEST_RUN_EXCLUDE='replication/' make test-force
+make test-force
 %endif
 
 %pre
