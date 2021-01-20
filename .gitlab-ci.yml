@@ -174,7 +174,6 @@ before_script:
   script:
     - ${GITLAB_MAKE} test_jepsen
   stage: long_tests
-  when: manual
   tags:
     - mcs_jepsen_docker
   artifacts:
@@ -282,12 +281,14 @@ jepsen-single-instance-txm:
 
 jepsen-cluster:
   <<: *jepsen_test_definition
+  when: manual
   variables:
     LEIN_OPT: '--nemesis standard'
     INSTANCE_COUNT: '5'
 
 jepsen-cluster-txm:
   <<: *jepsen_test_definition
+  when: manual
   variables:
     LEIN_OPT: '--nemesis standard --mvcc'
     INSTANCE_COUNT: '5'
