@@ -754,8 +754,6 @@ if (0 > 0)
            ANALYZE;
         ]])
 
-    --db("close")
-    --sql("db", "test.db")
     test:do_eqp_test("7.4", "SELECT count(*) FROM t1", {
        {0, 0, 0, "SCAN TABLE T1"}
    })

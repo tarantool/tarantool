@@ -26,8 +26,6 @@ for _, enc in ipairs({"utf8"}) do
     test:do_test(
         "numcast-"..enc..".0",
         function()
-            --db("close")
-            --sql("db", ":memory:")
             --test:execsql("PRAGMA encoding='"..enc.."'")
             local x = "utf8"--test:execsql("PRAGMA encoding")[1]
             x = string.lower(x)

@@ -1062,8 +1062,6 @@ test:do_catchsql_test(
 
 -- # 2015-04-19: NULL pointer dereference on a corrupt schema
 -- #
--- db close
--- sql db :memory:
 -- do_execsql_test misc1-23.1 {
 --   CREATE TABLE t1(x INT );
 --   UPDATE sql_master SET sql='CREATE table t(d CHECK(T(#0)';
@@ -1074,9 +1072,7 @@ test:do_catchsql_test(
 -- } {}
 -- # 2015-04-19:  Faulty assert() statement
 -- #
--- db close
 -- database_may_be_corrupt
--- sql db :memory:
 -- do_catchsql_test misc1-23.2 {
 --   CREATE TABLE t1(x  INT UNIQUE);
 --   UPDATE sql_master SET sql='CREATE TABLE IF not EXISTS t(c)';
@@ -1085,8 +1081,6 @@ test:do_catchsql_test(
 --   ROLLBACK;
 --   DROP TABLE F;
 -- } {1 {no such table: F}}
--- db close
--- sql db :memory:
 -- do_catchsql_test misc1-23.3 {
 --   CREATE TABLE t1(x  INT UNIQUE);
 --   UPDATE sql_master SET sql='CREATE table y(a TEXT, a TEXT)';
