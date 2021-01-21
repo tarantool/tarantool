@@ -37,18 +37,20 @@
 #include "ssl_cert_paths_discover.h"
 #include "tt_static.h"
 
-static int is_dir_empty(const char *dir_path) {
+static int
+is_dir_empty(const char *dir_path)
+{
 	DIR *dir = opendir(dir_path);
 	if (!dir)
 		return 1;
 
-	struct dirent *d_ent;
+	struct dirent *ent;
 	int is_empty = 1;
-	while ((d_ent = readdir(dir))) {
-		if (strcmp(d_ent->d_name, ".") && strcmp(d_ent->d_name, "..")) {
-			if (d_ent->d_type == DT_REG ||
-				d_ent->d_type == DT_LNK ||
-				d_ent->d_type == DT_DIR) {
+	while ((ent = readdir(dir))) {
+		if (strcmp(ent->d_name, ".") && strcmp(ent->d_name, "..")) {
+			if (ent->d_type == DT_REG ||
+			    ent->d_type == DT_LNK ||
+			    ent->d_type == DT_DIR) {
 				is_empty = 0;
 				break;
 			}
@@ -59,17 +61,19 @@ static int is_dir_empty(const char *dir_path) {
 	return is_empty;
 }
 
-const char **get_default_cert_dir_paths() {
+const char **
+get_default_cert_dir_paths()
+{
 	static const char *default_cert_dir_paths[] = {
-		// Fedora/RHEL/Centos
+		/* Fedora/RHEL/Centos */
 		"/etc/pki/tls/certs",
-		// Debian/Ubuntu/Gentoo etc. (OpenSuse)
+		/* Debian/Ubuntu/Gentoo etc. (OpenSuse) */
 		"/etc/ssl/certs",
-		// FreeBSD
+		/* FreeBSD */
 		"/usr/local/share/certs",
-		// NetBSD
+		/* NetBSD */
 		"/etc/openssl/certs",
-		// macOS
+		/* macOS */
 		"/private/etc/ssl/certs",
 		"/usr/local/etc/openssl@1.1/certs",
 		"/usr/local/etc/openssl@1.0/certs",
@@ -79,19 +83,21 @@ const char **get_default_cert_dir_paths() {
 	return default_cert_dir_paths;
 }
 
-const char **get_default_cert_file_paths() {
+const char **
+get_default_cert_file_paths()
+{
 	static const char *default_cert_file_paths[] = {
-		// Fedora/RHEL 6
+		/* Fedora/RHEL 6 */
 		"/etc/pki/tls/certs/ca-bundle.crt",
-		// CentOS/RHEL 7
+		/* CentOS/RHEL 7 */
 		"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
-		// Debian/Ubuntu/Gentoo etc.
+		/* Debian/Ubuntu/Gentoo etc. */
 		"/etc/ssl/certs/ca-certificates.crt",
-		// OpenSUSE
+		/* OpenSUSE */
 		"/etc/ssl/ca-bundle.pem",
-		// FreeBSD
+		/* FreeBSD */
 		"/usr/local/share/certs/ca-root-nss.crt",
-		// macOS
+		/* macOS */
 		"/private/etc/ssl/cert.pem",
 		"/usr/local/etc/openssl@1.1/cert.pem",
 		"/usr/local/etc/openssl@1.0/cert.pem",
@@ -100,28 +106,30 @@ const char **get_default_cert_file_paths() {
 	return default_cert_file_paths;
 }
 
-void ssl_cert_paths_discover(int overwrite) {
+void
+ssl_cert_paths_discover(int overwrite)
+{
 	char *cert_dirs = tt_static_buf();
 	char *cert_dirs_end = cert_dirs;
 
-	const char *path_iter = NULL;
+	const char *path = NULL;
 	const char **default_dir_paths = get_default_cert_dir_paths();
-	for (int i = 0; (path_iter = default_dir_paths[i]); i++) {
+	for (int i = 0; (path = default_dir_paths[i]); i++) {
 		struct stat sb;
-		if (stat(path_iter, &sb) != 0 || !S_ISDIR(sb.st_mode))
+		if (stat(path, &sb) != 0 || !S_ISDIR(sb.st_mode))
 			continue;
 
-		if (!is_dir_empty(path_iter))
-			cert_dirs_end += sprintf(cert_dirs_end, "%s:", path_iter);
+		if (!is_dir_empty(path))
+			cert_dirs_end += sprintf(cert_dirs_end, "%s:", path);
 	}
 
-	path_iter = NULL;
+	path = NULL;
 	const char *cert_file = NULL;
 	const char **default_file_paths = get_default_cert_file_paths();
-	for (int i = 0; (path_iter = default_file_paths[i]); i++) {
+	for (int i = 0; (path = default_file_paths[i]); i++) {
 		struct stat sb;
-		if (stat(path_iter, &sb) == 0) {
-			cert_file = path_iter;
+		if (stat(path, &sb) == 0) {
+			cert_file = path;
 			break;
 		}
 	}
