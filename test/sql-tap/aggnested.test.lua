@@ -73,7 +73,6 @@ test:do_execsql_test("aggnested-1.4",
 -- # http://www.mail-archive.com/sql-users@sql.org/msg70787.html
 -- #
 -- do_test aggnested-2.0 {
---   sql db2 :memory:
 --   db2 eval {
 --     CREATE TABLE t1 (A1 INTEGER NOT NULL,A2 INTEGER NOT NULL,A3 INTEGER NOT 
 --     NULL,A4 INTEGER NOT NULL,PRIMARY KEY(A1));

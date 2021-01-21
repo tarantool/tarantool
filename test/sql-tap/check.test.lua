@@ -227,8 +227,6 @@ test:do_execsql_test(
         -- </check-2.2>
     })
 
---db("close")
---sql("db", "test.db")
 test:do_execsql_test(
     "check-2.3",
     [[

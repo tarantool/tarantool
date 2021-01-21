@@ -52,8 +52,6 @@ test:do_execsql_test(
 -- test:do_test(
 --     "autoinc-1.4",
 --     function()
---         db("close")
---         sql("db", "test.db")
 --         return test:execsql([[
 --             SELECT * FROM _sequence;
 --         ]])

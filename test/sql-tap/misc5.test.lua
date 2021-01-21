@@ -308,7 +308,6 @@ test:do_test(
 -- # schema.
 -- #
 -- do_test misc5-7.2 {
---   sql db2 :memory:
 --   catchsql {
 --     CREATE TABLE t1(x  INT UNIQUE);
 --     UPDATE sql_master SET sql='CREATE table t(o CHECK(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((;VALUES(o)';

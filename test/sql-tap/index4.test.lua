@@ -58,8 +58,6 @@ test:do_execsql_test(
 
 -- MUST_WORK_TEST limit memory
 --soft_limit = sql_soft_heap_limit(50000)
---db("close")
---sql("db", "test.db")
 --test:do_execsql_test(
 --    1.4,
 --    [[

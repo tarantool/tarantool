@@ -50,7 +50,6 @@ test:plan(3)
 test:do_test(
     "tkt1443-1.0",
     function()
-        --sql("db", ":memory:")
         return test:execsql(string.format([[
             CREATE TABLE Items(
                 itemId integer primary key,

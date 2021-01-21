@@ -2170,8 +2170,6 @@ test:do_test(
         "def", "abc", "X"
         -- </e_expr-15.1.4>
     })
---db("close")
---sql("db", "test.db")
 -- EVIDENCE-OF: R-22868-25880 The LIKE operator can be made case
 -- sensitive using the case_sensitive_like pragma.
 --
@@ -3245,9 +3243,6 @@ end
 ---------------------------------------------------------------------------
 -- Test statements related to scalar sub-queries.
 --
--- catch { db close }
--- forcedelete test.db
--- sql db test.db
 test:catchsql "DROP TABLE t22;"
 test:do_execsql_test(
     "e_expr-35.0",

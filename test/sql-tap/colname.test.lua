@@ -435,8 +435,6 @@ test:do_execsql2_test(
 test:do_test(
     "colname-6.1",
     function()
-        --db("close")
-        --sql("db", "test.db")
         -- instead of reconnect to database
         -- we are just turning settings to default state
         test:execsql([[

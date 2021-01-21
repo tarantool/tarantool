@@ -805,8 +805,6 @@ box.internal.sql_create_function("cksum", cksum)
     ---------------------------------------------------------------------------
     --
     for _ in X(0, "X!foreach", [=[["tn mmap_limit nWorker tmpstore coremutex fakeheap softheaplimit","\n             1          0       3     file      true    false             0\n             2          0       3     file      true     true             0\n             3          0       0     file      true    false             0\n             4    1000000       3     file      true    false             0\n             5          0       0   memory     false     true             0\n             6          0       0     file     false     true       1000000     \n             7          0       0     file     false     true         10000\n   "]]=]) do
-        db("close")
-        sql_shutdown()
         if coremutex then
             sql_config("multithread")
         else
@@ -815,7 +813,6 @@ box.internal.sql_create_function("cksum", cksum)
         sql_initialize()
         X(558, "X!cmd", [=[["sorter_test_fakeheap",["fakeheap"]]]=])
         sql_soft_heap_limit(softheaplimit)
-        reset_db()
         sql_test_control("sql_TESTCTRL_SORTER_MMAP", "db", mmap_limit)
         test:execsql(string.format("PRAGMA temp_store = %s; PRAGMA threads = '%s'", tmpstore, nWorker))
         local ten, one
@@ -870,15 +867,12 @@ box.internal.sql_create_function("cksum", cksum)
 
         X(605, "X!cmd", [=[["sorter_test_fakeheap","0"]]=])
     end
-    db("close")
-    sql_shutdown()
     X(617, "X!cmd", [=[["set","t(0)","singlethread"]]=])
     X(618, "X!cmd", [=[["set","t(1)","multithread"]]=])
     X(619, "X!cmd", [=[["set","t(2)","serialized"]]=])
     sql_config(X(620, "X!expr", [=[["t($sql_options(threadsafe))"]]=]))
     sql_initialize()
     sql_soft_heap_limit(0)
-    reset_db()
     test:do_catchsql_test(
         16.1,
         [[
@@ -895,7 +889,6 @@ box.internal.sql_create_function("cksum", cksum)
             -- </16.1>
         })
 
-    reset_db()
     test:do_catchsql_test(
         16.2,
         [[
@@ -912,7 +905,6 @@ box.internal.sql_create_function("cksum", cksum)
             -- </16.2>
         })
 
-    reset_db()
     test:do_execsql_test(
         17.1,
         [[
