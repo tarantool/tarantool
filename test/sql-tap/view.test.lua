@@ -88,8 +88,6 @@ test:do_execsql_test(
 test:do_test(
     "view-1.3.1",
     function()
-        --db("close")
-        --sql("db", "test.db")
         return test:execsql [[
             SELECT * FROM v1 ORDER BY a;
         ]]
@@ -502,14 +500,12 @@ test:do_execsql_test(
         -- </view-7.1>
     })
 
--- MUST_WORK_TEST db close problem
+-- MUST_WORK_TEST
 if (0 > 0)
  then
     test:do_test(
         "view-7.2",
         function()
-            db("close")
-            sql("db", "test.db")
             return test:execsql [[
                 SELECT * FROM test;
             ]]
@@ -540,8 +536,6 @@ if (0 > 0)
     test:do_test(
         "view-7.4",
         function()
-            db("close")
-            sql("db", "test.db")
             return test:execsql [[
                 SELECT * FROM test;
             ]]
@@ -572,8 +566,6 @@ if (0 > 0)
     test:do_test(
         "view-7.6",
         function()
-            db("close")
-            sql("db", "test.db")
             return test:execsql [[
                 SELECT * FROM test;
             ]]
@@ -595,14 +587,12 @@ test:do_execsql_test(
         -- </view-8.1>
     })
 
--- MUST_WORK_TEST db close
+-- MUST_WORK_TEST
 if (0 > 0)
  then
     test:do_test(
         "view-8.2",
         function()
-            db("close")
-            sql("db", "test.db")
             return test:execsql [[
                 SELECT * FROM v6 ORDER BY xyz;
             ]]
@@ -1068,8 +1058,6 @@ test:do_execsql_test(
 if (0 > 0)
  then
     -- Ticket #d58ccbb3f1b"]],":"],"Prevent","Table.nRef","overflow.
-    --db("close")
-    --sql("db", ":memory:")
     test:execsql([[
         drop view v1;
         drop view v2;
@@ -1120,8 +1108,6 @@ if (0 > 0)
 
 
 
-    --db("close")
-    --sql("db", ":memory:")
     test:do_execsql_test(
         "view-22.1",
         [[

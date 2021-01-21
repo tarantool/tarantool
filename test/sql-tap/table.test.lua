@@ -422,9 +422,6 @@ if (0 > 0)
     test:do_test(
         "table-5.2.2",
         function()
-            db("close")
-            forcedelete("test.db")
-            sql("db", "test.db")
             return test:execsql [[
                 CREATE TABLE t0(a,b);
                 CREATE INDEX t ON t0(a);
@@ -440,9 +437,6 @@ if (0 > 0)
             -- </table-5.2.2>
         })
 
-    db("close")
-    forcedelete("test.db")
-    sql("db", "test.db")
     X(313, "X!cmd", [=[["Make","sure","an","EXPLAIN","does","not","really","create","a","new","table"]]=])
 end
 test:do_test(
