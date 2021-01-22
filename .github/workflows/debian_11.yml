@@ -71,3 +71,5 @@ jobs:
             Commit ${{github.sha}}
             Author ${{ github.actor }}
             Branch/tag ${{ github.ref }}
+            📝 Commit message
+            ${{ github.event.head_commit.message }}
