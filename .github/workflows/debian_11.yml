@@ -58,6 +58,10 @@ jobs:
           name: debian-bullseye
           retention-days: 21
           path: test/var/artifacts
+      - name: GITHUB CONTEXT
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$GITHUB_CONTEXT"
       - name: send on failure Telegram notification
         uses: appleboy/telegram-action@master
         if: failure() || cancelled()
