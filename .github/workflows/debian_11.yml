@@ -22,6 +22,8 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+      # must be before the main job to get needed environment
+      - uses: FranzDiebold/github-env-vars-action@v2
       - name: packaging
         env:
           # Our testing expects that the init process (PID 1) will
@@ -56,7 +58,6 @@ jobs:
           name: debian-bullseye
           retention-days: 21
           path: test/var/artifacts
-      - uses: FranzDiebold/github-env-vars-action@v2
       - name: send on failure Telegram notification
         uses: appleboy/telegram-action@master
         if: failure() || cancelled()
