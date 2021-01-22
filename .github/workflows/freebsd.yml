@@ -1,0 +1,42 @@
+name: freebsd
+
+on: [push, pull_request]
+
+jobs:
+  freebsd:
+    # We want to run on external PRs, but not on our own internal PRs
+    # as they'll be run by the push to the branch.
+    if: github.event_name == 'push' ||
+        github.event.pull_request.head.repo.full_name != github.repository
+
+    runs-on: macos-latest
+
+    strategy:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v2.3.4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Test in FreeBSD
+        id: test
+        uses: vmactions/freebsd-vm@v0.1.0
+        with:
+          usesh: true
+          sync: sshfs
+          mem: 8192
+          prepare: |
+            pwd
+            ls -lah
+            whoami
+            env
+            freebsd-version
+          run: make -f .travis.mk test_freebsd
+      - name: artifacts
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: freebsd
+          retention-days: 21
+          path: test/var/artifacts

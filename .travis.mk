@@ -385,8 +385,9 @@ test_static_build_cmake_osx_github_actions: base_deps_osx_github_actions test_st
 ###########
 
 deps_freebsd:
-	sudo pkg install -y git cmake gmake icu libiconv \
-		python27 py27-yaml py27-six py27-gevent
+	echo y | pkg update -f
+	pkg install -y git cmake gmake icu libiconv \
+		python37 py37-yaml py37-six py37-gevent
 
 build_freebsd:
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
