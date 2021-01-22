@@ -67,5 +67,6 @@ jobs:
             ❌ Job failed ${{ env.CI_WORKFLOW }}
             🌐 https://github.com/${{ github.repository }}/actions/runs/${{ env.CI_RUN_ID }}
             On ${{ github.event_name }}
+            Commit ${{github.sha}}
             Author ${{ github.actor }}
-            Commit ${{github.sha}}@${{ github.ref }}]
+            Branch/tag ${{ github.ref }}
