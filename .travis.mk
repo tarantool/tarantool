@@ -369,6 +369,7 @@ test_static_build_cmake_osx: base_deps_osx
 ###########
 
 deps_freebsd:
+	echo y | sudo pkg update -f
 	sudo pkg install -y git cmake gmake icu libiconv \
 		python27 py27-yaml py27-six py27-gevent
 
