@@ -30,6 +30,8 @@
  */
 #include <assert.h>
 #include <string.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include "fakesys/fakenet.h"
 #include "swim/swim_transport.h"
 
