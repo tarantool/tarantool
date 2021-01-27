@@ -1440,7 +1440,7 @@ test_run:cmd("create server test with script='box/lua/cfg_memory.lua'")
 ---
 - true
 ...
-test_run:cmd(string.format("start server test with args='%d'", 100 * 1024 * 1024))
+test_run:cmd(string.format("start server test with args='%d'", 112 * 1024 * 1024))
 ---
 - true
 ...

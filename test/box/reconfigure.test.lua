@@ -68,7 +68,7 @@ pad = string.rep('x', 100 * 1024)
 for i = 1, count do s:replace{i, pad} end -- error: not enough memory
 s:count() < count
 
-box.cfg{memtx_memory = 64 * 1024 * 1024}
+box.cfg{memtx_memory = 80 * 1024 * 1024}
 box.slab.info().quota_size
 
 for i = s:count() + 1, count do s:replace{i, pad} end -- ok
