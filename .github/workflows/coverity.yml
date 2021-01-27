@@ -1,6 +1,7 @@
 name: coverity
 
 on:
+  push:
   schedule:
     - cron:  '0 4 * * 6'
 
@@ -49,3 +50,17 @@ jobs:
           name: debug
           retention-days: 21
           path: test/var/artifacts
+
+      # Find the PR associated with this push, if there is one.
+      - uses: jwalton/gh-find-current-pr@v1
+        id: findPr
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create comment in PR if it exists
+        if: steps.findPr.outputs.number
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          issue-number: ${{ steps.findPr.outputs.pr }}
+          body: |
+            [![Coverity Status](https://scan.coverity.com/projects/11609/badge.svg?flat=1)](https://scan.coverity.com/projects/tarantool-tarantool)
+          reactions: '+1'
