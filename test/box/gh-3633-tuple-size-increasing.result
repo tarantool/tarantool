@@ -1,0 +1,98 @@
+-- test-run result file version 2
+env = require('test_run')
+ | ---
+ | ...
+test_run = env.new()
+ | ---
+ | ...
+test_run:cmd("create server test with script='box/gh-3633-simple-tuple-size-increasing.lua'")
+ | ---
+ | - true
+ | ...
+test_run:cmd("start server test")
+ | ---
+ | - true
+ | ...
+test_run:cmd("switch test")
+ | ---
+ | - true
+ | ...
+digest = require('digest')
+ | ---
+ | ...
+
+s = box.schema.space.create('test')
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ';'")
+ | ---
+ | - true
+ | ...
+_ = s:create_index('primary', {
+    if_not_exists = true,
+    type = 'tree',
+    parts = {1, 'integer'}
+});
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
+ | ...
+
+size = 500 * 1024
+ | ---
+ | ...
+str = digest.urandom(size)
+ | ---
+ | ...
+-- insert tuples, until we get error due to no enough of memory
+for i = 1, 1024 do s:insert({i, str}) end
+ | ---
+ | - error: Failed to allocate 512023 bytes in slab allocator for memtx_tuple
+ | ...
+-- truncate space, and collect garbage (free previous allocated memory)
+s:truncate()
+ | ---
+ | ...
+collectgarbage('collect')
+ | ---
+ | - 0
+ | ...
+
+-- check that we have enought space for tuples, in previous allocator strategy,
+-- we get error, because spare slabs takes a lot of memory
+test_run:cmd("setopt delimiter ';'")
+ | ---
+ | - true
+ | ...
+for j = 9, 40 do
+    size = j * 8 * 1024
+    str = digest.urandom(size)
+    for i = 1, 1024 do s:insert({i, str}) end
+    for i = 1, 1024 do s:delete(i) end
+    collectgarbage('collect')
+end;
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
+ | ...
+
+box.space.test:drop()
+ | ---
+ | ...
+
+test_run:cmd("switch default")
+ | ---
+ | - true
+ | ...
+test_run:cmd("stop server test")
+ | ---
+ | - true
+ | ...
+test_run:cmd("cleanup server test")
+ | ---
+ | - true
+ | ...

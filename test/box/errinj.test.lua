@@ -500,7 +500,7 @@ s:drop()
 -- if snapshot is in progress.
 --
 test_run:cmd("create server test with script='box/lua/cfg_memory.lua'")
-test_run:cmd(string.format("start server test with args='%d'", 100 * 1024 * 1024))
+test_run:cmd(string.format("start server test with args='%d'", 112 * 1024 * 1024))
 test_run:cmd("switch test")
 
 fiber = require('fiber')
