@@ -9,10 +9,15 @@ project(tarantool-static C CXX)
 
 include(ExternalProject)
 set(OPENSSL_VERSION 1.1.1f)
+set(OPENSSL_HASH 3f486f2f4435ef14b81814dbbc7b48bb)
 set(ZLIB_VERSION 1.2.11)
+set(ZLIB_HASH 1c9f62f0778697a09d36121ead88e08e)
 set(NCURSES_VERSION 6.2)
+set(NCURSES_HASH e812da327b1c2214ac1aed440ea3ae8d)
 set(READLINE_VERSION 8.0)
+set(READLINE_HASH 7e6c1f16aee3244a69aba6e438295ca3)
 set(UNWIND_VERSION 1.3-rc1)
+set(UNWIND_HASH f09b670de5db6430a3de666e6aed60e3)
 
 # Pass -isysroot=<SDK_PATH> option on Mac OS to a preprocessor and a C
 # compiler to find header files installed with an SDK.
@@ -40,6 +45,7 @@ endif()
 #
 ExternalProject_Add(openssl
     URL https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz
+    URL_MD5 ${OPENSSL_HASH}
     CONFIGURE_COMMAND <SOURCE_DIR>/config
         CC=${CMAKE_C_COMPILER}
         CXX=${CMAKE_CXX_COMPILER}
@@ -84,6 +90,7 @@ ExternalProject_Add(icu
 #
 ExternalProject_Add(zlib
     URL https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz
+    URL_MD5 ${ZLIB_HASH}
     CONFIGURE_COMMAND env
         CC=${CMAKE_C_COMPILER}
         CFLAGS=${DEPENDENCY_CFLAGS}
@@ -99,6 +106,7 @@ ExternalProject_Add(zlib
 #
 ExternalProject_Add(ncurses
     URL https://ftp.gnu.org/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz
+    URL_MD5 ${NCURSES_HASH}
     CONFIGURE_COMMAND <SOURCE_DIR>/configure
         CC=${CMAKE_C_COMPILER}
         CXX=${CMAKE_CXX_COMPILER}
@@ -132,6 +140,7 @@ ExternalProject_Add(ncurses
 #
 ExternalProject_Add(readline
     URL https://ftp.gnu.org/gnu/readline/readline-${READLINE_VERSION}.tar.gz
+    URL_MD5 ${READLINE_HASH}
     CONFIGURE_COMMAND <SOURCE_DIR>/configure
         CC=${CMAKE_C_COMPILER}
         CFLAGS=${DEPENDENCY_CFLAGS}
@@ -241,6 +250,7 @@ if (APPLE)
 else()
     ExternalProject_Add(unwind
         URL https://download.savannah.nongnu.org/releases/libunwind/libunwind-${UNWIND_VERSION}.tar.gz
+        URL_MD5 ${UNWIND_HASH}
         CONFIGURE_COMMAND <SOURCE_DIR>/configure
             CC=${CMAKE_C_COMPILER}
             CXX=${CMAKE_CXX_COMPILER}
