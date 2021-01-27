@@ -157,9 +157,9 @@ test_coverage_debian_no_deps: build_coverage_debian
 	@if [ -n "$(COVERALLS_TOKEN)" ]; then \
 		echo "Exporting code coverage information to coveralls.io"; \
 		gem install coveralls-lcov; \
-		echo coveralls-lcov --service-name github-ci --service-job-id $(GITHUB_RUN_ID) \
+		echo coveralls-lcov --service-name github --service-job-id $(GITHUB_RUN_ID) \
 			--repo-token [FILTERED] coverage.info; \
-		coveralls-lcov --service-name github-ci --service-job-id $(GITHUB_RUN_ID) \
+		coveralls-lcov --service-name github --service-job-id $(GITHUB_RUN_ID) \
 			--repo-token $(COVERALLS_TOKEN) coverage.info; \
 	fi;
 
