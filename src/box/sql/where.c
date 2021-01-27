@@ -853,6 +853,7 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 				part->sort_order = SORT_ORDER_ASC;
 				part->coll_id = field->coll_id;
 				part->path = NULL;
+				part->exclude_null = false;
 				n++;
 			}
 		}
@@ -873,6 +874,7 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 			part->sort_order = SORT_ORDER_ASC;
 			part->coll_id = field->coll_id;
 			part->path = NULL;
+			part->exclude_null = false;
 			n++;
 		}
 	}
@@ -887,6 +889,7 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 			part->sort_order = SORT_ORDER_ASC;
 			part->coll_id = field->coll_id;
 			part->path = NULL;
+			part->exclude_null = false;
 			n++;
 		}
 	}
