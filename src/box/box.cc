@@ -857,6 +857,7 @@ box_check_small_alloc_options(void)
 	 * result if the user enters a large value.
 	 */
 	int64_t granularity = cfg_geti64("granularity");
+	float alloc_factor = cfg_getd("slab_alloc_factor");
 	/*
 	 * Granularity must be exponent of two and >= 4.
 	 * We can use granularity value == 4 only because we used small
@@ -871,6 +872,10 @@ box_check_small_alloc_options(void)
 			  "must be greater than or equal to 4,"
 			  " less than or equal"
 			  " to 1024 * 16 and exponent of two");
+	if (alloc_factor > 2.0 || alloc_factor <= 1.0)
+		tnt_raise(ClientError, ER_CFG, "slab_alloc_factor",
+			  "must be less than or equal to 2.0 and"
+			  " greater than 1.0");
 }
 
 void

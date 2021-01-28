@@ -1116,16 +1116,6 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	if (objsize_min < OBJSIZE_MIN)
 		objsize_min = OBJSIZE_MIN;
 
-	if (alloc_factor > 2) {
-		say_error("Alloc factor must be less than or equal to 2.0. It "
-			  "will be reduced to 2.0");
-		alloc_factor = 2.0;
-	} else if (alloc_factor <= 1.0) {
-		say_error("Alloc factor must be greater than 1.0. It will be "
-			  "increased to 1.001");
-		alloc_factor = 1.001;
-	}
-
 	/* Initialize tuple allocator. */
 	quota_init(&memtx->quota, tuple_arena_max_size);
 	tuple_arena_create(&memtx->arena, &memtx->quota, tuple_arena_max_size,

@@ -482,7 +482,7 @@ test_run:cmd('switch cfg_tester4')
 box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
  | ---
  | - 268435456
- | - 3.14
+ | - 2
  | - 4
  | ...
 test_run:cmd("switch default")
@@ -693,24 +693,38 @@ test_run:cmd("cleanup server cfg_tester8")
  | - true
  | ...
 
-test_run:cmd('create server cfg_tester9 with script = "box/lua/cfg_test1.lua"')
+test_run:cmd('create server cfg_tester9 with script = "box/lua/cfg_test9.lua"')
  | ---
  | - true
  | ...
-test_run:cmd("start server cfg_tester9")
+-- slab_alloc_factor == 3.14 is invalid, because it must be less than or equal to 2.0
+test_run:cmd("start server cfg_tester9 with crash_expected=True")
+ | ---
+ | - false
+ | ...
+test_run:cmd("cleanup server cfg_tester9")
+ | ---
+ | - true
+ | ...
+
+test_run:cmd('create server cfg_tester10 with script = "box/lua/cfg_test1.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd("start server cfg_tester10")
  | ---
  | - true
  | ...
 --- Check that the warning isn't printed.
-test_run:wait_log('cfg_tester9', version_warning, 1000, 1.0) == nil
+test_run:wait_log('cfg_tester10', version_warning, 1000, 1.0) == nil
  | ---
  | - true
  | ...
-test_run:cmd("stop server cfg_tester9")
+test_run:cmd("stop server cfg_tester10")
  | ---
  | - true
  | ...
-test_run:cmd("cleanup server cfg_tester9")
+test_run:cmd("cleanup server cfg_tester10")
  | ---
  | - true
  | ...

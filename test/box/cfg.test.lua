@@ -171,9 +171,14 @@ test_run:wait_log('cfg_tester8', version_warning, 1000, 1.0) ~= nil
 test_run:cmd("stop server cfg_tester8")
 test_run:cmd("cleanup server cfg_tester8")
 
-test_run:cmd('create server cfg_tester9 with script = "box/lua/cfg_test1.lua"')
-test_run:cmd("start server cfg_tester9")
---- Check that the warning isn't printed.
-test_run:wait_log('cfg_tester9', version_warning, 1000, 1.0) == nil
-test_run:cmd("stop server cfg_tester9")
+test_run:cmd('create server cfg_tester9 with script = "box/lua/cfg_test9.lua"')
+-- slab_alloc_factor == 3.14 is invalid, because it must be less than or equal to 2.0
+test_run:cmd("start server cfg_tester9 with crash_expected=True")
 test_run:cmd("cleanup server cfg_tester9")
+
+test_run:cmd('create server cfg_tester10 with script = "box/lua/cfg_test1.lua"')
+test_run:cmd("start server cfg_tester10")
+--- Check that the warning isn't printed.
+test_run:wait_log('cfg_tester10', version_warning, 1000, 1.0) == nil
+test_run:cmd("stop server cfg_tester10")
+test_run:cmd("cleanup server cfg_tester10")
