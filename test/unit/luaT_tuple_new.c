@@ -120,6 +120,7 @@ test_basic(struct lua_State *L)
 	part.coll_id = COLL_NONE;
 	part.is_nullable = false;
 	part.nullable_action = ON_CONFLICT_ACTION_DEFAULT;
+	part.exclude_null = false;
 	part.sort_order = SORT_ORDER_ASC;
 	part.path = NULL;
 	struct key_def *key_def = key_def_new(&part, 1, false);
