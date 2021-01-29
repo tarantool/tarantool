@@ -371,7 +371,7 @@ test:do_execsql_test(
         SELECT max(x) FROM t3 LIMIT 0
     ]], {
         -- <minmax2-6.6>
-        
+
         -- </minmax2-6.6>
     })
 

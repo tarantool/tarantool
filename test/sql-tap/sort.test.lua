@@ -655,7 +655,7 @@ test:do_execsql_test(
         INSERT INTO t7 VALUES(4);
     ]], {
         -- <sort-10.1>
-        
+
         -- </sort-10.1>
     })
 
@@ -739,7 +739,7 @@ test:do_test(
         test:execsql("COMMIT;")
     end, {
         -- <sort-13.1>
-        
+
         -- </sort-13.1>
     })
 
@@ -805,7 +805,7 @@ box.internal.sql_create_function("cksum", cksum)
                 X(536, "X!cmd", [=[["db","eval"," SELECT * FROM t11 ORDER BY b ","\n         if {$b != [cksum $a]} {error \"checksum failed\"}\n         if {[string compare $b $prev] < 0} {error \"sort failed\"}\n         set prev $b\n       "]]=])
                 return X(541, "X!cmd", [=[["set","",""]]=])
             end, {
-                
+
             })
 
     end
@@ -927,7 +927,7 @@ box.internal.sql_create_function("cksum", cksum)
             SELECT * FROM sql_master ORDER BY sql;
         ]], {
             -- <17.1>
-            
+
             -- </17.1>
         })
 

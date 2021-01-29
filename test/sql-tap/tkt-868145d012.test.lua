@@ -46,7 +46,7 @@ test:do_execsql_test(
         INSERT INTO a VALUES(6,'1234',99);
     ]], {
         -- <tkt-868145d012.100>
-        
+
         -- </tkt-868145d012.100>
     })
 

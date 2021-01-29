@@ -49,8 +49,6 @@ exclude_files = {
 
 files["test/sql-tap/**/*.lua"] = {
     ignore = {
-        -- A line consists of nothing but whitespace.
-        "611",
         -- Line is too long.
         -- https://github.com/tarantool/tarantool/issues/5181
         "631"

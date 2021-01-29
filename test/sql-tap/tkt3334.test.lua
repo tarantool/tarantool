@@ -44,7 +44,7 @@ test:do_execsql_test(
         SELECT a FROM (SELECT a FROM t1 ORDER BY b LIMIT 2) WHERE a=1;
     ]], {
         -- <tkt3334-1.1>
-        
+
         -- </tkt3334-1.1>
     })
 

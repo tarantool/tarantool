@@ -38,7 +38,7 @@ test:do_execsql_test(
         COMMIT;
     ]], {
         -- <join5-1.1>
-        
+
         -- </join5-1.1>
     })
 
@@ -131,7 +131,7 @@ test:do_execsql_test(
         SELECT * FROM xy LEFT JOIN ab ON false WHERE false
     ]], {
         -- <join5-2.4>
-        
+
         -- </join5-2.4>
     })
 
@@ -141,7 +141,7 @@ test:do_execsql_test(
         SELECT * FROM xy LEFT JOIN ab ON true WHERE false
     ]], {
         -- <join5-2.5>
-        
+
         -- </join5-2.5>
     })
 
@@ -151,7 +151,7 @@ test:do_execsql_test(
         SELECT * FROM xy LEFT JOIN ab ON NULL WHERE false
     ]], {
         -- <join5-2.6>
-        
+
         -- </join5-2.6>
     })
 
@@ -191,7 +191,7 @@ test:do_execsql_test(
         SELECT * FROM xy LEFT JOIN ab ON false WHERE NULL
     ]], {
         -- <join5-2.10>
-        
+
         -- </join5-2.10>
     })
 
@@ -201,7 +201,7 @@ test:do_execsql_test(
         SELECT * FROM xy LEFT JOIN ab ON true WHERE NULL
     ]], {
         -- <join5-2.11>
-        
+
         -- </join5-2.11>
     })
 
@@ -211,7 +211,7 @@ test:do_execsql_test(
         SELECT * FROM xy LEFT JOIN ab ON NULL WHERE NULL
     ]], {
         -- <join5-2.12>
-        
+
         -- </join5-2.12>
     })
 
@@ -286,7 +286,7 @@ test:do_execsql_test(
         SELECT * FROM x1 LEFT JOIN x2 JOIN x3 WHERE x3.d = x2.b;
     ]], {
         -- <join5-3.3>
-        
+
         -- </join5-3.3>
     })
 

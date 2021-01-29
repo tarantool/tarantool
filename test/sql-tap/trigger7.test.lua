@@ -125,7 +125,7 @@ test:do_execsql_test(
         DROP TRIGGER t2r6;
     ]], {
         -- <trigger7-3.1>
-        
+
         -- </trigger7-3.1>
     })
 
