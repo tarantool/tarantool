@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 
-repl_include_self = arg[1] and arg[1] == 'true' or false
-repl_list = nil
+local repl_include_self = arg[1] and arg[1] == 'true' or false
+local repl_list
 
 if repl_include_self then
     repl_list = {os.getenv("MASTER"), os.getenv("LISTEN")}
