@@ -15,9 +15,9 @@ end
 
 -- start console first
 require('console').listen(os.getenv('ADMIN'))
-env = require('test_run')
-test_run = env.new()
-engine = test_run:get_cfg('engine')
+local env = require('test_run')
+local test_run = env.new()
+local engine = test_run:get_cfg('engine')
 
 box.cfg({
     listen = instance_uri(INSTANCE_ID);

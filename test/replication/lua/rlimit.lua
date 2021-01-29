@@ -1,5 +1,5 @@
 
-ffi = require('ffi')
+local ffi = require('ffi')
 pcall(ffi.cdef, [[
 typedef long rlim_t;
 struct rlimit {

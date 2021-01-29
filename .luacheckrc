@@ -36,7 +36,7 @@ exclude_files = {
     "test/engine/*.test.lua",
     "test/engine_long/*.test.lua",
     "test/luajit-tap/**/*.lua",
-    "test/replication/**/*.lua",
+    "test/replication/*.test.lua",
     "test/replication-py/**/*.lua",
     "test/sql/**/*.lua",
     "test/swim/*.test.lua",
@@ -131,4 +131,10 @@ files["test/swim/box.lua"] = {
         "uuid",
         "uri",
     }
+}
+files["test/replication/replica_quorum.lua"] = {
+    globals = {
+        "INSTANCE_URI",
+        "nonexistent_uri",
+    },
 }

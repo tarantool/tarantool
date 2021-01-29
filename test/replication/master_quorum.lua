@@ -26,8 +26,8 @@ box.cfg({
     replication_timeout = TIMEOUT;
 })
 
-test_run = require('test_run').new()
-engine = test_run:get_cfg('engine')
+local test_run = require('test_run').new()
+local engine = test_run:get_cfg('engine')
 
 box.once("bootstrap", function()
     box.schema.user.grant("guest", 'replication')
