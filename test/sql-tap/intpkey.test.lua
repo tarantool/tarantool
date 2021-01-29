@@ -30,7 +30,7 @@ test:do_execsql_test(
         CREATE TABLE t1(a TEXT PRIMARY KEY, b INT, c INT);
     ]], {
         -- <intpkey-1.0>
-        
+
         -- </intpkey-1.0>
     })
 
@@ -58,7 +58,7 @@ test:do_execsql_test(
         --  WHERE type='index' AND tbl_name='t1';
     ]], {
         -- <intpkey-1.2>
-        
+
         -- </intpkey-1.2>
     })
 
@@ -74,7 +74,7 @@ test:do_test(
         --db last_insert_rowid
     end, {
         -- <intpkey-1.3>
-        
+
         -- </intpkey-1.3>
     })
 
@@ -386,7 +386,7 @@ test:do_execsql_test(
         CREATE INDEX i2 ON t1(a);
     ]], {
         -- <intpkey-3.1>
-        
+
         -- </intpkey-3.1>
     })
 
@@ -433,7 +433,7 @@ test:do_execsql_test(
         CREATE INDEX i3 ON t1(c,a);
     ]], {
         -- <intpkey-3.5>
-        
+
         -- </intpkey-3.5>
     })
 
@@ -635,7 +635,7 @@ test:do_execsql_test(
         SELECT * FROM t1 WHERE b=='b-21';
     ]], {
         -- <intpkey-6.3>
-        
+
         -- </intpkey-6.3>
     })
 
@@ -658,7 +658,7 @@ test:do_execsql_test(
         --SELECT * FROM t1 WHERE rowid>=30;
     ]], {
         -- <intpkey-7.1>
-        
+
         -- </intpkey-7.1>
     })
 
@@ -766,7 +766,7 @@ test:do_execsql_test(
         SELECT b FROM t1 WHERE a=2.0+3.5;
     ]], {
         -- <intpkey-11.1>
-        
+
         -- </intpkey-11.1>
     })
 
@@ -780,7 +780,7 @@ test:do_execsql_test(
         SELECT * FROM t1 WHERE a>2147483648;
     ]], {
         -- <intpkey-15.1>
-        
+
         -- </intpkey-15.1>
     })
 
@@ -805,7 +805,7 @@ test:do_execsql_test(
         SELECT b FROM t1 WHERE a>2147483648;
     ]], {
         -- <intpkey-15.3>
-        
+
         -- </intpkey-15.3>
     })
 

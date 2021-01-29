@@ -50,7 +50,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select 11 from t1 where 19 in (t1.b,+11,coalesce((select max((abs(17)/abs(t1.f))) from t1 where ((abs(t1.f)/abs(t1.b)) in (select case (min(t1.a | d*d)+(abs(count(*)-count(*)+ -count(*)*max( -t1.c))-max(f))) when  -count(distinct 19) then ((count(*))) else max(13) end from t1 union select count(distinct b) from t1)) or 19 in (t1.a,t1.c,17)),17) | 17)),13) FROM t1 WHERE not not c=a-+(select case ~case  -~+count(distinct (select count(distinct t1.a)*max(13) from t1))+max( -19*f)*max(f)*max(f)* -count(distinct d)-(count(distinct 11)) | max(t1.f)*count(*) when count(distinct b) then count(distinct t1.b) else  -min(t1.f) end*cast(avg(11) AS integer) when max(t1.f) then max(c) else count(*) end from t1)+d"
     end, {
         -- <randexpr-2.1>
-        
+
         -- </randexpr-2.1>
     })
 
@@ -90,7 +90,7 @@ test:do_test(
         return test:execsql "SELECT t1.c*19-t1.f*19+coalesce((select 17 from t1 where e in (f,case (select cast(avg(t1.a) AS integer) from t1)-t1.d when coalesce((select +case when not exists(select 1 from t1 where 17<>t1.f and ((a))<t1.b) then t1.c when c not between b and 11 then case when t1.c<f then t1.b when e in (t1.d,t1.d, -e) then d else t1.b end else f end+11 from t1 where exists(select 1 from t1 where t1.f in (select (count(distinct f)) from t1 union select max(11) from t1))),e) then 11 else t1.a end,t1.d)),13)*b+b FROM t1 WHERE NOT (~t1.b<case when t1.b+t1.c in (select  -count(distinct 17+coalesce((select max( -f+t1.c-d) from t1 where (19>=a) and t1.b between f and 13),t1.a))+case abs(+(max(19))) | count(distinct t1.e) | count(distinct 19) when count(*) then (max(a)) else count(distinct d) end from t1 union select (count(*)) from t1) and t1.b>=19 then d when t1.b in (select d from t1 union select c from t1) then t1.e else a end)"
     end, {
         -- <randexpr-2.5>
-        
+
         -- </randexpr-2.5>
     })
 
@@ -110,7 +110,7 @@ test:do_test(
         return test:execsql "SELECT case when case when not exists(select 1 from t1 where e not in (~t1.d,+case when t1.c<b then t1.e else t1.a end-11 | t1.f,c) or b in (select cast(avg(b) AS integer)*(~abs((count(*))))* -( -cast(avg(e) AS integer)) from t1 union select min(t1.c) from t1)) then t1.f when not exists(select 1 from t1 where not c<>d) then 17 else t1.e end in (a,t1.e,17) or (not exists(select 1 from t1 where a in (f,t1.c,t1.a))) then 11 else 13 end FROM t1 WHERE NOT (t1.b<case when exists(select 1 from t1 where not  -(select min(t1.b*b*t1.a+t1.d)+abs(case count(*) | (cast(avg(c) AS integer)) when max(17) then min(c) else (min(13)) end)+min(e) from t1) not in (t1.c,f-d,11) and c not between (19) and e) then ~13*t1.a when 13 not in (t1.e,c,11) then b else t1.c end*c-t1.d)"
     end, {
         -- <randexpr-2.7>
-        
+
         -- </randexpr-2.7>
     })
 
@@ -130,7 +130,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(11- -19-f-t1.b+a) from t1 where exists(select 1 from t1 where 11-~(d)-c*a*~t1.a-t1.e-t1.e+coalesce((select coalesce((select t1.c from t1 where case (c) when d then e else 11 end=t1.f),t1.d) from t1 where (t1.d)>b), -11) | f+t1.f not in (((c)),b,13))),f) FROM t1 WHERE case when 19+c>=t1.a then t1.c when not case when not exists(select 1 from t1 where +f | b*b*19+19*13-a | case when t1.e not in (t1.f,t1.c,b) then 11 when 17>t1.c then a else e end<>e) then b when 17=t1.e then b else e end<>t1.b then a else d end-t1.b=(13)"
     end, {
         -- <randexpr-2.9>
-        
+
         -- </randexpr-2.9>
     })
 
@@ -160,7 +160,7 @@ test:do_test(
         return test:execsql "SELECT (abs(17)/abs(~case when (abs(t1.c* -(abs(case b | coalesce((select max(17*e*case when 11 in (select t1.b from t1 union select t1.c from t1) then 19 when d between f and t1.e then t1.e else t1.e end | b) from t1 where (13 not in (11,t1.d,e))),e)*a*d when 11 then e else d end*17)/abs(19)))/abs(t1.e))<>e then t1.b else t1.d end*(19))) FROM t1 WHERE exists(select 1 from t1 where t1.d+11 in (case t1.b++c when +a*(+case (select count(*) from t1) when 19 then t1.c else a end) then t1.a else case when (t1.b> -d) and not exists(select 1 from t1 where not exists(select 1 from t1 where (abs(f)/abs( -f*a+c*11))<>a)) then 13 else 19 end end,17,a)) or c=t1.d"
     end, {
         -- <randexpr-2.12>
-        
+
         -- </randexpr-2.12>
     })
 
@@ -190,7 +190,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.c from t1 where e not between 19 and b*d or not exists(select 1 from t1 where t1.a not in (case when d not between b+~(t1.d)-case when ((t1.f<=t1.e) and  -11<f) then e*(abs(t1.a)/abs((t1.c))) else c end+b and t1.e then e when not exists(select 1 from t1 where 11<17) then a else t1.f end,(c),c))),t1.d) FROM t1 WHERE t1.c*((select  -count(distinct t1.a) | + -count(distinct t1.b)*cast(avg(a) AS integer)-cast(avg(13) AS integer) | ~abs(min(17)) |  -min(c)*(count(distinct t1.e)) from t1)- -(abs(+t1.b-13)/abs(11)))+t1.f-coalesce((select max(f) from t1 where t1.d between c and t1.a),17)*a in (select 17 from t1 union select  -17 from t1)"
     end, {
         -- <randexpr-2.15>
-        
+
         -- </randexpr-2.15>
     })
 
@@ -210,7 +210,7 @@ test:do_test(
         return test:execsql "SELECT +t1.f*~t1.c-coalesce((select max(~b) from t1 where t1.e+11-(abs(e+case d when b then case when f=(13) then (abs(13+b*t1.f)/abs(t1.c)) when d<=t1.e then 13 else a end else 19 end*13+f)/abs((a)))*17<=c),b)-13*c FROM t1 WHERE not exists(select 1 from t1 where coalesce((select max(case when case when exists(select 1 from t1 where ~t1.d+d in (select ~count(distinct 13) from t1 union select count(*)+~abs(+(~min(t1.a))) from t1)) then t1.e+t1.c else  -(abs(t1.d)/abs(coalesce((select max(t1.d) from t1 where d not in (17,f,f)),11)*t1.c)) end<=(11) then 19 else (t1.e) end) from t1 where (13=11)),c) not between 13 and 19)"
     end, {
         -- <randexpr-2.17>
-        
+
         -- </randexpr-2.17>
     })
 
@@ -230,7 +230,7 @@ test:do_test(
         return test:execsql "SELECT case when (a not in (t1.e,(+case when t1.b<=(abs(coalesce((select max(a+(select count(distinct (select max(((abs( -t1.d)/abs(a))) | t1.c)*min(t1.e) from t1)) from t1)) from t1 where +t1.f>e),17))/abs( - -17)) then 17 else t1.d end-t1.b-d) |  -f,c)) then 11-t1.f when ( -13<e) then t1.d else a end FROM t1 WHERE t1.c not between ~case when case when (select  - -abs( -case  -count(distinct c) when count(*) then max(c) else count(distinct 13) end) | min(c) from t1) in (t1.f,b+11,19*t1.d) then 19 else a end*t1.b>13 or t1.e in (select (count(*)) from t1 union select cast(avg(t1.e) AS integer) from t1) or 19>17 and 13 not between 19 and 17 then (t1.f) when not t1.b<>t1.f or d<>b then t1.e else a end and c"
     end, {
         -- <randexpr-2.19>
-        
+
         -- </randexpr-2.19>
     })
 
@@ -270,7 +270,7 @@ test:do_test(
         return test:execsql "SELECT t1.a | case when e in (select (13) from t1 union select d from t1) then (17) when c*~case (17) when coalesce((select max(case when case when 19 in (13,t1.f,11) then t1.b else t1.b end | 11>t1.a then 11 else t1.b end-b) from t1 where (13 not in (a,19,b)) and t1.a not between  -11 and t1.f),f) then e else t1.c end | a in (select 11 from t1 union select t1.d from t1) then 17 else t1.a end | f FROM t1 WHERE NOT (coalesce((select t1.a*t1.a from t1 where ~ -(abs((select abs(count(*))-count(distinct t1.d*11) from t1)*+b)/abs(~t1.c))+c not in (coalesce((select ~13*t1.a from t1 where f+(abs(d* -t1.f)/abs(t1.c))<=t1.b or not t1.a<=t1.c),t1.c),e,(t1.e))),(a))+11<>11)"
     end, {
         -- <randexpr-2.23>
-        
+
         -- </randexpr-2.23>
     })
 
@@ -290,7 +290,7 @@ test:do_test(
         return test:execsql "SELECT c*coalesce((select ~19-e from t1 where not exists(select 1 from t1 where case when t1.b<>(d) then case when exists(select 1 from t1 where not exists(select 1 from t1 where case t1.e when e*(11) then 13 else 11 end in (select t1.a from t1 union select 13 from t1))) then coalesce((select case when f in (select t1.c from t1 union select (t1.b) from t1) then f else a end from t1 where t1.f not between 17 and f), -f) else 11 end else (a) end*d not in (e,t1.c,t1.e))),t1.e)-a FROM t1 WHERE 19+(select cast(avg((abs(t1.d)/abs(coalesce((select max(+b-(t1.e+b+ -c)*19) from t1 where 11 not between t1.b and f), -17)))*(11)) AS integer) from t1)*f in (select count(*) from t1 union select case max(t1.d)-( -min(t1.d)*(+max(e))) when max(t1.a) then cast(avg(t1.d) AS integer)-(count(distinct t1.f))-( -cast(avg(f) AS integer)) else max(t1.e) end from t1)"
     end, {
         -- <randexpr-2.25>
-        
+
         -- </randexpr-2.25>
     })
 
@@ -310,7 +310,7 @@ test:do_test(
         return test:execsql "SELECT (abs((select (case abs(min(t1.f)) | count(distinct e) when (~+count(*)+max(e)++abs(cast(avg(~19) AS integer))) then +cast(avg(c) AS integer) else ~ -max(+t1.b)+~max(19)*count(distinct a)*min(17) | max(t1.d) end) from t1))/abs(~c+(select  -(count(distinct t1.e)) from t1)-11+t1.e)) FROM t1 WHERE 11>=t1.f"
     end, {
         -- <randexpr-2.27>
-        
+
         -- </randexpr-2.27>
     })
 
@@ -340,7 +340,7 @@ test:do_test(
         return test:execsql "SELECT (select +count(distinct case when 11=a or e<+t1.f+t1.c and not exists(select 1 from t1 where not t1.a-t1.b=~a and f<=coalesce((select max((e)) from t1 where +t1.f>=b),t1.d)*13) and t1.c>t1.e and t1.a<17 then f when a<c then t1.d else c end) from t1) FROM t1 WHERE t1.b=case t1.e | f+t1.d when case when t1.f | t1.e in (select  -+min(case when t1.c in (select t1.b from t1 union select b-19*(abs(b)/abs(t1.b*case when not exists(select 1 from t1 where t1.a in (select ~cast(avg(d) AS integer) from t1 union select max(t1.f) from t1)) then ~(13) when  -c=t1.b then t1.c else f end)) from t1) then e else 17 end) from t1 union select max((a)) from t1) then  -b else t1.d end+13 then a else 13 end"
     end, {
         -- <randexpr-2.30>
-        
+
         -- </randexpr-2.30>
     })
 
@@ -360,7 +360,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select (select max(t1.a)*(max(a))*max(t1.f*~11*case when b not in ((select min(19) from t1),b,coalesce((select max((t1.f)) from t1 where t1.c in (c,t1.b,(t1.f)) or t1.a<>(c)),b)*t1.b-t1.b) then d else t1.e end | f* -13-c) from t1) from t1 where not ~a<f), -19)+t1.d+b FROM t1 WHERE 13*t1.d between coalesce((select t1.d from t1 where b in (select t1.d from t1 union select case b*t1.f+t1.a*+coalesce((select t1.a from t1 where (not exists(select 1 from t1 where b*t1.c=13))),11)+t1.e when ~f then d+case b when e then f else t1.e end*13 else f end from t1)),19) and t1.d and 19 between 17 and e and a>a"
     end, {
         -- <randexpr-2.32>
-        
+
         -- </randexpr-2.32>
     })
 
@@ -400,7 +400,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.d not in (t1.d,coalesce((select max(11) from t1 where f not between 13 and c-coalesce((select max(d) from t1 where 19 not in ((t1.f),f,11)),t1.d)*t1.e | a),13), -(t1.e)) then t1.b when t1.f=t1.a and exists(select 1 from t1 where b in (select c from t1 union select 11 from t1) and t1.c=b and not  -d in (t1.d,t1.d,t1.b) and d between 11 and c) or d<=17 or a not in (e,19,(t1.b)) then 17 else 11 end FROM t1 WHERE NOT (a<>f+f)"
     end, {
         -- <randexpr-2.36>
-        
+
         -- </randexpr-2.36>
     })
 
@@ -420,7 +420,7 @@ test:do_test(
         return test:execsql "SELECT case 13 when coalesce((select t1.a*d+++b | b+(abs(t1.e)/abs(c))+(select count(*) from t1) from t1 where not exists(select 1 from t1 where 17 in (select d from t1 union select t1.f from t1))),t1.b) then ~t1.c-(select case min(case when 17 not in (19,19,t1.c) then c when 13 between (19) and t1.e then e else 19 end-19) when cast(avg( -11) AS integer) then max(t1.c)* -min(t1.d) else (count(distinct t1.f)) end from t1) | +t1.f else t1.c end FROM t1 WHERE coalesce((select max(t1.c) from t1 where (abs(t1.b)/abs(a))>=(e)),+ -case when (11<17) then t1.a when t1.a*e=19* -11 and not exists(select 1 from t1 where  -t1.d not between coalesce((select a from t1 where  -t1.c>t1.e), -19) and t1.d and not exists(select 1 from t1 where (t1.e) in (select d from t1 union select t1.c from t1))) then c else a end*a)-t1.b* -(b) in (e,d,b)"
     end, {
         -- <randexpr-2.38>
-        
+
         -- </randexpr-2.38>
     })
 
@@ -450,7 +450,7 @@ test:do_test(
         return test:execsql "SELECT case when not exists(select 1 from t1 where ( -case when b in ((11),coalesce((select f from t1 where (not exists(select 1 from t1 where coalesce((select (t1.a) from t1 where e<=a),11) in (select t1.f from t1 union select 13 from t1)) or t1.a>d)),t1.a),t1.e) or not not exists(select 1 from t1 where (t1.f<=(t1.a))) then e*t1.a else t1.c end)<=d and not (t1.e)>=t1.e) then coalesce((select max( -t1.e) from t1 where t1.d between t1.b and t1.c),t1.d) else t1.c end+13*13 FROM t1 WHERE t1.b=t1.f | 19+coalesce((select max(a) from t1 where case t1.e when case when (11<=11 | t1.f and b>=b or t1.f<=a) then case when c between t1.e and b then e else +t1.f end else  -t1.c end then t1.b else 13 end*13 between t1.f and c and exists(select 1 from t1 where (b not between 11 and a)) and f>=t1.b), -t1.b)-c"
     end, {
         -- <randexpr-2.41>
-        
+
         -- </randexpr-2.41>
     })
 
@@ -470,7 +470,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select c from t1 where t1.a=case when a=t1.b+~(select case cast(avg( -b*13) AS integer) when max(f*13* -c) then (cast(avg(t1.d) AS integer)) else count(distinct t1.e*c) end from t1) then t1.d | t1.a else case when t1.a-b not between e and  -t1.c* -13 then 19 else d end end),d) | t1.d FROM t1 WHERE +13 in (f,t1.f+t1.f, -coalesce((select max(t1.f) from t1 where (t1.a-13)<=(case (select count(*) from t1) when 13 then  -+t1.e |  -(coalesce((select max(~coalesce((select ( -13) from t1 where  -c<(11) or 11 between a and t1.d),13)*t1.d) from t1 where d not between b and 13),19))*t1.a else 13 end-b-c)),t1.e)-19)"
     end, {
         -- <randexpr-2.43>
-        
+
         -- </randexpr-2.43>
     })
 
@@ -510,7 +510,7 @@ test:do_test(
         return test:execsql "SELECT case ~11-13 when 11-d-case when t1.f*+a-t1.a-t1.f=t1.a then a when t1.f between 19-t1.a+coalesce((select a from t1 where e in (select case  -max(t1.c) when count(*) then max(t1.d) else  -(cast(avg((t1.e)) AS integer)) end from t1 union select (max(t1.b)) from t1)), -b) and e or ((11<c)) or e>=t1.d then t1.b else a end+13+(t1.c) then a else  -d end FROM t1 WHERE NOT (exists(select 1 from t1 where not exists(select 1 from t1 where (not +t1.b-~a*(d*t1.e | + -coalesce((select t1.c from t1 where t1.b*case t1.b when f then  -a*b else e end<>a+t1.a),17))+e*t1.e*11 | t1.a not between 13 and  -t1.a and b between d and  -f))))"
     end, {
         -- <randexpr-2.47>
-        
+
         -- </randexpr-2.47>
     })
 
@@ -530,7 +530,7 @@ test:do_test(
         return test:execsql "SELECT 11++(case 19 when t1.c-19-coalesce((select t1.b from t1 where e*19-t1.e<=+case when c in (select 19 | 17 from t1 union select 11 from t1) then (abs(a)/abs(19)) when a*t1.d>19 or (11) not in (b,t1.a,t1.a) then b else b end-11),f) then 13 else 11 end-t1.e*a) FROM t1 WHERE NOT (f in (17,t1.f | coalesce((select max(t1.e) from t1 where not 17 in (select f from t1 union select +17 from t1)),b+coalesce((select max(b) from t1 where 19 in (select case min(t1.d) when (count(*)) then min(d) else  -min(d) end from t1 union select max(d) from t1)),f)*f-17+19),b) or d<=f or t1.f>=11 or t1.b<=11 or t1.c<=11 or t1.b<=b)"
     end, {
         -- <randexpr-2.49>
-        
+
         -- </randexpr-2.49>
     })
 
@@ -550,7 +550,7 @@ test:do_test(
         return test:execsql "SELECT  -c-coalesce((select max(t1.a) from t1 where (a>17-t1.a) and (select abs(min(t1.a))*case abs(case (((min((t1.c))))+min(a)) when count(distinct f) then min(11) else count(distinct b) end) when min(t1.f) then (count(distinct t1.b)) else  -count(*) end from t1)<>case d when +(select ((min(t1.a))) from t1)-(abs(c)/abs(f)) then b else 17 end+t1.c),coalesce((select t1.d from t1 where d>19),t1.a)) FROM t1 WHERE b+(coalesce((select max(a) from t1 where exists(select 1 from t1 where t1.b<=c-(select ~~max((abs(e)/abs(13 | (t1.e)-c-19))) from t1) or d in (select t1.b from t1 union select d from t1)) or 13 in (select cast(avg(19) AS integer) from t1 union select ( -cast(avg(19) AS integer) | count(*)*min(19)) from t1) or 19<=11),t1.c))-t1.d-c>f"
     end, {
         -- <randexpr-2.51>
-        
+
         -- </randexpr-2.51>
     })
 
@@ -570,7 +570,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.b+coalesce((select max(a) from t1 where exists(select 1 from t1 where not not t1.d>19)),13) | case when f in (select a from t1 union select case when (a)<>t1.c then c when not exists(select 1 from t1 where t1.c not between 17 and  -(t1.d)) then f else (11) end from t1) then t1.c when (not exists(select 1 from t1 where 17 not between t1.f and a)) and d=b then t1.c else d end<=19 and (t1.c<>c and (13) not between t1.d and t1.c) and a>= -b or 11>13 and c<>13 then  -f else d end FROM t1 WHERE (case when (17 not in (f*11,+coalesce((select max(b-b) from t1 where t1.c+f not between 11 and t1.d),13),c)) or (t1.e in (select ~min(t1.f) from t1 union select ~count(*) from t1) and exists(select 1 from t1 where (not f>=19 and 17 not between a and t1.e)) or (e) not in (e,d,13) or t1.d>=f) then e when 17 between t1.c and 13 then case when 11<>19 then t1.d else t1.a end else b end in (select  -t1.a from t1 union select a from t1))"
     end, {
         -- <randexpr-2.53>
-        
+
         -- </randexpr-2.53>
     })
 
@@ -610,7 +610,7 @@ test:do_test(
         return test:execsql "SELECT t1.e+case when d not between f and case when a in (select t1.c from t1 union select t1.e from t1) or coalesce((select 19 from t1 where 17<=t1.d or 19*t1.f*t1.b<>t1.d | t1.d | t1.a),t1.b)*case when (t1.a) in (t1.d,t1.a,a) then  -c when 17<13 then t1.f else 17 end-t1.f*e not in (19,t1.d,17) then 19 else t1.e end then  -b else t1.b end FROM t1 WHERE NOT ((coalesce((select t1.d-coalesce((select max(coalesce((select max(c+13) from t1 where ~13*t1.b in (select abs(abs(abs((cast(avg( -e) AS integer)))))- -count(distinct (13))*max(13) from t1 union select count(distinct 19) from t1)), -t1.f)) from t1 where exists(select 1 from t1 where 17 in (t1.b,13,b))),b)+d+t1.a from t1 where d not in (13,t1.b,b)),17) not between 11 and e or not 17 between d and d))"
     end, {
         -- <randexpr-2.57>
-        
+
         -- </randexpr-2.57>
     })
 
@@ -630,7 +630,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.f*case when not exists(select 1 from t1 where exists(select 1 from t1 where (select count(distinct 11) from t1) between coalesce((select max(c) from t1 where t1.e=t1.a+17),a) and t1.b) or c not in (t1.e,19,t1.e)) then 13 when exists(select 1 from t1 where t1.a between 19 and  -c) then coalesce((select coalesce((select max((( -d))) from t1 where 17 not in (t1.d,e,t1.e)),e) from t1 where c= -f),( -c)) else t1.f end) from t1 where not (11 between a and t1.e)),19) FROM t1 WHERE case c when case when (exists(select 1 from t1 where t1.d<>coalesce((select 13 from t1 where (t1.b>+e)),(17))+coalesce((select 13 from t1 where exists(select 1 from t1 where 13 in (t1.b+c,case when f between t1.f and b then t1.b else f end,(11)))),f)-17-17)) then  -c-(c) when 11 in (b,f,(t1.d)) then t1.c else t1.b end then t1.d else 11 end in (select  -count(*) from t1 union select count(*) from t1)"
     end, {
         -- <randexpr-2.59>
-        
+
         -- </randexpr-2.59>
     })
 
@@ -650,7 +650,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.a-coalesce((select t1.b from t1 where (d<=~a)),t1.b+t1.d | 19+13)-t1.a | ~coalesce((select ~17 from t1 where not exists(select 1 from t1 where ~case when 13 in (select +(cast(avg(b) AS integer)) from t1 union select count(*) from t1) then 17 when 11 not in (c,t1.a,t1.a) then e else e end*a not between 11 and c)),t1.c) in (11,t1.a,e) then t1.f when 19 in (select ~count(distinct d) from t1 union select cast(avg(19) AS integer) from t1) then t1.d else 19 end FROM t1 WHERE not exists(select 1 from t1 where (select count(*) from t1)+coalesce((select max(a) from t1 where t1.a between (abs(case when exists(select 1 from t1 where case when t1.e=case when 19 between 11 and e then t1.f else a end then t1.e else t1.b end in (select count(distinct d) | max(11)*abs(case count(*) when max(f) then cast(avg(e) AS integer) else count(distinct t1.e) end) from t1 union select  -cast(avg(c) AS integer) from t1)) then (select  -min(e) from t1) when (c>e) then t1.d else f end)/abs(b)) and (17)),e) not between t1.a and d)"
     end, {
         -- <randexpr-2.61>
-        
+
         -- </randexpr-2.61>
     })
 
@@ -680,7 +680,7 @@ test:do_test(
         return test:execsql "SELECT case when 11 in (select max(f) from t1 union select min(19++13) | min(t1.c) from t1) and (e in (select t1.d from t1 union select t1.a | 17*case e when coalesce((select max(a) from t1 where b not in (b,f,d) or t1.a<=f),11) then t1.a else t1.b end from t1) and  -a not between b and d) then d when  -t1.f=b or t1.b between  -f and  -d then 19 else d end+d FROM t1 WHERE case when (coalesce((select case (select max(t1.b) from t1) when (b* -t1.e+e*e-t1.a) then c else a end from t1 where 17 in (select min(t1.d)-abs(count(*)) from t1 union select count(distinct c) from t1)),t1.d)=(t1.d)) and e in (select  -min(t1.b) from t1 union select count(distinct 11) from t1) and a< - -17 then t1.d | 11 else 19 end in (select 17 from t1 union select d from t1)"
     end, {
         -- <randexpr-2.64>
-        
+
         -- </randexpr-2.64>
     })
 
@@ -720,7 +720,7 @@ test:do_test(
         return test:execsql "SELECT (abs((select min(13) from t1))/abs(coalesce((select t1.e from t1 where coalesce((select t1.f from t1 where  -11<=b-t1.c*case when (d)-t1.f+t1.e-13<>t1.b then 11 when exists(select 1 from t1 where t1.d<>((t1.b)) or t1.a not between d and 13) or t1.b<>t1.c then t1.e else  -t1.d end+t1.a or t1.c not between f and d),e)<>e), -f))) FROM t1 WHERE NOT (t1.c<>(select min((abs(( -19-t1.b*13- -++~t1.f*d-17*19*11))/abs(17))) from t1))"
     end, {
         -- <randexpr-2.68>
-        
+
         -- </randexpr-2.68>
     })
 
@@ -740,7 +740,7 @@ test:do_test(
         return test:execsql "SELECT case d-case when c< -case when b<=f or coalesce((select t1.e from t1 where 11<coalesce((select b+(t1.f)+t1.e-d from t1 where (t1.c<f)),t1.d)),t1.e)>e then 19 when not exists(select 1 from t1 where not exists(select 1 from t1 where t1.d>=d)) then t1.f else 17 end then e when not exists(select 1 from t1 where d=b) then t1.c else f end when 17 then 19 else t1.f end FROM t1 WHERE NOT (coalesce((select max(+t1.d) from t1 where e<>e or not exists(select 1 from t1 where not exists(select 1 from t1 where (abs(f)/abs(f))++t1.b in (select case abs(cast(avg(e) AS integer)) when cast(avg(17) AS integer) | max(d) | cast(avg(t1.e) AS integer) | min(t1.e) then (cast(avg(19) AS integer)) else cast(avg(c) AS integer) end from t1 union select cast(avg(t1.f) AS integer) from t1))) and t1.a between t1.f and b or not 17<13 or  -11= -t1.f or t1.f between c and 19),d)+(t1.d) not between b and e)"
     end, {
         -- <randexpr-2.70>
-        
+
         -- </randexpr-2.70>
     })
 
@@ -750,7 +750,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.e in (select abs(max(case a+case when t1.a>=e+ -c then a else t1.b end+t1.a when t1.f then 19 else  -19 end)+abs( -count(distinct t1.c))+~(count(distinct t1.b)))-min(b) from t1 union select max(f) from t1) and case t1.e when  -t1.c then 19 else b end<t1.d then e+(d) when exists(select 1 from t1 where 19 not between t1.e and (19)) then  -19 else t1.c end FROM t1 WHERE (exists(select 1 from t1 where t1.e between t1.c-t1.d and (t1.a)) and ((not case 19 when 11 then e else ~d | t1.a*19 end*((b))>=t1.e))) or c in (select f from t1 union select 13 from t1) and (b)< -t1.c and f in (select max(13) from t1 union select ~+abs(count(distinct e)*abs(((count(*)))*((max(f))))) from t1)"
     end, {
         -- <randexpr-2.71>
-        
+
         -- </randexpr-2.71>
     })
 
@@ -770,7 +770,7 @@ test:do_test(
         return test:execsql "SELECT c*case when t1.a in (select ~count(*) from t1 union select  -count(distinct ~case (abs(11)/abs(b-(coalesce((select 17-t1.a from t1 where not t1.d=t1.d),(abs(11)/abs(a)))))) when case when t1.d between 19 and c and t1.b between 11 and t1.a then 13 else (13) end then (13) else 19 end-19*13+11) from t1) then t1.a when t1.f<=t1.e then f else b end-19-c+f FROM t1 WHERE t1.b>=c+case when exists(select 1 from t1 where a>=+f- -c*e+coalesce((select max(b) from t1 where (b not between (t1.b) and 19) or t1.f<11),d)*f | t1.e+t1.b) then ( -t1.e)-19 when ((t1.a in (select 19 from t1 union select t1.f from t1) or b<c and b> -17)) then f else f end | d"
     end, {
         -- <randexpr-2.73>
-        
+
         -- </randexpr-2.73>
     })
 
@@ -800,7 +800,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case when a>=b then t1.c-case when not exists(select 1 from t1 where case d when +17 then 19+c else 11 end-(abs((select  - -cast(avg(case when (11- -(abs(e)/abs(13))-t1.f<t1.e) then t1.c+d else a end-t1.c) AS integer) from t1))/abs(t1.a))<=b) then  -e+d else (t1.c) end else 19 end)/abs(c)) FROM t1 WHERE NOT (f<>11)"
     end, {
         -- <randexpr-2.76>
-        
+
         -- </randexpr-2.76>
     })
 
@@ -820,7 +820,7 @@ test:do_test(
         return test:execsql "SELECT  -coalesce((select max(e-t1.b) from t1 where t1.e<11 and t1.b | e in ((abs(13)/abs(t1.b)),(abs((+17-case when t1.c | 13*(d) | b<>a or ((t1.e)>=a) then t1.b-t1.e when not exists(select 1 from t1 where 17<13) then  -(13) else 17 end*13))/abs(13)),t1.c)),t1.e) | c FROM t1 WHERE NOT (not exists(select 1 from t1 where 17<=(select (case (~+abs(cast(avg((t1.e)-17 | b) AS integer))-((case  -cast(avg(case when ~t1.b in (select d from t1 union select 19 from t1) then b when 13 in (t1.f,c,t1.b) then c else f end) AS integer)+count(distinct t1.f)+count(distinct t1.d) when count(*) then ((max(c))) else count(*) end)*cast(avg(t1.e) AS integer))) when ((cast(avg(a) AS integer))) then  -max(d) else ((count(*))) end) from t1)))"
     end, {
         -- <randexpr-2.78>
-        
+
         -- </randexpr-2.78>
     })
 
@@ -850,7 +850,7 @@ test:do_test(
         return test:execsql "SELECT 17-coalesce((select c+t1.f from t1 where (select count(distinct d)-abs(min((select case  - -count(*) when  -max(19) then  -count(*) else count(*) end from t1))-count(*)) from t1)-t1.a+case when (abs(t1.e)/abs(t1.e)) not in (a,t1.a,19) and (b between 19 and  -t1.c) then 17 else c end-19+t1.e*13<= -(t1.a)),11)-t1.d-c FROM t1 WHERE NOT (((t1.d in ((select +cast(avg(coalesce((select max(coalesce((select max(a) from t1 where not a in (b,~(select ~count(*) from t1),case (select +max(11) |  -count(*) from t1) when 17*t1.f*17 then b else (t1.b) end+f | 17)),e)) from t1 where not exists(select 1 from t1 where 17 between a and a)),(19))) AS integer) from t1),coalesce((select max(e) from t1 where t1.e<>11),b),t1.d))))"
     end, {
         -- <randexpr-2.81>
-        
+
         -- </randexpr-2.81>
     })
 
@@ -870,7 +870,7 @@ test:do_test(
         return test:execsql "SELECT case (t1.a) when e then t1.a else t1.d end+(b)*t1.c | (select ~count(distinct (select count(distinct t1.f) from t1)) from t1)* -case c*t1.b when 19 then t1.d else (t1.b) | case when not (e)*f in (select count(distinct a)-count(distinct c) | min(a) from t1 union select  -count(*) from t1) and (t1.f in (d, -t1.c,f)) then e when t1.c not in (t1.b,t1.e,b) then t1.e else f end end FROM t1 WHERE NOT (t1.d<>coalesce((select max(case when exists(select 1 from t1 where f<=e | b) then (select min(+t1.f) from t1) else 11 end) from t1 where +case when t1.e=c then  -t1.c else t1.a end-t1.a-11-f in (select (case  -min(a) when count(*)*(( -+abs(cast(avg(a) AS integer))*max((17))) | max(19)) then min(11) else min(a) end | count(distinct  -d)) from t1 union select min(t1.e) from t1)),t1.c))"
     end, {
         -- <randexpr-2.83>
-        
+
         -- </randexpr-2.83>
     })
 
@@ -890,7 +890,7 @@ test:do_test(
         return test:execsql "SELECT (select abs(max((select (case cast(avg(t1.a) AS integer) when +~abs(cast(avg( -17+case when t1.a in (c,(e),t1.f) and f in (c,t1.d,t1.a) then d when d between c and t1.d then f else e end) AS integer))-(abs(~max((b)))-min(t1.f)) then cast(avg(t1.f) AS integer) else count(*) end) from t1)+case when (exists(select 1 from t1 where t1.a in (select  -max(e) from t1 union select  -count(*) from t1)) or e in (t1.b*d,a, - -d)) then 17*t1.c else c end)) from t1) FROM t1 WHERE ~t1.e>case 13 when e then a else coalesce((select ~t1.d from t1 where exists(select 1 from t1 where t1.f between coalesce((select t1.a from t1 where ((select min(d-d- -t1.d+a) from t1)) not between f and t1.c or exists(select 1 from t1 where b<>17)),(a)) and  -d) or not exists(select 1 from t1 where e in (select min(19)*(count(*))*cast(avg(11) AS integer) | min(b) from t1 union select (cast(avg(t1.e) AS integer)) from t1))),c) end-t1.c"
     end, {
         -- <randexpr-2.85>
-        
+
         -- </randexpr-2.85>
     })
 
@@ -910,7 +910,7 @@ test:do_test(
         return test:execsql "SELECT t1.c+(abs(t1.b*t1.b)/abs(++t1.a-t1.e-(abs(t1.b)/abs(d))*11*t1.f)) | 19-b-t1.e | t1.e-+~t1.d*13+a+case case when (d)+17-c=d then a else t1.b end when e then t1.a else 19 end FROM t1 WHERE not coalesce((select (abs(case t1.b when coalesce((select case when exists(select 1 from t1 where f between 17 and f) then 11 else f end from t1 where not exists(select 1 from t1 where c>=t1.d)),17)*t1.a then t1.e else 13 end)/abs(17)) from t1 where ((13 in (select abs(~min(d)*count(distinct  -(f)) | count(*)*cast(avg(11) AS integer)) from t1 union select count(*) from t1) and a<=13) and c<> -(t1.c))), -t1.a)*t1.e*f+d not in (11,d,t1.c)"
     end, {
         -- <randexpr-2.87>
-        
+
         -- </randexpr-2.87>
     })
 
@@ -950,7 +950,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.f>t1.d then (select abs(+count(distinct c)+(abs(min((abs(+11)/abs(b)))* -count(*)))) from t1)-t1.a when d+case when (select cast(avg(t1.f) AS integer)-count(distinct 19) from t1)<>17 then c when t1.e in (select cast(avg(t1.a) AS integer) from t1 union select count(distinct f) from t1) and d>t1.c and t1.f not in (11,19,t1.b) then a else (c) end+(17)=c then t1.d else t1.c end-c FROM t1 WHERE NOT (13 not in (e,t1.b,+coalesce((select max(b) from t1 where 13*b-t1.d-case when 11>=a then t1.a-t1.d else (t1.d)*e+19 end*t1.a+19+(11) | t1.c*t1.a-17<t1.e),b)-a+17*17*c))"
     end, {
         -- <randexpr-2.91>
-        
+
         -- </randexpr-2.91>
     })
 
@@ -960,7 +960,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select +19 from t1 where 19-c+t1.c-f not in (coalesce((select 19 from t1 where (t1.b between t1.c*t1.a*t1.b | a-e | 13-(abs(19)/abs((select max(t1.d | coalesce((select max( -t1.c) from t1 where b in (select e from t1 union select (f) from t1)),t1.d)+(e)) from t1)+c)) and f)),11),f,17)),f) FROM t1 WHERE (select count(distinct 11)+min((coalesce((select max(case when t1.d<>(abs(t1.a)/abs(e)) then d else ~(t1.e)-e+d+13-t1.b+b*19 end) from t1 where (select max(19)-cast(avg(a) AS integer) from t1)> -t1.e),17)+e+t1.e-t1.c+(c))*17) from t1) between  -17 and t1.c"
     end, {
         -- <randexpr-2.92>
-        
+
         -- </randexpr-2.92>
     })
 
@@ -1000,7 +1000,7 @@ test:do_test(
         return test:execsql "SELECT (case t1.a when (select (count(distinct t1.f)) from t1)-e then 11 else t1.c+17-f*~f | f+~e-a*t1.b+13 end | 13) FROM t1 WHERE NOT ((coalesce((select max(f) from t1 where (c+t1.f | (select count(distinct t1.d) from t1)>=coalesce((select b+(abs(case when t1.f>=(select case max(f) when max(19) then cast(avg(t1.a) AS integer) else count(distinct 13) end from t1) | t1.b and (a in (select (b) from t1 union select t1.b from t1)) then (a)-b when not exists(select 1 from t1 where c between t1.c and t1.a) then a else t1.a end)/abs(t1.b))- -f from t1 where b not in (t1.b,t1.f,c)),t1.d)-t1.d)), -17) between 13 and t1.f))"
     end, {
         -- <randexpr-2.96>
-        
+
         -- </randexpr-2.96>
     })
 
@@ -1020,7 +1020,7 @@ test:do_test(
         return test:execsql "SELECT case when ((select  -abs(min(coalesce((select max(11 | t1.f) from t1 where coalesce((select f from t1 where e+c in (select 19 from t1 union select f from t1)),b) not in (t1.a,+case when 13>=t1.e then t1.a when 17 not in (t1.d,b,t1.e) then 13 else t1.b end-t1.e,t1.f)),t1.f))*count(*)*min(t1.c)) from t1)<17) and 13* -f+a not between (a) and f then c-11+b else 19 end FROM t1 WHERE e+case case when a<>c then (abs(case when coalesce((select (abs( -19+11)/abs(t1.c)) from t1 where (17) in (a,13,11) and 17 in (select 11 from t1 union select t1.f from t1)),t1.a) between t1.f and c then t1.d when not exists(select 1 from t1 where not exists(select 1 from t1 where 19=f)) then f else (b) end-19)/abs(e)) else 11 end when 17 then a else t1.f end-13 | e between  -t1.e and 13"
     end, {
         -- <randexpr-2.98>
-        
+
         -- </randexpr-2.98>
     })
 
@@ -1050,7 +1050,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.b-t1.e*c<>c then coalesce((select  -17 from t1 where (t1.f+((select case count(*) when  -cast(avg(19) AS integer)+count(distinct (t1.c)) | (cast(avg(19) AS integer))*max(t1.c)*count(*)-((count(*))) then cast(avg(b) AS integer) else (count(*)) end-min(a) from t1)) | case when t1.b | a in (select t1.a from t1 union select (select count(distinct e) from t1) from t1) then t1.e else b end+t1.a)<e),17) else 19 end FROM t1 WHERE case  -coalesce((select d-+t1.d-13-b from t1 where case when not exists(select 1 from t1 where (t1.a-t1.f in (select t1.e from t1 union select 17 from t1)) or 19<=t1.a) then t1.c-b else b end in (select  -max(13)++abs(max(t1.c))*+max(t1.d) from t1 union select cast(avg(t1.e) AS integer) from t1)),13) | t1.d when (t1.f) then f else a end not between 11 and b"
     end, {
         -- <randexpr-2.101>
-        
+
         -- </randexpr-2.101>
     })
 
@@ -1080,7 +1080,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(case when (select ~cast(avg(a) AS integer) from t1)>~t1.a then f else +~11 end) from t1 where ((select case ~abs(count(distinct t1.e)+(count(*)+count(*)+(abs( -~count(*) | max((t1.b))))))*(cast(avg(t1.a) AS integer)) when (count(*)) then min(19) else  -(min(b)) end from t1))+11<>t1.f), -c-f) FROM t1 WHERE ~e>coalesce((select max(case case case coalesce((select max(coalesce((select c from t1 where t1.a-t1.c>13),13)) from t1 where  -b not in (case d when ~t1.f | t1.c then 13 else 11 end,19,19)),t1.d) when c then t1.a else t1.b end+f-e*b when f then 19 else  -t1.b end when t1.b then 11 else 13 end) from t1 where c in (select 19 from t1 union select e from t1)),t1.d)"
     end, {
         -- <randexpr-2.104>
-        
+
         -- </randexpr-2.104>
     })
 
@@ -1120,7 +1120,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select a from t1 where b>=~11-coalesce((select max((abs(19)/abs(t1.e))+19+t1.d) from t1 where (select abs(count(*) | count(*) | case count(*) when cast(avg(17) AS integer) then  -cast(avg(b) AS integer) else count(*) end*min(b))*(min(t1.e)) from t1) in (11*(select count(*) from t1)*17*t1.e-e*t1.b,t1.e,t1.f)),a)*t1.d),13)-f FROM t1 WHERE NOT (~((case when not 13-+t1.c>=17 then  -~ -b+t1.f+case when t1.c<t1.b then t1.b when e*t1.b in (c,f,19) then (abs(a)/abs(case when 13=e then t1.e when  -a<>t1.d then 11 else t1.e end)) else t1.b end when d>a then (a) else t1.b end))+t1.c in (13,t1.a,13) or t1.e>c)"
     end, {
         -- <randexpr-2.108>
-        
+
         -- </randexpr-2.108>
     })
 
@@ -1140,7 +1140,7 @@ test:do_test(
         return test:execsql "SELECT case when 13>=~t1.a or (exists(select 1 from t1 where 11 not in (17,t1.f,17))) then f when not exists(select 1 from t1 where exists(select 1 from t1 where 13 not between e and ~+case b when t1.f then case  -case f when 11 then  -17 else 19 end+17 when b then b else 13 end else 13 end- -t1.a and t1.c not in (t1.f,a,c) or t1.f<11)) then t1.c else 11 end FROM t1 WHERE +t1.e in (select cast(avg(t1.c*t1.a*(abs(13)/abs(t1.e))) AS integer) from t1 union select min(c+13) from t1)"
     end, {
         -- <randexpr-2.110>
-        
+
         -- </randexpr-2.110>
     })
 
@@ -1160,7 +1160,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select max(13) from t1 where coalesce((select max(c) from t1 where coalesce((select max(17) from t1 where 11 in (select ~d | case when t1.a>+19 then 11 when t1.d not in ( -e,e,c) or 13<t1.c then t1.b else d end-t1.d from t1 union select e from t1)),t1.b) in (select e from t1 union select c from t1)),d)<>d or t1.e<>b),t1.b)*13<=f then  -t1.e when 19 between  -t1.f and t1.a then  -t1.b else t1.f end FROM t1 WHERE exists(select 1 from t1 where t1.f between a and coalesce((select max(t1.f) from t1 where exists(select 1 from t1 where coalesce((select 19 from t1 where t1.c=b),a)= -t1.b and not exists(select 1 from t1 where b between e and b) and a<= -17 or exists(select 1 from t1 where 17<=f)) or t1.a>=t1.c),13)*~13*t1.c*13 or t1.d>13 and 11>=t1.d and 11 not between c and c and t1.f>=17 and (d)=f)"
     end, {
         -- <randexpr-2.112>
-        
+
         -- </randexpr-2.112>
     })
 
@@ -1190,7 +1190,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select +case when not exists(select 1 from t1 where 19*t1.e< -~11*a or t1.b>=t1.c and t1.a<>e) then coalesce((select max(13) from t1 where 11>11), -(e)) | t1.a when (t1.d) in (select f from t1 union select b from t1) then a else e end from t1 where t1.f<> -t1.d),t1.b) not in (d,t1.d,t1.c) then 19 when (t1.b<>t1.e or  -t1.b>=t1.b) then (f) else d end FROM t1 WHERE t1.e=a and b>=(abs(case when 19 not between ~+17 and +case when ((b+e-f=t1.d or b not in (t1.a,t1.f,t1.b) or t1.a not between 19 and e or b>=(t1.d) or t1.b not in (d,t1.a,t1.b))) then e-f else t1.e*t1.f end | f then d else  -d end)/abs(11))"
     end, {
         -- <randexpr-2.115>
-        
+
         -- </randexpr-2.115>
     })
 
@@ -1220,7 +1220,7 @@ test:do_test(
         return test:execsql "SELECT (select (cast(avg(b) AS integer) | count(distinct case when coalesce((select 13 from t1 where (+(abs(e)/abs(t1.b))) in ( -b, -(a),13)),t1.e)>=b then 11 else  - -19 end-17+19) | abs(~case count(distinct t1.b) when +min(e) then +abs(~ - -count(distinct 11)-count(distinct t1.b))-count(distinct a) else  -min(b) end)*count(distinct 19)-count(distinct t1.b)) from t1) FROM t1 WHERE 11<=t1.a-t1.f-19*t1.b+19+coalesce((select e from t1 where d not between (select count(distinct coalesce((select t1.a from t1 where (select cast(avg(t1.e) AS integer)-+count(distinct c)+max((abs(t1.c)/abs(t1.f))-a)-(count(*)-cast(avg((17)) AS integer)) from t1) in (t1.e, -e | d,b)),c)) from t1) and t1.a),t1.d)-t1.d"
     end, {
         -- <randexpr-2.118>
-        
+
         -- </randexpr-2.118>
     })
 
@@ -1250,7 +1250,7 @@ test:do_test(
         return test:execsql "SELECT 11+a*case t1.a*t1.e when 17 then coalesce((select +t1.b from t1 where t1.c<>t1.c and e between +(abs(case b+f*coalesce((select c from t1 where t1.d>17), -t1.c)+(19) when b then t1.f else t1.d end)/abs(t1.d)) and t1.c and t1.a>b or t1.f<t1.a),t1.c)*17 else  -t1.d end*t1.b FROM t1 WHERE  -19-~t1.b<(select ~count(*) from t1)+(abs(++coalesce((select max(t1.a-c) from t1 where t1.a=11),11))/abs(case when not not exists(select 1 from t1 where exists(select 1 from t1 where t1.a>c or t1.d | 11 in (select t1.e from t1 union select d from t1))) then 17 else (abs(coalesce((select max(f) from t1 where not (c)<t1.a),t1.b))/abs(d))+f end-t1.c))-t1.e-t1.e"
     end, {
         -- <randexpr-2.121>
-        
+
         -- </randexpr-2.121>
     })
 
@@ -1270,7 +1270,7 @@ test:do_test(
         return test:execsql "SELECT (e)+case when t1.a>e then t1.f else t1.b+case when b between coalesce((select max(t1.d-~(abs(a)/abs(c))+t1.c) from t1 where f in (select  -min(t1.f)-+cast(avg(e) AS integer) from t1 union select  -(cast(avg(13) AS integer)) from t1) and f<=a and not exists(select 1 from t1 where f not between t1.d and t1.d or (f)<=a) and (t1.f) between 11 and d),t1.a) and t1.f then e when (11<d) then 11 else d end end | t1.e FROM t1 WHERE (abs(13)/abs(a)) in (+coalesce((select 13 from t1 where (t1.e in (select cast(avg(t1.c) AS integer) from t1 union select case +count(distinct t1.c) when +count(*) then ( -min( -b)) else count(*) end*max(e) from t1)) and +case when c in (select (11) from t1 union select  -t1.c from t1) then 17 when 17 in (select 17 from t1 union select d from t1) then c else t1.a end>13),case when c<=11 then t1.e when t1.e<=b then t1.d else t1.e end)-11,11,17)"
     end, {
         -- <randexpr-2.123>
-        
+
         -- </randexpr-2.123>
     })
 
@@ -1300,7 +1300,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(~d-t1.f+b-13) from t1 where t1.c not between case when +f=t1.b then 13 when ~f not in (~t1.a,coalesce((select max(t1.b) from t1 where b between c-t1.c+e and (t1.b)),coalesce((select max(t1.d) from t1 where not e in (select 17 from t1 union select t1.c+e | a from t1)),b)),t1.e) then t1.b else a end and c),t1.a) FROM t1 WHERE (select (++ -count(*) | cast(avg(t1.b) AS integer) | ++(max(t1.d))+count(*)+max(t1.b)-count(distinct t1.e)-+abs( -+~max((abs(t1.c)/abs((select min(a) from t1)))))+count(distinct t1.a-t1.b)) from t1) between e and c"
     end, {
         -- <randexpr-2.126>
-        
+
         -- </randexpr-2.126>
     })
 
@@ -1330,7 +1330,7 @@ test:do_test(
         return test:execsql "SELECT a+case when exists(select 1 from t1 where 19>=e) then b*b+coalesce((select max( -coalesce((select max(19 | t1.e) from t1 where exists(select 1 from t1 where exists(select 1 from t1 where +case t1.a when a then a else (17) end*19 in (select max(d) from t1 union select max(t1.a) from t1) and not exists(select 1 from t1 where t1.a<=11)) or 11>(19))),11* -a)) from t1 where t1.e<>17),f) else t1.e end-11 FROM t1 WHERE (t1.a>=(abs(coalesce((select +13*t1.a | c from t1 where 11+case when exists(select 1 from t1 where case when +t1.d in (select case +count(*) when count(distinct 11) then count(*) else (min(11)) end from t1 union select max( -11) from t1) or 11<> -t1.f then t1.d when t1.b in (13,a,d) then c else c end+t1.b=b) then e-c else (t1.d) end>t1.d),d))/abs(t1.f)) and 11 in (select  -t1.a from t1 union select 13 from t1))"
     end, {
         -- <randexpr-2.129>
-        
+
         -- </randexpr-2.129>
     })
 
@@ -1370,7 +1370,7 @@ test:do_test(
         return test:execsql "SELECT case ~13 when t1.e then e else (select case case (abs(count(*))-~count(*)+count(*) | count(*)-count(*)+max(t1.b)* -(cast(avg(13) AS integer)) |  -(count(distinct t1.c))) when min(e) then (min(13)) else count(*) end*count(*) when max(e) then count(distinct  -d) else count(*) end from t1) end-t1.d*case (abs(e | t1.b)/abs((select cast(avg(t1.c) AS integer) from t1))) when (select cast(avg(a) AS integer) from t1) then t1.c else f+13 end FROM t1 WHERE NOT (not exists(select 1 from t1 where coalesce((select case when t1.a>t1.f-~case when ~t1.d+c+t1.f>11 then t1.a when (f between t1.f and t1.c) then t1.f else 13 end*t1.a then t1.d when c<t1.e or e>19 then c else t1.e end from t1 where e<>a and 19<>t1.f),t1.b)+t1.f-t1.e<d))"
     end, {
         -- <randexpr-2.133>
-        
+
         -- </randexpr-2.133>
     })
 
@@ -1390,7 +1390,7 @@ test:do_test(
         return test:execsql "SELECT 11-case when 17<=c and (select ( -abs(case count(*)+~case  -min(e) when count(distinct t1.a) then  -count(*) else min(a) end+max(t1.c) when count(*) then max(b) else  -count(distinct 19) end)*cast(avg(17) AS integer)) from t1) not in (case f when e then 19 | 11 else (t1.d) end,d, -t1.b) then +t1.c when t1.d not in (11,c,t1.a) then 13 else a end-t1.d*t1.d FROM t1 WHERE ((abs((abs(coalesce((select a from t1 where (select max(case when t1.f=b then e when 11>t1.c and 11<>e then 13 else a end-(a))-max(t1.e)*count(distinct t1.f) | case max((f)) when (count(distinct f)) then count(*) else min(t1.c) end+min(19) from t1) not in (11,19,t1.e)),t1.f*17))/abs(a)))/abs(c)) in (select t1.c from t1 union select t1.a from t1)) or ( -t1.f=e)"
     end, {
         -- <randexpr-2.135>
-        
+
         -- </randexpr-2.135>
     })
 
@@ -1420,7 +1420,7 @@ test:do_test(
         return test:execsql "SELECT (f+case +t1.e when t1.d then 17 else f*19 end |  -(abs( -coalesce((select 17* -c+19 from t1 where (abs(case 19*e*d when (select +(cast(avg( -11) AS integer)) |  -count(*)*max( -13) from t1) then 11 | case t1.b when a then a else t1.f end else t1.a end)/abs(a)) in (select t1.b from t1 union select (a) from t1)),t1.b))/abs( -13))) FROM t1 WHERE +b in (select case case case when not ((~coalesce((select t1.e+d from t1 where (19 between f and t1.b)),(select cast(avg(c+t1.b) AS integer)++cast(avg(b) AS integer) from t1))) not in (t1.c+c,b,e)) or (13 not between d and t1.d) then 13 else b end when  -11 then 13 else 19 end*t1.e when (f) then 19 else 19 end from t1 union select f from t1)"
     end, {
         -- <randexpr-2.138>
-        
+
         -- </randexpr-2.138>
     })
 
@@ -1460,7 +1460,7 @@ test:do_test(
         return test:execsql "SELECT 11*coalesce((select max(t1.f) from t1 where a-case t1.c when +coalesce((select t1.a-t1.b from t1 where (abs(19)/abs(b)) in (17-case when a<t1.b then t1.a when c not between 19 and t1.d then e else (t1.b) end, -t1.b,f) or 19 in (select t1.b from t1 union select t1.a from t1)),e)+t1.f*t1.b then t1.c else 13 end in (select t1.b from t1 union select f from t1) or e<>17),d)*(t1.e) FROM t1 WHERE NOT ((coalesce((select max(~t1.b) from t1 where t1.c in (select ~+case count(distinct a) when (max(t1.a)) then (count(*)) else ~+abs(cast(avg(d | t1.a) AS integer)+case (cast(avg(13) AS integer)) when cast(avg(b) AS integer) then cast(avg(t1.f) AS integer) else min(t1.a) end) | count(distinct c)*( -( -max(t1.f)))*count(*) end from t1 union select count(distinct  -e) from t1)),~a-11)<19 or t1.a*13<>t1.d and not exists(select 1 from t1 where t1.e=e)))"
     end, {
         -- <randexpr-2.142>
-        
+
         -- </randexpr-2.142>
     })
 
@@ -1470,7 +1470,7 @@ test:do_test(
         return test:execsql "SELECT 11+t1.b+17+case when 13 not between t1.d*(17)+d-t1.f and 13 then t1.d when case when case when t1.f not in (t1.b,c,t1.f) and  -d between d and 11 then d else 19 end not between a and e then t1.b when t1.d in (17,13,11) then 19 else t1.e end*a>e then t1.a else t1.d end*f*e FROM t1 WHERE not exists(select 1 from t1 where (t1.f) in (b-b,(select +(max( -13*t1.c*c+t1.e+case t1.a when +t1.d-(c) then  -t1.a else t1.c end | 19* -17)*count(distinct a) | (count(distinct t1.f)))++cast(avg(f) AS integer)-max(13) | cast(avg(b) AS integer) from t1),t1.f))"
     end, {
         -- <randexpr-2.143>
-        
+
         -- </randexpr-2.143>
     })
 
@@ -1500,7 +1500,7 @@ test:do_test(
         return test:execsql "SELECT ((abs(+((select count(*)*abs(min((abs(case (abs(c)/abs(f)) | e when case when 19>=d then 13 when a=f then 13 else f end then b else a end+t1.a)/abs(11))*t1.c*17))-cast(avg(e) AS integer)*count(*) from t1)))/abs(coalesce((select max(case when t1.a in (select t1.c from t1 union select 19 from t1) then e else t1.e end) from t1 where (t1.a<= -t1.e)),17)+c*13))) FROM t1 WHERE NOT (exists(select 1 from t1 where ~coalesce((select max(c) from t1 where exists(select 1 from t1 where case when not case coalesce((select max(coalesce((select d from t1 where exists(select 1 from t1 where a<(t1.c))),19)) from t1 where e=t1.e),13) when t1.e then t1.b else f end in (select abs((min(e))*(max(t1.d))+min(t1.e)*(( -((max(t1.a)))))) from t1 union select count(distinct t1.a) from t1) then coalesce((select t1.c from t1 where t1.a< -t1.c and a in (t1.b,t1.f,t1.c)),17) else 17 end>=t1.f)),t1.f)+t1.a*b in (select c from t1 union select 19 from t1)) or exists(select 1 from t1 where not t1.f not in (t1.f,11,t1.d) and 19<=19))"
     end, {
         -- <randexpr-2.146>
-        
+
         -- </randexpr-2.146>
     })
 
@@ -1530,7 +1530,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(case when t1.f between 17 and 11+case when not coalesce((select max(11) from t1 where t1.f in (select max(t1.d) from t1 union select  -count(*) from t1) or 17=(13) or f in (( -t1.b),13,a)),case when d>13 then 13 else 11 end) between 19 and 19 then 19 when t1.c=d then e else 17 end then t1.e else t1.d end) from t1 where e in (select  -(+max(11)-max((t1.a))+ -count(distinct d) | cast(avg(t1.a) AS integer)*count(distinct b))-count(*)* -count(distinct t1.e) from t1 union select cast(avg(d) AS integer) from t1)),d)+b FROM t1 WHERE NOT ((select +~abs( -min(t1.a)-abs(count(*)))+ -abs(+ -+case (cast(avg(a) AS integer)) when min(e+t1.d) then +case cast(avg(coalesce((select max(t1.f+ -t1.e) from t1 where t1.c between 13 and t1.b),19)) AS integer) when ~~min(t1.f) then count(distinct 13) else cast(avg(t1.b) AS integer) end+count(distinct t1.e) else  -count(*) end | max(a)+max(t1.e)) from t1)+e<a)"
     end, {
         -- <randexpr-2.149>
-        
+
         -- </randexpr-2.149>
     })
 
@@ -1560,7 +1560,7 @@ test:do_test(
         return test:execsql "SELECT case when ((+b in (select min(coalesce((select c from t1 where t1.b-t1.c+coalesce((select max(case when 13 in (select  -count(distinct b)*max(c) from t1 union select (( - -cast(avg(d) AS integer))) from t1) then b else t1.f end) from t1 where t1.f<t1.e),13) between (b) and  -t1.b), -e)) from t1 union select +( -case  -abs(( -count(*))) | count(distinct d) when max(17) then max(13) else  -(min(13)) end) | (count(distinct t1.a)) from t1))) then t1.f else case c when t1.d then e else 11 end end FROM t1 WHERE NOT (t1.a+case t1.c when case c when 13 then t1.f*(select count(*) | cast(avg(a) AS integer) from t1)+13*t1.a else (select abs( -count(*)) from t1) end then b else t1.c end in (t1.a,d,17) or  -(select ~ -max(c) from t1)+17<>d or t1.a not between b and 13 or f<> -19 and t1.b>a)"
     end, {
         -- <randexpr-2.152>
-        
+
         -- </randexpr-2.152>
     })
 
@@ -1590,7 +1590,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.a | (abs(case when  -t1.e in (17,11,(abs(t1.b)/abs(b+case when (17 in (select f-c from t1 union select  -a from t1)) or t1.b<=a then d when t1.e in (select  -(count(*)) from t1 union select max(t1.b) from t1) then c else c end*a-t1.f))) then t1.b else t1.e end)/abs(t1.f))>=11 and not exists(select 1 from t1 where exists(select 1 from t1 where t1.d in (select t1.d from t1 union select 17 from t1))) then c else t1.c end FROM t1 WHERE NOT ((coalesce((select f from t1 where case a-e+a when (abs(t1.d)/abs((coalesce((select ~t1.e*+t1.a+b*a*(abs(19)/abs(a))*a+e from t1 where 13<t1.e),a))))+11 then 11 else d end>=13 or t1.b<= -19),t1.f)+17* -t1.c<t1.c))"
     end, {
         -- <randexpr-2.155>
-        
+
         -- </randexpr-2.155>
     })
 
@@ -1620,7 +1620,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(~t1.b) from t1 where b in (select count(distinct b) from t1 union select max(case coalesce((select max(b) from t1 where d in (select t1.f from t1 union select d from t1) and t1.a=d),t1.a) when  -t1.a then d*t1.e+t1.c-11+b | e-t1.a+e+t1.f else c end) from t1)),t1.a) FROM t1 WHERE NOT ((e<t1.f*case 17 when t1.a then t1.d else +coalesce((select max(17) from t1 where not 13<>~a-11),t1.f) end))"
     end, {
         -- <randexpr-2.158>
-        
+
         -- </randexpr-2.158>
     })
 
@@ -1640,7 +1640,7 @@ test:do_test(
         return test:execsql "SELECT case when not t1.c not in (13,d,~case when coalesce((select max((abs(t1.c)/abs(t1.e))) from t1 where b-t1.d+b+t1.f>a),t1.a) in (select 19 from t1 union select t1.a from t1) then  -b else a end*b | d) and  -(t1.b)>=e and 11<d or ((19))<> -t1.c then t1.f else t1.f end+(t1.b)+a FROM t1 WHERE e>e"
     end, {
         -- <randexpr-2.160>
-        
+
         -- </randexpr-2.160>
     })
 
@@ -1680,7 +1680,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.c*c from t1 where (select (abs(cast(avg(b*13) AS integer))) from t1) in (select 11 from t1 union select e | a-17 from t1)), -case t1.c when t1.b++(select cast(avg(e) AS integer) from t1) then 17 else t1.b end)-d FROM t1 WHERE NOT (b<=t1.d)"
     end, {
         -- <randexpr-2.164>
-        
+
         -- </randexpr-2.164>
     })
 
@@ -1710,7 +1710,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max((case (abs(t1.b)/abs(e)) when 13 then ((select +case count(*)*count(distinct coalesce((select max((11)+b) from t1 where exists(select 1 from t1 where t1.e=(t1.b))), -13)) when count(distinct  -c) then count(*)*max( -d) else max((a)) end+min(c) from t1)) else t1.a end-(abs(case when a=17 and e<=b then a when a>=e then t1.c else t1.c end+13)/abs(e))*(e))) from t1 where t1.a in (select d from t1 union select  -t1.e from t1)),13) FROM t1 WHERE NOT (not coalesce((select max(case when f<=d | b | case when case when (t1.c in (f,19,c)) then t1.f when d>t1.b then t1.f else t1.f end<=c then 11 else c end- -t1.c-13 and t1.c in (select b from t1 union select  -17 from t1) then t1.b else a end) from t1 where 11 between d and a), -17) not between t1.f and t1.f and t1.f>11 or (not exists(select 1 from t1 where t1.b in (select min(t1.d) from t1 union select min(c) from t1))))"
     end, {
         -- <randexpr-2.167>
-        
+
         -- </randexpr-2.167>
     })
 
@@ -1720,7 +1720,7 @@ test:do_test(
         return test:execsql "SELECT case when ((t1.e | (select min( -t1.f) from t1)*((abs(b)/abs(19)))-b<=t1.b and not e>13 or  -f in (select count(distinct e)-min(t1.a) from t1 union select count(distinct f) from t1))) then 13 when 17 between f and 19 or 11 between b and 19 or not t1.f>e then t1.d else d | f end FROM t1 WHERE not case when t1.a=t1.a then c when ~case when case when t1.e in (select + -count(distinct t1.d) from t1 union select cast(avg(t1.a) AS integer) from t1) then (t1.e) when 17 in (13, -f,a) then t1.d else d end<17 then e else f end+17+a* -e+b+b>t1.e then t1.e else t1.a end<c and a in (select max( -t1.f) | count(distinct t1.b)+~~count(distinct t1.b)-max(e)- -max(a) from t1 union select min(11) from t1)"
     end, {
         -- <randexpr-2.168>
-        
+
         -- </randexpr-2.168>
     })
 
@@ -1750,7 +1750,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select (select cast(avg(~13) AS integer)-count(distinct ~19-coalesce((select d-17 from t1 where case when (case 17 when b then d else (select min(11) | min(17) from t1)++t1.a end in (d, -c,t1.d)) then b else t1.c end between t1.a and (t1.e)),19)-t1.f) from t1) | (abs(t1.e)/abs(t1.e)) from t1 where (t1.c not in (( -t1.d),(t1.b),(d)))),t1.e) FROM t1 WHERE 13 between 19 and ~ -(abs( -t1.d | coalesce((select t1.f from t1 where 19 not between + -case when ~~b+coalesce((select max(t1.d) from t1 where exists(select 1 from t1 where (select cast(avg(19) AS integer)-cast(avg(b) AS integer) from t1)<>a and 19 between 11 and b and 11 between a and b)),t1.f) | c in ( -t1.c,13,b) then 11 when f in (select min(t1.d) from t1 union select cast(avg(f) AS integer) from t1) then t1.b else a end and t1.a),t1.c))/abs(11))+ -f"
     end, {
         -- <randexpr-2.171>
-        
+
         -- </randexpr-2.171>
     })
 
@@ -1790,7 +1790,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(+(d+a)*b) from t1 where (case e-t1.b when 17+11*13 then t1.a else 17 end-(17)<>(select cast(avg(t1.f) AS integer) from t1))),case when case when 11+13<>19 then 13 else t1.f end*e in (a,t1.f,t1.c) and not exists(select 1 from t1 where t1.b in (select  - -count(distinct t1.b)*( -count(*)) from t1 union select count(distinct t1.e) from t1)) then t1.c else a end) FROM t1 WHERE NOT (case when t1.d in (select count(*)-count(*)+ -min(case d when t1.c then 19 else 11 end)*count(*) | min(19)-(max((e))) from t1 union select count(*) from t1) then c when exists(select 1 from t1 where exists(select 1 from t1 where not exists(select 1 from t1 where (abs(b)/abs(t1.c))>coalesce((select max(f) from t1 where f<=t1.a),t1.d)))) then f*t1.c+11 else t1.f end+e-e*t1.f<=17)"
     end, {
         -- <randexpr-2.175>
-        
+
         -- </randexpr-2.175>
     })
 
@@ -1800,7 +1800,7 @@ test:do_test(
         return test:execsql "SELECT t1.c*case when t1.e>(select +cast(avg(13) AS integer)*min((11)* - -d |  - -coalesce((select max(b) from t1 where (select cast(avg((abs(a)/abs(b-(e)))) AS integer) from t1)+11*c<t1.d),e)-t1.f-t1.b+(t1.a)) from t1) then t1.c when +b in (17,a,b) then d else f end FROM t1 WHERE ((not exists(select 1 from t1 where not (exists(select 1 from t1 where (t1.c in (select t1.d from t1 union select  -c from t1)) or (select cast(avg(~(e)) AS integer) | min(case when f=t1.e and t1.e in (t1.b,t1.f,t1.a) then t1.f when t1.d>=a then t1.b else t1.b end | 19+a-c)*count(distinct t1.d)-+count(distinct t1.d) from t1) not in (19,d,b) and t1.f not between b and t1.f)))))"
     end, {
         -- <randexpr-2.176>
-        
+
         -- </randexpr-2.176>
     })
 
@@ -1840,7 +1840,7 @@ test:do_test(
         return test:execsql "SELECT case when not exists(select 1 from t1 where (not exists(select 1 from t1 where not exists(select 1 from t1 where not d*19=b))) or t1.a-a-t1.d*t1.f in (select ~case cast(avg(t1.d) AS integer) | count(*)+max(t1.c) when max(17) then cast(avg( -f) AS integer) else  -min(e) end from t1 union select max( -13) from t1)) then (select abs((+ -min(a)) | min(t1.a)-cast(avg(t1.f) AS integer)) | max(e) from t1) else 11 end*a | t1.a*f FROM t1 WHERE NOT (t1.c in (c,t1.b,~e) and 13+19-t1.b | coalesce((select max(case d when +t1.e+13*13 then coalesce((select case when f<t1.f then ~d else 19 end from t1 where not d>=e or  -f<=e and t1.d<>19),d) else d end) from t1 where t1.d<b),t1.a)*d*(a)<=t1.d)"
     end, {
         -- <randexpr-2.180>
-        
+
         -- </randexpr-2.180>
     })
 
@@ -1860,7 +1860,7 @@ test:do_test(
         return test:execsql "SELECT (abs(t1.f-(abs(case c when t1.a+(select max(17-coalesce((select +e-t1.a+11-13+d+11-t1.a from t1 where t1.e in (select ~coalesce((select a from t1 where t1.c-a=b),t1.c)+17 from t1 union select t1.e from t1)),c)-d) from t1) then 17 else  -t1.e end)/abs(d))-17)/abs(t1.b)) FROM t1 WHERE b in (select +count(distinct (19)-11) from t1 union select case count(*) when  -case min((abs(t1.c*(t1.c)+11)/abs(19))*~d*f) when abs(count(*)+count(*)) then (+(min(e)* -cast(avg(17) AS integer)* -cast(avg(d) AS integer)+max(t1.f))) else (count(*)) end | (min( -((t1.b)))) then (max(t1.c)) else  -count(distinct t1.d) end from t1) and not exists(select 1 from t1 where d<f)"
     end, {
         -- <randexpr-2.182>
-        
+
         -- </randexpr-2.182>
     })
 
@@ -1880,7 +1880,7 @@ test:do_test(
         return test:execsql "SELECT ~case +~c+(case when not exists(select 1 from t1 where t1.d in (select abs( -abs(max(t1.f)-count(distinct e)* -cast(avg(11) AS integer) | count(*))+min(f)*min( -17)*cast(avg(19) AS integer)) from t1 union select count(*) from t1)) or (t1.f)<>t1.b then d*t1.f*17 else (b) end)+t1.f*13 when c then t1.a else t1.e end- -t1.f FROM t1 WHERE b-case when t1.b=t1.b and (coalesce((select max(t1.e) from t1 where t1.b in (select ~cast(avg(19) AS integer)+max(t1.b)+min(t1.e) from t1 union select max(t1.a) from t1) or exists(select 1 from t1 where 11 in (select max(t1.e) from t1 union select max(t1.f) from t1))),(abs(17)/abs(17)))) not between c and t1.a then 13 else 13 end | t1.c in (select ++cast(avg(f) AS integer)-(+(count(distinct 13) | max(19))-count(*) |  -max(t1.e)) from t1 union select count(*) from t1)"
     end, {
         -- <randexpr-2.184>
-        
+
         -- </randexpr-2.184>
     })
 
@@ -1910,7 +1910,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.c in (select c from t1 union select a from t1) then 11 when ((select max(19) from t1) | t1.a+e not between (case  -19 when b*e-b-case when b<>~d*t1.d+t1.c*d then t1.d when t1.c=19 then f else d end-f*t1.d then t1.d else 13 end) and 13) then 11 else t1.b end FROM t1 WHERE t1.b*coalesce((select max(t1.d) from t1 where  -f<=(select max(t1.e) from t1)*e),case when case when t1.e- -13>t1.b+t1.f+c then 13 else  -d end in (select 19 from t1 union select t1.f from t1) then e when t1.b in (select ~count(distinct t1.a)+count(*) from t1 union select abs( - -((cast(avg(c) AS integer)))*(cast(avg(t1.b) AS integer))) from t1) then 17 else d end)+ -17 | t1.a-t1.d in (t1.e,f,f)"
     end, {
         -- <randexpr-2.187>
-        
+
         -- </randexpr-2.187>
     })
 
@@ -1950,7 +1950,7 @@ test:do_test(
         return test:execsql "SELECT ~(d)-(select case case cast(avg(t1.b- -~b) AS integer) when max(coalesce((select e from t1 where 11<>e),coalesce((select c from t1 where c not in (t1.e,a,(17)) or t1.b in ((b),t1.c,t1.f)),13))) then +cast(avg(d) AS integer) | case max(t1.c) when min((e)) then max(e)+cast(avg(t1.d) AS integer) else min(t1.f) end+max(d) else count(*) end |  -cast(avg(t1.f) AS integer) |  - -count(distinct c)*max(b) when count(distinct t1.d) then  - -min(a) else count(*) end from t1) FROM t1 WHERE NOT (t1.c+a=t1.e+t1.c*t1.e | case t1.d when case when 13 in (select min(c) from t1 union select max(d) from t1) or t1.f>=13 then 19 when t1.c<=11 then  -t1.b else 13 end then 13 else t1.e end or f in (select t1.a from t1 union select t1.f from t1) or (t1.a<t1.b) and e>t1.b and (((t1.d not between  -a and t1.f))) or t1.a not in ( -t1.d,13,a) and d<c or d=t1.d or e<d)"
     end, {
         -- <randexpr-2.191>
-        
+
         -- </randexpr-2.191>
     })
 
@@ -1970,7 +1970,7 @@ test:do_test(
         return test:execsql "SELECT (abs(coalesce((select max(a) from t1 where exists(select 1 from t1 where t1.f<19 and coalesce((select max(case when t1.a+e in (select t1.c from t1 union select f from t1) then f else (17) end) from t1 where t1.e in (f,coalesce((select max(t1.f) from t1 where 17<=((abs(t1.d | (t1.a))/abs(13))*(a))-d),17),e)),t1.c) not between t1.b and 11 and 13<t1.f)),f+t1.d))/abs(19)) FROM t1 WHERE 11*c+17-f in (select min(t1.e*11*case when exists(select 1 from t1 where not exists(select 1 from t1 where + -17<a)) then (abs((d))/abs(13)) when 11 in (select case count(*) when count(distinct t1.f) then count(distinct 17) else cast(avg((11)) AS integer) end from t1 union select cast(avg(t1.c) AS integer) from t1) then b else e end) from t1 union select case count(*) when  -count(distinct t1.d) then max(a) else (count(distinct t1.c))-max((b)) | (count(distinct t1.e))*count(distinct (13))-count(distinct e) end-count(*)-count(*) from t1)"
     end, {
         -- <randexpr-2.193>
-        
+
         -- </randexpr-2.193>
     })
 
@@ -2000,7 +2000,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(~t1.d) from t1 where not exists(select 1 from t1 where exists(select 1 from t1 where c>t1.c or ((t1.f>e)) and t1.e-19+c+ -d*t1.d+11<>17+coalesce((select max(t1.d) from t1 where 17+t1.c<t1.d),t1.b) or f<>11))),11) | case e when c then a else t1.b end+a FROM t1 WHERE case when d not in (a,11,(13)) then a when exists(select 1 from t1 where case when case when case when (t1.c) in (c,e,b) then f else (19) end-t1.f<t1.d then 11 else a end>=t1.a then 11 else t1.c end in (select abs(~~max(t1.c)) from t1 union select cast(avg(c) AS integer) from t1)) then 11 else t1.f end in (select (~~count(*)*cast(avg(19) AS integer)) from t1 union select min(t1.d)+ -count(distinct f) from t1)"
     end, {
         -- <randexpr-2.196>
-        
+
         -- </randexpr-2.196>
     })
 
@@ -2040,7 +2040,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.e*t1.b<>e then 19 else  -11-b+coalesce((select max(t1.e+t1.f) from t1 where 11+f*t1.c<>t1.a*(~f+case when t1.f in (t1.f, -((13)),19) then t1.a when t1.e>17 then a else a end+b-t1.e-(f))),13)+d end+t1.b* -c FROM t1 WHERE NOT (exists(select 1 from t1 where coalesce((select max(t1.a*t1.e+13) from t1 where 13 in ((abs(e)/abs(t1.a)),a+t1.c,17*t1.c)),(select  -case max(c) | cast(avg(e) AS integer) when ~+ -count(distinct coalesce((select d from t1 where exists(select 1 from t1 where  -17<e)),( -t1.e))) | case max(11) when cast(avg(a) AS integer) then max( -t1.f) else count(distinct  -11) end then cast(avg(t1.d) AS integer) else max((d)) end*count(distinct t1.b) from t1) | t1.b-t1.d*t1.c+11)<=b))"
     end, {
         -- <randexpr-2.200>
-        
+
         -- </randexpr-2.200>
     })
 
@@ -2050,7 +2050,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(coalesce((select 19 from t1 where (case when ((abs(coalesce((select max(case when t1.a between (t1.c)+ -b and d then e else d end) from t1 where t1.e in (select (count(*)) from t1 union select max( -a)-count(distinct t1.c)-((min(13))) | max((t1.f)) from t1)),11))/abs(19)))+d>c then t1.b when 17 not between t1.e and c then 11 else f end in (select a from t1 union select 13 from t1))),11)) from t1 where not exists(select 1 from t1 where f=17)),e) FROM t1 WHERE ( -13 in (13,b,case when 19=11 then t1.d else case when (d | b-case when t1.f-(select +abs(cast(avg( -17* -17) AS integer)*count(*)+max(t1.e)) from t1)*t1.f not in (f,a,c) then t1.a else t1.b end between 19 and e) then a else 13 end end-t1.a) or t1.c<19)"
     end, {
         -- <randexpr-2.201>
-        
+
         -- </randexpr-2.201>
     })
 
@@ -2090,7 +2090,7 @@ test:do_test(
         return test:execsql "SELECT  -~d*19-a-c | t1.c+(abs(case  -19 | ~case t1.d when c then t1.f else c end when +t1.d then 17 else case case when b>case case when t1.c=d or  -t1.a=17 then ((a)) when t1.a<>d then (t1.c) else a end+19+11 when 19 then t1.a else b end-(t1.e) then f else t1.c end when 17 then t1.b else a end end)/abs(d))+t1.b FROM t1 WHERE NOT (t1.f+13<>19)"
     end, {
         -- <randexpr-2.205>
-        
+
         -- </randexpr-2.205>
     })
 
@@ -2120,7 +2120,7 @@ test:do_test(
         return test:execsql "SELECT (abs(coalesce((select b from t1 where t1.a>(abs(t1.f)/abs(coalesce((select 13 from t1 where not coalesce((select (select cast(avg(case when case when t1.e not between t1.c and 19 then t1.d when d in (11,t1.b,13) then e else 17 end*b between 13 and (t1.b) then t1.f when a<>19 and t1.c not in (a,t1.f,b) then t1.e else t1.f end) AS integer) from t1)+t1.c-b* -a*f from t1 where (t1.d in (select c from t1 union select t1.b from t1))),t1.e)-c<>c),t1.c)))),e))/abs(t1.e)) FROM t1 WHERE NOT ((t1.a-t1.c-case when e<c*17 then t1.e when case case t1.b when t1.c then coalesce((select max(t1.c) from t1 where t1.c in (select ~cast(avg(case when 17 in (t1.f,t1.f,t1.a) then c when 13<>b then f else d end | t1.d) AS integer) from t1 union select count(distinct 11) from t1)),c) else t1.f end when f then 19 else t1.b end<t1.f then t1.b else t1.e end-11 not between 11 and t1.d))"
     end, {
         -- <randexpr-2.208>
-        
+
         -- </randexpr-2.208>
     })
 
@@ -2130,7 +2130,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.d<>d then case 11 when ~+case t1.a when (abs(t1.a)/abs( -c))*t1.c+ -a+coalesce((select t1.c from t1 where ((abs(e)/abs((case when (11>=e) then  -17 when (11)<=a then e else b end)+t1.f))>19)),b)-d then c else 17 end+ -b then ( -t1.a) else c end when 11<=t1.f then 11 else 17 end FROM t1 WHERE (coalesce((select max(17) from t1 where ~case ((select min( -e-a)*+cast(avg(11) AS integer)*count(*)-(count(*))*max(b)*min( -13)+count(*)-min( -13) from t1)+19)+a when e then (select min(f) from t1) else coalesce((select t1.f from t1 where 17>t1.c),19) end=11 and f=t1.b),19) not between  -a and t1.a)"
     end, {
         -- <randexpr-2.209>
-        
+
         -- </randexpr-2.209>
     })
 
@@ -2160,7 +2160,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.e) from t1 where not d in (select (abs(t1.f)/abs(~case when (abs(t1.e)/abs( -t1.a))+t1.b-t1.e*t1.a-t1.c between b and t1.e then f else a end+19)) from t1 union select 13 from t1) or (t1.e=(a)) and  -11 in (select t1.f from t1 union select c from t1)),a)*coalesce((select max(f) from t1 where d=f),f)*c+(t1.c) FROM t1 WHERE NOT (case when +(abs(19)/abs(13*t1.e))<>11 then 19 when coalesce((select max(c) from t1 where t1.e+t1.a between t1.f and f),t1.a)=(a) then d else  -19 end<=f or (((e in (b,t1.b,13)))) or b<(f) and t1.a<>11 or exists(select 1 from t1 where t1.d=d) or (t1.a)<>a or t1.a<>e)"
     end, {
         -- <randexpr-2.212>
-        
+
         -- </randexpr-2.212>
     })
 
@@ -2170,7 +2170,7 @@ test:do_test(
         return test:execsql "SELECT case (select abs(count(distinct  -17+(abs(c)/abs(case when exists(select 1 from t1 where (17<>(f))) then e when t1.c not between 11 and t1.d then +11 else t1.e end | b))+d)*+ -(min(f)*max(t1.e))*+cast(avg(t1.f) AS integer) | count(distinct (f))- - -count(*)-cast(avg((e)) AS integer)) from t1) when (abs(11)/abs(t1.e)) then 13 else b end FROM t1 WHERE case when t1.e not between coalesce((select (select count(*)+case max(17) when count(distinct 19-t1.c*t1.c-e) then  -min(b)-cast(avg((13)) AS integer)*count(*) else min(19) end from t1)*a*t1.d-17*a+17 from t1 where t1.d not in (13,t1.f, -c)),t1.c) and e then ( -b) when (13)>=(e) then t1.c else e end in (t1.d,t1.c, -11)"
     end, {
         -- <randexpr-2.213>
-        
+
         -- </randexpr-2.213>
     })
 
@@ -2200,7 +2200,7 @@ test:do_test(
         return test:execsql "SELECT  -case when d<d or not exists(select 1 from t1 where not exists(select 1 from t1 where not not not exists(select 1 from t1 where not e+~t1.c between t1.e and t1.c and t1.c>t1.d))) then case +coalesce((select case when 13>t1.b then 17+t1.d+d when 17 in (t1.b,b,b) and 17<=t1.e then (c) else t1.d end from t1 where 17<a),11) when f then t1.c else b end when 19 between 11 and t1.e then f else a end-19*13 FROM t1 WHERE exists(select 1 from t1 where +13 in (select count(distinct 13) from t1 union select case count(*)+ -(max(t1.c)) when count(*) | ~( -count(*)-count(distinct  -f))+min(a)-max(t1.b) then  - -max(13) else max(e) end+count(distinct 17) from t1) and d*t1.b>b+t1.a*t1.a-coalesce((select max(d) from t1 where (17 between (t1.d) and (f))),t1.e)-t1.c and t1.d>11)"
     end, {
         -- <randexpr-2.216>
-        
+
         -- </randexpr-2.216>
     })
 
@@ -2230,7 +2230,7 @@ test:do_test(
         return test:execsql "SELECT (select + -max(t1.c)*abs(min(t1.b) | case (abs(min(13)))+count(*)-max(t1.a) when max(~13) then abs( -~min(t1.b)+abs(count(distinct (select +++cast(avg(t1.b) AS integer)-case  -count(*) when  -count(*) then  -count(distinct b) else count(distinct c) end from t1)))) else count(*) end-max((e))) |  -cast(avg(t1.e) AS integer) from t1) FROM t1 WHERE NOT (exists(select 1 from t1 where  -f-d*t1.f-c-coalesce((select max(t1.a) from t1 where 11 not in ((select count(*) from t1),coalesce((select max(t1.f+e) from t1 where t1.b in (select count(distinct t1.c) from t1 union select  -case abs(abs(count(distinct 13))) when max(t1.b) then abs(cast(avg(11) AS integer)) else  -cast(avg(17) AS integer) end from t1)),case t1.f when  -b then 17 else 17 end)- -t1.f,b)),a)+f+c-t1.c<t1.b))"
     end, {
         -- <randexpr-2.219>
-        
+
         -- </randexpr-2.219>
     })
 
@@ -2250,7 +2250,7 @@ test:do_test(
         return test:execsql "SELECT  -+(select count(distinct case when (case ~c | coalesce((select max(t1.e-f+t1.d) from t1 where b-coalesce((select max(b) from t1 where t1.c in (select max(t1.d) from t1 union select min(a) from t1)),t1.f) in (select t1.a from t1 union select e from t1)),c) when e then  -c else  -t1.b end in ( -19, -d,b)) then d when t1.e in (19,d,19) and (t1.b between c and t1.a) then t1.d else 17 end-d) from t1) FROM t1 WHERE f<= -b"
     end, {
         -- <randexpr-2.221>
-        
+
         -- </randexpr-2.221>
     })
 
@@ -2290,7 +2290,7 @@ test:do_test(
         return test:execsql "SELECT (abs(~(+t1.b))/abs(~coalesce((select max(t1.a) from t1 where t1.f<+case when not exists(select 1 from t1 where not c+11=case c when t1.e then 13 else t1.f end+t1.e) and t1.f in (select 11 from t1 union select t1.d from t1) and c not in (t1.f,17,a) then case when a=17 or t1.c between t1.e and 19 or t1.a<>e then 19 else t1.c-t1.d end else b end),(e))-t1.a+(13)-19)) FROM t1 WHERE NOT ((not t1.e not in (case when exists(select 1 from t1 where 17<=t1.f*17*t1.b) then f+coalesce((select max(t1.b-c-11+t1.c-a) from t1 where 13 in (select t1.e from t1 union select case when a not between t1.f and d or f<t1.f then d when t1.f<=e then d else e end+17- -17 from t1)),t1.c) else t1.f end,e,t1.a) or exists(select 1 from t1 where t1.a not in (t1.c,(t1.d),(t1.c)))))"
     end, {
         -- <randexpr-2.225>
-        
+
         -- </randexpr-2.225>
     })
 
@@ -2310,7 +2310,7 @@ test:do_test(
         return test:execsql "SELECT (select min(b) | case case cast(avg(c) AS integer) when ~+~count(distinct  -19*f*f) then count(distinct (select cast(avg(d-case when t1.a<=19 then 19 else 11 end+f+a) AS integer) from t1))+count(distinct t1.c)+ -+ -count(*) |  - -max((17))*min(t1.b)*min((e)) else max(t1.c) end when ( - - -min(a)) then ( -min(c)) else max((11)) end from t1) FROM t1 WHERE NOT (case when (((exists(select 1 from t1 where ~t1.d-t1.f between  -+t1.f*c and f and not t1.e in (19,a,13))) or  -e>=t1.b) and (t1.e<>( -t1.d)) and (t1.c<=13)) then c else d+11 end<=case when (t1.c)>=19 then (t1.e) when (f) not between 11 and f then coalesce((select 13 from t1 where  -t1.b>=d),13) else b end)"
     end, {
         -- <randexpr-2.227>
-        
+
         -- </randexpr-2.227>
     })
 
@@ -2330,7 +2330,7 @@ test:do_test(
         return test:execsql "SELECT case when 19-b in (select (min(case coalesce((select e from t1 where (c not between c and e)),(select abs(count(distinct coalesce((select max( -coalesce((select max(17) from t1 where (d)>17 and c not between d and b),11)-d) from t1 where ((11)) not in (d,d,e)), - -e))) from t1)+t1.e+t1.a) when f then t1.e else t1.a end)) from t1 union select max(11) from t1) then c else f end+t1.e FROM t1 WHERE coalesce((select max(d) from t1 where coalesce((select max(case when (a++19=case t1.d when t1.e then t1.b else t1.a end*f) and  -13=a then case t1.d+13 when t1.f then 17 else t1.f end when (11 not in (d,17,t1.f)) then e else 11 end+b*t1.b) from t1 where exists(select 1 from t1 where exists(select 1 from t1 where t1.f in (select t1.e from t1 union select b from t1)))),(d))<=c),a) between t1.f and d"
     end, {
         -- <randexpr-2.229>
-        
+
         -- </randexpr-2.229>
     })
 
@@ -2350,7 +2350,7 @@ test:do_test(
         return test:execsql "SELECT  -t1.e*coalesce((select max(17) from t1 where (11*(select case  -abs( -+count(*)) when  -case +(cast(avg( -f) AS integer)) | (abs(cast(avg(c) AS integer))) when min(d) then  -max(t1.f) else count(*) end then cast(avg( -t1.f) AS integer) else max(b) end from t1)*~t1.e*case (select min(e) from t1) when 17-t1.b then (e) else t1.f+t1.f end) in (select t1.d from t1 union select 19 from t1)), -t1.a) FROM t1 WHERE (select min(19) from t1) in (select 17 from t1 union select  -11+t1.d+t1.c from t1)"
     end, {
         -- <randexpr-2.231>
-        
+
         -- </randexpr-2.231>
     })
 
@@ -2380,7 +2380,7 @@ test:do_test(
         return test:execsql "SELECT (coalesce((select max(case when t1.e>= -e | 13-19*d then case when c not in (+(select count(*) from t1),coalesce((select max(t1.a) from t1 where 13 in (select case count(distinct t1.a) | count(*) when cast(avg(t1.b) AS integer) then count(distinct a) else min(11) end from t1 union select count(*) from t1)),19),t1.a) then t1.c else c end when t1.f in (select t1.f from t1 union select t1.e from t1) then t1.e else  -t1.e end) from t1 where (17 in (e,d,a))),t1.d)* -19) FROM t1 WHERE (((abs(t1.f)/abs(d)) in (select case (case max(coalesce((select max(e*(t1.d*13+t1.b)-t1.b) from t1 where t1.a=13),(t1.c))) when (case max(t1.a) when  -abs(max(17))-count(distinct 19) then cast(avg(t1.d) AS integer) else max(13) end)*count(distinct t1.c) then (max((t1.b))) else min(19) end) when max(f) then  -(count(distinct t1.f)) else min(t1.b) end from t1 union select cast(avg(13) AS integer) from t1) and (13 in (select ((min(b))) from t1 union select  - -count(*) from t1))))"
     end, {
         -- <randexpr-2.234>
-        
+
         -- </randexpr-2.234>
     })
 
@@ -2420,7 +2420,7 @@ test:do_test(
         return test:execsql "SELECT case when case when b in (select abs(abs( -max(case c+d when f then f else 19 end | c)-( -case min(c) when  -(cast(avg((t1.f)) AS integer)) then count(*) else ((cast(avg(t1.b) AS integer))) end))+count(*)+(max(17))) from t1 union select count(*) from t1) then t1.a when ~13*t1.a- -c not in (b,e,19) then t1.c else (t1.d) end<=(b) and 13 between t1.f and 11 then t1.f else  -19 end FROM t1 WHERE NOT (d>=case when t1.d+case when ( -17)-c>11 or b in ((select min(13)+ -cast(avg(11) AS integer) from t1)+~t1.f, -c,(13)) and e in (select (d) from t1 union select f from t1) then t1.a when d= -t1.d then a- -17 else 17 end-t1.c>d then 11 when exists(select 1 from t1 where 17 not between t1.b and t1.b) then t1.b else (t1.a) end)"
     end, {
         -- <randexpr-2.238>
-        
+
         -- </randexpr-2.238>
     })
 
@@ -2440,7 +2440,7 @@ test:do_test(
         return test:execsql "SELECT e-coalesce((select coalesce((select max(19) from t1 where (coalesce((select max(case 11 when b then 13 else t1.a end) from t1 where 19 not in (c,t1.f,b)),t1.a)+t1.d in (select 17 from t1 union select 19 from t1) and 11 in (13,t1.c,17) or 19 not in (t1.f,a,17) or t1.e not between 13 and f and a>=d)),(a)-17+t1.f)+t1.a+17 from t1 where not exists(select 1 from t1 where a>t1.f)),t1.b) FROM t1 WHERE t1.a-17 in (select (abs(count(*)))-case case case abs(abs(count(*))) when min(t1.f) then count(*) else cast(avg(+t1.a+(e) | 19*e+t1.f) AS integer) end when abs(+cast(avg(b) AS integer) | count(distinct (13))*+~ -(min(e)) | cast(avg(19) AS integer)) then cast(avg(19) AS integer) else count(distinct t1.c) end | min(t1.d) when count(*) then (count(distinct d)) else (min(11)) end from t1 union select (cast(avg(t1.a) AS integer)) from t1)"
     end, {
         -- <randexpr-2.240>
-        
+
         -- </randexpr-2.240>
     })
 
@@ -2460,7 +2460,7 @@ test:do_test(
         return test:execsql "SELECT  -coalesce((select case when b>19 | f-(select abs(max(t1.b+case when e>17 then 11 else f end)+count(*)) from t1) and case when (19<11*t1.d*t1.b) then 13 else t1.e end not between c and b then d+17 else c end-f from t1 where t1.b>=f),t1.c)+17-a FROM t1 WHERE +c in (+~a+case when ((case t1.d when coalesce((select f from t1 where e in (select count(distinct t1.e) from t1 union select min((abs(t1.c)/abs(e | b)) | d* -t1.d) from t1)),t1.e)+a then c else b end in (select  -cast(avg(t1.c) AS integer)-~cast(avg(11) AS integer) from t1 union select  -count(distinct 19) from t1))) then  -e*19 else 13 end,t1.a,d)"
     end, {
         -- <randexpr-2.242>
-        
+
         -- </randexpr-2.242>
     })
 
@@ -2490,7 +2490,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.b>=+(abs(t1.e)/abs(coalesce((select c from t1 where 17<=+(e)),(e)-+~11*17+t1.d-e | +coalesce((select max(t1.d) from t1 where f>e),t1.a)*b | (e))))-t1.a and c>=t1.d or (17 not between e and b) then t1.e else d end FROM t1 WHERE exists(select 1 from t1 where (19-((17))+(b) in (select d*e*a from t1 union select ~19 from t1)) and case b-(abs(case a when coalesce((select max(19) from t1 where exists(select 1 from t1 where exists(select 1 from t1 where b not between e and (t1.f) or a not in (t1.c,17,t1.d)))),case t1.b when  -d then 13 else 13 end)*a+t1.c then e else a end)/abs(t1.d))*t1.e when  -13 then t1.c else 19 end in (select +count(distinct e) from t1 union select count(*) from t1))"
     end, {
         -- <randexpr-2.245>
-        
+
         -- </randexpr-2.245>
     })
 
@@ -2530,7 +2530,7 @@ test:do_test(
         return test:execsql "SELECT case when 11 in (select min(+t1.e)* -max(a)+count(distinct d*11*c)*(count(distinct (e))) | ( -min(t1.b)) | count(distinct 19) | (max(t1.f))-max(t1.b) from t1 union select (min(19)) from t1) then coalesce((select max(17) from t1 where  -17=13 or c in (select t1.d from t1 union select d from t1)),b)*t1.b-a+19 when t1.d<(d) then (d) else 19 end FROM t1 WHERE NOT (case when case when t1.c not in (f,19,b) then t1.d-t1.c-case when 17<>t1.a then  -(abs((select cast(avg(b) AS integer)- -max(t1.c) from t1))/abs(t1.c)) else t1.f end-17 | 19 when exists(select 1 from t1 where exists(select 1 from t1 where (e between 13 and (t1.a))) and e<=t1.c) then f else t1.a end>=11 then c when f<a then t1.b else t1.e end=t1.c)"
     end, {
         -- <randexpr-2.249>
-        
+
         -- </randexpr-2.249>
     })
 
@@ -2550,7 +2550,7 @@ test:do_test(
         return test:execsql "SELECT c*~17+~case when (exists(select 1 from t1 where not exists(select 1 from t1 where (abs(e)/abs(c))=case when t1.c not in (a,13,11) and t1.b>=c then t1.b else t1.f end)) and 17<>f) then case when (e) not in (t1.a,t1.f,e) then case case t1.c when 13 then 19 else t1.d end-19 when t1.d then  -t1.b else t1.f end when t1.d not in (17,t1.a,t1.d) or c in (d,(19),t1.b) then  -t1.b else c end else 19 end+t1.b-f+t1.e FROM t1 WHERE t1.f-case when (coalesce((select 13*(abs(~11)/abs(t1.b)) from t1 where ~a between +f+~+17 and t1.e),e) not between coalesce((select 19-(abs(11)/abs(t1.b)) from t1 where f<>c),t1.b) and t1.f or t1.d between (select case min(a) when cast(avg(e) AS integer) then  -((count(*))) else cast(avg(t1.a) AS integer) end | count(*) from t1) and (t1.a)) then 19 else f end=f"
     end, {
         -- <randexpr-2.251>
-        
+
         -- </randexpr-2.251>
     })
 
@@ -2580,7 +2580,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select c-t1.a | 17 | b-~t1.e-11 from t1 where not exists(select 1 from t1 where t1.c<=t1.b)),17) FROM t1 WHERE NOT ((((coalesce((select max((abs(b-t1.d-19*t1.a*e+~case when t1.e=t1.f-e then (select abs(abs(cast(avg((f)) AS integer))) from t1) else ((abs(t1.b)/abs(t1.a))) end-t1.b-t1.c)/abs(t1.b))) from t1 where not t1.c in (select count(distinct c) from t1 union select count(*) from t1) and 17< -t1.e),(c)) |  -(c))<>e)))"
     end, {
         -- <randexpr-2.254>
-        
+
         -- </randexpr-2.254>
     })
 
@@ -2600,7 +2600,7 @@ test:do_test(
         return test:execsql "SELECT case case +(select case count(distinct case when case when (abs(f | t1.d)/abs(13))<= -c then t1.a else t1.b end+t1.b<=19 then c when 19=a then 17 else 11 end+13) when ~+case (cast(avg(t1.b) AS integer) | ((count(*)))-max(t1.d)) when count(distinct d) then count(*) else cast(avg(t1.c) AS integer) end then count(*) else count(*) end from t1) when c*t1.a then 13 else t1.a end when a then  -f else t1.a end+d FROM t1 WHERE case when coalesce((select t1.c | c*t1.e-11 from t1 where exists(select 1 from t1 where t1.d-t1.d*d between  - -t1.e and a)), -13)<=e and 11 not in (d,t1.a,f) and t1.a not between 11 and 19 or t1.e<>t1.e and t1.e<c or a between t1.c and c and d>=t1.a or  -t1.e>=b then b when 17 not between t1.f and t1.b then a else b end in (select 11 from t1 union select f from t1)"
     end, {
         -- <randexpr-2.256>
-        
+
         -- </randexpr-2.256>
     })
 
@@ -2640,7 +2640,7 @@ test:do_test(
         return test:execsql "SELECT f*coalesce((select max((select count(*) from t1)) from t1 where ~case when t1.e<=case when 17>=+case when c*a in (c,t1.b,13) then t1.e when a>t1.b and a<=19 then c else t1.e end then t1.c else 17 end-f*17 or a between b and 19 then t1.c when  -f<=11 then c else  -11 end*t1.c+d>=e),17) FROM t1 WHERE NOT ((19 not between t1.b and ~e))"
     end, {
         -- <randexpr-2.260>
-        
+
         -- </randexpr-2.260>
     })
 
@@ -2660,7 +2660,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.c- -case when (~(select max(b*t1.a)*~((min(t1.e))-min((a))) |  -cast(avg(t1.e+t1.a) AS integer) from t1))<d then c else (abs( -~19)/abs(c)) end-coalesce((select max(t1.e+a) from t1 where 11<>c or (t1.b)> -(11)),11)) from t1 where  -11 in ((d),f,t1.d)),t1.a) FROM t1 WHERE NOT (c<>e+t1.c)"
     end, {
         -- <randexpr-2.262>
-        
+
         -- </randexpr-2.262>
     })
 
@@ -2690,7 +2690,7 @@ test:do_test(
         return test:execsql "SELECT  -case when (not exists(select 1 from t1 where e*d*case 17 when case t1.c-t1.f when t1.a then t1.a else 11 end then t1.c else t1.b end-e+(t1.a)-e not in (e,e,t1.a) and (t1.f not between 19 and t1.e))) and t1.b<t1.a then f-d-c+b when 17=17 then 19 else d end FROM t1 WHERE NOT (f*t1.a not between coalesce((select t1.b from t1 where 17=13),17*e) and e)"
     end, {
         -- <randexpr-2.265>
-        
+
         -- </randexpr-2.265>
     })
 
@@ -2700,7 +2700,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select 17+coalesce((select max(case when  -coalesce((select max((abs( -(abs(t1.a)/abs(t1.d))+11)/abs(e))-b) from t1 where t1.b not between f and t1.c and t1.f<>e),c) between t1.e and f then t1.e when  -f> - -b then c else t1.c end) from t1 where not 11 in (select f from t1 union select a from t1)),t1.d)-t1.a-13 from t1 where t1.d between  -t1.e and t1.a),f) FROM t1 WHERE exists(select 1 from t1 where not exists(select 1 from t1 where c in (select (abs(f)/abs(13)) from t1 union select t1.a+b from t1)))"
     end, {
         -- <randexpr-2.266>
-        
+
         -- </randexpr-2.266>
     })
 
@@ -2730,7 +2730,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.d) from t1 where exists(select 1 from t1 where t1.d in (select case (abs(((count(distinct t1.d-c))* -cast(avg(11) AS integer)+max(t1.c)))) when (cast(avg(t1.c+a) AS integer)*+min(a)*max(c)-max(t1.a)+cast(avg(f) AS integer))+cast(avg(t1.e) AS integer) then min(11) else (((min(11)))) end from t1 union select count(*) from t1))),coalesce((select max(b+13) from t1 where exists(select 1 from t1 where f in (select 11 from t1 union select t1.b from t1))),t1.e)) FROM t1 WHERE NOT (b>11)"
     end, {
         -- <randexpr-2.269>
-        
+
         -- </randexpr-2.269>
     })
 
@@ -2740,7 +2740,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max( -(select count(*)-case min(19)-abs(count(*))+(max( -b)-+count(distinct (t1.e))) when max(a) then (count(distinct 19)) else count(*) end from t1)) from t1 where exists(select 1 from t1 where a<(abs(case when a-t1.c+ -19+t1.d between 11 and f then t1.f else d end+t1.a+d)/abs(c))) or t1.c>t1.c),17)*f FROM t1 WHERE not f<>t1.b"
     end, {
         -- <randexpr-2.270>
-        
+
         -- </randexpr-2.270>
     })
 
@@ -2770,7 +2770,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select f-coalesce((select +coalesce((select t1.c from t1 where (t1.c=(abs(t1.e)/abs(+t1.c+f+(f))))),13+17)+t1.b | t1.c from t1 where case when t1.a not in (d,17,t1.c) then f else f end |  -13 in (select cast(avg(t1.e) AS integer) from t1 union select min(t1.a) from t1)),c) from t1 where 17>c), -t1.b)>t1.c then 17 when t1.b<>11 then e else t1.f end FROM t1 WHERE NOT (case when t1.f in (t1.a+(abs(17)/abs((t1.d))),coalesce((select max(c) from t1 where (not (d- -case f when 17 then d else (17) end+e*t1.d) not in ((t1.d),t1.f,f))),coalesce((select c from t1 where 13 not in (19,d,b)),f)),17) then t1.b when e<=f then 17 else c end<d or t1.d> -19)"
     end, {
         -- <randexpr-2.273>
-        
+
         -- </randexpr-2.273>
     })
 
@@ -2800,7 +2800,7 @@ test:do_test(
         return test:execsql "SELECT case when d*t1.c*a<>t1.b*~t1.b*t1.f-b then e else 17 end*t1.e+case when a not between t1.a and t1.d or (select  - -cast(avg(c) AS integer) from t1)<>17+c then case 11 when t1.f then  -t1.b else t1.b end when 13 not in (c,t1.f,19) or not exists(select 1 from t1 where 13=t1.d or t1.e<>a) then (17) else  -t1.f end FROM t1 WHERE NOT ((not (case e when e then +case when e>=a and 13<>e*t1.e or t1.d<>11 then t1.c else t1.b end else 17 end) in (select cast(avg( -t1.c) AS integer) from t1 union select case min(13) when  -+count(distinct 13) then case (+(cast(avg(e) AS integer))+((cast(avg(13) AS integer)))* - -count(distinct c)*count(*)) | count(*) when min(t1.c) then (min(11)) else max(f) end else cast(avg(17) AS integer) end from t1)))"
     end, {
         -- <randexpr-2.276>
-        
+
         -- </randexpr-2.276>
     })
 
@@ -2810,7 +2810,7 @@ test:do_test(
         return test:execsql "SELECT (select max(t1.a)*abs(count(distinct f-t1.a-(abs(t1.a)/abs(case e when case t1.f when e*(b)-19 then 11 else t1.d end then t1.f else 11 end)))) | case +~cast(avg(t1.a) AS integer)-+abs(count(distinct 17)) when case count(distinct t1.b)*cast(avg(t1.a) AS integer)+count(distinct t1.c) when count(*) then min(t1.f) else count(distinct e) end then max((t1.e)) else max(d) end-count(*) from t1) FROM t1 WHERE e not between (select min(t1.a) from t1) and d+t1.d"
     end, {
         -- <randexpr-2.277>
-        
+
         -- </randexpr-2.277>
     })
 
@@ -2850,7 +2850,7 @@ test:do_test(
         return test:execsql "SELECT e*c-t1.e*t1.c++(select abs(case abs(max(coalesce((select f from t1 where (b*coalesce((select max(b) from t1 where 17>f),t1.e) not between c and f or t1.a>d and t1.a<11 or a<> -f)),(t1.a)))) when  -+count(distinct e) then  -+(count(distinct 19))+min(t1.c) else  -min(t1.f) end) from t1)+t1.b-19 FROM t1 WHERE NOT (d-coalesce((select max(t1.d*c+c) from t1 where t1.f between (select count(distinct t1.b-e)+abs(~case case ~cast(avg(t1.f) AS integer)-count(distinct t1.a) when count(*) then count(distinct e) else count(*) end when min(e) then min( -t1.c) else max(a) end) from t1)+17 and  -case when d>=d-11 then t1.c else t1.a end),t1.a)*t1.a not in (t1.f,t1.f,d))"
     end, {
         -- <randexpr-2.281>
-        
+
         -- </randexpr-2.281>
     })
 
@@ -2860,7 +2860,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select a from t1 where (exists(select 1 from t1 where 11-case when ((select count(distinct t1.e+d) from t1))<>t1.d*f then  -13 when t1.b in (select abs(cast(avg(c) AS integer)) from t1 union select count(distinct e)*count(distinct c)-cast(avg(e) AS integer) from t1) or c in (select t1.d from t1 union select 17 from t1) then a else t1.b end>=t1.c) and f>=d and d>=t1.f)),case when 11=19 and t1.a between t1.d and e then t1.d-b else t1.b end) FROM t1 WHERE 19 not in ( -t1.f,+19,t1.b)"
     end, {
         -- <randexpr-2.282>
-        
+
         -- </randexpr-2.282>
     })
 
@@ -2880,7 +2880,7 @@ test:do_test(
         return test:execsql "SELECT (~case when t1.f>(abs(t1.c)/abs(13-coalesce((select max(t1.a) from t1 where case when e not in (c,t1.a,~11) then 19+( -c) else a end in (select (19) from t1 union select t1.c from t1)),t1.b)+a)) and e>d and (t1.a)=e then t1.e when (not exists(select 1 from t1 where  -t1.d=e) and  -d in (select d from t1 union select e from t1)) then t1.b else a end) FROM t1 WHERE (t1.f in (select coalesce((select max(coalesce((select c from t1 where coalesce((select max(coalesce((select max(++13*t1.d) from t1 where case when case when e<>13 or b<= -t1.a then t1.c when t1.a not in ( - -13,t1.a,13) then a else c end not in ( -e,d,(11)) or t1.d<t1.a then t1.b when t1.a<> -b then t1.e else t1.d end<a),t1.d)) from t1 where e<>t1.b),c) not in (t1.e,c,b)),13)) from t1 where ((t1.f) in (select max(a) from t1 union select abs(abs(min(13))) from t1))),11) from t1 union select b from t1))"
     end, {
         -- <randexpr-2.284>
-        
+
         -- </randexpr-2.284>
     })
 
@@ -2910,7 +2910,7 @@ test:do_test(
         return test:execsql "SELECT (select count(distinct case b when 13 then (select (+(cast(avg(+(d)*case t1.f-c*(abs(case when case when not exists(select 1 from t1 where not exists(select 1 from t1 where (d<=t1.e) or d between c and t1.b)) then 11 else 19 end in ((t1.d),t1.a,t1.f) then t1.f when c<=t1.e then t1.c else b end | a)/abs(c))+t1.b when t1.c then a else d end) AS integer))) from t1) else t1.b*(e) end) from t1) FROM t1 WHERE NOT (not t1.a+t1.b | t1.f-11*(select max(+case when case ~e-(abs(d*t1.d+t1.d)/abs( -f)) when t1.a then t1.e else t1.c end in (select cast(avg((f)) AS integer) from t1 union select +~(min(t1.d)) from t1) then (t1.d) when not exists(select 1 from t1 where a not in (17,a,d)) then 19 else  -t1.a end* -t1.d) from t1)* -17>13)"
     end, {
         -- <randexpr-2.287>
-        
+
         -- </randexpr-2.287>
     })
 
@@ -2930,7 +2930,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(coalesce((select max(13) from t1 where ((~t1.f) between b and (abs(e)/abs(f)))),13+(select case abs((+count(*)*max(19))) when (~min(b)) then  -min(a) | min( -a) else (max(t1.c)) end from t1)+17*f+11)) from t1 where not 19<=coalesce((select e from t1 where t1.d-d not between 19 and 19),11)),13) FROM t1 WHERE t1.f+t1.d=t1.f+17-case when (abs(t1.a*(case when not exists(select 1 from t1 where not exists(select 1 from t1 where (b) between d and t1.f)) then (t1.b |  -(t1.c)) | 19 when d=t1.a then 13 else d end)+ -t1.d)/abs(d)) not in (d,e,t1.d) then t1.f when 19 in (select t1.f from t1 union select t1.e from t1) then e else  -t1.a end- - -t1.e*17-t1.d-t1.d"
     end, {
         -- <randexpr-2.289>
-        
+
         -- </randexpr-2.289>
     })
 
@@ -2970,7 +2970,7 @@ test:do_test(
         return test:execsql "SELECT case when  -t1.b=c and ((t1.c>t1.b)) and not exists(select 1 from t1 where (abs((select max(t1.d) from t1))/abs((abs(c+t1.b)/abs(t1.d))-t1.e))+c in (select cast(avg((t1.a)) AS integer) | abs(count(distinct t1.d))+count(*) | count(*)+count(*) from t1 union select (min(t1.d)) from t1)) then (abs(t1.b)/abs(t1.f)) when t1.b not in (a,t1.f,(a)) then t1.b else t1.d end-11 FROM t1 WHERE NOT (case when ~e in (coalesce((select 13 from t1 where 17 between t1.a and b or not exists(select 1 from t1 where (c in (11,e,a)))),t1.e),c,e) then e else t1.f end in (select ++abs(case case count(*) when (max(t1.d)) then cast(avg(t1.c) AS integer) else count(distinct b) end | count(*) when max(e) then min(c) else max(13) end | count(*)*count(*)) | max(t1.a) from t1 union select count(distinct t1.c) from t1) or b in (select cast(avg(t1.b) AS integer) from t1 union select cast(avg( -t1.a) AS integer) from t1))"
     end, {
         -- <randexpr-2.293>
-        
+
         -- </randexpr-2.293>
     })
 
@@ -2990,7 +2990,7 @@ test:do_test(
         return test:execsql "SELECT case when (((abs(11 | e)/abs(17-d))+t1.b | a<>11)) and t1.d in (13,t1.c,11) or 17 between t1.f and b or not f in (select 19 from t1 union select t1.e from t1) and b<>19 or e between 19 and t1.d or b<=d or d<17 or t1.a<>t1.f then 17 when t1.e=t1.b then 11 else coalesce((select t1.e from t1 where (b) between  - -d and e),t1.b) end FROM t1 WHERE t1.a between d and +17-17*coalesce((select ~ -19-13-19 from t1 where 19>(select abs(count(distinct t1.d-17))+count(distinct case when 19>17 then t1.f else t1.e end+b) | max(t1.b)+count(distinct 13) from t1)-coalesce((select 13 from t1 where t1.e not in (19,17,e) and 11<=t1.d),c)),t1.f)"
     end, {
         -- <randexpr-2.295>
-        
+
         -- </randexpr-2.295>
     })
 
@@ -3030,7 +3030,7 @@ test:do_test(
         return test:execsql "SELECT case when 19=13 or 13+a | 19*11+b<>b and ((19<=b+(select count(*) from t1))) then t1.d when t1.e<= -19 then d-t1.e+(select ~max(19)*+(count(distinct b)) from t1)+t1.d*t1.d+f else t1.c end FROM t1 WHERE NOT ((13*case when 19*case when 19 not between 17 and t1.e then t1.e when ((case when case case when e<>11 or t1.b not in (t1.a, -c,17) then b else a end when  -e then b else a end*a in (select 19 from t1 union select 13 from t1) then e else t1.c end in (select  -abs(+count(*)) from t1 union select count(distinct f) from t1))) then 19 else d end>=f then t1.a when t1.e>=b then a else c end>=t1.d))"
     end, {
         -- <randexpr-2.299>
-        
+
         -- </randexpr-2.299>
     })
 
@@ -3060,7 +3060,7 @@ test:do_test(
         return test:execsql "SELECT +coalesce((select t1.d from t1 where coalesce((select t1.c+t1.b-case (19) when t1.c then 13+13+17 else t1.e end from t1 where (not exists(select 1 from t1 where t1.f<13)) and d not in (t1.e,11,19) and not 19>=t1.f or e in (select min(t1.c) from t1 union select cast(avg(t1.c) AS integer) from t1)), -a)-b*(13)<t1.b),(t1.c)) | t1.e FROM t1 WHERE NOT (not (11>(+b)))"
     end, {
         -- <randexpr-2.302>
-        
+
         -- </randexpr-2.302>
     })
 
@@ -3080,7 +3080,7 @@ test:do_test(
         return test:execsql "SELECT case when (((t1.c)<=a-11*t1.e)) then t1.b else a end | ((abs(b*(abs(t1.e | +c)/abs(11)))/abs(t1.a))) FROM t1 WHERE case when t1.e in (select t1.a-e from t1 union select t1.e from t1) then 19*coalesce((select a*t1.c-19+f+t1.d-case case when 11>=d then f when not f<>17 then t1.d else t1.f end+t1.e-t1.c when d then b else t1.f end from t1 where t1.f>a), -t1.a)- -(t1.c)-t1.e+b else 11 end<t1.f"
     end, {
         -- <randexpr-2.304>
-        
+
         -- </randexpr-2.304>
     })
 
@@ -3110,7 +3110,7 @@ test:do_test(
         return test:execsql "SELECT 17*case when case t1.e when 13-c+f then d else (select + -case cast(avg(b) AS integer)*count(*) when (count(distinct 17)+case abs((count(distinct t1.e))) when count(*) then count(*) else count(distinct c) end) | count(*) then  -count(distinct b) else  - -min(e) end*min(f)-min(t1.e) from t1) end-(select (count(*)) from t1) in (select 19 from t1 union select t1.a-(select count(distinct t1.c) from t1) from t1) then a-13 else t1.d end FROM t1 WHERE not exists(select 1 from t1 where (case  -17 when c then (abs(t1.d)/abs(c-(abs(case when t1.e in (17,t1.a,(abs(e)/abs(t1.d))) then +d-17*t1.b when (select +cast(avg(t1.a*t1.e+e-19) AS integer) from t1) in (select (abs(b)/abs(f)) from t1 union select (19) from t1) then b else t1.f end)/abs(e))*e))+(c) else  -t1.c end<=(11)))"
     end, {
         -- <randexpr-2.307>
-        
+
         -- </randexpr-2.307>
     })
 
@@ -3150,7 +3150,7 @@ test:do_test(
         return test:execsql "SELECT t1.f+coalesce((select t1.b-13-(coalesce((select 17 from t1 where b>a),13)*11)-t1.c from t1 where 11 between t1.a and  -13+t1.f*~coalesce((select max(b-f) from t1 where t1.a<=13 or a not in (13,f,17)),b) or (t1.d<19 or b> -t1.c)),b) FROM t1 WHERE NOT (11 not between d and coalesce((select  -(select (cast(avg(d) AS integer)) from t1) from t1 where case when 17<t1.a then t1.b else coalesce((select max(f) from t1 where t1.d-+case when (d<=t1.f) and t1.e not in (17,t1.d,t1.a) and 11 in (13,t1.e, -t1.a) and t1.c<13 then  -b else case when a>13 then e when 19 between t1.a and t1.b then b else b end end*13<=c),t1.c) end in (select t1.e from t1 union select d from t1)),t1.b))"
     end, {
         -- <randexpr-2.311>
-        
+
         -- </randexpr-2.311>
     })
 
@@ -3170,7 +3170,7 @@ test:do_test(
         return test:execsql "SELECT (abs(13)/abs((select min(case when case when exists(select 1 from t1 where not exists(select 1 from t1 where (select count(distinct (t1.e)) from t1)+t1.f>t1.e) and t1.a>=13 or f in (select t1.e from t1 union select t1.e from t1)) then b when f not in (13,13,13) then coalesce((select max(d*f) from t1 where t1.e in (t1.d,t1.e,(e))),t1.e) else a end>=t1.f then b when t1.c in (e,f,t1.e) then b else t1.c end)*abs(count(*))-abs(~count(*)-min(e))-cast(avg(17) AS integer) from t1))) FROM t1 WHERE NOT (t1.b not in (a*17-17-case when  -17-t1.f in (select coalesce((select t1.a from t1 where (d)=t1.a),d) from t1 union select 19 from t1) or 13 not between 17 and 13 and (19 between (t1.e) and t1.f) or ( -t1.e)>=17 then b when t1.d not in (19,f,t1.f) then a else case when t1.a=t1.d then e when 17 in (t1.e,t1.b,t1.d) then t1.a else a end end,e,11))"
     end, {
         -- <randexpr-2.313>
-        
+
         -- </randexpr-2.313>
     })
 
@@ -3180,7 +3180,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case coalesce((select t1.d* -case when d in (select cast(avg(13) AS integer)*abs(((cast(avg(d) AS integer)))+ -count(distinct c))-max(t1.c) from t1 union select min(e) from t1) then (abs(19)/abs(case when b not in (19,d,13) or t1.b not in (b,17,17) then e else b end)) else 19 end from t1 where a>=t1.c and 17 not in (t1.c,17,t1.f)),13)*t1.f when e then (11) else 17 end+19 | b)/abs(f))-t1.e FROM t1 WHERE not exists(select 1 from t1 where case a when coalesce((select max(case 19 when 17 then b-d else t1.e end) from t1 where ( -coalesce((select max(t1.a) from t1 where e between t1.b and (abs(e)/abs(17))),(abs(case when case when 13 between e and (t1.b) and 11 not in (t1.f,t1.e,c) then (t1.d) else  -c end< -e then 11 when 13>t1.b then 11 else t1.a end*13)/abs((f)))-t1.a) not in (e,(b),t1.c))),19) then t1.b else 13 end not between t1.b and 11)"
     end, {
         -- <randexpr-2.314>
-        
+
         -- </randexpr-2.314>
     })
 
@@ -3210,7 +3210,7 @@ test:do_test(
         return test:execsql "SELECT  -(+case when ~t1.d-f-case coalesce((select max((select (min((abs(t1.f)/abs(t1.b))-17)) from t1)) from t1 where e<=17),f) when t1.f then (select case  -( -count(distinct b)) when cast(avg( -13) AS integer) then cast(avg(13) AS integer) else max(19) end from t1)-t1.e else 13 end*b between t1.c and t1.d then t1.d when e<t1.f then  -t1.b else 19 end | d*e) FROM t1 WHERE ~t1.d*~( -coalesce((select max(t1.d | t1.a) from t1 where d-(select  -( - -count(distinct 13)) | min((t1.f))+min(t1.c) from t1) not between case t1.a when t1.b then e else  -c end and c or t1.a not in (a,19,c)),d)) in (select +(max(t1.b))*max((13))++(count(distinct t1.a))+count(*)-count(distinct f) | cast(avg(t1.d) AS integer) from t1 union select cast(avg(13) AS integer) from t1)"
     end, {
         -- <randexpr-2.317>
-        
+
         -- </randexpr-2.317>
     })
 
@@ -3250,7 +3250,7 @@ test:do_test(
         return test:execsql "SELECT ~d-coalesce((select +e from t1 where b not between b and ~d++ -t1.b),f)-f-+19-t1.a+case when d<=(abs(19)/abs(+coalesce((select 11 from t1 where not exists(select 1 from t1 where not coalesce((select t1.d from t1 where not t1.a<=t1.c),11) in (select 19 from t1 union select t1.a from t1) or t1.c<=t1.c and a<t1.b)),17-t1.e))) then f else t1.a end*c FROM t1 WHERE NOT ((select count(*) from t1)*e-17 | f not between 11 and t1.d or t1.c* -b in (select (abs(case when not 19<( -(t1.e-c*t1.b)+(d)-c) then t1.f-t1.b when t1.f<=11 or exists(select 1 from t1 where t1.e in (13,t1.f,t1.d)) then t1.f else 19 end)/abs(e)) from t1 union select 17 from t1))"
     end, {
         -- <randexpr-2.321>
-        
+
         -- </randexpr-2.321>
     })
 
@@ -3270,7 +3270,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select 17 from t1 where not exists(select 1 from t1 where 11 in (select count(distinct d-coalesce((select t1.c-t1.f from t1 where 13 in (19,e,t1.b) and e in (select ( -count(*)) from t1 union select max(e) from t1) or t1.a>t1.f),d)*t1.e)+max(t1.f)+cast(avg(e) AS integer) | (abs((count(distinct 17)))) from t1 union select max(t1.b) from t1) or 17 in (select  -t1.b from t1 union select t1.a from t1) and exists(select 1 from t1 where t1.e=t1.c))),f+(t1.e)) FROM t1 WHERE NOT (exists(select 1 from t1 where +t1.d between (abs((abs(t1.c)/abs(case when not exists(select 1 from t1 where d*~(select abs(min(13))-( -(max(t1.f))*( -(count(distinct a)))-max(17)*min(t1.a) | (cast(avg(t1.b) AS integer))) from t1)>case when a in (select max(c) from t1 union select count(distinct  -t1.a) from t1) or +17 in (select  -count(distinct t1.f) from t1 union select cast(avg(t1.f) AS integer) from t1) then c else t1.a end) then  -t1.f else t1.f end)))/abs(c+a)) and d))"
     end, {
         -- <randexpr-2.323>
-        
+
         -- </randexpr-2.323>
     })
 
@@ -3300,7 +3300,7 @@ test:do_test(
         return test:execsql "SELECT t1.d*17- -case when case (b) when t1.c then (abs(t1.f)/abs((select + -~abs(min(f) | +cast(avg(++t1.e+t1.d) AS integer) | ((count(distinct t1.a)-count(*)))) from t1))) else c*case t1.b when t1.d then (t1.c) else t1.c end*(b)-c end=t1.d then t1.c when  -17=c then t1.e else t1.c end FROM t1 WHERE NOT (t1.b in (f,b,a))"
     end, {
         -- <randexpr-2.326>
-        
+
         -- </randexpr-2.326>
     })
 
@@ -3330,7 +3330,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select e-t1.d-+b*coalesce((select 11 from t1 where (t1.a<=coalesce((select  - -coalesce((select max(case case 19 when t1.d then t1.e else t1.a end when b then 13 else t1.e end) from t1 where (c)>=(b)),t1.c)+t1.b from t1 where t1.e>e and exists(select 1 from t1 where b in (t1.b,e,t1.c) or e not between a and d) and 13<b),a))),t1.e) from t1 where t1.a<t1.a),t1.e) FROM t1 WHERE NOT (exists(select 1 from t1 where coalesce((select max(coalesce((select case case coalesce((select d from t1 where b in (17,t1.a,13)),11) when (coalesce((select 11 from t1 where a++t1.d>(coalesce((select (f)+t1.c from t1 where a>t1.c),b))),t1.e)) then 19 else e end when t1.d then t1.e else b end from t1 where t1.b>=f),13)-b*17) from t1 where 11<>e),t1.b)<(c)))"
     end, {
         -- <randexpr-2.329>
-        
+
         -- </randexpr-2.329>
     })
 
@@ -3340,7 +3340,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case when ++e not in (~c-(19)*+case t1.c when t1.d-coalesce((select max(t1.f) from t1 where (select count(*) from t1)>case when exists(select 1 from t1 where not exists(select 1 from t1 where (not not exists(select 1 from t1 where 19<t1.c)))) then ~t1.d else case coalesce((select 17 from t1 where  -t1.b<>e),t1.e) when 13 then b else t1.c end end+f),c)*t1.c then t1.e else t1.b end,11,b) then  -(t1.b) else a end)/abs(13)) FROM t1 WHERE a*t1.a<=17 and exists(select 1 from t1 where (+case coalesce((select max(f) from t1 where d in (select ((+count(*)-( -max(b))))*min(t1.c)* -max(11) from t1 union select count(distinct (19)) from t1)),t1.c) when 13 then 19 else coalesce((select t1.a from t1 where t1.c not in (t1.c,f,13)),b) end)>t1.c) and ( -( -19) between 13 and b or b in (select 11 from t1 union select a from t1) and 19 in (t1.d,t1.d,19))"
     end, {
         -- <randexpr-2.330>
-        
+
         -- </randexpr-2.330>
     })
 
@@ -3360,7 +3360,7 @@ test:do_test(
         return test:execsql "SELECT case when a>=f then  -t1.a-11*t1.c when ((t1.e-t1.e+17 between (select max(c) from t1)-13 and coalesce((select t1.d from t1 where ((coalesce((select max(case when (not b>17) then t1.b-b when  -e in (c,a,13) then 11 else t1.a end) from t1 where 19<=11),t1.e)>=e))),t1.a))) then c else t1.b end | 17 FROM t1 WHERE 11-t1.d+d-13+(t1.f*case when exists(select 1 from t1 where ( -coalesce((select max(t1.d) from t1 where (exists(select 1 from t1 where 19 in (select d from t1 union select t1.f from t1)))),t1.d)<=case when 13*11+11 in (select abs(+~abs( -min(c))) from t1 union select (min(t1.e)) from t1) then t1.f else 19 end)) then t1.c else (abs(e)/abs(19)) end*t1.f*f)<(t1.d)"
     end, {
         -- <randexpr-2.332>
-        
+
         -- </randexpr-2.332>
     })
 
@@ -3390,7 +3390,7 @@ test:do_test(
         return test:execsql "SELECT case ~13*c-t1.f- -t1.f when coalesce((select max(coalesce((select max(t1.c) from t1 where coalesce((select t1.d from t1 where 11*f-a=a),t1.e) in (select case ~count(distinct 11) | min(c) when (count(*))-count(*) then max( -17) else (min(13)) end from t1 union select  - -cast(avg(b) AS integer) from t1)),19)-t1.c) from t1 where exists(select 1 from t1 where t1.b not between t1.e and 11 and ((a<>t1.f)) and (t1.a)=t1.d)),17) then t1.d else  -b end FROM t1 WHERE case when ~13+t1.e-19>=13 then 17 else t1.c end>=a*19 and (f in (select case min(t1.e*+(abs(11)/abs(13))) when count(distinct t1.c) | abs((min(t1.b)-(max(t1.d)))+abs(max(a))+count(*)) | cast(avg(e) AS integer) then max(c) else max(c) end from t1 union select min(t1.c) from t1))"
     end, {
         -- <randexpr-2.335>
-        
+
         -- </randexpr-2.335>
     })
 
@@ -3430,7 +3430,7 @@ test:do_test(
         return test:execsql "SELECT f*13-t1.f*(abs(19*t1.a*c-(select ~max(t1.c)- -( -cast(avg(f) AS integer))+(max(d))*cast(avg(t1.d) AS integer)*(count(*)) from t1))/abs(case when coalesce((select (coalesce((select max(t1.c) from t1 where  -(b)<> -t1.a),b)+11) from t1 where not (11)<=t1.e and c not between 17 and t1.e and b not in (f,(t1.a),t1.e)),t1.f) in (select t1.d from t1 union select 19 from t1) then t1.a when f>13 then t1.e else a end)) FROM t1 WHERE NOT ( -b<>b*t1.e)"
     end, {
         -- <randexpr-2.339>
-        
+
         -- </randexpr-2.339>
     })
 
@@ -3440,7 +3440,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select c from t1 where (13-(11-t1.e | t1.b) in (select +min(c)*+case +min(t1.e) when min(coalesce((select t1.e*t1.a from t1 where t1.f in (t1.d,11,t1.d) or t1.e>11 or t1.d>=c),17))+max(11)-count(distinct  -a) | max(11)+min(t1.c)-max(13) then count(distinct c) else (max(13)) end from t1 union select (( -cast(avg(11) AS integer))) from t1))),d) in (select f from t1 union select t1.a from t1) then 17 else 19 end FROM t1 WHERE not exists(select 1 from t1 where (select +min(case when not (f*e between (select min(~~t1.d) from t1)*(abs(c)/abs(d)) and case when f<t1.b then 19 else e end+t1.b) and not exists(select 1 from t1 where exists(select 1 from t1 where 11 in (select t1.e from t1 union select (a) from t1))) then case when  -c>=b then t1.f when not c>=17 then ~t1.b else 11 end else 19 end) from t1)-19 not in (d,t1.a,d))"
     end, {
         -- <randexpr-2.340>
-        
+
         -- </randexpr-2.340>
     })
 
@@ -3480,7 +3480,7 @@ test:do_test(
         return test:execsql "SELECT t1.c*a+(case when t1.b+11 | case when exists(select 1 from t1 where b<>17 or not exists(select 1 from t1 where t1.f in (19,t1.f,c)) or (t1.d)<>b) then e else d end+t1.b+t1.a*b=t1.d or d=b then t1.e when not exists(select 1 from t1 where b>t1.c or 17 between t1.f and e and d>=t1.c) then t1.d else c end) FROM t1 WHERE NOT (exists(select 1 from t1 where not exists(select 1 from t1 where (abs(c)/abs(b)) in (t1.a, -e*~e*17,17))))"
     end, {
         -- <randexpr-2.344>
-        
+
         -- </randexpr-2.344>
     })
 
@@ -3500,7 +3500,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select  -b from t1 where t1.f=d),case when case  -17-t1.b*t1.d+d when b then t1.a else t1.e end not in (t1.c,13,19) and e>f and 13 not between 17 and  -f and e not between d and a then 13 when c<=a then 13 else 19 | e end)*a-d*t1.e FROM t1 WHERE (abs(+t1.f)/abs(coalesce((select max(coalesce((select max(e) from t1 where t1.a in (select (abs( -t1.b)/abs(a)) from t1 union select e from t1)),(abs(case t1.f when c then (select (~cast(avg(b*d) AS integer))*abs(min(11)) from t1) else coalesce((select f from t1 where d in (select ( -min(e)) from t1 union select  -count(*) from t1)),t1.c) end*t1.b)/abs(c))+17)) from t1 where exists(select 1 from t1 where d not between t1.f and t1.b)),(t1.c))))*t1.d between t1.f and t1.a"
     end, {
         -- <randexpr-2.346>
-        
+
         -- </randexpr-2.346>
     })
 
@@ -3540,7 +3540,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.b*19 from t1 where ~f in (select 19 from t1 union select ~b-+case 13 when coalesce((select max(a) from t1 where (abs(d)/abs(t1.d)) | t1.e-c-t1.d-t1.c+11*f-c+t1.a>17), -a) then f else t1.d end+17 | a*f | t1.c-d from t1)),19) FROM t1 WHERE NOT (t1.e*t1.c>coalesce((select 13 from t1 where ~t1.a<>case when exists(select 1 from t1 where e<>~d and not +17 not between a+case 13 when d then case t1.d when t1.a then b else 13 end else 13 end and 13) or 13 not in (t1.e,t1.f,t1.c) then 19-e+19 when f<=t1.f then b else 11 end),e)-13)"
     end, {
         -- <randexpr-2.350>
-        
+
         -- </randexpr-2.350>
     })
 
@@ -3570,7 +3570,7 @@ test:do_test(
         return test:execsql "SELECT (abs( -coalesce((select max((t1.f)) from t1 where not exists(select 1 from t1 where  -b-~b not between t1.c and f and t1.d*( -(select abs(+count(*)) from t1))-d>=a) and case when +case when ((f)) in (select  -count(distinct t1.a) from t1 union select count(*) from t1) then t1.b else d end in (select min(17) from t1 union select min(t1.e) from t1) then d else 17 end+c not between 11 and a),f)*11)/abs(a)) FROM t1 WHERE NOT (t1.f*t1.a*(+c)+case case when t1.d=f and (t1.a<>~+a*a*e*t1.e+case when t1.c between 11 and b and t1.a<>e then 13 when ( -t1.e)<>(t1.a) then (t1.b) else 13 end-t1.b-e+f) then t1.f+a else 17 end when d then 17 else d end-t1.e not in (13,t1.a,11))"
     end, {
         -- <randexpr-2.353>
-        
+
         -- </randexpr-2.353>
     })
 
@@ -3590,7 +3590,7 @@ test:do_test(
         return test:execsql "SELECT case t1.b- -t1.d+t1.d+t1.f when t1.f then 19+~13 else d end-case when not exists(select 1 from t1 where (f not between coalesce((select b from t1 where d in (17,13,t1.a) and 13 between c and 13 and 19>=f),13) and e or d not between 13 and f) or f>=d) then t1.f else coalesce((select max(~e-11) from t1 where t1.b in (f,13,13)),t1.a) end FROM t1 WHERE NOT (a<e)"
     end, {
         -- <randexpr-2.355>
-        
+
         -- </randexpr-2.355>
     })
 
@@ -3610,7 +3610,7 @@ test:do_test(
         return test:execsql "SELECT  -coalesce((select max(13) from t1 where case case when f in (select e from t1 union select coalesce((select max(e) from t1 where (select  -max(e) from t1)*t1.e<e and exists(select 1 from t1 where  -c in (a,a,a))),t1.d) from t1) and e>=t1.c and exists(select 1 from t1 where t1.f>=13) then t1.d when d between t1.d and t1.a then 19 else a end | e when (a) then e else a end between b and t1.c and not exists(select 1 from t1 where 13 in (t1.d,t1.a,13)) or t1.a>= -13),c) FROM t1 WHERE NOT (t1.e not in ( -coalesce((select max(13) from t1 where exists(select 1 from t1 where not t1.d>a) and t1.a not in (d*+case when t1.b in (select max(e*11+t1.a)+ -count(*)-( -max(t1.e))-min(11)-count(distinct t1.a) from t1 union select  - -min(t1.b) from t1) then t1.e when e in (select count(distinct t1.a) from t1 union select (max(d)) from t1) then e else  -(19) end+ -t1.d, -17,f)),case c when a then f else 17 end),d,11))"
     end, {
         -- <randexpr-2.357>
-        
+
         -- </randexpr-2.357>
     })
 
@@ -3630,7 +3630,7 @@ test:do_test(
         return test:execsql "SELECT case d when  -e+coalesce((select max(case (select +abs((~case case count(distinct b) when  -count(*) then count(*) else max(t1.e) end when max(e) then min(t1.c) else count(*) end-min(c))) from t1) when t1.c then t1.a else  -11 end) from t1 where case ~t1.b when e then d else 11 end in (b,t1.e,t1.b) or not t1.f>=b or (t1.f in (a,e,t1.e)) or f<b),t1.e) then t1.b else f end FROM t1 WHERE b<=(d) and (abs(coalesce((select max(coalesce((select case when (abs(~11)/abs(((abs(17+f+t1.f)/abs(t1.c))-11*c)-d*17)) not in (b,13,((e))) then 19 else 19 end from t1 where a in (select t1.b from t1 union select t1.b from t1)),13)) from t1 where t1.d in (select a from t1 union select 13 from t1)), -e)+17*c)/abs(t1.c))=13"
     end, {
         -- <randexpr-2.359>
-        
+
         -- </randexpr-2.359>
     })
 
@@ -3650,7 +3650,7 @@ test:do_test(
         return test:execsql "SELECT case a when ~c then e+17-d else case t1.a when c then t1.b else case when ((case t1.e when c then d-11 else t1.f end not in (e,(17),t1.d))) or not exists(select 1 from t1 where e not in (d,t1.f,11) and  -t1.a>t1.b) or t1.a not in (f,t1.b,t1.e) or t1.d<=t1.b and 19 not in (t1.d,11,t1.f) then t1.d else 19 end+e+17 end |  -t1.c*d end-13 FROM t1 WHERE e not in (e,t1.b,t1.d)"
     end, {
         -- <randexpr-2.361>
-        
+
         -- </randexpr-2.361>
     })
 
@@ -3680,7 +3680,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(case t1.a when d then ~11 else t1.e end) from t1 where (t1.f*17<t1.d-(t1.a*t1.a+t1.b+case case d when coalesce((select max(19) from t1 where  -(t1.e) in (select count(distinct c) from t1 union select (count(distinct t1.f)) from t1)),13) then c else 19 end*d when c then 13 else 17 end+t1.c)) and (f>=a or t1.e=t1.a and  -c>=t1.b)),t1.b) FROM t1 WHERE a+( -t1.c) between case when case a when t1.f then ~t1.b*t1.c+17 else  -case when f not in (e,f,17) then a when 11=13 then t1.c else t1.d end end>=t1.b then b when t1.d in (select +max(19) from t1 union select abs(cast(avg(t1.f) AS integer))+case ~count(*)-max(t1.a)+max(11) when (max(a)) then (max(t1.d)) else count(distinct 11) end from t1) and e in (t1.d,17,11) then (11) else b end and a"
     end, {
         -- <randexpr-2.364>
-        
+
         -- </randexpr-2.364>
     })
 
@@ -3710,7 +3710,7 @@ test:do_test(
         return test:execsql "SELECT t1.f+case when c*f | (t1.a) in (select b*f from t1 union select  -case when d not between ~13 | 13+case a when a then e else a end and f then 11 else e-t1.d end from t1) then  -(abs(case when ((case t1.f when t1.b then t1.f else a end*f+t1.c)) in (select d from t1 union select (t1.e) from t1) then d else (t1.f) end)/abs(b)) else t1.a end FROM t1 WHERE NOT (~(f+17-(select +max(t1.f)-case count(distinct d-19) when ~count(distinct (abs(b)/abs(a))) then cast(avg(17) AS integer) else ~count(distinct e)*count(*) end from t1)-f-coalesce((select t1.f from t1 where t1.a>=t1.c or t1.b between  -t1.a and 19 or exists(select 1 from t1 where t1.e not in (13,t1.c,e)) and d>a),t1.d)) not between d and c)"
     end, {
         -- <randexpr-2.367>
-        
+
         -- </randexpr-2.367>
     })
 
@@ -3730,7 +3730,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select d from t1 where not coalesce((select f*t1.b from t1 where exists(select 1 from t1 where (t1.f*t1.a)-19-13 in (select ~(cast(avg(t1.b) AS integer)) from t1 union select min(t1.a)+case min( -t1.a) when cast(avg(19) AS integer) then cast(avg(19) AS integer) else min(13) end+( -min(a)) from t1))),(t1.f)) between 17 and d),11)=19 then t1.b when 17<11 or exists(select 1 from t1 where d in (select 13 from t1 union select f from t1)) then 11 else t1.c end FROM t1 WHERE case c when 13 then +t1.d else t1.a end in (select abs(case + -count(*)+count(distinct coalesce((select (abs(~case when t1.c=19 | 13 then t1.c when not e>(13) then f else d end)/abs(a)) from t1 where 17>=t1.b),t1.b))+min(t1.a)*count(*) | (((max(a)))-cast(avg((17)) AS integer)) when max(d) then count(*) else cast(avg(t1.e) AS integer) end) from t1 union select count(*) from t1)"
     end, {
         -- <randexpr-2.369>
-        
+
         -- </randexpr-2.369>
     })
 
@@ -3750,7 +3750,7 @@ test:do_test(
         return test:execsql "SELECT  -(select count(*) from t1)*(select (+(cast(avg(+f) AS integer))+++case +max(t1.b-case when t1.e+t1.e>=11 then  -a else t1.e end)-abs(min(e)+ -max(c) | ((max(11)))) when max(11) then (min(b)) else cast(avg( -b) AS integer) end-cast(avg(b) AS integer)-count(*)+count(*)) from t1)+~17- -t1.a FROM t1 WHERE f between 19*t1.d and 19"
     end, {
         -- <randexpr-2.371>
-        
+
         -- </randexpr-2.371>
     })
 
@@ -3790,7 +3790,7 @@ test:do_test(
         return test:execsql "SELECT case when not t1.a< -~~e then b when c*(select +case max((abs( -a)/abs(a))) when min(t1.b) then case ~min(t1.d)-cast(avg(e) AS integer) | max(e) when count(distinct 11) then count(*) else max(b) end else count(*) end from t1) not between 13 and case when exists(select 1 from t1 where exists(select 1 from t1 where f not in (19,t1.f,19)) and 11 between t1.b and t1.b) then (13) else  -t1.d end then f else e end FROM t1 WHERE NOT (d>11)"
     end, {
         -- <randexpr-2.375>
-        
+
         -- </randexpr-2.375>
     })
 
@@ -3810,7 +3810,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.c | ~17) from t1 where exists(select 1 from t1 where t1.f<>b-(abs(13)/abs(e)))),13) FROM t1 WHERE case when case (abs(c+a+19+coalesce((select max(t1.a) from t1 where coalesce((select coalesce((select (f) from t1 where t1.d between 19 and b),t1.a) from t1 where 13=(c)),f) in (select ~case count(*) when max(t1.b) then ((count(distinct 11))) else count(*) end- -count(distinct a) from t1 union select count(distinct 13) from t1)),t1.c) | t1.b+t1.d)/abs(e)) when t1.d then a else 17 end not between 19 and t1.f then t1.b else d end in (select t1.c from t1 union select (t1.a) from t1)"
     end, {
         -- <randexpr-2.377>
-        
+
         -- </randexpr-2.377>
     })
 
@@ -3840,7 +3840,7 @@ test:do_test(
         return test:execsql "SELECT (coalesce((select (coalesce((select d from t1 where not exists(select 1 from t1 where 17>t1.c)),d))*c from t1 where t1.b between t1.d | (select count(distinct coalesce((select max(t1.e) from t1 where case when  -e>t1.b then f when t1.a<t1.f then t1.e else t1.d end<=c),(19))) from t1) and b or 13 in (t1.d,t1.d,t1.d)),t1.b)-b*f)+11-t1.e FROM t1 WHERE d<case when d>(abs(19*case when coalesce((select b*case when 11 not between 19 and (abs(13)/abs(t1.b-t1.d-e+b-f+19*t1.a)) then  -t1.a else f end from t1 where (b=17)),f)= -t1.d then 17 when 11<>19 then f else t1.d end)/abs(t1.b)) then d else 19 end"
     end, {
         -- <randexpr-2.380>
-        
+
         -- </randexpr-2.380>
     })
 
@@ -3880,7 +3880,7 @@ test:do_test(
         return test:execsql "SELECT 19*case when coalesce((select max(t1.e-c) from t1 where f=(abs(coalesce((select t1.c from t1 where not (not exists(select 1 from t1 where a in (select b from t1 union select c from t1)))),13))/abs(coalesce((select 13 from t1 where t1.b in (d,t1.d,a)), -t1.b)))),c) in (select ~min(t1.c) from t1 union select count(*) from t1) and  -f<>t1.c then t1.a-t1.e when not t1.a in (select cast(avg(a) AS integer) from t1 union select min(13) from t1) then  -19 else f end FROM t1 WHERE NOT (11<>13)"
     end, {
         -- <randexpr-2.384>
-        
+
         -- </randexpr-2.384>
     })
 
@@ -3890,7 +3890,7 @@ test:do_test(
         return test:execsql "SELECT t1.b*(select max(t1.b*coalesce((select max(t1.f*(t1.b)) from t1 where 17 not in (d,(a),(t1.b)+13)),t1.c)-t1.a) | cast(avg(t1.d) AS integer) | ~+case abs(abs(count(distinct t1.b))) when ~count(distinct e)-(count(*)) then max(t1.e) else max(d) end | max((19)) | min(19) from t1)-t1.d-t1.d*17 FROM t1 WHERE t1.f-case t1.d+19+13*case when (abs(e)/abs((select count(*)+cast(avg(a) AS integer)*count(*) from t1)-c*(abs(d)/abs(c*t1.e-19)))) not in (17,17,t1.a) then t1.f when t1.d<>t1.f then b else d end+ - -f*t1.b*d when b then 11 else  -13 end<=(t1.b)"
     end, {
         -- <randexpr-2.385>
-        
+
         -- </randexpr-2.385>
     })
 
@@ -3930,7 +3930,7 @@ test:do_test(
         return test:execsql "SELECT (select abs(count(distinct t1.e) | min(b))-cast(avg(c) AS integer) | case +~+max(t1.a)*abs(+~ - -+cast(avg(19*f) AS integer) | count(*) | ~max(b) | ((max(t1.e)))-count(distinct t1.d)+ -(count(distinct t1.c)))* -count(distinct 17) | count(distinct a) when ((count(distinct t1.d))) then  -min(t1.c) else count(distinct t1.c) end- -min(d) from t1) FROM t1 WHERE NOT (((not exists(select 1 from t1 where c=f)) and case when not 19+t1.c- -11+11+e>=a or t1.d>b then f else t1.e end<> -t1.c) or (t1.a in (select +count(*) from t1 union select abs((case max(d) when count(distinct d) then min( -t1.e) else count(distinct a) end-count(distinct  -t1.f)))*count(*) from t1) or not exists(select 1 from t1 where t1.d not in (c,17,e))))"
     end, {
         -- <randexpr-2.389>
-        
+
         -- </randexpr-2.389>
     })
 
@@ -3960,7 +3960,7 @@ test:do_test(
         return test:execsql "SELECT case when exists(select 1 from t1 where coalesce((select b from t1 where case when (b<t1.b) then (select (min(a+17+a-t1.f)) from t1) else t1.a end in (select (17-a)*t1.e+c*c from t1 union select 17 from t1)),t1.f)<e) then case when t1.e in (t1.d, -t1.a,c) then 17 else  -e end when not t1.c in (select t1.e from t1 union select e from t1) then t1.c else t1.b end FROM t1 WHERE NOT (coalesce((select max(13) from t1 where e=t1.a),case when f+(d)<=~case when (case when 17*t1.a in (select 13 from t1 union select 19 from t1) then f else 17 end in (select max(t1.a) from t1 union select cast(avg(t1.e) AS integer)+max(a) | count(*) from t1)) or 13 in (b,t1.e,19) then t1.b*b when t1.a> -11 then  -t1.c else  -b end then d else t1.a end) not in (t1.b,d,t1.b))"
     end, {
         -- <randexpr-2.392>
-        
+
         -- </randexpr-2.392>
     })
 
@@ -3970,7 +3970,7 @@ test:do_test(
         return test:execsql "SELECT t1.f+coalesce((select t1.a-t1.d*f-coalesce((select max(coalesce((select max(t1.c) from t1 where exists(select 1 from t1 where a=~t1.d+case when (c in (select abs(~( -cast(avg(e) AS integer))) from t1 union select  -min(19) from t1)) and 19<>t1.e or t1.e<11 and c in (t1.b,t1.b,t1.d) or 17 between  -t1.d and t1.d then 11 else d end)),c-f)) from t1 where t1.a<=t1.c),11)-t1.c from t1 where f between t1.a and d),19) FROM t1 WHERE exists(select 1 from t1 where case +t1.d when d then f else t1.e end in (t1.e,17,11) or 13*e-t1.b in (select t1.e from t1 union select 17 from t1)) and 11<=case  -case when not exists(select 1 from t1 where (17 | t1.e in (11,11,11) and b<(19))) then case t1.c+t1.f+c when t1.b then c else 19 end else 17 end when d then t1.b else t1.a end"
     end, {
         -- <randexpr-2.393>
-        
+
         -- </randexpr-2.393>
     })
 
@@ -3990,7 +3990,7 @@ test:do_test(
         return test:execsql "SELECT case when (coalesce((select coalesce((select max( -11) from t1 where not case t1.c*case when exists(select 1 from t1 where (t1.d) in (select case count(*) when count(distinct t1.c) then count(*) else count(*) end from t1 union select cast(avg(t1.c) AS integer) from t1)) then +e when f=19 then 17 else t1.e end when t1.a then 19 else c end=e),t1.a)- -d*f-a from t1 where (t1.e)<>13),19)*(a)=19) then (c) when (exists(select 1 from t1 where 17=t1.d)) then 19 else c end FROM t1 WHERE t1.d*c*(select cast(avg(((abs(t1.d*13)/abs(f)))) AS integer) from t1)+t1.d=case when +(coalesce((select t1.a from t1 where case when not exists(select 1 from t1 where not exists(select 1 from t1 where c=t1.e)) then 19 |  -17 else 13 end not in (t1.f,b,t1.b)),t1.f))*t1.a-t1.c-13 in (e,11,t1.c) then t1.a when (d between  -t1.f and f) then t1.d else t1.a end"
     end, {
         -- <randexpr-2.395>
-        
+
         -- </randexpr-2.395>
     })
 
@@ -4010,7 +4010,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select d from t1 where f in (select max(19) from t1 union select ~+max(t1.e) from t1)),b-case  -11 when 13 then t1.a-e else case when not exists(select 1 from t1 where c not in ( -t1.c,(t1.e),19)) and d+t1.b-t1.b in (select t1.a from t1 union select t1.d from t1) then 19+19*(t1.f) when t1.b<=a then 17 else t1.a end end+t1.b)*t1.a FROM t1 WHERE (select +cast(avg(~13+(select count(*) from t1)) AS integer)++min(case when (not d<>a) then coalesce((select t1.b from t1 where t1.f not between e and t1.d),13)+13 when t1.d not between 11 and t1.d then 17 else f end) | count(*) | ~count(distinct t1.e) | cast(avg(e) AS integer)-max(t1.d) from t1) not between coalesce((select case t1.a when a then e else 17 end from t1 where t1.a in (t1.e,11,( -t1.d))), -(b)) and t1.a"
     end, {
         -- <randexpr-2.397>
-        
+
         -- </randexpr-2.397>
     })
 
@@ -4030,7 +4030,7 @@ test:do_test(
         return test:execsql "SELECT (abs(c)/abs((coalesce((select t1.d from t1 where ((19) in (select count(distinct  - -(abs(coalesce((select max(t1.e) from t1 where t1.c*t1.a | t1.d=t1.d or t1.f in (select min(t1.f)-cast(avg(e) AS integer) from t1 union select  -count(*) from t1)),c))/abs(a))) from t1 union select case cast(avg(c) AS integer)-abs( -((count(*))))*(count(*))*min(d) when cast(avg(a) AS integer) then count(distinct 11) else count(*) end-(count(distinct 17)) from t1))),a))))*t1.e FROM t1 WHERE case when a between  -t1.a+(t1.c) and c-case when (~+t1.b-~case when t1.a not between 19*11 and 11 then t1.a when 11=f and  -t1.d not between t1.a and d then e else b end in (select min(19) from t1 union select case count(distinct 17) when count(*) then count(distinct t1.f) else min(c) end from t1)) then t1.f else 17 end then 17 else 13 end in (t1.a,t1.d,a)"
     end, {
         -- <randexpr-2.399>
-        
+
         -- </randexpr-2.399>
     })
 
@@ -4060,7 +4060,7 @@ test:do_test(
         return test:execsql "SELECT case when d=c-(select (~max(t1.f*t1.c-11)) from t1) then coalesce((select max(19) from t1 where 13<coalesce((select case when (select count(distinct t1.f+13) from t1)>d then t1.e when not not exists(select 1 from t1 where t1.c not in (a,a,t1.d) and d not between b and 19) then t1.a else 11 end*f-f from t1 where t1.f between e and e and d between 19 and t1.e or 11<>t1.a),t1.c)),d) else 17 end FROM t1 WHERE (t1.e=11)"
     end, {
         -- <randexpr-2.402>
-        
+
         -- </randexpr-2.402>
     })
 
@@ -4090,7 +4090,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.a-t1.a | case when (abs(t1.d)/abs(t1.c | t1.a))<>t1.e then e*+t1.c-t1.d*coalesce((select t1.b from t1 where b>=+d+ -e*11),11)+t1.b | t1.f when not exists(select 1 from t1 where d not in (17,e,d)) then 11 else t1.d end>=13 then 11 when d=c then a else f end FROM t1 WHERE NOT ((abs(case when not t1.d<=t1.f and not t1.d not between  -f and  -17-11*t1.d and (13<t1.b) and 17 in (select min(c)-+min(13)-min(t1.b) from t1 union select  -max((( -11))) from t1) then 13 when c<>d then t1.d*coalesce((select max(t1.a) from t1 where (17) not between (t1.b) and 11),d) else t1.d end)/abs(f)) not between 13 and 19)"
     end, {
         -- <randexpr-2.405>
-        
+
         -- </randexpr-2.405>
     })
 
@@ -4120,7 +4120,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.f*13 from t1 where exists(select 1 from t1 where 13<=t1.e)),(abs(+ -17)/abs(c))) FROM t1 WHERE NOT (coalesce((select 17 from t1 where 11>++a-~t1.a+d | (19)),(abs(t1.c)/abs(case when case t1.c*17-case when b not between t1.b and f then t1.a when f>=a then 19 else 13 end when 19 then 13 else t1.f end not between c and a then c else 13 end)))> -e or 13 between f and c and t1.e>=b)"
     end, {
         -- <randexpr-2.408>
-        
+
         -- </randexpr-2.408>
     })
 
@@ -4130,7 +4130,7 @@ test:do_test(
         return test:execsql "SELECT ~+coalesce((select (select count(distinct +coalesce((select c from t1 where e>=13),+c)-t1.c) from t1) from t1 where case a when t1.d*(select cast(avg(case when t1.b*coalesce((select 17 from t1 where case  -a when t1.b then d else (t1.f) end not in ((t1.e),a,t1.f)),t1.c)-c in (d,a,t1.c) then c else b end) AS integer) from t1)+t1.d then 13 else t1.e end not in (19,a,17)),13) FROM t1 WHERE +c in (a,17,t1.d)"
     end, {
         -- <randexpr-2.409>
-        
+
         -- </randexpr-2.409>
     })
 
@@ -4160,7 +4160,7 @@ test:do_test(
         return test:execsql "SELECT f-coalesce((select t1.d from t1 where t1.a>11+t1.d),coalesce((select coalesce((select t1.d from t1 where 17>=d or (case c when t1.c then (t1.c) else t1.e end in (b,17,17) or t1.b>=t1.a) or t1.b<=e),case d when (19) then t1.d else t1.a end)-t1.d from t1 where 13 in (select ( -count(distinct (e)) | cast(avg(t1.d) AS integer)*count(*))+max( -11) | max( -c) from t1 union select count(distinct 11) from t1)),a)) FROM t1 WHERE NOT (not b<=13 or (coalesce((select max(t1.b) from t1 where b in (case when not a<>13 then 17 when  -(select ~abs( -(max(f))+count(distinct t1.a)) from t1)+13>=t1.b then case c when t1.a then d else f end-c else t1.d end-19, -t1.d,f)),19)) not in (t1.a,c,t1.d) or t1.e>t1.f)"
     end, {
         -- <randexpr-2.412>
-        
+
         -- </randexpr-2.412>
     })
 
@@ -4180,7 +4180,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select e from t1 where (coalesce((select max(+e+e*11*t1.c-e) from t1 where exists(select 1 from t1 where (19<=~t1.f))),case (abs(t1.c)/abs(case t1.c when 19 then f*~case when t1.e+t1.d between  -t1.f and (d) then b when (d=a) then t1.e else e end else c end*t1.a)) | f when (d) then 17 else t1.f end)<t1.c)),13) FROM t1 WHERE a>coalesce((select coalesce((select e from t1 where case when  -d+t1.e>e then coalesce((select d+b from t1 where exists(select 1 from t1 where not 13-b not in (f,a,d)) and (t1.b between (a) and t1.c)),c) when a=13 then t1.e else a end in (select t1.d from t1 union select t1.d from t1) and e not in (d, -19,11)),d) from t1 where not f in (t1.a,19,t1.d)),t1.d)"
     end, {
         -- <randexpr-2.414>
-        
+
         -- </randexpr-2.414>
     })
 
@@ -4220,7 +4220,7 @@ test:do_test(
         return test:execsql "SELECT (select count(distinct 11-17-11) from t1)-coalesce((select (abs(13)/abs(t1.b-c*11+coalesce((select max(f) from t1 where t1.a>t1.a),(e))*case when (abs(e)/abs(t1.b)) not between ~f and t1.e then c else (abs(t1.b)/abs(t1.d)) end | 13+b | b+t1.e)) from t1 where t1.c in (select t1.c from t1 union select (a) from t1)),19) FROM t1 WHERE NOT (t1.f>=19)"
     end, {
         -- <randexpr-2.418>
-        
+
         -- </randexpr-2.418>
     })
 
@@ -4250,7 +4250,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(case when 11+(select +abs(count(*)) from t1) not in (case when (case when not exists(select 1 from t1 where t1.d=f) then a else a end+11 in (select ((13)) from t1 union select t1.d from t1)) then (abs(t1.c)/abs(t1.b)) when a>=t1.c then b else f end,t1.a,c) then t1.a when b in (select cast(avg(t1.a) AS integer) | ~ -count(distinct 17) from t1 union select min(c) from t1) then b else  -t1.e end) from t1 where d not between c and  -t1.b and b=d and b between 13 and t1.c),(17)) FROM t1 WHERE NOT (t1.a in (coalesce((select max(e) from t1 where case case (select count(*) from t1)-~19 when t1.f*t1.d+coalesce((select max((select + -(((min(t1.b)))) |  -(count(distinct t1.c)) | count(*) from t1)*11) from t1 where f>=case when d in ((d),t1.d,13) then 19 when 17=17 then 11 else a end),t1.e) then c else t1.f end when t1.e then f else t1.d end in (13,(13),c)),t1.d),t1.e,a))"
     end, {
         -- <randexpr-2.421>
-        
+
         -- </randexpr-2.421>
     })
 
@@ -4270,7 +4270,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.a-case t1.a when c then coalesce((select case (abs(11-(abs(t1.b)/abs(t1.a)))/abs((abs(t1.c)/abs(t1.a))))-t1.f when t1.d then f else 19 end from t1 where +t1.b*a in (select t1.e from t1 union select c from t1) and e between d and 11),t1.b) else a end from t1 where exists(select 1 from t1 where ((a in (13,c,d)))) and  -t1.e in ((t1.d),t1.a,t1.b)),t1.c) FROM t1 WHERE ++e*19 in (case when case when not (d<>case when  -case when (t1.a not between b and  -e) then 17 when f<>a then  -t1.d else t1.a end not in (a,a,c) then b when b<=c then e else b end) then 19 when (t1.b not in ( -13,t1.a,a)) then t1.b | 13 else e end* -19*t1.a<t1.f then t1.c when t1.f=t1.f then t1.a else t1.b end+d,a,11)"
     end, {
         -- <randexpr-2.423>
-        
+
         -- </randexpr-2.423>
     })
 
@@ -4300,7 +4300,7 @@ test:do_test(
         return test:execsql "SELECT (abs(e-((coalesce((select max(t1.c) from t1 where t1.f-a-case coalesce((select max(d) from t1 where (13<>~19)),f) when a- -t1.a | t1.f then t1.a*11-t1.e else coalesce((select max(t1.b) from t1 where not exists(select 1 from t1 where 17=t1.a or b>=f)),c) | t1.b end>19),t1.a))+c)-t1.c*e)/abs(t1.d)) FROM t1 WHERE NOT (a-t1.b not in (a,a-19-c | t1.d-d | e*t1.c*b,t1.e+t1.a))"
     end, {
         -- <randexpr-2.426>
-        
+
         -- </randexpr-2.426>
     })
 
@@ -4330,7 +4330,7 @@ test:do_test(
         return test:execsql "SELECT t1.b-coalesce((select t1.a from t1 where (d<=f)),~~case b when coalesce((select coalesce((select t1.c from t1 where a+~+~(abs(t1.d)/abs(17)) |  -d*a*(b++ -13)*b>=b),17) | a from t1 where a<a),17)-13 then 11 else t1.a end) FROM t1 WHERE NOT ( -coalesce((select (abs(t1.d)/abs(~t1.e))-a from t1 where (c>=coalesce((select t1.d+(select case min(a) | max(t1.b) when max(e) then count(*) else  -count(distinct f) end from t1)-t1.f+( - - -19) from t1 where t1.c in (select 19 from t1 union select 17 from t1)),11))),19)+11 not in ((b),e,e) or t1.e in (select min(t1.f) from t1 union select count(*)- -(cast(avg(17) AS integer)) from t1) or e>=t1.c)"
     end, {
         -- <randexpr-2.429>
-        
+
         -- </randexpr-2.429>
     })
 
@@ -4350,7 +4350,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(case when e<=t1.d then f*+case 17 when 17 then (abs((select abs(cast(avg(13) AS integer)+min(t1.b)) from t1))/abs(t1.c)) else d end*t1.c else a end) from t1 where coalesce((select t1.c from t1 where a<>t1.e+f-t1.c-a),+t1.a)+t1.d*case when d in (select t1.c from t1 union select 11 from t1) then a when 19 not in (d,e,b) then 11 else 19 end | t1.b in (select 19 from t1 union select t1.a from t1)),17)*11 FROM t1 WHERE 17>=t1.b"
     end, {
         -- <randexpr-2.431>
-        
+
         -- </randexpr-2.431>
     })
 
@@ -4390,7 +4390,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select max(case f when (abs(t1.d)/abs(case when +~e not in (t1.d,c,t1.a) or 17 in (select count(distinct  -b) from t1 union select count(distinct d) from t1) and d<=t1.b or b>(f) then coalesce((select c from t1 where t1.f<t1.e),e)+(d) when 17<19 then t1.c else t1.b end)) then t1.b else f end) from t1 where (17 not between 11 and t1.b) or t1.f>f or t1.b<> -t1.c), -t1.d)<11 then c else f end FROM t1 WHERE NOT (not exists(select 1 from t1 where exists(select 1 from t1 where case  -case when case t1.c-t1.b-e when t1.b then t1.e else  -t1.c+~17 | coalesce((select max(t1.c) from t1 where 19 not between  -(a)-t1.c and 17),t1.c) end in (select (t1.f) from t1 union select b from t1) then e when c<>19 then t1.b else f end when  -11 then 11 else 19 end in ( -19,t1.a,d)) and not 17<t1.d))"
     end, {
         -- <randexpr-2.435>
-        
+
         -- </randexpr-2.435>
     })
 
@@ -4410,7 +4410,7 @@ test:do_test(
         return test:execsql "SELECT ((select abs(min(t1.b-t1.b)-cast(avg((t1.d-t1.a*a) | (select max(t1.e-e) | max(17)*~abs(count(*)-cast(avg(coalesce((select t1.c from t1 where t1.c<=11),19)+ -e) AS integer) | max(t1.c)) | min(b) | (count(*))*min(19)- -count(*) | (cast(avg(b) AS integer)) from t1)) AS integer)-cast(avg(t1.b) AS integer)) from t1)) FROM t1 WHERE NOT (+b+(19*19)+c+t1.d<=e-19+case 13 when t1.f+~11+(select cast(avg(t1.e) AS integer) from t1) then (case when not exists(select 1 from t1 where t1.a between d and t1.b) then case c when d then d else t1.f end when not t1.b in (11,t1.c,t1.d) or t1.c<=(d) then (t1.a) else t1.b end) else  -e end or f in (t1.f,d,t1.c))"
     end, {
         -- <randexpr-2.437>
-        
+
         -- </randexpr-2.437>
     })
 
@@ -4440,7 +4440,7 @@ test:do_test(
         return test:execsql "SELECT case when (b<coalesce((select coalesce((select max(19 | t1.c) from t1 where 13 not in (t1.f,e,t1.e) or (select (count(distinct coalesce((select d from t1 where t1.c between  -17 and b),11)) | count(*)-max(t1.d)* -(max(d))) from t1)-c*t1.e in (select 19 | f from t1 union select a from t1)),c)*a from t1 where (13 not between a and 19)),19) and b>a) then t1.f else t1.c end FROM t1 WHERE NOT (case when (((case coalesce((select  -t1.b-t1.b*19*c | 19 from t1 where (exists(select 1 from t1 where e>=t1.a))),t1.a)+11 when d then t1.e else t1.c end=t1.d))) then t1.b when not not exists(select 1 from t1 where t1.f<(t1.a)) and t1.d>=f or t1.c>t1.a or t1.b between t1.f and 19 then t1.c else ~t1.c end=11 or (t1.e) not between 13 and t1.c)"
     end, {
         -- <randexpr-2.440>
-        
+
         -- </randexpr-2.440>
     })
 
@@ -4460,7 +4460,7 @@ test:do_test(
         return test:execsql "SELECT case when not t1.d not in (coalesce((select 17 |  -coalesce((select (select min(a-t1.a+t1.a-t1.c*t1.e) from t1) from t1 where t1.d<=a),11) | 19 from t1 where not ( -13 in ( -t1.d,t1.d,19))),e)+11,11,13) then e when ((t1.b<t1.c) or d=19) then (t1.a) else a end FROM t1 WHERE exists(select 1 from t1 where not exists(select 1 from t1 where ~f-e+t1.b*d+case when coalesce((select max(d) from t1 where (t1.c*t1.b in (b,t1.e,17)) or t1.b not in (t1.c,t1.a,t1.c)), -17) in (select count(distinct 13) from t1 union select  - -~min( -11) | cast(avg(c) AS integer) from t1) then f else a end+e*t1.c+t1.c>t1.f and a>=17))"
     end, {
         -- <randexpr-2.442>
-        
+
         -- </randexpr-2.442>
     })
 
@@ -4500,7 +4500,7 @@ test:do_test(
         return test:execsql "SELECT e+c-(c)+t1.e*(abs(case when 13 in (select abs(max(17)*case  -count(*) when cast(avg(a) AS integer) then count(distinct b) else  -max(f) end | (cast(avg(t1.e) AS integer)) |  -min(f)) from t1 union select count(distinct d) from t1) and case when (t1.e+a> -(a)) then e when not c<t1.f or t1.d=f then e else t1.e end<=t1.f then  -a when t1.d<=13 then a else t1.b end)/abs( -t1.a))-t1.b+t1.b FROM t1 WHERE NOT (case when  -case when t1.f<t1.c then  -(t1.e) when 11 between e and coalesce((select c from t1 where not exists(select 1 from t1 where b>=e)),coalesce((select max(case t1.e when t1.c then t1.a else a end) from t1 where b>=t1.c and b<>t1.c),13)) then t1.b else a end<11 then b when (11 in (select a from t1 union select t1.b from t1)) or t1.b=e or a between a and 13 then t1.b else b end>19)"
     end, {
         -- <randexpr-2.446>
-        
+
         -- </randexpr-2.446>
     })
 
@@ -4530,7 +4530,7 @@ test:do_test(
         return test:execsql "SELECT 13-coalesce((select t1.a*a from t1 where not exists(select 1 from t1 where 17 not between case +coalesce((select  -case 19 when a*b then 19 else f end from t1 where (t1.d-t1.e between case f when (select abs(case abs( -min(13)) when min(t1.b) then  -(count(distinct f)) else min(t1.b) end) from t1) then 17*( -13) | f else t1.e end and  -t1.a)),d)*c when 13 then 11 else t1.a end and c)),t1.a)*19 FROM t1 WHERE NOT (((not f-c<=(abs(a)/abs(+t1.a)) or t1.e not between coalesce((select 11 from t1 where  - -a*t1.d*case coalesce((select max(d) from t1 where ((t1.b<=t1.c))),case when f>t1.d or t1.d=t1.a or t1.c<=c then a else  -c end*t1.b) when (f) then 11 else 19 end-t1.a<=b),c) and 13)))"
     end, {
         -- <randexpr-2.449>
-        
+
         -- </randexpr-2.449>
     })
 
@@ -4550,7 +4550,7 @@ test:do_test(
         return test:execsql "SELECT ~case when (t1.d | 17 in (b*t1.e,19*case when t1.d<= -a then t1.d*~t1.c*e*t1.c-19 else ~t1.b+17 end-d,(t1.c))) then +t1.d else (abs( -case t1.e when t1.c then (t1.b) else t1.f end-11+ -a)/abs(f))+a end FROM t1 WHERE not exists(select 1 from t1 where not c in (select case count(distinct (f)-19) when ~( -+~cast(avg(c) AS integer) | count(distinct 11)-max(d)+min(t1.a)+ -( -count(distinct b))+(count(*)))-count(*)+cast(avg(c) AS integer) then count(distinct d) else ((max(t1.b))) end-min(b) from t1 union select min(t1.c) from t1)) and t1.c in (select +d from t1 union select case when c+b=17 then a else 13 end+11 from t1)"
     end, {
         -- <randexpr-2.451>
-        
+
         -- </randexpr-2.451>
     })
 
@@ -4580,7 +4580,7 @@ test:do_test(
         return test:execsql "SELECT (select case case min(d) when abs(cast(avg((abs(a)/abs(coalesce((select (select abs(cast(avg(t1.f) AS integer)) from t1) from t1 where (case when t1.e in (select 11 from t1 union select 17 from t1) then  -t1.e- -t1.e else a end<>a) and not not exists(select 1 from t1 where t1.b in (select ~+max( -t1.b) | max(t1.c) from t1 union select count(distinct  -t1.a) from t1))),t1.a)))) AS integer)) then (count(*) | ((count(distinct b)))-count(*)) else min(11) end when max(a) then count(distinct f) else (min(17)) end from t1) FROM t1 WHERE coalesce((select max(13) from t1 where t1.b not in ( -case when 13 not between 17 and b then f when t1.e+~+e between coalesce((select max(case 19 when e then 17 else coalesce((select coalesce((select max(f) from t1 where exists(select 1 from t1 where t1.b not between t1.a and a)),e)*b*t1.f from t1 where t1.f>=t1.c),c) end) from t1 where e>b),t1.f) | f and f then c else 11 end,(c),t1.e)),19)-t1.c in (select t1.a from t1 union select e from t1)"
     end, {
         -- <randexpr-2.454>
-        
+
         -- </randexpr-2.454>
     })
 
@@ -4610,7 +4610,7 @@ test:do_test(
         return test:execsql "SELECT (a*f+c | ~b*(select cast(avg(19) AS integer) from t1)+17*(select max(a*b-d) from t1)+(abs((select count(distinct b) from t1))/abs(case when  -13*c between t1.f and t1.c then c when not 17 between 17 and 11 and 17<=((t1.c)) then c else a end*t1.c))-a*a)-c FROM t1 WHERE exists(select 1 from t1 where t1.e-11+t1.d*e+(abs(coalesce((select max(t1.b) from t1 where 19-13- -coalesce((select c*t1.e+t1.f*f from t1 where not exists(select 1 from t1 where not exists(select 1 from t1 where (17<=d or  -11 in (select cast(avg(c) AS integer) from t1 union select +count(*) from t1))))),t1.b)<a),(t1.c)))/abs(t1.c))<=a or 13 between t1.e and  -t1.b)"
     end, {
         -- <randexpr-2.457>
-        
+
         -- </randexpr-2.457>
     })
 
@@ -4640,7 +4640,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(case when not ((select ((count(distinct t1.f)*(cast(avg(e) AS integer)))-min(t1.d)*min(t1.c)) from t1)*(select min(t1.d) from t1) not in ((select count(distinct b) from t1),f*d,19) and  -a in (t1.d,b,a)) and d>=t1.c or t1.b>t1.c or 19 not between c and t1.e then 17 else t1.b end) from t1 where (e<=t1.b)),11) FROM t1 WHERE t1.a in (f,t1.d*+a,t1.c* -(select (abs(case +(max(coalesce((select max((select count(*)-cast(avg(b) AS integer) from t1)) from t1 where (c<c)),b)-t1.d))+max(c)*+count(distinct coalesce((select max((17)) from t1 where d in (select 11 from t1 union select 17 from t1)),t1.e))*count(*) when ~count(*) then cast(avg(d) AS integer) else max(t1.a) end*count(distinct c))) from t1))"
     end, {
         -- <randexpr-2.460>
-        
+
         -- </randexpr-2.460>
     })
 
@@ -4660,7 +4660,7 @@ test:do_test(
         return test:execsql "SELECT (case case when +c>e then case t1.d when 13 then t1.c else 19 end-13 else t1.e+coalesce((select max(19) from t1 where case when e in (+b,coalesce((select a+(11) from t1 where b not between c and d or t1.b not in (a,11,17)),b),11) then 19 when (c) not in (t1.c,t1.b,d) then t1.c else t1.d end*f not between t1.a and d),13) end when c then 11 else c end) FROM t1 WHERE 19 not between coalesce((select max(d*t1.c) from t1 where (select cast(avg((b)) AS integer) from t1) in (select ( - -(abs(case max(b) when cast(avg( -13-11) AS integer) then count(distinct a-e) else ~ -cast(avg((c)) AS integer)-min(17)+count(*) end) | (min(e)))-min((19))) from t1 union select count(distinct 13) from t1)),case when  -e | 19 between  -11 and f then 19 else 19 end) and (f)"
     end, {
         -- <randexpr-2.462>
-        
+
         -- </randexpr-2.462>
     })
 
@@ -4680,7 +4680,7 @@ test:do_test(
         return test:execsql "SELECT (abs((select abs(case  -max(e)+max(t1.f)+(count(*)* -count(distinct case e when 19 then c else 13 end))*~min(t1.a) when cast(avg(t1.a) AS integer) then  -min(e) else  -count(*) end) from t1)*coalesce((select (t1.a) from t1 where case when c+t1.b-b | d in (select max(d) from t1 union select  -max(19) from t1) then t1.b else f end=t1.d),t1.b)*(t1.d) | e+t1.a)/abs(t1.d)) FROM t1 WHERE t1.f in (19,d*t1.d,(select min((select count(*)*min((17)+(abs(11)/abs(+~coalesce((select max(f) from t1 where 13 not between t1.c and t1.a),t1.e)-11))) from t1)) from t1)+17)"
     end, {
         -- <randexpr-2.464>
-        
+
         -- </randexpr-2.464>
     })
 
@@ -4720,7 +4720,7 @@ test:do_test(
         return test:execsql "SELECT d+case when (coalesce((select max(t1.a) from t1 where t1.a not in (t1.d,f*(select count(distinct t1.d) from t1)+t1.f,c)),b)-c-17-t1.c)-case when 13*t1.a-19*e<>11 then f when t1.f not between 11 and t1.d then b else f end=t1.d then t1.f when not e>t1.f then 17 else b end FROM t1 WHERE NOT (exists(select 1 from t1 where 11* -d>=e) or t1.c<+ -e*11 or (17 not between t1.d and case t1.a when t1.a then t1.d+f-b else 11 end | t1.e))"
     end, {
         -- <randexpr-2.468>
-        
+
         -- </randexpr-2.468>
     })
 
@@ -4730,7 +4730,7 @@ test:do_test(
         return test:execsql "SELECT t1.f-coalesce((select max(+e | b) from t1 where case when  -(abs(11)/abs(~(19 | t1.d)))-~c*e not in (19,b*t1.b,b) then 11 when f<=13 then d else t1.d end in (select (count(*))-cast(avg(11 | 17*t1.b) AS integer) from t1 union select count(distinct a-17) from t1)),t1.c)-c FROM t1 WHERE case when (t1.f*a<=11+d+coalesce((select max(19+19) from t1 where 13 in (select min(f)+cast(avg((abs(t1.e)/abs((select count(distinct c) from t1)))) AS integer)+(~cast(avg(e) AS integer))-min(c) from t1 union select count(*) from t1)),b)) then (a) else t1.b end-t1.b<=t1.b and 13 in (select t1.e from t1 union select t1.e from t1) and a<e"
     end, {
         -- <randexpr-2.469>
-        
+
         -- </randexpr-2.469>
     })
 
@@ -4760,7 +4760,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.c) from t1 where case when (t1.e*19*f-t1.b in (select cast(avg(d-~d) AS integer) from t1 union select +( -case +~count(*)*count(distinct (c)) when cast(avg(19) AS integer) then min(c) else count(distinct 17) end*cast(avg((13)) AS integer)-max(11)+(count(distinct b))) from t1)) then +11 else t1.b end>=t1.d or (exists(select 1 from t1 where (t1.e=t1.c)))),t1.c)-11 FROM t1 WHERE (not exists(select 1 from t1 where 11+t1.c-13>=t1.c or not exists(select 1 from t1 where a in (select b from t1 union select 19-d from t1) and ((abs(a+(abs(coalesce((select t1.d from t1 where exists(select 1 from t1 where case when t1.e>= -13 or  -e<>f then d when t1.c=13 then (b) else t1.c end not between 13 and b)),d))/abs(t1.d))-b)/abs(t1.a))<> -13 and exists(select 1 from t1 where 19<>e) or 13>=19))))"
     end, {
         -- <randexpr-2.472>
-        
+
         -- </randexpr-2.472>
     })
 
@@ -4780,7 +4780,7 @@ test:do_test(
         return test:execsql "SELECT +coalesce((select max(11) from t1 where not case d+t1.c*coalesce((select max(coalesce((select d | e from t1 where 17 not between coalesce((select (t1.d) from t1 where t1.a between (select max(t1.b+d+t1.a) from t1)-t1.e and 17),t1.a) and 11),19)) from t1 where t1.d<t1.b),d)+t1.e when t1.f then t1.d else t1.f end not in (e,t1.c,t1.c)),c) | c FROM t1 WHERE exists(select 1 from t1 where c in (t1.a,(select count(distinct  -t1.d) from t1),t1.b)) or (~d=t1.e)"
     end, {
         -- <randexpr-2.474>
-        
+
         -- </randexpr-2.474>
     })
 
@@ -4810,7 +4810,7 @@ test:do_test(
         return test:execsql "SELECT case when ((select  -min(e)+cast(avg(t1.a) AS integer) from t1)>t1.d*a) then (abs(~a)/abs(+11))*f when (c-(coalesce((select 11 from t1 where t1.d in (case when (19)+11>=c then 19 when e<>b then 13 else c end,a,13)),17))+13) not between 11 and t1.c then (t1.b) else 17 end+b FROM t1 WHERE a*b*11 in (select case when not coalesce((select max(~13 | (select abs((count(distinct t1.f))*cast(avg(t1.f) AS integer)+(max(t1.e))) from t1)) from t1 where coalesce((select max(11) from t1 where t1.b=19),b) in (f,11,19) and t1.f between a and t1.c or 19=t1.a and d=17 or c>=t1.f or t1.d<>t1.c),11)*c in (select f from t1 union select  -t1.b from t1) then t1.c when c not between f and 13 then e else  -e end from t1 union select e from t1)"
     end, {
         -- <randexpr-2.477>
-        
+
         -- </randexpr-2.477>
     })
 
@@ -4840,7 +4840,7 @@ test:do_test(
         return test:execsql "SELECT t1.d-coalesce((select  -t1.c from t1 where not exists(select 1 from t1 where not exists(select 1 from t1 where t1.d<=case t1.d+e when case when d>19 then 11+t1.c else t1.b end-t1.f-t1.e then (abs(t1.d-19*t1.b)/abs(13+case when t1.f in (select count(*)-count(distinct t1.b) from t1 union select (max((t1.f))) from t1) then (((t1.d))) when t1.b not in (t1.d,13,a) then t1.d else 19 end*t1.c))-t1.d else e end))),13)+c*t1.a FROM t1 WHERE NOT (exists(select 1 from t1 where ~coalesce((select a+t1.a from t1 where ~(abs(c)/abs(17 | +13))-t1.f in (select f from t1 union select case when t1.b between 11*e and f then e when a in (e* -t1.f-f,coalesce((select 17 from t1 where t1.e in (select (cast(avg(e) AS integer)) from t1 union select max(b) from t1)),a),d) then t1.c else (f) end from t1)),f) between  -19 and (13) or t1.f<>t1.a))"
     end, {
         -- <randexpr-2.480>
-        
+
         -- </randexpr-2.480>
     })
 
@@ -4850,7 +4850,7 @@ test:do_test(
         return test:execsql "SELECT (abs((abs(t1.b*t1.b*t1.f+a)/abs(t1.f))*t1.a-case  -(abs(coalesce((select (case when 11*19 in (select count(*) from t1 union select  -min(13)-(max(t1.a)) from t1) then 19 else  -17 end) from t1 where t1.e between 13 and (a)),t1.b)+d)/abs(t1.f))-t1.b-t1.c | d when  -t1.f then c else 17 end)/abs(13))-b*t1.d FROM t1 WHERE 13 in (t1.b,17*e+c*a,coalesce((select max(d) from t1 where +f+b not in (a,t1.a*~t1.c | t1.b-case when t1.a<=case when t1.f in (b,11,e) then d else t1.e end+f then 19 else (f) end-b*13- -t1.f-17,t1.c)),17))"
     end, {
         -- <randexpr-2.481>
-        
+
         -- </randexpr-2.481>
     })
 
@@ -4890,7 +4890,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.c*f from t1 where t1.f-+coalesce((select max(t1.d) from t1 where  - -t1.e in (select f from t1 union select t1.e from t1)),a)+case when 19 not in (t1.e,case when ~t1.a<>e+a then  -t1.d else t1.e end,f) then t1.b when  -(t1.e) in (e,(19),t1.c) then t1.f else e end+17*t1.c+d>b),t1.c)+a FROM t1 WHERE NOT (t1.b>=~b)"
     end, {
         -- <randexpr-2.485>
-        
+
         -- </randexpr-2.485>
     })
 
@@ -4900,7 +4900,7 @@ test:do_test(
         return test:execsql "SELECT case case when case when 13 between coalesce((select max(t1.f) from t1 where b+f in (b+(coalesce((select t1.f from t1 where (t1.c)>=17 or 19 not in (11,t1.e,c)),13)),b,t1.e) and c<=e and not t1.b<>13 and 19 not between t1.c and a or c between f and f),t1.c) and b then t1.b when 13<>t1.a then 11 else d end in (select 13 from t1 union select 19 from t1) then t1.c when t1.f not in (17,b,b) then t1.f else e end when t1.e then t1.e else  -d end FROM t1 WHERE case when not exists(select 1 from t1 where t1.f not between coalesce((select coalesce((select max(+case t1.a when f then t1.a else t1.e end+case when t1.f>t1.d or 11 in (t1.e,11,b) then b else a end) from t1 where t1.f in (select a from t1 union select d from t1)),t1.d) from t1 where t1.a=b),(t1.c)) and d) then (select case max(t1.a) when ~min((11)) | min(e) then max(t1.e) else abs(max(t1.c)*count(distinct 19)) end from t1) else t1.b end<>b"
     end, {
         -- <randexpr-2.486>
-        
+
         -- </randexpr-2.486>
     })
 
@@ -4920,7 +4920,7 @@ test:do_test(
         return test:execsql "SELECT case  -coalesce((select max(case when case when t1.e in (11*t1.e*17,(select (min(b) |  - -+cast(avg(17) AS integer)*max((t1.c))+cast(avg(t1.a) AS integer))+(( -(min(t1.c))))*count(*) from t1), -~b*t1.d+t1.d) then d else t1.a end<(t1.c) then t1.f else e end) from t1 where 13<>c),e)-(t1.b) when t1.a then 17 else t1.f end FROM t1 WHERE coalesce((select max(t1.e) from t1 where (not exists(select 1 from t1 where b<+c))),case when b | ~case t1.a when  -t1.b then  -t1.f else t1.f end*f+f in (select t1.b from t1 union select t1.c from t1) then  -(t1.f) when a<>11 then (d) else 11 end) in (select abs(~(abs(case (min(t1.b)*abs(count(distinct a)+count(*) |  -count(distinct a)))- -max(19) when max(t1.e) then min(d) else (max(a)) end))) from t1 union select count(*) from t1)"
     end, {
         -- <randexpr-2.488>
-        
+
         -- </randexpr-2.488>
     })
 
@@ -4950,7 +4950,7 @@ test:do_test(
         return test:execsql "SELECT +case when case when ~t1.b<=case when ~17*19 | 11*11*f between t1.c and b then t1.a when e in (t1.a,t1.e,e) then t1.c else 19 end-t1.c-17+a then (t1.d) when 13 not between 13 and 19 then c else c end=(f) or d<t1.f then  -t1.f else t1.d end FROM t1 WHERE 19*++t1.e=coalesce((select case  -t1.f when case when d-t1.a*d*coalesce((select max(t1.d) from t1 where b-b> -coalesce((select t1.b from t1 where c*13+c<>t1.f),a)),t1.e)+t1.f=t1.f then  - - -f else b end then  -11 else  -d end from t1 where ( -t1.c<f)),t1.e)+19"
     end, {
         -- <randexpr-2.491>
-        
+
         -- </randexpr-2.491>
     })
 
@@ -4990,7 +4990,7 @@ test:do_test(
         return test:execsql "SELECT case when case when 19 in (select abs(abs(count(distinct f))*~~~count(*)-abs(+abs(count(*))* -cast(avg(17) AS integer) | cast(avg(t1.d) AS integer))+count(distinct  -t1.a)+count(*)) from t1 union select  -cast(avg(19) AS integer) from t1) then b* -b-c else t1.e*c end=17 then d else coalesce((select  -11 from t1 where e<e),a)-c end+d*t1.a FROM t1 WHERE NOT ((a-t1.b+19<>case when b between ~11 and (abs(case when (coalesce((select max(+13) from t1 where not not exists(select 1 from t1 where t1.b+e in (b,t1.b,t1.d)) and 13 not in (d,f,17)),t1.a) not in (t1.f,17,17)) then coalesce((select max(19) from t1 where (17) in (t1.a,17,a)),t1.b) when b in (13,t1.a,b) then t1.c else d end)/abs(11)) then t1.f when t1.d>19 then d else d end))"
     end, {
         -- <randexpr-2.495>
-        
+
         -- </randexpr-2.495>
     })
 
@@ -5020,7 +5020,7 @@ test:do_test(
         return test:execsql "SELECT t1.a-coalesce((select t1.e from t1 where not exists(select 1 from t1 where a in (select min(d-11) | cast(avg((select  -case count(*) when count(*) then +abs(+case ~min((abs(13- -a)/abs(t1.c))) when ~~count(*)+min((13)) then max(t1.e) else cast(avg(t1.a) AS integer) end | max(c))+count(*) else count(*) end*max(t1.d) from t1)) AS integer)+max(t1.c)*count(distinct f) from t1 union select  -count(*) from t1))),~17) FROM t1 WHERE NOT (case 11 when coalesce((select coalesce((select 19 from t1 where t1.b not between t1.e and e and not not exists(select 1 from t1 where (e in ((abs(c)/abs(17)),(d) | e,(select count(distinct t1.b) from t1)-b)))),case d when a then f else t1.c end) | (t1.d) | b from t1 where t1.c not in (t1.a,19,11)),t1.b)-d then t1.e else t1.d end*t1.d<>f)"
     end, {
         -- <randexpr-2.498>
-        
+
         -- </randexpr-2.498>
     })
 
@@ -5050,7 +5050,7 @@ test:do_test(
         return test:execsql "SELECT case b*coalesce((select coalesce((select max(coalesce((select t1.b from t1 where t1.a<>11),17+~19)) from t1 where (t1.e<>e)),case 13 when 17 then 13 else c-coalesce((select max(case when (select min(d) from t1) in (select max(13) from t1 union select min(t1.f) from t1) then 13 else t1.a end*c) from t1 where t1.b<(t1.b)),f) end) from t1 where 19<=t1.e),(t1.b)) when t1.b then e else t1.d end+t1.c FROM t1 WHERE NOT (b+coalesce((select max((d)) from t1 where e=b),t1.c)*((select  -(min(coalesce((select 19+(abs((abs((t1.a)*case f when c then t1.b else t1.d end-e)/abs((t1.f))))/abs( -t1.e))+b from t1 where 13 not between d and t1.c),t1.f))) from t1))*case e when 19 then t1.d else t1.b end+t1.e not in (t1.d,t1.a,17))"
     end, {
         -- <randexpr-2.501>
-        
+
         -- </randexpr-2.501>
     })
 
@@ -5060,7 +5060,7 @@ test:do_test(
         return test:execsql "SELECT case when case when exists(select 1 from t1 where 17 in (select b from t1 union select 13 from t1)) and 19+a in (select count(distinct  -(select min(t1.a-f) from t1)) from t1 union select min(case when 11 between coalesce((select max(t1.b) from t1 where case when t1.d<>c or t1.b>=t1.a then ( -11) else t1.d end>=t1.a),t1.c) and  -17 then  -t1.f else e end) from t1) then a else 19 end+t1.e in (select e from t1 union select  -t1.b from t1) then t1.b when not (f) between f and t1.c then t1.e else e end FROM t1 WHERE 17>coalesce((select t1.b from t1 where t1.a+case when b in (19,t1.c,case t1.e when d-(b) then t1.f else 13 end) then 13 when d in (select count(distinct t1.a) from t1 union select case ~max(f) when cast(avg(b) AS integer) then max(d) else min(t1.f) end*min(e) from t1) or (t1.c<a) then t1.f else  -t1.c end<f or 13<=f),c) or 19>=t1.e"
     end, {
         -- <randexpr-2.502>
-        
+
         -- </randexpr-2.502>
     })
 
@@ -5090,7 +5090,7 @@ test:do_test(
         return test:execsql "SELECT c*(select (count(distinct (abs(case when t1.c<>e then e else 19 end)/abs(case when case when +case when a | t1.e+t1.e in (select  -count(*) from t1 union select (max(case when 11 not in (t1.f,11,f) then c when c not in (d,t1.f,t1.f) then  -t1.a else 13 end)) from t1) then 17 else 13 end>=t1.e then  -11 when (t1.f)>c then 11 else 11 end<=11 and not exists(select 1 from t1 where t1.a between t1.e and e) then 19 else (17) end)))) from t1) FROM t1 WHERE NOT (((select  -case min(a-13*17+c*coalesce((select 19 from t1 where 19>=t1.d),(t1.b))+t1.e) when +(min(17)) then min(17) else +min(b) end* -cast(avg(19) AS integer)*count(*) from t1) not between a and d) and +c in (c,t1.d,d) or d<>t1.f)"
     end, {
         -- <randexpr-2.505>
-        
+
         -- </randexpr-2.505>
     })
 
@@ -5120,7 +5120,7 @@ test:do_test(
         return test:execsql "SELECT a*coalesce((select t1.d+17 from t1 where 13*case a when t1.a then 11 else  -t1.a-d-11-coalesce((select max(e-coalesce((select d from t1 where a<=t1.d*(coalesce((select max( -t1.d) from t1 where t1.f not in (11, -t1.d,17) and t1.a between (13) and c and e not in (t1.b,t1.b,b)),b))), -17)) from t1 where t1.b<>a),19)+t1.d+t1.c end<13),t1.e) FROM t1 WHERE NOT (t1.e not between f and 19)"
     end, {
         -- <randexpr-2.508>
-        
+
         -- </randexpr-2.508>
     })
 
@@ -5130,7 +5130,7 @@ test:do_test(
         return test:execsql "SELECT 17 | case case when exists(select 1 from t1 where (not t1.d between a and f)) then t1.e when not (b=coalesce((select ~t1.c-case when (select (count(*))*(count(distinct t1.f)) from t1)>=11 then b else 19 end from t1 where not not (13<=e) and t1.b=t1.b),13)) then coalesce((select max((abs(11)/abs(t1.b))) from t1 where t1.a not between t1.e and t1.b),(t1.a)) else t1.a end when c then 13 else 19 end+b FROM t1 WHERE ~t1.a+t1.d+c*17 | (select max(t1.d)*abs(case (max(t1.f)+count(distinct t1.b))*(count(distinct f)) when count(distinct e) then  -min(t1.e) else min(t1.f) end)+max(b)+count(distinct t1.d) from t1) in (select max(t1.d*(19)) from t1 union select count(distinct case when t1.c+b in (select max(e) from t1 union select cast(avg(f) AS integer) from t1) then (17) when e not in (c,d,19) or 11=19 then (19) else t1.e end+t1.a) from t1)"
     end, {
         -- <randexpr-2.509>
-        
+
         -- </randexpr-2.509>
     })
 
@@ -5170,7 +5170,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select max((+t1.a+17+11+case when (abs(19)/abs(t1.a)) in (select ~(case count(*) when min( -c) then count(distinct b) else count(*) end) from t1 union select  -min(t1.e) from t1) or 13>=t1.a then case c when 13 then t1.d else e end when  -t1.e<=t1.a then t1.c else t1.c end)) from t1 where not t1.c= -t1.f),b)=f and t1.e<=(t1.f) then ~(t1.a) when 17=e then 19 else t1.b end FROM t1 WHERE NOT (case when  -t1.f in (select (13) from t1 union select coalesce((select max(coalesce((select (~13) from t1 where t1.b>(11)),e*t1.c)) from t1 where (not (abs(t1.c)/abs(a))>=c)),t1.d) from t1) then  -t1.e+ -a-coalesce((select t1.d from t1 where not exists(select 1 from t1 where  -b=t1.f-f)),t1.c)*17 when 19<=11 then 19 else t1.d end>=b)"
     end, {
         -- <randexpr-2.513>
-        
+
         -- </randexpr-2.513>
     })
 
@@ -5190,7 +5190,7 @@ test:do_test(
         return test:execsql "SELECT +(case when t1.a<=a then t1.d when ((abs(t1.a)/abs((coalesce((select t1.e from t1 where t1.f>=t1.c),e))))) between coalesce((select case when not 19> -11 then (case when t1.d in (select e from t1 union select f from t1) then  -d when t1.b not between 11 and t1.d then (19) else c end) else t1.e end from t1 where not exists(select 1 from t1 where e not in (t1.d,a, -a)) and t1.d>t1.b),a) and t1.a then d else b end)-17 FROM t1 WHERE NOT ((+e*t1.d in (select (+abs(abs(min(~+b)-min(a)-case  -case abs(max(t1.c)) when max(e) then count(*) else count(distinct 19) end- -max(t1.a) when count(distinct t1.a) then (count(*)) else min(t1.f) end)))-(count(*)) from t1 union select max(t1.f) from t1) or ~c*case when not exists(select 1 from t1 where t1.f in (t1.f,t1.a,d)) then t1.c when t1.c<t1.d then (17) else e end+t1.b |  -((c)) not between a and 17))"
     end, {
         -- <randexpr-2.515>
-        
+
         -- </randexpr-2.515>
     })
 
@@ -5200,7 +5200,7 @@ test:do_test(
         return test:execsql "SELECT  -case when coalesce((select max(case when ~(+case when t1.b*t1.b>t1.e then t1.a when  -d=t1.e or t1.c not between t1.c and e then c else t1.d end)- -17 in (select a from t1 union select  -t1.e from t1) then 19 else a end) from t1 where t1.a in (select  -a from t1 union select 19 from t1)),t1.a)<>t1.d then 13 when a in (19,d,c) and a<11 then t1.a else b end+t1.a-t1.b FROM t1 WHERE c>=t1.e"
     end, {
         -- <randexpr-2.516>
-        
+
         -- </randexpr-2.516>
     })
 
@@ -5230,7 +5230,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select case coalesce((select max(19) from t1 where +case when exists(select 1 from t1 where not exists(select 1 from t1 where not c in (case when e>=c then b else t1.b end,t1.b,t1.e))) then a-f+13-t1.f+19 when f>=t1.e then t1.e else t1.c end+17 in (select count(distinct 19) from t1 union select cast(avg(b) AS integer) | count(distinct 11)-count(*) from t1)),a) when b then 17 else c end from t1 where t1.f<=t1.e),t1.e) FROM t1 WHERE NOT (~~+d-d*19*case ~(select count(*) from t1)-11 when 19 then  -+(abs(t1.a)/abs(a)) | (f)-(abs(+t1.c)/abs((select ~+max(13*e)+min(f)*count(distinct 13) from t1)))*t1.a else  -t1.f-t1.b end*t1.a not between  -e and t1.e)"
     end, {
         -- <randexpr-2.519>
-        
+
         -- </randexpr-2.519>
     })
 
@@ -5250,7 +5250,7 @@ test:do_test(
         return test:execsql "SELECT a*17+ -case when not exists(select 1 from t1 where 11=t1.d) then 11-b when case when t1.c<>t1.c++t1.a or t1.c*t1.a+d-f between 19 and case when not t1.e>=11 and t1.b<=t1.c then coalesce((select max(a) from t1 where 19=11),f) when f not in (t1.b,13,b) then f else  -d end then d else t1.c end in (select 17 from t1 union select d from t1) then 17 else b end FROM t1 WHERE  -(+~ -d++c+b)>=t1.a-case when coalesce((select t1.a-(select max(t1.e) from t1)-(abs(11)/abs(17))+t1.d from t1 where not (not exists(select 1 from t1 where c=t1.c)) or t1.b in (select abs(max(11)+count(*)) from t1 union select ((max(a))) from t1)),f)>=a then t1.f when d not in (11,c,17) then a else 19 end"
     end, {
         -- <randexpr-2.521>
-        
+
         -- </randexpr-2.521>
     })
 
@@ -5280,7 +5280,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.b+a) from t1 where case (select count(distinct b*case when t1.f*+~a | b+17*13+a+11 in (select c from t1 union select d from t1) then t1.f else t1.b end) from t1) when t1.a then f else t1.c end+ -f between 17 and d and b in (13,t1.e,t1.e) and d not between t1.f and d),13) FROM t1 WHERE NOT (coalesce((select max(t1.d) from t1 where (coalesce((select ~t1.c from t1 where  -t1.a<=c*+d or not (case when (t1.b)>=t1.d then t1.e when 17<d then (a) else 11 end>a and a<>e and t1.e<t1.e) or 19<=t1.c),(c))+b*t1.c+17*t1.a | 11+(t1.f)>=19)),19)<>t1.c)"
     end, {
         -- <randexpr-2.524>
-        
+
         -- </randexpr-2.524>
     })
 
@@ -5310,7 +5310,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select (t1.b-(abs(t1.b-~17 | 13+13)/abs(t1.e))* -t1.a- -19+t1.d) from t1 where exists(select 1 from t1 where 19 in (select t1.a from t1 union select  -19 from t1) and a in (c,e,13) and 19 in (select t1.a from t1 union select b from t1) or 13 in (select 19 from t1 union select d from t1) and not t1.c=t1.f or ( -t1.d between e and 19) or  -((17))<>c)),e) FROM t1 WHERE NOT (((abs(a)/abs(f-a)) between  -(abs(++t1.b)/abs(13)) and t1.c))"
     end, {
         -- <randexpr-2.527>
-        
+
         -- </randexpr-2.527>
     })
 
@@ -5330,7 +5330,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select max(c- -b-t1.c) from t1 where t1.d between 11 and case when b | ~t1.e*(t1.f)>t1.f then a when (19<13) and not exists(select 1 from t1 where f not in (t1.a,((b)),17)) or d in ((a),t1.c,19) or (f)>13 then t1.e else f end*t1.a),t1.a)>=e then t1.d when t1.e>=c then 13 else f end FROM t1 WHERE +11 between case when t1.f>t1.c then t1.b else t1.b end and ((select count(distinct case when t1.a between (abs(coalesce((select t1.b from t1 where case when t1.d<=(abs((c))/abs(coalesce((select max(17) from t1 where 11=b),13))) then 17 when b=t1.e then d else e end-13>=(e)), -d))/abs(b)) and b then t1.d when (b) in (13,t1.b,t1.a) then f else 19 end) from t1))-d"
     end, {
         -- <randexpr-2.529>
-        
+
         -- </randexpr-2.529>
     })
 
@@ -5370,7 +5370,7 @@ test:do_test(
         return test:execsql "SELECT (select ~abs(max(case when (case when ( -t1.a>e) then t1.a else (select (~count(*) | max(case when t1.d<>c then  -+13 else case when b between 19 and 17 or (t1.a)>=13 then 19 else t1.c end end)) from t1) end<>t1.e) then 19 when c*e+t1.b<=19 then f else (t1.d) end | b)) from t1)+c FROM t1 WHERE NOT (f | t1.a+b>=t1.d)"
     end, {
         -- <randexpr-2.533>
-        
+
         -- </randexpr-2.533>
     })
 
@@ -5390,7 +5390,7 @@ test:do_test(
         return test:execsql "SELECT  -case when ~case t1.f+13+t1.a when coalesce((select max(17) from t1 where coalesce((select max(( -11)) from t1 where not exists(select 1 from t1 where case case when not exists(select 1 from t1 where (a in (select f from t1 union select b from t1))) then d when (a) in (f,t1.a, -f) then t1.a else b end when t1.d then c else t1.b end<>a and 11= -t1.a and 19=a)),11) in (select c from t1 union select 17 from t1)),t1.c) then e else 11 end=t1.d then 17 else 17 end FROM t1 WHERE not exists(select 1 from t1 where f<d or exists(select 1 from t1 where ~t1.a not between coalesce((select max(case b+(select  -case max(t1.b)- -count(distinct c)*max(t1.b) when min(17) then (count(*)) else cast(avg(t1.d) AS integer) end*max(f) from t1)+case when (abs((abs(19)/abs(e)))/abs(t1.d))*t1.a not between b and 13 then e else (e) end when d then b else 17 end) from t1 where t1.c between b and t1.f),t1.b) and a))"
     end, {
         -- <randexpr-2.535>
-        
+
         -- </randexpr-2.535>
     })
 
@@ -5410,7 +5410,7 @@ test:do_test(
         return test:execsql "SELECT t1.f-t1.b | coalesce((select max((select max(case  -case when t1.f>coalesce((select max(case when (17> -t1.e) then f when 19=t1.a then t1.a else a end) from t1 where t1.c<=t1.e or (t1.d)>=t1.d),t1.a)+a then f when b not in (e,t1.e,t1.b) or t1.f not in (f,t1.c, -d) or e<=13 then f else (17) end-t1.d+t1.f*13 when (t1.c) then b else  -t1.e end) from t1)) from t1 where t1.b in (t1.b,t1.f,(t1.e))),t1.e)*(a) FROM t1 WHERE t1.f<=a"
     end, {
         -- <randexpr-2.537>
-        
+
         -- </randexpr-2.537>
     })
 
@@ -5440,7 +5440,7 @@ test:do_test(
         return test:execsql "SELECT t1.e+t1.a*case when not t1.f<=d-(c)*13 then t1.e+13*(abs(case when exists(select 1 from t1 where (select  -count(*)* -max(t1.a) | ((((cast(avg((e)) AS integer))))) from t1)>=+c+b) then +11 when t1.a not between t1.c and c then t1.b else  -19 end)/abs(b)) | (19) when not exists(select 1 from t1 where t1.c between t1.e and t1.c) then d else t1.f end FROM t1 WHERE b in (+c,case b when f*~19-t1.b*t1.f then t1.f else a end,a | t1.a)"
     end, {
         -- <randexpr-2.540>
-        
+
         -- </randexpr-2.540>
     })
 
@@ -5480,7 +5480,7 @@ test:do_test(
         return test:execsql "SELECT t1.e++a-c-a+coalesce((select t1.e from t1 where 11=case when t1.f not between 13 and t1.b+a*t1.c then 17 when (select min((select cast(avg(17) AS integer)*max(d)-(cast(avg(c) AS integer))*count(distinct t1.b) from t1)) from t1)>=case coalesce((select t1.b | e from t1 where t1.d in (t1.c,17,t1.c)),a) when 13 then t1.a else 19 end then t1.a else e end),t1.d) FROM t1 WHERE NOT (+t1.a*t1.c between case when case coalesce((select max(+t1.f-t1.b*(select min((b))+count(distinct c) from t1)) from t1 where  -b between 11 and t1.b or b in (select  -max(19) from t1 union select  -count(*)+ -count(*) from t1) and 17=d),13)-t1.b*a when t1.b then (17) else c end>b then e else 11 end and ( -b) or t1.e not between a and 11)"
     end, {
         -- <randexpr-2.544>
-        
+
         -- </randexpr-2.544>
     })
 
@@ -5500,7 +5500,7 @@ test:do_test(
         return test:execsql "SELECT (select case ~case count(*) when (count(distinct d)*min(17)+min(13)+min(11))-max(t1.a) then count(distinct  -13) else min(t1.c) end-max( - -t1.d)*count(*) when  -count(*) then count(*) else (cast(avg(e) AS integer)) end from t1)-case when a>b then t1.d+case when (e= -t1.a) and c<c then coalesce((select t1.f+f from t1 where t1.b not in (f,13,t1.b)),t1.d) else d end+ -t1.a-c+e else 19 end FROM t1 WHERE t1.b not between a and 11 and t1.c in (select +case count(*) when count(*)*cast(avg(13) AS integer) then min(~b-c-t1.e*(abs(a)/abs(case when t1.d>=(13) and t1.e<=c then 11 else t1.f end | t1.a)))-abs(abs(count(*)))-+~min(t1.e)+~count(distinct 11)* -count(*) | max(t1.d)-( -cast(avg(13) AS integer))*(min(e)) else  -min(t1.a) end from t1 union select max(t1.f) from t1)"
     end, {
         -- <randexpr-2.546>
-        
+
         -- </randexpr-2.546>
     })
 
@@ -5520,7 +5520,7 @@ test:do_test(
         return test:execsql "SELECT case ~case 19 when t1.e then f else 19*f end*case when exists(select 1 from t1 where t1.e not between t1.f-~case case  -e when f then t1.d else case when t1.b in (t1.e,f,11) then e when 11<=d then  -t1.d else 17 end end when 13 then 19 else c end and 19) then coalesce((select t1.b from t1 where not exists(select 1 from t1 where (a<>b))),b) else t1.c end | e+t1.b when a then f else 19 end FROM t1 WHERE 17 in (select count(distinct t1.f)+~min(coalesce((select max(e*f-case when case when 11<>e and t1.e<=t1.d or (t1.d)<=t1.e then d when ( -17) not between  -t1.c and t1.a then coalesce((select max((19)) from t1 where  -b between e and 11), -a) else d end in (b,t1.d,a) and 19 in (13,13,t1.c) or b not in (f,(t1.e),19) then t1.c when 17 not in ((19),(t1.b),f) then +t1.d else f end) from t1 where (not a between 19 and d and (d>a))),d)) from t1 union select cast(avg(f) AS integer) from t1)"
     end, {
         -- <randexpr-2.548>
-        
+
         -- </randexpr-2.548>
     })
 
@@ -5560,7 +5560,7 @@ test:do_test(
         return test:execsql "SELECT (abs(11*coalesce((select max(t1.a) from t1 where d>=case when coalesce((select case when not exists(select 1 from t1 where  -d in (select b-(abs(13)/abs(t1.e)) from t1 union select e from t1)) then ~c when not exists(select 1 from t1 where not exists(select 1 from t1 where  -t1.d in (select cast(avg(c) AS integer) | count(distinct e)+max( -t1.d)-(max(f)) from t1 union select count(*) from t1))) then t1.a else e end from t1 where exists(select 1 from t1 where t1.f between d and t1.b) or 17 in (11,17,d)),11) not between t1.c and t1.d then 17 when 13=t1.a then 19 else (13) end), -t1.b)-e)/abs(a)) FROM t1 WHERE NOT (t1.c+t1.c=t1.f)"
     end, {
         -- <randexpr-2.552>
-        
+
         -- </randexpr-2.552>
     })
 
@@ -5590,7 +5590,7 @@ test:do_test(
         return test:execsql "SELECT  -t1.a*coalesce((select max(c) from t1 where  -(17 | case when (select cast(avg(17+coalesce((select max(c) from t1 where exists(select 1 from t1 where (coalesce((select max( -f) from t1 where (t1.b<=t1.b)),t1.e)<>e))),f |  -t1.a)) AS integer) from t1) in (13,e,t1.c) then f when (f>e) then b else t1.a end)*c*e not between 19 and t1.b),11)+13-19*(19) FROM t1 WHERE NOT ((c<=t1.e))"
     end, {
         -- <randexpr-2.555>
-        
+
         -- </randexpr-2.555>
     })
 
@@ -5610,7 +5610,7 @@ test:do_test(
         return test:execsql "SELECT 19-coalesce((select max(case when 17 | t1.a in (select case case coalesce((select max(t1.b) from t1 where t1.f not between case when  -b in (13,f,a) then a else a end and t1.f or (a not in (d,d,t1.c))),c) when a then t1.e else f end when 13 then 13 else b end from t1 union select 17 from t1) then c when not b not in (d, -t1.e,c) then 17 else b end) from t1 where e not in (17,t1.e,b)),t1.e) FROM t1 WHERE t1.a in (select  -count(*) from t1 union select min((select (cast(avg((select +max(t1.b) from t1)) AS integer)) from t1)+17*c) from t1)"
     end, {
         -- <randexpr-2.557>
-        
+
         -- </randexpr-2.557>
     })
 
@@ -5640,7 +5640,7 @@ test:do_test(
         return test:execsql "SELECT  -f-coalesce((select max(case a-t1.a when t1.f then 13 else +t1.a-t1.f end) from t1 where (select count(distinct a) from t1)>d),( -~t1.a+17+case when (not exists(select 1 from t1 where c=t1.b and c>t1.d)) then ~coalesce((select t1.f from t1 where t1.e not between t1.b and t1.e),11)+a when b<=t1.d then t1.c else 11 end+t1.b)*d)*17+d FROM t1 WHERE +t1.c in (select max(~case when 17>t1.f then 19 else  -case when d=11 or t1.b> -t1.e or d not in (b,t1.a,t1.e) then e-( -13)+d else 11 end end-t1.d) from t1 union select max(17)+case min(t1.a) | case + -case abs(cast(avg(t1.d) AS integer)) when  -count(*) then count(*) else max(19) end when min(e) then count(*) else cast(avg(t1.c) AS integer) end when min(t1.f) then count(*) else min(b) end from t1)"
     end, {
         -- <randexpr-2.560>
-        
+
         -- </randexpr-2.560>
     })
 
@@ -5670,7 +5670,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select 11 from t1 where exists(select 1 from t1 where not exists(select 1 from t1 where not (select +count(*)* -count(distinct case when exists(select 1 from t1 where 13+a=t1.b) then d else 13 end-t1.b) from t1)<=17 | e-13)) or not exists(select 1 from t1 where not t1.e in ((13),17,19) and not t1.d>a and t1.e not between t1.e and b)),coalesce((select max(coalesce((select max(b) from t1 where (b)>11),d)) from t1 where 11> -19),f)-c) FROM t1 WHERE NOT (case when  -13 not in (b,(abs(coalesce((select max(case when  -17<>t1.f then b when coalesce((select t1.b from t1 where t1.c in (select (a) from t1 union select c from t1)),17)<=t1.e then b else f end) from t1 where b<=11),t1.c))/abs((d))),19) then t1.b when (exists(select 1 from t1 where not exists(select 1 from t1 where ((13)=e and t1.f between 17 and t1.a) or t1.f between (a) and  -(t1.f)))) and t1.e between b and 13 or b<>(f) then t1.f else d end>=a or d>=13)"
     end, {
         -- <randexpr-2.563>
-        
+
         -- </randexpr-2.563>
     })
 
@@ -5700,7 +5700,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(coalesce((select max(13+f | c+a) from t1 where 17<t1.a),~case when 17 in (select count(distinct 11) from t1 union select ++cast(avg(a | 11) AS integer)-count(*) from t1) then t1.a else 17 end)) from t1 where case t1.d when 17 then t1.a else 17 end not between 13 and case t1.c when t1.b*case when t1.d<>d then 13 else c end-c then e else t1.e end),c) FROM t1 WHERE NOT (exists(select 1 from t1 where t1.a+( -case when exists(select 1 from t1 where exists(select 1 from t1 where b | c-c+t1.d not between 19 and 11)) then coalesce((select t1.c from t1 where c+17 in (f,13,c) or t1.e*coalesce((select case when (not exists(select 1 from t1 where 17>e)) then t1.d else ~t1.e end from t1 where (t1.f not in (19,a,t1.b) or c=f)),c)=c), -11) else e end)<=t1.b))"
     end, {
         -- <randexpr-2.566>
-        
+
         -- </randexpr-2.566>
     })
 
@@ -5720,7 +5720,7 @@ test:do_test(
         return test:execsql "SELECT case when ((coalesce((select max((select ~cast(avg((~d*f)) AS integer) from t1)) from t1 where  - -t1.f<>d),e) in (select cast(avg(+13) AS integer)*~count(*) | case count(*) when  -abs(abs(max(f))) then cast(avg(e) AS integer) else (count(distinct b)) end from t1 union select count(*) from t1) and b>= -t1.d)) then (17) when b between 13 and t1.d then  -e+t1.a else t1.f end FROM t1 WHERE (case when +t1.f-(select abs(count(distinct d)) from t1)*case when c in (select min(b) from t1 union select max(c+f*case 11*t1.b when b then t1.c else c end | t1.a) from t1) then d else f end | t1.a*b in (t1.d,17,a) then  -t1.a else t1.d end) in (e,t1.c,f) and  -((t1.c)) in (11,t1.e,t1.c)"
     end, {
         -- <randexpr-2.568>
-        
+
         -- </randexpr-2.568>
     })
 
@@ -5760,7 +5760,7 @@ test:do_test(
         return test:execsql "SELECT t1.d-case when e in (17,coalesce((select max((select count(*) from t1)) from t1 where (~t1.f++19*t1.f+b in (a,t1.b, -t1.e)) and b in (select count(distinct t1.a) from t1 union select (abs(abs(abs(max(t1.e)*max(t1.d))-min(11)* -count(*)))) from t1)),17),13) and t1.f in (select t1.b from t1 union select f from t1) then t1.c else c end+f FROM t1 WHERE NOT (not (select (abs(abs((+count(*)*~ -cast(avg(+t1.f-c) AS integer)*count(distinct +coalesce((select max((abs(c)/abs(t1.e))) from t1 where coalesce((select coalesce((select max(f) from t1 where t1.d<=t1.d),e)*c from t1 where t1.f<>f),c) not between t1.a and c),t1.e)+13)-count(distinct f) | abs(cast(avg(t1.b) AS integer)))))) from t1)-13<t1.c)"
     end, {
         -- <randexpr-2.572>
-        
+
         -- </randexpr-2.572>
     })
 
@@ -5770,7 +5770,7 @@ test:do_test(
         return test:execsql "SELECT (abs(t1.f*case when (abs(t1.f+17-(t1.a*11*(abs(d)/abs(coalesce((select max(11) from t1 where e=a-t1.a or e not between 17 and 11 or (t1.f)>=c or f<>e),+d))) | t1.c*b+t1.d)- -f)/abs(13))<>t1.e then  -t1.e when t1.e not between f and t1.a then t1.c else t1.c end)/abs(t1.e)) FROM t1 WHERE (abs(b*t1.e+t1.a)/abs(t1.c))<case when 13 in (coalesce((select max(~(abs( -11*t1.a)/abs(c))+t1.e) from t1 where t1.d in (f,c,(f))),f)-f,b,t1.b) then e when not exists(select 1 from t1 where f in (select max(19) from t1 union select cast(avg(t1.e) AS integer)- -min(11) | abs((cast(avg(t1.d) AS integer))) from t1)) then d else d end and e<e"
     end, {
         -- <randexpr-2.573>
-        
+
         -- </randexpr-2.573>
     })
 
@@ -5810,7 +5810,7 @@ test:do_test(
         return test:execsql "SELECT (abs(t1.c-case when +coalesce((select max(coalesce((select max(a-a*t1.f) from t1 where ~t1.a*t1.a-t1.b+f* -19 not in (t1.d,e,b)),11)*t1.a) from t1 where not exists(select 1 from t1 where not exists(select 1 from t1 where (c) in (b,c,t1.c))) or t1.e between  -b and b),a)+a<=e then t1.d else 17 end)/abs(f)) FROM t1 WHERE NOT (t1.d-t1.c+~t1.c<>case when (17) in (select + -abs(count(distinct t1.e*17*c+f)-max(19)) from t1 union select count(*)-max(case t1.f when a then (11+19*t1.b+t1.f) else (19) end*t1.c) from t1) then (abs(b- -f)/abs(f)) else t1.f end)"
     end, {
         -- <randexpr-2.577>
-        
+
         -- </randexpr-2.577>
     })
 
@@ -5830,7 +5830,7 @@ test:do_test(
         return test:execsql "SELECT (abs( -coalesce((select 11 from t1 where (case f when (19+ -(select count(*) from t1)) then (select ++~count(distinct 17+t1.f*(17)) | cast(avg(c) AS integer) from t1) else 13-t1.b*t1.b end*t1.c*(select max(e)*cast(avg(t1.b) AS integer) from t1) | 13) | 17 between 11 and 17),(e))+d)/abs(t1.b))-t1.d FROM t1 WHERE NOT (11<>t1.b)"
     end, {
         -- <randexpr-2.579>
-        
+
         -- </randexpr-2.579>
     })
 
@@ -5860,7 +5860,7 @@ test:do_test(
         return test:execsql "SELECT ( -13)-case when (13)+19 between (select cast(avg(11+coalesce((select d from t1 where t1.a in (select b from t1 union select c from t1)),11)+t1.e*d) AS integer)*+(max(t1.c))+cast(avg((c)) AS integer)*count(*) | max( -t1.b) from t1)-t1.d and t1.a then t1.b when b<>t1.f then t1.c else a end-b-t1.b FROM t1 WHERE NOT (11<=t1.e+19*+t1.d)"
     end, {
         -- <randexpr-2.582>
-        
+
         -- </randexpr-2.582>
     })
 
@@ -5880,7 +5880,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.e++case ~t1.c when t1.f-c then t1.b*+coalesce((select max(+t1.c) from t1 where 19-19-13 | t1.d+(select ~min(17) from t1) not in (case when t1.a<>b then e else  -e end,(t1.d),t1.a)),b)+((e))* -t1.e else t1.d end | b) from t1 where a not between 13 and c),t1.e) FROM t1 WHERE not case when (exists(select 1 from t1 where (((abs(19)/abs((case when exists(select 1 from t1 where +t1.f>c) then 19 when f in (t1.d,t1.a,13) and b=t1.e then t1.f else t1.a end))) in (e, -t1.c,t1.b))))) then  -t1.f when b in (d,11, -d) then t1.e*t1.a else a end+d<>t1.f and (t1.f=( -17))"
     end, {
         -- <randexpr-2.584>
-        
+
         -- </randexpr-2.584>
     })
 
@@ -5910,7 +5910,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.d-~case t1.b when coalesce((select max(b) from t1 where exists(select 1 from t1 where t1.c<>b)),case when 17 in (select min(c+17) from t1 union select ~ -count(distinct 11) | max(d) from t1) then d when ((t1.a not between t1.f and t1.f)) then t1.a else t1.b end) then (c) else (t1.c) end<t1.a then t1.d when f not between 19 and c and 17 in (t1.f,t1.d,c) then t1.f else 11 end+t1.e*( -11) FROM t1 WHERE case c when f then case (abs(t1.d | case when ((13))*a+c+19>=d then  -13 when b in (select cast(avg((a)) AS integer) from t1 union select  -~abs(count(*))*min(t1.f) from t1) then d else 19 end)/abs(19)) when 11 then 11 else t1.f end+13-t1.d else t1.b end+b>=d and not exists(select 1 from t1 where e>=19)"
     end, {
         -- <randexpr-2.587>
-        
+
         -- </randexpr-2.587>
     })
 
@@ -5950,7 +5950,7 @@ test:do_test(
         return test:execsql "SELECT b+coalesce((select (t1.e) from t1 where coalesce((select max((select abs(cast(avg( -t1.f*17) AS integer))+count(*) from t1)-19*coalesce((select b*+~(t1.c)*(abs(c)/abs(a))+t1.e from t1 where 11 in (t1.a,17,b* -t1.f)),t1.e)*t1.b) from t1 where t1.f<>17),17) in (11,11, -t1.f)),t1.e) FROM t1 WHERE NOT (coalesce((select max(coalesce((select 19-e from t1 where t1.b not in (coalesce((select max(t1.e+coalesce((select 11+ -coalesce((select max(t1.a) from t1 where t1.a in (select cast(avg( -11) AS integer) from t1 union select  -max(c) from t1)),11)*t1.a from t1 where exists(select 1 from t1 where a= -e)),e)-t1.c | t1.d) from t1 where t1.e=t1.a),17),(t1.e),c)),t1.b)) from t1 where not exists(select 1 from t1 where (13>=a) or exists(select 1 from t1 where d<>11))), -19)<=t1.b)"
     end, {
         -- <randexpr-2.591>
-        
+
         -- </randexpr-2.591>
     })
 
@@ -5970,7 +5970,7 @@ test:do_test(
         return test:execsql "SELECT (select count(distinct t1.a)-cast(avg(~c+coalesce((select e from t1 where e in (select t1.f from t1 union select d from t1) or t1.d not in (case when a not in (t1.d,t1.c,t1.b) then a-case when ~t1.b+t1.e |  -t1.e not in (a,(b),19) then t1.d else 11 end*b when 13 in (c,13,t1.a) then  -t1.a else 17 end,c,d)),t1.e)) AS integer) from t1) FROM t1 WHERE NOT (~e<=(a-(select count(*) from t1)+c+(select  -abs(abs( -(max((abs(coalesce((select a*(abs(b-b)/abs((c*a*b)-11+coalesce((select max(b) from t1 where a<c),e))) from t1 where 17<>e),e))/abs(11))*t1.e)))) | abs((count(*))) from t1)))"
     end, {
         -- <randexpr-2.593>
-        
+
         -- </randexpr-2.593>
     })
 
@@ -5990,7 +5990,7 @@ test:do_test(
         return test:execsql "SELECT 13-(select cast(avg(t1.c-13) AS integer) from t1) | 11+t1.b | coalesce((select max(case when b in (select case  -case max(17) when ~cast(avg(13-t1.a) AS integer) then count(distinct 13) else  - -((cast(avg(e) AS integer))) end when cast(avg(t1.c) AS integer) then count(distinct d) else count(*) end from t1 union select count(*) from t1) then case when t1.d<>~13 then b when t1.c<>13 then t1.a else a end else t1.a end) from t1 where t1.f<>( -(17))),t1.e)+c FROM t1 WHERE (~coalesce((select (11+t1.d) from t1 where 17 in (select f+a from t1 union select case when 11>coalesce((select  -case when (11 not in (t1.f,(abs(t1.a)/abs((select count(distinct  -case when 13<=e then c when d between (t1.d) and t1.d then a else 11 end) from t1)-f)),c)) then f when (t1.f>t1.d) then 17 else 13 end from t1 where t1.e>a),17) then f else t1.b end from t1)),b)*13>e)"
     end, {
         -- <randexpr-2.595>
-        
+
         -- </randexpr-2.595>
     })
 
@@ -6020,7 +6020,7 @@ test:do_test(
         return test:execsql "SELECT f+coalesce((select case when ~case when coalesce((select max(b) from t1 where not exists(select 1 from t1 where 11*t1.b>case t1.b when 13 then 11 else b end)),t1.b) not in (a,b,+t1.e | case when t1.a<>17 then 17 else t1.e end) then c when (t1.e)<>d then 11 else f end*(e) not between d and e then 17 else 17 end from t1 where 13 not between 19 and f),t1.b)*11 FROM t1 WHERE not exists(select 1 from t1 where 11 between c and b and  -case when 13 between  -f | case when t1.b<+c then b when t1.f>13 then a else (d) end and d then t1.d when t1.a in (select 19 from t1 union select 11 from t1) or not exists(select 1 from t1 where exists(select 1 from t1 where not b=t1.b)) then  -19 else t1.b end in (select max(17) from t1 union select count(distinct a)+count(distinct 11) from t1) and t1.f<t1.d or b not in (d,t1.d,a))"
     end, {
         -- <randexpr-2.598>
-        
+
         -- </randexpr-2.598>
     })
 
@@ -6060,7 +6060,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(e) from t1 where e*~t1.b*e+c*case when +(abs(coalesce((select max(t1.b) from t1 where t1.b>=t1.a-11),11))/abs(17))=t1.f and ((t1.f)=t1.e) then t1.a+t1.d when not exists(select 1 from t1 where  -b>c) or t1.a>=11 then t1.e else e end*13*t1.f | d>=19),t1.b)+t1.a FROM t1 WHERE NOT (t1.e not in (t1.f+case when f-d not between coalesce((select max(d) from t1 where (coalesce((select max(17) from t1 where not 19 in (select cast(avg(c) AS integer)-~count(distinct f- -e)+cast(avg(19) AS integer) from t1 union select cast(avg(d) AS integer) from t1)),b) not in (13,t1.c,13))),17)+ -e+t1.f and  -(t1.b) then (t1.d) when t1.b in (select min(a) from t1 union select min(17) from t1) then c else 11 end,c, -13))"
     end, {
         -- <randexpr-2.602>
-        
+
         -- </randexpr-2.602>
     })
 
@@ -6080,7 +6080,7 @@ test:do_test(
         return test:execsql "SELECT case when exists(select 1 from t1 where f in (select cast(avg(t1.c) AS integer) from t1 union select min(t1.b) from t1)) then c+d-d when (coalesce((select a from t1 where a<(select abs(count(*)) from t1)),(select count(distinct t1.e) | abs(+ -count(distinct t1.e)*min(t1.b) | count(distinct 11)) from t1))) not in (17,(abs(t1.d)/abs(coalesce((select max(t1.f) from t1 where t1.a*t1.f>=t1.c),t1.f))),t1.e) then t1.c else t1.e end-f FROM t1 WHERE 13*~~(abs(b)/abs(coalesce((select max(t1.a) from t1 where t1.e in ( -(13-17)-b+(e | (abs(t1.e)/abs(case when ~t1.d between t1.e and c and t1.b in (select t1.c from t1 union select b from t1) then 11+t1.b when a=t1.d then b else c end)))*17,t1.c, -17)),13)))-e+b-19>19"
     end, {
         -- <randexpr-2.604>
-        
+
         -- </randexpr-2.604>
     })
 
@@ -6120,7 +6120,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.f<d or t1.d>=17 then t1.d-19-11*f*t1.a*t1.b-case (select +cast(avg(a) AS integer) from t1) when 19 then 17 else a end when t1.a between case t1.c when t1.c*t1.c then (d) else t1.c end and c then e else t1.a end FROM t1 WHERE NOT (not exists(select 1 from t1 where exists(select 1 from t1 where (abs(+f-( -~(select count(distinct ~a*e | (select max(f)*count(distinct t1.f) from t1)) |  -max(17)+(count(*))+max(11)+count(distinct t1.e)- - -count(distinct f) from t1)+b*b-t1.c) | t1.e)/abs(17))*c*b in (17,19,t1.e))))"
     end, {
         -- <randexpr-2.608>
-        
+
         -- </randexpr-2.608>
     })
 
@@ -6140,7 +6140,7 @@ test:do_test(
         return test:execsql "SELECT f-~+17*(abs(t1.f)/abs(a*case when case when (case when d>=t1.b or t1.b>=11 then t1.c when t1.b>t1.d then t1.d else t1.a end+17) not in (11,t1.e,17) then c when (t1.b>=a and b>b) then t1.d else d end in (select +abs( -max(t1.e)) from t1 union select count(*) | max(17) from t1) then (t1.a) else a end+(t1.e)))*(11)-f | t1.a-f FROM t1 WHERE NOT (((t1.d>=t1.c)))"
     end, {
         -- <randexpr-2.610>
-        
+
         -- </randexpr-2.610>
     })
 
@@ -6170,7 +6170,7 @@ test:do_test(
         return test:execsql "SELECT e+ -((abs(f)/abs(17))) | t1.e*11-coalesce((select max(f) from t1 where ((abs(~+t1.b-coalesce((select coalesce((select max(t1.d) from t1 where not exists(select 1 from t1 where ((f) not in (11,19,t1.b)))),11* -t1.b) from t1 where  -a<=c),t1.f))/abs( -b)) between t1.c and e and not exists(select 1 from t1 where f not in ( -t1.f,19,t1.e)))),case t1.c when 19 then (11) else (t1.a) end) | (13) FROM t1 WHERE NOT (d<>13 or t1.c in (select count(distinct  -c*11-( -e)-t1.e)-( -case +max(t1.c)-min((select +cast(avg(19*17) AS integer) from t1)* -t1.f)+~(~count(distinct f))+count(*)-cast(avg(t1.c) AS integer) when count(distinct t1.f) then count(distinct e) else  -count(*) end-count(*)) from t1 union select count(distinct 11) from t1))"
     end, {
         -- <randexpr-2.613>
-        
+
         -- </randexpr-2.613>
     })
 
@@ -6200,7 +6200,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select case t1.e when t1.d then  -t1.b else b | t1.f end from t1 where case e when case 11 when t1.f then 13 else c end-19 then case  -(select count(distinct 19+ - -d*t1.f+d) from t1)*(abs(c)/abs(coalesce((select max(e) from t1 where not t1.c>t1.d),(17-t1.a)))) when 11 then t1.f else t1.a end else a end<>t1.c),t1.e) FROM t1 WHERE NOT ((select case count(*)* -+abs(+count(*)+min(t1.d)) | max(+(17)) when ~count(*)*(count(*))-(count(distinct t1.b)) then count(distinct 11) else max(t1.e) end from t1)>=(abs(coalesce((select t1.b from t1 where (a<f)),b-t1.a))/abs((11*c)-t1.f-b)) and 13 not between (t1.b) and t1.b)"
     end, {
         -- <randexpr-2.616>
-        
+
         -- </randexpr-2.616>
     })
 
@@ -6220,7 +6220,7 @@ test:do_test(
         return test:execsql "SELECT case when 13<11 then 19 when  -(abs(f)/abs(13))*17-13 | case t1.b when ~((select (count(*)-abs(case cast(avg(19) AS integer) when count(distinct 19)*(count(*))-count(*) then count(distinct t1.d) else  -count(distinct 17) end)+max(17)) from t1)) then t1.c else d end+11*t1.e*t1.a | e>(t1.c) then t1.d else t1.d end FROM t1 WHERE case when 17-t1.f in (select case  -~max(c-~e+19)*max(c)*count(*)+~count(distinct f)+case count(distinct d) when max(t1.b) then cast(avg(t1.d) AS integer) else count(distinct d) end-count(distinct d)*max(f)+ -count(distinct 13) when count(*) then ( -min(t1.c)) else min(( -d)) end from t1 union select  -min(c) from t1) then 13 else case t1.c when t1.c then f else d end end-e-(17) in (select c from t1 union select c from t1)"
     end, {
         -- <randexpr-2.618>
-        
+
         -- </randexpr-2.618>
     })
 
@@ -6250,7 +6250,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select case ~(case when  -f between t1.e and f then coalesce((select max(t1.a-t1.d) from t1 where d=b),case when (f*11-a-t1.d-c>t1.e and b>=19) then  -+d when t1.b>= -13 then 17 else t1.f end) else (19) end) when 11 then b else f end from t1 where  -t1.e<=t1.d),a) FROM t1 WHERE (+coalesce((select max((abs(19*a-t1.b+t1.a*a)/abs(19))) from t1 where not t1.f in (select case  -count(*)-cast(avg(c) AS integer)+cast(avg(e) AS integer)*count(*) when min(t1.d) then  -(cast(avg(t1.f) AS integer)) else max(13) end+min(t1.d)+count(*) | count(*) | min(11) | count(distinct f) from t1 union select  -count(*) from t1)),e))-t1.e*d | f in (t1.d,e,e)"
     end, {
         -- <randexpr-2.621>
-        
+
         -- </randexpr-2.621>
     })
 
@@ -6270,7 +6270,7 @@ test:do_test(
         return test:execsql "SELECT case d*t1.f when  -t1.a then t1.c+(coalesce((select max(13+case when  -t1.d*13*c*d | case t1.e when t1.e then t1.b+t1.d else (abs(t1.b)/abs(case when c>b or d in (t1.e,a,d) then d else e end))+f end=t1.f then a when t1.a<=19 then 17 else d end) from t1 where (t1.f>t1.b)),(f))) else f end+t1.a FROM t1 WHERE t1.f+case d when 19 then +t1.c else 19-(abs((t1.b)*~coalesce((select f from t1 where (case when +case when t1.d>13 then t1.e else (t1.a) end<13 then f when t1.c<=e then d else t1.a end*t1.d in (select +case ~min(b) when  -max(13) then cast(avg( -(11)) AS integer) else  -cast(avg(17) AS integer) end+count(distinct t1.a) from t1 union select min(t1.f) from t1))),t1.a))/abs(f)) end+(a) in (b,t1.c,t1.a)"
     end, {
         -- <randexpr-2.623>
-        
+
         -- </randexpr-2.623>
     })
 
@@ -6300,7 +6300,7 @@ test:do_test(
         return test:execsql "SELECT case case when (not exists(select 1 from t1 where  -e in (select t1.c from t1 union select b from t1))) then coalesce((select max(t1.d) from t1 where (17+~t1.c in (select min(t1.b) from t1 union select min(13) from t1))),t1.d)*t1.a+d when not a=a and t1.b not in (b,13,d) or d<13 or t1.f not between t1.c and f or t1.c<>c then t1.e else t1.d end when t1.c then (t1.d) else  -f end FROM t1 WHERE (abs(case when (t1.e in (17,19+t1.b,t1.a)) or (t1.d-19)+(t1.d)+t1.d in (select t1.f from t1 union select t1.e from t1) and 13 in (select t1.c from t1 union select c from t1) or 11 not between e and 17 then  -17-a else d end*13)/abs((b)))*d-f-13 between t1.d and (b)"
     end, {
         -- <randexpr-2.626>
-        
+
         -- </randexpr-2.626>
     })
 
@@ -6320,7 +6320,7 @@ test:do_test(
         return test:execsql "SELECT a+a+(f)-(t1.f+d+t1.e | case when case (13) when t1.c then case coalesce((select  -t1.b-t1.f-13 from t1 where t1.f between t1.d and (a)),t1.b) when b then 13 else t1.f end-f else t1.d end>=e then 19 else t1.c end*t1.c)*f-(t1.d)-b FROM t1 WHERE (t1.b)=t1.a+t1.d-13 | +~f+13 | e+t1.c+coalesce((select t1.a+e from t1 where b in (select (~max(b-t1.b-coalesce((select ((a)) from t1 where e=d or b not between b and t1.e),t1.b)))++~case case count(*) when  -max(t1.c) then min(b) else min(17) end when max( -t1.a) then (min(t1.f)) else max((a)) end*cast(avg(f) AS integer)+max(19) from t1 union select count(distinct f) from t1)),(t1.e)) | t1.b"
     end, {
         -- <randexpr-2.628>
-        
+
         -- </randexpr-2.628>
     })
 
@@ -6360,7 +6360,7 @@ test:do_test(
         return test:execsql "SELECT 19-e+t1.d | 19-(abs(11)/abs(t1.b-(select case cast(avg(t1.f) AS integer)-count(*)-count(distinct t1.c)-abs(count(*))-(cast(avg(case when 11<b then d when (c) in (t1.a,t1.b,t1.a) then t1.a else t1.f end) AS integer) | min(t1.a) | (max(t1.a)))+max((t1.d)) when min(t1.a) then  -count(*) else min((e)) end from t1)*19))-c+13 FROM t1 WHERE NOT (case when case when not b-(t1.c)-11 in (case  -(b*11) when t1.d then coalesce((select 13 from t1 where e<>b),t1.d) else ~11 end+t1.b,11,19) then t1.a else  -t1.d-case d*a when t1.d then t1.e else 13 end end+e+b>19 then t1.a else t1.f end not between t1.d and e)"
     end, {
         -- <randexpr-2.632>
-        
+
         -- </randexpr-2.632>
     })
 
@@ -6380,7 +6380,7 @@ test:do_test(
         return test:execsql "SELECT (select abs(abs(~ -min(case t1.a-d when (abs(f)/abs(f+t1.b)) then ~e-11-+ -13*t1.a else 13 end)-count(*)*case + -count(*) when (count(distinct t1.e)) then max(t1.f) else (count(*)* - -+count(*) | min(17)) end+(cast(avg(t1.f) AS integer))+min(d))) from t1) FROM t1 WHERE not t1.f>=t1.a or not exists(select 1 from t1 where 19=17) and 13 in (select abs(count(*) | ((count(*)))) from t1 union select count(distinct  -t1.c | t1.a) | abs(abs(min(d+c))) from t1)"
     end, {
         -- <randexpr-2.634>
-        
+
         -- </randexpr-2.634>
     })
 
@@ -6410,7 +6410,7 @@ test:do_test(
         return test:execsql "SELECT (case when not exists(select 1 from t1 where ((not t1.f in (b,17-d,t1.a) and f<t1.f)) or b=t1.e or a in (select  - -count(distinct t1.c) from t1 union select min(11) from t1)) then (select case max( -t1.c) when (~ -count(distinct (b))-count(*))* -count(*) then count(distinct 11) else  -cast(avg(c) AS integer) end | min(t1.e)*cast(avg(13) AS integer) from t1)+b else (abs(t1.c)/abs( -b)) end-t1.b) FROM t1 WHERE exists(select 1 from t1 where (13>=t1.a))"
     end, {
         -- <randexpr-2.637>
-        
+
         -- </randexpr-2.637>
     })
 
@@ -6440,7 +6440,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.a from t1 where case when +(abs(e)/abs(19))+(abs(coalesce((select max(b) from t1 where 19 not in (f,(c),11) or  -c not in (t1.f,e,d)),13)*e+t1.f)/abs((d)))<>t1.b then t1.e when t1.d not in (t1.f,17,t1.b) or t1.f not between t1.d and 13 then t1.a else t1.e end>e or not exists(select 1 from t1 where a>=e or not exists(select 1 from t1 where d<>t1.b))),f)+19 FROM t1 WHERE 13 in (case when (select +max( -t1.b+a*case when not 13*13<t1.c then 19 else d end*11*c)+max(b) from t1)<>t1.f and ~e>= -t1.b then t1.c when 11 not between t1.d and e and (d<c) then t1.f else d end | e,a,t1.c)"
     end, {
         -- <randexpr-2.640>
-        
+
         -- </randexpr-2.640>
     })
 
@@ -6460,7 +6460,7 @@ test:do_test(
         return test:execsql "SELECT +coalesce((select case when coalesce((select f+t1.e from t1 where b not in (case when not exists(select 1 from t1 where (f not in (t1.f-t1.b,t1.d,t1.d))) then t1.a when t1.f*t1.c*17>+(t1.e*(d))-t1.d then t1.f else 11 end,17,f)),e) | 19-13<d then t1.a else t1.d end from t1 where d not between c and e),19) FROM t1 WHERE not exists(select 1 from t1 where ((t1.c not between case d-c+(t1.b) when d then 17 else 13 end+f and coalesce((select t1.f from t1 where ((t1.f*case when not exists(select 1 from t1 where t1.f>=t1.b) then (select max(11)-(count(distinct f)) from t1) else t1.a end+c in (t1.d,e,f) or e in (11,11,11)))),b)*t1.b*11))) and t1.b>=a"
     end, {
         -- <randexpr-2.642>
-        
+
         -- </randexpr-2.642>
     })
 
@@ -6500,7 +6500,7 @@ test:do_test(
         return test:execsql "SELECT (case when case 19 when b then 13 else t1.e end in (select (c) from t1 union select a from t1) then 11 else (d*coalesce((select t1.b from t1 where 19 | (t1.c)+case when  -17>t1.a then t1.a when (19>=13) then t1.a else t1.e end=f and (e)>a or 11 in (select e from t1 union select t1.b from t1)),t1.d*t1.e))+c+a end) FROM t1 WHERE NOT (case case when case when not (abs(t1.d | f)/abs(a)) in (d,a,t1.c) then  -d when (not exists(select 1 from t1 where f>=c)) then t1.a else e end+t1.d not in (t1.b,(t1.f),11) or not exists(select 1 from t1 where not exists(select 1 from t1 where t1.b in (19,t1.c,13))) then b+t1.c when t1.d>=t1.a then t1.c else (c) end when (13) then t1.e else b end in (t1.a,t1.b,13))"
     end, {
         -- <randexpr-2.646>
-        
+
         -- </randexpr-2.646>
     })
 
@@ -6520,7 +6520,7 @@ test:do_test(
         return test:execsql "SELECT case when 19<=19 then d when not exists(select 1 from t1 where case case when case when (select  -min(((t1.f)))*((cast(avg(t1.d) AS integer))) from t1) in (select t1.a-b from t1 union select 17 from t1) then f when (19 not between t1.c and 13 and f>13) then d else a end | b-t1.b in (t1.e,t1.f, -d) then t1.e when c<t1.e then ( -b) else (c) end-t1.e | (17)+17 when 13 then t1.a else d end+19>=17) then t1.e else t1.e end FROM t1 WHERE coalesce((select +a- -t1.d*b*coalesce((select t1.c from t1 where t1.a in (select (abs(11)/abs(case when not exists(select 1 from t1 where +e=t1.e) then case t1.b when a-c then b else b end when (not exists(select 1 from t1 where 19 in (select 13 from t1 union select t1.b from t1))) and e in (t1.e, -f,e) then 19 else t1.a end)) from t1 union select b from t1)),17)*d from t1 where t1.f not in (t1.a,(t1.b),t1.d)),13)<=(13)"
     end, {
         -- <randexpr-2.648>
-        
+
         -- </randexpr-2.648>
     })
 
@@ -6560,7 +6560,7 @@ test:do_test(
         return test:execsql "SELECT case when c<=t1.b*e+case when not exists(select 1 from t1 where a+ -t1.f= -t1.e*(17)+f and 19 in (select  -13 from t1 union select t1.f from t1) and 19>=t1.a or  -11 in (select a from t1 union select 17 from t1)) then t1.f else 19 end+t1.d or ((c))<>a then t1.f-t1.c when c not between ((t1.b)) and f then a else d end FROM t1 WHERE NOT (coalesce((select t1.e from t1 where t1.c in (t1.a,f,coalesce((select max( -f) from t1 where t1.f<coalesce((select (select cast(avg(b) AS integer) from t1) from t1 where a>=(abs(13)/abs(~19+(abs((select count(distinct t1.f) from t1))/abs(coalesce((select 13 from t1 where d | 17*c*a*b+d<>t1.a),b)-(b)))))),b)),19))),t1.e)*c<>t1.e)"
     end, {
         -- <randexpr-2.652>
-        
+
         -- </randexpr-2.652>
     })
 
@@ -6580,7 +6580,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.c>=13 or d in (select case ((case min(t1.f)+min(f) when max( -11) then min(19) else cast(avg( -t1.d) AS integer) end | count(*))) when count(distinct 13) then  -cast(avg( -t1.e) AS integer) else min(e) end from t1 union select max( -a) from t1) then case when +c-11+(t1.d)<e or f in (select 17 from t1 union select 13 from t1) then f when t1.c in (select t1.c from t1 union select 19 from t1) then t1.f else  -f end when e in (a,19,t1.e) then t1.d else f end FROM t1 WHERE NOT ((c<=t1.f or 11<case when t1.b+ -~a*case when exists(select 1 from t1 where case when b | 17 not between 17 and c then 11 else t1.e end in (d,a,b)) then t1.b when t1.b not in (t1.f,b,c) then 11 else b end>13 then d when not exists(select 1 from t1 where t1.c in (f,t1.b,t1.b)) then a else 19 end*t1.c and t1.d>=19))"
     end, {
         -- <randexpr-2.654>
-        
+
         -- </randexpr-2.654>
     })
 
@@ -6600,7 +6600,7 @@ test:do_test(
         return test:execsql "SELECT t1.a+(e*a)*t1.d+(abs(d)/abs(case when case f when t1.a then t1.f else d end*t1.f*t1.e*c*17+coalesce((select t1.d from t1 where c<=~t1.f | 13),e)*t1.a<case when 13 between a and 19 and c<a then t1.b else f end then t1.e when exists(select 1 from t1 where ((t1.b)=t1.f)) then t1.c else f end)) FROM t1 WHERE d*19 between 11 and f"
     end, {
         -- <randexpr-2.656>
-        
+
         -- </randexpr-2.656>
     })
 
@@ -6640,7 +6640,7 @@ test:do_test(
         return test:execsql "SELECT case f when (abs(t1.f)/abs(case when d+case when exists(select 1 from t1 where exists(select 1 from t1 where exists(select 1 from t1 where case when not case when +11>=t1.d then t1.d when (t1.b)<>17 or t1.b<=t1.c then a else (e) end in (select min(t1.e) from t1 union select abs( -max((17))) from t1) then c when 19<>17 then 13 else  -d end>t1.d))) then 17 when t1.a<=13 then coalesce((select (17) | t1.c from t1 where t1.e>d),b) else 13 end in (select min(f) from t1 union select count(*) from t1) then 19 else t1.f end)) then t1.f else f end FROM t1 WHERE NOT (coalesce((select max(11 | e+case c*t1.b+13 when 19 | ~t1.f+case when d>11 then t1.f-(case t1.d when a then 19+t1.f else t1.b end) else d-case e when c+t1.a then 13 else case when not exists(select 1 from t1 where (t1.d)<>17) then d when b in ( -f,11,17) then 11 else t1.f end end end+d then e else t1.a end) from t1 where t1.a>= -11),b)>t1.c)"
     end, {
         -- <randexpr-2.660>
-        
+
         -- </randexpr-2.660>
     })
 
@@ -6670,7 +6670,7 @@ test:do_test(
         return test:execsql "SELECT (select abs(case max(t1.b)-(min(17))* -count(distinct case when case t1.f when t1.b then case e when c then t1.c else c end else t1.b end>=t1.e then d else e end) | ~+count(distinct t1.c)-(abs( -count(*))- -max(c)) | count(distinct t1.c) when count(distinct ( -t1.c)) then count(*) else max(t1.b) end* -count(*))-cast(avg( -11) AS integer)*min(19)+max(e) from t1) FROM t1 WHERE NOT (t1.a+t1.a>13)"
     end, {
         -- <randexpr-2.663>
-        
+
         -- </randexpr-2.663>
     })
 
@@ -6700,7 +6700,7 @@ test:do_test(
         return test:execsql "SELECT (t1.d- -c+e-f++case when a between case f when case when ~~~11-coalesce((select b from t1 where coalesce((select max(e) from t1 where not t1.d>= -11),a)+a between 11 and t1.a), -d)*17-a-13 | 13>=17 then a else 11 end then t1.a else t1.d end and t1.f then 19 else t1.a end) FROM t1 WHERE NOT (t1.f<> -13)"
     end, {
         -- <randexpr-2.666>
-        
+
         -- </randexpr-2.666>
     })
 
@@ -6720,7 +6720,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case when (c<=b+t1.b) then  -11+t1.a-d when b*(select count(distinct e)*+max(~t1.a*case when (select count(*)*+min(t1.b)+max(t1.a) from t1) in (c,t1.d,t1.d) then (select  -(count(*)) from t1) else e end) from t1)<=a-11 then 11 else t1.e end)/abs(t1.e))+c FROM t1 WHERE a<+coalesce((select t1.f from t1 where exists(select 1 from t1 where ~case when (e not between t1.a-~case d when b then  -c else 13 end and d) then 11 else a end+17-f-a*19*t1.f not in (f, -t1.d,11))),c)-t1.f and (t1.d<17) and t1.f=c or f<= -e"
     end, {
         -- <randexpr-2.668>
-        
+
         -- </randexpr-2.668>
     })
 
@@ -6740,7 +6740,7 @@ test:do_test(
         return test:execsql "SELECT case when case when c in (select abs((max(d*case t1.b when t1.b+t1.f then d else b end+d))- - -~count(*)*cast(avg(t1.b) AS integer)-min(d)*cast(avg(b) AS integer)*count(*)) from t1 union select  -count(distinct t1.f) from t1) then case when 17 between t1.f and 11 then c else d end when t1.c>=13 then a else a end<=c then t1.d else 13 end+e FROM t1 WHERE t1.f between  -11 and b"
     end, {
         -- <randexpr-2.670>
-        
+
         -- </randexpr-2.670>
     })
 
@@ -6760,7 +6760,7 @@ test:do_test(
         return test:execsql "SELECT b*~~t1.b*(a-t1.c+t1.b)+13-+~case t1.b when d then case 17*13 when t1.e then case when case when t1.c<>~(11) then t1.e else coalesce((select max( -c) from t1 where (f<>e)),t1.f) end<=a then (t1.c) else t1.c end else  -f end else 13 end*t1.e-t1.f | 13 FROM t1 WHERE b between (d) and t1.c*(abs(t1.c-13 | t1.d+t1.a)/abs(13))"
     end, {
         -- <randexpr-2.672>
-        
+
         -- </randexpr-2.672>
     })
 
@@ -6790,7 +6790,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.b in (select case 13 when 13 | t1.e then case +(select (min((e)))-case count(*) | max(t1.b*d+17+e) when abs(count(distinct (11))*count(*)-cast(avg(a) AS integer) | max( -t1.a)) then (count(distinct 13)) else  -(cast(avg(t1.b) AS integer)) end from t1) when (select count(distinct e) from t1) then t1.e else a+(t1.b) end-d-t1.d else t1.e end from t1 union select (f) from t1) then t1.b else (b) end FROM t1 WHERE b in (select a from t1 union select 11+t1.e from t1)"
     end, {
         -- <randexpr-2.675>
-        
+
         -- </randexpr-2.675>
     })
 
@@ -6820,7 +6820,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select 17 from t1 where d between 17 and 13),case when t1.f in (select c+a from t1 union select a from t1) and (abs(f)/abs(t1.b))-t1.e>=case when not exists(select 1 from t1 where t1.e>(select count(distinct t1.f) from t1)) then t1.f when (11)-~t1.f<case 13 when f then 19 else coalesce((select  -t1.c from t1 where 11<=t1.e),e) end then t1.e else 13 end*t1.e then t1.f else b end) FROM t1 WHERE  -coalesce((select max(11) from t1 where (abs( -case 19 when (abs(coalesce((select max(coalesce((select 13 from t1 where a>e),b)) from t1 where (t1.f) in (13,e,t1.c) or t1.c>13),t1.b))/abs(13)) then t1.b else d end)/abs(13)) in (t1.f,t1.e,t1.a) or 17 between 13 and f or (f>11 and t1.f<t1.b)),case when 19 not between  -17 and d then 11 when t1.c=d then t1.a else t1.f end)>=t1.e"
     end, {
         -- <randexpr-2.678>
-        
+
         -- </randexpr-2.678>
     })
 
@@ -6840,7 +6840,7 @@ test:do_test(
         return test:execsql "SELECT (select min(19-case 19 when  -t1.a+13 then coalesce((select c from t1 where (abs(13)/abs(11))>=coalesce((select f+b*+t1.c from t1 where t1.c=+11+t1.e),11) or (e in (a,a,13) and t1.a<f) and t1.c not between t1.f and  -b),t1.b) else t1.b end) from t1) | f FROM t1 WHERE case 13-t1.e when 13 then f*c else ~f+(abs(t1.f | t1.e-c)/abs((coalesce((select max((select  -cast(avg(b) AS integer) from t1)-b) from t1 where 17 in (c,( -(f)),11) and 17>=f or t1.a=t1.e),t1.f)*t1.a+t1.f)*19)) end*f-t1.f in (select d from t1 union select t1.c from t1) and b in (t1.f,t1.d,c)"
     end, {
         -- <randexpr-2.680>
-        
+
         -- </randexpr-2.680>
     })
 
@@ -6870,7 +6870,7 @@ test:do_test(
         return test:execsql "SELECT ~case when exists(select 1 from t1 where t1.c not between case case ~t1.b*19 when b then t1.c*t1.e else t1.d end when c then case ++13 when case when a+d+~~11 not between e and  -19 then 19 else b end then t1.d else 19 end else t1.a end and d) then 19 when c in (select abs(count(distinct 17)) from t1 union select max(t1.b) from t1) then (d) else t1.e end | 19 FROM t1 WHERE t1.d between 11 and ~19-coalesce((select d from t1 where (d>=c)),t1.d)*+t1.e+t1.e"
     end, {
         -- <randexpr-2.683>
-        
+
         -- </randexpr-2.683>
     })
 
@@ -6900,7 +6900,7 @@ test:do_test(
         return test:execsql "SELECT +t1.b-17*11-coalesce((select coalesce((select max(t1.f+a-t1.c+b) from t1 where 17* -b+t1.e=13),coalesce((select +t1.f*coalesce((select b from t1 where 19 between  -a and c),t1.d) from t1 where 17<>b),17)*11) from t1 where f<c),e) |  -t1.e-b-t1.b-t1.e FROM t1 WHERE t1.b=11"
     end, {
         -- <randexpr-2.686>
-        
+
         -- </randexpr-2.686>
     })
 
@@ -6930,7 +6930,7 @@ test:do_test(
         return test:execsql "SELECT  -d+t1.d-t1.a-+t1.c-(select +min((abs(+(case when b>=case when b not between  -t1.f and c then e else f end or a<=11 or t1.e between a and 11 or t1.d not in (b,d,d) then case when f>=c then t1.c else 19 end when t1.e=a then e else t1.e end) | f)/abs(t1.a))) from t1)+e* -t1.a+f+d FROM t1 WHERE t1.b<=t1.c+ -(abs(t1.b)/abs(case t1.b+t1.e when 11 then t1.c else 17 end))*coalesce((select coalesce((select coalesce((select 13 from t1 where b=t1.b),f) | t1.f-11 from t1 where (t1.c) in (select +min(19)*(~max(b)-max(11))*max(11) from t1 union select min(f) from t1)),t1.f) from t1 where f in (select case count(distinct 19) when max(t1.b) then  -cast(avg(t1.e) AS integer) else cast(avg(b) AS integer) end from t1 union select count(*) from t1)),t1.a)"
     end, {
         -- <randexpr-2.689>
-        
+
         -- </randexpr-2.689>
     })
 
@@ -6960,7 +6960,7 @@ test:do_test(
         return test:execsql "SELECT ~case +t1.a when t1.a then 19 else coalesce((select max(t1.d) from t1 where not exists(select 1 from t1 where t1.b*f<>e and e not in (17,t1.c-case when t1.e<19 then t1.c else (abs(t1.c)/abs(d*coalesce((select t1.e from t1 where exists(select 1 from t1 where t1.c in (select t1.f from t1 union select 11 from t1)) or t1.a<=t1.d),a))) end*t1.e,t1.e))),coalesce((select max(a) from t1 where (b) in ((11),e,b)),17)) end FROM t1 WHERE not (c)+c*d>t1.e and exists(select 1 from t1 where d*coalesce((select +case when ((select cast(avg((c)) AS integer)- -cast(avg(a) AS integer) from t1) in (select min(b)-count(*) from t1 union select count(distinct 19) from t1)) or not t1.b between 19 and 19 then t1.c else coalesce((select e from t1 where t1.e>=e),c) end from t1 where ( -f)<a),17)>19) and 17<> -t1.e and b>=a"
     end, {
         -- <randexpr-2.692>
-        
+
         -- </randexpr-2.692>
     })
 
@@ -6980,7 +6980,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.d-t1.e) from t1 where not exists(select 1 from t1 where c*+19<=(d)) or c+e not between a and ~f*t1.f*case when t1.e<> -coalesce((select case when ((e between t1.d and f)) then  -(17) | b else t1.d end from t1 where b in (select t1.c from t1 union select 11 from t1)),d) then t1.d when e not in ( -t1.b,t1.c,(t1.e)) then t1.c else d end), -b) FROM t1 WHERE t1.d<>d"
     end, {
         -- <randexpr-2.694>
-        
+
         -- </randexpr-2.694>
     })
 
@@ -7020,7 +7020,7 @@ test:do_test(
         return test:execsql "SELECT case when a in (select max(17) from t1 union select abs(count(*)) from t1) then t1.a- -e-t1.d | e- -t1.f*19+(select  -abs(max(a))*count(distinct e)*max(19) from t1)-11-13-d*11+t1.a else d end-b FROM t1 WHERE NOT (t1.e in (select (abs(case when (abs(f)/abs((select ~min(a) from t1)+coalesce((select t1.f from t1 where 11<>t1.b),19)))*t1.e+ -t1.d | e<=t1.f then  -e when (b)>t1.a then t1.d else t1.a end)/abs(11)) from t1 union select 13 from t1) and f not between t1.b and e or not exists(select 1 from t1 where not exists(select 1 from t1 where 19<c)) and t1.c not in (t1.d,e,t1.a))"
     end, {
         -- <randexpr-2.698>
-        
+
         -- </randexpr-2.698>
     })
 
@@ -7040,7 +7040,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select f from t1 where (case t1.a*t1.b*c when t1.d*coalesce((select max(coalesce((select 19 from t1 where t1.b in (select max(~case  -e when c+coalesce((select max(e) from t1 where (t1.d) not between c and t1.f),17) then c else 13 end) from t1 union select count(distinct a) from t1)),t1.f)) from t1 where f>t1.d),c) then 19 else 17 end between t1.b and t1.f and t1.d not in (c,e,(17)))),11) FROM t1 WHERE (((select min(t1.f) from t1)<=e))"
     end, {
         -- <randexpr-2.700>
-        
+
         -- </randexpr-2.700>
     })
 
@@ -7070,7 +7070,7 @@ test:do_test(
         return test:execsql "SELECT case t1.a when e*t1.e then case when exists(select 1 from t1 where (coalesce((select max(17) from t1 where (not (case when not a>=13*c then t1.f else (11)*t1.b end between 11 and t1.f or t1.c>(t1.c)))),t1.b*~t1.c)*b*d>=13)) then (abs(17)/abs(e)) else b end else t1.f end | t1.c+t1.f FROM t1 WHERE NOT (coalesce((select max(11) from t1 where c-d not between ~case when (select +~count(distinct t1.f)*cast(avg(t1.e) AS integer) from t1)+19 not in (t1.e,t1.f,t1.a) then t1.a when a in (e,t1.d,d) then t1.b else t1.e end and t1.b and c>=e or (t1.d<>b) and not exists(select 1 from t1 where (t1.f between 13 and a))),t1.a)-e<=t1.e)"
     end, {
         -- <randexpr-2.703>
-        
+
         -- </randexpr-2.703>
     })
 
@@ -7090,7 +7090,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.e+(t1.b)) from t1 where 17<=t1.d-(select ~+cast(avg(b) AS integer) | case  -case cast(avg(t1.e) AS integer) when min((abs((a))/abs(t1.e))) then cast(avg(t1.c) AS integer)+count(*) else min(d) end when max(t1.e) then count(*) else ( -count(*)) end-min(t1.b)-count(distinct  -a)*count(*) from t1) | c+coalesce((select f from t1 where (19=t1.c-t1.b)),t1.f+17)),f) FROM t1 WHERE c not between (abs(t1.f)/abs(case when t1.f+e<=t1.c+t1.d then case when d in (select +count(distinct case when  -t1.a*19-t1.c not between 11 and c then t1.e when (19<>19) then t1.d else d end) from t1 union select cast(avg(e) AS integer) from t1) then t1.e when c in (select count(*) from t1 union select cast(avg(f) AS integer)* - - -cast(avg(t1.e) AS integer) from t1) then b else (t1.b) end when not (11>=11) then  -t1.e else b end)) and t1.f"
     end, {
         -- <randexpr-2.705>
-        
+
         -- </randexpr-2.705>
     })
 
@@ -7120,7 +7120,7 @@ test:do_test(
         return test:execsql "SELECT 17-(abs(case when t1.e<+(select count(distinct  -f) from t1)+t1.b then +case when t1.b not in (coalesce((select max(coalesce((select case when 17<e then 13 else t1.e end+t1.b from t1 where not (t1.f) between d and ((t1.d))),t1.f)) from t1 where t1.f>=a and 13 not in (b,t1.f,d)),b),t1.d, -13) then (e) else (13) end-19 when not exists(select 1 from t1 where 19<>f) then c else t1.e end | t1.d)/abs((13)))*f FROM t1 WHERE coalesce((select f from t1 where coalesce((select ~d*19-d*~case c when case a when t1.e*19 then (select  - -( -max(t1.f))*cast(avg(t1.c) AS integer) from t1) else 13 end*13-11 then  -11 else t1.f end | t1.e | t1.f*19 from t1 where t1.f>t1.a),b)*b not in (17,17,t1.e)),t1.a)-b*d>=11"
     end, {
         -- <randexpr-2.708>
-        
+
         -- </randexpr-2.708>
     })
 
@@ -7150,7 +7150,7 @@ test:do_test(
         return test:execsql "SELECT (select cast(avg(case when (e=case when e>d and case coalesce((select ((t1.b)) from t1 where 17<=t1.c),a) when t1.b then f else d end*b>t1.d then (t1.a) else 11 end or 17 not in (19,f,d) or not not exists(select 1 from t1 where  - -e>=13)) and 17 in ( -t1.b,c,t1.f) then t1.c when t1.c not between t1.f and 17 then t1.c else d end) AS integer) from t1)+b+a FROM t1 WHERE (((coalesce((select coalesce((select max(19) from t1 where d between ~t1.a and 11),c+d-coalesce((select e from t1 where (abs(b)/abs(coalesce((select 13 from t1 where case when (17) not in (19,t1.c,t1.b) or 17 not in (t1.b,t1.f,t1.e) then 11 else 19 end<>t1.c),11)*17))=t1.b),d)) from t1 where d not in (b,b,d)),t1.a) not between b and b) and d>=t1.d) and t1.d in (13,c,t1.b))"
     end, {
         -- <randexpr-2.711>
-        
+
         -- </randexpr-2.711>
     })
 
@@ -7170,7 +7170,7 @@ test:do_test(
         return test:execsql "SELECT (abs((select +abs(+max(b) | abs(~~count(distinct  -19))) from t1))/abs(coalesce((select max(19*11*d) from t1 where (t1.e<=t1.e)),t1.f)))+case e when (t1.e) then d else c*13 | 11 end FROM t1 WHERE t1.d>=(case when (select count(*) from t1)*t1.c*t1.e+e<>t1.e*13 | f+(select (min(13+t1.b) | ~+~count(*)) from t1)*e*coalesce((select max(19+t1.a) from t1 where t1.e in (select +(count(distinct b))+count(*) from t1 union select ( -min(17)) from t1)),t1.a)-t1.d* -t1.e then e else  -a end)"
     end, {
         -- <randexpr-2.713>
-        
+
         -- </randexpr-2.713>
     })
 
@@ -7210,7 +7210,7 @@ test:do_test(
         return test:execsql "SELECT  -17+c-(abs(t1.a)/abs(t1.c))-case when t1.a<>c then case when exists(select 1 from t1 where 11 not between + -d and d and 13 not between 13 and 17 or not  -f<=19 or (t1.a)<a or t1.a>(11)) and 11<t1.b then t1.e else coalesce((select case when t1.f not in (c,t1.c,t1.e) then (select +count(*) from t1) when  -t1.f>=t1.f then b else a end from t1 where t1.e in (e,t1.c,b)),11) end else  -17 end FROM t1 WHERE NOT (not exists(select 1 from t1 where t1.a>=coalesce((select t1.f from t1 where + -19*t1.c<~+t1.a*13),a)))"
     end, {
         -- <randexpr-2.717>
-        
+
         -- </randexpr-2.717>
     })
 
@@ -7230,7 +7230,7 @@ test:do_test(
         return test:execsql "SELECT f*19+17*(select max(b)+count(*)- -~count(*)-min(case when (e<=b-t1.b) then case when t1.b>t1.a or f not in (c, -c,f) or f in (e,13,13) then t1.b else t1.b end else a end*a) from t1)+t1.f*(abs(case b | t1.c+t1.a when ((f)) then f else c end+b)/abs(17))-(c) FROM t1 WHERE NOT (t1.e>11)"
     end, {
         -- <randexpr-2.719>
-        
+
         -- </randexpr-2.719>
     })
 
@@ -7250,7 +7250,7 @@ test:do_test(
         return test:execsql "SELECT  -case when case when (case (abs(13)/abs(t1.e-13*t1.f)) when b- -13+t1.d then 11 else a end) not between t1.b and b then t1.c when d not between t1.e and t1.c or t1.f in (select 11 from t1 union select f from t1) and 17=d then 13 else t1.a end+11>=f then a when f>b then t1.d else 17 end-t1.e FROM t1 WHERE (case when not exists(select 1 from t1 where exists(select 1 from t1 where (abs(b*d-t1.e)/abs(t1.b))>c)) and t1.d in (13,t1.f,17) then e else ( - -t1.a)+11+c end*t1.b in (select (case  -+min(17) when +count(*) | min(t1.a) | cast(avg(11) AS integer) then cast(avg(11) AS integer) else cast(avg(a) AS integer) end)-cast(avg(t1.a) AS integer) from t1 union select (min(t1.e)) from t1) or not t1.c in ((f),t1.c,(t1.e)))"
     end, {
         -- <randexpr-2.721>
-        
+
         -- </randexpr-2.721>
     })
 
@@ -7270,7 +7270,7 @@ test:do_test(
         return test:execsql "SELECT case t1.a when a then t1.c else  -case coalesce((select t1.e from t1 where (abs(case when not (a*case when f>=f*13-19 then t1.e else +t1.a end=t1.a) then (select min(a)+min(+19) from t1) else case when t1.a=(f) then c else c end+17 end)/abs(t1.e)) between 17 and 13),e) when 17 then 13 else t1.d end end FROM t1 WHERE 17 in (select case cast(avg(b+b) AS integer) when abs(abs(count(*))) then min(case t1.c+t1.b+t1.e+17+case case when t1.b<>17 and t1.e>=t1.b then b else  -t1.f end when 11 then 13 else f end*t1.f*b when 19 then  -11 else t1.d end- -t1.f) else min(t1.c) end from t1 union select abs(abs(count(distinct b)*max(t1.d))+count(distinct 13)-count(*)) from t1)"
     end, {
         -- <randexpr-2.723>
-        
+
         -- </randexpr-2.723>
     })
 
@@ -7290,7 +7290,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select e from t1 where coalesce((select coalesce((select max( -coalesce((select max(case when exists(select 1 from t1 where not exists(select 1 from t1 where b in (select e+d from t1 union select t1.e from t1))) then t1.d else t1.f end) from t1 where exists(select 1 from t1 where f not in ((c),a,11))),e)) from t1 where t1.b=t1.f and e<d or d>t1.b),t1.b) from t1 where t1.a in (select a from t1 union select  -f from t1)),17)>=17),((b))) not in (t1.e,b,e) then 19 when not  -a<=f then t1.f else t1.b end FROM t1 WHERE 13=t1.d"
     end, {
         -- <randexpr-2.725>
-        
+
         -- </randexpr-2.725>
     })
 
@@ -7310,7 +7310,7 @@ test:do_test(
         return test:execsql "SELECT 19*13+((abs(case when 17*d in ((abs((case (abs((abs((select abs(min(d))+cast(avg(19) AS integer) from t1) | t1.d | 11 | b)/abs(19)))/abs(b)) when 11 then a else e end))/abs(13)),t1.f,b) then t1.b when t1.c>=t1.d then (t1.c) else c end*d)/abs(f))) | t1.a-a-17 FROM t1 WHERE ( -t1.d+coalesce((select max(11) from t1 where t1.c between 13 and t1.d and case d when b then 13+ -~t1.a else +case when coalesce((select max((select +case (cast(avg(e) AS integer)) when count(distinct t1.a) then count(*) else min(( -d)) end from t1)-+a+d) from t1 where (e in (17,t1.e, -a))),b)<>f then a else 11 end end<(t1.e)),t1.d) in (select t1.a from t1 union select b from t1))"
     end, {
         -- <randexpr-2.727>
-        
+
         -- </randexpr-2.727>
     })
 
@@ -7340,7 +7340,7 @@ test:do_test(
         return test:execsql "SELECT case when (19*b)+11*~f-coalesce((select max(11) from t1 where f<>case when case 17 when 11 then 17 else c end-11 in (t1.c,c,t1.e) and 19=t1.a or 17<=e or e<=19 then 19 | c when t1.b=t1.f then d else 19 end or t1.e not in (13,19,c)),b) |  -c not between  -e and  -a then (t1.c) else t1.d end FROM t1 WHERE c in (select case abs((count(*))) when  -max(t1.c) | abs(abs(+count(*)))-~case (case  -max(e) when max(11)- -count(*) then ((max(t1.e))) else count(*) end) when count(distinct t1.e) then cast(avg(f) AS integer) else cast(avg(t1.c) AS integer) end* -cast(avg(f) AS integer) then max(f) else (max(b)) end from t1 union select (max(13)) from t1) and not exists(select 1 from t1 where case when t1.e<=19-b then c else c end in (select c from t1 union select (select  -((count(distinct t1.d))) from t1)-t1.b from t1))"
     end, {
         -- <randexpr-2.730>
-        
+
         -- </randexpr-2.730>
     })
 
@@ -7380,7 +7380,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.e not between e and 13 then (select count(*) from t1) when f>=case when c in (select a from t1 union select t1.e+coalesce((select 11 from t1 where (select count(distinct t1.b) from t1)+17 not in (b,t1.c,t1.f-(select ~count(distinct 17) from t1)+ -e)),13) from t1) or 19 between d and t1.f then (select min(19) from t1) when not (e not between c and a) then d else a end then d else (t1.c) end FROM t1 WHERE NOT (f not in (17,f+d | f+case when  -f=19 then (select max((select +abs(abs(max(((select ((max(t1.d))+count(distinct t1.e))-min(t1.a) from t1))+t1.e)-abs(count(distinct  -t1.b)-count(distinct 11)))*min(a)-count(*))-min(t1.a) from t1)) from t1) else t1.f end,c-a) and c<>11)"
     end, {
         -- <randexpr-2.734>
-        
+
         -- </randexpr-2.734>
     })
 
@@ -7400,7 +7400,7 @@ test:do_test(
         return test:execsql "SELECT case c-+case when t1.f in (t1.a,t1.e,19) then t1.b else case when a<>t1.a then case ~(t1.d) when t1.e then (select max(t1.f) from t1)-(select +(cast(avg(b) AS integer))*cast(avg(t1.a) AS integer)+max(d)*count(*)+count(*) from t1)* -t1.f else 13 end else t1.a+a end*t1.f-t1.b*(e) end when d then d else 17 end FROM t1 WHERE NOT (case when not exists(select 1 from t1 where not exists(select 1 from t1 where c in (select t1.a*t1.b from t1 union select t1.d | e from t1))) and (coalesce((select (abs(11)/abs(13-17*c)) from t1 where b in (select 13 from t1 union select (t1.c) from t1)),11) not in (17,b,b)) then (abs(+t1.f)/abs(c)) when exists(select 1 from t1 where not exists(select 1 from t1 where not (not exists(select 1 from t1 where e<=19 and e>19)))) then c else t1.e end not between t1.f and c)"
     end, {
         -- <randexpr-2.736>
-        
+
         -- </randexpr-2.736>
     })
 
@@ -7410,7 +7410,7 @@ test:do_test(
         return test:execsql "SELECT 11+a+(select count(distinct coalesce((select  -coalesce((select case when (t1.a<=a) then (case when 17=t1.c then (select count(distinct e)-min(11) from t1) else f end) when f>=t1.f and t1.c not in (t1.e,a,17) and 17=t1.f then  -t1.d else 11 end*t1.d from t1 where t1.a<=t1.b),t1.b) from t1 where t1.e not between d and 13),t1.a)) | +max(t1.c) from t1) FROM t1 WHERE 11 in (t1.a,+t1.c* -t1.f | t1.d*+t1.c-b-(abs((select min(case when 19 in (select abs(count(distinct c)) from t1 union select ~ -min(t1.c) from t1) then case (11) when a then t1.c else t1.d end when (f)<=t1.b then t1.b else t1.a end)+min((t1.d)) | min(b) from t1))/abs(t1.e))+case 13 when t1.b then b else  - -t1.b end*b-11, -f)"
     end, {
         -- <randexpr-2.737>
-        
+
         -- </randexpr-2.737>
     })
 
@@ -7440,7 +7440,7 @@ test:do_test(
         return test:execsql "SELECT  -c-case 11 when ++e*(select cast(avg( -t1.f+case when case when 19=t1.e+((select min(17 | a) from t1)) then t1.f else t1.b end>=t1.e then t1.e when (((exists(select 1 from t1 where b in (select case  -count(*) when (count(distinct d)) then count(*) else (cast(avg(t1.b) AS integer)) end from t1 union select  -count(*) from t1))))) then t1.a else a end+t1.a*d) AS integer) from t1) then 13 else f end*e FROM t1 WHERE (select cast(avg(case when +d>=e+17 and (not case when 13>=(select case  -count(distinct t1.e) when cast(avg(c) AS integer) then cast(avg(19) AS integer) else count(distinct t1.a) end from t1) then t1.e else t1.f end in (select t1.b from t1 union select 13 from t1)) or t1.a<=e and e in (select count(*) from t1 union select  -count(*) from t1) and b>=t1.b or t1.e between c and 19 then c when f between 19 and b then coalesce((select max(t1.d) from t1 where a<>t1.b),13)* -(d) else t1.e end) AS integer) from t1)<=19"
     end, {
         -- <randexpr-2.740>
-        
+
         -- </randexpr-2.740>
     })
 
@@ -7480,7 +7480,7 @@ test:do_test(
         return test:execsql "SELECT case d when 11 then t1.d-(abs(t1.d)/abs(19))+coalesce((select d*d from t1 where (select cast(avg(case when f | c+case when e in (select min(coalesce((select t1.f from t1 where 11 not between t1.b and 19),t1.f)) from t1 union select (max(t1.b)) from t1) then 19 when t1.b=b or t1.c>=c then 13 else e end*19 in (select 17 from t1 union select 11 from t1) then  -c else t1.d end) AS integer) from t1)<13),d) else 11 end FROM t1 WHERE NOT ((b>~t1.c-+(abs(case when 11>(c) and t1.a>13 then t1.d else (b) end)/abs(t1.d))-13 or t1.f between t1.a and 19 and 11 in (select (min(t1.e))-~( -+count(*)) from t1 union select count(distinct t1.c) from t1)) and 17 not in (f,(t1.b),t1.c) and (t1.f<>t1.e) or d in (f,t1.a,t1.d) or (d)<=t1.e)"
     end, {
         -- <randexpr-2.744>
-        
+
         -- </randexpr-2.744>
     })
 
@@ -7500,7 +7500,7 @@ test:do_test(
         return test:execsql "SELECT (select  -~count(distinct ~+case when c<>coalesce((select max(case when ~13 in (t1.a,t1.f,13+t1.d+(19)*t1.d*f-e) then 13 else a end) from t1 where  -t1.d<>19),(a))*d+a then t1.d when exists(select 1 from t1 where b=d) then t1.f else 17 end*11) | count(*)-max(t1.e) from t1) FROM t1 WHERE 19 in (select max(b) from t1 union select count(*) from t1) and +t1.b+c*d+coalesce((select max(17) from t1 where case when t1.a=coalesce((select max((select (min(t1.f)) from t1)) from t1 where not case when not exists(select 1 from t1 where ( -t1.b)=13 and d in (f,c,e)) or 17 between 17 and e then t1.e-t1.c else 11 end>=d),19)-11 then 11 else 17 end<=t1.a),t1.f)+t1.f-f<>17"
     end, {
         -- <randexpr-2.746>
-        
+
         -- </randexpr-2.746>
     })
 
@@ -7540,7 +7540,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(a) from t1 where exists(select 1 from t1 where (abs(t1.f)/abs(case when (t1.a+case when exists(select 1 from t1 where t1.e>=(abs(coalesce((select f from t1 where (((b>=t1.d) or t1.e= -a) or 17=a)),case when t1.d between t1.a and b then t1.b when e in (e,t1.a,t1.e) then 13 else (f) end))/abs(13))) then 11 else t1.d end* - -t1.f)<=c then d else t1.d end))-t1.c-19>=t1.a)),((t1.b))) FROM t1 WHERE NOT (case when t1.f in (e,19,(abs(t1.e)/abs(t1.e))) and (17 between 11+(select +max(case case when f=(t1.b) then e when t1.e in (13,19,c) then c else  -t1.b end- -c when (13) then d else t1.f end) from t1) and 17 and (19 in (b,t1.d,11))) and f not between 19 and b then e when 13 not between (t1.e) and t1.a then 11 else 11 end not between d and t1.a)"
     end, {
         -- <randexpr-2.750>
-        
+
         -- </randexpr-2.750>
     })
 
@@ -7560,7 +7560,7 @@ test:do_test(
         return test:execsql "SELECT 11-17 | case when 11<t1.c then case when ~f<=(abs(t1.e)/abs(19))-t1.f then 17 when 11>=c or 11 in (select cast(avg(t1.c) AS integer)-case cast(avg(t1.b) AS integer) when count(distinct e) then min(t1.a) else  -count(distinct 19) end from t1 union select count(*) from t1) or e in (t1.e,t1.b,b) or 13=t1.f and e>=t1.a then e else e end when ( -19<=e) then 13 else e end+a FROM t1 WHERE NOT (t1.c*d not in ( -t1.a,coalesce((select d from t1 where coalesce((select c from t1 where ((d<=11))),(17)+(abs(coalesce((select (select ( -+count(*))+count(distinct d) from t1) from t1 where (coalesce((select b from t1 where ~a<>13),(t1.c))) not between d and t1.d),17))/abs(d)))*f<a and t1.b<>17),e),t1.b))"
     end, {
         -- <randexpr-2.752>
-        
+
         -- </randexpr-2.752>
     })
 
@@ -7590,7 +7590,7 @@ test:do_test(
         return test:execsql "SELECT (abs(f-case when +(t1.f)-c<case when 17=case when not exists(select 1 from t1 where (19)=17 or c<>13 and  -f<t1.a) then (select max((select min(t1.b) | count(distinct 19) from t1)) from t1) when e not between t1.b and e then t1.e else 17 end+t1.e or t1.c in (t1.f,f,t1.d) then (11)+f when t1.c=11 and t1.e not in (a,(t1.e),a) then a else t1.f end-d then 11 else (t1.e) end-t1.b)/abs(11))*11 FROM t1 WHERE NOT ((case when (f not in (~(t1.f*case when case when case 11 when t1.e then t1.c else a end | 19 in (select t1.a from t1 union select t1.e from t1) then f when d>t1.c then 11 else  -11 end<>t1.c and t1.f not between (11) and (t1.f) then b else 11 end)*b+t1.f,a,t1.d)) then 11 else t1.d end=e) or e<(t1.f))"
     end, {
         -- <randexpr-2.755>
-        
+
         -- </randexpr-2.755>
     })
 
@@ -7610,7 +7610,7 @@ test:do_test(
         return test:execsql "SELECT +(select (max(case when not (((exists(select 1 from t1 where b not between t1.a and t1.d) or t1.a>=coalesce((select max(17) from t1 where  -t1.e between t1.e and a),f)-11) or 11<=t1.c)) then b when 19 between 19 and b then t1.f else +d+ -t1.a-t1.f-e end | f-t1.b+ -t1.b)+min(t1.b)) from t1)*t1.c FROM t1 WHERE b in (t1.b-b,coalesce((select max(e) from t1 where t1.d not between 11 and case when d>=+13 then case when t1.a between e and a then t1.c else (t1.f)+(t1.b) end else case (d)*e when b then f else a end end or t1.d in (select cast(avg(d) AS integer) from t1 union select +abs( -max(e))*max(19) | max(d) from t1)),11),t1.c)"
     end, {
         -- <randexpr-2.757>
-        
+
         -- </randexpr-2.757>
     })
 
@@ -7640,7 +7640,7 @@ test:do_test(
         return test:execsql "SELECT t1.e*t1.c*(select count(*)+abs(cast(avg(case t1.a when (select  -count(*)-(min(t1.a)) | +(abs(case max(a) when abs(min(17)) then +cast(avg(a) AS integer) | count(distinct d) else count(*) end)) from t1) then a else  -+b-coalesce((select max(f*19) from t1 where ~~c in (a,13,t1.a)),t1.b) end) AS integer)) from t1) FROM t1 WHERE 19-(abs(b)/abs(t1.b)) | case when t1.e in (select case (+cast(avg(t1.c+a) AS integer) | (cast(avg(t1.d) AS integer) |  -cast(avg( -d) AS integer)* -( -count(*))+min(17))) when min(13) then max( -11) else count(*) end from t1 union select min(17) from t1) or 13 in (case when t1.e between e and coalesce((select c from t1 where not exists(select 1 from t1 where (b)>=t1.e)),t1.b) then 19 else 11 end,17,f) then 11 else b end in (select c from t1 union select 19 from t1)"
     end, {
         -- <randexpr-2.760>
-        
+
         -- </randexpr-2.760>
     })
 
@@ -7670,7 +7670,7 @@ test:do_test(
         return test:execsql "SELECT t1.b+case when e+(select abs(abs(min(d+case 11 when t1.d+19 | b | case when e<=b+coalesce((select 11 from t1 where 11<>13),17)-17 then t1.d else d end+19 then 11 else d end))) from t1)- -d-(t1.e) in (select 17 from t1 union select 11 from t1) then t1.e when exists(select 1 from t1 where e>t1.c) then t1.b else 13 end FROM t1 WHERE e in (select count(*) from t1 union select min(case when (select abs(cast(avg(+17) AS integer)) from t1) not between t1.e and 17+t1.f then f when ((case when ((select cast(avg(t1.d) AS integer) from t1)=17) then 19 else t1.f end)<>t1.c or t1.a in (select  -+abs(cast(avg(t1.b) AS integer)) from t1 union select +((cast(avg(11) AS integer)))+ -min(b) from t1)) or not exists(select 1 from t1 where ((t1.d in (b,a,17)) and f<=t1.a)) and t1.f<> - -t1.a then d else  - -t1.d end) from t1)"
     end, {
         -- <randexpr-2.763>
-        
+
         -- </randexpr-2.763>
     })
 
@@ -7700,7 +7700,7 @@ test:do_test(
         return test:execsql "SELECT (select cast(avg( -coalesce((select max(+(abs(t1.d)/abs(~d))*+c*t1.c) from t1 where e in (select coalesce((select f from t1 where t1.f<> -11),17)+c*19 from t1 union select f from t1)),t1.c)) AS integer)-~case ~count(distinct 17)*count(distinct 19) when count(distinct t1.c)*count(*)-count(distinct 19) then +(max(a)+case  - - - -min(t1.f) when max(c) then count(distinct (f)) else min(13) end) else ( -cast(avg( -t1.b) AS integer)) end from t1) FROM t1 WHERE exists(select 1 from t1 where (abs(e*coalesce((select (abs(b*(t1.b)+f)/abs(d)) from t1 where t1.c in (select min(a | t1.b) from t1 union select abs(case  -case ~ -~cast(avg(e) AS integer) when ++min(17)+( -cast(avg(a) AS integer))-max(t1.c) then cast(avg(t1.b) AS integer) else cast(avg(f) AS integer) end when  - -max((t1.d)) then  -min(t1.b) else cast(avg(t1.c) AS integer) end) from t1)),b))/abs(t1.d)) in (select min(t1.c)-cast(avg( -e) AS integer)- -cast(avg(t1.f) AS integer) from t1 union select (max((19))) from t1))"
     end, {
         -- <randexpr-2.766>
-        
+
         -- </randexpr-2.766>
     })
 
@@ -7720,7 +7720,7 @@ test:do_test(
         return test:execsql "SELECT t1.a+11*coalesce((select max( -t1.e-coalesce((select max((abs(t1.c)/abs((13*e+t1.c)-t1.f))) from t1 where exists(select 1 from t1 where d<>a) or ~(select case abs(count(distinct f)) when (count(*)) then count(*) else min(t1.f) end from t1)+coalesce((select f from t1 where d in (select min(t1.d) from t1 union select count(*) from t1)),c) in (11,t1.a,t1.b)),11)- -11) from t1 where 13<11),t1.b) FROM t1 WHERE not ++coalesce((select t1.f from t1 where not exists(select 1 from t1 where ((select min(b) from t1)<>case t1.d when coalesce((select max(case e-t1.c when 19-t1.c+f+(t1.c*coalesce((select max(17) from t1 where 17 between 11 and t1.a),t1.d)+b) then  -17 else d end-a) from t1 where t1.d>11),b) then 11 else c end))),b | t1.d)*17 not between t1.e and 17"
     end, {
         -- <randexpr-2.768>
-        
+
         -- </randexpr-2.768>
     })
 
@@ -7740,7 +7740,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(coalesce((select ((abs(coalesce((select max((select ~(count(distinct e-11)-cast(avg(t1.a) AS integer) | count(*)) from t1)) from t1 where t1.f<case when not exists(select 1 from t1 where exists(select 1 from t1 where t1.a not in (11,e,13))) then t1.b when t1.d<t1.b then t1.e else t1.b end+ -c or t1.e>b or t1.c in (select c from t1 union select 19 from t1)),e | b))/abs(t1.f))) from t1 where e in (select  -(b) from t1 union select 13 from t1)),t1.a)) from t1 where f<>11),t1.e) FROM t1 WHERE  -11 in (a,case when exists(select 1 from t1 where 11 in (select 13 from t1 union select t1.d from t1)) and exists(select 1 from t1 where exists(select 1 from t1 where (t1.a) not between t1.c and t1.c)) then ~case when ~t1.f not between +t1.b-11 and e or not b in (c,17,e) and (not exists(select 1 from t1 where b in (( -t1.e), -t1.c,t1.c))) or 17 not in (t1.e,t1.c,t1.f) then c when 19= - -11 then t1.b else t1.c end when (13) between t1.f and ( -t1.e) then t1.d else  -t1.d end*c,d)"
     end, {
         -- <randexpr-2.770>
-        
+
         -- </randexpr-2.770>
     })
 
@@ -7770,7 +7770,7 @@ test:do_test(
         return test:execsql "SELECT 17-13-case 19 when 17+case case t1.b when t1.b then coalesce((select coalesce((select 11 from t1 where (coalesce((select t1.a from t1 where (abs(f)/abs(case t1.e when 11 then a else t1.c end))<c),b)*a- -t1.e) not between t1.e and  -13),19) from t1 where d>19 or d not between f and t1.e),(t1.c)) else 11 end when  -a then 13 else e end then t1.b else b end+t1.c FROM t1 WHERE not exists(select 1 from t1 where coalesce((select e from t1 where case when not exists(select 1 from t1 where not not exists(select 1 from t1 where f<> -t1.e-t1.c)) or coalesce((select max(17+t1.c) from t1 where t1.f in (select cast(avg(17) AS integer) from t1 union select cast(avg(t1.c) AS integer) from t1)),t1.d)<>19 then 19 else t1.a+ -(b)+t1.c end<=t1.c),t1.b)>t1.d) or (e) in (t1.c,f,13) or d in (select +count(*) from t1 union select count(*) from t1)"
     end, {
         -- <randexpr-2.773>
-        
+
         -- </randexpr-2.773>
     })
 
@@ -7790,7 +7790,7 @@ test:do_test(
         return test:execsql "SELECT t1.e*(abs(coalesce((select max(case when t1.c in (select (case when d>13 then t1.c else 11 end+e) from t1 union select t1.a from t1) or t1.a between 17 and c then c when t1.d>=a then t1.c else t1.e end-t1.e*t1.b-d) from t1 where b<>(t1.c) or not exists(select 1 from t1 where b in (t1.d,13,a))),11)*t1.a)/abs(t1.a))+t1.c FROM t1 WHERE a>c"
     end, {
         -- <randexpr-2.775>
-        
+
         -- </randexpr-2.775>
     })
 
@@ -7820,7 +7820,7 @@ test:do_test(
         return test:execsql "SELECT t1.d*(+coalesce((select max(case when coalesce((select (abs(f)/abs((abs(d)/abs((select cast(avg(19+11) AS integer) from t1)))+t1.b)) from t1 where exists(select 1 from t1 where t1.d not between t1.f and t1.e)),17) not in (17,t1.f, -t1.b) then 19 else  -19 end) from t1 where exists(select 1 from t1 where 11 in (select abs(count(distinct t1.f)) from t1 union select cast(avg(t1.e) AS integer) from t1) and exists(select 1 from t1 where t1.f<t1.c) or 17<f)),13)+13) FROM t1 WHERE NOT (not exists(select 1 from t1 where t1.c*coalesce((select max(19) from t1 where a between (select abs(+min(b)*case cast(avg(b) AS integer) when case  -(count(distinct 11)) when max(coalesce((select 11 from t1 where c in (13,17,t1.b)),b)) then  -count(*) else (cast(avg(19) AS integer)) end+max(11) then max(t1.e) else count(*) end | count(*))+count(*) from t1) and ~a),(select  -count(*) from t1)) between t1.c and 13-d))"
     end, {
         -- <randexpr-2.778>
-        
+
         -- </randexpr-2.778>
     })
 
@@ -7830,7 +7830,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(coalesce((select (select cast(avg(d) AS integer) | case max(~f) | count(distinct t1.d) when count(*) then count(*) else  -min(17) end from t1) from t1 where b=t1.e+ -e or t1.a not in (t1.f,t1.d,t1.d) or f not in (t1.a, -t1.b,f)),t1.c)+b | 13-d) from t1 where t1.b> -11),(17)) | b-19*d FROM t1 WHERE b>coalesce((select max(13+d) from t1 where 17>=11),t1.b)"
     end, {
         -- <randexpr-2.779>
-        
+
         -- </randexpr-2.779>
     })
 
@@ -7860,7 +7860,7 @@ test:do_test(
         return test:execsql "SELECT (d+f*t1.c-t1.e+coalesce((select c from t1 where c>=a),case when (c in (select e from t1 union select 13 from t1)) then 11+a else f end))-13 FROM t1 WHERE c not between c and b+coalesce((select c from t1 where t1.d<case when 13 not in (case a when b then coalesce((select max(case when f in (select case when ((t1.c | t1.f not between c and 13)) then t1.e-(t1.a) else 17 end from t1 union select 13 from t1) then t1.e else e end*a) from t1 where 11=17),t1.f) else f end,17,t1.f) then t1.d else t1.d end+t1.a | b),f)"
     end, {
         -- <randexpr-2.782>
-        
+
         -- </randexpr-2.782>
     })
 
@@ -7880,7 +7880,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.e not in (t1.a,~case when case when 17>=d then (abs(13)/abs(t1.f)) when (d in ((select abs(min(19)) from t1), -(select count(*)-abs( -count(*)) from t1),t1.e)) then coalesce((select max(19) from t1 where (c)>t1.f),17) else 13 end<>a then 11 when b<(d) then b else c end,d) then 17 when (17 in (13,t1.a,t1.c)) then e else c end+t1.c FROM t1 WHERE t1.a+t1.e in (select 19 from t1 union select t1.c from t1)"
     end, {
         -- <randexpr-2.784>
-        
+
         -- </randexpr-2.784>
     })
 
@@ -7900,7 +7900,7 @@ test:do_test(
         return test:execsql "SELECT (select ~cast(avg(t1.c) AS integer)*case count(*) | +min(case +case when a<13 or case t1.f when c then 17 else t1.d end in (11,a,(t1.a)) and a<>a then t1.b+f when f not in (d,t1.a,c) then t1.f else t1.e end when t1.f then 17 else f end)+abs(++count(distinct 19))*(count(distinct 13))-count(distinct t1.e)-(count(*))*max(19) when max(11) then cast(avg(a) AS integer) else min(t1.f) end from t1) FROM t1 WHERE t1.a not between 17 and d"
     end, {
         -- <randexpr-2.786>
-        
+
         -- </randexpr-2.786>
     })
 
@@ -7940,7 +7940,7 @@ test:do_test(
         return test:execsql "SELECT case t1.a when c then  -~t1.d*t1.e-coalesce((select max((abs(d+e+d)/abs(case when 11-t1.d in (select t1.d from t1 union select coalesce((select t1.c from t1 where 17<=t1.d and e between 11 and a),c) from t1) or 11 in (select ( -+(count(*))) from t1 union select count(distinct  -t1.a) from t1) then (f) when b=a then c else t1.b end))) from t1 where t1.c not between 17 and t1.b),13)+t1.f else d end FROM t1 WHERE NOT (not exists(select 1 from t1 where f<=a))"
     end, {
         -- <randexpr-2.790>
-        
+
         -- </randexpr-2.790>
     })
 
@@ -7960,7 +7960,7 @@ test:do_test(
         return test:execsql "SELECT (select  -max(d) from t1)+coalesce((select max(t1.e*t1.d*f) from t1 where t1.b-coalesce((select  -a*d from t1 where t1.c not in (t1.f,coalesce((select b+t1.b from t1 where t1.a not between f and t1.b),coalesce((select  -b from t1 where (t1.d>=t1.c) and 19<>t1.f),t1.a))-e*a,e)),(t1.a))+t1.f between 19 and e),t1.a)*a FROM t1 WHERE NOT (exists(select 1 from t1 where not exists(select 1 from t1 where case when t1.d-t1.b-t1.d*(case when t1.b>= -t1.d then c when t1.d not between c and t1.d then (19) else d end*e)+t1.d | 19>t1.c then e when exists(select 1 from t1 where t1.e not between d and t1.b or (17 in (t1.e, - -a,t1.d))) then t1.f else (e) end between 13 and e or 11>t1.b)))"
     end, {
         -- <randexpr-2.792>
-        
+
         -- </randexpr-2.792>
     })
 
@@ -7970,7 +7970,7 @@ test:do_test(
         return test:execsql "SELECT 11-t1.d-t1.e-case when (select count(distinct t1.b+coalesce((select max((abs(19)/abs(case when coalesce((select t1.f from t1 where e not between t1.f and t1.f),f)*( -11)=((e)) then 11 else d end))) from t1 where e in (17,t1.b,t1.b)), -t1.a)-(t1.c)) from t1)>t1.f then t1.b when 11>13 and a>=f then 11 else d end-t1.f FROM t1 WHERE (select min(d)-case cast(avg(case (d-~t1.c+~(select max(+d-coalesce((select max(t1.f) from t1 where c<>e),t1.a))-(( - -(cast(avg(13) AS integer)))-count(distinct e))*max(17) from t1) | 19-13*b) when  -t1.d then 13 else  -13 end) AS integer) when min(t1.c) then cast(avg(e) AS integer) else ~count(*) end from t1)<b"
     end, {
         -- <randexpr-2.793>
-        
+
         -- </randexpr-2.793>
     })
 
@@ -7990,7 +7990,7 @@ test:do_test(
         return test:execsql "SELECT case f when 13 then 19 else case when (case when c not between b and d then t1.c when +~t1.d+(select  -+cast(avg(t1.a) AS integer) | ((max(t1.d)))*(max(e)) from t1)-19+t1.a*t1.d in (select ~max(c) from t1 union select count(distinct d)-count(distinct b) from t1) then f else  -11 end not between 11 and 11) or 17>(c) then t1.d else 13 end end FROM t1 WHERE not ((abs(f)/abs(t1.b))<=(select min(+t1.d)+~+case count(distinct (abs(case d when 11 then coalesce((select coalesce((select max(t1.a) from t1 where t1.b=t1.e),t1.f) | a from t1 where 13<>(a)),d) else 17 end*f)/abs(t1.f))) when cast(avg(t1.c) AS integer) then case count(*) when min(t1.b) | cast(avg(t1.c) AS integer) then count(distinct f) else max(17) end else cast(avg((c)) AS integer) end from t1))"
     end, {
         -- <randexpr-2.795>
-        
+
         -- </randexpr-2.795>
     })
 
@@ -8030,7 +8030,7 @@ test:do_test(
         return test:execsql "SELECT f+case when (not exists(select 1 from t1 where ((17<>+t1.b+t1.f or b between t1.e and t1.e)))) then (abs( -(abs(case when exists(select 1 from t1 where not exists(select 1 from t1 where d in (select (select cast(avg((t1.b)) AS integer)-count(*) from t1) from t1 union select t1.e+(11) from t1))) then c when not t1.d between f and 11 or d>a then (a) else 13 end+t1.e+e)/abs(d)))/abs(t1.b)) else f end-13 FROM t1 WHERE NOT (case when 17< - -t1.b-case when not exists(select 1 from t1 where 19<>t1.d) then 13+coalesce((select max((abs((case case when  - -t1.c*11 in (select +max(t1.d)*count(distinct  -t1.c) from t1 union select max(t1.b) from t1) then 13 else 19 end when f then 19 else (t1.d) end)+e)/abs(f))) from t1 where (13 between t1.d and 19)),t1.b) else 13 end then a else t1.a end-13 not in (t1.d,d,(t1.f)))"
     end, {
         -- <randexpr-2.799>
-        
+
         -- </randexpr-2.799>
     })
 
@@ -8040,7 +8040,7 @@ test:do_test(
         return test:execsql "SELECT +~t1.a-(abs(+case when (((t1.d*t1.c+11 in (select cast(avg(17) AS integer) from t1 union select  -(count(*)) from t1)))) then  -coalesce((select t1.e-b from t1 where not exists(select 1 from t1 where t1.c in (select max(f) from t1 union select max(e) | max( -t1.e)-count(*) from t1))),f) else f end)/abs(t1.f))-e+11+t1.b+t1.a- -17 FROM t1 WHERE +b between case when c<=t1.a then t1.b when case when  -t1.a*d-17+17*~e- -13 in (select + -max(19) | +cast(avg(19) AS integer) from t1 union select (count(distinct  -19)*case max((13)) when max(e)*count(*) then min(t1.d) else count(*) end) from t1) then t1.f else (d) end in (select e from t1 union select d from t1) then f else  -t1.b end and b"
     end, {
         -- <randexpr-2.800>
-        
+
         -- </randexpr-2.800>
     })
 
@@ -8080,7 +8080,7 @@ test:do_test(
         return test:execsql "SELECT case when 19=(select ( -count(*)* -(cast(avg(t1.e) AS integer))+count(distinct 13)*min(t1.f)) | cast(avg(t1.e) AS integer) |  -cast(avg(13) AS integer)-(min(d)) from t1) then 13*a when t1.a+((select min((t1.d)) from t1)) in (select t1.b from t1 union select 11 from t1) or not exists(select 1 from t1 where not exists(select 1 from t1 where  - -e in (select t1.e from t1 union select t1.d from t1) or t1.d in (select count(distinct t1.a) from t1 union select count(*) from t1)) or  -b=(19) and 11<c) then b else t1.c end*a FROM t1 WHERE NOT (17-case 19 when t1.f-+(t1.d)-t1.a*t1.a then ~t1.d | e*coalesce((select b from t1 where 17< -17), -f)-17 else 19 end-case when (~t1.d)*17<f then f when t1.c in (f,a,t1.e) then t1.f else 17 end not in (t1.c,e,t1.d))"
     end, {
         -- <randexpr-2.804>
-        
+
         -- </randexpr-2.804>
     })
 
@@ -8110,7 +8110,7 @@ test:do_test(
         return test:execsql "SELECT +t1.a*11+case when 19<13-11 or exists(select 1 from t1 where not (abs(f)/abs(+t1.a+t1.c*t1.d-t1.c))*t1.a between t1.e and 17) then coalesce((select max(t1.a) from t1 where t1.b not between t1.a and t1.a),17) when 13 not between  -f and  -t1.d then t1.c else d end-13-13*c*t1.e FROM t1 WHERE NOT (19<=case t1.b when  -t1.d+c-t1.a-19-t1.f*t1.b-coalesce((select max(coalesce((select max( -b) from t1 where not t1.f+19 in (select case cast(avg(17) AS integer) when min(t1.a) then max((d)) else max(b) end | count(*) from t1 union select max(13) from t1) and not exists(select 1 from t1 where t1.c not between 19 and 11)),t1.e)*19) from t1 where 13 in (select  -d from t1 union select t1.f from t1)),b)-e-(t1.e) then t1.f else t1.e end)"
     end, {
         -- <randexpr-2.807>
-        
+
         -- </randexpr-2.807>
     })
 
@@ -8120,7 +8120,7 @@ test:do_test(
         return test:execsql "SELECT case (abs(f)/abs(f)) when t1.e*t1.f then (abs(t1.d)/abs(t1.b*11)) else ~case when case ~~19 when t1.f then e else case coalesce((select (abs(f)/abs(a)) from t1 where t1.a<>17 and t1.a>= -t1.b),t1.f) when t1.d then c else t1.d end end in (select count(*) from t1 union select ~abs(min(t1.a)) | count(*) from t1) then 17 when t1.f not between (e) and t1.c then f else b end+c+a end FROM t1 WHERE t1.f in (case when ~(select max(d) from t1)*t1.f>=case when 17*d<t1.f then d when (t1.d) not between t1.e-t1.d-e and +(t1.e*13*(select case count(*) when  -count(distinct e) then max(13) else count(distinct t1.b) end from t1)-case when c<e then c else 11 end)-17 then  -c else t1.c end then e else (13) end+d,t1.a,11)"
     end, {
         -- <randexpr-2.808>
-        
+
         -- </randexpr-2.808>
     })
 
@@ -8160,7 +8160,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case when a*case when e<+(t1.e) then e else d end+t1.f<c then t1.e when d not between +13 and case when (e>=(select cast(avg(13) AS integer) from t1)) and (exists(select 1 from t1 where not exists(select 1 from t1 where coalesce((select t1.c from t1 where (b between d and 13)),t1.e)>13))) then case when b not between 19 and t1.c then a else 13 end+t1.b when t1.c>11 then c else b end then 13 else t1.d end*t1.f)/abs(17)) FROM t1 WHERE NOT (c not in (coalesce((select max(d) from t1 where (select min(t1.e) from t1)-17<=coalesce((select t1.c from t1 where exists(select 1 from t1 where 17<19 or coalesce((select 13 from t1 where t1.e not in (a+t1.c,t1.e*t1.a+t1.d* -a*(a)*f,((b)))),19) not in (c,t1.f,t1.b))),(select abs( -max(19)) from t1))),t1.f)-t1.b, -f,17))"
     end, {
         -- <randexpr-2.812>
-        
+
         -- </randexpr-2.812>
     })
 
@@ -8170,7 +8170,7 @@ test:do_test(
         return test:execsql "SELECT t1.c*case when (t1.f in (select case (coalesce((select t1.d from t1 where not (coalesce((select d from t1 where f<=(11)),19)*e in (select ((min((17)) |  -min(t1.b))) from t1 union select  -cast(avg(t1.f) AS integer) from t1))),19)+11)*t1.a when t1.d then t1.a else f end-e-t1.a*( -17) from t1 union select c from t1) or 13 not between t1.e and b) then d+19-t1.f else t1.c end-e FROM t1 WHERE t1.f in (~t1.b,13,+e) and 11<>d-case when t1.e<>t1.b or f>t1.f and 19 not between 17 and case when (b not in (b,t1.d,a)) then e else (abs(11)/abs(d)) end and not exists(select 1 from t1 where t1.a<>c) then t1.f when not (t1.b) in (select t1.d from t1 union select t1.c from t1) then 13 else t1.b+a end"
     end, {
         -- <randexpr-2.813>
-        
+
         -- </randexpr-2.813>
     })
 
@@ -8200,7 +8200,7 @@ test:do_test(
         return test:execsql "SELECT e-t1.e+a*f*11*c*case when ~f*t1.d-t1.c*b-13*19+(abs(t1.d)/abs(case when t1.c=13 then 17 else 19 end))*a between b*(select abs(cast(avg(( -13)) AS integer)) from t1)-19+19 and t1.b then t1.d else t1.d end+13 FROM t1 WHERE t1.b not between a and e"
     end, {
         -- <randexpr-2.816>
-        
+
         -- </randexpr-2.816>
     })
 
@@ -8220,7 +8220,7 @@ test:do_test(
         return test:execsql "SELECT case case when coalesce((select b from t1 where not exists(select 1 from t1 where d-e+coalesce((select max(b) from t1 where case case when t1.d-t1.e not between t1.f and e then 11 else t1.d end when t1.e then f else b end+t1.e=13),t1.c) not in (( -c),c,t1.d))),t1.f)<>a and c not in (t1.b,c,t1.a) then (select count(*) from t1) else c end-11 when t1.d then t1.e else c end FROM t1 WHERE ~b | coalesce((select case (select +count(distinct b) from t1) when coalesce((select case when coalesce((select e from t1 where c>b),t1.c) between 11 and (b) then t1.d else t1.b end-e from t1 where t1.d in (13,t1.a,f)),17) then e else 17 end from t1 where not b=t1.c or t1.d in (select abs(abs( -min(13)*(cast(avg(t1.c) AS integer)))) from t1 union select (max(c)) from t1) and b>t1.a),t1.f) in (select 11 from t1 union select c from t1)"
     end, {
         -- <randexpr-2.818>
-        
+
         -- </randexpr-2.818>
     })
 
@@ -8250,7 +8250,7 @@ test:do_test(
         return test:execsql "SELECT case t1.c when t1.e then 19 else  -case when not exists(select 1 from t1 where t1.b in (select (t1.b) from t1 union select +13 from t1)) then coalesce((select max(c*t1.b) from t1 where 17>=19*e),coalesce((select (select abs(~min(coalesce((select max(t1.a) from t1 where  -19 in (f,a,13)),f)))+min(e) | ( -(min(13))) from t1) from t1 where f between  -a and t1.c),t1.e)) when 19<>a then 13 else c end end FROM t1 WHERE NOT (t1.e<>f)"
     end, {
         -- <randexpr-2.821>
-        
+
         -- </randexpr-2.821>
     })
 
@@ -8270,7 +8270,7 @@ test:do_test(
         return test:execsql "SELECT 13- -(abs(coalesce((select max(17) from t1 where f*b in (select count(*)*case  -min(~t1.f)+min(coalesce((select  -(select min(17) from t1) from t1 where (t1.b in (select abs(min(t1.f)) from t1 union select  -max(t1.e) from t1))),17)+d) when count(distinct a) then abs(count(*)) else count(*) end from t1 union select min(t1.c) from t1)),coalesce((select max(f) from t1 where d in (select t1.b from t1 union select t1.e from t1)),17)) | t1.a)/abs(c)) | t1.f FROM t1 WHERE (abs(t1.f*11++ -f)/abs(19 | (abs(((abs(f)/abs(17))))/abs(case when a not in (t1.d,(c)-~c*f |  -13-t1.b+ -d,13) then t1.f when 11=11 then c else d end))*d+t1.c))+e+ -(t1.d) in (select t1.a from t1 union select 19 from t1)"
     end, {
         -- <randexpr-2.823>
-        
+
         -- </randexpr-2.823>
     })
 
@@ -8310,7 +8310,7 @@ test:do_test(
         return test:execsql "SELECT (a+case when (exists(select 1 from t1 where not exists(select 1 from t1 where not t1.e*13=13-f or (e)=t1.c or  -d not between t1.b and t1.a or e not between 17 and (a) and 11 not in (a,(t1.f),a) or t1.e<>13 or t1.d between t1.e and t1.c or t1.d=17 or a>=b))) and a between t1.e and t1.b then case when e not between (17) and t1.d then ~c*coalesce((select t1.a | 13+d from t1 where t1.e not between b and 11),t1.a) else t1.f end else t1.f end-11) FROM t1 WHERE NOT (case when case case when case when  -(select +min(11) from t1)*(13)>11 then t1.e when 13<e then 19 else c end in (t1.a,a,t1.e) then 17 when c<>t1.a then t1.d else  -t1.e end when (a) then a else t1.e end>t1.a then 13 when t1.a not in (t1.f,t1.b,t1.a) then a else t1.c end in (select cast(avg(13) AS integer) from t1 union select (max(t1.e)+min(17)) from t1))"
     end, {
         -- <randexpr-2.827>
-        
+
         -- </randexpr-2.827>
     })
 
@@ -8340,7 +8340,7 @@ test:do_test(
         return test:execsql "SELECT ~b-t1.a-f*+case when exists(select 1 from t1 where 17<>t1.d-f or not exists(select 1 from t1 where (select (min(a)+count(distinct d)) from t1)+( -f)- -c<t1.e or d not between t1.a and b and exists(select 1 from t1 where 11<(a)) and 13=d or 13 between (t1.f) and f)) then t1.b when a not in (e,d,d) then (select ((count(*))) from t1) else case d when d then  -e else 11 end end FROM t1 WHERE NOT (~(abs(17)/abs((a)))*~t1.e-coalesce((select (abs((select abs(cast(avg(d) AS integer)) from t1) | 13*e+17)/abs(t1.f)) from t1 where t1.c<>f and not exists(select 1 from t1 where t1.c<b or 19 in (17,19,b) or 17 not between a and f) or a not in (c,b,17)),t1.c)+t1.a-e-t1.f*e+ -a-t1.a*d not in (d,( -f),t1.a))"
     end, {
         -- <randexpr-2.830>
-        
+
         -- </randexpr-2.830>
     })
 
@@ -8360,7 +8360,7 @@ test:do_test(
         return test:execsql "SELECT (t1.a)*t1.d*t1.c+t1.b*case when (select case count(*) when (count(*))+ - -count(*)+cast(avg(t1.d) AS integer)- - -min(f) then min(11) else cast(avg(c) AS integer) end from t1) in (select (cast(avg((19)) AS integer)) from t1 union select max(t1.e) from t1) then b when d=a then t1.f else coalesce((select t1.c from t1 where not exists(select 1 from t1 where (~+a not in ((a),b,t1.f)))),case e when 13 then t1.f else 13 end) end FROM t1 WHERE NOT (c | a | ~(t1.d)+t1.b not in (t1.a* -+13+~(abs( -case when (11) in (select e from t1 union select t1.f*coalesce((select case when e<e then t1.f when (13) in (13,t1.d,t1.c) then c else t1.d end from t1 where t1.b between  -11 and e),e) from t1) then t1.a else d end*t1.a)/abs(t1.e)),19,d) or t1.e<b)"
     end, {
         -- <randexpr-2.832>
-        
+
         -- </randexpr-2.832>
     })
 
@@ -8380,7 +8380,7 @@ test:do_test(
         return test:execsql "SELECT case when case ~( -t1.e)-a when coalesce((select max(case +t1.e when t1.b*~19 | t1.a*case when c-c<>19 then 13 else c end*d+t1.c then f else 17 end) from t1 where d<=e), -d) then 19 else 17 end in (t1.b,19,c) then 19 when t1.a in (select a from t1 union select 13 from t1) then t1.d else t1.d end FROM t1 WHERE NOT ((select abs(cast(avg(t1.d*t1.f) AS integer))-cast(avg(b) AS integer) from t1)-~coalesce((select max(t1.a+t1.d-coalesce((select max(a*case when t1.e<=e then f when t1.d<>a then 11 else 11 end*t1.a*11) from t1 where t1.d>=d),t1.f)) from t1 where 11 not between (13) and 17),f)*t1.b+17-e not in (t1.d,t1.f,t1.f))"
     end, {
         -- <randexpr-2.834>
-        
+
         -- </randexpr-2.834>
     })
 
@@ -8400,7 +8400,7 @@ test:do_test(
         return test:execsql "SELECT t1.d+case when case when case when (19 not between ~(t1.a)*b and t1.c) then (select (abs(case count(distinct t1.e) when min( -f) then  -max(t1.d) else cast(avg(19) AS integer) end-(count(distinct t1.e)))) from t1) when a<>t1.f then  -19 else 11 end>f or b in ((13),f,11) then t1.a when t1.e in (e,f,t1.f) then (t1.d) else t1.d end in (17,t1.c,17) then 13 when b not between t1.a and (19) then t1.e else  -11 end+a+((f)) FROM t1 WHERE t1.f in (select case +cast(avg(t1.f+c) AS integer)++count(*) when count(*) then ~~(count(distinct 11+t1.a)) else +(case max(e-f) | ~ -max(t1.f) |  -abs(abs(min(e-19+e))-abs(count(*)))-abs(cast(avg(f) AS integer)) when (min(f)) then cast(avg(a) AS integer) else min(13) end) end from t1 union select  -count(distinct 13) from t1)"
     end, {
         -- <randexpr-2.836>
-        
+
         -- </randexpr-2.836>
     })
 
@@ -8420,7 +8420,7 @@ test:do_test(
         return test:execsql "SELECT (select (min(case when b+b*(select cast(avg(e+19-t1.f*case when case when not (c) in (select (e) from t1 union select f from t1) or t1.b not in (t1.e,t1.b,11) or 19= -t1.a then 17 else  -d end<e then e when t1.b>13 then 13 else t1.f end+11*19) AS integer) from t1)+d not between 11 and c then t1.c else t1.c end)) from t1) FROM t1 WHERE 13 not between +b* -f and coalesce((select f*19-case when not a=~f+t1.d then case when d*b not in (case when d not between  -c and t1.d then e else 13 end+17,c,t1.a) then b when t1.e>t1.f then b else  -d end else f end-e+(d) from t1 where 17 between t1.a and t1.e),t1.d) | t1.b"
     end, {
         -- <randexpr-2.838>
-        
+
         -- </randexpr-2.838>
     })
 
@@ -8440,7 +8440,7 @@ test:do_test(
         return test:execsql "SELECT t1.c-(abs((select (case abs(count(distinct 11-c*11)) when count(*) then count(*) else  -min(+e+~e+coalesce((select d-a*t1.d+t1.e from t1 where (t1.f>=17) and t1.e in (11,a,e)),13)*t1.d) end) from t1)-(a-t1.f)-t1.d)/abs(d)) FROM t1 WHERE t1.c in (select d from t1 union select ( -t1.e) from t1)"
     end, {
         -- <randexpr-2.840>
-        
+
         -- </randexpr-2.840>
     })
 
@@ -8460,7 +8460,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select max(t1.a-case when not (coalesce((select d+c from t1 where c between ( -(a)) and b or 17 between 11 and (c)),(t1.f)))=f then b | d when f not in (t1.b,f,a) then t1.a else f end-t1.f) from t1 where 19<=11 and t1.c between 19 and t1.a or t1.f>11), -t1.e)*e between b and 17 then  -t1.f when  -a<=19 or  -11<>t1.f then  -19 else d end FROM t1 WHERE ((13 in (t1.b,f,b)))"
     end, {
         -- <randexpr-2.842>
-        
+
         -- </randexpr-2.842>
     })
 
@@ -8490,7 +8490,7 @@ test:do_test(
         return test:execsql "SELECT case  -(abs(t1.b-13*d*b*t1.e- -11)/abs(+d-t1.f*(11+ -13)-t1.c))+c+(e*t1.c)+f*17*a | t1.e-13+f when t1.d then t1.e else f end-t1.f FROM t1 WHERE  -b*t1.c>13"
     end, {
         -- <randexpr-2.845>
-        
+
         -- </randexpr-2.845>
     })
 
@@ -8530,7 +8530,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.c between t1.e and ~t1.d+(abs(~d*case t1.b-19 when t1.e then e else e end)/abs(case case t1.b when c then t1.d else 13+17 | e end when (select abs(abs(min(11) | max((a)))) from t1) then d else ~t1.f end)) | t1.b then t1.c when (not (11>=b)) then 13 else e end-a FROM t1 WHERE NOT (+13*case when +11*t1.f=f+t1.b then t1.f else t1.b end not between coalesce((select max(f) from t1 where (not exists(select 1 from t1 where exists(select 1 from t1 where not not exists(select 1 from t1 where t1.c in (select abs(min(e)) from t1 union select ~ -case cast(avg(~17) AS integer) when min(e | 17) then min(e) else cast(avg(c) AS integer) end from t1)))) or f>e*t1.a+e)),t1.c) and 17)"
     end, {
         -- <randexpr-2.849>
-        
+
         -- </randexpr-2.849>
     })
 
@@ -8550,7 +8550,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select +case when case d when b then e else (select min(case b when 17 then b else t1.c end)+ -+ -(abs(max(t1.e))-min(t1.d)+max( -d)) | count(distinct t1.e)+( -cast(avg(13) AS integer)) | max(t1.f)+min(e)+count(*) from t1) end<>b then t1.a else 19*~t1.e-c | t1.c end from t1 where b in ( -c,t1.f,t1.c)),19) FROM t1 WHERE (abs(d)/abs(coalesce((select max(coalesce((select d*c from t1 where ((abs(t1.b)/abs(t1.d))-(abs(t1.f)/abs(t1.c))+(t1.a)*13-t1.e not between t1.e and ~f*11+t1.f-11 | t1.a+13+d)),19)) from t1 where c not in (+ -11,a,c)),t1.c))) in (b,b,a)"
     end, {
         -- <randexpr-2.851>
-        
+
         -- </randexpr-2.851>
     })
 
@@ -8580,7 +8580,7 @@ test:do_test(
         return test:execsql "SELECT a-a-(abs(f)/abs(coalesce((select 17+19 from t1 where (select min(t1.e*e) from t1)>t1.b+case when not exists(select 1 from t1 where e not between 11 and t1.f-e) then coalesce((select max(f*case when t1.f not in (19,t1.c,(t1.a)) and c<=17 then 11 when 17 not between 11 and 17 then c else 17 end) from t1 where d not between t1.a and 13),t1.c) else t1.b end-13 and a=t1.e),17)+t1.c))-f FROM t1 WHERE +(select cast(avg(13-t1.a-t1.b++t1.a-(select count(*) from t1)+case b-(select +~ -min(case when exists(select 1 from t1 where ((select count(*)+ -(min(13)) from t1)) not between 13 and 13) then d else e end) from t1) when f*t1.b*t1.b then t1.a else b end*t1.a) AS integer) from t1)*t1.b in (t1.f,17,f)"
     end, {
         -- <randexpr-2.854>
-        
+
         -- </randexpr-2.854>
     })
 
@@ -8610,7 +8610,7 @@ test:do_test(
         return test:execsql "SELECT case when (11+19 | t1.e-e*17=t1.e*~d+t1.a+ -d | a-~(abs((abs((case when 13 not in (b,((t1.a)),f) then t1.d else t1.a end+e))/abs(t1.f))*b+t1.b)/abs(17))+t1.e+t1.a) then 11 else t1.a end FROM t1 WHERE NOT (case (case when (select +~ -~ -cast(avg(b*e*case when t1.a between t1.c and a and d<13 then b else 19 end* -f*d) AS integer) | count(*)++~+min((11))*max(19)-min((b)) from t1) in (select 13 from t1 union select (select min(19) from t1) from t1) then t1.f+t1.d else 13 end-t1.e) when t1.e then t1.f else a end<e)"
     end, {
         -- <randexpr-2.857>
-        
+
         -- </randexpr-2.857>
     })
 
@@ -8630,7 +8630,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(+t1.a) from t1 where c in (select  -max(d | coalesce((select max(t1.b) from t1 where (abs(case d when t1.f then t1.e else t1.c end-t1.f)/abs(13))<=11), -a)) | min(t1.c) | (max(f))++abs(case max(b) when (count(distinct e)) then count(*) else min(17) end) from t1 union select (min(19)) from t1) or not exists(select 1 from t1 where coalesce((select c from t1 where b in (select  - - - -count(*) from t1 union select  -min((a)) from t1)),13)<t1.d)),17) FROM t1 WHERE ~a in (select count(*) from t1 union select case +abs((abs(abs(count(*))))+min(a))*max(case when exists(select 1 from t1 where d between 17+(b)-a and 17) then (select count(*) from t1) when 13<> -t1.b then t1.f else t1.e end)*min(t1.a)+ -count(*) | +max(e)*(min(t1.e)) | count(distinct t1.d) | (count(*)) when count(distinct ((19))) then count(*) else max(t1.f) end from t1)"
     end, {
         -- <randexpr-2.859>
-        
+
         -- </randexpr-2.859>
     })
 
@@ -8660,7 +8660,7 @@ test:do_test(
         return test:execsql "SELECT case 17 when (select ~count(distinct t1.d) from t1) then e else case when not not exists(select 1 from t1 where (abs(~coalesce((select (coalesce((select max(13) from t1 where e>a),19)) from t1 where (not exists(select 1 from t1 where t1.c in (f,b,c)))),c)*t1.c | 17-(e))/abs(t1.f)) | 17*17*a in (select e from t1 union select f from t1)) then 13 when t1.a not between (b) and t1.c then (abs(17)/abs(17)) else t1.d end*f end FROM t1 WHERE t1.a>t1.c-19"
     end, {
         -- <randexpr-2.862>
-        
+
         -- </randexpr-2.862>
     })
 
@@ -8690,7 +8690,7 @@ test:do_test(
         return test:execsql "SELECT case when f>=t1.c then t1.d when coalesce((select max(+11-b) from t1 where a-t1.d in (select +case when f in (13,b | 11,t1.b) then  -t1.d when f in (select ~count(distinct 17) from t1 union select count(distinct t1.a) from t1) then 19 else c end-d+b from t1 union select a from t1) and (17) in (t1.f,11,t1.c)),f)< -a then d else t1.c end-11 FROM t1 WHERE a<(select count(distinct +11*coalesce((select max(coalesce((select max(t1.d) from t1 where t1.e>t1.b),b)*t1.f) from t1 where case 11 when t1.a then  -t1.e else a end<=17),e)-11+c-19) | count(distinct 19)*count(*)* -(count(distinct t1.f))+cast(avg(17) AS integer)-(~~(count(*)))-cast(avg(11) AS integer) | cast(avg((19)) AS integer) from t1)-t1.c"
     end, {
         -- <randexpr-2.865>
-        
+
         -- </randexpr-2.865>
     })
 
@@ -8720,7 +8720,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(17) from t1 where  -coalesce((select t1.b+coalesce((select case when case t1.f when c then (e) else a end+t1.c+(f)>17 and e>=f and (13>t1.f) then (select ~(cast(avg(t1.e) AS integer)) | min(t1.a) from t1) when  -c>c then 19 else t1.f end from t1 where (17<t1.f)),t1.f) from t1 where not exists(select 1 from t1 where 13 not between t1.a and c)),d)*17< -t1.c),b) FROM t1 WHERE not exists(select 1 from t1 where not exists(select 1 from t1 where  -11=17*t1.d*f))"
     end, {
         -- <randexpr-2.868>
-        
+
         -- </randexpr-2.868>
     })
 
@@ -8750,7 +8750,7 @@ test:do_test(
         return test:execsql "SELECT case when a*t1.a*a in (select case (e- -11+case when ~c>=a then 13 when ((case when t1.d<t1.d then f when t1.c not between a and t1.e then  -f else t1.f end>=a)) then 19 else t1.b end-t1.f) when 19 then  - -13 else 17 end from t1 union select  -17 from t1) and 19 in (select d from t1 union select e from t1) then (select abs(min(t1.f)) from t1) else c end FROM t1 WHERE case coalesce((select 19 from t1 where 13<coalesce((select 19 | case when t1.e>=e then d when (case when not exists(select 1 from t1 where (a>d and d not between e and ((19)) and c in (e,t1.b,(b)) and e not in (t1.f,t1.a,t1.b))) then t1.b when f not between 11 and d then t1.d else d end<=11) then (abs(13)/abs(11)) else  -11 end from t1 where (t1.b)<d),b)),11) | d when c then 17 else (e) end not in (t1.e,t1.c,a)"
     end, {
         -- <randexpr-2.871>
-        
+
         -- </randexpr-2.871>
     })
 
@@ -8780,7 +8780,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.e not between (select +max(17) from t1)*t1.f and d then t1.c+case when e+f<=coalesce((select max((19)) from t1 where t1.e not in ((abs( -17-17)/abs(t1.e)),(c),(t1.b))),d) and 13 in (select d from t1 union select c from t1) then 19 else c end-19 when exists(select 1 from t1 where t1.a in (select t1.a from t1 union select 13 from t1)) and not exists(select 1 from t1 where a<19) then b else t1.b end FROM t1 WHERE NOT (not t1.d=b)"
     end, {
         -- <randexpr-2.874>
-        
+
         -- </randexpr-2.874>
     })
 
@@ -8790,7 +8790,7 @@ test:do_test(
         return test:execsql "SELECT +17+(11)-coalesce((select max(case (11) when f then +e+case when +11< -13-f or b between (b) and t1.b and e<>t1.c and e not between 13 and t1.d and t1.e in (t1.d,17,t1.c) then c+t1.e*t1.d when t1.f>=t1.d then t1.a else t1.c end else t1.e end-e) from t1 where t1.b not in (t1.b,t1.d,d)), -c)*13 FROM t1 WHERE (abs(e+17)/abs((select count(distinct 11-t1.b)*cast(avg(case c when coalesce((select max(19-coalesce((select max(f) from t1 where 19 in (17,t1.f,11)),t1.d)) from t1 where c in (t1.a,11,13) and t1.a<=t1.c),t1.c) then t1.c else e end) AS integer) | max(e) | (+~case case cast(avg(t1.d) AS integer) when  -min(13) then count(*) else count(*) end when max(t1.c) then count(distinct f) else count(*) end-count(distinct 19)) from t1)))>=t1.e | f"
     end, {
         -- <randexpr-2.875>
-        
+
         -- </randexpr-2.875>
     })
 
@@ -8820,7 +8820,7 @@ test:do_test(
         return test:execsql "SELECT case when case when d*c not in (13,a,d) then (t1.b-f)+coalesce((select max((select count(distinct 13)-case max(11) when count(*) then count(*) else min(t1.b) end*min(17)+(min(t1.c)) from t1)) from t1 where not exists(select 1 from t1 where t1.c between 17-d | d and t1.e)),b) else t1.e end<=d then e when f in (a,13,d) or t1.b between f and  -b then c else t1.a end FROM t1 WHERE NOT (t1.d<>t1.a)"
     end, {
         -- <randexpr-2.878>
-        
+
         -- </randexpr-2.878>
     })
 
@@ -8840,7 +8840,7 @@ test:do_test(
         return test:execsql "SELECT case case c when  -b then (abs(b)/abs(c)) else (select count(distinct f) | (~abs(min(c-+case 11 when case when t1.a between b and t1.e-case when (13<=b) then (select  -count(*) from t1) else a end then t1.e when e>=11 then (19) else b end then d else 17 end | e))) from t1) end when  -13 then t1.f else +17 end FROM t1 WHERE 17 in (select +(count(*) | case abs( -abs(abs( -min(d)))) | max(+11) when  -+~count(distinct  -(abs(coalesce((select max(f) from t1 where t1.e in (select e from t1 union select t1.a from t1)),f) | t1.c-t1.b)/abs(13))) | +abs(case max(b) when count(*) then  -min(t1.e) else (cast(avg(t1.f) AS integer)) end)- -count(*) then  -count(*) else max(19) end* -cast(avg(t1.b) AS integer))+(max(t1.f)) from t1 union select count(distinct b) from t1)"
     end, {
         -- <randexpr-2.880>
-        
+
         -- </randexpr-2.880>
     })
 
@@ -8880,7 +8880,7 @@ test:do_test(
         return test:execsql "SELECT case 11 when (case when t1.e in (select +cast(avg(coalesce((select max(13) from t1 where case when exists(select 1 from t1 where t1.b in ((a),d,(t1.e))) then case when 19 in (select  -max(17) from t1 union select min(t1.f) from t1) then t1.b else 17 end when a not in ((t1.f),11,t1.e) then 17 else t1.c end<t1.b),11)*a) AS integer) from t1 union select max(b) | case (+min(t1.f)) when cast(avg(a) AS integer) then count(distinct 13) else max(t1.c) end from t1) then t1.e when c<=t1.d then t1.b else t1.f end-17) then b else t1.e end FROM t1 WHERE NOT (e-case when a*b between t1.d-(abs(11)/abs(coalesce((select t1.b from t1 where not exists(select 1 from t1 where c=17) or a not between (coalesce((select t1.c from t1 where 19>(19)),c)) and c and (11 in (select t1.b from t1 union select 13 from t1) and ( -t1.d)=d)),e | 19*t1.a))) and t1.a then t1.a when 19>=t1.a then e else c end> -e)"
     end, {
         -- <randexpr-2.884>
-        
+
         -- </randexpr-2.884>
     })
 
@@ -8900,7 +8900,7 @@ test:do_test(
         return test:execsql "SELECT case a*t1.a when ~++a*(abs(e)/abs(19)) | t1.d+(select count(*) from t1) then b else t1.a end*coalesce((select max(f) from t1 where f<>t1.d),b) FROM t1 WHERE (abs(c-~t1.b)/abs(d))-((+coalesce((select max(c) from t1 where  -+(select ~ -(cast(avg((13+case 11*t1.c when t1.b then f else ~e-coalesce((select max((f)) from t1 where t1.f<a), -t1.c-(t1.c)) end)) AS integer)) from t1)=d*a),t1.d)+a))* -t1.e=t1.f"
     end, {
         -- <randexpr-2.886>
-        
+
         -- </randexpr-2.886>
     })
 
@@ -8930,7 +8930,7 @@ test:do_test(
         return test:execsql "SELECT t1.c-t1.f-coalesce((select max(a) from t1 where e in ((abs(a)/abs(t1.d))*coalesce((select max((abs(case when e>=+t1.b then f when t1.c+f<a or e<>13 then t1.d else t1.a end)/abs(t1.d))) from t1 where t1.c not between t1.c and 11 and e>d),f)*t1.e+d,a,13)),e) | t1.b FROM t1 WHERE (abs(+(+t1.a)+case a-case when c>=d then 13 when t1.c not in (17,17,e) then a else t1.d end when c then  -f else b end*d)/abs(17))<=11 and 11 in (select cast(avg(17) AS integer) from t1 union select min( -19)+(case max(a) when abs(count(*)) then  -abs(count(*)*min(t1.e)+max(11)) else min(c) end) from t1)"
     end, {
         -- <randexpr-2.889>
-        
+
         -- </randexpr-2.889>
     })
 
@@ -8970,7 +8970,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select (select count(*) from t1)*a*b from t1 where ((~b*a-t1.d+11*e-(select  -count(*) | count(*) | count(*) from t1)*(select min((abs(coalesce((select max(t1.c) from t1 where not exists(select 1 from t1 where  -17 in (t1.b,t1.f,t1.d))),11))/abs(t1.d))) from t1)-17+(abs(11)/abs(11)) | b+d | 11 in (select t1.a from t1 union select 13 from t1)))),t1.a) FROM t1 WHERE NOT (f>case when f-case when not exists(select 1 from t1 where case when b in (select abs(max(coalesce((select max(~t1.c) from t1 where t1.f<=13),17))) from t1 union select cast(avg(t1.c) AS integer) from t1) then t1.e else (13) end> -t1.e) or d<>19 then coalesce((select max((select abs(max(d)+cast(avg(d) AS integer)) from t1)) from t1 where t1.e<t1.c),19) when  -t1.c in (t1.e,t1.f,e) then 11 else t1.a end<>19 then b when t1.a<=11 then 11 else t1.d end)"
     end, {
         -- <randexpr-2.893>
-        
+
         -- </randexpr-2.893>
     })
 
@@ -8990,7 +8990,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select e from t1 where ((abs((select case (~max(f) | ~max(19-t1.d) | cast(avg(11) AS integer)) when min(+t1.d*c) then max(case when 19+13 not between 13 and t1.c or t1.c not in ((b),11,(e)) then d else t1.d end+ -t1.d) else min(a) end from t1))/abs(11)))<17),t1.b)+17 FROM t1 WHERE (13 in (a,t1.a,~+(e)+t1.c*t1.c | t1.c- -t1.b-t1.b+e*b | t1.e-t1.e-e*coalesce((select max(t1.b) from t1 where t1.a*d<>coalesce((select max(t1.e-t1.b) from t1 where exists(select 1 from t1 where coalesce((select e from t1 where (17 not between 13 and t1.c)),t1.c)>=t1.c)),b)),t1.f)+17))"
     end, {
         -- <randexpr-2.895>
-        
+
         -- </randexpr-2.895>
     })
 
@@ -9030,7 +9030,7 @@ test:do_test(
         return test:execsql "SELECT c | coalesce((select max(~b*case +coalesce((select max( -(abs(c)/abs(11))+case when t1.c*17 not in (a,a,c) then t1.e when t1.b in (select 13 from t1 union select (c) from t1) then  -(t1.c) else d end* -t1.c+a) from t1 where t1.f>=11),17) | t1.b when t1.b then c else t1.a end) from t1 where t1.f>t1.a),t1.c)+13*17 FROM t1 WHERE NOT (t1.e<t1.c*(select min((select count(*) from t1)) from t1)*f)"
     end, {
         -- <randexpr-2.899>
-        
+
         -- </randexpr-2.899>
     })
 
@@ -9060,7 +9060,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(a) from t1 where t1.b<t1.b),13 |  -(coalesce((select max((abs(~t1.a | (abs(11)/abs((abs(t1.e)/abs(coalesce((select max(t1.e) from t1 where not exists(select 1 from t1 where exists(select 1 from t1 where (t1.d)<>e) and not exists(select 1 from t1 where (19)=t1.e))),19*t1.e)-t1.c)) | 17))*t1.b)/abs(17))) from t1 where (t1.b) between d and t1.b),t1.c)) | t1.f-c-d) FROM t1 WHERE NOT (13 not in (f,t1.c+11*c,coalesce((select e from t1 where case t1.b when c- -case (select cast(avg(+t1.c*t1.f) AS integer) from t1) when 13*case when not case when  -17 in (select (t1.c) from t1 union select t1.c from t1) or t1.f in (t1.b,t1.d,t1.b) then t1.a when 11<>t1.c then e else a end>=(11) and a=d or  -t1.f between c and b then e else t1.f end then 19 else t1.d end then t1.c else t1.b end<>13),d)))"
     end, {
         -- <randexpr-2.902>
-        
+
         -- </randexpr-2.902>
     })
 
@@ -9070,7 +9070,7 @@ test:do_test(
         return test:execsql "SELECT f+b+(t1.a+c)+(case when (select (cast(avg(coalesce((select max(t1.b) from t1 where case  -(select +cast(avg(b-t1.e) AS integer)-abs(cast(avg(~(abs(f)/abs(f))) AS integer)) from t1)+d when 11 then d else 13 end+t1.e<>t1.e),(t1.e))-13+13) AS integer)) from t1)-t1.b<>a then t1.e else e end) FROM t1 WHERE c in (select abs((max(t1.d))) from t1 union select count(*) from t1) and (coalesce((select max(+ -(t1.f-d)* -b) from t1 where not exists(select 1 from t1 where (b not in (coalesce((select t1.e-a from t1 where not t1.a between 13 and f or t1.b in (t1.e,e,17)),11),17,t1.a) and (b<>d)))),b) in (select  -min(17) from t1 union select abs(max(e)) from t1))"
     end, {
         -- <randexpr-2.903>
-        
+
         -- </randexpr-2.903>
     })
 
@@ -9090,7 +9090,7 @@ test:do_test(
         return test:execsql "SELECT case when case when not exists(select 1 from t1 where not exists(select 1 from t1 where (case when (select  -min(t1.e) from t1) in (select f from t1 union select d from t1) then +e else d end | t1.e not between t1.a and t1.b))) and not exists(select 1 from t1 where a>=t1.e) and b=e then 13 else coalesce((select 19 from t1 where t1.d>=t1.e),13) end<11*t1.b then 17 when 17 in (19,t1.e, -t1.c) or 17<f then t1.d else t1.b end FROM t1 WHERE exists(select 1 from t1 where f<=19)"
     end, {
         -- <randexpr-2.905>
-        
+
         -- </randexpr-2.905>
     })
 
@@ -9120,7 +9120,7 @@ test:do_test(
         return test:execsql "SELECT 11*t1.c* -case when t1.d<=t1.c then case when case case +t1.b-case when exists(select 1 from t1 where (exists(select 1 from t1 where t1.e not in (t1.a,a,11)))) then (abs((select case count(distinct d) when cast(avg(19) AS integer) then  -min(t1.a) else (cast(avg(f) AS integer)) end from t1))/abs(b)) when t1.c<>t1.a then c else 19 end when t1.c then e else t1.d end when 17 then t1.d else  -d end between e and t1.e then 13 when (13<>13) then t1.c else 17 end when exists(select 1 from t1 where (t1.c between b and 11)) then e else f end FROM t1 WHERE ~a* -b+11-case when coalesce((select max(case when (t1.c in (case t1.b when t1.c then 13 else 17 end,17,19)) then case e when a then c else 13 end else c end) from t1 where a between b and t1.c),t1.a)=c or (17>d) then case when f= -t1.a then t1.b when (t1.d)<t1.e then (f) else t1.e end else c end+d<a"
     end, {
         -- <randexpr-2.908>
-        
+
         -- </randexpr-2.908>
     })
 
@@ -9150,7 +9150,7 @@ test:do_test(
         return test:execsql "SELECT +case when e in (13, -b,11) then d else coalesce((select max(13 | d | d+19+(abs(case when (19) between (abs(case f when t1.f then (13) else 17 end)/abs(a)) and d then 19 when (not exists(select 1 from t1 where t1.a>=t1.f)) and t1.f>t1.a or e<>c then 17 else d end)/abs(a))) from t1 where exists(select 1 from t1 where not exists(select 1 from t1 where (t1.f) in (t1.c,(t1.e),17)))),t1.a) end+e FROM t1 WHERE NOT (exists(select 1 from t1 where 17>(case coalesce((select max((abs(+t1.f-case when 11=(abs((select count(*) from t1)-13*13)/abs(t1.d)) then coalesce((select max(t1.c) from t1 where 19 in (select ((max(19))) from t1 union select min(t1.d) from t1) or  -t1.a=t1.a and f<17),t1.e-d) when not exists(select 1 from t1 where t1.b not between (d) and  -t1.f) then 11 else t1.a end)/abs(t1.a))) from t1 where t1.e not in ((f),11,t1.f)),t1.c) when b then  -t1.a else 13 end)-t1.c))"
     end, {
         -- <randexpr-2.911>
-        
+
         -- </randexpr-2.911>
     })
 
@@ -9180,7 +9180,7 @@ test:do_test(
         return test:execsql "SELECT (13*case when exists(select 1 from t1 where exists(select 1 from t1 where coalesce((select max(b) from t1 where t1.b=e),a)<(b-a)+13)) then 11 else t1.e end*coalesce((select 17 from t1 where not ((select cast(avg(13) AS integer) from t1)< -t1.c) and 17 between 13 and 13),case when f<c then b when t1.c<t1.a then  -d else e end)*d+b)+ - -t1.b+11 FROM t1 WHERE NOT (not exists(select 1 from t1 where b>=case when exists(select 1 from t1 where (13 in ( -(b)*(select count(*)* -cast(avg(case t1.e when t1.b then (f)-f-f else e end) AS integer)*cast(avg(17) AS integer) | cast(avg((17)) AS integer) | min(d) | count(distinct e) from t1),19+(abs(19)/abs(17))*f,t1.b))) then 11 when 17>t1.f then +a else t1.d end))"
     end, {
         -- <randexpr-2.914>
-        
+
         -- </randexpr-2.914>
     })
 
@@ -9190,7 +9190,7 @@ test:do_test(
         return test:execsql "SELECT case when +11 | (select min(case 13+a when e then d else 17-t1.b-~b*a end) from t1)-f*t1.f=(coalesce((select e from t1 where a<=f and not exists(select 1 from t1 where d-case 19 when 11 then (b) else t1.e end not between  -t1.a and (t1.c))),e)) then t1.e when  -17>=d then t1.f else t1.b end*t1.a FROM t1 WHERE e<=19"
     end, {
         -- <randexpr-2.915>
-        
+
         -- </randexpr-2.915>
     })
 
@@ -9230,7 +9230,7 @@ test:do_test(
         return test:execsql "SELECT 11-coalesce((select max(coalesce((select max((select abs(case +max((e)) when abs(abs( -count(distinct e))) then +cast(avg(f) AS integer) else count(*) end+count(*)+min( -e)) from t1)) from t1 where t1.b in (select count(distinct (17 | case case when e in (13,t1.a,e) or t1.d>=t1.e then 17 else a end when t1.e then 17 else t1.d end*t1.c)) from t1 union select cast(avg(t1.a) AS integer) from t1)),17)) from t1 where t1.c in (select ~cast(avg(t1.b) AS integer) from t1 union select  -(cast(avg(t1.c) AS integer)) from t1)),(t1.c)) FROM t1 WHERE NOT (t1.b not in (case when 11 in (select case +min(t1.f) when (+cast(avg((case t1.c when a then f else a end-f)) AS integer)) then +count(distinct (t1.f))-count(distinct t1.f) else count(*) end-count(*) | count(*) from t1 union select min(e) from t1) then (abs(b | 13-f | c)/abs(t1.f)) else t1.c end,f,t1.b) or not  -t1.a<t1.f or t1.f>=11)"
     end, {
         -- <randexpr-2.919>
-        
+
         -- </randexpr-2.919>
     })
 
@@ -9260,7 +9260,7 @@ test:do_test(
         return test:execsql "SELECT (select  -abs(max(+(select +count(*) from t1)))-max(case when b in (select (abs(13)/abs(b)) from t1 union select case when exists(select 1 from t1 where not exists(select 1 from t1 where (abs(17)/abs(coalesce((select max(+19*t1.e+case t1.f when (abs(f)/abs(t1.f)) then t1.f else e end) from t1 where 19<17),t1.a)))+11 in (select b from t1 union select t1.e from t1))) then d else t1.c end from t1) then f when 13=d then  -a else t1.a end) from t1) FROM t1 WHERE NOT (~(select ~ -(min(f)- -cast(avg(f) AS integer)-abs(count(distinct case when t1.d=b then d when e in (select +cast(avg(e) AS integer) from t1 union select count(*) from t1) then t1.f else c end*17*f))) | (count(*)) from t1)-f<>case when (select + -max(t1.e) from t1)+(select  -min(17) from t1)*13 between 17 and 19 then t1.b else t1.d end)"
     end, {
         -- <randexpr-2.922>
-        
+
         -- </randexpr-2.922>
     })
 
@@ -9280,7 +9280,7 @@ test:do_test(
         return test:execsql "SELECT case (select ( - - -(+max(c))+min(e)-(count(*))+cast(avg(t1.e) AS integer)-min(t1.a)*(cast(avg(11) AS integer))) from t1) when t1.d then t1.c else case (select max(a) from t1) when  -t1.b then case when not 17<>case when t1.e<=t1.d or ((t1.e))=t1.e then t1.f when e>=t1.b then 11 else t1.d end or d in (t1.f,t1.a,t1.a) then c | 17 when t1.f between t1.a and  -t1.e then d else t1.c end else t1.c end end-t1.c FROM t1 WHERE NOT (not (exists(select 1 from t1 where a<>11+t1.d-t1.a+(select count(distinct t1.d)++max(case e when coalesce((select 11 from t1 where a>=case when coalesce((select f from t1 where exists(select 1 from t1 where 13 in (t1.c,13,t1.a))),(d))+f not between d and t1.e then d else (t1.c) end-13),(d))-t1.d then t1.a else 17 end) from t1)) and not a<(d)*19))"
     end, {
         -- <randexpr-2.924>
-        
+
         -- </randexpr-2.924>
     })
 
@@ -9300,7 +9300,7 @@ test:do_test(
         return test:execsql "SELECT case t1.b when c*(case when ((select ++case abs(cast(avg(a) AS integer))*min(c) when min(t1.c) then cast(avg(t1.b) AS integer) else count(*) end | (count(distinct t1.c)) | ((max(t1.a))) | count(distinct b) from t1) not between t1.e and 11 and coalesce((select max(e) from t1 where a between t1.c and c+b),e) in (select t1.d from t1 union select t1.b from t1) or (not exists(select 1 from t1 where 13<>t1.a))) then 11*b else t1.b end) then t1.c else e end FROM t1 WHERE exists(select 1 from t1 where t1.d>=f)"
     end, {
         -- <randexpr-2.926>
-        
+
         -- </randexpr-2.926>
     })
 
@@ -9330,7 +9330,7 @@ test:do_test(
         return test:execsql "SELECT d-coalesce((select d from t1 where case when ~11*a*c>=17 then coalesce((select (abs(t1.e+c+(abs(f*(select abs((min(e))) from t1)-t1.f)/abs( - -a))-a)/abs(t1.d)) from t1 where f not in (e,b,t1.f) and c<>f),f)*19 else f end in (b,e,17)),13)-19 FROM t1 WHERE not f>=11"
     end, {
         -- <randexpr-2.929>
-        
+
         -- </randexpr-2.929>
     })
 
@@ -9360,7 +9360,7 @@ test:do_test(
         return test:execsql "SELECT f*t1.d+coalesce((select a+17-t1.e from t1 where 13=t1.f and not (t1.f | b*t1.d-t1.c*coalesce((select max(coalesce((select t1.f from t1 where f not in (13,a,d)),d)) from t1 where t1.a in (select cast(avg(c) AS integer) from t1 union select count(distinct b)*count(distinct t1.c) from t1)),((17)))+ -b+19+13)=t1.f and 19>=t1.a or  - -a>=t1.b),a) FROM t1 WHERE NOT (f not in (coalesce((select max(19) from t1 where (t1.e<=+t1.f*case when ~(abs(b)/abs(b)) in (f,t1.d,17) then (abs(t1.e-11 | d)/abs(coalesce((select d from t1 where not coalesce((select t1.a from t1 where not exists(select 1 from t1 where c>=t1.c)),d) in (select count(distinct f)*cast(avg(19) AS integer) from t1 union select count(distinct d) from t1)),13))) when not 11<=t1.a then t1.f else 19 end-19)),f)-17, -a,e))"
     end, {
         -- <randexpr-2.932>
-        
+
         -- </randexpr-2.932>
     })
 
@@ -9390,7 +9390,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select case e*+(abs(t1.f-t1.b)/abs(e))-d when coalesce((select t1.e from t1 where exists(select 1 from t1 where +d+ -t1.e not between case when (abs(b)/abs(t1.b)) between a and 17 then t1.b when not 11 not between b and d then 19 else 19 end and t1.f and t1.a between 17 and b)), -13) then (t1.a) else 13 end from t1 where 17 between b and 13), -19) | c FROM t1 WHERE NOT (case when t1.e*t1.b | f+d | f+11+(a)-+a+ -t1.c-t1.f | coalesce((select case t1.e when 17 then e else t1.a end from t1 where t1.a<t1.b),t1.b)*f<= -t1.a and c<t1.f then (select (max((b))) from t1) else t1.b end not in (a,a,t1.c))"
     end, {
         -- <randexpr-2.935>
-        
+
         -- </randexpr-2.935>
     })
 
@@ -9410,7 +9410,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.d*case when case when ~ -t1.d+17-b-13*t1.f*(abs(t1.b+13)/abs(t1.a))+a*t1.e*t1.a+c*t1.d-t1.a in (select t1.b from t1 union select t1.d from t1) then t1.e else t1.e end not in (t1.f,t1.e,19) then t1.d else 11 end) from t1 where d not between t1.a and a),c) FROM t1 WHERE t1.e in (select a from t1 union select +b-t1.b from t1)"
     end, {
         -- <randexpr-2.937>
-        
+
         -- </randexpr-2.937>
     })
 
@@ -9440,7 +9440,7 @@ test:do_test(
         return test:execsql "SELECT d*(select  - - -max( -(abs(e)/abs(~t1.c))) from t1)-13 | coalesce((select max(+t1.a*a) from t1 where t1.e+case e when a then t1.f+(select case ~ -max(d)* - -cast(avg(c) AS integer) when  -min( -t1.b) then min(t1.b) else count(distinct 13) end from t1)-a else ~case when t1.f not in (b,b,a) or c between d and t1.a then c when t1.b>b then e else t1.d end end-11>=13),e) | 13 FROM t1 WHERE NOT (not exists(select 1 from t1 where t1.c< -d or t1.e between c and  -t1.d or d<=17))"
     end, {
         -- <randexpr-2.940>
-        
+
         -- </randexpr-2.940>
     })
 
@@ -9470,7 +9470,7 @@ test:do_test(
         return test:execsql "SELECT t1.c*+case when a<>+case when b>t1.e or exists(select 1 from t1 where not exists(select 1 from t1 where t1.e in (select coalesce((select b from t1 where (d<f) or t1.e in ((t1.f),(t1.a),13) and (t1.e)<>( -t1.d)),(( -b))) from t1 union select t1.d from t1))) then (select  -max(t1.e)-count(*) from t1) else (t1.c) end+b+(t1.f) | f | e then t1.d when t1.f not in (19,13,e) then 13 else 11 end FROM t1 WHERE NOT ((f<>coalesce((select max(a) from t1 where (exists(select 1 from t1 where c between t1.b and case when (abs(19)/abs(t1.f)) in (t1.f,17,t1.a) then t1.b when t1.d<=t1.a then t1.a else c end or c<c) or 13>=b and c>=t1.d and t1.d between c and t1.c)),e+case (select count(distinct case 19 when 13 then t1.b else 11 end) from t1) when 13 then b else t1.b end)-17-17))"
     end, {
         -- <randexpr-2.943>
-        
+
         -- </randexpr-2.943>
     })
 
@@ -9490,7 +9490,7 @@ test:do_test(
         return test:execsql "SELECT case when (e)- -((select case min(case when e in (select coalesce((select max(d) from t1 where 13<>(t1.d-e)),e) from t1 union select c from t1) then d else  -11 end+a) when count(distinct  -f) then count(*) else  -(case cast(avg(17) AS integer)- -count(distinct t1.c)+cast(avg(b) AS integer) when  -max(11) then count(*) else cast(avg(t1.e) AS integer) end+max(t1.f)) end from t1))<=t1.b | t1.e then t1.d when not exists(select 1 from t1 where c<>13) then 11 else d end FROM t1 WHERE (select max(t1.a*case f when b then ~case when not exists(select 1 from t1 where f-d>(select abs(cast(avg(~17+b+d) AS integer)) from t1) or f-e in (select b from t1 union select t1.d from t1) or exists(select 1 from t1 where 13<>b)) then (abs(a)/abs( -d)) when (d<t1.a) then e else t1.e end else t1.a end) from t1)*t1.e in (select t1.f from t1 union select t1.b from t1)"
     end, {
         -- <randexpr-2.945>
-        
+
         -- </randexpr-2.945>
     })
 
@@ -9520,7 +9520,7 @@ test:do_test(
         return test:execsql "SELECT (t1.b+coalesce((select case when e-13+11 | f+case when not t1.b not between t1.f and t1.f then e else (t1.e) end-c-b+c>=e and d between d and a then t1.c when (t1.c>19) then  -11 else a end from t1 where a<d),e)+f+t1.e*d)*17 FROM t1 WHERE t1.b in (select cast(avg(17) AS integer) from t1 union select ~case (+abs(cast(avg((d)) AS integer))) when count(distinct case when (case when c>c then t1.e else  -d end-t1.e) between b and 11 then b when exists(select 1 from t1 where a<=d) then 11 else 13 end) then cast(avg(t1.b) AS integer)-(cast(avg(11) AS integer)-min(a))-count(distinct  -e) else cast(avg(13) AS integer) end*max(b) from t1) or (t1.f not between t1.d and 17 | 19*e)"
     end, {
         -- <randexpr-2.948>
-        
+
         -- </randexpr-2.948>
     })
 
@@ -9560,7 +9560,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(+19) from t1 where t1.f>=(abs(19)/abs(t1.c*(select count(distinct (abs(t1.f)/abs(t1.c))*coalesce((select max(case when (select count(*) from t1)*t1.f in (t1.b,17,t1.f) then d when t1.e not in (t1.b,t1.a,t1.b) then  -17 else t1.d end) from t1 where (11 not in (t1.b,(f),t1.c)) and t1.c>=t1.f),e)) from t1))) or ((t1.d<=t1.b))),13) FROM t1 WHERE NOT (t1.a<>(coalesce((select coalesce((select max(t1.a) from t1 where case  -t1.c when t1.b then coalesce((select t1.b from t1 where not exists(select 1 from t1 where not exists(select 1 from t1 where ((select count(*)++count(distinct a) from t1) not between b and +(17))))),19)*t1.e else f end<=(t1.b)),t1.c) from t1 where d<>b),13)-17+a)+d+(19)+a or d between 11 and  -11)"
     end, {
         -- <randexpr-2.952>
-        
+
         -- </randexpr-2.952>
     })
 
@@ -9580,7 +9580,7 @@ test:do_test(
         return test:execsql "SELECT t1.b-coalesce((select max(~t1.a) from t1 where coalesce((select max(t1.d) from t1 where coalesce((select max(coalesce((select t1.c*t1.d from t1 where not f>=a-t1.c+ -coalesce((select t1.f*e from t1 where (not exists(select 1 from t1 where d<=19))),b)-d),13)* -e) from t1 where (d<19 or 13 not between t1.f and t1.d)),11) between 17 and 19),t1.c)< -b),d) FROM t1 WHERE NOT (+case when b in (b+~b+t1.f,coalesce((select max(13) from t1 where exists(select 1 from t1 where 17<>+a or not exists(select 1 from t1 where e+19=f))),(e)),case when c>case when coalesce((select 13 from t1 where f>=t1.b and c not between t1.e and t1.d),11) in (select (case max(11) when (min(b)) then min( -d) else cast(avg(t1.e) AS integer) end) from t1 union select max(19) from t1) then t1.d else 13 end then t1.f else t1.e end) or b>=(t1.f) then t1.e else t1.e end*b>f)"
     end, {
         -- <randexpr-2.954>
-        
+
         -- </randexpr-2.954>
     })
 
@@ -9600,7 +9600,7 @@ test:do_test(
         return test:execsql "SELECT (select count(distinct + - -f-c-17*a+(t1.d)-+((select abs( - - -count(distinct 13)-count(*)*count(distinct t1.d)*count(*))-cast(avg(f) AS integer) from t1))-~19+13- -d*t1.e*(19)+ -f- -b) from t1)-e FROM t1 WHERE NOT (not t1.c between t1.f and coalesce((select coalesce((select case when exists(select 1 from t1 where +~f=case when d<>t1.d then t1.f else  -d end and d between 17 and t1.c) then ~case when a in (d,c,t1.d) then 17 else t1.f end when f=f then d else  -b end from t1 where c>f),e) from t1 where not exists(select 1 from t1 where t1.d<=c) and 19=(11) and t1.e<>19),a))"
     end, {
         -- <randexpr-2.956>
-        
+
         -- </randexpr-2.956>
     })
 
@@ -9610,7 +9610,7 @@ test:do_test(
         return test:execsql "SELECT case when f-t1.b*coalesce((select max(11) from t1 where exists(select 1 from t1 where (abs(t1.b)/abs(13-11))=(19+c))),coalesce((select t1.c | f from t1 where (abs(c*19)/abs(17))=t1.e),19))-e between t1.f and  -((19)) and 13 not between t1.c and 11 and not exists(select 1 from t1 where t1.b>b) then t1.d when t1.c>=13 then c else f end FROM t1 WHERE e-t1.c=+e*~coalesce((select max(t1.f) from t1 where (t1.f in (coalesce((select max(11) from t1 where  -13<>(13)-(select (count(*)) from t1)*t1.f and ( -11+t1.b+b*b-(select max(13) from t1)) in (t1.f,a,f)),d),17,13))),t1.f)-e"
     end, {
         -- <randexpr-2.957>
-        
+
         -- </randexpr-2.957>
     })
 
@@ -9640,7 +9640,7 @@ test:do_test(
         return test:execsql "SELECT t1.e+case when coalesce((select  -(abs(t1.e)/abs(t1.c-t1.e)) from t1 where d | d between  -t1.d and ~case t1.d when t1.f then ((abs((select ((min(b)+abs(cast(avg(t1.a) AS integer)*(max(19))))-(cast(avg(t1.d) AS integer))) from t1)*~f)/abs(t1.a*t1.c)))*17 else 19 end),f)- -c<>t1.c then f else t1.f end FROM t1 WHERE 19*coalesce((select max(a) from t1 where not (select count(distinct ~t1.b | t1.d) from t1)<case when b+(case when t1.c not in (f,(b),t1.c) then t1.d else 19 end)>t1.e then c when  -b<11 then t1.c else  -t1.e end and not d in ( -t1.d,t1.a,f) and c=t1.f and f<>t1.a),t1.b) between t1.a and b"
     end, {
         -- <randexpr-2.960>
-        
+
         -- </randexpr-2.960>
     })
 
@@ -9680,7 +9680,7 @@ test:do_test(
         return test:execsql "SELECT t1.b*coalesce((select max(e) from t1 where ((t1.d))<=case case when +coalesce((select (abs(t1.a)/abs(c))-(abs( -e)/abs(11* -t1.b+t1.d* -c))-t1.c from t1 where not exists(select 1 from t1 where t1.c=(11))), -11) between 17 and t1.a then t1.a when t1.b>t1.e then (b) else b end-c when d then d else t1.f end),((t1.e))) FROM t1 WHERE NOT (~ -case when not exists(select 1 from t1 where t1.b between b and 11 | d) then  -(abs(17+d)/abs(e)) else case when not (t1.d>=case when case a when case t1.f when (e) then 17 else 19 end then 13 else 19 end in (t1.e,b,((t1.b))) then d when t1.d not in (19,t1.a, -c) then 11 else  -a end) then 11 else c end end*17*t1.b not in (a,b,13))"
     end, {
         -- <randexpr-2.964>
-        
+
         -- </randexpr-2.964>
     })
 
@@ -9700,7 +9700,7 @@ test:do_test(
         return test:execsql "SELECT e*case +case when not (select max(17) from t1)>=case when not d=c+t1.c then 11 else 11 end or (c in (select t1.c from t1 union select c from t1) or 11<=t1.a) or d<=11 or 19 in ( -13,d,19) or a not between 13 and (t1.c) then case when t1.f<=(t1.a) then t1.e+13*e when (t1.b) not between f and a then c else 11 end*11 else a end when 19 then t1.a else 17 end FROM t1 WHERE NOT (b<>17)"
     end, {
         -- <randexpr-2.966>
-        
+
         -- </randexpr-2.966>
     })
 
@@ -9710,7 +9710,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case when (13+e in (select min(a) | case abs(min(case when t1.e in (select b from t1 union select a from t1) then t1.e when t1.b=t1.c then t1.b else c end-f)) when ~(cast(avg(c) AS integer)) then min(t1.e) else count(*) end from t1 union select min(f) from t1)) and t1.d not between c and 13 then coalesce((select t1.d from t1 where t1.e<>a),19)-t1.d else 19 end)/abs(c))-c+11+c FROM t1 WHERE t1.e<f+11-b"
     end, {
         -- <randexpr-2.967>
-        
+
         -- </randexpr-2.967>
     })
 
@@ -9750,7 +9750,7 @@ test:do_test(
         return test:execsql "SELECT case when case when not exists(select 1 from t1 where (11 not between ~~t1.d-case c when coalesce((select case f when coalesce((select max(t1.f) from t1 where 11 not in (((13)),d,t1.d)),11) then f else a end from t1 where 11 not between (t1.a) and 17),t1.c)-c*17 then (17) else t1.b end+t1.d+t1.a and d)) then t1.e-11+19 else (d) end*d<=11 then t1.b else f end FROM t1 WHERE NOT (not exists(select 1 from t1 where d>=t1.f))"
     end, {
         -- <randexpr-2.971>
-        
+
         -- </randexpr-2.971>
     })
 
@@ -9760,7 +9760,7 @@ test:do_test(
         return test:execsql "SELECT 13 | t1.c+case when (not t1.d-c between +t1.b and  -coalesce((select (select count(distinct 17) from t1)*a from t1 where  -case when not t1.f in (select count(distinct 13) from t1 union select min( -t1.a) from t1) then case when (t1.e)< -11 then  -c else t1.a end else d end-c*t1.a-d+ -e-t1.a not in (17,e,t1.a)),b) | t1.f) then c else 11 end FROM t1 WHERE case when (+e | (t1.e) | 11)<>b then t1.b when t1.e<>~(case when (t1.a*b) in (select d from t1 union select b from t1) or t1.c not in (t1.a,t1.d,13) and t1.f in (select case min(19) when min(17) then min(19) else count(distinct t1.e) end from t1 union select (count(*)) from t1) then t1.f else b end)+11 then b else 13 end+t1.d between b and 17"
     end, {
         -- <randexpr-2.972>
-        
+
         -- </randexpr-2.972>
     })
 
@@ -9790,7 +9790,7 @@ test:do_test(
         return test:execsql "SELECT case when case when t1.a<>t1.d then d*t1.a*11-e-(+11+d)-e else (select case  -count(distinct t1.e) when cast(avg(b) AS integer) then count(distinct t1.d) else cast(avg(13) AS integer) end*cast(avg(19) AS integer) from t1) end<>case e when e then t1.e else (t1.f) end or not exists(select 1 from t1 where 19=f) and  -t1.d>t1.e then t1.e+e*e when 11=t1.c then e else c end FROM t1 WHERE ~c>(case when t1.e<=e then case when case when 17+f in (d,t1.d | t1.c,t1.b) and 13<>19 or not t1.c<f then coalesce((select max(b) from t1 where c not between b and t1.c),c)+(17) when d<=t1.c then t1.b else t1.c end-b not in (a,f,11) then c else 17 end else f end)"
     end, {
         -- <randexpr-2.975>
-        
+
         -- </randexpr-2.975>
     })
 
@@ -9810,7 +9810,7 @@ test:do_test(
         return test:execsql "SELECT case when (13 in (select ~t1.c from t1 union select case when t1.a in (select t1.f-t1.e | t1.c+19 from t1 union select coalesce((select max(13) from t1 where e in (select ~19-(select case count(*)-cast(avg(c) AS integer) when cast(avg(t1.f) AS integer) then  -max(d) else min(t1.d) end | ( -cast(avg(t1.a) AS integer)) from t1)-b*d-coalesce((select max(f) from t1 where not t1.c=c),b) from t1 union select 13 from t1)),a) from t1) then t1.c else t1.b end from t1)) then (abs(c)/abs(19)) else c end FROM t1 WHERE coalesce((select  -case (select count(*) from t1) when d*+b then a else d end from t1 where b not in (11*case t1.e when case +coalesce((select b+19*+case t1.c when t1.a then t1.b else t1.f end*f*11 from t1 where t1.a=t1.f),c) when t1.e then 17 else d end then t1.f else t1.b end,f,d)),t1.d) in (13,e, -b)"
     end, {
         -- <randexpr-2.977>
-        
+
         -- </randexpr-2.977>
     })
 
@@ -9840,7 +9840,7 @@ test:do_test(
         return test:execsql "SELECT ~case when exists(select 1 from t1 where ((coalesce((select d from t1 where t1.e-f | +t1.d between t1.c and t1.a or exists(select 1 from t1 where 19 in (11,11,13)) and 17 in (select case min(d) when count(*) then (min(13)) else  -(cast(avg( -c) AS integer)) end*count(distinct 19) from t1 union select count(distinct e) from t1)),f) | c*b<= -b or not not t1.c<13 or (t1.f)>=t1.f))) and t1.c not in (17,b,e) then a else (select count(distinct t1.d) from t1) end FROM t1 WHERE (select (count(*)) from t1) between 11 and t1.d"
     end, {
         -- <randexpr-2.980>
-        
+
         -- </randexpr-2.980>
     })
 
@@ -9880,7 +9880,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(b) from t1 where not not c*t1.e>=19 or case when 17<=t1.b and case when 13 not between d and  -f then case e when 11 then case when e in (select ( -d) from t1 union select e from t1) and 19<=(a) then t1.a else (19) end else f end else t1.a end+t1.a<19 then ~d when e in (a,11, -b) then b else e end not between f and 13),a) FROM t1 WHERE NOT (t1.a>=+a)"
     end, {
         -- <randexpr-2.984>
-        
+
         -- </randexpr-2.984>
     })
 
@@ -9890,7 +9890,7 @@ test:do_test(
         return test:execsql "SELECT case when case when 11 between a+a+t1.b and b then c*e-t1.c*t1.a when +b<= -t1.c-t1.e-19*t1.b+c*t1.b then e else d end-(11)-e<d then 11 when 13=t1.e then a else 13 end+c-d FROM t1 WHERE ~coalesce((select max((select count(*) from t1)+t1.f) from t1 where 17 in (~t1.a,d,13)), -(select max(13) from t1) | coalesce((select c from t1 where t1.e* -coalesce((select 17 from t1 where (abs(t1.a+t1.d)/abs(t1.f))*t1.e | 17 | 11 not in ((t1.d),c,t1.c)),13)*13 in (11,t1.e,a)),19)) in (13,13,c)"
     end, {
         -- <randexpr-2.985>
-        
+
         -- </randexpr-2.985>
     })
 
@@ -9910,7 +9910,7 @@ test:do_test(
         return test:execsql "SELECT c-case 17 when c+b-t1.a-a*coalesce((select max(t1.c) from t1 where t1.b- -(abs(13)/abs(t1.e)) in (case t1.f when f then coalesce((select max(coalesce((select 13 from t1 where exists(select 1 from t1 where f not between e and c)),e)) from t1 where d not between t1.a and 13),d)-b else a end, -13,(t1.f)) and 13 between e and 17),a) | a then t1.d else e end+ -t1.e FROM t1 WHERE not exists(select 1 from t1 where coalesce((select  -+t1.c | case when a in (select case max(+b) when ~count(*) then count(*) else (abs((max(f)))) end from t1 union select  -max(e) from t1) then case when (t1.d>=11) or t1.c not between t1.d and  - -11 then t1.a when 11 not between  -t1.e and t1.a then 11 else t1.b end when (d not in (a,c,19)) then f else c end*17 from t1 where  -11<=t1.c),t1.c)+f not in (t1.f, -d,19))"
     end, {
         -- <randexpr-2.987>
-        
+
         -- </randexpr-2.987>
     })
 
@@ -9950,7 +9950,7 @@ test:do_test(
         return test:execsql "SELECT (select ( -count(distinct case case a when e then c*case when e<=t1.d+b then a when (abs(t1.f)/abs(case when b-coalesce((select max(t1.f-t1.b) from t1 where not exists(select 1 from t1 where 17 in (b,13,(b)) or b in (d,c,t1.e))),t1.b) not in (d,((c)),t1.b) then  -19 when c between a and 13 then 19 else t1.f end))=13 then f else 13 end else 17 end when 13 then t1.f else t1.b end-t1.c)) from t1) FROM t1 WHERE NOT (coalesce((select max(t1.d) from t1 where t1.c<>t1.c-13),t1.a)>=d or b*coalesce((select max((d)) from t1 where c not between +coalesce((select max(13) from t1 where e between  -(abs(( -coalesce((select max(case f when t1.f then e else  -t1.c end) from t1 where 11>e and t1.b<t1.e),t1.c)))/abs(b)) and d),a) and t1.e),t1.b)* -19 not between (17) and t1.f and (t1.e<=a))"
     end, {
         -- <randexpr-2.991>
-        
+
         -- </randexpr-2.991>
     })
 
@@ -9970,7 +9970,7 @@ test:do_test(
         return test:execsql "SELECT case when (11=(t1.b)) then t1.c-coalesce((select case when t1.f*c-b<>b then t1.a else e end | f from t1 where 13 in (select abs(~max((17))) from t1 union select cast(avg(t1.b) AS integer)-min(19) from t1)), -t1.a) when c<d or (e=17 or t1.f in (select min(t1.a) from t1 union select max(a) from t1)) then e else d end*b+t1.e FROM t1 WHERE NOT ((select case case case cast(avg(+(select abs(+count(distinct t1.d)-count(distinct t1.b) | max(17)) |  -cast(avg(f) AS integer)*count(*) from t1)) AS integer) when  -count(*)* - -max(b) then (count(distinct 19)) else max(t1.e) end when count(*) then count(*) else cast(avg(t1.c) AS integer) end when max(c) then (cast(avg(t1.c) AS integer)) else min(t1.f) end-max(17) | min((11)) from t1)<>+case ~e+~t1.d | 13 when case when t1.c<=t1.c or (11)=t1.a then 11 when  -11 in (17,11, -d) then t1.a else t1.b end then 19 else 13 end* -t1.c)"
     end, {
         -- <randexpr-2.993>
-        
+
         -- </randexpr-2.993>
     })
 
@@ -9990,7 +9990,7 @@ test:do_test(
         return test:execsql "SELECT case when (f in (select count(distinct 17) from t1 union select count(distinct t1.b) from t1)) then d when e in (coalesce((select max(e+e) from t1 where exists(select 1 from t1 where not exists(select 1 from t1 where 11-t1.a in (select case  -max(11)-max(b) when min(t1.f) then count(distinct f) else count(distinct t1.c) end | count(*) from t1 union select min( -a) from t1)) and t1.e in (select count(distinct  -t1.e) from t1 union select count(distinct a) from t1) and d not in (b,f,t1.d)) and a between t1.c and t1.e),f),c,11) then c else t1.f end | a FROM t1 WHERE coalesce((select a from t1 where t1.a | (17-coalesce((select t1.b from t1 where ~t1.f | t1.e=d and a<=19+(select (cast(avg(c) AS integer)) from t1)),t1.c))+t1.e*t1.d+t1.c not between t1.d and 19), -t1.d) in (select (count(*)) from t1 union select (++~min(c)*+max(t1.a)+cast(avg( -(t1.e)) AS integer)) from t1)"
     end, {
         -- <randexpr-2.995>
-        
+
         -- </randexpr-2.995>
     })
 
@@ -10030,7 +10030,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select t1.b from t1 where a not in (19,coalesce((select max(t1.f) from t1 where (select count(distinct t1.b) from t1) in (t1.e,t1.f*13-11,d)),(t1.f))-17*c,c) or t1.c<=11),19)>13 and f not in (t1.a,11,t1.d) then (((e))) when f=11 or f not in (a,19,17) then 13 else e end FROM t1 WHERE NOT (c in (select min(t1.a*a+(select count(distinct t1.b+(t1.a)- - -c) from t1)-t1.e) from t1 union select count(*) from t1) and c in (select min(t1.d) from t1 union select cast(avg(d) AS integer)+abs(case count(*) when count(distinct 11) then  -count(distinct 19) else count(distinct (t1.b)) end) | cast(avg((t1.c)) AS integer)+count(*) from t1) and e=13 and t1.d>c or 13 not in (17,(t1.f),t1.a) or (11)=t1.b and t1.e>=a or 11<=t1.b or d<=17)"
     end, {
         -- <randexpr-2.999>
-        
+
         -- </randexpr-2.999>
     })
 
@@ -10040,7 +10040,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.d not between (abs(d)/abs(t1.e))+t1.f*t1.a*a and 17*e then case when 11 between a and coalesce((select max(t1.b) from t1 where (case when t1.e+(t1.b) not in (t1.e,d,f) or 13<>17 then 17 when a>e then 11 else a end in (select count(*) from t1 union select min(a) from t1))),17) then 19 when  -11 in (select t1.c from t1 union select  -19 from t1) or  - - -t1.e=t1.a then 17 else t1.a end else t1.e end FROM t1 WHERE (select +count(distinct f) from t1)-t1.f between t1.f and c"
     end, {
         -- <randexpr-2.1000>
-        
+
         -- </randexpr-2.1000>
     })
 
@@ -10070,7 +10070,7 @@ test:do_test(
         return test:execsql "SELECT case when (case when e between t1.b and c+(select cast(avg( -case c when a then t1.f+c else 17 end) AS integer) from t1) then t1.e when not 19>=t1.a then 17 else d end in (select cast(avg(13) AS integer)-max(11) | +count(*) from t1 union select case (cast(avg(d) AS integer)) when min(a) then abs( -max(19)) else count(*) end from t1)) then (t1.a) else c end |  -e*a FROM t1 WHERE NOT (f*t1.d*(abs(case d when coalesce((select max((abs(t1.e)/abs(t1.f))) from t1 where ((e between (b) and 13) or t1.d=(c)) and t1.f between 17 and t1.e),a) then  -b else  -e end+ -t1.e)/abs(t1.c))+f<=17 or t1.f not between f and t1.e or (t1.c in (select 17 from t1 union select f from t1)) or exists(select 1 from t1 where (a not in (d,t1.a,t1.e) and t1.a in (t1.a,c,19))) and f not in (t1.d,t1.c,c))"
     end, {
         -- <randexpr-2.1003>
-        
+
         -- </randexpr-2.1003>
     })
 
@@ -10090,7 +10090,7 @@ test:do_test(
         return test:execsql "SELECT  -case coalesce((select case when f<>t1.d | c-(e)*t1.b and 17 in (select t1.b from t1 union select  -(t1.c) from t1) or t1.e>=11 and t1.f not between b and f or e not in (11,19,t1.e) and t1.c<=a then coalesce((select max(t1.f+t1.f) from t1 where  -t1.a<t1.f),t1.c) when e not in (t1.c,t1.d,t1.e) then t1.f else t1.e end-d from t1 where e>=13),e) when t1.e then c else t1.a end FROM t1 WHERE coalesce((select t1.f from t1 where (t1.e>=case (abs(11)/abs(t1.a)) when 11 then case t1.c when t1.a then t1.e else a end else t1.f end+t1.d) and (exists(select 1 from t1 where t1.b not in (t1.b,a,19))) or t1.a>=11),(select abs((~cast(avg(t1.b) AS integer)-~cast(avg((t1.b)) AS integer)* -count(*))+ -count(distinct t1.b)) from t1)*19)<=f and b in (select count(*) from t1 union select  -min(d) from t1)"
     end, {
         -- <randexpr-2.1005>
-        
+
         -- </randexpr-2.1005>
     })
 
@@ -10130,7 +10130,7 @@ test:do_test(
         return test:execsql "SELECT case when exists(select 1 from t1 where exists(select 1 from t1 where  -case when t1.d<=coalesce((select t1.d | (f)*t1.a from t1 where not exists(select 1 from t1 where t1.f not in ((e),t1.e,13) or t1.a not between a and  -t1.d or (f) not between f and 13)),19) then e when (t1.f)<19 or e<=d then b else d end in (select case ~ -(cast(avg(b) AS integer)*cast(avg(t1.b) AS integer)*min(t1.f)) | count(*) when min(t1.c) then ( - -count(distinct  -d)) else count(*) end from t1 union select cast(avg(f) AS integer) from t1) and b<a)) then t1.b else t1.d end FROM t1 WHERE NOT (case case when case when not d<t1.a+t1.d+t1.c then ~f when ((not exists(select 1 from t1 where 19 in ( -(t1.f),17, -e)))) or f not between a and a then t1.f else 19 end in (select min(e)-~ -count(*)*(count(*))+count(*)*min(e) from t1 union select  -( -( -count(*))) from t1) then 11 when e<=f then 17 else 13 end+(19)+f when c then b else c end<>t1.b or 19<>t1.f)"
     end, {
         -- <randexpr-2.1009>
-        
+
         -- </randexpr-2.1009>
     })
 
@@ -10160,7 +10160,7 @@ test:do_test(
         return test:execsql "SELECT case when ~+11<>f then case e when 11 then coalesce((select case d when t1.e-coalesce((select a+t1.c from t1 where (d) in (select +min(t1.f)+count(*) from t1 union select count(distinct t1.e) from t1)),t1.f) then t1.c else d end from t1 where t1.f in (select t1.f from t1 union select b from t1) or (t1.a not in ( -a,t1.a,t1.b))),t1.c) else t1.f end-t1.f when not exists(select 1 from t1 where b between f and t1.a) then t1.c else t1.f end FROM t1 WHERE NOT (t1.a<=coalesce((select max(b) from t1 where coalesce((select t1.c*case when coalesce((select max((select count(*) from t1)) from t1 where not not exists(select 1 from t1 where case t1.b | a when t1.f then c else 11 end<>f and 13>=13 and f between t1.b and c)),13)=case e when a then 19 else d end then t1.b when t1.a not in (a,t1.b,a) then e else b end-d from t1 where t1.f between t1.d and t1.e),e)>t1.f),17)+t1.f)"
     end, {
         -- <randexpr-2.1012>
-        
+
         -- </randexpr-2.1012>
     })
 
@@ -10170,7 +10170,7 @@ test:do_test(
         return test:execsql "SELECT (abs(d)/abs(t1.f++(select cast(avg(coalesce((select max(b) from t1 where case when t1.a*+(abs( -t1.b)/abs((select cast(avg(13) AS integer) from t1)))<=(t1.c-t1.d- -t1.c) then case d when 17 then  -t1.d else f end when t1.b between t1.b and t1.b then a else t1.d end in (select count(*) from t1 union select abs(cast(avg(13) AS integer)) | min(t1.c) from t1) or ((13))>=b),17)) AS integer) from t1)+13)) FROM t1 WHERE coalesce((select +t1.a from t1 where not exists(select 1 from t1 where (select cast(avg(13) AS integer) from t1)<=(abs( -11)/abs(t1.f))*coalesce((select t1.e from t1 where not t1.f in (select max(+b-t1.d) from t1 union select + -(abs(cast(avg((t1.b)) AS integer)))-+count(*)-(min(13)) from t1)),d+t1.d*t1.d) | (17)-t1.b)),f) in (select max(t1.c) from t1 union select count(distinct f) from t1)"
     end, {
         -- <randexpr-2.1013>
-        
+
         -- </randexpr-2.1013>
     })
 
@@ -10200,7 +10200,7 @@ test:do_test(
         return test:execsql "SELECT case t1.a when (select ~max(coalesce((select (t1.b-a*+t1.c-t1.e) from t1 where not 11*t1.f++t1.f-t1.a*f*+t1.e*t1.b>17 and 19+e not in (t1.c,t1.b,a)),19)) from t1) then 19*11 else d end | (17) | t1.d FROM t1 WHERE exists(select 1 from t1 where coalesce((select max(13) from t1 where t1.e not in (d,13-19,17) or e*19=d or ((t1.a< -t1.a or 11- -t1.d-case when 13<( -t1.e) then a else e end*t1.b+t1.e in (select t1.d from t1 union select t1.e from t1) and 19<>d))),b)+11*11=t1.e)"
     end, {
         -- <randexpr-2.1016>
-        
+
         -- </randexpr-2.1016>
     })
 
@@ -10240,7 +10240,7 @@ test:do_test(
         return test:execsql "SELECT t1.a-coalesce((select 11-case when 11<19-f+t1.a then a | (t1.a+++(select cast(avg((abs(t1.d | e)/abs((abs(t1.a)/abs(13))))) AS integer)-max(a) from t1)+e+13*19+t1.a-c) else 13 end+t1.e-19 from t1 where 13>t1.f),e) FROM t1 WHERE NOT (~(abs((select max( -case when d+(11)*d between coalesce((select 11 from t1 where (t1.f)=e),d*f) and t1.e then d-case when a<> -17+(abs(t1.d)/abs(t1.f)) then t1.f else t1.e end*11+c-(c) else d end) from t1)*t1.e)/abs((t1.f)))-f<>11)"
     end, {
         -- <randexpr-2.1020>
-        
+
         -- </randexpr-2.1020>
     })
 
@@ -10270,7 +10270,7 @@ test:do_test(
         return test:execsql "SELECT d | (select (cast(avg((abs(case when b*(abs((abs(case f when 17 then t1.e else t1.c end)/abs( -d)))/abs(t1.c)) in (d,a,a) then 19 when (exists(select 1 from t1 where t1.c=t1.a) or a<>d) then a else c end)/abs(t1.e))-17) AS integer)* -min(19)-count(distinct a)-+count(distinct 17)*min(t1.a)+ -cast(avg(t1.a) AS integer)- -max(17) | max(e)) from t1) FROM t1 WHERE NOT ( -f-t1.f++e+case when not (((select abs(count(*)) from t1)) not in ((case when (t1.b>t1.c) then t1.b else f end),e,13)) and not exists(select 1 from t1 where 11 in (select t1.f from t1 union select ((t1.f)) from t1)) then (t1.e)+c-c+c when  -b in (13,19,t1.c) then 17 else 13 end-d | t1.a not in (a,b,b))"
     end, {
         -- <randexpr-2.1023>
-        
+
         -- </randexpr-2.1023>
     })
 
@@ -10300,7 +10300,7 @@ test:do_test(
         return test:execsql "SELECT 11-(select min((abs(e)/abs(f*t1.e*c+17+~case when f | 11 between (select case  -max(19) when (cast(avg(t1.a) AS integer)) then count(distinct t1.f) else count(*) end from t1) and coalesce((select 13 from t1 where a<=(t1.d)),f)-a then t1.a when f in (select 17 from t1 union select  -b from t1) and t1.d<a or d<>(17) or 19>=d then (f) else 11 end))) from t1) FROM t1 WHERE NOT (e in (e, -17*t1.c*17,e))"
     end, {
         -- <randexpr-2.1026>
-        
+
         -- </randexpr-2.1026>
     })
 
@@ -10330,7 +10330,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max( -t1.d-f+~t1.d*t1.b) from t1 where (select ~+min(t1.f)+abs(min(+(select cast(avg((b)) AS integer) from t1)-d*d))-max(f)-count(distinct 19) | count(*)*count(*) from t1)>c),case 13 when +t1.c-t1.c-t1.a then c else c end*d) FROM t1 WHERE NOT (((t1.b>=case when not exists(select 1 from t1 where not exists(select 1 from t1 where not exists(select 1 from t1 where e>=t1.a or (coalesce((select max(coalesce((select case when a in (select t1.d from t1 union select t1.c from t1) then a when  -b in (17,c,t1.f) then f else b end from t1 where not exists(select 1 from t1 where f<=13)),17)) from t1 where t1.f>=t1.b),d) between t1.f and 11) or t1.b between 13 and t1.b))) then a when e<=17 then t1.b+ -~11 else a end and not e>= - -b or 13 not in (c,f,11)) and d not between 11 and t1.a))"
     end, {
         -- <randexpr-2.1029>
-        
+
         -- </randexpr-2.1029>
     })
 
@@ -10360,7 +10360,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.d<>coalesce((select 13 from t1 where (d in (select case when (13<>t1.a*d-19-+11*13-t1.c) then case when t1.c=d then e else t1.b end when not exists(select 1 from t1 where 17<>t1.b) then t1.e else t1.e end | t1.a+t1.e from t1 union select t1.d from t1))),t1.f) or a> -t1.e then 11 else 17 end*d FROM t1 WHERE NOT (t1.a-d<=d-(abs(coalesce((select b from t1 where ~e<case when (case when case when d>=13 then t1.d else (t1.c) end not between t1.a and 13 then a when (17) not between 11 and t1.c then a else a end) not between 13 and t1.d then 13 else a end),19))/abs(t1.e))+t1.c+t1.e*b+c or ((17 in (select f from t1 union select t1.e from t1))))"
     end, {
         -- <randexpr-2.1032>
-        
+
         -- </randexpr-2.1032>
     })
 
@@ -10380,7 +10380,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select (abs(c)/abs(case when 13<=11 then t1.a when case t1.d when (11) then coalesce((select coalesce((select d-17 from t1 where t1.e=a),11) from t1 where 13 in (select t1.e from t1 union select c from t1)),19) else d end>=t1.f or 11 in (select cast(avg(t1.f) AS integer) from t1 union select ( - -count(*)) from t1) and t1.c between 13 and  -b then f else e end)) from t1 where d<=(19)),d)-t1.b FROM t1 WHERE 17>=case when t1.c not in (f,t1.a,c*17*a | t1.c-~t1.d+(+coalesce((select max(case when exists(select 1 from t1 where (t1.e in (select  -t1.e from t1 union select t1.c from t1))) then t1.b else t1.b*t1.b end) from t1 where not exists(select 1 from t1 where 17=t1.a)),d))+t1.e | (13)*t1.e+c) and e in (select  -c from t1 union select 17 from t1) then t1.d*13 else c end- -e"
     end, {
         -- <randexpr-2.1034>
-        
+
         -- </randexpr-2.1034>
     })
 
@@ -10400,7 +10400,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case when t1.a in (select case when d=(select ~cast(avg(t1.a) AS integer) | ~+min(17*(abs(19)/abs(t1.a))) from t1) or 13 in (select count(distinct t1.b | 11) from t1 union select count(*) | count(distinct c) | count(distinct 17) from t1) and not b<=17 then t1.a when 11=t1.f then (abs(t1.c)/abs(11)) else f end from t1 union select c from t1) then t1.c else a end)/abs(t1.d))-t1.d FROM t1 WHERE ((abs(e)/abs(t1.a* -(coalesce((select max(t1.b-t1.d) from t1 where f>=13),~a+ -a)) | case when not exists(select 1 from t1 where coalesce((select max(c) from t1 where 19-t1.a | e<=17),~( -t1.a)) in (select f from t1 union select t1.d from t1)) then t1.d else (t1.c) end)) in (17,f,t1.a)) or 19=13 or 19=17"
     end, {
         -- <randexpr-2.1036>
-        
+
         -- </randexpr-2.1036>
     })
 
@@ -10430,7 +10430,7 @@ test:do_test(
         return test:execsql "SELECT case when f>coalesce((select c from t1 where coalesce((select max(c+c) from t1 where t1.f in (select  - -abs(max(19))+(min(a)) from t1 union select count(distinct  -t1.d) from t1)),e)>=e),t1.f) | t1.a | 19 or (t1.c) not in (19, - -t1.f,t1.c) or exists(select 1 from t1 where t1.b not between t1.a and  -11) then coalesce((select  -b from t1 where  -t1.a in (select c from t1 union select 17 from t1)),t1.d) when t1.a=c then c else t1.e end FROM t1 WHERE t1.e in (select +cast(avg(f) AS integer) from t1 union select case +max(19) | count(*) when count(*)*+count(*) then ~+count(*) else count(*) end from t1)"
     end, {
         -- <randexpr-2.1039>
-        
+
         -- </randexpr-2.1039>
     })
 
@@ -10460,7 +10460,7 @@ test:do_test(
         return test:execsql "SELECT +case t1.d when d then t1.f else +t1.b+(select  -count(distinct coalesce((select max(c) from t1 where exists(select 1 from t1 where 17 not between d and e)),case when t1.f+f-~17<>d then case when exists(select 1 from t1 where t1.d=(13)) then t1.e when c=t1.e then  -a else f end when not 17>11 then t1.b else e end))-max(t1.d) from t1)+ -e-(t1.d) end-11-b FROM t1 WHERE e-case +t1.e when e*e then t1.d else case (abs(case when (abs(case when t1.a+11+t1.a>11-t1.e then +t1.f when e<=a then (c) else b end)/abs(13))*b between b and t1.f then  -a else t1.c end+d)/abs(a)) when d then 13 else t1.e end end+e+t1.d<=c"
     end, {
         -- <randexpr-2.1042>
-        
+
         -- </randexpr-2.1042>
     })
 
@@ -10490,7 +10490,7 @@ test:do_test(
         return test:execsql "SELECT + -(select count(*) from t1)*(t1.b)-a-t1.e+17*coalesce((select max(13) from t1 where not exists(select 1 from t1 where case when t1.f<coalesce((select a from t1 where t1.a not in (t1.b,t1.a,19)),t1.a)*f and not exists(select 1 from t1 where exists(select 1 from t1 where (t1.d)=19)) then +t1.d when c<>t1.d then 17 else  -17 end* -(t1.f)=(t1.a))), -d)*t1.f*t1.a* -e FROM t1 WHERE NOT (not exists(select 1 from t1 where ~case when d+ -t1.c+11*t1.e-t1.c*a*(t1.b)<=~~t1.b then f else case b when t1.b*t1.c-t1.d then c-b else  -t1.c end end-13+f>=case when d not between t1.c and (t1.b) then t1.e else t1.c end) or t1.d in (d,t1.c,t1.c))"
     end, {
         -- <randexpr-2.1045>
-        
+
         -- </randexpr-2.1045>
     })
 
@@ -10500,7 +10500,7 @@ test:do_test(
         return test:execsql "SELECT (abs((select  -~~ -count(*)+++count(distinct c) from t1))/abs(coalesce((select e from t1 where (case when case when b not between case t1.d when f then  -t1.c else t1.e end and c then d when b=19 then t1.c else d end in (select max(13) from t1 union select count(distinct b) from t1) and t1.d not in (a,t1.b,a) or  -t1.d between 13 and e then 17+t1.e when 19 not between t1.f and 17 then t1.b else t1.a end in (17,(t1.e),t1.a))),b) | 17)) FROM t1 WHERE 11>t1.b"
     end, {
         -- <randexpr-2.1046>
-        
+
         -- </randexpr-2.1046>
     })
 
@@ -10530,7 +10530,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.d) from t1 where coalesce((select e from t1 where case when (c)<>11+case f when t1.a then (select abs( -cast(avg(t1.c) AS integer)) | max((17)) | cast(avg(t1.d) AS integer)-count(distinct e) from t1) else 17*(abs(case t1.d when t1.b then a else b end)/abs(b)) end- -c-17+c*t1.c- -t1.d then t1.c else e end>=f),d)<>t1.a), -t1.f) FROM t1 WHERE NOT (not a<=17-t1.f)"
     end, {
         -- <randexpr-2.1049>
-        
+
         -- </randexpr-2.1049>
     })
 
@@ -10550,7 +10550,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select coalesce((select ~d from t1 where t1.b-t1.c+13 not between t1.b and (abs(t1.a-case t1.c when t1.c | (select max((abs(case when (select count(*) from t1)<>(~t1.e-13*+d+d) then  -t1.e else  -t1.f end*13)/abs(f))-t1.f) from t1) then t1.f else t1.c end)/abs(c))),t1.e) from t1 where t1.f=f), - -11) FROM t1 WHERE case ((abs(t1.e)/abs(case b when ~17 then 19+(t1.d)+13 else case t1.a*17 when c then 19*case when c<>coalesce((select max(~a) from t1 where 19<>case case when t1.d in (select +count(distinct 11) from t1 union select ( -max(a)) from t1) then t1.f else b end when t1.f then d else t1.a end-t1.b),11) then t1.b else t1.d end else 11 end end))) when t1.b then 11 else t1.d end*t1.c= -t1.f"
     end, {
         -- <randexpr-2.1051>
-        
+
         -- </randexpr-2.1051>
     })
 
@@ -10590,7 +10590,7 @@ test:do_test(
         return test:execsql "SELECT  -13-case when (not d<=11-t1.c*t1.e+t1.b) then case when t1.f | coalesce((select +d from t1 where t1.d= -c),(t1.a)) not between b and t1.a then t1.f+a when t1.a<11 and exists(select 1 from t1 where t1.f in (t1.b,17,11)) then b else 19 end when (t1.b between t1.d and e) then b else  -t1.c end FROM t1 WHERE NOT (case when b between case when coalesce((select t1.c-t1.c from t1 where 13*(select case min(11) when cast(avg(t1.c) AS integer) then (count(*)) else count(distinct 11) end+cast(avg( -f) AS integer) from t1)>=t1.a),t1.c) in ( -t1.c,d,b) then t1.e when f in (select e from t1 union select t1.d from t1) then f else c end and a and 13<>c and exists(select 1 from t1 where f<>c) then case when c in (11,b, -11) then t1.e else e end else 13 end<=t1.c)"
     end, {
         -- <randexpr-2.1055>
-        
+
         -- </randexpr-2.1055>
     })
 
@@ -10610,7 +10610,7 @@ test:do_test(
         return test:execsql "SELECT t1.b | (abs( -(select ~ -~abs(case ~min((c* -b+c))+min(f) when ~abs(count(distinct 13))+(min(13)) then max(11) else count(*) end) from t1)-11 | +(abs(t1.d-t1.e)/abs(t1.b))-t1.f*19+t1.c*17)/abs(f))+t1.b FROM t1 WHERE (a between t1.e and  -13)"
     end, {
         -- <randexpr-2.1057>
-        
+
         -- </randexpr-2.1057>
     })
 
@@ -10640,7 +10640,7 @@ test:do_test(
         return test:execsql "SELECT t1.c-case t1.b when t1.f-t1.b-f then +coalesce((select b from t1 where (t1.d in (select (select count(*)+abs(count(*)) | ~cast(avg(b | case when 11 between b and (f) then b when (19)>19 then 17 else t1.e end) AS integer) | min(d) from t1) from t1 union select 19 from t1))),(abs(c*c)/abs(11))-a-t1.c+t1.f-t1.c)+b else b end FROM t1 WHERE (t1.d)+t1.b<( -t1.b)"
     end, {
         -- <randexpr-2.1060>
-        
+
         -- </randexpr-2.1060>
     })
 
@@ -10670,7 +10670,7 @@ test:do_test(
         return test:execsql "SELECT 17*(select (case case min(t1.d+( -d | case 11* -11*11 when 13 then t1.c else  -17 end)-d*t1.d)-count(*)-abs( -max(17)+~max(t1.b)) | +abs(cast(avg((a)) AS integer))+(count(*)) when  -max(17) then  -max(19) else (cast(avg(d) AS integer)) end when count(distinct t1.c) then min(b) else count(*) end) from t1) FROM t1 WHERE d>=(abs(coalesce((select max(d) from t1 where not not case when a in (select count(*)* -case +min(case when t1.e<t1.e then 11 else a end-19)*case count(*) when max(13) then count(*) else min(b) end | ( -cast(avg(b) AS integer)) when max(t1.d) then (cast(avg((t1.a)) AS integer)) else min(f) end |  -max(t1.d) from t1 union select  -min(c) from t1) then e else e end<(select max(t1.c) from t1)),c++t1.f*c))/abs(e))+t1.d"
     end, {
         -- <randexpr-2.1063>
-        
+
         -- </randexpr-2.1063>
     })
 
@@ -10710,7 +10710,7 @@ test:do_test(
         return test:execsql "SELECT 11 | ~case case when e between 17 and coalesce((select max(((f-t1.f))) from t1 where d<>f),t1.f) and 11 not between 13 and 13 and ( -11<>c and t1.b>c) or 19<>t1.e and t1.b<=t1.f then +f*b when t1.d>=e then  -13 else t1.c end when b then (17) else t1.d end+a+f*a FROM t1 WHERE NOT (not exists(select 1 from t1 where a between t1.f and 17 or e>=(d)*19+t1.e*c))"
     end, {
         -- <randexpr-2.1067>
-        
+
         -- </randexpr-2.1067>
     })
 
@@ -10730,7 +10730,7 @@ test:do_test(
         return test:execsql "SELECT  -case when t1.d | ~b<>coalesce((select max(t1.c) from t1 where t1.c not between coalesce((select max(coalesce((select max(e) from t1 where 11 not in (case when 13 not between d and c then 17 when (t1.a) not in (e,b,b) then 19 else c end,a,t1.d)),b)+f) from t1 where t1.d not in (11,f,t1.e)),t1.b) and f),11) or 11<>(d) then  -f* -d else (e) end*f FROM t1 WHERE case f when 11 then coalesce((select b from t1 where 19+case when 17*t1.d-t1.f+t1.f between t1.d-case when +d=coalesce((select max(f) from t1 where e>t1.f),17) and c=t1.e and b not in (17,11,(t1.f)) then  -17 else t1.c end and c then  -t1.a else t1.d end+11*e not between t1.f and d),13)+t1.d else  -13 end=c"
     end, {
         -- <randexpr-2.1069>
-        
+
         -- </randexpr-2.1069>
     })
 
@@ -10760,7 +10760,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.b from t1 where not (t1.c>19) and 11<=+(abs(t1.b-19)/abs(a))+case when ((coalesce((select 13 from t1 where c in (b,t1.b,t1.d)),e))<>13) or f in ((t1.b),t1.e, -b) then 11+(c) else b end or b<>d),t1.f+t1.f+13) |  - -a FROM t1 WHERE 13 between t1.c and 13+~19+c+(select min(f-(abs(17)/abs((t1.e)))) from t1)"
     end, {
         -- <randexpr-2.1072>
-        
+
         -- </randexpr-2.1072>
     })
 
@@ -10800,7 +10800,7 @@ test:do_test(
         return test:execsql "SELECT  -(coalesce((select max(coalesce((select t1.f from t1 where not exists(select 1 from t1 where (abs(+b+19+19)/abs(t1.b))<t1.b) or 19+f>=(select  -max(19) from t1)+t1.f),t1.e+t1.f)* -t1.e+19-f) from t1 where (( -t1.c<19) or d>=c)),t1.c))*c*((t1.b))-17 FROM t1 WHERE NOT (t1.e not between t1.f*c and t1.f+ -d)"
     end, {
         -- <randexpr-2.1076>
-        
+
         -- </randexpr-2.1076>
     })
 
@@ -10810,7 +10810,7 @@ test:do_test(
         return test:execsql "SELECT case 17 when (t1.d)*coalesce((select (select case (cast(avg(c) AS integer)+max(case when (not d+ -t1.e not between 11 and  -f) then f when b<(11) then t1.b else 11 end))+count(distinct t1.c)*max(b) when  -min(e) |  -count(distinct t1.c) then cast(avg(e) AS integer) else count(*) end from t1) from t1 where case c when a then a else t1.d end-11<>19),t1.a)+t1.b then f else t1.f end FROM t1 WHERE not exists(select 1 from t1 where exists(select 1 from t1 where (abs(d)/abs((f*+coalesce((select  -~case when exists(select 1 from t1 where b<c) then t1.b else 17 end+case (select (min(coalesce((select b from t1 where 11<>t1.c or ((t1.c))<>e),(t1.e)))) from t1)*17 when e then a else t1.e end-t1.b-19 from t1 where t1.e in (select abs(+min(f)+cast(avg( -a) AS integer)) from t1 union select count(distinct c) from t1)),d))))<>f))"
     end, {
         -- <randexpr-2.1077>
-        
+
         -- </randexpr-2.1077>
     })
 
@@ -10840,7 +10840,7 @@ test:do_test(
         return test:execsql "SELECT ((select  -case min(17 | (abs(a)/abs(case (select max(a) from t1)+13+t1.c when c then (abs(case when 17<>a and t1.c=d then ((17)) else e end)/abs(t1.b)) else 17 end)) | f*a) when abs(~(count(distinct t1.e))-abs((~max(c)))-count(*) | min(t1.f)+max(11)) then  -cast(avg((b)) AS integer) else min(b) end from t1))*a FROM t1 WHERE (13)-(t1.a*17-t1.b)-coalesce((select (select  -cast(avg(t1.c) AS integer)+case  - -count(*) | (count(distinct t1.a)) when  -min(t1.e) then (max(t1.d)) else count(distinct t1.b) end from t1)-e+(abs(17)/abs(e)) from t1 where not exists(select 1 from t1 where not exists(select 1 from t1 where (d)>=13 and (t1.b not in (c,a, -t1.d) or t1.e in (select c from t1 union select t1.c from t1)) or 11<=t1.d))),17) in (select e from t1 union select e from t1)"
     end, {
         -- <randexpr-2.1080>
-        
+
         -- </randexpr-2.1080>
     })
 
@@ -10870,7 +10870,7 @@ test:do_test(
         return test:execsql "SELECT case when (select  -min(11) from t1)<>(abs(17)/abs(t1.d | e)) then case 11+case 11 when b | e-e then 19+e else b end*(abs(t1.a)/abs(b | a)) | coalesce((select case when a in (select cast(avg(d) AS integer) from t1 union select  - - -max(c) from t1) or e not in (c,d,a) then +13 when t1.a>a then 19 else f end from t1 where t1.c=13 or f<>t1.e),a) when f then f else c end else t1.e end FROM t1 WHERE ~17 in (11,t1.c,19)"
     end, {
         -- <randexpr-2.1083>
-        
+
         -- </randexpr-2.1083>
     })
 
@@ -10900,7 +10900,7 @@ test:do_test(
         return test:execsql "SELECT (select case +cast(avg(+19) AS integer) when (abs(count(*))) then (cast(avg(e*t1.b) AS integer)) else cast(avg(t1.a) AS integer) end+count(*) | +max(f-t1.e*t1.e | (f)* -19+ -b*d) | count(*)*count(*)* -count(*) | ~count(distinct  -b)*cast(avg(t1.f) AS integer)+count(*) from t1)-t1.c+t1.b FROM t1 WHERE ((select  -count(*)+min(case ~coalesce((select max(d) from t1 where (not not exists(select 1 from t1 where t1.b not in ((select  -max(a)+(count(*)) from t1) | c+case when t1.e not in (13,e,c) then (t1.f) else t1.c end+17*c+19,c,e)))),t1.f) when (f) then t1.a else t1.f end | b | t1.a) from t1) in (c,t1.c+ -a,f))"
     end, {
         -- <randexpr-2.1086>
-        
+
         -- </randexpr-2.1086>
     })
 
@@ -10930,7 +10930,7 @@ test:do_test(
         return test:execsql "SELECT (coalesce((select (select  -~+ -abs(case cast(avg(a*t1.d) AS integer) when case ~case count(distinct ((abs(t1.a)/abs(d)))) when case cast(avg(17) AS integer)-count(*) when  -count(*) then count(distinct d) else (max(t1.d)) end*count(*) then count(distinct t1.c) else min(19) end-count(*) when cast(avg(t1.a) AS integer) then ((count(*))) else min(a) end then (count(*)) else max(e) end)*(count(*))*max(a) from t1) from t1 where (19>=(17))),d)) FROM t1 WHERE exists(select 1 from t1 where 19 in (t1.a*coalesce((select a from t1 where (11<case a when (t1.e+c-t1.a) then t1.b else t1.c end) or d between +t1.e-+coalesce((select max(coalesce((select (select cast(avg((19)) AS integer) from t1) from t1 where t1.e>t1.b),t1.e)) from t1 where e not between 13 and t1.c),(a))-t1.d and 13),13*b)-17, -b,17))"
     end, {
         -- <randexpr-2.1089>
-        
+
         -- </randexpr-2.1089>
     })
 
@@ -10950,7 +10950,7 @@ test:do_test(
         return test:execsql "SELECT case when (coalesce((select max((select +max(c) from t1)) from t1 where t1.c<>t1.a),d) not in (t1.d,+case when 17>19 then e when t1.b<>+(select count(*) from t1) then t1.e else t1.d end,t1.c)) then (select count(*)-count(distinct t1.d)+ -max( -t1.c-a)*case cast(avg((f)) AS integer) when count(distinct d) then max((13)) else max(t1.d) end from t1)*t1.b else t1.c end |  -13*t1.d*t1.c FROM t1 WHERE c in (select case count(distinct ~(abs( -a)/abs(d))) when ~count(*) then ~min(coalesce((select max((abs(e)/abs(d))) from t1 where not exists(select 1 from t1 where t1.e>( -+t1.a-t1.e*17))),19))+count(*) else case ~ -cast(avg((11)) AS integer) | +cast(avg(d) AS integer) | (cast(avg(c) AS integer))+min(t1.e) when min(t1.c) then max(11) else  -count(*) end end+max(t1.c) from t1 union select  -count(*) from t1)"
     end, {
         -- <randexpr-2.1091>
-        
+
         -- </randexpr-2.1091>
     })
 
@@ -10980,7 +10980,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.c+t1.b-t1.b+(abs(d++t1.f)/abs(t1.a)) | 13*17) from t1 where coalesce((select 11 from t1 where case case case c when d then t1.d else 13 end when b then  -11 else t1.b end when 13 then (t1.a) else d end not in (c,13,a)),t1.c) | f not in (t1.a,t1.c,13) and not exists(select 1 from t1 where t1.c in (select e from t1 union select  -11 from t1))),t1.f) FROM t1 WHERE (((13+coalesce((select max(13) from t1 where not exists(select 1 from t1 where ((abs(c-case when not exists(select 1 from t1 where ((f) between c and 13)) then (select case min(f) when max(17) then min(13) else min(b) end from t1) when 17 in (t1.e,13,f) then  -13 else 11 end)/abs(t1.f)) in (select min(c) from t1 union select  -count(*) | + -min(19) from t1))) and f<13),t1.e+t1.c) in (select count(distinct c)-count(*) from t1 union select  -case min((e))+cast(avg(t1.a) AS integer) when ((min(t1.c))) then count(distinct e) else  -cast(avg(t1.d) AS integer) end from t1))))"
     end, {
         -- <randexpr-2.1094>
-        
+
         -- </randexpr-2.1094>
     })
 
@@ -11010,7 +11010,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.a in (select t1.e*case when t1.b between t1.d and 11 or c-case when (t1.e=13) then ~e when e<>a then t1.d else t1.f end in (11,t1.e,t1.c) and 11 not between t1.a and 13 and 19<11 then 11 else t1.e end*t1.d from t1 union select t1.c from t1) then a when e between e and b then ((19)) else 11 end FROM t1 WHERE coalesce((select (select count(distinct t1.f) from t1) from t1 where case coalesce((select max(t1.d) from t1 where 17<>19),t1.d) when a then coalesce((select ~t1.f- - -c-c*17-f-c-t1.a from t1 where (t1.f) in (select max(11) from t1 union select ~cast(avg(17) AS integer) | ~count(*)+max(f)- -cast(avg(11) AS integer) from t1)),13) else e end in (a,t1.c,11)),c)>=t1.e"
     end, {
         -- <randexpr-2.1097>
-        
+
         -- </randexpr-2.1097>
     })
 
@@ -11030,7 +11030,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(case t1.b+(select ~((cast(avg(17) AS integer)))*min(a)+ -count(distinct b)*cast(avg(t1.b) AS integer)-count(*)+max(19) from t1)-(e) when d then 13 else 13*c end+t1.c) from t1 where t1.b in (select +cast(avg(e) AS integer)*case count(*) when cast(avg(13) AS integer) then count(distinct t1.b) else count(*) end-(count(distinct 19))*min(t1.d) from t1 union select max(a) from t1)),(f))*e+t1.f*19 FROM t1 WHERE 17 not between  -t1.e and d"
     end, {
         -- <randexpr-2.1099>
-        
+
         -- </randexpr-2.1099>
     })
 
@@ -11050,7 +11050,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(~19) from t1 where 11 in (select t1.b-11*coalesce((select max(b) from t1 where coalesce((select max(e) from t1 where c*case 19*19+coalesce((select 19 from t1 where (11 not in (13+t1.d,b,(11)))),13)*d when t1.e then t1.b else t1.b end+t1.e between d and t1.b),t1.b) | (f)<>13), - -17)+c from t1 union select  -19 from t1)),17) FROM t1 WHERE ~t1.d not between 11*13-+t1.d-11-f and t1.d"
     end, {
         -- <randexpr-2.1101>
-        
+
         -- </randexpr-2.1101>
     })
 
@@ -11090,7 +11090,7 @@ test:do_test(
         return test:execsql "SELECT case t1.b when coalesce((select max(17+coalesce((select max(coalesce((select (select count(distinct case f when 19 then coalesce((select coalesce((select max(11-(abs(d)/abs(11))) from t1 where not  -a in (19,t1.b,17)),17) from t1 where (f in (b,f,t1.a))),b) else b end) from t1) from t1 where 17 between e and t1.f),t1.a)) from t1 where 13>=e),b)) from t1 where t1.f>t1.f),t1.b) then 17 else t1.f end FROM t1 WHERE NOT (not exists(select 1 from t1 where 13 between a+17 and (t1.c)))"
     end, {
         -- <randexpr-2.1105>
-        
+
         -- </randexpr-2.1105>
     })
 
@@ -11110,7 +11110,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select max(d) from t1 where t1.a in (select a-a from t1 union select a from t1)),t1.b)*(select max(t1.b) from t1)>=case when t1.b<case 17 when 19 then t1.a else t1.a end then b when 17<19 then t1.e else t1.b end and (t1.e=t1.c or (not exists(select 1 from t1 where not exists(select 1 from t1 where a=(13)))) or t1.b between 17 and t1.d and b in (t1.f,f,13) or t1.d<e) then t1.c when t1.c between 19 and 11 then d else a end FROM t1 WHERE NOT (t1.c>=t1.a)"
     end, {
         -- <randexpr-2.1107>
-        
+
         -- </randexpr-2.1107>
     })
 
@@ -11120,7 +11120,7 @@ test:do_test(
         return test:execsql "SELECT case when case when f*~case when t1.c*t1.f in (c,t1.b,(17)) then 17 when 11>t1.c then 13 else t1.e end+t1.f in (select +max(e)+case (count(distinct a)*count(*))+max(19) when  -max(11) then count(distinct a) else ((count(distinct t1.d))) end from t1 union select count(distinct c) from t1) then 17 else d end+(t1.c)<17 then b when not exists(select 1 from t1 where 11>t1.b) then t1.d else t1.a end FROM t1 WHERE t1.b< -f"
     end, {
         -- <randexpr-2.1108>
-        
+
         -- </randexpr-2.1108>
     })
 
@@ -11140,7 +11140,7 @@ test:do_test(
         return test:execsql "SELECT (select cast(avg(f) AS integer) | ~++cast(avg((abs(17)/abs( -f+(c-coalesce((select case when c=d and t1.e=t1.b then e when e in (t1.b,19,t1.c) then 17 else d end from t1 where e between t1.a and t1.c),a))+a))) AS integer)-abs( -min(t1.c))-abs(max((t1.b)) |  -~(count(*))+max(17))+cast(avg(t1.a) AS integer) | min(a)*(count(*))*min(17) from t1) FROM t1 WHERE b-(t1.e*t1.e)-t1.d=t1.c"
     end, {
         -- <randexpr-2.1110>
-        
+
         -- </randexpr-2.1110>
     })
 
@@ -11180,7 +11180,7 @@ test:do_test(
         return test:execsql "SELECT ~+coalesce((select case when t1.f>d then b when (abs(t1.a)/abs((abs(f)/abs(t1.c))))*case ~b when e then (select cast(avg( -+t1.f) AS integer) from t1) else c end+coalesce((select max(17*case t1.a+b when t1.b then t1.d else t1.f end) from t1 where d=e),t1.f)+13>=17 then 19 else f end from t1 where t1.a in (select d from t1 union select e from t1)),b) FROM t1 WHERE NOT (17<>f-~t1.a-case when  -b in (t1.b,(select min( -coalesce((select max(coalesce((select a- -t1.b from t1 where 11 in (t1.b,13, -t1.e) and f not between  -13 and t1.b),c)) from t1 where b not in (a,11,17)),t1.e)) from t1),e) or not exists(select 1 from t1 where t1.c in (select t1.b from t1 union select t1.b from t1)) then coalesce((select  -t1.e from t1 where e<>t1.e),f) when not t1.e<>t1.c then 19 else e end)"
     end, {
         -- <randexpr-2.1114>
-        
+
         -- </randexpr-2.1114>
     })
 
@@ -11200,7 +11200,7 @@ test:do_test(
         return test:execsql "SELECT d- -e*(abs(t1.c)/abs(d)) | t1.a+ -coalesce((select max(t1.e) from t1 where case when case when (a in (13,b,t1.b)) and d in (t1.c,17,a) then 17+t1.e when 19>=t1.b then a else 11 end=t1.f and d between c and (d) then (abs(17)/abs(d)) else t1.d end*f>e and not f<=13 and  -t1.f>=t1.e and t1.b<t1.b),t1.e)-case when t1.c<>e then t1.b else c end FROM t1 WHERE NOT (b-coalesce((select (coalesce((select max((coalesce((select d from t1 where not  -case when case 13 when +~(select case count(*) when  -max(t1.b) then max(a) else min(c) end from t1) then c else  -a end in (17,t1.b,(b)) then f else b end-f+17<=t1.a),t1.f)-d)) from t1 where t1.e=b),t1.b)) from t1 where (t1.a=t1.c)), -t1.a) not between 19 and 19)"
     end, {
         -- <randexpr-2.1116>
-        
+
         -- </randexpr-2.1116>
     })
 
@@ -11230,7 +11230,7 @@ test:do_test(
         return test:execsql "SELECT 19-case 13-f when b then t1.a*11-t1.d-+17*t1.b-coalesce((select 17 from t1 where 13<=f),+coalesce((select (abs(17+~coalesce((select a from t1 where 11<>t1.b and 11 not between t1.e and 19),17)+t1.e+t1.d | b)/abs(c))+f from t1 where 19 not between 19 and c),d)) else 19 end*t1.e+b FROM t1 WHERE NOT (11+11 not in (t1.c,t1.e,19) and f+19*19*case when ~t1.a+19*b between t1.a-case case when f=(t1.d) then ((t1.d)) else  -d end*e when c then e else t1.a end*t1.e and c then t1.e else b end in (select d from t1 union select t1.a from t1) or t1.d>=t1.f or not exists(select 1 from t1 where a<=13))"
     end, {
         -- <randexpr-2.1119>
-        
+
         -- </randexpr-2.1119>
     })
 
@@ -11250,7 +11250,7 @@ test:do_test(
         return test:execsql "SELECT case 19 when e then t1.b-t1.d else 11+coalesce((select 19 from t1 where not (t1.a)+(abs(case coalesce((select coalesce((select t1.e from t1 where 11=d),a) from t1 where t1.d<=13),a) when 17 then 13 else t1.a end)/abs(t1.b))-t1.d*e+t1.d not between b and b or e in (select  -min(c) from t1 union select min(t1.b) from t1)),(abs(e)/abs(t1.b)))+t1.c end FROM t1 WHERE exists(select 1 from t1 where c in (select t1.a from t1 union select f from t1))"
     end, {
         -- <randexpr-2.1121>
-        
+
         -- </randexpr-2.1121>
     })
 
@@ -11280,7 +11280,7 @@ test:do_test(
         return test:execsql "SELECT 17 | t1.d-(select +max(case when not exists(select 1 from t1 where (a<=t1.f)) then  -19 else  -t1.d end)- -min(t1.f+t1.f-(select (count(*)) from t1)) from t1)- -19 | b-d+coalesce((select max(d) from t1 where e-t1.a in (19,b,11) or e in (19,t1.b,c)),11) FROM t1 WHERE NOT ((11<=11 and case coalesce((select max((f)) from t1 where t1.b | case 11 when t1.e*t1.e then e else case when ~b-case when 19 not in (t1.d,13,e) then 13 when c between t1.e and b then 19 else t1.c end-(c) in (select  -t1.f from t1 union select d from t1) then c else t1.b end end*t1.a in (19,e,c)),t1.a) when t1.d then t1.a else  -a end not in (t1.c,b,t1.f)))"
     end, {
         -- <randexpr-2.1124>
-        
+
         -- </randexpr-2.1124>
     })
 
@@ -11300,7 +11300,7 @@ test:do_test(
         return test:execsql "SELECT case t1.e-d+b when coalesce((select (select max(t1.a | a |  -(select (count(*))+( - - -count(*)) from t1)*19+ -f+t1.e) from t1) from t1 where not exists(select 1 from t1 where (d not between a and 11) or not d>=11 and exists(select 1 from t1 where not t1.a<>13)) or 19 not in (17,t1.c,t1.c)),19)*t1.c+d then b else c end-b FROM t1 WHERE c<17"
     end, {
         -- <randexpr-2.1126>
-        
+
         -- </randexpr-2.1126>
     })
 
@@ -11330,7 +11330,7 @@ test:do_test(
         return test:execsql "SELECT f*f*(abs(case when (17-coalesce((select max(11) from t1 where coalesce((select max(t1.c-11*t1.a) from t1 where +e=(abs(d)/abs(11))+ -13),t1.b)<b and exists(select 1 from t1 where t1.f between d and  -t1.c)),19)-19 in (select max(t1.e) | min(t1.e) from t1 union select count(*) from t1) and 17>t1.e) then e else 17 end)/abs(c)) FROM t1 WHERE (t1.a in ((t1.f-t1.c)+b,11,t1.a+f))"
     end, {
         -- <randexpr-2.1129>
-        
+
         -- </randexpr-2.1129>
     })
 
@@ -11370,7 +11370,7 @@ test:do_test(
         return test:execsql "SELECT ( -19-f+coalesce((select max( -~case when case 11 when ~coalesce((select max(13) from t1 where not (e)<>(t1.c)),19)+11 |  -19-f then  -13 else t1.c end-e<=t1.a then 11 when not exists(select 1 from t1 where (not t1.c<19) and not (13<>17)) then  -e else f end) from t1 where (b)<=t1.e),t1.d)+ -t1.c) | b FROM t1 WHERE NOT ((~(select (max(f)-count(distinct c)) from t1) | case when e>=t1.c then t1.b+(select abs(count(*)+max(c)*abs(count(distinct e)+max(t1.f))+cast(avg(c) AS integer)) | cast(avg(t1.d) AS integer)*min(11) from t1)-t1.c else c end in (select case  -t1.b when 17 then 17 else  -case when not t1.c not in (17,t1.d,17) then 19 else a end end from t1 union select a from t1)) or (11)<=t1.b)"
     end, {
         -- <randexpr-2.1133>
-        
+
         -- </randexpr-2.1133>
     })
 
@@ -11390,7 +11390,7 @@ test:do_test(
         return test:execsql "SELECT +case when (not exists(select 1 from t1 where (abs(t1.a+coalesce((select max(b+ -case when e=t1.f then (abs(d)/abs(t1.e)) when not exists(select 1 from t1 where 17<t1.c) then d else f end |  -(t1.e) | 13*e) from t1 where f in (select t1.e from t1 union select t1.f from t1)),d) | 11)/abs(t1.b))-b not between b and t1.d) and t1.d>t1.c) then e else e end FROM t1 WHERE not t1.d-d+case b when t1.a+t1.a then t1.f+ -t1.e else 11+b*coalesce((select max(t1.f) from t1 where 11>= -f+t1.d),t1.c)*19 end not between d and t1.c-(11)+17"
     end, {
         -- <randexpr-2.1135>
-        
+
         -- </randexpr-2.1135>
     })
 
@@ -11430,7 +11430,7 @@ test:do_test(
         return test:execsql "SELECT t1.d+case when (t1.a)<=11 then ~t1.a else ~19 end-+~ -coalesce((select t1.d from t1 where ~t1.f in (select (cast(avg(t1.e+c) AS integer)) from t1 union select count(distinct (abs(coalesce((select max(19) from t1 where not ~11-t1.a=t1.c+case when t1.d between c and t1.d then 11 when t1.f>=17 then f else 19 end*t1.c),17)+f)/abs(f))) from t1)),11) FROM t1 WHERE NOT (e>c)"
     end, {
         -- <randexpr-2.1139>
-        
+
         -- </randexpr-2.1139>
     })
 
@@ -11440,7 +11440,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select max(case b | d*(abs(t1.e)/abs(a))-f | t1.b when t1.e then coalesce((select max(t1.e) from t1 where t1.e between (select ~count(*)*cast(avg(19) AS integer) from t1) and case c when a then 13 else a end),t1.f)+e*c else t1.d end) from t1 where t1.a in (select t1.d from t1 union select 17 from t1)),e)+17<19 then t1.a else 19 end | 11+e-17*19 FROM t1 WHERE d*t1.c-case when case when ((13 in (17+e,b,11)) or 19>(13)) then (abs(coalesce((select t1.a from t1 where t1.a not in (13,c,t1.f)),11))/abs(t1.e))-f when t1.b not between t1.b and f then t1.d else t1.a end in (a,e,t1.d) then t1.f else t1.f end+f+t1.e in (t1.d,e,b)"
     end, {
         -- <randexpr-2.1140>
-        
+
         -- </randexpr-2.1140>
     })
 
@@ -11480,7 +11480,7 @@ test:do_test(
         return test:execsql "SELECT ((select (count(*) | +~(case ++(min(t1.f+17+(11-case when b between d and d and t1.a not in (13,c,t1.c) and e< -t1.b then 17+(11) else t1.e end+ -b))) when case min(e) when min( -13) | ~max(t1.f) then count(distinct t1.f) | ~count(distinct t1.d) else count(*) end then min(t1.c) else  -cast(avg(11) AS integer) end)+count(distinct (f))) from t1)+e) FROM t1 WHERE NOT ((a in (11*a-t1.a | t1.b+e*13,(f | a | (select min((select min(13)-min(17)*((count(distinct t1.d))) from t1)) from t1)+t1.a- -11)+(11),t1.c) and (a) between t1.d and t1.f or t1.d not between t1.c and f or d not in (t1.c,t1.f,c)))"
     end, {
         -- <randexpr-2.1144>
-        
+
         -- </randexpr-2.1144>
     })
 
@@ -11500,7 +11500,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(13) from t1 where d in (select (max(19)*count(distinct case when t1.f between ~e and  -b-t1.f then b else d end)-count(distinct f)) from t1 union select cast(avg(case e when case t1.b when  -a | t1.e*19 then t1.a else  -t1.c end then  -d else t1.e end) AS integer) from t1)),case when t1.d in (select t1.e from t1 union select b from t1) then t1.f when t1.f between 13 and f then f else f end) FROM t1 WHERE c in (select (t1.a) from t1 union select e from t1)"
     end, {
         -- <randexpr-2.1146>
-        
+
         -- </randexpr-2.1146>
     })
 
@@ -11530,7 +11530,7 @@ test:do_test(
         return test:execsql "SELECT (abs(t1.d+b)/abs(~t1.f+case when t1.f=t1.c or exists(select 1 from t1 where c>=+~t1.c*17) or exists(select 1 from t1 where (select  -cast(avg(case when 19<>t1.f then  -c when c<>b then t1.e else t1.d end) AS integer) from t1) in (d-t1.f,b,19)) then d+b when 11<b then t1.c else d end* -t1.a-19)) FROM t1 WHERE t1.a-(select cast(avg(a) AS integer) from t1) in (select t1.c from t1 union select 19 from t1) and not exists(select 1 from t1 where coalesce((select max(11) from t1 where case when not d>(19) then c else  -case when 11>b or t1.c<=c then f when t1.f>t1.a then t1.a else t1.e end*d-11 end+d*t1.b>t1.e),d)>t1.b and c<>d and not exists(select 1 from t1 where 17>=(t1.f)) and t1.e not in (f,t1.b,t1.b))"
     end, {
         -- <randexpr-2.1149>
-        
+
         -- </randexpr-2.1149>
     })
 
@@ -11550,7 +11550,7 @@ test:do_test(
         return test:execsql "SELECT t1.b-~case when +a in (select ~min(11) from t1 union select  -count(*)+count(distinct ~coalesce((select coalesce((select t1.b-19+c from t1 where a<>13 or 13 in (t1.b,d,t1.e)),11) from t1 where 19 in (19,e,17)),e)) from t1) then (select  -min(19)+cast(avg(t1.d) AS integer) from t1) else d end | 17 | t1.e FROM t1 WHERE c-b+e*11+(c+13+11)+(13)+(select cast(avg((abs(e-d+a)/abs(t1.f))) AS integer) from t1)-t1.d+~13<=t1.e-c-17"
     end, {
         -- <randexpr-2.1151>
-        
+
         -- </randexpr-2.1151>
     })
 
@@ -11580,7 +11580,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(b) from t1 where t1.e<t1.b-11*case when ( -c*case d when case +t1.c+t1.b when ~11*(select count(distinct d) from t1) then a else t1.d end then t1.b else (abs((select max(+coalesce((select (t1.d) from t1 where 19 not between t1.b and t1.a and t1.d between 19 and  -13),t1.a)) from t1))/abs(f)) end)<>t1.e then 17 when 19 not between 11 and b then t1.e else 19 end*t1.c),t1.c) FROM t1 WHERE not t1.f*(abs(case when ~19-17*e>=t1.d then t1.b when (select cast(avg(t1.e) AS integer) from t1) in ((abs(t1.e)/abs(t1.e))-case when f not in (t1.d,13,c) then c else t1.e end-t1.b-t1.a | b-(t1.c), -a,e) then t1.e else e end+a)/abs(t1.d)) | b not between b and t1.d"
     end, {
         -- <randexpr-2.1154>
-        
+
         -- </randexpr-2.1154>
     })
 
@@ -11610,7 +11610,7 @@ test:do_test(
         return test:execsql "SELECT  -f+( - -case when 13-b not between case when (a<>t1.f or case when not exists(select 1 from t1 where 11<>t1.a) then b when c<=t1.b then t1.f else 11 end in (select 17 from t1 union select t1.b from t1)) then b-c-b when t1.f=13 then a else 19 end | t1.d and t1.e and not exists(select 1 from t1 where 19=t1.f) then  -c else 19 end+17) FROM t1 WHERE NOT (not not exists(select 1 from t1 where ~(select cast(avg(t1.d) AS integer) from t1) | +~~case case when f-case when exists(select 1 from t1 where 13 not in (d,11,case when not exists(select 1 from t1 where f between t1.d and e) then 13 when t1.e<>19 then f else 11 end) or b in ( -d,t1.c,17)) then b else f end-(t1.d) in (t1.c,t1.c,b) then t1.b else e end when 11 then t1.e else  -c end-c<>t1.b))"
     end, {
         -- <randexpr-2.1157>
-        
+
         -- </randexpr-2.1157>
     })
 
@@ -11630,7 +11630,7 @@ test:do_test(
         return test:execsql "SELECT +(abs(d+d+a+b+t1.d)/abs(coalesce((select (select abs(cast(avg(17-11+e*t1.d) AS integer)++cast(avg(coalesce((select max(11-+t1.f- -e-a* -19+t1.a) from t1 where  -a in (select 11 from t1 union select  -11 from t1)),e)) AS integer)) from t1) from t1 where f=17),t1.b)*a)) FROM t1 WHERE t1.b in (select t1.e from t1 union select coalesce((select max(11) from t1 where d<t1.f),f) from t1)"
     end, {
         -- <randexpr-2.1159>
-        
+
         -- </randexpr-2.1159>
     })
 
@@ -11660,7 +11660,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.b*t1.c=coalesce((select t1.f from t1 where case when exists(select 1 from t1 where t1.d in (select e from t1 union select 19 from t1)) or t1.e>t1.e then t1.a+e-a when 19>t1.c then c else t1.c end+c not between b and t1.d),t1.f) and  -(t1.b) between t1.e and  -t1.d or b<>19 then (select ~(min(13))+max(f) from t1) else (t1.b) end*t1.b FROM t1 WHERE NOT (b in (b,e,case coalesce((select max(t1.b) from t1 where e>13 or ( -(select case  -~count(distinct 17)-cast(avg((t1.f)) AS integer)*cast(avg(d) AS integer) when  -cast(avg(f) AS integer) then max(17) else  -(count(*)) end from t1)-(coalesce((select (b) from t1 where t1.b>=t1.e),t1.c)) in (17,t1.e,b)) or (exists(select 1 from t1 where (t1.d=(d))))),t1.c) when b then c else (e) end))"
     end, {
         -- <randexpr-2.1162>
-        
+
         -- </randexpr-2.1162>
     })
 
@@ -11680,7 +11680,7 @@ test:do_test(
         return test:execsql "SELECT +t1.c+case when t1.e not in ((e)-(case when 17<11 then 19 when (t1.d in (d,coalesce((select max(t1.a) from t1 where not b<>t1.b),case t1.b when coalesce((select max(t1.a) from t1 where exists(select 1 from t1 where e not in (t1.f,11,17))),(19))*t1.f then c else t1.c end+ -t1.d)-t1.b+t1.e,d)) then 19 else b end)-e,t1.c, -13) then e else 17 end FROM t1 WHERE NOT (t1.e*t1.b | t1.b<>17*+coalesce((select max(t1.b) from t1 where case when coalesce((select max(b) from t1 where case when (b between 17 and d) then t1.f when t1.c between b and t1.a then t1.e else t1.a end not in (11,19,13)),11) in (t1.d,17,17) then t1.f when d<>13 then 11 else t1.a end+a<17),t1.a)-17+t1.f*d-a)"
     end, {
         -- <randexpr-2.1164>
-        
+
         -- </randexpr-2.1164>
     })
 
@@ -11690,7 +11690,7 @@ test:do_test(
         return test:execsql "SELECT 11+case when case case f when (abs(t1.a)/abs(19))+t1.e then (abs(19)/abs(b+e)) else 13 end | 11 when (select ~~+min(t1.e) from t1) then t1.c else  -e end<>case t1.a when 17 then case when (c not between 19 and t1.b) and t1.b<>t1.d then coalesce((select a from t1 where t1.d in (t1.e,t1.f,f)),t1.e) else 13 end else d end or t1.c<t1.d then t1.f else 17 end-f FROM t1 WHERE (f*c*coalesce((select e from t1 where (exists(select 1 from t1 where +t1.e<= -e | t1.f))),a)+b in (select t1.c from t1 union select c from t1) or (t1.e between b and (19)) and 13 between t1.e and 13 and 11 in (13,t1.c,17) and exists(select 1 from t1 where t1.d in (select count(*)-max(e)-((max((11)))) from t1 union select max(17) from t1)) and c>f)"
     end, {
         -- <randexpr-2.1165>
-        
+
         -- </randexpr-2.1165>
     })
 
@@ -11730,7 +11730,7 @@ test:do_test(
         return test:execsql "SELECT d-case when ~c<>case when not exists(select 1 from t1 where  -t1.b<>19) then coalesce((select max(t1.f) from t1 where exists(select 1 from t1 where (t1.c in (select ~~+~max(~case when 13 not between t1.d and t1.d or c between c and f then t1.f else t1.a end)*abs(count(*)+(min( -t1.e))) from t1 union select cast(avg(e) AS integer) from t1) and (abs(t1.f*f-t1.a)/abs(d))>t1.b)) and (17) not in ( -t1.f,13,17)),19) else a end then b else f end FROM t1 WHERE NOT (f=(select case ~ -~count(distinct t1.b)+count(distinct d) |  -count(distinct t1.e)*count(*)* -cast(avg(b) AS integer)*(cast(avg(13) AS integer)) when  -min(19) then min(t1.e) else ((cast(avg(17) AS integer))) end from t1) or 19>=(19) and not exists(select 1 from t1 where (select count(*) from t1)*t1.d not between 19+11 and d) and  -t1.e not in (e,t1.a, -a) and t1.e between t1.f and (t1.b) or c in ( -11,17,t1.c) or t1.a in (a,11,t1.d))"
     end, {
         -- <randexpr-2.1169>
-        
+
         -- </randexpr-2.1169>
     })
 
@@ -11740,7 +11740,7 @@ test:do_test(
         return test:execsql "SELECT case when a in (select t1.b from t1 union select coalesce((select ~19 from t1 where e>13*t1.d or c in (select b from t1 union select case a*t1.f when e then (t1.c) else (t1.b) end from t1)),t1.a) from t1) and t1.d>b or not exists(select 1 from t1 where t1.e in (select count(*)*min(t1.b)*~count(*) from t1 union select case  -min((19)) when  -max(b) then (min(t1.a)) else (count(distinct t1.d)) end from t1)) then (t1.c) when exists(select 1 from t1 where f not between 19 and f) then 19 else t1.c end-a FROM t1 WHERE a=coalesce((select f from t1 where t1.c in (11,(abs(coalesce((select max(t1.d) from t1 where (abs(t1.c | 13)/abs(11)) not in (b+case when coalesce((select max(b) from t1 where 11 between d and t1.a),b)<a then 19 when (e) not in (t1.e,13,t1.d) then t1.c else  - -t1.e end-19,a,17)),19))/abs(t1.a)),t1.b) or (((13)>=t1.b))),c) and f between 19 and t1.d or c>(f)"
     end, {
         -- <randexpr-2.1170>
-        
+
         -- </randexpr-2.1170>
     })
 
@@ -11770,7 +11770,7 @@ test:do_test(
         return test:execsql "SELECT case when  -(t1.f)- -case when t1.e not in ((t1.d)+a-t1.a,t1.c, - -a) then t1.b when (not exists(select 1 from t1 where t1.d>= -t1.f)) then  -19 else f end-t1.f in (select cast(avg(19) AS integer)*case count(*) when abs((++min( -11))*max(13)-count(distinct 13)) then min(t1.a) else count(distinct 17) end from t1 union select count(distinct t1.a) from t1) then t1.c when b not between t1.f and 13 then e else t1.a end FROM t1 WHERE NOT (11 not between ~17+d and ~case when t1.b in (c*((abs(case 13 when  -(select abs(count(distinct coalesce((select max(coalesce((select t1.b from t1 where not exists(select 1 from t1 where (t1.c) in (t1.a,e,13))),t1.d)) from t1 where not t1.d>c),b))) from t1) then t1.f else t1.b end- -t1.c)/abs(c))+a),t1.d,t1.a) then (t1.c) else (d) end-13 or  -t1.a in (17,a,f))"
     end, {
         -- <randexpr-2.1173>
-        
+
         -- </randexpr-2.1173>
     })
 
@@ -11780,7 +11780,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select 17 from t1 where not exists(select 1 from t1 where (t1.b- -b+(select +case max(b)-~count(distinct e*(select case max(c) when abs((count(*))) then max(t1.f) else max(t1.c) end+cast(avg(t1.b) AS integer) from t1)) when abs(count(distinct e*19)) then max(b) else max(t1.c) end | count(distinct t1.e) from t1)-b*+t1.b not in ((11),17,13)))),t1.e) FROM t1 WHERE t1.c in (select min(coalesce((select 17 from t1 where t1.c | 17>=(abs(t1.a)/abs(case when t1.e not in (19,t1.d,19) then a when 13<=case when not exists(select 1 from t1 where (abs(e)/abs(t1.c)) in (select 19 from t1 union select d from t1) and t1.c>=17 or 19=t1.a) then f else a end then t1.d else e end))-f),e))*min(f) | ++min(a) from t1 union select cast(avg(f) AS integer) from t1)"
     end, {
         -- <randexpr-2.1174>
-        
+
         -- </randexpr-2.1174>
     })
 
@@ -11810,7 +11810,7 @@ test:do_test(
         return test:execsql "SELECT case coalesce((select t1.e from t1 where +coalesce((select a from t1 where 13 | b | t1.b<=11*a*case when exists(select 1 from t1 where (a-t1.d+t1.e-f<17 and  -17 between 19 and a)) then c when 17 between f and t1.c then a*11 else t1.d end),t1.e) not in (b,t1.f,t1.d)),a) when c then  -c else t1.b end FROM t1 WHERE (exists(select 1 from t1 where case when not exists(select 1 from t1 where (select cast(avg(d) AS integer) from t1) in (select a from t1 union select case case when t1.e>t1.d or t1.b in (select c from t1 union select e from t1) or t1.a>=f and b>=11 then t1.c-(t1.c)*19 when b not in (e,c,t1.d) then t1.b else t1.c end when 13 then f else  -t1.f end from t1)) then 17 when not exists(select 1 from t1 where not exists(select 1 from t1 where f not in (t1.d,f, -t1.b)) or  -19<=t1.c) or t1.e between 13 and t1.a then f else d end<>t1.f) and f between 11 and t1.c and t1.e not in (t1.d,c,t1.e)) or d not between t1.b and t1.d"
     end, {
         -- <randexpr-2.1177>
-        
+
         -- </randexpr-2.1177>
     })
 
@@ -11850,7 +11850,7 @@ test:do_test(
         return test:execsql "SELECT case when exists(select 1 from t1 where b<>coalesce((select (select + - -count(*)-~count(*)+~+case  - -count(distinct (t1.d)) when max(t1.d) then count(*) else max(a) end+(cast(avg(17) AS integer)) from t1) | d from t1 where not exists(select 1 from t1 where (abs(f)/abs(t1.c)) between 13+a and  -t1.d)),19) or (coalesce((select t1.d from t1 where (( - -19)>a)),t1.f) in (e,e,t1.e))) then t1.b*t1.f when t1.d not between (a) and a then e else b end FROM t1 WHERE NOT (not exists(select 1 from t1 where a in (select 13 from t1 union select 17 from t1)))"
     end, {
         -- <randexpr-2.1181>
-        
+
         -- </randexpr-2.1181>
     })
 
@@ -11880,7 +11880,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select case when f>17-t1.f then (select +max(coalesce((select +11 from t1 where coalesce((select max(d) from t1 where +t1.c between (f) and c),t1.f) not in (c, -f,t1.e)),d)) from t1) else 17+19 end from t1 where not not exists(select 1 from t1 where t1.a in (select a from t1 union select t1.a from t1) and 17=d or (17)<=(( -19)) and t1.f in (select d from t1 union select 13 from t1) or 19>13 or t1.b not in (t1.b,17,d))), -(t1.c)) FROM t1 WHERE NOT (+t1.a-13+(select count(distinct a) from t1)-e*e*case when coalesce((select max(coalesce((select a from t1 where ((case b+t1.c-t1.c*d*17 when t1.a then t1.a else f end<>c))),t1.b+13)) from t1 where t1.f between 17 and t1.d),t1.c)<=(b) then f else t1.e end-13<>t1.f)"
     end, {
         -- <randexpr-2.1184>
-        
+
         -- </randexpr-2.1184>
     })
 
@@ -11890,7 +11890,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select 13 from t1 where ~(select max(b) from t1)<= -+d*f+t1.b*f or coalesce((select max(case when d=(abs(19)/abs(t1.f)) then case b+d when (abs(coalesce((select 11 from t1 where t1.f between  -d and c),t1.f))/abs(t1.a)) then b else t1.d end when a<t1.d then 13 else 11 end) from t1 where a not between t1.e and b),t1.d)>=t1.e),17)+ -c FROM t1 WHERE t1.b-+(t1.b) in (select a from t1 union select 19 from t1)"
     end, {
         -- <randexpr-2.1185>
-        
+
         -- </randexpr-2.1185>
     })
 
@@ -11910,7 +11910,7 @@ test:do_test(
         return test:execsql "SELECT case when (abs((abs(d)/abs(t1.f-c)))/abs( -t1.f))*case when (t1.c not in (case when t1.b>case t1.d when t1.b then e else 11 end then t1.a when ( -t1.d in (select  -count(*)-cast(avg(f) AS integer) from t1 union select count(*) from t1)) or 11 in (e,t1.e,c) then a else b end,t1.a,11) or t1.a in (17,t1.a,t1.d) and b>(t1.a)) then 11 when c<b then t1.f+t1.e else b end+t1.a>t1.b then t1.c else 17 end FROM t1 WHERE t1.b>f"
     end, {
         -- <randexpr-2.1187>
-        
+
         -- </randexpr-2.1187>
     })
 
@@ -11930,7 +11930,7 @@ test:do_test(
         return test:execsql "SELECT t1.e-case when case when ((exists(select 1 from t1 where not exists(select 1 from t1 where case when not 13<=13 or (t1.c<>t1.e) then t1.d else +13 end+13 in (select max(13) | max((t1.b)) from t1 union select max(f) from t1))))) then t1.f else ~t1.e | t1.d*t1.b end+11 not between t1.c and 13 then b when (t1.f not in (19,t1.f,t1.d)) then c else  -b end FROM t1 WHERE ( -(select  -min(13-t1.b) from t1)-coalesce((select case when  -d>=t1.e or 11 between 17 and  -t1.e then 19+f when t1.f=11 then  -t1.c else t1.b end from t1 where t1.a not in (11,t1.e,t1.a)),t1.c)*11 in (select  -case abs((abs(min(t1.d)))) when max(19) then cast(avg(f) AS integer) else case count(*) when count(*) then (count(distinct t1.f)) else cast(avg(11) AS integer) end end from t1 union select min(d) from t1)) or b in (select (count(*)) from t1 union select max(t1.a) from t1)"
     end, {
         -- <randexpr-2.1189>
-        
+
         -- </randexpr-2.1189>
     })
 
@@ -11960,7 +11960,7 @@ test:do_test(
         return test:execsql "SELECT (coalesce((select c*(select +~count(distinct 19)-cast(avg(~ -c) AS integer)-max( -f)-cast(avg(t1.d) AS integer) from t1)+t1.a*t1.f+t1.e-a*b from t1 where not t1.e<t1.b or 11=d and 19<>d and 11<=t1.e and (not exists(select 1 from t1 where exists(select 1 from t1 where (13=a)) or t1.e>t1.b))),19)) FROM t1 WHERE coalesce((select max(t1.f*11) from t1 where not exists(select 1 from t1 where t1.a<>17) and t1.b>case (abs(b* -t1.a)/abs(11)) when b*case case when f>=t1.e then 11 when t1.b<=d then 17 else a end* -a when e then 11 else c end then (t1.b) else 19 end or t1.f<13), -b)>=e and ((d in (select f from t1 union select f from t1)))"
     end, {
         -- <randexpr-2.1192>
-        
+
         -- </randexpr-2.1192>
     })
 
@@ -11980,7 +11980,7 @@ test:do_test(
         return test:execsql "SELECT b-b+case when d+e between 17 and case when exists(select 1 from t1 where coalesce((select max(coalesce((select 11 from t1 where t1.e not between 13 and case when t1.e<>c then c | 19+t1.a else 17 end),t1.a)) from t1 where t1.d<=17 or a not in (b,11,a)),(t1.b))+b>=t1.a) then 11 else a end then d else a end+11*f FROM t1 WHERE (t1.b*19<=17)"
     end, {
         -- <randexpr-2.1194>
-        
+
         -- </randexpr-2.1194>
     })
 
@@ -12020,7 +12020,7 @@ test:do_test(
         return test:execsql "SELECT +(abs(13)/abs(+~~case t1.e | +11-b-coalesce((select max(c) from t1 where 19 in (select cast(avg(coalesce((select max(case when t1.a<t1.d and t1.f<(11) then t1.f else  -a end*t1.c) from t1 where e<=d and c<f),17)) AS integer)- -max(t1.e)-count(distinct a) from t1 union select max(f) from t1)),t1.c) when t1.a then t1.e else t1.c end*17)) FROM t1 WHERE NOT (t1.a between 19 and (t1.b))"
     end, {
         -- <randexpr-2.1198>
-        
+
         -- </randexpr-2.1198>
     })
 
@@ -12050,7 +12050,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.f from t1 where case d-(select case cast(avg(coalesce((select case when not 11<>e*c then 11 else 13 end from t1 where  -t1.c not between t1.f and 11),t1.e)) AS integer) when case max( -d) when ((min(17))) then cast(avg(t1.a) AS integer) else min(e) end+cast(avg((t1.b)) AS integer) then cast(avg(t1.d) AS integer) else  -(max(c)) end from t1)-f | b*13+e when t1.b then (f) else t1.a end in (select d from t1 union select 17 from t1)),d) FROM t1 WHERE NOT (t1.e*c>13-+t1.f | (abs((select abs(min(b)-abs( - -count(distinct 17-d-13+ -e-(t1.d)*e)+max(t1.e)) | (~abs((max(c)))+cast(avg(17) AS integer)-count(*)*cast(avg(11) AS integer))) from t1))/abs(t1.f)))"
     end, {
         -- <randexpr-2.1201>
-        
+
         -- </randexpr-2.1201>
     })
 
@@ -12080,7 +12080,7 @@ test:do_test(
         return test:execsql "SELECT t1.b-~case when ~(abs(17)/abs(t1.a))+17+t1.b in (select count(distinct d) | count(*) from t1 union select case count(*) | count(distinct e) when count(*) then  -count(*) else cast(avg(11) AS integer) end from t1) and t1.e>b or e not between (e) and c and 17 in (t1.c,b,b) and t1.a not between a and (t1.f) then coalesce((select t1.a*t1.c from t1 where  -11 in (t1.a,(t1.f), -f)),13)*t1.c else t1.f end FROM t1 WHERE NOT ((t1.e<>t1.a+~~c-t1.a+13*e-17+t1.b))"
     end, {
         -- <randexpr-2.1204>
-        
+
         -- </randexpr-2.1204>
     })
 
@@ -12100,7 +12100,7 @@ test:do_test(
         return test:execsql "SELECT ((abs(b)/abs(t1.e+coalesce((select max((abs(coalesce((select max(11) from t1 where t1.a<=coalesce((select case when t1.a in (case t1.b when t1.d then t1.d else a end,17,11) then 13 when t1.a>b then 19 else d end from t1 where c in (select (~case count(*) when min(f) then  -min(d) else count(distinct (t1.f)) end)*(count(*)) from t1 union select  -min((t1.c)) from t1)),11) and (b<=t1.c)),t1.f))/abs(e))-13) from t1 where b not in (d,( -e),e)),c)-t1.c))) FROM t1 WHERE (exists(select 1 from t1 where b in (select +( -abs(max(19+((select case  -+cast(avg(e) AS integer) when  -max(19)-min(t1.c) | count(*) then count(distinct t1.e) else min(f) end-cast(avg( -19) AS integer)*count(*) | count(*) from t1))-17)) | +cast(avg((select cast(avg(a) AS integer) from t1)*f) AS integer)-cast(avg(13-t1.a+b) AS integer))+ -max(t1.a) from t1 union select cast(avg( -f) AS integer) from t1)))"
     end, {
         -- <randexpr-2.1206>
-        
+
         -- </randexpr-2.1206>
     })
 
@@ -12120,7 +12120,7 @@ test:do_test(
         return test:execsql "SELECT t1.f-17+(abs(case when ~e*coalesce((select max(coalesce((select d from t1 where not  -(19*t1.d*17) not in (t1.a*t1.c,b,b)),f)) from t1 where 13 between t1.d and 19),11* -t1.e)-(t1.a)>d then 17 when (e in (select  -(t1.d) from t1 union select  -(t1.b) from t1)) then e else  -t1.d end)/abs(17))*a FROM t1 WHERE 17 in (select 19 from t1 union select  -17 | d from t1)"
     end, {
         -- <randexpr-2.1208>
-        
+
         -- </randexpr-2.1208>
     })
 
@@ -12140,7 +12140,7 @@ test:do_test(
         return test:execsql "SELECT case t1.a when case when 13+( -f-b)*c-t1.d-t1.c | c+d>=d*case when not ++c+t1.d<>+b- -a*t1.e then  -f else 17 end+t1.f then t1.e when 11<>19 then c else 11 end then e else f end FROM t1 WHERE (case when (abs(t1.f+case f-case when exists(select 1 from t1 where t1.c>13) then t1.e when t1.f>= -f then b else e end when 13 then t1.e else t1.c end)/abs(c)) in (select max(f)*max(f)*( -max( -17)) | min(t1.a) | cast(avg(13) AS integer)+count(*) from t1 union select ( -max(e)) from t1) then ( -d) when c not between f and ( -c) then 13 else b end between t1.a and e) and 19 not between 19 and c"
     end, {
         -- <randexpr-2.1210>
-        
+
         -- </randexpr-2.1210>
     })
 
@@ -12180,7 +12180,7 @@ test:do_test(
         return test:execsql "SELECT case when 19=t1.e or (abs(t1.f)/abs(((select  -count(distinct f+~t1.e-t1.b-coalesce((select max(b*c) from t1 where 17<>b),b))+~cast(avg(d) AS integer) from t1)))) not between f and d then coalesce((select max( -a) from t1 where 13<=11 or t1.d>=f),t1.d) when 17 in (select 11 from t1 union select t1.a from t1) then t1.d else t1.c end | 19 FROM t1 WHERE NOT ((case t1.d when ~a then coalesce((select max((abs( -~+b)/abs(t1.c))) from t1 where case t1.e when (abs((abs(case t1.a++t1.d | 19-coalesce((select e from t1 where b not between t1.f+b+c and t1.b), -t1.f) when t1.e then t1.a else f end)/abs(t1.b)))/abs(t1.e)) then t1.d else t1.d end>t1.f),t1.d)*t1.b else t1.f end not between a and e))"
     end, {
         -- <randexpr-2.1214>
-        
+
         -- </randexpr-2.1214>
     })
 
@@ -12210,7 +12210,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.c from t1 where  -a in (select e from t1 union select 13 from t1)),(select count(distinct coalesce((select max((17)) from t1 where c not between case 19-t1.b when a then ~+(abs((select count(distinct (t1.a)) from t1)+(t1.b))/abs((t1.a)*a+13 | t1.d | t1.a)) else a end and 13 or d in (a,a,t1.f)),d)) from t1) | t1.d) FROM t1 WHERE NOT (e<d or case case when  -t1.a between coalesce((select coalesce((select d from t1 where (t1.f=~coalesce((select max(t1.d) from t1 where t1.d<=t1.e),f)*19)),17) from t1 where (t1.f in ( -11,t1.f,a)) or 19<=13),t1.b) and c then t1.f when t1.d=f then t1.f else f end when t1.d then 11 else 17 end*t1.e not in (t1.a,t1.f,e))"
     end, {
         -- <randexpr-2.1217>
-        
+
         -- </randexpr-2.1217>
     })
 
@@ -12240,7 +12240,7 @@ test:do_test(
         return test:execsql "SELECT case when case when t1.b<=f+coalesce((select max(11) from t1 where not e in (select count(distinct f) from t1 union select count(*) from t1)),t1.d) or 19 between (e) and 19 and f not in (t1.d,(19),t1.e) and exists(select 1 from t1 where t1.e<=19) or t1.e>t1.a then (select +abs(count(distinct t1.f)*max(13)) from t1) else +d end>=b+t1.c and b not in (f,13,b) then t1.d when b>b then d else t1.d end*11 FROM t1 WHERE NOT (d<>b)"
     end, {
         -- <randexpr-2.1220>
-        
+
         -- </randexpr-2.1220>
     })
 
@@ -12250,7 +12250,7 @@ test:do_test(
         return test:execsql "SELECT ~(abs(case when t1.a not between  -t1.d*(b) and 17 then f when e<=t1.f then b*t1.d else 13*(a) end)/abs((coalesce((select d from t1 where +(abs((select (min(a)) from t1))/abs((select count(distinct a) from t1)))- -t1.a in (select  -case max(e)+count(distinct d) when cast(avg(( -t1.e)) AS integer) then ( -(count(*))) else  -min(d) end+max(t1.f) from t1 union select max(t1.a) from t1)),t1.d)))) FROM t1 WHERE (t1.a<t1.a)"
     end, {
         -- <randexpr-2.1221>
-        
+
         -- </randexpr-2.1221>
     })
 
@@ -12280,7 +12280,7 @@ test:do_test(
         return test:execsql "SELECT f+case when (~t1.c between case when +d between (select  -abs(count(distinct t1.a+17+t1.f))+case min(19)*count(distinct  -t1.a) when (count(*)) then ((count(*))) else ((max(t1.e))) end from t1) and case when  -t1.b>=13 then 11 else a end then  -17 else a end and (t1.c) and (b=17)) then (+(t1.c)) when t1.a<=t1.f then t1.d else 11 end FROM t1 WHERE NOT (c<>~13)"
     end, {
         -- <randexpr-2.1224>
-        
+
         -- </randexpr-2.1224>
     })
 
@@ -12290,7 +12290,7 @@ test:do_test(
         return test:execsql "SELECT case when ~(abs((select count(*) from t1))/abs(c))<>case when 17*case when coalesce((select max(f) from t1 where exists(select 1 from t1 where t1.f=t1.e)),t1.a) in (select min(t1.f) from t1 union select  -min(t1.d) from t1) then 11 when 11<=(a) then f else  -e end |  -t1.b< -c then d else f end then ((t1.a)) when t1.f in (select ~(++(count(*))+cast(avg(t1.f) AS integer))+max(( -t1.d)) from t1 union select cast(avg(e) AS integer) from t1) then 11 else d end FROM t1 WHERE t1.a between case when t1.d=t1.a*11 | (select (cast(avg(t1.a) AS integer)+abs( -count(distinct e)) | ~count(distinct coalesce((select max(b) from t1 where not exists(select 1 from t1 where  -e>=13)),(t1.e)))- -( -max(d))* -count(*)) from t1)+(abs(t1.f)/abs((select cast(avg(11) AS integer) from t1))) then t1.a else coalesce((select max(c) from t1 where 11>=t1.e or 11 in (t1.b,t1.b,t1.d) or t1.a>=t1.a),13)*a end and t1.c"
     end, {
         -- <randexpr-2.1225>
-        
+
         -- </randexpr-2.1225>
     })
 
@@ -12320,7 +12320,7 @@ test:do_test(
         return test:execsql "SELECT (coalesce((select 19 from t1 where  - -t1.d | t1.c+~(select max(11) |  -~count(*)+count(*)-cast(avg(case when t1.e in (select a from t1 union select f from t1) then c else 11 end) AS integer) from t1)*coalesce((select t1.b from t1 where ((abs(t1.b)/abs(coalesce((select (b)-f from t1 where t1.f not in ( -e, -t1.b, -t1.d) and t1.d>=a or 19 not in (a,13,t1.f)),b))))<t1.e),f)+b<t1.c),d)) FROM t1 WHERE t1.f | +19+f*t1.d+t1.b*d<case when (select min(t1.e) from t1) not in (t1.b,11, -b*case c when coalesce((select max(t1.b+b) from t1 where 19+13=t1.f),coalesce((select max(19*f) from t1 where t1.a=a),a)) then d else t1.f end) then t1.f when f=t1.c then a else 19 end"
     end, {
         -- <randexpr-2.1228>
-        
+
         -- </randexpr-2.1228>
     })
 
@@ -12350,7 +12350,7 @@ test:do_test(
         return test:execsql "SELECT +case when t1.f<c then 19 when f<=case t1.c when c*d then case when (t1.d=17) and not (d-case when 11<19 then t1.b when t1.d in (t1.e, - -e,c) then a else t1.d end+b in (t1.a,19,11)) then case 19 when c then t1.d else t1.d end when d in (select a from t1 union select 11 from t1) then (t1.e) else 11 end else 19 end then c else 19 end FROM t1 WHERE exists(select 1 from t1 where 19 in (select ++min(t1.f)+case abs((count(distinct 11-t1.a-t1.f)-case ((min(13))) when count(distinct t1.f) then  - -cast(avg(t1.d) AS integer) else cast(avg(t1.d) AS integer) end | count(*)*max(b)- -min(b)))- -min((b)) | min(b) | count(*)*count(*) when count(*) then max(19) else max(19) end | cast(avg(t1.b) AS integer)+min(t1.d)* -max(t1.c) | ( -( -min(t1.e)))*min(d)- -min(d) from t1 union select ((min(b))) from t1))"
     end, {
         -- <randexpr-2.1231>
-        
+
         -- </randexpr-2.1231>
     })
 
@@ -12370,7 +12370,7 @@ test:do_test(
         return test:execsql "SELECT ~case when exists(select 1 from t1 where t1.c in (t1.a,e+t1.b+e-19 | coalesce((select max(t1.f | t1.a+11*a) from t1 where (abs((abs(f)/abs(d)))/abs(coalesce((select max(t1.a) from t1 where (13 between (f) and f and t1.e between e and t1.b)),t1.c)))<=(f)),e)+f+13, -t1.c)) then t1.b when t1.d<>t1.d then (17) else e end+t1.d-19 FROM t1 WHERE not  -t1.e+t1.c not between case when  -case case when exists(select 1 from t1 where 17 in (select min(19) from t1 union select  -min(19) from t1) and 13 not in (17,a,t1.e)) then case when f>=19 then (c) when t1.f>13 then 19 else 19 end | t1.a else e end when b then t1.c else b end in (select  -max(13) from t1 union select count(distinct 17) from t1) and 11 not in (11,t1.a,f) and t1.c=f then ~(abs(t1.e)/abs(t1.d)) when f<13 then 17 else 19 end*b and t1.e"
     end, {
         -- <randexpr-2.1233>
-        
+
         -- </randexpr-2.1233>
     })
 
@@ -12410,7 +12410,7 @@ test:do_test(
         return test:execsql "SELECT ((select min(e+case when b not between coalesce((select t1.d | b from t1 where not exists(select 1 from t1 where 17>11)), -c) and (t1.a) or e<t1.b and (11)<>d then a when 19>11 then  -13 else t1.b end+13)+count(distinct d)+count(*)* -count(distinct t1.f)-((count(distinct t1.c)))+min(a) | max(c) from t1)*t1.e*19*11) FROM t1 WHERE NOT (b<>(select count(distinct f) from t1))"
     end, {
         -- <randexpr-2.1237>
-        
+
         -- </randexpr-2.1237>
     })
 
@@ -12430,7 +12430,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.a) from t1 where +b-b+t1.e<>(case when (case when ((select case  -cast(avg(17) AS integer) when max(17) then count(*) else count(distinct t1.d) end from t1))-case 19 when 11 then e else t1.f end<=e then 19 when b not between t1.c and 13 then e else 17 end+t1.c in (select 19 from t1 union select a from t1)) then e-t1.c else t1.f end*t1.b)-e),a) FROM t1 WHERE coalesce((select 13 from t1 where t1.c<>t1.b | t1.e*19-e),f+t1.d) not in (13,(c)*a,e)"
     end, {
         -- <randexpr-2.1239>
-        
+
         -- </randexpr-2.1239>
     })
 
@@ -12450,7 +12450,7 @@ test:do_test(
         return test:execsql "SELECT t1.d-case when (11) not between coalesce((select max(a) from t1 where f in (select cast(avg(t1.c+(select case case case max(a) when  -count(*) then min(b) else  - -(min((t1.a))) end when (max((19))) then max(t1.f) else count(*) end when max(t1.a) then  -min(t1.c) else count(*) end from t1)+c+t1.d) AS integer)-min(a) |  -cast(avg(f) AS integer)*(cast(avg(f) AS integer))-( -count(*)) from t1 union select min( -c) from t1)),t1.a) and  -c then (d) when t1.f<=((t1.c)) then  - -13 else c end FROM t1 WHERE 13-e>(abs(t1.f)/abs((t1.d)*d))"
     end, {
         -- <randexpr-2.1241>
-        
+
         -- </randexpr-2.1241>
     })
 
@@ -12480,7 +12480,7 @@ test:do_test(
         return test:execsql "SELECT (abs(coalesce((select max(b) from t1 where not exists(select 1 from t1 where 19>(t1.c))),(11+(abs(c)/abs(19)))+b)+coalesce((select max(t1.c) from t1 where t1.a<=13),t1.d+t1.b+case when exists(select 1 from t1 where  -t1.b in (select min(t1.a-+13) from t1 union select max(t1.c) from t1)) then (select ++(cast(avg(11) AS integer)) | cast(avg(b) AS integer)*cast(avg(d) AS integer) from t1) when f>=b then 19 else 19 end))/abs(b)) FROM t1 WHERE not b in (select case when t1.e in (select +cast(avg(d) AS integer)-count(*)*count(*)-(case ~count(distinct d)*cast(avg(t1.b) AS integer) when count(distinct t1.e) then max(19) else cast(avg(t1.b) AS integer) end+(count(distinct t1.c))) from t1 union select  -min(t1.f) from t1) or 19<=+11 then ((select (min(t1.b)) from t1)*a-19+17*13) | a when (11 in (select d from t1 union select t1.e from t1)) then 19 else t1.b end from t1 union select t1.c from t1)"
     end, {
         -- <randexpr-2.1244>
-        
+
         -- </randexpr-2.1244>
     })
 
@@ -12510,7 +12510,7 @@ test:do_test(
         return test:execsql "SELECT +case ~t1.d when case when b*f in (select b from t1 union select 17 from t1) and ((case when t1.f | e in (select ~abs(~(case cast(avg(t1.f) AS integer) when min(b) then min(t1.d) else  - -count(distinct e) end | count(*)*( -cast(avg(t1.b) AS integer)))) from t1 union select (count(distinct t1.b)) from t1) then t1.f else t1.f*17+a end-13+e<>t1.c)) then d else t1.c end then t1.f else t1.e end+19 FROM t1 WHERE b>=+t1.e or f<=t1.b and  -c*17-t1.d*19 not in (c+coalesce((select (abs(~+d*t1.f)/abs(11)) from t1 where +case when t1.d+ -t1.e in (select max(t1.d)*count(distinct b) from t1 union select count(distinct 11) from t1) then (17) when (t1.e>t1.a) then e else e end not in (e,f,t1.a)),t1.f),t1.a,b)"
     end, {
         -- <randexpr-2.1247>
-        
+
         -- </randexpr-2.1247>
     })
 
@@ -12550,7 +12550,7 @@ test:do_test(
         return test:execsql "SELECT (abs((abs(t1.a)/abs(~17 | coalesce((select ~coalesce((select (d) from t1 where t1.b>=t1.a),case when t1.e-(select ~max( -19*c | e+t1.c) from t1) not between (abs(c)/abs(e)) and t1.e then a else 17 end*17)+13 from t1 where a in (select max(t1.f) from t1 union select ~count(distinct b) from t1)),b) | 13)))/abs(e)) FROM t1 WHERE NOT (exists(select 1 from t1 where t1.a+t1.d-11<=t1.e))"
     end, {
         -- <randexpr-2.1251>
-        
+
         -- </randexpr-2.1251>
     })
 
@@ -12570,7 +12570,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(d) from t1 where not exists(select 1 from t1 where t1.e not in (13,e,coalesce((select f from t1 where (abs(case  -t1.e when ~f then (t1.c)*13-t1.b+a-d+ -t1.a else a end)/abs(11))*19*t1.d>=a),(t1.b)))) or d not in (f,e,19)),coalesce((select max(17) from t1 where e in (select t1.e from t1 union select 17 from t1)),t1.c)) | t1.f FROM t1 WHERE t1.e not in (13,(select +count(*)+abs(cast(avg(case t1.d when 17 then  -t1.e+13 else (abs( -c)/abs(case when t1.e*+coalesce((select max(13) from t1 where a>t1.b),t1.f)>=(13) then  -f else t1.a end)) end) AS integer)) from t1)*(13),(select ((max(t1.d))) from t1)) and not exists(select 1 from t1 where e+b not in (b,t1.c,t1.e))"
     end, {
         -- <randexpr-2.1253>
-        
+
         -- </randexpr-2.1253>
     })
 
@@ -12610,7 +12610,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case when (t1.d*coalesce((select max(case coalesce((select max(e) from t1 where t1.a not in (coalesce((select (select count(distinct t1.e) from t1) from t1 where c>=t1.c),f),19,a)),t1.a) when t1.c then t1.a else b end-a) from t1 where c>t1.d),b)<= -11) then t1.a when not exists(select 1 from t1 where not (t1.d=e) or t1.f between t1.a and  -e and (t1.c)=f and a not in (t1.c,a,c)) then t1.a else t1.a end)/abs( -13))+e-d FROM t1 WHERE NOT (17 not in (13,19,t1.c))"
     end, {
         -- <randexpr-2.1257>
-        
+
         -- </randexpr-2.1257>
     })
 
@@ -12630,7 +12630,7 @@ test:do_test(
         return test:execsql "SELECT ~ -coalesce((select c from t1 where (case when b<= -e*t1.f then +coalesce((select case when (select count(*) from t1)=e then t1.f | c else f end from t1 where e>=(select ~case count(*) when  -abs(max(11)-count(distinct  -t1.d)) then count(distinct e) else max(f) end*count(*) from t1)),13) else 19 end>=t1.e)),case when t1.c<t1.a then t1.f else a end |  -a*d)-13-17 FROM t1 WHERE NOT ((abs(coalesce((select  -coalesce((select max((select +count(distinct a | t1.d)- -(((count(distinct d))))-max(t1.c) from t1)) from t1 where (( -case t1.b when 17 then 17 else 13 end<c))),t1.b) from t1 where d not in (t1.c,19,17) or t1.a in (select (max(b)) from t1 union select (cast(avg(b) AS integer)) from t1)),(t1.b))*19)/abs(e))<a or (not exists(select 1 from t1 where t1.f not in (a, -17,e))) and (t1.a) in (select cast(avg(e) AS integer) from t1 union select max(19) from t1))"
     end, {
         -- <randexpr-2.1259>
-        
+
         -- </randexpr-2.1259>
     })
 
@@ -12660,7 +12660,7 @@ test:do_test(
         return test:execsql "SELECT case t1.b when coalesce((select t1.b from t1 where not exists(select 1 from t1 where +case ( -case f when 13 then (abs(t1.b+f)/abs(c)) else t1.d end) when f*t1.f+t1.d then e else coalesce((select coalesce((select max(b) from t1 where t1.a<=t1.a or t1.d+f<=19 or t1.b in (select (11) from t1 union select (19) from t1)),t1.d) from t1 where not exists(select 1 from t1 where 17=b)),c)+e end between t1.c and b)),d) then c else t1.d end FROM t1 WHERE NOT (b>t1.e | case when exists(select 1 from t1 where not ~+11<=coalesce((select max(a) from t1 where ~17*case when a=+(select cast(avg(t1.a*e) AS integer) from t1) then t1.e when c<11 then b else f end+c not between t1.e and  -17), -t1.c)) then e+c when not exists(select 1 from t1 where t1.c not between 13 and  -f) then 17 else  -t1.d end or (f)<=c)"
     end, {
         -- <randexpr-2.1262>
-        
+
         -- </randexpr-2.1262>
     })
 
@@ -12670,7 +12670,7 @@ test:do_test(
         return test:execsql "SELECT case when case when case when exists(select 1 from t1 where exists(select 1 from t1 where t1.a+t1.a | case when t1.b between f and 19 and t1.c<a then t1.e else t1.d end<e)) then a else coalesce((select 11 from t1 where c in (select  -(abs(count(*)) | cast(avg(t1.b) AS integer))+( -min(17))+ -(count(distinct t1.e)) from t1 union select max((t1.a)) from t1)),a) end-t1.d=13 then t1.a else e end*t1.e*t1.c>=t1.e then t1.e else 19 end | a FROM t1 WHERE t1.b not in ((a),t1.d,b)"
     end, {
         -- <randexpr-2.1263>
-        
+
         -- </randexpr-2.1263>
     })
 
@@ -12710,7 +12710,7 @@ test:do_test(
         return test:execsql "SELECT case when exists(select 1 from t1 where a between 13+t1.e and t1.e and (abs((abs(case when not 19 between t1.e and b and not exists(select 1 from t1 where (abs(17)/abs(f-c)) not between (d) and t1.e) then t1.e else 19 end)/abs(11)))/abs(19))=f) or t1.e<= -a then t1.b when exists(select 1 from t1 where t1.d>t1.c) and t1.b<19 then a else 11 end*d FROM t1 WHERE NOT (exists(select 1 from t1 where t1.e<>(select count(distinct ((coalesce((select coalesce((select max( -coalesce((select max( -e) from t1 where ((abs(t1.a)/abs(d)) in (select ~~count(*) from t1 union select count(*) from t1) or a in (d,t1.f,d) and  -c in (b,e,t1.d))),t1.c)-19 | 11-t1.e) from t1 where exists(select 1 from t1 where a<=e) and f not in (17,t1.b,t1.c) or (t1.a)>=t1.d),e)-t1.c from t1 where b<t1.d or d<= -t1.c),t1.e)))) from t1)))"
     end, {
         -- <randexpr-2.1267>
-        
+
         -- </randexpr-2.1267>
     })
 
@@ -12730,7 +12730,7 @@ test:do_test(
         return test:execsql "SELECT t1.c | 13-19-d+case when t1.d-t1.b+t1.f*t1.a-coalesce((select max(c-17-case when t1.e<c then t1.f when exists(select 1 from t1 where d between  -c and f) then t1.a else 17 end) from t1 where 11 in (select a from t1 union select 17 from t1)),c)*11-d in (select c from t1 union select t1.c from t1) then 17 when 11 between a and (a) then a else t1.a end FROM t1 WHERE NOT (t1.a<b)"
     end, {
         -- <randexpr-2.1269>
-        
+
         -- </randexpr-2.1269>
     })
 
@@ -12750,7 +12750,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select b from t1 where t1.d not in (t1.c,case when t1.d not in (d,coalesce((select (select count(distinct d) from t1)*e from t1 where not exists(select 1 from t1 where t1.d>=t1.f) or 11+t1.a between (select  -cast(avg( -t1.b | 19) AS integer)+case min(t1.d) when  -max(t1.e) then  -count(distinct 11) else  - -max((t1.c)) end from t1) and f),(e)),13) then t1.a else d end* -t1.f,13)),d)>=e then 17 else  -11 end FROM t1 WHERE t1.d*b<=+~t1.c-t1.d+d*~b | e"
     end, {
         -- <randexpr-2.1271>
-        
+
         -- </randexpr-2.1271>
     })
 
@@ -12790,7 +12790,7 @@ test:do_test(
         return test:execsql "SELECT t1.a*a+11-case when exists(select 1 from t1 where (t1.d)<d and (b=case when t1.d+(t1.c*c)*t1.b=t1.f then t1.e else  -11 end)) or not exists(select 1 from t1 where t1.d between 13 and  -19 and d<>b) and (19 not in ((t1.a),11,a)) then ~t1.b when t1.c<c then ~c else a end FROM t1 WHERE NOT (a+d> -coalesce((select (select max(e) | min(coalesce((select coalesce((select t1.d from t1 where a<a),11)+c from t1 where (b<e)),19)+t1.c)*abs(count(*))*case count(*) when  -min(a) then min(t1.c) else max( -19) end* -count(*) from t1) from t1 where (abs((abs(e)/abs(t1.e)))/abs(t1.e)) between a and b),((t1.a)))-17 and t1.e not between 13 and 17)"
     end, {
         -- <randexpr-2.1275>
-        
+
         -- </randexpr-2.1275>
     })
 
@@ -12810,7 +12810,7 @@ test:do_test(
         return test:execsql "SELECT case when case when case (abs(t1.b)/abs(t1.a)) when e then f else t1.a end>c then 19 else b end- -11 in (select case case count(distinct t1.f) | (max(17)) when (count(*)) then count(distinct b) else count(distinct 19) end when min(t1.f) then (count(distinct t1.f)) else count(*) end-min(13) from t1 union select cast(avg( -t1.c) AS integer) from t1) or f<>t1.a then coalesce((select max(t1.b) from t1 where exists(select 1 from t1 where t1.e>=t1.e)), -t1.a) when exists(select 1 from t1 where 17 between t1.f and t1.d) then t1.c else c end FROM t1 WHERE NOT (t1.b=t1.b)"
     end, {
         -- <randexpr-2.1277>
-        
+
         -- </randexpr-2.1277>
     })
 
@@ -12830,7 +12830,7 @@ test:do_test(
         return test:execsql "SELECT (abs(b)/abs(case 19 when case e+13*~t1.c*11 when case when (select ~min(t1.a) from t1)>t1.c then (case when 11 between (a) and (19) then d else d+t1.c end) else f end then (abs((e+t1.d)*e*19-t1.d)/abs(c)) else t1.b end then 11 else ( -t1.b) end*13)) FROM t1 WHERE case when ((select min( -case when b in (d-t1.e,case when e in (select d from t1 union select 17 from t1) then 11 else c end,( -t1.d)) then t1.b when b>e then c else  -t1.f end)+ -((min(t1.f)))-+min(f) | ( -(cast(avg(a) AS integer))) from t1)) in (select 11 from t1 union select 19 from t1) then 19 when not exists(select 1 from t1 where  -17>t1.f and t1.e in (select t1.e from t1 union select d from t1)) then 11 else d end=t1.d"
     end, {
         -- <randexpr-2.1279>
-        
+
         -- </randexpr-2.1279>
     })
 
@@ -12850,7 +12850,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(11) from t1 where not not exists(select 1 from t1 where ((abs(b)/abs(t1.f))-19+f-case ~11 when 19 then c else t1.a end)> -c+t1.a)),(11))- -b FROM t1 WHERE b*case when 19 not in (t1.e,a*+t1.d,(abs(+c)/abs(case 11 when b then +case when (not exists(select 1 from t1 where d<=c or c<t1.d or f<=b)) then e*19 | d+f else (t1.d) end | t1.d else b end))) then t1.b when not exists(select 1 from t1 where  -t1.e between 11 and e) then a else 17 end*t1.f between  -c and  -t1.d"
     end, {
         -- <randexpr-2.1281>
-        
+
         -- </randexpr-2.1281>
     })
 
@@ -12870,7 +12870,7 @@ test:do_test(
         return test:execsql "SELECT case when ((select count(*) from t1) not between b+t1.f and  -(coalesce((select max(coalesce((select max((select count(*) from t1) |  -case when ~19-b between a and 17 and (t1.c) between (13) and d and t1.a<=a then f-19 when 19<t1.d then f else t1.d end) from t1 where  - -t1.d between t1.b and a),t1.c)) from t1 where 11<(11)),e)-t1.c)) then b+t1.f else (b) end+13 FROM t1 WHERE e in (case when 17+b-17*+11 | +case when ~b-17*t1.d in (13,19, -t1.b) or 13 between t1.a and d and 11 not in (t1.e,f, -b) then t1.d*17 else b end not in (17,17,t1.c) then t1.c when t1.d not in (f,e,b) then t1.d else 11 end,11,t1.a)"
     end, {
         -- <randexpr-2.1283>
-        
+
         -- </randexpr-2.1283>
     })
 
@@ -12900,7 +12900,7 @@ test:do_test(
         return test:execsql "SELECT case coalesce((select t1.e from t1 where 19 in (select 13 from t1 union select 11 | coalesce((select  -(t1.c) from t1 where t1.a<=t1.c),case when ~case when t1.e not between 11 and t1.e then d else 19 end+t1.a+f in (select  -(count(distinct  -c))-max(d)+count(distinct t1.d) from t1 union select cast(avg((b)) AS integer) from t1) then (t1.d) when not (t1.a not in ( -t1.e,t1.b,17) and 11<d) then e else b end) from t1)),11) when t1.c then a else a end-t1.b FROM t1 WHERE t1.d>=11*t1.d"
     end, {
         -- <randexpr-2.1286>
-        
+
         -- </randexpr-2.1286>
     })
 
@@ -12940,7 +12940,7 @@ test:do_test(
         return test:execsql "SELECT (select min(coalesce((select max(case (b | case  -e when 11 then +(abs(17)/abs((19))) else 13 end) when t1.f then 17 else a end) from t1 where 17 not between e and  -a and 19=13 or t1.f=19 and t1.c<e and t1.c in (select cast(avg(19) AS integer)*min(c) from t1 union select +count(*) from t1)),t1.c)) from t1)*t1.e-t1.a FROM t1 WHERE NOT ((19)<>t1.b)"
     end, {
         -- <randexpr-2.1290>
-        
+
         -- </randexpr-2.1290>
     })
 
@@ -12970,7 +12970,7 @@ test:do_test(
         return test:execsql "SELECT t1.f*b | coalesce((select max(t1.f) from t1 where (case when (select cast(avg((select (count(distinct e+t1.c)) from t1)) AS integer) from t1)=t1.d then case when not exists(select 1 from t1 where (b)+t1.e+t1.f in (select min(e) from t1 union select case count(distinct t1.c) when count(distinct f) then cast(avg((t1.f)) AS integer) else (cast(avg(13) AS integer)) end from t1)) and not exists(select 1 from t1 where (d=b)) then t1.d when 13 in (f,c,c) then case t1.c when 11 then  -a else t1.b end else 13 end else 19 end)<17),19)-t1.a FROM t1 WHERE NOT (c>=case when d<t1.e then t1.b when t1.f not between 11 and 17 then coalesce((select max( -~e | (17-c)) from t1 where not exists(select 1 from t1 where (( -13-b) in (select ++cast(avg(b) AS integer) from t1 union select case  -case ~max(e)-count(*) when (min(19)) then count(*) else max(t1.c) end |  -cast(avg(11) AS integer) when max(b) then (max(e)) else count(*) end | min(t1.d) from t1)))),t1.d) else t1.c end)"
     end, {
         -- <randexpr-2.1293>
-        
+
         -- </randexpr-2.1293>
     })
 
@@ -12990,7 +12990,7 @@ test:do_test(
         return test:execsql "SELECT +case when b in (13,(t1.f),19+a) and not exists(select 1 from t1 where  -case when case when case (abs(coalesce((select b from t1 where t1.b>=t1.a),t1.e))/abs(13)) when t1.b then b else  -a end=11 then 13 else a end<>t1.f or 19 not in (b,(t1.b), -19) then b else e end<>e) then t1.f else c end | t1.a+d- -f+f FROM t1 WHERE a in (13+17,case when (t1.a>t1.e) then ~t1.c+d*case coalesce((select coalesce((select d from t1 where 11 not between t1.e and coalesce((select t1.b from t1 where  -coalesce((select max(t1.b) from t1 where t1.d in (a,11,d) and b=c),c) between b and d),(t1.e))),t1.f) from t1 where t1.e=a),t1.a) when 17 then (t1.f) else t1.d end+b+c when a>=t1.d then t1.a else f end,b)"
     end, {
         -- <randexpr-2.1295>
-        
+
         -- </randexpr-2.1295>
     })
 
@@ -13030,7 +13030,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.b from t1 where 17+13+t1.b in (e,19,case when 17 in (select case max(b*17-d*t1.b*t1.d)+case max((19)) when ~ -max(t1.f) then +count(*) else cast(avg(13) AS integer) end when count(distinct 11) then min(e) else max(t1.c) end from t1 union select min(d) from t1) then t1.a* -(t1.a) when t1.c=19 then (t1.c) else t1.f end) and t1.f<=13),17) FROM t1 WHERE NOT (t1.e<>~t1.b)"
     end, {
         -- <randexpr-2.1299>
-        
+
         -- </randexpr-2.1299>
     })
 
@@ -13050,7 +13050,7 @@ test:do_test(
         return test:execsql "SELECT (abs(coalesce((select  -~(abs(t1.d)/abs(a)) from t1 where case when f in (select ~~(+abs( - -count(*)) | cast(avg(d) AS integer)) from t1 union select (min(f)) from t1) then (abs(t1.c)/abs( -13)) | f-13+d*17 when a in (t1.f,t1.c,11) then f else  -(f) end*c not in (13,d,d) and 19 in (t1.d,t1.d,b)),13))/abs(17)) FROM t1 WHERE NOT (exists(select 1 from t1 where t1.d<>case case when not exists(select 1 from t1 where t1.b<e and t1.c>(abs(c)/abs(t1.a))) then t1.b else 17 end when +~(e- -coalesce((select e from t1 where not (b) in (select max(t1.b) from t1 union select case max(t1.e)-max(17)-count(distinct (13)) when  -cast(avg( -t1.b) AS integer) then count(distinct d) else min(t1.f) end from t1)),c*d))*a*13 | f then (13) else c end))"
     end, {
         -- <randexpr-2.1301>
-        
+
         -- </randexpr-2.1301>
     })
 
@@ -13080,7 +13080,7 @@ test:do_test(
         return test:execsql "SELECT t1.f*+case when ( -17-a*t1.f | case when (coalesce((select max((case a when +13*19* -b then a else 17 end)) from t1 where (t1.b) not between 13 and t1.a),e))-t1.b=t1.f then f else 17 end-b*a*d)<>11 then f else t1.c end-t1.c*e FROM t1 WHERE NOT ((select +cast(avg(case when 13*a in (select 11 from t1 union select b from t1) then e when t1.f in (select ~count(distinct f) | count(*) from t1 union select count(distinct 13*t1.a+coalesce((select max(e) from t1 where ~(abs(t1.e)/abs(a)) not in (t1.a+e-c,t1.e,case when t1.f>t1.c or f>t1.c then 13 when t1.c>c then t1.a else  -t1.d end)),f)*19) from t1) then d else d end) AS integer) from t1)=d)"
     end, {
         -- <randexpr-2.1304>
-        
+
         -- </randexpr-2.1304>
     })
 
@@ -13100,7 +13100,7 @@ test:do_test(
         return test:execsql "SELECT t1.c+case when t1.a in (select max(coalesce((select coalesce((select coalesce((select max(19+case t1.f when a then e else t1.d end) from t1 where t1.d> -c),b) from t1 where (t1.c=e) and t1.f=17), -a) from t1 where (e not between e and 11)),t1.f)) | cast(avg(t1.a) AS integer)*max(t1.c) from t1 union select count(distinct c)-max(a) | min(t1.b) | (count(*))* -min(f) from t1) then t1.a when exists(select 1 from t1 where not exists(select 1 from t1 where  -17>11)) then (13) else 13 end FROM t1 WHERE 19=case when exists(select 1 from t1 where t1.f not between 11 and ~c+b-t1.c*case when t1.f<13+(t1.d) and  -t1.f<17 or (b<>b) then ~d else t1.b end) or exists(select 1 from t1 where not exists(select 1 from t1 where t1.e=19)) then c+f*17 else t1.a end and t1.e<13"
     end, {
         -- <randexpr-2.1306>
-        
+
         -- </randexpr-2.1306>
     })
 
@@ -13130,7 +13130,7 @@ test:do_test(
         return test:execsql "SELECT 13-case when exists(select 1 from t1 where f+b>t1.f+t1.c) or +17 |  -coalesce((select case coalesce((select 13-(select (cast(avg(13) AS integer))-max(t1.b) from t1) from t1 where  -c in (select max(17) from t1 union select max(t1.b) from t1)),t1.a) when t1.d then 19 else d end from t1 where d>=11),b) between 13 and 11 and 17<=13 then a | t1.c+t1.f else c end FROM t1 WHERE (case when a not in (t1.d+t1.f,b,t1.b) then case when case f | t1.c when t1.e then e else (t1.a)-d | 13 end<>f then t1.e when (((13) in (select min(t1.a) from t1 union select max( -e) from t1) or t1.f between 13 and  -t1.b or (f>=f) or 19<c or t1.d<=13)) then 13 else 19 end else  -t1.b end) not between 17 and e"
     end, {
         -- <randexpr-2.1309>
-        
+
         -- </randexpr-2.1309>
     })
 
@@ -13160,7 +13160,7 @@ test:do_test(
         return test:execsql "SELECT a+case when ((~t1.d*13<=e or (coalesce((select coalesce((select case when  -t1.e<>t1.e or f between b and 13 then t1.c else c end |  -b from t1 where 17<=17),t1.e) from t1 where 11<c and t1.b not between f and t1.d or 13<=17),t1.f)) not in (13,t1.e,13) and ((13>=d) and t1.e>17))) then t1.a | (select ~ - -cast(avg( -c) AS integer) from t1) else c end FROM t1 WHERE t1.f>=e and t1.f in (select 17 from t1 union select case when (not exists(select 1 from t1 where case when coalesce((select max(19+t1.c) from t1 where 17>=t1.f),c)+19+t1.c< -d then t1.d when t1.c not in (c,t1.f,e) then 17 else t1.d end<t1.e) or (f<=t1.b)) and t1.a not in (a,11, -t1.f) then coalesce((select f from t1 where 17 not in (e,b,t1.f)),t1.f-t1.d) | t1.b when  -19<>11 then d else 13 end from t1)"
     end, {
         -- <randexpr-2.1312>
-        
+
         -- </randexpr-2.1312>
     })
 
@@ -13200,7 +13200,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.b not in (17 | t1.e*t1.a,11,(select +case max((select  -+case (max(t1.f)) when count(*) then count(distinct d) else  -( -(cast(avg(f) AS integer))) end-count(distinct t1.a) from t1)) | count(distinct (t1.e)) when  -min(c) then count(*) else  -count(distinct e) end | cast(avg(17) AS integer) from t1)) then case when d<=t1.c and (exists(select 1 from t1 where (select count(distinct (e)) from t1)=(abs(17)/abs(d)))) then (abs(t1.f)/abs(t1.c)) when t1.f<>e or t1.c<=d and t1.e<=t1.d then 19 else  - -d end-t1.e else (t1.f) end FROM t1 WHERE NOT (not t1.b=coalesce((select (abs(c)/abs(11)) from t1 where exists(select 1 from t1 where  -coalesce((select max(((abs(coalesce((select max(case (select min((abs(19)/abs(19))+19)*count(*)- -cast(avg(t1.d) AS integer)-max(17)+min( -11) from t1) when e then t1.e else f end) from t1 where t1.d<=t1.f), -f)- -t1.e)/abs(d))-t1.b)) from t1 where c<11),t1.b)*a not in (d,d,f))),c))"
     end, {
         -- <randexpr-2.1316>
-        
+
         -- </randexpr-2.1316>
     })
 
@@ -13220,7 +13220,7 @@ test:do_test(
         return test:execsql "SELECT  -t1.a*(select (cast(avg((select count(*)-abs(count(*)*count(*)) from t1)) AS integer)++max(t1.d))*cast(avg(t1.a) AS integer) from t1)+t1.c+t1.c+d-e | 11+t1.b-coalesce((select max(case when exists(select 1 from t1 where t1.a+11=t1.b) then c when t1.a not between t1.f and t1.d or 13<11 then  -b else 19 end) from t1 where c>=t1.f),t1.f) FROM t1 WHERE exists(select 1 from t1 where (f=(d)*e))"
     end, {
         -- <randexpr-2.1318>
-        
+
         -- </randexpr-2.1318>
     })
 
@@ -13260,7 +13260,7 @@ test:do_test(
         return test:execsql "SELECT  -case when t1.a+ -c+coalesce((select d from t1 where (t1.d between a and case when t1.c*t1.b*a between a and 13 then t1.d else 11 end) or not t1.e in (select max(d) from t1 union select max(t1.e)-( -count(distinct t1.e)) from t1) or t1.c>=t1.b or a not in (c,t1.f,t1.d) and b<=t1.c),13)+d-(17) | t1.c*17<=t1.a then t1.c else d end FROM t1 WHERE NOT (case a when e then f else case when  -t1.c not between e*f | b and t1.d then case (select max((b)) from t1)+coalesce((select max(case when 19 in (b,e,17) then 13 when 11 in (t1.a,t1.a,t1.a) then t1.e else 19 end) from t1 where a<=e and 13 between t1.e and  -t1.f),13) when 17 then a else t1.d end when e in (select f from t1 union select  -t1.d from t1) then t1.a else c end*d end-13*a not in (19,t1.d,19))"
     end, {
         -- <randexpr-2.1322>
-        
+
         -- </randexpr-2.1322>
     })
 
@@ -13280,7 +13280,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select (abs(t1.a)/abs(13)) from t1 where a<>(select max(b)-abs(+min(f+13*17+~coalesce((select case when 11-t1.c<>19 then t1.c when (c) not between t1.e and d and 11 in (t1.f,13,((c))) then 19 else 11 end from t1 where ( -d)<e and 17>f),11)+c-t1.c)) |  - - -+max(19) from t1)-f),b) FROM t1 WHERE t1.b-t1.a+case ((t1.a)) when t1.f then (abs(e*e-(e)*c)/abs(t1.f)) else (abs(t1.a)/abs(t1.b)) end between f and (select case cast(avg(13) AS integer) when (count(*)) then (~abs( -case count(*) when abs((count(*))) then count(distinct 13) else count(*) end)-(count(distinct 11)))-count(distinct 19)*((max(t1.c)))-cast(avg(11) AS integer) else (max(19)) end from t1)"
     end, {
         -- <randexpr-2.1324>
-        
+
         -- </randexpr-2.1324>
     })
 
@@ -13310,7 +13310,7 @@ test:do_test(
         return test:execsql "SELECT t1.d*coalesce((select d from t1 where coalesce((select max(t1.c) from t1 where 11<>13),e)<=(select ~min(13) from t1)*t1.a),c)-coalesce((select (t1.b+17) | (abs( -~17)/abs(t1.d)) from t1 where not exists(select 1 from t1 where case t1.d when case when t1.f not in (t1.e,e,17) then f when t1.c not between 11 and  -t1.a then b else 17 end+13 then t1.f else t1.b end+13+t1.b between 17 and 13)),t1.b)+t1.a FROM t1 WHERE (not d in (t1.d,(select max(e) from t1),case d*case when not exists(select 1 from t1 where not exists(select 1 from t1 where coalesce((select max(t1.c) from t1 where t1.b<=11-d+(select  -max(13-t1.f) from t1)*t1.a),19)>t1.c) and c not between d and 19) then 11+~ -t1.a when t1.e<t1.d then f else t1.a end when 17 then t1.b else t1.c end))"
     end, {
         -- <randexpr-2.1327>
-        
+
         -- </randexpr-2.1327>
     })
 
@@ -13340,7 +13340,7 @@ test:do_test(
         return test:execsql "SELECT d+~e-case when exists(select 1 from t1 where  -a in (select max( -(select  -count(*)-min(e)++cast(avg(case when d in (select +max(c) from t1 union select ((count(distinct (e)))) from t1) then (c) when t1.c<e then 13 else t1.f end) AS integer) from t1)++case 19 when a*t1.e then (t1.c) else 13 end+t1.b) from t1 union select max(11) from t1)) then (abs(19)/abs(t1.b)) when f>=f then t1.b else t1.a end*a+19-13 FROM t1 WHERE not exists(select 1 from t1 where exists(select 1 from t1 where (select min(case when 13 not in (19,e-t1.a*17,17- -case 19 when 17+17 then a else t1.d end+f-t1.a*11) then 17 else t1.b end*17+11-b) from t1) between 11 and f or t1.e<>t1.d)) or c not in (t1.c,17,d)"
     end, {
         -- <randexpr-2.1330>
-        
+
         -- </randexpr-2.1330>
     })
 
@@ -13370,7 +13370,7 @@ test:do_test(
         return test:execsql "SELECT case coalesce((select 11*19*t1.a+(abs(t1.e*(select count(distinct  -d) from t1)*case t1.f when +c then d else c end+b)/abs(d)) from t1 where t1.b*13=(e)),13) when (t1.d)*b-19*(e)*e-19+(t1.d) then 13 else b end*a FROM t1 WHERE NOT (not d=19 and (abs(t1.c)/abs(17))-a<coalesce((select max(d-+d+case when exists(select 1 from t1 where (exists(select 1 from t1 where t1.b<>b))) then case when 13 not between t1.e and t1.a then c when t1.c>t1.c then 13 else a end | 19 else (19) end*f*13) from t1 where 17=t1.d and (b<>11)),t1.b)+t1.a | d)"
     end, {
         -- <randexpr-2.1333>
-        
+
         -- </randexpr-2.1333>
     })
 
@@ -13390,7 +13390,7 @@ test:do_test(
         return test:execsql "SELECT (c*(abs(coalesce((select t1.b from t1 where (select ~~count(*)+ -count(distinct coalesce((select max(case coalesce((select max(a+(t1.e)) from t1 where  -(a)>=t1.e or t1.e<17),c) when t1.d then t1.a else 17 end) from t1 where t1.b not in (e,(c),t1.a)),f)) from t1) between t1.a and b),case when exists(select 1 from t1 where t1.c>=t1.a) then 19 else t1.e end+t1.c))/abs(b))-11 | 19) FROM t1 WHERE NOT (not t1.e<=d or not exists(select 1 from t1 where exists(select 1 from t1 where ( -t1.c+d)>t1.a+case when f |  -b not between 17 and e then  -t1.d else (19) end) or 11 not between 17 and t1.f) or a in (select  -cast(avg(13) AS integer)*count(distinct 17)-min(b)- -max(11) | (count(*)) from t1 union select ((((max(b))))) from t1) and t1.e in (13,(13),b))"
     end, {
         -- <randexpr-2.1335>
-        
+
         -- </randexpr-2.1335>
     })
 
@@ -13410,7 +13410,7 @@ test:do_test(
         return test:execsql "SELECT (select cast(avg(13*13* -coalesce((select b from t1 where case +(abs(17)/abs(d))*e+c-case  -case when not a in (d,13,t1.b) then t1.b when t1.f<=b then e else  -f end-17 when t1.e then t1.d else a end when c then b else f end<>e or e<b),f)+t1.a-d*a+t1.c) AS integer) from t1) FROM t1 WHERE 19 in (select  -~count(distinct case when not not not exists(select 1 from t1 where (d in ((abs(19*t1.f-t1.e*e)/abs(11))*13,t1.f,t1.f))) then 13 else t1.a+17-13 end)-min(t1.f) from t1 union select ( -abs(count(distinct d)))-min(t1.b)*+(+count(*) | (min(19)))+min(c) from t1)"
     end, {
         -- <randexpr-2.1337>
-        
+
         -- </randexpr-2.1337>
     })
 
@@ -13430,7 +13430,7 @@ test:do_test(
         return test:execsql "SELECT b | t1.d- -coalesce((select case coalesce((select max((select (abs(cast(avg(coalesce((select max(coalesce((select 17 from t1 where  -11=t1.e),a)) from t1 where not exists(select 1 from t1 where 13 between t1.f and 13)),11)-c) AS integer)))+min( -b) from t1)+b) from t1 where t1.d not in (b*19,t1.a,a)),t1.e) when t1.e then t1.b else t1.d end from t1 where (e not in (b,t1.a,(a)))),13) FROM t1 WHERE t1.c=coalesce((select t1.d*(select count(*) from t1) from t1 where ((abs(e)/abs(case 13 when t1.d then t1.e else 11 end+13))>t1.d) or (t1.f in (select 11 from t1 union select t1.c from t1) or c>t1.e and b not in (t1.b, -t1.e,t1.a)) or c<>b),(a))-19*t1.c-c*t1.d and exists(select 1 from t1 where not exists(select 1 from t1 where t1.a in (t1.b,e,19) or not exists(select 1 from t1 where t1.c=19)))"
     end, {
         -- <randexpr-2.1339>
-        
+
         -- </randexpr-2.1339>
     })
 
@@ -13470,7 +13470,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select 19 from t1 where not exists(select 1 from t1 where 11+d between b and 19-case when t1.e>e*f+case when 13 in (select count(*) from t1 union select ~min(a*t1.d)+count(*) from t1) then c when (select min(d) from t1) in (select cast(avg(17) AS integer) from t1 union select min(t1.a) from t1) and 11<>(f) then  -f else 19 end | c then 13 else 19 end*b*t1.b)),a) FROM t1 WHERE NOT ((coalesce((select d from t1 where coalesce((select ~(coalesce((select max(t1.a) from t1 where 13+t1.c-c*coalesce((select t1.a from t1 where ( -t1.d not between a and d)),t1.e)+t1.e- - -11-t1.d*11<17),d)) from t1 where f between t1.a and t1.a),t1.c)<>e),t1.d)*(19)-t1.e- -17-a>=d or t1.c between f and a))"
     end, {
         -- <randexpr-2.1343>
-        
+
         -- </randexpr-2.1343>
     })
 
@@ -13500,7 +13500,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select +case case when f>t1.d then a+t1.b-f when coalesce((select max(t1.b-case f when 13*t1.a then 11 else 11 end*c) from t1 where f in (select min(t1.d) from t1 union select +count(distinct f) from t1)),17) not in (e,b,t1.a) then f else t1.b end-e*t1.a when  -11 then 19 else (t1.d) end from t1 where 17 not between  -13 and t1.e),19) FROM t1 WHERE NOT (not t1.b*coalesce((select max(17 | coalesce((select coalesce((select +coalesce((select max(case when (b not in (a,t1.b, -t1.a)) and t1.f=t1.b then t1.c-t1.f when 11>d then 17 else 11 end+f) from t1 where t1.e<>b), -t1.e) from t1 where t1.f in (select min(b) from t1 union select max(19)+count(distinct e)+(count(distinct e)) |  - -count(distinct 17)*count(*) from t1)),13) from t1 where t1.f>=t1.f),t1.f)) from t1 where t1.f>=b),c)<t1.d)"
     end, {
         -- <randexpr-2.1346>
-        
+
         -- </randexpr-2.1346>
     })
 
@@ -13510,7 +13510,7 @@ test:do_test(
         return test:execsql "SELECT  -11* -t1.b-t1.b+ -case when t1.e-(select max((select abs((cast(avg(t1.f) AS integer)+++ -cast(avg(a | a) AS integer))) from t1))+(( -max( -b))) from t1)<=(abs(11)/abs((select count(distinct t1.e) from t1)-b*case when t1.a<>11 then t1.a when 17 not between d and 13 or t1.f in (b,b,t1.a) then t1.d else c end)) then  -t1.e else b end*t1.a FROM t1 WHERE a in ((abs(t1.c*+(abs(17-(abs(19)/abs(b-coalesce((select max(t1.c) from t1 where c>t1.f),t1.e))))/abs(t1.e))+t1.b | t1.d*t1.a)/abs(coalesce((select case when t1.f in (case when  -e<=t1.a then f else 17 end,f,b) then b else t1.c end from t1 where not a in (t1.d,t1.a,c)),t1.f))),b,t1.b) and e in (select f from t1 union select e from t1)"
     end, {
         -- <randexpr-2.1347>
-        
+
         -- </randexpr-2.1347>
     })
 
@@ -13540,7 +13540,7 @@ test:do_test(
         return test:execsql "SELECT case when ((select count(*) | min(case when (a*e in (select  -+ -min(a) | cast(avg(11) AS integer) from t1 union select count(distinct t1.e) from t1) and exists(select 1 from t1 where not 13 in (select count(distinct 11) from t1 union select (max(19)) from t1) or (t1.f) between t1.e and (t1.e)) or t1.a<=f) or t1.e<t1.a then t1.a when t1.e not between t1.c and t1.b then t1.c | a*t1.c else  -b end) from t1))+19-17<=c then f when 19>t1.c then t1.e else t1.b end FROM t1 WHERE (c not between +(select + -~~max(coalesce((select case when t1.b<=t1.d*a then t1.c else t1.e end*t1.e from t1 where t1.d>=t1.b and c=(f) or t1.e>t1.d and b<e),t1.b))-count(*) | max(d)+cast(avg(19) AS integer) | count(distinct 17) from t1)*t1.a and ((coalesce((select max(t1.b) from t1 where t1.f in (select 17 from t1 union select a from t1)),e))*c))"
     end, {
         -- <randexpr-2.1350>
-        
+
         -- </randexpr-2.1350>
     })
 
@@ -13580,7 +13580,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(coalesce((select max((abs((11))/abs(13))-e) from t1 where 11 not in (c,f,(select count(distinct  -17+t1.a) from t1)) or (d*coalesce((select b | coalesce((select max(17) from t1 where e in (d,t1.c,t1.c)),+b) from t1 where d in (d-13,t1.c,f)),13))<>t1.c),t1.d)) from t1 where b not in (t1.e, -13,f)),f) FROM t1 WHERE NOT (d*a | 19<> -t1.d)"
     end, {
         -- <randexpr-2.1354>
-        
+
         -- </randexpr-2.1354>
     })
 
@@ -13610,7 +13610,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.f from t1 where case when 19<>(c*case when 19 |  -t1.e in (select ~+(max(c)) from t1 union select min(19) from t1) then  -t1.f else 13 end-f) then ( -17) else  -19 end-b in (t1.b,t1.f,b) or c in (select ~case max( -t1.d) | count(*)*cast(avg(b) AS integer) when count(distinct t1.f) then cast(avg(t1.f) AS integer) else cast(avg(f) AS integer) end | (cast(avg( -t1.e) AS integer)) from t1 union select max(c) from t1) and t1.f in (select max(17) from t1 union select max(11) from t1)),e) FROM t1 WHERE NOT (not 13 in (select (t1.b)*(coalesce((select (abs(t1.f)/abs( -t1.f-d))-coalesce((select 19 from t1 where not exists(select 1 from t1 where (select count(distinct t1.f+19-(abs(e)/abs(e))) from t1)- -e<>d)),t1.e)* -t1.a-t1.a-(t1.f)*t1.e*t1.d-t1.b from t1 where t1.e between t1.a and b),11)) from t1 union select d from t1))"
     end, {
         -- <randexpr-2.1357>
-        
+
         -- </randexpr-2.1357>
     })
 
@@ -13640,7 +13640,7 @@ test:do_test(
         return test:execsql "SELECT ~ -case when t1.d in (17,t1.e,case t1.b*c when  -c+f-11 | coalesce((select 11 from t1 where (select (min(13)-max(t1.c))+count(*) from t1)+13<=(( -(t1.f)))),b)+17 then t1.d else b end) then c when c between 13 and f and b>17 then f else t1.a end-t1.f FROM t1 WHERE NOT (t1.e>= -f)"
     end, {
         -- <randexpr-2.1360>
-        
+
         -- </randexpr-2.1360>
     })
 
@@ -13670,7 +13670,7 @@ test:do_test(
         return test:execsql "SELECT ((abs(13)/abs( -b | coalesce((select 17 | t1.e from t1 where (d in (select coalesce((select 17 | (a) | c*case when case when t1.c in (select max(13) | cast(avg(t1.b) AS integer) from t1 union select count(*) from t1) then t1.c when 13>=17 then (11) else t1.e end>t1.d and t1.b>=t1.f then 13 when 11 not in (t1.d, -f,13) then f else 11 end from t1 where b<>11),d) from t1 union select t1.e from t1) or b not in (t1.e,b,e))),t1.e)))) FROM t1 WHERE NOT (11<=coalesce((select max(t1.d) from t1 where coalesce((select ~d+t1.d-case when c not in (t1.b-f,19+~coalesce((select t1.a from t1 where t1.f<=b),case when not (e not between f and t1.e) then (t1.e)-d else b end), -t1.d) then 17 when t1.d not between 13 and t1.d then d else (c) end from t1 where c>t1.a),t1.b)<d),t1.c))"
     end, {
         -- <randexpr-2.1363>
-        
+
         -- </randexpr-2.1363>
     })
 
@@ -13700,7 +13700,7 @@ test:do_test(
         return test:execsql "SELECT case when (c between 11 and t1.e*t1.a | c) then case when (case when (b=(select max((t1.c))-min(t1.d) from t1)*b) then t1.c else 17 end-e>t1.d and a between d and d) then c else d end when exists(select 1 from t1 where (11)>19) or a in (t1.b,(t1.c),(a)) and  - -11<>13 and t1.b not between  -b and d then 19 else a end FROM t1 WHERE NOT (19 | t1.d not between (select ~case case count(distinct t1.c) when (count(*)) then ~~~count(*) else  -count(*)- -max(coalesce((select max(19) from t1 where (abs(t1.b-b)/abs(d))+11<a and 17>=t1.a),11))*max(t1.e) | count(*)-abs(max((c)))*max(t1.d) end when  -count(*) then cast(avg(f) AS integer) else  -(max(c)) end from t1) and t1.c)"
     end, {
         -- <randexpr-2.1366>
-        
+
         -- </randexpr-2.1366>
     })
 
@@ -13720,7 +13720,7 @@ test:do_test(
         return test:execsql "SELECT case when not exists(select 1 from t1 where t1.c not in (t1.d,17,t1.c | coalesce((select t1.f from t1 where t1.c*t1.c-t1.e not in (t1.e*(case when (f) not between c and +f then (a) else t1.e end)+17,13, -((t1.a))) and f not between f and t1.d), -t1.e))) then (abs(e)/abs(a)) when 17<17 or 13<>a then f else (f) end FROM t1 WHERE t1.f in (e,(19),case when not exists(select 1 from t1 where coalesce((select max( -(abs(case  -t1.d when t1.d*13+coalesce((select a from t1 where d>19),t1.c) then f else b end)/abs(t1.b))) from t1 where f in (t1.a,t1.d,(c))),t1.d)+c+17<t1.b) then t1.c*t1.b else d end) and (((17 not in (17,t1.c,19))))"
     end, {
         -- <randexpr-2.1368>
-        
+
         -- </randexpr-2.1368>
     })
 
@@ -13760,7 +13760,7 @@ test:do_test(
         return test:execsql "SELECT case +b when coalesce((select max(b) from t1 where exists(select 1 from t1 where (((+~13) in (select case cast(avg(t1.e+(11)+t1.b*e) AS integer) when max(((t1.e))) then min(b)-case  -cast(avg(17) AS integer) when min(e) then cast(avg(t1.c) AS integer) else (max(d)) end-count(distinct t1.f) else count(distinct d) end+count(*) from t1 union select max(d) from t1))))),(abs(~d)/abs(11))) then  -e else  - -13 end+d | t1.d FROM t1 WHERE NOT (((a)>coalesce((select max(coalesce((select max(case when case case when 19 in (select case min(11) when  - -cast(avg(c) AS integer) then count(*) else count(*) end-cast(avg(19) AS integer) | cast(avg(17) AS integer) from t1 union select min(t1.d) from t1) then t1.b*t1.a else  -t1.a end when t1.f then e else t1.d end<a then t1.a when b between  -a and t1.d then  -a else t1.f end) from t1 where b<>d),t1.d)) from t1 where t1.c<>e and  -17<=a),t1.d)))"
     end, {
         -- <randexpr-2.1372>
-        
+
         -- </randexpr-2.1372>
     })
 
@@ -13790,7 +13790,7 @@ test:do_test(
         return test:execsql "SELECT +c+case when (~t1.e in (+(select case cast(avg(17) AS integer)+min(19)+count(*) when  -max(c) then count(distinct t1.c) else  - - -(max(13)) end*count(distinct ( -17)) from t1)-case when d+case when f<>d or t1.d<=t1.e then t1.a else  -11 end in (select cast(avg(t1.e) AS integer) from t1 union select cast(avg(b) AS integer) from t1) then 19 when ((t1.c) between e and a and  -13 not in (d,f,e)) then t1.e else d end,a,t1.b)) then case when t1.b<19 then 13 else 19 end else t1.c end FROM t1 WHERE NOT (not exists(select 1 from t1 where 19>t1.f+coalesce((select 13 from t1 where t1.d in (coalesce((select max(e) from t1 where c<t1.c),case when exists(select 1 from t1 where not exists(select 1 from t1 where not (coalesce((select 19 from t1 where case when not exists(select 1 from t1 where 17<17) then t1.f else a end>=t1.c),t1.d) between t1.b and c))) then  -f+(t1.b)-t1.e-t1.c+t1.c when c in (select  -( -f) from t1 union select 13 from t1) then t1.e else t1.a end),t1.b,a)),11)))"
     end, {
         -- <randexpr-2.1375>
-        
+
         -- </randexpr-2.1375>
     })
 
@@ -13810,7 +13810,7 @@ test:do_test(
         return test:execsql "SELECT (17-t1.e-17*t1.d+coalesce((select  -(abs(t1.a)/abs(t1.e))-t1.e*13*c*c-c from t1 where coalesce((select max(t1.a) from t1 where +case when t1.a not in (e,(t1.b),t1.f) then 11 when t1.b not between t1.c and t1.c then d else b end not in (13,t1.c,b)),f) between f and 11),d)-t1.d)-f+13 FROM t1 WHERE NOT (t1.f<>case when 11 in (coalesce((select e from t1 where not exists(select 1 from t1 where not case when t1.c between 11 and f then +t1.d else (((abs(coalesce((select  -t1.c from t1 where (c in (b,b,t1.e))),13) | t1.e*t1.d)/abs(c))-t1.f)) end-t1.d<a and a>=c)),t1.e),d,t1.e) or t1.b<t1.a then 13 when 11=a then t1.a else t1.a end)"
     end, {
         -- <randexpr-2.1377>
-        
+
         -- </randexpr-2.1377>
     })
 
@@ -13820,7 +13820,7 @@ test:do_test(
         return test:execsql "SELECT case +c when 19*t1.b*coalesce((select t1.b-(19* -case when (coalesce((select t1.a from t1 where c>=e or t1.a not in (t1.c,e,t1.f)),t1.b)+19<=t1.a) then ((b)) when d>=b or d not between 19 and t1.e then t1.c else t1.b end-t1.a*f) from t1 where 13 between t1.f and t1.b or e not in (t1.e,b,19)),t1.a) then d else t1.a end FROM t1 WHERE  -b>=(select max(19) from t1)"
     end, {
         -- <randexpr-2.1378>
-        
+
         -- </randexpr-2.1378>
     })
 
@@ -13840,7 +13840,7 @@ test:do_test(
         return test:execsql "SELECT d+(abs(case t1.e when e*(abs(17)/abs(b)) then f else case when not not 13=c then coalesce((select t1.b from t1 where ((e-11 in (select 19 from t1 union select 17 from t1))) or f>=f),d) else case when c in (t1.a,t1.c,d) then t1.e when  -11 in (t1.a,e,t1.d) then t1.a else 19 end end-t1.e end*19)/abs(t1.c))-t1.e+d*t1.f FROM t1 WHERE t1.d+t1.c*coalesce((select e from t1 where coalesce((select max(t1.f) from t1 where not f in (select abs(case min(case when a not between a and f then 17 when e>17 then t1.d else 13 end) when abs(case cast(avg(t1.a) AS integer) when  -min(t1.b) then count(distinct 17) else (count(distinct t1.a)) end)-count(distinct  -b) then count(distinct d) else max(t1.f) end)+count(*)*max(e) from t1 union select (cast(avg(t1.c) AS integer)) from t1)),b*case 19 when t1.a then 11 else e end)<=f),17)=c"
     end, {
         -- <randexpr-2.1380>
-        
+
         -- </randexpr-2.1380>
     })
 
@@ -13860,7 +13860,7 @@ test:do_test(
         return test:execsql "SELECT case when ~t1.b=t1.b-coalesce((select 17 from t1 where t1.d-a>=(abs(case when c*11 between 19+(select cast(avg(13*b) AS integer) from t1) and case t1.e-t1.f when t1.a then 11 else a end then 19 else 17 end-c+a)/abs(t1.a))),e) then (f) when exists(select 1 from t1 where (11) in (c,t1.c,t1.b)) then f else 19 end*t1.f FROM t1 WHERE case 19 when t1.b then b*case t1.a when +t1.f then e else 17+t1.a end-11++(select ~~abs(~count(*))+count(distinct 13) from t1)*t1.b-t1.c- -a else 17 end>=t1.e"
     end, {
         -- <randexpr-2.1382>
-        
+
         -- </randexpr-2.1382>
     })
 
@@ -13890,7 +13890,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.a<=e and d*(t1.d)+t1.d++a-t1.f-a<=e or c not between b and d and 19 not between t1.e and 11 or  -t1.b in (select b from t1 union select 17 from t1) and t1.d<>t1.e or t1.d in (select t1.c from t1 union select t1.d from t1) then t1.e else 17 end+f+t1.b FROM t1 WHERE NOT (t1.c*~case 19+coalesce((select 19 from t1 where e>11-d),t1.e) when coalesce((select max(11) from t1 where not t1.f in (select ~abs(cast(avg(coalesce((select max(b+f) from t1 where  -f=(t1.b) and a between t1.c and t1.b),a)) AS integer))+ -count(distinct t1.b)- -max(f)*max((f)) from t1 union select min(t1.e) from t1) or a in (select +d*d from t1 union select t1.c from t1)),t1.e) then t1.d else t1.c end*t1.b<t1.b)"
     end, {
         -- <randexpr-2.1385>
-        
+
         -- </randexpr-2.1385>
     })
 
@@ -13910,7 +13910,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select 17 from t1 where (~f=(abs(coalesce((select t1.d from t1 where case (select count(distinct c | 13)- -(cast(avg(11) AS integer)) from t1)+coalesce((select 19 from t1 where d in (select t1.c from t1 union select 17 from t1)),t1.f) when e then t1.c else t1.d end*d<=19 and not exists(select 1 from t1 where (e)<>b)),e)-13)/abs(t1.e))+17)),t1.a)*t1.d+b FROM t1 WHERE NOT (not exists(select 1 from t1 where t1.b=case 19 when f then d+case when t1.c not between 13 and d | (select abs((min(17) | (min(t1.f)))) from t1) and coalesce((select max(11*19) from t1 where not exists(select 1 from t1 where (e>=t1.b))),11) not in (t1.c,19,t1.c) or t1.a in (select count(*) from t1 union select max(c)+cast(avg(11) AS integer) from t1) and (c) not between t1.a and t1.d and t1.b between 11 and a then t1.d else c end else (t1.f) end))"
     end, {
         -- <randexpr-2.1387>
-        
+
         -- </randexpr-2.1387>
     })
 
@@ -13940,7 +13940,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.f+19+case  -d when t1.f then t1.e else e end+case when +d in (select case when exists(select 1 from t1 where coalesce((select max( -17-d+t1.b-t1.d) from t1 where e not in (f,t1.e,11)),c) | t1.e>=c) then b else d end from t1 union select c from t1) then t1.b else d end-e*b+11) from t1 where f<>t1.b),d) FROM t1 WHERE NOT ((exists(select 1 from t1 where f> -t1.a*11 or e in (a-~ -t1.e,+a | e*case when coalesce((select t1.c from t1 where t1.f in (select (count(*)) from t1 union select ((count(*))) from t1)),a)-t1.e not in (e,t1.a,d) or 19 in (t1.b,t1.c,13) and c>19 then b*d else ( -t1.d) end-t1.a*t1.b*19,b))))"
     end, {
         -- <randexpr-2.1390>
-        
+
         -- </randexpr-2.1390>
     })
 
@@ -13960,7 +13960,7 @@ test:do_test(
         return test:execsql "SELECT case t1.b* -(abs(e)/abs(d+b)) when ~a-11 then coalesce((select max(case when (~~19- -t1.d<t1.f or t1.e>=f) then +(abs(t1.c)/abs(t1.e)) when (t1.d>e or t1.a>=t1.a) then 19 else t1.a end*b-(19)-a-t1.c) from t1 where t1.f>=11),13) else b end FROM t1 WHERE (not exists(select 1 from t1 where t1.e<=t1.f) or c- -e*17 in (t1.c+c, -b-17, -coalesce((select case when +coalesce((select max(coalesce((select t1.f from t1 where t1.d in (select max(t1.d)-count(*) from t1 union select max( -t1.a) from t1)),e)+11) from t1 where ( -19)>=t1.a),t1.e)-13 not between t1.a and d then t1.d else 19 end+t1.b from t1 where t1.d<>19),11)))"
     end, {
         -- <randexpr-2.1392>
-        
+
         -- </randexpr-2.1392>
     })
 
@@ -13980,7 +13980,7 @@ test:do_test(
         return test:execsql "SELECT (select case case min(d-t1.c)-max(t1.a) when ~count(distinct d+case  -f*t1.d+11 when b then b else b end)-min(c) then case +max(t1.a)*~abs(count(*)) when  -min(13) then max(17) else count(*) end else  -max(e) end when max(t1.a) then max(d) else max(17) end-count(distinct t1.b) from t1)-(d) FROM t1 WHERE +19 between b*11 and (select max(d-13) | ~+~+~((count(*)))*cast(avg(b) AS integer) from t1)+b"
     end, {
         -- <randexpr-2.1394>
-        
+
         -- </randexpr-2.1394>
     })
 
@@ -14010,7 +14010,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case when +a*t1.e+(abs(t1.e | 11+coalesce((select max(d) from t1 where (not not b<coalesce((select e from t1 where e<>19),17)) and t1.b>13 and d=t1.a and 13 in (d,t1.a,11)),t1.e)*d)/abs(11+t1.a-19))=c or b<>c then t1.e when b<>19 then 17 else b end)/abs(11)) FROM t1 WHERE NOT ((coalesce((select max(case when exists(select 1 from t1 where coalesce((select a from t1 where not 19-~(coalesce((select t1.d from t1 where d between e and 17),t1.a)-t1.a-17) in (t1.d,t1.e,19)),19)*11*d in (select d from t1 union select t1.b from t1)) then c when d between t1.a and  -19 then t1.e else 19 end-d*c) from t1 where (t1.f>=t1.c)),11)) not in (17,17,a))"
     end, {
         -- <randexpr-2.1397>
-        
+
         -- </randexpr-2.1397>
     })
 
@@ -14030,7 +14030,7 @@ test:do_test(
         return test:execsql "SELECT 19+(t1.f)*case coalesce((select max(b) from t1 where not f not between coalesce((select (select (count(distinct t1.c))+ -max( -(f)) from t1)+t1.c from t1 where t1.c<=d),17)-c-19 and 17 or f<>13),case when not exists(select 1 from t1 where ((a)) between b and t1.f) then c when not ( -f not in (t1.b,t1.a,t1.c)) then  -t1.b else 19 end)-t1.d-t1.e when t1.e then 11 else 19 end FROM t1 WHERE not not exists(select 1 from t1 where not 11=c and a*e between coalesce((select max(t1.e) from t1 where f=t1.b*19+case when (e not in (t1.d,t1.d, -c) or t1.a<e or 13 in (select  - -count(*) from t1 union select min(17) from t1)) then t1.c when  -19 in (13,f,e) then  -t1.d else 17 end+t1.b*d),f)*d and t1.a)"
     end, {
         -- <randexpr-2.1399>
-        
+
         -- </randexpr-2.1399>
     })
 
@@ -14060,7 +14060,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(19) from t1 where e-coalesce((select 13 from t1 where exists(select 1 from t1 where ((+(case when d*t1.b not in (t1.d,t1.f,e) then 11 else t1.c end))+19*11+e<=11))),19+t1.d) between t1.c and  -e and exists(select 1 from t1 where t1.d=c and exists(select 1 from t1 where exists(select 1 from t1 where t1.f=b and a in (19,t1.b,d) or t1.b=11) or t1.c>19) or t1.d=a)),19) FROM t1 WHERE NOT (t1.c not between f and d)"
     end, {
         -- <randexpr-2.1402>
-        
+
         -- </randexpr-2.1402>
     })
 
@@ -14080,7 +14080,7 @@ test:do_test(
         return test:execsql "SELECT case e when (t1.e+case when t1.e not between t1.c and case when d+coalesce((select t1.d+13+case case a when t1.a then t1.b else t1.c end when 17 then t1.b else f end+19 from t1 where exists(select 1 from t1 where t1.f< -17)),11)>=d then 13 else 13 end*(t1.c) then  -c when t1.e not between t1.f and t1.d then t1.a else ( - -t1.a) end-d) then t1.a else t1.d end FROM t1 WHERE NOT (t1.d between case when  -(t1.e-c)+a between  -+coalesce((select max(+t1.c) from t1 where (coalesce((select max(case when d>~t1.e then t1.c when t1.f in (select t1.d from t1 union select t1.e from t1) then (19) else t1.e end) from t1 where not exists(select 1 from t1 where t1.e< -(11))),t1.f) in (select min(t1.f) from t1 union select count(distinct 13) from t1))),t1.e) and t1.d then a when 13<=c then b else t1.c end-c and f)"
     end, {
         -- <randexpr-2.1404>
-        
+
         -- </randexpr-2.1404>
     })
 
@@ -14090,7 +14090,7 @@ test:do_test(
         return test:execsql "SELECT (select abs(min(case when d not between coalesce((select max(case case t1.e when e-t1.f-a then case when (not exists(select 1 from t1 where coalesce((select max(t1.f) from t1 where 19<>17 and e not between  -13 and t1.a),t1.c)>=t1.e)) then (select abs(cast(avg(17) AS integer)) from t1) when c between e and 17 then (select (count(*)) from t1) else 11 end else 11 end when e then 11 else a end) from t1 where t1.b>t1.b),t1.e) and 13 then t1.d else 17 end))*min(b) |  -count(distinct t1.f) from t1) FROM t1 WHERE (e) in (select +t1.f from t1 union select t1.f+coalesce((select t1.d+e from t1 where t1.f not in (t1.b,t1.f,e)),(19))*case when t1.a<=a and t1.e<=e then t1.d else t1.c end from t1) and (t1.c not between 11 and e) or d in (select count(*)-cast(avg(t1.a) AS integer) from t1 union select max(19) from t1) and not t1.a not in (11,t1.d,b) or 17>=t1.a"
     end, {
         -- <randexpr-2.1405>
-        
+
         -- </randexpr-2.1405>
     })
 
@@ -14120,7 +14120,7 @@ test:do_test(
         return test:execsql "SELECT case when ++coalesce((select (abs(a)/abs((select max((abs(13*f)/abs(t1.d))-t1.d*t1.e) from t1)))+b-t1.c+(select +(cast(avg(c) AS integer))*count(*) from t1)-t1.d-b*t1.e+19 from t1 where t1.c not between 11 and t1.d),19)<=t1.d then t1.d when not exists(select 1 from t1 where  -11=t1.a) then e else 11 end FROM t1 WHERE (coalesce((select max(coalesce((select a-19 | ~~t1.b from t1 where (abs(t1.f)/abs(b)) not between case when t1.d<=case when not exists(select 1 from t1 where 19<=t1.d) then case when t1.a<=c then f else t1.d end when d>=17 then t1.c else (b) end*t1.c then  - -t1.c when c<>t1.a then t1.f else 11 end and e),t1.e)-(t1.a)) from t1 where e<=a),17)<=t1.e) and t1.d=(f)"
     end, {
         -- <randexpr-2.1408>
-        
+
         -- </randexpr-2.1408>
     })
 
@@ -14140,7 +14140,7 @@ test:do_test(
         return test:execsql "SELECT c*t1.c*(abs(case 11 when case when 11*11 not between b and t1.a then t1.d else  -coalesce((select t1.c from t1 where (not exists(select 1 from t1 where e*~13 not in (a*t1.c, -t1.a,case when 13=t1.c or 13 between 11 and a then  - -a when e<=t1.e then 13 else 11 end)))),t1.b+t1.b) end then t1.c else ((e)) end)/abs(t1.a))+t1.a-e-13 FROM t1 WHERE t1.a*13+case when (select count(distinct b++(select case count(distinct 19*(select  -+min((13*f))-count(distinct t1.c)-max(t1.e) | (count(distinct 11)) from t1)*(f)) when count(*) then min(a)+(cast(avg(t1.d) AS integer)) else  -min(17) end from t1) | t1.c-f) from t1)>t1.b then 19 else c end+17<c"
     end, {
         -- <randexpr-2.1410>
-        
+
         -- </randexpr-2.1410>
     })
 
@@ -14170,7 +14170,7 @@ test:do_test(
         return test:execsql "SELECT ~coalesce((select b from t1 where b between e and case when t1.c+coalesce((select 11 from t1 where (a in (+d-11,t1.f-a,b)) and t1.c in (select t1.f from t1 union select c from t1) or b between 13 and t1.b and t1.e<(c) and a>=t1.c and e between d and t1.f),case when (13)<>(t1.e) then d when t1.a<=t1.e then 13 else d end) not in (17,b,17) then t1.d else t1.a end+a),t1.d) FROM t1 WHERE NOT (case t1.f when 11 then t1.e | f*case when ((select max(17) from t1) | 11>17+~coalesce((select max(t1.b) from t1 where (coalesce((select max(t1.e) from t1 where t1.e in (select (cast(avg( -t1.a) AS integer)) from t1 union select count(*) from t1)),a)) in (t1.f,a,t1.e)),f)+17) then t1.a when 19 in (t1.c, -e,11) or not exists(select 1 from t1 where t1.e between d and a) then 13 else 19 end+t1.f else 11 end<17)"
     end, {
         -- <randexpr-2.1413>
-        
+
         -- </randexpr-2.1413>
     })
 
@@ -14180,7 +14180,7 @@ test:do_test(
         return test:execsql "SELECT ~case when (a<> -++ -11) then e+case when c*t1.a<t1.d then 19 when not not 11>d then t1.a else b end else a end | case when not exists(select 1 from t1 where not exists(select 1 from t1 where 13 | d in (select a from t1 union select d from t1))) or t1.f not between c and 19 then +t1.a else c-a end-17*c FROM t1 WHERE (case when (case when b in (select 11*coalesce((select 11 from t1 where (d not between 13 and 13+17)),coalesce((select max(13) from t1 where t1.c in (select max(e) from t1 union select count(*) from t1)),t1.b)) from t1 union select  -t1.e from t1) then 13 when t1.f in ( -f, -(f),c) then 19 else f end in (select t1.a from t1 union select (t1.c) from t1)) then (abs(19)/abs(t1.b)) when (e in (b,11,19)) and t1.a<c then 19 else a end between d and 11)"
     end, {
         -- <randexpr-2.1414>
-        
+
         -- </randexpr-2.1414>
     })
 
@@ -14220,7 +14220,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.d in (select case when exists(select 1 from t1 where 13>19) then  -d when ~c in (select min(e) from t1 union select cast(avg(case when c not between b and t1.a then b else 13-e+t1.e end) AS integer) from t1) then 13-coalesce((select max(coalesce((select max(19) from t1 where (17=a)),13)) from t1 where t1.a>=c),a) else t1.d end*(t1.c) from t1 union select (11) from t1) then a when b not in (e,t1.f,13) then t1.f else 13 end FROM t1 WHERE NOT (13<>e or t1.a in (select f from t1 union select f from t1))"
     end, {
         -- <randexpr-2.1418>
-        
+
         -- </randexpr-2.1418>
     })
 
@@ -14230,7 +14230,7 @@ test:do_test(
         return test:execsql "SELECT 17-(select case max(t1.f*~case when 17>=b then t1.d else t1.a end) when (count(distinct t1.c)) then count(distinct t1.d+~13*19) else  -min((select +case abs(count(*)) when abs(+count(*)) then ~case count(distinct a) when max(t1.c) then max(t1.c) else min(t1.f) end+max(17) else count(*) end from t1))- -cast(avg(f) AS integer)-min(a) end from t1) FROM t1 WHERE (select count(*) from t1) in (select abs(min(coalesce((select t1.d from t1 where coalesce((select max((t1.d)) from t1 where not b+t1.e*(select min(t1.a+t1.e) from t1)<=(abs(t1.d)/abs(t1.c))+t1.d),f*17+d+case when f between e and d and t1.c= -c then ~13 when b not between 11 and e then (11) else e end+t1.d)=13),t1.e))) from t1 union select (cast(avg(b) AS integer)) from t1)"
     end, {
         -- <randexpr-2.1419>
-        
+
         -- </randexpr-2.1419>
     })
 
@@ -14260,7 +14260,7 @@ test:do_test(
         return test:execsql "SELECT case when +coalesce((select 19 from t1 where c between f and 13),t1.f)<>t1.c*t1.d then coalesce((select max(d) from t1 where t1.d between t1.a and t1.a),t1.f-f)-(13 | case when 11 in (select abs(max(t1.b)*cast(avg(t1.c) AS integer))+count(*) from t1 union select count(distinct b) from t1) and t1.a not in (b,t1.a,e) or a not in (e,19,(t1.e)) then t1.b else 17+t1.a end*t1.a) when 13 in (select e from t1 union select c from t1) then a else e end FROM t1 WHERE NOT ((select  -count(*) from t1)*case when not coalesce((select max(11) from t1 where t1.f<>a),t1.a)<>b then c else ~case when not 19+13-t1.d=t1.d or c>c or (t1.a=t1.d) or 13>=a then a when t1.c not between 13 and 17 then (abs(13+t1.d-t1.a)/abs(b)) else d end end+a | 11<=e)"
     end, {
         -- <randexpr-2.1422>
-        
+
         -- </randexpr-2.1422>
     })
 
@@ -14290,7 +14290,7 @@ test:do_test(
         return test:execsql "SELECT case t1.d | t1.f+(e)+case when +t1.e-d*t1.a+17-b*(abs(t1.f)/abs( -a))-case when 19>=e then ~t1.a*case when t1.e>19 and t1.f<>d then t1.a else t1.d end | b*e else 17 end+t1.a=17 then t1.c else t1.b end when 17 then t1.b else t1.b end FROM t1 WHERE NOT (case when c<=13*t1.a then 11 else  -case when t1.f*e>= -((19)) then case when a>=t1.c then t1.d*e else b end else coalesce((select t1.b from t1 where 11+d-17-t1.d-t1.b not in (case d-17 when f then t1.d else t1.b end,e,t1.c)),t1.c) end*19 end<>b)"
     end, {
         -- <randexpr-2.1425>
-        
+
         -- </randexpr-2.1425>
     })
 
@@ -14310,7 +14310,7 @@ test:do_test(
         return test:execsql "SELECT (coalesce((select max(~t1.d*19*t1.f) from t1 where (abs(17)/abs(t1.f-case when not exists(select 1 from t1 where case when a in (f,t1.a,c) then c when t1.a not in (13,t1.c,a) then e else t1.a end in (select abs(abs(min(t1.e))) from t1 union select cast(avg(11) AS integer) from t1)) or c<a then t1.f else a+d end-11))<>13 or t1.e in (e,t1.c,d)),t1.e) | 13)-d*e FROM t1 WHERE 11 in (select max(+(select max(d | b) from t1)*17-e) from t1 union select (cast(avg(+a-+((coalesce((select t1.e from t1 where exists(select 1 from t1 where (abs( -case when coalesce((select max(b-17) from t1 where not exists(select 1 from t1 where t1.f not between a and 11)),t1.c) in (select t1.d from t1 union select (17) from t1) then t1.c else ( - -t1.d) end)/abs(t1.f))+11>f)),b)))*19) AS integer))-count(distinct t1.f) from t1)"
     end, {
         -- <randexpr-2.1427>
-        
+
         -- </randexpr-2.1427>
     })
 
@@ -14350,7 +14350,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.e from t1 where +~case when d-(abs(+t1.b)/abs( -19*t1.c-(select (abs( -cast(avg((abs(d)/abs(t1.d))) AS integer))) from t1)))+11<19 then t1.a-19-a-f when not (c in (case f when t1.a then 17 else 11 end-a,t1.d, -e)) then 17 else (t1.b) end<d),t1.d) FROM t1 WHERE NOT (exists(select 1 from t1 where f not between ~17+t1.e and coalesce((select max(t1.f) from t1 where 17+19=t1.c),case when case  -case when e not in (+c, - -19,t1.c) then 19 else (b)*t1.a end+t1.c when c then 19 else t1.d end<>(t1.b) then t1.d when (not exists(select 1 from t1 where t1.f<>t1.c)) then t1.b else 17 end-e)-19))"
     end, {
         -- <randexpr-2.1431>
-        
+
         -- </randexpr-2.1431>
     })
 
@@ -14360,7 +14360,7 @@ test:do_test(
         return test:execsql "SELECT case when (abs(17)/abs(t1.e))<t1.b then t1.d when (select count(distinct coalesce((select d from t1 where exists(select 1 from t1 where 19<(select abs(max(t1.b)) from t1)*case when t1.e>=case when (exists(select 1 from t1 where not exists(select 1 from t1 where t1.f<>19))) then coalesce((select 11 from t1 where not exists(select 1 from t1 where t1.e not in ( -t1.d,(b),t1.d))),t1.a)+t1.f*11 else t1.a end then b else e end)),17)) from t1) not in (13,e,17) then t1.e else 11 end FROM t1 WHERE not (t1.e<>coalesce((select (case t1.c when (coalesce((select 19 from t1 where (case when not exists(select 1 from t1 where e not in (c,e,t1.f)) then t1.f | t1.a else t1.a end in (d,19,t1.a)) or t1.f<=t1.c),+13))*t1.b-t1.d then  -t1.c else b end) from t1 where 17<f), -e) or ((a)<=a)) or e<t1.e and  -(13) between 19 and 19"
     end, {
         -- <randexpr-2.1432>
-        
+
         -- </randexpr-2.1432>
     })
 
@@ -14380,7 +14380,7 @@ test:do_test(
         return test:execsql "SELECT (select max(t1.c) from t1) | case when d=(abs(t1.d)/abs(t1.b)) then 19 else case b when a then b+17+c-t1.d+d-a*t1.c else e+t1.f+ -(select abs(~+count(distinct case when b<d and t1.f<> -19 then e when a in (17,d,t1.f) then  -t1.f else f end)+count(*)-max(t1.f) | count(distinct t1.a) | cast(avg(t1.c) AS integer)) |  -max(a) from t1) end end FROM t1 WHERE a | t1.c in (select f from t1 union select case  -t1.c when (abs(c | t1.c)/abs(17)) then (abs(t1.e)/abs(t1.c))+~19 else coalesce((select b from t1 where 11<=case d+coalesce((select max((select ( -(cast(avg(17) AS integer)))*max(t1.e)-max(t1.d)*cast(avg(t1.e) AS integer) from t1)) from t1 where (abs(case t1.f when 19 then b else t1.c end)/abs(t1.e))=b),d)*t1.f when  -t1.b then t1.d else 19 end),a) end+d+e from t1)"
     end, {
         -- <randexpr-2.1434>
-        
+
         -- </randexpr-2.1434>
     })
 
@@ -14420,7 +14420,7 @@ test:do_test(
         return test:execsql "SELECT case e*case when case coalesce((select max(13) from t1 where exists(select 1 from t1 where t1.a in (17,b,17))),t1.e)-t1.c when c then 19 else  -t1.d end+17 in (t1.d,c,11) or b<= -( - -a) then ~(a) when f in (select case case (max(e)) when count(*) then max(17) else (max(17)) end+count(distinct e)- -count(distinct d) when  -count(*) then  -count(distinct d) else ((min(t1.f))) end from t1 union select min( -19) from t1) then c else (13) end when b then t1.b else f end FROM t1 WHERE NOT (t1.b<t1.e)"
     end, {
         -- <randexpr-2.1438>
-        
+
         -- </randexpr-2.1438>
     })
 
@@ -14440,7 +14440,7 @@ test:do_test(
         return test:execsql "SELECT case when d in (c,t1.a*19,+++case when exists(select 1 from t1 where case 17 when ~t1.b then f-e*~b-17+ -t1.c else c end<>17 or (t1.c in (19,c,a))) then 13 else c end-11+11*11) then t1.e when (11)<13 then  - -t1.c else t1.d end FROM t1 WHERE NOT (((t1.c+17 not between case b*(11-coalesce((select max(t1.a) from t1 where ~case when (not t1.d*17=f) then t1.c-13+c else t1.d end+t1.c>=(b)),b)*e) when t1.f then b else f end-f- -17 and d or t1.d not in (t1.c,11,b))))"
     end, {
         -- <randexpr-2.1440>
-        
+
         -- </randexpr-2.1440>
     })
 
@@ -14450,7 +14450,7 @@ test:do_test(
         return test:execsql "SELECT t1.e*coalesce((select 17 from t1 where (19>(abs(case coalesce((select coalesce((select ~11 from t1 where b not between (13) and b),17) from t1 where 19 not between e+b+13 and  -t1.d),t1.f) when d then t1.e else t1.d end-e | f)/abs((e)))) and (t1.b<=a and 11<> - -t1.e) and t1.d<d),c) FROM t1 WHERE t1.a>t1.a | t1.c"
     end, {
         -- <randexpr-2.1441>
-        
+
         -- </randexpr-2.1441>
     })
 
@@ -14480,7 +14480,7 @@ test:do_test(
         return test:execsql "SELECT ~coalesce((select max(t1.a) from t1 where ((t1.c)<=case 11-~t1.b++(t1.a+ -c)*t1.d-b | d when ~e then 17 else (abs(f)/abs(t1.f-t1.c)) end-19 | b-~t1.e*a-t1.b | +c)),b)*a FROM t1 WHERE not exists(select 1 from t1 where t1.a=((abs(coalesce((select coalesce((select max(+d) from t1 where not exists(select 1 from t1 where  -t1.d in (select  -max(13)-(min((t1.a))) from t1 union select count(distinct f) from t1)) and 11 in (select f from t1 union select 17 from t1) and a<>13),case when e>(11) then  -c else d end) from t1 where e<>11 and e<d),t1.d)+t1.b)/abs(17))* -19)-b or t1.e not in (a,11,t1.f) or not exists(select 1 from t1 where (exists(select 1 from t1 where  -11=b and (d)<>t1.e))))"
     end, {
         -- <randexpr-2.1444>
-        
+
         -- </randexpr-2.1444>
     })
 
@@ -14510,7 +14510,7 @@ test:do_test(
         return test:execsql "SELECT (select count(distinct ~(((abs(b-a)/abs(case (select min((select case cast(avg(11+t1.e) AS integer) when case min( -~coalesce((select 13 from t1 where case t1.e when f then d else 17 end>=b),e)) when case max(t1.b) when (~ -count(*)+(( -max( -t1.a)))-(count(*))) then  -count(distinct (t1.c)) else min( -t1.e) end then count(*) else cast(avg( -(e)) AS integer) end then cast(avg(13) AS integer) else max(17) end from t1)) from t1) when 13 then c else (d) end))))) from t1)*t1.b FROM t1 WHERE not t1.c>=t1.b"
     end, {
         -- <randexpr-2.1447>
-        
+
         -- </randexpr-2.1447>
     })
 
@@ -14540,7 +14540,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(coalesce((select max(13) from t1 where t1.b in (select e from t1 union select t1.e from t1)),t1.a)) from t1 where case when t1.d=case when d not between t1.a and case when not t1.c in ((t1.e),a,t1.c) then 19 | t1.c when a not between 19 and b then (19) else 13 end then t1.d else b end-11 and not t1.f=t1.c or 19 not in (t1.d,c, -t1.f) and 17< -t1.d then e when t1.b not between 17 and t1.b then f else d end<11),t1.c)*f FROM t1 WHERE NOT (t1.b<=(coalesce((select c from t1 where e in (t1.a,t1.c,case when 17 not between 19 and (19)-t1.a-(abs(coalesce((select d from t1 where case (t1.b+e*b*t1.c) when 13 then t1.b else 19 end<>19),17))/abs(a))*t1.a then 17 when exists(select 1 from t1 where ( -e)=a) or 13>=d then 17 else t1.f end)),c)))"
     end, {
         -- <randexpr-2.1450>
-        
+
         -- </randexpr-2.1450>
     })
 
@@ -14570,7 +14570,7 @@ test:do_test(
         return test:execsql "SELECT (d)+(select  -abs(+cast(avg((select max((coalesce((select d from t1 where case when 13>=e then t1.c else 19 end>=d),coalesce((select 19-(select count(distinct 19 | (abs(19)/abs(~13))) from t1) | t1.d from t1 where coalesce((select max(11) from t1 where t1.a in (select t1.d from t1 union select c from t1)),19)>t1.d),e)+t1.b))) from t1)) AS integer)+abs( -max(b))) from t1) FROM t1 WHERE NOT (c-t1.c not between t1.c and +case when +case  -case when 17 not in (17,(e),t1.c) then a else 19 end-13 when t1.e then b else 13 end>19 or 17 in (select b from t1 union select t1.c from t1) then case c when t1.c then d else c end when not t1.f in (select  -cast(avg(a) AS integer)*count(distinct (17))+min(f)* - - -cast(avg(b) AS integer) from t1 union select (count(*)) from t1) then d else a end)"
     end, {
         -- <randexpr-2.1453>
-        
+
         -- </randexpr-2.1453>
     })
 
@@ -14590,7 +14590,7 @@ test:do_test(
         return test:execsql "SELECT case when 19 in (case when coalesce((select max(case when e*t1.b in (coalesce((select t1.a from t1 where (abs(f)/abs(coalesce((select f from t1 where t1.f in (a,b,t1.d)),13))) in (b,b,11)),c),t1.a,17) then b else d end) from t1 where f>=13 and a>=17 and not exists(select 1 from t1 where (b<>f))), -t1.c) between d and 11 then d else t1.f end,t1.c,11) then 13 else 17 end FROM t1 WHERE t1.d in (select (abs(t1.a)/abs(t1.f)) from t1 union select e from t1) and ((b*coalesce((select  -11 from t1 where (coalesce((select max( -t1.e+ -coalesce((select d from t1 where t1.c<= - -t1.d),t1.c)) from t1 where b in (select  -count(distinct d)+count(distinct d)- -((min(e))) from t1 union select count(*) from t1)),(t1.e))-19*d<>t1.e)),a)*t1.f)=b)"
     end, {
         -- <randexpr-2.1455>
-        
+
         -- </randexpr-2.1455>
     })
 
@@ -14610,7 +14610,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max((select count(*) from t1)) from t1 where coalesce((select max(t1.a-coalesce((select t1.d+case when exists(select 1 from t1 where exists(select 1 from t1 where t1.f between t1.a and f)) or d | b between 19 and 19 then f+17 else (t1.b) end from t1 where t1.e not between  -t1.d and (19)),(17))) from t1 where not exists(select 1 from t1 where 19 between t1.b and 13 or t1.b>t1.c) or 19>=19),b) between 13 and f), -t1.a) FROM t1 WHERE exists(select 1 from t1 where +t1.f+t1.e<(abs(t1.b)/abs( -f*e))) or case t1.c when case when 19 not between 17 and case when t1.e<>e then t1.b when not exists(select 1 from t1 where coalesce((select max(b) from t1 where (e<t1.a)),e)>t1.d or (t1.d<>t1.e)) then t1.c else 17 end then t1.c when e<>b then 17 else e end then t1.d else t1.e end between d and b"
     end, {
         -- <randexpr-2.1457>
-        
+
         -- </randexpr-2.1457>
     })
 
@@ -14650,7 +14650,7 @@ test:do_test(
         return test:execsql "SELECT case when not case 11 when t1.e*coalesce((select max(t1.b) from t1 where (abs(t1.c)/abs(~11)) not between coalesce((select max((abs(a)/abs(c))) from t1 where t1.b>=t1.a or b= -e),t1.f) and e and c not in (t1.a,t1.f,t1.c) and not (a)<t1.b or t1.b not between b and t1.a),17)*11+b+f then f else 17 end not between t1.f and a then b else t1.a end FROM t1 WHERE NOT (not exists(select 1 from t1 where a in (select coalesce((select max(13) from t1 where t1.e not in (t1.d,case when t1.b not in ((select (count(distinct case when  -t1.a not between a and t1.f then t1.c when 13 not in (t1.a,t1.b,d) then f else 19 end)) from t1),b,t1.f) then c when 11 in (select min(a)+max(19) from t1 union select cast(avg(11) AS integer) from t1) and t1.c in (f,13,t1.e) or a>17 then c else a end | t1.b,a) or not (t1.d<11)),d) from t1 union select t1.a from t1) and f in (select b from t1 union select b from t1)))"
     end, {
         -- <randexpr-2.1461>
-        
+
         -- </randexpr-2.1461>
     })
 
@@ -14660,7 +14660,7 @@ test:do_test(
         return test:execsql "SELECT case when case when coalesce((select max(case when ((a<=case t1.a+t1.a when t1.d then  -c else b end or t1.b<>e)) then 17 else 19*19*a end*13) from t1 where d<>t1.d),d)<=a or 11<=t1.e then t1.c when 17<11 then 17 else e end<=t1.a then t1.d when e= -e then t1.d else 19 end FROM t1 WHERE t1.e<=t1.a or (abs(+a+coalesce((select max(t1.b) from t1 where (select ~count(distinct 17) from t1)-b in (select t1.b+t1.b from t1 union select 19 from t1)), -11))/abs(case when not exists(select 1 from t1 where t1.d not between 17 and c- -c+e) or t1.e>t1.f then t1.d when t1.d not in (17,e,d) then a else 17 end)) in (c,d,11)"
     end, {
         -- <randexpr-2.1462>
-        
+
         -- </randexpr-2.1462>
     })
 
@@ -14680,7 +14680,7 @@ test:do_test(
         return test:execsql "SELECT ~case when t1.e<=t1.a then b else (11) end+(select  -((cast(avg(coalesce((select a from t1 where (select cast(avg(t1.d) AS integer) | case case min((t1.e)) when cast(avg(t1.b) AS integer) then max(t1.c) else max(19) end*count(*) when  -count(distinct e) then count(*) else max( - -17) end from t1) not between c and  -t1.e-f+f),11)-11) AS integer)))*max(e) from t1)+e* - -a-t1.d*e FROM t1 WHERE coalesce((select max(case when 11 between d and d then e | b else case (select (case count(distinct coalesce((select  -coalesce((select max(t1.f) from t1 where t1.b in (select 11 from t1 union select 19 from t1)),t1.e) from t1 where 13<>17),17)) when (max( -t1.e)) then max(17)+max(11) else ((count(*))) end)*(count(*)) from t1) when 11 then  -13+19 else t1.e end end) from t1 where ((t1.a not between d and  -t1.c))),t1.a)<11"
     end, {
         -- <randexpr-2.1464>
-        
+
         -- </randexpr-2.1464>
     })
 
@@ -14710,7 +14710,7 @@ test:do_test(
         return test:execsql "SELECT t1.e*~13-t1.a-~case when (abs(t1.a)/abs(coalesce((select max(t1.a) from t1 where e not between f and e-t1.b+13),case when (a in (select ( -c) from t1 union select 11 from t1) or exists(select 1 from t1 where 11 between f and t1.f)) then t1.b-a else  -t1.e end)+13*t1.f)) | 13<t1.a then t1.f when (t1.a in (select 19 from t1 union select c from t1)) then a else  -19 end FROM t1 WHERE exists(select 1 from t1 where t1.c*coalesce((select f from t1 where  - -f+b-(select min(t1.b) from t1) not in (c,17-t1.b*t1.a,t1.c)),case when (select abs(count(*)) from t1)<> -19-a then (a)-coalesce((select max(case when a in (13,t1.b,11) then t1.b else (13) end) from t1 where not exists(select 1 from t1 where t1.b>=b)),t1.c) else  -13 end)*(a)<17)"
     end, {
         -- <randexpr-2.1467>
-        
+
         -- </randexpr-2.1467>
     })
 
@@ -14740,7 +14740,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(f*b | case when f in (t1.b,t1.b*(select count(*) from t1)+(select  -count(*) from t1), -b) and +13<(abs( -~d-case when t1.a in (select  -f from t1 union select t1.c from t1) then (t1.a) when t1.a<e then t1.d else a end)/abs(t1.c)) then t1.b*19 else e end+t1.c | t1.d) from t1 where 13 not in (t1.e,13,c)),11)-11 FROM t1 WHERE b not between e-case when case 11 when t1.a then t1.e*17 else t1.c end in (select ~t1.a | b+(abs(f)/abs(case coalesce((select (select abs( -cast(avg(17) AS integer)) from t1) from t1 where not f=t1.b or 11>=a),coalesce((select 11 from t1 where 11 not between 19 and t1.c),t1.a))-19 when t1.e then t1.f else e end)) from t1 union select  -d from t1) then d when t1.f between 17 and d then t1.d else t1.d end and (f) or d<17"
     end, {
         -- <randexpr-2.1470>
-        
+
         -- </randexpr-2.1470>
     })
 
@@ -14770,7 +14770,7 @@ test:do_test(
         return test:execsql "SELECT case when (t1.b+case when a in (select coalesce((select max(t1.a) from t1 where not exists(select 1 from t1 where 11=case e when (e) then t1.b else t1.c end or c in (t1.f,f,11))),t1.f) from t1 union select t1.d from t1) and t1.e<>e then t1.f when t1.a in (t1.d,a,13) then 17 else t1.d end not in (t1.f,t1.d,17)) or c<> -19 then b when f<t1.c and t1.b in (e,11,t1.f) then t1.b-t1.c else  - -d end FROM t1 WHERE t1.f- -t1.d in (select case a when 13+coalesce((select coalesce((select coalesce((select case when b>a-e then b else 19 end from t1 where 11<>t1.b),a) from t1 where not 19 in (select max(19)*count(distinct a) from t1 union select cast(avg(11) AS integer) from t1)),11) from t1 where t1.e<>a),17) then d else 19 end from t1 union select f from t1) and c in (select count(distinct c) from t1 union select  -+max(d) | abs(count(*)) from t1)"
     end, {
         -- <randexpr-2.1473>
-        
+
         -- </randexpr-2.1473>
     })
 
@@ -14800,7 +14800,7 @@ test:do_test(
         return test:execsql "SELECT 17+coalesce((select max(19) from t1 where  -(select max(t1.d) from t1)>coalesce((select max((13)) from t1 where (coalesce((select 11 from t1 where  -e-t1.d-b-(abs(t1.b)/abs(11))*t1.f*b-e not between (f) and t1.e or 11 in (t1.b,t1.e, -e)),t1.a) in (select t1.b from t1 union select 19 from t1)) and exists(select 1 from t1 where 13<19)),t1.e)),e) FROM t1 WHERE NOT (t1.a<>t1.d or not exists(select 1 from t1 where t1.a>=coalesce((select case t1.e*d when  -case d*11 when t1.f then t1.e else t1.c end then 13*coalesce((select max(f*b*t1.e*t1.c) from t1 where t1.d in (select t1.c from t1 union select f from t1) or ((t1.e<f or t1.e=t1.b))),t1.d) | t1.b else d end from t1 where t1.f between t1.c and a),(13))))"
     end, {
         -- <randexpr-2.1476>
-        
+
         -- </randexpr-2.1476>
     })
 
@@ -14820,7 +14820,7 @@ test:do_test(
         return test:execsql "SELECT case +a when (coalesce((select d*f*t1.d from t1 where t1.f between (case when e* -13<~ - -t1.e then e when 13>=t1.a then f-coalesce((select  -(select max((select min(a)-count(distinct c) from t1)) from t1) from t1 where a between f and d),c) else d end) and c or not exists(select 1 from t1 where 11<=13)),f)) then (e) else t1.b end FROM t1 WHERE NOT (not  -c between  -d+f | 17+t1.a and 11 or 11*e=(+case when c>=d then coalesce((select max(d-t1.f*f) from t1 where 11 in (select count(distinct t1.e) from t1 union select (~case count(*) when  -max(t1.f) then count(distinct t1.d) else (cast(avg(t1.f) AS integer)) end) from t1)),t1.c) else d end+t1.b-t1.c+b)+t1.c- -(13))"
     end, {
         -- <randexpr-2.1478>
-        
+
         -- </randexpr-2.1478>
     })
 
@@ -14840,7 +14840,7 @@ test:do_test(
         return test:execsql "SELECT case when case when not exists(select 1 from t1 where a between +d-case when t1.c+e not between case 11 when +t1.b+11 then 19 else  -t1.f end+(11) and d and exists(select 1 from t1 where (a)>b) and not exists(select 1 from t1 where 11 in (a,11,t1.c)) then 19 else t1.a end and t1.a) then 17 when t1.d<>e then (t1.a) else e end-a<=e then c else 11 end FROM t1 WHERE NOT (coalesce((select a from t1 where not exists(select 1 from t1 where  -t1.c not between b and t1.a)),case when t1.d<=19-13 then coalesce((select max((select count(*)*cast(avg(~t1.a-e*~17+t1.e) AS integer) from t1)) from t1 where (exists(select 1 from t1 where + - -e-11*a-t1.d in (11,(t1.b),c)))),19+e)* -b else c end)>=17)"
     end, {
         -- <randexpr-2.1480>
-        
+
         -- </randexpr-2.1480>
     })
 
@@ -14850,7 +14850,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.c-~t1.e*19++case t1.b when coalesce((select 17 from t1 where t1.f not between t1.c-+coalesce((select max(a+ -t1.c) from t1 where (select count(distinct 11) from t1) in (select  -+case when a not between f and b or b>=t1.d then (t1.d) when a in (t1.e,b,13) then t1.d else t1.c end*a from t1 union select t1.f from t1)),f) and 17),a) | 17*c then 19 else d end+t1.c from t1 where e<>t1.b),19) FROM t1 WHERE not (t1.e not between ~17 and +t1.e*(~b)*e)"
     end, {
         -- <randexpr-2.1481>
-        
+
         -- </randexpr-2.1481>
     })
 
@@ -14880,7 +14880,7 @@ test:do_test(
         return test:execsql "SELECT ~case when b<=(t1.c | (abs(d)/abs(a*f)))+case when (13*(t1.b) not in (19,b,t1.d)) and exists(select 1 from t1 where 19 between t1.d and 11) then (select case count(distinct t1.f) when +( -count(distinct c) | cast(avg(t1.d) AS integer)) then cast(avg(t1.c) AS integer) else min(f) end from t1) else 13 end*t1.c or exists(select 1 from t1 where  -f in (select e from t1 union select  -t1.a from t1)) then t1.d else t1.c end FROM t1 WHERE exists(select 1 from t1 where t1.c+b-t1.d between 11 and 17)"
     end, {
         -- <randexpr-2.1484>
-        
+
         -- </randexpr-2.1484>
     })
 
@@ -14920,7 +14920,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(~coalesce((select 19+~coalesce((select (abs((19)*c+~t1.a-t1.a*19)/abs(case when t1.d<>t1.b then t1.f when 13<>19 then (11) else t1.c end)) from t1 where f= -t1.a or t1.d not between t1.d and  -f),t1.f) from t1 where not exists(select 1 from t1 where  -19 not between d and f)),d)*t1.a-f) from t1 where c not in (c,c,c)),t1.b) FROM t1 WHERE NOT ((coalesce((select max( -t1.d+19+11+coalesce((select a from t1 where 11 not between e and t1.d),t1.d)) from t1 where not ( -t1.f not between b and f) and t1.e in (b,11,f)),f)+t1.e<=19) or c>t1.d or e in (a,19,11) or t1.f>b or  -t1.f<=13 and a between 11 and t1.a)"
     end, {
         -- <randexpr-2.1488>
-        
+
         -- </randexpr-2.1488>
     })
 
@@ -14930,7 +14930,7 @@ test:do_test(
         return test:execsql "SELECT case t1.d when 17 then 11 | t1.a-17+13+t1.f*t1.e+t1.e-case when d | t1.e in (t1.b,t1.a,c) then  -13 else (b*19) end-(select cast(avg(coalesce((select a from t1 where e in (t1.f,t1.b,f)), -e)) AS integer) from t1)*d-11-t1.e-t1.a else t1.f end FROM t1 WHERE d*13 in (select abs(min(d)) from t1 union select cast(avg(d) AS integer) from t1)"
     end, {
         -- <randexpr-2.1489>
-        
+
         -- </randexpr-2.1489>
     })
 
@@ -14970,7 +14970,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(19-(abs(t1.c)/abs( -13))-(select count(*)*abs(max(t1.a-b)) from t1)-t1.d) from t1 where (case coalesce((select max(~(select ~count(*) from t1)) from t1 where b=(abs(17)/abs(d))),11*case when not t1.c>=e or 17=c then d else 17*b end*t1.d) when 13 then 11 else t1.c end) in (select c from t1 union select t1.c from t1)),13) FROM t1 WHERE NOT (case t1.a*(select  -case count(distinct ~(case 13-+t1.d-f when d then c else (19) end)*19)* -max(19) |  -count(*)+abs(min(19)) | cast(avg(d) AS integer) when min(a) then count(distinct 11) else count(*) end from t1)*(abs(t1.a)/abs(11))-f-t1.b+(t1.f) when 11 then 17 else 19 end<>d)"
     end, {
         -- <randexpr-2.1493>
-        
+
         -- </randexpr-2.1493>
     })
 
@@ -14990,7 +14990,7 @@ test:do_test(
         return test:execsql "SELECT +(select abs( -abs(count(distinct case when (abs(t1.f)/abs(t1.a-t1.d)) in (select count(distinct 19) from t1 union select +abs(+ -cast(avg(c) AS integer)) from t1) then  -(f) else e end-17)) | case count(distinct b) when count(*) then cast(avg(13) AS integer) else ( -count(distinct d)) end-count(*)* - -cast(avg(a) AS integer)) from t1)+case when t1.f in (select d*b | t1.d from t1 union select d from t1) then t1.f when 19<>t1.e then t1.b else 11 end+11 FROM t1 WHERE NOT (f<a+t1.f)"
     end, {
         -- <randexpr-2.1495>
-        
+
         -- </randexpr-2.1495>
     })
 
@@ -15010,7 +15010,7 @@ test:do_test(
         return test:execsql "SELECT case when e in (+(select ~(max(t1.f)-+count(distinct 11)) from t1)*t1.b+t1.c*a*t1.b+e,a,t1.c) and (19)<>17 or 17 between 13 and a and exists(select 1 from t1 where c not between t1.f and t1.d) then coalesce((select max(d) from t1 where t1.e<>19),17) else a end*(( -f))+t1.d FROM t1 WHERE exists(select 1 from t1 where exists(select 1 from t1 where t1.c between case when (a<a and not exists(select 1 from t1 where exists(select 1 from t1 where d<~t1.f-+t1.a or (abs(17)/abs(t1.c)) in (select 19 from t1 union select 11 from t1)))) then +e when d<>13 or b>=e or 19 between t1.d and  -t1.e then t1.f else f end and f) and c>((t1.c))) and not exists(select 1 from t1 where 17<t1.c)"
     end, {
         -- <randexpr-2.1497>
-        
+
         -- </randexpr-2.1497>
     })
 
@@ -15030,7 +15030,7 @@ test:do_test(
         return test:execsql "SELECT 17+11+d+t1.d | t1.c+(abs(case when 11 in (select count(distinct 11*+t1.d) from t1 union select ~cast(avg(t1.c) AS integer)*case (count(distinct 19)) when (cast(avg(t1.c) AS integer) | min(t1.a-f)) then cast(avg(a) AS integer) else cast(avg(t1.b) AS integer) end+max( - -d) from t1) then t1.a-13 when (11)>=13 then t1.e else t1.c end)/abs(19)) | (t1.d) FROM t1 WHERE d>=(case when ((t1.a)) between t1.f and a then case when 11 between 19-case when (~coalesce((select t1.e from t1 where d>t1.c and e<>t1.f),e))>=13 then t1.b when t1.d in (select (count(*)-min(19)) from t1 union select cast(avg(t1.e) AS integer) from t1) then 17 else (t1.d) end*t1.a and (13) then 11 when not exists(select 1 from t1 where not 19<>(t1.e) and t1.a between d and d and t1.c=a) then 17 else t1.a end-17 else e end)"
     end, {
         -- <randexpr-2.1499>
-        
+
         -- </randexpr-2.1499>
     })
 
@@ -15060,7 +15060,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select 17 from t1 where ((abs(19)/abs(case when ((f+17<(d))) and (abs(t1.c)/abs((t1.b)))>11 then ~a+11 when (t1.f)>t1.d then 19 else c end))<>t1.b) or (b in (( -t1.d),b,e) and (t1.a)<>c) and (17) not in (t1.f,11,17) or (f) not between t1.c and  -t1.c),t1.a) FROM t1 WHERE 17 between  -t1.b+f-19 | 17 and t1.e+t1.c"
     end, {
         -- <randexpr-2.1502>
-        
+
         -- </randexpr-2.1502>
     })
 
@@ -15090,7 +15090,7 @@ test:do_test(
         return test:execsql "SELECT +(11)-19-case when 19+13-19+f*19*c not in (coalesce((select max((select ~min(t1.b)+(count(distinct t1.d)) | min(13)*count(distinct t1.a)*max(a) from t1)) from t1 where not 19 in (select t1.d from t1 union select 19 from t1) or 19<=t1.c),t1.b | f) | e-f,d,d) then t1.a else d end FROM t1 WHERE NOT (t1.d in (select case when t1.e>(case coalesce((select (11)-t1.e from t1 where case t1.e when t1.c then (coalesce((select max(+t1.b) from t1 where (a in (case when 19 in (select cast(avg((t1.b)) AS integer) from t1 union select cast(avg( - -17) AS integer) from t1) then a when 17>=13 then c else t1.e end,11,11) or not 19 between t1.b and t1.a)),t1.e)) else d end<=t1.c),13) when e then a else d end) then a when 19 in (select (11) from t1 union select t1.e from t1) then (e) else t1.d end from t1 union select t1.d from t1))"
     end, {
         -- <randexpr-2.1505>
-        
+
         -- </randexpr-2.1505>
     })
 
@@ -15110,7 +15110,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case t1.f when (abs((abs( -t1.b+t1.f | case when t1.e-b*19<=17 then 13 when t1.d<>c-coalesce((select max(coalesce((select t1.d from t1 where (not exists(select 1 from t1 where (19)<=a) or 11 between t1.e and f)),d | t1.f)) from t1 where (t1.a between 19 and t1.a)),13) then 19 else f end)/abs(t1.f))-t1.a)/abs(e))+t1.e then t1.b else b end)/abs(19))+t1.a FROM t1 WHERE 17 in (select f*f from t1 union select a+d from t1)"
     end, {
         -- <randexpr-2.1507>
-        
+
         -- </randexpr-2.1507>
     })
 
@@ -15140,7 +15140,7 @@ test:do_test(
         return test:execsql "SELECT (coalesce((select t1.e from t1 where +case when t1.c+f<>d-17 then t1.a when not (abs(t1.c)/abs(case case  -f when f then a else t1.b end-t1.e-t1.f when t1.b then  -e else t1.c end))>e or t1.b=a or exists(select 1 from t1 where 19>=t1.b) and t1.c< -e then t1.e else 13 end<=t1.b),b)) | d FROM t1 WHERE case 13 when 13 then 17-f else a end=e and (exists(select 1 from t1 where b in (select t1.f from t1 union select coalesce((select case when (abs(t1.c)/abs(17)) in (a,f*c,11) then c when ( -t1.d) in (select ~count(distinct t1.b) from t1 union select min((t1.c)) from t1) then t1.a else t1.e end from t1 where exists(select 1 from t1 where (t1.f) in (t1.d,17, -11))),b)-d*11*c+a from t1)))"
     end, {
         -- <randexpr-2.1510>
-        
+
         -- </randexpr-2.1510>
     })
 
@@ -15180,7 +15180,7 @@ test:do_test(
         return test:execsql "SELECT (abs( -case when exists(select 1 from t1 where (abs(e++11-(abs(c)/abs(t1.f)))/abs(19+t1.b))+t1.b-c=(b)) or d in (~d, -f,c) then (select min(13) from t1)+11+~t1.a*t1.a else d end-t1.d)/abs((select (max(d))+count(*)-min(t1.c) from t1))) FROM t1 WHERE NOT ((select +min(c+d) | (max(13)+min(case when t1.e not in (t1.d,t1.d,19*t1.d) then t1.a when 17=d then t1.b else a end)+ - -max(t1.a)*count(distinct f) | count(*)+max(t1.d) | count(distinct d))-count(distinct 17)-count(*) from t1) not in (e,d+11,(t1.a+t1.f)))"
     end, {
         -- <randexpr-2.1514>
-        
+
         -- </randexpr-2.1514>
     })
 
@@ -15190,7 +15190,7 @@ test:do_test(
         return test:execsql "SELECT case when not exists(select 1 from t1 where (not case t1.b when d then c else coalesce((select max(b+case c+c when t1.c then coalesce((select ((e)) from t1 where c in (e,t1.f,t1.d)),t1.a) else t1.f end+t1.e) from t1 where not t1.e not between t1.f and t1.a),19) end+f<>b)) then e when f in (19,t1.d, -c) then 19 else case when e>=t1.f then 19 else 19 end end FROM t1 WHERE 19 between e+case when d>(select ~max(t1.d)+max(t1.d*t1.c)-~count(distinct c)-count(*)-count(distinct t1.b)* -(count(*)) from t1) then ~a when not exists(select 1 from t1 where t1.c>=13) or (t1.f=t1.a or c in ((f), -c,t1.e)) and b=b and e not between t1.b and  -11 or t1.c in (t1.c,17,t1.c) and t1.f=t1.d then t1.a*t1.d*t1.c else d end and e"
     end, {
         -- <randexpr-2.1515>
-        
+
         -- </randexpr-2.1515>
     })
 
@@ -15220,7 +15220,7 @@ test:do_test(
         return test:execsql "SELECT (select  -+case  -(case  -max(d) when ~+ -+(count(*)) then abs(max(case 17+t1.a-11-t1.c when 19 then f else e end*((t1.c))+b)) else (min(d)*count(distinct t1.e)) end)++abs(count(*))- -cast(avg(c) AS integer)+max(d) when count(distinct c) then min(f) else (count(distinct a)) end from t1) FROM t1 WHERE NOT (((case  -a when case when f between 11 and t1.d then d else c+17 end then b else a end+11-c between  -a and t1.a) or b>t1.f and t1.a<t1.e and (t1.d)<=b or 19 in (select f from t1 union select e from t1) and t1.f not between 19 and 11 or t1.b not in (t1.e,t1.e,11)))"
     end, {
         -- <randexpr-2.1518>
-        
+
         -- </randexpr-2.1518>
     })
 
@@ -15230,7 +15230,7 @@ test:do_test(
         return test:execsql "SELECT  -coalesce((select max((select case +count(*)+(case min((abs(d)/abs(b))) when +count(*) | (min(b)) then  -min((t1.a)) else max( -t1.a) end*max( -t1.e))+max(f) when (count(*)) then count(distinct 17) else cast(avg((t1.c)) AS integer) end from t1)) from t1 where t1.d in (select 13 from t1 union select t1.c from t1)),(abs(case when ((c>=f) or f in (t1.a,(t1.a),a)) then  -~c-d else t1.e end)/abs(13))) FROM t1 WHERE (select (+~max(case when t1.e>=coalesce((select max(t1.d) from t1 where +f not in (coalesce((select 11 from t1 where 13 | c in (select c from t1 union select b from t1)),f),t1.c, -a)),13) then e else 19 end)-min(t1.a)) from t1)+((coalesce((select t1.e from t1 where not exists(select 1 from t1 where not exists(select 1 from t1 where t1.c=t1.a))),a)))+13 in (select d from t1 union select t1.a from t1) and e>=b"
     end, {
         -- <randexpr-2.1519>
-        
+
         -- </randexpr-2.1519>
     })
 
@@ -15260,7 +15260,7 @@ test:do_test(
         return test:execsql "SELECT +(select +abs(+cast(avg(t1.b) AS integer)*abs(case  -max( -(t1.a*t1.f)+t1.e* -t1.f*13 | 17 | f+t1.c) when abs(cast(avg(d) AS integer))-(++~min(t1.f) | count(*)-cast(avg(f) AS integer)) then count(*) else cast(avg(13) AS integer) end+ -min(b)))+min(a) from t1) FROM t1 WHERE case t1.a-t1.e*+t1.f-(select abs(count(*)) from t1)+coalesce((select max(t1.c) from t1 where not exists(select 1 from t1 where ~t1.b in (select +count(*) | count(distinct case b when t1.a then f else case when (t1.d-t1.b)<11 then t1.d else f end end) from t1 union select +cast(avg(( -d)) AS integer) from t1))),t1.d*t1.a) | e when t1.f then (t1.d) else t1.f end not in (d,f,e)"
     end, {
         -- <randexpr-2.1522>
-        
+
         -- </randexpr-2.1522>
     })
 
@@ -15290,7 +15290,7 @@ test:do_test(
         return test:execsql "SELECT t1.d+case when coalesce((select b from t1 where case when (select max(t1.a*(select case count(distinct c) when max(17+c) then  - -max(d)-count(*) else cast(avg((e)) AS integer) end from t1)) from t1) not between t1.d and t1.d then t1.d when t1.c not between c and t1.f then ( -t1.d) else t1.d end not between e and t1.e),d)<>17 then (t1.f) when 11=t1.c then 11 else t1.f end*c*t1.a-c FROM t1 WHERE (case when coalesce((select ~coalesce((select max(a) from t1 where 11 in (select ~case  -count(*) when cast(avg(d) AS integer) then  -max(t1.f) else (count(distinct 11)) end+cast(avg( - -13) AS integer) | count(*)-min(f) from t1 union select count(*) from t1)),t1.b*t1.f*17) from t1 where not exists(select 1 from t1 where t1.a not between d and 11)),b)-17*t1.d+t1.a in ( -t1.c,t1.e,11) then b else t1.d end in (select 17 from t1 union select 13 from t1)) and  -t1.a in (select (d) from t1 union select t1.b from t1)"
     end, {
         -- <randexpr-2.1525>
-        
+
         -- </randexpr-2.1525>
     })
 
@@ -15310,7 +15310,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select (abs(b+t1.c)/abs(coalesce((select max( -~t1.d) from t1 where coalesce((select max(11) from t1 where not t1.d>=(select count(*) from t1)),case b-coalesce((select t1.e-f from t1 where coalesce((select max(case a when t1.e then t1.f else 11 end) from t1 where t1.b>=t1.f),t1.d) not in (f,e,13)),t1.f) when  -11 then t1.c else 19 end)-d not in (f,f,b)),f))) from t1 where d<=t1.d),f) FROM t1 WHERE c+case when coalesce((select d from t1 where coalesce((select max(17) from t1 where c>17-11),17)<c),case when not (t1.d) in (select 19 from t1 union select t1.a from t1) then case when  -d<=17 then f else t1.a end else 19 end)+e in (select 17 from t1 union select  -t1.b from t1) then b when 17<t1.b or 17<f then  -11 else t1.d end*b-t1.d in (select count(distinct d) from t1 union select count(distinct c) from t1)"
     end, {
         -- <randexpr-2.1527>
-        
+
         -- </randexpr-2.1527>
     })
 
@@ -15340,7 +15340,7 @@ test:do_test(
         return test:execsql "SELECT (abs(19)/abs(coalesce((select max((abs((abs(t1.a)/abs(e)))/abs(b))) from t1 where not t1.f<13 and 17-(abs(b-13*f*(abs(+17-f+t1.a)/abs(t1.d)))/abs(t1.e))+e-17>f and (exists(select 1 from t1 where (17 in (e, -t1.f,c)) and t1.f<=19))),d))) FROM t1 WHERE NOT (f*t1.c<>t1.b)"
     end, {
         -- <randexpr-2.1530>
-        
+
         -- </randexpr-2.1530>
     })
 
@@ -15350,7 +15350,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.d in (select count(distinct 11) from t1 union select case abs(++cast(avg(t1.b) AS integer)+count(*) |  -(count(*))) when count(*) then count(distinct t1.b) else count(distinct  -t1.a) end | max(t1.c) from t1) and t1.f<=case when exists(select 1 from t1 where t1.f+t1.f<>17 and t1.b>d) then 19 when t1.e=a then coalesce((select b from t1 where 13 not in (t1.b,t1.a,t1.a)),t1.c) else t1.d end and t1.d>(t1.b) and c in (e,t1.d,t1.b) then b | c when f=t1.e then e else 19 end FROM t1 WHERE t1.f between (c-t1.d+t1.f*t1.f) and 11+t1.e*coalesce((select max(coalesce((select max(t1.e) from t1 where exists(select 1 from t1 where (c-13 between t1.e*a and 11 or (t1.f>f) or t1.c>=t1.f))),t1.b-b-11)) from t1 where (f>t1.f)),11)-t1.b*e"
     end, {
         -- <randexpr-2.1531>
-        
+
         -- </randexpr-2.1531>
     })
 
@@ -15390,7 +15390,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.e from t1 where (case when 19>=t1.c then t1.d else coalesce((select max(11*t1.b) from t1 where case ~t1.c-(select max(11) from t1)*~t1.b+f*~coalesce((select max(d) from t1 where d>=b),d)-t1.a*t1.c*t1.d when  -t1.c then 13 else f end in (select b from t1 union select 13 from t1)),t1.f) end | b<>a)),t1.e) FROM t1 WHERE NOT (not exists(select 1 from t1 where not (t1.e<t1.b and t1.e<>t1.b+case (select count(distinct e)*cast(avg(case c when e then case a when f then b else d end-a-13 else 13 end*t1.a+ -t1.d) AS integer) from t1)+c | (t1.f)*f when  -c then d else 19 end) and  -17 in (select min(t1.b) from t1 union select count(distinct f) from t1)))"
     end, {
         -- <randexpr-2.1535>
-        
+
         -- </randexpr-2.1535>
     })
 
@@ -15420,7 +15420,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.c from t1 where f between case when (abs(coalesce((select 11* -~coalesce((select a*case coalesce((select max(a) from t1 where exists(select 1 from t1 where e in (17,t1.b,13))), -t1.e) when  -a then d else c end from t1 where t1.a>=t1.e),17)+t1.a-t1.d from t1 where exists(select 1 from t1 where  -b>t1.b)),e))/abs(d))<>17 then t1.d when 11< -f then d else d end*d and 17),b)-f-t1.d FROM t1 WHERE NOT (case when e<t1.d then t1.a when t1.f>=(abs(t1.b)/abs((abs(t1.f)/abs( -case b when 19 then ((abs((case when (+case when f between e and c then t1.f when t1.b>19 then t1.e else t1.f end+11+t1.a in (select t1.c from t1 union select f from t1)) then e-(13) when not exists(select 1 from t1 where not exists(select 1 from t1 where (13)>t1.f)) then t1.c else t1.f end))/abs(t1.d))) else c end)))) then b else (t1.d) end not between t1.a and t1.a)"
     end, {
         -- <randexpr-2.1538>
-        
+
         -- </randexpr-2.1538>
     })
 
@@ -15440,7 +15440,7 @@ test:do_test(
         return test:execsql "SELECT case when not exists(select 1 from t1 where (coalesce((select max(coalesce((select 11 from t1 where t1.b*t1.d<=+case t1.c when (select max(case when not exists(select 1 from t1 where e=t1.b) then t1.a else f end) from t1)*t1.b | t1.a then 17 else 13 end-f | t1.e),13)) from t1 where a in (t1.b,t1.b,(t1.e))),11)*11 not in (d,t1.a,17))) then 13 when c in (select e from t1 union select t1.d from t1) then 19 else 13 end FROM t1 WHERE NOT (not exists(select 1 from t1 where case when  -b*13>+d then t1.e else coalesce((select case when not exists(select 1 from t1 where 11 in (c,+case when (case when e between t1.b and f then t1.a when t1.c not in (a,(c),t1.a) then  -t1.b else t1.a end<>d or f>e) then t1.e else t1.c end,t1.b)) then 19 else  -17 end*t1.d from t1 where (17 in (19,17,t1.f))),(t1.e)) end between 11 and t1.b and t1.a<>b))"
     end, {
         -- <randexpr-2.1540>
-        
+
         -- </randexpr-2.1540>
     })
 
@@ -15460,7 +15460,7 @@ test:do_test(
         return test:execsql "SELECT a-coalesce((select max(++19) from t1 where (select count(distinct coalesce((select max(t1.c) from t1 where not (t1.c+t1.c)-case when (not coalesce((select max(t1.a-t1.a) from t1 where t1.d>t1.b),e) in (t1.d,19,(t1.e))) then b when exists(select 1 from t1 where t1.e> -13) then c else e end<>c),17)) from t1) not between 19 and t1.f),t1.b) | 19-t1.d*f+b FROM t1 WHERE t1.f | coalesce((select case when c>=t1.f then t1.e+t1.e when  -19 | (a)+t1.f in (b,coalesce((select t1.c | (f+e)-e*17 from t1 where  -c not in (t1.d,c,(13))),19),t1.e) then t1.c else 17 end+b from t1 where t1.a not in (17,d,c)),17) in (select f from t1 union select f from t1)"
     end, {
         -- <randexpr-2.1542>
-        
+
         -- </randexpr-2.1542>
     })
 
@@ -15490,7 +15490,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select (t1.d) from t1 where not not case when c<coalesce((select f from t1 where 13 | t1.d in (select 11*t1.f*case when exists(select 1 from t1 where d>=case when f<>( -t1.c) then c when 19<>t1.d then t1.f else d end) then e-f when c in (select d from t1 union select f from t1) then a else t1.b end | t1.a-f from t1 union select  -19 from t1)),19) then 19 when 11 between f and t1.f then t1.c else 19 end=a),t1.f) FROM t1 WHERE coalesce((select t1.d from t1 where (case when exists(select 1 from t1 where not  - -19 in (17,f,t1.b)) and 19>c or t1.c in (select t1.e from t1 union select 17 from t1) then a when exists(select 1 from t1 where (t1.c<>d)) and  -t1.c not between b and e then 11 else (select cast(avg((abs(b)/abs(d))) AS integer) from t1) end+t1.d not in (t1.f,11,b) and f not between 17 and t1.d)),t1.e)=t1.a"
     end, {
         -- <randexpr-2.1545>
-        
+
         -- </randexpr-2.1545>
     })
 
@@ -15530,7 +15530,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(case when  -++t1.c++(abs(case when t1.b<case when exists(select 1 from t1 where  -t1.b-13=t1.e) then t1.b else c end then t1.f else case when t1.a<t1.b+t1.d then 19 when t1.f not in (t1.c,c,c) then t1.d else t1.f end end)/abs(19))*b-d>b then 11 else b end) from t1 where ((t1.b)) between e and e),t1.e) FROM t1 WHERE NOT (not ~t1.c-(coalesce((select max(~case t1.e | b*11+d+19 when t1.a then t1.b else t1.d end) from t1 where (13 not in (t1.a,t1.a,13))),e)) not between t1.a and 11 or exists(select 1 from t1 where (t1.d) not in (11,13,t1.a) and (c<>b or  -13<>t1.b and c in (t1.f, -c,t1.d))))"
     end, {
         -- <randexpr-2.1549>
-        
+
         -- </randexpr-2.1549>
     })
 
@@ -15550,7 +15550,7 @@ test:do_test(
         return test:execsql "SELECT case 19*d-+t1.a | coalesce((select f from t1 where +b between coalesce((select +t1.f from t1 where not exists(select 1 from t1 where case 17 when b then f else f end>=~13)),t1.f) and t1.d),c+11)- -t1.e | 17+case t1.b when t1.a then 17 else t1.f end*t1.c+a when f then  -f else t1.f end | t1.b FROM t1 WHERE NOT (t1.f=f and not exists(select 1 from t1 where case when t1.b>e then (abs(13)/abs(t1.f | 17))+(t1.f) else ~t1.a-(~e) end in (select count(distinct coalesce((select max(coalesce((select 11 from t1 where t1.a<d),(b))*17) from t1 where (e in (select count(*) from t1 union select max(t1.a)-cast(avg(17) AS integer)-(cast(avg(11) AS integer)) from t1))),t1.d)) from t1 union select cast(avg(c) AS integer) from t1)) and e between c and f)"
     end, {
         -- <randexpr-2.1551>
-        
+
         -- </randexpr-2.1551>
     })
 
@@ -15580,7 +15580,7 @@ test:do_test(
         return test:execsql "SELECT (coalesce((select max(coalesce((select (abs(t1.e* -b*coalesce((select max( -t1.e*t1.e+t1.f) from t1 where  -case when b>=t1.e and e>f then 11 | 19 else t1.c end | b in (select a from t1 union select 13 from t1)),b)+t1.b | (d)*11)/abs(e)) from t1 where a=19),t1.e)*13) from t1 where 13>f),t1.f)) FROM t1 WHERE NOT (coalesce((select max(~t1.a*t1.f*t1.b+f+a) from t1 where case when d in (select  -+count(distinct (t1.c))*max(t1.e+b)-(( -count(distinct 17))) from t1 union select  -count(distinct t1.d) from t1) then t1.d else (abs(case when t1.e in (select t1.c from t1 union select c from t1) then c else d end)/abs(f)) end in (select max( -c) from t1 union select abs(count(distinct 19)) from t1)), -a) not in (d,t1.f,13))"
     end, {
         -- <randexpr-2.1554>
-        
+
         -- </randexpr-2.1554>
     })
 
@@ -15610,7 +15610,7 @@ test:do_test(
         return test:execsql "SELECT +(abs(17*(abs(a | t1.a)/abs(11)) | f)/abs(coalesce((select +t1.b+~a from t1 where case when a=t1.b then c when t1.d=t1.e then t1.b else 17 end<=t1.f and (b<>13) or t1.a<>a or t1.d>d and 11 between 17 and t1.a and t1.b<> -e and  -13<(17)),a)+ -t1.e))*(t1.c) FROM t1 WHERE NOT (not a not between t1.a and 11+ -coalesce((select  -c*coalesce((select max(~f*a+11-t1.a |  -a+t1.a*t1.b*f) from t1 where 11=11),t1.a)+d from t1 where 13>=e),d) | t1.b or t1.a not between  -b and f or 17<>13)"
     end, {
         -- <randexpr-2.1557>
-        
+
         -- </randexpr-2.1557>
     })
 
@@ -15630,7 +15630,7 @@ test:do_test(
         return test:execsql "SELECT b-case e*13+case when not not t1.d in (select t1.b from t1 union select f from t1) then t1.c when coalesce((select max(coalesce((select (select ~min(coalesce((select max(a*f) from t1 where t1.f<=t1.b or a<=f),t1.a)) |  -(count(distinct 19)) from t1) from t1 where f between (t1.f) and 11),a)) from t1 where 11 not in (f, -11,19)),e)>=d then t1.f else t1.c end when  -a then 11 else t1.e end FROM t1 WHERE coalesce((select case case when case when (coalesce((select max(t1.e) from t1 where c>c and  -19>= -a),d) not in (11,t1.b,t1.a)) then d else a end between 11 and t1.c then b else a end+13-t1.a when t1.d then (b) else t1.d end from t1 where b between e and t1.f),11) in (select (+abs(count(*)+case  -count(distinct t1.e) when  -(max(19)) then (count(distinct 19)) else  -count(distinct e) end-max(t1.b)) | count(distinct t1.e) | (cast(avg(11) AS integer))) from t1 union select cast(avg(c) AS integer) from t1)"
     end, {
         -- <randexpr-2.1559>
-        
+
         -- </randexpr-2.1559>
     })
 
@@ -15660,7 +15660,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select case when a not in (~17,a,c) then b when t1.c<>t1.f-13 then +f else 11 end+t1.e*t1.a+case when ((a-c)>case when (exists(select 1 from t1 where (c) between d and  -t1.b)) then a+t1.f else f end) or e between t1.c and 13 then  -t1.c else t1.e end-t1.d from t1 where ( -17=a)),e) FROM t1 WHERE +case when not exists(select 1 from t1 where f+(select ~ -min(b) | abs(+max(+c)) from t1)+b not between 13-a*17 and t1.e-t1.b) then t1.a when b not between ((11)) and 11 then 13 else 17 end+ - -t1.f in (f,t1.d,f) or t1.b>t1.a and not exists(select 1 from t1 where t1.d in (t1.c,d,t1.c))"
     end, {
         -- <randexpr-2.1562>
-        
+
         -- </randexpr-2.1562>
     })
 
@@ -15680,7 +15680,7 @@ test:do_test(
         return test:execsql "SELECT case coalesce((select 19-case when case when f in (select t1.c from t1 union select (select count(*) from t1) from t1) then a+e else 19 end*19-19-13 not in (11,19,a) then f when (13<>(t1.c) or d>e and b=b) then t1.a else 13 end from t1 where (not exists(select 1 from t1 where not exists(select 1 from t1 where t1.a=17)))),a) when t1.d then 19 else e end FROM t1 WHERE 13-coalesce((select (abs(19)/abs(11)) from t1 where case when a in (select d from t1 union select case when  -11-11<>d or t1.e between (t1.d) and b then t1.f else f end from t1) then t1.e else  -a end not between 13 and 19 or exists(select 1 from t1 where f< -( -t1.d)) and t1.a not between  -e and t1.e or t1.f<f and 13=13 and t1.f>(t1.f)),t1.d)=11"
     end, {
         -- <randexpr-2.1564>
-        
+
         -- </randexpr-2.1564>
     })
 
@@ -15710,7 +15710,7 @@ test:do_test(
         return test:execsql "SELECT (select  -count(distinct  -case (select (max( -c-t1.b+~f)*count(distinct 11) | +cast(avg(11) AS integer)-min(t1.f)+ -(cast(avg(( -11)) AS integer))-count(distinct t1.d)*(max(13))*(max(d))-(count(*))-min(e)) from t1) when + -c then t1.d else t1.b*19 end-a | t1.d+t1.d) from t1) FROM t1 WHERE NOT (not 11-t1.a=a+11)"
     end, {
         -- <randexpr-2.1567>
-        
+
         -- </randexpr-2.1567>
     })
 
@@ -15730,7 +15730,7 @@ test:do_test(
         return test:execsql "SELECT (select ~count(distinct t1.d*e+19)+abs(+cast(avg((select (count(*)) from t1)) AS integer)-cast(avg(t1.c) AS integer) | min(case when d | f* -19 in (select min(c) from t1 union select ~count(*)-max(17) from t1) then t1.e when (t1.b between 17 and (b)) then t1.d else t1.d end)*cast(avg(e) AS integer))-count(distinct t1.f) | cast(avg( -d) AS integer)*cast(avg(f) AS integer) from t1)*t1.e FROM t1 WHERE coalesce((select 17 from t1 where coalesce((select max(case when 13-b+coalesce((select case when (f>a) then t1.f when t1.c<=19 then a else a end from t1 where c in (select (e) from t1 union select 13 from t1)),13)<13 then 13 else t1.b end) from t1 where (13)<>13),17) in (select +min(b) from t1 union select ~max(t1.d)*max( -t1.b)*min(t1.e) from t1) and e>c),f) between ((t1.f)) and b and t1.a=19"
     end, {
         -- <randexpr-2.1569>
-        
+
         -- </randexpr-2.1569>
     })
 
@@ -15770,7 +15770,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select d from t1 where case when (17 between c+t1.d-t1.a and b and t1.b in (13,t1.d,19)) then case when t1.c<(a) then t1.c when t1.e not in (a,11,(t1.d)) then t1.d else d end else t1.a end in (select abs(min(a) | ~~count(distinct t1.e)+min(b)-count(*)) from t1 union select count(*) from t1) and not exists(select 1 from t1 where (t1.a) between t1.a and t1.d)),t1.f)-t1.a FROM t1 WHERE NOT (case when t1.e not in (coalesce((select max(coalesce((select max(b+t1.c-19*(e)-~11) from t1 where t1.a in (select ~cast(avg(~t1.a) AS integer) from t1 union select abs(~cast(avg(f) AS integer)) from t1)),e)* -c-c-b-t1.d-f) from t1 where t1.f>=t1.c),((t1.d)))- - -19,17,t1.b) then b else t1.f end<d)"
     end, {
         -- <randexpr-2.1573>
-        
+
         -- </randexpr-2.1573>
     })
 
@@ -15790,7 +15790,7 @@ test:do_test(
         return test:execsql "SELECT (abs((select min(t1.a)*~+ -count(*)-max(t1.f) from t1))/abs((abs(13*~t1.c- -e-( -19) | case 17*~13 when t1.c+case when not 19 between 13 and a then t1.c when  -11 not between e and 17 then 19 else a end then 19 else 17 end*19)/abs(t1.d)))) FROM t1 WHERE t1.e in (select d from t1 union select case when not exists(select 1 from t1 where c+a*17 not between case when t1.f>=(t1.f)+a then t1.d else 19 end and t1.c or exists(select 1 from t1 where (b in (13,13,b)) and (t1.f<>t1.e)) or (13)<>17 and e<=f and e<= -c) and t1.f>f then t1.e*19-t1.e-b else 17 end from t1)"
     end, {
         -- <randexpr-2.1575>
-        
+
         -- </randexpr-2.1575>
     })
 
@@ -15820,7 +15820,7 @@ test:do_test(
         return test:execsql "SELECT b-t1.b-coalesce((select (abs(case t1.c+coalesce((select +17*case when b in (select abs(max(19) | count(distinct t1.e)) | cast(avg(t1.d) AS integer) from t1 union select (count(*)) from t1) then +11+t1.a when 11<d then  -b else t1.c end from t1 where t1.f not between d and t1.c),t1.d)-13*t1.b when e then t1.e else  -17 end)/abs( - -d)) from t1 where (t1.a<>e)),d) FROM t1 WHERE NOT (t1.a<> -a)"
     end, {
         -- <randexpr-2.1578>
-        
+
         -- </randexpr-2.1578>
     })
 
@@ -15850,7 +15850,7 @@ test:do_test(
         return test:execsql "SELECT ~(abs(b*t1.b)/abs(case when coalesce((select max((abs(a)/abs(case t1.e when t1.e then c*(t1.d) else t1.a end))) from t1 where b in (select min((t1.a)) from t1 union select + -max(b) from t1)),19)+a not between t1.e and  -19 and 13<=a then (select case cast(avg((a)) AS integer) when min(e)*max(f) then  -(count(distinct 13)) else cast(avg(13) AS integer) end-count(*) | count(distinct d) |  -count(*) from t1) else b end)) FROM t1 WHERE NOT (f not between t1.d and b)"
     end, {
         -- <randexpr-2.1581>
-        
+
         -- </randexpr-2.1581>
     })
 
@@ -15860,7 +15860,7 @@ test:do_test(
         return test:execsql "SELECT +(abs(19)/abs(d | 11*t1.f))*t1.e-coalesce((select t1.b from t1 where not ((f*case when a>=17 then t1.c else (a) end-b not in (t1.b,t1.f,t1.f) or not exists(select 1 from t1 where t1.c>t1.a) and c not in (t1.d,t1.b,c)))),e) | coalesce((select ( - -f) from t1 where 19 not between 17 and 17),(a))-17*d*c FROM t1 WHERE t1.b>=e"
     end, {
         -- <randexpr-2.1582>
-        
+
         -- </randexpr-2.1582>
     })
 
@@ -15890,7 +15890,7 @@ test:do_test(
         return test:execsql "SELECT (abs((abs(a)/abs(~17+t1.b-e+(abs(a)/abs(coalesce((select max(13) from t1 where c not in (c-(abs(+coalesce((select max(t1.b-f) from t1 where (abs(13+case ~t1.f when t1.c then t1.b else b end-e)/abs(c))-t1.e>t1.c),t1.c))/abs(11))+t1.b,t1.a,11)),t1.a)))))+19)/abs( - -t1.c)) FROM t1 WHERE ~t1.e+t1.a+(abs(case when d+e+17*~t1.a-t1.a-a*~(abs(~f)/abs( -13))*+(t1.c | a)*t1.b=e then t1.d when ( -e) not between c and  -d then  -(t1.f) else t1.b end)/abs(19))>t1.f and 11<(11)"
     end, {
         -- <randexpr-2.1585>
-        
+
         -- </randexpr-2.1585>
     })
 
@@ -15910,7 +15910,7 @@ test:do_test(
         return test:execsql "SELECT (abs((abs( -t1.e)/abs(~17+b)))/abs((case 19 when case when t1.b in (select ~cast(avg(19) AS integer) from t1 union select max(t1.b) from t1) then case when case when exists(select 1 from t1 where t1.c not between d and e) then (11) when t1.d<11 then ( -t1.f) else c end in (select count(distinct 17) from t1 union select ~min(a) | max( -t1.a)- -min(b) from t1) then d else 17 end when 13> -t1.b then f else d end then (t1.b) else c end))) FROM t1 WHERE d in (b,+(abs(t1.b | t1.e)/abs(coalesce((select max(t1.b) from t1 where t1.f=(e*+t1.b-t1.d+b-t1.f-t1.a-case case a*t1.b when coalesce((select max(f) from t1 where c<11),(a)) then  -t1.b else t1.f end when e then d else 19 end*t1.e+19)*d),t1.b))),t1.b)"
     end, {
         -- <randexpr-2.1587>
-        
+
         -- </randexpr-2.1587>
     })
 
@@ -15950,7 +15950,7 @@ test:do_test(
         return test:execsql "SELECT c | case when e<=(abs(case when case when not exists(select 1 from t1 where case when t1.f>case when 19>=17 or f in (19,c,t1.d) then t1.b else b end then t1.e else  -t1.b end*t1.d in (select t1.e from t1 union select c from t1)) then e else f end<>t1.d then  -a when (11 in (select b from t1 union select a from t1)) then 19 else t1.a end-(c))/abs(c))+t1.d | t1.a then  -19 else 17 end+t1.d-(t1.a) FROM t1 WHERE NOT (coalesce((select 13 from t1 where not exists(select 1 from t1 where t1.e*t1.d*t1.f>=(11) and d in (13,coalesce((select t1.f+t1.b from t1 where coalesce((select max(t1.a) from t1 where not (t1.d)<=t1.c),c) not in (t1.e,t1.d,b)),b)+f,d)) or (t1.f>f) or 11<=t1.d and 17<>13),a)<(t1.a))"
     end, {
         -- <randexpr-2.1591>
-        
+
         -- </randexpr-2.1591>
     })
 
@@ -15970,7 +15970,7 @@ test:do_test(
         return test:execsql "SELECT  -+t1.f*coalesce((select 17 from t1 where b in (coalesce((select f- -11 from t1 where not exists(select 1 from t1 where t1.d*a<=(case when  -17<t1.c or d in (c,t1.f,c) then 13 else 13 end-e+t1.d) or 17 in (select count(distinct t1.c) from t1 union select  -count(*)-~+cast(avg(11) AS integer) | cast(avg((t1.b)) AS integer)* -cast(avg(d) AS integer)+count(distinct t1.c) from t1))),19),t1.f,e)),(f))+11-e FROM t1 WHERE not exists(select 1 from t1 where exists(select 1 from t1 where ((exists(select 1 from t1 where not b | t1.d<t1.f)))) or t1.b | f | b>=d-coalesce((select a from t1 where coalesce((select max(19) from t1 where case when 13 between coalesce((select max(b) from t1 where t1.e in (c,t1.a,17)),(a)) and ((17)) then t1.b when f=t1.b then t1.f else 17 end>t1.b),e)+b*a>=t1.a),c))"
     end, {
         -- <randexpr-2.1593>
-        
+
         -- </randexpr-2.1593>
     })
 
@@ -16000,7 +16000,7 @@ test:do_test(
         return test:execsql "SELECT ~f+coalesce((select max(17+~a+t1.b) from t1 where 17>t1.c),c+case when t1.f*d not between t1.f-13 and ~t1.b then 19 when t1.a between case coalesce((select 17 from t1 where (e in (f,e,t1.b))),13) | t1.a* - -c*t1.f-a+a when e then t1.a else 13 end and b then b else e end)-11 FROM t1 WHERE 17=19*~d-case when (exists(select 1 from t1 where 17-e not between t1.b and f) or  -f not in ( -13,b,c) and t1.f not between t1.f and 13) then 13 else coalesce((select t1.f from t1 where 11 not in (a,(e),t1.f)),(t1.c)) end+t1.c or 17 in (select +(count(*)) from t1 union select ~+case  -min(t1.b) when case case max(19) when cast(avg((b)) AS integer) then (count(distinct t1.b)) else  -cast(avg(t1.b) AS integer) end when ( -max(t1.e)) then max(17) else  -count(distinct t1.f) end then cast(avg(19) AS integer) else count(*) end-count(*) |  -cast(avg(11) AS integer) from t1)"
     end, {
         -- <randexpr-2.1596>
-        
+
         -- </randexpr-2.1596>
     })
 
@@ -16030,7 +16030,7 @@ test:do_test(
         return test:execsql "SELECT (case when (select count(*) from t1)++t1.d+b*t1.e | t1.a+coalesce((select max(t1.d) from t1 where d-19<>c),t1.a)+t1.f in (select coalesce((select max(b) from t1 where t1.c-case when t1.c in (select c from t1 union select t1.f from t1) then f when t1.c not in ( -e,t1.e,11) then (t1.e) else 13 end in (f,t1.e,t1.f) or t1.a not between 19 and 17),t1.c) from t1 union select e from t1) then  -t1.e else t1.a end) FROM t1 WHERE 11*b+~ -coalesce((select t1.e from t1 where not exists(select 1 from t1 where 19=t1.f)),t1.d+(abs( -a)/abs(t1.d)))-t1.d-19<=11"
     end, {
         -- <randexpr-2.1599>
-        
+
         -- </randexpr-2.1599>
     })
 
@@ -16070,7 +16070,7 @@ test:do_test(
         return test:execsql "SELECT 19+~case when not not (select + - -min(f | f)-count(*)+count(*)-min(b)+count(distinct a) from t1)<=13-case when +13 between t1.a and a then 11 else 11 end and (11 not in (17, -t1.d,(f))) then t1.b | a-t1.f when t1.d<>17 then e else 17 end FROM t1 WHERE NOT (+t1.e-c<>case when c in (select d from t1 union select f from t1) then case (case when 13 in (select +c*a*13-11 from t1 union select b from t1) then t1.a when t1.f in ( -t1.f,11,a) or t1.a<=f or (exists(select 1 from t1 where 13>=d)) then t1.c else b end) when t1.d then 11 else e end when t1.b in (19,t1.d,(19)) then c else a end)"
     end, {
         -- <randexpr-2.1603>
-        
+
         -- </randexpr-2.1603>
     })
 
@@ -16090,7 +16090,7 @@ test:do_test(
         return test:execsql "SELECT (case when e not between 19 and t1.a then case coalesce((select t1.e from t1 where (exists(select 1 from t1 where c in (select case count(distinct t1.b) when max(b) then min((t1.d)) else count(distinct 11) end+ -count(*) |  - -count(distinct t1.e) from t1 union select min(f) from t1))) or (select min(17) from t1) not between 13 and b and  - -c<e),t1.a)+f when (select cast(avg(a) AS integer) from t1) then 19 else 19 end when not 13>=17 and 17 between t1.e and 13 or 13>d or 11>= -t1.d then a else 13 end)+t1.f FROM t1 WHERE b<=13"
     end, {
         -- <randexpr-2.1605>
-        
+
         -- </randexpr-2.1605>
     })
 
@@ -16130,7 +16130,7 @@ test:do_test(
         return test:execsql "SELECT case c when d then +e else 17-e+case when exists(select 1 from t1 where not  -f<19) then (a) when t1.a between case when t1.d- -~t1.a+(select case min(t1.a) when count(distinct t1.e) then max(f) else max(t1.f) end-min(t1.b) from t1)*(select max(17) from t1)+e*13-f in (t1.d,f,d) then f else t1.b end and b then t1.d else d end end FROM t1 WHERE NOT (b<>c*f)"
     end, {
         -- <randexpr-2.1609>
-        
+
         -- </randexpr-2.1609>
     })
 
@@ -16140,7 +16140,7 @@ test:do_test(
         return test:execsql "SELECT  -(select min(coalesce((select max(case when d>=t1.c then f-t1.c else t1.b end) from t1 where case when (17)-13<=(abs(a-e)/abs(19-t1.a)) then (select  -max(c++t1.d | +case when 19 in (select b from t1 union select t1.c from t1) then t1.d else f end) from t1) else 11-19 end not in (e,t1.e,17)),c)+t1.b) from t1) FROM t1 WHERE  -case when case when e=case when not 17>+t1.d and b*b in (e, -d,13) then  -b*c else t1.e end then t1.f when e>=a then c else 19 end+t1.e<> -t1.d then 11 when not 11<>13 then 13 else e end*17*t1.d+t1.f in (select e from t1 union select t1.b from t1)"
     end, {
         -- <randexpr-2.1610>
-        
+
         -- </randexpr-2.1610>
     })
 
@@ -16170,7 +16170,7 @@ test:do_test(
         return test:execsql "SELECT case when b<=(abs(19)/abs(t1.a)) | 13-b then +f | ~d else ~case when case case when t1.c in (select 13+19 from t1 union select t1.a from t1) then  -c when 13 between t1.a and b then 17 else c end when t1.c then e else 11 end between t1.e and 11 or f in (select 17 from t1 union select (a) from t1) then t1.f-d when t1.b in (select t1.f from t1 union select t1.f from t1) then t1.c else t1.b end end FROM t1 WHERE (t1.e in (select +17 from t1 union select 11 from t1))"
     end, {
         -- <randexpr-2.1613>
-        
+
         -- </randexpr-2.1613>
     })
 
@@ -16210,7 +16210,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select coalesce((select coalesce((select ~e+coalesce((select  -e-+17 from t1 where (select cast(avg(11) AS integer) from t1) between case when +13+13 between 19 and t1.c then t1.d else 13 end and 13),t1.c)* -(19)+17-t1.a+e from t1 where t1.b>=t1.f),t1.b) | t1.f from t1 where f in (select d from t1 union select 11 from t1)),t1.b) from t1 where t1.b=13),t1.d) FROM t1 WHERE NOT (t1.f<>(abs(t1.c)/abs(t1.a)))"
     end, {
         -- <randexpr-2.1617>
-        
+
         -- </randexpr-2.1617>
     })
 
@@ -16240,7 +16240,7 @@ test:do_test(
         return test:execsql "SELECT (abs(a)/abs(coalesce((select case when coalesce((select d from t1 where d+case (coalesce((select max(e) from t1 where 17+f*13-(case 19 when t1.f then 17 else t1.e end)<>b),17)) when t1.e then t1.e else t1.a end- -13+ -t1.f between b and f),11)+t1.d between 13 and t1.d then b else (19) end-t1.c from t1 where c in (select t1.e from t1 union select f from t1)),b))) FROM t1 WHERE NOT (d>t1.a)"
     end, {
         -- <randexpr-2.1620>
-        
+
         -- </randexpr-2.1620>
     })
 
@@ -16260,7 +16260,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select case when coalesce((select max(coalesce((select max(e-c-coalesce((select max(c) from t1 where 19 between 13 and 13),(abs(case when c<=17 or f in (t1.a, -17,t1.f) then b else t1.c end)/abs(e))+t1.b)) from t1 where not exists(select 1 from t1 where t1.e>=b)),e)) from t1 where not exists(select 1 from t1 where 13<=t1.b or t1.f in (select d from t1 union select t1.d from t1))),17) in (select 11 from t1 union select t1.d from t1) then c else t1.e end from t1 where t1.c in (select b from t1 union select b from t1)),f) | t1.c FROM t1 WHERE NOT (c<=e)"
     end, {
         -- <randexpr-2.1622>
-        
+
         -- </randexpr-2.1622>
     })
 
@@ -16290,7 +16290,7 @@ test:do_test(
         return test:execsql "SELECT (select +max(case when t1.a in (f,case when f in (t1.b,+ -(select count(*)-min(17) from t1)+19,11) then  -19 else 19 end*(abs(b)/abs(a)),a) then t1.b when (case a when 17 then c | t1.d else t1.c end+11)-13 in (b,11,f) then b else 17 end*17) from t1) FROM t1 WHERE NOT (c between (abs(case when (abs(d+19)/abs(19))-c*t1.d+t1.e+case when  -(abs(case when exists(select 1 from t1 where exists(select 1 from t1 where 13 in (select cast(avg(t1.b) AS integer) from t1 union select max(d) from t1))) then ~c when t1.d not between 13 and d then  -t1.b else  -f end)/abs(t1.b))+d in (t1.e,(13),e) then e when (b)<>d then t1.b else 19 end in (select 17 from t1 union select e from t1) then t1.e else t1.e end)/abs(t1.f)) and t1.e)"
     end, {
         -- <randexpr-2.1625>
-        
+
         -- </randexpr-2.1625>
     })
 
@@ -16310,7 +16310,7 @@ test:do_test(
         return test:execsql "SELECT case when c between f and t1.f*t1.f then (coalesce((select max(d | coalesce((select 19+t1.c from t1 where t1.a between d and (b)),(t1.f))*t1.f*t1.b) from t1 where 11>13 or 19 not between 13 and 11 or t1.a>=b or b>t1.e or 11=a and t1.b<=d),f)) when a in (select min(t1.b)-abs(count(distinct 11)) from t1 union select cast(avg(t1.d) AS integer) from t1) then f else c end-t1.e FROM t1 WHERE (t1.f+a)*t1.b+(abs(b)/abs(b)) in (t1.e,case when 11-t1.a+e+case 19 when +11+ -t1.b then case ~t1.f*(f)-b when d then a else ( -c) end*(c) else t1.a end+t1.a not in (17,11,t1.e) then t1.b else (d) end*19,t1.a)"
     end, {
         -- <randexpr-2.1627>
-        
+
         -- </randexpr-2.1627>
     })
 
@@ -16340,7 +16340,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(f) from t1 where (a+13>19*t1.e+a | a | 17*e or ~c not between 17 and 19*(select +(~count(distinct e)*(cast(avg(t1.b) AS integer))) | count(distinct t1.c) from t1)-f and t1.a*t1.f+c not between t1.f and f)),t1.c*(t1.e)*e) FROM t1 WHERE case case t1.f when ~17 then 11 else t1.d end when a then t1.a else e end>d*11"
     end, {
         -- <randexpr-2.1630>
-        
+
         -- </randexpr-2.1630>
     })
 
@@ -16370,7 +16370,7 @@ test:do_test(
         return test:execsql "SELECT case when e<11 then (case case t1.a when coalesce((select max(11) from t1 where t1.c<=case when exists(select 1 from t1 where 13=e) then case when c not in (t1.f,t1.e,c) then c else ~(c)+d*f end when a>b then 11 else 11 end),(t1.c)) | 11 then b else t1.a end when 11 then t1.f else t1.d end) when d<c then t1.f else (e) end | t1.d FROM t1 WHERE 17 in (select case t1.e+ -coalesce((select max(coalesce((select max(e+t1.a) from t1 where  -t1.a in (select min(coalesce((select 11 from t1 where  -t1.a in (select a from t1 union select t1.e from t1)),t1.c))+(~cast(avg(f) AS integer)) from t1 union select case abs(( -count(distinct t1.e))) when count(distinct  -11) then count(distinct t1.b) else (max(t1.c)) end from t1)),t1.f)) from t1 where t1.c in (t1.c,t1.f,f)),c)-t1.b-t1.c-(t1.d) when 17 then 17 else t1.c end from t1 union select c from t1)"
     end, {
         -- <randexpr-2.1633>
-        
+
         -- </randexpr-2.1633>
     })
 
@@ -16410,7 +16410,7 @@ test:do_test(
         return test:execsql "SELECT case coalesce((select a from t1 where exists(select 1 from t1 where t1.e>f)),17) when coalesce((select max((b)) from t1 where not case (abs(t1.b)/abs(t1.d+t1.b)) when t1.d then f-coalesce((select max(a) from t1 where case t1.e when c then c else 11 end not between b and  -t1.b),t1.e) else t1.a end-17 between t1.e and f and (t1.e<e) and t1.d>17), -e)*19 then t1.b else t1.c end FROM t1 WHERE NOT (not  -coalesce((select d from t1 where exists(select 1 from t1 where coalesce((select max(case when 11 not in (case when d*11<>17-(t1.e) then 13 else c end,t1.d,t1.c) then e else t1.c end) from t1 where t1.d<= - -d),11) in (select + -case (+ -cast(avg(19) AS integer)+ - -(count(*))* -count(distinct ((t1.e)))*max(d)) when count(*) then max(b) else count(*) end from t1 union select count(*) from t1))),t1.d)+13>a)"
     end, {
         -- <randexpr-2.1637>
-        
+
         -- </randexpr-2.1637>
     })
 
@@ -16420,7 +16420,7 @@ test:do_test(
         return test:execsql "SELECT ~coalesce((select 17 from t1 where not exists(select 1 from t1 where t1.e-t1.e in (select t1.c+case d when case when not case when t1.f between ( -t1.a) and (b) or 11<>19 then (abs(t1.e)/abs(t1.f)) else e end between t1.b and e then t1.d | t1.e when 19>b then 13 else t1.a end*e*13 | 11+t1.f then t1.b else 17 end from t1 union select e from t1))),t1.a-t1.b)*t1.d*e FROM t1 WHERE d in (select 11 from t1 union select +11 from t1) or coalesce((select max(coalesce((select b-e*case when (c) | e | b in (select 19*t1.d from t1 union select t1.e from t1) then t1.d else e end from t1 where t1.a<11),d)) from t1 where (not ((17 not in ( -t1.a,e,d) and 13<11) and f>=11))),t1.b)<11"
     end, {
         -- <randexpr-2.1638>
-        
+
         -- </randexpr-2.1638>
     })
 
@@ -16450,7 +16450,7 @@ test:do_test(
         return test:execsql "SELECT case b-f when t1.a then  -case when not (case t1.a when (select case cast(avg(c) AS integer) when count(distinct t1.f) then +max(t1.e) |  -((( -(count(*))))) else cast(avg(f) AS integer) end from t1)-b then a else coalesce((select t1.a from t1 where (e<d)),t1.d) end not between t1.a and t1.f) then coalesce((select max(13) from t1 where (13)=e),t1.d) when d not in (a,t1.f,c) then  -11 else t1.a end else 17 end FROM t1 WHERE  -13*t1.b-c-e+case when t1.b | b in (select cast(avg(t1.a | +(select abs(+count(*))-count(distinct (t1.f))*abs(min(t1.d))+count(distinct case when exists(select 1 from t1 where (19)>=a and e>c) or c not between a and 19 then 11 when t1.b not between e and t1.a then 17 else 11 end) from t1)) AS integer) from t1 union select cast(avg((abs(b)/abs(t1.f))) AS integer) from t1) then 17 else t1.e end>=a"
     end, {
         -- <randexpr-2.1641>
-        
+
         -- </randexpr-2.1641>
     })
 
@@ -16480,7 +16480,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max((abs(t1.b*t1.d*case when f*t1.d<a*17* -t1.c+coalesce((select max(a) from t1 where 11>b),t1.d*19)*e+c+t1.d then t1.c when exists(select 1 from t1 where 13>=e) then t1.e else f end-f*e)/abs(13))) from t1 where (a)<=t1.d),13) | e FROM t1 WHERE +t1.c>t1.d"
     end, {
         -- <randexpr-2.1644>
-        
+
         -- </randexpr-2.1644>
     })
 
@@ -16510,7 +16510,7 @@ test:do_test(
         return test:execsql "SELECT case when not exists(select 1 from t1 where 17>=19) or t1.c in (select min(19)-(cast(avg(f) AS integer)) from t1 union select cast(avg(19) AS integer) from t1) and e in (select ~+count(distinct 19)*max(13) from t1 union select min(17+d) from t1) or t1.f in (select count(*) from t1 union select (max(a)) from t1) then coalesce((select  -d- -t1.d from t1 where b in (select cast(avg(c) AS integer) from t1 union select (count(*)) from t1) or b<=11),e) else t1.e end FROM t1 WHERE a< -13"
     end, {
         -- <randexpr-2.1647>
-        
+
         -- </randexpr-2.1647>
     })
 
@@ -16530,7 +16530,7 @@ test:do_test(
         return test:execsql "SELECT f+case when 17-t1.f in (select ~count(distinct (abs((abs(c)/abs(c)))/abs((abs(11)/abs(+case  -t1.a when t1.d then  -13 else 17 end))))-t1.c) from t1 union select ~case cast(avg(t1.c) AS integer) when  -~ -count(*)*max((t1.f))+count(*) then (min(d)) else max(a) end-count(distinct t1.a)+ -count(*)-count(*) from t1) then d when b not between t1.f and t1.e then a else 11 end+t1.a FROM t1 WHERE (exists(select 1 from t1 where case when exists(select 1 from t1 where case when (t1.e+case (t1.b) when f then case t1.c when 11 |  -13-coalesce((select max(d) from t1 where c not in ( -t1.e,t1.c,17) and t1.c<17),e)*17+t1.a then t1.b else 11 end else d end)+t1.f not in (d,13,d) then f else t1.d end not between (c) and f) then t1.e else f end-t1.c in (t1.b,t1.a,f)))"
     end, {
         -- <randexpr-2.1649>
-        
+
         -- </randexpr-2.1649>
     })
 
@@ -16560,7 +16560,7 @@ test:do_test(
         return test:execsql "SELECT case ~t1.d when case when c in (select count(*) from t1 union select +(( -min(17)-~cast(avg(t1.c) AS integer)))* -min(t1.f)-max(t1.d)*count(*) | cast(avg(17) AS integer) from t1) then 17*e*t1.f | t1.e else 19-coalesce((select max(t1.f) from t1 where not exists(select 1 from t1 where t1.c>=e)),t1.f) end | 13+13 then 17 else t1.f end FROM t1 WHERE NOT ((not exists(select 1 from t1 where +c-19 in (select (~((min(b)))-+count(*) | cast(avg(case when 11 in (select (abs((t1.b))/abs(e)) from t1 union select (17) from t1) then t1.c when  -a<=b then t1.a else t1.e end) AS integer)++case max(t1.b) when cast(avg(c) AS integer) then count(*) else cast(avg(f) AS integer) end |  -count(*)-(count(*))*max(t1.e)*count(*)*cast(avg(a) AS integer))+min(11) from t1 union select max((d)) from t1))))"
     end, {
         -- <randexpr-2.1652>
-        
+
         -- </randexpr-2.1652>
     })
 
@@ -16580,7 +16580,7 @@ test:do_test(
         return test:execsql "SELECT 19 | case when not (select min(17) from t1)>t1.e then coalesce((select max(coalesce((select b from t1 where (t1.a not in (a | t1.c,t1.d,19) or not exists(select 1 from t1 where t1.b in (select t1.d from t1 union select a from t1)) and (a in (select count(*) from t1 union select max(t1.b) from t1) and t1.c in (t1.b,f,t1.d)))),t1.c)) from t1 where f=d and  -b>c),t1.f)-t1.c when c in ((a),11,t1.c) then 13 else 13 end-c FROM t1 WHERE (t1.e)*case when +a*t1.f*t1.e>=+d*a+b-t1.f*~13 | t1.d*11-f-~f+17-coalesce((select max( -f) from t1 where b<t1.a),t1.b) | a-(17)-13-f then e else c end<17"
     end, {
         -- <randexpr-2.1654>
-        
+
         -- </randexpr-2.1654>
     })
 
@@ -16620,7 +16620,7 @@ test:do_test(
         return test:execsql "SELECT case when not exists(select 1 from t1 where not not not d=17) then t1.b when (not coalesce((select coalesce((select max(d) from t1 where c+c>t1.c),11)*e*t1.e from t1 where e<=t1.d),t1.a)*f<t1.b) then coalesce((select case when 19>=11 then e when t1.a in (select e from t1 union select b from t1) then t1.b-t1.a else e end from t1 where a=t1.a), -17) else e end FROM t1 WHERE NOT (not exists(select 1 from t1 where t1.e in (select max((abs(~+t1.a-t1.c*a)/abs(17))) from t1 union select min(11*t1.c+t1.f) from t1)))"
     end, {
         -- <randexpr-2.1658>
-        
+
         -- </randexpr-2.1658>
     })
 
@@ -16640,7 +16640,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select coalesce((select max(case when not a not in ((abs(11)/abs(coalesce((select t1.d from t1 where 17 in (select count(*) from t1 union select count(distinct t1.a) from t1)),b)*t1.e*c)),t1.a,t1.b) or t1.c<=t1.f or (t1.d>= -a) then (select cast(avg(~t1.f-t1.f) AS integer) from t1) else 17 end) from t1 where t1.b<=c and t1.b<=a),11) from t1 where exists(select 1 from t1 where e<c) and 11 not between t1.d and c),a) FROM t1 WHERE NOT (e>=(select min(coalesce((select max(19) from t1 where not exists(select 1 from t1 where (select count(distinct +case when coalesce((select max(case when e<a then b else (c) end) from t1 where f<>t1.d),t1.d) in (select abs(cast(avg(t1.d) AS integer)-min(t1.c)) from t1 union select  -cast(avg(19) AS integer) from t1) then b when t1.e< -t1.c then t1.b else t1.c end-19*e) from t1)<=a)),17))+ -(max(a))- -cast(avg(11) AS integer)+ -count(distinct c) from t1)-11)"
     end, {
         -- <randexpr-2.1660>
-        
+
         -- </randexpr-2.1660>
     })
 
@@ -16650,7 +16650,7 @@ test:do_test(
         return test:execsql "SELECT e*(case when +t1.c+t1.e+f<=13 then (select case cast(avg(coalesce((select (t1.f*a)*11 from t1 where c<>t1.a),b)) AS integer)+cast(avg(b) AS integer)+max( -b)-min(e) when max(11) then cast(avg(t1.e) AS integer) else cast(avg(t1.b) AS integer) end from t1) when ~11*t1.d<=t1.b or (t1.e=t1.a) then t1.b else  -19 end)+e FROM t1 WHERE a>13*d+t1.e+c"
     end, {
         -- <randexpr-2.1661>
-        
+
         -- </randexpr-2.1661>
     })
 
@@ -16670,7 +16670,7 @@ test:do_test(
         return test:execsql "SELECT (abs(t1.d-t1.b)/abs(t1.c))+t1.a*coalesce((select max(coalesce((select max(~11+11) from t1 where e-a>=case when 11*t1.d+13+(select cast(avg(t1.d+f) AS integer) from t1)-d+t1.d-b not between a and a then e else coalesce((select e from t1 where d>b and b between 11 and t1.d),t1.b) end), -t1.b)) from t1 where t1.e<=c),17)+ -t1.d FROM t1 WHERE case when (19>b) then case (abs(t1.d+case when not exists(select 1 from t1 where f in (19,d,11) and f not between t1.e and a) then (19) when a<=t1.d then 17 else t1.c end* -c*13)/abs(d))*f when 19 then t1.c else  - - -t1.d end when c in (select max(t1.e) from t1 union select ( - -abs(cast(avg(t1.f) AS integer))-case cast(avg(a) AS integer) when (min(t1.f)) then max(13) else max(11) end |  -((min(11)))+max((a))) from t1) then c else  -b end*t1.d>d"
     end, {
         -- <randexpr-2.1663>
-        
+
         -- </randexpr-2.1663>
     })
 
@@ -16690,7 +16690,7 @@ test:do_test(
         return test:execsql "SELECT ~t1.a*(case when not not exists(select 1 from t1 where coalesce((select max(t1.c) from t1 where (select count(distinct b | case 13 | case when  -11<>a then t1.a else b end when t1.e then t1.b else d end*t1.f) from t1)<>17 or t1.a not between c and t1.a),11) in (t1.e,c,c)) and  -11>f then t1.d else f end-17)+ -(t1.b) FROM t1 WHERE (13-coalesce((select  -case when 19+c=a then f else 11 end*(e) from t1 where (t1.b in (select t1.a from t1 union select 11 from t1))),(t1.f))*e+f*(t1.f)=a and not 17 in (select max(f) from t1 union select max(19) from t1) or 19<>t1.f) and 13 between f and f and d<>b"
     end, {
         -- <randexpr-2.1665>
-        
+
         -- </randexpr-2.1665>
     })
 
@@ -16720,7 +16720,7 @@ test:do_test(
         return test:execsql "SELECT ~13+case when (t1.e-~b+13*case when b>(select max(case when (19*f in (select ~count(distinct a)+count(distinct (e)) from t1 union select (cast(avg(t1.c) AS integer)) from t1)) then coalesce((select  -19 from t1 where t1.f<=c or 19 not in (t1.c, -b,19)),t1.e) when t1.e>c then e else 13 end | f) from t1) then 13 else d end in (select t1.f from t1 union select c from t1)) then t1.f when not exists(select 1 from t1 where a between f and f) then (d) else t1.c end FROM t1 WHERE exists(select 1 from t1 where case when 19 in (19,+(abs(case t1.f when e then case (select +cast(avg(a) AS integer)*min(e) from t1) when case when 19 not between  -t1.c and d then 11 else t1.f end then f else t1.c end else e end+17+b)/abs(t1.d))*13,t1.f) then a when t1.d not in (f,d, -c) then t1.c else t1.b end not between d and c and t1.b not between t1.b and f)"
     end, {
         -- <randexpr-2.1668>
-        
+
         -- </randexpr-2.1668>
     })
 
@@ -16750,7 +16750,7 @@ test:do_test(
         return test:execsql "SELECT  -case coalesce((select max((case when a>t1.c | t1.a then (select abs(count(distinct a)) from t1) when (e not in (coalesce((select c from t1 where exists(select 1 from t1 where c<=11) and t1.a>e),e),d,a)) or t1.d<>e then t1.c else c end)- -11*b) from t1 where not exists(select 1 from t1 where not (c in ((t1.e),d,19)))),(t1.c))*b when 17 then t1.b else 19 end FROM t1 WHERE e<=coalesce((select t1.b from t1 where coalesce((select c*19 | (a) from t1 where not exists(select 1 from t1 where 19>=13 or case when coalesce((select max(19) from t1 where t1.e=t1.d or t1.f<>e),t1.f)>19 and t1.f=t1.d then 11+ -t1.d when  -t1.f not between f and f then t1.a else d end not in ((t1.a),13,t1.a) and c in (select (13) from t1 union select f from t1) and 17<(f)) and t1.a<>t1.e),t1.d)>=t1.c),t1.f)"
     end, {
         -- <randexpr-2.1671>
-        
+
         -- </randexpr-2.1671>
     })
 
@@ -16780,7 +16780,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select (11) from t1 where not e in (select  -min(d*13) from t1 union select count(distinct f) from t1)),t1.f*t1.d | t1.f) FROM t1 WHERE  -t1.c*d>case d when ~coalesce((select max(e) from t1 where exists(select 1 from t1 where not exists(select 1 from t1 where not e=c))),+coalesce((select +t1.e from t1 where not exists(select 1 from t1 where c>=t1.b)),(abs( -t1.c+case t1.c when ~~t1.c+a-t1.c then coalesce((select max(case when t1.b<=c then 19 else f end) from t1 where 13<b),d) else t1.d end)/abs(a))*(d))) then  -t1.e else (13) end"
     end, {
         -- <randexpr-2.1674>
-        
+
         -- </randexpr-2.1674>
     })
 
@@ -16820,7 +16820,7 @@ test:do_test(
         return test:execsql "SELECT +case when t1.e>=(select max(17) from t1) then case 11 when e then coalesce((select 17 from t1 where not exists(select 1 from t1 where t1.d in (select t1.a from t1 union select e from t1) and e=case when 11<19 and t1.e<19 then t1.e when t1.c in (t1.b,t1.e,t1.d) then 13 else 13 end and e<=d or b between 19 and t1.a or t1.a<=(13))),t1.a) else t1.e-t1.d end*t1.a when  -11 not in (17,t1.d,a) then t1.c else b end*19 FROM t1 WHERE NOT (not t1.b>t1.e or t1.d not in (~t1.f,d+case when (b+(abs(19*~t1.c | t1.b*d*(b)-t1.e-t1.e+a)/abs(t1.c)) not in (17,b,t1.e)) then 13+f else b end-t1.f,t1.e) or t1.e not in (f,a,t1.d))"
     end, {
         -- <randexpr-2.1678>
-        
+
         -- </randexpr-2.1678>
     })
 
@@ -16830,7 +16830,7 @@ test:do_test(
         return test:execsql "SELECT t1.e | t1.b+a*coalesce((select t1.a from t1 where ~(d)-f<>e-c or 17+f in (select  -(~case max(t1.c) when abs(count(*)) then abs( - -cast(avg(b) AS integer)*count(*)) else cast(avg(t1.c) AS integer) end) from t1 union select count(distinct (11)) from t1) and exists(select 1 from t1 where not 13>t1.e) or t1.c<d),~b)- -b FROM t1 WHERE d between t1.f and t1.c"
     end, {
         -- <randexpr-2.1679>
-        
+
         -- </randexpr-2.1679>
     })
 
@@ -16860,7 +16860,7 @@ test:do_test(
         return test:execsql "SELECT ~(select +~count(distinct 17)*count(distinct t1.e) from t1)-t1.e+a*11-case when 13<>t1.b then 19 when case when case (select ( -max(c)) from t1) when 11 then d else e end*t1.d<>d then a else 11 end=t1.b or 17=d then b else t1.e end+11+t1.a*a-e FROM t1 WHERE coalesce((select coalesce((select max(c) from t1 where  -+ -e-t1.d*case when coalesce((select d from t1 where (c=a)),f) between t1.b and t1.b or (13)<>c and e in (t1.e,e,(t1.a)) then b*t1.c else b end+t1.c in (select t1.f from t1 union select t1.b from t1)),19) from t1 where t1.f in (select count(*) from t1 union select cast(avg(t1.e) AS integer)*min((a))*+(max(t1.b))+max(17) from t1)),t1.d)< -e"
     end, {
         -- <randexpr-2.1682>
-        
+
         -- </randexpr-2.1682>
     })
 
@@ -16890,7 +16890,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(case when f<=(17-coalesce((select ~t1.e+11 from t1 where t1.f in (select c from t1 union select b from t1)),f)) then  -case when e>case when 17+ -t1.b in (select cast(avg(f) AS integer) from t1 union select min(c-17+a) from t1) then  -17 else t1.d end then a when 19<11 then t1.a else t1.b end | t1.f else a end) from t1 where e between a and d),19) FROM t1 WHERE NOT (case 19 when ((select max(f) from t1)) then 13 else t1.d end-t1.c>a-b-t1.d)"
     end, {
         -- <randexpr-2.1685>
-        
+
         -- </randexpr-2.1685>
     })
 
@@ -16910,7 +16910,7 @@ test:do_test(
         return test:execsql "SELECT case when (select case min(t1.b) when max(13) | +max(t1.e)*max(f) then abs( -+count(*)) else max(t1.f) end from t1)*t1.a+(abs(case 19 when 19 then d else ((13)) end)/abs(13))+(19) between f and 13 or (not not 17<e) then (abs(17)/abs((f))) when f in (select min(f) from t1 union select cast(avg(11) AS integer) from t1) then c else b end FROM t1 WHERE exists(select 1 from t1 where f<13)"
     end, {
         -- <randexpr-2.1687>
-        
+
         -- </randexpr-2.1687>
     })
 
@@ -16950,7 +16950,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select +(select max(coalesce((select (abs(((t1.e)+b))/abs(f))+e from t1 where (select (case min(t1.b) when count(*) then count(*) else abs(++count(distinct t1.a)+cast(avg(d) AS integer)) end)+min(f)-max(11) from t1)<>~17),t1.e+(select count(*) from t1) | 11-coalesce((select 13 from t1 where 11 not in ( -t1.f,t1.e,t1.f)),t1.b))+ -(t1.c)) from t1) from t1 where t1.a=(13)), -a)*e FROM t1 WHERE NOT (not exists(select 1 from t1 where (select count(distinct t1.e) from t1)<=coalesce((select case when not exists(select 1 from t1 where e=t1.b*coalesce((select max(+b) from t1 where exists(select 1 from t1 where not (not not exists(select 1 from t1 where t1.c in (select 11 from t1 union select 19+13 from t1)))) and not t1.b<a),case when b in (t1.c,t1.e,f) and b=t1.a then ~b when 13 not between d and 11 then  -t1.d-c else t1.d end)) then (abs((11))/abs(17)) else b end from t1 where t1.b not in (t1.f,t1.e,17)), -t1.d)))"
     end, {
         -- <randexpr-2.1691>
-        
+
         -- </randexpr-2.1691>
     })
 
@@ -16970,7 +16970,7 @@ test:do_test(
         return test:execsql "SELECT ~~t1.b | 11+d*coalesce((select max(t1.f-a) from t1 where not exists(select 1 from t1 where (a-coalesce((select b from t1 where t1.f<case when not exists(select 1 from t1 where 11=b or d<>e) then t1.e*c else c end-13+t1.a),f)+t1.d- -t1.a)*t1.c<>f) and t1.b not between (e) and t1.c),f)+11*t1.f FROM t1 WHERE (17 in (select 13 from t1 union select case coalesce((select max( -case when not b in ((select  -+case max((b)) when cast(avg(13) AS integer) then count(*) else max(a) end+min(b)-max(d) from t1),coalesce((select t1.d from t1 where case when  -13 in ( -t1.e,f,t1.e) then t1.c else e end | 11<=(t1.b)),t1.c)-11,t1.e) then t1.f else 13 end) from t1 where b>=t1.e),f) when e then t1.c else c end from t1))"
     end, {
         -- <randexpr-2.1693>
-        
+
         -- </randexpr-2.1693>
     })
 
@@ -17000,7 +17000,7 @@ test:do_test(
         return test:execsql "SELECT case case when not ++b+~e-11-d-f*e*case when (t1.f) not between t1.c and t1.e or (13>e) then (abs(17)/abs(d)) when 11 not between 17 and (t1.b) then c else 13 end-(f)-f between t1.c and t1.f then t1.c when a between t1.d and 13 then t1.e else t1.a end when a then f else 13 end FROM t1 WHERE t1.a in (select case when (+e*t1.f not in ( -(select (case max(+t1.e-case when not exists(select 1 from t1 where 19 in (select 13 from t1 union select ((t1.d)) from t1)) then 13-t1.b else 19 end) when count(*)-(cast(avg(t1.b) AS integer)-cast(avg(b) AS integer)) then count(distinct t1.b) else count(distinct t1.c) end | cast(avg((19)) AS integer)) from t1),~17-f,c)) then (select count(*) from t1) when t1.a>t1.a then b else t1.d end+(f) from t1 union select b from t1)"
     end, {
         -- <randexpr-2.1696>
-        
+
         -- </randexpr-2.1696>
     })
 
@@ -17030,7 +17030,7 @@ test:do_test(
         return test:execsql "SELECT 13-case when a<=case when e not between t1.b*(abs(t1.c)/abs(e | 19-(select  -~count(distinct t1.b)+min(t1.a-t1.c-f+t1.d+t1.d+t1.d) from t1)))-t1.e and coalesce((select 11 from t1 where c<e),d)* -d then 17 else t1.e end then t1.c else 17 end+f FROM t1 WHERE NOT ((t1.f<>t1.c))"
     end, {
         -- <randexpr-2.1699>
-        
+
         -- </randexpr-2.1699>
     })
 
@@ -17060,7 +17060,7 @@ test:do_test(
         return test:execsql "SELECT (case when coalesce((select max(~case coalesce((select max(b) from t1 where case (select count(distinct 17) from t1)-e when b then d else t1.b end<13),f) when c then (( -c)) else 13 end) from t1 where t1.e between a and b),t1.b) in (select  -min(t1.f) from t1 union select case cast(avg(t1.d) AS integer) when count(distinct b) then case +~ -cast(avg(b) AS integer) when max(t1.f) then count(*) else (max(e)) end else count(*) end from t1) then c when 13<=t1.f then ( -17) else t1.b end) FROM t1 WHERE NOT ((select min(19*coalesce((select max(t1.e) from t1 where ~coalesce((select t1.a-coalesce((select max((abs(a)/abs(d))) from t1 where  -13 not in ((d)*t1.a+t1.e,13,t1.c) or 17 not in (a,b,t1.d)), -t1.a) from t1 where c<>t1.e),a) | 11+17 between b and 17),c))*~ -max(e) from t1)<>11)"
     end, {
         -- <randexpr-2.1702>
-        
+
         -- </randexpr-2.1702>
     })
 
@@ -17070,7 +17070,7 @@ test:do_test(
         return test:execsql "SELECT t1.f* -t1.e-c | b++19*(select (case max(t1.c) when +abs(count(distinct case when e<t1.a then 19 else d end)) then  -count(distinct e) else (((count(distinct t1.d)))) end | max(e)+(cast(avg(t1.c) AS integer)))+count(*) from t1)+case when t1.d>=13 then coalesce((select max(t1.c) from t1 where not  -c+b-t1.f<>d),a) else b end FROM t1 WHERE d in (select 11 from t1 union select  -d*~t1.b from t1)"
     end, {
         -- <randexpr-2.1703>
-        
+
         -- </randexpr-2.1703>
     })
 
@@ -17100,7 +17100,7 @@ test:do_test(
         return test:execsql "SELECT 11-t1.e+d+case case when (b between  -+case when f not between case coalesce((select t1.a from t1 where e not between (t1.d) and t1.a or 17<11),t1.d) when 17 then t1.f else t1.e end and d then 17 when e>=t1.f then t1.b else t1.b end and t1.e) then case f when t1.d then t1.c else  -e end when (not exists(select 1 from t1 where  -(11)>a) or t1.c<b) then 17 else 11 end when (t1.e) then d else t1.e end FROM t1 WHERE not (f)>t1.e"
     end, {
         -- <randexpr-2.1706>
-        
+
         -- </randexpr-2.1706>
     })
 
@@ -17120,7 +17120,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(case when f>11 then 13 when 19*e+(select  -count(distinct t1.c)-max(c) | count(distinct 13) from t1) between coalesce((select max(case when t1.a<t1.c and (t1.a)<=d then c when 17 between t1.b and b then (t1.c) else a end) from t1 where  -19 in (select min(11) from t1 union select count(*) from t1)),11) and 11 or (exists(select 1 from t1 where not exists(select 1 from t1 where c not between ( -b) and e))) and b not between 17 and t1.a and 19<b then 17 else f end) from t1 where t1.b between t1.c and 13 and t1.b<>e),17) FROM t1 WHERE case case 13+coalesce((select max( -t1.b*t1.c) from t1 where t1.c*c<>(select  -(count(distinct e)) from t1)-t1.c | t1.d*t1.e+11*t1.a+11-t1.a*b),d)+t1.d+e when t1.f then e else  -11 end-d when t1.e then 11 else f end+f=19"
     end, {
         -- <randexpr-2.1708>
-        
+
         -- </randexpr-2.1708>
     })
 
@@ -17160,7 +17160,7 @@ test:do_test(
         return test:execsql "SELECT 13+coalesce((select  -(abs(b)/abs(coalesce((select (abs(e+t1.a)/abs(13)) from t1 where a<c), -19)+t1.a+t1.c)) from t1 where (not t1.a not between e and e)),t1.d) FROM t1 WHERE NOT (~(abs(t1.f)/abs(f)) not in (f,case c when coalesce((select max(17) from t1 where case when 17 not between 13 and 11+case when exists(select 1 from t1 where t1.e<c) then case when d between f and t1.c then 19 when 11 in (t1.a,11,e) then a else t1.e end else 13 end | 11+17 then t1.e else e end<>17 and t1.d<>t1.f),17)+a- -t1.d then t1.d else  -t1.b end,b))"
     end, {
         -- <randexpr-2.1712>
-        
+
         -- </randexpr-2.1712>
     })
 
@@ -17170,7 +17170,7 @@ test:do_test(
         return test:execsql "SELECT (~(abs(case when t1.f*17 not in (coalesce((select 13 from t1 where d in (select count(distinct t1.e- -t1.e+t1.e*11) from t1 union select (abs(~~(cast(avg(d) AS integer))* -(min(13))+max(d) | min(13))) from t1)),d),a,t1.e) then c else t1.c end-c)/abs((t1.d)))*t1.c)*t1.d+t1.b-b FROM t1 WHERE (abs(case when (t1.e+case when t1.f+t1.d*t1.c<=t1.f or t1.c>=a and a not between 19 and t1.e then e else b end-t1.c) | t1.b<>19 then t1.f when 19<=t1.d and not  -t1.c>=11 and t1.a between t1.f and (19) then b else t1.c end)/abs(b))+11>=t1.f and t1.f not between f and t1.a"
     end, {
         -- <randexpr-2.1713>
-        
+
         -- </randexpr-2.1713>
     })
 
@@ -17200,7 +17200,7 @@ test:do_test(
         return test:execsql "SELECT (abs(a)/abs(case when (not t1.f in (select count(*) from t1 union select  - -min(c) | min(13*t1.d) from t1)) and ( -t1.a*t1.d)>=d or (t1.a in (a,11,f)) or (c>=t1.a) then 17+case when not exists(select 1 from t1 where e<t1.f) then + -(e)-d when t1.e in (19,19, -e) then  -t1.f else t1.a end else t1.b end)) FROM t1 WHERE t1.d in (select min(t1.d) from t1 union select +~case abs(max(case when t1.e not between 19-f | f | t1.c and b then t1.b else e end+b) | count(distinct f)) when count(distinct e) then count(*) else (+count(*)-(count(*))+min(t1.d)) end from t1) and (f)*coalesce((select 17 from t1 where f between t1.e and a),(13))<=b"
     end, {
         -- <randexpr-2.1716>
-        
+
         -- </randexpr-2.1716>
     })
 
@@ -17230,7 +17230,7 @@ test:do_test(
         return test:execsql "SELECT +case when case when coalesce((select c from t1 where (exists(select 1 from t1 where not (abs(b)/abs(t1.b)) not between f and 19 and  -b>c)) and 13 between t1.c and 17 or a=13),coalesce((select a from t1 where (t1.d) in (c,11,t1.c)),t1.d)) | c | coalesce((select max(d) from t1 where t1.b>b),t1.a)=19 then e else 13 end between t1.a and t1.f and 17>=c then a when d in (e,13,c) or t1.b<> -19 then (17) else 17 end FROM t1 WHERE  -b in (t1.b,t1.f,case when a in (select case +(min(t1.c)*+~cast(avg(+t1.f) AS integer)*cast(avg(d) AS integer) | abs(count(*))+count(*)*count(distinct 17)) when count(distinct e) then  -cast(avg(t1.a) AS integer) else min(11) end from t1 union select ((min(13))) from t1) then (abs(t1.d)/abs(case when  -19<b then t1.e- -f+f else b end)) when t1.a between t1.f and 13 then f else t1.e end)"
     end, {
         -- <randexpr-2.1719>
-        
+
         -- </randexpr-2.1719>
     })
 
@@ -17260,7 +17260,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.b from t1 where not exists(select 1 from t1 where 13 in (select count(*) | ~min((select max((abs(d)/abs(t1.e+t1.e))) from t1)* -case when f*case e*~a when case e when (d) then 19 else (b) end then d else 17 end*t1.b between 11 and 13 then e when d in (a,(19),e) then c else 13 end-e*17) from t1 union select (count(*)) from t1))),f) FROM t1 WHERE not exists(select 1 from t1 where t1.a<>e)"
     end, {
         -- <randexpr-2.1722>
-        
+
         -- </randexpr-2.1722>
     })
 
@@ -17290,7 +17290,7 @@ test:do_test(
         return test:execsql "SELECT  - -case b when +~coalesce((select max(coalesce((select c from t1 where coalesce((select max(t1.a+f) from t1 where (t1.a not between t1.a and t1.e)),t1.a)-b not between e and  -t1.d),d)+19) from t1 where (f in (select ( -count(*) | count(*)+cast(avg(11) AS integer)) from t1 union select count(distinct 13) from t1) or  -b<>19 or 17>=t1.a)),t1.e)-c-t1.d then t1.a else 19 end- - -11 FROM t1 WHERE d+a*~coalesce((select max((select count(distinct t1.e)-max(t1.d) from t1)) from t1 where not exists(select 1 from t1 where t1.e in (11-f*19,a,c-b)) and 11=t1.b),t1.a)=(t1.b) and  -t1.b<case when (+11 | coalesce((select t1.f from t1 where b<=(t1.b) and  -t1.e<=(t1.f)),13) | t1.e between 13 and 19) then 17 else 11 end"
     end, {
         -- <randexpr-2.1725>
-        
+
         -- </randexpr-2.1725>
     })
 
@@ -17320,7 +17320,7 @@ test:do_test(
         return test:execsql "SELECT  -(abs(t1.a)/abs(case when coalesce((select max( -c) from t1 where t1.a*e>coalesce((select max(coalesce((select max(t1.d) from t1 where not exists(select 1 from t1 where e | t1.f-19 between t1.e-a and b and e>=t1.d)),+d)) from t1 where (exists(select 1 from t1 where t1.b in (select 19 from t1 union select 17 from t1) or 11 between t1.b and d))),c)),t1.e)*t1.a<=c then b else t1.d end)) FROM t1 WHERE (select abs( -abs(abs(case count(*) when ~ -min(f)+case  - -abs(+cast(avg(c*17) AS integer)) when count(*) then max(t1.a) else max(11) end+(cast(avg(e) AS integer)) then min(17) else count(*) end-cast(avg(a) AS integer)-count(*))))+ -cast(avg(t1.a) AS integer) | ((count(*))) from t1)+f in (select max((abs(+11*t1.a)/abs(t1.f))) from t1 union select max(d)-(( -count(distinct 11))) from t1)"
     end, {
         -- <randexpr-2.1728>
-        
+
         -- </randexpr-2.1728>
     })
 
@@ -17360,7 +17360,7 @@ test:do_test(
         return test:execsql "SELECT case when ((select (+~~max(13)*count(distinct t1.c)) from t1)<>(select (+ -count(*)) from t1)) then +(17) else 19 end+~(abs(13)/abs(d))-t1.d FROM t1 WHERE NOT (coalesce((select (select  -+ -count(distinct a)*count(*)+max(t1.b) from t1) from t1 where exists(select 1 from t1 where t1.b=c)),t1.c)+f<>t1.f)"
     end, {
         -- <randexpr-2.1732>
-        
+
         -- </randexpr-2.1732>
     })
 
@@ -17380,7 +17380,7 @@ test:do_test(
         return test:execsql "SELECT case t1.f when case when 17<=c and coalesce((select case when e in (case when (t1.a=c) then b else  -13 end,t1.d,t1.a) then 13 else t1.b end from t1 where (b)=13),t1.d) in ((t1.e),b,t1.b) and d not between 19 and 11 then +(select ~ -~max(e)+count(*)+cast(avg((t1.c)) AS integer) from t1) when t1.f<>e and t1.e<d then t1.c else 19 end then t1.a else t1.f end FROM t1 WHERE NOT (t1.b between t1.b and case when ((select abs(cast(avg( -17+f) AS integer)) from t1) between  -a and c) then case when coalesce((select max(d) from t1 where 11 in (select max(c) | (count(distinct 13)) from t1 union select count(*) from t1)),13) | t1.a between 13 and t1.f then f else (c) end-c when f in (19,(f), -13) then f else (t1.f) end-d or (f) not in (b,c,d))"
     end, {
         -- <randexpr-2.1734>
-        
+
         -- </randexpr-2.1734>
     })
 
@@ -17400,7 +17400,7 @@ test:do_test(
         return test:execsql "SELECT t1.c+b+t1.c*case when f in (select max(case when not t1.e<case when (select ~+(min(13)) from t1)+t1.e in (select  -+count(*) from t1 union select ((cast(avg(e) AS integer))) from t1) then c when t1.f not between f and t1.f or (c) in (t1.e,c,d) then c else 11 end then +f else b end)-count(*) from t1 union select +min(11)-count(distinct t1.e) from t1) then d else 17 end-19 FROM t1 WHERE NOT ((select abs(case (count(distinct case when not exists(select 1 from t1 where  -t1.c=t1.c) and t1.d not in (13,t1.c,t1.c) then case (19)-c when t1.b then 11 else t1.f end else t1.d end+t1.c)+max(11)) when (count(distinct t1.f)*count(distinct 19)) then  -max(f) else count(*) end) from t1)*coalesce((select max(e) from t1 where (abs(case  -d when t1.b then 19 else t1.e end)/abs(c))< -e), -b)-e<=f)"
     end, {
         -- <randexpr-2.1736>
-        
+
         -- </randexpr-2.1736>
     })
 
@@ -17420,7 +17420,7 @@ test:do_test(
         return test:execsql "SELECT +case + -(+t1.a)-~13+t1.b*t1.b+ -c+(select abs(case ~max(t1.c)++min( -13)+ -count(*)+(count(*)) | ((cast(avg(t1.e) AS integer))) when min(t1.c) then min(t1.d) else min(b) end)+min(13) | count(distinct f) | min(t1.a) from t1) when t1.e then 11-17 else t1.b*c end FROM t1 WHERE NOT ((~coalesce((select max(coalesce((select max(19) from t1 where case when case f-(coalesce((select ~11 from t1 where  -19= -t1.f or b=t1.b),13)) when 19 then t1.d else t1.b end<=17 then 17 when t1.b>t1.e then t1.d else (d) end in (select count(*) from t1 union select  -abs(~abs(count(distinct d)) | min(t1.e))*count(*) from t1)),t1.f)) from t1 where a>13),d) not between t1.d and c))"
     end, {
         -- <randexpr-2.1738>
-        
+
         -- </randexpr-2.1738>
     })
 
@@ -17450,7 +17450,7 @@ test:do_test(
         return test:execsql "SELECT (abs(e)/abs((+b)*coalesce((select c+c+t1.a+t1.e+t1.a+t1.a | 17+e*(t1.c) from t1 where a in (select count(distinct t1.c)-+count(*) from t1 union select  - -( -max(t1.f))-count(distinct t1.b)+min(t1.b)*count(*)+count(distinct a) from t1)),t1.a)+e))*19 FROM t1 WHERE NOT (coalesce((select 11 from t1 where case t1.e-(t1.a) when (f) then ((19)) else t1.f end+ -t1.b+a+coalesce((select coalesce((select d from t1 where exists(select 1 from t1 where 13+(t1.a)<>19 or 17 not in (c,e,t1.c) or f not in (t1.e,t1.a, -f))),~ -13+e) from t1 where b between (11) and t1.f),t1.a)<=t1.d), -c)<=11)"
     end, {
         -- <randexpr-2.1741>
-        
+
         -- </randexpr-2.1741>
     })
 
@@ -17480,7 +17480,7 @@ test:do_test(
         return test:execsql "SELECT case coalesce((select t1.f from t1 where not exists(select 1 from t1 where coalesce((select max(d) from t1 where 13 not in (11,coalesce((select max((+f)) from t1 where not d>=f or e in (select 11-t1.b from t1 union select t1.d from t1) or not exists(select 1 from t1 where  -b in (select t1.d from t1 union select b from t1) or t1.a<>b or t1.d>e) or t1.a not between (t1.f) and t1.e),+f),t1.e)),t1.f)*t1.b not in (13,t1.b,t1.f))),t1.a)*b when c then b else t1.f end FROM t1 WHERE NOT (case when c*coalesce((select max(19+t1.e*~case case t1.e when t1.f then  -t1.a else 11 end when 11 then t1.a else (select cast(avg(a) AS integer) from t1) end- -t1.b*coalesce((select 19 from t1 where t1.f in ((a),t1.d,t1.c)),a)) from t1 where exists(select 1 from t1 where not exists(select 1 from t1 where t1.a not in (t1.b,t1.a,17)))),13)>=a then b when t1.c>t1.a then d else 17 end not in (a,17,t1.b))"
     end, {
         -- <randexpr-2.1744>
-        
+
         -- </randexpr-2.1744>
     })
 
@@ -17490,7 +17490,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case when (c*+~t1.d++t1.b+a-case when (select +case count(*)+min(d) when  -count(distinct 17) then max(t1.b) else  -cast(avg(d) AS integer) end from t1) in (select cast(avg(c) AS integer) from t1 union select ((count(*))) from t1) then t1.a* -f else f end*c*19-(f)-t1.c-t1.f+t1.d>=f) then (t1.d) else d end)/abs(t1.b)) FROM t1 WHERE coalesce((select a from t1 where t1.d not in ( -13*d,19,t1.a)),(abs(coalesce((select case when c>=t1.e then b else case ~t1.d+a-+t1.b+17 when case when t1.e+t1.e not between e and (c) then t1.d when d>a then t1.d else t1.c end | t1.a-(d) then t1.f else c end end from t1 where d>=t1.c),13))/abs(t1.c)))=t1.e"
     end, {
         -- <randexpr-2.1745>
-        
+
         -- </randexpr-2.1745>
     })
 
@@ -17510,7 +17510,7 @@ test:do_test(
         return test:execsql "SELECT d+coalesce((select max(coalesce((select f from t1 where coalesce((select 17 | t1.b from t1 where 11 not in ((t1.e),+a-f,t1.c | b+17*t1.e-c)), -c) in (select  -count(distinct e)-+max(t1.b) from t1 union select count(distinct c)+cast(avg(t1.b) AS integer) from t1)),17)) from t1 where not t1.c<t1.e),17)+b+e FROM t1 WHERE case t1.f when t1.a then t1.e else d-case when e<>(select ~~+(min(11-11)) | ~ -(count(*)) from t1)*(case when t1.d=19 then a when not t1.a in (11,t1.e,c) or t1.a not between t1.f and e then t1.a else t1.e end+19) then 13 when 19 between  -17 and t1.a then t1.a else 19 end end>=t1.f and t1.e>t1.a"
     end, {
         -- <randexpr-2.1747>
-        
+
         -- </randexpr-2.1747>
     })
 
@@ -17550,7 +17550,7 @@ test:do_test(
         return test:execsql "SELECT (select case ~ -(~case case cast(avg(t1.e) AS integer) when min(case when t1.c between coalesce((select t1.b from t1 where d in (select f from t1 union select t1.e from t1)),(e)) and t1.d and (19=(11)) then 17 else b end) | max((13))-min(t1.c) |  -count(distinct t1.d)*max(11) then count(*) else max(f) end*count(*)-(( -count(distinct f))) when min(t1.c) then (count(distinct (13))) else max((b)) end)+max(t1.a) when (max(t1.c)) then  -cast(avg(a) AS integer) else cast(avg(t1.c) AS integer) end from t1) FROM t1 WHERE NOT ((f) not between c and 17 | t1.b | coalesce((select t1.d from t1 where t1.d*~case when a<=f or (case t1.f when d+17+17 then e else +case when (11<>17) then 11 when  -t1.b not in (e,19,(f)) then t1.c else a end+13 end>= -t1.f) then ~ -t1.c else c end*t1.f*a*17<=t1.f),17))"
     end, {
         -- <randexpr-2.1751>
-        
+
         -- </randexpr-2.1751>
     })
 
@@ -17580,7 +17580,7 @@ test:do_test(
         return test:execsql "SELECT (select abs(min(t1.b)) from t1)-f | case when +t1.d*d not in (t1.f,t1.a,case when ~t1.f-17*c<>t1.a then 11 when 19 in (select (+count(distinct b)) | cast(avg(19) AS integer)*count(*) from t1 union select count(distinct t1.d) from t1) then d else d end+19+b) then (a) else 17 end*13+d FROM t1 WHERE NOT (t1.f<>(abs(t1.a)/abs(coalesce((select max(case when coalesce((select max((select count(*) from t1)) from t1 where f<>t1.a),coalesce((select max(11) from t1 where 17+coalesce((select t1.a from t1 where a in (select +~cast(avg(d+11) AS integer) from t1 union select count(distinct coalesce((select max((13)) from t1 where not (t1.f)<>19),f)*d) from t1)),19)+t1.e between 13 and (t1.b)),e))>=e then d else t1.f end) from t1 where ((not f>= -t1.b))),t1.c))))"
     end, {
         -- <randexpr-2.1754>
-        
+
         -- </randexpr-2.1754>
     })
 
@@ -17610,7 +17610,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(a) from t1 where a>a*(((t1.d)) | a)-+case t1.a-t1.d-19+coalesce((select max(t1.c) from t1 where ~(select  -cast(avg(a+d) AS integer) from t1) not in (~((17)),t1.a,(t1.e))),b)+a*(c) when t1.f then a else t1.f end-17+c),13)*t1.a FROM t1 WHERE NOT (t1.b*t1.d*11*case 13 | t1.a when (case when not exists(select 1 from t1 where t1.a not between coalesce((select f-a from t1 where a not in (11,d,(a)) or e<=d and 11=t1.e),d)+e and t1.c) and (t1.a>=t1.f or (t1.a)>=t1.a) then (c)+t1.d else a end)* -t1.a then e else t1.f end | 13>=b)"
     end, {
         -- <randexpr-2.1757>
-        
+
         -- </randexpr-2.1757>
     })
 
@@ -17630,7 +17630,7 @@ test:do_test(
         return test:execsql "SELECT (abs(t1.f)/abs(11*19 | case when (e+t1.b*t1.d+(abs(case  -13+t1.d*t1.a-+coalesce((select t1.d from t1 where t1.b not between b and d and d in (select c from t1 union select d from t1)),(19)) when d then 13 else d end*t1.e)/abs(d))+f not between e and t1.a) then ( -f) else d end*a)) FROM t1 WHERE a in (select abs(max(b))-count(distinct case when d not between coalesce((select max(13) from t1 where a+a<+(19)), -f*case (select  -cast(avg(t1.c) AS integer)*cast(avg(c) AS integer)-cast(avg(13) AS integer) from t1)*coalesce((select d from t1 where (e=(f))),t1.d) when t1.a then 17 else 19 end) and d then t1.f when (19 between t1.e and  -a) then t1.a else (t1.c) end) from t1 union select max(t1.e)+~min(t1.c) from t1)"
     end, {
         -- <randexpr-2.1759>
-        
+
         -- </randexpr-2.1759>
     })
 
@@ -17670,7 +17670,7 @@ test:do_test(
         return test:execsql "SELECT +t1.d | (d)*t1.e | (select case abs((max(t1.e)-abs(+case min(a) | (~(min(~t1.c)))*(abs(abs(count(*))+count(distinct b)*count(distinct 17)))*max(c) when max(t1.c) then max(t1.d) else cast(avg(d) AS integer) end | max(t1.a))))*cast(avg(11) AS integer) when (cast(avg( -a) AS integer)) then min(19) else  -count(distinct 13) end from t1)+t1.b FROM t1 WHERE NOT (not exists(select 1 from t1 where e<t1.a))"
     end, {
         -- <randexpr-2.1763>
-        
+
         -- </randexpr-2.1763>
     })
 
@@ -17690,7 +17690,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(e) from t1 where  -(abs(~(t1.f+b))/abs(t1.f)) not in (~case 11+c*case when  -t1.d not between coalesce((select max(d) from t1 where f- -t1.f+t1.f-13-e<c),(f)) and a then t1.d else t1.a end when d then 17 else 13 end,d,c) or exists(select 1 from t1 where b<d)),13) FROM t1 WHERE (case when (t1.f<>13) or t1.a*t1.f- -a>=t1.d or d in (select  -case cast(avg(b) AS integer) when max(19) then count(distinct  -t1.f) else count(distinct f) end* -max(t1.d) from t1 union select  -cast(avg(13) AS integer) from t1) and 11 between t1.f and d then case when t1.f not between b and 13 then f else t1.e end-t1.c when t1.d in (t1.e,b,d) then t1.f else  -t1.d end-t1.d)*d*f>=a"
     end, {
         -- <randexpr-2.1765>
-        
+
         -- </randexpr-2.1765>
     })
 
@@ -17720,7 +17720,7 @@ test:do_test(
         return test:execsql "SELECT case when ~case when t1.a | case when exists(select 1 from t1 where 19 in (select (count(*))-count(*) from t1 union select  -min(b) from t1) or t1.f not in (17,11,t1.c) and t1.d in (a,19,t1.a)) then ~c | 11 else 17 end* -19 in (select count(*) from t1 union select abs( - -case ~cast(avg(t1.b) AS integer) when min(b) then max(a) else (max( -d)) end | count(*)) from t1) then t1.a else t1.c end | b in (select f from t1 union select 13 from t1) then t1.b when t1.a<>(17) then c else t1.a end FROM t1 WHERE NOT (exists(select 1 from t1 where d<>13))"
     end, {
         -- <randexpr-2.1768>
-        
+
         -- </randexpr-2.1768>
     })
 
@@ -17740,7 +17740,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select a+t1.d from t1 where t1.d+coalesce((select max(case when e not between 11 and case when (abs(f)/abs(t1.f+19*t1.b))>e then ~d when not not 17 in (13,17,t1.a) then f else t1.f end then 11 when b<17 then t1.b else f end) from t1 where exists(select 1 from t1 where (c<>c))), -f)+t1.c in (select (t1.e) from t1 union select c from t1)),c) FROM t1 WHERE not (t1.a)<=case a when t1.f then +coalesce((select max(c) from t1 where (abs(d-11)/abs(t1.a))+t1.f<=d*d*t1.a+coalesce((select 19 from t1 where (select cast(avg(f) AS integer) from t1)*t1.f+19+ -13 in ((t1.d),c,t1.a)),t1.c) or ((not exists(select 1 from t1 where 19 in (select e from t1 union select  -11 from t1))))),c) else e end"
     end, {
         -- <randexpr-2.1770>
-        
+
         -- </randexpr-2.1770>
     })
 
@@ -17770,7 +17770,7 @@ test:do_test(
         return test:execsql "SELECT (abs( -c+b)/abs(case when ~11 in (select t1.c from t1 union select coalesce((select t1.f from t1 where coalesce((select max(17) from t1 where coalesce((select case  -t1.d when t1.e then a else b end-(t1.d) from t1 where t1.a not between  -a and t1.b or t1.f<t1.e and e<=a),t1.e)*t1.d not in (b,11,t1.f)),19)<19 and not exists(select 1 from t1 where t1.f>=t1.b) and (f)>= -13),t1.b) from t1) then t1.c when t1.b<=t1.f then 13 else t1.e end)) FROM t1 WHERE NOT ((d-coalesce((select max(case 11 when +13-17 | 13 | coalesce((select t1.b from t1 where ((abs(t1.b)/abs((abs(b)/abs(+(19)))*t1.c)) | a in ( -t1.c,t1.a,t1.b))),d)* -d then 13 else 11 end) from t1 where e not in (d,11,11) or t1.e>t1.e),17)+t1.a>b))"
     end, {
         -- <randexpr-2.1773>
-        
+
         -- </randexpr-2.1773>
     })
 
@@ -17780,7 +17780,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(17) from t1 where (e* -t1.f*e*c-coalesce((select max(t1.f) from t1 where t1.c between case when e+~ -t1.e+11 in (select c from t1 union select t1.a from t1) and t1.d>=c then 19 else ( - -(t1.a)) end*c+f and t1.b),13) not in (t1.b,e,t1.c) and (11) not in (b,( -t1.b),13))),19) FROM t1 WHERE d>e+f"
     end, {
         -- <randexpr-2.1774>
-        
+
         -- </randexpr-2.1774>
     })
 
@@ -17800,7 +17800,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.b in (select case 13-(select case count(*) when count(distinct (abs(19)/abs(t1.d)))*~count(distinct 13)*(max((abs(t1.e*d*f)/abs(17)))) then  -case  - -count(distinct e) when min(19) then (cast(avg(17) AS integer)) else count(distinct t1.a) end*max(t1.b)-cast(avg(a) AS integer) else count(distinct t1.d) end from t1)+t1.b*d when t1.c+t1.a then f else t1.f end from t1 union select t1.c from t1) then t1.a when a in (select 11 from t1 union select a from t1) then a else e end FROM t1 WHERE (case when case 11+case f when e then d else (abs(e)/abs(19))*a end when 19 then b else d end<t1.d then t1.c when b>= -19 then 13 else t1.e end between 17 and t1.a or b>=17 and ((( -t1.f))>=t1.c and 17 between t1.c and 19 and t1.c between t1.d and a or t1.d=17) or c in (b,13,17))"
     end, {
         -- <randexpr-2.1776>
-        
+
         -- </randexpr-2.1776>
     })
 
@@ -17820,7 +17820,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select case when (not exists(select 1 from t1 where t1.f<>t1.f)) then case when d-t1.e*t1.d=((select (count(distinct t1.a)) from t1)) then t1.a when 13 not in ( -b,13,19) then t1.b else e end when t1.e=13 then e else 17 end-17*b from t1 where (t1.d in (d,t1.e,t1.f))),( -f)) not in (d,t1.e,c) then t1.d else  -t1.f end* -t1.b FROM t1 WHERE not exists(select 1 from t1 where 11 in (select max(coalesce((select max(case when e+coalesce((select max(d) from t1 where not a<t1.c),(a)) in (((f)),c,13) then t1.e else e end-d) from t1 where 17 between (c) and t1.c),17)) from t1 union select ( -case cast(avg(c) AS integer) when case min(11) when ( -min(e)) then min(t1.b) else min(f) end then  -min(b) else count(distinct 13) end+min(13)- - -count(*)) from t1) or 17 in (19,t1.d,(a)) and exists(select 1 from t1 where t1.e in (t1.d,e,11)))"
     end, {
         -- <randexpr-2.1778>
-        
+
         -- </randexpr-2.1778>
     })
 
@@ -17850,7 +17850,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select (abs(~c*t1.a+t1.b*coalesce((select case c when b+coalesce((select t1.b-case e when 19 then b else b end*11 from t1 where t1.b<>b or not t1.f in (11,t1.a,t1.e)),t1.a) | e then c else e end from t1 where  -t1.a<11),13))/abs(t1.b))-t1.b*17 from t1 where c=t1.c),17) FROM t1 WHERE NOT (t1.e+e>=coalesce((select max(t1.d) from t1 where +(t1.f) not between c and f),case when exists(select 1 from t1 where t1.e+t1.c<>(abs(e*(select  -count(*) from t1))/abs(t1.e*coalesce((select max((select cast(avg(13) AS integer) from t1)) from t1 where not (a) not between  -c and  -17), -d)+ -a+t1.f))) then case when e between 17 and d then a else 19 end when not c between e and 11 then 13 else t1.a end))"
     end, {
         -- <randexpr-2.1781>
-        
+
         -- </randexpr-2.1781>
     })
 
@@ -17870,7 +17870,7 @@ test:do_test(
         return test:execsql "SELECT t1.a-~17-t1.c+t1.c | (c) | (13)*coalesce((select max((case when 11 in (case when (19 in (select abs(max(c)) from t1 union select ( -cast(avg(19) AS integer)) from t1)) then 13 when t1.a= -t1.a then t1.b else c end,a,13) then t1.e when t1.b in (t1.a,13, -19) then d else t1.a end)) from t1 where t1.d between t1.d and t1.b and t1.d<=17),t1.d)*11 | t1.e FROM t1 WHERE e in (select 11 from t1 union select a from t1)"
     end, {
         -- <randexpr-2.1783>
-        
+
         -- </randexpr-2.1783>
     })
 
@@ -17900,7 +17900,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case when 11 not between t1.d and case coalesce((select case c+case when b in (case when a<=t1.b then (t1.a) when f not in (d,t1.f, -(a)) then (t1.a) else c end,t1.a,b) then 11 when (t1.c not between 17 and  -d) then t1.d else e end+e*t1.a when 19 then b else t1.e end from t1 where not exists(select 1 from t1 where not exists(select 1 from t1 where  -(19)=d))),t1.d) when c then a else  -17 end or a>=19 then 17 else b end+ -13)/abs(b)) FROM t1 WHERE not exists(select 1 from t1 where not e+case 13 when 11 then +t1.d else t1.f+11 end*a-19+t1.c+a in (~e | coalesce((select ~a*+(abs( -case case b*e when f then e else  -13 end when t1.d then t1.b else t1.b end)/abs(17))+t1.b from t1 where t1.a=e),d),e,e))"
     end, {
         -- <randexpr-2.1786>
-        
+
         -- </randexpr-2.1786>
     })
 
@@ -17920,7 +17920,7 @@ test:do_test(
         return test:execsql "SELECT t1.c-coalesce((select t1.e from t1 where not 17 | (select abs(min((t1.c) | +case 19 when d then f else t1.c end*(13)+a)- -count(*)) from t1)>t1.c and (exists(select 1 from t1 where c in (select f from t1 union select a from t1))) or t1.e>t1.c),coalesce((select e*(e) from t1 where not exists(select 1 from t1 where b not in (f,a,19))),c)) FROM t1 WHERE t1.f*t1.e*b+coalesce((select case when 17 not in (case e++t1.d+19*11 when case when 11 in (select  -min(t1.a)*min(t1.e)+cast(avg(t1.a) AS integer) from t1 union select  -count(*) from t1) then 13 else 11 end*17 then a else t1.a end,(t1.b),t1.d) then t1.f else  -b end from t1 where t1.b not between 17 and (a)),d)-t1.d-c*b<c"
     end, {
         -- <randexpr-2.1788>
-        
+
         -- </randexpr-2.1788>
     })
 
@@ -17950,7 +17950,7 @@ test:do_test(
         return test:execsql "SELECT c-coalesce((select max(case when (case t1.a when a then case f when e*e then ~c | case when +c>= -b+t1.f | 19 then t1.d else 11 end else t1.a end-t1.e else d end not between f and t1.f) then c else e end) from t1 where f>=t1.b and t1.c between t1.f and t1.a),e)*d*b FROM t1 WHERE t1.b in (select 11-case when (t1.a+19<=case when c>=(19) then 11 else t1.e+t1.a*c end*e and t1.f in (select case abs(+abs( -count(*) | count(*)*count(distinct c)+max(13))) when min(d) then min(b) else min(t1.b) end | cast(avg(t1.e) AS integer) from t1 union select count(distinct t1.e) from t1)) then t1.a else t1.f end*17 from t1 union select t1.a from t1)"
     end, {
         -- <randexpr-2.1791>
-        
+
         -- </randexpr-2.1791>
     })
 
@@ -17980,7 +17980,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select f from t1 where ~coalesce((select max(b-e) from t1 where 13 in (select d from t1 union select d from t1)),(abs(t1.f)/abs(t1.f)))-t1.d+case a when t1.b then 13 else case when 19>case a when t1.a then 13 else  -d end or e<>c then coalesce((select max(a) from t1 where t1.e not between (13) and t1.d),11) when b in (select t1.a from t1 union select t1.f from t1) then 19 else a end end-b>11),17) FROM t1 WHERE b in (select e-17 from t1 union select d from t1)"
     end, {
         -- <randexpr-2.1794>
-        
+
         -- </randexpr-2.1794>
     })
 
@@ -18000,7 +18000,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select case case when 13<>((abs(t1.b)/abs(f+t1.c))) then 11 else coalesce((select max(b) from t1 where (b=(abs((select min((select case  -min(11) when count(distinct d) then count(*) else min(t1.c) end from t1)) from t1))/abs(t1.f))-c)), -19)*e end*d* -e+t1.d when 13 then c else c end+b from t1 where d>13 or (b between t1.e and 19)),a) FROM t1 WHERE not exists(select 1 from t1 where ((not not exists(select 1 from t1 where ((case when coalesce((select max(19) from t1 where case when b>=e and f between t1.d and t1.c or ( -t1.b)=t1.f then b+a else 11 end in (d,t1.d,(17))),t1.d)>t1.b then (t1.f) else d end*e*t1.e<=t1.b)) or 13<>13)) or 17<d) and t1.f in (t1.e,d,t1.b)) and e<=a"
     end, {
         -- <randexpr-2.1796>
-        
+
         -- </randexpr-2.1796>
     })
 
@@ -18020,7 +18020,7 @@ test:do_test(
         return test:execsql "SELECT ~case when 19 not between ~case when coalesce((select max(t1.c*(select cast(avg(13) AS integer) from t1)) from t1 where exists(select 1 from t1 where case when (t1.b in (d,b,t1.c)) and 13>t1.d then e+t1.c when 19 between t1.f and t1.f then 11 else e end between t1.e and 17) and c=t1.f),t1.c) not between t1.a and (19) then c else t1.b end*a-19 and b then b when a not in (a,t1.f,11) then a else a end FROM t1 WHERE (select abs((+min(t1.c)*min(t1.d)*count(*)))*count(*)++count(distinct ~13*11+t1.f) | case abs(+count(*)) when min(t1.e) then count(*) else max(13) end from t1)*t1.b between d and a++19 and t1.c in (select ~((abs(17)/abs(c)))-d from t1 union select t1.f from t1)"
     end, {
         -- <randexpr-2.1798>
-        
+
         -- </randexpr-2.1798>
     })
 
@@ -18040,7 +18040,7 @@ test:do_test(
         return test:execsql "SELECT (t1.d)+(abs(coalesce((select ((abs(case t1.e when a+(abs(11)/abs(b)) then t1.f else case coalesce((select max(d+c) from t1 where +19+11<b),t1.d)-t1.d-t1.d*d when t1.c then  -e else t1.d end end-c)/abs(17))) from t1 where 17<>t1.c),d))/abs(t1.d))-11 | (17) | b FROM t1 WHERE (select ~min(b)+count(distinct 17) from t1)>(select max((abs((13))/abs(coalesce((select case when b*13 in (case when e=t1.b then c when 11<>e then f else t1.b end,t1.f,t1.a) then d when not exists(select 1 from t1 where t1.f<>e) then t1.a else c end from t1 where t1.e=13),t1.f) | b)))+(~~cast(avg(f) AS integer)-min((13))) from t1)"
     end, {
         -- <randexpr-2.1800>
-        
+
         -- </randexpr-2.1800>
     })
 
@@ -18070,7 +18070,7 @@ test:do_test(
         return test:execsql "SELECT d+case coalesce((select t1.f from t1 where coalesce((select max((11)) from t1 where (coalesce((select d from t1 where ((case b when ( -a) then 19 else e end)) not in ( -d,t1.c,13)),b))>t1.b and ((c in (select ~~cast(avg(t1.b) AS integer)+ -(max(t1.e)) from t1 union select max(c) from t1) and (e) in (select  -count(distinct 17) from t1 union select count(*) from t1) or 11<>t1.c))),t1.b) not between (f) and 11),t1.d) when (19) then e else 13 end-t1.f FROM t1 WHERE exists(select 1 from t1 where (t1.a between case when e | b*c-19 | a<t1.a or (19 in (select coalesce((select max(f) from t1 where e<19),t1.e-17 | t1.e) from t1 union select 13 from t1)) then coalesce((select t1.e from t1 where not exists(select 1 from t1 where 11<=19) or exists(select 1 from t1 where  -(e) between a and 19) or b between b and c),c) else f end and 19))"
     end, {
         -- <randexpr-2.1803>
-        
+
         -- </randexpr-2.1803>
     })
 
@@ -18100,7 +18100,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select c from t1 where  - -19-coalesce((select t1.e from t1 where not f<=b-17 or not  -13>=f or (select  -count(*) from t1) in (select t1.c from t1 union select 17 from t1)),b)*e not between case coalesce((select max(~case when 17>t1.e then d else 13 end) from t1 where not t1.c<=17),t1.c) when 13 then c else t1.e end+t1.c-t1.e and t1.e),t1.e) FROM t1 WHERE NOT (case ~case when not exists(select 1 from t1 where f<=~t1.d) then (abs(coalesce((select ~19 from t1 where d+t1.f=b),d))/abs(e)) when d in (select +min(11) from t1 union select ( -abs(count(distinct e)))+count(distinct t1.a) from t1) then e else t1.d end when  -d then t1.e else t1.b end=t1.f or t1.d not in (t1.c,t1.e,t1.e) and t1.c not in (17,t1.a,e))"
     end, {
         -- <randexpr-2.1806>
-        
+
         -- </randexpr-2.1806>
     })
 
@@ -18120,7 +18120,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.e<=~d then case when t1.d-e in (~t1.c-case e*case when t1.e not in (t1.d,19,f) then e else b end*e when (19) then t1.a else  -e end,19,17) then t1.f when t1.d not in (t1.b,b,17) then t1.b else 19 end when 13= -t1.f and not (19=t1.d) then t1.f else (d) end FROM t1 WHERE NOT (19<>d)"
     end, {
         -- <randexpr-2.1808>
-        
+
         -- </randexpr-2.1808>
     })
 
@@ -18130,7 +18130,7 @@ test:do_test(
         return test:execsql "SELECT (select max(case when (t1.d<=t1.a*t1.b) then t1.e else case when t1.a> -t1.c*t1.f then b else b*(a) end end)*min(+ -19-(select min(a) from t1)-+17*case when not exists(select 1 from t1 where (select abs(cast(avg(a) AS integer)) from t1)=t1.a) then e when 19>=a then 13 else t1.a end*19-e) from t1) FROM t1 WHERE t1.e in (select max(t1.e)-cast(avg(e) AS integer) from t1 union select (~+count(*) | count(*) | cast(avg((abs(coalesce((select max(case f+c-17 when t1.b then t1.e else t1.d end) from t1 where 17 in (select a from t1 union select t1.b from t1)),a))/abs( -t1.e))) AS integer)+~case count(*) when cast(avg(t1.d) AS integer) then  -cast(avg(t1.e) AS integer) else count(distinct d) end-max(13)+ -min(t1.a) | min((17)) | count(distinct d))-min(e) from t1)"
     end, {
         -- <randexpr-2.1809>
-        
+
         -- </randexpr-2.1809>
     })
 
@@ -18160,7 +18160,7 @@ test:do_test(
         return test:execsql "SELECT case when case (select max(t1.b)*min(case when (abs(t1.e)/abs(d)) in (select 19 from t1 union select +t1.d from t1) then t1.d when t1.d=d or 11 in (t1.c,b,t1.b) and 13 in (select max(b)-count(distinct b) from t1 union select count(distinct  -t1.c) from t1) then f else 17 end) from t1) when t1.a then 11 else t1.d end+t1.a>c or t1.c between 13 and a then f when (t1.b)>=t1.a then d else b end FROM t1 WHERE NOT ((not exists(select 1 from t1 where coalesce((select max(e) from t1 where  -b+a-(abs(c)/abs(b))-( -t1.a)-t1.c>=d),d) in (select count(distinct a) from t1 union select cast(avg(t1.b) AS integer) from t1) and exists(select 1 from t1 where not t1.d<>f) and t1.a in (select min(t1.a)+max(a)*max(19)*count(distinct c) from t1 union select ((count(distinct 11))) from t1) or t1.c>(13) and a between (t1.f) and 13)))"
     end, {
         -- <randexpr-2.1812>
-        
+
         -- </randexpr-2.1812>
     })
 
@@ -18170,7 +18170,7 @@ test:do_test(
         return test:execsql "SELECT f*~13*(abs(13*d- -(abs(case when ~coalesce((select max(c) from t1 where b>case when not exists(select 1 from t1 where f not in ( - -(t1.b),t1.b,t1.f)) then e when t1.c<>f then c else 13 end),17) |  -19 not in (f,b,f) then  -b when not 13 in (select max((19)) from t1 union select count(*) | count(*) from t1) and 11 not between t1.b and e or 13 in (t1.a, -e,(t1.c)) then a else 11 end)/abs(t1.c))*b | t1.b)/abs(f))*f*f FROM t1 WHERE ~case f when coalesce((select max(17) from t1 where b+t1.f*case 11 when coalesce((select max(t1.f) from t1 where 17>t1.f),19)-t1.b-t1.b | d then b else c end+t1.d*11-t1.c<=case when b>=a then 19 else f end | t1.a),13) then f else t1.e end*t1.e*17-d in (select 13 from t1 union select t1.e from t1)"
     end, {
         -- <randexpr-2.1813>
-        
+
         -- </randexpr-2.1813>
     })
 
@@ -18210,7 +18210,7 @@ test:do_test(
         return test:execsql "SELECT t1.b | (select case max( -17)-min(17) when cast(avg(a) AS integer)*(+cast(avg(f) AS integer)-cast(avg(case when not exists(select 1 from t1 where not case when t1.c<>t1.b or  -d not between b and a then 11 when (11)=11 then b else t1.b end in (t1.d,t1.c,13)) then 13 when t1.e not between 17 and t1.b then t1.c else t1.d end*t1.b) AS integer))-cast(avg(19) AS integer)*~max(t1.c)-((max(13)))*(count(*))+(max(11)) then count(distinct 13) else cast(avg(17) AS integer) end from t1) FROM t1 WHERE NOT ((abs(t1.c)/abs(case t1.d when t1.f then 13 else t1.f+13 end)) not between c and 19)"
     end, {
         -- <randexpr-2.1817>
-        
+
         -- </randexpr-2.1817>
     })
 
@@ -18240,7 +18240,7 @@ test:do_test(
         return test:execsql "SELECT case +c-case (select case count(distinct 13) when min(19*e) then ~count(*) else ~min(case when not +13*(case when e*c>=e then e else f end)-a+c not in (b,t1.b,t1.e) then 19 else 17 end*a) end from t1) when 11 then 11 else c end+t1.c when t1.b then d else 19 end FROM t1 WHERE NOT (t1.a<>~coalesce((select max(e) from t1 where 13-17*13<>19*17-f or coalesce((select max(~case +t1.d-f*e | c+(17)+a | c*((b)) when a then t1.a else d end-d) from t1 where t1.c>= -t1.a),t1.b) | 19>t1.a),c))"
     end, {
         -- <randexpr-2.1820>
-        
+
         -- </randexpr-2.1820>
     })
 
@@ -18250,7 +18250,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.d) from t1 where f between case when (19 not in (t1.b,(a),t1.a)) or t1.a=t1.b |  -(select +cast(avg(17-case when  -c<=17 then a when  -11 not in (11,19,a) then e else 11 end-t1.a*d) AS integer) from t1) then t1.b when (11)*f in (13,t1.a,a) or t1.a<t1.d then b*t1.f else a end and  -11), -b) FROM t1 WHERE (f-b<case case (a) when a then 19+coalesce((select t1.a from t1 where 11 between +coalesce((select max(case when t1.b not in (t1.f,f,t1.b) and a in (select 11 from t1 union select c from t1) then ~(t1.e) else 13 end) from t1 where t1.c>=e),f)*b-f and t1.f),t1.b) else d end+19 when t1.a then 11 else e end-t1.a)"
     end, {
         -- <randexpr-2.1821>
-        
+
         -- </randexpr-2.1821>
     })
 
@@ -18290,7 +18290,7 @@ test:do_test(
         return test:execsql "SELECT case when not  -t1.c in (coalesce((select d from t1 where t1.a not in (t1.c+f, -f,19) and t1.b in (select max(t1.d)+min(19)*min(t1.e) from t1 union select count(distinct d) from t1) and (t1.d) in (select  -count(*) from t1 union select  -count(*) from t1)),d* -t1.e),b,f) or  -c not in (a, -t1.a,t1.e) then case when b between 17 and t1.b and a not in (t1.a,e,t1.e) then t1.d else 19 end*t1.b else t1.d end+t1.d FROM t1 WHERE NOT ((abs((17))/abs(11 | e*e+d++t1.d)) in (19+t1.f,e,(abs(13)/abs( -t1.c))))"
     end, {
         -- <randexpr-2.1825>
-        
+
         -- </randexpr-2.1825>
     })
 
@@ -18310,7 +18310,7 @@ test:do_test(
         return test:execsql "SELECT case when ( -(select ~ -~ -(max(c))-min(t1.e) | count(distinct (11)) | min(t1.a) from t1)-case when case d when a then case when t1.e=t1.a then t1.c else c end else c end<=t1.f then t1.b when t1.c not in (a,19,c) then b else 17 end>=19) or d in (19,f, -11) then 19 else (select case min(t1.a)-(cast(avg(t1.f) AS integer))-(min(11)) when count(*) then count(*) else count(distinct a) end from t1) end FROM t1 WHERE NOT (not exists(select 1 from t1 where (abs(11-13)/abs(f))>19*~19+t1.d-t1.f+coalesce((select max(f) from t1 where t1.a-t1.e+case when case when a not between t1.c and 19 and  -t1.e>t1.c then case when t1.f in (t1.d,e,t1.f) then d when c not in (11,t1.c,d) then t1.a else a end when t1.b=11 then t1.c else t1.e end>e then e else e end-11<t1.f),c)- -c-17) or 19<>t1.f)"
     end, {
         -- <randexpr-2.1827>
-        
+
         -- </randexpr-2.1827>
     })
 
@@ -18330,7 +18330,7 @@ test:do_test(
         return test:execsql "SELECT t1.e | t1.a*~(17)-t1.c*f*f-coalesce((select max( -t1.a+coalesce((select t1.a from t1 where 19 not between 17 and f),(t1.b))*c+11) from t1 where 19 in (select  -cast(avg(f) AS integer)-cast(avg(a) AS integer)*count(distinct d) from t1 union select count(*) from t1) and t1.d in (17,t1.d, -t1.c) or 19<>19),a)*11 FROM t1 WHERE not +19+coalesce((select  -19 from t1 where t1.c | e in (select ~ -abs(case ~abs(+(count(distinct 17) | case ~(max(t1.a))+(+~ -min(17)) when abs(min(t1.c)) then count(distinct 17) else  -cast(avg(t1.e) AS integer) end)*cast(avg(c) AS integer)*cast(avg(t1.b) AS integer)) when count(distinct t1.d) then min(b) else  -cast(avg(d) AS integer) end) from t1 union select count(*) from t1)),13)>13"
     end, {
         -- <randexpr-2.1829>
-        
+
         -- </randexpr-2.1829>
     })
 
@@ -18370,7 +18370,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.a<(abs((abs(13)/abs(case t1.e+11*17*case +case case when ~19>=t1.c then f when f not in (a,e,d) then 19 else b end when 19 then 19 else b end |  -c when c then t1.c else c end*d-t1.e when e then 13 else c end)))/abs(t1.b)) then 17 when t1.b not in (t1.a,13,e) then e else  -t1.c end FROM t1 WHERE NOT (19>=11)"
     end, {
         -- <randexpr-2.1833>
-        
+
         -- </randexpr-2.1833>
     })
 
@@ -18400,7 +18400,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select (select count(*)-+count(*) from t1) from t1 where +t1.f+t1.f<~case when exists(select 1 from t1 where coalesce((select t1.a from t1 where b-19<t1.f),11) in (case when  -(select count(distinct t1.a) from t1)-c-t1.d between b and (d) then d else t1.e end,f,c)) then t1.b when t1.e<>(11) then d else (c) end+e+t1.d),c) FROM t1 WHERE NOT (case when t1.f+(select min(t1.c+(abs(13+(abs(t1.e+d-11-e+d+c)/abs(t1.e))-c*t1.f)/abs(t1.b))) from t1)+f=d or t1.b not between t1.e and t1.a then 11-a when (13 in (13,19,19)) then t1.d else t1.b end<t1.f)"
     end, {
         -- <randexpr-2.1836>
-        
+
         -- </randexpr-2.1836>
     })
 
@@ -18410,7 +18410,7 @@ test:do_test(
         return test:execsql "SELECT case when not exists(select 1 from t1 where not exists(select 1 from t1 where (case when (abs(a)/abs(t1.f))<a then t1.a when t1.b not in (11,t1.f,(c+d*t1.d)+t1.b+d-t1.a+e) then e else e end<=d))) then (select ~max(13) from t1) when 13 not between coalesce((select max(t1.a) from t1 where not exists(select 1 from t1 where 13>=t1.b)),((d))) and t1.c then 19 else 13 end FROM t1 WHERE d*a in (case when 19>t1.e then c | (select +~count(distinct t1.b)-++abs(min(11)+ -~min(t1.b)+ -(max(t1.d))-min(t1.b)-count(distinct t1.f)) | max(f) from t1) else a+t1.c end,t1.a+case 19 when (11*a)*t1.c then d else a end*t1.a-d,f)"
     end, {
         -- <randexpr-2.1837>
-        
+
         -- </randexpr-2.1837>
     })
 
@@ -18430,7 +18430,7 @@ test:do_test(
         return test:execsql "SELECT case when b<= -coalesce((select max(t1.b+t1.c+a*a-t1.c-e) from t1 where not 11>e or c<=17 and b<=b), -t1.d)+13 and 17 not between a and c and not exists(select 1 from t1 where f not between t1.d and t1.e and t1.d between 13 and  -t1.a) then t1.b when e not in (a,t1.f, -t1.d) then t1.c else e end FROM t1 WHERE not coalesce((select max((c)) from t1 where d* -coalesce((select max(coalesce((select t1.d from t1 where (d<=d)),d)) from t1 where (abs(case 11 when (select  -+count(distinct 13)*min(c) | count(*) from t1) then 11 else case when (19 between (19) and 17 or t1.c in (c,19,d)) then c when  -t1.e>=c then c else c end end*11)/abs((13))) not in (17, -t1.e, -t1.e)),t1.e)=17),t1.c) between 13 and t1.f"
     end, {
         -- <randexpr-2.1839>
-        
+
         -- </randexpr-2.1839>
     })
 
@@ -18450,7 +18450,7 @@ test:do_test(
         return test:execsql "SELECT 17 |  -(case when (a) not between 11 and case (abs(~(abs(13-case (abs(17)/abs(19+e | t1.e)) when (t1.d) then  -(t1.c) else t1.f end+t1.f*t1.c)/abs(a)))/abs(17)) when 19 then d else t1.d end then 17 when not exists(select 1 from t1 where t1.e not in (t1.b,t1.b,b) or a between a and 17) then 11 else b end) | t1.e FROM t1 WHERE 17>=e"
     end, {
         -- <randexpr-2.1841>
-        
+
         -- </randexpr-2.1841>
     })
 
@@ -18490,7 +18490,7 @@ test:do_test(
         return test:execsql "SELECT (abs(11 | t1.e)/abs(case 13 when 17*+t1.a+d*+d then ~ -17*+ - -case f when b then a-b else t1.d end-f+t1.f+17 else t1.a end)) FROM t1 WHERE NOT (t1.f<>17)"
     end, {
         -- <randexpr-2.1845>
-        
+
         -- </randexpr-2.1845>
     })
 
@@ -18520,7 +18520,7 @@ test:do_test(
         return test:execsql "SELECT case when not coalesce((select max(case 11 when case d when coalesce((select f from t1 where case when (t1.d) | case 11 when t1.d then 11 else (t1.a) end | t1.b in (e,c,(11)) then 17 when c between e and f then t1.e else t1.a end>t1.e),t1.d) then 13 else c end then c else c end) from t1 where t1.e not between (a) and (t1.d)),c) not in ((11),((19)),a) then (t1.c) else (c) end FROM t1 WHERE NOT (t1.d-t1.c>=13)"
     end, {
         -- <randexpr-2.1848>
-        
+
         -- </randexpr-2.1848>
     })
 
@@ -18540,7 +18540,7 @@ test:do_test(
         return test:execsql "SELECT (select case count(distinct ~case when (abs(coalesce((select t1.e from t1 where (not exists(select 1 from t1 where a | e between c and coalesce((select (t1.d) from t1 where (t1.a=t1.a)), -(c))))),b+19))/abs(d))>11 then b else t1.d end) when count(distinct 17) then ~min((t1.d))-case  -(case  -cast(avg(t1.b) AS integer) when  -max(13) then (min(t1.d)) else count(distinct t1.b) end+(min(t1.e)))*(cast(avg( -17) AS integer)) when  -count(distinct 19) then count(*) else max(t1.c) end else count(distinct f) end from t1) FROM t1 WHERE t1.e=t1.d"
     end, {
         -- <randexpr-2.1850>
-        
+
         -- </randexpr-2.1850>
     })
 
@@ -18580,7 +18580,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.d<>t1.a and a-t1.b-c in (13,t1.e-(abs(d)/abs(coalesce((select max(e) from t1 where 19 not between  -b and 17),b))),t1.b) or (not exists(select 1 from t1 where t1.f not between  -17 and a)) then case when e>t1.e then t1.d when t1.c<d or (19<=13) then (13) else b end+t1.e when c<=a then t1.d else f end+17 FROM t1 WHERE NOT ((t1.d)-case when not exists(select 1 from t1 where c<>f-11 and not not b<coalesce((select max(a) from t1 where (select cast(avg(case t1.a*19 when (select abs(cast(avg(c) AS integer)+(count(*))) from t1) | t1.f+11* -b then ((e)) else t1.a end) AS integer) from t1)-t1.f in (a,a,e)),19)) then 13*e else t1.b end not between 13 and t1.c)"
     end, {
         -- <randexpr-2.1854>
-        
+
         -- </randexpr-2.1854>
     })
 
@@ -18590,7 +18590,7 @@ test:do_test(
         return test:execsql "SELECT ~case 17 when t1.c then coalesce((select max((case when not exists(select 1 from t1 where 11<>coalesce((select d from t1 where not exists(select 1 from t1 where c*b in (t1.b*t1.d,t1.c,b) or c between d and a)),19)-t1.c*e) then coalesce((select f from t1 where 11 in (select c from t1 union select b from t1)),(c)) when 17<>t1.b then d else 19 end)) from t1 where f in (a,t1.f,t1.d)),(19)) else t1.e end FROM t1 WHERE not not exists(select 1 from t1 where (select abs(min(19-19))*count(*) | min(13)*min((a))+cast(avg(t1.e) AS integer)+(cast(avg(19) AS integer)) from t1) in (17,+(select min(b) from t1),(select cast(avg(f) AS integer) from t1)) and 11 in (select ( -(min(c))) from t1 union select (min(13)) from t1)) or t1.d between c and  -(f) or not t1.c in (select min(e) from t1 union select  -(max(e)) from t1) and t1.e in (t1.f,a,11) and f not between a and 17 and 19<=17 and 13 not in (b,t1.b,13)"
     end, {
         -- <randexpr-2.1855>
-        
+
         -- </randexpr-2.1855>
     })
 
@@ -18620,7 +18620,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select +f+coalesce((select case when b- -f*t1.d-t1.a>d and t1.e in (select b from t1 union select t1.d from t1) then 11 else  -a end from t1 where (not (t1.f) not between 13 and t1.f)),11) from t1 where t1.c<=c and (d) between 11 and t1.b or b in (select d from t1 union select t1.e from t1) and 19<>t1.e or 19 not between a and a),19) FROM t1 WHERE NOT (t1.e<>(select cast(avg((b)*(select abs( -max(t1.f)) from t1)) AS integer) from t1))"
     end, {
         -- <randexpr-2.1858>
-        
+
         -- </randexpr-2.1858>
     })
 
@@ -18630,7 +18630,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(coalesce((select (t1.f) from t1 where f in (select t1.f+(select case count(distinct 19) when count(*) then max(t1.d) else  -count(*) end from t1) from t1 union select 13 from t1)),c)) from t1 where not exists(select 1 from t1 where coalesce((select (select +count(*) | ~(~ -count(distinct  -13)) from t1) from t1 where case when d*~f-13<>((d)) then 19 else t1.a end not between d and t1.e),t1.f) | t1.d in (select t1.d from t1 union select t1.d from t1))),13) FROM t1 WHERE b= -~case f-t1.a | ~case coalesce((select max(t1.b) from t1 where b>t1.e or t1.d=17-(abs(coalesce((select 17 from t1 where 17 between c and c),a)-c+a)/abs(t1.f))-c and d not in (17,19,c)),c) when 11 then e else t1.d end | t1.c-d when t1.c then c else e end | a"
     end, {
         -- <randexpr-2.1859>
-        
+
         -- </randexpr-2.1859>
     })
 
@@ -18660,7 +18660,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(( -17-case when t1.c-13<+11 | (t1.a)-e then 13*t1.a when coalesce((select 11 from t1 where t1.a>t1.c),17)+f+t1.a not between 13 and e then t1.f else c end)) from t1 where exists(select 1 from t1 where (19>=t1.f)) and f in (select max(13) from t1 union select count(*) from t1) and (19)>=t1.f),d) FROM t1 WHERE t1.f in (select 19 from t1 union select  -17*11+t1.d from t1)"
     end, {
         -- <randexpr-2.1862>
-        
+
         -- </randexpr-2.1862>
     })
 
@@ -18690,7 +18690,7 @@ test:do_test(
         return test:execsql "SELECT (t1.a)+c*case when not b in (select 11 from t1 union select 13 from t1) and a=case when not exists(select 1 from t1 where exists(select 1 from t1 where ~+( -(17)) | t1.d>=b)) then case t1.d when c then 19 else t1.c end*a else d end-a then e when b not between f and d and t1.b>=11 or not (t1.e>=b) and 11<=17 then 13 else t1.d end FROM t1 WHERE b in (e | 19,t1.c,case 17 when 19 then +(case when 19> -coalesce((select max(a) from t1 where t1.a not in (case e when t1.d then (c)-c else 11 end | (11)-c*t1.f,e,t1.f)),13) then t1.e else t1.e end)*e else 13 end-19+ - -t1.d* -b) or  -t1.e>b"
     end, {
         -- <randexpr-2.1865>
-        
+
         -- </randexpr-2.1865>
     })
 
@@ -18720,7 +18720,7 @@ test:do_test(
         return test:execsql "SELECT case when b | case when 13 between ~coalesce((select 19 from t1 where b in (select max(a*17) from t1 union select cast(avg( -19) AS integer)+abs(cast(avg(a) AS integer)) from t1)),17) and 11 then a when not exists(select 1 from t1 where not exists(select 1 from t1 where 19<=e)) and d in (select 17 from t1 union select 17 from t1) then  -b else a end-a in (select max(t1.c) from t1 union select min(e) | count(*)+count(*) from t1) then t1.b when not (not 19<=t1.b) then 13 else a end-b FROM t1 WHERE +~+13>=t1.c"
     end, {
         -- <randexpr-2.1868>
-        
+
         -- </randexpr-2.1868>
     })
 
@@ -18750,7 +18750,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select case when t1.d in (select min(f) from t1 union select ~ -count(*) from t1) then d else 13 end from t1 where 19<=case when 13>=+17-c+(select count(*)-min(11) from t1)+t1.f*t1.e*c*t1.d then c else t1.b end),t1.c | +t1.e) FROM t1 WHERE a between (abs(coalesce((select max(case when (t1.d+a*coalesce((select d-13 from t1 where a<=19),t1.f))>= -c then c else 13 end) from t1 where f>=d or t1.a>t1.d),t1.a))/abs(t1.f)) and 19 and 13=t1.e and not exists(select 1 from t1 where 13 in (select  -( -count(distinct (a))) |  -cast(avg(t1.c) AS integer) from t1 union select (min(t1.c)) from t1) or t1.f not between t1.c and t1.c)"
     end, {
         -- <randexpr-2.1871>
-        
+
         -- </randexpr-2.1871>
     })
 
@@ -18790,7 +18790,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(f) from t1 where coalesce((select max(+(select cast(avg(t1.d) AS integer) from t1)*19) from t1 where (abs(t1.d*t1.c)/abs(f))+t1.e> -t1.d*t1.e-a),13-case +coalesce((select max(t1.c) from t1 where d<=d and  - -t1.a<=(t1.f) or f<>19 and 17<19),(t1.c)) | c*t1.f*b when t1.a then 19 else (b) end)>=a),t1.f) FROM t1 WHERE NOT ((~c-13*case when case when a+19-c in (select case count(distinct c)-case cast(avg(t1.a) AS integer) when max( -b) then cast(avg(t1.f) AS integer) else cast(avg((t1.d)) AS integer) end when min(b) then cast(avg(b) AS integer) else count(*) end from t1 union select max(t1.f) from t1) and 17 between (t1.b) and c and 19>t1.d or 19 in (t1.f,t1.a,(b)) then a else t1.e end in (13,t1.a,b) then 17 else t1.e end*t1.d+a+t1.b+t1.f)<t1.d)"
     end, {
         -- <randexpr-2.1875>
-        
+
         -- </randexpr-2.1875>
     })
 
@@ -18820,7 +18820,7 @@ test:do_test(
         return test:execsql "SELECT a | t1.c-case t1.b when case when f< -(c*case when f<13 then t1.e | 13-coalesce((select max( -13+13+t1.a) from t1 where not exists(select 1 from t1 where 17=11)),19) else a end+t1.e*t1.d)+11+(13) then t1.f when not t1.f> -b then a else f end then t1.e else f end FROM t1 WHERE NOT (t1.f-~coalesce((select 17 from t1 where (e+ -case when (d<coalesce((select max(a) from t1 where a | a<t1.a and t1.c<=17 or t1.d not between a and b),13)) then 17*t1.d else t1.f end in (select ~~~cast(avg(f) AS integer)*max(t1.c)-count(distinct t1.e)-( -min(t1.f))+( -count(*)) from t1 union select max(a) from t1))),13)*t1.c-t1.d not between 17 and d)"
     end, {
         -- <randexpr-2.1878>
-        
+
         -- </randexpr-2.1878>
     })
 
@@ -18840,7 +18840,7 @@ test:do_test(
         return test:execsql "SELECT  -(17-case (select max(a)+min( -(abs(t1.c-t1.a | t1.e- -t1.b+19*t1.c)/abs(c)))+ -case min(a) when count(distinct  -a) then count(distinct 19) else count(*) end-count(distinct t1.e)*(max(t1.a))-(count(distinct 19)) from t1) when (select count(*) from t1) then b else t1.d end*11)-11* -c FROM t1 WHERE f between (case case when +(f) in (select t1.f from t1 union select case when t1.b in ((abs(19)/abs(11)),f,c) and (d) in (select  -count(distinct b)*count(*) from t1 union select count(distinct  -13) from t1) or (t1.e>19) then case when f in (11,11,d) then t1.e when t1.a<=19 then a else e end else  -t1.e end from t1) then e when t1.c=t1.b then 19 else e end when f then 19 else c end) | d-c and a"
     end, {
         -- <randexpr-2.1880>
-        
+
         -- </randexpr-2.1880>
     })
 
@@ -18880,7 +18880,7 @@ test:do_test(
         return test:execsql "SELECT (case coalesce((select +a from t1 where exists(select 1 from t1 where t1.e not between t1.f-b and (select count(*) from t1)-t1.f | e)),t1.d+case when t1.b not between t1.d and 17+case when a in (t1.d,a,(abs(~case when (t1.f)<=t1.c then  -17 else t1.f end)/abs(19))*d*t1.d) then (b) else a end then 11 else f end+(t1.a)) when f then 17 else t1.e end) FROM t1 WHERE NOT (a-e*case t1.d+case c when (abs(~t1.d*(select min(case when not exists(select 1 from t1 where ((d)+(19) between 11 and 19)) then 11+13 when e not in (t1.f,17,e) and t1.c<>a then t1.e else 19 end*t1.a-f) from t1))/abs(b)) then 13 else 17 end when t1.f then (f) else t1.c end<b and 19 between t1.a and t1.a or d<f)"
     end, {
         -- <randexpr-2.1884>
-        
+
         -- </randexpr-2.1884>
     })
 
@@ -18910,7 +18910,7 @@ test:do_test(
         return test:execsql "SELECT  -19 | t1.c*coalesce((select max(+(select cast(avg(case when  -e+t1.d in (select t1.e*a from t1 union select a from t1) then t1.b when 17 in (select t1.a from t1 union select 11 from t1) then 19 else 11 end-19+a+t1.f) AS integer)+count(distinct t1.a) from t1)+(t1.b)) from t1 where (19) not in (17,d,a)),t1.a)*t1.b*19* -11 FROM t1 WHERE NOT (case t1.e when f then (select ~count(distinct a) | abs((count(distinct d*f+d+t1.b+17+~t1.f))) from t1) else coalesce((select e from t1 where t1.f not between 17+t1.f+19 and (abs(f)/abs(t1.f))*~t1.b*(b)),coalesce((select t1.b from t1 where 19 in (select count(distinct (t1.d)) from t1 union select  -count(distinct a) from t1)),19)) | 17 end not between t1.c and t1.c)"
     end, {
         -- <randexpr-2.1887>
-        
+
         -- </randexpr-2.1887>
     })
 
@@ -18930,7 +18930,7 @@ test:do_test(
         return test:execsql "SELECT (abs(b)/abs((select max(c) from t1)))+case when (select +cast(avg(17 | ~coalesce((select e from t1 where t1.b>(13) |  -11 and c>f),19)+t1.c) AS integer)-(~case cast(avg(t1.f) AS integer)*abs(max(b)+(count(*))+count(distinct b)) when min(c) then cast(avg(t1.b) AS integer) else count(*) end) from t1) in (select t1.e from t1 union select t1.c from t1) then f when d<t1.e then t1.e else 19 end FROM t1 WHERE not ( -a*(select case min(coalesce((select max(a) from t1 where case when 11 between t1.c and d then c when t1.c not in (t1.a,e,t1.c) then d else 13 end*d>=(c)),b)) when max(d) then ( -max(c))+((min(11)))+max(t1.c) else max(t1.a) end from t1)-e+t1.b-(b)-11-t1.d*t1.c<>t1.c)"
     end, {
         -- <randexpr-2.1889>
-        
+
         -- </randexpr-2.1889>
     })
 
@@ -18970,7 +18970,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(case 13 when +coalesce((select max(c) from t1 where t1.a+f in (t1.b,t1.b,(abs(19)/abs(+17+~(abs(t1.a+f)/abs(~t1.c))+case when not exists(select 1 from t1 where coalesce((select max(e) from t1 where (b)> -t1.a),c)=t1.b) then 19 else b end))-f)),t1.a)+a then f else 17 end*t1.e) from t1 where 13<>t1.f),t1.f) FROM t1 WHERE NOT (not exists(select 1 from t1 where coalesce((select max(case when 13 not in (t1.b,b,t1.c) then t1.c | t1.a else 13-19+a+t1.e-t1.e end+t1.a*17+( -d)-17 | t1.c-t1.a | 19+b) from t1 where not a=e),11) in (select 17 from t1 union select c from t1) or t1.c>=t1.e))"
     end, {
         -- <randexpr-2.1893>
-        
+
         -- </randexpr-2.1893>
     })
 
@@ -18990,7 +18990,7 @@ test:do_test(
         return test:execsql "SELECT t1.f++c*coalesce((select +t1.f from t1 where a<~13),case when exists(select 1 from t1 where not exists(select 1 from t1 where 17 in (select 11 from t1 union select (17) from t1))) then b else + -19 | coalesce((select case when (select cast(avg(a) AS integer) from t1)>e then case when (11=(e) and 17<f) then (e)+ -c else e end else c end from t1 where 13 not in (f,t1.b,e)),t1.d) end*t1.c) FROM t1 WHERE NOT (not exists(select 1 from t1 where exists(select 1 from t1 where t1.e=+(abs((coalesce((select max( -a | case when coalesce((select c from t1 where not 17 not between t1.e and t1.b),e)-(a) not between t1.e and t1.b then f when c>=t1.a then  -c else 19 end-f) from t1 where not exists(select 1 from t1 where d in (select  -~count(distinct 11)+max(t1.a) from t1 union select count(distinct e)* -count(distinct t1.b) from t1)) or (c<t1.c)),t1.f)))/abs(t1.c)))))"
     end, {
         -- <randexpr-2.1895>
-        
+
         -- </randexpr-2.1895>
     })
 
@@ -19010,7 +19010,7 @@ test:do_test(
         return test:execsql "SELECT (select + -min(case when case when exists(select 1 from t1 where a<=c or coalesce((select max(11) from t1 where d=17),19)*11<=f and t1.e in (select t1.c from t1 union select a from t1)) then (f)-d when a<t1.a then t1.b else a end in (select ~( -min(f)) from t1 union select case  -max(t1.d)-count(distinct t1.c) when min(f) then cast(avg( -e) AS integer) else ( -count(distinct 17)) end from t1) then d when t1.f>=t1.c then f else t1.f end-f) from t1) FROM t1 WHERE (~ -t1.c in (select d from t1 union select t1.c*case when (17 in (+case c when t1.f then t1.c else c+e+t1.c*e+coalesce((select max((c)) from t1 where (t1.e)>a),19)-t1.e end | e-t1.b,t1.d,c)) then d when t1.e in (select (max( -e)-~~count(*)) from t1 union select count(*) from t1) then d else t1.f end from t1))"
     end, {
         -- <randexpr-2.1897>
-        
+
         -- </randexpr-2.1897>
     })
 
@@ -19040,7 +19040,7 @@ test:do_test(
         return test:execsql "SELECT ~+t1.f-coalesce((select t1.f from t1 where case when t1.d>=t1.f then b else case c when 11 then t1.f*case when (select (count(*)) from t1)<>a+t1.b | +11-coalesce((select max(t1.f-a) from t1 where (f<=t1.c and t1.d=c)),d)-11 then b when (t1.c)<=t1.b then 19 else 11 end else c end end*19-13< - -b),e) FROM t1 WHERE NOT ((exists(select 1 from t1 where  -t1.f not between ~17 and t1.a+(b+d+13))))"
     end, {
         -- <randexpr-2.1900>
-        
+
         -- </randexpr-2.1900>
     })
 
@@ -19060,7 +19060,7 @@ test:do_test(
         return test:execsql "SELECT  -t1.e+coalesce((select (d) from t1 where t1.f=t1.f*(select +count(distinct case when (coalesce((select max(case when a in (select b+17 from t1 union select  -17 from t1) then 19 when 17<c then t1.b else c end | t1.e) from t1 where exists(select 1 from t1 where  -e in (t1.b,t1.d,c) and f not between t1.f and b) and 17<>a),e)<>f or d not between (e) and b) then 11 else (abs(13)/abs( -(d))) end*t1.c) from t1)),e-f) FROM t1 WHERE ((case when t1.e+d*~coalesce((select coalesce((select max(b) from t1 where ~case when t1.f not between t1.c and coalesce((select t1.b from t1 where  -t1.e in (select (( - -min(19))) from t1 union select count(distinct t1.d) from t1)),t1.d) then c when t1.f=e then t1.f else b end=13),13) from t1 where t1.e not between 13 and 11 or not exists(select 1 from t1 where t1.a not between (11) and d and 11>=a)),t1.f) in (select count(*) from t1 union select ~max( -13) from t1) then  -13 else 17 end) | d in (a,d,13))"
     end, {
         -- <randexpr-2.1902>
-        
+
         -- </randexpr-2.1902>
     })
 
@@ -19100,7 +19100,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max((19)) from t1 where d* -a<=(select count(*) from t1)+19*19*a-e-d or b in (t1.c+ -t1.b,t1.a,b+t1.b)),d) FROM t1 WHERE NOT (exists(select 1 from t1 where exists(select 1 from t1 where not t1.e>e)))"
     end, {
         -- <randexpr-2.1906>
-        
+
         -- </randexpr-2.1906>
     })
 
@@ -19120,7 +19120,7 @@ test:do_test(
         return test:execsql "SELECT (select  -~count(distinct (abs(11)/abs(f-17-+(select cast(avg(+(select count(*) from t1)) AS integer) from t1)))) from t1) FROM t1 WHERE NOT ((abs((a))/abs(t1.b))>(select count(distinct case case when 17 in (select  -b-case when 17 in (select +(( - -max(t1.b))) from t1 union select max((t1.b)) from t1) then f when t1.e=(t1.d) then 17 else e end | e-t1.d | t1.c* -13*d*t1.b from t1 union select 11 from t1) then c when c>=a then 13 else 13 end+t1.b when  -f then 19 else 13 end)*min(t1.f) from t1)-19-f)"
     end, {
         -- <randexpr-2.1908>
-        
+
         -- </randexpr-2.1908>
     })
 
@@ -19140,7 +19140,7 @@ test:do_test(
         return test:execsql "SELECT  -(select cast(avg(coalesce((select max(f) from t1 where  -case coalesce((select max(~c-case when exists(select 1 from t1 where  -b in (~e,t1.e,t1.e)) then t1.e when (17 in (select ++ -(count(distinct t1.a)) from t1 union select (max( -f)) from t1)) then b else t1.f end) from t1 where (13 in (19,b,11))),t1.e) when c then (b) else 11 end-a*b*13=t1.e),13)) AS integer) from t1) FROM t1 WHERE NOT (exists(select 1 from t1 where case when not (case when ~17*d>=b then a when c*(abs((abs(f)/abs(t1.c)))/abs(t1.b))+d*t1.b<19 and not case 13 when a then 11 else  -t1.e end<>f then 11 else c end+t1.d) not in (t1.c,t1.f,d) then (abs(c)/abs(t1.f)) else t1.a end*t1.f not between t1.d and c))"
     end, {
         -- <randexpr-2.1910>
-        
+
         -- </randexpr-2.1910>
     })
 
@@ -19150,7 +19150,7 @@ test:do_test(
         return test:execsql "SELECT case t1.c when (select abs( -max(t1.a*t1.f*t1.a*e)) from t1)*case when not exists(select 1 from t1 where (select cast(avg(c) AS integer) from t1) in (select case case when ( -case t1.f when 17 then t1.c else e end=17) then 19 else e end when e then c else  -a end*t1.d from t1 union select d from t1)) then e*t1.a else b end+e*t1.d+t1.b then t1.d else c end+t1.e FROM t1 WHERE 13 in (select +abs(case count(distinct t1.e+(abs((abs(coalesce((select t1.b from t1 where coalesce((select max(case when (19<=t1.d) then (13) when a>=13 then 13 else t1.f end) from t1 where a in (t1.c,19,t1.b)),19)>13),d))/abs(f))+t1.a*t1.b)/abs(e))) when +cast(avg(c) AS integer) then ~~+max(f) | cast(avg(t1.c) AS integer) else count(distinct 13)+min(t1.b) | count(*) end)*max(t1.d)-count(*) from t1 union select count(*) from t1)"
     end, {
         -- <randexpr-2.1911>
-        
+
         -- </randexpr-2.1911>
     })
 
@@ -19180,7 +19180,7 @@ test:do_test(
         return test:execsql "SELECT case when f in (d, -case when (case 11 when (select max(t1.d) from t1) then (abs(a)/abs(+t1.b)) else ~b end<19) then (abs( -(abs(17)/abs(t1.f)))/abs((select count(*) from t1))) when (f) not between coalesce((select 13 from t1 where t1.a<=case t1.a when 13 then  -t1.c else 13 end and 13 not between t1.f and 11),11) and 19 then e else b end,t1.d) then b else t1.b end FROM t1 WHERE NOT (t1.f between f and a-c-t1.d-t1.d+t1.d*case when exists(select 1 from t1 where d between (select ~cast(avg(17) AS integer) from t1) and a) then case when case b when f then 13 else b end<c then t1.d when (t1.a) in (select  -( -b) from t1 union select  -t1.f from t1) and f not in (t1.b,t1.d,t1.a) then  -d else (13) end when d in (c,((t1.d)),c) then b else 19 end and exists(select 1 from t1 where not t1.a=17))"
     end, {
         -- <randexpr-2.1914>
-        
+
         -- </randexpr-2.1914>
     })
 
@@ -19200,7 +19200,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case when 11<=case 17 when t1.d then t1.b+~19-~case when not t1.b not in (t1.a,b,coalesce((select a+(a) from t1 where t1.b>19),t1.b)) or ((t1.a>19)) or e<>19 then  -t1.e else  -13 end-b+t1.d else a end then 19 when d between b and t1.c then t1.e else e end)/abs(t1.a)) FROM t1 WHERE NOT (b | t1.b>b-case when a-f in (select 17 from t1 union select coalesce((select coalesce((select t1.e+t1.a+d+d from t1 where 13 not between t1.e+19 and 13),(select count(distinct t1.e) from t1)*11) from t1 where b not in (b,(t1.f),t1.a)),13) from t1) then b else c end+a-13-13*(13) | 11)"
     end, {
         -- <randexpr-2.1916>
-        
+
         -- </randexpr-2.1916>
     })
 
@@ -19220,7 +19220,7 @@ test:do_test(
         return test:execsql "SELECT  -t1.a | coalesce((select t1.f*(select min(f)+min(( -(select  -case (min(13)) when  -abs(min(t1.b)) then count(distinct a) else count(*) end from t1)*(select  - -count(*) from t1)))* -count(*) from t1) from t1 where t1.d in (select case case when t1.a<(f) then c else 19 end when f then b else  -c end*a*t1.c from t1 union select t1.b from t1)),b) | a FROM t1 WHERE NOT (+19*case when exists(select 1 from t1 where e<+13 | f or t1.d=19) then t1.a when case when exists(select 1 from t1 where t1.c in (select 11 from t1 union select c from t1)) then 13*t1.e else 19 end<=c and (t1.e between (b) and 13) or 11 not between t1.f and 13 or 17 between b and 13 then t1.e+a else 17 end not between b and d or t1.e not between 13 and 17)"
     end, {
         -- <randexpr-2.1918>
-        
+
         -- </randexpr-2.1918>
     })
 
@@ -19250,7 +19250,7 @@ test:do_test(
         return test:execsql "SELECT (select  -case +count(distinct case when  -+ -~case when ((t1.e)) not between e and f then e when t1.b between  -11 and t1.b then d else t1.a end*19 in (select t1.f from t1 union select t1.d from t1) then t1.b when a in (select  -19 from t1 union select c from t1) then a else f end) when +~ -(count(*)) then  -( -count(distinct t1.e))-count(distinct c) else max(t1.c) end-count(distinct t1.c)-count(distinct 19)-(max(11)) from t1) FROM t1 WHERE NOT ( -~coalesce((select max(19*t1.b) from t1 where t1.d in (select max( -coalesce((select max(t1.c) from t1 where case 13 when f+ -13+t1.b-case 13 when t1.a | (abs(t1.a)/abs(t1.f)) then 11 else f end then f else 17 end in (b,t1.d,(e))),13)) from t1 union select ~~min(b)*abs(cast(avg(b) AS integer)) from t1)),e)*((t1.d))<>t1.d)"
     end, {
         -- <randexpr-2.1921>
-        
+
         -- </randexpr-2.1921>
     })
 
@@ -19270,7 +19270,7 @@ test:do_test(
         return test:execsql "SELECT case a when c then (abs((select abs(~(+~~case max(t1.d) when +count(distinct ~d | (select case max(17) when count(*) then count(distinct (t1.c)) else count(distinct 11) end from t1)) then (+cast(avg((17)) AS integer))+count(*) else  -(( - -(cast(avg(c) AS integer)))) end)+count(distinct t1.e)+min(13)) from t1)*+11-((abs(t1.a)/abs(coalesce((select c from t1 where ((t1.f<>d))),(t1.c))))) | t1.d)/abs( -(d))) else a end FROM t1 WHERE NOT (coalesce((select max(case t1.a when +t1.e then case when t1.c+(select (max(t1.d))-max(13)+cast(avg(c) AS integer)+min((e)) | max(a) from t1)<= -t1.a | case when not exists(select 1 from t1 where  -t1.d<=t1.a) then t1.f when 11<a then f else t1.f end then b when  -t1.c>=c then a else 13 end | t1.c else t1.a end) from t1 where 19<=e and t1.e between t1.d and 11),13) not in (e,a,c))"
     end, {
         -- <randexpr-2.1923>
-        
+
         -- </randexpr-2.1923>
     })
 
@@ -19300,7 +19300,7 @@ test:do_test(
         return test:execsql "SELECT t1.d-+case ~(select ~+~count(distinct case when case when case when 11 not between t1.c and t1.a-e then t1.d else e end*d-(d) between  -13 and e then a else c end in (select b from t1 union select 17 from t1) then a else 13 end)*cast(avg(d) AS integer) from t1) when t1.e then (abs(11)/abs(coalesce((select max(19) from t1 where (a)<>t1.e),19))) else t1.c end+t1.c FROM t1 WHERE NOT (19 not in (t1.a*+case when  -c+~t1.a-t1.c in (t1.a,b*case t1.a | coalesce((select max(coalesce((select 17 from t1 where t1.e>t1.a),t1.d)) from t1 where not 11=19),17) when 11 then t1.d else (f) end*b-t1.a+c, -b) then d when a<>f then a else b end-c,d,t1.b))"
     end, {
         -- <randexpr-2.1926>
-        
+
         -- </randexpr-2.1926>
     })
 
@@ -19310,7 +19310,7 @@ test:do_test(
         return test:execsql "SELECT case when case (select +min(~ -11+f*~b) | case abs(cast(avg(t1.f) AS integer))*~min(c) when count(*)+max( -11) then abs(count(*)) else max(13) end from t1) when coalesce((select max(coalesce((select max(19) from t1 where (17>=17)),t1.f)) from t1 where c<b),13) then t1.f else (f) end*t1.f>t1.a then  -d else  -t1.b end FROM t1 WHERE t1.a+b-t1.c*17>=c"
     end, {
         -- <randexpr-2.1927>
-        
+
         -- </randexpr-2.1927>
     })
 
@@ -19340,7 +19340,7 @@ test:do_test(
         return test:execsql "SELECT case when ~case when t1.f>11*t1.a then f when case when (t1.c*19<(t1.f)) then (e) when a<t1.f then c else  -e end not in (11,b,19) then t1.a else f end=17 or not t1.a>t1.e and a in (d,t1.c,13) then t1.b when  -17 not between f and d then f else t1.c end FROM t1 WHERE c in (select + -min(case (select count(*) from t1) when t1.a then t1.c else coalesce((select max(b) from t1 where d in (select  -abs(cast(avg(t1.b) AS integer)) | (min(t1.f)) | count(distinct a)+abs(cast(avg(b) AS integer))*( -min(b)) | cast(avg(t1.c) AS integer)*((min(t1.e))) from t1 union select cast(avg(f) AS integer) from t1)),t1.e) | +case b when  -t1.c then (select (count(*)) from t1) else b end | 13 end) from t1 union select min(t1.d) from t1)"
     end, {
         -- <randexpr-2.1930>
-        
+
         -- </randexpr-2.1930>
     })
 
@@ -19360,7 +19360,7 @@ test:do_test(
         return test:execsql "SELECT case when (b) between 19 and case when t1.a* -t1.d+t1.a-t1.d-b-a<=d then t1.c when not exists(select 1 from t1 where (13>t1.e) and ((a>a))) and  -(13)>t1.b then t1.d else 11 end or d=e then 13+t1.f when ( -a) not between t1.e and t1.b then (c) else t1.e end+t1.a+17 FROM t1 WHERE (case when a<=f+t1.a | f then t1.c*a-coalesce((select max( -e) from t1 where t1.a=t1.d),b)*d- -f else t1.b end) in (select min(t1.f)+~max(b) | count(distinct t1.d)*+ - -case (count(*)) when +count(distinct e) then count(*) else  -cast(avg(d) AS integer) end from t1 union select count(*) from t1) and d between 11 and t1.a"
     end, {
         -- <randexpr-2.1932>
-        
+
         -- </randexpr-2.1932>
     })
 
@@ -19380,7 +19380,7 @@ test:do_test(
         return test:execsql "SELECT +f*19*~~ -t1.c-13-case when t1.b in (select +case when not exists(select 1 from t1 where (((abs((abs((select count(*)*(count(distinct t1.d)) from t1))/abs(b)))/abs(e))*(e))>=d)) then f when t1.a=f then b else t1.e end+19 | (17) from t1 union select t1.b from t1) or  -e<t1.d then 11 else a end-t1.b FROM t1 WHERE (e in (17,t1.b*19+(abs(19)/abs(coalesce((select t1.b+d from t1 where not exists(select 1 from t1 where 19* -t1.c+ -t1.b-~e not between 11-c+b and 11) or e=a),d))),a)) and d<=b or b>e and t1.e<=t1.b"
     end, {
         -- <randexpr-2.1934>
-        
+
         -- </randexpr-2.1934>
     })
 
@@ -19420,7 +19420,7 @@ test:do_test(
         return test:execsql "SELECT f-coalesce((select max(d+~+ - -(a)*(select min(t1.d) from t1)*t1.f+case when ( -13)*t1.e<>11 |  -t1.e or c=11 then (t1.e) when  -t1.d<=t1.b and (t1.f<>t1.c) then a else  -t1.f end) from t1 where 11 not between t1.e and b),t1.f)-13 FROM t1 WHERE NOT ( -a not in (17+~coalesce((select t1.a from t1 where (exists(select 1 from t1 where 11>c))),11)+17-11,11,t1.c) or f in (select case (min((t1.a))) when max(b) then min(13) else cast(avg(c) AS integer) end*max(d)*(case cast(avg(19) AS integer) when ( -min(19)) then count(*) else count(*) end) |  -cast(avg(19) AS integer) from t1 union select cast(avg(b) AS integer) from t1) or t1.f>= -t1.d)"
     end, {
         -- <randexpr-2.1938>
-        
+
         -- </randexpr-2.1938>
     })
 
@@ -19450,7 +19450,7 @@ test:do_test(
         return test:execsql "SELECT ~case when ~coalesce((select max(f) from t1 where b | (select +max(13) from t1)+t1.b<~13*t1.d*coalesce((select  -t1.b from t1 where coalesce((select t1.e+a from t1 where 11=17),a) between 19 and e),17)*d),t1.b) in (select cast(avg(t1.d) AS integer) from t1 union select ~count(distinct 11) from t1) then 11 when t1.d>=t1.b then 13 else f end-t1.e FROM t1 WHERE NOT (not exists(select 1 from t1 where coalesce((select case t1.b when  -t1.c then c-17 else case f when (abs(case when ((13*case  -e when case when b>c and 11>11 then  -a when  -(t1.c)>t1.e then d else t1.d end then t1.d else t1.e end<=11)) then ~t1.b+f when (d)<=c then t1.a else (t1.a) end+b)/abs(b)) then  -b else 11 end end-19 from t1 where t1.e<=t1.b),a)>t1.a))"
     end, {
         -- <randexpr-2.1941>
-        
+
         -- </randexpr-2.1941>
     })
 
@@ -19470,7 +19470,7 @@ test:do_test(
         return test:execsql "SELECT +(case when (not exists(select 1 from t1 where t1.c in (select +(abs(a)/abs( -coalesce((select max(17) from t1 where (not (c>=t1.d and t1.c>=f) and t1.e>e)),19-17))) from t1 union select case when (b)>d then d when c not in (f,t1.b,t1.d) then t1.f else t1.d end from t1) or a not in (t1.d,a, -b))) and exists(select 1 from t1 where b<11) then c when t1.c not between e and  -19 then t1.b else ~c end) FROM t1 WHERE t1.e*f-a- -13-b= -d"
     end, {
         -- <randexpr-2.1943>
-        
+
         -- </randexpr-2.1943>
     })
 
@@ -19500,7 +19500,7 @@ test:do_test(
         return test:execsql "SELECT b-case when a not between t1.f and case when t1.d in (select count(*) from t1 union select cast(avg(coalesce((select +11*t1.e from t1 where e+b<case when 19 not in (t1.a | c,t1.a,f) then 13 when  -b<=17 then t1.e else a end),17)) AS integer) from t1) then 13 when not exists(select 1 from t1 where 13 between e and 17) or (a= -13) then t1.e else  -11 end then 11 else t1.a end FROM t1 WHERE NOT (not exists(select 1 from t1 where (e+17+t1.f)<=(case b when ~t1.f+(select +max(t1.f*case t1.b when +t1.f then t1.b else case when (not case when c=d then t1.c when t1.c<>b and t1.d between c and b then t1.d else t1.d end<t1.b) then t1.d when f<= -a then case when 17<c then a else a end else t1.e end end) from t1)*+t1.f then e else 17 end)))"
     end, {
         -- <randexpr-2.1946>
-        
+
         -- </randexpr-2.1946>
     })
 
@@ -19520,7 +19520,7 @@ test:do_test(
         return test:execsql "SELECT (select (min(coalesce((select max((case when t1.f<coalesce((select max(e+case when (t1.d in (select cast(avg(b) AS integer)+count(*) from t1 union select max(13) from t1)) then e*a else c end-t1.e) from t1 where (t1.c between b and t1.f and  -t1.b between  -t1.d and  -t1.a or c in (t1.b,t1.f,(f)))),13)+t1.c*19 then f else c end)) from t1 where  -t1.b not between t1.b and t1.c),11)-19))+count(distinct t1.e) from t1) FROM t1 WHERE  - -+t1.b*(19-t1.a | e*(select abs((count(distinct  -f+t1.d-11*t1.a))) from t1))*+(abs(c)/abs(t1.c))+t1.c*(t1.a)+case when b>=t1.d and 17<=13 or f between  -t1.c and 11 then case d when t1.c then 13 else t1.e end when (11)>b then a else c end in (t1.e,a,b)"
     end, {
         -- <randexpr-2.1948>
-        
+
         -- </randexpr-2.1948>
     })
 
@@ -19540,7 +19540,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max((abs(e)/abs(t1.a))) from t1 where (select (count(distinct ~ - -11- -t1.a-a*t1.d | 11-19+t1.f+17*c)-cast(avg(17) AS integer)+(cast(avg((19)) AS integer))) from t1)>a),17 | 11+17)+e-(c)-d-b FROM t1 WHERE (d>t1.d-case when case +(abs(t1.d | t1.f)/abs(t1.b)) when +b then coalesce((select max(t1.d | t1.c+(11+t1.d-t1.c)) from t1 where ((t1.e=17))),17) else t1.c end>=b then a else t1.f end) and (not (e<=c)) and not (t1.c<>b)"
     end, {
         -- <randexpr-2.1950>
-        
+
         -- </randexpr-2.1950>
     })
 
@@ -19570,7 +19570,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select c from t1 where case b when t1.a*(17) | case b++b when e then d else t1.b+f end+a+t1.d then d else t1.b | +e end<+~(select (count(*)) from t1)),17) FROM t1 WHERE (b+t1.c*c in (11, -t1.f,t1.b))"
     end, {
         -- <randexpr-2.1953>
-        
+
         -- </randexpr-2.1953>
     })
 
@@ -19600,7 +19600,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select max((abs(c)/abs(t1.d))) from t1 where t1.f*case when t1.a in (select (abs(17)/abs(c))*(t1.a) from t1 union select t1.e from t1) then t1.b else b end<19),e)+a-d in (select case max(t1.b)-count(distinct t1.c) when +case abs(cast(avg(t1.f) AS integer)) when +cast(avg(f) AS integer)-min(f) then count(distinct c) else cast(avg(d) AS integer) end then count(distinct t1.a) else cast(avg(b) AS integer) end from t1 union select count(distinct t1.e) from t1) then t1.c else f end FROM t1 WHERE ((19 in (t1.b,case t1.f when 11 then 11 else  -+t1.b | 19 end+coalesce((select 11 from t1 where c<=t1.c* -e),f),t1.f)) or (b between t1.b and 17) or not exists(select 1 from t1 where  -17 between  -f and t1.e or (not b<>11) and 19 in (select 11 from t1 union select t1.b from t1))) or 13>(t1.e)"
     end, {
         -- <randexpr-2.1956>
-        
+
         -- </randexpr-2.1956>
     })
 
@@ -19620,7 +19620,7 @@ test:do_test(
         return test:execsql "SELECT f+case when e>+11+t1.e or ~t1.a=f+t1.e+t1.c then t1.a+case when b*coalesce((select max(a) from t1 where not exists(select 1 from t1 where (t1.f=case when exists(select 1 from t1 where t1.f<b) then f when 19<13 then t1.e else f end))),coalesce((select max(11) from t1 where (t1.d) between t1.c and  - -f and d<>f),11))<(e) then t1.e else 19 end+(c) else t1.a end*c-t1.c FROM t1 WHERE not ~coalesce((select max(t1.f*coalesce((select max(f) from t1 where case 17 when e*19 then case t1.a when 17 then f else t1.c+t1.d end | (e) else ~a end>=e or not t1.b in (select a from t1 union select d from t1)),19)) from t1 where e>coalesce((select 17 from t1 where not exists(select 1 from t1 where t1.c=t1.a)),case t1.b when t1.b then a else 19 end)),13)*t1.b not between t1.e and t1.e"
     end, {
         -- <randexpr-2.1958>
-        
+
         -- </randexpr-2.1958>
     })
 
@@ -19650,7 +19650,7 @@ test:do_test(
         return test:execsql "SELECT e*(select  -max((case when  -case when (+(abs(f)/abs(17))*13)> -a then 17 else f end |  -t1.f-e*11<>11 then c when exists(select 1 from t1 where not exists(select 1 from t1 where t1.b not in (t1.d,19,d) and t1.d<>11)) or 13<= -t1.f then 11 else d end-t1.a)*e) from t1) FROM t1 WHERE NOT (exists(select 1 from t1 where c<>a))"
     end, {
         -- <randexpr-2.1961>
-        
+
         -- </randexpr-2.1961>
     })
 
@@ -19670,7 +19670,7 @@ test:do_test(
         return test:execsql "SELECT a-t1.b | (case case when 13 in (t1.c,(t1.c),t1.e) then e+b when b in (select e from t1 union select d from t1) then (select count(distinct (abs(case when t1.e not between c and c then f else case t1.a when t1.c then e+t1.d else c end end)/abs(b))) from t1) else t1.b- -t1.d end when t1.c then 11 else e end- -a)+d-t1.b FROM t1 WHERE (case when f between f+(abs(coalesce((select t1.c*t1.c from t1 where f between 19 and (select count(distinct coalesce((select max(case case when t1.b<>t1.c then t1.d when 19<d then t1.c else d end | 19-17 when b then 11 else f end) from t1 where c in (select 11 from t1 union select t1.e from t1)),e)) from t1)),13))/abs(19)) and (e) then c when 17 in ((c),t1.e,f) and a in (select 19 from t1 union select t1.e from t1) then t1.f else 13 end<13)"
     end, {
         -- <randexpr-2.1963>
-        
+
         -- </randexpr-2.1963>
     })
 
@@ -19700,7 +19700,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case t1.f | d when coalesce((select max(~b) from t1 where +t1.a<> -case t1.f when +b-case when (17 in (select count(distinct b)+count(distinct t1.a) from t1 union select count(distinct 13) from t1)) then d else 13 end+t1.d | d* -11+t1.d*t1.f | a-17 then 13 else c end*t1.e),d) then t1.b else d end)/abs(t1.a))*19 FROM t1 WHERE t1.f in (select count(*) from t1 union select count(*) from t1)"
     end, {
         -- <randexpr-2.1966>
-        
+
         -- </randexpr-2.1966>
     })
 
@@ -19730,7 +19730,7 @@ test:do_test(
         return test:execsql "SELECT t1.d+coalesce((select max(t1.b*t1.b | ~case a | c | t1.d when t1.c then t1.a else t1.e end | e-13*b) from t1 where  -t1.a in (select e from t1 union select t1.b from t1) and not exists(select 1 from t1 where (a) in (select min(13)* -cast(avg(t1.e) AS integer)*~case count(*) when count(*) then ((cast(avg(e) AS integer))) else count(*) end | (min(t1.e)) |  -count(*) from t1 union select max(t1.a) from t1))), -t1.b)+a FROM t1 WHERE not exists(select 1 from t1 where 11*d+a>=(t1.a-e+17*(select +cast(avg((select cast(avg((abs(case when (abs(t1.a)/abs(coalesce((select max(c+t1.e) from t1 where not exists(select 1 from t1 where 13 in (select  -t1.c from t1 union select t1.f from t1))),17) | e*e)) not between e and t1.f then 19 else t1.b end)/abs(19))) AS integer)* -count(*) from t1)) AS integer)*count(distinct 11)-abs(cast(avg(b) AS integer)) from t1)))"
     end, {
         -- <randexpr-2.1969>
-        
+
         -- </randexpr-2.1969>
     })
 
@@ -19760,7 +19760,7 @@ test:do_test(
         return test:execsql "SELECT ~case when case when +d+case b when 11 then coalesce((select max(b) from t1 where (((abs(f)/abs((abs(11)/abs(e))+t1.b))>t1.f))),(select max(t1.e) from t1)) else t1.f end*t1.f*17>=(t1.e) or 17>t1.f then t1.a else t1.a end in (c,13,c) then t1.f when t1.a not in (t1.d, -t1.b,a) then  -t1.b else 11 end FROM t1 WHERE t1.a in (+e,17,11*13) and b not between t1.f*(abs(t1.c-((abs(t1.a | coalesce((select max(case when  -f-t1.c<=t1.f then 19 when (t1.a)<>t1.f and 13 between a and t1.e then  -11 else 17 end) from t1 where c>19),f)-t1.e)/abs(e))))/abs(b))-t1.e | (19) and  -t1.a and t1.f in (select 13 from t1 union select a from t1)"
     end, {
         -- <randexpr-2.1972>
-        
+
         -- </randexpr-2.1972>
     })
 
@@ -19790,7 +19790,7 @@ test:do_test(
         return test:execsql "SELECT case when case 17 when case when (abs(t1.c)/abs(t1.c | coalesce((select max(t1.d) from t1 where not t1.e<17 or 11 not in (t1.a,t1.c,a) or c=d and (t1.b)<f and t1.c>=t1.e and 17 in ( -t1.c,a,d) and t1.f not in (19,a,b)),11) | (select  -max(+t1.b) from t1)+19-19 | f))<>t1.a or e>17 then f else a end then 11 else f end=t1.a then f else  -t1.f end FROM t1 WHERE NOT ( -t1.b+a>= -t1.a)"
     end, {
         -- <randexpr-2.1975>
-        
+
         -- </randexpr-2.1975>
     })
 
@@ -19810,7 +19810,7 @@ test:do_test(
         return test:execsql "SELECT (abs(coalesce((select ((t1.c)) from t1 where not exists(select 1 from t1 where t1.e*17<13*coalesce((select max(a) from t1 where 19 in (select max(e*11) from t1 union select cast(avg(t1.b) AS integer) from t1)),a | a))),case when f-13<d+17 and not exists(select 1 from t1 where e<= -13) or a between e and d then case t1.a when t1.b then f else t1.f end when  - -t1.f<>t1.e then t1.b else f end))/abs(17)) FROM t1 WHERE NOT (((d not between  -a and b)))"
     end, {
         -- <randexpr-2.1977>
-        
+
         -- </randexpr-2.1977>
     })
 
@@ -19840,7 +19840,7 @@ test:do_test(
         return test:execsql "SELECT case f when (d)-case when coalesce((select max(coalesce((select 11 from t1 where case when (t1.f<=17 or exists(select 1 from t1 where 11 | d in (select (abs(max(t1.f))) from t1 union select ( -min(c)) from t1))) then a when t1.f not in (e,13,13) then t1.c else e end between 19 and c),t1.a)) from t1 where f>=t1.d),17) not between e and t1.c and 11<=17 then t1.e-19 when t1.a not in (c,t1.e,t1.c) then 11 else t1.b end then t1.e else t1.f end FROM t1 WHERE NOT ((not (case 17 when d then t1.c else c end=f | (select case count(*) when count(*)++max(11)+ -(abs(+cast(avg(c) AS integer)-(~count(*))+count(*)*(~case max( -c) when  - -cast(avg(t1.f) AS integer) then (count(*)) else  -max(t1.b) end*cast(avg(a) AS integer))-count(*) | ( -( -max(11)))) | ( -min(17))+count(*)) then (max(19)) else max(t1.c) end from t1))))"
     end, {
         -- <randexpr-2.1980>
-        
+
         -- </randexpr-2.1980>
     })
 
@@ -19860,7 +19860,7 @@ test:do_test(
         return test:execsql "SELECT case when d+t1.d not between t1.f and + -t1.c then ~+a+(select +count(*) from t1) else (select +abs(count(*)) from t1)-t1.a end FROM t1 WHERE t1.b+f | d+a in (select +cast(avg(b) AS integer)++case min(coalesce((select t1.c from t1 where (e) in ((a)+17,t1.b,d)),t1.f)) when ~~cast(avg(17) AS integer)-max((t1.a)) then case min(13) when count(*) then count(distinct t1.a) else cast(avg(b) AS integer) end*max(d)+max(t1.b) else  -count(*) end-count(*) from t1 union select cast(avg(t1.f) AS integer) from t1)"
     end, {
         -- <randexpr-2.1982>
-        
+
         -- </randexpr-2.1982>
     })
 
@@ -19880,7 +19880,7 @@ test:do_test(
         return test:execsql "SELECT case when case when case case when (case when (( -f<t1.a)) and a between t1.b and 17 then c else +t1.c end-f+11+e between (17) and a) then t1.d else f end+t1.e*11-11 when  -11 then 17 else f end in (select t1.d from t1 union select b from t1) then c when t1.d<=(a) then t1.e else  -f end<t1.d then a else 11 end-19*f FROM t1 WHERE t1.b in (case +t1.f | d*~(case when b not between c and e+t1.d-coalesce((select  -t1.f* -t1.c from t1 where (f in (select t1.d from t1 union select  -t1.d from t1))),t1.b) then t1.c when not exists(select 1 from t1 where a<>t1.c or exists(select 1 from t1 where not exists(select 1 from t1 where (a not between b and  -t1.e)) and t1.f>=(t1.a)) and t1.f<(t1.b)) then 19 else e end) when a then t1.e else 11 end,(a),19)"
     end, {
         -- <randexpr-2.1984>
-        
+
         -- </randexpr-2.1984>
     })
 
@@ -19900,7 +19900,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select 11 from t1 where 19 in (select ((count(*)*min(11)*(abs(max(a)))-max(b)*+count(*))) from t1 union select case abs(abs(min(t1.b))*case count(distinct b) when count(distinct t1.a) then count(distinct t1.f-t1.f) else max(11) end) when cast(avg(e) AS integer) then count(*) else count(*) end from t1)),d)*11+t1.c+b | 13+19 FROM t1 WHERE t1.c in (select 19 from t1 union select ~t1.f-t1.f+17- -17 from t1)"
     end, {
         -- <randexpr-2.1986>
-        
+
         -- </randexpr-2.1986>
     })
 
@@ -19930,7 +19930,7 @@ test:do_test(
         return test:execsql "SELECT case f when (select ++abs(max(d))+case case count(*) when min(t1.c) then (count(*)) else min(t1.e) end when  -count(distinct t1.e) then count(distinct a) else min(t1.b) end from t1) then coalesce((select case when e in (select d from t1 union select f from t1) and t1.a not between b and 13 and d in (select 17 from t1 union select b from t1) then 17 when 11=f then 19 else d end from t1 where 11 not in (t1.c,t1.c,t1.d)),a) else e end-t1.e-t1.d-17*t1.f FROM t1 WHERE case when coalesce((select max(c) from t1 where 19 not between 11 and t1.e and t1.b in (select count(*) from t1 union select ~min(case c when (abs(case when d=( -t1.e) or t1.b<>t1.f then b else t1.b end)/abs(t1.c))+19 then t1.f else d end) from t1) and  -b in (select min(17) from t1 union select min( -c) | count(distinct 17)- -(count(*))+max(t1.c) |  -cast(avg(t1.c) AS integer) from t1)),t1.c)*t1.f not between  -t1.e and t1.f then 11 else f end>f"
     end, {
         -- <randexpr-2.1989>
-        
+
         -- </randexpr-2.1989>
     })
 
@@ -19950,7 +19950,7 @@ test:do_test(
         return test:execsql "SELECT case when ((coalesce((select t1.a from t1 where exists(select 1 from t1 where t1.a<=t1.b-e*coalesce((select max(a) from t1 where t1.e in (select min(13+13) from t1 union select  -(count(distinct t1.f)-count(*)) from t1)),17)-f-t1.f) or t1.d in (select t1.a from t1 union select b from t1)),t1.d*t1.f)<>a)) then t1.d when not exists(select 1 from t1 where ((t1.f in (c,19,f)))) then t1.f else 17 end FROM t1 WHERE t1.c<=a"
     end, {
         -- <randexpr-2.1991>
-        
+
         -- </randexpr-2.1991>
     })
 
@@ -19980,7 +19980,7 @@ test:do_test(
         return test:execsql "SELECT case 17 when t1.f then 11 else (case when (c between case when ~t1.e+13-t1.c+case coalesce((select t1.c from t1 where t1.a not between a and 17),coalesce((select max(case when exists(select 1 from t1 where a>=t1.a) then ((t1.e)) when t1.e>=11 then 17 else t1.b end) from t1 where ( -11<e)),a)*t1.c) when t1.f then t1.d else b end | 13<t1.d then f else t1.f end and e) then case t1.b when t1.b then  -t1.c else 17 end else t1.b end) end FROM t1 WHERE NOT (d- -coalesce((select max( -(17)+(t1.d)* -coalesce((select max(+d) from t1 where case when t1.e between 19 and t1.d then a when t1.d between t1.e and 17 then e else t1.c end+13 between a and t1.b or (c) in (select t1.b from t1 union select a from t1) or 11<>d),t1.c) | b- -17-(17)*c) from t1 where (19<13)),t1.c) not between a and t1.a)"
     end, {
         -- <randexpr-2.1994>
-        
+
         -- </randexpr-2.1994>
     })
 
@@ -20010,7 +20010,7 @@ test:do_test(
         return test:execsql "SELECT 17+(select case ~max((abs(t1.c+coalesce((select max(t1.f) from t1 where t1.f in (select 13-c-case when not a>=t1.c then f else t1.c end+t1.c from t1 union select 19 from t1) or exists(select 1 from t1 where 13<t1.e)),17)*(19))/abs(b))) when ~abs( -+max(t1.a)) then +abs(cast(avg(t1.e) AS integer)) | ~abs(~cast(avg(b) AS integer)) else cast(avg(t1.f) AS integer) end from t1) | t1.d FROM t1 WHERE NOT ((case when case when 13<>17 | e*d-17*t1.e*case a when case when (not f>=19 and t1.f<=t1.b) then coalesce((select case 11 when  -c then t1.f else (t1.f) end from t1 where 13 between t1.e and t1.f),(e)) when  -t1.f not between b and d then t1.d else t1.a end then 11 else 19 end then d when a<t1.d then 19 else 11 end=t1.e then t1.a else t1.d end+f>d))"
     end, {
         -- <randexpr-2.1997>
-        
+
         -- </randexpr-2.1997>
     })
 
@@ -20030,7 +20030,7 @@ test:do_test(
         return test:execsql "SELECT ~c-t1.a*case  -case 19 when d then t1.f else t1.a end-d when 11 then coalesce((select max(case when (case when exists(select 1 from t1 where 11*11>13) then t1.c else 11 end)<=(select min(~d+case 19 when e then 13 else e end) from t1) then c when ((f))<=17 then d else t1.c end+t1.f) from t1 where (t1.b between  -c and t1.e)),t1.e) else 17 end FROM t1 WHERE +(abs(d-(select cast(avg((select (abs(max(t1.d*+d*( -e*(13)) | 17)+ -min(t1.d)+~ - -max(17) | max(t1.a) |  -count(distinct t1.a)-count(distinct 13)*(count(distinct t1.a)) | (count(distinct 17)))) from t1)) AS integer) from t1)-11)/abs(c+d-t1.e))>=t1.d"
     end, {
         -- <randexpr-2.1999>
-        
+
         -- </randexpr-2.1999>
     })
 
@@ -20050,7 +20050,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select 11 from t1 where a not in (17,e,(select  -abs(case ( -count(distinct t1.e)) when count(distinct 13) | max((abs(case 11 when  -(abs(19)/abs(17 | t1.c*t1.e))*t1.c | t1.b then a else +d end)/abs(b*t1.a))) then max(c*13) else cast(avg(t1.f) AS integer) end)-max(11) from t1)*d)),t1.d) FROM t1 WHERE 19-c*coalesce((select max(case (select count(distinct t1.f) from t1) | t1.a when case a when (abs(case when not c+t1.d>=e then 17*t1.e+a when not exists(select 1 from t1 where 11>b) then c else a end)/abs(t1.e))+t1.f*13 then 11 else t1.f end then 19 else d end-b) from t1 where (d) not between f and e),t1.d)= -c"
     end, {
         -- <randexpr-2.2001>
-        
+
         -- </randexpr-2.2001>
     })
 
@@ -20080,7 +20080,7 @@ test:do_test(
         return test:execsql "SELECT 11+t1.b*~c*17-13-a+t1.d | t1.f+t1.b*coalesce((select 17 from t1 where t1.e in (select (select cast(avg(case case e when (t1.d) then 17 else (abs((abs(case when d<t1.d then b when t1.c<>19 then 19 else a end)/abs(f)))/abs((t1.e))) end when b then (11) else f end+17) AS integer) from t1) from t1 union select t1.c from t1)),(17)) FROM t1 WHERE e=11"
     end, {
         -- <randexpr-2.2004>
-        
+
         -- </randexpr-2.2004>
     })
 
@@ -20120,7 +20120,7 @@ test:do_test(
         return test:execsql "SELECT e*~~(coalesce((select +case when not exists(select 1 from t1 where 13*coalesce((select max(coalesce((select max(11) from t1 where not exists(select 1 from t1 where (select  -count(distinct 11) | min(11) from t1)>case b when b then c else d end)),13)) from t1 where  -c<>d),13)<>t1.f and 13 between 13 and 19) then b-t1.e+e else (t1.f) end from t1 where ((not not e>t1.c and c not between a and e))),t1.d)) FROM t1 WHERE NOT (exists(select 1 from t1 where case when case when e<c then  -coalesce((select max((abs(17)/abs(coalesce((select max(d) from t1 where (abs(13)/abs(t1.b)) between 11 and e),19)*f+d))*t1.f) from t1 where not exists(select 1 from t1 where 11 not in (t1.d, -t1.a,11))),t1.b)-e when (t1.c=17) then b else e end=f then d else t1.b end<=t1.d or t1.a<> -b))"
     end, {
         -- <randexpr-2.2008>
-        
+
         -- </randexpr-2.2008>
     })
 
@@ -20140,7 +20140,7 @@ test:do_test(
         return test:execsql "SELECT (case t1.b-coalesce((select max(t1.f) from t1 where +t1.c=e or coalesce((select max(t1.a) from t1 where exists(select 1 from t1 where ((13-(select +cast(avg( -t1.b) AS integer) from t1) in (case f when (19) then t1.f else t1.f end,11,t1.e))))),(t1.a)+t1.e) not in (t1.f,t1.a,b) and t1.e not in (11,t1.b,t1.b)),d) when 19 then t1.e else c end-t1.e*t1.f) FROM t1 WHERE t1.e<t1.e"
     end, {
         -- <randexpr-2.2010>
-        
+
         -- </randexpr-2.2010>
     })
 
@@ -20160,7 +20160,7 @@ test:do_test(
         return test:execsql "SELECT t1.a+e-case when 19<+17 then case when 19 not between t1.e and t1.e then (abs(case when e+17*(select count(distinct (abs(+17)/abs(t1.c))) from t1)<>coalesce((select max(f) from t1 where 19>=b),19) then f else t1.e end-f)/abs(t1.a))-11 else t1.e end when exists(select 1 from t1 where not exists(select 1 from t1 where ((c)) not in (b,a,e))) then t1.c else ((11)) end FROM t1 WHERE (not 13 not in (17,a,e))"
     end, {
         -- <randexpr-2.2012>
-        
+
         -- </randexpr-2.2012>
     })
 
@@ -20180,7 +20180,7 @@ test:do_test(
         return test:execsql "SELECT case when not exists(select 1 from t1 where case when  -~(19)=t1.c then t1.f*~case when t1.f<=(select max(t1.c) from t1) then e when (c<>13) then t1.a else (b) end when t1.b between 19 and 17 then 17 else e end-e+t1.a>e or  -19 in (select max(13) from t1 union select min( -19) from t1)) then t1.b when  -11>=a then ~b else 19 end FROM t1 WHERE (c not between coalesce((select max(c) from t1 where (not t1.c<>t1.a)), -(abs(case when t1.e<=t1.c then t1.d when exists(select 1 from t1 where 17 in (select case when coalesce((select c from t1 where 17-t1.a-coalesce((select 17 from t1 where t1.f in (t1.b,19,t1.c)),17) not between e and 13),t1.b) not in (e,13,t1.a) then t1.c else b end | f from t1 union select t1.f from t1)) then t1.f else 11 end)/abs(t1.a))) and t1.e)"
     end, {
         -- <randexpr-2.2014>
-        
+
         -- </randexpr-2.2014>
     })
 
@@ -20210,7 +20210,7 @@ test:do_test(
         return test:execsql "SELECT case t1.c | t1.b when t1.f-c then case when c<t1.c then t1.e when not t1.f in (select case when exists(select 1 from t1 where t1.e<=coalesce((select (select case count(distinct  -e*a) when ~( -min(11)) then count(*) else count(*) end from t1) from t1 where (b-d<= -t1.f)),t1.e) or exists(select 1 from t1 where t1.d>=11) or t1.c<=t1.e) then + - -b+11 else 13 end from t1 union select (t1.c) from t1) then 17 else 11 end else t1.a end FROM t1 WHERE NOT (t1.f | 13+coalesce((select max(11) from t1 where e>=(select ~case cast(avg(19*f+(c)) AS integer) when (min(c))-min(t1.a) then cast(avg(13) AS integer) else count(distinct e) end from t1)),t1.f)>=coalesce((select c from t1 where (exists(select 1 from t1 where t1.f>=f and (t1.d)<>t1.a))),c) or not exists(select 1 from t1 where not 11>=t1.d) or (b between c and 11 and 11< -t1.b and t1.e>=t1.b) or t1.c>e)"
     end, {
         -- <randexpr-2.2017>
-        
+
         -- </randexpr-2.2017>
     })
 
@@ -20240,7 +20240,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select 19 from t1 where a<=case (abs(e)/abs(case b+f when b then t1.e else e end)) when + -t1.b+coalesce((select max(t1.f) from t1 where (19<=+e) and (c*b)>= -t1.e and (c>=c)),11+(e)+a)-t1.b then 17 else 17 end-t1.e),a) FROM t1 WHERE NOT (+d*t1.f+c+t1.c*13<>t1.e)"
     end, {
         -- <randexpr-2.2020>
-        
+
         -- </randexpr-2.2020>
     })
 
@@ -20250,7 +20250,7 @@ test:do_test(
         return test:execsql "SELECT (abs(t1.e)/abs(coalesce((select +t1.a*c from t1 where (abs(e)/abs(d)) in (select +~count(*)-min(t1.d) from t1 union select abs(abs(cast(avg(t1.b) AS integer))+cast(avg(b) AS integer)) from t1)),d))) FROM t1 WHERE not b not between (select max(13) from t1) and 13"
     end, {
         -- <randexpr-2.2021>
-        
+
         -- </randexpr-2.2021>
     })
 
@@ -20280,7 +20280,7 @@ test:do_test(
         return test:execsql "SELECT +(select +~(count(distinct (abs((abs(coalesce((select max(t1.c) from t1 where  -e in (select t1.e from t1 union select (e) from t1)),c)-11)/abs(19))*t1.c)/abs(19))))*count(distinct t1.a)*+count(distinct a)*count(distinct t1.d) | count(*)-max(11)+cast(avg(t1.b) AS integer)*min(t1.a) from t1)+19+t1.c*19+~coalesce((select e from t1 where 13 in (select count(distinct 17) from t1 union select count(distinct 11) from t1) or t1.f<>c),17) FROM t1 WHERE NOT (exists(select 1 from t1 where coalesce((select t1.f from t1 where t1.a in (case when exists(select 1 from t1 where b*t1.e in (select (t1.a) from t1 union select (case  -13 when f then t1.b else t1.a end) from t1)) then t1.d else 17 end,d,11)),c) not in (17,19,t1.b)) or (b) in (select abs(~~abs(count(*)) |  - -min(c)-min(11)+count(*) | max(a) | count(*)-count(distinct 11)) from t1 union select max(t1.f) from t1) or t1.b>=19)"
     end, {
         -- <randexpr-2.2024>
-        
+
         -- </randexpr-2.2024>
     })
 
@@ -20300,7 +20300,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case t1.c when ~coalesce((select max(case coalesce((select max(b) from t1 where not a<b or e*coalesce((select case t1.d when c then e else 13 end from t1 where not t1.c in (select t1.e from t1 union select 11 from t1)),(d))+c in (select +min(t1.d) from t1 union select cast(avg(13) AS integer) from t1)),e-f)*e when t1.e then t1.f else 19 end) from t1 where e>a),e) then 17 else a end)/abs(19)) FROM t1 WHERE d not in (d,d+case coalesce((select t1.e from t1 where (case when 17*case case f-+t1.c+coalesce((select t1.c from t1 where t1.d<e),t1.e) when  -t1.d then e else t1.f end when d then t1.c else  -17 end*17*b<=t1.f then b when t1.a<e then 11 else 13 end>f)),d) when t1.e then (t1.c) else  -e end,t1.f)"
     end, {
         -- <randexpr-2.2026>
-        
+
         -- </randexpr-2.2026>
     })
 
@@ -20320,7 +20320,7 @@ test:do_test(
         return test:execsql "SELECT case 13 when 13 then case when 11 between case case when not 17 not between f-t1.e and (abs(19)/abs(((t1.b))))*19 then t1.a when exists(select 1 from t1 where t1.e not between d and 13) then t1.c else  -e end when t1.e then t1.c else e end and 17 then 19 when not exists(select 1 from t1 where 11=f) and exists(select 1 from t1 where d<>t1.a) or t1.f>=17 then a else t1.e end else 19 end*11 FROM t1 WHERE case 17 when t1.f then 11 else c end+d=t1.f"
     end, {
         -- <randexpr-2.2028>
-        
+
         -- </randexpr-2.2028>
     })
 
@@ -20340,7 +20340,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(b-case when exists(select 1 from t1 where case when t1.c>t1.b then t1.c*19 else coalesce((select max((abs(t1.a)/abs(~(select +max(t1.c)*max(a)*cast(avg(t1.d) AS integer) from t1)+case when e=t1.c or t1.c between e and b then +a else 13 end))) from t1 where 17=b),t1.a) end not between f and t1.c) then c else e end+ - -d-17) from t1 where t1.e<d),17) FROM t1 WHERE  -a>=(select cast(avg(d) AS integer) from t1)"
     end, {
         -- <randexpr-2.2030>
-        
+
         -- </randexpr-2.2030>
     })
 
@@ -20360,7 +20360,7 @@ test:do_test(
         return test:execsql "SELECT case when  -13 in (select +case when case when exists(select 1 from t1 where ~coalesce((select t1.f from t1 where exists(select 1 from t1 where t1.a not between t1.b and  -t1.e)),t1.c)+c | b not between f and t1.b) then  -11-19 else t1.d end in (select ~abs(max(19))+cast(avg(e) AS integer)-max(13)-count(*) from t1 union select min(f) from t1) then t1.f else b end+t1.e from t1 union select t1.f from t1) then b when e<t1.f then d else t1.f end+11 FROM t1 WHERE (select count(distinct +t1.e) from t1) in (select max(coalesce((select case when exists(select 1 from t1 where +19*a<>(select count(distinct d) from t1)) then t1.a when +(select cast(avg(e-19*~case 19 when t1.f then (t1.d) else t1.e end*t1.d*c) AS integer) from t1) in (e,t1.c,t1.e) then 13 else a end from t1 where d not between t1.b and f),a)) from t1 union select min((t1.b)) from t1) or (t1.e<=13)"
     end, {
         -- <randexpr-2.2032>
-        
+
         -- </randexpr-2.2032>
     })
 
@@ -20390,7 +20390,7 @@ test:do_test(
         return test:execsql "SELECT (+coalesce((select max(c) from t1 where case when ( -t1.f between t1.a |  -a*(abs(11 | e+case when not exists(select 1 from t1 where t1.b<>f or a=t1.a) then 17*(a) else 17 end*c)/abs(c))-d+f* -e-t1.a and b) then  -11-a else t1.a end*19+b | t1.a<=t1.e),t1.b)) FROM t1 WHERE t1.e between  -case when e not in (t1.e,case when d+t1.c-b-t1.b+case when  -e<f then + -t1.c*t1.d+a*13*e when ( -t1.f<=a) then f else 13 end*t1.e-a-t1.b<(t1.e) then t1.d else t1.d end,t1.f) then f else t1.d end and t1.c"
     end, {
         -- <randexpr-2.2035>
-        
+
         -- </randexpr-2.2035>
     })
 
@@ -20420,7 +20420,7 @@ test:do_test(
         return test:execsql "SELECT (select +~~ -(count(*))+max((select ~count(*)+count(distinct d)*~cast(avg(19) AS integer)+case count(*)- -abs(abs(~abs(++abs(cast(avg(t1.c) AS integer)))+count(distinct e)+count(*)))+(min(19) | ( -cast(avg(b) AS integer) |  - -(count(distinct t1.f)))) when  -count(*) then max( -b) else max((t1.d)) end from t1)) from t1) FROM t1 WHERE (abs(c)/abs((select (abs(count(*))) from t1))) not between t1.b and (select abs(count(*)* -~min(~e+case when t1.a+(a)>e then t1.d else a end+f)-case (+min(t1.f)*min(e)+cast(avg(c) AS integer))*count(*) when  - -((count(distinct f))) then max(a) else count(*) end |  -cast(avg(11) AS integer)*count(*))-count(*)*( -max(f)) from t1)"
     end, {
         -- <randexpr-2.2038>
-        
+
         -- </randexpr-2.2038>
     })
 
@@ -20460,7 +20460,7 @@ test:do_test(
         return test:execsql "SELECT case when ((select abs((count(*)))+min(case 17 when b then 13 | 11+c | f else 19 end) | +count(*)- - -max(t1.d) from t1) not between 19-case when t1.c not between ~e and (e) then t1.d else t1.c end and t1.e) then t1.d when t1.d in (select  -~count(distinct t1.f)*(min(t1.b)) from t1 union select (cast(avg(17) AS integer)) from t1) then d else t1.b end FROM t1 WHERE NOT (not exists(select 1 from t1 where d in (coalesce((select max((select abs(~min(f))++~count(distinct t1.a)+cast(avg(t1.b) AS integer)*cast(avg(13) AS integer) from t1)) from t1 where exists(select 1 from t1 where not not exists(select 1 from t1 where (exists(select 1 from t1 where 11<e or t1.a not between t1.a and c)) or e<t1.f)) or t1.a not in (13,f,13)),case when t1.b>=13 then ~19*13 | t1.c+t1.e when c between t1.d and a then t1.b else t1.d end)-13,17,11)))"
     end, {
         -- <randexpr-2.2042>
-        
+
         -- </randexpr-2.2042>
     })
 
@@ -20480,7 +20480,7 @@ test:do_test(
         return test:execsql "SELECT case when not exists(select 1 from t1 where e in (select +(count(distinct (abs(case when ((abs(coalesce((select coalesce((select case when c>f and a in (19, -e,t1.c) then +t1.a else t1.e end from t1 where c<b and f=13),13) from t1 where 11 not between t1.f and f and t1.c<=(11)),t1.e))/abs(t1.e))+17)<=c then t1.b when not exists(select 1 from t1 where t1.f in (select c from t1 union select 11 from t1)) then t1.f else 17 end)/abs(t1.e)))) from t1 union select max(t1.e) from t1)) then f else c end*t1.d FROM t1 WHERE (select max(t1.c) from t1) in (t1.f+coalesce((select max(d) from t1 where (c in (select 11*case when e=c then a else t1.f end from t1 union select b from t1)) and t1.c in (select b from t1 union select d from t1) and not exists(select 1 from t1 where t1.c in (t1.a,17,t1.b)) and t1.e=17 or c<>t1.f),(select case abs(count(distinct t1.e)-cast(avg(t1.d) AS integer)*cast(avg(t1.b) AS integer)) when min(19) then count(*) else min(c) end+count(distinct t1.c) from t1))+t1.b,t1.d, -d)"
     end, {
         -- <randexpr-2.2044>
-        
+
         -- </randexpr-2.2044>
     })
 
@@ -20500,7 +20500,7 @@ test:do_test(
         return test:execsql "SELECT  -case when  -b=t1.c then t1.a when (select min(t1.b) from t1)<=d+coalesce((select max(11+a) from t1 where (not exists(select 1 from t1 where c |  -((case case when (t1.f between a and t1.b) then b else c end-t1.c when 19 then t1.c else f end+t1.c)+t1.b | a)-t1.c-(c)<=19))),t1.c) then e else  -t1.d end-(17) FROM t1 WHERE (t1.b | case t1.b when ((t1.e)) then (abs(19)/abs(t1.a))-coalesce((select max(t1.e*case b when a then 11 else t1.a end) from t1 where +~case when 13=17 and t1.e+11 in (select t1.f from t1 union select t1.d from t1) then t1.b when (b<17 and a>= -17) then f else  -t1.e end+(17)<=13),d) else b end | b between t1.d and t1.f)"
     end, {
         -- <randexpr-2.2046>
-        
+
         -- </randexpr-2.2046>
     })
 
@@ -20530,7 +20530,7 @@ test:do_test(
         return test:execsql "SELECT case when not c<b and case when not (11 not in (c+b+t1.d- -13+e,(select  -min((case (abs(t1.a)/abs(a)) when 13 then b else  -19 end+11)) from t1),d)) and 13 in (19,t1.c,t1.e) then t1.b else 17 end<=~t1.e then +b*t1.c else t1.b end FROM t1 WHERE (abs(a)/abs(coalesce((select (e) from t1 where case when not d<=c then b else (19) end in (select ~( -(~(((count(*)))) | (count(distinct t1.e)))+min(t1.b)-(cast(avg(d) AS integer))-count(distinct b))-min(e)*max(t1.a) from t1 union select count(distinct f) from t1)),19 | t1.b)*t1.c+13)) in (select ~ -count(distinct e)*max((b)) | min(a) from t1 union select count(*) from t1)"
     end, {
         -- <randexpr-2.2049>
-        
+
         -- </randexpr-2.2049>
     })
 
@@ -20550,7 +20550,7 @@ test:do_test(
         return test:execsql "SELECT +11+~coalesce((select  -19 from t1 where exists(select 1 from t1 where f*t1.e not in ( -f*~t1.a-f*case when t1.f in ((e),coalesce((select b from t1 where b>=t1.f | t1.d),19),t1.a) then (t1.d) when  -a<=( -t1.a) then a else f end*a,13,19)) or e=17),a)*17 FROM t1 WHERE (select case min(+19) when abs((max(17)* -min(a*(abs(case e when t1.b then t1.f else  -t1.c end*f)/abs(t1.d))*e)-count(*) | max(19))) then  - -case count(distinct 11) when min(11) then max(19) else min(13) end-( -count(distinct 13)) else  -(count(distinct b)) end*cast(avg(17) AS integer)-max(e) from t1) between t1.d and coalesce((select max(13) from t1 where not 17>a-f-e),13)"
     end, {
         -- <randexpr-2.2051>
-        
+
         -- </randexpr-2.2051>
     })
 
@@ -20590,7 +20590,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select 11 from t1 where (b-case (select count(distinct t1.f*e) from t1) when t1.f | 11 | 11*coalesce((select 19 from t1 where (~coalesce((select f from t1 where (t1.c>17)),a)+t1.c not between f and t1.e or 19>=c)),(t1.d)) then a else t1.f end>=f and exists(select 1 from t1 where 13<>c) or  - -t1.f<t1.f)),13) FROM t1 WHERE NOT (a not in (f,t1.e,11))"
     end, {
         -- <randexpr-2.2055>
-        
+
         -- </randexpr-2.2055>
     })
 
@@ -20620,7 +20620,7 @@ test:do_test(
         return test:execsql "SELECT (abs(coalesce((select max(t1.e) from t1 where c>coalesce((select max(coalesce((select t1.e from t1 where not (abs(a+t1.e*c | case when t1.b in (select  -max(t1.b)*cast(avg(19) AS integer) from t1 union select  -max(13) from t1) then t1.f else 19 end-f+(19)+19)/abs(t1.e)) in (d,13,e) or t1.e<=t1.e),t1.b-17)) from t1 where  -11<>17 or e in (select max(19) from t1 union select (cast(avg(f) AS integer)) from t1)),a)),17))/abs(t1.e)) FROM t1 WHERE NOT (t1.e<>13 | (t1.f)+c-((13))-~13 | (abs(e)/abs(coalesce((select max(t1.c) from t1 where (d)<=t1.d),case when (exists(select 1 from t1 where not exists(select 1 from t1 where (abs(17)/abs(t1.d))>coalesce((select max(a) from t1 where t1.c not between t1.f and t1.f and f not in (t1.f, -t1.c,13)),t1.c)))) then c else 19 end))) | t1.a*11* -e*t1.c or not exists(select 1 from t1 where f>c))"
     end, {
         -- <randexpr-2.2058>
-        
+
         -- </randexpr-2.2058>
     })
 
@@ -20640,7 +20640,7 @@ test:do_test(
         return test:execsql "SELECT case t1.e when a then case when not exists(select 1 from t1 where (abs(~coalesce((select c from t1 where (case when not case when a between t1.b and t1.a then t1.c when  -17 not in (11,t1.d,11) then a else t1.a end in (select count(distinct t1.a)+count(distinct t1.a) from t1 union select count(*) from t1) then t1.c when t1.b<(11) then f else a end>=11 and (t1.f)=11)),+11))/abs(e)) not between 17 and  -t1.a) or c not between 19 and t1.b then t1.c when t1.e<t1.a then  -e*t1.d else 17 end | t1.e else t1.b end FROM t1 WHERE f+17<=17"
     end, {
         -- <randexpr-2.2060>
-        
+
         -- </randexpr-2.2060>
     })
 
@@ -20680,7 +20680,7 @@ test:do_test(
         return test:execsql "SELECT ~~coalesce((select t1.a from t1 where case f*+e when ~11-coalesce((select max(t1.f) from t1 where t1.f>b),~case when b between 17 and e | coalesce((select max(a) from t1 where (f in (t1.b,f,a))),13) then f when  -d<=d then t1.e else e end+13)+13 then d else d end+t1.f=d),b)+b FROM t1 WHERE NOT (b=b)"
     end, {
         -- <randexpr-2.2064>
-        
+
         -- </randexpr-2.2064>
     })
 
@@ -20700,7 +20700,7 @@ test:do_test(
         return test:execsql "SELECT e | t1.e*case d when t1.e then a else case when t1.a<= -~+e then b else 17-t1.e end*c*f+case when case when +c in (select +min(11) from t1 union select cast(avg(f) AS integer) from t1) and b between c and t1.f then 11+t1.a when f>=c then d else t1.c end<t1.c and t1.d between t1.a and t1.e then 19 when t1.a<=t1.c then t1.d else f end end FROM t1 WHERE 13 in (select case when ++(select abs(max((select count(*) from t1)+~13)) from t1)*11 not in ((d*~19),(abs(f)/abs(t1.b)),case when not exists(select 1 from t1 where b<=e+t1.d) then b*f when d in (select min(t1.d) from t1 union select min(e) from t1) then 19 else f end*a) then t1.c else  -c end from t1 union select t1.a from t1) or f<c"
     end, {
         -- <randexpr-2.2066>
-        
+
         -- </randexpr-2.2066>
     })
 
@@ -20730,7 +20730,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select  -(select min(f)-+min(f)*~case +cast(avg(t1.e) AS integer) when max(13)-abs( -max(a)) then +count(distinct a) | abs(max( -c+13)) else (count(*)) end from t1) from t1 where t1.a<>t1.e), -t1.d) FROM t1 WHERE t1.b between coalesce((select (coalesce((select max(case when case when not exists(select 1 from t1 where (17) not in (13,case when 19 not in (19,t1.f,t1.e) and b>=t1.a then e when b<=t1.c then 11 else b end,11)) then c | t1.a else 17 end | 19 in (c,t1.b,d) then t1.a else t1.a end | t1.c) from t1 where not exists(select 1 from t1 where t1.a<=t1.e)),t1.c)) from t1 where t1.d<=t1.a),17)*c-11 and d"
     end, {
         -- <randexpr-2.2069>
-        
+
         -- </randexpr-2.2069>
     })
 
@@ -20770,7 +20770,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select c from t1 where case when +case when not 11 | c not in (11,case when 13> -d then e when a>t1.c then 17 else t1.e end,t1.b) then t1.d when c<>t1.a then t1.b else 19 end-b>=17 or 11<t1.c then case when not exists(select 1 from t1 where not exists(select 1 from t1 where t1.f<t1.c)) then t1.f when not exists(select 1 from t1 where 19 not in (t1.d,t1.b,t1.a)) then t1.c else t1.a end else  - -f end>=19 and b<=e),d) FROM t1 WHERE NOT ((+a*t1.a+(19-(abs(case  -c when d then (abs(f)/abs(case t1.a when 19 then b else +~( -case t1.f*t1.a | 17 when  -t1.a then d else (t1.e) end*d)+t1.a-a end)) else 13 end)/abs(11))*t1.c)+17-d not in (11,a,b)))"
     end, {
         -- <randexpr-2.2073>
-        
+
         -- </randexpr-2.2073>
     })
 
@@ -20800,7 +20800,7 @@ test:do_test(
         return test:execsql "SELECT case 17 when t1.c then t1.c*f | t1.b+t1.d+b+c-t1.e+t1.c+t1.c-t1.c*t1.f else case when t1.f+case when (abs(t1.a-coalesce((select a from t1 where (t1.c) in (t1.c,d,19)), -t1.a))/abs(f)) between t1.c and a then  -(t1.b) else b end not in (11, -t1.d,t1.d) then t1.d else d end end FROM t1 WHERE NOT (~17 between (select  -count(distinct b+b)++max(t1.b)*(~(max(t1.d)))-abs(cast(avg(17) AS integer)*count(*))-max(f) | count(distinct t1.a)-count(distinct 13)-cast(avg(c) AS integer) from t1) and c-case when f<>t1.e then (abs(~(a)+e+t1.a | t1.a)/abs(t1.c)) else 13 end- -t1.e)"
     end, {
         -- <randexpr-2.2076>
-        
+
         -- </randexpr-2.2076>
     })
 
@@ -20820,7 +20820,7 @@ test:do_test(
         return test:execsql "SELECT (select cast(avg(coalesce((select max(coalesce((select e from t1 where not ((coalesce((select b from t1 where coalesce((select max(11) from t1 where exists(select 1 from t1 where (a in (select count(*)+max(((t1.a))) from t1 union select cast(avg(a) AS integer) from t1)))),b)<=19), -b))*f<t1.b and not exists(select 1 from t1 where d>=t1.e) and 17<>11 and e in (t1.f,f,17)) or a not between  -a and (17)),+~b)-17*b) from t1 where t1.b>=b),t1.a)) AS integer) from t1) FROM t1 WHERE f in (select cast(avg(t1.e-f-t1.e) AS integer)+min(t1.d) from t1 union select max(case b when 11 then case case when f in (a,a,f) then t1.b when (t1.f)>d then  -19 else t1.a end when 11 then a else t1.e end else (t1.b) end*a)*cast(avg(a) AS integer)+ -+cast(avg(t1.e) AS integer)*case cast(avg(t1.e) AS integer) when (cast(avg( -t1.a) AS integer)) then count(*) else count(*) end*min(t1.d)*min(e) from t1) and (a between d and t1.f)"
     end, {
         -- <randexpr-2.2078>
-        
+
         -- </randexpr-2.2078>
     })
 
@@ -20850,7 +20850,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select max(coalesce((select max((select min(13) from t1)*d*case when not 19<>(t1.c)-d then 11 else 17 end) from t1 where 13<t1.f and t1.e not between (t1.a) and d),c)) from t1 where t1.d between (d) and 19 or t1.c in (t1.f,(11),17)), -11)>=t1.e then t1.d when not exists(select 1 from t1 where t1.c in (select (count(*)) from t1 union select +count(*) from t1)) then t1.c else 19 end FROM t1 WHERE NOT (((11>=11)))"
     end, {
         -- <randexpr-2.2081>
-        
+
         -- </randexpr-2.2081>
     })
 
@@ -20860,7 +20860,7 @@ test:do_test(
         return test:execsql "SELECT  -case when 19 in (select abs((count(*))) from t1 union select abs(min(t1.f)*min(e*e)) from t1) and case when not not (17>a) or d>=c and (19)<=t1.b and  - -t1.f<>t1.f then f when t1.b between d and t1.f then case when t1.e=e then coalesce((select max(d) from t1 where t1.b>=b),a) when t1.a not between c and e then e else 13 end else (17) end>t1.d then b else b end+t1.b-a FROM t1 WHERE exists(select 1 from t1 where +coalesce((select 19 from t1 where not exists(select 1 from t1 where exists(select 1 from t1 where case when (select max(11-(select +count(distinct +case + -coalesce((select t1.d from t1 where exists(select 1 from t1 where (b)>t1.c)),t1.f)*11 when  -a then 19 else 19 end) from t1)) from t1)<=t1.d-c then f when exists(select 1 from t1 where t1.f not between b and a) then  -d else t1.d end not in (t1.b,t1.e, -t1.f)))),f) not in (f,e,13))"
     end, {
         -- <randexpr-2.2082>
-        
+
         -- </randexpr-2.2082>
     })
 
@@ -20890,7 +20890,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(b) from t1 where d not between a-t1.e and a),coalesce((select max(t1.c) from t1 where exists(select 1 from t1 where t1.e<t1.a)),e)+19) FROM t1 WHERE NOT (+case f when case  -~c-case when d=17 then t1.c*(select abs(case (cast(avg(19) AS integer)) when ( -count(*)) then min(19) else count(*) end*min(a)) from t1) when b* -(e)-t1.b in (select max(19) | max(t1.c) from t1 union select max(17) from t1) then c else a end when  -f then 13 else 19 end then t1.d else t1.c end<>e or 11 between b and 13)"
     end, {
         -- <randexpr-2.2085>
-        
+
         -- </randexpr-2.2085>
     })
 
@@ -20910,7 +20910,7 @@ test:do_test(
         return test:execsql "SELECT (select case count(*) when ~(case case  -abs(count(*) | (case case ~case  -count(distinct case when t1.a< -t1.d then b when 19 in (t1.e, - -19,t1.b) then t1.c else t1.f end)-count(distinct (t1.f)) when count(*) then max(c) else count(distinct 17) end when count(*) then ((cast(avg(b) AS integer))) else  -count(*) end when  -count(distinct t1.f) then count(distinct t1.a) else count(distinct t1.e) end))+count(*) when cast(avg(19) AS integer) then  -min( -t1.c) else count(*) end when (min(t1.e)) then cast(avg(c) AS integer) else min(t1.f) end) then min(e) else count(*) end | max(11) from t1)+19 FROM t1 WHERE NOT (case when (((d not between (+t1.a-coalesce((select max(b*t1.b* -t1.f) from t1 where a>a),13)) and a)) and c>=d or f<c) then coalesce((select (abs(17)/abs(13))*e from t1 where f in (t1.a,13,t1.b) and (t1.c)<>e and t1.c< -11 and f<>b or t1.b<17),c) else t1.a end>=11)"
     end, {
         -- <randexpr-2.2087>
-        
+
         -- </randexpr-2.2087>
     })
 
@@ -20940,7 +20940,7 @@ test:do_test(
         return test:execsql "SELECT case when case when t1.a*~t1.a-19-c | 17+t1.d*f*c=d then f else  -13 end+t1.b+a in (t1.f,t1.d,t1.f) and (not c=11) and t1.e<>f then coalesce((select f from t1 where t1.d not in (t1.e,f,11)), -17) else f end-b FROM t1 WHERE NOT (not exists(select 1 from t1 where +d between d*13 and ((abs(13+e+e)/abs(+case when not t1.c in (~(select cast(avg(case e when b then 11 else 13 end) AS integer) from t1)*b*17,t1.e,t1.e) then 11* -c when t1.f in (select min(e)*count(distinct c) from t1 union select  - - - -max(e) | cast(avg((d)) AS integer) from t1) then (c) else e end)))) or d<17)"
     end, {
         -- <randexpr-2.2090>
-        
+
         -- </randexpr-2.2090>
     })
 
@@ -20960,7 +20960,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select c from t1 where t1.b between t1.b and  -17),coalesce((select  -t1.e from t1 where (select count(distinct coalesce((select case t1.b-t1.a*(b)*13 when 11 then (a) else 11 end from t1 where a not in ((t1.e),c,11) and e>b),13)) from t1) in (t1.d,b,13) and not t1.b<13 or 11<> -17 or (11)>17 or t1.f not between b and (t1.a)),(b))) FROM t1 WHERE ((+case +d when f then (d) else case t1.f-(b)-11 when d then  -t1.c else a end end not in ( -17,(t1.d),13) and (11 not in ((c),t1.f,t1.d)) and (e in (select 13 from t1 union select t1.a from t1) and d in (select t1.e from t1 union select 19 from t1))) or exists(select 1 from t1 where  -t1.a= -t1.d)) and exists(select 1 from t1 where t1.b not between f and e or 19>=t1.d)"
     end, {
         -- <randexpr-2.2092>
-        
+
         -- </randexpr-2.2092>
     })
 
@@ -20980,7 +20980,7 @@ test:do_test(
         return test:execsql "SELECT case d when f then case when (abs(coalesce((select ~f*case when t1.f<(select  -count(distinct (select count(*)-min(13) from t1)) from t1) then d when t1.d between t1.b and f and not (t1.b between ( -t1.f) and f) then  -d else b end-b | t1.f*17 from t1 where ((d>t1.d))),17))/abs(11))-13=t1.c then a else 11 end else b end FROM t1 WHERE t1.b between coalesce((select case when coalesce((select t1.c from t1 where not ((t1.a>=11+17 and (13+(11)<>13))) and b<=c and c in (c, -c,(e)) and d not in (f,b,c) or t1.d>=13 and 13 between 19 and a),d) not between 13-case when t1.f<>t1.b then t1.f else t1.c end | d and d then b when c<c then 13 else 11 end*t1.e from t1 where b>= -d),19) and c"
     end, {
         -- <randexpr-2.2094>
-        
+
         -- </randexpr-2.2094>
     })
 
@@ -21010,7 +21010,7 @@ test:do_test(
         return test:execsql "SELECT (coalesce((select case when exists(select 1 from t1 where case when (t1.b)>=f+e*coalesce((select max( -+t1.c) from t1 where case a when e then e else 11 end in (select 17 from t1 union select d from t1) or e not between d and a),t1.f) then ( -t1.d) else e end in (11,c,b)) then 17 else t1.f end+t1.f from t1 where not d in ((b),(f),11) and t1.f<f),19)) FROM t1 WHERE exists(select 1 from t1 where coalesce((select max(case when t1.d in (select  -a from t1 union select 11 from t1) then t1.b when case when t1.f not in (t1.d, -19,t1.e) and t1.a>=t1.b and 19<13 then 19 else 13 end<a then e else b end) from t1 where t1.f in (select +count(distinct  - -13)* - -case max(t1.f) when max(13) then (min(t1.c)) else (max(t1.b)) end from t1 union select cast(avg(t1.a) AS integer) from t1) or t1.e not in (b,17,e)), -17)>=19) and b not in (c,t1.a,d) or b between e and  -t1.f or t1.b between t1.e and c and t1.a<=t1.d"
     end, {
         -- <randexpr-2.2097>
-        
+
         -- </randexpr-2.2097>
     })
 
@@ -21040,7 +21040,7 @@ test:do_test(
         return test:execsql "SELECT 11+17+case when case 17 when coalesce((select max(d) from t1 where 13+(t1.c-e)+19+e-t1.e>=b and not 11 not in (19,t1.e,13) and (t1.f)>b),19)*19 then c else  -d end not in (c,19,t1.c) then d when d<=t1.d then 13 else 11 end+ -a FROM t1 WHERE NOT (coalesce((select max(~t1.f) from t1 where (13*t1.e)<=case when 17 | a<=t1.e then coalesce((select max(19) from t1 where case when not not exists(select 1 from t1 where 19 in (t1.d+19,11,t1.f) or not exists(select 1 from t1 where a<e)) then case when t1.d<(t1.b) then t1.d when 13>=t1.c then  - -11 else t1.b end else f end-f<=b),t1.b) else t1.e end),f)-19>=13)"
     end, {
         -- <randexpr-2.2100>
-        
+
         -- </randexpr-2.2100>
     })
 
@@ -21060,7 +21060,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.a+(select count(distinct 11-case when coalesce((select max(11) from t1 where t1.f<(t1.a)-t1.b),b) in (select ~abs(min(c-case when (case 13 when  -coalesce((select (t1.e) from t1 where  -a not in (f,t1.d,d)),(11)) then b else t1.e end not between b and  -t1.e) then e else t1.a end)) | count(*) from t1 union select  -min(17) from t1) then t1.a else t1.d end) from t1)-t1.b) from t1 where 17<t1.e),t1.e) FROM t1 WHERE NOT (case when not (not exists(select 1 from t1 where c*case when (a>11) then e else a end-t1.c+(d)*(13) in (select ~count(distinct (t1.f))+ -~ -count(distinct t1.e)+(min(13)) from t1 union select cast(avg(11) AS integer) from t1) or t1.e<>t1.f)) then f when not a<19 then coalesce((select max(11) from t1 where (t1.d) between  -d and  -t1.e or t1.f not between d and a and  -b=19),t1.b) else +t1.f end not between a and e)"
     end, {
         -- <randexpr-2.2102>
-        
+
         -- </randexpr-2.2102>
     })
 
@@ -21090,7 +21090,7 @@ test:do_test(
         return test:execsql "SELECT t1.b-case when 13 not between 13 and (select +count(*) from t1) then t1.e when +11 in (coalesce((select t1.f from t1 where d-((f))*coalesce((select d from t1 where 17 between ~(select max(d) | count(*) | cast(avg(e) AS integer)+count(*) from t1) and case when c<13 or 17>13 then a else e end-t1.b),e)-t1.a<=(t1.e)),19),b,13) then e else b end-t1.b FROM t1 WHERE NOT (t1.b>=coalesce((select max(d-c) from t1 where exists(select 1 from t1 where (~a*(select  -count(distinct 11-d*13+d+19) from t1)* -b in (f,t1.d-c,a-(abs(c)/abs(case when (abs(13- -(19))/abs(t1.f)) in (select c from t1 union select  -a from t1) then t1.c when b<=c then t1.a else  -13 end)))))),19))"
     end, {
         -- <randexpr-2.2105>
-        
+
         -- </randexpr-2.2105>
     })
 
@@ -21110,7 +21110,7 @@ test:do_test(
         return test:execsql "SELECT t1.f*case when c*case when t1.d*t1.b-(~19) in (select (cast(avg(d-t1.d) AS integer)) from t1 union select min(11)+cast(avg(e) AS integer) | abs(count(distinct t1.a) | min(19)) from t1) then t1.d when not 11 not in (d,t1.e,13) then t1.a else 11 end in (select (t1.c) from t1 union select 11 from t1) or t1.e not in (f, -t1.f,t1.e) then c else d end FROM t1 WHERE case when t1.e=t1.c and (abs(case when (11* -17 not in (c,t1.f-t1.c-coalesce((select max(c) from t1 where c in (select min(19) from t1 union select ~count(*)*max(t1.f) from t1)),a),t1.a)) then coalesce((select max(17) from t1 where  -b>=(t1.c)),19) else f end+19)/abs(t1.f))*t1.d between d and b then t1.b-t1.e else c end=19"
     end, {
         -- <randexpr-2.2107>
-        
+
         -- </randexpr-2.2107>
     })
 
@@ -21140,7 +21140,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max((abs(t1.d)/abs((coalesce((select c from t1 where (abs(+f)/abs(t1.b))-t1.a between 13 and case (13+c+((abs(coalesce((select 11 from t1 where 11+19<b),case t1.f when t1.f then b else 11 end)*a)/abs(c)))+t1.f) when f then  -c else t1.f end),e)-t1.e*19)))) from t1 where e<e),t1.c) FROM t1 WHERE c in (select c+19 from t1 union select +t1.f from t1) and t1.e<case when case (abs(t1.a)/abs(t1.b))-coalesce((select (abs(e+t1.e | b)/abs(e))*13 from t1 where (c=11) and b< -f or 13=b or  -d< -(e)),b) when e then 11 else t1.e end between b and (19) then t1.b else c end"
     end, {
         -- <randexpr-2.2110>
-        
+
         -- </randexpr-2.2110>
     })
 
@@ -21160,7 +21160,7 @@ test:do_test(
         return test:execsql "SELECT f+coalesce((select max(t1.f) from t1 where (case when 13<>a then (coalesce((select  -e from t1 where case coalesce((select case when 19 in (select t1.e from t1 union select f from t1) then b when t1.c=11 then a else (13) end from t1 where t1.a in (select ( -cast(avg(13) AS integer)+max(t1.e)) from t1 union select cast(avg(19) AS integer) from t1)),19) when f then f else ( -t1.c) end+17<=e and a>=t1.b or t1.c>=b),t1.e)) else e end)>=e),b)+f FROM t1 WHERE exists(select 1 from t1 where 17 in (select  -abs(case (min(t1.b)) when count(*)*max(a) then  -abs((max(e))) | ~max( -coalesce((select max(coalesce((select e from t1 where f>=11 or exists(select 1 from t1 where 11 not in (11,t1.c,f))),d)) from t1 where 13=t1.d and 17<>f),t1.d))+count(distinct t1.e) else count(*)+~cast(avg(t1.f) AS integer) end | count(distinct t1.a))+count(distinct t1.a) from t1 union select count(*) from t1))"
     end, {
         -- <randexpr-2.2112>
-        
+
         -- </randexpr-2.2112>
     })
 
@@ -21180,7 +21180,7 @@ test:do_test(
         return test:execsql "SELECT case when case when (abs( -t1.b)/abs(case case case (select ~ -(+abs(case min(19) when (( -min(t1.e))) then count(distinct (t1.e)) else cast(avg(11) AS integer) end)) from t1) when t1.e then (select min(19) from t1) else 17 end when (13)-a*17 then t1.d else t1.a end when a then 19 else  -( -f) end))>=d then t1.e else 13 end between f and 19 then f when t1.c<=t1.a or (t1.b>(11)) then 11 else t1.b end FROM t1 WHERE t1.c in (select case when 11<17 then case when (t1.b*coalesce((select (abs((coalesce((select a-19 from t1 where t1.c between e and f and d<>17 and t1.d not between 19 and 19),a)))/abs(t1.c))+t1.b-17 from t1 where c=a), -t1.d)+c>t1.f) then  -13+(t1.e) when 11<>t1.c then 13 else t1.c end when 11=c then t1.c else (c) end from t1 union select t1.e from t1)"
     end, {
         -- <randexpr-2.2114>
-        
+
         -- </randexpr-2.2114>
     })
 
@@ -21200,7 +21200,7 @@ test:do_test(
         return test:execsql "SELECT t1.e+coalesce((select case t1.a-case when t1.a in (case (abs(coalesce((select t1.e from t1 where t1.a>t1.b),~c))/abs(t1.b))* -(select count(distinct t1.c)-cast(avg(coalesce((select 19 from t1 where c not between (abs(b-11)/abs( -t1.e)) and (17)),17)) AS integer) from t1) when t1.e then f else 17 end,t1.c,t1.c) then d else t1.e end when d then 17 else 13 end from t1 where 11<11),t1.f) FROM t1 WHERE 11* -19 in (select case when ~coalesce((select t1.b from t1 where coalesce((select d from t1 where t1.a=17*~e+t1.d*case when 11< -~t1.b*t1.b*c+a then (c) else 19 end*a),e)>e),11)<=19 then t1.c when (not exists(select 1 from t1 where t1.d<17)) then b else c end from t1 union select t1.a from t1)"
     end, {
         -- <randexpr-2.2116>
-        
+
         -- </randexpr-2.2116>
     })
 
@@ -21220,7 +21220,7 @@ test:do_test(
         return test:execsql "SELECT 19* -coalesce((select coalesce((select t1.d*17 from t1 where t1.b<=t1.b+17), -(a | 17)) from t1 where t1.d in (select case abs(count(*))*count(distinct (17)) when max(11) then abs(+max(13)-case  -cast(avg(t1.d) AS integer)- -(max(19))-count(distinct d) when min(t1.c) then cast(avg(c) AS integer) else count(distinct t1.f) end | max(c)) else max(t1.d) end from t1 union select count(*) from t1)),t1.f)-t1.e+c FROM t1 WHERE ~(abs(case 17 when d then coalesce((select t1.d from t1 where 13 in (select t1.d-f | case when (17 in (t1.a,19,t1.f)) then case when a*f in (select e from t1 union select t1.a from t1) or 11=t1.c or t1.a>=(19) and ( -b)<f or e<>13 then b when t1.e in (t1.c, -t1.b,a) then 19 else 19 end else a end from t1 union select t1.b from t1)),d) else 13 end)/abs(11))+19*t1.e in (e, -t1.e,a)"
     end, {
         -- <randexpr-2.2118>
-        
+
         -- </randexpr-2.2118>
     })
 
@@ -21260,7 +21260,7 @@ test:do_test(
         return test:execsql "SELECT case t1.f when f then t1.a-case d+t1.d+coalesce((select (select cast(avg( -case when t1.d in (select  -min(17)-count(*)+max(f) from t1 union select  -count(distinct 13) from t1) then t1.e else a end*a) AS integer) from t1)-t1.d from t1 where  -t1.b not in (11, -(t1.b),t1.d) and c in (select b from t1 union select 19 from t1) and t1.a in (select  -e from t1 union select t1.e from t1)),a)*t1.f when 19 then t1.f else 11 end else c end FROM t1 WHERE NOT (t1.c>11)"
     end, {
         -- <randexpr-2.2122>
-        
+
         -- </randexpr-2.2122>
     })
 
@@ -21280,7 +21280,7 @@ test:do_test(
         return test:execsql "SELECT case when (case when (e not in (e | e,17,e)) then 13 else t1.b end>+t1.b*f-b+t1.d-e) or 19 between b and t1.a then 11 when exists(select 1 from t1 where (t1.d) | t1.d in (case when (e>=(11)) or (t1.a)>=t1.f then c-b when t1.c<>t1.e then t1.a else (17) end,c,13)) then 17 else t1.b end FROM t1 WHERE NOT ((select min(case when a not in (coalesce((select 19 from t1 where t1.f<((abs(e)/abs(t1.a+e)) | d)-e),e),t1.f,t1.a) then c else 13 end)-(count(distinct d)-abs(count(distinct t1.c)-cast(avg(d) AS integer) | min(b)+(cast(avg(19) AS integer) | case count(distinct t1.c) when cast(avg( -t1.b) AS integer) then cast(avg(t1.a) AS integer) else max(13) end))) from t1) not between b | a and 19)"
     end, {
         -- <randexpr-2.2124>
-        
+
         -- </randexpr-2.2124>
     })
 
@@ -21310,7 +21310,7 @@ test:do_test(
         return test:execsql "SELECT case when case when t1.c+13<13 then 11 when (t1.b) not in (t1.b,e,t1.c) then t1.f else  -t1.c end- -a | 13 in (select max(a) from t1 union select count(distinct 17)* -case count(*) when count(*) then  -((count(distinct 17))) else max(t1.b) end | ( -count(*)) from t1) and e<=17 and t1.c<=d then coalesce((select max(coalesce((select max(e) from t1 where t1.f not in (e,17,t1.b) and d= -t1.b),t1.d)) from t1 where t1.d<f),b) when  -c not between f and t1.f then b else t1.a end FROM t1 WHERE NOT (a<=case b when coalesce((select max(19) from t1 where (coalesce((select max(11) from t1 where ((not coalesce((select max(t1.e) from t1 where  -19 in (select count(*) from t1 union select (max(t1.c)) from t1)),t1.a)-11 between f and t1.c))),case when exists(select 1 from t1 where  -(17)< -a) then 17*17 else a end) not in (17,b,t1.e)) or 17 between a and t1.f and  -a<11 and 19<=(t1.b)),t1.c) then ~case when 11>(f) then t1.e else 17 end else t1.c end-19)"
     end, {
         -- <randexpr-2.2127>
-        
+
         -- </randexpr-2.2127>
     })
 
@@ -21330,7 +21330,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select case t1.e when coalesce((select max(e- -coalesce((select 17-d-e from t1 where ( -e*(d)>t1.c and 17=(t1.b) or not 11>(a) and b not between ((f)) and t1.d)),t1.c)-f-(f)*b+t1.a) from t1 where f<>13),t1.b) then t1.c else t1.b end from t1 where c in (select t1.a from t1 union select (t1.e) from t1)),e) FROM t1 WHERE (c in (select ~abs(cast(avg(19) AS integer))- -(case (++abs(max( -(select case case ( -abs(+cast(avg(b) AS integer) | count(distinct t1.b*17)*min( -11)*count(distinct t1.e))) when (max( -t1.b)) then count(distinct e) else max(11) end when  -min(d) then count(*) else cast(avg(t1.a) AS integer) end from t1))*max(11))) when min(b) then max(19) else (count(*)) end)* -(max(t1.a))-count(*) from t1 union select count(distinct t1.a) from t1))"
     end, {
         -- <randexpr-2.2129>
-        
+
         -- </randexpr-2.2129>
     })
 
@@ -21350,7 +21350,7 @@ test:do_test(
         return test:execsql "SELECT t1.e+13-(abs(f)/abs(e | coalesce((select case when (f>=~t1.c*case t1.a when  -d then (11) else 17 end*19) then case a when t1.e then b else e end else t1.c end from t1 where e in (select t1.a from t1 union select a from t1) or t1.d not in (f,f,17) and t1.b not between f and 17 and e=c),t1.c)*17+d+t1.d)) FROM t1 WHERE coalesce((select ~f+t1.c*t1.d | t1.d*t1.d-t1.b from t1 where t1.b | t1.a between case when (abs(coalesce((select f from t1 where t1.e between 11-17 and t1.c),e)-t1.d*b)/abs(((d))))-d between t1.b and d then a when  -(f) between e and t1.e then t1.a else a end and t1.b),t1.a)-11=d"
     end, {
         -- <randexpr-2.2131>
-        
+
         -- </randexpr-2.2131>
     })
 
@@ -21390,7 +21390,7 @@ test:do_test(
         return test:execsql "SELECT +(abs(~+13+(abs(t1.c)/abs(t1.c | coalesce((select t1.a from t1 where (select min(t1.c) from t1)<>(abs(t1.f | coalesce((select c from t1 where b=17),f)-b)/abs(coalesce((select max(d-t1.e) from t1 where not exists(select 1 from t1 where t1.e in (select f from t1 union select t1.d from t1))),19)*e+19)) or t1.a in (select 13 from t1 union select t1.d from t1) and (b)<= -t1.f),11))))/abs(e)) FROM t1 WHERE NOT (t1.e<>coalesce((select case 17 when f then coalesce((select max(t1.c) from t1 where coalesce((select coalesce((select ~e from t1 where not 17<=e | 17),11)+t1.d+t1.e from t1 where (e>=f or (not t1.e>=t1.a or e between f and t1.f))),t1.b) not in (13,17,c) or t1.a> -t1.d),19) else t1.c end from t1 where (not 17 not in (t1.b,11,b) and f>=t1.f) or 19<=t1.f),d)-11)"
     end, {
         -- <randexpr-2.2135>
-        
+
         -- </randexpr-2.2135>
     })
 
@@ -21420,7 +21420,7 @@ test:do_test(
         return test:execsql "SELECT (case when not case when ((e not between d and case when not exists(select 1 from t1 where 11>=(a)*t1.d*11 or  -(d) not in (a,11,t1.f)) then f else ~f end or not d<>t1.e or t1.c in (a,t1.d,t1.c))) then case when  -b between 11 and b then (select count(distinct 17) from t1) when t1.e<>11 then f else d end else t1.d end<=a then (abs(t1.d)/abs(e)) when t1.d<t1.f then d else t1.e end) FROM t1 WHERE NOT (case when ~ -13*case when (not exists(select 1 from t1 where t1.c in (a,case case when 11<=17 then e else 13 end when 11 then 11 else b end,f))) then t1.a when not exists(select 1 from t1 where (t1.a>=t1.b and 17=t1.e)) then f else 19 end-t1.a*t1.a-e<=t1.b and 17 in (t1.d,13,t1.b) then c else t1.b end<>t1.b or not exists(select 1 from t1 where 17 between (d) and ( -(t1.d))))"
     end, {
         -- <randexpr-2.2138>
-        
+
         -- </randexpr-2.2138>
     })
 
@@ -21430,7 +21430,7 @@ test:do_test(
         return test:execsql "SELECT t1.b+case when f+f not in (c+case when t1.f<>d then 11 when f between 11 and t1.d then 11 else 13 end,e,(t1.f)) and not exists(select 1 from t1 where (exists(select 1 from t1 where 19<11)) or 11 in ((t1.d),t1.c,b) and t1.b>13) and t1.b=t1.b then (abs(t1.d)/abs(13)) when a not between t1.c and 19 then t1.f else 19 end+13*17-t1.e FROM t1 WHERE not exists(select 1 from t1 where (exists(select 1 from t1 where t1.c>=19)))"
     end, {
         -- <randexpr-2.2139>
-        
+
         -- </randexpr-2.2139>
     })
 
@@ -21460,7 +21460,7 @@ test:do_test(
         return test:execsql "SELECT (case when f>(select abs((((count(*)-+cast(avg(d) AS integer)))) | count(distinct a)) from t1) then case when (abs(coalesce((select max(t1.d) from t1 where coalesce((select max(case when t1.b between t1.f and a then  -f when f<> -b then t1.e else  -19 end) from t1 where not exists(select 1 from t1 where t1.c not in (t1.f,t1.c,t1.a))),t1.c)<=b), -t1.c))/abs(t1.a))<t1.b and exists(select 1 from t1 where t1.c between d and t1.f) then t1.a else t1.d end when a not in (e, -t1.f,t1.a) or f in (d,t1.c,(f)) and d in (t1.e,17,c) then 19 else (b) end)+t1.b FROM t1 WHERE NOT (t1.d>11)"
     end, {
         -- <randexpr-2.2142>
-        
+
         -- </randexpr-2.2142>
     })
 
@@ -21490,7 +21490,7 @@ test:do_test(
         return test:execsql "SELECT (abs(+coalesce((select t1.f from t1 where not exists(select 1 from t1 where (((c)<=t1.a)))),f+(select count(distinct t1.b) from t1)*t1.b+case when case (select count(*) from t1) when coalesce((select max(t1.f-e+13) from t1 where (t1.e>a and 19 not in (13,b,19))),t1.c)+e then t1.b else t1.b end in (select  -c from t1 union select c from t1) then f when t1.a>t1.e then t1.c else d end+ -13))/abs((t1.f))) FROM t1 WHERE NOT (coalesce((select t1.f from t1 where a>=e),13) between  -c and t1.a)"
     end, {
         -- <randexpr-2.2145>
-        
+
         -- </randexpr-2.2145>
     })
 
@@ -21510,7 +21510,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(~19) from t1 where t1.a between case t1.c when t1.b then t1.e else +~f end and case when 19 not in (e+b,t1.e-d,(select max(e) from t1)) then t1.a else case 13 when case e when e then t1.f else f end-a+t1.f then 19 else t1.b end+11 end-t1.d-17 or t1.b<>t1.a),13)-t1.b | 11 FROM t1 WHERE NOT ((+(17)-(select cast(avg( -((17)*case t1.b when 13+f then t1.f else t1.b end)) AS integer) | case case cast(avg(e) AS integer) when abs((case (~min(t1.c)) when max(t1.e) then cast(avg(t1.b) AS integer) else (( -count(*))) end-max(b)))+(min(t1.c)) then  -cast(avg(c) AS integer) else min(f) end when cast(avg(17) AS integer) then max(f) else (min(d)) end from t1)+e+c*19>=13))"
     end, {
         -- <randexpr-2.2147>
-        
+
         -- </randexpr-2.2147>
     })
 
@@ -21540,7 +21540,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(e) from t1 where 11>=coalesce((select max(b) from t1 where (abs(13)/abs(coalesce((select max(11) from t1 where f not between t1.a and t1.d),t1.d)))=case when 11 in (select (11 | d)-coalesce((select t1.e | coalesce((select t1.e from t1 where t1.f in (select 13 from t1 union select t1.c from t1) and d in (select t1.b from t1 union select 17 from t1)),(c))-17-19 from t1 where (t1.b)<=t1.b),(d)) from t1 union select t1.d from t1) then t1.a else (b) end),c)),19) FROM t1 WHERE NOT (~t1.b not in (~++(select (case ~ -min( -11) when abs(count(*)*count(*)) then +~max(t1.a-11 | (19)) else case abs((cast(avg(f) AS integer)))-count(distinct t1.a) when (( -(max(a)))) then (min(t1.d)) else (min(a)) end end) from t1)+(abs(+t1.b)/abs(a))-t1.f+~t1.d+b+t1.c,13,e))"
     end, {
         -- <randexpr-2.2150>
-        
+
         -- </randexpr-2.2150>
     })
 
@@ -21570,7 +21570,7 @@ test:do_test(
         return test:execsql "SELECT (abs(+b)/abs(coalesce((select max(t1.b) from t1 where (not t1.a not between t1.c-(abs(b)/abs(d)) and c)),19)+19*t1.e | t1.e))-t1.f*coalesce((select case d when e*t1.d*f then 17 else t1.c+t1.c end from t1 where t1.b>=(select count(*) from t1)),+f+t1.b-t1.b+19- -b) FROM t1 WHERE NOT (not exists(select 1 from t1 where not exists(select 1 from t1 where not exists(select 1 from t1 where not (b>=(abs(case when case (select count(*) from t1) when t1.a then a+case t1.f when a+ -t1.a*t1.d then 19 else e end+t1.a+f else  -d end>=e then f when t1.b>=t1.d or not d<f or t1.f>t1.b then t1.e else d end)/abs(f)) or a>e)))))"
     end, {
         -- <randexpr-2.2153>
-        
+
         -- </randexpr-2.2153>
     })
 
@@ -21600,7 +21600,7 @@ test:do_test(
         return test:execsql "SELECT (abs((select +abs(case count(*) when +max(19) then count(distinct b)*count(distinct (13+(select max(t1.d) from t1)* -a+t1.e*t1.b*a))+cast(avg(13) AS integer) | min(13)*cast(avg(c) AS integer)-count(distinct t1.e)-((min(f))) | cast(avg(17) AS integer)-( -cast(avg(( -t1.d)) AS integer))- -cast(avg(t1.d) AS integer) | count(*) else max(t1.f) end) from t1))/abs(t1.a)) FROM t1 WHERE NOT (b<=e or exists(select 1 from t1 where 17 in (select ~e+coalesce((select d from t1 where 11* -~+case when not (b) not between t1.f and b then  -~t1.c-11*+19+((b)) when f not between f and 11 then b else a end+11-(b)-t1.f<>17),d) from t1 union select t1.a from t1)))"
     end, {
         -- <randexpr-2.2156>
-        
+
         -- </randexpr-2.2156>
     })
 
@@ -21630,7 +21630,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(11) from t1 where c=(abs(coalesce((select case when t1.c-t1.f+coalesce((select max(b) from t1 where case when (11<>17) then t1.c else c end in (select b from t1 union select t1.b from t1) and 13=11),f)+t1.b>=t1.f then 11 when c>t1.f then 19 else 19 end from t1 where exists(select 1 from t1 where not exists(select 1 from t1 where (e>19)))),t1.d))/abs(b)) and  -t1.d between t1.b and 13 or 17<>t1.e), -((11))) FROM t1 WHERE NOT (case when case when (not exists(select 1 from t1 where 19 not between case when coalesce((select b from t1 where (abs(t1.c)/abs(17))+t1.e between case when not exists(select 1 from t1 where not a<=t1.e) then t1.e when d<t1.c then 17 else  -d end and f),e)<13 then t1.a else t1.c end and e)) then +t1.a else d end not in (e,t1.d,t1.a) then t1.a when a in (select 19 from t1 union select t1.a from t1) then 19 else  -e end<t1.c)"
     end, {
         -- <randexpr-2.2159>
-        
+
         -- </randexpr-2.2159>
     })
 
@@ -21650,7 +21650,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select ( -t1.e*(abs((case when not 13 not in (case coalesce((select max(t1.f) from t1 where not exists(select 1 from t1 where d between  -b and f)),11) when 11 then 19 else a end,t1.a,t1.a) then f-t1.f when t1.c in (select  -abs(count(*)+(max((t1.a)))) from t1 union select  -max((19)) from t1) then d else 13 end-19))/abs(t1.b))-t1.d*e-19) from t1 where t1.e not between 13 and c),19)*13 FROM t1 WHERE NOT (19<>(t1.c))"
     end, {
         -- <randexpr-2.2161>
-        
+
         -- </randexpr-2.2161>
     })
 
@@ -21660,7 +21660,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(13) from t1 where f= -case when exists(select 1 from t1 where not t1.b>=e and b in (select b from t1 union select (+(t1.f-d)) from t1) or 19 in (select min(e) from t1 union select  -~+++ -abs(min(17*t1.d)) from t1) or not t1.a>a) then 13 else t1.c end+a | ~11),19) FROM t1 WHERE (exists(select 1 from t1 where t1.c>19)) and a>d-a"
     end, {
         -- <randexpr-2.2162>
-        
+
         -- </randexpr-2.2162>
     })
 
@@ -21690,7 +21690,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select case when a between (select count(distinct 19) from t1) and case when d<t1.d and (select min(d)*min(a) from t1)<=t1.c+d then case 11 when 13 then t1.b else t1.a end else t1.d end+19 and exists(select 1 from t1 where t1.b between  -t1.e and t1.d) then f-d when 13 not between  -(c) and 13 then t1.c else 17 end from t1 where t1.e not in (c,f,t1.b)), -b) FROM t1 WHERE case 13*(abs(c)/abs(c*d-~t1.f-case coalesce((select +t1.f-a from t1 where b in (13,t1.f,f+19*+c)),b-a+coalesce((select max(c) from t1 where t1.f=d),d)-t1.a) when 13 then t1.d else t1.d end)) when 19 then 13 else  -11 end | 19=t1.c"
     end, {
         -- <randexpr-2.2165>
-        
+
         -- </randexpr-2.2165>
     })
 
@@ -21720,7 +21720,7 @@ test:do_test(
         return test:execsql "SELECT case 17 when  -b then e*c else (abs(coalesce((select max(coalesce((select coalesce((select max(case when t1.d<=19 and t1.d>e then b*t1.e else a end) from t1 where t1.e=t1.e),t1.f) from t1 where (d not between 13 and (f))),17)-d) from t1 where (11<>19)),t1.e)+t1.c)/abs(t1.e))*11*c-t1.d*t1.d+a end FROM t1 WHERE NOT (13-e*t1.e<case when (coalesce((select max(c*13) from t1 where not exists(select 1 from t1 where (19+(coalesce((select coalesce((select max(a) from t1 where 17>=19),(abs(e)/abs((abs( -d+e)/abs(a))))+t1.a) from t1 where t1.b in (t1.e,(t1.e),t1.f)),f))=t1.e)) or b<=19),t1.b)<=13) then 13 else t1.f end-f)"
     end, {
         -- <randexpr-2.2168>
-        
+
         -- </randexpr-2.2168>
     })
 
@@ -21740,7 +21740,7 @@ test:do_test(
         return test:execsql "SELECT case when case when e*(d-case a when 13 then (19) else d end) between 13 and f then f when exists(select 1 from t1 where 19<>t1.a) then e else b end in (select  -max(e)+min(11)-case ~~cast(avg(t1.c) AS integer) when max(19) then max(f) else  -cast(avg(f) AS integer) end from t1 union select  -max(13) from t1) and f>d and (t1.f=c) then t1.b else t1.c+ -t1.f end FROM t1 WHERE NOT (t1.e+11>=~t1.a-11)"
     end, {
         -- <randexpr-2.2170>
-        
+
         -- </randexpr-2.2170>
     })
 
@@ -21750,7 +21750,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.f from t1 where not (abs(coalesce((select 17*13+(select cast(avg(t1.a) AS integer)-(count(distinct t1.c)*+cast(avg((select count(*) from t1)) AS integer))+count(*) from t1) from t1 where (select count(distinct t1.d*(((t1.d)))+f) from t1) in ( -b*t1.e-11,t1.d,d) and exists(select 1 from t1 where t1.d>c)),t1.e))/abs(b)) not in (t1.f,11,d)),t1.d) FROM t1 WHERE exists(select 1 from t1 where +t1.c-case when exists(select 1 from t1 where (select +case count(distinct case when 19*d in (select (cast(avg(11) AS integer)*cast(avg( -13) AS integer)) from t1 union select count(*) from t1) then t1.c else 13 end) when count(*) then count(*) else (min(t1.b)) end from t1)<>case when (not t1.f<b) or b>t1.d then case when f>=17 then t1.a else t1.e end else b end) then 11+t1.f when d<>17 then t1.e else a end- -13<>e) and t1.a<=17"
     end, {
         -- <randexpr-2.2171>
-        
+
         -- </randexpr-2.2171>
     })
 
@@ -21780,7 +21780,7 @@ test:do_test(
         return test:execsql "SELECT case when not (select  - -count(distinct t1.f)-(max(case when e not between f and t1.b+(13)+ -d-t1.a then t1.d else 11 end))+ -max(t1.b)*cast(avg(13) AS integer)-count(*) | (max(t1.e)) from t1)<>~t1.d then b when  -coalesce((select (abs(t1.e)/abs(t1.b)) from t1 where a<>b), - -17)<=t1.a then  -f else 11 end FROM t1 WHERE NOT (t1.a<>(select max(19) from t1))"
     end, {
         -- <randexpr-2.2174>
-        
+
         -- </randexpr-2.2174>
     })
 
@@ -21810,7 +21810,7 @@ test:do_test(
         return test:execsql "SELECT case when case coalesce((select t1.d+a*11 from t1 where e<=t1.d),19) when 19 then  -t1.d-t1.a else t1.e end not between 17 and d then t1.f when not (t1.c<=e and ((13<>e or t1.c not between t1.c and 13)) or t1.c=17 and t1.a not in (t1.e, -t1.d,t1.b) and b<t1.e) and c>=b then t1.d else 13 end FROM t1 WHERE NOT ((case t1.f when t1.b then case when case when not exists(select 1 from t1 where (t1.d+t1.a in (c,coalesce((select max(t1.c) from t1 where exists(select 1 from t1 where (t1.a>=c))),+b), -t1.b))) then (select abs( -case ((abs( - - -count(*)+count(*)))) when min(d) then  -(cast(avg(t1.d) AS integer)) else cast(avg(e) AS integer) end | ((max((t1.f)))))+(min(t1.c)) from t1) else 11 end>f then 19 else t1.b end else b end)<=13 or (t1.f>b))"
     end, {
         -- <randexpr-2.2177>
-        
+
         -- </randexpr-2.2177>
     })
 
@@ -21820,7 +21820,7 @@ test:do_test(
         return test:execsql "SELECT (((d)+t1.f))-case +t1.d when coalesce((select max(13) from t1 where (select  -max(17*case when d>=coalesce((select 19 from t1 where a<>t1.e),t1.b) then e when  -c<>d then e else t1.a end*t1.f)+ -case count(*) when (+cast(avg(c) AS integer)) then count(*) else  -count(distinct t1.f) end+count(*) from t1)<=(abs(t1.c)/abs(t1.f))),17) then 17 else t1.d end-t1.b FROM t1 WHERE ~d-c in (select cast(avg(19) AS integer) from t1 union select  - -abs((abs((cast(avg(f) AS integer)) | abs(count(distinct 19))))) from t1)"
     end, {
         -- <randexpr-2.2178>
-        
+
         -- </randexpr-2.2178>
     })
 
@@ -21850,7 +21850,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(f+t1.c*b) from t1 where (select abs(cast(avg(f) AS integer)) from t1)-c*~ -b+ -coalesce((select max(t1.a) from t1 where (select cast(avg((c) | ~t1.d) AS integer) from t1) not between t1.d-+(abs(t1.d)/abs(t1.c))+d and 11 and 17>=t1.e),t1.e)-b in (t1.c,d,e)),a)+c FROM t1 WHERE NOT (19*e not in (a,t1.d,coalesce((select coalesce((select max(t1.d) from t1 where (exists(select 1 from t1 where not exists(select 1 from t1 where e*case when ~c | f+11* -a in ( -t1.c,17,(t1.b)) then (f) when e=e or t1.d=f and (e)>(e) then (11) else a end+a*c in (select d from t1 union select  -11 from t1))))),t1.f) from t1 where t1.d<=d),13)))"
     end, {
         -- <randexpr-2.2181>
-        
+
         -- </randexpr-2.2181>
     })
 
@@ -21870,7 +21870,7 @@ test:do_test(
         return test:execsql "SELECT c*~case ((abs(t1.b)/abs(t1.b))) when c then e else t1.c end-(case when (c)>=case coalesce((select max((abs(d)/abs(c))) from t1 where 13 not in (a-t1.e-(select count(*) | min(e)+min(c) from t1)*19*t1.b,11,a)),e) when e then b else t1.d end then d when 17<11 then c else t1.d end) | t1.f FROM t1 WHERE case when not (abs(t1.d | (abs( - -coalesce((select max(coalesce((select c+e from t1 where not t1.b in ((c),b,(f))),t1.b)) from t1 where 11=b),t1.f)+13*t1.f*e)/abs(t1.e)))/abs(t1.b))>=c then coalesce((select (t1.c) from t1 where t1.e in (11,e,t1.a)),a) when 13<=t1.b then t1.f else t1.d end in (select e from t1 union select (t1.d) from t1)"
     end, {
         -- <randexpr-2.2183>
-        
+
         -- </randexpr-2.2183>
     })
 
@@ -21910,7 +21910,7 @@ test:do_test(
         return test:execsql "SELECT case when a+13*+ -~case when 17=t1.c*17 then 19 | (t1.b) when f+t1.e+(d)+b+c not between (d) and e or (a between t1.b and t1.a) then 17 else a end-17-(e)<=17 then b when c in (select 17 from t1 union select t1.a from t1) then c else t1.e end FROM t1 WHERE NOT (e-coalesce((select f-case 17+t1.a*(abs(t1.e)/abs((abs(coalesce((select max(+ -case when t1.a>=d then c else t1.e end-d) from t1 where (not exists(select 1 from t1 where (t1.d in ( -f,d,t1.b))) or  -t1.f not between  -b and t1.b)),11))/abs(13)))) when 13 then d else t1.f end from t1 where t1.e in ((19),t1.e,17) or e>=t1.d),e)<>17 or 19<=19)"
     end, {
         -- <randexpr-2.2187>
-        
+
         -- </randexpr-2.2187>
     })
 
@@ -21940,7 +21940,7 @@ test:do_test(
         return test:execsql "SELECT 17-t1.a*(select abs(~count(*)*abs(count(distinct a)) | (~count(distinct case (a* -coalesce((select a from t1 where (13 in (select max((abs(t1.e)/abs(case when not exists(select 1 from t1 where (b<>c)) then (11)-t1.f-e else e end))) from t1 union select (count(distinct 11)) from t1))),t1.b)+11) when (17) then e else f end))) from t1) FROM t1 WHERE NOT (13>case (e) when t1.a then t1.a else 11 end-t1.b)"
     end, {
         -- <randexpr-2.2190>
-        
+
         -- </randexpr-2.2190>
     })
 
@@ -21970,7 +21970,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.b= -b then e else (select  -(count(distinct t1.a))*max(c)-count(*)+count(distinct t1.b+d)*min(t1.f-case when 19 in (select t1.d from t1 union select e from t1) then 17 when f<=t1.c then t1.b else e end-(d)*c)-count(distinct t1.d)*case +max(f) when max(17) | max(d) |  -(cast(avg(d) AS integer)) then  -cast(avg(11) AS integer) else  -count(distinct 11) end*min(t1.d) from t1) end FROM t1 WHERE NOT (t1.f>=f)"
     end, {
         -- <randexpr-2.2193>
-        
+
         -- </randexpr-2.2193>
     })
 
@@ -21990,7 +21990,7 @@ test:do_test(
         return test:execsql "SELECT  -~f | (abs(13+t1.b)/abs((select max(t1.b | t1.f+ -17-11) | +case min(e) when count(*) | case (~ -min(c)*cast(avg(19) AS integer)) when  -count(*) then min(a) else min(13) end then  -((max(t1.c))) else max(e) end-(count(distinct  -t1.a)) from t1)))+~(abs((abs(case when a<>19 then t1.a when f>17 then a else b end)/abs(t1.b)))/abs(t1.f)) FROM t1 WHERE (17 between t1.f*(abs(b)/abs((abs((select max(17) from t1) | 17)/abs(13))+c-coalesce((select max(d) from t1 where d between f-a-11-d and a+t1.a+d-t1.b+17+13),case when a not between a and t1.b then t1.d when t1.d not in ((e),a,d) then c else b end*d))) and b and t1.e> -17)"
     end, {
         -- <randexpr-2.2195>
-        
+
         -- </randexpr-2.2195>
     })
 
@@ -22010,7 +22010,7 @@ test:do_test(
         return test:execsql "SELECT (select abs(abs( -case case ~count(distinct t1.f+(t1.f)+coalesce((select (abs(t1.e+(b)+a)/abs(11))+b from t1 where exists(select 1 from t1 where t1.f not in (t1.b,(b),e) and not (t1.b)>c)),f)) when ~count(*)-min(t1.f) then +(count(*))*( -count(*)-max(t1.a)) else min(11) end when count(distinct (f)) then  -count(distinct a) else count(*) end | count(distinct 13))) from t1) FROM t1 WHERE exists(select 1 from t1 where case when t1.f>(abs(b)/abs(a)) then ~case when t1.e+13-b<=(coalesce((select max(11) from t1 where (select abs(min(11)) from t1) in (select case d when f then 17 else t1.f end from t1 union select t1.f from t1)),b)*13)-19 then 11 when not 19 between t1.c and t1.b then a else e end-t1.a when (t1.a) not between b and t1.f then t1.a else c end=t1.e)"
     end, {
         -- <randexpr-2.2197>
-        
+
         -- </randexpr-2.2197>
     })
 
@@ -22040,7 +22040,7 @@ test:do_test(
         return test:execsql "SELECT 19 | t1.a*(select case max(case when t1.b*17>=t1.b then coalesce((select max(e) from t1 where e in (select count(*) from t1 union select count(distinct t1.f) from t1)),d) when t1.a in (select min(11) from t1 union select (( -( -max(t1.f)))) from t1) and 17 in (select count(distinct 17) from t1 union select  -count(distinct d) from t1) and (d)<>t1.c and t1.c not between b and b then a else 11 end)+cast(avg(t1.a) AS integer) when ~count(distinct t1.e) then count(distinct d) else count(distinct e) end from t1) | e*t1.b-t1.d FROM t1 WHERE (((abs(19)/abs(case ~c*d+(abs(e)/abs((coalesce((select case when (f in (select count(*) from t1 union select  -min(d) from t1)) then case when  -t1.f between t1.c and t1.f then b when 11<>a then t1.a else t1.c end when 13=13 then 13 else t1.a end from t1 where 19 not between 11 and t1.b or t1.b not in ((e),(b),c)),a)- -((t1.c))-c)))+t1.b+17 when 13 then ((13)) else t1.f end*t1.b)) in ( -17,t1.a,11)))"
     end, {
         -- <randexpr-2.2200>
-        
+
         -- </randexpr-2.2200>
     })
 
@@ -22070,7 +22070,7 @@ test:do_test(
         return test:execsql "SELECT c-coalesce((select  -coalesce((select max(case when (abs(~~case when case when t1.e<=e and t1.f>t1.d then b when t1.a<>t1.a then 17 else 17 end+t1.c>=t1.a then (c) when c not in (f,e,t1.c) then t1.d else 13 end)/abs(t1.a))<t1.b then t1.e when c<=t1.a then b else d end) from t1 where (19) not in (13,t1.e,f)),17) from t1 where 19>c),t1.a)*19 FROM t1 WHERE (17) | case when 19 not in ((case when (e*19=f) then case t1.f when a then 13 else t1.d end when b<t1.f then f else a end)*t1.d,c, -t1.f) then t1.f when (e=(d) and 19<>t1.b) then f else a end in (select c from t1 union select  -13 from t1) or 17 in (select 19 from t1 union select d from t1) and t1.b in (c,b,19) and t1.b>=( -b)"
     end, {
         -- <randexpr-2.2203>
-        
+
         -- </randexpr-2.2203>
     })
 
@@ -22090,7 +22090,7 @@ test:do_test(
         return test:execsql "SELECT 13+case when not (t1.d in (11,f,t1.a)) then coalesce((select +t1.e from t1 where case t1.e when t1.b then 19+t1.a+~e+a*t1.a else 11 end not between 19 and 19),(abs(t1.f-case when (19)<t1.a and d=t1.d then a else a end-f)/abs(13))*c+t1.c)+c else 19 end*t1.e FROM t1 WHERE t1.e in (select +count(distinct a-(select count(*)+count(distinct (abs((select max(coalesce((select case d++11+(t1.c-t1.d-t1.e*t1.e) when t1.a then t1.b else t1.b end from t1 where f in (select (abs(case when e not between  -t1.a and f then 11 when t1.b>=17 then t1.c else t1.f end)/abs(19)) from t1 union select c from t1)), -d)) from t1))/abs(t1.d))) from t1)*(c) | 11+t1.c*t1.b) from t1 union select cast(avg(t1.c) AS integer) from t1)"
     end, {
         -- <randexpr-2.2205>
-        
+
         -- </randexpr-2.2205>
     })
 
@@ -22120,7 +22120,7 @@ test:do_test(
         return test:execsql "SELECT case when  -11-t1.b-f-t1.b>~c then t1.e else case when t1.d<>b*~17+t1.d*(select max(+(select count(distinct t1.a)+ -cast(avg(d) AS integer)*max(13) from t1)) from t1) or (abs(c)/abs(c)) not in (11,d,t1.c) then 13 when d in (select f from t1 union select b from t1) then t1.f else  -t1.a end+ -f end FROM t1 WHERE NOT (~t1.b*19-d not between ~b and t1.f)"
     end, {
         -- <randexpr-2.2208>
-        
+
         -- </randexpr-2.2208>
     })
 
@@ -22140,7 +22140,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.b from t1 where coalesce((select max(coalesce((select max(t1.a) from t1 where t1.c=t1.e),case b-f when f then e else 13 end-t1.d)) from t1 where not exists(select 1 from t1 where  -t1.f>=17)),a)*(19) in (select max(d) from t1 union select case  -count(*) when +count(distinct (t1.f)) then min(t1.d) else count(*) end from t1) and a<=f and d not between b and 19 and not exists(select 1 from t1 where b between t1.c and e or c<>t1.f)),17) FROM t1 WHERE NOT (t1.a-19<>c*d)"
     end, {
         -- <randexpr-2.2210>
-        
+
         -- </randexpr-2.2210>
     })
 
@@ -22160,7 +22160,7 @@ test:do_test(
         return test:execsql "SELECT (coalesce((select case (select ~count(*) | max(b+t1.b)+case max((abs(+coalesce((select max(f) from t1 where not (17=e)),t1.f))/abs(b))*a) when  -~~ -(cast(avg(13) AS integer)) | count(*) then min(13) else count(*) end-count(distinct d) from t1) when 17+t1.d then t1.a else 13 end from t1 where e not between 13 and 11),11)+t1.e+b) FROM t1 WHERE NOT (not f in (select t1.e from t1 union select t1.f from t1) or 13 not in (t1.b | t1.e,t1.f,d) or (abs(f)/abs(+(abs(f+(select max(case when ((13<>t1.c)) then 13 else t1.c end) | ~min(t1.a)+cast(avg(a) AS integer) from t1)*(d)-b)/abs(d))*e))-t1.b not in (t1.c,f,t1.d) and t1.b<>t1.f)"
     end, {
         -- <randexpr-2.2212>
-        
+
         -- </randexpr-2.2212>
     })
 
@@ -22190,7 +22190,7 @@ test:do_test(
         return test:execsql "SELECT t1.b-c*a*t1.b+ -f | (case when 13<f then d else t1.a+case (select +min(a) from t1) when case when a<=d*a | e then b when not f not between e and 17 or not 19=coalesce((select 13 from t1 where t1.f in (t1.b,t1.d,t1.a)),d) then 11 else (13) end then 11 else (a) end end-b) FROM t1 WHERE NOT (exists(select 1 from t1 where t1.a>17))"
     end, {
         -- <randexpr-2.2215>
-        
+
         -- </randexpr-2.2215>
     })
 
@@ -22220,7 +22220,7 @@ test:do_test(
         return test:execsql "SELECT ~(select (abs(cast(avg(((b)-d*t1.a-c+17+f+e+ -17)) AS integer))) from t1)*t1.c++ -(11-t1.b*~f-e*t1.b)-coalesce((select max(case when not c=13 then 17 else b end) from t1 where (t1.a>17)),c) |  -f-f FROM t1 WHERE NOT (a+coalesce((select max(coalesce((select max(f) from t1 where ((not b in (select t1.b from t1 union select (select  -cast(avg(t1.b) AS integer) from t1) from t1)) or not t1.d= -t1.c and 19<=t1.c)),t1.f)-coalesce((select c from t1 where d<=t1.a), -e)) from t1 where d in (select t1.d from t1 union select t1.d from t1)),t1.d)-a | t1.b>(f) or t1.d between 19 and t1.c and exists(select 1 from t1 where b=13) and not 13 not in (t1.d,(c),d) and e not between 17 and 13)"
     end, {
         -- <randexpr-2.2218>
-        
+
         -- </randexpr-2.2218>
     })
 
@@ -22250,7 +22250,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.a in (select count(*) from t1 union select cast(avg(t1.a) AS integer)*count(distinct 17) |  -count(*) from t1) then ~coalesce((select max(19+t1.a) from t1 where +d=t1.a),case t1.c-(select count(*) from t1) when coalesce((select (abs((select (cast(avg(13) AS integer)) from t1))/abs(13)) from t1 where f<~13-(t1.a)*19),d) then a else 19 end) | b when t1.d>a then f else b end FROM t1 WHERE NOT (19<=case when (t1.a*11*19-e<>(select abs(min(e))+case  -abs(abs( - -( -(( -max(c)))))-(min(c))) when min(e) then  -(min(f)) else  - -min(t1.a) end from t1)*t1.d) then e+f+coalesce((select max(e-a) from t1 where (t1.b) between 11 and  -t1.c),c) when t1.c<=17 then 17 else t1.b end and 19<>t1.f)"
     end, {
         -- <randexpr-2.2221>
-        
+
         -- </randexpr-2.2221>
     })
 
@@ -22280,7 +22280,7 @@ test:do_test(
         return test:execsql "SELECT c-case when t1.e>coalesce((select case  -t1.d-case when d in (select  -t1.f from t1 union select t1.c+t1.c from t1) and (t1.a<=t1.a) then 11*(17) when d between 11 and e or  -c<>t1.f then 19 else 19 end+11 when 19 then b else t1.b end-t1.a from t1 where not e<=f),( -t1.f)) then b when ((d<c)) then 19 else f end FROM t1 WHERE NOT (t1.c in (t1.c,~19,13))"
     end, {
         -- <randexpr-2.2224>
-        
+
         -- </randexpr-2.2224>
     })
 
@@ -22290,7 +22290,7 @@ test:do_test(
         return test:execsql "SELECT (abs(~(select case max(t1.a) when min(coalesce((select ~coalesce((select max((abs(e)/abs(t1.d))*t1.b*13+t1.b) from t1 where t1.d=t1.f),t1.e)-d from t1 where e between t1.f and 19),(b))) then ~case ~cast(avg(t1.b) AS integer)+~case cast(avg(f) AS integer) when min(19) then  -min(t1.f) else (cast(avg(e) AS integer)) end when cast(avg(f) AS integer) then count(*) else count(distinct c) end-cast(avg(11) AS integer) else cast(avg(t1.f) AS integer) end | min(b) from t1))/abs(t1.b)) FROM t1 WHERE e<a"
     end, {
         -- <randexpr-2.2225>
-        
+
         -- </randexpr-2.2225>
     })
 
@@ -22330,7 +22330,7 @@ test:do_test(
         return test:execsql "SELECT case when not (select  -case (( -(count(*)) | cast(avg(d) AS integer))) | min((e)) when cast(avg(d) AS integer) then count(*) else count(distinct t1.e) end+max((17)) | max(t1.a)+ -count(*) from t1)-e in (t1.a,11-t1.d,t1.b) and coalesce((select max(t1.c) from t1 where case t1.d when t1.f then d else b end<>t1.d),d)>=13 then coalesce((select  -17+e from t1 where t1.a<=19),b) else (19) end FROM t1 WHERE NOT ((abs( -t1.f)/abs(t1.a))<=t1.d)"
     end, {
         -- <randexpr-2.2229>
-        
+
         -- </randexpr-2.2229>
     })
 
@@ -22360,7 +22360,7 @@ test:do_test(
         return test:execsql "SELECT case when 13 in (select cast(avg(11) AS integer) from t1 union select count(*) from t1) then t1.f-case c-(abs(d+~+t1.d-(abs(13)/abs(t1.e-t1.b-t1.c))*e)/abs(17*19+t1.e)) when 19 then 17 else a end when (t1.a in (select count(distinct 13) from t1 union select max(t1.f) from t1)) and c between ((c)) and (t1.a) then c else 19 end+t1.e FROM t1 WHERE NOT (19<>t1.c)"
     end, {
         -- <randexpr-2.2232>
-        
+
         -- </randexpr-2.2232>
     })
 
@@ -22380,7 +22380,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(case when not exists(select 1 from t1 where coalesce((select a from t1 where (t1.c+t1.d<=t1.b and exists(select 1 from t1 where t1.f not in (~case when t1.d>d then t1.a else a end,( -e),t1.b))) and (c<>17)),e) in (select e from t1 union select d from t1)) then case when b not in (a,17,e) or f=t1.e then t1.d else d end else a end*19) from t1 where ((t1.c not between e and t1.e))),13) FROM t1 WHERE NOT (c not in (~t1.e,t1.e,a))"
     end, {
         -- <randexpr-2.2234>
-        
+
         -- </randexpr-2.2234>
     })
 
@@ -22400,7 +22400,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.f from t1 where d+(select count(distinct e) from t1)+~+ -~e-a+t1.a-b- -a*coalesce((select c-t1.d*case when ( -11<=e or b>= - -c and t1.c<t1.f) then (t1.d)-11 when a not between t1.b and t1.e then 11 else b end from t1 where t1.e<=11),t1.f)*t1.e<>19),t1.f) FROM t1 WHERE NOT (t1.f<>c)"
     end, {
         -- <randexpr-2.2236>
-        
+
         -- </randexpr-2.2236>
     })
 
@@ -22420,7 +22420,7 @@ test:do_test(
         return test:execsql "SELECT 19+case when d between t1.b and 19+t1.d*(select ~min(t1.e | a) from t1)-case when exists(select 1 from t1 where 19<>t1.a and 19 between case +19 when 19 then t1.e else e end and t1.a) then a when t1.a between 13 and f or (t1.f<19) and d>=t1.c and f not between a and t1.b then a else t1.d end then b else t1.a end+ -d FROM t1 WHERE NOT (f>=t1.d+(t1.a))"
     end, {
         -- <randexpr-2.2238>
-        
+
         -- </randexpr-2.2238>
     })
 
@@ -22450,7 +22450,7 @@ test:do_test(
         return test:execsql "SELECT t1.d+(select case max(t1.f) when count(distinct ~coalesce((select case when 17 in (select t1.b from t1 union select t1.e from t1) then c when (d<= -(abs(t1.a)/abs(t1.d))) then t1.b+ -case when t1.b<b then f when d not in ( - -f,11,t1.c) then d else t1.d end*a | d else e end-t1.e from t1 where a<f or a=f),c)) then cast(avg(17) AS integer) else  -~count(*) end from t1)+e FROM t1 WHERE NOT ((e-coalesce((select b+11+( -t1.e) | coalesce((select (abs(c)/abs(coalesce((select max(t1.b) from t1 where t1.d<=f),c)*t1.b)) from t1 where 13 not in (f,19,b)),e)+t1.b+t1.e+13+19-t1.b-t1.c from t1 where d>t1.a or t1.d>=t1.f),t1.a)-e)<=t1.e)"
     end, {
         -- <randexpr-2.2241>
-        
+
         -- </randexpr-2.2241>
     })
 
@@ -22470,7 +22470,7 @@ test:do_test(
         return test:execsql "SELECT (select count(distinct (select case ~abs(~+abs(case (max(17)) when max(coalesce((select ~b from t1 where (not exists(select 1 from t1 where  -17<>f or t1.d>=b and 19 between 19 and t1.b))),(abs(case when 19<>a then t1.c else t1.b end)/abs(19)))) then ~+cast(avg(19) AS integer) else min(t1.a) end) | case min(13) when max(11) then count(distinct  -d) else count(distinct t1.d) end)*max(t1.d) when count(*) then  -min(e) else (count(*)) end+count(*) from t1)) from t1) FROM t1 WHERE (d in (select abs(count(*) | case max((case when b<=13 then t1.b*e when case when t1.c between t1.d and a then t1.a when (f< -19) then t1.c else d end between t1.d and b then t1.e else t1.b end))-max((t1.c)) when max(t1.f) then  -abs(+cast(avg(19) AS integer)) else abs(max(t1.c)) end++max(17))- -cast(avg(f) AS integer) from t1 union select min(11) from t1))"
     end, {
         -- <randexpr-2.2243>
-        
+
         -- </randexpr-2.2243>
     })
 
@@ -22510,7 +22510,7 @@ test:do_test(
         return test:execsql "SELECT case d*coalesce((select e from t1 where t1.f in (case when not exists(select 1 from t1 where 19>=(+f-13)) then case when not not exists(select 1 from t1 where 17>=t1.d-13) then f else d end else t1.c end,c,+(abs(e)/abs(19*d | case 19 when b then 17 else b end-b))) or e between 13 and a),19) when b then c else t1.b end FROM t1 WHERE NOT (t1.b<=coalesce((select coalesce((select t1.a from t1 where not t1.b*(select max(t1.d) from t1)<a),e)-b-~11+t1.d from t1 where c not in (((abs((select  -case  -case abs(+count(*)-(count(distinct a))) when min(a) then min(d) else cast(avg(t1.a) AS integer) end when min(19) then cast(avg(a) AS integer) else min(d) end from t1) | d)/abs(d)))+19,17,11-c)),t1.c))"
     end, {
         -- <randexpr-2.2247>
-        
+
         -- </randexpr-2.2247>
     })
 
@@ -22520,7 +22520,7 @@ test:do_test(
         return test:execsql "SELECT 13-case when f in (select t1.f from t1 union select ~17 from t1) then ~t1.c*t1.f-(abs(17-e*c)/abs(b))*t1.b-11-a+19-coalesce((select (abs(case  -(abs(coalesce((select t1.f from t1 where t1.e in (t1.a,b,f)),t1.a))/abs(c)) when c then t1.c else c end)/abs(17)) from t1 where e<t1.c),f) else t1.c end- -d FROM t1 WHERE 17 in (select t1.f from t1 union select t1.d from t1) and (select max((case when t1.d*19 not between  -t1.e-case when e=t1.f then (select abs(max( -17)-count(*)-min(13)) from t1) else b- -(c) end*d* -t1.c and 11 then 19 else e end-t1.a-t1.f)+(a)) from t1) in (t1.b,b,t1.f) and 11<=e"
     end, {
         -- <randexpr-2.2248>
-        
+
         -- </randexpr-2.2248>
     })
 
@@ -22550,7 +22550,7 @@ test:do_test(
         return test:execsql "SELECT case when case when case when case when t1.b<> -c then (b)* -19 else t1.d end<=11 or 17 not between t1.f and 13 or a not in (t1.c,t1.b,11) then c else c end<>t1.a and (f) in (select cast(avg(11) AS integer) from t1 union select case max(b) when (min(t1.c)) then count(distinct f) else max(19) end from t1) then 13 else d end | f-t1.d<=t1.f then f else 19 end FROM t1 WHERE NOT (((f not between t1.f and d)))"
     end, {
         -- <randexpr-2.2251>
-        
+
         -- </randexpr-2.2251>
     })
 
@@ -22580,7 +22580,7 @@ test:do_test(
         return test:execsql "SELECT d-b-(abs(a)/abs(coalesce((select b from t1 where coalesce((select t1.f from t1 where 13>=f-b),t1.c)*case when coalesce((select case (d*t1.e+b) when t1.a-13 then  - -t1.d else t1.a end+13 from t1 where e>=t1.f),11) | b<t1.e then d else c end between c and d),11)-19))+11 FROM t1 WHERE NOT (d>=case when coalesce((select max(case when f<>~b | coalesce((select max(11*c) from t1 where 17=t1.f),t1.d)*d then b when a in (c,(t1.d),(f)) then a else 19 end-t1.f) from t1 where not 13 in (select cast(avg(t1.b) AS integer)-cast(avg( -t1.a) AS integer) from t1 union select count(*) from t1)),17) not in ((t1.f),c, -19) and e between 11 and (19) then 19 else t1.d end)"
     end, {
         -- <randexpr-2.2254>
-        
+
         -- </randexpr-2.2254>
     })
 
@@ -22610,7 +22610,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(coalesce((select 13 from t1 where not t1.b<>e*b),t1.c*case when d>=case case 13 when coalesce((select ~~t1.f*(abs(t1.f)/abs(t1.e))-e |  -t1.b from t1 where a in (11,13,t1.e)),d)*t1.e then  -e else t1.b end when t1.e then 11 else t1.e end then  -f else c end) | t1.a) from t1 where e>t1.d), -(t1.f)) FROM t1 WHERE NOT (not  -13 in (select (+(case case min(a+t1.a) when abs(count(*)-count(distinct t1.d-+(f)-case 19 when b then t1.b else a end)) then case count(*)*max(c) when ~ -count(*)*cast(avg(t1.e) AS integer)*count(distinct  -a) then count(*) else cast(avg(19) AS integer) end else cast(avg(b) AS integer) end when min(f) then max( -a) else (count(*)) end)*count(distinct t1.f)-count(*)) from t1 union select count(distinct f) from t1))"
     end, {
         -- <randexpr-2.2257>
-        
+
         -- </randexpr-2.2257>
     })
 
@@ -22640,7 +22640,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.e*~t1.b- -t1.b-t1.b-coalesce((select t1.a from t1 where exists(select 1 from t1 where ~d+case case when a between b and f then 13 else  -17 end-13 when  -19 then t1.f else d end+t1.b<>e or not t1.e between 19 and t1.a or 11 in (19,c, -19))),a)*e) from t1 where t1.f<19),t1.e)-13 FROM t1 WHERE NOT (t1.b not between e and 13)"
     end, {
         -- <randexpr-2.2260>
-        
+
         -- </randexpr-2.2260>
     })
 
@@ -22650,7 +22650,7 @@ test:do_test(
         return test:execsql "SELECT (select (count(distinct case t1.d+case when (coalesce((select max((select + -cast(avg(b) AS integer)-min(19) | (cast(avg(19) AS integer)) from t1)) from t1 where ~c+t1.c<t1.d),(c)) in (select t1.c from t1 union select t1.f from t1)) then (select abs( -min(t1.e)) | min(t1.c) from t1) when 11 not between  -d and a or a<>t1.a and f between t1.e and d and f<=19 then t1.f else t1.b end-c*a when t1.f then e else t1.b end)) from t1) FROM t1 WHERE not b*c+d<>b"
     end, {
         -- <randexpr-2.2261>
-        
+
         -- </randexpr-2.2261>
     })
 
@@ -22680,7 +22680,7 @@ test:do_test(
         return test:execsql "SELECT t1.b+case case c when f-((abs(t1.f)/abs(coalesce((select max(f+t1.d | t1.c*e+f+~case when c not between b and t1.a or 11<19 then c-d else t1.f end+e-t1.b*11+t1.e) from t1 where 17 not between e and 19),19)))) then d else a end when (t1.c) then t1.f else f end FROM t1 WHERE (b)-t1.c*19-t1.b>17*b-13"
     end, {
         -- <randexpr-2.2264>
-        
+
         -- </randexpr-2.2264>
     })
 
@@ -22710,7 +22710,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select coalesce((select ((abs(19)/abs(17))) from t1 where +13 | d>d),13-(select abs(abs(~count(*)))+~count(*) from t1)+(t1.c*t1.e*(abs(19+(13))/abs(a)))-coalesce((select 17 from t1 where c<>e and b not in ((d),t1.b,b)),t1.c)+t1.d)-13 from t1 where t1.f<b),11)+ -t1.c FROM t1 WHERE (t1.e in (select  -(+min(f*t1.c)- -max(t1.a))-+min(b) | count(distinct 17) from t1 union select abs(case count(*) when abs(min(d*t1.c-t1.b*~b+c) | (max(case when not 19<(e) then 19 when  -17>19 then 17 else t1.c end)-count(*))) then max(11) else +max(b) end) from t1))"
     end, {
         -- <randexpr-2.2267>
-        
+
         -- </randexpr-2.2267>
     })
 
@@ -22750,7 +22750,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select case d when e then t1.f else d++(abs((select count(*) from t1)-case when t1.f*case when t1.b-c in (select  -cast(avg(e) AS integer) from t1 union select max(t1.a) from t1) or b between t1.a and  -17 and  -t1.f not between 17 and a then t1.e when 17<>11 then (abs(19)/abs(f)) else 17 end-17 not in (13,11,c) then t1.f else t1.c end)/abs(c))*t1.e end from t1 where f between t1.c and 17),t1.f) FROM t1 WHERE NOT (t1.b<>19)"
     end, {
         -- <randexpr-2.2271>
-        
+
         -- </randexpr-2.2271>
     })
 
@@ -22760,7 +22760,7 @@ test:do_test(
         return test:execsql "SELECT t1.f-case when ((t1.a in (select case case +min(case when coalesce((select max(a) from t1 where t1.e not between f and t1.b),f)<>(t1.d) then  - -t1.f else 19 end)-case count(*)+(count(distinct t1.d)) when  -min(e) then max(t1.f) else min(19) end when cast(avg(13) AS integer) then cast(avg( -t1.a) AS integer) else (min(t1.f)) end when (count(distinct t1.e)) then  -cast(avg(a) AS integer) else cast(avg(19) AS integer) end | count(distinct 13)+ -count(*) from t1 union select  -max(t1.b) from t1))) then a when d between a and 11 or t1.e<>c then +t1.a-(t1.e) else t1.e end FROM t1 WHERE t1.e between d | t1.a*13 and 11+13*17+b*c++13-~b"
     end, {
         -- <randexpr-2.2272>
-        
+
         -- </randexpr-2.2272>
     })
 
@@ -22790,7 +22790,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select ~(abs(e)/abs(case when exists(select 1 from t1 where 19=+c or exists(select 1 from t1 where not exists(select 1 from t1 where 11>=d or b not between b and 19)) or t1.a not in (t1.a,(11),13)) then e-13+a-c else a end))*t1.f-(19) | 19 from t1 where t1.d in (select  -(cast(avg(19) AS integer)) from t1 union select count(distinct (t1.e)) from t1) and (f in (a,c,(t1.a))) and a between 11 and 11 and t1.d>=t1.f and 11 not in ((t1.f),e,(f)) and 13 not in (t1.c,t1.d,t1.c)),t1.d) FROM t1 WHERE not exists(select 1 from t1 where not coalesce((select max(b) from t1 where coalesce((select t1.f from t1 where t1.f not between t1.e and coalesce((select 13*+ -t1.a | e+case when t1.a not in (case t1.f when d then 19 else 11 end,f*e+19,t1.e+(d)) then 13 else t1.d end+t1.c-17 from t1 where t1.c>=t1.d),t1.c)),t1.d)>t1.c),11) not between b and t1.f)"
     end, {
         -- <randexpr-2.2275>
-        
+
         -- </randexpr-2.2275>
     })
 
@@ -22830,7 +22830,7 @@ test:do_test(
         return test:execsql "SELECT case when (select +case  -+ -case min(t1.f) when cast(avg(t1.a) AS integer) then abs(~case (min(t1.a)) when (count(*)) then (min(e)) else count(*) end) else ( -cast(avg(b) AS integer)) end*count(*) | count(distinct 11) when  -cast(avg(13) AS integer) then  -min(13) else max(b) end+max(a) from t1) in ((abs(coalesce((select max(11*a) from t1 where t1.b>11-(select  -cast(avg(t1.d) AS integer) from t1)),case when exists(select 1 from t1 where t1.f<13) then a else e end))/abs(c)) | t1.f,f,f) then t1.e else a end FROM t1 WHERE NOT ((select case min(case when not 17<11 then (abs(+(d)*t1.c+e-f)/abs(13)) when b between a and 11 then e else b end) when abs(min(t1.b) | (+count(*))) | ~case ( -count(*))-cast(avg(a) AS integer) when count(distinct t1.a) then  -count(distinct f) else count(distinct 11) end then max( -t1.d) else  -max(f) end from t1)-~c*t1.a not in (t1.e,t1.c,t1.a))"
     end, {
         -- <randexpr-2.2279>
-        
+
         -- </randexpr-2.2279>
     })
 
@@ -22860,7 +22860,7 @@ test:do_test(
         return test:execsql "SELECT case when ~t1.b | 13>=~coalesce((select t1.e from t1 where 11 in (select  -case +max(case when (t1.f) in (t1.b,t1.a,t1.f) then f else e end) when max(f)*cast(avg(t1.d) AS integer) then cast(avg(c) AS integer) else  -( - -max(t1.f)) end from t1 union select count(*) from t1)),b | ( -t1.e))*t1.c*t1.a*t1.d-f then a when 19 not between  -t1.e and t1.e or f not between  -a and 19 then d else 11 end FROM t1 WHERE NOT (not (d in (select t1.c from t1 union select 11 from t1)))"
     end, {
         -- <randexpr-2.2282>
-        
+
         -- </randexpr-2.2282>
     })
 
@@ -22890,7 +22890,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select c from t1 where 19 in (select case count(*) when count(distinct c)*+cast(avg(13) AS integer) then max(t1.d) else max(case case when exists(select 1 from t1 where 13 not in (d,e,(19)) and 13 between t1.d and t1.f) then t1.a when b in (t1.a,a,17) then case when t1.a not between 13 and c then (t1.b) else t1.b end else 19 end when 13 then a else 19 end) end from t1 union select (abs(abs(~cast(avg(t1.d) AS integer))) | cast(avg(t1.a) AS integer)) from t1)),t1.e-11)*(t1.a) FROM t1 WHERE NOT (not exists(select 1 from t1 where t1.e in (coalesce((select max(13) from t1 where 19 in (select f from t1 union select a from t1) or (not exists(select 1 from t1 where t1.a<=(19)*c*c | 13))),+e-(f)*case when t1.c not in (coalesce((select max(t1.a) from t1 where not c<(19)),19),e,(19)) then d else f end)+a,19,17)) or (d<t1.a))"
     end, {
         -- <randexpr-2.2285>
-        
+
         -- </randexpr-2.2285>
     })
 
@@ -22910,7 +22910,7 @@ test:do_test(
         return test:execsql "SELECT  -~a+d-case d when  -(select max(d)*~min(coalesce((select max(t1.e) from t1 where (exists(select 1 from t1 where 17<>13))),t1.a)-f-a+t1.f) | case (cast(avg(t1.c) AS integer)) when cast(avg(t1.a) AS integer)-(count(*))+max(19) then  - -max(19) else cast(avg(e) AS integer) end from t1)+(select cast(avg(b) AS integer) from t1) then t1.a else e-t1.d end-17+11 FROM t1 WHERE +c-(c)*d in (coalesce((select max( -t1.d-d-13) from t1 where (t1.c) not between (abs(13)/abs(t1.c)) and t1.b),d),11,c)"
     end, {
         -- <randexpr-2.2287>
-        
+
         -- </randexpr-2.2287>
     })
 
@@ -22940,7 +22940,7 @@ test:do_test(
         return test:execsql "SELECT case when 17 in (case (abs(coalesce((select max((select cast(avg(case when 17-(t1.b)+t1.a | b+b in (select b from t1 union select 17 from t1) then c when t1.f in (select t1.a from t1 union select 19 from t1) then 11 else t1.c end) AS integer) from t1)) from t1 where t1.e>=t1.e or (b)<b or t1.a>=b and c not in (f,t1.a,t1.a)),d))/abs(t1.b)) when 17 then t1.b else 13 end-a,13,17) then t1.a else  -d end FROM t1 WHERE t1.e<t1.e"
     end, {
         -- <randexpr-2.2290>
-        
+
         -- </randexpr-2.2290>
     })
 
@@ -22970,7 +22970,7 @@ test:do_test(
         return test:execsql "SELECT case t1.a when coalesce((select a from t1 where t1.b>19),b-case when +13>case when (coalesce((select b from t1 where coalesce((select max(t1.f) from t1 where 17<=case c when t1.e+f then d else case when 11<17 and t1.d<=t1.e then 13 when t1.d<>f then (t1.f) else c end end*t1.c),a) in (select 17 from t1 union select b from t1)),t1.c)>= -11) then (a)*t1.a else 19 end then 13 else 17 end*19) then d else (t1.a) end FROM t1 WHERE t1.d+t1.b not in (b,f,coalesce((select max(t1.b) from t1 where exists(select 1 from t1 where c-t1.b not between case when coalesce((select max(~t1.e) from t1 where f not in (t1.b,17,t1.a)),t1.e) not in (e,13,(t1.d)) then 11 when t1.d>=17 then t1.c else 11 end and (11) and (exists(select 1 from t1 where t1.b<>11))) or 13 in (select max(t1.d) from t1 union select max(b) from t1)),t1.b+19+a))"
     end, {
         -- <randexpr-2.2293>
-        
+
         -- </randexpr-2.2293>
     })
 
@@ -22990,7 +22990,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max((coalesce((select coalesce((select max(case when case when e<case 17 when case when t1.e=f then a else t1.b end then 13 else d end then t1.b when 13<>t1.f then t1.b else c end<b or 13<17 then e* -17 else 11 end*e | e) from t1 where 19<>19),t1.f) from t1 where t1.e<>t1.d),t1.b))) from t1 where 11=t1.c), -c) FROM t1 WHERE not exists(select 1 from t1 where  -~e not in (c++case when 17+t1.c<coalesce((select max(t1.c) from t1 where (not exists(select 1 from t1 where 19+coalesce((select a from t1 where d in (( -t1.a), - -b, -t1.f)),e)-a-c>=d))),f-13) then a else (t1.a) end+f*19-a,b,f)) and t1.a=b"
     end, {
         -- <randexpr-2.2295>
-        
+
         -- </randexpr-2.2295>
     })
 
@@ -23020,7 +23020,7 @@ test:do_test(
         return test:execsql "SELECT t1.b-11-case when t1.d+13+t1.c | 17+case when (+a*t1.b*t1.c not in (e,t1.f,t1.e)) then coalesce((select max(e) from t1 where t1.f>=f), -d) when f>b and t1.e<t1.a or t1.f>t1.c then 17 else  -13 end not in (f,t1.f,a) and exists(select 1 from t1 where a<=11) then t1.e else c end FROM t1 WHERE case f+~d*case when t1.f<=t1.b*t1.a then e*t1.e else f end*a+f when ~case when 11 not between +(abs(b)/abs(case b+d when t1.a then f else t1.e end*13))+a and (b) then t1.e when t1.e<>11 then t1.d else 17 end+11 then t1.d else t1.b end<=13"
     end, {
         -- <randexpr-2.2298>
-        
+
         -- </randexpr-2.2298>
     })
 
@@ -23050,7 +23050,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.a from t1 where d not between 11 and 13 or case 13*17 when  -c then case when (coalesce((select 17 from t1 where (~case when t1.e=d then 19 when 11 in (t1.d,b,17) then t1.c else c end-11 in (select max(e) from t1 union select (case cast(avg((t1.b)) AS integer) when max(11) then min(17) else ( -count(*)) end) from t1))),(19))>d) then t1.d else 11 end else t1.c end<=a),c) FROM t1 WHERE 19 | (abs(t1.d)/abs(11))=b"
     end, {
         -- <randexpr-2.2301>
-        
+
         -- </randexpr-2.2301>
     })
 
@@ -23070,7 +23070,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(17-t1.e-17) from t1 where (t1.c>d)),case when coalesce((select +f+~coalesce((select coalesce((select case when (select cast(avg(17) AS integer) | cast(avg(t1.e) AS integer) from t1)<>coalesce((select t1.e from t1 where 19 in (select count(*) from t1 union select  -( -count(*)) from t1)), -d) then b when exists(select 1 from t1 where t1.b between (t1.b) and 13) then a else  -b end from t1 where 19=e),t1.c) from t1 where t1.c<=b),t1.d) from t1 where 17 between t1.a and b),t1.e) between c and t1.e then  -t1.d else 13 end) FROM t1 WHERE exists(select 1 from t1 where t1.e-13-17-f*f*t1.d*coalesce((select 19-case when not not t1.d>e then case when t1.f<t1.a then case when e<=t1.c then t1.e when (c)>=t1.c then 19 else f end else  -t1.b end when e in (f,t1.e,17) then t1.a else t1.b end*t1.d from t1 where ((f)) in (select (~case count(distinct 11) when count(distinct t1.d) | count(distinct t1.b)-max( -f) then max(e) else (count(distinct (((a))))) end) from t1 union select max(e) from t1)),f)+c>=t1.f)"
     end, {
         -- <randexpr-2.2303>
-        
+
         -- </randexpr-2.2303>
     })
 
@@ -23100,7 +23100,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.b from t1 where exists(select 1 from t1 where (abs(~case (~13*case when c in (select (max(case when b<>11 then d when 13 not in (19,c,e) then t1.f else 19 end*t1.d)) from t1 union select abs(count(*)) | min(19) from t1) then t1.a else t1.c end-a-13-f*e*17) when f then t1.a else 13 end*t1.c)/abs(a))>t1.b)),13) FROM t1 WHERE ++case when a<=t1.a then 17 else 13 end>+f+(coalesce((select max(19) from t1 where 11 not in (case when t1.e<(abs(11)/abs(19*d*t1.c)) and (c in (select t1.c from t1 union select f from t1) or a>a) then t1.a when 11 not between t1.c and t1.a or t1.e not in ( -t1.a,17,f) then t1.d else e end+t1.f,19,(17))),17))* -11"
     end, {
         -- <randexpr-2.2306>
-        
+
         -- </randexpr-2.2306>
     })
 
@@ -23130,7 +23130,7 @@ test:do_test(
         return test:execsql "SELECT case when c*(abs(t1.f)/abs(c))*b-11-t1.a<coalesce((select max(case when coalesce((select max(c*+(t1.e)) from t1 where t1.c+ - -t1.f*t1.b in (select a from t1 union select d from t1)),t1.e)<>t1.d then  -d else t1.f end*e) from t1 where (b)<>t1.a or 11 between ( -a) and a),t1.b) then t1.d when e=t1.e then t1.c else t1.e end FROM t1 WHERE (coalesce((select (t1.b)+f*case case +coalesce((select 13 from t1 where t1.e<=d),f)-a when d then t1.b else t1.c end+t1.e when a then 17 else t1.e end from t1 where not t1.d in (select b from t1 union select 19 from t1) or not (17<t1.a) or t1.c in (select count(*) from t1 union select max(t1.c) from t1)),t1.e) in (b,t1.b,t1.f) or not exists(select 1 from t1 where not t1.d between 11 and  -t1.f))"
     end, {
         -- <randexpr-2.2309>
-        
+
         -- </randexpr-2.2309>
     })
 
@@ -23150,7 +23150,7 @@ test:do_test(
         return test:execsql "SELECT (17)+coalesce((select (case when (case (case t1.d when t1.d then 11 else 13 end) when e then e else 13 end*11)*t1.c not between a and 11 then (17) else c end)+t1.a from t1 where 17 in (select max(t1.d)*count(distinct 17) from t1 union select  -cast(avg(t1.d) AS integer)*case case +min(t1.c) when min(e) then cast(avg(b) AS integer) else max(t1.d) end when (max(c)) then cast(avg(t1.b) AS integer) else count(distinct 17) end from t1)),b)-a FROM t1 WHERE ((abs(t1.c)/abs(a)) between 11 | 11 and  -b)"
     end, {
         -- <randexpr-2.2311>
-        
+
         -- </randexpr-2.2311>
     })
 
@@ -23170,7 +23170,7 @@ test:do_test(
         return test:execsql "SELECT case when case when  -f-case when t1.a between 13 and (e) then t1.d | a else 13 end<t1.d and  -(13) in (select cast(avg(13) AS integer) from t1 union select +count(distinct c)-cast(avg(t1.c) AS integer) from t1) or not exists(select 1 from t1 where (not exists(select 1 from t1 where t1.e<>a) or ( -d) between c and c or (19) between t1.f and t1.b) or (b) not in (t1.d,t1.c,e)) then t1.b*t1.b when a>19 then t1.d else 11 end>=11 then t1.e else  -e end FROM t1 WHERE not exists(select 1 from t1 where ((11<=+11)))"
     end, {
         -- <randexpr-2.2313>
-        
+
         -- </randexpr-2.2313>
     })
 
@@ -23200,7 +23200,7 @@ test:do_test(
         return test:execsql "SELECT (abs(+case when 11*t1.d not between 13 and t1.d then coalesce((select 17 from t1 where case ~e when (abs(+(b+(select ~ -cast(avg(t1.c) AS integer) from t1)))/abs(case 17 when 17 then c else a end)) then t1.d else t1.d end<>t1.a),f) when not exists(select 1 from t1 where (19<=(f))) and 17=t1.b or 19 not between a and a then t1.d else d end)/abs(b)) FROM t1 WHERE t1.d-13 in (t1.a,d,(t1.b))"
     end, {
         -- <randexpr-2.2316>
-        
+
         -- </randexpr-2.2316>
     })
 
@@ -23230,7 +23230,7 @@ test:do_test(
         return test:execsql "SELECT b+(select case ~min(t1.a+13) when (cast(avg(t1.a) AS integer)) then max(d) else max(case when case t1.b when t1.e then t1.c else t1.f end+19<>+(select count(*) from t1) then case when b in (t1.e,t1.d,t1.e) and t1.c not between t1.f and 13 then (t1.c) when 17>t1.b then 19 else t1.b end-t1.d when d in (e,f,t1.f) and (a)<t1.c then 13 else  -t1.e end) end from t1)* -11-t1.f FROM t1 WHERE NOT (t1.a between (abs(e)/abs(a)) and t1.f-case when not (19)<>+t1.e then e+case when (exists(select 1 from t1 where d<17) and d<(abs(t1.e)/abs(+ - -t1.f+d))) then coalesce((select max((t1.f)) from t1 where not 19=t1.e),t1.e)+t1.e else t1.d end when not exists(select 1 from t1 where t1.d not in (19,11,t1.c)) then (t1.f) else d end)"
     end, {
         -- <randexpr-2.2319>
-        
+
         -- </randexpr-2.2319>
     })
 
@@ -23250,7 +23250,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.d) from t1 where t1.b+b in (select (t1.c)*11*e+f+ -c-t1.b*coalesce((select max(a) from t1 where t1.a*17 between 19 and (((abs(f)/abs(t1.c+d))))),t1.c-(abs(t1.c)/abs(19)) | case when t1.d= -t1.f then b when (t1.c) not in (e, -11,19) then 19 else t1.a end-c)*t1.a-c from t1 union select t1.d from t1)),a) FROM t1 WHERE NOT ((select abs(+min(b)) from t1)<=d+t1.a)"
     end, {
         -- <randexpr-2.2321>
-        
+
         -- </randexpr-2.2321>
     })
 
@@ -23270,7 +23270,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select c from t1 where (~13<>d)),t1.d-+d+13*coalesce((select max(17) from t1 where  -f<case when (abs(a+coalesce((select max(19) from t1 where not t1.d<>d),e))/abs(13))*f not in (t1.e,t1.c,e) then 19 when 17 not between t1.f and 17 then t1.f else t1.e end),f)+t1.c) | d<>11 then a else 19 end FROM t1 WHERE 13=b"
     end, {
         -- <randexpr-2.2323>
-        
+
         -- </randexpr-2.2323>
     })
 
@@ -23300,7 +23300,7 @@ test:do_test(
         return test:execsql "SELECT case case t1.e+13 when case when not  -f>coalesce((select max(t1.b) from t1 where (select min(a) from t1)<a),a) then case when not exists(select 1 from t1 where d>t1.d and t1.c<19 and d between b and ( -c)) then (select case ~max( -( - -t1.f)) when min(e) then  -count(*) else count(*) end-cast(avg(b) AS integer) from t1) when 17<>11 then f else case  -17 when t1.d then b else  -t1.f end end+t1.e when t1.d>=11 then 17 else 11 end then t1.d else t1.d end when t1.c then t1.a else 11 end FROM t1 WHERE (coalesce((select coalesce((select max(coalesce((select max( -(select + -case ++case (count(*)) when cast(avg(11) AS integer) then count(*) else  -min(13) end when max(19) then  -cast(avg(11) AS integer) else count(distinct (b)) end | max(t1.a)+max(b) from t1)) from t1 where 11 in (select b from t1 union select 13 from t1)),case (select count(*) from t1) when 19 then case when d not between  -d and b then t1.f else t1.b end else t1.c end)+d-t1.e) from t1 where t1.f not between t1.c and 19),t1.b) from t1 where t1.c between d and  -t1.b),t1.b))>=c"
     end, {
         -- <randexpr-2.2326>
-        
+
         -- </randexpr-2.2326>
     })
 
@@ -23320,7 +23320,7 @@ test:do_test(
         return test:execsql "SELECT case when +case when coalesce((select t1.b from t1 where not exists(select 1 from t1 where f<=coalesce((select c from t1 where t1.a in (select ~f from t1 union select coalesce((select max(case  -(13) when 13 then t1.f else a end | 13) from t1 where c<= -c or b not between f and t1.d and t1.b not in (e,t1.a,17)),a)+d from t1)),13) or t1.a>c)),11*19) between e and 17 then c else  -(c) end>=t1.c then t1.d else c end FROM t1 WHERE t1.d<17-t1.a | a-+11"
     end, {
         -- <randexpr-2.2328>
-        
+
         -- </randexpr-2.2328>
     })
 
@@ -23360,7 +23360,7 @@ test:do_test(
         return test:execsql "SELECT t1.c+c- -d*t1.d+t1.e | case when t1.e<=e and (a*t1.c) in (select ((abs(f)/abs(( -+(select abs(~(min( -c))-max( - -b)-count(*)) from t1))))) from t1 union select b from t1) then +a*t1.c-t1.d*t1.c else e end-t1.d+t1.f FROM t1 WHERE NOT ((exists(select 1 from t1 where coalesce((select max(++11+coalesce((select max(17) from t1 where case case when exists(select 1 from t1 where c not between t1.e and 17) then 19 else f end when  -t1.f then t1.f else t1.a end<=t1.e or 11 in (b,a,e) and e between 11 and 11), -(a)-19)*t1.f) from t1 where t1.b between d and 17 and 17=e),19) not in (a,b,b))) and (e>=d) or b not in (c,13,19))"
     end, {
         -- <randexpr-2.2332>
-        
+
         -- </randexpr-2.2332>
     })
 
@@ -23380,7 +23380,7 @@ test:do_test(
         return test:execsql "SELECT b-case when exists(select 1 from t1 where (exists(select 1 from t1 where t1.a not between 17 and a+t1.f) or not exists(select 1 from t1 where not exists(select 1 from t1 where t1.b+f+a in (select max(19) |  -max(t1.e)-cast(avg(t1.c) AS integer)- -count(distinct t1.b) from t1 union select max(t1.b) from t1)) or not exists(select 1 from t1 where not exists(select 1 from t1 where 11>c or (13) in ( -11,c,19)) or 11>f))) and t1.c not in ( -(d),t1.a,t1.a) and 17 in (t1.b,13,19)) then coalesce((select max(+19) from t1 where 17<b),13) else (abs(11)/abs(t1.e)) end FROM t1 WHERE not exists(select 1 from t1 where (13 between f and (e) or (f-d in (select t1.c*t1.d | f-19 from t1 union select 19*t1.d*coalesce((select coalesce((select max(t1.d-c*11) from t1 where 17= -t1.a),t1.a)-c from t1 where exists(select 1 from t1 where 17>e)),b) from t1))) or ((t1.d<f)))"
     end, {
         -- <randexpr-2.2334>
-        
+
         -- </randexpr-2.2334>
     })
 
@@ -23410,7 +23410,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.f*t1.b+case t1.a when 17 then  -t1.c else coalesce((select b from t1 where 19 in (f,d+b,coalesce((select t1.e-b from t1 where t1.b*d+case t1.c when case coalesce((select t1.b from t1 where c not in (b,a,13)),(13)) when t1.b then 19 else 19 end then t1.d else 19 end+ -b>= -t1.f),t1.c))),b) end from t1 where not a=11),t1.c) FROM t1 WHERE not 13<>11+17-case when 17 between (abs(case f when 19 | t1.a then +(select cast(avg(case when not exists(select 1 from t1 where ~ -13*(select  -cast(avg(t1.b*d) AS integer) from t1)+17<>(t1.b)) then ~t1.c when b>t1.d then c else (f) end) AS integer) from t1) else a end)/abs(19)) and t1.f then t1.b when a<>t1.c then t1.e else b end"
     end, {
         -- <randexpr-2.2337>
-        
+
         -- </randexpr-2.2337>
     })
 
@@ -23440,7 +23440,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(19) from t1 where t1.f*17+case t1.f when 11 then coalesce((select max(t1.a) from t1 where 13<>t1.d),(abs(13+b-case when not c+(abs(case when t1.c not between a and t1.f then  -(e) else t1.d end)/abs( -17))<a then 11 else t1.c end)/abs(17)))*d*t1.a else c end-((f))-e*t1.a<17),t1.f)+t1.a FROM t1 WHERE NOT (e>=13)"
     end, {
         -- <randexpr-2.2340>
-        
+
         -- </randexpr-2.2340>
     })
 
@@ -23460,7 +23460,7 @@ test:do_test(
         return test:execsql "SELECT +coalesce((select max(e) from t1 where  -(case 13*(t1.b* -case when e<=19 then b when t1.e=c then (b) else f end*t1.e) when e then 13 else t1.f end)=t1.b and t1.a in (select count(*) | case case min(b)*(count(*)) when abs(cast(avg(13) AS integer))-max(t1.d) then min(19) else  -cast(avg(b) AS integer) end when count(*) then (max(c)) else count(distinct 19) end+cast(avg((b)) AS integer) from t1 union select count(*) from t1)),t1.a) FROM t1 WHERE NOT ((select (min(13-(abs(c)/abs(case when coalesce((select case when coalesce((select  -a from t1 where case a*f when t1.a then  -c else (f) end between t1.a and t1.c),b) not between t1.e and b then 19 when 17 not in (19,d,11) then b else a end from t1 where b in (select t1.e from t1 union select t1.b from t1)),t1.a) not in (t1.e,t1.a,t1.f) then (d) else 19 end)))) from t1) in (select +13 from t1 union select 17 from t1))"
     end, {
         -- <randexpr-2.2342>
-        
+
         -- </randexpr-2.2342>
     })
 
@@ -23490,7 +23490,7 @@ test:do_test(
         return test:execsql "SELECT case when b in (select 19 from t1 union select c from t1) then  -d else 19-13+coalesce((select t1.c from t1 where t1.d>=case when e in (select f*t1.b from t1 union select t1.d from t1) then t1.c when not exists(select 1 from t1 where t1.f not in (17,t1.c,11) and b between b and 17 or c in (t1.b,17,a) or t1.d>t1.d and t1.c<>11 and 13=e and t1.f not in ( -t1.c,19,f)) then coalesce((select max(case when t1.c in (t1.e,d,b) then t1.f else t1.a end) from t1 where e<=t1.f),11) else t1.b end*11),t1.e) end FROM t1 WHERE NOT (13 not between +19 and a)"
     end, {
         -- <randexpr-2.2345>
-        
+
         -- </randexpr-2.2345>
     })
 
@@ -23500,7 +23500,7 @@ test:do_test(
         return test:execsql "SELECT (abs(13)/abs(case when t1.f not between a and f then 19-t1.d-t1.d*d | c+(select case count(*) | (~ -count(*)) when cast(avg( -19) AS integer) then min(d) else (cast(avg(e) AS integer)) end from t1) | t1.f-t1.b when f<>case when f<>b and 19 in (d,( -t1.a),t1.c) then 11 when e not between b and (t1.d) then t1.e else t1.d end-t1.e or t1.b not in (f,c,(a)) then  -d else t1.f end-t1.f)) FROM t1 WHERE (select  -count(*) from t1)=d+11"
     end, {
         -- <randexpr-2.2346>
-        
+
         -- </randexpr-2.2346>
     })
 
@@ -23530,7 +23530,7 @@ test:do_test(
         return test:execsql "SELECT ((select count(distinct 11+19 | case (d) when t1.b then coalesce((select case coalesce((select max(+c*t1.f) from t1 where (t1.e=f and 13<=t1.d)), -17)+11-t1.a when (t1.c) then 19 else 13 end from t1 where t1.c in (select ~+ -count(distinct t1.f) from t1 union select count(*)+count(distinct b)*min(11) from t1)),e) else 19 end+d) | count(*) from t1)) FROM t1 WHERE case b when 19 then ~b-~e-d+d+t1.c else a end in (select max(t1.b)-~count(*)+abs(abs((case min((abs(~t1.c*t1.f)/abs(t1.e))) when case max(b) when abs(count(distinct t1.b)) then +cast(avg((13)) AS integer) else +case min(b) when count(*) then count(*) else count(distinct t1.f) end end then max(19) else ( -count(*)) end)))*count(distinct f)*cast(avg(t1.c) AS integer) from t1 union select count(distinct a) from t1)"
     end, {
         -- <randexpr-2.2349>
-        
+
         -- </randexpr-2.2349>
     })
 
@@ -23570,7 +23570,7 @@ test:do_test(
         return test:execsql "SELECT 17+ -(abs(case case when a>t1.c then t1.e else a end*11-case when not exists(select 1 from t1 where coalesce((select  -t1.e-11+coalesce((select t1.e from t1 where 13=t1.e),d) from t1 where t1.e between t1.d and a),13)-t1.e in (select t1.d from t1 union select d from t1)) then t1.b else t1.d end-t1.e-13+b when 19 then t1.b else c end)/abs(t1.d)) FROM t1 WHERE NOT (coalesce((select max(t1.d) from t1 where t1.a+t1.d<19),t1.a) in (select t1.b from t1 union select c from t1) or t1.c in (select  -abs(max(case when  -f<>t1.b and b<>11 then t1.f when t1.a=e then t1.d else  -(f) end) | case cast(avg(f) AS integer) when count(distinct t1.f) then min(e) else  -count(*) end+cast(avg((t1.f)) AS integer)) from t1 union select max(17) from t1) or t1.c between ((c)) and  -t1.b and  -c not between d and 11 or b>=19)"
     end, {
         -- <randexpr-2.2353>
-        
+
         -- </randexpr-2.2353>
     })
 
@@ -23580,7 +23580,7 @@ test:do_test(
         return test:execsql "SELECT e*~+(e)-(abs(~case when (t1.f)>13+~t1.d then case when d=t1.b+13 then 17 when 11 in (t1.d,e,e) then ~19*t1.a else coalesce((select t1.c from t1 where 19*(abs(t1.e)/abs(b)) between t1.c and t1.c),t1.d) end when a not between 13 and  -17 then 19 else b end)/abs(t1.b)) FROM t1 WHERE (not d>case t1.b+t1.f when +(~(select (case abs(cast(avg(13) AS integer)) when cast(avg(+a) AS integer) then abs(abs(count(distinct case when t1.f*e<=11 then 13 when exists(select 1 from t1 where t1.e<17 or t1.a>=t1.a) then (11) else f end))) else min(t1.b)-min(11) end) from t1))+17*t1.b*f*17 then e else 11 end)"
     end, {
         -- <randexpr-2.2354>
-        
+
         -- </randexpr-2.2354>
     })
 
@@ -23610,7 +23610,7 @@ test:do_test(
         return test:execsql "SELECT  -case when t1.c<= -case coalesce((select max((coalesce((select case 11 when t1.b then t1.f else 11 end-d from t1 where c in (select count(*) | ~count(distinct f) from t1 union select count(*) from t1)),a)*t1.a)-t1.f) from t1 where not exists(select 1 from t1 where ((t1.f not in ( -c,t1.d,b)) or t1.a not in (b,11,t1.c)) or t1.d not in (17,a,t1.a))),19)-t1.b when d then t1.e else t1.e end-19 | e then b else  -13 end*e-c FROM t1 WHERE NOT (b<>coalesce((select max((abs((abs(11)/abs(13)))/abs(case when t1.e between 11 and 19 then t1.d when 11>=b-19 then (select count(distinct ~a | 19*f+case when f not in (t1.e,t1.f, -t1.f) then 17 when c not in ( -t1.a,t1.c,b) then f else 11 end) from t1) else t1.e end))-t1.e*a) from t1 where e in (t1.c,17,17)),t1.a) or a=t1.e or d>t1.b)"
     end, {
         -- <randexpr-2.2357>
-        
+
         -- </randexpr-2.2357>
     })
 
@@ -23630,7 +23630,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case when t1.d not in (t1.f,t1.d,(select abs(min(((select +count(*)*case max(t1.e-coalesce((select max(case t1.b when 13 then a else e end) from t1 where t1.b>b),19)+d)- -+count(*) when +cast(avg(d) AS integer) then max(c) else (cast(avg(c) AS integer)) end | count(*) from t1)+t1.f)))-max(t1.c) from t1)) then t1.b*t1.f else f end)/abs(b+19)) FROM t1 WHERE a not in ((11),(t1.d),a) or case when f<t1.e | 11+t1.b+17-coalesce((select t1.f+case when ((not (t1.d)>(abs(d)/abs(t1.d)))) then a when f not between t1.f | t1.b and t1.d then a else 13 end from t1 where 19<=c),f) then t1.a else f end between 13 and 11"
     end, {
         -- <randexpr-2.2359>
-        
+
         -- </randexpr-2.2359>
     })
 
@@ -23660,7 +23660,7 @@ test:do_test(
         return test:execsql "SELECT t1.a+d | +case when +t1.a-t1.f++t1.c+(select case ~count(*) when (+cast(avg(f*t1.f) AS integer) | min(t1.b)) then  -(cast(avg(t1.f) AS integer)) else min(e) end from t1)-b* - -13-f+c in (select b from t1 union select t1.d from t1) or e<e then b | 13 else t1.c end FROM t1 WHERE coalesce((select max(coalesce((select  -e*a from t1 where (select max(case t1.a when b then d else 17 end) from t1) in (select 17 from t1 union select  -case when exists(select 1 from t1 where coalesce((select t1.d from t1 where t1.a not between t1.d and 17 and 19=17),t1.c)-t1.e+b<=a) then 17 | c when  -e<=d then 13 else (b) end from t1)),e)) from t1 where t1.e not in (11, -t1.b,(f))),t1.c) not in ( -c,t1.d,t1.d) and b<=13"
     end, {
         -- <randexpr-2.2362>
-        
+
         -- </randexpr-2.2362>
     })
 
@@ -23700,7 +23700,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max((select (max((abs(coalesce((select max(+case when ~t1.d=t1.a then a when coalesce((select case when t1.c in (select 19 from t1 union select (d) from t1) then e else f end from t1 where t1.a<>t1.a),t1.f) between t1.a and 19 then ( -b) else t1.a end) from t1 where t1.c in (a,(f),e)),t1.c))/abs(a)))) from t1)) from t1 where case when exists(select 1 from t1 where e<11) and 17 in (select 11 from t1 union select a from t1) then d else (d) end in (select cast(avg(f) AS integer) from t1 union select count(*) from t1)),t1.d) FROM t1 WHERE NOT (exists(select 1 from t1 where b not between case 11 when d then (select + -(abs(abs(case  -min(d)+ - -count(*)-max(c) when count(*) then max(t1.b) else count(*) end))) from t1)+t1.f-f*t1.b*((select min(a) from t1))-b+f else t1.e end | t1.c+13 and 19) and b<t1.c or (17>t1.e))"
     end, {
         -- <randexpr-2.2366>
-        
+
         -- </randexpr-2.2366>
     })
 
@@ -23720,7 +23720,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.d+b+c | case +a-t1.d-f*(select cast(avg(17) AS integer)+count(distinct e)-count(distinct t1.a) |  - -cast(avg(t1.b) AS integer) from t1)+~t1.e-a when d then t1.f else d end+t1.e*b<>11 then f when t1.a=b or t1.b>(t1.d) then 19 else t1.f end+19 FROM t1 WHERE NOT (coalesce((select case t1.e-case coalesce((select (select min(t1.d) from t1) from t1 where coalesce((select max(coalesce((select max(a) from t1 where t1.d in (select cast(avg(t1.b) AS integer) from t1 union select count(distinct a) from t1)), -19)*t1.e) from t1 where d>11),t1.f)>17),t1.f) when (17) then e else d end when b then (19) else 19 end from t1 where not t1.f in (select ( -max(13)) from t1 union select max(c) from t1)),11)-d not in ( -19,13,d))"
     end, {
         -- <randexpr-2.2368>
-        
+
         -- </randexpr-2.2368>
     })
 
@@ -23740,7 +23740,7 @@ test:do_test(
         return test:execsql "SELECT case when (t1.a not in (coalesce((select 17 from t1 where case when t1.b*(abs( -t1.b*f*coalesce((select 17 from t1 where not t1.d<t1.d),t1.b)*t1.a+19* -17)/abs(b))<=b then t1.b else 13 end+t1.d not between t1.b and  - -11),d),11,t1.e) or a<=19) or t1.e not between t1.c and 13 then 13 else e end FROM t1 WHERE t1.f+(abs(f)/abs((abs(t1.e+19)/abs(t1.c))*t1.d)) in (e*11,(select count(*) from t1),t1.e)"
     end, {
         -- <randexpr-2.2370>
-        
+
         -- </randexpr-2.2370>
     })
 
@@ -23760,7 +23760,7 @@ test:do_test(
         return test:execsql "SELECT case when case when (case (t1.a)*case when c<f and t1.e<>t1.d then 13 when c>b then c else 11 end when e then a else t1.e end>c) or 19 in (select ++min(f) from t1 union select  -count(distinct t1.a) from t1) then (case when t1.f in (select t1.f from t1 union select  -t1.a from t1) then c when b not between t1.a and b then  -t1.c else t1.a end) else t1.c end not in (f,a,17) then 11 else 11 end FROM t1 WHERE not c not between (select abs(max(~(19*e-t1.a*c*t1.d))*~abs((abs(min(a)-min(c) | cast(avg(19) AS integer))) | count(distinct 19)) | (cast(avg(d) AS integer))) from t1) and (abs(case coalesce((select max(19) from t1 where b not between a and f or 19 in (t1.c,t1.c,b)),t1.e) when c then f else 11 end)/abs(c))"
     end, {
         -- <randexpr-2.2372>
-        
+
         -- </randexpr-2.2372>
     })
 
@@ -23780,7 +23780,7 @@ test:do_test(
         return test:execsql "SELECT (select count(*)-+ -(max(~coalesce((select ~b from t1 where not t1.c | 19 not between c+t1.c and d),a)*(abs(t1.a)/abs(d*(case t1.a*case when 17>e then 11 else 13 end when 19 then e else t1.d end)))+17))-cast(avg(c) AS integer) | count(distinct f) from t1)+(select abs(min(11)) from t1) FROM t1 WHERE coalesce((select max(11) from t1 where case when b<=13-~case when ~~(select count(*)+count(*)* -count(*) from t1)>17*17 then t1.f+case when not case when 19 in (t1.e,a,19) then 17 when f<=19 then 17 else  -d end=19 then f when a>=19 then d else f end else t1.c end | f then 19 else b end*t1.d between e and b),f)<c"
     end, {
         -- <randexpr-2.2374>
-        
+
         -- </randexpr-2.2374>
     })
 
@@ -23820,7 +23820,7 @@ test:do_test(
         return test:execsql "SELECT case when ((select max((t1.e+19 | (abs((select case ++cast(avg(b-coalesce((select t1.c from t1 where t1.e not in (t1.a, -e,e)),c)) AS integer) when count(distinct t1.b) then count(distinct  -t1.a) |  - -count(distinct t1.b) else count(*) end*( -(min(11)))+(min(t1.f))-(count(*)) from t1))/abs(b+t1.b+t1.d | t1.e-19+t1.a))*t1.c)) from t1))>19 then 11 else 17 end-t1.d FROM t1 WHERE NOT ((select min(a) from t1)<t1.e)"
     end, {
         -- <randexpr-2.2378>
-        
+
         -- </randexpr-2.2378>
     })
 
@@ -23850,7 +23850,7 @@ test:do_test(
         return test:execsql "SELECT t1.d*11-case 11 when a then 11 else  - -t1.b-(t1.b)+c+t1.a* -case when not exists(select 1 from t1 where coalesce((select t1.c from t1 where t1.c=case when 13 in (coalesce((select max(coalesce((select max(t1.c) from t1 where c between t1.d and t1.f and t1.a<=b),e)) from t1 where (11 not in (b,19,c))),b),e, -b) then 17 when t1.a in (b,t1.d,b) and t1.f>c then t1.a else (d) end),d)<= -t1.c) then t1.e*t1.c else 13 end end FROM t1 WHERE NOT (exists(select 1 from t1 where ((b not between f and t1.a))))"
     end, {
         -- <randexpr-2.2381>
-        
+
         -- </randexpr-2.2381>
     })
 
@@ -23870,7 +23870,7 @@ test:do_test(
         return test:execsql "SELECT t1.c*case when not b>(+coalesce((select t1.e from t1 where t1.b>(abs(case when t1.d<=c+ -17*t1.f*19*17 then 11+a-13-t1.d else case (select abs(count(distinct 19))+ -count(distinct 17) from t1) when 17*t1.d then a else t1.a end end)/abs(17))),(11)))+17 then (t1.c)*f else 17 end FROM t1 WHERE NOT ((t1.b)-b<=t1.a*13)"
     end, {
         -- <randexpr-2.2383>
-        
+
         -- </randexpr-2.2383>
     })
 
@@ -23880,7 +23880,7 @@ test:do_test(
         return test:execsql "SELECT t1.b+coalesce((select max(~e- -t1.d+case +b+f when a-case when t1.a-d+t1.c between t1.e and a*e then (abs(e)/abs(t1.a)) else f |  -f*t1.b-t1.c end*t1.e+f then 19 else t1.b end*19) from t1 where 19 in (select e from t1 union select 17 from t1)),19) FROM t1 WHERE d in (11,t1.c+c*t1.d+case when t1.c-case when ~(19+13)*c=11 and d<>17 or t1.e>=c then case t1.a when c then f else 11 end+t1.c when t1.f in (select max(13) from t1 union select cast(avg(c) AS integer) from t1) or t1.c<t1.b then 13 else b end=13 then 11 when d<>t1.b then t1.e else 19 end,a)"
     end, {
         -- <randexpr-2.2384>
-        
+
         -- </randexpr-2.2384>
     })
 
@@ -23910,7 +23910,7 @@ test:do_test(
         return test:execsql "SELECT (abs((select (case (abs(max( -t1.a))* -case count(*) when case min(c) when max(d) then count(*) else max(17) end-cast(avg(17) AS integer) then max(11) else cast(avg(t1.d) AS integer) end | max(13)+max(f)) when cast(avg(f) AS integer) then cast(avg(19) AS integer) else (max(11)) end) from t1) | coalesce((select (select max( -t1.d) from t1) from t1 where t1.b-~e in (select d from t1 union select e from t1) and t1.e=t1.d), -t1.e)-17)/abs(t1.e)) |  -t1.e FROM t1 WHERE exists(select 1 from t1 where coalesce((select +19 from t1 where (coalesce((select max(e) from t1 where ((coalesce((select max(19) from t1 where coalesce((select t1.d*19+(t1.c) from t1 where e in (select  -11 from t1 union select t1.f from t1) and (t1.d) in (select ~max(t1.e) from t1 union select (( -count(*))) from t1) or 19>=(a)),f) in ((e),e,t1.a)),t1.a)<=t1.c))),t1.f+t1.c)>13)),11) in (11,17,t1.d) and e>=t1.b)"
     end, {
         -- <randexpr-2.2387>
-        
+
         -- </randexpr-2.2387>
     })
 
@@ -23940,7 +23940,7 @@ test:do_test(
         return test:execsql "SELECT f-coalesce((select 19+t1.e+t1.f from t1 where +11>coalesce((select +t1.f from t1 where t1.a between ~ -(select case cast(avg((abs(t1.d)/abs(t1.b))) AS integer) when  -~max(19) then  - -case count(distinct c) when count(*) then min((a)) else  -min(t1.d) end else max( -t1.b) end from t1) and (select count(distinct f) from t1)),(coalesce((select max(t1.e) from t1 where not 11>=d),t1.c)))),19)-t1.f+19+f*t1.d FROM t1 WHERE f in (select (min((abs(d-t1.c+coalesce((select t1.f from t1 where f<t1.a),t1.c)+a-t1.d*(f)-19)/abs(11))) | abs((count(*))))+(abs(~case count(*) | max(t1.a) when max(t1.d) then count(distinct 19) else count(distinct e) end)+cast(avg((t1.e)) AS integer))+max(t1.c) from t1 union select count(*) from t1) and c*t1.a in (select e from t1 union select f from t1)"
     end, {
         -- <randexpr-2.2390>
-        
+
         -- </randexpr-2.2390>
     })
 
@@ -23970,7 +23970,7 @@ test:do_test(
         return test:execsql "SELECT t1.b-case when b not between 17 and t1.d*11*f*t1.a or t1.c+case when  -t1.e between t1.d and coalesce((select coalesce((select max((select ~count(*) from t1)) from t1 where  -17*13-19-((d))<>(c)), -a) from t1 where (e)<=t1.a),d) then d when e<t1.f then 19 else e end>=a then t1.f else f end FROM t1 WHERE NOT (f in (13*13-(abs(d)/abs(e)),19,case t1.b+coalesce((select max((abs((abs(17)/abs(a)))/abs(11+t1.c))) from t1 where  -t1.c>=t1.f and e in (select count(*) | min(t1.c) from t1 union select cast(avg(e) AS integer) from t1) or 11 not in (e,b,a) or t1.c< -a and t1.e not in (t1.e,b,t1.d)),t1.b) when f then 19 else b end-11) or d>t1.b)"
     end, {
         -- <randexpr-2.2393>
-        
+
         -- </randexpr-2.2393>
     })
 
@@ -23990,7 +23990,7 @@ test:do_test(
         return test:execsql "SELECT case t1.d when (abs(17)/abs(coalesce((select max(e) from t1 where a not in (t1.e,case when 11+t1.d not between t1.e and  -t1.c | t1.a*(abs(b)/abs(c)) then  -d when a in (select +11 from t1 union select c from t1) then  -t1.c else 13 end | t1.c,t1.b)),d)-f)) | t1.c then case when 13<c then t1.b when d<>t1.d then 13 else f end else b end FROM t1 WHERE NOT (17>d*~t1.e+case when not t1.f<>(select count(distinct 19)+min(e) from t1) then case when (13-a<= -t1.b) and t1.f<=t1.f then 19*d else f end-t1.f*d+t1.d when b not in (t1.b,19,19) or t1.d not between t1.b and a then t1.f else b end)"
     end, {
         -- <randexpr-2.2395>
-        
+
         -- </randexpr-2.2395>
     })
 
@@ -24010,7 +24010,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(d) from t1 where coalesce((select t1.c from t1 where 17>b),d*coalesce((select max(11*19) from t1 where coalesce((select c from t1 where 19<(abs((case a when b then ~case t1.a+(select min(t1.f)+min(b) from t1) when (d) then e else t1.b end else t1.c end+f+t1.f))/abs(t1.b))),c)<=19),13))*d | e<e),t1.e) FROM t1 WHERE (t1.d*t1.c not in (t1.b,t1.b*t1.f,t1.c))"
     end, {
         -- <randexpr-2.2397>
-        
+
         -- </randexpr-2.2397>
     })
 
@@ -24050,7 +24050,7 @@ test:do_test(
         return test:execsql "SELECT t1.b+ -t1.d*(select max(t1.a) | count(*) | abs(cast(avg(f+a-(select ~(min((abs(a)/abs(13+case when f=coalesce((select t1.b from t1 where d<>t1.e and 11 in (t1.e,t1.e,d)),f)+13 then t1.b else c end))- -f)) from t1)) AS integer))-count(distinct 11+11+13)+count(distinct t1.a) from t1) FROM t1 WHERE NOT (t1.d<c+t1.c | (select max((t1.e)) from t1)+case when t1.f-t1.d<a then t1.c-(abs(c)/abs(b*t1.c)) when case when not  -c>=b then t1.c when  -f*e<=t1.b then e else 17 end not between 17 and t1.f then t1.c else t1.b end-19+f+19*(t1.c))"
     end, {
         -- <randexpr-2.2401>
-        
+
         -- </randexpr-2.2401>
     })
 
@@ -24070,7 +24070,7 @@ test:do_test(
         return test:execsql "SELECT case when case when t1.e<~17 or (case case case t1.d*17*13 when t1.a then e+c else c end when d*f+coalesce((select 17 from t1 where 13 not between 13 and  -13),(17)) then t1.b else b end when t1.a then a else t1.c end*d<>d) then ~t1.c else a end<>t1.f then  -t1.d else t1.a end+11-t1.c-e FROM t1 WHERE (case when (~f- -e in (17,case when d in (select t1.f from t1 union select a+(abs(coalesce((select (t1.c) from t1 where a in (select min(13) | (max(t1.e)) from t1 union select count(distinct t1.d) from t1)),b)+13)/abs(e))*19*f from t1) then b when not a between 13 and 13 then t1.f else 17 end,t1.c)) then (select max(t1.e)-count(*) | count(*) from t1) else c end)>(t1.e)"
     end, {
         -- <randexpr-2.2403>
-        
+
         -- </randexpr-2.2403>
     })
 
@@ -24100,7 +24100,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(t1.a-(abs(e*coalesce((select max(d) from t1 where (case when case e when case when (t1.e)=d then t1.a+11 else 17 end then (c) else b end<=a then b when 19 in (t1.b,b,t1.e) then f else  -19 end+17 between 19 and c or b in (select t1.c from t1 union select t1.a from t1))),t1.a))/abs( -t1.d))) from t1 where 13=17),t1.b)+(t1.b) FROM t1 WHERE NOT (coalesce((select  -case when (d)>=(select ~case +(+~~cast(avg(a) AS integer)*abs(( -count(*))) | count(distinct 11)) when (count(*)) then count(distinct 19) else min(t1.a) end+min(t1.a) from t1)*13-t1.f then 13 else (e) | t1.c*(select (min(17)) from t1) end*case when (c) in (select 11 from t1 union select t1.f from t1) then 17 else 19 end from t1 where t1.c<t1.f),19)*19<>c)"
     end, {
         -- <randexpr-2.2406>
-        
+
         -- </randexpr-2.2406>
     })
 
@@ -24120,7 +24120,7 @@ test:do_test(
         return test:execsql "SELECT t1.b-t1.d-case when exists(select 1 from t1 where  -coalesce((select t1.a from t1 where a in (c,coalesce((select max((abs(t1.d)/abs(e))) from t1 where case t1.b when t1.e then t1.d else t1.d end-17 between b and t1.f),17)-t1.f-t1.e,t1.a) or t1.b in (t1.a,19,t1.f)),19)>=d) then 19-b when t1.c between (f) and t1.f then t1.d else t1.f end-11 FROM t1 WHERE NOT (coalesce((select 13 from t1 where ( -t1.a<d)),(abs(t1.d)/abs(case when ( -11)+f+d+ -17+f*e not between t1.b and  -11 and not t1.a<>13 or a in (select cast(avg(d) AS integer) | count(*)* -max(t1.f) from t1 union select count(*) from t1) then 17 when not exists(select 1 from t1 where b>=c) then e else 17 end |  -t1.a))*b)*t1.d>=b)"
     end, {
         -- <randexpr-2.2408>
-        
+
         -- </randexpr-2.2408>
     })
 
@@ -24130,7 +24130,7 @@ test:do_test(
         return test:execsql "SELECT 17 | t1.c*t1.a | case when ~ -~(abs(t1.b)/abs(coalesce((select max(coalesce((select max(+t1.d) from t1 where (t1.b not between 17 and t1.b) and d not between c and 19),d)*(t1.d)-d) from t1 where t1.a in (t1.c,(t1.c),t1.f)),19)))-b+19+ -17>=t1.a then 19 when 19 in (select t1.f from t1 union select t1.b from t1) then t1.c else f end-19*t1.c FROM t1 WHERE (17-t1.f in (d | b-17,t1.f,coalesce((select e+(abs(11)/abs(case t1.c when case (abs(a)/abs(11)) when e then t1.c else 17+c end then b else 11+t1.e end)) from t1 where (13 not between + -b and 13)),t1.c)) and 17 between t1.d | t1.f and t1.e)"
     end, {
         -- <randexpr-2.2409>
-        
+
         -- </randexpr-2.2409>
     })
 
@@ -24170,7 +24170,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.a*a+t1.f | t1.d from t1 where t1.d<+t1.c*d-c*19+t1.e-(abs( -t1.e)/abs(19))), -t1.c+coalesce((select t1.b from t1 where not not (select max(t1.c) from t1)-17+e in (e,t1.c,b) and not (d in (select ( -((max(b)))) from t1 union select min(d) from t1))),t1.b) | t1.a) FROM t1 WHERE NOT (not t1.f in (select ((select abs(count(*)) from t1)-11) from t1 union select t1.a-17 from t1) or not exists(select 1 from t1 where case (abs(e)/abs(+c)) when coalesce((select max((select +(count(distinct t1.a)) from t1)) from t1 where not (e<=c*t1.a)),~(case when t1.c<=17 then e when t1.c<=t1.c then e else 17 end)) then 13 else d end*b-a= -d))"
     end, {
         -- <randexpr-2.2413>
-        
+
         -- </randexpr-2.2413>
     })
 
@@ -24190,7 +24190,7 @@ test:do_test(
         return test:execsql "SELECT case a+(abs(+13)/abs(a)) when ~(e)*(abs(b* -t1.d*19-t1.c+a-~t1.b*b-coalesce((select max(case when not exists(select 1 from t1 where d in (f,t1.c,f) or t1.c not in (13,f,t1.a)) then case when t1.a>= -t1.e then (( - -b)) else t1.b end else c end+e) from t1 where (a>11)),13)*17)/abs(e)) then 11 else c end FROM t1 WHERE 17 between a and t1.a"
     end, {
         -- <randexpr-2.2415>
-        
+
         -- </randexpr-2.2415>
     })
 
@@ -24220,7 +24220,7 @@ test:do_test(
         return test:execsql "SELECT +~t1.f-c*case when t1.f between coalesce((select max(a) from t1 where (t1.c-17*t1.b | c=e)),t1.b) and (abs(coalesce((select max(19) from t1 where t1.b not between c+(select min(t1.d) from t1)-t1.d+d+t1.d+t1.c*t1.e and 11),t1.a))/abs(a))-c*b then 17 else 13 end FROM t1 WHERE NOT (t1.c not between (abs(+case when not  -19 in (case when t1.b+~d+11+f>e then (select  -cast(avg(coalesce((select 17 from t1 where (t1.b>=f)),19)) AS integer)*min(d)*(min(e))* -min(b) from t1) when 17+b not between 17 and t1.a then 11 else a end,19,(t1.e)) then f else 19 end*t1.a)/abs(b)) and 19)"
     end, {
         -- <randexpr-2.2418>
-        
+
         -- </randexpr-2.2418>
     })
 
@@ -24240,7 +24240,7 @@ test:do_test(
         return test:execsql "SELECT +(abs(case t1.a when coalesce((select max(13) from t1 where d<=case when t1.b=(select abs(count(distinct t1.e)) from t1) and (select  -count(distinct e) from t1) not in ( -11,e,13) then 13 else t1.e end and (not exists(select 1 from t1 where t1.d in (select count(*) from t1 union select max(f) from t1))) and 19<f and t1.f>=13 or  -e=17),coalesce((select (abs(17)/abs(b))-t1.b from t1 where (19)<=t1.f),t1.d))*t1.b then 17 else 13 end)/abs(19)) FROM t1 WHERE a in (select case max(13)-~cast(avg(case when t1.d>13 or exists(select 1 from t1 where not (( -c<=e)) and (b)*t1.a in (select count(*) from t1 union select cast(avg(t1.c) AS integer)+max(f) from t1)) then t1.a else t1.c end) AS integer) when abs(count(distinct t1.d)) then count(distinct (~t1.a)) else count(distinct c)-cast(avg(e) AS integer) end from t1 union select abs(count(distinct a)*max(t1.d)) from t1)"
     end, {
         -- <randexpr-2.2420>
-        
+
         -- </randexpr-2.2420>
     })
 
@@ -24270,7 +24270,7 @@ test:do_test(
         return test:execsql "SELECT +coalesce((select max(f+c) from t1 where t1.b in (select +max(b+t1.b) from t1 union select cast(avg(d-b | f-11-t1.b | coalesce((select ~t1.a from t1 where (t1.a=case when not exists(select 1 from t1 where 13 not in (t1.b,t1.e,t1.f)) then (abs(t1.d)/abs(c)) when c<>17 then c else 19 end)),t1.c)) AS integer) from t1) and t1.e not in (b,d,(13))),t1.b) FROM t1 WHERE NOT ((select cast(avg(~t1.f) AS integer) from t1) not in ( -c,17,11*c))"
     end, {
         -- <randexpr-2.2423>
-        
+
         -- </randexpr-2.2423>
     })
 
@@ -24290,7 +24290,7 @@ test:do_test(
         return test:execsql "SELECT t1.e*case when ((13)-13-13-t1.d+t1.c*b>11) then b when case when (t1.a*b not in (t1.a,t1.b,t1.f)) then 11+e else t1.f end<= -f or f in (t1.a,11,13) or exists(select 1 from t1 where not exists(select 1 from t1 where f in (f,d,t1.e))) then t1.d else b end FROM t1 WHERE coalesce((select 19 from t1 where 13-t1.b*c-t1.a+case when case when coalesce((select +t1.b from t1 where a<>b),13) in ((b),t1.f,b) and not t1.b in (select  -cast(avg(13) AS integer) from t1 union select cast(avg(11) AS integer) from t1) or a>=13 then (abs(t1.b+a)/abs(11)) else t1.e end-17+t1.d<>b then (19) else f end=e),13)>=t1.c"
     end, {
         -- <randexpr-2.2425>
-        
+
         -- </randexpr-2.2425>
     })
 
@@ -24310,7 +24310,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(d) from t1 where 19+case t1.b when t1.a-a then (abs(case when (e>=case t1.a when coalesce((select max(t1.d) from t1 where (select case  -max(c)+cast(avg(t1.a) AS integer) when cast(avg(t1.a) AS integer) then cast(avg(19) AS integer) else cast(avg(t1.b) AS integer) end from t1)>t1.c),coalesce((select max(d) from t1 where 19<>17 and d<=b), -(t1.c)))+e then c else t1.d end+b) then b when 19 between c and 17 then 11 else e end)/abs( -t1.b)) else t1.a end+13>=d),d) FROM t1 WHERE a=case when t1.f in (select (max(f)-++(min(t1.a))-max(19)-count(*)) from t1 union select +max(t1.b) from t1) then t1.b*19*19 when t1.f>d then 17-d else t1.f end and exists(select 1 from t1 where not exists(select 1 from t1 where d in (select count(distinct 11)+max(a) from t1 union select cast(avg(13) AS integer) from t1) or 19 not in (t1.b,c,13)))"
     end, {
         -- <randexpr-2.2427>
-        
+
         -- </randexpr-2.2427>
     })
 
@@ -24330,7 +24330,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(case t1.c | b-t1.d+13 when 17 then c else 13 end) from t1 where case when exists(select 1 from t1 where b<>t1.c) then t1.d when a not between (abs(t1.d)/abs((t1.b))) and (t1.c) or (a in (select ~max(((17))) from t1 union select case  -(count(distinct  -t1.c)) when count(distinct t1.c) then (count(*)) else max(f) end from t1)) and t1.f>19 or a<>11 then t1.b else t1.b end>(11)),13)+b*(b) FROM t1 WHERE case when not exists(select 1 from t1 where (19<>11+t1.b*c+d)) and 13<>b or t1.d between t1.c and b and f between t1.b and  -a or 19 between 19 and 17 or t1.e not between e and t1.d then ~13 else coalesce((select max(t1.b) from t1 where f=a),(a)) end in (select  -( -+count(distinct 11)-count(*))*count(distinct ( -t1.c))+(count(distinct t1.c))+max(17)-count(*) from t1 union select count(*) from t1)"
     end, {
         -- <randexpr-2.2429>
-        
+
         -- </randexpr-2.2429>
     })
 
@@ -24370,7 +24370,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(coalesce((select max(11) from t1 where t1.b< -t1.b),e)+coalesce((select t1.b from t1 where not case when ~case when  -17+t1.d> - -t1.d then t1.b when t1.b between 13 and c or t1.a>= -f then t1.b else t1.e end+t1.c<= -c then 19 else t1.f end not in (c,d,e) or t1.f not between t1.b and 19 and 13>= -t1.f or 13 in (e,(t1.b),11)),t1.b)) from t1 where  -(f) not in (f,(t1.e),b)),t1.f) FROM t1 WHERE NOT (f in (select f from t1 union select t1.f*t1.b from t1))"
     end, {
         -- <randexpr-2.2433>
-        
+
         -- </randexpr-2.2433>
     })
 
@@ -24380,7 +24380,7 @@ test:do_test(
         return test:execsql "SELECT ( -+(a)*(abs(case coalesce((select max(d) from t1 where t1.d<>c*(select count(distinct e*coalesce((select 13-17 from t1 where not exists(select 1 from t1 where t1.a in (select f from t1 union select (a) from t1))),t1.f)+(t1.c)) from t1) | t1.e*19 and not t1.a<13),t1.b)+t1.b when t1.d then (t1.f) else t1.c end)/abs(t1.f))-13*t1.f) FROM t1 WHERE f>=t1.a+ -(select (count(*))-(~case cast(avg(t1.b-13-e) AS integer) when count(*) then (max(t1.f*case 13 when 11 then 13 else c end))- -cast(avg(t1.f) AS integer)*count(*)-min(19) else count(distinct d) end)+min(t1.d) |  -max(t1.b) from t1) | t1.b*17+t1.d+t1.b-d"
     end, {
         -- <randexpr-2.2434>
-        
+
         -- </randexpr-2.2434>
     })
 
@@ -24410,7 +24410,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select t1.a from t1 where c in (select a from t1 union select t1.a*f from t1) and t1.b in (select (select count(*) from t1)*11 from t1 union select  -13 from t1)),13) FROM t1 WHERE (d<t1.b)"
     end, {
         -- <randexpr-2.2437>
-        
+
         -- </randexpr-2.2437>
     })
 
@@ -24440,7 +24440,7 @@ test:do_test(
         return test:execsql "SELECT case when (not exists(select 1 from t1 where a<=case a | e-case t1.f when c then e else 19 end | t1.b when t1.c then t1.e else 19 end+d)) or f between a and b and (t1.f) not in (d,t1.e,11) then case 17+e | t1.c when 19 then 13 else  -(19) end | 11 else a end-t1.f-f*t1.c FROM t1 WHERE NOT (case when t1.b in ( - -case when case when t1.f-case when 19<=c then a else 19 end between 13 and t1.d and not a not in ((f),d,f) then t1.c-a when t1.d not in ( -b,c,11) then 13 else f end>=17 then d when f<=t1.c then t1.a else d end,t1.e,e) or not 19>c then t1.c-19 else 13 end<>t1.c)"
     end, {
         -- <randexpr-2.2440>
-        
+
         -- </randexpr-2.2440>
     })
 
@@ -24470,7 +24470,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select d-(abs(case when +coalesce((select 19 from t1 where not exists(select 1 from t1 where d | f in (select ~case count(distinct f) when ( -(cast(avg((( -19))) AS integer))) then (count(*)) else count(distinct 17) end*(max(t1.d)) from t1 union select min(b) from t1))),13) | t1.b+t1.e in (13,(t1.b),t1.a) then t1.a when a in (select t1.f from t1 union select t1.b from t1) then t1.e else a end)/abs(f))-t1.e from t1 where not exists(select 1 from t1 where not 19 in (select t1.b from t1 union select t1.f from t1) or 13 in (select e from t1 union select e from t1))),f) FROM t1 WHERE NOT (not exists(select 1 from t1 where case when not exists(select 1 from t1 where a<+case c when (abs(t1.b)/abs(e))+t1.b-b-t1.b then (t1.d)*t1.c else t1.d end) then b else 19 end in (select  -count(distinct c)*(max(f)) | ~+case min(t1.a) when cast(avg(c) AS integer) then cast(avg(t1.a) AS integer) | count(distinct t1.d)* -count(distinct t1.e) else ( -count(*)) end |  -cast(avg(t1.d) AS integer)+min(a)*count(distinct b) from t1 union select max(13) from t1)))"
     end, {
         -- <randexpr-2.2443>
-        
+
         -- </randexpr-2.2443>
     })
 
@@ -24500,7 +24500,7 @@ test:do_test(
         return test:execsql "SELECT (t1.e)+t1.c-coalesce((select max((abs(coalesce((select case when f>=(abs(coalesce((select max(a) from t1 where 11*(t1.f)*a*t1.d=11),t1.b))/abs(t1.d))+t1.b then c when not exists(select 1 from t1 where t1.c<>b) then 13 else 11 end from t1 where (13 not in (f,t1.c,13))),b)+t1.d)/abs(t1.f))) from t1 where b<>t1.a),t1.a) | t1.d FROM t1 WHERE NOT (~a<>a or d<>t1.e)"
     end, {
         -- <randexpr-2.2446>
-        
+
         -- </randexpr-2.2446>
     })
 
@@ -24530,7 +24530,7 @@ test:do_test(
         return test:execsql "SELECT case when coalesce((select 11 from t1 where exists(select 1 from t1 where t1.a<= -19)),t1.c-t1.e*e-19-t1.d-t1.e-~a*coalesce((select max(b) from t1 where b>(abs(+c+case c when 11 then t1.f else 11 end)/abs(b))),t1.e)-f+t1.c+19+e-t1.e)<=t1.f then e else c end FROM t1 WHERE NOT ((abs(t1.d)/abs(~b)) in (select count(distinct case when t1.c+t1.f<coalesce((select b from t1 where ((select case min( -d+d+f+d) when ~max(t1.c) then case max(d) when  -( - -min(d)) then cast(avg(t1.d) AS integer) else (max( -c)) end else cast(avg(t1.e) AS integer) end from t1)<t1.b)),17) or t1.b=f then case when t1.f<>e and ((d) between t1.a and d) then t1.b else 13 end else 11 end) from t1 union select count(*) from t1))"
     end, {
         -- <randexpr-2.2449>
-        
+
         -- </randexpr-2.2449>
     })
 
@@ -24540,7 +24540,7 @@ test:do_test(
         return test:execsql "SELECT case when 19*case when case when t1.e>((t1.d)) and 11>t1.d then  -17 else e end in (select count(distinct a) from t1 union select min(d) from t1) then (d) else e end | t1.c+a in (select count(*) from t1 union select case +(max(19))+count(distinct  -t1.d) when min(19) then cast(avg(e) AS integer) else cast(avg(t1.a) AS integer) end from t1) and 17 between 17 and t1.b then  -(t1.e) when b between t1.c and 13 then b else 11 end+t1.f*(t1.d)+t1.c FROM t1 WHERE ~+e+11>b"
     end, {
         -- <randexpr-2.2450>
-        
+
         -- </randexpr-2.2450>
     })
 
@@ -24570,7 +24570,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max((e)) from t1 where not (((abs(c)/abs((abs(t1.e)/abs(t1.d)))) between d and a+t1.f+19-a or (not exists(select 1 from t1 where f*11 in (19,t1.d,case when (11 in (19,17,19) and t1.a>t1.d) then t1.e-19 else t1.e end+f))) and a<11) and 19<>a)),c+d) FROM t1 WHERE 17+case b*f when b then a+e else d end*t1.b<=case when not f=11 then c when t1.e<f-coalesce((select max(d) from t1 where e in (select (select count(*) from t1) | coalesce((select e from t1 where t1.d>d and exists(select 1 from t1 where 19 in (t1.e,t1.a,(e)))),a)*c from t1 union select f from t1)),t1.a)+f+17 then t1.c else b end"
     end, {
         -- <randexpr-2.2453>
-        
+
         -- </randexpr-2.2453>
     })
 
@@ -24590,7 +24590,7 @@ test:do_test(
         return test:execsql "SELECT ((select cast(avg(case a when t1.d then (abs(coalesce((select coalesce((select coalesce((select e-a from t1 where not exists(select 1 from t1 where t1.f>11 or t1.a= -f)), -t1.a) from t1 where 11<= -t1.f),t1.f)-13 from t1 where not exists(select 1 from t1 where t1.e in (f,t1.b,d))),t1.d))/abs(11)) else (17) end) AS integer)+abs( -count(distinct e)+count(*)) |  -count(*)*+min(e)*count(distinct b)*cast(avg(11) AS integer) from t1)) FROM t1 WHERE d= -19"
     end, {
         -- <randexpr-2.2455>
-        
+
         -- </randexpr-2.2455>
     })
 
@@ -24620,7 +24620,7 @@ test:do_test(
         return test:execsql "SELECT 11+t1.e*c | t1.a+t1.a*coalesce((select max(b*t1.d*case when c in (select t1.b from t1 union select case when (t1.b>=d) then 19 else case when ((((t1.a<>t1.b)))) then b when f<=11 then case when e not in (19,t1.d,a) then coalesce((select 11 from t1 where e between a and e),e) when 11<=e then t1.a else 13 end else t1.c end end from t1) then 19 else (t1.d) end-a) from t1 where (t1.d)<= -e),t1.f) FROM t1 WHERE ((f not between t1.a and (abs(19)/abs(17 | (a))) and ((exists(select 1 from t1 where coalesce((select case e*(17) when b-(abs((abs(11)/abs(t1.c+e+t1.c)))/abs(17-((t1.f-t1.e | 11)))) then e else a end from t1 where t1.c not in (19,t1.b,t1.d)),c)=b)))))"
     end, {
         -- <randexpr-2.2458>
-        
+
         -- </randexpr-2.2458>
     })
 
@@ -24650,7 +24650,7 @@ test:do_test(
         return test:execsql "SELECT (select (case +~ -abs(count(distinct + -(select (case ~((min(t1.b)+max(a))+count(*))*cast(avg(e) AS integer) when count(distinct (17)) then count(distinct t1.d) else max(a) end) from t1)*(17)-t1.f+case (abs( -t1.e)/abs(17)) when t1.f then b else 11 end)) | max(c)-case max(f) when (max(t1.f)) then min(c) else cast(avg((t1.d)) AS integer) end when count(*) then min(t1.a) else cast(avg(t1.c) AS integer) end) from t1) FROM t1 WHERE 13 in ((select ~ -abs((abs( -max(c)+count(distinct c)-~case +max(f) when min(13) then count(distinct t1.e) else count(*) end-((cast(avg(t1.c) AS integer)))))) from t1),~t1.c-t1.e,case when exists(select 1 from t1 where not exists(select 1 from t1 where t1.a in (select case when t1.c<d or e>a then b else (c) end+t1.d from t1 union select  -t1.e from t1)) or 11 not between b and d or e>e) then t1.f else t1.f end*t1.b- -t1.b)"
     end, {
         -- <randexpr-2.2461>
-        
+
         -- </randexpr-2.2461>
     })
 
@@ -24680,7 +24680,7 @@ test:do_test(
         return test:execsql "SELECT case when (abs(~(t1.e))/abs(case when (( -13<d or b not in (t1.d,a,19)) and t1.b<d) or a<13 then +~c else 17 end)) in (select cast(avg(t1.b |  -t1.f) AS integer)- - -case (~min(t1.e)+count(*)) when  -max(13) then max(t1.c) else  -cast(avg(11) AS integer) end from t1 union select cast(avg(11) AS integer) from t1) then t1.e when not exists(select 1 from t1 where (19 not between d and 13)) then 19 else c end-t1.c FROM t1 WHERE  -t1.a-+case when c between b and t1.a then 19 else t1.b end | (coalesce((select t1.f from t1 where case ~((abs(case case t1.e when t1.b then  -13 else f end when t1.a then t1.f else t1.b end+(e)-t1.b)/abs(c))+t1.d) when 19 then 11 else a end not in ( - -13,a,11)),b))+t1.b+e in (select t1.d from t1 union select d from t1)"
     end, {
         -- <randexpr-2.2464>
-        
+
         -- </randexpr-2.2464>
     })
 
@@ -24710,7 +24710,7 @@ test:do_test(
         return test:execsql "SELECT case when (select  -case abs(min(c)) when count(distinct a)-min(t1.c) then  -~abs(max(c)) | min( -13) |  -count(*)+min(d)*count(*) else  -(count(distinct t1.f)) end from t1) in (select count(distinct b)+max(f) from t1 union select cast(avg(19) AS integer) from t1) then (t1.d) when b<=case d when t1.d then t1.a else t1.d end then coalesce((select t1.d from t1 where not exists(select 1 from t1 where t1.a not in (11,e,13))),13) else 17 end FROM t1 WHERE t1.f in (select count(*)-max(case f+(abs(e-17*(abs(11+17+e)/abs(f)) | t1.e*b+t1.d)/abs(e))+t1.a when t1.a then  -t1.d else 13 end) | abs( -cast(avg(b) AS integer)-count(distinct 13) | (count(*))+count(*))-cast(avg(((a))) AS integer) from t1 union select count(distinct 11) from t1)"
     end, {
         -- <randexpr-2.2467>
-        
+
         -- </randexpr-2.2467>
     })
 
@@ -24740,7 +24740,7 @@ test:do_test(
         return test:execsql "SELECT (select min(coalesce((select max(t1.c-case t1.e | (abs(coalesce((select max(t1.b) from t1 where 19<f-13 or exists(select 1 from t1 where  -case coalesce((select max( -17-19) from t1 where (e>c)),f)+t1.b when 13 then t1.c else t1.b end<>a) or t1.a=a),e+t1.e))/abs((f))) when a then e else f end) from t1 where t1.a>t1.d),19)) from t1) FROM t1 WHERE 19*~case when (case when t1.f<>t1.a*17*(abs(t1.e)/abs(a))*a*(select case +min(11)*cast(avg(b) AS integer)*cast(avg(19) AS integer) when count(distinct t1.f) then max( -t1.e) else cast(avg( -f) AS integer) end from t1)*(select min(t1.b) from t1)*t1.d then coalesce((select max(11) from t1 where t1.a between t1.d and 17 and 19 not between 17 and a),17) else 17 end in (select t1.f from t1 union select 17 from t1)) then ~t1.b else t1.d end<=b"
     end, {
         -- <randexpr-2.2470>
-        
+
         -- </randexpr-2.2470>
     })
 
@@ -24780,7 +24780,7 @@ test:do_test(
         return test:execsql "SELECT  -case (select ~count(*)-~abs(~ -(count(*)+count(*)))*count(*) from t1)*13++coalesce((select max( -+17+case when f not between e and t1.c and t1.f between t1.e and t1.a then e when (b)>19 then f else t1.b end) from t1 where 17 not in (a,t1.f,17) or (d>=t1.e) or a<=17),d) when t1.c then 19 else t1.f end FROM t1 WHERE NOT ((19<+case when not 17>e then +t1.f when e | 13 in (select ~(abs(a)/abs(t1.b)) from t1 union select t1.f from t1) then case when f between case case b*f+19-case t1.c when f then 13 else c end when t1.d then b else b end*11 when 19 then 13 else t1.c end and t1.f then c when t1.b<=c then t1.d else 13 end else t1.d end))"
     end, {
         -- <randexpr-2.2474>
-        
+
         -- </randexpr-2.2474>
     })
 
@@ -24790,7 +24790,7 @@ test:do_test(
         return test:execsql "SELECT case when e not in (t1.a,t1.b,t1.e-t1.a) then f-coalesce((select max(~19-t1.b-f) from t1 where case when (select count(*)*count(*) from t1)-coalesce((select max(13) from t1 where (abs(13)/abs(19-f)) in (select count(distinct f) from t1 union select ~ - -count(distinct  -f) from t1)),t1.b) between t1.f and t1.d then d else f end between t1.f and a),t1.f)+ -t1.f else t1.e end FROM t1 WHERE d not in (c,t1.d, -coalesce((select max( -coalesce((select f from t1 where t1.b>t1.c* - -t1.f),case when (t1.e-t1.e | 19*t1.c+e<19 and 19<=e or not exists(select 1 from t1 where t1.a<=t1.d or e in (a,t1.e,b))) then  -e when f in ((t1.a),d,11) then 13 else d end)) from t1 where c between 19 and f),b))"
     end, {
         -- <randexpr-2.2475>
-        
+
         -- </randexpr-2.2475>
     })
 
@@ -24810,7 +24810,7 @@ test:do_test(
         return test:execsql "SELECT  -case when (17<>t1.b-d+t1.a | t1.f) then ~c when ((19)-coalesce((select case t1.d-t1.f when (abs(((select abs(cast(avg(13) AS integer) | cast(avg( -(t1.b)) AS integer)) from t1)))/abs(case d when t1.b then  -11 else 19 end))*17 then t1.e else t1.a end from t1 where (19 not in (f,t1.d,t1.e))),t1.d)<>a) then t1.d else t1.c end FROM t1 WHERE a in (~b-t1.f*c,13 | coalesce((select max(t1.a) from t1 where  -t1.a-~case when b in (case when t1.e in (select 11 from t1 union select d from t1) and 13>19 then 13*c when f not in (t1.d,c,13) then t1.a else a end,t1.f,d) then a else 11 end+b in (select +(min(11)) from t1 union select max(11)+cast(avg(19) AS integer) from t1)),13),t1.f)"
     end, {
         -- <randexpr-2.2477>
-        
+
         -- </randexpr-2.2477>
     })
 
@@ -24850,7 +24850,7 @@ test:do_test(
         return test:execsql "SELECT case f when case when +t1.a between a and case e when 17 then t1.e else f-t1.e+a-((select ++count(distinct d) | cast(avg(t1.e) AS integer)+count(distinct e) |  -count(*) from t1)) end-t1.b*f and t1.b | t1.b-b<=c then  -t1.b+d when 11 in (select t1.e from t1 union select 11 from t1) then 13 else a end then b else c end FROM t1 WHERE NOT (case when ++c-13*d>t1.a and f=t1.d-t1.b then (select count(distinct 11)*(+cast(avg(t1.b) AS integer)+case cast(avg(e) AS integer) when max(d) | min(11) then min(f) else ( -min(t1.b)) end*(count(*)))* -min(19) from t1) else t1.e end*11 in (select a from t1 union select t1.e from t1) and e=17 or 11 not in ( -t1.d,f,t1.f))"
     end, {
         -- <randexpr-2.2481>
-        
+
         -- </randexpr-2.2481>
     })
 
@@ -24880,7 +24880,7 @@ test:do_test(
         return test:execsql "SELECT  -(19)-coalesce((select max(t1.e) from t1 where c not in (t1.b,17,t1.c)),case coalesce((select b+f+coalesce((select t1.a from t1 where t1.e>=t1.e+t1.a+t1.c or t1.f between c and t1.f),t1.e) from t1 where 11<>13 or t1.a=b),t1.c)*f+a when a then 17 else 17 end+t1.e)+a FROM t1 WHERE NOT (e | a not between  -case when not c between case when exists(select 1 from t1 where (f not in (coalesce((select max(t1.d) from t1 where t1.e=t1.d),t1.e)+a,19,t1.c)) or not exists(select 1 from t1 where a in (19,a,e) and 11>=t1.f)) or 11<17 then t1.e+19*t1.f-b when t1.c in (e,t1.b,e) then f else t1.f end and t1.b or (11>=(t1.a)) then e when t1.a=t1.a then (select count(*) from t1) else e end and t1.b)"
     end, {
         -- <randexpr-2.2484>
-        
+
         -- </randexpr-2.2484>
     })
 
@@ -24890,7 +24890,7 @@ test:do_test(
         return test:execsql "SELECT case (abs(case when 13 not in (t1.f,a,t1.b) then d*(abs((coalesce((select coalesce((select coalesce((select max(t1.d-t1.a) from t1 where (t1.c between 19 and (c) and c<t1.c)),17) from t1 where (11>=17)),t1.f) from t1 where t1.e between e and 17),17))-b)/abs(d)) | b+t1.b when e between t1.f and d then 19 else 17 end*f)/abs(a)) when t1.c then 11 else t1.d end FROM t1 WHERE d>=e"
     end, {
         -- <randexpr-2.2485>
-        
+
         -- </randexpr-2.2485>
     })
 
@@ -24930,7 +24930,7 @@ test:do_test(
         return test:execsql "SELECT case ((abs(case when case  -(select count(distinct case when t1.d in (select t1.b from t1 union select t1.b from t1) then b when f not in (t1.a,b,a) then c else 17 end) | cast(avg(d) AS integer) | min(b) from t1) | +b-e when t1.e then f else a end not between 11 and 13 then f when 17>e and 17<c or exists(select 1 from t1 where b>=t1.f) or d in ( -t1.c,f,t1.a) then  -a else t1.f end)/abs(t1.b))) when 17 then t1.f else t1.f end FROM t1 WHERE NOT (t1.d=t1.b+case c-11+coalesce((select case when +(select +(case max(t1.e) when count(*) then (count(*)) else cast(avg(d) AS integer) end) from t1)-d between b and t1.d then 11 else f end from t1 where t1.f<=t1.c and exists(select 1 from t1 where exists(select 1 from t1 where e between t1.e and t1.e))),t1.b)-19 when t1.d then t1.f else (t1.f) end | e-c or t1.f not in (b, -f, -f))"
     end, {
         -- <randexpr-2.2489>
-        
+
         -- </randexpr-2.2489>
     })
 
@@ -24960,7 +24960,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(11) from t1 where 17 not in (11,case when (case when t1.f>b then t1.d*t1.d else (abs((abs(19)/abs(coalesce((select 17*t1.e-t1.c from t1 where 17<13 and (t1.a in (select (min(17)) from t1 union select max(c) from t1) and  -t1.d not in ((t1.b),d,a))), -17))))/abs(c))*13 end)<>(t1.f) then a when a=t1.a then 17 else  -19 end-d,a)),e) FROM t1 WHERE NOT (19<=case when not exists(select 1 from t1 where case when case when case when ((t1.a in (select +min(t1.c) from t1 union select max(t1.a) from t1))) or 19 between t1.d and b then +c | 11*f else d end<b and 17 not in (t1.b,t1.e,t1.c) then case when f=t1.b then t1.c when d between t1.c and t1.c then 17 else 19 end else t1.d end<>b then c else t1.d end in (17,( -b),t1.c)) then t1.e when t1.f in (t1.a,13,d) then 17 else t1.f end*11*t1.d and a<=t1.d)"
     end, {
         -- <randexpr-2.2492>
-        
+
         -- </randexpr-2.2492>
     })
 
@@ -24970,7 +24970,7 @@ test:do_test(
         return test:execsql "SELECT b*case when t1.f not in (a,f,t1.e-e) and t1.b in (select coalesce((select max(t1.e) from t1 where coalesce((select max(~d) from t1 where case when t1.b not in (t1.c,17, -c) then t1.f when t1.c>17 then 17 else e end>t1.f and t1.f not in (b,f,d)),17)>=t1.c or 19<=t1.e),t1.a) from t1 union select (e) from t1) then d when t1.c<e then  -t1.b else b end*c FROM t1 WHERE b not between 13 and d"
     end, {
         -- <randexpr-2.2493>
-        
+
         -- </randexpr-2.2493>
     })
 
@@ -25000,7 +25000,7 @@ test:do_test(
         return test:execsql "SELECT +(select ~(~cast(avg(t1.c) AS integer)* -cast(avg(c) AS integer))-case min(t1.e) when case count(*)*~(count(*)-+count(*)*cast(avg(case t1.d when 19 then d else (t1.a) end*e) AS integer) | cast(avg(13) AS integer)-cast(avg( -11) AS integer)+max(b)+cast(avg(19) AS integer) | (max(t1.e))) | min(f) when  -max(19) then (count(distinct  -t1.a)) else (count(distinct 17)) end then max(t1.d) else cast(avg(t1.e) AS integer) end from t1) FROM t1 WHERE NOT (t1.c-case f when 17 | b then case +case f | case when +t1.a>c and e in (select +max(17) from t1 union select count(*) from t1) then (abs( -c)/abs(a)) when b>=t1.f then t1.b else 11 end when t1.f then 17 else t1.d end*(c)+17 when e then c else t1.f end else  -c end-t1.c-c-19+c+a not in (t1.a,13,e))"
     end, {
         -- <randexpr-2.2496>
-        
+
         -- </randexpr-2.2496>
     })
 
@@ -25030,7 +25030,7 @@ test:do_test(
         return test:execsql "SELECT case t1.d when e then t1.d else (abs(e-b)/abs(t1.c+a*a | 17+19*coalesce((select 17 from t1 where 11 between +(select abs(+cast(avg(13) AS integer)) from t1)*19 and t1.e),t1.e-11-t1.e+( -t1.e*13)*t1.e | e*t1.b)*f)) end FROM t1 WHERE NOT ((abs(t1.d)/abs(t1.c)) not between +13 and t1.c)"
     end, {
         -- <randexpr-2.2499>
-        
+
         -- </randexpr-2.2499>
     })
 
@@ -25050,7 +25050,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select coalesce((select t1.e from t1 where case when c+a in (select t1.f from t1 union select 13 from t1) then c when not not exists(select 1 from t1 where d>= -11) then t1.d else  -t1.f end between b and 11 or d not between e and 11), -f)+e+ -11*17 from t1 where not exists(select 1 from t1 where exists(select 1 from t1 where t1.e in (select ~min(e) from t1 union select case case count(distinct f) | min(19)+min(a) when count(*) then max( -t1.c) else max(17) end when (max(t1.c)) then min(11) else min(t1.c) end from t1)) or d=a)),t1.e) FROM t1 WHERE +t1.e<~case when t1.e in (select (abs(c)/abs(~t1.d)) from t1 union select a from t1) then coalesce((select e from t1 where t1.d+ -coalesce((select max(11-t1.e*b) from t1 where 19 in (11,t1.b,e)),11)*t1.e+19 in (select t1.d from t1 union select  -t1.d from t1)),17) | t1.e+e when t1.f in (17,f,f) then t1.b else 17 end*13"
     end, {
         -- <randexpr-2.2501>
-        
+
         -- </randexpr-2.2501>
     })
 
@@ -25090,7 +25090,7 @@ test:do_test(
         return test:execsql "SELECT case when ((t1.f)+coalesce((select coalesce((select ++d from t1 where not t1.d not between e and e),19) from t1 where t1.d<>19),a)-c*a not between c and t1.a and not exists(select 1 from t1 where 17<=a) and exists(select 1 from t1 where not e in (select t1.b from t1 union select t1.e from t1)) and t1.f between 11 and t1.d) or e between c and 13 then t1.a+e when t1.a not between a and d then 17 else t1.a end FROM t1 WHERE NOT ((a)+t1.f>t1.e+a)"
     end, {
         -- <randexpr-2.2505>
-        
+
         -- </randexpr-2.2505>
     })
 
@@ -25100,7 +25100,7 @@ test:do_test(
         return test:execsql "SELECT b*b+case d*d when t1.f then c else coalesce((select coalesce((select max(f) from t1 where (d=t1.b or case when e=11 then t1.a else f end<>t1.d and exists(select 1 from t1 where f not between t1.c and a))),(select count(distinct f) from t1)+case when t1.b between a and (19) and t1.e=a then 13 else 17 end) from t1 where d>=11),f)*t1.e end-11-a- -(11) FROM t1 WHERE (c<19)"
     end, {
         -- <randexpr-2.2506>
-        
+
         -- </randexpr-2.2506>
     })
 
@@ -25130,7 +25130,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(c) from t1 where ((d between t1.c and c)) and b not between t1.a and a or f+c in (d | +f*d*coalesce((select case when not  -t1.c<t1.b then t1.b when  -t1.a between t1.a and e then 11 else c end from t1 where (t1.d>=a)),e)*f,b,11) or  -19>=t1.c and t1.a in (b,t1.f,c)),13) FROM t1 WHERE NOT (t1.c in (select count(distinct t1.a)*max(d) | +case (~ -~+count(distinct 13)*min(19) | (max(e))+ -(count(*))) when count(distinct t1.a) then max(d) else count(*) end+min(t1.c) from t1 union select min(e) from t1) and 17=t1.c-t1.d or t1.c-d not in ( -c,(abs(case a when t1.a then 13 else e end+f)/abs(e)),t1.a))"
     end, {
         -- <randexpr-2.2509>
-        
+
         -- </randexpr-2.2509>
     })
 
@@ -25150,7 +25150,7 @@ test:do_test(
         return test:execsql "SELECT case case when not (abs(t1.d)/abs(17))>=t1.a+((19))+ -e-b or 11 between t1.a and 11 then 13 when t1.f in (select case count(distinct t1.d) when abs( -+(cast(avg(t1.c) AS integer)))*count(distinct (t1.e)) then max(19) else case count(distinct t1.a) when cast(avg(19) AS integer) then count(*) else cast(avg((t1.a)) AS integer) end end from t1 union select max(13) from t1) then  -t1.b else t1.f end when c then  -c else b end FROM t1 WHERE not exists(select 1 from t1 where not exists(select 1 from t1 where 13>=f))"
     end, {
         -- <randexpr-2.2511>
-        
+
         -- </randexpr-2.2511>
     })
 
@@ -25170,7 +25170,7 @@ test:do_test(
         return test:execsql "SELECT 11-(abs( -(select ((count(*)-(abs( -min(~19)))+case min(case when not exists(select 1 from t1 where (exists(select 1 from t1 where 17>f) or t1.c>=a)) then d else 11 end) | abs(cast(avg(19) AS integer)) when (count(distinct t1.f*19))-+ -( -count(*)) then ((cast(avg(t1.d) AS integer))) else cast(avg(t1.a) AS integer) end*count(distinct t1.d))+cast(avg(c) AS integer))-max(17) from t1)-17)/abs(t1.f)) FROM t1 WHERE  - - -f+d in (select 19 from t1 union select t1.b from t1) or ((abs(a)/abs( -11+case when t1.e>=( -f) | d then ~t1.a when coalesce((select t1.d from t1 where e not in (e-(d)+a,e,t1.b)),a)<>t1.b then a else  -t1.c end)))<=t1.e and t1.e in (13,t1.a,t1.f)"
     end, {
         -- <randexpr-2.2513>
-        
+
         -- </randexpr-2.2513>
     })
 
@@ -25200,7 +25200,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select ~11*b from t1 where (not exists(select 1 from t1 where case d when t1.b then t1.b else d end not between b and t1.b and f in (select ~count(*) from t1 union select count(distinct coalesce((select max( -c+(abs(coalesce((select max(t1.a) from t1 where not exists(select 1 from t1 where d>a)),t1.b)-17)/abs((b)))*(a)) from t1 where t1.f>b),f)) from t1) or t1.e not in ((d),c,c)))),c)*17+t1.c FROM t1 WHERE coalesce((select 17*case when exists(select 1 from t1 where coalesce((select t1.e from t1 where f<>e and e not between c and 11),d) in (select 11 from t1 union select c from t1)) then t1.b when t1.a between t1.f and 19 then t1.d else t1.c end*f | 19 from t1 where a between t1.c and b or t1.e in ((b),b,t1.f)),17) in (select ( -~case case (((count(*)))) when max(e) then max(e) else cast(avg(c) AS integer) end when min(17) then cast(avg(13) AS integer) else cast(avg(t1.b) AS integer) end+ -count(*)* -count(*))+min(d) from t1 union select count(distinct t1.e) from t1)"
     end, {
         -- <randexpr-2.2516>
-        
+
         -- </randexpr-2.2516>
     })
 
@@ -25220,7 +25220,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case when not +c<>coalesce((select max(19) from t1 where not (abs(c)/abs(a))*a-t1.a>=case when (exists(select 1 from t1 where d=11)) then t1.a*~b else case when b in (select (f) from t1 union select 17 from t1) or not 17 not between f and  -b then t1.a when f<t1.e then a else t1.c end end),t1.c) then case when 19 between 13 and a then 13 else t1.f end else 11 end)/abs(a)) FROM t1 WHERE (t1.f in (select case case ~abs(case case  -cast(avg((select +max((select min(c) from t1)) from t1)) AS integer) when  -abs( -max(f)*count(*)) then ~case max(c)-count(distinct (t1.f))-(cast(avg(t1.d) AS integer)) when ( -cast(avg( -11) AS integer)) then min( -13) else count(*) end else  -cast(avg(f) AS integer) end when ((min(e))) then min(t1.f) else (count(distinct 17)) end | cast(avg(11) AS integer)-cast(avg(13) AS integer)) when count(*) then count(*) else max(b) end when count(distinct 17) then  -count(distinct t1.d) else count(distinct  -e) end*min(t1.c) from t1 union select count(distinct 17) from t1))"
     end, {
         -- <randexpr-2.2518>
-        
+
         -- </randexpr-2.2518>
     })
 
@@ -25240,7 +25240,7 @@ test:do_test(
         return test:execsql "SELECT ~case when case 11*17 when f then t1.a else t1.e end in ( -coalesce((select max(case coalesce((select t1.f from t1 where exists(select 1 from t1 where t1.c in (case t1.e when  -d then c else (d) end,t1.e,t1.a))), -t1.c) when 19 then 11 else t1.e end) from t1 where t1.e in (19, -t1.b,a)),17)+f-11,17,19) then a when ((d<d)) then 11 else  -t1.e end FROM t1 WHERE not e>=t1.b and (b not in (c,t1.e,t1.a))"
     end, {
         -- <randexpr-2.2520>
-        
+
         -- </randexpr-2.2520>
     })
 
@@ -25260,7 +25260,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case f when case when d+f between e and t1.f then f when coalesce((select max(t1.f) from t1 where c in (select t1.a from t1 union select case when a not between t1.c and 13 then a else t1.c end from t1) or f*f not in (case when (11<=d) then case when 13<t1.a then (t1.d) else t1.a end else t1.a end-t1.d,17,f) or a>= -d),b)<=t1.b then t1.e else 13 end then f else t1.b end)/abs(f)) FROM t1 WHERE c between c and coalesce((select max(f) from t1 where b in (select count(*) from t1 union select max(13) from t1)),19)"
     end, {
         -- <randexpr-2.2522>
-        
+
         -- </randexpr-2.2522>
     })
 
@@ -25290,7 +25290,7 @@ test:do_test(
         return test:execsql "SELECT d++11*a+coalesce((select max(t1.a) from t1 where 17+case when (19>=a) then t1.b when f>=f then  -(select cast(avg(t1.e-t1.f*t1.a) AS integer) from t1)-f else t1.f end*a+f*t1.a not in (t1.e,e,13)),17)- -t1.b-a-c*19 FROM t1 WHERE NOT (f*t1.a*t1.b>17 and case when 13 not in (19, -(select count(*) from t1),coalesce((select max(coalesce((select max(t1.a) from t1 where  -coalesce((select max(case when not t1.f<=(t1.d) then t1.a else (a) end) from t1 where t1.f>c or 13<(t1.a)),17)>=t1.a or not exists(select 1 from t1 where  - -c not in (a,t1.b,t1.e))),t1.e)) from t1 where (f not in (b,f,f))),c)) then (t1.e) when t1.a<>e then e else b end- -t1.f not in (a, -c,(c)))"
     end, {
         -- <randexpr-2.2525>
-        
+
         -- </randexpr-2.2525>
     })
 
@@ -25310,7 +25310,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select (a) from t1 where 11-11+t1.b<=17-b),case when case when not t1.e*f>= -t1.f and a in (11,t1.c,t1.b) or 19>e then (select case min((f)-f) when cast(avg(t1.a) AS integer) then (cast(avg(17) AS integer)) else ((cast(avg((13)) AS integer))) end from t1) when 13 not between f and t1.c then (abs(e)/abs(17)) else t1.e end |  -17<=f then b when f<19 or t1.b<=t1.d then f else f end) FROM t1 WHERE NOT ( -f | t1.f*c-t1.a | t1.c+11*case ~17 when  -coalesce((select max(t1.e) from t1 where 13*(17)>=11),t1.a) then case case when (t1.b>= -t1.b) then t1.f when t1.f<a or 11>a and t1.e in (e,(t1.d),19) then t1.f else t1.c end when a then t1.a else t1.e end else a end*t1.a-13<c)"
     end, {
         -- <randexpr-2.2527>
-        
+
         -- </randexpr-2.2527>
     })
 
@@ -25330,7 +25330,7 @@ test:do_test(
         return test:execsql "SELECT (abs(case when exists(select 1 from t1 where b not between ~case when (t1.e-(c-t1.c) | t1.a) in (select abs(~((min(t1.f) | cast(avg(c) AS integer))*(min(b))-count(distinct 19)*min(e)) |  -((count(*))))-cast(avg(d) AS integer) from t1 union select  -count(distinct t1.a) from t1) or f>a then 11 else e end*11 and t1.e) then t1.e when  -17<11 then 17 else t1.a end)/abs(a)) FROM t1 WHERE c<=19"
     end, {
         -- <randexpr-2.2529>
-        
+
         -- </randexpr-2.2529>
     })
 
@@ -25370,7 +25370,7 @@ test:do_test(
         return test:execsql "SELECT case when t1.e-19 in (case (abs(t1.a*+~c*coalesce((select c from t1 where ~ -(select abs(case cast(avg(13) AS integer) when  - -cast(avg(f) AS integer) then count(distinct t1.d) else (count(*)) end+count(*)) from t1) not between (abs(a | t1.a)/abs(t1.c)) and 19),t1.b)-c*17*(t1.f))/abs(d)) when 13 then 19 else t1.b end,(b),17) then 19 when (11)>=t1.b then b else b end*11 FROM t1 WHERE NOT ((case 11 when case t1.e when coalesce((select a from t1 where t1.a<t1.e),t1.e | case when 13 in (coalesce((select max( -b) from t1 where d not between (t1.a) and t1.e and t1.e>=t1.a),t1.f),d,13) then c when 11 between t1.b and 17 then d else 19 end) then f else 19 end then t1.d else c end< -c) and a not in (11,c,11) or 11<>e or exists(select 1 from t1 where b<17))"
     end, {
         -- <randexpr-2.2533>
-        
+
         -- </randexpr-2.2533>
     })
 
@@ -25390,7 +25390,7 @@ test:do_test(
         return test:execsql "SELECT t1.b*case when (abs(t1.c+case when d not in (a,case when b=(t1.a) then (e) when b not between f and t1.c then t1.b else t1.e end, -11) then t1.d when not exists(select 1 from t1 where 19 not between (a) and a or t1.c>d) then d else b end+t1.a+13-19+d)/abs(t1.d))> -t1.f then t1.a when t1.d in (select d from t1 union select c from t1) or 13 not between d and t1.f then t1.b else e end+ - -a FROM t1 WHERE t1.f<=11"
     end, {
         -- <randexpr-2.2535>
-        
+
         -- </randexpr-2.2535>
     })
 
@@ -25410,7 +25410,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select max(coalesce((select e+t1.c from t1 where f*11+coalesce((select max(17) from t1 where not ~case a when t1.f+13*e-(11)*t1.f then d else a end>d and (a not between t1.c and t1.c)),t1.d)- -f-b+11=b),19)-t1.f) from t1 where exists(select 1 from t1 where 19<>11)),c) FROM t1 WHERE case when 11 in (select  -abs(abs( - -(cast(avg(+11-c) AS integer)+cast(avg(~a) AS integer))*max(11))+cast(avg(d) AS integer)-cast(avg(e) AS integer)-((max(t1.e))))+count(*) from t1 union select ( -count(*)) from t1) then t1.a when e>d then c- - -t1.a else 19 end in (select count(distinct  -f) from t1 union select count(distinct d) from t1) and not e<17"
     end, {
         -- <randexpr-2.2537>
-        
+
         -- </randexpr-2.2537>
     })
 
@@ -25430,7 +25430,7 @@ test:do_test(
         return test:execsql "SELECT case when (coalesce((select max(a*case when 17+f>f-t1.d*t1.f then t1.d when t1.c not between t1.e and d then 19 else (c) end) from t1 where not t1.d not between  - -17 and 19),t1.a) in (select min((13)) from t1 union select ~(abs(count(distinct t1.a))*((( -max( -t1.f)))+max( -t1.c) | count(*)))-cast(avg(11) AS integer) from t1)) then c- - -d when t1.d>=d then d else 13 end FROM t1 WHERE ((abs(t1.a-t1.a*t1.d*coalesce((select coalesce((select max(11) from t1 where exists(select 1 from t1 where 11+t1.d |  -t1.c-case when b+d in (select count(*) from t1 union select max(17)+ -count(distinct t1.d) from t1) then t1.c else d end-a | 13<>c)),t1.c) from t1 where 13 not in (d,t1.a,f) and 19=t1.f),(13))+(t1.d))/abs(t1.c)) between t1.f and t1.d)"
     end, {
         -- <randexpr-2.2539>
-        
+
         -- </randexpr-2.2539>
     })
 
@@ -25460,7 +25460,7 @@ test:do_test(
         return test:execsql "SELECT case when f | c>t1.d-case when (abs(t1.b-t1.d*f)/abs(c))=t1.e then 17 when not exists(select 1 from t1 where t1.b=(11) or c not in (13,17,b)) or a<e then t1.f else 19 end+b-t1.f and t1.b between t1.b and t1.f and e in (t1.f,b,b) then (select cast(avg(e) AS integer)-~ -~count(*) from t1) else 11 end FROM t1 WHERE e<=case when (case when 17<>a then t1.c when not 11<(f) then case when t1.c= -b then c else 11 end else e end | f>=t1.b and b not between  -(t1.e) and f) then 17 when f in (select  -count(distinct t1.e) from t1 union select case min(f) when case cast(avg( -t1.b) AS integer) when cast(avg(e) AS integer) then  -max(e) else min(t1.b) end then count(*) else (cast(avg(t1.e) AS integer)) end from t1) then case c when e then t1.f else 13 end else t1.d end"
     end, {
         -- <randexpr-2.2542>
-        
+
         -- </randexpr-2.2542>
     })
 
@@ -25490,7 +25490,7 @@ test:do_test(
         return test:execsql "SELECT 17+coalesce((select max(19) from t1 where 11 in (select (abs((abs(~(case +b+17 when t1.e*t1.b then 17 else case when t1.b+17+d*a in (select (~count(distinct a)) from t1 union select case cast(avg(t1.e) AS integer) when count(*) then count(distinct t1.d) else count(distinct b) end from t1) then t1.f when (t1.e in ( -t1.a,t1.e,d)) then 17 else t1.e end | e end)- -b)/abs(t1.f)))/abs(13)) from t1 union select t1.d from t1)),17) FROM t1 WHERE e+t1.b not in (d,a,t1.c) and case case e when (case when +case 13 when t1.a then 19 else 19 end+d in (select count(*)-min(b) from t1 union select  - -min(t1.d) from t1) or f in (select ( -min(t1.e)) from t1 union select cast(avg( -19) AS integer) from t1) or (t1.f in (select  -max( -t1.c) from t1 union select (min(t1.c)) from t1)) then b else +t1.b end)-t1.b then b else 19 end when a then b else e end between ( -(t1.c)) and a"
     end, {
         -- <randexpr-2.2545>
-        
+
         -- </randexpr-2.2545>
     })
 
@@ -25530,7 +25530,7 @@ test:do_test(
         return test:execsql "SELECT (abs(~(abs((select ~count(*) | +(max( -coalesce((select max(13) from t1 where coalesce((select max(t1.d) from t1 where 11<+coalesce((select max((case when 19=t1.a then (d) else 19 end)) from t1 where (11) in (17,c,b)),c)*t1.e),t1.c)<13),11)*b | t1.c+17)) from t1))/abs(~b-f))-t1.d*a)/abs(e)) FROM t1 WHERE NOT (c not in (coalesce((select t1.a from t1 where  -(t1.a+17*~case when coalesce((select max(t1.c) from t1 where (coalesce((select max(t1.f) from t1 where not exists(select 1 from t1 where a<=t1.a)),11) in (select (count(distinct t1.d)+count(distinct c)) from t1 union select count(distinct e) from t1))),13)*f=d then d when t1.d in (select t1.d from t1 union select t1.f from t1) then d else t1.f end+c*c | f)+t1.c*t1.a in (select 17 from t1 union select 13 from t1)),t1.f),17,t1.f))"
     end, {
         -- <randexpr-2.2549>
-        
+
         -- </randexpr-2.2549>
     })
 
@@ -25560,7 +25560,7 @@ test:do_test(
         return test:execsql "SELECT case (19) when t1.a then t1.f+coalesce((select max(t1.f) from t1 where case when t1.c=t1.a or (t1.d | case when t1.f=t1.d then a else coalesce((select max(case when 11>=a then t1.b else d end+t1.a) from t1 where  -t1.a not between t1.e and 19),11) end<>t1.d) then t1.e else c end-t1.f*b+f=19),t1.b) | (t1.a)+e else a end FROM t1 WHERE NOT ((case e when d then +(select (min(t1.a)) from t1) else case when a in ((select min(case  -t1.c when d then d else f end+ -e)-+cast(avg(19) AS integer)+max(d) from t1)*t1.d |  -t1.c,b,e) then t1.d when t1.b in (select +min(e) | min(t1.b) from t1 union select  -count(distinct e) from t1) then d else 11 end*13-(e) end not in (t1.c,c,17)))"
     end, {
         -- <randexpr-2.2552>
-        
+
         -- </randexpr-2.2552>
     })
 
@@ -25580,7 +25580,7 @@ test:do_test(
         return test:execsql "SELECT (abs(( -case when 11*coalesce((select coalesce((select d from t1 where ((+t1.f*(select max(t1.f)*min(t1.a) from t1)*d*t1.f between 11 and 13))), -t1.c) from t1 where ((e)>=t1.b) or not t1.a in (select f from t1 union select c from t1) and 11<=a or c between (t1.c) and t1.d),t1.f)<t1.b then 13 else c end-d-t1.e))/abs(17)) FROM t1 WHERE +(select ~case  -++(( -~count(distinct t1.b)))*min(c)*max(t1.f) when ~+count(distinct  -(abs(d)/abs(t1.a))+t1.d+c-13) then count(*) else case (~max(d))+((count(distinct f))) when max(t1.e) then min(t1.c) else (cast(avg(t1.e) AS integer)) end end from t1)-+(select min(17) from t1)+19>t1.f"
     end, {
         -- <randexpr-2.2554>
-        
+
         -- </randexpr-2.2554>
     })
 
@@ -25600,7 +25600,7 @@ test:do_test(
         return test:execsql "SELECT case (t1.b) | t1.d-+t1.e*(select (~count(*) | min(c)-case max(case when e | b in (select t1.b from t1 union select t1.b from t1) then d when 17 between 13 and t1.d then d else t1.c end) when abs(count(distinct (t1.e)))- -min(t1.e) then cast(avg(17) AS integer) else count(distinct c) end) from t1) | b-a-+f-t1.f when +a then t1.d else d end FROM t1 WHERE (17>t1.d) and coalesce((select max((t1.a)+coalesce((select max(17*b) from t1 where t1.d-coalesce((select t1.e from t1 where t1.b<>13 or 19=t1.a),t1.d)*f<=(19) or (t1.c<11 and not not d<t1.a)), -11)-17) from t1 where t1.d not in (19,a,t1.c)),e)*13>t1.d or d=11"
     end, {
         -- <randexpr-2.2556>
-        
+
         -- </randexpr-2.2556>
     })
 
@@ -25630,7 +25630,7 @@ test:do_test(
         return test:execsql "SELECT case when case when coalesce((select max(c*case (select min(case when f in (select t1.e from t1 union select f+case when d<=d then t1.f when b<=11 then t1.c else t1.b end*11 from t1) then f else c end) from t1) when f then 11 else b end) from t1 where d in (t1.b,t1.a,c)),d) between (d) and 19 then  -a else a end in ( -c,t1.d,t1.d) then c when e<> -d then a else t1.c end FROM t1 WHERE a=c or case when e<coalesce((select t1.c from t1 where exists(select 1 from t1 where (f not in (case (select case +(min(11)) when cast(avg(t1.c) AS integer) then count(*) else  - -cast(avg(t1.a) AS integer) end from t1) when t1.b then d else t1.b end,13,a) and t1.c<= -t1.d and (t1.a)<=b or e not between t1.a and b) or a not between t1.b and t1.f) or 19>=(e)),t1.a) then c | t1.f when exists(select 1 from t1 where a not between 19 and e) then t1.a else 17 end>t1.d"
     end, {
         -- <randexpr-2.2559>
-        
+
         -- </randexpr-2.2559>
     })
 
@@ -25650,7 +25650,7 @@ test:do_test(
         return test:execsql "SELECT 13+(select  -abs(+cast(avg((select cast(avg(t1.e*(t1.c)- -(abs(b+e)/abs(f))) AS integer) from t1)) AS integer)-~ -+abs(abs(count(*))) | min(t1.e | t1.e-t1.b)*max(e)-max(t1.f) | min(c)*min(t1.b)+min(t1.e)-count(distinct 11) | min(b)*( - -count(distinct 19)))-count(*) from t1) FROM t1 WHERE d in (select count(*) from t1 union select case count(*) when max(17) |  -max(coalesce((select case t1.d*t1.e when t1.a then 11 else 13 end*f- -f from t1 where b in (select case ~abs(max(13)) when case ((max(c))) when cast(avg(t1.c) AS integer) then max(13) else count(distinct t1.d) end then cast(avg(t1.a) AS integer) else cast(avg(11) AS integer) end from t1 union select  -max(13) from t1)),13))*cast(avg(f) AS integer) then count(*) else count(distinct e) end from t1) and exists(select 1 from t1 where case d when  -(abs(17)/abs(t1.f)) then t1.a else t1.d end<t1.a)"
     end, {
         -- <randexpr-2.2561>
-        
+
         -- </randexpr-2.2561>
     })
 
@@ -25690,7 +25690,7 @@ test:do_test(
         return test:execsql "SELECT c+c*(abs(t1.c+coalesce((select case when 17 not in (t1.f,t1.e,t1.d) or (17<t1.d) then case d when t1.a then t1.f else 11 end else t1.e end*d from t1 where 19 in (select abs(~count(distinct a)) from t1 union select case cast(avg(t1.c) AS integer) when  -max(t1.b) then min(c) else min(f) end+ -max(t1.d) from t1)),t1.b)+t1.e)/abs(17))+t1.b+ -t1.f+17-t1.c FROM t1 WHERE NOT ((13)+19>=19)"
     end, {
         -- <randexpr-2.2565>
-        
+
         -- </randexpr-2.2565>
     })
 
@@ -25710,7 +25710,7 @@ test:do_test(
         return test:execsql "SELECT +case when not c in (select count(distinct t1.b) from t1 union select  -+(cast(avg(b*t1.b) AS integer))*max(case 17 when b then 13 else t1.a end)-count(distinct a) | cast(avg(t1.f) AS integer)+max(t1.d) from t1) then t1.e when a<=case t1.a when (e) then t1.d else d end then d else t1.b end*11-a | 17 | t1.a-f FROM t1 WHERE NOT ((c not in (t1.b,(select case case ++(min(19))*(count(distinct t1.a))+count(distinct e) | cast(avg(t1.e) AS integer) when min( -t1.d) then cast(avg(13) AS integer) else min(17) end*cast(avg(a) AS integer) when count(distinct  -b) then cast(avg(11) AS integer) else  - -(cast(avg(c) AS integer)) end from t1)-11+t1.e,t1.a) or d*case d when a then t1.c else 17 end*19 not between b and t1.c or  -17=b or f in (select a from t1 union select  -b from t1)))"
     end, {
         -- <randexpr-2.2567>
-        
+
         -- </randexpr-2.2567>
     })
 
@@ -25740,7 +25740,7 @@ test:do_test(
         return test:execsql "SELECT coalesce((select (abs(f)/abs(coalesce((select max(19*b+d*coalesce((select max(t1.c) from t1 where case when d>=(abs((11))/abs(t1.a*13+(13)-d*e+11)) then t1.c when t1.c>=a then 19 else  -17 end*t1.e> -e),t1.f)) from t1 where 13<=t1.e),t1.d))) from t1 where t1.d in (select d from t1 union select a from t1)),t1.e) FROM t1 WHERE NOT (t1.c between (11) and coalesce((select max(b*case t1.c when t1.f then t1.f else 11 end) from t1 where +(select count(distinct case when f not between  -13 and 19 then t1.f++(f) | t1.e*(+13)* -(t1.c)-t1.b when 13=t1.d then 19 else t1.b end*t1.a) from t1) in (t1.e,11, -19)),d)+f)"
     end, {
         -- <randexpr-2.2570>
-        
+
         -- </randexpr-2.2570>
     })
 
@@ -25760,7 +25760,7 @@ test:do_test(
         return test:execsql "SELECT case when (not 19>=(abs(t1.b)/abs(+f))) then case 13 when case t1.c when t1.b then f else 13 end then t1.e else t1.a end+coalesce((select max(c) from t1 where a not between t1.d*17*coalesce((select max(e*b) from t1 where t1.a=11),t1.c) and t1.d),t1.d) when (case when t1.d not in (e,t1.a,t1.b) then 19 else t1.f end between t1.c and 19) then t1.e else 11 end FROM t1 WHERE NOT (t1.b*+c>=17)"
     end, {
         -- <randexpr-2.2572>
-        
+
         -- </randexpr-2.2572>
     })
 
@@ -25780,7 +25780,7 @@ test:do_test(
         return test:execsql "SELECT case when d-t1.c<>e then c when (11 not between 13 and 13) then 13 else  -case when c*t1.d>=b*b then  -t1.f else b-t1.c | d*(case t1.d when  -case t1.b when t1.b then t1.b else 19 end*19*(t1.d) then 13 else 19 end) end+19*11 end+b FROM t1 WHERE NOT (~~case when t1.d+(abs(t1.b+coalesce((select coalesce((select max(b-a-a) from t1 where 17 not in (e,case when (t1.d)<=t1.f or  -a not between c and t1.b then c when  -19 in ( -d,(t1.a),19) then b else f end,t1.e)), -13) from t1 where not b in (t1.b, -t1.b,c)),e))/abs(11)) between 13 and d then (t1.b) when t1.e<13 then 19 else a end-(19)-d*t1.d not in (d,t1.c,13))"
     end, {
         -- <randexpr-2.2574>
-        
+
         -- </randexpr-2.2574>
     })
 
@@ -25800,7 +25800,7 @@ test:do_test(
         return test:execsql "SELECT 19+t1.d+d-t1.c*case when 11 not between e and ~c+(select min((abs(t1.b*t1.b)/abs(+t1.c-e))) from t1) then 17 when case when 17*13 not in (t1.b,(abs(~c)/abs( -17-e)),(t1.e)) then 17 else (t1.c) end+c+t1.f not in (t1.f,19,t1.f) then  -t1.e else t1.f end FROM t1 WHERE (+13) between +b and t1.e+11"
     end, {
         -- <randexpr-2.2576>
-        
+
         -- </randexpr-2.2576>
     })
 
@@ -25820,7 +25820,7 @@ test:do_test(
         return test:execsql "SELECT 17+d*~(abs(coalesce((select 19 | f | e*~+((abs(e)/abs(+19))-t1.c-case 17 when t1.f then f else 19 end-17) from t1 where (e in (select ~(11) from t1 union select case when (f)>a then b when e between  -e and t1.b then 17 else t1.f end*t1.a from t1))),t1.b)*e)/abs(17))-t1.a-19 FROM t1 WHERE t1.e not in (d,e,case 19 when  - -~case when exists(select 1 from t1 where 17 not in (t1.d,t1.a,coalesce((select max(11-a) from t1 where coalesce((select +c from t1 where exists(select 1 from t1 where case when t1.f not in (19+(f),d,t1.c) then t1.c when (exists(select 1 from t1 where t1.c>19)) then 19 else f end not between a and t1.f)),t1.c)<=b),17))) then t1.d-11 else t1.b end then (d) else t1.f end-(c))"
     end, {
         -- <randexpr-2.2578>
-        
+
         -- </randexpr-2.2578>
     })
 
@@ -25850,7 +25850,7 @@ test:do_test(
         return test:execsql "SELECT case a when b-coalesce((select coalesce((select max(c-(abs((19))/abs(coalesce((select t1.c+d from t1 where 17 not in (d,t1.c, -t1.e)),t1.b)-(e)))) from t1 where t1.d in (t1.e,e,t1.f)),(e)) from t1 where t1.b=t1.e or t1.b not between b and e or t1.f not between t1.b and e or c not between  -b and a),d) then 13 else 17 end FROM t1 WHERE a+17+(17) in ( -t1.a,13,coalesce((select max(e) from t1 where b+a-13<=b),e)) or e in (select abs( -+~abs(+(min(c))))+count(distinct b) from t1 union select abs(+((max(t1.c)) | min(t1.b))) from t1) and 13 not between f and 19 or not e not in ( -17,13,t1.a)"
     end, {
         -- <randexpr-2.2581>
-        
+
         -- </randexpr-2.2581>
     })
 
@@ -25870,7 +25870,7 @@ test:do_test(
         return test:execsql "SELECT case when not t1.e between 17 and a then 11+ -(select ~case count(distinct +13+t1.c | c*13)- -+ -cast(avg(c) AS integer)-min(19)+case  -max(c) when  -cast(avg(b) AS integer) then max(11) else max(13) end+count(distinct t1.f) when max(( -d)) then cast(avg(t1.c) AS integer) else (min((t1.b))) end | cast(avg(t1.f) AS integer)*count(distinct 17) from t1)+b else +t1.e |  -t1.a-a end FROM t1 WHERE (t1.f<=~c+f)"
     end, {
         -- <randexpr-2.2583>
-        
+
         -- </randexpr-2.2583>
     })
 
@@ -25910,7 +25910,7 @@ test:do_test(
         return test:execsql "SELECT t1.f-coalesce((select max(case when b<>~t1.f then b+f else coalesce((select t1.c from t1 where case a when 19*t1.e+a then 19 else 13 end between 13 and a),t1.d)+b end) from t1 where (t1.c) in (select  -~min(c) | max(t1.d) from t1 union select  -cast(avg(t1.a) AS integer) from t1) and t1.c in (t1.a,d,11) or 11<t1.c),t1.a) FROM t1 WHERE NOT (not exists(select 1 from t1 where +case when 19+~coalesce((select max(+c*t1.c-d) from t1 where t1.f>13 and not exists(select 1 from t1 where (((t1.d<=t1.b))))),e)*b*t1.f>t1.a or not exists(select 1 from t1 where (13) not in (11,t1.b,t1.c)) then c+d else t1.e end>=t1.f) or (not exists(select 1 from t1 where  -11 in (c,t1.d, -a)) or a not between  - - -(b) and b) or 13 between t1.b and f)"
     end, {
         -- <randexpr-2.2587>
-        
+
         -- </randexpr-2.2587>
     })
 
@@ -25930,7 +25930,7 @@ test:do_test(
         return test:execsql "SELECT case when ( -c=~t1.b and coalesce((select max(coalesce((select b from t1 where t1.f between case when t1.e between t1.f and 19 then (t1.b) else t1.a end and t1.f),a)) from t1 where 11=t1.f),t1.f)+t1.c=d) and a>t1.c and 19> -19 and exists(select 1 from t1 where (b=17)) and 17 between 19 and 13 then 19*case (d) when c then b else a end when t1.d not in ( -t1.a,f,13) then  -t1.f else (d) end FROM t1 WHERE 11*case when d | (abs(+t1.e-t1.e*b+(select case abs(count(*)) when count(*) then count(*) else cast(avg(t1.c) AS integer) end from t1)*17+(d)-13-11)/abs(c))-f- -t1.c-d | t1.a not between 19 and f then t1.a when t1.d in (select 11 from t1 union select d from t1) then e else e end-t1.c between 19 and c"
     end, {
         -- <randexpr-2.2589>
-        
+
         -- </randexpr-2.2589>
     })
 
@@ -25950,7 +25950,7 @@ test:do_test(
         return test:execsql "SELECT +case when t1.a-17 in (select cast(avg(t1.a*t1.d+(abs( -t1.e)/abs(case when t1.e>t1.a or a>t1.d then t1.f when 13<11 then t1.b else c end))*t1.d) AS integer) from t1 union select count(distinct t1.a) from t1) then t1.c when d in (select +count(distinct b)-case case  - -cast(avg(d) AS integer) when case max(11) when min(17) then count(*) else (cast(avg(a) AS integer)) end then  -count(*) else  -cast(avg(17) AS integer) end when max(19) then count(distinct t1.f) else count(distinct  -t1.d) end | min(e) from t1 union select count(*) from t1) then t1.d else t1.a end FROM t1 WHERE  -+b>=19"
     end, {
         -- <randexpr-2.2591>
-        
+
         -- </randexpr-2.2591>
     })
 
@@ -25990,7 +25990,7 @@ test:do_test(
         return test:execsql "SELECT case ~(t1.f)-t1.b-t1.e*c when coalesce((select case when d*13 | d=case when 19 between b+e+a | t1.f and a+11+t1.b*(t1.f) then d else b end then t1.c when e not between 13 and 13 then 19 else a end from t1 where 13=t1.b),c) then t1.c else b end FROM t1 WHERE NOT (not t1.d in (select cast(avg(t1.e) AS integer)-~~min(coalesce((select (abs(11)/abs(11+(select count(*)+min(17)+ -cast(avg(t1.d) AS integer) from t1)*13+coalesce((select max(b) from t1 where (t1.c)<>t1.e or e<(a)),13)-d*t1.c))*t1.b from t1 where 19<=e),c))++abs(count(distinct t1.b))+~max(11)*max(11) from t1 union select +max(11) from t1))"
     end, {
         -- <randexpr-2.2595>
-        
+
         -- </randexpr-2.2595>
     })
 
@@ -26020,7 +26020,7 @@ test:do_test(
         return test:execsql "SELECT t1.d+(abs(11)/abs(e*~(select  -+ -case min(t1.e) when count(distinct case when (exists(select 1 from t1 where (t1.d not in (19+11,t1.e,t1.c)))) then c*b-t1.a else  -c end) then count(*)+case (cast(avg(a) AS integer))-count(distinct f) when  -(count(*)) then count(distinct e) else max(t1.b) end- -count(distinct 17)* -min(t1.c) else count(distinct  -19) end-count(distinct b) | cast(avg(19) AS integer) from t1)))-~t1.c FROM t1 WHERE NOT (c*coalesce((select e from t1 where case when exists(select 1 from t1 where not exists(select 1 from t1 where coalesce((select +b | 13 from t1 where ((17<(select (+~min(coalesce((select t1.c from t1 where case e when 13 then a else 11 end not in ( -b,t1.b,e)),(a)))) from t1)+d-19))),17) not between t1.b and t1.a)) then 11*d else t1.a end in (select c from t1 union select t1.e from t1)),t1.f) not between ( -d) and 13)"
     end, {
         -- <randexpr-2.2598>
-        
+
         -- </randexpr-2.2598>
     })
 

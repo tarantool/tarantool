@@ -85,7 +85,7 @@ test:do_execsql_test(
                     ORDER BY debian_bugs.bug;
     ]], {
         -- <autoindex5-1.0>
-        
+
         -- </autoindex5-1.0>
     })
 

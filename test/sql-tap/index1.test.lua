@@ -71,7 +71,7 @@ test:do_test(
         --execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
     end, {
         -- <index-1.2>
-        
+
         -- </index-1.2>
     })
 
@@ -258,7 +258,7 @@ test:do_test(
         --execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
     end, {
         -- <index-4.13>
-        
+
         -- </index-4.13>
     })
 
@@ -282,7 +282,7 @@ test:do_test(
         return test:execsql "CREATE INDEX index1 ON test1(f1)"
     end, {
         -- <index-6.1>
-        
+
         -- </index-6.1>
     })
 
@@ -331,7 +331,7 @@ test:do_test(
         --execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
     end, {
         -- <index-6.3>
-        
+
         -- </index-6.3>
     })
 
@@ -346,7 +346,7 @@ test:do_execsql_test(
         SELECT "name" FROM "_space" WHERE "name"='TEST1';
     ]], {
         -- <index-6.4>
-        
+
         -- </index-6.4>
     })
 
@@ -396,7 +396,7 @@ test:do_test(
         return test:execsql [[SELECT "name" FROM "_space" WHERE "name"='TEST1']]
     end, {
         -- <index-7.4>
-        
+
         -- </index-7.4>
     })
 
@@ -491,7 +491,7 @@ test:do_execsql_test(
         SELECT b FROM t1 WHERE a=1 ORDER BY b;
     ]], {
         -- <index-10.3>
-        
+
         -- </index-10.3>
     })
 
@@ -549,7 +549,7 @@ test:do_execsql_test(
         SELECT b FROM t1 WHERE a=1 ORDER BY b;
     ]], {
         -- <index-10.7>
-        
+
         -- </index-10.7>
     })
 
@@ -840,7 +840,7 @@ test:do_execsql_test(
         SELECT * FROM t1;
     ]], {
         -- <index-15.1>
-        
+
         -- </index-15.1>
     })
 

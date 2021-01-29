@@ -251,7 +251,7 @@ test:do_test(
         return blobs2
     end, {
         -- <blob-2.4>
-        
+
         -- </blob-2.4>
     })
 
