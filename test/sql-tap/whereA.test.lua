@@ -88,7 +88,7 @@ test:do_execsql_test(
         SELECT * FROM t1 WHERE b=2 AND a IS NULL;
     ]], {
         -- <whereA-1.8>
-        
+
         -- </whereA-1.8>
     })
 

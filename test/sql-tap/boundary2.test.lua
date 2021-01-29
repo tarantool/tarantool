@@ -97,7 +97,7 @@ test:do_test(
         ]])
     end, {
         -- <boundary2-1.1>
-        
+
         -- </boundary2-1.1>
     })
 
@@ -7662,7 +7662,7 @@ test:do_test(
         ]])
     end, {
         -- <boundary2-3.1>
-        
+
         -- </boundary2-3.1>
     })
 

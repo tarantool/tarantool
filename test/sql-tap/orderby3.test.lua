@@ -40,7 +40,7 @@ test:do_execsql_test(
         INSERT INTO t3 VALUES(1, 4),(2, 3),(3, 5);
     ]], {
         -- <1.0>
-        
+
         -- </1.0>
     })
 

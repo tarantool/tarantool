@@ -31,7 +31,7 @@ test:do_execsql_test(
         INSERT INTO t1(a) VALUES(3);
     ]], {
         -- <tkt2832-1.1>
-        
+
         -- </tkt2832-1.1>
     })
 

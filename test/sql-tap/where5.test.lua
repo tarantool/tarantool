@@ -86,7 +86,7 @@ test:do_execsql_test("where5-1.6", [[
     SELECT * FROM t1 WHERE x<NULL
 ]], {
     -- <where5-1.6>
-    
+
     -- </where5-1.6>
 })
 
@@ -94,7 +94,7 @@ test:do_execsql_test("where5-1.7", [[
     SELECT * FROM t1 WHERE x<=NULL
 ]], {
     -- <where5-1.7>
-    
+
     -- </where5-1.7>
 })
 
@@ -102,7 +102,7 @@ test:do_execsql_test("where5-1.8", [[
     SELECT * FROM t1 WHERE x=NULL
 ]], {
     -- <where5-1.8>
-    
+
     -- </where5-1.8>
 })
 
@@ -110,7 +110,7 @@ test:do_execsql_test("where5-1.9", [[
     SELECT * FROM t1 WHERE x>=NULL
 ]], {
     -- <where5-1.9>
-    
+
     -- </where5-1.9>
 })
 
@@ -118,7 +118,7 @@ test:do_execsql_test("where5-1.10", [[
     SELECT * FROM t1 WHERE x>NULL
 ]], {
     -- <where5-1.10>
-    
+
     -- </where5-1.10>
 })
 
@@ -126,7 +126,7 @@ test:do_execsql_test("where5-1.11", [[
     SELECT * FROM t1 WHERE x!=NULL
 ]], {
     -- <where5-1.11>
-    
+
     -- </where5-1.11>
 })
 
@@ -134,7 +134,7 @@ test:do_execsql_test("where5-1.12", [[
     SELECT * FROM t1 WHERE x IS NULL
 ]], {
     -- <where5-1.12>
-    
+
     -- </where5-1.12>
 })
 
@@ -198,7 +198,7 @@ test:do_execsql_test("where5-2.6", [[
     SELECT * FROM t2 WHERE x<NULL
 ]], {
     -- <where5-2.6>
-    
+
     -- </where5-2.6>
 })
 
@@ -206,7 +206,7 @@ test:do_execsql_test("where5-2.7", [[
     SELECT * FROM t2 WHERE x<=NULL
 ]], {
     -- <where5-2.7>
-    
+
     -- </where5-2.7>
 })
 
@@ -214,7 +214,7 @@ test:do_execsql_test("where5-2.8", [[
     SELECT * FROM t2 WHERE x=NULL
 ]], {
     -- <where5-2.8>
-    
+
     -- </where5-2.8>
 })
 
@@ -222,7 +222,7 @@ test:do_execsql_test("where5-2.9", [[
     SELECT * FROM t2 WHERE x>=NULL
 ]], {
     -- <where5-2.9>
-    
+
     -- </where5-2.9>
 })
 
@@ -230,7 +230,7 @@ test:do_execsql_test("where5-2.10", [[
     SELECT * FROM t2 WHERE x>NULL
 ]], {
     -- <where5-2.10>
-    
+
     -- </where5-2.10>
 })
 
@@ -238,7 +238,7 @@ test:do_execsql_test("where5-2.11", [[
     SELECT * FROM t2 WHERE x!=NULL
 ]], {
     -- <where5-2.11>
-    
+
     -- </where5-2.11>
 })
 
@@ -246,7 +246,7 @@ test:do_execsql_test("where5-2.12", [[
     SELECT * FROM t2 WHERE x IS NULL
 ]], {
     -- <where5-2.12>
-    
+
     -- </where5-2.12>
 })
 
@@ -310,7 +310,7 @@ test:do_execsql_test("where5-3.6", [[
     SELECT * FROM t3 WHERE x<NULL
 ]], {
     -- <where5-3.6>
-    
+
     -- </where5-3.6>
 })
 
@@ -318,7 +318,7 @@ test:do_execsql_test("where5-3.7", [[
     SELECT * FROM t3 WHERE x<=NULL
 ]], {
     -- <where5-3.7>
-    
+
     -- </where5-3.7>
 })
 
@@ -326,7 +326,7 @@ test:do_execsql_test("where5-3.8", [[
     SELECT * FROM t3 WHERE x=NULL
 ]], {
     -- <where5-3.8>
-    
+
     -- </where5-3.8>
 })
 
@@ -334,7 +334,7 @@ test:do_execsql_test("where5-3.9", [[
     SELECT * FROM t3 WHERE x>=NULL
 ]], {
     -- <where5-3.9>
-    
+
     -- </where5-3.9>
 })
 
@@ -342,7 +342,7 @@ test:do_execsql_test("where5-3.10", [[
     SELECT * FROM t3 WHERE x>NULL
 ]], {
     -- <where5-3.10>
-    
+
     -- </where5-3.10>
 })
 
@@ -350,7 +350,7 @@ test:do_execsql_test("where5-3.11", [[
     SELECT * FROM t3 WHERE x!=NULL
 ]], {
     -- <where5-3.11>
-    
+
     -- </where5-3.11>
 })
 
@@ -358,7 +358,7 @@ test:do_execsql_test("where5-3.12", [[
     SELECT * FROM t3 WHERE x IS NULL
 ]], {
     -- <where5-3.12>
-    
+
     -- </where5-3.12>
 })
 

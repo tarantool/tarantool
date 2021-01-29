@@ -46,7 +46,7 @@ test:do_execsql_test(
         --  ORDER BY name
     ]], {
         -- <bigrow-1.1>
-        
+
         -- </bigrow-1.1>
     })
 
@@ -398,7 +398,7 @@ test:do_execsql_test(
         DROP TABLE t1
     ]], {
         -- <bigrow-5.99>
-        
+
         -- </bigrow-5.99>
     })
 

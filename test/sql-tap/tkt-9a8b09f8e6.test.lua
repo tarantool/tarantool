@@ -28,7 +28,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES('1');
     ]], {
         -- <1.1>
-        
+
         -- </1.1>
     })
 
@@ -39,7 +39,7 @@ test:do_execsql_test(
         INSERT INTO t2 VALUES(1);
     ]], {
         -- <1.2>
-        
+
         -- </1.2>
     })
 
@@ -50,7 +50,7 @@ test:do_execsql_test(
         INSERT INTO t3 VALUES(1.0);
     ]], {
         -- <1.3>
-        
+
         -- </1.3>
     })
 
@@ -61,7 +61,7 @@ test:do_execsql_test(
         INSERT INTO t4 VALUES(1.11);
     ]], {
         -- <1.4>
-        
+
         -- </1.4>
     })
 
@@ -75,7 +75,7 @@ test:do_execsql_test(
         INSERT INTO t5 VALUES(4, 1.0, 'four');
     ]], {
         -- <1.5>
-        
+
         -- </1.5>
     })
 
@@ -115,7 +115,7 @@ test:do_execsql_test(
         SELECT x FROM t1 WHERE x IN ('1.0');
     ]], {
         -- <2.4>
-        
+
         -- </2.4>
     })
 
@@ -155,7 +155,7 @@ test:do_execsql_test(
         SELECT x FROM t1 WHERE '1.0' IN (x);
     ]], {
         -- <2.8>
-        
+
         -- </2.8>
     })
 
@@ -305,7 +305,7 @@ test:do_execsql_test(
         SELECT x FROM t4 WHERE x IN (1);
     ]], {
         -- <5.1>
-        
+
         -- </5.1>
     })
 
@@ -315,7 +315,7 @@ test:do_execsql_test(
         SELECT x FROM t4 WHERE x IN (1.0);
     ]], {
         -- <5.2>
-        
+
         -- </5.2>
     })
 
@@ -365,7 +365,7 @@ test:do_execsql_test(
         SELECT x FROM t4 WHERE 1 IN (x);
     ]], {
         -- <5.7>
-        
+
         -- </5.7>
     })
 
@@ -375,7 +375,7 @@ test:do_execsql_test(
         SELECT x FROM t4 WHERE 1.0 IN (x);
     ]], {
         -- <5.8>
-        
+
         -- </5.8>
     })
 

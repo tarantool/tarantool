@@ -271,7 +271,7 @@ test:do_execsql_test(
         SELECT x,y FROM t7a JOIN t7b ON (x=99) ORDER BY x;
     ]], {
         -- <index6-7.1>
-        
+
         -- </index6-7.1>
     })
 
@@ -324,7 +324,7 @@ test:do_execsql_test(
         INSERT INTO t8b VALUES(4, 'dummy', 4);
     ]], {
         -- <index6-8.0>
-        
+
         -- </index6-8.0>
     })
 

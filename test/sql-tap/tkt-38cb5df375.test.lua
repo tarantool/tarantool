@@ -41,7 +41,7 @@ test:do_execsql_test(
         INSERT INTO t1 SELECT a+4 FROM t1;
     ]], {
         -- <tkt-38cb5df375.0>
-        
+
         -- </tkt-38cb5df375.0>
     })
 

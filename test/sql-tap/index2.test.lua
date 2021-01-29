@@ -34,7 +34,7 @@ test:do_test(
         return test:execsql(sql)
     end, {
         -- <index2-1.1>
-        
+
         -- </index2-1.1>
     })
 
@@ -49,7 +49,7 @@ test:do_test(
         return test:execsql(sql)
     end, {
         -- <index2-1.2>
-        
+
         -- </index2-1.2>
     })
 
@@ -104,7 +104,7 @@ test:do_test(
         return test:execsql(sql)
     end, {
         -- <index2-2.1>
-        
+
         -- </index2-2.1>
     })
 

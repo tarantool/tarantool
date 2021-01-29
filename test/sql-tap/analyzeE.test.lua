@@ -281,7 +281,7 @@ test:do_execsql_test(
         ANALYZE;
     ]], {
         -- <analyzeE-3.0>
-        
+
         -- </analyzeE-3.0>
     })
 
@@ -405,7 +405,7 @@ test:do_execsql_test(
         ANALYZE;
     ]], {
         -- <analyzeE-4.0>
-        
+
         -- </analyzeE-4.0>
     })
 

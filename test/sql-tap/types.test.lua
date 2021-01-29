@@ -70,7 +70,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(3, -120);
     ]], {
         -- <types-2.1.1>
-        
+
         -- </types-2.1.1>
     })
 
@@ -92,7 +92,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(5, -30000);
     ]], {
         -- <types-2.1.3>
-        
+
         -- </types-2.1.3>
     })
 
@@ -114,7 +114,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(7, -2100000000);
     ]], {
         -- <types-2.1.5>
-        
+
         -- </types-2.1.5>
     })
 
@@ -136,7 +136,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(9, -9000000*1000000*1000000);
     ]], {
         -- <types-2.1.7>
-        
+
         -- </types-2.1.7>
     })
 
@@ -171,7 +171,7 @@ test:do_execsql_test(
         INSERT INTO t2 VALUES(3, -12345.678);
     ]], {
         -- <types-2.2.1>
-        
+
         -- </types-2.2.1>
     })
 
@@ -205,7 +205,7 @@ test:do_execsql_test(
         INSERT INTO t3 VALUES(1, NULL);
     ]], {
         -- <types-2.3.1>
-        
+
         -- </types-2.3.1>
     })
 

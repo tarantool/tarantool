@@ -61,7 +61,7 @@ test:do_test(
         ]]
     end, {
         -- <triggerD-1.1>
-        
+
         -- </triggerD-1.1>
     })
 

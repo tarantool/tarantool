@@ -2468,7 +2468,7 @@ test:do_execsql_test(
         CREATE TABLE t9(id int primary key, c INT , d INT );
     ]], {
         -- <5.0>
-        
+
         -- </5.0>
     })
 

@@ -121,7 +121,7 @@ test:do_execsql_test(
         CREATE INDEX idx1 ON tbl2(f2)
     ]], {
         -- <select2-3.2a>
-        
+
         -- </select2-3.2a>
     })
 

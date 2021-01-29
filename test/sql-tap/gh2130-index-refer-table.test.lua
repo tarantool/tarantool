@@ -21,7 +21,7 @@ test:do_execsql_test(
 
 	-- <index-1.1>
 	})
-	
+
 test:do_execsql_test(
 	"index-1.2",
 	[[

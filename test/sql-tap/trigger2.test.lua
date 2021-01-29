@@ -133,7 +133,7 @@ for _, tbl_defn in ipairs(tbl_definitions) do
                 SELECT * FROM clog ORDER BY idx;
             ]]
             for _,v in pairs(raw_result) do table.insert(r, v) end
-            
+
             return r
         end, {
             1, 1, 2, 4, 6, 10, 20, 2, 1, 2, 13, 24, 10, 20, 3, 3, 4, 13, 24, 30, 40, 4, 3, 4, 40, 60, 30, 40, 1, 1, 2, 13, 24, 10, 20
@@ -429,7 +429,7 @@ test:do_test(
         for _, v in ipairs(raw) do
             table.insert(r, v)
         end
-        
+
         raw = test:execsql [[ SELECT * FROM tblC; ]]
         for _, v in ipairs(raw) do
             table.insert(r, v)
@@ -649,7 +649,7 @@ test:do_execsql_test(
          END;
     ]], {
         -- <trigger2-7.1>
-        
+
         -- </trigger2-7.1>
     })
 
@@ -720,7 +720,7 @@ test:do_execsql_test(
         SELECT * FROM v1log;
     ]], {
         -- <trigger2-8.2>
-        
+
         -- </trigger2-8.2>
     })
 
@@ -792,7 +792,7 @@ test:do_execsql_test(
         DELETE FROM v3 WHERE a = 1;
     ]], {
         -- <trigger2-9.1>
-        
+
         -- </trigger2-9.1>
     })
 
