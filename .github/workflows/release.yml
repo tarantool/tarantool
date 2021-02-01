@@ -26,9 +26,18 @@ jobs:
       options: '--init'
 
     steps:
+      # must be before the main job to get needed environment,
+      # used to get CI_ACTION_REF_NAME value
+      - uses: FranzDiebold/github-env-vars-action@v2.1.0
       - uses: actions/checkout@v1
       - name: test
-        run: ${CI_MAKE} test_debian_no_deps
+        run: ALX ${CI_MAKE} test_debian_no_deps
+      - name: call action with send Telegram message on failure
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
+          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
+        uses: ./.github/actions/send-telegram-notify
+        if: failure()
       - name: artifacts
         uses: actions/upload-artifact@v2
         if: failure()

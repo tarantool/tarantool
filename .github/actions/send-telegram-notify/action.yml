@@ -1,0 +1,47 @@
+name: 'Send Telegram message on failure'
+description: 'Send message to Telegram channel/bot on failure'
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        python -m pip install --upgrade pip
+        pip install requests
+      shell: bash
+    # Let's logout github environment
+    - env:
+        GITHUB_CONTEXT: ${{ toJson(github) }}
+      run: echo "$GITHUB_CONTEXT"
+      shell: bash
+    - env:
+        MSG: >-
+          🔴 Workflow testing failed:\n
+          Job: [ `${{ github.job }}`](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n
+          Commit: [ `${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})\n
+          Branch: [ `${{ env.CI_ACTION_REF_NAME }}`](https://github.com/${{ github.repository }}/tree/${{ github.ref }})\n
+          History: [commits](https://github.com/${{ github.repository }}/commits/${{ github.sha }})\n
+          Triggered on: `${{ github.event_name }}`\n
+          Committer: `${{ github.actor }}`
+          -------------------- Commit message --------------------------
+        COMMIT_MSG: |
+          ```
+          ${{ github.event.head_commit.message }}
+          ```
+      # Use MarkdownV2 while Markdown is legacy
+      # https://core.telegram.org/bots/api#markdownv2-style
+      run: |
+        send_to=$TELEGRAM_TO
+        if ${{ github.ref != 'refs/heads/master' &&
+            github.ref != 'refs/heads/1.10' &&
+            ! startsWith(github.ref, 'refs/heads/2.') &&
+            ! startsWith(github.ref, 'refs/tags') }} ; then
+          send_to=${send_to}_${{ github.actor }}
+          echo "Sending message to '$send_to' developer's chat"
+        fi
+        echo "Sending message:
+        echo "$MSG"
+        echo "$COMMIT_MSG"
+        python -c "import urllib, requests ; \\
+          url = 'https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s&parse_mode=MarkdownV2&disable_web_page_preview=true' \\
+            % ('$TELEGRAM_TOKEN', '$send_to', urllib.quote_plus('$MSG' + '$COMMIT_MSG')) ; \\
+          _ = requests.post(url, timeout=10)"
+      shell: bash
