@@ -24,6 +24,12 @@ jobs:
           submodules: recursive
       - name: test
         run: ${CI_MAKE} test_osx_github_actions
+      - name: call action to send Telegram message on failure
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
+          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
+        uses: ./.github/actions/send-telegram-notify
+        if: failure()
       - name: artifacts
         uses: actions/upload-artifact@v2
         if: failure()

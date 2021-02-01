@@ -29,3 +29,9 @@ jobs:
       - uses: actions/checkout@v1
       - name: test
         run: ${CI_MAKE} test_debian_luacheck
+      - name: call action to send Telegram message on failure
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
+          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
+        uses: ./.github/actions/send-telegram-notify
+        if: failure()
