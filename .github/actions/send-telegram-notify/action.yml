@@ -1,0 +1,59 @@
+name: 'Send Telegram message on failure'
+description: 'Send message to Telegram channel/bot on failure'
+runs:
+  using: "composite"
+  steps:
+    # install 'requests' Python module
+    - run: |
+        python -m pip install --upgrade pip
+        pip install requests
+      shell: bash
+    # logout github environment
+    - env:
+        GITHUB_CONTEXT: ${{ toJson(github) }}
+      run: echo "$GITHUB_CONTEXT"
+      shell: bash
+    # extract branch name
+    - run: |
+        branch_name=${{ github.head_ref }}
+        if ${{ github.event_name != 'pull_request' }} ; then
+          branch_name=${{ github.ref }}
+          branch_name=${branch_name#refs/heads/}
+        fi
+        echo BRANCH_NAME=$branch_name | tee -a $GITHUB_ENV
+      shell: bash
+    - env:
+        MSG: |
+          🔴 Workflow testing failed:
+          Job: [ `${{ github.job }}`](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          Commit: [ `${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+          Branch: [ `${{ env.BRANCH_NAME }}`](https://github.com/${{ github.repository }}/tree/${{ env.BRANCH_NAME }})
+          History: [commits](https://github.com/${{ github.repository }}/commits/${{ github.sha }})
+          Triggered on: `${{ github.event_name }}`
+          Committer: `${{ github.actor }}`
+          ```
+          -------------------- Commit message --------------------------
+          ${{ github.event.head_commit.message }}
+          ```
+      run: |
+        # convert message from multi lines to single line
+        msg="${MSG//$'\n'/'\n'}"
+        # add backslashes to single quote marks in message
+        msg="${msg//$'\''/\\\'}"
+        echo "Sending message: $msg"
+        # select target channel
+        send_to=$TELEGRAM_TO
+        if ${{ github.ref != 'refs/heads/master' &&
+            github.ref != 'refs/heads/1.10' &&
+            ! startsWith(github.ref, 'refs/heads/2.') &&
+            ! startsWith(github.ref, 'refs/tags') }} ; then
+          send_to=${send_to}_${{ github.actor }}
+          echo "Sending message to '$send_to' developer's chat"
+        fi
+        # Use MarkdownV2 while Markdown is legacy
+        # https://core.telegram.org/bots/api#markdownv2-style
+        python -c "import urllib, requests ; \\
+          url = 'https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s&parse_mode=MarkdownV2&disable_web_page_preview=true' \\
+            % ('$TELEGRAM_TOKEN', '$send_to', urllib.quote_plus('$msg')) ; \\
+          _ = requests.post(url, timeout=10)"
+      shell: bash

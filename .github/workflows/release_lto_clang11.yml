@@ -37,6 +37,12 @@ jobs:
           CXX: clang++-11
           CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
         run: ${CI_MAKE} test_debian_no_deps
+      - name: call action to send Telegram message on failure
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
+          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
+        uses: ./.github/actions/send-telegram-notify
+        if: failure()
       - name: artifacts
         uses: actions/upload-artifact@v2
         if: failure()
