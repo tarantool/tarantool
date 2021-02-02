@@ -37,7 +37,7 @@ runs:
           send_to=${send_to}_${{ github.actor }}
           echo "Sending message to '$send_to' developer's chat"
         fi
-        echo "Sending message:
+        echo "Sending message:"
         echo "$MSG"
         echo "$COMMIT_MSG"
         python -c "import urllib, requests ; \\
