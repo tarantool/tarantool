@@ -55,6 +55,7 @@ before_script:
   except:
     - "1.10"
     - tags
+    - /^.*-notest$/
 
 .perf_only_template: &perf_only_definition
   only:
@@ -69,6 +70,8 @@ before_script:
 
 .docker_test_template: &docker_test_definition
   <<: *artifacts_files_definition
+  except:
+    - /^.*-notest$/
   image: "${CI_REGISTRY}/${CI_PROJECT_PATH}/testing/debian-stretch:latest"
   stage: test
   tags:
@@ -98,6 +101,8 @@ before_script:
 
 .osx_template: &osx_definition
   <<: *artifacts_files_definition
+  except:
+    - /^.*-notest$/
   stage: test
   script:
     - ${GITLAB_MAKE} test_osx
@@ -110,6 +115,8 @@ before_script:
 
 .vbox_template: &vbox_definition
   <<: *artifacts_files_definition
+  except:
+    - /^.*-notest$/
   stage: test
   after_script:
     - >
