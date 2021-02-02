@@ -21,7 +21,7 @@ runs:
           History: [commits](https://github.com/${{ github.repository }}/commits/${{ github.sha }})\n
           Triggered on: `${{ github.event_name }}`\n
           Committer: `${{ github.actor }}`
-          -------------------- Commit message --------------------------
+          -------------------- Commit message --------------------------\n
         COMMIT_MSG: |
           ```
           ${{ github.event.head_commit.message }}
