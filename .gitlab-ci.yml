@@ -53,15 +53,6 @@ before_script:
   after_script:
     - cp -r test/var/artifacts .
 
-.deploy_only_template: &deploy_only_definition
-  only:
-    - master
-    - tags
-  except:
-    - schedules
-    - external_pull_requests
-    - merge_requests
-
 .pack_only_template: &pack_only_definition
   except:
     - master
@@ -81,13 +72,6 @@ before_script:
 .docker_test_template: &docker_test_definition
   <<: *artifacts_files_definition
   image: "${CI_REGISTRY}/${CI_PROJECT_PATH}/testing/debian-stretch:latest"
-  stage: test
-  tags:
-    - docker_test
-
-.docker_test_clang11_template: &docker_test_clang8_definition
-  <<: *artifacts_files_definition
-  image: "${CI_REGISTRY}/${CI_PROJECT_PATH}/testing/debian-buster:latest"
   stage: test
   tags:
     - docker_test
@@ -113,23 +97,6 @@ before_script:
     - deploy_test
   script:
     - ${GITLAB_MAKE} package
-
-.deploy_template: &deploy_definition
-  <<: *deploy_only_definition
-  stage: test
-  tags:
-    - deploy
-  script:
-    - ${GITLAB_MAKE} deploy
-
-.deploy_test_template: &deploy_test_definition
-  <<: *deploy_only_definition
-  <<: *pack_artifacts_files_definition
-  stage: test
-  tags:
-    - deploy_test
-  script:
-    - ${GITLAB_MAKE} deploy
 
 .osx_template: &osx_definition
   <<: *artifacts_files_definition
@@ -200,53 +167,9 @@ out_of_source:
   script:
     - ${GITLAB_MAKE} test_oos_build
 
-release:
-  <<: *docker_test_definition
-  script:
-    - ${GITLAB_MAKE} test_debian_no_deps
-
-debug:
-  <<: *docker_test_definition
-  script:
-    - ${GITLAB_MAKE} test_coverage_debian_no_deps
-
-release_clang:
-  <<: *docker_test_definition
-  variables:
-    CC: clang
-    CXX: clang++
-  script:
-    - ${GITLAB_MAKE} test_debian_no_deps
-
-release_lto:
-  <<: *docker_test_clang8_definition
-  variables:
-    CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
-  script:
-    - ${GITLAB_MAKE} test_debian_no_deps
-
-release_lto_clang11:
-  <<: *docker_test_clang8_definition
-  variables:
-    CC: clang-11
-    CXX: clang++-11
-    CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
-  script:
-    - ${GITLAB_MAKE} test_debian_no_deps
-
-release_asan_clang11:
-  <<: *docker_test_clang8_definition
-  script:
-    - ${GITLAB_MAKE} test_asan_debian_no_deps
-
 osx_14_release:
   tags:
     - osx_14
-  <<: *osx_definition
-
-osx_15_release:
-  tags:
-    - osx_15
   <<: *osx_definition
 
 osx_15_release_lto:
