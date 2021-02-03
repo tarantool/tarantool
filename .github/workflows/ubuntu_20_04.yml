@@ -62,4 +62,4 @@ jobs:
         with:
           name: ubuntu-focal
           retention-days: 21
-          path: test/var/artifacts
+          path: build/usr/src/*/tarantool-*/test/var/artifacts

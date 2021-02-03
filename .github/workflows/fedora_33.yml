@@ -62,4 +62,4 @@ jobs:
         with:
           name: fedora-33
           retention-days: 21
-          path: test/var/artifacts
+          path: build/usr/src/*/tarantool-*/test/var/artifacts
