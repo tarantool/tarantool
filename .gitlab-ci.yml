@@ -53,12 +53,6 @@ before_script:
   after_script:
     - cp -r test/var/artifacts .
 
-.pack_only_template: &pack_only_definition
-  except:
-    - master
-    - tags
-    - /^.*-notest$/
-
 .perf_only_template: &perf_only_definition
   only:
     - master
@@ -78,28 +72,6 @@ before_script:
   stage: test
   tags:
     - docker_test
-
-.pack_artifacts_files_template: &pack_artifacts_files_definition
-  <<: *artifacts_files_definition
-  after_script:
-    - cp -r build/usr/src/*/tarantool-*/test/var/artifacts .
-
-.pack_template: &pack_definition
-  <<: *pack_only_definition
-  stage: test
-  tags:
-    - deploy
-  script:
-    - ${GITLAB_MAKE} package
-
-.pack_test_template: &pack_test_definition
-  <<: *pack_only_definition
-  <<: *pack_artifacts_files_definition
-  stage: test
-  tags:
-    - deploy_test
-  script:
-    - ${GITLAB_MAKE} package
 
 .osx_template: &osx_definition
   <<: *artifacts_files_definition
@@ -224,13 +196,6 @@ jepsen-cluster-txm:
   variables:
     LEIN_OPT: '--nemesis standard --mvcc'
     INSTANCE_COUNT: '5'
-
-default_gcc_centos_7:
-  <<: *pack_test_definition
-  variables:
-    PACKPACK_EXTRA_DOCKER_RUN_PARAMS: '-e CC=/usr/bin/gcc -e CXX=/usr/bin/g++'
-    OS: 'el'
-    DIST: '7'
 
 # ####
 # Perf
