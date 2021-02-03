@@ -38,4 +38,4 @@ jobs:
         with:
           name: osx_11_0
           retention-days: 21
-          path: test/var/artifacts
+          path: /tmp/tnt/artifacts
