@@ -23,6 +23,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+      - uses: ./.github/actions/environment
       - name: packaging
         env:
           # Our testing expects that the init process (PID 1) will
