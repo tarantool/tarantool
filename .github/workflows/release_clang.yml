@@ -28,6 +28,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v1
+      - uses: ./.github/actions/environment
       - name: test
         env:
           CC: clang
