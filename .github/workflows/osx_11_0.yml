@@ -22,6 +22,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+      - uses: ./.github/actions/environment
       - name: test
         run: ${CI_MAKE} test_osx_github_actions
       - name: artifacts

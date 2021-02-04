@@ -30,6 +30,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+      - uses: ./.github/actions/environment
       - name: test
         env:
           CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
