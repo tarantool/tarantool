@@ -266,8 +266,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 					 in_queue, tmp) {
 		e->txn->signature = TXN_SIGNATURE_QUORUM_TIMEOUT;
 		txn_limbo_abort(limbo, e);
-		txn_clear_flag(e->txn, TXN_WAIT_SYNC);
-		txn_clear_flag(e->txn, TXN_WAIT_ACK);
+		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
 		txn_complete_fail(e->txn);
 		if (e == entry)
 			break;
@@ -399,8 +398,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		}
 		e->is_commit = true;
 		txn_limbo_remove(limbo, e);
-		txn_clear_flag(e->txn, TXN_WAIT_SYNC);
-		txn_clear_flag(e->txn, TXN_WAIT_ACK);
+		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
 		/*
 		 * If already written to WAL by now, finish tx processing.
 		 * Otherwise just clear the sync flags. Tx procesing will finish
@@ -456,8 +454,7 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 		return;
 	rlist_foreach_entry_safe_reverse(e, &limbo->queue, in_queue, tmp) {
 		txn_limbo_abort(limbo, e);
-		txn_clear_flag(e->txn, TXN_WAIT_SYNC);
-		txn_clear_flag(e->txn, TXN_WAIT_ACK);
+		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
 		if (e->txn->signature >= 0) {
 			/* Rollback the transaction. */
 			e->txn->signature = TXN_SIGNATURE_SYNC_ROLLBACK;
