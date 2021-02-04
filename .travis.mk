@@ -351,22 +351,33 @@ test_osx_github_actions: deps_osx_github_actions test_osx_no_deps
 
 # Static macOS build
 
-STATIC_OSX_PKGS=cmake file://$${PWD}/tools/brew_taps/tntpython2.rb
+STATIC_OSX_MIN=cmake
+STATIC_OSX_PKGS=${STATIC_OSX_MIN} file://$${PWD}/tools/brew_taps/tntpython2.rb
 base_deps_osx:
 	brew update || echo | /usr/bin/ruby -e \
 		"$$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 	brew install --force ${STATIC_OSX_PKGS} || brew upgrade ${STATIC_OSX_PKGS}
 	pip install --force-reinstall -r test-run/requirements.txt
 
+base_deps_osx_github_actions:
+	# try to install the packages either upgrade it to avoid of fails
+	# if the package already exists with the previous version
+	brew install --force ${STATIC_OSX_PKGS_MIN} || brew upgrade ${STATIC_OSX_PKGS_MIN}
+	pip install --force-reinstall -r test-run/requirements.txt
+
 # builddir used in this target - is a default build path from cmake
 # ExternalProject_Add()
-test_static_build_cmake_osx: base_deps_osx
+test_static_build_cmake_osx_no_deps: base_deps_osx
 	cd static-build && cmake -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON" . && \
 	make -j && ctest -V
 	${INIT_TEST_ENV_OSX}; \
 	cd test && ./test-run.py --vardir ${OSX_VARDIR} \
 		--builddir ${PWD}/static-build/tarantool-prefix/src/tarantool-build \
 		--force $(TEST_RUN_EXTRA_PARAMS)
+
+test_static_build_cmake_osx: base_deps_osx test_static_build_cmake_osx_no_deps
+
+test_static_build_cmake_osx_github_actions: base_deps_osx_github_actions test_static_build_cmake_osx_no_deps
 
 
 ###########
