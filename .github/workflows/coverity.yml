@@ -32,6 +32,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v1
+      - uses: ./.github/actions/environment
       - name: test
         run: ${CI_MAKE} test_coverity_debian_no_deps
         env:
