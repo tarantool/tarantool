@@ -57,25 +57,25 @@ struct Vdbe;
 
 enum txn_flag {
 	/** Transaction has been processed. */
-	TXN_IS_DONE,
+	TXN_IS_DONE = 0x1,
 	/**
 	 * Transaction has been aborted by fiber yield so
 	 * should be rolled back at commit.
 	 */
-	TXN_IS_ABORTED_BY_YIELD,
+	TXN_IS_ABORTED_BY_YIELD = 0x2,
 	/**
 	 * fiber_yield() is allowed inside the transaction.
 	 * See txn_can_yield() for more details.
 	 */
-	TXN_CAN_YIELD,
+	TXN_CAN_YIELD = 0x4,
 	/** on_commit and/or on_rollback list is not empty. */
-	TXN_HAS_TRIGGERS,
+	TXN_HAS_TRIGGERS = 0x8,
 	/**
 	 * Synchronous transaction touched sync spaces, or an
 	 * asynchronous transaction blocked by a sync one until it
 	 * is confirmed.
 	 */
-	TXN_WAIT_SYNC,
+	TXN_WAIT_SYNC = 0x10,
 	/**
 	 * Synchronous transaction 'waiting for ACKs' state before
 	 * commit. In this state it waits until it is replicated
@@ -83,14 +83,14 @@ enum txn_flag {
 	 * commit and returns success to a user.
 	 * TXN_WAIT_SYNC is always set, if TXN_WAIT_ACK is set.
 	 */
-	TXN_WAIT_ACK,
+	TXN_WAIT_ACK = 0x20,
 	/**
 	 * A transaction may be forced to be asynchronous, not
 	 * wait for any ACKs, and not depend on prepending sync
 	 * transactions. This happens in a few special cases. For
 	 * example, when applier receives snapshot from master.
 	 */
-	TXN_FORCE_ASYNC,
+	TXN_FORCE_ASYNC = 0x40,
 };
 
 enum {
@@ -427,19 +427,20 @@ struct txn {
 static inline bool
 txn_has_flag(struct txn *txn, enum txn_flag flag)
 {
-	return (txn->flags & (1 << flag)) != 0;
+	assert((flag & (flag - 1)) == 0);
+	return (txn->flags & flag) != 0;
 }
 
 static inline void
-txn_set_flag(struct txn *txn, enum txn_flag flag)
+txn_set_flags(struct txn *txn, unsigned int flags)
 {
-	txn->flags |= 1 << flag;
+	txn->flags |= flags;
 }
 
 static inline void
-txn_clear_flag(struct txn *txn, enum txn_flag flag)
+txn_clear_flags(struct txn *txn, unsigned int flags)
 {
-	txn->flags &= ~(1 << flag);
+	txn->flags &= ~flags;
 }
 
 /* Pointer to the current transaction (if any) */
@@ -532,7 +533,7 @@ txn_init_triggers(struct txn *txn)
 		rlist_create(&txn->on_commit);
 		rlist_create(&txn->on_rollback);
 		rlist_create(&txn->on_wal_write);
-		txn_set_flag(txn, TXN_HAS_TRIGGERS);
+		txn_set_flags(txn, TXN_HAS_TRIGGERS);
 	}
 }
 

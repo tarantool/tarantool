@@ -246,7 +246,7 @@ apply_snapshot_row(struct xrow_header *row)
 	 * Do not wait for confirmation when fetching a snapshot.
 	 * Master only sends confirmed rows during join.
 	 */
-	txn_set_flag(txn, TXN_FORCE_ASYNC);
+	txn_set_flags(txn, TXN_FORCE_ASYNC);
 	if (txn_begin_stmt(txn, space, request.type) != 0)
 		goto rollback;
 	/* no access checks here - applier always works with admin privs */

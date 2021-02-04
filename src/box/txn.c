@@ -310,7 +310,7 @@ txn_begin(void)
 	 * It's a responsibility of an engine to disable yields
 	 * if they are not supported.
 	 */
-	txn_set_flag(txn, TXN_CAN_YIELD);
+	txn_set_flags(txn, TXN_CAN_YIELD);
 	return txn;
 }
 
@@ -488,7 +488,7 @@ txn_free_or_wakeup(struct txn *txn)
 	if (txn->fiber == NULL)
 		txn_free(txn);
 	else {
-		txn_set_flag(txn, TXN_IS_DONE);
+		txn_set_flags(txn, TXN_IS_DONE);
 		fiber_wakeup(txn->fiber);
 	}
 }
@@ -638,8 +638,7 @@ txn_journal_entry_new(struct txn *txn)
 	 */
 	if (!txn_has_flag(txn, TXN_FORCE_ASYNC) && !is_fully_nop) {
 		if (is_sync) {
-			txn_set_flag(txn, TXN_WAIT_SYNC);
-			txn_set_flag(txn, TXN_WAIT_ACK);
+			txn_set_flags(txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
 		} else if (!txn_limbo_is_empty(&txn_limbo)) {
 			/*
 			 * There some sync entries on the
@@ -648,7 +647,7 @@ txn_journal_entry_new(struct txn *txn)
 			 * doesn't touch sync space (each sync txn
 			 * should be considered as a barrier).
 			 */
-			txn_set_flag(txn, TXN_WAIT_SYNC);
+			txn_set_flags(txn, TXN_WAIT_SYNC);
 		}
 	}
 
@@ -1012,10 +1011,10 @@ txn_can_yield(struct txn *txn, bool set)
 	assert(txn == in_txn());
 	bool could = txn_has_flag(txn, TXN_CAN_YIELD);
 	if (set && !could) {
-		txn_set_flag(txn, TXN_CAN_YIELD);
+		txn_set_flags(txn, TXN_CAN_YIELD);
 		trigger_clear(&txn->fiber_on_yield);
 	} else if (!set && could) {
-		txn_clear_flag(txn, TXN_CAN_YIELD);
+		txn_clear_flags(txn, TXN_CAN_YIELD);
 		trigger_create(&txn->fiber_on_yield, txn_on_yield, NULL, NULL);
 		trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
 	}
@@ -1252,6 +1251,6 @@ txn_on_yield(struct trigger *trigger, void *event)
 	assert(txn != NULL);
 	assert(!txn_has_flag(txn, TXN_CAN_YIELD));
 	txn_rollback_to_svp(txn, NULL);
-	txn_set_flag(txn, TXN_IS_ABORTED_BY_YIELD);
+	txn_set_flags(txn, TXN_IS_ABORTED_BY_YIELD);
 	return 0;
 }

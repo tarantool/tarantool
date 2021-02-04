@@ -265,7 +265,7 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 	 * Snapshot rows are confirmed by definition. They don't need to go to
 	 * the synchronous transactions limbo.
 	 */
-	txn_set_flag(txn, TXN_FORCE_ASYNC);
+	txn_set_flags(txn, TXN_FORCE_ASYNC);
 	rc = txn_commit(txn);
 	/*
 	 * Don't let gc pool grow too much. Yet to
