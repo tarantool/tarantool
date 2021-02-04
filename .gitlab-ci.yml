@@ -139,15 +139,6 @@ luacheck:
 
 # Tests
 
-out_of_source:
-  stage: test
-  except:
-    - /^.*-notest$/
-  tags:
-    - deploy_test
-  script:
-    - ${GITLAB_MAKE} test_oos_build
-
 osx_14_release:
   tags:
     - osx_14

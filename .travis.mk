@@ -273,14 +273,19 @@ test_oos_no_deps: build_oos
 	cd ${OOS_BUILD_PATH}/test && \
 		${OOS_SRC_PATH}/test/test-run.py \
 			--builddir ${OOS_BUILD_PATH} \
-			--vardir ${OOS_BUILD_PATH}/test/var --force
+			--vardir ${OOS_BUILD_PATH}/test/var --force || \
+		( chmod -R a+rwx var/artifacts ; exit 1 )
 
 test_oos: deps_debian test_oos_no_deps
 
 test_oos_build:
+	# Our testing expects that the init process (PID 1) will
+	# reap orphan processes. At least the following test leans
+	# on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
 	docker run --network=host -w ${OOS_SRC_PATH} \
+		--init \
 		--mount type=bind,source="${PWD}",target=${OOS_SRC_PATH},readonly,bind-propagation=rslave \
-		--tmpfs ${OOS_BUILD_PATH}:exec \
+		-v ${PWD}/artifacts:${OOS_BUILD_PATH}/test/var/artifacts \
 		${DOCKER_ENV} \
 		-i ${DOCKER_IMAGE_TARANTOOL} \
 		make -f .travis.mk ${OOS_BUILD_RULE}
