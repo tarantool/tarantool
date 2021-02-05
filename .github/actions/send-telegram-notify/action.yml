@@ -22,10 +22,18 @@ runs:
         fi
         echo BRANCH_NAME=$branch_name | tee -a $GITHUB_ENV
       shell: bash
+    # get job id number
+    - run: |
+        apt update && apt install -y jq
+        echo 'JOB_ID<<EOF' >> $GITHUB_ENV
+        curl -s https://api.github.com/repos/tarantool/tarantool/actions/runs/${{ github.run_id }}/jobs | jq -r '.jobs[0].id' | tee -a $GITHUB_ENV
+        echo 'EOF' >> $GITHUB_ENV
+      shell: bash
     - env:
         MSG: |
           🔴 Workflow testing failed:
           Job: [ `${{ github.job }}`](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          Log: [ `#${{ env.JOB_ID }}`](https://github.com/${{ github.repository }}/runs/${{ env.JOB_ID }})
           Commit: [ `${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
           Branch: [ `${{ env.BRANCH_NAME }}`](https://github.com/${{ github.repository }}/tree/${{ env.BRANCH_NAME }})
           History: [commits](https://github.com/${{ github.repository }}/commits/${{ github.sha }})
