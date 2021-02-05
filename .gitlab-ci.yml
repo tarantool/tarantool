@@ -121,13 +121,6 @@ osx_14_release:
     - osx_14
   <<: *osx_definition
 
-osx_15_release_lto:
-  tags:
-    - osx_15
-  variables:
-    CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
-  <<: *osx_definition
-
 freebsd_12_release:
   <<: *vbox_definition
   tags:
