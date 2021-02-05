@@ -1,4 +1,4 @@
-name: static_build_cmake_osx_15
+name: osx_10_15_lto
 
 on: [push, pull_request]
 
@@ -6,7 +6,7 @@ env:
   CI_MAKE: make -f .travis.mk
 
 jobs:
-  static_build_cmake_osx_15:
+  osx_10_15_lto:
     # We want to run on external PRs, but not on our own internal PRs
     # as they'll be run by the push to the branch.
     if: ( github.event_name == 'push' ||
@@ -25,7 +25,9 @@ jobs:
           submodules: recursive
       - uses: ./.github/actions/environment
       - name: test
-        run: ${CI_MAKE} test_static_build_cmake_osx_github_actions
+        env:
+          CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
+        run: ${CI_MAKE} test_osx_github_actions
       - name: call action to send Telegram message on failure
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
@@ -36,6 +38,6 @@ jobs:
         uses: actions/upload-artifact@v2
         if: failure()
         with:
-          name: static_build_cmake_osx_15
+          name: osx_10_15_lto
           retention-days: 21
           path: /tmp/tnt/artifacts

@@ -351,8 +351,8 @@ test_osx_github_actions: deps_osx_github_actions test_osx_no_deps
 
 # Static macOS build
 
-STATIC_OSX_MIN=cmake
-STATIC_OSX_PKGS=${STATIC_OSX_MIN} file://$${PWD}/tools/brew_taps/tntpython2.rb
+STATIC_OSX_PKGS_MIN=cmake
+STATIC_OSX_PKGS=${STATIC_OSX_PKGS_MIN} file://$${PWD}/tools/brew_taps/tntpython2.rb
 base_deps_osx:
 	brew update || echo | /usr/bin/ruby -e \
 		"$$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
@@ -367,7 +367,7 @@ base_deps_osx_github_actions:
 
 # builddir used in this target - is a default build path from cmake
 # ExternalProject_Add()
-test_static_build_cmake_osx_no_deps: base_deps_osx
+test_static_build_cmake_osx_no_deps:
 	cd static-build && cmake -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON" . && \
 	make -j && ctest -V
 	${INIT_TEST_ENV_OSX}; \
