@@ -1,0 +1,472 @@
+#!/usr/bin/env python
+
+from __future__ import print_function
+import os
+import sys
+import glob
+import datetime
+import itertools
+import subprocess
+
+
+# {{{ Redefinitions
+
+# Ensure certain order for known sections.
+SECTIONS_TOP = ['core', 'memtx', 'vinyl', 'replication', 'swim', 'raft',
+                'luajit', 'lua', 'sql']
+SECTIONS_BOTTOM = ['build', 'testing', 'misc']
+
+# Prettify headers, apply the ordering.
+REDEFINITIONS = {
+    (2, 'feature'): {
+        'header': 'Functionality added or changed',
+        'subsections_top': SECTIONS_TOP,
+        'subsections_bottom': SECTIONS_BOTTOM,
+    },
+    (2, 'bugfix'): {
+        'header': 'Bugs fixed',
+        'subsections_top': SECTIONS_TOP,
+        'subsections_bottom': SECTIONS_BOTTOM,
+    },
+    (3, 'luajit'): {
+        'header': 'LuaJIT',
+    },
+    (3, 'sql'): {
+        'header': 'SQL',
+    },
+    (3, 'http client'): {
+        'header': 'HTTP client',
+    },
+
+}
+
+# }}} Redefinitions
+
+
+# {{{ Templates
+
+FEATURES_ANCHOR = '{{FEATURES}}'
+BUGFIXES_ANCHOR = '{{BUGFIXES}}'
+
+OVERVIEW_TEMPLATE = """
+## Overview
+
+// {{{ BETA X.Y.1
+
+**TBD** is the [beta][release_policy] version of the **TBD** release series.
+
+This release introduces {{FEATURES}} new features and resolves {{BUGFIXES}} bugs since
+the **TBD** version. There can be bugs in less common areas. If you find any,
+feel free to [report an issue][issues] on GitHub.
+
+Notable changes are:
+
+* **TBD**
+* **TBD**
+* **TBD**
+
+[release_policy]: https://www.tarantool.io/en/doc/latest/dev_guide/release_management/#release-policy
+[issues]: https://github.com/tarantool/tarantool/issues
+
+// }}} BETA X.Y.1
+
+// {{{ STABLE X.Y.{2,3}
+
+**TBD** is the **TBD**th [stable][release_policy] version of the **TBD** release
+series. It introduces {{FEATURES}} improvements and resolves {{BUGFIXES}} bugs since
+**TBD**.
+
+The "stable" label means that we have all planned features implemented and we
+see no high-impact issues. However, if you encounter an issue, feel free to
+[report it][issues] on GitHub.
+
+[release_policy]: https://www.tarantool.io/en/doc/latest/dev_guide/release_management/#release-policy
+[issues]: https://github.com/tarantool/tarantool/issues
+
+// }}} STABLE X.Y.{2,3}
+
+// {{{ LTS 1.10.Z
+
+**TBD** is the next stable release in the [long-term support (LTS)
+version][release_policy][release_policy] 1.10.x release series.
+
+The label "stable" means there are 1.10.x-based applications running in
+production for quite a while without known crashes, incorrect results or
+other showstopper bugs.
+
+This release introduces {{FEATURES}} improvements and resolves roughly {{BUGFIXES}}
+issues since the **TBD** version.
+
+[release_policy]: https://www.tarantool.io/en/doc/1.10/dev_guide/release_management/#release-policy
+[issues]: https://github.com/tarantool/tarantool/issues
+
+// }}} LTS 1.10.Z
+""".strip()  # noqa: E501 line too long
+
+COMPATIBILITY_TEMPLATE = """
+## Compatibility
+
+// {{{ BETA / STABLE 2.Y.Z
+
+Tarantool 2.x is backward compatible with Tarantool 1.10.x in the binary data
+layout, client-server protocol, and replication protocol.
+
+Please [upgrade][upgrade] using the `box.schema.upgrade()` procedure to unlock
+all the new features of the 2.x series.
+
+[upgrade]: https://www.tarantool.io/en/doc/latest/book/admin/upgrades/
+
+// }}} BETA / STABLE 2.Y.Z
+
+// {{{ LTS 1.10.Z
+
+Tarantool 1.10.x is backward compatible with Tarantool 1.9.x in binary data
+layout, client-server protocol and replication protocol.
+
+Please [upgrade][upgrade] using the `box.schema.upgrade()` procedure to unlock
+all the new features of the 1.10.x series.
+
+[upgrade]: https://www.tarantool.io/en/doc/1.10/book/admin/upgrades/
+
+// }}} LTS 1.10.Z
+""".strip()  # noqa: E501 line too long
+
+# }}} Templates
+
+
+# {{{ Collecting
+
+def changelog_entries_sorted(source_dir, entries_dir_relative):
+    """ Acquire order of appearance from ```git log``.
+
+        Misses uncommitted entries and contains files that were
+        deleted.
+    """
+    cmdline = ['git', 'log', '--reverse', '--pretty=', '--name-only',
+               entries_dir_relative]
+    popen_kwargs = {
+        'stdout': subprocess.PIPE,
+        'cwd': source_dir,
+    }
+    if sys.version_info[0] == 3:
+        popen_kwargs['encoding'] = 'utf-8'
+
+    if sys.version_info[0] == 2:
+        global FileNotFoundError
+        FileNotFoundError = OSError
+
+    processed = set()
+    res = []
+    try:
+        process = subprocess.Popen(cmdline, **popen_kwargs)
+        for line in process.stdout:
+            entry_file = line.rstrip()
+            if entry_file not in processed and entry_file.endswith('.md'):
+                processed.add(entry_file)
+                res.append(os.path.join(source_dir, entry_file))
+        process.wait()
+    except FileNotFoundError as e:
+        raise RuntimeError("Unable to find '{}' executable: {}".format(
+            cmdline[0], str(e)))
+    return res
+
+
+def changelog_entries():
+    """ Return a list of changelog entry files.
+
+    Sort the entries according to ``git log`` (by a time of the
+    first appearance) and append ones out of the git tracking
+    afterwards with the alphabetical order.
+    """
+    # Be immutable to a caller current working directory.
+    script_file = os.path.realpath(__file__)
+    script_dir = os.path.dirname(script_file)
+    source_dir = os.path.dirname(script_dir)
+
+    entries_dir_relative = os.path.join('changelogs', 'unreleased')
+    entries_dir = os.path.join(source_dir, entries_dir_relative)
+    if not os.path.exists(entries_dir):
+        raise RuntimeError('The changelog entries directory {} does not '
+                           'exist'.format(entries_dir))
+    if not os.path.isdir(entries_dir):
+        raise RuntimeError('The path {} that is expected to be the changelog '
+                           'entries directory is not a directory'.format(
+                            entries_dir))
+
+    # Uncommitted entries are not present here. Deleted entries
+    # are present.
+    entries_sorted = changelog_entries_sorted(source_dir, entries_dir_relative)
+    entries_known = set(entries_sorted)
+
+    res = []
+
+    # Add entries according to 'git log' order first.
+    for entry in entries_sorted:
+        if os.path.exists(entry):
+            res.append(entry)
+
+    # Add the rest in the alphabetical order.
+    entries_glob = os.path.join(entries_dir, '*.md')
+    entries = sorted(glob.glob(entries_glob))
+    if not entries:
+        raise RuntimeError('Not found any *.md file in the changelog entries '
+                           'directory {}'.format(entries_dir))
+    for entry in entries:
+        if entry not in entries_known:
+            res.append(entry)
+
+    return res
+
+# }}} Collecting
+
+
+# {{{ Parsing
+
+class ParserError(RuntimeError):
+    pass
+
+
+class Parser:
+    """ Parse a changelog entry file.
+
+    Usage:
+
+        parser = Parser()
+        try:
+            parser.parse(fh)
+        except parser.error:
+            pass  # Handle error.
+        print(parser.header)
+        print(parser.content)
+        if parser.comment:
+            print(parser.comment)
+
+    ``parser.content`` and ``parser.comment`` are free form texts,
+    so it may contain newlines and always end with a newline.
+    """
+    EOF = None
+    EOS = '----\n'
+    error = ParserError
+
+    def __init__(self):
+        self._process = self._wait_header
+
+        # Parsed data.
+        self.header = None
+        self.content = None
+        self.comment = None
+
+    def parse(self, fh):
+        for line in fh:
+            self._process(line)
+        self._process(self.EOF)
+
+    def _wait_header(self, line):
+        if line is self.EOF:
+            raise self.error(
+                'Unexpected end of file: no header')
+
+        if line.startswith('## '):
+            header = line.split(' ', 1)[1].strip()
+            fst = header.split('/', 1)[0]
+            if fst not in ('feature', 'bugfix'):
+                raise self.error("Unknown header: '{}', should be "
+                                 "'feature/<...>' or 'bugfix/<...>'"
+                                 .format(header))
+            self.header = header
+            self._process = self._wait_content
+            return
+
+        raise self.error(
+            "The first line should be a header, got '{}'".format(line.strip()))
+
+    def _wait_content(self, line):
+        if line is self.EOF:
+            if not self.content:
+                raise self.error('Unexpected end of file (empty content)')
+            self.content = self.content.strip() + '\n'
+            return
+
+        if line == self.EOS:
+            self._process = self._wait_comment
+            return
+
+        if self.content is None:
+            self.content = line
+        else:
+            self.content += line
+
+    def _wait_comment(self, line):
+        if line is self.EOF:
+            if not self.comment:
+                raise self.error('Unexpected end of file (empty comment)')
+            self.comment = self.comment.strip() + '\n'
+            return
+
+        if self.comment is None:
+            self.comment = line
+        else:
+            self.comment += line
+
+
+def parse_changelog_entries(changelog_entries):
+    """ Parse and structurize changelog entries content.
+    """
+    entry_section = {
+        'header': 'main',
+        'level': 1,
+        'entries': [],
+        'subsections': dict(),
+        'nested_entry_count': 0,
+    }
+    comments = []
+
+    for entry_file in changelog_entries:
+        parser = Parser()
+        try:
+            with open(entry_file, 'r') as fh:
+                parser.parse(fh)
+        except parser.error as e:
+            raise RuntimeError(
+                'Unable to parse {}: {}'.format(entry_file, str(e)))
+
+        section = entry_section
+
+        # Nested slash delimited subcategories.
+        for section_header in parser.header.split('/'):
+            if section_header not in section['subsections']:
+                section['subsections'][section_header] = {
+                    'header': section_header,
+                    'level': section['level'] + 1,
+                    'entries': [],
+                    'subsections': dict(),
+                    'nested_entry_count': 0,
+                }
+            section = section['subsections'][section_header]
+            section['nested_entry_count'] += 1
+
+        section['entries'].append(parser.content)
+
+        if parser.comment:
+            comments.append(parser.comment)
+
+    return (entry_section, comments)
+
+# }}} Parsing
+
+
+# {{{ Printing
+
+is_block_first = True
+
+
+def print_block(block):
+    """ Print a Markdown block.
+
+    Separate it from the previous one with an empty line.
+
+    Add a newline at the end if it is not here.
+    """
+    global is_block_first
+
+    if is_block_first:
+        is_block_first = False
+    else:
+        print('\n', end='')
+
+    if isinstance(block, (list, tuple)):
+        block = ''.join(block)
+
+    if not block.endswith('\n'):
+        block += '\n'
+
+    print(block, end='')
+
+
+def print_section(section, redefinitions):
+    """ Print a Markdown section (header, content, subsections).
+
+    Order of the content entries is kept (as defined by
+    ``changelog_entries()``).
+
+    Order of subsection is alphabetical when is not predefined (as
+    for typical third level sections, see
+    ``parse_changelog_entries()``).
+    """
+    level = section['level']
+    header = section['header']
+
+    redefinition = redefinitions.get((level, header))
+    if redefinition:
+        section.update(redefinition)
+    else:
+        section['header'] = header.capitalize()
+
+    level = section['level']
+    header = section['header']
+
+    print_block('{} {}'.format('#' * level, header))
+    if section['entries']:
+        print_block(section['entries'])
+
+    # Keep defined ordering for predefined top and bottom
+    # subsections, but ensure the alphabetical order for others.
+    subsections = section['subsections']
+    subheaders_top = section.get('subsections_top', [])
+    subheaders_bottom = section.get('subsections_bottom', [])
+    subheaders_known = set(subheaders_top) | set(subheaders_bottom)
+    subheaders_middle = sorted(set(subsections.keys()) - subheaders_known)
+
+    it = itertools.chain(subheaders_top, subheaders_middle, subheaders_bottom)
+    for subheader in it:
+        if subheader in subsections:
+            print_section(subsections[subheader], redefinitions)
+
+
+def print_templates(feature_count, bugfix_count):
+    for template in (OVERVIEW_TEMPLATE, COMPATIBILITY_TEMPLATE):
+        block = template                                  \
+            .replace(FEATURES_ANCHOR, str(feature_count)) \
+            .replace(BUGFIXES_ANCHOR, str(bugfix_count))
+        print_block(block)
+
+
+def print_release_notes(entry_section, comments, redefinitions):
+    print_block('# **TBD**')
+    print_block((
+        'Date: {}\n'.format(datetime.date.today().isoformat()),
+        'Tag: **TBD**\n',
+    ))
+
+    if comments:
+        print_block('## Comments for a release manager')
+        print_block("**TBD:** Don't forget to remove this section before "
+                    "publishing.")
+        print_block(comments)
+
+    features = entry_section['subsections']['feature']
+    bugfixes = entry_section['subsections']['bugfix']
+    feature_count = features['nested_entry_count']
+    bugfix_count = bugfixes['nested_entry_count']
+    print_templates(feature_count, bugfix_count)
+
+    # Keep features first, bugfixes next. Print other sections
+    # in the alphabetical order afterwards.
+    headers = sorted(entry_section['subsections'].keys())
+    headers_head = ['feature', 'bugfix']
+    headers_tail = sorted(set(headers) - set(headers_head))
+    for header in itertools.chain(headers_head, headers_tail):
+        section = entry_section['subsections'][header]
+        print_section(section, redefinitions)
+
+# }}} Printing
+
+
+if __name__ == '__main__':
+    try:
+        entries = changelog_entries()
+        entry_section, comments = parse_changelog_entries(entries)
+        print_release_notes(entry_section, comments, REDEFINITIONS)
+    except RuntimeError as e:
+        print(str(e))
+        exit(1)
