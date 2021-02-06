@@ -22,6 +22,12 @@ runs:
         fi
         echo BRANCH_NAME=$branch_name | tee -a $GITHUB_ENV
       shell: bash
+    # get host kernel name
+    - run: |
+        echo 'KERNEL_NAME<<EOF' >> $GITHUB_ENV
+        uname -s | tee -a $GITHUB_ENV
+        echo 'EOF' >> $GITHUB_ENV
+      shell: bash
     # get job id number
     - run: |
         apt update && apt install -y jq
@@ -40,14 +46,19 @@ runs:
           Triggered on: `${{ github.event_name }}`
           Committer: `${{ github.actor }}`
           ```
-          -------------------- Commit message --------------------------
+          ---------------- Commit message -------------------
           ${{ github.event.head_commit.message }}
           ```
       run: |
-        # convert message from multi lines to single line
-        msg="${MSG//$'\n'/'\n'}"
+        # convert message from multi lines to single line and
         # add backslashes to single quote marks in message
-        msg="${msg//$'\''/\\\'}"
+        if ${{ env.KERNEL_NAME == 'Darwin' }} ; then
+          msg="${MSG//$'\n'/\n}"
+          msg="${msg//$'\\\''/\'}"
+        else
+          msg="${MSG//$'\n'/'\n'}"
+          msg="${msg//$'\''/\\\'}"
+        fi
         echo "Sending message: $msg"
         # select target channel
         send_to=$TELEGRAM_TO
