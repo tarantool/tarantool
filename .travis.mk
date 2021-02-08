@@ -194,7 +194,11 @@ test_static_build: deps_debian_static
 	CMAKE_EXTRA_PARAMS=-DBUILD_STATIC=ON make -f .travis.mk test_debian_no_deps
 
 test_static_docker_build:
-	docker build --no-cache --network=host --build-arg RUN_TESTS=ON -f Dockerfile.staticbuild .
+	docker build --no-cache --network=host -f Dockerfile.staticbuild -t static_build:tmp .
+	docker run --rm -v ${PWD}/artifacts:/tarantool/test/var/artifacts static_build:tmp \
+		-c "set -x && cd /tarantool/test && \
+		        /usr/bin/python test-run.py --force box/admin || \
+		        ( chmod -R a+rwx var/artifacts ; exit 1 )"
 
 #######
 # OSX #
