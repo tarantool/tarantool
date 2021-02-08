@@ -225,12 +225,3 @@ remove_images_sh9:
   <<: *perf_cleanup_definition
   tags:
     - sh9_shell
-
-# Static builds
-
-static_docker_build:
-  <<: *osx_definition
-  tags:
-    - deploy_test
-  script:
-    - ${GITLAB_MAKE} test_static_docker_build
