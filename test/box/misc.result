@@ -85,6 +85,7 @@ t
   - info
   - internal
   - is_in_txn
+  - lib
   - on_commit
   - on_rollback
   - once

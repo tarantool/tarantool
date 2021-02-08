@@ -60,6 +60,7 @@
 #include "box/lua/cfg.h"
 #include "box/lua/xlog.h"
 #include "box/lua/console.h"
+#include "box/lua/lib.h"
 #include "box/lua/tuple.h"
 #include "box/lua/execute.h"
 #include "box/lua/key_def.h"
@@ -465,6 +466,7 @@ box_lua_init(struct lua_State *L)
 	box_lua_tuple_init(L);
 	box_lua_call_init(L);
 	box_lua_cfg_init(L);
+	box_lua_lib_init(L);
 	box_lua_slab_init(L);
 	box_lua_index_init(L);
 	box_lua_space_init(L);

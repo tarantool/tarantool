@@ -599,6 +599,7 @@ local box_cfg_guard_whitelist = {
     error = true;
     internal = true;
     index = true;
+    lib = true;
     session = true;
     tuple = true;
     runtime = true;
