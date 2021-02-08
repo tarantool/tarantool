@@ -228,11 +228,6 @@ remove_images_sh9:
 
 # Static builds
 
-static_build:
-  <<: *docker_test_definition
-  script:
-    - ${GITLAB_MAKE} test_static_build
-
 static_docker_build:
   <<: *osx_definition
   tags:
