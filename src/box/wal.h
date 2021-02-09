@@ -238,6 +238,13 @@ void
 wal_set_checkpoint_threshold(int64_t threshold);
 
 /**
+ * Set the pending write limit in bytes. Once the limit is reached, new
+ * writes are blocked until some previous writes succeed.
+ */
+void
+wal_set_queue_max_size(int64_t size);
+
+/**
  * Remove WAL files that are not needed by consumers reading
  * rows at @vclock or newer.
  */
