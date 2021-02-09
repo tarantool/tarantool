@@ -123,6 +123,8 @@ cfg_filter(box.cfg)
  |     - 268435456
  |   - - wal_mode
  |     - write
+ |   - - wal_queue_max_size
+ |     - 16777216
  |   - - worker_pool_threads
  |     - 4
  | ...
@@ -240,6 +242,8 @@ cfg_filter(box.cfg)
  |     - 268435456
  |   - - wal_mode
  |     - write
+ |   - - wal_queue_max_size
+ |     - 16777216
  |   - - worker_pool_threads
  |     - 4
  | ...

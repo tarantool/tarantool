@@ -249,12 +249,12 @@ box_process_rw(struct request *request, struct space *space,
 		 * synchronous tx it meets until confirm timeout
 		 * is reached and the tx is rolled back, yielding
 		 * an error.
-		 * Moreover, txn_commit_async() doesn't hurt at
+		 * Moreover, txn_commit_try_async() doesn't hurt at
 		 * all during local recovery, since journal_write
 		 * is faked at this stage and returns immediately.
 		 */
 		if (is_local_recovery) {
-			res = txn_commit_async(txn);
+			res = txn_commit_try_async(txn);
 		} else {
 			res = txn_commit(txn);
 		}
@@ -757,6 +757,20 @@ box_check_wal_mode(const char *mode_name)
 	return (enum wal_mode) mode;
 }
 
+static int64_t
+box_check_wal_queue_max_size(void)
+{
+	int64_t size = cfg_geti64("wal_queue_max_size");
+	if (size < 0) {
+		diag_set(ClientError, ER_CFG, "wal_queue_max_size",
+			 "wal_queue_max_size must be >= 0");
+	}
+	/* Unlimited. */
+	if (size == 0)
+		size = INT64_MAX;
+	return size;
+}
+
 static void
 box_check_readahead(int readahead)
 {
@@ -902,6 +916,8 @@ box_check_config(void)
 	box_check_checkpoint_count(cfg_geti("checkpoint_count"));
 	box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
+	if (box_check_wal_queue_max_size() < 0)
+		diag_raise();
 	if (box_check_memory_quota("memtx_memory") < 0)
 		diag_raise();
 	box_check_memtx_min_tuple_size(cfg_geti64("memtx_min_tuple_size"));
@@ -1437,6 +1453,16 @@ box_set_checkpoint_wal_threshold(void)
 {
 	int64_t threshold = cfg_geti64("checkpoint_wal_threshold");
 	wal_set_checkpoint_threshold(threshold);
+}
+
+int
+box_set_wal_queue_max_size(void)
+{
+	int64_t size = box_check_wal_queue_max_size();
+	if (size < 0)
+		return -1;
+	wal_set_queue_max_size(size);
+	return 0;
 }
 
 void

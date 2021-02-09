@@ -868,7 +868,7 @@ apply_synchro_row(struct xrow_header *row)
 	if (entry == NULL)
 		goto err;
 
-	if (journal_write_async(&entry->journal_entry) != 0) {
+	if (journal_write_try_async(&entry->journal_entry) != 0) {
 		diag_set(ClientError, ER_WAL_IO);
 		goto err;
 	}
@@ -1040,7 +1040,7 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 	trigger_create(on_wal_write, applier_txn_wal_write_cb, NULL, NULL);
 	txn_on_wal_write(txn, on_wal_write);
 
-	if (txn_commit_async(txn) < 0)
+	if (txn_commit_try_async(txn) < 0)
 		goto fail;
 
 success:
