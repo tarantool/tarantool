@@ -472,12 +472,13 @@ txn_rollback(struct txn *txn);
  * journal write completion. Note, the journal write may still fail.
  * To track transaction status, one is supposed to use on_commit and
  * on_rollback triggers.
+ * Note, this may yield occasionally, once journal queue gets full.
  *
  * On failure -1 is returned and the transaction is rolled back and
  * freed.
  */
 int
-txn_commit_async(struct txn *txn);
+txn_commit_try_async(struct txn *txn);
 
 /**
  * Most txns don't have triggers, and txn objects

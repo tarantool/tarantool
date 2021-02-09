@@ -55,6 +55,7 @@ wal_dir:.
 wal_dir_rescan_delay:2
 wal_max_size:268435456
 wal_mode:write
+wal_queue_max_size:16777216
 worker_pool_threads:4
 --
 -- Test insert from detached fiber
