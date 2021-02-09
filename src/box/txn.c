@@ -790,7 +790,7 @@ txn_limbo_on_rollback(struct trigger *trig, void *event)
 }
 
 int
-txn_commit_async(struct txn *txn)
+txn_commit_try_async(struct txn *txn)
 {
 	struct journal_entry *req;
 
@@ -860,7 +860,7 @@ txn_commit_async(struct txn *txn)
 	}
 
 	fiber_set_txn(fiber(), NULL);
-	if (journal_write_async(req) != 0) {
+	if (journal_write_try_async(req) != 0) {
 		fiber_set_txn(fiber(), txn);
 		diag_set(ClientError, ER_WAL_IO);
 		diag_log();
