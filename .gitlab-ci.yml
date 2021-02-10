@@ -1,7 +1,5 @@
 stages:
-  - static_analysis
   - test
-  - long_tests
   - perf
   - cleanup
 
@@ -115,58 +113,12 @@ before_script:
   script:
     - ${GITLAB_MAKE} perf_cleanup
 
-.jepsen_test_definition: &jepsen_test_definition
-  <<: *docker_test_definition
-  script:
-    - ${GITLAB_MAKE} test_jepsen
-  stage: long_tests
-  tags:
-    - mcs_jepsen_docker
-  artifacts:
-    paths:
-      - jepsen-tests-prefix/src/jepsen-tests/store
-    expire_in: 6 month
-
-# Static Analysis
-
-luacheck:
-  <<: *docker_test_definition
-  stage: static_analysis
-  tags:
-    - deploy_test
-  script:
-    - ${GITLAB_MAKE} test_debian_docker_luacheck
-
 # Tests
 
 osx_14_release:
   tags:
     - osx_14
   <<: *osx_definition
-
-jepsen-single-instance:
-  <<: *jepsen_test_definition
-  variables:
-    LEIN_OPT: '--nemesis standard'
-
-jepsen-single-instance-txm:
-  <<: *jepsen_test_definition
-  variables:
-    LEIN_OPT: '--nemesis standard --mvcc'
-
-jepsen-cluster:
-  <<: *jepsen_test_definition
-  when: manual
-  variables:
-    LEIN_OPT: '--nemesis standard'
-    INSTANCE_COUNT: '5'
-
-jepsen-cluster-txm:
-  <<: *jepsen_test_definition
-  when: manual
-  variables:
-    LEIN_OPT: '--nemesis standard --mvcc'
-    INSTANCE_COUNT: '5'
 
 # ####
 # Perf
