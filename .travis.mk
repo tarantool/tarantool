@@ -402,5 +402,9 @@ test_freebsd: deps_freebsd test_freebsd_no_deps
 # ###################
 
 test_jepsen: deps_debian_jepsen
+	# Jepsen build uses git commands internally, like command
+	# 'git stash --all' which fails w/o git configuration setup
+	git config --get user.name || git config --global user.name "Nodody User"
+	git config --get user.email || git config --global user.email "nobody@nowhere.com"
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON -DWITH_JEPSEN=ON
 	make run-jepsen
