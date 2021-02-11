@@ -152,12 +152,12 @@ local function decode_error(raw_data)
     local err = ffi.C.error_unpack_unsafe(ptr)
     if err ~= nil then
         err._refs = err._refs + 1
-        err = ffi.gc(err, ffi.C.error_unref)
         -- From FFI it is returned as 'struct error *', which is
         -- not considered equal to 'const struct error &', and is
         -- is not accepted by functions like box.error(). Need to
         -- cast explicitly.
         err = ffi.cast('const struct error &', err)
+        err = ffi.gc(err, ffi.C.error_unref)
     else
         -- Error unpacker installs fail reason into diag.
         box.error()
