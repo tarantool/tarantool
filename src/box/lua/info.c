@@ -50,6 +50,7 @@
 #include "version.h"
 #include "box/box.h"
 #include "box/raft.h"
+#include "box/txn_limbo.h"
 #include "lua/utils.h"
 #include "lua/serializer.h" /* luaL_setmaphint */
 #include "fiber.h"
@@ -600,6 +601,26 @@ lbox_info_election(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_info_synchro(struct lua_State *L)
+{
+	lua_createtable(L, 0, 2);
+
+	/* Quorum value may be evaluated via formula */
+	lua_pushinteger(L, replication_synchro_quorum);
+	lua_setfield(L, -2, "quorum");
+
+	/* Queue information. */
+	struct txn_limbo *queue = &txn_limbo;
+	lua_createtable(L, 0, 1);
+	lua_pushnumber(L, queue->len);
+	lua_setfield(L, -2, "len");
+	lua_setfield(L, -2, "queue");
+
+	return 1;
+}
+
+
 static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"id", lbox_info_id},
 	{"uuid", lbox_info_uuid},
@@ -619,6 +640,7 @@ static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"sql", lbox_info_sql},
 	{"listen", lbox_info_listen},
 	{"election", lbox_info_election},
+	{"synchro", lbox_info_synchro},
 	{NULL, NULL}
 };
 

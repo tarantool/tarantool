@@ -89,6 +89,7 @@ t
   - signature
   - sql
   - status
+  - synchro
   - uptime
   - uuid
   - vclock
