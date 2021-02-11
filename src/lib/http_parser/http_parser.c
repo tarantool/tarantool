@@ -269,6 +269,9 @@ http_parse_header_line(struct http_parser *prsr, char **bufp,
 			default:
 				state = sw_name;
 
+				if (ch < 0) {
+					return HTTP_PARSE_INVALID;
+				}
 				c = lowcase[ch];
 				if (c != 0) {
 					prsr->hdr_name[0] = c;
@@ -303,6 +306,9 @@ http_parse_header_line(struct http_parser *prsr, char **bufp,
 			break;
 		/* http_header name */
 		case sw_name:
+			if (ch < 0) {
+				return HTTP_PARSE_INVALID;
+			}
 			c = lowcase[ch];
 			if (c != 0) {
 				if (prsr->hdr_name_idx < max_hname_len) {
