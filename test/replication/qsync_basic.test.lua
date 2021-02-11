@@ -248,15 +248,32 @@ for i = 1, 100 do box.space.sync:delete{i} end
 test_run:cmd('switch replica')
 box.space.sync:count()
 
--- Cleanup.
+--
+-- gh-5191: test box.info.synchro interface. For
+-- this sake we stop the replica and initiate data
+-- write in sync space which won't pass due to timeout.
+-- While we're sitting in a wait cycle the queue should
+-- not be empty.
+--
+-- Make sure this test is the *LAST* one since we stop
+-- the replica node and never restart it back before the
+-- cleanup procedure, also we're spinning on default node
+-- and do not switch to other nodes.
+--
 test_run:cmd('switch default')
+test_run:cmd('stop server replica')
+assert(box.info.synchro.queue.len == 0)
+box.cfg{replication_synchro_timeout = 2}
+f = fiber.new(function() box.space.sync:insert{1024} end)
+test_run:wait_cond(function() return box.info.synchro.queue.len == 1 end)
+test_run:wait_cond(function() return box.info.synchro.queue.len == 0 end)
 
+-- Cleanup
 box.cfg{                                                                        \
     replication_synchro_quorum = old_synchro_quorum,                            \
     replication_synchro_timeout = old_synchro_timeout,                          \
     replication_timeout = old_timeout,                                          \
 }
-test_run:cmd('stop server replica')
 test_run:cmd('delete server replica')
 box.space.test:drop()
 box.space.sync:drop()

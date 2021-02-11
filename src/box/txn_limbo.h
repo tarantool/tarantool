@@ -95,6 +95,10 @@ struct txn_limbo {
 	 */
 	struct rlist queue;
 	/**
+	 * Number of entries in limbo queue.
+	 */
+	int64_t len;
+	/**
 	 * Instance ID of the owner of all the transactions in the
 	 * queue. Strictly speaking, nothing prevents to store not
 	 * own transactions here, originated from some other
