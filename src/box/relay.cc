@@ -118,6 +118,11 @@ struct relay {
 	 */
 	uint32_t id_filter;
 	/**
+	 * How many rows has this relay sent to the replica. Used to yield once
+	 * in a while when reading a WAL to unblock the event loop.
+	 */
+	int64_t row_count;
+	/**
 	 * Local vclock at the moment of subscribe, used to check
 	 * dataset on the other side and send missing data rows if any.
 	 */
@@ -218,6 +223,7 @@ relay_start(struct relay *relay, int fd, uint64_t sync,
 	coio_create(&relay->io, fd);
 	relay->sync = sync;
 	relay->state = RELAY_FOLLOW;
+	relay->row_count = 0;
 	relay->last_row_time = ev_monotonic_now(loop());
 }
 
@@ -840,6 +846,13 @@ relay_send(struct relay *relay, struct xrow_header *packet)
 	relay->last_row_time = ev_monotonic_now(loop());
 	coio_write_xrow(&relay->io, packet);
 	fiber_gc();
+
+	/*
+	 * It may happen that the socket is always ready for write, so yield
+	 * explicitly every now and then to not block the event loop.
+	 */
+	if (++relay->row_count % WAL_ROWS_PER_YIELD == 0)
+		fiber_sleep(0);
 
 	struct errinj *inj = errinj(ERRINJ_RELAY_TIMEOUT, ERRINJ_DOUBLE);
 	if (inj != NULL && inj->dparam > 0)
