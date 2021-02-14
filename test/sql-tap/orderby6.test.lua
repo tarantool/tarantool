@@ -26,7 +26,7 @@ test:plan(34)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "orderby6"
+
 -- Run all tests twice.  Once with a normal table and a second time
 -- with a WITHOUT ROWID table
 --

@@ -738,7 +738,7 @@ if 0>0 then
     local db = nil
     local X = nil
     db("collate", "numeric", "numeric_collate")
-    local function numeric_collate(lhs, rhs)
+    local function numeric_collate(lhs, rhs) -- luacheck: no unused
         if (lhs == rhs)
         then
             return 0
@@ -748,7 +748,7 @@ if 0>0 then
 
     -- Mimic the sql 2 collation type TEXT.
     db("collate", "text", "text_collate")
-    local function numeric_collate(lhs, rhs)
+    local function numeric_collate(lhs, rhs) -- luacheck: no unused
         return X(34, "X!cmd", [=[["string","compare",["lhs"],["rhs"]]]=])
     end
 

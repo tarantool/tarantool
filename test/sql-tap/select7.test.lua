@@ -18,7 +18,6 @@ test:plan(18)
 -- $Id: select7.test,v 1.11 2007/09/12 17:01:45 danielk1977 Exp $
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "select7"
 -- A 3-way INTERSECT.  Ticket #875
 test:do_execsql_test(
     "select7-1.1",

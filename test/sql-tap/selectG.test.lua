@@ -19,7 +19,6 @@ test:plan(1)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "selectG"
 -- Do an INSERT with a VALUES clause that contains 100,000 entries.  Verify
 -- that this insert happens quickly (in less than 10 seconds).  Actually, the
 -- insert will normally happen in less than 0.5 seconds on a workstation, but
@@ -36,7 +35,6 @@ test:do_test(
     function()
         local sql_arr = {[[CREATE TABLE t1(x INT primary key);
             INSERT INTO t1(x) VALUES]]}
-        local i
         for i = 1, 100000-1, 1 do
             table.insert(sql_arr, "("..i.."),")
         end

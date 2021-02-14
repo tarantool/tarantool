@@ -482,9 +482,8 @@ test:execsql [[
 -- trigger works.  Then drop the trigger.  Make sure the table is
 -- still there.
 --
-local view_v1 = "view v1"
 
-
+local view_v1 = "view v1" -- luacheck: no unused
 -- do_test trigger1-6.1 {
 --   execsql {SELECT type, name FROM sql_master}
 -- } [concat $view_v1 {table t2}]

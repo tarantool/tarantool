@@ -105,7 +105,6 @@ for _, zIndex in ipairs(queries) do
         })
 
 end
-local json = require("json")
 local function uses_op_count(sql)
     if test:lsearch(test:execsql("EXPLAIN "..sql), "Count")>0 then
         return 1

@@ -21,8 +21,7 @@ local json = require("json")
 -- with many repeated values and only a few distinct values.
 --
 
-local testprefix = "analyze5"
-local function eqp(sql)
+local function eqp(sql) -- luacheck: no unused
     return test:execsql("EXPLAIN QUERY PLAN"..sql)
 end
 
@@ -30,7 +29,7 @@ end
 -- function.
 local X = nil
 
-local function alpha(blob)
+local function alpha(blob) -- luacheck: no unused
     local ret = ""
     for _, c in ipairs(X(37, "X!cmd", [=[["split",["blob"],""]]=])) do
         if X(39, "X!cmd", [=[["string","is","alpha",["c"]]]=])

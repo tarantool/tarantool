@@ -18,7 +18,7 @@ test:plan(14)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "delete4"
+
 test:do_execsql_test(
     1.1,
     [[

@@ -31,7 +31,6 @@ local function lrange(arr, start_num, end_num)
     return tmp
 end
 
-local ii
 test:do_execsql_test(
     "tkt-38cb5df375.0",
     [[

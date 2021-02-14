@@ -19,7 +19,6 @@ test:plan(36)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "whereD"
 test:do_execsql_test(
     1.1,
     [[

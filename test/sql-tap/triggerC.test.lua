@@ -16,7 +16,6 @@ test:plan(43)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "triggerC"
 
 
 ---------------------------------------------------------------------------

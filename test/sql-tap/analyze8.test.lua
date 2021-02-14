@@ -18,8 +18,6 @@ test:plan(15)
 -- in this file is testing the capabilities of sql_stat3.
 --
 
-local testprefix = "analyze8"
-
 -- Scenario:
 --
 --    Two indices.  One has mostly singleton entries, but for a few

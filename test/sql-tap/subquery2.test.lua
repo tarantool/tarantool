@@ -19,8 +19,6 @@ test:plan(11)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "subquery2"
-
 
 test:do_test(
     "subquery2-1.1",
