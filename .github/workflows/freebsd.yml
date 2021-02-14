@@ -24,7 +24,7 @@ jobs:
         uses: vmactions/freebsd-vm@v0.1.0
         with:
           usesh: true
-          sync: sshfs
+          #sync: sshfs
           mem: 8192
           prepare: |
             pwd
