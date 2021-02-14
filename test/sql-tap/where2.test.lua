@@ -1,8 +1,5 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-local yaml = require("yaml")
-local fio = require("fio")
-
 local ffi = require("ffi")
 test:plan(74)
 
@@ -59,16 +56,6 @@ test:do_test(
         
         -- </where2-1.0>
     })
-
--- Do an SQL statement.  Append the search count to the end of the result.
---
-local function count(sql)
-    local sql_sort_count = box.stat.sql().sql_sort_count
-    local r = test:execsql(sql)
-    print("lol "..(box.stat.sql().sql_sort_count - sql_sort_count))
-    table.insert(r, box.stat.sql().sql_sort_count - sql_sort_count)
-    return r
-end
 
 -- This procedure executes the SQL.  Then it checks to see if the OP_Sort
 -- opcode was executed.  If an OP_Sort did occur, then "sort" is appended

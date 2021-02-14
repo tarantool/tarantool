@@ -23,7 +23,6 @@ test:plan(10)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "whereK"
 test:do_execsql_test(1.1, [[
   CREATE TABLE t1(a INT ,b INT ,c INT , primary key (a,b,c));
   WITH RECURSIVE c(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM c WHERE x<99)

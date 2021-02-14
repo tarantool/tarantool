@@ -18,7 +18,6 @@ test:plan(14694)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "func"
 -- Create a table to work with.
 --
 test:do_test(
@@ -1485,7 +1484,7 @@ test:do_test(
 test:do_test(
     "func-17.1",
     function()
-        local function testfunc1(args)
+        local function testfunc1(args) -- luacheck: no unused
             X(768, "X!cmd", [=[["error","Error %d with %s percents %p"]]=])
         end
 

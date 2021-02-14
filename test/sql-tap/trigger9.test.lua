@@ -34,8 +34,6 @@ test:plan(28)
 -- ["source",[["testdir"],"\/tester.tcl"]]
 
 
-local testprefix = "trigger9"
-
 local function has_rowdata(sql)
     local result = test:execsql('EXPLAIN '..sql)
 

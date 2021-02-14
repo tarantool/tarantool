@@ -1,6 +1,5 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-local json = require("json")
 test:plan(34)
 
 --!./tcltestrunner.lua

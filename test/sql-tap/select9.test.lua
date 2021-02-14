@@ -274,10 +274,6 @@ test:do_execsql_test(
         -- </select9-2.0>
     })
 
-local t1_space_id = ""
-local t2_space_id = ""
-t1_space_id = test:execsql([[SELECT * from "_space" where "name"='T1']])["id"]
-t2_space_id = test:execsql([[SELECT * from "_space" where "name"='T2']])["id"]
 --X(276, "X!cmd", [=[["db","eval","SELECT * from _space where name='t2'","data","\n  set t2_space_id $data(id)\n"]]=])
 --local function reverse(lhs, rhs)
 --    return X(283, "X!cmd", [=[["string","compare",["rhs"],["lhs"]]]=])
@@ -289,7 +285,6 @@ t2_space_id = test:execsql([[SELECT * from "_space" where "name"='T2']])["id"]
 -- to them. Sometimes the WHERE clause may be satisfied using the same
 -- index used for ORDER BY, sometimes not.
 --
-local recreate_i1 = "DROP INDEX i1 ON t1; CREATE INDEX i1 ON t1(b, a)"
 iOuterLoop = 1
 for _, indexes in ipairs({ [[
   /* Do not create any indexes. */
@@ -480,7 +475,6 @@ test:do_execsql_test(
 --
 -- For additional information.
 --
-local json = require('json')
 test:do_test(
     "select9-5.1",
     function()

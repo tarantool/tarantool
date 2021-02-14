@@ -21,7 +21,7 @@ test:plan(6)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "orderby4"
+
 -- Generate test data for a join.  Verify that the join gets the
 -- correct answer.
 --

@@ -19,7 +19,6 @@ test:plan(56)
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
 
-local testprefix = "distinct"
 local function is_distinct_noop(sql)
     local sql1 = sql
     local sql2 = string.gsub(sql, "DISTINCT", "")

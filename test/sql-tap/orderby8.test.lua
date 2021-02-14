@@ -22,7 +22,6 @@ test:plan(203)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "orderby8"
 
 local rs = ""
 test:do_test(

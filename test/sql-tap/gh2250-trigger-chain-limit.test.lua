@@ -74,7 +74,6 @@ for _, table_count in ipairs({30, 31}) do
     end
 
     local function check(sql)
-        local msg = ''
         local _, msg = pcall(function () test:execsql(sql) end)
         msg = tostring(msg)
         test:do_test(sql,

@@ -35,7 +35,7 @@ test:plan(79)
 --
 -- Verify the default settings for full_column_name
 --
-local function lreplace(arr, pos, len, val)
+local function lreplace(arr, pos, len, val) -- luacheck: no unused
     for i = pos + 1, pos + len + 1, 1 do
         arr[i] = val
     end

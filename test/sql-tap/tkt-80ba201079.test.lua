@@ -22,7 +22,6 @@ test:plan(11)
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
 
-local testprefix = "tkt-80ba201079"
 test:do_test(
     "tkt-80ba2-100",
     function()

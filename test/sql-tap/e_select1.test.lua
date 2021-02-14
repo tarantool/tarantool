@@ -990,7 +990,7 @@ for _ in X(0, "X!foreach", [=[["tn select","\n  8.1  \"SELECT count(*) FROM a1\"
  do
         nRow = nRow + 1
     end
-    local rc = sql_finalize(stmt)
+    sql_finalize(stmt)
     -- Test that $nRow==1 and that statement execution was successful
     -- (rc==sql_OK).
 
@@ -1445,7 +1445,6 @@ data = {
     {23, "SELECT * FROM j1 INTERSECT SELECT * FROM j2,j3 LIMIT 10 OFFSET 5"},
     {24, "SELECT a FROM j1 INTERSECT SELECT g FROM j2,j3 LIMIT (SELECT 10)"}
 }
-local json = require("json")
 for _, val in ipairs(data) do
     local tn = val[1]
     local select = val[2]
@@ -2193,7 +2192,6 @@ for _, val in ipairs({
     {"5", "SELECT b FROM f1 ORDER BY a LIMIT (SELECT group_concat(b) FROM f1)"}}) do
     local tn = val[1]
     local select = val[2]
-    local err_param = val[3]
     test:do_catchsql_test(
         "e_select-9.2."..tn,
         select,

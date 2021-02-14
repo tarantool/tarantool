@@ -25,8 +25,6 @@ test:plan(194)
 -- $Id: selectA.test,v 1.6 2008/08/21 14:24:29 drh Exp $
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "selectA"
-
 
 test:do_execsql_test(
     "selectA-1.0",
@@ -2359,7 +2357,7 @@ test:do_execsql_test(
 if (0 > 0)
  then
 end
-local function f(args)
+local function f(args) -- luacheck: no unused
     return 1
 end
 

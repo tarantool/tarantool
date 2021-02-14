@@ -2,8 +2,6 @@
 local test = require("sqltester")
 test:plan(48)
 
-local testprefix = "analyzeE"
-
 --!./tcltestrunner.lua
 -- 2014-10-08
 --

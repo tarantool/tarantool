@@ -106,7 +106,6 @@ test:do_test(
 test:do_test(
     "index-2.2",
     function()
-        local msg
         local v , msg= pcall(function()
             test:execsql("CREATE INDEX index1 ON test1(f1, f2, f4, f3)")
             end)

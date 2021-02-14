@@ -23,8 +23,6 @@ test:plan(8)
 -- $Id: where4.test,v 1.6 2007/12/10 05:03:48 danielk1977 Exp $
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "where4"
-
 
 -- Build some test data
 --

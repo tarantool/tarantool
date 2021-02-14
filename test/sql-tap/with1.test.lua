@@ -18,7 +18,6 @@ test:plan(64)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "with1"
 -- if X(0, "X!capable", [["!cte"]]) then
 --   test:finish_test()
 --  return 
