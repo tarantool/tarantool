@@ -18,7 +18,6 @@ test:plan(0)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "tkt-bd484a090c"
 
 -- Disabled until #3694 is resolved.
 --

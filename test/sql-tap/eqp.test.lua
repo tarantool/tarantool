@@ -17,8 +17,6 @@ test:plan(70)
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
 
-
-local testprefix = "eqp"
 ---------------------------------------------------------------------------
 --
 -- eqp-1.*:        Assorted tests.

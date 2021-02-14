@@ -18,7 +18,6 @@ test:plan(23)
 -- likelihood() functions.
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "whereG"
 test:do_execsql_test(
     "whereG-1.0",
     [[

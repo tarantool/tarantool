@@ -19,7 +19,7 @@ test:plan(61)
 -- $Id: check.test,v 1.13 2009/06/05 17:09:12 drh Exp $
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "check"
+
 -- Only run these tests if the build includes support for CHECK constraints
 
 

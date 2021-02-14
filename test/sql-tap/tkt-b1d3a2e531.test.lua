@@ -21,9 +21,6 @@ test:plan(11)
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
 
-
-local testprefix = "tkt-b1d3a2e531"
-
 test:do_execsql_test(
     1.1,
     [[

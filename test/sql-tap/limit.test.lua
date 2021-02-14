@@ -694,7 +694,6 @@ test:do_catchsql_test(
 test:do_test(
     "limit-10.1",
     function()
-        local limit = 10
         return test:execsql [[
             SELECT x FROM t1 LIMIT 10;
         ]]

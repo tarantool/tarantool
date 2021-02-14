@@ -26,7 +26,7 @@ test:plan(28)
 -- Return the number of OpenEphemeral instructions used in the
 -- implementation of the sql statement passed as a an argument.
 --
-local function nEphemeral(sql)
+local function nEphemeral(sql) -- luacheck: no unused
     local nEph = 0
     for _, op in ipairs(test:execsql("EXPLAIN "..sql.."")) do
         if (op == "OpenTEphemeral")

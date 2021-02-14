@@ -20,7 +20,6 @@ test:plan(47)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "tkt-9a8b09f8e6"
 -- MUST_WORK_TEST
 if (0 > 0)
  then

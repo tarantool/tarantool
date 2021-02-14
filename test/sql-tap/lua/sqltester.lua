@@ -381,7 +381,6 @@ function test.randstr(Length)
     for Loop = 0, 255 do
         Chars[Loop+1] = string.char(Loop)
     end
-    local String = table.concat(Chars)
     local Result = {}
     local Lookup = Chars
     local Range = #Lookup

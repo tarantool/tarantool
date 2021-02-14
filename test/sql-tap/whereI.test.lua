@@ -20,7 +20,6 @@ test:plan(7)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "whereI"
 test:do_execsql_test(1.0, [[
     CREATE TABLE t1(a INT, b TEXT, c TEXT, PRIMARY KEY(a));
     INSERT INTO t1 VALUES(1, 'a', 'z');

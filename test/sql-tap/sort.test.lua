@@ -19,7 +19,6 @@ test:plan(60)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-local testprefix = "sort"
 -- Create a bunch of data to sort against
 --
 test:do_test(
@@ -802,7 +801,7 @@ box.internal.sql_create_function("cksum", cksum)
             "sort-14."..tn,
             function()
                 sql_test_control("sql_TESTCTRL_SORTER_MMAP", "db", mmap_limit)
-                local prev = ""
+                local prev = "" -- luacheck: no unused
                 X(536, "X!cmd", [=[["db","eval"," SELECT * FROM t11 ORDER BY b ","\n         if {$b != [cksum $a]} {error \"checksum failed\"}\n         if {[string compare $b $prev] < 0} {error \"sort failed\"}\n         set prev $b\n       "]]=])
                 return X(541, "X!cmd", [=[["set","",""]]=])
             end, {

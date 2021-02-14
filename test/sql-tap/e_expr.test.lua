@@ -1087,7 +1087,7 @@ if (0>0) then
         local number = nil
         local stmt = sql_prepare_v2(sql, -1)
         for _ in X(0, "X!foreach", [=[["number name",["params"]]]=]) do
-            local nm = sql_bind_parameter_name(stmt, number)
+            sql_bind_parameter_name(stmt, number)
             X(480, "X!cmd", [=[["do_test",[["tn"],".name.",["number"]],[["list","set","",["nm"]]],["name"]]]=])
             sql_bind_int(stmt, number, ((-1) * number))
         end
@@ -1103,7 +1103,7 @@ if (0>0) then
         -- Legacy from the original code. Must be replaced with analogue
         -- functions from box.
         local sql_finalize = nil
-        local rc = sql_finalize(stmt)
+        sql_finalize(stmt)
         X(491, "X!cmd", [=[["do_test",[["tn"],".rc"],[["list","set","",["rc"]]],"sql_OK"]]=])
         X(492, "X!cmd", [=[["do_test",[["tn"],".res"],[["list","set","",["res"]]],["result"]]]=])
     end
@@ -1422,7 +1422,7 @@ for _, val in ipairs(test_cases12) do
         test:do_test(
             string.format("e_expr-12.3.%s.%s", tn, x),
             function()
-                local rc, err = pcall( function()
+                local rc = pcall( function()
                     test:execsql("SELECT "..e.." FROM tblname")
                 end)
                 return rc

@@ -40,7 +40,6 @@ local function datetest(tnum, expr, result)
         result)
 end
 
-local tcl_precision = 15
 datetest(1.1, "julianday('2000-01-01')", "2451544.5")
 datetest(1.2, "julianday('1970-01-01')", "2440587.5")
 datetest(1.3, "julianday('1910-04-20')", "2418781.5")

@@ -22,8 +22,6 @@ test:plan(88)
 -- ["source",[["testdir"],"\/tester.tcl"]]
 -- Omit this whole file if the library is build without subquery support.
 
-
-local testprefix = "select6"
 test:do_test(
     "select6-1.0",
     function()
@@ -665,7 +663,7 @@ local json = require("json")
 local function is_flat(sql)
     local r = test:execsql("EXPLAIN "..sql)
     r = json.encode(r)
-    local i, j = string.find(r,"OpenEphemeral")
+    local i = string.find(r,"OpenEphemeral")
     -- return 1 if there is no OpenEphemeral in r
     return i == nil and {1} or {0}
 end

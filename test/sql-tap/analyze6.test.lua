@@ -21,8 +21,6 @@ test:plan(13)
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
 
-local testprefix = "analyze6"
-
 test:do_test(
     "analyze6-1.0",
     function()
