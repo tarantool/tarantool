@@ -98,6 +98,8 @@ add_library(crc32 STATIC
 )
 target_link_libraries(crc32 cpu_feature)
 
+add_library(shutdown STATIC on_shutdown.c)
+
 set (server_sources
      find_path.c
      curl.c
@@ -142,6 +144,7 @@ set (server_sources
 set(api_headers
     ${CMAKE_BINARY_DIR}/src/trivia/config.h
     ${CMAKE_SOURCE_DIR}/src/trivia/util.h
+    ${CMAKE_SOURCE_DIR}/src/on_shutdown.h
     ${CMAKE_SOURCE_DIR}/src/lib/core/say.h
     ${CMAKE_SOURCE_DIR}/src/lib/core/fiber.h
     ${CMAKE_SOURCE_DIR}/src/lib/core/fiber_cond.h
@@ -187,7 +190,7 @@ target_link_libraries(server core coll http_parser bit uri uuid swim swim_udp
 # Rule of thumb: if exporting a symbol from a static library, list the
 # library here.
 set (reexport_libraries server core misc bitset csv swim swim_udp swim_ev
-     ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES})
+     shutdown ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES})
 
 set (common_libraries
     ${reexport_libraries}
