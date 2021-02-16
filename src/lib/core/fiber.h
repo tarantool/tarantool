@@ -329,6 +329,22 @@ API_EXPORT int
 fiber_join(struct fiber *f);
 
 /**
+ * Wait until the fiber is dead or timeout exceeded.
+ * In case timeout == TIMEOUT_INFINITY, this function
+ * same as fiber_join function.
+ * Return fiber execution status to the caller or -1
+ * if timeout exceeded and set diag.
+ * The fiber must not be detached (@sa fiber_set_joinable()).
+ * @pre FIBER_IS_JOINABLE flag is set.
+ *
+ * \param f fiber to be woken up
+ * \param timeout time during which we wait for the fiber completion
+ * \return fiber function ret code or -1 in case if timeout exceeded
+ */
+API_EXPORT int
+fiber_join_timeout(struct fiber *f, double timeout);
+
+/**
  * Put the current fiber to sleep for at least 's' seconds.
  *
  * \param s time to sleep

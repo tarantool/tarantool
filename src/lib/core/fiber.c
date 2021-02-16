@@ -609,9 +609,17 @@ fiber_reschedule(void)
 int
 fiber_join(struct fiber *fiber)
 {
+	int rc = fiber_join_timeout(fiber, TIMEOUT_INFINITY);
+	return rc;
+}
+
+int
+fiber_join_timeout(struct fiber *fiber, double timeout)
+{
 	assert(fiber->flags & FIBER_IS_JOINABLE);
 
 	if (! fiber_is_dead(fiber)) {
+		bool exceeded = false;
 		do {
 			/*
 			 * In case fiber is cancelled during yield
@@ -620,8 +628,27 @@ fiber_join(struct fiber *fiber)
 			 * to put it back in.
 			 */
 			rlist_add_tail_entry(&fiber->wake, fiber(), state);
-			fiber_yield();
-		} while (! fiber_is_dead(fiber));
+			if (timeout != TIMEOUT_INFINITY) {
+				double time = fiber_clock();
+				exceeded = fiber_yield_timeout(timeout);
+				timeout -= (fiber_clock() - time);
+			} else {
+				fiber_yield();
+			}
+		} while (! fiber_is_dead(fiber) && ! exceeded && timeout > 0);
+	}
+
+	if (! fiber_is_dead(fiber)) {
+		/*
+		 * Not exactly the right error message for this place. Error
+		 * message is generated based on the ETIMEDOUT code, that is
+		 * used for network timeouts in linux. But in other places,
+		 * this type of error is always used when the timeout expires,
+		 * regardless of whether it is related to the network (see
+		 * cbus_call for example).
+		 */
+		diag_set(TimedOut);
+		return -1;
 	}
 
 	/* Move exception to the caller */
