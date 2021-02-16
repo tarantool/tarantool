@@ -5,8 +5,8 @@ runs:
   steps:
     # install 'requests' Python module
     - run: |
-        python -m pip install --upgrade pip
-        pip install requests
+        python -m pip install --upgrade pip ||:
+        pip install requests ||:
       shell: bash
     # logout github environment
     - env:
@@ -30,7 +30,8 @@ runs:
       shell: bash
     # get job id number
     - run: |
-        apt update && apt install -y jq
+        apt update ||:
+        apt install -y jq ||:
         echo 'JOB_ID<<EOF' >> $GITHUB_ENV
         curl -s https://api.github.com/repos/tarantool/tarantool/actions/runs/${{ github.run_id }}/jobs | jq -r '.jobs[0].id' | tee -a $GITHUB_ENV
         echo 'EOF' >> $GITHUB_ENV
