@@ -1,7 +1,5 @@
 stages:
   - test
-  - perf
-  - cleanup
 
 # 1. Git strategy disabled as shown at:
 #    https://docs.gitlab.com/ee/ci/yaml/README.html#git-strategy
@@ -51,17 +49,6 @@ before_script:
   after_script:
     - cp -r test/var/artifacts .
 
-.perf_only_template: &perf_only_definition
-  only:
-    - master
-    - tags
-    - /^.*-perf$/
-  except:
-    - schedules
-  variables: &perf_vars_definition
-    IMAGE_PERF: "${CI_REGISTRY}/${CI_PROJECT_PATH}/perf/ubuntu-bionic:perf_master"
-    IMAGE_PERF_BUILT: "${CI_REGISTRY}/${CI_PROJECT_PATH}/perf_tmp/ubuntu-bionic:perf_${CI_COMMIT_SHORT_SHA}"
-
 .docker_test_template: &docker_test_definition
   <<: *artifacts_files_definition
   except:
@@ -85,160 +72,9 @@ before_script:
     # "and can’t directly link outside it."
     - cp -rf ${OSX_VARDIR}/artifacts .
 
-.vbox_template: &vbox_definition
-  <<: *artifacts_files_definition
-  except:
-    - /^.*-notest$/
-  stage: test
-  after_script:
-    - >
-      scp -r -P ${VMS_PORT} ${VMS_USER}@127.0.0.1:tarantool/test/var/artifacts . ;
-      ${GITLAB_MAKE} vms_shutdown
-
-.perf_docker_test_template: &perf_docker_test_definition
-  <<: *perf_only_definition
-  image: ${IMAGE_PERF_BUILT}
-  stage: perf
-  artifacts:
-    when: always
-    paths:
-      - "*_result.txt"
-      - "*_t_version.txt"
-  script:
-    - ${GITLAB_MAKE} perf_run
-
-.perf_cleanup_definition: &perf_cleanup_definition
-  <<: *perf_only_definition
-  stage: cleanup
-  script:
-    - ${GITLAB_MAKE} perf_cleanup
-
 # Tests
 
 osx_14_release:
   tags:
     - osx_14
   <<: *osx_definition
-
-# ####
-# Perf
-# ####
-
-# Pre-testing part
-
-perf_bootstrap:
-  <<: *perf_only_definition
-  stage: test
-  tags:
-    - deploy
-  script:
-    - ${GITLAB_MAKE} perf_prepare
-  after_script:
-    - ${GITLAB_MAKE} perf_cleanup_image
-
-# Testing part
-
-perf_tpch:
-  <<: *perf_docker_test_definition
-  tags:
-    - docker_sh2_perf
-  image: ${IMAGE_PERF_BUILT}_tpch
-  variables:
-    <<: *perf_vars_definition
-    BENCH: 'tpch'
-  artifacts:
-    when: always
-    paths:
-      - "bench-*.csv"
-      - "*_t_version.txt"
-      - "*_result.txt"
-
-perf_sysbench:
-  <<: *perf_docker_test_definition
-  tags:
-    - docker_sh3_perf
-  variables:
-    <<: *perf_vars_definition
-    BENCH: 'sysbench'
-
-perf_tpcc:
-  <<: *perf_docker_test_definition
-  tags:
-    - docker_sh3_perf
-  variables:
-    <<: *perf_vars_definition
-    BENCH: 'tpcc'
-
-perf_ycsb_hash:
-  <<: *perf_docker_test_definition
-  tags:
-    - docker_sh2_perf
-  variables:
-    <<: *perf_vars_definition
-    BENCH: 'ycsb'
-    ARG: 'hash'
-
-perf_ycsb_tree:
-  <<: *perf_docker_test_definition
-  tags:
-    - docker_sh2_perf
-  variables:
-    <<: *perf_vars_definition
-    BENCH: 'ycsb'
-    ARG: 'tree'
-
-perf_nosqlbench_hash:
-  <<: *perf_docker_test_definition
-  tags:
-    - docker_sh1_perf
-  variables:
-    <<: *perf_vars_definition
-    BENCH: 'nosqlbench'
-    ARG: 'hash'
-
-perf_nosqlbench_tree:
-  <<: *perf_docker_test_definition
-  tags:
-    - docker_sh1_perf
-  variables:
-    <<: *perf_vars_definition
-    BENCH: 'nosqlbench'
-    ARG: 'tree'
-
-perf_cbench:
-  <<: *perf_docker_test_definition
-  tags:
-    - docker_sh2_perf
-  variables:
-    <<: *perf_vars_definition
-    BENCH: 'cbench'
-
-perf_linkbench_ssd:
-  <<: *perf_docker_test_definition
-  tags:
-    - docker_perf_ssd
-  variables:
-    <<: *perf_vars_definition
-    BENCH: 'linkbench'
-
-# Post-testing part
-
-remove_images_sh1:
-  <<: *perf_cleanup_definition
-  tags:
-    - sh1_shell
-
-remove_images_sh2:
-  <<: *perf_cleanup_definition
-  tags:
-    - sh2_shell
-
-remove_images_sh3:
-  <<: *perf_cleanup_definition
-  tags:
-    - sh3_shell
-
-remove_images_sh9:
-  <<: *perf_cleanup_definition
-  tags:
-    - sh9_shell
