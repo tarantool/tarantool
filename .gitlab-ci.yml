@@ -121,19 +121,6 @@ osx_14_release:
     - osx_14
   <<: *osx_definition
 
-freebsd_12_release:
-  <<: *vbox_definition
-  tags:
-    - vms_freebsd_12
-  variables:
-    VMS_NAME: 'freebsd_12'
-    VMS_USER: 'vagrant'
-    VMS_PORT: '2232'
-    MAKE: 'gmake'
-  script:
-    - ${GITLAB_MAKE} vms_start
-    - ${GITLAB_MAKE} vms_test_freebsd_no_deps
-
 # ####
 # Perf
 # ####
