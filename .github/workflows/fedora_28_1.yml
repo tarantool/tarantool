@@ -1,4 +1,4 @@
-name: centos_8
+name: fedora_28_1
 
 on:
   push:
@@ -10,14 +10,14 @@ env:
   CI_MAKE: make -f .gitlab.mk
 
 jobs:
-  centos_8:
+  fedora_28:
     # We want to run on external PRs, but not on our own internal PRs
     # as they'll be run by the push to the branch.
     if: ( github.event_name == 'push' ||
         github.event.pull_request.head.repo.full_name != github.repository ) &&
         ! endsWith(github.ref, '-notest')
 
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
@@ -51,9 +51,9 @@ jobs:
             sudo apt-get install -y procmail createrepo awscli reprepro
             mkdir -p ~/.gnupg
             echo 'digest-algo sha256' >> ~/.gnupg/gpg.conf
-            OS=el DIST=8 ${CI_MAKE} deploy
+            OS=fedora DIST=28 ${CI_MAKE} deploy
           else
-            OS=el DIST=8 ${CI_MAKE} package
+            OS=fedora DIST=28 ${CI_MAKE} package
           fi
       - name: call action to send Telegram message on failure
         env:
@@ -65,7 +65,7 @@ jobs:
         uses: actions/upload-artifact@v2
         if: always()
         with:
-          name: centos-8
+          name: fedora-28
           retention-days: 21
           path: |
             build/usr/src/*/tarantool-*/test/var/artifacts

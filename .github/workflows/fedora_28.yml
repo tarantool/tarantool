@@ -1,6 +1,10 @@
 name: fedora_28
 
-on: [push, pull_request]
+on:
+  push:
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    - cron:  '*/15 * * * *'
 
 env:
   CI_MAKE: make -f .gitlab.mk
@@ -59,8 +63,11 @@ jobs:
         if: failure()
       - name: artifacts
         uses: actions/upload-artifact@v2
-        if: failure()
+        if: always()
         with:
           name: fedora-28
           retention-days: 21
-          path: build/usr/src/*/tarantool-*/test/var/artifacts
+          path: |
+            build/usr/src/*/tarantool-*/test/var/artifacts
+            /var/log/dnf.log
+            /var/log/dnf.librepo.log

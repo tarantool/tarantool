@@ -120,7 +120,8 @@ S3_BUCKET_URL="s3://tarantool_repo/sources/$(BUCKET)"
 
 deploy_prepare:
 	[ -d packpack ] || \
-		git clone https://github.com/packpack/packpack.git packpack
+		git clone https://github.com/avtikhon/packpack.git packpack
+	( cd packpack && git checkout avtikhon/dns-issue )
 	rm -rf build
 
 package: deploy_prepare

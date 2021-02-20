@@ -33,7 +33,8 @@ DOCKER_ENV := $(foreach var,$(ENVVARS),-e $(var)="$($(var))")
 all: package
 
 package:
-	git clone https://github.com/packpack/packpack.git packpack
+	git clone https://github.com/avtikhon/packpack.git packpack
+	( cd packpack && git checkout avtikhon/dns-issue )
 	./packpack/packpack
 
 test: test_$(TRAVIS_OS_NAME)
