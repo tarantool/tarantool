@@ -13,7 +13,7 @@ runs:
     - name: test
       env:
         CI_MAKE: make -f .gitlab.mk
-        IMAGE_PERF: registry.gitlab.com/tarantool/tarantool/perf/ubuntu-bionic:perf_master
+        IMAGE_PERF: docker.io/tarantool/perf:ubuntu-bionic_perf_master
         IMAGE_PERF_BUILT: ubuntu-bionic:perf_${{ github.sha }}
         DOCKER_NETWORK_ARG: --network=host
         DOCKER_RUN_ARGS: ${DOCKER_NETWORK_ARG} ${{ env.DOCKER_RUN_ARGS }}
