@@ -126,6 +126,7 @@ add_library(box STATIC
     memtx_rtree.c
     memtx_bitset.c
     memtx_tx.c
+    module_cache.c
     engine.c
     memtx_engine.c
     memtx_space.c

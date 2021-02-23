@@ -172,7 +172,7 @@ static void
 module_gc(struct module *module);
 
 int
-module_init(void)
+schema_module_init(void)
 {
 	modules = mh_strnptr_new();
 	if (modules == NULL) {
@@ -184,7 +184,7 @@ module_init(void)
 }
 
 void
-module_free(void)
+schema_module_free(void)
 {
 	while (mh_size(modules) > 0) {
 		mh_int_t i = mh_first(modules);
@@ -372,7 +372,7 @@ module_sym(struct module *module, const char *name)
 }
 
 int
-module_reload(const char *package, const char *package_end)
+schema_module_reload(const char *package, const char *package_end)
 {
 	struct module *old_module = module_cache_find(package, package_end);
 	if (old_module == NULL) {

@@ -76,6 +76,7 @@
 #include "box/lua/init.h" /* box_lua_init() */
 #include "box/session.h"
 #include "box/memtx_tx.h"
+#include "box/module_cache.h"
 #include "systemd.h"
 #include "crypto/crypto.h"
 #include "core/popen.h"
@@ -521,6 +522,7 @@ tarantool_free(void)
 	title_free(main_argc, main_argv);
 
 	popen_free();
+	module_free();
 
 	/* unlink pidfile. */
 	if (pid_file_handle != NULL && pidfile_remove(pid_file_handle) == -1)
@@ -703,6 +705,7 @@ main(int argc, char **argv)
 	cbus_init();
 	coll_init();
 	memtx_tx_manager_init();
+	module_init();
 	crypto_init();
 	systemd_init();
 

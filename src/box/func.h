@@ -85,16 +85,16 @@ struct func {
 };
 
 /**
- * Initialize modules subsystem.
+ * Initialize schema modules subsystem.
  */
 int
-module_init(void);
+schema_module_init(void);
 
 /**
- * Cleanup modules subsystem.
+ * Cleanup schema modules subsystem.
  */
 void
-module_free(void);
+schema_module_free(void);
 
 struct func *
 func_new(struct func_def *def);
@@ -109,7 +109,7 @@ int
 func_call(struct func *func, struct port *args, struct port *ret);
 
 /**
- * Reload dynamically loadable module.
+ * Reload dynamically loadable schema module.
  *
  * @param package name begin pointer.
  * @param package_end package_end name end pointer.
@@ -117,7 +117,7 @@ func_call(struct func *func, struct port *args, struct port *ret);
  * @retval 0 on success.
  */
 int
-module_reload(const char *package, const char *package_end);
+schema_module_reload(const char *package, const char *package_end);
 
 #if defined(__cplusplus)
 } /* extern "C" */
