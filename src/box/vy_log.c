@@ -1027,9 +1027,10 @@ vy_log_bootstrap(void)
 }
 
 struct vy_recovery *
-vy_log_begin_recovery(const struct vclock *vclock)
+vy_log_begin_recovery(const struct vclock *vclock, bool force_recovery)
 {
 	assert(vy_log.recovery == NULL);
+	(void) force_recovery;
 
 	/*
 	 * Do not fail recovery if vinyl directory does not exist,
