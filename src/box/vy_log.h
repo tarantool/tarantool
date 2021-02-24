@@ -556,7 +556,7 @@ vy_log_bootstrap(void);
  * Returns NULL on failure.
  */
 struct vy_recovery *
-vy_log_begin_recovery(const struct vclock *vclock);
+vy_log_begin_recovery(const struct vclock *vclock, bool force_recovery);
 
 /**
  * Finish recovery from the metadata log.
