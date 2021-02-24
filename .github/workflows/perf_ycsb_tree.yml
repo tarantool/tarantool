@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: set PATH to GIT of the newer version 2.9.0
         run: echo "/usr/local/git/bin" | tee -a $GITHUB_PATH
+      - name: cleanup workspace
+        run: docker run -w /source -v ${PWD}:/source -i centos:8 /bin/bash -c "chown -R $(id -u):$(id -g) * .[^.]*"
       - uses: actions/checkout@v1
       - name: test
         env:
