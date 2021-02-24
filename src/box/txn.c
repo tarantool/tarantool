@@ -551,7 +551,8 @@ txn_on_journal_write(struct journal_entry *entry)
 		int n_rows = txn->n_new_rows + txn->n_applier_rows;
 		say_warn_ratelimited("too long WAL write: %d rows at LSN %lld: "
 				     "%.3f sec", n_rows,
-				     txn->signature - n_rows + 1, delta);
+				     (long long)(txn->signature - n_rows + 1),
+				     delta);
 	}
 	if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
 		txn_run_wal_write_triggers(txn);
