@@ -345,7 +345,7 @@ CustomError::CustomError(const char *file, unsigned int line,
 void
 CustomError::log() const
 {
-	say_file_line(S_ERROR, file, line, errmsg, "%s",
+	say_file_line(S_ERROR, file, line, errmsg,
 		      "Custom type %s", m_custom_type);
 }
 
