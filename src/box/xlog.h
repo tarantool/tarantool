@@ -241,6 +241,13 @@ void
 xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags);
 
 /**
+ * Unlink single file with given vclock. If there's no file corresponding to
+ * this vclock then log an error and return -1.
+ */
+int
+xdir_remove_file_by_vclock(struct xdir *dir, struct vclock *vclock);
+
+/**
  * Remove inprogress files in the specified directory.
  */
 void
