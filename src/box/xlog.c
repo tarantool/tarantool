@@ -314,8 +314,8 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 			/*
 			 * Unknown key
 			 */
-			say_warn("Unknown meta item: `%.*s'", key_end - key,
-				 key);
+			say_warn("Unknown meta item: '%.*s'",
+				 (int)(key_end - key), key);
 		}
 	}
 	*data = end + 1; /* skip the last trailing \n of \n\n sequence */
