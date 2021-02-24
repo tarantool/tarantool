@@ -287,7 +287,7 @@ typedef void (*sayfunc_t)(int, const char *, int, const char *,
 		    const char *, ...);
 
 /** Internal function used to implement say() macros */
-CFORMAT(printf, 5, 0) extern sayfunc_t _say;
+CFORMAT(printf, 5, 6) extern sayfunc_t _say;
 
 /**
  * Format and print a message to Tarantool log file.
