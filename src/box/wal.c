@@ -1009,13 +1009,14 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 			int64_t diff = (*row)->lsn - vclock_get(base, (*row)->replica_id);
 			if (diff <= vclock_get(vclock_diff,
 					       (*row)->replica_id)) {
+				int64_t confirmed_lsn =
+					vclock_get(base, (*row)->replica_id) +
+					vclock_get(vclock_diff, (*row)->replica_id);
 				say_crit("Attempt to write a broken LSN to WAL:"
-					 " replica id: %d, confirmed lsn: %d,"
-					 " new lsn %d", (*row)->replica_id,
-					 vclock_get(base, (*row)->replica_id) +
-					 vclock_get(vclock_diff,
-						    (*row)->replica_id),
-						    (*row)->lsn);
+					 " replica id: %u, confirmed lsn: %lld,"
+					 " new lsn %lld", (*row)->replica_id,
+					 (long long)confirmed_lsn,
+					 (long long)(*row)->lsn);
 				assert(false);
 			} else {
 				vclock_follow(vclock_diff, (*row)->replica_id, diff);
@@ -1254,9 +1255,9 @@ wal_write_async(struct journal *journal, struct journal_entry *entry)
 		 * commit a transaction which has seen changes
 		 * that will be rolled back.
 		 */
-		say_error("Aborting transaction %llu during "
+		say_error("Aborting transaction %lld during "
 			  "cascading rollback",
-			  vclock_sum(&writer->vclock));
+			  (long long)vclock_sum(&writer->vclock));
 		goto fail;
 	}
 
