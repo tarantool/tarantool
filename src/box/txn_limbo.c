@@ -347,7 +347,7 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 		 * Or retry automatically with some period.
 		 */
 		panic("Could not write a synchro request to WAL: "
-		      "lsn = %lld, type = %s\n", lsn,
+		      "lsn = %lld, type = %s\n", (long long)lsn,
 		      iproto_type_name(type));
 	}
 }
