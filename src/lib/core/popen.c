@@ -240,7 +240,7 @@ handle_new(struct popen_opts *opts)
 static inline void
 handle_free(struct popen_handle *handle)
 {
-	say_debug("popen: handle %p free %p", handle);
+	say_debug("popen: handle free %p", handle);
 	free(handle);
 }
 
@@ -533,7 +533,7 @@ popen_shutdown(struct popen_handle *handle, unsigned int flags)
 		if (handle->ios[idx].fd < 0)
 			continue;
 
-		say_debug("popen: %d: shutdown idx [%s:%d] fd %s",
+		say_debug("popen: %d: shutdown idx [%s:%zd] fd %d",
 			  handle->pid, stdX_str(idx), idx,
 			  handle->ios[idx].fd);
 		coio_close_io(loop(), &handle->ios[idx]);
