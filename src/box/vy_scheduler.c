@@ -1714,7 +1714,7 @@ err_run:
 	vy_task_delete(task);
 err_task:
 	diag_log();
-	say_error("%s: could not start compacting range %s: %s",
+	say_error("%s: could not start compacting range %s",
 		  vy_lsm_name(lsm), vy_range_str(range));
 	return -1;
 }
