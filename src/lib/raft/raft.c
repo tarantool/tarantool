@@ -322,7 +322,8 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 	/* Outdated request. */
 	if (req->term < raft->volatile_term) {
 		say_info("RAFT: the message is ignored due to outdated term - "
-			 "current term is %u", raft->volatile_term);
+			 "current term is %llu",
+			 (long long)raft->volatile_term);
 		return 0;
 	}
 
@@ -653,7 +654,7 @@ raft_sm_become_candidate(struct raft *raft)
 static void
 raft_sm_schedule_new_term(struct raft *raft, uint64_t new_term)
 {
-	say_info("RAFT: bump term to %llu, follow", new_term);
+	say_info("RAFT: bump term to %llu, follow", (long long)new_term);
 	assert(new_term > raft->volatile_term);
 	assert(raft->volatile_term >= raft->term);
 	raft->volatile_term = new_term;
