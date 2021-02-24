@@ -2838,7 +2838,8 @@ vinyl_engine_begin_initial_recovery(struct engine *engine,
 	assert(e->status == VINYL_OFFLINE);
 	if (recovery_vclock != NULL) {
 		e->recovery_vclock = recovery_vclock;
-		e->recovery = vy_log_begin_recovery(recovery_vclock);
+		e->recovery = vy_log_begin_recovery(recovery_vclock,
+						    e->force_recovery);
 		if (e->recovery == NULL)
 			return -1;
 		/*
