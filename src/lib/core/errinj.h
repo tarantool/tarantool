@@ -202,6 +202,7 @@ errinj_foreach(errinj_cb cb, void *cb_ctx);
 #define ERROR_INJECT_RETURN(ID) ERROR_INJECT(ID, return -1)
 #define ERROR_INJECT_SLEEP(ID) ERROR_INJECT_WHILE(ID, usleep(1000))
 #define ERROR_INJECT_YIELD(ID) ERROR_INJECT_WHILE(ID, fiber_sleep(0.001))
+#define ERROR_INJECT_TERMINATE(ID) ERROR_INJECT(ID, assert(0))
 
 #if defined(__cplusplus)
 } /* extern "C" */
