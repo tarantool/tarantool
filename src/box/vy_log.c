@@ -1030,7 +1030,6 @@ struct vy_recovery *
 vy_log_begin_recovery(const struct vclock *vclock, bool force_recovery)
 {
 	assert(vy_log.recovery == NULL);
-	(void) force_recovery;
 
 	/*
 	 * Do not fail recovery if vinyl directory does not exist,
@@ -1057,11 +1056,36 @@ vy_log_begin_recovery(const struct vclock *vclock, bool force_recovery)
 		/*
 		 * Last vy_log log is newer than the last snapshot.
 		 * This can't normally happen, as vy_log is rotated
-		 * after snapshot is created. Looks like somebody
+		 * in a short gap between checkpoint wait and commit.
+		 * However, if memtx for some reason fails to commit its
+		 * changes, instance will crash leaving .inprogress snap
+		 * and corresponding (already rotated) vylog.
+		 * Another and simpler reason is the case when somebody
 		 * deleted snap file, but forgot to delete vy_log.
+		 * So in case we are anyway in force recovery mode, let's
+		 * try to delete last .vylog file and continue recovery process.
 		 */
-		diag_set(ClientError, ER_MISSING_SNAPSHOT);
-		return NULL;
+		if (!force_recovery) {
+			diag_set(ClientError, ER_MISSING_SNAPSHOT);
+			say_info("To bootstrap instance try to remove last "
+				 ".vylog file or run in force_recovery mode");
+			return NULL;
+		}
+		if (xdir_remove_file_by_vclock(&vy_log.dir,
+					       &vy_log.last_checkpoint) != 0) {
+			say_info(".vylog is newer than snapshot. Failed to "
+				 "remove it. Try to delete last .vylog "
+				 "manually");
+			return NULL;
+		}
+		const struct vclock *prev_checkpoint =
+			vy_log_prev_checkpoint(&vy_log.last_checkpoint);
+		if (prev_checkpoint == NULL) {
+			say_info("Can't find previous vylog");
+			return NULL;
+		}
+		vclock_copy(&vy_log.last_checkpoint, prev_checkpoint);
+		assert(vclock_compare(&vy_log.last_checkpoint, vclock) == 0);
 	}
 	if (cmp < 0) {
 		/*
