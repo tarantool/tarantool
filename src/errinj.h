@@ -185,6 +185,7 @@ void errinj_set_with_environment_vars(void);
 #endif
 
 #define ERROR_INJECT_RETURN(ID) ERROR_INJECT(ID, return -1)
+#define ERROR_INJECT_TERMINATE(ID) ERROR_INJECT(ID, assert(0))
 
 #if defined(__cplusplus)
 } /* extern "C" */
