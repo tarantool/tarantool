@@ -775,6 +775,7 @@ static void
 memtx_engine_commit_checkpoint(struct engine *engine,
 			       const struct vclock *vclock)
 {
+	ERROR_INJECT_TERMINATE(ERRINJ_SNAP_COMMIT_FAIL);
 	(void) vclock;
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 
