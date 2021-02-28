@@ -23,7 +23,7 @@ RUN set -x \
     && yum -y install \
         perl \
         gcc-c++ \
-        cmake \
+        cmake3 \
         lz4-devel \
         binutils-devel \
         lua-devel \
@@ -80,7 +80,7 @@ RUN set -x && \
 RUN pip install -r /tarantool/test-run/requirements.txt
 
 RUN set -x && \
-    cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    cmake3 -DCMAKE_BUILD_TYPE=RelWithDebInfo \
          -DENABLE_DIST:BOOL=ON \
          -DBUILD_STATIC=ON \
          -DOPENSSL_USE_STATIC_LIBS=ON \
