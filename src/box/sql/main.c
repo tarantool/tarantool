@@ -36,6 +36,7 @@
  * accessed by users of the library.
  */
 #include "sqlInt.h"
+#include "mem.h"
 #include "vdbeInt.h"
 #include "version.h"
 #include "box/session.h"

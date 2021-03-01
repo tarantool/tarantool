@@ -35,6 +35,7 @@
  */
 #include "sqlInt.h"
 #include "tarantoolInt.h"
+#include "mem.h"
 #include "vdbeInt.h"
 #include "box/ck_constraint.h"
 #include "bit/bit.h"
