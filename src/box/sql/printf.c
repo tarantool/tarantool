@@ -10,6 +10,7 @@
  * sql.
  */
 #include "sqlInt.h"
+#include "mem.h"
 
 /*
  * Conversion types fall into various categories as defined by the

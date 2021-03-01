@@ -40,6 +40,7 @@
 #include "coll/coll.h"
 #include "sqlInt.h"
 #include "tarantoolInt.h"
+#include "mem.h"
 #include "vdbeInt.h"
 #include "whereInt.h"
 #include "box/coll_id_cache.h"

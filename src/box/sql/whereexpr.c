@@ -40,6 +40,7 @@
 #include "box/coll_id_cache.h"
 #include "coll/coll.h"
 #include "sqlInt.h"
+#include "mem.h"
 #include "whereInt.h"
 
 /* Forward declarations */

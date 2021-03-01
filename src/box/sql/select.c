@@ -36,6 +36,7 @@
 #include "coll/coll.h"
 #include "sqlInt.h"
 #include "tarantoolInt.h"
+#include "mem.h"
 #include "vdbeInt.h"
 #include "box/box.h"
 #include "box/coll_id_cache.h"
