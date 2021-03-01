@@ -84,7 +84,7 @@ fiber_cond_signal(struct fiber_cond *e)
 {
 	if (! rlist_empty(&e->waiters)) {
 		struct fiber *f;
-		f = rlist_shift_entry(&e->waiters, struct fiber, state);
+		f = rlist_first_entry(&e->waiters, struct fiber, state);
 		fiber_wakeup(f);
 	}
 }
@@ -94,7 +94,7 @@ fiber_cond_broadcast(struct fiber_cond *e)
 {
 	while (! rlist_empty(&e->waiters)) {
 		struct fiber *f;
-		f = rlist_shift_entry(&e->waiters, struct fiber, state);
+		f = rlist_first_entry(&e->waiters, struct fiber, state);
 		fiber_wakeup(f);
 	}
 }
