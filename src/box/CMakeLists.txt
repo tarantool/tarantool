@@ -42,6 +42,7 @@ set(sql_sources
     sql/legacy.c
     sql/main.c
     sql/malloc.c
+    sql/mem.c
     sql/os.c
     sql/os_unix.c
     sql/parse_def.c

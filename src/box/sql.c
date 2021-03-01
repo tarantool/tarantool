@@ -34,6 +34,7 @@
 #include "sql.h"
 #include "sql/sqlInt.h"
 #include "sql/tarantoolInt.h"
+#include "sql/mem.h"
 #include "sql/vdbeInt.h"
 
 #include "index.h"

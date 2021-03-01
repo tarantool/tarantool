@@ -35,6 +35,7 @@
  * VDBE.
  */
 #include "sqlInt.h"
+#include "mem.h"
 #include "vdbeInt.h"
 #include "box/session.h"
 
@@ -120,101 +121,6 @@ bool
 sql_metadata_is_full()
 {
 	return current_session()->sql_flags & SQL_FullMetadata;
-}
-
-/**************************** sql_value_  ******************************
- * The following routines extract information from a Mem or sql_value
- * structure.
- */
-const void *
-sql_value_blob(sql_value * pVal)
-{
-	Mem *p = (Mem *) pVal;
-	if (p->flags & (MEM_Blob | MEM_Str)) {
-		if (ExpandBlob(p) != 0) {
-			assert(p->flags == MEM_Null && p->z == 0);
-			return 0;
-		}
-		p->flags |= MEM_Blob;
-		return p->n ? p->z : 0;
-	} else {
-		return sql_value_text(pVal);
-	}
-}
-
-int
-sql_value_bytes(sql_value * pVal)
-{
-	return sqlValueBytes(pVal);
-}
-
-double
-sql_value_double(sql_value * pVal)
-{
-	double v = 0.0;
-	sqlVdbeRealValue((Mem *) pVal, &v);
-	return v;
-}
-
-bool
-sql_value_boolean(sql_value *val)
-{
-	bool b = false;
-	int rc = mem_value_bool((struct Mem *) val, &b);
-	assert(rc == 0);
-	(void) rc;
-	return b;
-}
-
-int
-sql_value_int(sql_value * pVal)
-{
-	int64_t i = 0;
-	bool is_neg;
-	sqlVdbeIntValue((Mem *) pVal, &i, &is_neg);
-	return (int)i;
-}
-
-sql_int64
-sql_value_int64(sql_value * pVal)
-{
-	int64_t i = 0;
-	bool unused;
-	sqlVdbeIntValue((Mem *) pVal, &i, &unused);
-	return i;
-}
-
-uint64_t
-sql_value_uint64(sql_value *val)
-{
-	int64_t i = 0;
-	bool is_neg;
-	sqlVdbeIntValue((struct Mem *) val, &i, &is_neg);
-	assert(!is_neg);
-	return i;
-}
-
-enum sql_subtype
-sql_value_subtype(sql_value * pVal)
-{
-	return (pVal->flags & MEM_Subtype) != 0 ? pVal->subtype : SQL_SUBTYPE_NO;
-}
-
-const unsigned char *
-sql_value_text(sql_value * pVal)
-{
-	return (const unsigned char *)sqlValueText(pVal);
-}
-
-/* EVIDENCE-OF: R-12793-43283 Every value in sql has one of five
- * fundamental datatypes: 64-bit signed integer 64-bit IEEE floating
- * point number string BLOB NULL
- */
-enum mp_type
-sql_value_type(sql_value *pVal)
-{
-	struct Mem *mem = (struct Mem *) pVal;
-	return mem_mp_type(mem);
 }
 
 /* Make a copy of an sql_value object
@@ -580,47 +486,6 @@ sql_data_count(sql_stmt * pStmt)
 	if (pVm == 0 || pVm->pResultSet == 0)
 		return 0;
 	return pVm->nResColumn;
-}
-
-/*
- * Return a pointer to static memory containing an SQL NULL value.
- */
-static const Mem *
-columnNullValue(void)
-{
-	/* Even though the Mem structure contains an element
-	 * of type i64, on certain architectures (x86) with certain compiler
-	 * switches (-Os), gcc may align this Mem object on a 4-byte boundary
-	 * instead of an 8-byte one. This all works fine, except that when
-	 * running with SQL_DEBUG defined the sql code sometimes assert()s
-	 * that a Mem structure is located on an 8-byte boundary. To prevent
-	 * these assert()s from failing, when building with SQL_DEBUG defined
-	 * using gcc, we force nullMem to be 8-byte aligned using the magical
-	 * __attribute__((aligned(8))) macro.
-	 */
-	static const Mem nullMem
-#if defined(SQL_DEBUG) && defined(__GNUC__)
-	    __attribute__ ((aligned(8)))
-#endif
-	    = {
-		/* .u          = */  {
-		0},
-		    /* .flags      = */ (u16) MEM_Null,
-		    /* .eSubtype   = */ (u8) 0,
-		    /* .field_type = */ field_type_MAX,
-		    /* .n          = */ (int)0,
-		    /* .z          = */ (char *)0,
-		    /* .zMalloc    = */ (char *)0,
-		    /* .szMalloc   = */ (int)0,
-		    /* .uTemp      = */ (u32) 0,
-		    /* .db         = */ (sql *) 0,
-		    /* .xDel       = */ (void (*)(void *))0,
-#ifdef SQL_DEBUG
-		    /* .pScopyFrom = */ (Mem *) 0,
-		    /* .pFiller    = */ (void *)0,
-#endif
-	};
-	return &nullMem;
 }
 
 /*

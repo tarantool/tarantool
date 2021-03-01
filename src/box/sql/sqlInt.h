@@ -351,20 +351,6 @@ sql_stricmp(const char *, const char *);
 int
 sql_strnicmp(const char *, const char *, int);
 
- const void *
-sql_value_blob(sql_value *);
-
-int
-sql_value_bytes(sql_value *);
-
-double
-sql_value_double(sql_value *);
-
-bool
-sql_value_boolean(sql_value *val);
-
-int
-sql_value_int(sql_value *);
 
 /**
  * Get row column subtype.
@@ -374,34 +360,6 @@ sql_value_int(sql_value *);
  */
 enum sql_subtype
 sql_column_subtype(struct sql_stmt *stmt, int i);
-
-sql_int64
-sql_value_int64(sql_value *);
-
-uint64_t
-sql_value_uint64(sql_value *val);
-
-const unsigned char *
-sql_value_text(sql_value *);
-
-/**
- * Return pointer to a string with the data type in the case of
- * binary data stored in @a value. Otherwise, return the result
- * of sql_value_text(). It is used due to the fact that not all
- * binary strings can be displayed correctly (e.g. contain
- * unprintable symbols).
- */
-const char *
-sql_value_to_diag_str(sql_value *value);
-
-enum mp_type
-sql_value_type(sql_value *);
-
-static inline bool
-sql_value_is_null(sql_value *value)
-{
-	return sql_value_type(value) == MP_NIL;
-}
 
 sql *
 sql_context_db_handle(sql_context *);
@@ -4000,16 +3958,8 @@ int
 sql_rem_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
 	    int64_t *res, bool *is_res_neg);
 
-const void *sqlValueText(sql_value *);
-int sqlValueBytes(sql_value *);
-void sqlValueSetStr(sql_value *, int, const void *,
-			void (*)(void *));
-void sqlValueSetNull(sql_value *);
-void sqlValueFree(sql_value *);
-sql_value *sqlValueNew(sql *);
 int sqlValueFromExpr(sql *, Expr *, enum field_type type,
 			 sql_value **);
-void sql_value_apply_type(sql_value *val, enum field_type type);
 
 extern const unsigned char sqlOpcodeProperty[];
 extern const unsigned char sqlUpperToLower[];

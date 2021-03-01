@@ -152,6 +152,7 @@
  * the main thread to read from.
  */
 #include "sqlInt.h"
+#include "mem.h"
 #include "vdbeInt.h"
 
 /*

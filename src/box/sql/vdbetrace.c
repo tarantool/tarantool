@@ -37,6 +37,7 @@
  * The Vdbe parse-tree explainer is also found here.
  */
 #include "sqlInt.h"
+#include "mem.h"
 #include "vdbeInt.h"
 
 /*
