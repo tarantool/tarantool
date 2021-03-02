@@ -333,17 +333,6 @@ int sqlVdbeList(Vdbe *);
 
 int sqlVdbeHalt(Vdbe *);
 
-/**
- * In terms of VDBE memory cell type, _BIN, _ARRAY and _MAP
- * messagepacks are stored as binary string (i.e. featuring
- * MEM_Blob internal type).
- */
-#define mp_type_is_bloblike(X) ((X) == MP_BIN || (X) == MP_ARRAY || (X) == MP_MAP)
-
-/** Return TRUE if MP_type of X is numeric, FALSE otherwise. */
-#define mp_type_is_numeric(X) ((X) == MP_INT || (X) == MP_UINT ||\
-			       (X) == MP_DOUBLE)
-
 const char *sqlOpcodeName(int);
 int sqlVdbeCloseStatement(Vdbe *, int);
 void sqlVdbeFrameDelete(VdbeFrame *);

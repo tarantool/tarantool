@@ -92,10 +92,10 @@ minmaxFunc(sql_context * context, int argc, sql_value ** argv)
 	pColl = sqlGetFuncCollSeq(context);
 	assert(mask == -1 || mask == 0);
 	iBest = 0;
-	if (sql_value_is_null(argv[0]))
+	if (mem_is_null(argv[0]))
 		return;
 	for (i = 1; i < argc; i++) {
-		if (sql_value_is_null(argv[i]))
+		if (mem_is_null(argv[i]))
 			return;
 		if ((sqlMemCompare(argv[iBest], argv[i], pColl) ^ mask) >=
 		    0) {
@@ -430,11 +430,8 @@ substrFunc(sql_context * context, int argc, sql_value ** argv)
 		context->is_aborted = true;
 		return;
 	}
-	if (sql_value_is_null(argv[1])
-	    || (argc == 3 && sql_value_is_null(argv[2]))
-	    ) {
+	if (mem_is_null(argv[1]) || (argc == 3 && mem_is_null(argv[2])))
 		return;
-	}
 	p0type = sql_value_type(argv[0]);
 	p1 = sql_value_int(argv[1]);
 	if (p0type == MP_BIN) {
@@ -532,16 +529,15 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 		return;
 	}
 	if (argc == 2) {
-		if (sql_value_is_null(argv[1]))
+		if (mem_is_null(argv[1]))
 			return;
 		n = sql_value_int(argv[1]);
 		if (n < 0)
 			n = 0;
 	}
-	if (sql_value_is_null(argv[0]))
+	if (mem_is_null(argv[0]))
 		return;
-	enum mp_type mp_type = sql_value_type(argv[0]);
-	if (mp_type_is_bloblike(mp_type)) {
+	if (mem_is_bin(argv[0])) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 mem_str(argv[0]), "numeric");
 		context->is_aborted = true;
@@ -601,8 +597,7 @@ case_type##ICUFunc(sql_context *context, int argc, sql_value **argv)   \
 	const char *z2;                                                        \
 	int n;                                                                 \
 	UNUSED_PARAMETER(argc);                                                \
-	int arg_type = sql_value_type(argv[0]);                                \
-	if (mp_type_is_bloblike(arg_type)) {                                   \
+	if (mem_is_bin(argv[0])) {                                             \
 		diag_set(ClientError, ER_INCONSISTENT_TYPES, "text",           \
 			 "varbinary");                                         \
 		context->is_aborted = true;                                    \
@@ -683,7 +678,7 @@ randomBlob(sql_context * context, int argc, sql_value ** argv)
 	unsigned char *p;
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
-	if (mp_type_is_bloblike(sql_value_type(argv[0]))) {
+	if (mem_is_bin(argv[0])) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 mem_str(argv[0]), "numeric");
 		context->is_aborted = true;
@@ -1133,7 +1128,7 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 		break;
 	}
 	default:{
-			assert(sql_value_is_null(argv[0]));
+			assert(mem_is_null(argv[0]));
 			sql_result_text(context, "NULL", 4, SQL_STATIC);
 			break;
 		}
@@ -1272,13 +1267,13 @@ replaceFunc(sql_context * context, int argc, sql_value ** argv)
 	assert(zStr == sql_value_text(argv[0]));	/* No encoding change */
 	zPattern = sql_value_text(argv[1]);
 	if (zPattern == 0) {
-		assert(sql_value_is_null(argv[1])
+		assert(mem_is_null(argv[1])
 		       || sql_context_db_handle(context)->mallocFailed);
 		return;
 	}
 	nPattern = sql_value_bytes(argv[1]);
 	if (nPattern == 0) {
-		assert(! sql_value_is_null(argv[1]));
+		assert(!mem_is_null(argv[1]));
 		sql_result_value(context, argv[0]);
 		return;
 	}
@@ -1442,10 +1437,9 @@ trim_func_one_arg(struct sql_context *context, sql_value *arg)
 {
 	/* In case of VARBINARY type default trim octet is X'00'. */
 	const unsigned char *default_trim;
-	enum mp_type val_type = sql_value_type(arg);
-	if (val_type == MP_NIL)
+	if (mem_is_null(arg))
 		return;
-	if (mp_type_is_bloblike(val_type))
+	if (mem_is_bin(arg))
 		default_trim = (const unsigned char *) "\0";
 	else
 		default_trim = (const unsigned char *) " ";
@@ -1574,8 +1568,7 @@ soundexFunc(sql_context * context, int argc, sql_value ** argv)
 		1, 2, 6, 2, 3, 0, 1, 0, 2, 0, 2, 0, 0, 0, 0, 0,
 	};
 	assert(argc == 1);
-	enum mp_type mp_type = sql_value_type(argv[0]);
-	if (mp_type_is_bloblike(mp_type)) {
+	if (mem_is_bin(argv[0])) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 mem_str(argv[0]), "text");
 		context->is_aborted = true;
@@ -1733,9 +1726,8 @@ countStep(sql_context * context, int argc, sql_value ** argv)
 		return;
 	}
 	p = sql_aggregate_context(context, sizeof(*p));
-	if ((argc == 0 || ! sql_value_is_null(argv[0])) && p) {
+	if ((argc == 0 || !mem_is_null(argv[0])) && p != NULL)
 		p->n++;
-	}
 }
 
 static void
@@ -1762,7 +1754,7 @@ minmaxStep(sql_context * context, int NotUsed, sql_value ** argv)
 	if (!pBest)
 		return;
 
-	if (sql_value_is_null(argv[0])) {
+	if (mem_is_null(argv[0])) {
 		if (pBest->flags)
 			sqlSkipAccumulatorLoad(context);
 	} else if (pBest->flags) {
@@ -1816,7 +1808,7 @@ groupConcatStep(sql_context * context, int argc, sql_value ** argv)
 		context->is_aborted = true;
 		return;
 	}
-	if (sql_value_is_null(argv[0]))
+	if (mem_is_null(argv[0]))
 		return;
 	pAccum =
 	    (StrAccum *) sql_aggregate_context(context, sizeof(*pAccum));

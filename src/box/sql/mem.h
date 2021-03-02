@@ -87,21 +87,6 @@ struct Mem {
  */
 #define MEMCELLSIZE offsetof(Mem,zMalloc)
 
-/**
- * Return a string that represent content of MEM. String is either allocated
- * using static_alloc() of just a static variable.
- */
-const char *
-mem_str(const struct Mem *mem);
-
-/** Initialize MEM and set NULL. */
-void
-mem_create(struct Mem *mem);
-
-/** Free all allocated memory in MEM and set MEM to NULL. */
-void
-mem_destroy(struct Mem *mem);
-
 /* One or more of the following flags are set to indicate the validOK
  * representations of the value stored in the Mem struct.
  *
@@ -153,6 +138,173 @@ static_assert(MEM_PURE_TYPE_MASK == (MEM_Null | MEM_Str | MEM_Int | MEM_Real |
 				     MEM_Blob | MEM_Bool | MEM_UInt),
 	      "value of type mask must consist of corresponding to memory "\
 	      "type bits");
+
+static inline bool
+mem_is_null(const struct Mem *mem)
+{
+	return (mem->flags & MEM_Null) != 0;
+}
+
+static inline bool
+mem_is_uint(const struct Mem *mem)
+{
+	return (mem->flags & MEM_UInt) != 0;
+}
+
+static inline bool
+mem_is_nint(const struct Mem *mem)
+{
+	return (mem->flags & MEM_Int) != 0;
+}
+
+static inline bool
+mem_is_str(const struct Mem *mem)
+{
+	return (mem->flags & MEM_Str) != 0;
+}
+
+static inline bool
+mem_is_num(const struct Mem *mem)
+{
+	return (mem->flags & (MEM_Real | MEM_Int | MEM_UInt)) != 0;
+}
+
+static inline bool
+mem_is_double(const struct Mem *mem)
+{
+	return (mem->flags & MEM_Real) != 0;
+}
+
+static inline bool
+mem_is_int(const struct Mem *mem)
+{
+	return (mem->flags & (MEM_Int | MEM_UInt)) != 0;
+}
+
+static inline bool
+mem_is_bool(const struct Mem *mem)
+{
+	return (mem->flags & MEM_Bool) != 0;
+}
+
+static inline bool
+mem_is_bin(const struct Mem *mem)
+{
+	return (mem->flags & MEM_Blob) != 0;
+}
+
+static inline bool
+mem_is_map(const struct Mem *mem)
+{
+	assert((mem->flags & MEM_Subtype) == 0 || (mem->flags & MEM_Blob) != 0);
+	assert((mem->flags & MEM_Subtype) == 0 ||
+	       mem->subtype == SQL_SUBTYPE_MSGPACK);
+	return (mem->flags & MEM_Subtype) != 0 && mp_typeof(*mem->z) == MP_MAP;
+}
+
+static inline bool
+mem_is_array(const struct Mem *mem)
+{
+	assert((mem->flags & MEM_Subtype) == 0 || (mem->flags & MEM_Blob) != 0);
+	assert((mem->flags & MEM_Subtype) == 0 ||
+	       mem->subtype == SQL_SUBTYPE_MSGPACK);
+	return (mem->flags & MEM_Subtype) != 0 &&
+	       mp_typeof(*mem->z) == MP_ARRAY;
+}
+
+static inline bool
+mem_is_agg(const struct Mem *mem)
+{
+	return (mem->flags & MEM_Agg) != 0;
+}
+
+static inline bool
+mem_is_bytes(const struct Mem *mem)
+{
+	return (mem->flags & (MEM_Blob | MEM_Str)) != 0;
+}
+
+static inline bool
+mem_is_frame(const struct Mem *mem)
+{
+	return (mem->flags & MEM_Frame) != 0;
+}
+
+static inline bool
+mem_is_invalid(const struct Mem *mem)
+{
+	return (mem->flags & MEM_Undefined) != 0;
+}
+
+static inline bool
+mem_is_static(const struct Mem *mem)
+{
+	assert((mem->flags & (MEM_Str | MEM_Blob)) != 0);
+	return (mem->flags & MEM_Static) != 0;
+}
+
+static inline bool
+mem_is_ephemeral(const struct Mem *mem)
+{
+	assert((mem->flags & (MEM_Str | MEM_Blob)) != 0);
+	return (mem->flags & MEM_Ephem) != 0;
+}
+
+static inline bool
+mem_is_dynamic(const struct Mem *mem)
+{
+	assert((mem->flags & (MEM_Str | MEM_Blob)) != 0);
+	return (mem->flags & MEM_Dyn) != 0;
+}
+
+static inline bool
+mem_is_allocated(const struct Mem *mem)
+{
+	return (mem->flags & (MEM_Str | MEM_Blob)) != 0 &&
+	       mem->z == mem->zMalloc;
+}
+
+static inline bool
+mem_is_cleared(const struct Mem *mem)
+{
+	assert((mem->flags & MEM_Cleared) == 0 || (mem->flags & MEM_Null) != 0);
+	return (mem->flags & MEM_Cleared) != 0;
+}
+
+static inline bool
+mem_is_zerobin(const struct Mem *mem)
+{
+	assert((mem->flags & MEM_Zero) == 0 || (mem->flags & MEM_Blob) != 0);
+	return (mem->flags & MEM_Zero) != 0;
+}
+
+static inline bool
+mem_is_same_type(const struct Mem *mem1, const struct Mem *mem2)
+{
+	return (mem1->flags & MEM_PURE_TYPE_MASK) ==
+	       (mem2->flags & MEM_PURE_TYPE_MASK);
+}
+
+static inline bool
+mem_is_any_null(const struct Mem *mem1, const struct Mem *mem2)
+{
+	return ((mem1->flags | mem2->flags) & MEM_Null) != 0;
+}
+
+/**
+ * Return a string that represent content of MEM. String is either allocated
+ * using static_alloc() of just a static variable.
+ */
+const char *
+mem_str(const struct Mem *mem);
+
+/** Initialize MEM and set NULL. */
+void
+mem_create(struct Mem *mem);
+
+/** Free all allocated memory in MEM and set MEM to NULL. */
+void
+mem_destroy(struct Mem *mem);
 
 /**
  * Simple type to str convertor. It is used to simplify
@@ -374,12 +526,6 @@ const Mem *
 columnNullValue(void);
 
 /** Checkers. */
-
-static inline bool
-sql_value_is_null(struct Mem *value)
-{
-	return sql_value_type(value) == MP_NIL;
-}
 
 int sqlVdbeMemTooBig(Mem *);
 
