@@ -1,0 +1,65 @@
+name: 'Send Telegram message with Actions status'
+description: 'Send message to Telegram channel/bot with Actions status'
+
+runs:
+  using: "composite"
+  steps:
+    # install 'requests' Python module
+    - run: |
+        python -m pip install --upgrade pip ||:
+        pip install requests ||:
+      shell: bash
+    # logout github environment
+    - env:
+        GITHUB_CONTEXT: ${{ toJson(github) }}
+      run: echo "$GITHUB_CONTEXT"
+      shell: bash
+    # extract branch latest tag
+    - run: |
+        branch_name=${{ github.ref }}
+        branch_name=${branch_name#refs/heads/}
+        echo 'BRANCH_TAG<<EOF' >> $GITHUB_ENV
+        git rev-parse $branch_name >>$GITHUB_ENV
+        echo 'EOF' >> $GITHUB_ENV
+        echo REL_VER=${branch_name#origin/} | tee -a $GITHUB_ENV
+      shell: bash
+    - name: add GEM ENV
+      run: |
+        echo GEM_HOME=$HOME/.gem | tee -a $GITHUB_ENV
+        echo GEM_PATH=$HOME/.gem | tee -a $GITHUB_ENV
+      shell: bash
+    - name: get Actions status for current branch
+      run: |
+        mkdir -p $GEM_PATH
+        gem install octokit
+        gem install json
+        gem install optparse
+        gem install colorize
+        ruby .github/actions/send-telegram-status/check_status.rb -b $REL_VER -t $BRANCH_TAG -f issues.txt --no-color
+        issues=$(cat issues.txt)
+        echo ISSUES=${issues//$'\n'/'\n'} >>$GITHUB_ENV
+      shell: bash
+    - name: send Telegram message if it is not empty
+      env:
+        MSG: |
+          🔴 Workflow testing failed:
+          Release branch: [ `${{ env.REL_VER }}`](https://github.com/${{ github.repository }}/commits/${{ env.REL_VER }})
+          Latest commit: [ `#${{ env.BRANCH_TAG }}`](https://github.com/${{ github.repository }}/commit/${{ env.JOB_ID }})
+          ```
+          ---------------- Found issues -------------------
+          ${{ env.ISSUES }}
+          ```
+      run: |
+        if [ ! -s issues.txt ] ; then echo "No issues exists, exiting" ; exit 0 ; fi
+        # convert message from multi lines to single line and
+        # add backslashes to single quote marks in message
+        msg="${MSG//$'\n'/'\n'}"
+        msg="${msg//$'\''/\\\'}"
+        echo "Sending message: $msg"
+        # Use MarkdownV2 while Markdown is legacy
+        # https://core.telegram.org/bots/api#markdownv2-style
+        python -c "import urllib, requests ; \\
+          url = 'https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s&parse_mode=MarkdownV2&disable_web_page_preview=true' \\
+            % ('$TELEGRAM_TOKEN', '$TELEGRAM_TO', urllib.quote_plus('$msg')) ; \\
+          _ = requests.post(url, timeout=10)"
+      shell: bash

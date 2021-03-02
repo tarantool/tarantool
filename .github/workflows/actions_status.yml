@@ -1,0 +1,35 @@
+name: actions_status
+
+on:
+  repository_dispatch:
+    types: [backend_automation]
+  workflow_dispatch:
+  schedule:
+    - cron:  '0 */1 * * *'
+
+jobs:
+  actions_status:
+    if: github.ref == 'refs/heads/master' ||
+        github.ref == 'refs/heads/1.10' ||
+        startsWith(github.ref, 'refs/heads/2.')
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v1
+      - name: call action to send Telegram message with Actions status
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
+          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
+        uses: ./.github/actions/send-telegram-status
+      - name: artifacts
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: actions_status
+          retention-days: 21
+          path: |
+            issues.txt
