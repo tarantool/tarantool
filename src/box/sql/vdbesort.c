@@ -2218,7 +2218,7 @@ sqlVdbeSorterCompare(const VdbeCursor * pCsr,	/* Sorter cursor */
 	pKey = vdbeSorterRowkey(pSorter, &nKey);
 	sqlVdbeRecordUnpackMsgpack(pCsr->key_def, pKey, r2);
 	for (i = 0; i < nKeyCol; i++) {
-		if (r2->aMem[i].flags & MEM_Null) {
+		if (mem_is_null(&r2->aMem[i])) {
 			*pRes = -1;
 			return 0;
 		}
