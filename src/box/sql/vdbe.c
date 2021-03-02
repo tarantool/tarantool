@@ -182,14 +182,6 @@ vdbeTakeBranch(int iSrcLine, u8 I, u8 M)
 #endif
 
 /*
- * Convert the given register into a string if it isn't one
- * already. Return non-zero if a malloc() fails.
- */
-#define Stringify(P)						\
-	if(((P)->flags&(MEM_Str|MEM_Blob))==0 && sqlVdbeMemStringify(P)) \
-	{ goto no_mem; }
-
-/*
  * An ephemeral string value (signified by the MEM_Ephem flag) contains
  * a pointer to a dynamically allocated string where some other entity
  * is responsible for deallocating that string.  Because the register
