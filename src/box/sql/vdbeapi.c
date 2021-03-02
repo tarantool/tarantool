@@ -101,61 +101,10 @@ sql_stmt_reset(sql_stmt *pStmt)
 	return rc;
 }
 
-/*
- * Set all the parameters in the compiled SQL statement to NULL.
- */
-int
-sql_clear_bindings(sql_stmt * pStmt)
-{
-	int i;
-	int rc = 0;
-	Vdbe *p = (Vdbe *) pStmt;
-	for (i = 0; i < p->nVar; i++) {
-		sqlVdbeMemRelease(&p->aVar[i]);
-		p->aVar[i].flags = MEM_Null;
-	}
-	return rc;
-}
-
 bool
 sql_metadata_is_full()
 {
 	return current_session()->sql_flags & SQL_FullMetadata;
-}
-
-/* Make a copy of an sql_value object
- */
-sql_value *
-sql_value_dup(const sql_value * pOrig)
-{
-	sql_value *pNew;
-	if (pOrig == 0)
-		return 0;
-	pNew = sql_malloc(sizeof(*pNew));
-	if (pNew == 0)
-		return 0;
-	memset(pNew, 0, sizeof(*pNew));
-	memcpy(pNew, pOrig, MEMCELLSIZE);
-	pNew->flags &= ~MEM_Dyn;
-	pNew->db = 0;
-	if (pNew->flags & (MEM_Str | MEM_Blob)) {
-		pNew->flags &= ~(MEM_Static | MEM_Dyn);
-		pNew->flags |= MEM_Ephem;
-		if (sqlVdbeMemMakeWriteable(pNew) != 0) {
-			sqlValueFree(pNew);
-			pNew = 0;
-		}
-	}
-	return pNew;
-}
-
-/* Destroy an sql_value object previously obtained from
- * sql_value_dup().
- */
-void
-sql_value_free(sql_value * pOld)
-{
-	sqlValueFree(pOld);
 }
 
 /**************************** sql_result_  ******************************
@@ -564,17 +513,6 @@ const unsigned char *
 sql_column_text(sql_stmt * pStmt, int i)
 {
 	return sql_value_text(columnMem(pStmt, i));
-}
-
-sql_value *
-sql_column_value(sql_stmt * pStmt, int i)
-{
-	Mem *pOut = columnMem(pStmt, i);
-	if (pOut->flags & MEM_Static) {
-		pOut->flags &= ~MEM_Static;
-		pOut->flags |= MEM_Ephem;
-	}
-	return (sql_value *) pOut;
 }
 
 enum mp_type
