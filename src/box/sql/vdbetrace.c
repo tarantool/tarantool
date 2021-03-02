@@ -97,8 +97,6 @@ sqlVdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 	int nextIndex = 1;	/* Index of next ? host parameter */
 	int n;			/* Length of a token prefix */
 	int nToken;		/* Length of the parameter token */
-	int i;			/* Loop counter */
-	Mem *pVar;		/* Value of a host parameter */
 	StrAccum out;		/* Accumulate the output here */
 	char zBase[100];	/* Initial working space */
 
@@ -147,33 +145,8 @@ sqlVdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 			zRawSql += nToken;
 			nextIndex = idx + 1;
 			assert(idx > 0 && idx <= p->nVar);
-			pVar = &p->aVar[idx - 1];
-			if (pVar->flags & MEM_Null) {
-				sqlStrAccumAppend(&out, "NULL", 4);
-			} else if (pVar->flags & MEM_Int) {
-				sqlXPrintf(&out, "%lld", pVar->u.i);
-			} else if (pVar->flags & MEM_UInt) {
-				sqlXPrintf(&out, "%llu", pVar->u.u);
-			} else if (pVar->flags & MEM_Real) {
-				sqlXPrintf(&out, "%!.15g", pVar->u.r);
-			} else if (pVar->flags & MEM_Str) {
-				int nOut;	/* Number of bytes of the string text to include in output */
-				nOut = pVar->n;
-				sqlXPrintf(&out, "'%.*q'", nOut, pVar->z);
-			} else if (pVar->flags & MEM_Zero) {
-				sqlXPrintf(&out, "zeroblob(%d)",
-					       pVar->u.nZero);
-			} else {
-				int nOut;	/* Number of bytes of the blob to include in output */
-				assert(pVar->flags & MEM_Blob);
-				sqlStrAccumAppend(&out, "x'", 2);
-				nOut = pVar->n;
-				for (i = 0; i < nOut; i++) {
-					sqlXPrintf(&out, "%02x",
-						       pVar->z[i] & 0xff);
-				}
-				sqlStrAccumAppend(&out, "'", 1);
-			}
+			const char *value = mem_str(&p->aVar[idx - 1]);
+			sqlStrAccumAppend(&out, value, strlen(value));
 		}
 	}
 	if (out.accError)

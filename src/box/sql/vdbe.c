@@ -1265,12 +1265,12 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 	} else {
 		if (sqlVdbeRealValue(pIn1, &rA) != 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-				 sql_value_to_diag_str(pIn1), "numeric");
+				 mem_str(pIn1), "numeric");
 			goto abort_due_to_error;
 		}
 		if (sqlVdbeRealValue(pIn2, &rB) != 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-				 sql_value_to_diag_str(pIn2), "numeric");
+				 mem_str(pIn2), "numeric");
 			goto abort_due_to_error;
 		}
 		assert(((type1 | type2) & MEM_Real) != 0);
@@ -1546,12 +1546,12 @@ case OP_ShiftRight: {           /* same as TK_RSHIFT, in1, in2, out3 */
 	bool unused;
 	if (sqlVdbeIntValue(pIn2, (int64_t *) &iA, &unused) != 0) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 sql_value_to_diag_str(pIn2), "integer");
+			 mem_str(pIn2), "integer");
 		goto abort_due_to_error;
 	}
 	if (sqlVdbeIntValue(pIn1, (int64_t *) &iB, &unused) != 0) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 sql_value_to_diag_str(pIn1), "integer");
+			 mem_str(pIn1), "integer");
 		goto abort_due_to_error;
 	}
 	op = pOp->opcode;
@@ -1616,7 +1616,7 @@ case OP_MustBeInt: {            /* jump, in1 */
 		if ((pIn1->flags & (MEM_Int | MEM_UInt)) == 0) {
 			if (pOp->p2==0) {
 				diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-					 sql_value_to_diag_str(pIn1), "integer");
+					 mem_str(pIn1), "integer");
 				goto abort_due_to_error;
 			} else {
 				goto jump_to_p2;
@@ -1673,7 +1673,7 @@ case OP_Cast: {                  /* in1 */
 	UPDATE_MAX_BLOBSIZE(pIn1);
 	if (rc == 0)
 		break;
-	diag_set(ClientError, ER_SQL_TYPE_MISMATCH, sql_value_to_diag_str(pIn1),
+	diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(pIn1),
 		 field_type_strs[pOp->p2]);
 	goto abort_due_to_error;
 }
@@ -1846,7 +1846,7 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 					if (mem_apply_numeric_type(pIn3) != 0) {
 						diag_set(ClientError,
 							 ER_SQL_TYPE_MISMATCH,
-							 sql_value_to_diag_str(pIn3),
+							 mem_str(pIn3),
 							 "numeric");
 						goto abort_due_to_error;
 					}
@@ -2112,7 +2112,7 @@ case OP_Or: {             /* same as TK_OR, in1, in2, out3 */
 		v1 = pIn1->u.b;
 	} else {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 sql_value_to_diag_str(pIn1), "boolean");
+			 mem_str(pIn1), "boolean");
 		goto abort_due_to_error;
 	}
 	pIn2 = &aMem[pOp->p2];
@@ -2122,7 +2122,7 @@ case OP_Or: {             /* same as TK_OR, in1, in2, out3 */
 		v2 = pIn2->u.b;
 	} else {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 sql_value_to_diag_str(pIn2), "boolean");
+			 mem_str(pIn2), "boolean");
 		goto abort_due_to_error;
 	}
 	if (pOp->opcode==OP_And) {
@@ -2152,7 +2152,7 @@ case OP_Not: {                /* same as TK_NOT, in1, out2 */
 	if ((pIn1->flags & MEM_Null)==0) {
 		if ((pIn1->flags & MEM_Bool) == 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-				 sql_value_to_diag_str(pIn1), "boolean");
+				 mem_str(pIn1), "boolean");
 			goto abort_due_to_error;
 		}
 		mem_set_bool(pOut, ! pIn1->u.b);
@@ -2177,7 +2177,7 @@ case OP_BitNot: {             /* same as TK_BITNOT, in1, out2 */
 		bool is_neg;
 		if (sqlVdbeIntValue(pIn1, &i, &is_neg) != 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-				 sql_value_to_diag_str(pIn1), "integer");
+				 mem_str(pIn1), "integer");
 			goto abort_due_to_error;
 		}
 		mem_set_i64(pOut, ~i);
@@ -2223,7 +2223,7 @@ case OP_IfNot: {            /* jump, in1 */
 		c = pOp->opcode == OP_IfNot ? ! pIn1->u.b : pIn1->u.b;
 	} else {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 sql_value_to_diag_str(pIn1), "boolean");
+			 mem_str(pIn1), "boolean");
 		goto abort_due_to_error;
 	}
 	VdbeBranchTaken(c!=0, 2);
@@ -2403,7 +2403,7 @@ case OP_ApplyType: {
 		continue;
 type_mismatch:
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 sql_value_to_diag_str(pIn1), field_type_strs[type]);
+			 mem_str(pIn1), field_type_strs[type]);
 		goto abort_due_to_error;
 	}
 	break;
@@ -3033,7 +3033,7 @@ case OP_SeekGT: {       /* jump, in3 */
 			is_neg = i < 0;
 		} else {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-				 sql_value_to_diag_str(pIn3), "integer");
+				 mem_str(pIn3), "integer");
 			goto abort_due_to_error;
 		}
 		iKey = i;

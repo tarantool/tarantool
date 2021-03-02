@@ -87,6 +87,13 @@ struct Mem {
  */
 #define MEMCELLSIZE offsetof(Mem,zMalloc)
 
+/**
+ * Return a string that represent content of MEM. String is either allocated
+ * using static_alloc() of just a static variable.
+ */
+const char *
+mem_str(const struct Mem *mem);
+
 /* One or more of the following flags are set to indicate the validOK
  * representations of the value stored in the Mem struct.
  *
@@ -358,15 +365,6 @@ sql_value_text(struct Mem *);
 
 const void *sqlValueText(struct Mem *);
 
-/**
- * Return pointer to a string with the data type in the case of
- * binary data stored in @a value. Otherwise, return the result
- * of sql_value_text(). It is used due to the fact that not all
- * binary strings can be displayed correctly (e.g. contain
- * unprintable symbols).
- */
-const char *
-sql_value_to_diag_str(struct Mem *value);
 #define VdbeFrameMem(p) ((Mem *)&((u8 *)p)[ROUND8(sizeof(VdbeFrame))])
 
 enum sql_subtype
