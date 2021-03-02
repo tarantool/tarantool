@@ -380,7 +380,7 @@ static SQL_NOINLINE void *
 createAggContext(sql_context * p, int nByte)
 {
 	Mem *pMem = p->pMem;
-	assert((pMem->flags & MEM_Agg) == 0);
+	assert(!mem_is_agg(pMem));
 	if (nByte <= 0) {
 		sqlVdbeMemSetNull(pMem);
 		pMem->z = 0;
@@ -407,7 +407,7 @@ sql_aggregate_context(sql_context * p, int nByte)
 	assert(p->func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
 	assert(p->func->def->aggregate == FUNC_AGGREGATE_GROUP);
 	testcase(nByte < 0);
-	if ((p->pMem->flags & MEM_Agg) == 0) {
+	if (!mem_is_agg(p->pMem)) {
 		return createAggContext(p, nByte);
 	} else {
 		return (void *)p->pMem->z;

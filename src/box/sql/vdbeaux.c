@@ -1251,7 +1251,7 @@ sqlVdbeList(Vdbe * p)
 		 */
 		assert(p->nMem > 9);
 		pSub = &p->aMem[9];
-		if (pSub->flags & MEM_Blob) {
+		if (mem_is_bin(pSub)) {
 			/* On the first call to sql_step(), pSub will hold a NULL.  It is
 			 * initialized to a BLOB by the P4_SUBPROGRAM processing logic below
 			 */
@@ -1720,7 +1720,7 @@ Cleanup(Vdbe * p)
 			assert(p->apCsr[i] == 0);
 	if (p->aMem) {
 		for (i = 0; i < p->nMem; i++)
-			assert(p->aMem[i].flags == MEM_Undefined);
+			assert(mem_is_invalid(&p->aMem[i]));
 	}
 #endif
 
@@ -2735,7 +2735,7 @@ sqlVdbeGetBoundValue(Vdbe * v, int iVar, u8 aff)
 	assert(iVar > 0);
 	if (v) {
 		Mem *pMem = &v->aVar[iVar - 1];
-		if (0 == (pMem->flags & MEM_Null)) {
+		if (!mem_is_null(pMem)) {
 			sql_value *pRet = sqlValueNew(v->db);
 			if (pRet) {
 				sqlVdbeMemCopy((Mem *) pRet, pMem);

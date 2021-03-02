@@ -1045,8 +1045,7 @@ mem_convert_to_integer(struct Mem *mem)
 int
 mem_convert_to_numeric(struct Mem *mem, enum field_type type)
 {
-	assert(mp_type_is_numeric(mem_mp_type(mem)) &&
-	       sql_type_is_numeric(type));
+	assert(mem_is_num(mem) && sql_type_is_numeric(type));
 	assert(type != FIELD_TYPE_NUMBER);
 	if (type == FIELD_TYPE_DOUBLE)
 		return mem_convert_to_double(mem);

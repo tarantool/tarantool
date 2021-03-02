@@ -1092,7 +1092,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 				 * re-use second for Null op-code.
 				 *
 				 * Change to an OP_Null sets the
-				 * MEM_Cleared bit on the first
+				 * Cleared flag on the first
 				 * register of the previous value. 
 				 * This will cause the OP_Ne below
 				 * to always fail on the first
