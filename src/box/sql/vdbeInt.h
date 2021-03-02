@@ -333,8 +333,6 @@ int sqlVdbeList(Vdbe *);
 
 int sqlVdbeHalt(Vdbe *);
 
-int sqlVdbeMemFromBtree(BtCursor *, u32, u32, Mem *);
-
 /**
  * In terms of VDBE memory cell type, _BIN, _ARRAY and _MAP
  * messagepacks are stored as binary string (i.e. featuring

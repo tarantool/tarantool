@@ -474,10 +474,6 @@ sql_column_text(sql_stmt *,
 enum mp_type
 sql_column_type(sql_stmt *stmt, int field_no);
 
-sql_value *
-sql_column_value(sql_stmt *,
-		     int iCol);
-
 /*
  * Terminate the current execution of an SQL statement and reset
  * it back to its starting state so that it can be reused.
