@@ -40,6 +40,40 @@
 #include "lua/utils.h"
 #include "lua/msgpack.h"
 
+enum {
+	BUF_SIZE = 32,
+};
+
+const char *
+mem_str(const struct Mem *mem)
+{
+	char buf[BUF_SIZE];
+	switch (mem->flags & MEM_PURE_TYPE_MASK) {
+	case MEM_Null:
+		return "NULL";
+	case MEM_Str:
+		if ((mem->flags & MEM_Term) != 0)
+			return mem->z;
+		return tt_cstr(mem->z, mem->n);
+	case MEM_Int:
+		return tt_sprintf("%lld", mem->u.i);
+	case MEM_UInt:
+		return tt_sprintf("%llu", mem->u.u);
+	case MEM_Real:
+		sql_snprintf(BUF_SIZE, &buf[0], "%!.15g", mem->u.r);
+		return tt_sprintf("%s", buf);
+	case MEM_Blob:
+		if ((mem->flags & MEM_Subtype) == 0)
+			return "varbinary";
+		assert(mem->subtype == SQL_SUBTYPE_MSGPACK);
+		return mp_str(mem->z);
+	case MEM_Bool:
+		return mem->u.b ? "TRUE" : "FALSE";
+	default:
+		return "unknown";
+	}
+}
+
 static inline bool
 mem_has_msgpack_subtype(struct Mem *mem)
 {
@@ -1590,18 +1624,6 @@ sqlValueText(sql_value * pVal)
 		return 0;
 	}
 	return valueToText(pVal);
-}
-
-const char *
-sql_value_to_diag_str(sql_value *value)
-{
-	enum mp_type mp_type = sql_value_type(value);
-	if (mp_type_is_bloblike(mp_type)) {
-		if (mem_has_msgpack_subtype(value))
-			return sqlValueText(value);
-		return "varbinary";
-	}
-	return sqlValueText(value);
 }
 
 enum sql_subtype
