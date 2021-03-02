@@ -543,7 +543,7 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 	enum mp_type mp_type = sql_value_type(argv[0]);
 	if (mp_type_is_bloblike(mp_type)) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 sql_value_to_diag_str(argv[0]), "numeric");
+			 mem_str(argv[0]), "numeric");
 		context->is_aborted = true;
 		return;
 	}
@@ -685,7 +685,7 @@ randomBlob(sql_context * context, int argc, sql_value ** argv)
 	UNUSED_PARAMETER(argc);
 	if (mp_type_is_bloblike(sql_value_type(argv[0]))) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 sql_value_to_diag_str(argv[0]), "numeric");
+			 mem_str(argv[0]), "numeric");
 		context->is_aborted = true;
 		return;
 	}
@@ -1577,7 +1577,7 @@ soundexFunc(sql_context * context, int argc, sql_value ** argv)
 	enum mp_type mp_type = sql_value_type(argv[0]);
 	if (mp_type_is_bloblike(mp_type)) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 sql_value_to_diag_str(argv[0]), "text");
+			 mem_str(argv[0]), "text");
 		context->is_aborted = true;
 		return;
 	}
@@ -1650,7 +1650,7 @@ sum_step(struct sql_context *context, int argc, sql_value **argv)
 	if (type != MP_DOUBLE && type != MP_INT && type != MP_UINT) {
 		if (mem_apply_numeric_type(argv[0]) != 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-				 sql_value_to_diag_str(argv[0]), "number");
+				 mem_str(argv[0]), "number");
 			context->is_aborted = true;
 			return;
 		}

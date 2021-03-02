@@ -1108,21 +1108,8 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 			break;
 		}
 	case P4_MEM:{
-			Mem *pMem = pOp->p4.pMem;
-			if (pMem->flags & MEM_Str) {
-				zP4 = pMem->z;
-			} else if (pMem->flags & MEM_Int) {
-				sqlXPrintf(&x, "%lld", pMem->u.i);
-			} else if (pMem->flags & MEM_UInt) {
-				sqlXPrintf(&x, "%llu", pMem->u.u);
-			} else if (pMem->flags & MEM_Real) {
-				sqlXPrintf(&x, "%.16g", pMem->u.r);
-			} else if (pMem->flags & MEM_Null) {
-				zP4 = "NULL";
-			} else {
-				assert(pMem->flags & MEM_Blob);
-				zP4 = "(binary string)";
-			}
+			const char *value = mem_str(pOp->p4.pMem);
+			sqlStrAccumAppend(&x, value, strlen(value));
 			break;
 		}
 	case P4_INTARRAY:{
