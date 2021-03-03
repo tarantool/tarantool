@@ -1026,6 +1026,51 @@ vy_log_bootstrap(void)
 	return 0;
 }
 
+/**
+ * Return true if the last vylog is new and contains no user data
+ * (i.e. last entry is VY_LOG_SNAPSHOT).
+ * In case of any errors log them and return false.
+ */
+static bool
+vy_log_last_entry_is_snapshot(void)
+{
+	const char *path =
+		vy_log_filename(vclock_sum(&vy_log.last_checkpoint));
+	if (access(path, F_OK) < 0) {
+		say_error("Failed to access last vylog");
+		return false;
+	}
+	struct xlog_cursor cursor;
+	if (xdir_open_cursor(&vy_log.dir,
+			     vclock_sum(&vy_log.last_checkpoint),
+			     &cursor) < 0) {
+		diag_log();
+		diag_clear(diag_get());
+		return false;
+	}
+	int rc;
+	struct xrow_header row;
+	while ((rc = xlog_cursor_next(&cursor, &row, false)) == 0) {
+		struct vy_log_record record;
+		rc = vy_log_record_decode(&record, &row);
+		if (rc < 0)
+			break;
+		if (record.type == VY_LOG_SNAPSHOT) {
+			rc = xlog_cursor_next(&cursor, &row, false);
+			if (rc <= 0)
+				break;
+			xlog_cursor_close(&cursor, false);
+			return true;
+		}
+	}
+	xlog_cursor_close(&cursor, false);
+	if (rc < 0) {
+		diag_log();
+		diag_clear(diag_get());
+	}
+	return false;
+}
+
 struct vy_recovery *
 vy_log_begin_recovery(const struct vclock *vclock, bool force_recovery)
 {
@@ -1065,7 +1110,12 @@ vy_log_begin_recovery(const struct vclock *vclock, bool force_recovery)
 		 * So in case we are anyway in force recovery mode, let's
 		 * try to delete last .vylog file and continue recovery process.
 		 */
-		if (!force_recovery) {
+		bool is_vylog_empty = vy_log_last_entry_is_snapshot();
+		if (!is_vylog_empty) {
+			say_info("Last vylog is not empty. Its removal "
+				 "may cause data loss!");
+		}
+		if (!force_recovery && !is_vylog_empty) {
 			diag_set(ClientError, ER_MISSING_SNAPSHOT);
 			say_info("To bootstrap instance try to remove last "
 				 ".vylog file or run in force_recovery mode");
