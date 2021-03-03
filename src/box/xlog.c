@@ -684,10 +684,12 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 	       vclock_sum(vclock) < signature) {
 		const char *filename =
 			xdir_format_filename(dir, vclock_sum(vclock), NONE);
-		if (flags & XDIR_GC_ASYNC)
+		if (flags & XDIR_GC_ASYNC) {
 			eio_unlink(filename, 0, xdir_complete_gc, NULL);
-		else
-			xdir_say_gc(unlink(filename), errno, filename);
+		} else {
+			int rc = unlink(filename);
+			xdir_say_gc(rc, errno, filename);
+		}
 		vclockset_remove(&dir->index, vclock);
 		free(vclock);
 
