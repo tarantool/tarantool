@@ -7,9 +7,7 @@ test_run = require('test_run').new()
 -- 1. There's both memtx and vinyl data;
 -- 2. User starts checkpoint process;
 -- 3. In the most unsuitable moment instance crashes;
--- 4. Recovering in the casual mode does not help;
--- 5. Recovering in the force recovery mode solves the problem (deletes
---    redundant vylog file).
+-- 4. Recovering in the casual mode successes.
 --
 test_run:cmd("create server test with script='vinyl/gh-5823-crash_snapshot.lua'")
  | ---
@@ -19,38 +17,6 @@ test_run:cmd("start server test with args='2' with crash_expected=True")
  | ---
  | - false
  | ...
--- Can't bootstrap instance without force_recovery.
---
-test_run:cmd("start server test with args='0' with crash_expected=True")
- | ---
- | - false
- | ...
-
-fio = require('fio')
- | ---
- | ...
-fh = fio.open(fio.pathjoin(fio.cwd(), 'gh-5823-crash_snapshot.log'), {'O_RDONLY'})
- | ---
- | ...
-size = fh:seek(0, 'SEEK_END')
- | ---
- | ...
-fh:seek(-256, 'SEEK_END') ~= nil
- | ---
- | - true
- | ...
-line = fh:read(256)
- | ---
- | ...
-fh:close()
- | ---
- | - true
- | ...
-string.match(line, "Can\'t find snapshot") ~= nil
- | ---
- | - true
- | ...
-
 test_run:cmd("start server test with args='1'")
  | ---
  | - true

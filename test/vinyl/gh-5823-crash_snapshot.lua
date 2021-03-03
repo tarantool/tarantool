@@ -1,13 +1,11 @@
 #!/usr/bin/env tarantool
 
 --
--- mode == 0: casual bootstrap;
--- mode == 1: force recovery bootstrap;
+-- mode == 1: casual bootstrap;
 -- mode == 2: casual bootstrap and fill in data.
 --
 local mode = tonumber(arg[1])
 box.cfg ({
-    force_recovery = (mode == 1),
 })
 
 if mode == 2 then
