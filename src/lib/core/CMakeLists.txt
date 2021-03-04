@@ -29,6 +29,7 @@ set(core_sources
     port.c
     decimal.c
     mp_decimal.c
+    cord_buf.c
 )
 
 if (TARGET_OS_NETBSD)

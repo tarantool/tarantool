@@ -72,7 +72,6 @@ struct tt_uuid;
  * snprintf(m_errmsg, sizeof(m_errmsg), "%s", msg ? msg : "");
  */
 extern struct lua_State *tarantool_L;
-extern struct ibuf *tarantool_lua_ibuf;
 
 struct tt_uuid *
 luaL_pushuuid(struct lua_State *L);

@@ -33,11 +33,10 @@
 #include "coll/coll.h"
 #include "lua/utils.h"
 #include "lua/utf8.h"
+#include "cord_buf.h"
 #include "diag.h"
 #include "small/ibuf.h"
 #include "tt_static.h"
-
-extern struct ibuf *tarantool_lua_ibuf;
 
 /** Collations for cmp/casecmp functions. */
 static struct coll *unicode_coll = NULL;
@@ -52,12 +51,13 @@ utf8_str_to_case(struct lua_State *L, const char *src, int src_bsize,
 	int i = 0;
 	int dst_bsize = src_bsize;
 	(void) i;
+	struct ibuf *ibuf = cord_ibuf_take();
 	do {
 		UErrorCode err = U_ZERO_ERROR;
-		ibuf_reset(tarantool_lua_ibuf);
-		char *dst = ibuf_alloc(tarantool_lua_ibuf, dst_bsize);
+		char *dst = ibuf_alloc(ibuf, dst_bsize);
 		if (dst == NULL) {
 			diag_set(OutOfMemory, dst_bsize, "ibuf_alloc", "dst");
+			cord_ibuf_put(ibuf);
 			return luaT_error(L);
 		}
 		int real_bsize;
@@ -73,11 +73,13 @@ utf8_str_to_case(struct lua_State *L, const char *src, int src_bsize,
 		if (err == U_ZERO_ERROR ||
 		    err == U_STRING_NOT_TERMINATED_WARNING) {
 			lua_pushlstring(L, dst, real_bsize);
+			cord_ibuf_put(ibuf);
 			return 1;
 		} else if (err == U_BUFFER_OVERFLOW_ERROR) {
 			assert(real_bsize > dst_bsize);
 			dst_bsize = real_bsize;
 		} else {
+			cord_ibuf_put(ibuf);
 			lua_pushnil(L);
 			lua_pushstring(L, tt_sprintf("error during ICU case "\
 						     "transform: %s",
@@ -249,9 +251,10 @@ utf8_char(struct lua_State *L)
 		return 1;
 	}
 	/* Slow way - use dynamic buffer. */
-	ibuf_reset(tarantool_lua_ibuf);
-	char *str = ibuf_alloc(tarantool_lua_ibuf, top * U8_MAX_LENGTH);
+	struct ibuf *ibuf = cord_ibuf_take();
+	char *str = ibuf_alloc(ibuf, top * U8_MAX_LENGTH);
 	if (str == NULL) {
+		cord_ibuf_put(ibuf);
 		diag_set(OutOfMemory, top * U8_MAX_LENGTH, "ibuf_alloc",
 			 "str");
 		return luaT_error(L);
@@ -261,6 +264,7 @@ utf8_char(struct lua_State *L)
 		U8_APPEND_UNSAFE(str, len, c);
 	}
 	lua_pushlstring(L, str, len);
+	cord_ibuf_put(ibuf);
 	return 1;
 }
 

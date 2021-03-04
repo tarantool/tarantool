@@ -16,8 +16,7 @@ ffi = require('ffi')
 
 test_run:cmd("setopt delimiter ';'")
 function encode_bin(bytes)
-    local tmpbuf = buffer.IBUF_SHARED
-    tmpbuf:reset()
+    local tmpbuf = buffer.internal.cord_ibuf_take()
     local p = tmpbuf:alloc(3 + #bytes)
     p[0] = 0x91
     p[1] = 0xC4

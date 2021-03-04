@@ -52,7 +52,7 @@ local function test_buffers(test, module)
     test:ok(not module.toibuf(box.NULL), 'toibuf of box.NULL')
     test:ok(not module.toibuf(buffer.reg1), 'toibuf of reg1')
     test:ok(not module.toibuf(bufalloc), 'toibuf of allocated buffer')
-    test:ok(module.toibuf(buffer.IBUF_SHARED), "toibuf of ibuf*")
+    test:ok(module.toibuf(buffer.internal.cord_ibuf_take()), "toibuf of ibuf*")
     test:ok(module.toibuf(ibuf), 'toibuf of ibuf')
     test:ok(not module.toibuf(pbuf), 'toibuf of pointer to ibuf data')
 end
