@@ -2793,38 +2793,62 @@ vdbe_decode_msgpack_into_mem(const char *buf, struct Mem *mem, uint32_t *len)
 {
 	const char *start_buf = buf;
 	switch (mp_typeof(*buf)) {
-	case MP_ARRAY:
-	case MP_MAP:
-	case MP_EXT:
-	default: {
-		mem->flags = 0;
+	case MP_ARRAY: {
+		mem->z = (char *)buf;
+		mp_next(&buf);
+		mem->n = buf - mem->z;
+		mem->flags = MEM_Blob | MEM_Ephem | MEM_Subtype;
+		mem->subtype = SQL_SUBTYPE_MSGPACK;
+		mem->field_type = FIELD_TYPE_ARRAY;
+		break;
+	}
+	case MP_MAP: {
+		mem->z = (char *)buf;
+		mp_next(&buf);
+		mem->n = buf - mem->z;
+		mem->flags = MEM_Blob | MEM_Ephem | MEM_Subtype;
+		mem->subtype = SQL_SUBTYPE_MSGPACK;
+		mem->field_type = FIELD_TYPE_MAP;
+		break;
+	}
+	case MP_EXT: {
+		mem->z = (char *)buf;
+		mp_next(&buf);
+		mem->n = buf - mem->z;
+		mem->flags = MEM_Blob | MEM_Ephem;
+		mem->field_type = FIELD_TYPE_VARBINARY;
 		break;
 	}
 	case MP_NIL: {
 		mp_decode_nil(&buf);
 		mem->flags = MEM_Null;
+		mem->field_type = field_type_MAX;
 		break;
 	}
 	case MP_BOOL: {
 		mem->u.b = mp_decode_bool(&buf);
 		mem->flags = MEM_Bool;
+		mem->field_type = FIELD_TYPE_BOOLEAN;
 		break;
 	}
 	case MP_UINT: {
 		uint64_t v = mp_decode_uint(&buf);
 		mem->u.u = v;
 		mem->flags = MEM_UInt;
+		mem->field_type = FIELD_TYPE_INTEGER;
 		break;
 	}
 	case MP_INT: {
 		mem->u.i = mp_decode_int(&buf);
 		mem->flags = MEM_Int;
+		mem->field_type = FIELD_TYPE_INTEGER;
 		break;
 	}
 	case MP_STR: {
 		/* XXX u32->int */
 		mem->n = (int) mp_decode_strl(&buf);
 		mem->flags = MEM_Str | MEM_Ephem;
+		mem->field_type = FIELD_TYPE_STRING;
 install_blob:
 		mem->z = (char *)buf;
 		buf += mem->n;
@@ -2834,18 +2858,33 @@ install_blob:
 		/* XXX u32->int */
 		mem->n = (int) mp_decode_binl(&buf);
 		mem->flags = MEM_Blob | MEM_Ephem;
+		mem->field_type = FIELD_TYPE_VARBINARY;
 		goto install_blob;
 	}
 	case MP_FLOAT: {
 		mem->u.r = mp_decode_float(&buf);
-		mem->flags = sqlIsNaN(mem->u.r) ? MEM_Null : MEM_Real;
+		if (sqlIsNaN(mem->u.r)) {
+			mem->flags = MEM_Null;
+			mem->field_type = FIELD_TYPE_DOUBLE;
+		} else {
+			mem->flags = MEM_Real;
+			mem->field_type = FIELD_TYPE_DOUBLE;
+		}
 		break;
 	}
 	case MP_DOUBLE: {
 		mem->u.r = mp_decode_double(&buf);
-		mem->flags = sqlIsNaN(mem->u.r) ? MEM_Null : MEM_Real;
+		if (sqlIsNaN(mem->u.r)) {
+			mem->flags = MEM_Null;
+			mem->field_type = FIELD_TYPE_DOUBLE;
+		} else {
+			mem->flags = MEM_Real;
+			mem->field_type = FIELD_TYPE_DOUBLE;
+		}
 		break;
 	}
+	default:
+		unreachable();
 	}
 	*len = (uint32_t)(buf - start_buf);
 	return 0;
@@ -2868,15 +2907,8 @@ sqlVdbeRecordUnpackMsgpack(struct key_def *key_def,	/* Information about the rec
 		pMem->z = 0;
 		uint32_t sz = 0;
 		vdbe_decode_msgpack_into_mem(zParse, pMem, &sz);
-		if (sz == 0) {
-			/* MsgPack array, map or ext. Treat as blob. */
-			pMem->z = (char *)zParse;
-			mp_next(&zParse);
-			pMem->n = zParse - pMem->z;
-			pMem->flags = MEM_Blob | MEM_Ephem;
-		} else {
-			zParse += sz;
-		}
+		assert(sz != 0);
+		zParse += sz;
 		pMem++;
 	}
 }

@@ -846,16 +846,6 @@ vdbe_field_ref_fetch_data(struct vdbe_field_ref *field_ref, uint32_t fieldno)
 	return field_begin;
 }
 
-static inline enum field_type
-vdbe_field_ref_fetch_type(struct vdbe_field_ref *field_ref, uint32_t fieldno)
-{
-	const struct tuple_field *tf =
-		vdbe_field_ref_fetch_field(field_ref, fieldno);
-	if (tf == NULL || tf->type == FIELD_TYPE_ANY)
-		return field_type_MAX;
-	return tf->type;
-}
-
 /**
  * Fetch field by fieldno using vdbe_field_ref and store result
  * in dest_mem.
@@ -880,17 +870,6 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 		return -1;
 
 	/*
-	 * MsgPack map, array or extension (unsupported in sql).
-	 * Wrap it in a blob verbatim.
-	 */
-	if (dest_mem->flags == 0) {
-		dest_mem->z = (char *) data;
-		dest_mem->n = vdbe_field_ref_fetch_data(field_ref,
-							fieldno + 1) - data;
-		dest_mem->flags = MEM_Blob | MEM_Ephem | MEM_Subtype;
-		dest_mem->subtype = SQL_SUBTYPE_MSGPACK;
-	}
-	/*
 	 * Add 0 termination (at most for strings)
 	 * Not sure why do we check MEM_Ephem
 	 */
@@ -909,7 +888,6 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 		dest_mem->flags |= MEM_Term;
 	}
 	UPDATE_MAX_BLOBSIZE(dest_mem);
-	dest_mem->field_type = vdbe_field_ref_fetch_type(field_ref, fieldno);
 	return 0;
 }
 
