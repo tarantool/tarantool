@@ -1796,7 +1796,7 @@ minMaxFinalize(sql_context * context)
 		if (pRes->flags) {
 			sql_result_value(context, pRes);
 		}
-		sqlVdbeMemRelease(pRes);
+		mem_destroy(pRes);
 	}
 }
 

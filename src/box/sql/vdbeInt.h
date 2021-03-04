@@ -130,7 +130,7 @@ struct VdbeCursor {
  * is linked into the Vdbe.pDelFrame list. The contents of the Vdbe.pDelFrame
  * list is deleted when the VM is reset in VdbeHalt(). The reason for doing
  * this instead of deleting the VdbeFrame immediately is to avoid recursive
- * calls to sqlVdbeMemRelease() when the memory cells belonging to the
+ * calls to mem_destroy() when the memory cells belonging to the
  * child frame are released.
  *
  * The currently executing frame is stored in Vdbe.pFrame. Vdbe.pFrame is
