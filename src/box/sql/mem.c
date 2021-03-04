@@ -152,6 +152,25 @@ mem_copy(struct Mem *to, const struct Mem *from)
 	return 0;
 }
 
+void
+mem_copy_as_ephemeral(struct Mem *to, const struct Mem *from)
+{
+	mem_clear(to);
+	to->u = from->u;
+	to->flags = from->flags;
+	to->subtype = from->subtype;
+	to->field_type = from->field_type;
+	to->n = from->n;
+	to->z = from->z;
+	if ((to->flags & (MEM_Str | MEM_Blob)) == 0)
+		return;
+	if ((to->flags & (MEM_Static | MEM_Ephem)) != 0)
+		return;
+	to->flags &= (MEM_Str | MEM_Blob | MEM_Term | MEM_Zero | MEM_Subtype);
+	to->flags |= MEM_Ephem;
+	return;
+}
+
 static inline bool
 mem_has_msgpack_subtype(struct Mem *mem)
 {
@@ -261,20 +280,6 @@ vdbeMemAddTerminator(Mem * pMem)
 	pMem->z[pMem->n + 1] = 0;
 	pMem->flags |= MEM_Term;
 	return 0;
-}
-
-/*
- * Make an shallow copy of pFrom into pTo.  Prior contents of
- * pTo are freed.  The pFrom->z field is not duplicated.  If
- * pFrom->z is used, then pTo->z points to the same thing as pFrom->z
- * and flags gets srcType (either MEM_Ephem or MEM_Static).
- */
-static SQL_NOINLINE void
-vdbeClrCopy(Mem * pTo, const Mem * pFrom, int eType)
-{
-	mem_clear(pTo);
-	assert(!VdbeMemDynamic(pTo));
-	sqlVdbeMemShallowCopy(pTo, pFrom, eType);
 }
 
 /*
@@ -1843,22 +1848,6 @@ vdbe_mem_alloc_blob_region(struct Mem *vdbe_mem, uint32_t size)
 	vdbe_mem->flags = MEM_Ephem | MEM_Blob;
 	assert(sqlVdbeCheckMemInvariants(vdbe_mem));
 	return 0;
-}
-
-void
-sqlVdbeMemShallowCopy(Mem * pTo, const Mem * pFrom, int srcType)
-{
-	assert(pTo->db == pFrom->db);
-	if (VdbeMemDynamic(pTo)) {
-		vdbeClrCopy(pTo, pFrom, srcType);
-		return;
-	}
-	memcpy(pTo, pFrom, MEMCELLSIZE);
-	if ((pFrom->flags & MEM_Static) == 0) {
-		pTo->flags &= ~(MEM_Dyn | MEM_Static | MEM_Ephem);
-		assert(srcType == MEM_Ephem || srcType == MEM_Static);
-		pTo->flags |= srcType;
-	}
 }
 
 /*
