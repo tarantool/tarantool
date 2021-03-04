@@ -74,6 +74,25 @@ mem_str(const struct Mem *mem)
 	}
 }
 
+void
+mem_create(struct Mem *mem)
+{
+	mem->flags = MEM_Null;
+	mem->subtype = SQL_SUBTYPE_NO;
+	mem->field_type = field_type_MAX;
+	mem->n = 0;
+	mem->z = NULL;
+	mem->zMalloc = NULL;
+	mem->szMalloc = 0;
+	mem->uTemp = 0;
+	mem->db = sql_get();
+	mem->xDel = NULL;
+#ifdef SQL_DEBUG
+	mem->pScopyFrom = NULL;
+	mem->pFiller = NULL;
+#endif
+}
+
 static inline bool
 mem_has_msgpack_subtype(struct Mem *mem)
 {
@@ -1301,21 +1320,6 @@ sqlVdbeMemSetStr(Mem * pMem,	/* Memory cell to set to string value */
 }
 
 /*
- * Initialize bulk memory to be a consistent Mem object.
- *
- * The minimum amount of initialization feasible is performed.
- */
-void
-sqlVdbeMemInit(Mem * pMem, sql * db, u32 flags)
-{
-	assert((flags & ~MEM_TypeMask) == 0);
-	pMem->flags = flags;
-	pMem->db = db;
-	pMem->szMalloc = 0;
-	pMem->field_type = field_type_MAX;
-}
-
-/*
  * Delete any previous value and set the value stored in *pMem to NULL.
  *
  * This routine calls the Mem.xDel destructor to dispose of values that
@@ -1397,21 +1401,6 @@ sqlValueNew(sql * db)
 		p->db = db;
 	}
 	return p;
-}
-
-void
-initMemArray(Mem * p, int N, sql * db, u32 flags)
-{
-	while ((N--) > 0) {
-		p->db = db;
-		p->flags = flags;
-		p->szMalloc = 0;
-		p->field_type = field_type_MAX;
-#ifdef SQL_DEBUG
-		p->pScopyFrom = 0;
-#endif
-		p++;
-	}
 }
 
 void
@@ -2374,7 +2363,7 @@ vdbemem_alloc_on_region(uint32_t count)
 	}
 	memset(ret, 0, count * sizeof(*ret));
 	for (uint32_t i = 0; i < count; i++) {
-		sqlVdbeMemInit(&ret[i], sql_get(), MEM_Null);
+		mem_create(&ret[i]);
 		assert(memIsValid(&ret[i]));
 	}
 	return ret;
