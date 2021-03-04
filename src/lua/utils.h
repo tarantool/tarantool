@@ -66,7 +66,6 @@ typedef struct ibuf box_ibuf_t;
  * snprintf(m_errmsg, sizeof(m_errmsg), "%s", msg ? msg : "");
  */
 extern struct lua_State *tarantool_L;
-extern struct ibuf *tarantool_lua_ibuf;
 
 /** \cond public */
 

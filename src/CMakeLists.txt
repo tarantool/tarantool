@@ -107,6 +107,7 @@ set (core_sources
      http_parser.c
      coll.c
      coll_def.c
+     cord_buf.c
  )
 
 if (TARGET_OS_NETBSD)

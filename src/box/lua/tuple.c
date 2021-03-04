@@ -36,6 +36,7 @@
 #include "diag.h" /* diag_set() */
 #include <small/ibuf.h>
 #include <small/region.h>
+#include "cord_buf.h"
 #include <fiber.h>
 
 #include "box/tuple.h"
@@ -279,16 +280,18 @@ luaT_tuple_encode(struct lua_State *L, int idx, size_t *tuple_len_ptr)
 box_tuple_t *
 luaT_tuple_new(struct lua_State *L, int idx, box_tuple_format_t *format)
 {
-	struct ibuf *ibuf = tarantool_lua_ibuf;
-	ibuf_reset(ibuf);
+	struct ibuf *ibuf = cord_ibuf_take();
 	size_t tuple_len;
+	box_tuple_t *tuple;
 	char *tuple_data = luaT_tuple_encode_on_lua_ibuf(L, idx, &tuple_len,
 							 ibuf);
-	if (tuple_data == NULL)
-		return NULL;
-	box_tuple_t *tuple = box_tuple_new(format, tuple_data,
-					   tuple_data + tuple_len);
-	ibuf_reinit(ibuf);
+	if (tuple_data == NULL) {
+		tuple = NULL;
+	} else {
+		tuple = box_tuple_new(format, tuple_data,
+				      tuple_data + tuple_len);
+	}
+	cord_ibuf_drop(ibuf);
 	return tuple;
 }
 
@@ -307,12 +310,11 @@ lbox_tuple_new(lua_State *L)
 	 */
 	box_tuple_format_t *fmt = box_tuple_format_default();
 	if (argc != 1 || (!lua_istable(L, 1) && !luaT_istuple(L, 1))) {
-		struct ibuf *buf = tarantool_lua_ibuf;
-		ibuf_reset(buf);
+		struct ibuf *buf = cord_ibuf_take();
 		luaT_tuple_encode_values(L, buf); /* may raise */
 		struct tuple *tuple = box_tuple_new(fmt, buf->buf,
 						    buf->buf + ibuf_used(buf));
-		ibuf_reinit(buf);
+		cord_ibuf_drop(buf);
 		if (tuple == NULL)
 			return luaT_error(L);
 		luaT_pushtuple(L, tuple);
@@ -586,8 +588,7 @@ lbox_tuple_transform(struct lua_State *L)
 		return 1;
 	}
 
-	struct ibuf *buf = tarantool_lua_ibuf;
-	ibuf_reset(buf);
+	struct ibuf *buf = cord_ibuf_take();
 	struct mpstream stream;
 	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb,
 		      luamp_error, L);
@@ -632,12 +633,11 @@ lbox_tuple_transform(struct lua_State *L)
 		new_tuple = tuple_new(box_tuple_format_default(),
 				      new_data, new_data + new_size);
 	region_truncate(region, used);
-
+	cord_ibuf_put(buf);
 	if (new_tuple == NULL)
 		luaT_error(L);
 
 	luaT_pushtuple(L, new_tuple);
-	ibuf_reset(buf);
 	return 1;
 }
 
