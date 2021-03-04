@@ -25,8 +25,6 @@
  * box/tuple.test.lua.
  */
 
-extern struct ibuf *tarantool_lua_ibuf;
-
 uint32_t
 min_u32(uint32_t a, uint32_t b)
 {
@@ -183,8 +181,6 @@ main()
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-
-	ibuf_create(tarantool_lua_ibuf, &cord()->slabc, 16000);
 
 	struct lua_State *L = luaL_newstate();
 	luaL_openlibs(L);
