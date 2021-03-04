@@ -1505,9 +1505,6 @@ case OP_SCopy: {            /* out2 */
  * the result row.
  */
 case OP_ResultRow: {
-	Mem *pMem;
-	int i;
-
 	assert(p->nResColumn==pOp->p2);
 	assert(pOp->p1>0);
 	assert(pOp->p1+pOp->p2<=(p->nMem+1 - p->nCursor)+1);
@@ -1516,20 +1513,14 @@ case OP_ResultRow: {
 	/* Invalidate all ephemeral cursor row caches */
 	p->cacheCtr = (p->cacheCtr + 2)|1;
 
-	/* Make sure the results of the current row are \000 terminated
-	 * and have an assigned type.  The results are de-ephemeralized as
-	 * a side effect.
-	 */
-	pMem = p->pResultSet = &aMem[pOp->p1];
-	for(i=0; i<pOp->p2; i++) {
+	p->pResultSet = &aMem[pOp->p1];
+#ifdef SQL_DEBUG
+	struct Mem *pMem = p->pResultSet;
+	for (int i = 0; i < pOp->p2; i++) {
 		assert(memIsValid(&pMem[i]));
-		Deephemeralize(&pMem[i]);
-		assert((pMem[i].flags & MEM_Ephem)==0
-		       || (pMem[i].flags & (MEM_Str|MEM_Blob))==0);
-		sqlVdbeMemNulTerminate(&pMem[i]);
 		REGISTER_TRACE(p, pOp->p1+i, &pMem[i]);
 	}
-	if (db->mallocFailed) goto no_mem;
+#endif
 
 	if (db->mTrace & SQL_TRACE_ROW) {
 		db->xTrace(SQL_TRACE_ROW, db->pTraceArg, p, 0);
