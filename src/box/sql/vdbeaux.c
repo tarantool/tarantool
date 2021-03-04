@@ -1587,9 +1587,13 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 	} else {
 		p->nCursor = nCursor;
 		p->nVar = (ynVar) nVar;
-		initMemArray(p->aVar, nVar, db, MEM_Null);
+		for (int i = 0; i < nVar; ++i)
+			mem_create(&p->aVar[i]);
 		p->nMem = nMem;
-		initMemArray(p->aMem, nMem, db, MEM_Undefined);
+		for (int i = 0; i < nMem; ++i) {
+			mem_create(&p->aMem[i]);
+			p->aMem[i].flags = MEM_Undefined;
+		}
 		memset(p->apCsr, 0, nCursor * sizeof(VdbeCursor *));
 	}
 	sqlVdbeRewind(p);
