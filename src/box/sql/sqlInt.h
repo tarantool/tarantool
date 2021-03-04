@@ -266,6 +266,8 @@
 #include <assert.h>
 #include <stddef.h>
 
+/** \cond ffi */
+
 typedef long long int sql_int64;
 typedef unsigned long long int sql_uint64;
 typedef sql_int64 sql_int64;
@@ -281,6 +283,8 @@ struct sql_file {
 };
 
 typedef int (*sql_callback) (void *, int, char **, char **);
+
+/** \endcond ffi */
 
 typedef struct sql_vfs sql_vfs;
 struct sql_vfs {
@@ -857,6 +861,9 @@ sql_bind_parameter_lindex(sql_stmt * pStmt, const char *zName,
 #ifndef LONGDOUBLE_TYPE
 #define LONGDOUBLE_TYPE long double
 #endif
+
+/** \cond ffi */
+
 typedef sql_int64 i64;	/* 8-byte signed integer */
 typedef sql_uint64 u64;	/* 8-byte unsigned integer */
 typedef UINT32_TYPE u32;	/* 4-byte unsigned integer */
@@ -933,6 +940,8 @@ typedef u32 uptr;
 #else
 typedef u64 uptr;
 #endif
+
+/** \endcond ffi */
 
 /*
  * The sql_WITHIN(P,S,E) macro checks to see if pointer P points to
@@ -1087,6 +1096,7 @@ typedef struct UnpackedRecord UnpackedRecord;
 typedef struct Walker Walker;
 typedef struct WhereInfo WhereInfo;
 typedef struct With With;
+
 
 /* A VList object records a mapping between parameters/variables/wildcards
  * in the SQL statement (such as $abc, @pqr, or :xyz) and the integer
@@ -1436,6 +1446,8 @@ index_field_tuple_est(const struct index_def *idx, uint32_t field);
 /** [10*log_{2}(1048576)] == 200 */
 #define DEFAULT_TUPLE_LOG_COUNT 200
 
+/** \cond ffi */
+
 /*
  * An instance of this structure contains information needed to generate
  * code for a SELECT that contains aggregate functions.
@@ -1460,7 +1472,7 @@ struct AggInfo {
 	int sortingIdxPTab;	/* Cursor number of pseudo-table */
 	int nSortingColumn;	/* Number of columns in the sorting index */
 	int mnReg, mxReg;	/* Range of registers allocated for aCol and aFunc */
-	ExprList *pGroupBy;	/* The group by clause */
+	struct ExprList *pGroupBy;/* The group by clause */
 	struct AggInfo_col {	/* For each column used in source tables */
 		/** Pointer to space definition. */
 		struct space_def *space_def;
@@ -1468,7 +1480,7 @@ struct AggInfo {
 		int iColumn;	/* Column number within the source table */
 		int iSorterColumn;	/* Column number in the sorting index */
 		int iMem;	/* Memory location that acts as accumulator */
-		Expr *pExpr;	/* The original expression */
+		struct Expr *pExpr;/* The original expression */
 	} *aCol;
 	int nColumn;		/* Number of used entries in aCol[] */
 	int nAccumulator;	/* Number of columns that show through to the output.
@@ -1476,7 +1488,7 @@ struct AggInfo {
 				 * aggregate functions
 				 */
 	struct AggInfo_func {	/* For each aggregate function */
-		Expr *pExpr;	/* Expression encoding the function */
+		struct Expr *pExpr;	/* Expression encoding the function */
 		/** The aggregate function implementation. */
 		struct func *func;
 		int iMem;	/* Memory location that acts as accumulator */
@@ -1573,11 +1585,11 @@ struct Expr {
 	 * access them will result in a segfault or malfunction.
 	 ********************************************************************/
 
-	Expr *pLeft;		/* Left subnode */
-	Expr *pRight;		/* Right subnode */
+	struct Expr *pLeft;		/* Left subnode */
+	struct Expr *pRight;		/* Right subnode */
 	union {
-		ExprList *pList;	/* op = IN, EXISTS, SELECT, CASE, FUNCTION, BETWEEN */
-		Select *pSelect;	/* EP_xIsSelect and op = IN, EXISTS, SELECT */
+		struct ExprList *pList;	/* op = IN, EXISTS, SELECT, CASE, FUNCTION, BETWEEN */
+		struct Select *pSelect;	/* EP_xIsSelect and op = IN, EXISTS, SELECT */
 	} x;
 
 	/* If the EP_Reduced flag is set in the Expr.flags mask, then no
@@ -1604,7 +1616,7 @@ struct Expr {
 				 * TK_COLUMN_REF: the value of p5 for OP_Column
 				 * TK_AGG_FUNCTION: nesting depth
 				 */
-	AggInfo *pAggInfo;	/* Used by TK_AGG_COLUMN and TK_AGG_FUNCTION */
+	struct AggInfo *pAggInfo;/* Used by TK_AGG_COLUMN and TK_AGG_FUNCTION */
 	/** Pointer for table relative definition. */
 	struct space_def *space_def;
 };
@@ -1696,7 +1708,7 @@ struct Expr {
 struct ExprList {
 	int nExpr;		/* Number of expressions on the list */
 	struct ExprList_item {	/* For each expression in the list */
-		Expr *pExpr;	/* The list of expressions */
+		struct Expr *pExpr;	/* The list of expressions */
 		char *zName;	/* Token associated with this expression */
 		char *zSpan;	/* Original text of the expression */
 		enum sort_order sort_order;
@@ -1725,7 +1737,7 @@ struct ExprList {
  * expression.
  */
 struct ExprSpan {
-	Expr *pExpr;		/* The expression parse tree */
+	struct Expr *pExpr;		/* The expression parse tree */
 	const char *zStart;	/* First character of input text */
 	const char *zEnd;	/* One character past the end of input text */
 };
@@ -1805,7 +1817,7 @@ struct SrcList {
 		char *zAlias;	/* The "B" part of a "A AS B" phrase.  zName is the "A" */
 		/** A space corresponding to zName */
 		struct space *space;
-		Select *pSelect;	/* A SELECT statement used in place of a table name */
+		struct Select *pSelect;	/* A SELECT statement used in place of a table name */
 		int addrFillSub;	/* Address of subroutine to manifest a subquery */
 		int regReturn;	/* Register holding return address of addrFillSub */
 		int regResult;	/* Registers holding results of a co-routine */
@@ -1823,12 +1835,12 @@ struct SrcList {
 		};
 		u8 iSelectId;	/* If pSelect!=0, the id of the sub-select in EQP */
 		int iCursor;	/* The VDBE cursor number used to access this table */
-		Expr *pOn;	/* The ON clause of a join */
-		IdList *pUsing;	/* The USING clause of a join */
+		struct Expr *pOn;	/* The ON clause of a join */
+		struct IdList *pUsing;	/* The USING clause of a join */
 		Bitmask colUsed;	/* Bit N (1<<N) set if column N of space is used */
 		union {
 			char *zIndexedBy;	/* Identifier from "INDEXED BY <zIndex>" clause */
-			ExprList *pFuncArg;	/* Arguments to table-valued-function */
+			struct ExprList *pFuncArg;	/* Arguments to table-valued-function */
 		} u1;
 		struct index_def *pIBIndex;
 	} a[1];			/* One entry for each identifier on the list */
@@ -1879,6 +1891,8 @@ struct SrcList {
 #define WHERE_DISTINCT_ORDERED   2	/* All duplicates are adjacent */
 #define WHERE_DISTINCT_UNORDERED 3	/* Duplicates are scattered */
 
+/** \endcond ffi */
+
 /*
  * A NameContext defines a context in which to resolve table and column
  * names.  The context consists of a list of tables (the pSrcList) field and
@@ -1928,6 +1942,9 @@ struct NameContext {
 #define NC_MinMaxAgg 0x1000	/* min/max aggregates seen.  See note above */
 /** One or more identifiers are out of aggregate function. */
 #define NC_HasUnaggregatedId     0x2000
+
+/** \cond ffi */
+
 /*
  * An instance of the following structure contains all information
  * needed to generate code for a single SELECT statement.
@@ -1949,23 +1966,23 @@ struct NameContext {
  * sequences for the ORDER BY clause.
  */
 struct Select {
-	ExprList *pEList;	/* The fields of the result */
+	struct ExprList *pEList;	/* The fields of the result */
 	u8 op;			/* One of: TK_UNION TK_ALL TK_INTERSECT TK_EXCEPT */
 	LogEst nSelectRow;	/* Estimated number of result rows */
 	u32 selFlags;		/* Various SF_* values */
 	int iLimit, iOffset;	/* Memory registers holding LIMIT & OFFSET counters */
 	char zSelName[12];	/* Symbolic name of this SELECT use for debugging */
 	int addrOpenEphm[2];	/* OP_OpenEphem opcodes related to this select */
-	SrcList *pSrc;		/* The FROM clause */
-	Expr *pWhere;		/* The WHERE clause */
-	ExprList *pGroupBy;	/* The GROUP BY clause */
-	Expr *pHaving;		/* The HAVING clause */
-	ExprList *pOrderBy;	/* The ORDER BY clause */
-	Select *pPrior;		/* Prior select in a compound select statement */
-	Select *pNext;		/* Next select to the left in a compound */
-	Expr *pLimit;		/* LIMIT expression. NULL means not used. */
-	Expr *pOffset;		/* OFFSET expression. NULL means not used. */
-	With *pWith;		/* WITH clause attached to this select. Or NULL. */
+	struct SrcList *pSrc;	/* The FROM clause */
+	struct Expr *pWhere;	/* The WHERE clause */
+	struct ExprList *pGroupBy;/* The GROUP BY clause */
+	struct Expr *pHaving;	/* The HAVING clause */
+	struct ExprList *pOrderBy;/* The ORDER BY clause */
+	struct Select *pPrior;	/* Prior select in a compound select statement */
+	struct Select *pNext;	/* Next select to the left in a compound */
+	struct Expr *pLimit;	/* LIMIT expression. NULL means not used. */
+	struct Expr *pOffset;	/* OFFSET expression. NULL means not used. */
+	struct With *pWith;	/* WITH clause attached to this select. Or NULL. */
 };
 
 /*
@@ -2093,8 +2110,10 @@ struct SelectDest {
 	int reg_eph;
 	int iSdst;		/* Base register where results are written */
 	int nSdst;		/* Number of registers allocated */
-	ExprList *pOrderBy;	/* Key columns for SRT_Queue and SRT_DistQueue */
+	struct ExprList *pOrderBy;/* Key columns for SRT_Queue and SRT_DistQueue */
 };
+
+/** \endcond ffi */
 
 /*
  * Size of the column cache
@@ -2133,6 +2152,8 @@ struct TriggerPrg {
 	uint64_t column_mask[2];
 };
 
+/** \cond ffi */
+
 struct sql_trigger;
 
 enum ast_type {
@@ -2154,6 +2175,8 @@ struct sql_parsed_ast {
 		struct sql_trigger *trigger;
 	};
 };
+
+/** \endcond ffi */
 
 /*
  * An SQL parser context.  A copy of this structure is passed through
@@ -2556,20 +2579,23 @@ int sqlExprWalkNoop(Walker *, Expr *);
 #define WRC_Prune       1	/* Omit children but continue walking siblings */
 #define WRC_Abort       2	/* Abandon the tree walk */
 
+/** \cond ffi */
 /*
  * An instance of this structure represents a set of one or more CTEs
  * (common table expressions) created by a single WITH clause.
  */
 struct With {
 	int nCte;		/* Number of CTEs in the WITH clause */
-	With *pOuter;		/* Containing WITH clause, or NULL */
+	struct With *pOuter;	/* Containing WITH clause, or NULL */
 	struct Cte {		/* For each CTE in the WITH clause.... */
 		char *zName;	/* Name of this CTE */
-		ExprList *pCols;	/* List of explicit column names, or NULL */
-		Select *pSelect;	/* The definition of this CTE */
+		struct ExprList *pCols;	/* List of explicit column names, or NULL */
+		struct Select *pSelect;	/* The definition of this CTE */
 		const char *zCteErr;	/* Error message for circular references */
 	} a[1];
 };
+/** \endcond ffi */
+
 
 #ifdef SQL_DEBUG
 /*

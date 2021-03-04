@@ -43,6 +43,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 /** \cond public */
+/** \cond ffi */
 
 /*
  * Possible field data types. Can't use STRS/ENUM macros for them,
@@ -77,6 +78,7 @@ enum on_conflict_action {
 	on_conflict_action_MAX
 };
 
+/** \endcond ffi */
 /** \endcond public */
 
 enum {

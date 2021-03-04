@@ -184,12 +184,12 @@ lbox_sqlparser_deserialize(struct lua_State *L)
 	return 1;
 }
 
-extern char sql_ast_ffi_defs_lua[];
+extern char sql_ast_cdef[];
 
 void
 box_lua_sqlparser_init(struct lua_State *L)
 {
-	int rc = luaL_cdef(L, sql_ast_ffi_defs_lua);
+	int rc = luaL_cdef(L, sql_ast_cdef);
 	if (rc != LUA_OK) {
 		const char * error = lua_tostring(L, -1);
 		panic("ffi cdef error: %s", error);

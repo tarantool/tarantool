@@ -45,12 +45,16 @@ extern "C" {
 /* Sorting order of a part. */
 extern const char *sort_order_strs[];
 
+/** \cond ffi */
+
 enum sort_order {
 	SORT_ORDER_ASC = 0,
 	SORT_ORDER_DESC,
 	SORT_ORDER_UNDEF,
 	sort_order_MAX
 };
+
+/** \endcond ffi */
 
 struct key_part_def {
 	/** Tuple field index for this part. */
