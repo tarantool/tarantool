@@ -7,7 +7,15 @@ ffi.cdef[[
 struct slab_cache;
 struct slab_cache *
 tarantool_lua_slab_cache();
-extern struct ibuf *tarantool_lua_ibuf;
+
+struct ibuf *
+cord_ibuf_take(void);
+
+void
+cord_ibuf_put(struct ibuf *ibuf);
+
+void
+cord_ibuf_drop(struct ibuf *ibuf);
 
 struct ibuf
 {
@@ -244,9 +252,48 @@ end
 --
 local reg_array = ffi.new('union c_register[?]', 2)
 
+--
+-- Cord buffer is useful for the places, where
+--
+-- * Want to reuse the already allocated memory which might be stored in the
+--   cord buf. Although sometimes the buffer is recycled, so should not rely on
+--   being able to reuse it always. When reused, the win is the biggest -
+--   becomes about x20 times faster than a new buffer creation (~5ns vs ~100ns);
+--
+-- * Want to avoid allocation of a new ibuf because it produces a new GC object
+--   which is additional load for Lua GC. Although according to benches it is
+--   not super expensive;
+--
+-- * Almost always can put the buffer back manually. Not rely on it being
+--   recycled automatically. It is recycled, but still should not rely on that;
+--
+-- It is important to wrap the C functions, not expose them directly. Because
+-- JIT works a bit better when C functions are called as 'ffi.C.func()' than
+-- 'func()' with func being cached. The only pros is to cache 'ffi.C' itself.
+-- It is quite strange though how having them wrapped into a Lua function is
+-- faster than cached directly as C functions.
+--
+local function cord_ibuf_take()
+    return builtin.cord_ibuf_take()
+end
+
+local function cord_ibuf_put(buf)
+    return builtin.cord_ibuf_put(buf)
+end
+
+local function cord_ibuf_drop(buf)
+    return builtin.cord_ibuf_drop(buf)
+end
+
+local internal = {
+    cord_ibuf_take = cord_ibuf_take,
+    cord_ibuf_put = cord_ibuf_put,
+    cord_ibuf_drop = cord_ibuf_drop,
+}
+
 return {
+    internal = internal,
     ibuf = ibuf_new;
-    IBUF_SHARED = ffi.C.tarantool_lua_ibuf;
     READAHEAD = READAHEAD;
     static_alloc = static_alloc,
     -- Keep reference.

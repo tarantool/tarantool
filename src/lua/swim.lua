@@ -6,6 +6,8 @@ local crypto = require('crypto')
 local fiber = require('fiber')
 local internal = require('swim')
 local schedule_task = fiber._internal.schedule_task
+local cord_ibuf_take = buffer.internal.cord_ibuf_take
+local cord_ibuf_put = buffer.internal.cord_ibuf_put
 
 ffi.cdef[[
     struct swim;
@@ -655,14 +657,17 @@ end
 local function swim_set_payload(s, payload)
     local func_name = 'swim:set_payload'
     local ptr = swim_check_instance(s, func_name)
-    local payload_size = 0
-    if payload ~= nil then
-        local buf = buffer.IBUF_SHARED
-        buf:reset()
-        payload_size = msgpack.encode(payload, buf)
+    local rc
+    if payload == nil then
+        rc = capi.swim_set_payload(ptr, nil, 0)
+    else
+        local buf = cord_ibuf_take()
+        local payload_size = msgpack.encode(payload, buf)
         payload = buf.rpos
+        rc = capi.swim_set_payload(ptr, payload, payload_size)
+        cord_ibuf_put(buf)
     end
-    if capi.swim_set_payload(ptr, payload, payload_size) ~= 0 then
+    if rc ~= 0 then
         return nil, box.error.last()
     end
     return true

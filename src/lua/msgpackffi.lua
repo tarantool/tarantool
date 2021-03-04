@@ -10,6 +10,8 @@ local uint16_ptr_t = ffi.typeof('uint16_t *')
 local uint32_ptr_t = ffi.typeof('uint32_t *')
 local uint64_ptr_t = ffi.typeof('uint64_t *')
 local char_ptr_t = ffi.typeof('char *')
+local cord_ibuf_take = buffer.internal.cord_ibuf_take
+local cord_ibuf_drop = buffer.internal.cord_ibuf_drop
 
 ffi.cdef([[
 char *
@@ -294,11 +296,10 @@ local function encode_r(buf, obj, level)
 end
 
 local function encode(obj)
-    local tmpbuf = buffer.IBUF_SHARED
-    tmpbuf:reset()
+    local tmpbuf = cord_ibuf_take()
     encode_r(tmpbuf, obj, 0)
     local r = ffi.string(tmpbuf.rpos, tmpbuf:size())
-    tmpbuf:recycle()
+    cord_ibuf_drop(tmpbuf)
     return r
 end
 
