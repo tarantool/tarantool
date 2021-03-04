@@ -26,6 +26,9 @@ local check_symbols = {
     'guava',
     'base64_decode',
     'base64_encode',
+    'cord_ibuf_drop',
+    'cord_ibuf_put',
+    'cord_ibuf_take',
     'SHA1internal',
     'random_bytes',
     'fiber_time',
@@ -42,7 +45,6 @@ local check_symbols = {
     'exception_get_int',
     'exception_get_string',
 
-    'tarantool_lua_ibuf',
     'uuid_nil',
     'tt_uuid_create',
     'tt_uuid_str',
