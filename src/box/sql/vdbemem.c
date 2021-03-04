@@ -579,7 +579,7 @@ sqlStat4ProbeFree(UnpackedRecord * pRec)
 		int part_count = pRec->key_def->part_count;
 		struct Mem *aMem = pRec->aMem;
 		for (int i = 0; i < part_count; i++)
-			sqlVdbeMemRelease(&aMem[i]);
+			mem_destroy(&aMem[i]);
 		sqlDbFree(aMem[0].db, pRec);
 	}
 }
