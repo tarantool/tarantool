@@ -81,12 +81,6 @@ struct Mem {
 #endif
 };
 
-/*
- * Size of struct Mem not including the Mem.zMalloc member or anything that
- * follows.
- */
-#define MEMCELLSIZE offsetof(Mem,zMalloc)
-
 /* One or more of the following flags are set to indicate the validOK
  * representations of the value stored in the Mem struct.
  *
@@ -313,6 +307,14 @@ mem_destroy(struct Mem *mem);
  */
 int
 mem_copy(struct Mem *to, const struct Mem *from);
+
+/**
+ * Copy content of MEM from one MEM to another. In case source MEM contains
+ * string or binary and allocation type is not STATIC, this value is copied as
+ * value with ephemeral allocation type.
+ */
+void
+mem_copy_as_ephemeral(struct Mem *to, const struct Mem *from);
 
 /**
  * Simple type to str convertor. It is used to simplify
@@ -561,7 +563,6 @@ mem_is_type_compatible(struct Mem *mem, enum field_type type);
 
 int
 vdbe_mem_alloc_blob_region(struct Mem *vdbe_mem, uint32_t size);
-void sqlVdbeMemShallowCopy(Mem *, const Mem *, int);
 void sqlVdbeMemMove(Mem *, Mem *);
 int sqlVdbeMemMakeWriteable(Mem *);
 
