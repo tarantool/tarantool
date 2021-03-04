@@ -2500,7 +2500,7 @@ case OP_MakeRecord: {
 		 * to be passed to Tarantool. Before that, make
 		 * sure previously allocated memory has gone.
 		 */
-		sqlVdbeMemRelease(pOut);
+		mem_destroy(pOut);
 		pOut->flags = MEM_Blob | MEM_Ephem;
 		pOut->n = tuple_size;
 		pOut->z = tuple;
@@ -4454,7 +4454,7 @@ case OP_Program: {        /* jump */
 		if (!pFrame) {
 			goto no_mem;
 		}
-		sqlVdbeMemRelease(pRt);
+		mem_destroy(pRt);
 		pRt->flags = MEM_Frame;
 		pRt->u.pFrame = pFrame;
 
@@ -4747,7 +4747,7 @@ case OP_AggStep: {
 	struct func_sql_builtin *func = (struct func_sql_builtin *)pCtx->func;
 	func->call(pCtx, pCtx->argc, pCtx->argv);
 	if (pCtx->is_aborted) {
-		sqlVdbeMemRelease(&t);
+		mem_destroy(&t);
 		goto abort_due_to_error;
 	}
 	assert(t.flags==MEM_Null);
