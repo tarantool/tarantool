@@ -46,6 +46,12 @@ struct Parse;
 void
 box_lua_sqlparser_init(struct lua_State *L);
 
+int
+lbox_sqlparser_serialize(struct lua_State *L);
+
+int
+lbox_sqlparser_deserialize(struct lua_State *L);
+
 struct sql_parsed_ast *
 luaT_check_sql_parsed_ast(struct lua_State *L, int idx);
 
@@ -65,6 +71,14 @@ int
 sql_parser_ast_execute(struct lua_State *L,
 		       struct sql_parsed_ast *ast,
 		       struct sql_stmt *stmt);
+
+void
+sqlparser_generate_msgpack_walker(struct Parse *parser,
+				  struct ibuf *ibuf,
+				  struct Select *p);
+
+int
+sqlparser_msgpack_decode_string(struct lua_State *L, bool check);
 
 // to avoid session.h inclusion
 extern uint32_t default_flags;

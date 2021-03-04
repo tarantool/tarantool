@@ -38,26 +38,6 @@
 
 static struct sql_stmt_cache sql_stmt_cache;
 
-struct sql_parsed_ast*
-sql_ast_alloc(void)
-{
-	struct sql_parsed_ast *p = calloc(1, sizeof(*p));
-	if (p == NULL) {
-		diag_set(OutOfMemory, sizeof(*p), "malloc",
-			 "struct sql_parsed_ast");
-		return NULL;
-	}
-	return p;
-}
-
-void
-sql_ast_free(struct sql_parsed_ast *p)
-{
-	if (p == NULL)
-		return;
-	free(p);
-}
-
 void
 sql_stmt_cache_init(void)
 {

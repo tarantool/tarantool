@@ -1700,9 +1700,15 @@ struct ExprList {
 		char *zName;	/* Token associated with this expression */
 		char *zSpan;	/* Original text of the expression */
 		enum sort_order sort_order;
-		unsigned done:1;	/* A flag to indicate when processing is finished */
-		unsigned bSpanIsTab:1;	/* zSpan holds DB.TABLE.COLUMN */
-		unsigned reusable:1;	/* Constant expression is reusable */
+		union {
+			unsigned bits;			/* aggregated bits for serialization */
+			struct {
+				unsigned done:1;	/* A flag to indicate when processing is finished */
+				unsigned bSpanIsTab:1;	/* zSpan holds DB.TABLE.COLUMN */
+				unsigned reusable:1;	/* Constant expression is reusable */
+
+			};
+		};
 		union {
 			struct {
 				u16 iOrderByCol;	/* For ORDER BY, column number in result set */
@@ -1803,15 +1809,18 @@ struct SrcList {
 		int addrFillSub;	/* Address of subroutine to manifest a subquery */
 		int regReturn;	/* Register holding return address of addrFillSub */
 		int regResult;	/* Registers holding results of a co-routine */
-		struct {
-			u8 jointype;	/* Type of join between this table and the previous */
-			unsigned notIndexed:1;	/* True if there is a NOT INDEXED clause */
-			unsigned isIndexedBy:1;	/* True if there is an INDEXED BY clause */
-			unsigned isTabFunc:1;	/* True if table-valued-function syntax */
-			unsigned isCorrelated:1;	/* True if sub-query is correlated */
-			unsigned viaCoroutine:1;	/* Implemented as a co-routine */
-			unsigned isRecursive:1;	/* True for recursive reference in WITH */
-		} fg;
+		union {
+			struct {
+				u8 jointype;	/* Type of join between this table and the previous */
+				unsigned notIndexed:1;	/* True if there is a NOT INDEXED clause */
+				unsigned isIndexedBy:1;	/* True if there is an INDEXED BY clause */
+				unsigned isTabFunc:1;	/* True if table-valued-function syntax */
+				unsigned isCorrelated:1;	/* True if sub-query is correlated */
+				unsigned viaCoroutine:1;	/* Implemented as a co-routine */
+				unsigned isRecursive:1;	/* True for recursive reference in WITH */
+			} fg;
+			unsigned fgBits;
+		};
 		u8 iSelectId;	/* If pSelect!=0, the id of the sub-select in EQP */
 		int iCursor;	/* The VDBE cursor number used to access this table */
 		Expr *pOn;	/* The ON clause of a join */
@@ -2122,6 +2131,28 @@ struct TriggerPrg {
 	int orconf;		/* Default ON CONFLICT policy */
 	/* Masks of old.*, new.* columns accessed. */
 	uint64_t column_mask[2];
+};
+
+struct sql_trigger;
+
+enum ast_type {
+	AST_TYPE_UNDEFINED = 0,
+	AST_TYPE_SELECT,
+	AST_TYPE_EXPR,
+	AST_TYPE_TRIGGER,
+	ast_type_MAX
+};
+
+
+struct sql_parsed_ast {
+	const char* sql_query; 	/**< original query */
+	enum ast_type ast_type;	/**< Type of parsed_ast member. */
+	bool keep_ast;		/**< Keep AST after .parse */
+	union {
+		struct Expr *expr;
+		struct Select *select;
+		struct sql_trigger *trigger;
+	};
 };
 
 /*

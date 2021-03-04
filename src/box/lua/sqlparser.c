@@ -15,6 +15,26 @@
 uint32_t CTID_STRUCT_SQL_PARSED_AST = 0;
 static uint32_t CTID_STRUCT_SQL_STMT = 0;
 
+struct sql_parsed_ast*
+sql_ast_alloc(void)
+{
+	struct sql_parsed_ast *p = calloc(1, sizeof(*p));
+	if (p == NULL) {
+		diag_set(OutOfMemory, sizeof(*p), "malloc",
+			 "struct sql_parsed_ast");
+		return NULL;
+	}
+	return p;
+}
+
+void
+sql_ast_free(struct sql_parsed_ast *p)
+{
+	if (p == NULL)
+		return;
+	free(p);
+}
+
 inline struct sql_parsed_ast *
 luaT_check_sql_parsed_ast(struct lua_State *L, int idx)
 {
@@ -124,6 +144,46 @@ lbox_sqlparser_execute(struct lua_State *L)
 		return 1;
 }
 
+int
+lbox_sqlparser_serialize(struct lua_State *L)
+{
+	struct sql_parsed_ast *ast = luaT_check_sql_parsed_ast(L, 1);
+
+	if (AST_VALID(ast)) {
+		assert(ast->ast_type == AST_TYPE_SELECT);
+
+		struct ibuf ibuf;
+		ibuf_create(&ibuf, &cord()->slabc, 1024);
+		ibuf_reset(&ibuf);
+
+		struct Parse parser;
+		struct sql *db = sql_get();
+		sql_parser_create(&parser, db, default_flags);
+		sqlparser_generate_msgpack_walker(&parser, &ibuf, ast->select);
+
+		lua_pushlstring(L, ibuf.buf, ibuf_used(&ibuf));
+		ibuf_reinit(&ibuf);
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int
+lbox_sqlparser_deserialize(struct lua_State *L)
+{
+	int index = lua_gettop(L);
+	int type = index >= 1 ? lua_type(L, 1) : LUA_TNONE;
+	switch (type) {
+	case LUA_TSTRING:
+		return sqlparser_msgpack_decode_string(L, true);
+	default:
+		return luaL_error(L, "sqldeserialize: "
+				  "a Lua string or 'char *' expected");
+	}
+	return 1;
+}
+
 extern char sql_ast_ffi_defs_lua[];
 
 void
@@ -142,6 +202,8 @@ box_lua_sqlparser_init(struct lua_State *L)
 
 	static const struct luaL_Reg meta[] = {
 		{ "parse", lbox_sqlparser_parse },
+		{ "serialize", lbox_sqlparser_serialize },
+		{ "deserialize", lbox_sqlparser_deserialize },
 		{ "execute", lbox_sqlparser_execute },
 		{ NULL, NULL },
 	};

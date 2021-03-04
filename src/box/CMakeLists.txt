@@ -184,6 +184,9 @@ add_library(box STATIC
     sql.c
     bind.c
     execute.c
+    sqlparser.c
+    sqlserialize.c
+    sqldeserialize.c
     sql_stmt_cache.c
     sqlparser.c
     wal.c
