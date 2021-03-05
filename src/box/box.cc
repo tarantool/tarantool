@@ -88,7 +88,8 @@ static char status[64] = "unknown";
 /** box.stat rmean */
 struct rmean *rmean_box;
 
-struct rlist box_on_shutdown = RLIST_HEAD_INITIALIZER(box_on_shutdown);
+struct rlist box_on_shutdown_trigger_list =
+	RLIST_HEAD_INITIALIZER(box_on_shutdown_trigger_list);
 
 static void title(const char *new_status)
 {

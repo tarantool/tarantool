@@ -71,7 +71,8 @@ lbox_ctl_wait_rw(struct lua_State *L)
 static int
 lbox_ctl_on_shutdown(struct lua_State *L)
 {
-	return lbox_trigger_reset(L, 2, &box_on_shutdown, NULL, NULL);
+	return lbox_trigger_reset(L, 2, &box_on_shutdown_trigger_list,
+				  NULL, NULL);
 }
 
 static int
