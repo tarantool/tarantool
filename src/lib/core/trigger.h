@@ -131,6 +131,18 @@ trigger_run(struct rlist *list, void *event);
 int
 trigger_run_reverse(struct rlist *list, void *event);
 
+/**
+ * Runs registered triggers in fibers.
+ * Note, since triggers are added to the list head, this
+ * function first runs triggers that were added last. Waits
+ * for their completion for a specified period of time.
+ * If timeout has expired, trigger currently running continues
+ * to run until it completes, and then function immediately
+ * terminates, without waiting for other triggers.
+ */
+void
+trigger_fiber_run(struct rlist *list, void *event, double timeout);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
