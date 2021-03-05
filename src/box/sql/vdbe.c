@@ -197,21 +197,6 @@ vdbeTakeBranch(int iSrcLine, u8 I, u8 M)
 }
 #endif
 
-/*
- * An ephemeral string value (signified by the MEM_Ephem flag) contains
- * a pointer to a dynamically allocated string where some other entity
- * is responsible for deallocating that string.  Because the register
- * does not control the string, it might be deleted without the register
- * knowing it.
- *
- * This routine converts an ephemeral string into a dynamically allocated
- * string that the register itself controls.  In other words, it
- * converts an MEM_Ephem string into a string with P.z==P.zMalloc.
- */
-#define Deephemeralize(P)					\
-	if (((P)->flags&MEM_Ephem)!=0				\
-	    && sqlVdbeMemMakeWriteable(P)) { goto no_mem;}
-
 /* Return true if the cursor was opened using the OP_OpenSorter opcode. */
 #define isSorter(x) ((x)->eCurType==CURTYPE_SORTER)
 
@@ -981,13 +966,7 @@ case OP_Move: {
 		assert(pIn1<=&aMem[(p->nMem+1 - p->nCursor)]);
 		assert(memIsValid(pIn1));
 		memAboutToChange(p, pOut);
-		sqlVdbeMemMove(pOut, pIn1);
-#ifdef SQL_DEBUG
-		if (pOut->pScopyFrom>=&aMem[p1] && pOut->pScopyFrom<pOut) {
-			pOut->pScopyFrom += pOp->p2 - p1;
-		}
-#endif
-		Deephemeralize(pOut);
+		mem_move(pOut, pIn1);
 		REGISTER_TRACE(p, p2++, pOut);
 		pIn1++;
 		pOut++;
