@@ -99,6 +99,26 @@ lbox_ctl_is_recovery_finished(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_ctl_set_on_shutdown_timeout(struct lua_State *L)
+{
+	int index = lua_gettop(L);
+	if (index != 1) {
+		lua_pushstring(L, "function expected one argument");
+		lua_error(L);
+	}
+
+	double wait_time = luaL_checknumber(L, 1);
+	if (wait_time <= 0) {
+		lua_pushstring(L, "on_shutdown timeout must be greater "
+			       "then zero");
+		lua_error(L);
+	}
+
+	on_shutdown_trigger_timeout = wait_time;
+	return 0;
+}
+
 static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"wait_ro", lbox_ctl_wait_ro},
 	{"wait_rw", lbox_ctl_wait_rw},
@@ -106,6 +126,7 @@ static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"on_schema_init", lbox_ctl_on_schema_init},
 	{"clear_synchro_queue", lbox_ctl_clear_synchro_queue},
 	{"is_recovery_finished", lbox_ctl_is_recovery_finished},
+	{"set_on_shutdown_timeout", lbox_ctl_set_on_shutdown_timeout},
 	{NULL, NULL}
 };
 
