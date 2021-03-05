@@ -99,8 +99,6 @@ static double start_time;
 static struct fiber *on_shutdown_fiber = NULL;
 /** A flag restricting repeated execution of tarantool_exit(). */
 static bool is_shutting_down = false;
-/** A trigger which will break the event loop on shutdown. */
-static struct trigger break_loop_trigger;
 static int exit_code = 0;
 
 double
@@ -137,7 +135,9 @@ static int
 on_shutdown_f(va_list ap)
 {
 	(void) ap;
-	trigger_run(&box_on_shutdown_trigger_list, NULL);
+	trigger_fiber_run(&box_on_shutdown_trigger_list, NULL,
+			  on_shutdown_trigger_timeout);
+	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 }
 
@@ -582,13 +582,6 @@ print_help(const char *program)
 	puts("to see online documentation, submit bugs or contribute a patch.");
 }
 
-static int
-break_loop(struct trigger *, void *)
-{
-	ev_break(loop(), EVBREAK_ALL);
-	return 0;
-}
-
 extern "C" void **
 export_syms(void);
 
@@ -741,13 +734,6 @@ main(int argc, char **argv)
 						 on_shutdown_f);
 		if (on_shutdown_fiber == NULL)
 			diag_raise();
-		/*
-		 * Register a on_shutdown trigger which will break the
-		 * main event loop. The trigger will be the last to run
-		 * since it's the first one we register.
-		 */
-		trigger_create(&break_loop_trigger, break_loop, NULL, NULL);
-		trigger_add(&box_on_shutdown_trigger_list, &break_loop_trigger);
 
 		/*
 		 * The call to tarantool_free() below, thanks to
