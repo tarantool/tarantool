@@ -317,6 +317,12 @@ void
 mem_copy_as_ephemeral(struct Mem *to, const struct Mem *from);
 
 /**
+ * Move all content of source MEM to destination MEM. Source MEM is set to NULL.
+ */
+void
+mem_move(struct Mem *to, struct Mem *from);
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -563,8 +569,6 @@ mem_is_type_compatible(struct Mem *mem, enum field_type type);
 
 int
 vdbe_mem_alloc_blob_region(struct Mem *vdbe_mem, uint32_t size);
-void sqlVdbeMemMove(Mem *, Mem *);
-int sqlVdbeMemMakeWriteable(Mem *);
 
 /**
  * Memory cell mem contains the context of an aggregate function.

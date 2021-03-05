@@ -171,6 +171,16 @@ mem_copy_as_ephemeral(struct Mem *to, const struct Mem *from)
 	return;
 }
 
+void
+mem_move(struct Mem *to, struct Mem *from)
+{
+	mem_destroy(to);
+	memcpy(to, from, sizeof(*to));
+	from->flags = MEM_Null;
+	from->szMalloc = 0;
+	from->zMalloc = NULL;
+}
+
 static inline bool
 mem_has_msgpack_subtype(struct Mem *mem)
 {
@@ -1847,52 +1857,6 @@ vdbe_mem_alloc_blob_region(struct Mem *vdbe_mem, uint32_t size)
 		return -1;
 	vdbe_mem->flags = MEM_Ephem | MEM_Blob;
 	assert(sqlVdbeCheckMemInvariants(vdbe_mem));
-	return 0;
-}
-
-/*
- * Transfer the contents of pFrom to pTo. Any existing value in pTo is
- * freed. If pFrom contains ephemeral data, a copy is made.
- *
- * pFrom contains an SQL NULL when this routine returns.
- */
-void
-sqlVdbeMemMove(Mem * pTo, Mem * pFrom)
-{
-	assert(pFrom->db == 0 || pTo->db == 0 || pFrom->db == pTo->db);
-
-	mem_destroy(pTo);
-	memcpy(pTo, pFrom, sizeof(Mem));
-	pFrom->flags = MEM_Null;
-	pFrom->szMalloc = 0;
-}
-
-/*
- * Change pMem so that its MEM_Str or MEM_Blob value is stored in
- * MEM.zMalloc, where it can be safely written.
- *
- * Return 0 on success or -1 if malloc fails.
- */
-int
-sqlVdbeMemMakeWriteable(Mem * pMem)
-{
-	if ((pMem->flags & (MEM_Str | MEM_Blob)) != 0) {
-		if (ExpandBlob(pMem))
-			return -1;
-		if (pMem->szMalloc == 0 || pMem->z != pMem->zMalloc) {
-			if (sqlVdbeMemGrow(pMem, pMem->n + 2, 1)) {
-				return -1;
-			}
-			pMem->z[pMem->n] = 0;
-			pMem->z[pMem->n + 1] = 0;
-			pMem->flags |= MEM_Term;
-		}
-	}
-	pMem->flags &= ~MEM_Ephem;
-#ifdef SQL_DEBUG
-	pMem->pScopyFrom = 0;
-#endif
-
 	return 0;
 }
 

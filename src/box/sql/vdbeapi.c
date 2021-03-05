@@ -980,7 +980,7 @@ sqlTransferBindings(sql_stmt * pFromStmt, sql_stmt * pToStmt)
 	assert(pTo->db == pFrom->db);
 	assert(pTo->nVar == pFrom->nVar);
 	for (i = 0; i < pFrom->nVar; i++) {
-		sqlVdbeMemMove(&pTo->aVar[i], &pFrom->aVar[i]);
+		mem_move(&pTo->aVar[i], &pFrom->aVar[i]);
 	}
 	return 0;
 }
