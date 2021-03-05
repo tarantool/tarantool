@@ -137,7 +137,7 @@ static int
 on_shutdown_f(va_list ap)
 {
 	(void) ap;
-	trigger_run(&box_on_shutdown, NULL);
+	trigger_run(&box_on_shutdown_trigger_list, NULL);
 	return 0;
 }
 
@@ -747,7 +747,7 @@ main(int argc, char **argv)
 		 * since it's the first one we register.
 		 */
 		trigger_create(&break_loop_trigger, break_loop, NULL, NULL);
-		trigger_add(&box_on_shutdown, &break_loop_trigger);
+		trigger_add(&box_on_shutdown_trigger_list, &break_loop_trigger);
 
 		/*
 		 * The call to tarantool_free() below, thanks to
