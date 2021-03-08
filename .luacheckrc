@@ -30,7 +30,6 @@ include_files = {
 
 exclude_files = {
     "build/**/*.lua",
-    "test-run/**/*.lua",
     "test/app/*.test.lua",
     "test/box/*.test.lua",
     "test/engine/*.test.lua",
