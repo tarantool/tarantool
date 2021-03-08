@@ -32,7 +32,6 @@ exclude_files = {
     "build/**/*.lua",
     -- Third-party source code.
     "src/box/lua/serpent.lua",
-    "test-run/**/*.lua",
     "test/app/*.test.lua",
     "test/box/*.test.lua",
     "test/engine/*.test.lua",
