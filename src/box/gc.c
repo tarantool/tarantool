@@ -239,7 +239,7 @@ gc_cleanup_fiber_f(va_list ap)
 {
 	(void)ap;
 	while (!fiber_is_cancelled()) {
-		int delta = gc.cleanup_scheduled - gc.cleanup_completed;
+		int64_t delta = gc.cleanup_scheduled - gc.cleanup_completed;
 		if (delta == 0) {
 			/* No pending garbage collection. */
 			fiber_sleep(TIMEOUT_INFINITY);
@@ -278,7 +278,7 @@ gc_schedule_cleanup(void)
 static void
 gc_wait_cleanup(void)
 {
-	unsigned scheduled = gc.cleanup_scheduled;
+	int64_t scheduled = gc.cleanup_scheduled;
 	while (gc.cleanup_completed < scheduled)
 		fiber_cond_wait(&gc.cleanup_cond);
 }
