@@ -18,7 +18,9 @@ struct ibuf *
 cord_ibuf_take(void);
 
 /**
- * Put the global ibuf back.
+ * Put the global ibuf back. It is not necessary - the buffer is put back on the
+ * next yield. But then it can't be reused/freed until the yield. Put it back
+ * manually when possible.
  */
 void
 cord_ibuf_put(struct ibuf *ibuf);
@@ -28,6 +30,8 @@ cord_ibuf_put(struct ibuf *ibuf);
  * itself is saved to the stash. Main reason why it is a dedicated function is
  * because it is often needed from Lua, and allows not to call :recycle() there,
  * which would be an additional FFI call before cord_ibuf_put().
+ *
+ * Drop is not necessary though, see the put() comment.
  *
  * XXX: recycle of the global buffer is a workaround for the ibuf being used in
  * some places working with Lua API, where it wasn't wanted to "reuse" it
