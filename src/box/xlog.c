@@ -588,7 +588,7 @@ xdir_scan(struct xdir *dir, bool is_dir_required)
 		signatures[s_count++] = signature;
 	}
 	/** Sort the list of files */
-	if (s_count > 0)
+	if (s_count > 1)
 		qsort(signatures, s_count, sizeof(*signatures), cmp_i64);
 	/**
 	 * Update the log dir index with the current state:
