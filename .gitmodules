@@ -40,3 +40,7 @@
 [submodule "third_party/c-ares"]
 	path = third_party/c-ares
 	url = https://github.com/tarantool/c-ares.git
+[submodule "src/lib/xtm"]
+	path = src/lib/xtm
+	url = https://github.com/tarantool/xtm.git
+	branch = mechanik20051988/gh-4802-implement-xtm-api-1
