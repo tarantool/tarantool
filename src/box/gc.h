@@ -146,7 +146,7 @@ struct gc_state {
 	 * sleep until @completed reaches the value of @scheduled
 	 * taken at that moment of time.
 	 */
-	unsigned cleanup_completed, cleanup_scheduled;
+	int64_t cleanup_completed, cleanup_scheduled;
 	/**
 	 * Set if there's a fiber making a checkpoint right now.
 	 */
