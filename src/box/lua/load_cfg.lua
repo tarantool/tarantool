@@ -123,6 +123,10 @@ local module_cfg = {
 -- provide some API with type enumeration or
 -- similar. Currently it has use for environment
 -- processing only.
+--
+-- get_option_from_env() leans on the set of types
+-- in use: don't forget to update it when add a new
+-- type or a combination of types here.
 local module_cfg_type = {
     -- logging
     log                 = 'string',
@@ -133,6 +137,10 @@ local module_cfg_type = {
 
 -- types of available options
 -- could be comma separated lua types or 'any' if any type is allowed
+--
+-- get_option_from_env() leans on the set of types in use: don't
+-- forget to update it when add a new type or a combination of
+-- types here.
 local template_cfg = {
     listen              = 'string, number',
     memtx_memory        = 'number',
@@ -539,6 +547,18 @@ local function prepare_cfg(cfg, default_cfg, template_cfg,
     return new_cfg
 end
 
+-- Transfer options from env_cfg to cfg.
+local function apply_env_cfg(cfg, env_cfg)
+    -- Add options passed through environment variables.
+    -- Here we only add options without overloading the ones set
+    -- by the user.
+    for k, v in pairs(env_cfg) do
+        if cfg[k] == nil then
+            cfg[k] = v
+        end
+    end
+end
+
 local function apply_default_cfg(cfg, default_cfg, module_cfg)
     for k,v in pairs(default_cfg) do
         if cfg[k] == nil then
@@ -682,6 +702,10 @@ local function load_cfg(cfg)
     end
 
     cfg = upgrade_cfg(cfg, translate_cfg)
+
+    -- Set options passed through environment variables.
+    apply_env_cfg(cfg, box.internal.cfg.env)
+
     cfg = prepare_cfg(cfg, default_cfg, template_cfg,
                       module_cfg, modify_cfg)
     apply_default_cfg(cfg, default_cfg, module_cfg);
@@ -793,6 +817,81 @@ box_load_and_execute = function(...)
     return box.execute(...)
 end
 box.execute = box_load_and_execute
+
+--
+-- Parse TT_* environment variable that corresponds to given
+-- option.
+--
+local function get_option_from_env(option)
+    local param_type = template_cfg[option]
+    assert(type(param_type) == 'string')
+
+    if param_type == 'module' then
+        -- Parameter from module.
+        param_type = module_cfg_type[option]
+    end
+
+    local env_var_name = 'TT_' .. option:upper()
+    local raw_value = os.getenv(env_var_name)
+
+    if raw_value == nil or raw_value == '' then
+        return nil
+    end
+
+    local err_msg_fmt = 'Environment variable %s has ' ..
+        'incorrect value for option "%s": should be %s'
+
+    -- This code lean on the existing set of template_cfg and
+    -- module_cfg_type types for simplicity.
+    if param_type:find('table') and raw_value:find(',') then
+        assert(not param_type:find('boolean'))
+        local res = {}
+        for i, v in ipairs(raw_value:split(',')) do
+            res[i] = tonumber(v) or v
+        end
+        return res
+    elseif param_type:find('boolean') then
+        assert(param_type == 'boolean')
+        if raw_value:lower() == 'false' then
+            return false
+        elseif raw_value:lower() == 'true' then
+            return true
+        end
+        error(err_msg_fmt:format(env_var_name, option, '"true" or "false"'))
+    elseif param_type == 'number' then
+        local res = tonumber(raw_value)
+        if res == nil then
+            error(err_msg_fmt:format(env_var_name, option,
+                'convertible to a number'))
+        end
+        return res
+    elseif param_type:find('number') then
+        assert(not param_type:find('boolean'))
+        return tonumber(raw_value) or raw_value
+    else
+        assert(param_type == 'string')
+        return raw_value
+    end
+end
+
+--
+-- Read box configuration from environment variables.
+--
+box.internal.cfg = setmetatable({}, {
+    __index = function(self, key)
+        if key == 'env' then
+            local res = {}
+            for option, _ in pairs(template_cfg) do
+                res[option] = get_option_from_env(option)
+            end
+            return res
+        end
+        assert(false)
+    end,
+    __newindex = function(self, key, value) -- luacheck: no unused args
+        error('Attempt to modify a read-only table')
+    end,
+})
 
 -- gh-810:
 -- hack luajit default cpath

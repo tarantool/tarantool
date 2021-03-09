@@ -449,10 +449,27 @@ local function wrapper_cfg(cfg)
         end
     end
 
+    -- Collect box.cfg options from environment variables if
+    -- tarantool supports this feature.
+    local ok, env_cfg = pcall(function()
+        return box.internal.cfg and box.internal.cfg.env or {}
+    end)
+    if not ok then
+        log.error(tostring(env_cfg))
+        os.exit(1)
+    end
+
     cfg = cfg or {}
     for i, v in pairs(default_cfg) do
         if cfg[i] == nil then
-            cfg[i] = v
+            -- If an option is set using an environment variable,
+            -- prefer this value. Otherwise fallback to
+            -- tarantoolctl's default value.
+            --
+            -- If we'll not do it there, the tarantoolctl's
+            -- default will rewrite the value passed via the
+            -- environment variable.
+            cfg[i] = env_cfg[i] or v
         end
     end
     -- force these startup options
