@@ -1,6 +1,10 @@
 name: source
 
-on: [push]
+on:
+  push:
+  repository_dispatch:
+    types: [backend_automation]
+  workflow_dispatch:
 
 env:
   CI_MAKE: make -f .gitlab.mk
