@@ -1,6 +1,11 @@
 name: static_build_cmake_linux
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  repository_dispatch:
+    types: [backend_automation]
+  workflow_dispatch:
 
 env:
   CI_MAKE: make -f .travis.mk
