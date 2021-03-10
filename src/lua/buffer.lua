@@ -215,6 +215,55 @@ local function ibuf_new(arg)
 end
 
 --
+-- Stash keeps an FFI object for re-usage and helps to ensure the proper
+-- ownership. Is supposed to be used in yield-free code when almost always it is
+-- possible to put the taken object back.
+-- Then cost of the stash is almost the same as ffi.new() for small objects like
+-- 'int[1]' even when jitted. Examples:
+--
+-- * ffi.new('int[1]') is about ~0.4ns, while the stash take() + put() is about
+--   ~0.8ns;
+--
+-- * Much better on objects > 128 bytes in size. ffi.new('struct uri[1]') is
+--   ~300ns, while the stash is still ~0.8ns;
+--
+-- * For structs not allocated as an array is also much better than ffi.new().
+--   For instance, ffi.new('struct tt_uuid') is ~300ns, the stash is ~0.8ns.
+--   Even though 'struct tt_uuid' is 16 bytes;
+--
+local function ffi_stash_new(c_type)
+    local item = nil
+
+    local function take()
+        local res
+        -- This line is guaranteed to be GC-safe. GC is not invoked. Because
+        -- there are no allocation. So it can be considered 'atomic'.
+        res, item = item, nil
+        -- The next lines don't need to be atomic and can survive GC. The only
+        -- important part was to take the global item and set it to nil.
+        if res then
+            return res
+        end
+        return ffi.new(c_type)
+    end
+
+    local function put(i)
+        -- It is ok to rewrite the existing global item if it was set. Does
+        -- not matter. They are all the same.
+        item = i
+    end
+
+    -- Due to some random reason if the stash returns a table with methods it
+    -- works faster than returning them as multiple values. Regardless of how
+    -- the methods are used later. Even if the caller will cache take and put
+    -- methods anyway.
+    return {
+        take = take,
+        put = put,
+    }
+end
+
+--
 -- NOTE: ffi.new() with inlined size <= 128 works even faster
 --       than this allocator. If your size is a constant <= 128 -
 --       use ffi.new(). This function is faster than malloc,
@@ -299,5 +348,6 @@ return {
     -- Keep reference.
     reg_array = reg_array,
     reg1 = reg_array[0],
-    reg2 = reg_array[1]
+    reg2 = reg_array[1],
+    ffi_stash_new = ffi_stash_new,
 }
