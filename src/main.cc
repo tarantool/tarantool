@@ -76,6 +76,7 @@
 #include "box/lua/init.h" /* box_lua_init() */
 #include "box/session.h"
 #include "systemd.h"
+#include "errinj.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -749,6 +750,9 @@ main(int argc, char **argv)
 	signal_init();
 	cbus_init();
 	coll_init();
+#ifndef NDEBUG
+	errinj_set_with_environment_vars();
+#endif
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
 
 	start_time = ev_monotonic_time();

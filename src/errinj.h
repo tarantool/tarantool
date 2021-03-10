@@ -153,6 +153,11 @@ typedef int (*errinj_cb)(struct errinj *e, void *cb_ctx);
 int
 errinj_foreach(errinj_cb cb, void *cb_ctx);
 
+/**
+ * Set injections by scanning ERRINJ_$(NAME) in environment variables
+ */
+void errinj_set_with_environment_vars(void);
+
 #ifdef NDEBUG
 #  define ERROR_INJECT(ID, CODE)
 #  define errinj(ID, TYPE) ((struct errinj *) NULL)
