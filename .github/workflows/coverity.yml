@@ -1,6 +1,9 @@
 name: coverity
 
 on:
+  repository_dispatch:
+    types: [backend_automation]
+  workflow_dispatch:
   schedule:
     - cron:  '0 4 * * 6'
 
