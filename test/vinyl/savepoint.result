@@ -34,7 +34,8 @@ space:select{}
 ...
 space:insert({1})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''[1]'', new tuple - ''[1]'''
 ...
 space:select{}
 ---
@@ -59,7 +60,8 @@ space:insert({7})
 ...
 space:insert({7})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''[7]'', new tuple - ''[7]'''
 ...
 space:insert({8})
 ---
@@ -140,7 +142,8 @@ space:insert({3, 2, 'b'})
 ...
 space:insert({2, 3, 'c'})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''[2, 2, "a"]'', new tuple - ''[2, 3, "c"]'''
 ...
 index:select{}
 ---
@@ -160,15 +163,18 @@ box.begin()
 ...
 space:insert({1, 10, '10'})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''[1, 1, "a"]'', new tuple - ''[1, 10, "10"]'''
 ...
 space:insert({2, 10, '10'})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''[2, 2, "a"]'', new tuple - ''[2, 10, "10"]'''
 ...
 space:insert({3, 10, '10'})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''[3, 2, "b"]'', new tuple - ''[3, 10, "10"]'''
 ...
 box.commit()
 ---
@@ -191,7 +197,8 @@ box.begin()
 ...
 space:insert({1, 1, '1'})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''[1, 1, "a"]'', new tuple - ''[1, 1, "1"]'''
 ...
 space:insert({4, 4, 'd'})
 ---
@@ -234,7 +241,8 @@ space:insert({7, 6, 'e'})
 ...
 space:insert({1, 1, '1'})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''[1, 1, "a"]'', new tuple - ''[1, 1, "1"]'''
 ...
 box.commit()
 ---
@@ -265,7 +273,8 @@ box.begin()
 ...
 space:insert({1, 100, '100'})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''[1, 1, "a"]'', new tuple - ''[1, 100, "100"]'''
 ...
 box.commit()
 ---
@@ -296,7 +305,8 @@ box.begin()
 ...
 space:insert({8, 6, 'd'})
 ---
-- error: Duplicate key exists in unique index 'secondary' in space 'test'
+- error: 'Duplicate key exists in unique index ''secondary'' in space ''test'': old
+    tuple - ''[6, 6, "d"]'', new tuple - ''[8, 6, "d"]'''
 ...
 box.commit()
 ---
@@ -498,7 +508,8 @@ box.begin()
 ...
 space:insert({1, 'a', 'sclr1', 20})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''[1, "a", "sclr1", 20]'', new tuple - ''[1, "a", "sclr1", 20]'''
 ...
 space:update({2, 'a'}, {{'=', 3, 3.14}})
 ---
@@ -629,7 +640,8 @@ index3:delete({3, 'a'})
 ...
 space:insert({4, 100, 100})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''[4, 2, "b"]'', new tuple - ''[4, 100, 100]'''
 ...
 box.rollback()
 ---

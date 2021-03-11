@@ -40,7 +40,9 @@ box.internal.collation.create('test', 'ICU', 'ru_RU', setmap{}) --ok
  | ...
 box.internal.collation.create('test', 'ICU', 'ru_RU')
  | ---
- | - error: Duplicate key exists in unique index 'name' in space '_collation'
+ | - error: 'Duplicate key exists in unique index ''name'' in space ''_collation'': old
+ |     tuple - ''[277, "test", 1, "ICU", "ru_RU", {"strength": "tertiary"}]'', new tuple
+ |     - ''[278, "test", 1, "ICU", "ru_RU", {"strength": "tertiary"}]'''
  | ...
 box.internal.collation.drop('test')
  | ---
@@ -160,7 +162,9 @@ box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}} --ok
  | ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}}
  | ---
- | - error: Duplicate key exists in unique index 'name' in space '_collation'
+ | - error: 'Duplicate key exists in unique index ''name'' in space ''_collation'': old
+ |     tuple - ''[277, "test", 0, "ICU", "ru_RU", {}]'', new tuple - ''[278, "test",
+ |     0, "ICU", "ru_RU", {}]'''
  | ...
 box.space._collation.index.name:delete{'test'} -- ok
  | ---

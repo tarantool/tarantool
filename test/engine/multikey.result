@@ -61,7 +61,10 @@ s:insert({2, {3, 4, 5}, {{fname='Ivan', sname='Ivanych'}}})
 ...
 _ = s:create_index('arr_idx', {unique = true, parts = {{2, 'unsigned', path = '[*]'}}})
 ---
-- error: Duplicate key exists in unique index 'arr_idx' in space 'withdata'
+- error: 'Duplicate key exists in unique index ''arr_idx'' in space ''withdata'':
+    old tuple - ''[1, [1, 2, 3], [{"sname": "Bond", "fname": "James"}, {"sname": "Pupkin",
+    "fname": "Vasya"}]]'', new tuple - ''[2, [3, 4, 5], [{"sname": "Ivanych", "fname":
+    "Ivan"}]]'''
 ...
 -- Non-unique multikey index; two multikey indexes per space.
 arr_idx = s:create_index('arr_idx', {unique = false, parts = {{2, 'unsigned', path = '[*]'}}})
@@ -96,11 +99,16 @@ idx:select()
 ...
 s:insert({3, {1, 2}, {{fname='Vasya', sname='Pupkin'}}})
 ---
-- error: Duplicate key exists in unique index 'idx' in space 'withdata'
+- error: 'Duplicate key exists in unique index ''idx'' in space ''withdata'': old
+    tuple - ''[1, [1, 2, 3], [{"sname": "Bond", "fname": "James"}, {"sname": "Pupkin",
+    "fname": "Vasya"}]]'', new tuple - ''[3, [1, 2], [{"sname": "Pupkin", "fname":
+    "Vasya"}]]'''
 ...
 s:insert({4, {1}, {{fname='James', sname='Bond'}}})
 ---
-- error: Duplicate key exists in unique index 'idx' in space 'withdata'
+- error: 'Duplicate key exists in unique index ''idx'' in space ''withdata'': old
+    tuple - ''[1, [1, 2, 3], [{"sname": "Bond", "fname": "James"}, {"sname": "Pupkin",
+    "fname": "Vasya"}]]'', new tuple - ''[4, [1], [{"sname": "Bond", "fname": "James"}]]'''
 ...
 idx:select()
 ---
@@ -239,7 +247,8 @@ s:insert({2, {2, 2}})
 ...
 s:insert({3, {3, 3, 2, 2, 1, 1}})
 ---
-- error: Duplicate key exists in unique index 'idx0' in space 'withdata'
+- error: 'Duplicate key exists in unique index ''idx0'' in space ''withdata'': old
+    tuple - ''[2, [2, 2]]'', new tuple - ''[3, [3, 3, 2, 2, 1, 1]]'''
 ...
 idx0:get(2)
 ---
@@ -491,11 +500,19 @@ s:replace({2, {{fname='A2_2'}, {fname='B2_2', name='ZB2_2'}, {fname='C2_2'}, {na
 ...
 s:replace({2, {{fname='A2_3'}, {fname='B2_3', name='ZB2_3'}, {fname='C2_3'}, {name="DUP"}, {name='CONFLICT1'}, {name='CONFLICT2'}, {name="DUP"}}})
 ---
-- error: Duplicate key exists in unique index 'idx0' in space 'withdata'
+- error: 'Duplicate key exists in unique index ''idx0'' in space ''withdata'': old
+    tuple - ''[0, [{"fname": "A0"}, {"fname": "B0"}, {"name": "CONFLICT1", "fname":
+    "C0"}]]'', new tuple - ''[2, [{"fname": "A2_3"}, {"name": "ZB2_3", "fname": "B2_3"},
+    {"fname": "C2_3"}, {"name": "DUP"}, {"name": "CONFLICT1"}, {"name": "CONFLICT2"},
+    {"name": "DUP"}]]'''
 ...
 s:replace({2, {{fname='A2_4'}, {fname='B2_4', name='ZB2_4'}, {fname='C2_4'}, {name="DUP"}, {name='CONFLICT2'}, {name='CONFLICT1'}, {name="DUP"}}})
 ---
-- error: Duplicate key exists in unique index 'idx0' in space 'withdata'
+- error: 'Duplicate key exists in unique index ''idx0'' in space ''withdata'': old
+    tuple - ''[1, [{"fname": "A1"}, {"fname": "B1"}, {"name": "CONFLICT2", "fname":
+    "C1"}]]'', new tuple - ''[2, [{"fname": "A2_4"}, {"name": "ZB2_4", "fname": "B2_4"},
+    {"fname": "C2_4"}, {"name": "DUP"}, {"name": "CONFLICT2"}, {"name": "CONFLICT1"},
+    {"name": "DUP"}]]'''
 ...
 idx0:select()
 ---

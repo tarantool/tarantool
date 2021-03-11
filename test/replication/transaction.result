@@ -80,7 +80,8 @@ box.info.replication[1].upstream.status
 ...
 box.info.replication[1].upstream.message
 ---
-- Duplicate key exists in unique index 'pk' in space 'test'
+- 'Duplicate key exists in unique index ''pk'' in space ''test'': old tuple - ''[4,
+  "r"]'', new tuple - ''[4, "m"]'''
 ...
 -- set conflict to third transaction
 _ = box.space.test:delete({4})
@@ -125,7 +126,8 @@ box.info.replication[1].upstream.status
 ...
 box.info.replication[1].upstream.message
 ---
-- Duplicate key exists in unique index 'pk' in space 'test'
+- 'Duplicate key exists in unique index ''pk'' in space ''test'': old tuple - ''[6,
+  "r"]'', new tuple - ''[6, "m"]'''
 ...
 -- check restart does not help
 test_run:cmd("switch default")

@@ -143,7 +143,8 @@ box.space.test:insert{ffi.new('uint64_t', 0)}
 -- check duplicates
 box.space.test:insert{decimal.new(0)}
  | ---
- | - error: Duplicate key exists in unique index 'pk' in space 'test'
+ | - error: 'Duplicate key exists in unique index ''pk'' in space ''test'': old tuple
+ |     - ''[0]'', new tuple - ''[0]'''
  | ...
 
 box.space.test.index.pk:drop()
@@ -210,19 +211,23 @@ box.space.test:select{}
 -- check duplicates
 box.space.test:insert{-2}
  | ---
- | - error: Duplicate key exists in unique index 'pk' in space 'test'
+ | - error: 'Duplicate key exists in unique index ''pk'' in space ''test'': old tuple
+ |     - ''[-2]'', new tuple - ''[-2]'''
  | ...
 box.space.test:insert{decimal.new(-2)}
  | ---
- | - error: Duplicate key exists in unique index 'pk' in space 'test'
+ | - error: 'Duplicate key exists in unique index ''pk'' in space ''test'': old tuple
+ |     - ''[-2]'', new tuple - ''[-2]'''
  | ...
 box.space.test:insert{decimal.new(-1.875)}
  | ---
- | - error: Duplicate key exists in unique index 'pk' in space 'test'
+ | - error: 'Duplicate key exists in unique index ''pk'' in space ''test'': old tuple
+ |     - ''[-1.875]'', new tuple - ''[-1.875]'''
  | ...
 box.space.test:insert{-1.875}
  | ---
- | - error: Duplicate key exists in unique index 'pk' in space 'test'
+ | - error: 'Duplicate key exists in unique index ''pk'' in space ''test'': old tuple
+ |     - ''[-1.875]'', new tuple - ''[-1.875]'''
  | ...
 
 box.space.test.index.pk:drop()

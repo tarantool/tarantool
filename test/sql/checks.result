@@ -627,7 +627,9 @@ _ = s1:create_check_constraint('physics', 'X < Y')
 ...
 _ = s1:create_check_constraint('physics', 'X > Y')
 ---
-- error: Duplicate key exists in unique index 'primary' in space '_ck_constraint'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''_ck_constraint'':
+    old tuple - ''[534, "physics", false, "SQL", "X < Y", true]'', new tuple - ''[534,
+    "physics", false, "SQL", "X > Y", true]'''
 ...
 _ = s1:create_check_constraint('greater', 'X > 20')
 ---

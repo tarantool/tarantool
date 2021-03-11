@@ -94,7 +94,9 @@ s.id
 -- duplicate id
 box.schema.space.create('tweedledee', { id = 3000 })
 ---
-- error: Duplicate key exists in unique index 'primary' in space '_space'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''_space'': old
+    tuple - ''[3000, 1, "tweedledum", "memtx", 0, {}, []]'', new tuple - ''[3000,
+    1, "tweedledee", "memtx", 0, {}, []]'''
 ...
 -- stupid space id
 box.schema.space.create('tweedledee', { id = 'tweedledee' })
@@ -736,7 +738,9 @@ index = s:create_index('third', { type = 'hash', parts = {  3, 'unsigned' } })
 ...
 s.index.third:rename('second')
 ---
-- error: Duplicate key exists in unique index 'name' in space '_index'
+- error: 'Duplicate key exists in unique index ''name'' in space ''_index'': old tuple
+    - ''[814, 1, "second", "tree", {"unique": true}, [[1, "string"]]]'', new tuple
+    - ''[814, 2, "second", "hash", {"unique": true}, [[2, "unsigned"]]]'''
 ...
 s.index.third.id
 ---
@@ -817,12 +821,14 @@ s.index.primary:select{}
 -- a duplicate in the created index
 index = s:create_index('nodups', { type = 'tree', unique=true, parts = { 2, 'unsigned'} })
 ---
-- error: Duplicate key exists in unique index 'nodups' in space 'full'
+- error: 'Duplicate key exists in unique index ''nodups'' in space ''full'': old tuple
+    - ''["Barbara", 2012]'', new tuple - ''["Cloud Atlas", 2012]'''
 ...
 -- change of non-unique index to unique: same effect
 s.index.year:alter({unique=true})
 ---
-- error: Duplicate key exists in unique index 'year' in space 'full'
+- error: 'Duplicate key exists in unique index ''year'' in space ''full'': old tuple
+    - ''["Barbara", 2012]'', new tuple - ''["Cloud Atlas", 2012]'''
 ...
 s.index.primary:select{}
 ---
@@ -895,7 +901,8 @@ s:insert{2, 1}
 ...
 s.index.secondary:alter{ unique = true }
 ---
-- error: Duplicate key exists in unique index 'secondary' in space 'test'
+- error: 'Duplicate key exists in unique index ''secondary'' in space ''test'': old
+    tuple - ''[1, 1]'', new tuple - ''[2, 1]'''
 ...
 s:delete{2}
 ---
@@ -906,7 +913,8 @@ s.index.secondary:alter{ unique = true }
 ...
 s:insert{2, 1}
 ---
-- error: Duplicate key exists in unique index 'secondary' in space 'test'
+- error: 'Duplicate key exists in unique index ''secondary'' in space ''test'': old
+    tuple - ''[1, 1]'', new tuple - ''[2, 1]'''
 ...
 s:insert{2, 2}
 ---

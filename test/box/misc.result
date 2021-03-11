@@ -251,7 +251,8 @@ pcall(myinsert, {1, 'hello'})
 pcall(myinsert, {1, 'hello'})
 ---
 - false
-- Duplicate key exists in unique index 'primary' in space 'tweedledum'
+- 'Duplicate key exists in unique index ''primary'' in space ''tweedledum'': old tuple
+  - ''[1, "hello"]'', new tuple - ''[1, "hello"]'''
 ...
 box.space.tweedledum:truncate()
 ---

@@ -102,7 +102,8 @@ errinj.set('ERRINJ_BUILD_INDEX_DELAY', true);
 fiber.new(function() t:replace{1, 2} errinj.set('ERRINJ_BUILD_INDEX_DELAY',false) end)
 t:create_index('sk', {parts = {2, 'unsigned'}, unique=true});
 ---
-- error: Duplicate key exists in unique index 'sk' in space 'space'
+- error: 'Duplicate key exists in unique index ''sk'' in space ''space'': old tuple
+    - ''[1, 2]'', new tuple - ''[2, 2]'''
 ...
 t:get{1};
 ---
@@ -123,7 +124,8 @@ errinj.set('ERRINJ_BUILD_INDEX_DELAY', true);
 fiber.new(function() t:replace{2, 3} errinj.set('ERRINJ_BUILD_INDEX_DELAY', false) end)
 t:create_index('sk', {parts = {2, 'unsigned'}, unique=true});
 ---
-- error: Duplicate key exists in unique index 'sk' in space 'space'
+- error: 'Duplicate key exists in unique index ''sk'' in space ''space'': old tuple
+    - ''[2, 3]'', new tuple - ''[3, 3]'''
 ...
 t:get{2};
 ---
@@ -337,7 +339,8 @@ errinj.set("ERRINJ_BUILD_INDEX_DELAY", true)
 ...
 s:create_index('sk', {parts = {2, 'unsigned'}}) -- must fail
 ---
-- error: Duplicate key exists in unique index 'sk' in space 'test'
+- error: 'Duplicate key exists in unique index ''sk'' in space ''test'': old tuple
+    - ''[101, 101, "xxxxxxxxxxxxxxxx"]'', new tuple - ''[100, 101]'''
 ...
 ch:get()
 ---

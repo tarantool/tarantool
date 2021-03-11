@@ -622,7 +622,8 @@ space:select{}
 ...
 space:update({1}, {{'=', 2, 2}, {'=', 3, 3}})
 ---
-- error: Duplicate key exists in unique index 'secondary' in space 'test'
+- error: 'Duplicate key exists in unique index ''secondary'' in space ''test'': old
+    tuple - ''[2, 2, 2]'', new tuple - ''[1, 2, 3]'''
 ...
 index1:select{}
 ---
