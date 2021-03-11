@@ -49,7 +49,8 @@ box.space._ck_constraint:insert({550, 'CK_CONSTRAINT_01', false, 'SQL', 'X<5', t
 -- Pass integer instead of expression.
 box.space._ck_constraint:insert({513, 'CK_CONSTRAINT_01', false, 'SQL', 666, true})
 ---
-- error: 'Tuple field 5 type does not match one required by operation: expected string'
+- error: 'Tuple field 5 type does not match one required by operation: expected string,
+    got unsigned'
 ...
 -- Deferred CK constraints are not supported.
 box.space._ck_constraint:insert({513, 'CK_CONSTRAINT_01', true, 'SQL', 'X<5', true})
@@ -392,7 +393,8 @@ _ = box.space._ck_constraint:insert({s.id, 'XlessY', false, 'SQL', 'X < Y and Y 
 ...
 s:insert({'1', 2})
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+    got string'
 ...
 s:insert({})
 ---

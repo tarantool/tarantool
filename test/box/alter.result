@@ -36,7 +36,8 @@ _space:insert{_space.id, ADMIN, 'test', 'memtx', 0, EMPTY_MAP, {}}
 --
 _space:insert{'hello', 'world', 'test', 'memtx', 0, EMPTY_MAP, {}}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+    got string'
 ...
 --
 -- Can't create a space which has wrong field count - field_count must be NUM
@@ -1016,7 +1017,8 @@ s:replace{1}
 ...
 pk:alter{parts = {{1, 'string'}}} -- Must fail.
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected string'
+- error: 'Tuple field 1 type does not match one required by operation: expected string,
+    got unsigned'
 ...
 s:drop()
 ---

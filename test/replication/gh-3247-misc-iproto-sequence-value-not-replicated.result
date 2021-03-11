@@ -41,7 +41,8 @@ c = net_box.connect(box.cfg.listen)
 ...
 c.space.space1:insert{box.NULL, "data"} -- fails, but bumps sequence value
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got string'
 ...
 c.space.space1:insert{box.NULL, 1, "data"}
 ---
