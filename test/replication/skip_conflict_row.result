@@ -120,7 +120,7 @@ lsn1 == box.info.vclock[1]
 - true
 ...
 ok, instance_info = test_run:wait_upstream(1, {status = 'stopped', \
-    message_re = "Duplicate key exists in unique index 'primary' in space 'test'"})
+    message_re = "Duplicate key exists in unique index \"primary\" in space \"test\""})
 ---
 ...
 ok or require('log').error('test_run:wait_upstream failed with instance info: ' \
@@ -138,7 +138,7 @@ test_run:cmd("restart server replica")
 ...
 -- applier is not in follow state
 ok, instance_info = test_run:wait_upstream(1, {status = 'stopped', \
-    message_re = "Duplicate key exists in unique index 'primary' in space 'test'"})
+    message_re = "Duplicate key exists in unique index \"primary\" in space \"test\""})
 ---
 ...
 ok or require('log').error('test_run:wait_upstream failed with instance info: ' \

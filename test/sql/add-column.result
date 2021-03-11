@@ -95,7 +95,8 @@ INSERT INTO pk_check VALUES (1, 1);
 INSERT INTO pk_check VALUES (1, 1);
  | ---
  | - null
- | - Duplicate key exists in unique index 'pk_unnamed_PK_CHECK_1' in space 'PK_CHECK'
+ | - Duplicate key exists in unique index "pk_unnamed_PK_CHECK_1" in space "PK_CHECK"
+ |   with old tuple - [1, 1] and new tuple - [1, 1]
  | ...
 DROP TABLE pk_check;
  | ---
@@ -120,7 +121,8 @@ INSERT INTO unique_check VALUES (1, 1);
 INSERT INTO unique_check VALUES (2, 1);
  | ---
  | - null
- | - Duplicate key exists in unique index 'unique_unnamed_UNIQUE_CHECK_2' in space 'UNIQUE_CHECK'
+ | - Duplicate key exists in unique index "unique_unnamed_UNIQUE_CHECK_2" in space "UNIQUE_CHECK"
+ |   with old tuple - [1, 1] and new tuple - [2, 1]
  | ...
 DROP TABLE unique_check;
  | ---
@@ -509,7 +511,8 @@ INSERT INTO t2 VALUES (1, 1, 1);
 INSERT INTO t2 VALUES (2, 1, 1);
  | ---
  | - null
- | - Duplicate key exists in unique index 'unique_unnamed_T2_2' in space 'T2'
+ | - Duplicate key exists in unique index "unique_unnamed_T2_2" in space "T2" with old
+ |   tuple - [1, 1, 1] and new tuple - [2, 1, 1]
  | ...
 SELECT * FROM t2;
  | ---

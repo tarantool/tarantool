@@ -702,7 +702,8 @@ box.execute("INSERT INTO t3b VALUES ('A');")
 box.execute("INSERT INTO t3b VALUES ('a');")
 ---
 - null
-- Duplicate key exists in unique index 'pk_unnamed_T3B_1' in space 'T3B'
+- Duplicate key exists in unique index "pk_unnamed_T3B_1" in space "T3B" with old
+  tuple - ["a"] and new tuple - ["a"]
 ...
 box.execute("SELECT * FROM t3b;")
 ---
@@ -767,7 +768,8 @@ box.execute("INSERT INTO t3c VALUES ('A');")
 box.execute("INSERT INTO t3c VALUES ('a');")
 ---
 - null
-- Duplicate key exists in unique index 'pk_unnamed_T3C_1' in space 'T3C'
+- Duplicate key exists in unique index "pk_unnamed_T3C_1" in space "T3C" with old
+  tuple - ["a"] and new tuple - ["a"]
 ...
 box.execute("SELECT * FROM t3c;")
 ---
@@ -832,7 +834,8 @@ box.execute("INSERT INTO t3d VALUES ('A');")
 box.execute("INSERT INTO t3d VALUES ('a');")
 ---
 - null
-- Duplicate key exists in unique index 'pk_unnamed_T3D_1' in space 'T3D'
+- Duplicate key exists in unique index "pk_unnamed_T3D_1" in space "T3D" with old
+  tuple - ["a"] and new tuple - ["a"]
 ...
 box.execute("SELECT * FROM t3d;")
 ---
@@ -863,7 +866,8 @@ box.execute("INSERT INTO t3e VALUES ('a');")
 box.execute("INSERT INTO t3e VALUES ('A');")
 ---
 - null
-- Duplicate key exists in unique index 'pk_unnamed_T3E_1' in space 'T3E'
+- Duplicate key exists in unique index "pk_unnamed_T3E_1" in space "T3E" with old
+  tuple - ["a"] and new tuple - ["A"]
 ...
 box.execute("SELECT * FROM t3e;")
 ---
@@ -927,7 +931,8 @@ box.execute("INSERT INTO t3f VALUES ('A');")
 box.execute("INSERT INTO t3f VALUES ('a');")
 ---
 - null
-- Duplicate key exists in unique index 'pk_unnamed_T3F_1' in space 'T3F'
+- Duplicate key exists in unique index "pk_unnamed_T3F_1" in space "T3F" with old
+  tuple - ["a"] and new tuple - ["a"]
 ...
 box.execute("SELECT * FROM t3f;")
 ---
@@ -958,7 +963,8 @@ box.execute("INSERT INTO t3g VALUES ('a');")
 box.execute("INSERT INTO t3g VALUES ('A');")
 ---
 - null
-- Duplicate key exists in unique index 'pk_unnamed_T3G_1' in space 'T3G'
+- Duplicate key exists in unique index "pk_unnamed_T3G_1" in space "T3G" with old
+  tuple - ["a"] and new tuple - ["A"]
 ...
 box.execute("SELECT * FROM t3g;")
 ---
@@ -1228,15 +1234,18 @@ s:insert{'Ё'}
 -- the following calls should fail
 s:insert{'е'}
 ---
-- error: Duplicate key exists in unique index 'pk' in space 't1'
+- error: Duplicate key exists in unique index "pk" in space "t1" with old tuple -
+    ["Ё"] and new tuple - ["е"]
 ...
 s:insert{'Е'}
 ---
-- error: Duplicate key exists in unique index 'pk' in space 't1'
+- error: Duplicate key exists in unique index "pk" in space "t1" with old tuple -
+    ["Ё"] and new tuple - ["Е"]
 ...
 s:insert{'ё'}
 ---
-- error: Duplicate key exists in unique index 'pk' in space 't1'
+- error: Duplicate key exists in unique index "pk" in space "t1" with old tuple -
+    ["Ё"] and new tuple - ["ё"]
 ...
 -- return single 'Ё'
 s:select{}

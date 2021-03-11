@@ -1513,9 +1513,9 @@ vy_check_is_unique_primary(struct vy_tx *tx, const struct vy_read_view **rv,
 	if (vy_get(lsm, tx, rv, stmt, &found))
 		return -1;
 	if (found != NULL) {
+		diag_set(ClientError, ER_TUPLE_FOUND, index_name, space_name,
+			 tuple_str(found), tuple_str(stmt));
 		tuple_unref(found);
-		diag_set(ClientError, ER_TUPLE_FOUND,
-			 index_name, space_name);
 		return -1;
 	}
 	return 0;
@@ -1561,9 +1561,9 @@ vy_check_is_unique_secondary_one(struct vy_tx *tx, const struct vy_read_view **r
 		return 0;
 	}
 	if (found != NULL) {
+		diag_set(ClientError, ER_TUPLE_FOUND, index_name, space_name,
+			 tuple_str(found), tuple_str(stmt));
 		tuple_unref(found);
-		diag_set(ClientError, ER_TUPLE_FOUND,
-			 index_name, space_name);
 		return -1;
 	}
 	return 0;

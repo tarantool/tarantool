@@ -397,7 +397,8 @@ true_check_res
  | ---
  | - - 'Finished ok, errors and trigger catcher content: '
  |   - 'Check constraint failed ''CK1'': b < 100'
- |   - Duplicate key exists in unique index 'unique_unnamed_T2_2' in space 'T2'
+ |   - Duplicate key exists in unique index "unique_unnamed_T2_2" in space "T2" with
+ |     old tuple - [1, 1, 1] and new tuple - [2, 2, 1]
  |   - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
  |   - 'Check constraint failed ''CK2'': a > 0'
  |   - metadata:

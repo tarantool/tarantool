@@ -253,7 +253,8 @@ old_index2_size = index2:bsize()
 ...
 space:insert({2, 'b', 4})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: Duplicate key exists in unique index "primary" in space "test" with old tuple
+    - [2, "b", 4] and new tuple - [2, "b", 4]
 ...
 old_pk_size == pk:bsize()
 ---

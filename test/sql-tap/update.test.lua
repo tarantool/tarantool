@@ -917,7 +917,7 @@ test:do_catchsql_test("update-10.3", [[
   SELECT a,b,c,d,e,f FROM t1;
 ]], {
   -- <update-10.3>
-  1, "Duplicate key exists in unique index 'unique_unnamed_T1_1' in space 'T1'"
+  1, "Duplicate key exists in unique index \"unique_unnamed_T1_1\" in space \"T1\" with old tuple - [1, 2, 3, 4, 9, 6, 1] and new tuple - [1, 3, 4, 4, 10, 7, 2]"
   -- </update-10.3>
 })
 
@@ -943,7 +943,7 @@ test:do_catchsql_test("update-10.6", [[
   SELECT a,b,c,d,e,f FROM t1;
 ]], {
   -- <update-10.6>
-  1, "Duplicate key exists in unique index 'unique_unnamed_T1_2' in space 'T1'"
+  1, "Duplicate key exists in unique index \"unique_unnamed_T1_2\" in space \"T1\" with old tuple - [1, 2, 3, 4, 11, 6, 1] and new tuple - [2, 2, 4, 4, 12, 7, 2]"
   -- </update-10.6>
 })
 
@@ -969,7 +969,7 @@ test:do_catchsql_test("update-10.9", [[
   SELECT a,b,c,d,e,f FROM t1;
 ]], {
   -- <update-10.9>
-  1, "Duplicate key exists in unique index 'unique_unnamed_T1_3' in space 'T1'"
+  1, "Duplicate key exists in unique index \"unique_unnamed_T1_3\" in space \"T1\" with old tuple - [1, 2, 3, 4, 13, 6, 1] and new tuple - [2, 3, 3, 4, 14, 7, 2]"
   -- </update-10.9>
 })
 

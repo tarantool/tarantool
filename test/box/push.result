@@ -465,7 +465,8 @@ future = c:call('do_push_and_duplicate', {}, {is_async = true})
 future:wait_result(1000)
 ---
 - null
-- Duplicate key exists in unique index 'pk' in space 'test'
+- Duplicate key exists in unique index "pk" in space "test" with old tuple - [1] and
+  new tuple - [1]
 ...
 messages = {}
 ---
@@ -479,7 +480,8 @@ for i, message in future:pairs() do table.insert(messages, message) table.insert
 messages
 ---
 - - 100
-  - Duplicate key exists in unique index 'pk' in space 'test'
+  - Duplicate key exists in unique index "pk" in space "test" with old tuple - [1]
+    and new tuple - [1]
 ...
 keys
 ---

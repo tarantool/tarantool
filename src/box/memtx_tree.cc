@@ -774,9 +774,19 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 			if (dup_data.tuple != NULL)
 				memtx_tree_insert(&index->tree, dup_data, NULL);
 			struct space *sp = space_cache_find(base->def->space_id);
-			if (sp != NULL)
-				diag_set(ClientError, errcode, base->def->name,
-					 space_name(sp));
+			if (sp != NULL) {
+				if (errcode == ER_TUPLE_FOUND) {
+					diag_set(ClientError, errcode,
+						 base->def->name,
+						 space_name(sp),
+						 tuple_str(dup_data.tuple),
+						 tuple_str(new_data.tuple));
+				} else {
+					diag_set(ClientError, errcode,
+						 base->def->name,
+						 space_name(sp));
+				}
+			}
 			return -1;
 		}
 		if (dup_data.tuple != NULL) {
@@ -833,8 +843,17 @@ memtx_tree_index_replace_multikey_one(struct memtx_tree_index<true> *index,
 			memtx_tree_insert(&index->tree, dup_data, NULL);
 		struct space *sp = space_cache_find(index->base.def->space_id);
 		if (sp != NULL) {
-			diag_set(ClientError, errcode, index->base.def->name,
-				 space_name(sp));
+			if (errcode == ER_TUPLE_FOUND) {
+				diag_set(ClientError, errcode,
+					 index->base.def->name,
+					 space_name(sp),
+					 tuple_str(dup_data.tuple),
+					 tuple_str(new_data.tuple));
+			} else {
+				diag_set(ClientError, errcode,
+	     				 index->base.def->name,
+	     				 space_name(sp));
+			}
 		}
 		return -1;
 	}

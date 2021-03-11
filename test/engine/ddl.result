@@ -2231,7 +2231,8 @@ s:select()
 ...
 s:create_index('sk', {parts = {2, 'string'}}) -- error: unique constraint
 ---
-- error: Duplicate key exists in unique index 'sk' in space 'test'
+- error: Duplicate key exists in unique index "sk" in space "test" with old tuple
+    - [1, "zzz", "aaa", 999, "fff"] and new tuple - [4, "zzz", "ddd", -666]
 ...
 s:create_index('sk', {parts = {3, 'string'}}) -- error: nullability constraint
 ---
@@ -2285,7 +2286,8 @@ i3:select()
 ...
 i1:alter{unique = true} -- error: unique contraint
 ---
-- error: Duplicate key exists in unique index 'i1' in space 'test'
+- error: Duplicate key exists in unique index "i1" in space "test" with old tuple
+    - [1, "zzz", "aaa", 999, "fff"] and new tuple - [4, "zzz", "ddd", -666]
 ...
 i2:alter{parts = {3, 'string'}} -- error: nullability contraint
 ---

@@ -38,7 +38,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt-4a03ed-1.1>
-        1, "Duplicate key exists in unique index 'pk_unnamed_T1_1' in space 'T1'"
+        1, "Duplicate key exists in unique index \"pk_unnamed_T1_1\" in space \"T1\" with old tuple - [1, 1] and new tuple - [1, 2]"
         -- </tkt-4a03ed-1.1>
     })
 

@@ -392,7 +392,7 @@ test:do_catchsql_test(
         INSERT INTO t5 VALUES(1,2,4);
     ]], {
         -- <misc1-7.4>
-        1, "Duplicate key exists in unique index 'pk_unnamed_T5_1' in space 'T5'"
+        1, "Duplicate key exists in unique index \"pk_unnamed_T5_1\" in space \"T5\" with old tuple - [1, 2, 3] and new tuple - [1, 2, 4]"
         -- </misc1-7.4>
     })
 

@@ -506,7 +506,8 @@ rpos, wpos = ibuf.rpos, ibuf.wpos
 ...
 c.space.test:insert({1}, {buffer = ibuf})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: Duplicate key exists in unique index "primary" in space "test" with old tuple
+    - [1, "hello"] and new tuple - [1]
 ...
 ibuf.rpos == rpos, ibuf.wpos == wpos
 ---

@@ -265,7 +265,8 @@ test_run:cmd("setopt delimiter ''");
 ...
 first:replace({1, "rollback"})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'second'
+- error: Duplicate key exists in unique index "primary" in space "second" with old
+    tuple - [1, "discarded"] and new tuple - [1]
 ...
 first:select()
 ---

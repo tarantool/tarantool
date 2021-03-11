@@ -679,9 +679,17 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 			errcode = replace_check_dup(old_tuple, visible_replaced,
 						    i == 0 ? mode : DUP_INSERT);
 			if (errcode != 0) {
-				diag_set(ClientError, errcode,
-					 index->def->name,
-					 space_name(space));
+				if (errcode == ER_TUPLE_FOUND) {
+					diag_set(ClientError, errcode,
+						 index->def->name,
+						 space_name(space),
+						 tuple_str(visible_replaced),
+						 tuple_str(replaced));
+				} else {
+					diag_set(ClientError, errcode,
+						 index->def->name,
+						 space_name(space));
+				}
 				goto fail;
 			}
 

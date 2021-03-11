@@ -207,7 +207,8 @@ s:insert{1, 1, 1}
 ...
 s:insert{1, 1, 2} -- error
 ---
-- error: Duplicate key exists in unique index 'sk' in space 'test'
+- error: Duplicate key exists in unique index "sk" in space "test" with old tuple
+    - [1, 1, 1] and new tuple - [1, 1, 2]
 ...
 s:drop()
 ---

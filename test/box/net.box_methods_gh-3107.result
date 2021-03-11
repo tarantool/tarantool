@@ -259,12 +259,14 @@ future = c.space.test:insert({1}, {is_async = true})
 future:wait_result()
 ---
 - null
-- Duplicate key exists in unique index 'pk' in space 'test'
+- Duplicate key exists in unique index "pk" in space "test" with old tuple - [1] and
+  new tuple - [1]
 ...
 future:result()
 ---
 - null
-- Duplicate key exists in unique index 'pk' in space 'test'
+- Duplicate key exists in unique index "pk" in space "test" with old tuple - [1] and
+  new tuple - [1]
 ...
 box.schema.func.drop('long_function')
 ---

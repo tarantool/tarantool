@@ -125,7 +125,8 @@ s0 = box.schema.space.create('test')
  | ...
 i0 = s0:create_index('test')
  | ---
- | - error: Duplicate key exists in unique index 'test' in space 'loc'
+ | - error: Duplicate key exists in unique index "test" in space "loc" with old tuple
+ |     - [1] and new tuple - [1]
  | ...
 box.space.temp:select()
  | ---

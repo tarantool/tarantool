@@ -198,6 +198,19 @@ local function do_catchsql_test(self, label, sql, expect)
 end
 test.do_catchsql_test = do_catchsql_test
 
+local function do_catchsql_prefix_test(self, label, sql, prefix_end, expect)
+    local function inner()
+        local catch =  catchsql(self, sql)
+        local match = string.find(catch[2], prefix_end)
+        if match ~= nil and match ~= 1 then
+            catch[2] = string.sub(catch[2], 1, match - 1)
+        end
+        return catch
+    end
+    return do_test(self, label, inner, expect)
+end
+test.do_catchsql_prefix_test = do_catchsql_prefix_test
+
 local function do_catchsql2_test(self, label, sql, expect)
     return do_test(self, label, function() return test.catchsql2(self, sql) end, expect)
 end
