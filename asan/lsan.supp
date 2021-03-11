@@ -28,9 +28,12 @@ leak:Curl_resolver_init
 # source: /usr/lib/x86_64-linux-gnu/gconv/UTF-16.so
 leak:gconv_init
 
-# test: box*/
+# XXX: All warnings reported for LuaJIT runtime are considered
+# false positive until sanitizers support is not introduced in
+# LuaJIT. See the issue below for more info.
+# https://github.com/tarantool/tarantool/issues/5878
 # source: third_party/luajit
-leak:lj_BC_FUNCC
+leak:lj_*
 
 # test: box/access.test.lua
 # test: box/access_bin.test.lua
