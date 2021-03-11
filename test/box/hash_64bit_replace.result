@@ -60,7 +60,8 @@ hash:replace{2, 'value1 v1.43', 'value2 1.92'}
  | ...
 hash:replace{'invalid key', 'value1 v1.0', 'value2 v1.0'}
  | ---
- | - error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+ | - error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+ |     got string'
  | ...
 
 hash:drop()

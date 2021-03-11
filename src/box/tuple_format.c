@@ -898,7 +898,8 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 							nullable)) {
 				diag_set(ClientError, ER_FIELD_TYPE,
 					 tuple_field_path(field),
-					 field_type_strs[field->type]);
+					 field_type_strs[field->type],
+					 mp_type_strs[mp_typeof(*pos)]);
 				return -1;
 			}
 			bit_clear(required_fields, field->id);
@@ -1248,7 +1249,8 @@ tuple_format_iterator_next(struct tuple_format_iterator *it,
 	if (!field_mp_type_is_compatible(field->type, entry->data, is_nullable) != 0) {
 		diag_set(ClientError, ER_FIELD_TYPE,
 			 tuple_field_path(field),
-			 field_type_strs[field->type]);
+			 field_type_strs[field->type],
+			 mp_type_strs[mp_typeof(*entry->data)]);
 		return -1;
 	}
 	bit_clear(it->multikey_frame != NULL ?

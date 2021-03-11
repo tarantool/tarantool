@@ -140,19 +140,23 @@ box.space._collation:auto_increment{'test', 0, 'ICU'}
  | ...
 box.space._collation:auto_increment{'test', 'ADMIN', 'ICU', 'ru_RU'}
  | ---
- | - error: 'Tuple field 3 type does not match one required by operation: expected unsigned'
+ | - error: 'Tuple field 3 type does not match one required by operation: expected unsigned,
+ |     got string'
  | ...
 box.space._collation:auto_increment{42, 0, 'ICU', 'ru_RU'}
  | ---
- | - error: 'Tuple field 2 type does not match one required by operation: expected string'
+ | - error: 'Tuple field 2 type does not match one required by operation: expected string,
+ |     got unsigned'
  | ...
 box.space._collation:auto_increment{'test', 0, 42, 'ru_RU'}
  | ---
- | - error: 'Tuple field 4 type does not match one required by operation: expected string'
+ | - error: 'Tuple field 4 type does not match one required by operation: expected string,
+ |     got unsigned'
  | ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 42}
  | ---
- | - error: 'Tuple field 5 type does not match one required by operation: expected string'
+ | - error: 'Tuple field 5 type does not match one required by operation: expected string,
+ |     got unsigned'
  | ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}} --ok
  | ---
@@ -171,11 +175,13 @@ box.space._collation.index.name:delete{'nothing'} -- allowed
  | ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', 42}
  | ---
- | - error: 'Tuple field 6 type does not match one required by operation: expected map'
+ | - error: 'Tuple field 6 type does not match one required by operation: expected map,
+ |     got unsigned'
  | ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', 'options'}
  | ---
- | - error: 'Tuple field 6 type does not match one required by operation: expected map'
+ | - error: 'Tuple field 6 type does not match one required by operation: expected map,
+ |     got string'
  | ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', {ping='pong'}}
  | ---

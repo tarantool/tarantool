@@ -966,7 +966,8 @@ s:replace{50, 50}
 ...
 s:replace{25, box.NULL}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got nil'
 ...
 format[2].is_nullable = true
 ---
@@ -1021,7 +1022,8 @@ s:replace{50, 50}
 ...
 s:replace{25, box.NULL}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got nil'
 ...
 sk:alter({parts = {{2, 'unsigned', is_nullable = true}}})
 ---
@@ -1612,7 +1614,8 @@ s:replace{1, 1}
 ...
 s:replace{2, box.NULL}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got nil'
 ...
 s:select{}
 ---
@@ -1768,7 +1771,8 @@ s:insert{5}
 ...
 s:insert{5, box.NULL}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got nil'
 ...
 s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=true}}} -- This is allowed.
 ---
@@ -1776,7 +1780,8 @@ s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=true}}} -- This is al
 -- Without space format setting this fails.
 s:insert{5, box.NULL}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got nil'
 ...
 s:insert{5}
 ---
@@ -1794,7 +1799,8 @@ s:format(format) -- This is also allowed.
 -- inserts still fail due to not nullable index parts.
 s:insert{5, box.NULL}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got nil'
 ...
 s:insert{5}
 ---
@@ -1830,11 +1836,13 @@ format[2].is_nullable = false
 ...
 s:format(format) -- Fail.
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got nil'
 ...
 s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}} -- Fail.
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got nil'
 ...
 _ = s:delete{5}
 ---
@@ -1859,7 +1867,8 @@ s:format(format)
 ...
 s:insert{5, box.NULL} -- Fail.
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got nil'
 ...
 s:insert{5} -- Fail.
 ---
@@ -1876,7 +1885,8 @@ s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}}
 ...
 s:insert{5, box.NULL} -- Fail.
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got nil'
 ...
 s:insert{5} -- Fail.
 ---
@@ -1922,7 +1932,8 @@ sk2 = s:create_index('sk2', {parts={{2, 'number', is_nullable=true}}})
 ...
 s:insert{2, nil, 2} --error
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected number'
+- error: 'Tuple field 2 type does not match one required by operation: expected number,
+    got nil'
 ...
 s:drop()
 ---
@@ -1981,7 +1992,8 @@ sk2:select{}
 -- Error
 sk3 = s:create_index('sk3', {parts={{2, 'number', is_nullable=false}}})
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected number'
+- error: 'Tuple field 2 type does not match one required by operation: expected number,
+    got nil'
 ...
 s:truncate()
 ---
@@ -1996,7 +2008,8 @@ s:insert{1, 1}
 ...
 s:insert{2, box.NULL} -- error
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected number'
+- error: 'Tuple field 2 type does not match one required by operation: expected number,
+    got nil'
 ...
 s:drop()
 ---
