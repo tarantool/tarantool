@@ -130,15 +130,18 @@ box.space.test:select{}
 -- check invalid values
 box.space.test:insert{1.23}
  | ---
- | - error: 'Tuple field 1 type does not match one required by operation: expected decimal'
+ | - error: 'Tuple field 1 type does not match one required by operation: expected decimal,
+ |     got decimal'
  | ...
 box.space.test:insert{'str'}
  | ---
- | - error: 'Tuple field 1 type does not match one required by operation: expected decimal'
+ | - error: 'Tuple field 1 type does not match one required by operation: expected decimal,
+ |     got number'
  | ...
 box.space.test:insert{ffi.new('uint64_t', 0)}
  | ---
- | - error: 'Tuple field 1 type does not match one required by operation: expected decimal'
+ | - error: 'Tuple field 1 type does not match one required by operation: expected decimal,
+ |     got unsigned'
  | ...
 -- check duplicates
 box.space.test:insert{decimal.new(0)}
@@ -315,7 +318,8 @@ box.space.test:insert{2, -5}
 -- failure
 box.space.test.index.sk:alter{parts={2, 'decimal'}}
  | ---
- | - error: 'Tuple field 2 type does not match one required by operation: expected decimal'
+ | - error: 'Tuple field 2 type does not match one required by operation: expected decimal,
+ |     got string'
  | ...
 _ = box.space.test:delete{2}
  | ---
@@ -330,12 +334,14 @@ box.space.test:insert{3, decimal.new(3)}
 --failure
 box.space.test:insert{4, 'string'}
  | ---
- | - error: 'Tuple field 2 type does not match one required by operation: expected decimal'
+ | - error: 'Tuple field 2 type does not match one required by operation: expected decimal,
+ |     got number'
  | ...
 -- failure
 box.space.test:insert{2, -5}
  | ---
- | - error: 'Tuple field 2 type does not match one required by operation: expected decimal'
+ | - error: 'Tuple field 2 type does not match one required by operation: expected decimal,
+ |     got string'
  | ...
 box.space.test.index.sk:alter{parts={2, 'number'}}
  | ---

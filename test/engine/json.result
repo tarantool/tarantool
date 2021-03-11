@@ -76,12 +76,12 @@ s:create_index('test2', {parts = {{2, 'number'}, {3, 'number', path = 'FIO.fname
 s:insert{7, 7, {town = 'London', FIO = 666}, 4, 5}
 ---
 - error: 'Tuple field [3]["FIO"] type does not match one required by operation: expected
-    map'
+    map, got unsigned'
 ...
 s:insert{7, 7, {town = 'London', FIO = {fname = 666, sname = 'Bond'}}, 4, 5}
 ---
 - error: 'Tuple field [3]["FIO"]["fname"] type does not match one required by operation:
-    expected string'
+    expected string, got unsigned'
 ...
 s:insert{7, 7, {town = 'London', FIO = {fname = "James"}}, 4, 5}
 ---
@@ -269,7 +269,7 @@ s:insert{4, 4, 7, {town = 'London', FIO = {1,2,3}}, 4, 5}
 s:create_index('test1', {parts = {{3, 'number'}, {4, 'str', path = '["FIO"]["fname"]'}, {4, 'str', path = '["FIO"]["sname"]'}}})
 ---
 - error: 'Tuple field [4]["FIO"] type does not match one required by operation: expected
-    map'
+    map, got unsigned'
 ...
 _ = s:delete(1)
 ---
@@ -284,7 +284,7 @@ _ = s:delete(2)
 s:create_index('test1', {parts = {{3, 'number'}, {4, 'str', path = '["FIO"]["fname"]'}, {4, 'str', path = '["FIO"]["sname"]'}}})
 ---
 - error: 'Tuple field [4]["FIO"] type does not match one required by operation: expected
-    map'
+    map, got integer'
 ...
 _ = s:delete(4)
 ---
@@ -509,12 +509,12 @@ s:insert{{-1}}
 i:alter{parts = {{1, 'string', path = '[1]'}}}
 ---
 - error: 'Tuple field [1][1] type does not match one required by operation: expected
-    string'
+    string, got string'
 ...
 s:insert{{'a'}}
 ---
 - error: 'Tuple field [1][1] type does not match one required by operation: expected
-    integer'
+    integer, got number'
 ...
 i:drop()
 ---
@@ -529,12 +529,12 @@ s:insert{{{FIO=-1}}}
 i:alter{parts = {{1, 'integer', path = '[1][1]'}}}
 ---
 - error: 'Tuple field [1][1] type does not match one required by operation: expected
-    array'
+    array, got boolean'
 ...
 i:alter{parts = {{1, 'integer', path = '[1].FIO[1]'}}}
 ---
 - error: 'Tuple field [1][1]["FIO"] type does not match one required by operation:
-    expected array'
+    expected array, got string'
 ...
 s:drop()
 ---

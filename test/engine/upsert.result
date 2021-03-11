@@ -1085,7 +1085,8 @@ index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2
 ...
 space:upsert({0, 'key', 0}, {{'+', 3, 1}})
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got number'
 ...
 space:drop()
 ---
@@ -1805,7 +1806,8 @@ index1 = space:create_index('primary', { parts = {1, 'string'} })
 ...
 space:upsert({1}, {{'!', 2, 100}}) -- must fail on checking tuple
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected string'
+- error: 'Tuple field 1 type does not match one required by operation: expected string,
+    got unsigned'
 ...
 space:upsert({'a'}, {{'a', 2, 100}}) -- must fail on checking ops
 ---
@@ -1859,7 +1861,8 @@ index2:select{}
 -- test upsert that executes as update
 space:upsert({'a', 100, 100}, {{'=', 3, -200}}) -- must fail on cheking new tuple in secondary index
 ---
-- error: 'Tuple field 3 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 3 type does not match one required by operation: expected unsigned,
+    got string'
 ...
 space:upsert({'b', 100, 200}, {{'=', 1, 'd'}}) -- must fail with attempt to modify primary index
 ---

@@ -60,7 +60,8 @@ mp_decode_num(const char **data, uint32_t fieldno, double *ret)
 	if (mp_read_double(data, ret) != 0) {
 		diag_set(ClientError, ER_FIELD_TYPE,
 			 int2str(fieldno + TUPLE_INDEX_BASE),
-			 field_type_strs[FIELD_TYPE_NUMBER]);
+			 field_type_strs[FIELD_TYPE_NUMBER],
+			 field_type_strs[mp_typeof(**data)]);
 		return -1;
 	}
 	return 0;

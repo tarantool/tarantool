@@ -423,7 +423,8 @@ space:upsert({12}, {})
 ...
 space:insert({'abc'})
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+    got number'
 ...
 space:update({1}, {{'#', 2, 1}})
 ---

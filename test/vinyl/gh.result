@@ -158,7 +158,8 @@ i = s:create_index('primary',{parts={1, 'string'}})
 ...
 box.space.t:insert{1,'A'}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected string'
+- error: 'Tuple field 1 type does not match one required by operation: expected string,
+    got unsigned'
 ...
 s:drop()
 ---

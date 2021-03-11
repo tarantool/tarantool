@@ -801,7 +801,7 @@ s:insert{1, box.NULL} -- ok
 s:insert{2, {box.NULL}} -- error
 ---
 - error: 'Tuple field [2][*] type does not match one required by operation: expected
-    unsigned'
+    unsigned, got any'
 ...
 s:insert{3, {}} -- ok
 ---
@@ -854,7 +854,8 @@ _ = s:create_index('sk', {parts = {{'[2][*]', 'unsigned'}}})
 ...
 s:insert{1, {a = 1}} -- error
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected array'
+- error: 'Tuple field 2 type does not match one required by operation: expected array,
+    got boolean'
 ...
 s:insert{2, {1}} -- ok
 ---

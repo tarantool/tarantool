@@ -854,7 +854,8 @@ s:insert{'Der Baader Meinhof Komplex', '2009 '}
 -- create an index on a field with a wrong type
 index = s:create_index('year', { type = 'tree', unique = false, parts = { 2, 'unsigned'}})
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got number'
 ...
 -- a field is missing
 s:replace{'Der Baader Meinhof Komplex'}

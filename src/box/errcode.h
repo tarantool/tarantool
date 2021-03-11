@@ -75,7 +75,7 @@ struct errcode_record {
 	/* 20 */_(ER_INVALID_MSGPACK,		"Invalid MsgPack - %s") \
 	/* 21 */_(ER_PROC_RET,			"msgpack.encode: can not encode Lua type '%s'") \
 	/* 22 */_(ER_TUPLE_NOT_ARRAY,		"Tuple/Key must be MsgPack array") \
-	/* 23 */_(ER_FIELD_TYPE,		"Tuple field %s type does not match one required by operation: expected %s") \
+	/* 23 */_(ER_FIELD_TYPE,		"Tuple field %s type does not match one required by operation: expected %s, got %s") \
 	/* 24 */_(ER_INDEX_PART_TYPE_MISMATCH,	"Field %s has type '%s' in one index, but type '%s' in another") \
 	/* 25 */_(ER_UPDATE_SPLICE,		"SPLICE error on field %s: %s") \
 	/* 26 */_(ER_UPDATE_ARG_TYPE,		"Argument type in operation '%c' on field %s does not match field type: expected %s") \

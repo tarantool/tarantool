@@ -130,7 +130,8 @@ box.execute("SELECT * FROM \"withdata\" WHERE \"b\" <= x'DEADBEAF';")
 ...
 pk:alter({parts = {1, "varbinary"}})
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected varbinary'
+- error: 'Tuple field 1 type does not match one required by operation: expected varbinary,
+    got unsigned'
 ...
 s:delete({11})
 ---

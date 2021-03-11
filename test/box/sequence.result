@@ -1115,7 +1115,8 @@ s.index.pk.sequence_id == nil
 ...
 s:insert{nil, 'x'} -- error
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+    got any'
 ...
 box.sequence.test_seq == nil
 ---
@@ -2269,7 +2270,8 @@ s.index.pk.sequence_id == nil
 ...
 s:insert{box.NULL} -- error
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+    got any'
 ...
 s.index.pk:alter{sequence = sq}
 ---

@@ -184,19 +184,23 @@ sort(space:select{})
 -- https://bugs.launchpad.net/tarantool/+bug/1072624
 space:insert{'', 1, 2, '', '', '', '', '', 0}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+    got number'
 ...
 space:insert{'xxxxxxxx', 1, 2, '', '', '', '', '', 0}
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+    got number'
 ...
 space:insert{1, '', 2, '', '', '', '', '', 0}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got number'
 ...
 space:insert{1, 'xxxxxxxxxxx', 2, '', '', '', '', '', 0}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
+    got number'
 ...
 space:drop()
 ---

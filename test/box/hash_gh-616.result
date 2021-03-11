@@ -10,7 +10,8 @@ _ = box.space.test:create_index('i',{parts={1,'string'}})
  | ...
 box.space.test:insert{1}
  | ---
- | - error: 'Tuple field 1 type does not match one required by operation: expected string'
+ | - error: 'Tuple field 1 type does not match one required by operation: expected string,
+ |     got unsigned'
  | ...
 box.space.test:drop()
  | ---
