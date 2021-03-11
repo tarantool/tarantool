@@ -29,12 +29,13 @@ test:do_execsql_test('rollback1_check',
 
 for _, verb in ipairs({'ROLLBACK', 'ABORT'}) do
     box.execute('DELETE FROM t2')
-    local answer = "/Duplicate key exists in unique index 'unique_unnamed_T1_2' in space 'T1'/"
-    test:do_catchsql_test('insert1_'..verb,
+    local answer = "Duplicate key exists in unique index \"unique_unnamed_T1_2\" in space \"T1\""
+    test:do_catchsql_prefix_test('insert1_'..verb,
                           [[START TRANSACTION;
                             INSERT INTO t2 VALUES (20, 2, 2);
                             INSERT OR ]]..verb..[[ INTO t1 VALUES (10,1,1);
                           ]],
+                          " with old tuple - ",
                           {1, answer})
 
     local expect = {}
@@ -46,11 +47,12 @@ for _, verb in ipairs({'ROLLBACK', 'ABORT'}) do
                          'SELECT * FROM t2', expect)
 
     box.execute('DELETE FROM t2')
-    test:do_catchsql_test('update1_'..verb,
+    test:do_catchsql_prefix_test('update1_'..verb,
                           [[START TRANSACTION;
                             INSERT INTO t2 VALUES (20, 2, 2);
                             UPDATE OR ]]..verb..[[ t1 SET s1 = 1 WHERE s1 = 2;
                           ]],
+                          " with old tuple - ",
                           {1, answer})
 
     test:do_execsql_test('update1_'..verb..'check',

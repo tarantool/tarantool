@@ -46,7 +46,8 @@ hash:insert{1, 'bar', 1, '', 4}
 -- try to insert a row with a duplicate key
 hash:insert{1, 'bar', 1, '', 5}
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'tweedledum'
+- error: Duplicate key exists in unique index "primary" in space "tweedledum" with
+    old tuple - [1, "bar", 1, "", 4] and new tuple - [1, "bar", 1, "", 5]
 ...
 -- output all rows
 env = require('test_run')

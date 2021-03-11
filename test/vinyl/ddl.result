@@ -745,7 +745,8 @@ _ = box.space.test:replace{1001, 1, string.rep('x', 1000)}
 ...
 box.space.test:create_index('sk', {parts = {2, 'unsigned', 3, 'string'}})
 ---
-- error: Duplicate key exists in unique index 'sk' in space 'test'
+- error: Duplicate key exists in unique index "sk" in space "test" with old tuple
+    - [1, 1, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ...
 #fio.listdir(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 1)) > 0
 ---

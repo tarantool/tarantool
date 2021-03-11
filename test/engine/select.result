@@ -3276,11 +3276,13 @@ space:insert({5, 'bbbb'})
 ...
 space:insert({5, 'cbcb'})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: Duplicate key exists in unique index "primary" in space "test" with old tuple
+    - [5, "bbbb"] and new tuple - [5, "cbcb"]
 ...
 space:insert({6, 'bbbb'})
 ---
-- error: Duplicate key exists in unique index 'secondary' in space 'test'
+- error: Duplicate key exists in unique index "secondary" in space "test" with old
+    tuple - [5, "bbbb"] and new tuple - [6, "bbbb"]
 ...
 space:insert({-45.2, 'waerwe'})
 ---

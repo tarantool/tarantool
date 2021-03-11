@@ -341,7 +341,8 @@ idx = s:create_index('idx', {unique = true, func = 'extr', parts = {{1, 'integer
  | ...
 s:insert({2, 1})
  | ---
- | - error: Duplicate key exists in unique index 'idx' in space 'withdata'
+ | - error: Duplicate key exists in unique index "idx" in space "withdata" with old tuple
+ |     - [1, 2] and new tuple - [2, 1]
  | ...
 idx:get(3)
  | ---
@@ -392,7 +393,8 @@ s:insert({1, 2})
  | ...
 s:insert({3, 5})
  | ---
- | - error: Duplicate key exists in unique index 'idx' in space 'withdata'
+ | - error: Duplicate key exists in unique index "idx" in space "withdata" with old tuple
+ |     - [1, 2] and new tuple - [3, 5]
  | ...
 s:insert({5, 3})
  | ---

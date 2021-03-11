@@ -203,11 +203,13 @@ space:insert({1, 'a'})
 ...
 space:insert({2, 'a'})
 ---
-- error: Duplicate key exists in unique index 'secondary' in space 'test_space'
+- error: Duplicate key exists in unique index "secondary" in space "test_space" with
+    old tuple - [1, "a"] and new tuple - [2, "a"]
 ...
 space:insert({1, 'b'})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test_space'
+- error: Duplicate key exists in unique index "primary" in space "test_space" with
+    old tuple - [1, "a"] and new tuple - [1, "b"]
 ...
 space:insert({2, 'b'})
 ---
@@ -292,7 +294,8 @@ old_tuple, new_tuple
 ...
 space:replace({4, 5})
 ---
-- error: Duplicate key exists in unique index 'secondary' in space 'test_space'
+- error: Duplicate key exists in unique index "secondary" in space "test_space" with
+    old tuple - [5, 5] and new tuple - [4, 5]
 ...
 old_tuple, new_tuple
 ---

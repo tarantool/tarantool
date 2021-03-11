@@ -28,7 +28,8 @@ box.execute("INSERT INTO foobar VALUES (1000, 'foobar')")
 box.execute("INSERT INTO foobar VALUES (1, 'duplicate')")
 ---
 - null
-- Duplicate key exists in unique index 'pk_unnamed_FOOBAR_1' in space 'FOOBAR'
+- Duplicate key exists in unique index "pk_unnamed_FOOBAR_1" in space "FOOBAR" with
+  old tuple - [1, "foo"] and new tuple - [1, "duplicate"]
 ...
 -- simple select
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
@@ -312,7 +313,8 @@ box.execute("INSERT INTO barfoo VALUES ('foobar', 1000)")
 box.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")
 ---
 - null
-- Duplicate key exists in unique index 'pk_unnamed_BARFOO_1' in space 'BARFOO'
+- Duplicate key exists in unique index "pk_unnamed_BARFOO_1" in space "BARFOO" with
+  old tuple - ["foo", 1] and new tuple - ["xfoo", 1]
 ...
 box.execute("SELECT foo, bar FROM barfoo")
 ---

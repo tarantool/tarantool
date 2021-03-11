@@ -342,7 +342,8 @@ s5:insert({1152921504606846976ULL})
 ...
 s5:insert({ffi.new('double', 1152921504606846976ULL)}) -- fail
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'my_space5'
+- error: Duplicate key exists in unique index "primary" in space "my_space5" with
+    old tuple - [1152921504606846976] and new tuple - [1.15292e+18]
 ...
 s5:select()
 ---
@@ -375,7 +376,8 @@ s5:insert({-1152921504606846976LL})
 ...
 s5:insert({ffi.new('double', -1152921504606846976LL)}) -- fail
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'my_space5'
+- error: Duplicate key exists in unique index "primary" in space "my_space5" with
+    old tuple - [-1152921504606846976] and new tuple - [-1.15292e+18]
 ...
 s5:select()
 ---
@@ -428,7 +430,8 @@ s5:insert({0x8000000000000000LL})
 ...
 s5:insert({ffi.new('double', -ffi.C.exp2(63))}) -- duplicate
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'my_space5'
+- error: Duplicate key exists in unique index "primary" in space "my_space5" with
+    old tuple - [-9223372036854775808] and new tuple - [-9.22337e+18]
 ...
 s5:select()
 ---

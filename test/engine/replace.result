@@ -568,7 +568,8 @@ space:select{}
 ...
 space:replace({1, 2, 3})
 ---
-- error: Duplicate key exists in unique index 'secondary' in space 'test'
+- error: Duplicate key exists in unique index "secondary" in space "test" with old
+    tuple - [2, 2, 2] and new tuple - [1, 2, 3]
 ...
 index1:select{}
 ---

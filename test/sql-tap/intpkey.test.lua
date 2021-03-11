@@ -96,7 +96,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(5,'second','entry');
     ]], {
         -- <intpkey-1.6>
-        1, "Duplicate key exists in unique index 'pk_unnamed_T1_1' in space 'T1'"
+        1, "Duplicate key exists in unique index \"pk_unnamed_T1_1\" in space \"T1\" with old tuple - [5, \"hello\", \"world\"] and new tuple - [5, \"second\", \"entry\"]"
         -- </intpkey-1.6>
     })
 

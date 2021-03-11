@@ -442,7 +442,8 @@ future1:wait_result()
 future2:wait_result()
 ---
 - null
-- Duplicate key exists in unique index 'pk_unnamed_TEST_1' in space 'TEST'
+- Duplicate key exists in unique index "pk_unnamed_TEST_1" in space "TEST" with old
+  tuple - [1, 1, 1] and new tuple - [1, 2, 2]
 ...
 future3:wait_result()
 ---

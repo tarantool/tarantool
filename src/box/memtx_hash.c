@@ -369,9 +369,16 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 				}
 			}
 			struct space *sp = space_cache_find(base->def->space_id);
-			if (sp != NULL)
-				diag_set(ClientError, errcode, base->def->name,
-					 space_name(sp));
+			if (sp != NULL) {
+				if (errcode == ER_TUPLE_FOUND){
+					diag_set(ClientError, errcode,  base->def->name,
+						 space_name(sp), tuple_str(dup_tuple),
+						 tuple_str(new_tuple));
+				} else {
+					diag_set(ClientError, errcode, base->def->name,
+						 space_name(sp));
+				}
+			}
 			return -1;
 		}
 

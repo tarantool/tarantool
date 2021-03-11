@@ -107,7 +107,8 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space:insert{234, 1,2,3}
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'net_box_test_space'
+- error: Duplicate key exists in unique index "primary" in space "net_box_test_space"
+    with old tuple - [234, 1, 2, 3] and new tuple - [234, 1, 2, 3]
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---

@@ -238,7 +238,7 @@ test:do_catchsql_test(
         UPDATE OR ROLLBACK t1 SET a=100;
     ]], {
         -- <triggerC-1.15>
-        1, "Duplicate key exists in unique index 'unique_unnamed_T1_1' in space 'T1'"
+        1, "Duplicate key exists in unique index \"unique_unnamed_T1_1\" in space \"T1\" with old tuple - [100, 2, 3, 4, 5] and new tuple - [100, 7, 8, 9, 10]"
         -- </triggerC-1.15>
     })
 
