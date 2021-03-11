@@ -40,16 +40,19 @@ set(LUAJIT_TEST_BINARY $<TARGET_FILE:tarantool> CACHE STRING
 set(LUAJIT_USE_TEST OFF CACHE BOOL
     "Generate <test> target" FORCE)
 
-# Enable internal LuaJIT assertions for Tarantool Debug build.
 # XXX: There is <strict> module enabled by default in Tarantool
 # built in Debug, so we need to tweak LuaJIT testing environment.
+# XXX: Also, this script "unloads" internal Tarantool's modules
+# and remove globals conflicting with LuaJIT test suites.
+set(LUAJIT_TEST_INIT "${PROJECT_SOURCE_DIR}/test/luajit-test-init.lua"
+    CACHE STRING "Lua code need to be run before tests are started" FORCE)
+
+# Enable internal LuaJIT assertions for Tarantool Debug build.
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(LUAJIT_USE_APICHECK ON CACHE BOOL
         "Assertions for the Lua/C API" FORCE)
     set(LUAJIT_USE_ASSERT ON CACHE BOOL
         "Assertions for the whole LuaJIT VM" FORCE)
-    set(LUAJIT_TEST_INIT "${PROJECT_SOURCE_DIR}/test/luajit-test-init.lua"
-        CACHE STRING "Lua code need to be run before tests are started" FORCE)
 endif()
 
 # Valgrind can be used only with the system allocator. For more
