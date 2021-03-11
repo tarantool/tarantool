@@ -101,8 +101,7 @@ fio_methods.pread = function(self, buf, size, offset)
     if not ffi.istype(const_char_ptr_t, buf) then
         offset = size
         size = buf
-        tmpbuf = buffer.IBUF_SHARED
-        tmpbuf:reset()
+        tmpbuf = buffer.ibuf()
         buf = tmpbuf:reserve(size)
     end
     local res, err = internal.pread(self.fh, buf, size, offset)
