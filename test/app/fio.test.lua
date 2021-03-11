@@ -442,35 +442,6 @@ fio.path.lexists(link)
 
 fio.unlink(link)
 fio.unlink(tmpfile)
-tmp1 = fio.pathjoin(tmpdir, "tmp1")
-tmp2= fio.pathjoin(tmpdir, "tmp2")
-test_run:cmd("setopt delimiter ';'")
-function write_file(name, odd)
-    local fh = fio.open(name, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
-    if odd then
-        fh:write(string.rep('1', 100))
-    else
-        fh:write(string.rep('2', 100))
-    end
-    fh:write(name)
-    fh:seek(0)
-    return fh
-end;
-test_run:cmd("setopt delimiter ''");
-fh1 = write_file(tmp1)
-fh2 = write_file(tmp2)
-fiber = require('fiber')
-digest = require('digest')
-str = fh1:read()
-fh1:seek(0)
-hash = digest.crc32(str)
-ch = fiber.channel(1)
-f1 = fiber.create(function() str = fh1:read() ch:put(digest.crc32(str)) end)
-f2 = fiber.create(function() str = fh2:read() end)
-ch:get() == hash
-
-fio.unlink(tmp1)
-fio.unlink(tmp2)
 fio.rmdir(tmpdir)
 
 --
@@ -526,3 +497,41 @@ fio.tempdir()
 tmpdir = nil
 
 os.setenv('TMPDIR', old_tmpdir)
+
+--
+-- read() and pread() should not use a shared buffer so as not to clash with
+-- other fibers during yield.
+--
+rights = tonumber('0777', 8)
+flags = {'O_RDWR', 'O_TRUNC', 'O_CREAT'}
+tmpdir = fio.tempdir()
+file1 = fio.pathjoin(tmpdir, 'file1')
+file2 = fio.pathjoin(tmpdir, 'file2')
+fd1 = fio.open(file1, flags, rights)
+fd2 = fio.open(file2, flags, rights)
+fd1:write('1'), fd1:seek(0)
+fd2:write('2'), fd2:seek(0)
+
+res1, res2 = nil
+do                                                                              \
+    fiber.new(function() res1 = fd1:read() end)                                 \
+    fiber.new(function() res2 = fd2:read() end)                                 \
+end
+_ = test_run:wait_cond(function() return res1 and res2 end)
+assert(res1 == '1')
+assert(res2 == '2')
+--
+-- The same with pread().
+--
+res1, res2 = nil
+do                                                                              \
+    fiber.new(function() res1 = fd1:pread(1, 0) end)                            \
+    fiber.new(function() res2 = fd2:pread(1, 0) end)                            \
+end
+_ = test_run:wait_cond(function() return res1 and res2 end)
+assert(res1 == '1')
+assert(res2 == '2')
+
+fd1:close()
+fd2:close()
+fio.rmtree(tmpdir)
