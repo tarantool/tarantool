@@ -489,12 +489,14 @@ INSERT INTO t3 VALUES (2, false)
 INSERT INTO t3 VALUES (3, true)
  | ---
  | - null
- | - Duplicate key exists in unique index 'UQ' in space 'T3'
+ | - 'Duplicate key exists in unique index ''UQ'' in space ''T3'': old tuple - ''[1,
+ |   true]'', new tuple - ''[3, true]'''
  | ...
 INSERT INTO t3 VALUES (4, false)
  | ---
  | - null
- | - Duplicate key exists in unique index 'UQ' in space 'T3'
+ | - 'Duplicate key exists in unique index ''UQ'' in space ''T3'': old tuple - ''[2,
+ |   false]'', new tuple - ''[4, false]'''
  | ...
 
 -- Check CAST from BOOLEAN to the other types.

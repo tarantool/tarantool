@@ -340,7 +340,8 @@ s0.index['i3']:select{10}
 -- TupleFound (primary key)
 s0:insert{1, 10, 10, 10}
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'tweedledum'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''tweedledum'':
+    old tuple - ''[1, 1, 1, 1]'', new tuple - ''[1, 10, 10, 10]'''
 ...
 s0.index['primary']:get{10}
 ---
@@ -385,7 +386,8 @@ s0.index['i3']:select{10}
 -- TupleFound (key #1)
 s0:insert{10, 0, 10, 10}
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'tweedledum'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''tweedledum'':
+    old tuple - ''[10, 10, 10, 10]'', new tuple - ''[10, 0, 10, 10]'''
 ...
 s0.index['primary']:get{10}
 ---
@@ -410,7 +412,8 @@ s0.index['i1']:select{0}
 -- TupleFound (key #1)
 s0:replace{2, 0, 10, 10}
 ---
-- error: Duplicate key exists in unique index 'i1' in space 'tweedledum'
+- error: 'Duplicate key exists in unique index ''i1'' in space ''tweedledum'': old
+    tuple - ''[0, 0, 0, 0]'', new tuple - ''[2, 0, 10, 10]'''
 ...
 s0.index['primary']:get{10}
 ---
@@ -435,7 +438,8 @@ s0.index['i1']:select{0}
 -- TupleFound (key #3)
 s0:insert{10, 10, 10, 0}
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'tweedledum'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''tweedledum'':
+    old tuple - ''[10, 10, 10, 10]'', new tuple - ''[10, 10, 10, 0]'''
 ...
 s0.index['primary']:get{10}
 ---
@@ -460,7 +464,8 @@ s0.index['i3']:select{0}
 -- TupleFound (key #3)
 s0:replace{2, 10, 10, 0}
 ---
-- error: Duplicate key exists in unique index 'i1' in space 'tweedledum'
+- error: 'Duplicate key exists in unique index ''i1'' in space ''tweedledum'': old
+    tuple - ''[10, 10, 10, 10]'', new tuple - ''[2, 10, 10, 0]'''
 ...
 s0.index['primary']:get{10}
 ---
@@ -750,7 +755,8 @@ s:select{}
 ...
 i1:alter({parts = {{1, 'str', collation='test-ci'}}})
 ---
-- error: Duplicate key exists in unique index 'i1' in space 'test'
+- error: 'Duplicate key exists in unique index ''i1'' in space ''test'': old tuple
+    - ''["ааа"]'', new tuple - ''["ААА"]'''
 ...
 _ = s:delete{"ААА"}
 ---
@@ -772,7 +778,8 @@ s:select{}
 ...
 s:insert{"ААА"}
 ---
-- error: Duplicate key exists in unique index 'i1' in space 'test'
+- error: 'Duplicate key exists in unique index ''i1'' in space ''test'': old tuple
+    - ''["ааа"]'', new tuple - ''["ААА"]'''
 ...
 s:replace{"ЯЯЯ"}
 ---

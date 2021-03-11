@@ -251,7 +251,7 @@ call  myinsert (3, 'old', 2)
 {
     "error": {
         "code": "ER_TUPLE_FOUND", 
-        "reason": "Duplicate key exists in unique index 'primary' in space 'tweedledum'"
+        "reason": "Duplicate key exists in unique index 'primary' in space 'tweedledum': old tuple - '[3, \"old\", 2]', new tuple - '[3, \"old\", 2]'"
     }
 }
 space:update({3}, {{'=', 1, 4}, {'=', 2, 'new'}})

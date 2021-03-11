@@ -546,7 +546,7 @@ test:do_catchsql_test(
     [[
         ALTER TABLE t ADD CONSTRAINT pk1 PRIMARY KEY("f2");
     ]], {
-        1, "Duplicate key exists in unique index 'primary' in space '_index'"
+        1, "Duplicate key exists in unique index 'primary' in space '_index': old tuple - '[526, 0, \"PK\", \"tree\", {\"unique\": true}, [{\"type\": \"scalar\", \"field\": 0, \"is_nullable\": false, \"nullable_action\": \"default\", \"sort_order\": \"asc\", \"exclude_null\": false}]]', new tuple - '[526, 0, \"PK1\", \"tree\", {\"unique\": true}, [{\"type\": \"scalar\", \"field\": 1, \"is_nullable\": false, \"nullable_action\": \"default\", \"sort_order\": \"asc\", \"exclude_null\": false}]]'"
     })
 
 test:do_catchsql_test(

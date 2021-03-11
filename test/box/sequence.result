@@ -114,7 +114,9 @@ _ = box.schema.sequence.create('test2')
 ...
 box.schema.sequence.alter('test2', {name = 'test'})
 ---
-- error: Duplicate key exists in unique index 'name' in space '_sequence'
+- error: 'Duplicate key exists in unique index ''name'' in space ''_sequence'': old
+    tuple - ''[1, 1, "test", 1, 1, 9223372036854775807, 1, 0, false]'', new tuple
+    - ''[2, 1, "test", 1, 1, 9223372036854775807, 1, 0, false]'''
 ...
 box.schema.sequence.drop('test2')
 ---

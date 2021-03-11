@@ -29,7 +29,12 @@ EMPTY_MAP = utils.setmap({})
 --
 _space:insert{_space.id, ADMIN, 'test', 'memtx', 0, EMPTY_MAP, {}}
 ---
-- error: Duplicate key exists in unique index 'primary' in space '_space'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''_space'': old
+    tuple - ''[280, 1, "_space", "memtx", 0, {}, [{"name": "id", "type": "unsigned"},
+    {"name": "owner", "type": "unsigned"}, {"name": "name", "type": "string"}, {"name":
+    "engine", "type": "string"}, {"name": "field_count", "type": "unsigned"}, {"name":
+    "flags", "type": "map"}, {"name": "format", "type": "array"}]]'', new tuple -
+    ''[280, 1, "test", "memtx", 0, {}, []]'''
 ...
 --
 -- Bad space id
@@ -43,18 +48,32 @@ _space:insert{'hello', 'world', 'test', 'memtx', 0, EMPTY_MAP, {}}
 --
 _space:insert{_space.id, ADMIN, 'test', 'world', 0, EMPTY_MAP, {}}
 ---
-- error: Duplicate key exists in unique index 'primary' in space '_space'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''_space'': old
+    tuple - ''[280, 1, "_space", "memtx", 0, {}, [{"name": "id", "type": "unsigned"},
+    {"name": "owner", "type": "unsigned"}, {"name": "name", "type": "string"}, {"name":
+    "engine", "type": "string"}, {"name": "field_count", "type": "unsigned"}, {"name":
+    "flags", "type": "map"}, {"name": "format", "type": "array"}]]'', new tuple -
+    ''[280, 1, "test", "world", 0, {}, []]'''
 ...
 --
 -- There is already a tuple for the system space
 --
 _space:insert{_space.id, ADMIN, '_space', 'memtx', 0, EMPTY_MAP, {}}
 ---
-- error: Duplicate key exists in unique index 'primary' in space '_space'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''_space'': old
+    tuple - ''[280, 1, "_space", "memtx", 0, {}, [{"name": "id", "type": "unsigned"},
+    {"name": "owner", "type": "unsigned"}, {"name": "name", "type": "string"}, {"name":
+    "engine", "type": "string"}, {"name": "field_count", "type": "unsigned"}, {"name":
+    "flags", "type": "map"}, {"name": "format", "type": "array"}]]'', new tuple -
+    ''[280, 1, "_space", "memtx", 0, {}, []]'''
 ...
 _space:insert{_index.id, ADMIN, '_index', 'memtx', 0, EMPTY_MAP, {}}
 ---
-- error: Duplicate key exists in unique index 'primary' in space '_space'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''_space'': old
+    tuple - ''[288, 1, "_index", "memtx", 0, {}, [{"name": "id", "type": "unsigned"},
+    {"name": "iid", "type": "unsigned"}, {"name": "name", "type": "string"}, {"name":
+    "type", "type": "string"}, {"name": "opts", "type": "map"}, {"name": "parts",
+    "type": "array"}]]'', new tuple - ''[288, 1, "_index", "memtx", 0, {}, []]'''
 ...
 --
 -- Can't drop a system space
@@ -141,7 +160,9 @@ space:replace{0}
 ...
 _index:insert{_space.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}}
 ---
-- error: Duplicate key exists in unique index 'primary' in space '_index'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''_index'': old
+    tuple - ''[280, 0, "primary", "tree", {"unique": true}, [[0, "unsigned"]]]'',
+    new tuple - ''[280, 0, "primary", "tree", {"unique": true}, [[0, "unsigned"]]]'''
 ...
 _index:replace{_space.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}}
 ---
@@ -149,7 +170,10 @@ _index:replace{_space.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}
 ...
 _index:insert{_index.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
 ---
-- error: Duplicate key exists in unique index 'primary' in space '_index'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''_index'': old
+    tuple - ''[288, 0, "primary", "tree", {"unique": true}, [[0, "unsigned"], [1,
+    "unsigned"]]]'', new tuple - ''[288, 0, "primary", "tree", {"unique": true}, [[0,
+    "unsigned"], [1, "unsigned"]]]'''
 ...
 _index:replace{_index.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
 ---
@@ -438,7 +462,9 @@ auto = box.schema.space.create('auto_original')
 ...
 box.schema.space.create('auto', {id = auto.id})
 ---
-- error: Duplicate key exists in unique index 'primary' in space '_space'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''_space'': old
+    tuple - ''[524, 1, "auto_original", "memtx", 0, {}, []]'', new tuple - ''[524,
+    1, "auto", "memtx", 0, {}, []]'''
 ...
 box.schema.space.drop('auto')
 ---
@@ -1522,7 +1548,12 @@ assert(s.name == 'test2')
 ...
 s:alter({name = '_space'})
 ---
-- error: Duplicate key exists in unique index 'name' in space '_space'
+- error: 'Duplicate key exists in unique index ''name'' in space ''_space'': old tuple
+    - ''[280, 1, "_space", "memtx", 0, {}, [{"name": "id", "type": "unsigned"}, {"name":
+    "owner", "type": "unsigned"}, {"name": "name", "type": "string"}, {"name": "engine",
+    "type": "string"}, {"name": "field_count", "type": "unsigned"}, {"name": "flags",
+    "type": "map"}, {"name": "format", "type": "array"}]]'', new tuple - ''[799, 1,
+    "_space", "memtx", 0, {"temporary": false, "is_sync": false}, []]'''
 ...
 s:alter({name = 'test'})
 ---

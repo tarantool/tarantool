@@ -128,7 +128,8 @@ t
 ...
 space:insert({tostring(7)})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''["7"]'', new tuple - ''["7"]'''
 ...
 space:drop()
 ---
@@ -254,7 +255,8 @@ t
 ...
 space:insert({7})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''[7]'', new tuple - ''[7]'''
 ...
 space:drop()
 ---
@@ -380,7 +382,8 @@ t
 ...
 space:insert({7, 7})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''[7, 7]'', new tuple - ''[7, 7]'''
 ...
 space:drop()
 ---
@@ -506,7 +509,8 @@ t
 ...
 space:insert(box.tuple.new{tostring(7)})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''["7"]'', new tuple - ''["7"]'''
 ...
 space:drop()
 ---
@@ -604,7 +608,8 @@ space:select{}
 ...
 space:insert({1, 2, 3})
 ---
-- error: Duplicate key exists in unique index 'primary' in space 'test'
+- error: 'Duplicate key exists in unique index ''primary'' in space ''test'': old
+    tuple - ''[1, 1, 1]'', new tuple - ''[1, 2, 3]'''
 ...
 index1:select{}
 ---
