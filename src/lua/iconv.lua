@@ -43,15 +43,18 @@ local function iconv_convert(iconv, data)
         buf_left[0] = buf:unused()
         local res = ffi.C.tnt_iconv(iconv, data_ptr, data_left,
                                 buf_ptr, buf_left)
-        if res == ffi.cast('size_t', -1) and errno() ~= E2BIG then
-            ffi.C.tnt_iconv(iconv, nil, nil, nil, nil)
-            if errno() == EINVAL then
-                error('Invalid multibyte sequence')
+        if res == ffi.cast('size_t', -1) then
+            local err = errno()
+            if err ~= E2BIG then
+                ffi.C.tnt_iconv(iconv, nil, nil, nil, nil)
+                if err == EINVAL then
+                    error('Invalid multibyte sequence')
+                end
+                if err == EILSEQ then
+                    error('Incomplete multibyte sequence')
+                end
+                error('Unknown conversion error: ' .. errno.strerror(err))
             end
-            if errno() == EILSEQ then
-                error('Incomplete multibyte sequence')
-            end
-            error('Unknown conversion error: ' .. errno.strerror())
         end
         buf:alloc(buf:unused() - buf_left[0])
     end
