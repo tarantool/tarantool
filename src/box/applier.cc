@@ -551,7 +551,7 @@ applier_wait_register(struct applier *applier, uint64_t row_count)
 }
 
 static void
-applier_register(struct applier *applier)
+applier_register(struct applier *applier, bool was_anon)
 {
 	/* Send REGISTER request */
 	struct ev_io *coio = &applier->io;
@@ -566,9 +566,16 @@ applier_register(struct applier *applier)
 	row.type = IPROTO_REGISTER;
 	coio_write_xrow(coio, &row);
 
-	applier_set_state(applier, APPLIER_REGISTER);
+	/*
+	 * Register may serve as a retry for final join. Set corresponding
+	 * states to unblock anyone who's waiting for final join to start or
+	 * end.
+	 */
+	applier_set_state(applier, was_anon ? APPLIER_REGISTER :
+					      APPLIER_FINAL_JOIN);
 	applier_wait_register(applier, 0);
-	applier_set_state(applier, APPLIER_REGISTERED);
+	applier_set_state(applier, was_anon ? APPLIER_REGISTERED :
+					      APPLIER_JOINED);
 	applier_set_state(applier, APPLIER_READY);
 }
 
@@ -1303,6 +1310,14 @@ applier_f(va_list ap)
 		return -1;
 	session_set_type(session, SESSION_TYPE_APPLIER);
 
+	/*
+	 * The instance saves replication_anon value on bootstrap.
+	 * If a freshly started instance sees it has received
+	 * REPLICASET_UUID but hasn't yet registered, it must be an
+	 * anonymous replica, hence the default value 'true'.
+	 */
+	bool was_anon = true;
+
 	/* Re-connect loop */
 	while (!fiber_is_cancelled()) {
 		try {
@@ -1316,6 +1331,7 @@ applier_f(va_list ap)
 				 * The join will pause the applier
 				 * until WAL is created.
 				 */
+				was_anon = replication_anon;
 				if (replication_anon)
 					applier_fetch_snapshot(applier);
 				else
@@ -1324,11 +1340,10 @@ applier_f(va_list ap)
 			if (instance_id == REPLICA_ID_NIL &&
 			    !replication_anon) {
 				/*
-				 * The instance transitioned
-				 * from anonymous. Register it
-				 * now.
+				 * The instance transitioned from anonymous or
+				 * is retrying final join.
 				 */
-				applier_register(applier);
+				applier_register(applier, was_anon);
 			}
 			applier_subscribe(applier);
 			/*
