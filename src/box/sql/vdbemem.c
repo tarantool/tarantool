@@ -563,7 +563,7 @@ sql_stat4_column(struct sql *db, const char *record, uint32_t col_num,
 		}
 	}
 	uint32_t unused;
-	return vdbe_decode_msgpack_into_mem(a, mem, &unused);
+	return mem_from_mp(mem, a, &unused);
 }
 
 /*

@@ -405,26 +405,8 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 	assert(sqlVdbeCheckMemInvariants(dest_mem) != 0);
 	const char *data = vdbe_field_ref_fetch_data(field_ref, fieldno);
 	uint32_t dummy;
-	if (vdbe_decode_msgpack_into_mem(data, dest_mem, &dummy) != 0)
+	if (mem_from_mp(dest_mem, data, &dummy) != 0)
 		return -1;
-
-	/*
-	 * Add 0 termination (at most for strings)
-	 * Not sure why do we check MEM_Ephem
-	 */
-	if (mem_is_str(dest_mem) && mem_is_ephemeral(dest_mem)) {
-		int len = dest_mem->n;
-		if (dest_mem->szMalloc < len + 1) {
-			if (sqlVdbeMemGrow(dest_mem, len + 1, 1) != 0)
-				return -1;
-		} else {
-			dest_mem->z =
-				memcpy(dest_mem->zMalloc, dest_mem->z, len);
-			dest_mem->flags &= ~MEM_Ephem;
-		}
-		dest_mem->z[len] = 0;
-		dest_mem->flags |= MEM_Term;
-	}
 	UPDATE_MAX_BLOBSIZE(dest_mem);
 	return 0;
 }
