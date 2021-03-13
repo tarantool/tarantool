@@ -2356,7 +2356,7 @@ sqlVdbeRecordUnpackMsgpack(struct key_def *key_def,	/* Information about the rec
 		pMem->szMalloc = 0;
 		pMem->z = 0;
 		uint32_t sz = 0;
-		vdbe_decode_msgpack_into_mem(zParse, pMem, &sz);
+		mem_from_mp_ephemeral(pMem, zParse, &sz);
 		assert(sz != 0);
 		zParse += sz;
 		pMem++;
