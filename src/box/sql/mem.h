@@ -323,6 +323,14 @@ void
 mem_move(struct Mem *to, struct Mem *from);
 
 /**
+ * Concatenate strings or binaries from the first and the second MEMs and write
+ * to the result MEM. In case the first MEM or the second MEM is NULL, the
+ * result MEM is set to NULL even if the result MEM is actually the first MEM.
+ */
+int
+mem_concat(struct Mem *left, struct Mem *right, struct Mem *result);
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
