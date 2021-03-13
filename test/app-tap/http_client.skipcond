@@ -1,7 +1,14 @@
+import os
+import sys
 import platform
 
 # Disabled on OpenBSD due to fail #XXXX.
 if platform.system() == 'OpenBSD':
     self.skip = 1
+
+# We use gevent in httpd.py as well as in test-run. Many
+# interpreter versions may be installed on a system, but
+# one that runs test-run surely has the gevent library.
+os.environ['PYTHON_EXECUTABLE'] = sys.executable
 
 # vim: set ft=python:
