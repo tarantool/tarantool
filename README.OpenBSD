@@ -2,9 +2,7 @@ Target OS: OpenBSD 6.6 amd64
 
 1. Install necessary packages
 -----------------------------
-pkg_add git m4 curl cmake gmake autoconf automake
-export AUTOMAKE_VERSION=XXX
-export AUTOCONF_VERSION=YYY
+pkg_add git m4 curl cmake gmake
 
 2. Download & build tarantool source code
 -----------------------------------------

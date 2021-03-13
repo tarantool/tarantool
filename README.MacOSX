@@ -22,7 +22,7 @@ For Homebrew:
 brew install openssl readline curl icu4c libiconv zlib cmake python3
 
 For MacPorts:
-port install autoconf binutils cmake ncurses zlib readline openssl python37
+port install binutils cmake ncurses zlib readline openssl python37
 
 
 2. Install test-required packages and modules for Python 3.x
