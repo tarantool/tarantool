@@ -13,7 +13,6 @@ be necessary for building and testing:
   Ordinarily, this is gcc and g++ version 4.6 or later. On Mac OS X, this
   is Clang version 3.2+.
 * cmake
-* autoconf automake libtool
 * make
 * Python and modules.
 
@@ -30,16 +29,16 @@ CentOS:
 
 ```bash
 yum install -y \
-    git perl gcc cmake make gcc-c++ libstdc++-static autoconf automake libtool \
-    python3-yaml python3-six python3-gevent
+    git perl gcc cmake make gcc-c++ libstdc++-static \
+    python3-msgpack python3-yaml python3-six python3-gevent
 ```
 
 Ubuntu/Debian:
 
 ```bash
 apt-get install -y \
-    build-essential cmake make coreutils autoconf automake libtool sed \
-    python3 python3-yaml python3-six python3-gevent
+    build-essential cmake make coreutils sed \
+    python3 python3-msgpack python3-yaml python3-six python3-gevent
 ```
 
 MacOS:
@@ -57,7 +56,7 @@ Install brew using command from
 After that run next script:
 
 ```bash
-brew install autoconf automake libtool cmake
+brew install cmake
 pip install --user --force-reinstall -r test-run/requirements.txt
 ```
 
