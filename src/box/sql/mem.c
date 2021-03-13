@@ -1607,12 +1607,6 @@ sqlValueText(sql_value * pVal)
 	return valueToText(pVal);
 }
 
-enum sql_subtype
-sql_value_subtype(sql_value * pVal)
-{
-	return (pVal->flags & MEM_Subtype) != 0 ? pVal->subtype : SQL_SUBTYPE_NO;
-}
-
 /*
  * Return a pointer to static memory containing an SQL NULL value.
  */

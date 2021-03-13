@@ -535,9 +535,6 @@ const void *sqlValueText(struct Mem *);
 
 #define VdbeFrameMem(p) ((Mem *)&((u8 *)p)[ROUND8(sizeof(VdbeFrame))])
 
-enum sql_subtype
-sql_value_subtype(sql_value * pVal);
-
 const Mem *
 columnNullValue(void);
 

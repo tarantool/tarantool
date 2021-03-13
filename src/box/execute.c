@@ -132,112 +132,9 @@ port_sql_create(struct port *port, struct sql_stmt *stmt,
 }
 
 /**
- * Serialize a single column of a result set row.
- * @param stmt Prepared and started statement. At least one
- *        sql_step must be called.
- * @param i Column number.
- * @param region Allocator for column value.
- *
- * @retval  0 Success.
- * @retval -1 Out of memory when resizing the output buffer.
- */
-static inline int
-sql_column_to_messagepack(struct sql_stmt *stmt, int i,
-			  struct region *region)
-{
-	size_t size;
-	enum mp_type type = sql_column_type(stmt, i);
-	switch (type) {
-	case MP_INT: {
-		int64_t n = sql_column_int64(stmt, i);
-		size = mp_sizeof_int(n);
-		char *pos = (char *) region_alloc(region, size);
-		if (pos == NULL)
-			goto oom;
-		mp_encode_int(pos, n);
-		break;
-	}
-	case MP_UINT: {
-		uint64_t n = sql_column_uint64(stmt, i);
-		size = mp_sizeof_uint(n);
-		char *pos = (char *) region_alloc(region, size);
-		if (pos == NULL)
-			goto oom;
-		mp_encode_uint(pos, n);
-		break;
-	}
-	case MP_DOUBLE: {
-		double d = sql_column_double(stmt, i);
-		size = mp_sizeof_double(d);
-		char *pos = (char *) region_alloc(region, size);
-		if (pos == NULL)
-			goto oom;
-		mp_encode_double(pos, d);
-		break;
-	}
-	case MP_STR: {
-		uint32_t len = sql_column_bytes(stmt, i);
-		size = mp_sizeof_str(len);
-		char *pos = (char *) region_alloc(region, size);
-		if (pos == NULL)
-			goto oom;
-		const char *s;
-		s = (const char *)sql_column_text(stmt, i);
-		mp_encode_str(pos, s, len);
-		break;
-	}
-	case MP_BIN:
-	case MP_MAP:
-	case MP_ARRAY: {
-		uint32_t len = sql_column_bytes(stmt, i);
-		const char *s =
-			(const char *)sql_column_blob(stmt, i);
-		if (sql_column_subtype(stmt, i) == SQL_SUBTYPE_MSGPACK) {
-			size = len;
-			char *pos = (char *)region_alloc(region, size);
-			if (pos == NULL)
-				goto oom;
-			memcpy(pos, s, len);
-		} else {
-			size = mp_sizeof_bin(len);
-			char *pos = (char *)region_alloc(region, size);
-			if (pos == NULL)
-				goto oom;
-			mp_encode_bin(pos, s, len);
-		}
-		break;
-	}
-	case MP_BOOL: {
-		bool b = sql_column_boolean(stmt, i);
-		size = mp_sizeof_bool(b);
-		char *pos = (char *) region_alloc(region, size);
-		if (pos == NULL)
-			goto oom;
-		mp_encode_bool(pos, b);
-		break;
-	}
-	case MP_NIL: {
-		size = mp_sizeof_nil();
-		char *pos = (char *) region_alloc(region, size);
-		if (pos == NULL)
-			goto oom;
-		mp_encode_nil(pos);
-		break;
-	}
-	default:
-		unreachable();
-	}
-	return 0;
-oom:
-	diag_set(OutOfMemory, size, "region_alloc", "SQL value");
-	return -1;
-}
-
-/**
  * Convert sql row into a tuple and append to a port.
  * @param stmt Started prepared statement. At least one
  *        sql_step must be done.
- * @param column_count Statement's column count.
  * @param region Runtime allocator for temporary objects.
  * @param port Port to store tuples.
  *
@@ -245,29 +142,11 @@ oom:
  * @retval -1 Memory error.
  */
 static inline int
-sql_row_to_port(struct sql_stmt *stmt, int column_count,
-		struct region *region, struct port *port)
+sql_row_to_port(struct sql_stmt *stmt, struct region *region, struct port *port)
 {
-	assert(column_count > 0);
-	size_t size = mp_sizeof_array(column_count);
+	uint32_t size;
 	size_t svp = region_used(region);
-	char *pos = (char *) region_alloc(region, size);
-	if (pos == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "SQL row");
-		return -1;
-	}
-	mp_encode_array(pos, column_count);
-
-	for (int i = 0; i < column_count; ++i) {
-		if (sql_column_to_messagepack(stmt, i, region) != 0)
-			goto error;
-	}
-	size = region_used(region) - svp;
-	pos = (char *) region_join(region, size);
-	if (pos == NULL) {
-		diag_set(OutOfMemory, size, "region_join", "pos");
-		goto error;
-	}
+	char *pos = sql_stmt_result_to_msgpack(stmt, &size, region);
 	struct tuple *tuple =
 		tuple_new(box_tuple_format_default(), pos, pos + size);
 	if (tuple == NULL)
@@ -677,8 +556,7 @@ sql_execute(struct sql_stmt *stmt, struct port *port, struct region *region)
 	if (column_count > 0) {
 		/* Either ROW or DONE or ERROR. */
 		while ((rc = sql_step(stmt)) == SQL_ROW) {
-			if (sql_row_to_port(stmt, column_count, region,
-					    port) != 0)
+			if (sql_row_to_port(stmt, region, port) != 0)
 				return -1;
 		}
 		assert(rc == SQL_DONE || rc != 0);

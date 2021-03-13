@@ -515,16 +515,13 @@ sql_column_text(sql_stmt * pStmt, int i)
 	return sql_value_text(columnMem(pStmt, i));
 }
 
-enum mp_type
-sql_column_type(sql_stmt * pStmt, int i)
+char *
+sql_stmt_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
+			   struct region *region)
 {
-	return sql_value_type(columnMem(pStmt, i));
-}
-
-enum sql_subtype
-sql_column_subtype(struct sql_stmt *stmt, int i)
-{
-	return sql_value_subtype(columnMem(stmt, i));
+	struct Vdbe *vdbe = (struct Vdbe *)stmt;
+	return sql_vdbe_mem_encode_tuple(vdbe->pResultSet, vdbe->nResColumn,
+					 tuple_size, region);
 }
 
 /*
