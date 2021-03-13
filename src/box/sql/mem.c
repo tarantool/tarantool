@@ -181,6 +181,70 @@ mem_move(struct Mem *to, struct Mem *from)
 	from->zMalloc = NULL;
 }
 
+static bool
+try_return_null(const struct Mem *a, const struct Mem *b, struct Mem *result,
+		enum field_type type)
+{
+	mem_clear(result);
+	result->field_type = type;
+	return (((a->flags | b->flags) & MEM_Null) != 0);
+}
+
+int
+mem_concat(struct Mem *a, struct Mem *b, struct Mem *result)
+{
+	assert(result != b);
+	if (a != result) {
+		if (try_return_null(a, b, result, FIELD_TYPE_STRING))
+			return 0;
+	} else {
+		if (((a->flags | b->flags) & MEM_Null) != 0) {
+			mem_clear(a);
+			result->field_type = FIELD_TYPE_STRING;
+			return 0;
+		}
+	}
+
+	/* Concatenation operation can be applied only to strings and blobs. */
+	if ((b->flags & (MEM_Str | MEM_Blob)) == 0) {
+		diag_set(ClientError, ER_INCONSISTENT_TYPES,
+			 "text or varbinary", mem_type_to_str(b));
+		return -1;
+	}
+	if ((a->flags & (MEM_Str | MEM_Blob)) == 0) {
+		diag_set(ClientError, ER_INCONSISTENT_TYPES,
+			 "text or varbinary", mem_type_to_str(a));
+		return -1;
+	}
+
+	/* Moreover, both operands must be of the same type. */
+	if ((b->flags & MEM_Str) != (a->flags & MEM_Str)) {
+		diag_set(ClientError, ER_INCONSISTENT_TYPES,
+			 mem_type_to_str(a), mem_type_to_str(b));
+		return -1;
+	}
+
+	if (ExpandBlob(a) != 0 || ExpandBlob(b) != 0)
+		return -1;
+
+	uint32_t size = a->n + b->n;
+	if ((int)size > sql_get()->aLimit[SQL_LIMIT_LENGTH]) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		return -1;
+	}
+	if (sqlVdbeMemGrow(result, size, result == a) != 0)
+		return -1;
+
+	result->flags = a->flags & (MEM_Str | MEM_Blob);
+	if ((result->flags & MEM_Blob) != 0)
+		result->field_type = FIELD_TYPE_VARBINARY;
+	if (result != a)
+		memcpy(result->z, a->z, a->n);
+	memcpy(&result->z[a->n], b->z, b->n);
+	result->n = size;
+	return 0;
+}
+
 static inline bool
 mem_has_msgpack_subtype(struct Mem *mem)
 {
