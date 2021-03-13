@@ -36,8 +36,11 @@ local function start_server(test, sock_family, sock_addr)
     else
         error(string.format('invalid socket family: %s', sock_family))
     end
-    local cmd = string.format("%s/test/app-tap/httpd.py %s",
-                              TARANTOOL_SRC_DIR, arg)
+    -- PYTHON_EXECUTABLE is set in http_client.skipcond.
+    local python_executable = os.getenv('PYTHON_EXECUTABLE') or ''
+    local cmd_prefix = (python_executable .. ' '):lstrip()
+    local cmd = string.format("%s%s/test/app-tap/httpd.py %s",
+                              cmd_prefix, TARANTOOL_SRC_DIR, arg)
     local server = io.popen(cmd)
     test:is(server:read("*l"), "heartbeat", "server started")
     test:diag("trying to connect to %s", url)
