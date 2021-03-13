@@ -17,31 +17,31 @@ True
 #  Test gh-206 "Segfault if sending IPROTO package without `KEY` field"
 
 IPROTO_SELECT
-query {'IPROTO_CODE': 1} {'IPROTO_SPACE_ID': 280}
+query [('IPROTO_CODE', 1)] [('IPROTO_SPACE_ID', 280)]
 True
 
 
 IPROTO_DELETE
-query {'IPROTO_CODE': 5} {'IPROTO_SPACE_ID': 280}
+query [('IPROTO_CODE', 5)] [('IPROTO_SPACE_ID', 280)]
 True
 
 
 IPROTO_UPDATE
-query {'IPROTO_CODE': 4} {'IPROTO_SPACE_ID': 280}
+query [('IPROTO_CODE', 4)] [('IPROTO_SPACE_ID', 280)]
 True
-query {'IPROTO_CODE': 4} {'IPROTO_SPACE_ID': 280, 'IPROTO_KEY': (1,)}
+query [('IPROTO_CODE', 4)] [('IPROTO_KEY', (1,)), ('IPROTO_SPACE_ID', 280)]
 True
 
 
 IPROTO_REPLACE
-query {'IPROTO_CODE': 3} {'IPROTO_SPACE_ID': 280}
+query [('IPROTO_CODE', 3)] [('IPROTO_SPACE_ID', 280)]
 True
 
 
 IPROTO_CALL
-query {'IPROTO_CODE': 10} {}
+query [('IPROTO_CODE', 10)] []
 True
-query {'IPROTO_CODE': 10} {'IPROTO_KEY': ('procname',)}
+query [('IPROTO_CODE', 10)] [('IPROTO_KEY', ('procname',))]
 True
 
 

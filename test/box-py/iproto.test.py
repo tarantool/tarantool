@@ -50,7 +50,8 @@ def repr_dict(todump):
     for (k, v) in todump.items():
         k_name = key_names.get(k, k)
         d[k_name] = v
-    return repr(d)
+    return repr(sorted(d.items()))
+
 
 def test(header, body):
     # Connect and authenticate
