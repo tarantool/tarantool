@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import os
 import sys
+import json
 
 def call(name, *args):
     return iproto.call(name, *args)
@@ -136,16 +137,30 @@ admin("space:drop()")
 admin("space = box.schema.space.create('tweedledum')")
 admin("index = space:create_index('primary', { type = 'tree' })")
 
+json_dumps_kwargs=dict(sort_keys=True, separators=(', ', ': '))
+
+def dump_args(*args):
+    return json.dumps(args, **json_dumps_kwargs)[1:-1]
+
+def dump_response(response):
+    if response.return_code:
+        return str(response)
+    if not response.data:
+        return ''
+    res = []
+    for item in response.data:
+        res.append(json.dumps(item, **json_dumps_kwargs))
+    return '- ' + '\n- '.join(res)
 
 def lua_eval(name, *args):
-    print("eval ({})({})".format(name, ",".join([ str(arg) for arg in args])))
+    print("eval ({})({})".format(name, dump_args(*args)))
     print("---")
-    print(iproto.py_con.eval(name, args))
+    print(dump_response(iproto.py_con.eval(name, args)))
 
 def lua_call(name, *args):
-    print("call {}({})".format(name, ",".join([ str(arg) for arg in args])))
+    print("call {}({})".format(name, dump_args(*args)))
     print("---")
-    print(iproto.py_con.call(name, args))
+    print(dump_response(iproto.py_con.call(name, args)))
 
 def test(expr, *args):
     lua_eval("return " + expr, *args)
