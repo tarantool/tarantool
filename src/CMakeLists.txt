@@ -131,7 +131,6 @@ set (server_sources
      lua/utf8.c
      lua/info.c
      lua/string.c
-     lua/buffer.c
      lua/swim.c
      lua/decimal.c
      ${lua_sources}
