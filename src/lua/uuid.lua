@@ -1,7 +1,7 @@
 -- uuid.lua (internal file)
 
 local ffi = require("ffi")
-local static_alloc = require('buffer').static_alloc
+local buffer = require('buffer')
 local builtin = ffi.C
 
 ffi.cdef[[
@@ -27,6 +27,9 @@ extern const struct tt_uuid uuid_nil;
 local uuid_t = ffi.typeof('struct tt_uuid')
 local UUID_STR_LEN = 36
 local UUID_LEN = ffi.sizeof(uuid_t)
+local uuid_stash = buffer.ffi_stash_new(uuid_t)
+local uuid_stash_take = uuid_stash.take
+local uuid_stash_put = uuid_stash.put
 
 local is_uuid = function(value)
     return ffi.istype(uuid_t, value)
@@ -66,10 +69,12 @@ local uuid_tobin = function(uu, byteorder)
         return error('Usage: uuid:bin([byteorder])')
     end
     if need_bswap(byteorder) then
-        local uuidbuf = static_alloc('struct tt_uuid')
+        local uuidbuf = uuid_stash_take()
         ffi.copy(uuidbuf, uu, UUID_LEN)
         builtin.tt_uuid_bswap(uuidbuf)
-        return ffi.string(ffi.cast('char *', uuidbuf), UUID_LEN)
+        uu = ffi.string(ffi.cast('char *', uuidbuf), UUID_LEN)
+        uuid_stash_put(uuidbuf)
+        return uu
     end
     return ffi.string(ffi.cast('char *', uu), UUID_LEN)
 end
@@ -93,42 +98,29 @@ local uuid_isnil = function(uu)
     return builtin.tt_uuid_is_nil(uu)
 end
 
-local fromstr = function(str)
-    local uu = static_alloc('struct tt_uuid')
-    local rc = builtin.tt_uuid_from_string(str, uu)
-    if rc ~= 0 then
-        return nil
-    end
-    return uu
-end
-
-local to_uuid = function(value)
-    if is_uuid(value) then
-        return value
-    end
-    if type(value) == 'string' then
-        return fromstr(value)
-    end
-    return nil
-end
-
-local check_uuid = function(value, index, err_lvl)
-    value = to_uuid(value)
-    if value ~= nil then
-        return value
-    end
-
+local function error_convert_arg(arg_index)
     local err_fmt = 'incorrect value to convert to uuid as %d argument'
-    error(err_fmt:format(index), err_lvl)
+    error(err_fmt:format(arg_index), 3)
 end
 
 local uuid_eq = function(lhs, rhs)
-    rhs = to_uuid(rhs)
-    if rhs == nil then
+    if not is_uuid(lhs) then
+        lhs, rhs = rhs, lhs
+    elseif is_uuid(rhs) then
+        return builtin.tt_uuid_is_equal(lhs, rhs)
+    end
+    if type(rhs) ~= 'string' then
         return false
     end
-    lhs = check_uuid(lhs, 1, 3)
-    return builtin.tt_uuid_is_equal(lhs, rhs)
+    local buf = uuid_stash_take()
+    local rc = builtin.tt_uuid_from_string(rhs, buf) == 0
+    if rc then
+        rc = builtin.tt_uuid_is_equal(lhs, buf)
+    else
+        rc = false
+    end
+    uuid_stash_put(buf)
+    return rc
 end
 
 local uuid_new = function()
@@ -138,20 +130,50 @@ local uuid_new = function()
 end
 
 local uuid_new_bin = function(byteorder)
-    local uuidbuf = static_alloc('struct tt_uuid')
+    local uuidbuf = uuid_stash_take()
     builtin.tt_uuid_create(uuidbuf)
-    return uuid_tobin(uuidbuf, byteorder)
+    local res = uuid_tobin(uuidbuf, byteorder)
+    uuid_stash_put(uuidbuf)
+    return res
 end
 local uuid_new_str = function()
-    local uuidbuf = static_alloc('struct tt_uuid')
+    local uuidbuf = uuid_stash_take()
     builtin.tt_uuid_create(uuidbuf)
-    return uuid_tostring(uuidbuf)
+    local res = uuid_tostring(uuidbuf)
+    uuid_stash_put(uuidbuf)
+    return res
 end
 
 local uuid_cmp = function(lhs, rhs)
-    lhs = check_uuid(lhs, 1, 4)
-    rhs = check_uuid(rhs, 2, 4)
-    return builtin.tt_uuid_compare(lhs, rhs)
+    local buf
+    if is_uuid(lhs) then
+        if is_uuid(rhs) then
+            -- Fast path.
+           return builtin.tt_uuid_compare(lhs, rhs)
+        end
+        if type(rhs) ~= 'string' then
+            return error_convert_arg(2)
+        end
+        buf = uuid_stash_take()
+        if builtin.tt_uuid_from_string(rhs, buf) ~= 0 then
+            uuid_stash_put(buf)
+            return error_convert_arg(2)
+        end
+        rhs = buf
+    else
+        if type(lhs) ~= 'string' then
+            return error_convert_arg(1)
+        end
+        buf = uuid_stash_take()
+        if builtin.tt_uuid_from_string(lhs, buf) ~= 0 then
+            uuid_stash_put(buf)
+            return error_convert_arg(1)
+        end
+        lhs = buf
+    end
+    local rc = builtin.tt_uuid_compare(lhs, rhs)
+    uuid_stash_put(buf)
+    return rc
 end
 local uuid_lt = function(lhs, rhs)
     return uuid_cmp(lhs, rhs) < 0
