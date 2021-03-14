@@ -365,6 +365,39 @@ int
 mem_rem(const struct Mem *left, const struct Mem *right, struct Mem *result);
 
 /**
+ * Compare two MEMs and return the result of comparison. MEMs should be of
+ * BOOLEAN type or their values are converted to VARBINARY according to implicit
+ * cast rules. Original MEMs are not changed.
+ */
+int
+mem_cmp_bool(const struct Mem *a, const struct Mem *b, int *result);
+
+/**
+ * Compare two MEMs and return the result of comparison. MEMs should be of
+ * VARBINARY type or their values are converted to VARBINARY according to
+ * implicit cast rules. Original MEMs are not changed.
+ */
+int
+mem_cmp_bin(const struct Mem *a, const struct Mem *b, int *result);
+
+/**
+ * Compare two MEMs and return the result of comparison. MEMs should be of
+ * STRING type or their values are converted to VARBINARY according to
+ * implicit cast rules. Original MEMs are not changed.
+ */
+int
+mem_cmp_str(const struct Mem *left, const struct Mem *right, int *result,
+	    const struct coll *coll);
+
+/**
+ * Compare two MEMs and return the result of comparison. MEMs should be of
+ * NUMBER type or their values are converted to NUMBER according to
+ * implicit cast rules. Original MEMs are not changed.
+ */
+int
+mem_cmp_num(const struct Mem *a, const struct Mem *b, int *result);
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
