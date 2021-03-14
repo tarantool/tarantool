@@ -331,6 +331,40 @@ int
 mem_concat(struct Mem *left, struct Mem *right, struct Mem *result);
 
 /**
+ * Add the first MEM to the second MEM and write the result to the third MEM.
+ */
+int
+mem_add(const struct Mem *left, const struct Mem *right, struct Mem *result);
+
+/**
+ * Subtract the second MEM from the first MEM and write the result to the third
+ * MEM.
+ */
+int
+mem_sub(const struct Mem *left, const struct Mem *right, struct Mem *result);
+
+/**
+ * Multiply the first MEM by the second MEM and write the result to the third
+ * MEM.
+ */
+int
+mem_mul(const struct Mem *left, const struct Mem *right, struct Mem *result);
+
+/**
+ * Divide the first MEM by the second MEM and write the result to the third
+ * MEM.
+ */
+int
+mem_div(const struct Mem *left, const struct Mem *right, struct Mem *result);
+
+/**
+ * Divide the first MEM by the second MEM and write integer part of the result
+ * to the third MEM.
+ */
+int
+mem_rem(const struct Mem *left, const struct Mem *right, struct Mem *result);
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -347,8 +381,6 @@ mem_mp_type(struct Mem *mem);
 
 enum mp_type
 sql_value_type(struct Mem *);
-u16
-numericType(Mem *pMem);
 
 int sqlValueBytes(struct Mem *);
 
