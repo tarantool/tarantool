@@ -3,7 +3,9 @@
 local ffi = require('ffi')
 local crypto = require('crypto')
 local bit = require('bit')
-local static_alloc = require('buffer').static_alloc
+local buffer = require('buffer')
+local cord_ibuf_take = buffer.internal.cord_ibuf_take
+local cord_ibuf_put = buffer.internal.cord_ibuf_put
 
 ffi.cdef[[
     /* internal implementation */
@@ -180,9 +182,12 @@ local m = {
         end
         local blen = #bin
         local slen = ffi.C.base64_bufsize(blen, mask)
-        local str  = static_alloc('char', slen)
+        local ibuf = cord_ibuf_take()
+        local str = ibuf:alloc(slen)
         local len = ffi.C.base64_encode(bin, blen, str, slen, mask)
-        return ffi.string(str, len)
+        str = ffi.string(str, len)
+        cord_ibuf_put(ibuf)
+        return str
     end,
 
     base64_decode = function(str)
@@ -191,9 +196,12 @@ local m = {
         end
         local slen = #str
         local blen = math.ceil(slen * 3 / 4)
-        local bin  = static_alloc('char', blen)
+        local ibuf = cord_ibuf_take()
+        local bin = ibuf:alloc(blen)
         local len = ffi.C.base64_decode(str, slen, bin, blen)
-        return ffi.string(bin, len)
+        bin = ffi.string(bin, len)
+        cord_ibuf_put(ibuf)
+        return bin
     end,
 
     crc32 = CRC32,
@@ -229,9 +237,12 @@ local m = {
         if n == nil then
             error('Usage: digest.urandom(len)')
         end
-        local buf = static_alloc('char', n)
+        local ibuf = cord_ibuf_take()
+        local buf = ibuf:alloc(n)
         ffi.C.random_bytes(buf, n)
-        return ffi.string(buf, n)
+        buf = ffi.string(buf, n)
+        cord_ibuf_put(ibuf)
+        return buf
     end,
 
     murmur = PMurHash,

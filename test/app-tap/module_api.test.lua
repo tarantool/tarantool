@@ -1,6 +1,7 @@
 #!/usr/bin/env tarantool
 
 local fio = require('fio')
+local ffi = require('ffi')
 
 box.cfg{log = "tarantool.log"}
 -- Use BUILDDIR passed from test-run or cwd when run w/o
@@ -42,7 +43,7 @@ local function test_buffers(test, module)
     test:plan(9)
     local buffer = require('buffer')
 
-    local bufalloc = buffer.static_alloc("char", 128)
+    local bufalloc = ffi.new('char[?]', 128)
     local ibuf = buffer.ibuf()
     local pbuf = ibuf:alloc(128)
 

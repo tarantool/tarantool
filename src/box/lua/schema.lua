@@ -2725,9 +2725,12 @@ box.schema.user = {}
 
 box.schema.user.password = function(password)
     local BUF_SIZE = 128
-    local buf = buffer.static_alloc('char', BUF_SIZE)
+    local ibuf = cord_ibuf_take()
+    local buf = ibuf:alloc(BUF_SIZE)
     builtin.password_prepare(password, #password, buf, BUF_SIZE)
-    return ffi.string(buf)
+    buf = ffi.string(buf)
+    cord_ibuf_put(ibuf)
+    return buf
 end
 
 local function chpasswd(uid, new_password)

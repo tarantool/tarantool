@@ -6,6 +6,8 @@ local buffer = require('buffer')
 local fiber = require('fiber')
 local errno = require('errno')
 local schedule_task = fiber._internal.schedule_task
+local cord_ibuf_take = buffer.internal.cord_ibuf_take
+local cord_ibuf_put = buffer.internal.cord_ibuf_put
 
 ffi.cdef[[
     int umask(int mask);
@@ -302,9 +304,12 @@ fio.dirname = function(path)
     -- Can't just cast path to char * - on Linux dirname modifies
     -- its argument.
     local bsize = #path + 1
-    local cpath = buffer.static_alloc('char', bsize)
+    local ibuf = cord_ibuf_take()
+    local cpath = ibuf:alloc(bsize)
     ffi.copy(cpath, ffi.cast('const char *', path), bsize)
-    return ffi.string(ffi.C.dirname(cpath))
+    path = ffi.string(ffi.C.dirname(cpath))
+    cord_ibuf_put(ibuf)
+    return path
 end
 
 fio.umask = function(umask)

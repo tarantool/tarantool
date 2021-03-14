@@ -12,8 +12,8 @@ local log = require('log')
 local buffer = require('buffer')
 local reg1 = buffer.reg1
 local reg2 = buffer.reg2
-local static_alloc = buffer.static_alloc
 local cord_ibuf_take = buffer.internal.cord_ibuf_take
+local cord_ibuf_put = buffer.internal.cord_ibuf_put
 local cord_ibuf_drop = buffer.internal.cord_ibuf_drop
 
 local format = string.format
@@ -540,15 +540,19 @@ local function socket_getsockopt(self, level, name)
     end
 
     if info.type == 2 then
-        local value = static_alloc('char', 256)
+        local ibuf = cord_ibuf_take()
+        local value = ibuf:alloc(256)
         local len = reg1.as
         len[0] = 256
         local res = ffi.C.getsockopt(fd, level, info.iname, value, len)
         if res < 0 then
             self._errno = boxerrno()
+            cord_ibuf_put(ibuf)
             return nil
         end
-        return ffi.string(value, tonumber(len[0]))
+        value = ffi.string(value, tonumber(len[0]))
+        cord_ibuf_put(ibuf)
+        return value
     end
 
     if name == 'SO_LINGER' then
@@ -564,7 +568,7 @@ local function socket_linger(self, active, timeout)
     local info = internal.SO_OPT[level].SO_LINGER
     self._errno = nil
     if active == nil then
-        local value = static_alloc('linger_t')
+        local value = ffi.new('linger_t[1]')
         local len = reg1.as
         len[0] = ffi.sizeof('linger_t')
         local res = ffi.C.getsockopt(fd, level, info.iname, value, len)
@@ -858,14 +862,18 @@ local function socket_recv(self, size, flags)
     end
 
     self._errno = nil
-    local buf = static_alloc('char', size)
+    local ibuf = cord_ibuf_take()
+    local buf = ibuf:alloc(size)
     local res = ffi.C.recv(fd, buf, size, iflags)
 
     if res == -1 then
         self._errno = boxerrno()
+        cord_ibuf_put(ibuf)
         return nil
     end
-    return ffi.string(buf, res)
+    buf = ffi.string(buf, res)
+    cord_ibuf_put(ibuf)
+    return buf
 end
 
 local function socket_recvfrom(self, size, flags)
