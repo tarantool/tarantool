@@ -348,7 +348,7 @@ local function swim_member_is_dropped(m)
 end
 
 local function swim_member_payload_raw(ptr)
-    local int = buffer.reg1.ai
+    local int = ffi.new('int[1]')
     local cdata = capi.swim_member_payload(ptr, int)
     return cdata, int[0]
 end

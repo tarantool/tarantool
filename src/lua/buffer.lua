@@ -41,35 +41,6 @@ ibuf_reinit(struct ibuf *ibuf);
 
 void *
 ibuf_reserve_slow(struct ibuf *ibuf, size_t size);
-
-/**
- * Register is a buffer to use with FFI functions, which usually
- * operate with pointers to scalar values like int, char, size_t,
- * void *. To avoid doing 'ffi.new(<type>[1])' on each such FFI
- * function invocation, a module can use one of attributes of the
- * register union.
- *
- * Naming policy of the attributes is easy to remember:
- * 'a' for array type + type name first letters + 'p' for pointer.
- *
- * For example:
- * - int[1] - <a>rray of <i>nt - ai;
- * - const unsigned char *[1] -
- *       <a>rray of <c>onst <u>nsigned <c>har <p> pointer - acucp.
- */
-union c_register {
-    size_t as[1];
-    void *ap[1];
-    int ai[1];
-    char ac[1];
-    const unsigned char *acucp[1];
-    unsigned long aul[1];
-    uint16_t u16;
-    uint32_t u32;
-    uint64_t u64;
-    int64_t i64;
-    int64_t ai64[1];
-};
 ]]
 
 local builtin = ffi.C
@@ -261,16 +232,6 @@ local function ffi_stash_new(c_type)
 end
 
 --
--- Sometimes it is wanted to use several temporary registers at
--- once. For example, when a C function takes 2 C pointers. Then
--- one register is not enough - its attributes share memory. Note,
--- registers are not allocated with separate ffi.new calls
--- deliberately. With a single allocation they fit into 1 cache
--- line, and reduce the heap fragmentation.
---
-local reg_array = ffi.new('union c_register[?]', 2)
-
---
 -- Cord buffer is useful for the places, where
 --
 -- * Want to reuse the already allocated memory which might be stored in the
@@ -313,9 +274,5 @@ return {
     internal = internal,
     ibuf = ibuf_new;
     READAHEAD = READAHEAD;
-    -- Keep reference.
-    reg_array = reg_array,
-    reg1 = reg_array[0],
-    reg2 = reg_array[1],
     ffi_stash_new = ffi_stash_new,
 }

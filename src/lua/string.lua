@@ -16,8 +16,6 @@ ffi.cdef[[
 ]]
 
 local c_char_ptr     = ffi.typeof('const char *')
-local strip_newstart = buffer.reg1.aul
-local strip_newlen   = buffer.reg2.aul
 
 local memcmp  = ffi.C.memcmp
 local memmem  = ffi.C.memmem
@@ -371,6 +369,8 @@ local function string_strip(inp, chars)
     end
 
     local casted_inp = c_char_ptr(inp)
+    local strip_newstart = ffi.new('unsigned long[1]')
+    local strip_newlen = ffi.new('unsigned long[1]')
     ffi.C.string_strip_helper(inp, #inp, chars, #chars, true, true,
                               strip_newstart, strip_newlen)
     return ffi.string(casted_inp + strip_newstart[0], strip_newlen[0])
@@ -392,6 +392,8 @@ local function string_lstrip(inp, chars)
     end
 
     local casted_inp = c_char_ptr(inp)
+    local strip_newstart = ffi.new('unsigned long[1]')
+    local strip_newlen = ffi.new('unsigned long[1]')
     ffi.C.string_strip_helper(inp, #inp, chars, #chars, true, false,
                               strip_newstart, strip_newlen)
     return ffi.string(casted_inp + strip_newstart[0], strip_newlen[0])
@@ -413,6 +415,8 @@ local function string_rstrip(inp, chars)
     end
 
     local casted_inp = c_char_ptr(inp)
+    local strip_newstart = ffi.new('unsigned long[1]')
+    local strip_newlen = ffi.new('unsigned long[1]')
     ffi.C.string_strip_helper(inp, #inp, chars, #chars, false, true,
                               strip_newstart, strip_newlen)
     return ffi.string(casted_inp + strip_newstart[0], strip_newlen[0])
