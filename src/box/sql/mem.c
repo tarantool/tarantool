@@ -245,6 +245,240 @@ mem_concat(struct Mem *a, struct Mem *b, struct Mem *result)
 	return 0;
 }
 
+struct sql_num {
+	union {
+		int64_t i;
+		uint64_t u;
+		double d;
+	};
+	int type;
+	bool is_neg;
+};
+
+static int
+get_number(const struct Mem *mem, struct sql_num *number)
+{
+	if ((mem->flags & MEM_Real) != 0) {
+		number->d = mem->u.r;
+		number->type = MEM_Real;
+		return 0;
+	}
+	if ((mem->flags & MEM_Int) != 0) {
+		number->i = mem->u.i;
+		number->type = MEM_Int;
+		number->is_neg = true;
+		return 0;
+	}
+	if ((mem->flags & MEM_UInt) != 0) {
+		number->u = mem->u.u;
+		number->type = MEM_UInt;
+		number->is_neg = false;
+		return 0;
+	}
+	if ((mem->flags & (MEM_Str | MEM_Blob)) == 0)
+		return -1;
+	if ((mem->flags & MEM_Subtype) != 0)
+		return -1;
+	if (sql_atoi64(mem->z, &number->i, &number->is_neg, mem->n) == 0) {
+		number->type = number->is_neg ? MEM_Int : MEM_UInt;
+		/*
+		 * The next line should be removed along with the is_neg field
+		 * of struct sql_num. The integer type tells us about the sign.
+		 * However, if it is removed, the behavior of arithmetic
+		 * operations will change.
+		 */
+		number->is_neg = false;
+		return 0;
+	}
+	if (sqlAtoF(mem->z, &number->d, mem->n) != 0) {
+		number->type = MEM_Real;
+		return 0;
+	}
+	return -1;
+}
+
+static int
+arithmetic_prepare(const struct Mem *left, const struct Mem *right,
+		   struct sql_num *a, struct sql_num *b)
+{
+	if (get_number(right, b) != 0) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "numeric");
+		return -1;
+	}
+	if (get_number(left, a) != 0) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
+			 "numeric");
+		return -1;
+	}
+	assert(a->type != 0 && b->type != 0);
+	if (a->type == MEM_Real && b->type != MEM_Real) {
+		b->d = b->type == MEM_Int ? (double)b->i : (double)b->u;
+		b->type = MEM_Real;
+		return 0;
+	}
+	if (a->type != MEM_Real && b->type == MEM_Real) {
+		a->d = a->type == MEM_Int ? (double)a->i : (double)a->u;
+		a->type = MEM_Real;
+		return 0;
+	}
+	return 0;
+}
+
+int
+mem_add(const struct Mem *left, const struct Mem *right, struct Mem *result)
+{
+	if (try_return_null(left, right, result, FIELD_TYPE_NUMBER))
+		return 0;
+
+	struct sql_num a, b;
+	if (arithmetic_prepare(left, right, &a, &b) != 0)
+		return -1;
+
+	assert(a.type != MEM_Real || a.type == b.type);
+	if (a.type == MEM_Real) {
+		result->u.r = a.d + b.d;
+		result->flags = MEM_Real;
+		return 0;
+	}
+
+	int64_t res;
+	bool is_neg;
+	if (sql_add_int(a.i, a.is_neg, b.i, b.is_neg, &res, &is_neg) != 0) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
+		return -1;
+	}
+	result->u.i = res;
+	result->flags = is_neg ? MEM_Int : MEM_UInt;
+	return 0;
+}
+
+int
+mem_sub(const struct Mem *left, const struct Mem *right, struct Mem *result)
+{
+	if (try_return_null(left, right, result, FIELD_TYPE_NUMBER))
+		return 0;
+
+	struct sql_num a, b;
+	if (arithmetic_prepare(left, right, &a, &b) != 0)
+		return -1;
+
+	assert(a.type != MEM_Real || a.type == b.type);
+	if (a.type == MEM_Real) {
+		result->u.r = a.d - b.d;
+		result->flags = MEM_Real;
+		return 0;
+	}
+
+	int64_t res;
+	bool is_neg;
+	if (sql_sub_int(a.i, a.is_neg, b.i, b.is_neg, &res, &is_neg) != 0) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
+		return -1;
+	}
+	result->u.i = res;
+	result->flags = is_neg ? MEM_Int : MEM_UInt;
+	return 0;
+}
+
+int
+mem_mul(const struct Mem *left, const struct Mem *right, struct Mem *result)
+{
+	if (try_return_null(left, right, result, FIELD_TYPE_NUMBER))
+		return 0;
+
+	struct sql_num a, b;
+	if (arithmetic_prepare(left, right, &a, &b) != 0)
+		return -1;
+
+	assert(a.type != MEM_Real || a.type == b.type);
+	if (a.type == MEM_Real) {
+		result->u.r = a.d * b.d;
+		result->flags = MEM_Real;
+		return 0;
+	}
+
+	int64_t res;
+	bool is_neg;
+	if (sql_mul_int(a.i, a.is_neg, b.i, b.is_neg, &res, &is_neg) != 0) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
+		return -1;
+	}
+	result->u.i = res;
+	result->flags = is_neg ? MEM_Int : MEM_UInt;
+	return 0;
+}
+
+int
+mem_div(const struct Mem *left, const struct Mem *right, struct Mem *result)
+{
+	if (try_return_null(left, right, result, FIELD_TYPE_NUMBER))
+		return 0;
+
+	struct sql_num a, b;
+	if (arithmetic_prepare(left, right, &a, &b) != 0)
+		return -1;
+
+	assert(a.type != MEM_Real || a.type == b.type);
+	if (a.type == MEM_Real) {
+		if (b.d == 0.) {
+			diag_set(ClientError, ER_SQL_EXECUTE,
+				 "division by zero");
+			return -1;
+		}
+		result->u.r = a.d / b.d;
+		result->flags = MEM_Real;
+		return 0;
+	}
+
+	if (b.i == 0) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "division by zero");
+		return -1;
+	}
+	int64_t res;
+	bool is_neg;
+	if (sql_div_int(a.i, a.is_neg, b.i, b.is_neg, &res, &is_neg) != 0) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
+		return -1;
+	}
+	result->u.i = res;
+	result->flags = is_neg ? MEM_Int : MEM_UInt;
+	return 0;
+}
+
+int
+mem_rem(const struct Mem *left, const struct Mem *right, struct Mem *result)
+{
+	if (try_return_null(left, right, result, FIELD_TYPE_NUMBER))
+		return 0;
+
+	struct sql_num a, b;
+	if (arithmetic_prepare(left, right, &a, &b) != 0)
+		return -1;
+
+	assert(a.type != MEM_Real || a.type == b.type);
+	/*
+	 * TODO: This operation works wrong when double d > INT64_MAX and
+	 * d < UINT64_MAX. Also, there may be precision losses due to
+	 * conversion integer to double and back.
+	 */
+	a.i = a.type == MEM_Real ? (int64_t)a.d : a.i;
+	b.i = b.type == MEM_Real ? (int64_t)b.d : b.i;
+	if (b.i == 0) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "division by zero");
+		return -1;
+	}
+	int64_t res;
+	bool is_neg;
+	if (sql_rem_int(a.i, a.is_neg, b.i, b.is_neg, &res, &is_neg) != 0) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
+		return -1;
+	}
+	result->u.i = res;
+	result->flags = is_neg ? MEM_Int : MEM_UInt;
+	return 0;
+}
+
 static inline bool
 mem_has_msgpack_subtype(struct Mem *mem)
 {
@@ -447,44 +681,6 @@ sql_value_type(sql_value *pVal)
 {
 	struct Mem *mem = (struct Mem *) pVal;
 	return mem_mp_type(mem);
-}
-
-
-/*
- * pMem currently only holds a string type (or maybe a BLOB that we can
- * interpret as a string if we want to).  Compute its corresponding
- * numeric type, if has one.  Set the pMem->u.r and pMem->u.i fields
- * accordingly.
- */
-static u16 SQL_NOINLINE
-computeNumericType(Mem *pMem)
-{
-	assert((pMem->flags & (MEM_Int | MEM_UInt | MEM_Real)) == 0);
-	assert((pMem->flags & (MEM_Str|MEM_Blob))!=0);
-	if (sqlAtoF(pMem->z, &pMem->u.r, pMem->n)==0)
-		return 0;
-	bool is_neg;
-	if (sql_atoi64(pMem->z, (int64_t *) &pMem->u.i, &is_neg, pMem->n) == 0)
-		return is_neg ? MEM_Int : MEM_UInt;
-	return MEM_Real;
-}
-
-/*
- * Return the numeric type for pMem, either MEM_Int or MEM_Real or both or
- * none.
- *
- * Unlike mem_apply_numeric_type(), this routine does not modify pMem->flags.
- * But it does set pMem->u.r and pMem->u.i appropriately.
- */
-u16
-numericType(Mem *pMem)
-{
-	if ((pMem->flags & (MEM_Int | MEM_UInt | MEM_Real)) != 0)
-		return pMem->flags & (MEM_Int | MEM_UInt | MEM_Real);
-	if (pMem->flags & (MEM_Str|MEM_Blob)) {
-		return computeNumericType(pMem);
-	}
-	return 0;
 }
 
 /*
