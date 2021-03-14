@@ -479,6 +479,115 @@ mem_rem(const struct Mem *left, const struct Mem *right, struct Mem *result)
 	return 0;
 }
 
+static int
+bitwise_prepare(const struct Mem *left, const struct Mem *right,
+		int64_t *a, int64_t *b)
+{
+	bool unused;
+	if (sqlVdbeIntValue(left, a, &unused) != 0) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
+			 "integer");
+		return -1;
+	}
+	if (sqlVdbeIntValue(right, b, &unused) != 0) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "integer");
+		return -1;
+	}
+	return 0;
+}
+
+int
+mem_bit_and(const struct Mem *left, const struct Mem *right, struct Mem *result)
+{
+	if (try_return_null(left, right, result, FIELD_TYPE_INTEGER))
+		return 0;
+	int64_t a;
+	int64_t b;
+	if (bitwise_prepare(left, right, &a, &b) != 0)
+		return -1;
+	result->u.i = a & b;
+	result->flags = result->u.i < 0 ? MEM_Int : MEM_UInt;
+	return 0;
+}
+
+int
+mem_bit_or(const struct Mem *left, const struct Mem *right, struct Mem *result)
+{
+	if (try_return_null(left, right, result, FIELD_TYPE_INTEGER))
+		return 0;
+	int64_t a;
+	int64_t b;
+	if (bitwise_prepare(left, right, &a, &b) != 0)
+		return -1;
+	result->u.i = a | b;
+	result->flags = result->u.i < 0 ? MEM_Int : MEM_UInt;
+	return 0;
+}
+
+int
+mem_shift_left(const struct Mem *left, const struct Mem *right,
+	       struct Mem *result)
+{
+	if (try_return_null(left, right, result, FIELD_TYPE_INTEGER))
+		return 0;
+	int64_t a;
+	int64_t b;
+	if (bitwise_prepare(left, right, &a, &b) != 0)
+		return -1;
+	if (b <= -64)
+		result->u.i = a >= 0 ? 0 : -1;
+	else if (b < 0)
+		result->u.i = a >> -b;
+	else if (b > 64)
+		result->u.i = 0;
+	else
+		result->u.i = a << b;
+	result->flags = result->u.i < 0 ? MEM_Int : MEM_UInt;
+	return 0;
+}
+
+int
+mem_shift_right(const struct Mem *left, const struct Mem *right,
+		struct Mem *result)
+{
+	if (try_return_null(left, right, result, FIELD_TYPE_INTEGER))
+		return 0;
+	int64_t a;
+	int64_t b;
+	if (bitwise_prepare(left, right, &a, &b) != 0)
+		return -1;
+	if (b <= -64)
+		result->u.i = 0;
+	else if (b < 0)
+		result->u.i = a << -b;
+	else if (b > 64)
+		result->u.i = a >= 0 ? 0 : -1;
+	else
+		result->u.i = a >> b;
+	result->flags = result->u.i < 0 ? MEM_Int : MEM_UInt;
+	return 0;
+}
+
+int
+mem_bit_not(const struct Mem *mem, struct Mem *result)
+{
+	mem_clear(result);
+	result->field_type = FIELD_TYPE_INTEGER;
+	if ((mem->flags & MEM_Null) != 0)
+		return 0;
+	int64_t i;
+	bool unused;
+	if (sqlVdbeIntValue(mem, &i, &unused) != 0) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(mem),
+			 "integer");
+		return -1;
+	}
+	result->u.i = ~i;
+	result->flags = result->u.i < 0 ? MEM_Int : MEM_UInt;
+	return 0;
+}
+
 int
 mem_cmp_bool(const struct Mem *a, const struct Mem *b, int *result)
 {
@@ -1889,7 +1998,7 @@ mem_value_bool(const struct Mem *mem, bool *b)
  * If pMem represents a string value, its encoding might be changed.
  */
 int
-sqlVdbeIntValue(Mem * pMem, int64_t *i, bool *is_neg)
+sqlVdbeIntValue(const struct Mem *pMem, int64_t *i, bool *is_neg)
 {
 	int flags;
 	assert(EIGHT_BYTE_ALIGNMENT(pMem));
