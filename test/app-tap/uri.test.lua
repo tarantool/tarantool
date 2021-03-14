@@ -2,8 +2,6 @@
 
 local tap = require('tap')
 local uri = require('uri')
-local ffi = require('ffi')
-local static_alloc = require('buffer').static_alloc
 
 local function test_parse(test)
     -- Tests for uri.parse() Lua bindings.
@@ -66,28 +64,8 @@ local function test_format(test)
     test:is(uri.format(u, true), "user:password@localhost", "password kept")
 end
 
-local function test_static_alloc(test)
-    -- gh-4779 uri.format returns junk output.
-    -- As static allocator is also used in several places
-    -- we should properly handle situation when output
-    -- is zero-length string.
-    -- Here we allocate the whole buffer,
-    -- fill it with some "junk" bytes and
-    -- check that result doesn't contain any of them.
-    local buffer_size = 12288
-    local buf = static_alloc('char', buffer_size)
-    ffi.fill(buf, 512, string.byte('x'))
-
-    local iterations = 10
-    test:plan(iterations)
-    for _ = 1, iterations do
-        test:is(uri.format({}), '')
-    end
-end
-
 tap.test("uri", function(test)
-    test:plan(3)
+    test:plan(2)
     test:test("parse", test_parse)
     test:test("format", test_format)
-    test:test("static_alloc", test_static_alloc)
 end)

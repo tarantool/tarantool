@@ -3,6 +3,8 @@
 local ffi = require('ffi')
 local buffer = require('buffer')
 local reg = buffer.reg1
+local cord_ibuf_take = buffer.internal.cord_ibuf_take
+local cord_ibuf_put = buffer.internal.cord_ibuf_put
 
 ffi.cdef[[
     /* from openssl/err.h */
@@ -204,11 +206,15 @@ local function hmac_final(self)
         return error('HMAC not initialized')
     end
     self.initialized = false
-    local buf = buffer.static_alloc('char', 64)
+    local ibuf = cord_ibuf_take()
+    local buf = ibuf:alloc(64)
     if ffi.C.HMAC_Final(self.ctx, buf, reg.ai) ~= 1 then
+        cord_ibuf_put(ibuf)
         return error('Can\'t finalize HMAC: ' .. openssl_err_str())
     end
-    return ffi.string(buf, reg.ai[0])
+    buf = ffi.string(buf, reg.ai[0])
+    cord_ibuf_put(ibuf)
+    return buf
 end
 
 local function hmac_free(self)
