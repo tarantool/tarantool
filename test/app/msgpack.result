@@ -206,10 +206,10 @@ msgpack.decode(buf.rpos, buf:size() - 1)
 - error: 'msgpack.decode: invalid MsgPack'
 ...
 -- Provide a buffer. Try both 'struct ibuf' and 'struct ibuf *'.
-buf = buffer.IBUF_SHARED
+buf_storage = buffer.ibuf()
 ---
 ...
-buf:reset()
+buf = ffi.cast('struct ibuf *', buf_storage)
 ---
 ...
 size = msgpack.encode({a = 1, b = 2}, buf)
@@ -218,6 +218,9 @@ size = msgpack.encode({a = 1, b = 2}, buf)
 (msgpack.decode(buf.rpos, size))
 ---
 - {'a': 1, 'b': 2}
+...
+buf_storage = nil
+---
 ...
 buf = buffer.ibuf()
 ---

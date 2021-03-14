@@ -65,10 +65,11 @@ msgpack.encode({1, 2, 3}, buf)
 msgpack.decode(buf.rpos, buf:size() - 1)
 
 -- Provide a buffer. Try both 'struct ibuf' and 'struct ibuf *'.
-buf = buffer.IBUF_SHARED
-buf:reset()
+buf_storage = buffer.ibuf()
+buf = ffi.cast('struct ibuf *', buf_storage)
 size = msgpack.encode({a = 1, b = 2}, buf)
 (msgpack.decode(buf.rpos, size))
+buf_storage = nil
 buf = buffer.ibuf()
 size = msgpack.encode({c = 3, d = 4}, buf)
 (msgpack.decode(buf.rpos, size))
