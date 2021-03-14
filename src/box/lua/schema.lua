@@ -2234,7 +2234,7 @@ sequence_mt.next = function(self)
 end
 
 sequence_mt.current = function(self)
-    local ai64 = buffer.reg1.ai64
+    local ai64 = ffi.new('int64_t[1]')
     local rc = builtin.box_sequence_current(self.id, ai64)
     if rc < 0 then
         box.error(box.error.last())

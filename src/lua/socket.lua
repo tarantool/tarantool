@@ -10,8 +10,6 @@ local fiber = require('fiber')
 local fio = require('fio')
 local log = require('log')
 local buffer = require('buffer')
-local reg1 = buffer.reg1
-local reg2 = buffer.reg2
 local cord_ibuf_take = buffer.internal.cord_ibuf_take
 local cord_ibuf_put = buffer.internal.cord_ibuf_put
 local cord_ibuf_drop = buffer.internal.cord_ibuf_drop
@@ -478,9 +476,9 @@ local function socket_setsockopt(self, level, name, value)
     end
 
     if info.type == 1 then
-        reg1.ai[0] = value
+        local ai = ffi.new('int[1]', value)
         local res = ffi.C.setsockopt(fd,
-            level, info.iname, reg1.ai, ffi.sizeof('int'))
+            level, info.iname, ai, ffi.sizeof('int'))
 
         if res < 0 then
             self._errno = boxerrno()
@@ -522,10 +520,8 @@ local function socket_getsockopt(self, level, name)
     self._errno = nil
 
     if info.type == 1 then
-        local value = reg1.ai
-        value[0] = 0
-        local len = reg2.as
-        len[0] = ffi.sizeof('int')
+        local value = ffi.new('int[1]')
+        local len = ffi.new('size_t[1]', ffi.sizeof('int'))
         local res = ffi.C.getsockopt(fd, level, info.iname, value, len)
 
         if res < 0 then
@@ -542,8 +538,7 @@ local function socket_getsockopt(self, level, name)
     if info.type == 2 then
         local ibuf = cord_ibuf_take()
         local value = ibuf:alloc(256)
-        local len = reg1.as
-        len[0] = 256
+        local len = ffi.new('size_t[1]', 256)
         local res = ffi.C.getsockopt(fd, level, info.iname, value, len)
         if res < 0 then
             self._errno = boxerrno()
@@ -569,8 +564,7 @@ local function socket_linger(self, active, timeout)
     self._errno = nil
     if active == nil then
         local value = ffi.new('linger_t[1]')
-        local len = reg1.as
-        len[0] = ffi.sizeof('linger_t')
+        local len = ffi.new('size_t[1]', ffi.sizeof('linger_t'))
         local res = ffi.C.getsockopt(fd, level, info.iname, value, len)
         if res < 0 then
             self._errno = boxerrno()
@@ -825,7 +819,7 @@ local function get_recv_size(self, size)
             -- them using message peek.
             local iflags = get_iflags(internal.SEND_FLAGS, {'MSG_PEEK'})
             assert(iflags ~= nil)
-            size = tonumber(ffi.C.recv(fd, reg1.ac, 1, iflags))
+            size = tonumber(ffi.C.recv(fd, ffi.new('char[1]'), 1, iflags))
             -- Prevent race condition: proceed with the case when
             -- a datagram of length > 0 has been arrived after the
             -- getsockopt call above.

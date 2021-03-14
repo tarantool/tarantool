@@ -15,7 +15,6 @@ local fiber_clock       = fiber.clock
 local fiber_self        = fiber.self
 local decode            = msgpack.decode_unchecked
 local decode_map_header = msgpack.decode_map_header
-local buffer_reg        = buffer.reg1
 
 local table_new           = require('table.new')
 local check_iterator_type = box.internal.check_iterator_type
@@ -147,8 +146,7 @@ local method_decoder = {
 }
 
 local function decode_error(raw_data)
-    local ptr = buffer_reg.acucp
-    ptr[0] = raw_data
+    local ptr = ffi.new('const char *[1]', raw_data)
     local err = ffi.C.error_unpack_unsafe(ptr)
     if err ~= nil then
         err._refs = err._refs + 1

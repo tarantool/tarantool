@@ -40,7 +40,7 @@ local function test_pushcdata(test, module)
 end
 
 local function test_buffers(test, module)
-    test:plan(9)
+    test:plan(8)
     local buffer = require('buffer')
 
     local bufalloc = ffi.new('char[?]', 128)
@@ -51,7 +51,6 @@ local function test_buffers(test, module)
     test:ok(not module.toibuf({}), 'toibuf of {}')
     test:ok(not module.toibuf(1LL), 'toibuf of 1LL')
     test:ok(not module.toibuf(box.NULL), 'toibuf of box.NULL')
-    test:ok(not module.toibuf(buffer.reg1), 'toibuf of reg1')
     test:ok(not module.toibuf(bufalloc), 'toibuf of allocated buffer')
     test:ok(module.toibuf(buffer.internal.cord_ibuf_take()), "toibuf of ibuf*")
     test:ok(module.toibuf(ibuf), 'toibuf of ibuf')
