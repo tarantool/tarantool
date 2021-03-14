@@ -403,7 +403,8 @@ test_static_build_cmake_osx_github_actions: base_deps_osx_github_actions test_st
 
 deps_freebsd:
 	sudo pkg install -y git cmake gmake icu libiconv \
-		python27 py27-yaml py27-six py27-gevent
+		python37 py37-yaml py37-gevent py37-six
+	[ ! -e /usr/bin/python3 ] && sudo ln -s /usr/local/bin/python3.7 /usr/bin/python3
 
 build_freebsd:
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
@@ -411,7 +412,7 @@ build_freebsd:
 
 test_freebsd_no_deps: build_freebsd
 	make LuaJIT-test
-	cd test && python2.7 test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
+	cd test && ./test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_freebsd: deps_freebsd test_freebsd_no_deps
 
