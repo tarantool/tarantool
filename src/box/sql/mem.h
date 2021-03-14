@@ -364,6 +364,35 @@ mem_div(const struct Mem *left, const struct Mem *right, struct Mem *result);
 int
 mem_rem(const struct Mem *left, const struct Mem *right, struct Mem *result);
 
+/** Perform a bitwise AND for two MEMs and write the result to the third MEM. */
+int
+mem_bit_and(const struct Mem *left, const struct Mem *right,
+	    struct Mem *result);
+
+/** Perform a bitwise OR for two MEMs and write the result to the third MEM. */
+int
+mem_bit_or(const struct Mem *left, const struct Mem *right, struct Mem *result);
+
+/**
+ * Perform a bitwise left shift for the first MEM by value from the second MEM
+ * and write the result to the third MEM.
+ */
+int
+mem_shift_left(const struct Mem *left, const struct Mem *right,
+	       struct Mem *result);
+
+/**
+ * Perform a bitwise right shift for the first MEM by value from the second MEM
+ * and write the result to the third MEM.
+ */
+int
+mem_shift_right(const struct Mem *left, const struct Mem *right,
+		struct Mem *result);
+
+/** Perform a bitwise NOT to the MEM and write the result to the second MEM. */
+int
+mem_bit_not(const struct Mem *mem, struct Mem *result);
+
 /**
  * Compare two MEMs and return the result of comparison. MEMs should be of
  * BOOLEAN type or their values are converted to VARBINARY according to implicit
@@ -578,7 +607,7 @@ releaseMemArray(Mem * p, int N);
 
 int
 mem_value_bool(const struct Mem *mem, bool *b);
-int sqlVdbeIntValue(struct Mem *, int64_t *, bool *is_neg);
+int sqlVdbeIntValue(const struct Mem *, int64_t *, bool *is_neg);
 int sqlVdbeRealValue(struct Mem *, double *);
 const void *
 sql_value_blob(struct Mem *);
