@@ -11,6 +11,7 @@ local tap = require('tap')
 local ffi = require('ffi')
 local uuid = require('uuid')
 local uri = require('uri')
+local msgpackffi = require('msgpackffi')
 
 local function test_uuid(test)
     test:plan(1)
@@ -99,9 +100,52 @@ local function test_uri(test)
     test:ok(is_success, 'uri in gc')
 end
 
+local function test_msgpackffi(test)
+    test:plan(1)
+
+    local mp_encode = msgpackffi.encode
+    local mp_decode = msgpackffi.decode
+    local gc_count = 100
+    local iter_count = 1000
+    local is_success = true
+    local data = {0, 1, 1000, 100000000, 'str', true, 1.1}
+
+    local function do_encode()
+        if not is_success then
+            return
+        end
+        local t = mp_encode(data)
+        t = mp_decode(t)
+        if #t ~= #data then
+            is_success = false
+            return
+        end
+        for i = 1, #t do
+            if t[i] ~= data[i] then
+                is_success = false
+                return
+            end
+        end
+    end
+
+    local function create_gc()
+        for _ = 1, gc_count do
+            ffi.gc(ffi.new('char[1]'), do_encode)
+        end
+    end
+
+    for _ = 1, iter_count do
+        create_gc()
+        do_encode()
+    end
+
+    test:ok(is_success, 'msgpackffi in gc')
+end
+
 local test = tap.test('gh-5632-gc-buf-reuse')
-test:plan(2)
+test:plan(3)
 test:test('uuid in __gc', test_uuid)
 test:test('uri in __gc', test_uri)
+test:test('msgpackffi in __gc', test_msgpackffi)
 
 os.exit(test:check() and 0 or 1)
