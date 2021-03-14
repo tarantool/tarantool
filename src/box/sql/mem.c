@@ -479,6 +479,180 @@ mem_rem(const struct Mem *left, const struct Mem *right, struct Mem *result)
 	return 0;
 }
 
+int
+mem_cmp_bool(const struct Mem *a, const struct Mem *b, int *result)
+{
+	if ((a->flags & b->flags & MEM_Bool) == 0)
+		return -1;
+	if (a->u.b == b->u.b)
+		*result = 0;
+	else if (a->u.b)
+		*result = 1;
+	else
+		*result = -1;
+	return 0;
+}
+
+int
+mem_cmp_bin(const struct Mem *a, const struct Mem *b, int *result)
+{
+	if ((a->flags & b->flags & MEM_Blob) == 0)
+		return -1;
+	int an = a->n;
+	int bn = b->n;
+	int minlen = MIN(an, bn);
+
+	/*
+	 * It is possible to have a Blob value that has some non-zero content
+	 * followed by zero content.  But that only comes up for Blobs formed
+	 * by the OP_MakeRecord opcode, and such Blobs never get passed into
+	 * mem_compare().
+	 */
+	assert((a->flags & MEM_Zero) == 0 || an == 0);
+	assert((b->flags & MEM_Zero) == 0 || bn == 0);
+
+	if ((a->flags & b->flags & MEM_Zero) != 0) {
+		*result = a->u.nZero - b->u.nZero;
+		return 0;
+	}
+	if ((a->flags & MEM_Zero) != 0) {
+		for (int i = 0; i < minlen; ++i) {
+			if (b->z[i] != 0) {
+				*result = -1;
+				return 0;
+			}
+		}
+		*result = a->u.nZero - bn;
+		return 0;
+	}
+	if ((b->flags & MEM_Zero) != 0) {
+		for (int i = 0; i < minlen; ++i) {
+			if (a->z[i] != 0){
+				*result = 1;
+				return 0;
+			}
+		}
+		*result = b->u.nZero - an;
+		return 0;
+	}
+	*result = memcmp(a->z, b->z, minlen);
+	if (*result != 0)
+		return 0;
+	*result = an - bn;
+	return 0;
+}
+
+int
+mem_cmp_num(const struct Mem *left, const struct Mem *right, int *result)
+{
+	struct sql_num a, b;
+	/* TODO: Here should be check for right value type. */
+	if (get_number(right, &b) != 0) {
+		*result = -1;
+		return 0;
+	}
+	if (get_number(left, &a) != 0)
+		return -1;
+	if (a.type == MEM_Real) {
+		if (b.type == MEM_Real) {
+			if (a.d > b.d)
+				*result = 1;
+			else if (a.d < b.d)
+				*result = -1;
+			else
+				*result = 0;
+			return 0;
+		}
+		if (b.type == MEM_Int)
+			*result = double_compare_nint64(a.d, b.i, 1);
+		else
+			*result = double_compare_uint64(a.d, b.u, 1);
+		return 0;
+	}
+	if (a.type == MEM_Int) {
+		if (b.type == MEM_Int) {
+			if (a.i > b.i)
+				*result = 1;
+			else if (a.i < b.i)
+				*result = -1;
+			else
+				*result = 0;
+			return 0;
+		}
+		if (b.type == MEM_UInt)
+			*result = -1;
+		else
+			*result = double_compare_nint64(b.d, a.i, -1);
+		return 0;
+	}
+	assert(a.type == MEM_UInt);
+	if (b.type == MEM_UInt) {
+		if (a.u > b.u)
+			*result = 1;
+		else if (a.u < b.u)
+			*result = -1;
+		else
+			*result = 0;
+		return 0;
+	}
+	if (b.type == MEM_Int)
+		*result = 1;
+	else
+		*result = double_compare_uint64(b.d, a.u, -1);
+	return 0;
+}
+
+int
+mem_cmp_str(const struct Mem *left, const struct Mem *right, int *result,
+	    const struct coll *coll)
+{
+	char *a;
+	uint32_t an;
+	char bufl[BUF_SIZE];
+	if ((left->flags & MEM_Str) != 0) {
+		a = left->z;
+		an = left->n;
+	} else {
+		assert((left->flags & (MEM_Int | MEM_UInt | MEM_Real)) != 0);
+		a = &bufl[0];
+		if ((left->flags & MEM_Int) != 0)
+			sql_snprintf(BUF_SIZE, a, "%lld", left->u.i);
+		else if ((left->flags & MEM_UInt) != 0)
+			sql_snprintf(BUF_SIZE, a, "%llu", left->u.u);
+		else
+			sql_snprintf(BUF_SIZE, a, "%!.15g", left->u.r);
+		an = strlen(a);
+	}
+
+	char *b;
+	uint32_t bn;
+	char bufr[BUF_SIZE];
+	if ((right->flags & MEM_Str) != 0) {
+		b = right->z;
+		bn = right->n;
+	} else {
+		assert((right->flags & (MEM_Int | MEM_UInt | MEM_Real)) != 0);
+		b = &bufr[0];
+		if ((right->flags & MEM_Int) != 0)
+			sql_snprintf(BUF_SIZE, b, "%lld", right->u.i);
+		else if ((right->flags & MEM_UInt) != 0)
+			sql_snprintf(BUF_SIZE, b, "%llu", right->u.u);
+		else
+			sql_snprintf(BUF_SIZE, b, "%!.15g", right->u.r);
+		bn = strlen(b);
+	}
+	if (coll != NULL) {
+		*result = coll->cmp(a, an, b, bn, coll);
+		return 0;
+	}
+	uint32_t minlen = MIN(an, bn);
+	*result = memcmp(a, b, minlen);
+	if (*result != 0)
+		return 0;
+	*result = an - bn;
+	return 0;
+}
+
 static inline bool
 mem_has_msgpack_subtype(struct Mem *mem)
 {
@@ -1927,45 +2101,6 @@ sqlVdbeMemTooBig(Mem * p)
 }
 
 /*
- * Compare two blobs.  Return negative, zero, or positive if the first
- * is less than, equal to, or greater than the second, respectively.
- * If one blob is a prefix of the other, then the shorter is the lessor.
- */
-static SQL_NOINLINE int
-sqlBlobCompare(const Mem * pB1, const Mem * pB2)
-{
-	int c;
-	int n1 = pB1->n;
-	int n2 = pB2->n;
-
-	/* It is possible to have a Blob value that has some non-zero content
-	 * followed by zero content.  But that only comes up for Blobs formed
-	 * by the OP_MakeRecord opcode, and such Blobs never get passed into
-	 * sqlMemCompare().
-	 */
-	assert((pB1->flags & MEM_Zero) == 0 || n1 == 0);
-	assert((pB2->flags & MEM_Zero) == 0 || n2 == 0);
-
-	if ((pB1->flags | pB2->flags) & MEM_Zero) {
-		if (pB1->flags & pB2->flags & MEM_Zero) {
-			return pB1->u.nZero - pB2->u.nZero;
-		} else if (pB1->flags & MEM_Zero) {
-			if (!isAllZero(pB2->z, pB2->n))
-				return -1;
-			return pB1->u.nZero - n2;
-		} else {
-			if (!isAllZero(pB1->z, pB1->n))
-				return +1;
-			return n1 - pB2->u.nZero;
-		}
-	}
-	c = memcmp(pB1->z, pB2->z, n1 > n2 ? n2 : n1);
-	if (c)
-		return c;
-	return n1 - n2;
-}
-
-/*
  * Compare the values contained by the two memory cells, returning
  * negative, zero or positive if pMem1 is less than, equal to, or greater
  * than pMem2. Sorting order is NULL's first, followed by numbers (integers
@@ -1978,6 +2113,7 @@ int
 sqlMemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
 {
 	int f1, f2;
+	int res;
 	int combined_flags;
 
 	f1 = pMem1->flags;
@@ -2007,57 +2143,12 @@ sqlMemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
 	/* At least one of the two values is a number
 	 */
 	if ((combined_flags & (MEM_Int | MEM_UInt | MEM_Real)) != 0) {
-		if ((f1 & f2 & MEM_Int) != 0) {
-			if (pMem1->u.i < pMem2->u.i)
-				return -1;
-			if (pMem1->u.i > pMem2->u.i)
-				return +1;
-			return 0;
-		}
-		if ((f1 & f2 & MEM_UInt) != 0) {
-			if (pMem1->u.u < pMem2->u.u)
-				return -1;
-			if (pMem1->u.u > pMem2->u.u)
-				return +1;
-			return 0;
-		}
-		if ((f1 & f2 & MEM_Real) != 0) {
-			if (pMem1->u.r < pMem2->u.r)
-				return -1;
-			if (pMem1->u.r > pMem2->u.r)
-				return +1;
-			return 0;
-		}
-		if ((f1 & MEM_Int) != 0) {
-			if ((f2 & MEM_Real) != 0) {
-				return double_compare_nint64(pMem2->u.r,
-							     pMem1->u.i, -1);
-			} else {
-				return -1;
-			}
-		}
-		if ((f1 & MEM_UInt) != 0) {
-			if ((f2 & MEM_Real) != 0) {
-				return double_compare_uint64(pMem2->u.r,
-							     pMem1->u.u, -1);
-			} else if ((f2 & MEM_Int) != 0) {
-				return +1;
-			} else {
-				return -1;
-			}
-		}
-		if ((f1 & MEM_Real) != 0) {
-			if ((f2 & MEM_Int) != 0) {
-				return double_compare_nint64(pMem1->u.r,
-							     pMem2->u.i, 1);
-			} else if ((f2 & MEM_UInt) != 0) {
-				return double_compare_uint64(pMem1->u.r,
-							     pMem2->u.u, 1);
-			} else {
-				return -1;
-			}
-		}
-		return +1;
+		if ((f1 & (MEM_Real | MEM_Int | MEM_UInt)) == 0)
+			return +1;
+		if ((f2 & (MEM_Real | MEM_Int | MEM_UInt)) == 0)
+			return -1;
+		mem_cmp_num(pMem1, pMem2, &res);
+		return res;
 	}
 
 	/* If one value is a string and the other is a blob, the string is less.
@@ -2070,27 +2161,13 @@ sqlMemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
 		if ((f2 & MEM_Str) == 0) {
 			return -1;
 		}
-		/* The collation sequence must be defined at this point, even if
-		 * the user deletes the collation sequence after the vdbe program is
-		 * compiled (this was not always the case).
-		 */
-		if (pColl) {
-			return vdbeCompareMemString(pMem1, pMem2, pColl);
-		} else {
-			size_t n = pMem1->n < pMem2->n ? pMem1->n : pMem2->n;
-			int res;
-			res = memcmp(pMem1->z, pMem2->z, n);
-			if (res == 0)
-				res = (int)pMem1->n - (int)pMem2->n;
-			return res;
-		}
-		/* If a NULL pointer was passed as the collate function, fall through
-		 * to the blob case and use memcmp().
-		 */
+		mem_cmp_str(pMem1, pMem2, &res, pColl);
+		return res;
 	}
 
 	/* Both values must be blobs.  Compare using memcmp().  */
-	return sqlBlobCompare(pMem1, pMem2);
+	mem_cmp_bin(pMem1, pMem2, &res);
+	return res;
 }
 
 bool
