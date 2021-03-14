@@ -16,18 +16,18 @@ git submodule update --init --recursive
 cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
 gmake
 
-3. Set up python 2.7
+3. Set up python 3.x
 -------------
 
 Install testing dependences either from packages or from pip.
 
 3.1. From packages:
 -------------
-pkg install python27 py27-yaml py27-daemon py27-msgpack
+pkg install python37 py37-yaml py37-gevent py37-six
 
 3.2. From pip:
 -------------
-pkg install py27-virtualenv
+pkg install py37-virtualenv
 virtualenv .venv
 source .venv/bin/activate
 pip install -r ../test-run/requirements.txt
