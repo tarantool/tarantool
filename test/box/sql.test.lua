@@ -56,9 +56,6 @@ space:select{1}
 space:update(1, {{'=', 2, 'Huh'}, {'=', 3, 'I am a new field! I was added via append'}})
 space:select{1}
 
--- this is illegal
-space:update(1, {{'=', 2, 'Huh'}, {'=', 1001, 'invalid field'}})
-space:select{1}
 space:replace{1, 'I am a new tuple', 'stub'}
 space:update(1, {{'=', 2, 'Huh'}, {'=', 3, 'Oh-ho-ho'}})
 space:select{1}

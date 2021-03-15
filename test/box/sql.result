@@ -139,15 +139,6 @@ space:select{1}
 ---
 - - [1, 'Huh', 'I am a new field! I was added via append']
 ...
--- this is illegal
-space:update(1, {{'=', 2, 'Huh'}, {'=', 1001, 'invalid field'}})
----
-- error: Field 1001 was not found in the tuple
-...
-space:select{1}
----
-- - [1, 'Huh', 'I am a new field! I was added via append']
-...
 space:replace{1, 'I am a new tuple', 'stub'}
 ---
 - [1, 'I am a new tuple', 'stub']
