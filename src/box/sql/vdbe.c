@@ -609,7 +609,7 @@ case OP_Gosub: {            /* jump */
 	pIn1 = &aMem[pOp->p1];
 	assert(VdbeMemDynamic(pIn1)==0);
 	memAboutToChange(p, pIn1);
-	mem_set_u64(pIn1, pOp - aOp);
+	mem_set_uint(pIn1, pOp - aOp);
 	REGISTER_TRACE(p, pOp->p1, pIn1);
 
 	/* Most jump operations do a goto to this spot in order to update
@@ -650,7 +650,7 @@ case OP_InitCoroutine: {     /* jump */
 	assert(pOp->p3>0 && pOp->p3<p->nOp);
 	pOut = &aMem[pOp->p1];
 	assert(!VdbeMemDynamic(pOut));
-	mem_set_u64(pOut, pOp->p3 - 1);
+	mem_set_uint(pOut, pOp->p3 - 1);
 	if (pOp->p2) goto jump_to_p2;
 	break;
 }
@@ -693,7 +693,7 @@ case OP_Yield: {            /* in1, jump */
 	pIn1 = &aMem[pOp->p1];
 	assert(VdbeMemDynamic(pIn1)==0);
 	int pcDest = (int)pIn1->u.u;
-	mem_set_u64(pIn1, pOp - aOp);
+	mem_set_uint(pIn1, pOp - aOp);
 	REGISTER_TRACE(p, pOp->p1, pIn1);
 	pOp = &aOp[pcDest];
 	break;
@@ -2277,7 +2277,7 @@ case OP_Count: {         /* out2 */
 		nEntry = tarantoolsqlEphemeralCount(pCrsr);
 	}
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
-	mem_set_u64(pOut, nEntry);
+	mem_set_uint(pOut, nEntry);
 	break;
 }
 
@@ -3055,7 +3055,7 @@ case OP_Sequence: {           /* out2 */
 	assert(p->apCsr[pOp->p1]!=0);
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	int64_t seq_val = p->apCsr[pOp->p1]->seqCount++;
-	mem_set_u64(pOut, seq_val);
+	mem_set_uint(pOut, seq_val);
 	break;
 }
 
@@ -3071,7 +3071,7 @@ case OP_NextSequenceId: {
 	uint64_t id = 0;
 	tarantoolSqlNextSeqId(&id);
 	id++;
-	mem_set_u64(pOut, id);
+	mem_set_uint(pOut, id);
 	break;
 }
 
@@ -3101,7 +3101,7 @@ case OP_NextIdEphemeral: {
 		goto abort_due_to_error;
 	}
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
-	mem_set_u64(pOut, rowid);
+	mem_set_uint(pOut, rowid);
 	break;
 }
 
@@ -4368,7 +4368,7 @@ case OP_OffsetLimit: {    /* in1, out2, in3 */
 			"values should not result in integer overflow");
 		goto abort_due_to_error;
 	}
-	mem_set_u64(pOut, x);
+	mem_set_uint(pOut, x);
 	break;
 }
 
@@ -4624,10 +4624,10 @@ case OP_Init: {          /* jump */
 case OP_IncMaxid: {
 	assert(pOp->p1 > 0);
 	pOut = vdbe_prepare_null_out(p, pOp->p1);
-
-	if (tarantoolsqlIncrementMaxid(&pOut->u.u) != 0)
+	uint64_t u;
+	if (tarantoolsqlIncrementMaxid(&u) != 0)
 		goto abort_due_to_error;
-	pOut->flags = MEM_UInt;
+	mem_set_uint(pOut, u);
 	break;
 }
 
