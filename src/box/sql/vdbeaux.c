@@ -1322,13 +1322,13 @@ sqlVdbeList(Vdbe * p)
 			}
 		}
 
-		mem_set_i64(pMem, pOp->p1);
+		mem_set_int(pMem, pOp->p1, pOp->p1 < 0);
 		pMem++;
 
-		mem_set_i64(pMem, pOp->p2);
+		mem_set_int(pMem, pOp->p2, pOp->p2 < 0);
 		pMem++;
 
-		mem_set_i64(pMem, pOp->p3);
+		mem_set_int(pMem, pOp->p3, pOp->p3 < 0);
 		pMem++;
 
 		if (sqlVdbeMemClearAndResize(pMem, 256)) {

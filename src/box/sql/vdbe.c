@@ -763,7 +763,7 @@ case OP_Halt: {
  */
 case OP_Integer: {         /* out2 */
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
-	mem_set_i64(pOut, pOp->p1);
+	mem_set_int(pOut, pOp->p1, pOp->p1 < 0);
 	break;
 }
 
@@ -3135,8 +3135,7 @@ case OP_FCopy: {     /* out2 */
 		assert(mem_is_int(pIn1));
 
 		pOut = vdbe_prepare_null_out(p, pOp->p2);
-		mem_set_int(pOut, pIn1->u.i, pIn1->flags == MEM_Int);
-		pOut->field_type = pIn1->field_type;
+		mem_copy_as_ephemeral(pOut, pIn1);
 	}
 	break;
 }

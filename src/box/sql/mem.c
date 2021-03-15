@@ -132,6 +132,15 @@ mem_set_null(struct Mem *mem)
 	mem_clear(mem);
 }
 
+void
+mem_set_int(struct Mem *mem, int64_t value, bool is_neg)
+{
+	mem_clear(mem);
+	mem->u.i = value;
+	mem->flags = is_neg ? MEM_Int : MEM_UInt;
+	mem->field_type = FIELD_TYPE_INTEGER;
+}
+
 int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
@@ -1208,8 +1217,9 @@ vdbe_mem_numerify(struct Mem *mem)
 	if ((mem->flags & (MEM_Int | MEM_UInt | MEM_Real | MEM_Null)) != 0)
 		return 0;
 	if ((mem->flags & MEM_Bool) != 0) {
-		mem->u.u = mem->u.b;
-		MemSetTypeFlag(mem, MEM_UInt);
+		mem->u.u = (uint64_t)mem->u.b;
+		mem->flags = MEM_UInt;
+		mem->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
 	}
 	assert((mem->flags & (MEM_Blob | MEM_Str)) != 0);
@@ -1278,20 +1288,23 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 			return 0;
 		}
 		if ((pMem->flags & MEM_Bool) != 0) {
-			pMem->u.u = pMem->u.b;
-			MemSetTypeFlag(pMem, MEM_UInt);
+			pMem->u.u = (uint64_t)pMem->u.b;
+			pMem->flags = MEM_UInt;
+			pMem->field_type = FIELD_TYPE_UNSIGNED;
 			return 0;
 		}
 		if ((pMem->flags & MEM_Real) != 0) {
-			double d;
-			if (sqlVdbeRealValue(pMem, &d) != 0)
-				return -1;
-			if (d < (double)INT64_MAX && d >= (double)INT64_MIN) {
-				mem_set_int(pMem, d, d <= -1);
+			double d = pMem->u.r;
+			if (d < 0. && d >= (double)INT64_MIN) {
+				pMem->u.i = (int64_t)d;
+				pMem->flags = MEM_Int;
+				pMem->field_type = FIELD_TYPE_INTEGER;
 				return 0;
 			}
-			if (d >= (double)INT64_MAX && d < (double)UINT64_MAX) {
-				mem_set_u64(pMem, d);
+			if (d >= 0. && d < (double)UINT64_MAX) {
+				pMem->u.u = (uint64_t)d;
+				pMem->flags = MEM_UInt;
+				pMem->field_type = FIELD_TYPE_UNSIGNED;
 				return 0;
 			}
 			return -1;
@@ -1342,8 +1355,11 @@ mem_apply_integer_type(Mem *pMem)
 	assert(pMem->flags & MEM_Real);
 	assert(EIGHT_BYTE_ALIGNMENT(pMem));
 
-	if ((rc = doubleToInt64(pMem->u.r, (int64_t *) &ix)) == 0)
-		mem_set_int(pMem, ix, pMem->u.r <= -1);
+	if ((rc = doubleToInt64(pMem->u.r, (int64_t *) &ix)) == 0) {
+		pMem->u.i = ix;
+		pMem->flags = pMem->u.r <= -1 ? MEM_Int : MEM_UInt;
+		pMem->field_type = FIELD_TYPE_INTEGER;
+	}
 	return rc;
 }
 
@@ -1487,13 +1503,20 @@ mem_apply_type(struct Mem *record, enum field_type type)
 				if (double_compare_uint64(d, UINT64_MAX,
 							  1) > 0)
 					return 0;
-				if ((double)(uint64_t)d == d)
-					mem_set_u64(record, (uint64_t)d);
+				if ((double)(uint64_t)d == d) {
+					record->u.u = (uint64_t)d;
+					record->flags = MEM_UInt;
+					record->field_type =
+						FIELD_TYPE_UNSIGNED;
+				}
 			} else {
 				if (double_compare_nint64(d, INT64_MIN, 1) < 0)
 					return 0;
-				if ((double)(int64_t)d == d)
-					mem_set_int(record, (int64_t)d, true);
+				if ((double)(int64_t)d == d) {
+					record->u.i = (int64_t)d;
+					record->flags = MEM_Int;
+					record->field_type = FIELD_TYPE_INTEGER;
+				}
 			}
 			return 0;
 		}
@@ -1605,7 +1628,9 @@ mem_convert_to_unsigned(struct Mem *mem)
 	double d = mem->u.r;
 	if (d < 0.0 || d >= (double)UINT64_MAX)
 		return -1;
-	mem_set_u64(mem, (uint64_t) d);
+	mem->u.u = (uint64_t)d;
+	mem->flags = MEM_UInt;
+	mem->field_type = FIELD_TYPE_UNSIGNED;
 	return 0;
 }
 
@@ -1625,10 +1650,15 @@ mem_convert_to_integer(struct Mem *mem)
 	double d = mem->u.r;
 	if (d >= (double)UINT64_MAX || d < (double)INT64_MIN)
 		return -1;
-	if (d < (double)INT64_MAX)
-		mem_set_int(mem, (int64_t) d, d < 0);
-	else
-		mem_set_int(mem, (uint64_t) d, false);
+	if (d < 0.) {
+		mem->u.i = (int64_t)d;
+		mem->flags = MEM_Int;
+		mem->field_type = FIELD_TYPE_INTEGER;
+	} else {
+		mem->u.u = (uint64_t)d;
+		mem->flags = MEM_UInt;
+		mem->field_type = FIELD_TYPE_UNSIGNED;
+	}
 	return 0;
 }
 
@@ -1748,37 +1778,12 @@ mem_set_ptr(struct Mem *mem, void *ptr)
 }
 
 void
-mem_set_i64(struct Mem *mem, int64_t value)
-{
-	mem_clear(mem);
-	mem->u.i = value;
-	int flag = value < 0 ? MEM_Int : MEM_UInt;
-	MemSetTypeFlag(mem, flag);
-	mem->field_type = FIELD_TYPE_INTEGER;
-}
-
-void
 mem_set_u64(struct Mem *mem, uint64_t value)
 {
 	mem_clear(mem);
 	mem->u.u = value;
 	MemSetTypeFlag(mem, MEM_UInt);
 	mem->field_type = FIELD_TYPE_UNSIGNED;
-}
-
-void
-mem_set_int(struct Mem *mem, int64_t value, bool is_neg)
-{
-	mem_clear(mem);
-	if (is_neg) {
-		assert(value < 0);
-		mem->u.i = value;
-		MemSetTypeFlag(mem, MEM_Int);
-	} else {
-		mem->u.u = value;
-		MemSetTypeFlag(mem, MEM_UInt);
-	}
-	mem->field_type = FIELD_TYPE_INTEGER;
 }
 
 void
