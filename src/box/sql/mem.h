@@ -421,6 +421,25 @@ mem_set_strl(struct Mem *mem, char *value, int len_hint,
 		return mem_set_strl_dynamic(mem, value, len_hint);
 }
 
+/** Copy string to a newly allocated memory. The MEM type becomes STRING. */
+int
+mem_copy_str(struct Mem *mem, const char *value, uint32_t len);
+
+/**
+ * Copy NULL-terminated string to a newly allocated memory. The MEM type becomes
+ * STRING.
+ */
+int
+mem_copy_str0(struct Mem *mem, const char *value);
+
+static inline int
+mem_copy_strl(struct Mem *mem, const char *value, int len_hint)
+{
+	if (len_hint < 0)
+		return mem_copy_str0(mem, value);
+	return mem_copy_str(mem, value, len_hint);
+}
+
 /**
  * Copy content of MEM from one MEM to another. In case source MEM contains
  * string or binary and allocation type is not STATIC, this value is copied to

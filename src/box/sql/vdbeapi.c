@@ -127,7 +127,7 @@ setResultStrOrError(sql_context * pCtx,	/* Function context */
 {
 	if (xDel != SQL_TRANSIENT)
 		return mem_set_strl(pCtx->pOut, (char *)z, n, xDel);
-	if (sqlVdbeMemSetStr(pCtx->pOut, z, n, 1, xDel) != 0)
+	if (mem_copy_strl(pCtx->pOut, z, n) != 0)
 		pCtx->is_aborted = true;
 }
 
@@ -766,7 +766,7 @@ bindText(sql_stmt * pStmt,	/* The statement to bind against */
 	pVar = &p->aVar[i - 1];
 	if (xDel != SQL_TRANSIENT)
 		mem_set_strl(pVar, (char *)zData, nData, xDel);
-	else if (sqlVdbeMemSetStr(pVar, zData, nData, 1, xDel) != 0)
+	else if (mem_copy_strl(pVar, zData, nData) != 0)
 		return -1;
 	return sql_bind_type(p, i, "text");
 }
