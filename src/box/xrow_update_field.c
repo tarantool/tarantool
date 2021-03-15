@@ -33,6 +33,7 @@
 #include "mp_extension_types.h"
 
 #include <float.h>
+#include <backtrace.h>
 
 /* {{{ Error helpers. */
 
@@ -84,6 +85,8 @@ xrow_update_err_splice_bound(const struct xrow_update_op *op)
 int
 xrow_update_err_no_such_field(const struct xrow_update_op *op)
 {
+	say_info("xrow_update_err_no_such_field");
+	print_backtrace();
 	if (op->lexer.src == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_FIELD_NO, op->field_no +
 			 (op->field_no >= 0 ? TUPLE_INDEX_BASE : 0));

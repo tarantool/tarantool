@@ -160,3 +160,15 @@ t:update({{'+', '[1]', 50}})
 s:update({1}, {{'=', 'field3', {d = 30, e = 31, f = 32}}})
 
 s:drop()
+
+format = {}
+format[1] = {name = 'field1', type = 'unsigned'}
+format[2] = {name = 'field2', type = 'unsigned'}
+format[3] = {name = 'field3', type = 'unsigned', is_nullable = true}
+format[4] = {name = 'field4', type = 'unsigned', is_nullable = true}
+s = box.schema.create_space('test', {format = format})
+pk = s:create_index('pk')
+s:replace{1, 2}
+s:update({1}, {{'!', 4, 0}})
+
+s:drop()

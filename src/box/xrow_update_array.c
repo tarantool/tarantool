@@ -28,6 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <backtrace.h>
 #include "xrow_update_field.h"
 #include "msgpuck.h"
 #include "fiber.h"
@@ -310,6 +311,15 @@ xrow_update_array_store(struct xrow_update_field *field,
 	return out - out_begin;
 }
 
+void print_hex(const char *s, int len)
+{
+	while(len > 0) {
+		say_info("hex: %02x", (unsigned int) *s++);
+		--len;
+	}
+	say_info("\n");
+}
+
 int
 xrow_update_op_do_array_insert(struct xrow_update_op *op,
 			       struct xrow_update_field *field)
@@ -329,6 +339,24 @@ xrow_update_op_do_array_insert(struct xrow_update_op *op,
 
 	struct xrow_update_rope *rope = field->array.rope;
 	uint32_t size = xrow_update_rope_size(rope);
+	while (op->field_no >= (int32_t)(size + 1)) {
+		print_backtrace();
+		item = (struct xrow_update_array_item *)
+			xrow_update_alloc(rope->ctx, sizeof(*item));
+		if (item == NULL)
+			return -1;
+		uint32_t nil_size = mp_sizeof_nil();
+		char *pos = (char *) region_alloc(rope->ctx, nil_size);
+		if (pos == NULL)
+			return -1;
+		mp_encode_nil(pos);
+		xrow_update_array_item_create(item, XUPDATE_NOP, pos, nil_size, 0);
+		print_hex(op->arg.set.value,
+			  op->arg.set.length);
+		if (xrow_update_rope_insert(rope, op->field_no, item, 1) != 0)
+			return -1;
+		++size;
+	}
 	if (xrow_update_op_adjust_field_no(op, size + 1) != 0)
 		return -1;
 
