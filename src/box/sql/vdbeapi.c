@@ -201,7 +201,7 @@ sql_result_bool(struct sql_context *ctx, bool value)
 void
 sql_result_null(sql_context * pCtx)
 {
-	sqlVdbeMemSetNull(pCtx->pOut);
+	mem_set_null(pCtx->pOut);
 }
 
 void
@@ -382,7 +382,7 @@ createAggContext(sql_context * p, int nByte)
 	Mem *pMem = p->pMem;
 	assert(!mem_is_agg(pMem));
 	if (nByte <= 0) {
-		sqlVdbeMemSetNull(pMem);
+		mem_set_null(pMem);
 		pMem->z = 0;
 	} else {
 		sqlVdbeMemClearAndResize(pMem, nByte);

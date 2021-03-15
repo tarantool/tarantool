@@ -276,7 +276,7 @@ vdbe_prepare_null_out(struct Vdbe *v, int n)
 	assert(n <= (v->nMem + 1 - v->nCursor));
 	struct Mem *out = &v->aMem[n];
 	memAboutToChange(v, out);
-	sqlVdbeMemSetNull(out);
+	mem_set_null(out);
 	out->field_type = field_type_MAX;
 	return out;
 }
@@ -862,19 +862,17 @@ case OP_String: {          /* out2 */
  */
 case OP_Null: {           /* out2 */
 	int cnt;
-	u16 nullFlag;
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	cnt = pOp->p3-pOp->p2;
 	assert(pOp->p3<=(p->nMem+1 - p->nCursor));
-	pOut->flags = nullFlag = pOp->p1 ? (MEM_Null|MEM_Cleared) : MEM_Null;
-	pOut->n = 0;
+	if (pOp->p1 != 0)
+		pOut->flags = MEM_Null | MEM_Cleared;
 	while( cnt>0) {
 		pOut++;
 		memAboutToChange(p, pOut);
-		sqlVdbeMemSetNull(pOut);
-		pOut->flags = nullFlag;
-		pOut->field_type = field_type_MAX;
-		pOut->n = 0;
+		mem_set_null(pOut);
+		if (pOp->p1 != 0)
+			pOut->flags = MEM_Null | MEM_Cleared;
 		cnt--;
 	}
 	break;
