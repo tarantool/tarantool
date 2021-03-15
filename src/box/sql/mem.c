@@ -170,6 +170,89 @@ mem_set_double(struct Mem *mem, double value)
 	mem->flags = MEM_Real;
 }
 
+static inline void
+set_str_const(struct Mem *mem, char *value, uint32_t len, int alloc_type)
+{
+	assert((alloc_type & (MEM_Static | MEM_Ephem)) != 0);
+	mem_clear(mem);
+	mem->z = value;
+	mem->n = len;
+	mem->flags = MEM_Str | alloc_type;
+	mem->field_type = FIELD_TYPE_STRING;
+}
+
+static inline void
+set_str_dynamic(struct Mem *mem, char *value, uint32_t len, int alloc_type)
+{
+	assert((mem->flags & MEM_Dyn) == 0 || value != mem->z);
+	assert(mem->szMalloc == 0 || value != mem->zMalloc);
+	assert(alloc_type == MEM_Dyn || alloc_type == 0);
+	mem_destroy(mem);
+	mem->z = value;
+	mem->n = len;
+	mem->flags = MEM_Str | alloc_type;
+	mem->field_type = FIELD_TYPE_STRING;
+	if (alloc_type == MEM_Dyn) {
+		mem->xDel = sql_free;
+	} else {
+		mem->xDel = NULL;
+		mem->zMalloc = mem->z;
+		mem->szMalloc = sqlDbMallocSize(mem->db, mem->zMalloc);
+	}
+}
+
+void
+mem_set_str_ephemeral(struct Mem *mem, char *value, uint32_t len)
+{
+	set_str_const(mem, value, len, MEM_Ephem);
+}
+
+void
+mem_set_str_static(struct Mem *mem, char *value, uint32_t len)
+{
+	set_str_const(mem, value, len, MEM_Static);
+}
+
+void
+mem_set_str_dynamic(struct Mem *mem, char *value, uint32_t len)
+{
+	set_str_dynamic(mem, value, len, MEM_Dyn);
+}
+
+void
+mem_set_str_allocated(struct Mem *mem, char *value, uint32_t len)
+{
+	set_str_dynamic(mem, value, len, 0);
+}
+
+void
+mem_set_str0_ephemeral(struct Mem *mem, char *value)
+{
+	set_str_const(mem, value, strlen(value), MEM_Ephem);
+	mem->flags |= MEM_Term;
+}
+
+void
+mem_set_str0_static(struct Mem *mem, char *value)
+{
+	set_str_const(mem, value, strlen(value), MEM_Static);
+	mem->flags |= MEM_Term;
+}
+
+void
+mem_set_str0_dynamic(struct Mem *mem, char *value)
+{
+	set_str_dynamic(mem, value, strlen(value), MEM_Dyn);
+	mem->flags |= MEM_Term;
+}
+
+void
+mem_set_str0_allocated(struct Mem *mem, char *value)
+{
+	set_str_dynamic(mem, value, strlen(value), 0);
+	mem->flags |= MEM_Term;
+}
+
 int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
@@ -1907,20 +1990,6 @@ sqlVdbeMemSetZeroBlob(Mem * pMem, int n)
 		n = 0;
 	pMem->u.nZero = n;
 	pMem->z = 0;
-}
-
-/*
- * Change the string value of an sql_value object
- */
-void
-sqlValueSetStr(sql_value * v,	/* Value to be set */
-		   int n,	/* Length of string z */
-		   const void *z,	/* Text of the new string */
-		   void (*xDel) (void *)	/* Destructor for the string */
-    )
-{
-	if (v)
-		sqlVdbeMemSetStr((Mem *) v, z, n, 1, xDel);
 }
 
 /*

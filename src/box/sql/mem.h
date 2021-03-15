@@ -320,6 +320,107 @@ mem_set_bool(struct Mem *mem, bool value);
 void
 mem_set_double(struct Mem *mem, double value);
 
+/** Clear MEM and set it to STRING. The string belongs to another object. */
+void
+mem_set_str_ephemeral(struct Mem *mem, char *value, uint32_t len);
+
+/** Clear MEM and set it to STRING. The string is static. */
+void
+mem_set_str_static(struct Mem *mem, char *value, uint32_t len);
+
+/**
+ * Clear MEM and set it to STRING. The string was allocated by another object
+ * and passed to MEM. MEMs with this allocation type must free given memory
+ * whenever the MEM changes.
+ */
+void
+mem_set_str_dynamic(struct Mem *mem, char *value, uint32_t len);
+
+/**
+ * Clear MEM and set it to STRING. The string was allocated by another object
+ * and passed to MEM. MEMs with this allocation type only deallocate the string
+ * on destruction. Also, the memory may be reallocated if MEM is set to a
+ * different value of this allocation type.
+ */
+void
+mem_set_str_allocated(struct Mem *mem, char *value, uint32_t len);
+
+/**
+ * Clear MEM and set it to NULL-terminated STRING. The string belongs to
+ * another object.
+ */
+void
+mem_set_str0_ephemeral(struct Mem *mem, char *value);
+
+/** Clear MEM and set it to NULL-terminated STRING. The string is static. */
+void
+mem_set_str0_static(struct Mem *mem, char *value);
+
+/**
+ * Clear MEM and set it to NULL-terminated STRING. The string was allocated by
+ * another object and passed to MEM. MEMs with this allocation type must free
+ * given memory whenever the MEM changes.
+ */
+void
+mem_set_str0_dynamic(struct Mem *mem, char *value);
+
+/**
+ * Clear MEM and set it to NULL-terminated STRING. The string was allocated by
+ * another object and passed to MEM. MEMs with this allocation type only
+ * deallocate the string on destruction. Also, the memory may be reallocated if
+ * MEM is set to a different value of this allocation type.
+ */
+void
+mem_set_str0_allocated(struct Mem *mem, char *value);
+
+static inline void
+mem_set_strl_ephemeral(struct Mem *mem, char *value, int len_hint)
+{
+	if (len_hint < 0)
+		mem_set_str0_ephemeral(mem, value);
+	else
+		mem_set_str_ephemeral(mem, value, len_hint);
+}
+
+static inline void
+mem_set_strl_static(struct Mem *mem, char *value, int len_hint)
+{
+	if (len_hint < 0)
+		mem_set_str0_static(mem, value);
+	else
+		mem_set_str_static(mem, value, len_hint);
+}
+
+static inline void
+mem_set_strl_dynamic(struct Mem *mem, char *value, int len_hint)
+{
+	if (len_hint < 0)
+		mem_set_str0_dynamic(mem, value);
+	else
+		mem_set_str_dynamic(mem, value, len_hint);
+}
+
+static inline void
+mem_set_strl_allocated(struct Mem *mem, char *value, int len_hint)
+{
+	if (len_hint < 0)
+		mem_set_str0_allocated(mem, value);
+	else
+		mem_set_str_allocated(mem, value, len_hint);
+}
+
+static inline void
+mem_set_strl(struct Mem *mem, char *value, int len_hint,
+	     void (*custom_free)(void *))
+{
+	if (custom_free == SQL_STATIC)
+		return mem_set_strl_static(mem, value, len_hint);
+	if (custom_free == SQL_DYNAMIC)
+		return mem_set_strl_allocated(mem, value, len_hint);
+	if (custom_free != SQL_TRANSIENT)
+		return mem_set_strl_dynamic(mem, value, len_hint);
+}
+
 /**
  * Copy content of MEM from one MEM to another. In case source MEM contains
  * string or binary and allocation type is not STATIC, this value is copied to
@@ -578,8 +679,6 @@ int
 sqlVdbeMemSetStr(struct Mem *, const char *, int, u8, void (*)(void *));
 void
 sqlVdbeMemSetZeroBlob(struct Mem *, int);
-void sqlValueSetStr(struct Mem *, int, const void *,
-			void (*)(void *));
 void sqlValueFree(struct Mem *);
 struct Mem *sqlValueNew(struct sql *);
 

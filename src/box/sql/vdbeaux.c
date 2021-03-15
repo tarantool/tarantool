@@ -1293,10 +1293,8 @@ sqlVdbeList(Vdbe * p)
 
 			pMem++;
 
-			pMem->flags = MEM_Static | MEM_Str | MEM_Term;
-			pMem->z = (char *)sqlOpcodeName(pOp->opcode);	/* Opcode */
-			assert(pMem->z != 0);
-			pMem->n = sqlStrlen30(pMem->z);
+			char *value = (char *)sqlOpcodeName(pOp->opcode);
+			mem_set_str0_static(pMem, value);
 			pMem++;
 
 			/* When an OP_Program opcode is encounter (the only opcode that has
@@ -1331,41 +1329,34 @@ sqlVdbeList(Vdbe * p)
 		mem_set_int(pMem, pOp->p3, pOp->p3 < 0);
 		pMem++;
 
-		if (sqlVdbeMemClearAndResize(pMem, 256)) {
-			assert(p->db->mallocFailed);
+		char *buf = sqlDbMallocRaw(sql_get(), 256);
+		if (buf == NULL)
 			return -1;
-		}
-		pMem->flags = MEM_Str | MEM_Term;
-		zP4 = displayP4(pOp, pMem->z, pMem->szMalloc);
-
-		if (zP4 != pMem->z) {
-			pMem->n = 0;
-			sqlVdbeMemSetStr(pMem, zP4, -1, 1, 0);
+		zP4 = displayP4(pOp, buf, sqlDbMallocSize(sql_get(), buf));
+		if (zP4 != buf) {
+			sqlDbFree(sql_get(), buf);
+			mem_set_str0_ephemeral(pMem, zP4);
 		} else {
-			assert(pMem->z != 0);
-			pMem->n = sqlStrlen30(pMem->z);
+			mem_set_str0_allocated(pMem, zP4);
 		}
 		pMem++;
 
 		if (p->explain == 1) {
-			if (sqlVdbeMemClearAndResize(pMem, 4)) {
-				assert(p->db->mallocFailed);
+			buf = sqlDbMallocRaw(sql_get(), 4);
+			if (buf == NULL)
 				return -1;
-			}
-			pMem->flags = MEM_Str | MEM_Term;
-			pMem->n = 2;
-			sql_snprintf(3, pMem->z, "%.2x", pOp->p5);	/* P5 */
+			sql_snprintf(3, buf, "%.2x", pOp->p5);
+			mem_set_str0_allocated(pMem, buf);
 			pMem++;
 
 #ifdef SQL_ENABLE_EXPLAIN_COMMENTS
-			if (sqlVdbeMemClearAndResize(pMem, 500)) {
-				assert(p->db->mallocFailed);
+			buf = sqlDbMallocRaw(sql_get(), 500);
+			if (buf == NULL)
 				return -1;
-			}
-			pMem->flags = MEM_Str | MEM_Term;
-			pMem->n = displayComment(pOp, zP4, pMem->z, 500);
+			displayComment(pOp, zP4, buf, 500);
+			mem_set_str0_allocated(pMem, buf);
 #else
-			pMem->flags = MEM_Null;	/* Comment */
+			mem_set_null(pMem);
 #endif
 		}
 
