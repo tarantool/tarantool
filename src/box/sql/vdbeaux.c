@@ -2669,6 +2669,8 @@ sqlVdbeAllocUnpackedRecord(struct sql *db, struct key_def *key_def)
 	if (!p)
 		return 0;
 	p->aMem = (Mem *) & ((char *)p)[ROUND8(sizeof(UnpackedRecord))];
+	for (uint32_t i = 0; i < key_def->part_count + 1; ++i)
+		mem_create(&p->aMem[i]);
 	p->key_def = key_def;
 	p->nField = key_def->part_count + 1;
 	return p;
