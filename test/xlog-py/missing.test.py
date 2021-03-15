@@ -35,7 +35,7 @@ os.unlink(wal)
 # tarantool doesn't issue an LSN for deletes which delete nothing
 # this may lead to infinite recursion at start
 server.start()
-line="ignoring a gap in LSN"
+line = "ignoring a gap in LSN"
 print("check log line for '{}'".format(line))
 print("")
 if server.logfile_pos.seek_once(line) >= 0:

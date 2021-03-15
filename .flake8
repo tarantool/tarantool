@@ -1,0 +1,4 @@
+[flake8]
+# check warnings that are already fixed to avoid regression
+# see #5599 for a list of remaining warnings to be fixed
+select = E201, E202, E225

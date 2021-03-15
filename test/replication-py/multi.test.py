@@ -22,7 +22,7 @@ print("----------------------------------------------------------------------")
 
 # Start replicas
 master.id = master.get_param("id")
-cluster = [ master ]
+cluster = [master]
 for i in range(REPLICA_N - 1):
     server = TarantoolServer(server.ini)
     server.script = "replication-py/replica.lua"

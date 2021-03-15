@@ -137,7 +137,7 @@ admin("space:drop()")
 admin("space = box.schema.space.create('tweedledum')")
 admin("index = space:create_index('primary', { type = 'tree' })")
 
-json_dumps_kwargs=dict(sort_keys=True, separators=(', ', ': '))
+json_dumps_kwargs = dict(sort_keys=True, separators=(', ', ': '))
 
 def dump_args(*args):
     return json.dumps(args, **json_dumps_kwargs)[1:-1]
@@ -192,7 +192,7 @@ test("box.error(0)")
 test("...")
 test("...", 1, 2, 3)
 test("...",  None, None, None)
-test("...", { "k1": "v1", "k2": "v2"})
+test("...", {"k1": "v1", "k2": "v2"})
 # Transactions
 test("space:auto_increment({\"transaction\"})")
 test("space:select{}")

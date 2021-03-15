@@ -75,26 +75,26 @@ print("""
 """)
 
 print("IPROTO_SELECT")
-test({ IPROTO_CODE : REQUEST_TYPE_SELECT }, { IPROTO_SPACE_ID: 280 })
+test({IPROTO_CODE : REQUEST_TYPE_SELECT}, {IPROTO_SPACE_ID: 280})
 print("\n")
 
 print("IPROTO_DELETE")
-test({ IPROTO_CODE : REQUEST_TYPE_DELETE }, { IPROTO_SPACE_ID: 280 })
+test({IPROTO_CODE : REQUEST_TYPE_DELETE}, {IPROTO_SPACE_ID: 280})
 print("\n")
 
 print("IPROTO_UPDATE")
-test({ IPROTO_CODE : REQUEST_TYPE_UPDATE }, { IPROTO_SPACE_ID: 280 })
-test({ IPROTO_CODE : REQUEST_TYPE_UPDATE },
-     { IPROTO_SPACE_ID: 280, IPROTO_KEY: (1, )})
+test({IPROTO_CODE : REQUEST_TYPE_UPDATE}, {IPROTO_SPACE_ID: 280})
+test({IPROTO_CODE : REQUEST_TYPE_UPDATE},
+     {IPROTO_SPACE_ID: 280, IPROTO_KEY: (1, )})
 print("\n")
 
 print("IPROTO_REPLACE")
-test({ IPROTO_CODE : REQUEST_TYPE_REPLACE }, { IPROTO_SPACE_ID: 280 })
+test({IPROTO_CODE : REQUEST_TYPE_REPLACE}, {IPROTO_SPACE_ID: 280})
 print("\n")
 
 print("IPROTO_CALL")
-test({ IPROTO_CODE : REQUEST_TYPE_CALL }, {})
-test({ IPROTO_CODE : REQUEST_TYPE_CALL }, { IPROTO_KEY: ("procname", )})
+test({IPROTO_CODE : REQUEST_TYPE_CALL}, {})
+test({IPROTO_CODE : REQUEST_TYPE_CALL}, {IPROTO_KEY: ("procname", )})
 print("\n")
 
 # gh-434 Tarantool crashes on multiple iproto requests with WAL enabled
@@ -209,7 +209,7 @@ for test in TESTS:
         field = "*" * size
         c._send_request(RawInsert(c, space_id, b'\x91' + fmt + field.encode("utf-8")))
         tuple = space.select(field)[0]
-        print(len(tuple[0])== size and "ok" or "fail", end=" ")
+        print(len(tuple[0]) == size and "ok" or "fail", end=" ")
         it2 = iter(test)
         next(it2)
         for fmt2 in it2:
@@ -262,36 +262,36 @@ def test_request(req_header, req_body):
         print("   => ", "Failed to send request")
     return receive_response()
 
-header = { IPROTO_CODE : REQUEST_TYPE_SELECT}
-body = { IPROTO_SPACE_ID: space_id,
+header = {IPROTO_CODE : REQUEST_TYPE_SELECT}
+body = {IPROTO_SPACE_ID: space_id,
     IPROTO_INDEX_ID: 0,
     IPROTO_KEY: [],
     IPROTO_ITERATOR: 2,
     IPROTO_OFFSET: 0,
-    IPROTO_LIMIT: 1 }
+    IPROTO_LIMIT: 1}
 resp = test_request(header, body)
 print("Normal connect done w/o errors:", resp["header"][0] == 0)
 print("Got schema_id:", resp["header"][5] > 0)
 schema_id = resp["header"][5]
 
-header = { IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : 0 }
+header = {IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : 0}
 resp = test_request(header, body)
 print("Zero-schema_id connect done w/o errors:", resp["header"][0] == 0)
 print("Same schema_id:", resp["header"][5] == schema_id)
 
-header = { IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : schema_id }
+header = {IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : schema_id}
 resp = test_request(header, body)
 print("Normal connect done w/o errors:", resp["header"][0] == 0)
 print("Same schema_id:", resp["header"][5] == schema_id)
 
-header = { IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : schema_id + 1 }
+header = {IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : schema_id + 1}
 resp = test_request(header, body)
 print("Wrong schema_id leads to error:", resp["header"][0] != 0)
 print("Same schema_id:", resp["header"][5] == schema_id)
 
 admin("space2 = box.schema.create_space('test2')")
 
-header = { IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : schema_id }
+header = {IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : schema_id}
 resp = test_request(header, body)
 print("Schema changed -> error:", resp["header"][0] != 0)
 print("Got another schema_id:", resp["header"][5] != schema_id)
@@ -300,8 +300,8 @@ print("Got another schema_id:", resp["header"][5] != schema_id)
 # gh-2334 Lost SYNC in JOIN response.
 #
 uuid = "0d5bd431-7f3e-4695-a5c2-82de0a9cbc95"
-header = { IPROTO_CODE: REQUEST_TYPE_JOIN, IPROTO_SYNC: 2334 }
-body = { IPROTO_SERVER_UUID: uuid }
+header = {IPROTO_CODE: REQUEST_TYPE_JOIN, IPROTO_SYNC: 2334}
+body = {IPROTO_SERVER_UUID: uuid}
 resp = test_request(header, body)
 if resp["header"][IPROTO_SYNC] == 2334:
     i = 1
@@ -362,18 +362,18 @@ print("""
 c = Connection("localhost", server.iproto.port)
 c.connect()
 s = c._socket
-header = { "hello": "world"}
-body = { "bug": 272 }
+header = {"hello": "world"}
+body = {"bug": 272}
 resp = test_request(header, body)
 print("sync={}, {}".format(resp["header"][IPROTO_SYNC],
         resp["body"].get(IPROTO_ERROR).decode("utf-8")))
-header = { IPROTO_CODE : REQUEST_TYPE_SELECT }
+header = {IPROTO_CODE : REQUEST_TYPE_SELECT}
 header[IPROTO_SYNC] = 1234
 resp = test_request(header, body)
 print("sync={}, {}".format(resp["header"][IPROTO_SYNC],
         resp["body"].get(IPROTO_ERROR).decode("utf-8")))
 header[IPROTO_SYNC] = 5678
-body = { IPROTO_SPACE_ID: 304, IPROTO_KEY: [], IPROTO_LIMIT: 1 }
+body = {IPROTO_SPACE_ID: 304, IPROTO_KEY: [], IPROTO_LIMIT: 1}
 resp = test_request(header, body)
 print("sync={}, {}".format(resp["header"][IPROTO_SYNC],
         resp["body"].get(IPROTO_ERROR).decode("utf-8")))
@@ -431,8 +431,8 @@ c = Connection("localhost", server.iproto.port)
 c.connect()
 s = c._socket
 
-header = { IPROTO_CODE: REQUEST_TYPE_CALL, IPROTO_SYNC: 100 }
-body = { IPROTO_FUNCTION_NAME: "kek" }
+header = {IPROTO_CODE: REQUEST_TYPE_CALL, IPROTO_SYNC: 100}
+body = {IPROTO_FUNCTION_NAME: "kek"}
 resp = test_request(header, body)
 print("Sync: ", resp["header"][IPROTO_SYNC])
 body = resp["body"][IPROTO_DATA]

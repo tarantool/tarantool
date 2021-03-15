@@ -29,7 +29,7 @@ server.stop()
 os.unlink(wal)
 
 server.start()
-line="ignoring a gap in LSN"
+line = "ignoring a gap in LSN"
 print("check log line for '{}'".format(line))
 print("")
 if server.logfile_pos.seek_once(line) >= 0:
