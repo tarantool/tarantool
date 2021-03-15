@@ -89,29 +89,7 @@ test_getaddrinfo(void)
 			      15768000000);
 	isnt(rc, 0, "getaddrinfo retval");
 	const char *errmsg = diag_get()->last->errmsg;
-	/* EAI_NONAME */
-	const char *exp_errmsg_1 = "getaddrinfo: nodename nor servname provided"
-		", or not known";
-	/* EAI_SERVICE */
-	const char *exp_errmsg_2 = "getaddrinfo: Servname not supported for "
-		"ai_socktype";
-	/* EAI_NONAME */
-	const char *exp_errmsg_3 = "getaddrinfo: Name or service not known";
-	/* EAI_NONAME */
-	const char *exp_errmsg_4 = "getaddrinfo: hostname nor servname provided"
-		", or not known";
-	/* EAI_AGAIN */
-	const char *exp_errmsg_5 = "getaddrinfo: Temporary failure in name "
-		"resolution";
-	/* EAI_AGAIN */
-	const char *exp_errmsg_6 = "getaddrinfo: Name could not be resolved at "
-		"this time";
-	bool is_match_with_exp = strcmp(errmsg, exp_errmsg_1) == 0 ||
-		strcmp(errmsg, exp_errmsg_2) == 0 ||
-		strcmp(errmsg, exp_errmsg_3) == 0 ||
-		strcmp(errmsg, exp_errmsg_4) == 0 ||
-		strcmp(errmsg, exp_errmsg_5) == 0 ||
-		strcmp(errmsg, exp_errmsg_6) == 0;
+	bool is_match_with_exp = strstr(errmsg, "getaddrinfo") == errmsg;
 	is(is_match_with_exp, true, "getaddrinfo error message");
 
 	/*
