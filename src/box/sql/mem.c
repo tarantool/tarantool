@@ -254,6 +254,38 @@ mem_set_str0_allocated(struct Mem *mem, char *value)
 }
 
 int
+mem_copy_str(struct Mem *mem, const char *value, uint32_t len)
+{
+	if ((mem->flags & (MEM_Str | MEM_Blob)) != 0 && mem->z == value) {
+		/* Own value, but might be ephemeral. Make it own if so. */
+		if (sqlVdbeMemGrow(mem, len, 1) != 0)
+			return -1;
+		mem->flags = MEM_Str;
+		mem->field_type = FIELD_TYPE_STRING;
+		return 0;
+	}
+	mem_clear(mem);
+	if (sqlVdbeMemGrow(mem, len, 0) != 0)
+		return -1;
+	memcpy(mem->z, value, len);
+	mem->n = len;
+	mem->flags = MEM_Str;
+	mem->field_type = FIELD_TYPE_STRING;
+	return 0;
+}
+
+int
+mem_copy_str0(struct Mem *mem, const char *value)
+{
+	uint32_t len = strlen(value);
+	if (mem_copy_str(mem, value, len + 1) != 0)
+		return -1;
+	mem->n = len;
+	mem->flags |= MEM_Term;
+	return 0;
+}
+
+int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
 	mem_clear(to);
@@ -1442,8 +1474,8 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 		assert(MEM_Str == (MEM_Blob >> 3));
 		if ((pMem->flags & MEM_Bool) != 0) {
 			const char *str_bool = SQL_TOKEN_BOOLEAN(pMem->u.b);
-			sqlVdbeMemSetStr(pMem, str_bool, strlen(str_bool), 1,
-					 SQL_TRANSIENT);
+			if (mem_copy_str0(pMem, str_bool) != 0)
+				return -1;
 			return 0;
 		}
 		pMem->flags |= (pMem->flags & MEM_Blob) >> 3;
@@ -2904,9 +2936,8 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 			val[i].u.i = field.ival;
 			break;
 		case MP_STR:
-			if (sqlVdbeMemSetStr(&val[i], field.sval.data,
-					     field.sval.len, 1,
-					     SQL_TRANSIENT) != 0)
+			if (mem_copy_str(&val[i], field.sval.data,
+					 field.sval.len) != 0)
 				goto error;
 			break;
 		case MP_NIL:
@@ -2981,8 +3012,7 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 			break;
 		case MP_STR:
 			str = mp_decode_str(&data, &len);
-			if (sqlVdbeMemSetStr(&val[i], str, len,
-					     1, SQL_TRANSIENT) != 0)
+			if (mem_copy_str(&val[i], str, len) != 0)
 				goto error;
 			break;
 		case MP_NIL:
