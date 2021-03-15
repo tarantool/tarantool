@@ -74,7 +74,7 @@ def post_handle(env, response):
     code = "200 OK"
     body = [env["wsgi.input"].read()]
     headers = []
-    for key,value in env.iteritems():
+    for key,value in iter(env.items()):
         if "HTTP_" in key:
             headers.append((key[5:].lower(), value))
     response(code, headers)
@@ -83,7 +83,7 @@ def post_handle(env, response):
 def other_handle(env, response, method, code):
     headers = [("Content-Type", "text/plain"), ("method", method)]
     body = [method.encode('utf-8')]
-    for key,value in env.iteritems():
+    for key,value in iter(env.items()):
         if "HTTP_" in key:
             headers.append((key[5:].lower(), value))
     response(code, headers)
