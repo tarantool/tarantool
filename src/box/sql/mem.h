@@ -300,6 +300,10 @@ mem_create(struct Mem *mem);
 void
 mem_destroy(struct Mem *mem);
 
+/** Clear MEM and set it to NULL. */
+void
+mem_set_null(struct Mem *mem);
+
 /**
  * Copy content of MEM from one MEM to another. In case source MEM contains
  * string or binary and allocation type is not STATIC, this value is copied to
@@ -582,12 +586,9 @@ mem_set_double(struct Mem *mem, double value);
 int
 sqlVdbeMemSetStr(struct Mem *, const char *, int, u8, void (*)(void *));
 void
-sqlVdbeMemSetNull(struct Mem *);
-void
 sqlVdbeMemSetZeroBlob(struct Mem *, int);
 void sqlValueSetStr(struct Mem *, int, const void *,
 			void (*)(void *));
-void sqlValueSetNull(struct Mem *);
 void sqlValueFree(struct Mem *);
 struct Mem *sqlValueNew(struct sql *);
 
