@@ -183,7 +183,7 @@ sql_result_double(sql_context * pCtx, double rVal)
 void
 sql_result_uint(sql_context *ctx, uint64_t u_val)
 {
-	mem_set_u64(ctx->pOut, u_val);
+	mem_set_uint(ctx->pOut, u_val);
 }
 
 void
@@ -851,7 +851,7 @@ sql_bind_uint64(struct sql_stmt *stmt, int i, uint64_t value)
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	int rc = sql_bind_type(p, i, "integer");
-	mem_set_u64(&p->aVar[i - 1], value);
+	mem_set_uint(&p->aVar[i - 1], value);
 	return rc;
 }
 

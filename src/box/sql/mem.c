@@ -141,6 +141,15 @@ mem_set_int(struct Mem *mem, int64_t value, bool is_neg)
 	mem->field_type = FIELD_TYPE_INTEGER;
 }
 
+void
+mem_set_uint(struct Mem *mem, uint64_t value)
+{
+	mem_clear(mem);
+	mem->u.u = value;
+	mem->flags = MEM_UInt;
+	mem->field_type = FIELD_TYPE_UNSIGNED;
+}
+
 int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
@@ -1775,15 +1784,6 @@ mem_set_ptr(struct Mem *mem, void *ptr)
 	mem_destroy(mem);
 	mem->flags = MEM_Ptr;
 	mem->u.p = ptr;
-}
-
-void
-mem_set_u64(struct Mem *mem, uint64_t value)
-{
-	mem_clear(mem);
-	mem->u.u = value;
-	MemSetTypeFlag(mem, MEM_UInt);
-	mem->field_type = FIELD_TYPE_UNSIGNED;
 }
 
 void
