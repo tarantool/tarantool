@@ -841,9 +841,8 @@ case OP_String8: {         /* same as TK_STRING, out2 */
 case OP_String: {          /* out2 */
 	assert(pOp->p4.z!=0);
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
-	pOut->flags = MEM_Str|MEM_Static|MEM_Term;
-	pOut->z = pOp->p4.z;
-	pOut->n = pOp->p1;
+	assert(strlen(pOp->p4.z) == (size_t)pOp->p1);
+	mem_set_str0_static(pOut, pOp->p4.z);
 	UPDATE_MAX_BLOBSIZE(pOut);
 	break;
 }
