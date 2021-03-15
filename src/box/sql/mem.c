@@ -126,6 +126,12 @@ mem_destroy(struct Mem *mem)
 	mem->z = NULL;
 }
 
+void
+mem_set_null(struct Mem *mem)
+{
+	mem_clear(mem);
+}
+
 int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
@@ -1883,24 +1889,6 @@ sqlVdbeMemSetStr(Mem * pMem,	/* Memory cell to set to string value */
 }
 
 /*
- * Delete any previous value and set the value stored in *pMem to NULL.
- *
- * This routine calls the Mem.xDel destructor to dispose of values that
- * require the destructor.  But it preserves the Mem.zMalloc memory allocation.
- * To free all resources, use mem_destroy(), which both calls this
- * routine to invoke the destructor and deallocates Mem.zMalloc.
- *
- * Use this routine to reset the Mem prior to insert a new value.
- *
- * Use mem_destroy() to complete erase the Mem prior to abandoning it.
- */
-void
-sqlVdbeMemSetNull(Mem * pMem)
-{
-	mem_clear(pMem);
-}
-
-/*
  * Delete any previous value and set the value to be a BLOB of length
  * n containing all zeros.
  */
@@ -1928,12 +1916,6 @@ sqlValueSetStr(sql_value * v,	/* Value to be set */
 {
 	if (v)
 		sqlVdbeMemSetStr((Mem *) v, z, n, 1, xDel);
-}
-
-void
-sqlValueSetNull(sql_value * p)
-{
-	sqlVdbeMemSetNull((Mem *) p);
 }
 
 /*
@@ -2825,21 +2807,27 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 				 NULL, -1 - i, &field) < 0) {
 			goto error;
 		}
+		mem_clear(&val[i]);
 		switch (field.type) {
 		case MP_BOOL:
-			mem_set_bool(&val[i], field.bval);
+			val[i].flags = MEM_Bool;
+			val[i].u.b = field.bval;
 			break;
 		case MP_FLOAT:
-			mem_set_double(&val[i], field.fval);
+			val[i].flags = MEM_Real;
+			val[i].u.r = field.fval;
 			break;
 		case MP_DOUBLE:
-			mem_set_double(&val[i], field.dval);
+			val[i].flags = MEM_Real;
+			val[i].u.r = field.dval;
 			break;
 		case MP_INT:
-			mem_set_i64(&val[i], field.ival);
+			val[i].flags = MEM_Int;
+			val[i].u.i = field.ival;
 			break;
 		case MP_UINT:
-			mem_set_u64(&val[i], field.ival);
+			val[i].flags = MEM_UInt;
+			val[i].u.i = field.ival;
 			break;
 		case MP_STR:
 			if (sqlVdbeMemSetStr(&val[i], field.sval.data,
@@ -2848,7 +2836,6 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 				goto error;
 			break;
 		case MP_NIL:
-			sqlVdbeMemSetNull(&val[i]);
 			break;
 		default:
 			diag_set(ClientError, ER_SQL_EXECUTE,
@@ -2895,22 +2882,28 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 			data = pe->mp;
 		}
 		uint32_t len;
+		mem_clear(&val[i]);
 		const char *str;
 		switch (mp_typeof(*data)) {
 		case MP_BOOL:
-			mem_set_bool(&val[i], mp_decode_bool(&data));
+			val[i].flags = MEM_Bool;
+			val[i].u.b = mp_decode_bool(&data);
 			break;
 		case MP_FLOAT:
-			mem_set_double(&val[i], mp_decode_float(&data));
+			val[i].flags = MEM_Real;
+			val[i].u.r = mp_decode_float(&data);
 			break;
 		case MP_DOUBLE:
-			mem_set_double(&val[i], mp_decode_double(&data));
+			val[i].flags = MEM_Real;
+			val[i].u.r = mp_decode_double(&data);
 			break;
 		case MP_INT:
-			mem_set_i64(&val[i], mp_decode_int(&data));
+			val[i].flags = MEM_Int;
+			val[i].u.i = mp_decode_int(&data);
 			break;
 		case MP_UINT:
-			mem_set_u64(&val[i], mp_decode_uint(&data));
+			val[i].flags = MEM_UInt;
+			val[i].u.u = mp_decode_uint(&data);
 			break;
 		case MP_STR:
 			str = mp_decode_str(&data, &len);
@@ -2919,7 +2912,6 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 				goto error;
 			break;
 		case MP_NIL:
-			sqlVdbeMemSetNull(&val[i]);
 			break;
 		default:
 			diag_set(ClientError, ER_SQL_EXECUTE,
