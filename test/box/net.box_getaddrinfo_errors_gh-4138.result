@@ -17,19 +17,8 @@ test_run:cmd("setopt delimiter ';'")
  | - true
  | ...
 function check_err(err)
--- EAI_NONAME
-    if err == 'getaddrinfo: nodename nor servname provided, or not known' or
--- EAI_SERVICE
-       err == 'getaddrinfo: Servname not supported for ai_socktype' or
--- EAI_NONAME
-       err == 'getaddrinfo: Name or service not known' or
--- EAI_NONAME
-       err == 'getaddrinfo: hostname nor servname provided, or not known' or
--- EAI_AGAIN
-       err == 'getaddrinfo: Temporary failure in name resolution' or
--- EAI_AGAIN
-       err == 'getaddrinfo: Name could not be resolved at this time' then
-            return true
+    if err:startswith('getaddrinfo') then
+        return true
     end
     return false
 end;
