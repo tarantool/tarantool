@@ -310,6 +310,36 @@ xrow_update_array_store(struct xrow_update_field *field,
 	return out - out_begin;
 }
 
+/**
+ * Helper function that appends nils in the end so that op will insert
+ * without gaps
+ */
+static int
+xrow_update_array_append_nils(struct xrow_update_field *field,
+			      struct xrow_update_op *op)
+{
+	struct xrow_update_rope *rope = field->array.rope;
+	uint32_t size = xrow_update_rope_size(rope);
+	if (op->field_no < 0 || (uint32_t)op->field_no <= size)
+		return 0;
+	uint32_t nil_count = op->field_no - size;
+	struct xrow_update_array_item *item =
+		(struct xrow_update_array_item *)
+		xrow_update_alloc(rope->ctx, sizeof(*item));
+	if (item == NULL)
+		return -1;
+	assert(mp_sizeof_nil() == 1);
+	char *item_data = (char *)region_alloc(rope->ctx, nil_count);
+	if (item_data == NULL) {
+		diag_set(OutOfMemory, nil_count, "region", "item_data");
+		return -1;
+	}
+	memset(item_data, 0xc0, nil_count);
+	xrow_update_array_item_create(item, XUPDATE_NOP, item_data,
+				      nil_count, 0);
+	return xrow_update_rope_insert(rope, op->field_no, item, nil_count);
+}
+
 int
 xrow_update_op_do_array_insert(struct xrow_update_op *op,
 			       struct xrow_update_field *field)
@@ -326,6 +356,9 @@ xrow_update_op_do_array_insert(struct xrow_update_op *op,
 		op->is_token_consumed = true;
 		return xrow_update_op_do_field_insert(op, &item->field);
 	}
+
+	if (xrow_update_array_append_nils(field, op) != 0)
+		return -1;
 
 	struct xrow_update_rope *rope = field->array.rope;
 	uint32_t size = xrow_update_rope_size(rope);
@@ -351,7 +384,7 @@ xrow_update_op_do_array_set(struct xrow_update_op *op,
 		return -1;
 
 	/* Interpret '=' for n + 1 field as insert. */
-	if (op->field_no == (int32_t) xrow_update_rope_size(rope))
+	if (op->field_no >= (int32_t) xrow_update_rope_size(rope))
 		return xrow_update_op_do_array_insert(op, field);
 
 	struct xrow_update_array_item *item =
