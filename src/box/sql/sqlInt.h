@@ -642,10 +642,6 @@ int
 sql_bind_null(sql_stmt *, int);
 
 int
-sql_bind_text(sql_stmt *, int, const char *, int,
-		  void (*)(void *));
-
-int
 sql_bind_text64(sql_stmt *, int, const char *,
 		    sql_uint64, void (*)(void *));
 
