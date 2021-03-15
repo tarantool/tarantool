@@ -304,6 +304,10 @@ mem_destroy(struct Mem *mem);
 void
 mem_set_null(struct Mem *mem);
 
+/** Clear MEM and set it to INTEGER. */
+void
+mem_set_int(struct Mem *mem, int64_t value, bool is_neg);
+
 /**
  * Copy content of MEM from one MEM to another. In case source MEM contains
  * string or binary and allocation type is not STATIC, this value is copied to
@@ -561,23 +565,9 @@ mem_set_bool(struct Mem *mem, bool value);
 void
 mem_set_ptr(struct Mem *mem, void *ptr);
 
-/**
- * Set integer value. Depending on its sign MEM_Int (in case
- * of negative value) or MEM_UInt flag is set.
- */
-void
-mem_set_i64(struct Mem *mem, int64_t value);
-
 /** Set unsigned value and MEM_UInt flag. */
 void
 mem_set_u64(struct Mem *mem, uint64_t value);
-
-/**
- * Set integer value. According to is_neg flag value is considered
- * to be signed or unsigned.
- */
-void
-mem_set_int(struct Mem *mem, int64_t value, bool is_neg);
 
 /** Set double value and MEM_Real flag. */
 void

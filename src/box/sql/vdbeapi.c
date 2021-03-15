@@ -189,7 +189,7 @@ sql_result_uint(sql_context *ctx, uint64_t u_val)
 void
 sql_result_int(sql_context *ctx, int64_t val)
 {
-	mem_set_i64(ctx->pOut, val);
+	mem_set_int(ctx->pOut, val, val < 0);
 }
 
 void
