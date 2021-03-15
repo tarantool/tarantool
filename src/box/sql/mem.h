@@ -312,6 +312,14 @@ mem_set_int(struct Mem *mem, int64_t value, bool is_neg);
 void
 mem_set_uint(struct Mem *mem, uint64_t value);
 
+/** Clear MEM and set it to BOOLEAN. */
+void
+mem_set_bool(struct Mem *mem, bool value);
+
+/** Clear MEM and set it to DOUBLE. */
+void
+mem_set_double(struct Mem *mem, double value);
+
 /**
  * Copy content of MEM from one MEM to another. In case source MEM contains
  * string or binary and allocation type is not STATIC, this value is copied to
@@ -558,9 +566,6 @@ mem_convert_to_numeric(struct Mem *mem, enum field_type type);
 int sqlVdbeMemGrow(struct Mem * pMem, int n, int preserve);
 int sqlVdbeMemClearAndResize(struct Mem * pMem, int n);
 
-void
-mem_set_bool(struct Mem *mem, bool value);
-
 /**
  * Set VDBE memory register with given pointer as a data.
  * @param mem VDBE memory register to update.
@@ -568,10 +573,6 @@ mem_set_bool(struct Mem *mem, bool value);
  */
 void
 mem_set_ptr(struct Mem *mem, void *ptr);
-
-/** Set double value and MEM_Real flag. */
-void
-mem_set_double(struct Mem *mem, double value);
 
 int
 sqlVdbeMemSetStr(struct Mem *, const char *, int, u8, void (*)(void *));
