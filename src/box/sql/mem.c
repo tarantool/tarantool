@@ -150,6 +150,26 @@ mem_set_uint(struct Mem *mem, uint64_t value)
 	mem->field_type = FIELD_TYPE_UNSIGNED;
 }
 
+void
+mem_set_bool(struct Mem *mem, bool value)
+{
+	mem_clear(mem);
+	mem->u.b = value;
+	mem->flags = MEM_Bool;
+	mem->field_type = FIELD_TYPE_BOOLEAN;
+}
+
+void
+mem_set_double(struct Mem *mem, double value)
+{
+	mem_clear(mem);
+	mem->field_type = FIELD_TYPE_DOUBLE;
+	if (sqlIsNaN(value))
+		return;
+	mem->u.r = value;
+	mem->flags = MEM_Real;
+}
+
 int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
@@ -1770,31 +1790,11 @@ sqlVdbeMemClearAndResize(Mem * pMem, int szNew)
 }
 
 void
-mem_set_bool(struct Mem *mem, bool value)
-{
-	mem_clear(mem);
-	mem->u.b = value;
-	mem->flags = MEM_Bool;
-	mem->field_type = FIELD_TYPE_BOOLEAN;
-}
-
-void
 mem_set_ptr(struct Mem *mem, void *ptr)
 {
 	mem_destroy(mem);
 	mem->flags = MEM_Ptr;
 	mem->u.p = ptr;
-}
-
-void
-mem_set_double(struct Mem *mem, double value)
-{
-	mem_clear(mem);
-	if (sqlIsNaN(value))
-		return;
-	mem->u.r = value;
-	MemSetTypeFlag(mem, MEM_Real);
-	mem->field_type = FIELD_TYPE_DOUBLE;
 }
 
 /*
