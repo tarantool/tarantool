@@ -2241,11 +2241,8 @@ case OP_MakeRecord: {
 	 * routine.
 	 */
 	if (bIsEphemeral) {
-		if (sqlVdbeMemClearAndResize(pOut, tuple_size) != 0)
+		if (mem_copy_bin(pOut, tuple, tuple_size) != 0)
 			goto abort_due_to_error;
-		pOut->flags = MEM_Blob;
-		pOut->n = tuple_size;
-		memcpy(pOut->z, tuple, tuple_size);
 		region_truncate(region, used);
 	} else {
 		/* Allocate memory on the region for the tuple
@@ -2585,7 +2582,7 @@ case OP_SequenceTest: {
  * Open a new cursor that points to a fake table that contains a single
  * row of data.  The content of that one row is the content of memory
  * register P2.  In other words, cursor P1 becomes an alias for the
- * MEM_Blob content contained in register P2.
+ * MEM with binary content contained in register P2.
  *
  * A pseudo-table created by this opcode is used to hold a single
  * row output from the sorter so that the row can be decomposed into

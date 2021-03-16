@@ -160,7 +160,7 @@ sql_result_blob(sql_context * pCtx,
 	assert(n >= 0);
 	if (xDel != SQL_TRANSIENT)
 		mem_set_binl(pCtx->pOut, (char *)z, n, xDel);
-	else if (sqlVdbeMemSetStr(pCtx->pOut, z, n, 0, xDel) != 0)
+	else if (mem_copy_bin(pCtx->pOut, z, n) != 0)
 		pCtx->is_aborted = true;
 }
 
@@ -791,7 +791,7 @@ sql_bind_blob(sql_stmt * pStmt,
 	struct Mem *var = &p->aVar[i - 1];
 	if (xDel != SQL_TRANSIENT)
 		mem_set_binl(var, (char *)zData, nData, xDel);
-	else if (sqlVdbeMemSetStr(var, zData, nData, 0, xDel) != 0)
+	else if (mem_copy_bin(var, zData, nData) != 0)
 		return -1;
 	return sql_bind_type(p, i, "varbinary");
 }

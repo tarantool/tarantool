@@ -2164,12 +2164,8 @@ sqlVdbeSorterRowkey(const VdbeCursor * pCsr, Mem * pOut)
 	assert(pCsr->eCurType == CURTYPE_SORTER);
 	pSorter = pCsr->uc.pSorter;
 	pKey = vdbeSorterRowkey(pSorter, &nKey);
-	if (sqlVdbeMemClearAndResize(pOut, nKey)) {
+	if (mem_copy_bin(pOut, pKey, nKey) != 0)
 		return -1;
-	}
-	pOut->n = nKey;
-	MemSetTypeFlag(pOut, MEM_Blob);
-	memcpy(pOut->z, pKey, nKey);
 
 	return 0;
 }
