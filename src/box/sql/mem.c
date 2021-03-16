@@ -285,6 +285,61 @@ mem_copy_str0(struct Mem *mem, const char *value)
 	return 0;
 }
 
+static inline void
+set_bin_const(struct Mem *mem, char *value, uint32_t size, int alloc_type)
+{
+	assert((alloc_type & (MEM_Static | MEM_Ephem)) != 0);
+	mem_clear(mem);
+	mem->z = value;
+	mem->n = size;
+	mem->flags = MEM_Blob | alloc_type;
+	mem->field_type = FIELD_TYPE_VARBINARY;
+}
+
+static inline void
+set_bin_dynamic(struct Mem *mem, char *value, uint32_t size, int alloc_type)
+{
+	assert((mem->flags & MEM_Dyn) == 0 || value != mem->z);
+	assert(mem->szMalloc == 0 || value != mem->zMalloc);
+	assert(alloc_type == MEM_Dyn || alloc_type == 0);
+	mem_destroy(mem);
+	mem->z = value;
+	mem->n = size;
+	mem->flags = MEM_Blob | alloc_type;
+	mem->field_type = FIELD_TYPE_VARBINARY;
+	if (alloc_type == MEM_Dyn) {
+		mem->xDel = sql_free;
+	} else {
+		mem->xDel = NULL;
+		mem->zMalloc = mem->z;
+		mem->szMalloc = sqlDbMallocSize(mem->db, mem->zMalloc);
+	}
+}
+
+void
+mem_set_bin_ephemeral(struct Mem *mem, char *value, uint32_t size)
+{
+	set_bin_const(mem, value, size, MEM_Ephem);
+}
+
+void
+mem_set_bin_static(struct Mem *mem, char *value, uint32_t size)
+{
+	set_bin_const(mem, value, size, MEM_Static);
+}
+
+void
+mem_set_bin_dynamic(struct Mem *mem, char *value, uint32_t size)
+{
+	set_bin_dynamic(mem, value, size, MEM_Dyn);
+}
+
+void
+mem_set_bin_allocated(struct Mem *mem, char *value, uint32_t size)
+{
+	set_bin_dynamic(mem, value, size, 0);
+}
+
 int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
@@ -2373,19 +2428,6 @@ mem_is_type_compatible(struct Mem *mem, enum field_type type)
 	enum mp_type mp_type = mem_mp_type(mem);
 	assert(mp_type < MP_EXT);
 	return field_mp_plain_type_is_compatible(type, mp_type, true);
-}
-
-/* Allocate memory for internal VDBE structure on region. */
-int
-vdbe_mem_alloc_blob_region(struct Mem *vdbe_mem, uint32_t size)
-{
-	vdbe_mem->n = size;
-	vdbe_mem->z = region_alloc(&fiber()->gc, size);
-	if (vdbe_mem->z == NULL)
-		return -1;
-	vdbe_mem->flags = MEM_Ephem | MEM_Blob;
-	assert(sqlVdbeCheckMemInvariants(vdbe_mem));
-	return 0;
 }
 
 int

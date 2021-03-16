@@ -441,6 +441,46 @@ mem_copy_strl(struct Mem *mem, const char *value, int len_hint)
 }
 
 /**
+ * Clear MEM and set it to VARBINARY. The binary value belongs to another
+ * object.
+ */
+void
+mem_set_bin_ephemeral(struct Mem *mem, char *value, uint32_t size);
+
+/** Clear MEM and set it to VARBINARY. The binary value is static. */
+void
+mem_set_bin_static(struct Mem *mem, char *value, uint32_t size);
+
+/**
+ * Clear MEM and set it to VARBINARY. The binary value was allocated by another
+ * object and passed to MEM. MEMs with this allocation type must free given
+ * memory whenever the MEM changes.
+ */
+void
+mem_set_bin_dynamic(struct Mem *mem, char *value, uint32_t size);
+
+/**
+ * Clear MEM and set it to VARBINARY. The binary value was allocated by another
+ * object and passed to MEM. MEMs with this allocation type only deallocate the
+ * string on destruction. Also, the memory may be reallocated if MEM is set to a
+ * different value of this allocation type.
+ */
+void
+mem_set_bin_allocated(struct Mem *mem, char *value, uint32_t size);
+
+static inline void
+mem_set_binl(struct Mem *mem, char *value, uint32_t size,
+	     void (*custom_free)(void *))
+{
+	if (custom_free == SQL_STATIC)
+		return mem_set_bin_static(mem, value, size);
+	if (custom_free == SQL_DYNAMIC)
+		return mem_set_bin_allocated(mem, value, size);
+	if (custom_free != SQL_TRANSIENT)
+		return mem_set_bin_dynamic(mem, value, size);
+}
+
+/**
  * Copy content of MEM from one MEM to another. In case source MEM contains
  * string or binary and allocation type is not STATIC, this value is copied to
  * newly allocated by destination MEM memory.
@@ -775,9 +815,6 @@ bool
 mem_is_type_compatible(struct Mem *mem, enum field_type type);
 
 /** MEM manipulate functions. */
-
-int
-vdbe_mem_alloc_blob_region(struct Mem *vdbe_mem, uint32_t size);
 
 /**
  * Memory cell mem contains the context of an aggregate function.
