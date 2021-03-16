@@ -479,6 +479,22 @@ mem_set_frame(struct Mem *mem, struct VdbeFrame *frame)
 }
 
 int
+mem_set_agg(struct Mem *mem, struct func *func, int size)
+{
+	mem_clear(mem);
+	if (size <= 0)
+		return 0;
+	if (sqlVdbeMemGrow(mem, size, 0) != 0)
+		return -1;
+	memset(mem->z, 0, size);
+	mem->n = size;
+	mem->flags = MEM_Agg;
+	mem->u.func = func;
+	mem->field_type = field_type_MAX;
+	return 0;
+}
+
+int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
 	mem_clear(to);

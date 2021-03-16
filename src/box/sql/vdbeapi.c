@@ -376,29 +376,6 @@ sqlStmtCurrentTime(sql_context * p)
 }
 
 /*
- * Create a new aggregate context for p and return a pointer to
- * its pMem->z element.
- */
-static SQL_NOINLINE void *
-createAggContext(sql_context * p, int nByte)
-{
-	Mem *pMem = p->pMem;
-	assert(!mem_is_agg(pMem));
-	if (nByte <= 0) {
-		mem_set_null(pMem);
-		pMem->z = 0;
-	} else {
-		sqlVdbeMemClearAndResize(pMem, nByte);
-		pMem->flags = MEM_Agg;
-		pMem->u.func = p->func;
-		if (pMem->z) {
-			memset(pMem->z, 0, nByte);
-		}
-	}
-	return (void *)pMem->z;
-}
-
-/*
  * Allocate or return the aggregate context for a user function.  A new
  * context is allocated on the first call.  Subsequent calls return the
  * same context that was returned on prior calls.
@@ -409,12 +386,9 @@ sql_aggregate_context(sql_context * p, int nByte)
 	assert(p != NULL && p->func != NULL);
 	assert(p->func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
 	assert(p->func->def->aggregate == FUNC_AGGREGATE_GROUP);
-	testcase(nByte < 0);
-	if (!mem_is_agg(p->pMem)) {
-		return createAggContext(p, nByte);
-	} else {
-		return (void *)p->pMem->z;
-	}
+	if (!mem_is_agg(p->pMem) && mem_set_agg(p->pMem, p->func, nByte) != 0)
+		return NULL;
+	return p->pMem->z;
 }
 
 /*
