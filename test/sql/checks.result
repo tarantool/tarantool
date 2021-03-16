@@ -1,6 +1,9 @@
 env = require('test_run')
 ---
 ...
+ffi = require 'ffi'
+---
+...
 test_run = env.new()
 ---
 ...
@@ -625,11 +628,13 @@ test_run:cmd("push filter 'space_id: [0-9]+' to 'space_id: <ID>'")
 _ = s1:create_check_constraint('physics', 'X < Y')
 ---
 ...
-_ = s1:create_check_constraint('physics', 'X > Y')
+status, error = pcall(function() return s1:create_check_constraint('physics', 'X > Y') end)
 ---
-- error: 'Duplicate key exists in unique index ''primary'' in space ''_ck_constraint'':
-    old tuple - ''[534, "physics", false, "SQL", "X < Y", true]'', new tuple - ''[534,
-    "physics", false, "SQL", "X > Y", true]'''
+...
+error = ffi.string(error)
+---
+- error: '[string "error = ffi.string(error) "]:1: bad argument #1 to ''string'' (cannot
+    convert ''struct error'' to ''const char *'')'
 ...
 _ = s1:create_check_constraint('greater', 'X > 20')
 ---
