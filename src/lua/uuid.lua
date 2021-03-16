@@ -26,8 +26,6 @@ bool
 tt_uuid_is_nil(const struct tt_uuid *uu);
 bool
 tt_uuid_is_equal(const struct tt_uuid *lhs, const struct tt_uuid *rhs);
-char *
-tt_uuid_str(const struct tt_uuid *uu);
 extern const struct tt_uuid uuid_nil;
 ]]
 
@@ -38,11 +36,20 @@ local uuid_stash = buffer.ffi_stash_new(uuid_t)
 local uuid_stash_take = uuid_stash.take
 local uuid_stash_put = uuid_stash.put
 
+local uuid_str_stash =
+    buffer.ffi_stash_new(string.format('char[%s]', UUID_STR_LEN + 1))
+local uuid_str_stash_take = uuid_str_stash.take
+local uuid_str_stash_put = uuid_str_stash.put
+
 local uuid_tostring = function(uu)
     if not ffi.istype(uuid_t, uu) then
         return error('Usage: uuid:str()')
     end
-    return ffi.string(builtin.tt_uuid_str(uu), UUID_STR_LEN)
+    local strbuf = uuid_str_stash_take()
+    builtin.tt_uuid_to_string(uu, strbuf)
+    uu = ffi.string(strbuf, UUID_STR_LEN)
+    uuid_str_stash_put(strbuf)
+    return uu
 end
 
 local uuid_fromstr = function(str)
