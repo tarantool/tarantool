@@ -494,6 +494,71 @@ int
 mem_copy_bin(struct Mem *mem, const char *value, uint32_t size);
 
 /**
+ * Clear MEM and set it to MAP. The binary value belongs to another object. The
+ * binary value must be msgpack of MAP type.
+ */
+void
+mem_set_map_ephemeral(struct Mem *mem, char *value, uint32_t size);
+
+/**
+ * Clear MEM and set it to MAP. The binary value is static. The binary value
+ * must be msgpack of MAP type.
+ */
+void
+mem_set_map_static(struct Mem *mem, char *value, uint32_t size);
+
+/**
+ * Clear MEM and set it to MAP. The binary value was allocated by another object
+ * and passed to MEM. The binary value must be msgpack of MAP type. MEMs with
+ * this allocation type must free given memory whenever the MEM changes.
+ */
+void
+mem_set_map_dynamic(struct Mem *mem, char *value, uint32_t size);
+
+/**
+ * Clear MEM and set it to MAP. The binary value was allocated by another object
+ * and passed to MEM. The binary value must be msgpack of MAP type. MEMs with
+ * this allocation type only deallocate the string on destruction. Also, the
+ * memory may be reallocated if MEM is set to a different value of this
+ * allocation type.
+ */
+void
+mem_set_map_allocated(struct Mem *mem, char *value, uint32_t size);
+
+/**
+ * Clear MEM and set it to ARRAY. The binary value belongs to another object.
+ * The binary value must be msgpack of ARRAY type.
+ */
+void
+mem_set_array_ephemeral(struct Mem *mem, char *value, uint32_t size);
+
+/**
+ * Clear MEM and set it to ARRAY. The binary value is static. The binary value
+ * must be msgpack of ARRAY type.
+ */
+void
+mem_set_array_static(struct Mem *mem, char *value, uint32_t size);
+
+/**
+ * Clear MEM and set it to ARRAY. The binary value was allocated by another
+ * object and passed to MEM. The binary value must be msgpack of ARRAY type.
+ * MEMs with this allocation type must free given memory whenever the MEM
+ * changes.
+ */
+void
+mem_set_array_dynamic(struct Mem *mem, char *value, uint32_t size);
+
+/**
+ * Clear MEM and set it to ARRAY. The binary value was allocated by another
+ * object and passed to MEM. The binary value must be msgpack of ARRAY type.
+ * MEMs with this allocation type only deallocate the string on destruction.
+ * Also, the memory may be reallocated if MEM is set to a different value of
+ * this allocation type.
+ */
+void
+mem_set_array_allocated(struct Mem *mem, char *value, uint32_t size);
+
+/**
  * Copy content of MEM from one MEM to another. In case source MEM contains
  * string or binary and allocation type is not STATIC, this value is copied to
  * newly allocated by destination MEM memory.
@@ -746,8 +811,6 @@ int sqlVdbeMemClearAndResize(struct Mem * pMem, int n);
 void
 mem_set_ptr(struct Mem *mem, void *ptr);
 
-int
-sqlVdbeMemSetStr(struct Mem *, const char *, int, u8, void (*)(void *));
 void sqlValueFree(struct Mem *);
 struct Mem *sqlValueNew(struct sql *);
 
