@@ -77,7 +77,7 @@ sqlVdbeMemAboutToChange(Vdbe * pVdbe, Mem * pMem)
 		if (mem_is_bytes(pX) && !mem_is_ephemeral(pX) &&
 		    !mem_is_static(pX)) {
 			if (pX->pScopyFrom == pMem) {
-				pX->flags |= MEM_Undefined;
+				mem_set_invalid(pX);
 				pX->pScopyFrom = 0;
 			}
 		}
@@ -629,7 +629,7 @@ case OP_Return: {           /* in1 */
 	pIn1 = &aMem[pOp->p1];
 	assert(mem_is_uint(pIn1));
 	pOp = &aOp[pIn1->u.u];
-	pIn1->flags = MEM_Undefined;
+	mem_set_invalid(pIn1);
 	break;
 }
 
@@ -672,7 +672,7 @@ case OP_EndCoroutine: {           /* in1 */
 	assert(pCaller->opcode==OP_Yield);
 	assert(pCaller->p2>=0 && pCaller->p2<p->nOp);
 	pOp = &aOp[pCaller->p2 - 1];
-	pIn1->flags = MEM_Undefined;
+	mem_set_invalid(pIn1);
 	break;
 }
 
@@ -4226,8 +4226,8 @@ case OP_Program: {        /* jump */
 
 		pEnd = &VdbeFrameMem(pFrame)[pFrame->nChildMem];
 		for(pMem=VdbeFrameMem(pFrame); pMem!=pEnd; pMem++) {
-			pMem->flags = MEM_Undefined;
-			pMem->db = db;
+			mem_create(pMem);
+			mem_set_invalid(pMem);
 		}
 	} else {
 		pFrame = pRt->u.pFrame;
