@@ -198,6 +198,19 @@ local function do_catchsql_test(self, label, sql, expect)
 end
 test.do_catchsql_test = do_catchsql_test
 
+local function do_catchsql_substr_test(self, label, sql, pattern, expect)
+    function func()
+        local catch =  catchsql(self, sql)
+        local match = string.find(catch[2], pattern)
+        if match ~= nil and match ~= 1 then
+            catch[2] = string.sub(catch[2], 1, match - 1)
+        end
+        return catch
+    end
+    return do_test(self, label, func, expect)
+end
+test.do_catchsql_substr_test = do_catchsql_substr_test
+
 local function do_catchsql2_test(self, label, sql, expect)
     return do_test(self, label, function() return test.catchsql2(self, sql) end, expect)
 end
