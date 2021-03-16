@@ -481,6 +481,13 @@ mem_set_binl(struct Mem *mem, char *value, uint32_t size,
 }
 
 /**
+ * Copy binary value to a newly allocated memory. The MEM type becomes
+ * VARBINARY.
+ */
+int
+mem_copy_bin(struct Mem *mem, const char *value, uint32_t size);
+
+/**
  * Copy content of MEM from one MEM to another. In case source MEM contains
  * string or binary and allocation type is not STATIC, this value is copied to
  * newly allocated by destination MEM memory.
@@ -723,7 +730,6 @@ mem_convert_to_numeric(struct Mem *mem, enum field_type type);
 
 /** Setters = Change MEM value. */
 
-int sqlVdbeMemGrow(struct Mem * pMem, int n, int preserve);
 int sqlVdbeMemClearAndResize(struct Mem * pMem, int n);
 
 /**

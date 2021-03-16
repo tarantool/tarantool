@@ -40,6 +40,18 @@
 #include "lua/utils.h"
 #include "lua/msgpack.h"
 
+/*
+ * Make sure pMem->z points to a writable allocation of at least
+ * min(n,32) bytes.
+ *
+ * If the bPreserve argument is true, then copy of the content of
+ * pMem->z into the new allocation.  pMem must be either a string or
+ * blob if bPreserve is true.  If bPreserve is false, any prior content
+ * in pMem->z is discarded.
+ */
+static int
+sqlVdbeMemGrow(struct Mem *pMem, int n, int preserve);
+
 enum {
 	BUF_SIZE = 32,
 };
@@ -338,6 +350,27 @@ void
 mem_set_bin_allocated(struct Mem *mem, char *value, uint32_t size)
 {
 	set_bin_dynamic(mem, value, size, 0);
+}
+
+int
+mem_copy_bin(struct Mem *mem, const char *value, uint32_t size)
+{
+	if ((mem->flags & (MEM_Str | MEM_Blob)) != 0 && mem->z == value) {
+		/* Own value, but might be ephemeral. Make it own if so. */
+		if (sqlVdbeMemGrow(mem, size, 1) != 0)
+			return -1;
+		mem->flags = MEM_Blob;
+		mem->field_type = FIELD_TYPE_VARBINARY;
+		return 0;
+	}
+	mem_clear(mem);
+	if (sqlVdbeMemGrow(mem, size, 0) != 0)
+		return -1;
+	memcpy(mem->z, value, size);
+	mem->n = size;
+	mem->flags = MEM_Blob;
+	mem->field_type = FIELD_TYPE_VARBINARY;
+	return 0;
 }
 
 int
@@ -1874,17 +1907,8 @@ mem_convert_to_numeric(struct Mem *mem, enum field_type type)
 	return mem_convert_to_integer(mem);
 }
 
-/*
- * Make sure pMem->z points to a writable allocation of at least
- * min(n,32) bytes.
- *
- * If the bPreserve argument is true, then copy of the content of
- * pMem->z into the new allocation.  pMem must be either a string or
- * blob if bPreserve is true.  If bPreserve is false, any prior content
- * in pMem->z is discarded.
- */
-SQL_NOINLINE int
-sqlVdbeMemGrow(Mem * pMem, int n, int bPreserve)
+static int
+sqlVdbeMemGrow(struct Mem *pMem, int n, int bPreserve)
 {
 	assert(sqlVdbeCheckMemInvariants(pMem));
 	testcase(pMem->db == 0);
