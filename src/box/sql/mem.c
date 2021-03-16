@@ -386,6 +386,75 @@ mem_set_zerobin(struct Mem *mem, int n)
 	mem->field_type = FIELD_TYPE_VARBINARY;
 }
 
+static inline void
+set_msgpack_value(struct Mem *mem, char *value, uint32_t size, int alloc_type,
+		  enum field_type type)
+{
+	if (alloc_type == MEM_Ephem || alloc_type == MEM_Static)
+		set_bin_const(mem, value, size, alloc_type);
+	else
+		set_bin_dynamic(mem, value, size, alloc_type);
+	mem->flags |= MEM_Subtype;
+	mem->subtype = SQL_SUBTYPE_MSGPACK;
+	mem->field_type = type;
+}
+
+void
+mem_set_map_ephemeral(struct Mem *mem, char *value, uint32_t size)
+{
+	assert(mp_typeof(*value) == MP_MAP);
+	set_msgpack_value(mem, value, size, MEM_Ephem, FIELD_TYPE_MAP);
+}
+
+void
+mem_set_map_static(struct Mem *mem, char *value, uint32_t size)
+{
+	assert(mp_typeof(*value) == MP_MAP);
+	set_msgpack_value(mem, value, size, MEM_Static, FIELD_TYPE_MAP);
+}
+
+void
+mem_set_map_dynamic(struct Mem *mem, char *value, uint32_t size)
+{
+	assert(mp_typeof(*value) == MP_MAP);
+	set_msgpack_value(mem, value, size, MEM_Dyn, FIELD_TYPE_MAP);
+}
+
+void
+mem_set_map_allocated(struct Mem *mem, char *value, uint32_t size)
+{
+	assert(mp_typeof(*value) == MP_MAP);
+	set_msgpack_value(mem, value, size, 0, FIELD_TYPE_MAP);
+}
+
+void
+mem_set_array_ephemeral(struct Mem *mem, char *value, uint32_t size)
+{
+	assert(mp_typeof(*value) == MP_ARRAY);
+	set_msgpack_value(mem, value, size, MEM_Ephem, FIELD_TYPE_ARRAY);
+}
+
+void
+mem_set_array_static(struct Mem *mem, char *value, uint32_t size)
+{
+	assert(mp_typeof(*value) == MP_ARRAY);
+	set_msgpack_value(mem, value, size, MEM_Static, FIELD_TYPE_ARRAY);
+}
+
+void
+mem_set_array_dynamic(struct Mem *mem, char *value, uint32_t size)
+{
+	assert(mp_typeof(*value) == MP_ARRAY);
+	set_msgpack_value(mem, value, size, MEM_Dyn, FIELD_TYPE_ARRAY);
+}
+
+void
+mem_set_array_allocated(struct Mem *mem, char *value, uint32_t size)
+{
+	assert(mp_typeof(*value) == MP_ARRAY);
+	set_msgpack_value(mem, value, size, 0, FIELD_TYPE_ARRAY);
+}
+
 int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
@@ -2002,102 +2071,6 @@ mem_set_ptr(struct Mem *mem, void *ptr)
 	mem_destroy(mem);
 	mem->flags = MEM_Ptr;
 	mem->u.p = ptr;
-}
-
-/*
- * Change the value of a Mem to be a string or a BLOB.
- *
- * The memory management strategy depends on the value of the xDel
- * parameter. If the value passed is SQL_TRANSIENT, then the
- * string is copied into a (possibly existing) buffer managed by the
- * Mem structure. Otherwise, any existing buffer is freed and the
- * pointer copied.
- *
- * If the string is too large (if it exceeds the SQL_LIMIT_LENGTH
- * size limit) then no memory allocation occurs.  If the string can be
- * stored without allocating memory, then it is.  If a memory allocation
- * is required to store the string, then value of pMem is unchanged.  In
- * either case, error is returned.
- */
-int
-sqlVdbeMemSetStr(Mem * pMem,	/* Memory cell to set to string value */
-		     const char *z,	/* String pointer */
-		     int n,	/* Bytes in string, or negative */
-		     u8 not_blob,	/* Encoding of z.  0 for BLOBs */
-		     void (*xDel) (void *)	/* Destructor function */
-    )
-{
-	int nByte = n;		/* New value for pMem->n */
-	int iLimit;		/* Maximum allowed string or blob size */
-	u16 flags = 0;		/* New value for pMem->flags */
-
-	/* If z is a NULL pointer, set pMem to contain an SQL NULL. */
-	if (!z) {
-		mem_clear(pMem);
-		return 0;
-	}
-
-	if (pMem->db) {
-		iLimit = pMem->db->aLimit[SQL_LIMIT_LENGTH];
-	} else {
-		iLimit = SQL_MAX_LENGTH;
-	}
-	flags = (not_blob == 0 ? MEM_Blob : MEM_Str);
-	if (nByte < 0) {
-		assert(not_blob != 0);
-		nByte = sqlStrlen30(z);
-		if (nByte > iLimit)
-			nByte = iLimit + 1;
-		flags |= MEM_Term;
-	}
-
-	/* The following block sets the new values of Mem.z and Mem.xDel. It
-	 * also sets a flag in local variable "flags" to indicate the memory
-	 * management (one of MEM_Dyn or MEM_Static).
-	 */
-	if (xDel == SQL_TRANSIENT) {
-		int nAlloc = nByte;
-		if (flags & MEM_Term) {
-			nAlloc += 1; //SQL_UTF8
-		}
-		if (nByte > iLimit) {
-			diag_set(ClientError, ER_SQL_EXECUTE, "string or binary"\
-				 "string is too big");
-			return -1;
-		}
-		testcase(nAlloc == 0);
-		testcase(nAlloc == 31);
-		testcase(nAlloc == 32);
-		if (sqlVdbeMemClearAndResize(pMem, MAX(nAlloc, 32))) {
-			return -1;
-		}
-		memcpy(pMem->z, z, nAlloc);
-	} else if (xDel == SQL_DYNAMIC) {
-		mem_destroy(pMem);
-		pMem->zMalloc = pMem->z = (char *)z;
-		pMem->szMalloc = sqlDbMallocSize(pMem->db, pMem->zMalloc);
-	} else {
-		mem_destroy(pMem);
-		pMem->z = (char *)z;
-		pMem->xDel = xDel;
-		flags |= ((xDel == SQL_STATIC) ? MEM_Static : MEM_Dyn);
-	}
-
-	pMem->n = nByte;
-	pMem->flags = flags;
-	assert((pMem->flags & (MEM_Str | MEM_Blob)) != 0);
-	if ((pMem->flags & MEM_Str) != 0)
-		pMem->field_type = FIELD_TYPE_STRING;
-	else
-		pMem->field_type = FIELD_TYPE_VARBINARY;
-
-	if (nByte > iLimit) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "string or binary string"\
-			 "is too big");
-		return -1;
-	}
-
-	return 0;
 }
 
 /*
