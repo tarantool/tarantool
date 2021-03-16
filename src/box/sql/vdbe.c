@@ -2530,8 +2530,7 @@ case OP_OpenTEphemeral: {
 
 	if (space == NULL)
 		goto abort_due_to_error;
-	aMem[pOp->p1].u.p = space;
-	aMem[pOp->p1].flags = MEM_Ptr;
+	mem_set_ptr(&aMem[pOp->p1], space);
 	break;
 }
 

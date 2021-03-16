@@ -562,6 +562,10 @@ mem_set_array_allocated(struct Mem *mem, char *value, uint32_t size);
 void
 mem_set_invalid(struct Mem *mem);
 
+/** Clear MEM and set pointer to be its value. */
+void
+mem_set_ptr(struct Mem *mem, void *ptr);
+
 /**
  * Copy content of MEM from one MEM to another. In case source MEM contains
  * string or binary and allocation type is not STATIC, this value is copied to
@@ -806,14 +810,6 @@ mem_convert_to_numeric(struct Mem *mem, enum field_type type);
 /** Setters = Change MEM value. */
 
 int sqlVdbeMemClearAndResize(struct Mem * pMem, int n);
-
-/**
- * Set VDBE memory register with given pointer as a data.
- * @param mem VDBE memory register to update.
- * @param ptr Pointer to use.
- */
-void
-mem_set_ptr(struct Mem *mem, void *ptr);
 
 void sqlValueFree(struct Mem *);
 struct Mem *sqlValueNew(struct sql *);
