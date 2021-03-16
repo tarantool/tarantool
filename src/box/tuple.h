@@ -1057,7 +1057,7 @@ tuple_field_u32(struct tuple *tuple, uint32_t fieldno, uint32_t *out)
 	if (field == NULL)
 		return -1;
 	uint64_t val = mp_decode_uint(&field);
-	if (*out > UINT32_MAX) {
+	if (val > UINT32_MAX) {
 		diag_set(ClientError, ER_FIELD_TYPE,
 			 int2str(fieldno + TUPLE_INDEX_BASE),
 			 "uint32_t", "uint64_t");
