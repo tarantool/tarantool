@@ -462,6 +462,14 @@ mem_set_invalid(struct Mem *mem)
 	mem->flags = MEM_Undefined;
 }
 
+void
+mem_set_ptr(struct Mem *mem, void *ptr)
+{
+	mem_clear(mem);
+	mem->flags = MEM_Ptr;
+	mem->u.p = ptr;
+}
+
 int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
@@ -2070,14 +2078,6 @@ sqlVdbeMemClearAndResize(Mem * pMem, int szNew)
 	pMem->z = pMem->zMalloc;
 	pMem->flags &= (MEM_Null | MEM_Int | MEM_Real);
 	return 0;
-}
-
-void
-mem_set_ptr(struct Mem *mem, void *ptr)
-{
-	mem_destroy(mem);
-	mem->flags = MEM_Ptr;
-	mem->u.p = ptr;
 }
 
 /*
