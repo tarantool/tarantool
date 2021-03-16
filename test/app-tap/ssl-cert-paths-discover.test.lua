@@ -178,4 +178,4 @@ end)
 ----- Cleanup
 fio.rmtree(temp_dir)
 
-os:exit(test:check() and 0 or 1)
+os.exit(test:check() and 0 or 1)
