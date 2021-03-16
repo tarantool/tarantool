@@ -558,6 +558,10 @@ mem_set_array_dynamic(struct Mem *mem, char *value, uint32_t size);
 void
 mem_set_array_allocated(struct Mem *mem, char *value, uint32_t size);
 
+/** Clear MEM and set it to invalid state. */
+void
+mem_set_invalid(struct Mem *mem);
+
 /**
  * Copy content of MEM from one MEM to another. In case source MEM contains
  * string or binary and allocation type is not STATIC, this value is copied to

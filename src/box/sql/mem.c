@@ -455,6 +455,13 @@ mem_set_array_allocated(struct Mem *mem, char *value, uint32_t size)
 	set_msgpack_value(mem, value, size, 0, FIELD_TYPE_ARRAY);
 }
 
+void
+mem_set_invalid(struct Mem *mem)
+{
+	mem_clear(mem);
+	mem->flags = MEM_Undefined;
+}
+
 int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
