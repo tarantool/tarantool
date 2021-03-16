@@ -571,6 +571,13 @@ void
 mem_set_frame(struct Mem *mem, struct VdbeFrame *frame);
 
 /**
+ * Clear the MEM, set the function as its value, and allocate enough memory to
+ * hold the accumulation structure for the aggregate function.
+ */
+int
+mem_set_agg(struct Mem *mem, struct func *func, int size);
+
+/**
  * Copy content of MEM from one MEM to another. In case source MEM contains
  * string or binary and allocation type is not STATIC, this value is copied to
  * newly allocated by destination MEM memory.
