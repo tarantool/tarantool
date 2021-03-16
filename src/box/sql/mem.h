@@ -566,6 +566,10 @@ mem_set_invalid(struct Mem *mem);
 void
 mem_set_ptr(struct Mem *mem, void *ptr);
 
+/** Clear MEM and set frame to be its value. */
+void
+mem_set_frame(struct Mem *mem, struct VdbeFrame *frame);
+
 /**
  * Copy content of MEM from one MEM to another. In case source MEM contains
  * string or binary and allocation type is not STATIC, this value is copied to
