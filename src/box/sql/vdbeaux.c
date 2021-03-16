@@ -1590,7 +1590,7 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 		p->nMem = nMem;
 		for (int i = 0; i < nMem; ++i) {
 			mem_create(&p->aMem[i]);
-			p->aMem[i].flags = MEM_Undefined;
+			mem_set_invalid(&p->aMem[i]);
 		}
 		memset(p->apCsr, 0, nCursor * sizeof(VdbeCursor *));
 	}
