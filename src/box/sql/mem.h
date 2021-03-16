@@ -577,6 +577,10 @@ mem_set_frame(struct Mem *mem, struct VdbeFrame *frame);
 int
 mem_set_agg(struct Mem *mem, struct func *func, int size);
 
+/** Clear MEM and set it to special, "cleared", NULL. */
+void
+mem_set_null_clear(struct Mem *mem);
+
 /**
  * Copy content of MEM from one MEM to another. In case source MEM contains
  * string or binary and allocation type is not STATIC, this value is copied to
