@@ -470,6 +470,14 @@ mem_set_ptr(struct Mem *mem, void *ptr)
 	mem->u.p = ptr;
 }
 
+void
+mem_set_frame(struct Mem *mem, struct VdbeFrame *frame)
+{
+	mem_clear(mem);
+	mem->flags = MEM_Frame;
+	mem->u.pFrame = frame;
+}
+
 int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
