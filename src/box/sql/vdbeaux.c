@@ -1303,19 +1303,26 @@ sqlVdbeList(Vdbe * p)
 			 * has not already been seen.
 			 */
 			if (pOp->p4type == P4_SUBPROGRAM) {
-				int nByte = (nSub + 1) * sizeof(SubProgram *);
 				int j;
 				for (j = 0; j < nSub; j++) {
 					if (apSub[j] == pOp->p4.pProgram)
 						break;
 				}
-				if (j == nSub &&
-				    sqlVdbeMemGrow(pSub, nByte,
-						   nSub != 0) == 0) {
-					apSub = (SubProgram **) pSub->z;
-					apSub[nSub++] = pOp->p4.pProgram;
-					pSub->flags |= MEM_Blob;
-					pSub->n = nSub * sizeof(SubProgram *);
+				if (nSub == 0) {
+					uint32_t size = sizeof(SubProgram *);
+					char *bin = (char *)&pOp->p4.pProgram;
+					if (mem_copy_bin(pSub, bin, size) != 0)
+						return -1;
+				} else if (j == nSub) {
+					struct Mem tmp;
+					mem_create(&tmp);
+					uint32_t size = sizeof(SubProgram *);
+					char *bin = (char *)&pOp->p4.pProgram;
+					mem_set_bin_ephemeral(&tmp, bin, size);
+					int rc = mem_concat(pSub, &tmp, pSub);
+					mem_destroy(&tmp);
+					if (rc != 0)
+						return -1;
 				}
 			}
 		}
