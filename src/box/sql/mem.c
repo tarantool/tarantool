@@ -494,6 +494,13 @@ mem_set_agg(struct Mem *mem, struct func *func, int size)
 	return 0;
 }
 
+void
+mem_set_null_clear(struct Mem *mem)
+{
+	mem_clear(mem);
+	mem->flags = MEM_Null | MEM_Cleared;
+}
+
 int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
