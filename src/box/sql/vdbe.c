@@ -886,8 +886,15 @@ case OP_Null: {           /* out2 */
 case OP_Blob: {                /* out2 */
 	assert(pOp->p1 <= SQL_MAX_LENGTH);
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
-	sqlVdbeMemSetStr(pOut, pOp->p4.z, pOp->p1, 0, 0);
-	if (pOp->p3!=0) {
+	if (pOp->p3 == 0) {
+		/*
+		 * TODO: It is possible that vabinary should be stored as
+		 * ephemeral or static depending on value. There is no way to
+		 * determine right now, so it is stored as static.
+		 */
+		mem_set_bin_static(pOut, pOp->p4.z, pOp->p1);
+	} else {
+		sqlVdbeMemSetStr(pOut, pOp->p4.z, pOp->p1, 0, 0);
 		pOut->flags |= MEM_Subtype;
 		pOut->subtype = pOp->p3;
 	}
@@ -2245,9 +2252,7 @@ case OP_MakeRecord: {
 		 * sure previously allocated memory has gone.
 		 */
 		mem_destroy(pOut);
-		pOut->flags = MEM_Blob | MEM_Ephem;
-		pOut->n = tuple_size;
-		pOut->z = tuple;
+		mem_set_bin_ephemeral(pOut, tuple, tuple_size);
 	}
 	assert(sqlVdbeCheckMemInvariants(pOut));
 	assert(pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor));
@@ -3330,9 +3335,14 @@ case OP_RowData: {
 	}
 	testcase( n==0);
 
-	if (vdbe_mem_alloc_blob_region(pOut, n) != 0)
+	char *buf = region_alloc(&fiber()->gc, n);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, n, "region_alloc", "buf");
 		goto abort_due_to_error;
-	sqlCursorPayload(pCrsr, 0, n, pOut->z);
+	}
+	sqlCursorPayload(pCrsr, 0, n, buf);
+	mem_set_bin_ephemeral(pOut, buf, n);
+	assert(sqlVdbeCheckMemInvariants(pOut));
 	UPDATE_MAX_BLOBSIZE(pOut);
 	REGISTER_TRACE(p, pOp->p2, pOut);
 	break;
