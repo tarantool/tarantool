@@ -135,8 +135,6 @@ static int
 on_shutdown_f(va_list ap)
 {
 	(void) ap;
-	/** Time to wait for shutdown trigger finished */
-	const double shutdown_trigger_wait_time = 3.0;
 	trigger_fiber_run(&box_on_shutdown_trigger_list, NULL,
 			  shutdown_trigger_wait_time);
 	ev_break(loop(), EVBREAK_ALL);

@@ -64,6 +64,9 @@ struct vclock;
  */
 extern const struct vclock *box_vclock;
 
+/** Time to wait for shutdown triggers finished */
+extern double shutdown_trigger_wait_time;
+
 /** Invoked on box shutdown. */
 extern struct rlist box_on_shutdown_trigger_list;
 

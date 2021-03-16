@@ -88,6 +88,8 @@ static char status[64] = "unknown";
 /** box.stat rmean */
 struct rmean *rmean_box;
 
+double shutdown_trigger_wait_time = 3.0;
+
 struct rlist box_on_shutdown_trigger_list =
 	RLIST_HEAD_INITIALIZER(box_on_shutdown_trigger_list);
 
