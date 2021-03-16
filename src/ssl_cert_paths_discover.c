@@ -35,7 +35,6 @@
 #include <sys/stat.h>
 #include <openssl/ssl.h>
 #include "ssl_cert_paths_discover.h"
-#include "tt_static.h"
 
 static int
 is_dir_empty(const char *dir_path)
