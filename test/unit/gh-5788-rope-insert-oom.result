@@ -1,0 +1,23 @@
+	*** out_of_memory_stress_test ***
+1..20
+ok 1 - all allocated nodes freed
+ok 2 - all allocated nodes freed
+ok 3 - all allocated nodes freed
+ok 4 - all allocated nodes freed
+ok 5 - all allocated nodes freed
+ok 6 - all allocated nodes freed
+ok 7 - all allocated nodes freed
+ok 8 - all allocated nodes freed
+ok 9 - all allocated nodes freed
+ok 10 - all allocated nodes freed
+ok 11 - all allocated nodes freed
+ok 12 - all allocated nodes freed
+ok 13 - all allocated nodes freed
+ok 14 - all allocated nodes freed
+ok 15 - all allocated nodes freed
+ok 16 - all allocated nodes freed
+ok 17 - all allocated nodes freed
+ok 18 - all allocated nodes freed
+ok 19 - all allocated nodes freed
+ok 20 - all allocated nodes freed
+	*** out_of_memory_stress_test: done ***
