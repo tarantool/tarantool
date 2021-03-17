@@ -456,12 +456,6 @@ sql_column_bytes(sql_stmt * pStmt, int i)
 	return sql_value_bytes(columnMem(pStmt, i));
 }
 
-bool
-sql_column_boolean(struct sql_stmt *stmt, int i)
-{
-	return sql_value_boolean(columnMem(stmt, i));
-}
-
 const unsigned char *
 sql_column_text(sql_stmt * pStmt, int i)
 {

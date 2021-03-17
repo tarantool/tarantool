@@ -442,9 +442,6 @@ sql_column_bytes(sql_stmt *, int iCol);
 int
 sql_column_bytes16(sql_stmt *, int iCol);
 
-bool
-sql_column_boolean(struct sql_stmt *stmt, int column);
-
 const unsigned char *
 sql_column_text(sql_stmt *,
 		    int iCol);

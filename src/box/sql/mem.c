@@ -1134,6 +1134,16 @@ mem_get_double(const struct Mem *mem, double *d)
 }
 
 int
+mem_get_bool(const struct Mem *mem, bool *b)
+{
+	if ((mem->flags & MEM_Bool) != 0) {
+		*b = mem->u.b;
+		return 0;
+	}
+	return -1;
+}
+
+int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
 	mem_clear(to);
@@ -2262,16 +2272,6 @@ releaseMemArray(Mem * p, int N)
 	}
 }
 
-int
-mem_value_bool(const struct Mem *mem, bool *b)
-{
-	if ((mem->flags  & MEM_Bool) != 0) {
-		*b = mem->u.b;
-		return 0;
-	}
-	return -1;
-}
-
 /**************************** sql_value_  ******************************
  * The following routines extract information from a Mem or sql_value
  * structure.
@@ -2296,16 +2296,6 @@ int
 sql_value_bytes(sql_value * pVal)
 {
 	return sqlValueBytes(pVal);
-}
-
-bool
-sql_value_boolean(sql_value *val)
-{
-	bool b = false;
-	int rc = mem_value_bool((struct Mem *) val, &b);
-	assert(rc == 0);
-	(void) rc;
-	return b;
 }
 
 const unsigned char *
