@@ -1052,6 +1052,38 @@ mem_cast_implicit_old(struct Mem *mem, enum field_type type)
 }
 
 int
+mem_get_int(const struct Mem *mem, int64_t *i, bool *is_neg)
+{
+	if ((mem->flags & MEM_Int) != 0) {
+		*i = mem->u.i;
+		*is_neg = true;
+		return 0;
+	}
+	if ((mem->flags & MEM_UInt) != 0) {
+		*i = mem->u.i;
+		*is_neg = false;
+		return 0;
+	}
+	if ((mem->flags & (MEM_Str | MEM_Blob)) != 0)
+		return sql_atoi64(mem->z, i, is_neg, mem->n);
+	if ((mem->flags & MEM_Real) != 0) {
+		double d = mem->u.r;
+		if (d < 0 && d >= (double)INT64_MIN) {
+			*i = (int64_t)d;
+			*is_neg = true;
+			return 0;
+		}
+		if (d >= 0 && d < (double)UINT64_MAX) {
+			*i = (int64_t)(uint64_t)d;
+			*is_neg = false;
+			return 0;
+		}
+		return -1;
+	}
+	return -1;
+}
+
+int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
 	mem_clear(to);
@@ -1409,12 +1441,12 @@ bitwise_prepare(const struct Mem *left, const struct Mem *right,
 		int64_t *a, int64_t *b)
 {
 	bool unused;
-	if (sqlVdbeIntValue(left, a, &unused) != 0) {
+	if (mem_get_int(left, a, &unused) != 0) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
 			 "integer");
 		return -1;
 	}
-	if (sqlVdbeIntValue(right, b, &unused) != 0) {
+	if (mem_get_int(right, b, &unused) != 0) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
 			 "integer");
 		return -1;
@@ -1503,7 +1535,7 @@ mem_bit_not(const struct Mem *mem, struct Mem *result)
 		return 0;
 	int64_t i;
 	bool unused;
-	if (sqlVdbeIntValue(mem, &i, &unused) != 0) {
+	if (mem_get_int(mem, &i, &unused) != 0) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(mem),
 			 "integer");
 		return -1;
@@ -1715,35 +1747,6 @@ valueToText(sql_value * pVal)
 		assert(0 == (1 & SQL_PTR_TO_INT(pVal->z)));
 	}
 	return pVal->z;
-}
-
-/*
- * Convert a 64-bit IEEE double into a 64-bit signed integer.
- * If the double is out of range of a 64-bit signed integer then
- * return the closest available 64-bit signed integer.
- */
-static int
-doubleToInt64(double r, int64_t *i)
-{
-	/*
-	 * Many compilers we encounter do not define constants for the
-	 * minimum and maximum 64-bit integers, or they define them
-	 * inconsistently.  And many do not understand the "LL" notation.
-	 * So we define our own static constants here using nothing
-	 * larger than a 32-bit integer constant.
-	 */
-	static const int64_t maxInt = LARGEST_INT64;
-	static const int64_t minInt = SMALLEST_INT64;
-	if (r <= (double)minInt) {
-		*i = minInt;
-		return -1;
-	} else if (r >= (double)maxInt) {
-		*i = maxInt;
-		return -1;
-	} else {
-		*i = (int64_t) r;
-		return *i != r;
-	}
 }
 
 /*
@@ -2220,42 +2223,6 @@ mem_value_bool(const struct Mem *mem, bool *b)
 }
 
 /*
- * Return some kind of integer value which is the best we can do
- * at representing the value that *pMem describes as an integer.
- * If pMem is an integer, then the value is exact.  If pMem is
- * a floating-point then the value returned is the integer part.
- * If pMem is a string or blob, then we make an attempt to convert
- * it into an integer and return that.  If pMem represents an
- * an SQL-NULL value, return 0.
- *
- * If pMem represents a string value, its encoding might be changed.
- */
-int
-sqlVdbeIntValue(const struct Mem *pMem, int64_t *i, bool *is_neg)
-{
-	int flags;
-	assert(EIGHT_BYTE_ALIGNMENT(pMem));
-	flags = pMem->flags;
-	if (flags & MEM_Int) {
-		*i = pMem->u.i;
-		*is_neg = true;
-		return 0;
-	} else if (flags & MEM_UInt) {
-		*i = pMem->u.u;
-		*is_neg = false;
-		return 0;
-	} else if (flags & MEM_Real) {
-		*is_neg = pMem->u.r < 0;
-		return doubleToInt64(pMem->u.r, i);
-	} else if (flags & (MEM_Str)) {
-		assert(pMem->z || pMem->n == 0);
-		if (sql_atoi64(pMem->z, i, is_neg, pMem->n) == 0)
-			return 0;
-	}
-	return -1;
-}
-
-/*
  * Return the best representation of pMem that we can get into a
  * double.  If pMem is already a double or an integer, return its
  * value.  If it is a string or blob, try to convert it to a double.
@@ -2325,30 +2292,12 @@ sql_value_boolean(sql_value *val)
 	return b;
 }
 
-int
-sql_value_int(sql_value * pVal)
-{
-	int64_t i = 0;
-	bool is_neg;
-	sqlVdbeIntValue((Mem *) pVal, &i, &is_neg);
-	return (int)i;
-}
-
-sql_int64
-sql_value_int64(sql_value * pVal)
-{
-	int64_t i = 0;
-	bool unused;
-	sqlVdbeIntValue((Mem *) pVal, &i, &unused);
-	return i;
-}
-
 uint64_t
 sql_value_uint64(sql_value *val)
 {
 	int64_t i = 0;
 	bool is_neg;
-	sqlVdbeIntValue((struct Mem *) val, &i, &is_neg);
+	mem_get_int((struct Mem *) val, &i, &is_neg);
 	assert(!is_neg);
 	return i;
 }
