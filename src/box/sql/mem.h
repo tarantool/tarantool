@@ -733,6 +733,13 @@ int
 mem_to_double(struct Mem *mem);
 
 /**
+ * Convert the given MEM to NUMBER. This function defines the rules that are
+ * used to convert values of all other types to NUMBER.
+ */
+int
+mem_to_number(struct Mem *mem);
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -764,31 +771,6 @@ registerTrace(int iReg, Mem *p);
  */
 #define memIsValid(M)  ((M)->flags & MEM_Undefined)==0
 #endif
-
-/**
- * Try to convert a string value into a numeric representation
- * if we can do so without loss of information. Firstly, value
- * is attempted to be converted to integer, and in case of fail -
- * to floating point number. Note that function is assumed to be
- * called on memory cell containing string, i.e. mem->type == MEM_Str.
- *
- * @param record Memory cell containing value to be converted.
- * @retval 0 If value can be converted to integer or number.
- * @retval -1 Otherwise.
- */
-int
-mem_apply_numeric_type(struct Mem *record);
-
-/**
- * Convert @a mem to NUMBER type, so that after conversion it has
- * one of types MEM_Real, MEM_Int or MEM_UInt. If conversion is
- * not possible, function returns -1.
- *
- * Beware - this function changes value and type of @a mem
- * argument.
- */
-int
-vdbe_mem_numerify(struct Mem *mem);
 
 int sqlVdbeMemCast(struct Mem *, enum field_type type);
 int sqlVdbeMemStringify(struct Mem *);
