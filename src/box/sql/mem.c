@@ -1111,6 +1111,29 @@ mem_get_uint(const struct Mem *mem, uint64_t *u)
 }
 
 int
+mem_get_double(const struct Mem *mem, double *d)
+{
+	if ((mem->flags & MEM_Real) != 0) {
+		*d = mem->u.r;
+		return 0;
+	}
+	if ((mem->flags & MEM_Int) != 0) {
+		*d = (double)mem->u.i;
+		return 0;
+	}
+	if ((mem->flags & MEM_UInt) != 0) {
+		*d = (double)mem->u.u;
+		return 0;
+	}
+	if ((mem->flags & MEM_Str) != 0) {
+		if (sqlAtoF(mem->z, d, mem->n) == 0)
+			return -1;
+		return 0;
+	}
+	return -1;
+}
+
+int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
 	mem_clear(to);
@@ -2249,32 +2272,6 @@ mem_value_bool(const struct Mem *mem, bool *b)
 	return -1;
 }
 
-/*
- * Return the best representation of pMem that we can get into a
- * double.  If pMem is already a double or an integer, return its
- * value.  If it is a string or blob, try to convert it to a double.
- * If it is a NULL, return 0.0.
- */
-int
-sqlVdbeRealValue(Mem * pMem, double *v)
-{
-	assert(EIGHT_BYTE_ALIGNMENT(pMem));
-	if (pMem->flags & MEM_Real) {
-		*v = pMem->u.r;
-		return 0;
-	} else if (pMem->flags & MEM_Int) {
-		*v = (double)pMem->u.i;
-		return 0;
-	} else if ((pMem->flags & MEM_UInt) != 0) {
-		*v = (double)pMem->u.u;
-		return 0;
-	} else if (pMem->flags & MEM_Str) {
-		if (sqlAtoF(pMem->z, v, pMem->n))
-			return 0;
-	}
-	return -1;
-}
-
 /**************************** sql_value_  ******************************
  * The following routines extract information from a Mem or sql_value
  * structure.
@@ -2299,14 +2296,6 @@ int
 sql_value_bytes(sql_value * pVal)
 {
 	return sqlValueBytes(pVal);
-}
-
-double
-sql_value_double(sql_value * pVal)
-{
-	double v = 0.0;
-	sqlVdbeRealValue((Mem *) pVal, &v);
-	return v;
 }
 
 bool
