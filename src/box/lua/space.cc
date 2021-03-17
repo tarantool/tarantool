@@ -480,8 +480,7 @@ lbox_space_frommap(struct lua_State *L)
 	space = space_by_id(id);
 	if (space == NULL) {
 		lua_pushnil(L);
-		lua_pushstring(L, tt_sprintf("Space with id '%d' "\
-					     "doesn't exist", id));
+		lua_pushfstring(L, "Space with id '%d' doesn't exist", id);
 		return 2;
 	}
 	assert(space->format != NULL);
@@ -498,8 +497,7 @@ lbox_space_frommap(struct lua_State *L)
 		if (tuple_fieldno_by_name(dict, key, key_len, key_hash,
 					  &fieldno)) {
 			lua_pushnil(L);
-			lua_pushstring(L, tt_sprintf("Unknown field '%s'",
-						     key));
+			lua_pushfstring(L, "Unknown field '%s'", key);
 			return 2;
 		}
 		lua_rawseti(L, -3, fieldno+1);
