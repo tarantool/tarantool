@@ -512,8 +512,26 @@ static inline void
 swim_complete_send(struct swim_scheduler *scheduler, struct swim_task *task,
 		   ssize_t size)
 {
-	if (size < 0)
-		diag_log();
+	if (size < 0) {
+		bool is_critical = true;
+		int err = diag_last_error(diag_get())->saved_errno;
+#if TARGET_OS_DARWIN
+		/*
+		 * On Mac this error happens regularly if SWIM is bound to
+		 * the localhost and tries to broadcast out of the machine. This
+		 * is not critical, because will happen in the tests a lot, and
+		 * in prod it simply should not bind to localhost if there are
+		 * multiple machines in the cluster. Besides, Mac as a platform
+		 * is not supposed to be used in prod.
+		 */
+		is_critical = (err != EADDRNOTAVAIL);
+#else
+		/* The same as EADDRNOTAVAIL, but happens on Linux as EINVAL. */
+		is_critical = (err != EINVAL);
+#endif
+		if (is_critical)
+			diag_log();
+	}
 	if (task->complete != NULL)
 		task->complete(task, scheduler, size);
 }
