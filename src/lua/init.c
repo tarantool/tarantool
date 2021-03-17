@@ -705,8 +705,16 @@ tarantool_lua_run_script(char *path, bool interactive,
 	if (script_fiber == NULL)
 		panic("%s", diag_last_error(diag_get())->errmsg);
 	script_fiber->storage.lua.stack = tarantool_L;
+	/*
+	 * Create a new diag on the stack. Don't pass fiber's diag, because it
+	 * might be overwritten by libev callbacks invoked in the scheduler
+	 * fiber (which is this), and therefore can't be used as a sign of fail
+	 * in the script itself.
+	 */
+	struct diag script_diag;
+	diag_create(&script_diag);
 	fiber_start(script_fiber, tarantool_L, path, interactive,
-		    optc, optv, argc, argv, diag_get());
+		    optc, optv, argc, argv, &script_diag);
 
 	/*
 	 * Run an auxiliary event loop to re-schedule run_script fiber.
@@ -716,6 +724,8 @@ tarantool_lua_run_script(char *path, bool interactive,
 		ev_run(loop(), 0);
 	/* The fiber running the startup script has ended. */
 	script_fiber = NULL;
+	diag_move(&script_diag, diag_get());
+	diag_destroy(&script_diag);
 	/*
 	 * Result can't be obtained via fiber_join - script fiber
 	 * never dies if os.exit() was called. This is why diag
