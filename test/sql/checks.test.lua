@@ -212,8 +212,11 @@ s2:format({{name='X', type='any'}, {name='Y', type='integer'}})
 test_run:cmd("push filter 'space_id: [0-9]+' to 'space_id: <ID>'")
 _ = s1:create_check_constraint('physics', 'X < Y')
 
+--hide different parts of the function call result
 status, error = pcall(function() return s1:create_check_constraint('physics', 'X > Y') end)
-error = ffi.string(error)
+error = ffi.string(error._errmsg)
+string.sub(error, 1, string.find(error, ": old tuple - ") - 1)
+
 _ = s1:create_check_constraint('greater', 'X > 20')
 _ = s2:create_check_constraint('physics', 'X > Y')
 _ = s2:create_check_constraint('greater', 'X > 20')

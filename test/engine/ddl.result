@@ -2575,7 +2575,7 @@ ch = fiber.channel(1)
 ...
 check_fiber()
 ---
-- false
+- true
 ...
 inspector:cmd("restart server default")
 inspector = require('test_run').new()
@@ -2617,7 +2617,7 @@ inspector:cmd("setopt delimiter ''");
 ...
 check_server_restart()
 ---
-- false
+- true
 ...
 box.space.test:drop()
 ---
