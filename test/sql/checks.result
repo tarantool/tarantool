@@ -628,13 +628,16 @@ test_run:cmd("push filter 'space_id: [0-9]+' to 'space_id: <ID>'")
 _ = s1:create_check_constraint('physics', 'X < Y')
 ---
 ...
+--hide different parts of the function call result
 status, error = pcall(function() return s1:create_check_constraint('physics', 'X > Y') end)
 ---
 ...
-error = ffi.string(error)
+error = ffi.string(error._errmsg)
 ---
-- error: '[string "error = ffi.string(error) "]:1: bad argument #1 to ''string'' (cannot
-    convert ''struct error'' to ''const char *'')'
+...
+string.sub(error, 1, string.find(error, ": old tuple - ") - 1)
+---
+- Duplicate key exists in unique index 'primary' in space '_ck_constraint'
 ...
 _ = s1:create_check_constraint('greater', 'X > 20')
 ---
