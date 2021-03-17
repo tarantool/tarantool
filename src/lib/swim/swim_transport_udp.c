@@ -80,25 +80,27 @@ swim_transport_bind(struct swim_transport *transport,
 		return 0;
 	}
 
+	int is_on = 1;
+	int real_port = new_addr->sin_port;
 	int fd = sio_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (fd < 0)
 		return -1;
-	if (sio_bind(fd, (struct sockaddr *) addr, addr_len) != 0 ||
-	    evio_setsockopt_server(fd, AF_INET, SOCK_DGRAM) != 0) {
+	if (sio_bind(fd, (struct sockaddr *) addr, addr_len) != 0) {
 		if (errno == EADDRINUSE)
 			diag_set(SocketError, sio_socketname(fd), "bind");
-		close(fd);
-		return -1;
+		goto end_error;
 	}
-	int real_port = new_addr->sin_port;
+	if (sio_setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &is_on,
+			   sizeof(is_on)) != 0)
+		goto end_error;
+	if (evio_setsockopt_server(fd, AF_INET, SOCK_DGRAM) != 0)
+		goto end_error;
 	if (is_new_port_any) {
 		struct sockaddr_in real_addr;
 		addr_len = sizeof(real_addr);
 		if (sio_getsockname(fd, (struct sockaddr *) &real_addr,
-				    &addr_len) != 0) {
-			close(fd);
-			return -1;
-		}
+				    &addr_len) != 0)
+			goto end_error;
 		real_port = real_addr.sin_port;
 	}
 	if (transport->fd != -1)
@@ -107,6 +109,9 @@ swim_transport_bind(struct swim_transport *transport,
 	transport->addr = *new_addr;
 	transport->addr.sin_port = real_port;
 	return 0;
+end_error:
+	close(fd);
+	return -1;
 }
 
 void
