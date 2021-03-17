@@ -337,7 +337,7 @@ lbox_fiber_top_entry(struct fiber *f, void *cb_ctx)
 {
 	struct lua_State *L = (struct lua_State *) cb_ctx;
 
-	lua_pushstring(L, tt_sprintf("%u/%s", f->fid, f->name));
+	lua_pushfstring(L, "%f/%s", (lua_Number)f->fid, f->name);
 
 	lua_newtable(L);
 
