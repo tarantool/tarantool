@@ -756,6 +756,10 @@ mem_to_str(struct Mem *mem);
 int
 mem_to_str0(struct Mem *mem);
 
+/** Convert the given MEM to given type according to explicit cast rules. */
+int
+mem_cast_explicit(struct Mem *mem, enum field_type type);
+
 /**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
@@ -789,7 +793,6 @@ registerTrace(int iReg, Mem *p);
 #define memIsValid(M)  ((M)->flags & MEM_Undefined)==0
 #endif
 
-int sqlVdbeMemCast(struct Mem *, enum field_type type);
 int sqlVdbeMemNulTerminate(struct Mem *);
 int sqlVdbeMemExpandBlob(struct Mem *);
 #define ExpandBlob(P) (((P)->flags&MEM_Zero)?sqlVdbeMemExpandBlob(P):0)
@@ -832,17 +835,6 @@ void sql_value_apply_type(struct Mem *val, enum field_type type);
 int
 mem_apply_type(struct Mem *record, enum field_type type);
 
-/**
- * Convert the numeric value contained in MEM to another numeric
- * type.
- *
- * @param mem The MEM that contains the numeric value.
- * @param type The type to convert to.
- * @retval 0 if the conversion was successful, -1 otherwise.
- */
-int
-mem_convert_to_numeric(struct Mem *mem, enum field_type type);
-
 /** Setters = Change MEM value. */
 
 int sqlVdbeMemClearAndResize(struct Mem * pMem, int n);
@@ -855,12 +847,6 @@ struct Mem *sqlValueNew(struct sql *);
  */
 void
 releaseMemArray(Mem * p, int N);
-
-/*
- * Clear any existing type flags from a Mem and replace them with f
- */
-#define MemSetTypeFlag(p, f) \
-   ((p)->flags = ((p)->flags&~(MEM_TypeMask|MEM_Zero))|f)
 
 /** Getters. */
 

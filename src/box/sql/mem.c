@@ -527,6 +527,15 @@ int_to_str0(struct Mem *mem)
 }
 
 static inline int
+int_to_bool(struct Mem *mem)
+{
+	mem->u.b = mem->u.i != 0;
+	mem->flags = MEM_Bool;
+	mem->field_type = FIELD_TYPE_BOOLEAN;
+	return 0;
+}
+
+static inline int
 str_to_str0(struct Mem *mem)
 {
 	assert((mem->flags | MEM_Str) != 0);
@@ -535,6 +544,42 @@ str_to_str0(struct Mem *mem)
 	mem->z[mem->n] = '\0';
 	mem->flags |= MEM_Term;
 	mem->field_type = FIELD_TYPE_STRING;
+	return 0;
+}
+
+static inline int
+str_to_bin(struct Mem *mem)
+{
+	mem->flags = (mem->flags & (MEM_Dyn | MEM_Static | MEM_Ephem)) |
+		     MEM_Blob;
+	mem->field_type = FIELD_TYPE_VARBINARY;
+	return 0;
+}
+
+static inline int
+str_to_bool(struct Mem *mem)
+{
+	char *str = mem->z;
+	bool b;
+	const char *str_true = "TRUE";
+	const char *str_false = "FALSE";
+	uint32_t len_true = strlen(str_true);
+	uint32_t len_false = strlen(str_false);
+
+	for (; str[0] == ' '; str++);
+	if (strncasecmp(str, str_true, len_true) == 0) {
+		b = true;
+		str += len_true;
+	} else if (strncasecmp(str, str_false, len_false) == 0) {
+		b = false;
+		str += len_false;
+	} else {
+		return -1;
+	}
+	for (; str[0] == ' '; str++);
+	if (str[0] != '\0')
+		return -1;
+	mem_set_bool(mem, b);
 	return 0;
 }
 
@@ -570,6 +615,19 @@ bytes_to_int(struct Mem *mem)
 	if (sql_atoi64(mem->z, &i, &is_neg, mem->n) != 0)
 		return -1;
 	mem_set_int(mem, i, is_neg);
+	return 0;
+}
+
+static inline int
+bytes_to_uint(struct Mem *mem)
+{
+	bool is_neg;
+	int64_t i;
+	if (sql_atoi64(mem->z, &i, &is_neg, mem->n) != 0)
+		return -1;
+	if (is_neg)
+		return -1;
+	mem_set_uint(mem, (uint64_t)i);
 	return 0;
 }
 
@@ -630,6 +688,15 @@ double_to_str0(struct Mem *mem)
 	mem->n = strlen(mem->z);
 	mem->flags = MEM_Str | MEM_Term;
 	mem->field_type = FIELD_TYPE_STRING;
+	return 0;
+}
+
+static inline int
+double_to_bool(struct Mem *mem)
+{
+	mem->u.b = mem->u.r != 0.;
+	mem->flags = MEM_Bool;
+	mem->field_type = FIELD_TYPE_BOOLEAN;
 	return 0;
 }
 
@@ -762,6 +829,64 @@ mem_to_str(struct Mem *mem)
 		if (mp_typeof(*mem->z) == MP_MAP)
 			return map_to_str0(mem);
 		return array_to_str0(mem);
+	}
+	return -1;
+}
+
+int
+mem_cast_explicit(struct Mem *mem, enum field_type type)
+{
+	if ((mem->flags & MEM_Null) != 0) {
+		mem->field_type = type;
+		return 0;
+	}
+	switch (type) {
+	case FIELD_TYPE_UNSIGNED:
+		if ((mem->flags & MEM_UInt) != 0)
+			return 0;
+		if ((mem->flags & MEM_Int) != 0)
+			return -1;
+		if ((mem->flags & MEM_Blob) != 0 &&
+		    (mem->flags & MEM_Subtype) != 0)
+			return -1;
+		if ((mem->flags & (MEM_Str | MEM_Blob)) != 0)
+			return bytes_to_uint(mem);
+		if ((mem->flags & MEM_Real) != 0)
+			return double_to_int(mem);
+		if ((mem->flags & MEM_Bool) != 0)
+			return bool_to_int(mem);
+		return -1;
+	case FIELD_TYPE_STRING:
+		return mem_to_str(mem);
+	case FIELD_TYPE_DOUBLE:
+		return mem_to_double(mem);
+	case FIELD_TYPE_INTEGER:
+		return mem_to_int(mem);
+	case FIELD_TYPE_BOOLEAN:
+		if ((mem->flags & MEM_Bool) != 0)
+			return 0;
+		if ((mem->flags & (MEM_UInt | MEM_Int)) != 0)
+			return int_to_bool(mem);
+		if ((mem->flags & MEM_Str) != 0)
+			return str_to_bool(mem);
+		if ((mem->flags & MEM_Real) != 0)
+			return double_to_bool(mem);
+		return -1;
+	case FIELD_TYPE_VARBINARY:
+		if ((mem->flags & MEM_Blob) != 0)
+			return 0;
+		if ((mem->flags & MEM_Str) != 0)
+			return str_to_bin(mem);
+		return -1;
+	case FIELD_TYPE_NUMBER:
+		return mem_to_number(mem);
+	case FIELD_TYPE_SCALAR:
+		if ((mem->flags & MEM_Blob) != 0 &&
+		    (mem->flags & MEM_Subtype) != 0)
+			return -1;
+		return 0;
+	default:
+		break;
 	}
 	return -1;
 }
@@ -1432,42 +1557,6 @@ valueToText(sql_value * pVal)
 	return pVal->z;
 }
 
-/**
- * According to ANSI SQL string value can be converted to boolean
- * type if string consists of literal "true" or "false" and
- * number of leading and trailing spaces.
- *
- * For instance, "   tRuE  " can be successfully converted to
- * boolean value true.
- *
- * @param str String to be converted to boolean. Assumed to be
- *        null terminated.
- * @param[out] result Resulting value of cast.
- * @retval 0 If string satisfies conditions above.
- * @retval -1 Otherwise.
- */
-static int
-str_cast_to_boolean(const char *str, bool *result)
-{
-	assert(str != NULL);
-	for (; *str == ' '; str++);
-	if (strncasecmp(str, SQL_TOKEN_TRUE, strlen(SQL_TOKEN_TRUE)) == 0) {
-		*result = true;
-		str += 4;
-	} else if (strncasecmp(str, SQL_TOKEN_FALSE,
-			       strlen(SQL_TOKEN_FALSE)) == 0) {
-		*result = false;
-		str += 5;
-	} else {
-		return -1;
-	}
-	for (; *str != '\0'; ++str) {
-		if (*str != ' ')
-			return -1;
-	}
-	return 0;
-}
-
 /*
  * Convert a 64-bit IEEE double into a 64-bit signed integer.
  * If the double is out of range of a 64-bit signed integer then
@@ -1804,113 +1893,6 @@ registerTrace(int iReg, Mem *p) {
 #endif
 
 /*
- * Cast the datatype of the value in pMem according to the type
- * @type.  Casting is different from applying type in that a cast
- * is forced.  In other words, the value is converted into the desired
- * type even if that results in loss of data.  This routine is
- * used (for example) to implement the SQL "cast()" operator.
- */
-int
-sqlVdbeMemCast(Mem * pMem, enum field_type type)
-{
-	assert(type < field_type_MAX);
-	if (pMem->flags & MEM_Null)
-		return 0;
-	switch (type) {
-	case FIELD_TYPE_SCALAR:
-		return 0;
-	case FIELD_TYPE_BOOLEAN:
-		if ((pMem->flags & MEM_Int) != 0) {
-			mem_set_bool(pMem, pMem->u.i);
-			return 0;
-		}
-		if ((pMem->flags & MEM_UInt) != 0) {
-			mem_set_bool(pMem, pMem->u.u);
-			return 0;
-		}
-		if ((pMem->flags & MEM_Real) != 0) {
-			mem_set_bool(pMem, pMem->u.r);
-			return 0;
-		}
-		if ((pMem->flags & MEM_Str) != 0) {
-			bool value;
-			if (str_cast_to_boolean(pMem->z, &value) != 0)
-				return -1;
-			mem_set_bool(pMem, value);
-			return 0;
-		}
-		if ((pMem->flags & MEM_Bool) != 0)
-			return 0;
-		return -1;
-	case FIELD_TYPE_INTEGER:
-	case FIELD_TYPE_UNSIGNED:
-		if ((pMem->flags & (MEM_Blob | MEM_Str)) != 0) {
-			bool is_neg;
-			int64_t val;
-			if (sql_atoi64(pMem->z, &val, &is_neg, pMem->n) != 0)
-				return -1;
-			if (type == FIELD_TYPE_UNSIGNED && is_neg)
-				return -1;
-			mem_set_int(pMem, val, is_neg);
-			return 0;
-		}
-		if ((pMem->flags & MEM_Bool) != 0) {
-			pMem->u.u = (uint64_t)pMem->u.b;
-			pMem->flags = MEM_UInt;
-			pMem->field_type = FIELD_TYPE_UNSIGNED;
-			return 0;
-		}
-		if ((pMem->flags & MEM_Real) != 0) {
-			double d = pMem->u.r;
-			if (d < 0. && d >= (double)INT64_MIN) {
-				pMem->u.i = (int64_t)d;
-				pMem->flags = MEM_Int;
-				pMem->field_type = FIELD_TYPE_INTEGER;
-				return 0;
-			}
-			if (d >= 0. && d < (double)UINT64_MAX) {
-				pMem->u.u = (uint64_t)d;
-				pMem->flags = MEM_UInt;
-				pMem->field_type = FIELD_TYPE_UNSIGNED;
-				return 0;
-			}
-			return -1;
-		}
-		if (type == FIELD_TYPE_UNSIGNED &&
-		    (pMem->flags & MEM_UInt) == 0)
-			return -1;
-		return 0;
-	case FIELD_TYPE_DOUBLE:
-		return mem_to_double(pMem);
-	case FIELD_TYPE_NUMBER:
-		return mem_to_number(pMem);
-	case FIELD_TYPE_VARBINARY:
-		if ((pMem->flags & MEM_Blob) != 0)
-			return 0;
-		if ((pMem->flags & MEM_Str) != 0) {
-			MemSetTypeFlag(pMem, MEM_Str);
-			return 0;
-		}
-		return -1;
-	default:
-		assert(type == FIELD_TYPE_STRING);
-		assert(MEM_Str == (MEM_Blob >> 3));
-		if ((pMem->flags & MEM_Bool) != 0) {
-			const char *str_bool = SQL_TOKEN_BOOLEAN(pMem->u.b);
-			if (mem_copy_str0(pMem, str_bool) != 0)
-				return -1;
-			return 0;
-		}
-		pMem->flags |= (pMem->flags & MEM_Blob) >> 3;
-			sql_value_apply_type(pMem, FIELD_TYPE_STRING);
-		assert(pMem->flags & MEM_Str || pMem->db->mallocFailed);
-		pMem->flags &=
-			~(MEM_Int | MEM_UInt | MEM_Real | MEM_Blob | MEM_Zero);
-		return 0;
-	}
-}
-
-/*
  * Make sure the given Mem is \u0000 terminated.
  */
 int
@@ -2065,43 +2047,6 @@ mem_apply_type(struct Mem *record, enum field_type type)
 	default:
 		return -1;
 	}
-}
-
-/**
- * Convert the numeric value contained in MEM to unsigned.
- *
- * @param mem The MEM that contains the numeric value.
- * @retval 0 if the conversion was successful, -1 otherwise.
- */
-static int
-mem_convert_to_unsigned(struct Mem *mem)
-{
-	if ((mem->flags & MEM_UInt) != 0)
-		return 0;
-	if ((mem->flags & MEM_Int) != 0)
-		return -1;
-	if ((mem->flags & MEM_Real) == 0)
-		return -1;
-	double d = mem->u.r;
-	if (d < 0.0 || d >= (double)UINT64_MAX)
-		return -1;
-	mem->u.u = (uint64_t)d;
-	mem->flags = MEM_UInt;
-	mem->field_type = FIELD_TYPE_UNSIGNED;
-	return 0;
-}
-
-int
-mem_convert_to_numeric(struct Mem *mem, enum field_type type)
-{
-	assert(mem_is_num(mem) && sql_type_is_numeric(type));
-	assert(type != FIELD_TYPE_NUMBER);
-	if (type == FIELD_TYPE_DOUBLE)
-		return mem_to_double(mem);
-	if (type == FIELD_TYPE_UNSIGNED)
-		return mem_convert_to_unsigned(mem);
-	assert(type == FIELD_TYPE_INTEGER);
-	return mem_to_int(mem);
 }
 
 static int
