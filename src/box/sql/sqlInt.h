@@ -445,14 +445,8 @@ sql_column_bytes16(sql_stmt *, int iCol);
 double
 sql_column_double(sql_stmt *, int iCol);
 
-int
-sql_column_int(sql_stmt *, int iCol);
-
 bool
 sql_column_boolean(struct sql_stmt *stmt, int column);
-
-sql_int64
-sql_column_int64(sql_stmt *, int iCol);
 
 uint64_t
 sql_column_uint64(struct sql_stmt *stmt, int column);

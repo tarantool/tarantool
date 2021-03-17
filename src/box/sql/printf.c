@@ -144,7 +144,7 @@ getIntArg(PrintfArguments * p)
 {
 	if (p->nArg <= p->nUsed)
 		return 0;
-	return sql_value_int64(p->apArg[p->nUsed++]);
+	return mem_get_int_unsafe(p->apArg[p->nUsed++]);
 }
 
 static double
