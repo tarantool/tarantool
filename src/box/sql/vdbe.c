@@ -2757,7 +2757,7 @@ case OP_SeekGT: {       /* jump, in3 */
 		if (mem_is_null(pIn3))
 			goto skip_truncate;
 		if (mem_is_str(pIn3))
-			mem_apply_numeric_type(pIn3);
+			mem_to_number(pIn3);
 		int64_t i;
 		if (mem_is_uint(pIn3)) {
 			i = pIn3->u.u;
