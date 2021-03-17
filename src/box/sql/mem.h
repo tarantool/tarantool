@@ -815,6 +815,28 @@ mem_get_uint_unsafe(const struct Mem *mem)
 }
 
 /**
+ * Return value for MEM of DOUBLE type. For MEM of all other types convert
+ * value of the MEM to DOUBLE if possible and return converted value. Original
+ * MEM is not changed.
+ */
+int
+mem_get_double(const struct Mem *mem, double *d);
+
+/**
+ * Return value of MEM converted to double. This function is not safe since
+ * there is no proper processing in case mem_get_double() return an error. In
+ * this case this functions returns 0.
+ */
+static inline double
+mem_get_double_unsafe(const struct Mem *mem)
+{
+	double d;
+	if (mem_get_double(mem, &d) != 0)
+		return 0.;
+	return d;
+}
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -868,15 +890,11 @@ releaseMemArray(Mem * p, int N);
 
 int
 mem_value_bool(const struct Mem *mem, bool *b);
-int sqlVdbeRealValue(struct Mem *, double *);
 const void *
 sql_value_blob(struct Mem *);
 
 int
 sql_value_bytes(struct Mem *);
-
-double
-sql_value_double(struct Mem *);
 
 bool
 sql_value_boolean(struct Mem *val);

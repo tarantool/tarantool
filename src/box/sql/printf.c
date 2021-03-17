@@ -152,7 +152,7 @@ getDoubleArg(PrintfArguments * p)
 {
 	if (p->nArg <= p->nUsed)
 		return 0.0;
-	return sql_value_double(p->apArg[p->nUsed++]);
+	return mem_get_double_unsafe(p->apArg[p->nUsed++]);
 }
 
 static char *

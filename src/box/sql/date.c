@@ -929,7 +929,7 @@ isDate(sql_context * context, int argc, sql_value ** argv, DateTime * p)
 	}
 	if ((eType = sql_value_type(argv[0])) == MP_DOUBLE
 	    || eType == MP_INT) {
-		setRawDateNumber(p, sql_value_double(argv[0]));
+		setRawDateNumber(p, mem_get_double_unsafe(argv[0]));
 	} else {
 		z = sql_value_text(argv[0]);
 		if (!z || parseDateOrTime(context, (char *)z, p)) {
