@@ -516,6 +516,53 @@ int_to_double(struct Mem *mem)
 }
 
 static inline int
+int_to_str0(struct Mem *mem)
+{
+	const char *str;
+	if ((mem->flags & MEM_UInt) != 0)
+		str = tt_sprintf("%llu", mem->u.u);
+	else
+		str = tt_sprintf("%lld", mem->u.i);
+	return mem_copy_str0(mem, str);
+}
+
+static inline int
+str_to_str0(struct Mem *mem)
+{
+	assert((mem->flags | MEM_Str) != 0);
+	if (sqlVdbeMemGrow(mem, mem->n + 1, 1) != 0)
+		return -1;
+	mem->z[mem->n] = '\0';
+	mem->flags |= MEM_Term;
+	mem->field_type = FIELD_TYPE_STRING;
+	return 0;
+}
+
+static inline int
+bin_to_str(struct Mem *mem)
+{
+	if (ExpandBlob(mem) != 0)
+		return -1;
+	mem->flags = (mem->flags & (MEM_Dyn | MEM_Static | MEM_Ephem)) |
+		      MEM_Str;
+	mem->field_type = FIELD_TYPE_STRING;
+	return 0;
+}
+
+static inline int
+bin_to_str0(struct Mem *mem)
+{
+	if (ExpandBlob(mem) != 0)
+		return -1;
+	if (sqlVdbeMemGrow(mem, mem->n + 1, 1) != 0)
+		return -1;
+	mem->z[mem->n] = '\0';
+	mem->flags = MEM_Str | MEM_Term;
+	mem->field_type = FIELD_TYPE_STRING;
+	return 0;
+}
+
+static inline int
 bytes_to_int(struct Mem *mem)
 {
 	bool is_neg;
@@ -575,12 +622,45 @@ double_to_int_precise(struct Mem *mem)
 }
 
 static inline int
+double_to_str0(struct Mem *mem)
+{
+	if (sqlVdbeMemGrow(mem, BUF_SIZE, 0) != 0)
+		return -1;
+	sql_snprintf(BUF_SIZE, mem->z, "%!.15g", mem->u.r);
+	mem->n = strlen(mem->z);
+	mem->flags = MEM_Str | MEM_Term;
+	mem->field_type = FIELD_TYPE_STRING;
+	return 0;
+}
+
+static inline int
 bool_to_int(struct Mem *mem)
 {
 	mem->u.u = (uint64_t)mem->u.b;
 	mem->flags = MEM_UInt;
 	mem->field_type = FIELD_TYPE_UNSIGNED;
 	return 0;
+}
+
+static inline int
+bool_to_str0(struct Mem *mem)
+{
+	const char *str = mem->u.b ? "TRUE" : "FALSE";
+	return mem_copy_str0(mem, str);
+}
+
+static inline int
+array_to_str0(struct Mem *mem)
+{
+	const char *str = mp_str(mem->z);
+	return mem_copy_str0(mem, str);
+}
+
+static inline int
+map_to_str0(struct Mem *mem)
+{
+	const char *str = mp_str(mem->z);
+	return mem_copy_str0(mem, str);
 }
 
 int
@@ -636,6 +716,52 @@ mem_to_number(struct Mem *mem)
 		if (bytes_to_int(mem) == 0)
 			return 0;
 		return bytes_to_double(mem);
+	}
+	return -1;
+}
+
+int
+mem_to_str0(struct Mem *mem)
+{
+	assert((mem->flags & MEM_PURE_TYPE_MASK) != 0);
+	if ((mem->flags & (MEM_Str | MEM_Term)) == (MEM_Str | MEM_Term))
+		return 0;
+	if ((mem->flags & MEM_Str) != 0)
+		return str_to_str0(mem);
+	if ((mem->flags & (MEM_Int | MEM_UInt)) != 0)
+		return int_to_str0(mem);
+	if ((mem->flags & MEM_Real) != 0)
+		return double_to_str0(mem);
+	if ((mem->flags & MEM_Bool) != 0)
+		return bool_to_str0(mem);
+	if ((mem->flags & MEM_Blob) != 0) {
+		if ((mem->flags & MEM_Subtype) == 0)
+			return bin_to_str0(mem);
+		if (mp_typeof(*mem->z) == MP_MAP)
+			return map_to_str0(mem);
+		return array_to_str0(mem);
+	}
+	return -1;
+}
+
+int
+mem_to_str(struct Mem *mem)
+{
+	assert((mem->flags & MEM_PURE_TYPE_MASK) != 0);
+	if ((mem->flags & MEM_Str) != 0)
+		return 0;
+	if ((mem->flags & (MEM_Int | MEM_UInt)) != 0)
+		return int_to_str0(mem);
+	if ((mem->flags & MEM_Real) != 0)
+		return double_to_str0(mem);
+	if ((mem->flags & MEM_Bool) != 0)
+		return bool_to_str0(mem);
+	if ((mem->flags & MEM_Blob) != 0) {
+		if ((mem->flags & MEM_Subtype) == 0)
+			return bin_to_str(mem);
+		if (mp_typeof(*mem->z) == MP_MAP)
+			return map_to_str0(mem);
+		return array_to_str0(mem);
 	}
 	return -1;
 }
@@ -1300,7 +1426,7 @@ valueToText(sql_value * pVal)
 		pVal->flags |= MEM_Str;
 		sqlVdbeMemNulTerminate(pVal);	/* IMP: R-31275-44060 */
 	} else {
-		sqlVdbeMemStringify(pVal);
+		mem_to_str(pVal);
 		assert(0 == (1 & SQL_PTR_TO_INT(pVal->z)));
 	}
 	return pVal->z;
@@ -1785,74 +1911,6 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 }
 
 /*
- * Add MEM_Str to the set of representations for the given Mem.  Numbers
- * are converted using sql_snprintf().  Converting a BLOB to a string
- * is a no-op.
- *
- * Existing representations MEM_Int and MEM_Real are invalidated if
- * bForce is true but are retained if bForce is false.
- *
- * A MEM_Null value will never be passed to this function. This function is
- * used for converting values to text for returning to the user (i.e. via
- * sql_value_text()), or for ensuring that values to be used as btree
- * keys are strings. In the former case a NULL pointer is returned the
- * user and the latter is an internal programming error.
- */
-int
-sqlVdbeMemStringify(Mem * pMem)
-{
-	int fg = pMem->flags;
-	int nByte = 32;
-
-	if ((fg & (MEM_Null | MEM_Str | MEM_Blob)) != 0 &&
-	    !mem_has_msgpack_subtype(pMem))
-		return 0;
-
-	assert(!(fg & MEM_Zero));
-	assert((fg & (MEM_Int | MEM_UInt | MEM_Real | MEM_Bool |
-		      MEM_Blob)) != 0);
-	assert(EIGHT_BYTE_ALIGNMENT(pMem));
-
-	/*
-	 * In case we have ARRAY/MAP we should save decoded value
-	 * before clearing pMem->z.
-	 */
-	char *value = NULL;
-	if (mem_has_msgpack_subtype(pMem)) {
-		const char *value_str = mp_str(pMem->z);
-		nByte = strlen(value_str) + 1;
-		value = region_alloc(&fiber()->gc, nByte);
-		memcpy(value, value_str, nByte);
-	}
-
-	if (sqlVdbeMemClearAndResize(pMem, nByte)) {
-		return -1;
-	}
-	if (fg & MEM_Int) {
-		sql_snprintf(nByte, pMem->z, "%lld", pMem->u.i);
-		pMem->flags &= ~MEM_Int;
-	} else if ((fg & MEM_UInt) != 0) {
-		sql_snprintf(nByte, pMem->z, "%llu", pMem->u.u);
-		pMem->flags &= ~MEM_UInt;
-	} else if ((fg & MEM_Bool) != 0) {
-		sql_snprintf(nByte, pMem->z, "%s",
-			     SQL_TOKEN_BOOLEAN(pMem->u.b));
-		pMem->flags &= ~MEM_Bool;
-	} else if (mem_has_msgpack_subtype(pMem)) {
-		sql_snprintf(nByte, pMem->z, "%s", value);
-		pMem->flags &= ~MEM_Subtype;
-		pMem->subtype = SQL_SUBTYPE_NO;
-	} else {
-		assert(fg & MEM_Real);
-		sql_snprintf(nByte, pMem->z, "%!.15g", pMem->u.r);
-		pMem->flags &= ~MEM_Real;
-	}
-	pMem->n = sqlStrlen30(pMem->z);
-	pMem->flags |= MEM_Str | MEM_Term;
-	return 0;
-}
-
-/*
  * Make sure the given Mem is \u0000 terminated.
  */
 int
@@ -1974,7 +2032,7 @@ mem_apply_type(struct Mem *record, enum field_type type)
 		 */
 		if ((record->flags & MEM_Str) == 0 &&
 		    (record->flags & (MEM_Real | MEM_Int | MEM_UInt)) != 0)
-			sqlVdbeMemStringify(record);
+			mem_to_str(record);
 		record->flags &= ~(MEM_Real | MEM_Int | MEM_UInt);
 		return 0;
 	case FIELD_TYPE_VARBINARY:
