@@ -760,6 +760,16 @@ mem_to_str0(struct Mem *mem);
 int
 mem_cast_explicit(struct Mem *mem, enum field_type type);
 
+/** Convert the given MEM to given type according to implicit cast rules. */
+int
+mem_cast_implicit(struct Mem *mem, enum field_type type);
+
+/**
+ * Convert the given MEM to given type according to legacy implicit cast rules.
+ */
+int
+mem_cast_implicit_old(struct Mem *mem, enum field_type type);
+
 /**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
@@ -796,44 +806,6 @@ registerTrace(int iReg, Mem *p);
 int sqlVdbeMemNulTerminate(struct Mem *);
 int sqlVdbeMemExpandBlob(struct Mem *);
 #define ExpandBlob(P) (((P)->flags&MEM_Zero)?sqlVdbeMemExpandBlob(P):0)
-void sql_value_apply_type(struct Mem *val, enum field_type type);
-
-
-/**
- * Processing is determined by the field type parameter:
- *
- * INTEGER:
- *    If memory holds floating point value and it can be
- *    converted without loss (2.0 - > 2), it's type is
- *    changed to INT. Otherwise, simply return success status.
- *
- * NUMBER:
- *    If memory holds INT or floating point value,
- *    no actions take place.
- *
- * STRING:
- *    Convert mem to a string representation.
- *
- * SCALAR:
- *    Mem is unchanged, but flag is set to BLOB in case of
- *    scalar-like type. Otherwise, (MAP, ARRAY) conversion
- *    is impossible.
- *
- * BOOLEAN:
- *    If memory holds BOOLEAN no actions take place.
- *
- * ANY:
- *    Mem is unchanged, no actions take place.
- *
- * MAP/ARRAY:
- *    These types can't be casted to scalar ones, or to each
- *    other. So the only valid conversion is to type itself.
- *
- * @param record The value to apply type to.
- * @param type The type to be applied.
- */
-int
-mem_apply_type(struct Mem *record, enum field_type type);
 
 /** Setters = Change MEM value. */
 
@@ -897,17 +869,6 @@ int sqlVdbeMemTooBig(Mem *);
 
 
 int sqlMemCompare(const Mem *, const Mem *, const struct coll *);
-
-/**
- * Check that MEM_type of the mem is compatible with given type.
- *
- * @param mem The MEM that contains the value to check.
- * @param type The type to check.
- * @retval TRUE if the MEM_type of the value and the given type
- *         are compatible, FALSE otherwise.
- */
-bool
-mem_is_type_compatible(struct Mem *mem, enum field_type type);
 
 /** MEM manipulate functions. */
 

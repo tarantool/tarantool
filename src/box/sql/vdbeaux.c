@@ -2739,7 +2739,7 @@ sqlVdbeGetBoundValue(Vdbe * v, int iVar, u8 aff)
 			sql_value *pRet = sqlValueNew(v->db);
 			if (pRet) {
 				mem_copy(pRet, pMem);
-				sql_value_apply_type(pRet, aff);
+				mem_cast_implicit_old(pRet, aff);
 			}
 			return pRet;
 		}
