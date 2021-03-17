@@ -81,9 +81,8 @@ utf8_str_to_case(struct lua_State *L, const char *src, int src_bsize,
 		} else {
 			cord_ibuf_put(ibuf);
 			lua_pushnil(L);
-			lua_pushstring(L, tt_sprintf("error during ICU case "\
-						     "transform: %s",
-						     u_errorName(err)));
+			lua_pushfstring(L, "error during ICU case "
+					"transform: %s", u_errorName(err));
 			return 2;
 		}
 		/*
