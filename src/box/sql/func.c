@@ -1122,7 +1122,7 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 		}
 	case MP_BOOL: {
 		sql_result_text(context,
-				SQL_TOKEN_BOOLEAN(sql_value_boolean(argv[0])),
+				SQL_TOKEN_BOOLEAN(mem_get_bool_unsafe(argv[0])),
 				-1, SQL_TRANSIENT);
 		break;
 	}

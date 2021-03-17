@@ -837,6 +837,28 @@ mem_get_double_unsafe(const struct Mem *mem)
 }
 
 /**
+ * Return value for MEM of BOOLEAN type. For MEM of all other types convert
+ * value of the MEM to BOOLEAN if possible and return converted value. Original
+ * MEM is not changed.
+ */
+int
+mem_get_bool(const struct Mem *mem, bool *b);
+
+/**
+ * Return value of MEM converted to boolean. This function is not safe since
+ * there is no proper processing in case mem_get_bool() return an error. In
+ * this case this function returns FALSE.
+ */
+static inline bool
+mem_get_bool_unsafe(const struct Mem *mem)
+{
+	bool b;
+	if (mem_get_bool(mem, &b) != 0)
+		return false;
+	return b;
+}
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -888,16 +910,11 @@ releaseMemArray(Mem * p, int N);
 
 /** Getters. */
 
-int
-mem_value_bool(const struct Mem *mem, bool *b);
 const void *
 sql_value_blob(struct Mem *);
 
 int
 sql_value_bytes(struct Mem *);
-
-bool
-sql_value_boolean(struct Mem *val);
 
 const unsigned char *
 sql_value_text(struct Mem *);
