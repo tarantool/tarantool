@@ -52,7 +52,10 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-enum { SERVICE_NAME_MAXLEN = 32 };
+enum {
+	SERVICE_NAME_MAXLEN = 32,
+	SIO_STRADDR_MAXSIZE = 1200,
+};
 
 /**
  * Check if an errno, returned from a sio function, means a
@@ -64,6 +67,9 @@ sio_wouldblock(int err)
 	return err == EAGAIN || err == EWOULDBLOCK || err == EINTR;
 }
 
+int
+sio_snprintf(char *buf, size_t size, const struct sockaddr *addr,
+	     socklen_t addrlen);
 
 /**
  * Format the address provided in struct sockaddr *addr.

@@ -273,10 +273,13 @@ lbox_session_peer(struct lua_State *L)
 
 	struct sockaddr_storage addr;
 	socklen_t addrlen = sizeof(addr);
-	if (sio_getpeername(fd, (struct sockaddr *)&addr, &addrlen) < 0)
+	struct sockaddr *addr_base = (struct sockaddr *)&addr;
+	if (sio_getpeername(fd, addr_base, &addrlen) < 0)
 		luaL_error(L, "session.peer(): getpeername() failed");
 
-	lua_pushstring(L, sio_strfaddr((struct sockaddr *)&addr, addrlen));
+	char addrbuf[SIO_STRADDR_MAXSIZE];
+	sio_snprintf(addrbuf, SIO_STRADDR_MAXSIZE, addr_base, addrlen);
+	lua_pushstring(L, addrbuf);
 	return 1;
 }
 

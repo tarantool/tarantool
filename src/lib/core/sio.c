@@ -326,36 +326,49 @@ sio_getsockname(int fd, struct sockaddr *addr, socklen_t *addrlen)
 	return 0;
 }
 
+int
+sio_snprintf(char *buf, size_t size, const struct sockaddr *addr,
+	     socklen_t addrlen)
+{
+	int res;
+	switch (addr->sa_family) {
+	case AF_UNIX: {
+		struct sockaddr_un *u = (struct sockaddr_un *) addr;
+		if (addrlen >= sizeof(*u))
+			res = snprintf(buf, size, "unix/:%s", u->sun_path);
+		else
+			res = snprintf(buf, size, "unix/:(socket)");
+		break;
+	}
+	case AF_INET: {
+		struct sockaddr_in *in = (struct sockaddr_in *) addr;
+		res = snprintf(buf, size, "%s:%d", inet_ntoa(in->sin_addr),
+			       ntohs(in->sin_port));
+		break;
+	}
+	default: {
+		char host[NI_MAXHOST], serv[NI_MAXSERV];
+		if (getnameinfo(addr, addrlen, host, sizeof(host), serv,
+				sizeof(serv),
+				NI_NUMERICHOST | NI_NUMERICSERV) != 0)
+			res = snprintf(buf, size, "(host):(port)");
+		else
+			res = snprintf(buf, size, "[%s]:%s", host, serv);
+		break;
+	}
+	}
+	assert(res + 1 < SIO_STRADDR_MAXSIZE);
+	assert(res > 0);
+	return res;
+}
+
 const char *
 sio_strfaddr(const struct sockaddr *addr, socklen_t addrlen)
 {
-	switch (addr->sa_family) {
-		case AF_UNIX: {
-			struct sockaddr_un *u = (struct sockaddr_un *) addr;
-			if (addrlen >= sizeof(*u))
-				return tt_sprintf("unix/:%s", u->sun_path);
-			else
-				return tt_sprintf("unix/:(socket)");
-			break;
-		}
-		case AF_INET: {
-			struct sockaddr_in *in = (struct sockaddr_in *) addr;
-			return tt_snprintf(SERVICE_NAME_MAXLEN, "%s:%d",
-					   inet_ntoa(in->sin_addr),
-					   ntohs(in->sin_port));
-		}
-		default: {
-			char host[NI_MAXHOST], serv[NI_MAXSERV];
-			if (getnameinfo(addr, addrlen, host, sizeof(host),
-					serv, sizeof(serv),
-					NI_NUMERICHOST | NI_NUMERICSERV) != 0)
-				return tt_sprintf("(host):(port)");
-
-			return tt_snprintf(NI_MAXHOST + NI_MAXSERV, "[%s]:%s",
-					   host, serv);
-		}
-	}
-	unreachable();
+	int size = SIO_STRADDR_MAXSIZE;
+	char *buf = (char *) static_reserve(size);
+	static_alloc(sio_snprintf(buf, SIO_STRADDR_MAXSIZE, addr, addrlen));
+	return buf;
 }
 
 int
