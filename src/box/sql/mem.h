@@ -726,6 +726,13 @@ int
 mem_to_int_precise(struct Mem *mem);
 
 /**
+ * Convert the given MEM to DOUBLE. This function defines the rules that are
+ * used to convert values of all other types to DOUBLE.
+ */
+int
+mem_to_double(struct Mem *mem);
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -771,7 +778,6 @@ registerTrace(int iReg, Mem *p);
  */
 int
 mem_apply_numeric_type(struct Mem *record);
-int sqlVdbeMemRealify(struct Mem *);
 
 /**
  * Convert @a mem to NUMBER type, so that after conversion it has

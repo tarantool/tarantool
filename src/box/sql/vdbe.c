@@ -1457,7 +1457,7 @@ case OP_MustBeInt: {            /* jump, in1 */
 case OP_Realify: {                  /* in1 */
 	pIn1 = &aMem[pOp->p1];
 	if (mem_is_int(pIn1)) {
-		sqlVdbeMemRealify(pIn1);
+		mem_to_double(pIn1);
 	}
 	break;
 }
