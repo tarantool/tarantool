@@ -205,7 +205,7 @@ absFunc(sql_context * context, int argc, sql_value ** argv)
 		break;
 	}
 	case MP_INT: {
-		int64_t value = sql_value_int64(argv[0]);
+		int64_t value = mem_get_int_unsafe(argv[0]);
 		assert(value < 0);
 		sql_result_uint(context, -value);
 		break;
@@ -421,7 +421,7 @@ substrFunc(sql_context * context, int argc, sql_value ** argv)
 	const unsigned char *z2;
 	int len;
 	int p0type;
-	i64 p1, p2;
+	int64_t p1, p2;
 	int negP2 = 0;
 
 	if (argc != 2 && argc != 3) {
@@ -433,7 +433,7 @@ substrFunc(sql_context * context, int argc, sql_value ** argv)
 	if (mem_is_null(argv[1]) || (argc == 3 && mem_is_null(argv[2])))
 		return;
 	p0type = sql_value_type(argv[0]);
-	p1 = sql_value_int(argv[1]);
+	p1 = mem_get_int_unsafe(argv[1]);
 	if (p0type == MP_BIN) {
 		len = sql_value_bytes(argv[0]);
 		z = sql_value_blob(argv[0]);
@@ -449,7 +449,7 @@ substrFunc(sql_context * context, int argc, sql_value ** argv)
 			len = sql_utf8_char_count(z, sql_value_bytes(argv[0]));
 	}
 	if (argc == 3) {
-		p2 = sql_value_int(argv[2]);
+		p2 = mem_get_int_unsafe(argv[2]);
 		if (p2 < 0) {
 			p2 = -p2;
 			negP2 = 1;
@@ -520,7 +520,7 @@ substrFunc(sql_context * context, int argc, sql_value ** argv)
 static void
 roundFunc(sql_context * context, int argc, sql_value ** argv)
 {
-	int n = 0;
+	int64_t n = 0;
 	double r;
 	if (argc != 1 && argc != 2) {
 		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, "ROUND",
@@ -531,7 +531,7 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 	if (argc == 2) {
 		if (mem_is_null(argv[1]))
 			return;
-		n = sql_value_int(argv[1]);
+		n = mem_get_int_unsafe(argv[1]);
 		if (n < 0)
 			n = 0;
 	}
@@ -674,7 +674,7 @@ randomFunc(sql_context * context, int NotUsed, sql_value ** NotUsed2)
 static void
 randomBlob(sql_context * context, int argc, sql_value ** argv)
 {
-	int n;
+	int64_t n;
 	unsigned char *p;
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
@@ -684,7 +684,7 @@ randomBlob(sql_context * context, int argc, sql_value ** argv)
 		context->is_aborted = true;
 		return;
 	}
-	n = sql_value_int(argv[0]);
+	n = mem_get_int_unsafe(argv[0]);
 	if (n < 1)
 		return;
 	p = contextMalloc(context, n);
@@ -1225,10 +1225,10 @@ hexFunc(sql_context * context, int argc, sql_value ** argv)
 static void
 zeroblobFunc(sql_context * context, int argc, sql_value ** argv)
 {
-	i64 n;
+	int64_t n;
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
-	n = sql_value_int64(argv[0]);
+	n = mem_get_int_unsafe(argv[0]);
 	if (n < 0)
 		n = 0;
 	if (sql_result_zeroblob64(context, n) != 0) {
@@ -1472,7 +1472,7 @@ trim_func_two_args(struct sql_context *context, sql_value *arg1,
 	int input_str_sz = sql_value_bytes(arg2);
 	if (sql_value_type(arg1) == MP_INT || sql_value_type(arg1) == MP_UINT) {
 		uint8_t len_one = 1;
-		trim_procedure(context, sql_value_int(arg1),
+		trim_procedure(context, mem_get_int_unsafe(arg1),
 			       (const unsigned char *) " ", &len_one, 1,
 			       input_str, input_str_sz);
 	} else if ((trim_set = sql_value_text(arg1)) != NULL) {
@@ -1512,7 +1512,7 @@ trim_func_three_args(struct sql_context *context, sql_value *arg1,
 					     &char_len);
 	if (char_cnt == -1)
 		return;
-	trim_procedure(context, sql_value_int(arg1), trim_set, char_len,
+	trim_procedure(context, mem_get_int_unsafe(arg1), trim_set, char_len,
 		       char_cnt, input_str, input_str_sz);
 	sql_free(char_len);
 }
@@ -1651,7 +1651,7 @@ sum_step(struct sql_context *context, int argc, sql_value **argv)
 	}
 	p->cnt++;
 	if (type == MP_INT || type == MP_UINT) {
-		int64_t v = sql_value_int64(argv[0]);
+		int64_t v = mem_get_int_unsafe(argv[0]);
 		if (type == MP_INT)
 			p->rSum += v;
 		else

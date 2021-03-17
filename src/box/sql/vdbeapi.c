@@ -462,22 +462,10 @@ sql_column_double(sql_stmt * pStmt, int i)
 	return sql_value_double(columnMem(pStmt, i));
 }
 
-int
-sql_column_int(sql_stmt * pStmt, int i)
-{
-	return sql_value_int(columnMem(pStmt, i));
-}
-
 bool
 sql_column_boolean(struct sql_stmt *stmt, int i)
 {
 	return sql_value_boolean(columnMem(stmt, i));
-}
-
-sql_int64
-sql_column_int64(sql_stmt * pStmt, int i)
-{
-	return sql_value_int64(columnMem(pStmt, i));
 }
 
 uint64_t

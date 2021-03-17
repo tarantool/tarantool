@@ -771,6 +771,29 @@ int
 mem_cast_implicit_old(struct Mem *mem, enum field_type type);
 
 /**
+ * Return value for MEM of INTEGER type. For MEM of all other types convert
+ * value of the MEM to INTEGER if possible and return converted value. Original
+ * MEM is not changed.
+ */
+int
+mem_get_int(const struct Mem *mem, int64_t *i, bool *is_neg);
+
+/**
+ * Return value of MEM converted to int64_t. This function is not safe, since it
+ * returns 0 if mem_get_int() fails. There is no proper handling for this case.
+ * Also it works incorrectly with integer values that are more than INT64_MAX.
+ */
+static inline int64_t
+mem_get_int_unsafe(const struct Mem *mem)
+{
+	int64_t i;
+	bool is_neg;
+	if (mem_get_int(mem, &i, &is_neg) != 0)
+		return 0;
+	return i;
+}
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -824,7 +847,6 @@ releaseMemArray(Mem * p, int N);
 
 int
 mem_value_bool(const struct Mem *mem, bool *b);
-int sqlVdbeIntValue(const struct Mem *, int64_t *, bool *is_neg);
 int sqlVdbeRealValue(struct Mem *, double *);
 const void *
 sql_value_blob(struct Mem *);
@@ -837,12 +859,6 @@ sql_value_double(struct Mem *);
 
 bool
 sql_value_boolean(struct Mem *val);
-
-int
-sql_value_int(struct Mem *);
-
-sql_int64
-sql_value_int64(struct Mem *);
 
 uint64_t
 sql_value_uint64(struct Mem *val);
