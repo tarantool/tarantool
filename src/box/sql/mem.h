@@ -740,6 +740,23 @@ int
 mem_to_number(struct Mem *mem);
 
 /**
+ * Convert the given MEM to STRING. This function and the function below define
+ * the rules that are used to convert values of all other types to STRING. In
+ * this function, the string received after the convertion may be not
+ * NULL-terminated.
+ */
+int
+mem_to_str(struct Mem *mem);
+
+/**
+ * Convert the given MEM to STRING. This function and the function above define
+ * the rules that are used to convert values of all other types to STRING. In
+ * this function, the string received after convertion is NULL-terminated.
+ */
+int
+mem_to_str0(struct Mem *mem);
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -773,7 +790,6 @@ registerTrace(int iReg, Mem *p);
 #endif
 
 int sqlVdbeMemCast(struct Mem *, enum field_type type);
-int sqlVdbeMemStringify(struct Mem *);
 int sqlVdbeMemNulTerminate(struct Mem *);
 int sqlVdbeMemExpandBlob(struct Mem *);
 #define ExpandBlob(P) (((P)->flags&MEM_Zero)?sqlVdbeMemExpandBlob(P):0)
