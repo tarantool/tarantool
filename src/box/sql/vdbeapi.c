@@ -456,12 +456,6 @@ sql_column_bytes(sql_stmt * pStmt, int i)
 	return sql_value_bytes(columnMem(pStmt, i));
 }
 
-double
-sql_column_double(sql_stmt * pStmt, int i)
-{
-	return sql_value_double(columnMem(pStmt, i));
-}
-
 bool
 sql_column_boolean(struct sql_stmt *stmt, int i)
 {

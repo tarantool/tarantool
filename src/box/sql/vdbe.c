@@ -2752,24 +2752,22 @@ case OP_SeekGT: {       /* jump, in3 */
 		if (mem_is_str(pIn3))
 			mem_to_number(pIn3);
 		int64_t i;
-		if (mem_is_uint(pIn3)) {
-			i = pIn3->u.u;
-			is_neg = false;
-		} else if (mem_is_nint(pIn3)) {
-			i = pIn3->u.i;
-			is_neg = true;
-		} else if (mem_is_double(pIn3)) {
-			if (pIn3->u.r > (double)INT64_MAX)
+		if (mem_get_int(pIn3, &i, &is_neg) != 0) {
+			if (!mem_is_double(pIn3)) {
+				diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+					 mem_str(pIn3), "integer");
+				goto abort_due_to_error;
+			}
+			double d = pIn3->u.r;
+			assert(d >= (double)INT64_MAX || d < (double)INT64_MIN);
+			/* TODO: add [INT64_MAX, UINT64_MAX) here. */
+			if (d > (double)INT64_MAX)
 				i = INT64_MAX;
-			else if (pIn3->u.r < (double)INT64_MIN)
+			else if (d < (double)INT64_MIN)
 				i = INT64_MIN;
 			else
-				i = pIn3->u.r;
+				i = d;
 			is_neg = i < 0;
-		} else {
-			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-				 mem_str(pIn3), "integer");
-			goto abort_due_to_error;
 		}
 		iKey = i;
 
