@@ -708,6 +708,24 @@ int
 mem_cmp_num(const struct Mem *a, const struct Mem *b, int *result);
 
 /**
+ * Convert the given MEM to INTEGER. This function and the function below define
+ * the rules that are used to convert values of all other types to INTEGER. In
+ * this function, the conversion from double to integer may result in loss of
+ * precision.
+ */
+int
+mem_to_int(struct Mem *mem);
+
+/**
+ * Convert the given MEM to INTEGER. This function and the function above define
+ * the rules that are used to convert values of all other types to INTEGER. In
+ * this function, the conversion from double to integer is only possible if it
+ * is lossless.
+ */
+int
+mem_to_int_precise(struct Mem *mem);
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -767,7 +785,6 @@ int
 vdbe_mem_numerify(struct Mem *mem);
 
 int sqlVdbeMemCast(struct Mem *, enum field_type type);
-int mem_apply_integer_type(struct Mem *);
 int sqlVdbeMemStringify(struct Mem *);
 int sqlVdbeMemNulTerminate(struct Mem *);
 int sqlVdbeMemExpandBlob(struct Mem *);

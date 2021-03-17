@@ -1435,17 +1435,12 @@ case OP_AddImm: {            /* in1 */
  */
 case OP_MustBeInt: {            /* jump, in1 */
 	pIn1 = &aMem[pOp->p1];
-	if (!mem_is_int(pIn1)) {
-		mem_apply_type(pIn1, FIELD_TYPE_INTEGER);
-		if (!mem_is_int(pIn1)) {
-			if (pOp->p2==0) {
-				diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-					 mem_str(pIn1), "integer");
-				goto abort_due_to_error;
-			} else {
-				goto jump_to_p2;
-			}
-		}
+	if (mem_to_int_precise(pIn1) != 0) {
+		if (pOp->p2 != 0)
+			goto jump_to_p2;
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+			 mem_str(pIn1), "integer");
+		goto abort_due_to_error;
 	}
 	break;
 }

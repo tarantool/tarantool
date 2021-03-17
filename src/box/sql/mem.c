@@ -501,6 +501,92 @@ mem_set_null_clear(struct Mem *mem)
 	mem->flags = MEM_Null | MEM_Cleared;
 }
 
+static inline int
+bytes_to_int(struct Mem *mem)
+{
+	bool is_neg;
+	int64_t i;
+	if (sql_atoi64(mem->z, &i, &is_neg, mem->n) != 0)
+		return -1;
+	mem_set_int(mem, i, is_neg);
+	return 0;
+}
+
+static inline int
+double_to_int(struct Mem *mem)
+{
+	double d = mem->u.r;
+	if (d < 0 && d >= (double)INT64_MIN) {
+		mem->u.i = (int64_t)d;
+		mem->flags = MEM_Int;
+		mem->field_type = FIELD_TYPE_INTEGER;
+		return 0;
+	}
+	if (d >= 0 && d < (double)UINT64_MAX) {
+		mem->u.u = (uint64_t)d;
+		mem->flags = MEM_UInt;
+		mem->field_type = FIELD_TYPE_UNSIGNED;
+		return 0;
+	}
+	return -1;
+}
+
+static inline int
+double_to_int_precise(struct Mem *mem)
+{
+	double d = mem->u.r;
+	if (d < 0 && d >= (double)INT64_MIN && (double)(int64_t)d == d) {
+		mem->u.i = (int64_t)d;
+		mem->flags = MEM_Int;
+		mem->field_type = FIELD_TYPE_INTEGER;
+		return 0;
+	}
+	if (d >= 0 && d < (double)UINT64_MAX && (double)(uint64_t)d == d) {
+		mem->u.u = (uint64_t)d;
+		mem->flags = MEM_UInt;
+		mem->field_type = FIELD_TYPE_UNSIGNED;
+		return 0;
+	}
+	return -1;
+}
+
+static inline int
+bool_to_int(struct Mem *mem)
+{
+	mem->u.u = (uint64_t)mem->u.b;
+	mem->flags = MEM_UInt;
+	mem->field_type = FIELD_TYPE_UNSIGNED;
+	return 0;
+}
+
+int
+mem_to_int(struct Mem *mem)
+{
+	assert((mem->flags & MEM_PURE_TYPE_MASK) != 0);
+	if ((mem->flags & (MEM_Int | MEM_UInt)) != 0)
+		return 0;
+	if ((mem->flags & (MEM_Str | MEM_Blob)) != 0)
+		return bytes_to_int(mem);
+	if ((mem->flags & MEM_Real) != 0)
+		return double_to_int(mem);
+	if ((mem->flags & MEM_Bool) != 0)
+		return bool_to_int(mem);
+	return -1;
+}
+
+int
+mem_to_int_precise(struct Mem *mem)
+{
+	assert((mem->flags & MEM_PURE_TYPE_MASK) != 0);
+	if ((mem->flags & (MEM_Int | MEM_UInt)) != 0)
+		return 0;
+	if ((mem->flags & MEM_Str) != 0)
+		return bytes_to_int(mem);
+	if ((mem->flags & MEM_Real) != 0)
+		return double_to_int_precise(mem);
+	return -1;
+}
+
 int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
@@ -1704,26 +1790,6 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 }
 
 /*
- * The MEM structure is already a MEM_Real.  Try to also make it a
- * MEM_Int if we can.
- */
-int
-mem_apply_integer_type(Mem *pMem)
-{
-	int rc;
-	i64 ix;
-	assert(pMem->flags & MEM_Real);
-	assert(EIGHT_BYTE_ALIGNMENT(pMem));
-
-	if ((rc = doubleToInt64(pMem->u.r, (int64_t *) &ix)) == 0) {
-		pMem->u.i = ix;
-		pMem->flags = pMem->u.r <= -1 ? MEM_Int : MEM_UInt;
-		pMem->field_type = FIELD_TYPE_INTEGER;
-	}
-	return rc;
-}
-
-/*
  * Add MEM_Str to the set of representations for the given Mem.  Numbers
  * are converted using sql_snprintf().  Converting a BLOB to a string
  * is a no-op.
@@ -1994,34 +2060,6 @@ mem_convert_to_unsigned(struct Mem *mem)
 	return 0;
 }
 
-/**
- * Convert the numeric value contained in MEM to integer.
- *
- * @param mem The MEM that contains the numeric value.
- * @retval 0 if the conversion was successful, -1 otherwise.
- */
-static int
-mem_convert_to_integer(struct Mem *mem)
-{
-	if ((mem->flags & (MEM_UInt | MEM_Int)) != 0)
-		return 0;
-	if ((mem->flags & MEM_Real) == 0)
-		return -1;
-	double d = mem->u.r;
-	if (d >= (double)UINT64_MAX || d < (double)INT64_MIN)
-		return -1;
-	if (d < 0.) {
-		mem->u.i = (int64_t)d;
-		mem->flags = MEM_Int;
-		mem->field_type = FIELD_TYPE_INTEGER;
-	} else {
-		mem->u.u = (uint64_t)d;
-		mem->flags = MEM_UInt;
-		mem->field_type = FIELD_TYPE_UNSIGNED;
-	}
-	return 0;
-}
-
 int
 mem_convert_to_numeric(struct Mem *mem, enum field_type type)
 {
@@ -2032,7 +2070,7 @@ mem_convert_to_numeric(struct Mem *mem, enum field_type type)
 	if (type == FIELD_TYPE_UNSIGNED)
 		return mem_convert_to_unsigned(mem);
 	assert(type == FIELD_TYPE_INTEGER);
-	return mem_convert_to_integer(mem);
+	return mem_to_int(mem);
 }
 
 static int
