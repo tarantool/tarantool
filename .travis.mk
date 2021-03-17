@@ -54,7 +54,6 @@ docker_%:
 		--workdir /tarantool \
 		-e XDG_CACHE_HOME=/cache \
 		-e CCACHE_DIR=/cache/ccache \
-		-e COVERALLS_TOKEN=${COVERALLS_TOKEN} \
 		-e TRAVIS_JOB_ID=${TRAVIS_JOB_ID} \
 		-e CMAKE_EXTRA_PARAMS=${CMAKE_EXTRA_PARAMS} \
 		-e APT_EXTRA_FLAGS="${APT_EXTRA_FLAGS}" \
@@ -177,14 +176,6 @@ test_coverage_debian_no_deps: build_coverage_debian
 	lcov --compat-libtool --remove coverage.info.tmp 'tests/*' 'third_party/*' '/usr/*' \
 		--rc lcov_branch_coverage=1 --rc lcov_function_coverage=1 --output-file coverage.info
 	lcov --list coverage.info
-	# coveralls API: https://docs.coveralls.io/api-reference
-	@if [ -n "$(COVERALLS_TOKEN)" ]; then \
-		echo "Exporting code coverage information to coveralls.io"; \
-		echo coveralls-lcov --service-name github-ci --service-job-id $(GITHUB_RUN_ID) \
-			--repo-token [FILTERED] coverage.info; \
-		coveralls-lcov --service-name github-ci --service-job-id $(GITHUB_RUN_ID) \
-			--repo-token $(COVERALLS_TOKEN) coverage.info; \
-	fi;
 
 coverage_debian: deps_debian test_coverage_debian_no_deps
 
