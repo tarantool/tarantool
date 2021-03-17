@@ -201,7 +201,7 @@ absFunc(sql_context * context, int argc, sql_value ** argv)
 	UNUSED_PARAMETER(argc);
 	switch (sql_value_type(argv[0])) {
 	case MP_UINT: {
-		sql_result_uint(context, sql_value_uint64(argv[0]));
+		sql_result_uint(context, mem_get_uint_unsafe(argv[0]));
 		break;
 	}
 	case MP_INT: {
@@ -1169,7 +1169,7 @@ charFunc(sql_context * context, int argc, sql_value ** argv)
 		if (sql_value_type(argv[i]) == MP_INT)
 			x = 0xfffd;
 		else
-			x = sql_value_uint64(argv[i]);
+			x = mem_get_uint_unsafe(argv[i]);
 		if (x > 0x10ffff)
 			x = 0xfffd;
 		c = (unsigned)(x & 0x1fffff);
