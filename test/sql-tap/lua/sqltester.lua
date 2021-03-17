@@ -199,7 +199,7 @@ end
 test.do_catchsql_test = do_catchsql_test
 
 local function do_catchsql_substr_test(self, label, sql, pattern, expect)
-    function func()
+    local function inner()
         local catch =  catchsql(self, sql)
         local match = string.find(catch[2], pattern)
         if match ~= nil and match ~= 1 then
@@ -207,7 +207,7 @@ local function do_catchsql_substr_test(self, label, sql, pattern, expect)
         end
         return catch
     end
-    return do_test(self, label, func, expect)
+    return do_test(self, label, inner, expect)
 end
 test.do_catchsql_substr_test = do_catchsql_substr_test
 
