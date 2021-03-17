@@ -1084,6 +1084,33 @@ mem_get_int(const struct Mem *mem, int64_t *i, bool *is_neg)
 }
 
 int
+mem_get_uint(const struct Mem *mem, uint64_t *u)
+{
+	if ((mem->flags & MEM_Int) != 0)
+		return -1;
+	if ((mem->flags & MEM_UInt) != 0) {
+		*u = mem->u.u;
+		return 0;
+	}
+	if ((mem->flags & (MEM_Str | MEM_Blob)) != 0) {
+		bool is_neg;
+		if (sql_atoi64(mem->z, (int64_t *)u, &is_neg, mem->n) != 0 ||
+		    is_neg)
+			return -1;
+		return 0;
+	}
+	if ((mem->flags & MEM_Real) != 0) {
+		double d = mem->u.r;
+		if (d >= 0 && d < (double)UINT64_MAX) {
+			*u = (uint64_t)d;
+			return 0;
+		}
+		return -1;
+	}
+	return -1;
+}
+
+int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
 	mem_clear(to);
@@ -2290,16 +2317,6 @@ sql_value_boolean(sql_value *val)
 	assert(rc == 0);
 	(void) rc;
 	return b;
-}
-
-uint64_t
-sql_value_uint64(sql_value *val)
-{
-	int64_t i = 0;
-	bool is_neg;
-	mem_get_int((struct Mem *) val, &i, &is_neg);
-	assert(!is_neg);
-	return i;
 }
 
 const unsigned char *

@@ -794,6 +794,27 @@ mem_get_int_unsafe(const struct Mem *mem)
 }
 
 /**
+ * Return value for MEM of UNSIGNED type. For MEM of all other types convert
+ * value of the MEM to UNSIGNED if possible and return converted value. Original
+ * MEM is not changed.
+ */
+int
+mem_get_uint(const struct Mem *mem, uint64_t *u);
+
+/**
+ * Return value of MEM converted to uint64_t. This function is not safe, since it
+ * returns 0 if mem_get_uint() fails. There is no proper handling for this case.
+ */
+static inline uint64_t
+mem_get_uint_unsafe(const struct Mem *mem)
+{
+	uint64_t u;
+	if (mem_get_uint(mem, &u) != 0)
+		return 0;
+	return u;
+}
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -859,9 +880,6 @@ sql_value_double(struct Mem *);
 
 bool
 sql_value_boolean(struct Mem *val);
-
-uint64_t
-sql_value_uint64(struct Mem *val);
 
 const unsigned char *
 sql_value_text(struct Mem *);

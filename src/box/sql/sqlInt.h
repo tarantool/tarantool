@@ -448,9 +448,6 @@ sql_column_double(sql_stmt *, int iCol);
 bool
 sql_column_boolean(struct sql_stmt *stmt, int column);
 
-uint64_t
-sql_column_uint64(struct sql_stmt *stmt, int column);
-
 const unsigned char *
 sql_column_text(sql_stmt *,
 		    int iCol);
