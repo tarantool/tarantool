@@ -481,6 +481,12 @@ mem_set_binl(struct Mem *mem, char *value, uint32_t size,
 }
 
 /**
+ * Clear MEM and set it to VARBINARY. The binary value consist of n zero bytes.
+ */
+void
+mem_set_zerobin(struct Mem *mem, int n);
+
+/**
  * Copy binary value to a newly allocated memory. The MEM type becomes
  * VARBINARY.
  */
@@ -742,8 +748,6 @@ mem_set_ptr(struct Mem *mem, void *ptr);
 
 int
 sqlVdbeMemSetStr(struct Mem *, const char *, int, u8, void (*)(void *));
-void
-sqlVdbeMemSetZeroBlob(struct Mem *, int);
 void sqlValueFree(struct Mem *);
 struct Mem *sqlValueNew(struct sql *);
 
