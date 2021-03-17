@@ -468,12 +468,6 @@ sql_column_boolean(struct sql_stmt *stmt, int i)
 	return sql_value_boolean(columnMem(stmt, i));
 }
 
-uint64_t
-sql_column_uint64(sql_stmt * pStmt, int i)
-{
-	return sql_value_uint64(columnMem(pStmt, i));
-}
-
 const unsigned char *
 sql_column_text(sql_stmt * pStmt, int i)
 {
