@@ -138,12 +138,14 @@ static struct sockaddr_storage iproto_bound_address_storage;
 static socklen_t iproto_bound_address_len;
 
 const char *
-iproto_bound_address(void)
+iproto_bound_address(char *buf)
 {
 	if (iproto_bound_address_len == 0)
 		return NULL;
-	return sio_strfaddr((struct sockaddr *) &iproto_bound_address_storage,
-			    iproto_bound_address_len);
+	sio_addr_snprintf(buf, SERVICE_NAME_MAXLEN,
+			  (struct sockaddr *) &iproto_bound_address_storage,
+			  iproto_bound_address_len);
+	return buf;
 }
 
 /**

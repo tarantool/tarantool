@@ -52,7 +52,7 @@
 #include "box/raft.h"
 #include "lua/utils.h"
 #include "fiber.h"
-#include "tt_static.h"
+#include "sio.h"
 
 static void
 lbox_pushvclock(struct lua_State *L, const struct vclock *vclock)
@@ -574,7 +574,8 @@ static int
 lbox_info_listen(struct lua_State *L)
 {
 	/* NULL is ok, no need to check. */
-	lua_pushstring(L, iproto_bound_address());
+	char addrbuf[SERVICE_NAME_MAXLEN];
+	lua_pushstring(L, iproto_bound_address(addrbuf));
 	return 1;
 }
 
