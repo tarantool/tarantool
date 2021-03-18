@@ -442,10 +442,6 @@ sql_column_bytes(sql_stmt *, int iCol);
 int
 sql_column_bytes16(sql_stmt *, int iCol);
 
-const unsigned char *
-sql_column_text(sql_stmt *,
-		    int iCol);
-
 char *
 sql_stmt_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
 			   struct region *region);

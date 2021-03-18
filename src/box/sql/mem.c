@@ -1144,6 +1144,15 @@ mem_get_bool(const struct Mem *mem, bool *b)
 }
 
 int
+mem_get_str0(const struct Mem *mem, const char **s)
+{
+	if ((mem->flags & MEM_Str) == 0 || (mem->flags & MEM_Term) == 0)
+		return -1;
+	*s = mem->z;
+	return 0;
+}
+
+int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
 	mem_clear(to);
@@ -1787,45 +1796,6 @@ mem_has_msgpack_subtype(struct Mem *mem)
 }
 
 /*
- * The pVal argument is known to be a value other than NULL.
- * Convert it into a string with encoding enc and return a pointer
- * to a zero-terminated version of that string.
- */
-static SQL_NOINLINE const void *
-valueToText(sql_value * pVal)
-{
-	assert(pVal != 0);
-	assert((pVal->flags & (MEM_Null)) == 0);
-	if ((pVal->flags & (MEM_Blob | MEM_Str)) &&
-	    !mem_has_msgpack_subtype(pVal)) {
-		if (ExpandBlob(pVal))
-			return 0;
-		pVal->flags |= MEM_Str;
-		sqlVdbeMemNulTerminate(pVal);	/* IMP: R-31275-44060 */
-	} else {
-		mem_to_str(pVal);
-		assert(0 == (1 & SQL_PTR_TO_INT(pVal->z)));
-	}
-	return pVal->z;
-}
-
-/*
- * It is already known that pMem contains an unterminated string.
- * Add the zero terminator.
- */
-static SQL_NOINLINE int
-vdbeMemAddTerminator(Mem * pMem)
-{
-	if (sqlVdbeMemGrow(pMem, pMem->n + 2, 1)) {
-		return -1;
-	}
-	pMem->z[pMem->n] = 0;
-	pMem->z[pMem->n + 1] = 0;
-	pMem->flags |= MEM_Term;
-	return 0;
-}
-
-/*
  * Both *pMem1 and *pMem2 contain string values. Compare the two values
  * using the collation sequence pColl. As usual, return a negative , zero
  * or positive value if *pMem1 is less than, equal to or greater than
@@ -1926,7 +1896,9 @@ sql_value_type(sql_value *pVal)
 static SQL_NOINLINE int
 valueBytes(sql_value * pVal)
 {
-	return valueToText(pVal) != 0 ? pVal->n : 0;
+	if (mem_to_str(pVal) != 0)
+		return 0;
+	return pVal->n;
 }
 
 int
@@ -2116,21 +2088,6 @@ registerTrace(int iReg, Mem *p) {
 #endif
 
 /*
- * Make sure the given Mem is \u0000 terminated.
- */
-int
-sqlVdbeMemNulTerminate(Mem * pMem)
-{
-	testcase((pMem->flags & (MEM_Term | MEM_Str)) == (MEM_Term | MEM_Str));
-	testcase((pMem->flags & (MEM_Term | MEM_Str)) == 0);
-	if ((pMem->flags & (MEM_Term | MEM_Str)) != MEM_Str) {
-		return 0;	/* Nothing to do */
-	} else {
-		return vdbeMemAddTerminator(pMem);
-	}
-}
-
-/*
  * If the given Mem* has a zero-filled tail, turn it into an ordinary
  * blob stored in dynamically allocated space.
  */
@@ -2288,7 +2245,9 @@ sql_value_blob(sql_value * pVal)
 		p->flags |= MEM_Blob;
 		return p->n ? p->z : 0;
 	} else {
-		return sql_value_text(pVal);
+		if (mem_to_str(pVal) != 0)
+			return NULL;
+		return pVal->z;
 	}
 }
 
@@ -2296,36 +2255,6 @@ int
 sql_value_bytes(sql_value * pVal)
 {
 	return sqlValueBytes(pVal);
-}
-
-const unsigned char *
-sql_value_text(sql_value * pVal)
-{
-	return (const unsigned char *)sqlValueText(pVal);
-}
-
-/* This function is only available internally, it is not part of the
- * external API. It works in a similar way to sql_value_text(),
- * except the data returned is in the encoding specified by the second
- * parameter, which must be one of SQL_UTF16BE, SQL_UTF16LE or
- * SQL_UTF8.
- *
- * (2006-02-16:)  The enc value can be or-ed with SQL_UTF16_ALIGNED.
- * If that is the case, then the result must be aligned on an even byte
- * boundary.
- */
-const void *
-sqlValueText(sql_value * pVal)
-{
-	if (!pVal)
-		return 0;
-	if ((pVal->flags & (MEM_Str | MEM_Term)) == (MEM_Str | MEM_Term)) {
-		return pVal->z;
-	}
-	if (pVal->flags & MEM_Null) {
-		return 0;
-	}
-	return valueToText(pVal);
 }
 
 /*
