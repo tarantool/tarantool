@@ -57,6 +57,11 @@ enum {
 	SERVICE_NAME_MAXLEN = 200,
 };
 
+/** Format the address into the given buffer. Behaves like snprintf(). */
+int
+sio_addr_snprintf(char *buf, size_t size, const struct sockaddr *addr,
+		  socklen_t addrlen);
+
 const char *
 sio_strfaddr(struct sockaddr *addr, socklen_t addrlen);
 
