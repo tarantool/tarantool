@@ -456,12 +456,6 @@ sql_column_bytes(sql_stmt * pStmt, int i)
 	return sql_value_bytes(columnMem(pStmt, i));
 }
 
-const unsigned char *
-sql_column_text(sql_stmt * pStmt, int i)
-{
-	return sql_value_text(columnMem(pStmt, i));
-}
-
 char *
 sql_stmt_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
 			   struct region *region)
