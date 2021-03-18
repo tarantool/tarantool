@@ -2,39 +2,40 @@ env = require('test_run')
 test_run = env.new()
 
 test_run:cmd("setopt delimiter ';'")
-function check_slab_stats(slab_stats, granularity)
+function check_slab_stats(slab_stats, slab_alloc_granularity)
     for _, stats in pairs(slab_stats) do
         assert(type(stats) == "table")
         for key, value in pairs(stats) do
             if key == "item_size" then
-                assert((value % granularity) == 0)
+                assert((value % slab_alloc_granularity) == 0)
             end
         end
     end
 end;
-function get_slab_info_and_check_stats(granularity)
+function get_slab_info_and_check_stats(slab_alloc_granularity)
     local slab_stats = test_run:eval('test', "box.slab.stats()")
     local slab_info = test_run:eval('test', "box.slab.info()")
-    check_slab_stats(slab_stats[1], granularity)
+    check_slab_stats(slab_stats[1], slab_alloc_granularity)
     return slab_info[1]
 end;
 test_run:cmd('create server test with script=\z
              "box/gh-5518-add-granularity-option.lua"');
 test_run:cmd("setopt delimiter ''");
--- Start server test with granularity == 2 failed
+-- Start server test with slab_alloc_granularity == 2 failed
 -- (must be greater than or equal to 4)
 test_run:cmd('start server test with args="2" with crash_expected=True')
--- Start server test with granularity == 7 failed
+-- Start server test with slab_alloc_granularity == 7 failed
 -- (must be exponent of 2)
 test_run:cmd('start server test with args="7" with crash_expected=True')
 
 test_run:cmd('start server test with args="4"')
--- Granularity determines not only alignment of objects,
--- but also size of the objects in the pool. Thus, the greater
--- the granularity, the greater the memory loss per one memory allocation,
--- but tuples with different sizes are allocated from the same mempool,
--- and we do not lose memory on the slabs, when we have highly
--- distributed tuple sizes. This is somewhat similar to a large alloc factor
+-- slab_alloc_granularity determines not only alignment of objects, but
+-- also size of the objects in the pool. Thus, the greater the
+-- slab_alloc_granularity, the greater the memory loss per one
+-- memory allocation, but tuples with different sizes are allocated
+-- from the same mempool, and we do not lose memory on the slabs, when
+-- we have highly distributed tuple sizes. This is somewhat similar to
+-- a large alloc factor
 
 -- Try to insert/delete to space, in case when UB sanitizer on,
 -- we check correct memory aligment
@@ -45,15 +46,15 @@ test_run:cmd('start server test with args="64"')
 slab_info_64 = get_slab_info_and_check_stats(64)
 test_run:cmd('stop server test')
 
--- Start server test with granularity = 8192
--- This is not a user case (such big granularity leads
+-- Start server test with slab_alloc_granularity = 8192
+-- This is not a user case (such big slab_alloc_granularity leads
 -- to an unacceptably large memory consumption).
 -- For test purposes only.
 test_run:cmd('start server test with args="8192"')
 slab_info_8192 = get_slab_info_and_check_stats(8192)
 test_run:cmd('stop server test')
 
--- Check that the larger the granularity,
+-- Check that the larger the slab_alloc_granularity,
 -- the larger memory usage.
 test_run:cmd("setopt delimiter ';'")
 function percent_string_to_number(str)
