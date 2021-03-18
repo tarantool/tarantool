@@ -81,7 +81,7 @@ sio_socketname(int fd)
 {
 	/* Preserve errno */
 	int save_errno = errno;
-	static __thread char name[2 * SERVICE_NAME_MAXLEN];
+	static __thread char name[SERVICE_NAME_MAXLEN];
 	int rc = sio_socketname_to_buffer(fd, name, sizeof(name));
 	/*
 	 * Could fail only because of a bad format in snprintf, but it is not

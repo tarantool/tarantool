@@ -46,7 +46,16 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-enum { SERVICE_NAME_MAXLEN = 32 };
+enum {
+	/**
+	 * - Unix socket path is 108 bytes max;
+	 * - IP(v4, v6) max string len is 45;
+	 *
+	 * Max result is rounded up just in case the numbers are a bit different
+	 * on various platforms.
+	 */
+	SERVICE_NAME_MAXLEN = 200,
+};
 
 const char *
 sio_strfaddr(struct sockaddr *addr, socklen_t addrlen);
