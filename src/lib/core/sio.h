@@ -73,6 +73,10 @@ sio_wouldblock(int err)
 	return err == EAGAIN || err == EWOULDBLOCK || err == EINTR;
 }
 
+/** Format the address into the given buffer. Behaves like snprintf(). */
+int
+sio_addr_snprintf(char *buf, size_t size, const struct sockaddr *addr,
+		  socklen_t addrlen);
 
 /**
  * Format the address provided in struct sockaddr *addr.

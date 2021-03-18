@@ -85,7 +85,7 @@ iproto_reset_stat(void);
  * iproto. To be shown in box.info.
  */
 const char *
-iproto_bound_address(void);
+iproto_bound_address(char *buf);
 
 #if defined(__cplusplus)
 } /* extern "C" */
