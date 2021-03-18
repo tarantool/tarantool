@@ -856,7 +856,7 @@ box_check_small_alloc_options(void)
 	 * If we use the int type, we may get an incorrect
 	 * result if the user enters a large value.
 	 */
-	int64_t granularity = cfg_geti64("granularity");
+	int64_t granularity = cfg_geti64("slab_alloc_granularity");
 	/*
 	 * Granularity must be exponent of two and >= 4.
 	 * We can use granularity value == 4 only because we used small
@@ -867,7 +867,7 @@ box_check_small_alloc_options(void)
 	 */
 	if (granularity < 4 || granularity > 1024 * 16 ||
 	    ! is_exp_of_two(granularity))
-		tnt_raise(ClientError, ER_CFG, "granularity",
+		tnt_raise(ClientError, ER_CFG, "slab_alloc_granularity",
 			  "must be greater than or equal to 4,"
 			  " less than or equal"
 			  " to 1024 * 16 and exponent of two");
@@ -2566,7 +2566,7 @@ engine_init()
 				    cfg_getd("memtx_memory"),
 				    cfg_geti("memtx_min_tuple_size"),
 				    cfg_geti("strip_core"),
-				    cfg_geti("granularity"),
+				    cfg_geti("slab_alloc_granularity"),
 				    cfg_getd("slab_alloc_factor"));
 	engine_register((struct engine *)memtx);
 	box_set_memtx_max_tuple_size();

@@ -51,8 +51,6 @@ cfg_filter(box.cfg)
     - 3600
   - - force_recovery
     - false
-  - - granularity
-    - 8
   - - hot_standby
     - false
   - - listen
@@ -99,6 +97,8 @@ cfg_filter(box.cfg)
     - 1
   - - slab_alloc_factor
     - 1.05
+  - - slab_alloc_granularity
+    - 8
   - - sql_cache_size
     - 5242880
   - - strip_core
