@@ -78,7 +78,7 @@ sio_socketname(int fd)
 {
 	/* Preserve errno */
 	int save_errno = errno;
-	int name_size = 2 * SERVICE_NAME_MAXLEN;
+	int name_size = SERVICE_NAME_MAXLEN;
 	char *name = static_alloc(name_size);
 	int rc = sio_socketname_to_buffer(fd, name, name_size);
 	/*
