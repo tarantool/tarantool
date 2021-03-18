@@ -514,29 +514,22 @@ const char *
 sio_strfaddr(struct sockaddr *addr, socklen_t addrlen)
 {
 	static __thread char name[NI_MAXHOST + _POSIX_PATH_MAX + 2];
-	switch(addr->sa_family) {
-		case AF_UNIX:
-			if (addrlen >= sizeof(sockaddr_un)) {
-				snprintf(name, sizeof(name), "unix/:%s",
-					((struct sockaddr_un *)addr)->sun_path);
-			} else {
-				snprintf(name, sizeof(name),
-					 "unix/:(socket)");
-			}
-			break;
-		default: {
-			char host[NI_MAXHOST], serv[NI_MAXSERV];
-			if (getnameinfo(addr, addrlen, host, sizeof(host),
-					serv, sizeof(serv),
-					NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
-				snprintf(name, sizeof(name),
-					 addr->sa_family == AF_INET
-					 ? "%s:%s" : "[%s]:%s", host, serv);
-			} else {
-				snprintf(name, sizeof(name), "(host):(port)");
-			}
-			break;
-		}
+	if (addr->sa_family == AF_UNIX) {
+		struct sockaddr_un *u = (struct sockaddr_un *)addr;
+		if (addrlen >= sizeof(*u))
+			snprintf(name, sizeof(name), "unix/:%s", u->sun_path);
+		else
+			snprintf(name, sizeof(name), "unix/:(socket)");
+	} else {
+		char host[NI_MAXHOST], serv[NI_MAXSERV];
+		int flags = NI_NUMERICHOST | NI_NUMERICSERV;
+		if (getnameinfo(addr, addrlen, host, sizeof(host),
+				serv, sizeof(serv), flags) != 0)
+			snprintf(name, sizeof(name), "(host):(port)");
+		else if (addr->sa_family == AF_INET)
+			snprintf(name, sizeof(name), "%s:%s", host, serv);
+		else
+			snprintf(name, sizeof(name), "[%s]:%s", host, serv);
 	}
 	return name;
 }
