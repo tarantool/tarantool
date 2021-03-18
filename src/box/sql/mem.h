@@ -859,6 +859,27 @@ mem_get_bool_unsafe(const struct Mem *mem)
 }
 
 /**
+ * Return value for MEM of STRING type if MEM contains a NULL-terminated string.
+ * Otherwise convert value of the MEM to NULL-terminated string if possible and
+ * return converted value. Original MEM is not changed.
+ */
+int
+mem_get_str0(const struct Mem *mem, const char **s);
+
+/**
+ * Return value for MEM of STRING type if MEM contains NULL-terminated string.
+ * Otherwise convert MEM to MEM of string type that contains NULL-terminated
+ * string and return its value. Return NULL if conversion is impossible.
+ */
+static inline const char *
+mem_as_str0(struct Mem *mem)
+{
+	if (mem_to_str0(mem) != 0)
+		return NULL;
+	return mem->z;
+}
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -891,7 +912,6 @@ registerTrace(int iReg, Mem *p);
 #define memIsValid(M)  ((M)->flags & MEM_Undefined)==0
 #endif
 
-int sqlVdbeMemNulTerminate(struct Mem *);
 int sqlVdbeMemExpandBlob(struct Mem *);
 #define ExpandBlob(P) (((P)->flags&MEM_Zero)?sqlVdbeMemExpandBlob(P):0)
 
@@ -915,11 +935,6 @@ sql_value_blob(struct Mem *);
 
 int
 sql_value_bytes(struct Mem *);
-
-const unsigned char *
-sql_value_text(struct Mem *);
-
-const void *sqlValueText(struct Mem *);
 
 #define VdbeFrameMem(p) ((Mem *)&((u8 *)p)[ROUND8(sizeof(VdbeFrame))])
 
