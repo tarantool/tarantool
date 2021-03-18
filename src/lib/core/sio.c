@@ -329,33 +329,23 @@ sio_getsockname(int fd, struct sockaddr *addr, socklen_t *addrlen)
 const char *
 sio_strfaddr(const struct sockaddr *addr, socklen_t addrlen)
 {
-	switch (addr->sa_family) {
-		case AF_UNIX: {
-			struct sockaddr_un *u = (struct sockaddr_un *) addr;
-			if (addrlen >= sizeof(*u))
-				return tt_sprintf("unix/:%s", u->sun_path);
-			else
-				return tt_sprintf("unix/:(socket)");
-			break;
-		}
-		case AF_INET: {
-			struct sockaddr_in *in = (struct sockaddr_in *) addr;
-			return tt_snprintf(SERVICE_NAME_MAXLEN, "%s:%d",
-					   inet_ntoa(in->sin_addr),
-					   ntohs(in->sin_port));
-		}
-		default: {
-			char host[NI_MAXHOST], serv[NI_MAXSERV];
-			if (getnameinfo(addr, addrlen, host, sizeof(host),
-					serv, sizeof(serv),
-					NI_NUMERICHOST | NI_NUMERICSERV) != 0)
-				return tt_sprintf("(host):(port)");
-
-			return tt_snprintf(NI_MAXHOST + NI_MAXSERV, "[%s]:%s",
-					   host, serv);
-		}
+	if (addr->sa_family == AF_UNIX) {
+		struct sockaddr_un *u = (struct sockaddr_un *)addr;
+		if (addrlen >= sizeof(*u))
+			return tt_sprintf("unix/:%s", u->sun_path);
+		else
+			return tt_sprintf("unix/:(socket)");
+	} else {
+		char host[NI_MAXHOST], serv[NI_MAXSERV];
+		int flags = NI_NUMERICHOST | NI_NUMERICSERV;
+		if (getnameinfo(addr, addrlen, host, sizeof(host), serv,
+				sizeof(serv), flags) != 0)
+			return tt_sprintf("(host):(port)");
+		else if (addr->sa_family == AF_INET)
+			return tt_sprintf("%s:%s", host, serv);
+		else
+			return tt_sprintf("[%s]:%s", host, serv);
 	}
-	unreachable();
 }
 
 int
