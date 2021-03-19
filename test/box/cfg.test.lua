@@ -35,6 +35,15 @@ box.cfg{memtx_memory = 5000000000000}
 box.cfg{vinyl_memory = 5000000000000}
 
 --------------------------------------------------------------------------------
+-- Test of literals in memory options
+--------------------------------------------------------------------------------
+
+box.cfg{memtx_memory = "1GB", vinyl_memory = " 2 GB "}
+box.cfg{memtx_memory = "1025 MB", vinyl_memory = "  3  00  0000 KB   "}
+box.cfg{memtx_memory = "   1025   MB   "}
+box.cfg{memtx_memory = "MB"}
+
+--------------------------------------------------------------------------------
 -- Dynamic configuration check
 --------------------------------------------------------------------------------
 

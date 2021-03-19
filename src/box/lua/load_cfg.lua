@@ -120,26 +120,26 @@ local module_cfg = {
 -- could be comma separated lua types or 'any' if any type is allowed
 local template_cfg = {
     listen              = 'string, number',
-    memtx_memory        = 'number',
+    memtx_memory        = 'string, number',
     strip_core          = 'boolean',
-    memtx_min_tuple_size  = 'number',
-    memtx_max_tuple_size  = 'number',
+    memtx_min_tuple_size  = 'string, number',
+    memtx_max_tuple_size  = 'string, number',
     granularity         = 'number',
     slab_alloc_factor   = 'number',
     work_dir            = 'string',
     memtx_dir            = 'string',
     wal_dir             = 'string',
     vinyl_dir           = 'string',
-    vinyl_memory        = 'number',
-    vinyl_cache               = 'number',
-    vinyl_max_tuple_size      = 'number',
+    vinyl_memory        = 'string, number',
+    vinyl_cache               = 'string, number',
+    vinyl_max_tuple_size      = 'string, number',
     vinyl_read_threads        = 'number',
     vinyl_write_threads       = 'number',
     vinyl_timeout             = 'number',
     vinyl_run_count_per_level = 'number',
     vinyl_run_size_ratio      = 'number',
     vinyl_range_size          = 'number',
-    vinyl_page_size           = 'number',
+    vinyl_page_size           = 'string, number',
     vinyl_bloom_fpr           = 'number',
 
     log                 = 'module',
@@ -152,7 +152,7 @@ local template_cfg = {
     snap_io_rate_limit  = 'number',
     too_long_threshold  = 'number',
     wal_mode            = 'string',
-    wal_max_size        = 'number',
+    wal_max_size        = 'string, number',
     wal_dir_rescan_delay= 'number',
     force_recovery      = 'boolean',
     replication         = 'string, number, table',
@@ -186,7 +186,7 @@ local template_cfg = {
     feedback_host         = ifdef_feedback('string'),
     feedback_interval     = ifdef_feedback('number'),
     net_msg_max           = 'number',
-    sql_cache_size        = 'number',
+    sql_cache_size        = 'string, number',
 }
 
 local function normalize_uri(port)
@@ -208,10 +208,51 @@ local function normalize_uri_list(port_list)
     return result
 end
 
+local function parse_memory(option, memory)
+    if type(memory) == "number" then
+        return memory
+    end
+    local converted_memory = tonumber(memory)
+    if converted_memory ~= nil then
+        return converted_memory
+    end
+    local first_letter = string.find(memory, "%u")
+    if first_letter == 1  or first_letter == nil then
+        box.error(box.error.CFG, option, "non integer memory amount")
+    end
+    local suffix = string.sub(memory, first_letter)
+    local suffix_spaces_start = string.find(suffix, ' ')
+    if suffix_spaces_start ~= nil then
+        suffix = string.sub(suffix, 1, suffix_spaces_start - 1)
+    end
+    local memory_number = tonumber(string.sub(memory, 1, first_letter - 1))
+    if memory_number == nil then
+        box.error(box.error.CFG, option, "non integer memory amount")
+    end
+    if suffix == "KB" then
+        return memory_number * 1024
+    elseif suffix == "MB" then
+        return memory_number * 1024 * 1024
+    elseif suffix == "GB" then
+        return memory_number * 1024 * 1024 * 1024
+    else
+        box.error(box.error.CFG, option, "bad memory literal")
+    end
+end
+
 -- options that require special handling
 local modify_cfg = {
-    listen             = normalize_uri,
-    replication        = normalize_uri_list,
+    listen                 = normalize_uri,
+    replication            = normalize_uri_list,
+    memtx_memory           = function(memory) return parse_memory("memtx_memory", memory) end,
+    memtx_min_tuple_size   = function(memory) return parse_memory("memtx_min_tuple_size", memory) end,
+    memtx_max_tuple_size   = function(memory) return parse_memory("memtx_max_tuple_size", memory) end,
+    vinyl_memory           = function(memory) return parse_memory("vinyl_memory", memory) end,
+    vinyl_cache            = function(memory) return parse_memory("vinyl_cache", memory) end,
+    vinyl_max_tuple_size   = function(memory) return parse_memory("vinyl_max_tuple_size", memory) end,
+    vinyl_page_size        = function(memory) return parse_memory("vinyl_page_size", memory) end,
+    wal_max_size           = function(memory) return parse_memory("wal_max_size", memory) end,
+    sql_cache_size         = function(memory) return parse_memory("sql_cache_size", memory) end,
 }
 
 local function purge_password_from_uri(uri)
