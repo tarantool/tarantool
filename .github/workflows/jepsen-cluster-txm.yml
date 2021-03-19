@@ -13,7 +13,7 @@ jobs:
     if: github.event_name == 'repository_dispatch' ||
         github.event_name == 'workflow_dispatch'
 
-    runs-on: ubuntu-18.04
+    runs-on: [ ubuntu-18.04, test-dev3, test-dev5 ]
 
     strategy:
       fail-fast: false

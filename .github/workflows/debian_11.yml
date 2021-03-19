@@ -18,7 +18,7 @@ jobs:
         github.event.pull_request.head.repo.full_name != github.repository ) &&
         ! endsWith(github.ref, '-notest')
 
-    runs-on: ubuntu-18.04
+    runs-on: [ ubuntu-18.04, test-dev3, test-dev5 ]
 
     strategy:
       fail-fast: false
