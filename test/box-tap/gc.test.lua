@@ -8,11 +8,12 @@ local debug = type(box.error.injection) == "table"
 
 -- check box.info.gc() is false if snapshot is not in progress
 local test = tap.test('box.info.gc')
-test:plan(1 + (debug and 1 or 0))
+test:plan(2 + (debug and 1 or 0))
 
 
 local gc = box.info.gc()
 test:is(gc.checkpoint_is_in_progress, false, "checkpoint is not in progress")
+test:is(gc.is_paused, false, "GC is not paused")
 
 -- check box.info.gc() is true if snapshot is in progress
 --
