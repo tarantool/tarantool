@@ -148,6 +148,24 @@ struct gc_state {
 	 */
 	int64_t cleanup_completed, cleanup_scheduled;
 	/**
+	 * A counter to wait until all replicas are managed to
+	 * subscribe so that we can enable cleanup fiber to
+	 * remove old XLOGs. Otherwise some replicas might be
+	 * far behind the master node and after the master
+	 * node been restarted they will have to reread all
+	 * data back due to XlogGapError, ie too early deleted
+	 * XLOGs.
+	 */
+	int64_t delay_ref;
+	/**
+	 * Delay timeout in seconds.
+	 */
+	double wal_cleanup_delay;
+	/**
+	 * When set the cleanup fiber is paused.
+	 */
+	bool is_paused;
+	/**
 	 * Set if there's a fiber making a checkpoint right now.
 	 */
 	bool checkpoint_is_in_progress;
@@ -205,6 +223,24 @@ gc_init(void);
  */
 void
 gc_free(void);
+
+/**
+ * Set a new delay value.
+ */
+void
+gc_set_wal_cleanup_delay(double wal_cleanup_delay);
+
+/**
+ * Increment a reference to delay counter.
+ */
+void
+gc_delay_ref(void);
+
+/**
+ * Decrement a reference from the delay counter.
+ */
+void
+gc_delay_unref(void);
 
 /**
  * Advance the garbage collector vclock to the given position.

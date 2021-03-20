@@ -111,6 +111,8 @@ cfg_filter(box.cfg)
  |     - 60
  |   - - vinyl_write_threads
  |     - 4
+ |   - - wal_cleanup_delay
+ |     - 14400
  |   - - wal_dir
  |     - <hidden>
  |   - - wal_dir_rescan_delay
@@ -226,6 +228,8 @@ cfg_filter(box.cfg)
  |     - 60
  |   - - vinyl_write_threads
  |     - 4
+ |   - - wal_cleanup_delay
+ |     - 14400
  |   - - wal_dir
  |     - <hidden>
  |   - - wal_dir_rescan_delay

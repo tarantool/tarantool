@@ -2,6 +2,12 @@ env = require('test_run')
 test_run = env.new()
 
 --
+-- gh-5806: this replica_rejoin test relies on the wal cleanup fiber
+-- been disabled thus lets turn it off explicitly every time we restart
+-- the main node.
+box.cfg{wal_cleanup_delay = 0}
+
+--
 -- gh-461: check that garbage collection works as expected
 -- after rebootstrap.
 --
@@ -23,6 +29,7 @@ test_run:cmd("stop server replica")
 
 -- Invoke garbage collector on the master.
 test_run:cmd("restart server default")
+box.cfg{wal_cleanup_delay = 0}
 checkpoint_count = box.cfg.checkpoint_count
 box.cfg{checkpoint_count = 1}
 box.space.test:delete(1)
@@ -48,6 +55,7 @@ test_run:cmd("stop server replica")
 
 -- Invoke garbage collector on the master.
 test_run:cmd("restart server default")
+box.cfg{wal_cleanup_delay = 0}
 checkpoint_count = box.cfg.checkpoint_count
 box.cfg{checkpoint_count = 1}
 box.space.test:delete(2)
