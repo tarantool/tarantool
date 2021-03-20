@@ -250,6 +250,7 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 						   tt_uuid_str(&replica->uuid));
 	}
 	replicaset.replica_by_id[replica_id] = replica;
+	gc_delay_ref();
 	++replicaset.registered_count;
 	say_info("assigned id %d to replica %s",
 		 replica->id, tt_uuid_str(&replica->uuid));
@@ -273,6 +274,7 @@ replica_clear_id(struct replica *replica)
 	replicaset.replica_by_id[replica->id] = NULL;
 	assert(replicaset.registered_count > 0);
 	--replicaset.registered_count;
+	gc_delay_unref();
 	if (replica->id == instance_id) {
 		/* See replica_check_id(). */
 		assert(replicaset.is_joining);

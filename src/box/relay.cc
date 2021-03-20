@@ -835,6 +835,7 @@ relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 						   tt_uuid_str(&replica->uuid));
 		if (replica->gc == NULL)
 			diag_raise();
+		gc_delay_unref();
 	}
 
 	relay_start(relay, fd, sync, relay_send_row);
