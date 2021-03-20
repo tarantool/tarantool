@@ -107,6 +107,11 @@ gc_init(void)
 	/* Don't delete any files until recovery is complete. */
 	gc.min_checkpoint_count = INT_MAX;
 
+	gc.wal_cleanup_delay = TIMEOUT_INFINITY;
+	gc.delay_ref = 0;
+	gc.is_paused = true;
+	say_info("wal/engine cleanup is paused");
+
 	vclock_create(&gc.vclock);
 	rlist_create(&gc.checkpoints);
 	gc_tree_new(&gc.consumers);
@@ -238,6 +243,51 @@ static int
 gc_cleanup_fiber_f(va_list ap)
 {
 	(void)ap;
+
+	/*
+	 * Stage 1 (optional): in case if we're booting
+	 * up with cleanup disabled lets do wait in a
+	 * separate cycle to minimize branching on stage 2.
+	 */
+	if (gc.is_paused) {
+		double start_time = fiber_clock();
+		double timeout = gc.wal_cleanup_delay;
+		while (!fiber_is_cancelled()) {
+			if (fiber_yield_timeout(timeout)) {
+				say_info("wal/engine cleanup is resumed "
+					 "due to timeout expiration");
+				gc.is_paused = false;
+				gc.delay_ref = 0;
+				break;
+			}
+
+			/*
+			 * If a last reference is dropped
+			 * we can exit out early.
+			 */
+			if (!gc.is_paused) {
+				say_info("wal/engine cleanup is resumed");
+				break;
+			}
+
+			/*
+			 * Woken up to update the timeout.
+			 */
+			double elapsed = fiber_clock() - start_time;
+			if (elapsed >= gc.wal_cleanup_delay) {
+				say_info("wal/engine cleanup is resumed "
+					 "due to timeout manual update");
+				gc.is_paused = false;
+				gc.delay_ref = 0;
+				break;
+			}
+			timeout = gc.wal_cleanup_delay - elapsed;
+		}
+	}
+
+	/*
+	 * Stage 2: a regular cleanup cycle.
+	 */
 	while (!fiber_is_cancelled()) {
 		int64_t delta = gc.cleanup_scheduled - gc.cleanup_completed;
 		if (delta == 0) {
@@ -251,6 +301,42 @@ gc_cleanup_fiber_f(va_list ap)
 		fiber_cond_signal(&gc.cleanup_cond);
 	}
 	return 0;
+}
+
+void
+gc_set_wal_cleanup_delay(double wal_cleanup_delay)
+{
+	gc.wal_cleanup_delay = wal_cleanup_delay;
+	/*
+	 * This routine may be called at arbitrary
+	 * moment thus we must be sure the cleanup
+	 * fiber is paused to not wake up it when
+	 * it is already in a regular cleanup stage.
+	 */
+	if (gc.is_paused)
+		fiber_wakeup(gc.cleanup_fiber);
+}
+
+void
+gc_delay_ref(void)
+{
+	if (gc.is_paused) {
+		assert(gc.delay_ref >= 0);
+		gc.delay_ref++;
+	}
+}
+
+void
+gc_delay_unref(void)
+{
+	if (gc.is_paused) {
+		assert(gc.delay_ref > 0);
+		gc.delay_ref--;
+		if (gc.delay_ref == 0) {
+			gc.is_paused = false;
+			fiber_wakeup(gc.cleanup_fiber);
+		}
+	}
 }
 
 /**
@@ -462,11 +548,12 @@ gc_checkpoint(void)
 	 * Wait for background garbage collection that might
 	 * have been triggered by this checkpoint to complete.
 	 * Strictly speaking, it isn't necessary, but it
-	 * simplifies testing as it guarantees that by the
-	 * time box.snapshot() returns, all outdated checkpoint
-	 * files have been removed.
+	 * simplifies testing. Same time if GC is paused and
+	 * waiting for old XLOGs to be read by replicas the
+	 * cleanup won't happen immediately after the checkpoint.
 	 */
-	gc_wait_cleanup();
+	if (!gc.is_paused)
+		gc_wait_cleanup();
 	return 0;
 }
 

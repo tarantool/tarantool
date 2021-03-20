@@ -445,6 +445,10 @@ lbox_info_gc_call(struct lua_State *L)
 	lua_pushboolean(L, gc.checkpoint_is_in_progress);
 	lua_settable(L, -3);
 
+	lua_pushstring(L, "is_paused");
+	lua_pushboolean(L, gc.is_paused);
+	lua_settable(L, -3);
+
 	lua_pushstring(L, "checkpoints");
 	lua_newtable(L);
 

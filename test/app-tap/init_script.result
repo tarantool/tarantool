@@ -53,6 +53,7 @@ vinyl_run_count_per_level:2
 vinyl_run_size_ratio:3.5
 vinyl_timeout:60
 vinyl_write_threads:4
+wal_cleanup_delay:14400
 wal_dir:.
 wal_dir_rescan_delay:2
 wal_max_size:268435456

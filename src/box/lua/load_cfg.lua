@@ -73,6 +73,7 @@ local default_cfg = {
     wal_max_size        = 256 * 1024 * 1024,
     wal_dir_rescan_delay= 2,
     wal_queue_max_size  = 16 * 1024 * 1024,
+    wal_cleanup_delay   = 4 * 3600,
     force_recovery      = false,
     replication         = nil,
     instance_uuid       = nil,
@@ -155,6 +156,7 @@ local template_cfg = {
     wal_mode            = 'string',
     wal_max_size        = 'number',
     wal_dir_rescan_delay= 'number',
+    wal_cleanup_delay   = 'number',
     force_recovery      = 'boolean',
     replication         = 'string, number, table',
     instance_uuid       = 'string',
@@ -289,6 +291,7 @@ local dynamic_cfg = {
     feedback_interval       = ifdef_feedback_set_params,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = function() end,
+    wal_cleanup_delay       = private.cfg_set_wal_cleanup_delay,
     custom_proc_title       = function()
         require('title').update(box.cfg.custom_proc_title)
     end,
@@ -349,6 +352,8 @@ local dynamic_cfg_order = {
     -- the new one. This should be fixed when box.cfg is able to
     -- apply some parameters together and atomically.
     replication_anon        = 250,
+    -- Cleanup delay should be ignored if replication_anon is set.
+    wal_cleanup_delay       = 260,
     election_mode           = 300,
     election_timeout        = 320,
 }

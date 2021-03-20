@@ -771,6 +771,19 @@ box_check_wal_queue_max_size(void)
 	return size;
 }
 
+static double
+box_check_wal_cleanup_delay(void)
+{
+	double value = cfg_getd("wal_cleanup_delay");
+	if (value < 0) {
+		diag_set(ClientError, ER_CFG, "wal_cleanup_delay",
+			 "value must be >= 0");
+		return -1;
+	}
+
+	return value;
+}
+
 static void
 box_check_readahead(int readahead)
 {
@@ -917,6 +930,8 @@ box_check_config(void)
 	box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
 	if (box_check_wal_queue_max_size() < 0)
+		diag_raise();
+	if (box_check_wal_cleanup_delay() < 0)
 		diag_raise();
 	if (box_check_memory_quota("memtx_memory") < 0)
 		diag_raise();
@@ -1462,6 +1477,23 @@ box_set_wal_queue_max_size(void)
 	if (size < 0)
 		return -1;
 	wal_set_queue_max_size(size);
+	return 0;
+}
+
+int
+box_set_wal_cleanup_delay(void)
+{
+	double delay = box_check_wal_cleanup_delay();
+	if (delay < 0)
+		return -1;
+	/*
+	 * Anonymous replicas do not require
+	 * delay since they can't be a source
+	 * of replication.
+	 */
+	if (replication_anon)
+		delay = 0;
+	gc_set_wal_cleanup_delay(delay);
 	return 0;
 }
 
@@ -3075,6 +3107,15 @@ box_cfg_xc(void)
 			  &is_bootstrap_leader);
 	}
 	fiber_gc();
+
+	/*
+	 * Exclude self from GC delay because we care
+	 * about remote replicas only, still for ref/unref
+	 * balance we do reference self node initially and
+	 * downgrade it to zero when there is no replication
+	 * set at all.
+	 */
+	gc_delay_unref();
 
 	bootstrap_journal_guard.is_active = false;
 	assert(current_journal != &bootstrap_journal);
