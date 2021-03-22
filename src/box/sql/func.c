@@ -1769,13 +1769,13 @@ minmaxStep(sql_context * context, int NotUsed, sql_value ** argv)
 		bool is_max = (func->flags & SQL_FUNC_MAX) != 0;
 		cmp = sqlMemCompare(pBest, pArg, pColl);
 		if ((is_max && cmp < 0) || (!is_max && cmp > 0)) {
-			sqlVdbeMemCopy(pBest, pArg);
+			mem_copy(pBest, pArg);
 		} else {
 			sqlSkipAccumulatorLoad(context);
 		}
 	} else {
 		pBest->db = sql_context_db_handle(context);
-		sqlVdbeMemCopy(pBest, pArg);
+		mem_copy(pBest, pArg);
 	}
 }
 
