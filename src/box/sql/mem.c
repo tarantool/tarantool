@@ -126,6 +126,32 @@ mem_destroy(struct Mem *mem)
 	mem->z = NULL;
 }
 
+int
+mem_copy(struct Mem *to, const struct Mem *from)
+{
+	mem_clear(to);
+	to->u = from->u;
+	to->flags = from->flags;
+	to->subtype = from->subtype;
+	to->field_type = from->field_type;
+	to->n = from->n;
+	to->z = from->z;
+	if ((to->flags & (MEM_Str | MEM_Blob)) == 0)
+		return 0;
+	if ((to->flags & MEM_Static) != 0)
+		return 0;
+	if ((to->flags & (MEM_Zero | MEM_Blob)) == (MEM_Zero | MEM_Blob))
+		return sqlVdbeMemExpandBlob(to);
+	to->zMalloc = sqlDbReallocOrFree(to->db, to->zMalloc, to->n);
+	if (to->zMalloc == NULL)
+		return -1;
+	to->szMalloc = sqlDbMallocSize(to->db, to->zMalloc);
+	memcpy(to->zMalloc, to->z, to->n);
+	to->z = to->zMalloc;
+	to->flags &= (MEM_Str | MEM_Blob | MEM_Term | MEM_Subtype);
+	return 0;
+}
+
 static inline bool
 mem_has_msgpack_subtype(struct Mem *mem)
 {
@@ -1817,28 +1843,6 @@ vdbe_mem_alloc_blob_region(struct Mem *vdbe_mem, uint32_t size)
 	vdbe_mem->flags = MEM_Ephem | MEM_Blob;
 	assert(sqlVdbeCheckMemInvariants(vdbe_mem));
 	return 0;
-}
-
-/*
- * Make a full copy of pFrom into pTo.  Prior contents of pTo are
- * freed before the copy is made.
- */
-int
-sqlVdbeMemCopy(Mem * pTo, const Mem * pFrom)
-{
-	int rc = 0;
-
-	mem_clear(pTo);
-	memcpy(pTo, pFrom, MEMCELLSIZE);
-	pTo->flags &= ~MEM_Dyn;
-	if (pTo->flags & (MEM_Str | MEM_Blob)) {
-		if (0 == (pFrom->flags & MEM_Static)) {
-			pTo->flags |= MEM_Ephem;
-			rc = sqlVdbeMemMakeWriteable(pTo);
-		}
-	}
-
-	return rc;
 }
 
 void

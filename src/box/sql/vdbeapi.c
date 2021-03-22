@@ -229,7 +229,7 @@ sql_result_text64(sql_context * pCtx,
 void
 sql_result_value(sql_context * pCtx, sql_value * pValue)
 {
-	sqlVdbeMemCopy(pCtx->pOut, pValue);
+	mem_copy(pCtx->pOut, pValue);
 }
 
 void
