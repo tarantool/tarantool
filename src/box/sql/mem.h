@@ -888,6 +888,27 @@ int
 mem_get_bin(const struct Mem *mem, const char **s);
 
 /**
+ * Return length of value for MEM of STRING or VARBINARY type. Original MEM is
+ * not changed.
+ */
+int
+mem_len(const struct Mem *mem, uint32_t *len);
+
+/**
+ * Return length of value for MEM of STRING or VARBINARY type. This function is
+ * not safe since there is no proper processing in case mem_len() return an
+ * error. In this case this function returns 0.
+ */
+static inline int
+mem_len_unsafe(const struct Mem *mem)
+{
+	uint32_t len;
+	if (mem_len(mem, &len) != 0)
+		return 0;
+	return len;
+}
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -904,8 +925,6 @@ mem_mp_type(struct Mem *mem);
 
 enum mp_type
 sql_value_type(struct Mem *);
-
-int sqlValueBytes(struct Mem *);
 
 #ifdef SQL_DEBUG
 int sqlVdbeCheckMemInvariants(struct Mem *);
@@ -936,17 +955,7 @@ struct Mem *sqlValueNew(struct sql *);
 void
 releaseMemArray(Mem * p, int N);
 
-/** Getters. */
-
-int
-sql_value_bytes(struct Mem *);
-
 #define VdbeFrameMem(p) ((Mem *)&((u8 *)p)[ROUND8(sizeof(VdbeFrame))])
-
-const Mem *
-columnNullValue(void);
-
-/** Checkers. */
 
 int sqlVdbeMemTooBig(Mem *);
 
