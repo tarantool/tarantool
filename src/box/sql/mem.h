@@ -880,6 +880,14 @@ mem_as_str0(struct Mem *mem)
 }
 
 /**
+ * Return value for MEM of VARBINARY type. For MEM of all other types convert
+ * value of the MEM to VARBINARY if possible and return converted value.
+ * Original MEM is not changed.
+ */
+int
+mem_get_bin(const struct Mem *mem, const char **s);
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -929,9 +937,6 @@ void
 releaseMemArray(Mem * p, int N);
 
 /** Getters. */
-
-const void *
-sql_value_blob(struct Mem *);
 
 int
 sql_value_bytes(struct Mem *);

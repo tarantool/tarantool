@@ -54,6 +54,17 @@ mem_as_ustr(struct Mem *mem)
 	return (const unsigned char *)mem_as_str0(mem);
 }
 
+static const void *
+mem_as_bin(struct Mem *mem)
+{
+	const char *s;
+	if (!mem_is_bytes(mem) && mem_to_str(mem) != 0)
+		return NULL;
+	if (mem_get_bin(mem, &s) != 0)
+		return NULL;
+	return s;
+}
+
 /*
  * Return the collating function associated with a function.
  */
@@ -300,8 +311,8 @@ position_func(struct sql_context *context, int argc, struct Mem **argv)
 		const unsigned char *haystack_str;
 		const unsigned char *needle_str;
 		if (haystack_type == MP_BIN) {
-			needle_str = sql_value_blob(needle);
-			haystack_str = sql_value_blob(haystack);
+			needle_str = mem_as_bin(needle);
+			haystack_str = mem_as_bin(haystack);
 			assert(needle_str != NULL);
 			assert(haystack_str != NULL || n_haystack_bytes == 0);
 			/*
@@ -440,7 +451,7 @@ substrFunc(sql_context * context, int argc, sql_value ** argv)
 	p1 = mem_get_int_unsafe(argv[1]);
 	if (p0type == MP_BIN) {
 		len = sql_value_bytes(argv[0]);
-		z = sql_value_blob(argv[0]);
+		z = mem_as_bin(argv[0]);
 		if (z == 0)
 			return;
 		assert(len == sql_value_bytes(argv[0]));
@@ -1073,9 +1084,9 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 	case MP_ARRAY:
 	case MP_MAP: {
 			char *zText = 0;
-			char const *zBlob = sql_value_blob(argv[0]);
+			char const *zBlob = mem_as_bin(argv[0]);
 			int nBlob = sql_value_bytes(argv[0]);
-			assert(zBlob == sql_value_blob(argv[0]));	/* No encoding change */
+			assert(zBlob == mem_as_bin(argv[0]));	/* No encoding change */
 			zText =
 			    (char *)contextMalloc(context,
 						  (2 * (i64) nBlob) + 4);
@@ -1208,9 +1219,9 @@ hexFunc(sql_context * context, int argc, sql_value ** argv)
 	char *zHex, *z;
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
-	pBlob = sql_value_blob(argv[0]);
+	pBlob = mem_as_bin(argv[0]);
 	n = sql_value_bytes(argv[0]);
-	assert(pBlob == sql_value_blob(argv[0]));	/* No encoding change */
+	assert(pBlob == mem_as_bin(argv[0]));	/* No encoding change */
 	z = zHex = contextMalloc(context, ((i64) n) * 2 + 1);
 	if (zHex) {
 		for (i = 0; i < n; i++, pBlob++) {

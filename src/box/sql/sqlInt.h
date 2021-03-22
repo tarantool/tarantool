@@ -433,9 +433,6 @@ sql_stmt_compile(const char *sql, int bytes_count, struct Vdbe *re_prepared,
 int
 sql_step(sql_stmt *);
 
-const void *
-sql_column_blob(sql_stmt *, int iCol);
-
 int
 sql_column_bytes(sql_stmt *, int iCol);
 
