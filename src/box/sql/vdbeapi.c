@@ -442,13 +442,6 @@ columnMem(sql_stmt * pStmt, int i)
  * The following routines are used to access elements of the current row
  * in the result set.
  */
-const void *
-sql_column_blob(sql_stmt * pStmt, int i)
-{
-	const void *val;
-	val = sql_value_blob(columnMem(pStmt, i));
-	return val;
-}
 
 int
 sql_column_bytes(sql_stmt * pStmt, int i)
