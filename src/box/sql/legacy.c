@@ -40,6 +40,8 @@
 #include "box/execute.h"
 #include "box/session.h"
 
+#if 0
+
 /*
  * Execute SQL code.  Return one of the SQL_ success/failure
  * codes.
@@ -162,3 +164,5 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 	assert(rc == 0);
 	return rc;
 }
+
+#endif
