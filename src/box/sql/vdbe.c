@@ -1008,11 +1008,7 @@ case OP_Copy: {
 	pOut = &aMem[pOp->p2];
 	assert(pOut!=pIn1);
 	while( 1) {
-		sqlVdbeMemShallowCopy(pOut, pIn1, MEM_Ephem);
-		Deephemeralize(pOut);
-#ifdef SQL_DEBUG
-		pOut->pScopyFrom = 0;
-#endif
+		mem_copy(pOut, pIn1);
 		REGISTER_TRACE(p, pOp->p2+pOp->p3-n, pOut);
 		if ((n--)==0) break;
 		pOut++;

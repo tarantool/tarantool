@@ -415,8 +415,7 @@ stat4ValueFromExpr(Parse * pParse,	/* Parse context */
 		if ((v = pParse->pReprepare) != 0) {
 			pVal = valueNew(db, pAlloc);
 			if (pVal) {
-				rc = sqlVdbeMemCopy((Mem *) pVal,
-							&v->aVar[iBindVar - 1]);
+				rc = mem_copy(pVal, &v->aVar[iBindVar - 1]);
 				if (rc == 0)
 					sql_value_apply_type(pVal, type);
 				pVal->db = pParse->db;

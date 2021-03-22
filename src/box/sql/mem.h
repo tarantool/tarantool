@@ -307,6 +307,14 @@ void
 mem_destroy(struct Mem *mem);
 
 /**
+ * Copy content of MEM from one MEM to another. In case source MEM contains
+ * string or binary and allocation type is not STATIC, this value is copied to
+ * newly allocated by destination MEM memory.
+ */
+int
+mem_copy(struct Mem *to, const struct Mem *from);
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -553,7 +561,6 @@ mem_is_type_compatible(struct Mem *mem, enum field_type type);
 
 int
 vdbe_mem_alloc_blob_region(struct Mem *vdbe_mem, uint32_t size);
-int sqlVdbeMemCopy(Mem *, const Mem *);
 void sqlVdbeMemShallowCopy(Mem *, const Mem *, int);
 void sqlVdbeMemMove(Mem *, Mem *);
 int sqlVdbeMemMakeWriteable(Mem *);
