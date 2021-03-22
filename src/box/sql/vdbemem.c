@@ -449,7 +449,8 @@ mem_mp_type(struct Mem *mem)
 		     mem->subtype != SQL_SUBTYPE_MSGPACK)
 			return MP_BIN;
 		assert(mp_typeof(*mem->z) == MP_MAP ||
-		       mp_typeof(*mem->z) == MP_ARRAY);
+		       mp_typeof(*mem->z) == MP_ARRAY ||
+		       mp_typeof(*mem->z) == MP_EXT);
 		return mp_typeof(*mem->z);
 	case MEM_Bool:
 		return MP_BOOL;

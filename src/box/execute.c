@@ -224,6 +224,10 @@ sql_column_to_messagepack(struct sql_stmt *stmt, int i,
 		mp_encode_nil(pos);
 		break;
 	}
+        case MP_EXT: {
+                diag_set(ClientError, ER_UNSUPPORTED, "SQL", sql_column_datatype(stmt,i));
+                return -1;
+        }
 	default:
 		unreachable();
 	}

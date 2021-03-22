@@ -382,7 +382,8 @@ mem_apply_type(struct Mem *record, enum field_type type)
 		if ((record->flags & MEM_Subtype) != 0 &&
 		    record->subtype == SQL_SUBTYPE_MSGPACK) {
 			assert(mp_typeof(*record->z) == MP_MAP ||
-			       mp_typeof(*record->z) == MP_ARRAY);
+			       mp_typeof(*record->z) == MP_ARRAY ||
+			       mp_typeof(*record->z) == MP_EXT);
 			return -1;
 		}
 		return 0;
@@ -2867,6 +2868,10 @@ case OP_ApplyType: {
 	while((type = *(types++)) != field_type_MAX) {
 		assert(pIn1 <= &p->aMem[(p->nMem+1 - p->nCursor)]);
 		assert(memIsValid(pIn1));
+		if (mem_mp_type(pIn1) >= MP_EXT) {
+			diag_set(ClientError, ER_UNSUPPORTED, "SQL", field_type_strs[type]);
+			goto abort_due_to_error;
+		}
 		if (!mem_is_type_compatible(pIn1, type)) {
 			/* Implicit cast is allowed only to numeric type. */
 			if (!sql_type_is_numeric(type))
