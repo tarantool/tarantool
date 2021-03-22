@@ -42,14 +42,6 @@ void
 sql_init(void);
 
 /**
- * Initialize SQL statistic system.
- *
- * Currently unused.
- */
-void
-sql_load_schema(void);
-
-/**
  * struct sql *
  * sql_get();
  *
