@@ -335,8 +335,9 @@ memtx_space_execute_replace(struct space *space, struct txn *txn,
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	enum dup_replace_mode mode = dup_replace_mode(request->type);
-	stmt->new_tuple = memtx_tuple_new(space->format, request->tuple,
-					  request->tuple_end);
+	stmt->new_tuple =
+		space->format->vtab.tuple_new(space->format, request->tuple,
+					      request->tuple_end);
 	if (stmt->new_tuple == NULL)
 		return -1;
 	tuple_ref(stmt->new_tuple);
@@ -420,8 +421,9 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	if (new_data == NULL)
 		return -1;
 
-	stmt->new_tuple = memtx_tuple_new(format, new_data,
-					  new_data + new_size);
+	stmt->new_tuple =
+		space->format->vtab.tuple_new(format, new_data,
+					      new_data + new_size);
 	if (stmt->new_tuple == NULL)
 		return -1;
 	tuple_ref(stmt->new_tuple);
@@ -491,8 +493,9 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 					  format, request->index_base) != 0) {
 			return -1;
 		}
-		stmt->new_tuple = memtx_tuple_new(format, request->tuple,
-						  request->tuple_end);
+		stmt->new_tuple =
+			space->format->vtab.tuple_new(format, request->tuple,
+						      request->tuple_end);
 		if (stmt->new_tuple == NULL)
 			return -1;
 		tuple_ref(stmt->new_tuple);
@@ -515,8 +518,9 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		if (new_data == NULL)
 			return -1;
 
-		stmt->new_tuple = memtx_tuple_new(format, new_data,
-						  new_data + new_size);
+		stmt->new_tuple =
+			space->format->vtab.tuple_new(format, new_data,
+						      new_data + new_size);
 		if (stmt->new_tuple == NULL)
 			return -1;
 		tuple_ref(stmt->new_tuple);
@@ -567,14 +571,14 @@ memtx_space_ephemeral_replace(struct space *space, const char *tuple,
 				      const char *tuple_end)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
-	struct tuple *new_tuple = memtx_tuple_new(space->format, tuple,
-						  tuple_end);
+	struct tuple *new_tuple =
+		space->format->vtab.tuple_new(space->format, tuple, tuple_end);
 	if (new_tuple == NULL)
 		return -1;
 	struct tuple *old_tuple;
 	if (memtx_space->replace(space, NULL, new_tuple,
 				 DUP_REPLACE_OR_INSERT, &old_tuple) != 0) {
-		memtx_tuple_delete(space->format, new_tuple);
+		space->format->vtab.tuple_delete(space->format, new_tuple);
 		return -1;
 	}
 	if (old_tuple != NULL)
