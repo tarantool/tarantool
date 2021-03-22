@@ -1120,7 +1120,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 			   SLAB_SIZE, dontdump, "memtx");
 	slab_cache_create(&memtx->slab_cache, &memtx->arena);
 	float actual_alloc_factor;
-	small_alloc_create(&memtx->alloc, &memtx->slab_cache,
+	small_alloc_create(&memtx->alloc, &memtx->slab_cache, sizeof(intptr_t),
 			   objsize_min, alloc_factor, &actual_alloc_factor);
 	say_info("Actual slab_alloc_factor calculated on the basis of desired "
 		 "slab_alloc_factor = %f", actual_alloc_factor);

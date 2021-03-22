@@ -315,7 +315,8 @@ tuple_init(field_name_hash_f hash)
 
 	float actual_alloc_factor;
 	small_alloc_create(&runtime_alloc, &cord()->slabc, OBJSIZE_MIN,
-			   ALLOC_FACTOR, &actual_alloc_factor);
+			   sizeof(intptr_t), ALLOC_FACTOR,
+			   &actual_alloc_factor);
 
 	mempool_create(&tuple_iterator_pool, &cord()->slabc,
 		       sizeof(struct tuple_iterator));
