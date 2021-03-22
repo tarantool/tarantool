@@ -263,14 +263,6 @@ memtx_enter_delayed_free_mode(struct memtx_engine *memtx);
 void
 memtx_leave_delayed_free_mode(struct memtx_engine *memtx);
 
-/** Allocate a memtx tuple. @sa tuple_new(). */
-struct tuple *
-memtx_tuple_new(struct tuple_format *format, const char *data, const char *end);
-
-/** Free a memtx tuple. @sa tuple_delete(). */
-void
-memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple);
-
 /** Tuple format vtab for memtx engine. */
 extern struct tuple_format_vtab memtx_tuple_format_vtab;
 

@@ -128,9 +128,9 @@ public:
 		MpDataSet &dataset = MpDataSet::instance();
 
 		for (size_t i = 0; i < NUM_TEST_TUPLES; i++) {
-			data[i] = memtx_tuple_new(format,
-						  dataset[i].begin(),
-						  dataset[i].end());
+			data[i] = box_tuple_new(format,
+						dataset[i].begin(),
+						dataset[i].end());
 			tuple_ref(data[i]);
 		}
 	}
@@ -148,7 +148,7 @@ private:
 	struct tuple *data[NUM_TEST_TUPLES];
 };
 
-// memtx_tuple_new benchmark.
+// box_tuple_new benchmark.
 static void
 bench_tuple_new(benchmark::State& state)
 {
@@ -168,9 +168,9 @@ bench_tuple_new(benchmark::State& state)
 			i = 0;
 			state.ResumeTiming();
 		}
-		tuples[i] = memtx_tuple_new(format,
-					    dataset[i].begin(),
-					    dataset[i].end());
+		tuples[i] = box_tuple_new(format,
+					  dataset[i].begin(),
+					  dataset[i].end());
 		tuple_ref(tuples[i]);
 		++i;
 	}
@@ -199,9 +199,9 @@ bench_tuple_delete(benchmark::State& state)
 			total_count += i;
 			state.PauseTiming();
 			for (size_t k = 0; k < NUM_TEST_TUPLES; k++) {
-				tuples[k] = memtx_tuple_new(format,
-							    dataset[k].begin(),
-							    dataset[k].end());
+				tuples[k] = box_tuple_new(format,
+							  dataset[k].begin(),
+							  dataset[k].end());
 				tuple_ref(tuples[k]);
 			}
 			i = 0;
