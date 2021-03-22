@@ -414,41 +414,6 @@ sql_data_count(sql_stmt * pStmt)
 	return pVm->nResColumn;
 }
 
-/*
- * Check to see if column iCol of the given statement is valid.  If
- * it is, return a pointer to the Mem for the value of that column.
- * If iCol is not valid, return a pointer to a Mem which has a value
- * of NULL.
- */
-static Mem *
-columnMem(sql_stmt * pStmt, int i)
-{
-	Vdbe *pVm;
-	Mem *pOut;
-
-	pVm = (Vdbe *) pStmt;
-	if (pVm == 0)
-		return (Mem *) columnNullValue();
-	assert(pVm->db);
-	if (pVm->pResultSet != 0 && i < pVm->nResColumn && i >= 0) {
-		pOut = &pVm->pResultSet[i];
-	} else {
-		pOut = (Mem *) columnNullValue();
-	}
-	return pOut;
-}
-
-/**************************** sql_column_  ******************************
- * The following routines are used to access elements of the current row
- * in the result set.
- */
-
-int
-sql_column_bytes(sql_stmt * pStmt, int i)
-{
-	return sql_value_bytes(columnMem(pStmt, i));
-}
-
 char *
 sql_stmt_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
 			   struct region *region)
