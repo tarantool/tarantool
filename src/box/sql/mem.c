@@ -1153,6 +1153,19 @@ mem_get_str0(const struct Mem *mem, const char **s)
 }
 
 int
+mem_get_bin(const struct Mem *mem, const char **s)
+{
+	if ((mem->flags & MEM_Str) != 0) {
+		*s = mem->n > 0 ? mem->z : NULL;
+		return 0;
+	}
+	if ((mem->flags & MEM_Blob) == 0 || (mem->flags & MEM_Zero) != 0)
+		return -1;
+	*s = mem->z;
+	return 0;
+}
+
+int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
 	mem_clear(to);
@@ -2226,28 +2239,6 @@ releaseMemArray(Mem * p, int N)
 			mem_destroy(p);
 			p->flags = MEM_Undefined;
 		} while ((++p) < pEnd);
-	}
-}
-
-/**************************** sql_value_  ******************************
- * The following routines extract information from a Mem or sql_value
- * structure.
- */
-const void *
-sql_value_blob(sql_value * pVal)
-{
-	Mem *p = (Mem *) pVal;
-	if (p->flags & (MEM_Blob | MEM_Str)) {
-		if (ExpandBlob(p) != 0) {
-			assert(p->flags == MEM_Null && p->z == 0);
-			return 0;
-		}
-		p->flags |= MEM_Blob;
-		return p->n ? p->z : 0;
-	} else {
-		if (mem_to_str(pVal) != 0)
-			return NULL;
-		return pVal->z;
 	}
 }
 
