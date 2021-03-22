@@ -4825,8 +4825,11 @@ case OP_RenameTable: {
  */
 case OP_LoadAnalysis: {
 	assert(pOp->p1==0 );
+	/* TODO: Enable analysis. */
+	/*
 	if (sql_analysis_load(db) != 0)
 		goto abort_due_to_error;
+	*/
 	break;
 }
 

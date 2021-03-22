@@ -116,6 +116,8 @@
 #include "tarantoolInt.h"
 #include "vdbeInt.h"
 
+#if 0
+
 /**
  * This routine generates code that opens the sql_stat1/4 tables.
  * If the sql_statN tables do not previously exist, they are
@@ -1114,19 +1116,6 @@ sqlAnalyze(Parse * pParse, Token * pName)
 		sqlVdbeAddOp0(v, OP_Expire);
 }
 
-ssize_t
-sql_index_tuple_size(struct space *space, struct index *idx)
-{
-	assert(space != NULL);
-	assert(idx != NULL);
-	assert(idx->def->space_id == space->def->id);
-	ssize_t tuple_count = index_size(idx);
-	ssize_t space_size = space_bsize(space);
-	ssize_t avg_tuple_size = tuple_count != 0 ?
-				 (space_size / tuple_count) : 0;
-	return avg_tuple_size;
-}
-
 /**
  * Used to pass information from the analyzer reader through
  * to the callback routine.
@@ -1539,70 +1528,6 @@ load_stat_to_index(const char *sql_select_load, struct index_stat **stats)
 }
 
 /**
- * default_tuple_est[] array contains default information
- * which is used when we don't have real space, e.g. temporary
- * objects representing result set of nested SELECT or VIEW.
- *
- * First number is supposed to contain the number of elements
- * in the index. Since we do not know, guess 1 million.
- * Second one is an estimate of the number of rows in the
- * table that match any particular value of the first column of
- * the index. Third one is an estimate of the number of
- * rows that match any particular combination of the first 2
- * columns of the index. And so on. It must always be true:
- *
- *           default_tuple_est[N] <= default_tuple_est[N-1]
- *           default_tuple_est[N] >= 1
- *
- * Apart from that, we have little to go on besides intuition
- * as to how default values should be initialized. The numbers
- * generated here are based on typical values found in actual
- * indices.
- */
-const log_est_t default_tuple_est[] = {DEFAULT_TUPLE_LOG_COUNT,
-/**                  [10*log_{2}(x)]:  10, 9,  8,  7,  6,  5 */
-				       33, 32, 30, 28, 26, 23};
-
-LogEst
-sql_space_tuple_log_count(struct space *space)
-{
-	if (space == NULL || space->index_map == NULL)
-		return 0;
-
-	struct index *pk = space_index(space, 0);
-	assert(sqlLogEst(DEFAULT_TUPLE_COUNT) == DEFAULT_TUPLE_LOG_COUNT);
-	/* If space represents VIEW, return default number. */
-	if (pk == NULL)
-		return DEFAULT_TUPLE_LOG_COUNT;
-	return sqlLogEst(pk->vtab->size(pk));
-}
-
-log_est_t
-index_field_tuple_est(const struct index_def *idx_def, uint32_t field)
-{
-	assert(idx_def != NULL);
-	struct space *space = space_by_id(idx_def->space_id);
-	if (space == NULL || strcmp(idx_def->name, "fake_autoindex") == 0)
-		return idx_def->opts.stat->tuple_log_est[field];
-	assert(field <= idx_def->key_def->part_count);
-	/* Statistics is held only in real indexes. */
-	struct index *tnt_idx = space_index(space, idx_def->iid);
-	assert(tnt_idx != NULL);
-	if (tnt_idx->def->opts.stat == NULL) {
-		/*
-		 * Last number for unique index is always 0:
-		 * only one tuple exists with given full key
-		 * in unique index and log(1) == 0.
-		 */
-		if (field == idx_def->key_def->part_count &&
-		    idx_def->opts.is_unique)
-			return 0;
-		return default_tuple_est[field + 1 >= 6 ? 6 : field];
-	}
-	return tnt_idx->def->opts.stat->tuple_log_est[field];
-}
-
-/**
  * This function performs copy of statistics.
  * In contrast to index_stat_dup(), there is no assumption
  * that source statistics is allocated within chunk. But
@@ -1744,3 +1669,5 @@ fail:
 	box_txn_rollback();
 	return -1;
 }
+
+#endif
