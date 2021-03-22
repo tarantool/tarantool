@@ -434,9 +434,6 @@ int
 sql_step(sql_stmt *);
 
 int
-sql_column_bytes(sql_stmt *, int iCol);
-
-int
 sql_column_bytes16(sql_stmt *, int iCol);
 
 char *

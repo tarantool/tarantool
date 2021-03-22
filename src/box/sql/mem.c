@@ -1166,6 +1166,18 @@ mem_get_bin(const struct Mem *mem, const char **s)
 }
 
 int
+mem_len(const struct Mem *mem, uint32_t *len)
+{
+	if ((mem->flags & (MEM_Str | MEM_Blob)) == 0)
+		return -1;
+	if ((mem->flags & MEM_Blob) !=0 && (mem->flags & MEM_Zero) != 0)
+		*len = mem->n + mem->u.nZero;
+	else
+		*len = mem->n;
+	return 0;
+}
+
+int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
 	mem_clear(to);
@@ -1901,41 +1913,6 @@ sql_value_type(sql_value *pVal)
 	return mem_mp_type(mem);
 }
 
-/*
- * The sqlValueBytes() routine returns the number of bytes in the
- * sql_value object assuming that it uses the encoding "enc".
- * The valueBytes() routine is a helper function.
- */
-static SQL_NOINLINE int
-valueBytes(sql_value * pVal)
-{
-	if (mem_to_str(pVal) != 0)
-		return 0;
-	return pVal->n;
-}
-
-int
-sqlValueBytes(sql_value * pVal)
-{
-	Mem *p = (Mem *) pVal;
-	assert((p->flags & MEM_Null) == 0
-	       || (p->flags & (MEM_Str | MEM_Blob)) == 0);
-	if ((p->flags & MEM_Str) != 0) {
-		return p->n;
-	}
-	if ((p->flags & MEM_Blob) != 0) {
-		if (p->flags & MEM_Zero) {
-			return p->n + p->u.nZero;
-		} else {
-			return p->n;
-		}
-	}
-	if (p->flags & MEM_Null)
-		return 0;
-	return valueBytes(pVal);
-}
-
-
 #ifdef SQL_DEBUG
 /*
  * Check invariants on a Mem object.
@@ -2240,53 +2217,6 @@ releaseMemArray(Mem * p, int N)
 			p->flags = MEM_Undefined;
 		} while ((++p) < pEnd);
 	}
-}
-
-int
-sql_value_bytes(sql_value * pVal)
-{
-	return sqlValueBytes(pVal);
-}
-
-/*
- * Return a pointer to static memory containing an SQL NULL value.
- */
-const Mem *
-columnNullValue(void)
-{
-	/* Even though the Mem structure contains an element
-	 * of type i64, on certain architectures (x86) with certain compiler
-	 * switches (-Os), gcc may align this Mem object on a 4-byte boundary
-	 * instead of an 8-byte one. This all works fine, except that when
-	 * running with SQL_DEBUG defined the sql code sometimes assert()s
-	 * that a Mem structure is located on an 8-byte boundary. To prevent
-	 * these assert()s from failing, when building with SQL_DEBUG defined
-	 * using gcc, we force nullMem to be 8-byte aligned using the magical
-	 * __attribute__((aligned(8))) macro.
-	 */
-	static const Mem nullMem
-#if defined(SQL_DEBUG) && defined(__GNUC__)
-	    __attribute__ ((aligned(8)))
-#endif
-	    = {
-		/* .u          = */  {
-		0},
-		    /* .flags      = */ (u16) MEM_Null,
-		    /* .eSubtype   = */ (u8) 0,
-		    /* .field_type = */ field_type_MAX,
-		    /* .n          = */ (int)0,
-		    /* .z          = */ (char *)0,
-		    /* .zMalloc    = */ (char *)0,
-		    /* .szMalloc   = */ (int)0,
-		    /* .uTemp      = */ (u32) 0,
-		    /* .db         = */ (sql *) 0,
-		    /* .xDel       = */ (void (*)(void *))0,
-#ifdef SQL_DEBUG
-		    /* .pScopyFrom = */ (Mem *) 0,
-		    /* .pFiller    = */ (void *)0,
-#endif
-	};
-	return &nullMem;
 }
 
 /*
