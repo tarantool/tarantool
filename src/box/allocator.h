@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 #include <small/small.h>
+#include "sysalloc.h"
 
 struct alloc_stats {
 	size_t used;
@@ -87,4 +88,38 @@ public:
 	}
 private:
 	static struct small_alloc small_alloc;
+};
+
+class SysAlloc
+{
+public:
+	static inline void
+	create(struct quota *quota)
+	{
+		sys_alloc_create(&sys_alloc, quota);
+	}
+	static inline void
+	destroy(void)
+	{
+		sys_alloc_destroy(&sys_alloc);
+	}
+	static inline void *
+	alloc(size_t size)
+	{
+		return sysalloc(&sys_alloc, size);
+	};
+	static inline void
+	free(void *ptr, size_t size)
+	{
+		return sysfree(&sys_alloc, ptr, size);
+	}
+	static inline void
+	stats(struct alloc_stats *alloc_stats)
+	{
+		struct sys_stats data_stats;
+		sys_stats(&sys_alloc, &data_stats);
+		alloc_stats->used = data_stats.used;
+	}
+private:
+	static struct sys_alloc sys_alloc;
 };
