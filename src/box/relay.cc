@@ -1047,6 +1047,7 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 					    ERRINJ_INT);
 		if (inj != NULL && packet->lsn == inj->iparam) {
 			packet->lsn = inj->iparam - 1;
+			packet->tsn = packet->lsn;
 			say_warn("injected broken lsn: %lld",
 				 (long long) packet->lsn);
 		}
