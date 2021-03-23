@@ -30,32 +30,44 @@
  * SUCH DAMAGE.
  */
 #include <small/small.h>
-#include "sysalloc.h"
 
-struct SmallAlloc
-{
-	static inline void *
-	alloc(void *alloc, size_t size)
-	{
-		return smalloc((struct small_alloc *)alloc, size);
-	};
-	static inline void
-	free(void *alloc, void *ptr, size_t size)
-	{
-		return smfree((struct small_alloc *)alloc, ptr, size);
-	}
+#include <pthread.h>
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+struct sys_alloc {
+	/** Allocated bytes */
+	uint64_t used_bytes;
+	/** The source of allocations */
+	struct quota *quota;
+	/**
+	 * List of allocations, used to free up
+	 * memory, when allocator is destroyed
+	 */
+	struct rlist allocations;
+#ifndef _NDEBUG
+	/**
+	 * Debug only: track that all allocations
+	 * are made from a single thread.
+	 */
+	pthread_t thread_id;
+#endif
 };
 
-struct SysAlloc
-{
-	static inline void *
-	alloc(void *alloc, size_t size)
-	{
-		return sysalloc((struct sys_alloc *)alloc, size);
-	};
-	static inline void
-	free(void *alloc, void *ptr, size_t size)
-	{
-		return sysfree((struct sys_alloc *)alloc, ptr, size);
-	}
-};
+void
+sys_alloc_create(struct sys_alloc *alloc, struct quota *quota);
+
+void
+sys_alloc_destroy(struct sys_alloc *alloc);
+
+void *
+sysalloc(struct sys_alloc *alloc, size_t size);
+
+void
+sysfree(struct sys_alloc *alloc, void *ptr, size_t size);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */

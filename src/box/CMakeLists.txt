@@ -130,6 +130,7 @@ add_library(box STATIC
     memtx_engine.cc
     memtx_space.c
     sysview.c
+    sysalloc.c
     blackhole.c
     service_engine.c
     session_settings.c
