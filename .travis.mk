@@ -234,6 +234,9 @@ deps_osx_github_actions:
 	pip3 install --force-reinstall -r test-run/requirements.txt
 
 build_osx:
+	# due swap disabling should be manualy configured need to
+	# control it's status
+	sysctl vm.swapusage
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
 	make -j
 
@@ -272,6 +275,7 @@ deps_freebsd:
 		autoconf automake libtool
 
 build_freebsd:
+	if [ "$$(swapctl -l | wc -l)" != "1" ]; then sudo swapoff -a ; fi ; swapctl -l
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
 	gmake -j
 

@@ -8,4 +8,35 @@ runs:
         echo TEST_TIMEOUT=310 | tee -a $GITHUB_ENV
         echo NO_OUTPUT_TIMEOUT=320 | tee -a $GITHUB_ENV
         echo PRESERVE_ENVVARS=REPLICATION_SYNC_TIMEOUT,TEST_TIMEOUT,NO_OUTPUT_TIMEOUT | tee -a $GITHUB_ENV
+        # This switching off swap command will not work as github step
+        # run from inside github 'container' tag. Also it will fail to
+        # run from it. So running it only outside of docker container.
+        # Also on local hosts, like that we use for 'freebsd' workflow
+        # testing, 'sudo' not acceptable outside of 'freebsd' virtual
+        # machine and to avoid of hangs let's check sudo run ability
+        # with command like 'timeout 2 sudo ls /sbin/swapoff'.
+        # NOTE: To switch off swap from inside github 'container' tag
+        # additional memory flags should be added to its 'options' tag:
+        #   options: '--memory=<some value, like 7G> --memory-swap=<the same value as for memory option>'
+        if which free ; then
+            echo "Check initial swap memory values:"
+            free
+        fi
+        if timeout 2 sudo ls /sbin/swapoff ; then
+            echo "Verified that 'sudo' enabled, switching off swap ..."
+            sudo /sbin/swapoff -a || echo "'swapoff' command failed, but failure is acceptable from inside the container"
+            if [ -e /proc/meminfo ] ; then
+                if [ "$(grep SwapTotal: /proc/meminfo | awk '{ print $2; }')" = "0" ] ; then
+                    echo "Swap disabled"
+                else
+                    echo "WARNING: swap still exists on the host, limits in container options can resolve it"
+                fi
+            else
+                echo "File '/proc/meminfo' not exists - couldn't check the swap size"
+            fi
+            if which free ; then
+                echo "Check updated swap memory values if 'swapoff' succeded:"
+                free
+            fi
+        fi
       shell: bash
