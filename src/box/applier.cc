@@ -116,6 +116,8 @@ applier_log_error(struct applier *applier, struct error *e)
 	case ER_PASSWORD_MISMATCH:
 	case ER_XLOG_GAP:
 	case ER_TOO_EARLY_SUBSCRIBE:
+	case ER_SYNC_QUORUM_TIMEOUT:
+	case ER_SYNC_ROLLBACK:
 		say_info("will retry every %.2lf second",
 			 replication_reconnect_interval());
 		break;
