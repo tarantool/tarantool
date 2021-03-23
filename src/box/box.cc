@@ -867,6 +867,18 @@ box_check_sql_cache_size(int size)
 }
 
 static void
+box_check_allocator(void)
+{
+	const char *allocator = cfg_gets("allocator");
+	if (allocator == NULL ||
+	    (strcmp(allocator, "small") && strcmp(allocator, "system"))) {
+		tnt_raise(ClientError, ER_CFG, "allocator",
+			  tt_sprintf("must be small or system, but was set to %s",
+				     (allocator == NULL ? "NULL" : allocator)));
+	}
+}
+
+static void
 box_check_small_alloc_options(void)
 {
 	/*
@@ -921,6 +933,7 @@ box_check_config(void)
 	if (box_check_memory_quota("memtx_memory") < 0)
 		diag_raise();
 	box_check_memtx_min_tuple_size(cfg_geti64("memtx_min_tuple_size"));
+	box_check_allocator();
 	box_check_small_alloc_options();
 	box_check_vinyl_options();
 	if (box_check_sql_cache_size(cfg_geti("sql_cache_size")) != 0)
@@ -2596,6 +2609,7 @@ engine_init()
 				    cfg_geti("memtx_min_tuple_size"),
 				    cfg_geti("strip_core"),
 				    cfg_geti("slab_alloc_granularity"),
+				    cfg_gets("allocator"),
 				    cfg_getd("slab_alloc_factor"));
 	engine_register((struct engine *)memtx);
 	box_set_memtx_max_tuple_size();

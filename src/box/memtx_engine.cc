@@ -90,7 +90,9 @@ static inline void *
 memtx_engine_get_alloc(struct memtx_engine *memtx)
 {
 	if (std::is_same<ALLOC, SmallAlloc>::value)
-		return &memtx->alloc;
+		return &memtx->small_alloc;
+	else if (std::is_same<ALLOC, SysAlloc>::value)
+		return &memtx->sys_alloc;
 	return NULL;
 }
 
@@ -99,7 +101,9 @@ static inline struct lifo *
 memtx_engine_get_delayed_lifo(struct memtx_engine *memtx)
 {
 	if (std::is_same<ALLOC, SmallAlloc>::value)
-		return &memtx->delayed;
+		return &memtx->small_delayed;
+	else if (std::is_same<ALLOC, SysAlloc>::value)
+		return &memtx->sys_delayed;
 	return NULL;
 }
 
@@ -215,11 +219,14 @@ memtx_engine_shutdown(struct engine *engine)
 	mempool_destroy(&memtx->index_extent_pool);
 	slab_cache_destroy(&memtx->index_slab_cache);
 	void *item;
-	while ((item = lifo_pop(&memtx->delayed)))
+	while ((item = lifo_pop(&memtx->small_delayed)))
 		memtx_free_tuple_from_lifo<SmallAlloc>(memtx, item);
-	small_alloc_destroy(&memtx->alloc);
+	small_alloc_destroy(&memtx->small_alloc);
 	slab_cache_destroy(&memtx->slab_cache);
 	tuple_arena_destroy(&memtx->arena);
+	while ((item = lifo_pop(&memtx->sys_delayed)))
+		memtx_free_tuple_from_lifo<SysAlloc>(memtx, item);
+	sys_alloc_destroy(&memtx->sys_alloc);
 	xdir_destroy(&memtx->snap_dir);
 	free(memtx);
 }
@@ -1065,7 +1072,7 @@ memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 	struct small_stats data_stats;
 	struct mempool_stats index_stats;
 	mempool_stats(&memtx->index_extent_pool, &index_stats);
-	small_stats(&memtx->alloc, &data_stats, small_stats_noop_cb, NULL);
+	small_stats(&memtx->small_alloc, &data_stats, small_stats_noop_cb, NULL);
 	stat->data += data_stats.used;
 	stat->index += index_stats.totals.used;
 }
@@ -1143,7 +1150,8 @@ memtx_engine_gc_f(va_list va)
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
-		 bool dontdump, unsigned granularity, float alloc_factor)
+		 bool dontdump, unsigned granularity,
+		 const char *allocator, float alloc_factor)
 {
 	int64_t snap_signature;
 	struct memtx_engine *memtx =
@@ -1213,13 +1221,18 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 			   SLAB_SIZE, dontdump, "memtx");
 	slab_cache_create(&memtx->slab_cache, &memtx->arena);
 	float actual_alloc_factor;
-	small_alloc_create(&memtx->alloc, &memtx->slab_cache,
+	small_alloc_create(&memtx->small_alloc, &memtx->slab_cache,
 			   objsize_min, granularity, alloc_factor,
 			   &actual_alloc_factor);
-	create_memtx_tuple_format_vtab<SmallAlloc>(&memtx_tuple_format_vtab);
+	sys_alloc_create(&memtx->sys_alloc, &memtx->quota);
+	if (!strcmp(allocator, "small"))
+		create_memtx_tuple_format_vtab<SmallAlloc>(&memtx_tuple_format_vtab);
+	else
+		create_memtx_tuple_format_vtab<SysAlloc>(&memtx_tuple_format_vtab);
 	say_info("Actual slab_alloc_factor calculated on the basis of desired "
 		 "slab_alloc_factor = %f", actual_alloc_factor);
-	lifo_init(&memtx->delayed);
+	lifo_init(&memtx->small_delayed);
+	lifo_init(&memtx->sys_delayed);
 	memtx->free_mode = MEMTX_ENGINE_FREE;
 
 

@@ -40,6 +40,7 @@
 #include "engine.h"
 #include "xlog.h"
 #include "salad/stailq.h"
+#include "sysalloc.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -148,7 +149,9 @@ struct memtx_engine {
 	/** Slab cache for allocating tuples. */
 	struct slab_cache slab_cache;
 	/** Tuple allocator. */
-	struct small_alloc alloc;
+	struct small_alloc small_alloc;
+	/** Tuple allocator */
+	struct sys_alloc sys_alloc;
 	/** Slab cache for allocating index extents. */
 	struct slab_cache index_slab_cache;
 	/** Index extent allocator. */
@@ -195,9 +198,15 @@ struct memtx_engine {
 	 */
 	enum memtx_engine_free_mode free_mode;
 	/**
-	 * List of tuples to be freed if delayed free mode
+	 * List of tuples to be freed if delayed free mode,
+	 * in case when small allocator selected.
 	 */
-	struct lifo delayed;
+	struct lifo small_delayed;
+	/**
+	 * List of tuples to be freed if delayed free mode,
+	 * in case when system allocator selected.
+	 */
+	struct lifo sys_delayed;
 };
 
 struct memtx_gc_task;
@@ -231,9 +240,9 @@ memtx_engine_schedule_gc(struct memtx_engine *memtx,
 
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
-		 uint64_t tuple_arena_max_size,
-		 uint32_t objsize_min, bool dontdump,
-		 unsigned granularity, float alloc_factor);
+		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
+		 bool dontdump, unsigned granularity,
+		 const char *allocator, float alloc_factor);
 
 int
 memtx_engine_recover_snapshot(struct memtx_engine *memtx,
@@ -309,15 +318,15 @@ memtx_index_def_change_requires_rebuild(struct index *index,
 
 static inline struct memtx_engine *
 memtx_engine_new_xc(const char *snap_dirname, bool force_recovery,
-		    uint64_t tuple_arena_max_size,
-		    uint32_t objsize_min, bool dontdump,
-		    unsigned granularity, float alloc_factor)
+		    uint64_t tuple_arena_max_size, uint32_t objsize_min,
+		    bool dontdump, unsigned granularity,
+		    const char *allocator, float alloc_factor)
 {
 	struct memtx_engine *memtx;
 	memtx = memtx_engine_new(snap_dirname, force_recovery,
 				 tuple_arena_max_size,
 				 objsize_min, dontdump,
-				 granularity, alloc_factor);
+				 granularity, allocator, alloc_factor);
 	if (memtx == NULL)
 		diag_raise();
 	return memtx;
