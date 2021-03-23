@@ -325,6 +325,9 @@ deps_osx_github_actions:
 	pip3 install --force-reinstall -r test-run/requirements.txt
 
 build_osx:
+	# due swap disabling should be manualy configured need to
+	# control it's status
+	sysctl vm.swapusage
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
 	make -j
 
@@ -375,6 +378,9 @@ base_deps_osx_github_actions:
 # builddir used in this target - is a default build path from cmake
 # ExternalProject_Add()
 test_static_build_cmake_osx_no_deps:
+	# due swap disabling should be manualy configured need to
+	# control it's status
+	sysctl vm.swapusage
 	cd static-build && cmake -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON" . && \
 	make -j && ctest -V
 	# FIXME: Hell with SIP on OSX: Tarantool (and also LuaJIT)
@@ -406,6 +412,7 @@ deps_freebsd:
 		python27 py27-yaml py27-six py27-gevent
 
 build_freebsd:
+	if [ "$$(swapctl -l | wc -l)" != "1" ]; then sudo swapoff -a ; fi ; swapctl -l
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
 	gmake -j
 
