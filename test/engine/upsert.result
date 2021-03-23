@@ -1099,6 +1099,7 @@ index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} }
 ...
 space:upsert({0, 0}, {{'+', 1, 1}, {'+', 2, 1}})
 ---
+- null
 ...
 space:get({0})
 ---
@@ -1486,6 +1487,7 @@ index2:select{}
 ...
 space:upsert({1, 1}, {{'=', 2, 2}})
 ---
+- null
 ...
 sort(index1:select{})
 ---
@@ -1508,6 +1510,7 @@ index = s:create_index('pk')
 ...
 s:upsert({0, 0}, {{'+', 2, 2}})
 ---
+- null
 ...
 s:select{0}
 ---
@@ -1518,6 +1521,7 @@ tmp = s:delete{0}
 ...
 s:upsert({0, 0, 0}, {{'+', 2, 2}})
 ---
+- null
 ...
 s:select{0}
 ---
@@ -1528,6 +1532,7 @@ tmp = s:delete{0}
 ...
 s:upsert({0}, {{'+', 2, 2}})
 ---
+- null
 ...
 s:select{0}
 ---
@@ -1539,6 +1544,7 @@ s:replace{0, 1, 2, 4}
 ...
 s:upsert({0, 0, "you will not see it"}, {{'+', 2, 2}})
 ---
+- null
 ...
 s:select{0}
 ---
@@ -1550,6 +1556,7 @@ s:replace{0, -0x4000000000000000ll}
 ...
 s:upsert({0}, {{'+', 2, -0x4000000000000001ll}})  -- overflow
 ---
+- null
 ...
 s:select{0}
 ---
@@ -1561,6 +1568,7 @@ s:replace{0, "thing"}
 ...
 s:upsert({0, "nothing"}, {{'+', 2, 2}})
 ---
+- null
 ...
 s:select{0}
 ---
@@ -1571,6 +1579,7 @@ tmp = s:delete{0}
 ...
 s:upsert({0, "thing"}, {{'+', 2, 2}})
 ---
+- null
 ...
 s:select{0}
 ---
@@ -1582,6 +1591,7 @@ s:replace{0, 1, 2}
 ...
 s:upsert({0}, {{'!', 42, 42}})
 ---
+- null
 ...
 s:select{0}
 ---
@@ -1589,6 +1599,7 @@ s:select{0}
 ...
 s:upsert({0}, {{'#', 42, 42}})
 ---
+- null
 ...
 s:select{0}
 ---
@@ -1596,6 +1607,7 @@ s:select{0}
 ...
 s:upsert({0}, {{'=', 42, 42}})
 ---
+- null
 ...
 s:select{}
 ---
@@ -1611,6 +1623,7 @@ s:select{}
 ...
 s:upsert({0}, {{'|', 1, 255}})
 ---
+- null
 ...
 s:select{0}
 ---
@@ -1626,6 +1639,7 @@ s:replace{0, 'something to splice'}
 ...
 s:upsert({0}, {{':', 2, 1, 4, 'no'}})
 ---
+- null
 ...
 s:select{0}
 ---
@@ -1633,6 +1647,7 @@ s:select{0}
 ...
 s:upsert({0}, {{':', 2, 1, 2, 'every'}})
 ---
+- null
 ...
 s:select{0}
 ---
@@ -1640,6 +1655,7 @@ s:select{0}
 ...
 s:upsert({0}, {{':', 2, -100, 2, 'every'}})
 ---
+- null
 ...
 s:select{0}
 ---
@@ -1695,6 +1711,7 @@ space:upsert({2, 2, 2}, {{'+', 3, 1}})
 ...
 space:upsert({3, 3}, {{'+', 2, 1}})
 ---
+- null
 ...
 -- TODO: https://github.com/tarantool/tarantool/issues/1622
 --space:upsert({4}, {{'=', 2, 10}})
@@ -1813,9 +1830,11 @@ space:upsert({'a'}, {{'a', 2, 100}}) -- must fail on checking ops
 ...
 space:upsert({'a'}, {{'!', 2, 'ups1'}}) -- 'fast' upsert via insert in one index
 ---
+- null
 ...
 space:upsert({'a', 'b'}, {{'!', 2, 'ups2'}}) -- 'fast' upsert via update in one index
 ---
+- null
 ...
 space:select{}
 ---
@@ -1837,12 +1856,15 @@ index2 = space:create_index('secondary', { parts = {2, 'scalar', 3, 'unsigned'} 
 -- test upsert that executes as insert in all indexes
 space:upsert({'a', 100, 100}, {{'!', 4, 200}})
 ---
+- null
 ...
 space:upsert({'b', 100, 200}, {{'!', 4, 300}})
 ---
+- null
 ...
 space:upsert({'c', 100, 300}, {{'!', 4, 400}})
 ---
+- null
 ...
 index1:select{}
 ---
@@ -1863,6 +1885,7 @@ space:upsert({'a', 100, 100}, {{'=', 3, -200}}) -- must fail on cheking new tupl
 ...
 space:upsert({'b', 100, 200}, {{'=', 1, 'd'}}) -- must fail with attempt to modify primary index
 ---
+- null
 ...
 index1:select{}
 ---
@@ -1906,9 +1929,11 @@ space:select{}
 ...
 space:upsert({2, 18, 76}, {})
 ---
+- null
 ...
 space:upsert({4, 4, 4}, {})
 ---
+- null
 ...
 space:select{}
 ---
@@ -2247,9 +2272,11 @@ box.snapshot()
 ...
 s:upsert({1, 1}, {{'+', 2, 2}})
 ---
+- null
 ...
 s:upsert({1, 1}, {{'+', 3, 4}})
 ---
+- null
 ...
 s:select()
 ---
@@ -2282,12 +2309,15 @@ pk = s:create_index('pk', {parts = {1, 'unsigned', 3, 'unsigned'}})
 ...
 s:upsert({100, 100, 100}, {{'+', 2, 200}})
 ---
+- null
 ...
 s:upsert({200, 100, 200}, {{'+', 2, 300}})
 ---
+- null
 ...
 s:upsert({300, 100, 300}, {{'+', 2, 400}})
 ---
+- null
 ...
 pk:select{}
 ---
@@ -2307,12 +2337,15 @@ pk = s:create_index('pk', {parts = {2, 'unsigned', 3, 'unsigned'}})
 ...
 s:upsert({100, 100, 100}, {{'+', 1, 200}})
 ---
+- null
 ...
 s:upsert({200, 100, 200}, {{'+', 1, 300}})
 ---
+- null
 ...
 s:upsert({300, 100, 300}, {{'+', 1, 400}})
 ---
+- null
 ...
 pk:select{}
 ---
@@ -2331,12 +2364,15 @@ pk = s:create_index('pk', {parts = {3, 'unsigned', 2, 'unsigned'}})
 ...
 s:upsert({100, 100, 100}, {{'+', 1, 200}})
 ---
+- null
 ...
 s:upsert({200, 100, 200}, {{'+', 1, 300}})
 ---
+- null
 ...
 s:upsert({300, 100, 300}, {{'+', 1, 400}})
 ---
+- null
 ...
 pk:select{}
 ---
@@ -2366,6 +2402,7 @@ sec:select{}
 ...
 s:upsert({1, 301, 300, 300}, {{'+', 2, 1}, {'+', 3, 1}, {'+', 4, 1}})
 ---
+- null
 ...
 sec:select{}
 ---
@@ -2373,6 +2410,7 @@ sec:select{}
 ...
 s:upsert({1, 302, 301, 301}, {{'+', 2, 1}, {'+', 3, 1}, {'+', 4, 1}})
 ---
+- null
 ...
 sec:select{}
 ---
@@ -2380,6 +2418,7 @@ sec:select{}
 ...
 s:upsert({2, 203, 200, 200}, {{'+', 2, 1}, {'+', 3, 1}, {'+', 4, 1}})
 ---
+- null
 ...
 sec:select{}
 ---

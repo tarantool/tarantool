@@ -73,7 +73,7 @@ for i = 1,100 do
     c1(string.format("t:delete{%d}", i))
 end;
 for i = 1,100 do
-    assert(#c1(string.format("t:get{%d}", i)) == 0)
+    assert(c1(string.format("t:get{%d}", i))[1] == nil)
 end;
 test_run:cmd("setopt delimiter ''");
 
@@ -88,7 +88,7 @@ for i = 1,100 do
 end;
 c1:rollback();
 for i = 1,100 do
-    assert(#c1(string.format("t:get{%d}", i)) == 0)
+    assert(c1(string.format("t:get{%d}", i))[1] == nil)
 end;
 test_run:cmd("setopt delimiter ''");
 

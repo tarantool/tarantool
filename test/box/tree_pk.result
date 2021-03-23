@@ -226,9 +226,11 @@ s0.index['primary']:get{200}
 ...
 s0.index['primary']:get{199}
 ---
+- null
 ...
 s0.index['primary']:get{201}
 ---
+- null
 ...
 s1:drop()
 ---
@@ -284,6 +286,7 @@ s0:replace{1, 1, 1, 1}
 ...
 s0.index['primary']:get{10}
 ---
+- null
 ...
 s0.index['i1']:select{10}
 ---
@@ -324,6 +327,7 @@ s0:delete{10}
 ...
 s0.index['primary']:get{10}
 ---
+- null
 ...
 s0.index['i1']:select{10}
 ---
@@ -344,6 +348,7 @@ s0:insert{1, 10, 10, 10}
 ...
 s0.index['primary']:get{10}
 ---
+- null
 ...
 s0.index['i1']:select{10}
 ---

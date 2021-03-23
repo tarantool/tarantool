@@ -47,9 +47,11 @@ hash:delete{'key 3'}
  | ...
 hash:delete{'key 4'}
  | ---
+ | - null
  | ...
 hash:delete{'key 5'}
  | ---
+ | - null
  | ...
 
 -- delete by invalid keys

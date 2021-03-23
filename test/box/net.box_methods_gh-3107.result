@@ -143,6 +143,7 @@ future:wait_result(100)
 ...
 s:get{6}
 ---
+- null
 ...
 future = c.space.test:update({5}, {{'=', 2, 5}}, {is_async = true})
 ---
@@ -238,6 +239,7 @@ future:wait_result(100)
 ...
 s:get{3}
 ---
+- null
 ...
 future = c.space.test.index.pk:update({4}, {{'=', 2, 6}}, {is_async = true})
 ---

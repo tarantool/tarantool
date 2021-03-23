@@ -19,6 +19,7 @@ s:select()
  | ...
 s:upsert({1}, {{'+', 1, 1}})
  | ---
+ | - null
  | ...
 s:select()
  | ---

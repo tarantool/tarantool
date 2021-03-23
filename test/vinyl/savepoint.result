@@ -92,6 +92,7 @@ index:get({3})
 ...
 index:get({4})
 ---
+- null
 ...
 index:get({5})
 ---
@@ -376,6 +377,7 @@ box.begin()
 ...
 space:delete({5})
 ---
+- null
 ...
 space:update({1}, {{'=', 2, 43}})
 ---
@@ -410,9 +412,11 @@ box.begin()
 ...
 space:delete({15})
 ---
+- null
 ...
 space:delete({10})
 ---
+- null
 ...
 space:insert({11})
 ---
@@ -420,6 +424,7 @@ space:insert({11})
 ...
 space:upsert({12}, {})
 ---
+- null
 ...
 space:insert({'abc'})
 ---
@@ -533,6 +538,7 @@ box.begin()
 ...
 space:delete({1, 'a'})
 ---
+- null
 ...
 space:insert({100, '100', '100', 100})
 ---
@@ -626,6 +632,7 @@ space:upsert({2}, {{'=', 4, 1000}})
 ...
 index3:delete({3, 'a'})
 ---
+- null
 ...
 space:insert({4, 100, 100})
 ---

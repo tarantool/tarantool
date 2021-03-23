@@ -776,6 +776,7 @@ stat_diff(gstat(), st, 'memory.tuple_cache')
 ...
 s:delete(1)
 ---
+- null
 ...
 -- rollback
 st = gstat()
@@ -845,6 +846,7 @@ stat_diff(gstat(), st, 'tx')
 ...
 s:delete(1)
 ---
+- null
 ...
 -- tx statements
 st = gstat()
@@ -972,6 +974,7 @@ stat_diff(gstat(), st, 'tx')
 ...
 s:delete(1)
 ---
+- null
 ...
 -- gap locks
 st = gstat()
@@ -1571,9 +1574,11 @@ i:stat().disk.statement
 ...
 s:upsert({1, 1}, {{'+', 2, 1}})
 ---
+- null
 ...
 s:delete{2}
 ---
+- null
 ...
 box.snapshot()
 ---

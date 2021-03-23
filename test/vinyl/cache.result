@@ -991,6 +991,7 @@ pk:stat().disk.iterator.lookup
 ...
 s:get{3}
 ---
+- null
 ...
 info = pk:stat().cache
 ---

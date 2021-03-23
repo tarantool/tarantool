@@ -58,12 +58,15 @@ space:insert({3})
 ...
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space:select{}
 ---
@@ -73,12 +76,15 @@ space:select{}
 ...
 space:delete{1}
 ---
+- null
 ...
 space:delete{2}
 ---
+- null
 ...
 space:delete{3}
 ---
+- null
 ...
 space:select{}
 ---
@@ -106,12 +112,15 @@ iter_obj = create_iterator(space)
 ...
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space:select{}
 ---
@@ -121,12 +130,15 @@ space:select{}
 ...
 space:delete{1}
 ---
+- null
 ...
 space:delete{2}
 ---
+- null
 ...
 space:delete{3}
 ---
+- null
 ...
 space:select{}
 ---
@@ -151,12 +163,15 @@ space:insert({3})
 ...
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 iter_obj = create_iterator(space)
 ---
@@ -169,12 +184,15 @@ space:select{}
 ...
 space:delete{1}
 ---
+- null
 ...
 space:delete{2}
 ---
+- null
 ...
 space:delete{3}
 ---
+- null
 ...
 space:select{}
 ---
@@ -193,21 +211,27 @@ iter_obj = create_iterator(space)
 ...
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space:delete{1}
 ---
+- null
 ...
 space:delete{2}
 ---
+- null
 ...
 space:delete{3}
 ---
+- null
 ...
 space:select{}
 ---
@@ -220,24 +244,30 @@ iterate_over(iter_obj)
 --   2) create iterator after initializing
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 iter_obj = create_iterator(space)
 ---
 ...
 space:delete{1}
 ---
+- null
 ...
 space:delete{2}
 ---
+- null
 ...
 space:delete{3}
 ---
+- null
 ...
 space:select{}
 ---
@@ -250,24 +280,30 @@ iterate_over(iter_obj)
 --   3) create iterator within test case
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space:delete{1}
 ---
+- null
 ...
 space:delete{2}
 ---
+- null
 ...
 iter_obj = create_iterator(space)
 ---
 ...
 space:delete{3}
 ---
+- null
 ...
 space:select{}
 ---
@@ -286,21 +322,27 @@ iter_obj = create_iterator(space)
 ...
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space:select{}
 ---
@@ -320,24 +362,30 @@ space:truncate()
 --   2) create iterator after initializing
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 iter_obj = create_iterator(space)
 ---
 ...
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space:select{}
 ---
@@ -357,24 +405,30 @@ space:truncate()
 --   3) create iterator within test case
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 iter_obj = create_iterator(space)
 ---
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space:select{}
 ---
@@ -400,6 +454,7 @@ iter_obj = create_iterator(space)
 ...
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:replace({1, 10})
 ---
@@ -407,6 +462,7 @@ space:replace({1, 10})
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:replace({2, 20})
 ---
@@ -414,6 +470,7 @@ space:replace({2, 20})
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space:replace({3, 30})
 ---
@@ -437,12 +494,15 @@ space:truncate()
 --   2) create iterator after initializing
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 iter_obj = create_iterator(space)
 ---
@@ -477,6 +537,7 @@ space:truncate()
 --   3) create iterator within test case
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:replace({1, 10})
 ---
@@ -484,6 +545,7 @@ space:replace({1, 10})
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:replace({2, 20})
 ---
@@ -491,6 +553,7 @@ space:replace({2, 20})
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 iter_obj = create_iterator(space)
 ---
@@ -535,12 +598,15 @@ space:replace({3, 30})
 ...
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space:select{}
 ---
@@ -575,12 +641,15 @@ iter_obj = create_iterator(space)
 ...
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space:select{}
 ---
@@ -612,15 +681,18 @@ space:replace({3, 30})
 ...
 space:upsert({1}, {{'!', 2, 1}})
 ---
+- null
 ...
 iter_obj = create_iterator(space)
 ---
 ...
 space:upsert({2}, {{'!', 2, 2}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space:select{}
 ---
@@ -658,12 +730,15 @@ space:replace({3, 30})
 ...
 space:delete{1}
 ---
+- null
 ...
 space:delete{2}
 ---
+- null
 ...
 space:delete{3}
 ---
+- null
 ...
 space:select{}
 ---
@@ -691,12 +766,15 @@ iter_obj = create_iterator(space)
 ...
 space:delete{1}
 ---
+- null
 ...
 space:delete{2}
 ---
+- null
 ...
 space:delete{3}
 ---
+- null
 ...
 space:select{}
 ---
@@ -721,15 +799,18 @@ space:replace({3, 30})
 ...
 space:delete{1}
 ---
+- null
 ...
 space:delete{2}
 ---
+- null
 ...
 iter_obj = create_iterator(space)
 ---
 ...
 space:delete{3}
 ---
+- null
 ...
 space:select{}
 ---
@@ -760,12 +841,15 @@ iter_obj = create_iterator(space)
 ...
 space:delete({1})
 ---
+- null
 ...
 space:delete({2})
 ---
+- null
 ...
 space:delete({3})
 ---
+- null
 ...
 space:replace({1})
 ---
@@ -809,12 +893,15 @@ space:insert({3, 30})
 ...
 space:delete({1})
 ---
+- null
 ...
 space:delete({2})
 ---
+- null
 ...
 space:delete({3})
 ---
+- null
 ...
 iter_obj = create_iterator(space)
 ---
@@ -861,12 +948,15 @@ space:insert({3, 30})
 ...
 space:delete({1})
 ---
+- null
 ...
 space:delete({2})
 ---
+- null
 ...
 space:delete({3})
 ---
+- null
 ...
 space:replace({1})
 ---
@@ -1039,12 +1129,15 @@ iter_obj = create_iterator(space)
 ...
 space:upsert({1}, {{'!', 2, 10}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 20}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 30}})
 ---
+- null
 ...
 space:select{}
 ---
@@ -1064,15 +1157,18 @@ space:truncate()
 --   2) create iterator after initializing
 space:upsert({1}, {{'!', 2, 10}})
 ---
+- null
 ...
 iter_obj = create_iterator(space)
 ---
 ...
 space:upsert({2}, {{'!', 2, 20}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 30}})
 ---
+- null
 ...
 space:select{}
 ---
@@ -1092,12 +1188,15 @@ space:truncate()
 --   3) create iterator within test case
 space:upsert({1}, {{'!', 2, 10}})
 ---
+- null
 ...
 space:upsert({2}, {{'!', 2, 20}})
 ---
+- null
 ...
 space:upsert({3}, {{'!', 2, 30}})
 ---
+- null
 ...
 iter_obj = create_iterator(space)
 ---
@@ -1243,9 +1342,11 @@ space1:replace({3})
 ...
 space1:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space1:upsert({5}, {{'!', 2, 5}})
 ---
+- null
 ...
 iter_obj_sp1 = create_iterator(space1, 3, {iterator = box.index.EQ})
 ---
@@ -1359,9 +1460,11 @@ space4:replace({3})
 ...
 space4:upsert({3}, {{'!', 2, 3}})
 ---
+- null
 ...
 space4:upsert({5}, {{'!', 2, 5}})
 ---
+- null
 ...
 iter_obj_sp4 = create_iterator(space4, 3, {iterator = box.index.LE})
 ---
@@ -1523,6 +1626,7 @@ space:replace({1, 2, 3})
 ...
 space:delete({1})
 ---
+- null
 ...
 space:replace({1, 1, 1})
 ---
@@ -1530,6 +1634,7 @@ space:replace({1, 1, 1})
 ...
 space:upsert({1, 1, 1}, {{'+', 2, 1}, {'+', 3, 2}})
 ---
+- null
 ...
 space:select{}
 ---
@@ -1544,6 +1649,7 @@ iter_obj2 = create_iterator(idx2, 2, {iterator = 'EQ'})
 ...
 space:delete({1})
 ---
+- null
 ...
 iterate_over(iter_obj2)
 ---
@@ -2133,6 +2239,7 @@ c("s:replace{0, 1}")
 ...
 s:upsert({1, 1}, {{'+', 2, 5}})
 ---
+- null
 ...
 s:select{0}
 ---
@@ -2179,6 +2286,7 @@ value
 ...
 s:delete{2}
 ---
+- null
 ...
 state, value = gen(param, state)
 ---

@@ -80,6 +80,7 @@ box.space.sync:get({11})
  | ...
 box.space.sync:get({12})
  | ---
+ | - null
  | ...
 box.space.sync:get({13})
  | ---

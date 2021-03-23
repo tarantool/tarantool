@@ -176,17 +176,18 @@ call  myinsert (1, 'test box delete')
 call  space:delete (1,)
 - [1, 'test box delete']
 call  space:delete (1,)
-
+- None
 call  myinsert (2, 'test box delete')
 - [2, 'test box delete']
 call  space:delete (1,)
-
+- None
 call  space:delete (2,)
 - [2, 'test box delete']
 call  space:delete (2,)
-
+- None
 space:delete{2}
 ---
+- null
 ...
 call  myinsert (2, 'test box delete')
 - [2, 'test box delete']
@@ -197,7 +198,7 @@ space:delete{2}
 - [2, 'test box delete']
 ...
 call  space:get (2,)
-
+- None
 call  myinsert (2, 'test box.select()')
 - [2, 'test box.select()']
 call  space:get (2,)
@@ -214,6 +215,7 @@ space:select{2}
 ...
 space:get{1}
 ---
+- null
 ...
 space:select{1}
 ---
@@ -244,7 +246,7 @@ call  space:select (2,)
 call  space:delete (2,)
 - [2]
 call  space:delete (2,)
-
+- None
 call  myinsert (3, 'old', 2)
 - [3, 'old', 2]
 call  myinsert (3, 'old', 2)

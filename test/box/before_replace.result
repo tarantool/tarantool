@@ -96,6 +96,7 @@ old_tuple, new_tuple
 ...
 s:upsert({1, 1}, {{'=', 2, 1}})
 ---
+- null
 ...
 old_tuple, new_tuple
 ---
@@ -104,6 +105,7 @@ old_tuple, new_tuple
 ...
 s:upsert({2, 2}, {{'=', 2, 2}})
 ---
+- null
 ...
 old_tuple, new_tuple
 ---
@@ -179,12 +181,15 @@ s:before_replace(ret_old) == ret_old
 ...
 s:insert{2, 2}
 ---
+- null
 ...
 s:update(1, {{'+', 2, 1}})
 ---
+- null
 ...
 s:delete(1)
 ---
+- null
 ...
 s:select()
 ---
@@ -494,6 +499,7 @@ s:on_replace(save) == save
 ...
 s:replace{1, 2}
 ---
+- null
 ...
 old_tuple, new_tuple
 ---
@@ -502,6 +508,7 @@ old_tuple, new_tuple
 ...
 s:delete(1)
 ---
+- null
 ...
 old_tuple, new_tuple
 ---
@@ -510,6 +517,7 @@ old_tuple, new_tuple
 ...
 s:insert{2, 2}
 ---
+- null
 ...
 old_tuple, new_tuple
 ---
@@ -659,6 +667,7 @@ s:before_replace(ret_old) == ret_old
 ...
 s:insert{1, 1}
 ---
+- null
 ...
 path = fio.pathjoin(box.cfg.wal_dir, string.format('%020d.xlog', box.info.lsn - 1))
 ---
@@ -757,6 +766,7 @@ type(s:before_replace(before_replace2))
 ...
 s:insert{1, 1}
 ---
+- null
 ...
 s:select{}
 ---

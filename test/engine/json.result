@@ -235,6 +235,7 @@ s:insert{{1, 2}, 3}
 ...
 s:upsert({{box.null, 2}}, {{'+', 2, 5}})
 ---
+- null
 ...
 s:get(2)
 ---
@@ -667,6 +668,7 @@ box.snapshot()
 ...
 s:upsert({1, 90, {town = 'Berlin', FIO = {fname = 'X', sname = 'Y'}}}, {{'+', 2, 1}})
 ---
+- null
 ...
 town:select()
 ---

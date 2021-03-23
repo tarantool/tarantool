@@ -50,9 +50,11 @@ hash:delete{3}
  | ...
 hash:delete{4}
  | ---
+ | - null
  | ...
 hash:delete{5}
  | ---
+ | - null
  | ...
 
 -- delete by invalid keys

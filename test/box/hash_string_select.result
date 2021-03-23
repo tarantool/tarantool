@@ -47,9 +47,11 @@ hash.index['primary']:get{'key 3'}
  | ...
 hash.index['primary']:get{'key 4'}
  | ---
+ | - null
  | ...
 hash.index['primary']:get{'key 5'}
  | ---
+ | - null
  | ...
 
 -- select by invalid keys

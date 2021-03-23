@@ -4,6 +4,7 @@ box.info.lsn
 ...
 box.space._schema:delete('dummy')
 ---
+- null
 ...
 box.info.lsn
 ---
@@ -11,6 +12,7 @@ box.info.lsn
 ...
 box.space._schema:delete('dummy')
 ---
+- null
 ...
 box.snapshot()
 ---
@@ -22,6 +24,7 @@ box.info.lsn
 ...
 box.space._schema:delete('dummy')
 ---
+- null
 ...
 box.snapshot()
 ---

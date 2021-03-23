@@ -139,6 +139,7 @@ s:get({'sql_default_engine'})
  | ...
 s:get({'abcd'})
  | ---
+ | - null
  | ...
 
 -- Check pairs() method of session_settings space.
@@ -174,6 +175,7 @@ s:update('sql_default_engine', {{':', 'value', 1, 5, 'memtx'}})
  | ...
 s:update('a', {{'=', 2, 1}})
  | ---
+ | - null
  | ...
 
 -- Inorrect updates.

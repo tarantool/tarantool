@@ -927,6 +927,7 @@ space:get{qNaN}
 ...
 space:get{1/0}
 ---
+- null
 ...
 space:get{1/0 - 1/0}
 ---

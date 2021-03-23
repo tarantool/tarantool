@@ -33,6 +33,12 @@
 #include <stddef.h>
 #include "trivia/util.h"
 
+#include "lua/utils.h"
+#include "lua/trigger.h"
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -124,9 +130,12 @@ luaT_tuple_new(struct lua_State *L, int idx, box_tuple_format_t *format);
 static inline int
 luaT_pushtupleornil(struct lua_State *L, struct tuple *tuple)
 {
-	if (tuple == NULL)
-		return 0;
-	luaT_pushtuple(L, tuple);
+	if (tuple != NULL) {
+		luaT_pushtuple(L, tuple);
+	}
+	else {
+		lua_pushnil(L);
+	}
 	return 1;
 }
 

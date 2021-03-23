@@ -36,6 +36,7 @@ _index = box.space[box.schema.INDEX_ID]
 ...
 _index:delete{102, 0}
 ---
+- null
 ...
 space:drop()
 ---

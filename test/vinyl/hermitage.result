@@ -443,7 +443,7 @@ c2("t:get{2}") -- {2, 20}
 ...
 c2("t:delete{2}")
 ---
-- 
+- - null
 ...
 c1:commit() -- ok
 ---
@@ -619,11 +619,11 @@ c2:commit() -- T2
 ...
 c1("t:delete{2}")
 ---
-- 
+- - null
 ...
 c1("t:get{2}") -- finds nothing
 ---
-- 
+- - null
 ...
 c1:commit() -- rollback
 ---

@@ -131,9 +131,11 @@ t
 ...
 space:update({tostring(101)}, {{'=', 2, 101}})
 ---
+- null
 ...
 space:get({tostring(101)})
 ---
+- null
 ...
 space:drop()
 ---
@@ -262,9 +264,11 @@ t
 ...
 space:update({101}, {{'=', 2, 101}})
 ---
+- null
 ...
 space:get({101})
 ---
+- null
 ...
 space:drop()
 ---
@@ -393,9 +397,11 @@ t
 ...
 space:update({101, 101}, {{'=', 3, 101}})
 ---
+- null
 ...
 space:get({101, 101})
 ---
+- null
 ...
 space:drop()
 ---
@@ -524,9 +530,11 @@ t
 ...
 space:update({101, 101}, {{'=', 3, 101}})
 ---
+- null
 ...
 space:get({101, 101})
 ---
+- null
 ...
 space:drop()
 ---
@@ -578,6 +586,7 @@ index1:update({1, 'fwoen'}, {{'+', 3, 10}})
 ...
 index1:update({0, 'fwoen'}, {{'=', 3, 5}})
 ---
+- null
 ...
 index2:update({'fwoen'}, {'=', 3, 1000})
 ---
@@ -738,6 +747,7 @@ aa = nil
 ...
 s:upsert({2, 'wwwww'}, {{'=', 2, 'wwwww'}})
 ---
+- null
 ...
 box.space.tst_sample:get(2).VAL
 ---
@@ -745,6 +755,7 @@ box.space.tst_sample:get(2).VAL
 ...
 s:upsert({2, 'wwwww2'}, {{'=', 2, 'wwwww2'}})
 ---
+- null
 ...
 box.space.tst_sample:get(2).VAL
 ---

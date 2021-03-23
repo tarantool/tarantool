@@ -50,9 +50,11 @@ hash.index['primary']:get{3}
  | ...
 hash.index['primary']:get{4}
  | ---
+ | - null
  | ...
 hash.index['primary']:get{5}
  | ---
+ | - null
  | ...
 
 -- select by invalid keys

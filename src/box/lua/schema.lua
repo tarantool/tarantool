@@ -1792,7 +1792,7 @@ base_index_mt.min_ffi = function(index, key)
     elseif ptuple[0] ~= nil then
         return tuple_bless(ptuple[0])
     else
-        return
+        return nil
     end
 end
 base_index_mt.min_luac = function(index, key)
@@ -1809,7 +1809,7 @@ base_index_mt.max_ffi = function(index, key)
     elseif ptuple[0] ~= nil then
         return tuple_bless(ptuple[0])
     else
-        return
+        return nil
     end
 end
 base_index_mt.max_luac = function(index, key)
@@ -1826,7 +1826,7 @@ base_index_mt.random_ffi = function(index, rnd)
     elseif ptuple[0] ~= nil then
         return tuple_bless(ptuple[0])
     else
-        return
+        return nil
     end
 end
 base_index_mt.random_luac = function(index, rnd)
@@ -1889,7 +1889,7 @@ base_index_mt.get_ffi = function(index, key)
     elseif ptuple[0] ~= nil then
         return tuple_bless(ptuple[0])
     else
-        return
+        return nil
     end
 end
 base_index_mt.get_luac = function(index, key)

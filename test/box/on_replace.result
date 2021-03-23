@@ -52,6 +52,7 @@ ts:insert{1, 'b', 'c'}
 ...
 ts:get{1}
 ---
+- null
 ...
 ts:on_replace(nil, fail)
 ---
@@ -77,6 +78,7 @@ ts:insert{2, 'b', 'c'}
 ...
 ts:get{2}
 ---
+- null
 ...
 o = nil
 ---
@@ -198,6 +200,7 @@ first:delete(1)
 ...
 second:delete(1)
 ---
+- null
 ...
 -- multiple statements
 test_run:cmd("setopt delimiter ';'");

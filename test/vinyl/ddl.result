@@ -98,9 +98,11 @@ space:replace{2, 2}
 ...
 space:delete{1}
 ---
+- null
 ...
 space:delete{2}
 ---
+- null
 ...
 pk:alter{parts = {2, 'unsigned'}} -- error: mem/run not empty
 ---
@@ -487,6 +489,7 @@ s:replace({7, 8, 9})
 ...
 s:upsert({10, 11, 12}, {})
 ---
+- null
 ...
 _ = fiber.create(function () s:drop() ch:put(true) end)
 ---
@@ -648,6 +651,7 @@ s:replace{1, 1}
 ...
 s:delete{2}
 ---
+- null
 ...
 _ = s:create_index('secondary', {parts = {2, 'unsigned'}})
 ---

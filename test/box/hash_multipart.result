@@ -119,6 +119,7 @@ hash.index['unique']:get{1, 4}
 -- secondary index select with no such key
 hash.index['unique']:get{1, 5}
 ---
+- null
 ...
 -- secondary index select with missing part
 hash.index['unique']:get{1}

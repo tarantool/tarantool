@@ -96,6 +96,7 @@ fio = require('fio')
 ...
 box.space._schema:delete('test') -- bump LSN
 ---
+- null
 ...
 box.error.injection.set('ERRINJ_SNAP_WRITE_DELAY', true)
 ---

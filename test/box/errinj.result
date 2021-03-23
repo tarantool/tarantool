@@ -158,6 +158,7 @@ space:insert{1}
 ...
 space:get{1}
 ---
+- null
 ...
 errinj.set("ERRINJ_WAL_IO", false)
 ---
@@ -181,6 +182,7 @@ space:get{1}
 ...
 space:get{2}
 ---
+- null
 ...
 errinj.set("ERRINJ_WAL_IO", false)
 ---
@@ -257,6 +259,7 @@ space:insert{1}
 ...
 space:get{1}
 ---
+- null
 ...
 errinj.set("ERRINJ_WAL_ROTATE", false)
 ---
@@ -280,6 +283,7 @@ space:get{1}
 ...
 space:get{2}
 ---
+- null
 ...
 errinj.set("ERRINJ_WAL_ROTATE", false)
 ---
@@ -295,6 +299,7 @@ space:get{1}
 ...
 space:get{2}
 ---
+- null
 ...
 space:truncate()
 ---

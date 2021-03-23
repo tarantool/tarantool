@@ -774,6 +774,7 @@ s:replace{1, 1, 2}
 ...
 s:delete{1}
 ---
+- null
 ...
 box.commit()
 ---

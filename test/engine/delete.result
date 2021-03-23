@@ -134,6 +134,7 @@ for key = 1, 100 do assert(space:get({tostring(key)}) == nil) end
 ...
 space:delete({tostring(7)})
 ---
+- null
 ...
 space:drop()
 ---
@@ -265,6 +266,7 @@ for key = 1, 100 do assert(space:get({key}) == nil) end
 ...
 space:delete({7})
 ---
+- null
 ...
 space:drop()
 ---
@@ -396,6 +398,7 @@ for key = 1, 100 do assert(space:get({key, key}) == nil) end
 ...
 space:delete({7, 7})
 ---
+- null
 ...
 space:drop()
 ---
@@ -527,6 +530,7 @@ for key = 1, 100 do assert(space:get({tostring(key)}) == nil) end
 ...
 space:delete(box.tuple.new{tostring(7)})
 ---
+- null
 ...
 space:drop()
 ---

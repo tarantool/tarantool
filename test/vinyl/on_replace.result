@@ -370,6 +370,7 @@ tmp = space:on_replace(on_replace)
 ...
 index:delete({3})
 ---
+- null
 ...
 old_tuple, new_tuple
 ---
@@ -378,6 +379,7 @@ old_tuple, new_tuple
 ...
 index:delete({4})
 ---
+- null
 ...
 old_tuple, new_tuple
 ---
@@ -438,6 +440,7 @@ tmp = space:on_replace(on_replace)
 ...
 index:delete({1})
 ---
+- null
 ...
 old_tuple, new_tuple
 ---
@@ -446,6 +449,7 @@ old_tuple, new_tuple
 ...
 index2:delete({30.3})
 ---
+- null
 ...
 old_tuple, new_tuple
 ---
@@ -536,6 +540,7 @@ old_tuple, new_tuple
 ...
 index:update({20}, {{'+', 2, 5}})
 ---
+- null
 ...
 old_tuple, new_tuple
 ---
@@ -698,6 +703,7 @@ tmp = space:on_replace(on_replace)
 ...
 space:upsert({1}, {{'+', 2, 10}})
 ---
+- null
 ...
 old_tuple, new_tuple
 ---
@@ -706,6 +712,7 @@ old_tuple, new_tuple
 ...
 space:upsert({4, 4, 4, 4}, {{'!', 2, 400}})
 ---
+- null
 ...
 old_tuple, new_tuple
 ---
@@ -776,6 +783,7 @@ tmp = space:on_replace(on_replace)
 ...
 space:upsert({1, 1, 1}, {{'+', 3, 1}})
 ---
+- null
 ...
 old_tuple, new_tuple
 ---
@@ -784,6 +792,7 @@ old_tuple, new_tuple
 ...
 space:upsert({1, 1, 1}, {{'+', 2, 1}}) -- must fail
 ---
+- null
 ...
 old_tuple, new_tuple
 ---
@@ -792,6 +801,7 @@ old_tuple, new_tuple
 ...
 space:upsert({4, 4, 4}, {{'!', 4, 400}})
 ---
+- null
 ...
 old_tuple, new_tuple
 ---

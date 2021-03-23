@@ -254,11 +254,11 @@ _ = s:replace{15, 2} -- send c2 and c3 to read view
 ...
 c2("s:get(15)") -- none
 ---
-- 
+- - null
 ...
 c3("s:get(15)") -- none
 ---
-- 
+- - null
 ...
 c4("s:get(15)") -- {15, 2}
 ---
@@ -277,15 +277,15 @@ _ = s:replace{35, 3} -- send c4, c5, and c6 to read view
 ...
 c4("s:get(35)") -- none
 ---
-- 
+- - null
 ...
 c5("s:get(35)") -- none
 ---
-- 
+- - null
 ...
 c6("s:get(35)") -- none
 ---
-- 
+- - null
 ...
 c1:commit()
 ---
@@ -406,11 +406,11 @@ _ = s:replace{25, 2} -- send c2 and c3 to read view
 ...
 c2("s:get(25)") -- none
 ---
-- 
+- - null
 ...
 c3("s:get(25)") -- none
 ---
-- 
+- - null
 ...
 c4("s:get(25)") -- {25, 2}
 ---
@@ -429,15 +429,15 @@ _ = s:replace{5, 3} -- send c4, c5, and c6 to read view
 ...
 c4("s:get(5)") -- none
 ---
-- 
+- - null
 ...
 c5("s:get(5)") -- none
 ---
-- 
+- - null
 ...
 c6("s:get(5)") -- none
 ---
-- 
+- - null
 ...
 c1:commit()
 ---
@@ -562,7 +562,7 @@ _ = s:replace{25, 4} -- send c3 to read view
 ...
 c3("s:get(25)") -- none
 ---
-- 
+- - null
 ...
 c4("s:get(25)") -- {25, 4}
 ---
@@ -573,7 +573,7 @@ _ = s:replace{75, 5} -- send c4 to read view
 ...
 c4("s:get(75)") -- none
 ---
-- 
+- - null
 ...
 c1:commit()
 ---
@@ -769,7 +769,7 @@ _ = s:insert{25} -- send c to read view
 ...
 c("s:get(25)") -- none
 ---
-- 
+- - null
 ...
 c:commit()
 ---
@@ -842,7 +842,7 @@ _ = s:insert{5} -- send c to read view
 ...
 c("s:get(5)") -- none
 ---
-- 
+- - null
 ...
 c:commit()
 ---
@@ -888,7 +888,7 @@ _ = s:insert{1000} -- send c to read view
 ...
 c("s:get(1000)") -- none
 ---
-- 
+- - null
 ...
 c:commit()
 ---
@@ -1005,11 +1005,11 @@ _ = s:insert{100, 50} -- send c1 and c2 to read view
 ...
 c1("s:get({100, 50})") -- none
 ---
-- 
+- - null
 ...
 c2("s:get({100, 50})") -- none
 ---
-- 
+- - null
 ...
 c3("s:get({100, 50})") -- {100, 50}
 ---
@@ -1028,7 +1028,7 @@ _ = s:insert{100, 100} -- send c3 to read view
 ...
 c3("s:get({100, 100})") -- none
 ---
-- 
+- - null
 ...
 c4("s:get({100, 100})") -- {100, 100}
 ---
@@ -1043,7 +1043,7 @@ _ = s:insert{100, 101} -- send c4 to read view
 ...
 c4("s:get({100, 101})") -- none
 ---
-- 
+- - null
 ...
 gap_lock_count() -- 6
 ---
@@ -1130,11 +1130,11 @@ _ = s:insert{100, 150} -- send c1 and c2 to read view
 ...
 c1("s:get({100, 150})") -- none
 ---
-- 
+- - null
 ...
 c2("s:get({100, 150})") -- none
 ---
-- 
+- - null
 ...
 c3("s:get({100, 150})") -- {100, 150}
 ---
@@ -1153,7 +1153,7 @@ _ = s:insert{100, 100} -- send c3 to read view
 ...
 c3("s:get({100, 100})") -- none
 ---
-- 
+- - null
 ...
 c4("s:get({100, 100})") -- {100, 100}
 ---
@@ -1168,7 +1168,7 @@ _ = s:insert{100, 99} -- send c4 to read view
 ...
 c4("s:get({100, 99})") -- none
 ---
-- 
+- - null
 ...
 gap_lock_count() -- 6
 ---

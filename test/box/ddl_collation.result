@@ -168,6 +168,7 @@ box.space._collation.index.name:delete{'test'} -- ok
  | ...
 box.space._collation.index.name:delete{'nothing'} -- allowed
  | ---
+ | - null
  | ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', 42}
  | ---

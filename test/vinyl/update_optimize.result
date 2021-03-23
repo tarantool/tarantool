@@ -738,6 +738,7 @@ s:update(1, {{'=', 2, 10}})
 ...
 s:delete(1)
 ---
+- null
 ...
 box.snapshot()
 ---

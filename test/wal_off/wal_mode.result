@@ -37,6 +37,7 @@ space.index['primary']:get(3)
 ...
 space.index['primary']:get(4)
 ---
+- null
 ...
 box.snapshot()
 ---

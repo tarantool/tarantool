@@ -52,9 +52,11 @@ hash.index.secondary:get(1)
  | ...
 hash.index.secondary:get('иогурт')
  | ---
+ | - null
  | ...
 hash.index.secondary:get(2)
  | ---
+ | - null
  | ...
 
 hash:drop()

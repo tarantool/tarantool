@@ -39,15 +39,19 @@ hash:replace{1, 1, 1, 1}
  | ...
 hash.index['primary']:get{10}
  | ---
+ | - null
  | ...
 hash.index['field1']:get{10}
  | ---
+ | - null
  | ...
 hash.index['field2']:get{10}
  | ---
+ | - null
  | ...
 hash.index['field3']:get{10}
  | ---
+ | - null
  | ...
 hash.index['primary']:get{1}
  | ---
@@ -77,15 +81,19 @@ hash:delete{10}
  | ...
 hash.index['primary']:get{10}
  | ---
+ | - null
  | ...
 hash.index['field1']:get{10}
  | ---
+ | - null
  | ...
 hash.index['field2']:get{10}
  | ---
+ | - null
  | ...
 hash.index['field3']:get{10}
  | ---
+ | - null
  | ...
 
 -- TupleFound (primary key)
@@ -95,15 +103,19 @@ hash:insert{1, 10, 10, 10}
  | ...
 hash.index['primary']:get{10}
  | ---
+ | - null
  | ...
 hash.index['field1']:get{10}
  | ---
+ | - null
  | ...
 hash.index['field2']:get{10}
  | ---
+ | - null
  | ...
 hash.index['field3']:get{10}
  | ---
+ | - null
  | ...
 hash.index['primary']:get{1}
  | ---

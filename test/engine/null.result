@@ -2189,9 +2189,11 @@ _ = s:update(3, {{'=', 2, 33}})
 ...
 s:upsert({2, 22}, {{'=', 2, box.NULL}})
 ---
+- null
 ...
 s:upsert({5, 55}, {{'=', 2, box.NULL}})
 ---
+- null
 ...
 sk1:select{}
 ---
@@ -2338,6 +2340,7 @@ box.snapshot()
 ...
 s:upsert({2, box.NULL}, {{'=', 2, box.NULL}})
 ---
+- null
 ...
 s:select{}
 ---

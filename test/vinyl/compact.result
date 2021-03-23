@@ -31,6 +31,7 @@ space:replace({1, 2})
 ...
 space:upsert({1},{{'=', 4, 5}}) -- bad upsert
 ---
+- null
 ...
 require('log').info(string.rep(" ", 1024))
 ---
@@ -63,6 +64,7 @@ space:replace({2,2})
 ...
 space:upsert({2},{{'=',4,5}}) -- bad upsert
 ---
+- null
 ...
 box.snapshot() -- create the second run
 ---

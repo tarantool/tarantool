@@ -30,6 +30,7 @@ space:insert{'ЁЁЁ', 777}
 ...
 space:delete{'ЁЁЁ'}
 ---
+- null
 ...
 box.snapshot()
 ---

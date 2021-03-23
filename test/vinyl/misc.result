@@ -33,6 +33,7 @@ s:insert{1, 1}
 -- tuples.
 s:delete(1)
 ---
+- null
 ...
 s:drop()
 ---
@@ -71,6 +72,7 @@ box.snapshot()
 ...
 s:delete(1)
 ---
+- null
 ...
 box.snapshot()
 ---

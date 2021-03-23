@@ -86,9 +86,11 @@ index0:select()
 ...
 index0:max(15)
 ---
+- null
 ...
 index0:min(15)
 ---
+- null
 ...
 index0:count(15)
 ---
@@ -133,9 +135,11 @@ index0:select()
 ...
 index0:max(0)
 ---
+- null
 ...
 index0:min(0)
 ---
+- null
 ...
 index0:count(0)
 ---
@@ -234,9 +238,11 @@ index1:select()
 ...
 index1:max(15)
 ---
+- null
 ...
 index1:min(15)
 ---
+- null
 ...
 index1:count(15)
 ---
@@ -281,9 +287,11 @@ index1:select()
 ...
 index1:max(0)
 ---
+- null
 ...
 index1:min(0)
 ---
+- null
 ...
 index1:count(0)
 ---
@@ -439,9 +447,11 @@ index2:select()
 ...
 index2:max('15')
 ---
+- null
 ...
 index2:min('15')
 ---
+- null
 ...
 index2:count('15')
 ---
@@ -486,9 +496,11 @@ index2:select()
 ...
 index2:max('0')
 ---
+- null
 ...
 index2:min('0')
 ---
+- null
 ...
 index2:count('0')
 ---
@@ -587,9 +599,11 @@ index3:select()
 ...
 index3:max(15)
 ---
+- null
 ...
 index3:min(15)
 ---
+- null
 ...
 index3:count(15)
 ---
@@ -688,9 +702,11 @@ index4:select()
 ...
 index4:max(15)
 ---
+- null
 ...
 index4:min(15)
 ---
+- null
 ...
 index4:count(15)
 ---
@@ -793,9 +809,11 @@ index4:select()
 ...
 index4:max('15')
 ---
+- null
 ...
 index4:min('15')
 ---
+- null
 ...
 index4:count('15')
 ---
@@ -847,9 +865,11 @@ index4:select()
 ...
 index4:max('0')
 ---
+- null
 ...
 index4:min('0')
 ---
+- null
 ...
 index4:count('0')
 ---
@@ -904,9 +924,11 @@ index4:select()
 ...
 index4:max(0)
 ---
+- null
 ...
 index4:min(0)
 ---
+- null
 ...
 index4:count(0)
 ---
@@ -972,6 +994,7 @@ index5:count({1})
 ...
 index5:max({1, 0})
 ---
+- null
 ...
 index5:min({1, 1})
 ---
@@ -1034,6 +1057,7 @@ index5:count({2})
 ...
 index5:max({2, 0})
 ---
+- null
 ...
 index5:min({2, 1})
 ---
@@ -1102,6 +1126,7 @@ index6:count({1})
 ...
 index6:max({1, '0'})
 ---
+- null
 ...
 index6:min({1, '1'})
 ---
@@ -1164,6 +1189,7 @@ index6:count({2})
 ...
 index6:max({2, '0'})
 ---
+- null
 ...
 index6:min({2, '1'})
 ---
@@ -1250,9 +1276,11 @@ for i = 1, 1000 do space8:insert({i % 10, i, long_string}) end
 ...
 index8:max({1, 100})
 ---
+- null
 ...
 index8:max({2, 700})
 ---
+- null
 ...
 index8:max({3})
 ---
@@ -1260,9 +1288,11 @@ index8:max({3})
 ...
 index8:min({1, 10})
 ---
+- null
 ...
 index8:min({1, 700})
 ---
+- null
 ...
 index8:min({3})
 ---

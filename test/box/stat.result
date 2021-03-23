@@ -81,6 +81,7 @@ box.stat.SELECT.total
 ...
 space:get(11)
 ---
+- null
 ...
 box.stat.SELECT.total
 ---
