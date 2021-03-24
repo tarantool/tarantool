@@ -204,7 +204,9 @@ test_greeting()
 void
 test_xrow_header_encode_decode()
 {
-	plan(10);
+	/* Test all possible 3-bit combinations. */
+	const int bit_comb_count = 1 << 3;
+	plan(1 + bit_comb_count);
 	struct xrow_header header;
 	char buffer[2048];
 	char *pos = mp_encode_uint(buffer, 300);
@@ -217,27 +219,47 @@ test_xrow_header_encode_decode()
 	header.tm = 123.456;
 	header.bodycnt = 0;
 	header.tsn = header.lsn;
-	header.is_commit = true;
 	uint64_t sync = 100500;
-	struct iovec vec[1];
-	is(1, xrow_header_encode(&header, sync, vec, 200), "encode");
-	int fixheader_len = 200;
-	pos = (char *)vec[0].iov_base + fixheader_len;
-	is(mp_decode_map((const char **)&pos), 5, "header map size");
+	for (int opt_idx = 0; opt_idx < bit_comb_count; opt_idx++) {
+		plan(12);
+		header.is_commit = opt_idx & 0x01;
+		header.wait_sync = opt_idx >> 1 & 0x01;
+		header.wait_ack = opt_idx >> 2 & 0x01;
+		struct iovec vec[1];
+		is(1, xrow_header_encode(&header, sync, vec, 200), "encode");
+		int fixheader_len = 200;
+		pos = (char *)vec[0].iov_base + fixheader_len;
+		uint32_t exp_map_size = 5;
+		/*
+		 * header.is_commit flag isn't encoded, since this row looks
+		 * like a single-statement transaction.
+		 */
+		if (header.wait_sync || header.wait_ack)
+			exp_map_size += 1;
+		/* tsn is encoded explicitly in this case. */
+		if (!header.is_commit)
+			exp_map_size += 1;
+		uint32_t size = mp_decode_map((const char **)&pos);
+		is(size, exp_map_size, "header map size");
 
-	struct xrow_header decoded_header;
-	const char *begin = (const char *)vec[0].iov_base;
-	begin += fixheader_len;
-	const char *end = (const char *)vec[0].iov_base;
-	end += vec[0].iov_len;
-	is(xrow_header_decode(&decoded_header, &begin, end, true), 0,
-	   "header decode");
-	is(header.type, decoded_header.type, "decoded type");
-	is(header.replica_id, decoded_header.replica_id, "decoded replica_id");
-	is(header.lsn, decoded_header.lsn, "decoded lsn");
-	is(header.tm, decoded_header.tm, "decoded tm");
-	is(decoded_header.sync, sync, "decoded sync");
-	is(decoded_header.bodycnt, 0, "decoded bodycnt");
+		struct xrow_header decoded_header;
+		const char *begin = (const char *)vec[0].iov_base;
+		begin += fixheader_len;
+		const char *end = (const char *)vec[0].iov_base;
+		end += vec[0].iov_len;
+		is(xrow_header_decode(&decoded_header, &begin, end, true), 0,
+		   "header decode");
+		is(header.is_commit, decoded_header.is_commit, "decoded is_commit");
+		is(header.wait_sync, decoded_header.wait_sync, "decoded wait_sync");
+		is(header.wait_ack, decoded_header.wait_ack, "decoded wait_ack");
+		is(header.type, decoded_header.type, "decoded type");
+		is(header.replica_id, decoded_header.replica_id, "decoded replica_id");
+		is(header.lsn, decoded_header.lsn, "decoded lsn");
+		is(header.tm, decoded_header.tm, "decoded tm");
+		is(decoded_header.sync, sync, "decoded sync");
+		is(decoded_header.bodycnt, 0, "decoded bodycnt");
+		check_plan();
+	}
 
 	check_plan();
 }
@@ -275,12 +297,49 @@ test_request_str()
 	check_plan();
 }
 
+/**
+ * The compiler doesn't have to preserve bitfields order,
+ * still we rely on it for convenience sake.
+ */
+static void
+test_xrow_fields()
+{
+	plan(6);
+
+	struct xrow_header header;
+
+	memset(&header, 0, sizeof(header));
+
+	header.is_commit = true;
+	is(header.flags, IPROTO_FLAG_COMMIT, "header.is_commit -> COMMIT");
+	header.is_commit = false;
+
+	header.wait_sync = true;
+	is(header.flags, IPROTO_FLAG_WAIT_SYNC, "header.wait_sync -> WAIT_SYNC");
+	header.wait_sync = false;
+
+	header.wait_ack = true;
+	is(header.flags, IPROTO_FLAG_WAIT_ACK, "header.wait_ack -> WAIT_ACK");
+	header.wait_ack = false;
+
+	header.flags = IPROTO_FLAG_COMMIT;
+	ok(header.is_commit && !header.wait_sync && !header.wait_ack, "COMMIT -> header.is_commit");
+
+	header.flags = IPROTO_FLAG_WAIT_SYNC;
+	ok(!header.is_commit && header.wait_sync && !header.wait_ack, "WAIT_SYNC -> header.wait_sync");
+
+	header.flags = IPROTO_FLAG_WAIT_ACK;
+	ok(!header.is_commit && !header.wait_sync && header.wait_ack, "WAIT_ACK -> header.wait_ack");
+
+	check_plan();
+}
+
 int
 main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	plan(3);
+	plan(4);
 
 	random_init();
 
@@ -288,6 +347,7 @@ main(void)
 	test_greeting();
 	test_xrow_header_encode_decode();
 	test_request_str();
+	test_xrow_fields();
 
 	random_free();
 	fiber_free();

@@ -80,14 +80,28 @@ struct xrow_header {
 	 * transaction.
 	 */
 	int64_t tsn;
-	/**
-	 * True for the last row in a multi-statement transaction,
-	 * or single-statement transaction. Is only encoded in the
-	 * write ahead log for multi-statement transactions.
-	 * Single-statement transactions do not encode
-	 * tsn and is_commit flag to save space.
-	 */
-	bool is_commit;
+	/** Transaction meta flags set only in the last transaction row. */
+	union {
+		uint8_t flags;
+		struct {
+			/**
+			 * Is only encoded in the write ahead log for
+			 * multi-statement transactions. Single-statement
+			 * transactions do not encode tsn and is_commit flag to
+			 * save space.
+			 */
+			bool is_commit : 1;
+			/**
+			 * True for any transaction that would enter the limbo
+			 * (not necessarily a synchronous one).
+			 */
+			bool wait_sync : 1;
+			/**
+			 * True for a synchronous transaction.
+			 */
+			bool wait_ack  : 1;
+		};
+	};
 
 	int bodycnt;
 	uint32_t schema_version;

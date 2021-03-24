@@ -996,7 +996,11 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 				first_glob_row = row;
 			}
 			(*row)->tsn = tsn == 0 ? (*start)->lsn : tsn;
-			(*row)->is_commit = row == end - 1;
+			/* Tx meta is stored in the last tx row. */
+			if (row == end - 1) {
+				(*row)->flags = entry->flags;
+				(*row)->is_commit = true;
+			}
 		} else {
 			int64_t diff = (*row)->lsn - vclock_get(base, (*row)->replica_id);
 			if (diff <= vclock_get(vclock_diff,
