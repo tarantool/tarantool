@@ -50,6 +50,9 @@
 #include "schema.h"
 #include "gc.h"
 #include "raft.h"
+#include "allocator.h"
+
+#include <type_traits>
 
 /* sync snapshot every 16MB */
 #define SNAP_SYNC_INTERVAL	(1 << 24)
@@ -78,6 +81,29 @@ enum {
 	MAX_TUPLE_SIZE = 1 * 1024 * 1024,
 };
 
+template <class ALLOC>
+static inline void
+create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab);
+
+template <class ALLOC>
+static inline void *
+memtx_engine_get_alloc(struct memtx_engine *memtx)
+{
+	if (std::is_same<ALLOC, SmallAlloc>::value)
+		return &memtx->alloc;
+	return NULL;
+}
+
+template <class ALLOC>
+static inline struct lifo *
+memtx_engine_get_delayed_lifo(struct memtx_engine *memtx)
+{
+	if (std::is_same<ALLOC, SmallAlloc>::value)
+		return &memtx->delayed;
+	return NULL;
+}
+
+template <class ALLOC>
 static inline void
 memtx_free_tuple_from_lifo(struct memtx_engine *memtx, void *item)
 {
@@ -85,22 +111,24 @@ memtx_free_tuple_from_lifo(struct memtx_engine *memtx, void *item)
 	struct tuple *tuple = &memtx_tuple->base;
 	size_t total = tuple_size(tuple) +
 		offsetof(struct memtx_tuple, base);
-	smfree(&memtx->alloc, memtx_tuple, total);
+	ALLOC::free(memtx_engine_get_alloc<ALLOC>(memtx), memtx_tuple, total);
 }
 
+template <class ALLOC>
 static inline void
 memtx_collect_garbage_tuples(struct memtx_engine *memtx)
 {
 	if (memtx->free_mode != MEMTX_ENGINE_COLLECT_GARBAGE)
 		return;
 
-	if (!lifo_is_empty(&memtx->delayed)) {
+	struct lifo *delayed = memtx_engine_get_delayed_lifo<ALLOC>(memtx);
+	if (!lifo_is_empty(delayed)) {
 		const int BATCH = 100;
 		for (int i = 0; i < BATCH; i++) {
-			void *item = lifo_pop(&memtx->delayed);
+			void *item = lifo_pop(delayed);
 			if (item == NULL)
 				break;
-			memtx_free_tuple_from_lifo(memtx, item);
+			memtx_free_tuple_from_lifo<ALLOC>(memtx, item);
 		}
 	} else {
 		/* Finish garbage collection and switch to regular mode */
@@ -108,17 +136,19 @@ memtx_collect_garbage_tuples(struct memtx_engine *memtx)
 	}
 }
 
+template <class ALLOC>
 static inline void *
 memtx_mem_alloc(struct memtx_engine *memtx, size_t size)
 {
-	memtx_collect_garbage_tuples(memtx);
-	return smalloc(&memtx->alloc, size);
+	memtx_collect_garbage_tuples<ALLOC>(memtx);
+	return ALLOC::alloc(memtx_engine_get_alloc<ALLOC>(memtx), size);
 }
 
+template <class ALLOC>
 static inline void
 memtx_mem_free(struct memtx_engine *memtx, void *ptr, size_t size)
 {
-	return smfree(&memtx->alloc, ptr, size);
+	return ALLOC::free(memtx_engine_get_alloc<ALLOC>(memtx), ptr, size);
 }
 
 static int
@@ -186,7 +216,7 @@ memtx_engine_shutdown(struct engine *engine)
 	slab_cache_destroy(&memtx->index_slab_cache);
 	void *item;
 	while ((item = lifo_pop(&memtx->delayed)))
-		memtx_free_tuple_from_lifo(memtx, item);
+		memtx_free_tuple_from_lifo<SmallAlloc>(memtx, item);
 	small_alloc_destroy(&memtx->alloc);
 	slab_cache_destroy(&memtx->slab_cache);
 	tuple_arena_destroy(&memtx->arena);
@@ -1186,6 +1216,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	small_alloc_create(&memtx->alloc, &memtx->slab_cache,
 			   objsize_min, granularity, alloc_factor,
 			   &actual_alloc_factor);
+	create_memtx_tuple_format_vtab<SmallAlloc>(&memtx_tuple_format_vtab);
 	say_info("Actual slab_alloc_factor calculated on the basis of desired "
 		 "slab_alloc_factor = %f", actual_alloc_factor);
 	lifo_init(&memtx->delayed);
@@ -1266,6 +1297,7 @@ memtx_leave_delayed_free_mode(struct memtx_engine *memtx)
 		memtx->free_mode = MEMTX_ENGINE_COLLECT_GARBAGE;
 }
 
+template<class ALLOC>
 struct tuple *
 memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
@@ -1308,8 +1340,8 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	}
 
 	struct memtx_tuple *memtx_tuple;
-	while ((memtx_tuple =
-	       (struct memtx_tuple *)memtx_mem_alloc(memtx, total)) == NULL) {
+	while ((memtx_tuple = (struct memtx_tuple *)
+		memtx_mem_alloc<ALLOC>(memtx, total)) == NULL) {
 		bool stop;
 		memtx_engine_run_gc(memtx, &stop);
 		if (stop)
@@ -1337,6 +1369,7 @@ end:
 	return tuple;
 }
 
+template<class ALLOC>
 void
 memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
@@ -1348,13 +1381,16 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	size_t total = tuple_size(tuple) + offsetof(struct memtx_tuple, base);
 	if (memtx->free_mode != MEMTX_ENGINE_DELAYED_FREE ||
 	    memtx_tuple->version == memtx->snapshot_version ||
-	    format->is_temporary)
-		memtx_mem_free(memtx, memtx_tuple, total);
-	else
-		lifo_push(&memtx->delayed, (void *)memtx_tuple);
+	    format->is_temporary) {
+		memtx_mem_free<ALLOC>(memtx, memtx_tuple, total);
+	} else {
+		lifo_push(memtx_engine_get_delayed_lifo<ALLOC>(memtx),
+			  (void *)memtx_tuple);
+	}
 	tuple_format_unref(format);
 }
 
+template <class ALLOC>
 void
 metmx_tuple_chunk_delete(struct tuple_format *format, const char *data)
 {
@@ -1363,9 +1399,10 @@ metmx_tuple_chunk_delete(struct tuple_format *format, const char *data)
 		container_of((const char (*)[0])data,
 			     struct tuple_chunk, data);
 	uint32_t sz = tuple_chunk_sz(tuple_chunk->data_sz);
-	memtx_mem_free(memtx, tuple_chunk, sz);
+	memtx_mem_free<ALLOC>(memtx, tuple_chunk, sz);
 }
 
+template <class ALLOC>
 const char *
 memtx_tuple_chunk_new(struct tuple_format *format, struct tuple *tuple,
 		      const char *data, uint32_t data_sz)
@@ -1373,7 +1410,7 @@ memtx_tuple_chunk_new(struct tuple_format *format, struct tuple *tuple,
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	uint32_t sz = tuple_chunk_sz(data_sz);
 	struct tuple_chunk *tuple_chunk =
-		(struct tuple_chunk *) memtx_mem_alloc(memtx, sz);
+		(struct tuple_chunk *) memtx_mem_alloc<ALLOC>(memtx, sz);
 	if (tuple == NULL) {
 		diag_set(OutOfMemory, sz, "memtx_mem_alloc", "tuple");
 		return NULL;
@@ -1383,12 +1420,17 @@ memtx_tuple_chunk_new(struct tuple_format *format, struct tuple *tuple,
 	return tuple_chunk->data;
 }
 
-struct tuple_format_vtab memtx_tuple_format_vtab = {
-	memtx_tuple_delete,
-	memtx_tuple_new,
-	metmx_tuple_chunk_delete,
-	memtx_tuple_chunk_new,
-};
+struct tuple_format_vtab memtx_tuple_format_vtab;
+
+template <class ALLOC>
+static inline void
+create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab)
+{
+	vtab->tuple_delete = memtx_tuple_delete<ALLOC>;
+	vtab->tuple_new = memtx_tuple_new<ALLOC>;
+	vtab->tuple_chunk_delete = metmx_tuple_chunk_delete<ALLOC>;
+	vtab->tuple_chunk_new = memtx_tuple_chunk_new<ALLOC>;
+}
 
 /**
  * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index
