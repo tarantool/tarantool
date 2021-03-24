@@ -1253,7 +1253,6 @@ applier_subscribe(struct applier *applier)
 		struct stailq rows;
 		applier_read_tx(applier, &rows);
 
-		applier->last_row_time = ev_monotonic_now(loop());
 		/*
 		 * In case of an heartbeat message wake a writer up
 		 * and check applier state.
