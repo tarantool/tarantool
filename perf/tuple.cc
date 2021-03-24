@@ -2,6 +2,7 @@
 #include "fiber.h"
 #include "tuple.h"
 #include "memtx_engine.h"
+#include <allocator.h>
 
 #include <iostream>
 #include <benchmark/benchmark.h>
@@ -41,8 +42,9 @@ private:
 		slab_cache_create(&memtx.slab_cache, &memtx.arena);
 
 		float actual_alloc_factor;
-		small_alloc_create(&memtx.alloc, &memtx.slab_cache, 16, 8, 1.1,
+		SmallAlloc::create(&memtx.slab_cache, 16, 8, 1.1,
 				   &actual_alloc_factor);
+		create_memtx_tuple_format_vtab<SmallAlloc>(&memtx_tuple_format_vtab);
 
 		memtx.max_tuple_size = 1024 * 1024;
 
@@ -58,9 +60,10 @@ private:
 	{
 		key_def_delete(kd);
 		tuple_format_unref(fmt);
-		small_alloc_destroy(&memtx.alloc);
+		SmallAlloc::destroy();
 		slab_cache_destroy(&memtx.slab_cache);
 		tuple_arena_destroy(&memtx.arena);
+		box_tuple_last = NULL;
 		tuple_free();
 		fiber_free();
 		memory_free();
