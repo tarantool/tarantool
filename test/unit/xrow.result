@@ -1,4 +1,4 @@
-1..3
+1..4
     1..40
     ok 1 - round trip
     ok 2 - roundtrip.version_id
@@ -41,18 +41,129 @@
     ok 39 - invalid 10
     ok 40 - invalid 11
 ok 1 - subtests
-    1..10
+    1..9
     ok 1 - bad msgpack end
-    ok 2 - encode
-    ok 3 - header map size
-    ok 4 - header decode
-    ok 5 - decoded type
-    ok 6 - decoded replica_id
-    ok 7 - decoded lsn
-    ok 8 - decoded tm
-    ok 9 - decoded sync
-    ok 10 - decoded bodycnt
+        1..12
+        ok 1 - encode
+        ok 2 - header map size
+        ok 3 - header decode
+        ok 4 - decoded is_commit
+        ok 5 - decoded wait_sync
+        ok 6 - decoded wait_ack
+        ok 7 - decoded type
+        ok 8 - decoded replica_id
+        ok 9 - decoded lsn
+        ok 10 - decoded tm
+        ok 11 - decoded sync
+        ok 12 - decoded bodycnt
+    ok 2 - subtests
+        1..12
+        ok 1 - encode
+        ok 2 - header map size
+        ok 3 - header decode
+        ok 4 - decoded is_commit
+        ok 5 - decoded wait_sync
+        ok 6 - decoded wait_ack
+        ok 7 - decoded type
+        ok 8 - decoded replica_id
+        ok 9 - decoded lsn
+        ok 10 - decoded tm
+        ok 11 - decoded sync
+        ok 12 - decoded bodycnt
+    ok 3 - subtests
+        1..12
+        ok 1 - encode
+        ok 2 - header map size
+        ok 3 - header decode
+        ok 4 - decoded is_commit
+        ok 5 - decoded wait_sync
+        ok 6 - decoded wait_ack
+        ok 7 - decoded type
+        ok 8 - decoded replica_id
+        ok 9 - decoded lsn
+        ok 10 - decoded tm
+        ok 11 - decoded sync
+        ok 12 - decoded bodycnt
+    ok 4 - subtests
+        1..12
+        ok 1 - encode
+        ok 2 - header map size
+        ok 3 - header decode
+        ok 4 - decoded is_commit
+        ok 5 - decoded wait_sync
+        ok 6 - decoded wait_ack
+        ok 7 - decoded type
+        ok 8 - decoded replica_id
+        ok 9 - decoded lsn
+        ok 10 - decoded tm
+        ok 11 - decoded sync
+        ok 12 - decoded bodycnt
+    ok 5 - subtests
+        1..12
+        ok 1 - encode
+        ok 2 - header map size
+        ok 3 - header decode
+        ok 4 - decoded is_commit
+        ok 5 - decoded wait_sync
+        ok 6 - decoded wait_ack
+        ok 7 - decoded type
+        ok 8 - decoded replica_id
+        ok 9 - decoded lsn
+        ok 10 - decoded tm
+        ok 11 - decoded sync
+        ok 12 - decoded bodycnt
+    ok 6 - subtests
+        1..12
+        ok 1 - encode
+        ok 2 - header map size
+        ok 3 - header decode
+        ok 4 - decoded is_commit
+        ok 5 - decoded wait_sync
+        ok 6 - decoded wait_ack
+        ok 7 - decoded type
+        ok 8 - decoded replica_id
+        ok 9 - decoded lsn
+        ok 10 - decoded tm
+        ok 11 - decoded sync
+        ok 12 - decoded bodycnt
+    ok 7 - subtests
+        1..12
+        ok 1 - encode
+        ok 2 - header map size
+        ok 3 - header decode
+        ok 4 - decoded is_commit
+        ok 5 - decoded wait_sync
+        ok 6 - decoded wait_ack
+        ok 7 - decoded type
+        ok 8 - decoded replica_id
+        ok 9 - decoded lsn
+        ok 10 - decoded tm
+        ok 11 - decoded sync
+        ok 12 - decoded bodycnt
+    ok 8 - subtests
+        1..12
+        ok 1 - encode
+        ok 2 - header map size
+        ok 3 - header decode
+        ok 4 - decoded is_commit
+        ok 5 - decoded wait_sync
+        ok 6 - decoded wait_ack
+        ok 7 - decoded type
+        ok 8 - decoded replica_id
+        ok 9 - decoded lsn
+        ok 10 - decoded tm
+        ok 11 - decoded sync
+        ok 12 - decoded bodycnt
+    ok 9 - subtests
 ok 2 - subtests
     1..1
     ok 1 - request_str
 ok 3 - subtests
+    1..6
+    ok 1 - header.is_commit -> COMMIT
+    ok 2 - header.wait_sync -> WAIT_SYNC
+    ok 3 - header.wait_ack -> WAIT_ACK
+    ok 4 - COMMIT -> header.is_commit
+    ok 5 - WAIT_SYNC -> header.wait_sync
+    ok 6 - WAIT_ACK -> header.wait_ack
+ok 4 - subtests

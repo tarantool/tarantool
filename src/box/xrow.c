@@ -183,7 +183,7 @@ error:
 			break;
 		case IPROTO_FLAGS:
 			flags = mp_decode_uint(pos);
-			header->is_commit = flags & IPROTO_FLAG_COMMIT;
+			header->flags = flags;
 			break;
 		default:
 			/* unknown header */
@@ -299,6 +299,7 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 	 *   flag to find transaction boundary (last row in the
 	 *   transaction stream).
 	 */
+	uint8_t flags_to_encode = header->flags & ~IPROTO_FLAG_COMMIT;
 	if (header->tsn != 0) {
 		if (header->tsn != header->lsn || !header->is_commit) {
 			/*
@@ -314,11 +315,13 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 			map_size++;
 		}
 		if (header->is_commit && header->tsn != header->lsn) {
-			/* Setup last row for multi row transaction. */
-			d = mp_encode_uint(d, IPROTO_FLAGS);
-			d = mp_encode_uint(d, IPROTO_FLAG_COMMIT);
-			map_size++;
+			flags_to_encode |= IPROTO_FLAG_COMMIT;
 		}
+	}
+	if (flags_to_encode != 0) {
+		d = mp_encode_uint(d, IPROTO_FLAGS);
+		d = mp_encode_uint(d, flags_to_encode);
+		map_size++;
 	}
 	assert(d <= data + XROW_HEADER_LEN_MAX);
 	mp_encode_map(data, map_size);
