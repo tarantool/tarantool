@@ -21,7 +21,8 @@ end
 box.ctl.on_schema_init(on_init_trig)
 
 box.cfg{
-    listen = os.getenv("LISTEN")
+    listen = os.getenv("LISTEN"),
+    allocator = os.getenv("TEST_RUN_MEMTX_ALLOCATOR")
 }
 
 require('console').listen(os.getenv('ADMIN'))

@@ -9,7 +9,7 @@ require('console').listen(os.getenv('ADMIN'))
 
 box.cfg({
     listen = os.getenv("LISTEN"),
-    slab_alloc_granularity = slab_alloc_granularity,
+    slab_alloc_granularity = slab_alloc_granularity
 })
 
 if box.space.test ~= nil then

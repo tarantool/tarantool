@@ -7,5 +7,5 @@ box.cfg({
     memtx_memory = 2*1024*1024*1024,
     listen = os.getenv("LISTEN"),
     memtx_min_tuple_size=32,
-    slab_alloc_factor=1.03
+    slab_alloc_factor=1.03,
 })

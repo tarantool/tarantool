@@ -16,7 +16,7 @@ box.cfg.nosuchoption = 1
 cfg_filter(box.cfg)
  | ---
  | - - - allocator
- |     - small
+ |     - <hidden>
  |   - - background
  |     - false
  |   - - checkpoint_count
@@ -137,7 +137,7 @@ box.cfg()
 cfg_filter(box.cfg)
  | ---
  | - - - allocator
- |     - small
+ |     - <hidden>
  |   - - background
  |     - false
  |   - - checkpoint_count
