@@ -2159,8 +2159,8 @@ box_process_register(struct ev_io *io, struct xrow_header *header)
 	assert(header->type == IPROTO_REGISTER);
 
 	struct tt_uuid instance_uuid = uuid_nil;
-	struct vclock vclock;
-	xrow_decode_register_xc(header, &instance_uuid, &vclock);
+	struct vclock replica_vclock;
+	xrow_decode_register_xc(header, &instance_uuid, &replica_vclock);
 
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
@@ -2186,7 +2186,9 @@ box_process_register(struct ev_io *io, struct xrow_header *header)
 			  "wal_mode = 'none'");
 	}
 
-	struct gc_consumer *gc = gc_consumer_register(&replicaset.vclock,
+	/* @sa box_process_subscribe(). */
+	vclock_reset(&replica_vclock, 0, vclock_get(&replicaset.vclock, 0));
+	struct gc_consumer *gc = gc_consumer_register(&replica_vclock,
 				"replica %s", tt_uuid_str(&instance_uuid));
 	if (gc == NULL)
 		diag_raise();
@@ -2194,9 +2196,6 @@ box_process_register(struct ev_io *io, struct xrow_header *header)
 
 	say_info("registering replica %s at %s",
 		 tt_uuid_str(&instance_uuid), sio_socketname(io->fd));
-
-	struct vclock start_vclock;
-	vclock_copy(&start_vclock, &replicaset.vclock);
 
 	/**
 	 * Call the server-side hook which stores the replica uuid
@@ -2212,10 +2211,10 @@ box_process_register(struct ev_io *io, struct xrow_header *header)
 
 	/*
 	 * Feed replica with WALs in range
-	 * (start_vclock, stop_vclock) so that it gets its
+	 * (replica_vclock, stop_vclock) so that it gets its
 	 * registration.
 	 */
-	relay_final_join(io->fd, header->sync, &start_vclock, &stop_vclock);
+	relay_final_join(io->fd, header->sync, &replica_vclock, &stop_vclock);
 	say_info("final data sent.");
 
 	struct xrow_header row;
