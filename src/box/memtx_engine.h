@@ -147,8 +147,6 @@ struct memtx_engine {
 	struct slab_arena arena;
 	/** Slab cache for allocating tuples. */
 	struct slab_cache slab_cache;
-	/** Tuple allocator. */
-	struct small_alloc alloc;
 	/** Slab cache for allocating index extents. */
 	struct slab_cache index_slab_cache;
 	/** Index extent allocator. */
