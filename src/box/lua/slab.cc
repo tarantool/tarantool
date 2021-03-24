@@ -43,14 +43,7 @@
 #include "memory.h"
 #include "box/engine.h"
 #include "box/memtx_engine.h"
-
-static int
-small_stats_noop_cb(const struct mempool_stats *stats, void *cb_ctx)
-{
-	(void) stats;
-	(void) cb_ctx;
-	return 0;
-}
+#include "box/allocator.h"
 
 static int
 small_stats_lua_cb(const struct mempool_stats *stats, void *cb_ctx)
@@ -108,13 +101,13 @@ lbox_slab_stats(struct lua_State *L)
 	struct memtx_engine *memtx;
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 
-	struct small_stats totals;
+	struct alloc_stats totals;
 	lua_newtable(L);
 	/*
 	 * List all slabs used for tuples and slabs used for
 	 * indexes, with their stats.
 	 */
-	small_stats(&memtx->alloc, &totals, small_stats_lua_cb, L);
+	SmallAlloc::stats(&totals);
 	struct mempool_stats index_stats;
 	mempool_stats(&memtx->index_extent_pool, &index_stats);
 	small_stats_lua_cb(&index_stats, L);
@@ -128,14 +121,14 @@ lbox_slab_info(struct lua_State *L)
 	struct memtx_engine *memtx;
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 
-	struct small_stats totals;
+	struct alloc_stats totals;
 
 	/*
 	 * List all slabs used for tuples and slabs used for
 	 * indexes, with their stats.
 	 */
 	lua_newtable(L);
-	small_stats(&memtx->alloc, &totals, small_stats_noop_cb, L);
+	SmallAlloc::stats(&totals);
 	struct mempool_stats index_stats;
 	mempool_stats(&memtx->index_extent_pool, &index_stats);
 
@@ -257,9 +250,7 @@ lbox_runtime_info(struct lua_State *L)
 static int
 lbox_slab_check(MAYBE_UNUSED struct lua_State *L)
 {
-	struct memtx_engine *memtx;
-	memtx = (struct memtx_engine *)engine_by_name("memtx");
-	slab_cache_check(memtx->alloc.cache);
+	slab_cache_check(SmallAlloc::get_alloc()->cache);
 	return 0;
 }
 
