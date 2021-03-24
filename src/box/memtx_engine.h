@@ -147,8 +147,6 @@ struct memtx_engine {
 	struct slab_arena arena;
 	/** Slab cache for allocating tuples. */
 	struct slab_cache slab_cache;
-	/** Tuple allocator. */
-	struct small_alloc alloc;
 	/** Slab cache for allocating index extents. */
 	struct slab_cache index_slab_cache;
 	/** Index extent allocator. */
@@ -335,6 +333,10 @@ memtx_engine_recover_snapshot_xc(struct memtx_engine *memtx,
 	if (memtx_engine_recover_snapshot(memtx, vclock) != 0)
 		diag_raise();
 }
+
+template <class ALLOC>
+void
+create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab);
 
 #endif /* defined(__plusplus) */
 
