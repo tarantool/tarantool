@@ -49,9 +49,14 @@ enum {
 	XLOG_FIXHEADER_SIZE = 19
 };
 
+/** IPROTO_FLAGS bitfield constants. */
 enum {
 	/** Set for the last xrow in a transaction. */
 	IPROTO_FLAG_COMMIT = 0x01,
+	/** Set for the last row of a tx residing in limbo. */
+	IPROTO_FLAG_WAIT_SYNC = 0x02,
+	/** Set for the last row of a synchronous tx. */
+	IPROTO_FLAG_WAIT_ACK = 0x04,
 };
 
 enum iproto_key {

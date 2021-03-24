@@ -76,6 +76,7 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 		row->lsn = 0;
 		row->sync = 0;
 		row->tm = 0;
+		row->flags = 0;
 	}
 	/*
 	 * Group ID should be set both for requests not having a
@@ -666,6 +667,14 @@ txn_journal_entry_new(struct txn *txn)
 	} else {
 		--req->n_rows;
 	}
+
+	static const uint8_t flags_map[] = {
+		[TXN_WAIT_SYNC] = IPROTO_FLAG_WAIT_SYNC,
+		[TXN_WAIT_ACK] = IPROTO_FLAG_WAIT_ACK,
+	};
+
+	req->flags |= flags_map[txn->flags & TXN_WAIT_SYNC];
+	req->flags |= flags_map[txn->flags & TXN_WAIT_ACK];
 
 	return req;
 }

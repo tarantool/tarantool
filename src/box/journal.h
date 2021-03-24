@@ -63,6 +63,8 @@ struct journal_entry {
 	 * A journal entry completion callback argument.
 	 */
 	void *complete_data;
+	/** Flags that should be set for the last entry row. */
+	uint8_t flags;
 	/**
 	 * Asynchronous write completion function.
 	 */
@@ -97,6 +99,7 @@ journal_entry_create(struct journal_entry *entry, size_t n_rows,
 	entry->approx_len	= approx_len;
 	entry->n_rows		= n_rows;
 	entry->res		= -1;
+	entry->flags		= 0;
 }
 
 /**
