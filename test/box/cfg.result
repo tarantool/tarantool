@@ -52,7 +52,7 @@ cfg_filter(box.cfg)
  |   - - log_level
  |     - 5
  |   - - memtx_allocator
- |     - small
+ |     - <hidden>
  |   - - memtx_dir
  |     - <hidden>
  |   - - memtx_max_tuple_size
@@ -177,7 +177,7 @@ cfg_filter(box.cfg)
  |   - - log_level
  |     - 5
  |   - - memtx_allocator
- |     - small
+ |     - <hidden>
  |   - - memtx_dir
  |     - <hidden>
  |   - - memtx_max_tuple_size
