@@ -51,6 +51,18 @@ struct tuple;
 struct tuple_format;
 
 /**
+ * Free mode, determines a strategy for freeing up memory
+ */
+enum memtx_engine_free_mode {
+	/** Free objects immediately. */
+	MEMTX_ENGINE_FREE,
+	/** Collect garbage after delayed free. */
+	MEMTX_ENGINE_COLLECT_GARBAGE,
+	/** Postpone deletion of objects. */
+	MEMTX_ENGINE_DELAYED_FREE,
+};
+
+/**
  * The state of memtx recovery process.
  * There is a global state of the entire engine state of each
  * space. The state of a space is initialized from the engine
@@ -178,6 +190,12 @@ struct memtx_engine {
 	 * memtx_gc_task::link.
 	 */
 	struct stailq gc_queue;
+	/**
+	 * Free mode, determines a strategy for freeing up memory
+	 */
+	enum memtx_engine_free_mode free_mode;
+	/** List of tuples for delayed free. */
+	struct lifo delayed;
 };
 
 struct memtx_gc_task;
