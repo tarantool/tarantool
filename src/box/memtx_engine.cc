@@ -632,7 +632,7 @@ struct checkpoint {
 static struct checkpoint *
 checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 {
-	struct checkpoint *ckpt = malloc(sizeof(*ckpt));
+	struct checkpoint *ckpt = (struct checkpoint *)malloc(sizeof(*ckpt));
 	if (ckpt == NULL) {
 		diag_set(OutOfMemory, sizeof(*ckpt), "malloc",
 			 "struct checkpoint");
@@ -702,7 +702,8 @@ checkpoint_add_space(struct space *sp, void *data)
 	if (!pk)
 		return 0;
 	struct checkpoint *ckpt = (struct checkpoint *)data;
-	struct checkpoint_entry *entry = malloc(sizeof(*entry));
+	struct checkpoint_entry *entry =
+		(struct checkpoint_entry *)malloc(sizeof(*entry));
 	if (entry == NULL) {
 		diag_set(OutOfMemory, sizeof(*entry),
 			 "malloc", "struct checkpoint_entry");
@@ -944,7 +945,7 @@ struct memtx_join_ctx {
 static int
 memtx_join_add_space(struct space *space, void *arg)
 {
-	struct memtx_join_ctx *ctx = arg;
+	struct memtx_join_ctx *ctx = (struct memtx_join_ctx *)arg;
 	if (!space_is_memtx(space))
 		return 0;
 	if (space_is_temporary(space))
@@ -954,7 +955,8 @@ memtx_join_add_space(struct space *space, void *arg)
 	struct index *pk = space_index(space, 0);
 	if (pk == NULL)
 		return 0;
-	struct memtx_join_entry *entry = malloc(sizeof(*entry));
+	struct memtx_join_entry *entry =
+		(struct memtx_join_entry *)malloc(sizeof(*entry));
 	if (entry == NULL) {
 		diag_set(OutOfMemory, sizeof(*entry),
 			 "malloc", "struct memtx_join_entry");
@@ -974,7 +976,8 @@ static int
 memtx_engine_prepare_join(struct engine *engine, void **arg)
 {
 	(void)engine;
-	struct memtx_join_ctx *ctx = malloc(sizeof(*ctx));
+	struct memtx_join_ctx *ctx =
+		(struct memtx_join_ctx *)malloc(sizeof(*ctx));
 	if (ctx == NULL) {
 		diag_set(OutOfMemory, sizeof(*ctx),
 			 "malloc", "struct memtx_join_ctx");
@@ -1034,7 +1037,7 @@ static int
 memtx_engine_join(struct engine *engine, void *arg, struct xstream *stream)
 {
 	(void)engine;
-	struct memtx_join_ctx *ctx = arg;
+	struct memtx_join_ctx *ctx = (struct memtx_join_ctx *)arg;
 	ctx->stream = stream;
 	/*
 	 * Memtx snapshot iterators are safe to use from another
@@ -1056,7 +1059,7 @@ static void
 memtx_engine_complete_join(struct engine *engine, void *arg)
 {
 	(void)engine;
-	struct memtx_join_ctx *ctx = arg;
+	struct memtx_join_ctx *ctx = (struct memtx_join_ctx *)arg;
 	struct memtx_join_entry *entry, *next;
 	rlist_foreach_entry_safe(entry, &ctx->entries, in_ctx, next) {
 		entry->iterator->free(entry->iterator);
@@ -1160,7 +1163,9 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
 		 bool dontdump, unsigned granularity, float alloc_factor)
 {
-	struct memtx_engine *memtx = calloc(1, sizeof(*memtx));
+	int64_t snap_signature;
+	struct memtx_engine *memtx =
+		(struct memtx_engine *)calloc(1, sizeof(*memtx));
 	if (memtx == NULL) {
 		diag_set(OutOfMemory, sizeof(*memtx),
 			 "malloc", "struct memtx_engine");
@@ -1184,7 +1189,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	 * So if the local directory isn't empty, read the snapshot
 	 * signature right now to initialize the instance UUID.
 	 */
-	int64_t snap_signature = xdir_last_vclock(&memtx->snap_dir, NULL);
+	snap_signature = xdir_last_vclock(&memtx->snap_dir, NULL);
 	if (snap_signature >= 0) {
 		struct xlog_cursor cursor;
 		if (xdir_open_cursor(&memtx->snap_dir,
@@ -1317,23 +1322,27 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	struct field_map_builder builder;
+	size_t total, tuple_len;
+	uint32_t data_offset, field_map_size;
+	char *raw;
+	bool make_compact;
 	if (tuple_field_map_create(format, data, true, &builder) != 0)
 		goto end;
-	uint32_t field_map_size = field_map_build_size(&builder);
+	field_map_size = field_map_build_size(&builder);
 	/*
 	 * Data offset is calculated from the begin of the struct
 	 * tuple base, not from memtx_tuple, because the struct
 	 * tuple is not the first field of the memtx_tuple.
 	 */
-	uint32_t data_offset = sizeof(struct tuple) + field_map_size;
+	data_offset = sizeof(struct tuple) + field_map_size;
 	if (tuple_check_data_offset(data_offset) != 0)
 		goto end;
 
-	size_t tuple_len = end - data;
+	tuple_len = end - data;
 	assert(tuple_len <= UINT32_MAX); /* bsize is UINT32_MAX */
-	size_t total = sizeof(struct memtx_tuple) + field_map_size + tuple_len;
+	total = sizeof(struct memtx_tuple) + field_map_size + tuple_len;
 
-	bool make_compact = tuple_can_be_compact(data_offset, tuple_len);
+	make_compact = tuple_can_be_compact(data_offset, tuple_len);
 	if (make_compact) {
 		data_offset -= TUPLE_COMPACT_SAVINGS;
 		total -= TUPLE_COMPACT_SAVINGS;
@@ -1350,7 +1359,8 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	}
 
 	struct memtx_tuple *memtx_tuple;
-	while ((memtx_tuple = memtx_mem_alloc(memtx, total)) == NULL) {
+	while ((memtx_tuple =
+	       (struct memtx_tuple *)memtx_mem_alloc(memtx, total)) == NULL) {
 		bool stop;
 		memtx_engine_run_gc(memtx, &stop);
 		if (stop)
@@ -1365,7 +1375,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 		     data_offset, tuple_len, make_compact);
 	memtx_tuple->version = memtx->snapshot_version;
 	tuple_format_ref(format);
-	char *raw = (char *) tuple + data_offset;
+	raw = (char *) tuple + data_offset;
 	field_map_build(&builder, raw - field_map_size);
 	memcpy(raw, data, tuple_len);
 	say_debug("%s(%zu) = %p", __func__, tuple_len, memtx_tuple);
