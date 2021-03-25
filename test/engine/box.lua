@@ -12,6 +12,7 @@ box.cfg{
     vinyl_page_size     = 1024,
     memtx_max_tuple_size = 1024 * 1024 * 100,
     vinyl_max_tuple_size = 1024 * 1024 * 100,
+    memtx_allocator      = os.getenv("MEMTX_ALLOCATOR")
 }
 
 require('console').listen(os.getenv('ADMIN'))
