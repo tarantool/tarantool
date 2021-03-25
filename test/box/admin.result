@@ -63,6 +63,8 @@ cfg_filter(box.cfg)
     - plain
   - - log_level
     - 5
+  - - memtx_allocator
+    - small
   - - memtx_dir
     - <hidden>
   - - memtx_max_tuple_size
