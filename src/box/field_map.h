@@ -35,6 +35,10 @@
 #include <stddef.h>
 #include "bit/bit.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct region;
 struct field_map_builder_slot;
 
@@ -258,3 +262,7 @@ void
 field_map_build(struct field_map_builder *builder, char *buffer);
 
 #endif /* TARANTOOL_BOX_FIELD_MAP_H_INCLUDED */
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__plusplus) */
