@@ -58,6 +58,7 @@
 #define SNAP_SYNC_INTERVAL	(1 << 24)
 
 struct small_alloc SmallAlloc::small_alloc;
+struct sys_alloc SysAlloc::sys_alloc;
 
 static void
 checkpoint_cancel(struct checkpoint *ckpt);
@@ -97,6 +98,8 @@ memtx_engine_get_delayed_lifo(struct memtx_engine *memtx)
 {
 	if (std::is_same<ALLOC, SmallAlloc>::value)
 		return &memtx->delayed;
+	else if (std::is_same<ALLOC, SysAlloc>::value)
+		return &memtx->sys_delayed;
 	unreachable();
 	return NULL;
 }
@@ -225,6 +228,8 @@ memtx_engine_shutdown(struct engine *engine)
 	SmallAlloc::destroy();
 	slab_cache_destroy(&memtx->slab_cache);
 	tuple_arena_destroy(&memtx->arena);
+	memtx_free_all_garbage_tuples<SysAlloc>(memtx);
+	SysAlloc::destroy();
 	xdir_destroy(&memtx->snap_dir);
 	free(memtx);
 }
@@ -1067,6 +1072,8 @@ memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 	SmallAlloc::stats(&data_stats);
 	stat->data += data_stats.used;
 	stat->index += index_stats.totals.used;
+	SysAlloc::stats(&data_stats);
+	stat->data += data_stats.used;
 }
 
 static const struct engine_vtab memtx_engine_vtab = {
@@ -1142,7 +1149,8 @@ memtx_engine_gc_f(va_list va)
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
-		 bool dontdump, unsigned granularity, float alloc_factor)
+		 bool dontdump, unsigned granularity,
+		 const char *allocator, float alloc_factor)
 {
 	int64_t snap_signature;
 	struct memtx_engine *memtx =
@@ -1214,10 +1222,15 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	float actual_alloc_factor;
 	SmallAlloc::create(&memtx->slab_cache, objsize_min, granularity,
 			  alloc_factor, &actual_alloc_factor);
-	create_memtx_tuple_format_vtab<SmallAlloc>(&memtx_tuple_format_vtab);
+	SysAlloc::create(&memtx->quota);
+	if (!strcmp(allocator, "small"))
+		create_memtx_tuple_format_vtab<SmallAlloc>(&memtx_tuple_format_vtab);
+	else
+		create_memtx_tuple_format_vtab<SysAlloc>(&memtx_tuple_format_vtab);
 	say_info("Actual slab_alloc_factor calculated on the basis of desired "
 		 "slab_alloc_factor = %f", actual_alloc_factor);
 	lifo_init(&memtx->delayed);
+	lifo_init(&memtx->sys_delayed);
 	memtx->free_mode = MEMTX_ENGINE_FREE;
 
 	/* Initialize index extent allocator. */
