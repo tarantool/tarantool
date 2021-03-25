@@ -21,6 +21,7 @@ listen:port
 log:tarantool.log
 log_format:plain
 log_level:5
+memtx_allocator:small
 memtx_dir:.
 memtx_max_tuple_size:1048576
 memtx_memory:107374182
