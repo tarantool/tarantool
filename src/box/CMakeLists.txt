@@ -129,7 +129,7 @@ add_library(box STATIC
     memtx_tx.c
     module_cache.c
     engine.c
-    memtx_engine.c
+    memtx_engine.cc
     memtx_space.c
     sysview.c
     blackhole.c
@@ -200,7 +200,7 @@ add_library(box STATIC
     lua/lib.c
     lua/serialize_lua.c
     lua/tuple.c
-    lua/slab.c
+    lua/slab.cc
     lua/index.c
     lua/space.cc
     lua/sequence.c
