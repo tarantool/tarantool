@@ -35,14 +35,14 @@
 void
 rmean_roll(int64_t *value, double dt)
 {
-	value[0] /= dt;
+	int64_t tmp = __atomic_load_n(&value[0], __ATOMIC_RELAXED) / dt;
 	int j = RMEAN_WINDOW;
 	/* in case when dt >= 2. we update not only last counter */
 	for (; j > (int)(dt + 0.1); j--)
-		value[j] = value[j - 1];
+		value[j] = (j > 1 ? value[j - 1] : tmp);
 	for (; j > 0; j--)
-		value[j] = value[0];
-	value[0] = 0;
+		value[j] = tmp;
+	__atomic_store_n(&value[0], 0, __ATOMIC_RELAXED);
 }
 
 int64_t
@@ -61,8 +61,8 @@ rmean_collect(struct rmean *rmean, size_t name, int64_t value)
 {
 	assert(name < rmean->stats_n);
 
-	rmean->stats[name].value[0] += value;
-	rmean->stats[name].total += value;
+	__atomic_add_fetch(&rmean->stats[name].value[0], value, __ATOMIC_RELAXED);
+	__atomic_add_fetch(&rmean->stats[name].total, value, __ATOMIC_RELAXED);
 }
 
 int
@@ -125,16 +125,21 @@ rmean_delete(struct rmean *rmean)
 {
 	ev_timer_stop(loop(), &rmean->timer);
 	free(rmean);
-	rmean = 0;
 }
 
+/**
+ * Called only from tx thread, so we need to use
+ * atomic only for rmean->stats[i].value[0] and
+ * rmean->stats[i].total which are accessed from
+ * another thread.
+ */
 void
 rmean_cleanup(struct rmean *rmean)
 {
 	for (size_t i = 0; i < rmean->stats_n; i++) {
-		for (size_t j = 0; j < RMEAN_WINDOW + 1; j++)
+		__atomic_store_n(&rmean->stats[i].value[0], 0, __ATOMIC_RELAXED);
+		for (size_t j = 1; j < RMEAN_WINDOW + 1; j++)
 			rmean->stats[i].value[j] = 0;
-		rmean->stats[i].total = 0;
+		__atomic_store_n(&rmean->stats[i].total, 0, __ATOMIC_RELAXED);
 	}
 }
-
