@@ -331,7 +331,7 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn)
 	 * This is a synchronous commit so we can
 	 * allocate everything on a stack.
 	 */
-	struct synchro_body_bin body;
+	char body[XROW_SYNCHRO_BODY_LEN_MAX];
 	struct xrow_header row;
 	char buf[sizeof(struct journal_entry) +
 		 sizeof(struct xrow_header *)];
@@ -339,7 +339,7 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn)
 	struct journal_entry *entry = (struct journal_entry *)buf;
 	entry->rows[0] = &row;
 
-	xrow_encode_synchro(&row, &body, &req);
+	xrow_encode_synchro(&row, body, &req);
 
 	journal_entry_create(entry, 1, xrow_approx_len(&row),
 			     txn_limbo_write_cb, fiber());
