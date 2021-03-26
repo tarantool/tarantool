@@ -132,6 +132,18 @@ enum iproto_key {
 	IPROTO_REPLICA_ANON = 0x50,
 	IPROTO_ID_FILTER = 0x51,
 	IPROTO_ERROR = 0x52,
+	/**
+	 * Term. Has the same meaning as IPROTO_RAFT_TERM, but is an iproto
+	 * key, rather than a raft key. Used for PROMOTE request, which needs
+	 * both iproto (e.g. REPLICA_ID) and raft (RAFT_TERM) keys.
+	 */
+	IPROTO_TERM = 0x53,
+	/*
+	 * Be careful to not extend iproto_key values over 0x7f.
+	 * iproto_keys are encoded in msgpack as positive fixnum, which ends at
+	 * 0x7f, and we rely on this in some places by allocating a uint8_t to
+	 * hold a msgpack-encoded key value.
+	 */
 	IPROTO_KEY_MAX
 };
 
@@ -226,6 +238,8 @@ enum iproto_type {
 	IPROTO_TYPE_STAT_MAX,
 
 	IPROTO_RAFT = 30,
+	/** PROMOTE request. */
+	IPROTO_PROMOTE = 31,
 
 	/** A confirmation message for synchronous transactions. */
 	IPROTO_CONFIRM = 40,
@@ -340,11 +354,19 @@ dml_request_key_map(uint16_t type)
 	return iproto_body_key_map[type];
 }
 
-/** CONFIRM/ROLLBACK entries for synchronous replication. */
+/** Synchronous replication entries: CONFIRM/ROLLBACK/PROMOTE. */
 static inline bool
 iproto_type_is_synchro_request(uint16_t type)
 {
-	return type == IPROTO_CONFIRM || type == IPROTO_ROLLBACK;
+	return type == IPROTO_CONFIRM || type == IPROTO_ROLLBACK ||
+	       type == IPROTO_PROMOTE;
+}
+
+/** PROMOTE entry (synchronous replication and leader elections). */
+static inline bool
+iproto_type_is_promote_request(uint32_t type)
+{
+       return type == IPROTO_PROMOTE;
 }
 
 static inline bool
