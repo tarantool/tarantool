@@ -62,21 +62,38 @@ struct rmean {
 static inline int64_t
 rmean_total(struct rmean *rmean, size_t name)
 {
-	return rmean->stats[name].total;
+	return __atomic_load_n(&rmean->stats[name].total, __ATOMIC_RELAXED);
 }
 
+/**
+ * This function should be called only from the thread,
+ * which creates rmean structure (tx thread).
+ */
 void
 rmean_roll(int64_t *value, double dt);
 
+/**
+ * This function should be called only from the thread,
+ * which creates rmean structure (tx thread).
+ */
 int64_t
 rmean_mean(struct rmean *rmean, size_t name);
 
+/**
+ * This function should be called from the tx thread only
+ * to work correctly with the fields of the rmean structure
+ * from multiple threads.
+ */
 struct rmean *
 rmean_new(const char **name, size_t n);
 
 void
 rmean_delete(struct rmean *rmean);
 
+/**
+ * This function should be called only from the thread,
+ * which creates rmean structure (tx thread).
+ */
 void
 rmean_cleanup(struct rmean *rmean);
 
@@ -85,6 +102,10 @@ rmean_collect(struct rmean *rmean, size_t name, int64_t value);
 
 typedef int (*rmean_cb)(const char *name, int rps, int64_t total, void *cb_ctx);
 
+/**
+ * This function should be called only from the thread,
+ * which creates rmean structure (tx thread).
+ */
 int
 rmean_foreach(struct rmean *rmean, rmean_cb cb, void *cb_ctx);
 
