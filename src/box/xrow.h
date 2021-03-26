@@ -49,6 +49,7 @@ enum {
 	XROW_IOVMAX = XROW_HEADER_IOVMAX + XROW_BODY_IOVMAX,
 	XROW_HEADER_LEN_MAX = 52,
 	XROW_BODY_LEN_MAX = 256,
+	XROW_SYNCHRO_BODY_LEN_MAX = 32,
 	IPROTO_HEADER_LEN = 28,
 	/** 7 = sizeof(iproto_body_bin). */
 	IPROTO_SELECT_HEADER_LEN = IPROTO_HEADER_LEN + 7,
@@ -226,7 +227,10 @@ xrow_encode_dml(const struct request *request, struct region *region,
  * pending synchronous transactions.
  */
 struct synchro_request {
-	/** Operation type - IPROTO_ROLLBACK or IPROTO_CONFIRM. */
+	/**
+	 * Operation type - either IPROTO_ROLLBACK or IPROTO_CONFIRM or
+	 * IPROTO_PROMOTE
+	 */
 	uint16_t type;
 	/**
 	 * ID of the instance owning the pending transactions.
@@ -237,24 +241,24 @@ struct synchro_request {
 	 */
 	uint32_t replica_id;
 	/**
+	 * Id of the instance which has issued this request. Only filled on
+	 * decoding, and left blank when encoding a request.
+	 */
+	uint32_t origin_id;
+	/**
 	 * Operation LSN.
 	 * In case of CONFIRM it means 'confirm all
 	 * transactions with lsn <= this value'.
 	 * In case of ROLLBACK it means 'rollback all transactions
 	 * with lsn >= this value'.
+	 * In case of PROMOTE it means CONFIRM(lsn) + ROLLBACK(lsn+1)
 	 */
 	int64_t lsn;
-};
-
-/** Synchro request xrow's body in MsgPack format. */
-struct PACKED synchro_body_bin {
-	uint8_t m_body;
-	uint8_t k_replica_id;
-	uint8_t m_replica_id;
-	uint32_t v_replica_id;
-	uint8_t k_lsn;
-	uint8_t m_lsn;
-	uint64_t v_lsn;
+	/**
+	 * The new term the instance issuing this request is in. Only used for
+	 * PROMOTE request.
+	 */
+	uint64_t term;
 };
 
 /**
@@ -264,8 +268,7 @@ struct PACKED synchro_body_bin {
  * @param req Request parameters.
  */
 void
-xrow_encode_synchro(struct xrow_header *row,
-		    struct synchro_body_bin *body,
+xrow_encode_synchro(struct xrow_header *row, char *body,
 		    const struct synchro_request *req);
 
 /**

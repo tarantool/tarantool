@@ -885,28 +885,33 @@ xrow_encode_dml(const struct request *request, struct region *region,
 }
 
 void
-xrow_encode_synchro(struct xrow_header *row,
-		    struct synchro_body_bin *body,
+xrow_encode_synchro(struct xrow_header *row, char *body,
 		    const struct synchro_request *req)
 {
-	/*
-	 * A map with two elements. We don't compress
-	 * numbers to have this structure constant in size,
-	 * which allows us to preallocate it on stack.
-	 */
-	body->m_body = 0x80 | 2;
-	body->k_replica_id = IPROTO_REPLICA_ID;
-	body->m_replica_id = 0xce;
-	body->v_replica_id = mp_bswap_u32(req->replica_id);
-	body->k_lsn = IPROTO_LSN;
-	body->m_lsn = 0xcf;
-	body->v_lsn = mp_bswap_u64(req->lsn);
+	assert(iproto_type_is_synchro_request(req->type));
+
+	char *pos = body;
+
+	pos = mp_encode_map(pos,
+			    iproto_type_is_promote_request(req->type) ? 3 : 2);
+
+	pos = mp_encode_uint(pos, IPROTO_REPLICA_ID);
+	pos = mp_encode_uint(pos, req->replica_id);
+
+	pos = mp_encode_uint(pos, IPROTO_LSN);
+	pos = mp_encode_uint(pos, req->lsn);
+
+	if (iproto_type_is_promote_request(req->type)) {
+		pos = mp_encode_uint(pos, IPROTO_TERM);
+		pos = mp_encode_uint(pos, req->term);
+	}
+
+	assert(pos - body < XROW_SYNCHRO_BODY_LEN_MAX);
 
 	memset(row, 0, sizeof(*row));
-
 	row->type = req->type;
-	row->body[0].iov_base = (void *)body;
-	row->body[0].iov_len = sizeof(*body);
+	row->body[0].iov_base = body;
+	row->body[0].iov_len = pos - body;
 	row->bodycnt = 1;
 }
 
@@ -952,11 +957,17 @@ xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 		case IPROTO_LSN:
 			req->lsn = mp_decode_uint(&d);
 			break;
+		case IPROTO_TERM:
+			req->term = mp_decode_uint(&d);
+			break;
 		default:
 			mp_next(&d);
 		}
 	}
+
 	req->type = row->type;
+	req->origin_id = row->replica_id;
+
 	return 0;
 }
 
