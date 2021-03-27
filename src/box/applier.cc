@@ -1055,8 +1055,8 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 		 * each other.
 		 */
 		assert(first_row == last_row);
-		if (apply_synchro_row(first_row) != 0)
-			diag_raise();
+		if ((rc = apply_synchro_row(first_row)) != 0)
+			goto finish;
 	} else if ((rc = apply_plain_tx(rows, replication_skip_conflict,
 					true)) != 0) {
 		goto finish;
