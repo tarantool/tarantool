@@ -315,14 +315,16 @@ txn_limbo_write_cb(struct journal_entry *entry)
 }
 
 static void
-txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn)
+txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
+			uint64_t term)
 {
-	assert(lsn > 0);
+	assert(lsn >= 0);
 
 	struct synchro_request req = {
 		.type		= type,
 		.replica_id	= limbo->owner_id,
 		.lsn		= lsn,
+		.term		= term,
 	};
 
 	/*
@@ -369,14 +371,14 @@ txn_limbo_write_confirm(struct txn_limbo *limbo, int64_t lsn)
 	assert(lsn > limbo->confirmed_lsn);
 	assert(!limbo->is_in_rollback);
 	limbo->confirmed_lsn = lsn;
-	txn_limbo_write_synchro(limbo, IPROTO_CONFIRM, lsn);
+	txn_limbo_write_synchro(limbo, IPROTO_CONFIRM, lsn, 0);
 }
 
 /** Confirm all the entries <= @a lsn. */
 static void
 txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 {
-	assert(limbo->owner_id != REPLICA_ID_NIL);
+	assert(limbo->owner_id != REPLICA_ID_NIL || txn_limbo_is_empty(limbo));
 	assert(limbo == &txn_limbo);
 	struct txn_limbo_entry *e, *tmp;
 	rlist_foreach_entry_safe(e, &limbo->queue, in_queue, tmp) {
@@ -424,7 +426,7 @@ txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 	assert(lsn > limbo->confirmed_lsn);
 	assert(!limbo->is_in_rollback);
 	limbo->is_in_rollback = true;
-	txn_limbo_write_synchro(limbo, IPROTO_ROLLBACK, lsn);
+	txn_limbo_write_synchro(limbo, IPROTO_ROLLBACK, lsn, 0);
 	limbo->is_in_rollback = false;
 }
 
@@ -432,7 +434,7 @@ txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 static void
 txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 {
-	assert(limbo->owner_id != REPLICA_ID_NIL);
+	assert(limbo->owner_id != REPLICA_ID_NIL || txn_limbo_is_empty(limbo));
 	assert(limbo == &txn_limbo);
 	struct txn_limbo_entry *e, *tmp;
 	struct txn_limbo_entry *last_rollback = NULL;
@@ -462,6 +464,37 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 	/* Update is_ro once the limbo is clear. */
 	if (txn_limbo_is_empty(limbo))
 		box_update_ro_summary();
+}
+
+void
+txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
+{
+	limbo->confirmed_lsn = lsn;
+	limbo->is_in_rollback = true;
+	/*
+	 * We make sure that promote is only written once everything this
+	 * instance has may be confirmed.
+	 */
+	struct txn_limbo_entry *e = txn_limbo_last_synchro_entry(limbo);
+	assert(e == NULL || e->lsn <= lsn);
+	(void) e;
+	txn_limbo_write_synchro(limbo, IPROTO_PROMOTE, lsn, term);
+	limbo->is_in_rollback = false;
+}
+
+/**
+ * Process a PROMOTE request, i.e. confirm all entries <= @a req.lsn and
+ * rollback all entries > @a req.lsn.
+ */
+static void
+txn_limbo_read_promote(struct txn_limbo *limbo, uint32_t replica_id,
+		       int64_t lsn)
+{
+	txn_limbo_read_confirm(limbo, lsn);
+	txn_limbo_read_rollback(limbo, lsn + 1);
+	assert(txn_limbo_is_empty(&txn_limbo));
+	limbo->owner_id = replica_id;
+	limbo->confirmed_lsn = 0;
 }
 
 void
@@ -626,36 +659,13 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 	case IPROTO_ROLLBACK:
 		txn_limbo_read_rollback(limbo, req->lsn);
 		break;
+	case IPROTO_PROMOTE:
+		txn_limbo_read_promote(limbo, req->origin_id, req->lsn);
+		break;
 	default:
 		unreachable();
 	}
 	return;
-}
-
-void
-txn_limbo_force_empty(struct txn_limbo *limbo, int64_t confirm_lsn)
-{
-	struct txn_limbo_entry *e, *last_quorum = NULL;
-	struct txn_limbo_entry *rollback = NULL;
-	rlist_foreach_entry(e, &limbo->queue, in_queue) {
-		if (txn_has_flag(e->txn, TXN_WAIT_ACK)) {
-			if (e->lsn <= confirm_lsn) {
-				last_quorum = e;
-			} else {
-				rollback = e;
-				break;
-			}
-		}
-	}
-
-	if (last_quorum != NULL) {
-		txn_limbo_write_confirm(limbo, last_quorum->lsn);
-		txn_limbo_read_confirm(limbo, last_quorum->lsn);
-	}
-	if (rollback != NULL) {
-		txn_limbo_write_rollback(limbo, rollback->lsn);
-		txn_limbo_read_rollback(limbo, rollback->lsn);
-	}
 }
 
 void
