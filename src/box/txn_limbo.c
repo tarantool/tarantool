@@ -45,6 +45,8 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->owner_id = REPLICA_ID_NIL;
 	fiber_cond_create(&limbo->wait_cond);
 	vclock_create(&limbo->vclock);
+	vclock_create(&limbo->promote_term_map);
+	limbo->promote_greatest_term = 0;
 	limbo->confirmed_lsn = 0;
 	limbo->rollback_count = 0;
 	limbo->is_in_rollback = false;
@@ -643,12 +645,26 @@ complete:
 void
 txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 {
+	uint64_t term = req->term;
+	uint32_t origin = req->origin_id;
+	if (txn_limbo_replica_term(limbo, origin) < term) {
+		vclock_follow(&limbo->promote_term_map, origin, term);
+		if (term > limbo->promote_greatest_term) {
+			limbo->promote_greatest_term = term;
+		} else if (req->type == IPROTO_PROMOTE) {
+			/*
+			 * PROMOTE for outdated term. Ignore.
+			 */
+			return;
+		}
+	}
+	int64_t lsn = req->lsn;
 	if (req->replica_id == REPLICA_ID_NIL) {
 		/*
 		 * The limbo was empty on the instance issuing the request.
 		 * This means this instance must empty its limbo as well.
 		 */
-		assert(req->lsn == 0 && req->type == IPROTO_PROMOTE);
+		assert(lsn == 0 && req->type == IPROTO_PROMOTE);
 	} else if (req->replica_id != limbo->owner_id) {
 		/*
 		 * Ignore CONFIRM/ROLLBACK messages for a foreign master.
@@ -656,17 +672,25 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 		 * data from an old leader, who has just started and written
 		 * confirm right on synchronous transaction recovery.
 		 */
-		return;
+		if (req->type != IPROTO_PROMOTE)
+			return;
+		/*
+		 * Promote has a bigger term, and tries to steal the limbo. It
+		 * means it probably was elected with a quorum, and it makes no
+		 * sense to wait here for confirmations. The other nodes already
+		 * elected a new leader. Rollback all the local txns.
+		 */
+		lsn = 0;
 	}
 	switch (req->type) {
 	case IPROTO_CONFIRM:
-		txn_limbo_read_confirm(limbo, req->lsn);
+		txn_limbo_read_confirm(limbo, lsn);
 		break;
 	case IPROTO_ROLLBACK:
-		txn_limbo_read_rollback(limbo, req->lsn);
+		txn_limbo_read_rollback(limbo, lsn);
 		break;
 	case IPROTO_PROMOTE:
-		txn_limbo_read_promote(limbo, req->origin_id, req->lsn);
+		txn_limbo_read_promote(limbo, req->origin_id, lsn);
 		break;
 	default:
 		unreachable();

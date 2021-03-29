@@ -130,6 +130,24 @@ struct txn_limbo {
 	 */
 	struct vclock vclock;
 	/**
+	 * Latest terms received with PROMOTE entries from remote instances.
+	 * Limbo uses them to filter out the transactions coming not from the
+	 * limbo owner, but so outdated that they are rolled back everywhere
+	 * except outdated nodes.
+	 */
+	struct vclock promote_term_map;
+	/**
+	 * The biggest PROMOTE term seen by the instance and persisted in WAL.
+	 * It is related to raft term, but not the same. Synchronous replication
+	 * represented by the limbo is interested only in the won elections
+	 * ended with PROMOTE request.
+	 * It means the limbo's term might be smaller than the raft term, while
+	 * there are ongoing elections, or the leader is already known and this
+	 * instance hasn't read its PROMOTE request yet. During other times the
+	 * limbo and raft are in sync and the terms are the same.
+	 */
+	uint64_t promote_greatest_term;
+	/**
 	 * Maximal LSN gathered quorum and either already confirmed in WAL, or
 	 * whose confirmation is in progress right now. Any attempt to confirm
 	 * something smaller than this value can be safely ignored. Moreover,
@@ -191,6 +209,28 @@ txn_limbo_last_entry(struct txn_limbo *limbo)
 {
 	return rlist_last_entry(&limbo->queue, struct txn_limbo_entry,
 				in_queue);
+}
+
+/**
+ * Return the latest term as seen in PROMOTE requests from instance with id
+ * @a replica_id.
+ */
+static inline uint64_t
+txn_limbo_replica_term(const struct txn_limbo *limbo, uint32_t replica_id)
+{
+	return vclock_get(&limbo->promote_term_map, replica_id);
+}
+
+/**
+ * Check whether replica with id @a source_id is too old to apply synchronous
+ * data from it. The check is only valid when elections are enabled.
+ */
+static inline bool
+txn_limbo_is_replica_outdated(const struct txn_limbo *limbo,
+			      uint32_t replica_id)
+{
+	return txn_limbo_replica_term(limbo, replica_id) <
+	       limbo->promote_greatest_term;
 }
 
 /**
