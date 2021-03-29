@@ -1475,7 +1475,14 @@ box_clear_synchro_queue(bool try_wait)
 		return -1;
 	}
 
+	/*
+	 * Do nothing when box isn't configured and when PROMOTE was already
+	 * written for this term (synchronous replication and leader election
+	 * are in sync, and both chose this node as a leader).
+	 */
 	if (!is_box_configured)
+		return 0;
+	if (txn_limbo_replica_term(&txn_limbo, instance_id) == box_raft()->term)
 		return 0;
 	uint32_t former_leader_id = txn_limbo.owner_id;
 	int64_t wait_lsn = txn_limbo.confirmed_lsn;
@@ -1530,17 +1537,16 @@ box_clear_synchro_queue(bool try_wait)
 			rc = -1;
 		} else {
 promote:
-			/*
-			 * Term parameter is unused now, We'll pass
-			 * box_raft()->term there later.
-			 */
-			txn_limbo_write_promote(&txn_limbo, wait_lsn, 0);
+			/* We cannot possibly get here in a volatile state. */
+			assert(box_raft()->volatile_term == box_raft()->term);
+			txn_limbo_write_promote(&txn_limbo, wait_lsn,
+						box_raft()->term);
 			struct synchro_request req = {
 				.type = IPROTO_PROMOTE,
 				.replica_id = former_leader_id,
 				.origin_id = instance_id,
 				.lsn = wait_lsn,
-				.term = 0, /* unused */
+				.term = box_raft()->term,
 			};
 			txn_limbo_process(&txn_limbo, &req);
 			assert(txn_limbo_is_empty(&txn_limbo));

@@ -970,6 +970,62 @@ apply_final_join_tx(struct stailq *rows)
 }
 
 /**
+ * When elections are enabled we must filter out synchronous rows coming
+ * from an instance that fell behind the current leader. This includes
+ * both synchronous tx rows and rows for txs following unconfirmed
+ * synchronous transactions.
+ * The rows are replaced with NOPs to preserve the vclock consistency.
+ */
+static void
+applier_synchro_filter_tx(struct stailq *rows)
+{
+	/*
+	 * XXX: in case raft is disabled, synchronous replication still works
+	 * but without any filtering. That might lead to issues with
+	 * unpredictable confirms after rollbacks which are supposed to be
+	 * fixed by the filtering.
+	 */
+	if (!raft_is_enabled(box_raft()))
+		return;
+	struct xrow_header *row;
+	/*
+	 * It  may happen that we receive the instance's rows via some third
+	 * node, so cannot check for applier->instance_id here.
+	 */
+	row = &stailq_first_entry(rows, struct applier_tx_row, next)->row;
+	if (!txn_limbo_is_replica_outdated(&txn_limbo, row->replica_id))
+		return;
+
+	if (stailq_last_entry(rows, struct applier_tx_row, next)->row.wait_sync)
+		goto nopify;
+
+	/*
+	 * Not waiting for sync and not a synchro request - this make it already
+	 * NOP or an asynchronous transaction not depending on any synchronous
+	 * ones - let it go as is.
+	 */
+	if (!iproto_type_is_synchro_request(row->type))
+		return;
+	/*
+	 * Do not NOPify promotion, otherwise won't even know who is the limbo
+	 * owner now.
+	 */
+	if (iproto_type_is_promote_request(row->type))
+		return;
+nopify:;
+	struct applier_tx_row *item;
+	stailq_foreach_entry(item, rows, next) {
+		row = &item->row;
+		row->type = IPROTO_NOP;
+		/*
+		 * Row body is saved to fiber's region and will be freed
+		 * on next fiber_gc() call.
+		 */
+		row->bodycnt = 0;
+	}
+}
+
+/**
  * Apply all rows in the rows queue as a single transaction.
  *
  * Return 0 for success or -1 in case of an error.
@@ -1028,7 +1084,7 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 			}
 		}
 	}
-
+	applier_synchro_filter_tx(rows);
 	if (unlikely(iproto_type_is_synchro_request(first_row->type))) {
 		/*
 		 * Synchro messages are not transactions, in terms
