@@ -272,14 +272,11 @@ int
 txn_limbo_wait_confirm(struct txn_limbo *limbo);
 
 /**
- * Make txn_limbo confirm all the entries with lsn less than or
- * equal to the given one, and rollback all the following entries.
- * The function makes txn_limbo write CONFIRM and ROLLBACK
- * messages for appropriate lsns, and then process the messages
- * immediately.
+ * Write a PROMOTE request, which has the same effect as CONFIRM(@a lsn) and
+ * ROLLBACK(@a lsn + 1) combined.
  */
 void
-txn_limbo_force_empty(struct txn_limbo *limbo, int64_t last_confirm);
+txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term);
 
 /**
  * Update qsync parameters dynamically.

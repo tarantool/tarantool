@@ -1556,7 +1556,19 @@ box_clear_synchro_queue(bool try_wait)
 				 "new synchronous transactions appeared");
 			rc = -1;
 		} else {
-			txn_limbo_force_empty(&txn_limbo, wait_lsn);
+			/*
+			 * Term parameter is unused now, We'll pass
+			 * box_raft()->term there later.
+			 */
+			txn_limbo_write_promote(&txn_limbo, wait_lsn, 0);
+			struct synchro_request req = {
+				.type = IPROTO_PROMOTE,
+				.replica_id = former_leader_id,
+				.origin_id = instance_id,
+				.lsn = wait_lsn,
+				.term = 0, /* unused */
+			};
+			txn_limbo_process(&txn_limbo, &req);
 			assert(txn_limbo_is_empty(&txn_limbo));
 		}
 	}
