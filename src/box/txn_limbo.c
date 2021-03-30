@@ -643,7 +643,13 @@ complete:
 void
 txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 {
-	if (req->replica_id != limbo->owner_id) {
+	if (req->replica_id == REPLICA_ID_NIL) {
+		/*
+		 * The limbo was empty on the instance issuing the request.
+		 * This means this instance must empty its limbo as well.
+		 */
+		assert(req->lsn == 0 && req->type == IPROTO_PROMOTE);
+	} else if (req->replica_id != limbo->owner_id) {
 		/*
 		 * Ignore CONFIRM/ROLLBACK messages for a foreign master.
 		 * These are most likely outdated messages for already confirmed

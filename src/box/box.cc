@@ -1502,18 +1502,17 @@ box_clear_synchro_queue(bool try_wait)
 			 "simultaneous invocations");
 		return -1;
 	}
-	/*
-	 * XXX: we may want to write confirm + rollback even when the limbo is
-	 * empty for the sake of limbo ownership transition.
-	 */
-	if (!is_box_configured || txn_limbo_is_empty(&txn_limbo))
+
+	if (!is_box_configured)
 		return 0;
 	uint32_t former_leader_id = txn_limbo.owner_id;
-	assert(former_leader_id != REPLICA_ID_NIL);
-	if (former_leader_id == instance_id)
-		return 0;
-
+	int64_t wait_lsn = txn_limbo.confirmed_lsn;
+	int rc = 0;
+	int quorum = replication_synchro_quorum;
 	in_clear_synchro_queue = true;
+
+	if (txn_limbo_is_empty(&txn_limbo))
+		goto promote;
 
 	if (try_wait) {
 		/* Wait until pending confirmations/rollbacks reach us. */
@@ -1528,8 +1527,11 @@ box_clear_synchro_queue(bool try_wait)
 		 * Our mission was to clear the limbo from former leader's
 		 * transactions. Exit in case someone did that for us.
 		 */
-		if (txn_limbo_is_empty(&txn_limbo) ||
-		    former_leader_id != txn_limbo.owner_id) {
+		if (former_leader_id != txn_limbo.owner_id) {
+			/*
+			 * TODO: error once we see someone else has become the
+			 * leader already.
+			 */
 			in_clear_synchro_queue = false;
 			return 0;
 		}
@@ -1540,12 +1542,11 @@ box_clear_synchro_queue(bool try_wait)
 	 * in the limbo must've come through the applier meaning they already
 	 * have an lsn assigned, even if their WAL write hasn't finished yet.
 	 */
-	int64_t wait_lsn = txn_limbo_last_synchro_entry(&txn_limbo)->lsn;
+	wait_lsn = txn_limbo_last_synchro_entry(&txn_limbo)->lsn;
 	assert(wait_lsn > 0);
 
-	int quorum = replication_synchro_quorum;
-	int rc = box_wait_quorum(former_leader_id, wait_lsn, quorum,
-				 replication_synchro_timeout);
+	rc = box_wait_quorum(former_leader_id, wait_lsn, quorum,
+			     replication_synchro_timeout);
 	if (rc == 0) {
 		if (quorum < replication_synchro_quorum) {
 			diag_set(ClientError, ER_QUORUM_WAIT, quorum,
@@ -1556,6 +1557,7 @@ box_clear_synchro_queue(bool try_wait)
 				 "new synchronous transactions appeared");
 			rc = -1;
 		} else {
+promote:
 			/*
 			 * Term parameter is unused now, We'll pass
 			 * box_raft()->term there later.
