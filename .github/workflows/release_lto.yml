@@ -18,20 +18,10 @@ jobs:
         github.event.pull_request.head.repo.full_name != github.repository ) &&
         ! endsWith(github.ref, '-notest')
 
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
 
     strategy:
       fail-fast: false
-
-    # image built by .gitlab.mk instructions and targets from .travis.mk
-    container:
-      image: docker.io/tarantool/testing:debian-buster
-      # Our testing expects that the init process (PID 1) will
-      # reap orphan processes. At least the following test leans
-      # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
-      # Memory size hard coding will be removed within resolving issue
-      #   http://github.com/tarantool/tarantool-qa/issues/101
-      options: '--init --memory=7G --memory-swap=7G'
 
     steps:
       - uses: actions/checkout@v2.3.4
@@ -42,7 +32,7 @@ jobs:
       - name: test
         env:
           CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
-        run: ${CI_MAKE} test_debian_no_deps
+        run: ${CI_MAKE} test_ubuntu_ghactions
       - name: call action to send Telegram message on failure
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
