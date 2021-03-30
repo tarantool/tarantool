@@ -120,7 +120,8 @@ port_vdbemem_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 			lua_pushnumber(L, sql_value_double(param));
 			break;
 		case MP_STR:
-			lua_pushstring(L, (const char *) sql_value_text(param));
+			lua_pushlstring(L, (const char *)sql_value_text(param),
+					(size_t)sql_value_bytes(param));
 			break;
 		case MP_BIN:
 		case MP_ARRAY:
