@@ -676,17 +676,27 @@ box_check_uri(const char *source, const char *option_name)
 	}
 }
 
-static const char *
+static enum election_mode
 box_check_election_mode(void)
 {
 	const char *mode = cfg_gets("election_mode");
-	if (mode == NULL || (strcmp(mode, "off") != 0 &&
-	    strcmp(mode, "voter") != 0 && strcmp(mode, "candidate") != 0)) {
-		diag_set(ClientError, ER_CFG, "election_mode", "the value must "
-			 "be a string 'off' or 'voter' or 'candidate'");
-		return NULL;
-	}
-	return mode;
+	if (mode == NULL)
+		goto error;
+
+	if (strcmp(mode, "off") == 0)
+		return ELECTION_MODE_OFF;
+	else if (strcmp(mode, "voter") == 0)
+		return ELECTION_MODE_VOTER;
+	else if (strcmp(mode, "manual") == 0)
+		return ELECTION_MODE_MANUAL;
+	else if (strcmp(mode, "candidate") == 0)
+		return ELECTION_MODE_CANDIDATE;
+
+error:
+	diag_set(ClientError, ER_CFG, "election_mode",
+		"the value must be one of the following strings: "
+		"'off', 'voter', 'candidate', 'manual'");
+	return ELECTION_MODE_INVALID;
 }
 
 static double
@@ -1109,7 +1119,7 @@ box_check_config(void)
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_instance_uuid(&uuid);
 	box_check_replicaset_uuid(&uuid);
-	if (box_check_election_mode() == NULL)
+	if (box_check_election_mode() == ELECTION_MODE_INVALID)
 		diag_raise();
 	if (box_check_election_timeout() < 0)
 		diag_raise();
@@ -1143,11 +1153,12 @@ box_check_config(void)
 int
 box_set_election_mode(void)
 {
-	const char *mode = box_check_election_mode();
-	if (mode == NULL)
+	enum election_mode mode = box_check_election_mode();
+	if (mode == ELECTION_MODE_INVALID)
 		return -1;
-	raft_cfg_is_candidate(box_raft(), strcmp(mode, "candidate") == 0);
-	raft_cfg_is_enabled(box_raft(), strcmp(mode, "off") != 0);
+	box_election_mode = mode;
+	raft_cfg_is_candidate(box_raft(), mode == ELECTION_MODE_CANDIDATE);
+	raft_cfg_is_enabled(box_raft(), mode != ELECTION_MODE_OFF);
 	return 0;
 }
 

@@ -22,8 +22,8 @@ box.cfg{election_mode = 100}
  | ...
 box.cfg{election_mode = '100'}
  | ---
- | - error: 'Incorrect value for option ''election_mode'': the value must be a string
- |     ''off'' or ''voter'' or ''candidate'''
+ | - error: 'Incorrect value for option ''election_mode'': the value must be one of the
+ |     following strings: ''off'', ''voter'', ''candidate'', ''manual'''
  | ...
 box.cfg{election_timeout = -1}
  | ---
