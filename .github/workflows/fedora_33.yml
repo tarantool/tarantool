@@ -24,6 +24,12 @@ jobs:
       fail-fast: false
 
     steps:
+      # Permissions correction is needed for self-host runners,
+      # where work path is saved between different workflows runs.
+      - name: correct permissions in working directory
+        shell: bash
+        run: |
+          sudo chown -R $(id -u):$(id -g) .
       - uses: actions/checkout@v2.3.4
         with:
           fetch-depth: 0
