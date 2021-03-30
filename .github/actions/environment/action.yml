@@ -39,4 +39,9 @@ runs:
                 free
             fi
         fi
+        # Drop a tag that points to a current commit (if any)
+        # on a job triggered by pushing to a branch.
+        if ${{ ! startsWith(github.ref, 'refs/tags/') }}; then
+            git tag -d "$(git tag --points-at HEAD)" 2>/dev/null || true
+        fi
       shell: bash
