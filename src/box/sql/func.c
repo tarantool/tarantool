@@ -175,7 +175,8 @@ port_vdbemem_get_msgpack(struct port *base, uint32_t *size)
 		}
 		case MP_STR: {
 			const char *str = (const char *) sql_value_text(param);
-			mpstream_encode_str(&stream, str);
+			mpstream_encode_strn(&stream, str,
+					     sql_value_bytes(param));
 			break;
 		}
 		case MP_BIN:
