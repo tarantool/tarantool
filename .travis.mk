@@ -11,7 +11,7 @@ OOS_SRC_PATH?=/source
 OOS_BUILD_PATH?=/rw_bins
 OOS_BUILD_RULE?=test_oos_no_deps
 BIN_DIR=/usr/local/bin
-OSX_VARDIR?=/tmp/tnt
+VARDIR?=/tmp/tnt
 GIT_DESCRIBE=$(shell git describe HEAD)
 COVERITY_BINS=/cov-analysis/bin
 
@@ -135,7 +135,7 @@ build_debian: configure_debian
 
 test_debian_no_deps: build_debian
 	make LuaJIT-test
-	cd test && ./test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
+	cd test && ./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_debian: deps_debian test_debian_no_deps
 
@@ -150,7 +150,7 @@ build_coverage_debian:
 test_coverage_debian_no_deps: build_coverage_debian
 	make LuaJIT-test
 	# Enable --long tests for coverage
-	cd test && ./test-run.py --force $(TEST_RUN_EXTRA_PARAMS) --long
+	cd test && ./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS) --long
 	lcov --compat-libtool --directory src/ --capture --output-file coverage.info.tmp \
 		--rc lcov_branch_coverage=1 --rc lcov_function_coverage=1
 	lcov --compat-libtool --remove coverage.info.tmp 'tests/*' 'third_party/*' '/usr/*' \
@@ -219,7 +219,7 @@ test_asan_debian_no_deps: build_asan_debian
 	cd test && ASAN=ON \
 		LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
 		ASAN_OPTIONS=heap_profile=0:unmap_shadow_on_exit=1:detect_invalid_pointer_pairs=1:symbolize=1:detect_leaks=1:dump_instruction_bytes=1:print_suppressions=0 \
-		./test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
+		./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_asan_debian: deps_debian deps_buster_clang_11 test_asan_debian_no_deps
 
@@ -243,7 +243,7 @@ test_static_build_cmake_linux:
 	cd static-build && cmake -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON" . && \
 	make -j && ctest -V
 	make -C ${PWD}/static-build/tarantool-prefix/src/tarantool-build LuaJIT-test
-	cd test && ./test-run.py --force \
+	cd test && ./test-run.py --vardir ${VARDIR} --force \
 		--builddir ${PWD}/static-build/tarantool-prefix/src/tarantool-build $(TEST_RUN_EXTRA_PARAMS)
 
 # ###################
@@ -349,12 +349,12 @@ INIT_TEST_ENV_OSX=\
 		launchctl limit maxproc || : ; \
 		ulimit -u ${MAX_PROC} || : ; \
 		ulimit -u ; \
-		rm -rf ${OSX_VARDIR}
+		rm -rf ${VARDIR}
 
 test_osx_no_deps: build_osx
 	make LuaJIT-test
 	${INIT_TEST_ENV_OSX}; \
-	cd test && ./test-run.py --vardir ${OSX_VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
+	cd test && ./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_osx: deps_osx test_osx_no_deps
 
@@ -394,7 +394,7 @@ test_static_build_cmake_osx_no_deps:
 	#
 	# make -C ${PWD}/static-build/tarantool-prefix/src/tarantool-build LuaJIT-test
 	${INIT_TEST_ENV_OSX}; \
-	cd test && ./test-run.py --vardir ${OSX_VARDIR} \
+	cd test && ./test-run.py --vardir ${VARDIR} \
 		--builddir ${PWD}/static-build/tarantool-prefix/src/tarantool-build \
 		--force $(TEST_RUN_EXTRA_PARAMS)
 
