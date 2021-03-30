@@ -6,7 +6,7 @@ DOCKER_IMAGE?=packpack/packpack:debian-stretch
 TEST_RUN_EXTRA_PARAMS?=
 MAX_FILES?=65534
 MAX_PROC?=2500
-OSX_VARDIR?=/tmp/tnt
+VARDIR?=/tmp/tnt
 GIT_DESCRIBE=$(shell git describe HEAD)
 COVERITY_BINS=/cov-analysis/bin
 
@@ -120,7 +120,7 @@ build_debian:
 
 test_debian_no_deps: build_debian
 	make LuaJIT-test
-	cd test && ./test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
+	cd test && ./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_debian: deps_debian test_debian_no_deps
 
@@ -137,8 +137,9 @@ build_coverage_debian:
 test_coverage_debian_no_deps: build_coverage_debian
 	make LuaJIT-test
 	# Enable --long tests for coverage
-	cd test && ./test-run.py --force $(TEST_RUN_EXTRA_PARAMS) --long
-	lcov --compat-libtool --directory src/ --capture --output-file coverage.info.tmp
+	cd test && ./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS) --long
+	lcov --compat-libtool --directory src/ --capture --output-file coverage.info.tmp \
+		--rc lcov_branch_coverage=1 --rc lcov_function_coverage=1
 	lcov --compat-libtool --remove coverage.info.tmp 'tests/*' 'third_party/*' '/usr/*' \
 		--output-file coverage.info
 	lcov --list coverage.info
@@ -205,7 +206,7 @@ test_asan_debian_no_deps: build_asan_debian
 	cd test && ASAN=ON \
 		LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
 		ASAN_OPTIONS=heap_profile=0:unmap_shadow_on_exit=1:detect_invalid_pointer_pairs=1:symbolize=1:detect_leaks=1:dump_instruction_bytes=1:print_suppressions=0 \
-		./test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
+		./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_asan_debian: deps_debian deps_buster_clang_11 test_asan_debian_no_deps
 
@@ -281,9 +282,9 @@ test_osx_no_deps: build_osx
 		launchctl limit maxproc || : ; \
 		ulimit -u ${MAX_PROC} || : ; \
 		ulimit -u ; \
-		rm -rf ${OSX_VARDIR} ; \
+		rm -rf ${VARDIR} ; \
 		make LuaJIT-test ; \
-		cd test && ./test-run.py --vardir ${OSX_VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
+		cd test && ./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_osx: deps_osx test_osx_no_deps
 
