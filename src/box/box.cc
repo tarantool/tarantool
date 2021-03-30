@@ -334,7 +334,26 @@ box_set_orphan(bool orphan)
 }
 
 struct wal_stream {
+	/** Base class. */
 	struct xstream base;
+	/** Current transaction ID. 0 when no transaction. */
+	int64_t tsn;
+	/**
+	 * LSN of the first row saved to check TSN and LSN match in case all
+	 * rows of the tx appeared to be local.
+	 */
+	int64_t first_row_lsn;
+	/**
+	 * Flag whether there is a pending yield to do when the current
+	 * transaction is finished. It can't always be done right away because
+	 * would abort the current transaction if it is memtx.
+	 */
+	bool has_yield;
+	/**
+	 * True if any row in the transaction was global. Saved to check if TSN
+	 * matches LSN of a first global row.
+	 */
+	bool has_global_row;
 	/** How many rows have been recovered so far. */
 	size_t rows;
 };
@@ -379,47 +398,245 @@ recovery_journal_create(struct vclock *v)
 	journal_set(&journal.base);
 }
 
+/**
+ * Drop the stream to the initial state. It is supposed to be done when an error
+ * happens. Because in case of force recovery the stream will continue getting
+ * tuples. For that it must stay in a valid state and must handle them somehow.
+ *
+ * Now the stream simply drops the current transaction like it never happened,
+ * even if its commit-row wasn't met yet. Should be good enough for
+ * force-recovery when the consistency is already out of the game.
+ */
 static void
-apply_wal_row(struct xstream *stream, struct xrow_header *row)
+wal_stream_abort(struct wal_stream *stream)
+{
+	struct txn *tx = in_txn();
+	if (tx != NULL)
+		txn_rollback(tx);
+	stream->tsn = 0;
+	fiber_gc();
+}
+
+/**
+ * The wrapper exists only for the debug purposes, to ensure tsn being non-0 is
+ * in sync with the fiber's txn being non-NULL. It has nothing to do with the
+ * journal content, and therefore can use assertions instead of rigorous error
+ * checking even in release.
+ */
+static bool
+wal_stream_has_tx(const struct wal_stream *stream)
+{
+	bool has = stream->tsn != 0;
+	assert(has == (in_txn() != NULL));
+	return has;
+}
+
+static int
+wal_stream_apply_synchro_row(struct wal_stream *stream, struct xrow_header *row)
+{
+	assert(iproto_type_is_synchro_request(row->type));
+	if (wal_stream_has_tx(stream)) {
+		diag_set(XlogError, "found synchro request in a transaction");
+		return -1;
+	}
+	struct synchro_request syn_req;
+	if (xrow_decode_synchro(row, &syn_req) != 0) {
+		say_error("couldn't decode a synchro request");
+		return -1;
+	}
+	txn_limbo_process(&txn_limbo, &syn_req);
+	return 0;
+}
+
+static int
+wal_stream_apply_raft_row(struct wal_stream *stream, struct xrow_header *row)
+{
+	assert(iproto_type_is_raft_request(row->type));
+	if (wal_stream_has_tx(stream)) {
+		diag_set(XlogError, "found raft request in a transaction");
+		return -1;
+	}
+	struct raft_request raft_req;
+	/* Vclock is never persisted in WAL by Raft. */
+	if (xrow_decode_raft(row, &raft_req, NULL) != 0) {
+		say_error("couldn't decode a raft request");
+		return -1;
+	}
+	box_raft_recover(&raft_req);
+	return 0;
+}
+
+/**
+ * Rows of the same transaction are wrapped into begin/commit. Mostly for the
+ * sake of synchronous replication, when the log can contain rolled back
+ * transactions, which must be entirely reverted during recovery when ROLLBACK
+ * records are met. Row-by-row recovery wouldn't work for multi-statement
+ * synchronous transactions.
+ */
+static int
+wal_stream_apply_dml_row(struct wal_stream *stream, struct xrow_header *row)
 {
 	struct request request;
-	if (iproto_type_is_synchro_request(row->type)) {
-		struct synchro_request syn_req;
-		if (xrow_decode_synchro(row, &syn_req) != 0)
-			diag_raise();
-		txn_limbo_process(&txn_limbo, &syn_req);
-		return;
+	uint64_t req_type = dml_request_key_map(row->type);
+	if (xrow_decode_dml(row, &request, req_type) != 0) {
+		say_error("couldn't decode a DML request");
+		return -1;
 	}
-	if (iproto_type_is_raft_request(row->type)) {
-		struct raft_request raft_req;
-		/* Vclock is never persisted in WAL by Raft. */
-		if (xrow_decode_raft(row, &raft_req, NULL) != 0)
-			diag_raise();
-		box_raft_recover(&raft_req);
-		return;
+	/*
+	 * Note that all the information which came from the log is validated
+	 * and the errors are handled. Not asserted or paniced. That is for the
+	 * sake of force recovery, which must be able to recover just everything
+	 * what possible instead of terminating the instance.
+	 */
+	struct txn *txn;
+	if (stream->tsn == 0) {
+		if (row->tsn == 0) {
+			diag_set(XlogError, "found a row without TSN");
+			goto end_diag_request;
+		}
+		stream->tsn = row->tsn;
+		stream->first_row_lsn = row->lsn;
+		stream->has_global_row = false;
+		/*
+		 * Rows are not stacked into a list like during replication,
+		 * because recovery does not yield while reading the rows. All
+		 * the yields are controlled by the stream, and therefore no
+		 * need to wait for all the rows to start a transaction. Can
+		 * start now, apply the rows, and make a yield after commit if
+		 * necessary. Helps to avoid a lot of copying.
+		 */
+		txn = txn_begin();
+		if (txn == NULL) {
+			say_error("couldn't begin a recovery transaction");
+			return -1;
+		}
+	} else if (row->tsn != stream->tsn) {
+		diag_set(XlogError, "found a next transaction with the "
+			 "previous one not yet committed");
+		goto end_diag_request;
+	} else {
+		txn = in_txn();
 	}
-	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));
+	/* Ensure TSN is equal to LSN of the first global row. */
+	if (!stream->has_global_row && row->group_id != GROUP_LOCAL) {
+		if (row->tsn != row->lsn) {
+			diag_set(XlogError, "found a first global row in a "
+				 "transaction with LSN/TSN mismatch");
+			goto end_diag_request;
+		}
+		stream->has_global_row = true;
+	}
+	assert(wal_stream_has_tx(stream));
+	/* Nops might appear at least after before_replace skipping rows. */
 	if (request.type != IPROTO_NOP) {
-		struct space *space = space_cache_find_xc(request.space_id);
+		struct space *space = space_cache_find(request.space_id);
+		if (space == NULL) {
+			say_error("couldn't find space by ID");
+			goto end_diag_request;
+		}
 		if (box_process_rw(&request, space, NULL) != 0) {
-			say_error("error applying row: %s", request_str(&request));
-			diag_raise();
+			say_error("couldn't apply the request");
+			goto end_diag_request;
 		}
 	}
-	struct wal_stream *xstream =
-		container_of(stream, struct wal_stream, base);
-	/**
-	 * Yield once in a while, but not too often,
-	 * mostly to allow signal handling to take place.
+	assert(txn != NULL);
+	if (!row->is_commit)
+		return 0;
+	/*
+	 * For fully local transactions the TSN check won't work like for global
+	 * transactions, because it is not known if there are global rows until
+	 * commit arrives.
 	 */
-	if (++xstream->rows % WAL_ROWS_PER_YIELD == 0)
-		fiber_sleep(0);
+	if (!stream->has_global_row && stream->tsn != stream->first_row_lsn) {
+		diag_set(XlogError, "fully local transaction's TSN does not "
+			 "match LSN of the first row");
+		return -1;
+	}
+	stream->tsn = 0;
+	/*
+	 * During local recovery the commit procedure should be async, otherwise
+	 * the only fiber processing recovery will get stuck on the first
+	 * synchronous tx it meets until confirm timeout is reached and the tx
+	 * is rolled back, yielding an error.
+	 * Moreover, txn_commit_try_async() doesn't hurt at all during local
+	 * recovery, since journal_write is faked at this stage and returns
+	 * immediately.
+	 */
+	if (txn_commit_try_async(txn) != 0) {
+		/* Commit fail automatically leads to rollback. */
+		assert(in_txn() == NULL);
+		say_error("couldn't commit a recovery transaction");
+		return -1;
+	}
+	assert(in_txn() == NULL);
+	fiber_gc();
+	return 0;
+
+end_diag_request:
+	/*
+	 * The label must be used only for the errors related directly to the
+	 * request. Errors like txn_begin() fail has nothing to do with it, and
+	 * therefore don't log the request as the fault reason.
+	 */
+	say_error("error at request: %s", request_str(&request));
+	return -1;
+}
+
+/**
+ * Yield once in a while, but not too often, mostly to allow signal handling to
+ * take place.
+ */
+static void
+wal_stream_try_yield(struct wal_stream *stream)
+{
+	/*
+	 * Save the yield. Otherwise it would happen only on rows which
+	 * are a multiple of WAL_ROWS_PER_YIELD and are last in their
+	 * transaction, which is probably a very rare coincidence.
+	 */
+	stream->has_yield |= (stream->rows % WAL_ROWS_PER_YIELD == 0);
+	if (wal_stream_has_tx(stream) || !stream->has_yield)
+		return;
+	stream->has_yield = false;
+	fiber_sleep(0);
+}
+
+static void
+wal_stream_apply_row(struct xstream *base, struct xrow_header *row)
+{
+	struct wal_stream *stream =
+		container_of(base, struct wal_stream, base);
+	/*
+	 * Account all rows, even non-DML, and even leading to an error. Because
+	 * still need to yield sometimes.
+	 */
+	++stream->rows;
+	if (iproto_type_is_synchro_request(row->type)) {
+		if (wal_stream_apply_synchro_row(stream, row) != 0)
+			goto end_error;
+	} else if (iproto_type_is_raft_request(row->type)) {
+		if (wal_stream_apply_raft_row(stream, row) != 0)
+			goto end_error;
+	} else if (wal_stream_apply_dml_row(stream, row) != 0) {
+		goto end_error;
+	}
+	wal_stream_try_yield(stream);
+	return;
+
+end_error:
+	wal_stream_abort(stream);
+	wal_stream_try_yield(stream);
+	diag_raise();
 }
 
 static void
 wal_stream_create(struct wal_stream *ctx)
 {
-	xstream_create(&ctx->base, apply_wal_row);
+	xstream_create(&ctx->base, wal_stream_apply_row);
+	ctx->tsn = 0;
+	ctx->first_row_lsn = 0;
+	ctx->has_yield = false;
+	ctx->has_global_row = false;
 	ctx->rows = 0;
 }
 
@@ -2829,9 +3046,13 @@ local_recovery(const struct tt_uuid *instance_uuid,
 
 	struct wal_stream wal_stream;
 	wal_stream_create(&wal_stream);
+	auto stream_guard = make_scoped_guard([&]{
+		wal_stream_abort(&wal_stream);
+	});
 
 	struct recovery *recovery;
-	recovery = recovery_new(wal_dir(), cfg_geti("force_recovery"),
+	bool is_force_recovery = cfg_geti("force_recovery");
+	recovery = recovery_new(wal_dir(), is_force_recovery,
 				checkpoint_vclock);
 
 	/*
@@ -2893,6 +3114,14 @@ local_recovery(const struct tt_uuid *instance_uuid,
 
 	engine_begin_final_recovery_xc();
 	recover_remaining_wals(recovery, &wal_stream.base, NULL, false);
+	if (wal_stream_has_tx(&wal_stream)) {
+		wal_stream_abort(&wal_stream);
+		diag_set(XlogError, "found a not finished transaction "
+			 "in the log");
+		if (!is_force_recovery)
+			diag_raise();
+		diag_log();
+	}
 	engine_end_recovery_xc();
 	/*
 	 * Leave hot standby mode, if any, only after
@@ -2912,6 +3141,14 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		}
 		recovery_stop_local(recovery);
 		recover_remaining_wals(recovery, &wal_stream.base, NULL, true);
+		if (wal_stream_has_tx(&wal_stream)) {
+			wal_stream_abort(&wal_stream);
+			diag_set(XlogError, "found a not finished transaction "
+				 "in the log in hot standby mode");
+			if (!is_force_recovery)
+				diag_raise();
+			diag_log();
+		}
 		/*
 		 * Advance replica set vclock to reflect records
 		 * applied in hot standby mode.
@@ -2920,6 +3157,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		box_listen();
 		box_sync_replication(false);
 	}
+	stream_guard.is_active = false;
 	recovery_finalize(recovery);
 	is_local_recovery = false;
 
