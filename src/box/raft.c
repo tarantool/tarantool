@@ -44,6 +44,8 @@ struct raft box_raft_global = {
 	.state = 0,
 };
 
+enum election_mode box_election_mode = ELECTION_MODE_INVALID;
+
 /**
  * A trigger executed each time the Raft state machine updates any
  * of its visible attributes.
