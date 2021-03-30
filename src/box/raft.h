@@ -35,7 +35,24 @@
 extern "C" {
 #endif
 
+enum election_mode {
+	ELECTION_MODE_INVALID = -1,
+	ELECTION_MODE_OFF = 0,
+	ELECTION_MODE_VOTER = 1,
+	ELECTION_MODE_MANUAL = 2,
+	ELECTION_MODE_CANDIDATE = 3,
+};
+
 struct raft_request;
+
+/**
+ * box_election_mode - current mode of operation for raft. Some modes correspond
+ * to RAFT operation modes directly, like CANDIDATE, VOTER and OFF.
+ * There's a mode which does not map to raft operation mode directly:
+ * MANUAL. In this mode RAFT usually operates as a voter, but it may become a
+ * candidate for some period of time when user calls `box.ctl.promote()`
+ */
+extern enum election_mode box_election_mode;
 
 /** Raft state of this instance. */
 static inline struct raft *
