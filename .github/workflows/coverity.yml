@@ -34,6 +34,12 @@ jobs:
       options: '--init'
 
     steps:
+      # Permissions correction is needed for self-host runners,
+      # where work path is saved between different workflows runs.
+      - name: correct permissions in working directory
+        shell: bash
+        run: |
+          sudo chown -R $(id -u):$(id -g) .
       - uses: actions/checkout@v1
       - uses: ./.github/actions/environment
       - name: test
