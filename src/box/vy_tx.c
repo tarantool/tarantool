@@ -899,8 +899,15 @@ vy_tx_begin_statement(struct vy_tx *tx, struct space *space, void **savepoint)
 	}
 	assert(tx->state == VINYL_TX_READY);
 	tx->last_stmt_space = space;
-	if (stailq_empty(&tx->log))
+	/*
+	 * When want to add to the writer list, can't rely on the log emptiness.
+	 * During recovery it is empty always for the data stored both in runs
+	 * and xlogs. Must check the list member explicitly.
+	 */
+	if (rlist_empty(&tx->in_writers)) {
+		assert(stailq_empty(&tx->log));
 		rlist_add_entry(&tx->xm->writers, tx, in_writers);
+	}
 	*savepoint = stailq_last(&tx->log);
 	return 0;
 }
