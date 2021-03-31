@@ -125,6 +125,7 @@ port_vdbemem_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 		case MP_BIN:
 		case MP_ARRAY:
 		case MP_MAP:
+		case MP_EXT:
 			lua_pushlstring(L, sql_value_blob(param),
 					(size_t) sql_value_bytes(param));
 			break;
@@ -179,6 +180,7 @@ port_vdbemem_get_msgpack(struct port *base, uint32_t *size)
 			break;
 		}
 		case MP_BIN:
+		case MP_EXT:
 		case MP_ARRAY:
 		case MP_MAP: {
 			mpstream_encode_binl(&stream, sql_value_bytes(param));
@@ -449,6 +451,9 @@ typeofFunc(sql_context * context, int NotUsed, sql_value ** argv)
 	case MP_BOOL:
 	case MP_NIL:
 		z = "boolean";
+		break;
+	case MP_EXT:
+		z = field_type_strs[argv[0]->field_type];
 		break;
 	default:
 		unreachable();
@@ -1437,6 +1442,12 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 				-1, SQL_TRANSIENT);
 		break;
 	}
+	case MP_EXT: {
+		diag_set(ClientError, ER_UNSUPPORTED, "SQL",
+			 field_type_strs[argv[0]->field_type]);
+		context->is_aborted = true;
+		break;
+	}
 	default:{
 			assert(sql_value_is_null(argv[0]));
 			sql_result_text(context, "NULL", 4, SQL_STATIC);
@@ -1750,6 +1761,11 @@ trim_func_one_arg(struct sql_context *context, sql_value *arg)
 	enum mp_type val_type = sql_value_type(arg);
 	if (val_type == MP_NIL)
 		return;
+        if (val_type == MP_EXT)
+                diag_set(ClientError, ER_UNSUPPORTED, "SQL",
+                         field_type_strs[arg->field_type]);
+                context->is_aborted = true;
+                return;
 	if (mp_type_is_bloblike(val_type))
 		default_trim = (const unsigned char *) "\0";
 	else

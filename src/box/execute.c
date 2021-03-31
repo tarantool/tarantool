@@ -34,6 +34,7 @@
 #include "bind.h"
 #include "iproto_constants.h"
 #include "sql/sqlInt.h"
+#include "sql/vdbeInt.h"
 #include "sql/sqlLimit.h"
 #include "errcode.h"
 #include "small/region.h"
@@ -225,7 +226,8 @@ sql_column_to_messagepack(struct sql_stmt *stmt, int i,
 		break;
 	}
         case MP_EXT: {
-                diag_set(ClientError, ER_UNSUPPORTED, "SQL", sql_column_datatype(stmt,i));
+                diag_set(ClientError, ER_UNSUPPORTED, "SQL",
+                         field_type_strs[sql_column_value(stmt,i)->field_type]);
                 return -1;
         }
 	default:
