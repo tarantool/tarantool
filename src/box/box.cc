@@ -122,8 +122,6 @@ static struct gc_checkpoint_ref backup_gc;
 static bool is_box_configured = false;
 static bool is_ro = true;
 static fiber_cond ro_cond;
-/** Set to true during recovery from local files. */
-static bool is_local_recovery = false;
 
 /**
  * The following flag is set if the instance failed to
@@ -238,24 +236,7 @@ box_process_rw(struct request *request, struct space *space,
 		goto rollback;
 
 	if (is_autocommit) {
-		int res = 0;
-		/*
-		 * During local recovery the commit procedure
-		 * should be async, otherwise the only fiber
-		 * processing recovery will get stuck on the first
-		 * synchronous tx it meets until confirm timeout
-		 * is reached and the tx is rolled back, yielding
-		 * an error.
-		 * Moreover, txn_commit_try_async() doesn't hurt at
-		 * all during local recovery, since journal_write
-		 * is faked at this stage and returns immediately.
-		 */
-		if (is_local_recovery) {
-			res = txn_commit_try_async(txn);
-		} else {
-			res = txn_commit(txn);
-		}
-		if (res < 0)
+		if (txn_commit(txn) < 0)
 			goto error;
 	        fiber_gc();
 	}
@@ -3071,7 +3052,6 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 	assert(memtx != NULL);
 
-	is_local_recovery = true;
 	recovery_journal_create(&recovery->vclock);
 
 	/*
@@ -3130,7 +3110,6 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	}
 	stream_guard.is_active = false;
 	recovery_finalize(recovery);
-	is_local_recovery = false;
 
 	/*
 	 * We must enable WAL before finalizing engine recovery,
