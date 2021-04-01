@@ -44,29 +44,8 @@
 #include "box/tuple.h"
 #include "mpstream/mpstream.h"
 
-#ifdef SQL_DEBUG
-/*
- * This routine prepares a memory cell for modification by breaking
- * its link to a shallow copy and by marking any current shallow
- * copies of this cell as invalid.
- *
- * This is used for testing and debugging only - to make sure shallow
- * copies are not misused.
- */
-void
-sqlVdbeMemAboutToChange(Vdbe * pVdbe, Mem * pMem)
-{
-	int i;
-	Mem *pX;
-	for (i = 0, pX = pVdbe->aMem; i < pVdbe->nMem; i++, pX++) {
-		if (pX->pScopyFrom == pMem) {
-			pX->flags |= MEM_Undefined;
-			pX->pScopyFrom = 0;
-		}
-	}
-	pMem->pScopyFrom = 0;
-}
-#endif				/* SQL_DEBUG */
+#if 0
+
 /*
  * Context object passed by sqlStat4ProbeSetValue() through to
  * valueNew(). See comments above valueNew() for details.
@@ -546,6 +525,22 @@ sqlStat4ValueFromExpr(Parse * pParse,	/* Parse context */
 	return stat4ValueFromExpr(pParse, pExpr, type, 0, ppVal);
 }
 
+/**
+ * Extract the col_num-th column from the record.  Write
+ * the column value into *res.  If *res is initially NULL
+ * then a new sql_value object is allocated.
+ *
+ * If *res is initially NULL then the caller is responsible for
+ * ensuring that the value written into *res is eventually
+ * freed.
+ *
+ * @param db Database handle.
+ * @param record Pointer to buffer containing record.
+ * @param col_num Column to extract.
+ * @param[out] res Extracted value.
+ *
+ * @retval -1 on error or 0.
+ */
 int
 sql_stat4_column(struct sql *db, const char *record, uint32_t col_num,
 		 sql_value **res)
@@ -588,3 +583,5 @@ sqlStat4ProbeFree(UnpackedRecord * pRec)
 		sqlDbFree(aMem[0].db, pRec);
 	}
 }
+
+#endif
