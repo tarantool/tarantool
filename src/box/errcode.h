@@ -275,6 +275,8 @@ struct errcode_record {
 	/*220 */_(ER_TOO_EARLY_SUBSCRIBE,	"Can't subscribe non-anonymous replica %s until join is done") \
 	/*221 */_(ER_UNUSED,	"Unused.") \
 	/*222 */_(ER_QUORUM_WAIT,		"Couldn't wait for quorum %d: %s") \
+	/*223 */_(ER_INTERFERING_PROMOTE,	"Instance with replica id %u was promoted first") \
+	/*224 */_(ER_RAFT_DISABLED,		"Elections were turned off while running box.ctl.promote()")\
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

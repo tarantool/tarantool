@@ -1492,13 +1492,82 @@ box_clear_synchro_queue(bool try_wait)
 	 */
 	if (!is_box_configured)
 		return 0;
-	if (txn_limbo_replica_term(&txn_limbo, instance_id) == box_raft()->term)
-		return 0;
+	bool run_elections = false;
+
+	switch (box_election_mode) {
+	case ELECTION_MODE_OFF:
+		break;
+	case ELECTION_MODE_VOTER:
+		assert(box_raft()->state == RAFT_STATE_FOLLOWER);
+		diag_set(ClientError, ER_UNSUPPORTED, "election_mode='voter'",
+			 "manual elections");
+		return -1;
+	case ELECTION_MODE_MANUAL:
+		if (box_raft()->state == RAFT_STATE_LEADER)
+			return 0;
+		run_elections = true;
+		try_wait = false;
+		break;
+	case ELECTION_MODE_CANDIDATE:
+		/*
+		 * Leader elections are enabled, and this instance is allowed to
+		 * promote only if it's already an elected leader. No manual
+		 * elections.
+		 */
+		if (box_raft()->state != RAFT_STATE_LEADER) {
+			diag_set(ClientError, ER_UNSUPPORTED, "election_mode="
+				 "'candidate'", "manual elections");
+			return -1;
+		}
+		if (txn_limbo_replica_term(&txn_limbo, instance_id) ==
+		    box_raft()->term)
+			return 0;
+
+		break;
+	default:
+		unreachable();
+	}
+
 	uint32_t former_leader_id = txn_limbo.owner_id;
 	int64_t wait_lsn = txn_limbo.confirmed_lsn;
 	int rc = 0;
 	int quorum = replication_synchro_quorum;
 	in_clear_synchro_queue = true;
+
+	if (run_elections) {
+		/*
+		 * Make this instance a candidate and run until some leader, not
+		 * necessarily this instance, emerges.
+		 */
+		raft_start_candidate(box_raft());
+		/*
+		 * Trigger new elections without waiting for an old leader to
+		 * disappear.
+		 */
+		raft_new_term(box_raft());
+		rc = box_raft_wait_leader_found();
+		/*
+		 * Do not reset raft mode if it was changed while running the
+		 * elections.
+		 */
+		if (box_election_mode == ELECTION_MODE_MANUAL)
+			raft_stop_candidate(box_raft(), false);
+		if (rc != 0) {
+			in_clear_synchro_queue = false;
+			return -1;
+		}
+		if (!box_raft()->is_enabled) {
+			diag_set(ClientError, ER_RAFT_DISABLED);
+			in_clear_synchro_queue = false;
+			return -1;
+		}
+		if (box_raft()->state != RAFT_STATE_LEADER) {
+			diag_set(ClientError, ER_INTERFERING_PROMOTE,
+				 box_raft()->leader);
+			in_clear_synchro_queue = false;
+			return -1;
+		}
+	}
 
 	if (txn_limbo_is_empty(&txn_limbo))
 		goto promote;
@@ -1517,12 +1586,10 @@ box_clear_synchro_queue(bool try_wait)
 		 * transactions. Exit in case someone did that for us.
 		 */
 		if (former_leader_id != txn_limbo.owner_id) {
-			/*
-			 * TODO: error once we see someone else has become the
-			 * leader already.
-			 */
+			diag_set(ClientError, ER_INTERFERING_PROMOTE,
+				 txn_limbo.owner_id);
 			in_clear_synchro_queue = false;
-			return 0;
+			return -1;
 		}
 	}
 

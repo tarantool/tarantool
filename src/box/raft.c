@@ -91,11 +91,11 @@ box_raft_update_synchro_queue(struct raft *raft)
 	 * If the node became a leader, it means it will ignore all records from
 	 * all the other nodes, and won't get late CONFIRM messages anyway. Can
 	 * clear the queue without waiting for confirmations.
-	 * It's alright that the user may have called clear_synchro_queue
-	 * manually. In this case the call below will exit immediately and we'll
-	 * simply log a warning.
+	 * In case these are manual elections, we are already in the middle of a
+	 * `clear_synchro_queue` call. No need to call it once again.
 	 */
-	if (raft->state == RAFT_STATE_LEADER) {
+	if (raft->state == RAFT_STATE_LEADER &&
+	    box_election_mode != ELECTION_MODE_MANUAL) {
 		int rc = 0;
 		uint32_t errcode = 0;
 		do {
@@ -334,6 +334,33 @@ fail:
 	 * when a raft request WAL write fails.
 	 */
 	panic("Could not write a raft request to WAL\n");
+}
+
+static int
+box_raft_wait_leader_found_f(struct trigger *trig, void *event)
+{
+	struct raft *raft = event;
+	assert(raft == box_raft());
+	struct fiber *waiter = trig->data;
+	if (raft->leader != REPLICA_ID_NIL || !raft->is_enabled)
+		fiber_wakeup(waiter);
+	return 0;
+}
+
+int
+box_raft_wait_leader_found(void)
+{
+	struct trigger trig;
+	trigger_create(&trig, box_raft_wait_leader_found_f, fiber(), NULL);
+	raft_on_update(box_raft(), &trig);
+	fiber_yield();
+	trigger_clear(&trig);
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
+	assert(box_raft()->leader != REPLICA_ID_NIL || !box_raft()->is_enabled);
+	return 0;
 }
 
 void

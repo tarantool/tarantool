@@ -440,6 +440,8 @@ t;
  |   219: box.error.XLOG_GAP
  |   220: box.error.TOO_EARLY_SUBSCRIBE
  |   222: box.error.QUORUM_WAIT
+ |   223: box.error.INTERFERING_PROMOTE
+ |   224: box.error.RAFT_DISABLED
  | ...
 
 test_run:cmd("setopt delimiter ''");
