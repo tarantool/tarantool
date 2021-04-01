@@ -441,6 +441,8 @@ t;
  |   220: box.error.TOO_EARLY_SUBSCRIBE
  |   221: box.error.SQL_CANT_ADD_AUTOINC
  |   222: box.error.QUORUM_WAIT
+ |   223: box.error.INTERFERING_PROMOTE
+ |   224: box.error.RAFT_DISABLED
  | ...
 
 test_run:cmd("setopt delimiter ''");
