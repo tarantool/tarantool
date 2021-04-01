@@ -37,26 +37,13 @@
 #include "small/rlist.h"
 #include "func_def.h"
 #include "user_def.h"
+#include "module_cache.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct func;
-
-/**
- * Dynamic shared module.
- */
-struct module {
-	/** Module dlhandle. */
-	void *handle;
-	/** List of imported functions. */
-	struct rlist funcs;
-	/** Count of active calls. */
-	size_t calls;
-	/** Module's package name. */
-	char package[0];
-};
 
 /** Virtual method table for func object. */
 struct func_vtab {
