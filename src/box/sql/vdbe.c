@@ -58,16 +58,30 @@
 #include "box/sequence.h"
 #include "box/session_settings.h"
 
-/*
- * Invoke this macro on memory cells just prior to changing the
- * value of the cell.  This macro verifies that shallow copies are
- * not misused.  A shallow copy of a string or blob just copies a
- * pointer to the string or blob, not the content.  If the original
- * is changed while the copy is still in use, the string or blob might
- * be changed out from under the copy.  This macro verifies that nothing
- * like that ever happens.
- */
 #ifdef SQL_DEBUG
+
+/*
+ * This routine prepares a memory cell for modification by breaking
+ * its link to a shallow copy and by marking any current shallow
+ * copies of this cell as invalid.
+ *
+ * This is used for testing and debugging only - to make sure shallow
+ * copies are not misused.
+ */
+static void
+sqlVdbeMemAboutToChange(Vdbe * pVdbe, Mem * pMem)
+{
+	int i;
+	Mem *pX;
+	for (i = 0, pX = pVdbe->aMem; i < pVdbe->nMem; i++, pX++) {
+		if (pX->pScopyFrom == pMem) {
+			pX->flags |= MEM_Undefined;
+			pX->pScopyFrom = 0;
+		}
+	}
+	pMem->pScopyFrom = 0;
+}
+
 # define memAboutToChange(P,M) sqlVdbeMemAboutToChange(P,M)
 #else
 # define memAboutToChange(P,M)
