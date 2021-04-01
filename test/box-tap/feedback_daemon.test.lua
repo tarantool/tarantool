@@ -70,7 +70,7 @@ if not ok then
     os.exit(0)
 end
 
-test:plan(27)
+test:plan(28)
 
 local function check(message)
     while feedback_count < 1 do
@@ -123,9 +123,11 @@ local fio = require("fio")
 local fh = fio.open("feedback.json")
 test:ok(fh, "file is created")
 local file_data = fh:read()
--- Ignore the report time. The data should be equal other than that.
-feedback_save = string.gsub(feedback_save, '"time":(%d+)', 'time:0')
-file_data = string.gsub(file_data, '"time":(%d+)', 'time:0')
+-- Ignore the report time and uptime. The data should be equal other than that.
+feedback_save = string.gsub(feedback_save, '"uptime":(%d+)', '"uptime":0')
+file_data = string.gsub(file_data, '"uptime":(%d+)', '"uptime":0')
+feedback_save = string.gsub(feedback_save, '"time":(%d+)', '"time":0')
+file_data = string.gsub(file_data, '"time":(%d+)', '"time":0')
 test:is(file_data, feedback_save, "data is equal")
 fh:close()
 fio.unlink("feedback.json")
@@ -287,6 +289,9 @@ actual = daemon.generate_feedback()
 test:is(fiber.time64(), actual.stats.time, "Time of report generation is correct")
 
 check_stats(actual.stats)
+
+actual = daemon.generate_feedback()
+test:is(box.info.uptime, actual.uptime, "Server uptime is reported and is correct.")
 
 test:check()
 os.exit(0)

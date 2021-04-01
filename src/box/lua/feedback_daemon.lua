@@ -108,6 +108,7 @@ local function fill_in_base_info(feedback)
     feedback.tarantool_version = box.info.version
     feedback.server_id         = box.info.uuid
     feedback.cluster_id        = box.info.cluster.uuid
+    feedback.uptime            = box.info.uptime
 end
 
 local function fill_in_platform_info(feedback)
@@ -400,7 +401,7 @@ setmetatable(daemon, {
         end,
         -- this function is used in saving feedback in file
         generate_feedback = function()
-            return fill_in_feedback({ feedback_version = 5 })
+            return fill_in_feedback({ feedback_version = 6 })
         end,
         start = function()
             start(daemon)
