@@ -93,28 +93,28 @@ feedback_reset()
 errinj.set("ERRINJ_HTTPC", false)
 check('feedback received after errinj')
 
-daemon.send_test()
+daemon.send()
 check("feedback received after explicit sending")
 
 box.cfg{feedback_enabled = false}
 feedback_reset()
-daemon.send_test()
+daemon.send()
 test:ok(feedback_count == 0, "no feedback after disabling")
 
 box.cfg{feedback_enabled = true}
-daemon.send_test()
+daemon.send()
 check("feedback after start")
 
 daemon.stop()
 feedback_reset()
-daemon.send_test()
+daemon.send()
 test:ok(feedback_count == 0, "no feedback after stop")
 
 daemon.start()
-daemon.send_test()
+daemon.send()
 check("feedback after start")
-daemon.send_test()
-check("feedback after feedback send_test")
+daemon.send()
+check("feedback after feedback send")
 
 daemon.stop()
 
@@ -136,7 +136,7 @@ server:close()
 -- check it does not fail without server
 daemon = box.internal.feedback_daemon
 daemon.start()
-daemon.send_test()
+daemon.send()
 daemon.stop()
 
 --

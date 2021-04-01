@@ -412,7 +412,7 @@ setmetatable(daemon, {
         reload = function()
             reload(daemon)
         end,
-        send_test = function()
+        send = function()
             if daemon.control ~= nil then
                 daemon.control:put("send")
             end
