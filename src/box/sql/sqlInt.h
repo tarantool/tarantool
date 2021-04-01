@@ -4151,31 +4151,38 @@ sql_expr_new_column(struct sql *db, struct SrcList *src_list, int src_idx,
 
 int sqlExprCheckIN(Parse *, Expr *);
 
-int sqlStat4ProbeSetValue(Parse *, struct index_def *, UnpackedRecord **, Expr *, int,
-			      int, int *);
-int sqlStat4ValueFromExpr(Parse *, Expr *, enum field_type type,
-			      sql_value **);
-void sqlStat4ProbeFree(UnpackedRecord *);
+/* TODO: Enable this function when stat-tables will be revived. */
+static inline int
+sqlStat4ProbeSetValue(struct Parse *parse, ...)
+{
+	(void)parse;
+	unreachable();
+	return 0;
+}
 
-/**
- * Extract the col_num-th column from the record.  Write
- * the column value into *res.  If *res is initially NULL
- * then a new sql_value object is allocated.
- *
- * If *res is initially NULL then the caller is responsible for
- * ensuring that the value written into *res is eventually
- * freed.
- *
- * @param db Database handle.
- * @param record Pointer to buffer containing record.
- * @param col_num Column to extract.
- * @param[out] res Extracted value.
- *
- * @retval -1 on error or 0.
- */
-int
-sql_stat4_column(struct sql *db, const char *record, uint32_t col_num,
-		 sql_value **res);
+/* TODO: Enable this function when stat-tables will be revived. */
+static inline int
+sqlStat4ValueFromExpr(struct Parse *parse, ...)
+{
+	(void)parse;
+	unreachable();
+	return 0;
+}
+
+/* TODO: Enable this function when stat-tables will be revived. */
+static inline void
+sqlStat4ProbeFree(struct UnpackedRecord *rec)
+{
+	(void)rec;
+}
+
+/* TODO: Enable this function when stat-tables will be revived. */
+static inline int
+sql_stat4_column(struct sql *db, ...)
+{
+	(void)db;
+	return 0;
+}
 
 /*
  * The interface to the LEMON-generated parser
