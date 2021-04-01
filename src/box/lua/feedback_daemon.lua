@@ -323,6 +323,12 @@ local function fill_in_feedback(feedback)
     return feedback
 end
 
+-- fixme: remove this hack.
+-- It's here to prevent too early feedback sending.
+-- This leads to problems with thread sanitization after fork() on Mac OS.
+-- Google objc_initializeAfterForkError for details.
+local is_first_send = true
+
 local function feedback_loop(self)
     fiber.name(PREFIX, { truncate = true })
 
@@ -333,6 +339,10 @@ local function feedback_loop(self)
         if msg == "stop" then
             break
         elseif feedback ~= nil then
+            if is_first_send then
+                fiber.sleep(10)
+                is_first_send = nil
+            end
             pcall(http.post, self.host, json.encode(feedback), {timeout=1})
         end
     end

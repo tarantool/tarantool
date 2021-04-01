@@ -626,6 +626,27 @@ setmetatable(box, {
      end
 })
 
+-- A trigger on initial box.cfg{} call. Used to perform some checks and
+-- send feedback report once instance is fully configured.
+local function on_initial_config()
+    -- Check if schema version matches Tarantool version and print
+    -- warning if it's not (in case user forgot to call
+    -- box.schema.upgrade()).
+    local needs, schema_version_str = private.schema_needs_upgrade()
+    if needs then
+        local msg = string.format(
+            'Your schema version is %s while Tarantool %s requires a more'..
+            ' recent schema version. Please, consider using box.'..
+            'schema.upgrade().', schema_version_str, box.info.version)
+        log.warn(msg)
+    end
+
+    -- Send feedback as soon as instance is configured.
+    if private.feedback_daemon ~= nil then
+        private.feedback_daemon.send()
+    end
+end
+
 -- Whether box is loaded.
 --
 -- `false` when box is not configured or when the initialization
@@ -716,17 +737,8 @@ local function load_cfg(cfg)
 
     box_is_configured = true
 
-    -- Check if schema version matches Tarantool version and print
-    -- warning if it's not (in case user forgot to call
-    -- box.schema.upgrade()).
-    local needs, schema_version_str = private.schema_needs_upgrade()
-    if needs then
-        local msg = string.format(
-            'Your schema version is %s while Tarantool %s requires a more'..
-            ' recent schema version. Please, consider using box.'..
-            'schema.upgrade().', schema_version_str, box.info.version)
-        log.warn(msg)
-    end
+    on_initial_config()
+
 end
 box.cfg = locked(load_cfg)
 
