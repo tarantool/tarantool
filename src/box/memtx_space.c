@@ -263,17 +263,22 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 		return -1;
 	assert(pk->def->opts.is_unique);
 
-	if (memtx_tx_manager_use_mvcc_engine) {
-		struct txn *txn = in_txn();
-		struct txn_stmt *stmt =
-			txn == NULL ? NULL : txn_current_stmt(txn);
-		if (stmt != NULL) {
-			return memtx_tx_history_add_stmt(stmt, old_tuple, new_tuple,
-						    mode, result);
-		} else {
-			/** Ephemeral space */
-			assert(space->def->id == 0);
-		}
+	/* Replace must be done in transaction, except ephemeral spaces. */
+	assert(space->def->opts.is_ephemeral ||
+	       (in_txn() != NULL && txn_current_stmt(in_txn()) != NULL));
+	/*
+	 * Don't use MVCC engine for ephemeral in any case.
+	 * MVCC engine requires txn to be present as a storage for
+	 * reads/writes/conflicts.
+	 * Also now there's not way to MVCC engine off: once MVCC engine
+	 * starts to manage a space - direct access to it must be prohibited.
+	 * Since modification of ephemeral spaces are allowed without txn,
+	 * we must not use MVCC for those spaces even if txn is present now.
+	 */
+	if (memtx_tx_manager_use_mvcc_engine && !space->def->opts.is_ephemeral) {
+		struct txn_stmt *stmt = txn_current_stmt(in_txn());
+		return memtx_tx_history_add_stmt(stmt, old_tuple, new_tuple,
+						 mode, result);
 	}
 
 	/*

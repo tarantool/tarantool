@@ -636,6 +636,7 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 			  struct tuple *new_tuple, enum dup_replace_mode mode,
 			  struct tuple **result)
 {
+	assert(stmt != NULL);
 	assert(new_tuple != NULL || old_tuple != NULL);
 	struct space *space = stmt->space;
 	assert(space != NULL);
@@ -1128,6 +1129,8 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 	if (txn == NULL)
 		return 0;
 	if (space == NULL)
+		return 0;
+	if (space->def->opts.is_ephemeral)
 		return 0;
 
 	struct memtx_story *story;
