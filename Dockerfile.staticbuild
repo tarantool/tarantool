@@ -52,7 +52,7 @@ RUN set -x && \
     tar -xvf icu4c-62_1-src.tgz && \
     cd icu/source && \
     ./configure --with-data-packaging=static --enable-static --enable-shared && \
-    make -j && make install
+    make -j $(nproc) && make install
 
 RUN set -x && \
     cd / && \
