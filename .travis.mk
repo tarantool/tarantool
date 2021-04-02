@@ -407,16 +407,7 @@ test_static_build_cmake_osx_no_deps:
 	sysctl vm.swapusage
 	cd static-build && cmake -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON" . && \
 	make -j && ctest -V
-	# FIXME: Hell with SIP on OSX: Tarantool (and also LuaJIT)
-	# is built out of sources, so the test located in the
-	# source directory fails to load the shared library built
-	# in the binary directory via dlopen(3).
-	# For more info, proceed the link below:
-	# https://developer.apple.com/library/archive/documentation/Security/Conceptual/System_Integrity_Protection_Guide/FileSystemProtections/FileSystemProtections.html
-	# Do not run LuaJIT related tests for this built until the
-	# issue is not resolved.
-	#
-	# make -C ${PWD}/static-build/tarantool-prefix/src/tarantool-build LuaJIT-test
+	make -C ${PWD}/static-build/tarantool-prefix/src/tarantool-build LuaJIT-test
 	${INIT_TEST_ENV_OSX}; \
 	cd test && ./test-run.py --vardir ${VARDIR} \
 		--builddir ${PWD}/static-build/tarantool-prefix/src/tarantool-build \
