@@ -333,16 +333,17 @@ local function feedback_loop(self)
     fiber.name(PREFIX, { truncate = true })
 
     while true do
-        local feedback = self:generate_feedback()
         local msg = self.control:get(self.interval)
         -- if msg == "send" then we simply send feedback
         if msg == "stop" then
             break
-        elseif feedback ~= nil then
-            if is_first_send then
-                fiber.sleep(10)
-                is_first_send = nil
-            end
+        end
+        if is_first_send then
+            fiber.sleep(10)
+            is_first_send = nil
+        end
+        local feedback = self:generate_feedback()
+        if feedback ~= nil then
             pcall(http.post, self.host, json.encode(feedback), {timeout=1})
         end
     end
