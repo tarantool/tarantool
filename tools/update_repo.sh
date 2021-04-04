@@ -618,7 +618,7 @@ EOF
 # The 'pack_rpm' function especialy created for RPM packages. It works
 # with RPM packing OS like CentOS, Fedora. It is based on globally known
 # tool 'createrepo' from:
-#   https://linux.die.net/man/8/createrepo
+#   https://github.com/rpm-software-management/createrepo_c.git
 # This tool works with single distribution of the given OS.
 #
 # The RPM packages structure must pass the documented instructions at
@@ -657,7 +657,7 @@ function pack_rpm {
     done
 
     # create the new repository metadata files
-    createrepo --no-database --update --workers=2 \
+    createrepo_c --no-database --update --workers=2 \
         --compress-type=gz --simple-md-filenames .
 
     updated_rpms=0
