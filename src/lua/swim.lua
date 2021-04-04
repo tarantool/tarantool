@@ -322,6 +322,16 @@ local function swim_check_member(m, func_name)
     return error(func_name..': first argument is not a SWIM member')
 end
 
+local function swim_check_event(event, func_name)
+    if type(event) == 'table' then
+        local value = event[1]
+        if type(value) == 'number' then
+            return value
+        end
+    end
+    return error(func_name..': first argument is not a SWIM event')
+end
+
 --
 -- Member methods. Most of them are one-liners, not much to
 -- comment.
@@ -435,7 +445,8 @@ local function swim_member_uuid(m)
 end
 
 local function swim_member_serialize(m)
-    local _, size = swim_member_payload_raw(m.ptr)
+    local ptr = swim_check_member(m, 'member:__serialize()')
+    local _, size = swim_member_payload_raw(ptr)
     return {
         status = swim_member_status(m),
         uuid = swim_member_uuid(m),
@@ -543,6 +554,7 @@ end
 -- serialized, for example, in a console.
 --
 local function swim_serialize(s)
+    swim_check_instance(s, 'swim:__serialize()')
     return s.cfg.index
 end
 
@@ -739,31 +751,40 @@ end
 
 local swim_member_event_index = {
     is_new = function(self)
-        return bit.band(self[1], capi.SWIM_EV_NEW) ~= 0
+        local value = swim_check_event(self, 'event:is_new()')
+        return bit.band(value, capi.SWIM_EV_NEW) ~= 0
     end,
     is_drop = function(self)
-        return bit.band(self[1], capi.SWIM_EV_DROP) ~= 0
+        local value = swim_check_event(self, 'event:is_drop()')
+        return bit.band(value, capi.SWIM_EV_DROP) ~= 0
     end,
     is_update = function(self)
-        return bit.band(self[1], capi.SWIM_EV_UPDATE) ~= 0
+        local value = swim_check_event(self, 'event:is_update()')
+        return bit.band(value, capi.SWIM_EV_UPDATE) ~= 0
     end,
     is_new_status = function(self)
-        return bit.band(self[1], capi.SWIM_EV_NEW_STATUS) ~= 0
+        local value = swim_check_event(self, 'event:is_new_status()')
+        return bit.band(value, capi.SWIM_EV_NEW_STATUS) ~= 0
     end,
     is_new_uri = function(self)
-        return bit.band(self[1], capi.SWIM_EV_NEW_URI) ~= 0
+        local value = swim_check_event(self, 'event:is_new_uri()')
+        return bit.band(value, capi.SWIM_EV_NEW_URI) ~= 0
     end,
     is_new_incarnation = function(self)
-        return bit.band(self[1], capi.SWIM_EV_NEW_INCARNATION) ~= 0
+        local value = swim_check_event(self, 'event:is_new_incarnation()')
+        return bit.band(value, capi.SWIM_EV_NEW_INCARNATION) ~= 0
     end,
     is_new_generation = function(self)
-        return bit.band(self[1], capi.SWIM_EV_NEW_GENERATION) ~= 0
+        local value = swim_check_event(self, 'event:is_new_generation()')
+        return bit.band(value, capi.SWIM_EV_NEW_GENERATION) ~= 0
     end,
     is_new_version = function(self)
-        return bit.band(self[1], capi.SWIM_EV_NEW_VERSION) ~= 0
+        local value = swim_check_event(self, 'event:is_new_version()')
+        return bit.band(value, capi.SWIM_EV_NEW_VERSION) ~= 0
     end,
     is_new_payload = function(self)
-        return bit.band(self[1], capi.SWIM_EV_NEW_PAYLOAD) ~= 0
+        local value = swim_check_event(self, 'event:is_new_payload()')
+        return bit.band(value, capi.SWIM_EV_NEW_PAYLOAD) ~= 0
     end,
 }
 

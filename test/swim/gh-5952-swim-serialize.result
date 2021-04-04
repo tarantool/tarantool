@@ -1,0 +1,101 @@
+-- test-run result file version 2
+fiber = require('fiber')
+ | ---
+ | ...
+swim = require('swim')
+ | ---
+ | ...
+test_run = require('test_run').new()
+ | ---
+ | ...
+test_run:cmd("push filter '\\.lua.*:[0-9]+: ' to '.lua:<line>: '")
+ | ---
+ | - true
+ | ...
+test_run:cmd("push filter '127.0.0.1:[0-9]+$' to '127.0.0.1:<port>'")
+ | ---
+ | - true
+ | ...
+
+--
+-- gh-5952: invalid types in __serialize methods could lead to a crash.
+--
+
+s = swim.new({generation = 0})
+ | ---
+ | ...
+getmetatable(s):__serialize()
+ | ---
+ | - error: 'builtin/swim.lua:<line>: swim:__serialize(): first argument is not a SWIM instance'
+ | ...
+getmetatable(s).__serialize(s)
+ | ---
+ | - []
+ | ...
+
+s:cfg({uuid = uuid(1), uri = uri()})
+ | ---
+ | - true
+ | ...
+getmetatable(s):__serialize()
+ | ---
+ | - error: 'builtin/swim.lua:<line>: swim:__serialize(): first argument is not a SWIM instance'
+ | ...
+getmetatable(s).__serialize(s)
+ | ---
+ | - uuid: 00000000-0000-1000-8000-000000000001
+ |   uri: 127.0.0.1:<port>
+ | ...
+
+self = s:self()
+ | ---
+ | ...
+getmetatable(self):__serialize()
+ | ---
+ | - error: 'builtin/swim.lua:<line>: member:__serialize(): first argument is not a SWIM
+ |     member'
+ | ...
+getmetatable(self).__serialize(self)
+ | ---
+ | - uri: 127.0.0.1:<port>
+ |   status: alive
+ |   incarnation: cdata {generation = 0ULL, version = 1ULL}
+ |   uuid: 00000000-0000-1000-8000-000000000001
+ |   payload_size: 0
+ | ...
+
+event = nil
+ | ---
+ | ...
+_ = s:on_member_event(function(m, e) event = e end)
+ | ---
+ | ...
+s:set_payload(1)
+ | ---
+ | - true
+ | ...
+test_run:wait_cond(function() return event ~= nil end)
+ | ---
+ | - true
+ | ...
+
+getmetatable(event):__serialize()
+ | ---
+ | - error: 'builtin/swim.lua:<line>: event:is_update(): first argument is not a SWIM event'
+ | ...
+getmetatable(event).__serialize(event)
+ | ---
+ | - is_new_payload: true
+ |   is_new_version: true
+ |   is_new_incarnation: true
+ |   is_update: true
+ | ...
+
+s:delete()
+ | ---
+ | ...
+
+test_run:cmd("clear filter")
+ | ---
+ | - true
+ | ...
