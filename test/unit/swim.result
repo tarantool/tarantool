@@ -1,5 +1,5 @@
 	*** main_f ***
-1..22
+1..23
 	*** swim_test_one_link ***
     1..6
     ok 1 - no rounds - no fullmesh
@@ -225,4 +225,11 @@ ok 21 - subtests
     ok 2 - S3 didn't add S1 from S2's messages, because S1 didn't answer on a ping
 ok 22 - subtests
 	*** swim_test_suspect_new_members: done ***
+	*** swim_test_member_by_uuid ***
+    1..3
+    ok 1 - found by UUID
+    ok 2 - not found by valid UUID
+    ok 3 - not found by NULL UUID
+ok 23 - subtests
+	*** swim_test_member_by_uuid: done ***
 	*** main_f: done ***

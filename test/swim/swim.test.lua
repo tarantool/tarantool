@@ -159,6 +159,9 @@ s.is_dropped()
 
 s1:member_by_uuid(uuid(1)) ~= nil
 s1:member_by_uuid(50)
+-- gh-5951: could crash with no arguments or NULL.
+s1:member_by_uuid()
+s1:member_by_uuid(box.NULL)
 s1:member_by_uuid(uuid(2))
 
 -- UUID can be cdata.
