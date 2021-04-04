@@ -126,6 +126,9 @@ deploy_prepare:
 package: deploy_prepare
 	PACKPACK_EXTRA_DOCKER_RUN_PARAMS="--network=host ${PACKPACK_EXTRA_DOCKER_RUN_PARAMS}" ./packpack/packpack
 
+# found that libcreaterepo_c.so installed in local lib path
+deploy: export LD_LIBRARY_PATH=/usr/local/lib
+
 deploy:
 	echo ${GPG_SECRET_KEY} | base64 -d | gpg --batch --import || true
 	./tools/update_repo.sh -o=${OS} -d=${DIST} \
