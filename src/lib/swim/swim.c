@@ -2337,6 +2337,8 @@ struct swim_member *
 swim_member_by_uuid(struct swim *swim, const struct tt_uuid *uuid)
 {
 	assert(swim_is_configured(swim));
+	if (uuid == NULL)
+		return NULL;
 	return swim_find_member(swim, uuid);
 }
 
