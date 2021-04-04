@@ -1071,10 +1071,30 @@ swim_test_suspect_new_members(void)
 	swim_finish_test();
 }
 
+static void
+swim_test_member_by_uuid(void)
+{
+	swim_start_test(3);
+	struct swim_cluster *cluster = swim_cluster_new(1);
+
+	struct swim *s1 = swim_cluster_member(cluster, 0);
+	const struct swim_member *s1_self = swim_self(s1);
+	is(swim_member_by_uuid(s1, swim_member_uuid(s1_self)), s1_self,
+	   "found by UUID")
+
+	struct tt_uuid uuid = uuid_nil;
+	uuid.time_low = 1000;
+	is(swim_member_by_uuid(s1, &uuid), NULL, "not found by valid UUID");
+	is(swim_member_by_uuid(s1, NULL), NULL, "not found by NULL UUID");
+
+	swim_cluster_delete(cluster);
+	swim_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	swim_start_test(22);
+	swim_start_test(23);
 
 	(void) ap;
 	fakeev_init();
@@ -1102,6 +1122,7 @@ main_f(va_list ap)
 	swim_test_generation();
 	swim_test_dissemination_speed();
 	swim_test_suspect_new_members();
+	swim_test_member_by_uuid();
 
 	fakenet_free();
 	fakeev_free();
