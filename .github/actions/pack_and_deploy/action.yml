@@ -17,7 +17,26 @@ runs:
             startsWith(github.ref, 'refs/heads/2.') ||
             startsWith(github.ref, 'refs/tags') ) }} ; then
           sudo apt-get -y update
-          sudo apt-get install -y procmail createrepo awscli reprepro
+          sudo apt-get install -y procmail awscli reprepro
+          # For RPM packages need to build 'createrepo_c' tool from
+          # sources till Github Actions will use ubuntu-21.04 where
+          # it be avaliable as DEB package for installation.
+          if [ ${OS} == 'el' -o ${OS} == 'fedora' -o ${OS} == 'opensuse-leap' ] ; then
+            git clone https://github.com/rpm-software-management/createrepo_c.git
+            cd createrepo_c/
+            # let's use the latest checked version
+            git checkout 0.17.1
+            mkdir build
+            cd build
+            sudo apt install -y libbz2-dev cmake libmagic-dev \
+              libglib2.0-dev libcurl4-openssl-dev libxml2-dev \
+              libpython3-dev librpm-dev libssl-dev libsqlite3-dev \
+              liblzma-dev zlib1g-dev libzstd-dev doxygen
+            cmake .. -DWITH_ZCHUNK=OFF -DWITH_LIBMODULEMD=OFF
+            make -j $(nproc)
+            sudo make install
+            cd ../..
+          fi
           mkdir -p ~/.gnupg
           echo 'digest-algo sha256' >> ~/.gnupg/gpg.conf
           make -f .gitlab.mk deploy
