@@ -1,37 +1,76 @@
--- write data recover from latest snapshot
 env = require('test_run')
 ---
 ...
-test_run = env.new()
+fio = require('fio')
 ---
 ...
-test_run:cmd("restart server default")
-fio = require 'fio'
+test_run = env.new()
 ---
 ...
 test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
-function get_snap_file ()
-    local snapfile = nil
+function get_snapshot_name ()
+    local shapshot = nil
     local directory = fio.pathjoin(fio.cwd(), 'gh-5422-broken_snapshot')
     for files in io.popen(string.format("ls %s", directory)):lines() do
-        local snaps = string.find(files, "snap")
-        if (snaps ~= nil) then
-            local snap = string.find(files, "%n")
-            if (snap ~= nil) then
-                snapfile = string.format("%s/%s", directory, files)
+        local snapshots = string.find(files, "snap")
+        if (snapshots ~= nil) then
+            shapshot = string.find(files, "%n")
+            if (shapshot ~= nil) then
+                shapshot = string.format("%s/%s", directory, files)
             end
         end
     end
-    return snapfile
+    return shapshot
+end;
+---
+...
+function get_file_size(filename)
+    local file = io.open(filename, "r")
+    local size = file:seek("end")
+    io.close(file)
+    return size
+end;
+---
+...
+function write_garbage_with_restore_or_save(filename, offset, count, restore)
+    if restore == true then
+        os.execute(string.format('cp %s.save %s', snapshot, snapshot))
+    else
+        os.execute(string.format('cp %s %s.save', filename, filename))
+    end
+    local file = io.open(filename, "r+b")
+    file:seek("set", offset)
+    for i = 1, count do
+        file:write(math.random(1,254))
+    end
+    io.close(file)
+end;
+---
+...
+function check_count_valid_snapshot_data(count)
+    local cnt = 0
+    local val = test_run:eval('test', "box.space.test:select()")[1]
+    for i = 1, count do
+        if val[i] ~= nil then
+            cnt = cnt + 1
+        end
+    end
+    return cnt
 end;
 ---
 ...
 test_run:cmd("setopt delimiter ''");
 ---
 - true
+...
+garbage_size = 500
+---
+...
+corruption_offset = 15000
+---
 ...
 test_run:cmd("create server test with script='box/gh-5422-broken_snapshot.lua'")
 ---
@@ -45,16 +84,20 @@ test_run:cmd("switch test")
 ---
 - true
 ...
+items_count = 20000
+---
+...
+-- Create space and snapshot file
 space = box.schema.space.create('test', { engine = "memtx" })
 ---
 ...
-space:format({ {name = 'id', type = 'unsigned'}, {name = 'year', type = 'unsigned'} })
+space:format({ {name = 'id', type = 'unsigned'} })
 ---
 ...
 index = space:create_index('primary', { parts = {'id'} })
 ---
 ...
-for key = 1, 10000 do space:insert({key, key + 1000}) end
+for key = 1, items_count do space:insert({key}) end
 ---
 ...
 box.snapshot()
@@ -65,55 +108,20 @@ test_run:cmd("switch default")
 ---
 - true
 ...
-snapfile = get_snap_file()
+items_count = test_run:eval("test", "items_count")[1]
 ---
 ...
-file = io.open(snapfile, "r")
+snapshot = get_snapshot_name()
 ---
 ...
-size = file:seek("end")
+size = get_file_size(snapshot)
 ---
 ...
-if size > 30000 then size = 30000 end
+-- Write data at the end of the file
+write_garbage_with_restore_or_save(snapshot, size, garbage_size, false)
 ---
-...
-io.close(file)
----
-- true
-...
--- save last snapshot
-os.execute(string.format('cp %s %s.save', snapfile, snapfile))
----
-- 0
-...
--- write garbage at the end of file
-file = io.open(snapfile, "ab")
----
-...
-for i = 1, 1000, 1 do file:write(math.random(1,254)) end
----
-...
-io.close(file)
----
-- true
-...
-test_run:cmd("switch test")
----
-- true
 ...
 test_run:cmd("restart server test with script='box/gh-5422-broken_snapshot.lua'")
-test_run:cmd("setopt delimiter ';'")
----
-- true
-...
--- check that all data valid
-val = box.space.test:select()
-for i = 1, 10000, 1 do
-    assert(val[i] ~= nil)
-end;
----
-...
-test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
@@ -121,35 +129,22 @@ test_run:cmd("switch default")
 ---
 - true
 ...
--- restore snapshot
-os.execute(string.format('cp %s.save %s', snapfile, snapfile))
+-- Check that all data valid
+assert(check_count_valid_snapshot_data(items_count) == items_count)
+---
+- true
+...
+-- Restore snapshot
+os.execute(string.format('cp %s.save %s', snapshot, snapshot))
 ---
 - 0
 ...
 -- truncate
-os.execute(string.format('dd if=%s.save of=%s bs=%d count=1', snapfile, snapfile, size))
+os.execute(string.format('dd if=%s.save of=%s bs=%d count=1', snapshot, snapshot, size - corruption_offset))
 ---
 - 0
 ...
-test_run:cmd("switch test")
----
-- true
-...
 test_run:cmd("restart server test with script='box/gh-5422-broken_snapshot.lua'")
--- check than some data valid
-test_run:cmd("setopt delimiter ';'")
----
-- true
-...
-val = box.space.test:select();
----
-...
-for i = 1, 1000, 1 do
-    assert(val[i] ~= nil)
-end;
----
-...
-test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
@@ -157,45 +152,19 @@ test_run:cmd("switch default")
 ---
 - true
 ...
--- restore snapshot
-os.execute(string.format('cp %s.save %s', snapfile, snapfile))
----
-- 0
-...
--- write garbage at the middle of file
-file = io.open(snapfile, "r+b")
+-- Check that some data valid
+valid_data_count_1 = check_count_valid_snapshot_data(items_count)
 ---
 ...
-file:seek("set", size)
----
-- 30000
-...
-for i = 1, 100, 1 do file:write(math.random(1,254)) end
----
-...
-io.close(file)
+assert(valid_data_count_1 > 0)
 ---
 - true
 ...
-test_run:cmd("switch test")
+-- Restore snapshot and write garbage at the middle of file
+write_garbage_with_restore_or_save(snapshot, size - corruption_offset, garbage_size, true)
 ---
-- true
 ...
 test_run:cmd("restart server test with script='box/gh-5422-broken_snapshot.lua'")
-test_run:cmd("setopt delimiter ';'")
----
-- true
-...
--- check that some data valid
-val = box.space.test:select();
----
-...
-for i = 1, 1000, 1 do
-    assert(val[i] ~= nil)
-end;
----
-...
-test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
@@ -203,80 +172,32 @@ test_run:cmd("switch default")
 ---
 - true
 ...
--- restore snapshot
-os.execute(string.format('cp %s.save %s', snapfile, snapfile))
----
-- 0
-...
--- write big garbage at the middle of file, check that start data valid
-file = io.open(snapfile, "r+b")
+-- Check that some data valid.
+-- Count of valid data is greater than we truncate snapshot.
+valid_data_count_2 = check_count_valid_snapshot_data(items_count)
 ---
 ...
-file:seek("set", size / 2 + 8000)
----
-- 23000
-...
-for i = 1, 10000, 1 do file:write(math.random(1,254)) end
----
-...
-io.close(file)
+assert(valid_data_count_2 > 0)
 ---
 - true
 ...
-test_run:cmd("switch test")
+assert(valid_data_count_2 > valid_data_count_1)
 ---
 - true
 ...
-test_run:cmd("restart server test with script='box/gh-5422-broken_snapshot.lua'")
-test_run:cmd("setopt delimiter ';'")
+-- Restore snapshot and write big garbage at the start of the file
+write_garbage_with_restore_or_save(snapshot, 5000, garbage_size, true)
+---
+...
+os.remove(string.format('%s.save', snapshot))
 ---
 - true
 ...
--- check that some data valid
-val = box.space.test:select();
----
-...
-for i = 1, 1000, 1 do
-    assert(val[i] ~= nil)
-end;
----
-...
-test_run:cmd("setopt delimiter ''");
+test_run:cmd("stop server test")
 ---
 - true
 ...
-test_run:cmd("switch default")
----
-- true
-...
-test_run:cmd('stop server test')
----
-- true
-...
--- restore snapshot
-os.execute(string.format('cp %s.save %s', snapfile, snapfile))
----
-- 0
-...
-os.execute(string.format('rm %s.save', snapfile))
----
-- 0
-...
--- write big garbage at the start of file
-file = io.open(snapfile, "r+b")
----
-...
-file:seek("set", size / 2)
----
-- 15000
-...
-for i = 1, 1000, 1 do file:write(math.random(1,254)) end
----
-...
-io.close(file)
----
-- true
-...
+-- Check that we unable to start with corrupted system space
 test_run:cmd("start server test with crash_expected=True")
 ---
 - false
