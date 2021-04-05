@@ -762,25 +762,20 @@ applier_txn_wal_write_cb(struct trigger *trigger, void *event)
 }
 
 struct synchro_entry {
-	/** Encoded form of a synchro record. */
-	struct synchro_body_bin	body_bin;
-
-	/** xrow to write, used by the journal engine. */
-	struct xrow_header row;
-
+	/** Request to process when WAL write is done. */
+	struct synchro_request *req;
+	/** Fiber created the entry. To wakeup when WAL write is done. */
+	struct fiber *owner;
 	/**
-	 * The journal entry itself. Note since
-	 * it has unsized array it must be the
-	 * last entry in the structure.
+	 * The base journal entry. It has unsized array and then must be the
+	 * last entry in the structure. But can workaround it via a union
+	 * adding the needed tail as char[].
 	 */
-	struct journal_entry journal_entry;
+	union {
+		struct journal_entry base;
+		char base_buf[sizeof(base) + sizeof(base.rows[0])];
+	};
 };
-
-static void
-synchro_entry_delete(struct synchro_entry *entry)
-{
-	free(entry);
-}
 
 /**
  * Async write journal completion.
@@ -791,50 +786,15 @@ apply_synchro_row_cb(struct journal_entry *entry)
 	assert(entry->complete_data != NULL);
 	struct synchro_entry *synchro_entry =
 		(struct synchro_entry *)entry->complete_data;
-	if (entry->res < 0)
+	if (entry->res < 0) {
 		applier_rollback_by_wal_io();
-	else
+	} else {
+		txn_limbo_process(&txn_limbo, synchro_entry->req);
 		trigger_run(&replicaset.applier.on_wal_write, NULL);
-
-	synchro_entry_delete(synchro_entry);
-}
-
-/**
- * Allocate a new synchro_entry to be passed to
- * the journal engine in async write way.
- */
-static struct synchro_entry *
-synchro_entry_new(struct xrow_header *applier_row,
-		  struct synchro_request *req)
-{
-	struct synchro_entry *entry;
-	size_t size = sizeof(*entry) + sizeof(struct xrow_header *);
-
-	/*
-	 * For simplicity we use malloc here but
-	 * probably should provide some cache similar
-	 * to txn cache.
-	 */
-	entry = (struct synchro_entry *)malloc(size);
-	if (entry == NULL) {
-		diag_set(OutOfMemory, size, "malloc", "synchro_entry");
-		return NULL;
 	}
-
-	struct journal_entry *journal_entry = &entry->journal_entry;
-	struct synchro_body_bin *body_bin = &entry->body_bin;
-	struct xrow_header *row = &entry->row;
-
-	journal_entry->rows[0] = row;
-
-	xrow_encode_synchro(row, body_bin, req);
-
-	row->lsn = applier_row->lsn;
-	row->replica_id = applier_row->replica_id;
-
-	journal_entry_create(journal_entry, 1, xrow_approx_len(row),
-			     apply_synchro_row_cb, entry);
-	return entry;
+	/* The fiber is the same on final join. */
+	if (synchro_entry->owner != fiber())
+		fiber_wakeup(synchro_entry->owner);
 }
 
 /** Process a synchro request. */
@@ -847,14 +807,37 @@ apply_synchro_row(struct xrow_header *row)
 	if (xrow_decode_synchro(row, &req) != 0)
 		goto err;
 
-	txn_limbo_process(&txn_limbo, &req);
-
-	struct synchro_entry *entry;
-	entry = synchro_entry_new(row, &req);
-	if (entry == NULL)
-		goto err;
-
-	if (journal_write_try_async(&entry->journal_entry) != 0) {
+	struct synchro_entry entry;
+	/*
+	 * Rows array is cast from *[] to **, because otherwise g++ complains
+	 * about out of array bounds access.
+	 */
+	struct xrow_header **rows;
+	rows = entry.base.rows;
+	rows[0] = row;
+	journal_entry_create(&entry.base, 1, xrow_approx_len(row),
+			     apply_synchro_row_cb, &entry);
+	entry.req = &req;
+	entry.owner = fiber();
+	/*
+	 * The WAL write is blocking. Otherwise it might happen that a CONFIRM
+	 * or ROLLBACK is sent to WAL, and it would empty the limbo, but before
+	 * it is written, more transactions arrive with a different owner. They
+	 * won't be able to enter the limbo due to owner ID mismatch. Hence the
+	 * synchro rows must block receipt of new transactions.
+	 *
+	 * Don't forget to return -1 both if the journal write failed right
+	 * away, and if it failed inside of WAL thread (res < 0). Otherwise the
+	 * caller would propagate committed vclock to this row thinking it was
+	 * a success.
+	 *
+	 * XXX: in theory it could be done vice-versa. The write could be made
+	 * non-blocking, and instead the potentially conflicting transactions
+	 * could try to wait for all the current synchro WAL writes to end
+	 * before trying to commit. But that requires extra steps from the
+	 * transactions side, including the async ones.
+	 */
+	if (journal_write(&entry.base) != 0 || entry.base.res < 0) {
 		diag_set(ClientError, ER_WAL_IO);
 		goto err;
 	}

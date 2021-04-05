@@ -403,20 +403,11 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		txn_limbo_remove(limbo, e);
 		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
 		/*
-		 * If already written to WAL by now, finish tx processing.
-		 * Otherwise just clear the sync flags. Tx procesing will finish
-		 * automatically once the tx is written to WAL.
-		 *
-		 * XXX: Normally at this point all transactions covered by this
-		 * CONFIRM should be in WAL already, but there is a bug, that
-		 * replica always processes received synchro requests *before*
-		 * writing them to WAL. So it can happen, that a CONFIRM is
-		 * 'read', but the transaction is not written yet. Should be
-		 * fixed when the replica will behave properly, and then this
-		 * branch won't exist.
+		 * Should be written to WAL by now. Confirm is always written
+		 * after the affected transactions.
 		 */
-		if (e->txn->signature >= 0)
-			txn_complete_success(e->txn);
+		assert(e->txn->signature >= 0);
+		txn_complete_success(e->txn);
 	}
 	/* Update is_ro once the limbo is clear. */
 	if (txn_limbo_is_empty(limbo))
@@ -458,30 +449,13 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 	rlist_foreach_entry_safe_reverse(e, &limbo->queue, in_queue, tmp) {
 		txn_limbo_abort(limbo, e);
 		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
-		if (e->txn->signature >= 0) {
-			/* Rollback the transaction. */
-			e->txn->signature = TXN_SIGNATURE_SYNC_ROLLBACK;
-			txn_complete_fail(e->txn);
-		} else {
-			/*
-			 * Rollback the transaction, but don't free it yet. It
-			 * will be freed after its WAL write is completed.
-			 *
-			 * XXX: Normally at this point all transactions covered
-			 * by this ROLLBACK should be in WAL already, but there
-			 * is a bug, that replica always processes received
-			 * synchro requests *before* writing them to WAL. So it
-			 * can happen, that a ROLLBACK is 'read', but the
-			 * transaction is not written yet. Should be fixed when
-			 * the replica will behave properly, and then this
-			 * branch won't exist.
-			 */
-			e->txn->signature = TXN_SIGNATURE_SYNC_ROLLBACK;
-			struct fiber *fiber = e->txn->fiber;
-			e->txn->fiber = fiber();
-			txn_complete_fail(e->txn);
-			e->txn->fiber = fiber;
-		}
+		/*
+		 * Should be written to WAL by now. Rollback is always written
+		 * after the affected transactions.
+		 */
+		assert(e->txn->signature >= 0);
+		e->txn->signature = TXN_SIGNATURE_SYNC_ROLLBACK;
+		txn_complete_fail(e->txn);
 		if (e == last_rollback)
 			break;
 	}
