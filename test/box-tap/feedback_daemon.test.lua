@@ -70,7 +70,7 @@ if not ok then
     os.exit(0)
 end
 
-test:plan(28)
+test:plan(30)
 
 local function check(message)
     while feedback_count < 1 do
@@ -292,6 +292,27 @@ check_stats(actual.stats)
 
 actual = daemon.generate_feedback()
 test:is(box.info.uptime, actual.uptime, "Server uptime is reported and is correct.")
+
+daemon.reload()
+actual = daemon.generate_feedback()
+
+local events_expected = {}
+test:is_deeply(actual.events, events_expected, "Events are empty initially.")
+
+box.schema.space.create('test')
+box.space.test:create_index('pk')
+box.space.test.index.pk:drop()
+box.space.test:drop()
+
+actual = daemon.generate_feedback()
+events_expected = {
+    create_space = 1,
+    create_index = 1,
+    drop_space = 1,
+    drop_index = 1,
+}
+
+test:is_deeply(actual.events, events_expected, "Events are counted correctly")
 
 test:check()
 os.exit(0)

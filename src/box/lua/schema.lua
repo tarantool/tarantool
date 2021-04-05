@@ -321,6 +321,12 @@ local function update_param_table(table, defaults)
     return new_table
 end
 
+local function feedback_save_event(event)
+    if internal.feedback_daemon ~= nil then
+        internal.feedback_daemon.save_event(event)
+    end
+end
+
 box.begin = function()
     if builtin.box_txn_begin() == -1 then
         box.error()
@@ -462,6 +468,8 @@ box.schema.space.create = function(name, options)
     })
     _space:insert{id, uid, name, options.engine, options.field_count,
         space_options, format}
+
+    feedback_save_event('create_space')
     return box.space[id], "created"
 end
 
@@ -531,6 +539,8 @@ box.schema.space.drop = function(space_id, space_name, opts)
             box.error(box.error.NO_SUCH_SPACE, space_name)
         end
     end
+
+    feedback_save_event('drop_space')
 end
 
 box.schema.space.rename = function(space_id, space_name)
@@ -1237,6 +1247,8 @@ box.schema.index.create = function(space_id, name, options)
         local _func_index = box.space[box.schema.FUNC_INDEX_ID]
         _func_index:insert{space_id, iid, index_opts.func}
     end
+
+    feedback_save_event('create_index')
     return space.index[name]
 end
 
@@ -1257,6 +1269,8 @@ box.schema.index.drop = function(space_id, index_id)
         _func_index:delete({v.space_id, v.index_id})
     end
     _index:delete{space_id, index_id}
+
+    feedback_save_event('drop_index')
 end
 
 box.schema.index.rename = function(space_id, index_id, name)
