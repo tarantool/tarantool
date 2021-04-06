@@ -1,0 +1,25 @@
+name: 'Pack and Deploy'
+description: 'Pack and deploy the package'
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        # Our testing expects that the init process (PID 1) will
+        # reap orphan processes. At least the following test leans
+        # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
+        echo PACKPACK_EXTRA_DOCKER_RUN_PARAMS='--init' | tee -a $GITHUB_ENV
+        # create packages
+        make -f .gitlab.mk package
+        # deploy packages
+        if ${{ github.event_name == 'push' &&
+          ( github.ref == 'refs/heads/master' ||
+            github.ref == 'refs/heads/1.10' ||
+            startsWith(github.ref, 'refs/heads/2.') ||
+            startsWith(github.ref, 'refs/tags') ) }} ; then
+          sudo apt-get -y update
+          sudo apt-get install -y procmail createrepo awscli reprepro
+          mkdir -p ~/.gnupg
+          echo 'digest-algo sha256' >> ~/.gnupg/gpg.conf
+          make -f .gitlab.mk deploy
+        fi
+      shell: bash
