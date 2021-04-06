@@ -7,9 +7,6 @@ on:
     types: [backend_automation]
   workflow_dispatch:
 
-env:
-  CI_MAKE: make -f .gitlab.mk
-
 jobs:
   fedora_28:
     # We want to run on external PRs, but not on our own internal PRs
@@ -31,10 +28,6 @@ jobs:
       - uses: ./.github/actions/environment
       - name: packaging
         env:
-          # Our testing expects that the init process (PID 1) will
-          # reap orphan processes. At least the following test leans
-          # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
-          PACKPACK_EXTRA_DOCKER_RUN_PARAMS: '--init'
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_S3_ENDPOINT_URL: ${{ secrets.AWS_S3_ENDPOINT_URL }}
@@ -42,20 +35,9 @@ jobs:
           RELEASE_REPO_S3_DIR: ${{ secrets.RELEASE_REPO_S3_DIR }}
           GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
           GPG_SIGN_KEY: ${{ secrets.GPG_SIGN_KEY }}
-        run: |
-          if ${{ github.event_name == 'push' &&
-              ( github.ref == 'refs/heads/master' ||
-                github.ref == 'refs/heads/1.10' ||
-                startsWith(github.ref, 'refs/heads/2.') ||
-                startsWith(github.ref, 'refs/tags') ) }} ; then
-            sudo apt-get -y update
-            sudo apt-get install -y procmail createrepo awscli reprepro
-            mkdir -p ~/.gnupg
-            echo 'digest-algo sha256' >> ~/.gnupg/gpg.conf
-            OS=fedora DIST=28 ${CI_MAKE} deploy
-          else
-            OS=fedora DIST=28 ${CI_MAKE} package
-          fi
+          OS: 'fedora'
+          DIST: '28'
+        uses: ./.github/actions/pack_and_deploy
       - name: call action to send Telegram message on failure
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
