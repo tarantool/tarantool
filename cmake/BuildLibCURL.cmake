@@ -154,7 +154,7 @@ macro(curl_build)
         STAMP_DIR ${LIBCURL_BINARY_DIR}/stamp
         BINARY_DIR ${LIBCURL_BINARY_DIR}/curl
         CONFIGURE_COMMAND
-            cd <BINARY_DIR> && cmake <SOURCE_DIR>
+            cd <BINARY_DIR> && ${CMAKE_COMMAND} <SOURCE_DIR>
                 ${LIBCURL_CMAKE_FLAGS}
         BUILD_COMMAND cd <BINARY_DIR> && $(MAKE)
         INSTALL_COMMAND cd <BINARY_DIR> && $(MAKE) install)
