@@ -166,11 +166,20 @@ tuple_field_delete(struct tuple_field *field)
 
 /** Return path to a tuple field. Used for error reporting. */
 static const char *
-tuple_field_path(const struct tuple_field *field)
+tuple_field_path(const struct tuple_field *field,
+		 const struct tuple_format *format)
 {
 	assert(field->token.parent != NULL);
 	if (field->token.parent->parent == NULL) {
-		/* Top-level field, no need to format the path. */
+		int name_count = format->dict->name_count;
+		if (field->token.num < name_count) {
+			const char *path;
+			int token_num = field->token.num;
+			path = tt_sprintf("%d (%s)",
+					  token_num + TUPLE_INDEX_BASE,
+					  format->dict->names[token_num]);
+			return path;
+		}
 		return int2str(field->token.num + TUPLE_INDEX_BASE);
 	}
 	char *path = tt_static_buf();
@@ -203,7 +212,8 @@ tuple_format_field_by_id(struct tuple_format *format, uint32_t id)
  */
 static int
 tuple_field_ensure_child_compatibility(struct tuple_field *parent,
-				       struct tuple_field *child)
+				       struct tuple_field *child,
+				       struct tuple_format* format)
 {
 	enum field_type expected_type =
 		child->token.type == JSON_TOKEN_STR ?
@@ -212,7 +222,7 @@ tuple_field_ensure_child_compatibility(struct tuple_field *parent,
 		parent->type = expected_type;
 	} else {
 		diag_set(ClientError, ER_INDEX_PART_TYPE_MISMATCH,
-			 tuple_field_path(parent),
+			 tuple_field_path(parent, format),
 			 field_type_strs[parent->type],
 			 field_type_strs[expected_type]);
 		return -1;
@@ -226,7 +236,7 @@ tuple_field_ensure_child_compatibility(struct tuple_field *parent,
 	    !json_token_is_multikey(&parent->token) &&
 	    !json_token_is_leaf(&parent->token)) {
 		diag_set(ClientError, ER_MULTIKEY_INDEX_MISMATCH,
-			 tuple_field_path(parent));
+			 tuple_field_path(parent, format));
 		return -1;
 	}
 	/*
@@ -236,7 +246,7 @@ tuple_field_ensure_child_compatibility(struct tuple_field *parent,
 	if (json_token_is_multikey(&parent->token) &&
 	    child->token.type != JSON_TOKEN_ANY) {
 		diag_set(ClientError, ER_MULTIKEY_INDEX_MISMATCH,
-			 tuple_field_path(parent));
+			 tuple_field_path(parent, format));
 		return -1;
 	}
 	return 0;
@@ -283,7 +293,7 @@ tuple_format_add_field(struct tuple_format *format, uint32_t fieldno,
 	json_lexer_create(&lexer, path, path_len, TUPLE_INDEX_BASE);
 	while ((rc = json_lexer_next_token(&lexer, &field->token)) == 0 &&
 	       field->token.type != JSON_TOKEN_END) {
-		if (tuple_field_ensure_child_compatibility(parent, field) != 0)
+		if (tuple_field_ensure_child_compatibility(parent, field, format) != 0)
 			goto fail;
 		struct tuple_field *next =
 			json_tree_lookup_entry(tree, &parent->token,
@@ -386,7 +396,7 @@ tuple_format_use_key_part(struct tuple_format *format, uint32_t field_count,
 			field->nullable_action = part->nullable_action;
 	} else if (field->nullable_action != part->nullable_action) {
 		diag_set(ClientError, ER_ACTION_MISMATCH,
-			 tuple_field_path(field),
+			 tuple_field_path(field, format),
 			 on_conflict_action_strs[field->nullable_action],
 			 on_conflict_action_strs[part->nullable_action]);
 		return -1;
@@ -408,7 +418,7 @@ tuple_format_use_key_part(struct tuple_format *format, uint32_t field_count,
 			errcode = ER_FORMAT_MISMATCH_INDEX_PART;
 		else
 			errcode = ER_INDEX_PART_TYPE_MISMATCH;
-		diag_set(ClientError, errcode, tuple_field_path(field),
+		diag_set(ClientError, errcode, tuple_field_path(field, format),
 			 field_type_strs[field->type],
 			 field_type_strs[part->type]);
 		return -1;
@@ -897,7 +907,7 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 			if(!field_mp_type_is_compatible(field->type, pos,
 							nullable)) {
 				diag_set(ClientError, ER_FIELD_TYPE,
-					 tuple_field_path(field),
+					 tuple_field_path(field, format),
 					 field_type_strs[field->type],
 					 mp_type_strs[mp_typeof(*pos)]);
 				return -1;
@@ -1103,7 +1113,7 @@ tuple_format_required_fields_validate(struct tuple_format *format,
 			tuple_format_field_by_id(format, id);
 		assert(field != NULL);
 		diag_set(ClientError, ER_FIELD_MISSING,
-			 tuple_field_path(field));
+			 tuple_field_path(field, format));
 		return -1;
 	}
 	return 0;
@@ -1248,7 +1258,7 @@ tuple_format_iterator_next(struct tuple_format_iterator *it,
 	bool is_nullable = tuple_field_is_nullable(field);
 	if (!field_mp_type_is_compatible(field->type, entry->data, is_nullable) != 0) {
 		diag_set(ClientError, ER_FIELD_TYPE,
-			 tuple_field_path(field),
+			 tuple_field_path(field, it->format),
 			 field_type_strs[field->type],
 			 mp_type_strs[mp_typeof(*entry->data)]);
 		return -1;

@@ -564,8 +564,8 @@ s.index.s:drop()
 -- with wrong args
 box.space._index:insert{s.id, 2, 's', 'rtree', nil, {{2, 'array'}}}
 ---
-- error: 'Tuple field 5 type does not match one required by operation: expected map,
-    got nil'
+- error: 'Tuple field 5 (opts) type does not match one required by operation: expected
+    map, got nil'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', utils.setmap({}), {{2, 'array'}}}
 ---

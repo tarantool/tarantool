@@ -458,7 +458,7 @@ sk = s:create_index('sk', {parts = {2, 'unsigned'}})
 ...
 s:replace{1, 2} -- error
 ---
-- error: Tuple field 3 required by space format is missing
+- error: Tuple field 3 (field3) required by space format is missing
 ...
 t1 = s:replace{2, 3, 4}
 ---
@@ -529,15 +529,15 @@ sk = s:create_index('sk', {parts = {2, 'unsigned'}})
 ...
 s:replace{1, 2} -- error
 ---
-- error: Tuple field 3 required by space format is missing
+- error: Tuple field 3 (field3) required by space format is missing
 ...
 s:replace{2, 3, 4} -- error
 ---
-- error: Tuple field 5 required by space format is missing
+- error: Tuple field 5 (field5) required by space format is missing
 ...
 s:replace{3, 4, 5, 6} -- error
 ---
-- error: Tuple field 5 required by space format is missing
+- error: Tuple field 5 (field5) required by space format is missing
 ...
 t1 = s:replace{4, 5, 6, 7, 8}
 ---
@@ -966,8 +966,8 @@ s:replace{50, 50}
 ...
 s:replace{25, box.NULL}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
-    got nil'
+- error: 'Tuple field 2 (field2) type does not match one required by operation: expected
+    unsigned, got nil'
 ...
 format[2].is_nullable = true
 ---
@@ -1767,12 +1767,12 @@ s:format(format)
 -- Field 2 is not nullable.
 s:insert{5}
 ---
-- error: Tuple field 2 required by space format is missing
+- error: Tuple field 2 (second) required by space format is missing
 ...
 s:insert{5, box.NULL}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
-    got nil'
+- error: 'Tuple field 2 (second) type does not match one required by operation: expected
+    unsigned, got nil'
 ...
 s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=true}}} -- This is allowed.
 ---
@@ -1780,12 +1780,12 @@ s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=true}}} -- This is al
 -- Without space format setting this fails.
 s:insert{5, box.NULL}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
-    got nil'
+- error: 'Tuple field 2 (second) type does not match one required by operation: expected
+    unsigned, got nil'
 ...
 s:insert{5}
 ---
-- error: Tuple field 2 required by space format is missing
+- error: Tuple field 2 (second) required by space format is missing
 ...
 s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}}
 ---
@@ -1799,12 +1799,12 @@ s:format(format) -- This is also allowed.
 -- inserts still fail due to not nullable index parts.
 s:insert{5, box.NULL}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
-    got nil'
+- error: 'Tuple field 2 (second) type does not match one required by operation: expected
+    unsigned, got nil'
 ...
 s:insert{5}
 ---
-- error: Tuple field 2 required by space format is missing
+- error: Tuple field 2 (second) required by space format is missing
 ...
 s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=true}}}
 ---
@@ -1836,24 +1836,24 @@ format[2].is_nullable = false
 ...
 s:format(format) -- Fail.
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
-    got nil'
+- error: 'Tuple field 2 (second) type does not match one required by operation: expected
+    unsigned, got nil'
 ...
 s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}} -- Fail.
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
-    got nil'
+- error: 'Tuple field 2 (second) type does not match one required by operation: expected
+    unsigned, got nil'
 ...
 _ = s:delete{5}
 ---
 ...
 s:format(format) -- Still fail.
 ---
-- error: Tuple field 2 required by space format is missing
+- error: Tuple field 2 (second) required by space format is missing
 ...
 s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}} -- Still fail.
 ---
-- error: Tuple field 2 required by space format is missing
+- error: Tuple field 2 (second) required by space format is missing
 ...
 -- Now check we can set nullability to false step by step.
 _ = s:delete{6}
@@ -1867,12 +1867,12 @@ s:format(format)
 ...
 s:insert{5, box.NULL} -- Fail.
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
-    got nil'
+- error: 'Tuple field 2 (second) type does not match one required by operation: expected
+    unsigned, got nil'
 ...
 s:insert{5} -- Fail.
 ---
-- error: Tuple field 2 required by space format is missing
+- error: Tuple field 2 (second) required by space format is missing
 ...
 format[2].is_nullable = true
 ---
@@ -1885,12 +1885,12 @@ s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}}
 ...
 s:insert{5, box.NULL} -- Fail.
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
-    got nil'
+- error: 'Tuple field 2 (second) type does not match one required by operation: expected
+    unsigned, got nil'
 ...
 s:insert{5} -- Fail.
 ---
-- error: Tuple field 2 required by space format is missing
+- error: Tuple field 2 (second) required by space format is missing
 ...
 format[2].is_nullable = false
 ---
@@ -1904,7 +1904,7 @@ s:select{}
 ...
 s:insert{5} -- Fail.
 ---
-- error: Tuple field 2 required by space format is missing
+- error: Tuple field 2 (second) required by space format is missing
 ...
 s:insert{9, 10} -- Success.
 ---

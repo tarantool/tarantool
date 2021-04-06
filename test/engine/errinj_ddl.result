@@ -65,8 +65,8 @@ errinj.set("ERRINJ_CHECK_FORMAT_DELAY", true)
 ...
 s:format(format) -- must fail
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected string,
-    got nil'
+- error: 'Tuple field 2 (field2) type does not match one required by operation: expected
+    string, got nil'
 ...
 ch:get()
 ---
