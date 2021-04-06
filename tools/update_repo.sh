@@ -895,6 +895,8 @@ function remove_rpm {
             # '1' is $(RELEASE) RPM spec directive value and the second
             # '1' is the number of rebuilds.
             os_dist="lp$(echo $option_dist | sed 's#\.##g').1.1"
+        elif [ "$os" == "fedora" ]; then
+            os_dist="1.fc${option_dist}"
         else
             os_dist="1.${os}${option_dist}"
         fi
