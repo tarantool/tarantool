@@ -2365,33 +2365,26 @@ port_vdbemem_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 	struct port_vdbemem *port = (struct port_vdbemem *) base;
 	assert(is_flat == true);
 	for (uint32_t i = 0; i < port->mem_count; i++) {
-		sql_value *param =
-			(sql_value *)((struct Mem *)port->mem + i);
-		switch (sql_value_type(param)) {
-		case MP_INT:
-			luaL_pushint64(L, sql_value_int64(param));
+		struct Mem *mem = (struct Mem *)port->mem + i;
+		switch (mem->flags & MEM_PURE_TYPE_MASK) {
+		case MEM_Int:
+			luaL_pushint64(L, mem->u.i);
 			break;
-		case MP_UINT:
-			luaL_pushuint64(L, sql_value_uint64(param));
+		case MEM_UInt:
+			luaL_pushuint64(L, mem->u.u);
 			break;
-		case MP_DOUBLE:
-			lua_pushnumber(L, sql_value_double(param));
+		case MEM_Real:
+			lua_pushnumber(L, mem->u.r);
 			break;
-		case MP_STR:
-			lua_pushlstring(L, (const char *)sql_value_text(param),
-					(size_t)sql_value_bytes(param));
+		case MEM_Str:
+		case MEM_Blob:
+			lua_pushlstring(L, mem->z, mem->n);
 			break;
-		case MP_BIN:
-		case MP_ARRAY:
-		case MP_MAP:
-			lua_pushlstring(L, sql_value_blob(param),
-					(size_t) sql_value_bytes(param));
-			break;
-		case MP_NIL:
+		case MEM_Null:
 			lua_pushnil(L);
 			break;
-		case MP_BOOL:
-			lua_pushboolean(L, sql_value_boolean(param));
+		case MEM_Bool:
+			lua_pushboolean(L, mem->u.b);
 			break;
 		default:
 			unreachable();
@@ -2410,54 +2403,8 @@ port_vdbemem_get_msgpack(struct port *base, uint32_t *size)
 	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
 		      set_encode_error, &is_error);
 	mpstream_encode_array(&stream, port->mem_count);
-	for (uint32_t i = 0; i < port->mem_count && !is_error; i++) {
-		sql_value *param =
-			(sql_value *)((struct Mem *)port->mem + i);
-		switch (sql_value_type(param)) {
-		case MP_INT: {
-			sql_int64 val = sql_value_int64(param);
-			if (val < 0) {
-				mpstream_encode_int(&stream, val);
-				break;
-			}
-			FALLTHROUGH;
-		}
-		case MP_UINT: {
-			sql_uint64 val = sql_value_uint64(param);
-			mpstream_encode_uint(&stream, val);
-			break;
-		}
-		case MP_DOUBLE: {
-			mpstream_encode_double(&stream,
-					       sql_value_double(param));
-			break;
-		}
-		case MP_STR: {
-			const char *str = (const char *) sql_value_text(param);
-			mpstream_encode_strn(&stream, str,
-					     sql_value_bytes(param));
-			break;
-		}
-		case MP_BIN:
-		case MP_ARRAY:
-		case MP_MAP: {
-			mpstream_encode_binl(&stream, sql_value_bytes(param));
-			mpstream_memcpy(&stream, sql_value_blob(param),
-					sql_value_bytes(param));
-			break;
-		}
-		case MP_NIL: {
-			mpstream_encode_nil(&stream);
-			break;
-		}
-		case MP_BOOL: {
-			mpstream_encode_bool(&stream, sql_value_boolean(param));
-			break;
-		}
-		default:
-			unreachable();
-		}
-	}
+	for (uint32_t i = 0; i < port->mem_count && !is_error; i++)
+		mpstream_encode_vdbe_mem(&stream, (struct Mem *)port->mem + i);
 	mpstream_flush(&stream);
 	*size = region_used(region) - region_svp;
 	if (is_error)
