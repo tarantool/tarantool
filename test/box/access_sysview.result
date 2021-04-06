@@ -713,7 +713,8 @@ box.internal.collation.drop('guest0')
 --
 box.space._vspace.index[1]:alter({parts = { 2, 'string' }})
 ---
-- error: Field 2 has type 'unsigned' in space format, but type 'string' in index definition
+- error: Field 2 (owner) has type 'unsigned' in space format, but type 'string' in
+    index definition
 ...
 box.space._vspace.index[1]:select('xxx')
 ---

@@ -707,7 +707,8 @@ pk = s:create_index('pk')
 ...
 sk1 = s:create_index('sk1', { parts = { 2, 'unsigned' } })
 ---
-- error: Field 2 has type 'string' in space format, but type 'unsigned' in index definition
+- error: Field 2 (field2) has type 'string' in space format, but type 'unsigned' in
+    index definition
 ...
 -- Check space format conflicting with index parts.
 sk3 = s:create_index('sk3', { parts = { 2, 'string' } })
@@ -718,7 +719,8 @@ format[2].type = 'unsigned'
 ...
 s:format(format)
 ---
-- error: Field 2 has type 'unsigned' in space format, but type 'string' in index definition
+- error: Field 2 (field2) has type 'unsigned' in space format, but type 'string' in
+    index definition
 ...
 s:format()
 ---
@@ -820,41 +822,41 @@ s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}, 8, 9}
 ...
 s:replace{1, 2, {3, 3}, 4.4, -5, true, {value=7}, 8, 9}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected string,
-    got unsigned'
+- error: 'Tuple field 2 (field2) type does not match one required by operation: expected
+    string, got unsigned'
 ...
 s:replace{1, '2', 3, 4.4, -5, true, {value=7}, 8, 9}
 ---
-- error: 'Tuple field 3 type does not match one required by operation: expected array,
-    got unsigned'
+- error: 'Tuple field 3 (field3) type does not match one required by operation: expected
+    array, got unsigned'
 ...
 s:replace{1, '2', {3, 3}, '4', -5, true, {value=7}, 8, 9}
 ---
-- error: 'Tuple field 4 type does not match one required by operation: expected number,
-    got string'
+- error: 'Tuple field 4 (field4) type does not match one required by operation: expected
+    number, got string'
 ...
 s:replace{1, '2', {3, 3}, 4.4, -5.5, true, {value=7}, 8, 9}
 ---
-- error: 'Tuple field 5 type does not match one required by operation: expected integer,
-    got double'
+- error: 'Tuple field 5 (field5) type does not match one required by operation: expected
+    integer, got double'
 ...
 s:replace{1, '2', {3, 3}, 4.4, -5, {6, 6}, {value=7}, 8, 9}
 ---
-- error: 'Tuple field 6 type does not match one required by operation: expected scalar,
-    got array'
+- error: 'Tuple field 6 (field6) type does not match one required by operation: expected
+    scalar, got array'
 ...
 s:replace{1, '2', {3, 3}, 4.4, -5, true, {7}, 8, 9}
 ---
-- error: 'Tuple field 7 type does not match one required by operation: expected map,
-    got array'
+- error: 'Tuple field 7 (field7) type does not match one required by operation: expected
+    map, got array'
 ...
 s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}}
 ---
-- error: Tuple field 8 required by space format is missing
+- error: Tuple field 8 (field8) required by space format is missing
 ...
 s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}, 8}
 ---
-- error: Tuple field 9 required by space format is missing
+- error: Tuple field 9 (err) required by space format is missing
 ...
 s:truncate()
 ---
@@ -1151,8 +1153,8 @@ inspector:cmd("setopt delimiter ''");
 -- any --X--> unsigned
 fail_format_change(2, 'unsigned')
 ---
-- 'Tuple field 2 type does not match one required by operation: expected unsigned,
-  got array'
+- 'Tuple field 2 (field2) type does not match one required by operation: expected
+  unsigned, got array'
 ...
 -- unsigned -----> any
 ok_format_change(3, 'any')
@@ -1161,8 +1163,8 @@ ok_format_change(3, 'any')
 -- unsigned --X--> string
 fail_format_change(3, 'string')
 ---
-- 'Tuple field 3 type does not match one required by operation: expected string, got
-  unsigned'
+- 'Tuple field 3 (field3) type does not match one required by operation: expected
+  string, got unsigned'
 ...
 -- unsigned -----> number
 ok_format_change(3, 'number')
@@ -1179,20 +1181,20 @@ ok_format_change(3, 'scalar')
 -- unsigned --X--> map
 fail_format_change(3, 'map')
 ---
-- 'Tuple field 3 type does not match one required by operation: expected map, got
-  unsigned'
+- 'Tuple field 3 (field3) type does not match one required by operation: expected
+  map, got unsigned'
 ...
 -- unsigned --X--> decimal
 fail_format_change(3, 'decimal')
 ---
-- 'Tuple field 3 type does not match one required by operation: expected decimal,
-  got unsigned'
+- 'Tuple field 3 (field3) type does not match one required by operation: expected
+  decimal, got unsigned'
 ...
 -- unsigned --X--> uuid
 fail_format_change(3, 'uuid')
 ---
-- 'Tuple field 3 type does not match one required by operation: expected uuid, got
-  unsigned'
+- 'Tuple field 3 (field3) type does not match one required by operation: expected
+  uuid, got unsigned'
 ...
 -- string -----> any
 ok_format_change(4, 'any')
@@ -1205,20 +1207,20 @@ ok_format_change(4, 'scalar')
 -- string --X--> boolean
 fail_format_change(4, 'boolean')
 ---
-- 'Tuple field 4 type does not match one required by operation: expected boolean,
-  got string'
+- 'Tuple field 4 (field4) type does not match one required by operation: expected
+  boolean, got string'
 ...
 -- string --X--> decimal
 fail_format_change(4, 'decimal')
 ---
-- 'Tuple field 4 type does not match one required by operation: expected decimal,
-  got string'
+- 'Tuple field 4 (field4) type does not match one required by operation: expected
+  decimal, got string'
 ...
 -- string --X--> uuid
 fail_format_change(4, 'uuid')
 ---
-- 'Tuple field 4 type does not match one required by operation: expected uuid, got
-  string'
+- 'Tuple field 4 (field4) type does not match one required by operation: expected
+  uuid, got string'
 ...
 -- number -----> any
 ok_format_change(5, 'any')
@@ -1231,20 +1233,20 @@ ok_format_change(5, 'scalar')
 -- number --X--> integer
 fail_format_change(5, 'integer')
 ---
-- 'Tuple field 5 type does not match one required by operation: expected integer,
-  got double'
+- 'Tuple field 5 (field5) type does not match one required by operation: expected
+  integer, got double'
 ...
 -- number --X--> decimal
 fail_format_change(5, 'decimal')
 ---
-- 'Tuple field 5 type does not match one required by operation: expected decimal,
-  got double'
+- 'Tuple field 5 (field5) type does not match one required by operation: expected
+  decimal, got double'
 ...
 -- number --X--> uuid
 fail_format_change(5, 'uuid')
 ---
-- 'Tuple field 5 type does not match one required by operation: expected uuid, got
-  double'
+- 'Tuple field 5 (field5) type does not match one required by operation: expected
+  uuid, got double'
 ...
 -- integer -----> any
 ok_format_change(6, 'any')
@@ -1261,20 +1263,20 @@ ok_format_change(6, 'scalar')
 -- integer --X--> unsigned
 fail_format_change(6, 'unsigned')
 ---
-- 'Tuple field 6 type does not match one required by operation: expected unsigned,
-  got integer'
+- 'Tuple field 6 (field6) type does not match one required by operation: expected
+  unsigned, got integer'
 ...
 -- integer --X--> decimal
 fail_format_change(6, 'decimal')
 ---
-- 'Tuple field 6 type does not match one required by operation: expected decimal,
-  got integer'
+- 'Tuple field 6 (field6) type does not match one required by operation: expected
+  decimal, got integer'
 ...
 -- integer --X--> uuid
 fail_format_change(6, 'uuid')
 ---
-- 'Tuple field 6 type does not match one required by operation: expected uuid, got
-  integer'
+- 'Tuple field 6 (field6) type does not match one required by operation: expected
+  uuid, got integer'
 ...
 -- boolean -----> any
 ok_format_change(7, 'any')
@@ -1287,20 +1289,20 @@ ok_format_change(7, 'scalar')
 -- boolean --X--> string
 fail_format_change(7, 'string')
 ---
-- 'Tuple field 7 type does not match one required by operation: expected string, got
-  boolean'
+- 'Tuple field 7 (field7) type does not match one required by operation: expected
+  string, got boolean'
 ...
 -- boolead --X--> decimal
 fail_format_change(7, 'decimal')
 ---
-- 'Tuple field 7 type does not match one required by operation: expected decimal,
-  got boolean'
+- 'Tuple field 7 (field7) type does not match one required by operation: expected
+  decimal, got boolean'
 ...
 -- boolean --X--> uuid
 fail_format_change(7, 'uuid')
 ---
-- 'Tuple field 7 type does not match one required by operation: expected uuid, got
-  boolean'
+- 'Tuple field 7 (field7) type does not match one required by operation: expected
+  uuid, got boolean'
 ...
 -- scalar -----> any
 ok_format_change(8, 'any')
@@ -1309,20 +1311,20 @@ ok_format_change(8, 'any')
 -- scalar --X--> unsigned
 fail_format_change(8, 'unsigned')
 ---
-- 'Tuple field 8 type does not match one required by operation: expected unsigned,
-  got integer'
+- 'Tuple field 8 (field8) type does not match one required by operation: expected
+  unsigned, got integer'
 ...
 -- scalar --X--> decimal
 fail_format_change(8, 'decimal')
 ---
-- 'Tuple field 8 type does not match one required by operation: expected decimal,
-  got integer'
+- 'Tuple field 8 (field8) type does not match one required by operation: expected
+  decimal, got integer'
 ...
 -- scalar --X--> uuid
 fail_format_change(8, 'uuid')
 ---
-- 'Tuple field 8 type does not match one required by operation: expected uuid, got
-  integer'
+- 'Tuple field 8 (field8) type does not match one required by operation: expected
+  uuid, got integer'
 ...
 -- array -----> any
 ok_format_change(9, 'any')
@@ -1331,20 +1333,20 @@ ok_format_change(9, 'any')
 -- array --X--> scalar
 fail_format_change(9, 'scalar')
 ---
-- 'Tuple field 9 type does not match one required by operation: expected scalar, got
-  array'
+- 'Tuple field 9 (field9) type does not match one required by operation: expected
+  scalar, got array'
 ...
 -- arary --X--> decimal
 fail_format_change(9, 'decimal')
 ---
-- 'Tuple field 9 type does not match one required by operation: expected decimal,
-  got array'
+- 'Tuple field 9 (field9) type does not match one required by operation: expected
+  decimal, got array'
 ...
 -- array --X--> uuid
 fail_format_change(9, 'uuid')
 ---
-- 'Tuple field 9 type does not match one required by operation: expected uuid, got
-  array'
+- 'Tuple field 9 (field9) type does not match one required by operation: expected
+  uuid, got array'
 ...
 -- map -----> any
 ok_format_change(10, 'any')
@@ -1353,20 +1355,20 @@ ok_format_change(10, 'any')
 -- map --X--> scalar
 fail_format_change(10, 'scalar')
 ---
-- 'Tuple field 10 type does not match one required by operation: expected scalar,
-  got map'
+- 'Tuple field 10 (field10) type does not match one required by operation: expected
+  scalar, got map'
 ...
 -- map --X--> decimal
 fail_format_change(10, 'decimal')
 ---
-- 'Tuple field 10 type does not match one required by operation: expected decimal,
-  got map'
+- 'Tuple field 10 (field10) type does not match one required by operation: expected
+  decimal, got map'
 ...
 -- map --X--> uuid
 fail_format_change(10, 'uuid')
 ---
-- 'Tuple field 10 type does not match one required by operation: expected uuid, got
-  map'
+- 'Tuple field 10 (field10) type does not match one required by operation: expected
+  uuid, got map'
 ...
 -- decimal ----> any
 ok_format_change(11, 'any')
@@ -1383,38 +1385,38 @@ ok_format_change(11, 'scalar')
 -- decimal --X--> string
 fail_format_change(11, 'string')
 ---
-- 'Tuple field 11 type does not match one required by operation: expected string,
-  got extension'
+- 'Tuple field 11 (field11) type does not match one required by operation: expected
+  string, got extension'
 ...
 -- decimal --X--> integer
 fail_format_change(11, 'integer')
 ---
-- 'Tuple field 11 type does not match one required by operation: expected integer,
-  got extension'
+- 'Tuple field 11 (field11) type does not match one required by operation: expected
+  integer, got extension'
 ...
 -- decimal --X--> unsigned
 fail_format_change(11, 'unsigned')
 ---
-- 'Tuple field 11 type does not match one required by operation: expected unsigned,
-  got extension'
+- 'Tuple field 11 (field11) type does not match one required by operation: expected
+  unsigned, got extension'
 ...
 -- decimal --X--> map
 fail_format_change(11, 'map')
 ---
-- 'Tuple field 11 type does not match one required by operation: expected map, got
-  extension'
+- 'Tuple field 11 (field11) type does not match one required by operation: expected
+  map, got extension'
 ...
 -- decimal --X--> array
 fail_format_change(11, 'array')
 ---
-- 'Tuple field 11 type does not match one required by operation: expected array, got
-  extension'
+- 'Tuple field 11 (field11) type does not match one required by operation: expected
+  array, got extension'
 ...
 -- decimal --X--> uuid
 fail_format_change(11, 'uuid')
 ---
-- 'Tuple field 11 type does not match one required by operation: expected uuid, got
-  extension'
+- 'Tuple field 11 (field11) type does not match one required by operation: expected
+  uuid, got extension'
 ...
 -- uuid ----> any
 ok_format_change(12, 'any')
@@ -1423,50 +1425,50 @@ ok_format_change(12, 'any')
 -- uuid --X--> number
 fail_format_change(12, 'number')
 ---
-- 'Tuple field 12 type does not match one required by operation: expected number,
-  got extension'
+- 'Tuple field 12 (field12) type does not match one required by operation: expected
+  number, got extension'
 ...
 -- uuid --X--> scalar
 fail_format_change(12, 'scalar')
 ---
-- 'Tuple field 12 type does not match one required by operation: expected scalar,
-  got extension'
+- 'Tuple field 12 (field12) type does not match one required by operation: expected
+  scalar, got extension'
 ...
 -- uuid --X--> string
 fail_format_change(12, 'string')
 ---
-- 'Tuple field 12 type does not match one required by operation: expected string,
-  got extension'
+- 'Tuple field 12 (field12) type does not match one required by operation: expected
+  string, got extension'
 ...
 -- uuid --X--> integer
 fail_format_change(12, 'integer')
 ---
-- 'Tuple field 12 type does not match one required by operation: expected integer,
-  got extension'
+- 'Tuple field 12 (field12) type does not match one required by operation: expected
+  integer, got extension'
 ...
 -- uuid --X--> unsigned
 fail_format_change(12, 'unsigned')
 ---
-- 'Tuple field 12 type does not match one required by operation: expected unsigned,
-  got extension'
+- 'Tuple field 12 (field12) type does not match one required by operation: expected
+  unsigned, got extension'
 ...
 -- uuid --X--> map
 fail_format_change(12, 'map')
 ---
-- 'Tuple field 12 type does not match one required by operation: expected map, got
-  extension'
+- 'Tuple field 12 (field12) type does not match one required by operation: expected
+  map, got extension'
 ...
 -- uuid --X--> array
 fail_format_change(12, 'array')
 ---
-- 'Tuple field 12 type does not match one required by operation: expected array, got
-  extension'
+- 'Tuple field 12 (field12) type does not match one required by operation: expected
+  array, got extension'
 ...
 -- uuid --X--> decimal
 fail_format_change(12, 'decimal')
 ---
-- 'Tuple field 12 type does not match one required by operation: expected decimal,
-  got extension'
+- 'Tuple field 12 (field12) type does not match one required by operation: expected
+  decimal, got extension'
 ...
 s:drop()
 ---
@@ -1556,7 +1558,7 @@ s:format(format)
 -- Fail, not enough fields.
 s:replace{2, 2, 2, 2, 2}
 ---
-- error: Tuple field 6 required by space format is missing
+- error: Tuple field 6 (field6) required by space format is missing
 ...
 s:replace{2, 2, 2, 2, 2, 2, 2}
 ---
@@ -1696,8 +1698,8 @@ format[2].is_nullable = false
 ...
 s:format(format)
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
-    got nil'
+- error: 'Tuple field 2 (field2) type does not match one required by operation: expected
+    unsigned, got nil'
 ...
 _ = s:delete(1)
 ---
@@ -1984,13 +1986,13 @@ s:format()
 ...
 s:replace{1, '100', -20.2}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
-    got string'
+- error: 'Tuple field 2 (field2) type does not match one required by operation: expected
+    unsigned, got string'
 ...
 s:replace{1, 100, -20.2}
 ---
-- error: 'Tuple field 3 type does not match one required by operation: expected integer,
-    got double'
+- error: 'Tuple field 3 (field3) type does not match one required by operation: expected
+    integer, got double'
 ...
 s:replace{1, 100, -20}
 ---
@@ -2054,13 +2056,13 @@ sk4:alter{parts = {{3, 'integer'}}}
 ...
 s:replace{1, 50.5, 1.5}
 ---
-- error: 'Tuple field 2 type does not match one required by operation: expected unsigned,
-    got double'
+- error: 'Tuple field 2 (field2) type does not match one required by operation: expected
+    unsigned, got double'
 ...
 s:replace{1, 50, 1.5}
 ---
-- error: 'Tuple field 3 type does not match one required by operation: expected integer,
-    got double'
+- error: 'Tuple field 3 (field3) type does not match one required by operation: expected
+    integer, got double'
 ...
 s:replace{5, 5, 5}
 ---
