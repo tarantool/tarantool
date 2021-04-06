@@ -126,7 +126,7 @@ deploy_prepare:
 package: deploy_prepare
 	PACKPACK_EXTRA_DOCKER_RUN_PARAMS="--network=host ${PACKPACK_EXTRA_DOCKER_RUN_PARAMS}" ./packpack/packpack
 
-deploy: package
+deploy:
 	echo ${GPG_SECRET_KEY} | base64 -d | gpg --batch --import || true
 	./tools/update_repo.sh -o=${OS} -d=${DIST} \
 		-b="${LIVE_REPO_S3_DIR}/${BUCKET}" build
