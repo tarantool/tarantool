@@ -59,7 +59,7 @@ struct region;
 struct xrow_header {
 	/* (!) Please update txn_add_redo() after changing members */
 
-	uint32_t type;
+	uint16_t type;
 	uint32_t replica_id;
 	/**
 	 * Replication group identifier. 0 - replicaset,
@@ -154,7 +154,7 @@ struct request {
 	/**
 	 * Request type - IPROTO type code
 	 */
-	uint32_t type;
+	uint16_t type;
 	uint32_t space_id;
 	uint32_t index_id;
 	uint32_t offset;
@@ -213,7 +213,7 @@ xrow_encode_dml(const struct request *request, struct region *region,
  */
 struct synchro_request {
 	/** Operation type - IPROTO_ROLLBACK or IPROTO_CONFIRM. */
-	uint32_t type;
+	uint16_t type;
 	/**
 	 * ID of the instance owning the pending transactions.
 	 * Note, it may be not the same instance, who created this
@@ -563,7 +563,7 @@ xrow_encode_timestamp(struct xrow_header *row, uint32_t replica_id, double tm);
  * @see xrow_header_encode()
  */
 void
-iproto_header_encode(char *data, uint32_t type, uint64_t sync,
+iproto_header_encode(char *data, uint16_t type, uint64_t sync,
 		     uint32_t schema_version, uint32_t body_length);
 
 struct obuf;

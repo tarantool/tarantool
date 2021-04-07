@@ -315,7 +315,7 @@ rollback:
 }
 
 static inline enum dup_replace_mode
-dup_replace_mode(uint32_t op)
+dup_replace_mode(uint16_t op)
 {
 	return op == IPROTO_INSERT ? DUP_INSERT : DUP_REPLACE_OR_INSERT;
 }
