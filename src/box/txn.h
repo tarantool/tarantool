@@ -212,6 +212,10 @@ struct txn_stmt {
 	 * old_tuple to be NULL.
 	 */
 	bool does_require_old_tuple;
+	/**
+	* Request type - IPROTO type code
+	*/
+	uint16_t type;
 	/** Commit/rollback triggers associated with this statement. */
 	struct rlist on_commit;
 	struct rlist on_rollback;
@@ -557,10 +561,10 @@ txn_n_rows(struct txn *txn)
 }
 
 /**
- * Start a new statement.
+ * Start a new statement in @a space with requst @a type (IPROTO_ constant).
  */
 int
-txn_begin_stmt(struct txn *txn, struct space *space);
+txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type);
 
 int
 txn_begin_in_engine(struct engine *engine, struct txn *txn);

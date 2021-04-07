@@ -75,9 +75,8 @@ lbox_push_txn_stmt(struct lua_State *L, void *event)
 	}
 	/* @todo: maybe the space object has to be here */
 	lua_pushstring(L, stmt->space->def->name);
-	assert(stmt->row != NULL);
 	/* operation type: INSERT/UPDATE/UPSERT/REPLACE/DELETE */
-	lua_pushstring(L, iproto_type_name(stmt->row->type));
+	lua_pushstring(L, iproto_type_name(stmt->type));
 	return 4;
 }
 
