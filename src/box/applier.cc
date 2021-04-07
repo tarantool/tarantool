@@ -247,7 +247,7 @@ apply_snapshot_row(struct xrow_header *row)
 	 * Master only sends confirmed rows during join.
 	 */
 	txn_set_flags(txn, TXN_FORCE_ASYNC);
-	if (txn_begin_stmt(txn, space) != 0)
+	if (txn_begin_stmt(txn, space, request.type) != 0)
 		goto rollback;
 	/* no access checks here - applier always works with admin privs */
 	struct tuple *unused;
@@ -277,7 +277,7 @@ process_nop(struct request *request)
 {
 	assert(request->type == IPROTO_NOP);
 	struct txn *txn = in_txn();
-	if (txn_begin_stmt(txn, NULL) != 0)
+	if (txn_begin_stmt(txn, NULL, request->type) != 0)
 		return -1;
 	return txn_commit_stmt(txn, request);
 }

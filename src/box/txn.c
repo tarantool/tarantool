@@ -306,7 +306,7 @@ txn_begin_in_engine(struct engine *engine, struct txn *txn)
 }
 
 int
-txn_begin_stmt(struct txn *txn, struct space *space)
+txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 {
 	assert(txn == in_txn());
 	assert(txn != NULL);
@@ -340,6 +340,7 @@ txn_begin_stmt(struct txn *txn, struct space *space)
 		goto fail;
 
 	stmt->space = space;
+	stmt->type = type;
 	if (engine_begin_statement(engine, txn) != 0)
 		goto fail;
 
@@ -418,25 +419,7 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 			 */
 			stmt->does_require_old_tuple = true;
 
-			int rc = 0;
-			if(!space_is_temporary(stmt->space)) {
-				rc = trigger_run(&stmt->space->on_replace, txn);
-			} else {
-				/*
-				 * There is no row attached to txn_stmt for
-				 * temporary spaces, since DML operations on
-				 * them are not written to WAL.
-				 * Fake a row to pass operation type to lua
-				 * on_replace triggers.
-				 */
-				assert(stmt->row == NULL);
-				struct xrow_header temp_header;
-				temp_header.type = request->type;
-				stmt->row = &temp_header;
-				rc = trigger_run(&stmt->space->on_replace, txn);
-				stmt->row = NULL;
-			}
-			if (rc != 0)
+			if(trigger_run(&stmt->space->on_replace, txn) != 0)
 				goto fail;
 		}
 	}
