@@ -315,7 +315,7 @@ txn_limbo_write_cb(struct journal_entry *entry)
 }
 
 static void
-txn_limbo_write_synchro(struct txn_limbo *limbo, uint32_t type, int64_t lsn)
+txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn)
 {
 	assert(lsn > 0);
 

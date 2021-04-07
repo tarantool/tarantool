@@ -273,7 +273,7 @@ enum iproto_raft_keys {
  * @param type IPROTO type.
  */
 static inline const char *
-iproto_type_name(uint32_t type)
+iproto_type_name(uint16_t type)
 {
 	/*
 	 * Sic: iptoto_type_strs[IPROTO_NOP] is NULL
@@ -316,7 +316,7 @@ iproto_key_name(enum iproto_key key)
 
 /** A data manipulation request. */
 static inline bool
-iproto_type_is_dml(uint32_t type)
+iproto_type_is_dml(uint16_t type)
 {
 	return (type >= IPROTO_SELECT && type <= IPROTO_DELETE) ||
 		type == IPROTO_UPSERT || type == IPROTO_NOP;
@@ -327,7 +327,7 @@ iproto_type_is_dml(uint32_t type)
  * @param type iproto type.
  */
 static inline uint64_t
-dml_request_key_map(uint32_t type)
+dml_request_key_map(uint16_t type)
 {
 	/** Advanced requests don't have a defined key map. */
 	assert(iproto_type_is_dml(type));
@@ -337,20 +337,20 @@ dml_request_key_map(uint32_t type)
 
 /** CONFIRM/ROLLBACK entries for synchronous replication. */
 static inline bool
-iproto_type_is_synchro_request(uint32_t type)
+iproto_type_is_synchro_request(uint16_t type)
 {
 	return type == IPROTO_CONFIRM || type == IPROTO_ROLLBACK;
 }
 
 static inline bool
-iproto_type_is_raft_request(uint32_t type)
+iproto_type_is_raft_request(uint16_t type)
 {
 	return type == IPROTO_RAFT;
 }
 
 /** This is an error. */
 static inline bool
-iproto_type_is_error(uint32_t type)
+iproto_type_is_error(uint16_t type)
 {
 	return (type & IPROTO_TYPE_ERROR) != 0;
 }
