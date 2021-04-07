@@ -213,7 +213,7 @@ box_process_rw(struct request *request, struct space *space,
 	rmean_collect(rmean_box, request->type, 1);
 	if (access_check_space(space, PRIV_W) != 0)
 		goto rollback;
-	if (txn_begin_stmt(txn, space) != 0)
+	if (txn_begin_stmt(txn, space, request->type) != 0)
 		goto rollback;
 	if (space_execute_dml(space, txn, request, &tuple) != 0) {
 		txn_rollback_stmt(txn);
