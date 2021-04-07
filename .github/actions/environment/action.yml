@@ -11,6 +11,11 @@ runs:
         # Configure AWS Region to avoid of issue:
         #   https://github.com/tarantool/tarantool-qa/issues/111
         echo AWS_DEFAULT_REGION=MS | tee -a $GITHUB_ENV
+        # For self-hosted runners run w/o restart may need to kill
+        # hanged processes that could be leaved from the previous
+        # workflows runs.
+        ps aux | grep " tarantool " | awk '{system("kill -9 "$2)}' || true
+        ps aux | grep "test-run.py " | awk '{system("kill -9 "$2)}' || true
         # This switching off swap command will not work as github step
         # run from inside github 'container' tag. Also it will fail to
         # run from it. So running it only outside of docker container.
