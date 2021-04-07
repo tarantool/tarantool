@@ -30,6 +30,7 @@ include_files = {
 
 exclude_files = {
     "build/**/*.lua",
+    "test-run/test/test-tarantool/*.test.lua",
     -- Third-party source code.
     "src/box/lua/serpent.lua",
     "test/app/*.test.lua",
