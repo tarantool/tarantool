@@ -261,16 +261,15 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	lua_pushboolean(L, space_index(space, 0) != 0);
 	lua_settable(L, i);
 
+	/* space:on_replace */
+	lua_pushstring(L, "on_replace");
+	lua_pushcfunction(L, lbox_space_on_replace);
+	lua_settable(L, i);
 
-        /* space:on_replace */
-        lua_pushstring(L, "on_replace");
-        lua_pushcfunction(L, lbox_space_on_replace);
-        lua_settable(L, i);
-
-        /* space:before_replace */
-        lua_pushstring(L, "before_replace");
-        lua_pushcfunction(L, lbox_space_before_replace);
-        lua_settable(L, i);
+	/* space:before_replace */
+	lua_pushstring(L, "before_replace");
+	lua_pushcfunction(L, lbox_space_before_replace);
+	lua_settable(L, i);
 
 	lua_getfield(L, i, "index");
 	if (lua_isnil(L, -1)) {
