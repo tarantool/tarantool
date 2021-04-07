@@ -356,7 +356,7 @@ static_assert(sizeof(struct iproto_header_bin) == IPROTO_HEADER_LEN,
 	      "sizeof(iproto_header_bin)");
 
 void
-iproto_header_encode(char *out, uint32_t type, uint64_t sync,
+iproto_header_encode(char *out, uint16_t type, uint64_t sync,
 		     uint32_t schema_version, uint32_t body_length)
 {
 	struct iproto_header_bin header;
