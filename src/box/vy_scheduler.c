@@ -861,7 +861,7 @@ vy_deferred_delete_process_one(struct space *deferred_delete_space,
 	tuple_unref(delete);
 
 	struct txn *txn = in_txn();
-	if (txn_begin_stmt(txn, deferred_delete_space) != 0)
+	if (txn_begin_stmt(txn, deferred_delete_space, request.type) != 0)
 		return -1;
 
 	struct tuple *unused;

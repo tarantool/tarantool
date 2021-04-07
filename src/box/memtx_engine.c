@@ -241,7 +241,7 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 	struct txn *txn = txn_begin();
 	if (txn == NULL)
 		return -1;
-	if (txn_begin_stmt(txn, space) != 0)
+	if (txn_begin_stmt(txn, space, request.type) != 0)
 		goto rollback;
 	/* no access checks here - applier always works with admin privs */
 	struct tuple *unused;
