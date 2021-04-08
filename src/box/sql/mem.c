@@ -1178,6 +1178,15 @@ mem_len(const struct Mem *mem, uint32_t *len)
 }
 
 int
+mem_get_agg(const struct Mem *mem, void **accum)
+{
+	if ((mem->flags & MEM_Agg) == 0)
+		return -1;
+	*accum = mem->z;
+	return 0;
+}
+
+int
 mem_copy(struct Mem *to, const struct Mem *from)
 {
 	mem_clear(to);
