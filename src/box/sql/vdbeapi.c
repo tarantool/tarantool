@@ -388,7 +388,10 @@ sql_aggregate_context(sql_context * p, int nByte)
 	assert(p->func->def->aggregate == FUNC_AGGREGATE_GROUP);
 	if (!mem_is_agg(p->pMem) && mem_set_agg(p->pMem, p->func, nByte) != 0)
 		return NULL;
-	return p->pMem->z;
+	void *accum;
+	if (mem_get_agg(p->pMem, &accum) != 0)
+		return NULL;
+	return accum;
 }
 
 /*
