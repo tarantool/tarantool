@@ -909,6 +909,13 @@ mem_len_unsafe(const struct Mem *mem)
 }
 
 /**
+ * Return address of memory allocated for accumulation structure of the
+ * aggregate function.
+ */
+int
+mem_get_agg(const struct Mem *mem, void **accum);
+
+/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
