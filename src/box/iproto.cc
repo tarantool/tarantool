@@ -1895,7 +1895,7 @@ net_send_msg(struct cmsg *m)
 }
 
 /**
- * Complete sending an iproto error: 
+ * Complete sending an iproto error:
  * recycle the error object and flush output.
  */
 static void
@@ -2065,15 +2065,6 @@ net_cord_f(va_list /* ap */)
 	evio_service_init(loop(), &binary, "binary",
 			  iproto_on_accept, NULL);
 
-
-	/* Init statistics counter */
-	rmean_net = rmean_new(rmean_net_strings, IPROTO_LAST);
-
-	if (rmean_net == NULL) {
-		tnt_raise(OutOfMemory, sizeof(struct rmean),
-			  "rmean", "struct rmean");
-	}
-
 	struct cbus_endpoint endpoint;
 	/* Create "net" endpoint. */
 	cbus_endpoint_create(&endpoint, "net", fiber_schedule_cb, fiber());
@@ -2092,7 +2083,6 @@ net_cord_f(va_list /* ap */)
 	if (evio_service_is_active(&binary))
 		evio_service_stop(&binary);
 
-	rmean_delete(rmean_net);
 	return 0;
 }
 
@@ -2192,8 +2182,19 @@ iproto_init(void)
 {
 	slab_cache_create(&net_slabc, &runtime);
 
-	if (cord_costart(&net_cord, "iproto", net_cord_f, NULL))
+	/* Init statistics counter */
+	rmean_net = rmean_new(rmean_net_strings, IPROTO_LAST);
+	if (rmean_net == NULL) {
+		slab_cache_destroy(&net_slabc);
+		tnt_raise(OutOfMemory, sizeof(struct rmean),
+			  "rmean", "struct rmean");
+	}
+
+	if (cord_costart(&net_cord, "iproto", net_cord_f, NULL)) {
+		rmean_delete(rmean_net);
+		slab_cache_destroy(&net_slabc);
 		panic("failed to initialize iproto thread");
+	}
 
 	/* Create a pipe to "net" thread. */
 	cpipe_create(&net_pipe, "net");
@@ -2348,4 +2349,7 @@ iproto_free(void)
 	*/
 	if (evio_service_is_active(&binary))
 		close(binary.ev.fd);
+
+	rmean_delete(rmean_net);
+	slab_cache_destroy(&net_slabc);
 }
