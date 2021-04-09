@@ -923,14 +923,14 @@ tuple_next_u32(struct tuple_iterator *it, uint32_t *out)
 	const char *field = tuple_next_with_type(it, MP_UINT);
 	if (field == NULL)
 		return -1;
-	uint32_t val = mp_decode_uint(&field);
+	uint64_t val = mp_decode_uint(&field);
+	*out = val;
 	if (val > UINT32_MAX) {
 		diag_set(ClientError, ER_FIELD_TYPE,
 			 int2str(fieldno + TUPLE_INDEX_BASE),
 			 field_type_strs[FIELD_TYPE_UNSIGNED]);
 		return -1;
 	}
-	*out = val;
 	return 0;
 }
 
@@ -1051,8 +1051,9 @@ tuple_field_u32(struct tuple *tuple, uint32_t fieldno, uint32_t *out)
 	const char *field = tuple_field_with_type(tuple, fieldno, MP_UINT);
 	if (field == NULL)
 		return -1;
-	*out = mp_decode_uint(&field);
-	if (*out > UINT32_MAX) {
+	uint64_t val = mp_decode_uint(&field);
+	*out = val;
+	if (val > UINT32_MAX) {
 		diag_set(ClientError, ER_FIELD_TYPE,
 			 int2str(fieldno + TUPLE_INDEX_BASE),
 			 field_type_strs[FIELD_TYPE_UNSIGNED]);

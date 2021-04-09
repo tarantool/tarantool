@@ -1,0 +1,10 @@
+	*** tuple_next_u32_test ***
+1..2
+ok 1 - can read next uint32_t
+ok 2 - can't read next uint64_t
+	*** tuple_next_u32_test: done ***
+	*** tuple_field_u32_test ***
+1..2
+ok 1 - can read uint32_t
+ok 2 - can't read uint64_t
+	*** tuple_field_u32_test: done ***
