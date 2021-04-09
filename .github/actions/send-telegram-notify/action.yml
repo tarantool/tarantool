@@ -5,8 +5,8 @@ runs:
   steps:
     # install 'requests' Python module
     - run: |
-        python -m pip install --upgrade pip ||:
-        pip install requests ||:
+        python3 -m pip install --upgrade pip ||:
+        pip3 install requests ||:
       shell: bash
     # logout github environment
     - env:
@@ -72,8 +72,9 @@ runs:
         fi
         # Use MarkdownV2 while Markdown is legacy
         # https://core.telegram.org/bots/api#markdownv2-style
-        python -c "import urllib, requests ; \\
-          url = 'https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s&parse_mode=MarkdownV2&disable_web_page_preview=true' \\
-            % ('$TELEGRAM_TOKEN', '$send_to', urllib.quote_plus('$msg')) ; \\
-          _ = requests.post(url, timeout=10)"
+        python3 -c "from urllib import request, parse ; \\
+          url = 'https://api.telegram.org/bot%s/sendMessage' % ('$TELEGRAM_TOKEN') ; \\
+          data = parse.urlencode({'chat_id' : '$send_to', 'parse_mode' : 'MarkdownV2', 'disable_web_page_preview' : 'true', 'text' : '$msg'}).encode('ascii') ; \\
+          response = request.urlopen(url=url, data=data, timeout=10) ; \\
+          print(response.read())"
       shell: bash
