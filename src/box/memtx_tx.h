@@ -77,31 +77,14 @@ struct tx_read_tracker {
 };
 
 /**
- * Pointer to tuple or story.
- */
-struct memtx_story_or_tuple {
-	/** Flag whether it's a story. */
-	bool is_story;
-	union {
-		/** Pointer to story, it must be reverse liked. */
-		struct memtx_story *story;
-		/** Smart pointer to tuple: the tuple is referenced if set. */
-		struct tuple *tuple;
-	};
-};
-
-/**
  * Link that connects a memtx_story with older and newer stories of the same
  * key in index.
  */
 struct memtx_story_link {
 	/** Story that was happened after that story was ended. */
 	struct memtx_story *newer_story;
-	/**
-	 * Older story or ancient tuple (so old that its story was lost).
-	 * In case of tuple is can also be NULL.
-	 */
-	struct memtx_story_or_tuple older;
+	/** Story that was happened before that story was started. */
+	struct memtx_story *older_story;
 };
 
 /**
