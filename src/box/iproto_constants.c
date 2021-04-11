@@ -90,6 +90,64 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x2a */	MP_MAP, /* IPROTO_TUPLE_META */
 	/* 0x2b */	MP_MAP, /* IPROTO_OPTIONS */
 	/* }}} */
+
+	/* {{{ unused */
+	/* 0x2c */	MP_UINT,
+	/* 0x2d */	MP_UINT,
+	/* 0x2e */	MP_UINT,
+	/* 0x2f */	MP_UINT,
+	/* }}} */
+
+	/* {{{ body -- response keys */
+	/* 0x30 */	MP_ARRAY, /* IPROTO_DATA */
+	/* 0x31 */	MP_STR, /* IPROTO_ERROR_24 */
+	/* 0x32 */	MP_ARRAY, /* IPROTO_METADATA */
+	/* 0x33 */	MP_ARRAY, /* IPROTO_BIND_METADATA */
+	/* 0x34 */	MP_UINT, /* IIPROTO_BIND_COUNT */
+	/* }}} */
+
+	/* {{{ unused */
+	/* 0x35 */	MP_UINT,
+	/* 0x36 */	MP_UINT,
+	/* 0x37 */	MP_UINT,
+	/* 0x38 */	MP_UINT,
+	/* 0x39 */	MP_UINT,
+	/* 0x3a */	MP_UINT,
+	/* 0x3b */	MP_UINT,
+	/* 0x3c */	MP_UINT,
+	/* 0x3d */	MP_UINT,
+	/* 0x3e */	MP_UINT,
+	/* 0x3f */	MP_UINT,
+	/* }}} */
+
+	/* {{{ body -- sql keys */
+	/* 0x40 */	MP_STR, /* IPROTO_SQL_TEXT */
+	/* 0x41 */	MP_ARRAY, /* IPROTO_SQL_BIND */
+	/* 0x42 */	MP_MAP, /* IPROTO_SQL_INFO */
+	/* 0x43 */	MP_UINT, /* IPROTO_STMT_ID */
+	/* }}} */
+
+	/* {{{ unused */
+	/* 0x44 */	MP_UINT,
+	/* 0x45 */	MP_UINT,
+	/* 0x46 */	MP_UINT,
+	/* 0x47 */	MP_UINT,
+	/* 0x48 */	MP_UINT,
+	/* 0x49 */	MP_UINT,
+	/* 0x4a */	MP_UINT,
+	/* 0x4b */	MP_UINT,
+	/* 0x4c */	MP_UINT,
+	/* 0x4d */	MP_UINT,
+	/* 0x4e */	MP_UINT,
+	/* 0x4f */	MP_UINT,
+	/* }}} */
+
+	/* {{{ body -- additional request keys */
+	/* 0x50 */	MP_BOOL, /* IPROTO_REPLICA_ANON */
+	/* 0x51 */	MP_ARRAY, /* IPROTO_ID_FILTER */
+	/* 0x52 */	MP_MAP, /* IPROTO_ERROR */
+	/* 0x53 */	MP_UINT, /* IPROTO_TERM */
+	/* }}} */
 };
 
 const char *iproto_type_strs[] =
