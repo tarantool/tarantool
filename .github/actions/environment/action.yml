@@ -21,8 +21,7 @@ runs:
         # run from it. So running it only outside of docker container.
         # Also on local hosts, like that we use for 'freebsd' workflow
         # testing, 'sudo' not acceptable outside of 'freebsd' virtual
-        # machine and to avoid of hangs let's check sudo run ability
-        # with command like 'timeout 2 sudo ls /sbin/swapoff'.
+        # machine and to avoid of hangs let's run it with '-n' flag.
         # NOTE: To switch off swap from inside github 'container' tag
         # additional memory flags should be added to its 'options' tag:
         #   options: '--memory=<some value, like 7G> --memory-swap=<the same value as for memory option>'
@@ -30,7 +29,7 @@ runs:
             echo "Check initial swap memory values:"
             free
         fi
-        if timeout 2 sudo ls /sbin/swapoff ; then
+        if sudo -n ls /sbin/swapoff ; then
             echo "Verified that 'sudo' enabled, switching off swap ..."
             sudo /sbin/swapoff -a || echo "'swapoff' command failed, but failure is acceptable from inside the container"
             if [ -e /proc/meminfo ] ; then
