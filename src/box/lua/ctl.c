@@ -82,9 +82,9 @@ lbox_ctl_on_schema_init(struct lua_State *L)
 }
 
 static int
-lbox_ctl_clear_synchro_queue(struct lua_State *L)
+lbox_ctl_promote(struct lua_State *L)
 {
-	if (box_clear_synchro_queue() != 0)
+	if (box_promote() != 0)
 		return luaT_error(L);
 	return 0;
 }
@@ -124,7 +124,9 @@ static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"wait_rw", lbox_ctl_wait_rw},
 	{"on_shutdown", lbox_ctl_on_shutdown},
 	{"on_schema_init", lbox_ctl_on_schema_init},
-	{"clear_synchro_queue", lbox_ctl_clear_synchro_queue},
+	{"promote", lbox_ctl_promote},
+	/* An old alias. */
+	{"clear_synchro_queue", lbox_ctl_promote},
 	{"is_recovery_finished", lbox_ctl_is_recovery_finished},
 	{"set_on_shutdown_timeout", lbox_ctl_set_on_shutdown_timeout},
 	{NULL, NULL}

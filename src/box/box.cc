@@ -1504,12 +1504,12 @@ box_wait_quorum(uint32_t lead_id, int64_t target_lsn, int quorum,
 }
 
 int
-box_clear_synchro_queue(void)
+box_promote(void)
 {
 	/* A guard to block multiple simultaneous function invocations. */
-	static bool in_clear_synchro_queue = false;
-	if (in_clear_synchro_queue) {
-		diag_set(ClientError, ER_UNSUPPORTED, "clear_synchro_queue",
+	static bool in_promote = false;
+	if (in_promote) {
+		diag_set(ClientError, ER_UNSUPPORTED, "box.ctl.promote",
 			 "simultaneous invocations");
 		return -1;
 	}
@@ -1562,7 +1562,7 @@ box_clear_synchro_queue(void)
 	int64_t wait_lsn = txn_limbo.confirmed_lsn;
 	int rc = 0;
 	int quorum = replication_synchro_quorum;
-	in_clear_synchro_queue = true;
+	in_promote = true;
 
 	if (run_elections) {
 		/*
@@ -1583,18 +1583,18 @@ box_clear_synchro_queue(void)
 		if (box_election_mode == ELECTION_MODE_MANUAL)
 			raft_stop_candidate(box_raft(), false);
 		if (rc != 0) {
-			in_clear_synchro_queue = false;
+			in_promote = false;
 			return -1;
 		}
 		if (!box_raft()->is_enabled) {
 			diag_set(ClientError, ER_RAFT_DISABLED);
-			in_clear_synchro_queue = false;
+			in_promote = false;
 			return -1;
 		}
 		if (box_raft()->state != RAFT_STATE_LEADER) {
 			diag_set(ClientError, ER_INTERFERING_PROMOTE,
 				 box_raft()->leader);
-			in_clear_synchro_queue = false;
+			in_promote = false;
 			return -1;
 		}
 	}
@@ -1618,13 +1618,13 @@ box_clear_synchro_queue(void)
 		if (former_leader_id != txn_limbo.owner_id) {
 			diag_set(ClientError, ER_INTERFERING_PROMOTE,
 				 txn_limbo.owner_id);
-			in_clear_synchro_queue = false;
+			in_promote = false;
 			return -1;
 		}
 	}
 
 	/*
-	 * clear_synchro_queue() is a no-op on the limbo owner, so all the rows
+	 * promote() is a no-op on the limbo owner, so all the rows
 	 * in the limbo must've come through the applier meaning they already
 	 * have an lsn assigned, even if their WAL write hasn't finished yet.
 	 */
@@ -1659,7 +1659,7 @@ promote:
 			assert(txn_limbo_is_empty(&txn_limbo));
 		}
 	}
-	in_clear_synchro_queue = false;
+	in_promote = false;
 	return rc;
 }
 
