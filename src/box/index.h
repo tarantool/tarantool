@@ -472,12 +472,12 @@ replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
 {
 	if (dup_tuple == NULL) {
 		if (mode == DUP_REPLACE) {
+			assert(old_tuple != NULL);
 			/*
 			 * dup_replace_mode is DUP_REPLACE, and
 			 * a tuple with the same key is not found.
 			 */
-			return old_tuple ?
-			       ER_CANT_UPDATE_PRIMARY_KEY : ER_TUPLE_NOT_FOUND;
+			return ER_CANT_UPDATE_PRIMARY_KEY;
 		}
 	} else { /* dup_tuple != NULL */
 		if (dup_tuple != old_tuple &&
