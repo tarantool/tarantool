@@ -4,18 +4,18 @@ test_run = env.new()
 
 test_run:cmd("setopt delimiter ';'")
 function get_snapshot_name ()
-    local shapshot = nil
+    local snapshot = nil
     local directory = fio.pathjoin(fio.cwd(), 'gh-5422-broken_snapshot')
     for files in io.popen(string.format("ls %s", directory)):lines() do
         local snapshots = string.find(files, "snap")
         if (snapshots ~= nil) then
-            shapshot = string.find(files, "%n")
-            if (shapshot ~= nil) then
-                shapshot = string.format("%s/%s", directory, files)
+            snapshot = string.find(files, "%n")
+            if (snapshot ~= nil) then
+                snapshot = string.format("%s/%s", directory, files)
             end
         end
     end
-    return shapshot
+    return snapshot
 end;
 function get_file_size(filename)
     local file = io.open(filename, "r")
@@ -92,7 +92,6 @@ test_run:cmd("switch default")
 -- Count of valid data is greater than we truncate snapshot.
 valid_data_count_2 = check_count_valid_snapshot_data(items_count)
 assert(valid_data_count_2 > 0)
-assert(valid_data_count_2 > valid_data_count_1)
 
 -- Restore snapshot and write big garbage at the start of the file
 write_garbage_with_restore_or_save(snapshot, 5000, garbage_size, true)
@@ -100,8 +99,9 @@ os.remove(string.format('%s.save', snapshot))
 test_run:cmd("stop server test")
 -- Check that we unable to start with corrupted system space
 test_run:cmd("start server test with crash_expected=True")
-log = string.format("%s/%s.%s", fio.cwd(), "gh-5422-broken_snapshot", "log")
--- We must not find ER_UNKNOWN_REPLICA in log file, so grep return not 0
-assert(os.execute(string.format("cat %s | grep ER_UNKNOWN_REPLICA:", log)) ~= 0)
+opts = {}
+opts.filename = 'gh-5422-broken_snapshot.log'
+-- We must not find ER_UNKNOWN_REPLICA in log file
+assert(test_run:grep_log("test", "ER_UNKNOWN_REPLICA", nil, opts) == nil)
 test_run:cmd("cleanup server test")
 test_run:cmd("delete server test")
