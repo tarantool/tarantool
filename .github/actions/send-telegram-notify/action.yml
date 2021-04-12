@@ -28,6 +28,12 @@ runs:
         uname -s | tee -a $GITHUB_ENV
         echo 'EOF' >> $GITHUB_ENV
       shell: bash
+    # check if host OS is rhel or fedora
+    - run: |
+        echo 'OS_IS_FEDORA_OR_RHEL<<EOF' >> $GITHUB_ENV
+        grep "^ID=" /etc/os-release | grep -e 'centos' -e 'fedora' && echo true | tee -a $GITHUB_ENV
+        echo 'EOF' >> $GITHUB_ENV
+      shell: bash
     # get job id number
     - run: |
         sudo -n apt update -y ||:
@@ -53,7 +59,7 @@ runs:
       run: |
         # convert message from multi lines to single line and
         # add backslashes to single quote marks in message
-        if ${{ env.KERNEL_NAME == 'Darwin' }} ; then
+        if ${{ env.OS_IS_FEDORA_OR_RHEL == 'true' }} || ${{ env.KERNEL_NAME == 'Darwin' }} ; then
           msg="${MSG//$'\n'/\n}"
           msg="${msg//$'\\\''/\'}"
         else
