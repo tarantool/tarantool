@@ -59,6 +59,95 @@ memtx_tx_story_key_hash(const struct tuple *a)
 #define MH_SOURCE
 #include "salad/mhash.h"
 
+/**
+ * An element that stores the fact that some transaction have read
+ * a full key and found nothing.
+ */
+struct point_hole_item {
+	/** A link of headless list of items with the same index and key. */
+	struct rlist ring;
+	/** Link in txn->point_holes_list. */
+	struct rlist in_point_holes_list;
+	/** Saved index->unique_id. */
+	uint32_t index_unique_id;
+	/** Precalculated hash for storing in hash table.. */
+	uint32_t hash;
+	/** Saved txn. */
+	struct txn *txn;
+	/** Saved key. Points to @a short_key or allocated in txn's region. */
+	const char *key;
+	/** Saved key len. */
+	size_t key_len;
+	/** Storage for short key. @key may point here. */
+	char short_key[16];
+	/** Flag that the hash tables stores pointer to this item. */
+	bool is_head;
+};
+
+/**
+ * Helper structure for searching for point_hole_item in the hash table,
+ * @sa point_hole_item_pool.
+ */
+struct point_hole_key {
+	struct index *index;
+	struct tuple *tuple;
+};
+
+/** Hash calculatore for the key. */
+static uint32_t
+point_hole_storage_key_hash(struct point_hole_key *key)
+{
+	struct key_def *def = key->index->def->key_def;
+	return key->index->unique_id ^ def->tuple_hash(key->tuple, def);
+}
+
+/** point_hole_item comparator. */
+static int
+point_hole_storage_equal(const struct point_hole_item *obj1,
+			 const struct point_hole_item *obj2)
+{
+	/* Canonical msgpack is comparable by memcmp. */
+	if (obj1->index_unique_id != obj2->index_unique_id ||
+	    obj1->key_len != obj2->key_len)
+		return 1;
+	return memcmp(obj1->key, obj2->key, obj1->key_len) != 0;
+}
+
+/** point_hole_item comparator with key. */
+static int
+point_hole_storage_key_equal(const struct point_hole_key *key,
+			     const struct point_hole_item *object)
+{
+	if (key->index->unique_id != object->index_unique_id)
+		return 1;
+	assert(key->index != NULL);
+	assert(key->tuple != NULL);
+	struct key_def *def = key->index->def->key_def;
+	hint_t oh = def->key_hint(object->key, def->part_count, def);
+	hint_t kh = def->tuple_hint(key->tuple, def);
+	return def->tuple_compare_with_key(key->tuple, kh, object->key,
+					   def->part_count, oh, def);
+}
+
+/**
+ * Hash table definition for hole read storage.
+ * The key is constructed by unique index ID and search key.
+ * Actually it stores pointers to point_hole_item structures.
+ * If more than one point_hole_item is added to the hash table,
+ * it is simply added to the headless list in existing point_hole_item.
+ */
+
+#define mh_name _point_holes
+#define mh_key_t struct point_hole_key *
+#define mh_node_t struct point_hole_item *
+#define mh_arg_t int
+#define mh_hash(a, arg) ((*(a))->hash)
+#define mh_hash_key(a, arg) ( point_hole_storage_key_hash(a) )
+#define mh_cmp(a, b, arg) point_hole_storage_equal(*(a), *(b))
+#define mh_cmp_key(a, b, arg) point_hole_storage_key_equal((a), *(b))
+#define MH_SOURCE
+#include "salad/mhash.h"
+
 struct tx_manager
 {
 	/**
@@ -71,6 +160,12 @@ struct tx_manager
 	struct mempool memtx_tx_story_pool[BOX_INDEX_MAX];
 	/** Hash table tuple -> memtx_story of that tuple. */
 	struct mh_history_t *history;
+	/** Mempool for point_hole_item objects. */
+	struct mempool point_hole_item_pool;
+	/** Hash table that hold point selects with empty result. */
+	struct mh_point_holes_t *point_holes;
+	/** Count of elements in point_holes table. */
+	size_t point_holes_size;
 	/** List of all memtx_story objects. */
 	struct rlist all_stories;
 	/** Iterator that sequentially traverses all memtx_story objects. */
@@ -103,6 +198,14 @@ memtx_tx_manager_init()
 			       cord_slab_cache(), item_size);
 	}
 	txm.history = mh_history_new();
+	if (txm.history == NULL)
+		panic("mh_history_new()");
+	mempool_create(&txm.point_hole_item_pool,
+		       cord_slab_cache(), sizeof(struct point_hole_item));
+	txm.point_holes = mh_point_holes_new();
+	if (txm.point_holes == NULL)
+		panic("mh_history_new()");
+	txm.point_holes_size = 0;
 	rlist_create(&txm.all_stories);
 	txm.traverse_all_stories = &txm.all_stories;
 }
@@ -112,7 +215,11 @@ memtx_tx_manager_free()
 {
 	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
 		mempool_destroy(&txm.memtx_tx_story_pool[i]);
+	mh_history_delete(txm.history);
+	mempool_destroy(&txm.point_hole_item_pool);
+	mh_point_holes_delete(txm.point_holes);
 }
+
 
 int
 memtx_tx_cause_conflict(struct txn *breaker, struct txn *victim)
@@ -539,6 +646,8 @@ struct memtx_tx_conflict
 {
 	/* The transaction that will conflict us upon commit. */
 	struct txn *breaker;
+	/* The transaction that will conflicted by upon commit. */
+	struct txn *victim;
 	/* Link in single-linked list. */
 	struct memtx_tx_conflict *next;
 };
@@ -549,7 +658,7 @@ struct memtx_tx_conflict
  * @return 0 on success, -1 on memory error.
  */
 static int
-memtx_tx_save_conflict(struct txn *breaker,
+memtx_tx_save_conflict(struct txn *breaker, struct txn *victim,
 		       struct memtx_tx_conflict **conflicts_head,
 		       struct region *region)
 {
@@ -562,6 +671,7 @@ memtx_tx_save_conflict(struct txn *breaker,
 		return -1;
 	}
 	next_conflict->breaker = breaker;
+	next_conflict->victim = victim;
 	next_conflict->next = *conflicts_head;
 	*conflicts_head = next_conflict;
 	return 0;
@@ -617,6 +727,7 @@ memtx_tx_story_find_visible_tuple(struct memtx_story *story,
 		}
 		if (cross_conflict) {
 			if (memtx_tx_save_conflict(story->add_stmt->txn,
+						   stmt->txn,
 						   collected_conflicts,
 						   region) != 0)
 				return -1;
@@ -655,6 +766,50 @@ memtx_tx_check_dup(struct tuple *new_tuple, struct tuple *old_tuple,
 	return 0;
 }
 
+static struct point_hole_item *
+point_hole_storage_find(struct index *index, struct tuple *tuple)
+{
+	struct point_hole_key key;
+	key.index = index;
+	key.tuple = tuple;
+	mh_int_t pos = mh_point_holes_find(txm.point_holes, &key, 0);
+	if (pos == mh_end(txm.point_holes))
+		return NULL;
+	return *mh_point_holes_node(txm.point_holes, pos);
+}
+
+/**
+ * Check for possible conflicts during inserting @a new tuple, and given
+ * that it was real insertion, not the replacement of existion tuple.
+ * It's the moment where we can search for stored point hole trackers
+ * and detect conflicts.
+ * Since the insertions in not completed succesfully, we better store
+ * conflicts to the special temporary storage @a collected_conflicts in
+ * other to become real conflint only when insertion success is inevitable.
+ */
+static int
+check_hole(struct space *space, uint32_t index,
+	   struct tuple *new_tuple, struct txn *inserter,
+	   struct memtx_tx_conflict **collected_conflicts,
+	   struct region *region)
+{
+	struct point_hole_item *list =
+		point_hole_storage_find(space->index[index], new_tuple);
+	if (list == NULL)
+		return 0;
+
+	struct point_hole_item *item = list;
+	do {
+		if (memtx_tx_save_conflict(inserter, item->txn,
+					   collected_conflicts, region) != 0)
+			return -1;
+		item = rlist_entry(item->ring.next,
+				   struct point_hole_item, ring);
+
+	} while (item != list);
+	return 0;
+}
+
 /**
  * Check that replaced tuples in space's indexes does not violate common
  * replace rules. See memtx_space_replace_all_keys comment.
@@ -676,6 +831,10 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 			       mode, space->index[0], space) != 0)
 		return -1;
 
+	if (replaced[0] == NULL)
+		check_hole(space, 0, new_tuple, stmt->txn,
+			   collected_conflicts, region);
+
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		/*
 		 * Check that visible tuple is NULL or the same as in the
@@ -683,6 +842,8 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 		 */
 		if (replaced[i] == NULL) {
 			/* NULL is OK. */
+			check_hole(space, i, new_tuple, stmt->txn,
+				   collected_conflicts, region);
 			continue;
 		}
 		if (!replaced[i]->is_dirty) {
@@ -711,6 +872,10 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 		if (memtx_tx_check_dup(new_tuple, replaced[0], check_visible,
 				       DUP_INSERT, space->index[i], space) != 0)
 			return -1;
+
+		if (check_visible == NULL)
+			check_hole(space, i, new_tuple, stmt->txn,
+				   collected_conflicts, region);
 	}
 
 	*old_tuple = replaced[0];
@@ -745,6 +910,10 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 			       mode, space->index[0], space) != 0)
 		return -1;
 
+	if (visible_replaced == NULL)
+		check_hole(space, 0, new_tuple, stmt->txn,
+			   collected_conflicts, region);
+
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		/*
 		 * Check that visible tuple is NULL or the same as in the
@@ -752,6 +921,8 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 		 */
 		if (replaced[i] == NULL) {
 			/* NULL is OK. */
+			check_hole(space, i, new_tuple, stmt->txn,
+				   collected_conflicts, region);
 			continue;
 		}
 		if (!replaced[i]->is_dirty) {
@@ -778,6 +949,10 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 				       check_visible, DUP_INSERT,
 				       space->index[i], space) != 0)
 			return -1;
+
+		if (check_visible == NULL)
+			check_hole(space, i, new_tuple, stmt->txn,
+				   collected_conflicts, region);
 	}
 
 	*old_tuple = visible_replaced;
@@ -860,6 +1035,8 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 				memtx_tx_story_get(directly_replaced[i]);
 			memtx_tx_story_link_story(add_story, next, i);
 		}
+
+
 	} else {
 		if (old_tuple->is_dirty) {
 			del_story = memtx_tx_story_get(old_tuple);
@@ -881,10 +1058,11 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 	/* Purge found conflicts. */
 	while (collected_conflicts != NULL) {
 		if (memtx_tx_cause_conflict(collected_conflicts->breaker,
-					    stmt->txn) != 0)
+					    collected_conflicts->victim) != 0)
 			goto fail;
 		collected_conflicts = collected_conflicts->next;
 	}
+
 
 	if (new_tuple != NULL) {
 		/*
@@ -1289,6 +1467,158 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 	rlist_add(&story->reader_list, &tracker->in_reader_list);
 	rlist_add(&txn->read_set, &tracker->in_read_set);
 	return 0;
+}
+
+/**
+ * Create new point_hole_item by given argumnets and put it to hash table.
+ */
+static int
+point_hole_storage_new(struct index *index, const char *key,
+		       size_t key_len, struct txn *txn)
+{
+	struct mempool *pool = &txm.point_hole_item_pool;
+	struct point_hole_item *object =
+		(struct point_hole_item *) mempool_alloc(pool);
+	if (object == NULL) {
+		diag_set(OutOfMemory, sizeof(*object),
+			 "mempool_alloc", "point_hole_item");
+		return -1;
+	}
+
+	rlist_create(&object->ring);
+	rlist_create(&object->in_point_holes_list);
+	object->txn = txn;
+	object->index_unique_id = index->unique_id;
+	if (key_len <= sizeof(object->short_key)) {
+		object->key = object->short_key;
+	} else {
+		object->key = (char *)region_alloc(&txn->region, key_len);
+		if (object->key == NULL) {
+			mempool_free(pool, object);
+			diag_set(OutOfMemory, key_len, "tx region",
+				 "point key");
+			return -1;
+		}
+	}
+	memcpy((char *)object->key, key, key_len);
+	object->key_len = key_len;
+	object->is_head = true;
+
+	struct key_def *def = index->def->key_def;
+	object->hash = object->index_unique_id ^ def->key_hash(key, def);
+
+	const struct point_hole_item **put =
+		(const struct point_hole_item **) &object;
+	struct point_hole_item *replaced = NULL;
+	struct point_hole_item **preplaced = &replaced;
+	mh_int_t pos = mh_point_holes_put(txm.point_holes, put,
+					    &preplaced, 0);
+	if (pos == mh_end(txm.point_holes)) {
+		mempool_free(pool, object);
+		diag_set(OutOfMemory, pos + 1, "mh_holes_storage_put",
+			 "mh_holes_storage_node");
+		return -1;
+	}
+	if (preplaced != NULL) {
+		/*
+		 * The item in hash table was overwitten. It's OK, but
+		 * we need replaced item to the item list.
+		 * */
+		rlist_add(&replaced->ring, &object->ring);
+		assert(replaced->is_head);
+		replaced->is_head = false;
+	} else {
+		txm.point_holes_size++;
+	}
+	rlist_add(&txn->point_holes_list, &object->in_point_holes_list);
+	return 0;
+}
+
+static void
+point_hole_storage_delete(struct point_hole_item *object)
+{
+	if (!object->is_head) {
+		/*
+		 * The deleting item is linked list, and the hash table
+		 * doesn't point directly to this item. Delete from the
+		 * list and that's enough.
+		 */
+		assert(!rlist_empty(&object->ring));
+		rlist_del(&object->ring);
+	} else if (!rlist_empty(&object->ring)) {
+		/*
+		 * Hash table point to this item, but there are more
+		 * items in the list. Relink the hash table with any other
+		 * item in the list, and delele this item from the list.
+		 */
+		struct point_hole_item *another =
+			rlist_entry(&object->ring, struct point_hole_item,
+				    ring);
+
+		const struct point_hole_item **put =
+			(const struct point_hole_item **) &another;
+		struct point_hole_item *replaced = NULL;
+		struct point_hole_item **preplaced = &replaced;
+		mh_int_t pos = mh_point_holes_put(txm.point_holes, put,
+						    &preplaced, 0);
+		assert(pos != mh_end(txm.point_holes)); (void)pos;
+		assert(replaced == object);
+		rlist_del(&object->ring);
+	} else {
+		/*
+		 * Hash table point to this item, and it's the last in the
+		 * list. We have to remove the item from the hash table.
+		 */
+		int exist = 0;
+		const struct point_hole_item **put =
+			(const struct point_hole_item **) &object;
+		mh_int_t pos = mh_point_holes_put_slot(txm.point_holes, put,
+						       &exist, 0);
+		assert(exist);
+		assert(pos != mh_end(txm.point_holes));
+		mh_point_holes_del(txm.point_holes, pos, 0);
+		txm.point_holes_size--;
+	}
+	rlist_del(&object->in_point_holes_list);
+	struct mempool *pool = &txm.point_hole_item_pool;
+	mempool_free(pool, object);
+}
+
+/**
+ * Record in TX manager that a transaction @a txn have read a nothing
+ * from @a space and @ a index with @ key.
+ * The key is expected to be full, that is has part count equal to part
+ * count in unique cmp_key of the index.
+ * @return 0 on success, -1 on memory error.
+ */
+int
+memtx_tx_track_point_slow(struct txn *txn, struct space *space,
+			  uint32_t index, const char *key)
+{
+	if (txn->status != TXN_INPROGRESS)
+		return 0;
+
+	struct key_def *def = space->index[index]->def->key_def;
+	const char *tmp = key;
+	for (uint32_t i = 0; i < def->part_count; i++)
+		mp_next(&tmp);
+	size_t key_len = tmp - key;
+	return point_hole_storage_new(space->index[index], key, key_len, txn);
+}
+
+/**
+ * Clean memtx_tx part of @a txm.
+ */
+void
+memtx_tx_clean_txn(struct txn *txn)
+{
+	while (!rlist_empty(&txn->point_holes_list)) {
+		struct point_hole_item *object =
+			rlist_first_entry(&txn->point_holes_list,
+					  struct point_hole_item,
+					  in_point_holes_list);
+		point_hole_storage_delete(object);
+	}
 }
 
 static uint32_t

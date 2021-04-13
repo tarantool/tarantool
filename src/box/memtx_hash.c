@@ -316,16 +316,18 @@ memtx_hash_index_get(struct index *base, const char *key,
 	(void) part_count;
 
 	struct space *space = space_by_id(base->def->space_id);
+	struct txn *txn = in_txn();
+	uint32_t iid = base->def->iid;
 	*result = NULL;
 	uint32_t h = key_hash(key, base->def->key_def);
 	uint32_t k = light_index_find_key(&index->hash_table, h, key);
 	if (k != light_index_end) {
 		struct tuple *tuple = light_index_get(&index->hash_table, k);
-		uint32_t iid = base->def->iid;
-		struct txn *txn = in_txn();
 		bool is_rw = txn != NULL;
 		*result = memtx_tx_tuple_clarify(txn, space, tuple, iid,
 						 0, is_rw);
+	} else {
+		memtx_tx_track_point(txn, space, iid, key);
 	}
 	return 0;
 }
@@ -430,6 +432,10 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		light_index_iterator_key(&index->hash_table, &it->iterator,
 				key_hash(key, base->def->key_def), key);
 		it->base.next = hash_iterator_eq;
+		if (it->iterator.slotpos == light_index_end)
+			memtx_tx_track_point(in_txn(),
+					     space_by_id(it->base.space_id),
+					     index->base.def->iid, key);
 		break;
 	default:
 		diag_set(UnsupportedIndexFeature, base->def,
