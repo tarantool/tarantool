@@ -762,7 +762,7 @@ template <bool USE_HINT>
 static int
 memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 			 struct tuple *new_tuple, enum dup_replace_mode mode,
-			 struct tuple **result)
+			 struct tuple **result, struct tuple **successor)
 {
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
@@ -796,6 +796,7 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 					 space_name(sp));
 			return -1;
 		}
+		*successor = suc_data.tuple;
 		if (dup_data.tuple != NULL) {
 			*result = dup_data.tuple;
 			return 0;
@@ -947,10 +948,14 @@ memtx_tree_index_replace_multikey_rollback(struct memtx_tree_index<true> *index,
 static int
 memtx_tree_index_replace_multikey(struct index *base, struct tuple *old_tuple,
 			struct tuple *new_tuple, enum dup_replace_mode mode,
-			struct tuple **result)
+			struct tuple **result, struct tuple **successor)
 {
 	struct memtx_tree_index<true> *index =
 		(struct memtx_tree_index<true> *)base;
+
+	/* MUTLIKEY doesn't support successor for now. */
+	*successor = NULL;
+
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	*result = NULL;
 	if (new_tuple != NULL) {
@@ -1069,8 +1074,11 @@ memtx_tree_func_index_replace_rollback(struct memtx_tree_index<true> *index,
 static int
 memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 			struct tuple *new_tuple, enum dup_replace_mode mode,
-			struct tuple **result)
+			struct tuple **result, struct tuple **successor)
 {
+	/* FUNC doesn't support successor for now. */
+	*successor = NULL;
+
 	struct memtx_tree_index<true> *index =
 		(struct memtx_tree_index<true> *)base;
 	struct index_def *index_def = index->base.def;

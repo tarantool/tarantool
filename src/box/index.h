@@ -413,9 +413,19 @@ struct index_vtab {
 			 const char *key, uint32_t part_count);
 	int (*get)(struct index *index, const char *key,
 		   uint32_t part_count, struct tuple **result);
+	/**
+	 * Main entrance point for changing data in index. Once built and
+	 * before deletion this is the only way to insert, replace and delete
+	 * data from the index.
+	 * @param mode - @sa dup_replace_mode description
+	 * @param result - here the replaced or deleted tuple is placed.
+	 * @param successor - if the index supports ordering, then in case of
+	 *  insert (!) here the successor tuple is returned. In other words,
+	 *  here will be stored the tuple, before which new tuple is inserted.
+	 */
 	int (*replace)(struct index *index, struct tuple *old_tuple,
 		       struct tuple *new_tuple, enum dup_replace_mode mode,
-		       struct tuple **result);
+		       struct tuple **result, struct tuple **successor);
 	/** Create an index iterator. */
 	struct iterator *(*create_iterator)(struct index *index,
 			enum iterator_type type,
@@ -628,9 +638,14 @@ index_get(struct index *index, const char *key,
 static inline int
 index_replace(struct index *index, struct tuple *old_tuple,
 	      struct tuple *new_tuple, enum dup_replace_mode mode,
-	      struct tuple **result)
+	      struct tuple **result, struct tuple **successor)
 {
-	return index->vtab->replace(index, old_tuple, new_tuple, mode, result);
+	if (old_tuple == NULL && new_tuple == NULL) {
+		*result = NULL;
+		return 0;
+	}
+	return index->vtab->replace(index, old_tuple, new_tuple, mode,
+				    result, successor);
 }
 
 static inline struct iterator *
@@ -708,7 +723,8 @@ ssize_t generic_index_count(struct index *, enum iterator_type,
 			    const char *, uint32_t);
 int generic_index_get(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_replace(struct index *, struct tuple *, struct tuple *,
-			  enum dup_replace_mode, struct tuple **);
+			  enum dup_replace_mode,
+			  struct tuple **, struct tuple **);
 struct snapshot_iterator *generic_index_create_snapshot_iterator(struct index *);
 void generic_index_stat(struct index *, struct info_handler *);
 void generic_index_compact(struct index *);
@@ -725,7 +741,7 @@ disabled_index_build_next(struct index *index, struct tuple *tuple);
 int
 disabled_index_replace(struct index *index, struct tuple *old_tuple,
 		       struct tuple *new_tuple, enum dup_replace_mode mode,
-		       struct tuple **result);
+		       struct tuple **result, struct tuple **successor);
 
 #if defined(__cplusplus)
 } /* extern "C" */
