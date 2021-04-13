@@ -170,6 +170,10 @@ pk = s:create_index('pk')
 s:replace{1, 2}
 s:update({1}, {{'!', 4, 0}})
 _ = s:delete({1})
+
+-- '#'
+s:replace{1, 2}
+s:update({1}, {{'#', 4, 1}})
 s:drop()
 
 -- Update respects field_count

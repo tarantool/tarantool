@@ -76,7 +76,7 @@ s:insert{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
 ...
 s:update({0}, {{'#', 42, 1}})
 ---
-- error: Field 42 was not found in the tuple
+- [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 ...
 s:update({0}, {{'#', 4, 'abirvalg'}})
 ---
@@ -261,7 +261,7 @@ s:insert{1684234849}
 ...
 s:update({1684234849}, {{'#', 2, 1}})
 ---
-- error: Field 2 was not found in the tuple
+- [1684234849]
 ...
 s:update({1684234849}, {{'!', -1, 'push1'}})
 ---

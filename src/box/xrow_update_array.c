@@ -426,8 +426,11 @@ xrow_update_op_do_array_delete(struct xrow_update_op *op,
 
 	struct xrow_update_rope *rope = field->array.rope;
 	uint32_t size = xrow_update_rope_size(rope);
-	if (xrow_update_op_adjust_field_no(op, size) != 0)
+	if (xrow_update_op_adjust_field_no(op, size) != 0) {
+		if (op->field_no >= (int)size)
+			return 0;
 		return -1;
+	}
 	uint32_t delete_count = op->arg.del.count;
 	if ((uint64_t) op->field_no + delete_count > size)
 		delete_count = size - op->field_no;
