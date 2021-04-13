@@ -772,12 +772,12 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 		new_data.tuple = new_tuple;
 		if (USE_HINT)
 			new_data.set_hint(tuple_hint(new_tuple, cmp_def));
-		struct memtx_tree_data<USE_HINT> dup_data;
-		dup_data.tuple = NULL;
+		struct memtx_tree_data<USE_HINT> dup_data, suc_data;
+		dup_data.tuple = suc_data.tuple = NULL;
 
 		/* Try to optimistically replace the new_tuple. */
 		int tree_res = memtx_tree_insert(&index->tree, new_data,
-						 &dup_data);
+						 &dup_data, &suc_data);
 		if (tree_res) {
 			diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
 				 "memtx_tree_index", "replace");
@@ -789,7 +789,7 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 		if (errcode) {
 			memtx_tree_delete(&index->tree, new_data);
 			if (dup_data.tuple != NULL)
-				memtx_tree_insert(&index->tree, dup_data, NULL);
+				memtx_tree_insert(&index->tree, dup_data, NULL, NULL);
 			struct space *sp = space_cache_find(base->def->space_id);
 			if (sp != NULL)
 				diag_set(ClientError, errcode, base->def->name,
@@ -829,7 +829,7 @@ memtx_tree_index_replace_multikey_one(struct memtx_tree_index<true> *index,
 	new_data.hint = hint;
 	dup_data.tuple = NULL;
 	*is_multikey_conflict = false;
-	if (memtx_tree_insert(&index->tree, new_data, &dup_data) != 0) {
+	if (memtx_tree_insert(&index->tree, new_data, &dup_data, NULL) != 0) {
 		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE, "memtx_tree_index",
 			 "replace");
 		return -1;
@@ -847,7 +847,7 @@ memtx_tree_index_replace_multikey_one(struct memtx_tree_index<true> *index,
 		/* Rollback replace. */
 		memtx_tree_delete(&index->tree, new_data);
 		if (dup_data.tuple != NULL)
-			memtx_tree_insert(&index->tree, dup_data, NULL);
+			memtx_tree_insert(&index->tree, dup_data, NULL, NULL);
 		struct space *sp = space_cache_find(index->base.def->space_id);
 		if (sp != NULL) {
 			diag_set(ClientError, errcode, index->base.def->name,
@@ -884,7 +884,7 @@ memtx_tree_index_replace_multikey_rollback(struct memtx_tree_index<true> *index,
 			tuple_multikey_count(replaced_tuple, cmp_def);
 		for (int i = 0; (uint32_t) i < multikey_count; i++) {
 			data.hint = i;
-			memtx_tree_insert(&index->tree, data, NULL);
+			memtx_tree_insert(&index->tree, data, NULL, NULL);
 		}
 	}
 	/*
@@ -1051,7 +1051,7 @@ memtx_tree_func_index_replace_rollback(struct memtx_tree_index<true> *index,
 				   (const char *)entry->key.hint);
 	}
 	rlist_foreach_entry(entry, old_keys, link)
-		memtx_tree_insert(&index->tree, entry->key, NULL);
+		memtx_tree_insert(&index->tree, entry->key, NULL, NULL);
 }
 
 /**
@@ -1123,7 +1123,7 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 					 * manually.
 					 */
 					memtx_tree_insert(&index->tree,
-							  old_data, NULL);
+							  old_data, NULL, NULL);
 					err = -1;
 					break;
 				}

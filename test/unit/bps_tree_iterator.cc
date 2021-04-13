@@ -91,7 +91,7 @@ iterator_check()
 		e.first = i * 2; /* note that filled with even numbers */
 		for (long j = 0; j < count2; j++) {
 			e.second = j;
-			test_insert(&tree, e, 0);
+			test_insert(&tree, e, 0, 0);
 		}
 	}
 	printf("Test tree size: %d\n", (int)test_size(&tree));
@@ -305,7 +305,7 @@ iterator_invalidate_check()
 			elem_t e;
 			e.first = i * test_size * 2;
 			e.second = i * test_size * 2;
-			test_insert(&tree, e, 0);
+			test_insert(&tree, e, 0, 0);
 		}
 		iterators[0] = test_iterator_first(&tree);
 		assert(test_iterator_get_elem(&tree, iterators));
@@ -350,7 +350,7 @@ iterator_invalidate_check()
 			elem_t e;
 			e.first = i * test_size * 2;
 			e.second = i * test_size * 2;
-			test_insert(&tree, e, 0);
+			test_insert(&tree, e, 0, 0);
 		}
 		iterators [0] = test_iterator_first(&tree);
 		assert(test_iterator_get_elem(&tree, iterators));
@@ -363,7 +363,7 @@ iterator_invalidate_check()
 			elem_t e;
 			e.first = ins_pos * test_size * 2 + i + 1;
 			e.second = e.first;
-			int res = test_insert(&tree, e, 0);
+			int res = test_insert(&tree, e, 0, 0);
 			assert(res == 0);
 		}
 		for (long i = 0; i < test_size; i++) {
@@ -406,7 +406,7 @@ iterator_invalidate_check()
 			elem_t e;
 			e.first = i * test_size * 2;
 			e.second = i * test_size * 2;
-			test_insert(&tree, e, 0);
+			test_insert(&tree, e, 0, 0);
 		}
 		iterators[0] = test_iterator_first(&tree);
 		assert(test_iterator_get_elem(&tree, iterators));
@@ -426,7 +426,7 @@ iterator_invalidate_check()
 			elem_t e;
 			e.first = ins_pos * test_size * 2 + i + 1;
 			e.second = e.first;
-			int res = test_insert(&tree, e, 0);
+			int res = test_insert(&tree, e, 0, 0);
 			assert(res == 0);
 		}
 		for (long i = 0; i < test_size; i++) {
@@ -478,7 +478,7 @@ iterator_freeze_check()
 			elem_t e;
 			e.first = rand() % test_data_mod;
 			e.second = 0;
-			test_insert(&tree, e, 0);
+			test_insert(&tree, e, 0, 0);
 			int check = test_debug_check(&tree);
 			fail_if(check);
 			assert(check == 0);
@@ -497,7 +497,7 @@ iterator_freeze_check()
 			elem_t e;
 			e.first = rand() % test_data_mod;
 			e.second = 0;
-			test_insert(&tree, e, 0);
+			test_insert(&tree, e, 0, 0);
 			int check = test_debug_check(&tree);
 			fail_if(check);
 			assert(check == 0);
