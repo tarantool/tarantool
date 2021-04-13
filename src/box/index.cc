@@ -495,6 +495,8 @@ index_create(struct index *index, struct engine *engine,
 	index->def = def;
 	index->refs = 1;
 	index->space_cache_version = space_cache_version;
+	static uint32_t unique_id = 0;
+	index->unique_id = unique_id++;
 	return 0;
 }
 
