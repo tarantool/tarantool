@@ -490,6 +490,10 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	it->base.next = tree_iterator_dummie;
 	memtx_tree_t<USE_HINT> *tree = &index->tree;
 	enum iterator_type type = it->type;
+	struct txn *txn = in_txn();
+	struct space *space = space_by_id(iterator->space_id);
+	uint32_t iid = iterator->index->def->iid;
+	struct key_def *cmp_def = index->base.def->cmp_def;
 	bool exact = false;
 	assert(it->current.tuple == NULL);
 	if (it->key_data.key == 0) {
@@ -503,14 +507,24 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 			it->tree_iterator =
 				memtx_tree_lower_bound(tree, &it->key_data,
 						       &exact);
-			if (type == ITER_EQ && !exact)
+			if (type == ITER_EQ && !exact) {
+				if (it->key_data.part_count ==
+				    cmp_def->part_count)
+					memtx_tx_track_point(txn, space, iid,
+							     it->key_data.key);
 				return 0;
+			}
 		} else { // ITER_GT, ITER_REQ, ITER_LE
 			it->tree_iterator =
 				memtx_tree_upper_bound(tree, &it->key_data,
 						       &exact);
-			if (type == ITER_REQ && !exact)
+			if (type == ITER_REQ && !exact) {
+				if (it->key_data.part_count ==
+				    cmp_def->part_count)
+					memtx_tx_track_point(txn, space, iid,
+							     it->key_data.key);
 				return 0;
+			}
 		}
 		if (iterator_type_is_reverse(type)) {
 			/*
@@ -537,10 +551,7 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	it->current = *res;
 	tree_iterator_set_next_method(it);
 
-	uint32_t iid = iterator->index->def->iid;
 	bool is_multikey = iterator->index->def->key_def->is_multikey;
-	struct txn *txn = in_txn();
-	struct space *space = space_by_id(iterator->space_id);
 	bool is_rw = txn != NULL;
 	uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
 	*ret = memtx_tx_tuple_clarify(txn, space, *ret, iid, mk_index, is_rw);
@@ -720,6 +731,8 @@ memtx_tree_index_get(struct index *base, const char *key,
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
+	struct txn *txn = in_txn();
+	struct space *space = space_by_id(base->def->space_id);
 	struct memtx_tree_key_data<USE_HINT> key_data;
 	key_data.key = key;
 	key_data.part_count = part_count;
@@ -729,10 +742,10 @@ memtx_tree_index_get(struct index *base, const char *key,
 		memtx_tree_find(&index->tree, &key_data);
 	if (res == NULL) {
 		*result = NULL;
+		if (part_count == cmp_def->part_count)
+			memtx_tx_track_point(txn, space, base->def->iid, key);
 		return 0;
 	}
-	struct txn *txn = in_txn();
-	struct space *space = space_by_id(base->def->space_id);
 	bool is_rw = txn != NULL;
 	bool is_multikey = base->def->key_def->is_multikey;
 	uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
