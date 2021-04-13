@@ -41,6 +41,8 @@ cfg_filter(box.cfg)
  |     - false
  |   - - hot_standby
  |     - false
+ |   - - iproto_threads
+ |     - 1
  |   - - listen
  |     - <hidden>
  |   - - log
@@ -162,6 +164,8 @@ cfg_filter(box.cfg)
  |     - false
  |   - - hot_standby
  |     - false
+ |   - - iproto_threads
+ |     - 1
  |   - - listen
  |     - <hidden>
  |   - - log

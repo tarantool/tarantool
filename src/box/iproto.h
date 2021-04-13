@@ -87,11 +87,14 @@ iproto_reset_stat(void);
 const char *
 iproto_bound_address(char *buf);
 
+int
+iproto_rmean_foreach(void *cb, void *cb_ctx);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
 void
-iproto_init(void);
+iproto_init(int threads_count);
 
 void
 iproto_listen(const char *uri);
