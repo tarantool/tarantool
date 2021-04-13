@@ -200,6 +200,7 @@ txn_new(void)
 	assert(region_used(&region) == sizeof(*txn));
 	txn->region = region;
 	rlist_create(&txn->read_set);
+	rlist_create(&txn->point_holes_list);
 	rlist_create(&txn->conflict_list);
 	rlist_create(&txn->conflicted_by_list);
 	rlist_create(&txn->in_read_view_txs);
@@ -212,6 +213,7 @@ txn_new(void)
 inline static void
 txn_free(struct txn *txn)
 {
+	memtx_tx_clean_txn(txn);
 	struct tx_read_tracker *tracker, *tmp;
 	rlist_foreach_entry_safe(tracker, &txn->read_set,
 				 in_read_set, tmp) {

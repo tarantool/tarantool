@@ -297,6 +297,173 @@ s:replace{1, 1, 2 }
 s:select{}
 s:drop()
 
+-- Point holes
+-- HASH
+-- One select
+s = box.schema.space.create('test')
+i1 = s:create_index('pk', {type='hash'})
+tx1:begin()
+tx2:begin()
+tx2('s:select{1}')
+tx2('s:replace{2, 2, 2}')
+tx1('s:replace{1, 1, 1}')
+tx1:commit()
+tx2:commit()
+s:select{}
+s:drop()
+
+-- One hash get
+s = box.schema.space.create('test')
+i1 = s:create_index('pk', {type='hash'})
+tx1:begin()
+tx2:begin()
+tx2('s:get{1}')
+tx2('s:replace{2, 2, 2}')
+tx1('s:replace{1, 1, 1}')
+tx1:commit()
+tx2:commit()
+s:select{}
+s:drop()
+
+-- Same value get and select
+s = box.schema.space.create('test')
+i1 = s:create_index('pk', {type='hash'})
+i2 = s:create_index('sk', {type='hash'})
+tx1:begin()
+tx2:begin()
+tx3:begin()
+tx2('s:select{1}')
+tx2('s:replace{2, 2, 2}')
+tx3('s:get{1}')
+tx3('s:replace{3, 3, 3}')
+tx1('s:replace{1, 1, 1}')
+tx1:commit()
+tx2:commit()
+tx3:commit()
+s:select{}
+s:drop()
+
+-- Different value get and select
+s = box.schema.space.create('test')
+i1 = s:create_index('pk', {type='hash'})
+i2 = s:create_index('sk', {type='hash'})
+tx1:begin()
+tx2:begin()
+tx3:begin()
+tx1('s:select{1}')
+tx2('s:get{2}')
+tx1('s:replace{3, 3, 3}')
+tx2('s:replace{4, 4, 4}')
+tx3('s:replace{1, 1, 1}')
+tx3('s:replace{2, 2, 2}')
+tx3:commit()
+tx1:commit()
+tx2:commit()
+s:select{}
+s:drop()
+
+-- Different value get and select but in coorrect orders
+s = box.schema.space.create('test')
+i1 = s:create_index('pk', {type='hash'})
+i2 = s:create_index('sk', {type='hash'})
+tx1:begin()
+tx2:begin()
+tx3:begin()
+tx1('s:select{1}')
+tx2('s:get{2}')
+tx1('s:replace{3, 3, 3}')
+tx2('s:replace{4, 4, 4}')
+tx3('s:replace{1, 1, 1}')
+tx3('s:replace{2, 2, 2}')
+tx1:commit()
+tx2:commit()
+tx3:commit()
+s:select{}
+s:drop()
+
+--TREE
+-- One select
+s = box.schema.space.create('test')
+i1 = s:create_index('pk', {type='tree'})
+tx1:begin()
+tx2:begin()
+tx2('s:select{1}')
+tx2('s:replace{2, 2, 2}')
+tx1('s:replace{1, 1, 1}')
+tx1:commit()
+tx2:commit()
+s:select{}
+s:drop()
+
+-- One get
+s = box.schema.space.create('test')
+i1 = s:create_index('pk', {type='tree'})
+tx1:begin()
+tx2:begin()
+tx2('s:get{1}')
+tx2('s:replace{2, 2, 2}')
+tx1('s:replace{1, 1, 1}')
+tx1:commit()
+tx2:commit()
+s:select{}
+s:drop()
+
+-- Same value get and select
+s = box.schema.space.create('test')
+i1 = s:create_index('pk', {type='tree'})
+i2 = s:create_index('sk', {type='tree'})
+tx1:begin()
+tx2:begin()
+tx3:begin()
+tx2('s:select{1}')
+tx2('s:replace{2, 2, 2}')
+tx3('s:get{1}')
+tx3('s:replace{3, 3, 3}')
+tx1('s:replace{1, 1, 1}')
+tx1:commit()
+tx2:commit()
+tx3:commit()
+s:select{}
+s:drop()
+
+-- Different value get and select
+s = box.schema.space.create('test')
+i1 = s:create_index('pk', {type='tree'})
+i2 = s:create_index('sk', {type='tree'})
+tx1:begin()
+tx2:begin()
+tx3:begin()
+tx1('s:select{1}')
+tx2('s:get{2}')
+tx1('s:replace{3, 3, 3}')
+tx2('s:replace{4, 4, 4}')
+tx3('s:replace{1, 1, 1}')
+tx3('s:replace{2, 2, 2}')
+tx3:commit()
+tx1:commit()
+tx2:commit()
+s:select{}
+s:drop()
+
+-- Different value get and select but in coorrect orders
+s = box.schema.space.create('test')
+i1 = s:create_index('pk', {type='tree'})
+i2 = s:create_index('sk', {type='tree'})
+tx1:begin()
+tx2:begin()
+tx3:begin()
+tx1('s:select{1}')
+tx2('s:get{2}')
+tx1('s:replace{3, 3, 3}')
+tx2('s:replace{4, 4, 4}')
+tx3('s:replace{1, 1, 1}')
+tx3('s:replace{2, 2, 2}')
+tx1:commit()
+tx2:commit()
+tx3:commit()
+s:select{}
+s:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")

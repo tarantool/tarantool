@@ -395,6 +395,8 @@ struct txn {
 	struct rlist in_read_view_txs;
 	/** List of tx_read_trackers with stories that the TX have read. */
 	struct rlist read_set;
+	/** List of point hole reads. @sa struct point_hole_item. */
+	struct rlist point_holes_list;
 };
 
 static inline bool

@@ -268,6 +268,30 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 int
 memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple);
 
+
+/** Helper of memtx_tx_track_point */
+int
+memtx_tx_track_point_slow(struct txn *txn, struct space *space, uint32_t index,
+			  const char *key);
+
+/**
+ * Record in TX manager that a transaction @a txn have read a nothing
+ * from @a space and @ a index with @ key.
+ * The key is expected to be full, that is has part count equal to part
+ * count in unique cmp_key of the index.
+ * @return 0 on success, -1 on memory error.
+ */
+static inline int
+memtx_tx_track_point(struct txn *txn, struct space *space, uint32_t index,
+		     const char *key)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return 0;
+	if (txn == NULL)
+		return 0;
+	return memtx_tx_track_point_slow(txn, space, index, key);
+}
+
 /**
  * Clean a tuple if it's dirty - finds a visible tuple in history.
  * @param txn - current transactions.
@@ -292,6 +316,12 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index,
 					   is_prepared_ok);
 }
+
+/**
+ * Clean memtx_tx part of @a txm.
+ */
+void
+memtx_tx_clean_txn(struct txn *txn);
 
 /**
  * Notify manager the a space is deleted.
