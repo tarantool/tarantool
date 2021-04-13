@@ -70,41 +70,43 @@ clock_thread(void)
 #endif
 }
 
-uint64_t
+int64_t
 clock_realtime64(void)
 {
 	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
-	return ((uint64_t)ts.tv_sec) * 1000000000 + ts.tv_nsec;
+	return ((int64_t)ts.tv_sec) * 1000000000 + ts.tv_nsec;
 
 }
-uint64_t
+
+int64_t
 clock_monotonic64(void)
 {
 	struct timespec ts;
 	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return ((uint64_t)ts.tv_sec) * 1000000000 + ts.tv_nsec;
+	return ((int64_t)ts.tv_sec) * 1000000000 + ts.tv_nsec;
 }
-uint64_t
+
+int64_t
 clock_process64(void)
 {
 #if defined(CLOCK_PROCESS_CPUTIME_ID)
 	struct timespec ts;
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
-	return ((uint64_t)ts.tv_sec) * 1000000000 + ts.tv_nsec;
+	return ((int64_t)ts.tv_sec) * 1000000000 + ts.tv_nsec;
 #else
-	return (uint64_t) clock() * 1000000000 / CLOCKS_PER_SEC;
+	return (int64_t)clock() * 1000000000 / CLOCKS_PER_SEC;
 #endif
 }
 
-uint64_t
+int64_t
 clock_thread64(void)
 {
 #if defined(CLOCK_THREAD_CPUTIME_ID)
 	struct timespec ts;
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-	return ((uint64_t)ts.tv_sec) * 1000000000 + ts.tv_nsec;
+	return ((int64_t)ts.tv_sec) * 1000000000 + ts.tv_nsec;
 #else
-	return (uint64_t) clock() * 1000000000 / CLOCKS_PER_SEC;
+	return (int64_t)clock() * 1000000000 / CLOCKS_PER_SEC;
 #endif
 }
