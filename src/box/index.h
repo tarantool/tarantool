@@ -458,8 +458,10 @@ struct index {
 	struct index_def *def;
 	/** Reference counter. */
 	int refs;
-	/* Space cache version at the time of construction. */
+	/** Space cache version at the time of construction. */
 	uint32_t space_cache_version;
+	/** Globally unique ID. */
+	uint32_t unique_id;
 };
 
 /**
