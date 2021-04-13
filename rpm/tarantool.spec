@@ -18,9 +18,9 @@
 # otherwise this dependency is left unmet. If there are any issues
 # with building an RPM package on RHEL/CentOS 7 read the docs:
 # https://www.tarantool.io/en/doc/latest/dev_guide/building_from_source/
-BuildRequires: cmake3 >= 3.1
+BuildRequires: cmake3 >= 3.2
 %else
-BuildRequires: cmake >= 3.1
+BuildRequires: cmake >= 3.2
 %endif
 
 BuildRequires: make
@@ -124,7 +124,7 @@ Requires: openssl
 # RHEL <= 7 doesn't support Recommends:
 Recommends: tarantool-devel
 Recommends: git-core
-Recommends: cmake >= 3.1
+Recommends: cmake >= 3.2
 Recommends: make
 Recommends: gcc >= 4.5
 Recommends: gcc-c++ >= 4.5
