@@ -22,8 +22,8 @@ compare(type_t a, type_t b);
 
 /* check compiling with another name and settings */
 #define BPS_TREE_NAME testtest
-#define BPS_TREE_BLOCK_SIZE 512 /* value is to low specially for tests */
-#define BPS_TREE_EXTENT_SIZE 16*1024 /* value is to low specially for tests */
+#define BPS_TREE_BLOCK_SIZE 512
+#define BPS_TREE_EXTENT_SIZE 16*1024
 #define BPS_TREE_IS_IDENTICAL(a, b) (a == b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) compare(a, b)
@@ -178,7 +178,7 @@ simple_check()
 		type_t v = i;
 		if (test_find(&tree, v) != NULL)
 			fail("element already in tree (1)", "true");
-		test_insert(&tree, v, 0);
+		test_insert(&tree, v, 0, 0);
 		if (test_debug_check(&tree)) {
 			test_print(&tree, TYPE_F);
 			fail("debug check nonzero", "true");
@@ -205,7 +205,7 @@ simple_check()
 		type_t v = i;
 		if (test_find(&tree, v) != NULL)
 			fail("element already in tree (2)", "true");
-		test_insert(&tree, v, 0);
+		test_insert(&tree, v, 0, 0);
 		if (test_debug_check(&tree)) {
 			test_print(&tree, TYPE_F);
 			fail("debug check nonzero", "true");
@@ -232,7 +232,7 @@ simple_check()
 		type_t v = rounds - 1 - i;
 		if (test_find(&tree, v) != NULL)
 			fail("element already in tree (3)", "true");
-		test_insert(&tree, v, 0);
+		test_insert(&tree, v, 0, 0);
 		if (test_debug_check(&tree)) {
 			test_print(&tree, TYPE_F);
 			fail("debug check nonzero", "true");
@@ -259,7 +259,7 @@ simple_check()
 		type_t v = rounds - 1 - i;
 		if (test_find(&tree, v) != NULL)
 			fail("element already in tree (4)", "true");
-		test_insert(&tree, v, 0);
+		test_insert(&tree, v, 0, 0);
 		if (test_debug_check(&tree)) {
 			fail("debug check nonzero", "true");
 			test_print(&tree, TYPE_F);
@@ -330,7 +330,7 @@ compare_with_sptree_check()
 
 		if (find_res1 == 0) {
 			sptree_test_replace(&spt_test, &rnd, NULL);
-			test_insert(&tree, rnd, 0);
+			test_insert(&tree, rnd, 0, 0);
 		} else {
 			sptree_test_delete(&spt_test, &rnd);
 			test_delete(&tree, rnd);
@@ -373,7 +373,7 @@ compare_with_sptree_check_branches()
 		}
 
 		sptree_test_replace(&spt_test, &v, NULL);
-		test_insert(&tree, v, 0);
+		test_insert(&tree, v, 0, 0);
 
 		if (test_debug_check(&tree))
 			fail("debug check nonzero", "true");
@@ -408,7 +408,7 @@ compare_with_sptree_check_branches()
 			fail("trees integrity", "false");
 
 		sptree_test_replace(&spt_test, &v, NULL);
-		test_insert(&tree, v, 0);
+		test_insert(&tree, v, 0, 0);
 
 		if (test_debug_check(&tree))
 			fail("debug check nonzero", "true");
@@ -443,7 +443,7 @@ compare_with_sptree_check_branches()
 			fail("trees integrity", "false");
 
 		sptree_test_replace(&spt_test, &v, NULL);
-		test_insert(&tree, v, 0);
+		test_insert(&tree, v, 0, 0);
 
 		if (test_debug_check(&tree))
 			fail("debug check nonzero", "true");
@@ -482,7 +482,7 @@ compare_with_sptree_check_branches()
 			fail("trees integrity", "false");
 
 		sptree_test_replace(&spt_test, &v, NULL);
-		test_insert(&tree, v, 0);
+		test_insert(&tree, v, 0, 0);
 
 		if (test_debug_check(&tree))
 			fail("debug check nonzero", "true");
@@ -525,7 +525,7 @@ compare_with_sptree_check_branches()
 			fail("trees integrity", "false");
 
 		sptree_test_replace(&spt_test, &v, NULL);
-		test_insert(&tree, v, 0);
+		test_insert(&tree, v, 0, 0);
 
 		if (test_debug_check(&tree))
 			fail("debug check nonzero", "true");
@@ -640,11 +640,11 @@ printing_test()
 	for (type_t i = 0; i < rounds; i++) {
 		type_t v = rounds + i;
 		printf("Inserting " TYPE_F "\n", v);
-		test_insert(&tree, v, 0);
+		test_insert(&tree, v, 0, 0);
 		test_print(&tree, TYPE_F);
 		v = rounds - i - 1;
 		printf("Inserting " TYPE_F "\n", v);
-		test_insert(&tree, v, 0);
+		test_insert(&tree, v, 0, 0);
 		test_print(&tree, TYPE_F);
 	}
 
@@ -666,32 +666,32 @@ white_box_test()
 
 	printf("full leaf:\n");
 	for (type_t i = 0; i < 14; i++) {
-		test_insert(&tree, i, 0);
+		test_insert(&tree, i, 0, 0);
 	}
 	test_print(&tree, TYPE_F);
 
 	printf("split now:\n");
-	test_insert(&tree, 14, 0);
+	test_insert(&tree, 14, 0, 0);
 	test_print(&tree, TYPE_F);
 
 	printf("full 2 leafs:\n");
 	for (type_t i = 15; i < 28; i++) {
-		test_insert(&tree, i, 0);
+		test_insert(&tree, i, 0, 0);
 	}
 	test_print(&tree, TYPE_F);
 
 	printf("split now:\n");
-	test_insert(&tree, 28, 0);
+	test_insert(&tree, 28, 0, 0);
 	test_print(&tree, TYPE_F);
 
 	printf("full 3 leafs:\n");
 	for (type_t i = 29; i < 42; i++) {
-		test_insert(&tree, i, 0);
+		test_insert(&tree, i, 0, 0);
 	}
 	test_print(&tree, TYPE_F);
 
 	printf("split now:\n");
-	test_insert(&tree, 42, 0);
+	test_insert(&tree, 42, 0, 0);
 	test_print(&tree, TYPE_F);
 
 	test_destroy(&tree);
@@ -704,7 +704,7 @@ white_box_test()
 	test_print(&tree, TYPE_F);
 
 	printf("2-level split now:\n");
-	test_insert(&tree, 140, 0);
+	test_insert(&tree, 140, 0, 0);
 	test_print(&tree, TYPE_F);
 
 	test_destroy(&tree);
@@ -761,7 +761,7 @@ approximate_count()
 	}
 
 	for (uint64_t i = 0; i < count; i++)
-		approx_insert(&tree, arr[i], NULL);
+		approx_insert(&tree, arr[i], NULL, NULL);
 
 	printf("Count: %zu\n", tree.size);
 
@@ -844,7 +844,7 @@ delete_value_check()
 	struct_tree tree;
 	struct_tree_create(&tree, 0, extent_alloc, extent_free, &extents_count);
 	struct elem_t e1 = {1, 1};
-	struct_tree_insert(&tree, e1, NULL);
+	struct_tree_insert(&tree, e1, NULL, NULL);
 	struct elem_t e2 = {1, 2};
 	if (struct_tree_delete_value(&tree, e2, NULL) == 0)
 		fail("deletion of the non-identical element must fail", "false");
@@ -857,6 +857,50 @@ delete_value_check()
 	struct_tree_destroy(&tree);
 	footer();
 }
+
+static void
+insert_successor_test()
+{
+	header();
+	test tree;
+
+	size_t limits[] = {20, 2000};
+
+	for (size_t i = 0; i < sizeof(limits) / sizeof(limits[0]); i++) {
+		size_t limit = limits[i];
+		test_create(&tree, 0, extent_alloc, extent_free, &extents_count);
+
+		for (size_t j = 0; j < limit; j++) {
+			type_t v = 1 + rand() % (limit - 1);
+
+			bool exact = false;
+			test_iterator itr = test_lower_bound(&tree, v, &exact);
+
+			type_t expect_replaced = 0;
+			type_t expect_successor = 0;
+			if (exact) {
+				expect_replaced =
+					*test_iterator_get_elem(&tree, &itr);
+			} else if (!test_iterator_is_invalid(&itr)) {
+				expect_successor =
+					*test_iterator_get_elem(&tree, &itr);
+			}
+
+			type_t replaced = 0;
+			type_t successor = 0;
+
+			test_insert(&tree, v, &replaced, &successor);
+
+			fail_unless(replaced == expect_replaced);
+			fail_unless(successor == expect_successor);
+		}
+
+		test_destroy(&tree);
+	}
+
+	footer();
+}
+
 
 int
 main(void)
@@ -873,4 +917,5 @@ main(void)
 		fail("memory leak!", "true");
 	insert_get_iterator();
 	delete_value_check();
+	insert_successor_test();
 }

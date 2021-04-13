@@ -397,7 +397,7 @@ vy_cache_add(struct vy_cache *cache, struct vy_entry curr,
 		return;
 	}
 	replaced = NULL;
-	if (vy_cache_tree_insert(&cache->cache_tree, prev_node, &replaced)) {
+	if (vy_cache_tree_insert(&cache->cache_tree, prev_node, &replaced, NULL)) {
 		/* memory error, let's live without a chain */
 		vy_cache_node_delete(cache->env, prev_node);
 		return;
