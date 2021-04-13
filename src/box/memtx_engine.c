@@ -431,7 +431,7 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 		struct index *index = space->index[i];
 		/* Rollback must not fail. */
 		if (index_replace(index, stmt->new_tuple, stmt->old_tuple,
-				  DUP_INSERT, &unused) != 0) {
+				  DUP_INSERT, &unused, &unused) != 0) {
 			diag_log();
 			unreachable();
 			panic("failed to rollback change");

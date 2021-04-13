@@ -145,8 +145,9 @@ memtx_space_replace_primary_key(struct space *space, struct tuple *old_tuple,
 				enum dup_replace_mode mode,
 				struct tuple **result)
 {
+	struct tuple *successor;
 	if (index_replace(space->index[0], old_tuple,
-			  new_tuple, mode, &old_tuple) != 0)
+			  new_tuple, mode, &old_tuple, &successor) != 0)
 		return -1;
 	memtx_space_update_bsize(space, old_tuple, new_tuple);
 	if (new_tuple != NULL)
@@ -285,7 +286,9 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 	 * If old_tuple is not NULL, the index has to
 	 * find and delete it, or return an error.
 	 */
-	if (index_replace(pk, old_tuple, new_tuple, mode, &old_tuple) != 0)
+	struct tuple *successor;
+	if (index_replace(pk, old_tuple, new_tuple, mode,
+			  &old_tuple, &successor) != 0)
 		return -1;
 	assert(old_tuple || new_tuple);
 
@@ -294,7 +297,7 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 		struct tuple *unused;
 		struct index *index = space->index[i];
 		if (index_replace(index, old_tuple, new_tuple,
-				  DUP_INSERT, &unused) != 0)
+				  DUP_INSERT, &unused, &unused) != 0)
 			goto rollback;
 	}
 
@@ -310,7 +313,7 @@ rollback:
 		struct index *index = space->index[i - 1];
 		/* Rollback must not fail. */
 		if (index_replace(index, new_tuple, old_tuple,
-				  DUP_INSERT, &unused) != 0) {
+				  DUP_INSERT, &unused, &unused) != 0) {
 			diag_log();
 			unreachable();
 			panic("failed to rollback change");
@@ -1015,8 +1018,9 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 	enum dup_replace_mode mode =
 		state->index->def->opts.is_unique ? DUP_INSERT :
 						    DUP_REPLACE_OR_INSERT;
+	struct tuple *successor;
 	state->rc = index_replace(state->index, stmt->old_tuple,
-				  stmt->new_tuple, mode, &delete);
+				  stmt->new_tuple, mode, &delete, &successor);
 	if (state->rc != 0) {
 		diag_move(diag_get(), &state->diag);
 		return 0;
@@ -1106,8 +1110,9 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		 * @todo: better message if there is a duplicate.
 		 */
 		struct tuple *old_tuple;
+		struct tuple *successor;
 		rc = index_replace(new_index, NULL, tuple,
-				   DUP_INSERT, &old_tuple);
+				   DUP_INSERT, &old_tuple, &successor);
 		if (rc != 0)
 			break;
 		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
