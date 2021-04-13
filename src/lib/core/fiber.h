@@ -391,7 +391,7 @@ fiber_time(void);
  * Report loop begin time as 64-bit int.
  * Uses real time clock.
  */
-API_EXPORT uint64_t
+API_EXPORT int64_t
 fiber_time64(void);
 
 /**
@@ -405,7 +405,7 @@ fiber_clock(void);
  * Report loop begin time as 64-bit int.
  * Uses monotonic clock.
  */
-API_EXPORT uint64_t
+API_EXPORT int64_t
 fiber_clock64(void);
 
 /**

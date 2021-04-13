@@ -40,15 +40,67 @@ extern "C" {
 
 /** \cond public */
 
-double clock_realtime(void);
-double clock_monotonic(void);
-double clock_process(void);
-double clock_thread(void);
+/**
+ * A settable system-wide clock that measures real (i.e.,
+ * wall-clock) time.
+ *
+ * See clock_gettime(2), CLOCK_REALTIME.
+ */
+double
+clock_realtime(void);
 
-uint64_t clock_realtime64(void);
-uint64_t clock_monotonic64(void);
-uint64_t clock_process64(void);
-uint64_t clock_thread64(void);
+/**
+ * A nonsettable system-wide clock that represents monotonic time.
+ *
+ * See clock_gettime(2), CLOCK_MONOTONIC.
+ */
+double
+clock_monotonic(void);
+
+/**
+ * A clock that measures CPU time consumed by this process (by all
+ * threads in the process).
+ *
+ * See clock_gettime(2), CLOCK_PROCESS_CPUTIME_ID.
+ */
+double
+clock_process(void);
+
+/**
+ * A clock that measures CPU time consumed by this thread.
+ *
+ * See clock_gettime(2), CLOCK_THREAD_CPUTIME_ID.
+ */
+double
+clock_thread(void);
+
+/**
+ * Same as clock_realtime(), but returns the time as 64 bit
+ * signed integer.
+ */
+int64_t
+clock_realtime64(void);
+
+/**
+ * Same as clock_monotonic(), but returns the time as 64 bit
+ * signed integer.
+ */
+int64_t
+clock_monotonic64(void);
+
+/**
+ * Same as clock_process(), but returns the time as 64 bit
+ * signed integer.
+ */
+int64_t
+clock_process64(void);
+
+/**
+ * Same as clock_thread(), but returns the time as 64 bit
+ * signed integer.
+ */
+int64_t
+clock_thread64(void);
 
 /** \endcond public */
 
