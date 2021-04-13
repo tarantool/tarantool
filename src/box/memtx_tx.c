@@ -490,14 +490,15 @@ memtx_tx_story_full_unlink(struct memtx_story *story)
 			 */
 			if (story->del_psn > 0 && story->space != NULL) {
 				struct index *index = story->space->index[i];
-				struct tuple *unused;
+				struct tuple *removed, *unused;
 				if (index_replace(index, story->tuple, NULL,
-						  DUP_INSERT, &unused) != 0) {
+						  DUP_INSERT,
+						  &removed, &unused) != 0) {
 					diag_log();
 					unreachable();
 					panic("failed to rollback change");
 				}
-				assert(story->tuple == unused);
+				assert(story->tuple == removed);
 				/*
 				 * All tuples in pk are referenced.
 				 * Once removed it must be unreferenced.
@@ -988,9 +989,11 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 		for (uint32_t i = 0; i < space->index_count; i++) {
 			struct index *index = space->index[i];
 			struct tuple **replaced = &directly_replaced[i];
+			struct tuple *successor;
 			if (index_replace(index, NULL, new_tuple,
 					  DUP_REPLACE_OR_INSERT,
-					  replaced) != 0) {
+					  replaced, &successor) != 0)
+			{
 				directly_replaced_count = i;
 				goto fail;
 			}
@@ -1100,7 +1103,7 @@ fail:
 		struct index *index = space->index[i];
 		struct tuple *unused;
 		if (index_replace(index, new_tuple, directly_replaced[i],
-				  DUP_INSERT, &unused) != 0) {
+				  DUP_INSERT, &unused, &unused) != 0) {
 			diag_log();
 			unreachable();
 			panic("failed to rollback change");
@@ -1130,7 +1133,8 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 				struct tuple *was = link->older_story == NULL ?
 					NULL : link->older_story->tuple;
 				if (index_replace(index, story->tuple, was,
-						  DUP_INSERT, &unused) != 0) {
+						  DUP_INSERT,
+						  &unused, &unused) != 0) {
 					diag_log();
 					unreachable();
 					panic("failed to rollback change");
@@ -1242,7 +1246,7 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
 			struct tuple *unused;
 			struct index *index = stmt->space->index[i];
 			if (index_replace(index, story->tuple, old_story->tuple,
-					  DUP_INSERT, &unused) != 0) {
+					  DUP_INSERT, &unused, &unused) != 0) {
 				diag_log();
 				panic("failed to rollback change");
 			}
