@@ -339,10 +339,13 @@ memtx_hash_index_get(struct index *base, const char *key,
 static int
 memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 			 struct tuple *new_tuple, enum dup_replace_mode mode,
-			 struct tuple **result)
+			 struct tuple **result, struct tuple **successor)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct light_index_core *hash_table = &index->hash_table;
+
+	/* HASH index doesn't support ordering. */
+	*successor = NULL;
 
 	if (new_tuple) {
 		uint32_t h = tuple_hash(new_tuple, base->def->key_def);
