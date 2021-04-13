@@ -980,6 +980,32 @@ s:drop()
  | ---
  | ...
 
+-- A bit of alter
+s = box.schema.space.create('test')
+ | ---
+ | ...
+i = s:create_index('pk')
+ | ---
+ | ...
+s:replace{1, 1}
+ | ---
+ | - [1, 1]
+ | ...
+i = s:create_index('s', {parts={{2, 'unsigned'}}})
+ | ---
+ | ...
+s:replace{1, 1, 2 }
+ | ---
+ | - [1, 1, 2]
+ | ...
+s:select{}
+ | ---
+ | - - [1, 1, 2]
+ | ...
+s:drop()
+ | ---
+ | ...
+
 test_run:cmd("switch default")
  | ---
  | - true
