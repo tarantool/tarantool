@@ -340,6 +340,8 @@ memtx_tx_story_link_story(struct memtx_story *story,
 			  struct memtx_story *older_story,
 			  uint32_t index)
 {
+	assert(index < story->index_count);
+	assert(older_story == NULL || index < older_story->index_count);
 	struct memtx_story_link *link = &story->link[index];
 	/* Must be unlinked. */
 	assert(link->older_story == NULL);
@@ -354,10 +356,69 @@ memtx_tx_story_link_story(struct memtx_story *story,
 static void
 memtx_tx_story_unlink(struct memtx_story *story, uint32_t index)
 {
+	assert(index < story->index_count);
 	struct memtx_story_link *link = &story->link[index];
+	assert(link->older_story == NULL ||
+	       index < link->older_story->index_count);
 	if (link->older_story != NULL)
 		link->older_story->link[index].newer_story = NULL;
 	link->older_story = NULL;
+}
+
+/**
+ * Ulink @a story from all chains and remove corresponding tuple from
+ * indexes if necessary.
+ */
+static void
+memtx_tx_story_full_unlink(struct memtx_story *story)
+{
+	for (uint32_t i = 0; i < story->index_count; i++) {
+		struct memtx_story_link *link = &story->link[i];
+		if (link->newer_story == NULL) {
+			/*
+			 * We are at the top of the chain. That means
+			 * that story->tuple is in index. If the story
+			 * actually deletes the tuple, it must be deleted from
+			 * index.
+			 */
+			if (story->del_psn > 0 && story->space != NULL) {
+				struct index *index = story->space->index[i];
+				struct tuple *unused;
+				if (index_replace(index, story->tuple, NULL,
+						  DUP_INSERT, &unused) != 0) {
+					diag_log();
+					unreachable();
+					panic("failed to rollback change");
+				}
+				assert(story->tuple == unused);
+				/*
+				 * All tuples in pk are referenced.
+				 * Once removed it must be unreferenced.
+				 */
+				if (i == 0)
+					tuple_unref(story->tuple);
+			}
+			/*
+			 * If there is older story, we must unlink it, and
+			 * it will become at the top of chain. On the other
+			 * hand we have just handeled top of chain removal and
+			 * must not repeat this actions. We can do it by
+			 * clearing the space.
+			 */
+			if (link->older_story != NULL)
+				link->older_story->space = NULL;
+
+			memtx_tx_story_unlink(story, i);
+		} else {
+			/* Just unlink from list */
+			link->newer_story->link[i].older_story = link->older_story;
+			if (link->older_story != NULL)
+				link->older_story->link[i].newer_story =
+					link->newer_story;
+			link->older_story = NULL;
+			link->newer_story = NULL;
+		}
+	}
 }
 
 /**
@@ -400,44 +461,7 @@ memtx_tx_story_gc_step()
 	}
 
 	/* Unlink and delete the story */
-	for (uint32_t i = 0; i < story->index_count; i++) {
-		struct memtx_story_link *link = &story->link[i];
-		if (link->newer_story == NULL) {
-			/*
-			 * We are at the top of the chain. That means
-			 * that story->tuple is in index. If the story
-			 * actually deletes the tuple, it must be deleted from
-			 * index.
-			 */
-			if (story->del_psn > 0 && story->space != NULL) {
-				struct index *index = story->space->index[i];
-				struct tuple *unused;
-				if (index_replace(index, story->tuple, NULL,
-						  DUP_INSERT, &unused) != 0) {
-					diag_log();
-					unreachable();
-					panic("failed to rollback change");
-				}
-				assert(story->tuple == unused);
-				/*
-				 * All tuples in pk are referenced.
-				 * Once removed it must be unreferenced.
-				 */
-				if (i == 0)
-					tuple_unref(story->tuple);
-			}
-
-			memtx_tx_story_unlink(story, i);
-		} else {
-			/* Just unlink from list */
-			link->newer_story->link[i].older_story = link->older_story;
-			if (link->older_story != NULL)
-				link->older_story->link[i].newer_story =
-					link->newer_story;
-			link->older_story = NULL;
-			link->newer_story = NULL;
-		}
-	}
+	memtx_tx_story_full_unlink(story);
 
 	memtx_tx_story_delete(story);
 }
@@ -560,6 +584,7 @@ memtx_tx_story_find_visible_tuple(struct memtx_story *story,
 				  struct region *region)
 {
 	for (; story != NULL; story = story->link[index].older_story) {
+		assert(index < story->index_count);
 		bool unused;
 		if (memtx_tx_story_is_visible(story, stmt->txn,
 					      visible_replaced, true, &unused))
@@ -958,6 +983,10 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 				       older->link[i].newer_story == newer);
 			}
 		}
+
+		/* The story is no more allowed to change indexes. */
+		stmt->add_story->space = NULL;
+
 		stmt->add_story->add_stmt = NULL;
 		stmt->add_story = NULL;
 	}
@@ -1169,14 +1198,24 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 void
 memtx_tx_on_space_delete(struct space *space)
 {
-	/* Just clear pointer to space, it will be handled in GC. */
 	while (!rlist_empty(&space->memtx_stories)) {
 		struct memtx_story *story
 			= rlist_first_entry(&space->memtx_stories,
 					    struct memtx_story,
 					    in_space_stories);
-		story->space = NULL;
 		rlist_del(&story->in_space_stories);
+		memtx_tx_story_full_unlink(story);
+		if (story->add_stmt != NULL) {
+			story->add_stmt->add_story = NULL;
+			story->add_stmt = NULL;
+		}
+		while (story->del_stmt != NULL) {
+			struct txn_stmt *stmt = story->del_stmt;
+			stmt->del_story = NULL;
+			story->del_stmt = stmt->next_in_del_list;
+			stmt->next_in_del_list = NULL;
+		}
+		memtx_tx_story_delete(story);
 	}
 }
 
