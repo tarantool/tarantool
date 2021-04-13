@@ -12,7 +12,7 @@ Build-Depends: cdbs (>= 0.4.100), debhelper (>= 9), dpkg-dev (>= 1.16.1~),
 # make package manager seek for cmake3 package at first and use it
 # if found or fallback to cmake package (that provides CMake 3+
 # for modern distributions) otherwise.
- cmake3 (>= 3.1) | cmake (>= 3.1),
+ cmake3 (>= 3.2) | cmake (>= 3.2),
  libreadline-dev,
  libncurses5-dev,
  libssl-dev,
