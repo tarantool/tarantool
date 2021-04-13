@@ -5,11 +5,11 @@ local ffi = require('ffi')
 ffi.cdef[[
 double
 fiber_time(void);
-uint64_t
+int64_t
 fiber_time64(void);
 double
 fiber_clock(void);
-uint64_t
+int64_t
 fiber_clock64(void);
 ]]
 local C = ffi.C
