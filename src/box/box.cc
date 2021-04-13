@@ -3229,7 +3229,7 @@ box_cfg_xc(void)
 	schema_init();
 	replication_init();
 	port_init();
-	iproto_init();
+	iproto_init(cfg_geti("iproto_threads"));
 	sql_init();
 
 	int64_t wal_max_size = box_check_wal_max_size(cfg_geti64("wal_max_size"));

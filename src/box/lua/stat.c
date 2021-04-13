@@ -49,8 +49,6 @@
 
 extern struct rmean *rmean_box;
 extern struct rmean *rmean_error;
-/** network statistics (iproto & cbus) */
-extern struct rmean *rmean_net;
 extern struct rmean *rmean_tx_wal_bus;
 
 static void
@@ -148,7 +146,7 @@ static int
 lbox_stat_net_index(struct lua_State *L)
 {
 	const char *key = luaL_checkstring(L, -1);
-	if (rmean_foreach(rmean_net, seek_stat_item, L) == 0)
+	if (iproto_rmean_foreach(seek_stat_item, L) == 0)
 		return 0;
 
 	if (strcmp(key, "CONNECTIONS") == 0) {
@@ -183,7 +181,7 @@ static int
 lbox_stat_net_call(struct lua_State *L)
 {
 	lua_newtable(L);
-	rmean_foreach(rmean_net, set_stat_item, L);
+	iproto_rmean_foreach(set_stat_item, L);
 
 	lua_pushstring(L, "CONNECTIONS");
 	lua_rawget(L, -2);
