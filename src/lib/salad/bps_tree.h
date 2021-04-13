@@ -137,7 +137,7 @@
  * void bps_tree_destroy(tree);
  * int bps_tree_build(tree, sorted_array, array_size);
  * bps_tree_elem_t *bps_tree_find(tree, key);
- * int bps_tree_insert(tree, new_elem, replaced_elem);
+ * int bps_tree_insert(tree, new_elem, replaced_elem, before_elem);
  * int bps_tree_insert_get_iterator(tree, new_elem, replaced_elem,
  * 				    inserted_iterator)
  * int bps_tree_delete(tree, elem);
@@ -632,12 +632,14 @@ bps_tree_find(const struct bps_tree *tree, bps_tree_key_t key);
  *  then the replace was happend; insert otherwise.
  * @param tree - pointer to a tree
  * @param new_elem - inserting or replacing element
- * @replaced - optional pointer for a replaces element
+ * @replaced - optional pointer to an element that was replaced
+ * @successor - optional pointer to an element before which the new
+ *  element was inserted (untouched in case of replacement).
  * @return - 0 on success or -1 if memory allocation failed for insert
  */
 static inline int
 bps_tree_insert(struct bps_tree *tree, bps_tree_elem_t new_elem,
-		bps_tree_elem_t *replaced);
+		bps_tree_elem_t *replaced, bps_tree_elem_t *successor);
 
 /**
  * @sa bps_tree_insert + new parameter:
@@ -4444,12 +4446,14 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
  * Otherwise, it was an insert.
  * @param tree - pointer to a tree
  * @param new_elem - inserting or replacing element
- * @replaced - optional pointer for a replaces element
+ * @replaced - optional pointer to an element that was replaced
+ * @successor - optional pointer to an element before which the new
+ *  element was inserted (untouched in case of replacement).
  * @return - 0 on success or -1 if memory allocation failed for insert
  */
 static inline int
 bps_tree_insert(struct bps_tree *tree, bps_tree_elem_t new_elem,
-			   bps_tree_elem_t *replaced)
+		bps_tree_elem_t *replaced, bps_tree_elem_t *successor)
 {
 	if (tree->root_id == (bps_tree_block_id_t)(-1))
 		return bps_tree_insert_first_elem(tree, new_elem);
@@ -4465,6 +4469,13 @@ bps_tree_insert(struct bps_tree *tree, bps_tree_elem_t new_elem,
 	} else {
 		bps_tree_block_id_t unused1;
 		bps_tree_pos_t unused2;
+
+		struct bps_leaf *leaf = leaf_path_elem.block;
+		if (successor != NULL && leaf != NULL &&
+		    leaf_path_elem.insertion_point < leaf->header.size) {
+			bps_tree_pos_t pos = leaf_path_elem.insertion_point;
+			*successor = leaf->elems[pos];
+		}
 		return bps_tree_process_insert_leaf(tree, &leaf_path_elem,
 						    new_elem, &unused1,
 						    &unused2);
