@@ -223,7 +223,7 @@ vy_mem_insert(struct vy_mem *mem, struct vy_entry entry)
 	assert(!vy_stmt_is_refable(entry.stmt));
 	size_t size = tuple_size(entry.stmt);
 	struct vy_entry replaced = vy_entry_none();
-	if (vy_mem_tree_insert(&mem->tree, entry, &replaced))
+	if (vy_mem_tree_insert(&mem->tree, entry, &replaced, NULL))
 		return -1;
 	if (replaced.stmt == NULL)
 		mem->count.rows++;
