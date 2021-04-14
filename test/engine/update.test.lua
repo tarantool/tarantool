@@ -265,3 +265,31 @@ s:update({1}, {{'!', 'field2.key2', 0}})
 s:update({1}, {{'!', 'field3[5]', 0}})
 -- error: field4.key1 was not found in the tuple
 s:update({1}, {{'!', 'field4.key1', 0}})
+s:drop()
+
+--
+-- Autofill of nils is baned for nested arrays.
+--
+s = box.schema.create_space('test', {engine = engine})
+pk = s:create_index('pk')
+s:insert({1, 2, {11, 22}})
+-- When two operations are used for one array, internally it looks very similar
+-- to how the root array is represented. Still the ban should work.
+op1 = {'=', '[3][1]', 11}
+op2 = {'=', '[3][4]', 44}
+s:update({1}, {op1, op2})
+s:update({1}, {op1})
+s:update({1}, {op2})
+s:drop()
+
+format = {}
+format[1] = {name = 'field1', type = 'unsigned'}
+format[2] = {name = 'field2', type = 'unsigned', is_nullable = true}
+format[3] = {name = 'field3', type = 'unsigned', is_nullable = true}
+s = box.schema.create_space('test', {format = format})
+_ = s:create_index('pk')
+t = s:replace({1})
+t:update({{'=', 3, 3}})
+t:update({{'=', '[3]', 3}})
+t:update({{'=', 'field3', 3}})
+s:drop()
