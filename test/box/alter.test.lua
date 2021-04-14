@@ -11,7 +11,8 @@ EMPTY_MAP = utils.setmap({})
 -- Test insertion into a system space - verify that
 -- mandatory fields are required.
 --
-_space:insert{_space.id, ADMIN, 'test', 'memtx', 0, EMPTY_MAP, {}}
+err, res = pcall(function() return _space:insert{_space.id, ADMIN, 'test', 'memtx', 0, EMPTY_MAP, {}} end)
+assert(res.code == box.error.TUPLE_FOUND)
 --
 -- Bad space id
 --
@@ -19,11 +20,13 @@ _space:insert{'hello', 'world', 'test', 'memtx', 0, EMPTY_MAP, {}}
 --
 -- Can't create a space which has wrong field count - field_count must be NUM
 --
-_space:insert{_space.id, ADMIN, 'test', 'world', 0, EMPTY_MAP, {}}
+err, res = pcall(function() return _space:insert{_space.id, ADMIN, 'test', 'world', 0, EMPTY_MAP, {}} end)
+assert(res.code == box.error.TUPLE_FOUND)
 --
 -- There is already a tuple for the system space
 --
-_space:insert{_space.id, ADMIN, '_space', 'memtx', 0, EMPTY_MAP, {}}
+err, res = pcall(function() return _space:insert{_space.id, ADMIN, '_space', 'memtx', 0, EMPTY_MAP, {}} end)
+assert(res.code == box.error.TUPLE_FOUND)
 _space:insert{_index.id, ADMIN, '_index', 'memtx', 0, EMPTY_MAP, {}}
 --
 -- Can't drop a system space
@@ -56,9 +59,11 @@ t = _space:delete{space.id}
 space_deleted = box.space[t[1]]
 space_deleted
 space:replace{0}
-_index:insert{_space.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}}
+err, res = pcall(function() return _index:insert{_space.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}} end)
+assert(res.code == box.error.TUPLE_FOUND)
 _index:replace{_space.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}}
-_index:insert{_index.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
+err, res = pcall(function() return _index:insert{_index.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}, {1, 'unsigned'}}} end)
+assert(res.code == box.error.TUPLE_FOUND)
 _index:replace{_index.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
 -- access_sysview.test changes output of _index:select{}.
 -- let's change _index space in such a way that it will be
@@ -154,7 +159,8 @@ space:drop()
 -- gh-57 Confusing error message when trying to create space with a
 -- duplicate id
 auto = box.schema.space.create('auto_original')
-box.schema.space.create('auto', {id = auto.id})
+err, res = pcall(function() return box.schema.space.create('auto', {id = auto.id}) end)
+assert(res.code == box.error.TUPLE_FOUND)
 box.schema.space.drop('auto')
 box.schema.space.create('auto_original', {id = auto.id})
 auto:drop()
@@ -606,7 +612,8 @@ s:alter({name = nil})
 assert(box.space.test2 ~= nil)
 assert(box.space.test == nil)
 assert(s.name == 'test2')
-s:alter({name = '_space'})
+err, res = pcall(function() return s:alter({name = '_space'}) end)
+assert(res.code == box.error.TUPLE_FOUND)
 s:alter({name = 'test'})
 assert(box.space.test ~= nil)
 assert(box.space.test2 == nil)

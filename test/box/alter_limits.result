@@ -92,11 +92,12 @@ s.id
 - 3000
 ...
 -- duplicate id
-box.schema.space.create('tweedledee', { id = 3000 })
+err, res = pcall(function() return box.schema.space.create('tweedledee', { id = 3000 }) end)
 ---
-- error: Duplicate key exists in unique index "primary" in space "_space" with old
-    tuple - [3000, 1, "tweedledum", "memtx", 0, {}, []] and new tuple - [3000, 1,
-    "tweedledee", "memtx", 0, {}, []]
+...
+assert(res.code == box.error.TUPLE_FOUND)
+---
+- true
 ...
 -- stupid space id
 box.schema.space.create('tweedledee', { id = 'tweedledee' })
@@ -736,11 +737,12 @@ s.index.second.id
 index = s:create_index('third', { type = 'hash', parts = {  3, 'unsigned' } })
 ---
 ...
-s.index.third:rename('second')
+err, res = pcall(function() return s.index.third:rename('second') end)
 ---
-- error: 'Duplicate key exists in unique index "name" in space "_index" with old tuple
-    - [814, 1, "second", "tree", {"unique": true}, [[1, "string"]]] and new tuple
-    - [814, 2, "second", "hash", {"unique": true}, [[2, "unsigned"]]]'
+...
+assert(res.code == box.error.TUPLE_FOUND)
+---
+- true
 ...
 s.index.third.id
 ---

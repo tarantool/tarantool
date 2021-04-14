@@ -11,7 +11,8 @@ box.internal.collation.create('test', 42, 'ru_RU')
 box.internal.collation.create('test', 'ICU', 42)
 box.internal.collation.create('test', 'nothing', 'ru_RU')
 box.internal.collation.create('test', 'ICU', 'ru_RU', setmap{}) --ok
-box.internal.collation.create('test', 'ICU', 'ru_RU')
+err, res = pcall(function() return box.internal.collation.create('test', 'ICU', 'ru_RU') end)
+assert(res.code == box.error.TUPLE_FOUND)
 box.internal.collation.drop('test')
 box.internal.collation.drop('nothing') -- allowed
 box.internal.collation.create('test', 'ICU', 'ru_RU', 42)
@@ -48,7 +49,8 @@ box.space._collation:auto_increment{42, 0, 'ICU', 'ru_RU'}
 box.space._collation:auto_increment{'test', 0, 42, 'ru_RU'}
 box.space._collation:auto_increment{'test', 0, 'ICU', 42}
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}} --ok
-box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}}
+err, res = pcall(function() return box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}} end)
+assert(res.code == box.error.TUPLE_FOUND)
 box.space._collation.index.name:delete{'test'} -- ok
 box.space._collation.index.name:delete{'nothing'} -- allowed
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', 42}

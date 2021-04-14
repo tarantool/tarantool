@@ -35,7 +35,8 @@ box.schema.space.create('tweedleedee', { engine = 'unknown' })
 s = box.schema.space.create('tweedledum', { id = 3000 })
 s.id
 -- duplicate id
-box.schema.space.create('tweedledee', { id = 3000 })
+err, res = pcall(function() return box.schema.space.create('tweedledee', { id = 3000 }) end)
+assert(res.code == box.error.TUPLE_FOUND)
 -- stupid space id
 box.schema.space.create('tweedledee', { id = 'tweedledee' })
 s:drop()
@@ -255,7 +256,8 @@ s.index.pk:rename('primary')
 index = s:create_index('second', { type = 'tree', parts = {  2, 'string' } })
 s.index.second.id
 index = s:create_index('third', { type = 'hash', parts = {  3, 'unsigned' } })
-s.index.third:rename('second')
+err, res = pcall(function() return s.index.third:rename('second') end)
+assert(res.code == box.error.TUPLE_FOUND)
 s.index.third.id
 s.index.second:drop()
 s.index.third:alter({name = 'second'})

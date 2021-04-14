@@ -38,11 +38,12 @@ box.internal.collation.create('test', 'nothing', 'ru_RU')
 box.internal.collation.create('test', 'ICU', 'ru_RU', setmap{}) --ok
  | ---
  | ...
-box.internal.collation.create('test', 'ICU', 'ru_RU')
+err, res = pcall(function() return box.internal.collation.create('test', 'ICU', 'ru_RU') end)
  | ---
- | - error: 'Duplicate key exists in unique index "name" in space "_collation" with old
- |     tuple - [277, "test", 1, "ICU", "ru_RU", {"strength": "tertiary"}] and new tuple
- |     - [278, "test", 1, "ICU", "ru_RU", {"strength": "tertiary"}]'
+ | ...
+assert(res.code == box.error.TUPLE_FOUND)
+ | ---
+ | - true
  | ...
 box.internal.collation.drop('test')
  | ---
@@ -164,11 +165,12 @@ box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}} --ok
  | ---
  | - [277, 'test', 0, 'ICU', 'ru_RU', {}]
  | ...
-box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}}
+err, res = pcall(function() return box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}} end)
  | ---
- | - error: Duplicate key exists in unique index "name" in space "_collation" with old
- |     tuple - [277, "test", 0, "ICU", "ru_RU", {}] and new tuple - [278, "test", 0,
- |     "ICU", "ru_RU", {}]
+ | ...
+assert(res.code == box.error.TUPLE_FOUND)
+ | ---
+ | - true
  | ...
 box.space._collation.index.name:delete{'test'} -- ok
  | ---
