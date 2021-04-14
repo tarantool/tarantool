@@ -317,6 +317,27 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 					   is_prepared_ok);
 }
 
+uint32_t
+memtx_tx_index_invisible_count_slow(struct txn *txn,
+				    struct space *space, uint32_t index);
+
+/**
+ * When MVCC engine is enabled, an index can contain temporary non-committed
+ * tuples that are not visible outside their transaction.
+ * That's why internal index size can be greater than visible by
+ * standalone observer.
+ * The function calculates tje number of tuples that are physically present
+ * in index, but have no visible value.
+ */
+static inline uint32_t
+memtx_tx_index_invisible_count(struct txn *txn,
+			       struct space *space, uint32_t index)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return 0;
+	return memtx_tx_index_invisible_count_slow(txn, space, index);
+}
+
 /**
  * Clean memtx_tx part of @a txm.
  */

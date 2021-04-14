@@ -242,7 +242,11 @@ static ssize_t
 memtx_bitset_index_size(struct index *base)
 {
 	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
-	return tt_bitset_index_size(&index->index);
+	struct space *space = space_by_id(base->def->space_id);
+	uint32_t iid = base->def->iid;
+	/* Substract invisible count. */
+	return tt_bitset_index_size(&index->index) -
+	       memtx_tx_index_invisible_count(in_txn(), space, iid);
 }
 
 static ssize_t
@@ -427,7 +431,7 @@ memtx_bitset_index_count(struct index *base, enum iterator_type type,
 	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
 
 	if (type == ITER_ALL)
-		return tt_bitset_index_size(&index->index);
+		return memtx_bitset_index_size(base);
 
 	assert(part_count == 1); /* checked by key_validate() */
 	uint32_t bitset_key_size = 0;
