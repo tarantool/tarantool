@@ -33,7 +33,8 @@ box.schema.sequence.create('test')
 sq2, msg = box.schema.sequence.create('test', {if_not_exists = true})
 sq1 == sq2, msg
 _ = box.schema.sequence.create('test2')
-box.schema.sequence.alter('test2', {name = 'test'})
+err, res = pcall(function() return box.schema.sequence.alter('test2', {name = 'test'}) end)
+assert(res.code == box.error.TUPLE_FOUND)
 box.schema.sequence.drop('test2')
 box.schema.sequence.drop('test')
 

@@ -112,11 +112,12 @@ sq1 == sq2, msg
 _ = box.schema.sequence.create('test2')
 ---
 ...
-box.schema.sequence.alter('test2', {name = 'test'})
+err, res = pcall(function() return box.schema.sequence.alter('test2', {name = 'test'}) end)
 ---
-- error: Duplicate key exists in unique index "name" in space "_sequence" with old
-    tuple - [1, 1, "test", 1, 1, 9223372036854775807, 1, 0, false] and new tuple -
-    [2, 1, "test", 1, 1, 9223372036854775807, 1, 0, false]
+...
+assert(res.code == box.error.TUPLE_FOUND)
+---
+- true
 ...
 box.schema.sequence.drop('test2')
 ---
