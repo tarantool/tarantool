@@ -267,7 +267,11 @@ static ssize_t
 memtx_hash_index_size(struct index *base)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
-	return index->hash_table.count;
+	struct space *space = space_by_id(base->def->space_id);
+	uint32_t iid = base->def->iid;
+	/* Substract invisible count. */
+	return index->hash_table.count -
+	       memtx_tx_index_invisible_count(in_txn(), space, iid);
 }
 
 static ssize_t
