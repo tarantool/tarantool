@@ -270,7 +270,7 @@ extern "C" {
 typedef struct tuple box_tuple_t;
 
 int
-box_clear_synchro_queue(bool try_wait);
+box_clear_synchro_queue(void);
 
 /* box_select is private and used only by FFI */
 API_EXPORT int
