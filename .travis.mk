@@ -83,8 +83,8 @@ deps_coverage_ubuntu_ghactions: deps_ubuntu_ghactions
 	# Link src/lib/uri/src to local src dircetory to avoid of issue:
 	# /var/lib/gems/2.7.0/gems/coveralls-lcov-1.7.0/lib/coveralls/lcov/converter.rb:64:in
 	#   `initialize': No such file or directory @ rb_sysopen -
-	#   /home/runner/work/tarantool/tarantool/src/lib/uri/src/lib/uri/uri.c (Errno::ENOENT)
-	ln -s ${PWD}/src src/lib/uri/src
+	#   /home/runner/work/tarantool/tarantool/src/src/uri.c (Errno::ENOENT)
+	ln -s ${PWD}/src src/src
 
 deps_debian_packages:
 	apt-get update ${APT_EXTRA_FLAGS} && apt-get install -y -f \
