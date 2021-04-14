@@ -727,6 +727,7 @@ xrow_update_op_decode(struct xrow_update_op *op, int op_num, int index_base,
 	switch(mp_typeof(**expr)) {
 	case MP_INT:
 	case MP_UINT: {
+		op->is_for_root = true;
 		json_lexer_create(&op->lexer, NULL, 0, 0);
 		if (xrow_update_mp_read_int32(op, expr, &field_no) != 0)
 			return -1;
@@ -748,6 +749,7 @@ xrow_update_op_decode(struct xrow_update_op *op, int op_num, int index_base,
 					  &field_no) == 0) {
 			op->field_no = (int32_t) field_no;
 			op->lexer.offset = len;
+			op->is_for_root = true;
 			break;
 		}
 		struct json_token token;
@@ -771,6 +773,7 @@ xrow_update_op_decode(struct xrow_update_op *op, int op_num, int index_base,
 				 tt_cstr(path, len));
 			return -1;
 		}
+		op->is_for_root = json_lexer_is_eof(&op->lexer);
 		break;
 	}
 	default:

@@ -210,6 +210,13 @@ struct xrow_update_op {
 	 * update tree.
 	 */
 	struct json_lexer lexer;
+	/**
+	 * Flag, indicates that this operation is applied to the root, which
+	 * happens to be only an array so far. Can't use the lexer emptiness
+	 * because even in case of a single token it is not NULL and us used for
+	 * error reporting.
+	 */
+	bool is_for_root;
 };
 
 /**

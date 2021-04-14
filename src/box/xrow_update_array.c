@@ -322,6 +322,13 @@ xrow_update_array_append_nils(struct xrow_update_field *field,
 	uint32_t size = xrow_update_rope_size(rope);
 	if (op->field_no < 0 || (uint32_t)op->field_no <= size)
 		return 0;
+	/*
+	 * Do not allow autofill of nested arrays with nulls. It is not
+	 * supported only because there is no an easy way how to apply that to
+	 * bar updates which can also affect arrays.
+	 */
+	if (!op->is_for_root)
+		return 0;
 	uint32_t nil_count = op->field_no - size;
 	struct xrow_update_array_item *item =
 		(struct xrow_update_array_item *)
