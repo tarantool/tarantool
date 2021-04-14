@@ -2,6 +2,12 @@ env = require('test_run')
 test_run = env.new()
 test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
 
+test_run:cmd("push filter '\\[[0-9]+, 1, \"second\", \"tree\", {\"unique\": true}, \\[\\[1, \"string\"\\]\\]\\] and new tuple'" .. \
+             "to '\\[<NUM>, 1, \"second\", \"tree\", {\"unique\": true}, \\[\\[1, \"string\"\\]\\]\\] and new tuple'")
+
+test_run:cmd("push filter '\\[[0-9]+, 2, \"second\", \"hash\", {\"unique\": true}, \\[\\[2, \"unsigned\"\\]\\]\\]'" .. \
+             "to '\\[<NUM>, 2, \"second\", \"hash\", {\"unique\": true}, \\[\\[2, \"unsigned\"\\]\\]\\]'")
+
 -- ----------------------------------------------------------------
 -- LIMITS
 -- ----------------------------------------------------------------

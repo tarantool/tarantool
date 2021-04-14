@@ -8,6 +8,16 @@ test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
 ---
 - true
 ...
+test_run:cmd("push filter '\\[[0-9]+, 1, \"second\", \"tree\", {\"unique\": true}, \\[\\[1, \"string\"\\]\\]\\] and new tuple'" .. \
+             "to '\\[<NUM>, 1, \"second\", \"tree\", {\"unique\": true}, \\[\\[1, \"string\"\\]\\]\\] and new tuple'")
+---
+- true
+...
+test_run:cmd("push filter '\\[[0-9]+, 2, \"second\", \"hash\", {\"unique\": true}, \\[\\[2, \"unsigned\"\\]\\]\\]'" .. \
+             "to '\\[<NUM>, 2, \"second\", \"hash\", {\"unique\": true}, \\[\\[2, \"unsigned\"\\]\\]\\]'")
+---
+- true
+...
 -- ----------------------------------------------------------------
 -- LIMITS
 -- ----------------------------------------------------------------
@@ -739,8 +749,8 @@ index = s:create_index('third', { type = 'hash', parts = {  3, 'unsigned' } })
 s.index.third:rename('second')
 ---
 - error: 'Duplicate key exists in unique index "name" in space "_index" with old tuple
-    - [814, 1, "second", "tree", {"unique": true}, [[1, "string"]]] and new tuple
-    - [814, 2, "second", "hash", {"unique": true}, [[2, "unsigned"]]]'
+    - \[<NUM>, 1, "second", "tree", {"unique": true}, \[\[1, "string"\]\]\] and new tuple
+    - \[<NUM>, 2, "second", "hash", {"unique": true}, \[\[2, "unsigned"\]\]\]'
 ...
 s.index.third.id
 ---
