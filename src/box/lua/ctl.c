@@ -84,7 +84,7 @@ lbox_ctl_on_schema_init(struct lua_State *L)
 static int
 lbox_ctl_clear_synchro_queue(struct lua_State *L)
 {
-	if (box_clear_synchro_queue(true) != 0)
+	if (box_clear_synchro_queue() != 0)
 		return luaT_error(L);
 	return 0;
 }

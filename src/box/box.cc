@@ -1504,7 +1504,7 @@ box_wait_quorum(uint32_t lead_id, int64_t target_lsn, int quorum,
 }
 
 int
-box_clear_synchro_queue(bool try_wait)
+box_clear_synchro_queue(void)
 {
 	/* A guard to block multiple simultaneous function invocations. */
 	static bool in_clear_synchro_queue = false;
@@ -1522,9 +1522,11 @@ box_clear_synchro_queue(bool try_wait)
 	if (!is_box_configured)
 		return 0;
 	bool run_elections = false;
+	bool try_wait = false;
 
 	switch (box_election_mode) {
 	case ELECTION_MODE_OFF:
+		try_wait = true;
 		break;
 	case ELECTION_MODE_VOTER:
 		assert(box_raft()->state == RAFT_STATE_FOLLOWER);
@@ -1535,7 +1537,6 @@ box_clear_synchro_queue(bool try_wait)
 		if (box_raft()->state == RAFT_STATE_LEADER)
 			return 0;
 		run_elections = true;
-		try_wait = false;
 		break;
 	case ELECTION_MODE_CANDIDATE:
 		/*
