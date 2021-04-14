@@ -464,6 +464,116 @@ tx3:commit()
 s:select{}
 s:drop()
 
+-- https://github.com/tarantool/tarantool/issues/5972
+-- space:count and index:count
+s = box.schema.create_space('test')
+i1 = s:create_index('pk')
+
+tx1:begin()
+tx1('s:replace{1, 1, 1}')
+tx1('s:count()')
+s:count()
+tx1:commit()
+s:count()
+
+tx1:begin()
+tx1('s:delete{1}')
+tx1('s:count()')
+s:count()
+tx1:commit()
+s:count()
+
+s:replace{1, 0}
+s:replace{2, 0}
+tx1:begin()
+tx1('s:delete{2}')
+tx1('s:count()')
+tx1('s:replace{3, 1}')
+tx1('s:count()')
+tx1('s:replace{4, 1}')
+tx1('s:count()')
+tx2:begin()
+tx2('s:replace{4, 2}')
+tx2('s:count()')
+tx2('s:replace{5, 2}')
+tx2('s:count()')
+tx2('s:delete{3}')
+tx1('s:count()')
+tx2('s:count()')
+s:count()
+tx1:commit()
+tx2:commit()
+
+s:truncate()
+
+i2 = s:create_index('sk', {type = 'hash', parts={2,'unsigned'}})
+
+_ = test_run:cmd("setopt delimiter ';'")
+legend = 'status        i1:count() i2:count() tx1:i1:count() tx1:i2:count() tx2:i1:count() tx2:i2:count()'
+function check()
+    local res = ''
+    local ok = true
+    res = res .. '        ' .. tostring(i1:count())
+    if (i1:count() ~= #i1:select{}) or (i1:len() ~= #i1:select{}) then
+        ok = false
+        res = res .. '!'
+    end
+    res = res .. '        ' .. tostring(i2:count())
+    if (i2:count() ~= #i2:select{}) or (i1:len() ~= #i1:select{}) then
+        ok = false
+        res = res .. '!'
+    end
+    res = res .. '        ' .. tostring(tx1('i1:count()')[1])
+    if (tx1('i1:count()')[1] ~= tx1('#i1:select{}')[1]) or (tx1('i1:len()')[1] ~= tx1('#i1:select{}')[1]) then
+        ok = false
+        res = res .. '!'
+    end
+    res = res .. '        ' .. tostring(tx1('i2:count()')[1])
+    if (tx1('i2:count()')[1] ~= tx1('#i2:select{}')[1]) or (tx1('i2:len()')[1] ~= tx1('#i2:select{}')[1]) then
+        ok = false
+        res = res .. '!'
+    end
+    res = res .. '        ' .. tostring(tx2('i1:count()')[1])
+    if (tx2('i1:count()')[1] ~= tx2('#i1:select{}')[1]) or (tx2('i1:len()')[1] ~= tx2('#i1:select{}')[1]) then
+        ok = false
+        res = res .. '!'
+    end
+    res = res .. '        ' .. tostring(tx2('i2:count()')[1])
+    if (tx2('i2:count()')[1] ~= tx2('#i2:select{}')[1]) or (tx2('i2:len()')[1] ~= tx2('#i2:select{}')[1]) then
+        ok = false
+        res = res .. '!'
+    end
+
+    if ok then
+        res = 'ok' .. res
+    else
+        res = 'fail' .. res
+    end
+    return res
+end
+_ = test_run:cmd("setopt delimiter ''");
+legend
+
+s:replace{1, 2}
+s:replace{3, 4}
+tx1:begin()
+tx2:begin()
+check()
+tx1('s:replace{5, 42}')
+check()
+tx2('s:replace{6, 42}')
+check()
+tx1('s:delete{1}')
+tx2('s:delete{3}')
+check()
+tx1('s:replace{8, 2}')
+tx2('s:replace{3, 8}')
+check()
+tx1:commit()
+tx2:commit()
+
+s:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")

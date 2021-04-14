@@ -194,7 +194,11 @@ static ssize_t
 memtx_rtree_index_size(struct index *base)
 {
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
-	return rtree_number_of_records(&index->tree);
+	struct space *space = space_by_id(base->def->space_id);
+	uint32_t iid = base->def->iid;
+	/* Substract invisible count. */
+	return rtree_number_of_records(&index->tree) -
+	       memtx_tx_index_invisible_count(in_txn(), space, iid);
 }
 
 static ssize_t
@@ -210,6 +214,7 @@ memtx_rtree_index_count(struct index *base, enum iterator_type type,
 {
 	if (type == ITER_ALL)
 		return memtx_rtree_index_size(base); /* optimization */
+
 	return generic_index_count(base, type, key, part_count);
 }
 

@@ -1374,6 +1374,40 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 	return result;
 }
 
+uint32_t
+memtx_tx_index_invisible_count_slow(struct txn *txn,
+			       struct space *space, uint32_t index)
+{
+	uint32_t res = 0;
+	struct memtx_story *story;
+	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
+		if (story->space == NULL) {
+			/* The story is unlinked. */
+			continue;
+		}
+		assert(story->space == space);
+		struct memtx_story_link *link = &story->link[index];
+		if (link->newer_story != NULL) {
+			/* The story in in chain, but not at top. */
+			continue;
+		}
+
+		struct tuple *visible = NULL;
+		struct memtx_story *lookup = story;
+		for (; lookup != NULL; lookup = lookup->link[index].older_story) {
+			assert(index < lookup->index_count);
+			bool unused;
+			if (memtx_tx_story_is_visible(lookup, txn,
+						      &visible, true, &unused))
+				break;
+		}
+		if (visible == NULL)
+			res++;
+	}
+	return res;
+}
+
+
 void
 memtx_tx_on_space_delete(struct space *space)
 {

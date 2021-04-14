@@ -688,7 +688,11 @@ memtx_tree_index_size(struct index *base)
 {
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
-	return memtx_tree_size(&index->tree);
+	struct space *space = space_by_id(base->def->space_id);
+	uint32_t iid = base->def->iid;
+	/* Substract invisible count. */
+	return memtx_tree_size(&index->tree) -
+	       memtx_tx_index_invisible_count(in_txn(), space, iid);
 }
 
 template <bool USE_HINT>
