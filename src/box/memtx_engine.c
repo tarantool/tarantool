@@ -303,7 +303,7 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 	/* End of the fast path: loaded the primary key. */
 	space_foreach(memtx_end_build_primary_key, memtx);
 
-	if (!memtx->force_recovery) {
+	if (!memtx->force_recovery && !memtx_tx_manager_use_mvcc_engine) {
 		/*
 		 * Fast start path: "play out" WAL
 		 * records using the primary key only,
