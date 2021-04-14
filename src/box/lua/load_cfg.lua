@@ -119,6 +119,18 @@ local module_cfg = {
     log_format          = log.box_api,
 }
 
+-- cfg types for modules, probably better to
+-- provide some API with type enumeration or
+-- similar. Currently it has use for environment
+-- processing only.
+local module_cfg_type = {
+    -- logging
+    log                 = 'string',
+    log_nonblock        = 'boolean',
+    log_level           = 'number, string',
+    log_format          = 'string',
+}
+
 -- types of available options
 -- could be comma separated lua types or 'any' if any type is allowed
 local template_cfg = {
