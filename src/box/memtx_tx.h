@@ -85,6 +85,8 @@ struct memtx_story_link {
 	struct memtx_story *newer_story;
 	/** Story that was happened before that story was started. */
 	struct memtx_story *older_story;
+	/** List of interval items @sa interval_hole_item. */
+	struct rlist nearby_gaps;
 };
 
 /**
@@ -293,6 +295,36 @@ memtx_tx_track_point(struct txn *txn, struct space *space, uint32_t index,
 }
 
 /**
+ * Helper of memtx_tx_track_gap.
+ */
+int
+memtx_tx_track_gap_slow(struct txn *txn, struct space *space, uint32_t index,
+			struct tuple *successor, enum iterator_type type,
+			const char *key, uint32_t part_count);
+
+/**
+ * Record in TX manager that a transaction @a txn have read nothing
+ * from @a space and @ a index with @ key, somewhere from interval between
+ * some unknown predecessor and @a successor.
+ * This function must be used for ordered indexes, such as TREE, for queries
+ * when interation type is not EQ or when the key is not full (otherwise
+ * it's faster to use memtx_tx_track_point).
+ * @return 0 on success, -1 on memory error.
+ */
+static inline int
+memtx_tx_track_gap(struct txn *txn, struct space *space, uint32_t index,
+		   struct tuple *successor, enum iterator_type type,
+		   const char *key, uint32_t part_count)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return 0;
+	if (txn == NULL)
+		return 0;
+	return memtx_tx_track_gap_slow(txn, space, index, successor,
+				       type, key, part_count);
+}
+
+/**
  * Clean a tuple if it's dirty - finds a visible tuple in history.
  * @param txn - current transactions.
  * @param space - space in which the tuple was found.
@@ -343,6 +375,12 @@ memtx_tx_index_invisible_count(struct txn *txn,
  */
 void
 memtx_tx_clean_txn(struct txn *txn);
+
+/**
+ * Notify manager tha an index is deleted and free data, save in index.
+ */
+void
+memtx_tx_on_index_delete(struct index *index);
 
 /**
  * Notify manager the a space is deleted.
