@@ -301,6 +301,13 @@ tree_iterator_next_base(struct iterator *iterator, struct tuple **ret)
 		tuple_ref(*ret);
 		it->current = *res;
 	}
+	uint32_t iid = iterator->index->def->iid;
+	struct space *space = space_by_id(iterator->space_id);
+	/*
+	 * Pass no key because any write to the gap between that
+	 * two tuples must lead to conflict.
+	 */
+	memtx_tx_track_gap(in_txn(), space, iid, *ret, ITER_GE, NULL, 0);
 	return 0;
 }
 
@@ -319,7 +326,7 @@ tree_iterator_prev_base(struct iterator *iterator, struct tuple **ret)
 								it->current, NULL);
 	}
 	memtx_tree_iterator_prev(&index->tree, &it->tree_iterator);
-	tuple_unref(it->current.tuple);
+	struct tuple *successor = it->current.tuple;
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
 	if (!res) {
@@ -331,6 +338,14 @@ tree_iterator_prev_base(struct iterator *iterator, struct tuple **ret)
 		tuple_ref(*ret);
 		it->current = *res;
 	}
+	uint32_t iid = iterator->index->def->iid;
+	struct space *space = space_by_id(iterator->space_id);
+	/*
+	 * Pass no key because any write to the gap between that
+	 * two tuples must lead to conflict.
+	 */
+	memtx_tx_track_gap(in_txn(), space, iid, successor, ITER_LE, NULL, 0);
+	tuple_unref(successor);
 	return 0;
 }
 
@@ -368,6 +383,20 @@ tree_iterator_next_equal_base(struct iterator *iterator, struct tuple **ret)
 		tuple_ref(*ret);
 		it->current = *res;
 	}
+	uint32_t iid = iterator->index->def->iid;
+	struct space *space = space_by_id(iterator->space_id);
+	if (res != NULL && *ret == NULL) {
+		/** Got end of key. */
+		memtx_tx_track_gap(in_txn(), space, iid, *ret, ITER_EQ,
+		     it->key_data.key, it->key_data.part_count);
+	} else {
+		/*
+		 * Pass no key because any write to the gap between that
+		 * two tuples must lead to conflict.
+		 */
+		memtx_tx_track_gap(in_txn(), space, iid, *ret, ITER_GE,
+		     NULL, 0);
+	}
 	return 0;
 }
 
@@ -386,7 +415,7 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 								it->current, NULL);
 	}
 	memtx_tree_iterator_prev(&index->tree, &it->tree_iterator);
-	tuple_unref(it->current.tuple);
+	struct tuple *successor = it->current.tuple;
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
 	/* Use user key def to save a few loops. */
@@ -404,6 +433,21 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 		tuple_ref(*ret);
 		it->current = *res;
 	}
+	uint32_t iid = iterator->index->def->iid;
+	struct space *space = space_by_id(iterator->space_id);
+	if (res != NULL && *ret == NULL) {
+		/** Got end of key. */
+		memtx_tx_track_gap(in_txn(), space, iid, successor, ITER_REQ,
+		     it->key_data.key, it->key_data.part_count);
+	} else {
+		/*
+		 * Pass no key because any write to the gap between that
+		 * two tuples must lead to conflict.
+		 */
+		memtx_tx_track_gap(in_txn(), space, iid, successor, ITER_LE,
+		     NULL, 0);
+	}
+	tuple_unref(successor);
 	return 0;
 }
 
@@ -535,6 +579,16 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 		if (key_is_full)
 			memtx_tx_track_point(txn, space, iid, it->key_data.key);
 		return 0;
+	}
+	if ((!key_is_full || (type != ITER_EQ && type != ITER_REQ)) &&
+	    memtx_tx_manager_use_mvcc_engine) {
+		/* it->tree_iterator is positioned on successor of a key! */
+		struct memtx_tree_data<USE_HINT> *succ_data =
+			memtx_tree_iterator_get_elem(tree, &it->tree_iterator);
+		struct tuple *successor =
+			succ_data == NULL ? NULL : succ_data->tuple;
+		memtx_tx_track_gap(in_txn(), space, iid, successor, type,
+				   it->key_data.key, it->key_data.part_count);
 	}
 	if (iterator_type_is_reverse(type)) {
 		/*
