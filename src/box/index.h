@@ -640,8 +640,6 @@ index_replace(struct index *index, struct tuple *old_tuple,
 	      struct tuple *new_tuple, enum dup_replace_mode mode,
 	      struct tuple **result, struct tuple **successor)
 {
-	old_tuple = index_filter_tuple(index, old_tuple);
-	new_tuple = index_filter_tuple(index, new_tuple);
 	if (old_tuple == NULL && new_tuple == NULL) {
 		*result = NULL;
 		return 0;
