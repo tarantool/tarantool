@@ -472,6 +472,12 @@ struct index {
 	uint32_t space_cache_version;
 	/** Globally unique ID. */
 	uint32_t unique_id;
+	/**
+	 * List of gap read in the index with NULL successor. Those gap
+	 * reads happen when reading from empty index, or when reading
+	 * from rightmost part of ordered index (TREE).
+	 */
+	struct rlist nearby_gaps;
 };
 
 /**

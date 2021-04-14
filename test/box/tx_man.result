@@ -540,7 +540,7 @@ tx1:commit()
  | ...
 tx2:commit()
  | ---
- | - 
+ | - - {'error': 'Transaction has been aborted by conflict'}
  | ...
 s:select{}
  | ---
@@ -552,7 +552,6 @@ s2:select{}
  | ---
  | - - [1, 2]
  |   - [2, 1]
- |   - [4, 4]
  | ...
 s:truncate()
  | ---
@@ -1714,7 +1713,7 @@ tx1:commit()
  | ...
 tx2:commit()
  | ---
- | - 
+ | - - {'error': 'Transaction has been aborted by conflict'}
  | ...
 
 s:truncate()

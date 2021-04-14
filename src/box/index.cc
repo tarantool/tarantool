@@ -38,6 +38,7 @@
 #include "txn.h"
 #include "rmean.h"
 #include "info/info.h"
+#include "memtx_tx.h"
 
 /* {{{ Utilities. **********************************************/
 
@@ -497,6 +498,7 @@ index_create(struct index *index, struct engine *engine,
 	index->space_cache_version = space_cache_version;
 	static uint32_t unique_id = 0;
 	index->unique_id = unique_id++;
+	rlist_create(&index->nearby_gaps);
 	return 0;
 }
 
@@ -510,6 +512,7 @@ index_delete(struct index *index)
 	 * the index is primary or secondary.
 	 */
 	struct index_def *def = index->def;
+	memtx_tx_on_index_delete(index);
 	index->vtab->destroy(index);
 	index_def_delete(def);
 }
