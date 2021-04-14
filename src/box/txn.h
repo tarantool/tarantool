@@ -397,6 +397,8 @@ struct txn {
 	struct rlist read_set;
 	/** List of point hole reads. @sa struct point_hole_item. */
 	struct rlist point_holes_list;
+	/** List of gap reads. @sa struct gap_item. */
+	struct rlist gap_list;
 };
 
 static inline bool
