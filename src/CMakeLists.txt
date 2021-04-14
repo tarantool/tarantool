@@ -65,6 +65,7 @@ lua_source(lua_sources ${LUAJIT_BINARY_ROOT}/src/jit/vmdef.lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/memprof.lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/memprof/humanize.lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/memprof/parse.lua)
+lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/memprof/process.lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/utils/bufread.lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/utils/symtab.lua)
 

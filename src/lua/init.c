@@ -125,6 +125,7 @@ extern char strict_lua[],
 	bufread_lua[],
 	symtab_lua[],
 	parse_lua[],
+	process_lua[],
 	humanize_lua[],
 	memprof_lua[]
 ;
@@ -177,6 +178,7 @@ static const char *lua_modules[] = {
 	"utils.bufread", bufread_lua,
 	"utils.symtab", symtab_lua,
 	"memprof.parse", parse_lua,
+	"memprof.process", process_lua,
 	"memprof.humanize", humanize_lua,
 	"memprof", memprof_lua,
 	NULL
