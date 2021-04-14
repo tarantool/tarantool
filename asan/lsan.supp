@@ -8,6 +8,13 @@
 # source: /usr/lib/x86_64-linux-gnu/libcrypto.so
 leak:CRYPTO_zalloc
 
+# test: all (feedback demon fails using cURL)
+# https://github.com/tarantool/tarantool-qa/issues/116
+# source: /lib/x86_64-linux-gnu/libcrypto.so
+leak:libcrypto.so*
+# source: /lib/x86_64-linux-gnu/libssl.so
+leak:libssl.so*
+
 # test: app-tap/http_client.test.lua
 # source: src/tarantool
 leak:Curl_setstropt
