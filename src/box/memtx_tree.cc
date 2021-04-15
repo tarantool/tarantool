@@ -494,52 +494,61 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	struct space *space = space_by_id(iterator->space_id);
 	uint32_t iid = iterator->index->def->iid;
 	struct key_def *cmp_def = index->base.def->cmp_def;
-	bool exact = false;
+	/*
+	 * The key is full - all parts a present. If key if full, EQ and REQ
+	 * queries can return no more than one tuple.
+	 */
+	bool key_is_full = it->key_data.part_count == cmp_def->part_count;
+	/* The flag will be change to true if found tuple equals to the key. */
+	bool equals = false;
 	assert(it->current.tuple == NULL);
-	if (it->key_data.key == 0) {
+	if (it->key_data.key == NULL) {
+		assert(type == ITER_GE || type == ITER_LE);
 		if (iterator_type_is_reverse(it->type))
-			it->tree_iterator = memtx_tree_iterator_last(tree);
+			/*
+			 * For all reverse iterators we will step back,
+			 * see the and explanation code below.
+			 * BPS tree iterators have an interesting property:
+			 * a back step from invalid iterator set its
+			 * position to the last element. Let's use that.
+			 */
+			invalidate_tree_iterator(&it->tree_iterator);
 		else
 			it->tree_iterator = memtx_tree_iterator_first(tree);
+		/* If there is at least one tuple in the tree, it is
+		 * efficiently equals to the empty key. */
+		equals = memtx_tree_size(tree) != 0;
 	} else {
 		if (type == ITER_ALL || type == ITER_EQ ||
 		    type == ITER_GE || type == ITER_LT) {
 			it->tree_iterator =
 				memtx_tree_lower_bound(tree, &it->key_data,
-						       &exact);
-			if (type == ITER_EQ && !exact) {
-				if (it->key_data.part_count ==
-				    cmp_def->part_count)
-					memtx_tx_track_point(txn, space, iid,
-							     it->key_data.key);
-				return 0;
-			}
+						       &equals);
 		} else { // ITER_GT, ITER_REQ, ITER_LE
 			it->tree_iterator =
 				memtx_tree_upper_bound(tree, &it->key_data,
-						       &exact);
-			if (type == ITER_REQ && !exact) {
-				if (it->key_data.part_count ==
-				    cmp_def->part_count)
-					memtx_tx_track_point(txn, space, iid,
-							     it->key_data.key);
-				return 0;
-			}
+						       &equals);
 		}
-		if (iterator_type_is_reverse(type)) {
-			/*
-			 * Because of limitations of tree search API we use use
-			 * lower_bound for LT search and upper_bound for LE
-			 * and REQ searches. Thus we found position to the
-			 * right of the target one. Let's make a step to the
-			 * left to reach target position.
-			 * If we found an invalid iterator all the elements in
-			 * the tree are less (less or equal) to the key, and
-			 * iterator_next call will convert the iterator to the
-			 * last position in the tree, that's what we need.
-			 */
-			memtx_tree_iterator_prev(tree, &it->tree_iterator);
-		}
+	}
+	if (!equals && (type == ITER_EQ || type == ITER_REQ)) {
+		/* Found nothing */
+		if (key_is_full)
+			memtx_tx_track_point(txn, space, iid, it->key_data.key);
+		return 0;
+	}
+	if (iterator_type_is_reverse(type)) {
+		/*
+		 * Because of limitations of tree search API we use use
+		 * lower_bound for LT search and upper_bound for LE
+		 * and REQ searches. Thus we found position to the
+		 * right of the target one. Let's make a step to the
+		 * left to reach target position.
+		 * If we found an invalid iterator all the elements in
+		 * the tree are less (less or equal) to the key, and
+		 * iterator_next call will convert the iterator to the
+		 * last position in the tree, that's what we need.
+		 */
+		memtx_tree_iterator_prev(tree, &it->tree_iterator);
 	}
 
 	struct memtx_tree_data<USE_HINT> *res =
