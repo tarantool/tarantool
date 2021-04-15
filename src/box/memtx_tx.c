@@ -1740,11 +1740,10 @@ point_hole_storage_delete(struct point_hole_item *object)
 		/*
 		 * Hash table point to this item, but there are more
 		 * items in the list. Relink the hash table with any other
-		 * item in the list, and delele this item from the list.
+		 * item in the list, and delete this item from the list.
 		 */
 		struct point_hole_item *another =
-			rlist_entry(&object->ring, struct point_hole_item,
-				    ring);
+			rlist_next_entry(object, ring);
 
 		const struct point_hole_item **put =
 			(const struct point_hole_item **) &another;
@@ -1755,6 +1754,7 @@ point_hole_storage_delete(struct point_hole_item *object)
 		assert(pos != mh_end(txm.point_holes)); (void)pos;
 		assert(replaced == object);
 		rlist_del(&object->ring);
+		another->is_head = true;
 	} else {
 		/*
 		 * Hash table point to this item, and it's the last in the

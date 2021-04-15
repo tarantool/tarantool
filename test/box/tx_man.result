@@ -1847,6 +1847,151 @@ tx2:commit()
  | - - {'error': 'Transaction has been aborted by conflict'}
  | ...
 
+-- Check different orders
+s:truncate()
+ | ---
+ | ...
+tx1:begin()
+ | ---
+ | - 
+ | ...
+tx2:begin()
+ | ---
+ | - 
+ | ...
+tx1('s:select{1}')
+ | ---
+ | - - []
+ | ...
+tx2('s:select{1}')
+ | ---
+ | - - []
+ | ...
+tx1('s:replace{1, 1}')
+ | ---
+ | - - [1, 1]
+ | ...
+tx2('s:replace{1, 2}')
+ | ---
+ | - - [1, 2]
+ | ...
+tx1:commit()
+ | ---
+ | - 
+ | ...
+tx2:commit()
+ | ---
+ | - - {'error': 'Transaction has been aborted by conflict'}
+ | ...
+
+s:truncate()
+ | ---
+ | ...
+tx1:begin()
+ | ---
+ | - 
+ | ...
+tx2:begin()
+ | ---
+ | - 
+ | ...
+tx2('s:select{1}')
+ | ---
+ | - - []
+ | ...
+tx1('s:select{1}')
+ | ---
+ | - - []
+ | ...
+tx1('s:replace{1, 1}')
+ | ---
+ | - - [1, 1]
+ | ...
+tx2('s:replace{1, 2}')
+ | ---
+ | - - [1, 2]
+ | ...
+tx1:commit()
+ | ---
+ | - 
+ | ...
+tx2:commit()
+ | ---
+ | - - {'error': 'Transaction has been aborted by conflict'}
+ | ...
+
+s:truncate()
+ | ---
+ | ...
+tx1:begin()
+ | ---
+ | - 
+ | ...
+tx2:begin()
+ | ---
+ | - 
+ | ...
+tx1('s:select{1}')
+ | ---
+ | - - []
+ | ...
+tx2('s:select{1}')
+ | ---
+ | - - []
+ | ...
+tx2('s:replace{1, 2}')
+ | ---
+ | - - [1, 2]
+ | ...
+tx1('s:replace{1, 1}')
+ | ---
+ | - - [1, 1]
+ | ...
+tx1:commit()
+ | ---
+ | - 
+ | ...
+tx2:commit()
+ | ---
+ | - - {'error': 'Transaction has been aborted by conflict'}
+ | ...
+
+s:truncate()
+ | ---
+ | ...
+tx1:begin()
+ | ---
+ | - 
+ | ...
+tx2:begin()
+ | ---
+ | - 
+ | ...
+tx1('s:select{1}')
+ | ---
+ | - - []
+ | ...
+tx2('s:select{1}')
+ | ---
+ | - - []
+ | ...
+tx1('s:replace{1, 1}')
+ | ---
+ | - - [1, 1]
+ | ...
+tx2('s:replace{1, 2}')
+ | ---
+ | - - [1, 2]
+ | ...
+tx2:commit()
+ | ---
+ | - 
+ | ...
+tx1:commit()
+ | ---
+ | - - {'error': 'Transaction has been aborted by conflict'}
+ | ...
+
 s:drop()
  | ---
  | ...
