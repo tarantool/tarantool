@@ -629,6 +629,7 @@ run_script_f(va_list ap)
 	fiber_sleep(0.0);
 	aux_loop_is_run = true;
 
+	int is_a_tty = isatty(STDIN_FILENO);
 	/*
 	 * Override return value of isatty(STDIN_FILENO) if
 	 * ERRINJ_STDIN_ISATTY enabled (iparam not set to default).
@@ -636,13 +637,9 @@ run_script_f(va_list ap)
 	 * Integer param of errinj is used in order to set different
 	 * return values.
 	*/
-	int is_a_tty;
-	struct errinj *inj = errinj(ERRINJ_STDIN_ISATTY, ERRINJ_INT);
-	if (inj != NULL && inj->iparam >= 0) {
+	ERROR_INJECT_INT(ERRINJ_STDIN_ISATTY, inj->iparam >= 0, {
 		is_a_tty = inj->iparam;
-	} else {
-		is_a_tty = isatty(STDIN_FILENO);
-	}
+	});
 
 	if (path && strcmp(path, "-") != 0 && access(path, F_OK) == 0) {
 		/* Execute script. */
