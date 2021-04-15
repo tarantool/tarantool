@@ -138,7 +138,7 @@ local function check_ok(test, dir, cmd, args, e_res, e_stdout, e_stderr)
         ares = ares and val
     end
     if e_stdout ~= nil then
-        local val = test:is(res, e_res, ("check '%s' stdout for '%s'"):format(cmd,args))
+        local val = test:ok(stdout:find(e_stdout), ("check '%s' stdout for '%s'"):format(cmd,args))
         ares = ares and val
         if not val then
             print(("Expected to find '%s' in '%s'"):format(e_stdout, stdout))
