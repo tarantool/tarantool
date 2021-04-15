@@ -133,10 +133,12 @@ deploy:
 	echo ${GPG_SECRET_KEY} | base64 -d | gpg --batch --import || true
 	./tools/update_repo.sh -o=${OS} -d=${DIST} \
 		-b="${LIVE_REPO_S3_DIR}/${BUCKET}" build
-	if [ "${CI_COMMIT_TAG}" != "" ]; then \
-		./tools/update_repo.sh -o=${OS} -d=${DIST} \
+	case "${GITHUB_REF}" in                                       \
+	refs/tags/*)                                                  \
+		./tools/update_repo.sh -o=${OS} -d=${DIST}            \
 			-b="${RELEASE_REPO_S3_DIR}/${BUCKET}" build ; \
-	fi
+	        ;;                                                    \
+	esac
 
 source: deploy_prepare
 	TARBALL_COMPRESSOR=gz packpack/packpack tarball
