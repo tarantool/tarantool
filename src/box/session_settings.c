@@ -37,12 +37,14 @@
 #include "tuple.h"
 #include "xrow.h"
 #include "sql.h"
+#include "iproto.h"
 
 struct session_setting session_settings[SESSION_SETTING_COUNT] = {};
 
 /** Corresponding names of session settings. */
 const char *session_setting_strs[SESSION_SETTING_COUNT] = {
 	"error_marshaling_enabled",
+	"graceful_shutdown",
 	"sql_default_engine",
 	"sql_defer_foreign_keys",
 	"sql_full_column_names",
@@ -491,6 +493,48 @@ session_setting_error_marshaling_enabled_set(int id, const char *mp_value)
 	return 0;
 }
 
+static void
+session_setting_graceful_shutdown_get(int id, const char **mp_pair,
+				      const char **mp_pair_end)
+{
+	assert(id == SESSION_SETTING_GRACEFUL_SHUTDOWN);
+	struct session *session = current_session();
+	const char *name = session_setting_strs[id];
+	size_t name_len = strlen(name);
+	bool value = session->graceful_shutdown;
+	size_t size = mp_sizeof_array(2) + mp_sizeof_str(name_len) +
+		      mp_sizeof_bool(value);
+
+	char *pos = (char*)static_alloc(size);
+	assert(pos != NULL);
+	char *pos_end = mp_encode_array(pos, 2);
+	pos_end = mp_encode_str(pos_end, name, name_len);
+	pos_end = mp_encode_bool(pos_end, value);
+	*mp_pair = pos;
+	*mp_pair_end = pos_end;
+}
+
+static int
+session_setting_graceful_shutdown_set(int id, const char *mp_value) {
+	assert(id == SESSION_SETTING_GRACEFUL_SHUTDOWN);
+	enum mp_type mtype = mp_typeof(*mp_value);
+	enum field_type stype = session_settings[id].field_type;
+	if (mtype != MP_BOOL) {
+		diag_set(ClientError, ER_SESSION_SETTING_INVALID_VALUE,
+			 session_setting_strs[id], field_type_strs[stype]);
+		return -1;
+	}
+	struct session *session = current_session();
+	if (iproto_is_shutdown_active(session)) {
+		diag_set(ClientError, ER_PROC_LUA,
+			 "_session_settings.graceful_shutdown" \
+			 "can not be changed inside shutdown process");
+		return -1;
+	}
+	session->graceful_shutdown = mp_decode_bool(&mp_value);
+	return 0;
+}
+
 extern void
 sql_session_settings_init();
 
@@ -502,6 +546,11 @@ session_settings_init(void)
 	s->field_type = FIELD_TYPE_BOOLEAN;
 	s->get = session_setting_error_marshaling_enabled_get;
 	s->set = session_setting_error_marshaling_enabled_set;
+
+	s = &session_settings[SESSION_SETTING_GRACEFUL_SHUTDOWN];
+	s->field_type = FIELD_TYPE_BOOLEAN;
+	s->get = session_setting_graceful_shutdown_get;
+	s->set = session_setting_graceful_shutdown_set;
 
 	sql_session_settings_init();
 }

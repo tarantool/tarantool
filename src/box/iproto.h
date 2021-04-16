@@ -32,6 +32,7 @@
  */
 
 #include <stddef.h>
+#include "session.h"
 
 #if defined(__cplusplus)
 extern "C" {

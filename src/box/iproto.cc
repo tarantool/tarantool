@@ -54,7 +54,6 @@
 #include "box.h"
 #include "call.h"
 #include "tuple_convert.h"
-#include "session.h"
 #include "xrow.h"
 #include "schema.h" /* schema_version */
 #include "replication.h" /* instance_uuid */
