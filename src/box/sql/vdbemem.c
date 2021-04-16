@@ -93,7 +93,8 @@ valueNew(sql * db, struct ValueNewStat4Ctx *p)
 			pRec->aMem = (Mem *)((char *) pRec +
 					     ROUND8(sizeof(UnpackedRecord)));
 			for (uint32_t i = 0; i < part_count; i++) {
-				pRec->aMem[i].flags = MEM_Null;
+				pRec->aMem[i].type = MEM_NULL;
+				assert(pRec->aMem[i].flags == 0);
 				pRec->aMem[i].db = db;
 			}
 			p->ppRec[0] = pRec;
