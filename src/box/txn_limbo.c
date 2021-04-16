@@ -540,8 +540,7 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 		 */
 		if (!txn_has_flag(e->txn, TXN_WAIT_ACK)) {
 			assert(e->lsn == -1);
-			if (confirm_lsn == -1)
-				continue;
+			continue;
 		} else if (e->lsn <= prev_lsn) {
 			continue;
 		} else if (++e->ack_count < replication_synchro_quorum) {
