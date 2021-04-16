@@ -37,6 +37,22 @@ struct region;
 struct mpstream;
 struct VdbeFrame;
 
+enum mem_type {
+	MEM_TYPE_NULL		= 1,
+	MEM_TYPE_UINT		= 1 << 1,
+	MEM_TYPE_INT		= 1 << 2,
+	MEM_TYPE_STR		= 1 << 3,
+	MEM_TYPE_BIN		= 1 << 4,
+	MEM_TYPE_ARRAY		= 1 << 5,
+	MEM_TYPE_MAP		= 1 << 6,
+	MEM_TYPE_BOOL		= 1 << 7,
+	MEM_TYPE_DOUBLE		= 1 << 8,
+	MEM_TYPE_INVALID	= 1 << 9,
+	MEM_TYPE_FRAME		= 1 << 10,
+	MEM_TYPE_PTR		= 1 << 11,
+	MEM_TYPE_AGG		= 1 << 12,
+};
+
 /*
  * Internally, the vdbe manipulates nearly all SQL values as Mem
  * structures. Each Mem struct may cache multiple representations (string,
@@ -57,9 +73,9 @@ struct Mem {
 		struct func *func;
 		struct VdbeFrame *pFrame;	/* Used when flags==MEM_Frame */
 	} u;
+	/** Type of the value this MEM contains. */
+	enum mem_type type;
 	u32 flags;		/* Some combination of MEM_Null, MEM_Str, MEM_Dyn, etc. */
-	/** Subtype for this value. */
-	enum sql_subtype subtype;
 	/**
 	 * If value is fetched from tuple, then this property
 	 * contains type of corresponding space's field. If it's
@@ -81,29 +97,7 @@ struct Mem {
 #endif
 };
 
-/* One or more of the following flags are set to indicate the validOK
- * representations of the value stored in the Mem struct.
- *
- * If the MEM_Null flag is set, then the value is an SQL NULL value.
- * No other flags may be set in this case.
- *
- * If the MEM_Str flag is set then Mem.z points at a string representation.
- * Usually this is encoded in the same unicode encoding as the main
- * database (see below for exceptions). If the MEM_Term flag is also
- * set, then the string is nul terminated. The MEM_Int and MEM_Real
- * flags may coexist with the MEM_Str flag.
- */
-#define MEM_Null      0x0001	/* Value is NULL */
-#define MEM_Str       0x0002	/* Value is a string */
-#define MEM_Int       0x0004	/* Value is an integer */
-#define MEM_Real      0x0008	/* Value is a real number */
-#define MEM_Blob      0x0010	/* Value is a BLOB */
-#define MEM_Bool      0x0020    /* Value is a bool */
-#define MEM_UInt      0x0040	/* Value is an unsigned integer */
-#define MEM_Frame     0x0080	/* Value is a VdbeFrame object */
-#define MEM_Undefined 0x0100	/* Value is undefined */
 #define MEM_Cleared   0x0200	/* NULL set by OP_Null, not from data */
-#define MEM_TypeMask  0x83ff	/* Mask of type bits */
 
 /* Whenever Mem contains a valid string or blob representation, one of
  * the following flags must be set to determine the memory management
@@ -114,175 +108,151 @@ struct Mem {
 #define MEM_Dyn       0x0800	/* Need to call Mem.xDel() on Mem.z */
 #define MEM_Static    0x1000	/* Mem.z points to a static string */
 #define MEM_Ephem     0x2000	/* Mem.z points to an ephemeral string */
-#define MEM_Agg       0x4000	/* Mem.z points to an agg function context */
 #define MEM_Zero      0x8000	/* Mem.i contains count of 0s appended to blob */
-#define MEM_Subtype   0x10000	/* Mem.eSubtype is valid */
-#define MEM_Ptr       0x20000	/* Value is a generic pointer */
-
-/**
- * In contrast to Mem_TypeMask, this one allows to get
- * pure type of memory cell, i.e. without _Dyn/_Zero and other
- * auxiliary flags.
- */
-enum {
-	MEM_PURE_TYPE_MASK = 0x7f
-};
-
-static_assert(MEM_PURE_TYPE_MASK == (MEM_Null | MEM_Str | MEM_Int | MEM_Real |
-				     MEM_Blob | MEM_Bool | MEM_UInt),
-	      "value of type mask must consist of corresponding to memory "\
-	      "type bits");
 
 static inline bool
 mem_is_null(const struct Mem *mem)
 {
-	return (mem->flags & MEM_Null) != 0;
+	return mem->type == MEM_TYPE_NULL;
 }
 
 static inline bool
 mem_is_uint(const struct Mem *mem)
 {
-	return (mem->flags & MEM_UInt) != 0;
+	return mem->type == MEM_TYPE_UINT;
 }
 
 static inline bool
 mem_is_nint(const struct Mem *mem)
 {
-	return (mem->flags & MEM_Int) != 0;
+	return mem->type == MEM_TYPE_INT;
 }
 
 static inline bool
 mem_is_str(const struct Mem *mem)
 {
-	return (mem->flags & MEM_Str) != 0;
+	return mem->type == MEM_TYPE_STR;
 }
 
 static inline bool
 mem_is_num(const struct Mem *mem)
 {
-	return (mem->flags & (MEM_Real | MEM_Int | MEM_UInt)) != 0;
+	enum mem_type type = mem->type;
+	return (type & (MEM_TYPE_UINT | MEM_TYPE_INT | MEM_TYPE_DOUBLE)) != 0;
 }
 
 static inline bool
 mem_is_double(const struct Mem *mem)
 {
-	return (mem->flags & MEM_Real) != 0;
+	return mem->type == MEM_TYPE_DOUBLE;
 }
 
 static inline bool
 mem_is_int(const struct Mem *mem)
 {
-	return (mem->flags & (MEM_Int | MEM_UInt)) != 0;
+	return (mem->type & (MEM_TYPE_UINT | MEM_TYPE_INT)) != 0;
 }
 
 static inline bool
 mem_is_bool(const struct Mem *mem)
 {
-	return (mem->flags & MEM_Bool) != 0;
+	return mem->type == MEM_TYPE_BOOL;
 }
 
 static inline bool
 mem_is_bin(const struct Mem *mem)
 {
-	return (mem->flags & MEM_Blob) != 0 && (mem->flags & MEM_Subtype) == 0;
+	return mem->type == MEM_TYPE_BIN;
 }
 
 static inline bool
 mem_is_map(const struct Mem *mem)
 {
-	assert((mem->flags & MEM_Subtype) == 0 || (mem->flags & MEM_Blob) != 0);
-	assert((mem->flags & MEM_Subtype) == 0 ||
-	       mem->subtype == SQL_SUBTYPE_MSGPACK);
-	return (mem->flags & MEM_Subtype) != 0 && mp_typeof(*mem->z) == MP_MAP;
+	return mem->type == MEM_TYPE_MAP;
 }
 
 static inline bool
 mem_is_array(const struct Mem *mem)
 {
-	assert((mem->flags & MEM_Subtype) == 0 || (mem->flags & MEM_Blob) != 0);
-	assert((mem->flags & MEM_Subtype) == 0 ||
-	       mem->subtype == SQL_SUBTYPE_MSGPACK);
-	return (mem->flags & MEM_Subtype) != 0 &&
-	       mp_typeof(*mem->z) == MP_ARRAY;
+	return mem->type == MEM_TYPE_ARRAY;
 }
 
 static inline bool
 mem_is_agg(const struct Mem *mem)
 {
-	return (mem->flags & MEM_Agg) != 0;
+	return mem->type == MEM_TYPE_AGG;
 }
 
 static inline bool
 mem_is_bytes(const struct Mem *mem)
 {
-	return (mem->flags & (MEM_Blob | MEM_Str)) != 0;
+	return (mem->type & (MEM_TYPE_BIN | MEM_TYPE_STR |
+			     MEM_TYPE_MAP | MEM_TYPE_ARRAY)) != 0;
 }
 
 static inline bool
 mem_is_frame(const struct Mem *mem)
 {
-	return (mem->flags & MEM_Frame) != 0;
+	return mem->type == MEM_TYPE_FRAME;
 }
 
 static inline bool
 mem_is_invalid(const struct Mem *mem)
 {
-	return (mem->flags & MEM_Undefined) != 0;
+	return mem->type == MEM_TYPE_INVALID;
 }
 
 static inline bool
 mem_is_static(const struct Mem *mem)
 {
-	assert((mem->flags & (MEM_Str | MEM_Blob)) != 0);
+	assert(mem_is_bytes(mem));
 	return (mem->flags & MEM_Static) != 0;
 }
 
 static inline bool
 mem_is_ephemeral(const struct Mem *mem)
 {
-	assert((mem->flags & (MEM_Str | MEM_Blob)) != 0);
+	assert(mem_is_bytes(mem));
 	return (mem->flags & MEM_Ephem) != 0;
 }
 
 static inline bool
 mem_is_dynamic(const struct Mem *mem)
 {
-	assert((mem->flags & (MEM_Str | MEM_Blob)) != 0);
+	assert(mem_is_bytes(mem));
 	return (mem->flags & MEM_Dyn) != 0;
 }
 
 static inline bool
 mem_is_allocated(const struct Mem *mem)
 {
-	return (mem->flags & (MEM_Str | MEM_Blob)) != 0 &&
-	       mem->z == mem->zMalloc;
+	return mem_is_bytes(mem) && mem->z == mem->zMalloc;
 }
 
 static inline bool
 mem_is_cleared(const struct Mem *mem)
 {
-	assert((mem->flags & MEM_Cleared) == 0 || (mem->flags & MEM_Null) != 0);
+	assert((mem->flags & MEM_Cleared) == 0 || mem->type == MEM_TYPE_NULL);
 	return (mem->flags & MEM_Cleared) != 0;
 }
 
 static inline bool
 mem_is_zerobin(const struct Mem *mem)
 {
-	assert((mem->flags & MEM_Zero) == 0 || (mem->flags & MEM_Blob) != 0);
+	assert((mem->flags & MEM_Zero) == 0 || mem->type == MEM_TYPE_BIN);
 	return (mem->flags & MEM_Zero) != 0;
 }
 
 static inline bool
 mem_is_same_type(const struct Mem *mem1, const struct Mem *mem2)
 {
-	return (mem1->flags & MEM_PURE_TYPE_MASK) ==
-	       (mem2->flags & MEM_PURE_TYPE_MASK);
+	return mem1->type == mem2->type;
 }
 
 static inline bool
 mem_is_any_null(const struct Mem *mem1, const struct Mem *mem2)
 {
-	return ((mem1->flags | mem2->flags) & MEM_Null) != 0;
+	return ((mem1->type| mem2->type) & MEM_TYPE_NULL) != 0;
 }
 
 /**
@@ -943,7 +913,7 @@ registerTrace(int iReg, Mem *p);
  * Return true if a memory cell is not marked as invalid.  This macro
  * is for use inside assert() statements only.
  */
-#define memIsValid(M)  ((M)->flags & MEM_Undefined)==0
+#define memIsValid(M)  ((M)->type != MEM_TYPE_INVALID)
 #endif
 
 int sqlVdbeMemExpandBlob(struct Mem *);
@@ -969,9 +939,8 @@ int sqlVdbeMemTooBig(Mem *);
 /* Return TRUE if Mem X contains dynamically allocated content - anything
  * that needs to be deallocated to avoid a leak.
  */
-#define VdbeMemDynamic(X)  \
-  (((X)->flags&(MEM_Agg|MEM_Dyn|MEM_Frame))!=0)
-
+#define VdbeMemDynamic(X) (((X)->flags & MEM_Dyn) != 0 ||\
+			   ((X)->type & (MEM_TYPE_AGG | MEM_TYPE_FRAME)) != 0)
 
 int sqlMemCompare(const Mem *, const Mem *, const struct coll *);
 
