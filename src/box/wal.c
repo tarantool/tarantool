@@ -55,7 +55,11 @@ enum {
 	WAL_FALLOCATE_LEN = 1024 * 1024,
 };
 
-const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
+const char *wal_mode_STRS[WAL_MODE_MAX] = {
+	[WAL_NONE]	= "none",
+	[WAL_WRITE]	= "write",
+	[WAL_FSYNC]	= "fsync",
+};
 
 int wal_dir_lock = -1;
 
