@@ -962,14 +962,14 @@ out:
  */
 static void
 wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
-	       struct xrow_header **row,
-	       struct xrow_header **end)
+	       struct journal_entry *entry)
 {
 	int64_t tsn = 0;
-	struct xrow_header **start = row;
-	struct xrow_header **first_glob_row = row;
+	struct xrow_header **start = entry->rows;
+	struct xrow_header **end = entry->rows + entry->n_rows;
+	struct xrow_header **first_glob_row = entry->rows;
 	/** Assign LSN to all local rows. */
-	for ( ; row < end; row++) {
+	for (struct xrow_header **row = start; row < end; row++) {
 		if ((*row)->replica_id == 0) {
 			/*
 			 * All rows representing local space data
@@ -1020,7 +1020,7 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 	 * the first global row. tsn was yet unknown when those
 	 * rows were processed.
 	 */
-	for (row = start; row < first_glob_row; row++)
+	for (struct xrow_header **row = start; row < first_glob_row; row++)
 		(*row)->tsn = tsn;
 }
 
@@ -1098,8 +1098,7 @@ wal_write_to_disk(struct cmsg *msg)
 	struct journal_entry *entry;
 	struct stailq_entry *last_committed = NULL;
 	stailq_foreach_entry(entry, &wal_msg->commit, fifo) {
-		wal_assign_lsn(&vclock_diff, &writer->vclock,
-			       entry->rows, entry->rows + entry->n_rows);
+		wal_assign_lsn(&vclock_diff, &writer->vclock, entry);
 		entry->res = vclock_sum(&vclock_diff) +
 			     vclock_sum(&writer->vclock);
 		rc = xlog_write_entry(l, entry);
@@ -1319,8 +1318,7 @@ wal_write_none_async(struct journal *journal,
 	struct vclock vclock_diff;
 
 	vclock_create(&vclock_diff);
-	wal_assign_lsn(&vclock_diff, &writer->vclock, entry->rows,
-		       entry->rows + entry->n_rows);
+	wal_assign_lsn(&vclock_diff, &writer->vclock, entry);
 	vclock_merge(&writer->vclock, &vclock_diff);
 	vclock_copy(&replicaset.vclock, &writer->vclock);
 	entry->res = vclock_sum(&writer->vclock);
