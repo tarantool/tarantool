@@ -105,6 +105,8 @@ struct session_meta {
 struct session {
 	/** Session id. */
 	uint64_t id;
+	/** Support of graceful shutdown. */
+	bool graceful_shutdown;
 	/** SQL Tarantool Default storage engine. */
 	uint8_t sql_default_engine;
 	/** SQL Connection flag for current user session */

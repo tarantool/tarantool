@@ -53,6 +53,7 @@ s:replace({'sql_defer_foreign_keys', true})
 s:select()
  | ---
  | - - ['error_marshaling_enabled', false]
+ |   - ['graceful_shutdown', false]
  |   - ['sql_default_engine', 'memtx']
  |   - ['sql_defer_foreign_keys', false]
  |   - ['sql_full_column_names', false]

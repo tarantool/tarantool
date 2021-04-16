@@ -137,6 +137,7 @@ session_create(enum session_type type)
 	}
 
 	session->id = sid_max();
+	session->graceful_shutdown = false;
 	memset(&session->meta, 0, sizeof(session->meta));
 	session_set_type(session, type);
 	session->sql_flags = default_flags;
