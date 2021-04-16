@@ -95,8 +95,7 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 		id = instance_id;
 	bool make_ro = false;
 	if (limbo->owner_id != id) {
-		if (limbo->owner_id == REPLICA_ID_NIL ||
-		    rlist_empty(&limbo->queue)) {
+		if (rlist_empty(&limbo->queue)) {
 			limbo->owner_id = id;
 			limbo->confirmed_lsn = 0;
 			if (id != instance_id)
