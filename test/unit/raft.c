@@ -1267,10 +1267,60 @@ raft_test_too_long_wal_write(void)
 	raft_finish_test();
 }
 
+static void
+raft_test_start_stop_candidate(void)
+{
+	raft_start_test(8);
+	struct raft_node node;
+	raft_node_create(&node);
+
+	raft_node_cfg_is_candidate(&node, false);
+	raft_node_cfg_election_quorum(&node, 1);
+
+	raft_node_start_candidate(&node);
+	raft_run_next_event();
+	is(node.raft.state, RAFT_STATE_LEADER, "became leader after "
+	   "start candidate");
+
+	raft_node_stop_candidate(&node);
+	raft_run_for(node.cfg_death_timeout);
+	is(node.raft.state, RAFT_STATE_LEADER, "remain leader after "
+	   "stop candidate");
+
+	raft_node_demote_candidate(&node);
+	is(node.raft.state, RAFT_STATE_FOLLOWER, "demote drops a non-candidate "
+	   "leader to a follower");
+
+	/*
+	 * Ensure the non-candidate leader is demoted when sees a new term, and
+	 * does not try election again.
+	 */
+	raft_node_start_candidate(&node);
+	raft_run_next_event();
+	raft_node_stop_candidate(&node);
+	is(node.raft.state, RAFT_STATE_LEADER, "non-candidate but still "
+	   "leader");
+
+	is(raft_node_send_vote_request(&node,
+		4 /* Term. */,
+		"{}" /* Vclock. */,
+		2 /* Source. */
+	), 0, "vote request from 2");
+	is(node.raft.state, RAFT_STATE_FOLLOWER, "demote once new election "
+	   "starts");
+
+	raft_run_for(node.cfg_election_timeout * 2);
+	is(node.raft.state, RAFT_STATE_FOLLOWER, "still follower");
+	is(node.raft.term, 4, "still the same term");
+
+	raft_node_destroy(&node);
+	raft_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	raft_start_test(13);
+	raft_start_test(14);
 
 	(void) ap;
 	fakeev_init();
@@ -1288,6 +1338,7 @@ main_f(va_list ap)
 	raft_test_death_timeout();
 	raft_test_enable_disable();
 	raft_test_too_long_wal_write();
+	raft_test_start_stop_candidate();
 
 	fakeev_free();
 
