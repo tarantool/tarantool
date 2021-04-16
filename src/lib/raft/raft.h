@@ -281,6 +281,19 @@ raft_cfg_is_enabled(struct raft *raft, bool is_enabled);
 void
 raft_cfg_is_candidate(struct raft *raft, bool is_candidate);
 
+/**
+ * Make the instance a candidate.
+ */
+void
+raft_start_candidate(struct raft *raft);
+
+/**
+ * Make the instance stop taking part in new elections.
+ * @param do_demote whether to stop being a leader immediately or not.
+ */
+void
+raft_stop_candidate(struct raft *raft, bool do_demote);
+
 /** Configure Raft leader election timeout. */
 void
 raft_cfg_election_timeout(struct raft *raft, double timeout);
