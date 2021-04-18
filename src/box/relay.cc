@@ -87,6 +87,18 @@ struct relay_gc_msg {
 	struct vclock vclock;
 };
 
+/**
+ * Cbus message to push raft messages to relay.
+ */
+struct relay_raft_msg {
+	struct cmsg base;
+	struct cmsg_hop route[2];
+	struct raft_request req;
+	struct vclock vclock;
+	struct relay *relay;
+};
+
+
 /** State of a replication relay. */
 struct relay {
 	/** The thread in which we relay data to the replica. */
@@ -160,6 +172,24 @@ struct relay {
 		 * anonymous replica, for example.
 		 */
 		bool is_raft_enabled;
+		/**
+		 * A pair of raft messages travelling between tx and relay
+		 * threads. While one is en route, the other is ready to save
+		 * the next incoming raft message.
+		 */
+		struct relay_raft_msg raft_msgs[2];
+		/**
+		 * Id of the raft message waiting in tx thread and ready to
+		 * save Raft requests. May be either 0 or 1.
+		 */
+		int raft_ready_msg;
+		/** Whether raft_ready_msg holds a saved Raft message */
+		bool is_raft_push_pending;
+		/**
+		 * Whether any of the messages is en route between tx and
+		 * relay.
+		 */
+		bool is_raft_push_sent;
 	} tx;
 };
 
@@ -402,6 +432,12 @@ relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
 		relay_delete(relay);
 	});
 
+	/*
+	 * Save the first vclock as 'received'. Because firstly, it was really
+	 * received. Secondly, recv_vclock is used by recovery restart and must
+	 * always be valid.
+	 */
+	vclock_copy(&relay->recv_vclock, start_vclock);
 	relay->r = recovery_new(wal_dir(), false, start_vclock);
 	vclock_copy(&relay->stop_vclock, stop_vclock);
 
@@ -628,13 +664,30 @@ struct relay_is_raft_enabled_msg {
 	bool is_finished;
 };
 
+static void
+relay_push_raft_msg(struct relay *relay)
+{
+	if (!relay->tx.is_raft_enabled || relay->tx.is_raft_push_sent)
+		return;
+	struct relay_raft_msg *msg =
+		&relay->tx.raft_msgs[relay->tx.raft_ready_msg];
+	cpipe_push(&relay->relay_pipe, &msg->base);
+	relay->tx.raft_ready_msg = (relay->tx.raft_ready_msg + 1) % 2;
+	relay->tx.is_raft_push_sent = true;
+	relay->tx.is_raft_push_pending = false;
+}
+
 /** TX thread part of the Raft flag setting, first hop. */
 static void
 tx_set_is_raft_enabled(struct cmsg *base)
 {
 	struct relay_is_raft_enabled_msg *msg =
 		(struct relay_is_raft_enabled_msg *)base;
-	msg->relay->tx.is_raft_enabled = msg->value;
+	struct relay *relay  = msg->relay;
+	relay->tx.is_raft_enabled = msg->value;
+	/* Send saved raft message as soon as relay becomes operational. */
+	if (relay->tx.is_raft_push_pending)
+		relay_push_raft_msg(msg->relay);
 }
 
 /** Relay thread part of the Raft flag setting, second hop. */
@@ -845,6 +898,12 @@ relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 	});
 
 	vclock_copy(&relay->local_vclock_at_subscribe, &replicaset.vclock);
+	/*
+	 * Save the first vclock as 'received'. Because firstly, it was really
+	 * received. Secondly, recv_vclock is used by recovery restart and must
+	 * always be valid.
+	 */
+	vclock_copy(&relay->recv_vclock, replica_clock);
 	relay->r = recovery_new(wal_dir(), false, replica_clock);
 	vclock_copy(&relay->tx.vclock, replica_clock);
 	relay->version_id = replica_version_id;
@@ -930,14 +989,10 @@ relay_restart_recovery(struct relay *relay)
 	recover_remaining_wals(relay->r, &relay->stream, NULL, true);
 }
 
-struct relay_raft_msg {
-	struct cmsg base;
-	struct cmsg_hop route;
-	struct raft_request req;
-	struct vclock vclock;
-	struct relay *relay;
-};
-
+/**
+ * Send a Raft message to the peer. This is done asynchronously, out of scope
+ * of recover_remaining_wals loop.
+ */
 static void
 relay_raft_msg_push(struct cmsg *base)
 {
@@ -957,48 +1012,39 @@ relay_raft_msg_push(struct cmsg *base)
 		relay_set_error(msg->relay, e);
 		fiber_cancel(fiber());
 	}
-	free(msg);
+}
+
+static void
+tx_raft_msg_return(struct cmsg *base)
+{
+	struct relay_raft_msg *msg = (struct relay_raft_msg *)base;
+	msg->relay->tx.is_raft_push_sent = false;
+	if (msg->relay->tx.is_raft_push_pending)
+		relay_push_raft_msg(msg->relay);
 }
 
 void
 relay_push_raft(struct relay *relay, const struct raft_request *req)
 {
-	/*
-	 * Raft updates don't stack. They are thrown away if can't be pushed
-	 * now. This is fine, as long as relay's live much longer that the
-	 * timeouts in Raft are set.
-	 */
-	if (!relay->tx.is_raft_enabled)
-		return;
-	/*
-	 * XXX: the message should be preallocated. It should
-	 * work like Kharon in IProto. Relay should have 2 raft
-	 * messages rotating. When one is sent, the other can be
-	 * updated and a flag is set. When the first message is
-	 * sent, the control returns to TX thread, sees the set
-	 * flag, rotates the buffers, and sends it again. And so
-	 * on. This is how it can work in future, with 0 heap
-	 * allocations. Current solution with alloc-per-update is
-	 * good enough as a start. Another option - wait until all
-	 * is moved to WAL thread, where this will all happen
-	 * in one thread and will be much simpler.
-	 */
 	struct relay_raft_msg *msg =
-		(struct relay_raft_msg *)malloc(sizeof(*msg));
-	if (msg == NULL) {
-		panic("Couldn't allocate raft message");
-		return;
-	}
+		&relay->tx.raft_msgs[relay->tx.raft_ready_msg];
+	/*
+	 * Overwrite the request in raft_ready_msg. Only the latest raft request
+	 * is saved.
+	 */
 	msg->req = *req;
 	if (req->vclock != NULL) {
 		msg->req.vclock = &msg->vclock;
 		vclock_copy(&msg->vclock, req->vclock);
 	}
-	msg->route.f = relay_raft_msg_push;
-	msg->route.pipe = NULL;
-	cmsg_init(&msg->base, &msg->route);
+	msg->route[0].f = relay_raft_msg_push;
+	msg->route[0].pipe = &relay->tx_pipe;
+	msg->route[1].f = tx_raft_msg_return;
+	msg->route[1].pipe = NULL;
+	cmsg_init(&msg->base, msg->route);
 	msg->relay = relay;
-	cpipe_push(&relay->relay_pipe, &msg->base);
+	relay->tx.is_raft_push_pending = true;
+	relay_push_raft_msg(relay);
 }
 
 /** Send a single row to the client. */
