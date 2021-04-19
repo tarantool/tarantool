@@ -370,6 +370,10 @@ local function save_event(self, event)
     if type(event) ~= 'string' then
         error("Usage: box.internal.feedback_daemon.save_event(string)")
     end
+    if type(self.cached_events) ~= 'table' then
+        return
+    end
+
     self.cached_events[event] = (self.cached_events[event] or 0) + 1
 end
 
