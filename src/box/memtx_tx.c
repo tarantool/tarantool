@@ -1446,14 +1446,12 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
 		while (dels != NULL) {
 			struct txn_stmt *next = dels->next_in_del_list;
 			if (dels != stmt) {
-				dels->del_story = NULL;
 				dels->next_in_del_list = NULL;
 			}
 			dels = next;
 		}
 		// Set the only deleting statement for that story.
 		stmt->del_story->del_stmt = stmt;
-		stmt->next_in_del_list = NULL;
 	}
 }
 
@@ -1471,7 +1469,6 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
 		assert(stmt->del_story->del_stmt == stmt);
 		assert(stmt->next_in_del_list == NULL);
 		res -= stmt->del_story->tuple->bsize;
-		stmt->del_story->del_stmt = NULL;
 		stmt->del_story = NULL;
 	}
 	return res;
