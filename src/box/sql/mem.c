@@ -70,7 +70,7 @@ mem_str(const struct Mem *mem)
 	case MEM_Int:
 		return tt_sprintf("%lld", mem->u.i);
 	case MEM_UInt:
-		return tt_sprintf("%llu", mem->u.u);
+		return tt_sprintf("%lu", mem->u.u);
 	case MEM_Real:
 		sql_snprintf(BUF_SIZE, &buf[0], "%!.15g", mem->u.r);
 		return tt_sprintf("%s", buf);
@@ -520,7 +520,7 @@ int_to_str0(struct Mem *mem)
 {
 	const char *str;
 	if ((mem->flags & MEM_UInt) != 0)
-		str = tt_sprintf("%llu", mem->u.u);
+		str = tt_sprintf("%lu", mem->u.u);
 	else
 		str = tt_sprintf("%lld", mem->u.i);
 	return mem_copy_str0(mem, str);
@@ -729,7 +729,8 @@ double_to_bool(struct Mem *mem)
 static inline int
 bool_to_int(struct Mem *mem)
 {
-	mem->u.u = (uint64_t)mem->u.b;
+	uint64_t u = (uint64_t)mem->u.b;
+	mem->u.u = u;
 	mem->flags = MEM_UInt;
 	mem->field_type = FIELD_TYPE_UNSIGNED;
 	return 0;
@@ -1599,7 +1600,7 @@ mem_shift_left(const struct Mem *left, const struct Mem *right,
 		result->u.i = a >= 0 ? 0 : -1;
 	else if (b < 0)
 		result->u.i = a >> -b;
-	else if (b > 64)
+	else if (b >= 64)
 		result->u.i = 0;
 	else
 		result->u.i = a << b;
@@ -1621,7 +1622,7 @@ mem_shift_right(const struct Mem *left, const struct Mem *right,
 		result->u.i = 0;
 	else if (b < 0)
 		result->u.i = a << -b;
-	else if (b > 64)
+	else if (b >= 64)
 		result->u.i = a >= 0 ? 0 : -1;
 	else
 		result->u.i = a >> b;

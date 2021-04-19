@@ -343,6 +343,7 @@ position_func(struct sql_context *context, int argc, struct Mem **argv)
 			 */
 			haystack_str = mem_as_ustr(haystack);
 			needle_str = mem_as_ustr(needle);
+			assert(needle_str != NULL && haystack_str != NULL);
 
 			int n_needle_chars =
 				sql_utf8_char_count(needle_str, n_needle_bytes);
@@ -569,7 +570,7 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 	} else if (n == 0 && r < 0 && (-r) < (double)(LARGEST_INT64 - 1)) {
 		r = -(double)((sql_int64) ((-r) + 0.5));
 	} else {
-		const char *rounded_value = tt_sprintf("%.*f", n, r);
+		const char *rounded_value = tt_sprintf("%.*f", (int)n, r);
 		sqlAtoF(rounded_value, &r, sqlStrlen30(rounded_value));
 	}
 	sql_result_double(context, r);
