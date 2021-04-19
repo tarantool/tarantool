@@ -8,6 +8,10 @@ cmake_minimum_required(VERSION 2.8)
 project(tarantool-static C CXX)
 
 include(ExternalProject)
+set(LIBICU_VERSION release-62-1/icu4c-62_1)
+set(LIBICU_HASH 490ad9d920158e0314e10ba74ae9a150)
+set(LIBICONV_VERSION 1.16)
+set(LIBICONV_HASH 7d2a800b952942bb2880efb00cfd524c)
 set(OPENSSL_VERSION 1.1.1f)
 set(OPENSSL_HASH 3f486f2f4435ef14b81814dbbc7b48bb)
 set(ZLIB_VERSION 1.2.11)
@@ -63,7 +67,8 @@ ExternalProject_Add(openssl
 # ICU
 #
 ExternalProject_Add(icu
-    URL https://github.com/unicode-org/icu/releases/download/release-62-1/icu4c-62_1-src.tgz
+    URL https://github.com/unicode-org/icu/releases/download/${LIBICU_VERSION}-src.tgz
+    URL_MD5 ${LIBICU_HASH}
     # By default libicu is built by using clang/clang++ compiler (if it
     # exists). Here is a link for detecting compilers at libicu configure
     # script: https://github.com/unicode-org/icu/blob/7c7b8bd5702310b972f888299169bc3cc88bf0a6/icu4c/source/configure.ac#L135
@@ -156,7 +161,8 @@ ExternalProject_Add(readline
 #
 if (APPLE)
     ExternalProject_Add(iconv
-        URL https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.16.tar.gz
+        URL https://ftp.gnu.org/pub/gnu/libiconv/libiconv-${LIBICONV_VERSION}.tar.gz
+        URL_MD5 ${LIBICONV_HASH}
         CONFIGURE_COMMAND <SOURCE_DIR>/configure
             CC=${CMAKE_C_COMPILER}
             CFLAGS=${DEPENDENCY_CFLAGS}
