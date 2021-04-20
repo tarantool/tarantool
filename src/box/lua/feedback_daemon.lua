@@ -330,9 +330,12 @@ end
 
 local function feedback_loop(self)
     fiber.name(PREFIX, { truncate = true })
+    -- Speed up the first send.
+    local send_timeout = math.min(120, self.interval)
 
     while true do
-        local msg = self.control:get(self.interval)
+        local msg = self.control:get(send_timeout)
+        send_timeout = self.interval
         -- if msg == "send" then we simply send feedback
         if msg == "stop" then
             break
