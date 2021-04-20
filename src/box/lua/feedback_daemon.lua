@@ -328,12 +328,6 @@ local function fill_in_feedback(self, feedback)
     return feedback
 end
 
--- fixme: remove this hack.
--- It's here to prevent too early feedback sending.
--- This leads to problems with thread sanitization after fork() on Mac OS.
--- Google objc_initializeAfterForkError for details.
-local is_first_send = true
-
 local function feedback_loop(self)
     fiber.name(PREFIX, { truncate = true })
 
@@ -342,10 +336,6 @@ local function feedback_loop(self)
         -- if msg == "send" then we simply send feedback
         if msg == "stop" then
             break
-        end
-        if is_first_send then
-            fiber.sleep(10)
-            is_first_send = nil
         end
         local feedback = self:generate_feedback()
         if feedback ~= nil then
