@@ -248,6 +248,29 @@ for i = 1, 100 do box.space.sync:delete{i} end
 test_run:cmd('switch replica')
 box.space.sync:count()
 
+--
+-- gh-5445: NOPs bypass the limbo for the sake of vclock bumps from foreign
+-- instances, but also works for local rows.
+--
+test_run:switch('default')
+box.cfg{replication_synchro_quorum = 3, replication_synchro_timeout = 1000}
+f = fiber.create(function() box.space.sync:replace{1} end)
+test_run:wait_lsn('replica', 'default')
+
+test_run:switch('replica')
+function skip_row() return nil end
+old_lsn = box.info.lsn
+_ = box.space.sync:before_replace(skip_row)
+box.space.sync:replace{2}
+box.space.sync:before_replace(nil, skip_row)
+assert(box.space.sync:get{2} == nil)
+assert(box.space.sync:get{1} ~= nil)
+
+test_run:switch('default')
+box.cfg{replication_synchro_quorum = 2}
+test_run:wait_cond(function() return f:status() == 'dead' end)
+box.space.sync:truncate()
+
 -- Cleanup.
 test_run:cmd('switch default')
 
