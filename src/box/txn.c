@@ -601,6 +601,14 @@ txn_journal_entry_new(struct txn *txn)
 	struct xrow_header **remote_row = req->rows;
 	struct xrow_header **local_row = req->rows + txn->n_applier_rows;
 	bool is_sync = false;
+	/*
+	 * A transaction which consists of NOPs solely should pass through the
+	 * limbo without waiting. Even when the limbo is not empty. This is
+	 * because otherwise they might fail with the limbo being not owned by
+	 * the NOPs owner. But it does not matter, because they just need to
+	 * bump vclock. There is nothing to confirm or rollback in them.
+	 */
+	bool is_fully_nop = true;
 
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->has_triggers) {
@@ -612,8 +620,11 @@ txn_journal_entry_new(struct txn *txn)
 		if (stmt->row == NULL)
 			continue;
 
-		is_sync = is_sync || (stmt->space != NULL &&
-				      stmt->space->def->opts.is_sync);
+		if (stmt->row->type != IPROTO_NOP) {
+			is_fully_nop = false;
+			is_sync = is_sync || (stmt->space != NULL &&
+					      stmt->space->def->opts.is_sync);
+		}
 
 		if (stmt->row->replica_id == 0)
 			*local_row++ = stmt->row;
@@ -627,7 +638,7 @@ txn_journal_entry_new(struct txn *txn)
 	 * space can't be synchronous. So if there is at least one
 	 * synchronous space, the transaction is not local.
 	 */
-	if (!txn_has_flag(txn, TXN_FORCE_ASYNC)) {
+	if (!txn_has_flag(txn, TXN_FORCE_ASYNC) && !is_fully_nop) {
 		if (is_sync) {
 			txn_set_flag(txn, TXN_WAIT_SYNC);
 			txn_set_flag(txn, TXN_WAIT_ACK);
