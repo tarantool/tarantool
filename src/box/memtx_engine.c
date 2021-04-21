@@ -956,6 +956,7 @@ memtx_engine_join(struct engine *engine, void *arg, struct xstream *stream)
 	memtx->replica_join_cord = &cord;
 	int res = cord_cojoin(&cord);
 	memtx->replica_join_cord = NULL;
+	xstream_reset(stream);
 	return res;
 }
 
