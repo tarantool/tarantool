@@ -335,8 +335,6 @@ struct wal_stream {
 	 * matches LSN of a first global row.
 	 */
 	bool has_global_row;
-	/** How many rows have been recovered so far. */
-	size_t rows;
 };
 
 /**
@@ -570,12 +568,6 @@ end_diag_request:
 static void
 wal_stream_try_yield(struct wal_stream *stream)
 {
-	/*
-	 * Save the yield. Otherwise it would happen only on rows which
-	 * are a multiple of WAL_ROWS_PER_YIELD and are last in their
-	 * transaction, which is probably a very rare coincidence.
-	 */
-	stream->has_yield |= (stream->rows % WAL_ROWS_PER_YIELD == 0);
 	if (wal_stream_has_tx(stream) || !stream->has_yield)
 		return;
 	stream->has_yield = false;
@@ -587,11 +579,6 @@ wal_stream_apply_row(struct xstream *base, struct xrow_header *row)
 {
 	struct wal_stream *stream =
 		container_of(base, struct wal_stream, base);
-	/*
-	 * Account all rows, even non-DML, and even leading to an error. Because
-	 * still need to yield sometimes.
-	 */
-	++stream->rows;
 	if (iproto_type_is_synchro_request(row->type)) {
 		if (wal_stream_apply_synchro_row(stream, row) != 0)
 			goto end_error;
@@ -610,15 +597,27 @@ end_error:
 	diag_raise();
 }
 
+/**
+ * Plan a yield in recovery stream. Wal stream will execute it as soon as it's
+ * ready.
+ */
+static void
+wal_stream_schedule_yield(struct xstream *base)
+{
+	struct wal_stream *stream = container_of(base, struct wal_stream, base);
+	stream->has_yield = true;
+	wal_stream_try_yield(stream);
+}
+
 static void
 wal_stream_create(struct wal_stream *ctx)
 {
-	xstream_create(&ctx->base, wal_stream_apply_row);
+	xstream_create(&ctx->base, wal_stream_apply_row,
+		       wal_stream_schedule_yield);
 	ctx->tsn = 0;
 	ctx->first_row_lsn = 0;
 	ctx->has_yield = false;
 	ctx->has_global_row = false;
-	ctx->rows = 0;
 }
 
 /* {{{ configuration bindings */
@@ -3151,7 +3150,8 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	 * so we must reflect this in replicaset vclock to
 	 * not attempt to apply these rows twice.
 	 */
-	recovery_scan(recovery, &replicaset.vclock, &gc.vclock);
+	recovery_scan(recovery, &replicaset.vclock, &gc.vclock,
+		      &wal_stream.base);
 	say_info("instance vclock %s", vclock_to_string(&replicaset.vclock));
 
 	if (wal_dir_lock >= 0) {

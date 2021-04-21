@@ -41,16 +41,40 @@ extern "C" {
 struct xrow_header;
 struct xstream;
 
+/**
+ * A type for a callback invoked by recovery after some batch of rows is
+ * processed. Is used mostly to unblock the event loop every now and then.
+ */
+typedef void (*xstream_yield_f)(struct xstream *);
+
 typedef void (*xstream_write_f)(struct xstream *, struct xrow_header *);
 
 struct xstream {
 	xstream_write_f write;
+	xstream_yield_f yield;
+	uint64_t row_count;
 };
 
 static inline void
-xstream_create(struct xstream *xstream, xstream_write_f write)
+xstream_create(struct xstream *xstream, xstream_write_f write,
+	       xstream_yield_f yield)
 {
 	xstream->write = write;
+	xstream->yield = yield;
+	xstream->row_count = 0;
+}
+
+static inline void
+xstream_yield(struct xstream *stream)
+{
+	stream->yield(stream);
+}
+
+static inline void
+xstream_reset(struct xstream *stream)
+{
+	stream->row_count = 0;
+	xstream_yield(stream);
 }
 
 int
