@@ -368,11 +368,6 @@ local function save_event(self, event)
         error("Usage: box.internal.feedback_daemon.save_event(string)")
     end
     self.cached_events[event] = (self.cached_events[event] or 0) + 1
-    if self.cached_events[event] == 1 then
-        -- The first occurred event of this type triggers report dispatch
-        -- immediately.
-        self.send()
-    end
 end
 
 -- these functions are used for test purposes only
