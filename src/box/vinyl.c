@@ -3021,6 +3021,7 @@ vinyl_engine_join(struct engine *engine, void *arg, struct xstream *stream)
 		if (++loops % VY_YIELD_LOOPS == 0)
 			fiber_sleep(0);
 	}
+	xstream_reset(stream);
 	return 0;
 }
 

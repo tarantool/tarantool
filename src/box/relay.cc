@@ -260,11 +260,19 @@ relay_new(struct replica *replica)
 	return relay;
 }
 
+/** A callback recovery calls every now and then to unblock the event loop. */
+static void
+relay_yield(struct xstream *stream)
+{
+	(void) stream;
+	fiber_sleep(0);
+}
+
 static void
 relay_start(struct relay *relay, int fd, uint64_t sync,
 	     void (*stream_write)(struct xstream *, struct xrow_header *))
 {
-	xstream_create(&relay->stream, stream_write);
+	xstream_create(&relay->stream, stream_write, relay_yield);
 	/*
 	 * Clear the diagnostics at start, in case it has the old
 	 * error message which we keep around to display in
@@ -927,13 +935,6 @@ relay_send(struct relay *relay, struct xrow_header *packet)
 	relay->last_row_time = ev_monotonic_now(loop());
 	coio_write_xrow(&relay->io, packet);
 	fiber_gc();
-
-	/*
-	 * It may happen that the socket is always ready for write, so yield
-	 * explicitly every now and then to not block the event loop.
-	 */
-	if (++relay->row_count % WAL_ROWS_PER_YIELD == 0)
-		fiber_sleep(0);
 
 	struct errinj *inj = errinj(ERRINJ_RELAY_TIMEOUT, ERRINJ_DOUBLE);
 	if (inj != NULL && inj->dparam > 0)

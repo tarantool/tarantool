@@ -119,7 +119,7 @@ recovery_new(const char *wal_dirname, bool force_recovery,
 
 void
 recovery_scan(struct recovery *r, struct vclock *end_vclock,
-	      struct vclock *gc_vclock)
+	      struct vclock *gc_vclock, struct xstream *stream)
 {
 	xdir_scan_xc(&r->wal_dir, true);
 
@@ -139,9 +139,14 @@ recovery_scan(struct recovery *r, struct vclock *end_vclock,
 	if (xdir_open_cursor(&r->wal_dir, vclock_sum(end_vclock), &cursor) != 0)
 		return;
 	struct xrow_header row;
-	while (xlog_cursor_next(&cursor, &row, true) == 0)
+	while (xlog_cursor_next(&cursor, &row, true) == 0) {
 		vclock_follow_xrow(end_vclock, &row);
+		if (++stream->row_count % WAL_ROWS_PER_YIELD == 0)
+			xstream_yield(stream);
+	}
 	xlog_cursor_close(&cursor, false);
+
+	xstream_reset(stream);
 }
 
 static inline void
@@ -242,9 +247,14 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 	     const struct vclock *stop_vclock)
 {
 	struct xrow_header row;
-	uint64_t row_count = 0;
 	while (xlog_cursor_next_xc(&r->cursor, &row,
 				   r->wal_dir.force_recovery) == 0) {
+		if (++stream->row_count % WAL_ROWS_PER_YIELD == 0) {
+			xstream_yield(stream);
+		}
+		if (stream->row_count % 100000 == 0)
+			say_info("%.1fM rows processed",
+				 stream->row_count / 1000000.);
 		/*
 		 * Read the next row from xlog file.
 		 *
@@ -273,12 +283,7 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 		 * failed row anyway.
 		 */
 		vclock_follow_xrow(&r->vclock, &row);
-		if (xstream_write(stream, &row) == 0) {
-			++row_count;
-			if (row_count % 100000 == 0)
-				say_info("%.1fM rows processed",
-					 row_count / 1000000.);
-		} else {
+		if (xstream_write(stream, &row) != 0) {
 			if (!r->wal_dir.force_recovery)
 				diag_raise();
 

@@ -74,7 +74,7 @@ recovery_delete(struct recovery *r);
  */
 void
 recovery_scan(struct recovery *r,  struct vclock *end_vclock,
-	      struct vclock *gc_vclock);
+	      struct vclock *gc_vclock, struct xstream *stream);
 
 void
 recovery_follow_local(struct recovery *r, struct xstream *stream,
