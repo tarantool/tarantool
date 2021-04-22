@@ -397,7 +397,7 @@ static mp_compare_f mp_class_comparators[] = {
 	/* .MP_CLASS_NUMBER = */ mp_compare_number,
 	/* .MP_CLASS_STR    = */ mp_compare_str,
 	/* .MP_CLASS_BIN    = */ mp_compare_bin,
-	/* .MP_CLASS_UUID   = */ NULL,
+	/* .MP_CLASS_UUID   = */ mp_compare_uuid,
 	/* .MP_CLASS_ARRAY  = */ NULL,
 	/* .MP_CLASS_MAP    = */ NULL,
 };
@@ -1790,6 +1790,8 @@ field_hint_scalar(const char *field, struct coll *coll)
 			decimal_t dec;
 			return hint_decimal(decimal_unpack(&field, len, &dec));
 		}
+		case MP_UUID:
+			return hint_uuid_raw(field);
 		default:
 			unreachable();
 		}

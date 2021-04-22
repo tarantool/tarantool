@@ -522,8 +522,8 @@ fail_format_change(11, 'uuid')
 ok_format_change(12, 'any')
 -- uuid --X--> number
 fail_format_change(12, 'number')
--- uuid --X--> scalar
-fail_format_change(12, 'scalar')
+-- uuid ----> scalar
+ok_format_change(12, 'scalar')
 -- uuid --X--> string
 fail_format_change(12, 'string')
 -- uuid --X--> integer

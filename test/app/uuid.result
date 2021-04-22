@@ -443,6 +443,64 @@ u1_str = nil
 u2_str = nil
 ---
 ...
+--
+-- gh-6042: add UUID to SCALAR.
+--
+s = box.schema.space.create('s', {format={{'s', 'scalar'}}})
+---
+...
+_ = s:create_index('i')
+---
+...
+s:insert({uuid.fromstr('11111111-1111-1111-1111-111111111111')})
+---
+- [11111111-1111-1111-1111-111111111111]
+...
+s:insert({uuid.fromstr('11111111-1111-1111-1111-111111111112')})
+---
+- [11111111-1111-1111-1111-111111111112]
+...
+s:insert({1})
+---
+- [1]
+...
+s:insert({'1'})
+---
+- ['1']
+...
+s:insert({true})
+---
+- [true]
+...
+box.execute([[INSERT INTO "s" VALUES (x'303030')]])
+---
+- row_count: 1
+...
+--
+-- Make sure that comparison is right. Comparison in SCALAR field:
+-- bool < number < string < varbinary < uuid.
+--
+s:select()
+---
+- - [true]
+  - [1]
+  - ['1']
+  - ['000']
+  - [11111111-1111-1111-1111-111111111111]
+  - [11111111-1111-1111-1111-111111111112]
+...
+s:select({}, {iterator='LE'})
+---
+- - [11111111-1111-1111-1111-111111111112]
+  - [11111111-1111-1111-1111-111111111111]
+  - ['000']
+  - ['1']
+  - [1]
+  - [true]
+...
+s:drop()
+---
+...
 uuid = nil
 ---
 ...
