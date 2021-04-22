@@ -707,8 +707,7 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 		assert(e->ack_count <= VCLOCK_MAX);
 		if (!txn_has_flag(e->txn, TXN_WAIT_ACK)) {
 			assert(e->lsn == -1);
-			if (confirm_lsn == -1)
-				continue;
+			continue;
 		} else if (e->ack_count < replication_synchro_quorum) {
 			continue;
 		} else {
