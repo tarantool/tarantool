@@ -58,7 +58,8 @@ static const void *
 mem_as_bin(struct Mem *mem)
 {
 	const char *s;
-	if (!mem_is_bytes(mem) && mem_to_str(mem) != 0)
+	if (mem_cast_implicit(mem, FIELD_TYPE_VARBINARY) != 0 &&
+	    mem_to_str(mem) != 0)
 		return NULL;
 	if (mem_get_bin(mem, &s) != 0)
 		return NULL;
@@ -142,25 +143,28 @@ typeofFunc(sql_context * context, int NotUsed, sql_value ** argv)
 				-1, SQL_STATIC);
 		return;
 	}
-	switch (sql_value_type(argv[0])) {
-	case MP_INT:
-	case MP_UINT:
+	switch (argv[0]->type) {
+	case MEM_TYPE_INT:
+	case MEM_TYPE_UINT:
 		z = "integer";
 		break;
-	case MP_STR:
+	case MEM_TYPE_STR:
 		z = "string";
 		break;
-	case MP_DOUBLE:
+	case MEM_TYPE_DOUBLE:
 		z = "double";
 		break;
-	case MP_BIN:
-	case MP_ARRAY:
-	case MP_MAP:
+	case MEM_TYPE_BIN:
+	case MEM_TYPE_ARRAY:
+	case MEM_TYPE_MAP:
 		z = "varbinary";
 		break;
-	case MP_BOOL:
-	case MP_NIL:
+	case MEM_TYPE_BOOL:
+	case MEM_TYPE_NULL:
 		z = "boolean";
+		break;
+	case MEM_TYPE_UUID:
+		z = "uuid";
 		break;
 	default:
 		unreachable();
@@ -191,6 +195,7 @@ lengthFunc(sql_context * context, int argc, sql_value ** argv)
 			sql_result_uint(context, mem_len_unsafe(argv[0]));
 			break;
 		}
+	case MP_EXT:
 	case MP_STR:{
 			const unsigned char *z = mem_as_ustr(argv[0]);
 			if (z == 0)
@@ -235,6 +240,7 @@ absFunc(sql_context * context, int argc, sql_value ** argv)
 		}
 	case MP_BOOL:
 	case MP_BIN:
+	case MP_EXT:
 	case MP_ARRAY:
 	case MP_MAP: {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES, "number",
@@ -1461,8 +1467,8 @@ trim_func_one_arg(struct sql_context *context, sql_value *arg)
 		default_trim = (const unsigned char *) "\0";
 	else
 		default_trim = (const unsigned char *) " ";
-	int input_str_sz = mem_len_unsafe(arg);
 	const unsigned char *input_str = mem_as_ustr(arg);
+	int input_str_sz = mem_len_unsafe(arg);
 	uint8_t trim_char_len[1] = { 1 };
 	trim_procedure(context, TRIM_BOTH, default_trim, trim_char_len, 1,
 		       input_str, input_str_sz);

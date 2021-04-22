@@ -1834,6 +1834,7 @@ typedef(A) ::= SCALAR . { A.type = FIELD_TYPE_SCALAR; }
 typedef(A) ::= BOOL . { A.type = FIELD_TYPE_BOOLEAN; }
 typedef(A) ::= BOOLEAN . { A.type = FIELD_TYPE_BOOLEAN; }
 typedef(A) ::= VARBINARY . { A.type = FIELD_TYPE_VARBINARY; }
+typedef(A) ::= UUID . { A.type = FIELD_TYPE_UUID; }
 
 /**
  * Time-like types are temporary disabled, until they are

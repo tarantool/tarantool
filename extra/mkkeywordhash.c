@@ -172,6 +172,7 @@ static Keyword aKeywordTable[] = {
   { "UNSIGNED",               "TK_UNSIGNED",    true  },
   { "UPDATE",                 "TK_UPDATE",      true  },
   { "USING",                  "TK_USING",       true  },
+  { "UUID" ,                  "TK_UUID" ,       true  },
   { "VALUES",                 "TK_VALUES",      true  },
   { "VARBINARY",              "TK_VARBINARY",   true  },
   { "VIEW",                   "TK_VIEW",        true  },

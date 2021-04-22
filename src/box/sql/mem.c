@@ -58,6 +58,16 @@ enum {
 	BUF_SIZE = 32,
 };
 
+bool
+mem_is_field_compatible(const struct Mem *mem, enum field_type type)
+{
+	if (mem->type == MEM_TYPE_UUID)
+		return (field_ext_type[type] & (1U << MP_UUID)) != 0;
+	enum mp_type mp_type = mem_mp_type(mem);
+	assert(mp_type != MP_EXT);
+	return field_mp_plain_type_is_compatible(type, mp_type, true);
+}
+
 const char *
 mem_str(const struct Mem *mem)
 {
@@ -81,6 +91,8 @@ mem_str(const struct Mem *mem)
 	case MEM_TYPE_MAP:
 	case MEM_TYPE_ARRAY:
 		return mp_str(mem->z);
+	case MEM_TYPE_UUID:
+		return tt_uuid_str(&mem->u.uuid);
 	case MEM_TYPE_BOOL:
 		return mem->u.b ? "TRUE" : "FALSE";
 	default:
@@ -188,6 +200,16 @@ mem_set_double(struct Mem *mem, double value)
 		return;
 	mem->u.r = value;
 	mem->type = MEM_TYPE_DOUBLE;
+}
+
+void
+mem_set_uuid(struct Mem *mem, const struct tt_uuid *uuid)
+{
+	mem_clear(mem);
+	mem->field_type = FIELD_TYPE_UUID;
+	mem->u.uuid = *uuid;
+	mem->type = MEM_TYPE_UUID;
+	assert(mem->flags == 0);
 }
 
 static inline void
@@ -586,6 +608,17 @@ str_to_bin(struct Mem *mem)
 }
 
 static inline int
+str_to_uuid(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_STR);
+	struct tt_uuid uuid;
+	if (tt_uuid_from_strl(mem->z, mem->n, &uuid) != 0)
+		return -1;
+	mem_set_uuid(mem, &uuid);
+	return 0;
+}
+
+static inline int
 str_to_bool(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_STR);
@@ -636,6 +669,19 @@ bin_to_str0(struct Mem *mem)
 	mem->type = MEM_TYPE_STR;
 	mem->flags = MEM_Term;
 	mem->field_type = FIELD_TYPE_STRING;
+	return 0;
+}
+
+static inline int
+bin_to_uuid(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_BIN);
+	if (ExpandBlob(mem) != 0)
+		return -1;
+	if (mem->n != UUID_LEN ||
+	    tt_uuid_validate((struct tt_uuid *)mem->z) != 0)
+		return -1;
+	mem_set_uuid(mem, (struct tt_uuid *)mem->z);
 	return 0;
 }
 
@@ -810,6 +856,22 @@ map_to_str0(struct Mem *mem)
 	return mem_copy_str0(mem, str);
 }
 
+static inline int
+uuid_to_str0(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_UUID);
+	char buf[UUID_STR_LEN + 1];
+	tt_uuid_to_string(&mem->u.uuid, &buf[0]);
+	return mem_copy_str0(mem, &buf[0]);
+}
+
+static inline int
+uuid_to_bin(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_UUID);
+	return mem_copy_bin(mem, (char *)&mem->u.uuid, UUID_LEN);
+}
+
 int
 mem_to_int(struct Mem *mem)
 {
@@ -889,6 +951,8 @@ mem_to_str0(struct Mem *mem)
 		return map_to_str0(mem);
 	case MEM_TYPE_ARRAY:
 		return array_to_str0(mem);
+	case MEM_TYPE_UUID:
+		return uuid_to_str0(mem);
 	default:
 		return -1;
 	}
@@ -914,6 +978,8 @@ mem_to_str(struct Mem *mem)
 		return map_to_str0(mem);
 	case MEM_TYPE_ARRAY:
 		return array_to_str0(mem);
+	case MEM_TYPE_UUID:
+		return uuid_to_str0(mem);
 	default:
 		return -1;
 	}
@@ -966,9 +1032,19 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 			return str_to_bin(mem);
 		if (mem_is_bytes(mem))
 			return 0;
+		if (mem->type == MEM_TYPE_UUID)
+			return uuid_to_bin(mem);
 		return -1;
 	case FIELD_TYPE_NUMBER:
 		return mem_to_number(mem);
+	case FIELD_TYPE_UUID:
+		if (mem->type == MEM_TYPE_UUID)
+			return 0;
+		if (mem->type == MEM_TYPE_STR)
+			return str_to_uuid(mem);
+		if (mem->type == MEM_TYPE_BIN)
+			return bin_to_uuid(mem);
+		return -1;
 	case FIELD_TYPE_SCALAR:
 		if ((mem->type & (MEM_TYPE_MAP | MEM_TYPE_ARRAY)) != 0)
 			return -1;
@@ -996,6 +1072,8 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 	case FIELD_TYPE_STRING:
 		if (mem->type == MEM_TYPE_STR)
 			return 0;
+		if (mem->type == MEM_TYPE_UUID)
+			return uuid_to_str0(mem);
 		return -1;
 	case FIELD_TYPE_DOUBLE:
 		if (mem->type == MEM_TYPE_DOUBLE)
@@ -1017,6 +1095,8 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		if ((mem->type & (MEM_TYPE_BIN | MEM_TYPE_MAP |
 				  MEM_TYPE_ARRAY)) != 0)
 			return 0;
+		if (mem->type == MEM_TYPE_UUID)
+			return uuid_to_bin(mem);
 		return -1;
 	case FIELD_TYPE_NUMBER:
 		if (mem_is_num(mem))
@@ -1034,6 +1114,14 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		if ((mem->type & (MEM_TYPE_MAP | MEM_TYPE_ARRAY)) != 0)
 			return -1;
 		return 0;
+	case FIELD_TYPE_UUID:
+		if (mem->type == MEM_TYPE_UUID)
+			return 0;
+		if (mem->type == MEM_TYPE_STR)
+			return str_to_uuid(mem);
+		if (mem->type == MEM_TYPE_BIN)
+			return bin_to_uuid(mem);
+		return -1;
 	case FIELD_TYPE_ANY:
 		return 0;
 	default:
@@ -1063,6 +1151,8 @@ mem_cast_implicit_old(struct Mem *mem, enum field_type type)
 			return int_to_str0(mem);
 		if (mem->type == MEM_TYPE_DOUBLE)
 			return double_to_str0(mem);
+		if (mem->type == MEM_TYPE_UUID)
+			return uuid_to_str0(mem);
 		return -1;
 	case FIELD_TYPE_DOUBLE:
 		if (mem->type == MEM_TYPE_DOUBLE)
@@ -1087,6 +1177,8 @@ mem_cast_implicit_old(struct Mem *mem, enum field_type type)
 	case FIELD_TYPE_VARBINARY:
 		if (mem->type == MEM_TYPE_BIN)
 			return 0;
+		if (mem->type == MEM_TYPE_UUID)
+			return uuid_to_bin(mem);
 		return -1;
 	case FIELD_TYPE_NUMBER:
 		if (mem_is_num(mem))
@@ -1106,6 +1198,14 @@ mem_cast_implicit_old(struct Mem *mem, enum field_type type)
 		if ((mem->type & (MEM_TYPE_MAP | MEM_TYPE_ARRAY)) != 0)
 			return -1;
 		return 0;
+	case FIELD_TYPE_UUID:
+		if (mem->type == MEM_TYPE_UUID)
+			return 0;
+		if (mem->type == MEM_TYPE_STR)
+			return str_to_uuid(mem);
+		if (mem->type == MEM_TYPE_BIN)
+			return bin_to_uuid(mem);
+		return -1;
 	default:
 		break;
 	}
@@ -1899,6 +1999,15 @@ mem_cmp_str(const struct Mem *left, const struct Mem *right, int *result,
 	return 0;
 }
 
+int
+mem_cmp_uuid(const struct Mem *a, const struct Mem *b, int *result)
+{
+	if ((a->type & b->type & MEM_TYPE_UUID) == 0)
+		return -1;
+	*result = memcmp(&a->u.uuid, &b->u.uuid, UUID_LEN);
+	return 0;
+}
+
 /*
  * Both *pMem1 and *pMem2 contain string values. Compare the two values
  * using the collation sequence pColl. As usual, return a negative , zero
@@ -1951,13 +2060,15 @@ mem_type_to_str(const struct Mem *p)
 		return "varbinary";
 	case MEM_TYPE_BOOL:
 		return "boolean";
+	case MEM_TYPE_UUID:
+		return "uuid";
 	default:
 		unreachable();
 	}
 }
 
 enum mp_type
-mem_mp_type(struct Mem *mem)
+mem_mp_type(const struct Mem *mem)
 {
 	assert(mem->type < MEM_TYPE_INVALID);
 	switch (mem->type) {
@@ -1979,6 +2090,8 @@ mem_mp_type(struct Mem *mem)
 		return MP_BOOL;
 	case MEM_TYPE_DOUBLE:
 		return MP_DOUBLE;
+	case MEM_TYPE_UUID:
+		return MP_EXT;
 	default:
 		unreachable();
 	}
@@ -2143,6 +2256,9 @@ memTracePrint(Mem *p)
 		return;
 	case MEM_TYPE_BOOL:
 		printf(" bool:%s", SQL_TOKEN_BOOLEAN(p->u.b));
+		return;
+	case MEM_TYPE_UUID:
+		printf(" uuid:%s", tt_uuid_str(&p->u.uuid));
 		return;
 	default: {
 		char zBuf[200];
@@ -2360,6 +2476,14 @@ sqlMemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
 		return -1;
 	}
 
+	if (((type1 | type2) & MEM_TYPE_UUID) != 0) {
+		if (mem_cmp_uuid(pMem1, pMem2, &res) == 0)
+			return res;
+		if (type1 != MEM_TYPE_UUID)
+			return +1;
+		return -1;
+	}
+
 	/* At least one of the two values is a number
 	 */
 	if (((type1 | type2) &
@@ -2565,13 +2689,30 @@ sqlVdbeCompareMsgpack(const char **key1,
 			break;
 		}
 	case MP_ARRAY:
-	case MP_MAP:
-	case MP_EXT:{
+	case MP_MAP: {
 			mem1.z = (char *)aKey1;
 			mp_next(&aKey1);
 			mem1.n = aKey1 - (char *)mem1.z;
 			goto do_blob;
 		}
+	case MP_EXT: {
+		int8_t type;
+		const char *buf = aKey1;
+		uint32_t len = mp_decode_extl(&aKey1, &type);
+		if (type == MP_UUID) {
+			assert(len == UUID_LEN);
+			mem1.type = MEM_TYPE_UUID;
+			aKey1 = buf;
+			if (mp_decode_uuid(&aKey1, &mem1.u.uuid) == NULL ||
+			    mem_cmp_uuid(&mem1, pKey2, &rc) != 0)
+				rc = 1;
+			break;
+		}
+		aKey1 += len;
+		mem1.z = (char *)buf;
+		mem1.n = aKey1 - buf;
+		goto do_blob;
+	}
 	}
 	*key1 = aKey1;
 	return rc;
@@ -2625,9 +2766,25 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 		break;
 	}
 	case MP_EXT: {
-		mem->z = (char *)buf;
-		mp_next(&buf);
-		mem->n = buf - mem->z;
+		int8_t type;
+		const char *svp = buf;
+		uint32_t size = mp_decode_extl(&buf, &type);
+		if (type == MP_UUID) {
+			assert(size == UUID_LEN);
+			buf = svp;
+			if (mp_decode_uuid(&buf, &mem->u.uuid) == NULL) {
+				diag_set(ClientError, ER_INVALID_MSGPACK,
+					 "Invalid MP_UUID MsgPack format");
+				return -1;
+			}
+			mem->type = MEM_TYPE_UUID;
+			mem->flags = 0;
+			mem->field_type = FIELD_TYPE_UUID;
+			break;
+		}
+		buf += size;
+		mem->z = (char *)svp;
+		mem->n = buf - svp;
 		mem->type = MEM_TYPE_BIN;
 		mem->flags = MEM_Ephem;
 		mem->field_type = FIELD_TYPE_VARBINARY;
@@ -2764,6 +2921,9 @@ mpstream_encode_vdbe_mem(struct mpstream *stream, struct Mem *var)
 	case MEM_TYPE_BOOL:
 		mpstream_encode_bool(stream, var->u.b);
 		return;
+	case MEM_TYPE_UUID:
+		mpstream_encode_uuid(stream, &var->u.uuid);
+		return;
 	default:
 		unreachable();
 	}
@@ -2849,6 +3009,9 @@ port_vdbemem_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 			break;
 		case MEM_TYPE_BOOL:
 			lua_pushboolean(L, mem->u.b);
+			break;
+		case MEM_TYPE_UUID:
+			*luaL_pushuuid(L) = mem->u.uuid;
 			break;
 		default:
 			unreachable();
@@ -2976,14 +3139,8 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 			uint32_t size;
 			uint32_t svp = region_used(&fiber()->gc);
 			if (field.ext_type == MP_UUID) {
-				size = mp_sizeof_uuid();
-				buf = region_alloc(&fiber()->gc, size);
-				if (buf == NULL) {
-					diag_set(OutOfMemory, size,
-						 "region_alloc", "buf");
-					goto error;
-				}
-				mp_encode_uuid(buf, field.uuidval);
+				mem_set_uuid(&val[i], field.uuidval);
+				break;
 			} else {
 				size = mp_sizeof_decimal(field.decval);
 				buf = region_alloc(&fiber()->gc, size);
@@ -3087,7 +3244,22 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 			break;
 		case MP_EXT:
 			str = data;
-			mp_next(&data);
+			int8_t type;
+			len = mp_decode_extl(&data, &type);
+			if (type == MP_UUID) {
+				assert(len == UUID_LEN);
+				struct tt_uuid *uuid = &val[i].u.uuid;
+				data = str;
+				if (mp_decode_uuid(&data, uuid) == NULL) {
+					diag_set(ClientError,
+						 ER_INVALID_MSGPACK, "Invalid "
+						 "MP_UUID MsgPack format");
+					goto error;
+				}
+				val[i].type = MEM_TYPE_UUID;
+				break;
+			}
+			data += len;
 			if (mem_copy_bin(&val[i], str, data - str) != 0)
 				goto error;
 			break;

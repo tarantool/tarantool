@@ -1322,10 +1322,10 @@ case OP_FunctionByName: {
 	region_truncate(region, region_svp);
 	if (mem == NULL)
 		goto abort_due_to_error;
-	enum mp_type type = sql_value_type((sql_value *)pOut);
-	if (!field_mp_plain_type_is_compatible(returns, type, true)) {
+	if (!mem_is_field_compatible(pOut, returns)) {
 		diag_set(ClientError, ER_FUNC_INVALID_RETURN_TYPE, pOp->p4.z,
-			 field_type_strs[returns], mp_type_strs[type]);
+			 field_type_strs[returns],
+			 mp_type_strs[mem_mp_type(pOut)]);
 		goto abort_due_to_error;
 	}
 
@@ -1632,6 +1632,15 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 				    mem_type_to_str(pIn1);
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH, str,
 				 "boolean");
+			goto abort_due_to_error;
+		}
+	} else if (((pIn3->type | pIn1->type) & MEM_TYPE_UUID) != 0) {
+		if (mem_cmp_uuid(pIn3, pIn1, &res) != 0) {
+			char *str = pIn3->type != MEM_TYPE_UUID ?
+				    mem_type_to_str(pIn3) :
+				    mem_type_to_str(pIn1);
+			diag_set(ClientError, ER_SQL_TYPE_MISMATCH, str,
+				 "uuid");
 			goto abort_due_to_error;
 		}
 	} else if (mem_is_bin(pIn3) || mem_is_bin(pIn1)) {

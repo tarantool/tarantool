@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 #include "box/field_def.h"
+#include "uuid/tt_uuid.h"
 
 struct sql;
 struct Vdbe;
@@ -47,10 +48,11 @@ enum mem_type {
 	MEM_TYPE_MAP		= 1 << 6,
 	MEM_TYPE_BOOL		= 1 << 7,
 	MEM_TYPE_DOUBLE		= 1 << 8,
-	MEM_TYPE_INVALID	= 1 << 9,
-	MEM_TYPE_FRAME		= 1 << 10,
-	MEM_TYPE_PTR		= 1 << 11,
-	MEM_TYPE_AGG		= 1 << 12,
+	MEM_TYPE_UUID		= 1 << 9,
+	MEM_TYPE_INVALID	= 1 << 10,
+	MEM_TYPE_FRAME		= 1 << 11,
+	MEM_TYPE_PTR		= 1 << 12,
+	MEM_TYPE_AGG		= 1 << 13,
 };
 
 /*
@@ -72,6 +74,7 @@ struct Mem {
 		 */
 		struct func *func;
 		struct VdbeFrame *pFrame;	/* Used when flags==MEM_Frame */
+		struct tt_uuid uuid;
 	} u;
 	/** Type of the value this MEM contains. */
 	enum mem_type type;
@@ -255,6 +258,10 @@ mem_is_any_null(const struct Mem *mem1, const struct Mem *mem2)
 	return ((mem1->type| mem2->type) & MEM_TYPE_NULL) != 0;
 }
 
+/** Check if MEM is compatible with field type. */
+bool
+mem_is_field_compatible(const struct Mem *mem, enum field_type type);
+
 /**
  * Return a string that represent content of MEM. String is either allocated
  * using static_alloc() of just a static variable.
@@ -289,6 +296,10 @@ mem_set_bool(struct Mem *mem, bool value);
 /** Clear MEM and set it to DOUBLE. */
 void
 mem_set_double(struct Mem *mem, double value);
+
+/** Clear MEM and set it to UUID. */
+void
+mem_set_uuid(struct Mem *mem, const struct tt_uuid *uuid);
 
 /** Clear MEM and set it to STRING. The string belongs to another object. */
 void
@@ -678,6 +689,14 @@ int
 mem_cmp_num(const struct Mem *a, const struct Mem *b, int *result);
 
 /**
+ * Compare two MEMs and return the result of comparison. MEMs should be of
+ * UUID type or their values are converted to UUID according to
+ * implicit cast rules. Original MEMs are not changed.
+ */
+int
+mem_cmp_uuid(const struct Mem *left, const struct Mem *right, int *result);
+
+/**
  * Convert the given MEM to INTEGER. This function and the function below define
  * the rules that are used to convert values of all other types to INTEGER. In
  * this function, the conversion from double to integer may result in loss of
@@ -898,7 +917,7 @@ mem_type_to_str(const struct Mem *p);
  * transparent memory cell.
  */
 enum mp_type
-mem_mp_type(struct Mem *mem);
+mem_mp_type(const struct Mem *mem);
 
 enum mp_type
 sql_value_type(struct Mem *);
