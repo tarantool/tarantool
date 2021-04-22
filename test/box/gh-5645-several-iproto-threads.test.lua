@@ -62,9 +62,19 @@ function get_network_stat()
 end
 test_run:cmd("setopt delimiter ''");
 
+-- Check that we can't start server with iproto threads count <= 0 or > 1000
+-- We can't pass '-1' or another negative number as argument, so we pass string
+opts = {}
+opts.filename = 'gh-5645-several-iproto-threads.log'
+test_run:cmd("start server test with args='negative' with crash_expected=True")
+assert(test_run:grep_log("test", "Incorrect value for option 'iproto_threads'", nil, opts) ~= nil)
+test_run:cmd("start server test with args='0' with crash_expected=True")
+assert(test_run:grep_log("test", "Incorrect value for option 'iproto_threads'", nil, opts) ~= nil)
+test_run:cmd("start server test with args='1001' with crash_expected=True")
+assert(test_run:grep_log("test", "Incorrect value for option 'iproto_threads'", nil, opts) ~= nil)
+
 -- We check that statistics gathered per each thread in sum is equal to
 -- statistics gathered from all threads.
---
 thread_count = 2
 fibers_count = 100
 test_run:cmd(string.format("start server test with args=\"%s\"", thread_count))
