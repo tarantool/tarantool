@@ -112,6 +112,13 @@ journal_entry_new(size_t n_rows, struct region *region,
 		  journal_write_async_f write_async_cb,
 		  void *complete_data);
 
+/**
+ * Treat complete_data like a fiber pointer and wake it up when journal write is
+ * done.
+ */
+void
+journal_entry_fiber_wakeup_cb(struct journal_entry *entry);
+
 struct journal_queue {
 	/** Maximal size of entries enqueued in journal (in bytes). */
 	int64_t max_size;

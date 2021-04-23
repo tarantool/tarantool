@@ -2219,7 +2219,6 @@ swim_kill_event_handler(struct swim *swim)
 	 * reused.
 	 */
 	swim->event_handler = NULL;
-	fiber_wakeup(f);
 	fiber_cancel(f);
 	fiber_join(f);
 }
