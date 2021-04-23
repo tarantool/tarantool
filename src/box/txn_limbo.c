@@ -303,18 +303,6 @@ complete:
 	return 0;
 }
 
-/**
- * A callback for synchronous write: txn_limbo_write_synchro fiber
- * waiting to proceed once a record is written to WAL.
- */
-static void
-txn_limbo_write_cb(struct journal_entry *entry)
-{
-	assert(entry->complete_data != NULL);
-	if (fiber() != entry->complete_data)
-		fiber_wakeup(entry->complete_data);
-}
-
 static void
 txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 			uint64_t term)
@@ -343,7 +331,7 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 	xrow_encode_synchro(&row, body, &req);
 
 	journal_entry_create(entry, 1, xrow_approx_len(&row),
-			     txn_limbo_write_cb, fiber());
+			     journal_entry_fiber_wakeup_cb, fiber());
 
 	if (journal_write(entry) != 0 || entry->res < 0) {
 		diag_set(ClientError, ER_WAL_IO);

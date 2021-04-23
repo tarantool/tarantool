@@ -794,9 +794,7 @@ apply_synchro_row_cb(struct journal_entry *entry)
 		txn_limbo_process(&txn_limbo, synchro_entry->req);
 		trigger_run(&replicaset.applier.on_wal_write, NULL);
 	}
-	/* The fiber is the same on final join. */
-	if (synchro_entry->owner != fiber())
-		fiber_wakeup(synchro_entry->owner);
+	fiber_wakeup(synchro_entry->owner);
 }
 
 /** Process a synchro request. */

@@ -64,6 +64,12 @@ journal_entry_new(size_t n_rows, struct region *region,
 }
 
 void
+journal_entry_fiber_wakeup_cb(struct journal_entry *entry)
+{
+	fiber_wakeup(entry->complete_data);
+}
+
+void
 journal_queue_wakeup(void)
 {
 	struct rlist *list = &journal_queue.waiters;

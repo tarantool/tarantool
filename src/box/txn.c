@@ -504,9 +504,7 @@ txn_free_or_wakeup(struct txn *txn)
 		txn_free(txn);
 	else {
 		txn_set_flag(txn, TXN_IS_DONE);
-		if (txn->fiber != fiber())
-			/* Wake a waiting fiber up. */
-			fiber_wakeup(txn->fiber);
+		fiber_wakeup(txn->fiber);
 	}
 }
 
@@ -578,7 +576,7 @@ txn_on_journal_write(struct journal_entry *entry)
 		txn_run_wal_write_triggers(txn);
 	if (!txn_has_flag(txn, TXN_WAIT_SYNC))
 		txn_complete_success(txn);
-	else if (txn->fiber != NULL && txn->fiber != fiber())
+	else if (txn->fiber != NULL)
 		fiber_wakeup(txn->fiber);
 finish:
 	fiber_set_txn(fiber(), NULL);

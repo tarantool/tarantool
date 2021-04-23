@@ -155,8 +155,7 @@ box_raft_schedule_async(struct raft *raft)
 	 * adapted to this. Also don't wakeup the current fiber - it leads to
 	 * undefined behaviour.
 	 */
-	if ((box_raft_worker->flags & FIBER_IS_CANCELLABLE) != 0 &&
-	    fiber() != box_raft_worker)
+	if ((box_raft_worker->flags & FIBER_IS_CANCELLABLE) != 0)
 		fiber_wakeup(box_raft_worker);
 	box_raft_has_work = true;
 }
@@ -279,13 +278,6 @@ box_raft_broadcast(struct raft *raft, const struct raft_msg *msg)
 		relay_push_raft(replica->relay, &req);
 }
 
-/** Wakeup Raft state writer fiber waiting for WAL write end. */
-static void
-box_raft_write_cb(struct journal_entry *entry)
-{
-	fiber_wakeup(entry->complete_data);
-}
-
 static void
 box_raft_write(struct raft *raft, const struct raft_msg *msg)
 {
@@ -307,8 +299,8 @@ box_raft_write(struct raft *raft, const struct raft_msg *msg)
 
 	if (xrow_encode_raft(&row, region, &req) != 0)
 		goto fail;
-	journal_entry_create(entry, 1, xrow_approx_len(&row), box_raft_write_cb,
-			     fiber());
+	journal_entry_create(entry, 1, xrow_approx_len(&row),
+			     journal_entry_fiber_wakeup_cb, fiber());
 
 	/*
 	 * A non-cancelable fiber is considered non-wake-able, generally. Raft
