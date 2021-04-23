@@ -9,10 +9,8 @@ enum {
 static int
 yield_f(va_list ap)
 {
-	for (int i = 0; i < ITERATIONS; i++) {
-		fiber_wakeup(fiber());
-		fiber_yield();
-	}
+	for (int i = 0; i < ITERATIONS; i++)
+		fiber_reschedule();
 	return 0;
 }
 
