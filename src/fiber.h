@@ -89,6 +89,10 @@ enum {
 	 * This flag is set when fiber uses custom stack size.
 	 */
 	FIBER_CUSTOM_STACK	= 1 << 5,
+	/**
+	 * The flag is set for the fiber currently being executed by the cord.
+	 */
+	FIBER_IS_RUNNING	= 1 << 6,
 	FIBER_DEFAULT_FLAGS = FIBER_IS_CANCELLABLE
 };
 
@@ -206,7 +210,7 @@ API_EXPORT void
 fiber_start(struct fiber *callee, ...);
 
 /**
- * Interrupt a synchronous wait of a fiber
+ * Interrupt a synchronous wait of a fiber. Nop for the currently running fiber.
  *
  * \param f fiber to be woken up
  */

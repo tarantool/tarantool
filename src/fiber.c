@@ -262,10 +262,13 @@ fiber_call_impl(struct fiber *callee)
 	assert(rlist_empty(&callee->state));
 	assert(caller);
 	assert(caller != callee);
+	assert((caller->flags & FIBER_IS_RUNNING) != 0);
+	assert((callee->flags & FIBER_IS_RUNNING) == 0);
 
+	caller->flags &= ~FIBER_IS_RUNNING;
 	cord->fiber = callee;
+	callee->flags = (callee->flags & ~FIBER_IS_READY) | FIBER_IS_RUNNING;
 
-	callee->flags &= ~FIBER_IS_READY;
 	callee->csw++;
 	ASAN_START_SWITCH_FIBER(asan_state, 1,
 				callee->stack,
@@ -309,19 +312,9 @@ fiber_checkstack()
 	return false;
 }
 
-/**
- * Interrupt a synchronous wait of a fiber inside the event loop.
- * We do so by keeping an "async" event in every fiber, solely
- * for this purpose, and raising this event here.
- *
- * @note: if this is sent to self, followed by a fiber_yield()
- * call, it simply reschedules the fiber after other ready
- * fibers in the same event loop iteration.
- */
-void
-fiber_wakeup(struct fiber *f)
+static void
+fiber_make_ready(struct fiber *f)
 {
-	assert(! (f->flags & FIBER_IS_DEAD));
 	/**
 	 * Do nothing if the fiber is already in cord->ready
 	 * list *or* is in the call chain created by
@@ -330,21 +323,12 @@ fiber_wakeup(struct fiber *f)
 	 * but the same game is deadly when the fiber is in
 	 * the callee list created by fiber_schedule_list().
 	 *
-	 * To put it another way, fiber_wakeup() is a 'request' to
+	 * To put it another way, fiber_make_ready() is a 'request' to
 	 * schedule the fiber for execution, and once it is executing
-	 * a wakeup request is considered complete and it must be
+	 * the 'make ready' request is considered complete and it must be
 	 * removed.
-	 *
-	 * A dead fiber can be lingering in the cord fiber list
-	 * if it is joinable. This makes it technically possible
-	 * to schedule it. We would never make such a mistake
-	 * in our own code, hence the assert above. But as long
-	 * as fiber.wakeup() is a part of public Lua API, an
-	 * external rock can mess things up. Ignore such attempts
-	 * as well.
 	 */
-	if (f->flags & (FIBER_IS_READY | FIBER_IS_DEAD))
-		return;
+	assert((f->flags & (FIBER_IS_DEAD | FIBER_IS_READY)) == 0);
 	struct cord *cord = cord();
 	if (rlist_empty(&cord->ready)) {
 		/*
@@ -369,6 +353,23 @@ fiber_wakeup(struct fiber *f)
 	f->flags |= FIBER_IS_READY;
 }
 
+void
+fiber_wakeup(struct fiber *f)
+{
+	/*
+	 * DEAD is checked both in the assertion and in the release build
+	 * because it should not ever happen, at least internally. But in some
+	 * user modules it might happen, and better ignore such fibers.
+	 * Especially since this was allowed for quite some time in the public
+	 * API and need to keep it if it costs nothing, for backward
+	 * compatibility.
+	 */
+	assert((f->flags & FIBER_IS_DEAD) == 0);
+	const int no_flags = FIBER_IS_READY | FIBER_IS_DEAD | FIBER_IS_RUNNING;
+	if ((f->flags & no_flags) == 0)
+		fiber_make_ready(f);
+}
+
 /** Cancel the subject fiber.
 *
  * Note: cancelation is asynchronous. Use fiber_join() to wait for the
@@ -387,7 +388,6 @@ void
 fiber_cancel(struct fiber *f)
 {
 	assert(f->fid != 0);
-	struct fiber *self = fiber();
 	/**
 	 * Do nothing if the fiber is dead, since cancelling
 	 * the fiber would clear the diagnostics area and
@@ -401,10 +401,8 @@ fiber_cancel(struct fiber *f)
 	/**
 	 * Don't wake self and zombies.
 	 */
-	if (f != self) {
-		if (f->flags & FIBER_IS_CANCELLABLE)
-			fiber_wakeup(f);
-	}
+	if ((f->flags & FIBER_IS_CANCELLABLE) != 0)
+		fiber_wakeup(f);
 }
 
 /**
@@ -468,7 +466,14 @@ fiber_clock64(void)
 void
 fiber_reschedule(void)
 {
-	fiber_wakeup(fiber());
+	struct fiber *f = fiber();
+	/*
+	 * The current fiber can't be dead, the flag is set when the fiber
+	 * function returns. Can't be ready, because such status is assigned
+	 * only to the queued fibers in the ready-list.
+	 */
+	assert((f->flags & (FIBER_IS_READY | FIBER_IS_DEAD)) == 0);
+	fiber_make_ready(f);
 	fiber_yield();
 }
 
@@ -523,9 +528,14 @@ fiber_yield(void)
 
 	assert(callee->flags & FIBER_IS_READY || callee == &cord->sched);
 	assert(! (callee->flags & FIBER_IS_DEAD));
+	assert((caller->flags & FIBER_IS_RUNNING) != 0);
+	assert((callee->flags & FIBER_IS_RUNNING) == 0);
+
+	caller->flags &= ~FIBER_IS_RUNNING;
 	cord->fiber = callee;
 	callee->csw++;
-	callee->flags &= ~FIBER_IS_READY;
+	callee->flags = (callee->flags & ~FIBER_IS_READY) | FIBER_IS_RUNNING;
+
 	ASAN_START_SWITCH_FIBER(asan_state,
 				(caller->flags & FIBER_IS_DEAD) == 0,
 				callee->stack,
@@ -586,10 +596,6 @@ fiber_sleep(double delay)
 	if (delay == 0) {
 		ev_idle_start(loop(), &cord()->idle_event);
 	}
-	/*
-	 * We don't use fiber_wakeup() here to ensure there is
-	 * no infinite wakeup loop in case of fiber_sleep(0).
-	 */
 	fiber_yield_timeout(delay);
 
 	if (delay == 0) {
@@ -701,7 +707,11 @@ fiber_reset(struct fiber *fiber)
 {
 	rlist_create(&fiber->on_yield);
 	rlist_create(&fiber->on_stop);
-	fiber->flags = FIBER_DEFAULT_FLAGS;
+	/*
+	 * Preserve the running flag if set. Reset might be called on the
+	 * current fiber when it is recycled.
+	 */
+	fiber->flags = FIBER_DEFAULT_FLAGS | (fiber->flags & FIBER_IS_RUNNING);
 }
 
 /** Destroy an active fiber and prepare it for reuse. */
@@ -1180,6 +1190,7 @@ cord_create(struct cord *cord, const char *name)
 	region_create(&cord->sched.gc, &cord->slabc);
 	fiber_set_name(&cord->sched, "sched");
 	cord->fiber = &cord->sched;
+	cord->sched.flags |= FIBER_IS_RUNNING;
 
 	cord->max_fid = 100;
 	/*

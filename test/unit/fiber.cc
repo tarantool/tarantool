@@ -138,8 +138,7 @@ fiber_join_test()
 	fiber_set_joinable(fiber, true);
 	fiber_wakeup(fiber);
 	/** Let the fiber schedule */
-	fiber_wakeup(fiber());
-	fiber_yield();
+	fiber_reschedule();
 	note("by this time the fiber should be dead already");
 	fiber_cancel(fiber);
 	fiber_join(fiber);
@@ -201,12 +200,42 @@ fiber_name_test()
 	footer();
 }
 
+static void
+fiber_wakeup_self_test()
+{
+	header();
+
+	struct fiber *f = fiber();
+
+	fiber_wakeup(f);
+	double duration = 0.001;
+	uint64_t t1 = fiber_clock64();
+	fiber_sleep(duration);
+	uint64_t t2 = fiber_clock64();
+	/*
+	 * It was a real sleep, not 0 duration. Wakeup is nop on the running
+	 * fiber.
+	 */
+	assert(t2 - t1 >= duration);
+
+	/*
+	 * Wakeup + start of a new fiber. This is different from yield but
+	 * works without crashes too.
+	 */
+	struct fiber *newf = fiber_new_xc("nop", noop_f);
+	fiber_wakeup(f);
+	fiber_start(newf);
+
+	footer();
+}
+
 static int
 main_f(va_list ap)
 {
 	fiber_name_test();
 	fiber_join_test();
 	fiber_stack_test();
+	fiber_wakeup_self_test();
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 }
