@@ -17,3 +17,5 @@ SystemError Failed to allocate 42 bytes in allocator for exception: Cannot alloc
 # normal-stack fiber not crashed
 # big-stack fiber not crashed
 	*** fiber_stack_test: done ***
+	*** fiber_wakeup_self_test ***
+	*** fiber_wakeup_self_test: done ***
