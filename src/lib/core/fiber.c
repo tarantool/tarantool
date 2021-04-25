@@ -614,8 +614,7 @@ fiber_reschedule(void)
 int
 fiber_join(struct fiber *fiber)
 {
-	int rc = fiber_join_timeout(fiber, TIMEOUT_INFINITY);
-	return rc;
+	return fiber_join_timeout(fiber, TIMEOUT_INFINITY);
 }
 
 int
