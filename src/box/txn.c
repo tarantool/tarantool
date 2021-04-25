@@ -53,9 +53,6 @@ txn_on_stop(struct trigger *trigger, void *event);
 static int
 txn_on_yield(struct trigger *trigger, void *event);
 
-static void
-txn_run_rollback_triggers(struct txn *txn, struct rlist *triggers);
-
 static int
 txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 {
@@ -149,8 +146,10 @@ txn_rollback_one_stmt(struct txn *txn, struct txn_stmt *stmt)
 {
 	if (txn->engine != NULL && stmt->space != NULL)
 		engine_rollback_statement(txn->engine, txn, stmt);
-	if (stmt->has_triggers)
-		txn_run_rollback_triggers(txn, &stmt->on_rollback);
+	if (stmt->has_triggers && trigger_run(&stmt->on_rollback, txn) != 0) {
+		diag_log();
+		panic("statement rollback trigger failed");
+	}
 }
 
 static void
@@ -434,45 +433,6 @@ fail:
 	return -1;
 }
 
-/*
- * A helper function to process on_commit triggers.
- */
-static void
-txn_run_commit_triggers(struct txn *txn, struct rlist *triggers)
-{
-	/*
-	 * Commit triggers must be run in the same order they
-	 * were added so that a trigger sees the changes done
-	 * by previous triggers (this is vital for DDL).
-	 */
-	if (trigger_run_reverse(triggers, txn) != 0) {
-		/*
-		 * As transaction couldn't handle a trigger error so
-		 * there is no option except panic.
-		 */
-		diag_log();
-		unreachable();
-		panic("commit trigger failed");
-	}
-}
-
-/*
- * A helper function to process on_rollback triggers.
- */
-static void
-txn_run_rollback_triggers(struct txn *txn, struct rlist *triggers)
-{
-	if (trigger_run(triggers, txn) != 0) {
-		/*
-		 * As transaction couldn't handle a trigger error so
-		 * there is no option except panic.
-		 */
-		diag_log();
-		unreachable();
-		panic("rollback trigger failed");
-	}
-}
-
 /* A helper function to process on_wal_write triggers. */
 static void
 txn_run_wal_write_triggers(struct txn *txn)
@@ -520,8 +480,16 @@ txn_complete_fail(struct txn *txn)
 		txn_rollback_one_stmt(txn, stmt);
 	if (txn->engine != NULL)
 		engine_rollback(txn->engine, txn);
-	if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
-		txn_run_rollback_triggers(txn, &txn->on_rollback);
+	if (txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
+		if (trigger_run(&txn->on_rollback, txn) != 0) {
+			diag_log();
+			panic("transaction rollback trigger failed");
+		}
+		/* Can't rollback more than once. */
+		trigger_destroy(&txn->on_rollback);
+		/* Commit won't happen after rollback. */
+		trigger_destroy(&txn->on_commit);
+	}
 	txn_free_or_wakeup(txn);
 }
 
@@ -534,8 +502,21 @@ txn_complete_success(struct txn *txn)
 	txn->status = TXN_COMMITTED;
 	if (txn->engine != NULL)
 		engine_commit(txn->engine, txn);
-	if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
-		txn_run_commit_triggers(txn, &txn->on_commit);
+	if (txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
+		/*
+		 * Commit triggers must be run in the same order they were added
+		 * so that a trigger sees the changes done by previous triggers
+		 * (this is vital for DDL).
+		 */
+		if (trigger_run_reverse(&txn->on_commit, txn) != 0) {
+			diag_log();
+			panic("transaction commit trigger failed");
+		}
+		/* Can't commit more than once. */
+		trigger_destroy(&txn->on_commit);
+		/* Rollback won't happen after commit. */
+		trigger_destroy(&txn->on_rollback);
+	}
 	txn_free_or_wakeup(txn);
 }
 

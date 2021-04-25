@@ -544,6 +544,8 @@ static inline void
 txn_stmt_on_commit(struct txn_stmt *stmt, struct trigger *trigger)
 {
 	txn_stmt_init_triggers(stmt);
+	/* Statement triggers are private and never have anything to free. */
+	assert(trigger->destroy == NULL);
 	trigger_add(&stmt->on_commit, trigger);
 }
 
@@ -551,6 +553,8 @@ static inline void
 txn_stmt_on_rollback(struct txn_stmt *stmt, struct trigger *trigger)
 {
 	txn_stmt_init_triggers(stmt);
+	/* Statement triggers are private and never have anything to free. */
+	assert(trigger->destroy == NULL);
 	trigger_add(&stmt->on_rollback, trigger);
 }
 
