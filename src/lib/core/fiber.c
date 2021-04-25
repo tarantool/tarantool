@@ -614,7 +614,8 @@ fiber_reschedule(void)
 int
 fiber_join(struct fiber *fiber)
 {
-	assert(fiber->flags & FIBER_IS_JOINABLE);
+	if ((fiber->flags & FIBER_IS_JOINABLE) == 0)
+		panic("the fiber is not joinable");
 
 	if (! fiber_is_dead(fiber)) {
 		do {
