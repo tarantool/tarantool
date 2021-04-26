@@ -394,6 +394,26 @@ sql_aggregate_context(sql_context * p, int nByte)
 	return accum;
 }
 
+struct Mem *
+sql_context_agg_mem(struct sql_context *ctx)
+{
+	assert(ctx != NULL && ctx->func != NULL);
+	assert(ctx->func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
+	assert(ctx->func->def->aggregate == FUNC_AGGREGATE_GROUP);
+	struct Mem *mem;
+	if (!mem_is_agg(ctx->pMem)) {
+		if (mem_set_agg(ctx->pMem, ctx->func, sizeof(*mem)) != 0)
+			return NULL;
+		if (mem_get_agg(ctx->pMem, (void **)&mem) != 0)
+			return NULL;
+		mem_create(mem);
+		return mem;
+	}
+	if (mem_get_agg(ctx->pMem, (void **)&mem) != 0)
+		return NULL;
+	return mem;
+}
+
 /*
  * Return the number of columns in the result set for the statement pStmt.
  */
