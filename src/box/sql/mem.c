@@ -3047,6 +3047,17 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 			if (mem_copy_str(&val[i], str, len) != 0)
 				goto error;
 			break;
+		case MP_BIN:
+			str = mp_decode_bin(&data, &len);
+			if (mem_copy_bin(&val[i], str, len) != 0)
+				goto error;
+			break;
+		case MP_EXT:
+			str = data;
+			mp_next(&data);
+			if (mem_copy_bin(&val[i], str, data - str) != 0)
+				goto error;
+			break;
 		case MP_NIL:
 			break;
 		default:
