@@ -1766,14 +1766,14 @@ minmaxStep(sql_context * context, int NotUsed, sql_value ** argv)
 
 	struct func_sql_builtin *func =
 		(struct func_sql_builtin *)context->func;
-	pBest = (Mem *) sql_aggregate_context(context, sizeof(*pBest));
+	pBest = sql_context_agg_mem(context);
 	if (!pBest)
 		return;
 
 	if (mem_is_null(argv[0])) {
-		if (pBest->flags)
+		if (!mem_is_null(pBest))
 			sqlSkipAccumulatorLoad(context);
-	} else if (pBest->flags) {
+	} else if (!mem_is_null(pBest)) {
 		int cmp;
 		struct coll *pColl = sqlGetFuncCollSeq(context);
 		/*
@@ -1798,14 +1798,13 @@ minmaxStep(sql_context * context, int NotUsed, sql_value ** argv)
 static void
 minMaxFinalize(sql_context * context)
 {
-	sql_value *pRes;
-	pRes = (sql_value *) sql_aggregate_context(context, 0);
-	if (pRes) {
-		if (pRes->flags) {
-			sql_result_value(context, pRes);
-		}
-		mem_destroy(pRes);
-	}
+	struct Mem *mem = context->pMem;
+	struct Mem *res;
+	if (mem_get_agg(mem, (void **)&res) != 0)
+		return;
+	if (!mem_is_null(res))
+		sql_result_value(context, res);
+	mem_destroy(res);
 }
 
 /*
