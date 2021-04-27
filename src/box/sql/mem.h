@@ -184,7 +184,7 @@ mem_is_bool(const struct Mem *mem)
 static inline bool
 mem_is_bin(const struct Mem *mem)
 {
-	return (mem->flags & MEM_Blob) != 0;
+	return (mem->flags & MEM_Blob) != 0 && (mem->flags & MEM_Subtype) == 0;
 }
 
 static inline bool
