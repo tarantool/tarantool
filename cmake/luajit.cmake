@@ -73,11 +73,22 @@ if(ENABLE_ASAN)
     add_definitions(-DLUAJIT_USE_ASAN=1)
 endif()
 
-if(TARGET_OS_DARWIN)
-    # Necessary to make LuaJIT (and Tarantool) work on Darwin, see
-    # http://luajit.org/install.html.
-    set(CMAKE_EXE_LINKER_FLAGS
-        "${CMAKE_EXE_LINKER_FLAGS} -pagezero_size 10000 -image_base 100000000")
+if(TARGET_OS_DARWIN AND NOT LUAJIT_ENABLE_GC64)
+    # XXX: This is not the best idea to build LuaJIT on MacOS
+    # with GC64 disabled. But nobody will stop you from this.
+    # You are warned. For more info, see the following issue.
+    # https://github.com/tarantool/tarantool/issues/2643
+    message(WARNING "LUAJIT_ENABLE_GC64 is disabled for MacOS. "
+                    "If one wants to know why this is not a good idea, "
+                    "see https://github.com/tarantool/tarantool/issues/2643.")
+    # XXX: Necessary to make LuaJIT (and hence Tarantool) work on
+    # Darwin/x86_64, see the following links for more info:
+    # * http://luajit.org/install.html#embed
+    # * https://github.com/tarantool/luajit/blob/789820a/cmake/SetTargetFlags.cmake
+    if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+        set(CMAKE_EXE_LINKER_FLAGS
+            "${CMAKE_EXE_LINKER_FLAGS} -pagezero_size 10000 -image_base 100000000")
+    endif()
 endif()
 
 # Define the locations for LuaJIT sources and artefacts.
