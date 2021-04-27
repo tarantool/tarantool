@@ -553,7 +553,7 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 	}
 	if (mem_is_null(argv[0]))
 		return;
-	if (mem_is_bin(argv[0])) {
+	if (!mem_is_num(argv[0]) && !mem_is_str(argv[0])) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 mem_str(argv[0]), "numeric");
 		context->is_aborted = true;
@@ -613,7 +613,8 @@ case_type##ICUFunc(sql_context *context, int argc, sql_value **argv)   \
 	const char *z2;                                                        \
 	int n;                                                                 \
 	UNUSED_PARAMETER(argc);                                                \
-	if (mem_is_bin(argv[0])) {                                             \
+	if (mem_is_bin(argv[0]) || mem_is_map(argv[0]) ||                      \
+	    mem_is_array(argv[0])) {                                           \
 		diag_set(ClientError, ER_INCONSISTENT_TYPES, "text",           \
 			 "varbinary");                                         \
 		context->is_aborted = true;                                    \
@@ -694,7 +695,8 @@ randomBlob(sql_context * context, int argc, sql_value ** argv)
 	unsigned char *p;
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
-	if (mem_is_bin(argv[0])) {
+	if (mem_is_bin(argv[0]) || mem_is_map(argv[0]) ||
+	    mem_is_array(argv[0])) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 mem_str(argv[0]), "numeric");
 		context->is_aborted = true;
@@ -1584,7 +1586,8 @@ soundexFunc(sql_context * context, int argc, sql_value ** argv)
 		1, 2, 6, 2, 3, 0, 1, 0, 2, 0, 2, 0, 0, 0, 0, 0,
 	};
 	assert(argc == 1);
-	if (mem_is_bin(argv[0])) {
+	if (mem_is_bin(argv[0]) || mem_is_map(argv[0]) ||
+	    mem_is_array(argv[0])) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 mem_str(argv[0]), "text");
 		context->is_aborted = true;

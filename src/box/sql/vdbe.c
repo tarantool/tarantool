@@ -1643,6 +1643,11 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 				 "varbinary");
 			goto abort_due_to_error;
 		}
+	} else if (mem_is_map(pIn3) || mem_is_map(pIn1) || mem_is_array(pIn3) ||
+		   mem_is_array(pIn1)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+			 mem_type_to_str(pIn3), mem_type_to_str(pIn1));
+		goto abort_due_to_error;
 	} else if (type == FIELD_TYPE_STRING) {
 		if (mem_cmp_str(pIn3, pIn1, &res, pOp->p4.pColl) != 0) {
 			const char *str =
