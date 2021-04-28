@@ -138,7 +138,7 @@ struct iproto_thread {
 	/*
 	 * List of stopped connections
 	 */
-	RLIST_HEAD(stopped_connections);
+	struct rlist stopped_connections;
 	/*
 	 * Iproto thread stat
 	 */
