@@ -54,6 +54,7 @@ lua_source(lua_sources lua/swim.lua)
 # LuaJIT jit.* library
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/bc.lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/bcsave.lua)
+lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/dis_arm64.lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/dis_x86.lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/dis_x64.lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/dump.lua)
