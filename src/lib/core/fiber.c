@@ -823,28 +823,28 @@ fiber_schedule_idle(ev_loop *loop, ev_idle *watcher,
 
 
 struct fiber *
-fiber_find(uint32_t fid)
+fiber_find(uint64_t fid)
 {
-	struct mh_i32ptr_t *fiber_registry = cord()->fiber_registry;
-	mh_int_t k = mh_i32ptr_find(fiber_registry, fid, NULL);
+	struct mh_i64ptr_t *fiber_registry = cord()->fiber_registry;
+	mh_int_t k = mh_i64ptr_find(fiber_registry, fid, NULL);
 
 	if (k == mh_end(fiber_registry))
 		return NULL;
-	return (struct fiber *) mh_i32ptr_node(fiber_registry, k)->val;
+	return mh_i64ptr_node(fiber_registry, k)->val;
 }
 
 static void
 register_fid(struct fiber *fiber)
 {
-	struct mh_i32ptr_node_t node = { fiber->fid, fiber };
-	mh_i32ptr_put(cord()->fiber_registry, &node, NULL, NULL);
+	struct mh_i64ptr_node_t node = { fiber->fid, fiber };
+	mh_i64ptr_put(cord()->fiber_registry, &node, NULL, NULL);
 }
 
 static void
 unregister_fid(struct fiber *fiber)
 {
-	struct mh_i32ptr_node_t node = { fiber->fid, NULL };
-	mh_i32ptr_remove(cord()->fiber_registry, &node, NULL);
+	struct mh_i64ptr_node_t node = { fiber->fid, NULL };
+	mh_i64ptr_remove(cord()->fiber_registry, &node, NULL);
 }
 
 struct fiber *
@@ -1257,12 +1257,12 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	}
 
 	fiber->f = f;
-	/* Excluding reserved range */
-	if (++cord->max_fid < FIBER_ID_MAX_RESERVED)
-		cord->max_fid = FIBER_ID_MAX_RESERVED + 1;
-	fiber->fid = cord->max_fid;
+	fiber->fid = cord->next_fid;
 	fiber_set_name(fiber, name);
 	register_fid(fiber);
+
+	cord->next_fid++;
+	assert(cord->next_fid > FIBER_ID_MAX_RESERVED);
 
 	return fiber;
 
@@ -1449,7 +1449,7 @@ cord_create(struct cord *cord, const char *name)
 	rlist_create(&cord->alive);
 	rlist_create(&cord->ready);
 	rlist_create(&cord->dead);
-	cord->fiber_registry = mh_i32ptr_new();
+	cord->fiber_registry = mh_i64ptr_new();
 
 	/* sched fiber is not present in alive/ready/dead list. */
 	cord->sched.fid = FIBER_ID_SCHED;
@@ -1461,7 +1461,7 @@ cord_create(struct cord *cord, const char *name)
 	cord->fiber = &cord->sched;
 	cord->sched.flags |= FIBER_IS_RUNNING;
 
-	cord->max_fid = FIBER_ID_MAX_RESERVED;
+	cord->next_fid = FIBER_ID_MAX_RESERVED + 1;
 	/*
 	 * No need to start this event since it's only used for
 	 * ev_feed_event(). Saves a few cycles on every
@@ -1502,7 +1502,7 @@ cord_destroy(struct cord *cord)
 	/* Only clean up if initialized. */
 	if (cord->fiber_registry) {
 		fiber_destroy_all(cord);
-		mh_i32ptr_delete(cord->fiber_registry);
+		mh_i64ptr_delete(cord->fiber_registry);
 	}
 	region_destroy(&cord->sched.gc);
 	diag_destroy(&cord->sched.diag);

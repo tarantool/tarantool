@@ -113,7 +113,7 @@ lbox_create_weak_table(struct lua_State *L, const char *name)
  * Push a userdata for the given fiber onto Lua stack.
  */
 static void
-lbox_pushfiber(struct lua_State *L, int fid)
+lbox_pushfiber(struct lua_State *L, uint64_t fid)
 {
 	/*
 	 * Use 'memoize'  pattern and keep a single userdata for
@@ -131,22 +131,22 @@ lbox_pushfiber(struct lua_State *L, int fid)
 		lbox_create_weak_table(L, "memoize");
 	}
 	/* Find out whether the fiber is  already in the memoize table. */
-	lua_pushinteger(L, fid);
+	luaL_pushuint64(L, fid);
 	lua_gettable(L, -2);
 	if (lua_isnil(L, -1)) {
 		/* no userdata for fiber created so far */
 		/* pop the nil */
 		lua_pop(L, 1);
 		/* push the key back */
-		lua_pushinteger(L, fid);
+		luaL_pushuint64(L, fid);
 		/* create a new userdata */
-		int *ptr = (int *) lua_newuserdata(L, sizeof(int));
+		uint64_t *ptr = lua_newuserdata(L, sizeof(*ptr));
 		*ptr = fid;
 		luaL_getmetatable(L, fiberlib_name);
 		lua_setmetatable(L, -2);
 		/* memoize it */
 		lua_settable(L, -3);
-		lua_pushinteger(L, fid);
+		luaL_pushuint64(L, fid);
 		/* get it back */
 		lua_gettable(L, -2);
 	}
@@ -155,11 +155,11 @@ lbox_pushfiber(struct lua_State *L, int fid)
 static struct fiber *
 lbox_checkfiber(struct lua_State *L, int index)
 {
-	uint32_t fid;
+	uint64_t fid;
 	if (lua_type(L, index) == LUA_TNUMBER) {
-		fid = lua_tonumber(L, index);
+		fid = luaL_touint64(L, index);
 	} else {
-		fid = *(uint32_t *) luaL_checkudata(L, index, fiberlib_name);
+		fid = *(uint64_t *)luaL_checkudata(L, index, fiberlib_name);
 	}
 	struct fiber *f = fiber_find(fid);
 	if (f == NULL)
@@ -170,12 +170,12 @@ lbox_checkfiber(struct lua_State *L, int index)
 static int
 lbox_fiber_id(struct lua_State *L)
 {
-	uint32_t fid;
+	uint64_t fid;
 	if (lua_gettop(L)  == 0)
 		fid = fiber()->fid;
 	else
-		fid = *(uint32_t *) luaL_checkudata(L, 1, fiberlib_name);
-	lua_pushinteger(L, fid);
+		fid = *(uint64_t *)luaL_checkudata(L, 1, fiberlib_name);
+	luaL_pushuint64(L, fid);
 	return 1;
 }
 
@@ -267,7 +267,7 @@ lbox_fiber_statof(struct fiber *f, void *cb_ctx, bool backtrace)
 {
 	struct lua_State *L = (struct lua_State *) cb_ctx;
 
-	lua_pushinteger(L, f->fid);
+	luaL_pushuint64(L, f->fid);
 	lua_newtable(L);
 
 	lua_pushliteral(L, "name");
@@ -275,7 +275,7 @@ lbox_fiber_statof(struct fiber *f, void *cb_ctx, bool backtrace)
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "fid");
-	lua_pushnumber(L, f->fid);
+	luaL_pushuint64(L, f->fid);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "csw");
@@ -337,7 +337,10 @@ lbox_fiber_top_entry(struct fiber *f, void *cb_ctx)
 {
 	struct lua_State *L = (struct lua_State *) cb_ctx;
 
-	lua_pushfstring(L, "%f/%s", (lua_Number)f->fid, f->name);
+	char sbuf[FIBER_NAME_MAX + 32];
+	snprintf(sbuf, sizeof(sbuf), "%llu/%s",
+		 (long long)f->fid, f->name);
+	lua_pushstring(L, sbuf);
 
 	lua_newtable(L);
 
@@ -539,7 +542,7 @@ lbox_fiber_status(struct lua_State *L)
 {
 	struct fiber *f;
 	if (lua_gettop(L)) {
-		uint32_t fid = *(uint32_t *)
+		uint64_t fid = *(uint64_t *)
 			luaL_checkudata(L, 1, fiberlib_name);
 		f = fiber_find(fid);
 	} else {
@@ -704,7 +707,7 @@ lbox_fiber_find(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1)
 		luaL_error(L, "fiber.find(id): bad arguments");
-	int fid = lua_tonumber(L, -1);
+	uint64_t fid = luaL_touint64(L, -1);
 	struct fiber *f = fiber_find(fid);
 	if (f)
 		lbox_pushfiber(L, f->fid);
@@ -736,7 +739,7 @@ lbox_fiber_serialize(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
 	lua_createtable(L, 0, 1);
-	lua_pushinteger(L, f->fid);
+	luaL_pushuint64(L, f->fid);
 	lua_setfield(L, -2, "id");
 	lua_pushstring(L, fiber_name(f));
 	lua_setfield(L, -2, "name");
@@ -748,9 +751,10 @@ lbox_fiber_serialize(struct lua_State *L)
 static int
 lbox_fiber_tostring(struct lua_State *L)
 {
-	char buf[20];
+	char buf[32];
 	struct fiber *f = lbox_checkfiber(L, 1);
-	snprintf(buf, sizeof(buf), "fiber: %d", f->fid);
+	snprintf(buf, sizeof(buf), "fiber: %llu",
+		 (long long)f->fid);
 	lua_pushstring(L, buf);
 	return 1;
 }

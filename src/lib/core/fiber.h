@@ -550,7 +550,7 @@ struct fiber {
 	/** Number of context switches. */
 	int csw;
 	/** Fiber id. */
-	uint32_t fid;
+	uint64_t fid;
 	/** Fiber flags */
 	uint32_t flags;
 #if ENABLE_FIBER_TOP
@@ -661,7 +661,7 @@ struct cord {
 	 * Every new fiber gets a new monotonic id. Ids 0 - 100 are
 	 * reserved.
 	 */
-	uint32_t max_fid;
+	uint64_t next_fid;
 #if ENABLE_FIBER_TOP
 	struct clock_stat clock_stat;
 	struct cpu_stat cpu_stat;
@@ -669,7 +669,7 @@ struct cord {
 	pthread_t id;
 	const struct cord_on_exit *on_exit;
 	/** A helper hash to map id -> fiber. */
-	struct mh_i32ptr_t *fiber_registry;
+	struct mh_i64ptr_t *fiber_registry;
 	/** All fibers */
 	struct rlist alive;
 	/** Fibers, ready for execution */
@@ -828,7 +828,7 @@ void
 fiber_call(struct fiber *callee);
 
 struct fiber *
-fiber_find(uint32_t fid);
+fiber_find(uint64_t fid);
 
 void
 fiber_schedule_cb(ev_loop * /* loop */, ev_watcher *watcher, int revents);

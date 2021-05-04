@@ -1348,10 +1348,10 @@ void cord_on_yield(void)
 		 */
 		struct lua_State *L = fiber()->storage.lua.stack;
 		assert(L != NULL);
-		lua_pushfstring(L, "fiber %d is switched while running the"
+		lua_pushfstring(L, "fiber %llu is switched while running the"
 				" compiled code (it's likely a function with"
 				" a yield underneath called via LuaJIT FFI)",
-				fiber()->fid);
+				(long long)fiber()->fid);
 		if (g->panic)
 			g->panic(L);
 		exit(EXIT_FAILURE);
