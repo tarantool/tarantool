@@ -96,7 +96,7 @@ iproto_rmean_foreach(void *cb, void *cb_ctx);
 void
 iproto_init(int threads_count);
 
-void
+int
 iproto_listen(const char *uri);
 
 void
