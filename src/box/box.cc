@@ -1704,13 +1704,13 @@ promote:
 	return rc;
 }
 
-void
+int
 box_listen(void)
 {
 	const char *uri = cfg_gets("listen");
-	if (box_check_uri(uri, "listen") != 0)
-		diag_raise();
-	iproto_listen(uri);
+	if (box_check_uri(uri, "listen") != 0 || iproto_listen(uri) != 0)
+		return -1;
+	return 0;
 }
 
 void
@@ -3120,7 +3120,8 @@ bootstrap(const struct tt_uuid *instance_uuid,
 	 * Begin listening on the socket to enable
 	 * master-master replication leader election.
 	 */
-	box_listen();
+	if (box_listen() != 0)
+		diag_raise();
 	/*
 	 * Wait for the cluster to start up.
 	 *
@@ -3206,7 +3207,8 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	say_info("instance vclock %s", vclock_to_string(&replicaset.vclock));
 
 	if (wal_dir_lock >= 0) {
-		box_listen();
+		if (box_listen() != 0)
+			diag_raise();
 		box_sync_replication(false);
 
 		struct replica *master;
@@ -3284,7 +3286,8 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		 * applied in hot standby mode.
 		 */
 		vclock_copy(&replicaset.vclock, &recovery->vclock);
-		box_listen();
+		if (box_listen() != 0)
+			diag_raise();
 		box_sync_replication(false);
 	}
 	stream_guard.is_active = false;
