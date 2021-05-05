@@ -231,7 +231,7 @@ box_process_vote(struct ballot *ballot);
 void
 box_check_config(void);
 
-void box_listen(void);
+int box_listen(void);
 void box_set_replication(void);
 void box_set_log_level(void);
 void box_set_log_format(void);
