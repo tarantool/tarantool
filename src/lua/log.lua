@@ -499,6 +499,12 @@ local function load_cfg(self, cfg)
             local m = "log.cfg: \'%s\' %s"
             error(m:format('level', msg))
         end
+        -- Convert level to a numeric value since
+        -- low level api operates with numbers only.
+        if type(cfg.level) == 'string' then
+            assert(log_level_keys[cfg.level] ~= nil)
+            cfg.level = log_level_keys[cfg.level]
+        end
     end
 
     if cfg.nonblock ~= nil then
