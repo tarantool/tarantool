@@ -407,16 +407,29 @@ evio_service_stop(struct evio_service *service)
 {
 	say_info("%s: stopped", evio_service_name(service));
 
+	int service_fd = service->ev.fd;
+	evio_service_detach(service);
+	if (service_fd < 0)
+		return;
+
+	if (close(service_fd) < 0)
+		say_error("Failed to close socket: %s", strerror(errno));
+
+	if (service->addr.sa_family != AF_UNIX)
+		return;
+
+	if (unlink(((struct sockaddr_un *)&service->addr)->sun_path) < 0) {
+		say_error("Failed to unlink unix "
+			  "socket path: %s", strerror(errno));
+	}
+}
+
+void
+evio_service_detach(struct evio_service *service)
+{
 	if (ev_is_active(&service->ev)) {
 		ev_io_stop(service->loop, &service->ev);
 		service->addr_len = 0;
 	}
-
-	if (service->ev.fd >= 0) {
-		close(service->ev.fd);
-		ev_io_set(&service->ev, -1, 0);
-		if (service->addr.sa_family == AF_UNIX) {
-			unlink(((struct sockaddr_un *) &service->addr)->sun_path);
-		}
-	}
+	ev_io_set(&service->ev, -1, 0);
 }

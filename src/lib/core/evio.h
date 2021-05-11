@@ -117,6 +117,10 @@ evio_service_bind(struct evio_service *service, const char *uri);
 int
 evio_service_listen(struct evio_service *service);
 
+/** If started, stop event flow, without closing the acceptor socket. */
+void
+evio_service_detach(struct evio_service *service);
+
 /** If started, stop event flow and close the acceptor socket. */
 void
 evio_service_stop(struct evio_service *service);
