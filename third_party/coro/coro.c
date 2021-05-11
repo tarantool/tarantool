@@ -297,9 +297,14 @@ trampoline (int sig)
 
 #if CORO_STARTUP
   asm (
+# ifndef __APPLE__
          "\t.globl coro_startup\n"
          "\t.type coro_startup, %function\n"
          "coro_startup:\n"
+# else
+         "\t.globl _coro_startup\n"
+         "_coro_startup:\n"
+# endif
 
        #if __ARM_ARCH==7
 	 ".syntax unified\n"
@@ -324,7 +329,11 @@ trampoline (int sig)
          ".cfi_offset 30, -16\n"
          "\tmov x0, x20\n"
          "\tblr x19\n"
+# ifdef __APPLE__
+         "\tb _abort\n"
+# else
          "\tb abort\n"
+# endif
          ".cfi_endproc\n"
 
        #else
