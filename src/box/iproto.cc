@@ -155,6 +155,14 @@ struct iproto_thread {
 
 static struct iproto_thread *iproto_threads;
 static int iproto_threads_count;
+/**
+ * This binary contains all bind socket properties, like
+ * address the iproto listens for. Is kept in TX to be
+ * shown in box.info. It should be global, because it contains
+ * properties, and should be accessible from differnent functions
+ * in tx thread.
+ */
+static struct evio_service tx_binary;
 
 /**
  * In Greek mythology, Kharon is the ferryman who carries souls
@@ -198,22 +206,14 @@ unsigned iproto_readahead = 16320;
 /* The maximal number of iproto messages in fly. */
 static int iproto_msg_max = IPROTO_MSG_MAX_MIN;
 
-/**
- * Address the iproto listens for, stored in TX
- * thread. Is kept in TX to be shown in box.info.
- */
-static struct sockaddr_storage iproto_bound_address_storage;
-/** 0 means that no address is listened. */
-static socklen_t iproto_bound_address_len;
-
 const char *
 iproto_bound_address(char *buf)
 {
-	if (iproto_bound_address_len == 0)
+	if (tx_binary.addr_len == 0)
 		return NULL;
 	sio_addr_snprintf(buf, SERVICE_NAME_MAXLEN,
-			  (struct sockaddr *) &iproto_bound_address_storage,
-			  iproto_bound_address_len);
+			  (struct sockaddr *)&tx_binary.addrstorage,
+			  tx_binary.addr_len);
 	return buf;
 }
 
@@ -2064,9 +2064,7 @@ net_cord_f(va_list  ap)
 	 * will take care of creating events for incoming
 	 * connections.
 	 */
-	if (evio_service_is_active(&iproto_thread->binary))
-		evio_service_stop(&iproto_thread->binary);
-
+	evio_service_detach(&iproto_thread->binary);
 	return 0;
 }
 
@@ -2259,7 +2257,11 @@ iproto_init(int threads_count)
 		/* .fd = */ iproto_session_fd,
 		/* .sync = */ iproto_session_sync,
 	};
-
+	/*
+	 * We use this tx_binary only for bind, not for listen, so
+	 * we don't need any accept functions.
+	 */
+	evio_service_init(loop(), &tx_binary, "tx_binary", NULL, NULL);
 
 	iproto_threads = (struct iproto_thread *)
 		calloc(threads_count, sizeof(struct iproto_thread));
@@ -2408,8 +2410,7 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 				diag_raise();
 			break;
 		case IPROTO_CFG_STOP:
-			if (evio_service_is_active(&iproto_thread->binary))
-				evio_service_stop(&iproto_thread->binary);
+			evio_service_detach(&iproto_thread->binary);
 			break;
 		case IPROTO_CFG_STAT:
 			iproto_fill_stat(iproto_thread, cfg_msg);
@@ -2460,27 +2461,23 @@ iproto_send_listen_msg(struct evio_service *binary)
 int
 iproto_listen(const char *uri)
 {
-	struct evio_service binary;
-	memset(&binary, 0, sizeof(binary));
-
 	if (iproto_send_stop_msg() != 0)
 		return -1;
-
-	if (uri != NULL) {
-		/*
-		 * Please note, we bind socket in main thread, and then
-		 * listen this socket in all iproto threads! With this
-		 * implementation, we rely on the Linux kernel to distribute
-		 * incoming connections across iproto threads.
-		 */
-		if (evio_service_bind(&binary, uri) != 0)
-			return -1;
-		if (iproto_send_listen_msg(&binary) != 0)
-			return -1;
+	evio_service_stop(&tx_binary);
+	if (uri == NULL) {
+		tx_binary.addr_len = 0;
+		return 0;
 	}
-
-	iproto_bound_address_storage = binary.addrstorage;
-	iproto_bound_address_len = binary.addr_len;
+	/*
+	 * Please note, we bind socket in main thread, and then
+	 * listen this socket in all iproto threads! With this
+	 * implementation, we rely on the Linux kernel to distribute
+	 * incoming connections across iproto threads.
+	 */
+	if (evio_service_bind(&tx_binary, uri) != 0)
+		return -1;
+	if (iproto_send_listen_msg(&tx_binary) != 0)
+		return -1;
 	return 0;
 }
 
@@ -2584,13 +2581,17 @@ iproto_free(void)
 		 * failing to bind in case it tries to bind before socket
 		 * is closed by OS.
 		 */
-		if (evio_service_is_active(&iproto_threads[i].binary))
-			close(iproto_threads[i].binary.ev.fd);
-
+		evio_service_detach(&iproto_threads[i].binary);
 		rmean_delete(iproto_threads[i].rmean);
 		slab_cache_destroy(&iproto_threads[i].net_slabc);
 	}
 	free(iproto_threads);
+
+	/*
+	 * Here we close socket and unlink unix socket path.
+	 * in case it's unix socket.
+	 */
+	evio_service_stop(&tx_binary);
 }
 
 int
