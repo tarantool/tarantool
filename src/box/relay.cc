@@ -749,7 +749,6 @@ static int
 relay_subscribe_f(va_list ap)
 {
 	struct relay *relay = va_arg(ap, struct relay *);
-	struct recovery *r = relay->r;
 
 	coio_enable();
 	relay_set_cord_name(relay->io.fd);
@@ -772,7 +771,7 @@ relay_subscribe_f(va_list ap)
 	struct trigger on_close_log;
 	trigger_create(&on_close_log, relay_on_close_log_f, relay, NULL);
 	if (!relay->replica->anon)
-		trigger_add(&r->on_close_log, &on_close_log);
+		trigger_add(&relay->r->on_close_log, &on_close_log);
 
 	/* Setup WAL watcher for sending new rows to the replica. */
 	wal_set_watcher(&relay->wal_watcher, relay->endpoint.name,
@@ -824,7 +823,7 @@ relay_subscribe_f(va_list ap)
 			continue;
 		struct vclock *send_vclock;
 		if (relay->version_id < version_id(1, 7, 4))
-			send_vclock = &r->vclock;
+			send_vclock = &relay->r->vclock;
 		else
 			send_vclock = &relay->recv_vclock;
 
