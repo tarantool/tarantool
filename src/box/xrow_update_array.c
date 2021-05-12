@@ -342,8 +342,8 @@ xrow_update_array_append_nils(struct xrow_update_field *field,
 		return -1;
 	}
 	memset(item_data, 0xc0, nil_count);
-	xrow_update_array_item_create(item, XUPDATE_NOP, item_data,
-				      nil_count, 0);
+	xrow_update_array_item_create(item, XUPDATE_NOP, item_data, 1,
+				      nil_count - 1);
 	return xrow_update_rope_insert(rope, op->field_no, item, nil_count);
 }
 

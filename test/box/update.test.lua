@@ -777,3 +777,9 @@ _ = s:replace{1, dbl1, {{key1 = {key2 = {1, dbl1}}}}}
 s:update({1}, {{'+', 'field3[1].key1.key2[2]', dbl1}})
 
 s:drop()
+
+--
+-- gh-6069: update of an absent field could crash when had 2 operations in
+-- reversed order both on not specified fields.
+--
+box.tuple.new({1}):update({{'=', 4, 4}, {'=', 3, 3}})
