@@ -665,18 +665,20 @@ box_check_say(void)
 	}
 }
 
-static void
+static int
 box_check_uri(const char *source, const char *option_name)
 {
 	if (source == NULL)
-		return;
+		return 0;
 	struct uri uri;
 
 	/* URI format is [host:]service */
 	if (uri_parse(&uri, source) || !uri.service) {
-		tnt_raise(ClientError, ER_CFG, option_name,
-			  "expected host:service or /unix.socket");
+		diag_set(ClientError, ER_CFG, option_name,
+			 "expected host:service or /unix.socket");
+		return -1;
 	}
+	return 0;
 }
 
 static enum election_mode
@@ -720,7 +722,8 @@ box_check_replication(void)
 	int count = cfg_getarr_size("replication");
 	for (int i = 0; i < count; i++) {
 		const char *source = cfg_getarr_elem("replication", i);
-		box_check_uri(source, "replication");
+		if (box_check_uri(source, "replication") != 0)
+			diag_raise();
 	}
 }
 
@@ -1133,7 +1136,8 @@ box_check_config(void)
 {
 	struct tt_uuid uuid;
 	box_check_say();
-	box_check_uri(cfg_gets("listen"), "listen");
+	if (box_check_uri(cfg_gets("listen"), "listen") != 0)
+		diag_raise();
 	box_check_instance_uuid(&uuid);
 	box_check_replicaset_uuid(&uuid);
 	if (box_check_election_mode() == ELECTION_MODE_INVALID)
@@ -1704,7 +1708,8 @@ void
 box_listen(void)
 {
 	const char *uri = cfg_gets("listen");
-	box_check_uri(uri, "listen");
+	if (box_check_uri(uri, "listen") != 0)
+		diag_raise();
 	iproto_listen(uri);
 }
 
