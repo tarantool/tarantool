@@ -2380,11 +2380,14 @@ test_tuple_validate_formatted(lua_State *L)
 }
 
 static int
-session_check_admin(lua_State *L)
+session_check_default(lua_State *L)
 {
 	int sess_id = box_session_id();
 	bool sess_exist = box_session_exists(sess_id);
 	assert(sess_exist);
+
+	bool sess_not_exist = !box_session_exists(1234567890);
+	assert(sess_not_exist);
 
 	struct sockaddr addr;
 	uint32_t addrlen = sizeof(addr);
@@ -2392,10 +2395,18 @@ session_check_admin(lua_State *L)
 	bool status_is_not_ok = (status == -1);
 	assert(status_is_not_ok);
 
-	bool sess_not_exist = !box_session_exists(1234567890);
-	assert(sess_not_exist);
-
 	lua_pushboolean(L, 1);
+
+	return 1;
+}
+
+static int
+session_check_peer_exists(lua_State *L)
+{
+	assert(lua_gettop(L) == 1);
+
+	uint32_t ctypeid = lua_tointeger(L, 1);
+	assert(ctypeid > 0);
 
 	return 1;
 }
@@ -2496,7 +2507,8 @@ luaopen_module_api(lua_State *L)
 		{"tuple_validate_def", test_tuple_validate_default},
 		{"tuple_validate_fmt", test_tuple_validate_formatted},
 		{"test_key_def_dup", test_key_def_dup},
-		{"session_check_admin", session_check_admin},
+		{"session_check_default", session_check_default},
+		{"session_check_peer_exists", session_check_peer_exists},
 		{"session_check_fiber", session_check_fiber},
 		{"session_check_after_cleanup", session_check_after_cleanup},
 		{NULL, NULL}

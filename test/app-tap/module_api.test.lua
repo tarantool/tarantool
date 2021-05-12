@@ -252,13 +252,6 @@ require('tap').test("module_api", function(test)
     test:test("iscdata", test_iscdata, module)
     test:test("buffers", test_buffers, module)
     test:test("tuple_validate", test_tuple_validate, module)
-
-    test:ok(module.session_check_admin(), "session_check_admin is ok")
-    test:ok(module.session_check_fiber(), "session_check_fiber is ok")
-
-    space:drop()
-
-    test:ok(module.session_check_after_cleanup(), "session_check_after_cleanup is ok")
 end)
 
 os.exit(0)
