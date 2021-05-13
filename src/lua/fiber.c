@@ -263,12 +263,9 @@ fiber_backtrace_cb(int frameno, void *frameret, const char *func, size_t offset,
 #endif
 
 static int
-lbox_fiber_statof(struct fiber *f, void *cb_ctx, bool backtrace)
+lbox_fiber_statof_map(struct fiber *f, void *cb_ctx, bool backtrace)
 {
 	struct lua_State *L = (struct lua_State *) cb_ctx;
-
-	luaL_pushuint64(L, f->fid);
-	lua_newtable(L);
 
 	lua_pushliteral(L, "name");
 	lua_pushstring(L, fiber_name(f));
@@ -313,6 +310,16 @@ lbox_fiber_statof(struct fiber *f, void *cb_ctx, bool backtrace)
 		lua_settable(L, -3);
 #endif /* ENABLE_BACKTRACE */
 	}
+	return 0;
+}
+
+static int
+lbox_fiber_statof(struct fiber *f, void *cb_ctx, bool backtrace)
+{
+	struct lua_State *L = cb_ctx;
+	luaL_pushuint64(L, f->fid);
+	lua_newtable(L);
+	lbox_fiber_statof_map(f, cb_ctx, backtrace);
 	lua_settable(L, -3);
 	return 0;
 }
@@ -406,14 +413,10 @@ lbox_fiber_top_disable(struct lua_State *L)
 }
 #endif /* ENABLE_FIBER_TOP */
 
-/**
- * Return fiber statistics.
- */
-static int
-lbox_fiber_info(struct lua_State *L)
-{
 #ifdef ENABLE_BACKTRACE
-	bool do_backtrace = true;
+bool
+lbox_do_backtrace(struct lua_State *L)
+{
 	if (lua_istable(L, 1)) {
 		lua_pushstring(L, "backtrace");
 		lua_gettable(L, 1);
@@ -423,9 +426,21 @@ lbox_fiber_info(struct lua_State *L)
 			lua_gettable(L, 1);
 		}
 		if (!lua_isnil(L, -1))
-			do_backtrace = lua_toboolean(L, -1);
+			return lua_toboolean(L, -1);
 		lua_pop(L, 1);
 	}
+	return true;
+}
+#endif /* ENABLE_BACKTRACE */
+
+/**
+ * Return fiber statistics.
+ */
+static int
+lbox_fiber_info(struct lua_State *L)
+{
+#ifdef ENABLE_BACKTRACE
+	bool do_backtrace = lbox_do_backtrace(L);
 	if (do_backtrace) {
 		lua_newtable(L);
 		fiber_stat(lbox_fiber_statof_bt, L);
@@ -527,6 +542,17 @@ lbox_fiber_new(struct lua_State *L)
 	return 1;
 }
 
+static struct fiber *
+lbox_get_fiber(struct lua_State *L)
+{
+	if (lua_gettop(L) != 0) {
+		uint64_t *fid = luaL_checkudata(L, 1, fiberlib_name);
+		return fiber_find(*fid);
+	} else {
+		return fiber();
+	}
+}
+
 /**
  * Get fiber status.
  * This follows the rules of Lua coroutine.status() function:
@@ -540,16 +566,9 @@ lbox_fiber_new(struct lua_State *L)
 static int
 lbox_fiber_status(struct lua_State *L)
 {
-	struct fiber *f;
-	if (lua_gettop(L)) {
-		uint64_t fid = *(uint64_t *)
-			luaL_checkudata(L, 1, fiberlib_name);
-		f = fiber_find(fid);
-	} else {
-		f = fiber();
-	}
+	struct fiber *f = lbox_get_fiber(L);
 	const char *status;
-	if (f == NULL || f->fid == 0) {
+	if (f == NULL) {
 		/* This fiber is dead. */
 		status = "dead";
 	} else if (f == fiber()) {
@@ -560,6 +579,42 @@ lbox_fiber_status(struct lua_State *L)
 		status = "suspended";
 	}
 	lua_pushstring(L, status);
+	return 1;
+}
+
+/**
+ * Get fiber info: number of context switches, backtrace, id,
+ * total memory, used memory.
+ */
+static int
+lbox_fiber_object_info(struct lua_State *L)
+{
+	struct fiber *f = lbox_get_fiber(L);
+	if (f == NULL)
+		luaL_error(L, "the fiber is dead");
+#ifdef ENABLE_BACKTRACE
+	bool do_backtrace = lbox_do_backtrace(L);
+	if (do_backtrace) {
+		lua_newtable(L);
+		lbox_fiber_statof_map(f, L, true);
+	} else
+#endif /* ENABLE_BACKTRACE */
+	{
+		lua_newtable(L);
+		lbox_fiber_statof_map(f, L, false);
+	}
+	return 1;
+}
+
+static int
+lbox_fiber_csw(struct lua_State *L)
+{
+	struct fiber *f = lbox_get_fiber(L);
+	if (f == NULL) {
+		luaL_error(L, "the fiber is dead");
+	} else {
+		lua_pushinteger(L, f->csw);
+	}
 	return 1;
 }
 
@@ -857,6 +912,8 @@ static const struct luaL_Reg lbox_fiber_meta [] = {
 	{"name", lbox_fiber_name},
 	{"cancel", lbox_fiber_cancel},
 	{"status", lbox_fiber_status},
+	{"info", lbox_fiber_object_info},
+	{"csw", lbox_fiber_csw},
 	{"testcancel", lbox_fiber_testcancel},
 	{"__serialize", lbox_fiber_serialize},
 	{"__tostring", lbox_fiber_tostring},
