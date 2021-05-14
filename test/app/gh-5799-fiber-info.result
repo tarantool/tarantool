@@ -26,11 +26,9 @@ test_run:cmd('setopt delimiter ";"')
  | ...
 for i=1,100 do
     fibers[i] = fiber.new(function()
-        local start_csw = fiber.info()[fiber.self():id()].csw
         for j=1,10 do
             fiber.yield()
-            if j + start_csw == fiber.self():csw() and
-               j + start_csw == fiber.self():info().csw then
+            if j == fiber.self():csw() and j == fiber.self():info().csw then
                 csw_check_counter = csw_check_counter + 1
             end
         end
