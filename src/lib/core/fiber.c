@@ -1260,6 +1260,7 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	fiber->fid = cord->next_fid;
 	fiber_set_name(fiber, name);
 	register_fid(fiber);
+	fiber->csw = 0;
 
 	cord->next_fid++;
 	assert(cord->next_fid > FIBER_ID_MAX_RESERVED);
