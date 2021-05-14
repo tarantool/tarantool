@@ -1341,6 +1341,7 @@ void cord_on_yield(void)
 	 * code misbehaviour and failures, so stop its execution.
 	 */
 	if (unlikely(tvref(g->jit_base))) {
+		char buf[256];
 		/*
 		 * XXX: mcode is executed only in scope of Lua
 		 * world and one can obtain the corresponding Lua
@@ -1348,10 +1349,12 @@ void cord_on_yield(void)
 		 */
 		struct lua_State *L = fiber()->storage.lua.stack;
 		assert(L != NULL);
-		lua_pushfstring(L, "fiber %llu is switched while running the"
-				" compiled code (it's likely a function with"
-				" a yield underneath called via LuaJIT FFI)",
-				(long long)fiber()->fid);
+		snprintf(buf, sizeof(buf),
+			 "fiber %llu is switched while running the"
+			 " compiled code (it's likely a function with"
+			 " a yield underneath called via LuaJIT FFI)",
+			 (long long)fiber()->fid);
+		lua_pushstring(L, buf);
 		if (g->panic)
 			g->panic(L);
 		exit(EXIT_FAILURE);
@@ -1376,11 +1379,14 @@ void cord_on_yield(void)
 	 * GC hook is active and the platform is forced to stop.
 	 */
 	if (unlikely(g->hookmask & HOOK_GC)) {
+		char buf[128];
 		struct lua_State *L = fiber()->storage.lua.stack;
 		assert(L != NULL);
-		lua_pushfstring(L, "fiber %d is switched while running GC"
-				" finalizer (i.e. __gc metamethod)",
-				fiber()->fid);
+		snprintf(buf, sizeof(buf),
+			 "fiber %llu is switched while running GC"
+			 " finalizer (i.e. __gc metamethod)",
+			 (long long)fiber()->fid);
+		lua_pushstring(L, buf);
 		if (g->panic)
 			g->panic(L);
 		exit(EXIT_FAILURE);
