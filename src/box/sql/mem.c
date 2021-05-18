@@ -39,6 +39,8 @@
 #include "box/port.h"
 #include "lua/utils.h"
 #include "lua/msgpack.h"
+#include "uuid/mp_uuid.h"
+#include "mp_decimal.h"
 
 /*
  * Make sure pMem->z points to a writable allocation of at least
@@ -2967,6 +2969,37 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 					 field.sval.len) != 0)
 				goto error;
 			break;
+		case MP_EXT: {
+			assert(field.ext_type == MP_UUID ||
+			       field.ext_type == MP_DECIMAL);
+			char *buf;
+			uint32_t size;
+			uint32_t svp = region_used(&fiber()->gc);
+			if (field.ext_type == MP_UUID) {
+				size = mp_sizeof_uuid();
+				buf = region_alloc(&fiber()->gc, size);
+				if (buf == NULL) {
+					diag_set(OutOfMemory, size,
+						 "region_alloc", "buf");
+					goto error;
+				}
+				mp_encode_uuid(buf, field.uuidval);
+			} else {
+				size = mp_sizeof_decimal(field.decval);
+				buf = region_alloc(&fiber()->gc, size);
+				if (buf == NULL) {
+					diag_set(OutOfMemory, size,
+						 "region_alloc", "buf");
+					goto error;
+				}
+				mp_encode_decimal(buf, field.decval);
+			}
+			int rc = mem_copy_bin(&val[i], buf, size);
+			region_truncate(&fiber()->gc, svp);
+			if (rc != 0)
+				goto error;
+			break;
+		}
 		case MP_NIL:
 			break;
 		default:
