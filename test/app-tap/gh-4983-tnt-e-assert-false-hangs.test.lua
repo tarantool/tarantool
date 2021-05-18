@@ -13,7 +13,7 @@ local ffi = require('ffi')
 --
 
 local TARANTOOL_PATH = arg[-1]
-local output_file = fio.abspath('out.txt')
+local output_file = fio.abspath('gh-4983_out.txt')
 local line = ('%s -e "assert(false)" > %s 2>&1 & echo $!'):
         format(TARANTOOL_PATH, output_file)
 
@@ -45,6 +45,7 @@ local res = tap.test('gh-4983-tnt-e-assert-false-hangs', function(test)
     test:like(data, 'assertion failed', 'assertion failure is displayed')
 
     fh:close()
+    os.remove(output_file)
 end)
 
 os.exit(res and 0 or 1)
