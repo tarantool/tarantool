@@ -12,7 +12,7 @@ local fio = require('fio')
 --
 
 local TARANTOOL_PATH = arg[-1]
-local output_file = fio.abspath('out.txt')
+local output_file = fio.abspath('gh-5040_out.txt')
 local cmd_end = (' >%s & echo $!'):format(output_file)
 
 -- Like a default timeout for `cond_wait` in test-run
