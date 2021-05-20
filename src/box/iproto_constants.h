@@ -305,6 +305,10 @@ iproto_type_name(uint16_t type)
 		return iproto_type_strs[type];
 
 	switch (type) {
+	case IPROTO_RAFT:
+		return "RAFT";
+	case IPROTO_PROMOTE:
+		return "PROMOTE";
 	case IPROTO_CONFIRM:
 		return "CONFIRM";
 	case IPROTO_ROLLBACK:
