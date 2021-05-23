@@ -22,7 +22,7 @@ end
 
 tap.test("json", function(test)
     local serializer = require('json')
-    test:plan(33)
+    test:plan(34)
 
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
@@ -124,4 +124,17 @@ tap.test("json", function(test)
             '{"a":{"a":null,"b":null},"b":{"a":null,"b":null}}')
     serializer.cfg({encode_max_depth = orig_encode_max_depth,
                     encode_deep_as_nil = orig_encode_deep_as_nil})
+
+    --
+    -- Create a big JSON string to ensure the string builder works fine with
+    -- internal reallocs.
+    --
+    local bigstr = string.rep('a', 16384)
+    local t = {}
+    for _ = 1, 10 do
+        table.insert(t, bigstr)
+    end
+    local bigjson = serializer.encode(t)
+    local t_dec = serializer.decode(bigjson)
+    test:is_deeply(t_dec, t, 'encode/decode big strings')
 end)

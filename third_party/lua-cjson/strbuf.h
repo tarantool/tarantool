@@ -25,6 +25,8 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
+struct ibuf;
+
 /* Size: Total bytes allocated to *buf
  * Length: String length, excluding optional NULL terminator.
  * Increment: Allocation increments when resizing the string buffer.
@@ -36,9 +38,10 @@ typedef struct {
     int size;
     int length;
     int increment;
-    int dynamic;
     int reallocs;
     int debug;
+    /** Backend allocator for the buffer data. */
+    struct ibuf *ibuf;
 } strbuf_t;
 
 #ifndef STRBUF_DEFAULT_SIZE
@@ -49,13 +52,11 @@ typedef struct {
 #endif
 
 /* Initialise */
-extern strbuf_t *strbuf_new(int len);
-extern void strbuf_init(strbuf_t *s, int len);
+extern void strbuf_create(strbuf_t *s, int len, struct ibuf *ibuf);
 extern void strbuf_set_increment(strbuf_t *s, int increment);
 
 /* Release */
-extern void strbuf_free(strbuf_t *s);
-extern char *strbuf_free_to_string(strbuf_t *s, int *len);
+extern void strbuf_destroy(strbuf_t *s);
 
 /* Management */
 extern void strbuf_resize(strbuf_t *s, int len);
@@ -78,11 +79,6 @@ static void strbuf_ensure_null(strbuf_t *s);
 static inline void strbuf_reset(strbuf_t *s)
 {
     s->length = 0;
-}
-
-static inline int strbuf_allocated(strbuf_t *s)
-{
-    return s->buf != NULL;
 }
 
 /* Return bytes remaining in the string buffer
