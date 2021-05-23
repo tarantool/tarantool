@@ -1,16 +1,17 @@
 #!/usr/bin/env tarantool
 
 --
--- gh-5632: Lua code should not use any global buffers or objects without
--- proper ownership protection. Otherwise these items might be suddenly reused
--- during Lua GC which happens almost at any moment. That might lead to data
--- corruption.
+-- gh-5632, gh-6050: Lua code should not use any global buffers or objects
+-- without proper ownership protection. Otherwise these items might be suddenly
+-- reused during Lua GC which happens almost at any moment. That might lead to
+-- data corruption.
 --
 
 local tap = require('tap')
 local ffi = require('ffi')
 local uuid = require('uuid')
 local uri = require('uri')
+local json = require('json')
 local msgpackffi = require('msgpackffi')
 
 local function test_uuid(test)
@@ -142,10 +143,58 @@ local function test_msgpackffi(test)
     test:ok(is_success, 'msgpackffi in gc')
 end
 
-local test = tap.test('gh-5632-gc-buf-reuse')
-test:plan(3)
+local function test_json(test)
+    test:plan(1)
+
+    local encode = json.encode
+    local decode = json.decode
+    local gc_count = 100
+    local iter_count = 1000
+    local is_success = true
+    local data1 = {1, 2, 3, 4, 5}
+    local data2 = {6, 7, 8, 9, 10}
+
+    local function do_encode(data)
+        if not is_success then
+            return
+        end
+        local t = encode(data)
+        t = decode(t)
+        if #t ~= #data then
+            is_success = false
+            return
+        end
+        for i = 1, #t do
+            if t[i] ~= data[i] then
+                is_success = false
+                return
+            end
+        end
+    end
+
+    local function gc_encode()
+        return do_encode(data1)
+    end
+
+    local function create_gc()
+        for _ = 1, gc_count do
+            ffi.gc(ffi.new('char[1]'), gc_encode)
+        end
+    end
+
+    for _ = 1, iter_count do
+        create_gc()
+        do_encode(data2)
+    end
+
+   test:ok(is_success, 'json in gc')
+end
+
+local test = tap.test('gh-5632-6050-gc-buf-reuse')
+test:plan(4)
 test:test('uuid in __gc', test_uuid)
 test:test('uri in __gc', test_uri)
 test:test('msgpackffi in __gc', test_msgpackffi)
+test:test('json in __gc', test_json)
 
 os.exit(test:check() and 0 or 1)

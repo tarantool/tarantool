@@ -51,8 +51,7 @@
 #include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID */
 #include "tt_static.h"
 #include "uuid/tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
-
-#define DEFAULT_ENCODE_KEEP_BUFFER 1
+#include "cord_buf.h"
 
 typedef enum {
     T_OBJ_BEGIN,
@@ -99,10 +98,6 @@ static struct luaL_serializer *luaL_json_default;
 
 static json_token_type_t ch2token[256];
 static char escape2char[256];  /* Decoding */
-
-/* encode_buf is only allocated and used when
- * encode_keep_buffer is set */
-static strbuf_t encode_buf;
 
 typedef struct {
     const char *data;
@@ -182,9 +177,6 @@ static int json_destroy_config(lua_State *l)
 static void json_create_tokens()
 {
     int i;
-#if DEFAULT_ENCODE_KEEP_BUFFER > 0
-    strbuf_init(&encode_buf, 0);
-#endif
 
     /* Decoding init */
 
@@ -444,7 +436,9 @@ static int json_encode(lua_State *l) {
                   "expected 1 or 2 arguments");
 
     /* Reuse existing buffer. */
-    strbuf_reset(&encode_buf);
+    strbuf_t encode_buf;
+    struct ibuf *ibuf = cord_ibuf_take();
+    strbuf_create(&encode_buf, STRBUF_DEFAULT_SIZE, ibuf);
     struct luaL_serializer *cfg = luaL_checkserializer(l);
 
     if (lua_gettop(l) == 2) {
@@ -458,6 +452,13 @@ static int json_encode(lua_State *l) {
 
     char *json = strbuf_string(&encode_buf, NULL);
     lua_pushlstring(l, json, strbuf_length(&encode_buf));
+    /*
+     * Even if an exception is raised above, it is fine to skip the buffer
+     * destruction. The strbuf object destructor does not free anything, and
+     * the cord_ibuf object is freed automatically on a next yield.
+     */
+    strbuf_destroy(&encode_buf);
+    cord_ibuf_put(ibuf);
     return 1;
 }
 
@@ -885,8 +886,9 @@ static void json_throw_parse_error(lua_State *l, json_parse_t *json,
                                    const char *exp, json_token_t *token)
 {
     const char *found;
-
-    strbuf_free(json->tmp);
+    struct ibuf *ibuf = json->tmp->ibuf;
+    strbuf_destroy(json->tmp);
+    cord_ibuf_put(ibuf);
 
     if (token->type == T_ERROR)
         found = token->value.string;
@@ -919,7 +921,9 @@ static void json_decode_descend(lua_State *l, json_parse_t *json, int slots)
     char err_context[ERR_CONTEXT_MAX_LENGTH + 1];
     fill_err_context(err_context, json, json->ptr - json->cur_line_ptr - 1);
 
-    strbuf_free(json->tmp);
+    struct ibuf *ibuf = json->tmp->ibuf;
+    strbuf_destroy(json->tmp);
+    cord_ibuf_put(ibuf);
     luaL_error(l, "Found too many nested data structures (%d) on line %d at cha"
                "racter %d here '%s'", json->current_depth, json->line_count,
                json->ptr - json->cur_line_ptr, err_context);
@@ -1101,7 +1105,10 @@ static int json_decode(lua_State *l)
     /* Ensure the temporary buffer can hold the entire string.
      * This means we no longer need to do length checks since the decoded
      * string must be smaller than the entire json string */
-    json.tmp = strbuf_new(json_len);
+    strbuf_t decode_buf;
+    json.tmp = &decode_buf;
+    struct ibuf *ibuf = cord_ibuf_take();
+    strbuf_create(&decode_buf, json_len, ibuf);
 
     json_next_token(&json, &token);
     json_process_value(l, &json, &token);
@@ -1112,7 +1119,8 @@ static int json_decode(lua_State *l)
     if (token.type != T_END)
         json_throw_parse_error(l, &json, "the end", &token);
 
-    strbuf_free(json.tmp);
+    strbuf_destroy(&decode_buf);
+    cord_ibuf_put(ibuf);
 
     return 1;
 }

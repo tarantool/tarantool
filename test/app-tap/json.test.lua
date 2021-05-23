@@ -21,7 +21,7 @@ end
 
 tap.test("json", function(test)
     local serializer = require('json')
-    test:plan(57)
+    test:plan(58)
 
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
@@ -201,4 +201,16 @@ tap.test("json", function(test)
     _, err_msg = pcall(serializer.decode, '{"a": {a = {}}}')
     test:ok(string.find(err_msg, '{"a":  >> {a = {}}') ~= nil, 'context #6')
 
+    --
+    -- Create a big JSON string to ensure the string builder works fine with
+    -- internal reallocs.
+    --
+    local bigstr = string.rep('a', 16384)
+    local t = {}
+    for _ = 1, 10 do
+        table.insert(t, bigstr)
+    end
+    local bigjson = serializer.encode(t)
+    local t_dec = serializer.decode(bigjson)
+    test:is_deeply(t_dec, t, 'encode/decode big strings')
 end)
