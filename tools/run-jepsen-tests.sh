@@ -71,6 +71,7 @@ BUILD_DIR="$PROJECT_SOURCE_DIR/build"
 TESTS_DIR="$PROJECT_BINARY_DIR/jepsen-tests-prefix/src/jepsen-tests/"
 TERRAFORM_CONFIG="$PROJECT_SOURCE_DIR/extra/tf"
 TERRAFORM_STATE="$PROJECT_BINARY_DIR/terraform.tfstate"
+CUR_DIR=$(pwd)
 SSH_KEY_FILENAME="$HOME/.ssh/id_rsa"
 NODES_FILENAME="$BUILD_DIR/nodes"
 
@@ -83,6 +84,7 @@ CI_COMMIT_SHA=$(git rev-parse HEAD)
 # setup cleanup routine, which removes testing nodes by Terraform
 function cleanup {
     echo "Cleanup running ..."
+    cd $CUR_DIR
     rm -f $NODES_FILENAME $SSH_KEY_FILENAME
     [[ -e $TERRAFORM_STATE ]] && \
 	terraform destroy -state=$TERRAFORM_STATE -auto-approve $TERRAFORM_CONFIG
