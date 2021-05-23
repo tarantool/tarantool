@@ -28,6 +28,7 @@
 #include <string.h>
 
 #include "strbuf.h"
+#include "small/ibuf.h"
 
 static void die(const char *fmt, ...)
 {
@@ -41,7 +42,7 @@ static void die(const char *fmt, ...)
     exit(-1);
 }
 
-void strbuf_init(strbuf_t *s, int len)
+void strbuf_create(strbuf_t *s, int len, struct ibuf *ibuf)
 {
     int size;
 
@@ -50,35 +51,17 @@ void strbuf_init(strbuf_t *s, int len)
     else
         size = len + 1;         /* \0 terminator */
 
-    s->buf = NULL;
+    s->buf = ibuf_reserve(ibuf, size);
     s->size = size;
     s->length = 0;
     s->increment = STRBUF_DEFAULT_INCREMENT;
-    s->dynamic = 0;
     s->reallocs = 0;
     s->debug = 0;
-
-    s->buf = malloc(size);
+    s->ibuf = ibuf;
     if (!s->buf)
         die("Out of memory");
 
     strbuf_ensure_null(s);
-}
-
-strbuf_t *strbuf_new(int len)
-{
-    strbuf_t *s;
-
-    s = malloc(sizeof(strbuf_t));
-    if (!s)
-        die("Out of memory");
-
-    strbuf_init(s, len);
-
-    /* Dynamic strbuf allocation / deallocation */
-    s->dynamic = 1;
-
-    return s;
 }
 
 void strbuf_set_increment(strbuf_t *s, int increment)
@@ -99,36 +82,9 @@ static inline void debug_stats(strbuf_t *s)
     }
 }
 
-/* If strbuf_t has not been dynamically allocated, strbuf_free() can
- * be called any number of times strbuf_init() */
-void strbuf_free(strbuf_t *s)
+void strbuf_destroy(strbuf_t *s)
 {
     debug_stats(s);
-
-    if (s->buf) {
-        free(s->buf);
-        s->buf = NULL;
-    }
-    if (s->dynamic)
-        free(s);
-}
-
-char *strbuf_free_to_string(strbuf_t *s, int *len)
-{
-    char *buf;
-
-    debug_stats(s);
-
-    strbuf_ensure_null(s);
-
-    buf = s->buf;
-    if (len)
-        *len = s->length;
-
-    if (s->dynamic)
-        free(s);
-
-    return buf;
 }
 
 static int calculate_new_size(strbuf_t *s, int len)
@@ -173,7 +129,20 @@ void strbuf_resize(strbuf_t *s, int len)
     }
 
     s->size = newsize;
-    s->buf = realloc(s->buf, s->size);
+
+    struct ibuf *ibuf = s->ibuf;
+    /*
+     * Propagate the write position to enable memcpy() when realloc happens
+     * inside of the ibuf.
+     */
+    ibuf->wpos += s->length;
+    s->buf = ibuf_reserve(ibuf, newsize - s->length) - s->length;
+    /*
+     * But then it is reverted because memcpy() of the old data is done, and the
+     * write position + capacity are managed by strbuf itself.
+     */
+    ibuf->wpos = s->buf;
+
     if (!s->buf)
         die("Out of memory");
     s->reallocs++;
