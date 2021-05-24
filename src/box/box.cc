@@ -1562,6 +1562,9 @@ box_promote(void)
 	int rc = 0;
 	int quorum = replication_synchro_quorum;
 	in_promote = true;
+	auto promote_guard = make_scoped_guard([&] {
+		in_promote = false;
+	});
 
 	if (run_elections) {
 		/*
@@ -1581,19 +1584,15 @@ box_promote(void)
 		 */
 		if (box_election_mode == ELECTION_MODE_MANUAL)
 			raft_stop_candidate(box_raft(), false);
-		if (rc != 0) {
-			in_promote = false;
+		if (rc != 0)
 			return -1;
-		}
 		if (!box_raft()->is_enabled) {
 			diag_set(ClientError, ER_RAFT_DISABLED);
-			in_promote = false;
 			return -1;
 		}
 		if (box_raft()->state != RAFT_STATE_LEADER) {
 			diag_set(ClientError, ER_INTERFERING_PROMOTE,
 				 box_raft()->leader);
-			in_promote = false;
 			return -1;
 		}
 	}
@@ -1617,7 +1616,6 @@ box_promote(void)
 		if (former_leader_id != txn_limbo.owner_id) {
 			diag_set(ClientError, ER_INTERFERING_PROMOTE,
 				 txn_limbo.owner_id);
-			in_promote = false;
 			return -1;
 		}
 	}
@@ -1658,7 +1656,6 @@ promote:
 			assert(txn_limbo_is_empty(&txn_limbo));
 		}
 	}
-	in_promote = false;
 	return rc;
 }
 
