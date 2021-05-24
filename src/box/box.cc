@@ -1590,14 +1590,35 @@ box_promote(void)
 				 txn_limbo.owner_id);
 			return -1;
 		}
+		if (txn_limbo_is_empty(&txn_limbo)) {
+			wait_lsn = txn_limbo.confirmed_lsn;
+			goto promote;
+		}
 	}
 
-	/*
-	 * promote() is a no-op on the limbo owner, so all the rows
-	 * in the limbo must've come through the applier meaning they already
-	 * have an lsn assigned, even if their WAL write hasn't finished yet.
-	 */
-	wait_lsn = txn_limbo_last_synchro_entry(&txn_limbo)->lsn;
+	struct txn_limbo_entry *last_entry;
+	last_entry = txn_limbo_last_synchro_entry(&txn_limbo);
+	/* Wait for the last entries WAL write. */
+	if (last_entry->lsn < 0) {
+		int64_t tid = last_entry->txn->id;
+		if (wal_sync(NULL) < 0)
+			return -1;
+		if (former_leader_id != txn_limbo.owner_id) {
+			diag_set(ClientError, ER_INTERFERING_PROMOTE,
+				 txn_limbo.owner_id);
+			return -1;
+		}
+		if (txn_limbo_is_empty(&txn_limbo)) {
+			wait_lsn = txn_limbo.confirmed_lsn;
+			goto promote;
+		}
+		if (tid != txn_limbo_last_synchro_entry(&txn_limbo)->txn->id) {
+			diag_set(ClientError, ER_QUORUM_WAIT, quorum,
+				 "new synchronous transactions appeared");
+			return -1;
+		}
+	}
+	wait_lsn = last_entry->lsn;
 	assert(wait_lsn > 0);
 
 	rc = box_wait_quorum(former_leader_id, wait_lsn, quorum,
