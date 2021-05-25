@@ -1,0 +1,59 @@
+name: ubuntu_20_10
+
+on:
+  push:
+  pull_request:
+  repository_dispatch:
+    types: [backend_automation]
+  workflow_dispatch:
+
+jobs:
+  ubuntu_20_10:
+    # We want to run on external PRs, but not on our own internal PRs
+    # as they'll be run by the push to the branch.
+    if: ( github.event_name == 'push' ||
+        github.event.pull_request.head.repo.full_name != github.repository ) &&
+        ! endsWith(github.ref, '-notest')
+
+    runs-on: ubuntu-20.04
+
+    strategy:
+      fail-fast: false
+
+    steps:
+      # Permissions correction is needed for self-host runners,
+      # where work path is saved between different workflows runs.
+      - name: correct permissions in working directory
+        shell: bash
+        run: |
+          sudo chown -R $(id -u):$(id -g) .
+      - uses: actions/checkout@v2.3.4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - uses: ./.github/actions/environment
+      - name: packaging
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_S3_ENDPOINT_URL: ${{ secrets.AWS_S3_ENDPOINT_URL }}
+          LIVE_REPO_S3_DIR: ${{ secrets.LIVE_REPO_S3_DIR }}
+          RELEASE_REPO_S3_DIR: ${{ secrets.RELEASE_REPO_S3_DIR }}
+          GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
+          GPG_SIGN_KEY: ${{ secrets.GPG_SIGN_KEY }}
+          OS: 'ubuntu'
+          DIST: 'groovy'
+        uses: ./.github/actions/pack_and_deploy
+      - name: call action to send Telegram message on failure
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
+          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
+        uses: ./.github/actions/send-telegram-notify
+        if: failure()
+      - name: artifacts
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: ubuntu-groovy
+          retention-days: 21
+          path: build/usr/src/*/tarantool-*/test/var/artifacts
