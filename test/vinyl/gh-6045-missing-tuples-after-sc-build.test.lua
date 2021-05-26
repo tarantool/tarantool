@@ -1,0 +1,43 @@
+test_run = require('test_run').new()
+
+-- Test scenario is following. We have space filled with data in L0.
+-- Then we are trying to build secondary index and in parallel execute
+-- replace/insert+delete requests by the keys that have still not yet
+-- been transferred to secondary index.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+
+last_val = 1000
+box.begin()
+for i = 1, last_val do box.space.test:replace{i, i, i} end
+box.commit()
+
+-- Yield almost right away in order to setup on_replace trigger
+-- on secondary index being created.
+-- replace is equal to delete+insert while promoted to secondary index.
+-- So in older Tarantool versions this would lead to missing three
+-- tuples in secondary index by keys {last_val-2}, {last_val-1} and {last_val}.
+--
+test_run:cmd("setopt delimiter ';'")
+function gen_load()
+    require('fiber').sleep(0.001)
+    box.space.test:replace({last_val-2, last_val-2, 12})
+    box.space.test:replace({last_val-1, last_val-1, 12})
+    box.begin()
+        box.space.test:delete({last_val})
+        box.space.test:insert({last_val, last_val, 12})
+    box.commit()
+end;
+test_run:cmd("setopt delimiter ''");
+
+fiber = require('fiber')
+ch = require('fiber').channel(1)
+_ = fiber.create(function() gen_load() ch:put(true) end)
+_ = box.space.test:create_index('sk', {unique = false, parts = {2, 'unsigned'}})
+ch:get()
+pk_cnt = box.space.test.index.pk:count()
+sk_cnt = box.space.test.index.sk:count()
+assert(pk_cnt == sk_cnt)
+
+box.space.test:drop()
