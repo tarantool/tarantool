@@ -1088,7 +1088,8 @@ vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 	if (old == NULL && vy_stmt_type(stmt) == IPROTO_INSERT)
 		v->is_first_insert = true;
 
-	if (lsm->index_id > 0 && old != NULL && !old->is_nop) {
+	if (lsm->index_id > 0 && old != NULL && !old->is_nop &&
+	    !vy_lsm_is_being_constructed(lsm)) {
 		/*
 		 * In a secondary index write set, DELETE statement purges
 		 * exactly one older statement so REPLACE + DELETE is no-op.
@@ -1098,6 +1099,18 @@ vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 		 * Therefore we can zap DELETE + REPLACE as there must be
 		 * an older REPLACE for the same key stored somewhere in the
 		 * index data.
+		 *
+		 * Anyway, we do not apply this optimization if secondary
+		 * index is currently being built. Otherwise, we may face
+		 * the situation when we are handling pair of DELETE + REPLACE
+		 * requests redirected by on_replace trigger by the key that
+		 * hasn't been already inserted into secondary index.
+		 * It results in updated tuple in PK (with bumped lsn), but
+		 * still not inserted in secondary index (since optimization
+		 * annihilates it; meanwhile it is skipped in
+		 * vinyl_space_build_index() as featuring bumped lsn).
+		 * Finally, we'll get missing tuple in secondary index after
+		 * it is built.
 		 */
 		enum iproto_type type = vy_stmt_type(stmt);
 		enum iproto_type old_type = vy_stmt_type(old->stmt);
