@@ -532,7 +532,7 @@ local function create_transport(host, port, user, password, callback,
     -- @retval not nil Future object.
     --
     local function perform_async_request(buffer, skip_header, method, on_push,
-                                         on_push_ctx, request_ctx, ...)
+                                         on_push_ctx, request_ctx, stream_id, ...)
         if state ~= 'active' and state ~= 'fetch_schema' then
             local code = last_errno or E_NO_CONNECTION
             local msg = last_error or
@@ -546,7 +546,7 @@ local function create_transport(host, port, user, password, callback,
             worker_fiber:wakeup()
         end
         local id = next_request_id
-        method_encoder[method](send_buf, id, ...)
+        method_encoder[method](send_buf, id, stream_id, ...)
         next_request_id = next_id(id)
         -- Request in most cases has maximum 10 members:
         -- method, buffer, skip_header, id, cond, errno, response,
@@ -570,10 +570,10 @@ local function create_transport(host, port, user, password, callback,
     -- @retval not nil Response object.
     --
     local function perform_request(timeout, buffer, skip_header, method,
-                                   on_push, on_push_ctx, request_ctx, ...)
+                                   on_push, on_push_ctx, request_ctx, stream_id, ...)
         local request, err =
             perform_async_request(buffer, skip_header, method, on_push,
-                                  on_push_ctx, request_ctx, ...)
+                                  on_push_ctx, request_ctx, stream_id, ...)
         if not request then
             return nil, err
         end
@@ -789,7 +789,7 @@ local function create_transport(host, port, user, password, callback,
             set_state('fetch_schema')
             return iproto_schema_sm()
         end
-        encode_auth(send_buf, new_request_id(), user, password, salt)
+        encode_auth(send_buf, new_request_id(), nil, user, password, salt)
         local err, hdr, body_rpos = send_and_recv_iproto()
         if err then
             return error_sm(err, hdr)
@@ -815,13 +815,13 @@ local function create_transport(host, port, user, password, callback,
         local select3_id
         local response = {}
         -- fetch everything from space _vspace, 2 = ITER_ALL
-        encode_select(send_buf, select1_id, VSPACE_ID, 0, 2, 0, 0xFFFFFFFF, nil)
+        encode_select(send_buf, select1_id, nil, VSPACE_ID, 0, 2, 0, 0xFFFFFFFF, nil)
         -- fetch everything from space _vindex, 2 = ITER_ALL
-        encode_select(send_buf, select2_id, VINDEX_ID, 0, 2, 0, 0xFFFFFFFF, nil)
+        encode_select(send_buf, select2_id, nil, VINDEX_ID, 0, 2, 0, 0xFFFFFFFF, nil)
         -- fetch everything from space _vcollation, 2 = ITER_ALL
         if peer_has_vcollation then
             select3_id = new_request_id()
-            encode_select(send_buf, select3_id, VCOLLATION_ID, 0, 2, 0,
+            encode_select(send_buf, select3_id, nil, VCOLLATION_ID, 0, 2, 0,
                           0xFFFFFFFF, nil)
         end
 
@@ -1067,6 +1067,9 @@ local function new_sm(host, port, opts, connection, greeting)
     if opts.wait_connected ~= false then
         remote._transport.wait_state('active', tonumber(opts.wait_connected))
     end
+    remote._last_stream_id = 0
+    remote._use_auto_stream_id = true
+    remote._streams = {}
     return remote
 end
 
@@ -1124,6 +1127,49 @@ local function check_eval_args(args)
     end
 end
 
+function remote_methods:stream(stream_id)
+    check_remote_arg(self, 'stream')
+    if type(stream_id) ~= 'number' and type(stream_id) ~= 'nil' then
+        error("Use remote:stream(stream_id) with an integer stream_id or "..
+              "without any arguments")
+    end
+    local conflict = false
+    if stream_id then
+        if self._use_auto_stream_id and self._last_stream_id ~= 0 then
+            conflict = true
+        else
+            self._use_auto_stream_id = false
+        end
+    else
+        if not self._use_auto_stream_id then
+            conflict = true
+        else
+            stream_id = self._last_stream_id + 1
+            self._last_stream_id = stream_id
+        end
+    end
+
+    if conflict then
+        error("You can use stream_id, which is generated automatically, "..
+                   "or set it manually, but do not mix these two options")
+    end
+
+    if self._streams[stream_id] then
+        return self._streams[stream_id]
+    end
+
+    local stream = setmetatable(
+        { _stream_id = stream_id },
+        { __index = self, __metatable = false }
+    )
+    function stream:stream()
+        check_remote_arg(self, 'stream')
+        return self._stream_id
+    end
+    self._streams[stream_id] = stream
+    return stream
+end
+
 function remote_methods:close()
     check_remote_arg(self, 'close')
     self._transport.stop()
@@ -1154,7 +1200,7 @@ function remote_methods:wait_connected(timeout)
     return self._transport.wait_state('active', timeout)
 end
 
-function remote_methods:_request(method, opts, request_ctx, ...)
+function remote_methods:_request(method, opts, request_ctx, stream_id, ...)
     local transport = self._transport
     local on_push, on_push_ctx, buffer, skip_header, deadline
     -- Extract options, set defaults, check if the request is
@@ -1169,7 +1215,7 @@ function remote_methods:_request(method, opts, request_ctx, ...)
             local res, err =
                 transport.perform_async_request(buffer, skip_header, method,
                                                 table.insert, {}, request_ctx,
-                                                ...)
+                                                stream_id, ...)
             if err then
                 box.error(err)
             end
@@ -1197,7 +1243,7 @@ function remote_methods:_request(method, opts, request_ctx, ...)
     end
     local res, err = transport.perform_request(timeout, buffer, skip_header,
                                                method, on_push, on_push_ctx,
-                                               request_ctx, ...)
+                                               request_ctx, stream_id, ...)
     if err then
         box.error(err)
     end
@@ -1213,7 +1259,7 @@ end
 
 function remote_methods:ping(opts)
     check_remote_arg(self, 'ping')
-    return (pcall(self._request, self, 'ping', opts))
+    return (pcall(self._request, self, 'ping', opts, nil, self._stream_id))
 end
 
 function remote_methods:reload_schema()
@@ -1224,14 +1270,14 @@ end
 -- @deprecated since 1.7.4
 function remote_methods:call_16(func_name, ...)
     check_remote_arg(self, 'call')
-    return (self:_request('call_16', nil, nil, tostring(func_name), {...}))
+    return (self:_request('call_16', nil, nil, self._stream_id, tostring(func_name), {...}))
 end
 
 function remote_methods:call(func_name, args, opts)
     check_remote_arg(self, 'call')
     check_call_args(args)
     args = args or {}
-    local res = self:_request('call_17', opts, nil, tostring(func_name), args)
+    local res = self:_request('call_17', opts, nil, self._stream_id, tostring(func_name), args)
     if type(res) ~= 'table' or opts and opts.is_async then
         return res
     end
@@ -1241,14 +1287,14 @@ end
 -- @deprecated since 1.7.4
 function remote_methods:eval_16(code, ...)
     check_remote_arg(self, 'eval')
-    return unpack((self:_request('eval', nil, nil, code, {...})))
+    return unpack((self:_request('eval', nil, nil, self._stream_id, code, {...})))
 end
 
 function remote_methods:eval(code, args, opts)
     check_remote_arg(self, 'eval')
     check_eval_args(args)
     args = args or {}
-    local res = self:_request('eval', opts, nil, code, args)
+    local res = self:_request('eval', opts, nil, self._stream_id, code, args)
     if type(res) ~= 'table' or opts and opts.is_async then
         return res
     end
@@ -1260,7 +1306,7 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "execute", "options")
     end
-    return self:_request('execute', netbox_opts, nil, query, parameters or {},
+    return self:_request('execute', netbox_opts, nil, self._stream_id, query, parameters or {},
                          sql_opts or {})
 end
 
@@ -1272,7 +1318,7 @@ function remote_methods:prepare(query, parameters, sql_opts, netbox_opts) -- lua
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "prepare", "options")
     end
-    return self:_request('prepare', netbox_opts, nil, query)
+    return self:_request('prepare', netbox_opts, nil, self._stream_id, query)
 end
 
 function remote_methods:unprepare(query, parameters, sql_opts, netbox_opts)
@@ -1283,7 +1329,7 @@ function remote_methods:unprepare(query, parameters, sql_opts, netbox_opts)
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "unprepare", "options")
     end
-    return self:_request('unprepare', netbox_opts, nil, query, parameters or {},
+    return self:_request('unprepare', netbox_opts, nil, self._stream_id, query, parameters or {},
                          sql_opts or {})
 end
 
@@ -1465,12 +1511,14 @@ space_metatable = function(remote)
 
     function methods:insert(tuple, opts)
         check_space_arg(self, 'insert')
-        return remote:_request('insert', opts, self._format_cdata, self.id, tuple)
+        local stream_id = opts and opts.stream_id or nil
+        return remote:_request('insert', opts, self._format_cdata, stream_id, self.id, tuple)
     end
 
     function methods:replace(tuple, opts)
         check_space_arg(self, 'replace')
-        return remote:_request('replace', opts, self._format_cdata, self.id, tuple)
+        local stream_id = opts and opts.stream_id or nil
+        return remote:_request('replace', opts, self._format_cdata, stream_id, self.id, tuple)
     end
 
     function methods:select(key, opts)
@@ -1490,7 +1538,8 @@ space_metatable = function(remote)
 
     function methods:upsert(key, oplist, opts)
         check_space_arg(self, 'upsert')
-        return nothing_or_data(remote:_request('upsert', opts, nil, self.id, key,
+        local stream_id = opts and opts.stream_id or nil
+        return nothing_or_data(remote:_request('upsert', opts, nil, stream_id, self.id, key,
                                                oplist))
     end
 
@@ -1520,9 +1569,10 @@ index_metatable = function(remote)
         local iterator = check_iterator_type(opts, key_is_nil)
         local offset = tonumber(opts and opts.offset) or 0
         local limit = tonumber(opts and opts.limit) or 0xFFFFFFFF
+        local stream_id = opts and opts.stream_id or nil
         return (remote:_request('select', opts, self.space._format_cdata,
-                                self.space.id, self.id, iterator, offset,
-                                limit, key))
+                                stream_id, self.space.id, self.id,
+                                iterator, offset, limit, key))
     end
 
     function methods:get(key, opts)
@@ -1530,8 +1580,10 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:get() doesn't support `buffer` argument")
         end
+        local stream_id = opts and opts.stream_id or nil
         return nothing_or_data(remote:_request('get', opts,
                                                self.space._format_cdata,
+                                               stream_id,
                                                self.space.id, self.id,
                                                box.index.EQ, 0, 2, key))
     end
@@ -1541,8 +1593,10 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:min() doesn't support `buffer` argument")
         end
+        local stream_id = opts and opts.stream_id or nil
         return nothing_or_data(remote:_request('min', opts,
                                                self.space._format_cdata,
+                                               stream_id,
                                                self.space.id, self.id,
                                                box.index.GE, 0, 1, key))
     end
@@ -1552,8 +1606,10 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:max() doesn't support `buffer` argument")
         end
+        local stream_id = opts and opts.stream_id or nil
         return nothing_or_data(remote:_request('max', opts,
                                                self.space._format_cdata,
+                                               stream_id,
                                                self.space.id, self.id,
                                                box.index.LE, 0, 1, key))
     end
@@ -1565,20 +1621,23 @@ index_metatable = function(remote)
         end
         local code = string.format('box.space.%s.index.%s:count',
                                    self.space.name, self.name)
-        return remote:_request('count', opts, nil, code, { key, opts })
+        local stream_id = opts and opts.stream_id or nil
+        return remote:_request('count', opts, nil, stream_id, code, { key, opts })
     end
 
     function methods:delete(key, opts)
         check_index_arg(self, 'delete')
+        local stream_id = opts and opts.stream_id or nil
         return nothing_or_data(remote:_request('delete', opts,
-                                               self.space._format_cdata,
+                                               self.space._format_cdata, stream_id,
                                                self.space.id, self.id, key))
     end
 
     function methods:update(key, oplist, opts)
         check_index_arg(self, 'update')
+        local stream_id = opts and opts.stream_id or nil
         return nothing_or_data(remote:_request('update', opts,
-                                               self.space._format_cdata,
+                                               self.space._format_cdata, stream_id,
                                                self.space.id, self.id, key,
                                                oplist))
     end

@@ -185,6 +185,9 @@ error:
 			flags = mp_decode_uint(pos);
 			header->flags = flags;
 			break;
+		case IPROTO_STREAM_ID:
+			header->stream_id = mp_decode_uint(pos);
+			break;
 		default:
 			/* unknown header */
 			mp_next(pos);
