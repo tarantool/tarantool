@@ -166,6 +166,11 @@ enum {
 	 * The flag is set for the fiber currently being executed by the cord.
 	 */
 	FIBER_IS_RUNNING	= 1 << 6,
+	/**
+	 * This flag is set when fiber is in the idle list
+	 * of fiber_pool.
+	 */
+	FIBER_IS_IDLE		= 1 << 7,
 	FIBER_DEFAULT_FLAGS = FIBER_IS_CANCELLABLE
 };
 

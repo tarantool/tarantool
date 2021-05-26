@@ -82,8 +82,11 @@ restart:
 		 * Add the fiber to the front of the list, so that
 		 * it is most likely to get scheduled again.
 		 */
+		f->flags |= FIBER_IS_IDLE;
 		rlist_add_entry(&pool->idle, fiber(), state);
 		fiber_yield();
+		f->flags &= ~FIBER_IS_IDLE;
+
 		goto restart;
 	}
 	pool->size--;
