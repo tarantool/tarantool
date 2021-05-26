@@ -75,6 +75,27 @@ curl_easy_header_cb(char *buffer, size_t size, size_t nitems, void *ctx)
 {
 	struct httpc_request *req = (struct httpc_request *) ctx;
 	const size_t bytes = size * nitems;
+
+	/**
+	 * Skip saving response headers if redirect will be performed
+	 * (to get headers of the final response).
+	 *
+	 * From CURLOPT_HEADERFUNCTION man:
+	 * It's important to note that the callback will be invoked for the
+	 * headers of all responses received after initiating a request and
+	 * not just the final response. This includes all responses which
+	 * occur during authentication negotiation. If you need to operate
+	 * on only the headers from the final response, you will need to
+	 * collect headers in the callback yourself and use HTTP status
+	 * lines, for example, to delimit response boundaries.
+	 */
+	long response_code = 0;
+	curl_easy_getinfo(req->curl_request.easy, CURLINFO_RESPONSE_CODE, &response_code);
+	int is_redirected = (response_code / 100) == 3;
+	if (req->follow_location && is_redirected) {
+		return bytes;
+	}
+
 	char *p = region_alloc(&req->resp_headers, bytes);
 	if (p == NULL) {
 		diag_set(OutOfMemory, bytes, "ibuf", "httpc header");
@@ -149,6 +170,7 @@ httpc_request_new(struct httpc_env *env, const char *method,
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_URL, url);
 
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_FOLLOWLOCATION, 1);
+	req->follow_location = true;
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_SSL_VERIFYPEER, 1);
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_WRITEFUNCTION,
 			 curl_easy_write_cb);
@@ -168,7 +190,6 @@ httpc_request_delete(struct httpc_request *req)
 {
 	if (req->headers != NULL)
 		curl_slist_free_all(req->headers);
-
 	curl_request_destroy(&req->curl_request);
 
 	ibuf_destroy(&req->body);
@@ -357,6 +378,7 @@ httpc_set_interface(struct httpc_request *req, const char *interface)
 void
 httpc_set_follow_location(struct httpc_request *req, long follow)
 {
+	req->follow_location = (bool)follow;
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_FOLLOWLOCATION,
 			 follow);
 }

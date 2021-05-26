@@ -90,26 +90,47 @@ local function test_http_client(test, url, opts)
 
     -- gh-4119: specify whether to follow 'Location' header
     test:test('gh-4119: follow location', function(test)
-        test:plan(7)
+        test:plan(10)
         local endpoint = 'redirect'
 
         -- Verify that the default behaviour is to follow location.
         local r = client.request('GET', url .. endpoint, nil, opts)
+        local body_len_str = tostring((r.body and #r.body) or 0)
         test:is(r.status, 200, 'default: status')
         test:is(r.body, 'hello world', 'default: body')
+        -- gh-6101: verify headers after redirecrt is correct (from the final response)
+        test:is_deeply(
+            {r.headers['content-type'], r.headers['content-length']},
+            {'application/json', body_len_str},
+            'got headers from the final response (redirection)'
+        )
 
         -- Verify {follow_location = true} behaviour.
         local r = client.request('GET', url .. endpoint, nil, merge(opts, {
                                  follow_location = true}))
+        local body_len_str = tostring((r.body and #r.body) or 0)
         test:is(r.status, 200, 'follow location: status')
         test:is(r.body, 'hello world', 'follow location: body')
+        -- gh-6101: verify headers after redirecrt is correct (from the final response)
+        test:is_deeply(
+            {r.headers['content-type'], r.headers['content-length']},
+            {'application/json', body_len_str},
+            'got headers from the final response (redirection)'
+        )
 
         -- Verify {follow_location = false} behaviour.
         local r = client.request('GET', url .. endpoint, nil, merge(opts, {
                                  follow_location = false}))
+        local body_len_str = tostring((r.body and #r.body) or 0)
         test:is(r.status, 302, 'do not follow location: status')
         test:is(r.body, 'redirecting', 'do not follow location: body')
         test:is(r.headers['location'], '/', 'do not follow location: header')
+        -- gh-6101: verify headers after redirecrt is correct (from the final response)
+        test:is_deeply(
+            {r.headers['content-type'], r.headers['content-length']},
+            {nil, body_len_str},
+            'got headers from the final response (no redirection)'
+        )
     end)
 end
 

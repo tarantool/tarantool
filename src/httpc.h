@@ -130,6 +130,14 @@ struct httpc_request {
 	 * execution automatically.
 	 */
 	bool set_keep_alive_header;
+	/**
+	 * True by default. Used to skip saving response headers
+	 * at resp_headers from not the final responses in case of
+	 * curl internal redirections (status code=3xx
+	 * CURLOPT_FOLLOWLOCATION is set), to get headers from the
+	 * final response.
+	 */
+	bool follow_location;
 };
 
 /**
