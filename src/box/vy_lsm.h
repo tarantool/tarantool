@@ -362,6 +362,16 @@ vy_lsm_is_empty(struct vy_lsm *lsm)
 }
 
 /**
+ * Return true if LSM tree is currently being built
+ * (i.e. index_commit_create() hasn't been called yet).
+ */
+static inline bool
+vy_lsm_is_being_constructed(struct vy_lsm *lsm)
+{
+	return lsm->commit_lsn < 0;
+}
+
+/**
  * Return the averange number of dumps it takes to trigger major
  * compaction of a range in this LSM tree.
  */
