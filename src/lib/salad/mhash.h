@@ -157,7 +157,7 @@ struct _mh(t) {
 #define MH_DENSITY 0.7
 
 struct _mh(t) * _mh(new)();
-void _mh(clear)(struct _mh(t) *h);
+int _mh(clear)(struct _mh(t) *h);
 void _mh(delete)(struct _mh(t) *h);
 void _mh(resize)(struct _mh(t) *h, mh_arg_t arg);
 int _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
@@ -399,23 +399,50 @@ _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
 struct _mh(t) *
 _mh(new)()
 {
-	struct _mh(t) *h = (struct _mh(t) *) calloc(1, sizeof(*h));
-	h->shadow = (struct _mh(t) *) calloc(1, sizeof(*h));
+	struct _mh(t) *h = (struct _mh(t) *)calloc(1, sizeof(*h));
+	if (h == NULL)
+		return NULL;
+	h->shadow = (struct _mh(t) *)calloc(1, sizeof(*h));
+	if (h->shadow == NULL)
+		goto fail;
 	h->prime = 0;
 	h->n_buckets = __ac_prime_list[h->prime];
-	h->p = (mh_node_t *) calloc(h->n_buckets, sizeof(mh_node_t));
+	h->p = (mh_node_t *)calloc(h->n_buckets, sizeof(mh_node_t));
+	if (h->p == NULL)
+		goto fail;
 #if !mh_bytemap
-	h->b = (uint32_t *) calloc(h->n_buckets / 16 + 1, sizeof(uint32_t));
+	h->b = (uint32_t *)calloc(h->n_buckets / 16 + 1, sizeof(uint32_t));
 #else
-	h->b = (uint8_t *) calloc(h->n_buckets, sizeof(uint8_t));
+	h->b = (uint8_t *)calloc(h->n_buckets, sizeof(uint8_t));
 #endif
+	if (h->b == NULL)
+		goto fail;
 	h->upper_bound = h->n_buckets * MH_DENSITY;
 	return h;
+
+fail:
+	free(h->p);
+	free(h->shadow);
+	free(h);
+	return NULL;
 }
 
-void
+int
 _mh(clear)(struct _mh(t) *h)
 {
+	mh_int_t n_buckets = __ac_prime_list[h->prime];
+	mh_node_t *p = (mh_node_t *)calloc(n_buckets, sizeof(mh_node_t));
+	if (p == NULL)
+		return -1;
+#if !mh_bytemap
+	uint32_t *b = (uint32_t *)calloc(n_buckets / 16 + 1, sizeof(uint32_t));
+#else
+	uint8_t *b = (uint8_t *)calloc(n_buckets, sizeof(uint8_t));
+#endif
+	if (b == NULL) {
+		free(p);
+		return -1;
+	}
 	if (h->shadow->p) {
 		free(h->shadow->p);
 		free(h->shadow->b);
@@ -424,15 +451,12 @@ _mh(clear)(struct _mh(t) *h)
 	free(h->p);
 	free(h->b);
 	h->prime = 0;
-	h->n_buckets = __ac_prime_list[h->prime];
-	h->p = (mh_node_t *) calloc(h->n_buckets, sizeof(mh_node_t));
-#if !mh_bytemap
-	h->b = (uint32_t *) calloc(h->n_buckets / 16 + 1, sizeof(uint32_t));
-#else
-	h->b = (uint8_t *) calloc(h->n_buckets, sizeof(uint8_t));
-#endif
+	h->n_buckets = n_buckets;
+	h->p = p;
+	h->b = b;
 	h->size = 0;
 	h->upper_bound = h->n_buckets * MH_DENSITY;
+	return 0;
 }
 
 void
@@ -515,42 +539,47 @@ _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 		/* hash size is already greater than requested */
 		return 0;
 	}
-	while (h->prime < __ac_HASH_PRIME_SIZE - 1) {
-		if (__ac_prime_list[h->prime] >= buckets)
+	mh_int_t new_prime = h->prime;
+	while (new_prime < __ac_HASH_PRIME_SIZE - 1) {
+		if (__ac_prime_list[new_prime] >= buckets)
 			break;
-		h->prime += 1;
+		new_prime += 1;
 	}
-
-	h->batch = batch > 0 ? batch : h->n_buckets / (256 * 1024);
-	if (h->batch < 256) {
+	mh_int_t new_batch = batch > 0 ? batch : h->n_buckets / (256 * 1024);
+	if (new_batch < 256) {
 		/*
 		 * Minimal batch must be greater or equal to
 		 * 1 / (1 - f), where f is upper bound percent
 		 * = MH_DENSITY
 		 */
-		h->batch = 256;
+		new_batch = 256;
 	}
 
+	mh_int_t n_buckets = __ac_prime_list[new_prime];
+	mh_node_t *p = (mh_node_t *)malloc(n_buckets * sizeof(mh_node_t));
+	if (p == NULL)
+		return -1;
+#if !mh_bytemap
+	uint32_t *b = (uint32_t *)calloc(n_buckets / 16 + 1, sizeof(uint32_t));
+#else
+	uint8_t *b = (uint8_t *)calloc(n_buckets, sizeof(uint8_t));
+#endif
+	if (b == NULL) {
+		free(p);
+		return -1;
+	}
+
+	h->prime = new_prime;
+	h->batch = new_batch;
 	struct _mh(t) *s = h->shadow;
 	memcpy(s, h, sizeof(*h));
 	s->resize_position = 0;
-	s->n_buckets = __ac_prime_list[h->prime];
+	s->n_buckets = n_buckets;
 	s->upper_bound = s->n_buckets * MH_DENSITY;
 	s->n_dirty = 0;
 	s->size = 0;
-	s->p = (mh_node_t *) malloc(s->n_buckets * sizeof(mh_node_t));
-	if (s->p == NULL)
-		return -1;
-#if !mh_bytemap
-	s->b = (uint32_t *) calloc(s->n_buckets / 16 + 1, sizeof(uint32_t));
-#else
-	s->b = (uint8_t *) calloc(s->n_buckets, sizeof(uint8_t));
-#endif
-	if (s->b == NULL) {
-		free(s->p);
-		s->p = NULL;
-		return -1;
-	}
+	s->p = p;
+	s->b = b;
 	_mh(resize)(h, arg);
 
 	return 0;
