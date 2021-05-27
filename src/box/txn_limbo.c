@@ -389,6 +389,33 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			 */
 			if (e->lsn == -1)
 				break;
+		} else if (e->txn->signature < 0) {
+			/*
+			 * A transaction might be covered by the CONFIRM even if
+			 * it is not written to WAL yet when it is an async
+			 * transaction. It could be created just when the
+			 * CONFIRM was being written to WAL.
+			 */
+			assert(e->txn->status == TXN_PREPARED);
+			/*
+			 * Let it complete normally as a plain transaction. It
+			 * is important to remove the limbo entry, because the
+			 * async transaction might be committed in a
+			 * non-blocking way and won't ever wait explicitly for
+			 * its completion. Therefore, won't be able to remove
+			 * the limbo entry on its own. This happens for txns
+			 * created in the applier.
+			 */
+			txn_clear_flags(e->txn, TXN_WAIT_SYNC);
+			txn_limbo_remove(limbo, e);
+			/*
+			 * The limbo entry now should not be used by the owner
+			 * transaction since it just became a plain one. Nullify
+			 * the txn to get a crash on any usage attempt instead
+			 * of potential undefined behaviour.
+			 */
+			e->txn = NULL;
+			continue;
 		}
 		e->is_commit = true;
 		txn_limbo_remove(limbo, e);

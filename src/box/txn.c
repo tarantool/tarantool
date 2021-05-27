@@ -878,9 +878,14 @@ txn_commit(struct txn *txn)
 	req = txn_journal_entry_new(txn);
 	if (req == NULL)
 		goto rollback;
-
-	bool is_sync = txn_has_flag(txn, TXN_WAIT_SYNC);
-	if (is_sync) {
+	/*
+	 * Do not cache the flag value in a variable. The flag might be deleted
+	 * during WAL write. This can happen for async transactions created
+	 * during CONFIRM write, whose all blocking sync transactions get
+	 * confirmed. Then they turn the async transaction into just a plain
+	 * txn not waiting for anything.
+	 */
+	if (txn_has_flag(txn, TXN_WAIT_SYNC)) {
 		/*
 		 * Remote rows, if any, come before local rows, so
 		 * check for originating instance id here.
@@ -899,13 +904,13 @@ txn_commit(struct txn *txn)
 
 	fiber_set_txn(fiber(), NULL);
 	if (journal_write(req) != 0 || req->res < 0) {
-		if (is_sync)
+		if (txn_has_flag(txn, TXN_WAIT_SYNC))
 			txn_limbo_abort(&txn_limbo, limbo_entry);
 		diag_set(ClientError, ER_WAL_IO);
 		diag_log();
 		goto rollback;
 	}
-	if (is_sync) {
+	if (txn_has_flag(txn, TXN_WAIT_SYNC)) {
 		if (txn_has_flag(txn, TXN_WAIT_ACK)) {
 			int64_t lsn = req->rows[req->n_rows - 1]->lsn;
 			/*
