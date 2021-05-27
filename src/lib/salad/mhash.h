@@ -157,7 +157,7 @@ struct _mh(t) {
 #define MH_DENSITY 0.7
 
 struct _mh(t) * _mh(new)();
-void _mh(clear)(struct _mh(t) *h);
+int _mh(clear)(struct _mh(t) *h);
 void _mh(delete)(struct _mh(t) *h);
 void _mh(resize)(struct _mh(t) *h, mh_arg_t arg);
 int _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
@@ -400,20 +400,36 @@ struct _mh(t) *
 _mh(new)()
 {
 	struct _mh(t) *h = (struct _mh(t) *) calloc(1, sizeof(*h));
+	if (h == NULL)
+		return NULL;
 	h->shadow = (struct _mh(t) *) calloc(1, sizeof(*h));
+	if (h->shadow == NULL)
+		goto fail_alloc_shadow;
 	h->prime = 0;
 	h->n_buckets = __ac_prime_list[h->prime];
 	h->p = (mh_node_t *) calloc(h->n_buckets, sizeof(mh_node_t));
+	if (h->p == NULL)
+		goto fail_alloc_p;
 #if !mh_bytemap
 	h->b = (uint32_t *) calloc(h->n_buckets / 16 + 1, sizeof(uint32_t));
 #else
 	h->b = (uint8_t *) calloc(h->n_buckets, sizeof(uint8_t));
 #endif
+	if (h->b == NULL)
+		goto fail_alloc_b;
 	h->upper_bound = h->n_buckets * MH_DENSITY;
 	return h;
+
+fail_alloc_b:
+	free(h->p);
+fail_alloc_p:
+	free(h->shadow);
+fail_alloc_shadow:
+	free(h);
+	return NULL;
 }
 
-void
+int
 _mh(clear)(struct _mh(t) *h)
 {
 	if (h->shadow->p) {
@@ -426,13 +442,20 @@ _mh(clear)(struct _mh(t) *h)
 	h->prime = 0;
 	h->n_buckets = __ac_prime_list[h->prime];
 	h->p = (mh_node_t *) calloc(h->n_buckets, sizeof(mh_node_t));
+	if (h->p == NULL)
+		return -1;
 #if !mh_bytemap
 	h->b = (uint32_t *) calloc(h->n_buckets / 16 + 1, sizeof(uint32_t));
 #else
 	h->b = (uint8_t *) calloc(h->n_buckets, sizeof(uint8_t));
 #endif
+	if (h->b == NULL) {
+		free(h->p);
+		return -1;
+	}
 	h->size = 0;
 	h->upper_bound = h->n_buckets * MH_DENSITY;
+	return 0;
 }
 
 void
