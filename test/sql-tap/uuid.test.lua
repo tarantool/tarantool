@@ -3,7 +3,7 @@ local build_path = os.getenv("BUILDDIR")
 package.cpath = build_path..'/test/sql-tap/?.so;'..build_path..'/test/sql-tap/?.dylib;'..package.cpath
 
 local test = require("sqltester")
-test:plan(139)
+test:plan(145)
 
 local uuid = require("uuid")
 local uuid1 = uuid.fromstr("11111111-1111-1111-1111-111111111111")
@@ -1264,6 +1264,56 @@ test:do_execsql_test(
         SELECT i FROM t15 ORDER BY a;
     ]], {
         3,2,1
+    })
+
+-- Check function uuid().
+test:do_execsql_test(
+    "uuid-16.1",
+    [[
+        SELECT typeof(uuid());
+    ]], {
+        "uuid"
+    })
+
+test:do_execsql_test(
+    "uuid-16.2",
+    [[
+        SELECT typeof(uuid(4));
+    ]], {
+        "uuid"
+    })
+
+test:do_catchsql_test(
+    "uuid-16.3",
+    [[
+        SELECT uuid(1);
+    ]], {
+        1, "Function UUID does not support versions other than 4"
+    })
+
+test:do_catchsql_test(
+    "uuid-16.4",
+    [[
+        SELECT uuid('asd');
+    ]], {
+        1, "Type mismatch: can not convert asd to integer"
+    })
+
+test:do_catchsql_test(
+    "uuid-16.5",
+    [[
+        SELECT uuid(4, 5);
+    ]], {
+        1, "Wrong number of arguments is passed to UUID(): expected one or zero, got 2"
+    })
+
+-- Make sure the uuid() function generates a new UUID each time when called.
+test:do_execsql_test(
+    "uuid-16.6",
+    [[
+        SELECT uuid() != uuid();
+    ]], {
+        true
     })
 
 test:execsql([[

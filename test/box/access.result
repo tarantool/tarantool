@@ -703,7 +703,7 @@ box.schema.func.exists(1)
 ---
 - true
 ...
-box.schema.func.exists(68)
+box.schema.func.exists(69)
 ---
 - false
 ...

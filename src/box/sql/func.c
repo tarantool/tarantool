@@ -66,6 +66,35 @@ mem_as_bin(struct Mem *mem)
 	return s;
 }
 
+static void
+sql_func_uuid(struct sql_context *ctx, int argc, struct Mem **argv)
+{
+	if (argc > 1) {
+		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, "UUID",
+			 "one or zero", argc);
+		ctx->is_aborted = true;
+		return;
+	}
+	if (argc == 1) {
+		uint64_t version;
+		if (mem_get_uint(argv[0], &version) != 0) {
+			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+				 mem_str(argv[0]), "integer");
+			ctx->is_aborted = true;
+			return;
+		}
+		if (version != 4) {
+			diag_set(ClientError, ER_UNSUPPORTED, "Function UUID",
+				 "versions other than 4");
+			ctx->is_aborted = true;
+			return;
+		}
+	}
+	struct tt_uuid uuid;
+	tt_uuid_create(&uuid);
+	mem_set_uuid(ctx->pOut, &uuid);
+}
+
 /*
  * Return the collating function associated with a function.
  */
@@ -2542,6 +2571,16 @@ static struct {
 	 .is_deterministic = true,
 	 .flags = SQL_FUNC_DERIVEDCOLL | SQL_FUNC_NEEDCOLL,
 	 .call = UpperICUFunc,
+	 .finalize = NULL,
+	 .export_to_sql = true,
+	}, {
+	 .name = "UUID",
+	 .param_count = -1,
+	 .returns = FIELD_TYPE_UUID,
+	 .aggregate = FUNC_AGGREGATE_NONE,
+	 .is_deterministic = false,
+	 .flags = 0,
+	 .call = sql_func_uuid,
 	 .finalize = NULL,
 	 .export_to_sql = true,
 	}, {

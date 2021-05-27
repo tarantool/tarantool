@@ -97,7 +97,7 @@ box.func["function1.args"]
   exports:
     lua: true
     sql: false
-  id: 68
+  id: 69
   setuid: false
   is_multikey: false
   is_deterministic: false
@@ -593,7 +593,7 @@ func
   exports:
     lua: true
     sql: false
-  id: 68
+  id: 69
   setuid: false
   is_multikey: false
   is_deterministic: false
@@ -665,7 +665,7 @@ func
   exports:
     lua: true
     sql: false
-  id: 68
+  id: 69
   setuid: false
   is_multikey: false
   is_deterministic: false

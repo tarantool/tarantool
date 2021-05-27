@@ -42,11 +42,11 @@ test_run:cmd("setopt delimiter ''");
 ...
 func_limit()
 ---
-- error: 'Failed to create function ''func31934'': function id is too big'
+- error: 'Failed to create function ''func31933'': function id is too big'
 ...
 drop_limit_func()
 ---
-- error: Function 'func31934' does not exist
+- error: Function 'func31933' does not exist
 ...
 box.schema.user.create('testuser')
 ---
@@ -62,11 +62,11 @@ session.su('testuser')
 ...
 func_limit()
 ---
-- error: 'Failed to create function ''func31934'': function id is too big'
+- error: 'Failed to create function ''func31933'': function id is too big'
 ...
 drop_limit_func()
 ---
-- error: Function 'func31934' does not exist
+- error: Function 'func31933' does not exist
 ...
 session.su('admin')
 ---

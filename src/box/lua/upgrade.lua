@@ -1001,6 +1001,24 @@ local function upgrade_to_2_7_1()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 2.9.1
+--------------------------------------------------------------------------------
+local function sql_builtin_function_uuid()
+    local _func = box.space._func
+    local _priv = box.space._priv
+    local datetime = os.date("%Y-%m-%d %H:%M:%S")
+    local t = _func:auto_increment({ADMIN, 'UUID', 1, 'SQL_BUILTIN', '',
+                                    'function', {}, 'any', 'none', 'none',
+                                    false, false, true, {}, setmap({}), '',
+                                    datetime, datetime})
+    _priv:replace{ADMIN, PUBLIC, 'function', t.id, box.priv.X}
+end
+
+local function upgrade_to_2_9_1()
+    sql_builtin_function_uuid()
+end
+
+--------------------------------------------------------------------------------
 
 local handlers = {
     {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = true},
@@ -1015,6 +1033,7 @@ local handlers = {
     {version = mkversion(2, 3, 0), func = upgrade_to_2_3_0, auto = true},
     {version = mkversion(2, 3, 1), func = upgrade_to_2_3_1, auto = true},
     {version = mkversion(2, 7, 1), func = upgrade_to_2_7_1, auto = true},
+    {version = mkversion(2, 9, 1), func = upgrade_to_2_9_1, auto = true},
 }
 
 -- Schema version of the snapshot.
