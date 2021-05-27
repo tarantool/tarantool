@@ -42,6 +42,49 @@ runs:
         curl -s https://api.github.com/repos/tarantool/tarantool/actions/runs/${{ github.run_id }}/jobs | jq -r '.jobs[0].id' | tee -a $GITHUB_ENV
         echo 'EOF' >> $GITHUB_ENV
       shell: bash
+    # convert commit message to single line with marked new lines as 'TELEGRAMNEWLINE'
+    - env:
+        COMMIT_MSG: |
+          ${{ github.event.head_commit.message }}
+      run: |
+        # Make changes in the commit message to avoid of its fail on Markdown:
+        # 1. Convert message from multi lines to single line.
+        # 2. Add backslashes to single quote marks in message.
+        # 3. Add backslashes to '`' in message.
+        if ${{ env.OS_IS_FEDORA_OR_RHEL == 'true' }} || ${{ env.KERNEL_NAME == 'Darwin' }} ; then
+          msg="${COMMIT_MSG//$'\n'/TELEGRAMNEWLINE}"
+          msg="${msg//$'\\\\'/BACKSLASH}"
+          msg="${msg//$'\\\''/\'}"
+          msg="${msg//$'\`'/BACKTICK}"
+        else
+          msg="${COMMIT_MSG//$'\n'/TELEGRAMNEWLINE}"
+          msg="${msg//$'\\'/BACKSLASH}"
+          msg="${msg//$'\''/\\\'}"
+          msg="${msg//$'`'/BACKTICK}"
+        fi
+        echo 'COMMIT_MSG_LINE<<EOF' >> $GITHUB_ENV
+        echo "$msg" | tee -a $GITHUB_ENV
+        echo 'EOF' >> $GITHUB_ENV
+      shell: bash
+    # strip Markdown from commit message
+    - run: |
+        pip3 install setuptools
+        pip3 install markdown bs4
+        echo "Sending commit message part as a single line: ${{ env.COMMIT_MSG_LINE }}"
+        msg=`python3 -c "import markdown ; \\
+          from bs4 import BeautifulSoup ; \\
+          md = markdown.markdown(\"${{ env.COMMIT_MSG_LINE }}\") ; \\
+          soup = BeautifulSoup(md, features='html.parser') ; \\
+          print(soup.get_text())"`
+        echo "Sending commit message part as a single line: $msg"
+        echo 'COMMIT_MSG<<EOF' >> $GITHUB_ENV
+          if ${{ env.OS_IS_FEDORA_OR_RHEL == 'true' }} || ${{ env.KERNEL_NAME == 'Darwin' }} ; then
+            echo $msg | sed "s#TELEGRAMNEWLINE#\\\n#g" | tee -a $GITHUB_ENV
+          else
+            echo $msg | sed "s#TELEGRAMNEWLINE#\n#g" | tee -a $GITHUB_ENV
+          fi
+        echo 'EOF' >> $GITHUB_ENV
+      shell: bash
     - env:
         MSG: |
           🔴 Workflow testing failed:
@@ -54,7 +97,7 @@ runs:
           Committer: `${{ github.actor }}`
           ```
           ---------------- Commit message -------------------
-          ${{ github.event.head_commit.message }}
+          ${{ env.COMMIT_MSG }}
           ```
       run: |
         # convert message from multi lines to single line and
