@@ -23,7 +23,7 @@ h = init();
 destroy(h);
 
 h = init();
-clear(h);
+fail_unless(clear(h) == 0);
 
 /* access not yet initialized hash */
 clr(9);
@@ -59,7 +59,7 @@ tst(7);
 tst(8);
 tst(9);
 
-clear(h);
+fail_unless(clear(h) == 0);
 
 /* after clear no items should exist */
 clr(1);
