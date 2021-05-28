@@ -319,7 +319,8 @@ lbox_fiber_statof(struct fiber *f, void *cb_ctx, bool backtrace)
 	struct lua_State *L = cb_ctx;
 	luaL_pushuint64(L, f->fid);
 	lua_newtable(L);
-	lbox_fiber_statof_map(f, cb_ctx, backtrace);
+	lbox_fiber_statof_map(f, cb_ctx,
+			      backtrace && (f->flags & FIBER_IS_IDLE) == 0);
 	lua_settable(L, -3);
 	return 0;
 }
