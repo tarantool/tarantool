@@ -2676,17 +2676,30 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 		tnt_raise(ClientError, ER_LOADING);
 
 	struct tt_uuid replica_uuid = uuid_nil;
+	struct tt_uuid peer_replicaset_uuid = uuid_nil;
 	struct vclock replica_clock;
 	uint32_t replica_version_id;
 	vclock_create(&replica_clock);
 	bool anon;
 	uint32_t id_filter;
-	xrow_decode_subscribe_xc(header, NULL, &replica_uuid, &replica_clock,
-				 &replica_version_id, &anon, &id_filter);
+	xrow_decode_subscribe_xc(header, &peer_replicaset_uuid, &replica_uuid,
+				 &replica_clock, &replica_version_id, &anon,
+				 &id_filter);
 
 	/* Forbid connection to itself */
 	if (tt_uuid_is_equal(&replica_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
+	/*
+	 * The peer should have bootstrapped from somebody since it tries to
+	 * subscribe already. If it belongs to a different replicaset, it won't
+	 * be ever found here, and would try to reconnect thinking its replica
+	 * ID wasn't replicated here yet. Prevent it right away.
+	 */
+	if (!tt_uuid_is_equal(&peer_replicaset_uuid, &REPLICASET_UUID)) {
+		tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
+			  tt_uuid_str(&REPLICASET_UUID),
+			  tt_uuid_str(&peer_replicaset_uuid));
+	}
 
 	/*
 	 * Do not allow non-anonymous followers for anonymous
@@ -2745,11 +2758,13 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * the replica how many rows we have in stock for it,
 	 * and identify ourselves with our own replica id.
 	 *
-	 * Tarantool > 2.1.1 master doesn't check that replica
-	 * has the same cluster id. Instead it sends its cluster
-	 * id to replica, and replica checks that its cluster id
-	 * matches master's one. Older versions will just ignore
-	 * the additional field.
+	 * Master not only checks the replica has the same replicaset UUID, but
+	 * also sends the UUID to the replica so both Tarantools could perform
+	 * any checks they want depending on their version and supported
+	 * features.
+	 *
+	 * Older versions not supporting replicaset UUID in the response will
+	 * just ignore the additional field (these are < 2.1.1).
 	 */
 	struct xrow_header row;
 	xrow_encode_subscribe_response_xc(&row, &REPLICASET_UUID, &vclock);
