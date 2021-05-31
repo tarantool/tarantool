@@ -51,14 +51,14 @@
 #include "gc.h"
 #include "raft.h"
 #include "allocator.h"
-
-#include <type_traits>
+#include "memtx_delayed_tuples_free.h"
 
 /* sync snapshot every 16MB */
 #define SNAP_SYNC_INTERVAL	(1 << 24)
 
 struct small_alloc SmallAlloc::small_alloc;
 struct sys_alloc SysAlloc::sys_alloc;
+struct lifo MemtxDelayedFree::lifos[MEMTX_ALLOCATOR_COUNT];
 
 static void
 checkpoint_cancel(struct checkpoint *ckpt);
@@ -93,18 +93,6 @@ static inline void
 memtx_mem_free(void *ptr, size_t size);
 
 template <class ALLOC>
-static inline struct lifo *
-memtx_engine_get_delayed_lifo(struct memtx_engine *memtx)
-{
-	if (std::is_same<ALLOC, SmallAlloc>::value)
-		return &memtx->delayed;
-	else if (std::is_same<ALLOC, SysAlloc>::value)
-		return &memtx->sys_delayed;
-	unreachable();
-	return NULL;
-}
-
-template <class ALLOC>
 static inline void
 memtx_tuple_free(void *item)
 {
@@ -116,11 +104,10 @@ memtx_tuple_free(void *item)
 
 template <class ALLOC>
 static inline void
-memtx_free_all_garbage_tuples(struct memtx_engine *memtx)
+memtx_free_all_garbage_tuples(void)
 {
-	struct lifo *delayed = memtx_engine_get_delayed_lifo<ALLOC>(memtx);
 	void *item;
-	while ((item = lifo_pop(delayed)))
+	while ((item = MemtxDelayedFree::memtx_get_garbage_tuple<ALLOC>()))
 		memtx_tuple_free<ALLOC>(item);
 }
 
@@ -131,11 +118,11 @@ memtx_collect_garbage_tuples(struct memtx_engine *memtx)
 	if (memtx->free_mode != MEMTX_ENGINE_COLLECT_GARBAGE)
 		return;
 
-	struct lifo *delayed = memtx_engine_get_delayed_lifo<ALLOC>(memtx);
-	if (!lifo_is_empty(delayed)) {
+	if (!MemtxDelayedFree::memtx_garbage_lifo_is_empty<ALLOC>()) {
 		const int BATCH = 100;
 		for (int i = 0; i < BATCH; i++) {
-			void *item = lifo_pop(delayed);
+			void *item =
+				MemtxDelayedFree::memtx_get_garbage_tuple<ALLOC>();
 			if (item == NULL)
 				break;
 			memtx_tuple_free<ALLOC>(item);
@@ -224,11 +211,11 @@ memtx_engine_shutdown(struct engine *engine)
 		mempool_destroy(&memtx->rtree_iterator_pool);
 	mempool_destroy(&memtx->index_extent_pool);
 	slab_cache_destroy(&memtx->index_slab_cache);
-	memtx_free_all_garbage_tuples<SmallAlloc>(memtx);
+	memtx_free_all_garbage_tuples<SmallAlloc>();
 	SmallAlloc::destroy();
 	slab_cache_destroy(&memtx->slab_cache);
 	tuple_arena_destroy(&memtx->arena);
-	memtx_free_all_garbage_tuples<SysAlloc>(memtx);
+	memtx_free_all_garbage_tuples<SysAlloc>();
 	SysAlloc::destroy();
 	xdir_destroy(&memtx->snap_dir);
 	free(memtx);
@@ -1229,8 +1216,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		create_memtx_tuple_format_vtab<SysAlloc>(&memtx_tuple_format_vtab);
 	say_info("Actual slab_alloc_factor calculated on the basis of desired "
 		 "slab_alloc_factor = %f", actual_alloc_factor);
-	lifo_init(&memtx->delayed);
-	lifo_init(&memtx->sys_delayed);
+	MemtxDelayedFree::init();
 	memtx->free_mode = MEMTX_ENGINE_FREE;
 
 	/* Initialize index extent allocator. */
@@ -1393,8 +1379,7 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	    format->is_temporary) {
 		memtx_tuple_free<ALLOC>(memtx_tuple);
 	} else {
-		lifo_push(memtx_engine_get_delayed_lifo<ALLOC>(memtx),
-			  (void *)memtx_tuple);
+		MemtxDelayedFree::memtx_put_garbage_tuple<ALLOC>(memtx_tuple);
 	}
 	tuple_format_unref(format);
 }
