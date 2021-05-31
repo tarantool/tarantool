@@ -121,6 +121,18 @@ netbox_encode_ping(lua_State *L)
 }
 
 static int
+netbox_encode_shutdown(lua_State *L)
+{
+	if (lua_gettop(L) < 2)
+		return luaL_error(L, "Usage: netbox.encode_shutdown(ibuf, sync)");
+
+	struct mpstream stream;
+	size_t svp = netbox_prepare_request(L, &stream, IPROTO_SHUTDOWN);
+	netbox_encode_request(&stream, svp);
+	return 0;
+}
+
+static int
 netbox_encode_auth(lua_State *L)
 {
 	if (lua_gettop(L) < 5) {
@@ -889,6 +901,7 @@ luaopen_net_box(struct lua_State *L)
 {
 	static const luaL_Reg net_box_lib[] = {
 		{ "encode_ping",    netbox_encode_ping },
+		{ "encode_shutdown",netbox_encode_shutdown },
 		{ "encode_call_16", netbox_encode_call_16 },
 		{ "encode_call",    netbox_encode_call },
 		{ "encode_eval",    netbox_encode_eval },
