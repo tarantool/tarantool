@@ -75,6 +75,37 @@ size_t
 iproto_request_count(void);
 
 /**
+ * Wait while requests count > 0.
+ */
+void
+iproto_wait_requests_is_zero(void);
+
+/**
+  * Close connections that did't stop in
+  * shutdown processing.
+  */
+void
+iproto_close_all_connections(void);
+
+/**
+  * Wait while open connections exist.
+  */
+void
+iproto_wait_close_all_connections(void);
+
+/**
+ * Stop accepting new connections.
+ */
+void
+iproto_send_stop_msg(void);
+
+/**
+ * Start shutdown process.
+ */
+void
+iproto_send_shutdown_msg(void);
+
+/**
  * Reset network statistics.
  */
 void

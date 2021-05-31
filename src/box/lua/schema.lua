@@ -62,6 +62,22 @@ ffi.cdef[[
     ssize_t
     box_index_count(uint32_t space_id, uint32_t index_id, int type,
                     const char *key, const char *key_end);
+    void
+    iproto_send_stop_msg();
+    void
+    iproto_send_shutdown_msg(void);
+    void
+    iproto_close_all_connections(void);
+    void
+    iproto_wait_close_all_connections(void);
+    void
+    iproto_wait_requests_is_zero(void);
+    bool
+    is_shutdown_ready(struct session *session);
+    struct session *
+    next_session(struct session *session);
+    void
+    wait_shutdown_ready(struct session *session);
     /** \endcond public */
     /** \cond public */
     bool
@@ -3147,3 +3163,42 @@ end
 setmetatable(box.space, { __serialize = box_space_mt })
 
 box.NULL = msgpack.NULL
+
+local function active_sessions()
+    local cur_session = builtin.next_session(ffi.NULL)
+    return function ()
+        if cur_session ~= ffi.NULL then
+            local prev_session = cur_session
+            cur_session = builtin.next_session(cur_session)
+            return prev_session
+        end
+        return nil
+    end
+end
+
+--
+-- wait_shutdown_ready yields and then session can be
+-- freed, so it is necessary to start all checks again
+--
+local function wait_all_sessions()
+    local not_ready_session_exist = true
+    while not_ready_session_exist do
+        not_ready_session_exist = false
+        for session in active_sessions() do
+            if not builtin.is_shutdown_ready(session) then
+                not_ready_session_exist = true
+                builtin.wait_shutdown_ready(session)
+                break
+            end
+        end
+    end
+end
+
+box.ctl.on_shutdown(function()
+    builtin.iproto_send_stop_msg()
+    builtin.iproto_send_shutdown_msg()
+    wait_all_sessions()
+    builtin.iproto_wait_requests_is_zero()
+    builtin.iproto_close_all_connections()
+    builtin.iproto_wait_close_all_connections()
+ end)

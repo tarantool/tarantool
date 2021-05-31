@@ -246,6 +246,8 @@ enum iproto_type {
 	/** A rollback message for synchronous transactions. */
 	IPROTO_ROLLBACK = 41,
 
+	/** SHUTDOWN request */
+	IPROTO_SHUTDOWN = 63,
 	/** PING request */
 	IPROTO_PING = 64,
 	/** Replication JOIN command */

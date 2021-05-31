@@ -36,6 +36,7 @@
 #include <msgpuck.h>
 #include <small/ibuf.h>
 #include <small/obuf.h>
+#include <on_shutdown.h>
 #include "third_party/base64.h"
 
 #include "version.h"
@@ -91,6 +92,27 @@ iproto_wpos_create(struct iproto_wpos *wpos, struct obuf *out)
 	wpos->svp = obuf_create_svp(out);
 }
 
+/**
+  * Status of process that checks existing of
+  * alive connection.
+  */
+enum {
+    /**
+     * msg isn't sent to route.
+     */
+    CHECK_NOT_STARTED,
+    /**
+     * msg is sent to route and there are no
+     * new requests to send.
+     */
+    CHECK_PROCESS,
+    /**
+     * msg is sent to route and there are new
+     * requests to send.
+     */
+    CHECK_REQUEST,
+};
+
 struct iproto_thread {
 	/**
 	 * Slab cache used for allocating memory for output network buffers
@@ -117,6 +139,8 @@ struct iproto_thread {
 	/**
 	 * Static routes for this iproto thread
 	 */
+	struct cmsg_hop check_connections_route[2];
+	struct cmsg_hop check_requests_route[2];
 	struct cmsg_hop destroy_route[2];
 	struct cmsg_hop disconnect_route[2];
 	struct cmsg_hop misc_route[2];
@@ -130,6 +154,18 @@ struct iproto_thread {
 	struct cmsg_hop push_route[2];
 	struct cmsg_hop *dml_route[IPROTO_TYPE_STAT_MAX];
 	struct cmsg_hop connect_route[2];
+	struct cmsg_hop shutdown_route[1];
+	struct cmsg_hop clear_socket_route[2];
+	/*
+	* cmsg to notify tx thread about freeing of connection
+	*/
+	struct cmsg check_alive_connections_msg;
+	int check_alive_connections_status;
+	/*
+	* cmsg to notify tx thread about freeing of message
+	*/
+	struct cmsg check_alive_requests_msg;
+	int check_alive_requests_status;
 	/*
 	 * Iproto thread memory pools
 	 */
@@ -139,6 +175,15 @@ struct iproto_thread {
 	 * List of stopped connections
 	 */
 	RLIST_HEAD(stopped_connections);
+	/**
+	* List of connections that must be shutdowned
+	*/
+	struct rlist to_shutdown_connections;
+	/**
+	* List of connections that can't be closed
+	* normally and must be closed after shutdown.
+	*/
+	struct rlist to_close_connections;
 	/*
 	 * Iproto thread stat
 	 */
@@ -498,12 +543,25 @@ struct iproto_connection
 	 */
 	struct cmsg destroy_msg;
 	/**
+	* Pre-allocated shutdown msg. Is sent after shutdown start.
+	*/
+	struct cmsg shutdown_msg;
+	/**
+	* Pre-allocated msg. Is sent after shutdown start if
+	* connection doesn't support graceful shutdown to read all
+	* data from socket and notify graceful_shutdown_trigger
+	* about end of this process.
+	*/
+	struct cmsg clear_socket_msg;
+	/**
 	 * Connection state. Mainly it is used to determine when
 	 * the connection can be destroyed, and for debug purposes
 	 * to assert on a double destroy, for example.
 	 */
 	enum iproto_connection_state state;
 	struct rlist in_stop_list;
+	struct rlist to_shutdown_list;
+	struct rlist to_close_list;
 	/**
 	 * Kharon is used to implement box.session.push().
 	 * When a new push is ready, tx uses kharon to notify
@@ -557,6 +615,112 @@ struct iproto_connection
 	struct iproto_thread *iproto_thread;
 };
 
+static struct fiber_cond alive_connection_exists;
+static struct fiber_cond alive_request_exists;
+
+void
+iproto_wait_close_all_connections(void)
+{
+	if (iproto_connection_count() > 0)
+		fiber_cond_wait(&alive_connection_exists);
+}
+
+void
+check_no_alive_connections(struct iproto_thread *iproto_thread);
+
+void
+tx_check_no_alive_connections(struct cmsg *msg)
+{
+	(void) msg;
+	if (iproto_connection_count() == 0)
+		fiber_cond_broadcast(&alive_connection_exists);
+}
+
+void
+net_check_no_alive_connections(struct cmsg *msg)
+{
+	struct iproto_thread *iproto_thread =
+		container_of(msg, struct iproto_thread,
+			     check_alive_connections_msg);
+	if (iproto_thread->check_alive_connections_status == CHECK_REQUEST) {
+		iproto_thread->check_alive_connections_status =
+			CHECK_NOT_STARTED;
+		check_no_alive_connections(iproto_thread);
+	} else {
+		iproto_thread->check_alive_connections_status =
+			CHECK_NOT_STARTED;
+	}
+}
+
+void
+check_no_alive_connections(struct iproto_thread *iproto_thread)
+{
+	if (mempool_count(&iproto_thread->iproto_connection_pool) > 0)
+		return;
+	int check_status = iproto_thread->check_alive_connections_status;
+	if (check_status == CHECK_PROCESS || check_status == CHECK_REQUEST) {
+		iproto_thread->check_alive_connections_status =
+			CHECK_REQUEST;
+		return;
+	}
+	iproto_thread->check_alive_connections_status = CHECK_PROCESS;
+	cmsg_init(&iproto_thread->check_alive_connections_msg,
+		  iproto_thread->check_connections_route);
+	cpipe_push(&iproto_thread->tx_pipe,
+		   &iproto_thread->check_alive_connections_msg);
+	cpipe_flush_input(&iproto_thread->tx_pipe);
+}
+
+void
+iproto_wait_requests_is_zero(void)
+{
+	if (iproto_request_count() > 0)
+		fiber_cond_wait(&alive_request_exists);
+}
+
+void
+check_no_alive_requests(struct iproto_thread *iproto_thread);
+
+void
+tx_check_no_alive_requests(struct cmsg *msg)
+{
+	(void) msg;
+	if (iproto_request_count() == 0)
+		fiber_cond_broadcast(&alive_request_exists);
+}
+
+void
+net_check_no_alive_requests(struct cmsg *msg)
+{
+	struct iproto_thread *iproto_thread =
+		container_of(msg, struct iproto_thread,
+			     check_alive_requests_msg);
+	if (iproto_thread->check_alive_requests_status == CHECK_REQUEST) {
+		iproto_thread->check_alive_requests_status = CHECK_NOT_STARTED;
+		check_no_alive_requests(iproto_thread);
+	} else {
+		iproto_thread->check_alive_requests_status = CHECK_NOT_STARTED;
+	}
+}
+
+void
+check_no_alive_requests(struct iproto_thread *iproto_thread)
+{
+	if (mempool_count(&iproto_thread->iproto_msg_pool) > 0)
+		return;
+	int check_status = iproto_thread->check_alive_requests_status;
+	if (check_status == CHECK_PROCESS || check_status == CHECK_REQUEST) {
+		iproto_thread->check_alive_requests_status = CHECK_REQUEST;
+		return;
+	}
+	iproto_thread->check_alive_requests_status = CHECK_PROCESS;
+	cmsg_init(&iproto_thread->check_alive_requests_msg,
+		  iproto_thread->check_requests_route);
+	cpipe_push(&iproto_thread->tx_pipe,
+		   &iproto_thread->check_alive_requests_msg);
+	cpipe_flush_input(&iproto_thread->tx_pipe);
+}
+
 /**
  * Return true if we have not enough spare messages
  * in the message pool.
@@ -569,10 +733,17 @@ iproto_check_msg_max(struct iproto_thread *iproto_thread)
 }
 
 static inline void
+iproto_msg_free(struct iproto_thread *iproto_thread, struct iproto_msg *msg)
+{
+	mempool_free(&iproto_thread->iproto_msg_pool, msg);
+	check_no_alive_requests(iproto_thread);
+}
+
+static inline void
 iproto_msg_delete(struct iproto_msg *msg)
 {
 	struct iproto_thread *iproto_thread = msg->connection->iproto_thread;
-	mempool_free(&msg->connection->iproto_thread->iproto_msg_pool, msg);
+	iproto_msg_free(msg->connection->iproto_thread, msg);
 	iproto_resume(iproto_thread);
 }
 
@@ -583,7 +754,7 @@ iproto_msg_new(struct iproto_connection *con)
 	struct iproto_msg *msg =
 		(struct iproto_msg *) mempool_alloc(iproto_msg_pool);
 	ERROR_INJECT(ERRINJ_TESTING, {
-		mempool_free(&con->iproto_thread->iproto_msg_pool, msg);
+		iproto_msg_free(con->iproto_thread, msg);
 		msg = NULL;
 	});
 	if (msg == NULL) {
@@ -690,6 +861,16 @@ iproto_connection_try_to_start_destroy(struct iproto_connection *con)
 static inline void
 iproto_connection_close(struct iproto_connection *con)
 {
+	/*
+	 * to_shutdown_list is empty only if con->shutdown_msg is send to
+	 * shutdown_route. to_close_list isn't empty only if con->shutdown_msg
+	 * is send to shutdown_route and iproto_do_close_all_connections didn't
+	 * remove it from iproto_thread->to_close_connections. It means, that
+	 * condition is true only inside shutdown process.
+	 */
+	if (rlist_empty(&con->to_shutdown_list) &&
+	    ! rlist_empty(&con->to_close_list))
+		return;
 	if (evio_has_fd(&con->input)) {
 		/* Clears all pending events. */
 		ev_io_stop(con->loop, &con->input);
@@ -715,6 +896,8 @@ iproto_connection_close(struct iproto_connection *con)
 		assert(con->state == IPROTO_CONNECTION_CLOSED);
 	}
 	rlist_del(&con->in_stop_list);
+	rlist_del(&con->to_shutdown_list);
+	rlist_del(&con->to_close_list);
 }
 
 static inline struct ibuf *
@@ -1149,6 +1332,8 @@ iproto_connection_new(struct iproto_thread *iproto_thread, int fd)
 	con->long_poll_count = 0;
 	con->session = NULL;
 	rlist_create(&con->in_stop_list);
+	rlist_create(&con->to_shutdown_list);
+	rlist_create(&con->to_close_list);
 	/* It may be very awkward to allocate at close. */
 	cmsg_init(&con->destroy_msg, con->iproto_thread->destroy_route);
 	cmsg_init(&con->disconnect_msg, con->iproto_thread->disconnect_route);
@@ -1178,7 +1363,9 @@ iproto_connection_delete(struct iproto_connection *con)
 	       con->obuf[0].iov[0].iov_base == NULL);
 	assert(con->obuf[1].pos == 0 &&
 	       con->obuf[1].iov[0].iov_base == NULL);
+	struct iproto_thread *iproto_thread = con->iproto_thread;
 	mempool_free(&con->iproto_thread->iproto_connection_pool, con);
+	check_no_alive_connections(iproto_thread);
 }
 
 /* }}} iproto_connection */
@@ -1266,6 +1453,7 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 			goto error;
 		cmsg_init(&msg->base, iproto_thread->sql_route);
 		break;
+	case IPROTO_SHUTDOWN:
 	case IPROTO_PING:
 		cmsg_init(&msg->base, iproto_thread->misc_route);
 		break;
@@ -1669,6 +1857,7 @@ tx_process_misc(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct iproto_connection *con = msg->connection;
+	struct session *session = con->session;
 	struct obuf *out = con->tx.p_obuf;
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
@@ -1678,6 +1867,14 @@ tx_process_misc(struct cmsg *m)
 		switch (msg->header.type) {
 		case IPROTO_AUTH:
 			box_process_auth(&msg->auth, con->salt);
+			iproto_reply_ok_xc(out, msg->header.sync,
+					   ::schema_version);
+			break;
+		case IPROTO_SHUTDOWN:
+			session->client_shutdown_got = true;
+			session->graceful_shutdown = true;
+			if (is_shutdown_ready(session))
+				fiber_cond_broadcast(&session->shutdown_cond);
 			iproto_reply_ok_xc(out, msg->header.sync,
 					   ::schema_version);
 			break;
@@ -1868,6 +2065,8 @@ net_send_msg(struct cmsg *m)
 	} else if (iproto_connection_is_idle(con)) {
 		iproto_connection_close(con);
 	}
+	if (msg->header.type == IPROTO_SHUTDOWN)
+		shutdown(msg->connection->input.fd, SHUT_RD);
 	iproto_msg_delete(msg);
 }
 
@@ -1932,6 +2131,7 @@ tx_process_connect(struct cmsg *m)
 		if (con->session == NULL)
 			diag_raise();
 		con->session->meta.connection = con;
+		con->session->read_all_from_socket = false;
 		tx_fiber_init(con->session, 0);
 		char *greeting = (char *) static_alloc(IPROTO_GREETING_SIZE);
 		/* TODO: dirty read from tx thread */
@@ -2016,8 +2216,11 @@ iproto_on_accept(struct evio_service *service, int fd,
 	msg = iproto_msg_new(con);
 	if (msg == NULL) {
 		mempool_free(&con->iproto_thread->iproto_connection_pool, con);
+		check_no_alive_connections(iproto_thread);
 		return -1;
 	}
+	rlist_add_tail(&con->iproto_thread->to_shutdown_connections,
+		       &con->to_shutdown_list);
 	cmsg_init(&msg->base, iproto_thread->connect_route);
 	msg->p_ibuf = con->p_ibuf;
 	msg->wpos = con->wpos;
@@ -2161,9 +2364,90 @@ iproto_session_push(struct session *session, struct port *port)
 
 /** }}} */
 
+static void
+tx_send_shutdown(struct cmsg *m)
+{
+	struct iproto_connection *con =
+		container_of(m, struct iproto_connection, shutdown_msg);
+	struct session *session = con->session;
+	if (session == NULL || ! session->graceful_shutdown) {
+		cmsg_init(&con->clear_socket_msg,
+			  con->iproto_thread->clear_socket_route);
+		cpipe_push(&con->iproto_thread->net_pipe,
+			   &con->clear_socket_msg);
+		cpipe_flush_input(&con->iproto_thread->net_pipe);
+	} else {
+		iproto_reply_shutdown(con->tx.p_obuf, ::schema_version);
+		if (!con->tx.is_push_sent)
+			tx_begin_push(con);
+		else
+			con->tx.is_push_pending = true;
+	}
+}
+
+static void
+net_clear_socket(struct cmsg *m)
+{
+	struct iproto_connection *con =
+		container_of(m, struct iproto_connection, clear_socket_msg);
+	int fd = con->input.fd;
+	assert(fd >= 0);
+	try {
+		iproto_resume(con->iproto_thread);
+		while (rlist_empty(&con->in_stop_list)) {
+			if (iproto_check_msg_max(con->iproto_thread))
+				break;
+			/* Ensure we have sufficient space for the read.  */
+			struct ibuf *in = iproto_connection_input_buffer(con);
+			if (in == NULL)
+				break;
+			/* Read input. */
+			int nrd = sio_read(fd, in->wpos, ibuf_unused(in));
+			if (nrd < 0 && !sio_wouldblock(errno))
+				diag_raise();
+			if (nrd <= 0)
+				break;
+			/* Count statistics */
+			rmean_collect(con->iproto_thread->rmean,
+				      IPROTO_RECEIVED, nrd);
+
+			/* Update the read position and connection state. */
+			in->wpos += nrd;
+			con->parse_size += nrd;
+			/* Enqueue all requests which are fully read up. */
+			if (iproto_enqueue_batch(con, in) != 0)
+				diag_raise();
+		}
+	} catch (Exception *e) {
+		iproto_write_error(fd, e, ::schema_version, 0);
+		e->log();
+	}
+	shutdown(con->input.fd, SHUT_RD);
+}
+
+static void
+tx_clear_socket(struct cmsg *m)
+{
+	struct iproto_connection *con =
+		container_of(m, struct iproto_connection, clear_socket_msg);
+	if (con->session != NULL) {
+		con->session->read_all_from_socket = true;
+		if (is_shutdown_ready(con->session))
+			fiber_cond_broadcast(&con->session->shutdown_cond);
+	}
+}
+
 static inline void
 iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 {
+	iproto_thread->check_connections_route[0] =
+		{ tx_check_no_alive_connections, &iproto_thread->net_pipe };
+	iproto_thread->check_connections_route[1] =
+		{ net_check_no_alive_connections, NULL };
+	iproto_thread->check_requests_route[0] =
+		{ tx_check_no_alive_requests, &iproto_thread->net_pipe };
+	iproto_thread->check_requests_route[1] =
+		{ net_check_no_alive_requests, NULL };
 	iproto_thread->destroy_route[0] =
 		{ tx_process_destroy, &iproto_thread->net_pipe };
 	iproto_thread->destroy_route[1] =
@@ -2230,12 +2514,48 @@ iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 	iproto_thread->connect_route[0] =
 		{ tx_process_connect, &iproto_thread->net_pipe };
 	iproto_thread->connect_route[1] = { net_send_greeting, NULL };
+	iproto_thread->shutdown_route[0] = { tx_send_shutdown, NULL };
+	iproto_thread->clear_socket_route[0] = { net_clear_socket,
+						 &iproto_thread->tx_pipe };
+	iproto_thread->clear_socket_route[1] = { tx_clear_socket, NULL };
 };
+
+static void
+iproto_process_shutdown(struct iproto_thread* iproto_thread)
+{
+	while (! rlist_empty(&iproto_thread->to_shutdown_connections)) {
+		struct iproto_connection *con =
+			rlist_first_entry(&iproto_thread->to_shutdown_connections,
+					  struct iproto_connection,
+					  to_shutdown_list);
+		rlist_del(&con->to_shutdown_list);
+		rlist_add_tail_entry(&con->iproto_thread->to_close_connections,
+				     con, to_close_list);
+		cmsg_init(&con->shutdown_msg, iproto_thread->shutdown_route);
+		cpipe_push(&iproto_thread->tx_pipe, &con->shutdown_msg);
+	}
+	cpipe_flush_input(&iproto_thread->tx_pipe);
+}
+
+static void
+iproto_do_close_all_connections(struct iproto_thread *iproto_thread)
+{
+	while(! rlist_empty(&iproto_thread->to_close_connections)) {
+		struct iproto_connection *con =
+			rlist_first_entry(&iproto_thread->to_close_connections,
+					  struct iproto_connection,
+					  to_close_list);
+		rlist_del(&con->to_close_list);
+		iproto_connection_close(con);
+	}
+}
 
 static inline int
 iproto_thread_init(struct iproto_thread *iproto_thread)
 {
 	iproto_thread_init_routes(iproto_thread);
+	iproto_thread->check_alive_connections_status = CHECK_NOT_STARTED;
+	iproto_thread->check_alive_requests_status = CHECK_NOT_STARTED;
 	slab_cache_create(&iproto_thread->net_slabc, &runtime);
 	/* Init statistics counter */
 	iproto_thread->rmean = rmean_new(rmean_net_strings, IPROTO_LAST);
@@ -2260,6 +2580,8 @@ iproto_init(int threads_count)
 		/* .sync = */ iproto_session_sync,
 	};
 
+	fiber_cond_create(&alive_connection_exists);
+	fiber_cond_create(&alive_request_exists);
 
 	iproto_threads = (struct iproto_thread *)
 		calloc(threads_count, sizeof(struct iproto_thread));
@@ -2282,6 +2604,12 @@ iproto_init(int threads_count)
 			goto fail;
 		}
 		/* Create a pipe to "net" thread. */
+		iproto_thread->to_shutdown_connections =
+			RLIST_HEAD_INITIALIZER(iproto_thread->
+				to_shutdown_connections);
+		iproto_thread->to_close_connections =
+			RLIST_HEAD_INITIALIZER(iproto_thread->
+				to_close_connections);
 		iproto_thread->stopped_connections =
 			RLIST_HEAD_INITIALIZER(iproto_thread->
 					       stopped_connections);
@@ -2321,6 +2649,15 @@ enum iproto_cfg_op {
 	 * Command code do get statistic from iproto thread
 	 */
 	IPROTO_CFG_STAT,
+	/**
+	* Command code to process shutdown in all connections from
+	* iproto thread
+	*/
+	IPROTO_CFG_SHUTDOWN,
+	/**
+	* Command code to close connections that alive after shutdown
+	*/
+	IPROTO_CFG_CLOSE_CONNECTIONS
 };
 
 /**
@@ -2414,6 +2751,12 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 		case IPROTO_CFG_STAT:
 			iproto_fill_stat(iproto_thread, cfg_msg);
 			break;
+		case IPROTO_CFG_SHUTDOWN:
+			iproto_process_shutdown(iproto_thread);
+			break;
+		case IPROTO_CFG_CLOSE_CONNECTIONS:
+			iproto_do_close_all_connections(iproto_thread);
+			break;
 		default:
 			unreachable();
 		}
@@ -2433,11 +2776,20 @@ iproto_do_cfg(struct iproto_thread *iproto_thread, struct iproto_cfg_msg *msg)
 		diag_raise();
 }
 
-static inline void
+void
 iproto_send_stop_msg(void)
 {
 	struct iproto_cfg_msg cfg_msg;
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_STOP);
+	for (int i = 0; i < iproto_threads_count; i++)
+		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
+}
+
+void
+iproto_send_shutdown_msg(void)
+{
+	struct iproto_cfg_msg cfg_msg;
+	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_SHUTDOWN);
 	for (int i = 0; i < iproto_threads_count; i++)
 		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
 }
@@ -2515,6 +2867,15 @@ iproto_connection_count(void)
 		count += cfg_msg.connections;
 	}
 	return count;
+}
+
+void
+iproto_close_all_connections(void)
+{
+	struct iproto_cfg_msg cfg_msg;
+	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_CLOSE_CONNECTIONS);
+	for (int i = 0; i < iproto_threads_count; i++)
+		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
 }
 
 size_t
