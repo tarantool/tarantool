@@ -43,6 +43,7 @@ local IPROTO_ERROR         = 0x52
 local IPROTO_GREETING_SIZE = 128
 local IPROTO_CHUNK_KEY     = 128
 local IPROTO_OK_KEY        = 0
+local IPROTO_SHUTDOWN_KEY  = 63
 
 -- select errors from box.error
 local E_UNKNOWN              = box.error.UNKNOWN
@@ -99,6 +100,7 @@ end
 
 local method_encoder = {
     ping    = internal.encode_ping,
+    shutdown = internal.encode_shutdown,
     call_16 = internal.encode_call_16,
     call_17 = internal.encode_call,
     eval    = internal.encode_eval,
@@ -125,6 +127,7 @@ local method_encoder = {
 
 local method_decoder = {
     ping    = decode_nil,
+    shutdown = decode_nil,
     call_16 = internal.decode_select,
     call_17 = decode_data,
     eval    = decode_data,
@@ -284,6 +287,8 @@ local function create_transport(host, port, user, password, callback,
     local worker_fiber
     local send_buf         = buffer.ibuf(buffer.READAHEAD)
     local recv_buf         = buffer.ibuf(buffer.READAHEAD)
+
+    local shutdown_handler = function() end
 
     --
     -- Async request metamethods.
@@ -581,12 +586,21 @@ local function create_transport(host, port, user, password, callback,
     end
 
     local function dispatch_response_iproto(hdr, body_rpos, body_end)
+        local status = hdr[IPROTO_STATUS_KEY]
+        if status == IPROTO_SHUTDOWN_KEY then
+            -- Calling synchronous methods here leads to a deadlock, so it
+            -- must be in new fiber.
+            fiber.create(function()
+                perform_async_request(nil, nil, 'shutdown',
+                                      on_push_sync_default, {}, {})
+                shutdown_handler()
+            end)
+        end
         local id = hdr[IPROTO_SYNC_KEY]
         local request = requests[id]
         if request == nil then -- nobody is waiting for the response
             return
         end
-        local status = hdr[IPROTO_STATUS_KEY]
         local body
         local body_len = body_end - body_rpos
 
@@ -896,12 +910,17 @@ local function create_transport(host, port, user, password, callback,
         end
     end
 
+    local function set_shutdown_handler(handler)
+        shutdown_handler = handler
+    end
+
     return {
         stop            = stop,
         start           = start,
         wait_state      = wait_state,
         perform_request = perform_request,
         perform_async_request = perform_async_request,
+        set_shutdown_handler = set_shutdown_handler
     }
 end
 
@@ -1214,6 +1233,19 @@ end
 function remote_methods:ping(opts)
     check_remote_arg(self, 'ping')
     return (pcall(self._request, self, 'ping', opts))
+end
+
+function remote_methods:shutdown(opts)
+    check_remote_arg(self, 'shutdown')
+    return (pcall(self._request, self, 'shutdown', opts))
+end
+
+function remote_methods:set_shutdown_handler(handler)
+    check_remote_arg(self, 'shutdown')
+    if type(handler) ~= 'function' then
+        error("handler must be a function")
+    end
+    self._transport.set_shutdown_handler(handler)
 end
 
 function remote_methods:reload_schema()
@@ -1630,6 +1662,8 @@ end
 
 this_module.self = {
     ping = function() return true end,
+    shutdown = function() end,
+    set_shutdown_handler = function() end,
     reload_schema = function() end,
     close = function() end,
     timeout = function(self) return self end,
