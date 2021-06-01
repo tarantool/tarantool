@@ -321,7 +321,10 @@ test_oos_build:
 # OSX #
 #######
 
-OSX_PKGS=openssl readline curl icu4c libiconv zlib cmake python3
+# FIXME: Temporary pinned python3 to specific version (i.e. python@3.8) to
+# avoid gevent package installation failure described in gevent/gevent#1721.
+# Revert this back when the issue is resolved.
+OSX_PKGS=openssl readline curl icu4c libiconv zlib cmake python@3.8
 
 deps_osx:
 	# install brew using command from Homebrew repository instructions:
@@ -374,9 +377,16 @@ test_osx_no_deps: build_osx
 	${INIT_TEST_ENV_OSX}; \
 	cd test && ./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
+# FIXME: Temporary target with reduced number of tests.
+# Use test_osx_no_deps target, when all M1 issues are resolved.
+test_osx_arm64_no_deps: build_osx
+	make PUC-Rio-Lua-5.1-tests lua-Harness-tests tarantool-tests
+
 test_osx: deps_osx test_osx_no_deps
 
 test_osx_github_actions: deps_osx_github_actions test_osx_no_deps
+
+test_osx_arm64_github_actions: deps_osx_github_actions test_osx_arm64_no_deps
 
 # Static macOS build
 
