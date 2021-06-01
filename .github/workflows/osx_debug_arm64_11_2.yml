@@ -1,0 +1,48 @@
+name: osx_debug_arm64_11_2
+
+on:
+  push:
+  pull_request:
+  repository_dispatch:
+    types: [backend_automation]
+  workflow_dispatch:
+
+env:
+  CI_MAKE: arch -arm64 make -f .travis.mk
+
+jobs:
+  osx_debug_arm64_11_2:
+    # We want to run on external PRs, but not on our own internal PRs
+    # as they'll be run by the push to the branch.
+    if: ( github.event_name == 'push' ||
+        github.event.pull_request.head.repo.full_name != github.repository ) &&
+        ! endsWith(github.ref, '-notest')
+
+    runs-on: macos-m1-11.2
+
+    strategy:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v2.3.4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - uses: ./.github/actions/environment
+      - name: test
+        env:
+          CMAKE_BUILD_TYPE: Debug
+        run: ${CI_MAKE} test_osx_arm64_github_actions
+      - name: call action to send Telegram message on failure
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
+          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
+        uses: ./.github/actions/send-telegram-notify
+        if: failure()
+      - name: artifacts
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: osx_debug_arm64_11_2
+          retention-days: 21
+          path: /tmp/tnt/artifacts
