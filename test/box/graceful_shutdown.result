@@ -1,0 +1,466 @@
+-- test-run result file version 2
+net_box = require('net.box')
+ | ---
+ | ...
+fiber = require('fiber')
+ | ---
+ | ...
+env = require('test_run')
+ | ---
+ | ...
+test_run = env.new()
+ | ---
+ | ...
+
+------------------------------------------------------------
+-- Upon receiving a shutdown signal server
+-- should stop accept new connections,
+-- close for read existing not graceful connections
+-- and do some work before the shutdown is complete
+------------------------------------------------------------
+
+box.schema.user.grant('guest','execute,write,read','universe', nil, {if_not_exists = true})
+ | ---
+ | ...
+
+_ = box.schema.space.create('counter')
+ | ---
+ | ...
+_ = box.space.counter:create_index('primary')
+ | ---
+ | ...
+
+test_run:cmd("create server remote with script='box/graceful_shutdown.lua'")
+ | ---
+ | - true
+ | ...
+test_run:cmd("start server remote")
+ | ---
+ | - true
+ | ...
+test_run:cmd("switch remote")
+ | ---
+ | - true
+ | ...
+net_box = require('net.box')
+ | ---
+ | ...
+test_run:cmd("set variable def_uri to 'default.listen'")
+ | ---
+ | - true
+ | ...
+def_con = net_box.connect(def_uri)
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ';'")
+ | ---
+ | - true
+ | ...
+function check(t)
+    require('fiber').sleep(t)
+    def_con:call('box.space.counter:auto_increment',
+                 {{'sleep ' .. tostring(t)}})
+end;
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
+ | ...
+test_run:cmd("switch default")
+ | ---
+ | - true
+ | ...
+
+test_run:cmd("set variable remote_uri to 'remote.listen'")
+ | ---
+ | - true
+ | ...
+remote_con = net_box.connect(remote_uri)
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ';'")
+ | ---
+ | - true
+ | ...
+remote_con:set_shutdown_handler(function()
+    box.space.counter:auto_increment{'unreachable'}
+end);
+ | ---
+ | ...
+graceful_con = net_box.connect(remote_uri);
+ | ---
+ | ...
+graceful_con.space._session_settings:update('graceful_shutdown',
+                                            {{'=', 'value', true}});
+ | ---
+ | - ['graceful_shutdown', true]
+ | ...
+graceful_con:set_shutdown_handler(function()
+    box.space.counter:auto_increment{'shutdown receive'}
+end);
+ | ---
+ | ...
+graceful_shutdowned = net_box.connect(remote_uri);
+ | ---
+ | ...
+graceful_shutdowned.space._session_settings:update('graceful_shutdown',
+                                            {{'=', 'value', true}});
+ | ---
+ | - ['graceful_shutdown', true]
+ | ...
+graceful_shutdowned:shutdown();
+ | ---
+ | - true
+ | ...
+-- Connetion must be shutdowned by server after getting IPROTO_SHUTDOWN
+-- form client.
+graceful_shutdowned:ping();
+ | ---
+ | - false
+ | ...
+graceful_shutdowned:set_shutdown_handler(function()
+    box.space.counter:auto_increment{'unreachable'}
+end);
+ | ---
+ | ...
+
+for time = 1.5, 10, 3 do
+    remote_con:call('check', {time}, {is_async=true})
+end;
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
+ | ...
+
+fiber.sleep(0.1)
+ | ---
+ | ...
+_ = remote_con:call('os.exit', {}, { is_async=true })
+ | ---
+ | ...
+fiber.sleep(0.5)
+ | ---
+ | ...
+
+--
+-- Remote started to shutdown, so it isn't accept new connections
+-- and doesn't response to requests from existing connections.
+--
+net_box.connect(remote_uri).state
+ | ---
+ | - error
+ | ...
+remote_con:ping()
+ | ---
+ | - false
+ | ...
+graceful_con:ping()
+ | ---
+ | - false
+ | ...
+graceful_con:shutdown()
+ | ---
+ | - false
+ | ...
+graceful_con:ping()
+ | ---
+ | - false
+ | ...
+
+--
+-- shutdown_handler of remote_con must not be called
+-- shutdown_handler of graceful_con must be done
+-- shutdown_handler of graceful_shutdowned must not be called
+-- check(1,5) must be done
+-- check(4,5) must be cancelled by expiring of on_shutdown_trigger_timeout
+--
+--
+fiber.sleep(5)
+ | ---
+ | ...
+box.space.counter:select()
+ | ---
+ | - - [1, 'shutdown receive']
+ |   - [2, 'sleep 1.5']
+ | ...
+box.space.counter:drop()
+ | ---
+ | ...
+test_run:cmd("stop server remote")
+ | ---
+ | - true
+ | ...
+
+---------------------------------------------------------------
+-- Connections that support graceful shutdown can has different
+-- handlers. Handler of not graceful connections isn't called
+-- on shutdown.
+---------------------------------------------------------------
+
+test_run:cmd("start server remote")
+ | ---
+ | - true
+ | ...
+test_run:cmd("set variable remote_uri to 'remote.listen'")
+ | ---
+ | - true
+ | ...
+graceful_cons = {}
+ | ---
+ | ...
+cons = {}
+ | ---
+ | ...
+channel = fiber.channel(200)
+ | ---
+ | ...
+channel_sum = 0
+ | ---
+ | ...
+con_handler_invoked = false
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ';'")
+ | ---
+ | - true
+ | ...
+for i=1,100 do
+    graceful_con = net_box.connect(remote_uri)
+    con = net_box.connect(remote_uri)
+    graceful_con.space._session_settings:update('graceful_shutdown',
+                                                {{'=', 'value', true}})
+    graceful_con:set_shutdown_handler(function() channel:put(i) end)
+    con:set_shutdown_handler(function() channel:put(0) end)
+    graceful_cons[i] = graceful_con
+    cons[i] = con
+end;
+ | ---
+ | ...
+-- Synchronous request to wait for completion of shutdown.
+net_box.connect(remote_uri):call('os.exit');
+ | ---
+ | - error: Peer closed
+ | ...
+for i=1,100 do
+    local msg = 0
+    while msg == 0 and not con_handler_invoked do
+        msg = channel:get()
+        channel_sum = channel_sum + msg
+        if msg == 0 then
+            con_handler_invoked = true
+        end
+    end
+end;
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
+ | ...
+con_handler_invoked
+ | ---
+ | - false
+ | ...
+
+-- 1 + 2 + ... + 100 = 5050
+
+channel_sum
+ | ---
+ | - 5050
+ | ...
+graceful_cons = nil
+ | ---
+ | ...
+cons = nil
+ | ---
+ | ...
+
+test_run:cmd("stop server remote")
+ | ---
+ | - true
+ | ...
+
+---------------------------------------------------------------
+-- Active connections counter works with a large number of
+-- consecutive connection closes.
+---------------------------------------------------------------
+test_run:cmd("start server remote")
+ | ---
+ | - true
+ | ...
+test_run:cmd("set variable remote_uri to 'remote.listen'")
+ | ---
+ | - true
+ | ...
+table = {}
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ';'")
+ | ---
+ | - true
+ | ...
+for i = 1, 100 do
+    graceful_con = net_box.connect(remote_uri)
+    graceful_con.space._session_settings:update('graceful_shutdown',
+                                                {{'=', 'value', true}})
+    table[#table + 1] = graceful_con
+end;
+ | ---
+ | ...
+
+for i = 1, #table do
+    table[i]:close()
+end;
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
+ | ...
+-- Synchronous request to wait for completion of shutdown.
+net_box.connect(remote_uri):call('os.exit')
+ | ---
+ | - error: Peer closed
+ | ...
+net_box.connect(remote_uri):ping()
+ | ---
+ | - false
+ | ...
+table = nil
+ | ---
+ | ...
+test_run:cmd("stop server remote")
+ | ---
+ | - true
+ | ...
+
+---------------------------------------------------------------
+-- os.exit inside sequence of connects doesn't lead to infinity
+-- shutdown process.
+---------------------------------------------------------------
+
+test_run:cmd("start server remote")
+ | ---
+ | - true
+ | ...
+test_run:cmd("set variable remote_uri to 'remote.listen'")
+ | ---
+ | - true
+ | ...
+table = {}
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ';'")
+ | ---
+ | - true
+ | ...
+_ = net_box.connect(remote_uri):eval("require('fiber').sleep(0.1) os.exit()",
+                                     {}, {is_async=true});
+ | ---
+ | ...
+for i = 1, 100 do
+    con = net_box.connect(remote_uri)
+    table[i] = con
+end;
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
+ | ...
+fiber.sleep(0.5)
+ | ---
+ | ...
+-- server must be stopped
+net_box.connect(remote_uri):ping()
+ | ---
+ | - false
+ | ...
+table = nil
+ | ---
+ | ...
+test_run:cmd("stop server remote")
+ | ---
+ | - true
+ | ...
+
+---------------------------------------------------------------
+-- Requests aren't lost on shutdown process.
+---------------------------------------------------------------
+
+test_run:cmd("start server remote")
+ | ---
+ | - true
+ | ...
+test_run:cmd("set variable remote_uri to 'remote.listen'")
+ | ---
+ | - true
+ | ...
+table = {}
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ';'")
+ | ---
+ | - true
+ | ...
+for i = 1, 100 do
+    graceful_con = net_box.connect(remote_uri)
+    graceful_con.space._session_settings:update('graceful_shutdown',
+                                                {{'=', 'value', true}})
+    table[i] = graceful_con
+end;
+ | ---
+ | ...
+
+wait_ping = fiber.channel(100);
+ | ---
+ | ...
+
+for i = 1,10 do
+    fiber.create(function()
+        for i = 1, 100 do
+            table[i]:ping()
+            fiber.yield()
+        end
+        wait_ping:put(true)
+    end)
+end;
+ | ---
+ | ...
+
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
+ | ...
+net_box.connect(remote_uri):call("os.exit")
+ | ---
+ | - error: Peer closed
+ | ...
+for i=1,10 do wait_ping:get() end
+ | ---
+ | ...
+table = nil
+ | ---
+ | ...
+test_run:cmd("stop server remote")
+ | ---
+ | - true
+ | ...
+
+box.schema.user.revoke('guest','execute,write,read','universe')
+ | ---
+ | ...
+
+test_run:cmd("cleanup server remote")
+ | ---
+ | - true
+ | ...
+test_run:cmd("delete server remote")
+ | ---
+ | - true
+ | ...
+test_run:cmd("restart server default")
+ | 
