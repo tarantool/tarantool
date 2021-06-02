@@ -49,9 +49,9 @@ set(LUAJIT_TEST_INIT "${PROJECT_SOURCE_DIR}/test/luajit-test-init.lua"
 
 # Enable internal LuaJIT assertions for Tarantool Debug build.
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(LUAJIT_USE_APICHECK ON CACHE BOOL
+    set(LUA_USE_APICHECK ON CACHE BOOL
         "Assertions for the Lua/C API" FORCE)
-    set(LUAJIT_USE_ASSERT ON CACHE BOOL
+    set(LUA_USE_ASSERT ON CACHE BOOL
         "Assertions for the whole LuaJIT VM" FORCE)
 endif()
 
