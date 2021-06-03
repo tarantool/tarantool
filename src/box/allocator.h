@@ -34,18 +34,18 @@
 #include <small/small.h>
 #include "sysalloc.h"
 
-struct alloc_stats {
+struct alloc_stat {
 	size_t used;
 	size_t total;
 };
 
-static int
-small_stats_noop_cb(const struct mempool_stats *stats, void *cb_ctx)
-{
-	(void)stats;
-	(void)cb_ctx;
-	return 0;
-}
+struct allocator_stats {
+	struct alloc_stat small;
+	struct alloc_stat sys;
+};
+
+int
+small_stats_noop_cb(const struct mempool_stats *stats, void *cb_ctx);
 
 struct allocator_settings {
 	struct small_allocator {
@@ -113,13 +113,14 @@ public:
 		return smfree(&small_alloc, ptr, size);
 	}
 	static inline void
-	stats(struct alloc_stats *alloc_stats)
+	stats(struct allocator_stats *alloc_stats, mempool_stats_cb cb,
+	      void *cb_ctx)
 	{
 		struct small_stats data_stats;
 		small_stats(&SmallAlloc::small_alloc, &data_stats,
-			    small_stats_noop_cb, NULL);
-		alloc_stats->used = data_stats.used;
-		alloc_stats->total = data_stats.total;
+			    cb, cb_ctx);
+		alloc_stats->small.used = data_stats.used;
+		alloc_stats->small.total = data_stats.total;
 	}
 	static inline struct small_alloc *
 	get_alloc(void)
@@ -154,11 +155,14 @@ public:
 		return sysfree(&sys_alloc, ptr, size);
 	}
 	static inline void
-	stats(struct alloc_stats *alloc_stats)
+	stats(struct allocator_stats *alloc_stats, mempool_stats_cb cb,
+	      void *cb_ctx)
 	{
+		(void) cb;
+		(void) cb_ctx;
 		struct sys_stats data_stats;
 		sys_stats(&sys_alloc, &data_stats);
-		alloc_stats->used = data_stats.used;
+		alloc_stats->sys.used = data_stats.used;
 	}
 private:
 	static struct sys_alloc sys_alloc;
@@ -207,3 +211,19 @@ struct allocator_destroy {
 		Allocator::destroy();
 	}
 };
+
+struct allocator_stat {
+	template<typename Allocator, typename...Arg>
+	void
+	invoke(Arg&&...stats)
+	{
+		Allocator::stats(stats...);
+	}
+};
+
+void
+allocators_stats(struct allocator_stats *stats, mempool_stats_cb cb,
+		 void *cb_ctx);
+
+void
+allocators_stats(struct allocator_stats *stats);

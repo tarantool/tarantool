@@ -1018,16 +1018,14 @@ static void
 memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
-	struct alloc_stats data_stats;
+	struct allocator_stats data_stats;
 	struct mempool_stats index_stats;
 	mempool_stats(&memtx->index_extent_pool, &index_stats);
 	memset(&data_stats, 0, sizeof(data_stats));
-	SmallAlloc::stats(&data_stats);
-	stat->data += data_stats.used;
+	allocators_stats(&data_stats);
+	stat->data += data_stats.small.used;
+	stat->data += data_stats.sys.used;
 	stat->index += index_stats.totals.used;
-	memset(&data_stats, 0, sizeof(data_stats));
-	SysAlloc::stats(&data_stats);
-	stat->data += data_stats.used;
 }
 
 static const struct engine_vtab memtx_engine_vtab = {

@@ -32,3 +32,24 @@
 
 struct small_alloc SmallAlloc::small_alloc;
 struct sys_alloc SysAlloc::sys_alloc;
+
+int
+small_stats_noop_cb(const struct mempool_stats *stats, void *cb_ctx)
+{
+	(void) stats;
+	(void) cb_ctx;
+	return 0;
+}
+
+void
+allocators_stats(struct allocator_stats *stats, mempool_stats_cb cb,
+		 void *cb_ctx) {
+	foreach_allocator<allocator_stat,
+		struct allocator_stats *&, mempool_stats_cb&, void *&>
+			(stats, cb, cb_ctx);
+}
+
+void
+allocators_stats(struct allocator_stats *stats) {
+	allocators_stats(stats, small_stats_noop_cb, nullptr);
+}
