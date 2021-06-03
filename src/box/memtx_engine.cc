@@ -50,7 +50,6 @@
 #include "schema.h"
 #include "gc.h"
 #include "raft.h"
-#include "allocator.h"
 #include "memtx_allocator.h"
 
 #include <type_traits>
@@ -73,79 +72,6 @@ enum {
 template <class ALLOC>
 static inline void
 create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab);
-
-template <class ALLOC>
-static inline void
-memtx_mem_free(void *ptr, size_t size);
-
-template <class ALLOC>
-static inline struct lifo *
-memtx_engine_get_delayed_lifo(struct memtx_engine *memtx)
-{
-	if (std::is_same<ALLOC, SmallAlloc>::value)
-		return &memtx->delayed;
-	else if (std::is_same<ALLOC, SysAlloc>::value)
-		return &memtx->sys_delayed;
-	unreachable();
-	return NULL;
-}
-
-template <class ALLOC>
-static inline void
-memtx_tuple_free(void *item)
-{
-	struct memtx_tuple *memtx_tuple = (struct memtx_tuple *)item;
-	struct tuple *tuple = &memtx_tuple->base;
-	size_t total = tuple_size(tuple) + offsetof(struct memtx_tuple, base);
-	memtx_mem_free<ALLOC>(memtx_tuple, total);
-}
-
-template <class ALLOC>
-static inline void
-memtx_free_all_garbage_tuples(struct memtx_engine *memtx)
-{
-	struct lifo *delayed = memtx_engine_get_delayed_lifo<ALLOC>(memtx);
-	void *item;
-	while ((item = lifo_pop(delayed)))
-		memtx_tuple_free<ALLOC>(item);
-}
-
-template <class ALLOC>
-static inline void
-memtx_collect_garbage_tuples(struct memtx_engine *memtx)
-{
-	if (memtx->free_mode != MEMTX_ENGINE_COLLECT_GARBAGE)
-		return;
-
-	struct lifo *delayed = memtx_engine_get_delayed_lifo<ALLOC>(memtx);
-	if (!lifo_is_empty(delayed)) {
-		const int BATCH = 100;
-		for (int i = 0; i < BATCH; i++) {
-			void *item = lifo_pop(delayed);
-			if (item == NULL)
-				break;
-			memtx_tuple_free<ALLOC>(item);
-		}
-	} else {
-		/* Finish garbage collection and switch to regular mode */
-		memtx->free_mode = MEMTX_ENGINE_FREE;
-	}
-}
-
-template <class ALLOC>
-static inline void *
-memtx_mem_alloc(struct memtx_engine *memtx, size_t size)
-{
-	memtx_collect_garbage_tuples<ALLOC>(memtx);
-	return ALLOC::alloc(size);
-}
-
-template <class ALLOC>
-static inline void
-memtx_mem_free(void *ptr, size_t size)
-{
-	return ALLOC::free(ptr, size);
-}
 
 static int
 memtx_end_build_primary_key(struct space *space, void *param)
@@ -210,12 +136,14 @@ memtx_engine_shutdown(struct engine *engine)
 		mempool_destroy(&memtx->rtree_iterator_pool);
 	mempool_destroy(&memtx->index_extent_pool);
 	slab_cache_destroy(&memtx->index_slab_cache);
-	memtx_free_all_garbage_tuples<SmallAlloc>(memtx);
-	SmallAlloc::destroy();
+	/*
+	 * The order is vital: allocator destroy should take place before
+	 * slab cache destroy!
+	 */
+	memtx_allocators_destroy();
 	slab_cache_destroy(&memtx->slab_cache);
 	tuple_arena_destroy(&memtx->arena);
-	memtx_free_all_garbage_tuples<SysAlloc>(memtx);
-	SysAlloc::destroy();
+
 	xdir_destroy(&memtx->snap_dir);
 	free(memtx);
 }
@@ -1221,19 +1149,17 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	tuple_arena_create(&memtx->arena, &memtx->quota, tuple_arena_max_size,
 			   SLAB_SIZE, dontdump, "memtx");
 	slab_cache_create(&memtx->slab_cache, &memtx->arena);
+	memtx->free_mode = MEMTX_ENGINE_FREE;
 	float actual_alloc_factor;
 	allocator_settings alloc_settings;
 	allocator_settings_init(&alloc_settings, &memtx->slab_cache,
 				objsize_min, granularity, alloc_factor,
 				&actual_alloc_factor, &memtx->quota);
-	SmallAlloc::create(&alloc_settings);
-	SysAlloc::create(&alloc_settings);
+	memtx_allocators_init(memtx, &alloc_settings);
 	memtx_set_tuple_format_vtab(allocator);
+
 	say_info("Actual slab_alloc_factor calculated on the basis of desired "
 		 "slab_alloc_factor = %f", actual_alloc_factor);
-	lifo_init(&memtx->delayed);
-	lifo_init(&memtx->sys_delayed);
-	memtx->free_mode = MEMTX_ENGINE_FREE;
 
 	/* Initialize index extent allocator. */
 	slab_cache_create(&memtx->index_slab_cache, &memtx->arena);
@@ -1297,16 +1223,20 @@ void
 memtx_enter_delayed_free_mode(struct memtx_engine *memtx)
 {
 	memtx->snapshot_version++;
-	if (memtx->delayed_free_mode++ == 0)
+	if (memtx->delayed_free_mode++ == 0) {
 		memtx->free_mode = MEMTX_ENGINE_DELAYED_FREE;
+		memtx_allocators_set_mode(memtx->free_mode);
+	}
 }
 
 void
 memtx_leave_delayed_free_mode(struct memtx_engine *memtx)
 {
 	assert(memtx->delayed_free_mode > 0);
-	if (--memtx->delayed_free_mode == 0)
+	if (--memtx->delayed_free_mode == 0) {
 		memtx->free_mode = MEMTX_ENGINE_COLLECT_GARBAGE;
+		memtx_allocators_set_mode(memtx->free_mode);
+	}
 }
 
 template<class ALLOC>
@@ -1353,7 +1283,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 
 	struct memtx_tuple *memtx_tuple;
 	while ((memtx_tuple = (struct memtx_tuple *)
-		memtx_mem_alloc<ALLOC>(memtx, total)) == NULL) {
+			MemtxAllocator<ALLOC>::alloc(total)) == NULL) {
 		bool stop;
 		memtx_engine_run_gc(memtx, &stop);
 		if (stop)
@@ -1393,10 +1323,9 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	if (memtx->free_mode != MEMTX_ENGINE_DELAYED_FREE ||
 	    memtx_tuple->version == memtx->snapshot_version ||
 	    format->is_temporary) {
-		memtx_tuple_free<ALLOC>(memtx_tuple);
+		MemtxAllocator<ALLOC>::free(memtx_tuple);
 	} else {
-		lifo_push(memtx_engine_get_delayed_lifo<ALLOC>(memtx),
-			  (void *)memtx_tuple);
+		MemtxAllocator<ALLOC>::delayed_free(memtx_tuple);
 	}
 	tuple_format_unref(format);
 }
@@ -1410,20 +1339,20 @@ metmx_tuple_chunk_delete(struct tuple_format *format, const char *data)
 		container_of((const char (*)[0])data,
 			     struct tuple_chunk, data);
 	uint32_t sz = tuple_chunk_sz(tuple_chunk->data_sz);
-	memtx_mem_free<ALLOC>(tuple_chunk, sz);
+	MemtxAllocator<ALLOC>::free(tuple_chunk, sz);
 }
 
 template <class ALLOC>
-const char *
+static const char *
 memtx_tuple_chunk_new(struct tuple_format *format, struct tuple *tuple,
 		      const char *data, uint32_t data_sz)
 {
-	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
+	(void) format;
 	uint32_t sz = tuple_chunk_sz(data_sz);
 	struct tuple_chunk *tuple_chunk =
-		(struct tuple_chunk *) memtx_mem_alloc<ALLOC>(memtx, sz);
+		(struct tuple_chunk *) MemtxAllocator<ALLOC>::alloc(sz);
 	if (tuple == NULL) {
-		diag_set(OutOfMemory, sz, "memtx_mem_alloc", "tuple");
+		diag_set(OutOfMemory, sz, "MemtxAllocator::alloc", "tuple");
 		return NULL;
 	}
 	tuple_chunk->data_sz = data_sz;
