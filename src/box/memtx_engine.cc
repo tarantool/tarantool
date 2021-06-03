@@ -1256,9 +1256,12 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 			   SLAB_SIZE, dontdump, "memtx");
 	slab_cache_create(&memtx->slab_cache, &memtx->arena);
 	float actual_alloc_factor;
-	SmallAlloc::create(&memtx->slab_cache, objsize_min, granularity,
-			  alloc_factor, &actual_alloc_factor);
-	SysAlloc::create(&memtx->quota);
+	allocator_settings alloc_settings;
+	allocator_settings_init(&alloc_settings, &memtx->slab_cache,
+				objsize_min, granularity, alloc_factor,
+				&actual_alloc_factor, &memtx->quota);
+	SmallAlloc::create(&alloc_settings);
+	SysAlloc::create(&alloc_settings);
 	if (!strcmp(allocator, "small"))
 		create_memtx_tuple_format_vtab<SmallAlloc>(&memtx_tuple_format_vtab);
 	else

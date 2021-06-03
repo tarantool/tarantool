@@ -42,8 +42,11 @@ private:
 		slab_cache_create(&memtx.slab_cache, &memtx.arena);
 
 		float actual_alloc_factor;
-		SmallAlloc::create(&memtx.slab_cache, 16, 8, 1.1,
-				   &actual_alloc_factor);
+		allocator_settings alloc_settings;
+		allocator_settings_init(&alloc_settings, &memtx.slab_cache,
+					16, 8, 1.1, &actual_alloc_factor,
+					&memtx.quota);
+		SmallAlloc::create(&alloc_settings);
 		create_memtx_tuple_format_vtab<SmallAlloc>(&memtx_tuple_format_vtab);
 
 		memtx.max_tuple_size = 1024 * 1024;
