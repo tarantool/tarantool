@@ -43,4 +43,4 @@ jobs:
         with:
           name: static_build_cmake_osx_15
           retention-days: 21
-          path: /tmp/tnt/artifacts
+          path: ${{ env.VARDIR }}/artifacts

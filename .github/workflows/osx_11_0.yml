@@ -46,4 +46,4 @@ jobs:
         with:
           name: osx_11_0
           retention-days: 21
-          path: /tmp/tnt/artifacts
+          path: ${{ env.VARDIR }}/artifacts
