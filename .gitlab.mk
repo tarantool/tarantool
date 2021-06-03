@@ -103,7 +103,9 @@ vms_start:
 vms_test_%:
 	tar czf - ../tarantool | ssh ${VMS_USER}@127.0.0.1 -p ${VMS_PORT} tar xzf -
 	ssh ${VMS_USER}@127.0.0.1 -p ${VMS_PORT} "/bin/bash -c \
-		'cd tarantool && ${PRESERVE_ENV} ${TRAVIS_MAKE} $(subst vms_,,$@)'"
+		'cd tarantool && ${PRESERVE_ENV} ${TRAVIS_MAKE} $(subst vms_,,$@)'" || \
+		( scp -r -P ${VMS_PORT} ${VMS_USER}@127.0.0.1:tarantool/test/var/artifacts . \
+		; exit 1 )
 
 vms_shutdown:
 	VBoxManage controlvm ${VMS_NAME} poweroff

@@ -4,6 +4,7 @@ runs:
   using: "composite"
   steps:
     - run: |
+        echo VARDIR=/tmp/tnt | tee -a $GITHUB_ENV
         echo REPLICATION_SYNC_TIMEOUT=300 | tee -a $GITHUB_ENV
         echo TEST_TIMEOUT=310 | tee -a $GITHUB_ENV
         echo NO_OUTPUT_TIMEOUT=320 | tee -a $GITHUB_ENV
