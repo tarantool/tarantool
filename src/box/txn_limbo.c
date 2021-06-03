@@ -707,15 +707,18 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 	uint32_t origin = req->origin_id;
 	if (txn_limbo_replica_term(limbo, origin) < term) {
 		vclock_follow(&limbo->promote_term_map, origin, term);
-		if (term > limbo->promote_greatest_term) {
+		if (term > limbo->promote_greatest_term)
 			limbo->promote_greatest_term = term;
-		} else if (req->type == IPROTO_PROMOTE) {
-			/*
-			 * PROMOTE for outdated term. Ignore.
-			 */
-			return;
-		}
+	} else if (req->type == IPROTO_PROMOTE &&
+		   limbo->promote_greatest_term > 1) {
+		/* PROMOTE for outdated term. Ignore. */
+		say_info("RAFT: ignoring PROMOTE request from instance "
+			 "id %u for term %llu. Greatest term seen "
+			 "before (%llu) is bigger.", origin, (long long)term,
+			 (long long)limbo->promote_greatest_term);
+		return;
 	}
+
 	int64_t lsn = req->lsn;
 	if (req->replica_id == REPLICA_ID_NIL) {
 		/*
