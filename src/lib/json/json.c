@@ -42,7 +42,7 @@
 #include <unicode/utf8.h>
 
 #include "trivia/util.h"
-#include "third_party/PMurHash.h"
+#include <PMurHash.h>
 
 /**
  * Read a single symbol from a string starting from an offset.

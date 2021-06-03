@@ -51,8 +51,8 @@
 #include "lua/errno.h"
 #include "lua/socket.h"
 #include "lua/utils.h"
-#include "third_party/lua-cjson/lua_cjson.h"
-#include "third_party/lua-yaml/lyaml.h"
+#include <lua-cjson/lua_cjson.h>
+#include <lua-yaml/lyaml.h>
 #include "lua/msgpack.h"
 #include "lua/pickle.h"
 #include "lua/fio.h"

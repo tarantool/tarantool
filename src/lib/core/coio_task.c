@@ -39,7 +39,7 @@
 #include <sys/socket.h>
 
 #include "fiber.h"
-#include "third_party/tarantool_ev.h"
+#include <tarantool_ev.h>
 
 /*
  * Asynchronous IO Tasks (libeio wrapper).

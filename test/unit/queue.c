@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "third_party/queue.h"
+#include <queue.h>
 #include "unit.h"
 #include <stdio.h>
 #include <assert.h>

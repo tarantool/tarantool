@@ -47,7 +47,7 @@
  * SUCH DAMAGE.
  */
 
-#include <third_party/qsort_arg.h>
+#include <qsort_arg.h>
 #include <stdint.h>
 
 enum {

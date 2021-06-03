@@ -30,7 +30,7 @@
  */
 
 #include "coll.h"
-#include "third_party/PMurHash.h"
+#include <PMurHash.h>
 #include "diag.h"
 #include "assoc.h"
 #include <unicode/ucol.h>

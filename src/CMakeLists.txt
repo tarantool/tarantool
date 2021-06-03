@@ -96,7 +96,7 @@ add_library(cpu_feature STATIC cpu_feature.c)
 
 add_library(crc32 STATIC
     crc32.c
-    ${PROJECT_SOURCE_DIR}/third_party/crc32.c
+    ${PROJECT_SOURCE_DIR}/third_party/crc32_impl.c
 )
 target_link_libraries(crc32 cpu_feature)
 
