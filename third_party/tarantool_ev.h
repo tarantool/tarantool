@@ -51,7 +51,7 @@
 # define EV_USE_REALTIME 1
 # define EV_USE_MONOTONIC 1
 #endif
-#include "third_party/libev/ev.h"
+#include <libev/ev.h>
 #else /* !defined(ENABLE_BUNDLED_LIBEV) */
 #include <ev.h>
 #endif
