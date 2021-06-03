@@ -47,7 +47,7 @@ private:
 					16, 8, 1.1, &actual_alloc_factor,
 					&memtx.quota);
 		SmallAlloc::create(&alloc_settings);
-		create_memtx_tuple_format_vtab<SmallAlloc>(&memtx_tuple_format_vtab);
+		memtx_set_tuple_format_vtab("small");
 
 		memtx.max_tuple_size = 1024 * 1024;
 

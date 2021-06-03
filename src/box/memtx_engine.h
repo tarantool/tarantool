@@ -301,6 +301,9 @@ bool
 memtx_index_def_change_requires_rebuild(struct index *index,
 					const struct index_def *new_def);
 
+void
+memtx_set_tuple_format_vtab(const char *allocator_name);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -336,10 +339,6 @@ memtx_engine_recover_snapshot_xc(struct memtx_engine *memtx,
 	if (memtx_engine_recover_snapshot(memtx, vclock) != 0)
 		diag_raise();
 }
-
-template <class ALLOC>
-void
-create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab);
 
 #endif /* defined(__plusplus) */
 

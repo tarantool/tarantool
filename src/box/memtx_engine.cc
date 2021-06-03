@@ -84,6 +84,10 @@ enum {
 
 template <class ALLOC>
 static inline void
+create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab);
+
+template <class ALLOC>
+static inline void
 memtx_mem_free(void *ptr, size_t size);
 
 template <class ALLOC>
@@ -1179,6 +1183,20 @@ memtx_engine_gc_f(va_list va)
 	return 0;
 }
 
+void
+memtx_set_tuple_format_vtab(const char *allocator_name)
+{
+	if (strncmp(allocator_name, "small", strlen("small")) == 0) {
+		create_memtx_tuple_format_vtab<SmallAlloc>
+			(&memtx_tuple_format_vtab);
+	} else if (strncmp(allocator_name, "system", strlen("system")) == 0) {
+		create_memtx_tuple_format_vtab<SysAlloc>
+			(&memtx_tuple_format_vtab);
+	} else {
+		unreachable();
+	}
+}
+
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
@@ -1259,10 +1277,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 				&actual_alloc_factor, &memtx->quota);
 	SmallAlloc::create(&alloc_settings);
 	SysAlloc::create(&alloc_settings);
-	if (!strcmp(allocator, "small"))
-		create_memtx_tuple_format_vtab<SmallAlloc>(&memtx_tuple_format_vtab);
-	else
-		create_memtx_tuple_format_vtab<SysAlloc>(&memtx_tuple_format_vtab);
+	memtx_set_tuple_format_vtab(allocator);
 	say_info("Actual slab_alloc_factor calculated on the basis of desired "
 		 "slab_alloc_factor = %f", actual_alloc_factor);
 	lifo_init(&memtx->delayed);
@@ -1416,7 +1431,7 @@ end:
 }
 
 template<class ALLOC>
-void
+static void
 memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
@@ -1436,7 +1451,7 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 }
 
 template <class ALLOC>
-void
+static void
 metmx_tuple_chunk_delete(struct tuple_format *format, const char *data)
 {
 	(void)format;
@@ -1468,7 +1483,7 @@ memtx_tuple_chunk_new(struct tuple_format *format, struct tuple *tuple,
 struct tuple_format_vtab memtx_tuple_format_vtab;
 
 template <class ALLOC>
-void
+static inline void
 create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab)
 {
 	vtab->tuple_delete = memtx_tuple_delete<ALLOC>;
