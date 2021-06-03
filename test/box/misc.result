@@ -102,7 +102,6 @@ t
   - snapshot
   - space
   - stat
-  - sysalloc
   - tuple
   - unprepare
 ...
