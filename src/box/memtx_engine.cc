@@ -51,6 +51,7 @@
 #include "gc.h"
 #include "raft.h"
 #include "allocator.h"
+#include "memtx_allocator.h"
 
 #include <type_traits>
 
@@ -62,18 +63,6 @@ checkpoint_cancel(struct checkpoint *ckpt);
 
 static void
 replica_join_cancel(struct cord *replica_join_cord);
-
-struct PACKED memtx_tuple {
-	/*
-	 * sic: the header of the tuple is used
-	 * to store a free list pointer in smfree_delayed.
-	 * Please don't change it without understanding
-	 * how smfree_delayed and snapshotting COW works.
-	 */
-	/** Snapshot generation version. */
-	uint32_t version;
-	struct tuple base;
-};
 
 enum {
 	OBJSIZE_MIN = 16,
