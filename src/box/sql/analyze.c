@@ -110,7 +110,7 @@
 #include "box/index.h"
 #include "box/key_def.h"
 #include "box/schema.h"
-#include "third_party/qsort_arg.h"
+#include <qsort_arg.h>
 
 #include "sqlInt.h"
 #include "tarantoolInt.h"

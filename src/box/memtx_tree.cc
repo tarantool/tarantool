@@ -39,7 +39,7 @@
 #include "tuple.h"
 #include "txn.h"
 #include "memtx_tx.h"
-#include <third_party/qsort_arg.h>
+#include <qsort_arg.h>
 #include <small/mempool.h>
 
 /**

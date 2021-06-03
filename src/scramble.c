@@ -29,8 +29,8 @@
  * SUCH DAMAGE.
  */
 #include "scramble.h"
-#include "third_party/sha1.h"
-#include "third_party/base64.h"
+#include <sha1.h>
+#include <base64.h>
 #include <string.h>
 #include <stdio.h>
 

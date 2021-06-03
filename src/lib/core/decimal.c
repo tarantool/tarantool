@@ -30,8 +30,8 @@
  */
 
 #include "decimal.h"
-#include "third_party/decNumber/decContext.h"
-#include "third_party/decNumber/decPacked.h"
+#include <decNumber/decContext.h>
+#include <decNumber/decPacked.h>
 #include "lib/core/tt_static.h"
 #include "lib/msgpuck/msgpuck.h"
 #include <stddef.h>

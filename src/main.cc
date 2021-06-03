@@ -65,7 +65,7 @@
 #include "lua/init.h"
 #include "box/box.h"
 #include "box/error.h"
-#include "small/features.h"
+#include "small/small_features.h"
 #include "scoped_guard.h"
 #include "random.h"
 #include "cfg.h"

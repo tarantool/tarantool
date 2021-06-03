@@ -33,7 +33,7 @@
 #include "session.h"
 #include "msgpuck.h"
 #include "error.h"
-#include "third_party/base64.h"
+#include <base64.h>
 
 static char zero_hash[SCRAMBLE_SIZE];
 

@@ -36,7 +36,7 @@
 #include <sys/types.h> /* ssize_t */
 #include <stdarg.h>
 
-#include "third_party/tarantool_eio.h"
+#include <tarantool_eio.h>
 #include "diag.h"
 
 #if defined(__cplusplus)
