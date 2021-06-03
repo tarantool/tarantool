@@ -31,7 +31,7 @@
 
 #include <string.h>
 #include <lua/digest.h>
-#include <third_party/sha1.h>
+#include <sha1.h>
 #include <openssl/evp.h>
 #include <coio_task.h>
 #include <lua.h>

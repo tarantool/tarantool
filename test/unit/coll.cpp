@@ -10,7 +10,7 @@
 #include "coll/coll_def.h"
 #include "coll/coll.h"
 #include "unit.h"
-#include "third_party/PMurHash.h"
+#include <PMurHash.h>
 
 using namespace std;
 

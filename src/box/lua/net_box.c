@@ -42,7 +42,7 @@
 #include "box/execute.h"
 
 #include "lua/msgpack.h"
-#include "third_party/base64.h"
+#include <base64.h>
 
 #include "coio.h"
 #include "box/errcode.h"

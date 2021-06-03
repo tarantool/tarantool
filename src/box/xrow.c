@@ -33,7 +33,7 @@
 #include <msgpuck.h>
 #include <small/region.h>
 #include <small/obuf.h>
-#include "third_party/base64.h"
+#include <base64.h>
 
 #include "fiber.h"
 #include "version.h"

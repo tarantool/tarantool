@@ -13,7 +13,7 @@ extern "C" {
 #include <small/rlist.h>
 
 #include "trivia/util.h"
-#include "third_party/tarantool_ev.h"
+#include <tarantool_ev.h>
 
 /**
  * Describes popen object creation. This is API with Lua.

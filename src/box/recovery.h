@@ -32,7 +32,7 @@
  */
 #include "small/rlist.h"
 #include "trivia/util.h"
-#include "third_party/tarantool_ev.h"
+#include <tarantool_ev.h>
 #include "xlog.h"
 #include "vclock/vclock.h"
 

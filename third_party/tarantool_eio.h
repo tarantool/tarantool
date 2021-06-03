@@ -37,7 +37,7 @@
 #include <unistd.h>
 
 #if defined(ENABLE_BUNDLED_LIBEIO)
-#include "third_party/libeio/eio.h"
+#include <libeio/eio.h>
 #else /* !defined(ENABLE_BUNDLED_LIBEIO) */
 #include <eio.h>
 #endif

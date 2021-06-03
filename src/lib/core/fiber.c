@@ -152,7 +152,7 @@ cpu_stat_end(struct cpu_stat *stat, struct clock_stat *cord_clock_stat)
 
 #endif /* ENABLE_FIBER_TOP */
 
-#include "third_party/valgrind/memcheck.h"
+#include <valgrind/memcheck.h>
 
 static int (*fiber_invoke)(fiber_func f, va_list ap);
 

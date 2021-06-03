@@ -35,7 +35,7 @@
 #include "coll_id_cache.h"
 #include "tt_static.h"
 
-#include "third_party/PMurHash.h"
+#include <PMurHash.h>
 
 /** Global table of tuple formats */
 struct tuple_format **tuple_formats;
