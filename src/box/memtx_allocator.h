@@ -118,3 +118,25 @@ struct lifo MemtxAllocator<Allocator>::lifo;
 
 template<class Allocator>
 enum memtx_engine_free_mode MemtxAllocator<Allocator>::mode;
+
+void
+memtx_allocators_init(struct memtx_engine *memtx,
+		      struct allocator_settings *settings);
+
+void
+memtx_allocators_set_mode(enum memtx_engine_free_mode mode);
+
+void
+memtx_allocators_destroy();
+
+using memtx_allocators = std::tuple<MemtxAllocator<SmallAlloc>,
+				    MemtxAllocator<SysAlloc>>;
+
+template<class F, class...Arg>
+static void
+foreach_memtx_allocator(Arg&&...arg)
+{
+	F f;
+	foreach_allocator_internal((memtx_allocators *) nullptr, f,
+				   std::forward<Arg>(arg)...);
+}
