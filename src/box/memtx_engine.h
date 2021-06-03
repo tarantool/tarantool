@@ -193,10 +193,6 @@ struct memtx_engine {
 	 * Free mode, determines a strategy for freeing up memory
 	 */
 	enum memtx_engine_free_mode free_mode;
-	/** List of tuples for delayed free. */
-	struct lifo delayed;
-	/** List of tuples for delayed free in case when sys_alloc selected */
-	struct lifo sys_delayed;
 };
 
 struct memtx_gc_task;
