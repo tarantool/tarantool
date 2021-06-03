@@ -45,17 +45,55 @@ small_stats_noop_cb(const struct mempool_stats *stats, void *cb_ctx)
 	return 0;
 }
 
+struct allocator_settings {
+	struct small_allocator {
+		struct slab_cache *cache;
+		uint32_t objsize_min;
+		unsigned granularity;
+		float alloc_factor;
+		float *actual_alloc_factor;
+	} small;
+	struct system_allocator {
+		struct quota *quota;
+	} sys;
+};
+
+static inline void
+allocator_settings_init(allocator_settings *settings, struct slab_cache *cache,
+			uint32_t objsize_min, unsigned granularity,
+			float alloc_factor, float *actual_alloc_factor,
+			struct quota *quota)
+{
+	settings->small.cache = cache;
+	settings->small.objsize_min = objsize_min;
+	settings->small.granularity = granularity;
+	settings->small.alloc_factor = alloc_factor;
+	settings->small.actual_alloc_factor = actual_alloc_factor;
+
+	settings->sys.quota = quota;
+}
+
+/**
+ * Each allocator class should feature at least following interfaces:
+ *
+ * void create(struct allocator_settings *settings);
+ * void destroy(void);
+ * void* alloc(size_t size);
+ * void free(void* ptr, size_t size);
+ * void stats(struct alloc_stats);
+ */
 class SmallAlloc
 {
 public:
 	static inline void
-	create(struct slab_cache *cache, uint32_t objsize_min,
-	       unsigned granularity, float alloc_factor,
-	       float *actual_alloc_factor)
+	create(struct allocator_settings *settings)
 	{
-		small_alloc_create(&small_alloc, cache, objsize_min,
-				   granularity, alloc_factor,
-				   actual_alloc_factor);
+		small_alloc_create(&small_alloc,
+				   settings->small.cache,
+				   settings->small.objsize_min,
+				   settings->small.granularity,
+				   settings->small.alloc_factor,
+				   settings->small.actual_alloc_factor);
 	}
 	static inline void
 	destroy(void)
@@ -76,7 +114,7 @@ public:
 	stats(struct alloc_stats *alloc_stats)
 	{
 		struct small_stats data_stats;
-		small_stats(&small_alloc, &data_stats,
+		small_stats(&SmallAlloc::small_alloc, &data_stats,
 			    small_stats_noop_cb, NULL);
 		alloc_stats->used = data_stats.used;
 		alloc_stats->total = data_stats.total;
@@ -94,9 +132,9 @@ class SysAlloc
 {
 public:
 	static inline void
-	create(struct quota *quota)
+	create(struct allocator_settings *settings)
 	{
-		sys_alloc_create(&sys_alloc, quota);
+		sys_alloc_create(&sys_alloc, settings->sys.quota);
 	}
 	static inline void
 	destroy(void)
@@ -107,7 +145,7 @@ public:
 	alloc(size_t size)
 	{
 		return sysalloc(&sys_alloc, size);
-	};
+	}
 	static inline void
 	free(void *ptr, size_t size)
 	{
