@@ -49,4 +49,4 @@ jobs:
         with:
           name: release_asan_clang11
           retention-days: 21
-          path: test/var/artifacts
+          path: ${{ env.VARDIR }}/artifacts

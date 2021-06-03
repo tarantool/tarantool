@@ -58,7 +58,7 @@ jobs:
         with:
           name: debug
           retention-days: 21
-          path: test/var/artifacts
+          path: ${{ env.VARDIR }}/artifacts
       # Find the PR associated with this push, if there is one.
       - uses: jwalton/gh-find-current-pr@v1
         if: success()
