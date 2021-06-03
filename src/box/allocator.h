@@ -29,6 +29,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <tuple>
+
 #include <small/small.h>
 #include "sysalloc.h"
 
@@ -160,4 +162,48 @@ public:
 	}
 private:
 	static struct sys_alloc sys_alloc;
+};
+
+using allocators = std::tuple<SmallAlloc, SysAlloc>;
+
+template <class F, class... ARGS>
+static void
+foreach_allocator_internal(std::tuple<>*, F&, ARGS && ...)
+{
+}
+
+template <class ALL, class... MORE, class F, class... ARGS>
+static void
+foreach_allocator_internal(std::tuple<ALL, MORE...>*, F& f, ARGS && ...args)
+{
+	f.template invoke<ALL>(std::forward<ARGS>(args)...);
+	foreach_allocator_internal((std::tuple<MORE...> *) nullptr,
+				   f, std::forward<ARGS>(args)...);
+}
+
+template<class F, class... ARGS>
+static void
+foreach_allocator(ARGS && ...args)
+{
+	F f;
+	foreach_allocator_internal((allocators *) nullptr, f,
+				   std::forward<ARGS>(args)...);
+}
+
+struct allocator_create {
+	template<typename Allocator, typename...Arg>
+	void
+	invoke(Arg&&...settings)
+	{
+		Allocator::create(settings...);
+	}
+};
+
+struct allocator_destroy {
+	template<typename Allocator, typename...Arg>
+	void
+	invoke(Arg&&...)
+	{
+		Allocator::destroy();
+	}
 };
