@@ -98,6 +98,8 @@ tt_uuid_str(const struct tt_uuid *uu)
 int
 tt_uuid_from_strl(const char *in, size_t len, struct tt_uuid *uu)
 {
+	if (len != UUID_STR_LEN)
+		return 1;
 	char buf[UUID_STR_LEN + 1];
 	snprintf(buf, sizeof(buf), "%.*s", (int) len, in);
 	return tt_uuid_from_string(buf, uu);

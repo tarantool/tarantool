@@ -3,7 +3,7 @@ local build_path = os.getenv("BUILDDIR")
 package.cpath = build_path..'/test/sql-tap/?.so;'..build_path..'/test/sql-tap/?.dylib;'..package.cpath
 
 local test = require("sqltester")
-test:plan(145)
+test:plan(147)
 
 local uuid = require("uuid")
 local uuid1 = uuid.fromstr("11111111-1111-1111-1111-111111111111")
@@ -1314,6 +1314,23 @@ test:do_execsql_test(
         SELECT uuid() != uuid();
     ]], {
         true
+    })
+
+-- Make sure STRING of wrong length cannot be cast to UUID.
+test:do_catchsql_test(
+    "uuid-17.1",
+    [[
+        SELECT CAST('11111111-1111-1111-1111-111111111111111222222222' AS UUID);
+    ]], {
+        1, "Type mismatch: can not convert 11111111-1111-1111-1111-111111111111111222222222 to uuid"
+    })
+
+test:do_catchsql_test(
+    "uuid-17.2",
+    [[
+        SELECT CAST('11111111-1111-1111-1111-11111' AS UUID);
+    ]], {
+        1, "Type mismatch: can not convert 11111111-1111-1111-1111-11111 to uuid"
     })
 
 test:execsql([[
