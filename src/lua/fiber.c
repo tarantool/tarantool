@@ -181,10 +181,6 @@ lbox_fiber_id(struct lua_State *L)
 struct lua_fiber_tb_ctx {
 	/* Lua stack to push values. */
 	struct lua_State *L;
-	/* Lua stack to trace. */
-	struct lua_State *R;
-	/* Current Lua frame. */
-	int lua_frame;
 	/* Count of traced frames (both C and Lua). */
 	int tb_frame;
 };
@@ -230,14 +226,12 @@ dump_c_frame(struct lua_State *L, int frameno, void *frameret, const char *func,
 }
 
 static int
-dump_lua_frame_cb(lua_Debug *ar, int tb_frame, void *cb_ctx)
+save_lua_frame_cb(lua_Debug *ar, int tb_frame, void *cb_ctx)
 {
 	(void) tb_frame;
-	struct lua_fiber_tb_ctx *tb_ctx = (struct lua_fiber_tb_ctx *)cb_ctx;
-
-	tb_ctx->tb_frame++;
-	dump_lua_frame(tb_ctx->L, ar->name, ar->source, ar->currentline,
-		       tb_ctx->tb_frame);
+	struct backtrace *bt = cb_ctx;
+	backtrace_append_lua(bt, ar->name != NULL ? ar->name : "(unnamed)",
+			     ar->source, ar->currentline);
 
 	return 0;
 }
@@ -273,21 +267,35 @@ lua_backtrace_foreach(struct lua_State *L, lua_backtrace_cb cb, void *cb_ctx)
 }
 
 static int
-fiber_backtrace_cb(int frameno, void *frameret, const char *func, size_t offset, void *cb_ctx)
-{
-	struct lua_fiber_tb_ctx *tb_ctx = (struct lua_fiber_tb_ctx *)cb_ctx;
+fiber_backtrace_cxx_cb(int frameno, void *frameret, const char *func,
+		       size_t offset, void *cb_ctx) {
+	struct lua_fiber_tb_ctx *tb_ctx = cb_ctx;
 	struct lua_State *L = tb_ctx->L;
-	/*
-	 * There is impossible to get func == NULL until
-	 * https://github.com/tarantool/tarantool/issues/5326
-	 * will not resolved, but is possible afterwards.
-	 */
-	if (func != NULL && tb_ctx->R && strstr(func, "lj_BC_FUNCC") == func) {
-		/* We are in the LUA vm. */
-		lua_backtrace_foreach(tb_ctx->R, dump_lua_frame_cb, tb_ctx);
+	dump_c_frame(L, frameno, frameret, func, offset, ++tb_ctx->tb_frame);
+
+	return 0;
+}
+
+static int
+fiber_backtrace_lua_cb(int frameno, const char *func, const char *source,
+		       int line, void *cb_ctx) {
+	(void) frameno;
+	struct lua_fiber_tb_ctx *tb_ctx = cb_ctx;
+	struct lua_State *L = tb_ctx->L;
+	dump_lua_frame(L, func, source, line, ++tb_ctx->tb_frame);
+
+	return 0;
+}
+
+static int
+fiber_collect_lua_cb(struct backtrace *bt, struct fiber *f)
+{
+	struct lua_State *L = f->storage.lua.stack;
+	if (L != NULL) {
+		lua_backtrace_foreach(L, save_lua_frame_cb, bt);
+	} else {
+		backtrace_collect_lua_default(bt, f);
 	}
-	tb_ctx->tb_frame++;
-	dump_c_frame(L, frameno, frameret, func, offset, tb_ctx->tb_frame);
 
 	return 0;
 }
@@ -332,12 +340,17 @@ lbox_fiber_statof_map(struct fiber *f, void *cb_ctx, bool backtrace)
 #ifdef ENABLE_BACKTRACE
 		struct lua_fiber_tb_ctx tb_ctx;
 		tb_ctx.L = L;
-		tb_ctx.R = f->storage.lua.stack;
-		tb_ctx.lua_frame = 0;
 		tb_ctx.tb_frame = 0;
 		lua_pushstring(L, "backtrace");
 		lua_newtable(L);
-		backtrace_foreach_current(fiber_backtrace_cb, NULL, f, &tb_ctx);
+		struct backtrace bt;
+		backtrace_collect(&bt, f);
+		if (fiber_parent_bt_is_enabled() && f->parent_bt != NULL) {
+			backtrace_concat(&bt, f->parent_bt);
+		}
+		backtrace_foreach(&bt, fiber_backtrace_cxx_cb,
+				  fiber_backtrace_lua_cb, &tb_ctx);
+
 		lua_settable(L, -3);
 #endif /* ENABLE_BACKTRACE */
 	}
@@ -463,6 +476,22 @@ lbox_do_backtrace(struct lua_State *L)
 	}
 	return true;
 }
+
+static int
+lbox_fiber_parent_bt_enable(struct lua_State *L)
+{
+	(void) L;
+	fiber_parent_bt_enable();
+	return 0;
+}
+
+static int
+lbox_fiber_parent_bt_disable(struct lua_State *L)
+{
+	(void) L;
+	fiber_parent_bt_disable();
+	return 0;
+}
 #endif /* ENABLE_BACKTRACE */
 
 /**
@@ -503,10 +532,11 @@ lua_fiber_run_f(MAYBE_UNUSED va_list ap)
 	 * We can unref child stack here,
 	 * otherwise we have to unref child stack in join
 	 */
-	if (f->flags & FIBER_IS_JOINABLE)
+	if (f->flags & FIBER_IS_JOINABLE) {
 		lua_pushinteger(L, coro_ref);
-	else
+	} else {
 		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
+	}
 
 	return result;
 }
@@ -885,8 +915,9 @@ lbox_fiber_join(struct lua_State *L)
 			lua_xmove(child_L, L, num_ret);
 		}
 	}
-	if (child_L != NULL)
+	if (child_L != NULL) {
 		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
+	}
 	return num_ret + 1;
 }
 
@@ -940,6 +971,10 @@ static const struct luaL_Reg fiberlib[] = {
 	{"top_enable", lbox_fiber_top_enable},
 	{"top_disable", lbox_fiber_top_disable},
 #endif /* ENABLE_FIBER_TOP */
+#ifdef ENABLE_BACKTRACE
+	{"parent_bt_enable", lbox_fiber_parent_bt_enable},
+	{"parent_bt_disable", lbox_fiber_parent_bt_disable},
+#endif /* ENABLE_BACKTRACE */
 	{"sleep", lbox_fiber_sleep},
 	{"yield", lbox_fiber_yield},
 	{"self", lbox_fiber_self},
@@ -964,7 +999,7 @@ void
 tarantool_lua_fiber_init(struct lua_State *L)
 {
 #if ENABLE_BACKTRACE
-	backtrace_init(lj_BC_FUNCC, NULL);
+	backtrace_init(lj_BC_FUNCC, fiber_collect_lua_cb);
 #endif /* ENABLE_BACKTRACE */
 	luaL_register_module(L, fiberlib_name, fiberlib);
 	lua_pop(L, 1);
