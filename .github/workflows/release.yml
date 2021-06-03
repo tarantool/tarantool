@@ -49,4 +49,4 @@ jobs:
         with:
           name: release
           retention-days: 21
-          path: test/var/artifacts
+          path: ${{ env.VARDIR }}/artifacts

@@ -86,5 +86,5 @@ jobs:
           name: debug
           retention-days: 21
           path: |
-            test/var/artifacts
+            ${{ env.VARDIR }}/artifacts
             *.info
