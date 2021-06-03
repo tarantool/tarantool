@@ -57,9 +57,6 @@
 /* sync snapshot every 16MB */
 #define SNAP_SYNC_INTERVAL	(1 << 24)
 
-struct small_alloc SmallAlloc::small_alloc;
-struct sys_alloc SysAlloc::sys_alloc;
-
 static void
 checkpoint_cancel(struct checkpoint *ckpt);
 
