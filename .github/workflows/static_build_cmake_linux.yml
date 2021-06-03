@@ -49,4 +49,4 @@ jobs:
         with:
           name: static_build_cmake_linux
           retention-days: 21
-          path: test/var/artifacts
+          path: ${{ env.VARDIR }}/artifacts
