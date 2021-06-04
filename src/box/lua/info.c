@@ -143,6 +143,9 @@ lbox_pushrelay(lua_State *L, struct relay *relay)
 		lua_pushnumber(L, ev_monotonic_now(loop()) -
 			       relay_last_row_time(relay));
 		lua_settable(L, -3);
+		lua_pushstring(L, "lag");
+		lua_pushnumber(L, relay_txn_lag(relay));
+		lua_settable(L, -3);
 		break;
 	case RELAY_STOPPED:
 	{

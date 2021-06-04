@@ -68,6 +68,8 @@ struct relay_status_msg {
 	struct relay *relay;
 	/** Replica vclock. */
 	struct vclock vclock;
+	/** Last replicated transaction timestamp. */
+	double txn_lag;
 };
 
 /**
@@ -158,6 +160,14 @@ struct relay {
 	struct stailq pending_gc;
 	/** Time when last row was sent to peer. */
 	double last_row_time;
+	/**
+	 * A time difference between the moment when we
+	 * wrote a transaction to the local WAL and when
+	 * this transaction has been replicated to remote
+	 * node (ie written to node's WAL) so that ACK get
+	 * received.
+	 */
+	double txn_lag;
 	/** Relay sync state. */
 	enum relay_state state;
 
@@ -166,6 +176,11 @@ struct relay {
 		alignas(CACHELINE_SIZE)
 		/** Known relay vclock. */
 		struct vclock vclock;
+		/**
+		 * Transaction downstream lag to be accessed
+		 * from TX thread only.
+		 */
+		double txn_lag;
 		/**
 		 * True if the relay needs Raft updates. It can live fine
 		 * without sending Raft updates, if it is a relay to an
@@ -215,6 +230,12 @@ double
 relay_last_row_time(const struct relay *relay)
 {
 	return relay->last_row_time;
+}
+
+double
+relay_txn_lag(const struct relay *relay)
+{
+	return relay->tx.txn_lag;
 }
 
 static void
@@ -336,6 +357,12 @@ relay_stop(struct relay *relay)
 	 * upon cord_create().
 	 */
 	relay->cord.id = 0;
+	/*
+	 * If relay is stopped then lag statistics should
+	 * be updated on next new ACK packets obtained.
+	 */
+	relay->txn_lag = 0;
+	relay->tx.txn_lag = 0;
 }
 
 void
@@ -483,6 +510,8 @@ tx_status_update(struct cmsg *msg)
 {
 	struct relay_status_msg *status = (struct relay_status_msg *)msg;
 	vclock_copy(&status->relay->tx.vclock, &status->vclock);
+	status->relay->tx.txn_lag = status->txn_lag;
+
 	struct replication_ack ack;
 	ack.source = status->relay->replica->id;
 	ack.vclock = &status->vclock;
@@ -629,6 +658,17 @@ relay_reader_f(va_list ap)
 			/* vclock is followed while decoding, zeroing it. */
 			vclock_create(&relay->recv_vclock);
 			xrow_decode_vclock_xc(&xrow, &relay->recv_vclock);
+			/*
+			 * Replica send us last replicated transaction
+			 * timestamp which is needed for relay lag
+			 * monitoring. Note that this transaction has
+			 * been written to WAL with our current realtime
+			 * clock value, thus when it get reported back we
+			 * can compute time spent regardless of the clock
+			 * value on remote replica.
+			 */
+			if (xrow.tm != 0)
+				relay->txn_lag = ev_now(loop()) - xrow.tm;
 			fiber_cond_signal(&relay->reader_cond);
 		}
 	} catch (Exception *e) {
@@ -838,6 +878,7 @@ relay_subscribe_f(va_list ap)
 		};
 		cmsg_init(&relay->status_msg.msg, route);
 		vclock_copy(&relay->status_msg.vclock, send_vclock);
+		relay->status_msg.txn_lag = relay->txn_lag;
 		relay->status_msg.relay = relay;
 		cpipe_push(&relay->tx_pipe, &relay->status_msg.msg);
 	}

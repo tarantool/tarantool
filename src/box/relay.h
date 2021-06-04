@@ -94,6 +94,12 @@ double
 relay_last_row_time(const struct relay *relay);
 
 /**
+ * Returns relay's transaction's lag.
+ */
+double
+relay_txn_lag(const struct relay *relay);
+
+/**
  * Send a Raft update request to the relay channel. It is not
  * guaranteed that it will be delivered. The connection may break.
  */
