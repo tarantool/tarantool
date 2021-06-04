@@ -951,15 +951,6 @@ replicaset_next(struct replica *replica)
 	return replica_hash_next(&replicaset.hash, replica);
 }
 
-/**
- * Compare vclock, read only mode and orphan status
- * of all connected replicas and elect a leader.
- * Initiallly, skip read-only replicas, since they
- * can not properly act as bootstrap masters (register
- * new nodes in _cluster table). If there are no read-write
- * replicas, choose a read-only replica with biggest vclock
- * as a leader, in hope it will become read-write soon.
- */
 struct replica *
 replicaset_find_join_master(void)
 {
@@ -972,12 +963,23 @@ replicaset_find_join_master(void)
 		const struct ballot *ballot = &applier->ballot;
 		int score = 0;
 		/*
+		 * First of all try to ignore non-booted instances. Including
+		 * self if not booted yet. For self it is even dangerous as the
+		 * instance might decide to boot its own cluster if, for
+		 * example, the other nodes are available, but read-only. It
+		 * would be a mistake.
+		 *
+		 * For a new cluster it is ok to use a non-booted instance as it
+		 * means the algorithm tries to find an initial "boot-master".
+		 *
 		 * Prefer instances not configured as read-only via box.cfg, and
 		 * not being in read-only state due to any other reason. The
 		 * config is stronger because if it is configured as read-only,
 		 * it is in read-only state for sure, until the config is
 		 * changed.
 		 */
+		if (ballot->is_booted)
+			score += 10;
 		if (!ballot->is_ro_cfg)
 			score += 5;
 		if (!ballot->is_ro)
