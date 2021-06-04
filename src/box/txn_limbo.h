@@ -316,6 +316,13 @@ int
 txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout);
 
 /**
+ * Persist limbo state to a given synchro request.
+ */
+void
+txn_limbo_checkpoint(const struct txn_limbo *limbo,
+		     struct synchro_request *req);
+
+/**
  * Write a PROMOTE request, which has the same effect as CONFIRM(@a lsn) and
  * ROLLBACK(@a lsn + 1) combined.
  */
