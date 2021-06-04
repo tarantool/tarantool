@@ -34,6 +34,8 @@
 #include <small/small.h>
 #include "sysalloc.h"
 
+typedef int (*allocator_stats_cb)(const void *, void *);
+
 struct alloc_stat {
 	size_t used;
 	size_t total;
@@ -45,7 +47,7 @@ struct allocator_stats {
 };
 
 int
-small_stats_noop_cb(const struct mempool_stats *stats, void *cb_ctx);
+stats_noop_cb(const void *stats, void *cb_ctx);
 
 struct allocator_settings {
 	struct small_allocator {
@@ -113,7 +115,7 @@ public:
 		return smfree(&small_alloc, ptr, size);
 	}
 	static inline void
-	stats(struct allocator_stats *alloc_stats, mempool_stats_cb cb,
+	stats(struct allocator_stats *alloc_stats, allocator_stats_cb cb,
 	      void *cb_ctx)
 	{
 		struct small_stats data_stats;
@@ -155,7 +157,7 @@ public:
 		return sysfree(&sys_alloc, ptr, size);
 	}
 	static inline void
-	stats(struct allocator_stats *alloc_stats, mempool_stats_cb cb,
+	stats(struct allocator_stats *alloc_stats, allocator_stats_cb cb,
 	      void *cb_ctx)
 	{
 		(void) cb;
@@ -222,7 +224,7 @@ struct allocator_stat {
 };
 
 void
-allocators_stats(struct allocator_stats *stats, mempool_stats_cb cb,
+allocators_stats(struct allocator_stats *stats, allocator_stats_cb cb,
 		 void *cb_ctx);
 
 void

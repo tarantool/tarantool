@@ -46,10 +46,12 @@
 #include "box/allocator.h"
 
 static int
-small_stats_lua_cb(const struct mempool_stats *stats, void *cb_ctx)
+small_stats_lua_cb(const void *stats, void *cb_ctx)
 {
+	const struct mempool_stats *mempool_stats =
+		(const struct mempool_stats *)stats;
 	/** Don't publish information about empty slabs. */
-	if (stats->slabcount == 0)
+	if (mempool_stats->slabcount == 0)
 		return 0;
 
 	struct lua_State *L = (struct lua_State *) cb_ctx;
@@ -68,27 +70,28 @@ small_stats_lua_cb(const struct mempool_stats *stats, void *cb_ctx)
 	luaL_setmaphint(L, -1);
 
 	lua_pushstring(L, "mem_used");
-	luaL_pushuint64(L, stats->totals.used);
+	luaL_pushuint64(L, mempool_stats->totals.used);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "slab_size");
-	luaL_pushuint64(L, stats->slabsize);
+	luaL_pushuint64(L, mempool_stats->slabsize);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "mem_free");
-	luaL_pushuint64(L, stats->totals.total - stats->totals.used);
+	luaL_pushuint64(L, mempool_stats->totals.total -
+			mempool_stats->totals.used);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "item_size");
-	luaL_pushuint64(L, stats->objsize);
+	luaL_pushuint64(L, mempool_stats->objsize);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "slab_count");
-	luaL_pushuint64(L, stats->slabcount);
+	luaL_pushuint64(L, mempool_stats->slabcount);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "item_count");
-	luaL_pushuint64(L, stats->objcount);
+	luaL_pushuint64(L, mempool_stats->objcount);
 	lua_settable(L, -3);
 
 	lua_settable(L, -3);
