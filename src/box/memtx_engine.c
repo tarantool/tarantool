@@ -50,6 +50,7 @@
 #include "schema.h"
 #include "gc.h"
 #include "raft.h"
+#include "txn_limbo.h"
 
 /* sync snapshot every 16MB */
 #define SNAP_SYNC_INTERVAL	(1 << 24)
@@ -226,6 +227,22 @@ memtx_engine_recover_raft(const struct xrow_header *row)
 }
 
 static int
+memtx_engine_recover_synchro(const struct xrow_header *row)
+{
+	assert(row->type == IPROTO_PROMOTE);
+	struct synchro_request req;
+	if (xrow_decode_synchro(row, &req) != 0)
+		return -1;
+	/*
+	 * Origin id cannot be deduced from row.replica_id in a checkpoint,
+	 * because all its rows have a zero replica_id.
+	 */
+	req.origin_id = req.replica_id;
+	txn_limbo_process(&txn_limbo, &req);
+	return 0;
+}
+
+static int
 memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 				  struct xrow_header *row, int *is_space_system)
 {
@@ -233,6 +250,8 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 	if (row->type != IPROTO_INSERT) {
 		if (row->type == IPROTO_RAFT)
 			return memtx_engine_recover_raft(row);
+		if (row->type == IPROTO_PROMOTE)
+			return memtx_engine_recover_synchro(row);
 		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 			 (uint32_t) row->type);
 		return -1;
@@ -546,6 +565,7 @@ struct checkpoint {
 	struct vclock vclock;
 	struct xdir dir;
 	struct raft_request raft;
+	struct synchro_request synchro_state;
 	/**
 	 * Do nothing, just touch the snapshot file - the
 	 * checkpoint already exists.
@@ -571,6 +591,7 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 	xdir_create(&ckpt->dir, snap_dirname, SNAP, &INSTANCE_UUID, &opts);
 	vclock_create(&ckpt->vclock);
 	box_raft_checkpoint_local(&ckpt->raft);
+	txn_limbo_checkpoint(&txn_limbo, &ckpt->synchro_state);
 	ckpt->touch = false;
 	return ckpt;
 }
@@ -660,6 +681,15 @@ finish:
 }
 
 static int
+checkpoint_write_synchro(struct xlog *l, const struct synchro_request *req)
+{
+	struct xrow_header row;
+	char body[XROW_SYNCHRO_BODY_LEN_MAX];
+	xrow_encode_synchro(&row, body, req);
+	return checkpoint_write_row(l, &row);
+}
+
+static int
 checkpoint_f(va_list ap)
 {
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
@@ -695,6 +725,8 @@ checkpoint_f(va_list ap)
 			goto fail;
 	}
 	if (checkpoint_write_raft(&snap, &ckpt->raft) != 0)
+		goto fail;
+	if (checkpoint_write_synchro(&snap, &ckpt->synchro_state) != 0)
 		goto fail;
 	if (xlog_flush(&snap) < 0)
 		goto fail;
