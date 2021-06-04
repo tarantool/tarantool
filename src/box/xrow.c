@@ -449,11 +449,13 @@ iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 		  uint64_t sync, uint32_t schema_version)
 {
 	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_map(1) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_map(5) +
+		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_map(6) +
 		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_bool(ballot->is_ro_cfg) +
 		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_bool(ballot->is_ro) +
 		mp_sizeof_uint(IPROTO_BALLOT_IS_ANON) +
 		mp_sizeof_bool(ballot->is_anon) +
+		mp_sizeof_uint(IPROTO_BALLOT_IS_BOOTED) +
+		mp_sizeof_bool(ballot->is_booted) +
 		mp_sizeof_uint(UINT32_MAX) +
 		mp_sizeof_vclock_ignore0(&ballot->vclock) +
 		mp_sizeof_uint(UINT32_MAX) +
@@ -469,13 +471,15 @@ iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 	char *data = buf + IPROTO_HEADER_LEN;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_BALLOT);
-	data = mp_encode_map(data, 5);
+	data = mp_encode_map(data, 6);
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_RO_CFG);
 	data = mp_encode_bool(data, ballot->is_ro_cfg);
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_RO);
 	data = mp_encode_bool(data, ballot->is_ro);
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_ANON);
 	data = mp_encode_bool(data, ballot->is_anon);
+	data = mp_encode_uint(data, IPROTO_BALLOT_IS_BOOTED);
+	data = mp_encode_bool(data, ballot->is_booted);
 	data = mp_encode_uint(data, IPROTO_BALLOT_VCLOCK);
 	data = mp_encode_vclock_ignore0(data, &ballot->vclock);
 	data = mp_encode_uint(data, IPROTO_BALLOT_GC_VCLOCK);
@@ -1360,6 +1364,7 @@ xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 	ballot->is_ro_cfg = false;
 	ballot->is_ro = false;
 	ballot->is_anon = false;
+	ballot->is_booted = true;
 	vclock_create(&ballot->vclock);
 
 	const char *start = NULL;
@@ -1423,6 +1428,11 @@ xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 			if (mp_decode_vclock_ignore0(&data,
 						     &ballot->gc_vclock) != 0)
 				goto err;
+			break;
+		case IPROTO_BALLOT_IS_BOOTED:
+			if (mp_typeof(*data) != MP_BOOL)
+				goto err;
+			ballot->is_booted = mp_decode_bool(&data);
 			break;
 		default:
 			mp_next(&data);
