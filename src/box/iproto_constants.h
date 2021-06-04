@@ -162,7 +162,7 @@ enum iproto_metadata_key {
 };
 
 enum iproto_ballot_key {
-	IPROTO_BALLOT_IS_RO = 0x01,
+	IPROTO_BALLOT_IS_RO_CFG = 0x01,
 	IPROTO_BALLOT_VCLOCK = 0x02,
 	IPROTO_BALLOT_GC_VCLOCK = 0x03,
 	IPROTO_BALLOT_IS_LOADING = 0x04,

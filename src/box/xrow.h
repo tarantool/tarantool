@@ -366,8 +366,8 @@ xrow_encode_auth(struct xrow_header *row, const char *salt, size_t salt_len,
 
 /** Reply to IPROTO_VOTE request. */
 struct ballot {
-	/** Set if the instance is running in read-only mode. */
-	bool is_ro;
+	/** Set if the instance is configured in read-only mode. */
+	bool is_ro_cfg;
 	/**
 	 * A flag whether the instance is anonymous, not having an
 	 * ID, and not going to request it.

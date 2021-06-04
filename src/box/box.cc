@@ -2832,7 +2832,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 void
 box_process_vote(struct ballot *ballot)
 {
-	ballot->is_ro = cfg_geti("read_only") != 0;
+	ballot->is_ro_cfg = cfg_geti("read_only") != 0;
 	ballot->is_anon = replication_anon;
 	/*
 	 * is_ro is true on initial load and is set to box.cfg.read_only
