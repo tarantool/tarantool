@@ -1,0 +1,47 @@
+-- test-run result file version 2
+-- In this test we are attempting at simulating following scenario:
+-- inside transaction execute such first operation which won't get into
+-- tx log, but will get into tx writers list. Verify that the next operation
+-- in the same transaction won't be added to tx writers list again (otherwise
+-- it will break writers list itself since it doesn't tolerate adding the
+-- same entry twice). As verification of writers list integrity we switch
+-- read_only mode which assumes iteration over mentioned list.
+--
+format = {{name = "k", type = "unsigned"}, {name = "v", type = "unsigned"}}
+ | ---
+ | ...
+space = box.schema.space.create("t", {engine="vinyl", format=format})
+ | ---
+ | ...
+
+_ = space:create_index('k', { parts = { 'k' }, unique = true })
+ | ---
+ | ...
+-- Execute update operation by non-exitent key as first statement in tx.
+--
+box.begin()
+ | ---
+ | ...
+space:update(1, { { '+', 2, 1 } })
+ | ---
+ | ...
+space:insert{1, 1 }
+ | ---
+ | - [1, 1]
+ | ...
+box.commit()
+ | ---
+ | ...
+box.cfg({read_only=true})
+ | ---
+ | ...
+box.cfg({read_only=false})
+ | ---
+ | ...
+assert(box.cfg.read_only == false)
+ | ---
+ | - true
+ | ...
+space:drop()
+ | ---
+ | ...

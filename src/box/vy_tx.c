@@ -893,6 +893,12 @@ vy_tx_begin_statement(struct vy_tx *tx, struct space *space, void **savepoint)
 	 * When want to add to the writer list, can't rely on the log emptiness.
 	 * During recovery it is empty always for the data stored both in runs
 	 * and xlogs. Must check the list member explicitly.
+	 *
+	 * Apart from that, we may add to writers statement which in fact
+	 * don't get into tx log. Imagine first-in-tx update by non-existent
+	 * key: tx will get into xm->writers, but won't to tx log. The next
+	 * operation will lead to adding the same entry of tx to xm->writers,
+	 * which in turn will break rlist.
 	 */
 	if (rlist_empty(&tx->in_writers)) {
 		assert(stailq_empty(&tx->log));
