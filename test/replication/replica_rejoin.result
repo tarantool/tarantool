@@ -7,10 +7,19 @@ test_run = env.new()
 log = require('log')
 ---
 ...
-engine = test_run:get_cfg('engine')
+test_run:cmd("create server master with script='replication/master1.lua'")
 ---
+- true
 ...
-test_run:cleanup_cluster()
+test_run:cmd("start server master")
+---
+- true
+...
+test_run:switch("master")
+---
+- true
+...
+engine = test_run:get_cfg('engine')
 ---
 ...
 --
@@ -43,7 +52,7 @@ _ = box.space.test:insert{3}
 ---
 ...
 -- Join a replica, then stop it.
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica_rejoin.lua'")
+test_run:cmd("create server replica with rpl_master=master, script='replication/replica_rejoin.lua'")
 ---
 - true
 ...
@@ -65,7 +74,7 @@ box.space.test:select()
   - [2]
   - [3]
 ...
-test_run:cmd("switch default")
+test_run:cmd("switch master")
 ---
 - true
 ...
@@ -75,7 +84,7 @@ test_run:cmd("stop server replica")
 ...
 -- Restart the server to purge the replica from
 -- the garbage collection state.
-test_run:cmd("restart server default")
+test_run:cmd("restart server master")
 box.cfg{wal_cleanup_delay = 0}
 ---
 ...
@@ -146,7 +155,7 @@ box.space.test:select()
   - [20]
   - [30]
 ...
-test_run:cmd("switch default")
+test_run:cmd("switch master")
 ---
 - true
 ...
@@ -154,7 +163,7 @@ test_run:cmd("switch default")
 for i = 10, 30, 10 do box.space.test:update(i, {{'!', 1, i}}) end
 ---
 ...
-vclock = test_run:get_vclock('default')
+vclock = test_run:get_vclock('master')
 ---
 ...
 vclock[0] = nil
@@ -191,7 +200,7 @@ box.space.test:replace{1, 2, 3} -- bumps LSN on the replica
 ---
 - [1, 2, 3]
 ...
-test_run:cmd("switch default")
+test_run:cmd("switch master")
 ---
 - true
 ...
@@ -199,7 +208,7 @@ test_run:cmd("stop server replica")
 ---
 - true
 ...
-test_run:cmd("restart server default")
+test_run:cmd("restart server master")
 box.cfg{wal_cleanup_delay = 0}
 ---
 ...
@@ -253,7 +262,7 @@ box.space.test:select()
 -- from the replica.
 --
 -- Bootstrap a new replica.
-test_run:cmd("switch default")
+test_run:cmd("switch master")
 ---
 - true
 ...
@@ -295,7 +304,7 @@ box.cfg{replication = ''}
 ---
 ...
 -- Bump vclock on the master.
-test_run:cmd("switch default")
+test_run:cmd("switch master")
 ---
 - true
 ...
@@ -317,15 +326,15 @@ vclock = test_run:get_vclock('replica')
 vclock[0] = nil
 ---
 ...
-_ = test_run:wait_vclock('default', vclock)
+_ = test_run:wait_vclock('master', vclock)
 ---
 ...
 -- Restart the master and force garbage collection.
-test_run:cmd("switch default")
+test_run:cmd("switch master")
 ---
 - true
 ...
-test_run:cmd("restart server default")
+test_run:cmd("restart server master")
 box.cfg{wal_cleanup_delay = 0}
 ---
 ...
@@ -373,7 +382,7 @@ vclock = test_run:get_vclock('replica')
 vclock[0] = nil
 ---
 ...
-_ = test_run:wait_vclock('default', vclock)
+_ = test_run:wait_vclock('master', vclock)
 ---
 ...
 -- Restart the replica. It should successfully rebootstrap.
@@ -396,14 +405,7 @@ test_run:cmd("switch default")
 ---
 - true
 ...
-box.cfg{replication = ''}
----
-...
 test_run:cmd("stop server replica")
----
-- true
-...
-test_run:cmd("cleanup server replica")
 ---
 - true
 ...
@@ -411,23 +413,34 @@ test_run:cmd("delete server replica")
 ---
 - true
 ...
-test_run:cleanup_cluster()
+test_run:cmd("stop server master")
 ---
+- true
 ...
-box.space.test:drop()
+test_run:cmd("delete server master")
 ---
-...
-box.schema.user.revoke('guest', 'replication')
----
+- true
 ...
 --
 -- gh-4107: rebootstrap fails if the replica was deleted from
 -- the cluster on the master.
 --
+test_run:cmd("create server master with script='replication/master1.lua'")
+---
+- true
+...
+test_run:cmd("start server master")
+---
+- true
+...
+test_run:switch("master")
+---
+- true
+...
 box.schema.user.grant('guest', 'replication')
 ---
 ...
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica_uuid.lua'")
+test_run:cmd("create server replica with rpl_master=master, script='replication/replica_uuid.lua'")
 ---
 - true
 ...
@@ -462,11 +475,11 @@ box.space._cluster:get(2) ~= nil
 ---
 - true
 ...
-test_run:cmd("stop server replica")
+test_run:switch("default")
 ---
 - true
 ...
-test_run:cmd("cleanup server replica")
+test_run:cmd("stop server replica")
 ---
 - true
 ...
@@ -474,9 +487,11 @@ test_run:cmd("delete server replica")
 ---
 - true
 ...
-box.schema.user.revoke('guest', 'replication')
+test_run:cmd("stop server master")
 ---
+- true
 ...
-test_run:cleanup_cluster()
+test_run:cmd("delete server master")
 ---
+- true
 ...
