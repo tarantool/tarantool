@@ -968,6 +968,7 @@ replicaset_round(bool skip_ro)
 		struct applier *applier = replica->applier;
 		if (applier == NULL)
 			continue;
+		const struct ballot *ballot = &applier->ballot;
 		/**
 		 * While bootstrapping a new cluster, read-only
 		 * replicas shouldn't be considered as a leader.
@@ -975,17 +976,18 @@ replicaset_round(bool skip_ro)
 		 * replicas since there is still a possibility
 		 * that all replicas exist in cluster table.
 		 */
-		if (skip_ro && applier->ballot.is_ro)
+		if (skip_ro && ballot->is_ro)
 			continue;
 		if (leader == NULL) {
 			leader = replica;
 			continue;
 		}
+		const struct ballot *leader_ballot = &leader->applier->ballot;
 		/*
 		 * Try to find a replica which has already left
 		 * orphan mode.
 		 */
-		if (applier->ballot.is_loading && ! leader->applier->ballot.is_loading)
+		if (ballot->is_loading && !leader_ballot->is_loading)
 			continue;
 		/*
 		 * Choose the replica with the most advanced
@@ -993,8 +995,8 @@ replicaset_round(bool skip_ro)
 		 * with the same vclock, prefer the one with
 		 * the lowest uuid.
 		 */
-		int cmp = vclock_compare_ignore0(&applier->ballot.vclock,
-						 &leader->applier->ballot.vclock);
+		int cmp = vclock_compare_ignore0(&ballot->vclock,
+						 &leader_ballot->vclock);
 		if (cmp < 0)
 			continue;
 		if (cmp == 0 && tt_uuid_compare(&replica->uuid,
@@ -1006,7 +1008,7 @@ replicaset_round(bool skip_ro)
 }
 
 struct replica *
-replicaset_leader(void)
+replicaset_find_join_master(void)
 {
 	bool skip_ro = true;
 	/**

@@ -1341,7 +1341,7 @@ box_set_replication_anon(void)
 		 * Wait until the master has registered this
 		 * instance.
 		 */
-		struct replica *master = replicaset_leader();
+		struct replica *master = replicaset_find_join_master();
 		if (master == NULL || master->applier == NULL ||
 		    master->applier->state != APPLIER_CONNECTED) {
 			tnt_raise(ClientError, ER_CANNOT_REGISTER);
@@ -3085,8 +3085,7 @@ bootstrap(const struct tt_uuid *instance_uuid,
 	 */
 	box_sync_replication(true);
 
-	/* Use the first replica by URI as a bootstrap leader */
-	struct replica *master = replicaset_leader();
+	struct replica *master = replicaset_find_join_master();
 	assert(master == NULL || master->applier != NULL);
 
 	if (master != NULL && !tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID)) {
