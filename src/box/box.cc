@@ -2835,6 +2835,7 @@ box_process_vote(struct ballot *ballot)
 	ballot->is_ro_cfg = cfg_geti("read_only") != 0;
 	ballot->is_anon = replication_anon;
 	ballot->is_ro = is_ro_summary;
+	ballot->is_booted = is_box_configured;
 	vclock_copy(&ballot->vclock, &replicaset.vclock);
 	vclock_copy(&ballot->gc_vclock, &gc.vclock);
 }
