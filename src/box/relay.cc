@@ -427,6 +427,9 @@ relay_initial_join(int fd, uint64_t sync, struct vclock *vclock,
 	if (txn_limbo_wait_confirm(&txn_limbo) != 0)
 		diag_raise();
 
+	struct synchro_request req;
+	txn_limbo_checkpoint(&txn_limbo, &req);
+
 	/* Respond to the JOIN request with the current vclock. */
 	struct xrow_header row;
 	xrow_encode_vclock_xc(&row, vclock);
@@ -442,7 +445,10 @@ relay_initial_join(int fd, uint64_t sync, struct vclock *vclock,
 		xrow_encode_type(&row, IPROTO_JOIN_META);
 		xstream_write(&relay->stream, &row);
 
-		/* Empty at the moment. */
+		char body[XROW_SYNCHRO_BODY_LEN_MAX];
+		xrow_encode_synchro(&row, body, &req);
+		row.replica_id = req.replica_id;
+		xstream_write(&relay->stream, &row);
 
 		/* Mark the end of the metadata stream. */
 		xrow_encode_type(&row, IPROTO_JOIN_SNAPSHOT);
