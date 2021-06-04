@@ -960,68 +960,52 @@ replicaset_next(struct replica *replica)
  * replicas, choose a read-only replica with biggest vclock
  * as a leader, in hope it will become read-write soon.
  */
-static struct replica *
-replicaset_round(bool skip_ro)
+struct replica *
+replicaset_find_join_master(void)
 {
 	struct replica *leader = NULL;
+	int leader_score = -1;
 	replicaset_foreach(replica) {
 		struct applier *applier = replica->applier;
 		if (applier == NULL)
 			continue;
 		const struct ballot *ballot = &applier->ballot;
-		/**
-		 * While bootstrapping a new cluster, read-only
-		 * replicas shouldn't be considered as a leader.
-		 * The only exception if there is no read-write
-		 * replicas since there is still a possibility
-		 * that all replicas exist in cluster table.
-		 */
-		if (skip_ro && ballot->is_ro_cfg)
-			continue;
-		if (leader == NULL) {
-			leader = replica;
-			continue;
-		}
-		const struct ballot *leader_ballot = &leader->applier->ballot;
+		int score = 0;
 		/*
-		 * Try to find a replica which has already left
-		 * orphan mode.
+		 * Prefer instances not configured as read-only via box.cfg, and
+		 * not being in read-only state due to any other reason. The
+		 * config is stronger because if it is configured as read-only,
+		 * it is in read-only state for sure, until the config is
+		 * changed.
 		 */
-		if (ballot->is_ro && !leader_ballot->is_ro)
+		if (!ballot->is_ro_cfg)
+			score += 5;
+		if (!ballot->is_ro)
+			score += 1;
+		if (leader_score < score)
+			goto elect;
+		if (score < leader_score)
 			continue;
+		const struct ballot *leader_ballot;
+		leader_ballot = &leader->applier->ballot;
 		/*
 		 * Choose the replica with the most advanced
 		 * vclock. If there are two or more replicas
 		 * with the same vclock, prefer the one with
 		 * the lowest uuid.
 		 */
-		int cmp = vclock_compare_ignore0(&ballot->vclock,
-						 &leader_ballot->vclock);
+		int cmp;
+		cmp = vclock_compare_ignore0(&ballot->vclock,
+					     &leader_ballot->vclock);
 		if (cmp < 0)
 			continue;
 		if (cmp == 0 && tt_uuid_compare(&replica->uuid,
 						&leader->uuid) > 0)
 			continue;
+elect:
 		leader = replica;
+		leader_score = score;
 	}
-	return leader;
-}
-
-struct replica *
-replicaset_find_join_master(void)
-{
-	bool skip_ro = true;
-	/**
-	 * Two loops, first prefers read-write replicas among others.
-	 * Second for backward compatibility, if there is no such
-	 * replicas at all.
-	 */
-	struct replica *leader = replicaset_round(skip_ro);
-	if (leader == NULL) {
-		skip_ro = false;
-		leader = replicaset_round(skip_ro);
-	}
-
 	return leader;
 }
 
