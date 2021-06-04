@@ -306,6 +306,16 @@ complete:
 	return 0;
 }
 
+void
+txn_limbo_checkpoint(const struct txn_limbo *limbo,
+		     struct synchro_request *req)
+{
+	req->type = IPROTO_PROMOTE;
+	req->replica_id = limbo->owner_id;
+	req->lsn = limbo->confirmed_lsn;
+	req->term = limbo->promote_greatest_term;
+}
+
 static void
 txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 			uint64_t term)
