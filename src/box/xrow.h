@@ -374,10 +374,11 @@ struct ballot {
 	 */
 	bool is_anon;
 	/**
-	 * Set if the instance hasn't finished bootstrap or recovery, or
-	 * is syncing with other replicas in the replicaset.
+	 * Set if the instance is not writable due to any reason. Could be
+	 * config read_only=true; being orphan; being a Raft follower; not
+	 * finished recovery/bootstrap; or anything else.
 	 */
-	bool is_loading;
+	bool is_ro;
 	/** Current instance vclock. */
 	struct vclock vclock;
 	/** Oldest vclock available on the instance. */

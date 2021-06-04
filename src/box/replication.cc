@@ -987,7 +987,7 @@ replicaset_round(bool skip_ro)
 		 * Try to find a replica which has already left
 		 * orphan mode.
 		 */
-		if (ballot->is_loading && !leader_ballot->is_loading)
+		if (ballot->is_ro && !leader_ballot->is_ro)
 			continue;
 		/*
 		 * Choose the replica with the most advanced
