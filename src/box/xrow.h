@@ -379,6 +379,8 @@ struct ballot {
 	 * finished recovery/bootstrap; or anything else.
 	 */
 	bool is_ro;
+	/** Set if the instance has finished its bootstrap/recovery. */
+	bool is_booted;
 	/** Current instance vclock. */
 	struct vclock vclock;
 	/** Oldest vclock available on the instance. */
