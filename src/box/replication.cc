@@ -976,7 +976,7 @@ replicaset_round(bool skip_ro)
 		 * replicas since there is still a possibility
 		 * that all replicas exist in cluster table.
 		 */
-		if (skip_ro && ballot->is_ro)
+		if (skip_ro && ballot->is_ro_cfg)
 			continue;
 		if (leader == NULL) {
 			leader = replica;

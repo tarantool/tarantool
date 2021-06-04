@@ -450,7 +450,7 @@ iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 {
 	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_map(1) +
 		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_map(5) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_bool(ballot->is_ro) +
+		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_bool(ballot->is_ro_cfg) +
 		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_bool(ballot->is_loading) +
 		mp_sizeof_uint(IPROTO_BALLOT_IS_ANON) +
 		mp_sizeof_bool(ballot->is_anon) +
@@ -470,8 +470,8 @@ iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_BALLOT);
 	data = mp_encode_map(data, 5);
-	data = mp_encode_uint(data, IPROTO_BALLOT_IS_RO);
-	data = mp_encode_bool(data, ballot->is_ro);
+	data = mp_encode_uint(data, IPROTO_BALLOT_IS_RO_CFG);
+	data = mp_encode_bool(data, ballot->is_ro_cfg);
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_LOADING);
 	data = mp_encode_bool(data, ballot->is_loading);
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_ANON);
@@ -1357,7 +1357,7 @@ xrow_encode_vote(struct xrow_header *row)
 int
 xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 {
-	ballot->is_ro = false;
+	ballot->is_ro_cfg = false;
 	ballot->is_loading = false;
 	ballot->is_anon = false;
 	vclock_create(&ballot->vclock);
@@ -1399,10 +1399,10 @@ xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 		}
 		uint32_t key = mp_decode_uint(&data);
 		switch (key) {
-		case IPROTO_BALLOT_IS_RO:
+		case IPROTO_BALLOT_IS_RO_CFG:
 			if (mp_typeof(*data) != MP_BOOL)
 				goto err;
-			ballot->is_ro = mp_decode_bool(&data);
+			ballot->is_ro_cfg = mp_decode_bool(&data);
 			break;
 		case IPROTO_BALLOT_IS_LOADING:
 			if (mp_typeof(*data) != MP_BOOL)
