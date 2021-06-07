@@ -572,7 +572,7 @@ raft_test_vote_skip(void)
 static void
 raft_test_leader_resign(void)
 {
-	raft_start_test(15);
+	raft_start_test(23);
 	struct raft_node node;
 
 	/*
@@ -671,6 +671,84 @@ raft_test_leader_resign(void)
 		1 /* Vote. */,
 		NULL /* Vclock. */
 	), "resign notification is sent");
+
+	/*
+	 * gh-6129: resign of a remote leader during a local WAL write should
+	 * schedule a new election after the WAL write.
+	 *
+	 * Firstly start a new term.
+	 */
+	raft_node_block(&node);
+	raft_node_cfg_is_candidate(&node, true);
+	raft_run_next_event();
+	/* Volatile term is new, but the persistent one is not updated yet. */
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_FOLLOWER /* State. */,
+		0 /* Leader. */,
+		2 /* Term. */,
+		1 /* Vote. */,
+		3 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 1}" /* Vclock. */
+	), "new election is waiting for WAL write");
+
+	/* Now another node wins the election earlier. */
+	is(raft_node_send_leader(&node,
+		3 /* Term. */,
+		2 /* Source. */
+	), 0, "message is accepted");
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_FOLLOWER /* State. */,
+		2 /* Leader. */,
+		2 /* Term. */,
+		1 /* Vote. */,
+		3 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 1}" /* Vclock. */
+	), "the leader is accepted");
+
+	/*
+	 * The leader resigns and triggers a new election round on the first
+	 * node. A new election is triggered, but still waiting for the previous
+	 * WAL write to end.
+	 */
+	is(raft_node_send_follower(&node,
+		3 /* Term. */,
+		2 /* Source. */
+	), 0, "message is accepted");
+	/* Note how the volatile term is updated again. */
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_FOLLOWER /* State. */,
+		0 /* Leader. */,
+		2 /* Term. */,
+		1 /* Vote. */,
+		4 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 1}" /* Vclock. */
+	), "the leader has resigned, new election is scheduled");
+	raft_node_unblock(&node);
+
+	/* Ensure the node still collects votes after the WAL write. */
+	is(raft_node_send_vote_response(&node,
+		4 /* Term. */,
+		1 /* Vote. */,
+		2 /* Source. */
+	), 0, "vote from 2");
+	is(raft_node_send_vote_response(&node,
+		4 /* Term. */,
+		1 /* Vote. */,
+		3 /* Source. */
+	), 0, "vote from 3");
+	raft_run_next_event();
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_LEADER /* State. */,
+		1 /* Leader. */,
+		4 /* Term. */,
+		1 /* Vote. */,
+		4 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 2}" /* Vclock. */
+	), "the leader is elected");
 
 	raft_node_destroy(&node);
 
