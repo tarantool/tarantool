@@ -24,7 +24,7 @@ function get_os_dists {
     alldists=
 
     if [ "$os" == "ubuntu" ]; then
-        alldists='trusty xenial bionic disco eoan focal groovy'
+        alldists='trusty xenial bionic disco eoan focal groovy hirsute'
     elif [ "$os" == "debian" ]; then
         alldists='jessie stretch buster bullseye'
     elif [ "$os" == "el" ]; then
