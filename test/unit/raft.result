@@ -111,7 +111,7 @@ ok 4 - subtests
 ok 5 - subtests
 	*** raft_test_vote_skip: done ***
 	*** raft_test_leader_resign ***
-    1..15
+    1..23
     ok 1 - message is accepted
     ok 2 - leader is elected
     ok 3 - message is accepted
@@ -127,6 +127,14 @@ ok 5 - subtests
     ok 13 - became leader
     ok 14 - the leader has resigned
     ok 15 - resign notification is sent
+    ok 16 - new election is waiting for WAL write
+    ok 17 - message is accepted
+    ok 18 - the leader is accepted
+    ok 19 - message is accepted
+    ok 20 - the leader has resigned, new election is scheduled
+    ok 21 - vote from 2
+    ok 22 - vote from 3
+    ok 23 - the leader is elected
 ok 6 - subtests
 	*** raft_test_leader_resign: done ***
 	*** raft_test_split_brain ***

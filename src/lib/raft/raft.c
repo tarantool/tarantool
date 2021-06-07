@@ -687,10 +687,9 @@ static void
 raft_sm_schedule_new_election(struct raft *raft)
 {
 	say_info("RAFT: begin new election round");
-	assert(raft_is_fully_on_disk(raft));
 	assert(raft->is_candidate);
 	/* Everyone is a follower until its vote for self is persisted. */
-	raft_sm_schedule_new_term(raft, raft->term + 1);
+	raft_sm_schedule_new_term(raft, raft->volatile_term + 1);
 	raft_sm_schedule_new_vote(raft, raft->self);
 }
 
@@ -701,6 +700,11 @@ raft_sm_schedule_new_election_cb(struct ev_loop *loop, struct ev_timer *timer,
 	(void)events;
 	struct raft *raft = timer->data;
 	assert(timer == &raft->timer);
+	/*
+	 * Otherwise the timer would be stopped and the callback wouldn't be
+	 * invoked.
+	 */
+	assert(raft_is_fully_on_disk(raft));
 	raft_ev_timer_stop(loop, timer);
 	raft_sm_schedule_new_election(raft);
 }
