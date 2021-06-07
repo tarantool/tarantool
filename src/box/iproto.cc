@@ -63,6 +63,7 @@
 #include "execute.h"
 #include "errinj.h"
 #include "tt_static.h"
+#include "txn.h"
 
 enum {
 	IPROTO_SALT_SIZE = 32,
@@ -72,6 +73,75 @@ enum {
 enum {
 	 ENDPOINT_NAME_MAX = 10
 };
+
+enum iproto_txn_state {
+	/**
+	 * No active transaction in stream. All requests are
+	 * processed sequently.
+	 */
+	IPROTO_STREAM_NO_TXN,
+	/**
+	 * Transaction `begin` request are processed by tx thread.
+	 * All subsequent requests are processed in special transaction
+	 * fiber. Sends to tx thread in batch mode.
+	 */
+	IPROTO_STREAM_IN_TXN,
+	/**
+	 * Transaction commit or rollback request found in pending requests.
+	 * All subsequent requests puts to pending list, until active
+	 * transaction finished.
+	 */
+	IPROTO_STREAM_TXN_END_FOUND,
+};
+
+struct iproto_connection;
+struct iproto_msg;
+
+struct stream {
+	/**
+	 * State of current stream transaction. This field is accesable
+	 * only from iproto thread.
+	 */
+	enum iproto_txn_state state;
+	/** Currently active stream transaction or NULL */
+	struct txn *txn;
+	/**
+	 * Pending requests for this stream, in case of active transaction.
+	 * This field is accesable only from tx thread.
+	 */
+	struct rlist txn_pending_list;
+	/**
+	 * Pending requests for this stream, processed sequentially.
+	 * This field is accesable only from iproto thread.
+	 */
+	struct rlist pending_list;
+	/** Id of this stream, used as a key in streams hash table */
+	uint32_t stream_id;
+	/** This stream connection */
+	struct iproto_connection *connection;
+	/** This stream transaction fiber, or NULL if no active transaction */
+	struct fiber *fiber;
+	/**
+	 * Flag, indicates that stream wait's for graceful transaction finish
+	 */
+	bool is_pending_closed;
+	/** Special iproto message, to proccess rollback on disconnect */
+	struct iproto_msg *disconnect;
+};
+
+/**
+ * Hash table definition for streams.
+ */
+#define mh_name _streams
+#define mh_key_t uint32_t
+#define mh_node_t struct stream *
+#define mh_arg_t int
+#define mh_hash(a, arg) ((*(a))->stream_id)
+#define mh_hash_key(a, arg) (a)
+#define mh_cmp(a, b, arg) ((*(a))->stream_id != (*(b))->stream_id)
+#define mh_cmp_key(a, b, arg) ((a) != ((*(b))->stream_id))
+#define MH_SOURCE
+#include "salad/mhash.h"
 
 /**
  * A position in connection output buffer.
@@ -117,6 +187,11 @@ struct iproto_thread {
 	/**
 	 * Static routes for this iproto thread
 	 */
+	struct cmsg_hop rollback_on_disconnect_route[2];
+	struct cmsg_hop process_in_txn_route[2];
+	struct cmsg_hop begin_route[2];
+	struct cmsg_hop commit_route[2];
+	struct cmsg_hop rollback_route[2];
 	struct cmsg_hop destroy_route[2];
 	struct cmsg_hop disconnect_route[2];
 	struct cmsg_hop misc_route[2];
@@ -303,6 +378,31 @@ struct iproto_msg
 	 * and the connection must be closed.
 	 */
 	bool close_connection;
+	/**
+	 * Rlist entry for txn pending list in stream.
+	 * The message is being added to txn pending list
+	 * in case when this message is belongs to stream
+	 * with active transaction and some previous transaction
+	 * requests are still not finished.
+	 */
+	struct rlist in_txn_pending_list;
+	/**
+	 * Rlist entry for pending list in stream.
+	 * If there is no active transaction all requests
+	 * processed in stream sequently. So if there is some
+	 * active request and no transaction started for this
+	 * stream - message is being added to pending list.
+	 */
+	struct rlist in_pending_list;
+	/** Stream that owns this message, or NULL. */
+	struct stream *stream;
+	/** True if message was processed without errors */
+	bool is_request_successed;
+	/**
+	 * Fiber conditional variable, to wait for the message
+	 * processing finish in txn fiber.
+	 */
+	struct fiber_cond cond;
 };
 
 static struct iproto_msg *
@@ -555,7 +655,49 @@ struct iproto_connection
 	char salt[IPROTO_SALT_SIZE];
 	/** Iproto connection thread */
 	struct iproto_thread *iproto_thread;
+	/**
+	 * Hash table that holds all streams for this connection.
+	 * This field is accesable only from iproto thread.
+	 */
+	struct mh_streams_t *streams;
+	/** Count of elements in streams table. */
+	size_t streams_size;
+	/** Mempool for streams allocation */
+	struct mempool streams_pool;
+	/**
+	 * Count of streams with active transactions,
+	 * in the moment of connection closed.
+	 */
+	unsigned active_txn_in_streams;
 };
+
+static struct stream *
+iproto_stream_new(struct iproto_msg *msg)
+{
+	struct stream *stream = (struct stream *)
+		mempool_alloc(&msg->connection->streams_pool);
+	if (stream == NULL) {
+		diag_set(OutOfMemory, sizeof(*stream),
+			 "mempool_alloc", "stream");
+		return NULL;
+	}
+	stream->disconnect = iproto_msg_new(msg->connection);
+	if (stream->disconnect == NULL) {
+		mempool_free(&msg->connection->streams_pool, stream);
+		return NULL;
+	}
+	stream->disconnect->stream = stream;
+	stream->disconnect->header.type = IPROTO_TRANSACTION_ROLLBACK;
+	stream->state = IPROTO_STREAM_NO_TXN;
+	stream->txn = NULL;
+	stream->fiber = NULL;
+	rlist_create(&stream->txn_pending_list);
+	rlist_create(&stream->pending_list);
+	stream->stream_id = msg->header.stream_id;
+	stream->connection = msg->connection;
+	stream->is_pending_closed = false;
+	return stream;
+}
 
 /**
  * Return true if we have not enough spare messages
@@ -572,9 +714,20 @@ static inline void
 iproto_msg_delete(struct iproto_msg *msg)
 {
 	struct iproto_thread *iproto_thread = msg->connection->iproto_thread;
+	fiber_cond_destroy(&msg->cond);
 	mempool_free(&msg->connection->iproto_thread->iproto_msg_pool, msg);
 	iproto_resume(iproto_thread);
 }
+
+static void
+iproto_stream_delete(struct stream *stream)
+{
+	struct iproto_connection *connection = stream->connection;
+	if (stream->disconnect != NULL)
+		iproto_msg_delete(stream->disconnect);
+	mempool_free(&connection->streams_pool, stream);
+}
+
 
 static struct iproto_msg *
 iproto_msg_new(struct iproto_connection *con)
@@ -592,8 +745,13 @@ iproto_msg_new(struct iproto_connection *con)
 			 "connection %s", sio_socketname(con->input.fd));
 		return NULL;
 	}
+	rlist_create(&msg->in_txn_pending_list);
+	rlist_create(&msg->in_pending_list);
 	msg->close_connection = false;
 	msg->connection = con;
+	msg->stream = NULL;
+	msg->is_request_successed = true;
+	fiber_cond_create(&msg->cond);
 	rmean_collect(con->iproto_thread->rmean, IPROTO_REQUESTS, 1);
 	return msg;
 }
@@ -690,6 +848,30 @@ iproto_connection_try_to_start_destroy(struct iproto_connection *con)
 static inline void
 iproto_connection_close(struct iproto_connection *con)
 {
+	mh_int_t node;
+	mh_foreach(con->streams, node) {
+		struct stream *stream = *mh_streams_node(con->streams, node);
+		if (stream->is_pending_closed == true)
+			continue;
+		stream->is_pending_closed = true;
+		struct iproto_msg *msg;
+		while (!rlist_empty(&stream->pending_list)) {
+			msg = rlist_first_entry(&stream->pending_list,
+						struct iproto_msg,
+						in_pending_list);
+			rlist_del_entry(msg, in_pending_list);
+			iproto_msg_delete(msg);
+		}
+		if (stream->state != IPROTO_STREAM_NO_TXN) {
+			con->active_txn_in_streams++;
+			struct iproto_thread *iproto_thread =
+				stream->connection->iproto_thread;
+			cmsg_init(&stream->disconnect->base,
+				  iproto_thread->rollback_on_disconnect_route);
+			cpipe_push(&iproto_thread->tx_pipe, &stream->disconnect->base);
+		}
+	}
+
 	if (evio_has_fd(&con->input)) {
 		/* Clears all pending events. */
 		ev_io_stop(con->loop, &con->input);
@@ -706,9 +888,11 @@ iproto_connection_close(struct iproto_connection *con)
 		 * is done only once.
 		 */
 		con->p_ibuf->wpos -= con->parse_size;
-		cpipe_push(&con->iproto_thread->tx_pipe, &con->disconnect_msg);
-		assert(con->state == IPROTO_CONNECTION_ALIVE);
-		con->state = IPROTO_CONNECTION_CLOSED;
+		if (con->active_txn_in_streams == 0) {
+			cpipe_push(&con->iproto_thread->tx_pipe, &con->disconnect_msg);
+			assert(con->state == IPROTO_CONNECTION_ALIVE);
+			con->state = IPROTO_CONNECTION_CLOSED;
+		}
 	} else if (con->state == IPROTO_CONNECTION_PENDING_DESTROY) {
 		iproto_connection_try_to_start_destroy(con);
 	} else {
@@ -822,6 +1006,58 @@ iproto_connection_input_buffer(struct iproto_connection *con)
 }
 
 /**
+ * Checks is message belongs to stream (stream_id != 0), and if it
+ * is so creates new/stream or gets stream from connection streams
+ * hash table. Puts message to stream pending messages list.
+ * @retval 0 - if message ready to push
+ *         1 - if message puts in pending list
+ *        -1 - if error occurs
+ */
+static int
+iproto_set_msg_stream(struct iproto_msg *msg)
+{
+	uint32_t stream_id = msg->header.stream_id;
+	if (stream_id == 0)
+		return 0;
+
+	bool skip_push;
+	struct iproto_connection *con = msg->connection;
+	struct stream *stream = NULL;
+	mh_int_t pos = mh_streams_find(con->streams, stream_id, 0);
+	if (pos == mh_end(con->streams)) {
+		stream = iproto_stream_new(msg);
+		if (stream == NULL)
+			return -1;
+		pos = mh_streams_put(con->streams, (const struct stream **)
+				     &stream, NULL, 0);
+		if (pos == mh_end(con->streams)) {
+			iproto_stream_delete(stream);
+			diag_set(OutOfMemory, pos + 1, "mh_streams_put",
+				 "mh_streams_node");
+			return -1;
+		}
+	}
+	stream = *mh_streams_node(con->streams, pos);
+	msg->stream = stream;
+	assert(!stream->is_pending_closed);
+
+	if (stream->state == IPROTO_STREAM_IN_TXN) {
+		struct iproto_thread *iproto_thread = con->iproto_thread;
+		cmsg_init(&msg->base, iproto_thread->process_in_txn_route);
+		if (msg->header.type == IPROTO_TRANSACTION_COMMIT ||
+		    msg->header.type == IPROTO_TRANSACTION_ROLLBACK)
+			stream->state = IPROTO_STREAM_TXN_END_FOUND;
+		return 0;
+	}
+
+	skip_push = (!rlist_empty(&stream->pending_list) ||
+		     stream->state != IPROTO_STREAM_NO_TXN);
+	rlist_add_tail_entry(&stream->pending_list, msg,
+			     in_pending_list);
+	return (skip_push ? 1 : 0);
+}
+
+/**
  * Enqueue all requests which were read up. If a request limit is
  * reached - stop the connection input even if not the whole batch
  * is enqueued. Else try to read more feeding read event to the
@@ -883,12 +1119,30 @@ err_msgpack:
 		msg->len = reqend - reqstart; /* total request length */
 
 		iproto_msg_decode(msg, &pos, reqend, &stop_input);
+
+		int rc = iproto_set_msg_stream(msg);
+		if (rc < 0) {
+			iproto_msg_delete(msg);
+			/*
+			 * Do not treat it as an error - just wait
+			 * until some of requests are finished.
+			 */
+			iproto_connection_stop_msg_max_limit(con);
+			return 0;
+		}
 		/*
-		 * This can't throw, but should not be
-		 * done in case of exception.
+		 * rc > 0, means that stream pending list is not empty,
+		 * skip push.
 		 */
-		cpipe_push_input(&con->iproto_thread->tx_pipe, &msg->base);
-		n_requests++;
+		if (rc == 0) {
+			/*
+			 * This can't throw, but should not be
+			 * done in case of exception.
+			 */
+			cpipe_push_input(&con->iproto_thread->tx_pipe, &msg->base);
+			n_requests++;
+		}
+
 		/* Request is parsed */
 		assert(reqend > reqstart);
 		assert(con->parse_size >= (size_t) (reqend - reqstart));
@@ -1130,6 +1384,16 @@ iproto_connection_new(struct iproto_thread *iproto_thread, int fd)
 		diag_set(OutOfMemory, sizeof(*con), "mempool_alloc", "con");
 		return NULL;
 	}
+	mempool_create(&con->streams_pool, &cord()->slabc,
+		       sizeof(struct stream));
+	con->streams = mh_streams_new();
+	if (con->streams == NULL) {
+		diag_set(OutOfMemory, sizeof(*(con->streams)),
+			 "mh_streams_new", "streams");
+		mempool_destroy(&con->streams_pool);
+		mempool_free(&con->iproto_thread->iproto_connection_pool, con);
+		return NULL;
+	}
 	con->iproto_thread = iproto_thread;
 	con->input.data = con->output.data = con;
 	con->loop = loop();
@@ -1155,6 +1419,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread, int fd)
 	con->state = IPROTO_CONNECTION_ALIVE;
 	con->tx.is_push_pending = false;
 	con->tx.is_push_sent = false;
+	con->active_txn_in_streams = 0;
 	rmean_collect(iproto_thread->rmean, IPROTO_CONNECTIONS, 1);
 	return con;
 }
@@ -1178,6 +1443,9 @@ iproto_connection_delete(struct iproto_connection *con)
 	       con->obuf[0].iov[0].iov_base == NULL);
 	assert(con->obuf[1].pos == 0 &&
 	       con->obuf[1].iov[0].iov_base == NULL);
+
+	mh_streams_delete(con->streams);
+	mempool_destroy(&con->streams_pool);
 	mempool_free(&con->iproto_thread->iproto_connection_pool, con);
 }
 
@@ -1246,6 +1514,9 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 	case IPROTO_UPDATE:
 	case IPROTO_DELETE:
 	case IPROTO_UPSERT:
+	case IPROTO_TRANSACTION_BEGIN:
+	case IPROTO_TRANSACTION_COMMIT:
+	case IPROTO_TRANSACTION_ROLLBACK:
 		if (xrow_decode_dml(&msg->header, &msg->dml,
 				    dml_request_key_map(type)))
 			goto error;
@@ -1479,6 +1750,7 @@ tx_reply_error(struct iproto_msg *msg)
 	iproto_reply_error(out, diag_last_error(&fiber()->diag),
 			   msg->header.sync, ::schema_version);
 	iproto_wpos_create(&msg->wpos, out);
+	msg->is_request_successed = false;
 }
 
 /**
@@ -1525,6 +1797,255 @@ tx_process1(struct cmsg *m)
 		goto error;
 	iproto_reply_select(out, &svp, msg->header.sync, ::schema_version,
 			    tuple != 0);
+	iproto_wpos_create(&msg->wpos, out);
+	return;
+error:
+	tx_reply_error(msg);
+}
+
+static void
+tx_process_rollback_on_disconnect(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	if (msg->stream->fiber == NULL)
+		return;
+
+	bool skip_wakeup;
+	assert(msg->header.type == IPROTO_TRANSACTION_ROLLBACK);
+	msg->header.schema_version = ::schema_version;
+	skip_wakeup = !rlist_empty(&msg->stream->txn_pending_list);
+	rlist_add_entry(&msg->stream->txn_pending_list, msg,
+			in_txn_pending_list);
+	if (!skip_wakeup)
+		fiber_call(msg->stream->fiber);
+	if (!rlist_empty(&msg->in_txn_pending_list))
+		fiber_cond_wait(&msg->cond);
+	/**
+	 * In case of success rollback function sets
+	 * stream->txn to zero.
+	 */
+	if (msg->stream->txn == NULL)
+		fiber_join(msg->stream->fiber);
+
+	msg->stream->fiber = NULL;
+}
+
+static void
+tx_process_in_txn(struct cmsg *m)
+{
+	struct iproto_msg *msg = tx_accept_msg(m);
+	bool skip_wakeup;
+
+	if (tx_check_schema(msg->header.schema_version))
+		goto error;
+
+	assert(msg->stream != NULL);
+	skip_wakeup = !rlist_empty(&msg->stream->txn_pending_list);
+	rlist_add_tail_entry(&msg->stream->txn_pending_list, msg,
+			     in_txn_pending_list);
+	assert(msg->stream->fiber != NULL);
+	if (!skip_wakeup)
+		fiber_call(msg->stream->fiber);
+	if (!rlist_empty(&msg->in_txn_pending_list))
+		fiber_cond_wait(&msg->cond);
+	if ((msg->header.type == IPROTO_TRANSACTION_COMMIT ||
+	    msg->header.type == IPROTO_TRANSACTION_ROLLBACK) &&
+	    msg->stream->txn == NULL) {
+		fiber_join(msg->stream->fiber);
+		msg->stream->fiber = NULL;
+	}
+	return;
+error:
+	tx_reply_error(msg);
+}
+
+static void
+tx_process_msg(struct iproto_msg *msg)
+{
+	struct iproto_thread *iproto_thread = msg->connection->iproto_thread;
+	uint8_t type = msg->header.type;
+
+	switch (type) {
+	case IPROTO_SELECT:
+	case IPROTO_INSERT:
+	case IPROTO_REPLACE:
+	case IPROTO_UPDATE:
+	case IPROTO_DELETE:
+	case IPROTO_UPSERT:
+	case IPROTO_TRANSACTION_BEGIN:
+	case IPROTO_TRANSACTION_COMMIT:
+	case IPROTO_TRANSACTION_ROLLBACK:
+		iproto_thread->dml_route[type][0].f(&msg->base);
+		break;
+	case IPROTO_CALL_16:
+	case IPROTO_CALL:
+	case IPROTO_EVAL:
+		tx_process_call(&msg->base);
+		break;
+	case IPROTO_EXECUTE:
+	case IPROTO_PREPARE:
+		tx_process_sql(&msg->base);
+		break;
+	case IPROTO_JOIN:
+	case IPROTO_FETCH_SNAPSHOT:
+	case IPROTO_REGISTER:
+		/* TODO */
+		break;
+	case IPROTO_SUBSCRIBE:
+		/* TODO */
+		break;
+	case IPROTO_PING:
+	case IPROTO_VOTE_DEPRECATED:
+	case IPROTO_VOTE:
+	case IPROTO_AUTH:
+		tx_process_misc(&msg->base);
+		break;
+	default:
+		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+			 (uint32_t) type);
+		tx_reply_error(msg);
+	}
+
+	fiber_cond_signal(&msg->cond);
+	return;
+}
+
+static int
+tx_stream_worker(va_list ap)
+{
+	struct stream *stream = va_arg(ap, struct stream *);
+	struct iproto_msg *msg = va_arg(ap, struct iproto_msg *);
+
+	tx_fiber_init(stream->connection->session, msg->header.sync);
+	if (box_txn_begin() != 0) {
+		fiber_set_txn(fiber(), NULL);
+		goto error;
+	}
+
+	stream->txn = in_txn();
+	assert(stream->txn != NULL);
+	trigger_clear(&stream->txn->fiber_on_stop);
+	while (true) {
+		if (rlist_empty(&stream->txn_pending_list)) {
+			if ((msg->header.type == IPROTO_TRANSACTION_COMMIT ||
+			    msg->header.type == IPROTO_TRANSACTION_ROLLBACK) &&
+			    stream->txn == NULL)
+				break;
+			fiber_yield();
+		}
+		msg = rlist_first_entry(&stream->txn_pending_list,
+					struct iproto_msg,
+					in_txn_pending_list);
+		assert(msg != NULL);
+		tx_process_msg(msg);
+		rlist_del_entry(msg, in_txn_pending_list);
+	}
+
+	/**
+	 * We may still have some unprocessed requests in
+	 * case of rollback on disconnect. Clear them all.
+	 */
+	while (!rlist_empty(&msg->stream->txn_pending_list)) {
+		struct iproto_msg *next =
+			rlist_first_entry(&msg->stream->txn_pending_list,
+					  struct iproto_msg,
+					  in_txn_pending_list);
+		rlist_del_entry(next, in_txn_pending_list);
+		iproto_msg_delete(next);
+	}
+	fiber_set_txn(fiber(), NULL);
+	return 0;
+error:
+	return 1;
+}
+
+static void
+tx_process_begin(struct cmsg *m)
+{
+	struct iproto_msg *msg = tx_accept_msg(m);
+	struct obuf *out = msg->connection->tx.p_obuf;
+	struct stream *stream = msg->stream;
+
+	if (tx_check_schema(msg->header.schema_version))
+		goto error;
+
+	assert(stream != NULL);
+	if (stream->txn != NULL) {
+		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
+		goto error;
+	}
+	assert(stream->fiber == NULL);
+	stream->fiber = fiber_new("stream", tx_stream_worker);
+	if (stream->fiber == NULL)
+		goto error;
+	fiber_set_joinable(stream->fiber, true);
+	fiber_start(stream->fiber, stream, msg);
+	/**
+	 * Until stream->fiber yeild or finished it's work
+	 * we have never been here. Check if stream->fiber is
+	 * dead it's means something failes, join and reply error.
+	 * Otherwise it' is yeild until some requests comes, reply ok.
+	 */
+	if (fiber_is_dead(stream->fiber)) {
+		fiber_join(stream->fiber);
+		goto error;
+	}
+
+	iproto_reply_ok(out, msg->header.sync, ::schema_version);
+	iproto_wpos_create(&msg->wpos, out);
+	return;
+error:
+	tx_reply_error(msg);
+}
+
+static void
+tx_process_commit(struct cmsg *m)
+{
+	struct iproto_msg *msg = tx_accept_msg(m);
+	struct obuf *out = msg->connection->tx.p_obuf;
+	struct stream *stream = msg->stream;
+
+	if (tx_check_schema(msg->header.schema_version))
+		goto error;
+
+	assert(stream != NULL);
+	if (stream->txn == NULL)
+		goto ok;
+
+	if (box_txn_commit() != 0) {
+		stream->txn = in_txn();
+		goto error;
+	}
+
+	stream->txn = NULL;
+ok:
+	iproto_reply_ok(out, msg->header.sync, ::schema_version);
+	iproto_wpos_create(&msg->wpos, out);
+	return;
+error:
+	tx_reply_error(msg);
+}
+
+static void
+tx_process_rollback(struct cmsg *m)
+{
+	struct iproto_msg *msg = tx_accept_msg(m);
+	struct obuf *out = msg->connection->tx.p_obuf;
+	struct stream *stream = msg->stream;
+
+	if (tx_check_schema(msg->header.schema_version))
+		goto error;
+
+	assert(stream != NULL);
+	if (stream->txn == NULL)
+		goto ok;
+
+	if (box_txn_rollback() != 0)
+		goto error;
+
+	stream->txn = NULL;
+ok:
+	iproto_reply_ok(out, msg->header.sync, ::schema_version);
 	iproto_wpos_create(&msg->wpos, out);
 	return;
 error:
@@ -1670,6 +2191,7 @@ tx_process_misc(struct cmsg *m)
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct iproto_connection *con = msg->connection;
 	struct obuf *out = con->tx.p_obuf;
+
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
 
@@ -1851,7 +2373,81 @@ net_send_msg(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
+	uint32_t stream_id = msg->header.stream_id;
+	mh_int_t pos;
+	struct stream *stream;
 
+	if (stream_id == 0)
+		goto send_msg;
+
+	pos = mh_streams_find(con->streams, stream_id, 0);
+	assert(pos != mh_end(con->streams));
+	stream = *mh_streams_node(con->streams, pos);
+	rlist_del_entry(msg, in_pending_list);
+
+	if (msg->is_request_successed &&
+	    msg->header.type == IPROTO_TRANSACTION_BEGIN)
+		stream->state = IPROTO_STREAM_IN_TXN;
+	if ((msg->header.type == IPROTO_TRANSACTION_COMMIT ||
+	     msg->header.type == IPROTO_TRANSACTION_ROLLBACK) &&
+	     stream->txn == NULL)
+		stream->state = IPROTO_STREAM_NO_TXN;
+
+	if (rlist_empty(&stream->pending_list)) {
+		/*
+		 * If no more messages for the current stream
+		 * and no transaction started, then delete it.
+		 */
+		if (stream->state == IPROTO_STREAM_NO_TXN &&
+		    !stream->is_pending_closed) {
+			assert(stream->txn == NULL && stream->fiber == NULL);
+			mh_streams_remove(con->streams, (const struct stream **)
+					  &stream, 0);
+			iproto_stream_delete(stream);
+		}
+	} else {
+		unsigned n_requests = 0;
+		struct iproto_msg *next;
+
+		assert(!stream->is_pending_closed);
+		if (stream->state == IPROTO_STREAM_IN_TXN) {
+			while (!rlist_empty(&stream->pending_list)) {
+				next = rlist_first_entry(&stream->pending_list,
+							 struct iproto_msg,
+							 in_pending_list);
+				rlist_del_entry(next, in_pending_list);
+				struct iproto_thread *iproto_thread =
+					con->iproto_thread;
+				cmsg_init(&next->base,
+					  iproto_thread->process_in_txn_route);
+				cpipe_push_input(&con->iproto_thread->tx_pipe,
+						 &next->base);
+				n_requests++;
+				uint8_t type = next->header.type;
+				if (type == IPROTO_TRANSACTION_COMMIT ||
+				    type == IPROTO_TRANSACTION_ROLLBACK) {
+					stream->state =
+						IPROTO_STREAM_TXN_END_FOUND;
+					break;
+				}
+			}
+		} else if (stream->state == IPROTO_STREAM_NO_TXN) {
+			/*
+			 * If there are new messages for this stream
+			 * then schedule their processing.
+			 */
+			next = rlist_first_entry(&stream->pending_list,
+						 struct iproto_msg,
+						 in_pending_list);
+			cpipe_push_input(&con->iproto_thread->tx_pipe,
+					 &next->base);
+			n_requests++;
+		}
+		if (n_requests != 0)
+			cpipe_flush_input(&con->iproto_thread->tx_pipe);
+	}
+
+send_msg:
 	if (msg->len != 0) {
 		/* Discard request (see iproto_enqueue_batch()). */
 		msg->p_ibuf->rpos += msg->len;
@@ -1914,6 +2510,22 @@ net_end_subscribe(struct cmsg *m)
 	assert(! ev_is_active(&con->input));
 
 	iproto_connection_close(con);
+}
+
+static void
+net_process_rollback_on_disconnect(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	struct iproto_connection *con = msg->connection;
+
+	assert(msg == msg->stream->disconnect);
+	mh_streams_remove(con->streams, (const struct stream **)
+			  &msg->stream, 0);
+	iproto_stream_delete(msg->stream);
+	if (--con->active_txn_in_streams == 0) {
+		cpipe_push(&con->iproto_thread->tx_pipe, &con->disconnect_msg);
+		con->state = IPROTO_CONNECTION_CLOSED;
+	}
 }
 
 /**
@@ -2164,6 +2776,26 @@ iproto_session_push(struct session *session, struct port *port)
 static inline void
 iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 {
+	iproto_thread->rollback_on_disconnect_route[0] =
+		{ tx_process_rollback_on_disconnect, &iproto_thread->net_pipe };
+	iproto_thread->rollback_on_disconnect_route[1] =
+		{ net_process_rollback_on_disconnect, NULL };
+	iproto_thread->process_in_txn_route[0] =
+		{ tx_process_in_txn, &iproto_thread->net_pipe };
+	iproto_thread->process_in_txn_route[1] =
+		{ net_send_msg, NULL};
+	iproto_thread->begin_route[0] =
+		{ tx_process_begin, &iproto_thread->net_pipe };
+	iproto_thread->begin_route[1] =
+		{ net_send_msg, NULL };
+	iproto_thread->commit_route[0] =
+		{ tx_process_commit, &iproto_thread->net_pipe };
+	iproto_thread->commit_route[1] =
+		{ net_send_msg, NULL };
+	iproto_thread->rollback_route[0] =
+		{ tx_process_rollback, &iproto_thread->net_pipe };
+	iproto_thread->rollback_route[1] =
+		{ net_send_msg, NULL };
 	iproto_thread->destroy_route[0] =
 		{ tx_process_destroy, &iproto_thread->net_pipe };
 	iproto_thread->destroy_route[1] =
@@ -2227,6 +2859,9 @@ iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 	iproto_thread->dml_route[12] = NULL;
 	/* IPROTO_PREPARE */
 	iproto_thread->dml_route[13] = iproto_thread->sql_route;
+	iproto_thread->dml_route[14] = iproto_thread->begin_route;
+	iproto_thread->dml_route[15] = iproto_thread->commit_route;
+	iproto_thread->dml_route[16] = iproto_thread->rollback_route;
 	iproto_thread->connect_route[0] =
 		{ tx_process_connect, &iproto_thread->net_pipe };
 	iproto_thread->connect_route[1] = { net_send_greeting, NULL };

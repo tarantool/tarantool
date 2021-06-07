@@ -1,0 +1,940 @@
+-- test-run result file version 2
+env = require('test_run')
+ | ---
+ | ...
+net_box = require('net.box')
+ | ---
+ | ...
+test_run = env.new()
+ | ---
+ | ...
+
+test_run:cmd("create server test with script='box/gh-5860-implement-streams.lua'")
+ | ---
+ | - true
+ | ...
+
+-- Some simple checks for new object - stream
+test_run:cmd("start server test with args='1'")
+ | ---
+ | - true
+ | ...
+server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
+ | ---
+ | ...
+-- User can use automatically generated stream_id or sets it
+-- manually, not mix this.
+conn = net_box.connect(server_addr)
+ | ---
+ | ...
+stream = conn:stream()
+ | ---
+ | ...
+-- Error unable to mix user and automatically generated stream_id
+-- for one connection.
+_ = conn:stream(1)
+ | ---
+ | - error: 'builtin/box/net_box.lua:1159: You can use stream_id, which is generated
+ |     automatically, or set it manually, but do not mix these two options'
+ | ...
+conn:close()
+ | ---
+ | ...
+conn = net_box.connect(server_addr)
+ | ---
+ | ...
+stream = conn:stream(1)
+ | ---
+ | ...
+-- Error unable to mix user and automatically generated stream_id
+-- for one connection.
+_ = conn:stream()
+ | ---
+ | - error: 'builtin/box/net_box.lua:1159: You can use stream_id, which is generated
+ |     automatically, or set it manually, but do not mix these two options'
+ | ...
+conn:close()
+ | ---
+ | ...
+-- For different connections it's ok
+conn_1 = net_box.connect(server_addr)
+ | ---
+ | ...
+stream_1 = conn_1:stream(1)
+ | ---
+ | ...
+conn_2 = net_box.connect(server_addr)
+ | ---
+ | ...
+stream_2 = conn_2:stream()
+ | ---
+ | ...
+-- Stream is a wrapper around connection, so if you close connection
+-- you close stream, and vice versa.
+conn_1:close()
+ | ---
+ | ...
+assert(not stream_1:ping())
+ | ---
+ | - true
+ | ...
+stream_2:close()
+ | ---
+ | ...
+assert(not conn_2:ping())
+ | ---
+ | - true
+ | ...
+-- Simple checks for transactions
+conn_1 = net_box.connect(server_addr)
+ | ---
+ | ...
+conn_2 = net_box.connect(server_addr)
+ | ---
+ | ...
+stream_1_1 = conn_1:stream(1)
+ | ---
+ | ...
+stream_1_2 = conn_1:stream(2)
+ | ---
+ | ...
+-- It's ok to have streams with same id for different connections
+stream_2 = conn_2:stream(1)
+ | ---
+ | ...
+-- It's ok to commit or rollback without any active transaction
+stream_1_1:commit()
+ | ---
+ | - true
+ | ...
+stream_1_1:rollback()
+ | ---
+ | - true
+ | ...
+
+stream_1_1:begin()
+ | ---
+ | - true
+ | ...
+-- Error unable to start second transaction in one stream
+stream_1_1:begin()
+ | ---
+ | - false
+ | ...
+-- It's ok to start transaction in separate stream in one connection
+stream_1_2:begin()
+ | ---
+ | - true
+ | ...
+-- It's ok to start transaction in separate stream in other connection
+stream_2:begin()
+ | ---
+ | - true
+ | ...
+test_run:cmd("switch test")
+ | ---
+ | - true
+ | ...
+-- It's ok to start local transaction separately with active stream
+-- transactions
+box.begin()
+ | ---
+ | ...
+box.commit()
+ | ---
+ | ...
+test_run:cmd("switch default")
+ | ---
+ | - true
+ | ...
+stream_1_1:commit()
+ | ---
+ | - true
+ | ...
+stream_1_2:commit()
+ | ---
+ | - true
+ | ...
+stream_2:commit()
+ | ---
+ | - true
+ | ...
+
+-- Second argument (false is a value for memtx_use_mvcc_engine option)
+-- Server start without active transaction manager, so all transaction
+-- fails because of yeild!
+test_run:cmd("start server test with args='1, false'")
+ | ---
+ | - true
+ | ...
+server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
+ | ---
+ | ...
+
+test_run:cmd("switch test")
+ | ---
+ | - true
+ | ...
+s = box.schema.space.create('test', { engine = 'memtx' })
+ | ---
+ | ...
+_ = s:create_index('primary')
+ | ---
+ | ...
+-- function ping() return "pong" end //TODO
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+
+conn = net_box.connect(server_addr)
+ | ---
+ | ...
+assert(conn:ping())
+ | ---
+ | - true
+ | ...
+stream = conn:stream()
+ | ---
+ | ...
+-- Get stream id, it's used in replace/select/insert/upsert and other
+-- functions to specify stream_id for request.
+stream_id = stream:stream()
+ | ---
+ | ...
+space = conn.space.test
+ | ---
+ | ...
+
+-- Check syncronious stream txn requests for memtx
+-- with memtx_use_mvcc_engine = false
+stream:begin()
+ | ---
+ | - true
+ | ...
+space:replace({1}, { stream_id = stream_id } )
+ | ---
+ | - [1]
+ | ...
+-- Empty select, transaction was not commited and
+-- is not visible from requests not belonging to the
+-- transaction.
+space:select{}
+ | ---
+ | - []
+ | ...
+-- Select is empty, because memtx_use_mvcc_engine is false
+space:select( {}, { stream_id = stream_id })
+ | ---
+ | - []
+ | ...
+test_run:cmd("switch test")
+ | ---
+ | - true
+ | ...
+-- Select is empty, transaction was not commited
+s:select()
+ | ---
+ | - []
+ | ...
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+-- Commit fails, transaction yeild with memtx_use_mvcc_engine = false
+stream:commit()
+ | ---
+ | - false
+ | ...
+-- Select is empty, transaction was aborted
+space:select{}
+ | ---
+ | - []
+ | ...
+-- Check that after failed transaction commit we able to start next
+-- transaction (it's strange check, but it's necessary because it was
+-- bug with it)
+stream:begin()
+ | ---
+ | - true
+ | ...
+stream:ping()
+ | ---
+ | - true
+ | ...
+-- stream:call('ping') -- TODO
+stream:commit()
+ | ---
+ | - true
+ | ...
+test_run:cmd('switch test')
+ | ---
+ | - true
+ | ...
+s:drop()
+ | ---
+ | ...
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+test_run:cmd("stop server test")
+ | ---
+ | - true
+ | ...
+
+-- Next we check transactions only for memtx with
+-- memtx_use_mvcc_engine = true and for vinyl, because
+-- if memtx_use_mvcc_engine = false all transactions fails,
+-- as we can see before!
+
+-- Second argument (true is a value for memtx_use_mvcc_engine option)
+-- Same test case as previous but server start with active transaction
+-- manager. Also check vinyl, because it's behaviour is same.
+test_run:cmd("start server test with args='1, true'")
+ | ---
+ | - true
+ | ...
+server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
+ | ---
+ | ...
+
+test_run:cmd("switch test")
+ | ---
+ | - true
+ | ...
+s1 = box.schema.space.create('test_1', { engine = 'memtx' })
+ | ---
+ | ...
+s2 = box.schema.space.create('test_2', { engine = 'vinyl' })
+ | ---
+ | ...
+_ = s1:create_index('primary')
+ | ---
+ | ...
+_ = s2:create_index('primary')
+ | ---
+ | ...
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+
+conn = net_box.connect(server_addr)
+ | ---
+ | ...
+assert(conn:ping())
+ | ---
+ | - true
+ | ...
+stream_1 = conn:stream()
+ | ---
+ | ...
+stream_id1 = stream_1:stream()
+ | ---
+ | ...
+stream_2 = conn:stream()
+ | ---
+ | ...
+stream_id2 = stream_2:stream()
+ | ---
+ | ...
+space_1 = conn.space.test_1
+ | ---
+ | ...
+space_2 = conn.space.test_2
+ | ---
+ | ...
+-- Check syncronious stream txn requests for memtx
+-- with memtx_use_mvcc_engine = true and to vinyl:
+-- behaviour is same!
+stream_1:begin()
+ | ---
+ | - true
+ | ...
+space_1:replace({1}, { stream_id = stream_id1 } )
+ | ---
+ | - [1]
+ | ...
+stream_2:begin()
+ | ---
+ | - true
+ | ...
+space_2:replace({1}, { stream_id = stream_id2 } )
+ | ---
+ | - [1]
+ | ...
+-- Empty select, transaction was not commited and
+-- is not visible from requests not belonging to the
+-- transaction.
+space_1:select{}
+ | ---
+ | - []
+ | ...
+space_2:select{}
+ | ---
+ | - []
+ | ...
+-- Select return tuple, which was previously inserted,
+-- because this select belongs to transaction.
+space_1:select( {}, { stream_id = stream_id1 })
+ | ---
+ | - - [1]
+ | ...
+space_2:select( {}, { stream_id = stream_id2 })
+ | ---
+ | - - [1]
+ | ...
+test_run:cmd("switch test")
+ | ---
+ | - true
+ | ...
+-- Select is empty, transaction was not commited
+s1:select()
+ | ---
+ | - []
+ | ...
+s2:select()
+ | ---
+ | - []
+ | ...
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+-- Commit was successful, transaction can yeild with
+-- memtx_use_mvcc_engine = true. Vinyl transactions
+-- can yeild also.
+stream_1:commit()
+ | ---
+ | - true
+ | ...
+stream_2:commit()
+ | ---
+ | - true
+ | ...
+-- Select return tuple, which was previously inserted,
+-- because transaction was successful
+space_1:select{}
+ | ---
+ | - - [1]
+ | ...
+space_2:select{}
+ | ---
+ | - - [1]
+ | ...
+test_run:cmd("switch test")
+ | ---
+ | - true
+ | ...
+-- Select return tuple, which was previously inserted,
+-- because transaction was successful
+s1:select()
+ | ---
+ | - - [1]
+ | ...
+s2:select()
+ | ---
+ | - - [1]
+ | ...
+test_run:cmd('switch test')
+ | ---
+ | - true
+ | ...
+s1:drop()
+ | ---
+ | ...
+s2:drop()
+ | ---
+ | ...
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+test_run:cmd("stop server test")
+ | ---
+ | - true
+ | ...
+
+-- Check conflict resolution in stream transactions,
+test_run:cmd("start server test with args='1, true'")
+ | ---
+ | - true
+ | ...
+server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
+ | ---
+ | ...
+
+test_run:cmd("switch test")
+ | ---
+ | - true
+ | ...
+s1 = box.schema.space.create('test_1', { engine = 'memtx' })
+ | ---
+ | ...
+_ = s1:create_index('primary')
+ | ---
+ | ...
+s2 = box.schema.space.create('test_2', { engine = 'vinyl' })
+ | ---
+ | ...
+_ = s2:create_index('primary')
+ | ---
+ | ...
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+
+conn = net_box.connect(server_addr)
+ | ---
+ | ...
+space_1 = conn.space.test_1
+ | ---
+ | ...
+space_2 = conn.space.test_2
+ | ---
+ | ...
+stream_1 = conn:stream()
+ | ---
+ | ...
+stream_id1 = stream_1:stream()
+ | ---
+ | ...
+stream_2 = conn:stream()
+ | ---
+ | ...
+stream_id2 = stream_2:stream()
+ | ---
+ | ...
+stream_1:begin()
+ | ---
+ | - true
+ | ...
+stream_2:begin()
+ | ---
+ | - true
+ | ...
+
+-- Simple read/write conflict.
+space_1:select({1}, { stream_id = stream_id1 } )
+ | ---
+ | - []
+ | ...
+space_1:select({1}, { stream_id = stream_id2 })
+ | ---
+ | - []
+ | ...
+space_1:replace({1, 1}, { stream_id = stream_id1 } )
+ | ---
+ | - [1, 1]
+ | ...
+space_1:replace({1, 2}, { stream_id = stream_id2 })
+ | ---
+ | - [1, 2]
+ | ...
+stream_1:commit()
+ | ---
+ | - true
+ | ...
+-- This transaction fails, because of conflict
+stream_2:commit()
+ | ---
+ | - false
+ | ...
+-- Here we must accept [1, 1]
+space_1:select({}, { stream_id = stream_id1 } )
+ | ---
+ | - - [1, 1]
+ | ...
+
+-- Same test for vinyl sapce
+stream_1:begin()
+ | ---
+ | - true
+ | ...
+stream_2:begin()
+ | ---
+ | - true
+ | ...
+space_2:select({1}, { stream_id = stream_id1 } )
+ | ---
+ | - []
+ | ...
+space_2:select({1}, { stream_id = stream_id2 })
+ | ---
+ | - []
+ | ...
+space_2:replace({1, 1}, { stream_id = stream_id1 } )
+ | ---
+ | - [1, 1]
+ | ...
+space_2:replace({1, 2}, { stream_id = stream_id2 })
+ | ---
+ | - [1, 2]
+ | ...
+stream_1:commit()
+ | ---
+ | - true
+ | ...
+-- This transaction fails, because of conflict
+stream_2:commit()
+ | ---
+ | - false
+ | ...
+-- Here we must accept [1, 1]
+space_2:select({}, { stream_id = stream_id1 } )
+ | ---
+ | - - [1, 1]
+ | ...
+test_run:cmd('switch test')
+ | ---
+ | - true
+ | ...
+-- Both select return tuple [1, 1], transaction commited
+s1:select()
+ | ---
+ | - - [1, 1]
+ | ...
+s2:select()
+ | ---
+ | - - [1, 1]
+ | ...
+s1:drop()
+ | ---
+ | ...
+s2:drop()
+ | ---
+ | ...
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+test_run:cmd("stop server test")
+ | ---
+ | - true
+ | ...
+
+-- Check rollback as a command for memtx and vinyl spaces
+test_run:cmd("start server test with args='1, true'")
+ | ---
+ | - true
+ | ...
+server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
+ | ---
+ | ...
+
+test_run:cmd("switch test")
+ | ---
+ | - true
+ | ...
+s1 = box.schema.space.create('test_1', { engine = 'memtx' })
+ | ---
+ | ...
+_ = s1:create_index('primary')
+ | ---
+ | ...
+s2 = box.schema.space.create('test_2', { engine = 'vinyl' })
+ | ---
+ | ...
+_ = s2:create_index('primary')
+ | ---
+ | ...
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+
+conn = net_box.connect(server_addr)
+ | ---
+ | ...
+space_1 = conn.space.test_1
+ | ---
+ | ...
+space_2 = conn.space.test_2
+ | ---
+ | ...
+stream_1 = conn:stream()
+ | ---
+ | ...
+stream_id1 = stream_1:stream()
+ | ---
+ | ...
+stream_2 = conn:stream()
+ | ---
+ | ...
+stream_id2 = stream_2:stream()
+ | ---
+ | ...
+stream_1:begin()
+ | ---
+ | - true
+ | ...
+stream_2:begin()
+ | ---
+ | - true
+ | ...
+
+-- Test rollback for memtx space
+space_1:replace({1}, { stream_id = stream_id1 } )
+ | ---
+ | - [1]
+ | ...
+-- Select return tuple, which was previously inserted,
+-- because this select belongs to transaction.
+space_1:select({}, { stream_id = stream_id1 } )
+ | ---
+ | - - [1]
+ | ...
+stream_1:rollback()
+ | ---
+ | - true
+ | ...
+-- Select is empty, transaction rollback
+space_1:select({}, { stream_id = stream_id1 } )
+ | ---
+ | - []
+ | ...
+
+-- Test rollback for vinyl space
+space_2:replace({1}, { stream_id = stream_id2 } )
+ | ---
+ | - [1]
+ | ...
+-- Select return tuple, which was previously inserted,
+-- because this select belongs to transaction.
+space_2:select({}, { stream_id = stream_id2 } )
+ | ---
+ | - - [1]
+ | ...
+stream_2:rollback()
+ | ---
+ | - true
+ | ...
+-- Select is empty, transaction rollback
+space_2:select({}, { stream_id = stream_id2 } )
+ | ---
+ | - []
+ | ...
+
+-- This is simple test is necessary because i have a bug
+-- with halting stream after rollback
+stream_1:begin()
+ | ---
+ | - true
+ | ...
+stream_1:commit()
+ | ---
+ | - true
+ | ...
+stream_2:begin()
+ | ---
+ | - true
+ | ...
+stream_2:commit()
+ | ---
+ | - true
+ | ...
+conn:close()
+ | ---
+ | ...
+
+test_run:cmd('switch test')
+ | ---
+ | - true
+ | ...
+-- Both select are empty, because transaction rollback
+s1:select()
+ | ---
+ | - []
+ | ...
+s2:select()
+ | ---
+ | - []
+ | ...
+s1:drop()
+ | ---
+ | ...
+s2:drop()
+ | ---
+ | ...
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+test_run:cmd("stop server test")
+ | ---
+ | - true
+ | ...
+
+-- Check rollback on disconnect
+test_run:cmd("start server test with args='1, true'")
+ | ---
+ | - true
+ | ...
+server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
+ | ---
+ | ...
+
+test_run:cmd("switch test")
+ | ---
+ | - true
+ | ...
+s1 = box.schema.space.create('test_1', { engine = 'memtx' })
+ | ---
+ | ...
+_ = s1:create_index('primary')
+ | ---
+ | ...
+s2 = box.schema.space.create('test_2', { engine = 'vinyl' })
+ | ---
+ | ...
+_ = s2:create_index('primary')
+ | ---
+ | ...
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+
+conn = net_box.connect(server_addr)
+ | ---
+ | ...
+space_1 = conn.space.test_1
+ | ---
+ | ...
+space_2 = conn.space.test_2
+ | ---
+ | ...
+stream_1 = conn:stream(1)
+ | ---
+ | ...
+stream_id1 = stream_1:stream()
+ | ---
+ | ...
+stream_2 = conn:stream(2)
+ | ---
+ | ...
+stream_id2 = stream_2:stream()
+ | ---
+ | ...
+stream_1:begin()
+ | ---
+ | - true
+ | ...
+stream_2:begin()
+ | ---
+ | - true
+ | ...
+
+space_1:replace({1}, { stream_id = stream_id1 } )
+ | ---
+ | - [1]
+ | ...
+space_1:replace({2}, { stream_id = stream_id1 } )
+ | ---
+ | - [2]
+ | ...
+-- Select return two previously inserted tuples
+space_1:select({}, { stream_id = stream_id1 } )
+ | ---
+ | - - [1]
+ |   - [2]
+ | ...
+
+space_2:replace({1}, { stream_id = stream_id2 } )
+ | ---
+ | - [1]
+ | ...
+space_2:replace({2}, { stream_id = stream_id2 } )
+ | ---
+ | - [2]
+ | ...
+-- Select return two previously inserted tuples
+space_2:select({}, { stream_id = stream_id2 } )
+ | ---
+ | - - [1]
+ |   - [2]
+ | ...
+conn:close()
+ | ---
+ | ...
+
+-- Reconnect
+conn = net_box.connect(server_addr)
+ | ---
+ | ...
+space_1 = conn.space.test_1
+ | ---
+ | ...
+space_2 = conn.space.test_2
+ | ---
+ | ...
+stream_1 = conn:stream(1)
+ | ---
+ | ...
+stream_id1 = stream_1:stream()
+ | ---
+ | ...
+stream_2 = conn:stream(2)
+ | ---
+ | ...
+stream_id2 = stream_2:stream()
+ | ---
+ | ...
+-- We can begin new transactions with same stream_id, because
+-- previous one was rollbacked and destroyed.
+stream_1:begin()
+ | ---
+ | - true
+ | ...
+stream_2:begin()
+ | ---
+ | - true
+ | ...
+-- Two empty selects
+space_1:select({}, { stream_id = stream_id1 } )
+ | ---
+ | - []
+ | ...
+space_2:select({}, { stream_id = stream_id2 } )
+ | ---
+ | - []
+ | ...
+stream_1:commit()
+ | ---
+ | - true
+ | ...
+stream_2:commit()
+ | ---
+ | - true
+ | ...
+
+test_run:cmd('switch test')
+ | ---
+ | - true
+ | ...
+-- Both select are empty, because transaction rollback
+s1:select()
+ | ---
+ | - []
+ | ...
+s2:select()
+ | ---
+ | - []
+ | ...
+s1:drop()
+ | ---
+ | ...
+s2:drop()
+ | ---
+ | ...
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+test_run:cmd("stop server test")
+ | ---
+ | - true
+ | ...
+

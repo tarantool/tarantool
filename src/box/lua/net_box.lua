@@ -115,6 +115,9 @@ local method_encoder = {
     min     = internal.encode_select,
     max     = internal.encode_select,
     count   = internal.encode_call,
+    begin   = internal.encode_begin,
+    commit  = internal.encode_commit,
+    rollback = internal.encode_rollback,
     -- inject raw data into connection, used by console and tests
     inject = function(buf, id, bytes) -- luacheck: no unused args
         local ptr = buf:reserve(#bytes)
@@ -143,6 +146,9 @@ local method_decoder = {
     count   = decode_count,
     inject  = decode_data,
     push    = decode_push,
+    begin   = decode_nil,
+    commit  = decode_nil,
+    rollback = decode_nil,
 }
 
 local function decode_error(raw_data)
@@ -1165,6 +1171,18 @@ function remote_methods:stream(stream_id)
     function stream:stream()
         check_remote_arg(self, 'stream')
         return self._stream_id
+    end
+    function stream:begin(opts)
+        check_remote_arg(self, 'begin')
+        return (pcall(self._request, self, 'begin', opts, nil, self._stream_id))
+    end
+    function stream:commit(opts)
+        check_remote_arg(self, 'commit')
+        return (pcall(self._request, self, 'commit', opts, nil, self._stream_id))
+    end
+    function stream:rollback(opts)
+        check_remote_arg(self, 'rollback')
+        return (pcall(self._request, self, 'rollback', opts, nil, self._stream_id))
     end
     self._streams[stream_id] = stream
     return stream
