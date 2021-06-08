@@ -413,9 +413,10 @@ static int min_token_idx = 0;
  * Raise an exception when the maximal number of users
  * is reached (and we're out of tokens).
  */
-uint8_t
-auth_token_get(void)
+int
+auth_token_get(uint8_t *auth)
 {
+	assert(auth != NULL);
 	uint8_t bit_no = 0;
 	while (min_token_idx < USER_MAP_SIZE) {
                 bit_no = __builtin_ffs(tokens[min_token_idx]);
@@ -428,7 +429,8 @@ auth_token_get(void)
 		 * Check for BOX_USER_MAX to cover case when
 		 * USER_MAP_BITS > BOX_USER_MAX.
 		 */
-		tnt_raise(LoggedError, ER_USER_MAX, BOX_USER_MAX);
+		diag_set(ClientError, ER_USER_MAX, BOX_USER_MAX);
+		return -1;
 	}
         /*
          * find-first-set returns bit index starting from 1,
@@ -436,9 +438,9 @@ auth_token_get(void)
          */
 	bit_no--;
 	tokens[min_token_idx] ^= ((umap_int_t) 1) << bit_no;
-	int auth_token = min_token_idx * UMAP_INT_BITS + bit_no;
-	assert(auth_token < UINT8_MAX);
-	return auth_token;
+	assert((min_token_idx * UMAP_INT_BITS + bit_no) < UINT8_MAX);
+	*auth = min_token_idx * UMAP_INT_BITS + bit_no;
+	return 0;
 }
 
 /**
@@ -464,7 +466,9 @@ user_cache_replace(struct user_def *def)
 {
 	struct user *user = user_by_id(def->uid);
 	if (user == NULL) {
-		uint8_t auth_token = auth_token_get();
+		uint8_t auth_token = 0;
+		if (auth_token_get(&auth_token) != 0)
+			return NULL;
 		user = users + auth_token;
 		user_create(user, auth_token);
 		struct mh_i32ptr_node_t node = { def->uid, user };
@@ -560,14 +564,12 @@ user_cache_init(void)
 	struct user_def *def = (struct user_def *) calloc(1, sz);
 	if (def == NULL)
 		tnt_raise(OutOfMemory, sz, "malloc", "def");
-	/* Free def in a case of exception. */
-	auto guest_def_guard = make_scoped_guard([=] { free(def); });
 	memcpy(def->name, "guest", name_len);
 	def->owner = ADMIN;
 	def->type = SC_USER;
 	struct user *user = user_cache_replace(def);
-	/* Now the user cache owns the def. */
-	guest_def_guard.is_active = false;
+	if (user == NULL)
+		diag_raise();
 	/* 0 is the auth token and user id by default. */
 	assert(user->def->uid == GUEST && user->auth_token == GUEST);
 	(void) user;
@@ -577,12 +579,12 @@ user_cache_init(void)
 	def = (struct user_def *) calloc(1, sz);
 	if (def == NULL)
 		tnt_raise(OutOfMemory, sz, "malloc", "def");
-	auto admin_def_guard = make_scoped_guard([=] { free(def); });
 	memcpy(def->name, "admin", name_len);
 	def->uid = def->owner = ADMIN;
 	def->type = SC_USER;
 	user = user_cache_replace(def);
-	admin_def_guard.is_active = false;
+	if (user == NULL)
+		diag_raise();
 	/*
 	 * For performance reasons, we do not always explicitly
 	 * look at user id in access checks, while still need to

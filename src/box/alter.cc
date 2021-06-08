@@ -3107,14 +3107,10 @@ user_cache_alter_user(struct trigger *trigger, void * /* event */)
 	struct user_def *user = user_def_new_from_tuple(tuple);
 	if (user == NULL)
 		return -1;
-	auto def_guard = make_scoped_guard([=] { free(user); });
-	/* Can throw if, e.g. too many users. */
-	try {
-		user_cache_replace(user);
-	} catch (Exception *e) {
+	if (user_cache_replace(user) == NULL) {
+		free(user);
 		return -1;
 	}
-	def_guard.is_active = false;
 	return 0;
 }
 
@@ -3141,13 +3137,10 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		if (access_check_ddl(user->name, user->uid, user->owner, user->type,
 				 PRIV_C) != 0)
 			return -1;
-		auto def_guard = make_scoped_guard([=] { free(user); });
-		try {
-			(void) user_cache_replace(user);
-		} catch (Exception *e) {
+		if (user_cache_replace(user) == NULL) {
+			free(user);
 			return -1;
 		}
-		def_guard.is_active = false;
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(user_cache_remove_user, new_tuple);
 		if (on_rollback == NULL)
@@ -3195,15 +3188,14 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		if (user == NULL)
 			return -1;
 		if (access_check_ddl(user->name, user->uid, user->uid,
-				 old_user->def->type, PRIV_A) != 0)
-			return -1;
-		auto def_guard = make_scoped_guard([=] { free(user); });
-		try {
-			user_cache_replace(user);
-		} catch (Exception *e) {
+				 old_user->def->type, PRIV_A) != 0) {
+			free(user);
 			return -1;
 		}
-		def_guard.is_active = false;
+		if (user_cache_replace(user) == NULL) {
+			free(user);
+			return -1;
+		}
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(user_cache_alter_user, old_tuple);
 		if (on_rollback == NULL)
