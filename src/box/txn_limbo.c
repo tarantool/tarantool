@@ -335,21 +335,25 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 	journal_entry_create(entry, 1, xrow_approx_len(&row),
 			     journal_entry_fiber_wakeup_cb, fiber());
 
-	if (journal_write(entry) != 0 || entry->res < 0) {
+	if (journal_write(entry) != 0)
+		goto fail;
+	if (entry->res < 0) {
 		diag_set(ClientError, ER_WAL_IO);
-		diag_log();
-		/*
-		 * XXX: the stub is supposed to be removed once it is defined
-		 * what to do when a synchro request WAL write fails. One of
-		 * the possible solutions: log the error, keep the limbo
-		 * queue as is and probably put in rollback mode. Then
-		 * provide a hook to call manually when WAL problems are fixed.
-		 * Or retry automatically with some period.
-		 */
-		panic("Could not write a synchro request to WAL: "
-		      "lsn = %lld, type = %s\n", (long long)lsn,
-		      iproto_type_name(type));
+		goto fail;
 	}
+	return;
+fail:
+	diag_log();
+	/*
+	 * XXX: the stub is supposed to be removed once it is defined what to do
+	 * when a synchro request WAL write fails. One of the possible
+	 * solutions: log the error, keep the limbo queue as is and probably put
+	 * in rollback mode. Then provide a hook to call manually when WAL
+	 * problems are fixed. Or retry automatically with some period.
+	 */
+	panic("Could not write a synchro request to WAL: lsn = %lld, "
+	      "type = %s\n", (long long)lsn, iproto_type_name(type));
+
 }
 
 /**
