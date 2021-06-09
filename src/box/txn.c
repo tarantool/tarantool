@@ -276,7 +276,7 @@ txn_begin(void)
 	txn->psn = 0;
 	txn->rv_psn = 0;
 	txn->status = TXN_INPROGRESS;
-	txn->signature = TXN_SIGNATURE_ROLLBACK;
+	txn->signature = TXN_SIGNATURE_UNKNOWN;
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
 	txn->fk_deferred_count = 0;
@@ -479,6 +479,7 @@ txn_complete_fail(struct txn *txn)
 {
 	assert(!txn_has_flag(txn, TXN_IS_DONE));
 	assert(txn->signature < 0);
+	assert(txn->signature != TXN_SIGNATURE_UNKNOWN);
 	txn->status = TXN_ABORTED;
 	struct txn_stmt *stmt;
 	stailq_reverse(&txn->stmts);
@@ -535,7 +536,8 @@ txn_on_journal_write(struct journal_entry *entry)
 	 * txn_limbo has already rolled the tx back, so we just
 	 * have to free it.
 	 */
-	if (txn->signature < TXN_SIGNATURE_ROLLBACK) {
+	if (txn->signature != TXN_SIGNATURE_UNKNOWN) {
+		assert(txn->signature < 0);
 		txn_free(txn);
 		return;
 	}

@@ -78,7 +78,8 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 	 * needs that to be able rollback transactions, whose WAL write is in
 	 * progress.
 	 */
-	assert(txn->signature < 0);
+	assert(txn->signature == TXN_SIGNATURE_UNKNOWN);
+	assert(txn->status == TXN_PREPARED);
 	if (limbo->is_in_rollback) {
 		/*
 		 * Cascading rollback. It is impossible to commit the
@@ -391,7 +392,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			 */
 			if (e->lsn == -1)
 				break;
-		} else if (e->txn->signature < 0) {
+		} else if (e->txn->signature == TXN_SIGNATURE_UNKNOWN) {
 			/*
 			 * A transaction might be covered by the CONFIRM even if
 			 * it is not written to WAL yet when it is an async

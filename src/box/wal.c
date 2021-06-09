@@ -1165,7 +1165,7 @@ done:
 	if (!stailq_empty(&rollback)) {
 		/* Update status of the successfully committed requests. */
 		stailq_foreach_entry(entry, &rollback, fifo)
-			entry->res = -1;
+			entry->res = JOURNAL_ENTRY_ERR_IO;
 		/* Rollback unprocessed requests */
 		stailq_concat(&wal_msg->rollback, &rollback);
 		wal_begin_rollback();
@@ -1289,7 +1289,7 @@ wal_write_async(struct journal *journal, struct journal_entry *entry)
 	return 0;
 
 fail:
-	entry->res = -1;
+	assert(entry->res == JOURNAL_ENTRY_ERR_UNKNOWN);
 	return -1;
 }
 
