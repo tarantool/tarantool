@@ -45,6 +45,7 @@ struct journal_queue journal_queue = {
 void
 diag_set_journal_res_detailed(const char *file, unsigned line, int64_t res)
 {
+	assert(res < 0 && res != JOURNAL_ENTRY_ERR_UNKNOWN);
 	(void)res;
 	diag_set_detailed(file, line, ClientError, ER_WAL_IO);
 }

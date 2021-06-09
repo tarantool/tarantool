@@ -44,6 +44,19 @@ struct journal_entry;
 
 typedef void (*journal_write_async_f)(struct journal_entry *entry);
 
+enum {
+	/** Entry didn't attempt a journal write. */
+	JOURNAL_ENTRY_ERR_UNKNOWN = -1,
+	/** Tried to be written, but something happened related to IO. */
+	JOURNAL_ENTRY_ERR_IO = -2,
+	/**
+	 * Anchor for the structs built on top of journal entry so as they
+	 * could introduce their own unique errors. Set to a big value in
+	 * advance.
+	 */
+	JOURNAL_ENTRY_ERR_MIN = -100,
+};
+
 /**
  * Convert a result of a journal entry write to an error installed into the
  * current diag.
@@ -108,7 +121,7 @@ journal_entry_create(struct journal_entry *entry, size_t n_rows,
 	entry->complete_data	= complete_data;
 	entry->approx_len	= approx_len;
 	entry->n_rows		= n_rows;
-	entry->res		= -1;
+	entry->res		= JOURNAL_ENTRY_ERR_UNKNOWN;
 	entry->flags		= 0;
 }
 
