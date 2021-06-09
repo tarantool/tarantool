@@ -251,7 +251,22 @@ txn_free(struct txn *txn)
 void
 diag_set_txn_sign_detailed(const char *file, unsigned line, int64_t signature)
 {
-	return diag_set_journal_res_detailed(file, line, signature);
+	if (signature >= JOURNAL_ENTRY_ERR_MIN)
+		return diag_set_journal_res_detailed(file, line, signature);
+	switch(signature) {
+	case TXN_SIGNATURE_ROLLBACK:
+		diag_set_detailed(file, line, ClientError, ER_TXN_ROLLBACK);
+		return;
+	case TXN_SIGNATURE_QUORUM_TIMEOUT:
+		diag_set_detailed(file, line, ClientError,
+				  ER_SYNC_QUORUM_TIMEOUT);
+		return;
+	case TXN_SIGNATURE_SYNC_ROLLBACK:
+		diag_set_detailed(file, line, ClientError, ER_SYNC_ROLLBACK);
+		return;
+	}
+	panic("Transaction signature %lld can't be converted to an error "
+	      "at %s:%u", (long long)signature, file, line);
 }
 
 struct txn *
