@@ -772,7 +772,7 @@ txn_limbo_on_rollback(struct trigger *trig, void *event)
 	(void) event;
 	struct txn *txn = (struct txn *) event;
 	/* Check whether limbo has performed the cleanup. */
-	if (txn->signature != TXN_SIGNATURE_ROLLBACK)
+	if (!txn_has_flag(txn, TXN_WAIT_SYNC))
 		return 0;
 	struct txn_limbo_entry *entry = (struct txn_limbo_entry *) trig->data;
 	txn_limbo_abort(&txn_limbo, entry);
