@@ -347,16 +347,19 @@ struct error *
 BuildSocketError(const char *file, unsigned line, const char *socketname,
 		 const char *format, ...);
 
-#define diag_set(class, ...) do {					\
+#define diag_set_detailed(file, line, class, ...) do {			\
 	/* Preserve the original errno. */                              \
 	int save_errno = errno;                                         \
-	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
+	say_debug("%s at %s:%i", #class, file, line);			\
 	struct error *e;						\
-	e = Build##class(__FILE__, __LINE__, ##__VA_ARGS__);		\
+	e = Build##class(file, line, ##__VA_ARGS__);			\
 	diag_set_error(diag_get(), e);					\
 	/* Restore the errno which might have been reset.  */           \
 	errno = save_errno;                                             \
 } while (0)
+
+#define diag_set(...)							\
+	diag_set_detailed(__FILE__, __LINE__, __VA_ARGS__)
 
 #define diag_add(class, ...) do {					\
 	int save_errno = errno;						\
