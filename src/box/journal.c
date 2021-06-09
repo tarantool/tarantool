@@ -49,6 +49,9 @@ diag_set_journal_res_detailed(const char *file, unsigned line, int64_t res)
 	case JOURNAL_ENTRY_ERR_IO:
 		diag_set_detailed(file, line, ClientError, ER_WAL_IO);
 		return;
+	case JOURNAL_ENTRY_ERR_CASCADE:
+		diag_set_detailed(file, line, ClientError, ER_CASCADE_ROLLBACK);
+		return;
 	}
 	panic("Journal result code %lld can't be converted to an error "
 	      "at %s:%u", (long long)res, file, line);

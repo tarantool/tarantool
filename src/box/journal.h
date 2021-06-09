@@ -50,6 +50,11 @@ enum {
 	/** Tried to be written, but something happened related to IO. */
 	JOURNAL_ENTRY_ERR_IO = -2,
 	/**
+	 * Rollback because there is a not finished rollback of a previous
+	 * entry.
+	 */
+	JOURNAL_ENTRY_ERR_CASCADE = -3,
+	/**
 	 * Anchor for the structs built on top of journal entry so as they
 	 * could introduce their own unique errors. Set to a big value in
 	 * advance.
