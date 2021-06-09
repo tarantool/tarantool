@@ -1036,6 +1036,7 @@ wal_write_to_disk(struct cmsg *msg)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	struct wal_msg *wal_msg = (struct wal_msg *) msg;
+	int err_code = JOURNAL_ENTRY_ERR_UNKNOWN;
 	struct stailq_entry *last_committed = NULL;
 	struct journal_entry *entry;
 	struct error *error;
@@ -1060,16 +1061,19 @@ wal_write_to_disk(struct cmsg *msg)
 
 	if (writer->is_in_rollback) {
 		/* We're rolling back a failed write. */
+		err_code = JOURNAL_ENTRY_ERR_CASCADE;
 		goto done;
 	}
 
 	/* Xlog is only rotated between queue processing  */
 	if (wal_opt_rotate(writer) != 0) {
+		err_code = JOURNAL_ENTRY_ERR_IO;
 		goto done;
 	}
 
 	/* Ensure there's enough disk space before writing anything. */
 	if (wal_fallocate(writer, wal_msg->approx_len) != 0) {
+		err_code = JOURNAL_ENTRY_ERR_IO;
 		goto done;
 	}
 
@@ -1105,8 +1109,10 @@ wal_write_to_disk(struct cmsg *msg)
 		entry->res = vclock_sum(&vclock_diff) +
 			     vclock_sum(&writer->vclock);
 		rc = xlog_write_entry(l, entry);
-		if (rc < 0)
+		if (rc < 0) {
+			err_code = JOURNAL_ENTRY_ERR_IO;
 			goto done;
+		}
 		if (rc > 0) {
 			writer->checkpoint_wal_size += rc;
 			last_committed = &entry->fifo;
@@ -1115,8 +1121,10 @@ wal_write_to_disk(struct cmsg *msg)
 		/* rc == 0: the write is buffered in xlog_tx */
 	}
 	rc = xlog_flush(l);
-	if (rc < 0)
+	if (rc < 0) {
+		err_code= JOURNAL_ENTRY_ERR_IO;
 		goto done;
+	}
 
 	writer->checkpoint_wal_size += rc;
 	last_committed = stailq_last(&wal_msg->commit);
@@ -1168,12 +1176,15 @@ done:
 	stailq_cut_tail(&wal_msg->commit, last_committed, &rollback);
 
 	if (!stailq_empty(&rollback)) {
+		assert(err_code != JOURNAL_ENTRY_ERR_UNKNOWN);
 		/* Update status of the successfully committed requests. */
 		stailq_foreach_entry(entry, &rollback, fifo)
-			entry->res = JOURNAL_ENTRY_ERR_IO;
+			entry->res = err_code;
 		/* Rollback unprocessed requests */
 		stailq_concat(&wal_msg->rollback, &rollback);
 		wal_begin_rollback();
+	} else {
+		assert(err_code == JOURNAL_ENTRY_ERR_UNKNOWN);
 	}
 	fiber_gc();
 	wal_notify_watchers(writer, WAL_EVENT_WRITE);
