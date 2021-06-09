@@ -859,10 +859,8 @@ wal_opt_rotate(struct wal_writer *writer)
 		return 0;
 
 	if (xdir_create_xlog(&writer->wal_dir, &writer->current_wal,
-			     &writer->vclock) != 0) {
-		diag_log();
+			     &writer->vclock) != 0)
 		return -1;
-	}
 	/*
 	 * Keep track of the new WAL vclock. Required for garbage
 	 * collection, see wal_collect_garbage().
@@ -1033,7 +1031,11 @@ wal_write_to_disk(struct cmsg *msg)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	struct wal_msg *wal_msg = (struct wal_msg *) msg;
+	struct stailq_entry *last_committed = NULL;
+	struct journal_entry *entry;
 	struct error *error;
+	if (stailq_empty(&wal_msg->commit))
+		panic("Attempted to write an empty batch to WAL");
 
 	/*
 	 * Track all vclock changes made by this batch into
@@ -1053,23 +1055,17 @@ wal_write_to_disk(struct cmsg *msg)
 
 	if (writer->is_in_rollback) {
 		/* We're rolling back a failed write. */
-		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
-		vclock_copy(&wal_msg->vclock, &writer->vclock);
-		return;
+		goto done;
 	}
 
 	/* Xlog is only rotated between queue processing  */
 	if (wal_opt_rotate(writer) != 0) {
-		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
-		vclock_copy(&wal_msg->vclock, &writer->vclock);
-		return wal_begin_rollback();
+		goto done;
 	}
 
 	/* Ensure there's enough disk space before writing anything. */
 	if (wal_fallocate(writer, wal_msg->approx_len) != 0) {
-		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
-		vclock_copy(&wal_msg->vclock, &writer->vclock);
-		return wal_begin_rollback();
+		goto done;
 	}
 
 	/*
@@ -1099,8 +1095,6 @@ wal_write_to_disk(struct cmsg *msg)
 	 * Iterate over requests (transactions)
 	 */
 	int rc;
-	struct journal_entry *entry;
-	struct stailq_entry *last_committed = NULL;
 	stailq_foreach_entry(entry, &wal_msg->commit, fifo) {
 		wal_assign_lsn(&vclock_diff, &writer->vclock, entry);
 		entry->res = vclock_sum(&vclock_diff) +
