@@ -307,17 +307,19 @@ box_raft_write(struct raft *raft, const struct raft_msg *msg)
 	 * follows this pattern of 'protection'.
 	 */
 	bool cancellable = fiber_set_cancellable(false);
-	bool ok = (journal_write(entry) == 0 && entry->res >= 0);
+	bool is_err = journal_write(entry) != 0;
 	fiber_set_cancellable(cancellable);
-	if (!ok) {
+	if (is_err)
+		goto fail;
+	if (entry->res < 0) {
 		diag_set(ClientError, ER_WAL_IO);
-		diag_log();
 		goto fail;
 	}
 
 	region_truncate(region, svp);
 	return;
 fail:
+	diag_log();
 	/*
 	 * XXX: the stub is supposed to be removed once it is defined what to do
 	 * when a raft request WAL write fails.

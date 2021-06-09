@@ -847,7 +847,6 @@ txn_commit_try_async(struct txn *txn)
 	fiber_set_txn(fiber(), NULL);
 	if (journal_write_try_async(req) != 0) {
 		fiber_set_txn(fiber(), txn);
-		diag_set(ClientError, ER_WAL_IO);
 		diag_log();
 		goto rollback;
 	}
@@ -904,12 +903,11 @@ txn_commit(struct txn *txn)
 	}
 
 	fiber_set_txn(fiber(), NULL);
-	if (journal_write(req) != 0 || req->res < 0) {
-		if (txn_has_flag(txn, TXN_WAIT_SYNC))
-			txn_limbo_abort(&txn_limbo, limbo_entry);
+	if (journal_write(req) != 0)
+		goto rollback_io;
+	if (req->res < 0) {
 		diag_set(ClientError, ER_WAL_IO);
-		diag_log();
-		goto rollback;
+		goto rollback_io;
 	}
 	if (txn_has_flag(txn, TXN_WAIT_SYNC)) {
 		if (txn_has_flag(txn, TXN_WAIT_ACK)) {
@@ -934,6 +932,10 @@ txn_commit(struct txn *txn)
 	txn_free(txn);
 	return 0;
 
+rollback_io:
+	diag_log();
+	if (txn_has_flag(txn, TXN_WAIT_SYNC))
+		txn_limbo_abort(&txn_limbo, limbo_entry);
 rollback:
 	assert(txn->fiber != NULL);
 	if (!txn_has_flag(txn, TXN_IS_DONE)) {
