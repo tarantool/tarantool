@@ -14,6 +14,9 @@ s1.is_sync
 pk = s1:create_index('pk')
  | ---
  | ...
+box.ctl.promote()
+ | ---
+ | ...
 box.begin() s1:insert({1}) s1:insert({2}) box.commit()
  | ---
  | ...
@@ -645,19 +648,12 @@ test_run:switch('default')
  | ---
  | - true
  | ...
-box.cfg{replication_synchro_quorum = 3, replication_synchro_timeout = 1000}
+box.ctl.demote()
  | ---
  | ...
-f = fiber.create(function() box.space.sync:replace{1} end)
+box.space.sync:replace{1}
  | ---
- | ...
-test_run:wait_lsn('replica', 'default')
- | ---
- | ...
-
-test_run:switch('replica')
- | ---
- | - true
+ | - error: The synchronous transaction queue doesn't belong to any instance
  | ...
 function skip_row() return nil end
  | ---
@@ -674,26 +670,22 @@ box.space.sync:replace{2}
 box.space.sync:before_replace(nil, skip_row)
  | ---
  | ...
+assert(box.space.sync:get{1} == nil)
+ | ---
+ | - true
+ | ...
 assert(box.space.sync:get{2} == nil)
  | ---
  | - true
  | ...
-assert(box.space.sync:get{1} ~= nil)
+assert(box.info.lsn == old_lsn + 1)
  | ---
  | - true
+ | ...
+box.ctl.promote()
+ | ---
  | ...
 
-test_run:switch('default')
- | ---
- | - true
- | ...
-box.cfg{replication_synchro_quorum = 2}
- | ---
- | ...
-test_run:wait_cond(function() return f:status() == 'dead' end)
- | ---
- | - true
- | ...
 box.space.sync:truncate()
  | ---
  | ...
@@ -756,5 +748,8 @@ box.space.sync:drop()
  | ---
  | ...
 box.schema.user.revoke('guest', 'replication')
+ | ---
+ | ...
+box.ctl.demote()
  | ---
  | ...

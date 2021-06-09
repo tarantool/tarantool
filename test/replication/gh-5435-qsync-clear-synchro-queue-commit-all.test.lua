@@ -21,6 +21,7 @@ box.ctl.wait_rw()
 
 _ = box.schema.space.create('test', {is_sync=true})
 _ = box.space.test:create_index('pk')
+box.ctl.promote()
 
 -- Fill the limbo with pending entries. 3 mustn't receive them yet.
 test_run:cmd('stop server election_replica3')

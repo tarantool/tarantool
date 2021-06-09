@@ -14,6 +14,7 @@ box.schema.user.grant('guest', 'super')
 
 s = box.schema.space.create('test', {is_sync = true})
 _ = s:create_index('pk')
+box.ctl.promote()
 
 test_run:cmd('create server replica with rpl_master=default,\
               script="replication/gh-5213-replica.lua"')
@@ -120,3 +121,4 @@ box.cfg{                                                                        
     replication_synchro_quorum = old_synchro_quorum,                            \
     replication_synchro_timeout = old_synchro_timeout,                          \
 }
+box.ctl.demote()

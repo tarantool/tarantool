@@ -37,6 +37,7 @@ end
 -- Create a sync space we will operate on
 s = box.schema.space.create('sync', {is_sync = true, engine = engine})
 _ = s:create_index('pk')
+box.ctl.promote()
 
 -- Only one master node -> 1/2 + 1 = 1
 s:insert{1} -- should pass
@@ -135,3 +136,4 @@ box.cfg{                                                                        
     replication_synchro_quorum = old_synchro_quorum,                            \
     replication_synchro_timeout = old_synchro_timeout,                          \
 }
+box.ctl.demote()

@@ -280,6 +280,9 @@ int
 box_promote(void);
 
 int
+box_demote(void);
+
+int
 box_promote_qsync(void);
 
 /* box_select is private and used only by FFI */

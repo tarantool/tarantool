@@ -519,6 +519,29 @@ txn_limbo_read_promote(struct txn_limbo *limbo, uint32_t replica_id,
 }
 
 void
+txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
+{
+	limbo->confirmed_lsn = lsn;
+	limbo->is_in_rollback = true;
+	struct txn_limbo_entry *e = txn_limbo_last_synchro_entry(limbo);
+	assert(e == NULL || e->lsn <= lsn);
+	(void)e;
+	txn_limbo_write_synchro(limbo, IPROTO_DEMOTE, lsn, term);
+	limbo->is_in_rollback = false;
+}
+
+/**
+ * Process a DEMOTE request, which's like PROMOTE, but clears the limbo
+ * ownership.
+ * @sa txn_limbo_read_promote.
+ */
+static void
+txn_limbo_read_demote(struct txn_limbo *limbo, int64_t lsn)
+{
+	return txn_limbo_read_promote(limbo, REPLICA_ID_NIL, lsn);
+}
+
+void
 txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 {
 	if (rlist_empty(&limbo->queue))
@@ -709,12 +732,13 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 		vclock_follow(&limbo->promote_term_map, origin, term);
 		if (term > limbo->promote_greatest_term)
 			limbo->promote_greatest_term = term;
-	} else if (req->type == IPROTO_PROMOTE &&
+	} else if (iproto_type_is_promote_request(req->type) &&
 		   limbo->promote_greatest_term > 1) {
 		/* PROMOTE for outdated term. Ignore. */
-		say_info("RAFT: ignoring PROMOTE request from instance "
+		say_info("RAFT: ignoring %s request from instance "
 			 "id %u for term %llu. Greatest term seen "
-			 "before (%llu) is bigger.", origin, (long long)term,
+			 "before (%llu) is bigger.",
+			 iproto_type_name(req->type), origin, (long long)term,
 			 (long long)limbo->promote_greatest_term);
 		return;
 	}
@@ -725,7 +749,7 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 		 * The limbo was empty on the instance issuing the request.
 		 * This means this instance must empty its limbo as well.
 		 */
-		assert(lsn == 0 && req->type == IPROTO_PROMOTE);
+		assert(lsn == 0 && iproto_type_is_promote_request(req->type));
 	} else if (req->replica_id != limbo->owner_id) {
 		/*
 		 * Ignore CONFIRM/ROLLBACK messages for a foreign master.
@@ -733,7 +757,7 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 		 * data from an old leader, who has just started and written
 		 * confirm right on synchronous transaction recovery.
 		 */
-		if (req->type != IPROTO_PROMOTE)
+		if (!iproto_type_is_promote_request(req->type))
 			return;
 		/*
 		 * Promote has a bigger term, and tries to steal the limbo. It
@@ -752,6 +776,9 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 		break;
 	case IPROTO_PROMOTE:
 		txn_limbo_read_promote(limbo, req->origin_id, lsn);
+		break;
+	case IPROTO_DEMOTE:
+		txn_limbo_read_demote(limbo, lsn);
 		break;
 	default:
 		unreachable();

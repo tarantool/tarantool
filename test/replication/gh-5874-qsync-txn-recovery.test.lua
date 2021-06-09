@@ -12,6 +12,7 @@ async = box.schema.create_space('async', {engine = engine})
 _ = async:create_index('pk')
 sync = box.schema.create_space('sync', {is_sync = true, engine = engine})
 _ = sync:create_index('pk')
+box.ctl.promote()
 
 -- The transaction fails, but is written to the log anyway.
 box.begin() async:insert{1} sync:insert{1} box.commit()
@@ -82,3 +83,4 @@ loc:select()
 async:drop()
 sync:drop()
 loc:drop()
+box.ctl.demote()

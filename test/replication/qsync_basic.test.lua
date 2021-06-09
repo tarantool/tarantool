@@ -6,6 +6,7 @@
 s1 = box.schema.create_space('test1', {is_sync = true})
 s1.is_sync
 pk = s1:create_index('pk')
+box.ctl.promote()
 box.begin() s1:insert({1}) s1:insert({2}) box.commit()
 s1:select{}
 
@@ -253,22 +254,18 @@ box.space.sync:count()
 -- instances, but also works for local rows.
 --
 test_run:switch('default')
-box.cfg{replication_synchro_quorum = 3, replication_synchro_timeout = 1000}
-f = fiber.create(function() box.space.sync:replace{1} end)
-test_run:wait_lsn('replica', 'default')
-
-test_run:switch('replica')
+box.ctl.demote()
+box.space.sync:replace{1}
 function skip_row() return nil end
 old_lsn = box.info.lsn
 _ = box.space.sync:before_replace(skip_row)
 box.space.sync:replace{2}
 box.space.sync:before_replace(nil, skip_row)
+assert(box.space.sync:get{1} == nil)
 assert(box.space.sync:get{2} == nil)
-assert(box.space.sync:get{1} ~= nil)
+assert(box.info.lsn == old_lsn + 1)
+box.ctl.promote()
 
-test_run:switch('default')
-box.cfg{replication_synchro_quorum = 2}
-test_run:wait_cond(function() return f:status() == 'dead' end)
 box.space.sync:truncate()
 
 --
@@ -301,3 +298,4 @@ test_run:cmd('delete server replica')
 box.space.test:drop()
 box.space.sync:drop()
 box.schema.user.revoke('guest', 'replication')
+box.ctl.demote()

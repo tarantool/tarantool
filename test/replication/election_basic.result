@@ -114,6 +114,9 @@ box.cfg{                                                                        
 }
  | ---
  | ...
+box.ctl.demote()
+ | ---
+ | ...
 
 --
 -- See if bootstrap with election enabled works.

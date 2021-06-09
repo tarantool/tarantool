@@ -22,6 +22,7 @@ test_run:switch('default')
 box.cfg{replication_synchro_quorum=NUM_INSTANCES, replication_synchro_timeout=1000}
 _ = box.schema.space.create('sync', {is_sync=true, engine=engine})
 _ = box.space.sync:create_index('pk')
+box.ctl.promote()
 -- Testcase body.
 test_run:switch('default')
 box.space.sync:insert{1} -- success
@@ -81,4 +82,5 @@ box.cfg{                                                                        
     replication_synchro_quorum = orig_synchro_quorum,                           \
     replication_synchro_timeout = orig_synchro_timeout,                         \
 }
+box.ctl.demote()
 test_run:cleanup_cluster()

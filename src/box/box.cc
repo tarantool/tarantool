@@ -1679,8 +1679,27 @@ box_issue_promote(uint32_t prev_leader_id, int64_t promote_lsn)
 	assert(txn_limbo_is_empty(&txn_limbo));
 }
 
-/** A guard to block multiple simultaneous box_promote() invocations. */
+/** A guard to block multiple simultaneous promote()/demote() invocations. */
 static bool is_in_box_promote = false;
+
+/** Write and process a DEMOTE request. */
+static void
+box_issue_demote(uint32_t prev_leader_id, int64_t promote_lsn)
+{
+	assert(box_raft()->volatile_term == box_raft()->term);
+	assert(promote_lsn >= 0);
+	txn_limbo_write_demote(&txn_limbo, promote_lsn,
+				box_raft()->term);
+	struct synchro_request req = {
+		.type = IPROTO_DEMOTE,
+		.replica_id = prev_leader_id,
+		.origin_id = instance_id,
+		.lsn = promote_lsn,
+		.term = box_raft()->term,
+	};
+	txn_limbo_process(&txn_limbo, &req);
+	assert(txn_limbo_is_empty(&txn_limbo));
+}
 
 int
 box_promote_qsync(void)
@@ -1719,14 +1738,19 @@ box_promote(void)
 	auto promote_guard = make_scoped_guard([&] {
 		is_in_box_promote = false;
 	});
-	/*
-	 * Do nothing when box isn't configured and when PROMOTE was already
-	 * written for this term (synchronous replication and leader election
-	 * are in sync, and both chose this node as a leader).
-	 */
+
 	if (!is_box_configured)
 		return 0;
-	if (txn_limbo_replica_term(&txn_limbo, instance_id) == raft->term)
+	/*
+	 * Currently active leader (the instance that is seen as leader by both
+	 * raft and txn_limbo) can't issue another PROMOTE.
+	 */
+	bool is_leader = txn_limbo_replica_term(&txn_limbo, instance_id) ==
+			 raft->term && txn_limbo.owner_id == instance_id;
+	if (box_election_mode != ELECTION_MODE_OFF)
+		is_leader = is_leader && raft->state == RAFT_STATE_LEADER;
+
+	if (is_leader)
 		return 0;
 	switch (box_election_mode) {
 	case ELECTION_MODE_OFF:
@@ -1755,6 +1779,43 @@ box_promote(void)
 		return -1;
 
 	box_issue_promote(txn_limbo.owner_id, wait_lsn);
+
+	return 0;
+}
+
+int
+box_demote(void)
+{
+	if (is_in_box_promote) {
+		diag_set(ClientError, ER_UNSUPPORTED, "box.ctl.demote",
+			 "simultaneous invocations");
+		return -1;
+	}
+	is_in_box_promote = true;
+	auto promote_guard = make_scoped_guard([&] {
+		is_in_box_promote = false;
+	});
+
+	if (!is_box_configured)
+		return 0;
+
+	/* Currently active leader is the only one who can issue a DEMOTE. */
+	bool is_leader = txn_limbo_replica_term(&txn_limbo, instance_id) ==
+			 box_raft()->term && txn_limbo.owner_id == instance_id;
+	if (box_election_mode != ELECTION_MODE_OFF)
+		is_leader = is_leader && box_raft()->state == RAFT_STATE_LEADER;
+	if (!is_leader)
+		return 0;
+	if (box_trigger_elections() != 0)
+		return -1;
+	if (box_election_mode != ELECTION_MODE_OFF)
+		return 0;
+	if (box_try_wait_confirm(2 * replication_synchro_timeout) < 0)
+		return -1;
+	int64_t wait_lsn = box_wait_limbo_acked(replication_synchro_timeout);
+	if (wait_lsn < 0)
+		return -1;
+	box_issue_demote(txn_limbo.owner_id, wait_lsn);
 	return 0;
 }
 
