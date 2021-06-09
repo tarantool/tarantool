@@ -124,6 +124,16 @@ enum {
 };
 
 /**
+ * Convert a result of a transaction execution to an error installed into the
+ * current diag.
+ */
+void
+diag_set_txn_sign_detailed(const char *file, unsigned line, int64_t signature);
+
+#define diag_set_txn_sign(signature)						\
+	diag_set_txn_sign_detailed(__FILE__, __LINE__, signature)
+
+/**
  * Status of a transaction.
  */
 enum txn_status {

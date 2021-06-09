@@ -31,6 +31,7 @@
 #include "journal.h"
 #include <small/region.h>
 #include <diag.h>
+#include "error.h"
 
 struct journal *current_journal = NULL;
 
@@ -40,6 +41,13 @@ struct journal_queue journal_queue = {
 	.waiters = RLIST_HEAD_INITIALIZER(journal_queue.waiters),
 	.waiter_count = 0,
 };
+
+void
+diag_set_journal_res_detailed(const char *file, unsigned line, int64_t res)
+{
+	(void)res;
+	diag_set_detailed(file, line, ClientError, ER_WAL_IO);
+}
 
 struct journal_entry *
 journal_entry_new(size_t n_rows, struct region *region,

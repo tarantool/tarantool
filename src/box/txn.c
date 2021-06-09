@@ -248,6 +248,12 @@ txn_free(struct txn *txn)
 	stailq_add(&txn_cache, &txn->in_txn_cache);
 }
 
+void
+diag_set_txn_sign_detailed(const char *file, unsigned line, int64_t signature)
+{
+	return diag_set_journal_res_detailed(file, line, signature);
+}
+
 struct txn *
 txn_begin(void)
 {
@@ -906,7 +912,7 @@ txn_commit(struct txn *txn)
 	if (journal_write(req) != 0)
 		goto rollback_io;
 	if (req->res < 0) {
-		diag_set(ClientError, ER_WAL_IO);
+		diag_set_journal_res(req->res);
 		goto rollback_io;
 	}
 	if (txn_has_flag(txn, TXN_WAIT_SYNC)) {

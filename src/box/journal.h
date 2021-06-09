@@ -45,6 +45,16 @@ struct journal_entry;
 typedef void (*journal_write_async_f)(struct journal_entry *entry);
 
 /**
+ * Convert a result of a journal entry write to an error installed into the
+ * current diag.
+ */
+void
+diag_set_journal_res_detailed(const char *file, unsigned line, int64_t res);
+
+#define diag_set_journal_res(res)						\
+	diag_set_journal_res_detailed(__FILE__, __LINE__, res)
+
+/**
  * An entry for an abstract journal.
  * Simply put, a write ahead log request.
  *

@@ -312,7 +312,7 @@ box_raft_write(struct raft *raft, const struct raft_msg *msg)
 	if (is_err)
 		goto fail;
 	if (entry->res < 0) {
-		diag_set(ClientError, ER_WAL_IO);
+		diag_set_journal_res(entry->res);
 		goto fail;
 	}
 

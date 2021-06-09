@@ -713,7 +713,7 @@ applier_read_tx(struct applier *applier, struct stailq *rows, double timeout)
 }
 
 static void
-applier_rollback_by_wal_io(void)
+applier_rollback_by_wal_io(int64_t signature)
 {
 	/*
 	 * Setup shared applier diagnostic area.
@@ -727,7 +727,7 @@ applier_rollback_by_wal_io(void)
 	 * rollback may happen a way later after it was passed to
 	 * the journal engine.
 	 */
-	diag_set(ClientError, ER_WAL_IO);
+	diag_set_txn_sign(signature);
 	diag_set_error(&replicaset.applier.diag,
 		       diag_last_error(diag_get()));
 
@@ -749,7 +749,7 @@ applier_txn_rollback_cb(struct trigger *trigger, void *event)
 	 * special handling.
 	 */
 	if (txn->signature != TXN_SIGNATURE_SYNC_ROLLBACK)
-		applier_rollback_by_wal_io();
+		applier_rollback_by_wal_io(txn->signature);
 	return 0;
 }
 
@@ -789,7 +789,7 @@ apply_synchro_row_cb(struct journal_entry *entry)
 	struct synchro_entry *synchro_entry =
 		(struct synchro_entry *)entry->complete_data;
 	if (entry->res < 0) {
-		applier_rollback_by_wal_io();
+		applier_rollback_by_wal_io(entry->res);
 	} else {
 		txn_limbo_process(&txn_limbo, synchro_entry->req);
 		trigger_run(&replicaset.applier.on_wal_write, NULL);
@@ -840,7 +840,7 @@ apply_synchro_row(struct xrow_header *row)
 	if (journal_write(&entry.base) != 0)
 		goto err;
 	if (entry.base.res < 0) {
-		diag_set(ClientError, ER_WAL_IO);
+		diag_set_journal_res(entry.base.res);
 		goto err;
 	}
 	return 0;
