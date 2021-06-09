@@ -186,7 +186,7 @@ struct errcode_record {
 	/*131 */_(ER_INVALID_INDEX_FILE,	"Invalid INDEX file %s: %s") \
 	/*132 */_(ER_INVALID_RUN_FILE,		"Invalid RUN file: %s") \
 	/*133 */_(ER_INVALID_VYLOG_FILE,	"Invalid VYLOG file: %s") \
-	/*134 */_(ER_CHECKPOINT_ROLLBACK,	"Can't start a checkpoint while in cascading rollback") \
+	/*134 */_(ER_CASCADE_ROLLBACK,		"WAL has a rollback in progress") \
 	/*135 */_(ER_VY_QUOTA_TIMEOUT,		"Timed out waiting for Vinyl memory quota") \
 	/*136 */_(ER_PARTIAL_KEY,		"%s index  does not support selects via a partial key (expected %u parts, got %u). Please Consider changing index type to TREE.") \
 	/*137 */_(ER_TRUNCATE_SYSTEM_SPACE,	"Can't truncate a system space, space '%s'") \
