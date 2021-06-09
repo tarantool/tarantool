@@ -22,6 +22,7 @@ test_run:wait_cond(function()\
 end)
 
 -- Cleanup.
+box.ctl.demote()
 box.cfg{election_mode = old_election_mode}
 test_run:cmd('stop server replica')
 test_run:cmd('delete server replica')

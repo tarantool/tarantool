@@ -43,6 +43,7 @@ box.cfg{                                                                        
     election_mode = 'off',                                                      \
     election_timeout = old_election_timeout                                     \
 }
+box.ctl.demote()
 
 --
 -- See if bootstrap with election enabled works.

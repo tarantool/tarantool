@@ -11,3 +11,6 @@ assert(box.info.election.term == term + 1)
 -- Consequent promotes are no-ops on the leader.
 box.ctl.promote()
 assert(box.info.election.term == term + 1)
+
+-- Cleanup.
+box.ctl.demote()

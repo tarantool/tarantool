@@ -168,6 +168,9 @@ box.cfg{                                                                        
 }
  | ---
  | ...
+box.ctl.demote()
+ | ---
+ | ...
 box.schema.user.revoke('guest', 'super')
  | ---
  | ...

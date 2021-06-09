@@ -330,6 +330,13 @@ void
 txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term);
 
 /**
+ * Write a DEMOTE request.
+ * It has the same effect as PROMOTE and additionally clears limbo ownership.
+ */
+void
+txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term);
+
+/**
  * Update qsync parameters dynamically.
  */
 void

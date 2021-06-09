@@ -1,0 +1,189 @@
+-- test-run result file version 2
+test_run = require('test_run').new()
+ | ---
+ | ...
+
+--
+-- gh-6034: test that transactional limbo isn't accessible without a promotion.
+--
+synchro_quorum = box.cfg.replication_synchro_quorum
+ | ---
+ | ...
+election_mode = box.cfg.election_mode
+ | ---
+ | ...
+box.cfg{replication_synchro_quorum = 1, election_mode='off'}
+ | ---
+ | ...
+
+_ = box.schema.space.create('async'):create_index('pk')
+ | ---
+ | ...
+_ = box.schema.space.create('sync', {is_sync=true}):create_index('pk')
+ | ---
+ | ...
+
+-- Limbo is initially unclaimed, everyone is writeable.
+assert(not box.info.ro)
+ | ---
+ | - true
+ | ...
+assert(box.info.synchro.queue.owner == 0)
+ | ---
+ | - true
+ | ...
+box.space.async:insert{1} -- success.
+ | ---
+ | - [1]
+ | ...
+-- Synchro spaces aren't writeable
+box.space.sync:insert{1} -- error.
+ | ---
+ | - error: The synchronous transaction queue doesn't belong to any instance
+ | ...
+
+box.ctl.promote()
+ | ---
+ | ...
+assert(not box.info.ro)
+ | ---
+ | - true
+ | ...
+assert(box.info.synchro.queue.owner == box.info.id)
+ | ---
+ | - true
+ | ...
+box.space.sync:insert{1} -- success.
+ | ---
+ | - [1]
+ | ...
+
+-- Everyone but the limbo owner is read-only.
+box.schema.user.grant('guest', 'replication')
+ | ---
+ | ...
+test_run:cmd('create server replica with rpl_master=default,\
+                                         script="replication/replica.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server replica with wait=True, wait_load=True')
+ | ---
+ | - true
+ | ...
+test_run:cmd('set variable rpl_listen to "replica.listen"')
+ | ---
+ | - true
+ | ...
+orig_replication = box.cfg.replication
+ | ---
+ | ...
+box.cfg{replication=rpl_listen}
+ | ---
+ | ...
+
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+assert(box.info.ro)
+ | ---
+ | - true
+ | ...
+assert(box.info.synchro.queue.owner == test_run:get_server_id('default'))
+ | ---
+ | - true
+ | ...
+box.space.async:insert{2} -- failure.
+ | ---
+ | - error: Can't modify data because this instance is in read-only mode.
+ | ...
+
+-- Promotion on the other node. Default should become ro.
+box.ctl.promote()
+ | ---
+ | ...
+assert(not box.info.ro)
+ | ---
+ | - true
+ | ...
+assert(box.info.synchro.queue.owner == box.info.id)
+ | ---
+ | - true
+ | ...
+box.space.sync:insert{2} -- success.
+ | ---
+ | - [2]
+ | ...
+
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+test_run:wait_lsn('default', 'replica')
+ | ---
+ | ...
+assert(box.info.ro)
+ | ---
+ | - true
+ | ...
+assert(box.info.synchro.queue.owner == test_run:get_server_id('replica'))
+ | ---
+ | - true
+ | ...
+box.space.sync:insert{3} -- failure.
+ | ---
+ | - error: Can't modify data because this instance is in read-only mode.
+ | ...
+
+box.ctl.promote()
+ | ---
+ | ...
+box.ctl.demote()
+ | ---
+ | ...
+assert(not box.info.ro)
+ | ---
+ | - true
+ | ...
+box.space.sync:insert{3} -- still fails.
+ | ---
+ | - error: The synchronous transaction queue doesn't belong to any instance
+ | ...
+assert(box.info.synchro.queue.owner == 0)
+ | ---
+ | - true
+ | ...
+box.space.async:insert{3} -- success.
+ | ---
+ | - [3]
+ | ...
+
+-- Cleanup.
+box.ctl.demote()
+ | ---
+ | ...
+test_run:cmd('stop server replica')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server replica')
+ | ---
+ | - true
+ | ...
+box.schema.user.revoke('guest', 'replication')
+ | ---
+ | ...
+box.space.sync:drop()
+ | ---
+ | ...
+box.space.async:drop()
+ | ---
+ | ...
+box.cfg{\
+    replication_synchro_quorum = synchro_quorum,\
+    election_mode = election_mode,\
+    replication = orig_replication,\
+}
+ | ---
+ | ...

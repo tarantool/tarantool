@@ -26,3 +26,4 @@ box.cfg{\
     replication_synchro_timeout = replication_synchro_timeout,\
 }
 box.space.sync:drop()
+box.ctl.demote()

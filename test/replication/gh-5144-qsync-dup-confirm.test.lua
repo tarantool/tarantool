@@ -19,6 +19,7 @@ box.cfg{replication_synchro_quorum = 2, replication_synchro_timeout = 1000}
 
 _ = box.schema.space.create('sync', {is_sync = true, engine = engine})
 _ = _:create_index('pk')
+box.ctl.promote()
 
 -- Remember the current LSN. In the end, when the following synchronous
 -- transaction is committed, result LSN should be this value +2: for the
@@ -69,4 +70,5 @@ test_run:cmd('delete server replica1')
 test_run:cmd('stop server replica2')
 test_run:cmd('delete server replica2')
 
+box.ctl.demote()
 box.schema.user.revoke('guest', 'super')

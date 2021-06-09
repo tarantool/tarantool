@@ -48,6 +48,7 @@ _ = box.schema.space.create('sync', {is_sync = true, engine = engine})
 _ = _:create_index('pk')
 _ = box.schema.space.create('async', {is_sync=false, engine = engine})
 _ = _:create_index('pk')
+box.ctl.promote()
 -- Write something to flush the master state to replica.
 box.space.sync:replace{1}
 
@@ -103,3 +104,4 @@ test_run:cmd('stop server replica')
 test_run:cmd('delete server replica')
 
 box.schema.user.revoke('guest', 'super')
+box.ctl.demote()

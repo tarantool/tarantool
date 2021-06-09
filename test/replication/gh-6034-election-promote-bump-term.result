@@ -28,3 +28,8 @@ assert(box.info.election.term == term + 1)
  | ---
  | - true
  | ...
+
+-- Cleanup.
+box.ctl.demote()
+ | ---
+ | ...

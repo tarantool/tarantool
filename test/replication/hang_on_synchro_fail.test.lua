@@ -8,6 +8,7 @@ box.schema.user.grant('guest', 'replication')
 
 _ = box.schema.space.create('sync', {is_sync=true})
 _ = box.space.sync:create_index('pk')
+box.ctl.promote()
 
 old_synchro_quorum = box.cfg.replication_synchro_quorum
 box.cfg{replication_synchro_quorum=3}
@@ -54,4 +55,5 @@ box.cfg{replication_synchro_quorum=old_synchro_quorum,\
         replication_synchro_timeout=old_synchro_timeout}
 box.space.sync:drop()
 box.schema.user.revoke('guest', 'replication')
+box.ctl.demote()
 

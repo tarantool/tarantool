@@ -40,6 +40,10 @@ _ = s2:create_index('pk')
  | ---
  | ...
 
+box.ctl.promote()
+ | ---
+ | ...
+
 errinj = box.error.injection
  | ---
  | ...
@@ -159,5 +163,8 @@ box.cfg{                                                                        
     replication_synchro_quorum = old_synchro_quorum,                            \
     replication_synchro_timeout = old_synchro_timeout,                          \
 }
+ | ---
+ | ...
+box.ctl.demote()
  | ---
  | ...
