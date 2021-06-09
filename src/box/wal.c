@@ -1239,6 +1239,7 @@ wal_write_async(struct journal *journal, struct journal_entry *entry)
 	struct wal_writer *writer = (struct wal_writer *) journal;
 
 	ERROR_INJECT(ERRINJ_WAL_IO, {
+		diag_set(ClientError, ER_WAL_IO);
 		goto fail;
 	});
 
@@ -1253,6 +1254,7 @@ wal_write_async(struct journal *journal, struct journal_entry *entry)
 		say_error("Aborting transaction %llu during "
 			  "cascading rollback",
 			  vclock_sum(&writer->vclock));
+		diag_set(ClientError, ER_CASCADE_ROLLBACK);
 		goto fail;
 	}
 

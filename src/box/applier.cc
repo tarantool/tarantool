@@ -835,7 +835,9 @@ apply_synchro_row(struct xrow_header *row)
 	 * before trying to commit. But that requires extra steps from the
 	 * transactions side, including the async ones.
 	 */
-	if (journal_write(&entry.base) != 0 || entry.base.res < 0) {
+	if (journal_write(&entry.base) != 0)
+		goto err;
+	if (entry.base.res < 0) {
 		diag_set(ClientError, ER_WAL_IO);
 		goto err;
 	}
