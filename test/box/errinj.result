@@ -898,7 +898,7 @@ box.schema.user.revoke('guest', 'read', 'space', '_space')
 ...
 run()
 ---
-- error: Can't start a checkpoint while in cascading rollback
+- error: WAL has a rollback in progress
 ...
 ch:get()
 ---

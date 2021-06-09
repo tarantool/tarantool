@@ -606,7 +606,7 @@ wal_sync_f(struct cbus_call_msg *data)
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->is_in_rollback) {
 		/* We're rolling back a failed write. */
-		diag_set(ClientError, ER_WAL_IO);
+		diag_set(ClientError, ER_CASCADE_ROLLBACK);
 		return -1;
 	}
 	vclock_copy(&msg->vclock, &writer->vclock);
@@ -629,7 +629,7 @@ wal_sync(struct vclock *vclock)
 	}
 	if (!stailq_empty(&writer->rollback)) {
 		/* We're rolling back a failed write. */
-		diag_set(ClientError, ER_WAL_IO);
+		diag_set(ClientError, ER_CASCADE_ROLLBACK);
 		return -1;
 	}
 	bool cancellable = fiber_set_cancellable(false);
@@ -653,7 +653,7 @@ wal_begin_checkpoint_f(struct cbus_call_msg *data)
 		 * can't make a checkpoint - see the comment
 		 * in wal_begin_checkpoint() for the explanation.
 		 */
-		diag_set(ClientError, ER_CHECKPOINT_ROLLBACK);
+		diag_set(ClientError, ER_CASCADE_ROLLBACK);
 		return -1;
 	}
 	/*
@@ -691,7 +691,7 @@ wal_begin_checkpoint(struct wal_checkpoint *checkpoint)
 		 * the snapshot. So we abort checkpointing in this
 		 * case.
 		 */
-		diag_set(ClientError, ER_CHECKPOINT_ROLLBACK);
+		diag_set(ClientError, ER_CASCADE_ROLLBACK);
 		return -1;
 	}
 	bool cancellable = fiber_set_cancellable(false);

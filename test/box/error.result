@@ -353,7 +353,7 @@ t;
  |   131: box.error.INVALID_INDEX_FILE
  |   132: box.error.INVALID_RUN_FILE
  |   133: box.error.INVALID_VYLOG_FILE
- |   134: box.error.CHECKPOINT_ROLLBACK
+ |   134: box.error.CASCADE_ROLLBACK
  |   135: box.error.VY_QUOTA_TIMEOUT
  |   136: box.error.PARTIAL_KEY
  |   137: box.error.TRUNCATE_SYSTEM_SPACE
