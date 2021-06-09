@@ -19,7 +19,7 @@ box.schema.user.grant('guest', 'replication')
 --
 -- Create replica instance, we're the master and
 -- start it, no data to sync yet though
-test_run:cmd("create server replica_slave with rpl_master=default, script='replication/replica-applier-rollback.lua'")
+test_run:cmd("create server replica_slave with rpl_master=default, script='replication/replica.lua'")
  | ---
  | - true
  | ...
