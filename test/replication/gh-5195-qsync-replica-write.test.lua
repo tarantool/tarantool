@@ -17,6 +17,7 @@ test_run:cmd('start server replica with wait=True, wait_load=True')
 --
 _ = box.schema.space.create('sync', {engine = engine, is_sync = true})
 _ = box.space.sync:create_index('pk')
+box.ctl.promote()
 
 box.cfg{replication_synchro_timeout = 1000, replication_synchro_quorum = 3}
 lsn = box.info.lsn
@@ -30,10 +31,10 @@ test_run:wait_cond(function() return box.info.lsn == lsn end)
 test_run:switch('replica')
 test_run:wait_lsn('replica', 'default')
 -- Normal DML is blocked - the limbo is not empty and does not belong to the
--- replica. But synchro queue cleanup also does a WAL write, and propagates LSN
+-- replica. But promote also does a WAL write, and propagates LSN
 -- of the instance.
 box.cfg{replication_synchro_timeout = 0.001}
-box.ctl.clear_synchro_queue()
+box.ctl.promote()
 
 test_run:switch('default')
 -- Wait second ACK receipt.
@@ -59,6 +60,7 @@ test_run:switch('default')
 test_run:cmd('stop server replica')
 test_run:cmd('delete server replica')
 
+box.ctl.demote()
 box.space.sync:drop()
 box.schema.user.revoke('guest', 'super')
 

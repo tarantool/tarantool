@@ -8,6 +8,7 @@ engine = test_run:get_cfg('engine')
 --
 _ = box.schema.space.create('sync', {is_sync = true, engine = engine})
 _ = box.space.sync:create_index('pk')
+box.ctl.promote()
 for i = 1, 10 do box.space.sync:replace{i} end
 
 -- Local rows could affect this by increasing the signature.
@@ -46,3 +47,4 @@ box.cfg{                                                                        
 }
 box.space.sync:drop()
 box.space.loc:drop()
+box.ctl.demote()

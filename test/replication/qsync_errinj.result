@@ -35,6 +35,9 @@ _ = box.schema.space.create('sync', {is_sync = true, engine = engine})
 _ = box.space.sync:create_index('pk')
  | ---
  | ...
+box.ctl.promote()
+ | ---
+ | ...
 
 --
 -- gh-5100: slow ACK sending shouldn't stun replica for the
@@ -540,5 +543,8 @@ box.space.sync:drop()
  | ---
  | ...
 box.schema.user.revoke('guest', 'super')
+ | ---
+ | ...
+box.ctl.demote()
  | ---
  | ...

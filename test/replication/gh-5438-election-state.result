@@ -47,6 +47,9 @@ end)
  | ...
 
 -- Cleanup.
+box.ctl.demote()
+ | ---
+ | ...
 box.cfg{election_mode = old_election_mode}
  | ---
  | ...

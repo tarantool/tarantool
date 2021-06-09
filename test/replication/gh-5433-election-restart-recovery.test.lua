@@ -84,4 +84,5 @@ box.cfg{                                                                        
     election_mode = old_election_mode,                                          \
     replication_timeout = old_replication_timeout,                              \
 }
+box.ctl.demote()
 box.schema.user.revoke('guest', 'super')

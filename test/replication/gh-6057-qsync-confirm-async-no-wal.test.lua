@@ -21,6 +21,8 @@ _ = s:create_index('pk')
 s2 = box.schema.create_space('test2')
 _ = s2:create_index('pk')
 
+box.ctl.promote()
+
 errinj = box.error.injection
 
 function create_hanging_async_after_confirm(sync_key, async_key1, async_key2)   \
@@ -86,3 +88,4 @@ box.cfg{                                                                        
     replication_synchro_quorum = old_synchro_quorum,                            \
     replication_synchro_timeout = old_synchro_timeout,                          \
 }
+box.ctl.demote()

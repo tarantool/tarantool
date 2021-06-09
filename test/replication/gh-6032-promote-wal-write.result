@@ -67,3 +67,6 @@ box.cfg{\
 box.space.sync:drop()
  | ---
  | ...
+box.ctl.demote()
+ | ---
+ | ...

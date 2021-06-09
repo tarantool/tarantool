@@ -5,6 +5,7 @@ test_run = require('test_run').new()
 --
 _ = box.schema.space.create('sync', {is_sync=true})
 _ = box.space.sync:create_index('pk')
+box.ctl.promote()
 
 box.schema.user.grant('guest', 'replication')
 box.schema.user.grant('guest', 'write', 'space', 'sync')
@@ -59,3 +60,4 @@ box.cfg{\
 box.space.sync:drop()
 test_run:cleanup_cluster()
 box.schema.user.revoke('guest', 'replication')
+box.ctl.demote()

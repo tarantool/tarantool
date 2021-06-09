@@ -5,7 +5,9 @@ test_run = require('test_run').new()
 --
 s = box.schema.space.create('sync', {is_sync = true})
 _ = s:create_index('pk')
+box.ctl.promote()
 s:insert{1}
 box.snapshot()
 test_run:cmd('restart server default')
 box.space.sync:drop()
+box.ctl.demote()
