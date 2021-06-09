@@ -338,7 +338,7 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 	if (journal_write(entry) != 0)
 		goto fail;
 	if (entry->res < 0) {
-		diag_set(ClientError, ER_WAL_IO);
+		diag_set_journal_res(entry->res);
 		goto fail;
 	}
 	return;
