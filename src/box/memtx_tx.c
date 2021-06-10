@@ -741,6 +741,24 @@ memtx_tx_story_find_visible_tuple(struct memtx_story *story,
 			return 0;
 
 		/*
+		 *  We are about to skip a story that is not visible to us.
+		 *  It's a good time to record possible conflict. If we skip
+		 * not committed story, our TX should goto read view / be
+		 * aborted when/if the story becomes committed.
+		 *  But there's no reason to collect such a conflict if our
+		 * TX is already in read view / aborted.
+		 *  Moreover, if our TX is in read vew, we can skip a committed
+		 * story which transaction was already completed and pointers
+		 * to it are NULL, and that fact forces us to check that NULL.
+		 *  It's better and cheaper not to track conflict if we are
+		 * already in read view / conflicted.
+		 */
+		if (story->add_stmt == NULL)
+			assert(stmt->txn->status == TXN_IN_READ_VIEW);
+		if (stmt->txn->status == TXN_IN_READ_VIEW)
+			continue;
+
+		/*
 		 * We skip the story as invisible but if the corresponding TX
 		 * is committed our TX can become conflicted.
 		 * The conflict will be unavoidable if this statement

@@ -1992,6 +1992,43 @@ tx1:commit()
  | - - {'error': 'Transaction has been aborted by conflict'}
  | ...
 
+-- https://github.com/tarantool/tarantool/issues/6131
+s:truncate()
+ | ---
+ | ...
+s:replace{1, 1}
+ | ---
+ | - [1, 1]
+ | ...
+tx1:begin()
+ | ---
+ | - 
+ | ...
+tx2:begin()
+ | ---
+ | - 
+ | ...
+tx1('s:select{1}')
+ | ---
+ | - - [[1, 1]]
+ | ...
+tx2("s:update({1}, {{'=', 2, 2}})")
+ | ---
+ | - - [1, 2]
+ | ...
+tx2:commit()
+ | ---
+ | - 
+ | ...
+tx1("s:update({1}, {{'=', 2, 3}})")
+ | ---
+ | - - [1, 3]
+ | ...
+tx1:commit()
+ | ---
+ | - - {'error': 'Transaction has been aborted by conflict'}
+ | ...
+
 s:drop()
  | ---
  | ...
