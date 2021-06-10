@@ -261,7 +261,7 @@ apply_snapshot_row(struct xrow_header *row)
 rollback_stmt:
 	txn_rollback_stmt(txn);
 rollback:
-	txn_rollback(txn);
+	txn_abort(txn);
 	fiber_gc();
 	return -1;
 }
@@ -944,7 +944,7 @@ apply_plain_tx(struct stailq *rows, bool skip_conflict, bool use_triggers)
 
 	return txn_commit_try_async(txn);
 fail:
-	txn_rollback(txn);
+	txn_abort(txn);
 	return -1;
 }
 

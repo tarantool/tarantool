@@ -920,7 +920,7 @@ vy_deferred_delete_batch_process_f(struct cmsg *cmsg)
 	return;
 
 fail_rollback:
-	txn_rollback(txn);
+	txn_abort(txn);
 	fiber_gc();
 fail:
 	batch->is_failed = true;
