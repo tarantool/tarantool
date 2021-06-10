@@ -264,6 +264,10 @@ diag_set_txn_sign_detailed(const char *file, unsigned line, int64_t signature)
 	case TXN_SIGNATURE_SYNC_ROLLBACK:
 		diag_set_detailed(file, line, ClientError, ER_SYNC_ROLLBACK);
 		return;
+	case TXN_SIGNATURE_ABORT:
+		if (diag_is_empty(diag_get()))
+			panic("Tried to get an absent transaction error");
+		return;
 	}
 	panic("Transaction signature %lld can't be converted to an error "
 	      "at %s:%u", (long long)signature, file, line);
@@ -870,7 +874,7 @@ txn_commit_try_async(struct txn *txn)
 
 rollback:
 	assert(txn->fiber == NULL);
-	txn_rollback(txn);
+	txn_abort(txn);
 	return -1;
 }
 
@@ -883,7 +887,7 @@ txn_commit(struct txn *txn)
 	txn->fiber = fiber();
 
 	if (txn_prepare(txn) != 0)
-		goto rollback;
+		goto rollback_abort;
 
 	if (txn_commit_nop(txn)) {
 		txn_free(txn);
@@ -892,7 +896,7 @@ txn_commit(struct txn *txn)
 
 	req = txn_journal_entry_new(txn);
 	if (req == NULL)
-		goto rollback;
+		goto rollback_abort;
 	/*
 	 * Do not cache the flag value in a variable. The flag might be deleted
 	 * during WAL write. This can happen for async transactions created
@@ -914,7 +918,7 @@ txn_commit(struct txn *txn)
 		 */
 		limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn);
 		if (limbo_entry == NULL)
-			goto rollback;
+			goto rollback_abort;
 	}
 
 	fiber_set_txn(fiber(), NULL);
@@ -951,7 +955,10 @@ rollback_io:
 	diag_log();
 	if (txn_has_flag(txn, TXN_WAIT_SYNC))
 		txn_limbo_abort(&txn_limbo, limbo_entry);
+rollback_abort:
+	txn->signature = TXN_SIGNATURE_ABORT;
 rollback:
+	assert(txn->signature != TXN_SIGNATURE_UNKNOWN);
 	assert(txn->fiber != NULL);
 	if (!txn_has_flag(txn, TXN_IS_DONE)) {
 		fiber_set_txn(fiber(), txn);
@@ -983,6 +990,15 @@ txn_rollback(struct txn *txn)
 	txn->signature = TXN_SIGNATURE_ROLLBACK;
 	txn_complete_fail(txn);
 	fiber_set_txn(fiber(), NULL);
+}
+
+void
+txn_abort(struct txn *txn)
+{
+	assert(!diag_is_empty(diag_get()));
+	assert(txn->signature == TXN_SIGNATURE_UNKNOWN);
+	txn->signature = TXN_SIGNATURE_ABORT;
+	txn_rollback(txn);
 }
 
 int

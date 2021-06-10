@@ -277,7 +277,7 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 rollback_stmt:
 	txn_rollback_stmt(txn);
 rollback:
-	txn_rollback(txn);
+	txn_abort(txn);
 	fiber_gc();
 	return -1;
 }

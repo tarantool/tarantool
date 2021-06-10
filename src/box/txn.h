@@ -129,6 +129,11 @@ enum {
 	 * read.
 	 */
 	TXN_SIGNATURE_SYNC_ROLLBACK = JOURNAL_ENTRY_ERR_MIN - 3,
+	/**
+	 * Aborted before it could be written due an error which is already
+	 * installed into the global diag.
+	 */
+	TXN_SIGNATURE_ABORT = JOURNAL_ENTRY_ERR_MIN - 4,
 };
 
 /**
@@ -490,6 +495,15 @@ txn_commit(struct txn *txn);
  */
 void
 txn_rollback(struct txn *txn);
+
+/**
+ * Rollback a transaction due to an error which is already installed into the
+ * global diag. This is preferable over the plain rollback when there are
+ * already triggers installed and they might need to know the exact reason for
+ * the rollback.
+ */
+void
+txn_abort(struct txn *txn);
 
 /**
  * Submit a transaction to the journal.
