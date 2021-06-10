@@ -82,6 +82,7 @@
 #include "msgpack.h"
 #include "raft.h"
 #include "trivia/util.h"
+#include "version.h"
 
 enum {
 	IPROTO_THREADS_MAX = 1000,
@@ -2815,13 +2816,13 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 		 tt_uuid_str(&replica_uuid), sio_socketname(io->fd));
 	say_info("remote vclock %s local vclock %s",
 		 vclock_to_string(&replica_clock), vclock_to_string(&vclock));
-	if (raft_is_enabled(box_raft())) {
+	if (replica_version_id >= version_id(2, 6, 0) && !anon) {
 		/*
 		 * Send out the current raft state of the instance. Don't do
-		 * that if Raft is disabled. It can be that a part of the
-		 * cluster still contains old versions, which can't handle Raft
-		 * messages. So when it is disabled, its network footprint
-		 * should be 0.
+		 * that if the remote instance is old. It can be that a part of
+		 * the cluster still contains old versions, which can't handle
+		 * Raft messages. Raft's network footprint should be 0 as seen
+		 * by such instances.
 		 */
 		struct raft_request req;
 		box_raft_checkpoint_remote(&req);

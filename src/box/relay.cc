@@ -760,7 +760,7 @@ relay_subscribe_f(va_list ap)
 		  &relay->relay_pipe, NULL, NULL, cbus_process);
 
 	struct relay_is_raft_enabled_msg raft_enabler;
-	if (!relay->replica->anon)
+	if (!relay->replica->anon && relay->version_id >= version_id(2, 6, 0))
 		relay_send_is_raft_enabled(relay, &raft_enabler, true);
 
 	/*
@@ -842,7 +842,7 @@ relay_subscribe_f(va_list ap)
 		cpipe_push(&relay->tx_pipe, &relay->status_msg.msg);
 	}
 
-	if (!relay->replica->anon)
+	if (!relay->replica->anon && relay->version_id >= version_id(2, 6, 0))
 		relay_send_is_raft_enabled(relay, &raft_enabler, false);
 
 	/*
