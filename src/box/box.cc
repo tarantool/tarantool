@@ -255,7 +255,7 @@ box_process_rw(struct request *request, struct space *space,
 
 rollback:
 	if (is_autocommit) {
-		txn_rollback(txn);
+		txn_abort(txn);
 		fiber_gc();
 	}
 error:
@@ -395,7 +395,7 @@ wal_stream_abort(struct wal_stream *stream)
 {
 	struct txn *tx = in_txn();
 	if (tx != NULL)
-		txn_rollback(tx);
+		txn_abort(tx);
 	stream->tsn = 0;
 	fiber_gc();
 }
@@ -3247,9 +3247,9 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	engine_begin_final_recovery_xc();
 	recover_remaining_wals(recovery, &wal_stream.base, NULL, false);
 	if (wal_stream_has_tx(&wal_stream)) {
-		wal_stream_abort(&wal_stream);
 		diag_set(XlogError, "found a not finished transaction "
 			 "in the log");
+		wal_stream_abort(&wal_stream);
 		if (!is_force_recovery)
 			diag_raise();
 		diag_log();
@@ -3274,9 +3274,9 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		recovery_stop_local(recovery);
 		recover_remaining_wals(recovery, &wal_stream.base, NULL, true);
 		if (wal_stream_has_tx(&wal_stream)) {
-			wal_stream_abort(&wal_stream);
 			diag_set(XlogError, "found a not finished transaction "
 				 "in the log in hot standby mode");
+			wal_stream_abort(&wal_stream);
 			if (!is_force_recovery)
 				diag_raise();
 			diag_log();
