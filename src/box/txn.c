@@ -800,11 +800,6 @@ txn_commit_try_async(struct txn *txn)
 	ERROR_INJECT(ERRINJ_TXN_COMMIT_ASYNC, {
 		diag_set(ClientError, ER_INJECTION,
 			 "txn commit async injection");
-		/*
-		 * Log it for the testing sake: we grep
-		 * output to mark this event.
-		 */
-		diag_log();
 		goto rollback;
 	});
 
@@ -982,11 +977,11 @@ void
 txn_rollback(struct txn *txn)
 {
 	assert(txn == in_txn());
+	assert(txn->signature != TXN_SIGNATURE_UNKNOWN);
 	txn->status = TXN_ABORTED;
 	trigger_clear(&txn->fiber_on_stop);
 	if (!txn_has_flag(txn, TXN_CAN_YIELD))
 		trigger_clear(&txn->fiber_on_yield);
-	txn->signature = TXN_SIGNATURE_ROLLBACK;
 	txn_complete_fail(txn);
 	fiber_set_txn(fiber(), NULL);
 }
@@ -1085,6 +1080,8 @@ box_txn_rollback(void)
 		diag_set(ClientError, ER_ROLLBACK_IN_SUB_STMT);
 		return -1;
 	}
+	assert(txn->signature == TXN_SIGNATURE_UNKNOWN);
+	txn->signature = TXN_SIGNATURE_ROLLBACK;
 	txn_rollback(txn); /* doesn't throw */
 	fiber_gc();
 	return 0;
@@ -1220,7 +1217,10 @@ txn_on_stop(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	(void) event;
-	txn_rollback(in_txn());                 /* doesn't yield or fail */
+	struct txn *txn = in_txn();
+	assert(txn->signature == TXN_SIGNATURE_UNKNOWN);
+	txn->signature = TXN_SIGNATURE_ROLLBACK;
+	txn_rollback(txn);
 	fiber_gc();
 	return 0;
 }
