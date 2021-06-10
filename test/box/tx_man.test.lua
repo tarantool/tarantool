@@ -613,6 +613,17 @@ tx2('s:replace{1, 2}')
 tx2:commit()
 tx1:commit()
 
+-- https://github.com/tarantool/tarantool/issues/6131
+s:truncate()
+s:replace{1, 1}
+tx1:begin()
+tx2:begin()
+tx1('s:select{1}')
+tx2("s:update({1}, {{'=', 2, 2}})")
+tx2:commit()
+tx1("s:update({1}, {{'=', 2, 3}})")
+tx1:commit()
+
 s:drop()
 
 -- https://github.com/tarantool/tarantool/issues/6140
