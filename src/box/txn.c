@@ -532,15 +532,7 @@ static void
 txn_on_journal_write(struct journal_entry *entry)
 {
 	struct txn *txn = entry->complete_data;
-	/*
-	 * txn_limbo has already rolled the tx back, so we just
-	 * have to free it.
-	 */
-	if (txn->signature != TXN_SIGNATURE_UNKNOWN) {
-		assert(txn->signature < 0);
-		txn_free(txn);
-		return;
-	}
+	assert(txn->signature == TXN_SIGNATURE_UNKNOWN);
 	txn->signature = entry->res;
 	/*
 	 * Some commit/rollback triggers require for in_txn fiber
