@@ -38,6 +38,7 @@
 #include "tt_static.h"
 
 #include "lua/utils.h"
+#include "lua/serializer.h"
 #include "lua/msgpack.h"
 #include "lua/trigger.h"
 

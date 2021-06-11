@@ -32,6 +32,7 @@
 
 #include <fiber.h>
 #include "lua/utils.h"
+#include "lua/serializer.h"
 #include "backtrace.h"
 #include "tt_static.h"
 

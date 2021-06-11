@@ -32,6 +32,7 @@
 #include "box/xrow_update.h"
 
 #include "lua/utils.h" /* luaT_error() */
+#include "lua/serializer.h"
 #include "lua/msgpack.h" /* luamp_encode_XXX() */
 #include "diag.h" /* diag_set() */
 #include <small/ibuf.h>

@@ -38,6 +38,7 @@
 #include "mpstream/mpstream.h"
 #include "box/port.h"
 #include "lua/utils.h"
+#include "lua/serializer.h"
 #include "lua/msgpack.h"
 #include "uuid/mp_uuid.h"
 #include "mp_decimal.h"

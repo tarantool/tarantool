@@ -48,6 +48,7 @@
 #include "strbuf.h"
 
 #include "lua/utils.h"
+#include "lua/serializer.h"
 #include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID */
 #include "tt_static.h"
 #include "uuid/tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
