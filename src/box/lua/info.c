@@ -52,6 +52,7 @@
 #include "box/raft.h"
 #include "box/txn_limbo.h"
 #include "lua/utils.h"
+#include "lua/serializer.h" /* luaL_setmaphint */
 #include "fiber.h"
 #include "sio.h"
 

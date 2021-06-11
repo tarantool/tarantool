@@ -49,6 +49,7 @@ extern "C" {
 #include "b64.h"
 } /* extern "C" */
 #include "lua/utils.h"
+#include "lua/serializer.h"
 #include "lib/core/decimal.h"
 #include "tt_static.h"
 #include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID */

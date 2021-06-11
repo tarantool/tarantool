@@ -1,5 +1,6 @@
 #include "execute.h"
 #include "lua/utils.h"
+#include "lua/serializer.h"
 #include "lua/msgpack.h"
 #include "box/sql/sqlInt.h"
 #include "box/port.h"

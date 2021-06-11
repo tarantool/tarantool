@@ -34,6 +34,7 @@
 
 #include "trivia/util.h"
 #include "lua/utils.h"
+#include "lua/serializer.h"
 #include "say.h"
 
 #include "lib/core/decimal.h"

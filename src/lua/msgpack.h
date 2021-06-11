@@ -41,6 +41,7 @@ extern "C" {
 
 #include <lua.h>
 
+struct luaL_field;
 struct luaL_serializer;
 struct mpstream;
 struct serializer_opts;
