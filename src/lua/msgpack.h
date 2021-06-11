@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -39,8 +40,10 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+#include <msgpuck.h> /* enum mp_type */
 #include <lua.h>
 
+struct luaL_field;
 struct luaL_serializer;
 /**
  * Default instance of msgpack serializer (msgpack = require('msgpack')).

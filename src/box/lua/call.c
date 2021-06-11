@@ -34,6 +34,7 @@
 #include "fiber.h"
 
 #include "lua/utils.h"
+#include "lua/serializer.h"
 #include "lua/msgpack.h"
 
 #include "box/xrow.h"

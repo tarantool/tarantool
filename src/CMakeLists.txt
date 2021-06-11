@@ -174,6 +174,7 @@ set (server_sources
      lua/trigger.c
      lua/msgpack.c
      lua/utils.c
+     lua/serializer.c
      lua/errno.c
      lua/tnt_iconv.c
      lua/socket.c

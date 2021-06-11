@@ -34,6 +34,7 @@
 #include "box/port.h"
 #include "box/error.h"
 #include "lua/utils.h"
+#include "lua/serializer.h"
 #include "lua/fiber.h"
 #include "fiber.h"
 #include "coio.h"

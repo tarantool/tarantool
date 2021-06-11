@@ -49,6 +49,7 @@ extern "C" {
 #include "b64.h"
 } /* extern "C" */
 #include "lua/utils.h"
+#include "lua/serializer.h"
 
 #define LUAYAML_TAG_PREFIX "tag:yaml.org,2002:"
 

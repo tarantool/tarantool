@@ -48,6 +48,7 @@
 #include "strbuf.h"
 
 #include "lua/utils.h"
+#include "lua/serializer.h"
 #include "cord_buf.h"
 
 typedef enum {

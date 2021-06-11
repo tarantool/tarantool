@@ -51,6 +51,7 @@
 #include "lua/errno.h"
 #include "lua/socket.h"
 #include "lua/utils.h"
+#include "lua/serializer.h"
 #include <lua-cjson/lua_cjson.h>
 #include <lua-yaml/lyaml.h>
 #include "lua/msgpack.h"
@@ -445,6 +446,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_socket_init(L);
 	tarantool_lua_pickle_init(L);
 	tarantool_lua_digest_init(L);
+	tarantool_lua_serializer_init(L);
 	luaopen_http_client_driver(L);
 	lua_pop(L, 1);
 	luaopen_msgpack(L);

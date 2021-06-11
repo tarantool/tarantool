@@ -32,6 +32,7 @@
 
 #include "box/lua/slab.h"
 #include "lua/utils.h"
+#include "lua/serializer.h" /* luaL_setmaphint */
 
 #include <lua.h>
 #include <lauxlib.h>

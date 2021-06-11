@@ -38,6 +38,7 @@
 #include <lualib.h>
 
 #include "lua/utils.h"
+#include "lua/serializer.h"
 #include "lua/msgpack.h" /* luaL_msgpack_default */
 #include <fiber.h>
 #include "bit/bit.h"

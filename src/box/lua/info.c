@@ -53,6 +53,7 @@
 #include "version.h"
 #include "box/box.h"
 #include "lua/utils.h"
+#include "lua/serializer.h" /* luaL_setmaphint */
 #include "fiber.h"
 
 static void
