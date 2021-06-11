@@ -51,6 +51,7 @@
 #include "box/box.h"
 #include "box/raft.h"
 #include "lua/utils.h"
+#include "lua/serializer.h" /* luaL_setmaphint */
 #include "fiber.h"
 #include "sio.h"
 

@@ -34,6 +34,8 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
+#include "lib/core/mp_extension_types.h"
+
 #include "lua/utils.h" /* luaT_error() */
 #include "lua/trigger.h"
 #include "lua/msgpack.h"

@@ -31,6 +31,7 @@
 #include "lua/msgpack.h"
 #include "mpstream/mpstream.h"
 #include "lua/utils.h"
+#include "lua/serializer.h"
 
 #if defined(LUAJIT)
 #include <lj_ctype.h>
