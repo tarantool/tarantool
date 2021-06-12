@@ -428,6 +428,13 @@ else()
     find_package(CURL)
 endif()
 
+#
+# XXhash
+#
+include(BuildLibXXhash)
+libxxhash_build()
+add_dependencies(build_bundled_libs xxhash)
+
 # Install headers.
 if (ENABLE_BUNDLED_LIBCURL)
     install(DIRECTORY "${CURL_INCLUDE_DIRS}/curl"
