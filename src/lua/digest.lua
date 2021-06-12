@@ -59,22 +59,22 @@ ffi.cdef[[
 
     typedef unsigned int       XXH32_hash_t;
     typedef unsigned long long XXH64_hash_t;
-    XXH32_hash_t XXH32 (const void* input, size_t length, unsigned int seed);
-    XXH64_hash_t XXH64 (const void* input, size_t length, unsigned long long seed);
+    XXH32_hash_t tnt_XXH32 (const void* input, size_t length, unsigned int seed);
+    XXH64_hash_t tnt_XXH64 (const void* input, size_t length, unsigned long long seed);
 
     typedef struct XXH32_state_s XXH32_state_t;
     typedef struct XXH64_state_s XXH64_state_t;
 
-    XXH_errorcode XXH32_reset  (XXH32_state_t* statePtr, unsigned int seed);
-    XXH_errorcode XXH32_update (XXH32_state_t* statePtr, const void* input, size_t length);
-    XXH32_hash_t  XXH32_digest (const XXH32_state_t* statePtr);
+    XXH_errorcode tnt_XXH32_reset  (XXH32_state_t* statePtr, unsigned int seed);
+    XXH_errorcode tnt_XXH32_update (XXH32_state_t* statePtr, const void* input, size_t length);
+    XXH32_hash_t  tnt_XXH32_digest (const XXH32_state_t* statePtr);
 
-    XXH_errorcode XXH64_reset  (XXH64_state_t* statePtr, unsigned long long seed);
-    XXH_errorcode XXH64_update (XXH64_state_t* statePtr, const void* input, size_t length);
-    XXH64_hash_t  XXH64_digest (const XXH64_state_t* statePtr);
+    XXH_errorcode tnt_XXH64_reset  (XXH64_state_t* statePtr, unsigned long long seed);
+    XXH_errorcode tnt_XXH64_update (XXH64_state_t* statePtr, const void* input, size_t length);
+    XXH64_hash_t  tnt_XXH64_digest (const XXH64_state_t* statePtr);
 
-    void XXH32_copyState(XXH32_state_t* restrict dst_state, const XXH32_state_t* restrict src_state);
-    void XXH64_copyState(XXH64_state_t* restrict dst_state, const XXH64_state_t* restrict src_state);
+    void tnt_XXH32_copyState(XXH32_state_t* restrict dst_state, const XXH32_state_t* restrict src_state);
+    void tnt_XXH64_copyState(XXH64_state_t* restrict dst_state, const XXH64_state_t* restrict src_state);
 ]]
 
 local builtin = ffi.C
@@ -327,7 +327,7 @@ m['aes256cbc'] = {
 for _, var in ipairs({'32', '64'}) do
     local xxHash
 
-    local xxh_template = 'XXH%s_%s'
+    local xxh_template = 'tnt_XXH%s_%s'
     local update_fn_name = string.format(xxh_template, var, 'update')
     local digest_fn_name = string.format(xxh_template, var, 'digest')
     local reset_fn_name = string.format(xxh_template, var, 'reset')
@@ -358,7 +358,7 @@ for _, var in ipairs({'32', '64'}) do
         return copy
     end
 
-    local state_type_name = string.format(xxh_template, var, 'state_t')
+    local state_type_name = string.format('XXH%s_state_t', var)
     local XXH_state_t = ffi.typeof(state_type_name)
 
     xxHash = {
@@ -376,7 +376,7 @@ for _, var in ipairs({'32', '64'}) do
         end,
     }
 
-    local call_fn_name = 'XXH' .. var
+    local call_fn_name = 'tnt_XXH' .. var
     setmetatable(xxHash, {
         __call = function(_, str, seed)
             if type(str) ~= 'string' then
