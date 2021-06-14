@@ -148,6 +148,10 @@ struct iproto_thread {
 	 */
 	uint32_t id;
 	/*
+	 * Shutdown status.
+	 */
+	bool is_shutdown_active;
+	/*
 	 * Iproto binary listener
 	 */
 	struct evio_service binary;
@@ -2243,6 +2247,7 @@ iproto_thread_init(struct iproto_thread *iproto_thread)
 			  "rmean_new", "struct rmean");
 		return -1;
 	}
+	iproto_thread->is_shutdown_active = false;
 
 	return 0;
 }
@@ -2323,6 +2328,10 @@ enum iproto_cfg_op {
 	 * Command code do get statistic from iproto thread
 	 */
 	IPROTO_CFG_STAT,
+	/**
+	 * Command code to get shutdown status from iproto thread
+	 */
+	IPROTO_CFG_SHUTDOWN_STAT,
 };
 
 /**
@@ -2347,6 +2356,9 @@ struct iproto_cfg_msg: public cbus_call_msg
 
 		/** New iproto max message count. */
 		int iproto_msg_max;
+
+		/** Shutdown status. */
+		bool is_shutdown_active;
 	};
 	struct iproto_thread *iproto_thread;
 };
@@ -2414,6 +2426,10 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 			break;
 		case IPROTO_CFG_STAT:
 			iproto_fill_stat(iproto_thread, cfg_msg);
+			break;
+		case IPROTO_CFG_SHUTDOWN_STAT:
+			cfg_msg->is_shutdown_active =
+				iproto_thread->is_shutdown_active;
 			break;
 		default:
 			unreachable();
@@ -2549,6 +2565,20 @@ iproto_reset_stat(void)
 {
 	for (int i = 0; i < iproto_threads_count; i++)
 		rmean_cleanup(iproto_threads[i].rmean);
+}
+
+bool
+iproto_is_shutdown_active(struct session *session)
+{
+	struct iproto_connection *con =
+		(struct iproto_connection *)session->meta.connection;
+	if (con != NULL) {
+		struct iproto_cfg_msg cfg_msg;
+		iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_SHUTDOWN_STAT);
+		iproto_do_cfg(con->iproto_thread, &cfg_msg);
+		return cfg_msg.is_shutdown_active;
+	}
+	return false;
 }
 
 void

@@ -87,6 +87,13 @@ iproto_reset_stat(void);
 const char *
 iproto_bound_address(char *buf);
 
+/**
+ * True only if session has iproto connection and shutdown process has started
+ * in ipto thread with this connection.
+ */
+bool
+iproto_is_shutdown_active(struct session *session);
+
 int
 iproto_rmean_foreach(void *cb, void *cb_ctx);
 
