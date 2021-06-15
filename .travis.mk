@@ -346,7 +346,7 @@ build_osx:
 	# due swap disabling should be manualy configured need to
 	# control it's status
 	sysctl vm.swapusage
-	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
+	cmake . -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${CMAKE_EXTRA_PARAMS}
 	make -j
 
 
