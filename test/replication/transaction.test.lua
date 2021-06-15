@@ -81,7 +81,7 @@ test_run:cmd("restart server replica")
 test_run:cmd("switch replica")
 
 box.space.test:select()
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'follow'})
 
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")
