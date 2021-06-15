@@ -224,7 +224,7 @@ int
 sio_listen(int fd)
 {
 	int rc = listen(fd, sio_listen_backlog());
-	if (rc < 0 && errno != EADDRINUSE)
+	if (rc < 0)
 		diag_set(SocketError, sio_socketname(fd), "listen");
 	return rc;
 }
