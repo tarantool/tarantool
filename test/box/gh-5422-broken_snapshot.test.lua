@@ -95,7 +95,6 @@ assert(valid_data_count_2 > 0)
 
 -- Restore snapshot and write big garbage at the start of the file
 write_garbage_with_restore_or_save(snapshot, 5000, garbage_size, true)
-os.remove(string.format('%s.save', snapshot))
 test_run:cmd("stop server test")
 -- Check that we unable to start with corrupted system space
 test_run:cmd("start server test with crash_expected=True")
@@ -103,5 +102,13 @@ opts = {}
 opts.filename = 'gh-5422-broken_snapshot.log'
 -- We must not find ER_UNKNOWN_REPLICA in log file
 assert(test_run:grep_log("test", "ER_UNKNOWN_REPLICA", nil, opts) == nil)
+
+-- Check that snapshot filename in log file is not corrupted
+os.execute(string.format('cp %s.save %s', snapshot, snapshot))
+os.execute(string.format('dd if=%s.save of=%s bs=%d count=1', snapshot, snapshot, size - corruption_offset))
+test_run:cmd("start server test")
+test_run:cmd("stop server test")
+os.remove(string.format('%s.save', snapshot))
+assert(test_run:grep_log("test", ".snap' has no EOF marker", nil, opts))
 test_run:cmd("cleanup server test")
 test_run:cmd("delete server test")
