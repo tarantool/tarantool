@@ -205,9 +205,9 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	 */
 	if (!xlog_cursor_is_eof(&cursor)) {
 		if (!memtx->force_recovery)
-			panic("snapshot `%s' has no EOF marker", filename);
+			panic("snapshot `%s' has no EOF marker", cursor.name);
 		else
-			say_error("snapshot `%s' has no EOF marker", filename);
+			say_error("snapshot `%s' has no EOF marker", cursor.name);
 	}
 
 	return 0;

@@ -185,10 +185,6 @@ assert(valid_data_count_2 > 0)
 write_garbage_with_restore_or_save(snapshot, 5000, garbage_size, true)
 ---
 ...
-os.remove(string.format('%s.save', snapshot))
----
-- true
-...
 test_run:cmd("stop server test")
 ---
 - true
@@ -208,6 +204,31 @@ opts.filename = 'gh-5422-broken_snapshot.log'
 assert(test_run:grep_log("test", "ER_UNKNOWN_REPLICA", nil, opts) == nil)
 ---
 - true
+...
+-- Check that snapshot filename in log file is not corrupted
+os.execute(string.format('cp %s.save %s', snapshot, snapshot))
+---
+- 0
+...
+os.execute(string.format('dd if=%s.save of=%s bs=%d count=1', snapshot, snapshot, size - corruption_offset))
+---
+- 0
+...
+test_run:cmd("start server test")
+---
+- true
+...
+test_run:cmd("stop server test")
+---
+- true
+...
+os.remove(string.format('%s.save', snapshot))
+---
+- true
+...
+assert(test_run:grep_log("test", ".snap' has no EOF marker", nil, opts))
+---
+- .snap' has no EOF marker
 ...
 test_run:cmd("cleanup server test")
 ---
