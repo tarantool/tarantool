@@ -274,18 +274,8 @@ evio_service_listen(struct evio_service *service)
 		  sio_strfaddr(&service->addr, service->addr_len));
 
 	int fd = service->ev.fd;
-	if (sio_listen(fd)) {
-		if (sio_wouldblock(errno)) {
-			/*
-			 * sio_listen() doesn't set the diag
-			 * for EINTR errors. Set the
-			 * diagnostics area, since the caller
-			 * doesn't handle EINTR in any special way.
-			 */
-			diag_set(SocketError, sio_socketname(fd), "listen");
-		}
+	if (sio_listen(fd))
 		return -1;
-	}
 	ev_io_start(service->loop, &service->ev);
 	return 0;
 }
