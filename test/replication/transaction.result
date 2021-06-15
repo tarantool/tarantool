@@ -234,9 +234,9 @@ box.space.test:select()
   - [8, 'r']
   - [9, 'r']
 ...
-box.info.replication[1].upstream.status
+test_run:wait_upstream(1, {status = 'follow'})
 ---
-- follow
+- true
 ...
 test_run:cmd("switch default")
 ---
