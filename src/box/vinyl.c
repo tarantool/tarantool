@@ -640,6 +640,7 @@ vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 static void
 vinyl_space_destroy(struct space *space)
 {
+	TRASH(space);
 	free(space);
 }
 
