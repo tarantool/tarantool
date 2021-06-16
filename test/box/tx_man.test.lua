@@ -615,6 +615,15 @@ tx1:commit()
 
 s:drop()
 
+-- https://github.com/tarantool/tarantool/issues/6140
+s3 = box.schema.space.create('test3')
+i31 = s3:create_index('pk', {parts={{1, 'uint'}}})
+tx1:begin()
+tx1('s3:replace{2}')
+tx1('s3:select{}')
+s3:drop()
+tx1:rollback()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")

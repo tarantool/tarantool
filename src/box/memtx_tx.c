@@ -1576,6 +1576,7 @@ memtx_tx_on_space_delete(struct space *space)
 		memtx_tx_story_full_unlink(story);
 		if (story->add_stmt != NULL) {
 			story->add_stmt->add_story = NULL;
+			story->add_stmt->space = NULL;
 			story->add_stmt = NULL;
 		}
 		while (story->del_stmt != NULL) {
@@ -1583,6 +1584,7 @@ memtx_tx_on_space_delete(struct space *space)
 			stmt->del_story = NULL;
 			story->del_stmt = stmt->next_in_del_list;
 			stmt->next_in_del_list = NULL;
+			stmt->space = NULL;
 		}
 		memtx_tx_story_delete(story);
 	}
