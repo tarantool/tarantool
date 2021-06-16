@@ -626,6 +626,15 @@ tx1:commit()
 
 s:drop()
 
+-- https://github.com/tarantool/tarantool/issues/6140
+s3 = box.schema.space.create('test3')
+i31 = s3:create_index('pk', {parts={{1, 'uint'}}})
+tx1:begin()
+tx1('s3:replace{2}')
+tx1('s3:select{}')
+s3:drop()
+tx1:rollback()
+
 -- gh-6095: SQL query may crash in MVCC mode if it involves ephemeral spaces.
 --
 box.execute([[ CREATE TABLE test (id INT NOT NULL PRIMARY KEY, count INT NOT NULL)]])

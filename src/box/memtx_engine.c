@@ -409,6 +409,10 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	if (stmt->old_tuple == NULL && stmt->new_tuple == NULL)
 		return;
 	struct space *space = stmt->space;
+	if (space == NULL) {
+		/* The space was deleted. Nothing to rollback. */
+		return;
+	}
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	uint32_t index_count;
 
