@@ -37,7 +37,7 @@
 #include "exception.h"
 #include "crc32.h"
 #include "fio.h"
-#include "third_party/tarantool_eio.h"
+#include <tarantool_eio.h>
 #include <msgpuck.h>
 
 #include "coio_file.h"

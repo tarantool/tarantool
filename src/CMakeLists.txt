@@ -150,7 +150,7 @@ target_link_libraries(scramble core misc)
 add_library(crc32 STATIC
     crc32.c
     cpu_feature.c
-    ${PROJECT_SOURCE_DIR}/third_party/crc32.c
+    ${PROJECT_SOURCE_DIR}/third_party/crc32_impl.c
 )
 
 set (server_sources

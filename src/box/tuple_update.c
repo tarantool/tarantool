@@ -39,7 +39,7 @@
 #include "error.h"
 #include "diag.h"
 #include "trivia/util.h"
-#include "third_party/queue.h"
+#include <queue.h>
 #include <msgpuck/msgpuck.h>
 #include <bit/int96.h>
 #include <salad/rope.h>

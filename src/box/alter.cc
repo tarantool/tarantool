@@ -40,7 +40,7 @@
 #include "tuple.h"
 #include "fiber.h" /* for gc_pool */
 #include "scoped_guard.h"
-#include "third_party/base64.h"
+#include <base64.h>
 #include <new> /* for placement new */
 #include <stdio.h> /* snprintf() */
 #include <ctype.h>

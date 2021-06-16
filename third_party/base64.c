@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "third_party/base64.h"
+#include <base64.h>
 #include <trivia/util.h>
 
 /*

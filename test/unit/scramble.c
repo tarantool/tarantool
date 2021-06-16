@@ -1,6 +1,6 @@
 #include "scramble.h"
 #include "random.h"
-#include "third_party/sha1.h"
+#include <sha1.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
