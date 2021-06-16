@@ -50,11 +50,17 @@ box.cfg{                                                                        
 SERVERS = {'election_replica1', 'election_replica2', 'election_replica3'}
 test_run:create_cluster(SERVERS, "replication")
 test_run:wait_fullmesh(SERVERS)
+is_r1_leader = nil
+is_r2_leader = nil
+is_r3_leader = nil
 is_leader_cmd = 'return box.info.election.state == \'leader\''
 leader_id_cmd = 'return box.info.election.leader'
-is_r1_leader = test_run:eval('election_replica1', is_leader_cmd)[1]
-is_r2_leader = test_run:eval('election_replica2', is_leader_cmd)[1]
-is_r3_leader = test_run:eval('election_replica3', is_leader_cmd)[1]
+test_run:wait_cond(function()                                                   \
+    is_r1_leader = test_run:eval('election_replica1', is_leader_cmd)[1]         \
+    is_r2_leader = test_run:eval('election_replica2', is_leader_cmd)[1]         \
+    is_r3_leader = test_run:eval('election_replica3', is_leader_cmd)[1]         \
+    return is_r1_leader or is_r2_leader or is_r3_leader                         \
+end)
 leader_count = is_r1_leader and 1 or 0
 leader_count = leader_count + (is_r2_leader and 1 or 0)
 leader_count = leader_count + (is_r3_leader and 1 or 0)
@@ -81,7 +87,7 @@ elseif is_r2_leader then                                                        
     leader_name = 'election_replica2'                                           \
     nonleader1_name = 'election_replica1'                                       \
     nonleader2_name = 'election_replica3'                                       \
-else                                                                            \
+elseif is_r3_leader then                                                        \
     leader_name = 'election_replica3'                                           \
     nonleader1_name = 'election_replica1'                                       \
     nonleader2_name = 'election_replica2'                                       \
