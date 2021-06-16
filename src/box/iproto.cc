@@ -501,6 +501,19 @@ struct iproto_connection
 	 */
 	struct cmsg destroy_msg;
 	/**
+	 * Wait for shutdown readiness and close connection.
+	*/
+	struct ev_async after_shutdown;
+	/** Happened shutdown(socket, SHUT_RD) on input socket. */
+	bool socket_shutdown;
+	/**
+	* Connection support graceful shutdown. Is set only after start of
+	* shutdown process.
+	*/
+	bool graceful_shutdown;
+	/** Got shutdown packet from client. */
+	bool graceful_shutdown_got;
+	/**
 	 * Connection state. Mainly it is used to determine when
 	 * the connection can be destroyed, and for debug purposes
 	 * to assert on a double destroy, for example.
@@ -1124,6 +1137,15 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 	}
 }
 
+static void
+iproto_connection_on_shutdown(ev_loop *loop, struct ev_async *watcher,
+			      int /* revents */)
+{
+	struct iproto_connection *con = (struct iproto_connection *) watcher->data;
+	ev_async_stop(loop, &con->after_shutdown);
+	iproto_connection_close(con);
+}
+
 static struct iproto_connection *
 iproto_connection_new(struct iproto_thread *iproto_thread, int fd)
 {
@@ -1134,10 +1156,11 @@ iproto_connection_new(struct iproto_thread *iproto_thread, int fd)
 		return NULL;
 	}
 	con->iproto_thread = iproto_thread;
-	con->input.data = con->output.data = con;
+	con->input.data = con->output.data = con->after_shutdown.data = con;
 	con->loop = loop();
 	ev_io_init(&con->input, iproto_connection_on_input, fd, EV_READ);
 	ev_io_init(&con->output, iproto_connection_on_output, fd, EV_WRITE);
+	ev_async_init(&con->after_shutdown, iproto_connection_on_shutdown);
 	ibuf_create(&con->ibuf[0], cord_slab_cache(), iproto_readahead);
 	ibuf_create(&con->ibuf[1], cord_slab_cache(), iproto_readahead);
 	obuf_create(&con->obuf[0], &con->iproto_thread->net_slabc,
@@ -1151,6 +1174,9 @@ iproto_connection_new(struct iproto_thread *iproto_thread, int fd)
 	con->parse_size = 0;
 	con->long_poll_count = 0;
 	con->session = NULL;
+	con->graceful_shutdown = false;
+	con->graceful_shutdown_got = false;
+	con->socket_shutdown = false;
 	rlist_create(&con->in_stop_list);
 	/* It may be very awkward to allocate at close. */
 	cmsg_init(&con->destroy_msg, con->iproto_thread->destroy_route);
@@ -2161,6 +2187,24 @@ iproto_session_push(struct session *session, struct port *port)
 }
 
 /** }}} */
+
+/**
+ * True if both conditions are true:
+ * 1) Client doesn't support graceful shutdown and happened
+ * shutdown(socket, SHUT_RD) on net-socket (if socket exists).
+ * 2) Client support graceful shutdown and got
+ * IPROTO_SHUTDOWN from client.
+ *
+ * UB if shutdown process is not started because graceful_shutdown field is
+ * not initialized.
+ */
+static inline bool
+iproto_is_connection_shutdown_ready(struct iproto_connection *con)
+{
+	assert(con->iproto_thread->is_shutdown_active);
+	return (con->graceful_shutdown && con->graceful_shutdown_got) ||
+	       (!con->graceful_shutdown && con->socket_shutdown);
+}
 
 static inline void
 iproto_thread_init_routes(struct iproto_thread *iproto_thread)
