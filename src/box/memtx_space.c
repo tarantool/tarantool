@@ -62,6 +62,7 @@ enum { MEMTX_DDL_YIELD_LOOPS = 10 };
 static void
 memtx_space_destroy(struct space *space)
 {
+	TRASH(space);
 	free(space);
 }
 
