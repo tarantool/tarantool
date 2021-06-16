@@ -28,7 +28,7 @@
  */
 
 #include "tarantool_ev.h"
-#include "third_party/libev/ev.c"
+#include <libev/ev.c>
 
 #if defined(__cplusplus)
 extern "C" {

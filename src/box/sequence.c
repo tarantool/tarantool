@@ -47,7 +47,7 @@
 #include "session.h"
 #include "trivia/util.h"
 
-#include "third_party/PMurHash.h"
+#include <PMurHash.h>
 
 enum {
 	SEQUENCE_HASH_SEED = 13U,

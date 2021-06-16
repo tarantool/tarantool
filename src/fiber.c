@@ -44,7 +44,7 @@
 #include "errinj.h"
 
 extern void cord_on_yield(void);
-#include "third_party/valgrind/memcheck.h"
+#include <valgrind/memcheck.h>
 
 static int (*fiber_invoke)(fiber_func f, va_list ap);
 

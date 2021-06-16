@@ -44,7 +44,7 @@
 #include "tuple_hash.h"
 #include "salad/bloom.h"
 #include "trivia/util.h"
-#include "third_party/PMurHash.h"
+#include <PMurHash.h>
 
 enum { HASH_SEED = 13U };
 

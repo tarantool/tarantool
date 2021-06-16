@@ -31,7 +31,7 @@
 #include "crc32.h"
 
 #include <trivia/config.h>
-#include <third_party/crc32.h>
+#include <crc32_impl.h>
 #include <cpu_feature.h>
 /*
  * Pointer to an architecture-specific implementation of

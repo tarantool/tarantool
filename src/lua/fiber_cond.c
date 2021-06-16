@@ -31,7 +31,7 @@
 
 #include "lua/fiber_cond.h"
 
-#include "third_party/tarantool_ev.h"
+#include <tarantool_ev.h>
 
 #include "lua/utils.h"
 #include "fiber.h"
