@@ -18,7 +18,7 @@ for i = 1,10 do box.space.test:insert{i} end
 box.info.vclock[0] == a + 10 or box.info.vclock[0] - a
 
 test_run:cmd('switch replica')
-box.info.vclock[0]
+a = box.info.vclock[0] or 0
 box.cfg{checkpoint_count=1}
 box.space.test:select{}
 box.space.test:insert{1}
@@ -27,7 +27,7 @@ box.space.test:insert{2}
 box.snapshot()
 box.space.test:insert{3}
 
-box.info.vclock[0]
+assert(box.info.vclock[0] == a + 3)
 
 test_run:cmd('switch default')
 
