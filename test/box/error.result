@@ -445,6 +445,8 @@ t;
  |   224: box.error.ELECTION_DISABLED
  |   225: box.error.TXN_ROLLBACK
  |   226: box.error.NOT_LEADER
+ |   227: box.error.SYNC_QUEUE_UNCLAIMED
+ |   228: box.error.SYNC_QUEUE_FOREIGN
  | ...
 
 test_run:cmd("setopt delimiter ''");

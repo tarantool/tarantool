@@ -1464,7 +1464,7 @@ assert(s.is_sync)
 ...
 s:replace{1}
 ---
-- error: Quorum collection for a synchronous transaction is timed out
+- error: The synchronous transaction queue doesn't belong to any instance
 ...
 -- When not specified or nil - ignored.
 s:alter({is_sync = nil})
