@@ -3090,28 +3090,73 @@ user_def_new_from_tuple(struct tuple *tuple)
 }
 
 static int
-user_cache_remove_user(struct trigger *trigger, void * /* event */)
+on_create_user_commit(struct trigger * trigger, void * /* event */)
 {
-	struct tuple *tuple = (struct tuple *)trigger->data;
-	uint32_t uid;
-	if (tuple_field_u32(tuple, BOX_USER_FIELD_ID, &uid) != 0)
-		return -1;
-	user_cache_delete(uid);
+	struct user *user = (struct user *)trigger->data;
+	user->tx_id = 0;
 	return 0;
 }
 
 static int
-user_cache_alter_user(struct trigger *trigger, void * /* event */)
+on_create_user_rollback(struct trigger * trigger, void * /* event */)
 {
-	struct tuple *tuple = (struct tuple *)trigger->data;
-	struct user_def *user = user_def_new_from_tuple(tuple);
-	if (user == NULL)
-		return -1;
-	if (user_cache_replace(user) == NULL) {
-		free(user);
-		return -1;
-	}
+	struct user *user = (struct user *)trigger->data;
+	user_cache_delete(user->def->uid);
 	return 0;
+}
+
+static int
+on_delete_user_commit(struct trigger * trigger, void * /* event */)
+{
+	struct user *user = (struct user *)trigger->data;
+	if (user->is_deleted)
+		user_cache_delete(user->def->uid);
+	return 0;
+}
+
+static int
+on_delete_user_rollback(struct trigger * trigger, void * /* event */)
+{
+	struct user *user = (struct user *)trigger->data;
+	user->is_deleted = false;
+	user->tx_id = 0;
+	return 0;
+}
+
+static int
+on_alter_user_commit(struct trigger * trigger, void * /* event */)
+{
+	struct user_def *old_def = (struct user_def *)trigger->data;
+	struct user *new_user = user_by_id(old_def->uid);
+	assert(new_user != NULL);
+	new_user->tx_id = 0;
+	new_user->is_deleted = false;
+	free(old_def);
+	return 0;
+}
+
+static int
+on_alter_user_rollback(struct trigger * trigger, void * /* event */)
+{
+	struct user_def *old_def = (struct user_def *)trigger->data;
+	struct user *new_user = user_by_id(old_def->uid);
+	assert(new_user != NULL);
+	struct user *old_user = user_cache_replace(old_def);
+	assert(old_user != NULL);
+	old_user->tx_id = 0;
+	assert(!old_user->is_deleted);
+	return 0;
+}
+
+static struct user_def *
+user_def_dup(struct user_def *user)
+{
+	size_t def_size = user_def_sizeof(strlen(user->name));
+	struct user_def *dup = (struct user_def *) malloc(def_size);
+	if (dup == NULL)
+		return NULL;
+	memcpy(dup, user, def_size);
+	return dup;
 }
 
 /**
@@ -3130,6 +3175,10 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 			    BOX_USER_FIELD_ID, &uid) != 0)
 		return -1;
 	struct user *old_user = user_by_id(uid);
+	if (old_user != NULL && !user_check_tx_ownership(old_user)) {
+		diag_set(ClientError, ER_USER_BUSY);
+		return -1;
+	}
 	if (new_tuple != NULL && old_user == NULL) { /* INSERT */
 		struct user_def *user = user_def_new_from_tuple(new_tuple);
 		if (user == NULL)
@@ -3137,15 +3186,21 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		if (access_check_ddl(user->name, user->uid, user->owner, user->type,
 				 PRIV_C) != 0)
 			return -1;
-		if (user_cache_replace(user) == NULL) {
+		struct user *new_user = user_cache_replace(user);
+		if (new_user == NULL) {
 			free(user);
 			return -1;
 		}
+		new_user->tx_id = in_txn()->id;
 		struct trigger *on_rollback =
-			txn_alter_trigger_new(user_cache_remove_user, new_tuple);
-		if (on_rollback == NULL)
+			txn_alter_trigger_new(on_create_user_rollback,
+					      new_user);
+		struct trigger *on_commit =
+			txn_alter_trigger_new(on_create_user_commit, new_user);
+		if (on_rollback == NULL || on_commit == NULL)
 			return -1;
 		txn_stmt_on_rollback(stmt, on_rollback);
+		txn_stmt_on_commit(stmt, on_commit);
 	} else if (new_tuple == NULL) { /* DELETE */
 		if (access_check_ddl(old_user->def->name, old_user->def->uid,
 				 old_user->def->owner, old_user->def->type,
@@ -3171,12 +3226,27 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 				  old_user->def->name, "the user has objects");
 			return -1;
 		}
-		user_cache_delete(uid);
+		struct user *to_delete = user_by_id(uid);
+		/*
+		 * We can't delete user twice: if another transaction attempts
+		 * at deleting this user tx id check will fire first;
+		 * if we delete user twice in the same transaction, then MVCC
+		 * won't find corresponding tuple and on_replace trigger won't
+		 * fire.
+		 */
+		assert(!to_delete->is_deleted);
+		to_delete->is_deleted = true;
+		to_delete->tx_id = in_txn()->id;
 		struct trigger *on_rollback =
-			txn_alter_trigger_new(user_cache_alter_user, old_tuple);
-		if (on_rollback == NULL)
+			txn_alter_trigger_new(on_delete_user_rollback,
+					      to_delete);
+		struct trigger *on_commit =
+			txn_alter_trigger_new(on_delete_user_commit,
+					      to_delete);
+		if (on_rollback == NULL || on_commit == NULL)
 			return -1;
 		txn_stmt_on_rollback(stmt, on_rollback);
+		txn_stmt_on_commit(stmt, on_commit);
 	} else { /* UPDATE, REPLACE */
 		assert(old_user != NULL && new_tuple != NULL);
 		/*
@@ -3192,15 +3262,26 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 			free(user);
 			return -1;
 		}
-		if (user_cache_replace(user) == NULL) {
+		struct user_def *old_def_dup = user_def_dup(old_user->def);
+		struct user *replaced = user_cache_replace(user);
+		if (replaced == NULL) {
 			free(user);
 			return -1;
 		}
+		replaced->tx_id = in_txn()->id;
+		/* In fact sequence of DELETE + INSERT request inside one
+		 * transaction leads to DELETE + REPLACE since DELETE doesn't
+		 * erase entry from the cache until on_commit trigger is fired.
+		 */
+		replaced->is_deleted = false;
 		struct trigger *on_rollback =
-			txn_alter_trigger_new(user_cache_alter_user, old_tuple);
-		if (on_rollback == NULL)
+			txn_alter_trigger_new(on_alter_user_rollback, old_def_dup);
+		struct trigger *on_commit =
+			txn_alter_trigger_new(on_alter_user_commit, old_def_dup);
+		if (on_rollback == NULL || on_commit == NULL)
 			return -1;
 		txn_stmt_on_rollback(stmt, on_rollback);
+		txn_stmt_on_commit(stmt, on_commit);
 	}
 	return 0;
 }
@@ -4037,7 +4118,7 @@ grant_or_revoke(struct priv_def *priv)
 	 * and the role is specified.
 	 */
 	if (priv->object_type == SC_ROLE && !(priv->access & ~PRIV_X)) {
-		struct user *role = user_by_id(priv->object_id);
+		struct user *role = user_find(priv->object_id);
 		if (role == NULL || role->def->type != SC_ROLE)
 			return 0;
 		if (priv->access) {

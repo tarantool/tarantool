@@ -74,6 +74,16 @@ struct user
 {
 	struct user_def *def;
 	/**
+	 * Id of the transaction that processes this user. Is set only during
+	 * DDL operations via on_replace_dd_user() trigger.
+	 */
+	int64_t tx_id;
+	/**
+	 * Marker indicating that this user is deleted by some transaction.
+	 * Always false outside transactions.
+	 */
+	bool is_deleted;
+	/**
 	 * An id in privileges array to quickly find a
 	 * respective privilege.
 	 */
@@ -189,6 +199,9 @@ user_find_by_name_xc(const char *name, uint32_t len)
 		diag_raise();
 	return user;
 }
+
+bool
+user_check_tx_ownership(struct user *user);
 
 /** Initialize the user cache and access control subsystem. */
 void

@@ -39,6 +39,7 @@
 #include "scoped_guard.h"
 #include "sequence.h"
 #include "tt_static.h"
+#include "txn.h"
 
 struct universe universe;
 static struct user users[BOX_USER_MAX];
@@ -165,6 +166,8 @@ user_create(struct user *user, uint8_t auth_token)
 	privset_new(&user->privs);
 	region_create(&user->pool, &cord()->slabc);
 	rlist_create(&user->credentials_list);
+	user->is_deleted = false;
+	user->tx_id = 0;
 }
 
 static void
@@ -502,6 +505,16 @@ user_cache_delete(uint32_t uid)
 	}
 }
 
+bool
+user_check_tx_ownership(struct user *user)
+{
+	if (user->tx_id == 0)
+		return true;
+	if (in_txn() == NULL)
+		return true;
+	return user->tx_id == in_txn()->id;
+}
+
 /** Find user by id. */
 struct user *
 user_by_id(uint32_t uid)
@@ -516,8 +529,18 @@ struct user *
 user_find(uint32_t uid)
 {
 	struct user *user = user_by_id(uid);
-	if (user == NULL)
+	if (user == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_USER, int2str(uid));
+		return NULL;
+	}
+	if (!user_check_tx_ownership(user)) {
+		diag_set(ClientError, ER_USER_BUSY);
+		return NULL;
+	}
+	if (user->is_deleted) {
+		diag_set(ClientError, ER_NO_SUCH_USER, int2str(uid));
+		return NULL;
+	}
 	return user;
 }
 
@@ -536,9 +559,11 @@ user_find_by_name(const char *name, uint32_t len)
 	if (schema_find_id(BOX_USER_ID, 2, name, len, &uid) != 0)
 		return NULL;
 	if (uid != BOX_ID_NIL) {
-		struct user *user = user_by_id(uid);
+		struct user *user = user_find(uid);
 		if (user != NULL && user->def->type == SC_USER)
 			return user;
+		if (user == NULL)
+			return NULL;
 	}
 	diag_set(ClientError, ER_NO_SUCH_USER,
 		 tt_cstr(name, MIN((uint32_t) BOX_INVALID_NAME_MAX, len)));
