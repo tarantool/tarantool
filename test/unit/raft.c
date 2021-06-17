@@ -1184,7 +1184,7 @@ raft_test_death_timeout(void)
 static void
 raft_test_enable_disable(void)
 {
-	raft_start_test(10);
+	raft_start_test(11);
 	struct raft_node node;
 	raft_node_create(&node);
 
@@ -1276,7 +1276,20 @@ raft_test_enable_disable(void)
 		"{0: 2}" /* Vclock. */
 	), "nothing changed");
 
+	/* Disabled node still bumps the term when needed. */
+	raft_node_new_term(&node);
+
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_FOLLOWER /* State. */,
+		0 /* Leader. */,
+		4 /* Term. */,
+		0 /* Vote. */,
+		4 /* Volatile term. */,
+		0 /* Volatile vote. */,
+		"{0: 3}" /* Vclock. */
+	), "term bump when disabled");
 	raft_node_destroy(&node);
+
 	raft_finish_test();
 }
 
