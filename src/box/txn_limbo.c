@@ -55,7 +55,8 @@ txn_limbo_create(struct txn_limbo *limbo)
 bool
 txn_limbo_is_ro(struct txn_limbo *limbo)
 {
-	return limbo->owner_id != instance_id && !txn_limbo_is_empty(limbo);
+	return limbo->owner_id != REPLICA_ID_NIL &&
+	       limbo->owner_id != instance_id;
 }
 
 struct txn_limbo_entry *
@@ -95,18 +96,18 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 	}
 	if (id == 0)
 		id = instance_id;
-	bool make_ro = false;
-	if (limbo->owner_id != id) {
-		if (rlist_empty(&limbo->queue)) {
-			limbo->owner_id = id;
-			limbo->confirmed_lsn = 0;
-			if (id != instance_id)
-				make_ro = true;
+	if  (limbo->owner_id == REPLICA_ID_NIL) {
+		diag_set(ClientError, ER_SYNC_QUEUE_UNCLAIMED);
+		return NULL;
+	} else if (limbo->owner_id != id) {
+		if (txn_limbo_is_empty(limbo)) {
+			diag_set(ClientError, ER_SYNC_QUEUE_FOREIGN,
+				 limbo->owner_id);
 		} else {
 			diag_set(ClientError, ER_UNCOMMITTED_FOREIGN_SYNC_TXNS,
 				 limbo->owner_id);
-			return NULL;
 		}
+		return NULL;
 	}
 	size_t size;
 	struct txn_limbo_entry *e = region_alloc_object(&txn->region,
@@ -122,12 +123,6 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 	e->is_rollback = false;
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
 	limbo->len++;
-	/*
-	 * We added new entries from a remote instance to an empty limbo.
-	 * Time to make this instance read-only.
-	 */
-	if (make_ro)
-		box_update_ro_summary();
 	return e;
 }
 
@@ -442,9 +437,6 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		assert(e->txn->signature >= 0);
 		txn_complete_success(e->txn);
 	}
-	/* Update is_ro once the limbo is clear. */
-	if (txn_limbo_is_empty(limbo))
-		box_update_ro_summary();
 }
 
 /**
@@ -492,9 +484,6 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 		if (e == last_rollback)
 			break;
 	}
-	/* Update is_ro once the limbo is clear. */
-	if (txn_limbo_is_empty(limbo))
-		box_update_ro_summary();
 }
 
 void
@@ -525,6 +514,7 @@ txn_limbo_read_promote(struct txn_limbo *limbo, uint32_t replica_id,
 	txn_limbo_read_rollback(limbo, lsn + 1);
 	assert(txn_limbo_is_empty(&txn_limbo));
 	limbo->owner_id = replica_id;
+	box_update_ro_summary();
 	limbo->confirmed_lsn = 0;
 }
 
