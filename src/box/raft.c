@@ -394,6 +394,47 @@ box_raft_wait_term_outcome(void)
 	return 0;
 }
 
+struct raft_wait_persisted_data {
+	struct fiber *waiter;
+	uint64_t term;
+};
+
+static int
+box_raft_wait_term_persisted_f(struct trigger *trig, void *event)
+{
+	struct raft *raft = event;
+	struct raft_wait_persisted_data *data = trig->data;
+	if (raft->term >= data->term)
+		fiber_wakeup(data->waiter);
+	return 0;
+}
+
+int
+box_raft_wait_term_persisted(void)
+{
+	struct raft *raft = box_raft();
+	if (raft->term == raft->volatile_term)
+		return 0;
+	struct raft_wait_persisted_data data = {
+		.waiter = fiber(),
+		.term = raft->volatile_term,
+	};
+	struct trigger trig;
+	trigger_create(&trig, box_raft_wait_term_persisted_f, &data, NULL);
+	raft_on_update(raft, &trig);
+
+	do {
+		fiber_yield();
+	} while (raft->term < data.term && !fiber_is_cancelled());
+
+	trigger_clear(&trig);
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
+	return 0;
+}
+
 void
 box_raft_init(void)
 {

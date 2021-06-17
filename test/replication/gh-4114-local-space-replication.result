@@ -45,9 +45,8 @@ test_run:cmd('switch replica')
  | ---
  | - true
  | ...
-box.info.vclock[0]
+a = box.info.vclock[0] or 0
  | ---
- | - null
  | ...
 box.cfg{checkpoint_count=1}
  | ---
@@ -77,9 +76,9 @@ box.space.test:insert{3}
  | - [3]
  | ...
 
-box.info.vclock[0]
+assert(box.info.vclock[0] == a + 3)
  | ---
- | - 3
+ | - true
  | ...
 
 test_run:cmd('switch default')

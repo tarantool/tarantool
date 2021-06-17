@@ -101,6 +101,10 @@ box_raft_process(struct raft_request *req, uint32_t source);
 int
 box_raft_wait_term_outcome(void);
 
+/** Block this fiber until the current volatile term is persisted. */
+int
+box_raft_wait_term_persisted(void);
+
 void
 box_raft_init(void);
 
