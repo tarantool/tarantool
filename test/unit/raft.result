@@ -205,7 +205,7 @@ ok 10 - subtests
 ok 11 - subtests
 	*** raft_test_death_timeout: done ***
 	*** raft_test_enable_disable ***
-    1..10
+    1..11
     ok 1 - accepted a leader notification
     ok 2 - leader is seen
     ok 3 - death timeout passed
@@ -216,6 +216,7 @@ ok 11 - subtests
     ok 8 - became leader
     ok 9 - resigned from leader state
     ok 10 - nothing changed
+    ok 11 - term bump when disabled
 ok 12 - subtests
 	*** raft_test_enable_disable: done ***
 	*** raft_test_too_long_wal_write ***

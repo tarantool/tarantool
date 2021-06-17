@@ -996,8 +996,7 @@ raft_cfg_vclock(struct raft *raft, const struct vclock *vclock)
 void
 raft_new_term(struct raft *raft)
 {
-	if (raft->is_enabled)
-		raft_sm_schedule_new_term(raft, raft->volatile_term + 1);
+	raft_sm_schedule_new_term(raft, raft->volatile_term + 1);
 }
 
 static void
