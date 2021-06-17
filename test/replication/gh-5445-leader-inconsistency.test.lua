@@ -82,6 +82,9 @@ test_run:wait_cond(function() return box.space.test:get{2} ~= nil end)
 test_run:switch('default')
 test_run:cmd('stop server '..leader)
 is_possible_leader[leader_nr] = false
+-- And other node as well.
+test_run:cmd('stop server '..other)
+is_possible_leader[other_nr] = false
 
 -- Emulate a situation when next_leader wins the elections. It can't do that in
 -- this configuration, obviously, because it's behind the 'other' node, so set
@@ -93,6 +96,8 @@ is_possible_leader[leader_nr] = false
 -- a situation when some rows from the old leader were not received).
 test_run:cmd('start server '..next_leader..' with args="1 0.4 candidate 1"')
 assert(get_leader(is_possible_leader) == next_leader_nr)
+test_run:cmd('start server '..other..' with args="1 0.4 voter 2"')
+is_possible_leader[other_nr] = true
 test_run:switch(other)
 -- New leader didn't know about the unconfirmed rows but still rolled them back.
 test_run:wait_cond(function() return box.space.test:get{2} == nil end)

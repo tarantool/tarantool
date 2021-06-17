@@ -236,13 +236,6 @@ raft_is_ro(const struct raft *raft)
 	return raft->is_enabled && raft->state != RAFT_STATE_LEADER;
 }
 
-/** See if the instance can accept rows from an instance with the given ID. */
-static inline bool
-raft_is_source_allowed(const struct raft *raft, uint32_t source_id)
-{
-	return !raft->is_enabled || raft->leader == source_id;
-}
-
 /** Check if Raft is enabled. */
 static inline bool
 raft_is_enabled(const struct raft *raft)

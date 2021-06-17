@@ -1031,21 +1031,24 @@ nopify:;
  * Return 0 for success or -1 in case of an error.
  */
 static int
-applier_apply_tx(struct applier *applier, struct stailq *rows)
+applier_apply_tx(struct stailq *rows)
 {
 	/*
-	 * Rows received not directly from a leader are ignored. That is a
-	 * protection against the case when an old leader keeps sending data
-	 * around not knowing yet that it is not a leader anymore.
+	 * Initially we've been filtering out data if it came from
+	 * an applier which instance_id doesn't match raft->leader,
+	 * but this prevents from obtaining valid leader's data when
+	 * it comes from intermediate node. For example a series of
+	 * replica hops
 	 *
-	 * XXX: it may be that this can be fine to apply leader transactions by
-	 * looking at their replica_id field if it is equal to leader id. That
-	 * can be investigated as an 'optimization'. Even though may not give
-	 * anything, because won't change total number of rows sent in the
-	 * network anyway.
+	 *  master -> replica 1 -> replica 2
+	 *
+	 * where each replica carries master's initiated transaction
+	 * in xrow->replica_id field and master's data get propagated
+	 * indirectly.
+	 *
+	 * Finally we dropped such "sender" filtration and use transaction
+	 * "initiator" filtration via xrow->replica_id only.
 	 */
-	if (!raft_is_source_allowed(box_raft(), applier->instance_id))
-		return 0;
 	struct xrow_header *first_row = &stailq_first_entry(rows,
 					struct applier_tx_row, next)->row;
 	struct xrow_header *last_row;
@@ -1316,7 +1319,7 @@ applier_subscribe(struct applier *applier)
 					diag_raise();
 			}
 			applier_signal_ack(applier);
-		} else if (applier_apply_tx(applier, &rows) != 0) {
+		} else if (applier_apply_tx(&rows) != 0) {
 			diag_raise();
 		}
 
