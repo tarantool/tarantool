@@ -53,6 +53,8 @@
  */
 enum handlers {
 	HANDLER_CALL,
+	HANDLER_ENCODE_CALL,
+	HANDLER_ENCODE_CALL_16,
 	HANDLER_EVAL,
 	HANDLER_MAX,
 };
@@ -347,10 +349,26 @@ execute_lua_eval(lua_State *L)
 	return lua_gettop(L);
 }
 
+
+/**
+ * Encode call results to msgpack from Lua stack.
+ * Lua stack has the following structure -- the last element is
+ * lightuserdata pointer to encode_lua_ctx, all other values are
+ * arguments to process.
+ * The function encodes all given Lua objects to msgpack stream
+ * from context, sets port's size and returns no value on the Lua
+ * stack.
+ * XXX: This function *MUST* be called under lua_pcall(), because
+ * luamp_encode() may raise an error.
+ */
 static int
 encode_lua_call(lua_State *L)
 {
+	assert(lua_islightuserdata(L, -1));
 	struct port_lua *port = (struct port_lua *) lua_topointer(L, -1);
+	assert(port->L == L);
+	/* Delete port from the stack. */
+	lua_pop(L, 1);
 	/*
 	 * Add all elements from Lua stack to the buffer.
 	 *
@@ -361,18 +379,33 @@ encode_lua_call(lua_State *L)
 		      luamp_error, port->L);
 
 	struct luaL_serializer *cfg = luaL_msgpack_default;
-	int size = lua_gettop(port->L);
+	const int size = lua_gettop(L);
 	for (int i = 1; i <= size; ++i)
-		luamp_encode(port->L, cfg, &stream, i);
+		luamp_encode(L, cfg, &stream, i);
 	port->size = size;
 	mpstream_flush(&stream);
 	return 0;
 }
 
+/**
+ * Encode call_16 results to msgpack from Lua stack.
+ * Lua stack has the following structure -- the last element is
+ * lightuserdata pointer to encode_lua_ctx, all other values are
+ * arguments to process.
+ * The function encodes all given Lua objects to msgpack stream
+ * from context, sets port's size and returns no value on the Lua
+ * stack.
+ * XXX: This function *MUST* be called under lua_pcall(), because
+ * luamp_encode() may raise an error.
+ */
 static int
 encode_lua_call_16(lua_State *L)
 {
+	assert(lua_islightuserdata(L, -1));
 	struct port_lua *port = (struct port_lua *) lua_topointer(L, -1);
+	assert(port->L == L);
+	/* Delete port from the stack. */
+	lua_pop(L, 1);
 	/*
 	 * Add all elements from Lua stack to the buffer.
 	 *
@@ -383,42 +416,45 @@ encode_lua_call_16(lua_State *L)
 		      luamp_error, port->L);
 
 	struct luaL_serializer *cfg = luaL_msgpack_default;
-	port->size = luamp_encode_call_16(port->L, cfg, &stream);
+	port->size = luamp_encode_call_16(L, cfg, &stream);
 	mpstream_flush(&stream);
 	return 0;
 }
 
 static inline int
-port_lua_do_dump(struct port *base, struct obuf *out, lua_CFunction handler)
+port_lua_do_dump(struct port *base, struct obuf *out, enum handlers handler)
 {
 	struct port_lua *port = (struct port_lua *)base;
 	assert(port->vtab == &port_lua_vtab);
 	/* Use port to pass arguments to encoder quickly. */
 	port->out = out;
+	lua_State *L = port->L;
 	/*
-	 * Use the same global state, assuming the encoder doesn't
-	 * yield.
+	 * At the moment Lua stack holds only values to encode.
+	 * Insert corresponding encoder to the bottom and push
+	 * encode context as lightuserdata to the top.
 	 */
-	struct lua_State *L = tarantool_L;
-	int top = lua_gettop(L);
-	if (lua_cpcall(L, handler, port) != 0) {
-		luaT_toerror(port->L);
+	const int size = lua_gettop(L);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, execute_lua_refs[handler]);
+	assert(lua_isfunction(L, -1) && lua_iscfunction(L, -1));
+	lua_insert(L, 1);
+	lua_pushlightuserdata(L, port);
+	/* nargs -- all arguments + lightuserdata. */
+	if (luaT_call(L, size + 1, 0) != 0)
 		return -1;
-	}
-	lua_settop(L, top);
 	return port->size;
 }
 
 static int
 port_lua_dump(struct port *base, struct obuf *out)
 {
-	return port_lua_do_dump(base, out, encode_lua_call);
+	return port_lua_do_dump(base, out, HANDLER_ENCODE_CALL);
 }
 
 static int
 port_lua_dump_16(struct port *base, struct obuf *out)
 {
-	return port_lua_do_dump(base, out, encode_lua_call_16);
+	return port_lua_do_dump(base, out, HANDLER_ENCODE_CALL_16);
 }
 
 static void
@@ -499,6 +535,8 @@ box_lua_call_init(struct lua_State *L)
 
 	lua_CFunction handles[] = {
 		[HANDLER_CALL] = execute_lua_call,
+		[HANDLER_ENCODE_CALL] = encode_lua_call,
+		[HANDLER_ENCODE_CALL_16] = encode_lua_call_16,
 		[HANDLER_EVAL] = execute_lua_eval,
 	};
 
