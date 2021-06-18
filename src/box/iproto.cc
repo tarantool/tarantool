@@ -139,6 +139,10 @@ struct iproto_thread {
 	 */
 	struct rlist stopped_connections;
 	/*
+	* List of all connections.
+	*/
+	struct rlist all_connections;
+	/*
 	 * Iproto thread stat
 	 */
 	struct rmean *rmean;
@@ -520,6 +524,8 @@ struct iproto_connection
 	 */
 	enum iproto_connection_state state;
 	struct rlist in_stop_list;
+	/** Member of list with all connections in iproto_thread. */
+	struct rlist in_all_list;
 	/**
 	 * Kharon is used to implement box.session.push().
 	 * When a new push is ready, tx uses kharon to notify
@@ -686,6 +692,15 @@ iproto_connection_try_to_start_destroy(struct iproto_connection *con)
 		con->state = IPROTO_CONNECTION_PENDING_DESTROY;
 		return;
 	}
+	/*
+	 * If shutdown process started, part of iproto_connection struct
+	 * used there, so freeing of connection will lead to UB. Let shutdown
+	 * process destroy the connection.
+	 */
+	if (con->iproto_thread->is_shutdown_active &&
+	    !rlist_empty(&con->in_all_list))
+		return;
+	rlist_del(&con->in_all_list);
 	/*
 	 * If the connection has no outstanding requests in the
 	 * input buffer, then no one (e.g. tx thread) is referring
@@ -1143,6 +1158,7 @@ iproto_connection_on_shutdown(ev_loop *loop, struct ev_async *watcher,
 {
 	struct iproto_connection *con = (struct iproto_connection *) watcher->data;
 	ev_async_stop(loop, &con->after_shutdown);
+	rlist_del(&con->in_all_list);
 	iproto_connection_close(con);
 }
 
@@ -1178,6 +1194,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread, int fd)
 	con->graceful_shutdown_got = false;
 	con->socket_shutdown = false;
 	rlist_create(&con->in_stop_list);
+	rlist_create(&con->in_all_list);
 	/* It may be very awkward to allocate at close. */
 	cmsg_init(&con->destroy_msg, con->iproto_thread->destroy_route);
 	cmsg_init(&con->disconnect_msg, con->iproto_thread->disconnect_route);
@@ -2047,6 +2064,8 @@ iproto_on_accept(struct evio_service *service, int fd,
 		mempool_free(&con->iproto_thread->iproto_connection_pool, con);
 		return -1;
 	}
+	rlist_add_tail_entry(&iproto_thread->all_connections, con,
+			     in_all_list);
 	cmsg_init(&msg->base, iproto_thread->connect_route);
 	msg->p_ibuf = con->p_ibuf;
 	msg->wpos = con->wpos;
@@ -2335,6 +2354,9 @@ iproto_init(int threads_count)
 		iproto_thread->stopped_connections =
 			RLIST_HEAD_INITIALIZER(iproto_thread->
 					       stopped_connections);
+		iproto_thread->all_connections =
+			RLIST_HEAD_INITIALIZER(iproto_thread->
+					       all_connections);
 		char endpoint_name[ENDPOINT_NAME_MAX];
 		snprintf(endpoint_name, ENDPOINT_NAME_MAX, "net%u",
 			 iproto_thread->id);
