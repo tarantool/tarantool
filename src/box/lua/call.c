@@ -61,6 +61,8 @@
 enum handlers {
 	HANDLER_CALL,
 	HANDLER_CALL_BY_REF,
+	HANDLER_ENCODE_CALL,
+	HANDLER_ENCODE_CALL_16,
 	HANDLER_EVAL,
 	HANDLER_MAX,
 };
@@ -401,11 +403,26 @@ struct encode_lua_ctx {
 	struct mpstream *stream;
 };
 
+/**
+ * Encode call results to msgpack from Lua stack.
+ * Lua stack has the following structure -- the last element is
+ * lightuserdata pointer to encode_lua_ctx, all other values are
+ * arguments to process.
+ * The function encodes all given Lua objects to msgpack stream
+ * from context, sets port's size and returns no value on the Lua
+ * stack.
+ * XXX: This function *MUST* be called under lua_pcall(), because
+ * luamp_encode() may raise an error.
+ */
 static int
 encode_lua_call(lua_State *L)
 {
+	assert(lua_islightuserdata(L, -1));
 	struct encode_lua_ctx *ctx =
-		(struct encode_lua_ctx *) lua_topointer(L, 1);
+		(struct encode_lua_ctx *) lua_topointer(L, -1);
+	assert(ctx->port->L == L);
+	/* Delete ctx from the stack. */
+	lua_pop(L, 1);
 	/*
 	 * Add all elements from Lua stack to the buffer.
 	 *
@@ -414,33 +431,48 @@ encode_lua_call(lua_State *L)
 	struct luaL_serializer *cfg = luaL_msgpack_default;
 	const struct serializer_opts *opts =
 		&current_session()->meta.serializer_opts;
-	int size = lua_gettop(ctx->port->L);
+	const int size = lua_gettop(L);
 	for (int i = 1; i <= size; ++i)
-		luamp_encode(ctx->port->L, cfg, opts, ctx->stream, i);
+		luamp_encode(L, cfg, opts, ctx->stream, i);
 	ctx->port->size = size;
 	mpstream_flush(ctx->stream);
 	return 0;
 }
 
+/**
+ * Encode call_16 results to msgpack from Lua stack.
+ * Lua stack has the following structure -- the last element is
+ * lightuserdata pointer to encode_lua_ctx, all other values are
+ * arguments to process.
+ * The function encodes all given Lua objects to msgpack stream
+ * from context, sets port's size and returns no value on the Lua
+ * stack.
+ * XXX: This function *MUST* be called under lua_pcall(), because
+ * luamp_encode() may raise an error.
+ */
 static int
 encode_lua_call_16(lua_State *L)
 {
+	assert(lua_islightuserdata(L, -1));
 	struct encode_lua_ctx *ctx =
-		(struct encode_lua_ctx *) lua_topointer(L, 1);
+		(struct encode_lua_ctx *) lua_topointer(L, -1);
+	assert(ctx->port->L == L);
+	/* Delete ctx from the stack. */
+	lua_pop(L, 1);
 	/*
 	 * Add all elements from Lua stack to the buffer.
 	 *
 	 * TODO: forbid explicit yield from __serialize or __index here
 	 */
 	struct luaL_serializer *cfg = luaL_msgpack_default;
-	ctx->port->size = luamp_encode_call_16(ctx->port->L, cfg, ctx->stream);
+	ctx->port->size = luamp_encode_call_16(L, cfg, ctx->stream);
 	mpstream_flush(ctx->stream);
 	return 0;
 }
 
 static inline int
 port_lua_do_dump(struct port *base, struct mpstream *stream,
-		 lua_CFunction handler)
+		 enum handlers handler)
 {
 	struct port_lua *port = (struct port_lua *) base;
 	assert(port->vtab == &port_lua_vtab);
@@ -451,13 +483,20 @@ port_lua_do_dump(struct port *base, struct mpstream *stream,
 	struct encode_lua_ctx ctx;
 	ctx.port = port;
 	ctx.stream = stream;
-	struct lua_State *L = tarantool_L;
-	int top = lua_gettop(L);
-	if (lua_cpcall(L, handler, &ctx) != 0) {
-		luaT_toerror(port->L);
+	lua_State *L = port->L;
+	/*
+	 * At the moment Lua stack holds only values to encode.
+	 * Insert corresponding encoder to the bottom and push
+	 * encode context as lightuserdata to the top.
+	 */
+	const int size = lua_gettop(L);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, execute_lua_refs[handler]);
+	assert(lua_isfunction(L, -1) && lua_iscfunction(L, -1));
+	lua_insert(L, 1);
+	lua_pushlightuserdata(L, &ctx);
+	/* nargs -- all arguments + lightuserdata. */
+	if (luaT_call(L, size + 1, 0) != 0)
 		return -1;
-	}
-	lua_settop(L, top);
 	return port->size;
 }
 
@@ -468,7 +507,7 @@ port_lua_dump(struct port *base, struct obuf *out)
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
 		      luamp_error, port->L);
-	return port_lua_do_dump(base, &stream, encode_lua_call);
+	return port_lua_do_dump(base, &stream, HANDLER_ENCODE_CALL);
 }
 
 static int
@@ -478,7 +517,7 @@ port_lua_dump_16(struct port *base, struct obuf *out)
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
 		      luamp_error, port->L);
-	return port_lua_do_dump(base, &stream, encode_lua_call_16);
+	return port_lua_do_dump(base, &stream, HANDLER_ENCODE_CALL_16);
 }
 
 static void
@@ -502,7 +541,7 @@ port_lua_get_msgpack(struct port *base, uint32_t *size)
 	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
 		      luamp_error, port->L);
 	mpstream_encode_array(&stream, lua_gettop(port->L));
-	int rc = port_lua_do_dump(base, &stream, encode_lua_call);
+	int rc = port_lua_do_dump(base, &stream, HANDLER_ENCODE_CALL);
 	if (rc < 0) {
 		region_truncate(region, region_svp);
 		return NULL;
@@ -1049,6 +1088,8 @@ box_lua_call_init(struct lua_State *L)
 	lua_CFunction handles[] = {
 		[HANDLER_CALL] = execute_lua_call,
 		[HANDLER_CALL_BY_REF] = execute_lua_call_by_ref,
+		[HANDLER_ENCODE_CALL] = encode_lua_call,
+		[HANDLER_ENCODE_CALL_16] = encode_lua_call_16,
 		[HANDLER_EVAL] = execute_lua_eval,
 	};
 
