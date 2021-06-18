@@ -686,6 +686,19 @@ iproto_reply_chunk(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 	memcpy(pos + IPROTO_HEADER_LEN, &body, sizeof(body));
 }
 
+void
+iproto_reply_shutdown(struct obuf *out, uint32_t schema_version)
+{
+	char *buf = (char *)obuf_alloc(out, IPROTO_HEADER_LEN + 1);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, IPROTO_HEADER_LEN + 1, "obuf_alloc",
+			 "buf");
+		return;
+	}
+	iproto_header_encode(buf, IPROTO_SHUTDOWN, 0, schema_version, 1);
+	buf[IPROTO_HEADER_LEN] = 0x80; /* empty MessagePack Map */
+}
+
 int
 xrow_decode_dml(struct xrow_header *row, struct request *request,
 		uint64_t key_map)

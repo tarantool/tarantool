@@ -711,6 +711,17 @@ void
 iproto_reply_chunk(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 		   uint32_t schema_version);
 
+/**
+    Encode iproto header with IPROTO_SHUTDOWN response code.
+    * @param out Encode to.
+    * @param schema_version.
+    *
+    * @retval  0 Success.
+    * @retval -1 Memory error.
+    */
+void
+iproto_reply_shutdown(struct obuf *out, uint32_t schema_version);
+
 /** Write error directly to a socket. */
 void
 iproto_write_error(int fd, const struct error *e, uint32_t schema_version,
