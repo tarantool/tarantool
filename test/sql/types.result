@@ -270,7 +270,7 @@ box.space.T1:drop()
 box.execute("SELECT CAST('1.123' AS INTEGER);")
 ---
 - null
-- 'Type mismatch: can not convert 1.123 to integer'
+- 'Type mismatch: can not convert ''1.123'' to integer'
 ...
 box.execute("CREATE TABLE t1 (f TEXT PRIMARY KEY);")
 ---
@@ -283,7 +283,7 @@ box.execute("INSERT INTO t1 VALUES('0.0'), ('1.5'), ('3.9312453');")
 box.execute("SELECT CAST(f AS INTEGER) FROM t1;")
 ---
 - null
-- 'Type mismatch: can not convert 0.0 to integer'
+- 'Type mismatch: can not convert ''0.0'' to integer'
 ...
 box.space.T1:drop()
 ---
@@ -339,12 +339,12 @@ box.execute("INSERT INTO tboolean VALUES (TRUE);")
 box.execute("SELECT * FROM tboolean WHERE s1 = x'44';")
 ---
 - null
-- 'Type mismatch: can not convert varbinary to boolean'
+- 'Type mismatch: can not convert x''44'' to boolean'
 ...
 box.execute("SELECT * FROM tboolean WHERE s1 = 'abc';")
 ---
 - null
-- 'Type mismatch: can not convert abc to boolean'
+- 'Type mismatch: can not convert ''abc'' to boolean'
 ...
 box.execute("SELECT * FROM tboolean WHERE s1 = 1;")
 ---
@@ -632,7 +632,7 @@ box.execute("SELECT 1 LIMIT 1 OFFSET 18446744073709551614;")
 box.execute("SELECT CAST('18446744073' || '709551616' AS INTEGER);")
 ---
 - null
-- 'Type mismatch: can not convert 18446744073709551616 to integer'
+- 'Type mismatch: can not convert ''18446744073709551616'' to integer'
 ...
 box.execute("SELECT CAST('18446744073' || '709551615' AS INTEGER);")
 ---
@@ -1122,7 +1122,7 @@ box.execute("SELECT CAST('123' AS UNSIGNED);")
 box.execute("SELECT CAST('-123' AS UNSIGNED);")
 ---
 - null
-- 'Type mismatch: can not convert -123 to unsigned'
+- 'Type mismatch: can not convert ''-123'' to unsigned'
 ...
 box.space.T1:drop()
 ---
@@ -1231,7 +1231,7 @@ box.execute("INSERT INTO t VALUES(1, true);")
 box.execute("INSERT INTO t VALUES(1, 'asd');")
 ---
 - null
-- 'Type mismatch: can not convert asd to varbinary'
+- 'Type mismatch: can not convert ''asd'' to varbinary'
 ...
 box.execute("INSERT INTO t VALUES(1, x'616263');")
 ---
@@ -1265,17 +1265,17 @@ box.execute("SELECT * FROM t WHERE v = x'616263'")
 box.execute("SELECT sum(v) FROM t;")
 ---
 - null
-- 'Type mismatch: can not convert varbinary to number'
+- 'Type mismatch: can not convert x''616263'' to number'
 ...
 box.execute("SELECT avg(v) FROM t;")
 ---
 - null
-- 'Type mismatch: can not convert varbinary to number'
+- 'Type mismatch: can not convert x''616263'' to number'
 ...
 box.execute("SELECT total(v) FROM t;")
 ---
 - null
-- 'Type mismatch: can not convert varbinary to number'
+- 'Type mismatch: can not convert x''616263'' to number'
 ...
 box.execute("SELECT min(v) FROM t;")
 ---
@@ -1722,7 +1722,7 @@ box.execute("SELECT CAST(true AS DOUBLE);")
 box.execute("SELECT CAST('asd' AS DOUBLE);")
 ---
 - null
-- 'Type mismatch: can not convert asd to double'
+- 'Type mismatch: can not convert ''asd'' to double'
 ...
 box.execute("SELECT CAST('1' AS DOUBLE);")
 ---
@@ -1743,12 +1743,12 @@ box.execute("SELECT CAST('1.123' AS DOUBLE);")
 box.execute("SELECT CAST(x'' AS DOUBLE);")
 ---
 - null
-- 'Type mismatch: can not convert varbinary to double'
+- 'Type mismatch: can not convert x'''' to double'
 ...
 box.execute("SELECT CAST(x'35' AS DOUBLE);")
 ---
 - null
-- 'Type mismatch: can not convert varbinary to double'
+- 'Type mismatch: can not convert x''35'' to double'
 ...
 box.execute("SELECT CAST(CAST(x'35' AS STRING) AS DOUBLE);")
 ---
@@ -2209,12 +2209,12 @@ box.execute([[INSERT INTO ti(i) VALUES (true);]])
 box.execute([[INSERT INTO ti(i) VALUES ('33');]])
 ---
 - null
-- 'Type mismatch: can not convert 33 to integer'
+- 'Type mismatch: can not convert ''33'' to integer'
 ...
 box.execute([[INSERT INTO ti(i) VALUES (X'3434');]])
 ---
 - null
-- 'Type mismatch: can not convert varbinary to integer'
+- 'Type mismatch: can not convert x''3434'' to integer'
 ...
 box.execute([[SELECT * FROM ti;]])
 ---
@@ -2259,12 +2259,12 @@ box.execute([[INSERT INTO td(d) VALUES (true);]])
 box.execute([[INSERT INTO td(d) VALUES ('33');]])
 ---
 - null
-- 'Type mismatch: can not convert 33 to double'
+- 'Type mismatch: can not convert ''33'' to double'
 ...
 box.execute([[INSERT INTO td(d) VALUES (X'3434');]])
 ---
 - null
-- 'Type mismatch: can not convert varbinary to double'
+- 'Type mismatch: can not convert x''3434'' to double'
 ...
 box.execute([[SELECT * FROM td;]])
 ---
@@ -2303,12 +2303,12 @@ box.execute([[INSERT INTO tb(b) VALUES (true);]])
 box.execute([[INSERT INTO tb(b) VALUES ('33');]])
 ---
 - null
-- 'Type mismatch: can not convert 33 to boolean'
+- 'Type mismatch: can not convert ''33'' to boolean'
 ...
 box.execute([[INSERT INTO tb(b) VALUES (X'3434');]])
 ---
 - null
-- 'Type mismatch: can not convert varbinary to boolean'
+- 'Type mismatch: can not convert x''3434'' to boolean'
 ...
 box.execute([[SELECT * FROM tb;]])
 ---
@@ -2351,7 +2351,7 @@ box.execute([[INSERT INTO tt(t) VALUES ('33');]])
 box.execute([[INSERT INTO tt(t) VALUES (X'3434');]])
 ---
 - null
-- 'Type mismatch: can not convert varbinary to string'
+- 'Type mismatch: can not convert x''3434'' to string'
 ...
 box.execute([[SELECT * FROM tt;]])
 ---
@@ -2388,7 +2388,7 @@ box.execute([[INSERT INTO tv(v) VALUES (true);]])
 box.execute([[INSERT INTO tv(v) VALUES ('33');]])
 ---
 - null
-- 'Type mismatch: can not convert 33 to varbinary'
+- 'Type mismatch: can not convert ''33'' to varbinary'
 ...
 box.execute([[INSERT INTO tv(v) VALUES (X'3434');]])
 ---
@@ -2562,12 +2562,12 @@ box.execute([[UPDATE ti SET i = true WHERE a = 1;]])
 box.execute([[UPDATE ti SET i = '33' WHERE a = 1;]])
 ---
 - null
-- 'Type mismatch: can not convert 33 to integer'
+- 'Type mismatch: can not convert ''33'' to integer'
 ...
 box.execute([[UPDATE ti SET i = X'3434' WHERE a = 1;]])
 ---
 - null
-- 'Type mismatch: can not convert varbinary to integer'
+- 'Type mismatch: can not convert x''3434'' to integer'
 ...
 box.execute([[SELECT * FROM ti;]])
 ---
@@ -2603,12 +2603,12 @@ box.execute([[UPDATE td SET d = true WHERE a = 1;]])
 box.execute([[UPDATE td SET d = '33' WHERE a = 1;]])
 ---
 - null
-- 'Type mismatch: can not convert 33 to double'
+- 'Type mismatch: can not convert ''33'' to double'
 ...
 box.execute([[UPDATE td SET d = X'3434' WHERE a = 1;]])
 ---
 - null
-- 'Type mismatch: can not convert varbinary to double'
+- 'Type mismatch: can not convert x''3434'' to double'
 ...
 box.execute([[SELECT * FROM td;]])
 ---
@@ -2641,12 +2641,12 @@ box.execute([[UPDATE tb SET b = true WHERE a = 1;]])
 box.execute([[UPDATE tb SET b = '33' WHERE a = 1;]])
 ---
 - null
-- 'Type mismatch: can not convert 33 to boolean'
+- 'Type mismatch: can not convert ''33'' to boolean'
 ...
 box.execute([[UPDATE tb SET b = X'3434' WHERE a = 1;]])
 ---
 - null
-- 'Type mismatch: can not convert varbinary to boolean'
+- 'Type mismatch: can not convert x''3434'' to boolean'
 ...
 box.execute([[SELECT * FROM tb;]])
 ---
@@ -2684,7 +2684,7 @@ box.execute([[UPDATE tt SET t = '33' WHERE a = 1;]])
 box.execute([[UPDATE tt SET t = X'3434' WHERE a = 1;]])
 ---
 - null
-- 'Type mismatch: can not convert varbinary to string'
+- 'Type mismatch: can not convert x''3434'' to string'
 ...
 box.execute([[SELECT * FROM tt;]])
 ---
@@ -2718,7 +2718,7 @@ box.execute([[UPDATE tv SET v = true WHERE a = 1;]])
 box.execute([[UPDATE tv SET v = '33' WHERE a = 1;]])
 ---
 - null
-- 'Type mismatch: can not convert 33 to varbinary'
+- 'Type mismatch: can not convert ''33'' to varbinary'
 ...
 box.execute([[UPDATE tv SET v = X'3434' WHERE a = 1;]])
 ---

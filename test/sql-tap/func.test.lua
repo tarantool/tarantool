@@ -2931,7 +2931,7 @@ test:do_catchsql_test(
         SELECT ROUND(X'FF')
     ]], {
         -- <func-76.1>
-        1, "Type mismatch: can not convert varbinary to numeric"
+        1, "Type mismatch: can not convert x'FF' to numeric"
         -- </func-76.1>
     })
 
@@ -2941,7 +2941,7 @@ test:do_catchsql_test(
         SELECT RANDOMBLOB(X'FF')
     ]], {
         -- <func-76.2>
-        1, "Type mismatch: can not convert varbinary to numeric"
+        1, "Type mismatch: can not convert x'FF' to numeric"
         -- </func-76.2>
     })
 
@@ -2951,7 +2951,7 @@ test:do_catchsql_test(
         SELECT SOUNDEX(X'FF')
     ]], {
         -- <func-76.3>
-        1, "Type mismatch: can not convert varbinary to text"
+        1, "Type mismatch: can not convert x'FF' to text"
         -- </func-76.3>
     })
 
@@ -2961,7 +2961,7 @@ test:do_catchsql_test(
         SELECT SUM(X'FF')
     ]], {
         -- <func-76.4>
-        1, "Type mismatch: can not convert varbinary to number"
+        1, "Type mismatch: can not convert x'FF' to number"
         -- </func-76.4>
     })
 

@@ -616,7 +616,7 @@ test:do_catchsql_test(
             INSERT INTO t2 VALUES('asd');
     ]], {
         -- <autoinc-10.2>
-        1, "Type mismatch: can not convert asd to integer"
+        1, "Type mismatch: can not convert 'asd' to integer"
         -- </autoinc-10.2>
     })
 
@@ -809,7 +809,7 @@ test:do_catchsql_test(
         INSERT INTO t1 SELECT s2, s2 FROM t1;
     ]], {
         -- <autoinc-gh-3670>
-        1, "Type mismatch: can not convert a to integer"
+        1, "Type mismatch: can not convert 'a' to integer"
         -- </autoinc-gh-3670>
     })
 
