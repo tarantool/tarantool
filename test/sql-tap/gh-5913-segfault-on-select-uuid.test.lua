@@ -40,7 +40,7 @@ test:do_catchsql_test(
     [[
         INSERT INTO t1 SELECT i, NULL, d FROM t;
     ]], {
-        1, "Type mismatch: can not convert varbinary to decimal"
+        1, "Type mismatch: can not convert x'C70501030111111C' to decimal"
     })
 
 --
@@ -77,7 +77,7 @@ test:do_catchsql_test(
     [[
         UPDATE td SET d = d;
     ]], {
-        1, "Type mismatch: can not convert varbinary to decimal"
+        1, "Type mismatch: can not convert x'C70501030111111C' to decimal"
     })
 
 test:finish_test()

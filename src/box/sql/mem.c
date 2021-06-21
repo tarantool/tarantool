@@ -79,8 +79,8 @@ mem_str(const struct Mem *mem)
 		return "NULL";
 	case MEM_TYPE_STR:
 		if (mem->n > STR_VALUE_MAX_LEN)
-			return tt_sprintf("%.*s...", STR_VALUE_MAX_LEN, mem->z);
-		return tt_cstr(mem->z, mem->n);
+			return tt_sprintf("'%.*s...", STR_VALUE_MAX_LEN, mem->z);
+		return tt_sprintf("'%.*s'", mem->n, mem->z);
 	case MEM_TYPE_INT:
 		return tt_sprintf("%lld", mem->u.i);
 	case MEM_TYPE_UINT:
@@ -88,8 +88,18 @@ mem_str(const struct Mem *mem)
 	case MEM_TYPE_DOUBLE:
 		sql_snprintf(STR_VALUE_MAX_LEN, buf, "%!.15g", mem->u.r);
 		return tt_sprintf("%s", buf);
-	case MEM_TYPE_BIN:
-		return "varbinary";
+	case MEM_TYPE_BIN: {
+		int len = MIN(mem->n, STR_VALUE_MAX_LEN / 2);
+		for (int i = 0; i < len; ++i) {
+			int n = (mem->z[i] & 0xF0) >> 4;
+			buf[2 * i] = n < 10 ? ('0' + n) : ('A' + n - 10);
+			n = (mem->z[i] & 0x0F);
+			buf[2 * i + 1] = n < 10 ? ('0' + n) : ('A' + n - 10);
+		}
+		if (mem->n > len)
+			return tt_sprintf("x'%.*s...", len * 2, buf);
+		return tt_sprintf("x'%.*s'", len * 2, buf);
+	}
 	case MEM_TYPE_MAP:
 	case MEM_TYPE_ARRAY: {
 		const char *str = mp_str(mem->z);
@@ -99,7 +109,8 @@ mem_str(const struct Mem *mem)
 		return tt_sprintf("%.*s...", STR_VALUE_MAX_LEN, buf);
 	}
 	case MEM_TYPE_UUID:
-		return tt_uuid_str(&mem->u.uuid);
+		tt_uuid_to_string(&mem->u.uuid, buf);
+		return tt_sprintf("'%s'", buf);
 	case MEM_TYPE_BOOL:
 		return mem->u.b ? "TRUE" : "FALSE";
 	default:
