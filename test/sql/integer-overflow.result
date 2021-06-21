@@ -106,7 +106,7 @@ box.execute('SELECT CAST(\'9223372036854775808\' AS INTEGER);')
 box.execute('SELECT CAST(\'18446744073709551616\' AS INTEGER);')
 ---
 - null
-- 'Type mismatch: can not convert 18446744073709551616 to integer'
+- 'Type mismatch: can not convert ''18446744073709551616'' to integer'
 ...
 -- Due to inexact represantation of large integers in terms of
 -- floating point numbers, numerics with value < UINT64_MAX
