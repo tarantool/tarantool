@@ -309,7 +309,7 @@ end;
 test_run:cmd("setopt delimiter ''");
 
 cont = false
-test_run:wait_cond(function() return finished ~= 2 end)
+test_run:wait_cond(function() return finished == 2 end)
 
 s:drop()
 
