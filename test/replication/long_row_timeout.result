@@ -21,9 +21,9 @@ test_run:cmd('start server replica')
 ---
 - true
 ...
-box.info.replication[2].downstream.status
+test_run:wait_downstream(2, {status = 'follow'})
 ---
-- follow
+- true
 ...
 -- make applier incapable of reading rows in one go, so that it
 -- yields a couple of times.
@@ -54,15 +54,16 @@ test_run:cmd('setopt delimiter ";"')
 ---
 - true
 ...
-ok = true;
+status = nil;
 ---
 ...
 start = fiber.time();
 ---
 ...
 while fiber.time() - start < 3 * box.cfg.replication_timeout do
-    if box.info.replication[2].downstream.status ~= 'follow' then
-        ok = false
+    status = box.info.replication[2].downstream.status
+    if status ~= 'follow' then
+        status = box.info.replication
         break
     end
     fiber.sleep(0.001)
@@ -73,9 +74,9 @@ test_run:cmd('setopt delimiter ""');
 ---
 - true
 ...
-ok
+status
 ---
-- true
+- follow
 ...
 s:drop()
 ---
