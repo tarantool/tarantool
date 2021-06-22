@@ -51,6 +51,8 @@ int luaL_array_metatable_ref = LUA_REFNIL;
 extern uint32_t CTID_UUID;
 extern uint32_t CTID_DECIMAL;
 
+/* {{{ luaL_serializer manipulations */
+
 #define OPTION(type, name, defvalue) { #name, \
 	offsetof(struct luaL_serializer, name), type, defvalue}
 /**
@@ -237,6 +239,10 @@ luaL_newserializer(struct lua_State *L, const char *modname,
 
 	return serializer;
 }
+
+/* }}} luaL_serializer manipulations */
+
+/* {{{ Fill luaL_field */
 
 static int
 lua_gettable_wrapper(lua_State *L)
@@ -616,6 +622,8 @@ luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 	luaL_error(L, "unsupported Lua type '%s'",
 		   lua_typename(L, lua_type(L, idx)));
 }
+
+/* }}} Fill luaL_field */
 
 int
 tarantool_lua_serializer_init(struct lua_State *L)
