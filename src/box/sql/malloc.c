@@ -35,6 +35,8 @@
  */
 #include "sqlInt.h"
 #include <stdarg.h>
+#include <valgrind/valgrind.h>
+#include <valgrind/memcheck.h>
 
 /*
  * Like malloc(), but remember the size of the allocation
@@ -57,7 +59,9 @@ sql_sized_malloc(int nByte)
 		return NULL;
 	}
 	p[0] = nByte;
+	VALGRIND_MAKE_MEM_DEFINED(p, sizeof(p[0]));
 	p++;
+	VALGRIND_MAKE_MEM_UNDEFINED(p, nByte);
 	return (void *)p;
 }
 
@@ -92,6 +96,7 @@ sql_sized_realloc(void *pPrior, int nByte)
 	assert(pPrior != 0 && nByte > 0);
 	assert(nByte == ROUND8(nByte));	/* EV: R-46199-30249 */
 	p--;
+	VALGRIND_MAKE_MEM_NOACCESS(p, nByte + sizeof(p[0]));
 	p = realloc(p, nByte + 8);
 	if (p == NULL) {
 		sql_get()->mallocFailed = 1;
@@ -99,7 +104,9 @@ sql_sized_realloc(void *pPrior, int nByte)
 		return NULL;
 	}
 	p[0] = nByte;
+	VALGRIND_MAKE_MEM_DEFINED(p, sizeof(p[0]));
 	p++;
+	VALGRIND_MAKE_MEM_UNDEFINED(p, nByte);
 	return (void *)p;
 }
 
@@ -182,6 +189,7 @@ sql_free(void *p)
 		return;
 	sql_int64 *raw_p = (sql_int64 *) p;
 	raw_p--;
+	VALGRIND_MAKE_MEM_NOACCESS(raw_p, raw_p[0] + 8);
 	free(raw_p);
 }
 
@@ -196,6 +204,7 @@ sqlDbFree(sql * db, void *p)
 		if (isLookaside(db, p)) {
 			LookasideSlot *pBuf = (LookasideSlot *) p;
 			pBuf->pNext = db->lookaside.pFree;
+			VALGRIND_MAKE_MEM_UNDEFINED(p, db->lookaside.sz);
 			db->lookaside.pFree = pBuf;
 			db->lookaside.nOut--;
 			return;
@@ -248,6 +257,7 @@ sqlMallocZero(u64 n)
 	void *p = sqlMalloc(n);
 	if (p) {
 		memset(p, 0, (size_t) n);
+		VALGRIND_MAKE_MEM_DEFINED(p, n);
 	}
 	return p;
 }
@@ -262,8 +272,10 @@ sqlDbMallocZero(sql * db, u64 n)
 	void *p;
 	testcase(db == 0);
 	p = sqlDbMallocRaw(db, n);
-	if (p)
+	if (p) {
 		memset(p, 0, (size_t) n);
+		VALGRIND_MAKE_MEM_DEFINED(p, n);
+	}
 	return p;
 }
 
@@ -368,6 +380,7 @@ dbReallocFinish(sql * db, void *p, u64 n)
 			pNew = sqlDbMallocRawNN(db, n);
 			if (pNew) {
 				memcpy(pNew, p, db->lookaside.sz);
+				VALGRIND_MAKE_MEM_DEFINED(pNew, db->lookaside.sz);
 				sqlDbFree(db, p);
 			}
 		} else {
