@@ -30,6 +30,17 @@
  * SUCH DAMAGE.
  */
 
+/**
+ * A set of helpers for converting Lua values into another
+ * representation.
+ *
+ * <struct luaL_serializer> is the serializer object: options and
+ * options inheritance.
+ *
+ * <struct luaL_field> is a Lua value descriptor, which
+ * characterizes the value.
+ */
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -50,6 +61,8 @@ struct lua_State;
 
 extern int luaL_map_metatable_ref;
 extern int luaL_array_metatable_ref;
+
+/* {{{ luaL_serializer manipulations */
 
 /**
  * Common configuration options for Lua serializers (MsgPack, YAML, JSON)
@@ -187,6 +200,10 @@ void
 luaL_serializer_parse_options(struct lua_State *l,
 			      struct luaL_serializer *cfg);
 
+/* }}} luaL_serializer manipulations */
+
+/* {{{ Fill luaL_field */
+
 /** A single value on the Lua stack. */
 struct luaL_field {
 	union {
@@ -288,6 +305,10 @@ luaL_checkfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 	luaL_convertfield(L, cfg, idx, field);
 }
 
+/* }}} Fill luaL_field */
+
+/* {{{ Set map / array hint */
+
 /**
  * Push Lua Table with __serialize = 'map' hint onto the stack.
  * Tables with __serialize hint are properly handled by all serializers.
@@ -319,6 +340,8 @@ luaL_setarrayhint(struct lua_State *L, int idx)
 	lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_array_metatable_ref);
 	lua_setmetatable(L, idx);
 }
+
+/* }}} Set map / array hint */
 
 static inline void
 luaL_checkfinite(struct lua_State *L, struct luaL_serializer *cfg,
