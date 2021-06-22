@@ -169,15 +169,9 @@ luaL_serializer_cfg(struct lua_State *L)
 	return 0;
 }
 
-/**
- * @brief serializer.new() Lua binding.
- * @param L stack
- * @param reg methods to register
- * @param parent parent serializer to inherit configuration
- * @return new serializer
- */
 struct luaL_serializer *
-luaL_newserializer(struct lua_State *L, const char *modname, const luaL_Reg *reg)
+luaL_newserializer(struct lua_State *L, const char *modname,
+		   const luaL_Reg *reg)
 {
 	luaL_checkstack(L, 1, "too many upvalues");
 
