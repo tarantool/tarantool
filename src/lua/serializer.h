@@ -149,8 +149,16 @@ struct luaL_serializer {
 	struct rlist on_update;
 };
 
+/**
+ * @brief serializer.new() Lua binding.
+ * @param L stack
+ * @param reg methods to register
+ * @param parent parent serializer to inherit configuration
+ * @return new serializer
+ */
 struct luaL_serializer *
-luaL_newserializer(struct lua_State *L, const char *modname, const luaL_Reg *reg);
+luaL_newserializer(struct lua_State *L, const char *modname,
+		   const luaL_Reg *reg);
 
 /**
  * Copy all option fields of @a src into @a dst. Other fields,
@@ -161,7 +169,8 @@ luaL_serializer_copy_options(struct luaL_serializer *dst,
 			     const struct luaL_serializer *src);
 
 static inline struct luaL_serializer *
-luaL_checkserializer(struct lua_State *L) {
+luaL_checkserializer(struct lua_State *L)
+{
 	return (struct luaL_serializer *)
 		luaL_checkudata(L, lua_upvalueindex(1), LUAL_SERIALIZER);
 }
