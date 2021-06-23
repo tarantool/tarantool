@@ -615,6 +615,12 @@ tx1:commit()
 
 s:drop()
 
+-- gh-6095: SQL query may crash in MVCC mode if it involves ephemeral spaces.
+--
+box.execute([[ CREATE TABLE test (id INT NOT NULL PRIMARY KEY, count INT NOT NULL)]])
+box.execute([[ UPDATE test SET count = count + 1 WHERE id = 0 ]])
+box.execute([[ DROP TABLE test]])
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
