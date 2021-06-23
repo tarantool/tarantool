@@ -1,0 +1,135 @@
+1..48
+	*** test_luaL_field_basic ***
+ok 1 - table as array: luaL_tofield retval
+ok 2 - table as array: Lua stack size
+ok 3 - table as array: Lua result
+    1..4
+	*** check_luaL_field ***
+    ok 1 - table as array: type
+    ok 2 - table as array: size
+    ok 3 - # skip; table as array: Don't compare 'exp_type'
+    ok 4 - table as array: compact
+	*** check_luaL_field: done ***
+ok 4 - subtests
+ok 5 - table as map: luaL_tofield retval
+ok 6 - table as map: Lua stack size
+ok 7 - table as map: Lua result
+    1..4
+	*** check_luaL_field ***
+    ok 1 - table as map: type
+    ok 2 - table as map: size
+    ok 3 - # skip; table as map: Don't compare 'exp_type'
+    ok 4 - table as map: compact
+	*** check_luaL_field: done ***
+ok 8 - subtests
+ok 9 - table with __serialize = 'map': luaL_tofield retval
+ok 10 - table with __serialize = 'map': Lua stack size
+ok 11 - table with __serialize = 'map': Lua result
+    1..4
+	*** check_luaL_field ***
+    ok 1 - table with __serialize = 'map': type
+    ok 2 - table with __serialize = 'map': size
+    ok 3 - # skip; table with __serialize = 'map': Don't compare 'exp_type'
+    ok 4 - table with __serialize = 'map': compact
+	*** check_luaL_field: done ***
+ok 12 - subtests
+ok 13 - table with __serialize function: luaL_tofield retval
+ok 14 - table with __serialize function: Lua stack size
+ok 15 - table with __serialize function: Lua result
+    1..4
+	*** check_luaL_field ***
+    ok 1 - table with __serialize function: type
+    ok 2 - table with __serialize function: size
+    ok 3 - # skip; table with __serialize function: Don't compare 'exp_type'
+    ok 4 - table with __serialize function: compact
+	*** check_luaL_field: done ***
+ok 16 - subtests
+ok 17 - unknown userdata: luaL_tofield retval
+ok 18 - unknown userdata: Lua stack size
+ok 19 - unknown userdata: Lua result
+    1..4
+	*** check_luaL_field ***
+    ok 1 - unknown userdata: type
+    ok 2 - # skip; unknown userdata: Don't check MP_EXT data
+    ok 3 - unknown userdata: ext_type
+    ok 4 - # skip; unknown userdata: Don't compare 'compact'
+	*** check_luaL_field: done ***
+ok 20 - subtests
+ok 21 - # skip; unknown userdata (checkfield): luaL_checkfield() has no retval
+ok 22 - unknown userdata (checkfield): Lua stack size
+ok 23 - unknown userdata (checkfield): Lua result
+    1..4
+	*** check_luaL_field ***
+    ok 1 - unknown userdata (checkfield): type
+    ok 2 - unknown userdata (checkfield): sval.data
+    ok 3 - # skip; unknown userdata (checkfield): Don't compare 'exp_type'
+    ok 4 - # skip; unknown userdata (checkfield): Don't compare 'compact'
+	*** check_luaL_field: done ***
+ok 24 - subtests
+ok 25 - userdata with __serialize function: luaL_tofield retval
+ok 26 - userdata with __serialize function: Lua stack size
+ok 27 - userdata with __serialize function: Lua result
+    1..4
+	*** check_luaL_field ***
+    ok 1 - userdata with __serialize function: type
+    ok 2 - # skip; userdata with __serialize function: Don't check MP_EXT data
+    ok 3 - userdata with __serialize function: ext_type
+    ok 4 - # skip; userdata with __serialize function: Don't compare 'compact'
+	*** check_luaL_field: done ***
+ok 28 - subtests
+ok 29 - # skip; userdata with __serialize function (checkfield): luaL_checkfield() has no retval
+ok 30 - userdata with __serialize function (checkfield): Lua stack size
+ok 31 - userdata with __serialize function (checkfield): Lua result
+    1..4
+	*** check_luaL_field ***
+    ok 1 - userdata with __serialize function (checkfield): type
+    ok 2 - userdata with __serialize function (checkfield): size
+    ok 3 - # skip; userdata with __serialize function (checkfield): Don't compare 'exp_type'
+    ok 4 - userdata with __serialize function (checkfield): compact
+	*** check_luaL_field: done ***
+ok 32 - subtests
+ok 33 - unknown cdata: luaL_tofield retval
+ok 34 - unknown cdata: Lua stack size
+ok 35 - unknown cdata: Lua result
+    1..4
+	*** check_luaL_field ***
+    ok 1 - unknown cdata: type
+    ok 2 - # skip; unknown cdata: Don't check MP_EXT data
+    ok 3 - unknown cdata: ext_type
+    ok 4 - # skip; unknown cdata: Don't compare 'compact'
+	*** check_luaL_field: done ***
+ok 36 - subtests
+ok 37 - # skip; unknown cdata (checkfield): luaL_checkfield() has no retval
+ok 38 - unknown cdata (checkfield): Lua stack size
+ok 39 - unknown cdata (checkfield): Lua result
+    1..4
+	*** check_luaL_field ***
+    ok 1 - unknown cdata (checkfield): type
+    ok 2 - unknown cdata (checkfield): sval.data
+    ok 3 - # skip; unknown cdata (checkfield): Don't compare 'exp_type'
+    ok 4 - # skip; unknown cdata (checkfield): Don't compare 'compact'
+	*** check_luaL_field: done ***
+ok 40 - subtests
+ok 41 - cdata with __serialize: luaL_tofield retval
+ok 42 - cdata with __serialize: Lua stack size
+ok 43 - cdata with __serialize: Lua result
+    1..4
+	*** check_luaL_field ***
+    ok 1 - cdata with __serialize: type
+    ok 2 - # skip; cdata with __serialize: Don't check MP_EXT data
+    ok 3 - cdata with __serialize: ext_type
+    ok 4 - # skip; cdata with __serialize: Don't compare 'compact'
+	*** check_luaL_field: done ***
+ok 44 - subtests
+ok 45 - # skip; cdata with __serialize (checkfield): luaL_checkfield() has no retval
+ok 46 - cdata with __serialize (checkfield): Lua stack size
+ok 47 - cdata with __serialize (checkfield): Lua result
+    1..4
+	*** check_luaL_field ***
+    ok 1 - cdata with __serialize (checkfield): type
+    ok 2 - cdata with __serialize (checkfield): size
+    ok 3 - # skip; cdata with __serialize (checkfield): Don't compare 'exp_type'
+    ok 4 - cdata with __serialize (checkfield): compact
+	*** check_luaL_field: done ***
+ok 48 - subtests
+	*** test_luaL_field_basic: done ***

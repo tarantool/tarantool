@@ -275,3 +275,6 @@ add_executable(popen-child popen-child.c)
 
 add_executable(popen.test popen.c core_test_utils.c)
 target_link_libraries(popen.test misc unit core)
+
+add_executable(serializer.test serializer.c)
+target_link_libraries(serializer.test unit box ${LUAJIT_LIBRARIES})
