@@ -33,6 +33,7 @@
 #include "small/rlist.h"
 #include "index.h"
 #include "tuple.h"
+#include "space.h"
 
 #include "small/rlist.h"
 
@@ -291,6 +292,9 @@ memtx_tx_track_point(struct txn *txn, struct space *space, uint32_t index,
 		return 0;
 	if (txn == NULL)
 		return 0;
+	/* Skip ephemeral spaces. */
+	if (space == NULL || space->def->id == 0)
+		return 0;
 	return memtx_tx_track_point_slow(txn, space, index, key);
 }
 
@@ -319,6 +323,9 @@ memtx_tx_track_gap(struct txn *txn, struct space *space, uint32_t index,
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return 0;
 	if (txn == NULL)
+		return 0;
+	/* Skip ephemeral spaces. */
+	if (space == NULL || space->def->id == 0)
 		return 0;
 	return memtx_tx_track_gap_slow(txn, space, index, successor,
 				       type, key, part_count);
