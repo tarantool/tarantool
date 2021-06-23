@@ -536,6 +536,7 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	enum iterator_type type = it->type;
 	struct txn *txn = in_txn();
 	struct space *space = space_by_id(iterator->space_id);
+	assert(space != NULL || iterator->space_id == 0);
 	struct index *idx = iterator->index;
 	struct key_def *cmp_def = index->base.def->cmp_def;
 	/*
