@@ -98,7 +98,7 @@ sql_sized_realloc(void *pPrior, int nByte)
 	p--;
 	VALGRIND_MAKE_MEM_NOACCESS(p, nByte + sizeof(p[0]));
 	p = realloc(p, nByte + 8);
-	if (p == NULL) {
+	if (p == NULL && nByte != 0) {
 		sql_get()->mallocFailed = 1;
 		diag_set(OutOfMemory, nByte, "realloc", "p");
 		return NULL;
@@ -288,7 +288,7 @@ dbMallocRawFinish(sql * db, u64 n)
 	void *p;
 	assert(db != 0);
 	p = sqlMalloc(n);
-	if (!p)
+	if (p == NULL && n != 0)
 		sqlOomFault(db);
 	return p;
 }
@@ -385,7 +385,7 @@ dbReallocFinish(sql * db, void *p, u64 n)
 			}
 		} else {
 			pNew = sql_realloc64(p, n);
-			if (!pNew)
+			if (pNew == NULL && n != 0)
 				sqlOomFault(db);
 		}
 	}
@@ -401,7 +401,7 @@ sqlDbReallocOrFree(sql * db, void *p, u64 n)
 {
 	void *pNew;
 	pNew = sqlDbRealloc(db, p, n);
-	if (!pNew) {
+	if (pNew == NULL && n != 0) {
 		sqlDbFree(db, p);
 	}
 	return pNew;

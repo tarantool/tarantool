@@ -1366,8 +1366,10 @@ mem_copy(struct Mem *to, const struct Mem *from)
 	if ((to->flags & MEM_Zero) != 0)
 		return sqlVdbeMemExpandBlob(to);
 	to->zMalloc = sqlDbReallocOrFree(to->db, to->zMalloc, to->n);
-	if (to->zMalloc == NULL)
+	if (to->zMalloc == NULL) {
+		to->szMalloc = 0;
 		return -1;
+	}
 	to->szMalloc = sqlDbMallocSize(to->db, to->zMalloc);
 	memcpy(to->zMalloc, to->z, to->n);
 	to->z = to->zMalloc;
