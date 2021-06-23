@@ -212,3 +212,6 @@ target_link_libraries(coll.test core unit ${ICU_LIBRARIES} misc)
 
 add_executable(tuple_bigref.test tuple_bigref.c core_test_utils.c)
 target_link_libraries(tuple_bigref.test tuple unit)
+
+add_executable(serializer.test serializer.c)
+target_link_libraries(serializer.test unit box ${LUAJIT_LIBRARIES})

@@ -1,0 +1,111 @@
+1..36
+	*** test_luaL_field_basic ***
+ok 1 - table as array: Lua stack size
+ok 2 - table as array: Lua result
+    1..3
+	*** check_luaL_field ***
+    ok 1 - table as array: type
+    ok 2 - table as array: size
+    ok 3 - table as array: compact
+	*** check_luaL_field: done ***
+ok 3 - subtests
+ok 4 - table as map: Lua stack size
+ok 5 - table as map: Lua result
+    1..3
+	*** check_luaL_field ***
+    ok 1 - table as map: type
+    ok 2 - table as map: size
+    ok 3 - table as map: compact
+	*** check_luaL_field: done ***
+ok 6 - subtests
+ok 7 - table with __serialize = 'map': Lua stack size
+ok 8 - table with __serialize = 'map': Lua result
+    1..3
+	*** check_luaL_field ***
+    ok 1 - table with __serialize = 'map': type
+    ok 2 - table with __serialize = 'map': size
+    ok 3 - table with __serialize = 'map': compact
+	*** check_luaL_field: done ***
+ok 9 - subtests
+ok 10 - table with __serialize function: Lua stack size
+ok 11 - table with __serialize function: Lua result
+    1..3
+	*** check_luaL_field ***
+    ok 1 - table with __serialize function: type
+    ok 2 - table with __serialize function: size
+    ok 3 - table with __serialize function: compact
+	*** check_luaL_field: done ***
+ok 12 - subtests
+ok 13 - unknown userdata: Lua stack size
+ok 14 - unknown userdata: Lua result
+    1..3
+	*** check_luaL_field ***
+    ok 1 - unknown userdata: type
+    ok 2 - # skip; unknown userdata: Don't check MP_EXT data
+    ok 3 - # skip; unknown userdata: Don't compare 'compact'
+	*** check_luaL_field: done ***
+ok 15 - subtests
+ok 16 - unknown userdata (checkfield): Lua stack size
+ok 17 - unknown userdata (checkfield): Lua result
+    1..3
+	*** check_luaL_field ***
+    ok 1 - unknown userdata (checkfield): type
+    ok 2 - unknown userdata (checkfield): sval.data
+    ok 3 - # skip; unknown userdata (checkfield): Don't compare 'compact'
+	*** check_luaL_field: done ***
+ok 18 - subtests
+ok 19 - userdata with __serialize function: Lua stack size
+ok 20 - userdata with __serialize function: Lua result
+    1..3
+	*** check_luaL_field ***
+    ok 1 - userdata with __serialize function: type
+    ok 2 - # skip; userdata with __serialize function: Don't check MP_EXT data
+    ok 3 - # skip; userdata with __serialize function: Don't compare 'compact'
+	*** check_luaL_field: done ***
+ok 21 - subtests
+ok 22 - userdata with __serialize function (checkfield): Lua stack size
+ok 23 - userdata with __serialize function (checkfield): Lua result
+    1..3
+	*** check_luaL_field ***
+    ok 1 - userdata with __serialize function (checkfield): type
+    ok 2 - userdata with __serialize function (checkfield): size
+    ok 3 - userdata with __serialize function (checkfield): compact
+	*** check_luaL_field: done ***
+ok 24 - subtests
+ok 25 - unknown cdata: Lua stack size
+ok 26 - unknown cdata: Lua result
+    1..3
+	*** check_luaL_field ***
+    ok 1 - unknown cdata: type
+    ok 2 - # skip; unknown cdata: Don't check MP_EXT data
+    ok 3 - # skip; unknown cdata: Don't compare 'compact'
+	*** check_luaL_field: done ***
+ok 27 - subtests
+ok 28 - unknown cdata (checkfield): Lua stack size
+ok 29 - unknown cdata (checkfield): Lua result
+    1..3
+	*** check_luaL_field ***
+    ok 1 - unknown cdata (checkfield): type
+    ok 2 - unknown cdata (checkfield): sval.data
+    ok 3 - # skip; unknown cdata (checkfield): Don't compare 'compact'
+	*** check_luaL_field: done ***
+ok 30 - subtests
+ok 31 - cdata with __serialize: Lua stack size
+ok 32 - cdata with __serialize: Lua result
+    1..3
+	*** check_luaL_field ***
+    ok 1 - cdata with __serialize: type
+    ok 2 - # skip; cdata with __serialize: Don't check MP_EXT data
+    ok 3 - # skip; cdata with __serialize: Don't compare 'compact'
+	*** check_luaL_field: done ***
+ok 33 - subtests
+ok 34 - cdata with __serialize (checkfield): Lua stack size
+ok 35 - cdata with __serialize (checkfield): Lua result
+    1..3
+	*** check_luaL_field ***
+    ok 1 - cdata with __serialize (checkfield): type
+    ok 2 - cdata with __serialize (checkfield): size
+    ok 3 - cdata with __serialize (checkfield): compact
+	*** check_luaL_field: done ***
+ok 36 - subtests
+	*** test_luaL_field_basic: done ***
