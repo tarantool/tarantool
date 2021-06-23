@@ -695,6 +695,11 @@ iproto_connection_close(struct iproto_connection *con)
 		ev_io_stop(con->loop, &con->input);
 		ev_io_stop(con->loop, &con->output);
 
+		if (con->parse_size > 0)
+			say_warn("closing connection %s and discarding %zu "
+				 "unread bytes", sio_socketname(con->input.fd),
+				 con->parse_size);
+
 		int fd = con->input.fd;
 		/* Make evio_has_fd() happy */
 		con->input.fd = con->output.fd = -1;
