@@ -582,7 +582,7 @@ error_unpack_unsafe(const char **data)
 #define MP_PRINT_2(total, func, ...)						\
 	SNPRINT(total, func, buf, size, __VA_ARGS__)
 #define MP_PRINT_ARGS_DECL char *buf, int size
-#include __FILE__
+#include "box/mp_error.cc"
 
 #define MP_ERROR_PRINT_DEFINITION
 #define MP_PRINT_FUNC fprintf
@@ -594,7 +594,7 @@ error_unpack_unsafe(const char **data)
 	total += bytes;								\
 } while (0)
 #define MP_PRINT_ARGS_DECL FILE *file
-#include __FILE__
+#include "box/mp_error.cc"
 
 /* !defined(MP_ERROR_PRINT_DEFINITION) */
 #else
