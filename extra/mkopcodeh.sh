@@ -8,7 +8,7 @@
 #
 # The lines of the vdbe.c that we are interested in are of the form:
 #
-#       case OP_aaaa:      /* same as TK_bbbbb */
+#       EXECUTE(OP_aaaa):      /* same as TK_bbbbb */
 #
 # The TK_ comment is optional.  If it is present, then the value assigned to
 # the OP_ is the same as the TK_ value.  If missing, the OP_ value is assigned
@@ -24,7 +24,7 @@
 #
 # This script also scans for lines of the form:
 #
-#       case OP_aaaa:       /* jump, in1, in2, in3, out2-prerelease, out3 */
+#       EXECUTE(OP_aaaa):       /* jump, in1, in2, in3, out2-prerelease, out3 */
 #
 # When such comments are found on an opcode, it means that certain
 # properties apply to that opcode.  Set corresponding flags using the
@@ -79,12 +79,13 @@ while read line; do
         fi
         ;;
 
-    # Scan for "case OP_aaaa:" lines in the vdbe.c file
-    'case OP_'*)
+    # Scan for "EXECUTE(OP_aaaa):" lines in the vdbe.c file
+    'EXECUTE(OP_'*)
         IFS=" "
         set -- $line
         IFS="$newline"
-        name=${2%:}
+        label=${1%):}
+        name=${label#*(}
         eval "ARRAY_op_$name=-1"
         eval "ARRAY_jump_$name=0"
         eval "ARRAY_in1_$name=0"
@@ -92,7 +93,7 @@ while read line; do
         eval "ARRAY_in3_$name=0"
         eval "ARRAY_out2_$name=0"
         eval "ARRAY_out3_$name=0"
-        i=4
+        i=3
         while [ "$i" -lt "$#" ]; do
             eval "sym=\${$i%,}"
             case "$sym" in

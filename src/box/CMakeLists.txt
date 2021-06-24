@@ -283,6 +283,10 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 add_definitions(-DSQL_TEST=1)
 
+if (ENABLE_VDBE_GOTO_DISPATCH)
+  add_definitions(-DSQL_USE_GOTO=1)
+endif()
+
 set(EXT_SRC_DIR ${PROJECT_SOURCE_DIR}/extra)
 set(EXT_BIN_DIR ${PROJECT_BINARY_DIR}/extra)
 set(SQL_SRC_DIR ${PROJECT_SOURCE_DIR}/src/box/sql)
@@ -294,6 +298,7 @@ include_directories(${SQL_BIN_DIR})
 add_custom_target(generate_sql_files DEPENDS
     sql/parse.h
     sql/keywordhash.h
+    sql/dispatchtable.h
     sql/parse.y
     sql/parse.c
     sql/opcodes.c)
@@ -322,6 +327,12 @@ add_custom_command(OUTPUT ${SQL_BIN_DIR}/opcodes.c
     COMMAND ${EXT_SRC_DIR}/mkopcodec.sh opcodes.h > opcodes.c
     WORKING_DIRECTORY "${SQL_BIN_DIR}"
     DEPENDS ${SQL_SRC_DIR}/vdbe.c ${EXT_SRC_DIR}/mkopcodec.sh ${SQL_BIN_DIR}/parse.h
+        ${SQL_BIN_DIR}/opcodes.h)
+
+add_custom_command(OUTPUT ${SQL_BIN_DIR}/dispatchtable.h
+    COMMAND ${EXT_SRC_DIR}/mkdispatchtableh.sh opcodes.h > dispatchtable.h
+    WORKING_DIRECTORY "${SQL_BIN_DIR}"
+    DEPENDS ${SQL_SRC_DIR}/vdbe.c ${EXT_SRC_DIR}/mkdispatchtableh.sh ${SQL_BIN_DIR}/parse.h
         ${SQL_BIN_DIR}/opcodes.h)
 
 target_link_libraries(box box_error tuple stat xrow xlog vclock crc32 scramble
