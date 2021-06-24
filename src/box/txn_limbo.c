@@ -408,7 +408,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			 * the limbo entry on its own. This happens for txns
 			 * created in the applier.
 			 */
-			txn_clear_flag(e->txn, TXN_WAIT_SYNC);
+			txn_clear_flags(e->txn, TXN_WAIT_SYNC);
 			txn_limbo_remove(limbo, e);
 			/*
 			 * The limbo entry now should not be used by the owner
