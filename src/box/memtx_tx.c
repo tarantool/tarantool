@@ -463,7 +463,6 @@ memtx_tx_story_delete_del_stmt(struct memtx_story *story)
 	memtx_tx_story_delete(story);
 }
 
-
 /**
  * Link a @a story with @a older_story in @a index (in both directions).
  */
@@ -912,7 +911,7 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 			continue;
 		}
 		if (!replaced[i]->is_dirty) {
-			/* Check like there's not mvcc. */
+			/* Check like there's no mvcc. */
 			if (memtx_tx_check_dup(new_tuple, replaced[0],
 					       replaced[i], DUP_INSERT,
 					       space->index[i], space) != 0)
@@ -921,9 +920,9 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 		}
 
 		/*
-		 * The tuple is dirty. A chain of changes cannot lead to
-		 * clean tuple, but in can lead to NULL, that's the only
-		 * change to be OK.
+		 * The replaced tuple is dirty. A chain of changes cannot lead
+		 * to clean tuple, but in can lead to NULL, that's the only
+		 * chance to be OK.
 		 */
 		struct memtx_story *second_story = memtx_tx_story_get(replaced[i]);
 		struct tuple *check_visible;
@@ -1116,7 +1115,7 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 
 	struct space *space = stmt->space;
 	struct memtx_story *add_story = NULL, *del_story = NULL;
-	bool del_story_created = false;
+	bool del_story_is_created = false;
 	struct region *region = &stmt->txn->region;
 	size_t region_svp = region_used(region);
 
@@ -1130,6 +1129,13 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 	struct tuple *direct_successor[space->index_count];
 	uint32_t directly_replaced_count = 0;
 	if (new_tuple != NULL) {
+		/*
+		 * CASE 1. new_tuple != NULL.
+		 * A tuple is inserted. Just for understanding, that might be:
+		 * REPLACE, and old_tuple is NULL because it is unknown yet.
+		 * INSERT, and old_tuple is NULL because there's no such tuple.
+		 * UPDATE, and old_tuple is not NULL and is the updated tuple.
+		 */
 		for (uint32_t i = 0; i < space->index_count; i++) {
 			struct index *index = space->index[i];
 			struct tuple **replaced = &directly_replaced[i];
@@ -1167,7 +1173,7 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 			del_story = memtx_tx_story_new_del_stmt(replaced, stmt);
 			if (del_story == NULL)
 				goto fail;
-			del_story_created = true;
+			del_story_is_created = true;
 			memtx_tx_story_link_story(add_story, del_story, 0);
 		} else if (replaced != NULL) {
 			del_story = memtx_tx_story_get(replaced);
@@ -1192,6 +1198,11 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 		}
 
 	} else {
+		/*
+		 * CASE 2. new_tuple == NULL.
+		 * The old_tuple is deleted (and obviously not NULL).
+		 * Just for understanding, that's a DELETE statement.
+		 */
 		if (old_tuple->is_dirty) {
 			del_story = memtx_tx_story_get(old_tuple);
 		} else {
@@ -1199,11 +1210,15 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 								stmt);
 			if (del_story == NULL)
 				goto fail;
-			del_story_created = true;
+			del_story_is_created = true;
 		}
 	}
 
-	if (del_story != NULL && !del_story_created) {
+	assert(del_story == NULL || !del_story_is_created ||
+	       (del_story->del_stmt == stmt &&
+		del_story->del_stmt->next_in_del_list == NULL &&
+		stmt->del_story == del_story));
+	if (del_story != NULL && !del_story_is_created) {
 		stmt->next_in_del_list = del_story->del_stmt;
 		del_story->del_stmt = stmt;
 		stmt->del_story = del_story;
@@ -1216,7 +1231,6 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 			goto fail;
 		collected_conflicts = collected_conflicts->next;
 	}
-
 
 	if (new_tuple != NULL) {
 		/*
@@ -1246,7 +1260,7 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 fail:
 	if (add_story != NULL)
 		memtx_tx_story_delete_add_stmt(add_story);
-	if (del_story_created)
+	if (del_story_is_created)
 		memtx_tx_story_delete_del_stmt(del_story);
 	stmt->add_story = stmt->del_story = NULL;
 

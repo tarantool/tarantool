@@ -86,7 +86,7 @@ struct memtx_story_link {
 	struct memtx_story *newer_story;
 	/** Story that was happened before that story was started. */
 	struct memtx_story *older_story;
-	/** List of interval items @sa interval_hole_item. */
+	/** List of interval items @sa gap_item. */
 	struct rlist nearby_gaps;
 };
 
@@ -98,13 +98,12 @@ struct memtx_story_link {
  */
 struct memtx_story {
 	/** The story is about this tuple. The tuple is referenced. */
-
 	struct tuple *tuple;
 	/**
-	 * Statement that told this story. Is set to NULL when the statement's
-	 * transaction becomes committed. Can also be NULL if we don't know who
-	 * introduced that story, the tuple was added by a transaction that
-	 * was completed and destroyed some time ago.
+	 * Statement that introduced this story. Is set to NULL when the
+	 * statement's transaction becomes committed. Can also be NULL if we
+	 * don't know who introduced that story, the tuple was added by a
+	 * transaction that was completed and destroyed some time ago.
 	 */
 	struct txn_stmt *add_stmt;
 	/**
