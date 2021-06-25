@@ -105,6 +105,11 @@ struct session_meta {
 struct session {
 	/** Session id. */
 	uint64_t id;
+	/**
+	 * Flag indicates, that this session requires
+	 * graceful shutdown.
+	 */
+	bool graceful_shutdown_required;
 	/** SQL Tarantool Default storage engine. */
 	uint8_t sql_default_engine;
 	/** SQL Connection flag for current user session */
