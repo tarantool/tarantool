@@ -247,7 +247,7 @@ raft_test_recovery(void)
 static void
 raft_test_bad_msg(void)
 {
-	raft_start_test(9);
+	raft_start_test(11);
 	struct raft_msg msg;
 	struct raft_node node;
 	struct vclock vclock;
@@ -292,6 +292,14 @@ raft_test_bad_msg(void)
 		.vote = 2,
 	};
 	is(raft_node_process_msg(&node, &msg, 2), -1, "bad state");
+	is(node.raft.term, 1, "term from the bad message wasn't used");
+
+	msg = (struct raft_msg){
+		.state = -1,
+		.term = 10,
+		.vote = 2,
+	};
+	is(raft_node_process_msg(&node, &msg, 2), -1, "bad negative state");
 	is(node.raft.term, 1, "term from the bad message wasn't used");
 
 	raft_node_destroy(&node);
