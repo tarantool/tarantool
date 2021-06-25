@@ -92,7 +92,7 @@ enum raft_state {
  * Decode raft state into string representation.
  */
 const char *
-raft_state_str(uint32_t state);
+raft_state_str(uint64_t state);
 
 /**
  * Basic Raft communication unit for talking to other nodes, and even to other
@@ -110,7 +110,7 @@ struct raft_msg {
 	 * State of the instance. Can be 0 if the state does not matter for the
 	 * message. For instance, when the message is sent to disk.
 	 */
-	enum raft_state state;
+	uint64_t state;
 	/**
 	 * Vclock of the instance. Can be NULL, if the node is not a candidate.
 	 * Also is omitted when does not matter (when the message is for disk).
