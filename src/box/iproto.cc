@@ -130,26 +130,16 @@ struct iproto_thread {
 	struct cmsg_hop push_route[2];
 	struct cmsg_hop *dml_route[IPROTO_TYPE_STAT_MAX];
 	struct cmsg_hop connect_route[2];
-	/*
-	 * Iproto thread memory pools
-	 */
+	/** Iproto thread memory pools */
 	struct mempool iproto_msg_pool;
 	struct mempool iproto_connection_pool;
-	/*
-	 * List of stopped connections
-	 */
+	/** List of stopped connections */
 	struct rlist stopped_connections;
-	/*
-	 * Iproto thread stat
-	 */
+	/* Iproto thread stat */
 	struct rmean *rmean;
-	/*
-	 * Iproto thread id
-	 */
+	/** Iproto thread id */
 	uint32_t id;
-	/*
-	 * Iproto binary listener
-	 */
+	/** Iproto binary listener */
 	struct evio_service binary;
 };
 
