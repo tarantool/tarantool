@@ -2035,10 +2035,10 @@ net_cord_f(va_list  ap)
 	struct iproto_thread *iproto_thread =
 		va_arg(ap, struct iproto_thread *);
 
-	mempool_create(&iproto_thread->iproto_msg_pool, &cord()->slabc,
-		       sizeof(struct iproto_msg));
 	mempool_create(&iproto_thread->iproto_connection_pool, &cord()->slabc,
 		       sizeof(struct iproto_connection));
+	mempool_create(&iproto_thread->iproto_msg_pool, &cord()->slabc,
+		       sizeof(struct iproto_msg));
 
 	evio_service_init(loop(), &iproto_thread->binary, "binary",
 			  iproto_on_accept, iproto_thread);
@@ -2059,12 +2059,16 @@ net_cord_f(va_list  ap)
 	cbus_loop(&endpoint);
 
 	cpipe_destroy(&iproto_thread->tx_pipe);
+	cbus_endpoint_destroy(&endpoint, cbus_process);
 	/*
 	 * Nothing to do in the fiber so far, the service
 	 * will take care of creating events for incoming
 	 * connections.
 	 */
 	evio_service_detach(&iproto_thread->binary);
+
+	mempool_destroy(&iproto_thread->iproto_msg_pool);
+	mempool_destroy(&iproto_thread->iproto_connection_pool);
 	return 0;
 }
 
