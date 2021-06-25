@@ -44,7 +44,7 @@
  * a valid data incomes.
  */
 const char *
-raft_state_str(uint32_t state)
+raft_state_str(uint64_t state)
 {
 	static const char *str[] = {
 		[0]			= "invalid (0)",
@@ -405,7 +405,8 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 			raft_sm_become_leader(raft);
 			break;
 		default:
-			unreachable();
+			panic("RAFT: unreacheable state hit");
+			break;
 		}
 	}
 	if (req->state != RAFT_STATE_LEADER) {
