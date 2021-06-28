@@ -2458,7 +2458,7 @@ box_process_fetch_snapshot(struct ev_io *io, struct xrow_header *header)
 
 	/* Send the snapshot data to the instance. */
 	struct vclock start_vclock;
-	relay_initial_join(io->fd, header->sync, &start_vclock);
+	relay_initial_join(io->fd, header->sync, &start_vclock, 0);
 	say_info("read-view sent.");
 
 	/* Remember master's vclock after the last request */
@@ -2606,7 +2606,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Decode JOIN request */
 	struct tt_uuid instance_uuid = uuid_nil;
-	uint32_t replica_version_id;
+	uint32_t replica_version_id = 0;
 	xrow_decode_join_xc(header, &instance_uuid, &replica_version_id);
 
 	/* Check that bootstrap has been finished */
@@ -2656,7 +2656,8 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 * Initial stream: feed replica with dirty data from engines.
 	 */
 	struct vclock start_vclock;
-	relay_initial_join(io->fd, header->sync, &start_vclock);
+	relay_initial_join(io->fd, header->sync, &start_vclock,
+			   replica_version_id);
 	say_info("initial data sent.");
 
 	/**

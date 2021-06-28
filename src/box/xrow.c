@@ -1731,6 +1731,13 @@ xrow_encode_timestamp(struct xrow_header *row, uint32_t replica_id, double tm)
 }
 
 void
+xrow_encode_type(struct xrow_header *row, uint16_t type)
+{
+	memset(row, 0, sizeof(*row));
+	row->type = type;
+}
+
+void
 greeting_encode(char *greetingbuf, uint32_t version_id,
 		const struct tt_uuid *uuid, const char *salt, uint32_t salt_len)
 {

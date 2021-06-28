@@ -447,12 +447,26 @@ applier_wait_snapshot(struct applier *applier)
 		xrow_decode_vclock_xc(&row, &replicaset.vclock);
 	}
 
+	coio_read_xrow(coio, ibuf, &row);
+	if (row.type == IPROTO_JOIN_META) {
+		/* Read additional metadata. Empty at the moment. */
+		do {
+			coio_read_xrow(coio, ibuf, &row);
+			if (iproto_type_is_error(row.type)) {
+				xrow_decode_error_xc(&row);
+			} else if (row.type != IPROTO_JOIN_SNAPSHOT) {
+				tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+					  (uint32_t)row.type);
+			}
+		} while (row.type != IPROTO_JOIN_SNAPSHOT);
+		coio_read_xrow(coio, ibuf, &row);
+	}
+
 	/*
 	 * Receive initial data.
 	 */
 	uint64_t row_count = 0;
 	while (true) {
-		coio_read_xrow(coio, ibuf, &row);
 		applier->last_row_time = ev_monotonic_now(loop());
 		if (iproto_type_is_dml(row.type)) {
 			if (apply_snapshot_row(&row) != 0)
@@ -477,6 +491,7 @@ applier_wait_snapshot(struct applier *applier)
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 				  (uint32_t) row.type);
 		}
+		coio_read_xrow(coio, ibuf, &row);
 	}
 
 	return row_count;

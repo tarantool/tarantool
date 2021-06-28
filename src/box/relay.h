@@ -116,9 +116,11 @@ relay_push_raft(struct relay *relay, const struct raft_request *req);
  * @param fd        client connection
  * @param sync      sync from incoming JOIN request
  * @param vclock[out] vclock of the read view sent to the replica
+ * @param replica_version_id peer's version
  */
 void
-relay_initial_join(int fd, uint64_t sync, struct vclock *vclock);
+relay_initial_join(int fd, uint64_t sync, struct vclock *vclock,
+		   uint32_t replica_version_id);
 
 /**
  * Send final JOIN rows to the replica.

@@ -392,7 +392,8 @@ relay_set_cord_name(int fd)
 }
 
 void
-relay_initial_join(int fd, uint64_t sync, struct vclock *vclock)
+relay_initial_join(int fd, uint64_t sync, struct vclock *vclock,
+		   uint32_t replica_version_id)
 {
 	struct relay *relay = relay_new(NULL);
 	if (relay == NULL)
@@ -431,6 +432,22 @@ relay_initial_join(int fd, uint64_t sync, struct vclock *vclock)
 	xrow_encode_vclock_xc(&row, vclock);
 	row.sync = sync;
 	coio_write_xrow(&relay->io, &row);
+
+	/*
+	 * Version is present starting with 2.7.3, 2.8.2, 2.9.1
+	 * All these versions know of additional META stage of initial join.
+	 */
+	if (replica_version_id > 0) {
+		/* Mark the beginning of the metadata stream. */
+		xrow_encode_type(&row, IPROTO_JOIN_META);
+		xstream_write(&relay->stream, &row);
+
+		/* Empty at the moment. */
+
+		/* Mark the end of the metadata stream. */
+		xrow_encode_type(&row, IPROTO_JOIN_SNAPSHOT);
+		xstream_write(&relay->stream, &row);
+	}
 
 	/* Send read view to the replica. */
 	engine_join_xc(&ctx, &relay->stream);
