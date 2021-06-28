@@ -2479,7 +2479,9 @@ box_process_register(struct ev_io *io, struct xrow_header *header)
 
 	struct tt_uuid instance_uuid = uuid_nil;
 	struct vclock replica_vclock;
-	xrow_decode_register_xc(header, &instance_uuid, &replica_vclock);
+	uint32_t replica_version_id;
+	xrow_decode_register_xc(header, &instance_uuid, &replica_vclock,
+				&replica_version_id);
 
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
@@ -2604,7 +2606,8 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Decode JOIN request */
 	struct tt_uuid instance_uuid = uuid_nil;
-	xrow_decode_join_xc(header, &instance_uuid);
+	uint32_t replica_version_id;
+	xrow_decode_join_xc(header, &instance_uuid, &replica_version_id);
 
 	/* Check that bootstrap has been finished */
 	if (!is_box_configured)
