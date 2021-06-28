@@ -701,6 +701,15 @@ vy_lsm_compaction_priority(struct vy_lsm *lsm)
 	struct vy_range *range = vy_range_heap_top(&lsm->range_heap);
 	if (range == NULL)
 		return 0;
+	/*
+	 * There's no point in compacting dropped LSM trees. Moreover, since we
+	 * don't commit a new run for a dropped LSM tree so as not to mess with
+	 * garbage collection (see vy_task_compaction_complete()), enabling
+	 * compaction in this case would result in rescheduling it over and
+	 * over again, which is no good.
+	 */
+	if (lsm->is_dropped)
+		return 0;
 	return range->compaction_priority;
 }
 

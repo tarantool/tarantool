@@ -1454,6 +1454,17 @@ vy_task_compaction_complete(struct vy_task *task)
 	struct vy_run *run;
 
 	/*
+	 * The LSM tree could have been dropped while we were writing the new
+	 * run. In this case we should discard the run without committing to
+	 * vylog, because all the information about the LSM tree and its runs
+	 * could have already been garbage collected from vylog.
+	 */
+	if (lsm->is_dropped) {
+		vy_run_unref(new_run);
+		goto out;
+	}
+
+	/*
 	 * Allocate a slice of the new run.
 	 *
 	 * If the run is empty, we don't need to allocate a new slice
@@ -1580,7 +1591,7 @@ vy_task_compaction_complete(struct vy_task *task)
 		vy_slice_wait_pinned(slice);
 		vy_slice_delete(slice);
 	}
-
+out:
 	/* The iterator has been cleaned up in worker. */
 	task->wi->iface->close(task->wi);
 
