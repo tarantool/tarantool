@@ -571,6 +571,14 @@ void
 xrow_encode_timestamp(struct xrow_header *row, uint32_t replica_id, double tm);
 
 /**
+ * Encode any bodyless message.
+ * @param row[out] Row to encode into.
+ * @param type Message type.
+ */
+void
+xrow_encode_type(struct xrow_header *row, uint16_t type);
+
+/**
  * Fast encode xrow header using the specified header fields.
  * It is faster than the xrow_header_encode, because uses
  * the predefined values for all fields of the header, defined
