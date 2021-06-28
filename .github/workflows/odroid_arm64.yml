@@ -1,0 +1,47 @@
+name: odroid_arm64
+
+on:
+  push:
+  pull_request:
+  repository_dispatch:
+    types: [backend_automation]
+  workflow_dispatch:
+
+env:
+  CI_MAKE: make -f .travis.mk
+
+jobs:
+  odroid_arm64:
+    # We want to run on external PRs, but not on our own internal PRs
+    # as they'll be run by the push to the branch.
+    if: ( github.event_name == 'push' ||
+        github.event.pull_request.head.repo.full_name != github.repository ) &&
+        ! endsWith(github.ref, '-notest')
+
+    runs-on: odroid-arm64
+
+    strategy:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v1
+      - uses: ./.github/actions/environment
+      - name: test
+        env:
+          CMAKE_BUILD_TYPE: RelWithDebInfo
+          # FIXME: switched off backtraces support till #6142 is fixed.
+          CMAKE_EXTRA_PARAMS: '-DENABLE_BACKTRACE=OFF'
+        run: ${CI_MAKE} test_odroid_arm64
+      - name: call action to send Telegram message on failure
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
+          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
+        uses: ./.github/actions/send-telegram-notify
+        if: failure()
+      - name: artifacts
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: odroid_arm64
+          retention-days: 21
+          path: /tmp/tnt/artifacts
