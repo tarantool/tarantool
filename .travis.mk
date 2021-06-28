@@ -317,6 +317,22 @@ test_oos_build:
 		-i ${DOCKER_IMAGE_TARANTOOL} \
 		make -f .travis.mk ${OOS_BUILD_RULE}
 
+# Odroid arm64
+
+deps_odroid_arm64:
+	sudo apt update -y && sudo apt -y install git build-essential cmake make zlib1g-dev \
+		libreadline-dev libncurses5-dev libssl-dev libunwind-dev libicu-dev python3 \
+		python3-six python3-gevent python3-pip
+
+build_odroid_arm64:
+	cmake . -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${CMAKE_EXTRA_PARAMS}
+	make -j
+
+test_odroid_arm64_no_deps: build_odroid_arm64
+	make LuaJIT-test
+
+test_odroid_arm64: deps_odroid_arm64 test_odroid_arm64_no_deps
+
 #######
 # OSX #
 #######
