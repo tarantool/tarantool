@@ -273,6 +273,9 @@ extern "C" {
 
 typedef struct tuple box_tuple_t;
 
+bool
+box_in_promote(void);
+
 int
 box_promote(void);
 
