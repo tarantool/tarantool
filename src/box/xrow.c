@@ -1652,10 +1652,12 @@ xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid)
 		return -1;
 	}
 	char *data = buf;
-	data = mp_encode_map(data, 1);
+	data = mp_encode_map(data, 2);
 	data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
 	/* Greet the remote replica with our replica UUID */
 	data = xrow_encode_uuid(data, instance_uuid);
+	data = mp_encode_uint(data, IPROTO_SERVER_VERSION);
+	data = mp_encode_uint(data, tarantool_version_id());
 	assert(data <= buf + size);
 
 	row->body[0].iov_base = buf;
