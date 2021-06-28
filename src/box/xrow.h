@@ -473,15 +473,17 @@ xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid);
  * Decode JOIN command.
  * @param row Row to decode.
  * @param[out] instance_uuid.
+ * @param[out] version_id.
  *
  * @retval  0 Success.
  * @retval -1 Memory or format error.
  */
 static inline int
-xrow_decode_join(struct xrow_header *row, struct tt_uuid *instance_uuid)
+xrow_decode_join(struct xrow_header *row, struct tt_uuid *instance_uuid,
+		 uint32_t *version_id)
 {
-	return xrow_decode_subscribe(row, NULL, instance_uuid, NULL, NULL, NULL,
-				     NULL);
+	return xrow_decode_subscribe(row, NULL, instance_uuid, NULL, version_id,
+				     NULL, NULL);
 }
 
 /**
@@ -489,15 +491,17 @@ xrow_decode_join(struct xrow_header *row, struct tt_uuid *instance_uuid)
  * @param row Row to decode.
  * @param[out] instance_uuid Instance uuid.
  * @param[out] vclock Instance vclock.
+ * @param[out] version_id Replica version id.
+ *
  * @retval 0 Success.
  * @retval -1 Memory or format error.
  */
 static inline int
 xrow_decode_register(struct xrow_header *row, struct tt_uuid *instance_uuid,
-		     struct vclock *vclock)
+		     struct vclock *vclock, uint32_t *version_id)
 {
-	return xrow_decode_subscribe(row, NULL, instance_uuid, vclock, NULL,
-				     NULL, NULL);
+	return xrow_decode_subscribe(row, NULL, instance_uuid, vclock,
+				     version_id, NULL, NULL);
 }
 
 /**
@@ -962,18 +966,19 @@ xrow_encode_join_xc(struct xrow_header *row,
 
 /** @copydoc xrow_decode_join. */
 static inline void
-xrow_decode_join_xc(struct xrow_header *row, struct tt_uuid *instance_uuid)
+xrow_decode_join_xc(struct xrow_header *row, struct tt_uuid *instance_uuid,
+		    uint32_t *version_id)
 {
-	if (xrow_decode_join(row, instance_uuid) != 0)
+	if (xrow_decode_join(row, instance_uuid, version_id) != 0)
 		diag_raise();
 }
 
 /** @copydoc xrow_decode_register. */
 static inline void
 xrow_decode_register_xc(struct xrow_header *row, struct tt_uuid *instance_uuid,
-			struct vclock *vclock)
+			struct vclock *vclock, uint32_t *version_id)
 {
-	if (xrow_decode_register(row, instance_uuid, vclock) != 0)
+	if (xrow_decode_register(row, instance_uuid, vclock, version_id) != 0)
 		diag_raise();
 }
 
