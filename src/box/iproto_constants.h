@@ -262,6 +262,8 @@ enum iproto_type {
 	IPROTO_FETCH_SNAPSHOT = 69,
 	/** REGISTER request to leave anonymous replication. */
 	IPROTO_REGISTER = 70,
+	IPROTO_JOIN_META = 71,
+	IPROTO_JOIN_SNAPSHOT = 72,
 
 	/** Vinyl run info stored in .index file */
 	VY_INDEX_RUN_INFO = 100,
