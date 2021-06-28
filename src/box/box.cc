@@ -1741,22 +1741,11 @@ box_promote(void)
 			 "manual elections");
 		return -1;
 	case ELECTION_MODE_MANUAL:
+	case ELECTION_MODE_CANDIDATE:
 		if (raft->state == RAFT_STATE_LEADER)
 			return 0;
 		is_in_box_promote = false;
 		return box_run_elections();
-	case ELECTION_MODE_CANDIDATE:
-		/*
-		 * Leader elections are enabled, and this instance is allowed to
-		 * promote only if it's already an elected leader. No manual
-		 * elections.
-		 */
-		if (raft->state != RAFT_STATE_LEADER) {
-			diag_set(ClientError, ER_UNSUPPORTED, "election_mode="
-				 "'candidate'", "manual elections");
-			return -1;
-		}
-		break;
 	default:
 		unreachable();
 	}
