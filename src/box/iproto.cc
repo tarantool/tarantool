@@ -1725,6 +1725,12 @@ tx_process_join_subscribe(struct cmsg *m)
 		}
 	} catch (SocketError *e) {
 		return; /* don't write error response to prevent SIGPIPE */
+	} catch (TimedOut *e) {
+		 /*
+		  * In case of a timeout the error could come after a partially
+		  * written row. Do not push it on top.
+		  */
+		return;
 	} catch (Exception *e) {
 		iproto_write_error(con->input.fd, e, ::schema_version,
 				   msg->header.sync);

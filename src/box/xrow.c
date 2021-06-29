@@ -42,6 +42,7 @@
 #include "vclock.h"
 #include "scramble.h"
 #include "iproto_constants.h"
+#include "errinj.h"
 
 static inline uint32_t
 mp_sizeof_vclock_ignore0(const struct vclock *vclock)
@@ -463,6 +464,8 @@ iproto_write_error(int fd, const struct error *e, uint32_t schema_version,
 	body.v_data_len = mp_bswap_u32(msg_len);
 
 	ssize_t unused;
+
+	ERROR_INJECT_YIELD(ERRINJ_IPROTO_WRITE_ERROR_DELAY);
 	unused = write(fd, header, sizeof(header));
 	unused = write(fd, &body, sizeof(body));
 	unused = write(fd, e->errmsg, msg_len);

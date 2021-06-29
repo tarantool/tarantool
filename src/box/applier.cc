@@ -48,6 +48,7 @@
 #include "error.h"
 #include "session.h"
 #include "cfg.h"
+#include "errinj.h"
 
 STRS(applier_state, applier_STATE);
 
@@ -506,6 +507,7 @@ applier_subscribe(struct applier *applier)
 		 * from the master for quite a while the connection is
 		 * broken - the master might just be idle.
 		 */
+		ERROR_INJECT_YIELD(ERRINJ_APPLIER_READ_TX_ROW_DELAY);
 		if (applier->version_id < version_id(1, 7, 7)) {
 			coio_read_xrow(coio, ibuf, &row);
 		} else {

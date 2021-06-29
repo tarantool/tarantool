@@ -136,6 +136,8 @@ struct errinj {
 	_(ERRINJ_AUTO_UPGRADE, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_STDIN_ISATTY, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_SNAP_COMMIT_FAIL, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_IPROTO_WRITE_ERROR_DELAY, ERRINJ_BOOL, {.bparam = false})\
+	_(ERRINJ_APPLIER_READ_TX_ROW_DELAY, ERRINJ_BOOL, {.bparam = false})\
 
 ENUM0(errinj_id, ERRINJ_LIST);
 extern struct errinj errinjs[];
@@ -162,6 +164,7 @@ void errinj_set_with_environment_vars(void);
 
 #ifdef NDEBUG
 #  define ERROR_INJECT(ID, CODE)
+#  define ERROR_INJECT_WHILE(ID, CODE)
 #  define errinj(ID, TYPE) ((struct errinj *) NULL)
 #  define ERROR_INJECT_COUNTDOWN(ID, CODE)
 #else
@@ -177,6 +180,11 @@ void errinj_set_with_environment_vars(void);
 		if (errinj(ID, ERRINJ_BOOL)->bparam) \
 			CODE; \
 	} while (0)
+#  define ERROR_INJECT_WHILE(ID, CODE) \
+	do { \
+		while (errinj(ID, ERRINJ_BOOL)->bparam) \
+			CODE; \
+	} while (0)
 #  define ERROR_INJECT_COUNTDOWN(ID, CODE)				\
 	do {								\
 		if (errinj(ID, ERRINJ_INT)->iparam-- == 0) {		\
@@ -186,6 +194,7 @@ void errinj_set_with_environment_vars(void);
 #endif
 
 #define ERROR_INJECT_RETURN(ID) ERROR_INJECT(ID, return -1)
+#define ERROR_INJECT_YIELD(ID) ERROR_INJECT_WHILE(ID, fiber_sleep(0.001))
 #define ERROR_INJECT_TERMINATE(ID) ERROR_INJECT(ID, assert(0))
 
 #if defined(__cplusplus)
