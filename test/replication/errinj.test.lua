@@ -118,7 +118,7 @@ box.cfg{replication_timeout = 0.0001}
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
 fiber = require'fiber'
-while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
+test_run:wait_upstream(1, {status='disconnected', message_re='unexpected EOF'})
 
 test_run:cmd("switch default")
 -- Disable heartbeat messages on the master so as not
@@ -132,7 +132,7 @@ box.info.replication[1].upstream.status
 box.info.replication[1].upstream.lag > 0
 box.info.replication[1].upstream.lag < 1
 -- wait for ack timeout
-while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
+test_run:wait_upstream(1, {status='disconnected', message_re='unexpected EOF'})
 
 test_run:cmd("switch default")
 errinj.set("ERRINJ_RELAY_REPORT_INTERVAL", 0)
@@ -188,7 +188,7 @@ test_run:cmd("switch replica_timeout")
 -- due to infinite read timeout connection never breaks,
 -- replica shows state 'follow' so old behaviour hangs
 -- here in infinite loop.
-while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
+test_run:wait_upstream(1, {status='disconnected', message_re='timed out'})
 
 test_run:cmd("switch default")
 test_run:cmd("stop server replica_timeout")
@@ -221,7 +221,7 @@ for i = 0, 9999 do box.space.test:replace({i, 4, 5, 'test'}) end
 test_run:cmd("start server replica_timeout with args='0.00001 0.5'")
 test_run:cmd("switch replica_timeout")
 fiber = require('fiber')
-while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
+test_run:wait_upstream(1, {status='disconnected', message_re='timed out'})
 
 test_run:cmd("stop server default")
 test_run:cmd("deploy server default")

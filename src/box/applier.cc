@@ -622,6 +622,8 @@ applier_read_tx_row(struct applier *applier, double timeout)
 
 	struct xrow_header *row = &tx_row->row;
 
+	ERROR_INJECT_YIELD(ERRINJ_APPLIER_READ_TX_ROW_DELAY);
+
 	coio_read_xrow_timeout_xc(coio, ibuf, row, timeout);
 
 	applier->lag = ev_now(loop()) - row->tm;

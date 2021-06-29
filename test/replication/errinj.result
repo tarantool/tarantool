@@ -275,8 +275,9 @@ test_run:cmd("switch replica")
 fiber = require'fiber'
 ---
 ...
-while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
+test_run:wait_upstream(1, {status='disconnected', message_re='unexpected EOF'})
 ---
+- true
 ...
 test_run:cmd("switch default")
 ---
@@ -312,8 +313,9 @@ box.info.replication[1].upstream.lag < 1
 - true
 ...
 -- wait for ack timeout
-while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
+test_run:wait_upstream(1, {status='disconnected', message_re='unexpected EOF'})
 ---
+- true
 ...
 test_run:cmd("switch default")
 ---
@@ -450,8 +452,9 @@ test_run:cmd("switch replica_timeout")
 -- due to infinite read timeout connection never breaks,
 -- replica shows state 'follow' so old behaviour hangs
 -- here in infinite loop.
-while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
+test_run:wait_upstream(1, {status='disconnected', message_re='timed out'})
 ---
+- true
 ...
 test_run:cmd("switch default")
 ---
@@ -530,8 +533,9 @@ test_run:cmd("switch replica_timeout")
 fiber = require('fiber')
 ---
 ...
-while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
+test_run:wait_upstream(1, {status='disconnected', message_re='timed out'})
 ---
+- true
 ...
 test_run:cmd("stop server default")
 ---

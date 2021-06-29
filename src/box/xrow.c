@@ -43,6 +43,7 @@
 #include "scramble.h"
 #include "iproto_constants.h"
 #include "mpstream/mpstream.h"
+#include "errinj.h"
 
 static_assert(IPROTO_DATA < 0x7f && IPROTO_METADATA < 0x7f &&
 	      IPROTO_SQL_INFO < 0x7f, "encoded IPROTO_BODY keys must fit into "\
@@ -564,6 +565,8 @@ iproto_write_error(int fd, const struct error *e, uint32_t schema_version,
 			     schema_version, payload_size);
 
 	ssize_t unused;
+
+	ERROR_INJECT_YIELD(ERRINJ_IPROTO_WRITE_ERROR_DELAY);
 	unused = write(fd, header, sizeof(header));
 	unused = write(fd, payload, payload_size);
 	(void) unused;
