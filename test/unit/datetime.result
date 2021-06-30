@@ -1,0 +1,135 @@
+1..1
+    1..132
+    ok 1 - correct parse_datetime return value for '2012-12-24 15:30Z'
+    ok 2 - correct parse_datetime output seconds for '2012-12-24 15:30Z
+    ok 3 - correct parse_datetime return value for '2012-12-24 15:30z'
+    ok 4 - correct parse_datetime output seconds for '2012-12-24 15:30z
+    ok 5 - correct parse_datetime return value for '2012-12-24 16:30+01:00'
+    ok 6 - correct parse_datetime output seconds for '2012-12-24 16:30+01:00
+    ok 7 - correct parse_datetime return value for '2012-12-24 16:30+0100'
+    ok 8 - correct parse_datetime output seconds for '2012-12-24 16:30+0100
+    ok 9 - correct parse_datetime return value for '2012-12-24 16:30+01'
+    ok 10 - correct parse_datetime output seconds for '2012-12-24 16:30+01
+    ok 11 - correct parse_datetime return value for '2012-12-24 14:30-01:00'
+    ok 12 - correct parse_datetime output seconds for '2012-12-24 14:30-01:00
+    ok 13 - correct parse_datetime return value for '2012-12-24 14:30-0100'
+    ok 14 - correct parse_datetime output seconds for '2012-12-24 14:30-0100
+    ok 15 - correct parse_datetime return value for '2012-12-24 14:30-01'
+    ok 16 - correct parse_datetime output seconds for '2012-12-24 14:30-01
+    ok 17 - correct parse_datetime return value for '2012-12-24 15:30:00Z'
+    ok 18 - correct parse_datetime output seconds for '2012-12-24 15:30:00Z
+    ok 19 - correct parse_datetime return value for '2012-12-24 15:30:00z'
+    ok 20 - correct parse_datetime output seconds for '2012-12-24 15:30:00z
+    ok 21 - correct parse_datetime return value for '2012-12-24 16:30:00+01:00'
+    ok 22 - correct parse_datetime output seconds for '2012-12-24 16:30:00+01:00
+    ok 23 - correct parse_datetime return value for '2012-12-24 16:30:00+0100'
+    ok 24 - correct parse_datetime output seconds for '2012-12-24 16:30:00+0100
+    ok 25 - correct parse_datetime return value for '2012-12-24 14:30:00-01:00'
+    ok 26 - correct parse_datetime output seconds for '2012-12-24 14:30:00-01:00
+    ok 27 - correct parse_datetime return value for '2012-12-24 14:30:00-0100'
+    ok 28 - correct parse_datetime output seconds for '2012-12-24 14:30:00-0100
+    ok 29 - correct parse_datetime return value for '2012-12-24 15:30:00.123456Z'
+    ok 30 - correct parse_datetime output seconds for '2012-12-24 15:30:00.123456Z
+    ok 31 - correct parse_datetime return value for '2012-12-24 15:30:00.123456z'
+    ok 32 - correct parse_datetime output seconds for '2012-12-24 15:30:00.123456z
+    ok 33 - correct parse_datetime return value for '2012-12-24 16:30:00.123456+01:00'
+    ok 34 - correct parse_datetime output seconds for '2012-12-24 16:30:00.123456+01:00
+    ok 35 - correct parse_datetime return value for '2012-12-24 16:30:00.123456+01'
+    ok 36 - correct parse_datetime output seconds for '2012-12-24 16:30:00.123456+01
+    ok 37 - correct parse_datetime return value for '2012-12-24 14:30:00.123456-01:00'
+    ok 38 - correct parse_datetime output seconds for '2012-12-24 14:30:00.123456-01:00
+    ok 39 - correct parse_datetime return value for '2012-12-24 14:30:00.123456-01'
+    ok 40 - correct parse_datetime output seconds for '2012-12-24 14:30:00.123456-01
+    ok 41 - correct parse_datetime return value for '2012-12-24t15:30Z'
+    ok 42 - correct parse_datetime output seconds for '2012-12-24t15:30Z
+    ok 43 - correct parse_datetime return value for '2012-12-24t15:30z'
+    ok 44 - correct parse_datetime output seconds for '2012-12-24t15:30z
+    ok 45 - correct parse_datetime return value for '2012-12-24t16:30+01:00'
+    ok 46 - correct parse_datetime output seconds for '2012-12-24t16:30+01:00
+    ok 47 - correct parse_datetime return value for '2012-12-24t16:30+0100'
+    ok 48 - correct parse_datetime output seconds for '2012-12-24t16:30+0100
+    ok 49 - correct parse_datetime return value for '2012-12-24t14:30-01:00'
+    ok 50 - correct parse_datetime output seconds for '2012-12-24t14:30-01:00
+    ok 51 - correct parse_datetime return value for '2012-12-24t14:30-0100'
+    ok 52 - correct parse_datetime output seconds for '2012-12-24t14:30-0100
+    ok 53 - correct parse_datetime return value for '2012-12-24t15:30:00Z'
+    ok 54 - correct parse_datetime output seconds for '2012-12-24t15:30:00Z
+    ok 55 - correct parse_datetime return value for '2012-12-24t15:30:00z'
+    ok 56 - correct parse_datetime output seconds for '2012-12-24t15:30:00z
+    ok 57 - correct parse_datetime return value for '2012-12-24t16:30:00+01:00'
+    ok 58 - correct parse_datetime output seconds for '2012-12-24t16:30:00+01:00
+    ok 59 - correct parse_datetime return value for '2012-12-24t16:30:00+0100'
+    ok 60 - correct parse_datetime output seconds for '2012-12-24t16:30:00+0100
+    ok 61 - correct parse_datetime return value for '2012-12-24t14:30:00-01:00'
+    ok 62 - correct parse_datetime output seconds for '2012-12-24t14:30:00-01:00
+    ok 63 - correct parse_datetime return value for '2012-12-24t14:30:00-0100'
+    ok 64 - correct parse_datetime output seconds for '2012-12-24t14:30:00-0100
+    ok 65 - correct parse_datetime return value for '2012-12-24t15:30:00.123456Z'
+    ok 66 - correct parse_datetime output seconds for '2012-12-24t15:30:00.123456Z
+    ok 67 - correct parse_datetime return value for '2012-12-24t15:30:00.123456z'
+    ok 68 - correct parse_datetime output seconds for '2012-12-24t15:30:00.123456z
+    ok 69 - correct parse_datetime return value for '2012-12-24t16:30:00.123456+01:00'
+    ok 70 - correct parse_datetime output seconds for '2012-12-24t16:30:00.123456+01:00
+    ok 71 - correct parse_datetime return value for '2012-12-24t14:30:00.123456-01:00'
+    ok 72 - correct parse_datetime output seconds for '2012-12-24t14:30:00.123456-01:00
+    ok 73 - correct parse_datetime return value for '2012-12-24 16:30 +01:00'
+    ok 74 - correct parse_datetime output seconds for '2012-12-24 16:30 +01:00
+    ok 75 - correct parse_datetime return value for '2012-12-24 14:30 -01:00'
+    ok 76 - correct parse_datetime output seconds for '2012-12-24 14:30 -01:00
+    ok 77 - correct parse_datetime return value for '2012-12-24 15:30 UTC'
+    ok 78 - correct parse_datetime output seconds for '2012-12-24 15:30 UTC
+    ok 79 - correct parse_datetime return value for '2012-12-24 16:30 UTC+1'
+    ok 80 - correct parse_datetime output seconds for '2012-12-24 16:30 UTC+1
+    ok 81 - correct parse_datetime return value for '2012-12-24 16:30 UTC+01'
+    ok 82 - correct parse_datetime output seconds for '2012-12-24 16:30 UTC+01
+    ok 83 - correct parse_datetime return value for '2012-12-24 16:30 UTC+0100'
+    ok 84 - correct parse_datetime output seconds for '2012-12-24 16:30 UTC+0100
+    ok 85 - correct parse_datetime return value for '2012-12-24 16:30 UTC+01:00'
+    ok 86 - correct parse_datetime output seconds for '2012-12-24 16:30 UTC+01:00
+    ok 87 - correct parse_datetime return value for '2012-12-24 14:30 UTC-1'
+    ok 88 - correct parse_datetime output seconds for '2012-12-24 14:30 UTC-1
+    ok 89 - correct parse_datetime return value for '2012-12-24 14:30 UTC-01'
+    ok 90 - correct parse_datetime output seconds for '2012-12-24 14:30 UTC-01
+    ok 91 - correct parse_datetime return value for '2012-12-24 14:30 UTC-01:00'
+    ok 92 - correct parse_datetime output seconds for '2012-12-24 14:30 UTC-01:00
+    ok 93 - correct parse_datetime return value for '2012-12-24 14:30 UTC-0100'
+    ok 94 - correct parse_datetime output seconds for '2012-12-24 14:30 UTC-0100
+    ok 95 - correct parse_datetime return value for '2012-12-24 15:30 GMT'
+    ok 96 - correct parse_datetime output seconds for '2012-12-24 15:30 GMT
+    ok 97 - correct parse_datetime return value for '2012-12-24 16:30 GMT+1'
+    ok 98 - correct parse_datetime output seconds for '2012-12-24 16:30 GMT+1
+    ok 99 - correct parse_datetime return value for '2012-12-24 16:30 GMT+01'
+    ok 100 - correct parse_datetime output seconds for '2012-12-24 16:30 GMT+01
+    ok 101 - correct parse_datetime return value for '2012-12-24 16:30 GMT+0100'
+    ok 102 - correct parse_datetime output seconds for '2012-12-24 16:30 GMT+0100
+    ok 103 - correct parse_datetime return value for '2012-12-24 16:30 GMT+01:00'
+    ok 104 - correct parse_datetime output seconds for '2012-12-24 16:30 GMT+01:00
+    ok 105 - correct parse_datetime return value for '2012-12-24 14:30 GMT-1'
+    ok 106 - correct parse_datetime output seconds for '2012-12-24 14:30 GMT-1
+    ok 107 - correct parse_datetime return value for '2012-12-24 14:30 GMT-01'
+    ok 108 - correct parse_datetime output seconds for '2012-12-24 14:30 GMT-01
+    ok 109 - correct parse_datetime return value for '2012-12-24 14:30 GMT-01:00'
+    ok 110 - correct parse_datetime output seconds for '2012-12-24 14:30 GMT-01:00
+    ok 111 - correct parse_datetime return value for '2012-12-24 14:30 GMT-0100'
+    ok 112 - correct parse_datetime output seconds for '2012-12-24 14:30 GMT-0100
+    ok 113 - correct parse_datetime return value for '2012-12-24 14:30 -01:00'
+    ok 114 - correct parse_datetime output seconds for '2012-12-24 14:30 -01:00
+    ok 115 - correct parse_datetime return value for '2012-12-24 16:30:00 +01:00'
+    ok 116 - correct parse_datetime output seconds for '2012-12-24 16:30:00 +01:00
+    ok 117 - correct parse_datetime return value for '2012-12-24 14:30:00 -01:00'
+    ok 118 - correct parse_datetime output seconds for '2012-12-24 14:30:00 -01:00
+    ok 119 - correct parse_datetime return value for '2012-12-24 16:30:00.123456 +01:00'
+    ok 120 - correct parse_datetime output seconds for '2012-12-24 16:30:00.123456 +01:00
+    ok 121 - correct parse_datetime return value for '2012-12-24 14:30:00.123456 -01:00'
+    ok 122 - correct parse_datetime output seconds for '2012-12-24 14:30:00.123456 -01:00
+    ok 123 - correct parse_datetime return value for '2012-12-24 15:30:00.123456 -00:00'
+    ok 124 - correct parse_datetime output seconds for '2012-12-24 15:30:00.123456 -00:00
+    ok 125 - correct parse_datetime return value for '20121224T1630+01:00'
+    ok 126 - correct parse_datetime output seconds for '20121224T1630+01:00
+    ok 127 - correct parse_datetime return value for '2012-12-24T1630+01:00'
+    ok 128 - correct parse_datetime output seconds for '2012-12-24T1630+01:00
+    ok 129 - correct parse_datetime return value for '20121224T16:30+01'
+    ok 130 - correct parse_datetime output seconds for '20121224T16:30+01
+    ok 131 - correct parse_datetime return value for '20121224T16:30 +01'
+    ok 132 - correct parse_datetime output seconds for '20121224T16:30 +01
+ok 1 - subtests

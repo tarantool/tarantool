@@ -62,6 +62,7 @@
 #include "lua/utf8.h"
 #include "lua/swim.h"
 #include "lua/decimal.h"
+#include "lua/datetime.h"
 #include "digest.h"
 #include "errinj.h"
 #include <small/ibuf.h>
@@ -129,7 +130,8 @@ extern char strict_lua[],
 	parse_lua[],
 	process_lua[],
 	humanize_lua[],
-	memprof_lua[]
+	memprof_lua[],
+	datetime_lua[]
 ;
 
 static const char *lua_modules[] = {
@@ -184,6 +186,7 @@ static const char *lua_modules[] = {
 	"memprof.process", process_lua,
 	"memprof.humanize", humanize_lua,
 	"memprof", memprof_lua,
+	"datetime", datetime_lua,
 	NULL
 };
 
@@ -479,6 +482,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_serializer_init(L);
 	tarantool_lua_swim_init(L);
 	tarantool_lua_decimal_init(L);
+	tarantool_lua_datetime_init(L);
 	luaopen_http_client_driver(L);
 	lua_pop(L, 1);
 	luaopen_msgpack(L);
