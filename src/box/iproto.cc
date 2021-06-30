@@ -63,6 +63,7 @@
 #include "execute.h"
 #include "errinj.h"
 #include "tt_static.h"
+#include "../on_shutdown.h"
 
 enum {
 	IPROTO_SALT_SIZE = 32,
@@ -136,16 +137,26 @@ struct iproto_thread {
 	struct mempool iproto_connection_pool;
 	/** List of stopped connections */
 	struct rlist stopped_connections;
+	/** List of active connections */
+	struct rlist active_connections;
 	/* Iproto thread stat */
 	struct rmean *rmean;
 	/** Iproto thread id */
 	uint32_t id;
 	/** Iproto binary listener */
 	struct evio_service binary;
+	/** Flag indicates, that thread was successfully joined. */
+	bool was_successfully_joined;
 };
+
+static ev_async shutdown_watcher;
+static struct fiber_cond shutdown_cond;
 
 static struct iproto_thread *iproto_threads;
 static int iproto_threads_count;
+static unsigned total_iproto_connection_count;
+static ev_loop *tx_loop;
+
 /**
  * This binary contains all bind socket properties, like
  * address the iproto listens for. Is kept in TX to be
@@ -308,6 +319,9 @@ iproto_resume(struct iproto_thread *iproto_thread);
 static void
 iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 		  bool *stop_input);
+
+static inline int
+iproto_send_stop_msg(void);
 
 enum rmean_net_name {
 	IPROTO_SENT,
@@ -500,6 +514,7 @@ struct iproto_connection
 	 */
 	enum iproto_connection_state state;
 	struct rlist in_stop_list;
+	struct rlist in_active_list;
 	/**
 	 * Kharon is used to implement box.session.push().
 	 * When a new push is ready, tx uses kharon to notify
@@ -653,6 +668,7 @@ iproto_connection_stop_readahead_limit(struct iproto_connection *con)
 			     "readahead limit is reached",
 			     sio_socketname(con->input.fd));
 	assert(rlist_empty(&con->in_stop_list));
+	assert(!rlist_empty(&con->in_active_list));
 	ev_io_stop(con->loop, &con->input);
 }
 
@@ -660,6 +676,7 @@ static inline void
 iproto_connection_stop_msg_max_limit(struct iproto_connection *con)
 {
 	assert(rlist_empty(&con->in_stop_list));
+	assert(!rlist_empty(&con->in_active_list));
 
 	say_warn_ratelimited("stopping input on connection %s, "
 			     "net_msg_max limit is reached",
@@ -671,6 +688,7 @@ iproto_connection_stop_msg_max_limit(struct iproto_connection *con)
 	 */
 	rlist_add_tail(&con->iproto_thread->stopped_connections,
 		       &con->in_stop_list);
+	rlist_del(&con->in_active_list);
 }
 
 /**
@@ -738,6 +756,7 @@ iproto_connection_close(struct iproto_connection *con)
 		assert(con->state == IPROTO_CONNECTION_CLOSED);
 	}
 	rlist_del(&con->in_stop_list);
+	rlist_del(&con->in_active_list);
 }
 
 static inline struct ibuf *
@@ -859,6 +878,7 @@ static inline int
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 {
 	assert(rlist_empty(&con->in_stop_list));
+	assert(!rlist_empty(&con->in_active_list));
 	int n_requests = 0;
 	bool stop_input = false;
 	const char *errmsg;
@@ -963,6 +983,8 @@ iproto_connection_resume(struct iproto_connection *con)
 {
 	assert(! iproto_check_msg_max(con->iproto_thread));
 	rlist_del(&con->in_stop_list);
+	rlist_add_tail(&con->iproto_thread->active_connections,
+		       &con->in_active_list);
 	/*
 	 * Enqueue_batch() stops the connection again, if the
 	 * limit is reached again.
@@ -1010,6 +1032,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 	int fd = con->input.fd;
 	assert(fd >= 0);
 	assert(rlist_empty(&con->in_stop_list));
+	assert(!rlist_empty(&con->in_active_list));
 	assert(loop == con->loop);
 	/*
 	 * Throttle if there are too many pending requests,
@@ -1193,6 +1216,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread, int fd)
 	con->is_shutdown_in_progress = false;
 	con->is_on_disconnect_triggers_started = false;
 	rlist_create(&con->in_stop_list);
+	rlist_create(&con->in_active_list);
 	/* It may be very awkward to allocate at close. */
 	cmsg_init(&con->destroy_msg, con->iproto_thread->destroy_route);
 	cmsg_init(&con->disconnect_msg, con->iproto_thread->disconnect_route);
@@ -1223,6 +1247,9 @@ iproto_connection_delete(struct iproto_connection *con)
 	assert(con->obuf[1].pos == 0 &&
 	       con->obuf[1].iov[0].iov_base == NULL);
 	mempool_free(&con->iproto_thread->iproto_connection_pool, con);
+	if (pm_atomic_fetch_sub(&total_iproto_connection_count, 1) == 1 &&
+	    ev_is_active(&shutdown_watcher))
+		ev_async_send(tx_loop, &shutdown_watcher);
 }
 
 /* }}} iproto_connection */
@@ -2090,6 +2117,8 @@ iproto_on_accept(struct evio_service *service, int fd,
 		iproto_connection_new(iproto_thread, fd);
 	if (con == NULL)
 		return -1;
+	rlist_add_tail(&iproto_thread->active_connections,
+		       &con->in_active_list);
 	/*
 	 * Ignore msg allocation failure - the queue size is
 	 * fixed so there is a limited number of msgs in
@@ -2097,9 +2126,11 @@ iproto_on_accept(struct evio_service *service, int fd,
 	 */
 	msg = iproto_msg_new(con);
 	if (msg == NULL) {
+		rlist_del(&con->in_active_list);
 		mempool_free(&con->iproto_thread->iproto_connection_pool, con);
 		return -1;
 	}
+	pm_atomic_fetch_add(&total_iproto_connection_count, 1);
 	cmsg_init(&msg->base, iproto_thread->connect_route);
 	msg->p_ibuf = con->p_ibuf;
 	msg->wpos = con->wpos;
@@ -2337,16 +2368,104 @@ iproto_thread_init(struct iproto_thread *iproto_thread)
 	return 0;
 }
 
+struct iproto_shutdown_msg: public cbus_call_msg {
+	struct iproto_thread *iproto_thread;
+};
+
+static int
+iproto_do_shutdown_f(struct cbus_call_msg *m)
+{
+	struct iproto_shutdown_msg *shutdown_msg =
+		(struct iproto_shutdown_msg *) m;
+	struct iproto_thread *iproto_thread = shutdown_msg->iproto_thread;
+
+	struct iproto_connection *con;
+	struct rlist *connections;
+
+	connections = &iproto_thread->active_connections;
+	rlist_foreach_entry(con, connections, in_active_list)
+		shutdown(con->input.fd, SHUT_RD);
+
+	connections = &iproto_thread->stopped_connections;
+	rlist_foreach_entry(con, connections, in_stop_list)
+		shutdown(con->input.fd, SHUT_RD);
+	return 0;
+}
+
+static inline int
+iproto_send_shutdown_msg(void)
+{
+	struct iproto_shutdown_msg shutdown_msg;
+	for (int i = 0; i < iproto_threads_count; i++) {
+		shutdown_msg.iproto_thread = &iproto_threads[i];
+		if (cbus_call(&shutdown_msg.iproto_thread->net_pipe,
+			      &shutdown_msg.iproto_thread->tx_pipe,
+			      &shutdown_msg, iproto_do_shutdown_f, NULL,
+			      TIMEOUT_INFINITY) != 0)
+			return -1;
+	}
+	return 0;
+}
+
+
+static void
+iproto_join_net_threads(void)
+{
+	for (int i = 0; i < iproto_threads_count; i++) {
+		cbus_stop_loop(&iproto_threads[i].net_pipe);
+		cpipe_destroy(&iproto_threads[i].net_pipe);
+		cord_cojoin(&iproto_threads[i].net_cord);
+		iproto_threads[i].was_successfully_joined = true;
+	}
+}
+
+static void
+shutdown_async_cb(EV_P_ ev_async *w, int revents)
+{
+	(void)loop;
+	(void)w;
+	(void)revents;
+	fiber_cond_broadcast(&shutdown_cond);
+}
+
+static int
+iproto_shutdown_handler(void *arg)
+{
+	(void)arg;
+	iproto_send_stop_msg();
+	ev_async_start(loop(), &shutdown_watcher);
+	if (iproto_send_shutdown_msg() != 0) {
+		ev_async_stop(loop(), &shutdown_watcher);
+		return -1;
+	}
+	if (pm_atomic_load(&total_iproto_connection_count) != 0)
+		fiber_cond_wait(&shutdown_cond);
+	ev_async_stop(loop(), &shutdown_watcher);
+	iproto_join_net_threads();
+	return 0;
+}
+
 /** Initialize the iproto subsystem and start network io thread */
 void
 iproto_init(int threads_count)
 {
 	iproto_threads_count = 0;
+	total_iproto_connection_count = 0;
+	tx_loop = loop();
 	struct session_vtab iproto_session_vtab = {
 		/* .push = */ iproto_session_push,
 		/* .fd = */ iproto_session_fd,
 		/* .sync = */ iproto_session_sync,
 	};
+
+	ev_async_init(&shutdown_watcher, shutdown_async_cb);
+	fiber_cond_create(&shutdown_cond);
+
+	if (box_on_shutdown(NULL, iproto_shutdown_handler, NULL) != 0) {
+		tnt_raise(SystemError, "failed to refister iproto "
+			  "shutdown handler");
+	}
+
 	/*
 	 * We use this tx_binary only for bind, not for listen, so
 	 * we don't need any accept functions.
@@ -2356,14 +2475,16 @@ iproto_init(int threads_count)
 	iproto_threads = (struct iproto_thread *)
 		calloc(threads_count, sizeof(struct iproto_thread));
 	if (iproto_threads == NULL) {
-		tnt_raise(OutOfMemory, threads_count *
-			  sizeof(struct iproto_thread), "calloc",
-			  "struct iproto_thread");
+		diag_set(OutOfMemory, threads_count *
+			 sizeof(struct iproto_thread), "calloc",
+			 "struct iproto_thread");
+		goto fail;
 	}
 
 	for (int i = 0; i < threads_count; i++, iproto_threads_count++) {
 		struct iproto_thread *iproto_thread = &iproto_threads[i];
 		iproto_thread->id = i;
+		iproto_thread->was_successfully_joined = false;
 		if (iproto_thread_init(iproto_thread) != 0)
 			goto fail;
 
@@ -2377,6 +2498,9 @@ iproto_init(int threads_count)
 		iproto_thread->stopped_connections =
 			RLIST_HEAD_INITIALIZER(iproto_thread->
 					       stopped_connections);
+		iproto_thread->active_connections =
+			RLIST_HEAD_INITIALIZER(iproto_thread->
+					       active_connections);
 		char endpoint_name[ENDPOINT_NAME_MAX];
 		snprintf(endpoint_name, ENDPOINT_NAME_MAX, "net%u",
 			 iproto_thread->id);
@@ -2389,6 +2513,8 @@ iproto_init(int threads_count)
 	return;
 
 fail:
+	box_on_shutdown(NULL, NULL, iproto_shutdown_handler);
+	iproto_join_net_threads();
 	iproto_free();
 	diag_raise();
 }
@@ -2664,8 +2790,10 @@ void
 iproto_free(void)
 {
 	for (int i = 0; i < iproto_threads_count; i++) {
-		tt_pthread_cancel(iproto_threads[i].net_cord.id);
-		tt_pthread_join(iproto_threads[i].net_cord.id, NULL);
+		if (!iproto_threads[i].was_successfully_joined) {
+			tt_pthread_cancel(iproto_threads[i].net_cord.id);
+			tt_pthread_join(iproto_threads[i].net_cord.id, NULL);
+		}
 		/*
 		 * Close socket descriptor to prevent hot standby instance
 		 * failing to bind in case it tries to bind before socket
