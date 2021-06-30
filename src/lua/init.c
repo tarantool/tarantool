@@ -129,7 +129,8 @@ extern char strict_lua[],
 	parse_lua[],
 	process_lua[],
 	humanize_lua[],
-	memprof_lua[]
+	memprof_lua[],
+	datetime_lua[]
 ;
 
 static const char *lua_modules[] = {
@@ -184,6 +185,7 @@ static const char *lua_modules[] = {
 	"memprof.process", process_lua,
 	"memprof.humanize", humanize_lua,
 	"memprof", memprof_lua,
+	"datetime", datetime_lua,
 	NULL
 };
 
