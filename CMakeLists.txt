@@ -572,6 +572,14 @@ endif()
 #
 
 #
+# Chritian Hanson c-dt
+#
+
+include(BuildCDT)
+libccdt_build()
+add_dependencies(build_bundled_libs cdt)
+
+#
 # Third-Party misc
 #
 
