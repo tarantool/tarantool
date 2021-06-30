@@ -43,3 +43,6 @@
 [submodule "third_party/xxHash"]
 	path = third_party/xxHash
 	url = https://github.com/tarantool/xxHash
+[submodule "third_party/c-dt"]
+	path = third_party/c-dt
+	url = https://github.com/tarantool/c-dt.git

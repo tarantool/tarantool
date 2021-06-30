@@ -59,6 +59,7 @@ struct lua_State;
 struct ibuf;
 typedef struct ibuf box_ibuf_t;
 struct tt_uuid;
+struct datetime;
 
 /**
  * Single global lua_State shared by core and modules.
@@ -71,6 +72,7 @@ extern struct lua_State *tarantool_L;
 extern uint32_t CTID_CHAR_PTR;
 extern uint32_t CTID_CONST_CHAR_PTR;
 extern uint32_t CTID_UUID;
+extern uint32_t CTID_DATETIME;
 
 struct tt_uuid *
 luaL_pushuuid(struct lua_State *L);

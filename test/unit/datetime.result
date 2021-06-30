@@ -1,0 +1,375 @@
+1..2
+    1..355
+    ok 1 - correct parse_datetime return value for '2012-12-24 15:30Z'
+    ok 2 - correct parse_datetime output seconds for '2012-12-24 15:30Z
+    ok 3 - strftime
+    ok 4 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 5 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 6 - correct parse_datetime return value for '2012-12-24 15:30z'
+    ok 7 - correct parse_datetime output seconds for '2012-12-24 15:30z
+    ok 8 - strftime
+    ok 9 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 10 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 11 - correct parse_datetime return value for '2012-12-24 15:30'
+    ok 12 - correct parse_datetime output seconds for '2012-12-24 15:30
+    ok 13 - strftime
+    ok 14 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 15 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 16 - correct parse_datetime return value for '2012-12-24 16:30+01:00'
+    ok 17 - correct parse_datetime output seconds for '2012-12-24 16:30+01:00
+    ok 18 - strftime
+    ok 19 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 20 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 21 - correct parse_datetime return value for '2012-12-24 16:30+0100'
+    ok 22 - correct parse_datetime output seconds for '2012-12-24 16:30+0100
+    ok 23 - strftime
+    ok 24 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 25 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 26 - correct parse_datetime return value for '2012-12-24 16:30+01'
+    ok 27 - correct parse_datetime output seconds for '2012-12-24 16:30+01
+    ok 28 - strftime
+    ok 29 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 30 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 31 - correct parse_datetime return value for '2012-12-24 14:30-01:00'
+    ok 32 - correct parse_datetime output seconds for '2012-12-24 14:30-01:00
+    ok 33 - strftime
+    ok 34 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 35 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 36 - correct parse_datetime return value for '2012-12-24 14:30-0100'
+    ok 37 - correct parse_datetime output seconds for '2012-12-24 14:30-0100
+    ok 38 - strftime
+    ok 39 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 40 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 41 - correct parse_datetime return value for '2012-12-24 14:30-01'
+    ok 42 - correct parse_datetime output seconds for '2012-12-24 14:30-01
+    ok 43 - strftime
+    ok 44 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 45 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 46 - correct parse_datetime return value for '2012-12-24 15:30:00Z'
+    ok 47 - correct parse_datetime output seconds for '2012-12-24 15:30:00Z
+    ok 48 - strftime
+    ok 49 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 50 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 51 - correct parse_datetime return value for '2012-12-24 15:30:00z'
+    ok 52 - correct parse_datetime output seconds for '2012-12-24 15:30:00z
+    ok 53 - strftime
+    ok 54 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 55 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 56 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 57 - correct parse_datetime output seconds for '2012-12-24 15:30:00
+    ok 58 - strftime
+    ok 59 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 60 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 61 - correct parse_datetime return value for '2012-12-24 16:30:00+01:00'
+    ok 62 - correct parse_datetime output seconds for '2012-12-24 16:30:00+01:00
+    ok 63 - strftime
+    ok 64 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 65 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 66 - correct parse_datetime return value for '2012-12-24 16:30:00+0100'
+    ok 67 - correct parse_datetime output seconds for '2012-12-24 16:30:00+0100
+    ok 68 - strftime
+    ok 69 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 70 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 71 - correct parse_datetime return value for '2012-12-24 14:30:00-01:00'
+    ok 72 - correct parse_datetime output seconds for '2012-12-24 14:30:00-01:00
+    ok 73 - strftime
+    ok 74 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 75 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 76 - correct parse_datetime return value for '2012-12-24 14:30:00-0100'
+    ok 77 - correct parse_datetime output seconds for '2012-12-24 14:30:00-0100
+    ok 78 - strftime
+    ok 79 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 80 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 81 - correct parse_datetime return value for '2012-12-24 15:30:00.123456Z'
+    ok 82 - correct parse_datetime output seconds for '2012-12-24 15:30:00.123456Z
+    ok 83 - strftime
+    ok 84 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 85 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 86 - correct parse_datetime return value for '2012-12-24 15:30:00.123456z'
+    ok 87 - correct parse_datetime output seconds for '2012-12-24 15:30:00.123456z
+    ok 88 - strftime
+    ok 89 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 90 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 91 - correct parse_datetime return value for '2012-12-24 15:30:00.123456'
+    ok 92 - correct parse_datetime output seconds for '2012-12-24 15:30:00.123456
+    ok 93 - strftime
+    ok 94 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 95 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 96 - correct parse_datetime return value for '2012-12-24 16:30:00.123456+01:00'
+    ok 97 - correct parse_datetime output seconds for '2012-12-24 16:30:00.123456+01:00
+    ok 98 - strftime
+    ok 99 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 100 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 101 - correct parse_datetime return value for '2012-12-24 16:30:00.123456+01'
+    ok 102 - correct parse_datetime output seconds for '2012-12-24 16:30:00.123456+01
+    ok 103 - strftime
+    ok 104 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 105 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 106 - correct parse_datetime return value for '2012-12-24 14:30:00.123456-01:00'
+    ok 107 - correct parse_datetime output seconds for '2012-12-24 14:30:00.123456-01:00
+    ok 108 - strftime
+    ok 109 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 110 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 111 - correct parse_datetime return value for '2012-12-24 14:30:00.123456-01'
+    ok 112 - correct parse_datetime output seconds for '2012-12-24 14:30:00.123456-01
+    ok 113 - strftime
+    ok 114 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 115 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 116 - correct parse_datetime return value for '2012-12-24t15:30Z'
+    ok 117 - correct parse_datetime output seconds for '2012-12-24t15:30Z
+    ok 118 - strftime
+    ok 119 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 120 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 121 - correct parse_datetime return value for '2012-12-24t15:30z'
+    ok 122 - correct parse_datetime output seconds for '2012-12-24t15:30z
+    ok 123 - strftime
+    ok 124 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 125 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 126 - correct parse_datetime return value for '2012-12-24t15:30'
+    ok 127 - correct parse_datetime output seconds for '2012-12-24t15:30
+    ok 128 - strftime
+    ok 129 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 130 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 131 - correct parse_datetime return value for '2012-12-24t16:30+01:00'
+    ok 132 - correct parse_datetime output seconds for '2012-12-24t16:30+01:00
+    ok 133 - strftime
+    ok 134 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 135 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 136 - correct parse_datetime return value for '2012-12-24t16:30+0100'
+    ok 137 - correct parse_datetime output seconds for '2012-12-24t16:30+0100
+    ok 138 - strftime
+    ok 139 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 140 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 141 - correct parse_datetime return value for '2012-12-24t14:30-01:00'
+    ok 142 - correct parse_datetime output seconds for '2012-12-24t14:30-01:00
+    ok 143 - strftime
+    ok 144 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 145 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 146 - correct parse_datetime return value for '2012-12-24t14:30-0100'
+    ok 147 - correct parse_datetime output seconds for '2012-12-24t14:30-0100
+    ok 148 - strftime
+    ok 149 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 150 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 151 - correct parse_datetime return value for '2012-12-24t15:30:00Z'
+    ok 152 - correct parse_datetime output seconds for '2012-12-24t15:30:00Z
+    ok 153 - strftime
+    ok 154 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 155 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 156 - correct parse_datetime return value for '2012-12-24t15:30:00z'
+    ok 157 - correct parse_datetime output seconds for '2012-12-24t15:30:00z
+    ok 158 - strftime
+    ok 159 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 160 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 161 - correct parse_datetime return value for '2012-12-24t15:30:00'
+    ok 162 - correct parse_datetime output seconds for '2012-12-24t15:30:00
+    ok 163 - strftime
+    ok 164 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 165 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 166 - correct parse_datetime return value for '2012-12-24t16:30:00+01:00'
+    ok 167 - correct parse_datetime output seconds for '2012-12-24t16:30:00+01:00
+    ok 168 - strftime
+    ok 169 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 170 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 171 - correct parse_datetime return value for '2012-12-24t16:30:00+0100'
+    ok 172 - correct parse_datetime output seconds for '2012-12-24t16:30:00+0100
+    ok 173 - strftime
+    ok 174 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 175 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 176 - correct parse_datetime return value for '2012-12-24t14:30:00-01:00'
+    ok 177 - correct parse_datetime output seconds for '2012-12-24t14:30:00-01:00
+    ok 178 - strftime
+    ok 179 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 180 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 181 - correct parse_datetime return value for '2012-12-24t14:30:00-0100'
+    ok 182 - correct parse_datetime output seconds for '2012-12-24t14:30:00-0100
+    ok 183 - strftime
+    ok 184 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 185 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 186 - correct parse_datetime return value for '2012-12-24t15:30:00.123456Z'
+    ok 187 - correct parse_datetime output seconds for '2012-12-24t15:30:00.123456Z
+    ok 188 - strftime
+    ok 189 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 190 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 191 - correct parse_datetime return value for '2012-12-24t15:30:00.123456z'
+    ok 192 - correct parse_datetime output seconds for '2012-12-24t15:30:00.123456z
+    ok 193 - strftime
+    ok 194 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 195 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 196 - correct parse_datetime return value for '2012-12-24t16:30:00.123456+01:00'
+    ok 197 - correct parse_datetime output seconds for '2012-12-24t16:30:00.123456+01:00
+    ok 198 - strftime
+    ok 199 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 200 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 201 - correct parse_datetime return value for '2012-12-24t14:30:00.123456-01:00'
+    ok 202 - correct parse_datetime output seconds for '2012-12-24t14:30:00.123456-01:00
+    ok 203 - strftime
+    ok 204 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 205 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 206 - correct parse_datetime return value for '2012-12-24 16:30 +01:00'
+    ok 207 - correct parse_datetime output seconds for '2012-12-24 16:30 +01:00
+    ok 208 - strftime
+    ok 209 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 210 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 211 - correct parse_datetime return value for '2012-12-24 14:30 -01:00'
+    ok 212 - correct parse_datetime output seconds for '2012-12-24 14:30 -01:00
+    ok 213 - strftime
+    ok 214 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 215 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 216 - correct parse_datetime return value for '2012-12-24 15:30 UTC'
+    ok 217 - correct parse_datetime output seconds for '2012-12-24 15:30 UTC
+    ok 218 - strftime
+    ok 219 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 220 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 221 - correct parse_datetime return value for '2012-12-24 16:30 UTC+1'
+    ok 222 - correct parse_datetime output seconds for '2012-12-24 16:30 UTC+1
+    ok 223 - strftime
+    ok 224 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 225 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 226 - correct parse_datetime return value for '2012-12-24 16:30 UTC+01'
+    ok 227 - correct parse_datetime output seconds for '2012-12-24 16:30 UTC+01
+    ok 228 - strftime
+    ok 229 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 230 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 231 - correct parse_datetime return value for '2012-12-24 16:30 UTC+0100'
+    ok 232 - correct parse_datetime output seconds for '2012-12-24 16:30 UTC+0100
+    ok 233 - strftime
+    ok 234 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 235 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 236 - correct parse_datetime return value for '2012-12-24 16:30 UTC+01:00'
+    ok 237 - correct parse_datetime output seconds for '2012-12-24 16:30 UTC+01:00
+    ok 238 - strftime
+    ok 239 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 240 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 241 - correct parse_datetime return value for '2012-12-24 14:30 UTC-1'
+    ok 242 - correct parse_datetime output seconds for '2012-12-24 14:30 UTC-1
+    ok 243 - strftime
+    ok 244 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 245 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 246 - correct parse_datetime return value for '2012-12-24 14:30 UTC-01'
+    ok 247 - correct parse_datetime output seconds for '2012-12-24 14:30 UTC-01
+    ok 248 - strftime
+    ok 249 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 250 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 251 - correct parse_datetime return value for '2012-12-24 14:30 UTC-01:00'
+    ok 252 - correct parse_datetime output seconds for '2012-12-24 14:30 UTC-01:00
+    ok 253 - strftime
+    ok 254 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 255 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 256 - correct parse_datetime return value for '2012-12-24 14:30 UTC-0100'
+    ok 257 - correct parse_datetime output seconds for '2012-12-24 14:30 UTC-0100
+    ok 258 - strftime
+    ok 259 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 260 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 261 - correct parse_datetime return value for '2012-12-24 15:30 GMT'
+    ok 262 - correct parse_datetime output seconds for '2012-12-24 15:30 GMT
+    ok 263 - strftime
+    ok 264 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 265 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 266 - correct parse_datetime return value for '2012-12-24 16:30 GMT+1'
+    ok 267 - correct parse_datetime output seconds for '2012-12-24 16:30 GMT+1
+    ok 268 - strftime
+    ok 269 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 270 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 271 - correct parse_datetime return value for '2012-12-24 16:30 GMT+01'
+    ok 272 - correct parse_datetime output seconds for '2012-12-24 16:30 GMT+01
+    ok 273 - strftime
+    ok 274 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 275 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 276 - correct parse_datetime return value for '2012-12-24 16:30 GMT+0100'
+    ok 277 - correct parse_datetime output seconds for '2012-12-24 16:30 GMT+0100
+    ok 278 - strftime
+    ok 279 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 280 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 281 - correct parse_datetime return value for '2012-12-24 16:30 GMT+01:00'
+    ok 282 - correct parse_datetime output seconds for '2012-12-24 16:30 GMT+01:00
+    ok 283 - strftime
+    ok 284 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 285 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 286 - correct parse_datetime return value for '2012-12-24 14:30 GMT-1'
+    ok 287 - correct parse_datetime output seconds for '2012-12-24 14:30 GMT-1
+    ok 288 - strftime
+    ok 289 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 290 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 291 - correct parse_datetime return value for '2012-12-24 14:30 GMT-01'
+    ok 292 - correct parse_datetime output seconds for '2012-12-24 14:30 GMT-01
+    ok 293 - strftime
+    ok 294 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 295 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 296 - correct parse_datetime return value for '2012-12-24 14:30 GMT-01:00'
+    ok 297 - correct parse_datetime output seconds for '2012-12-24 14:30 GMT-01:00
+    ok 298 - strftime
+    ok 299 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 300 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 301 - correct parse_datetime return value for '2012-12-24 14:30 GMT-0100'
+    ok 302 - correct parse_datetime output seconds for '2012-12-24 14:30 GMT-0100
+    ok 303 - strftime
+    ok 304 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 305 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 306 - correct parse_datetime return value for '2012-12-24 14:30 -01:00'
+    ok 307 - correct parse_datetime output seconds for '2012-12-24 14:30 -01:00
+    ok 308 - strftime
+    ok 309 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 310 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 311 - correct parse_datetime return value for '2012-12-24 16:30:00 +01:00'
+    ok 312 - correct parse_datetime output seconds for '2012-12-24 16:30:00 +01:00
+    ok 313 - strftime
+    ok 314 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 315 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 316 - correct parse_datetime return value for '2012-12-24 14:30:00 -01:00'
+    ok 317 - correct parse_datetime output seconds for '2012-12-24 14:30:00 -01:00
+    ok 318 - strftime
+    ok 319 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 320 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 321 - correct parse_datetime return value for '2012-12-24 16:30:00.123456 +01:00'
+    ok 322 - correct parse_datetime output seconds for '2012-12-24 16:30:00.123456 +01:00
+    ok 323 - strftime
+    ok 324 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 325 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 326 - correct parse_datetime return value for '2012-12-24 14:30:00.123456 -01:00'
+    ok 327 - correct parse_datetime output seconds for '2012-12-24 14:30:00.123456 -01:00
+    ok 328 - strftime
+    ok 329 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 330 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 331 - correct parse_datetime return value for '2012-12-24 15:30:00.123456 -00:00'
+    ok 332 - correct parse_datetime output seconds for '2012-12-24 15:30:00.123456 -00:00
+    ok 333 - strftime
+    ok 334 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 335 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 336 - correct parse_datetime return value for '20121224T1630+01:00'
+    ok 337 - correct parse_datetime output seconds for '20121224T1630+01:00
+    ok 338 - strftime
+    ok 339 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 340 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 341 - correct parse_datetime return value for '2012-12-24T1630+01:00'
+    ok 342 - correct parse_datetime output seconds for '2012-12-24T1630+01:00
+    ok 343 - strftime
+    ok 344 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 345 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 346 - correct parse_datetime return value for '20121224T16:30+01'
+    ok 347 - correct parse_datetime output seconds for '20121224T16:30+01
+    ok 348 - strftime
+    ok 349 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 350 - reversible seconds via strftime for '2012-12-24 15:30:00
+    ok 351 - correct parse_datetime return value for '20121224T16:30 +01'
+    ok 352 - correct parse_datetime output seconds for '20121224T16:30 +01
+    ok 353 - strftime
+    ok 354 - correct parse_datetime return value for '2012-12-24 15:30:00'
+    ok 355 - reversible seconds via strftime for '2012-12-24 15:30:00
+ok 1 - subtests
+    1..15
+    ok 1 - string '1970-01-01T02:00:00+0200' expected, received '1970-01-01T02:00:00+0200'
+    ok 2 - string '1970-01-01T01:30:00+0130' expected, received '1970-01-01T01:30:00+0130'
+    ok 3 - string '1970-01-01T01:00:00+0100' expected, received '1970-01-01T01:00:00+0100'
+    ok 4 - string '1970-01-01T00:01:00+0001' expected, received '1970-01-01T00:01:00+0001'
+    ok 5 - string '1970-01-01T00:00:00Z' expected, received '1970-01-01T00:00:00Z'
+    ok 6 - string '1969-12-31T23:59:00-0001' expected, received '1969-12-31T23:59:00-0001'
+    ok 7 - string '1969-12-31T23:00:00-0100' expected, received '1969-12-31T23:00:00-0100'
+    ok 8 - string '1969-12-31T22:30:00-0130' expected, received '1969-12-31T22:30:00-0130'
+    ok 9 - string '1969-12-31T22:00:00-0200' expected, received '1969-12-31T22:00:00-0200'
+    ok 10 - string '1970-01-01T00:00:00.123456789Z' expected, received '1970-01-01T00:00:00.123456789Z'
+    ok 11 - string '1970-01-01T00:00:00.123456Z' expected, received '1970-01-01T00:00:00.123456Z'
+    ok 12 - string '1970-01-01T00:00:00.123Z' expected, received '1970-01-01T00:00:00.123Z'
+    ok 13 - string '1973-11-29T21:33:09Z' expected, received '1973-11-29T21:33:09Z'
+    ok 14 - string '2013-10-28T17:51:56Z' expected, received '2013-10-28T17:51:56Z'
+    ok 15 - string '9999-12-31T23:59:59Z' expected, received '9999-12-31T23:59:59Z'
+ok 2 - subtests
