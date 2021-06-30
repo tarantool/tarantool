@@ -4,7 +4,7 @@ local cdt = ffi.C
 ffi.cdef [[
 
     typedef int dt_t;
-    
+
     // dt_core.h
     typedef enum {
         DT_MON       = 1,
@@ -143,53 +143,12 @@ local native = ffi.C
 
 local SECS_PER_DAY     = 86400
 local NANOS_PER_SEC    = 1000000000LL
-local MIN_UNIT_YEARS   = -10000LL
-local MAX_UNIT_YEARS   = 10000LL
-local MIN_UNIT_MONTHS  = -120000LL
-local MAX_UNIT_MONTHS  = 120000LL
-local MIN_UNIT_WEEKS   = -521775LL
-local MAX_UNIT_WEEKS   = 521775LL
-local MIN_UNIT_DAYS    = -3652425LL
-local MAX_UNIT_DAYS    = 3652425LL
-local MIN_UNIT_HOURS   = -87658200LL
-local MAX_UNIT_HOURS   = 87658200LL
-local MIN_UNIT_MINUTES = -5259492000LL
-local MAX_UNIT_MINUTES = 5259492000LL
-local MIN_UNIT_SECONDS = -315569520000LL
-local MAX_UNIT_SECONDS = 315569520000LL
-local MIN_UNIT_MILLIS  = -315569520000000LL
-local MAX_UNIT_MILLIS  = 315569520000000LL
-local MIN_UNIT_MICROS  = -315569520000000000LL
-local MAX_UNIT_MICROS  = 315569520000000000LL
-
-local MIN_RATA_DIE_DAY    = 1LL            -- 0001-01-01
-local MAX_RATA_DIE_DAY    = 352059LL       -- 9999-12-31
-
-local MIN_RANGE           = 86400          -- 0LL01-01-01T00:00:00Z
-local MAX_RANGE           = 315537983999LL -- 9LL99-12-31T23:59:59Z
-local UNIX_EPOCH          = 62135683200LL  -- 1LL70-01-01T00:00:00Z
-local MIN_EPOCH_SEC       = -62135596800LL -- 0LL01-01-01T00:00:00Z
-local MAX_EPOCH_SEC       = 253402300799LL -- 9LL99-12-31T23:59:59Z
 
 -- c-dt/dt_config.h
-
--- Chronological Julian Date, January 1, 4713 BC, Monday
-local DT_JULIAN_4713BC_OFFSET = -1721425LL
-
--- Network Time Protocol (NTP), January 1, 1900, Monday
-local DT_NTP_1900_OFFSET = 693596LL
 
 -- Unix, January 1, 1970, Thursday
 local DT_EPOCH_1970_OFFSET = 719163LL
 
--- Rata Die, January 1, 0001, Monday (as Day 1)
-local DT_RATADIE_OFFSET = 0LL
-
-local DT_SECS_EPOCH_OFFSET = (DT_EPOCH_1970_OFFSET - DT_NTP_1900_OFFSET) * SECS_PER_DAY
-
-local function valid_epoch_sec(s)
-    return (s >= MIN_EPOCH_SEC) and (s <= MAX_EPOCH_SEC)
-end
 
 local datetime_t = ffi.typeof('struct t_datetime_tz')
 local duration_t = ffi.typeof('struct t_datetime_duration')
