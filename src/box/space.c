@@ -108,6 +108,7 @@ space_fill_index_map(struct space *space)
 		struct index *index = space->index_map[j];
 		if (index) {
 			assert(index_count < space->index_count);
+			index->dense_id = index_count;
 			space->index[index_count++] = index;
 		}
 	}
