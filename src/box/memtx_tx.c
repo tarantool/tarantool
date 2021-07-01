@@ -471,9 +471,9 @@ memtx_tx_story_delete_del_stmt(struct memtx_story *story)
  * Link a @a story with @a older_story in @a index (in both directions).
  */
 static void
-memtx_tx_story_link_story(struct memtx_story *story,
-			  struct memtx_story *older_story,
-			  uint32_t index)
+memtx_tx_story_link(struct memtx_story *story,
+		    struct memtx_story *older_story,
+		    uint32_t index)
 {
 	assert(index < story->index_count);
 	assert(older_story == NULL || index < older_story->index_count);
@@ -1150,10 +1150,10 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 			if (del_story == NULL)
 				goto fail;
 			del_story_is_created = true;
-			memtx_tx_story_link_story(add_story, del_story, 0);
+			memtx_tx_story_link(add_story, del_story, 0);
 		} else if (replaced != NULL) {
 			del_story = memtx_tx_story_get(replaced);
-			memtx_tx_story_link_story(add_story, del_story, 0);
+			memtx_tx_story_link(add_story, del_story, 0);
 		} else {
 			memtx_tx_handle_gap_write(stmt->txn, space,
 						  add_story, new_tuple,
@@ -1170,7 +1170,7 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 			assert(directly_replaced[i]->is_dirty);
 			struct memtx_story *next =
 				memtx_tx_story_get(directly_replaced[i]);
-			memtx_tx_story_link_story(add_story, next, i);
+			memtx_tx_story_link(add_story, next, i);
 		}
 	} else {
 		/**
@@ -1295,7 +1295,7 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 				       older->link[i].newer_story == story);
 				memtx_tx_story_unlink(newer, i);
 				memtx_tx_story_unlink(story, i);
-				memtx_tx_story_link_story(newer, older, i);
+				memtx_tx_story_link(newer, older, i);
 				assert(newer->link[i].older_story == older);
 				assert(older == NULL ||
 				       older->link[i].newer_story == newer);
@@ -1401,16 +1401,16 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
 			struct memtx_story *newer = link->newer_story;
 			assert(newer->link[i].older_story == story);
 			memtx_tx_story_unlink(newer, i);
-			memtx_tx_story_link_story(newer, old_story, i);
+			memtx_tx_story_link(newer, old_story, i);
 		}
 
 		memtx_tx_story_unlink(story, i);
 		struct memtx_story *to =
 			old_story->link[i].older_story;
 		memtx_tx_story_unlink(old_story, i);
-		memtx_tx_story_link_story(story, to, i);
+		memtx_tx_story_link(story, to, i);
 
-		memtx_tx_story_link_story(old_story, story, i);
+		memtx_tx_story_link(old_story, story, i);
 
 		if (i == 0) {
 			assert(stmt->del_story == old_story);
