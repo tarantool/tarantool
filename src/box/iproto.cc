@@ -130,6 +130,7 @@ struct iproto_thread {
 	struct cmsg_hop push_route[2];
 	struct cmsg_hop *dml_route[IPROTO_TYPE_STAT_MAX];
 	struct cmsg_hop connect_route[2];
+	struct cmsg_hop shutdown_route[2];
 	/** Iproto thread memory pools */
 	struct mempool iproto_msg_pool;
 	struct mempool iproto_connection_pool;
@@ -488,6 +489,11 @@ struct iproto_connection
 	 */
 	struct cmsg destroy_msg;
 	/**
+	 * Pre-allocated shutdown msg. Is sent after receiving EOF.
+	 * Runs on_disconnect triggers.
+	 */
+	struct cmsg shutdown_msg;
+	/**
 	 * Connection state. Mainly it is used to determine when
 	 * the connection can be destroyed, and for debug purposes
 	 * to assert on a double destroy, for example.
@@ -545,6 +551,26 @@ struct iproto_connection
 	char salt[IPROTO_SALT_SIZE];
 	/** Iproto connection thread */
 	struct iproto_thread *iproto_thread;
+	/**
+	 * Request count, currently in work,
+	 * for this connection.
+	 */
+	int64_t n_requests;
+	/**
+	 * Flag indicates, that read from input
+	 * socket returned zero.
+	 */
+	bool was_eof_received;
+	/**
+	 * Flag indicates, that shutdown_msg was
+	 * sent to tx thread.
+	 */
+	bool is_shutdown_in_progress;
+	/**
+	 * Flag indicates, that `on_disconnect` triggers
+	 * have already been started for this connection.
+	 */
+	bool is_on_disconnect_triggers_started;
 };
 
 /**
@@ -561,8 +587,11 @@ iproto_check_msg_max(struct iproto_thread *iproto_thread)
 static inline void
 iproto_msg_delete(struct iproto_msg *msg)
 {
+	struct iproto_connection *con = msg->connection;
 	struct iproto_thread *iproto_thread = msg->connection->iproto_thread;
 	mempool_free(&msg->connection->iproto_thread->iproto_msg_pool, msg);
+	con->n_requests--;
+	assert(con->n_requests >= 0);
 	iproto_resume(iproto_thread);
 }
 
@@ -582,6 +611,7 @@ iproto_msg_new(struct iproto_connection *con)
 			 "connection %s", sio_socketname(con->input.fd));
 		return NULL;
 	}
+	con->n_requests++;
 	msg->close_connection = false;
 	msg->connection = con;
 	rmean_collect(con->iproto_thread->rmean, IPROTO_REQUESTS, 1);
@@ -696,7 +726,10 @@ iproto_connection_close(struct iproto_connection *con)
 		 * is done only once.
 		 */
 		con->p_ibuf->wpos -= con->parse_size;
-		cpipe_push(&con->iproto_thread->tx_pipe, &con->disconnect_msg);
+		if (!con->is_shutdown_in_progress) {
+			cpipe_push(&con->iproto_thread->tx_pipe,
+				   &con->disconnect_msg);
+		}
 		assert(con->state == IPROTO_CONNECTION_ALIVE);
 		con->state = IPROTO_CONNECTION_CLOSED;
 	} else if (con->state == IPROTO_CONNECTION_PENDING_DESTROY) {
@@ -895,7 +928,8 @@ err_msgpack:
 		 */
 		ev_io_stop(con->loop, &con->output);
 		ev_io_stop(con->loop, &con->input);
-	} else if (n_requests != 1 || con->parse_size != 0) {
+	} else if ((n_requests != 1 && !con->was_eof_received) ||
+		   con->parse_size != 0) {
 		/*
 		 * Keep reading input, as long as the socket
 		 * supplies data, but don't waste CPU on an extra
@@ -1003,8 +1037,20 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 			return;
 		}
 		if (nrd == 0) {                 /* EOF */
-			iproto_connection_close(con);
-			return;
+			assert(con->state == IPROTO_CONNECTION_ALIVE);
+			if (!con->was_eof_received) {
+				con->is_shutdown_in_progress = true;
+				cmsg_init(&con->shutdown_msg,
+					  con->iproto_thread->shutdown_route);
+				cpipe_push(&con->iproto_thread->tx_pipe,
+					   &con->shutdown_msg);
+			}
+			con->was_eof_received = true;
+			ev_io_stop(con->loop, &con->input);
+			if (con->n_requests == 0 && con->parse_size == 0) {
+				iproto_connection_close(con);
+				return;
+			}
 		}
 		/* Count statistics */
 		rmean_collect(con->iproto_thread->rmean,
@@ -1099,12 +1145,16 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 				return;
 			}
 			if (! ev_is_active(&con->input) &&
-			    rlist_empty(&con->in_stop_list)) {
+			    rlist_empty(&con->in_stop_list) &&
+			    ! con->was_eof_received) {
 				ev_feed_event(loop, &con->input, EV_READ);
 			}
 		}
 		if (ev_is_active(&con->output))
 			ev_io_stop(con->loop, &con->output);
+		if (con->was_eof_received && con->n_requests == 0 &&
+		    con->parse_size == 0)
+			iproto_connection_close(con);
 	} catch (Exception *e) {
 		e->log();
 		iproto_connection_close(con);
@@ -1138,6 +1188,10 @@ iproto_connection_new(struct iproto_thread *iproto_thread, int fd)
 	con->parse_size = 0;
 	con->long_poll_count = 0;
 	con->session = NULL;
+	con->n_requests = 0;
+	con->was_eof_received = false;
+	con->is_shutdown_in_progress = false;
+	con->is_on_disconnect_triggers_started = false;
 	rlist_create(&con->in_stop_list);
 	/* It may be very awkward to allocate at close. */
 	cmsg_init(&con->destroy_msg, con->iproto_thread->destroy_route);
@@ -1317,16 +1371,45 @@ tx_fiber_init(struct session *session, uint64_t sync)
 }
 
 static void
+tx_run_on_disconnect_triggers(struct iproto_connection *con)
+{
+	if (! rlist_empty(&session_on_disconnect)) {
+		tx_fiber_init(con->session, 0);
+		session_run_on_disconnect_triggers(con->session);
+		con->is_on_disconnect_triggers_started = true;
+	}
+}
+
+static void
+tx_process_shutdown(struct cmsg *m)
+{
+	struct iproto_connection *con =
+		container_of(m, struct iproto_connection, shutdown_msg);
+	assert(con->is_shutdown_in_progress);
+	if (con->session != NULL)
+		tx_run_on_disconnect_triggers(con);
+}
+
+static void
+net_finish_shutdown(struct cmsg *m)
+{
+	struct iproto_connection *con =
+		container_of(m, struct iproto_connection, shutdown_msg);
+	con->is_shutdown_in_progress = false;
+	if (con->state == IPROTO_CONNECTION_CLOSED)
+		cpipe_push(&con->iproto_thread->tx_pipe, &con->disconnect_msg);
+}
+
+static void
 tx_process_disconnect(struct cmsg *m)
 {
 	struct iproto_connection *con =
 		container_of(m, struct iproto_connection, disconnect_msg);
+	assert(!con->is_shutdown_in_progress);
 	if (con->session != NULL) {
 		session_close(con->session);
-		if (! rlist_empty(&session_on_disconnect)) {
-			tx_fiber_init(con->session, 0);
-			session_run_on_disconnect_triggers(con->session);
-		}
+		if (!con->is_on_disconnect_triggers_started)
+			tx_run_on_disconnect_triggers(con);
 	}
 }
 
@@ -1395,7 +1478,7 @@ net_discard_input(struct cmsg *m)
 	msg->len = 0;
 	con->long_poll_count++;
 	if (evio_has_fd(&con->input) && !ev_is_active(&con->input) &&
-	    rlist_empty(&con->in_stop_list))
+	    rlist_empty(&con->in_stop_list) && !con->was_eof_received)
 		ev_feed_event(con->loop, &con->input, EV_READ);
 }
 
@@ -1885,6 +1968,15 @@ net_end_join(struct cmsg *m)
 
 	assert(! ev_is_active(&con->input));
 	/*
+	 * In case we received eof for this connection, and
+	 * all requests were processed, close it
+	 */
+	if (con->was_eof_received && con->parse_size == 0 &&
+	    con->n_requests == 0) {
+		iproto_connection_close(con);
+		return;
+	}
+	/*
 	 * Enqueue any messages if they are in the readahead
 	 * queue. Will simply start input otherwise.
 	 */
@@ -2160,6 +2252,10 @@ iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 		{ tx_process_destroy, &iproto_thread->net_pipe };
 	iproto_thread->destroy_route[1] =
 		{ net_finish_destroy, NULL };
+	iproto_thread->shutdown_route[0] =
+		{ tx_process_shutdown, &iproto_thread->net_pipe },
+	iproto_thread->shutdown_route[1] =
+		{ net_finish_shutdown, NULL };
 	iproto_thread->disconnect_route[0] =
 		{ tx_process_disconnect, &iproto_thread->net_pipe };
 	iproto_thread->disconnect_route[1] =

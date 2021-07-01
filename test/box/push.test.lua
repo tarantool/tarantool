@@ -259,6 +259,8 @@ chan_func:get()
 c:close()
 chan_disconnected:get()
 chan_push:put(true)
+-- no error now, because on `on_disconnect` triggers
+-- runs now before session is closed.
 chan_push:get()
 box.schema.func.drop('do_long_and_push')
 box.session.on_disconnect(nil, on_disconnect)
