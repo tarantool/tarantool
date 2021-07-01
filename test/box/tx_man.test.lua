@@ -770,6 +770,187 @@ for i = 1, N do                            \
     table.insert(fibers, fib)              \
 end
 for _,fib in pairs(fibers) do fib:join() end
+
+s:drop()
+
+-- Same key in primary, different in secondary.
+s = box.schema.create_space('test')
+pk = s:create_index('pk', {parts={1, 'uint'}})
+sk = s:create_index('sk', {parts={2, 'uint'}})
+s:replace{1, 1}
+tx1:begin()
+tx1('s:replace{1, 2}')
+tx2:begin()
+tx2('s:replace{1, 3}')
+tx1('sk:select{1}')
+tx2('sk:select{1}')
+tx1:rollback();
+tx2:rollback();
+s:drop()
+
+s = box.schema.create_space('test')
+pk = s:create_index('pk', {parts={1, 'uint'}})
+sk = s:create_index('sk', {parts={2, 'uint'}})
+tx1:begin()
+tx1('s:replace{1, 1}')
+tx2:begin()
+tx2('s:replace{1, 2}')
+tx3:begin()
+tx3('s:replace{1, 3}')
+tx1:commit()
+tx2('sk:select{}')
+tx3('sk:select{}')
+tx2:commit()
+tx3:commit()
+s:drop()
+
+s = box.schema.create_space('test')
+pk = s:create_index('pk', {parts={1, 'uint'}})
+sk = s:create_index('sk', {parts={2, 'uint'}})
+tx1:begin()
+tx1('s:replace{1, 1}')
+tx2:begin()
+tx2('s:replace{1, 2}')
+tx3:begin()
+tx3('s:replace{1, 3}')
+tx2:commit()
+tx1('sk:select{}')
+tx3('sk:select{}')
+tx1:commit()
+tx3:commit()
+s:drop()
+
+s = box.schema.create_space('test')
+pk = s:create_index('pk', {parts={1, 'uint'}})
+sk = s:create_index('sk', {parts={2, 'uint'}})
+tx1:begin()
+tx1('s:replace{1, 1}')
+tx2:begin()
+tx2('s:replace{1, 2}')
+tx3:begin()
+tx3('s:replace{1, 3}')
+tx3:commit()
+tx1('sk:select{}')
+tx2('sk:select{}')
+tx1:commit()
+tx2:commit()
+s:drop()
+
+-- More complex conflict in secondary index.
+s = box.schema.create_space('test')
+pk = s:create_index('pk', {parts={1, 'uint'}})
+sk = s:create_index('sk', {parts={2, 'uint'}})
+tx1:begin()
+tx2:begin()
+tx1('s:replace{1, 1, 1}')
+tx1('s:delete{1}')
+tx1('s:replace{1, 1, 2}')
+tx2('s:replace{2, 1, 1}')
+tx2('s:delete{2}')
+tx2('s:replace{2, 1, 2}')
+tx1:commit()
+tx2:commit()
+s:drop()
+
+s = box.schema.create_space('test')
+pk = s:create_index('pk', {parts={1, 'uint'}})
+sk = s:create_index('sk', {parts={2, 'uint'}})
+tx1:begin()
+tx2:begin()
+tx1('s:replace{1, 1, 1}')
+tx1('s:delete{1}')
+tx1('s:replace{1, 1, 2}')
+tx2('s:replace{2, 1, 1}')
+tx2('s:delete{2}')
+tx2('s:replace{2, 1, 2}')
+tx2:commit() -- note that tx2 commits first.
+tx1:commit()
+s:drop()
+
+-- Double deletes
+s = box.schema.create_space('test')
+pk = s:create_index('pk', {parts={1, 'uint'}})
+tx1:begin()
+tx1('s:replace{1, 1}')
+tx1('s:delete{1}')
+tx1('s:delete{1}')
+tx2:begin()
+tx2('s:replace{1, 2}')
+tx2('s:delete{1}')
+tx2('s:delete{1}')
+tx1:commit()
+tx2:commit()
+s:select{}
+s:drop()
+
+s = box.schema.create_space('test')
+pk = s:create_index('pk', {parts={1, 'uint'}})
+tx1:begin()
+tx1('s:replace{1, 1}')
+tx1('s:delete{1}')
+tx1('s:delete{1}')
+tx2:begin()
+tx2('s:replace{1, 2}')
+tx2('s:delete{1}')
+tx2('s:delete{1}')
+tx2:commit()
+tx1:commit()
+s:select{}
+s:drop()
+
+--https://github.com/tarantool/tarantool/issues/6132
+test_run:cmd("setopt delimiter ';'")
+run_background_mvcc = true
+function background_mvcc()
+    while run_background_mvcc do
+        box.space.accounts:update('petya', {{'+', 'balance', math.ceil(math.random() * 200) - 100}})
+    end
+end
+test_run:cmd("setopt delimiter ''");
+
+_ = box.schema.space.create('accounts', { format = {'name', 'balance'} })
+_ = box.space.accounts:create_index('pk', { parts = { 1, 'string' } })
+box.space.accounts:insert{ 'vasya', 0 }
+box.space.accounts:insert{ 'petya', 0 }
+
+fiber = require 'fiber'
+
+tx1:begin()
+tx1("box.space.accounts:update('vasya', {{'=', 'balance', 10}})")
+
+tx2:begin()
+tx2("box.space.accounts:update('vasya', {{'=', 'balance', 20}})")
+tx2:commit()
+
+fib = fiber.create(background_mvcc)
+fib:set_joinable(true)
+fiber.sleep(0.1)
+run_background_mvcc = false
+fib:join();
+
+tx1:commit()
+box.space.accounts:select{'vasya'}
+box.space.accounts:drop()
+
+--https://github.com/tarantool/tarantool/issues/6021
+s = box.schema.create_space('test')
+_ = s:create_index('pk', {parts={{1, 'uint'}}})
+
+txn_proxy = require('txn_proxy')
+tx1 = txn_proxy.new()
+tx2 = txn_proxy.new()
+
+s:insert({1, 0})
+
+tx2:begin()
+tx1:begin()
+
+tx1("s:delete(1)")
+tx2("s:replace({1, 3})")
+
+tx2:commit()
+tx1:commit()
+
 s:drop()
 
 s = box.schema.create_space('test')
