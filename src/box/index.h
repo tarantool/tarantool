@@ -472,6 +472,8 @@ struct index {
 	uint32_t space_cache_version;
 	/** Globally unique ID. */
 	uint32_t unique_id;
+	/** Compact ID - index in space->index array. */
+	uint32_t dense_id;
 	/**
 	 * List of gap read in the index with NULL successor. Those gap
 	 * reads happen when reading from empty index, or when reading
