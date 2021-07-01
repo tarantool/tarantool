@@ -498,6 +498,8 @@ index_create(struct index *index, struct engine *engine,
 	index->space_cache_version = space_cache_version;
 	static uint32_t unique_id = 0;
 	index->unique_id = unique_id++;
+	/* Unusable until set to proper value during space creation. */
+	index->dense_id = UINT32_MAX;
 	rlist_create(&index->nearby_gaps);
 	return 0;
 }
