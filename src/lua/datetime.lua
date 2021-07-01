@@ -308,11 +308,6 @@ local function datetime_new(o)
 
     for key, value in pairs(o) do
         local handlers = {
-            epoch = function(v)
-                secs = v + UNIX_EPOCH
-                easy_way = true
-            end,
-
             secs = function(v)
                 secs = v
                 easy_way = true
