@@ -30,7 +30,7 @@ function get_os_dists {
     elif [ "$os" == "el" ]; then
         alldists='6 7 8'
     elif [ "$os" == "fedora" ]; then
-        alldists='27 28 29 30 31 32 33'
+        alldists='27 28 29 30 31 32 33 34'
     elif [ "$os" == "opensuse-leap" ]; then
         alldists='15.0 15.1 15.2'
     fi
