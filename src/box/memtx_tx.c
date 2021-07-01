@@ -1253,6 +1253,20 @@ fail:
 void
 memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 {
+	if (stmt->del_story != NULL) {
+		struct memtx_story *story = stmt->del_story;
+
+		struct txn_stmt **prev = &story->del_stmt;
+		while (*prev != stmt) {
+			prev = &(*prev)->next_in_del_list;
+			assert(*prev != NULL);
+		}
+		*prev = stmt->next_in_del_list;
+		stmt->next_in_del_list = NULL;
+
+		stmt->del_story = NULL;
+	}
+
 	if (stmt->add_story != NULL) {
 		assert(stmt->add_story->tuple == stmt->new_tuple);
 		struct memtx_story *story = stmt->add_story;
@@ -1277,29 +1291,33 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 				}
 				/*
 				 * A space holds references to all his tuples.
-				 * It's made via primary index - all tuples that are physically
-				 * in primary index must be referenced (a replaces tuple must
-				 * be dereferenced).
+				 * It's made via primary index - all tuples that
+				 * are physically in primary index must be
+				 * referenced (a replaces tuple must be
+				 * dereferenced).
 				 */
-				if (i == 0)
+				if (i == 0) {
 					tuple_unref(story->tuple);
-				if (i == 0 && was != NULL)
-					tuple_ref(was);
+					if (was != NULL)
+						tuple_ref(was);
+				}
 
 				memtx_tx_story_unlink(story, i);
-			} else {
-				struct memtx_story *newer = link->newer_story;
-				struct memtx_story *older = link->older_story;
-				assert(newer->link[i].older_story == story);
-				assert(older == NULL ||
-				       older->link[i].newer_story == story);
-				memtx_tx_story_unlink(newer, i);
-				memtx_tx_story_unlink(story, i);
-				memtx_tx_story_link(newer, older, i);
-				assert(newer->link[i].older_story == older);
-				assert(older == NULL ||
-				       older->link[i].newer_story == newer);
+				continue;
 			}
+
+			assert(link->newer_story != NULL);
+			struct memtx_story *newer = link->newer_story;
+			struct memtx_story *older = link->older_story;
+			assert(newer->link[i].older_story == story);
+			assert(older == NULL ||
+			       older->link[i].newer_story == story);
+			memtx_tx_story_unlink(newer, i);
+			memtx_tx_story_unlink(story, i);
+			memtx_tx_story_link(newer, older, i);
+			assert(newer->link[i].older_story == older);
+			assert(older == NULL ||
+			       older->link[i].newer_story == newer);
 		}
 
 		/* The story is no more allowed to change indexes. */
@@ -1307,20 +1325,6 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 
 		stmt->add_story->add_stmt = NULL;
 		stmt->add_story = NULL;
-	}
-
-	if (stmt->del_story != NULL) {
-		struct memtx_story *story = stmt->del_story;
-
-		struct txn_stmt **prev = &story->del_stmt;
-		while (*prev != stmt) {
-			prev = &(*prev)->next_in_del_list;
-			assert(*prev != NULL);
-		}
-		*prev = stmt->next_in_del_list;
-		stmt->next_in_del_list = NULL;
-
-		stmt->del_story = NULL;
 	}
 }
 
