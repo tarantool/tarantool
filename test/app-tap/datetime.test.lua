@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test("errno")
 local date = require('datetime')
 
-test:plan(2)
+test:plan(3)
 
 test:test("Simple tests for parser", function(test)
     test:plan(2)
@@ -84,6 +84,28 @@ test:test("Multiple tests for parser (with nanoseconds)", function(test)
         test:ok(dt.nsec == nsec, ('%s: dt.nsec == %d'):format(str, nsec))
         test:ok(dt.offset == offset, ('%s: dt.offset == %d'):format(str, offset))
     end
+end)
+
+local ffi = require('ffi')
+
+ffi.cdef [[
+    void tzset(void);
+]]
+
+test:test("Datetime string formatting", function(test)
+    -- redefine timezone to be always GMT-2
+    test:plan(7)
+    local str = "1970-01-01"
+    local t = date(str)
+    test:ok(t.secs == 0, ('%s: t.secs == %d'):format(str, t.secs))
+    test:ok(t.nsec == 0, ('%s: t.nsec == %d'):format(str, t.nsec))
+    test:ok(t.offset == 0, ('%s: t.offset == %d'):format(str, t.offset))
+    test:ok(date.asctime(t) == 'Thu Jan  1 00:00:00 1970\n', ('%s: asctime'):format(str))
+    os.setenv('TZ', 'GMT-2')
+    ffi.C.tzset()
+    test:ok(date.ctime(t) == 'Thu Jan  1 02:00:00 1970\n', ('%s: ctime with timezone'):format(str))
+    test:ok(date.strftime('%d/%m/%Y', t) == '01/01/1970', ('%s: strftime #1'):format(str))
+    test:ok(date.strftime('%A %d. %B %Y', t) == 'Thursday 01. January 1970', ('%s: strftime #2'):format(str))
 end)
 
 os.exit(test:check() and 0 or 1)
