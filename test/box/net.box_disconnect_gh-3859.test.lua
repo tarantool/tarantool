@@ -2,13 +2,7 @@ fiber = require 'fiber'
 test_run = require('test_run').new()
 net = require('net.box')
 
-test_run:cmd('create server connecter with script = "box/proxy.lua"')
-
-box.schema.func.create('fast_call')
-box.schema.func.create('long_call')
 box.schema.func.create('wait_signal')
-box.schema.user.grant('guest', 'execute', 'function', 'fast_call')
-box.schema.user.grant('guest', 'execute', 'function', 'long_call')
 box.schema.user.grant('guest', 'execute', 'function', 'wait_signal')
 c = net.connect(box.cfg.listen)
 
@@ -45,6 +39,4 @@ disconnected -- nil, on_disconnect is not called second time.
 
 box.session.on_disconnect(nil, on_disconnect)
 
-box.schema.func.drop('long_call')
-box.schema.func.drop('fast_call')
 box.schema.func.drop('wait_signal')
