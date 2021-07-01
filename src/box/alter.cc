@@ -57,6 +57,7 @@
 #include "sequence.h"
 #include "sql.h"
 #include "constraint_id.h"
+#include "memtx_tx.h"
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -1663,7 +1664,7 @@ void
 UpdateSchemaVersion::alter(struct alter_space *alter)
 {
     (void)alter;
-    ++schema_version;
+	memtx_tx_bump_schema_version(in_txn());
 }
 
 /**
@@ -2196,6 +2197,10 @@ static int
 on_replace_dd_space(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -2246,7 +2251,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * AlterSpaceOps are registered in case of space
 		 * create.
 		 */
-		++schema_version;
+		memtx_tx_bump_schema_version(txn);
 		/*
 		 * So may happen that until the DDL change record
 		 * is written to the WAL, the space is used for
@@ -2360,7 +2365,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * deleting the space from the space_cache, since no
 		 * AlterSpaceOps are registered in case of space drop.
 		 */
-		++schema_version;
+		memtx_tx_bump_schema_version(txn);
 		struct trigger *on_commit =
 			txn_alter_trigger_new(on_drop_space_commit, old_space);
 		if (on_commit == NULL)
@@ -2565,6 +2570,10 @@ static int
 on_replace_dd_index(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -2847,6 +2856,10 @@ static int
 on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *new_tuple = stmt->new_tuple;
 
@@ -3125,6 +3138,10 @@ static int
 on_replace_dd_user(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -3488,6 +3505,10 @@ static int
 on_replace_dd_func(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -3740,9 +3761,14 @@ static int
 on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
+
 	if (new_tuple == NULL && old_tuple != NULL) {
 		/* DELETE */
 		struct trigger *on_commit =
@@ -4098,6 +4124,10 @@ static int
 on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -4157,6 +4187,10 @@ static int
 on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -4245,9 +4279,14 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
+
 	if (new_tuple != NULL) { /* Insert or replace */
 		/* Check fields */
 		uint32_t replica_id;
@@ -4439,6 +4478,10 @@ static int
 on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -4559,6 +4602,10 @@ static int
 on_replace_dd_sequence_data(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -4708,6 +4755,10 @@ static int
 on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *tuple = stmt->new_tuple ? stmt->new_tuple : stmt->old_tuple;
 	uint32_t space_id;
@@ -4884,10 +4935,13 @@ static int
 on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
-
 	struct trigger *on_rollback = txn_alter_trigger_new(NULL, NULL);
 	struct trigger *on_commit =
 		txn_alter_trigger_new(on_replace_trigger_commit, NULL);
@@ -4984,7 +5038,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 
 	txn_stmt_on_rollback(stmt, on_rollback);
 	txn_stmt_on_commit(stmt, on_commit);
-	++schema_version;
+	memtx_tx_bump_schema_version(txn);
 	return 0;
 }
 
@@ -5315,9 +5369,14 @@ static int
 on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 {
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
+
 	if (new_tuple != NULL) {
 		/* Create or replace foreign key. */
 		struct fk_constraint_def *fk_def =
@@ -5511,7 +5570,7 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 		space_reset_fk_constraint_mask(child_space);
 		space_reset_fk_constraint_mask(parent_space);
 	}
-	++schema_version;
+	memtx_tx_bump_schema_version(txn);
 	return 0;
 }
 
@@ -5645,6 +5704,10 @@ static int
 on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 {
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -5767,7 +5830,7 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 
 	if (trigger_run(&on_alter_space, space) != 0)
 		return -1;
-	++schema_version;
+	memtx_tx_bump_schema_version(txn);
 	return 0;
 }
 
@@ -5777,6 +5840,10 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	struct txn *txn = (struct txn *) event;
+	if (memtx_tx_acquire_ddl(txn) != 0) {
+		diag_set(ClientError, ER_TXN_BUSY_DDL);
+		return -1;
+	}
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;

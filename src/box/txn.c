@@ -38,6 +38,7 @@
 #include "xrow.h"
 #include "errinj.h"
 #include "iproto_constants.h"
+#include "schema.h"
 
 double too_long_threshold;
 
@@ -299,6 +300,8 @@ txn_begin(void)
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
 	txn->fk_deferred_count = 0;
+	txn->schema_version = box_schema_version();
+	txn->is_schema_changed = false;
 	rlist_create(&txn->savepoints);
 	txn->fiber = NULL;
 	fiber_set_txn(fiber(), txn);

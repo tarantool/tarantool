@@ -172,6 +172,30 @@ memtx_tx_manager_init();
 void
 memtx_tx_manager_free();
 
+
+/**
+ * Currently there's restriction on DDL operations: only one transaction at
+ * the time (until it is committed or rolled back) can process DDL. Moreover,
+ * if in the middle of the transaction processing we want to handle DDL
+ * operation, we must verify that schema ID hasn't changed since the start of
+ * the transaction (otherwise it means that current TX sees modifications
+ * provided by other transaction).
+ */
+int
+memtx_tx_acquire_ddl(struct txn *tx);
+
+void
+memtx_tx_bump_schema_version(struct txn *tx);
+
+void
+memtx_tx_prepare_ddl(struct txn *tx);
+
+void
+memtx_tx_commit_ddl(struct txn *tx);
+
+void
+memtx_tx_rollback_ddl(struct txn *tx);
+
 /**
  * Notify TX manager that if transaction @a breaker is committed then the
  * transaction @a victim must be aborted due to conflict. It is achieved

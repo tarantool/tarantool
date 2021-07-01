@@ -381,6 +381,7 @@ memtx_engine_prepare(struct engine *engine, struct txn *txn)
 		if (stmt->add_story != NULL || stmt->del_story != NULL)
 			memtx_tx_history_prepare_stmt(stmt);
 	}
+	memtx_tx_prepare_ddl(txn);
 	return 0;
 }
 
@@ -398,6 +399,7 @@ memtx_engine_commit(struct engine *engine, struct txn *txn)
 			mspace->bsize += bsize;
 		}
 	}
+	memtx_tx_commit_ddl(txn);
 }
 
 static void
@@ -443,6 +445,13 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 		tuple_ref(stmt->old_tuple);
 	if (stmt->new_tuple != NULL)
 		tuple_unref(stmt->new_tuple);
+}
+
+static void
+memtx_engine_rollback(struct engine *engine, struct txn *txn)
+{
+	(void)engine;
+	memtx_tx_rollback_ddl(txn);
 }
 
 static int
@@ -1004,7 +1013,7 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .prepare = */ memtx_engine_prepare,
 	/* .commit = */ memtx_engine_commit,
 	/* .rollback_statement = */ memtx_engine_rollback_statement,
-	/* .rollback = */ generic_engine_rollback,
+	/* .rollback = */ memtx_engine_rollback,
 	/* .switch_to_ro = */ generic_engine_switch_to_ro,
 	/* .bootstrap = */ memtx_engine_bootstrap,
 	/* .begin_initial_recovery = */ memtx_engine_begin_initial_recovery,

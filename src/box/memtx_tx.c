@@ -36,6 +36,7 @@
 
 #include "txn.h"
 #include "schema_def.h"
+#include "schema.h"
 #include "small/mempool.h"
 
 static uint32_t
@@ -193,6 +194,11 @@ struct tx_manager
 	struct rlist all_stories;
 	/** Iterator that sequentially traverses all memtx_story objects. */
 	struct rlist *traverse_all_stories;
+	/**
+	 * Id of the transaction currently performing DDL operation (may be
+	 * in-progress).
+	 */
+	int64_t ddl_tx_id;
 };
 
 enum {
@@ -233,6 +239,7 @@ memtx_tx_manager_init()
 	txm.point_holes_size = 0;
 	rlist_create(&txm.all_stories);
 	txm.traverse_all_stories = &txm.all_stories;
+	txm.ddl_tx_id = 0;
 }
 
 void
@@ -246,6 +253,75 @@ memtx_tx_manager_free()
 	mempool_destroy(&txm.gap_item_mempoool);
 }
 
+static inline bool
+memtx_tx_is_ddl_owner(struct txn *tx)
+{
+	return txm.ddl_tx_id == tx->id;
+}
+
+static inline bool
+memtx_tx_ddl_is_acquirable(struct txn *tx)
+{
+	if (tx->schema_version < box_schema_version())
+		return false;
+	if (txm.ddl_tx_id == 0)
+		return true;
+	if (txm.ddl_tx_id == tx->id)
+		return true;
+	return false;
+}
+
+int
+memtx_tx_acquire_ddl(struct txn *tx)
+{
+	assert(tx != NULL);
+	if (! memtx_tx_ddl_is_acquirable(tx))
+		return -1;
+	assert(txm.ddl_tx_id == 0 || memtx_tx_is_ddl_owner(tx));
+	txm.ddl_tx_id = tx->id;
+	return 0;
+}
+
+void
+memtx_tx_bump_schema_version(struct txn *tx)
+{
+	assert(tx != NULL);
+	assert(txm.ddl_tx_id == tx->id);
+	assert(tx->schema_version == box_schema_version());
+	tx->is_schema_changed = true;
+}
+
+void
+memtx_tx_prepare_ddl(struct txn *tx)
+{
+	assert(tx != NULL);
+	/*
+	 * We can release lock at the TX preparation stage, since in MVCC
+	 * mode transactions can see prepared changes.
+	 */
+	if (memtx_tx_is_ddl_owner(tx))
+		txm.ddl_tx_id = 0;
+}
+
+void
+memtx_tx_commit_ddl(struct txn *tx)
+{
+	assert(tx != NULL);
+	if (tx->is_schema_changed)
+		schema_version++;
+}
+
+void
+memtx_tx_rollback_ddl(struct txn *tx)
+{
+	assert(tx != NULL);
+	/*
+	 * We should reset DDL TX id only in case we are in the transaction
+	 * that acquired DDL.
+	 */
+	if (memtx_tx_is_ddl_owner(tx))
+		txm.ddl_tx_id = 0;
+}
 
 int
 memtx_tx_cause_conflict(struct txn *breaker, struct txn *victim)

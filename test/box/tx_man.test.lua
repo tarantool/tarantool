@@ -615,6 +615,56 @@ tx1:commit()
 
 s:drop()
 
+-- There's restriction that says only one transaction at once should operate
+-- on DDL operations (gh-5998).
+--
+tx1:begin()
+tx2:begin()
+tx1('_ = box.schema.space.create("test1")')
+tx1('_ = box.schema.space.create("test2")')
+tx2('_ = box.schema.space.create("parallel_test")')
+tx2:commit()
+tx1:commit()
+assert(box.space.test1 ~= nil)
+assert(box.space.test2 ~= nil)
+assert(box.space.parallel_test == nil)
+box.space.test1:drop()
+box.space.test2:drop()
+
+tx1:begin()
+tx2:begin()
+
+tx1("box.schema.user.create('internal1')")
+tx2("box.schema.user.create('internal3')")
+tx1("box.schema.user.create('internal2')")
+
+tx1:commit()
+tx2:commit()
+
+assert(box.space._user.index[2]:select({'internal1'})[1] ~= nil)
+assert(box.space._user.index[2]:select({'internal2'})[1] ~= nil)
+assert(box.space._user.index[2]:select({'internal3'})[1] == nil)
+
+box.schema.user.drop('internal1')
+box.schema.user.drop('internal2')
+s = box.schema.space.create("test")
+
+
+tx1:begin()
+tx2:begin()
+tx1('_ = box.schema.space.create("test1")')
+tx2('s:truncate()')
+tx2('box.space._schema:replace{"something"}')
+tx2('box.schema.func.create("fast_call")')
+tx2('box.internal.collation.create("test", "ICU", "ru_RU")')
+tx2('box.execute(\'CREATE TRIGGER tr1 AFTER INSERT on \"test\" FOR EACH ROW BEGIN SELECT 1; END;\')')
+
+tx1:commit()
+tx2:commit()
+
+box.space.test1:drop()
+s:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")

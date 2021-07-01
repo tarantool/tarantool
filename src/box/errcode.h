@@ -278,6 +278,7 @@ struct errcode_record {
 	/*223 */_(ER_INTERFERING_PROMOTE,	"Instance with replica id %u was promoted first") \
 	/*224 */_(ER_RAFT_DISABLED,		"Elections were turned off while running box.ctl.promote()")\
 	/*225 */_(ER_TXN_ROLLBACK,		"Transaction was rolled back") \
+	/*226 */_(ER_TXN_BUSY_DDL,		"Can't process DDL operation: only one transaction at the time is able to handle DDL") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

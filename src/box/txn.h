@@ -422,6 +422,10 @@ struct txn {
 	struct rlist point_holes_list;
 	/** List of gap reads. @sa struct gap_item. */
 	struct rlist gap_list;
+	/** Schema version at the moment of the transaction start. */
+	uint32_t schema_version;
+	/** Bump schema version on commit if true. */
+	bool is_schema_changed;
 };
 
 static inline bool
