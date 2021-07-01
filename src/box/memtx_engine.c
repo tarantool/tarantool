@@ -420,7 +420,7 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	if (stmt->engine_savepoint == NULL)
 		return;
 
-	if (stmt->add_story != NULL || stmt->del_story != NULL)
+	if (memtx_tx_manager_use_mvcc_engine)
 		return memtx_tx_history_rollback_stmt(stmt);
 
 	if (memtx_space->replace == memtx_space_replace_all_keys)
