@@ -121,6 +121,12 @@ luaL_pushuuidstr(struct lua_State *L, const struct tt_uuid *uuid)
 	lua_pushlstring(L, str, UUID_STR_LEN);
 }
 
+struct datetime *
+luaT_pushdatetime(struct lua_State *L)
+{
+	return luaL_pushcdata(L, CTID_DATETIME);
+}
+
 int
 luaL_iscdata(struct lua_State *L, int idx)
 {

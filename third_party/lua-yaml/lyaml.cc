@@ -618,7 +618,7 @@ static int dump_node(struct lua_yaml_dumper *dumper)
    yaml_event_t ev;
    yaml_scalar_style_t style = YAML_PLAIN_SCALAR_STYLE;
    int is_binary = 0;
-   char buf[FPCONV_G_FMT_BUFSIZE];
+   char buf[MAX(FPCONV_G_FMT_BUFSIZE, DT_TO_STRING_BUFSIZE)];
    struct luaL_field field;
    bool unused;
    (void) unused;
@@ -711,6 +711,10 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       case MP_ERROR:
          str = field.errorval->errmsg;
          len = strlen(str);
+         break;
+      case MP_DATETIME:
+         len = datetime_to_string(field.dateval, buf, sizeof(buf));
+         str = buf;
          break;
       default:
          assert(0); /* checked by luaL_checkfield() */

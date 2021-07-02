@@ -338,7 +338,7 @@ _fmt(char *buf, ssize_t size, const char *format, const struct tnt_tm *t,
 				/*
 				 ** no length modifier provided -
 				 ** enable default mode, as in
-				 ** tnt_datetime_to_string()
+				 ** datetime_to_string()
 				 */
 				if (width == 0) {
 					if ((nsec % 1000000) == 0) {

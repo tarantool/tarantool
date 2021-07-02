@@ -39,6 +39,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct tt_uuid;
+struct datetime;
 
 /**
 * Ask the allocator to reserve at least size bytes. It can reserve
@@ -144,6 +145,9 @@ mpstream_encode_decimal(struct mpstream *stream, const decimal_t *val);
 
 void
 mpstream_encode_uuid(struct mpstream *stream, const struct tt_uuid *uuid);
+
+void
+mpstream_encode_datetime(struct mpstream *stream, const struct datetime *dt);
 
 /** Copies n bytes from memory area src to stream. */
 void

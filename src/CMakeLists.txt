@@ -141,6 +141,7 @@ set (server_sources
      lua/tnt_iconv.c
      lua/tnt_msgpuck.c
      lua/tnt_readline.c
+     lua/tnt_datetime.c
      lua/error.c
      lua/socket.c
      lua/pickle.c

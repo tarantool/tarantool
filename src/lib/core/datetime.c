@@ -59,7 +59,7 @@ datetime_to_tm(const struct datetime *date, struct tnt_tm *tm)
 }
 
 size_t
-tnt_datetime_strftime(const struct datetime *date, char *buf, size_t len,
+datetime_strftime(const struct datetime *date, char *buf, size_t len,
 		      const char *fmt)
 {
 	struct tnt_tm tm;
@@ -68,7 +68,7 @@ tnt_datetime_strftime(const struct datetime *date, char *buf, size_t len,
 }
 
 void
-tnt_datetime_now(struct datetime *now)
+datetime_now(struct datetime *now)
 {
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
@@ -85,7 +85,7 @@ tnt_datetime_now(struct datetime *now)
  * calculated length of output string
  */
 size_t
-tnt_datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
+datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
 {
 	int offset = date->tzoffset;
 	int64_t rd_seconds = (int64_t)date->epoch + offset * 60 +
@@ -132,4 +132,14 @@ tnt_datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
 			offset / 60, offset % 60);
 	}
 	return sz;
+}
+
+int
+datetime_compare(const struct datetime *lhs, const struct datetime *rhs)
+{
+	int result = COMPARE_RESULT(lhs->epoch, rhs->epoch);
+	if (result != 0)
+		return result;
+
+	return COMPARE_RESULT(lhs->nsec, rhs->nsec);
 }

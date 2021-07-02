@@ -44,6 +44,7 @@ enum mp_extension_type {
     MP_DECIMAL = 1,
     MP_UUID = 2,
     MP_ERROR = 3,
+    MP_DATETIME = 4,
     mp_extension_type_MAX,
 };
 

@@ -41,6 +41,7 @@
 #include "lib/core/mp_extension_types.h"
 #include "lua/error.h"
 
+#include "datetime.h"
 #include "trivia/util.h"
 #include "diag.h"
 #include "lua/utils.h"
@@ -542,6 +543,9 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 			} else if (cd->ctypeid == CTID_CONST_STRUCT_ERROR_REF) {
 				field->ext_type = MP_ERROR;
 				field->errorval = *(struct error **)cdata;
+			} else if (cd->ctypeid == CTID_DATETIME) {
+				field->ext_type = MP_DATETIME;
+				field->dateval = (struct datetime *)cdata;
 			} else {
 				field->ext_type = MP_UNKNOWN_EXTENSION;
 			}
