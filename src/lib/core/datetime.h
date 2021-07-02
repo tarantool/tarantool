@@ -5,6 +5,7 @@
  * Copyright 2021, Tarantool AUTHORS, please see AUTHORS file.
  */
 
+#include <limits.h>
 #include <stdint.h>
 #include <sys/types.h>
 
@@ -30,10 +31,27 @@ struct tnt_tm;
 #define DT_EPOCH_1970_OFFSET  719163
 #endif
 
-#define SECS_EPOCH_1970_OFFSET ((int64_t)DT_EPOCH_1970_OFFSET * SECS_PER_DAY)
-
-/** Required size of tnt_datetime_to_string string buffer */
+/** Required size of datetime_to_string string buffer */
 #define DT_TO_STRING_BUFSIZE 48
+
+/**
+ * c-dt library uses int as type for dt value, which
+ * represents the number of days since Rata Die date.
+ * This implies limits to the number of seconds we
+ * could safely store in our structures and then safely
+ * pass to c-dt functions.
+ *
+ * So supported ranges will be
+ * - for seconds [-185604722870400 .. 185480451417600]
+ * - for dates   [-5879610-06-22T00:00Z .. 5879611-07-11T00:00Z]
+ */
+#define MAX_DT_DAY_VALUE (int64_t)INT_MAX
+#define MIN_DT_DAY_VALUE (int64_t)INT_MIN
+#define SECS_EPOCH_1970_OFFSET 	((int64_t)DT_EPOCH_1970_OFFSET * SECS_PER_DAY)
+#define MAX_EPOCH_SECS_VALUE    \
+	(MAX_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET)
+#define MIN_EPOCH_SECS_VALUE    \
+	(MIN_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET)
 
 /**
  * datetime structure keeps number of seconds and
@@ -60,7 +78,7 @@ struct datetime {
  * @retval length of a resultant text
  */
 size_t
-tnt_datetime_to_string(const struct datetime *date, char *buf, ssize_t len);
+datetime_to_string(const struct datetime *date, char *buf, ssize_t len);
 
 /**
  * Convert datetime to string using default format provided
@@ -72,11 +90,11 @@ tnt_datetime_to_string(const struct datetime *date, char *buf, ssize_t len);
  * @retval length of a resultant text
  */
 size_t
-tnt_datetime_strftime(const struct datetime *date, char *buf, size_t len,
+datetime_strftime(const struct datetime *date, char *buf, size_t len,
 		      const char *fmt);
 
 void
-tnt_datetime_now(struct datetime *now);
+datetime_now(struct datetime *now);
 
 /**
  * Convert @sa datetime to @sa dt_tm

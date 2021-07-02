@@ -41,6 +41,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+#include "mp_datetime.h"
 #include "mp_decimal.h"
 #include "box/mp_error.h"
 #include "mp_uuid.h"
@@ -62,6 +63,12 @@ tnt_mp_encode_error(char *data, const struct error *error);
 
 uint32_t
 tnt_mp_sizeof_error(const struct error *error);
+
+char *
+tnt_mp_encode_datetime(char *data, const struct datetime *date);
+
+uint32_t
+tnt_mp_sizeof_datetime(const struct datetime *date);
 
 #if defined(__cplusplus)
 } /* extern "C" */

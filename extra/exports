@@ -418,6 +418,7 @@ title_update
 tnt_datetime_now
 tnt_datetime_strftime
 tnt_datetime_to_string
+tnt_datetime_unpack
 tnt_default_cert_dir_paths
 tnt_default_cert_file_paths
 tnt_dt_add_months
@@ -437,11 +438,13 @@ tnt_iconv_open
 tnt_mp_decode_double
 tnt_mp_decode_extl
 tnt_mp_decode_float
+tnt_mp_encode_datetime
 tnt_mp_encode_decimal
 tnt_mp_encode_double
 tnt_mp_encode_error
 tnt_mp_encode_float
 tnt_mp_encode_uuid
+tnt_mp_sizeof_datetime
 tnt_mp_sizeof_decimal
 tnt_mp_sizeof_error
 tnt_mp_sizeof_uuid

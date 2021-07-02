@@ -97,3 +97,15 @@ tnt_mp_sizeof_error(const struct error *error)
 {
 	return mp_sizeof_error(error);
 }
+
+char *
+tnt_mp_encode_datetime(char *data, const struct datetime *date)
+{
+	return mp_encode_datetime(data, date);
+}
+
+uint32_t
+tnt_mp_sizeof_datetime(const struct datetime *date)
+{
+	return mp_sizeof_datetime(date);
+}

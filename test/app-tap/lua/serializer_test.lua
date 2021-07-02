@@ -210,6 +210,20 @@ local function test_uuid(test, s)
     rt(test, s, uuid.new(), 'cdata')
 end
 
+local function test_datetime(test, s)
+    local datetime = require('datetime')
+    test:plan(16)
+
+    rt(test, s, datetime.new(), 'cdata')
+    rt(test, s, datetime.new{year = -5879609}, 'cdata')
+    rt(test, s, datetime.new{year = -300}, 'cdata')
+    rt(test, s, datetime.new{year = 0}, 'cdata')
+    rt(test, s, datetime.new{year = 1000}, 'cdata')
+    rt(test, s, datetime.new{year = 2000}, 'cdata')
+    rt(test, s, datetime.new{year = 10000}, 'cdata')
+    rt(test, s, datetime.new{year = 5879611}, 'cdata')
+end
+
 local function test_boolean(test, s)
     test:plan(4)
 
@@ -532,6 +546,7 @@ return {
     test_ucdata = test_ucdata;
     test_decimal = test_decimal;
     test_uuid = test_uuid;
+    test_datetime = test_datetime;
     test_depth = test_depth;
     test_decode_buffer = test_decode_buffer;
     test_error = test_error;

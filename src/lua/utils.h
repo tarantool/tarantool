@@ -80,6 +80,15 @@ luaL_pushuuid(struct lua_State *L);
 void
 luaL_pushuuidstr(struct lua_State *L, const struct tt_uuid *uuid);
 
+/**
+ * @brief Push cdata of a datetime type onto the stack.
+ * @param L Lua State
+ * @sa luaL_pushcdata
+ * @return memory associated with this datetime data
+ */
+struct datetime *
+luaT_pushdatetime(struct lua_State *L);
+
 /** \cond public */
 
 /**
