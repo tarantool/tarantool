@@ -193,6 +193,8 @@ struct tx_manager
 	struct rlist all_stories;
 	/** Iterator that sequentially traverses all memtx_story objects. */
 	struct rlist *traverse_all_stories;
+	/** Accumulated number of GC steps that should be done. */
+	size_t must_do_gc_steps;
 };
 
 enum {
@@ -233,6 +235,7 @@ memtx_tx_manager_init()
 	txm.point_holes_size = 0;
 	rlist_create(&txm.all_stories);
 	txm.traverse_all_stories = &txm.all_stories;
+	txm.must_do_gc_steps = 0;
 }
 
 void
@@ -245,7 +248,6 @@ memtx_tx_manager_free()
 	mh_point_holes_delete(txm.point_holes);
 	mempool_destroy(&txm.gap_item_mempoool);
 }
-
 
 int
 memtx_tx_cause_conflict(struct txn *breaker, struct txn *victim)
@@ -313,10 +315,6 @@ memtx_tx_handle_conflict(struct txn *breaker, struct txn *victim)
 	}
 }
 
-/** See definition for details */
-static void
-memtx_tx_story_gc_step();
-
 /**
  * Create a new story and link it with the @a tuple.
  * @return story on success, NULL on error (diag is set).
@@ -324,9 +322,7 @@ memtx_tx_story_gc_step();
 static struct memtx_story *
 memtx_tx_story_new(struct space *space, struct tuple *tuple)
 {
-	/* Free some memory. */
-	for (size_t i = 0; i < TX_MANAGER_GC_STEPS_SIZE; i++)
-		memtx_tx_story_gc_step();
+	txm.must_do_gc_steps += TX_MANAGER_GC_STEPS_SIZE;
 	assert(!tuple->is_dirty);
 	uint32_t index_count = space->index_count;
 	assert(index_count < BOX_INDEX_MAX);
@@ -611,6 +607,17 @@ memtx_tx_story_gc_step()
 	memtx_tx_story_full_unlink(story);
 
 	memtx_tx_story_delete(story);
+}
+
+/**
+ * Run several rounds of memtx_tx_story_gc_step()
+ */
+static void
+memtx_tx_story_gc()
+{
+	for (size_t i = 0; i < txm.must_do_gc_steps; i++)
+		memtx_tx_story_gc_step();
+	txm.must_do_gc_steps = 0;
 }
 
 /**
@@ -1185,7 +1192,6 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 			memtx_tx_story_link_story(add_story, next, i);
 		}
 
-
 	} else {
 		if (old_tuple->is_dirty) {
 			del_story = memtx_tx_story_get(old_tuple);
@@ -1235,6 +1241,7 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 		 */
 		tuple_ref(*result);
 	}
+	memtx_tx_story_gc();
 	return 0;
 
 fail:
@@ -1677,6 +1684,7 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 	}
 	rlist_add(&story->reader_list, &tracker->in_reader_list);
 	rlist_add(&txn->read_set, &tracker->in_read_set);
+	memtx_tx_story_gc();
 	return 0;
 }
 
@@ -1893,6 +1901,7 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, uint32_t index,
 		rlist_add(&space->index[index]->nearby_gaps,
 			  &item->in_nearby_gaps);
 	}
+	memtx_tx_story_gc();
 	return 0;
 }
 
@@ -2004,7 +2013,6 @@ memtx_tx_snapshot_clarify_slow(struct memtx_tx_snapshot_cleaner *cleaner,
 
 	return tuple;
 }
-
 
 void
 memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner)

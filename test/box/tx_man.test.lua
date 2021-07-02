@@ -641,6 +641,27 @@ box.execute([[ CREATE TABLE test (id INT NOT NULL PRIMARY KEY, count INT NOT NUL
 box.execute([[ UPDATE test SET count = count + 1 WHERE id = 0 ]])
 box.execute([[ DROP TABLE test]])
 
+-- https://github.com/tarantool/tarantool/issues/5515
+NUM_TEST_SPACES = 4
+sp = {}
+for k=1,NUM_TEST_SPACES do				\
+	sp[k] = box.schema.space.create('test' .. k)	\
+	sp[k]:create_index('test1', {parts={1}})	\
+	sp[k]:create_index('test2', {parts={2}})	\
+end
+for k = 1,NUM_TEST_SPACES do				\
+	for i = 1,100 do				\
+		collectgarbage('collect')		\
+		box.begin()				\
+		sp[i % k + 1]:replace{1, 1, "hi", i}	\
+		sp[i % k + 1]:delete{1}			\
+		box.commit()				\
+	end						\
+end
+for k=1,NUM_TEST_SPACES do				\
+	sp[k]:drop()					\
+end
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
