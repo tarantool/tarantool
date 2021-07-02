@@ -35,6 +35,7 @@
 #include "mp_decimal.h"
 #include "uuid/mp_uuid.h"
 #include "mp_error.h"
+#include "datetime.h"
 
 static int
 msgpack_fprint_ext(FILE *file, const char **data, int depth)
@@ -47,6 +48,8 @@ msgpack_fprint_ext(FILE *file, const char **data, int depth)
 		return mp_fprint_decimal(file, data, len);
 	case MP_UUID:
 		return mp_fprint_uuid(file, data, len);
+	case MP_DATETIME:
+		return mp_fprint_datetime(file, data, len);
 	case MP_ERROR:
 		return mp_fprint_error(file, data, depth);
 	default:
@@ -65,6 +68,8 @@ msgpack_snprint_ext(char *buf, int size, const char **data, int depth)
 		return mp_snprint_decimal(buf, size, data, len);
 	case MP_UUID:
 		return mp_snprint_uuid(buf, size, data, len);
+	case MP_DATETIME:
+		return mp_snprint_datetime(buf, size, data, len);
 	case MP_ERROR:
 		return mp_snprint_error(buf, size, data, depth);
 	default:

@@ -33,6 +33,7 @@
 #include <c-dt/dt_core.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -54,6 +55,22 @@ struct t_datetime_duration {
 	int secs;	///< relative seconds delta
 	int nsec;	///< nanoseconds delta
 };
+
+int
+datetime_compare(const struct t_datetime_tz * lhs,
+		 const struct t_datetime_tz * rhs);
+
+struct t_datetime_tz *
+mp_decode_datetime(const char **data, struct t_datetime_tz *date);
+
+char *
+mp_encode_datetime(char *data, const struct t_datetime_tz *date);
+
+int
+mp_snprint_datetime(char *buf, int size, const char **data, uint32_t len);
+
+int
+mp_fprint_datetime(FILE *file, const char **data, uint32_t len);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -63,6 +63,7 @@ enum field_type {
 	FIELD_TYPE_UUID,
 	FIELD_TYPE_ARRAY,
 	FIELD_TYPE_MAP,
+	FIELD_TYPE_DATETIME,
 	field_type_MAX
 };
 
