@@ -526,6 +526,16 @@ local function create_transport(host, port, user, password, callback,
         end
     end
 
+    local function shutdown()
+        -- We don't use connection:shutdown() which is implemented,
+        -- in 'socket' library because of strange behaviour of this
+        -- function: it's closes socket both for read and write
+        -- regardless of what value is passed to this function.
+        if connection then
+            internal.shutdown(connection:fd())
+        end
+    end
+
     --
     -- Send a request and do not wait for response.
     -- @retval nil, error Error occured.
@@ -898,6 +908,7 @@ local function create_transport(host, port, user, password, callback,
 
     return {
         stop            = stop,
+        shutdown        = shutdown,
         start           = start,
         wait_state      = wait_state,
         perform_request = perform_request,
@@ -1127,6 +1138,11 @@ end
 function remote_methods:close()
     check_remote_arg(self, 'close')
     self._transport.stop()
+end
+
+function remote_methods:shutdown()
+    check_remote_arg(self, 'shutdown')
+    self._transport.shutdown()
 end
 
 function remote_methods:on_schema_reload(...)

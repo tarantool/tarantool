@@ -560,6 +560,17 @@ handle_error:
 }
 
 static int
+netbox_shutdown(lua_State *L)
+{
+	uint32_t fd = lua_tonumber(L, 1);
+	if (shutdown(fd, SHUT_WR) < 0) {
+		return luaL_error(L, tt_sprintf("shutdown failed: %s",
+						strerror(errno)));
+	}
+	return 0;
+}
+
+static int
 netbox_encode_execute(lua_State *L)
 {
 	if (lua_gettop(L) < 5)
@@ -903,6 +914,7 @@ luaopen_net_box(struct lua_State *L)
 		{ "encode_auth",    netbox_encode_auth },
 		{ "decode_greeting",netbox_decode_greeting },
 		{ "communicate",    netbox_communicate },
+		{ "shutdown",       netbox_shutdown },
 		{ "decode_select",  netbox_decode_select },
 		{ "decode_execute", netbox_decode_execute },
 		{ "decode_prepare", netbox_decode_prepare },
