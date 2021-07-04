@@ -370,7 +370,7 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
 box.execute("INSERT INTO foobar VALUES ('foobar trigger test', 8888)")
 ---
 - null
-- 'Type mismatch: can not convert ''foobar trigger test'' to integer'
+- 'Type mismatch: can not convert string(''foobar trigger test'') to integer'
 ...
 box.execute("SELECT * FROM barfoo WHERE foo = 9999");
 ---

@@ -105,7 +105,7 @@ test:do_catchsql_test(
     [[
         SELECT CAST((20000000000000000000.) AS UNSIGNED);
     ]], {
-        1,"Type mismatch: can not convert 2.0e+19 to unsigned"
+        1,"Type mismatch: can not convert double(2.0e+19) to unsigned"
     })
 
 test:do_execsql_test(
@@ -133,7 +133,7 @@ test:do_catchsql_test(
         INSERT INTO t VALUES(20000000000000000000.01);
         SELECT * FROM t;
     ]], {
-        1,"Type mismatch: can not convert 2.0e+19 to integer"
+        1,"Type mismatch: can not convert double(2.0e+19) to integer"
     })
 
 test:do_execsql_test(

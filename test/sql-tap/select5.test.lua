@@ -558,7 +558,7 @@ test:do_catchsql_test(
             SELECT 1 FROM jj HAVING avg(s2) = 1 AND avg(s2) = 0;
     ]], {
     -- <select5-9.13.2>
-    1, "Type mismatch: can not convert 'A' to number"
+    1, "Type mismatch: can not convert string('A') to number"
     -- </select5-9.13.2>
 })
 
