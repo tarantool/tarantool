@@ -40,7 +40,7 @@ test:do_catchsql_test(
     [[
         INSERT INTO t1 SELECT i, u, NULL FROM t;
     ]], {
-        1, "Type mismatch: can not convert x'D80211111111111111111111111111111111' to uuid"
+        1, "Type mismatch: can not convert varbinary(x'D80211111111111111111111111111111111') to uuid"
     })
 
 test:do_catchsql_test(
@@ -48,7 +48,7 @@ test:do_catchsql_test(
     [[
         INSERT INTO t1 SELECT i, NULL, d FROM t;
     ]], {
-        1, "Type mismatch: can not convert x'C70501030111111C' to decimal"
+        1, "Type mismatch: can not convert varbinary(x'C70501030111111C') to decimal"
     })
 
 --
@@ -85,7 +85,7 @@ test:do_catchsql_test(
     [[
         UPDATE tu SET u = u;
     ]], {
-        1, "Type mismatch: can not convert x'D80211111111111111111111111111111111' to uuid"
+        1, "Type mismatch: can not convert varbinary(x'D80211111111111111111111111111111111') to uuid"
     })
 
 test:do_catchsql_test(
@@ -93,7 +93,7 @@ test:do_catchsql_test(
     [[
         UPDATE td SET d = d;
     ]], {
-        1, "Type mismatch: can not convert x'C70501030111111C' to decimal"
+        1, "Type mismatch: can not convert varbinary(x'C70501030111111C') to decimal"
     })
 
 test:finish_test()

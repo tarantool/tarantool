@@ -32,9 +32,9 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "gh-4766-3",
     "SELECT CAST('" .. long_str .. "1234'" .. " AS INTEGER);", {
-        1, "Type mismatch: can not convert '00000000000000000000000000000000" ..
+        1, "Type mismatch: can not convert string('0000000000000000000000000" ..
         "0000000000000000000000000000000000000000000000000000000000000000000" ..
-        "00000000000000000000000000000... to integer"
+        "000000000000000000000000000000000000...) to integer"
     })
 
 test:finish_test()
