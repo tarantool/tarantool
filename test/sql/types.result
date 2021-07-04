@@ -158,39 +158,39 @@ sp:drop()
 box.execute("SELECT 'abc' || 1;")
 ---
 - null
-- 'Inconsistent types: expected text or varbinary got unsigned'
+- 'Inconsistent types: expected string or varbinary got unsigned'
 ...
 box.execute("SELECT 'abc' || 1.123;")
 ---
 - null
-- 'Inconsistent types: expected text or varbinary got real'
+- 'Inconsistent types: expected string or varbinary got double'
 ...
 box.execute("SELECT 1 || 'abc';")
 ---
 - null
-- 'Inconsistent types: expected text or varbinary got unsigned'
+- 'Inconsistent types: expected string or varbinary got unsigned'
 ...
 box.execute("SELECT 1.123 || 'abc';")
 ---
 - null
-- 'Inconsistent types: expected text or varbinary got real'
+- 'Inconsistent types: expected string or varbinary got double'
 ...
 box.execute("SELECt 'a' || 'b' || 1;")
 ---
 - null
-- 'Inconsistent types: expected text or varbinary got unsigned'
+- 'Inconsistent types: expected string or varbinary got unsigned'
 ...
 -- What is more, they must be of the same type.
 --
 box.execute("SELECT 'abc' || randomblob(5);")
 ---
 - null
-- 'Inconsistent types: expected text got varbinary'
+- 'Inconsistent types: expected string got varbinary'
 ...
 box.execute("SELECT randomblob(5) || 'x';")
 ---
 - null
-- 'Inconsistent types: expected varbinary got text'
+- 'Inconsistent types: expected varbinary got string'
 ...
 -- Result of BLOBs concatenation must be BLOB.
 --
@@ -215,17 +215,17 @@ box.execute("INSERT INTO t1 VALUES (randomblob(5));")
 box.execute("SELECT * FROM t1 WHERE s LIKE 'blob';")
 ---
 - null
-- 'Inconsistent types: expected text got varbinary'
+- 'Inconsistent types: expected string got varbinary'
 ...
 box.execute("SELECT * FROM t1 WHERE 'blob' LIKE s;")
 ---
 - null
-- 'Inconsistent types: expected text got varbinary'
+- 'Inconsistent types: expected string got varbinary'
 ...
 box.execute("SELECT * FROM t1 WHERE 'blob' LIKE x'0000';")
 ---
 - null
-- 'Inconsistent types: expected text got varbinary'
+- 'Inconsistent types: expected string got varbinary'
 ...
 box.execute("SELECT s LIKE NULL FROM t1;")
 ---
@@ -246,12 +246,12 @@ box.execute("INSERT INTO t1 VALUES (1);")
 box.execute("SELECT * FROM t1 WHERE s LIKE 'int';")
 ---
 - null
-- 'Inconsistent types: expected text got unsigned'
+- 'Inconsistent types: expected string got unsigned'
 ...
 box.execute("SELECT * FROM t1 WHERE 'int' LIKE 4;")
 ---
 - null
-- 'Inconsistent types: expected text got unsigned'
+- 'Inconsistent types: expected string got unsigned'
 ...
 box.execute("SELECT NULL LIKE s FROM t1;")
 ---
@@ -354,7 +354,7 @@ box.execute("SELECT * FROM tboolean WHERE s1 = 1;")
 box.execute("SELECT * FROM tboolean WHERE s1 = 1.123;")
 ---
 - null
-- 'Type mismatch: can not convert real to boolean'
+- 'Type mismatch: can not convert double to boolean'
 ...
 box.space.TBOOLEAN:drop()
 ---
@@ -1245,12 +1245,12 @@ box.execute("SELECT * FROM t WHERE v = 1")
 box.execute("SELECT * FROM t WHERE v = 1.123")
 ---
 - null
-- 'Type mismatch: can not convert real to varbinary'
+- 'Type mismatch: can not convert double to varbinary'
 ...
 box.execute("SELECT * FROM t WHERE v = 'str'")
 ---
 - null
-- 'Type mismatch: can not convert text to varbinary'
+- 'Type mismatch: can not convert string to varbinary'
 ...
 box.execute("SELECT * FROM t WHERE v = x'616263'")
 ---
@@ -1312,12 +1312,12 @@ box.execute("SELECT group_concat(v) FROM t;")
 box.execute("SELECT lower(v) FROM t;")
 ---
 - null
-- 'Inconsistent types: expected text got varbinary'
+- 'Inconsistent types: expected string got varbinary'
 ...
 box.execute("SELECT upper(v) FROM t;")
 ---
 - null
-- 'Inconsistent types: expected text got varbinary'
+- 'Inconsistent types: expected string got varbinary'
 ...
 box.execute("SELECT abs(v) FROM t;")
 ---
