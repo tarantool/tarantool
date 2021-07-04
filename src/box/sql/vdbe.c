@@ -1627,27 +1627,24 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 		}
 	} else if (mem_is_bool(pIn3) || mem_is_bool(pIn1)) {
 		if (mem_cmp_bool(pIn3, pIn1, &res) != 0) {
-			char *str = !mem_is_bool(pIn3) ?
-				    mem_type_to_str(pIn3) :
-				    mem_type_to_str(pIn1);
+			const char *str = !mem_is_bool(pIn3) ?
+					  mem_str(pIn3) : mem_str(pIn1);
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH, str,
 				 "boolean");
 			goto abort_due_to_error;
 		}
 	} else if (((pIn3->type | pIn1->type) & MEM_TYPE_UUID) != 0) {
 		if (mem_cmp_uuid(pIn3, pIn1, &res) != 0) {
-			char *str = pIn3->type != MEM_TYPE_UUID ?
-				    mem_type_to_str(pIn3) :
-				    mem_type_to_str(pIn1);
+			const char *str = pIn3->type != MEM_TYPE_UUID ?
+					  mem_str(pIn3) : mem_str(pIn1);
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH, str,
 				 "uuid");
 			goto abort_due_to_error;
 		}
 	} else if (mem_is_bin(pIn3) || mem_is_bin(pIn1)) {
 		if (mem_cmp_bin(pIn3, pIn1, &res) != 0) {
-			char *str = !mem_is_bin(pIn3) ?
-				    mem_type_to_str(pIn3) :
-				    mem_type_to_str(pIn1);
+			const char *str = !mem_is_bin(pIn3) ?
+					  mem_str(pIn3) : mem_str(pIn1);
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH, str,
 				 "varbinary");
 			goto abort_due_to_error;
@@ -1655,7 +1652,7 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 	} else if (mem_is_map(pIn3) || mem_is_map(pIn1) || mem_is_array(pIn3) ||
 		   mem_is_array(pIn1)) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 mem_type_to_str(pIn3), mem_type_to_str(pIn1));
+			 mem_str(pIn3), mem_type_to_str(pIn1));
 		goto abort_due_to_error;
 	} else if (type == FIELD_TYPE_STRING) {
 		if (mem_cmp_str(pIn3, pIn1, &res, pOp->p4.pColl) != 0) {

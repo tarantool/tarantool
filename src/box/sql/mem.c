@@ -78,16 +78,17 @@ mem_str(const struct Mem *mem)
 	case MEM_TYPE_NULL:
 		return "NULL";
 	case MEM_TYPE_STR:
-		if (mem->n > STR_VALUE_MAX_LEN)
-			return tt_sprintf("'%.*s...", STR_VALUE_MAX_LEN, mem->z);
-		return tt_sprintf("'%.*s'", mem->n, mem->z);
+		if (mem->n <= STR_VALUE_MAX_LEN)
+			return tt_sprintf("string('%.*s')", mem->n, mem->z);
+		return tt_sprintf("string('%.*s...)", STR_VALUE_MAX_LEN,
+				  mem->z);
 	case MEM_TYPE_INT:
-		return tt_sprintf("%lld", mem->u.i);
+		return tt_sprintf("integer(%lld)", mem->u.i);
 	case MEM_TYPE_UINT:
-		return tt_sprintf("%llu", mem->u.u);
+		return tt_sprintf("integer(%llu)", mem->u.u);
 	case MEM_TYPE_DOUBLE:
 		sql_snprintf(STR_VALUE_MAX_LEN, buf, "%!.15g", mem->u.r);
-		return tt_sprintf("%s", buf);
+		return tt_sprintf("double(%s)", buf);
 	case MEM_TYPE_BIN: {
 		int len = MIN(mem->n, STR_VALUE_MAX_LEN / 2);
 		for (int i = 0; i < len; ++i) {
@@ -97,22 +98,25 @@ mem_str(const struct Mem *mem)
 			buf[2 * i + 1] = n < 10 ? ('0' + n) : ('A' + n - 10);
 		}
 		if (mem->n > len)
-			return tt_sprintf("x'%.*s...", len * 2, buf);
-		return tt_sprintf("x'%.*s'", len * 2, buf);
+			return tt_sprintf("varbinary(x'%.*s...)", len * 2, buf);
+		return tt_sprintf("varbinary(x'%.*s')", len * 2, buf);
 	}
 	case MEM_TYPE_MAP:
 	case MEM_TYPE_ARRAY: {
 		const char *str = mp_str(mem->z);
-		if (strlen(str) <= STR_VALUE_MAX_LEN)
-			return str;
-		memcpy(buf, str, STR_VALUE_MAX_LEN);
-		return tt_sprintf("%.*s...", STR_VALUE_MAX_LEN, buf);
+		const char *type = mem_type_to_str(mem);
+		uint32_t len = strlen(str);
+		uint32_t minlen = MIN(STR_VALUE_MAX_LEN, len);
+		memcpy(buf, str, minlen);
+		if (len <= STR_VALUE_MAX_LEN)
+			return tt_sprintf("%s(%.*s)", type, minlen, buf);
+		return tt_sprintf("%s(%.*s...)", type, minlen, buf);
 	}
 	case MEM_TYPE_UUID:
 		tt_uuid_to_string(&mem->u.uuid, buf);
-		return tt_sprintf("'%s'", buf);
+		return tt_sprintf("uuid('%s')", buf);
 	case MEM_TYPE_BOOL:
-		return mem->u.b ? "TRUE" : "FALSE";
+		return mem->u.b ? "boolean(TRUE)" : "boolean(FALSE)";
 	default:
 		return "unknown";
 	}
@@ -1450,19 +1454,19 @@ mem_concat(struct Mem *a, struct Mem *b, struct Mem *result)
 	/* Concatenation operation can be applied only to strings and blobs. */
 	if (((b->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) == 0)) {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES,
-			 "string or varbinary", mem_type_to_str(b));
+			 "string or varbinary", mem_str(b));
 		return -1;
 	}
 	if (((a->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) == 0)) {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES,
-			 "string or varbinary", mem_type_to_str(a));
+			 "string or varbinary", mem_str(a));
 		return -1;
 	}
 
 	/* Moreover, both operands must be of the same type. */
 	if (b->type != a->type) {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES,
-			 mem_type_to_str(a), mem_type_to_str(b));
+			 mem_type_to_str(a), mem_str(b));
 		return -1;
 	}
 

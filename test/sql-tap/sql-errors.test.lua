@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(80)
+test:plan(81)
 
 test:execsql([[
 	CREATE TABLE t0 (i INT PRIMARY KEY, a INT);
@@ -696,7 +696,7 @@ test:do_catchsql_test(
 		SELECT X'ff' + 1;
 	]], {
 		-- <sql-errors-2.1>
-		1, "Type mismatch: can not convert x'FF' to number"
+		1, "Type mismatch: can not convert varbinary(x'FF') to number"
 		-- </sql-errors-2.1>
 	})
 
@@ -706,7 +706,7 @@ test:do_catchsql_test(
 		SELECT X'ff' - 1;
 	]], {
 		-- <sql-errors-2.2>
-		1, "Type mismatch: can not convert x'FF' to number"
+		1, "Type mismatch: can not convert varbinary(x'FF') to number"
 		-- </sql-errors-2.2>
 	})
 
@@ -716,7 +716,7 @@ test:do_catchsql_test(
 		SELECT X'ff' * 1;
 	]], {
 		-- <sql-errors-2.3>
-		1, "Type mismatch: can not convert x'FF' to number"
+		1, "Type mismatch: can not convert varbinary(x'FF') to number"
 		-- </sql-errors-2.3>
 	})
 
@@ -726,7 +726,7 @@ test:do_catchsql_test(
 		SELECT X'ff' / 1;
 	]], {
 		-- <sql-errors-2.4>
-		1, "Type mismatch: can not convert x'FF' to number"
+		1, "Type mismatch: can not convert varbinary(x'FF') to number"
 		-- </sql-errors-2.4>
 	})
 
@@ -736,7 +736,7 @@ test:do_catchsql_test(
 		SELECT X'ff' AND true;
 	]], {
 		-- <sql-errors-2.5>
-		1, "Type mismatch: can not convert x'FF' to boolean"
+		1, "Type mismatch: can not convert varbinary(x'FF') to boolean"
 		-- </sql-errors-2.5>
 	})
 
@@ -746,7 +746,7 @@ test:do_catchsql_test(
 		SELECT X'ff' OR false;
 	]], {
 		-- <sql-errors-2.6>
-		1, "Type mismatch: can not convert x'FF' to boolean"
+		1, "Type mismatch: can not convert varbinary(x'FF') to boolean"
 		-- </sql-errors-2.6>
 	})
 
@@ -756,7 +756,7 @@ test:do_catchsql_test(
 		SELECT false OR X'ff';
 	]], {
 		-- <sql-errors-2.7>
-		1, "Type mismatch: can not convert x'FF' to boolean"
+		1, "Type mismatch: can not convert varbinary(x'FF') to boolean"
 		-- </sql-errors-2.7>
 	})
 
@@ -766,7 +766,7 @@ test:do_catchsql_test(
 		SELECT X'ff' >= false;
 	]], {
 		-- <sql-errors-2.8>
-		1, "Type mismatch: can not convert varbinary to boolean"
+		1, "Type mismatch: can not convert varbinary(x'FF') to boolean"
 		-- </sql-errors-2.8>
 	})
 
@@ -776,7 +776,7 @@ test:do_catchsql_test(
 		SELECT X'ff' <= false;
 	]], {
 		-- <sql-errors-2.9>
-		1, "Type mismatch: can not convert varbinary to boolean"
+		1, "Type mismatch: can not convert varbinary(x'FF') to boolean"
 		-- </sql-errors-2.9>
 	})
 
@@ -790,16 +790,16 @@ local str2 = string.rep('ы', 200)
 test:do_catchsql_test(
 	"sql-errors-3.1",
 	"SELECT CAST('"..str1.."'AS UNSIGNED);", {
-		1, "Type mismatch: can not convert 'aaaaaaaaaaaaaaaaaaaaaaaaa"..
+		1, "Type mismatch: can not convert string('aaaaaaaaaaaaaaaaaa"..
 		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"..
-		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... to unsigned"
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...) to unsigned"
 	})
 
 test:do_catchsql_test(
 	"sql-errors-3.2",
 	"SELECT CAST('"..str2.."'AS UNSIGNED);", {
-		1, "Type mismatch: can not convert 'ыыыыыыыыыыыыыыыыыыыыыыыыы"..
-		"ыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыы... to unsigned"
+		1, "Type mismatch: can not convert string('ыыыыыыыыыыыыыыыыыы"..
+		"ыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыы...) to unsigned"
 	})
 
 local format = {{'I', 'integer'}, {'A', 'array'}, {'M', 'map'}}
@@ -810,17 +810,17 @@ s:insert({1, {str1}, {a = 1, b = str1}})
 test:do_catchsql_test(
 	"sql-errors-3.3",
 	"SELECT CAST(a AS UNSIGNED) from test;", {
-		1, 'Type mismatch: can not convert ["aaaaaaaaaaaaaaaaaaaaaaaa'..
+		1, 'Type mismatch: can not convert array(["aaaaaaaaaaaaaaaaaa'..
 		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'..
-		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... to unsigned'
+		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...) to unsigned'
 	})
 
 test:do_catchsql_test(
 	"sql-errors-3.4",
 	"SELECT CAST(m AS UNSIGNED) from test;", {
-		1, 'Type mismatch: can not convert {"a": 1, "b": "aaaaaaaaaaa'..
+		1, 'Type mismatch: can not convert map({"a": 1, "b": "aaaaaaa'..
 		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'..
-		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... to unsigned'
+		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...) to unsigned'
 	})
 
 test:execsql('DROP TABLE test;')
@@ -834,7 +834,7 @@ test:do_catchsql_test(
 	[[
 		SELECT CAST(x'F1' AS UNSIGNED);
 	]], {
-		1, "Type mismatch: can not convert x'F1' to unsigned"
+		1, "Type mismatch: can not convert varbinary(x'F1') to unsigned"
 	})
 
 test:do_catchsql_test(
@@ -842,7 +842,7 @@ test:do_catchsql_test(
 	[[
 		SELECT CAST('F1' AS UNSIGNED);
 	]], {
-		1, "Type mismatch: can not convert 'F1' to unsigned"
+		1, "Type mismatch: can not convert string('F1') to unsigned"
 	})
 
 test:do_catchsql_test(
@@ -850,7 +850,7 @@ test:do_catchsql_test(
 	[[
 		SELECT CAST(CAST('11111111-1111-1111-1111-111111111111' AS UUID) AS UNSIGNED);
 	]], {
-		1, "Type mismatch: can not convert '11111111-1111-1111-1111-111111111111' to unsigned"
+		1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to unsigned"
 	})
 
 local bin = ''
@@ -859,9 +859,17 @@ for i = 1,99 do bin = bin .. string.format("%02x", i) end
 test:do_catchsql_test(
 	"sql-errors-3.8",
 	"SELECT CAST(x'"..bin.."'AS UNSIGNED);", {
-		1, "Type mismatch: can not convert x'0102030405060708090A0B0C"..
-		"0D0E0F101112131415161718191A1B1C1D1E1F202122232425262728292A"..
-		"2B2C2D2E2F303132333435363738393A3B3C3D3E3F40... to unsigned"
+		1, "Type mismatch: can not convert varbinary(x'01020304050607"..
+		"08090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F202122232425"..
+		"262728292A2B2C2D2E2F303132333435363738393A3B3C3D3E3F40...) to unsigned"
+	})
+
+test:do_catchsql_test(
+	"sql-errors-3.9",
+	[[
+		SELECT POSITION('abc', 2);
+	]], {
+		1, "Inconsistent types: expected string or varbinary got integer(2)"
 	})
 
 test:finish_test()

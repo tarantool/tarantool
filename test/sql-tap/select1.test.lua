@@ -320,7 +320,7 @@ test:do_catchsql_test(
         SELECT count(*),count(a),count(b) FROM t4 WHERE b=5
     ]], {
         -- <select1-2.5.3>
-        1, "Type mismatch: can not convert 'This is a string that is too big to fit inside a NBFS buffer' to number"
+        1, "Type mismatch: can not convert string('This is a string that is too big to fit inside a NBFS buffer') to number"
         -- </select1-2.5.3>
     })
 
@@ -515,7 +515,7 @@ test:do_catchsql_test(
         SELECT sum(a) FROM t3
     ]], {
         -- <select1-2.17.1>
-        1, "Type mismatch: can not convert 'abc' to number"
+        1, "Type mismatch: can not convert string('abc') to number"
         -- </select1-2.17.1>
     })
 
@@ -1484,7 +1484,7 @@ test:do_catchsql_test(
         SELECT f1 FROM test1 WHERE 4.3+2.4 OR 1 ORDER BY f1
     ]], {
         -- <select1-8.1>
-        1, 'Type mismatch: can not convert 6.7 to boolean'
+        1, 'Type mismatch: can not convert double(6.7) to boolean'
         -- </select1-8.1>
     })
 

@@ -70,7 +70,7 @@ test:do_catchsql_test(
         SELECT CAST(x'616263' AS NUMBER)
     ]], {
         -- <cast-1.5>
-        1, "Type mismatch: can not convert x'616263' to number"
+        1, "Type mismatch: can not convert varbinary(x'616263') to number"
         -- </cast-1.5>
     })
 
@@ -100,7 +100,7 @@ test:do_catchsql_test(
         SELECT CAST(x'616263' AS integer)
     ]], {
         -- <cast-1.9>
-        1, "Type mismatch: can not convert x'616263' to integer"
+        1, "Type mismatch: can not convert varbinary(x'616263') to integer"
         -- </cast-1.9>
     })
 
@@ -450,7 +450,7 @@ test:do_catchsql_test(
         SELECT CAST('123abc' AS NUMBER)
     ]], {
         -- <cast-1.45>
-        1, "Type mismatch: can not convert '123abc' to number"
+        1, "Type mismatch: can not convert string('123abc') to number"
         -- </cast-1.45>
     })
 
@@ -470,7 +470,7 @@ test:do_catchsql_test(
         SELECT CAST('123abc' AS integer)
     ]], {
         -- <cast-1.49>
-        1, "Type mismatch: can not convert '123abc' to integer"
+        1, "Type mismatch: can not convert string('123abc') to integer"
         -- </cast-1.49>
     })
 
@@ -480,7 +480,7 @@ test:do_catchsql_test(
         SELECT CAST('123.5abc' AS NUMBER)
     ]], {
         -- <cast-1.51>
-        1, "Type mismatch: can not convert '123.5abc' to number"
+        1, "Type mismatch: can not convert string('123.5abc') to number"
         -- </cast-1.51>
     })
 
@@ -490,7 +490,7 @@ test:do_catchsql_test(
         SELECT CAST('123.5abc' AS integer)
     ]], {
         -- <cast-1.53>
-        1, "Type mismatch: can not convert '123.5abc' to integer"
+        1, "Type mismatch: can not convert string('123.5abc') to integer"
         -- </cast-1.53>
     })
 
@@ -561,7 +561,7 @@ test:do_catchsql_test(
         SELECT CAST('abc' AS NUMBER)
     ]], {
         -- <case-1.66>
-        1, "Type mismatch: can not convert 'abc' to number"
+        1, "Type mismatch: can not convert string('abc') to number"
         -- </case-1.66>
     })
 
@@ -835,7 +835,7 @@ test:do_test(
         ]]
     end, {
         -- <cast-4.1>
-        1, "Type mismatch: can not convert 'abc' to integer"
+        1, "Type mismatch: can not convert string('abc') to integer"
         -- </cast-4.1>
     })
 
@@ -847,7 +847,7 @@ test:do_test(
         ]]
     end, {
         -- <cast-4.2>
-        1, "Type mismatch: can not convert 'abc' to integer"
+        1, "Type mismatch: can not convert string('abc') to integer"
         -- </cast-4.2>
     })
 
@@ -859,7 +859,7 @@ test:do_test(
         ]]
     end, {
         -- <cast-4.4>
-        1, "Type mismatch: can not convert 'abc' to number"
+        1, "Type mismatch: can not convert string('abc') to number"
         -- </cast-4.4>
     })
 
