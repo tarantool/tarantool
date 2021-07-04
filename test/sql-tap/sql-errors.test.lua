@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(72)
+test:plan(76)
 
 test:execsql([[
 	CREATE TABLE t0 (i INT PRIMARY KEY, a INT);
@@ -779,5 +779,50 @@ test:do_catchsql_test(
 		1, "Type mismatch: can not convert varbinary to boolean"
 		-- </sql-errors-2.9>
 	})
+
+--
+-- gh-6176: Make sure that type mismatch error description with too long STRING,
+-- MAP or ARRAY is printed correctly.
+--
+local str1 = string.rep('a', 200)
+local str2 = string.rep('ы', 200)
+
+test:do_catchsql_test(
+	"sql-errors-3.1",
+	"SELECT CAST('"..str1.."'AS UNSIGNED);", {
+		1, "Type mismatch: can not convert aaaaaaaaaaaaaaaaaaaaaaaaaa"..
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"..
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... to unsigned"
+	})
+
+test:do_catchsql_test(
+	"sql-errors-3.2",
+	"SELECT CAST('"..str2.."'AS UNSIGNED);", {
+		1, "Type mismatch: can not convert ыыыыыыыыыыыыыыыыыыыыыыыыыы"..
+		"ыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыыы... to unsigned"
+	})
+
+local format = {{'I', 'integer'}, {'A', 'array'}, {'M', 'map'}}
+local s = box.schema.space.create('TEST', {format=format})
+s:create_index('I')
+s:insert({1, {str1}, {a = 1, b = str1}})
+
+test:do_catchsql_test(
+	"sql-errors-3.3",
+	"SELECT CAST(a AS UNSIGNED) from test;", {
+		1, 'Type mismatch: can not convert ["aaaaaaaaaaaaaaaaaaaaaaaa'..
+		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'..
+		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... to unsigned'
+	})
+
+test:do_catchsql_test(
+	"sql-errors-3.4",
+	"SELECT CAST(m AS UNSIGNED) from test;", {
+		1, 'Type mismatch: can not convert {"a": 1, "b": "aaaaaaaaaaa'..
+		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'..
+		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... to unsigned'
+	})
+
+test:execsql('DROP TABLE test;')
 
 test:finish_test()

@@ -257,7 +257,8 @@ mem_is_any_null(const struct Mem *mem1, const struct Mem *mem2)
 
 /**
  * Return a string that represent content of MEM. String is either allocated
- * using static_alloc() of just a static variable.
+ * using static_alloc() of just a static variable. This function should only be
+ * used for debugging or displaying MEM values in errors.
  */
 const char *
 mem_str(const struct Mem *mem);
