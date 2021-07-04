@@ -57,6 +57,7 @@ sqlVdbeMemGrow(struct Mem *pMem, int n, int preserve);
 
 enum {
 	BUF_SIZE = 32,
+	STR_VALUE_MAX_LEN = 128,
 };
 
 bool
@@ -72,26 +73,31 @@ mem_is_field_compatible(const struct Mem *mem, enum field_type type)
 const char *
 mem_str(const struct Mem *mem)
 {
-	char buf[BUF_SIZE];
+	char buf[STR_VALUE_MAX_LEN];
 	switch (mem->type) {
 	case MEM_TYPE_NULL:
 		return "NULL";
 	case MEM_TYPE_STR:
-		if ((mem->flags & MEM_Term) != 0)
-			return mem->z;
+		if (mem->n > STR_VALUE_MAX_LEN)
+			return tt_sprintf("%.*s...", STR_VALUE_MAX_LEN, mem->z);
 		return tt_cstr(mem->z, mem->n);
 	case MEM_TYPE_INT:
 		return tt_sprintf("%lld", mem->u.i);
 	case MEM_TYPE_UINT:
 		return tt_sprintf("%llu", mem->u.u);
 	case MEM_TYPE_DOUBLE:
-		sql_snprintf(BUF_SIZE, &buf[0], "%!.15g", mem->u.r);
+		sql_snprintf(STR_VALUE_MAX_LEN, buf, "%!.15g", mem->u.r);
 		return tt_sprintf("%s", buf);
 	case MEM_TYPE_BIN:
 		return "varbinary";
 	case MEM_TYPE_MAP:
-	case MEM_TYPE_ARRAY:
-		return mp_str(mem->z);
+	case MEM_TYPE_ARRAY: {
+		const char *str = mp_str(mem->z);
+		if (strlen(str) <= STR_VALUE_MAX_LEN)
+			return str;
+		memcpy(buf, str, STR_VALUE_MAX_LEN);
+		return tt_sprintf("%.*s...", STR_VALUE_MAX_LEN, buf);
+	}
 	case MEM_TYPE_UUID:
 		return tt_uuid_str(&mem->u.uuid);
 	case MEM_TYPE_BOOL:
