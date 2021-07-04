@@ -289,7 +289,7 @@ position_func(struct sql_context *context, int argc, struct Mem **argv)
 		inconsistent_type_arg = haystack;
 	if (inconsistent_type_arg != NULL) {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES,
-			 "text or varbinary",
+			 "string or varbinary",
 			 mem_type_to_str(inconsistent_type_arg));
 		context->is_aborted = true;
 		return;
@@ -555,7 +555,7 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 		return;
 	if (!mem_is_num(argv[0]) && !mem_is_str(argv[0])) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 mem_str(argv[0]), "numeric");
+			 mem_str(argv[0]), "number");
 		context->is_aborted = true;
 		return;
 	}
@@ -615,7 +615,7 @@ case_type##ICUFunc(sql_context *context, int argc, sql_value **argv)   \
 	UNUSED_PARAMETER(argc);                                                \
 	if (mem_is_bin(argv[0]) || mem_is_map(argv[0]) ||                      \
 	    mem_is_array(argv[0])) {                                           \
-		diag_set(ClientError, ER_INCONSISTENT_TYPES, "text",           \
+		diag_set(ClientError, ER_INCONSISTENT_TYPES, "string",         \
 			 "varbinary");                                         \
 		context->is_aborted = true;                                    \
 		return;                                                        \
@@ -698,7 +698,7 @@ randomBlob(sql_context * context, int argc, sql_value ** argv)
 	if (mem_is_bin(argv[0]) || mem_is_map(argv[0]) ||
 	    mem_is_array(argv[0])) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 mem_str(argv[0]), "numeric");
+			 mem_str(argv[0]), "number");
 		context->is_aborted = true;
 		return;
 	}
@@ -952,7 +952,7 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 		char *inconsistent_type = rhs_type != MP_STR ?
 					  mem_type_to_str(argv[0]) :
 					  mem_type_to_str(argv[1]);
-		diag_set(ClientError, ER_INCONSISTENT_TYPES, "text",
+		diag_set(ClientError, ER_INCONSISTENT_TYPES, "string",
 			 inconsistent_type);
 		context->is_aborted = true;
 		return;
@@ -1589,7 +1589,7 @@ soundexFunc(sql_context * context, int argc, sql_value ** argv)
 	if (mem_is_bin(argv[0]) || mem_is_map(argv[0]) ||
 	    mem_is_array(argv[0])) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 mem_str(argv[0]), "text");
+			 mem_str(argv[0]), "string");
 		context->is_aborted = true;
 		return;
 	}

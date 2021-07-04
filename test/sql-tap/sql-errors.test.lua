@@ -696,7 +696,7 @@ test:do_catchsql_test(
 		SELECT X'ff' + 1;
 	]], {
 		-- <sql-errors-2.1>
-		1, "Type mismatch: can not convert x'FF' to numeric"
+		1, "Type mismatch: can not convert x'FF' to number"
 		-- </sql-errors-2.1>
 	})
 
@@ -706,7 +706,7 @@ test:do_catchsql_test(
 		SELECT X'ff' - 1;
 	]], {
 		-- <sql-errors-2.2>
-		1, "Type mismatch: can not convert x'FF' to numeric"
+		1, "Type mismatch: can not convert x'FF' to number"
 		-- </sql-errors-2.2>
 	})
 
@@ -716,7 +716,7 @@ test:do_catchsql_test(
 		SELECT X'ff' * 1;
 	]], {
 		-- <sql-errors-2.3>
-		1, "Type mismatch: can not convert x'FF' to numeric"
+		1, "Type mismatch: can not convert x'FF' to number"
 		-- </sql-errors-2.3>
 	})
 
@@ -726,7 +726,7 @@ test:do_catchsql_test(
 		SELECT X'ff' / 1;
 	]], {
 		-- <sql-errors-2.4>
-		1, "Type mismatch: can not convert x'FF' to numeric"
+		1, "Type mismatch: can not convert x'FF' to number"
 		-- </sql-errors-2.4>
 	})
 
