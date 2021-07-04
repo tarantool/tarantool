@@ -1450,12 +1450,12 @@ mem_concat(struct Mem *a, struct Mem *b, struct Mem *result)
 	/* Concatenation operation can be applied only to strings and blobs. */
 	if (((b->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) == 0)) {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES,
-			 "text or varbinary", mem_type_to_str(b));
+			 "string or varbinary", mem_type_to_str(b));
 		return -1;
 	}
 	if (((a->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) == 0)) {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES,
-			 "text or varbinary", mem_type_to_str(a));
+			 "string or varbinary", mem_type_to_str(a));
 		return -1;
 	}
 
@@ -1544,12 +1544,12 @@ arithmetic_prepare(const struct Mem *left, const struct Mem *right,
 {
 	if (get_number(right, b) != 0) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
-			 "numeric");
+			 "number");
 		return -1;
 	}
 	if (get_number(left, a) != 0) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
-			 "numeric");
+			 "number");
 		return -1;
 	}
 	assert(a->type != 0 && b->type != 0);
@@ -2065,15 +2065,17 @@ mem_type_to_str(const struct Mem *p)
 	case MEM_TYPE_NULL:
 		return "NULL";
 	case MEM_TYPE_STR:
-		return "text";
+		return "string";
 	case MEM_TYPE_INT:
 		return "integer";
 	case MEM_TYPE_UINT:
 		return "unsigned";
 	case MEM_TYPE_DOUBLE:
-		return "real";
+		return "double";
 	case MEM_TYPE_ARRAY:
+		return "array";
 	case MEM_TYPE_MAP:
+		return "map";
 	case MEM_TYPE_BIN:
 		return "varbinary";
 	case MEM_TYPE_BOOL:

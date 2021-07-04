@@ -1674,7 +1674,7 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 				mem_cast_implicit_old(pIn3, type) != 0 ?
 				mem_str(pIn3) : mem_str(pIn1);
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH, str,
-				 "numeric");
+				 "number");
 			goto abort_due_to_error;
 		}
 	} else {
