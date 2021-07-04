@@ -78,21 +78,10 @@ datetime_size(const struct t_datetime_tz *date)
 }
 
 struct t_datetime_tz *
-mp_decode_datetime(const char **data, struct t_datetime_tz *date)
+datetime_unpack(const char **data, uint32_t len, struct t_datetime_tz *date)
 {
-	if (mp_typeof(**data) != MP_EXT)
-		return NULL;
-
-	int8_t type;
-	uint32_t len;
 	const char * svp = *data;
 
-	len = mp_decode_extl(data, &type);
-
-	if (type != MP_DATETIME || len == 0) {
-		*data = svp;
-		return NULL;
-	}
 	memset(date, 0, sizeof(*date));
 
 	date->secs = mp_decode_Xint(data);
@@ -113,13 +102,24 @@ mp_decode_datetime(const char **data, struct t_datetime_tz *date)
 	return date;
 }
 
-char *
-mp_encode_datetime(char *data, const struct t_datetime_tz *date)
+struct t_datetime_tz *
+mp_decode_datetime(const char **data, struct t_datetime_tz *date)
 {
-	uint32_t len = datetime_size(date);
+	if (mp_typeof(**data) != MP_EXT)
+		return NULL;
 
-	data = mp_encode_extl(data, MP_DATETIME, len);
+	int8_t type;
+	uint32_t len = mp_decode_extl(data, &type);
 
+	if (type != MP_DATETIME || len == 0) {
+		return NULL;
+	}
+	return datetime_unpack(data, len, date);
+}
+
+char *
+datetime_pack(char *data, const struct t_datetime_tz *date)
+{
 	data = mp_encode_Xint(data, date->secs);
 	if (date->nsec != 0 || date->offset != 0)
 		data = mp_encode_Xint(data, date->nsec);
@@ -129,25 +129,86 @@ mp_encode_datetime(char *data, const struct t_datetime_tz *date)
 	return data;
 }
 
+char *
+mp_encode_datetime(char *data, const struct t_datetime_tz *date)
+{
+	uint32_t len = datetime_size(date);
+
+	data = mp_encode_extl(data, MP_DATETIME, len);
+
+	return datetime_pack(data, date);
+}
+
+static int
+datetime_to_string(const struct t_datetime_tz * date, char *buf, uint32_t len)
+{
+	char * src = buf;
+	dt_t dt = dt_from_rdn(date->secs / SECS_PER_DAY);
+
+	int year, month, day, sec, ns, offset, sign;
+	dt_to_ymd(dt, &year, &month, &day);
+	int secs = date->secs, hour = (secs / 3600) % 24,
+	    minute = (secs / 60) % 60;
+	;
+	sec = secs % 60;
+	ns = date->nsec;
+	offset = date->offset;
+	uint32_t sz;
+	sz = snprintf(buf, len, "%04d-%02d-%02dT%02d:%02d",
+		      year, month, day, hour, minute);
+	buf += sz; len -= sz;
+	if (sec || ns) {
+		sz = snprintf(buf, len, ":%02d", sec);
+		buf += sz; len -= sz;
+		if (ns) {
+			if ((ns % 1000000) == 0)
+				sz = snprintf(buf, len, ".%03d", ns / 1000000);
+			else if ((ns % 1000) == 0)
+				sz = snprintf(buf, len, ".%06d", ns / 1000);
+			else
+				sz = snprintf(buf, len, ".%09d", ns);
+			buf += sz; len -= sz;
+		}
+	}
+	if (offset == 0) {
+		strncpy(buf, "Z", len);
+		buf++;
+		len--;
+	}
+	else {
+		if (offset < 0)
+			sign = '-', offset = -offset;
+		else
+			sign = '+';
+
+		sz = snprintf(buf, len, "%c%02d:%02d", sign, offset / 60, offset % 60);
+		buf += sz; len -= sz;
+	}
+	return (buf - src);
+}
 int
 mp_snprint_datetime(char *buf, int size, const char **data, uint32_t len)
 {
-	(void) buf;
-	(void) size;
-	(void) data;
-	(void) len;
-	return 0;
+	struct t_datetime_tz date = {0};
+
+	if (datetime_unpack(data, len, &date) == NULL)
+		return -1;
+
+	return datetime_to_string(&date, buf, size);
 }
 
 int
 mp_fprint_datetime(FILE *file, const char **data, uint32_t len)
 {
-	(void)file;
-	(void)len;
-	struct  t_datetime_tz dt;
-	if (mp_decode_datetime(data, &dt) == NULL)
+	struct  t_datetime_tz date;
+
+	if (datetime_unpack(data, len, &date) == NULL)
 		return -1;
-	return 0;
+
+	char buf[128];
+	datetime_to_string(&date, buf, sizeof buf);
+
+	return fprintf(file, "%s", buf);
 }
 
 static inline int
