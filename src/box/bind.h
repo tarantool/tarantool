@@ -40,6 +40,8 @@ extern "C" {
 #include <stdlib.h>
 
 #include "msgpuck.h"
+#include "uuid/tt_uuid.h"
+#include "mp_extension_types.h"
 
 struct sql_stmt;
 
@@ -59,6 +61,8 @@ struct sql_bind {
 	uint32_t bytes;
 	/** MessagePack type of the value. */
 	enum mp_type type;
+	/** Subtype of MP_EXT type. */
+	enum mp_extension_type ext_type;
 	/** Bind value. */
 	union {
 		bool b;
@@ -67,6 +71,7 @@ struct sql_bind {
 		uint64_t u64;
 		/** For string or blob. */
 		const char *s;
+		struct tt_uuid uuid;
 	};
 };
 

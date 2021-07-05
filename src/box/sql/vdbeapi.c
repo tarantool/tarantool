@@ -841,6 +841,16 @@ sql_bind_zeroblob64(sql_stmt * pStmt, int i, sql_uint64 n)
 }
 
 int
+sql_bind_uuid(struct sql_stmt *stmt, int i, const struct tt_uuid *uuid)
+{
+	struct Vdbe *p = (struct Vdbe *)stmt;
+	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "uuid") != 0)
+		return -1;
+	mem_set_uuid(&p->aVar[i - 1], uuid);
+	return 0;
+}
+
+int
 sql_bind_parameter_count(const struct sql_stmt *stmt)
 {
 	struct Vdbe *p = (struct Vdbe *) stmt;

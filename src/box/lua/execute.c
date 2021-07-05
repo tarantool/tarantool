@@ -371,6 +371,10 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 		bind->s = mp_decode_bin(&field.sval.data, &bind->bytes);
 		break;
 	case MP_EXT:
+		if (field.ext_type == MP_UUID) {
+			bind->uuid = *field.uuidval;
+			break;
+		}
 		diag_set(ClientError, ER_SQL_BIND_TYPE, "USERDATA",
 			 sql_bind_name(bind));
 		return -1;
@@ -386,6 +390,7 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 		unreachable();
 	}
 	bind->type = field.type;
+	bind->ext_type = field.ext_type;
 	lua_pop(L, lua_gettop(L) - idx);
 	return 0;
 }

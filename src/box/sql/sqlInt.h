@@ -326,6 +326,8 @@ struct sql_vfs {
 #define SQL_LIMIT_LIKE_PATTERN_LENGTH       8
 #define SQL_LIMIT_TRIGGER_DEPTH             9
 
+struct tt_uuid;
+
 enum sql_ret_code {
 	/** sql_step() has another row ready. */
 	SQL_ROW = 1,
@@ -633,6 +635,9 @@ sql_bind_zeroblob(sql_stmt *, int, int n);
 int
 sql_bind_zeroblob64(sql_stmt *, int,
 			sql_uint64);
+
+int
+sql_bind_uuid(struct sql_stmt *stmt, int i, const struct tt_uuid *uuid);
 
 /**
  * Return the number of wildcards that should be bound to.
