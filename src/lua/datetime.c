@@ -39,6 +39,12 @@
 uint32_t CTID_DATETIME_TZ = 0;
 uint32_t CTID_DURATION = 0;
 
+struct t_datetime_tz *
+luaL_pushdatetime(struct lua_State *L)
+{
+	return luaL_pushcdata(L, CTID_DATETIME_TZ);
+}
+
 void
 tarantool_lua_datetime_init(struct lua_State *L)
 {

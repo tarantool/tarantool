@@ -41,6 +41,7 @@
 #include "lib/core/mp_extension_types.h"
 #include "lua/error.h"
 
+#include "datetime.h"
 #include "trivia/util.h"
 #include "diag.h"
 #include "serializer_opts.h"
@@ -540,6 +541,9 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg,
 			} else if (cd->ctypeid == CTID_UUID) {
 				field->ext_type = MP_UUID;
 				field->uuidval = (struct tt_uuid *) cdata;
+			} else if (cd->ctypeid == CTID_DATETIME_TZ) {
+				field->ext_type = MP_DATETIME;
+				field->dateval = (struct t_datetime_tz *) cdata;
 			} else if (cd->ctypeid == CTID_CONST_STRUCT_ERROR_REF &&
 				   opts != NULL &&
 				   opts->error_marshaling_enabled) {

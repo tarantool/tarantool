@@ -52,6 +52,7 @@ extern "C" {
 #include <lauxlib.h>
 
 #include "trigger.h"
+#include "lib/core/datetime.h"
 #include "lib/core/decimal.h" /* decimal_t */
 #include "lib/core/mp_extension_types.h"
 #include "lua/error.h"
@@ -223,6 +224,7 @@ struct luaL_field {
 		uint32_t size;
 		decimal_t *decval;
 		struct tt_uuid *uuidval;
+		struct t_datetime_tz *dateval;
 	};
 	enum mp_type type;
 	/* subtypes of MP_EXT */

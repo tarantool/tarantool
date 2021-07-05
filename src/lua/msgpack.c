@@ -46,6 +46,7 @@
 #include "lib/core/decimal.h" /* decimal_unpack() */
 #include "lib/uuid/mp_uuid.h" /* mp_decode_uuid() */
 #include "lib/core/mp_extension_types.h"
+#include "datetime.h"
 
 #include "cord_buf.h"
 #include <fiber.h>
@@ -200,6 +201,9 @@ restart: /* used by MP_EXT of unidentified subtype */
 			break;
 		case MP_ERROR:
 			return luamp_encode_extension(L, top, stream);
+		case MP_DATETIME:
+			mpstream_encode_datetime(stream, field->dateval);
+			break;
 		default:
 			/* Run trigger if type can't be encoded */
 			type = luamp_encode_extension(L, top, stream);
@@ -330,6 +334,14 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 			*data = svp;
 			uuid = mp_decode_uuid(data, uuid);
 			if (uuid == NULL)
+				goto ext_decode_err;
+			return;
+		}
+		case MP_DATETIME:
+		{
+			struct t_datetime_tz * date = luaL_pushdatetime(L);
+			date = datetime_unpack(data, len, date);
+			if (date == NULL)
 				goto ext_decode_err;
 			return;
 		}

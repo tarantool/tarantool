@@ -62,8 +62,8 @@ mp_decode_Xint(const char **data)
 	return 0;
 }
 
-static inline uint32_t
-datetime_size(const struct t_datetime_tz *date)
+uint32_t
+mp_sizeof_datetime(const struct t_datetime_tz *date)
 {
 	uint32_t sz = mp_sizeof_Xint(date->secs);
 
@@ -132,14 +132,14 @@ datetime_pack(char *data, const struct t_datetime_tz *date)
 char *
 mp_encode_datetime(char *data, const struct t_datetime_tz *date)
 {
-	uint32_t len = datetime_size(date);
+	uint32_t len = mp_sizeof_datetime(date);
 
 	data = mp_encode_extl(data, MP_DATETIME, len);
 
 	return datetime_pack(data, date);
 }
 
-static int
+int
 datetime_to_string(const struct t_datetime_tz * date, char *buf, uint32_t len)
 {
 	char * src = buf;
@@ -187,7 +187,7 @@ datetime_to_string(const struct t_datetime_tz * date, char *buf, uint32_t len)
 	return (buf - src);
 }
 int
-mp_snprint_datetime(char *buf, int size, const char **data, uint32_t len)
+qmp_snprint_datetime(char *buf, int size, const char **data, uint32_t len)
 {
 	struct t_datetime_tz date = {0};
 

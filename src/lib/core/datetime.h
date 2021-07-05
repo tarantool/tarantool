@@ -72,11 +72,17 @@ datetime_unpack(const char **data, uint32_t len, struct t_datetime_tz *date);
 char *
 datetime_pack(char *data, const struct t_datetime_tz *date);
 
+uint32_t
+mp_sizeof_datetime(const struct t_datetime_tz *date);
+
 struct t_datetime_tz *
 mp_decode_datetime(const char **data, struct t_datetime_tz *date);
 
 char *
 mp_encode_datetime(char *data, const struct t_datetime_tz *date);
+
+int
+datetime_to_string(const struct t_datetime_tz * date, char *buf, uint32_t len);
 
 int
 mp_snprint_datetime(char *buf, int size, const char **data, uint32_t len);

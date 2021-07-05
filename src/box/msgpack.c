@@ -1,5 +1,5 @@
 /*
- * Copyright 2020, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2020-2021, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following

@@ -43,7 +43,7 @@ extern uint32_t CTID_DURATION;
 struct lua_State;
 
 struct t_datetime_tz*
-lua_pushdatetime(struct lua_State *L);
+luaL_pushdatetime(struct lua_State *L);
 
 void
 tarantool_lua_datetime_init(struct lua_State *L);

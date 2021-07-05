@@ -35,6 +35,7 @@
 #include "msgpuck.h"
 #include "mp_decimal.h"
 #include "uuid/mp_uuid.h"
+#include "core/datetime.h"
 
 void
 mpstream_reserve_slow(struct mpstream *stream, size_t size)
@@ -205,6 +206,16 @@ mpstream_encode_uuid(struct mpstream *stream, const struct tt_uuid *uuid)
 	if (data == NULL)
 		return;
 	char *pos = mp_encode_uuid(data, uuid);
+	mpstream_advance(stream, pos - data);
+}
+
+void
+mpstream_encode_datetime(struct mpstream *stream, const struct t_datetime_tz *val)
+{
+	char *data = mpstream_reserve(stream, mp_sizeof_datetime(val));
+	if (data == NULL)
+		return;
+	char *pos = mp_encode_datetime(data, val);
 	mpstream_advance(stream, pos - data);
 }
 

@@ -106,7 +106,7 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_UUID]     = */ "uuid",
 	/* [FIELD_TYPE_ARRAY]    = */ "array",
 	/* [FIELD_TYPE_MAP]      = */ "map",
-	/* [FIELD_TYPE_DATETIME] = */ "timestamp",
+	/* [FIELD_TYPE_DATETIME] = */ "datetime",
 };
 
 const char *on_conflict_action_strs[] = {

@@ -52,6 +52,7 @@
 #include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID */
 #include "tt_static.h"
 #include "uuid/tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
+#include "core/datetime.h"
 #include "cord_buf.h"
 
 typedef enum {
@@ -426,6 +427,13 @@ static void json_append_data(lua_State *l, struct luaL_serializer *cfg,
         case MP_UUID:
             return json_append_string(cfg, json, tt_uuid_str(field.uuidval),
                                       UUID_STR_LEN);
+
+        case MP_DATETIME:
+        {
+            char buf[128];
+            size_t sz = datetime_to_string(field.dateval, buf, sizeof buf);
+            return json_append_string(cfg, json, buf, sz);
+        }
         default:
             assert(false);
         }
