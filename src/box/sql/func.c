@@ -1095,8 +1095,8 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 {
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
-	switch (sql_value_type(argv[0])) {
-	case MP_DOUBLE:{
+	switch (argv[0]->type) {
+	case MEM_TYPE_DOUBLE:{
 			double r1, r2;
 			char zBuf[50];
 			r1 = mem_get_double_unsafe(argv[0]);
@@ -1110,14 +1110,20 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 					    SQL_TRANSIENT);
 			break;
 		}
-	case MP_UINT:
-	case MP_INT:{
+	case MEM_TYPE_UUID: {
+		char buf[UUID_STR_LEN + 1];
+		tt_uuid_to_string(&argv[0]->u.uuid, &buf[0]);
+		sql_result_text(context, buf, UUID_STR_LEN, SQL_TRANSIENT);
+		break;
+	}
+	case MEM_TYPE_UINT:
+	case MEM_TYPE_INT: {
 			sql_result_value(context, argv[0]);
 			break;
 		}
-	case MP_BIN:
-	case MP_ARRAY:
-	case MP_MAP: {
+	case MEM_TYPE_BIN:
+	case MEM_TYPE_ARRAY:
+	case MEM_TYPE_MAP: {
 			char *zText = 0;
 			char const *zBlob = mem_as_bin(argv[0]);
 			int nBlob = mem_len_unsafe(argv[0]);
@@ -1143,7 +1149,7 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 			}
 			break;
 		}
-	case MP_STR:{
+	case MEM_TYPE_STR: {
 			int i, j;
 			u64 n;
 			const unsigned char *zArg = mem_as_ustr(argv[0]);
@@ -1171,7 +1177,7 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 			}
 			break;
 		}
-	case MP_BOOL: {
+	case MEM_TYPE_BOOL: {
 		sql_result_text(context,
 				SQL_TOKEN_BOOLEAN(mem_get_bool_unsafe(argv[0])),
 				-1, SQL_TRANSIENT);
