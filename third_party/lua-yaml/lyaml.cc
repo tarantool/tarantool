@@ -707,6 +707,10 @@ static int dump_node(struct lua_yaml_dumper *dumper)
          str = tt_uuid_str(field.uuidval);
          len = UUID_STR_LEN;
          break;
+      case MP_DATETIME:
+         len = datetime_to_string(field.dateval, buf, sizeof buf);
+         str = buf;
+         break;
       default:
          assert(0); /* checked by luaL_checkfield() */
       }

@@ -187,7 +187,7 @@ datetime_to_string(const struct t_datetime_tz * date, char *buf, uint32_t len)
 	return (buf - src);
 }
 int
-qmp_snprint_datetime(char *buf, int size, const char **data, uint32_t len)
+mp_snprint_datetime(char *buf, int size, const char **data, uint32_t len)
 {
 	struct t_datetime_tz date = {0};
 
