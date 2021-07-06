@@ -47,8 +47,35 @@ runs:
                 free
             fi
         fi
-        # Drop a tag that points to a current commit (if any)
-        # on a job triggered by pushing to a branch.
+        # Found that Github checkout Actions pulls all the tags, but
+        # right it deannotates the testing tag, check:
+        #   https://github.com/actions/checkout/issues/290
+        # But we use 'git describe ..' calls w/o '--tags' flag and it
+        # prevents us from getting the needed tag for packages version
+        # setup. To avoid of it, let's fetch it manually, to be sure
+        # that all tags will exists always.
+        # To check it, were used commands to create dump commit and tag
+        # the new version. Also made twice push with extra flag for
+        # tags:
+        #
+        #   git commit -m"Dump commit" --allow-empty
+        #   git tag -a 2.4.8 -m ''
+        #   git push && git push --tags
+        #
+        # In this way would be run 2 jobs for each package:
+        #
+        # 1. Build package on testing branch. It will produce package
+        #    with name 2.4.7.x (because of the exception mentioned
+        #    below).
+        # 2. Build package on tag 2.4.8. It will produce package with
+        #    name 2.4.8.x.
+        git fetch --tags -f
+        # Github Actions may runs twice the same job on branch push and
+        # on new tag if it was created on this push. To avoid of fails
+        # on saving the commonly named packages, lets drop a tag that
+        # points to a current commit (if any) on a job triggered by
+        # pushing to a branch (it will produce the package based on
+        # previous tag) and leave the new tag in job triggered by tag.
         if ${{ ! startsWith(github.ref, 'refs/tags/') }}; then
             git tag -d "$(git tag --points-at HEAD)" 2>/dev/null || true
         fi
