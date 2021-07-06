@@ -617,7 +617,7 @@ static int dump_node(struct lua_yaml_dumper *dumper)
    yaml_event_t ev;
    yaml_scalar_style_t style = YAML_PLAIN_SCALAR_STYLE;
    int is_binary = 0;
-   char buf[FPCONV_G_FMT_BUFSIZE];
+   char buf[FPCONV_G_FMT_BUFSIZE + 8]; // FIXME - need extra space for datetime
    struct luaL_field field;
    bool unused;
    (void) unused;

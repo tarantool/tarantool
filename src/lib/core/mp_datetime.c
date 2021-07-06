@@ -143,7 +143,7 @@ int
 datetime_to_string(const struct t_datetime_tz * date, char *buf, uint32_t len)
 {
 	char * src = buf;
-	dt_t dt = dt_from_rdn(date->secs / SECS_PER_DAY);
+	dt_t dt = dt_from_rdn((date->secs / SECS_PER_DAY) + 719163);
 
 	int year, month, day, sec, ns, offset, sign;
 	dt_to_ymd(dt, &year, &month, &day);
