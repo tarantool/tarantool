@@ -120,7 +120,7 @@ endif ()
 add_library(core STATIC ${core_sources})
 add_dependencies(core curl)
 target_link_libraries(core
-    salad small
+    salad small uri
     ${LIBEV_LIBRARIES}
     ${LIBEIO_LIBRARIES}
     ${LIBCORO_LIBRARIES}
