@@ -434,7 +434,7 @@ end
 ]]
 local function parse_zone(str)
     local offset = ffi.new('int[1]')
-    local len = cdt.dt_parse_iso_zone(str, #str, offset)
+    local len = cdt.dt_parse_iso_zone_lenient(str, #str, offset)
     return len > 0 and mk_timestamp(nil, nil, nil, offset[0]) or nil, tonumber(len)
 end
 
@@ -486,7 +486,7 @@ local function parse_str(str)
     len = #str
 
     local offset = ffi.new('int[1]')
-    n = cdt.dt_parse_iso_zone(str, len, offset)
+    n = cdt.dt_parse_iso_zone_lenient(str, len, offset)
     if n == 0 then
         return mk_timestamp(dt_, sp_, fp_)
     end
@@ -519,10 +519,29 @@ local function local_now()
     return datetime_new_raw(secs, nsec, ofs) -- FIXME
 end
 
+local function datetime_to_tm_ptr(o)
+    local p_tm = ffi.new 'struct tm[1]'
+    assert(ffi.typeof(o) == datetime_t)
+    -- dt_to_struct_tm() fills only date data
+    cdt.dt_to_struct_tm(local_dt(o), p_tm)
+
+    -- calculate the smaller data (hour, minute,
+    -- seconds) using datetime seconds value
+    local seconds_of_day = o.secs % 86400
+    local hour = (seconds_of_day / 3600) % 24
+    local minute = (seconds_of_day / 60) % 60
+    p_tm[0].tm_sec = seconds_of_day % 60
+    p_tm[0].tm_min = minute
+    p_tm[0].tm_hour = hour
+
+    p_tm[0].tm_gmtoff = o.offset * 60
+
+    return p_tm
+end
+
 local function asctime(o)
     assert(ffi.typeof(o) == datetime_t)
-    local p_tm = ffi.new 'struct tm[1]'
-    cdt.dt_to_struct_tm(local_dt(o), p_tm)
+    local p_tm = datetime_to_tm_ptr(o)
     return ffi.string(native.asctime(p_tm))
 end
 
@@ -537,8 +556,7 @@ local function strftime(fmt, o)
     assert(ffi.typeof(o) == datetime_t)
     local sz = 50
     local buff = ffi.new('char[?]', sz)
-    local p_tm = ffi.new 'struct tm[1]'
-    cdt.dt_to_struct_tm(local_dt(o), p_tm)
+    local p_tm = datetime_to_tm_ptr(o)
     native.strftime(buff, sz, fmt, p_tm)
     return ffi.string(buff)
 end
