@@ -330,7 +330,7 @@ local function datetime_new(o)
             end,
 
             month = function(v)
-                assert(v > 0 and v < 12 )
+                assert(v > 0 and v < 13 )
                 M = v
                 ymd = true
             end,
@@ -405,9 +405,8 @@ end
 
 local function parse_date(str)
     local dt = ffi.new('dt_t[1]')
-    local rc = cdt.dt_parse_iso_date(str, #str, dt)
-    assert(rc > 0)
-    return mk_timestamp(dt[0])
+    local len = cdt.dt_parse_iso_date(str, #str, dt)
+    return len > 0 and mk_timestamp(dt[0]) or nil, tonumber(len)
 end
 
 --[[
@@ -423,9 +422,8 @@ end
 local function parse_time(str)
     local sp = ffi.new('int[1]')
     local fp = ffi.new('int[1]')
-    local rc = cdt.dt_parse_iso_time(str, #str, sp, fp)
-    assert(rc > 0)
-    return mk_timestamp(nil, sp[0], fp[0])
+    local len = cdt.dt_parse_iso_time(str, #str, sp, fp)
+    return len > 0 and mk_timestamp(nil, sp[0], fp[0]) or nil, tonumber(len)
 end
 
 --[[
@@ -436,9 +434,8 @@ end
 ]]
 local function parse_zone(str)
     local offset = ffi.new('int[1]')
-    local rc = cdt.dt_parse_iso_zone(str, #str, offset)
-    assert(rc > 0)
-    return mk_timestamp(nil, nil, nil, offset[0])
+    local len = cdt.dt_parse_iso_zone(str, #str, offset)
+    return len > 0 and mk_timestamp(nil, nil, nil, offset[0]) or nil, tonumber(len)
 end
 
 
@@ -461,7 +458,7 @@ local function parse_str(str)
     str = str:sub(tonumber(n) + 1)
 
     local ch = str:sub(1,1)
-    if ch ~= 't' and ch ~= 'T' and ch ~= ' ' then
+    if ch:match('[Tt ]') == nil then
         return mk_timestamp(dt_)
     end
 

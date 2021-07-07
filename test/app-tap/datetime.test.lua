@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test("errno")
 local date = require('datetime')
 
-test:plan(3)
+test:plan(5)
 
 test:test("Simple tests for parser", function(test)
     test:plan(2)
@@ -106,6 +106,82 @@ test:test("Datetime string formatting", function(test)
     test:ok(date.ctime(t) == 'Thu Jan  1 02:00:00 1970\n', ('%s: ctime with timezone'):format(str))
     test:ok(date.strftime('%d/%m/%Y', t) == '01/01/1970', ('%s: strftime #1'):format(str))
     test:ok(date.strftime('%A %d. %B %Y', t) == 'Thursday 01. January 1970', ('%s: strftime #2'):format(str))
+end)
+
+test:test("Parse iso date - valid strings", function(test)
+    test:plan(32)
+    local good = {
+        {2012, 12, 24, "20121224",                   8 },
+        {2012, 12, 24, "20121224  Foo bar",          8 },
+        {2012, 12, 24, "2012-12-24",                10 },
+        {2012, 12, 24, "2012-12-24 23:59:59",       10 },
+        {2012, 12, 24, "2012-12-24T00:00:00+00:00", 10 },
+        {2012, 12, 24, "2012359",                    7 },
+        {2012, 12, 24, "2012359T235959+0130",        7 },
+        {2012, 12, 24, "2012-359",                   8 },
+        {2012, 12, 24, "2012W521",                   8 },
+        {2012, 12, 24, "2012-W52-1",                10 },
+        {2012, 12, 24, "2012Q485",                   8 },
+        {2012, 12, 24, "2012-Q4-85",                10 },
+        {   1,  1,  1, "0001-Q1-01",                10 },
+        {   1,  1,  1, "0001-W01-1",                10 },
+        {   1,  1,  1, "0001-01-01",                10 },
+        {   1,  1,  1, "0001-001",                   8 },
+    }
+
+    for _, value in ipairs(good) do
+        local year, month, day, str, date_part_len;
+        year, month, day, str, date_part_len = unpack(value)
+        local expected_date = date{year = year, month = month, day = day}
+        local date_part, len
+        date_part, len = date.parse_date(str)
+        test:ok(len == date_part_len, ('%s: length check %d'):format(str, len))
+        test:ok(expected_date == date_part, ('%s: expected date'):format(str))
+    end
+end)
+
+test:test("Parse iso date - invalid strings", function(test)
+    test:plan(62)
+    local bad = {
+        "20121232"   , -- Invalid day of month
+        "2012-12-310", -- Invalid day of month
+        "2012-13-24" , -- Invalid month
+        "2012367"    , -- Invalid day of year
+        "2012-000"   , -- Invalid day of year
+        "2012W533"   , -- Invalid week of year
+        "2012-W52-8" , -- Invalid day of week
+        "2012Q495"   , -- Invalid day of quarter
+        "2012-Q5-85" , -- Invalid quarter
+        "20123670"   , -- Trailing digit
+        "201212320"  , -- Trailing digit
+        "2012-12"    , -- Reduced accuracy
+        "2012-Q4"    , -- Reduced accuracy
+        "2012-Q42"   , -- Invalid
+        "2012-Q1-1"  , -- Invalid day of quarter
+        "2012Q--420" , -- Invalid
+        "2012-Q-420" , -- Invalid
+        "2012Q11"    , -- Incomplete
+        "2012Q1234"  , -- Trailing digit
+        "2012W12"    , -- Incomplete
+        "2012W1234"  , -- Trailing digit
+        "2012W-123"  , -- Invalid
+        "2012-W12"   , -- Incomplete
+        "2012-W12-12", -- Trailing digit
+        "2012U1234"  , -- Invalid
+        "2012-1234"  , -- Invalid
+        "2012-X1234" , -- Invalid
+        "0000-Q1-01" , -- Year less than 0001
+        "0000-W01-1" , -- Year less than 0001
+        "0000-01-01" , -- Year less than 0001
+        "0000-001"   , -- Year less than 0001
+    }
+
+    for _, str in ipairs(bad) do
+        local date_part, len
+        date_part, len = date.parse_date(str)
+        test:ok(len == 0, ('%s: length check %d'):format(str, len))
+        test:ok(date_part == nil, ('%s: empty date check %s'):format(str, date_part))
+    end
 end)
 
 os.exit(test:check() and 0 or 1)
