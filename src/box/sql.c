@@ -1177,9 +1177,10 @@ sql_debug_info(struct info_handler *h)
 int
 tarantoolSqlNextSeqId(uint64_t *max_id)
 {
-	char key[16];
+	char key[1];
 	struct tuple *tuple;
 	char *key_end = mp_encode_array(key, 0);
+	assert(key_end - key == 1);
 	if (box_index_max(BOX_SEQUENCE_ID, 0 /* PK */, key,
 			  key_end, &tuple) != 0)
 		return -1;
