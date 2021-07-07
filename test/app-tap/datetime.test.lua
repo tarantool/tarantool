@@ -93,7 +93,6 @@ ffi.cdef [[
 ]]
 
 test:test("Datetime string formatting", function(test)
-    -- redefine timezone to be always GMT-2
     test:plan(7)
     local str = "1970-01-01"
     local t = date(str)
@@ -101,6 +100,11 @@ test:test("Datetime string formatting", function(test)
     test:ok(t.nsec == 0, ('%s: t.nsec == %d'):format(str, t.nsec))
     test:ok(t.offset == 0, ('%s: t.offset == %d'):format(str, t.offset))
     test:ok(date.asctime(t) == 'Thu Jan  1 00:00:00 1970\n', ('%s: asctime'):format(str))
+    -- ctime() is local timezone dependent. To make sure that
+    -- test is deterministic we enforce timezone via TZ environment
+    -- manipulations and calling tzset()
+
+    -- redefine timezone to be always GMT-2
     os.setenv('TZ', 'GMT-2')
     ffi.C.tzset()
     test:ok(date.ctime(t) == 'Thu Jan  1 02:00:00 1970\n', ('%s: ctime with timezone'):format(str))
