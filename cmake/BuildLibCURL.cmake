@@ -95,6 +95,7 @@ macro(curl_build)
                 --with-ca-fallback
 
                 --without-brotli
+                --without-zstd
                 --without-gnutls
                 --without-mbedtls
                 --without-cyassl
