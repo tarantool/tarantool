@@ -259,6 +259,7 @@ test_return_mp(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	(void) args;
 	(void) args_end;
 	char buf[512];
+	memset(buf, '\0', 512);
 	char *pos = mp_encode_uint(buf, 1);
 	int rc = box_return_mp(ctx, buf, pos);
 	if (rc != 0)
