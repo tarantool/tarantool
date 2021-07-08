@@ -215,11 +215,11 @@ bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 #else /* #ifndef OLD_GOOD_BITSET */
 		struct tuple *tuple = value_to_tuple(value);
 #endif /* #ifndef OLD_GOOD_BITSET */
-		uint32_t iid = iterator->index->def->iid;
+		struct index *idx = iterator->index;
 		struct txn *txn = in_txn();
 		struct space *space = space_by_id(iterator->space_id);
 		bool is_rw = txn != NULL;
-		*ret = memtx_tx_tuple_clarify(txn, space, tuple, iid, 0, is_rw);
+		*ret = memtx_tx_tuple_clarify(txn, space, tuple, idx, 0, is_rw);
 	} while (*ret == NULL);
 
 	return 0;
@@ -243,10 +243,9 @@ memtx_bitset_index_size(struct index *base)
 {
 	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
 	struct space *space = space_by_id(base->def->space_id);
-	uint32_t iid = base->def->iid;
 	/* Substract invisible count. */
 	return tt_bitset_index_size(&index->index) -
-	       memtx_tx_index_invisible_count(in_txn(), space, iid);
+	       memtx_tx_index_invisible_count(in_txn(), space, base);
 }
 
 static ssize_t
