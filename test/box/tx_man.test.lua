@@ -645,6 +645,72 @@ for k=1,NUM_TEST_SPACES do				\
 	sp[k]:drop()					\
 end
 
+-- Test all index types
+s = box.schema.space.create('test')
+i0 = s:create_index('pk', {parts={{1, 'uint'}}})
+i1 = s:create_index('i1', {id = 10, type = 'tree', parts={{2, 'uint'}}})
+i2 = s:create_index('i2', {id = 20, type = 'hash', parts={{2, 'uint'}}})
+i3 = s:create_index('i3', {id = 30, type = 'bitset', parts={{3, 'uint'}}})
+i4 = s:create_index('i4', {id = 40, type = 'rtree', parts={{4, 'array'}}})
+s:replace{1, 1, 15, {0, 0}}
+s:replace{1, 1, 7, {1, 1}}
+s:replace{1, 2, 3, {2, 2}}
+tx1:begin()
+tx1('i1:select{2}')
+tx1('i1:select{3}')
+tx1('i1:count()')
+tx1('i2:select{2}')
+tx1('i2:select{3}')
+tx1('i2:count()')
+tx1('i3:select{3}')
+tx1('i3:select{16}')
+tx1('i3:count()')
+tx1('i4:select{2, 2}')
+tx1('i4:select{3, 3}')
+tx1('i4:count()')
+tx1:commit()
+s:drop()
+
+-- CASE 2 from #5515
+fiber = require('fiber')
+channel1 = fiber.channel()
+channel2 = fiber.channel()
+function test1()                                 \
+    box.begin()                                  \
+    local s = box.schema.space.create('test')    \
+    s:create_index('pk')                         \
+    channel1:put(1)                              \
+    local ok = channel2:get()                    \
+    box.session.push(ok)                         \
+    box.rollback()                               \
+    channel1:put(1)                              \
+end
+f = fiber.new(test1)
+channel1:get()
+tx1('box.space.test:select()')
+tx1('box.space.test:replace({1, 2, 3})')
+
+assert(box.space.test ~= nil)
+channel2:put(1)
+channel1:get()
+assert(box.space.test == nil)
+
+-- "100% reproducer" from #5515
+box.begin()
+s = box.schema.space.create('test')
+_ = box.space.test:create_index('pk')
+box.space.test:replace({1,2,3})
+tx1:begin()
+tx1('s:replace{2,2,3}');
+tx1('s:replace{3,2,3}');
+tx1:commit()
+box.space.test:truncate()
+assert(box.space.test ~= nil)
+box.rollback()
+assert(box.space.test == nil)
+collectgarbage()
+assert(box.space.test == nil)
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")

@@ -301,13 +301,13 @@ tree_iterator_next_base(struct iterator *iterator, struct tuple **ret)
 		tuple_ref(*ret);
 		it->current = *res;
 	}
-	uint32_t iid = iterator->index->def->iid;
+	struct index *idx = iterator->index;
 	struct space *space = space_by_id(iterator->space_id);
 	/*
 	 * Pass no key because any write to the gap between that
 	 * two tuples must lead to conflict.
 	 */
-	memtx_tx_track_gap(in_txn(), space, iid, *ret, ITER_GE, NULL, 0);
+	memtx_tx_track_gap(in_txn(), space, idx, *ret, ITER_GE, NULL, 0);
 	return 0;
 }
 
@@ -338,13 +338,13 @@ tree_iterator_prev_base(struct iterator *iterator, struct tuple **ret)
 		tuple_ref(*ret);
 		it->current = *res;
 	}
-	uint32_t iid = iterator->index->def->iid;
+	struct index *idx = iterator->index;
 	struct space *space = space_by_id(iterator->space_id);
 	/*
 	 * Pass no key because any write to the gap between that
 	 * two tuples must lead to conflict.
 	 */
-	memtx_tx_track_gap(in_txn(), space, iid, successor, ITER_LE, NULL, 0);
+	memtx_tx_track_gap(in_txn(), space, idx, successor, ITER_LE, NULL, 0);
 	tuple_unref(successor);
 	return 0;
 }
@@ -383,19 +383,19 @@ tree_iterator_next_equal_base(struct iterator *iterator, struct tuple **ret)
 		tuple_ref(*ret);
 		it->current = *res;
 	}
-	uint32_t iid = iterator->index->def->iid;
+	struct index *idx = iterator->index;
 	struct space *space = space_by_id(iterator->space_id);
 	if (res != NULL && *ret == NULL) {
 		/** Got end of key. */
-		memtx_tx_track_gap(in_txn(), space, iid, *ret, ITER_EQ,
-		     it->key_data.key, it->key_data.part_count);
+		memtx_tx_track_gap(in_txn(), space, idx, *ret, ITER_EQ,
+				   it->key_data.key, it->key_data.part_count);
 	} else {
 		/*
 		 * Pass no key because any write to the gap between that
 		 * two tuples must lead to conflict.
 		 */
-		memtx_tx_track_gap(in_txn(), space, iid, *ret, ITER_GE,
-		     NULL, 0);
+		memtx_tx_track_gap(in_txn(), space, idx, *ret, ITER_GE,
+				   NULL, 0);
 	}
 	return 0;
 }
@@ -433,19 +433,19 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 		tuple_ref(*ret);
 		it->current = *res;
 	}
-	uint32_t iid = iterator->index->def->iid;
+	struct index *idx = iterator->index;
 	struct space *space = space_by_id(iterator->space_id);
 	if (res != NULL && *ret == NULL) {
 		/** Got end of key. */
-		memtx_tx_track_gap(in_txn(), space, iid, successor, ITER_REQ,
-		     it->key_data.key, it->key_data.part_count);
+		memtx_tx_track_gap(in_txn(), space, idx, successor, ITER_REQ,
+				   it->key_data.key, it->key_data.part_count);
 	} else {
 		/*
 		 * Pass no key because any write to the gap between that
 		 * two tuples must lead to conflict.
 		 */
-		memtx_tx_track_gap(in_txn(), space, iid, successor, ITER_LE,
-		     NULL, 0);
+		memtx_tx_track_gap(in_txn(), space, idx, successor, ITER_LE,
+				   NULL, 0);
 	}
 	tuple_unref(successor);
 	return 0;
@@ -461,7 +461,7 @@ name(struct iterator *iterator, struct tuple **ret)				\
 	struct tree_iterator<USE_HINT> *it =   					\
 		get_tree_iterator<USE_HINT>(iterator);				\
 	memtx_tree_iterator_t<USE_HINT> *ti = &it->tree_iterator;		\
-	uint32_t iid = iterator->index->def->iid;				\
+	struct index *idx = iterator->index;					\
 	bool is_multikey = iterator->index->def->key_def->is_multikey;		\
 	struct txn *txn = in_txn();						\
 	struct space *space = space_by_id(iterator->space_id);			\
@@ -478,7 +478,7 @@ name(struct iterator *iterator, struct tuple **ret)				\
 			mk_index = (uint32_t)check->hint;			\
 		}								\
 		*ret = memtx_tx_tuple_clarify(txn, space, *ret,			\
-					      iid, mk_index, is_rw);		\
+					      idx, mk_index, is_rw);		\
 	} while (*ret == NULL);							\
 	tuple_unref(it->current.tuple);						\
 	it->current.tuple = *ret;						\
@@ -536,7 +536,7 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	enum iterator_type type = it->type;
 	struct txn *txn = in_txn();
 	struct space *space = space_by_id(iterator->space_id);
-	uint32_t iid = iterator->index->def->iid;
+	struct index *idx = iterator->index;
 	struct key_def *cmp_def = index->base.def->cmp_def;
 	/*
 	 * The key is full - all parts a present. If key if full, EQ and REQ
@@ -577,7 +577,7 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	if (!equals && (type == ITER_EQ || type == ITER_REQ)) {
 		/* Found nothing */
 		if (key_is_full)
-			memtx_tx_track_point(txn, space, iid, it->key_data.key);
+			memtx_tx_track_point(txn, space, idx, it->key_data.key);
 		return 0;
 	}
 	if ((!key_is_full || (type != ITER_EQ && type != ITER_REQ)) &&
@@ -587,7 +587,7 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 			memtx_tree_iterator_get_elem(tree, &it->tree_iterator);
 		struct tuple *successor =
 			succ_data == NULL ? NULL : succ_data->tuple;
-		memtx_tx_track_gap(in_txn(), space, iid, successor, type,
+		memtx_tx_track_gap(in_txn(), space, idx, successor, type,
 				   it->key_data.key, it->key_data.part_count);
 	}
 	if (iterator_type_is_reverse(type)) {
@@ -617,7 +617,7 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	bool is_multikey = iterator->index->def->key_def->is_multikey;
 	bool is_rw = txn != NULL;
 	uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
-	*ret = memtx_tx_tuple_clarify(txn, space, *ret, iid, mk_index, is_rw);
+	*ret = memtx_tx_tuple_clarify(txn, space, *ret, idx, mk_index, is_rw);
 	if (*ret == NULL) {
 		return iterator->next(iterator, ret);
 	} else {
@@ -752,10 +752,9 @@ memtx_tree_index_size(struct index *base)
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
 	struct space *space = space_by_id(base->def->space_id);
-	uint32_t iid = base->def->iid;
 	/* Substract invisible count. */
 	return memtx_tree_size(&index->tree) -
-	       memtx_tx_index_invisible_count(in_txn(), space, iid);
+	       memtx_tx_index_invisible_count(in_txn(), space, base);
 }
 
 template <bool USE_HINT>
@@ -810,13 +809,13 @@ memtx_tree_index_get(struct index *base, const char *key,
 	if (res == NULL) {
 		*result = NULL;
 		if (part_count == cmp_def->part_count)
-			memtx_tx_track_point(txn, space, base->def->iid, key);
+			memtx_tx_track_point(txn, space, base, key);
 		return 0;
 	}
 	bool is_rw = txn != NULL;
 	bool is_multikey = base->def->key_def->is_multikey;
 	uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
-	*result = memtx_tx_tuple_clarify(txn, space, res->tuple, base->def->iid,
+	*result = memtx_tx_tuple_clarify(txn, space, res->tuple, base,
 					 mk_index, is_rw);
 	return 0;
 }

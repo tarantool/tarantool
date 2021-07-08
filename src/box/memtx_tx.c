@@ -1486,7 +1486,7 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
 
 struct tuple *
 memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
-			    struct tuple *tuple, uint32_t index,
+			    struct tuple *tuple, struct index *index,
 			    uint32_t mk_index, bool is_prepared_ok)
 {
 	assert(tuple->is_dirty);
@@ -1505,7 +1505,7 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 		 */
 		if (story->add_stmt != NULL && txn != NULL)
 			memtx_tx_cause_conflict(story->add_stmt->txn, txn);
-		story = story->link[index].older_story;
+		story = story->link[index->dense_id].older_story;
 		if (story == NULL)
 			break;
 	}
@@ -1520,7 +1520,7 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 
 uint32_t
 memtx_tx_index_invisible_count_slow(struct txn *txn,
-			       struct space *space, uint32_t index)
+				    struct space *space, struct index *index)
 {
 	uint32_t res = 0;
 	struct memtx_story *story;
@@ -1530,7 +1530,8 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 			continue;
 		}
 		assert(story->space == space);
-		struct memtx_story_link *link = &story->link[index];
+		assert(index->dense_id < story->index_count);
+		struct memtx_story_link *link = &story->link[index->dense_id];
 		if (link->newer_story != NULL) {
 			/* The story in in chain, but not at top. */
 			continue;
@@ -1538,8 +1539,9 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 
 		struct tuple *visible = NULL;
 		struct memtx_story *lookup = story;
-		for (; lookup != NULL; lookup = lookup->link[index].older_story) {
-			assert(index < lookup->index_count);
+		for (; lookup != NULL;
+		       lookup = lookup->link[index->dense_id].older_story) {
+			assert(index->dense_id < lookup->index_count);
 			bool unused;
 			if (memtx_tx_story_is_visible(lookup, txn,
 						      &visible, true, &unused))
@@ -1793,18 +1795,17 @@ point_hole_storage_delete(struct point_hole_item *object)
  * @return 0 on success, -1 on memory error.
  */
 int
-memtx_tx_track_point_slow(struct txn *txn, struct space *space,
-			  uint32_t index, const char *key)
+memtx_tx_track_point_slow(struct txn *txn, struct index *index, const char *key)
 {
 	if (txn->status != TXN_INPROGRESS)
 		return 0;
 
-	struct key_def *def = space->index[index]->def->key_def;
+	struct key_def *def = index->def->key_def;
 	const char *tmp = key;
 	for (uint32_t i = 0; i < def->part_count; i++)
 		mp_next(&tmp);
 	size_t key_len = tmp - key;
-	return point_hole_storage_new(space->index[index], key, key_len, txn);
+	return point_hole_storage_new(index, key, key_len, txn);
 }
 
 static struct gap_item *
@@ -1853,7 +1854,7 @@ memtx_tx_gap_item_new(struct txn *txn, enum iterator_type type,
  * @return 0 on success, -1 on memory error.
  */
 int
-memtx_tx_track_gap_slow(struct txn *txn, struct space *space, uint32_t index,
+memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *index,
 			struct tuple *successor, enum iterator_type type,
 			const char *key, uint32_t part_count)
 {
@@ -1876,12 +1877,11 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, uint32_t index,
 				return -1;
 			}
 		}
-		assert(index < story->index_count);
-		rlist_add(&story->link[index].nearby_gaps,
+		assert(index->dense_id < story->index_count);
+		rlist_add(&story->link[index->dense_id].nearby_gaps,
 			  &item->in_nearby_gaps);
 	} else {
-		rlist_add(&space->index[index]->nearby_gaps,
-			  &item->in_nearby_gaps);
+		rlist_add(&index->nearby_gaps, &item->in_nearby_gaps);
 	}
 	memtx_tx_story_gc();
 	return 0;

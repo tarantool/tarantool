@@ -260,7 +260,7 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt);
 /** Helper of memtx_tx_tuple_clarify */
 struct tuple *
 memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
-			    struct tuple *tuple, uint32_t index,
+			    struct tuple *tuples, struct index *index,
 			    uint32_t mk_index, bool is_prepared_ok);
 
 /**
@@ -273,7 +273,7 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple);
 
 /** Helper of memtx_tx_track_point */
 int
-memtx_tx_track_point_slow(struct txn *txn, struct space *space, uint32_t index,
+memtx_tx_track_point_slow(struct txn *txn, struct index *index,
 			  const char *key);
 
 /**
@@ -284,21 +284,22 @@ memtx_tx_track_point_slow(struct txn *txn, struct space *space, uint32_t index,
  * @return 0 on success, -1 on memory error.
  */
 static inline int
-memtx_tx_track_point(struct txn *txn, struct space *space, uint32_t index,
-		     const char *key)
+memtx_tx_track_point(struct txn *txn, struct space *space,
+		     struct index *index, const char *key)
 {
+	(void) space;
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return 0;
 	if (txn == NULL)
 		return 0;
-	return memtx_tx_track_point_slow(txn, space, index, key);
+	return memtx_tx_track_point_slow(txn, index, key);
 }
 
 /**
  * Helper of memtx_tx_track_gap.
  */
 int
-memtx_tx_track_gap_slow(struct txn *txn, struct space *space, uint32_t index,
+memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *index,
 			struct tuple *successor, enum iterator_type type,
 			const char *key, uint32_t part_count);
 
@@ -312,7 +313,7 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, uint32_t index,
  * @return 0 on success, -1 on memory error.
  */
 static inline int
-memtx_tx_track_gap(struct txn *txn, struct space *space, uint32_t index,
+memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
 		   struct tuple *successor, enum iterator_type type,
 		   const char *key, uint32_t part_count)
 {
@@ -329,14 +330,14 @@ memtx_tx_track_gap(struct txn *txn, struct space *space, uint32_t index,
  * @param txn - current transactions.
  * @param space - space in which the tuple was found.
  * @param tuple - tuple to clean.
- * @param index - index number.
+ * @param index - index in which the tuple was found.
  * @param mk_index - multikey index (iа the index is multikey).
  * @param is_prepared_ok - allow to return prepared tuples.
  * @return clean tuple (can be NULL).
  */
 static inline struct tuple *
 memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
-		       struct tuple *tuple, uint32_t index,
+		       struct tuple *tuple, struct index *index,
 		       uint32_t mk_index, bool is_prepared_ok)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
@@ -351,7 +352,7 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 
 uint32_t
 memtx_tx_index_invisible_count_slow(struct txn *txn,
-				    struct space *space, uint32_t index);
+				    struct space *space, struct index *index);
 
 /**
  * When MVCC engine is enabled, an index can contain temporary non-committed
@@ -363,7 +364,7 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
  */
 static inline uint32_t
 memtx_tx_index_invisible_count(struct txn *txn,
-			       struct space *space, uint32_t index)
+			       struct space *space, struct index *index)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return 0;

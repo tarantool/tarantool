@@ -137,7 +137,7 @@ name(struct iterator *iterator, struct tuple **ret)				\
 	struct txn *txn = in_txn();						\
 	struct space *space = space_by_id(iterator->space_id);			\
 	bool is_rw = txn != NULL;						\
-	uint32_t iid = iterator->index->def->iid;				\
+	struct index *idx = iterator->index;					\
 	bool is_first = true;							\
 	do {									\
 		int rc = is_first ? name##_base(iterator, ret)			\
@@ -145,7 +145,7 @@ name(struct iterator *iterator, struct tuple **ret)				\
 		if (rc != 0 || *ret == NULL)					\
 			return rc;						\
 		is_first = false;						\
-		*ret = memtx_tx_tuple_clarify(txn, space, *ret, iid, 0, is_rw); \
+		*ret = memtx_tx_tuple_clarify(txn, space, *ret, idx, 0, is_rw);	\
 	} while (*ret == NULL);							\
 	return 0;								\
 }										\
@@ -173,8 +173,7 @@ hash_iterator_eq(struct iterator *it, struct tuple **ret)
 	struct txn *txn = in_txn();
 	struct space *sp = space_by_id(it->space_id);
 	bool is_rw = txn != NULL;
-	*ret = memtx_tx_tuple_clarify(txn, sp, *ret, it->index->def->iid,
-				      0, is_rw);
+	*ret = memtx_tx_tuple_clarify(txn, sp, *ret, it->index, 0, is_rw);
 	return 0;
 }
 
@@ -268,10 +267,9 @@ memtx_hash_index_size(struct index *base)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct space *space = space_by_id(base->def->space_id);
-	uint32_t iid = base->def->iid;
 	/* Substract invisible count. */
 	return index->hash_table.count -
-	       memtx_tx_index_invisible_count(in_txn(), space, iid);
+	       memtx_tx_index_invisible_count(in_txn(), space, base);
 }
 
 static ssize_t
@@ -321,17 +319,16 @@ memtx_hash_index_get(struct index *base, const char *key,
 
 	struct space *space = space_by_id(base->def->space_id);
 	struct txn *txn = in_txn();
-	uint32_t iid = base->def->iid;
 	*result = NULL;
 	uint32_t h = key_hash(key, base->def->key_def);
 	uint32_t k = light_index_find_key(&index->hash_table, h, key);
 	if (k != light_index_end) {
 		struct tuple *tuple = light_index_get(&index->hash_table, k);
 		bool is_rw = txn != NULL;
-		*result = memtx_tx_tuple_clarify(txn, space, tuple, iid,
+		*result = memtx_tx_tuple_clarify(txn, space, tuple, base,
 						 0, is_rw);
 	} else {
-		memtx_tx_track_point(txn, space, iid, key);
+		memtx_tx_track_point(txn, space, base, key);
 	}
 	return 0;
 }
@@ -442,7 +439,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		if (it->iterator.slotpos == light_index_end)
 			memtx_tx_track_point(in_txn(),
 					     space_by_id(it->base.space_id),
-					     index->base.def->iid, key);
+					     &index->base, key);
 		break;
 	default:
 		diag_set(UnsupportedIndexFeature, base->def,
