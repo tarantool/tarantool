@@ -15,6 +15,7 @@ struct {
 } tests[] = {
 	S("2012-12-24 15:30Z"),
 	S("2012-12-24 15:30z"),
+	S("2012-12-24 15:30"),
 	S("2012-12-24 16:30+01:00"),
 	S("2012-12-24 16:30+0100"),
 	S("2012-12-24 16:30+01"),
@@ -23,24 +24,28 @@ struct {
 	S("2012-12-24 14:30-01"),
 	S("2012-12-24 15:30:00Z"),
 	S("2012-12-24 15:30:00z"),
+	S("2012-12-24 15:30:00"),
 	S("2012-12-24 16:30:00+01:00"),
 	S("2012-12-24 16:30:00+0100"),
 	S("2012-12-24 14:30:00-01:00"),
 	S("2012-12-24 14:30:00-0100"),
 	S("2012-12-24 15:30:00.123456Z"),
 	S("2012-12-24 15:30:00.123456z"),
+	S("2012-12-24 15:30:00.123456"),
 	S("2012-12-24 16:30:00.123456+01:00"),
 	S("2012-12-24 16:30:00.123456+01"),
 	S("2012-12-24 14:30:00.123456-01:00"),
 	S("2012-12-24 14:30:00.123456-01"),
 	S("2012-12-24t15:30Z"),
 	S("2012-12-24t15:30z"),
+	S("2012-12-24t15:30"),
 	S("2012-12-24t16:30+01:00"),
 	S("2012-12-24t16:30+0100"),
 	S("2012-12-24t14:30-01:00"),
 	S("2012-12-24t14:30-0100"),
 	S("2012-12-24t15:30:00Z"),
 	S("2012-12-24t15:30:00z"),
+	S("2012-12-24t15:30:00"),
 	S("2012-12-24t16:30:00+01:00"),
 	S("2012-12-24t16:30:00+0100"),
 	S("2012-12-24t14:30:00-01:00"),
@@ -84,7 +89,7 @@ struct {
 
 #define DIM(a) (sizeof(a) / sizeof(a[0]))
 
-// p5-time/moment/src/moment_parse.c: parse_string_lenient()
+// p5-time-moment/src/moment_parse.c: parse_string_lenient()
 static int
 parse_datetime(const char *str, size_t len, int64_t *sp, int64_t *np,
 	       int64_t *op)
@@ -92,11 +97,13 @@ parse_datetime(const char *str, size_t len, int64_t *sp, int64_t *np,
 	size_t n;
 	dt_t dt;
 	char c;
-	int sod, nanosecond, offset;
+	int sod = 0, nanosecond = 0, offset = 0;
 
 	n = dt_parse_iso_date(str, len, &dt);
-	if (!n || n == len)
+	if (!n)
 		return 1;
+	if (n == len)
+		goto exit;
 
 	c = str[n++];
 	if (!(c == 'T' || c == 't' || c == ' '))
@@ -106,8 +113,10 @@ parse_datetime(const char *str, size_t len, int64_t *sp, int64_t *np,
 	len -= n;
 
 	n = dt_parse_iso_time(str, len, &sod, &nanosecond);
-	if (!n || n == len)
+	if (!n)
 		return 1;
+	if (n == len)
+		goto exit;
 
 	if (str[n] == ' ')
 	n++;
@@ -119,6 +128,7 @@ parse_datetime(const char *str, size_t len, int64_t *sp, int64_t *np,
 	if (!n || n != len)
 		return 1;
 
+exit:
 	*sp = ((int64_t)dt_rdn(dt) - 719163) * 86400 + sod - offset * 60;
 	*np = nanosecond;
 	*op = offset;
@@ -172,7 +182,7 @@ static void datetime_test(void)
 	int64_t nanosecs;
 	int64_t ofs;
 
-	plan(330);
+	plan(355);
 	parse_datetime(sample, sizeof(sample) - 1,
 		       &secs_expected, &nanosecs, &ofs);
 
