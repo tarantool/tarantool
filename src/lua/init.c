@@ -51,14 +51,15 @@
 #include "lua/errno.h"
 #include "lua/socket.h"
 #include "lua/utils.h"
-#include "third_party/lua-cjson/lua_cjson.h"
-#include "third_party/lua-yaml/lyaml.h"
+#include <lua-cjson/lua_cjson.h>
+#include <lua-yaml/lyaml.h>
 #include "lua/msgpack.h"
 #include "lua/pickle.h"
 #include "lua/fio.h"
 #include "lua/httpc.h"
 #include "lua/utf8.h"
 #include "digest.h"
+#include "errinj.h"
 #include <small/ibuf.h>
 
 #include <ctype.h>
@@ -69,8 +70,6 @@
  * The single Lua state of the transaction processor (tx) thread.
  */
 struct lua_State *tarantool_L;
-static struct ibuf tarantool_lua_ibuf_body;
-struct ibuf *tarantool_lua_ibuf = &tarantool_lua_ibuf_body;
 /**
  * The fiber running the startup Lua script
  */
@@ -428,7 +427,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	if (L == NULL) {
 		panic("failed to initialize Lua");
 	}
-	ibuf_create(tarantool_lua_ibuf, tarantool_lua_slab_cache(), 16000);
 	luaL_openlibs(L);
 	tarantool_lua_setpaths(L);
 
@@ -554,6 +552,8 @@ run_script_f(va_list ap)
 	 * never really dead. It never returns from its function.
 	 */
 	struct diag *diag = va_arg(ap, struct diag *);
+	bool aux_loop_is_run = false;
+	bool is_option_e_ran = false;
 
 	/*
 	 * Load libraries and execute chunks passed by -l and -e
@@ -584,6 +584,7 @@ run_script_f(va_list ap)
 			if (luaT_call(L, 0, 0) != 0)
 				goto error;
 			lua_settop(L, 0);
+			is_option_e_ran = true;
 			break;
 		default:
 			unreachable(); /* checked by getopt() in main() */
@@ -596,6 +597,22 @@ run_script_f(va_list ap)
 	 * loop and re-schedule this fiber.
 	 */
 	fiber_sleep(0.0);
+	aux_loop_is_run = true;
+
+	/*
+	 * Override return value of isatty(STDIN_FILENO) if
+	 * ERRINJ_STDIN_ISATTY enabled (iparam not set to default).
+	 * Use iparam in such case, standard return value otherwise.
+	 * Integer param of errinj is used in order to set different
+	 * return values.
+	*/
+	int is_a_tty;
+	struct errinj *inj = errinj(ERRINJ_STDIN_ISATTY, ERRINJ_INT);
+	if (inj != NULL && inj->iparam >= 0) {
+		is_a_tty = inj->iparam;
+	} else {
+		is_a_tty = isatty(STDIN_FILENO);
+	}
 
 	if (path && strcmp(path, "-") != 0 && access(path, F_OK) == 0) {
 		/* Execute script. */
@@ -603,19 +620,20 @@ run_script_f(va_list ap)
 			goto luajit_error;
 		if (lua_main(L, argc, argv) != 0)
 			goto error;
-	} else if (!isatty(STDIN_FILENO) || (path && strcmp(path, "-") == 0)) {
+	} else if (!is_a_tty || (path && strcmp(path, "-") == 0)) {
 		/* Execute stdin */
 		if (luaL_loadfile(L, NULL) != 0)
 			goto luajit_error;
 		if (lua_main(L, argc, argv) != 0)
 			goto error;
-	} else {
+	} else if (!is_option_e_ran) {
 		interactive = true;
 	}
 
 	/*
-	 * Start interactive mode when it was explicitly requested
-	 * by "-i" option or stdin is TTY or there are no script.
+	 * Start interactive mode in any of the cases:
+	 * - it was explicitly requested by "-i" option;
+	 * - stdin is TTY and there are no script (-e is considered as a script).
 	 */
 	if (interactive) {
 		say_crit("%s %s\ntype 'help' for interactive help",
@@ -635,6 +653,13 @@ run_script_f(va_list ap)
 	 * return control back to tarantool_lua_run_script.
 	 */
 end:
+	/*
+	 * Auxiliary loop in tarantool_lua_run_script
+	 * should start (ev_run()) before this fiber
+	 * invokes ev_break().
+	 */
+	if (!aux_loop_is_run)
+		fiber_sleep(0.0);
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 

@@ -37,7 +37,7 @@
 #include <msgpuck.h>
 #include <small/ibuf.h>
 #include <small/obuf.h>
-#include "third_party/base64.h"
+#include <base64.h>
 
 #include "version.h"
 #include "fiber.h"
@@ -544,6 +544,7 @@ iproto_msg_new(struct iproto_connection *con)
 			 "connection %s", sio_socketname(con->input.fd));
 		return NULL;
 	}
+	msg->close_connection = false;
 	msg->connection = con;
 	rmean_collect(rmean_net, IPROTO_REQUESTS, 1);
 	return msg;
@@ -1345,13 +1346,14 @@ tx_process_destroy(struct cmsg *m)
 {
 	struct iproto_connection *con =
 		container_of(m, struct iproto_connection, destroy_msg);
+	assert(con->state == IPROTO_CONNECTION_DESTROYED);
 	if (con->session) {
 		session_destroy(con->session);
 		con->session = NULL; /* safety */
 	}
 	/*
-	 * Got to be done in iproto thread since
-	 * that's where the memory is allocated.
+	 * obuf is being destroyed in tx thread cause it is where
+	 * it was allocated.
 	 */
 	obuf_destroy(&con->obuf[0]);
 	obuf_destroy(&con->obuf[1]);
@@ -1902,7 +1904,6 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 	cmsg_init(&msg->base, connect_route);
 	msg->p_ibuf = con->p_ibuf;
 	msg->wpos = con->wpos;
-	msg->close_connection = false;
 	cpipe_push(&tx_pipe, &msg->base);
 	return;
 error_msg:

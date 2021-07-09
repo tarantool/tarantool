@@ -35,11 +35,11 @@
 #define DRIVER_LUA_UDATA_NAME	"httpc"
 
 #include <http_parser.h>
-#include "src/httpc.h"
+#include <httpc.h>
 #include "say.h"
 #include "lua/utils.h"
 #include "lua/httpc.h"
-#include "src/fiber.h"
+#include <fiber.h>
 
 /** Internal util functions
  * {{{

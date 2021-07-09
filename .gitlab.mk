@@ -14,7 +14,7 @@ test_%:
 #
 # How to run:
 #
-# make GITLAB_USER=foo -f .gitlab.mk docker_bootstrap
+# make DOCKER_USER=foo -f .gitlab.mk docker_bootstrap
 #
 # The command will prompt for a password. If two-factor
 # authentication is enabled an access token with 'api' scope
@@ -27,7 +27,7 @@ test_%:
 # Keep in a mind that the resulting image is used to run tests on
 # all branches, so avoid removing packages: only add them.
 
-GITLAB_REGISTRY?=registry.gitlab.com
+DOCKER_REGISTRY?=docker.io
 DOCKER_BUILD=docker build --network=host -f - .
 
 define DEBIAN_STRETCH_DOCKERFILE
@@ -44,27 +44,27 @@ RUN make APT_EXTRA_FLAGS="--allow-releaseinfo-change-version --allow-releaseinfo
 endef
 export DEBIAN_BUSTER_DOCKERFILE
 
-IMAGE_PREFIX:=${GITLAB_REGISTRY}/tarantool/tarantool/testing
-DEBIAN_STRETCH_IMAGE:=${IMAGE_PREFIX}/debian-stretch
-DEBIAN_BUSTER_IMAGE:=${IMAGE_PREFIX}/debian-buster
+IMAGE_PREFIX:=${DOCKER_REGISTRY}/tarantool/testing
+DEBIAN_STRETCH_IMAGE:=${IMAGE_PREFIX}:debian-stretch
+DEBIAN_BUSTER_IMAGE:=${IMAGE_PREFIX}:debian-buster
 
 TRAVIS_CI_MD5SUM:=$(firstword $(shell md5sum .travis.mk))
 
 docker_bootstrap:
 	# Login.
-	docker login -u ${GITLAB_USER} ${GITLAB_REGISTRY}
+	docker login -u ${DOCKER_USER} ${DOCKER_REGISTRY}
 	# Build images.
 	echo "$${DEBIAN_STRETCH_DOCKERFILE}" | ${DOCKER_BUILD} \
-		-t ${DEBIAN_STRETCH_IMAGE}:${TRAVIS_CI_MD5SUM} \
-		-t ${DEBIAN_STRETCH_IMAGE}:latest
+		-t ${DEBIAN_STRETCH_IMAGE}_${TRAVIS_CI_MD5SUM} \
+		-t ${DEBIAN_STRETCH_IMAGE}
 	echo "$${DEBIAN_BUSTER_DOCKERFILE}" | ${DOCKER_BUILD} \
-		-t ${DEBIAN_BUSTER_IMAGE}:${TRAVIS_CI_MD5SUM} \
-		-t ${DEBIAN_BUSTER_IMAGE}:latest
+		-t ${DEBIAN_BUSTER_IMAGE}_${TRAVIS_CI_MD5SUM} \
+		-t ${DEBIAN_BUSTER_IMAGE}
 	# Push images.
-	docker push ${DEBIAN_STRETCH_IMAGE}:${TRAVIS_CI_MD5SUM}
-	docker push ${DEBIAN_BUSTER_IMAGE}:${TRAVIS_CI_MD5SUM}
-	docker push ${DEBIAN_STRETCH_IMAGE}:latest
-	docker push ${DEBIAN_BUSTER_IMAGE}:latest
+	docker push ${DEBIAN_STRETCH_IMAGE}_${TRAVIS_CI_MD5SUM}
+	docker push ${DEBIAN_BUSTER_IMAGE}_${TRAVIS_CI_MD5SUM}
+	docker push ${DEBIAN_STRETCH_IMAGE}
+	docker push ${DEBIAN_BUSTER_IMAGE}
 
 # Clone the benchmarks repository for performance testing
 perf_clone_benchs_repo:
@@ -85,6 +85,16 @@ perf_cleanup: perf_clone_benchs_repo perf_cleanup_image
 # Run tests under a virtual machine
 # #################################
 
+# Transform the ${PRESERVE_ENVVARS} comma separated variables list
+# to the 'key="value" key="value" <...>' string.
+#
+# Add PRESERVE_ENVVARS itself to the list to allow to use this
+# make script again from the inner environment (if there will be
+# a need).
+comma := ,
+ENVVARS := PRESERVE_ENVVARS $(subst $(comma), ,$(PRESERVE_ENVVARS))
+PRESERVE_ENV := $(foreach var,$(ENVVARS),$(var)="$($(var))")
+
 vms_start:
 	VBoxManage controlvm ${VMS_NAME} poweroff || true
 	VBoxManage snapshot ${VMS_NAME} restore ${VMS_NAME}
@@ -93,9 +103,9 @@ vms_start:
 vms_test_%:
 	tar czf - ../tarantool | ssh ${VMS_USER}@127.0.0.1 -p ${VMS_PORT} tar xzf -
 	ssh ${VMS_USER}@127.0.0.1 -p ${VMS_PORT} "/bin/bash -c \
-		'${EXTRA_ENV} \
-		cd tarantool && \
-		${TRAVIS_MAKE} $(subst vms_,,$@)'"
+		'cd tarantool && ${PRESERVE_ENV} ${TRAVIS_MAKE} $(subst vms_,,$@)'" || \
+		( scp -r -P ${VMS_PORT} ${VMS_USER}@127.0.0.1:tarantool/test/var/artifacts . \
+		; exit 1 )
 
 vms_shutdown:
 	VBoxManage controlvm ${VMS_NAME} poweroff
@@ -118,14 +128,19 @@ deploy_prepare:
 package: deploy_prepare
 	PACKPACK_EXTRA_DOCKER_RUN_PARAMS="--network=host ${PACKPACK_EXTRA_DOCKER_RUN_PARAMS}" ./packpack/packpack
 
-deploy: package
+# found that libcreaterepo_c.so installed in local lib path
+deploy: export LD_LIBRARY_PATH=/usr/local/lib
+
+deploy:
 	echo ${GPG_SECRET_KEY} | base64 -d | gpg --batch --import || true
 	./tools/update_repo.sh -o=${OS} -d=${DIST} \
 		-b="${LIVE_REPO_S3_DIR}/${BUCKET}" build
-	if [ "${CI_COMMIT_TAG}" != "" ]; then \
-		./tools/update_repo.sh -o=${OS} -d=${DIST} \
+	case "${GITHUB_REF}" in                                       \
+	refs/tags/*)                                                  \
+		./tools/update_repo.sh -o=${OS} -d=${DIST}            \
 			-b="${RELEASE_REPO_S3_DIR}/${BUCKET}" build ; \
-	fi
+	        ;;                                                    \
+	esac
 
 source: deploy_prepare
 	TARBALL_COMPRESSOR=gz packpack/packpack tarball

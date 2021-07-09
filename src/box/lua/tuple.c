@@ -36,6 +36,7 @@
 #include "diag.h" /* diag_set() */
 #include <small/ibuf.h>
 #include <small/region.h>
+#include "cord_buf.h"
 #include <fiber.h>
 
 #include "box/tuple.h"
@@ -134,10 +135,8 @@ luaT_istuple(struct lua_State *L, int narg)
  * Helper for <lbox_tuple_new>().
  */
 static int
-luaT_tuple_encode_values(struct lua_State *L)
+luaT_tuple_encode_values(struct lua_State *L, struct ibuf *buf)
 {
-	struct ibuf *buf = tarantool_lua_ibuf;
-	ibuf_reset(buf);
 	struct mpstream stream;
 	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb, luamp_error,
 		      L);
@@ -150,21 +149,30 @@ luaT_tuple_encode_values(struct lua_State *L)
 	return 0;
 }
 
-typedef void luaT_mpstream_init_f(struct mpstream *stream, struct lua_State *L);
+typedef void luaT_mpstream_init_f(struct mpstream *stream, struct lua_State *L,
+				  void *buffer);
 
 static void
-luaT_mpstream_init_lua_ibuf(struct mpstream *stream, struct lua_State *L)
+luaT_mpstream_init_lua_ibuf(struct mpstream *stream, struct lua_State *L,
+			    void *buffer)
 {
-	mpstream_init(stream, tarantool_lua_ibuf, ibuf_reserve_cb,
+	mpstream_init(stream, (struct ibuf *)buffer, ibuf_reserve_cb,
 		      ibuf_alloc_cb, luamp_error, L);
 }
 
 static void
-luaT_mpstream_init_box_region(struct mpstream *stream, struct lua_State *L)
+luaT_mpstream_init_box_region(struct mpstream *stream, struct lua_State *L,
+			      void *buffer)
 {
-	mpstream_init(stream, &fiber()->gc, region_reserve_cb, region_alloc_cb,
-		      luamp_error, L);
+	mpstream_init(stream, (struct region *)buffer, region_reserve_cb,
+		      region_alloc_cb, luamp_error, L);
 }
+
+/** Helper to pass parameters into luaT_tuple_encode_table via the Lua stack. */
+struct luaT_tuple_encode_ctx {
+	luaT_mpstream_init_f *mpstream_init_f;
+	void *buffer;
+};
 
 /**
  * Encode a Lua table or a tuple as MsgPack.
@@ -177,8 +185,8 @@ static int
 luaT_tuple_encode_table(struct lua_State *L)
 {
 	struct mpstream stream;
-	luaT_mpstream_init_f *luaT_mpstream_init_f = lua_topointer(L, 1);
-	luaT_mpstream_init_f(&stream, L);
+	const struct luaT_tuple_encode_ctx *ctx = lua_topointer(L, 1);
+	ctx->mpstream_init_f(&stream, L, ctx->buffer);
 	luamp_encode_tuple(L, &tuple_serializer, &stream, 2);
 	mpstream_flush(&stream);
 	return 0;
@@ -189,7 +197,8 @@ luaT_tuple_encode_table(struct lua_State *L)
  */
 static int
 luaT_tuple_encode_on_mpstream(struct lua_State *L, int idx,
-			      luaT_mpstream_init_f *luaT_mpstream_init_f)
+			      luaT_mpstream_init_f *luaT_mpstream_init_f,
+			      void *buffer)
 {
 	assert(idx != 0);
 	if (!lua_istable(L, idx) && !luaT_istuple(L, idx)) {
@@ -212,7 +221,11 @@ luaT_tuple_encode_on_mpstream(struct lua_State *L, int idx,
 	lua_rawgeti(L, LUA_REGISTRYINDEX, luaT_tuple_encode_table_ref);
 	assert(lua_isfunction(L, -1));
 
-	lua_pushlightuserdata(L, luaT_mpstream_init_f);
+	struct luaT_tuple_encode_ctx ctx = {
+		.mpstream_init_f = luaT_mpstream_init_f,
+		.buffer = buffer,
+	};
+	lua_pushlightuserdata(L, &ctx);
 	lua_pushvalue(L, idx);
 
 	int rc = luaT_call(L, 2, 0);
@@ -225,12 +238,11 @@ luaT_tuple_encode_on_mpstream(struct lua_State *L, int idx,
  */
 static char *
 luaT_tuple_encode_on_lua_ibuf(struct lua_State *L, int idx,
-			      size_t *tuple_len_ptr)
+			      size_t *tuple_len_ptr, struct ibuf *buf)
 {
-	struct ibuf *buf = tarantool_lua_ibuf;
-	ibuf_reset(buf);
 	if (luaT_tuple_encode_on_mpstream(L, idx,
-					  luaT_mpstream_init_lua_ibuf) != 0)
+					  luaT_mpstream_init_lua_ibuf,
+					  buf) != 0)
 		return NULL;
 	if (tuple_len_ptr != NULL)
 		*tuple_len_ptr = ibuf_used(buf);
@@ -246,7 +258,8 @@ luaT_tuple_encode(struct lua_State *L, int idx, size_t *tuple_len_ptr)
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	if (luaT_tuple_encode_on_mpstream(L, idx,
-					  luaT_mpstream_init_box_region) != 0) {
+					  luaT_mpstream_init_box_region,
+					  region) != 0) {
 		region_truncate(region, region_svp);
 		return NULL;
 	}
@@ -267,15 +280,18 @@ luaT_tuple_encode(struct lua_State *L, int idx, size_t *tuple_len_ptr)
 box_tuple_t *
 luaT_tuple_new(struct lua_State *L, int idx, box_tuple_format_t *format)
 {
+	struct ibuf *ibuf = cord_ibuf_take();
 	size_t tuple_len;
-	char *tuple_data = luaT_tuple_encode_on_lua_ibuf(L, idx, &tuple_len);
-	if (tuple_data == NULL)
-		return NULL;
-	box_tuple_t *tuple = box_tuple_new(format, tuple_data,
-					   tuple_data + tuple_len);
-	if (tuple == NULL)
-		return NULL;
-	ibuf_reinit(tarantool_lua_ibuf);
+	box_tuple_t *tuple;
+	char *tuple_data = luaT_tuple_encode_on_lua_ibuf(L, idx, &tuple_len,
+							 ibuf);
+	if (tuple_data == NULL) {
+		tuple = NULL;
+	} else {
+		tuple = box_tuple_new(format, tuple_data,
+				      tuple_data + tuple_len);
+	}
+	cord_ibuf_drop(ibuf);
 	return tuple;
 }
 
@@ -294,11 +310,11 @@ lbox_tuple_new(lua_State *L)
 	 */
 	box_tuple_format_t *fmt = box_tuple_format_default();
 	if (argc != 1 || (!lua_istable(L, 1) && !luaT_istuple(L, 1))) {
-		struct ibuf *buf = tarantool_lua_ibuf;
-		luaT_tuple_encode_values(L); /* may raise */
+		struct ibuf *buf = cord_ibuf_take();
+		luaT_tuple_encode_values(L, buf); /* may raise */
 		struct tuple *tuple = box_tuple_new(fmt, buf->buf,
 						    buf->buf + ibuf_used(buf));
-		ibuf_reinit(buf);
+		cord_ibuf_drop(buf);
 		if (tuple == NULL)
 			return luaT_error(L);
 		luaT_pushtuple(L, tuple);
@@ -572,8 +588,7 @@ lbox_tuple_transform(struct lua_State *L)
 		return 1;
 	}
 
-	struct ibuf *buf = tarantool_lua_ibuf;
-	ibuf_reset(buf);
+	struct ibuf *buf = cord_ibuf_take();
 	struct mpstream stream;
 	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb,
 		      luamp_error, L);
@@ -618,12 +633,11 @@ lbox_tuple_transform(struct lua_State *L)
 		new_tuple = tuple_new(box_tuple_format_default(),
 				      new_data, new_data + new_size);
 	region_truncate(region, used);
-
+	cord_ibuf_put(buf);
 	if (new_tuple == NULL)
 		luaT_error(L);
 
 	luaT_pushtuple(L, new_tuple);
-	ibuf_reset(buf);
 	return 1;
 }
 

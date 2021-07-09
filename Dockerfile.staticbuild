@@ -23,7 +23,7 @@ RUN set -x \
     && yum -y install \
         perl \
         gcc-c++ \
-        cmake \
+        cmake3 \
         lz4-devel \
         binutils-devel \
         lua-devel \
@@ -36,7 +36,7 @@ RUN set -x \
 
 RUN yum -y install ncurses-static readline-static zlib-static pcre-static glibc-static
 
-RUN yum -y install python-devel python-pip
+RUN yum -y install python3-devel python3-pip
 
 RUN set -x && \
     cd / && \
@@ -52,7 +52,7 @@ RUN set -x && \
     tar -xvf icu4c-62_1-src.tgz && \
     cd icu/source && \
     ./configure --with-data-packaging=static --enable-static --enable-shared && \
-    make -j && make install
+    make -j $(nproc) && make install
 
 RUN set -x && \
     cd / && \
@@ -77,10 +77,10 @@ RUN set -x && \
     find . -name 'CMakeCache.txt' -type f -delete && \
     rm -rf build test/small test/luajit-tap
 
-RUN pip install -r /tarantool/test-run/requirements.txt
+RUN pip3 install -r /tarantool/test-run/requirements.txt
 
 RUN set -x && \
-    cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    cmake3 -DCMAKE_BUILD_TYPE=RelWithDebInfo \
          -DENABLE_DIST:BOOL=ON \
          -DBUILD_STATIC=ON \
          -DOPENSSL_USE_STATIC_LIBS=ON \
@@ -92,7 +92,7 @@ ARG RUN_TESTS
 RUN if [ -n "${RUN_TESTS}" ]; then \
         set -x && \
         cd test && \
-        /usr/bin/python test-run.py --force; \
+        ./test-run.py --force; \
     fi
 
 ENTRYPOINT ["/bin/bash"]

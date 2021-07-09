@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import tarantool
 from lib.tarantool_server import TarantoolServer
@@ -7,26 +9,26 @@ import yaml
 REPEAT = 20
 ID_BEGIN = 0
 ID_STEP = 5
-LOGIN = 'test'
-PASSWORD = 'pass123456'
+LOGIN = "test"
+PASSWORD = "pass123456"
 
-engines = ['memtx', 'vinyl']
+engines = ["memtx", "vinyl"]
 
 def insert_tuples(_server, begin, end, msg = "tuple"):
     for engine in engines:
         for i in range(begin, end):
-            print 'box.space.%s:insert{%d, "%s %d"}' % (engine, i, msg, i)
-            print '-'
+            print("box.space.{}:insert{{{}, \"{} {}\"}}".format(engine, i, msg, i))
+            print("-")
             space = _server.iproto.py_con.space(engine)
-            print space.insert((i, '%s %d' % (msg, i)))
+            print(space.insert((i, "{} {}".format(msg, i))))
 
 def select_tuples(_server, begin, end):
     for engine in engines:
         for i in range(begin, end):
-            print 'box.space.%s:select{%d}' % (engine, i)
-            print '-'
+            print("box.space.{}:select{{{}}}".format(engine, i))
+            print("-")
             space = _server.iproto.py_con.space(engine)
-            print space.select(i)
+            print(space.select(i))
 
 # master server
 master = server
@@ -34,39 +36,32 @@ master = server
 master.stop()
 master.cleanup()
 master.deploy()
-master.admin("box.schema.user.create('%s', { password = '%s'})" % (LOGIN, PASSWORD))
-master.admin("box.schema.user.grant('%s', 'read,write,execute', 'universe')" % LOGIN)
+master.admin("box.schema.user.create('{}', {{ password = '{}'}})".format(LOGIN, PASSWORD))
+master.admin("box.schema.user.grant('{}', 'read,write,execute', 'universe')".format(LOGIN))
 master.iproto.py_con.authenticate(LOGIN, PASSWORD)
-master.uri = '%s:%s@%s' % (LOGIN, PASSWORD, master.iproto.uri)
-os.putenv('MASTER', master.uri)
+master.uri = "{}:{}@{}".format(LOGIN, PASSWORD, master.iproto.uri)
+os.putenv("MASTER", master.uri)
 
 # replica server
 replica = TarantoolServer()
 replica.script = "replication-py/replica.lua"
-replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
+replica.vardir = server.vardir
 replica.deploy()
 replica.admin("while box.info.id == 0 do require('fiber').sleep(0.01) end")
-replica.uri = '%s:%s@%s' % (LOGIN, PASSWORD, replica.iproto.uri)
+replica.uri = "{}:{}@{}".format(LOGIN, PASSWORD, replica.iproto.uri)
 replica.admin("while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end")
 replica.iproto.py_con.authenticate(LOGIN, PASSWORD)
 
 for engine in engines:
-    master.admin("s = box.schema.space.create('%s', { engine = '%s'})" % (engine, engine))
+    master.admin("s = box.schema.space.create('{}', {{ engine = '{}'}})".format(engine, engine))
     master.admin("index = s:create_index('primary', {type = 'tree'})")
 
-### gh-343: replica.cc must not add login and password to proc title
-#status = replica.get_param("status")
-#host_port = "%s:%s" % master.iproto.uri
-#m = re.search(r'replica/(.*)/.*', status)
-#if not m or m.group(1) != host_port:
-#    print 'invalid box.info.status', status, 'expected host:port', host_port
-
-master_id = master.get_param('id')
-replica_id = replica.get_param('id')
+master_id = master.get_param("id")
+replica_id = replica.get_param("id")
 
 id = ID_BEGIN
 for i in range(REPEAT):
-    print "test %d iteration" % i
+    print("test {} iteration".format(i))
 
     # insert to master
     insert_tuples(master, id, id + ID_STEP)
@@ -82,7 +77,7 @@ for i in range(REPEAT):
     select_tuples(replica, id, id + ID_STEP)
     id += ID_STEP
 
-    print "swap servers"
+    print("swap servers")
     # reconfigure replica to master
     replica.rpl_master = None
     print("switch replica to master")
@@ -90,7 +85,7 @@ for i in range(REPEAT):
     # reconfigure master to replica
     master.rpl_master = replica
     print("switch master to replica")
-    master.admin("box.cfg{replication='%s'}" % replica.uri, silent=True)
+    master.admin("box.cfg{{replication='{}'}}".format(replica.uri), silent=True)
 
     # insert to replica
     insert_tuples(replica, id, id + ID_STEP)
@@ -106,7 +101,7 @@ for i in range(REPEAT):
     select_tuples(master, id, id + ID_STEP)
     id += ID_STEP
 
-    print "rollback servers configuration"
+    print("rollback servers configuration")
     # reconfigure replica to master
     master.rpl_master = None
     print("switch master to master")
@@ -114,7 +109,7 @@ for i in range(REPEAT):
     # reconfigure master to replica
     replica.rpl_master = master
     print("switch replica to replica")
-    replica.admin("box.cfg{replication='%s'}" % master.uri, silent=True)
+    replica.admin("box.cfg{{replication='{}'}}".format(master.uri), silent=True)
 
 
 # Cleanup.

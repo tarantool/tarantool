@@ -5,10 +5,26 @@
 %bcond_with systemd
 %endif
 
-BuildRequires: cmake >= 2.8
+# XXX: There is an old CMake (2.8.12) provided by cmake package in
+# main CentOS 7 repositories. At the same time, there is a newer
+# package cmake3 providing CMake 3+ from EPEL repository. So, one
+# need to use cmake3 package to build Tarantool on old systems.
+%define use_cmake3 0%{?rhel} == 7
+
+%if %use_cmake3
+# XXX: Unfortunately there is no way to make rpmbuild install and
+# enable EPEL repository prior to the build step. However, the
+# requirement below obligues user to enable EPEL by himself,
+# otherwise this dependency is left unmet. If there are any issues
+# with building an RPM package on RHEL/CentOS 7 read the docs:
+# https://www.tarantool.io/en/doc/latest/dev_guide/building_from_source/
+BuildRequires: cmake3 >= 3.2
+%else
+BuildRequires: cmake >= 3.2
+%endif
+
 BuildRequires: make
 %if (0%{?fedora} >= 22 || 0%{?rhel} >= 7 || 0%{?sle_version} >= 1500)
-# RHEL 6 requires devtoolset
 BuildRequires: gcc >= 4.5
 BuildRequires: gcc-c++ >= 4.5
 %endif
@@ -76,21 +92,17 @@ BuildRequires: libunwind-devel
 %endif
 
 # Set dependences for tests.
-# Do not install unused Python 3 packages which
-# is default since Fedora 31 and CentOS 8.
-%if (0%{?fedora} >= 31 || 0%{?rhel} >= 8)
-BuildRequires: python2 >= 2.7
-BuildRequires: python2-six >= 1.9.0
-BuildRequires: python2-gevent >= 1.0
-BuildRequires: python2-yaml >= 3.0.9
+BuildRequires: python3
+BuildRequires: python3-six
+BuildRequires: python3-gevent
+%if (0%{?sle_version} >= 1500)
+BuildRequires: python3-PyYAML
 %else
-%if (0%{?rhel} != 6 || 0%{?sle_version} >= 1500)
-BuildRequires: python >= 2.7
-BuildRequires: python-six >= 1.9.0
-BuildRequires: python-gevent >= 1.0
-BuildRequires: python-yaml >= 3.0.9
+BuildRequires: python3-pyyaml
 %endif
-%endif
+
+# Install prove to run LuaJIT tests.
+BuildRequires: perl-Test-Harness
 
 Name: tarantool
 # ${major}.${major}.${minor}.${patch}, e.g. 1.6.8.175
@@ -115,7 +127,7 @@ Requires: openssl
 # RHEL <= 7 doesn't support Recommends:
 Recommends: tarantool-devel
 Recommends: git-core
-Recommends: cmake >= 2.8
+Recommends: cmake >= 3.2
 Recommends: make
 Recommends: gcc >= 4.5
 Recommends: gcc-c++ >= 4.5
@@ -147,7 +159,22 @@ C and Lua/C modules.
 
 %build
 # RHBZ #1301720: SYSCONFDIR an LOCALSTATEDIR must be specified explicitly
-%cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+# Must specified explicitly since Fedora 33:
+# 1. -B .
+#    because for now binary path by default value like:
+#      '-B x86_64-redhat-linux-gnu'
+# 2. -DENABLE_LTO=ON
+#    because for now LTO flags are set in CC/LD flags by default:
+#      '-flto=auto -ffat-lto-objects'
+# XXX: KISS, please. I can play with RPM macros to redefine cmake
+# macro for cmake3 usage, but it totally doesn't worth it.
+%if %use_cmake3
+%cmake3 \
+%else
+%cmake \
+%endif
+       -B . \
+         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
          -DCMAKE_INSTALL_LOCALSTATEDIR:PATH=%{_localstatedir} \
          -DCMAKE_INSTALL_SYSCONFDIR:PATH=%{_sysconfdir} \
 %if %{with backtrace}
@@ -160,6 +187,9 @@ C and Lua/C modules.
          -DSYSTEMD_UNIT_DIR:PATH=%{_unitdir} \
          -DSYSTEMD_TMPFILES_DIR:PATH=%{_tmpfilesdir} \
 %endif
+%if 0%{?fedora} >= 33
+         -DENABLE_LTO=ON \
+%endif
          -DENABLE_WERROR:BOOL=ON \
          -DENABLE_DIST:BOOL=ON
 make %{?_smp_mflags}
@@ -170,29 +200,12 @@ make %{?_smp_mflags}
 rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
 
 %check
-%if "%{_ci}" == "travis"
-%if (0%{?fedora} >= 22 || 0%{?rhel} >= 7 || 0%{?sle_version} >= 1500)
-cd test && ./test-run.py --force -j 1 unit/ app/ app-tap/ box/ box-tap/ engine/ vinyl/
-%endif
-%else
-%if 0%{?rhel} != 6
-# Run all available test suites except 'replication'
-# which is not currently ready for this testing and
-# has standalone issue for it's enabling:
-# https://github.com/tarantool/tarantool/issues/4798
-TEST_RUN_EXCLUDE='replication/' make test-force
-%endif
-%endif
+make test-force
 
 %pre
 /usr/sbin/groupadd -r tarantool > /dev/null 2>&1 || :
-%if 0%{?rhel} < 6
-/usr/sbin/useradd -M -g tarantool -r -d /var/lib/tarantool -s /sbin/nologin\
+/usr/sbin/useradd -M %{?rhel:-N} -g tarantool -r -d /var/lib/tarantool -s /sbin/nologin\
     -c "Tarantool Server" tarantool > /dev/null 2>&1 || :
-%else
-/usr/sbin/useradd -M -N -g tarantool -r -d /var/lib/tarantool -s /sbin/nologin\
-    -c "Tarantool Server" tarantool > /dev/null 2>&1 || :
-%endif
 
 %post
 %if %{with systemd}
@@ -257,6 +270,7 @@ fi
 %{_includedir}/tarantool/luajit.h
 %{_includedir}/tarantool/lualib.h
 %{_includedir}/tarantool/module.h
+%{_includedir}/tarantool/curl
 
 %changelog
 * Tue Sep 12 2017 Roman Tsisyk <roman@tarantool.org> 1.7.5.46-1

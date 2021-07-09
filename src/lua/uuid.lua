@@ -1,6 +1,7 @@
 -- uuid.lua (internal file)
 
 local ffi = require("ffi")
+local buffer = require('buffer')
 local builtin = ffi.C
 
 ffi.cdef[[
@@ -25,21 +26,30 @@ bool
 tt_uuid_is_nil(const struct tt_uuid *uu);
 bool
 tt_uuid_is_equal(const struct tt_uuid *lhs, const struct tt_uuid *rhs);
-char *
-tt_uuid_str(const struct tt_uuid *uu);
 extern const struct tt_uuid uuid_nil;
 ]]
 
 local uuid_t = ffi.typeof('struct tt_uuid')
 local UUID_STR_LEN = 36
 local UUID_LEN = ffi.sizeof(uuid_t)
-local uuidbuf = ffi.new(uuid_t)
+local uuid_stash = buffer.ffi_stash_new(uuid_t)
+local uuid_stash_take = uuid_stash.take
+local uuid_stash_put = uuid_stash.put
+
+local uuid_str_stash =
+    buffer.ffi_stash_new(string.format('char[%s]', UUID_STR_LEN + 1))
+local uuid_str_stash_take = uuid_str_stash.take
+local uuid_str_stash_put = uuid_str_stash.put
 
 local uuid_tostring = function(uu)
     if not ffi.istype(uuid_t, uu) then
         return error('Usage: uuid:str()')
     end
-    return ffi.string(builtin.tt_uuid_str(uu), UUID_STR_LEN)
+    local strbuf = uuid_str_stash_take()
+    builtin.tt_uuid_to_string(uu, strbuf)
+    uu = ffi.string(strbuf, UUID_STR_LEN)
+    uuid_str_stash_put(strbuf)
+    return uu
 end
 
 local uuid_fromstr = function(str)
@@ -69,11 +79,12 @@ local uuid_tobin = function(uu, byteorder)
         return error('Usage: uuid:bin([byteorder])')
     end
     if need_bswap(byteorder) then
-        if uu ~= uuidbuf then
-            ffi.copy(uuidbuf, uu, UUID_LEN)
-        end
+        local uuidbuf = uuid_stash_take()
+        ffi.copy(uuidbuf, uu, UUID_LEN)
         builtin.tt_uuid_bswap(uuidbuf)
-        return ffi.string(ffi.cast('char *', uuidbuf), UUID_LEN)
+        uu = ffi.string(ffi.cast('char *', uuidbuf), UUID_LEN)
+        uuid_stash_put(uuidbuf)
+        return uu
     end
     return ffi.string(ffi.cast('char *', uu), UUID_LEN)
 end
@@ -114,12 +125,18 @@ local uuid_new = function()
 end
 
 local uuid_new_bin = function(byteorder)
+    local uuidbuf = uuid_stash_take()
     builtin.tt_uuid_create(uuidbuf)
-    return uuid_tobin(uuidbuf, byteorder)
+    local res = uuid_tobin(uuidbuf, byteorder)
+    uuid_stash_put(uuidbuf)
+    return res
 end
 local uuid_new_str = function()
+    local uuidbuf = uuid_stash_take()
     builtin.tt_uuid_create(uuidbuf)
-    return uuid_tostring(uuidbuf)
+    local res = uuid_tostring(uuidbuf)
+    uuid_stash_put(uuidbuf)
+    return res
 end
 
 local uuid_mt = {

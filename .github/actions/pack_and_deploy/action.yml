@@ -1,0 +1,44 @@
+name: 'Pack and Deploy'
+description: 'Pack and deploy the package'
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        # Our testing expects that the init process (PID 1) will
+        # reap orphan processes. At least the following test leans
+        # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
+        echo PACKPACK_EXTRA_DOCKER_RUN_PARAMS='--init' | tee -a $GITHUB_ENV
+        # create packages
+        make -f .gitlab.mk package
+        # deploy packages
+        if ${{ github.event_name == 'push' &&
+          ( github.ref == 'refs/heads/master' ||
+            github.ref == 'refs/heads/1.10' ||
+            startsWith(github.ref, 'refs/heads/2.') ||
+            startsWith(github.ref, 'refs/tags') ) }} ; then
+          sudo apt-get -y update
+          sudo apt-get install -y procmail awscli reprepro
+          # For RPM packages need to build 'createrepo_c' tool from
+          # sources till Github Actions will use ubuntu-21.04 where
+          # it be avaliable as DEB package for installation.
+          if [ ${OS} == 'el' -o ${OS} == 'fedora' -o ${OS} == 'opensuse-leap' ] ; then
+            git clone https://github.com/rpm-software-management/createrepo_c.git
+            cd createrepo_c/
+            # let's use the latest checked version
+            git checkout 0.17.1
+            mkdir build
+            cd build
+            sudo apt install -y libbz2-dev cmake libmagic-dev \
+              libglib2.0-dev libcurl4-openssl-dev libxml2-dev \
+              libpython3-dev librpm-dev libssl-dev libsqlite3-dev \
+              liblzma-dev zlib1g-dev libzstd-dev doxygen
+            cmake .. -DWITH_ZCHUNK=OFF -DWITH_LIBMODULEMD=OFF
+            make -j $(nproc)
+            sudo make install
+            cd ../..
+          fi
+          mkdir -p ~/.gnupg
+          echo 'digest-algo sha256' >> ~/.gnupg/gpg.conf
+          make -f .gitlab.mk deploy
+        fi
+      shell: bash

@@ -44,7 +44,6 @@ tnt_iconv
 exception_get_string
 exception_get_int
 
-tarantool_lua_ibuf
 uuid_nil
 tt_uuid_create
 tt_uuid_str
@@ -52,6 +51,7 @@ tt_uuid_is_equal
 tt_uuid_is_nil
 tt_uuid_bswap
 tt_uuid_from_string
+tt_uuid_to_string
 log_level
 log_format
 uri_parse
@@ -111,6 +111,9 @@ fiber_cond_signal
 fiber_cond_broadcast
 fiber_cond_wait_timeout
 fiber_cond_wait
+cord_ibuf_drop
+cord_ibuf_put
+cord_ibuf_take
 cord_slab_cache
 coio_wait
 coio_close

@@ -10,6 +10,8 @@ local uint16_ptr_t = ffi.typeof('uint16_t *')
 local uint32_ptr_t = ffi.typeof('uint32_t *')
 local uint64_ptr_t = ffi.typeof('uint64_t *')
 local char_ptr_t = ffi.typeof('char *')
+local cord_ibuf_take = buffer.internal.cord_ibuf_take
+local cord_ibuf_drop = buffer.internal.cord_ibuf_drop
 
 ffi.cdef([[
 char *
@@ -28,11 +30,6 @@ union tmpint {
 ]])
 
 local strict_alignment = (jit.arch == 'arm')
-
-local tmpint
-if strict_alignment then
-   tmpint = ffi.new('union tmpint[1]')
-end
 
 local function bswap_u16(num)
     return bit.rshift(bit.bswap(tonumber(num)), 16)
@@ -69,7 +66,7 @@ end
 local encode_u16
 if strict_alignment then
     encode_u16 = function(buf, code, num)
-        tmpint[0].u16 = bswap_u16(num)
+        local tmpint = ffi.new('uint16_t[1]', bswap_u16(num))
         local p = buf:alloc(3)
         p[0] = code
         ffi.copy(p + 1, tmpint, 2)
@@ -85,8 +82,9 @@ end
 local encode_u32
 if strict_alignment then
     encode_u32 = function(buf, code, num)
-        tmpint[0].u32 =
-            ffi.cast('uint32_t', bit.bswap(tonumber(num)))
+        local tmpint =
+            ffi.new('uint32_t[1]', ffi.cast('uint32_t',
+                                            bit.bswap(tonumber(num))))
         local p = buf:alloc(5)
         p[0] = code
         ffi.copy(p + 1, tmpint, 4)
@@ -103,7 +101,8 @@ end
 local encode_u64
 if strict_alignment then
     encode_u64 = function(buf, code, num)
-        tmpint[0].u64 = bit.bswap(ffi.cast('uint64_t', num))
+        local tmpint =
+            ffi.new('uint64_t[1]', bit.bswap(ffi.cast('uint64_t', num)))
         local p = buf:alloc(9)
         p[0] = code
         ffi.copy(p + 1, tmpint, 8)
@@ -280,11 +279,10 @@ local function encode_r(buf, obj, level)
 end
 
 local function encode(obj)
-    local tmpbuf = buffer.IBUF_SHARED
-    tmpbuf:reset()
+    local tmpbuf = cord_ibuf_take()
     encode_r(tmpbuf, obj, 0)
     local r = ffi.string(tmpbuf.rpos, tmpbuf:size())
-    tmpbuf:recycle()
+    cord_ibuf_drop(tmpbuf)
     return r
 end
 
@@ -327,9 +325,10 @@ end
 local decode_u16
 if strict_alignment then
     decode_u16 = function(data)
+        local tmpint = ffi.new('uint16_t[1]')
         ffi.copy(tmpint, data[0], 2)
         data[0] = data[0] + 2
-        return tonumber(bswap_u16(tmpint[0].u16))
+        return tonumber(bswap_u16(tmpint[0]))
     end
 else
     decode_u16 = function(data)
@@ -342,10 +341,11 @@ end
 local decode_u32
 if strict_alignment then
     decode_u32 = function(data)
+        local tmpint = ffi.new('uint32_t[1]')
         ffi.copy(tmpint, data[0], 4)
         data[0] = data[0] + 4
         return tonumber(
-            ffi.cast('uint32_t', bit.bswap(tonumber(tmpint[0].u32))))
+            ffi.cast('uint32_t', bit.bswap(tonumber(tmpint[0]))))
     end
 else
     decode_u32 = function(data)
@@ -359,9 +359,10 @@ end
 local decode_u64
 if strict_alignment then
     decode_u64 = function(data)
+        local tmpint = ffi.new('uint64_t[1]')
         ffi.copy(tmpint, data[0], 8);
         data[0] = data[0] + 8
-        local num = bit.bswap(tmpint[0].u64)
+        local num = bit.bswap(tmpint[0])
         if num <= DBL_INT_MAX then
             return tonumber(num) -- return as 'number'
         end
@@ -388,8 +389,9 @@ end
 local decode_i16
 if strict_alignment then
     decode_i16 = function(data)
+        local tmpint = ffi.new('uint16_t[1]')
         ffi.copy(tmpint, data[0], 2)
-        local num = bswap_u16(tmpint[0].u16)
+        local num = bswap_u16(tmpint[0])
         data[0] = data[0] + 2
         -- note: this double cast is actually necessary
         return tonumber(ffi.cast('int16_t', ffi.cast('uint16_t', num)))
@@ -406,8 +408,9 @@ end
 local decode_i32
 if strict_alignment then
     decode_i32 = function(data)
+        local tmpint = ffi.new('uint32_t[1]')
         ffi.copy(tmpint, data[0], 4)
-        local num = bit.bswap(tonumber(tmpint[0].u32))
+        local num = bit.bswap(tonumber(tmpint[0]))
         data[0] = data[0] + 4
         return num
     end
@@ -422,9 +425,10 @@ end
 local decode_i64
 if strict_alignment then
     decode_i64 = function(data)
+        local tmpint = ffi.new('int64_t[1]')
         ffi.copy(tmpint, data[0], 8)
         data[0] = data[0] + 8
-        local num = bit.bswap(ffi.cast('int64_t', tmpint[0].u64))
+        local num = bit.bswap(tmpint[0])
         if num >= -DBL_INT_MAX and num <= DBL_INT_MAX then
             return tonumber(num) -- return as 'number'
         end
@@ -549,13 +553,11 @@ decode_r = function(data)
 end
 
 ---
--- A temporary const char ** buffer.
 -- All decode_XXX functions accept const char **data as its first argument,
 -- like libmsgpuck does. After decoding data[0] position is changed to the next
 -- element. It is significally faster on LuaJIT to use double pointer than
 -- return result, newpos.
 --
-local bufp = ffi.new('const unsigned char *[1]');
 
 local function check_offset(offset, len)
     if offset == nil then
@@ -575,13 +577,13 @@ local function decode_unchecked(str, offset)
     if type(str) == "string" then
         offset = check_offset(offset, #str)
         local buf = ffi.cast(char_ptr_t, str)
-        bufp[0] = buf + offset - 1
+        local bufp = ffi.new('const unsigned char *[1]', buf + offset - 1)
         local r = decode_r(bufp)
         return r, bufp[0] - buf + 1
     elseif ffi.istype(char_ptr_t, str) then
         -- Note: ffi.istype() ignores the const qualifier, so both
         -- (char *) and (const char *) buffers are valid.
-        bufp[0] = str
+        local bufp = ffi.new('const unsigned char *[1]', str)
         local r = decode_r(bufp)
         return r, ffi.cast(ffi.typeof(str), bufp[0])
     else

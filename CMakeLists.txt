@@ -63,6 +63,9 @@ include(cmake/pod2man.cmake)
 include(cmake/arch.cmake)
 include(cmake/os.cmake)
 include(cmake/compiler.cmake)
+# NO_POLICY_SCOPE is to suppress CMP0069 warnings on the unset
+# policy.
+include(cmake/lto.cmake NO_POLICY_SCOPE)
 include(cmake/simd.cmake)
 include(cmake/atomic.cmake)
 include(cmake/profile.cmake)
@@ -203,9 +206,9 @@ find_package_message(TARANTOOL_VERSION
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src/lib)
-include_directories(${PROJECT_SOURCE_DIR}/src/lib/small)
+include_directories(${PROJECT_SOURCE_DIR}/src/lib/small/include)
 include_directories(${PROJECT_SOURCE_DIR}/src/lib/small/third_party)
-include_directories(${PROJECT_SOURCE_DIR})
+include_directories(${PROJECT_SOURCE_DIR}/third_party)
 
 #
 # Specify Tarantool modules prefixes
@@ -346,6 +349,23 @@ else()
     set(CURL_FIND_REQUIRED ON)
     find_package(CURL)
 endif()
+
+# Install headers.
+if (ENABLE_BUNDLED_LIBCURL)
+    install(DIRECTORY "${CURL_INCLUDE_DIRS}/curl"
+            DESTINATION ${MODULE_FULL_INCLUDEDIR}
+            FILES_MATCHING PATTERN "*.h")
+endif()
+
+#
+# Export libcurl symbols if the library is linked statically.
+#
+if (ENABLE_BUNDLED_LIBCURL)
+    set(EXPORT_LIBCURL_SYMBOLS ON)
+else()
+    set(EXPORT_LIBCURL_SYMBOLS OFF)
+endif()
+message(STATUS "EXPORT_LIBCURL_SYMBOLS: ${EXPORT_LIBCURL_SYMBOLS}")
 
 #
 # ReadLine

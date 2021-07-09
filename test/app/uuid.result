@@ -106,7 +106,7 @@ uu.node[5]
 -- invalid values
 uuid.fromstr(nil)
 ---
-- error: 'builtin/uuid.lua:47: fromstr(str)'
+- error: 'builtin/uuid.lua:57: fromstr(str)'
 ...
 uuid.fromstr('')
 ---

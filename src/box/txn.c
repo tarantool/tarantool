@@ -351,11 +351,15 @@ txn_commit(struct txn *txn)
 	 * may throw. In case an error has happened, there is
 	 * no other option but terminate.
 	 */
-	if (txn->has_triggers &&
-	    trigger_run(&txn->on_commit, txn) != 0) {
-		diag_log();
-		unreachable();
-		panic("commit trigger failed");
+	if (txn->has_triggers) {
+		if (trigger_run(&txn->on_commit, txn) != 0) {
+			diag_log();
+			panic("commit trigger failed");
+		}
+		/* Can't commit more than once. */
+		trigger_destroy(&txn->on_commit);
+		/* Rollback won't happen after commit. */
+		trigger_destroy(&txn->on_rollback);
 	}
 	/*
 	 * Engine can be NULL if transaction contains IPROTO_NOP
@@ -397,11 +401,15 @@ txn_rollback()
 	if (txn == NULL)
 		return;
 	/* Rollback triggers must not throw. */
-	if (txn->has_triggers &&
-	    trigger_run(&txn->on_rollback, txn) != 0) {
-		diag_log();
-		unreachable();
-		panic("rollback trigger failed");
+	if (txn->has_triggers) {
+		if (trigger_run(&txn->on_rollback, txn) != 0) {
+			diag_log();
+			panic("rollback trigger failed");
+		}
+		/* Can't rollback more than once. */
+		trigger_destroy(&txn->on_rollback);
+		/* Commit won't happen after rollback. */
+		trigger_destroy(&txn->on_commit);
 	}
 	if (txn->engine)
 		engine_rollback(txn->engine, txn);

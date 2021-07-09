@@ -1,6 +1,9 @@
 test_run = require('test_run').new()
 fiber = require('fiber')
 
+test_run:cmd("push filter 'Invalid VYLOG file: Slice [0-9]+ deleted but not registered'" .. \
+             " to 'Invalid VYLOG file: Slice <NUM> deleted but not registered'")
+
 --
 -- gh-2784: do not validate space formatted but not indexed fields
 -- in surrogate statements.

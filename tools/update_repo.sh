@@ -24,13 +24,13 @@ function get_os_dists {
     alldists=
 
     if [ "$os" == "ubuntu" ]; then
-        alldists='trusty xenial bionic disco eoan focal'
+        alldists='trusty xenial bionic disco eoan focal groovy hirsute'
     elif [ "$os" == "debian" ]; then
-        alldists='jessie stretch buster'
+        alldists='jessie stretch buster bullseye'
     elif [ "$os" == "el" ]; then
         alldists='6 7 8'
     elif [ "$os" == "fedora" ]; then
-        alldists='27 28 29 30 31'
+        alldists='27 28 29 30 31 32 33'
     elif [ "$os" == "opensuse-leap" ]; then
         alldists='15.0 15.1 15.2'
     fi
@@ -618,7 +618,7 @@ EOF
 # The 'pack_rpm' function especialy created for RPM packages. It works
 # with RPM packing OS like CentOS, Fedora. It is based on globally known
 # tool 'createrepo' from:
-#   https://linux.die.net/man/8/createrepo
+#   https://github.com/rpm-software-management/createrepo_c.git
 # This tool works with single distribution of the given OS.
 #
 # The RPM packages structure must pass the documented instructions at
@@ -657,7 +657,7 @@ function pack_rpm {
     done
 
     # create the new repository metadata files
-    createrepo --no-database --update --workers=2 \
+    createrepo_c --no-database --update --workers=2 \
         --compress-type=gz --simple-md-filenames .
 
     updated_rpms=0
@@ -895,6 +895,8 @@ function remove_rpm {
             # '1' is $(RELEASE) RPM spec directive value and the second
             # '1' is the number of rebuilds.
             os_dist="lp$(echo $option_dist | sed 's#\.##g').1.1"
+        elif [ "$os" == "fedora" ]; then
+            os_dist="1.fc${option_dist}"
         else
             os_dist="1.${os}${option_dist}"
         fi

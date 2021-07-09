@@ -27,4 +27,4 @@
  * SUCH DAMAGE.
  */
 #include "tarantool_eio.h"
-#include "third_party/libeio/eio.c"
+#include <libeio/eio.c>

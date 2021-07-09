@@ -1,6 +1,7 @@
 -- schema.lua (internal file)
 --
 local ffi = require('ffi')
+local buffer = require('buffer')
 local msgpack = require('msgpack')
 local msgpackffi = require('msgpackffi')
 local fun = require('fun')
@@ -20,6 +21,8 @@ local tuple_encode = box.tuple.encode
 local tuple_bless = box.tuple.bless
 local is_tuple = box.tuple.is
 assert(tuple_encode ~= nil and tuple_bless ~= nil and is_tuple ~= nil)
+local cord_ibuf_take = buffer.internal.cord_ibuf_take
+local cord_ibuf_put = buffer.internal.cord_ibuf_put
 
 local INT64_MIN = tonumber64('-9223372036854775808')
 local INT64_MAX = tonumber64('9223372036854775807')
@@ -1145,9 +1148,12 @@ base_index_mt.__len = base_index_mt.len
 -- min and max
 base_index_mt.min_ffi = function(index, key)
     check_index_arg(index, 'min')
-    local pkey, pkey_end = tuple_encode(key)
-    if builtin.box_index_min(index.space_id, index.id,
-                             pkey, pkey_end, ptuple) ~= 0 then
+    local ibuf = cord_ibuf_take()
+    local pkey, pkey_end = tuple_encode(ibuf, key)
+    local nok = builtin.box_index_min(index.space_id, index.id, pkey, pkey_end,
+                                      ptuple) ~= 0
+    cord_ibuf_put(ibuf)
+    if nok then
         box.error() -- error
     elseif ptuple[0] ~= nil then
         return tuple_bless(ptuple[0])
@@ -1162,9 +1168,12 @@ base_index_mt.min_luac = function(index, key)
 end
 base_index_mt.max_ffi = function(index, key)
     check_index_arg(index, 'max')
-    local pkey, pkey_end = tuple_encode(key)
-    if builtin.box_index_max(index.space_id, index.id,
-                             pkey, pkey_end, ptuple) ~= 0 then
+    local ibuf = cord_ibuf_take()
+    local pkey, pkey_end = tuple_encode(ibuf, key)
+    local nok = builtin.box_index_max(index.space_id, index.id, pkey, pkey_end,
+                                      ptuple) ~= 0
+    cord_ibuf_put(ibuf)
+    if nok then
         box.error() -- error
     elseif ptuple[0] ~= nil then
         return tuple_bless(ptuple[0])
@@ -1197,10 +1206,12 @@ end
 -- iteration
 base_index_mt.pairs_ffi = function(index, key, opts)
     check_index_arg(index, 'pairs')
-    local pkey, pkey_end = tuple_encode(key)
+    local ibuf = cord_ibuf_take()
+    local pkey, pkey_end = tuple_encode(ibuf, key)
     local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
 
     local keybuf = ffi.string(pkey, pkey_end - pkey)
+    cord_ibuf_put(ibuf)
     local pkeybuf = ffi.cast('const char *', keybuf)
     local cdata = builtin.box_index_iterator(index.space_id, index.id,
         itype, pkeybuf, pkeybuf + #keybuf);
@@ -1224,10 +1235,12 @@ end
 -- index subtree size
 base_index_mt.count_ffi = function(index, key, opts)
     check_index_arg(index, 'count')
-    local pkey, pkey_end = tuple_encode(key)
+    local ibuf = cord_ibuf_take()
+    local pkey, pkey_end = tuple_encode(ibuf, key)
     local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
     local count = builtin.box_index_count(index.space_id, index.id,
         itype, pkey, pkey_end);
+    cord_ibuf_put(ibuf)
     if count == -1 then
         box.error()
     end
@@ -1242,9 +1255,12 @@ end
 
 base_index_mt.get_ffi = function(index, key)
     check_index_arg(index, 'get')
-    local key, key_end = tuple_encode(key)
-    if builtin.box_index_get(index.space_id, index.id,
-                             key, key_end, ptuple) ~= 0 then
+    local ibuf = cord_ibuf_take()
+    local key, key_end = tuple_encode(ibuf, key)
+    local nok = builtin.box_index_get(index.space_id, index.id, key, key_end,
+                                      ptuple) ~= 0
+    cord_ibuf_put(ibuf)
+    if nok then
         return box.error() -- error
     elseif ptuple[0] ~= nil then
         return tuple_bless(ptuple[0])
@@ -1275,13 +1291,16 @@ end
 
 base_index_mt.select_ffi = function(index, key, opts)
     check_index_arg(index, 'select')
-    local key, key_end = tuple_encode(key)
+    local ibuf = cord_ibuf_take()
+    local key, key_end = tuple_encode(ibuf, key)
     local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
 
     local port = ffi.cast('struct port *', port_tuple)
 
-    if builtin.box_select(index.space_id, index.id,
-        iterator, offset, limit, key, key_end, port) ~= 0 then
+    local nok = builtin.box_select(index.space_id, index.id, iterator, offset,
+                                   limit, key, key_end, port) ~= 0
+    cord_ibuf_put(ibuf)
+    if nok then
         return box.error()
     end
 

@@ -1,4 +1,5 @@
 import os
+import codecs
 
 #
 # Check that Tarantool handles huge LSNs well (gh-4033).
@@ -17,10 +18,10 @@ new_lsn = 123456789123
 wal_dir = os.path.join(server.vardir, server.name)
 old_wal = os.path.join(wal_dir, "%020d.xlog" % old_lsn)
 new_wal = os.path.join(wal_dir, "%020d.xlog" % new_lsn)
-with open(old_wal, "r+") as f:
+with codecs.open(old_wal, "r+", encoding="ISO-8859-1") as f:
     s = f.read()
-    s = s.replace("VClock: {1: %d}" % old_lsn,
-                  "VClock: {1: %d}" % new_lsn)
+    s = s.replace("VClock: {{1: {}}}".format(old_lsn),
+                  "VClock: {{1: {}}}".format(new_lsn))
     f.seek(0)
     f.write(s)
 os.rename(old_wal, new_wal)

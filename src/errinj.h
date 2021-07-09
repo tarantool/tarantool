@@ -134,6 +134,8 @@ struct errinj {
 	_(ERRINJ_VY_WRITE_ITERATOR_START_FAIL, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_VY_RUN_OPEN, ERRINJ_INT, {.iparam = -1})\
 	_(ERRINJ_AUTO_UPGRADE, ERRINJ_BOOL, {.bparam = false})\
+	_(ERRINJ_STDIN_ISATTY, ERRINJ_INT, {.iparam = -1}) \
+	_(ERRINJ_SNAP_COMMIT_FAIL, ERRINJ_BOOL, {.bparam = false}) \
 
 ENUM0(errinj_id, ERRINJ_LIST);
 extern struct errinj errinjs[];
@@ -152,6 +154,11 @@ typedef int (*errinj_cb)(struct errinj *e, void *cb_ctx);
  */
 int
 errinj_foreach(errinj_cb cb, void *cb_ctx);
+
+/**
+ * Set injections by scanning ERRINJ_$(NAME) in environment variables
+ */
+void errinj_set_with_environment_vars(void);
 
 #ifdef NDEBUG
 #  define ERROR_INJECT(ID, CODE)
@@ -179,6 +186,7 @@ errinj_foreach(errinj_cb cb, void *cb_ctx);
 #endif
 
 #define ERROR_INJECT_RETURN(ID) ERROR_INJECT(ID, return -1)
+#define ERROR_INJECT_TERMINATE(ID) ERROR_INJECT(ID, assert(0))
 
 #if defined(__cplusplus)
 } /* extern "C" */

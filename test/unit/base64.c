@@ -1,4 +1,4 @@
-#include <third_party/base64.h>
+#include <base64.h>
 #include "unit.h"
 #include "trivia/util.h"
 #include <string.h>
@@ -58,9 +58,39 @@ base64_nowrap_test(const char *str)
 	base64_test(str, BASE64_NOWRAP, symbols, lengthof(symbols));
 }
 
+static void
+base64_invalid_chars_test(void)
+{
+	plan(1);
+
+	/* Upper bit must be cleared */
+	const char invalid_data[] = { '\x7b', '\x7c', '\x7d', '\x7e' };
+	char outbuf[8];
+
+	/* Invalid chars should be ignored, not decoded into garbage */
+	is(base64_decode(invalid_data, sizeof(invalid_data),
+	                 outbuf, sizeof(outbuf)),
+	   0, "ignoring invalid chars");
+
+	check_plan();
+}
+
+static void
+base64_no_space_test(void)
+{
+	plan(1);
+
+	const char *const in = "sIIpHw==";
+	const int in_len = strlen(in);
+	const int rc = base64_decode(in, in_len, NULL, 0);
+	is(rc, 0, "no space in out buffer");
+
+	check_plan();
+}
+
 int main(int argc, char *argv[])
 {
-	plan(28);
+	plan(30);
 	header();
 
 	const char *option_tests[] = {
@@ -77,6 +107,9 @@ int main(int argc, char *argv[])
 		base64_nopad_test(option_tests[i]);
 		base64_nowrap_test(option_tests[i]);
 	}
+
+	base64_invalid_chars_test();
+	base64_no_space_test();
 
 	footer();
 	return check_plan();

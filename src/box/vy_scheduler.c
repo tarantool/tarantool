@@ -1653,9 +1653,16 @@ vy_task_compaction_abort(struct vy_task *task)
 		error_log(e);
 		say_error("%s: failed to compact range %s",
 			  vy_lsm_name(lsm), vy_range_str(range));
+		vy_run_discard(task->new_run);
+	} else {
+		/*
+		 * If the LSM tree was dropped while we were writing the new
+		 * run, discard the run without committing to vylog, because
+		 * all the information about the LSM tree and its runs could
+		 * have already been garbage collected from vylog.
+		 */
+		vy_run_unref(task->new_run);
 	}
-
-	vy_run_discard(task->new_run);
 
 	assert(range->heap_node.pos == UINT32_MAX);
 	vy_range_heap_insert(&lsm->range_heap, &range->heap_node);

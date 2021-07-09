@@ -1,0 +1,40 @@
+name: 'Prepare docker image with benchmarks and run testing in it'
+description: 'Prepare docker image with benchmarks and run testing in it'
+
+runs:
+  using: "composite"
+  steps:
+    # get host name
+    - run: |
+        echo 'HOSTNAME<<EOF' >> $GITHUB_ENV
+        hostname | tee -a $GITHUB_ENV
+        echo 'EOF' >> $GITHUB_ENV
+      shell: bash
+    - name: test
+      env:
+        CI_MAKE: make -f .gitlab.mk
+        IMAGE_PERF: docker.io/tarantool/perf:ubuntu-bionic_perf_master
+        IMAGE_PERF_BUILT: ubuntu-bionic:perf_${{ github.sha }}
+        DOCKER_NETWORK_ARG: --network=host
+        DOCKER_RUN_ARGS: ${DOCKER_NETWORK_ARG} ${{ env.DOCKER_RUN_ARGS }}
+      run: |
+          set -x
+          ${CI_MAKE} perf_clone_benchs_repo
+          docker build ${DOCKER_NETWORK_ARG} \
+            --add-host ${{ env.HOSTNAME }}:127.0.0.1 \
+            -t ${IMAGE_PERF} \
+            -f bench-run/dockerfiles/ubuntu_benchs .
+          docker build ${DOCKER_NETWORK_ARG} \
+            --build-arg image_from=${IMAGE_PERF} \
+            --no-cache \
+            -t ${IMAGE_PERF_BUILT}${{ env.IMAGE_SUFFIX }} \
+            -f bench-run/dockerfiles/ubuntu_tnt${{ env.IMAGE_SUFFIX }} .
+          docker run ${{ env.DOCKER_RUN_ARGS }} \
+            --privileged \
+            --cpuset-cpus='6-11' \
+            -v ${PWD}:/source \
+            -w /source \
+            -i ${IMAGE_PERF_BUILT}${{ env.IMAGE_SUFFIX }} \
+            /opt/bench-run/benchs/${BENCH}/run.sh ${ARG}
+          ${CI_MAKE} perf_cleanup_image
+      shell: bash

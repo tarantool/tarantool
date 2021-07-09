@@ -6,7 +6,19 @@ DOCKER_IMAGE?=packpack/packpack:debian-stretch
 TEST_RUN_EXTRA_PARAMS?=
 MAX_FILES?=65534
 MAX_PROC?=2500
-OSX_VARDIR?=/tmp/tnt
+VARDIR?=/tmp/tnt
+GIT_DESCRIBE=$(shell git describe HEAD)
+COVERITY_BINS=/cov-analysis/bin
+
+# Transform the ${PRESERVE_ENVVARS} comma separated variables list
+# to the '-e key="value" -e key="value" <...>' string.
+#
+# Add PRESERVE_ENVVARS itself to the list to allow to use this
+# make script again from the inner environment (if there will be
+# a need).
+comma := ,
+ENVVARS := PRESERVE_ENVVARS $(subst $(comma), ,$(PRESERVE_ENVVARS))
+DOCKER_ENV := $(foreach var,$(ENVVARS),-e $(var)="$($(var))")
 
 all: package
 
@@ -30,11 +42,11 @@ docker_%:
 		--workdir /tarantool \
 		-e XDG_CACHE_HOME=/cache \
 		-e CCACHE_DIR=/cache/ccache \
-		-e COVERALLS_TOKEN=${COVERALLS_TOKEN} \
 		-e TRAVIS_JOB_ID=${TRAVIS_JOB_ID} \
 		-e CMAKE_EXTRA_PARAMS=${CMAKE_EXTRA_PARAMS} \
 		-e CC=${CC} \
 		-e CXX=${CXX} \
+		${DOCKER_ENV} \
 		${DOCKER_IMAGE} \
 		make -f .travis.mk $(subst docker_,,$@)
 
@@ -56,14 +68,34 @@ docker_%:
 # commit, so the build requires old dependencies to be installed.
 # See ce623a23416eb192ce70116fd14992e84e7ccbbe ('Enable GitLab CI
 # testing') for more information.
-deps_debian:
-	apt-get update && apt-get install -y -f \
+
+deps_tests:
+	pip install -r test-run/requirements.txt
+
+deps_ubuntu_ghactions: deps_tests
+	sudo apt-get update ${APT_EXTRA_FLAGS} && \
+		sudo apt-get install -y -f libreadline-dev libunwind-dev
+
+deps_coverage_ubuntu_ghactions: deps_ubuntu_ghactions
+	sudo apt-get install -y -f lcov
+	sudo gem install coveralls-lcov
+	# Link src/lib/uri/src to local src dircetory to avoid of issue:
+	# /var/lib/gems/2.7.0/gems/coveralls-lcov-1.7.0/lib/coveralls/lcov/converter.rb:64:in
+	#   `initialize': No such file or directory @ rb_sysopen -
+	#   /home/runner/work/tarantool/tarantool/src/src/uri.c (Errno::ENOENT)
+	ln -s ${PWD}/src src/src
+
+deps_debian_packages:
+	apt-get update ${APT_EXTRA_FLAGS} && apt-get install -y -f \
 		build-essential cmake coreutils sed \
 		libreadline-dev libncurses5-dev libyaml-dev libssl-dev \
 		libcurl4-openssl-dev libunwind-dev libicu-dev \
 		python python-pip python-setuptools python-dev \
 		python-msgpack python-yaml python-argparse python-six python-gevent \
+		python3 python3-gevent python3-six python3-yaml \
 		lcov ruby clang llvm llvm-dev zlib1g-dev autoconf automake libtool
+
+deps_debian: deps_debian_packages deps_tests
 
 deps_buster_clang_8: deps_debian
 	echo "deb http://apt.llvm.org/buster/ llvm-toolchain-buster-8 main" > /etc/apt/sources.list.d/clang_8.list
@@ -86,9 +118,12 @@ build_debian:
 	make -j
 
 test_debian_no_deps: build_debian
-	cd test && /usr/bin/python test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
+	make LuaJIT-test
+	cd test && ./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_debian: deps_debian test_debian_no_deps
+
+test_ubuntu_ghactions: deps_ubuntu_ghactions test_debian_no_deps
 
 test_debian_clang11: deps_debian deps_buster_clang_11 test_debian_no_deps
 
@@ -99,20 +134,48 @@ build_coverage_debian:
 	make -j
 
 test_coverage_debian_no_deps: build_coverage_debian
+	make LuaJIT-test
 	# Enable --long tests for coverage
-	cd test && /usr/bin/python test-run.py --force $(TEST_RUN_EXTRA_PARAMS) --long
-	lcov --compat-libtool --directory src/ --capture --output-file coverage.info.tmp
+	cd test && ./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS) --long
+	lcov --compat-libtool --directory src/ --capture --output-file coverage.info.tmp \
+		--rc lcov_branch_coverage=1 --rc lcov_function_coverage=1
 	lcov --compat-libtool --remove coverage.info.tmp 'tests/*' 'third_party/*' '/usr/*' \
 		--output-file coverage.info
 	lcov --list coverage.info
-	@if [ -n "$(COVERALLS_TOKEN)" ]; then \
-		echo "Exporting code coverage information to coveralls.io"; \
-		gem install coveralls-lcov; \
-		echo coveralls-lcov --service-name travis-ci --service-job-id $(TRAVIS_JOB_ID) --repo-token [FILTERED] coverage.info; \
-		coveralls-lcov --service-name travis-ci --service-job-id $(TRAVIS_JOB_ID) --repo-token $(COVERALLS_TOKEN) coverage.info; \
-	fi;
 
 coverage_debian: deps_debian test_coverage_debian_no_deps
+
+coverage_ubuntu_ghactions: deps_coverage_ubuntu_ghactions test_coverage_debian_no_deps
+
+# Coverity
+
+build_coverity_debian: configure_debian
+	export PATH=${PATH}:${COVERITY_BINS} ; \
+		cov-build --dir cov-int make -j
+
+test_coverity_debian_no_deps: build_coverity_debian
+	tar czvf tarantool.tgz cov-int
+	@if [ -n "$(COVERITY_TOKEN)" ]; then \
+		echo "Exporting code coverity information to scan.coverity.com"; \
+		curl --form token=$(COVERITY_TOKEN) \
+			--form email=tarantool@tarantool.org \
+			--form file=@tarantool.tgz \
+			--form version=${GIT_DESCRIBE} \
+			--form description="Tarantool Coverity" \
+			https://scan.coverity.com/builds?project=tarantool%2Ftarantool ; \
+	fi;
+
+deps_coverity_debian: deps_debian
+	# check that coverity tools installed in known place
+	@ls -al ${COVERITY_BINS} || \
+		( echo "=================== ERROR: =====================" ; \
+		  echo "Coverity binaries not found in: ${COVERITY_BINS}" ; \
+		  echo "please install it there using instructions from:" ; \
+		  echo "  https://scan.coverity.com/download?tab=cxx" ; \
+		  echo ; \
+		  exit 1 )
+
+coverity_debian: deps_coverity_debian test_coverity_debian_no_deps
 
 # ASAN
 
@@ -122,6 +185,13 @@ build_asan_debian:
 	make -j
 
 test_asan_debian_no_deps: build_asan_debian
+	# FIXME: PUC-Rio-Lua-5.1 test suite is disabled for ASAN
+	# due to https://github.com/tarantool/tarantool/issues/5880.
+	# Run tests suites manually.
+	ASAN=ON \
+		LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
+		ASAN_OPTIONS=heap_profile=0:unmap_shadow_on_exit=1:detect_invalid_pointer_pairs=1:symbolize=1:detect_leaks=1:dump_instruction_bytes=1:print_suppressions=0 \
+		make LuaJIT-tests lua-Harness-tests tarantool-tests
 	# Temporary excluded some tests by issue #4360:
 	#  - To exclude tests from ASAN checks the asan/asan.supp file
 	#    was set at the build time in cmake/profile.cmake file.
@@ -130,33 +200,38 @@ test_asan_debian_no_deps: build_asan_debian
 	cd test && ASAN=ON \
 		LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
 		ASAN_OPTIONS=heap_profile=0:unmap_shadow_on_exit=1:detect_invalid_pointer_pairs=1:symbolize=1:detect_leaks=1:dump_instruction_bytes=1:print_suppressions=0 \
-		./test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
+		./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_asan_debian: deps_debian deps_buster_clang_11 test_asan_debian_no_deps
 
+test_asan_ubuntu_ghactions: deps_ubuntu_ghactions test_asan_debian_no_deps
+
 # Static build
 
-deps_debian_static:
+deps_debian_static: deps_tests
 	# Found that in Debian OS libunwind library built with dependencies to
 	# liblzma library, but there is no liblzma static library installed,
 	# while liblzma dynamic library exists. So the build dynamicaly has no
 	# issues, while static build fails. To fix it we need to install
 	# liblzma-dev package with static library only for static build.
-	apt-get install -y -f liblzma-dev
+	sudo apt-get install -y -f liblzma-dev
 
 test_static_build: deps_debian_static
 	CMAKE_EXTRA_PARAMS=-DBUILD_STATIC=ON make -f .travis.mk test_debian_no_deps
 
 test_static_docker_build:
-	docker build --no-cache --network=host --build-arg RUN_TESTS=ON -f Dockerfile.staticbuild .
+	docker build --no-cache --network=host -f Dockerfile.staticbuild -t static_build:tmp .
+	docker run --rm -v ${PWD}/artifacts:/tarantool/test/var/artifacts static_build:tmp \
+		-c "set -x && cd /tarantool/test && \
+		        ./test-run.py --force box/admin || \
+		        ( chmod -R a+rwx var/artifacts ; exit 1 )"
 
 #######
 # OSX #
 #######
 
-# since Python 2 is EOL it's latest commit from tapped local formula is used
 OSX_PKGS=openssl readline curl icu4c libiconv zlib autoconf automake libtool \
-	cmake file://$${PWD}/tools/brew_taps/tntpython2.rb
+	cmake python3
 
 deps_osx:
 	# install brew using command from Homebrew repository instructions:
@@ -169,9 +244,18 @@ deps_osx:
 	# try to install the packages either upgrade it to avoid of fails
 	# if the package already exists with the previous version
 	brew install --force ${OSX_PKGS} || brew upgrade ${OSX_PKGS}
-	pip install --force-reinstall -r test-run/requirements.txt
+	pip3 install --force-reinstall -r test-run/requirements.txt
+
+deps_osx_github_actions:
+	# try to install the packages either upgrade it to avoid of fails
+	# if the package already exists with the previous version
+	brew install --force ${OSX_PKGS} || brew upgrade ${OSX_PKGS}
+	pip3 install --force-reinstall -r test-run/requirements.txt
 
 build_osx:
+	# due swap disabling should be manualy configured need to
+	# control it's status
+	sysctl vm.swapusage
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
 	make -j
 
@@ -192,10 +276,13 @@ test_osx_no_deps: build_osx
 		launchctl limit maxproc || : ; \
 		ulimit -u ${MAX_PROC} || : ; \
 		ulimit -u ; \
-		rm -rf ${OSX_VARDIR} ; \
-		cd test && ./test-run.py --vardir ${OSX_VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
+		rm -rf ${VARDIR} ; \
+		make LuaJIT-test ; \
+		cd test && ./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_osx: deps_osx test_osx_no_deps
+
+test_osx_github_actions: deps_osx_github_actions test_osx_no_deps
 
 ###########
 # FreeBSD #
@@ -207,10 +294,12 @@ deps_freebsd:
 		autoconf automake libtool
 
 build_freebsd:
+	if [ "$$(swapctl -l | wc -l)" != "1" ]; then sudo swapoff -a ; fi ; swapctl -l
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
 	gmake -j
 
 test_freebsd_no_deps: build_freebsd
+	make LuaJIT-test
 	cd test && python2.7 test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_freebsd: deps_freebsd test_freebsd_no_deps

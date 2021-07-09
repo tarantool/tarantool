@@ -907,8 +907,53 @@ vy_log_bootstrap(void)
 	return 0;
 }
 
+/**
+ * Return true if the last vylog is new and contains no user data
+ * (i.e. last entry is VY_LOG_SNAPSHOT).
+ * In case of any errors log them and return false.
+ */
+static bool
+vy_log_last_entry_is_snapshot(void)
+{
+	const char *path =
+		vy_log_filename(vclock_sum(&vy_log.last_checkpoint));
+	if (access(path, F_OK) < 0) {
+		say_error("Failed to access last vylog");
+		return false;
+	}
+	struct xlog_cursor cursor;
+	if (xdir_open_cursor(&vy_log.dir,
+			     vclock_sum(&vy_log.last_checkpoint),
+			     &cursor) < 0) {
+		diag_log();
+		diag_clear(diag_get());
+		return false;
+	}
+	int rc;
+	struct xrow_header row;
+	while ((rc = xlog_cursor_next(&cursor, &row, false)) == 0) {
+		struct vy_log_record record;
+		rc = vy_log_record_decode(&record, &row);
+		if (rc < 0)
+			break;
+		if (record.type == VY_LOG_SNAPSHOT) {
+			rc = xlog_cursor_next(&cursor, &row, false);
+			if (rc <= 0)
+				break;
+			xlog_cursor_close(&cursor, false);
+			return true;
+		}
+	}
+	xlog_cursor_close(&cursor, false);
+	if (rc < 0) {
+		diag_log();
+		diag_clear(diag_get());
+	}
+	return false;
+}
+
 struct vy_recovery *
-vy_log_begin_recovery(const struct vclock *vclock)
+vy_log_begin_recovery(const struct vclock *vclock, bool force_recovery)
 {
 	assert(vy_log.recovery == NULL);
 
@@ -937,11 +982,41 @@ vy_log_begin_recovery(const struct vclock *vclock)
 		/*
 		 * Last vy_log log is newer than the last snapshot.
 		 * This can't normally happen, as vy_log is rotated
-		 * after snapshot is created. Looks like somebody
+		 * in a short gap between checkpoint wait and commit.
+		 * However, if memtx for some reason fails to commit its
+		 * changes, instance will crash leaving .inprogress snap
+		 * and corresponding (already rotated) vylog.
+		 * Another and simpler reason is the case when somebody
 		 * deleted snap file, but forgot to delete vy_log.
+		 * So in case we are anyway in force recovery mode, let's
+		 * try to delete last .vylog file and continue recovery process.
 		 */
-		diag_set(ClientError, ER_MISSING_SNAPSHOT);
-		return NULL;
+		bool is_vylog_empty = vy_log_last_entry_is_snapshot();
+		if (!is_vylog_empty) {
+			say_info("Last vylog is not empty. Its removal "
+				 "may cause data loss!");
+		}
+		if (!force_recovery && !is_vylog_empty) {
+			diag_set(ClientError, ER_MISSING_SNAPSHOT);
+			say_info("To bootstrap instance try to remove last "
+				 ".vylog file or run in force_recovery mode");
+			return NULL;
+		}
+		if (xdir_remove_file_by_vclock(&vy_log.dir,
+					       &vy_log.last_checkpoint) != 0) {
+			say_info(".vylog is newer than snapshot. Failed to "
+				 "remove it. Try to delete last .vylog "
+				 "manually");
+			return NULL;
+		}
+		const struct vclock *prev_checkpoint =
+			vy_log_prev_checkpoint(&vy_log.last_checkpoint);
+		if (prev_checkpoint == NULL) {
+			say_info("Can't find previous vylog");
+			return NULL;
+		}
+		vclock_copy(&vy_log.last_checkpoint, prev_checkpoint);
+		assert(vclock_compare(&vy_log.last_checkpoint, vclock) == 0);
 	}
 	if (cmp < 0) {
 		/*

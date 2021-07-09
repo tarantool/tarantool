@@ -37,7 +37,7 @@
 #include "exception.h"
 #include "crc32.h"
 #include "fio.h"
-#include "third_party/tarantool_eio.h"
+#include <tarantool_eio.h>
 #include <msgpuck.h>
 
 #include "coio_file.h"
@@ -705,6 +705,23 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 		if (flags & XDIR_GC_REMOVE_ONE)
 			break;
 	}
+}
+
+int
+xdir_remove_file_by_vclock(struct xdir *dir, struct vclock *to_remove)
+{
+	struct vclock *find = vclockset_match(&dir->index, to_remove);
+	if (vclock_compare(find, to_remove) != 0)
+		return -1;
+	const char *filename =
+		xdir_format_filename(dir, vclock_sum(find), NONE);
+	int rc = unlink(filename);
+	xdir_say_gc(rc, errno, filename);
+	if (rc != 0)
+		return -1;
+	vclockset_remove(&dir->index, find);
+	free(find);
+	return 0;
 }
 
 void

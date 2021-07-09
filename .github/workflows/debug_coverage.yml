@@ -1,0 +1,90 @@
+name: debug_coverage
+
+on:
+  push:
+  pull_request:
+  repository_dispatch:
+    types: [backend_automation]
+  workflow_dispatch:
+
+env:
+  CI_MAKE: make -f .travis.mk
+
+jobs:
+  debug_coverage:
+    # We want to run on external PRs, but not on our own internal PRs
+    # as they'll be run by the push to the branch.
+    if: ( github.event_name == 'push' ||
+        github.event_name == 'pull_request') &&
+        ! endsWith(github.ref, '-notest')
+
+    runs-on: ubuntu-20.04
+
+    strategy:
+      fail-fast: false
+
+    steps:
+      # Permissions correction is needed for self-host runners,
+      # where work path is saved between different workflows runs.
+      - name: correct permissions in working directory
+        shell: bash
+        run: |
+          sudo chown -R $(id -u):$(id -g) .
+      # Finds an associated PR (PR can be detected only on push and never on pull_request).
+      # WARNING !!! use in these ways only:
+      #   on push: steps.findPr.outputs.pr
+      #   on pull_request: github.event.pull_request.number
+      - name: Find the PR associated with this push on push trigger, if there is one.
+        uses: jwalton/gh-find-current-pr@v1
+        id: findPr
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      # Runs w/o PR on push otherwise on PR events.
+      # To avoid of issue https://github.com/coverallsapp/github-action/issues/55
+      # sources checkout should be based on 2nd action version and later.
+      - name: Sources checkout
+        if: ( steps.findPr.outputs.pr == false && github.event_name == 'push' ) ||
+            github.event_name == 'pull_request'
+        uses: actions/checkout@v2.3.4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      # Runs w/o PR on push otherwise on PR events.
+      - name: Set environment
+        if: ( steps.findPr.outputs.pr == false && github.event_name == 'push' ) ||
+            github.event_name == 'pull_request'
+        uses: ./.github/actions/environment
+      # Runs w/o PR on push otherwise on PR events.
+      - name: test
+        if: ( steps.findPr.outputs.pr == false && github.event_name == 'push' ) ||
+            github.event_name == 'pull_request'
+        run: ${CI_MAKE} coverage_ubuntu_ghactions
+      # Runs w/o PR on push otherwise on PR events.
+      - name: Upload coverage.info results to coveralls.io
+        if: success() &&
+            ( ( steps.findPr.outputs.pr == false && github.event_name == 'push' ) ||
+            github.event_name == 'pull_request' )
+        uses: coverallsapp/github-action@v1.1.2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./coverage.info
+      # Runs on failure only.
+      - name: call action to send Telegram message on failure
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
+          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
+        uses: ./.github/actions/send-telegram-notify
+        if: failure()
+      # Runs w/o PR on push otherwise on PR events
+      # for failed tests either Coveralls results.
+      - name: artifacts
+        uses: actions/upload-artifact@v2
+        if: always() &&
+            ( ( steps.findPr.outputs.pr == false && github.event_name == 'push' ) ||
+            github.event_name == 'pull_request' )
+        with:
+          name: debug
+          retention-days: 21
+          path: |
+            ${{ env.VARDIR }}/artifacts
+            *.info

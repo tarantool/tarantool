@@ -34,7 +34,7 @@
 #include <stdint.h>
 
 #include "trivia/util.h"
-#include "third_party/tarantool_ev.h"
+#include <tarantool_ev.h>
 
 #if defined(__cplusplus)
 extern "C" {

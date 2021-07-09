@@ -365,8 +365,10 @@ rope_insert(struct rope *rope, rope_size_t offset, void *data, rope_size_t size)
 		if (offset != 0) {
 			struct rope_node *split_node;
 			split_node = rope_node_split(rope, **p_end, offset);
-			if (split_node == NULL)
+			if (split_node == NULL) {
+				rope->free(rope->alloc_ctx, new_node);
 				return -1;
+			}
 			split_node->link[0] = new_node;
 			split_node->height++;
 			split_node->tree_size += new_node->tree_size;

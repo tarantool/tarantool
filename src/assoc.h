@@ -37,7 +37,7 @@ extern "C" {
 #define MH_UNDEF
 #endif
 
-#include "third_party/PMurHash.h"
+#include <PMurHash.h>
 
 /*
  * Map: (i32) => (void *)
