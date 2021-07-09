@@ -150,7 +150,7 @@ local NANOS_PER_SEC    = 1000000000LL
 local DT_EPOCH_1970_OFFSET = 719163LL
 
 
-local datetime_t = ffi.typeof('struct t_datetime_tz')
+local datetime_t = ffi.typeof('struct datetime_t')
 local duration_t = ffi.typeof('struct t_datetime_duration')
 
 local function duration_new()

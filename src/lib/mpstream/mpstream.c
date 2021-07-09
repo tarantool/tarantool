@@ -210,7 +210,7 @@ mpstream_encode_uuid(struct mpstream *stream, const struct tt_uuid *uuid)
 }
 
 void
-mpstream_encode_datetime(struct mpstream *stream, const struct t_datetime_tz *val)
+mpstream_encode_datetime(struct mpstream *stream, const struct datetime_t *val)
 {
 	char *data = mpstream_reserve(stream, mp_sizeof_datetime(val));
 	if (data == NULL)

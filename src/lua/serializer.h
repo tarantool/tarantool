@@ -224,7 +224,7 @@ struct luaL_field {
 		uint32_t size;
 		decimal_t *decval;
 		struct tt_uuid *uuidval;
-		struct t_datetime_tz *dateval;
+		struct datetime_t *dateval;
 	};
 	enum mp_type type;
 	/* subtypes of MP_EXT */

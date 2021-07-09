@@ -39,7 +39,7 @@
 uint32_t CTID_DATETIME_TZ = 0;
 uint32_t CTID_DURATION = 0;
 
-struct t_datetime_tz *
+struct datetime_t *
 luaL_pushdatetime(struct lua_State *L)
 {
 	return luaL_pushcdata(L, CTID_DATETIME_TZ);
@@ -48,14 +48,14 @@ luaL_pushdatetime(struct lua_State *L)
 void
 tarantool_lua_datetime_init(struct lua_State *L)
 {
-	int rc = luaL_cdef(L, "struct t_datetime_tz {"
+	int rc = luaL_cdef(L, "struct datetime_t {"
 				"int secs;"
 				"int nsec;"
 				"int offset;"
 			  "};");
 	assert(rc == 0);
 	(void) rc;
-	CTID_DATETIME_TZ = luaL_ctypeid(L, "struct t_datetime_tz");
+	CTID_DATETIME_TZ = luaL_ctypeid(L, "struct datetime_t");
 	assert(CTID_DATETIME_TZ != 0);
 
 

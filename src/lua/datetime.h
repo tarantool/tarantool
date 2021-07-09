@@ -42,7 +42,7 @@ extern uint32_t CTID_DURATION;
 
 struct lua_State;
 
-struct t_datetime_tz*
+struct datetime_t*
 luaL_pushdatetime(struct lua_State *L);
 
 void

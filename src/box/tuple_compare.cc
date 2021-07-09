@@ -401,8 +401,8 @@ mp_compare_uuid(const char *field_a, const char *field_b)
 static int
 mp_compare_datetime(const char *lhs, const char *rhs)
 {
-	t_datetime_tz lhs_dt, rhs_dt;
-	t_datetime_tz *ret;
+	datetime_t lhs_dt, rhs_dt;
+	datetime_t *ret;
 	ret = mp_decode_datetime(&lhs, &lhs_dt);
 	assert(ret != NULL);
 	ret = mp_decode_datetime(&rhs, &rhs_dt);

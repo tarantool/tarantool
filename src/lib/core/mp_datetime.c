@@ -63,7 +63,7 @@ mp_decode_Xint(const char **data)
 }
 
 uint32_t
-mp_sizeof_datetime(const struct t_datetime_tz *date)
+mp_sizeof_datetime(const struct datetime_t *date)
 {
 	uint32_t sz = mp_sizeof_Xint(date->secs);
 
@@ -77,8 +77,8 @@ mp_sizeof_datetime(const struct t_datetime_tz *date)
 	return sz;
 }
 
-struct t_datetime_tz *
-datetime_unpack(const char **data, uint32_t len, struct t_datetime_tz *date)
+struct datetime_t *
+datetime_unpack(const char **data, uint32_t len, struct datetime_t *date)
 {
 	const char * svp = *data;
 
@@ -102,8 +102,8 @@ datetime_unpack(const char **data, uint32_t len, struct t_datetime_tz *date)
 	return date;
 }
 
-struct t_datetime_tz *
-mp_decode_datetime(const char **data, struct t_datetime_tz *date)
+struct datetime_t *
+mp_decode_datetime(const char **data, struct datetime_t *date)
 {
 	if (mp_typeof(**data) != MP_EXT)
 		return NULL;
@@ -118,7 +118,7 @@ mp_decode_datetime(const char **data, struct t_datetime_tz *date)
 }
 
 char *
-datetime_pack(char *data, const struct t_datetime_tz *date)
+datetime_pack(char *data, const struct datetime_t *date)
 {
 	data = mp_encode_Xint(data, date->secs);
 	if (date->nsec != 0 || date->offset != 0)
@@ -130,7 +130,7 @@ datetime_pack(char *data, const struct t_datetime_tz *date)
 }
 
 char *
-mp_encode_datetime(char *data, const struct t_datetime_tz *date)
+mp_encode_datetime(char *data, const struct datetime_t *date)
 {
 	uint32_t len = mp_sizeof_datetime(date);
 
@@ -140,7 +140,7 @@ mp_encode_datetime(char *data, const struct t_datetime_tz *date)
 }
 
 int
-datetime_to_string(const struct t_datetime_tz * date, char *buf, uint32_t len)
+datetime_to_string(const struct datetime_t * date, char *buf, uint32_t len)
 {
 	char * src = buf;
 	dt_t dt = dt_from_rdn((date->secs / SECS_PER_DAY) + 719163);
@@ -189,7 +189,7 @@ datetime_to_string(const struct t_datetime_tz * date, char *buf, uint32_t len)
 int
 mp_snprint_datetime(char *buf, int size, const char **data, uint32_t len)
 {
-	struct t_datetime_tz date = {0};
+	struct datetime_t date = {0};
 
 	if (datetime_unpack(data, len, &date) == NULL)
 		return -1;
@@ -200,7 +200,7 @@ mp_snprint_datetime(char *buf, int size, const char **data, uint32_t len)
 int
 mp_fprint_datetime(FILE *file, const char **data, uint32_t len)
 {
-	struct  t_datetime_tz date;
+	struct  datetime_t date;
 
 	if (datetime_unpack(data, len, &date) == NULL)
 		return -1;
@@ -218,8 +218,8 @@ adjusted_secs(int secs, int offset)
 }
 
 int
-datetime_compare(const struct t_datetime_tz * lhs,
-		 const struct t_datetime_tz * rhs)
+datetime_compare(const struct datetime_t * lhs,
+		 const struct datetime_t * rhs)
 {
 	int result = COMPARE_RESULT(adjusted_secs(lhs->secs, lhs->offset),
 				    adjusted_secs(rhs->secs, rhs->offset));

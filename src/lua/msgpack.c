@@ -339,7 +339,7 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 		}
 		case MP_DATETIME:
 		{
-			struct t_datetime_tz * date = luaL_pushdatetime(L);
+			struct datetime_t * date = luaL_pushdatetime(L);
 			date = datetime_unpack(data, len, date);
 			if (date == NULL)
 				goto ext_decode_err;

@@ -47,7 +47,7 @@ extern "C" {
 /**
  * datetime structure consisting of:
  */
-struct t_datetime_tz {
+struct datetime_t {
 	int secs;	///< seconds since epoch
 	int nsec;	///< nanoseconds if any
 	int offset;	///< offset in minutes from GMT
@@ -62,27 +62,27 @@ struct t_datetime_duration {
 };
 
 int
-datetime_compare(const struct t_datetime_tz * lhs,
-		 const struct t_datetime_tz * rhs);
+datetime_compare(const struct datetime_t * lhs,
+		 const struct datetime_t * rhs);
 
 
-struct t_datetime_tz *
-datetime_unpack(const char **data, uint32_t len, struct t_datetime_tz *date);
+struct datetime_t *
+datetime_unpack(const char **data, uint32_t len, struct datetime_t *date);
 
 char *
-datetime_pack(char *data, const struct t_datetime_tz *date);
+datetime_pack(char *data, const struct datetime_t *date);
 
 uint32_t
-mp_sizeof_datetime(const struct t_datetime_tz *date);
+mp_sizeof_datetime(const struct datetime_t *date);
 
-struct t_datetime_tz *
-mp_decode_datetime(const char **data, struct t_datetime_tz *date);
+struct datetime_t *
+mp_decode_datetime(const char **data, struct datetime_t *date);
 
 char *
-mp_encode_datetime(char *data, const struct t_datetime_tz *date);
+mp_encode_datetime(char *data, const struct datetime_t *date);
 
 int
-datetime_to_string(const struct t_datetime_tz * date, char *buf, uint32_t len);
+datetime_to_string(const struct datetime_t * date, char *buf, uint32_t len);
 
 int
 mp_snprint_datetime(char *buf, int size, const char **data, uint32_t len);
