@@ -230,6 +230,36 @@ local function duration_serialize(self)
     return { secs = self.secs, nsec = self.nsec }
 end
 
+local datetime_index = function(self, key)
+    local attributes = {
+        timestamp = function(self)
+            return tonumber(self.secs + self.nsec / 1e9)
+        end,
+        nanoseconds = function(self)
+            return tonumber(self.secs * 1e9 + self.nsec)
+        end,
+        microseconds = function(self)
+            return tonumber(self.secs * 1e6 + self.nsec / 1e3)
+        end,
+        milliseconds = function(self)
+            return tonumber(self.secs * 1e3 + self.nsec / 1e6)
+        end,
+        seconds = function(self)
+            return tonumber(self.secs + self.nsec / 1e9)
+        end,
+        minutes = function(self)
+            return tonumber((self.secs + self.nsec / 1e9) / 60 % 60)
+        end,
+        hours = function(self)
+            return tonumber((self.secs + self.nsec / 1e9) / (60 * 60))
+        end,
+        days = function(self)
+            return tonumber((self.secs + self.nsec / 1e9) / (60 * 60)) / 24
+        end,
+    }
+    return attributes[key] ~= nil and attributes[key](self) or nil
+end
+
 local datetime_mt = {
     -- __tostring = datetime_tostring,
     __serialize = datetime_serialize,
@@ -238,23 +268,7 @@ local datetime_mt = {
     __le = datetime_le,
     __sub = datetime_sub,
     __add = datetime_add,
-
-    nanoseconds = function(self)
-        return tonumber(self.secs*NANOS_PER_SEC + self.nsec)
-    end,
-    microseconds = function(self)
-        return tonumber(self.secs*1e6 + self.nsec*1e3)
-    end,
-    seconds = function(self)
-        return tonumber(self.secs + self.nsec*1e3)
-    end,
-    minutes = function(self)
-        return tonumber((self._ticks/(1e6*60))%60)
-    end,
-    hours = function(self)
-        return tonumber(self._ticks/(1e6*60*60))
-    end,
-
+    __index = datetime_index,
 }
 
 local duration_mt = {
@@ -263,6 +277,9 @@ local duration_mt = {
     __eq = datetime_eq,
     __lt = datetime_lt,
     __le = datetime_le,
+    __sub = datetime_sub,
+    __add = datetime_add,
+    __index = datetime_index,
 }
 
 local function datetime_new_raw(secs, nsec, offset)
