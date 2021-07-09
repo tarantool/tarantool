@@ -2325,6 +2325,67 @@ box.space.t:drop()
  | ---
  | ...
 
+-- https://github.com/tarantool/tarantool/issues/5892
+box.execute([[CREATE TABLE u (column1 INT PRIMARY KEY, column2 INT);]])
+ | ---
+ | - row_count: 1
+ | ...
+box.schema.user.grant('guest', 'read,write', 'space', 'U')
+ | ---
+ | ...
+conn = require('net.box').connect(box.cfg.listen)
+ | ---
+ | ...
+
+box.execute([[INSERT INTO u VALUES (1, 20);]])
+ | ---
+ | - row_count: 1
+ | ...
+box.execute([[START TRANSACTION;]])
+ | ---
+ | - row_count: 0
+ | ...
+box.execute([[SELECT * FROM u;]])
+ | ---
+ | - metadata:
+ |   - name: COLUMN1
+ |     type: integer
+ |   - name: COLUMN2
+ |     type: integer
+ |   rows:
+ |   - [1, 20]
+ | ...
+
+conn:execute([[UPDATE u SET column2 = 21;]])
+ | ---
+ | - row_count: 1
+ | ...
+
+box.execute([[UPDATE u SET column2 = 22;]])
+ | ---
+ | - row_count: 1
+ | ...
+box.execute([[COMMIT;]])
+ | ---
+ | - null
+ | - Transaction has been aborted by conflict
+ | ...
+box.execute([[SELECT * FROM u;]])
+ | ---
+ | - metadata:
+ |   - name: COLUMN1
+ |     type: integer
+ |   - name: COLUMN2
+ |     type: integer
+ |   rows:
+ |   - [1, 21]
+ | ...
+
+box.execute([[DROP TABLE u ;]])
+ | ---
+ | - row_count: 1
+ | ...
+
 test_run:cmd("switch default")
  | ---
  | - true
