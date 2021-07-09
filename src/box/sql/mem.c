@@ -2098,35 +2098,77 @@ mem_cmp_scalar(const struct Mem *a, const struct Mem *b, int *result,
 	return 0;
 }
 
-/*
- * Both *pMem1 and *pMem2 contain string values. Compare the two values
- * using the collation sequence pColl. As usual, return a negative , zero
- * or positive value if *pMem1 is less than, equal to or greater than
- * *pMem2, respectively. Similar in spirit to "rc = (*pMem1) - (*pMem2);".
- *
- * Strungs assume to be UTF-8 encoded
- */
-static int
-vdbeCompareMemString(const Mem * pMem1, const Mem * pMem2,
-		     const struct coll * pColl)
+int
+mem_cmp_msgpack(const struct Mem *a, const char **b, int *result,
+		const struct coll *coll)
 {
-	return pColl->cmp(pMem1->z, (size_t)pMem1->n,
-			      pMem2->z, (size_t)pMem2->n, pColl);
-}
-
-/*
- * The input pBlob is guaranteed to be a Blob that is not marked
- * with MEM_Zero.  Return true if it could be a zero-blob.
- */
-static int
-isAllZero(const char *z, int n)
-{
-	int i;
-	for (i = 0; i < n; i++) {
-		if (z[i])
-			return 0;
+	struct Mem mem;
+	switch (mp_typeof(**b)) {
+	case MP_NIL:
+		mem.type = MEM_TYPE_NULL;
+		mp_decode_nil(b);
+		break;
+	case MP_BOOL:
+		mem.type = MEM_TYPE_BOOL;
+		mem.u.b = mp_decode_bool(b);
+		break;
+	case MP_UINT:
+		mem.type = MEM_TYPE_UINT;
+		mem.u.u = mp_decode_uint(b);
+		break;
+	case MP_INT:
+		mem.type = MEM_TYPE_INT;
+		mem.u.i = mp_decode_int(b);
+		break;
+	case MP_FLOAT:
+		mem.type = MEM_TYPE_DOUBLE;
+		mem.u.r = mp_decode_float(b);
+		break;
+	case MP_DOUBLE:
+		mem.type = MEM_TYPE_DOUBLE;
+		mem.u.r = mp_decode_double(b);
+		break;
+	case MP_STR:
+		mem.type = MEM_TYPE_STR;
+		mem.n = mp_decode_strl(b);
+		mem.z = (char *)*b;
+		*b += mem.n;
+		mem.flags = MEM_Ephem;
+		break;
+	case MP_BIN:
+		mem.type = MEM_TYPE_BIN;
+		mem.n = mp_decode_binl(b);
+		mem.z = (char *)*b;
+		*b += mem.n;
+		mem.flags = MEM_Ephem;
+		break;
+	case MP_ARRAY:
+	case MP_MAP:
+		mp_next(b);
+		*result = -1;
+		return 0;
+	case MP_EXT: {
+		int8_t type;
+		const char *buf = *b;
+		uint32_t len = mp_decode_extl(b, &type);
+		if (type == MP_UUID) {
+			assert(len == UUID_LEN);
+			mem.type = MEM_TYPE_UUID;
+			if (uuid_unpack(b, len, &mem.u.uuid) == NULL)
+				return -1;
+			break;
+		}
+		*b += len;
+		mem.type = MEM_TYPE_BIN;
+		mem.z = (char *)buf;
+		mem.n = *b - buf;
+		mem.flags = MEM_Ephem;
+		break;
 	}
-	return 1;
+	default:
+		unreachable();
+	}
+	return mem_cmp_scalar(a, &mem, result, coll);
 }
 
 char *
@@ -2558,183 +2600,6 @@ sql_vdbemem_finalize(struct Mem *mem, struct func *func)
 }
 
 int
-sqlVdbeCompareMsgpack(const char **key1,
-			  struct UnpackedRecord *unpacked, int key2_idx)
-{
-	const char *aKey1 = *key1;
-	Mem *pKey2 = unpacked->aMem + key2_idx;
-	Mem mem1;
-	int rc = 0;
-	switch (mp_typeof(*aKey1)) {
-	default:{
-			/* FIXME */
-			rc = -1;
-			break;
-		}
-	case MP_NIL:{
-			rc = -(pKey2->type != MEM_TYPE_NULL);
-			mp_decode_nil(&aKey1);
-			break;
-		}
-	case MP_BOOL:{
-			mem1.u.b = mp_decode_bool(&aKey1);
-			if (pKey2->type == MEM_TYPE_BOOL) {
-				if (mem1.u.b != pKey2->u.b)
-					rc = mem1.u.b ? 1 : -1;
-			} else {
-				rc = pKey2->type == MEM_TYPE_NULL ? 1 : -1;
-			}
-			break;
-		}
-	case MP_UINT:{
-			mem1.u.u = mp_decode_uint(&aKey1);
-			if (pKey2->type == MEM_TYPE_INT) {
-				rc = +1;
-			} else if (pKey2->type == MEM_TYPE_UINT) {
-				if (mem1.u.u < pKey2->u.u)
-					rc = -1;
-				else if (mem1.u.u > pKey2->u.u)
-					rc = +1;
-			} else if (pKey2->type == MEM_TYPE_DOUBLE) {
-				rc = double_compare_uint64(pKey2->u.r,
-							   mem1.u.u, -1);
-			} else if (pKey2->type == MEM_TYPE_NULL) {
-				rc = 1;
-			} else if (pKey2->type == MEM_TYPE_BOOL) {
-				rc = 1;
-			} else {
-				rc = -1;
-			}
-			break;
-		}
-	case MP_INT:{
-			mem1.u.i = mp_decode_int(&aKey1);
-			if (pKey2->type == MEM_TYPE_UINT) {
-				rc = -1;
-			} else if (pKey2->type == MEM_TYPE_INT) {
-				if (mem1.u.i < pKey2->u.i) {
-					rc = -1;
-				} else if (mem1.u.i > pKey2->u.i) {
-					rc = +1;
-				}
-			} else if (pKey2->type == MEM_TYPE_DOUBLE) {
-				rc = double_compare_nint64(pKey2->u.r, mem1.u.i,
-							   -1);
-			} else if (pKey2->type == MEM_TYPE_NULL) {
-				rc = 1;
-			} else if (pKey2->type == MEM_TYPE_BOOL) {
-				rc = 1;
-			} else {
-				rc = -1;
-			}
-			break;
-		}
-	case MP_FLOAT:{
-			mem1.u.r = mp_decode_float(&aKey1);
-			goto do_float;
-		}
-	case MP_DOUBLE:{
-			mem1.u.r = mp_decode_double(&aKey1);
- do_float:
-			if (pKey2->type == MEM_TYPE_INT) {
-				rc = double_compare_nint64(mem1.u.r, pKey2->u.i,
-							   1);
-			} else if (pKey2->type == MEM_TYPE_UINT) {
-				rc = double_compare_uint64(mem1.u.r,
-							   pKey2->u.u, 1);
-			} else if (pKey2->type == MEM_TYPE_DOUBLE) {
-				if (mem1.u.r < pKey2->u.r) {
-					rc = -1;
-				} else if (mem1.u.r > pKey2->u.r) {
-					rc = +1;
-				}
-			} else if (pKey2->type == MEM_TYPE_NULL) {
-				rc = 1;
-			} else if (pKey2->type == MEM_TYPE_BOOL) {
-				rc = 1;
-			} else {
-				rc = -1;
-			}
-			break;
-		}
-	case MP_STR:{
-			if (pKey2->type == MEM_TYPE_STR) {
-				struct key_def *key_def = unpacked->key_def;
-				mem1.n = mp_decode_strl(&aKey1);
-				mem1.z = (char *)aKey1;
-				aKey1 += mem1.n;
-				struct coll *coll =
-					key_def->parts[key2_idx].coll;
-				if (coll != NULL) {
-					mem1.type = MEM_TYPE_STR;
-					mem1.flags = 0;
-					rc = vdbeCompareMemString(&mem1, pKey2,
-								  coll);
-				} else {
-					goto do_bin_cmp;
-				}
-			} else {
-				rc = pKey2->type == MEM_TYPE_BIN ? -1 : +1;
-			}
-			break;
-		}
-	case MP_BIN:{
-			mem1.n = mp_decode_binl(&aKey1);
-			mem1.z = (char *)aKey1;
-			aKey1 += mem1.n;
- do_blob:
-			if (pKey2->type == MEM_TYPE_BIN) {
-				if (pKey2->flags & MEM_Zero) {
-					if (!isAllZero
-					    ((const char *)mem1.z, mem1.n)) {
-						rc = 1;
-					} else {
-						rc = mem1.n - pKey2->u.nZero;
-					}
-				} else {
-					int nCmp;
- do_bin_cmp:
-					nCmp = MIN(mem1.n, pKey2->n);
-					rc = memcmp(mem1.z, pKey2->z, nCmp);
-					if (rc == 0)
-						rc = mem1.n - pKey2->n;
-				}
-			} else {
-				rc = 1;
-			}
-			break;
-		}
-	case MP_ARRAY:
-	case MP_MAP: {
-			mem1.z = (char *)aKey1;
-			mp_next(&aKey1);
-			mem1.n = aKey1 - (char *)mem1.z;
-			goto do_blob;
-		}
-	case MP_EXT: {
-		int8_t type;
-		const char *buf = aKey1;
-		uint32_t len = mp_decode_extl(&aKey1, &type);
-		if (type == MP_UUID) {
-			assert(len == UUID_LEN);
-			mem1.type = MEM_TYPE_UUID;
-			aKey1 = buf;
-			if (mp_decode_uuid(&aKey1, &mem1.u.uuid) == NULL ||
-			    mem_cmp_uuid(&mem1, pKey2, &rc) != 0)
-				rc = 1;
-			break;
-		}
-		aKey1 += len;
-		mem1.z = (char *)buf;
-		mem1.n = aKey1 - buf;
-		goto do_blob;
-	}
-	}
-	*key1 = aKey1;
-	return rc;
-}
-
-int
 sqlVdbeRecordCompareMsgpack(const void *key1,
 				struct UnpackedRecord *key2)
 {
@@ -2744,13 +2609,15 @@ sqlVdbeRecordCompareMsgpack(const void *key1,
 	n = MIN(n, key2->nField);
 
 	for (i = 0; i != n; i++) {
-		rc = sqlVdbeCompareMsgpack((const char**)&key1, key2, i);
+		struct key_part *part = &key2->key_def->parts[i];
+		struct Mem *mem = key2->aMem + i;
+		struct coll *coll = part->coll;
+		if (mem_cmp_msgpack(mem, (const char **)&key1, &rc, coll) != 0)
+			rc = 0;
 		if (rc != 0) {
-			if (key2->key_def->parts[i].sort_order !=
-			    SORT_ORDER_ASC) {
-				rc = -rc;
-			}
-			return rc;
+			if (part->sort_order != SORT_ORDER_ASC)
+				return rc;
+			return -rc;
 		}
 	}
 

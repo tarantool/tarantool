@@ -707,6 +707,16 @@ mem_cmp_scalar(const struct Mem *a, const struct Mem *b, int *result,
 	       const struct coll *coll);
 
 /**
+ * Compare MEM and packed to msgpack value using SCALAR rules and return the
+ * result of comparison. Both values should be scalars. Original MEM is not
+ * changed. If successful, the second argument will contain the address
+ * following the specified packed value.
+ */
+int
+mem_cmp_msgpack(const struct Mem *a, const char **b, int *result,
+		const struct coll *coll);
+
+/**
  * Convert the given MEM to INTEGER. This function and the function below define
  * the rules that are used to convert values of all other types to INTEGER. In
  * this function, the conversion from double to integer may result in loss of
@@ -982,20 +992,6 @@ int sqlVdbeMemTooBig(Mem *);
  */
 int
 sql_vdbemem_finalize(struct Mem *mem, struct func *func);
-
-/** MEM and msgpack functions. */
-
-/**
- * Perform comparison of two keys: one is packed and one is not.
- *
- * @param key1 Pointer to pointer to first key.
- * @param unpacked Pointer to unpacked tuple.
- * @param key2_idx index of key in umpacked record to compare.
- *
- * @retval +1 if key1 > pUnpacked[iKey2], -1 ptherwise.
- */
-int sqlVdbeCompareMsgpack(const char **key1,
-			      struct UnpackedRecord *unpacked, int key2_idx);
 
 /**
  * Perform comparison of two tuples: unpacked (key1) and packed (key2)

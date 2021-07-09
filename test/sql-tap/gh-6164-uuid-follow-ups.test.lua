@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(8)
+test:plan(9)
 
 -- Make sure that function quote() can work with uuid.
 test:do_execsql_test(
@@ -74,6 +74,18 @@ test:do_execsql_test(
         SELECT MIN(s) FROM t;
     ]], {
         2
+    })
+
+box.execute([[DELETE FROM t;]])
+
+box.execute([[INSERT INTO t VALUES (1, X'00'), (2, ?);]], {uuid1})
+
+test:do_execsql_test(
+    "gh-6164-9",
+    [[
+        SELECT i FROM t ORDER BY s;
+    ]], {
+        1, 2
     })
 
 box.execute([[DROP TABLE t;]])

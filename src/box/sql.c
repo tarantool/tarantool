@@ -765,10 +765,13 @@ tarantoolsqlIdxKeyCompare(struct BtCursor *cursor,
 			}
 		}
 		next_fieldno = fieldno + 1;
-		rc = sqlVdbeCompareMsgpack(&p, unpacked, i);
+		struct key_part *part = &unpacked->key_def->parts[i];
+		struct Mem *mem = unpacked->aMem + i;
+		struct coll *coll = part->coll;
+		if (mem_cmp_msgpack(mem, &p, &rc, coll) != 0)
+			rc = 0;
 		if (rc != 0) {
-			if (unpacked->key_def->parts[i].sort_order !=
-			    SORT_ORDER_ASC)
+			if (part->sort_order == SORT_ORDER_ASC)
 				rc = -rc;
 			goto out;
 		}
