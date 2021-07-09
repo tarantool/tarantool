@@ -735,6 +735,23 @@ box.execute([[ CREATE TABLE test (id INT NOT NULL PRIMARY KEY, count INT NOT NUL
 box.execute([[ UPDATE test SET count = count + 1 WHERE id = 0 ]])
 box.execute([[ DROP TABLE test]])
 
+-- https://github.com/tarantool/tarantool/issues/5892
+box.execute([[CREATE TABLE u (column1 INT PRIMARY KEY, column2 INT);]])
+box.schema.user.grant('guest', 'read,write', 'space', 'U')
+conn = require('net.box').connect(box.cfg.listen)
+
+box.execute([[INSERT INTO u VALUES (1, 20);]])
+box.execute([[START TRANSACTION;]])
+box.execute([[SELECT * FROM u;]])
+
+conn:execute([[UPDATE u SET column2 = 21;]])
+
+box.execute([[UPDATE u SET column2 = 22;]])
+box.execute([[COMMIT;]])
+box.execute([[SELECT * FROM u;]])
+
+box.execute([[DROP TABLE u ;]])
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
