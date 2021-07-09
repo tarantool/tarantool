@@ -53,6 +53,12 @@ ffi.cdef [[
     dt_t    dt_from_struct_tm  (const struct tm *tm);
     void    dt_to_struct_tm    (dt_t dt, struct tm *tm);
 
+    // mp_datetime.c
+
+    int
+    datetime_to_string(const struct datetime_t * date, char *buf, uint32_t len);
+
+
     // <asm-generic/posix_types.h>
     typedef long            __kernel_long_t;
     typedef unsigned long   __kernel_ulong_t;
@@ -566,8 +572,13 @@ local function strftime(fmt, o)
     return ffi.string(buff)
 end
 
--- strftime may be redirected to datetime:fmt("format")
-local function datetime_fmt()
+local function datetime_tostring(o)
+    assert(ffi.typeof(o) == datetime_t)
+    local sz = 48
+    local buff = ffi.new('char[?]', sz)
+    local len = native.datetime_to_string(o, buff, sz)
+    assert(len < sz)
+    return ffi.string(buff)
 end
 
 
@@ -583,7 +594,8 @@ return setmetatable(
         parse_date = parse_date,
         parse_time = parse_time,
         parse_zone = parse_zone,
-        fmt = datetime_fmt,
+
+        tostring = datetime_tostring,
 
         now = local_now,
     -- strptime = strptime;
