@@ -36,8 +36,8 @@ decimal_t *
 decimal_unpack(const char **data, uint32_t len, decimal_t *dec);
 struct tt_uuid *
 uuid_unpack(const char **data, uint32_t len, struct tt_uuid *uuid);
-struct t_datetime_tz *
-datetime_unpack(const char **data, uint32_t len, struct t_datetime_tz *date);
+struct datetime_t *
+datetime_unpack(const char **data, uint32_t len, struct datetime_t *date);
 ]])
 
 local strict_alignment = (jit.arch == 'arm')
@@ -517,7 +517,7 @@ local ext_decoder = {
     end,
     -- MP_DATETIME
     [4] = function(data, len)
-        local dt = ffi.new("struct t_datetime_tz")
+        local dt = ffi.new("struct datetime_t")
         builtin.datetime_unpack(data, len, dt)
         return dt
     end,
