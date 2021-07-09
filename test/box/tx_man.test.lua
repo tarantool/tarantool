@@ -711,6 +711,13 @@ assert(box.space.test == nil)
 collectgarbage()
 assert(box.space.test == nil)
 
+-- https://github.com/tarantool/tarantool/issues/6137
+_ = box.schema.create_space('t')
+tx1:begin()
+tx1("_ = box.space.t:create_index('i')")
+tx1:commit()
+box.space.t:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
