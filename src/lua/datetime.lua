@@ -190,40 +190,28 @@ end
 
 local function datetime_eq(lhs, rhs)
     -- we usually don't need to check nullness
-    -- but tarantool console will call is checking for equality to nil
+    -- but older tarantool console will call us checking for equality to nil
     if rhs == nil then
         return false
     end
-    -- FIXME - timezone?
     return (lhs.secs == rhs.secs) and (lhs.nsec == rhs.nsec)
 end
 
 
 local function datetime_lt(lhs, rhs)
-    -- FIXME - timezone?
     return (lhs.secs < rhs.secs) or
            (lhs.secs == rhs.secs and lhs.nsec < rhs.nsec)
 end
 
 local function datetime_le(lhs, rhs)
-    -- FIXME - timezone?
     return (lhs.secs <= rhs.secs) or
            (lhs.secs == rhs.secs and lhs.nsec <= rhs.nsec)
 end
-
---[[ local function datetime_tostring(self)
-    return string.format('DateTime:{secs: %d. nsec: %d, offset:%d}',
-                         self.secs, self.nsec, self.offset)
-end ]]
 
 local function datetime_serialize(self)
     -- Allow YAML, MsgPack and JSON to dump objects with sockets
     return { secs = self.secs, nsec = self.nsec, tz = self.offset }
 end
-
---[[ local function duration_tostring(self)
-    return string.format('Duration:{secs: %d. nsec: %d}', self.secs, self.nsec)
-end ]]
 
 local function duration_serialize(self)
     -- Allow YAML and JSON to dump objects with sockets
