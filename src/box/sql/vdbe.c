@@ -1825,7 +1825,13 @@ case OP_Compare: {
 		assert(i < (int)def->part_count);
 		struct coll *coll = def->parts[i].coll;
 		bool is_rev = def->parts[i].sort_order == SORT_ORDER_DESC;
-		iCompare = sqlMemCompare(&aMem[p1+idx], &aMem[p2+idx], coll);
+		struct Mem *a = &aMem[p1+idx];
+		struct Mem *b = &aMem[p2+idx];
+		if (mem_cmp_scalar(a, b, &iCompare, coll) != 0) {
+			diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(b),
+				 mem_type_to_str(a));
+			goto abort_due_to_error;
+		}
 		if (iCompare) {
 			if (is_rev)
 				iCompare = -iCompare;

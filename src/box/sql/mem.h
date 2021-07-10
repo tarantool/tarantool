@@ -699,6 +699,14 @@ int
 mem_cmp_uuid(const struct Mem *left, const struct Mem *right, int *result);
 
 /**
+ * Compare two MEMs using SCALAR rules and return the result of comparison. MEMs
+ * should be scalars. Original MEMs are not changed.
+ */
+int
+mem_cmp_scalar(const struct Mem *a, const struct Mem *b, int *result,
+	       const struct coll *coll);
+
+/**
  * Convert the given MEM to INTEGER. This function and the function below define
  * the rules that are used to convert values of all other types to INTEGER. In
  * this function, the conversion from double to integer may result in loss of
@@ -962,8 +970,6 @@ int sqlVdbeMemTooBig(Mem *);
  */
 #define VdbeMemDynamic(X) (((X)->flags & MEM_Dyn) != 0 ||\
 			   ((X)->type & (MEM_TYPE_AGG | MEM_TYPE_FRAME)) != 0)
-
-int sqlMemCompare(const Mem *, const Mem *, const struct coll *);
 
 /** MEM manipulate functions. */
 

@@ -144,11 +144,16 @@ minmaxFunc(sql_context * context, int argc, sql_value ** argv)
 	for (i = 1; i < argc; i++) {
 		if (mem_is_null(argv[i]))
 			return;
-		if ((sqlMemCompare(argv[iBest], argv[i], pColl) ^ mask) >=
-		    0) {
-			testcase(mask == 0);
-			iBest = i;
+		int res;
+		if (mem_cmp_scalar(argv[iBest], argv[i], &res, pColl) != 0) {
+			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+				 mem_str(argv[i]),
+				 mem_type_to_str(argv[iBest]));
+			context->is_aborted = true;
+			return;
 		}
+		if ((res ^ mask) >= 0)
+			iBest = i;
 	}
 	sql_result_value(context, argv[iBest]);
 }
@@ -1054,9 +1059,15 @@ nullifFunc(sql_context * context, int NotUsed, sql_value ** argv)
 {
 	struct coll *pColl = sqlGetFuncCollSeq(context);
 	UNUSED_PARAMETER(NotUsed);
-	if (sqlMemCompare(argv[0], argv[1], pColl) != 0) {
-		sql_result_value(context, argv[0]);
+	int res;
+	if (mem_cmp_scalar(argv[0], argv[1], &res, pColl) != 0) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+			 mem_str(argv[1]), mem_type_to_str(argv[0]));
+		context->is_aborted = true;
+		return;
 	}
+	if (res != 0)
+		sql_result_value(context, argv[0]);
 }
 
 /**
@@ -1824,7 +1835,12 @@ minmaxStep(sql_context * context, int NotUsed, sql_value ** argv)
 		 * comparison is inverted.
 		 */
 		bool is_max = (func->flags & SQL_FUNC_MAX) != 0;
-		cmp = sqlMemCompare(pBest, pArg, pColl);
+		if (mem_cmp_scalar(pBest, pArg, &cmp, pColl) != 0) {
+			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+				 mem_str(pArg), mem_type_to_str(pBest));
+			context->is_aborted = true;
+			return;
+		}
 		if ((is_max && cmp < 0) || (!is_max && cmp > 0)) {
 			mem_copy(pBest, pArg);
 		} else {

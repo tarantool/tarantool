@@ -60,6 +60,44 @@ enum {
 	STR_VALUE_MAX_LEN = 128,
 };
 
+/**
+ * Analogue of enum mp_class for enum mp_type. The order of the classes must be
+ * the same as in the enum mp_class.
+ */
+enum mem_class {
+	MEM_CLASS_NULL,
+	MEM_CLASS_BOOL,
+	MEM_CLASS_NUMBER,
+	MEM_CLASS_STR,
+	MEM_CLASS_BIN,
+	MEM_CLASS_UUID,
+	mem_class_max,
+};
+
+static inline enum mem_class
+mem_type_class(enum mem_type type)
+{
+	switch (type) {
+	case MEM_TYPE_NULL:
+		return MEM_CLASS_NULL;
+	case MEM_TYPE_UINT:
+	case MEM_TYPE_INT:
+	case MEM_TYPE_DOUBLE:
+		return MEM_CLASS_NUMBER;
+	case MEM_TYPE_STR:
+		return MEM_CLASS_STR;
+	case MEM_TYPE_BIN:
+		return MEM_CLASS_BIN;
+	case MEM_TYPE_BOOL:
+		return MEM_CLASS_BOOL;
+	case MEM_TYPE_UUID:
+		return MEM_CLASS_UUID;
+	default:
+		break;
+	}
+	return mem_class_max;
+}
+
 bool
 mem_is_field_compatible(const struct Mem *mem, enum field_type type)
 {
@@ -2030,6 +2068,36 @@ mem_cmp_uuid(const struct Mem *a, const struct Mem *b, int *result)
 	return 0;
 }
 
+int
+mem_cmp_scalar(const struct Mem *a, const struct Mem *b, int *result,
+	       const struct coll *coll)
+{
+	enum mem_class class_a = mem_type_class(a->type);
+	enum mem_class class_b = mem_type_class(b->type);
+	if (class_a != class_b) {
+		*result = class_a - class_b;
+		return 0;
+	}
+	switch (class_a) {
+	case MEM_CLASS_NULL:
+		*result = 0;
+		return 0;
+	case MEM_CLASS_BOOL:
+		return mem_cmp_bool(a, b, result);
+	case MEM_CLASS_NUMBER:
+		return mem_cmp_num(a, b, result);
+	case MEM_CLASS_STR:
+		return mem_cmp_str(a, b, result, coll);
+	case MEM_CLASS_BIN:
+		return mem_cmp_bin(a, b, result);
+	case MEM_CLASS_UUID:
+		return mem_cmp_uuid(a, b, result);
+	default:
+		unreachable();
+	}
+	return 0;
+}
+
 /*
  * Both *pMem1 and *pMem2 contain string values. Compare the two values
  * using the collation sequence pColl. As usual, return a negative , zero
@@ -2461,82 +2529,6 @@ sqlVdbeMemTooBig(Mem * p)
 		return n > p->db->aLimit[SQL_LIMIT_LENGTH];
 	}
 	return 0;
-}
-
-/*
- * Compare the values contained by the two memory cells, returning
- * negative, zero or positive if pMem1 is less than, equal to, or greater
- * than pMem2. Sorting order is NULL's first, followed by numbers (integers
- * and reals) sorted numerically, followed by text ordered by the collating
- * sequence pColl and finally blob's ordered by memcmp().
- *
- * Two NULL values are considered equal by this function.
- */
-int
-sqlMemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
-{
-	int res;
-
-	enum mem_type type1 = pMem1->type;
-	enum mem_type type2 = pMem2->type;
-
-	/* If one value is NULL, it is less than the other. If both values
-	 * are NULL, return 0.
-	 */
-	if (((type1 | type2) & MEM_TYPE_NULL) != 0)
-		return (int)(type2 == MEM_TYPE_NULL) -
-		       (int)(type1 == MEM_TYPE_NULL);
-
-	if (((type1 | type2) & MEM_TYPE_BOOL) != 0) {
-		if ((type1 & type2 & MEM_TYPE_BOOL) != 0) {
-			if (pMem1->u.b == pMem2->u.b)
-				return 0;
-			if (pMem1->u.b)
-				return 1;
-			return -1;
-		}
-		if (type2 == MEM_TYPE_BOOL)
-			return +1;
-		return -1;
-	}
-
-	if (((type1 | type2) & MEM_TYPE_UUID) != 0) {
-		if (mem_cmp_uuid(pMem1, pMem2, &res) == 0)
-			return res;
-		if (type1 != MEM_TYPE_UUID)
-			return +1;
-		return -1;
-	}
-
-	/* At least one of the two values is a number
-	 */
-	if (((type1 | type2) &
-	     (MEM_TYPE_INT | MEM_TYPE_UINT | MEM_TYPE_DOUBLE)) != 0) {
-		if (!mem_is_num(pMem1))
-			return +1;
-		if (!mem_is_num(pMem2))
-			return -1;
-		mem_cmp_num(pMem1, pMem2, &res);
-		return res;
-	}
-
-	/* If one value is a string and the other is a blob, the string is less.
-	 * If both are strings, compare using the collating functions.
-	 */
-	if (((type1 | type2) & MEM_TYPE_STR) != 0) {
-		if (type1 != MEM_TYPE_STR) {
-			return 1;
-		}
-		if (type2 != MEM_TYPE_STR) {
-			return -1;
-		}
-		mem_cmp_str(pMem1, pMem2, &res, pColl);
-		return res;
-	}
-
-	/* Both values must be blobs.  Compare using memcmp().  */
-	mem_cmp_bin(pMem1, pMem2, &res);
-	return res;
 }
 
 int
