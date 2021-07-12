@@ -1649,6 +1649,8 @@ box_promote(void)
 	 */
 	if (!is_box_configured)
 		return 0;
+	if (txn_limbo_replica_term(&txn_limbo, instance_id) == raft->term)
+		return 0;
 	switch (box_election_mode) {
 	case ELECTION_MODE_OFF:
 		if (box_try_wait_confirm(2 * replication_synchro_timeout) != 0)
@@ -1678,9 +1680,6 @@ box_promote(void)
 				 "'candidate'", "manual elections");
 			return -1;
 		}
-		if (txn_limbo_replica_term(&txn_limbo, instance_id) ==
-		    raft->term)
-			return 0;
 		break;
 	default:
 		unreachable();
