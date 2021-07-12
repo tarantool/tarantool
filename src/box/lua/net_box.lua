@@ -295,7 +295,7 @@ local function create_transport(host, port, user, password, callback,
     -- dispatcher.
     --
     function request_index:is_ready()
-        return self.id == nil or worker_fiber == nil
+        return self.id == nil
     end
     --
     -- When a request is finished, a result can be got from a
@@ -315,8 +315,6 @@ local function create_transport(host, port, user, password, callback,
             return nil, self.response
         elseif not self.id then
             return self.response
-        elseif not worker_fiber then
-            return nil, box.error.new(E_NO_CONNECTION)
         else
             return nil, box.error.new(box.error.PROC_LUA,
                                       'Response is not ready')
