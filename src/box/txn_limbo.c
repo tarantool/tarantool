@@ -612,11 +612,14 @@ txn_rollback_cb(struct trigger *trigger, void *event)
 	return 0;
 }
 
-int
-txn_limbo_wait_confirm(struct txn_limbo *limbo)
+/**
+ * Wait until the last transaction in the limbo is finished and get its result.
+ */
+static int
+txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
+			double timeout)
 {
-	if (txn_limbo_is_empty(limbo))
-		return 0;
+	assert(!txn_limbo_is_empty(limbo));
 
 	/* initialization of a waitpoint. */
 	struct confirm_waitpoint cwp;
@@ -632,31 +635,68 @@ txn_limbo_wait_confirm(struct txn_limbo *limbo)
 	struct txn_limbo_entry *tle = txn_limbo_last_entry(limbo);
 	txn_on_commit(tle->txn, &on_complete);
 	txn_on_rollback(tle->txn, &on_rollback);
-	double start_time = fiber_clock();
+	double deadline = fiber_clock() + timeout;
+	int rc;
 	while (true) {
-		double deadline = start_time + replication_synchro_timeout;
+		if (timeout < 0) {
+			rc = -1;
+			break;
+		}
 		bool cancellable = fiber_set_cancellable(false);
-		double timeout = deadline - fiber_clock();
-		int rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);
+		rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);
 		fiber_set_cancellable(cancellable);
-		if (cwp.is_confirm || cwp.is_rollback)
-			goto complete;
+		if (cwp.is_confirm || cwp.is_rollback) {
+			*is_rollback = cwp.is_rollback;
+			rc = 0;
+			break;
+		}
 		if (rc != 0)
-			goto timed_out;
+			break;
+		timeout = deadline - fiber_clock();
 	}
-timed_out:
-	/* Clear the triggers if the timeout has been reached. */
 	trigger_clear(&on_complete);
 	trigger_clear(&on_rollback);
-	diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
-	return -1;
+	return rc;
+}
 
-complete:
-	if (!cwp.is_confirm) {
+int
+txn_limbo_wait_confirm(struct txn_limbo *limbo)
+{
+	if (txn_limbo_is_empty(limbo))
+		return 0;
+	bool is_rollback;
+	if (txn_limbo_wait_last_txn(limbo, &is_rollback,
+				    replication_synchro_timeout) != 0) {
+		diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
+		return -1;
+	}
+	if (is_rollback) {
 		/* The transaction has been rolled back. */
 		diag_set(ClientError, ER_SYNC_ROLLBACK);
 		return -1;
 	}
+	return 0;
+}
+
+int
+txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout)
+{
+	if (txn_limbo_is_empty(limbo))
+		return 0;
+	bool is_rollback;
+	double deadline = fiber_clock() + timeout;
+	/*
+	 * Retry in the loop. More transactions might be added while waiting for
+	 * the last one.
+	 */
+	do {
+		if (txn_limbo_wait_last_txn(limbo, &is_rollback,
+					    timeout) != 0) {
+			diag_set(ClientError, ER_TIMEOUT);
+			return -1;
+		}
+		timeout = deadline - fiber_clock();
+	} while (!txn_limbo_is_empty(limbo));
 	return 0;
 }
 
