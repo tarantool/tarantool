@@ -1627,12 +1627,7 @@ box_promote(void)
 	if (try_wait) {
 		/* Wait until pending confirmations/rollbacks reach us. */
 		double timeout = 2 * replication_synchro_timeout;
-		double start_tm = fiber_clock();
-		while (!txn_limbo_is_empty(&txn_limbo)) {
-			if (fiber_clock() - start_tm > timeout)
-				break;
-			fiber_sleep(0.001);
-		}
+		txn_limbo_wait_empty(&txn_limbo, timeout);
 		/*
 		 * Our mission was to clear the limbo from former leader's
 		 * transactions. Exit in case someone did that for us.

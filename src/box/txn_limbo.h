@@ -311,6 +311,10 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req);
 int
 txn_limbo_wait_confirm(struct txn_limbo *limbo);
 
+/** Wait until the limbo is empty. Regardless of how its transactions end. */
+int
+txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout);
+
 /**
  * Write a PROMOTE request, which has the same effect as CONFIRM(@a lsn) and
  * ROLLBACK(@a lsn + 1) combined.
