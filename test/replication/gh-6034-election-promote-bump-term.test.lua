@@ -7,3 +7,7 @@ box.cfg{election_mode='off'}
 term = box.info.election.term
 box.ctl.promote()
 assert(box.info.election.term == term + 1)
+
+-- Consequent promotes are no-ops on the leader.
+box.ctl.promote()
+assert(box.info.election.term == term + 1)
