@@ -2386,6 +2386,49 @@ box.execute([[DROP TABLE u ;]])
  | - row_count: 1
  | ...
 
+--https://github.com/tarantool/tarantool/issues/6193
+s = box.schema.create_space('test')
+ | ---
+ | ...
+_ = s:create_index('pk')
+ | ---
+ | ...
+fiber = require('fiber')
+ | ---
+ | ...
+_ = fiber.create(function() box.space.test:replace({1, 2, 3}) end)
+ | ---
+ | ...
+box.space.test:delete({1})
+ | ---
+ | - [1, 2, 3]
+ | ...
+box.space.test:delete({1})
+ | ---
+ | ...
+N = 1e4
+ | ---
+ | ...
+fibers = {}
+ | ---
+ | ...
+for i = 1, N do                            \
+    local fib = fiber.new(function()       \
+        box.begin()                        \
+        box.space.test:replace({1, 2, 3})  \
+    end)                                   \
+    fib:set_joinable(true)                 \
+    table.insert(fibers, fib)              \
+end
+ | ---
+ | ...
+for _,fib in pairs(fibers) do fib:join() end
+ | ---
+ | ...
+s:drop()
+ | ---
+ | ...
+
 test_run:cmd("switch default")
  | ---
  | - true
