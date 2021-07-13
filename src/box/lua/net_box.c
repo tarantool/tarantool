@@ -436,9 +436,9 @@ netbox_decode_greeting(lua_State *L)
 }
 
 /**
- * communicate(fd, send_buf, recv_buf, limit_or_boundary)
- *  -> errno, error
- *  -> nil, limit/boundary_pos
+ * Reads data from the given socket until the limit or boundary is reached.
+ * Returns 0 and sets *size to limit or boundary position on success.
+ * On error returns -1 and sets diag.
  *
  * The need for this function arises from not wanting to
  * have more than one watcher for a single fd, and thus issue
@@ -450,53 +450,41 @@ netbox_decode_greeting(lua_State *L)
  * interaction.
  */
 static int
-netbox_communicate(lua_State *L)
+netbox_communicate(int fd, struct ibuf *send_buf, struct ibuf *recv_buf,
+		   size_t limit, const void *boundary, size_t boundary_len,
+		   size_t *size)
 {
-	uint32_t fd = lua_tonumber(L, 1);
 	const int NETBOX_READAHEAD = 16320;
-	struct ibuf *send_buf = (struct ibuf *) lua_topointer(L, 2);
-	struct ibuf *recv_buf = (struct ibuf *) lua_topointer(L, 3);
-
-	/* limit or boundary */
-	size_t limit = SIZE_MAX;
-	const void *boundary = NULL;
-	size_t boundary_len;
-
-	if (lua_type(L, 4) == LUA_TSTRING)
-		boundary = lua_tolstring(L, 4, &boundary_len);
-	else
-		limit = lua_tonumber(L, 4);
-
 	int revents = COIO_READ;
 	while (true) {
 		/* reader serviced first */
 check_limit:
 		if (ibuf_used(recv_buf) >= limit) {
-			lua_pushnil(L);
-			lua_pushinteger(L, (lua_Integer)limit);
-			return 2;
+			*size = limit;
+			return 0;
 		}
 		const char *p;
 		if (boundary != NULL && (p = memmem(
 					recv_buf->rpos,
 					ibuf_used(recv_buf),
 					boundary, boundary_len)) != NULL) {
-			lua_pushnil(L);
-			lua_pushinteger(L, (lua_Integer)(
-					p - recv_buf->rpos));
-			return 2;
+			*size = p - recv_buf->rpos;
+			return 0;
 		}
 
 		while (revents & COIO_READ) {
 			void *p = ibuf_reserve(recv_buf, NETBOX_READAHEAD);
-			if (p == NULL)
-				luaL_error(L, "out of memory");
+			if (p == NULL) {
+				diag_set(OutOfMemory, NETBOX_READAHEAD,
+					 "ibuf_reserve", "p");
+				return -1;
+			}
 			ssize_t rc = recv(
 				fd, recv_buf->wpos, ibuf_unused(recv_buf), 0);
 			if (rc == 0) {
-				lua_pushinteger(L, ER_NO_CONNECTION);
-				lua_pushstring(L, "Peer closed");
-				return 2;
+				box_error_raise(ER_NO_CONNECTION,
+						"Peer closed");
+				return -1;
 			} if (rc > 0) {
 				recv_buf->wpos += rc;
 				goto check_limit;
@@ -520,12 +508,85 @@ check_limit:
 		ERROR_INJECT_YIELD(ERRINJ_NETBOX_IO_DELAY);
 		revents = coio_wait(fd, EV_READ | (ibuf_used(send_buf) != 0 ?
 				EV_WRITE : 0), TIMEOUT_INFINITY);
-		luaL_testcancel(L);
+		if (fiber_is_cancelled()) {
+			diag_set(FiberIsCancelled);
+			return -1;
+		}
 	}
 handle_error:
-	lua_pushinteger(L, ER_NO_CONNECTION);
-	lua_pushstring(L, strerror(errno));
-	return 2;
+	box_error_raise(ER_NO_CONNECTION, "%s", strerror(errno));
+	return -1;
+}
+
+/**
+ * Sends and receives data over an iproto connection.
+ * Takes socket fd, send_buf (ibuf), recv_buf (ibuf).
+ * On success returns header (table), body_rpos (char *), body_end (char *).
+ * On error returns nil, error.
+ */
+static int
+netbox_send_and_recv_iproto(lua_State *L)
+{
+	int fd = lua_tointeger(L, 1);
+	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 2);
+	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 3);
+	while (true) {
+		size_t required;
+		size_t data_len = ibuf_used(recv_buf);
+		size_t fixheader_size = mp_sizeof_uint(UINT32_MAX);
+		if (data_len < fixheader_size) {
+			required = fixheader_size;
+		} else {
+			/* PWN! insufficient input validation */
+			const char *bufpos = recv_buf->rpos;
+			const char *rpos = bufpos;
+			size_t len = mp_decode_uint(&rpos);
+			required = (rpos - bufpos) + len;
+			if (data_len >= required) {
+				const char *body_end = rpos + len;
+				const char *body_rpos = rpos;
+				luamp_decode(L, cfg, &body_rpos);
+				*(const char **)luaL_pushcdata(
+					L, CTID_CONST_CHAR_PTR) = body_rpos;
+				*(const char **)luaL_pushcdata(
+					L, CTID_CONST_CHAR_PTR) = body_end;
+				recv_buf->rpos = (char *)body_end;
+				return 3;
+			}
+		}
+		size_t unused;
+		if (netbox_communicate(fd, send_buf, recv_buf,
+				       /*limit=*/required, /*boundary=*/NULL,
+				       /*boundary_len=*/0, &unused) != 0) {
+			luaL_testcancel(L);
+			return luaT_push_nil_and_error(L);
+		}
+	}
+}
+
+/**
+ * Sends and receives data over a console connection.
+ * Takes socket fd, send_buf (ibuf), recv_buf (ibuf).
+ * On success returns response (string).
+ * On error returns nil, error.
+ */
+static int
+netbox_send_and_recv_console(lua_State *L)
+{
+	int fd = lua_tointeger(L, 1);
+	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 2);
+	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 3);
+	const char delim[] = "\n...\n";
+	size_t delim_len = sizeof(delim) - 1;
+	size_t delim_pos;
+	if (netbox_communicate(fd, send_buf, recv_buf, /*limit=*/SIZE_MAX,
+			       delim, delim_len, &delim_pos) != 0) {
+		luaL_testcancel(L);
+		return luaT_push_nil_and_error(L);
+	}
+	lua_pushlstring(L, recv_buf->rpos, delim_pos + delim_len);
+	recv_buf->rpos += delim_pos + delim_len;
+	return 1;
 }
 
 static void
@@ -1099,7 +1160,8 @@ luaopen_net_box(struct lua_State *L)
 		{ "decode_greeting",netbox_decode_greeting },
 		{ "decode_method",  netbox_decode_method },
 		{ "decode_error",   netbox_decode_error },
-		{ "communicate",    netbox_communicate },
+		{ "send_and_recv_iproto", netbox_send_and_recv_iproto },
+		{ "send_and_recv_console", netbox_send_and_recv_console },
 		{ NULL, NULL}
 	};
 	/* luaL_register_module polutes _G */
