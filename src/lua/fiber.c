@@ -693,7 +693,9 @@ lbox_fiber_on_stop(struct trigger *trigger, void *event)
 static int
 lbox_fiber_storage(struct lua_State *L)
 {
-	struct fiber *f = lbox_checkfiber(L, 1);
+	struct fiber *f = lbox_get_fiber(L);
+	if (f == NULL)
+		luaL_error(L, "the fiber is dead");
 	int storage_ref = f->storage.lua.ref;
 	if (storage_ref <= 0) {
 		struct trigger *t = (struct trigger *)
@@ -948,6 +950,7 @@ static const struct luaL_Reg fiberlib[] = {
 	{"new", lbox_fiber_new},
 	{"status", lbox_fiber_status},
 	{"name", lbox_fiber_name},
+	{"storage", lbox_fiber_storage},
 	/* Internal functions, to hide in fiber.lua. */
 	{"stall", lbox_fiber_stall},
 	{NULL, NULL}

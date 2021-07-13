@@ -256,6 +256,17 @@ fiber.self().storage.key -- our local storage is not affected by f
 pcall(function(f) return f.storage end, f)
 
 --
+-- gh-6210: Access to fiber storage of current fiber via fiber.storage()
+--
+
+fiber.self().storage == fiber.storage()
+fiber.storage()['key'] = 'value'
+fiber.storage()['key']
+fiber.self().storage['key']
+fiber.self().storage['key'] = 'value2'
+fiber.storage()['key']
+
+--
 -- Test that local storage is garbage collected when fiber is died
 --
 ffi = require('ffi')

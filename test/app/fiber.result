@@ -681,6 +681,31 @@ pcall(function(f) return f.storage end, f)
 - '[string "return pcall(function(f) return f.storage end..."]:1: the fiber is dead'
 ...
 --
+-- gh-6210: Access to fiber storage of current fiber via fiber.storage()
+--
+fiber.self().storage == fiber.storage()
+---
+- true
+...
+fiber.storage()['key'] = 'value'
+---
+...
+fiber.storage()['key']
+---
+- value
+...
+fiber.self().storage['key']
+---
+- value
+...
+fiber.self().storage['key'] = 'value2'
+---
+...
+fiber.storage()['key']
+---
+- value2
+...
+--
 -- Test that local storage is garbage collected when fiber is died
 --
 ffi = require('ffi')
