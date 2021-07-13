@@ -68,6 +68,8 @@ struct tt_uuid;
  */
 extern struct lua_State *tarantool_L;
 
+extern uint32_t CTID_CHAR_PTR;
+extern uint32_t CTID_CONST_CHAR_PTR;
 extern uint32_t CTID_UUID;
 
 struct tt_uuid *

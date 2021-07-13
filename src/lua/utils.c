@@ -44,8 +44,8 @@ static int luaT_newthread_ref = LUA_NOREF;
 
 static uint32_t CTID_STRUCT_IBUF;
 static uint32_t CTID_STRUCT_IBUF_PTR;
-static uint32_t CTID_CHAR_PTR;
-static uint32_t CTID_CONST_CHAR_PTR;
+uint32_t CTID_CHAR_PTR;
+uint32_t CTID_CONST_CHAR_PTR;
 uint32_t CTID_UUID;
 
 void *
