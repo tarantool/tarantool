@@ -1735,8 +1735,10 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
     local fmt_str = function(x, n)
         if not x then x = '' end
         local str
-        if x:len() <= n then
-            local add = n - x:len()
+        local utf8 = require('utf8')
+        local x_len = utf8.len(x)
+        if x_len <= n then
+            local add = n - x_len
             local addl = math.floor(add/2)
             local addr = math.ceil(add/2)
             str = string.rep(' ', addl) .. x .. string.rep(' ', addr)
