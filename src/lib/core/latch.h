@@ -96,6 +96,17 @@ latch_owner(struct latch *l)
 }
 
 /**
+ * Return true if the latch is locked.
+ *
+ * @param l - latch to be tested.
+ */
+static inline bool
+latch_is_locked(const struct latch *l)
+{
+	return l->owner != NULL;
+}
+
+/**
  * Lock a latch. If the latch is already locked by another fiber,
  * waits for timeout.
  *
