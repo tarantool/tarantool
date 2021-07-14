@@ -422,6 +422,8 @@ struct txn {
 	struct rlist point_holes_list;
 	/** List of gap reads. @sa struct gap_item. */
 	struct rlist gap_list;
+	/** Link in tx_manager::all_txs. */
+	struct rlist in_all_txs;
 };
 
 static inline bool
