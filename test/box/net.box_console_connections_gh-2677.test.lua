@@ -30,7 +30,7 @@ c.space.test:delete{1}
 --
 -- Break a connection to test reconnect_after.
 --
-_ = c._transport.perform_request(nil, nil, false, 'inject', nil, nil, nil, '\x80')
+_ = c._transport.perform_request(nil, nil, false, net._method.inject, nil, nil, nil, '\x80')
 while not c:is_connected() do fiber.sleep(0.01) end
 c:ping()
 

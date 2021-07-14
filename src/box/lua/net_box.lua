@@ -51,6 +51,27 @@ local E_TIMEOUT              = box.error.TIMEOUT
 local E_PROC_LUA             = box.error.PROC_LUA
 local E_NO_SUCH_SPACE        = box.error.NO_SUCH_SPACE
 
+-- Method types used internally by net.box.
+local M_PING        = 0
+local M_CALL_16     = 1
+local M_CALL_17     = 2
+local M_EVAL        = 3
+local M_INSERT      = 4
+local M_REPLACE     = 5
+local M_DELETE      = 6
+local M_UPDATE      = 7
+local M_UPSERT      = 8
+local M_SELECT      = 9
+local M_EXECUTE     = 10
+local M_PREPARE     = 11
+local M_UNPREPARE   = 12
+local M_GET         = 13
+local M_MIN         = 14
+local M_MAX         = 15
+local M_COUNT       = 16
+-- Injects raw data into connection. Used by console and tests.
+local M_INJECT      = 17
+
 ffi.cdef[[
 struct error *
 error_unpack_unsafe(const char **data);
@@ -91,25 +112,24 @@ local function version_at_least(peer_version_id, major, minor, patch)
 end
 
 local method_encoder = {
-    ping    = internal.encode_ping,
-    call_16 = internal.encode_call_16,
-    call_17 = internal.encode_call,
-    eval    = internal.encode_eval,
-    insert  = internal.encode_insert,
-    replace = internal.encode_replace,
-    delete  = internal.encode_delete,
-    update  = internal.encode_update,
-    upsert  = internal.encode_upsert,
-    select  = internal.encode_select,
-    execute = internal.encode_execute,
-    prepare = internal.encode_prepare,
-    unprepare = internal.encode_prepare,
-    get     = internal.encode_select,
-    min     = internal.encode_select,
-    max     = internal.encode_select,
-    count   = internal.encode_call,
-    -- inject raw data into connection, used by console and tests
-    inject = function(buf, id, bytes) -- luacheck: no unused args
+    [M_PING]        = internal.encode_ping,
+    [M_CALL_16]     = internal.encode_call_16,
+    [M_CALL_17]     = internal.encode_call,
+    [M_EVAL]        = internal.encode_eval,
+    [M_INSERT]      = internal.encode_insert,
+    [M_REPLACE]     = internal.encode_replace,
+    [M_DELETE]      = internal.encode_delete,
+    [M_UPDATE]      = internal.encode_update,
+    [M_UPSERT]      = internal.encode_upsert,
+    [M_SELECT]      = internal.encode_select,
+    [M_EXECUTE]     = internal.encode_execute,
+    [M_PREPARE]     = internal.encode_prepare,
+    [M_UNPREPARE]   = internal.encode_prepare,
+    [M_GET]         = internal.encode_select,
+    [M_MIN]         = internal.encode_select,
+    [M_MAX]         = internal.encode_select,
+    [M_COUNT]       = internal.encode_call,
+    [M_INJECT]      = function(buf, id, bytes) -- luacheck: no unused args
         local ptr = buf:reserve(#bytes)
         ffi.copy(ptr, bytes, #bytes)
         buf.wpos = ptr + #bytes
@@ -117,24 +137,24 @@ local method_encoder = {
 }
 
 local method_decoder = {
-    ping    = decode_nil,
-    call_16 = internal.decode_select,
-    call_17 = decode_data,
-    eval    = decode_data,
-    insert  = decode_tuple,
-    replace = decode_tuple,
-    delete  = decode_tuple,
-    update  = decode_tuple,
-    upsert  = decode_nil,
-    select  = internal.decode_select,
-    execute = internal.decode_execute,
-    prepare = internal.decode_prepare,
-    unprepare = decode_nil,
-    get     = decode_tuple,
-    min     = decode_tuple,
-    max     = decode_tuple,
-    count   = decode_count,
-    inject  = decode_data,
+    [M_PING]        = decode_nil,
+    [M_CALL_16]     = internal.decode_select,
+    [M_CALL_17]     = decode_data,
+    [M_EVAL]        = decode_data,
+    [M_INSERT]      = decode_tuple,
+    [M_REPLACE]     = decode_tuple,
+    [M_DELETE]      = decode_tuple,
+    [M_UPDATE]      = decode_tuple,
+    [M_UPSERT]      = decode_nil,
+    [M_SELECT]      = internal.decode_select,
+    [M_EXECUTE]     = internal.decode_execute,
+    [M_PREPARE]     = internal.decode_prepare,
+    [M_UNPREPARE]   = decode_nil,
+    [M_GET]         = decode_tuple,
+    [M_MIN]         = decode_tuple,
+    [M_MAX]         = decode_tuple,
+    [M_COUNT]       = decode_count,
+    [M_INJECT]      = decode_data,
 }
 
 local function decode_error(raw_data)
@@ -749,7 +769,7 @@ local function create_transport(host, port, user, password, callback,
             log.warn("Netbox text protocol support is deprecated since 1.10, "..
                      "please use require('console').connect() instead")
             local setup_delimiter = 'require("console").delimiter("$EOF$")\n'
-            method_encoder.inject(send_buf, nil, setup_delimiter)
+            method_encoder[M_INJECT](send_buf, nil, setup_delimiter)
             local err, response = send_and_recv_console()
             if err then
                 return error_sm(err, response)
@@ -1198,7 +1218,7 @@ end
 
 function remote_methods:ping(opts)
     check_remote_arg(self, 'ping')
-    return (pcall(self._request, self, 'ping', opts))
+    return (pcall(self._request, self, M_PING, opts))
 end
 
 function remote_methods:reload_schema()
@@ -1209,14 +1229,14 @@ end
 -- @deprecated since 1.7.4
 function remote_methods:call_16(func_name, ...)
     check_remote_arg(self, 'call')
-    return (self:_request('call_16', nil, nil, tostring(func_name), {...}))
+    return (self:_request(M_CALL_16, nil, nil, tostring(func_name), {...}))
 end
 
 function remote_methods:call(func_name, args, opts)
     check_remote_arg(self, 'call')
     check_call_args(args)
     args = args or {}
-    local res = self:_request('call_17', opts, nil, tostring(func_name), args)
+    local res = self:_request(M_CALL_17, opts, nil, tostring(func_name), args)
     if type(res) ~= 'table' or opts and opts.is_async then
         return res
     end
@@ -1226,14 +1246,14 @@ end
 -- @deprecated since 1.7.4
 function remote_methods:eval_16(code, ...)
     check_remote_arg(self, 'eval')
-    return unpack((self:_request('eval', nil, nil, code, {...})))
+    return unpack((self:_request(M_EVAL, nil, nil, code, {...})))
 end
 
 function remote_methods:eval(code, args, opts)
     check_remote_arg(self, 'eval')
     check_eval_args(args)
     args = args or {}
-    local res = self:_request('eval', opts, nil, code, args)
+    local res = self:_request(M_EVAL, opts, nil, code, args)
     if type(res) ~= 'table' or opts and opts.is_async then
         return res
     end
@@ -1245,7 +1265,7 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "execute", "options")
     end
-    return self:_request('execute', netbox_opts, nil, query, parameters or {},
+    return self:_request(M_EXECUTE, netbox_opts, nil, query, parameters or {},
                          sql_opts or {})
 end
 
@@ -1257,7 +1277,7 @@ function remote_methods:prepare(query, parameters, sql_opts, netbox_opts) -- lua
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "prepare", "options")
     end
-    return self:_request('prepare', netbox_opts, nil, query)
+    return self:_request(M_PREPARE, netbox_opts, nil, query)
 end
 
 function remote_methods:unprepare(query, parameters, sql_opts, netbox_opts)
@@ -1268,7 +1288,7 @@ function remote_methods:unprepare(query, parameters, sql_opts, netbox_opts)
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "unprepare", "options")
     end
-    return self:_request('unprepare', netbox_opts, nil, query, parameters or {},
+    return self:_request(M_UNPREPARE, netbox_opts, nil, query, parameters or {},
                          sql_opts or {})
 end
 
@@ -1407,11 +1427,11 @@ function console_methods:eval(line, timeout)
     end
     if self.protocol == 'Binary' then
         local loader = 'return require("console").eval(...)'
-        res, err = pr(timeout, nil, false, 'eval', nil, nil, nil, loader,
+        res, err = pr(timeout, nil, false, M_EVAL, nil, nil, nil, loader,
                       {line})
     else
         assert(self.protocol == 'Lua console')
-        res, err = pr(timeout, nil, false, 'inject', nil, nil, nil,
+        res, err = pr(timeout, nil, false, M_INJECT, nil, nil, nil,
                       line..'$EOF$\n')
     end
     if err then
@@ -1431,12 +1451,14 @@ space_metatable = function(remote)
 
     function methods:insert(tuple, opts)
         check_space_arg(self, 'insert')
-        return remote:_request('insert', opts, self._format_cdata, self.id, tuple)
+        return remote:_request(M_INSERT, opts, self._format_cdata, self.id,
+                               tuple)
     end
 
     function methods:replace(tuple, opts)
         check_space_arg(self, 'replace')
-        return remote:_request('replace', opts, self._format_cdata, self.id, tuple)
+        return remote:_request(M_REPLACE, opts, self._format_cdata, self.id,
+                               tuple)
     end
 
     function methods:select(key, opts)
@@ -1456,8 +1478,8 @@ space_metatable = function(remote)
 
     function methods:upsert(key, oplist, opts)
         check_space_arg(self, 'upsert')
-        return nothing_or_data(remote:_request('upsert', opts, nil, self.id, key,
-                                               oplist))
+        return nothing_or_data(remote:_request(M_UPSERT, opts, nil, self.id,
+                                               key, oplist))
     end
 
     function methods:get(key, opts)
@@ -1486,7 +1508,7 @@ index_metatable = function(remote)
         local iterator = check_iterator_type(opts, key_is_nil)
         local offset = tonumber(opts and opts.offset) or 0
         local limit = tonumber(opts and opts.limit) or 0xFFFFFFFF
-        return (remote:_request('select', opts, self.space._format_cdata,
+        return (remote:_request(M_SELECT, opts, self.space._format_cdata,
                                 self.space.id, self.id, iterator, offset,
                                 limit, key))
     end
@@ -1496,7 +1518,7 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:get() doesn't support `buffer` argument")
         end
-        return nothing_or_data(remote:_request('get', opts,
+        return nothing_or_data(remote:_request(M_GET, opts,
                                                self.space._format_cdata,
                                                self.space.id, self.id,
                                                box.index.EQ, 0, 2, key))
@@ -1507,7 +1529,7 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:min() doesn't support `buffer` argument")
         end
-        return nothing_or_data(remote:_request('min', opts,
+        return nothing_or_data(remote:_request(M_MIN, opts,
                                                self.space._format_cdata,
                                                self.space.id, self.id,
                                                box.index.GE, 0, 1, key))
@@ -1518,7 +1540,7 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:max() doesn't support `buffer` argument")
         end
-        return nothing_or_data(remote:_request('max', opts,
+        return nothing_or_data(remote:_request(M_MAX, opts,
                                                self.space._format_cdata,
                                                self.space.id, self.id,
                                                box.index.LE, 0, 1, key))
@@ -1531,19 +1553,19 @@ index_metatable = function(remote)
         end
         local code = string.format('box.space.%s.index.%s:count',
                                    self.space.name, self.name)
-        return remote:_request('count', opts, nil, code, { key, opts })
+        return remote:_request(M_COUNT, opts, nil, code, { key, opts })
     end
 
     function methods:delete(key, opts)
         check_index_arg(self, 'delete')
-        return nothing_or_data(remote:_request('delete', opts,
+        return nothing_or_data(remote:_request(M_DELETE, opts,
                                                self.space._format_cdata,
                                                self.space.id, self.id, key))
     end
 
     function methods:update(key, oplist, opts)
         check_index_arg(self, 'update')
-        return nothing_or_data(remote:_request('update', opts,
+        return nothing_or_data(remote:_request(M_UPDATE, opts,
                                                self.space._format_cdata,
                                                self.space.id, self.id, key,
                                                oplist))
@@ -1558,6 +1580,26 @@ local this_module = {
     new = connect, -- Tarantool < 1.7.1 compatibility,
     wrap = wrap,
     establish_connection = establish_connection,
+    _method = { -- for tests
+        ping        = M_PING,
+        call_16     = M_CALL_16,
+        call_17     = M_CALL_17,
+        eval        = M_EVAL,
+        insert      = M_INSERT,
+        replace     = M_REPLACE,
+        delete      = M_DELETE,
+        update      = M_UPDATE,
+        upsert      = M_UPSERT,
+        select      = M_SELECT,
+        execute     = M_EXECUTE,
+        prepare     = M_PREPARE,
+        unprepare   = M_UNPREPARE,
+        get         = M_GET,
+        min         = M_MIN,
+        max         = M_MAX,
+        count       = M_COUNT,
+        inject      = M_INJECT,
+    }
 }
 
 function this_module.timeout(timeout, ...)

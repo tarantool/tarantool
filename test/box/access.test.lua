@@ -1,5 +1,6 @@
 env = require('test_run')
 test_run = env.new()
+net = require('net.box')
 
 session = box.session
 -- user id for a Lua session is admin - 1
@@ -138,7 +139,7 @@ box.schema.user.drop('Петя_Иванов')
 -- gh-300: misleading error message if a function does not exist
 LISTEN = require('uri').parse(box.cfg.listen)
 LISTEN ~= nil
-c = (require 'net.box').connect(LISTEN.host, LISTEN.service)
+c = net.connect(LISTEN.host, LISTEN.service)
 
 c:call('nosuchfunction')
 function nosuchfunction() end
@@ -155,6 +156,7 @@ box.schema.user.grant('testus', 'write', 'space', 'admin_space')
 s:drop()
 box.snapshot()
 test_run:cmd('restart server default')
+net = require('net.box')
 box.schema.user.drop('testus')
 -- ------------------------------------------------------------
 -- a test case for gh-289
@@ -348,10 +350,10 @@ box.schema.func.drop(name)
 -- Verify that when trying to access a non-existing or
 -- very large space id, no crash occurs.
 LISTEN = require('uri').parse(box.cfg.listen)
-c = (require 'net.box').connect(LISTEN.host, LISTEN.service)
-c:_request("select", nil, nil, 1, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
-c:_request("select", nil, nil, 65537, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
-c:_request("select", nil, nil, 4294967295, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
+c = net.connect(LISTEN.host, LISTEN.service)
+c:_request(net._method.select, nil, nil, 1, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
+c:_request(net._method.select, nil, nil, 65537, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
+c:_request(net._method.select, nil, nil, 4294967295, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
 c:close()
 
 session = box.session
@@ -429,7 +431,7 @@ box.schema.user.disable("test")
 -- test double disable is a no op
 box.schema.user.disable("test")
 session.su("test")
-c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user="test", password="pass"})
+c = net.connect(LISTEN.host, LISTEN.service, {user="test", password="pass"})
 c.state
 c.error
 
@@ -499,7 +501,7 @@ seq:set(1)
 obj_type, obj_name, op_type
 euid, auid
 box.session.su("admin")
-c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user="test_user", password="pass"})
+c = net.connect(LISTEN.host, LISTEN.service, {user="test_user", password="pass"})
 function func() end
 st, e = pcall(c.call, c, func)
 obj_type, op_type
@@ -514,7 +516,7 @@ obj_type, obj_name, op_type
 euid, auid
 box.session.su("admin")
 box.schema.user.revoke("test_user", "session", "universe")
-c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user="test_user", password="pass"})
+c = net.connect(LISTEN.host, LISTEN.service, {user="test_user", password="pass"})
 obj_type, obj_name, op_type
 euid, auid
 box.session.on_access_denied(nil, access_denied_trigger)
@@ -710,7 +712,7 @@ s = box.schema.space.create("test")
 _ = s:create_index("primary", {parts={1, "unsigned"}})
 seq = box.schema.sequence.create("test")
 box.schema.func.create("func")
-c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user='tester', password = '123'})
+c = net.connect(LISTEN.host, LISTEN.service, {user='tester', password = '123'})
 
 box.session.su("tester", s.select, s)
 box.session.su("tester", seq.set, seq, 1)
