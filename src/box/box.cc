@@ -1535,6 +1535,139 @@ box_wait_quorum(uint32_t lead_id, int64_t target_lsn, int quorum,
 	return 0;
 }
 
+/**
+ * A helper to start new Raft election round and wait until the election results
+ * are known.
+ * Returns 0 in case this instance has won the elections, -1 otherwise.
+ */
+static int
+box_run_elections(void)
+{
+	struct raft *raft = box_raft();
+	assert(raft->is_enabled);
+	assert(box_election_mode != ELECTION_MODE_VOTER);
+	/*
+	 * Make this instance a candidate and run until some leader, not
+	 * necessarily this instance, emerges.
+	 */
+	do {
+		raft_promote(raft);
+		if (box_raft_wait_term_outcome() != 0) {
+			raft_restore(raft);
+			return -1;
+		}
+	} while (raft->leader == 0);
+	if (raft->state != RAFT_STATE_LEADER) {
+		diag_set(ClientError, ER_INTERFERING_PROMOTE,
+			 raft->leader);
+		return -1;
+	}
+
+	return 0;
+}
+
+/**
+ * Check whether the greatest promote term has changed since it was last read.
+ * IOW check that a foreign PROMOTE arrived while we were sleeping.
+ */
+static int
+box_check_promote_term_intact(uint64_t promote_term)
+{
+	if (txn_limbo.promote_greatest_term != promote_term) {
+		diag_set(ClientError, ER_INTERFERING_PROMOTE,
+			 txn_limbo.owner_id);
+		return -1;
+	}
+	return 0;
+}
+
+/** Try waiting until limbo is emptied up to given timeout. */
+static int
+box_try_wait_confirm(double timeout)
+{
+	uint64_t promote_term = txn_limbo.promote_greatest_term;
+	txn_limbo_wait_empty(&txn_limbo, timeout);
+	return box_check_promote_term_intact(promote_term);
+}
+
+/**
+ * A helper to wait until all limbo entries are ready to be confirmed, i.e.
+ * written to WAL and have gathered a quorum of ACKs from replicas.
+ * Return lsn of the last limbo entry on success, -1 on error.
+ */
+static int64_t
+box_wait_limbo_acked(double timeout)
+{
+	if (txn_limbo_is_empty(&txn_limbo))
+		return txn_limbo.confirmed_lsn;
+
+	uint64_t promote_term = txn_limbo.promote_greatest_term;
+	int quorum = replication_synchro_quorum;
+	struct txn_limbo_entry *last_entry;
+	last_entry = txn_limbo_last_synchro_entry(&txn_limbo);
+	/* Wait for the last entries WAL write. */
+	if (last_entry->lsn < 0) {
+		int64_t tid = last_entry->txn->id;
+
+		if (wal_sync(NULL) != 0)
+			return -1;
+
+		if (box_check_promote_term_intact(promote_term) != 0)
+			return -1;
+		if (txn_limbo_is_empty(&txn_limbo))
+			return txn_limbo.confirmed_lsn;
+		if (tid != txn_limbo_last_synchro_entry(&txn_limbo)->txn->id) {
+			diag_set(ClientError, ER_QUORUM_WAIT, quorum,
+				 "new synchronous transactions appeared");
+			return -1;
+		}
+	}
+	assert(last_entry->lsn > 0);
+	int64_t wait_lsn = last_entry->lsn;
+
+	if (box_wait_quorum(txn_limbo.owner_id, wait_lsn, quorum, timeout) != 0)
+		return -1;
+
+	if (box_check_promote_term_intact(promote_term) != 0)
+		return -1;
+
+	if (txn_limbo_is_empty(&txn_limbo))
+		return txn_limbo.confirmed_lsn;
+
+	if (quorum < replication_synchro_quorum) {
+		diag_set(ClientError, ER_QUORUM_WAIT, quorum,
+			 "quorum was increased while waiting");
+		return -1;
+	}
+	if (wait_lsn < txn_limbo_last_synchro_entry(&txn_limbo)->lsn) {
+		diag_set(ClientError, ER_QUORUM_WAIT, quorum,
+			 "new synchronous transactions appeared");
+		return -1;
+	}
+
+	return wait_lsn;
+}
+
+/** Write and process a PROMOTE request. */
+static void
+box_issue_promote(uint32_t prev_leader_id, int64_t promote_lsn)
+{
+	struct raft *raft = box_raft();
+	assert(raft->volatile_term == raft->term);
+	assert(promote_lsn >= 0);
+	txn_limbo_write_promote(&txn_limbo, promote_lsn,
+				raft->term);
+	struct synchro_request req = {
+		.type = IPROTO_PROMOTE,
+		.replica_id = prev_leader_id,
+		.origin_id = instance_id,
+		.lsn = promote_lsn,
+		.term = raft->term,
+	};
+	txn_limbo_process(&txn_limbo, &req);
+	assert(txn_limbo_is_empty(&txn_limbo));
+}
+
 int
 box_promote(void)
 {
@@ -1546,6 +1679,10 @@ box_promote(void)
 		return -1;
 	}
 	struct raft *raft = box_raft();
+	in_promote = true;
+	auto promote_guard = make_scoped_guard([&] {
+		in_promote = false;
+	});
 	/*
 	 * Do nothing when box isn't configured and when PROMOTE was already
 	 * written for this term (synchronous replication and leader election
@@ -1553,12 +1690,10 @@ box_promote(void)
 	 */
 	if (!is_box_configured)
 		return 0;
-	bool run_elections = false;
-	bool try_wait = false;
-
 	switch (box_election_mode) {
 	case ELECTION_MODE_OFF:
-		try_wait = true;
+		if (box_try_wait_confirm(2 * replication_synchro_timeout) != 0)
+			return -1;
 		break;
 	case ELECTION_MODE_VOTER:
 		assert(raft->state == RAFT_STATE_FOLLOWER);
@@ -1568,7 +1703,8 @@ box_promote(void)
 	case ELECTION_MODE_MANUAL:
 		if (raft->state == RAFT_STATE_LEADER)
 			return 0;
-		run_elections = true;
+		if (box_run_elections() != 0)
+			return -1;
 		break;
 	case ELECTION_MODE_CANDIDATE:
 		/*
@@ -1584,117 +1720,17 @@ box_promote(void)
 		if (txn_limbo_replica_term(&txn_limbo, instance_id) ==
 		    raft->term)
 			return 0;
-
 		break;
 	default:
 		unreachable();
 	}
 
-	uint32_t former_leader_id = txn_limbo.owner_id;
-	int64_t wait_lsn = txn_limbo.confirmed_lsn;
-	int rc = 0;
-	int quorum = replication_synchro_quorum;
-	in_promote = true;
-	auto promote_guard = make_scoped_guard([&] {
-		in_promote = false;
-	});
+	int64_t wait_lsn = box_wait_limbo_acked(replication_synchro_timeout);
+	if (wait_lsn < 0)
+		return -1;
 
-	if (run_elections) {
-		/*
-		 * Make this instance a candidate and run until some leader, not
-		 * necessarily this instance, emerges.
-		 */
-		do {
-			raft_promote(raft);
-			rc = box_raft_wait_term_outcome();
-			if (rc != 0) {
-				raft_restore(raft);
-				return -1;
-			}
-		} while (raft->leader == 0);
-		if (raft->state != RAFT_STATE_LEADER) {
-			diag_set(ClientError, ER_INTERFERING_PROMOTE,
-				 raft->leader);
-			return -1;
-		}
-	}
-
-	if (txn_limbo_is_empty(&txn_limbo))
-		goto promote;
-
-	if (try_wait) {
-		/* Wait until pending confirmations/rollbacks reach us. */
-		double timeout = 2 * replication_synchro_timeout;
-		txn_limbo_wait_empty(&txn_limbo, timeout);
-		/*
-		 * Our mission was to clear the limbo from former leader's
-		 * transactions. Exit in case someone did that for us.
-		 */
-		if (former_leader_id != txn_limbo.owner_id) {
-			diag_set(ClientError, ER_INTERFERING_PROMOTE,
-				 txn_limbo.owner_id);
-			return -1;
-		}
-		if (txn_limbo_is_empty(&txn_limbo)) {
-			wait_lsn = txn_limbo.confirmed_lsn;
-			goto promote;
-		}
-	}
-
-	struct txn_limbo_entry *last_entry;
-	last_entry = txn_limbo_last_synchro_entry(&txn_limbo);
-	/* Wait for the last entries WAL write. */
-	if (last_entry->lsn < 0) {
-		int64_t tid = last_entry->txn->id;
-		if (wal_sync(NULL) < 0)
-			return -1;
-		if (former_leader_id != txn_limbo.owner_id) {
-			diag_set(ClientError, ER_INTERFERING_PROMOTE,
-				 txn_limbo.owner_id);
-			return -1;
-		}
-		if (txn_limbo_is_empty(&txn_limbo)) {
-			wait_lsn = txn_limbo.confirmed_lsn;
-			goto promote;
-		}
-		if (tid != txn_limbo_last_synchro_entry(&txn_limbo)->txn->id) {
-			diag_set(ClientError, ER_QUORUM_WAIT, quorum,
-				 "new synchronous transactions appeared");
-			return -1;
-		}
-	}
-	wait_lsn = last_entry->lsn;
-	assert(wait_lsn > 0);
-
-	rc = box_wait_quorum(former_leader_id, wait_lsn, quorum,
-			     replication_synchro_timeout);
-	if (rc == 0) {
-		if (quorum < replication_synchro_quorum) {
-			diag_set(ClientError, ER_QUORUM_WAIT, quorum,
-				 "quorum was increased while waiting");
-			rc = -1;
-		} else if (wait_lsn < txn_limbo_last_synchro_entry(&txn_limbo)->lsn) {
-			diag_set(ClientError, ER_QUORUM_WAIT, quorum,
-				 "new synchronous transactions appeared");
-			rc = -1;
-		} else {
-promote:
-			/* We cannot possibly get here in a volatile state. */
-			assert(raft->volatile_term == raft->term);
-			txn_limbo_write_promote(&txn_limbo, wait_lsn,
-						raft->term);
-			struct synchro_request req = {
-				.type = IPROTO_PROMOTE,
-				.replica_id = former_leader_id,
-				.origin_id = instance_id,
-				.lsn = wait_lsn,
-				.term = raft->term,
-			};
-			txn_limbo_process(&txn_limbo, &req);
-			assert(txn_limbo_is_empty(&txn_limbo));
-		}
-	}
-	return rc;
+	box_issue_promote(txn_limbo.owner_id, wait_lsn);
+	return 0;
 }
 
 int
