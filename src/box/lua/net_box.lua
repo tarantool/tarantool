@@ -142,7 +142,6 @@ local method_decoder = {
     max     = decode_get,
     count   = decode_count,
     inject  = decode_data,
-    push    = decode_push,
 }
 
 local function decode_error(raw_data)
@@ -662,8 +661,7 @@ local function create_transport(host, port, user, password, callback,
             request.id = nil
         else
             local msg
-            msg, real_end, request.errno =
-                method_decoder.push(body_rpos, body_end)
+            msg, real_end, request.errno = decode_push(body_rpos, body_end)
             assert(real_end == body_end, "invalid body length")
             request.on_push(request.on_push_ctx, msg)
         end
