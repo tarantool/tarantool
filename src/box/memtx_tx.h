@@ -161,6 +161,9 @@ struct memtx_tx_snapshot_cleaner {
 	struct mh_snapshot_cleaner_t *ht;
 };
 
+void
+memtx_tx_register_tx(struct txn *tx);
+
 /**
  * Initialize memtx transaction manager.
  */
