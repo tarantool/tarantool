@@ -543,7 +543,7 @@ local function create_transport(host, port, user, password, callback,
     -- @retval not nil Future object.
     --
     local function perform_async_request(buffer, skip_header, method, on_push,
-                                         on_push_ctx, request_ctx, ...)
+                                         on_push_ctx, format, ...)
         if state ~= 'active' and state ~= 'fetch_schema' then
             local code = last_errno or E_NO_CONNECTION
             local msg = last_error or
@@ -561,7 +561,7 @@ local function create_transport(host, port, user, password, callback,
         next_request_id = next_id(id)
         -- Request in most cases has maximum 10 members:
         -- method, buffer, skip_header, id, cond, errno, response,
-        -- on_push, on_push_ctx and ctx.
+        -- on_push, on_push_ctx and format.
         local request = setmetatable(table_new(0, 10), request_mt)
         request.method = method
         request.buffer = buffer
@@ -571,7 +571,7 @@ local function create_transport(host, port, user, password, callback,
         requests[id] = request
         request.on_push = on_push
         request.on_push_ctx = on_push_ctx
-        request.ctx = request_ctx
+        request.format = format
         return request
     end
 
@@ -581,10 +581,10 @@ local function create_transport(host, port, user, password, callback,
     -- @retval not nil Response object.
     --
     local function perform_request(timeout, buffer, skip_header, method,
-                                   on_push, on_push_ctx, request_ctx, ...)
+                                   on_push, on_push_ctx, format, ...)
         local request, err =
             perform_async_request(buffer, skip_header, method, on_push,
-                                  on_push_ctx, request_ctx, ...)
+                                  on_push_ctx, format, ...)
         if not request then
             return nil, err
         end
@@ -668,7 +668,8 @@ local function create_transport(host, port, user, password, callback,
         -- Decode xrow.body[DATA] to Lua objects
         if status == IPROTO_OK_KEY then
             request.response, real_end =
-                method_decoder[request.method](body_rpos, body_end, request.ctx)
+                method_decoder[request.method](body_rpos, body_end,
+                                               request.format)
             assert(real_end == body_end, "invalid body length")
             requests[id] = nil
             request.id = nil
@@ -1165,7 +1166,7 @@ function remote_methods:wait_connected(timeout)
     return self._transport.wait_state('active', timeout)
 end
 
-function remote_methods:_request(method, opts, request_ctx, ...)
+function remote_methods:_request(method, opts, format, ...)
     local transport = self._transport
     local on_push, on_push_ctx, buffer, skip_header, deadline
     -- Extract options, set defaults, check if the request is
@@ -1179,7 +1180,7 @@ function remote_methods:_request(method, opts, request_ctx, ...)
             end
             local res, err =
                 transport.perform_async_request(buffer, skip_header, method,
-                                                table.insert, {}, request_ctx,
+                                                table.insert, {}, format,
                                                 ...)
             if err then
                 box.error(err)
@@ -1202,7 +1203,7 @@ function remote_methods:_request(method, opts, request_ctx, ...)
     end
     local res, err = transport.perform_request(timeout, buffer, skip_header,
                                                method, on_push, on_push_ctx,
-                                               request_ctx, ...)
+                                               format, ...)
     if err then
         box.error(err)
     end
