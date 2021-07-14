@@ -24,7 +24,7 @@ local check_primary_index = box.internal.check_primary_index
 
 local communicate     = internal.communicate
 local encode_auth     = internal.encode_auth
-local encode_select   = internal.encode_select
+local encode_method   = internal.encode_method
 local decode_greeting = internal.decode_greeting
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
@@ -110,31 +110,6 @@ end
 local function version_at_least(peer_version_id, major, minor, patch)
     return peer_version_id >= version_id(major, minor, patch)
 end
-
-local method_encoder = {
-    [M_PING]        = internal.encode_ping,
-    [M_CALL_16]     = internal.encode_call_16,
-    [M_CALL_17]     = internal.encode_call,
-    [M_EVAL]        = internal.encode_eval,
-    [M_INSERT]      = internal.encode_insert,
-    [M_REPLACE]     = internal.encode_replace,
-    [M_DELETE]      = internal.encode_delete,
-    [M_UPDATE]      = internal.encode_update,
-    [M_UPSERT]      = internal.encode_upsert,
-    [M_SELECT]      = internal.encode_select,
-    [M_EXECUTE]     = internal.encode_execute,
-    [M_PREPARE]     = internal.encode_prepare,
-    [M_UNPREPARE]   = internal.encode_prepare,
-    [M_GET]         = internal.encode_select,
-    [M_MIN]         = internal.encode_select,
-    [M_MAX]         = internal.encode_select,
-    [M_COUNT]       = internal.encode_call,
-    [M_INJECT]      = function(buf, id, bytes) -- luacheck: no unused args
-        local ptr = buf:reserve(#bytes)
-        ffi.copy(ptr, bytes, #bytes)
-        buf.wpos = ptr + #bytes
-    end
-}
 
 local method_decoder = {
     [M_PING]        = decode_nil,
@@ -557,7 +532,7 @@ local function create_transport(host, port, user, password, callback,
             worker_fiber:wakeup()
         end
         local id = next_request_id
-        method_encoder[method](send_buf, id, ...)
+        encode_method(method, send_buf, id, ...)
         next_request_id = next_id(id)
         -- Request in most cases has maximum 10 members:
         -- method, buffer, skip_header, id, cond, errno, response,
@@ -770,7 +745,7 @@ local function create_transport(host, port, user, password, callback,
             log.warn("Netbox text protocol support is deprecated since 1.10, "..
                      "please use require('console').connect() instead")
             local setup_delimiter = 'require("console").delimiter("$EOF$")\n'
-            method_encoder[M_INJECT](send_buf, nil, setup_delimiter)
+            encode_method(M_INJECT, send_buf, nil, setup_delimiter)
             local err, response = send_and_recv_console()
             if err then
                 return error_sm(err, response)
@@ -830,14 +805,16 @@ local function create_transport(host, port, user, password, callback,
         local select3_id
         local response = {}
         -- fetch everything from space _vspace, 2 = ITER_ALL
-        encode_select(send_buf, select1_id, VSPACE_ID, 0, 2, 0, 0xFFFFFFFF, nil)
+        encode_method(M_SELECT, send_buf, select1_id, VSPACE_ID, 0, 2, 0,
+                      0xFFFFFFFF, nil)
         -- fetch everything from space _vindex, 2 = ITER_ALL
-        encode_select(send_buf, select2_id, VINDEX_ID, 0, 2, 0, 0xFFFFFFFF, nil)
+        encode_method(M_SELECT, send_buf, select2_id, VINDEX_ID, 0, 2, 0,
+                      0xFFFFFFFF, nil)
         -- fetch everything from space _vcollation, 2 = ITER_ALL
         if peer_has_vcollation then
             select3_id = new_request_id()
-            encode_select(send_buf, select3_id, VCOLLATION_ID, 0, 2, 0,
-                          0xFFFFFFFF, nil)
+            encode_method(M_SELECT, send_buf, select3_id, VCOLLATION_ID,
+                          0, 2, 0, 0xFFFFFFFF, nil)
         end
 
         schema_version = nil -- any schema_version will do provided that
