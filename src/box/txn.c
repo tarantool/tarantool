@@ -205,6 +205,7 @@ txn_new(void)
 	rlist_create(&txn->conflict_list);
 	rlist_create(&txn->conflicted_by_list);
 	rlist_create(&txn->in_read_view_txs);
+	rlist_create(&txn->in_all_txs);
 	return txn;
 }
 
@@ -238,6 +239,7 @@ txn_free(struct txn *txn)
 	assert(rlist_empty(&txn->conflicted_by_list));
 
 	rlist_del(&txn->in_read_view_txs);
+	rlist_del(&txn->in_all_txs);
 
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next)
@@ -300,6 +302,7 @@ txn_begin(void)
 	txn->engine_tx = NULL;
 	txn->fk_deferred_count = 0;
 	rlist_create(&txn->savepoints);
+	memtx_tx_register_tx(txn);
 	txn->fiber = NULL;
 	fiber_set_txn(fiber(), txn);
 	/* fiber_on_yield is initialized by engine on demand */

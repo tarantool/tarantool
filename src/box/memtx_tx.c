@@ -193,6 +193,8 @@ struct tx_manager
 	struct rlist all_stories;
 	/** Iterator that sequentially traverses all memtx_story objects. */
 	struct rlist *traverse_all_stories;
+	/** The list containing all transactions. */
+	struct rlist all_txs;
 	/** Accumulated number of GC steps that should be done. */
 	size_t must_do_gc_steps;
 };
@@ -234,6 +236,7 @@ memtx_tx_manager_init()
 		       cord_slab_cache(), sizeof(struct gap_item));
 	txm.point_holes_size = 0;
 	rlist_create(&txm.all_stories);
+	rlist_create(&txm.all_txs);
 	txm.traverse_all_stories = &txm.all_stories;
 	txm.must_do_gc_steps = 0;
 }
@@ -247,6 +250,12 @@ memtx_tx_manager_free()
 	mempool_destroy(&txm.point_hole_item_pool);
 	mh_point_holes_delete(txm.point_holes);
 	mempool_destroy(&txm.gap_item_mempoool);
+}
+
+void
+memtx_tx_register_tx(struct txn *tx)
+{
+	rlist_add_tail(&txm.all_txs, &tx->in_all_txs);
 }
 
 int
