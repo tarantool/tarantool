@@ -361,13 +361,14 @@ module_reload(const char *package, const char *package_end, struct module **modu
 
 	struct func *func, *tmp_func;
 	rlist_foreach_entry_safe(func, &old_module->funcs, item, tmp_func) {
+		/* Move immediately for restore sake. */
+		rlist_move(&new_module->funcs, &func->item);
 		struct func_name name;
 		func_split_name(func->def->name, &name);
 		func->func = module_sym(new_module, name.sym);
 		if (func->func == NULL)
 			goto restore;
 		func->module = new_module;
-		rlist_move(&new_module->funcs, &func->item);
 	}
 	module_cache_del(package, package_end);
 	if (module_cache_put(new_module) != 0)
@@ -377,10 +378,10 @@ module_reload(const char *package, const char *package_end, struct module **modu
 	return 0;
 restore:
 	/*
-	 * Some old-dso func can't be load from new module, restore old
-	 * functions.
+	 * Some old functions are not found in the new module,
+	 * thus restore all migrated functions back to the original.
 	 */
-	do {
+	rlist_foreach_entry_safe(func, &new_module->funcs, item, tmp_func) {
 		struct func_name name;
 		func_split_name(func->def->name, &name);
 		func->func = module_sym(old_module, name.sym);
@@ -394,9 +395,7 @@ restore:
 		}
 		func->module = old_module;
 		rlist_move(&old_module->funcs, &func->item);
-	} while (func != rlist_first_entry(&old_module->funcs,
-					   struct func, item));
-	assert(rlist_empty(&new_module->funcs));
+	}
 	module_delete(new_module);
 	return -1;
 }
