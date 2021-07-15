@@ -57,6 +57,20 @@ local function table_shallowcopy(orig)
     return copy
 end
 
+--- Check if a table is an array
+-- @function isarray
+-- @table         inp  table to check
+-- @returns            boolean (true if table is an array, false otherwise)
+local function table_isarray(obj)
+    if type(obj) ~= "table" then return false end
+    local count = tonumber("0")
+    for idx, _ in pairs(obj) do
+        count = count + 1
+        if type(idx) ~= "number" then return false end
+    end
+    return count == #obj
+end
+
 -- table library extension
 local table = require('table')
 -- require modifies global "table" module and adds "clear" function to it.
@@ -65,3 +79,4 @@ require('table.clear')
 
 table.copy     = table_shallowcopy
 table.deepcopy = table_deepcopy
+table.isarray  = table_isarray

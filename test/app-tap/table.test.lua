@@ -8,7 +8,7 @@ yaml.cfg{
     encode_invalid_as_nil  = true,
 }
 local test = require('tap').test('table')
-test:plan(31)
+test:plan(35)
 
 do -- check basic table.copy (deepcopy)
     local example_table = {
@@ -220,6 +220,29 @@ do -- check usage of not __copy metamethod on second level + shallow
         one_self[1].a,
         another_self[1].a,
         "checking that we've called __copy + shallow and object val is the same"
+    )
+end
+
+do -- check isarray function
+    test:is(
+            table.isarray({a = 1}),
+            false,
+            "checking that dict is not array"
+    )
+    test:is(
+            table.isarray({1, 2, 3, 4}),
+            true,
+            "checking that array is recognized"
+    )
+    test:is(
+            table.isarray({[2] = 3}),
+            false,
+            "checking that dict with numeric keys is not array"
+    )
+    test:is(
+            table.isarray({1, 2, 3, 4, key = 5}),
+            false,
+            "checking that dict which is partially array is not array"
     )
 end
 
