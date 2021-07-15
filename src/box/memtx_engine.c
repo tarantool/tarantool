@@ -400,6 +400,8 @@ memtx_engine_prepare(struct engine *engine, struct txn *txn)
 		if (stmt->add_story != NULL || stmt->del_story != NULL)
 			memtx_tx_history_prepare_stmt(stmt);
 	}
+	if (txn->is_schema_changed)
+		memtx_tx_abort_all_for_ddl(txn);
 	return 0;
 }
 

@@ -302,6 +302,7 @@ txn_begin(void)
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
 	txn->fk_deferred_count = 0;
+	txn->is_schema_changed = false;
 	rlist_create(&txn->savepoints);
 	memtx_tx_register_tx(txn);
 	txn->fiber = NULL;

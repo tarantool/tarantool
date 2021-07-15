@@ -183,6 +183,21 @@ void
 memtx_tx_manager_free();
 
 /**
+ * Transaction providing DDL changes is disallowed to yield after
+ * modifications of internal caches (i.e. after ALTER operation finishes).
+ */
+void
+memtx_tx_acquire_ddl(struct txn *tx);
+
+/**
+ * Mark all transactions except for a given as aborted due to conflict:
+ * when DDL operation is about to be committed other transactions are
+ * considered to use obsolete schema so that should be aborted.
+ */
+void
+memtx_tx_abort_all_for_ddl(struct txn *ddl_owner);
+
+/**
  * Notify TX manager that if transaction @a breaker is committed then the
  * transaction @a victim must be aborted due to conflict. It is achieved
  * by adding corresponding entry (of tx_conflict_tracker type) to @a breaker
