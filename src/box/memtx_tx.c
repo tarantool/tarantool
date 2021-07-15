@@ -277,6 +277,27 @@ memtx_tx_register_tx(struct txn *tx)
 	rlist_add_tail(&txm.all_txs, &tx->in_all_txs);
 }
 
+void
+memtx_tx_acquire_ddl(struct txn *tx)
+{
+	tx->is_schema_changed = true;
+	(void) txn_can_yield(tx, false);
+}
+
+void
+memtx_tx_abort_all_for_ddl(struct txn *ddl_owner)
+{
+	struct txn *to_be_aborted;
+	rlist_foreach_entry(to_be_aborted, &txm.all_txs, in_all_txs) {
+		if (to_be_aborted == ddl_owner)
+			continue;
+		to_be_aborted->status = TXN_CONFLICTED;
+		say_warn("Transaction committing DDL (id=%lld) has aborted "
+			 "another TX (id=%lld)", (long long) ddl_owner->id,
+			 (long long) to_be_aborted->id);
+	}
+}
+
 int
 memtx_tx_cause_conflict(struct txn *breaker, struct txn *victim)
 {
