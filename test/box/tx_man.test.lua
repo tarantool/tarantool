@@ -722,28 +722,10 @@ function test1()                                 \
 end
 f = fiber.new(test1)
 channel1:get()
-tx1('box.space.test:select()')
-tx1('box.space.test:replace({1, 2, 3})')
 
-assert(box.space.test ~= nil)
+assert(box.space.test == nil)
 channel2:put(1)
 channel1:get()
-assert(box.space.test == nil)
-
--- "100% reproducer" from #5515
-box.begin()
-s = box.schema.space.create('test')
-_ = box.space.test:create_index('pk')
-box.space.test:replace({1,2,3})
-tx1:begin()
-tx1('s:replace{2,2,3}');
-tx1('s:replace{3,2,3}');
-tx1:commit()
-box.space.test:truncate()
-assert(box.space.test ~= nil)
-box.rollback()
-assert(box.space.test == nil)
-collectgarbage()
 assert(box.space.test == nil)
 
 -- https://github.com/tarantool/tarantool/issues/6137
