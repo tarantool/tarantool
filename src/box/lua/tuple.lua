@@ -5,6 +5,7 @@ local msgpackffi = require('msgpackffi')
 local fun = require('fun')
 local buffer = require('buffer')
 local internal = require('box.internal')
+local table = require('table')
 local cord_ibuf_take = buffer.internal.cord_ibuf_take
 local cord_ibuf_put = buffer.internal.cord_ibuf_put
 
@@ -79,6 +80,9 @@ local tuple_encode = function(tmpbuf, obj)
     elseif is_tuple(obj) then
         encode_r(tmpbuf, obj, 1)
     elseif type(obj) == "table" then
+        if not table.isarray(obj) then
+            return box.error(box.error.TUPLE_NOT_ARRAY)
+        end
         encode_array(tmpbuf, #obj)
         for i = 1, #obj, 1 do
             encode_r(tmpbuf, obj[i], 1)

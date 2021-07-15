@@ -7,6 +7,7 @@ local log = require('log')
 local buffer = require('buffer')
 local session = box.session
 local internal = require('box.internal')
+local table = require('table')
 local function setmap(table)
     return setmetatable(table, { __serialize = 'map' })
 end
@@ -1403,7 +1404,12 @@ local ptuple = ffi.new('box_tuple_t *[1]')
 local function keify(key)
     if key == nil then
         return {}
-    elseif type(key) == "table" or is_tuple(key) then
+    elseif type(key) == "table" then
+        if not table.isarray(key) then
+            return box.error(box.error.TUPLE_NOT_ARRAY)
+        end
+        return key
+    elseif is_tuple(key) then
         return key
     end
     return {key}
@@ -1946,6 +1952,9 @@ base_index_mt.select_ffi = function(index, key, opts)
     check_index_arg(index, 'select')
     local ibuf = cord_ibuf_take()
     local key, key_end = tuple_encode(ibuf, key)
+    if key == nil then
+        return box.error()
+    end
     local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
 
     local port = ffi.cast('struct port *', port_c)

@@ -1,0 +1,70 @@
+-- test-run result file version 2
+-- https://github.com/tarantool/tarantool/issues/6167
+inspector = require('test_run').new()
+ | ---
+ | ...
+engine = inspector:get_cfg('engine')
+ | ---
+ | ...
+
+s = box.schema.create_space('test', {engine = engine})
+ | ---
+ | ...
+_ = s:create_index('pk')
+ | ---
+ | ...
+s:replace{1}
+ | ---
+ | - [1]
+ | ...
+s:select{key = 'value'}
+ | ---
+ | - error: Tuple/Key must be MsgPack array
+ | ...
+s:select{[2] = 1}
+ | ---
+ | - error: Tuple/Key must be MsgPack array
+ | ...
+s:select{1, key = 'value'}
+ | ---
+ | - error: Tuple/Key must be MsgPack array
+ | ...
+s:pairs{key = 'value'}
+ | ---
+ | - error: Tuple/Key must be MsgPack array
+ | ...
+s:pairs{[2] = 1}
+ | ---
+ | - error: Tuple/Key must be MsgPack array
+ | ...
+s:pairs{1, key = 'value'}
+ | ---
+ | - error: Tuple/Key must be MsgPack array
+ | ...
+s:fselect{key = 'value'}
+ | ---
+ | - error: Tuple/Key must be MsgPack array
+ | ...
+s:fselect{[2] = 1}
+ | ---
+ | - error: Tuple/Key must be MsgPack array
+ | ...
+s:fselect{1, key = 'value'}
+ | ---
+ | - error: Tuple/Key must be MsgPack array
+ | ...
+s:get{key = 'value'}
+ | ---
+ | - error: Tuple/Key must be MsgPack array
+ | ...
+s:get{[2] = 1}
+ | ---
+ | - error: Tuple/Key must be MsgPack array
+ | ...
+s:get{1, key = 'value'}
+ | ---
+ | - error: Tuple/Key must be MsgPack array
+ | ...
+s:drop()
+ | ---
+ | ...
