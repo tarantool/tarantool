@@ -27,6 +27,7 @@ local encode_auth     = internal.encode_auth
 local encode_method   = internal.encode_method
 local decode_greeting = internal.decode_greeting
 local decode_method   = internal.decode_method
+local decode_error    = internal.decode_error
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 local VSPACE_ID        = 281
@@ -40,7 +41,6 @@ local IPROTO_SYNC_KEY      = 0x01
 local IPROTO_SCHEMA_VERSION_KEY = 0x05
 local IPROTO_DATA_KEY      = 0x30
 local IPROTO_ERROR_24      = 0x31
-local IPROTO_ERROR         = 0x52
 local IPROTO_GREETING_SIZE = 128
 local IPROTO_CHUNK_KEY     = 128
 local IPROTO_OK_KEY        = 0
@@ -73,14 +73,6 @@ local M_COUNT       = 16
 -- Injects raw data into connection. Used by console and tests.
 local M_INJECT      = 17
 
-ffi.cdef[[
-struct error *
-error_unpack_unsafe(const char **data);
-
-void
-error_unref(struct error *e);
-]]
-
 -- utility tables
 local is_final_state         = {closed = 1, error = 1}
 
@@ -96,29 +88,6 @@ end
 local function version_at_least(peer_version_id, major, minor, patch)
     return peer_version_id >= version_id(major, minor, patch)
 end
-
-local function decode_error(raw_data)
-    local ptr = ffi.new('const char *[1]', raw_data)
-    local err = ffi.C.error_unpack_unsafe(ptr)
-    if err ~= nil then
-        err._refs = err._refs + 1
-        -- From FFI it is returned as 'struct error *', which is
-        -- not considered equal to 'const struct error &', and is
-        -- is not accepted by functions like box.error(). Need to
-        -- cast explicitly.
-        err = ffi.cast('const struct error &', err)
-        err = ffi.gc(err, ffi.C.error_unref)
-    else
-        -- Error unpacker installs fail reason into diag.
-        box.error()
-    end
-    return err, ptr[0]
-end
-
-local response_decoder = {
-    [IPROTO_ERROR_24] = decode,
-    [IPROTO_ERROR] = decode_error,
-}
 
 local function next_id(id) return band(id + 1, 0x7FFFFFFF) end
 
@@ -538,42 +507,14 @@ local function create_transport(host, port, user, password, callback,
             return
         end
         local status = hdr[IPROTO_STATUS_KEY]
-        local body
         local body_len = body_end - body_rpos
 
         if status > IPROTO_CHUNK_KEY then
             -- Handle errors
             requests[id] = nil
             request.id = nil
-            local map_len, key
-            map_len, body_rpos = decode_map_header(body_rpos, body_len)
-            -- Reserve for 2 keys and 2 array indexes. Because no
-            -- any guarantees how Lua will decide to save the
-            -- sparse table.
-            body = table_new(2, 2)
-            for _ = 1, map_len do
-                key, body_rpos = decode(body_rpos)
-                local rdec = response_decoder[key]
-                if rdec then
-                    body[key], body_rpos = rdec(body_rpos)
-                else
-                    _, body_rpos = decode(body_rpos)
-                end
-            end
-            assert(body_end == body_rpos, "invalid xrow length")
             request.errno = band(status, IPROTO_ERRNO_MASK)
-            -- IPROTO_ERROR comprises error encoded with
-            -- IPROTO_ERROR_24, so we may ignore content of that
-            -- key.
-            if body[IPROTO_ERROR] ~= nil then
-                request.response = body[IPROTO_ERROR]
-                assert(type(request.response) == 'cdata')
-            else
-                request.response = box.error.new({
-                    code = request.errno,
-                    reason = body[IPROTO_ERROR_24]
-                })
-            end
+            request.response = decode_error(body_rpos, request.errno)
             request.cond:broadcast()
             return
         end
