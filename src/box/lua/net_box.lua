@@ -26,6 +26,7 @@ local communicate     = internal.communicate
 local encode_auth     = internal.encode_auth
 local encode_method   = internal.encode_method
 local decode_greeting = internal.decode_greeting
+local decode_method   = internal.decode_method
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 local VSPACE_ID        = 281
@@ -83,21 +84,6 @@ error_unref(struct error *e);
 -- utility tables
 local is_final_state         = {closed = 1, error = 1}
 
-local function decode_nil(raw_data, raw_data_end) -- luacheck: no unused args
-    return nil, raw_data_end
-end
-local function decode_data(raw_data)
-    local response, raw_end = decode(raw_data)
-    return response[IPROTO_DATA_KEY], raw_end
-end
-local function decode_tuple(raw_data, raw_data_end, format) -- luacheck: no unused args
-    local response, raw_end = internal.decode_select(raw_data, nil, format)
-    return response[1], raw_end
-end
-local function decode_count(raw_data)
-    local response, raw_end = decode(raw_data)
-    return response[IPROTO_DATA_KEY][1], raw_end
-end
 local function decode_push(raw_data)
     local response, raw_end = decode(raw_data)
     return response[IPROTO_DATA_KEY][1], raw_end
@@ -110,27 +96,6 @@ end
 local function version_at_least(peer_version_id, major, minor, patch)
     return peer_version_id >= version_id(major, minor, patch)
 end
-
-local method_decoder = {
-    [M_PING]        = decode_nil,
-    [M_CALL_16]     = internal.decode_select,
-    [M_CALL_17]     = decode_data,
-    [M_EVAL]        = decode_data,
-    [M_INSERT]      = decode_tuple,
-    [M_REPLACE]     = decode_tuple,
-    [M_DELETE]      = decode_tuple,
-    [M_UPDATE]      = decode_tuple,
-    [M_UPSERT]      = decode_nil,
-    [M_SELECT]      = internal.decode_select,
-    [M_EXECUTE]     = internal.decode_execute,
-    [M_PREPARE]     = internal.decode_prepare,
-    [M_UNPREPARE]   = decode_nil,
-    [M_GET]         = decode_tuple,
-    [M_MIN]         = decode_tuple,
-    [M_MAX]         = decode_tuple,
-    [M_COUNT]       = decode_count,
-    [M_INJECT]      = decode_data,
-}
 
 local function decode_error(raw_data)
     local ptr = ffi.new('const char *[1]', raw_data)
@@ -642,9 +607,9 @@ local function create_transport(host, port, user, password, callback,
         local real_end
         -- Decode xrow.body[DATA] to Lua objects
         if status == IPROTO_OK_KEY then
-            request.response, real_end =
-                method_decoder[request.method](body_rpos, body_end,
-                                               request.format)
+            request.response, real_end = decode_method(request.method,
+                                                       body_rpos, body_end,
+                                                       request.format)
             assert(real_end == body_end, "invalid body length")
             requests[id] = nil
             request.id = nil
