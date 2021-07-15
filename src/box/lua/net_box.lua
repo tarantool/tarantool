@@ -73,13 +73,6 @@ local function decode_tuple(raw_data, raw_data_end, format) -- luacheck: no unus
     local response, raw_end = internal.decode_select(raw_data, nil, format)
     return response[1], raw_end
 end
-local function decode_get(raw_data, raw_data_end, format) -- luacheck: no unused args
-    local body, raw_end = internal.decode_select(raw_data, nil, format)
-    if body[2] then
-        return nil, raw_end, box.error.MORE_THAN_ONE_TUPLE
-    end
-    return body[1], raw_end
-end
 local function decode_count(raw_data)
     local response, raw_end = decode(raw_data)
     return response[IPROTO_DATA_KEY][1], raw_end
@@ -137,9 +130,9 @@ local method_decoder = {
     execute = internal.decode_execute,
     prepare = internal.decode_prepare,
     unprepare = decode_nil,
-    get     = decode_get,
-    min     = decode_get,
-    max     = decode_get,
+    get     = decode_tuple,
+    min     = decode_tuple,
+    max     = decode_tuple,
     count   = decode_count,
     inject  = decode_data,
 }
@@ -654,7 +647,7 @@ local function create_transport(host, port, user, password, callback,
         local real_end
         -- Decode xrow.body[DATA] to Lua objects
         if status == IPROTO_OK_KEY then
-            request.response, real_end, request.errno =
+            request.response, real_end =
                 method_decoder[request.method](body_rpos, body_end, request.ctx)
             assert(real_end == body_end, "invalid body length")
             requests[id] = nil
