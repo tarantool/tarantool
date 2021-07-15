@@ -1192,6 +1192,18 @@ public:
 	virtual void prepare(struct alter_space *alter);
 };
 
+static inline void
+space_check_format_with_yield(struct space *space,
+			      struct tuple_format *format)
+{
+	struct txn *txn = in_txn();
+	assert(txn != NULL);
+	(void) txn_can_yield(txn, true);
+	auto yield_guard =
+		make_scoped_guard([=] { txn_can_yield(txn, false); });
+	space_check_format_xc(space, format);
+}
+
 void
 CheckSpaceFormat::prepare(struct alter_space *alter)
 {
@@ -1203,7 +1215,7 @@ CheckSpaceFormat::prepare(struct alter_space *alter)
 		assert(new_format != NULL);
 		if (!tuple_format1_can_store_format2_tuples(new_format,
 							    old_format))
-		    space_check_format_xc(old_space, new_format);
+			space_check_format_with_yield(old_space, new_format);
 	}
 }
 
@@ -1444,6 +1456,18 @@ CreateIndex::alter_def(struct alter_space *alter)
 	index_def_list_add(&alter->key_list, new_index_def);
 }
 
+static inline void
+space_build_index_with_yield(struct space *old_space, struct space *new_space,
+			     struct index *new_index)
+{
+	struct txn *txn = in_txn();
+	assert(txn != NULL);
+	(void) txn_can_yield(txn, true);
+	auto yield_guard =
+		make_scoped_guard([=] { txn_can_yield(txn, false); });
+	space_build_index_xc(old_space, new_space, new_index);
+}
+
 /**
  * Optionally build the new index.
  *
@@ -1475,7 +1499,8 @@ CreateIndex::prepare(struct alter_space *alter)
 		space_add_primary_key_xc(alter->new_space);
 		return;
 	}
-	space_build_index_xc(alter->old_space, alter->new_space, new_index);
+	space_build_index_with_yield(alter->old_space, alter->new_space,
+				     new_index);
 }
 
 void
@@ -1540,7 +1565,8 @@ RebuildIndex::prepare(struct alter_space *alter)
 	/* Get the new index and build it.  */
 	new_index = space_index(alter->new_space, new_index_def->iid);
 	assert(new_index != NULL);
-	space_build_index_xc(alter->old_space, alter->new_space, new_index);
+	space_build_index_with_yield(alter->old_space, alter->new_space,
+				     new_index);
 }
 
 void
@@ -1627,7 +1653,8 @@ TruncateIndex::prepare(struct alter_space *alter)
 	 * callback to load indexes during local recovery.
 	 */
 	assert(new_index != NULL);
-	space_build_index_xc(alter->new_space, alter->new_space, new_index);
+	space_build_index_with_yield(alter->new_space, alter->new_space,
+				     new_index);
 }
 
 void

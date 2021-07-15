@@ -38,6 +38,7 @@
 #include "user.h"
 #include "vclock/vclock.h"
 #include "fiber.h"
+#include "memtx_tx.h"
 
 /**
  * @module Data Dictionary
@@ -262,6 +263,15 @@ space_cache_replace(struct space *old_space, struct space *new_space)
 		space_invalidate(old_space);
 }
 
+static int
+on_replace_dd_system_space(struct trigger *trigger, void *event)
+{
+	(void) trigger;
+	struct txn *txn = (struct txn *) event;
+	memtx_tx_acquire_ddl(txn);
+	return 0;
+}
+
 /** A wrapper around space_new() for data dictionary spaces. */
 static void
 sc_space_new(uint32_t id, const char *name,
@@ -296,6 +306,9 @@ sc_space_new(uint32_t id, const char *name,
 	space_cache_replace(NULL, space);
 	if (replace_trigger)
 		trigger_add(&space->on_replace, replace_trigger);
+	struct trigger *t = (struct trigger *) malloc(sizeof(*t));
+	trigger_create(t, on_replace_dd_system_space, NULL, (trigger_f0) free);
+	trigger_add(&space->on_replace, t);
 	/*
 	 * Data dictionary spaces are fully built since:
 	 * - they contain data right from the start
