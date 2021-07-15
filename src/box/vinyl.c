@@ -1076,9 +1076,6 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	if (txn_check_singlestatement(txn, "space format check") != 0)
 		return -1;
 
-	/* See the comment in vinyl_space_build_index(). */
-	bool could_yield = txn_can_yield(txn, true);
-
 	struct trigger on_replace;
 	struct vy_check_format_ctx ctx;
 	ctx.format = format;
@@ -1129,7 +1126,6 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 out:
 	diag_destroy(&ctx.diag);
 	trigger_clear(&on_replace);
-	txn_can_yield(txn, could_yield);
 	return rc;
 }
 
@@ -4180,23 +4176,6 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 		return -1;
 
 	/*
-	 * Tarantool doesn't support multi-engine transactions, and
-	 * DDL system tables are memtx tables. Memtx transactions,
-	 * generally, can't yield. So here we're in the middle of
-	 * a *memtx* transaction. We don't start a hidden vinyl
-	 * transaction for DDL to avoid its overhead, but some long
-	 * DDL operations can yield, like checking a format or
-	 * building an index. Unless we switch off memtx yield
-	 * rollback triggers, such yield leads to memtx transaction
-	 * rollback. It is safe to switch the trigger off though:
-	 * it protects subsequent memtx transactions from reading
-	 * a dirty state, and at this phase vinyl DDL does not
-	 * change the data dictionary, so there is no dirty state
-	 * that can be observed.
-	 */
-	bool could_yield = txn_can_yield(txn, true);
-
-	/*
 	 * Iterate over all tuples stored in the space and insert
 	 * each of them into the new LSM tree. Since read iterator
 	 * may yield, we install an on_replace trigger to forward
@@ -4295,7 +4274,6 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 out:
 	diag_destroy(&ctx.diag);
 	trigger_clear(&on_replace);
-	txn_can_yield(txn, could_yield);
 	return rc;
 }
 

@@ -2278,16 +2278,8 @@ channel1:get()
  | ---
  | - 1
  | ...
-tx1('box.space.test:select()')
- | ---
- | - - []
- | ...
-tx1('box.space.test:replace({1, 2, 3})')
- | ---
- | - - [1, 2, 3]
- | ...
 
-assert(box.space.test ~= nil)
+assert(box.space.test == nil)
  | ---
  | - true
  | ...
@@ -2298,59 +2290,6 @@ channel2:put(1)
 channel1:get()
  | ---
  | - 1
- | ...
-assert(box.space.test == nil)
- | ---
- | - true
- | ...
-
--- "100% reproducer" from #5515
-box.begin()
- | ---
- | ...
-s = box.schema.space.create('test')
- | ---
- | ...
-_ = box.space.test:create_index('pk')
- | ---
- | ...
-box.space.test:replace({1,2,3})
- | ---
- | - [1, 2, 3]
- | ...
-tx1:begin()
- | ---
- | - 
- | ...
-tx1('s:replace{2,2,3}');
- | ---
- | - - [2, 2, 3]
- | ...
-tx1('s:replace{3,2,3}');
- | ---
- | - - [3, 2, 3]
- | ...
-tx1:commit()
- | ---
- | - 
- | ...
-box.space.test:truncate()
- | ---
- | ...
-assert(box.space.test ~= nil)
- | ---
- | - true
- | ...
-box.rollback()
- | ---
- | ...
-assert(box.space.test == nil)
- | ---
- | - true
- | ...
-collectgarbage()
- | ---
- | - 0
  | ...
 assert(box.space.test == nil)
  | ---
@@ -2371,7 +2310,7 @@ tx1("_ = box.space.t:create_index('i')")
  | ...
 tx1:commit()
  | ---
- | - 
+ | - - {'error': 'Transaction has been aborted by a fiber yield'}
  | ...
 box.space.t:drop()
  | ---

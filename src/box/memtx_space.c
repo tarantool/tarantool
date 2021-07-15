@@ -915,8 +915,6 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 	if (txn_check_singlestatement(txn, "space format check") != 0)
 		return -1;
 
-	bool could_yield = txn_can_yield(txn, true);
-
 	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
 	struct memtx_ddl_state state;
 	state.format = format;
@@ -959,7 +957,6 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 	iterator_delete(it);
 	diag_destroy(&state.diag);
 	trigger_clear(&on_replace);
-	txn_can_yield(txn, could_yield);
 	return rc;
 }
 
@@ -1074,8 +1071,6 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	if (txn_check_singlestatement(txn, "index build") != 0)
 		return -1;
 
-	bool could_yield = txn_can_yield(txn, true);
-
 	struct memtx_engine *memtx = (struct memtx_engine *)src_space->engine;
 	struct memtx_ddl_state state;
 	state.index = new_index;
@@ -1153,7 +1148,6 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	iterator_delete(it);
 	diag_destroy(&state.diag);
 	trigger_clear(&on_replace);
-	txn_can_yield(txn, could_yield);
 	return rc;
 }
 
