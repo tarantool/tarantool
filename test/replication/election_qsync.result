@@ -75,13 +75,19 @@ box.cfg{                                                                        
  | ---
  | ...
 
-box.ctl.wait_rw()
+-- Promote is written asynchronously to the instance becoming the leader, so
+-- wait for it. As soon as it's written, the instance's definitely a leader.
+test_run:wait_cond(function()                                                   \
+    return box.info.synchro.queue.owner == box.info.id                          \
+end)
  | ---
+ | - true
  | ...
 assert(box.info.election.state == 'leader')
  | ---
  | - true
  | ...
+
 lsn = box.info.lsn
  | ---
  | ...
