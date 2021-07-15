@@ -39,8 +39,13 @@ box.cfg{                                                                        
     replication_timeout = 0.1,                                                  \
 }
 
-box.ctl.wait_rw()
+-- Promote is written asynchronously to the instance becoming the leader, so
+-- wait for it. As soon as it's written, the instance's definitely a leader.
+test_run:wait_cond(function()                                                   \
+    return box.info.synchro.queue.owner == box.info.id                          \
+end)
 assert(box.info.election.state == 'leader')
+
 lsn = box.info.lsn
 _ = fiber.create(function()                                                     \
     ok, err = pcall(box.space.test.replace, box.space.test, {1})                \
