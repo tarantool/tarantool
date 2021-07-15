@@ -40,6 +40,8 @@
 #include "box/xrow.h"
 #include "box/tuple.h"
 #include "box/execute.h"
+#include "box/error.h"
+#include "box/mp_error.h"
 
 #include "lua/msgpack.h"
 #include <base64.h>
@@ -1047,6 +1049,64 @@ netbox_decode_method(struct lua_State *L)
 	return 2;
 }
 
+/**
+ * Decodes an error from raw data and pushes it to Lua stack. Takes a pointer
+ * to the data (char ptr) and an error code.
+ */
+static int
+netbox_decode_error(struct lua_State *L)
+{
+	uint32_t ctypeid;
+	const char **data = luaL_checkcdata(L, 1, &ctypeid);
+	assert(ctypeid == CTID_CHAR_PTR || ctypeid == CTID_CONST_CHAR_PTR);
+	uint32_t errcode = lua_tointeger(L, 2);
+	struct error *error = NULL;
+	assert(mp_typeof(**data) == MP_MAP);
+	uint32_t map_size = mp_decode_map(data);
+	for (uint32_t i = 0; i < map_size; ++i) {
+		uint32_t key = mp_decode_uint(data);
+		if (key == IPROTO_ERROR) {
+			if (error != NULL)
+				error_unref(error);
+			error = error_unpack_unsafe(data);
+			if (error == NULL)
+				return luaT_error(L);
+			error_ref(error);
+			/*
+			 * IPROTO_ERROR comprises error encoded with
+			 * IPROTO_ERROR_24, so we may ignore content
+			 * of that key.
+			 */
+			break;
+		} else if (key == IPROTO_ERROR_24) {
+			if (error != NULL)
+				error_unref(error);
+			const char *reason = "";
+			uint32_t reason_len = 0;
+			if (mp_typeof(**data) == MP_STR)
+				reason = mp_decode_str(data, &reason_len);
+			box_error_raise(errcode, "%.*s", reason_len, reason);
+			error = box_error_last();
+			error_ref(error);
+			continue;
+		}
+		/* Skip value. */
+		mp_next(data);
+	}
+	if (error == NULL) {
+		/*
+		 * Error body is missing in the response.
+		 * Set the error code without a 'reason' message
+		 */
+		box_error_raise(errcode, "");
+		error = box_error_last();
+		error_ref(error);
+	}
+	luaT_pusherror(L, error);
+	error_unref(error);
+	return 1;
+}
+
 int
 luaopen_net_box(struct lua_State *L)
 {
@@ -1055,6 +1115,7 @@ luaopen_net_box(struct lua_State *L)
 		{ "encode_method",  netbox_encode_method },
 		{ "decode_greeting",netbox_decode_greeting },
 		{ "decode_method",  netbox_decode_method },
+		{ "decode_error",   netbox_decode_error },
 		{ "communicate",    netbox_communicate },
 		{ NULL, NULL}
 	};
