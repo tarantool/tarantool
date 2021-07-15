@@ -2828,6 +2828,9 @@ void
 box_process_vote(struct ballot *ballot)
 {
 	ballot->is_ro_cfg = cfg_geti("read_only") != 0;
+	enum election_mode mode = box_check_election_mode();
+	ballot->can_lead = mode == ELECTION_MODE_CANDIDATE ||
+			   mode == ELECTION_MODE_MANUAL;
 	ballot->is_anon = replication_anon;
 	ballot->is_ro = is_ro_summary;
 	ballot->is_booted = is_box_configured;

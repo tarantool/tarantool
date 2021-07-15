@@ -460,7 +460,9 @@ iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 		mp_sizeof_uint(UINT32_MAX) +
 		mp_sizeof_vclock_ignore0(&ballot->vclock) +
 		mp_sizeof_uint(UINT32_MAX) +
-		mp_sizeof_vclock_ignore0(&ballot->gc_vclock);
+		mp_sizeof_vclock_ignore0(&ballot->gc_vclock) +
+		mp_sizeof_uint(IPROTO_BALLOT_CAN_LEAD) +
+		mp_sizeof_bool(ballot->can_lead);
 
 	char *buf = obuf_reserve(out, max_size);
 	if (buf == NULL) {
@@ -472,7 +474,7 @@ iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 	char *data = buf + IPROTO_HEADER_LEN;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_BALLOT);
-	data = mp_encode_map(data, 6);
+	data = mp_encode_map(data, 7);
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_RO_CFG);
 	data = mp_encode_bool(data, ballot->is_ro_cfg);
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_RO);
@@ -485,6 +487,8 @@ iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 	data = mp_encode_vclock_ignore0(data, &ballot->vclock);
 	data = mp_encode_uint(data, IPROTO_BALLOT_GC_VCLOCK);
 	data = mp_encode_vclock_ignore0(data, &ballot->gc_vclock);
+	data = mp_encode_uint(data, IPROTO_BALLOT_CAN_LEAD);
+	data = mp_encode_bool(data, ballot->can_lead);
 	size_t size = data - buf;
 	assert(size <= max_size);
 
@@ -1365,6 +1369,7 @@ int
 xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 {
 	ballot->is_ro_cfg = false;
+	ballot->can_lead = false;
 	ballot->is_ro = false;
 	ballot->is_anon = false;
 	ballot->is_booted = true;
@@ -1436,6 +1441,11 @@ xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 			if (mp_typeof(*data) != MP_BOOL)
 				goto err;
 			ballot->is_booted = mp_decode_bool(&data);
+			break;
+		case IPROTO_BALLOT_CAN_LEAD:
+			if (mp_typeof(*data) != MP_BOOL)
+				goto err;
+			ballot->can_lead = mp_decode_bool(&data);
 			break;
 		default:
 			mp_next(&data);

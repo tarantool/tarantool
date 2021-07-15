@@ -168,6 +168,7 @@ enum iproto_ballot_key {
 	IPROTO_BALLOT_IS_RO = 0x04,
 	IPROTO_BALLOT_IS_ANON = 0x05,
 	IPROTO_BALLOT_IS_BOOTED = 0x06,
+	IPROTO_BALLOT_CAN_LEAD = 0x07,
 };
 
 #define bit(c) (1ULL<<IPROTO_##c)
