@@ -46,7 +46,9 @@
 #include "lua/msgpack.h"
 #include <base64.h>
 
+#include "assoc.h"
 #include "coio.h"
+#include "fiber_cond.h"
 #include "box/errcode.h"
 #include "lua/fiber.h"
 #include "mpstream/mpstream.h"
@@ -75,6 +77,243 @@ enum netbox_method {
 	NETBOX_INJECT      = 17,
 	netbox_method_MAX
 };
+
+struct netbox_registry {
+	/** sync -> netbox_request */
+	struct mh_i64ptr_t *requests;
+};
+
+struct netbox_request {
+	enum netbox_method method;
+	/**
+	 * Unique identifier needed for matching the request with its response.
+	 * Used as a key in the registry.
+	 */
+	uint64_t sync;
+	/**
+	 * The registry this request belongs to or NULL if the request has been
+	 * completed.
+	 */
+	struct netbox_registry *registry;
+	/** Format used for decoding the response (ref incremented). */
+	struct tuple_format *format;
+	/** Signaled when the response is received. */
+	struct fiber_cond cond;
+	/**
+	 * A user-provided buffer to which the response body should be copied.
+	 * If NULL, the response will be decoded to Lua stack.
+	 */
+	struct ibuf *buffer;
+	/**
+	 * Lua reference to the buffer. Used to prevent garbage collection in
+	 * case the user discards the request.
+	 */
+	int buffer_ref;
+	/**
+	 * Whether to skip MessagePack map header and IPROTO_DATA key when
+	 * copying the response body to a user-provided buffer. Ignored if
+	 * buffer is not set.
+	 */
+	bool skip_header;
+	/** Lua references to on_push trigger and its context. */
+	int on_push_ref;
+	int on_push_ctx_ref;
+	/**
+	 * Lua reference to the request result or LUA_NOREF if the response
+	 * hasn't been received yet. If the response was decoded to a
+	 * user-provided buffer (see buffer_ref), result_ref stores a Lua
+	 * reference to an integer value that contains the length of the
+	 * decoded data.
+	 */
+	int result_ref;
+	/**
+	 * Error if the request failed (ref incremented). NULL on success or if
+	 * the response hasn't been received yet.
+	 */
+	struct error *error;
+};
+
+static const char netbox_registry_typename[] = "net.box.registry";
+static const char netbox_request_typename[] = "net.box.request";
+
+/**
+ * Instead of pushing luaT_netbox_request_iterator_next with lua_pushcclosure
+ * in luaT_netbox_request_pairs, we get it by reference, because it works
+ * faster.
+ */
+static int luaT_netbox_request_iterator_next_ref;
+
+static void
+netbox_request_destroy(struct netbox_request *request)
+{
+	assert(request->registry == NULL);
+	if (request->format != NULL)
+		tuple_format_unref(request->format);
+	fiber_cond_destroy(&request->cond);
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, request->buffer_ref);
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, request->on_push_ref);
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, request->on_push_ctx_ref);
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, request->result_ref);
+	if (request->error != NULL)
+		error_unref(request->error);
+}
+
+/**
+ * Adds a request to a registry. There must not be a request with the same id
+ * (sync) in the registry. Returns -1 if out of memory.
+ */
+static int
+netbox_request_register(struct netbox_request *request,
+			struct netbox_registry *registry)
+{
+	struct mh_i64ptr_t *h = registry->requests;
+	struct mh_i64ptr_node_t node = { request->sync, request };
+	struct mh_i64ptr_node_t *old_node = NULL;
+	if (mh_i64ptr_put(h, &node, &old_node, NULL) == mh_end(h)) {
+		diag_set(OutOfMemory, 0, "mhash", "netbox_registry");
+		return -1;
+	}
+	assert(old_node == NULL);
+	request->registry = registry;
+	return 0;
+}
+
+/**
+ * Unregisters a previously registered request. Does nothing if the request has
+ * already been unregistered or has never been registered.
+ */
+static void
+netbox_request_unregister(struct netbox_request *request)
+{
+	struct netbox_registry *registry = request->registry;
+	if (registry == NULL)
+		return;
+	request->registry = NULL;
+	struct mh_i64ptr_t *h = registry->requests;
+	mh_int_t k = mh_i64ptr_find(h, request->sync, NULL);
+	assert(k != mh_end(h));
+	assert(mh_i64ptr_node(h, k)->val == request);
+	mh_i64ptr_del(h, k, NULL);
+}
+
+static inline bool
+netbox_request_is_ready(const struct netbox_request *request)
+{
+	return request->registry == NULL;
+}
+
+static inline void
+netbox_request_signal(struct netbox_request *request)
+{
+	fiber_cond_broadcast(&request->cond);
+}
+
+static inline void
+netbox_request_complete(struct netbox_request *request)
+{
+	netbox_request_unregister(request);
+	netbox_request_signal(request);
+}
+
+/**
+ * Waits on netbox_request::cond. Subtracts the wait time from the timeout.
+ * Returns false on timeout or if the fiber was cancelled.
+ */
+static inline bool
+netbox_request_wait(struct netbox_request *request, double *timeout)
+{
+	double ts = ev_monotonic_now(loop());
+	int rc = fiber_cond_wait_timeout(&request->cond, *timeout);
+	*timeout -= ev_monotonic_now(loop()) - ts;
+	return rc == 0;
+}
+
+static inline void
+netbox_request_set_result(struct netbox_request *request, int result_ref)
+{
+	assert(request->result_ref == LUA_NOREF);
+	request->result_ref = result_ref;
+}
+
+static inline void
+netbox_request_set_error(struct netbox_request *request, struct error *error)
+{
+	assert(request->error == NULL);
+	request->error = error;
+	error_ref(error);
+}
+
+/**
+ * Pushes the result or error to Lua stack. See the comment to request.result()
+ * for more information about the values pushed.
+ */
+static int
+netbox_request_push_result(struct netbox_request *request, struct lua_State *L)
+{
+	if (!netbox_request_is_ready(request)) {
+		diag_set(ClientError, ER_PROC_LUA, "Response is not ready");
+		return luaT_push_nil_and_error(L);
+	}
+	if (request->error != NULL) {
+		assert(request->result_ref == LUA_NOREF);
+		diag_set_error(diag_get(), request->error);
+		return luaT_push_nil_and_error(L);
+	} else {
+		assert(request->result_ref != LUA_NOREF);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, request->result_ref);
+	}
+	return 1;
+}
+
+static int
+netbox_registry_create(struct netbox_registry *registry)
+{
+	registry->requests = mh_i64ptr_new();
+	if (registry->requests == NULL) {
+		diag_set(OutOfMemory, 0, "mhash", "netbox_registry");
+		return -1;
+	}
+	return 0;
+}
+
+static void
+netbox_registry_destroy(struct netbox_registry *registry)
+{
+	struct mh_i64ptr_t *h = registry->requests;
+	assert(mh_size(h) == 0);
+	mh_i64ptr_delete(h);
+}
+
+/**
+ * Looks up a request by id (sync). Returns NULL if not found.
+ */
+static inline struct netbox_request *
+netbox_registry_lookup(struct netbox_registry *registry, uint64_t sync)
+{
+	struct mh_i64ptr_t *h = registry->requests;
+	mh_int_t k = mh_i64ptr_find(h, sync, NULL);
+	if (k == mh_end(h))
+		return NULL;
+	return mh_i64ptr_node(h, k)->val;
+}
+
+/**
+ * Completes all requests in the registry with the given error and cleans up
+ * the hash. Called when the associated connection is closed.
+ */
+static void
+netbox_registry_reset(struct netbox_registry *registry, struct error *error)
+{
+	struct mh_i64ptr_t *h = registry->requests;
+	mh_int_t k;
+	mh_foreach(h, k) {
+		struct netbox_request *request = mh_i64ptr_node(h, k)->val;
+		request->registry = NULL;
+		netbox_request_set_error(request, error);
+		netbox_request_signal(request);
+	}
+	mh_i64ptr_clear(h);
+}
 
 static inline size_t
 netbox_begin_encode(struct mpstream *stream, uint64_t sync,
@@ -1041,17 +1280,13 @@ netbox_decode_prepare(struct lua_State *L, const char **data,
 }
 
 /**
- * Decodes a response body for the specified method. Pushes the result and the
- * end of the decoded data to Lua stack.
- *
- * Takes the following arguments:
- *  - method: a value from the netbox_method enumeration
- *  - data: pointer to the data to decode (char ptr)
- *  - data_end: pointer to the end of the data (char ptr)
- *  - format: tuple format to use for decoding the body or nil
+ * Decodes a response body for the specified method and pushes the result to
+ * Lua stack.
  */
-static int
-netbox_decode_method(struct lua_State *L)
+static void
+netbox_decode_method(struct lua_State *L, enum netbox_method method,
+		     const char **data, const char *data_end,
+		     struct tuple_format *format)
 {
 	typedef void (*method_decoder_f)(struct lua_State *L, const char **data,
 					 const char *data_end,
@@ -1076,34 +1311,16 @@ netbox_decode_method(struct lua_State *L)
 		[NETBOX_COUNT]		= netbox_decode_value,
 		[NETBOX_INJECT]		= netbox_decode_table,
 	};
-	enum netbox_method method = lua_tointeger(L, 1);
-	assert(method < netbox_method_MAX);
-	uint32_t ctypeid;
-	const char *data = *(const char **)luaL_checkcdata(L, 2, &ctypeid);
-	assert(ctypeid == CTID_CHAR_PTR || ctypeid == CTID_CONST_CHAR_PTR);
-	const char *data_end = *(const char **)luaL_checkcdata(L, 3, &ctypeid);
-	assert(ctypeid == CTID_CHAR_PTR || ctypeid == CTID_CONST_CHAR_PTR);
-	struct tuple_format *format;
-	if (!lua_isnil(L, 4))
-		format = lbox_check_tuple_format(L, 4);
-	else
-		format = tuple_format_runtime;
-	method_decoder[method](L, &data, data_end, format);
-	*(const char **)luaL_pushcdata(L, CTID_CONST_CHAR_PTR) = data;
-	return 2;
+	method_decoder[method](L, data, data_end, format);
 }
 
 /**
- * Decodes an error from raw data and pushes it to Lua stack. Takes a pointer
- * to the data (char ptr) and an error code.
+ * Decodes an error from raw data. On success returns the decoded error object
+ * with ref counter incremented. On failure returns NULL.
  */
-static int
-netbox_decode_error(struct lua_State *L)
+static struct error *
+netbox_decode_error(const char **data, uint32_t errcode)
 {
-	uint32_t ctypeid;
-	const char **data = luaL_checkcdata(L, 1, &ctypeid);
-	assert(ctypeid == CTID_CHAR_PTR || ctypeid == CTID_CONST_CHAR_PTR);
-	uint32_t errcode = lua_tointeger(L, 2);
 	struct error *error = NULL;
 	assert(mp_typeof(**data) == MP_MAP);
 	uint32_t map_size = mp_decode_map(data);
@@ -1114,7 +1331,7 @@ netbox_decode_error(struct lua_State *L)
 				error_unref(error);
 			error = error_unpack_unsafe(data);
 			if (error == NULL)
-				return luaT_error(L);
+				return NULL;
 			error_ref(error);
 			/*
 			 * IPROTO_ERROR comprises error encoded with
@@ -1146,22 +1363,423 @@ netbox_decode_error(struct lua_State *L)
 		error = box_error_last();
 		error_ref(error);
 	}
-	luaT_pusherror(L, error);
-	error_unref(error);
+	return error;
+}
+
+static inline struct netbox_registry *
+luaT_check_netbox_registry(struct lua_State *L, int idx)
+{
+	return luaL_checkudata(L, idx, netbox_registry_typename);
+}
+
+static int
+luaT_netbox_registry_gc(struct lua_State *L)
+{
+	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
+	netbox_registry_destroy(registry);
+	return 0;
+}
+
+static int
+luaT_netbox_registry_reset(struct lua_State *L)
+{
+	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
+	struct error *error = luaL_checkerror(L, 2);
+	netbox_registry_reset(registry, error);
+	return 0;
+}
+
+static inline struct netbox_request *
+luaT_check_netbox_request(struct lua_State *L, int idx)
+{
+	return luaL_checkudata(L, idx, netbox_request_typename);
+}
+
+static int
+luaT_netbox_request_gc(struct lua_State *L)
+{
+	struct netbox_request *request = luaT_check_netbox_request(L, 1);
+	netbox_request_unregister(request);
+	netbox_request_destroy(request);
+	return 0;
+}
+
+/**
+ * Returns true if the response was received for the given request.
+ */
+static int
+luaT_netbox_request_is_ready(struct lua_State *L)
+{
+	struct netbox_request *request = luaT_check_netbox_request(L, 1);
+	lua_pushboolean(L, netbox_request_is_ready(request));
 	return 1;
+}
+
+/**
+ * Obtains the result of the given request.
+ *
+ * Returns:
+ *  - nil, error             if the response failed or not ready
+ *  - response body (table)  if the response is ready and buffer is nil
+ *  - body length in bytes   if the response was written to the buffer
+ */
+static int
+luaT_netbox_request_result(struct lua_State *L)
+{
+	struct netbox_request *request = luaT_check_netbox_request(L, 1);
+	return netbox_request_push_result(request, L);
+}
+
+/**
+ * Waits until the response is received for the given request and obtains the
+ * result. Takes an optional timeout argument.
+ *
+ * See the comment to request.result() for the return value format.
+ */
+static int
+luaT_netbox_request_wait_result(struct lua_State *L)
+{
+	struct netbox_request *request = luaT_check_netbox_request(L, 1);
+	double timeout = TIMEOUT_INFINITY;
+	if (!lua_isnoneornil(L, 2)) {
+		if (lua_type(L, 2) != LUA_TNUMBER ||
+		    (timeout = lua_tonumber(L, 2)) < 0)
+			luaL_error(L, "Usage: future:wait_result(timeout)");
+	}
+	while (!netbox_request_is_ready(request)) {
+		if (!netbox_request_wait(request, &timeout)) {
+			luaL_testcancel(L);
+			diag_set(ClientError, ER_TIMEOUT);
+			return luaT_push_nil_and_error(L);
+		}
+	}
+	return netbox_request_push_result(request, L);
+}
+
+/**
+ * Makes the connection forget about the given request. When the response is
+ * received, it will be ignored. It reduces the size of the request registry
+ * speeding up other requests.
+ */
+static int
+luaT_netbox_request_discard(struct lua_State *L)
+{
+	struct netbox_request *request = luaT_check_netbox_request(L, 1);
+	if (!netbox_request_is_ready(request)) {
+		diag_set(ClientError, ER_PROC_LUA, "Response is discarded");
+		netbox_request_set_error(request, diag_last_error(diag_get()));
+		netbox_request_complete(request);
+	}
+	return 0;
+}
+
+/**
+ * Gets the next message or the final result. Takes the index of the last
+ * returned message as a second argument. The request and timeout are passed in
+ * the first argument as a table (see request.pairs()).
+ *
+ * On success returns the index of the current message (used by the iterator
+ * implementation to continue iteration) and an object, which is either the
+ * message pushed with box.session.push() or the final response. If there's no
+ * more messages left for the request, returns nil, nil.
+ *
+ * On error returns box.NULL, error. We return box.NULL instead of nil to
+ * distinguish end of iteration from error when this function is called in
+ * `for k, v in future:pairs()`, because nil is treated by Lua as end of
+ * iteration marker.
+ */
+static int
+luaT_netbox_request_iterator_next(struct lua_State *L)
+{
+	/* The first argument is a table: {request, timeout}. */
+	lua_rawgeti(L, 1, 1);
+	struct netbox_request *request = luaT_check_netbox_request(L, -1);
+	lua_rawgeti(L, 1, 2);
+	double timeout = lua_tonumber(L, -1);
+	/* The second argument is the index of the last returned message. */
+	if (luaL_isnull(L, 2)) {
+		/* The previous call returned an error. */
+		goto stop;
+	}
+	int i = lua_tointeger(L, 2) + 1;
+	/*
+	 * In the async mode (and this is the async mode, because 'future'
+	 * objects are not available to the user in the sync mode), on_push_ctx
+	 * refers to a table that contains received messages. We iterate over
+	 * the content of the table.
+	 */
+	lua_rawgeti(L, LUA_REGISTRYINDEX, request->on_push_ctx_ref);
+	int messages_idx = lua_gettop(L);
+	assert(lua_istable(L, messages_idx));
+	int message_count = lua_objlen(L, messages_idx);
+retry:
+	if (i <= message_count) {
+		lua_pushinteger(L, i);
+		lua_rawgeti(L, messages_idx, i);
+		return 2;
+	}
+	if (netbox_request_is_ready(request)) {
+		/*
+		 * After all the messages are iterated, `i` is equal to
+		 * #messages + 1. After we return the response, `i` becomes
+		 * #messages + 2. It is the trigger to finish the iteration.
+		 */
+		if (i > message_count + 1)
+			goto stop;
+		int n = netbox_request_push_result(request, L);
+		if (n == 2)
+			goto error;
+		/* Success. Return i, response. */
+		assert(n == 1);
+		lua_pushinteger(L, i);
+		lua_insert(L, -2);
+		return 2;
+	}
+	int old_message_count = message_count;
+	do {
+		if (!netbox_request_wait(request, &timeout)) {
+			luaL_testcancel(L);
+			diag_set(ClientError, ER_TIMEOUT);
+			luaT_push_nil_and_error(L);
+			goto error;
+		}
+		message_count = lua_objlen(L, messages_idx);
+	} while (!netbox_request_is_ready(request) &&
+		 message_count == old_message_count);
+	goto retry;
+stop:
+	lua_pushnil(L);
+	lua_pushnil(L);
+	return 2;
+error:
+	/*
+	 * When we get here, the top two elements on the stack are nil, error.
+	 * We need to replace nil with box.NULL.
+	 */
+	luaL_pushnull(L);
+	lua_replace(L, -3);
+	return 2;
+}
+
+static int
+luaT_netbox_request_pairs(struct lua_State *L)
+{
+	if (!lua_isnoneornil(L, 2)) {
+		if (lua_type(L, 2) != LUA_TNUMBER || lua_tonumber(L, 2) < 0)
+			luaL_error(L, "Usage: future:pairs(timeout)");
+	} else {
+		if (lua_isnil(L, 2))
+			lua_pop(L, 1);
+		lua_pushnumber(L, TIMEOUT_INFINITY);
+	}
+	lua_settop(L, 2);
+	/* Create a table passed to next(): {request, timeout}. */
+	lua_createtable(L, 2, 0);
+	lua_insert(L, 1);
+	lua_rawseti(L, 1, 2); /* timeout */
+	lua_rawseti(L, 1, 1); /* request */
+	/* Push the next() function. It must go first. */
+	lua_rawgeti(L, LUA_REGISTRYINDEX,
+		    luaT_netbox_request_iterator_next_ref);
+	lua_insert(L, 1);
+	/* Push the iterator index. */
+	lua_pushinteger(L, 0);
+	return 3;
+}
+
+/**
+ * Creates a request registry object (userdata) and pushes it to Lua stack.
+ */
+static int
+netbox_new_registry(struct lua_State *L)
+{
+	struct netbox_registry *registry = lua_newuserdata(
+		L, sizeof(*registry));
+	if (netbox_registry_create(registry) != 0)
+		luaT_error(L);
+	luaL_getmetatable(L, netbox_registry_typename);
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
+/**
+ * Creates a request object (userdata) and pushes it to Lua stack.
+ *
+ * Takes the following arguments:
+ *  - requests: registry to register the new request with
+ *  - id: id (sync) to assign to the new request
+ *  - buffer: buffer (ibuf) to write the result to or nil
+ *  - skip_header: whether to skip header when writing the result to the buffer
+ *  - method: a value from the netbox_method enumeration
+ *  - on_push: on_push trigger function
+ *  - on_push_ctx: on_push trigger function argument
+ *  - format: tuple format to use for decoding the body or nil
+ */
+static int
+netbox_new_request(struct lua_State *L)
+{
+	struct netbox_request *request = lua_newuserdata(L, sizeof(*request));
+	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
+	request->sync = luaL_touint64(L, 2);
+	request->buffer = (struct ibuf *)lua_topointer(L, 3);
+	lua_pushvalue(L, 3);
+	request->buffer_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	request->skip_header = lua_toboolean(L, 4);
+	request->method = lua_tointeger(L, 5);
+	assert(request->method < netbox_method_MAX);
+	lua_pushvalue(L, 6);
+	request->on_push_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	lua_pushvalue(L, 7);
+	request->on_push_ctx_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	if (!lua_isnil(L, 8))
+		request->format = lbox_check_tuple_format(L, 8);
+	else
+		request->format = tuple_format_runtime;
+	tuple_format_ref(request->format);
+	fiber_cond_create(&request->cond);
+	request->result_ref = LUA_NOREF;
+	request->error = NULL;
+	if (netbox_request_register(request, registry) != 0) {
+		netbox_request_destroy(request);
+		luaT_error(L);
+	}
+	luaL_getmetatable(L, netbox_request_typename);
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
+/**
+ * Given a request registry, request id (sync), status, and a pointer to a
+ * response body, decodes the response and either completes the request or
+ * invokes the on-push trigger, depending on the status.
+ */
+static int
+netbox_dispatch_response_iproto(struct lua_State *L)
+{
+	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
+	uint64_t sync = luaL_touint64(L, 2);
+	enum iproto_type status = lua_tointeger(L, 3);
+	uint32_t ctypeid;
+	const char *data = *(const char **)luaL_checkcdata(L, 4, &ctypeid);
+	assert(ctypeid == CTID_CHAR_PTR || ctypeid == CTID_CONST_CHAR_PTR);
+	const char *data_end = *(const char **)luaL_checkcdata(L, 5, &ctypeid);
+	assert(ctypeid == CTID_CHAR_PTR || ctypeid == CTID_CONST_CHAR_PTR);
+	struct netbox_request *request = netbox_registry_lookup(registry, sync);
+	if (request == NULL) {
+		/* Nobody is waiting for the response. */
+		return 0;
+	}
+	if (status > IPROTO_CHUNK) {
+		/* Handle errors. */
+		struct error *error = netbox_decode_error(
+			&data, status & (IPROTO_TYPE_ERROR - 1));
+		if (error == NULL)
+			return luaT_error(L);
+		netbox_request_set_error(request, error);
+		error_unref(error);
+		netbox_request_complete(request);
+		return 0;
+	}
+	if (request->buffer != NULL) {
+		/* Copy xrow.body to user-provided buffer. */
+		if (request->skip_header)
+			netbox_skip_to_data(&data);
+		size_t data_len = data_end - data;
+		void *wpos = ibuf_alloc(request->buffer, data_len);
+		if (wpos == NULL)
+			luaL_error(L, "out of memory");
+		memcpy(wpos, data, data_len);
+		lua_pushinteger(L, data_len);
+	} else {
+		/* Decode xrow.body[DATA] to Lua objects. */
+		if (status == IPROTO_OK) {
+			netbox_decode_method(L, request->method, &data,
+					     data_end, request->format);
+		} else {
+			netbox_decode_value(L, &data, data_end,
+					    request->format);
+		}
+		assert(data == data_end);
+	}
+	if (status == IPROTO_OK) {
+		/*
+		 * We received the final response and pushed it to Lua stack.
+		 * Store a reference to it in the request, remove the request
+		 * from the registry, and wake up waiters.
+		 */
+		netbox_request_set_result(request,
+					  luaL_ref(L, LUA_REGISTRYINDEX));
+		netbox_request_complete(request);
+	} else {
+		/* We received a push. Invoke on_push trigger. */
+		lua_rawgeti(L, LUA_REGISTRYINDEX, request->on_push_ref);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, request->on_push_ctx_ref);
+		/* Push the received message as the second argument. */
+		lua_pushvalue(L, -3);
+		lua_call(L, 2, 0);
+		netbox_request_signal(request);
+	}
+	return 0;
+}
+
+/**
+ * Given a request registry, request id (sync), and a response string, assigns
+ * the response to the request and completes it.
+ */
+static int
+netbox_dispatch_response_console(struct lua_State *L)
+{
+	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
+	uint64_t sync = luaL_touint64(L, 2);
+	struct netbox_request *request = netbox_registry_lookup(registry, sync);
+	if (request == NULL) {
+		/* Nobody is waiting for the response. */
+		return 0;
+	}
+	/*
+	 * The response is the last argument of this function so it's already
+	 * on the top of the Lua stack.
+	 */
+	netbox_request_set_result(request, luaL_ref(L, LUA_REGISTRYINDEX));
+	netbox_request_complete(request);
+	return 0;
 }
 
 int
 luaopen_net_box(struct lua_State *L)
 {
+	lua_pushcfunction(L, luaT_netbox_request_iterator_next);
+	luaT_netbox_request_iterator_next_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+	static const struct luaL_Reg netbox_registry_meta[] = {
+		{ "__gc",           luaT_netbox_registry_gc },
+		{ "reset",          luaT_netbox_registry_reset },
+		{ NULL, NULL }
+	};
+	luaL_register_type(L, netbox_registry_typename, netbox_registry_meta);
+
+	static const struct luaL_Reg netbox_request_meta[] = {
+		{ "__gc",           luaT_netbox_request_gc },
+		{ "is_ready",       luaT_netbox_request_is_ready },
+		{ "result",         luaT_netbox_request_result },
+		{ "wait_result",    luaT_netbox_request_wait_result },
+		{ "discard",        luaT_netbox_request_discard },
+		{ "pairs",          luaT_netbox_request_pairs },
+		{ NULL, NULL }
+	};
+	luaL_register_type(L, netbox_request_typename, netbox_request_meta);
+
 	static const luaL_Reg net_box_lib[] = {
 		{ "encode_auth",    netbox_encode_auth },
 		{ "encode_method",  netbox_encode_method },
 		{ "decode_greeting",netbox_decode_greeting },
-		{ "decode_method",  netbox_decode_method },
-		{ "decode_error",   netbox_decode_error },
 		{ "send_and_recv_iproto", netbox_send_and_recv_iproto },
 		{ "send_and_recv_console", netbox_send_and_recv_console },
+		{ "new_registry",   netbox_new_registry },
+		{ "new_request",    netbox_new_request },
+		{ "dispatch_response_iproto", netbox_dispatch_response_iproto },
+		{ "dispatch_response_console",
+			netbox_dispatch_response_console },
 		{ NULL, NULL}
 	};
 	/* luaL_register_module polutes _G */
