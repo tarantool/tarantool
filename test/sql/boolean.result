@@ -498,25 +498,25 @@ INSERT INTO t3 VALUES (4, false)
  | ...
 
 -- Check CAST from BOOLEAN to the other types.
-SELECT cast(true AS INTEGER), cast(false AS INTEGER);
+SELECT cast(true AS INTEGER);
  | ---
- | - metadata:
- |   - name: COLUMN_1
- |     type: integer
- |   - name: COLUMN_2
- |     type: integer
- |   rows:
- |   - [1, 0]
+ | - null
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer'
  | ...
-SELECT cast(true AS NUMBER), cast(false AS NUMBER);
+SELECT cast(false AS INTEGER);
  | ---
- | - metadata:
- |   - name: COLUMN_1
- |     type: number
- |   - name: COLUMN_2
- |     type: number
- |   rows:
- |   - [1, 0]
+ | - null
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | ...
+SELECT cast(true AS NUMBER);
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
+ | ...
+SELECT cast(false AS NUMBER);
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 -- gh-4462: ensure that text representation is uppercase.
 SELECT cast(true AS TEXT), cast(false AS TEXT);
@@ -541,27 +541,30 @@ SELECT cast(true AS BOOLEAN), cast(false AS BOOLEAN);
  | ...
 
 -- Check CAST to BOOLEAN from the other types.
-SELECT cast(100 AS BOOLEAN), cast(1 AS BOOLEAN), cast(0 AS BOOLEAN);
+SELECT cast(100 AS BOOLEAN);
  | ---
- | - metadata:
- |   - name: COLUMN_1
- |     type: boolean
- |   - name: COLUMN_2
- |     type: boolean
- |   - name: COLUMN_3
- |     type: boolean
- |   rows:
- |   - [true, true, false]
+ | - null
+ | - 'Type mismatch: can not convert integer(100) to boolean'
  | ...
-SELECT cast(0.123 AS BOOLEAN), cast(0.0 AS BOOLEAN);
+SELECT cast(1 AS BOOLEAN);
  | ---
- | - metadata:
- |   - name: COLUMN_1
- |     type: boolean
- |   - name: COLUMN_2
- |     type: boolean
- |   rows:
- |   - [true, false]
+ | - null
+ | - 'Type mismatch: can not convert integer(1) to boolean'
+ | ...
+SELECT cast(0 AS BOOLEAN);
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert integer(0) to boolean'
+ | ...
+SELECT cast(0.123 AS BOOLEAN);
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert double(0.123) to boolean'
+ | ...
+SELECT cast(0.0 AS BOOLEAN);
+ | ---
+ | - null
+ | - 'Type mismatch: can not convert double(0.0) to boolean'
  | ...
 SELECT cast('true' AS BOOLEAN), cast('false' AS BOOLEAN);
  | ---

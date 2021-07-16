@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(79)
+test:plan(91)
 
 --!./tcltestrunner.lua
 -- 2005 June 25
@@ -875,6 +875,106 @@ test:do_execsql_test(
         -- <cast-5.1>
         184467440737.3
         -- </cast-5.1>
+    })
+
+-- gh-4470: Make explicit casts work according to our rules.
+
+-- Make sure that explicit cast from BOOLEAN to numeric types throws an error.
+test:do_catchsql_test(
+    "cast-6.1.1",
+    [[
+        SELECT CAST(TRUE AS UNSIGNED);
+    ]], {
+        1, "Type mismatch: can not convert boolean(TRUE) to unsigned"
+    })
+
+test:do_catchsql_test(
+    "cast-6.1.2",
+    [[
+        SELECT CAST(FALSE AS UNSIGNED);
+    ]], {
+        1, "Type mismatch: can not convert boolean(FALSE) to unsigned"
+    })
+
+test:do_catchsql_test(
+    "cast-6.1.3",
+    [[
+        SELECT CAST(TRUE AS INTEGER);
+    ]], {
+        1, "Type mismatch: can not convert boolean(TRUE) to integer"
+    })
+
+test:do_catchsql_test(
+    "cast-6.1.4",
+    [[
+        SELECT CAST(FALSE AS INTEGER);
+    ]], {
+        1, "Type mismatch: can not convert boolean(FALSE) to integer"
+    })
+
+test:do_catchsql_test(
+    "cast-6.1.5",
+    [[
+        SELECT CAST(TRUE AS DOUBLE);
+    ]], {
+        1, "Type mismatch: can not convert boolean(TRUE) to double"
+    })
+
+test:do_catchsql_test(
+    "cast-6.1.6",
+    [[
+        SELECT CAST(FALSE AS DOUBLE);
+    ]], {
+        1, "Type mismatch: can not convert boolean(FALSE) to double"
+    })
+
+test:do_catchsql_test(
+    "cast-6.1.7",
+    [[
+        SELECT CAST(TRUE AS NUMBER);
+    ]], {
+        1, "Type mismatch: can not convert boolean(TRUE) to number"
+    })
+
+test:do_catchsql_test(
+    "cast-6.1.8",
+    [[
+        SELECT CAST(FALSE AS NUMBER);
+    ]], {
+        1, "Type mismatch: can not convert boolean(FALSE) to number"
+    })
+
+-- Make sure that explicit cast numeric value to BOOLEAN throws an error.
+test:do_catchsql_test(
+    "cast-6.2.1",
+    [[
+        SELECT CAST(0 AS BOOLEAN);
+    ]], {
+        1, "Type mismatch: can not convert integer(0) to boolean"
+    })
+
+test:do_catchsql_test(
+    "cast-6.2.2",
+    [[
+        SELECT CAST(-1 AS BOOLEAN);
+    ]], {
+        1, "Type mismatch: can not convert integer(-1) to boolean"
+    })
+
+test:do_catchsql_test(
+    "cast-6.2.3",
+    [[
+        SELECT CAST(1.5 AS BOOLEAN);
+    ]], {
+        1, "Type mismatch: can not convert double(1.5) to boolean"
+    })
+
+test:do_catchsql_test(
+    "cast-6.2.4",
+    [[
+        SELECT CAST(CAST(1 AS NUMBER) AS BOOLEAN);
+    ]], {
+        1, "Type mismatch: can not convert integer(1) to boolean"
     })
 
 test:finish_test()
