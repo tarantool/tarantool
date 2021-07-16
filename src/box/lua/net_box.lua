@@ -14,9 +14,7 @@ local max               = math.max
 local fiber_clock       = fiber.clock
 local fiber_self        = fiber.self
 local decode            = msgpack.decode_unchecked
-local decode_map_header = msgpack.decode_map_header
 
-local table_new           = require('table.new')
 local check_iterator_type = box.internal.check_iterator_type
 local check_index_arg     = box.internal.check_index_arg
 local check_space_arg     = box.internal.check_space_arg
@@ -25,8 +23,6 @@ local check_primary_index = box.internal.check_primary_index
 local encode_auth     = internal.encode_auth
 local encode_method   = internal.encode_method
 local decode_greeting = internal.decode_greeting
-local decode_method   = internal.decode_method
-local decode_error    = internal.decode_error
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 local VSPACE_ID        = 281
@@ -41,13 +37,10 @@ local IPROTO_SCHEMA_VERSION_KEY = 0x05
 local IPROTO_DATA_KEY      = 0x30
 local IPROTO_ERROR_24      = 0x31
 local IPROTO_GREETING_SIZE = 128
-local IPROTO_CHUNK_KEY     = 128
-local IPROTO_OK_KEY        = 0
 
 -- select errors from box.error
 local E_UNKNOWN              = box.error.UNKNOWN
 local E_NO_CONNECTION        = box.error.NO_CONNECTION
-local E_TIMEOUT              = box.error.TIMEOUT
 local E_PROC_LUA             = box.error.PROC_LUA
 local E_NO_SUCH_SPACE        = box.error.NO_SUCH_SPACE
 
@@ -74,11 +67,6 @@ local M_INJECT      = 17
 
 -- utility tables
 local is_final_state         = {closed = 1, error = 1}
-
-local function decode_push(raw_data)
-    local response, raw_end = decode(raw_data)
-    return response[IPROTO_DATA_KEY][1], raw_end
-end
 
 local function version_id(major, minor, patch)
     return bit.bor(bit.lshift(major, 16), bit.lshift(minor, 8), patch)
@@ -190,171 +178,19 @@ local function create_transport(host, port, user, password, callback,
     local last_error
     local state_cond       = fiber.cond() -- signaled when the state changes
 
-    -- Async requests currently 'in flight', keyed by a request
-    -- id. Value refs are weak hence if a client dies
-    -- unexpectedly, GC cleans the mess.
+    -- The registry stores requests that are currently 'in flight'
+    -- for this connection.
     -- Async request can not be timed out completely. Instead a
     -- user must decide when he does not want to wait for
     -- response anymore.
     -- Sync requests are implemented as async call + immediate
     -- wait for a result.
-    local requests         = setmetatable({}, { __mode = 'v' })
+    local requests         = internal.new_registry()
     local next_request_id  = 1
 
     local worker_fiber
     local send_buf         = buffer.ibuf(buffer.READAHEAD)
     local recv_buf         = buffer.ibuf(buffer.READAHEAD)
-
-    --
-    -- Async request metamethods.
-    --
-    local request_index = {}
-    --
-    -- When an async request is finalized (with ok or error - no
-    -- matter), its 'id' field is nullified by a response
-    -- dispatcher.
-    --
-    function request_index:is_ready()
-        return self.id == nil
-    end
-    --
-    -- When a request is finished, a result can be got from a
-    -- future object anytime.
-    -- @retval result, nil Success, the response is returned.
-    -- @retval nil, error Error occured.
-    --
-    function request_index:result()
-        if self.errno then
-            if type(self.response) ~= 'cdata' then
-                -- Error could be set by the connection state
-                -- machine, and it is usually a string explaining
-                -- a reason.
-                self.response = box.error.new({code = self.errno,
-                                               reason = self.response})
-            end
-            return nil, self.response
-        elseif not self.id then
-            return self.response
-        else
-            return nil, box.error.new(box.error.PROC_LUA,
-                                      'Response is not ready')
-        end
-    end
-    --
-    -- Get the next message or the final result.
-    -- @param iterator Iterator object.
-    -- @param i Index to get a next message from.
-    --
-    -- @retval nil, nil The request is finished.
-    -- @retval i + 1, object A message/response and its index.
-    -- @retval box.NULL, error An error occured. When this
-    --         function is called in 'for k, v in future:pairs()',
-    --         `k` becomes box.NULL, and `v` becomes error object.
-    --         On error the key becomes exactly box.NULL instead
-    --         of nil, because nil is treated by Lua as iteration
-    --         end marker. Nil does not participate in iteration,
-    --         and does not allow to continue it.
-    --
-    local function request_iterator_next(iterator, i)
-        if i == box.NULL then
-            return nil, nil
-        else
-            i = i + 1
-        end
-        local request = iterator.request
-        local messages = request.on_push_ctx
-    ::retry::
-        if i <= #messages then
-            return i, messages[i]
-        end
-        if request:is_ready() then
-            -- After all the messages are iterated, `i` is equal
-            -- to #messages + 1. After response reading `i`
-            -- becomes #messages + 2. It is the trigger to finish
-            -- the iteration.
-            if i > #messages + 1 then
-                return nil, nil
-            end
-            local response, err = request:result()
-            if err then
-                return box.NULL, err
-            end
-            return i, response
-        end
-        local old_message_count = #messages
-        local timeout = iterator.timeout
-        repeat
-            local ts = fiber_clock()
-            request.cond:wait(timeout)
-            timeout = timeout - (fiber_clock() - ts)
-            if request:is_ready() or old_message_count ~= #messages then
-                goto retry
-            end
-        until timeout <= 0
-        return box.NULL, box.error.new(E_TIMEOUT)
-    end
-    --
-    -- Iterate over all messages, received by a request. @Sa
-    -- request_iterator_next for details what to expect in `for`
-    -- key/value pairs.
-    -- @param timeout One iteration timeout.
-    -- @retval next() callback, iterator, zero key.
-    --
-    function request_index:pairs(timeout)
-        if timeout then
-            if type(timeout) ~= 'number' or timeout < 0 then
-                error('Usage: future:pairs(timeout)')
-            end
-        else
-            timeout = TIMEOUT_INFINITY
-        end
-        local iterator = {request = self, timeout = timeout}
-        return request_iterator_next, iterator, 0
-    end
-    --
-    -- Wait for a response or error max timeout seconds.
-    -- @param timeout Max seconds to wait.
-    -- @retval result, nil Success, the response is returned.
-    -- @retval nil, error Error occured.
-    --
-    function request_index:wait_result(timeout)
-        if timeout then
-            if type(timeout) ~= 'number' or timeout < 0 then
-                error('Usage: future:wait_result(timeout)')
-            end
-        else
-            timeout = TIMEOUT_INFINITY
-        end
-        if not self:is_ready() then
-            -- When a response is ready before timeout, the
-            -- waiting client is waked up prematurely.
-            while timeout > 0 and not self:is_ready() do
-                local ts = fiber.clock()
-                self.cond:wait(timeout)
-                timeout = timeout - (fiber.clock() - ts)
-            end
-            if not self:is_ready() then
-                return nil, box.error.new(E_TIMEOUT)
-            end
-        end
-        return self:result()
-    end
-    --
-    -- Make a connection forget about the response. When it will
-    -- be received, it will be ignored. It reduces size of
-    -- requests table speeding up other requests.
-    --
-    function request_index:discard()
-        if self.id then
-            requests[self.id] = nil
-            self.id = nil
-            self.errno = box.error.PROC_LUA
-            self.response = 'Response is discarded'
-            self.cond:broadcast()
-        end
-    end
-
-    local request_mt = { __index = request_index }
 
     -- STATE SWITCHING --
     local function set_state(new_state, new_errno, new_error)
@@ -365,13 +201,8 @@ local function create_transport(host, port, user, password, callback,
         state_cond:broadcast()
         if state == 'error' or state == 'error_reconnect' or
            state == 'closed' then
-            for _, request in pairs(requests) do
-                request.id = nil
-                request.errno = new_errno
-                request.response = new_error
-                request.cond:broadcast()
-            end
-            requests = {}
+            requests:reset(box.error.new({code = new_errno,
+                                          reason = new_error}))
         end
     end
 
@@ -467,20 +298,8 @@ local function create_transport(host, port, user, password, callback,
         local id = next_request_id
         encode_method(method, send_buf, id, ...)
         next_request_id = next_id(id)
-        -- Request in most cases has maximum 10 members:
-        -- method, buffer, skip_header, id, cond, errno, response,
-        -- on_push, on_push_ctx and format.
-        local request = setmetatable(table_new(0, 10), request_mt)
-        request.method = method
-        request.buffer = buffer
-        request.skip_header = skip_header
-        request.id = id
-        request.cond = fiber.cond()
-        requests[id] = request
-        request.on_push = on_push
-        request.on_push_ctx = on_push_ctx
-        request.format = format
-        return request
+        return internal.new_request(requests, id, buffer, skip_header, method,
+                                    on_push, on_push_ctx, format)
     end
 
     --
@@ -501,76 +320,13 @@ local function create_transport(host, port, user, password, callback,
 
     local function dispatch_response_iproto(hdr, body_rpos, body_end)
         local id = hdr[IPROTO_SYNC_KEY]
-        local request = requests[id]
-        if request == nil then -- nobody is waiting for the response
-            return
-        end
         local status = hdr[IPROTO_STATUS_KEY]
-        local body_len = body_end - body_rpos
-
-        if status > IPROTO_CHUNK_KEY then
-            -- Handle errors
-            requests[id] = nil
-            request.id = nil
-            request.errno = band(status, IPROTO_ERRNO_MASK)
-            request.response = decode_error(body_rpos, request.errno)
-            request.cond:broadcast()
-            return
-        end
-
-        local buffer = request.buffer
-        if buffer ~= nil then
-            -- Copy xrow.body to user-provided buffer
-            if request.skip_header then
-                -- Skip {[IPROTO_DATA_KEY] = ...} wrapper.
-                local map_len, key
-                map_len, body_rpos = decode_map_header(body_rpos, body_len)
-                assert(map_len == 1)
-                key, body_rpos = decode(body_rpos)
-                assert(key == IPROTO_DATA_KEY)
-                body_len = body_end - body_rpos
-            end
-            local wpos = buffer:alloc(body_len)
-            ffi.copy(wpos, body_rpos, body_len)
-            body_len = tonumber(body_len)
-            if status == IPROTO_OK_KEY then
-                request.response = body_len
-                requests[id] = nil
-                request.id = nil
-            else
-                request.on_push(request.on_push_ctx, body_len)
-            end
-            request.cond:broadcast()
-            return
-        end
-
-        local real_end
-        -- Decode xrow.body[DATA] to Lua objects
-        if status == IPROTO_OK_KEY then
-            request.response, real_end = decode_method(request.method,
-                                                       body_rpos, body_end,
-                                                       request.format)
-            assert(real_end == body_end, "invalid body length")
-            requests[id] = nil
-            request.id = nil
-        else
-            local msg
-            msg, real_end, request.errno = decode_push(body_rpos, body_end)
-            assert(real_end == body_end, "invalid body length")
-            request.on_push(request.on_push_ctx, msg)
-        end
-        request.cond:broadcast()
+        internal.dispatch_response_iproto(requests, id, status,
+                                          body_rpos, body_end)
     end
 
     local function dispatch_response_console(rid, response)
-        local request = requests[rid]
-        if request == nil then -- nobody is waiting for the response
-            return
-        end
-        request.id = nil
-        requests[rid] = nil
-        request.response = response
-        request.cond:broadcast()
+        internal.dispatch_response_console(requests, rid, response)
     end
 
     local function new_request_id()
