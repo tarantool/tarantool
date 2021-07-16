@@ -3444,7 +3444,8 @@ box_cfg_xc(void)
 
 	if (!is_bootstrap_leader) {
 		replicaset_sync();
-	} else {
+	} else if (box_election_mode == ELECTION_MODE_CANDIDATE ||
+		   box_election_mode == ELECTION_MODE_MANUAL) {
 		/*
 		 * When the cluster is just bootstrapped and this instance is a
 		 * leader, it makes no sense to wait for a leader appearance.
@@ -3452,7 +3453,21 @@ box_cfg_xc(void)
 		 * should take the control over the situation and start a new
 		 * term immediately.
 		 */
-		raft_new_term(raft);
+		raft_promote(raft);
+		int rc = box_raft_wait_term_outcome();
+		if (rc == 0 && raft->leader != instance_id) {
+			/*
+			 * It was promoted and is a single registered node -
+			 * there can't be another leader or a new term bump.
+			 */
+			panic("Bootstrap master couldn't elect self as a "
+			      "leader. Leader is %u, term is %llu",
+			      raft->leader, (long long)raft->volatile_term);
+		}
+		if (rc != 0) {
+			raft_restore(raft);
+			diag_raise();
+		}
 	}
 
 	/* box.cfg.read_only is not read yet. */
