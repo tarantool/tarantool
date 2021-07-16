@@ -127,15 +127,20 @@ INSERT INTO t3 VALUES (3, true)
 INSERT INTO t3 VALUES (4, false)
 
 -- Check CAST from BOOLEAN to the other types.
-SELECT cast(true AS INTEGER), cast(false AS INTEGER);
-SELECT cast(true AS NUMBER), cast(false AS NUMBER);
+SELECT cast(true AS INTEGER);
+SELECT cast(false AS INTEGER);
+SELECT cast(true AS NUMBER);
+SELECT cast(false AS NUMBER);
 -- gh-4462: ensure that text representation is uppercase.
 SELECT cast(true AS TEXT), cast(false AS TEXT);
 SELECT cast(true AS BOOLEAN), cast(false AS BOOLEAN);
 
 -- Check CAST to BOOLEAN from the other types.
-SELECT cast(100 AS BOOLEAN), cast(1 AS BOOLEAN), cast(0 AS BOOLEAN);
-SELECT cast(0.123 AS BOOLEAN), cast(0.0 AS BOOLEAN);
+SELECT cast(100 AS BOOLEAN);
+SELECT cast(1 AS BOOLEAN);
+SELECT cast(0 AS BOOLEAN);
+SELECT cast(0.123 AS BOOLEAN);
+SELECT cast(0.0 AS BOOLEAN);
 SELECT cast('true' AS BOOLEAN), cast('false' AS BOOLEAN);
 SELECT cast('TRUE' AS BOOLEAN), cast('FALSE' AS BOOLEAN);
 

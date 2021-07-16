@@ -635,17 +635,6 @@ int_to_str0(struct Mem *mem)
 }
 
 static inline int
-int_to_bool(struct Mem *mem)
-{
-	assert((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0);
-	mem->u.b = mem->u.i != 0;
-	mem->type = MEM_TYPE_BOOL;
-	assert(mem->flags == 0);
-	mem->field_type = FIELD_TYPE_BOOLEAN;
-	return 0;
-}
-
-static inline int
 str_to_str0(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_STR);
@@ -871,28 +860,6 @@ double_to_str0(struct Mem *mem)
 }
 
 static inline int
-double_to_bool(struct Mem *mem)
-{
-	assert(mem->type == MEM_TYPE_DOUBLE);
-	mem->u.b = mem->u.r != 0.;
-	mem->type = MEM_TYPE_BOOL;
-	assert(mem->flags == 0);
-	mem->field_type = FIELD_TYPE_BOOLEAN;
-	return 0;
-}
-
-static inline int
-bool_to_int(struct Mem *mem)
-{
-	assert(mem->type == MEM_TYPE_BOOL);
-	mem->u.u = (uint64_t)mem->u.b;
-	mem->type = MEM_TYPE_UINT;
-	assert(mem->flags == 0);
-	mem->field_type = FIELD_TYPE_UNSIGNED;
-	return 0;
-}
-
-static inline int
 bool_to_str0(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_BOOL);
@@ -942,8 +909,6 @@ mem_to_int(struct Mem *mem)
 		return bytes_to_int(mem);
 	if (mem->type == MEM_TYPE_DOUBLE)
 		return double_to_int(mem);
-	if (mem->type == MEM_TYPE_BOOL)
-		return bool_to_int(mem);
 	return -1;
 }
 
@@ -979,8 +944,6 @@ mem_to_number(struct Mem *mem)
 	assert(mem->type < MEM_TYPE_INVALID);
 	if (mem_is_num(mem))
 		return 0;
-	if (mem->type == MEM_TYPE_BOOL)
-		return bool_to_int(mem);
 	if ((mem->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) != 0) {
 		if (bytes_to_int(mem) == 0)
 			return 0;
@@ -1062,8 +1025,6 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 			return bytes_to_uint(mem);
 		case MEM_TYPE_DOUBLE:
 			return double_to_uint(mem);
-		case MEM_TYPE_BOOL:
-			return bool_to_int(mem);
 		default:
 			return -1;
 		}
@@ -1077,13 +1038,8 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 		switch (mem->type) {
 		case MEM_TYPE_BOOL:
 			return 0;
-		case MEM_TYPE_INT:
-		case MEM_TYPE_UINT:
-			return int_to_bool(mem);
 		case MEM_TYPE_STR:
 			return str_to_bool(mem);
-		case MEM_TYPE_DOUBLE:
-			return double_to_bool(mem);
 		default:
 			return -1;
 		}
