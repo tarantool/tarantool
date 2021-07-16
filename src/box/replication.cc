@@ -977,12 +977,19 @@ replicaset_find_join_master(void)
 		 * config is stronger because if it is configured as read-only,
 		 * it is in read-only state for sure, until the config is
 		 * changed.
+		 *
+		 * In a cluster with leader election enabled all instances might
+		 * look equal by the scores above. Then must prefer the ones
+		 * which can be elected as a leader, because only they would be
+		 * able to boot themselves and register the others.
 		 */
 		if (ballot->is_booted)
-			score += 10;
+			score += 1000;
 		if (!ballot->is_ro_cfg)
-			score += 5;
+			score += 100;
 		if (!ballot->is_ro)
+			score += 10;
+		if (ballot->can_lead)
 			score += 1;
 		if (leader_score < score)
 			goto elect;
