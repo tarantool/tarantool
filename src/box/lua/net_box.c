@@ -77,10 +77,10 @@ enum netbox_method {
 };
 
 static inline size_t
-netbox_prepare_request(struct mpstream *stream, uint64_t sync,
-		       enum iproto_type type)
+netbox_begin_encode(struct mpstream *stream, uint64_t sync,
+		    enum iproto_type type)
 {
-	/* Remember initial size of ibuf (see netbox_encode_request()) */
+	/* Remember initial size of ibuf (see netbox_end_encode()) */
 	struct ibuf *ibuf = stream->ctx;
 	size_t used = ibuf_used(ibuf);
 
@@ -103,7 +103,7 @@ netbox_prepare_request(struct mpstream *stream, uint64_t sync,
 }
 
 static inline void
-netbox_encode_request(struct mpstream *stream, size_t initial_size)
+netbox_end_encode(struct mpstream *stream, size_t initial_size)
 {
 	mpstream_flush(stream);
 
@@ -134,8 +134,8 @@ netbox_encode_ping(lua_State *L, int idx, struct mpstream *stream,
 {
 	(void)L;
 	(void)idx;
-	size_t svp = netbox_prepare_request(stream, sync, IPROTO_PING);
-	netbox_encode_request(stream, svp);
+	size_t svp = netbox_begin_encode(stream, sync, IPROTO_PING);
+	netbox_end_encode(stream, svp);
 }
 
 static int
@@ -151,7 +151,7 @@ netbox_encode_auth(lua_State *L)
 	struct mpstream stream;
 	mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
 		      luamp_error, L);
-	size_t svp = netbox_prepare_request(&stream, sync, IPROTO_AUTH);
+	size_t svp = netbox_begin_encode(&stream, sync, IPROTO_AUTH);
 
 	size_t user_len;
 	const char *user = lua_tolstring(L, 3, &user_len);
@@ -175,7 +175,7 @@ netbox_encode_auth(lua_State *L)
 		mpstream_encode_strn(&stream, scramble, SCRAMBLE_SIZE);
 	}
 
-	netbox_encode_request(&stream, svp);
+	netbox_end_encode(&stream, svp);
 	return 0;
 }
 
@@ -184,7 +184,7 @@ netbox_encode_call_impl(lua_State *L, int idx, struct mpstream *stream,
 			uint64_t sync, enum iproto_type type)
 {
 	/* Lua stack at idx: function_name, args */
-	size_t svp = netbox_prepare_request(stream, sync, type);
+	size_t svp = netbox_begin_encode(stream, sync, type);
 
 	mpstream_encode_map(stream, 2);
 
@@ -198,7 +198,7 @@ netbox_encode_call_impl(lua_State *L, int idx, struct mpstream *stream,
 	mpstream_encode_uint(stream, IPROTO_TUPLE);
 	luamp_encode_tuple(L, cfg, stream, idx + 1);
 
-	netbox_encode_request(stream, svp);
+	netbox_end_encode(stream, svp);
 }
 
 static void
@@ -220,7 +220,7 @@ netbox_encode_eval(lua_State *L, int idx, struct mpstream *stream,
 		   uint64_t sync)
 {
 	/* Lua stack at idx: expr, args */
-	size_t svp = netbox_prepare_request(stream, sync, IPROTO_EVAL);
+	size_t svp = netbox_begin_encode(stream, sync, IPROTO_EVAL);
 
 	mpstream_encode_map(stream, 2);
 
@@ -234,7 +234,7 @@ netbox_encode_eval(lua_State *L, int idx, struct mpstream *stream,
 	mpstream_encode_uint(stream, IPROTO_TUPLE);
 	luamp_encode_tuple(L, cfg, stream, idx + 1);
 
-	netbox_encode_request(stream, svp);
+	netbox_end_encode(stream, svp);
 }
 
 static void
@@ -242,7 +242,7 @@ netbox_encode_select(lua_State *L, int idx, struct mpstream *stream,
 		     uint64_t sync)
 {
 	/* Lua stack at idx: space_id, index_id, iterator, offset, limit, key */
-	size_t svp = netbox_prepare_request(stream, sync, IPROTO_SELECT);
+	size_t svp = netbox_begin_encode(stream, sync, IPROTO_SELECT);
 
 	mpstream_encode_map(stream, 6);
 
@@ -276,7 +276,7 @@ netbox_encode_select(lua_State *L, int idx, struct mpstream *stream,
 	mpstream_encode_uint(stream, IPROTO_KEY);
 	luamp_convert_key(L, cfg, stream, idx + 5);
 
-	netbox_encode_request(stream, svp);
+	netbox_end_encode(stream, svp);
 }
 
 static void
@@ -284,7 +284,7 @@ netbox_encode_insert_or_replace(lua_State *L, int idx, struct mpstream *stream,
 				uint64_t sync, enum iproto_type type)
 {
 	/* Lua stack at idx: space_id, tuple */
-	size_t svp = netbox_prepare_request(stream, sync, type);
+	size_t svp = netbox_begin_encode(stream, sync, type);
 
 	mpstream_encode_map(stream, 2);
 
@@ -297,7 +297,7 @@ netbox_encode_insert_or_replace(lua_State *L, int idx, struct mpstream *stream,
 	mpstream_encode_uint(stream, IPROTO_TUPLE);
 	luamp_encode_tuple(L, cfg, stream, idx + 1);
 
-	netbox_encode_request(stream, svp);
+	netbox_end_encode(stream, svp);
 }
 
 static void
@@ -319,7 +319,7 @@ netbox_encode_delete(lua_State *L, int idx, struct mpstream *stream,
 		     uint64_t sync)
 {
 	/* Lua stack at idx: space_id, index_id, key */
-	size_t svp = netbox_prepare_request(stream, sync, IPROTO_DELETE);
+	size_t svp = netbox_begin_encode(stream, sync, IPROTO_DELETE);
 
 	mpstream_encode_map(stream, 3);
 
@@ -337,7 +337,7 @@ netbox_encode_delete(lua_State *L, int idx, struct mpstream *stream,
 	mpstream_encode_uint(stream, IPROTO_KEY);
 	luamp_convert_key(L, cfg, stream, idx + 2);
 
-	netbox_encode_request(stream, svp);
+	netbox_end_encode(stream, svp);
 }
 
 static void
@@ -345,7 +345,7 @@ netbox_encode_update(lua_State *L, int idx, struct mpstream *stream,
 		     uint64_t sync)
 {
 	/* Lua stack at idx: space_id, index_id, key, ops */
-	size_t svp = netbox_prepare_request(stream, sync, IPROTO_UPDATE);
+	size_t svp = netbox_begin_encode(stream, sync, IPROTO_UPDATE);
 
 	mpstream_encode_map(stream, 5);
 
@@ -371,7 +371,7 @@ netbox_encode_update(lua_State *L, int idx, struct mpstream *stream,
 	mpstream_encode_uint(stream, IPROTO_TUPLE);
 	luamp_encode_tuple(L, cfg, stream, idx + 3);
 
-	netbox_encode_request(stream, svp);
+	netbox_end_encode(stream, svp);
 }
 
 static void
@@ -379,7 +379,7 @@ netbox_encode_upsert(lua_State *L, int idx, struct mpstream *stream,
 		     uint64_t sync)
 {
 	/* Lua stack at idx: space_id, tuple, ops */
-	size_t svp = netbox_prepare_request(stream, sync, IPROTO_UPSERT);
+	size_t svp = netbox_begin_encode(stream, sync, IPROTO_UPSERT);
 
 	mpstream_encode_map(stream, 4);
 
@@ -400,7 +400,7 @@ netbox_encode_upsert(lua_State *L, int idx, struct mpstream *stream,
 	mpstream_encode_uint(stream, IPROTO_OPS);
 	luamp_encode_tuple(L, cfg, stream, idx + 2);
 
-	netbox_encode_request(stream, svp);
+	netbox_end_encode(stream, svp);
 }
 
 static int
@@ -594,7 +594,7 @@ netbox_encode_execute(lua_State *L, int idx, struct mpstream *stream,
 		      uint64_t sync)
 {
 	/* Lua stack at idx: query, parameters, options */
-	size_t svp = netbox_prepare_request(stream, sync, IPROTO_EXECUTE);
+	size_t svp = netbox_begin_encode(stream, sync, IPROTO_EXECUTE);
 
 	mpstream_encode_map(stream, 3);
 
@@ -615,7 +615,7 @@ netbox_encode_execute(lua_State *L, int idx, struct mpstream *stream,
 	mpstream_encode_uint(stream, IPROTO_OPTIONS);
 	luamp_encode_tuple(L, cfg, stream, idx + 2);
 
-	netbox_encode_request(stream, svp);
+	netbox_end_encode(stream, svp);
 }
 
 static void
@@ -623,7 +623,7 @@ netbox_encode_prepare(lua_State *L, int idx, struct mpstream *stream,
 		      uint64_t sync)
 {
 	/* Lua stack at idx: query */
-	size_t svp = netbox_prepare_request(stream, sync, IPROTO_PREPARE);
+	size_t svp = netbox_begin_encode(stream, sync, IPROTO_PREPARE);
 
 	mpstream_encode_map(stream, 1);
 
@@ -638,7 +638,7 @@ netbox_encode_prepare(lua_State *L, int idx, struct mpstream *stream,
 		mpstream_encode_strn(stream, query, len);
 	};
 
-	netbox_encode_request(stream, svp);
+	netbox_end_encode(stream, svp);
 }
 
 static void
