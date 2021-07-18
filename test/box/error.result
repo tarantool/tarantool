@@ -442,7 +442,7 @@ t;
  |   221: box.error.SQL_CANT_ADD_AUTOINC
  |   222: box.error.QUORUM_WAIT
  |   223: box.error.INTERFERING_PROMOTE
- |   224: box.error.RAFT_DISABLED
+ |   224: box.error.ELECTION_DISABLED
  |   225: box.error.TXN_ROLLBACK
  | ...
 

@@ -275,17 +275,20 @@ void
 raft_cfg_is_candidate(struct raft *raft, bool is_candidate);
 
 /**
- * Make the instance a candidate.
+ * Bump the term and become a candidate for it regardless of the config. In case
+ * of another term bump the node's role is restored according to its config
+ * automatically.
  */
 void
-raft_start_candidate(struct raft *raft);
+raft_promote(struct raft *raft);
 
 /**
- * Make the instance stop taking part in new elections.
- * @param do_demote whether to stop being a leader immediately or not.
+ * Restore the instance role according to its config. In particular, if it was
+ * promoted and elected in the current term despite its config, restoration
+ * makes it a follower.
  */
 void
-raft_stop_candidate(struct raft *raft, bool do_demote);
+raft_restore(struct raft *raft);
 
 /** Configure Raft leader election timeout. */
 void
