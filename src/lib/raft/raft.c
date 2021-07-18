@@ -662,6 +662,11 @@ raft_sm_schedule_new_term(struct raft *raft, uint64_t new_term)
 	raft->volatile_vote = 0;
 	raft->leader = 0;
 	raft->state = RAFT_STATE_FOLLOWER;
+	/*
+	 * The instance could be promoted for the previous term. But promotion
+	 * has no effect on following terms.
+	 */
+	raft_restore(raft);
 	raft_sm_pause_and_dump(raft);
 	/*
 	 * State is visible and it is changed - broadcast. Term is also visible,
@@ -850,30 +855,15 @@ raft_cfg_is_enabled(struct raft *raft, bool is_enabled)
 		raft_sm_start(raft);
 }
 
-void
-raft_cfg_is_candidate(struct raft *raft, bool is_candidate)
-{
-	raft->is_cfg_candidate = is_candidate;
-	is_candidate = is_candidate && raft->is_enabled;
-	if (is_candidate)
-		raft_start_candidate(raft);
-	else
-		raft_stop_candidate(raft, true);
-}
-
-void
+/** Make the instance a candidate. */
+static void
 raft_start_candidate(struct raft *raft)
 {
+	assert(raft->is_enabled);
 	if (raft->is_candidate)
 		return;
+	assert(raft->state == RAFT_STATE_FOLLOWER);
 	raft->is_candidate = true;
-	assert(raft->state != RAFT_STATE_CANDIDATE);
-	/*
-	 * May still be the leader after raft_stop_candidate
-	 * with do_demote = false.
-	 */
-	if (raft->state == RAFT_STATE_LEADER)
-		return;
 	if (raft->is_write_in_progress) {
 		/*
 		 * If there is an on-going WAL write, it means there was
@@ -888,35 +878,53 @@ raft_start_candidate(struct raft *raft)
 	}
 }
 
-void
-raft_stop_candidate(struct raft *raft, bool do_demote)
+/**
+ * Make the instance stop taking part in new elections and demote if it was a
+ * leader.
+ */
+static void
+raft_stop_candidate(struct raft *raft)
 {
-	/*
-	 * May still be the leader after raft_stop_candidate
-	 * with do_demote = false.
-	 */
-	if (!raft->is_candidate && raft->state != RAFT_STATE_LEADER)
+	if (!raft->is_candidate)
 		return;
 	raft->is_candidate = false;
-	if (raft->state != RAFT_STATE_LEADER) {
-		/* Do not wait for anything while being a voter. */
-		raft_ev_timer_stop(raft_loop(), &raft->timer);
-	}
-	if (raft->state != RAFT_STATE_FOLLOWER) {
-		if (raft->state == RAFT_STATE_LEADER) {
-			if (!do_demote) {
-				/*
-				 * Remain leader until someone
-				 * triggers new elections.
-				 */
-				return;
-			}
-			raft->leader = 0;
-		}
-		raft->state = RAFT_STATE_FOLLOWER;
-		/* State is visible and changed - broadcast. */
-		raft_schedule_broadcast(raft);
-	}
+	/* Do not wait for anything while not being a candidate. */
+	raft_ev_timer_stop(raft_loop(), &raft->timer);
+	if (raft->state == RAFT_STATE_LEADER)
+		raft->leader = 0;
+	raft->state = RAFT_STATE_FOLLOWER;
+	raft_schedule_broadcast(raft);
+}
+
+static inline void
+raft_set_candidate(struct raft *raft, bool is_candidate)
+{
+	if (is_candidate)
+		raft_start_candidate(raft);
+	else
+		raft_stop_candidate(raft);
+}
+
+void
+raft_cfg_is_candidate(struct raft *raft, bool is_candidate)
+{
+	raft->is_cfg_candidate = is_candidate;
+	raft_restore(raft);
+}
+
+void
+raft_promote(struct raft *raft)
+{
+	if (!raft->is_enabled)
+		return;
+	raft_sm_schedule_new_term(raft, raft->volatile_term + 1);
+	raft_start_candidate(raft);
+}
+
+void
+raft_restore(struct raft *raft)
+{
+	raft_set_candidate(raft, raft->is_cfg_candidate && raft->is_enabled);
 }
 
 void

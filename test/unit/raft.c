@@ -1354,38 +1354,31 @@ raft_test_too_long_wal_write(void)
 }
 
 static void
-raft_test_start_stop_candidate(void)
+raft_test_promote_restore(void)
 {
-	raft_start_test(8);
+	raft_start_test(12);
 	struct raft_node node;
 	raft_node_create(&node);
 
 	raft_node_cfg_is_candidate(&node, false);
 	raft_node_cfg_election_quorum(&node, 1);
 
-	raft_node_start_candidate(&node);
+	raft_node_promote(&node);
 	raft_run_next_event();
-	is(node.raft.state, RAFT_STATE_LEADER, "became leader after "
-	   "start candidate");
+	is(node.raft.state, RAFT_STATE_LEADER, "became leader after promotion");
 
-	raft_node_stop_candidate(&node);
-	raft_run_for(node.cfg_death_timeout);
-	is(node.raft.state, RAFT_STATE_LEADER, "remain leader after "
-	   "stop candidate");
-
-	raft_node_demote_candidate(&node);
-	is(node.raft.state, RAFT_STATE_FOLLOWER, "demote drops a non-candidate "
-	   "leader to a follower");
+	raft_node_restore(&node);
+	is(node.raft.state, RAFT_STATE_FOLLOWER, "restore drops a "
+	   "non-candidate leader to a follower");
 
 	/*
 	 * Ensure the non-candidate leader is demoted when sees a new term, and
 	 * does not try election again.
 	 */
-	raft_node_start_candidate(&node);
+	raft_node_promote(&node);
 	raft_run_next_event();
-	raft_node_stop_candidate(&node);
-	is(node.raft.state, RAFT_STATE_LEADER, "non-candidate but still "
-	   "leader");
+	is(node.raft.state, RAFT_STATE_LEADER, "became leader after promotion");
+	ok(node.raft.is_candidate, "is a candidate");
 
 	is(raft_node_send_vote_request(&node,
 		4 /* Term. */,
@@ -1394,10 +1387,22 @@ raft_test_start_stop_candidate(void)
 	), 0, "vote request from 2");
 	is(node.raft.state, RAFT_STATE_FOLLOWER, "demote once new election "
 	   "starts");
+	ok(!node.raft.is_candidate, "is not a candidate after term bump");
 
 	raft_run_for(node.cfg_election_timeout * 2);
 	is(node.raft.state, RAFT_STATE_FOLLOWER, "still follower");
 	is(node.raft.term, 4, "still the same term");
+
+	/* Promote does not do anything on a disabled node. */
+	raft_node_cfg_is_candidate(&node, true);
+	raft_node_cfg_is_enabled(&node, false);
+	raft_node_promote(&node);
+	is(node.raft.term, 4, "still old term");
+	ok(!node.raft.is_candidate, "not a candidate");
+
+	/* Restore takes into account if Raft is enabled. */
+	raft_node_restore(&node);
+	ok(!node.raft.is_candidate, "not a candidate");
 
 	raft_node_destroy(&node);
 	raft_finish_test();
@@ -1424,7 +1429,7 @@ main_f(va_list ap)
 	raft_test_death_timeout();
 	raft_test_enable_disable();
 	raft_test_too_long_wal_write();
-	raft_test_start_stop_candidate();
+	raft_test_promote_restore();
 
 	fakeev_free();
 

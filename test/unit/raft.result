@@ -230,16 +230,20 @@ ok 12 - subtests
     ok 8 - became candidate
 ok 13 - subtests
 	*** raft_test_too_long_wal_write: done ***
-	*** raft_test_start_stop_candidate ***
-    1..8
-    ok 1 - became leader after start candidate
-    ok 2 - remain leader after stop candidate
-    ok 3 - demote drops a non-candidate leader to a follower
-    ok 4 - non-candidate but still leader
+	*** raft_test_promote_restore ***
+    1..12
+    ok 1 - became leader after promotion
+    ok 2 - restore drops a non-candidate leader to a follower
+    ok 3 - became leader after promotion
+    ok 4 - is a candidate
     ok 5 - vote request from 2
     ok 6 - demote once new election starts
-    ok 7 - still follower
-    ok 8 - still the same term
+    ok 7 - is not a candidate after term bump
+    ok 8 - still follower
+    ok 9 - still the same term
+    ok 10 - still old term
+    ok 11 - not a candidate
+    ok 12 - not a candidate
 ok 14 - subtests
-	*** raft_test_start_stop_candidate: done ***
+	*** raft_test_promote_restore: done ***
 	*** main_f: done ***

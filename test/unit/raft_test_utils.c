@@ -388,24 +388,19 @@ raft_node_unblock(struct raft_node *node)
 }
 
 void
-raft_node_start_candidate(struct raft_node *node)
+raft_node_promote(struct raft_node *node)
 {
 	assert(raft_node_is_started(node));
-	raft_start_candidate(&node->raft);
+	raft_promote(&node->raft);
+	raft_run_async_work();
 }
 
 void
-raft_node_stop_candidate(struct raft_node *node)
+raft_node_restore(struct raft_node *node)
 {
 	assert(raft_node_is_started(node));
-	raft_stop_candidate(&node->raft, false);
-}
-
-void
-raft_node_demote_candidate(struct raft_node *node)
-{
-	assert(raft_node_is_started(node));
-	raft_stop_candidate(&node->raft, true);
+	raft_restore(&node->raft);
+	raft_run_async_work();
 }
 
 void
