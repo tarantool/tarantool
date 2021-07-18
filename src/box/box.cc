@@ -1484,7 +1484,7 @@ box_promote(void)
 			 "simultaneous invocations");
 		return -1;
 	}
-
+	struct raft *raft = box_raft();
 	/*
 	 * Do nothing when box isn't configured and when PROMOTE was already
 	 * written for this term (synchronous replication and leader election
@@ -1500,12 +1500,12 @@ box_promote(void)
 		try_wait = true;
 		break;
 	case ELECTION_MODE_VOTER:
-		assert(box_raft()->state == RAFT_STATE_FOLLOWER);
+		assert(raft->state == RAFT_STATE_FOLLOWER);
 		diag_set(ClientError, ER_UNSUPPORTED, "election_mode='voter'",
 			 "manual elections");
 		return -1;
 	case ELECTION_MODE_MANUAL:
-		if (box_raft()->state == RAFT_STATE_LEADER)
+		if (raft->state == RAFT_STATE_LEADER)
 			return 0;
 		run_elections = true;
 		break;
@@ -1515,13 +1515,13 @@ box_promote(void)
 		 * promote only if it's already an elected leader. No manual
 		 * elections.
 		 */
-		if (box_raft()->state != RAFT_STATE_LEADER) {
+		if (raft->state != RAFT_STATE_LEADER) {
 			diag_set(ClientError, ER_UNSUPPORTED, "election_mode="
 				 "'candidate'", "manual elections");
 			return -1;
 		}
 		if (txn_limbo_replica_term(&txn_limbo, instance_id) ==
-		    box_raft()->term)
+		    raft->term)
 			return 0;
 
 		break;
@@ -1543,28 +1543,28 @@ box_promote(void)
 		 * Make this instance a candidate and run until some leader, not
 		 * necessarily this instance, emerges.
 		 */
-		raft_start_candidate(box_raft());
+		raft_start_candidate(raft);
 		/*
 		 * Trigger new elections without waiting for an old leader to
 		 * disappear.
 		 */
-		raft_new_term(box_raft());
+		raft_new_term(raft);
 		rc = box_raft_wait_leader_found();
 		/*
 		 * Do not reset raft mode if it was changed while running the
 		 * elections.
 		 */
 		if (box_election_mode == ELECTION_MODE_MANUAL)
-			raft_stop_candidate(box_raft(), false);
+			raft_stop_candidate(raft, false);
 		if (rc != 0)
 			return -1;
-		if (!box_raft()->is_enabled) {
+		if (!raft->is_enabled) {
 			diag_set(ClientError, ER_RAFT_DISABLED);
 			return -1;
 		}
-		if (box_raft()->state != RAFT_STATE_LEADER) {
+		if (raft->state != RAFT_STATE_LEADER) {
 			diag_set(ClientError, ER_INTERFERING_PROMOTE,
-				 box_raft()->leader);
+				 raft->leader);
 			return -1;
 		}
 	}
@@ -1630,15 +1630,15 @@ box_promote(void)
 		} else {
 promote:
 			/* We cannot possibly get here in a volatile state. */
-			assert(box_raft()->volatile_term == box_raft()->term);
+			assert(raft->volatile_term == raft->term);
 			txn_limbo_write_promote(&txn_limbo, wait_lsn,
-						box_raft()->term);
+						raft->term);
 			struct synchro_request req = {
 				.type = IPROTO_PROMOTE,
 				.replica_id = former_leader_id,
 				.origin_id = instance_id,
 				.lsn = wait_lsn,
-				.term = box_raft()->term,
+				.term = raft->term,
 			};
 			txn_limbo_process(&txn_limbo, &req);
 			assert(txn_limbo_is_empty(&txn_limbo));
@@ -3436,9 +3436,10 @@ box_cfg_xc(void)
 	 * new records into WAL. Another reason - before recovery is done,
 	 * instance_id is not known, so Raft simply can't work.
 	 */
+	struct raft *raft = box_raft();
 	if (!replication_anon)
-		raft_cfg_instance_id(box_raft(), instance_id);
-	raft_cfg_vclock(box_raft(), &replicaset.vclock);
+		raft_cfg_instance_id(raft, instance_id);
+	raft_cfg_vclock(raft, &replicaset.vclock);
 
 	if (box_set_election_timeout() != 0)
 		diag_raise();
@@ -3462,7 +3463,7 @@ box_cfg_xc(void)
 		 * should take the control over the situation and start a new
 		 * term immediately.
 		 */
-		raft_new_term(box_raft());
+		raft_new_term(raft);
 	}
 
 	/* box.cfg.read_only is not read yet. */
