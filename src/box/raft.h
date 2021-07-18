@@ -97,9 +97,9 @@ box_raft_checkpoint_remote(struct raft_request *req);
 int
 box_raft_process(struct raft_request *req, uint32_t source);
 
-/** Block this fiber until Raft leader is known. */
+/** Block this fiber until the current term's outcome is known. */
 int
-box_raft_wait_leader_found();
+box_raft_wait_term_outcome(void);
 
 void
 box_raft_init(void);

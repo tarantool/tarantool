@@ -1543,25 +1543,14 @@ box_promote(void)
 		 * Make this instance a candidate and run until some leader, not
 		 * necessarily this instance, emerges.
 		 */
-		raft_start_candidate(raft);
-		/*
-		 * Trigger new elections without waiting for an old leader to
-		 * disappear.
-		 */
-		raft_new_term(raft);
-		rc = box_raft_wait_leader_found();
-		/*
-		 * Do not reset raft mode if it was changed while running the
-		 * elections.
-		 */
-		if (box_election_mode == ELECTION_MODE_MANUAL)
-			raft_stop_candidate(raft, false);
-		if (rc != 0)
-			return -1;
-		if (!raft->is_enabled) {
-			diag_set(ClientError, ER_RAFT_DISABLED);
-			return -1;
-		}
+		do {
+			raft_promote(raft);
+			rc = box_raft_wait_term_outcome();
+			if (rc != 0) {
+				raft_restore(raft);
+				return -1;
+			}
+		} while (raft->leader == 0);
 		if (raft->state != RAFT_STATE_LEADER) {
 			diag_set(ClientError, ER_INTERFERING_PROMOTE,
 				 raft->leader);

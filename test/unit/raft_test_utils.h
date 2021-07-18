@@ -208,22 +208,16 @@ raft_node_block(struct raft_node *node);
 void
 raft_node_unblock(struct raft_node *node);
 
-/**
- * Make the node candidate, and maybe start election if a leader is not known.
- */
+/** Promote the node. It bumps the term and tries to become a leader. */
 void
-raft_node_start_candidate(struct raft_node *node);
+raft_node_promote(struct raft_node *node);
 
 /**
- * Make the node non-candidate for next elections, but if it is a leader right
- * now, it will stay a leader.
+ * Restore the node's state back to its is_candidate config. It is demoted if
+ * was a leader.
  */
 void
-raft_node_stop_candidate(struct raft_node *node);
-
-/** Stop the candidate and remove its leader role if present. */
-void
-raft_node_demote_candidate(struct raft_node *node);
+raft_node_restore(struct raft_node *node);
 
 /** Configuration methods. */
 

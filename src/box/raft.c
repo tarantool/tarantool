@@ -327,30 +327,70 @@ fail:
 	panic("Could not write a raft request to WAL\n");
 }
 
+/**
+ * Context of waiting for a Raft term outcome. Which is either a leader is
+ * elected, or a new term starts, or Raft is disabled.
+ */
+struct box_raft_watch_ctx {
+	bool is_done;
+	uint64_t term;
+	struct fiber *owner;
+};
+
 static int
-box_raft_wait_leader_found_f(struct trigger *trig, void *event)
+box_raft_wait_term_outcome_f(struct trigger *trig, void *event)
 {
 	struct raft *raft = event;
 	assert(raft == box_raft());
-	struct fiber *waiter = trig->data;
-	if (raft->leader != REPLICA_ID_NIL || !raft->is_enabled)
-		fiber_wakeup(waiter);
+	struct box_raft_watch_ctx *ctx = trig->data;
+	/*
+	 * Term ended with nothing, probably split vote which led to a next
+	 * term.
+	 */
+	if (raft->volatile_term > ctx->term)
+		goto done;
+	/* Instance does not participate in terms anymore. */
+	if (!raft->is_enabled)
+		goto done;
+	/* The term ended with a leader being found. */
+	if (raft->leader != REPLICA_ID_NIL)
+		goto done;
+	/* The term still continues with no resolution. */
+	return 0;
+done:
+	ctx->is_done = true;
+	fiber_wakeup(ctx->owner);
 	return 0;
 }
 
 int
-box_raft_wait_leader_found(void)
+box_raft_wait_term_outcome(void)
 {
+	struct raft *raft = box_raft();
 	struct trigger trig;
-	trigger_create(&trig, box_raft_wait_leader_found_f, fiber(), NULL);
-	raft_on_update(box_raft(), &trig);
-	fiber_yield();
+	struct box_raft_watch_ctx ctx = {
+		.is_done = false,
+		.term = raft->volatile_term,
+		.owner = fiber(),
+	};
+	trigger_create(&trig, box_raft_wait_term_outcome_f, &ctx, NULL);
+	raft_on_update(raft, &trig);
+	/*
+	 * XXX: it is not a good idea not to have a timeout here. If all nodes
+	 * are voters, the term might never end with any result nor bump to a
+	 * new value.
+	 */
+	while (!fiber_is_cancelled() && !ctx.is_done)
+		fiber_yield();
 	trigger_clear(&trig);
 	if (fiber_is_cancelled()) {
 		diag_set(FiberIsCancelled);
 		return -1;
 	}
-	assert(box_raft()->leader != REPLICA_ID_NIL || !box_raft()->is_enabled);
+	if (!raft->is_enabled) {
+		diag_set(ClientError, ER_ELECTION_DISABLED);
+		return -1;
+	}
 	return 0;
 }
 
