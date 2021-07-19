@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(31)
+test:plan(32)
 
 --!./tcltestrunner.lua
 -- 2013 March 20
@@ -247,6 +247,18 @@ test:do_execsql_test(
         SELECT (1 / 1) / 3, (1 / 1.) / 3, (1 / 1) / 3.;
     ]], {
         0 , 0.33333333333333, 0.33333333333333
+})
+
+--
+-- gh-6010: Make sure that a negative DOUBLE value cannot be explicitly cast to
+-- UNSIGNED.
+--
+test:do_catchsql_test(
+    "numcast-4",
+    [[
+        SELECT CAST(-2.5 AS UNSIGNED);
+    ]], {
+        1, "Type mismatch: can not convert double(-2.5) to unsigned"
 })
 
 test:finish_test()
