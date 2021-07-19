@@ -1061,7 +1061,7 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 		case MEM_TYPE_BIN:
 			return bytes_to_uint(mem);
 		case MEM_TYPE_DOUBLE:
-			return double_to_int(mem);
+			return double_to_uint(mem);
 		case MEM_TYPE_BOOL:
 			return bool_to_int(mem);
 		default:
