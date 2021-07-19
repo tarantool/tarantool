@@ -1097,11 +1097,8 @@ box.execute("SELECT CAST(1.5 AS UNSIGNED);")
 ...
 box.execute("SELECT CAST(-1.5 AS UNSIGNED);")
 ---
-- metadata:
-  - name: COLUMN_1
-    type: unsigned
-  rows:
-  - [-1]
+- null
+- 'Type mismatch: can not convert double(-1.5) to unsigned'
 ...
 box.execute("SELECT CAST(true AS UNSIGNED);")
 ---
