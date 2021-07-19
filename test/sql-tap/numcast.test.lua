@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(32)
+test:plan(33)
 
 --!./tcltestrunner.lua
 -- 2013 March 20
@@ -259,6 +259,18 @@ test:do_catchsql_test(
         SELECT CAST(-2.5 AS UNSIGNED);
     ]], {
         1, "Type mismatch: can not convert double(-2.5) to unsigned"
+})
+
+--
+-- gh-6225: Make sure negative DOUBLE is greater than -1.0 and less than 0.0 can
+-- be converted to INTEGER and UNSIGNED.
+--
+test:do_execsql_test(
+    "numcast-5",
+    [[
+        SELECT CAST(-0.999 AS INTEGER), CAST(-0.111 AS UNSIGNED);
+    ]], {
+        0, 0
 })
 
 test:finish_test()

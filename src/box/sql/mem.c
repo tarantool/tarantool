@@ -702,14 +702,14 @@ double_to_int(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_DOUBLE);
 	double d = mem->u.r;
-	if (d < 0 && d >= (double)INT64_MIN) {
+	if (d <= -1.0 && d >= (double)INT64_MIN) {
 		mem->u.i = (int64_t)d;
 		mem->type = MEM_TYPE_INT;
 		assert(mem->flags == 0);
 		mem->field_type = FIELD_TYPE_INTEGER;
 		return 0;
 	}
-	if (d >= 0 && d < (double)UINT64_MAX) {
+	if (d > -1.0 && d < (double)UINT64_MAX) {
 		mem->u.u = (uint64_t)d;
 		mem->type = MEM_TYPE_UINT;
 		assert(mem->flags == 0);
@@ -724,14 +724,14 @@ double_to_int_precise(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_DOUBLE);
 	double d = mem->u.r;
-	if (d < 0 && d >= (double)INT64_MIN && (double)(int64_t)d == d) {
+	if (d <= -1.0 && d >= (double)INT64_MIN && (double)(int64_t)d == d) {
 		mem->u.i = (int64_t)d;
 		mem->type = MEM_TYPE_INT;
 		assert(mem->flags == 0);
 		mem->field_type = FIELD_TYPE_INTEGER;
 		return 0;
 	}
-	if (d >= 0 && d < (double)UINT64_MAX && (double)(uint64_t)d == d) {
+	if (d > -1.0 && d < (double)UINT64_MAX && (double)(uint64_t)d == d) {
 		mem->u.u = (uint64_t)d;
 		mem->type = MEM_TYPE_UINT;
 		assert(mem->flags == 0);
@@ -746,7 +746,7 @@ double_to_uint(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_DOUBLE);
 	double d = mem->u.r;
-	if (d >= 0 && d < (double)UINT64_MAX) {
+	if (d > -1.0 && d < (double)UINT64_MAX) {
 		mem->u.u = (uint64_t)d;
 		mem->type = MEM_TYPE_UINT;
 		assert(mem->flags == 0);
@@ -761,7 +761,7 @@ double_to_uint_precise(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_DOUBLE);
 	double d = mem->u.r;
-	if (d >= 0 && d < (double)UINT64_MAX && (double)(uint64_t)d == d) {
+	if (d > -1.0 && d < (double)UINT64_MAX && (double)(uint64_t)d == d) {
 		mem->u.u = (uint64_t)d;
 		mem->type = MEM_TYPE_UINT;
 		assert(mem->flags == 0);
@@ -1150,12 +1150,12 @@ mem_get_int(const struct Mem *mem, int64_t *i, bool *is_neg)
 		return sql_atoi64(mem->z, i, is_neg, mem->n);
 	if (mem->type == MEM_TYPE_DOUBLE) {
 		double d = mem->u.r;
-		if (d < 0 && d >= (double)INT64_MIN) {
+		if (d <= -1.0 && d >= (double)INT64_MIN) {
 			*i = (int64_t)d;
 			*is_neg = true;
 			return 0;
 		}
-		if (d >= 0 && d < (double)UINT64_MAX) {
+		if (d > -1.0 && d < (double)UINT64_MAX) {
 			*i = (int64_t)(uint64_t)d;
 			*is_neg = false;
 			return 0;
@@ -1183,7 +1183,7 @@ mem_get_uint(const struct Mem *mem, uint64_t *u)
 	}
 	if (mem->type == MEM_TYPE_DOUBLE) {
 		double d = mem->u.r;
-		if (d >= 0 && d < (double)UINT64_MAX) {
+		if (d > -1.0 && d < (double)UINT64_MAX) {
 			*u = (uint64_t)d;
 			return 0;
 		}
