@@ -33,7 +33,10 @@ ret
 -- Test discard.
 --
 future = c:call('long_function', {1, 2, 3}, {is_async = true})
+ch = fiber.channel()
+_ = fiber.create(function() ch:put({future:wait_result()}) end)
 future:discard()
+ch:get(100)
 finalize_long()
 future:result()
 future:wait_result(100)

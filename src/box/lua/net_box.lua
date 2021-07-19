@@ -432,6 +432,7 @@ local function create_transport(host, port, user, password, callback,
             self.id = nil
             self.errno = box.error.PROC_LUA
             self.response = 'Response is discarded'
+            self.cond:broadcast()
         end
     end
 
