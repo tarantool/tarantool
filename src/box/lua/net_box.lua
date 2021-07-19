@@ -583,6 +583,17 @@ local function create_transport(host, port, user, password, callback,
         request.cond:broadcast()
     end
 
+    local function dispatch_response_console(rid, response)
+        local request = requests[rid]
+        if request == nil then -- nobody is waiting for the response
+            return
+        end
+        request.id = nil
+        requests[rid] = nil
+        request.response = response
+        request.cond:broadcast()
+    end
+
     local function new_request_id()
         local id = next_request_id;
         next_request_id = next_id(id)
@@ -684,14 +695,7 @@ local function create_transport(host, port, user, password, callback,
         if err then
             return error_sm(err, response)
         else
-            local request = requests[rid]
-            if request == nil then -- nobody is waiting for the response
-                return
-            end
-            request.id = nil
-            requests[rid] = nil
-            request.response = response
-            request.cond:broadcast()
+            dispatch_response_console(rid, response)
             return console_sm(next_id(rid))
         end
     end

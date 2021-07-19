@@ -539,6 +539,7 @@ check_limit:
 		}
 
 		ev_tstamp deadline = ev_monotonic_now(loop()) + timeout;
+		ERROR_INJECT_YIELD(ERRINJ_NETBOX_IO_DELAY);
 		revents = coio_wait(fd, EV_READ | (ibuf_used(send_buf) != 0 ?
 				EV_WRITE : 0), timeout);
 		luaL_testcancel(L);
