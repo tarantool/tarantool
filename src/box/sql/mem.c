@@ -735,9 +735,9 @@ bin_to_uuid(struct Mem *mem)
 }
 
 static inline int
-bytes_to_int(struct Mem *mem)
+str_to_int(struct Mem *mem)
 {
-	assert((mem->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) != 0);
+	assert(mem->type == MEM_TYPE_STR);
 	bool is_neg;
 	int64_t i;
 	if (sql_atoi64(mem->z, &i, &is_neg, mem->n) != 0)
@@ -747,9 +747,9 @@ bytes_to_int(struct Mem *mem)
 }
 
 static inline int
-bytes_to_uint(struct Mem *mem)
+str_to_uint(struct Mem *mem)
 {
-	assert((mem->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) != 0);
+	assert(mem->type == MEM_TYPE_STR);
 	bool is_neg;
 	int64_t i;
 	if (sql_atoi64(mem->z, &i, &is_neg, mem->n) != 0)
@@ -761,9 +761,9 @@ bytes_to_uint(struct Mem *mem)
 }
 
 static inline int
-bytes_to_double(struct Mem *mem)
+str_to_double(struct Mem *mem)
 {
-	assert((mem->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) != 0);
+	assert(mem->type == MEM_TYPE_STR);
 	double d;
 	if (sqlAtoF(mem->z, &d, mem->n) == 0)
 		return -1;
@@ -905,8 +905,8 @@ mem_to_int(struct Mem *mem)
 	assert(mem->type < MEM_TYPE_INVALID);
 	if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0)
 		return 0;
-	if ((mem->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) != 0)
-		return bytes_to_int(mem);
+	if (mem->type == MEM_TYPE_STR)
+		return str_to_int(mem);
 	if (mem->type == MEM_TYPE_DOUBLE)
 		return double_to_int(mem);
 	return -1;
@@ -919,7 +919,7 @@ mem_to_int_precise(struct Mem *mem)
 	if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0)
 		return 0;
 	if (mem->type == MEM_TYPE_STR)
-		return bytes_to_int(mem);
+		return str_to_int(mem);
 	if (mem->type == MEM_TYPE_DOUBLE)
 		return double_to_int_precise(mem);
 	return -1;
@@ -934,7 +934,7 @@ mem_to_double(struct Mem *mem)
 	if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0)
 		return int_to_double(mem);
 	if (mem->type == MEM_TYPE_STR)
-		return bytes_to_double(mem);
+		return str_to_double(mem);
 	return -1;
 }
 
@@ -944,10 +944,10 @@ mem_to_number(struct Mem *mem)
 	assert(mem->type < MEM_TYPE_INVALID);
 	if (mem_is_num(mem))
 		return 0;
-	if ((mem->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) != 0) {
-		if (bytes_to_int(mem) == 0)
+	if (mem->type == MEM_TYPE_STR) {
+		if (str_to_int(mem) == 0)
 			return 0;
-		return bytes_to_double(mem);
+		return str_to_double(mem);
 	}
 	return -1;
 }
@@ -1021,8 +1021,7 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 		case MEM_TYPE_UINT:
 			return 0;
 		case MEM_TYPE_STR:
-		case MEM_TYPE_BIN:
-			return bytes_to_uint(mem);
+			return str_to_uint(mem);
 		case MEM_TYPE_DOUBLE:
 			return double_to_uint(mem);
 		default:
@@ -1158,7 +1157,7 @@ mem_cast_implicit_old(struct Mem *mem, enum field_type type)
 		if (mem->type == MEM_TYPE_DOUBLE)
 			return double_to_uint_precise(mem);
 		if (mem->type == MEM_TYPE_STR)
-			return bytes_to_uint(mem);
+			return str_to_uint(mem);
 		return -1;
 	case FIELD_TYPE_STRING:
 		if ((mem->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) != 0)
@@ -1182,7 +1181,7 @@ mem_cast_implicit_old(struct Mem *mem, enum field_type type)
 		if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0)
 			return 0;
 		if (mem->type == MEM_TYPE_STR)
-			return bytes_to_int(mem);
+			return str_to_int(mem);
 		if (mem->type == MEM_TYPE_DOUBLE)
 			return double_to_int_precise(mem);
 		return -1;

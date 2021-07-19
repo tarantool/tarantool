@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(91)
+test:plan(94)
 
 --!./tcltestrunner.lua
 -- 2005 June 25
@@ -565,23 +565,23 @@ test:do_catchsql_test(
         -- </case-1.66>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "case-1.68",
     [[
         SELECT CAST(x'31' AS NUMBER)
     ]], {
         -- <case-1.68>
-        1.0
+        1, "Type mismatch: can not convert varbinary(x'31') to number"
         -- </case-1.68>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "case-1.69",
     [[
         SELECT typeof(CAST(x'31' AS NUMBER))
     ]], {
         -- <case-1.69>
-        "number"
+        1, "Type mismatch: can not convert varbinary(x'31') to number"
         -- </case-1.69>
     })
 
@@ -727,49 +727,61 @@ test:do_execsql_test(
 
 
 if true then --test:execsql("PRAGMA encoding")[1][1]=="UTF-8" then
-    test:do_execsql_test(
+    test:do_catchsql_test(
         "cast-3.21",
         [[
             SELECT CAST(x'39323233333732303336383534373734383030' AS integer)
         ]], {
             -- <cast-3.21>
-            9223372036854774800LL
+            1, "Type mismatch: can not convert "..
+               "varbinary(x'39323233333732303336383534373734383030') to integer"
             -- </cast-3.21>
         })
 
-    test:do_execsql_test(
+    test:do_catchsql_test(
         "cast-3.22",
         [[
             SELECT CAST(x'393232333337323033363835343737343830302E' AS NUMBER)
         ]], {
             -- <cast-3.22>
-            9223372036854774784
+            1, "Type mismatch: can not convert "..
+               "varbinary(x'393232333337323033363835343737343830302E') "..
+               "to number"
             -- </cast-3.22>
         })
 
-    test:do_execsql_test(
+    test:do_catchsql_test(
         "cast-3.24",
         [[
             SELECT CAST(CAST(x'39323233333732303336383534373734383030' AS NUMBER)
                         AS integer)
         ]], {
             -- <cast-3.24>
-            9223372036854774800LL
+            1, "Type mismatch: can not convert "..
+               "varbinary(x'39323233333732303336383534373734383030') to number"
             -- </cast-3.24>
         })
 end
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "case-3.25",
     [[
         SELECT CAST(x'31383434363734343037333730393535313631352E' AS NUMBER);
-    ]], { 1.844674407371e+19 } )
+    ]], {
+        1, "Type mismatch: can not convert "..
+           "varbinary(x'31383434363734343037333730393535313631352E') to number"
+    })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "case-3.26",
     [[
         SELECT CAST(x'3138343436373434303733373039353531363135' AS INT);
-    ]], { 18446744073709551615LL } )
+    ]], {
+        -- <cast-3.21>
+        1, "Type mismatch: can not convert "..
+           "varbinary(x'3138343436373434303733373039353531363135') to integer"
+        -- </cast-3.21>
+    })
 
 test:do_execsql_test(
     "case-3.31",
@@ -861,20 +873,6 @@ test:do_test(
         -- <cast-4.4>
         1, "Type mismatch: can not convert string('abc') to number"
         -- </cast-4.4>
-    })
-
-
--- gh-4356: Check that result of blob to number cast if of type
--- number.
---
-test:do_execsql_test(
-    "cast-5.1",
-    [[
-        SELECT CAST(x'3138343436373434303733372e33' AS NUMBER)
-    ]], {
-        -- <cast-5.1>
-        184467440737.3
-        -- </cast-5.1>
     })
 
 -- gh-4470: Make explicit casts work according to our rules.
@@ -975,6 +973,39 @@ test:do_catchsql_test(
         SELECT CAST(CAST(1 AS NUMBER) AS BOOLEAN);
     ]], {
         1, "Type mismatch: can not convert integer(1) to boolean"
+    })
+
+-- Make sure that explicit cast from VARBINARY to numeric types throws an error.
+test:do_catchsql_test(
+    "cast-7.1.1",
+    [[
+        SELECT CAST(x'31' AS UNSIGNED);
+    ]], {
+        1, "Type mismatch: can not convert varbinary(x'31') to unsigned"
+    })
+
+test:do_catchsql_test(
+    "cast-7.1.2",
+    [[
+        SELECT CAST(x'31' AS INTEGER);
+    ]], {
+        1, "Type mismatch: can not convert varbinary(x'31') to integer"
+    })
+
+test:do_catchsql_test(
+    "cast-7.1.3",
+    [[
+        SELECT CAST(x'31' AS DOUBLE);
+    ]], {
+        1, "Type mismatch: can not convert varbinary(x'31') to double"
+    })
+
+test:do_catchsql_test(
+    "cast-7.1.4",
+    [[
+        SELECT CAST(x'31' AS NUMBER);
+    ]], {
+        1, "Type mismatch: can not convert varbinary(x'31') to number"
     })
 
 test:finish_test()

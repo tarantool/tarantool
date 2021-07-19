@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(32)
+test:plan(30)
 
 --!./tcltestrunner.lua
 -- 2013 March 20
@@ -149,22 +149,6 @@ test:do_execsql_test(
 -- gh-4233: Make sure that NUMBER can contain UNSIGNED, INTEGER
 -- and DOUBLE and is not automatically converted to DOUBLE.
 --
-test:do_execsql_test(
-    "numcast-3.1",
-    [[
-        SELECT CAST(x'3131313131313131313131313131313131313131' AS NUMBER);
-    ]], {
-        11111111111111111111ULL
-    })
-
-test:do_execsql_test(
-    "numcast-3.2",
-    [[
-        SELECT CAST(x'31313131313131313131313131313131313131312E' AS NUMBER);
-    ]], {
-        11111111111111110656
-    })
-
 test:do_execsql_test(
     "numcast-3.3",
     [[
