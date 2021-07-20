@@ -76,8 +76,6 @@ local function version_at_least(peer_version_id, major, minor, patch)
     return peer_version_id >= version_id(major, minor, patch)
 end
 
-local function next_id(id) return band(id + 1, 0x7FFFFFFF) end
-
 --
 -- Connect to a remote server, do handshake.
 -- @param host Hostname.
@@ -186,7 +184,6 @@ local function create_transport(host, port, user, password, callback,
     -- Sync requests are implemented as async call + immediate
     -- wait for a result.
     local requests         = internal.new_registry()
-    local next_request_id  = 1
 
     local worker_fiber
     local send_buf         = buffer.ibuf(buffer.READAHEAD)
@@ -295,9 +292,8 @@ local function create_transport(host, port, user, password, callback,
         if send_buf:size() == 0 then
             worker_fiber:wakeup()
         end
-        local id = next_request_id
+        local id = requests:new_id()
         encode_method(method, send_buf, id, ...)
-        next_request_id = next_id(id)
         return internal.new_request(requests, id, buffer, skip_header, method,
                                     on_push, on_push_ctx, format)
     end
@@ -327,12 +323,6 @@ local function create_transport(host, port, user, password, callback,
 
     local function dispatch_response_console(rid, response)
         internal.dispatch_response_console(requests, rid, response)
-    end
-
-    local function new_request_id()
-        local id = next_request_id;
-        next_request_id = next_id(id)
-        return id
     end
 
     -- IO (WORKER FIBER) --
@@ -390,7 +380,7 @@ local function create_transport(host, port, user, password, callback,
             elseif response ~= '---\n...\n' then
                 return error_sm(E_NO_CONNECTION, 'Unexpected response')
             end
-            local rid = next_request_id
+            local rid = requests:next_id()
             set_state('active')
             return console_sm(rid)
         elseif greeting.protocol == 'Binary' then
@@ -407,7 +397,7 @@ local function create_transport(host, port, user, password, callback,
             return error_sm(err, response)
         else
             dispatch_response_console(rid, response)
-            return console_sm(next_id(rid))
+            return console_sm(requests:next_id(rid))
         end
     end
 
@@ -417,7 +407,7 @@ local function create_transport(host, port, user, password, callback,
             set_state('fetch_schema')
             return iproto_schema_sm()
         end
-        encode_auth(send_buf, new_request_id(), user, password, salt)
+        encode_auth(send_buf, requests:new_id(), user, password, salt)
         local err, hdr, body_rpos = send_and_recv_iproto()
         if err then
             return error_sm(err, hdr)
@@ -438,8 +428,8 @@ local function create_transport(host, port, user, password, callback,
         -- _vcollation view was added in 2.2.0-389-g3e3ef182f
         local peer_has_vcollation = version_at_least(greeting.version_id,
                                                      2, 2, 1)
-        local select1_id = new_request_id()
-        local select2_id = new_request_id()
+        local select1_id = requests:new_id()
+        local select2_id = requests:new_id()
         local select3_id
         local response = {}
         -- fetch everything from space _vspace, 2 = ITER_ALL
@@ -450,7 +440,7 @@ local function create_transport(host, port, user, password, callback,
                       0xFFFFFFFF, nil)
         -- fetch everything from space _vcollation, 2 = ITER_ALL
         if peer_has_vcollation then
-            select3_id = new_request_id()
+            select3_id = requests:new_id()
             encode_method(M_SELECT, send_buf, select3_id, VCOLLATION_ID,
                           0, 2, 0, 0xFFFFFFFF, nil)
         end
