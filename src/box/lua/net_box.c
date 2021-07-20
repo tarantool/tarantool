@@ -79,6 +79,8 @@ enum netbox_method {
 };
 
 struct netbox_registry {
+	/** Next request id. */
+	uint64_t next_sync;
 	/** sync -> netbox_request */
 	struct mh_i64ptr_t *requests;
 };
@@ -268,6 +270,7 @@ netbox_request_push_result(struct netbox_request *request, struct lua_State *L)
 static int
 netbox_registry_create(struct netbox_registry *registry)
 {
+	registry->next_sync = 1;
 	registry->requests = mh_i64ptr_new();
 	if (registry->requests == NULL) {
 		diag_set(OutOfMemory, 0, "mhash", "netbox_registry");
@@ -1380,6 +1383,32 @@ luaT_netbox_registry_gc(struct lua_State *L)
 	return 0;
 }
 
+/** Allocates a new id (sync). */
+static int
+luaT_netbox_registry_new_id(struct lua_State *L)
+{
+	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
+	luaL_pushuint64(L, registry->next_sync++);
+	return 1;
+}
+
+/**
+ * Returns the next id (sync) without reserving it.
+ * If called with an argument, returns the id following its value.
+ */
+static int
+luaT_netbox_registry_next_id(struct lua_State *L)
+{
+	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
+	uint64_t next_sync;
+	if (lua_isnoneornil(L, 2))
+		next_sync = registry->next_sync;
+	else
+		next_sync = luaL_touint64(L, 2) + 1;
+	luaL_pushuint64(L, next_sync);
+	return 1;
+}
+
 static int
 luaT_netbox_registry_reset(struct lua_State *L)
 {
@@ -1753,6 +1782,8 @@ luaopen_net_box(struct lua_State *L)
 
 	static const struct luaL_Reg netbox_registry_meta[] = {
 		{ "__gc",           luaT_netbox_registry_gc },
+		{ "new_id",         luaT_netbox_registry_new_id },
+		{ "next_id",        luaT_netbox_registry_next_id },
 		{ "reset",          luaT_netbox_registry_reset },
 		{ NULL, NULL }
 	};
