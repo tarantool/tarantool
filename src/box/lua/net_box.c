@@ -366,15 +366,13 @@ netbox_encode_update(lua_State *L)
 	mpstream_encode_uint(&stream, IPROTO_INDEX_BASE);
 	mpstream_encode_uint(&stream, 1);
 
-	/* encode in reverse order for speedup - see luamp_encode() code */
-	/* encode ops */
-	mpstream_encode_uint(&stream, IPROTO_TUPLE);
-	luamp_encode_tuple(L, cfg, &stream, 6);
-	lua_pop(L, 1); /* ops */
-
 	/* encode key */
 	mpstream_encode_uint(&stream, IPROTO_KEY);
 	luamp_convert_key(L, cfg, &stream, 5);
+
+	/* encode ops */
+	mpstream_encode_uint(&stream, IPROTO_TUPLE);
+	luamp_encode_tuple(L, cfg, &stream, 6);
 
 	netbox_encode_request(&stream, svp);
 	return 0;
@@ -402,15 +400,13 @@ netbox_encode_upsert(lua_State *L)
 	mpstream_encode_uint(&stream, IPROTO_INDEX_BASE);
 	mpstream_encode_uint(&stream, 1);
 
-	/* encode in reverse order for speedup - see luamp_encode() code */
-	/* encode ops */
-	mpstream_encode_uint(&stream, IPROTO_OPS);
-	luamp_encode_tuple(L, cfg, &stream, 5);
-	lua_pop(L, 1); /* ops */
-
 	/* encode tuple */
 	mpstream_encode_uint(&stream, IPROTO_TUPLE);
 	luamp_encode_tuple(L, cfg, &stream, 4);
+
+	/* encode ops */
+	mpstream_encode_uint(&stream, IPROTO_OPS);
+	luamp_encode_tuple(L, cfg, &stream, 5);
 
 	netbox_encode_request(&stream, svp);
 	return 0;
