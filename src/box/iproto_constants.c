@@ -43,10 +43,10 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 		/* 0x07 */	MP_UINT,   /* IPROTO_GROUP_ID */
 		/* 0x08 */	MP_UINT,   /* IPROTO_TSN */
 		/* 0x09 */	MP_UINT,   /* IPROTO_FLAGS */
+		/* 0x0a */	MP_UINT,   /* IPROTO_STREAM_ID */
 	/* }}} */
 
 	/* {{{ unused */
-		/* 0x0a */	MP_UINT,
 		/* 0x0b */	MP_UINT,
 		/* 0x0c */	MP_UINT,
 		/* 0x0d */	MP_UINT,
@@ -198,7 +198,7 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"group id",         /* 0x07 */
 	"tsn",              /* 0x08 */
 	"flags",            /* 0x09 */
-	NULL,               /* 0x0a */
+	"stream_id",        /* 0x0a */
 	NULL,               /* 0x0b */
 	NULL,               /* 0x0c */
 	NULL,               /* 0x0d */

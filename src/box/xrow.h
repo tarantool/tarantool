@@ -81,6 +81,11 @@ struct xrow_header {
 	 * transaction.
 	 */
 	int64_t tsn;
+	/**
+	 * Stream id. Used in iproto binary protocol to identify stream.
+	 * Zero if stream is not used.
+	 */
+	uint64_t stream_id;
 	/** Transaction meta flags set only in the last transaction row. */
 	union {
 		uint8_t flags;

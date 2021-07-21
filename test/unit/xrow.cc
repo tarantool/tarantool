@@ -220,8 +220,10 @@ test_xrow_header_encode_decode()
 	header.bodycnt = 0;
 	header.tsn = header.lsn;
 	uint64_t sync = 100500;
+	uint64_t stream_id = 1;
 	for (int opt_idx = 0; opt_idx < bit_comb_count; opt_idx++) {
-		plan(12);
+		plan(13);
+		header.stream_id = stream_id++;
 		header.is_commit = opt_idx & 0x01;
 		header.wait_sync = opt_idx >> 1 & 0x01;
 		header.wait_ack = opt_idx >> 2 & 0x01;
@@ -229,7 +231,7 @@ test_xrow_header_encode_decode()
 		is(1, xrow_header_encode(&header, sync, vec, 200), "encode");
 		int fixheader_len = 200;
 		pos = (char *)vec[0].iov_base + fixheader_len;
-		uint32_t exp_map_size = 5;
+		uint32_t exp_map_size = 6;
 		/*
 		 * header.is_commit flag isn't encoded, since this row looks
 		 * like a single-statement transaction.
@@ -249,6 +251,7 @@ test_xrow_header_encode_decode()
 		end += vec[0].iov_len;
 		is(xrow_header_decode(&decoded_header, &begin, end, true), 0,
 		   "header decode");
+		is(header.stream_id, decoded_header.stream_id, "decoded stream_id");
 		is(header.is_commit, decoded_header.is_commit, "decoded is_commit");
 		is(header.wait_sync, decoded_header.wait_sync, "decoded wait_sync");
 		is(header.wait_ack, decoded_header.wait_ack, "decoded wait_ack");

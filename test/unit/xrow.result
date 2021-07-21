@@ -43,117 +43,125 @@
 ok 1 - subtests
     1..9
     ok 1 - bad msgpack end
-        1..12
+        1..13
         ok 1 - encode
         ok 2 - header map size
         ok 3 - header decode
-        ok 4 - decoded is_commit
-        ok 5 - decoded wait_sync
-        ok 6 - decoded wait_ack
-        ok 7 - decoded type
-        ok 8 - decoded replica_id
-        ok 9 - decoded lsn
-        ok 10 - decoded tm
-        ok 11 - decoded sync
-        ok 12 - decoded bodycnt
+        ok 4 - decoded stream_id
+        ok 5 - decoded is_commit
+        ok 6 - decoded wait_sync
+        ok 7 - decoded wait_ack
+        ok 8 - decoded type
+        ok 9 - decoded replica_id
+        ok 10 - decoded lsn
+        ok 11 - decoded tm
+        ok 12 - decoded sync
+        ok 13 - decoded bodycnt
     ok 2 - subtests
-        1..12
+        1..13
         ok 1 - encode
         ok 2 - header map size
         ok 3 - header decode
-        ok 4 - decoded is_commit
-        ok 5 - decoded wait_sync
-        ok 6 - decoded wait_ack
-        ok 7 - decoded type
-        ok 8 - decoded replica_id
-        ok 9 - decoded lsn
-        ok 10 - decoded tm
-        ok 11 - decoded sync
-        ok 12 - decoded bodycnt
+        ok 4 - decoded stream_id
+        ok 5 - decoded is_commit
+        ok 6 - decoded wait_sync
+        ok 7 - decoded wait_ack
+        ok 8 - decoded type
+        ok 9 - decoded replica_id
+        ok 10 - decoded lsn
+        ok 11 - decoded tm
+        ok 12 - decoded sync
+        ok 13 - decoded bodycnt
     ok 3 - subtests
-        1..12
+        1..13
         ok 1 - encode
         ok 2 - header map size
         ok 3 - header decode
-        ok 4 - decoded is_commit
-        ok 5 - decoded wait_sync
-        ok 6 - decoded wait_ack
-        ok 7 - decoded type
-        ok 8 - decoded replica_id
-        ok 9 - decoded lsn
-        ok 10 - decoded tm
-        ok 11 - decoded sync
-        ok 12 - decoded bodycnt
+        ok 4 - decoded stream_id
+        ok 5 - decoded is_commit
+        ok 6 - decoded wait_sync
+        ok 7 - decoded wait_ack
+        ok 8 - decoded type
+        ok 9 - decoded replica_id
+        ok 10 - decoded lsn
+        ok 11 - decoded tm
+        ok 12 - decoded sync
+        ok 13 - decoded bodycnt
     ok 4 - subtests
-        1..12
+        1..13
         ok 1 - encode
         ok 2 - header map size
         ok 3 - header decode
-        ok 4 - decoded is_commit
-        ok 5 - decoded wait_sync
-        ok 6 - decoded wait_ack
-        ok 7 - decoded type
-        ok 8 - decoded replica_id
-        ok 9 - decoded lsn
-        ok 10 - decoded tm
-        ok 11 - decoded sync
-        ok 12 - decoded bodycnt
+        ok 4 - decoded stream_id
+        ok 5 - decoded is_commit
+        ok 6 - decoded wait_sync
+        ok 7 - decoded wait_ack
+        ok 8 - decoded type
+        ok 9 - decoded replica_id
+        ok 10 - decoded lsn
+        ok 11 - decoded tm
+        ok 12 - decoded sync
+        ok 13 - decoded bodycnt
     ok 5 - subtests
-        1..12
+        1..13
         ok 1 - encode
         ok 2 - header map size
         ok 3 - header decode
-        ok 4 - decoded is_commit
-        ok 5 - decoded wait_sync
-        ok 6 - decoded wait_ack
-        ok 7 - decoded type
-        ok 8 - decoded replica_id
-        ok 9 - decoded lsn
-        ok 10 - decoded tm
-        ok 11 - decoded sync
-        ok 12 - decoded bodycnt
+        ok 4 - decoded stream_id
+        ok 5 - decoded is_commit
+        ok 6 - decoded wait_sync
+        ok 7 - decoded wait_ack
+        ok 8 - decoded type
+        ok 9 - decoded replica_id
+        ok 10 - decoded lsn
+        ok 11 - decoded tm
+        ok 12 - decoded sync
+        ok 13 - decoded bodycnt
     ok 6 - subtests
-        1..12
+        1..13
         ok 1 - encode
         ok 2 - header map size
         ok 3 - header decode
-        ok 4 - decoded is_commit
-        ok 5 - decoded wait_sync
-        ok 6 - decoded wait_ack
-        ok 7 - decoded type
-        ok 8 - decoded replica_id
-        ok 9 - decoded lsn
-        ok 10 - decoded tm
-        ok 11 - decoded sync
-        ok 12 - decoded bodycnt
+        ok 4 - decoded stream_id
+        ok 5 - decoded is_commit
+        ok 6 - decoded wait_sync
+        ok 7 - decoded wait_ack
+        ok 8 - decoded type
+        ok 9 - decoded replica_id
+        ok 10 - decoded lsn
+        ok 11 - decoded tm
+        ok 12 - decoded sync
+        ok 13 - decoded bodycnt
     ok 7 - subtests
-        1..12
+        1..13
         ok 1 - encode
         ok 2 - header map size
         ok 3 - header decode
-        ok 4 - decoded is_commit
-        ok 5 - decoded wait_sync
-        ok 6 - decoded wait_ack
-        ok 7 - decoded type
-        ok 8 - decoded replica_id
-        ok 9 - decoded lsn
-        ok 10 - decoded tm
-        ok 11 - decoded sync
-        ok 12 - decoded bodycnt
+        ok 4 - decoded stream_id
+        ok 5 - decoded is_commit
+        ok 6 - decoded wait_sync
+        ok 7 - decoded wait_ack
+        ok 8 - decoded type
+        ok 9 - decoded replica_id
+        ok 10 - decoded lsn
+        ok 11 - decoded tm
+        ok 12 - decoded sync
+        ok 13 - decoded bodycnt
     ok 8 - subtests
-        1..12
+        1..13
         ok 1 - encode
         ok 2 - header map size
         ok 3 - header decode
-        ok 4 - decoded is_commit
-        ok 5 - decoded wait_sync
-        ok 6 - decoded wait_ack
-        ok 7 - decoded type
-        ok 8 - decoded replica_id
-        ok 9 - decoded lsn
-        ok 10 - decoded tm
-        ok 11 - decoded sync
-        ok 12 - decoded bodycnt
+        ok 4 - decoded stream_id
+        ok 5 - decoded is_commit
+        ok 6 - decoded wait_sync
+        ok 7 - decoded wait_ack
+        ok 8 - decoded type
+        ok 9 - decoded replica_id
+        ok 10 - decoded lsn
+        ok 11 - decoded tm
+        ok 12 - decoded sync
+        ok 13 - decoded bodycnt
     ok 9 - subtests
 ok 2 - subtests
     1..1
