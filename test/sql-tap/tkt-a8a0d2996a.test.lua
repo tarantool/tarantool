@@ -19,7 +19,7 @@ test:plan(12)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
-test:do_execsql_test(
+test:do_catchsql_test(
     1.0,
     [[
         CREATE TABLE t(id INT PRIMARY KEY, x TEXT UNIQUE, y TEXT);
@@ -27,98 +27,98 @@ test:do_execsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x+0 AND y=='1';
     ]], {
         -- <1.0>
-        "string", "string"
+        1, "Type mismatch: can not convert string('1') to number"
         -- </1.0>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     1.1,
     [[
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x-0 AND y=='1';
     ]], {
         -- <1.1>
-        "string", "string"
+        1, "Type mismatch: can not convert string('1') to number"
         -- </1.1>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     1.2,
     [[
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x*1 AND y=='1';
     ]], {
         -- <1.2>
-        "string", "string"
+        1, "Type mismatch: can not convert string('1') to number"
         -- </1.2>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     1.3,
     [[
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x/1 AND y=='1';
     ]], {
         -- <1.3>
-        "string", "string"
+        1, "Type mismatch: can not convert string('1') to number"
         -- </1.3>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     1.4,
     [[
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x%4 AND y=='1';
     ]], {
         -- <1.4>
-        "string", "string"
+        1, "Type mismatch: can not convert string('1') to integer"
         -- </1.4>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     3.0,
     [[
         UPDATE t SET x='1.0';
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x+0 AND y=='1';
     ]], {
         -- <3.0>
-        "string", "string"
+        1, "Type mismatch: can not convert string('1.0') to number"
         -- </3.0>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     3.1,
     [[
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x-0 AND y=='1';
     ]], {
         -- <3.1>
-        "string", "string"
+        1, "Type mismatch: can not convert string('1.0') to number"
         -- </3.1>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     3.2,
     [[
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x*1 AND y=='1';
     ]], {
         -- <3.2>
-        "string", "string"
+        1, "Type mismatch: can not convert string('1.0') to number"
         -- </3.2>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     3.3,
     [[
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x/1 AND y=='1';
     ]], {
         -- <3.3>
-        "string", "string"
+        1, "Type mismatch: can not convert string('1.0') to number"
         -- </3.3>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     3.4,
     [[
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x%4 AND y=='1';
     ]], {
         -- <3.4>
-        "string", "string"
+        1, "Type mismatch: can not convert string('1.0') to integer"
         -- </3.4>
     })
 
@@ -132,13 +132,13 @@ test:do_execsql_test(
         -- </4.0>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     4.1,
     [[
         SELECT '1.23e64'/'1.0000e+62';
     ]], {
         -- <4.1>
-        123.0
+        1, "Type mismatch: can not convert string('1.0000e+62') to number"
         -- </4.1>
     })
 
