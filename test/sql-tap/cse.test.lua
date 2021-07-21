@@ -35,7 +35,8 @@ test:do_test(
         ]]
     end, {
         -- <cse-1.1>
-        11, -11, -12, false, true, 0, 22, 121, 1, 11, 21, -21, -22, false, true, 0, 42, 441, 1, 21
+        11, -11, 18446744073709551604ULL, false, true, 0, 22, 121, 1, 11,
+        21, -21, 18446744073709551594ULL, false, true, 0, 42, 441, 1, 21
         -- </cse-1.1>
     })
 
@@ -135,7 +136,8 @@ test:do_execsql_test(
         SELECT a, -a, ~a, NOT CAST(a AS BOOLEAN), NOT NOT CAST(a AS BOOLEAN), a-a, a+a, a*a, a/a, a FROM t1
     ]], {
         -- <cse-1.7>
-        1, -1 ,-2, false, true, 0, 2, 1, 1, 1, 2, -2, -3, false, true, 0, 4, 4, 1, 2
+        1, -1, 18446744073709551614ULL, false, true, 0, 2, 1, 1, 1,
+        2, -2, 18446744073709551613ULL, false, true, 0, 4, 4, 1, 2
         -- </cse-1.7>
     })
 
@@ -155,7 +157,8 @@ test:do_execsql_test(
         SELECT NOT CAST(b AS BOOLEAN), ~b, NOT NOT CAST(b AS BOOLEAN), b FROM t1
     ]], {
         -- <cse-1.9>
-        false, -12, true, 11, false, -22, true, 21
+        false, 18446744073709551604ULL, true, 11,
+        false, 18446744073709551594ULL, true, 21
         -- </cse-1.9>
     })
 
