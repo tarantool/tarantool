@@ -114,6 +114,7 @@ set (server_sources
      ssl_cert_paths_discover.c
      systemd.c
      version.c
+     chain_exec.c
      lua/digest.c
      lua/init.c
      lua/fiber.c

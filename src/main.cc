@@ -83,6 +83,7 @@
 #include "core/crash.h"
 #include "ssl_cert_paths_discover.h"
 #include "core/errinj.h"
+#include "chain_exec.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -596,6 +597,10 @@ main(int argc, char **argv)
 	    setlocale(LC_CTYPE, "en_US.utf8") == NULL)
 		fprintf(stderr, "Failed to set locale to C.UTF-8\n");
 	fpconv_check();
+
+	if ((exit_code = chain_exec(argv)) != 0) {
+		return exit_code;
+	}
 
 	/* Enter interactive mode after executing 'script' */
 	bool interactive = false;
