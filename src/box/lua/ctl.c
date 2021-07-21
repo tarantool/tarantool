@@ -43,6 +43,7 @@
 #include "box/schema.h"
 #include "box/engine.h"
 #include "box/memtx_engine.h"
+#include "box/raft.h"
 
 static int
 lbox_ctl_wait_ro(struct lua_State *L)
@@ -79,6 +80,12 @@ static int
 lbox_ctl_on_schema_init(struct lua_State *L)
 {
 	return lbox_trigger_reset(L, 2, &on_schema_init, NULL, NULL);
+}
+
+static int
+lbox_ctl_on_election(struct lua_State *L)
+{
+	return lbox_trigger_reset(L, 2, &box_raft_on_broadcast, NULL, NULL);
 }
 
 static int
@@ -124,6 +131,7 @@ static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"wait_rw", lbox_ctl_wait_rw},
 	{"on_shutdown", lbox_ctl_on_shutdown},
 	{"on_schema_init", lbox_ctl_on_schema_init},
+	{"on_election", lbox_ctl_on_election},
 	{"promote", lbox_ctl_promote},
 	/* An old alias. */
 	{"clear_synchro_queue", lbox_ctl_promote},

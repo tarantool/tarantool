@@ -116,3 +116,56 @@ assert(r1_leader == r2_leader)
 test_run:cmd(string.format('start server %s', leader_name))
 
 test_run:drop_cluster(SERVERS)
+
+-- gh-5819: on_election triggers, that are filed on every visible state change.
+box.schema.user.grant('guest', 'replication')
+test_run:cmd('create server replica with rpl_master=default,\
+	      script="replication/replica.lua"')
+test_run:cmd('start server replica')
+
+repl = test_run:eval('replica', 'return box.cfg.listen')[1]
+box.cfg{replication = repl}
+test_run:switch('replica')
+box.cfg{election_mode='voter'}
+test_run:switch('default')
+
+election_tbl = {}
+
+function trig()\
+    election_tbl[#election_tbl+1] = box.info.election\
+end
+
+_ = box.ctl.on_election(trig)
+
+box.cfg{replication_synchro_quorum=2}
+box.cfg{election_mode='candidate'}
+
+test_run:wait_cond(function() return #election_tbl == 3 end)
+assert(election_tbl[1].state == 'follower')
+assert(election_tbl[2].state == 'candidate')
+assert(election_tbl[2].vote == 1)
+assert(election_tbl[3].state == 'leader')
+
+box.cfg{election_mode='voter'}
+test_run:wait_cond(function() return #election_tbl == 4 end)
+assert(election_tbl[4].state == 'follower')
+
+box.cfg{election_mode='off'}
+test_run:wait_cond(function() return #election_tbl == 5 end)
+
+box.cfg{election_mode='manual'}
+test_run:wait_cond(function() return #election_tbl == 6 end)
+assert(election_tbl[6].state == 'follower')
+
+box.ctl.promote()
+
+test_run:wait_cond(function() return #election_tbl == 9 end)
+assert(election_tbl[7].state == 'follower')
+assert(election_tbl[7].term == election_tbl[6].term + 1)
+assert(election_tbl[8].state == 'candidate')
+assert(election_tbl[9].state == 'leader')
+
+test_run:cmd('stop server replica')
+test_run:cmd('delete server replica')
+
+box.schema.user.revoke('guest', 'replication')

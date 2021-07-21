@@ -52,6 +52,9 @@ enum election_mode box_election_mode = ELECTION_MODE_INVALID;
  */
 static struct trigger box_raft_on_update;
 
+struct rlist box_raft_on_broadcast =
+	RLIST_HEAD_INITIALIZER(box_raft_on_broadcast);
+
 /**
  * Worker fiber does all the asynchronous work, which may need yields and can be
  * long. These are WAL writes, network broadcasts. That allows not to block the
@@ -276,6 +279,7 @@ box_raft_broadcast(struct raft *raft, const struct raft_msg *msg)
 	box_raft_msg_to_request(msg, &req);
 	replicaset_foreach(replica)
 		relay_push_raft(replica->relay, &req);
+	trigger_run(&box_raft_on_broadcast, NULL);
 }
 
 static void

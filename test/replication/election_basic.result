@@ -275,3 +275,147 @@ test_run:cmd(string.format('start server %s', leader_name))
 test_run:drop_cluster(SERVERS)
  | ---
  | ...
+
+-- gh-5819: on_election triggers, that are filed on every visible state change.
+box.schema.user.grant('guest', 'replication')
+ | ---
+ | ...
+test_run:cmd('create server replica with rpl_master=default,\
+	      script="replication/replica.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server replica')
+ | ---
+ | - true
+ | ...
+
+repl = test_run:eval('replica', 'return box.cfg.listen')[1]
+ | ---
+ | ...
+box.cfg{replication = repl}
+ | ---
+ | ...
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.cfg{election_mode='voter'}
+ | ---
+ | ...
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+
+election_tbl = {}
+ | ---
+ | ...
+
+function trig()\
+    election_tbl[#election_tbl+1] = box.info.election\
+end
+ | ---
+ | ...
+
+_ = box.ctl.on_election(trig)
+ | ---
+ | ...
+
+box.cfg{replication_synchro_quorum=2}
+ | ---
+ | ...
+box.cfg{election_mode='candidate'}
+ | ---
+ | ...
+
+test_run:wait_cond(function() return #election_tbl == 3 end)
+ | ---
+ | - true
+ | ...
+assert(election_tbl[1].state == 'follower')
+ | ---
+ | - true
+ | ...
+assert(election_tbl[2].state == 'candidate')
+ | ---
+ | - true
+ | ...
+assert(election_tbl[2].vote == 1)
+ | ---
+ | - true
+ | ...
+assert(election_tbl[3].state == 'leader')
+ | ---
+ | - true
+ | ...
+
+box.cfg{election_mode='voter'}
+ | ---
+ | ...
+test_run:wait_cond(function() return #election_tbl == 4 end)
+ | ---
+ | - true
+ | ...
+assert(election_tbl[4].state == 'follower')
+ | ---
+ | - true
+ | ...
+
+box.cfg{election_mode='off'}
+ | ---
+ | ...
+test_run:wait_cond(function() return #election_tbl == 5 end)
+ | ---
+ | - true
+ | ...
+
+box.cfg{election_mode='manual'}
+ | ---
+ | ...
+test_run:wait_cond(function() return #election_tbl == 6 end)
+ | ---
+ | - true
+ | ...
+assert(election_tbl[6].state == 'follower')
+ | ---
+ | - true
+ | ...
+
+box.ctl.promote()
+ | ---
+ | ...
+
+test_run:wait_cond(function() return #election_tbl == 9 end)
+ | ---
+ | - true
+ | ...
+assert(election_tbl[7].state == 'follower')
+ | ---
+ | - true
+ | ...
+assert(election_tbl[7].term == election_tbl[6].term + 1)
+ | ---
+ | - true
+ | ...
+assert(election_tbl[8].state == 'candidate')
+ | ---
+ | - true
+ | ...
+assert(election_tbl[9].state == 'leader')
+ | ---
+ | - true
+ | ...
+
+test_run:cmd('stop server replica')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server replica')
+ | ---
+ | - true
+ | ...
+
+box.schema.user.revoke('guest', 'replication')
+ | ---
+ | ...
