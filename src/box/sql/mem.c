@@ -1727,51 +1727,47 @@ mem_rem(const struct Mem *left, const struct Mem *right, struct Mem *result)
 	return 0;
 }
 
-static int
-bitwise_prepare(const struct Mem *left, const struct Mem *right,
-		int64_t *a, int64_t *b)
-{
-	bool unused;
-	if (mem_get_int(left, a, &unused) != 0) {
-		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
-			 "integer");
-		return -1;
-	}
-	if (mem_get_int(right, b, &unused) != 0) {
-		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
-			 "integer");
-		return -1;
-	}
-	return 0;
-}
-
 int
 mem_bit_and(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
-	if (try_return_null(left, right, result, FIELD_TYPE_INTEGER))
+	if (mem_is_any_null(left, right)) {
+		mem_set_null(result);
+		result->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
-	int64_t a;
-	int64_t b;
-	if (bitwise_prepare(left, right, &a, &b) != 0)
+	}
+	if (right->type != MEM_TYPE_UINT) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "unsigned");
 		return -1;
-	result->u.i = a & b;
-	result->type = result->u.i < 0 ? MEM_TYPE_INT : MEM_TYPE_UINT;
-	assert(result->flags == 0);
+	}
+	if (left->type != MEM_TYPE_UINT) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
+			 "unsigned");
+		return -1;
+	}
+	mem_set_uint(result, left->u.u & right->u.u);
 	return 0;
 }
 
 int
 mem_bit_or(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
-	if (try_return_null(left, right, result, FIELD_TYPE_INTEGER))
+	if (mem_is_any_null(left, right)) {
+		mem_set_null(result);
+		result->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
-	int64_t a;
-	int64_t b;
-	if (bitwise_prepare(left, right, &a, &b) != 0)
+	}
+	if (right->type != MEM_TYPE_UINT) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "unsigned");
 		return -1;
-	result->u.i = a | b;
-	result->type = result->u.i < 0 ? MEM_TYPE_INT : MEM_TYPE_UINT;
-	assert(result->flags == 0);
+	}
+	if (left->type != MEM_TYPE_UINT) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
+			 "unsigned");
+		return -1;
+	}
+	mem_set_uint(result, left->u.u | right->u.u);
 	return 0;
 }
 
@@ -1779,22 +1775,22 @@ int
 mem_shift_left(const struct Mem *left, const struct Mem *right,
 	       struct Mem *result)
 {
-	if (try_return_null(left, right, result, FIELD_TYPE_INTEGER))
+	if (mem_is_any_null(left, right)) {
+		mem_set_null(result);
+		result->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
-	int64_t a;
-	int64_t b;
-	if (bitwise_prepare(left, right, &a, &b) != 0)
+	}
+	if (right->type != MEM_TYPE_UINT) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "unsigned");
 		return -1;
-	if (b <= -64)
-		result->u.i = a >= 0 ? 0 : -1;
-	else if (b < 0)
-		result->u.i = a >> -b;
-	else if (b > 64)
-		result->u.i = 0;
-	else
-		result->u.i = a << b;
-	result->type = result->u.i < 0 ? MEM_TYPE_INT : MEM_TYPE_UINT;
-	assert(result->flags == 0);
+	}
+	if (left->type != MEM_TYPE_UINT) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
+			 "unsigned");
+		return -1;
+	}
+	mem_set_uint(result, right->u.u >= 64 ? 0 : left->u.u << right->u.u);
 	return 0;
 }
 
@@ -1802,42 +1798,39 @@ int
 mem_shift_right(const struct Mem *left, const struct Mem *right,
 		struct Mem *result)
 {
-	if (try_return_null(left, right, result, FIELD_TYPE_INTEGER))
+	if (mem_is_any_null(left, right)) {
+		mem_set_null(result);
+		result->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
-	int64_t a;
-	int64_t b;
-	if (bitwise_prepare(left, right, &a, &b) != 0)
+	}
+	if (right->type != MEM_TYPE_UINT) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "unsigned");
 		return -1;
-	if (b <= -64)
-		result->u.i = 0;
-	else if (b < 0)
-		result->u.i = a << -b;
-	else if (b > 64)
-		result->u.i = a >= 0 ? 0 : -1;
-	else
-		result->u.i = a >> b;
-	result->type = result->u.i < 0 ? MEM_TYPE_INT : MEM_TYPE_UINT;
-	assert(result->flags == 0);
+	}
+	if (left->type != MEM_TYPE_UINT) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
+			 "unsigned");
+		return -1;
+	}
+	mem_set_uint(result, right->u.u >= 64 ? 0 : left->u.u >> right->u.u);
 	return 0;
 }
 
 int
 mem_bit_not(const struct Mem *mem, struct Mem *result)
 {
-	mem_clear(result);
-	result->field_type = FIELD_TYPE_INTEGER;
-	if (mem->type == MEM_TYPE_NULL)
+	if (mem_is_null(mem)) {
+		mem_set_null(result);
+		result->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
-	int64_t i;
-	bool unused;
-	if (mem_get_int(mem, &i, &unused) != 0) {
+	}
+	if (mem->type != MEM_TYPE_UINT) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(mem),
-			 "integer");
+			 "unsigned");
 		return -1;
 	}
-	result->u.i = ~i;
-	result->type = result->u.i < 0 ? MEM_TYPE_INT : MEM_TYPE_UINT;
-	assert(result->flags == 0);
+	mem_set_uint(result, ~mem->u.u);
 	return 0;
 }
 
