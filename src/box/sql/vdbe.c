@@ -1354,7 +1354,7 @@ case OP_BitAnd: {               /* same as TK_BITAND, in1, in2, out3 */
 	pOut = &aMem[pOp->p3];
 	if (mem_bit_and(pIn2, pIn1, pOut) != 0)
 		goto abort_due_to_error;
-	assert(pOut->field_type == FIELD_TYPE_INTEGER);
+	assert(pOut->field_type == FIELD_TYPE_UNSIGNED);
 	break;
 }
 
@@ -1371,7 +1371,7 @@ case OP_BitOr: {                /* same as TK_BITOR, in1, in2, out3 */
 	pOut = &aMem[pOp->p3];
 	if (mem_bit_or(pIn2, pIn1, pOut) != 0)
 		goto abort_due_to_error;
-	assert(pOut->field_type == FIELD_TYPE_INTEGER);
+	assert(pOut->field_type == FIELD_TYPE_UNSIGNED);
 	break;
 }
 
@@ -1389,7 +1389,7 @@ case OP_ShiftLeft: {            /* same as TK_LSHIFT, in1, in2, out3 */
 	pOut = &aMem[pOp->p3];
 	if (mem_shift_left(pIn2, pIn1, pOut) != 0)
 		goto abort_due_to_error;
-	assert(pOut->field_type == FIELD_TYPE_INTEGER);
+	assert(pOut->field_type == FIELD_TYPE_UNSIGNED);
 	break;
 }
 
@@ -1407,7 +1407,7 @@ case OP_ShiftRight: {           /* same as TK_RSHIFT, in1, in2, out3 */
 	pOut = &aMem[pOp->p3];
 	if (mem_shift_right(pIn2, pIn1, pOut) != 0)
 		goto abort_due_to_error;
-	assert(pOut->field_type == FIELD_TYPE_INTEGER);
+	assert(pOut->field_type == FIELD_TYPE_UNSIGNED);
 	break;
 }
 

@@ -1369,194 +1369,194 @@ SELECT a, a1, a % a1 FROM t, t6;
 SELECT ~true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT ~false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT true & true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT true & false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT false & true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT false & false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT true | true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT true | false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT false | true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT false | false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT true << true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT true << false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT false << true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT false << false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT true >> true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT true >> false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT false >> true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT false >> false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 
 SELECT a, true & a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a, false & a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a, true | a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a, false | a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a, true << a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a, false << a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a, true >> a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a, false >> a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a, a & true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a, a & false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a, a | true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a, a | false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a, a << true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a, a << false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a, a >> true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a, a >> false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 
 SELECT a, a1, a & a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a, a1, a | a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a, a1, a << a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a, a1, a >> a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 
 -- Check concatenate.
@@ -3050,325 +3050,325 @@ SELECT a2, b, b % a2 FROM t6, t7;
 SELECT true & 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT false & 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT true | 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT false | 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT true << 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT false << 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT true >> 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT false >> 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT 2 & true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT 2 & false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT 2 | true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT 2 | false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT 2 << true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT 2 << false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT 2 >> true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT 2 >> false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 
 SELECT a1, a1 & 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a1, a1 | 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a1, a1 << 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a1, a1 >> 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a1, 2 & a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a1, 2 | a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a1, 2 << a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a1, 2 >> a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a2, a2 & 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a2, a2 | 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a2, a2 << 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a2, a2 >> 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a2, 2 & a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a2, 2 | a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a2, 2 << a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a2, 2 >> a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 
 SELECT b, true & b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT b, false & b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT b, true | b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT b, false | b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT b, true << b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT b, false << b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT b, true >> b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT b, false >> b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT b, b & true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT b, b & false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT b, b | true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT b, b | false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT b, b << true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT b, b << false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT b, b >> true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT b, b >> false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 
 SELECT a1, b, a1 & b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a1, b, a1 | b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a1, b, a1 << b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a1, b, a1 >> b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a1, b, b & a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a1, b, b | a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a1, b, b << a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a1, b, b >> a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to unsigned'
  | ...
 SELECT a2, b, a2 & b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a2, b, a2 | b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a2, b, a2 << b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a2, b, a2 >> b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a2, b, b & a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a2, b, b | a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a2, b, b << a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 SELECT a2, b, b >> a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to unsigned'
  | ...
 
 SELECT true > 2;
