@@ -321,10 +321,6 @@ local function create_transport(host, port, user, password, callback,
                                           body_rpos, body_end)
     end
 
-    local function dispatch_response_console(rid, response)
-        internal.dispatch_response_console(requests, rid, response)
-    end
-
     -- IO (WORKER FIBER) --
     local function send_and_recv_iproto()
         local hdr, body_rpos, body_end = internal.send_and_recv_iproto(
@@ -336,22 +332,14 @@ local function create_transport(host, port, user, password, callback,
         return nil, hdr, body_rpos, body_end
     end
 
-    local function send_and_recv_console()
-        local response, err = internal.send_and_recv_console(
-            connection:fd(), send_buf, recv_buf)
-        if not response then
-            return err.code, err.message
-        end
-        return nil, response
-    end
-
     -- PROTOCOL STATE MACHINE (WORKER FIBER) --
     --
     -- The sm is implemented as a collection of functions performing
     -- tail-recursive calls to each other. Yep, Lua optimizes
     -- such calls, and yep, this is the canonical way to implement
     -- a state machine in Lua.
-    local console_sm, iproto_auth_sm, iproto_schema_sm, iproto_sm, error_sm
+    local console_setup_sm, console_sm, iproto_auth_sm, iproto_schema_sm,
+        iproto_sm, error_sm
 
     --
     -- Protocol_sm is a core function of netbox. It calls all
@@ -370,19 +358,7 @@ local function create_transport(host, port, user, password, callback,
         end
         -- @deprecated since 1.10
         if greeting.protocol == 'Lua console' then
-            log.warn("Netbox text protocol support is deprecated since 1.10, "..
-                     "please use require('console').connect() instead")
-            local setup_delimiter = 'require("console").delimiter("$EOF$")\n'
-            encode_method(M_INJECT, send_buf, nil, setup_delimiter)
-            local err, response = send_and_recv_console()
-            if err then
-                return error_sm(err, response)
-            elseif response ~= '---\n...\n' then
-                return error_sm(E_NO_CONNECTION, 'Unexpected response')
-            end
-            local rid = requests:next_id()
-            set_state('active')
-            return console_sm(rid)
+            return console_setup_sm()
         elseif greeting.protocol == 'Binary' then
             return iproto_auth_sm(greeting.salt)
         else
@@ -391,14 +367,21 @@ local function create_transport(host, port, user, password, callback,
         end
     end
 
-    console_sm = function(rid)
-        local err, response = send_and_recv_console()
+    console_setup_sm = function()
+        log.warn("Netbox text protocol support is deprecated since 1.10, "..
+                 "please use require('console').connect() instead")
+        local err = internal.console_setup(connection:fd(), send_buf, recv_buf)
         if err then
-            return error_sm(err, response)
-        else
-            dispatch_response_console(rid, response)
-            return console_sm(requests:next_id(rid))
+            return error_sm(err.code, err.message)
         end
+        set_state('active')
+        return console_sm()
+    end
+
+    console_sm = function()
+        local err = internal.console_loop(requests, connection:fd(),
+                                          send_buf, recv_buf)
+        return error_sm(err.code, err.message)
     end
 
     iproto_auth_sm = function(salt)

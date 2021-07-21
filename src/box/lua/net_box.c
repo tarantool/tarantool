@@ -808,27 +808,24 @@ netbox_send_and_recv_iproto(lua_State *L)
 
 /**
  * Sends and receives data over a console connection.
- * Takes socket fd, send_buf (ibuf), recv_buf (ibuf).
- * On success returns response (string).
- * On error returns nil, error.
+ * Returns a pointer to a response string and its len.
+ * On error returns NULL.
  */
-static int
-netbox_send_and_recv_console(lua_State *L)
+static const char *
+netbox_send_and_recv_console(int fd, struct ibuf *send_buf,
+			     struct ibuf *recv_buf, size_t *response_len)
 {
-	int fd = lua_tointeger(L, 1);
-	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 2);
-	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 3);
 	const char delim[] = "\n...\n";
 	size_t delim_len = sizeof(delim) - 1;
 	size_t delim_pos;
 	if (netbox_communicate(fd, send_buf, recv_buf, /*limit=*/SIZE_MAX,
 			       delim, delim_len, &delim_pos) != 0) {
-		luaL_testcancel(L);
-		return luaT_push_nil_and_error(L);
+		return NULL;
 	}
-	lua_pushlstring(L, recv_buf->rpos, delim_pos + delim_len);
+	const char *response = recv_buf->rpos;
 	recv_buf->rpos += delim_pos + delim_len;
-	return 1;
+	*response_len = delim_pos + delim_len;
+	return response;
 }
 
 static void
@@ -1392,23 +1389,6 @@ luaT_netbox_registry_new_id(struct lua_State *L)
 	return 1;
 }
 
-/**
- * Returns the next id (sync) without reserving it.
- * If called with an argument, returns the id following its value.
- */
-static int
-luaT_netbox_registry_next_id(struct lua_State *L)
-{
-	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
-	uint64_t next_sync;
-	if (lua_isnoneornil(L, 2))
-		next_sync = registry->next_sync;
-	else
-		next_sync = luaL_touint64(L, 2) + 1;
-	luaL_pushuint64(L, next_sync);
-	return 1;
-}
-
 static int
 luaT_netbox_registry_reset(struct lua_State *L)
 {
@@ -1754,24 +1734,89 @@ netbox_dispatch_response_iproto(struct lua_State *L)
 /**
  * Given a request registry, request id (sync), and a response string, assigns
  * the response to the request and completes it.
+ *
+ * Lua stack is used for temporarily storing the response string before getting
+ * a reference to it.
  */
-static int
-netbox_dispatch_response_console(struct lua_State *L)
+static void
+netbox_dispatch_response_console(struct lua_State *L,
+				 struct netbox_registry *registry,
+				 uint64_t sync, const char *response,
+				 size_t response_len)
 {
-	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
-	uint64_t sync = luaL_touint64(L, 2);
 	struct netbox_request *request = netbox_registry_lookup(registry, sync);
 	if (request == NULL) {
 		/* Nobody is waiting for the response. */
-		return 0;
+		return;
 	}
-	/*
-	 * The response is the last argument of this function so it's already
-	 * on the top of the Lua stack.
-	 */
+	lua_pushlstring(L, response, response_len);
 	netbox_request_set_result(request, luaL_ref(L, LUA_REGISTRYINDEX));
 	netbox_request_complete(request);
+}
+
+/**
+ * Sets up console delimiter. Should be called before serving any requests.
+ * Takes socket fd, send_buf (ibuf), recv_buf (ibuf).
+ * Returns none on success, error on failure.
+ */
+static int
+netbox_console_setup(struct lua_State *L)
+{
+	const char *setup_delimiter_cmd =
+		"require('console').delimiter('$EOF$')\n";
+	const size_t setup_delimiter_cmd_len = strlen(setup_delimiter_cmd);
+	const char *ok_response = "---\n...\n";
+	const size_t ok_response_len = strlen(ok_response);
+	int fd = lua_tointeger(L, 1);
+	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 2);
+	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 3);
+	void *wpos = ibuf_alloc(send_buf, setup_delimiter_cmd_len);
+	if (wpos == NULL)
+		return luaL_error(L, "out of memory");
+	memcpy(wpos, setup_delimiter_cmd, setup_delimiter_cmd_len);
+	size_t response_len;
+	const char *response = netbox_send_and_recv_console(
+		fd, send_buf, recv_buf, &response_len);
+	if (response == NULL) {
+		luaL_testcancel(L);
+		goto error;
+	}
+	if (response_len != ok_response_len ||
+	    strncmp(response, ok_response, ok_response_len) != 0) {
+		box_error_raise(ER_NO_CONNECTION, "Unexpected response");
+		goto error;
+	}
 	return 0;
+error:
+	luaT_pusherror(L, box_error_last());
+	return 1;
+}
+
+/**
+ * Processes console requests in a loop until an error.
+ * Takes request registry, socket fd, send_buf (ibuf), recv_buf (ibuf).
+ * Returns the error that broke the loop.
+ */
+static int
+netbox_console_loop(struct lua_State *L)
+{
+	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
+	int fd = lua_tointeger(L, 2);
+	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 3);
+	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 4);
+	uint64_t sync = registry->next_sync;
+	while (true) {
+		size_t response_len;
+		const char *response = netbox_send_and_recv_console(
+			fd, send_buf, recv_buf, &response_len);
+		if (response == NULL) {
+			luaL_testcancel(L);
+			luaT_pusherror(L, box_error_last());
+			return 1;
+		}
+		netbox_dispatch_response_console(L, registry, sync++,
+						 response, response_len);
+	}
 }
 
 int
@@ -1783,7 +1828,6 @@ luaopen_net_box(struct lua_State *L)
 	static const struct luaL_Reg netbox_registry_meta[] = {
 		{ "__gc",           luaT_netbox_registry_gc },
 		{ "new_id",         luaT_netbox_registry_new_id },
-		{ "next_id",        luaT_netbox_registry_next_id },
 		{ "reset",          luaT_netbox_registry_reset },
 		{ NULL, NULL }
 	};
@@ -1805,12 +1849,11 @@ luaopen_net_box(struct lua_State *L)
 		{ "encode_method",  netbox_encode_method },
 		{ "decode_greeting",netbox_decode_greeting },
 		{ "send_and_recv_iproto", netbox_send_and_recv_iproto },
-		{ "send_and_recv_console", netbox_send_and_recv_console },
 		{ "new_registry",   netbox_new_registry },
 		{ "new_request",    netbox_new_request },
 		{ "dispatch_response_iproto", netbox_dispatch_response_iproto },
-		{ "dispatch_response_console",
-			netbox_dispatch_response_console },
+		{ "console_setup",  netbox_console_setup },
+		{ "console_loop",   netbox_console_loop },
 		{ NULL, NULL}
 	};
 	/* luaL_register_module polutes _G */
