@@ -310,11 +310,8 @@ box.execute('SELECT 1 + 1.1;')
 ...
 box.execute('SELECT \'9223372036854\' + 1;')
 ---
-- metadata:
-  - name: COLUMN_1
-    type: integer
-  rows:
-  - [9223372036855]
+- null
+- 'Type mismatch: can not convert string(''9223372036854'') to number'
 ...
 -- Fix BOOLEAN bindings.
 box.execute('SELECT ?', {true})

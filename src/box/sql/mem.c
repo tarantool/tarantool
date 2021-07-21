@@ -1397,194 +1397,193 @@ get_number(const struct Mem *mem, struct sql_num *number)
 	return -1;
 }
 
-static int
-arithmetic_prepare(const struct Mem *left, const struct Mem *right,
-		   struct sql_num *a, struct sql_num *b)
+int
+mem_add(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
-	if (get_number(right, b) != 0) {
+	if (mem_is_any_null(left, right)) {
+		mem_set_null(result);
+		result->field_type = FIELD_TYPE_NUMBER;
+		return 0;
+	}
+	if (!mem_is_num(right)) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
 			 "number");
 		return -1;
 	}
-	if (get_number(left, a) != 0) {
+	if (!mem_is_num(left)) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
 			 "number");
 		return -1;
 	}
-	assert(a->type != 0 && b->type != 0);
-	if (a->type == b->type || ((a->type | b->type) & MEM_TYPE_DOUBLE) == 0)
-		return 0;
-	if (a->type == MEM_TYPE_DOUBLE) {
-		b->d = b->type == MEM_TYPE_INT ? (double)b->i : (double)b->u;
-		b->type = MEM_TYPE_DOUBLE;
-		return 0;
-	}
-	assert(b->type == MEM_TYPE_DOUBLE);
-	a->d = a->type == MEM_TYPE_INT ? (double)a->i : (double)a->u;
-	a->type = MEM_TYPE_DOUBLE;
-	return 0;
-}
-
-int
-mem_add(const struct Mem *left, const struct Mem *right, struct Mem *result)
-{
-	if (try_return_null(left, right, result, FIELD_TYPE_NUMBER))
-		return 0;
-
-	struct sql_num a, b;
-	if (arithmetic_prepare(left, right, &a, &b) != 0)
-		return -1;
-
-	assert(a.type != MEM_TYPE_DOUBLE || a.type == b.type);
-	if (a.type == MEM_TYPE_DOUBLE) {
-		result->u.r = a.d + b.d;
-		result->type = MEM_TYPE_DOUBLE;
-		assert(result->flags == 0);
+	if (((left->type | right->type) & MEM_TYPE_DOUBLE) != 0) {
+		double a;
+		double b;
+		mem_get_double(left, &a);
+		mem_get_double(right, &b);
+		mem_set_double(result, a + b);
 		return 0;
 	}
-
 	int64_t res;
 	bool is_neg;
-	if (sql_add_int(a.i, a.is_neg, b.i, b.is_neg, &res, &is_neg) != 0) {
+	if (sql_add_int(left->u.i, left->type == MEM_TYPE_INT, right->u.i,
+			right->type == MEM_TYPE_INT, &res, &is_neg) != 0) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	result->u.i = res;
-	result->type = is_neg ? MEM_TYPE_INT : MEM_TYPE_UINT;
-	assert(result->flags == 0);
+	mem_set_int(result, res, is_neg);
 	return 0;
 }
 
 int
 mem_sub(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
-	if (try_return_null(left, right, result, FIELD_TYPE_NUMBER))
-		return 0;
-
-	struct sql_num a, b;
-	if (arithmetic_prepare(left, right, &a, &b) != 0)
-		return -1;
-
-	assert(a.type != MEM_TYPE_DOUBLE || a.type == b.type);
-	if (a.type == MEM_TYPE_DOUBLE) {
-		result->u.r = a.d - b.d;
-		result->type = MEM_TYPE_DOUBLE;
-		assert(result->flags == 0);
+	if (mem_is_any_null(left, right)) {
+		mem_set_null(result);
+		result->field_type = FIELD_TYPE_NUMBER;
 		return 0;
 	}
-
+	if (!mem_is_num(right)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "number");
+		return -1;
+	}
+	if (!mem_is_num(left)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
+			 "number");
+		return -1;
+	}
+	if (((left->type | right->type) & MEM_TYPE_DOUBLE) != 0) {
+		double a;
+		double b;
+		mem_get_double(left, &a);
+		mem_get_double(right, &b);
+		mem_set_double(result, a - b);
+		return 0;
+	}
 	int64_t res;
 	bool is_neg;
-	if (sql_sub_int(a.i, a.is_neg, b.i, b.is_neg, &res, &is_neg) != 0) {
+	if (sql_sub_int(left->u.i, left->type == MEM_TYPE_INT, right->u.i,
+			right->type == MEM_TYPE_INT, &res, &is_neg) != 0) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	result->u.i = res;
-	result->type = is_neg ? MEM_TYPE_INT : MEM_TYPE_UINT;
-	assert(result->flags == 0);
+	mem_set_int(result, res, is_neg);
 	return 0;
 }
 
 int
 mem_mul(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
-	if (try_return_null(left, right, result, FIELD_TYPE_NUMBER))
-		return 0;
-
-	struct sql_num a, b;
-	if (arithmetic_prepare(left, right, &a, &b) != 0)
-		return -1;
-
-	assert(a.type != MEM_TYPE_DOUBLE || a.type == b.type);
-	if (a.type == MEM_TYPE_DOUBLE) {
-		result->u.r = a.d * b.d;
-		result->type = MEM_TYPE_DOUBLE;
-		assert(result->flags == 0);
+	if (mem_is_any_null(left, right)) {
+		mem_set_null(result);
+		result->field_type = FIELD_TYPE_NUMBER;
 		return 0;
 	}
-
+	if (!mem_is_num(right)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "number");
+		return -1;
+	}
+	if (!mem_is_num(left)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
+			 "number");
+		return -1;
+	}
+	if (((left->type | right->type) & MEM_TYPE_DOUBLE) != 0) {
+		double a;
+		double b;
+		mem_get_double(left, &a);
+		mem_get_double(right, &b);
+		mem_set_double(result, a * b);
+		return 0;
+	}
 	int64_t res;
 	bool is_neg;
-	if (sql_mul_int(a.i, a.is_neg, b.i, b.is_neg, &res, &is_neg) != 0) {
+	if (sql_mul_int(left->u.i, left->type == MEM_TYPE_INT, right->u.i,
+			right->type == MEM_TYPE_INT, &res, &is_neg) != 0) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	result->u.i = res;
-	result->type = is_neg ? MEM_TYPE_INT : MEM_TYPE_UINT;
-	assert(result->flags == 0);
+	mem_set_int(result, res, is_neg);
 	return 0;
 }
 
 int
 mem_div(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
-	if (try_return_null(left, right, result, FIELD_TYPE_NUMBER))
+	if (mem_is_any_null(left, right)) {
+		mem_set_null(result);
+		result->field_type = FIELD_TYPE_NUMBER;
 		return 0;
-
-	struct sql_num a, b;
-	if (arithmetic_prepare(left, right, &a, &b) != 0)
+	}
+	if (!mem_is_num(right)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "number");
 		return -1;
-
-	assert(a.type != MEM_TYPE_DOUBLE || a.type == b.type);
-	if (a.type == MEM_TYPE_DOUBLE) {
-		if (b.d == 0.) {
+	}
+	if (!mem_is_num(left)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
+			 "number");
+		return -1;
+	}
+	if (((left->type | right->type) & MEM_TYPE_DOUBLE) != 0) {
+		double a;
+		double b;
+		mem_get_double(left, &a);
+		mem_get_double(right, &b);
+		if (b == 0.0) {
 			diag_set(ClientError, ER_SQL_EXECUTE,
 				 "division by zero");
 			return -1;
 		}
-		result->u.r = a.d / b.d;
-		result->type = MEM_TYPE_DOUBLE;
-		assert(result->flags == 0);
+		mem_set_double(result, a / b);
 		return 0;
 	}
-
-	if (b.i == 0) {
+	if (right->u.u == 0) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "division by zero");
 		return -1;
 	}
 	int64_t res;
 	bool is_neg;
-	if (sql_div_int(a.i, a.is_neg, b.i, b.is_neg, &res, &is_neg) != 0) {
+	if (sql_div_int(left->u.i, left->type == MEM_TYPE_INT, right->u.i,
+			right->type == MEM_TYPE_INT, &res, &is_neg) != 0) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	result->u.i = res;
-	result->type = is_neg ? MEM_TYPE_INT : MEM_TYPE_UINT;
-	assert(result->flags == 0);
+	mem_set_int(result, res, is_neg);
 	return 0;
 }
 
 int
 mem_rem(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
-	if (try_return_null(left, right, result, FIELD_TYPE_NUMBER))
+	if (mem_is_any_null(left, right)) {
+		mem_set_null(result);
+		result->field_type = FIELD_TYPE_INTEGER;
 		return 0;
-
-	struct sql_num a, b;
-	if (arithmetic_prepare(left, right, &a, &b) != 0)
+	}
+	if (!mem_is_int(right)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "integer");
 		return -1;
-
-	assert(a.type != MEM_TYPE_DOUBLE || a.type == b.type);
-	/*
-	 * TODO: This operation works wrong when double d > INT64_MAX and
-	 * d < UINT64_MAX. Also, there may be precision losses due to
-	 * conversion integer to double and back.
-	 */
-	a.i = a.type == MEM_TYPE_DOUBLE ? (int64_t)a.d : a.i;
-	b.i = b.type == MEM_TYPE_DOUBLE ? (int64_t)b.d : b.i;
-	if (b.i == 0) {
+	}
+	if (!mem_is_int(left)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
+			 "integer");
+		return -1;
+	}
+	if (right->u.u == 0) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "division by zero");
 		return -1;
 	}
 	int64_t res;
 	bool is_neg;
-	if (sql_rem_int(a.i, a.is_neg, b.i, b.is_neg, &res, &is_neg) != 0) {
+	if (sql_rem_int(left->u.i, left->type == MEM_TYPE_INT, right->u.i,
+			right->type == MEM_TYPE_INT, &res, &is_neg) != 0) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	result->u.i = res;
-	result->type = is_neg ? MEM_TYPE_INT : MEM_TYPE_UINT;
-	assert(result->flags == 0);
+	mem_set_int(result, res, is_neg);
 	return 0;
 }
 
