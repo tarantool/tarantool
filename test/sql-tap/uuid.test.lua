@@ -1011,7 +1011,7 @@ test:do_catchsql_test(
     [[
         SELECT u % 1 FROM t2;
     ]], {
-        1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to number"
+        1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to integer"
     })
 
 -- Check that bitwise operations work with UUIDs as intended.

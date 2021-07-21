@@ -143,7 +143,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc3-2.6",
     [[
-        SELECT '-2.0e-127' * '-0.5e27'
+        SELECT CAST('-2.0e-127' AS DOUBLE) * CAST('-0.5e27' AS DOUBLE);
     ]], {
         -- <misc3-2.6>
         1e-100
@@ -153,7 +153,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc3-2.7",
     [[
-        SELECT '+2.0e-127' * '-0.5e27'
+        SELECT CAST('+2.0e-127' AS DOUBLE) * CAST('-0.5e27' AS DOUBLE);
     ]], {
         -- <misc3-2.7>
         -1e-100
@@ -163,7 +163,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc3-2.8",
     [[
-        SELECT 2.0e-27 * '+0.5e+127'
+        SELECT 2.0e-27 * CAST('+0.5e+127' AS DOUBLE);
     ]], {
         -- <misc3-2.8>
         1e+100
@@ -173,7 +173,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc3-2.9",
     [[
-        SELECT 2.0e-27 * '+0.000005e+132'
+        SELECT 2.0e-27 * CAST('+0.000005e+132' AS DOUBLE);
     ]], {
         -- <misc3-2.9>
         1e+100

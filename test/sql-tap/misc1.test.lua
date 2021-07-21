@@ -68,7 +68,9 @@ test:do_test(
             cmd = cmd .. ")"
             test:execsql(cmd)
         end
-        return test:execsql("SELECT x50 FROM manycol ORDER BY x80+0")
+        return test:execsql([[
+            SELECT x50 FROM manycol ORDER BY CAST(x80 AS INTEGER);
+        ]])
     end, {
         -- <misc1-1.3.1>
         "50", "150", "250", "350", "450", "550", "650", "750", "850", "950", "1050"
@@ -527,11 +529,12 @@ test:do_execsql_test(
         -- </misc1-10.6>
     })
 
+local cast = "CAST(CAST(x1 AS INTEGER) + 1 AS STRING)"
 test:do_test(
     "misc1-10.7",
     function()
         where = string.gsub(where, "x0=0", "x0=100")
-        return test:catchsql("UPDATE manycol SET x1=CAST(x1+1 AS STRING) "..where.."")
+        return test:catchsql("UPDATE manycol SET x1 = "..cast.." "..where..";")
     end, {
         -- <misc1-10.7>
         0
@@ -553,7 +556,7 @@ test:do_execsql_test(
 -- } {0 {}}
 test:do_execsql_test(
     "misc1-10.9",
-    "UPDATE manycol SET x1=CAST(x1+1 AS STRING) "..where
+    "UPDATE manycol SET x1 = "..cast.." "..where
         --"UPDATE manycol SET x1=x1+1 $::where AND rowid>0"
     , {})
 
