@@ -186,6 +186,9 @@ error:
 			flags = mp_decode_uint(pos);
 			header->flags = flags;
 			break;
+		case IPROTO_STREAM_ID:
+			header->stream_id = mp_decode_uint(pos);
+			break;
 		default:
 			/* unknown header */
 			mp_next(pos);
@@ -318,6 +321,11 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 		if (header->is_commit && header->tsn != header->lsn) {
 			flags_to_encode |= IPROTO_FLAG_COMMIT;
 		}
+	}
+	if (header->stream_id != 0) {
+		d = mp_encode_uint(d, IPROTO_STREAM_ID);
+		d = mp_encode_uint(d, header->stream_id);
+		map_size++;
 	}
 	if (flags_to_encode != 0) {
 		d = mp_encode_uint(d, IPROTO_FLAGS);

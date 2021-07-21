@@ -72,6 +72,7 @@ enum iproto_key {
 	IPROTO_GROUP_ID = 0x07,
 	IPROTO_TSN = 0x08,
 	IPROTO_FLAGS = 0x09,
+	IPROTO_STREAM_ID = 0x0a,
 	/* Leave a gap for other keys in the header. */
 	IPROTO_SPACE_ID = 0x10,
 	IPROTO_INDEX_ID = 0x11,
