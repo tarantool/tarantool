@@ -221,7 +221,8 @@ int
 http_parse_header_line(struct http_parser *prsr, char **bufp,
 		       const char *end_buf, int max_hname_len)
 {
-	char c, ch;
+	char c;
+	unsigned char ch;
 	char *p = *bufp;
 	char *header_name_start = p;
 	prsr->hdr_name_idx = 0;
@@ -268,10 +269,6 @@ http_parse_header_line(struct http_parser *prsr, char **bufp,
 				goto header_done;
 			default:
 				state = sw_name;
-
-				if (ch < 0) {
-					return HTTP_PARSE_INVALID;
-				}
 				c = lowcase[ch];
 				if (c != 0) {
 					prsr->hdr_name[0] = c;
@@ -306,9 +303,6 @@ http_parse_header_line(struct http_parser *prsr, char **bufp,
 			break;
 		/* http_header name */
 		case sw_name:
-			if (ch < 0) {
-				return HTTP_PARSE_INVALID;
-			}
 			c = lowcase[ch];
 			if (c != 0) {
 				if (prsr->hdr_name_idx < max_hname_len) {
