@@ -9,18 +9,15 @@ local urilib   = require('uri')
 local internal = require('net.box.lib')
 local trigger  = require('internal.trigger')
 
-local band              = bit.band
 local max               = math.max
 local fiber_clock       = fiber.clock
 local fiber_self        = fiber.self
-local decode            = msgpack.decode_unchecked
 
 local check_iterator_type = box.internal.check_iterator_type
 local check_index_arg     = box.internal.check_index_arg
 local check_space_arg     = box.internal.check_space_arg
 local check_primary_index = box.internal.check_primary_index
 
-local encode_auth     = internal.encode_auth
 local encode_method   = internal.encode_method
 local decode_greeting = internal.decode_greeting
 
@@ -29,20 +26,12 @@ local VSPACE_ID        = 281
 local VINDEX_ID        = 289
 local VCOLLATION_ID    = 277
 local DEFAULT_CONNECT_TIMEOUT = 10
-
-local IPROTO_STATUS_KEY    = 0x00
-local IPROTO_ERRNO_MASK    = 0x7FFF
-local IPROTO_SYNC_KEY      = 0x01
-local IPROTO_SCHEMA_VERSION_KEY = 0x05
-local IPROTO_DATA_KEY      = 0x30
-local IPROTO_ERROR_24      = 0x31
 local IPROTO_GREETING_SIZE = 128
 
 -- select errors from box.error
 local E_UNKNOWN              = box.error.UNKNOWN
 local E_NO_CONNECTION        = box.error.NO_CONNECTION
 local E_PROC_LUA             = box.error.PROC_LUA
-local E_NO_SUCH_SPACE        = box.error.NO_SUCH_SPACE
 
 -- Method types used internally by net.box.
 local M_PING        = 0
@@ -67,14 +56,6 @@ local M_INJECT      = 17
 
 -- utility tables
 local is_final_state         = {closed = 1, error = 1}
-
-local function version_id(major, minor, patch)
-    return bit.bor(bit.lshift(major, 16), bit.lshift(minor, 8), patch)
-end
-
-local function version_at_least(peer_version_id, major, minor, patch)
-    return peer_version_id >= version_id(major, minor, patch)
-end
 
 --
 -- Connect to a remote server, do handshake.
@@ -314,24 +295,6 @@ local function create_transport(host, port, user, password, callback,
         return request:wait_result(timeout)
     end
 
-    local function dispatch_response_iproto(hdr, body_rpos, body_end)
-        local id = hdr[IPROTO_SYNC_KEY]
-        local status = hdr[IPROTO_STATUS_KEY]
-        internal.dispatch_response_iproto(requests, id, status,
-                                          body_rpos, body_end)
-    end
-
-    -- IO (WORKER FIBER) --
-    local function send_and_recv_iproto()
-        local hdr, body_rpos, body_end = internal.send_and_recv_iproto(
-            connection:fd(), send_buf, recv_buf)
-        if not hdr then
-            local err = body_rpos
-            return err.code, err.message
-        end
-        return nil, hdr, body_rpos, body_end
-    end
-
     -- PROTOCOL STATE MACHINE (WORKER FIBER) --
     --
     -- The sm is implemented as a collection of functions performing
@@ -390,17 +353,13 @@ local function create_transport(host, port, user, password, callback,
             set_state('fetch_schema')
             return iproto_schema_sm()
         end
-        encode_auth(send_buf, requests:new_id(), user, password, salt)
-        local err, hdr, body_rpos = send_and_recv_iproto()
-        if err then
-            return error_sm(err, hdr)
-        end
-        if hdr[IPROTO_STATUS_KEY] ~= 0 then
-            local body = decode(body_rpos)
-            return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_24])
+        local schema_version, err = internal.iproto_auth(
+            user, password, salt, requests, connection:fd(), send_buf, recv_buf)
+        if not schema_version then
+            return error_sm(err.code, err.message)
         end
         set_state('fetch_schema')
-        return iproto_schema_sm(hdr[IPROTO_SCHEMA_VERSION_KEY])
+        return iproto_schema_sm(schema_version)
     end
 
     iproto_schema_sm = function(schema_version)
@@ -408,82 +367,28 @@ local function create_transport(host, port, user, password, callback,
             set_state('active')
             return iproto_sm(schema_version)
         end
-        -- _vcollation view was added in 2.2.0-389-g3e3ef182f
-        local peer_has_vcollation = version_at_least(greeting.version_id,
-                                                     2, 2, 1)
-        local select1_id = requests:new_id()
-        local select2_id = requests:new_id()
-        local select3_id
-        local response = {}
-        -- fetch everything from space _vspace, 2 = ITER_ALL
-        encode_method(M_SELECT, send_buf, select1_id, VSPACE_ID, 0, 2, 0,
-                      0xFFFFFFFF, nil)
-        -- fetch everything from space _vindex, 2 = ITER_ALL
-        encode_method(M_SELECT, send_buf, select2_id, VINDEX_ID, 0, 2, 0,
-                      0xFFFFFFFF, nil)
-        -- fetch everything from space _vcollation, 2 = ITER_ALL
-        if peer_has_vcollation then
-            select3_id = requests:new_id()
-            encode_method(M_SELECT, send_buf, select3_id, VCOLLATION_ID,
-                          0, 2, 0, 0xFFFFFFFF, nil)
+        local schema_version, schema = internal.iproto_schema(
+            greeting.version_id, requests, connection:fd(), send_buf, recv_buf)
+        if not schema_version then
+            local err = schema
+            return error_sm(err.code, err.message)
         end
-
-        schema_version = nil -- any schema_version will do provided that
-                             -- it is consistent across responses
-        repeat
-            local err, hdr, body_rpos, body_end = send_and_recv_iproto()
-            if err then return error_sm(err, hdr) end
-            dispatch_response_iproto(hdr, body_rpos, body_end)
-            local id = hdr[IPROTO_SYNC_KEY]
-            -- trick: omit check for peer_has_vcollation: id is
-            -- not nil
-            if id == select1_id or id == select2_id or id == select3_id then
-                -- response to a schema query we've submitted
-                local status = hdr[IPROTO_STATUS_KEY]
-                local response_schema_version = hdr[IPROTO_SCHEMA_VERSION_KEY]
-                if status ~= 0 then
-                    -- No _vcollation space (server has an old
-                    -- schema version).
-                    local errno = band(status, IPROTO_ERRNO_MASK)
-                    if id == select3_id and errno == E_NO_SUCH_SPACE then
-                        peer_has_vcollation = false
-                        goto continue
-                    end
-                    local body = decode(body_rpos)
-                    return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_24])
-                end
-                if schema_version == nil then
-                    schema_version = response_schema_version
-                elseif schema_version ~= response_schema_version then
-                    -- schema changed while fetching schema; restart loader
-                    return iproto_schema_sm()
-                end
-                local body = decode(body_rpos)
-                response[id] = body[IPROTO_DATA_KEY]
-            end
-            ::continue::
-        until response[select1_id] and response[select2_id] and
-              (not peer_has_vcollation or response[select3_id])
-        -- trick: response[select3_id] is nil when the key is nil
-        callback('did_fetch_schema', schema_version, response[select1_id],
-                 response[select2_id], response[select3_id])
+        callback('did_fetch_schema', schema_version, schema[VSPACE_ID],
+                 schema[VINDEX_ID], schema[VCOLLATION_ID])
         set_state('active')
         return iproto_sm(schema_version)
     end
 
     iproto_sm = function(schema_version)
-        local err, hdr, body_rpos, body_end = send_and_recv_iproto()
-        if err then return error_sm(err, hdr) end
-        dispatch_response_iproto(hdr, body_rpos, body_end)
-        local response_schema_version = hdr[IPROTO_SCHEMA_VERSION_KEY]
-        if response_schema_version > 0 and
-           response_schema_version ~= schema_version then
-            -- schema_version has been changed - start to load a new version.
-            -- Sic: self.schema_version will be updated only after reload.
-            set_state('fetch_schema')
-            return iproto_schema_sm(schema_version)
+        local schema_version, err = internal.iproto_loop(
+            schema_version, requests, connection:fd(), send_buf, recv_buf)
+        if not schema_version then
+            return error_sm(err.code, err.message)
         end
-        return iproto_sm(schema_version)
+        -- schema_version has been changed - start to load a new version.
+        -- Sic: self.schema_version will be updated only after reload.
+        set_state('fetch_schema')
+        return iproto_schema_sm(schema_version)
     end
 
     error_sm = function(err, msg)
