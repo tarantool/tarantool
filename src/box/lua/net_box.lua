@@ -18,7 +18,6 @@ local check_index_arg     = box.internal.check_index_arg
 local check_space_arg     = box.internal.check_space_arg
 local check_primary_index = box.internal.check_primary_index
 
-local encode_method   = internal.encode_method
 local decode_greeting = internal.decode_greeting
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
@@ -273,10 +272,9 @@ local function create_transport(host, port, user, password, callback,
         if send_buf:size() == 0 then
             worker_fiber:wakeup()
         end
-        local id = requests:new_id()
-        encode_method(method, send_buf, id, ...)
-        return internal.new_request(requests, id, buffer, skip_header, method,
-                                    on_push, on_push_ctx, format)
+        return internal.perform_async_request(requests, send_buf, buffer,
+                                              skip_header, method, on_push,
+                                              on_push_ctx, format, ...)
     end
 
     --
