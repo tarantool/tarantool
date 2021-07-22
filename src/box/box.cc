@@ -1488,6 +1488,14 @@ box_wait_quorum(uint32_t lead_id, int64_t target_lsn, int quorum,
 		assert(!tt_uuid_is_equal(&INSTANCE_UUID, &replica->uuid));
 
 		int64_t lsn = vclock_get(relay_vclock(replica->relay), lead_id);
+		/*
+		 * The replica might not yet received anything from the old
+		 * leader. Easily can happen with a newly added replica. Vclock
+		 * can't be followed then because would assert on lsn > old lsn
+		 * whereas they are both 0.
+		 */
+		if (lsn == 0)
+			continue;
 		vclock_follow(&t.vclock, replica->id, lsn);
 		if (lsn >= target_lsn) {
 			ack_count++;
