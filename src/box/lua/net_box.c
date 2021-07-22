@@ -1560,7 +1560,7 @@ netbox_new_registry(struct lua_State *L)
  * Writes a request to the send buffer and registers the request object
  * ('future') that can be used for waiting for a response.
  *
- * Takes the following arguments:
+ * Takes the following values from Lua stack starting at index idx:
  *  - requests: registry to register the new request with
  *  - send_buf: buffer (ibuf) to write the encoded request to
  *  - buffer: buffer (ibuf) to write the result to or nil
@@ -1571,32 +1571,31 @@ netbox_new_registry(struct lua_State *L)
  *  - format: tuple format to use for decoding the body or nil
  *  - ...: method-specific arguments passed to the encoder
  */
-static int
-netbox_perform_async_request(struct lua_State *L)
+static void
+netbox_make_request(struct lua_State *L, int idx,
+		    struct netbox_request *request)
 {
-	struct netbox_request *request = lua_newuserdata(L, sizeof(*request));
-
 	/* Encode and write the request to the send buffer. */
-	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
-	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 2);
-	enum netbox_method method = lua_tointeger(L, 5);
+	struct netbox_registry *registry = luaT_check_netbox_registry(L, idx);
+	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, idx + 1);
+	enum netbox_method method = lua_tointeger(L, idx + 4);
 	assert(method < netbox_method_MAX);
 	uint64_t sync = registry->next_sync++;
-	netbox_encode_method(L, 9, method, send_buf, sync);
+	netbox_encode_method(L, idx + 8, method, send_buf, sync);
 
 	/* Initialize and register the request object. */
 	request->method = method;
 	request->sync = sync;
-	request->buffer = (struct ibuf *)lua_topointer(L, 3);
-	lua_pushvalue(L, 3);
+	request->buffer = (struct ibuf *)lua_topointer(L, idx + 2);
+	lua_pushvalue(L, idx + 2);
 	request->buffer_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	request->skip_header = lua_toboolean(L, 4);
-	lua_pushvalue(L, 6);
+	request->skip_header = lua_toboolean(L, idx + 3);
+	lua_pushvalue(L, idx + 5);
 	request->on_push_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	lua_pushvalue(L, 7);
+	lua_pushvalue(L, idx + 6);
 	request->on_push_ctx_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	if (!lua_isnil(L, 8))
-		request->format = lbox_check_tuple_format(L, 8);
+	if (!lua_isnil(L, idx + 7))
+		request->format = lbox_check_tuple_format(L, idx + 7);
 	else
 		request->format = tuple_format_runtime;
 	tuple_format_ref(request->format);
@@ -1607,9 +1606,37 @@ netbox_perform_async_request(struct lua_State *L)
 		netbox_request_destroy(request);
 		luaT_error(L);
 	}
+}
+
+static int
+netbox_perform_async_request(struct lua_State *L)
+{
+	struct netbox_request *request = lua_newuserdata(L, sizeof(*request));
+	netbox_make_request(L, 1, request);
 	luaL_getmetatable(L, netbox_request_typename);
 	lua_setmetatable(L, -2);
 	return 1;
+}
+
+static int
+netbox_perform_request(struct lua_State *L)
+{
+	double timeout = (!lua_isnil(L, 1) ?
+			  lua_tonumber(L, 1) : TIMEOUT_INFINITY);
+	struct netbox_request request;
+	netbox_make_request(L, 2, &request);
+	while (!netbox_request_is_ready(&request)) {
+		if (!netbox_request_wait(&request, &timeout)) {
+			netbox_request_unregister(&request);
+			netbox_request_destroy(&request);
+			luaL_testcancel(L);
+			diag_set(ClientError, ER_TIMEOUT);
+			return luaT_push_nil_and_error(L);
+		}
+	}
+	int ret = netbox_request_push_result(&request, L);
+	netbox_request_destroy(&request);
+	return ret;
 }
 
 /**
@@ -1974,6 +2001,7 @@ luaopen_net_box(struct lua_State *L)
 		{ "decode_greeting",netbox_decode_greeting },
 		{ "new_registry",   netbox_new_registry },
 		{ "perform_async_request", netbox_perform_async_request },
+		{ "perform_request",netbox_perform_request },
 		{ "iproto_auth",    netbox_iproto_auth },
 		{ "iproto_schema",  netbox_iproto_schema },
 		{ "iproto_loop",    netbox_iproto_loop },

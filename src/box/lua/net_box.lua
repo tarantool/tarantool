@@ -253,6 +253,21 @@ local function create_transport(host, port, user, password, callback,
         end
     end
 
+    local function prepare_perform_request()
+        if state ~= 'active' and state ~= 'fetch_schema' then
+            local code = last_errno or E_NO_CONNECTION
+            local msg = last_error or
+                string.format('Connection is not established, state is "%s"',
+                              state)
+            return box.error.new({code = code, reason = msg})
+        end
+        -- alert worker to notify it of the queued outgoing data;
+        -- if the buffer wasn't empty, assume the worker was already alerted
+        if send_buf:size() == 0 then
+            worker_fiber:wakeup()
+        end
+    end
+
     --
     -- Send a request and do not wait for response.
     -- @retval nil, error Error occured.
@@ -260,17 +275,9 @@ local function create_transport(host, port, user, password, callback,
     --
     local function perform_async_request(buffer, skip_header, method, on_push,
                                          on_push_ctx, format, ...)
-        if state ~= 'active' and state ~= 'fetch_schema' then
-            local code = last_errno or E_NO_CONNECTION
-            local msg = last_error or
-                string.format('Connection is not established, state is "%s"',
-                              state)
-            return nil, box.error.new({code = code, reason = msg})
-        end
-        -- alert worker to notify it of the queued outgoing data;
-        -- if the buffer wasn't empty, assume the worker was already alerted
-        if send_buf:size() == 0 then
-            worker_fiber:wakeup()
+        local err = prepare_perform_request()
+        if err then
+            return nil, err
         end
         return internal.perform_async_request(requests, send_buf, buffer,
                                               skip_header, method, on_push,
@@ -284,13 +291,13 @@ local function create_transport(host, port, user, password, callback,
     --
     local function perform_request(timeout, buffer, skip_header, method,
                                    on_push, on_push_ctx, format, ...)
-        local request, err =
-            perform_async_request(buffer, skip_header, method, on_push,
-                                  on_push_ctx, format, ...)
-        if not request then
+        local err = prepare_perform_request()
+        if err then
             return nil, err
         end
-        return request:wait_result(timeout)
+        return internal.perform_request(timeout, requests, send_buf, buffer,
+                                        skip_header, method, on_push,
+                                        on_push_ctx, format, ...)
     end
 
     -- PROTOCOL STATE MACHINE (WORKER FIBER) --
