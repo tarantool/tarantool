@@ -915,17 +915,13 @@ netbox_encode_inject(struct lua_State *L, int idx, struct mpstream *stream,
 }
 
 /*
- * Encodes a request for the specified method.
- *
- * Takes three mandatory arguments:
- *  - method: a value from the netbox_method enumeration
- *  - ibuf: buffer to write the result to
- *  - sync: value of the IPROTO_SYNC key
- *
- * Other arguments are method-specific.
+ * Encodes a request for the specified method and writes the result to the
+ * provided buffer. Values to encode depend on the method and are passed via
+ * Lua stack starting at index idx.
  */
 static int
-netbox_encode_method(struct lua_State *L)
+netbox_encode_method(struct lua_State *L, int idx, enum netbox_method method,
+		     struct ibuf *ibuf, uint64_t sync)
 {
 	typedef void (*method_encoder_f)(struct lua_State *L, int idx,
 					 struct mpstream *stream,
@@ -950,14 +946,10 @@ netbox_encode_method(struct lua_State *L)
 		[NETBOX_COUNT]		= netbox_encode_call,
 		[NETBOX_INJECT]		= netbox_encode_inject,
 	};
-	enum netbox_method method = lua_tointeger(L, 1);
-	assert(method < netbox_method_MAX);
-	struct ibuf *ibuf = (struct ibuf *)lua_topointer(L, 2);
-	uint64_t sync = luaL_touint64(L, 3);
 	struct mpstream stream;
 	mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
 		      luamp_error, L);
-	method_encoder[method](L, 4, &stream, sync);
+	method_encoder[method](L, idx, &stream, sync);
 	return 0;
 }
 
@@ -1342,15 +1334,6 @@ luaT_netbox_registry_gc(struct lua_State *L)
 	return 0;
 }
 
-/** Allocates a new id (sync). */
-static int
-luaT_netbox_registry_new_id(struct lua_State *L)
-{
-	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
-	luaL_pushuint64(L, registry->next_sync++);
-	return 1;
-}
-
 static int
 luaT_netbox_registry_reset(struct lua_State *L)
 {
@@ -1574,30 +1557,40 @@ netbox_new_registry(struct lua_State *L)
 }
 
 /**
- * Creates a request object (userdata) and pushes it to Lua stack.
+ * Writes a request to the send buffer and registers the request object
+ * ('future') that can be used for waiting for a response.
  *
  * Takes the following arguments:
  *  - requests: registry to register the new request with
- *  - id: id (sync) to assign to the new request
+ *  - send_buf: buffer (ibuf) to write the encoded request to
  *  - buffer: buffer (ibuf) to write the result to or nil
  *  - skip_header: whether to skip header when writing the result to the buffer
  *  - method: a value from the netbox_method enumeration
  *  - on_push: on_push trigger function
  *  - on_push_ctx: on_push trigger function argument
  *  - format: tuple format to use for decoding the body or nil
+ *  - ...: method-specific arguments passed to the encoder
  */
 static int
-netbox_new_request(struct lua_State *L)
+netbox_perform_async_request(struct lua_State *L)
 {
 	struct netbox_request *request = lua_newuserdata(L, sizeof(*request));
+
+	/* Encode and write the request to the send buffer. */
 	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
-	request->sync = luaL_touint64(L, 2);
+	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 2);
+	enum netbox_method method = lua_tointeger(L, 5);
+	assert(method < netbox_method_MAX);
+	uint64_t sync = registry->next_sync++;
+	netbox_encode_method(L, 9, method, send_buf, sync);
+
+	/* Initialize and register the request object. */
+	request->method = method;
+	request->sync = sync;
 	request->buffer = (struct ibuf *)lua_topointer(L, 3);
 	lua_pushvalue(L, 3);
 	request->buffer_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	request->skip_header = lua_toboolean(L, 4);
-	request->method = lua_tointeger(L, 5);
-	assert(request->method < netbox_method_MAX);
 	lua_pushvalue(L, 6);
 	request->on_push_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	lua_pushvalue(L, 7);
@@ -1961,7 +1954,6 @@ luaopen_net_box(struct lua_State *L)
 
 	static const struct luaL_Reg netbox_registry_meta[] = {
 		{ "__gc",           luaT_netbox_registry_gc },
-		{ "new_id",         luaT_netbox_registry_new_id },
 		{ "reset",          luaT_netbox_registry_reset },
 		{ NULL, NULL }
 	};
@@ -1979,10 +1971,9 @@ luaopen_net_box(struct lua_State *L)
 	luaL_register_type(L, netbox_request_typename, netbox_request_meta);
 
 	static const luaL_Reg net_box_lib[] = {
-		{ "encode_method",  netbox_encode_method },
 		{ "decode_greeting",netbox_decode_greeting },
 		{ "new_registry",   netbox_new_registry },
-		{ "new_request",    netbox_new_request },
+		{ "perform_async_request", netbox_perform_async_request },
 		{ "iproto_auth",    netbox_iproto_auth },
 		{ "iproto_schema",  netbox_iproto_schema },
 		{ "iproto_loop",    netbox_iproto_loop },
