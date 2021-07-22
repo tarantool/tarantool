@@ -1,0 +1,76 @@
+--
+-- gh-5430: box.ctl.promote() could assert if one of replicas didn't receive
+-- anything from the old leader. Internally box.ctl.promote() collected a quorum
+-- using vclock_follow() from all connected relays by the old leader ID and in
+-- that case one of such replicas led to vclock_follow(0) which is always a
+-- crash.
+--
+test_run = require('test_run').new()
+
+--
+-- Start 2 fullmesh nodes working normally.
+--
+test_run:cmd('create server master1 with '..                                    \
+             'script="replication/gh-5430-master1.lua"')
+test_run:cmd('start server master1 with wait=False')
+
+test_run:cmd('create server master2 with '..                                    \
+             'script="replication/gh-5430-master2.lua"')
+test_run:cmd('start server master2 with wait=True')
+
+--
+-- One of them won't write to WAL anything from now on. If a new instance is
+-- added and it will write something, master2 won't apply it.
+--
+test_run:switch('master2')
+box.error.injection.set('ERRINJ_WAL_DELAY', true)
+
+--
+-- Third node is the future 'old leader', by which master2 has
+-- vclock[master3] == 0.
+--
+test_run:cmd('create server master3 with '..                                    \
+             'script="replication/gh-5430-master3.lua"')
+test_run:cmd('start server master3 with wait=True')
+
+--
+-- Make master1 fetch data from master3 so as it could receive sync data and
+-- confirm it later.
+--
+test_run:switch('master1')
+-- Can't keep master2 in there because it hangs with ER_CFG about a duplicate
+-- connection. Even reset via replication = {} does not help for 100%. But for
+-- the test it does not matter.
+box.cfg{replication = {test_run:eval('master3', 'return box.cfg.listen')[1]}}
+
+--
+-- Master3 fills the limbo and dies.
+--
+test_run:switch('master3')
+box.ctl.promote()
+s = box.schema.create_space('test', {is_sync = true})
+_ = s:create_index('pk')
+_ = require('fiber').create(s.replace, s, {1})
+test_run:wait_lsn('master1', 'master3')
+
+test_run:switch('master1')
+test_run:cmd('stop server master3')
+test_run:cmd('delete server master3')
+
+--
+-- Master1 tries to promote self. In the meantime master2 has
+-- vclock[master3] == 0. It is still blocked in the WAL thread. Master1 should
+-- be ready to seeing 0 LSN by the old leader's component in some replicas.
+--
+box.cfg{replication_synchro_timeout = 0.1}
+assert(box.info.synchro.queue.len > 0)
+assert(not pcall(box.ctl.promote))
+
+test_run:switch('master2')
+box.error.injection.set('ERRINJ_WAL_DELAY', false)
+
+test_run:switch('default')
+test_run:cmd('stop server master2')
+test_run:cmd('delete server master2')
+test_run:cmd('stop server master1')
+test_run:cmd('delete server master1')
