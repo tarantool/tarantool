@@ -1128,7 +1128,7 @@ test:do_catchsql_test(
     [[
         SELECT u > true FROM t2;
     ]], {
-        1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to boolean"
+        1, "Type mismatch: can not convert boolean(TRUE) to uuid"
     })
 
 test:do_execsql_test(
@@ -1192,7 +1192,7 @@ test:do_catchsql_test(
     [[
         SELECT u = true FROM t2;
     ]], {
-        1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to boolean"
+        1, "Type mismatch: can not convert boolean(TRUE) to uuid"
     })
 
 test:do_execsql_test(

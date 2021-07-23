@@ -284,13 +284,13 @@ test:do_execsql_test(
         -- </subquery-2.3.1>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "subquery-2.3.2",
     [[
         SELECT a IN (10.0, 20) FROM t3;
     ]], {
         -- <subquery-2.3.2>
-        false
+        1, "Type mismatch: can not convert string('10') to number"
         -- </subquery-2.3.2>
     })
 

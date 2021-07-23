@@ -45,7 +45,7 @@ test:do_execsql_test(
     [[
         SELECT
           CASE
-             WHEN B.val = 1 THEN 'XYZ'
+             WHEN B.val = '1' THEN 'XYZ'
              ELSE A.val
           END AS Col1
         FROM B
@@ -63,7 +63,7 @@ test:do_execsql_test(
     [[
         SELECT DISTINCT
           CASE
-             WHEN B.val = 1 THEN 'XYZ'
+             WHEN B.val = '1' THEN 'XYZ'
              ELSE A.val
           END AS Col1
         FROM B
@@ -79,14 +79,14 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-1.4",
     [[
-        SELECT b.val, CASE WHEN b.val = 1 THEN 'xyz' ELSE b.val END AS col1 FROM b;
+        SELECT b.val, CASE WHEN b.val = '1' THEN 'xyz' ELSE b.val END AS col1 FROM b;
     ]], {
         -- <tkt3493-1.4>
         "1", "xyz", "2", "2"
         -- </tkt3493-1.4>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "tkt3493-1.5",
     [[
         SELECT DISTINCT
@@ -95,7 +95,7 @@ test:do_execsql_test(
         FROM b;
     ]], {
         -- <tkt3493-1.5>
-        "1", "xyz", "2", "2"
+        1, "Type mismatch: can not convert integer(1) to string"
         -- </tkt3493-1.5>
     })
 
@@ -123,23 +123,23 @@ test:do_execsql_test(
         -- </tkt3493-2.1>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "tkt3493-2.2.1",
     [[
         SELECT a=123 FROM t1 GROUP BY a
     ]], {
         -- <tkt3493-2.2.1>
-        true
+        1, "Type mismatch: can not convert integer(123) to string"
         -- </tkt3493-2.2.1>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "tkt3493-2.2.2",
     [[
         SELECT a=123 FROM t1
     ]], {
         -- <tkt3493-2.2.2>
-        true
+        1, "Type mismatch: can not convert integer(123) to string"
         -- </tkt3493-2.2.2>
     })
 
@@ -153,93 +153,93 @@ test:do_execsql_test(
         -- </tkt3493-2.2.3>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "tkt3493-2.2.4",
     [[
         SELECT count(*), a=123 FROM t1
     ]], {
         -- <tkt3493-2.2.4>
-        1, true
+        1, "Type mismatch: can not convert integer(123) to string"
         -- </tkt3493-2.2.4>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "tkt3493-2.2.5",
     [[
         SELECT count(*), +a=123 FROM t1
     ]], {
         -- <tkt3493-2.2.5>
-        1, true
+        1, "Type mismatch: can not convert integer(123) to string"
         -- </tkt3493-2.2.5>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "tkt3493-2.3.3",
     [[
         SELECT b='456' FROM t1 GROUP BY a
     ]], {
         -- <tkt3493-2.3.3>
-        true
+        1, "Type mismatch: can not convert string('456') to number"
         -- </tkt3493-2.3.3>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "tkt3493-2.3.1",
     [[
         SELECT b='456' FROM t1 GROUP BY b
     ]], {
         -- <tkt3493-2.3.1>
-        true
+        1, "Type mismatch: can not convert string('456') to number"
         -- </tkt3493-2.3.1>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "tkt3493-2.3.2",
     [[
         SELECT b='456' FROM t1
     ]], {
         -- <tkt3493-2.3.2>
-        true
+        1, "Type mismatch: can not convert string('456') to number"
         -- </tkt3493-2.3.2>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "tkt3493-2.4.1",
     [[
         SELECT typeof(a), a FROM t1 GROUP BY a HAVING a=123
     ]], {
         -- <tkt3493-2.4.1>
-        "string", "123"
+        1, "Type mismatch: can not convert integer(123) to string"
         -- </tkt3493-2.4.1>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "tkt3493-2.4.2",
     [[
         SELECT typeof(a), a FROM t1 GROUP BY b HAVING a=123
     ]], {
         -- <tkt3493-2.4.2>
-        "string", "123"
+        1, "Type mismatch: can not convert integer(123) to string"
         -- </tkt3493-2.4.2>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "tkt3493-2.5.1",
     [[
         SELECT typeof(b), b FROM t1 GROUP BY a HAVING b='456'
     ]], {
         -- <tkt3493-2.5.1>
-        "integer", 456
+        1, "Type mismatch: can not convert string('456') to number"
         -- </tkt3493-2.5.1>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "tkt3493-2.5.2",
     [[
         SELECT typeof(b), b FROM t1 GROUP BY b HAVING b='456'
     ]], {
         -- <tkt3493-2.5.2>
-        "integer", 456
+        1, "Type mismatch: can not convert string('456') to number"
         -- </tkt3493-2.5.2>
     })
 

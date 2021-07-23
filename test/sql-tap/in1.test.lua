@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(80)
+test:plan(79)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -634,19 +634,6 @@ test:do_execsql_test(
         -- <in-11.1>
         1, 2
         -- </in-11.1>
-    })
-
-test:do_test(
-    "in-11.2",
-    function()
-        -- The '2' should be coerced into 2 because t6.b is NUMERIC
-        return test:execsql [[
-            SELECT * FROM t6 WHERE b IN ('2');
-        ]]
-    end, {
-        -- <in-11.2>
-        1, 2
-        -- </in-11.2>
     })
 
 test:do_execsql_test(

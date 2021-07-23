@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(103)
+test:plan(107)
 
 --!./tcltestrunner.lua
 -- 2005 June 25
@@ -1106,5 +1106,42 @@ test:execsql([[
     DROP TABLE t4;
     DROP TABLE t5;
 ]])
+
+--
+-- Make sure that implicit cast from STRING to number was removed during
+-- comparison where index is not used.
+--
+
+test:do_catchsql_test(
+    "cast-10.1",
+    [[
+        SELECT 1 < '2';
+    ]], {
+        1, "Type mismatch: can not convert string('2') to number"
+    })
+
+test:do_catchsql_test(
+    "cast-10.2",
+    [[
+        SELECT '1' < 2;
+    ]], {
+        1, "Type mismatch: can not convert integer(2) to string"
+    })
+
+test:do_catchsql_test(
+    "cast-10.3",
+    [[
+        SELECT 1.5 < '2';
+    ]], {
+        1, "Type mismatch: can not convert string('2') to number"
+    })
+
+test:do_catchsql_test(
+    "cast-10.4",
+    [[
+        SELECT '1' < 2.5;
+    ]], {
+        1, "Type mismatch: can not convert double(2.5) to string"
+    })
 
 test:finish_test()

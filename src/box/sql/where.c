@@ -1272,27 +1272,11 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 			rc = sql_stat4_column(db, samples[i].sample_key, nEq,
 					      &pVal);
 			if (rc == 0 && p1 != NULL) {
-				int res;
-				rc = mem_cmp_scalar(p1, pVal, &res, coll);
-				if (rc != 0) {
-					diag_set(ClientError,
-						 ER_SQL_TYPE_MISMATCH,
-						 mem_str(pVal),
-						 mem_type_to_str(p1));
-				}
-				if (rc == 0 && res >= 0)
+				if (mem_cmp_scalar(p1, pVal, coll) >= 0)
 					nLower++;
 			}
 			if (rc == 0 && p2 != NULL) {
-				int res;
-				rc = mem_cmp_scalar(p2, pVal, &res, coll);
-				if (rc != 0) {
-					diag_set(ClientError,
-						 ER_SQL_TYPE_MISMATCH,
-						 mem_str(pVal),
-						 mem_type_to_str(p2));
-				}
-				if (rc == 0 && res >= 0)
+				if (mem_cmp_scalar(p2, pVal, coll) >= 0)
 					nUpper++;
 			}
 		}

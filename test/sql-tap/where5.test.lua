@@ -34,7 +34,7 @@ test:do_test("where5-1.0", function()
         INSERT INTO t3 SELECT CAST(x AS INTEGER) FROM t1;
     ]]
     return test:execsql [[
-        SELECT * FROM t1 WHERE x<0
+        SELECT * FROM t1 WHERE CAST(x AS INTEGER) < 0
     ]]
 end, {
     -- <where5-1.0>
@@ -43,7 +43,7 @@ end, {
 })
 
 test:do_execsql_test("where5-1.1", [[
-    SELECT * FROM t1 WHERE x<=0
+    SELECT * FROM t1 WHERE CAST(x AS INTEGER) <= 0
 ]], {
     -- <where5-1.1>
     '-1', '0'
@@ -51,7 +51,7 @@ test:do_execsql_test("where5-1.1", [[
 })
 
 test:do_execsql_test("where5-1.2", [[
-    SELECT * FROM t1 WHERE x=0
+    SELECT * FROM t1 WHERE CAST(x AS INTEGER) = 0
 ]], {
     -- <where5-1.2>
     '0'
@@ -59,7 +59,7 @@ test:do_execsql_test("where5-1.2", [[
 })
 
 test:do_execsql_test("where5-1.3", [[
-    SELECT * FROM t1 WHERE x>=0
+    SELECT * FROM t1 WHERE CAST(x AS INTEGER) >= 0
 ]], {
     -- <where5-1.3>
     '0', '1'
@@ -67,7 +67,7 @@ test:do_execsql_test("where5-1.3", [[
 })
 
 test:do_execsql_test("where5-1.4", [[
-    SELECT * FROM t1 WHERE x>0
+    SELECT * FROM t1 WHERE CAST(x AS INTEGER) > 0
 ]], {
     -- <where5-1.4>
     '1'
@@ -75,7 +75,7 @@ test:do_execsql_test("where5-1.4", [[
 })
 
 test:do_execsql_test("where5-1.5", [[
-    SELECT * FROM t1 WHERE x<>0
+    SELECT * FROM t1 WHERE CAST(x AS INTEGER) <> 0
 ]], {
     -- <where5-1.5>
     '-1', '1'

@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
 local ffi = require("ffi")
-test:plan(74)
+test:plan(64)
 
 ffi.cdef[[
        int dup(int oldfd);
@@ -617,7 +617,7 @@ test:do_test(
     test:do_test(
         "where2-6.7",
         function()
-            test:execsql [[
+            test:catchsql [[
                 CREATE TABLE t2249a(a TEXT PRIMARY KEY, x VARCHAR(100));
                 CREATE TABLE t2249b(b INTEGER PRIMARY KEY);
                 INSERT INTO t2249a(a) VALUES('0123');
@@ -628,7 +628,7 @@ test:do_test(
     -- will attempt to convert to NUMERIC before the comparison.
     -- They will thus compare equal.
     --
-    SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE a=b;
+    SELECT b, a FROM t2249b CROSS JOIN t2249a WHERE CAST(a AS INT) = b;
   ]])
         end, {
             -- <where2-6.7>
@@ -642,148 +642,13 @@ test:do_test(
             return queryplan([[
     -- The + operator doesn't affect RHS.
     --
-    SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE a=+b;
+    SELECT b, a FROM t2249b CROSS JOIN t2249a WHERE CAST(a AS INT) = +b;
   ]])
         end, {
             -- <where2-6.9>
             123, "0123", "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.9>
         })
-
-    test:do_test(
-        "where2-6.9.2",
-        function()
-            -- The same thing but with the expression flipped around.
-            return queryplan([[
-    SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE +b=a
-  ]])
-        end, {
-            -- <where2-6.9.2>
-            123, "0123","nosort", "T2249B", "*", "T2249A", "*"
-            -- </where2-6.9.2>
-        })
-
-    test:do_test(
-        "where2-6.10",
-        function()
-            return queryplan([[
-    SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE +a=+b;
-  ]])
-        end, {
-            -- <where2-6.10>
-            123, "0123", "nosort", "T2249B", "*", "T2249A", "*"
-            -- </where2-6.10>
-        })
-
-    test:do_test(
-        "where2-6.11",
-        function()
-            -- This will not attempt the OR optimization because of the a=b
-            -- comparison.
-            return queryplan([[
-    SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE a=b OR a='hello';
-  ]])
-        end, {
-            -- <where2-6.11>
-            123, '0123', "nosort", "T2249B", "*", "T2249A", "*"
-            -- </where2-6.11>
-        })
-
-    test:do_test(
-        "where2-6.11.2",
-        function()
-            -- Permutations of the expression terms.
-            return queryplan([[
-    SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE b=a OR a='hello';
-  ]])
-        end, {
-            -- <where2-6.11.2>
-            123, '0123', "nosort", "T2249B", "*", "T2249A", "*"
-            -- </where2-6.11.2>
-        })
-
-    test:do_test(
-        "where2-6.11.3",
-        function()
-            -- Permutations of the expression terms.
-            return queryplan([[
-    SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE 'hello'=a OR b=a;
-  ]])
-        end, {
-            -- <where2-6.11.3>
-            123, '0123', "nosort", "T2249B", "*", "T2249A", "*"
-            -- </where2-6.11.3>
-        })
-
-    test:do_test(
-        "where2-6.11.4",
-        function()
-            -- Permutations of the expression terms.
-            return queryplan([[
-    SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE a='hello' OR b=a;
-  ]])
-        end, {
-            -- <where2-6.11.4>
-            123, '0123', "nosort", "T2249B", "*", "T2249A", "*"
-            -- </where2-6.11.4>
-        })
-
-    -- These tests are not run if subquery support is not included in the
-    -- build. This is because these tests test the "a = 1 OR a = 2" to
-    -- "a IN (1, 2)" optimisation transformation, which is not enabled if
-    -- subqueries and the IN operator is not available.
-    --
-    test:do_test(
-        "where2-6.12",
-        function()
-            return queryplan([[
-      SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE a=+b OR a='hello';
-    ]])
-        end, {
-            -- <where2-6.12>
-            123, "0123", "nosort", "T2249B", "*", "T2249A", "*"
-            -- </where2-6.12>
-        })
-
-    test:do_test(
-        "where2-6.12.2",
-        function()
-            return queryplan([[
-      SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE a='hello' OR +b=a;
-    ]])
-        end, {
-            -- <where2-6.12.2>
-            123, "0123", "nosort", "T2249B", "*", "T2249A", "*"
-            -- </where2-6.12.2>
-        })
-
-    test:do_test(
-        "where2-6.12.3",
-        function()
-            return queryplan([[
-      SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE +b=a OR a='hello';
-    ]])
-        end, {
-            -- <where2-6.12.3>
-            123, "0123", "nosort", "T2249B", "*", "T2249A", "*"
-            -- </where2-6.12.3>
-        })
-
-    test:do_test(
-        "where2-6.13",
-        function()
-            -- The addition of +a on the second term disabled the OR optimization.
-            -- But we should still get the same empty-set result as in where2-6.9.
-            return queryplan([[
-      SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE a=+b OR +a='hello';
-    ]])
-        end, {
-            -- <where2-6.13>
-            123, "0123", "nosort", "T2249B", "*", "T2249A", "*"
-            -- </where2-6.13>
-        })
-
-
 
     -- Variations on the order of terms in a WHERE clause in order
     -- to make sure the OR optimizer can recognize them all.

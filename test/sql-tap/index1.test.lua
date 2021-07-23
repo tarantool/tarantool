@@ -778,7 +778,7 @@ test:do_catchsql_test(
         SELECT c FROM t6 WHERE a>123;
     ]], {
         -- <index-14.6>
-        1, "Type mismatch: can not convert string('') to number"
+        1, "Type mismatch: can not convert integer(123) to string"
         -- </index-14.6>
     })
 
@@ -788,7 +788,7 @@ test:do_catchsql_test(
         SELECT c FROM t6 WHERE a>=123;
     ]], {
         -- <index-14.7>
-        1, "Type mismatch: can not convert string('') to number"
+        1, "Type mismatch: can not convert integer(123) to string"
         -- </index-14.7>
     })
 

@@ -63,7 +63,7 @@ test:do_execsql_test(
         INSERT INTO t2 VALUES(2, 20,20,'20');
         INSERT INTO t2 VALUES(3, 3,3,'3');
 
-        SELECT a,b,c FROM t2 WHERE a=b AND c=b AND c=20;
+        SELECT a, b, c FROM t2 WHERE a = b AND c = '20';
     ]], {
         -- <transitive1-200>
         20, 20, "20"
@@ -73,7 +73,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "transitive1-210",
     [[
-        SELECT a,b,c FROM t2 WHERE a=b AND c=b AND c>='20' ORDER BY +a;
+        SELECT a, b, c FROM t2 WHERE a = b AND c >= '20' ORDER BY +a;
     ]], {
         -- <transitive1-210>
         3, 3, "3", 20, 20, "20"
@@ -83,7 +83,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "transitive1-220",
     [[
-        SELECT a,b,c FROM t2 WHERE a=b AND c=b AND c<='20' ORDER BY +a;
+        SELECT a, b, c FROM t2 WHERE a = b AND c <= '20' ORDER BY +a;
     ]], {
         -- <transitive1-220>
         20, 20, "20", 100, 100, "100"
@@ -402,7 +402,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE x(i INTEGER PRIMARY KEY, y TEXT);
         INSERT INTO x VALUES(10, '10');
-        SELECT * FROM x WHERE x.y>='1' AND x.y<'2' AND x.i=x.y;
+        SELECT * FROM x WHERE x.y >= '1' AND x.y < '2' AND x.i = CAST(y AS INT);
     ]], {
         -- <transitive1-500>
         10, "10"
@@ -430,23 +430,23 @@ test:do_execsql_test(
     [[
         CREATE TABLE t3(i INTEGER PRIMARY KEY, t TEXT);
         INSERT INTO t3 VALUES(10, '10');
-        SELECT * FROM t3 WHERE i=t AND t = '10 ';
+        SELECT * FROM t3 WHERE i = CAST(t AS NUMBER) AND t = '10 ';
     ]], {
         -- <transitive1-520>
 
         -- </transitive1-520>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "transitive1-530",
     [[
         CREATE TABLE u1(x TEXT PRIMARY KEY, y INTEGER, z TEXT);
         CREATE INDEX i1 ON u1(x);
         INSERT INTO u1 VALUES('00013', 13, '013');
-        SELECT * FROM u1 WHERE x=y AND y=z AND z='013';
+        SELECT * FROM u1 WHERE x = y AND y = z AND z = '013';
     ]], {
         -- <transitive1-530>
-        "00013",13,"013"
+        1, "Type mismatch: can not convert integer(13) to string"
         -- </transitive1-530>
     })
 

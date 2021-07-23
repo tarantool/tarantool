@@ -658,52 +658,11 @@ int
 mem_bit_not(const struct Mem *mem, struct Mem *result);
 
 /**
- * Compare two MEMs and return the result of comparison. MEMs should be of
- * BOOLEAN type or their values are converted to VARBINARY according to implicit
- * cast rules. Original MEMs are not changed.
- */
-int
-mem_cmp_bool(const struct Mem *a, const struct Mem *b, int *result);
-
-/**
- * Compare two MEMs and return the result of comparison. MEMs should be of
- * VARBINARY type or their values are converted to VARBINARY according to
- * implicit cast rules. Original MEMs are not changed.
- */
-int
-mem_cmp_bin(const struct Mem *a, const struct Mem *b, int *result);
-
-/**
- * Compare two MEMs and return the result of comparison. MEMs should be of
- * STRING type or their values are converted to VARBINARY according to
- * implicit cast rules. Original MEMs are not changed.
- */
-int
-mem_cmp_str(const struct Mem *left, const struct Mem *right, int *result,
-	    const struct coll *coll);
-
-/**
- * Compare two MEMs and return the result of comparison. MEMs should be of
- * NUMBER type or their values are converted to NUMBER according to
- * implicit cast rules. Original MEMs are not changed.
- */
-int
-mem_cmp_num(const struct Mem *a, const struct Mem *b, int *result);
-
-/**
- * Compare two MEMs and return the result of comparison. MEMs should be of
- * UUID type or their values are converted to UUID according to
- * implicit cast rules. Original MEMs are not changed.
- */
-int
-mem_cmp_uuid(const struct Mem *left, const struct Mem *right, int *result);
-
-/**
  * Compare two MEMs using SCALAR rules and return the result of comparison. MEMs
  * should be scalars. Original MEMs are not changed.
  */
 int
-mem_cmp_scalar(const struct Mem *a, const struct Mem *b, int *result,
+mem_cmp_scalar(const struct Mem *a, const struct Mem *b,
 	       const struct coll *coll);
 
 /**
@@ -715,6 +674,14 @@ mem_cmp_scalar(const struct Mem *a, const struct Mem *b, int *result,
 int
 mem_cmp_msgpack(const struct Mem *a, const char **b, int *result,
 		const struct coll *coll);
+
+/**
+ * Compare two MEMs using implicit cast rules and return the result of
+ * comparison. MEMs should be scalars. Original MEMs are not changed.
+ */
+int
+mem_cmp(const struct Mem *a, const struct Mem *b, int *result,
+	const struct coll *coll);
 
 /**
  * Convert the given MEM to INTEGER. This function and the function below define

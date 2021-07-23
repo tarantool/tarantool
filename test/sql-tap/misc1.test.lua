@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(59)
+test:plan(58)
 
 --!./tcltestrunner.lua
 -- 2001 September 15.
@@ -90,7 +90,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc1-1.4",
     [[
-        SELECT x75 FROM manycol WHERE x50=350
+        SELECT x75 FROM manycol WHERE x50 = '350'
     ]], {
         -- <misc1-1.4>
         "375"
@@ -100,7 +100,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc1-1.5",
     [[
-        SELECT x50 FROM manycol WHERE x99=599
+        SELECT x50 FROM manycol WHERE x99 = '599'
     ]], {
         -- <misc1-1.5>
         "550"
@@ -111,7 +111,7 @@ test:do_test(
     "misc1-1.6",
     function()
         test:execsql("CREATE INDEX manycol_idx1 ON manycol(x99)")
-        return test:execsql("SELECT x50 FROM manycol WHERE x99=899")
+        return test:execsql("SELECT x50 FROM manycol WHERE x99 = '899'")
     end, {
         -- <misc1-1.6>
         "850"
@@ -131,7 +131,7 @@ test:do_execsql_test(
 test:do_test(
     "misc1-1.8",
     function()
-        test:execsql("DELETE FROM manycol WHERE x98=1234")
+        test:execsql("DELETE FROM manycol WHERE x98 = '1234'")
         return test:execsql("SELECT count(*) FROM manycol")
     end, {
         -- <misc1-1.8>
@@ -142,7 +142,7 @@ test:do_test(
 test:do_test(
     "misc1-1.9",
     function()
-        test:execsql("DELETE FROM manycol WHERE x98=998")
+        test:execsql("DELETE FROM manycol WHERE x98 = '998'")
         return test:execsql("SELECT count(*) FROM manycol")
     end, {
         -- <misc1-1.9>
@@ -153,7 +153,7 @@ test:do_test(
 test:do_test(
     "misc1-1.10",
     function()
-        test:execsql("DELETE FROM manycol WHERE x99=500")
+        test:execsql("DELETE FROM manycol WHERE x99 = '500'")
         return test:execsql("SELECT count(*) FROM manycol")
     end, {
         -- <misc1-1.10>
@@ -164,7 +164,7 @@ test:do_test(
 test:do_test(
     "misc1-1.11",
     function()
-        test:execsql("DELETE FROM manycol WHERE x99=599")
+        test:execsql("DELETE FROM manycol WHERE x99 = '599'")
         return test:execsql("SELECT count(*) FROM manycol")
     end, {
         -- <misc1-1.11>
@@ -478,13 +478,14 @@ test:do_execsql_test(
         -- </misc1-10.0>
     })
 local where = ""
+local where_part = ""
+for i = 1, 99, 1 do
+    where_part = where_part .. " AND CAST(x"..i.." AS NUMBER) <> 0"
+end
 test:do_test(
     "misc1-10.1",
     function()
-        where = "WHERE x0>=0"
-        for i = 1, 99, 1 do
-            where = where .. " AND x"..i.."<>0"
-        end
+        where = "WHERE CAST(x0 AS NUMBER) >= 0" .. where_part
         return test:catchsql("SELECT count(*) FROM manycol "..where.."")
     end, {
         -- <misc1-10.1>
@@ -498,7 +499,7 @@ test:do_test(
 test:do_test(
     "misc1-10.3",
     function()
-        where = string.gsub(where,"x0>=0", "x0=0")
+        where = "WHERE CAST(x0 AS NUMBER) = 0" .. where_part
         return test:catchsql("DELETE FROM manycol "..where.."")
     end, {
         -- <misc1-10.3>
@@ -522,7 +523,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc1-10.6",
     [[
-        SELECT x1 FROM manycol WHERE x0=100
+        SELECT x1 FROM manycol WHERE x0 = '100'
     ]], {
         -- <misc1-10.6>
         "101"
@@ -533,7 +534,7 @@ local cast = "CAST(CAST(x1 AS INTEGER) + 1 AS STRING)"
 test:do_test(
     "misc1-10.7",
     function()
-        where = string.gsub(where, "x0=0", "x0=100")
+        where = "WHERE CAST(x0 AS NUMBER) = 100" .. where_part
         return test:catchsql("UPDATE manycol SET x1 = "..cast.." "..where..";")
     end, {
         -- <misc1-10.7>
@@ -544,7 +545,7 @@ test:do_test(
 test:do_execsql_test(
     "misc1-10.8",
     [[
-        SELECT x1 FROM manycol WHERE x0=100
+        SELECT x1 FROM manycol WHERE x0 = '100'
     ]], {
         -- <misc1-10.8>
         "102"
@@ -566,7 +567,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc1-10.10",
     [[
-        SELECT x1 FROM manycol WHERE x0=100
+        SELECT x1 FROM manycol WHERE x0 = '100'
     ]], {
         -- <misc1-10.10>
         "103"
@@ -628,16 +629,6 @@ test:do_execsql_test(
         -- <misc1-12.1>
         false
         -- </misc1-12.1>
-    })
-
-test:do_execsql_test(
-    "misc1-12.2",
-    [[
-        SELECT '0'==0.0
-    ]], {
-        -- <misc1-12.2>
-        true
-        -- </misc1-12.2>
     })
 
 test:do_execsql_test(

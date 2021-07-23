@@ -79,23 +79,23 @@ test:do_execsql_test(
         -- </1.5>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     2.1,
     [[
         SELECT x FROM t1 WHERE x IN (1);
     ]], {
         -- <2.1>
-        "1"
+        1, "Type mismatch: can not convert integer(1) to string"
         -- </2.1>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     2.2,
     [[
         SELECT x FROM t1 WHERE x IN (1.0);
     ]], {
         -- <2.2>
-        "1"
+        1, "Type mismatch: can not convert double(1.0) to string"
         -- </2.2>
     })
 
@@ -119,23 +119,23 @@ test:do_execsql_test(
         -- </2.4>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     2.5,
     [[
         SELECT x FROM t1 WHERE 1 IN (x);
     ]], {
         -- <2.5>
-        "1"
+        1, "Type mismatch: can not convert integer(1) to string"
         -- </2.5>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     2.6,
     [[
         SELECT x FROM t1 WHERE 1.0 IN (x);
     ]], {
         -- <2.6>
-        "1"
+        1, "Type mismatch: can not convert double(1.0) to string"
         -- </2.6>
     })
 
@@ -439,23 +439,23 @@ test:do_execsql_test(
         -- </6.2>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     6.3,
     [[
         SELECT x, y FROM t5 WHERE x IN ('1');
     ]], {
         -- <6.3>
-        1, "one", 1, "two", 1, "three", 1.0, "four"
+        1, "Type mismatch: can not convert string('1') to number"
         -- </6.3>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     6.4,
     [[
         SELECT x, y FROM t5 WHERE x IN ('1.0');
     ]], {
         -- <6.4>
-        1, "one", 1, "two", 1, "three", 1.0, "four"
+        1, "Type mismatch: can not convert string('1.0') to number"
         -- </6.4>
     })
 
@@ -479,23 +479,23 @@ test:do_execsql_test(
         -- </6.6>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     6.7,
     [[
         SELECT x, y FROM t5 WHERE '1' IN (x);
     ]], {
         -- <6.7>
-        1, "one", 1, "two", 1, "three", 1.0, "four"
+        1, "Type mismatch: can not convert string('1') to number"
         -- </6.7>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     6.8,
     [[
         SELECT x, y FROM t5 WHERE '1.0' IN (x);
     ]], {
         -- <6.8>
-        1, "one", 1, "two", 1, "three", 1, "four"
+        1, "Type mismatch: can not convert string('1.0') to number"
         -- </6.8>
     })
 

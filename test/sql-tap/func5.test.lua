@@ -305,11 +305,13 @@ test:do_execsql_test(
         SELECT ifnull(null, 'qqq2') = 'qqq2';
     ]], { true } )
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "func-6.3-ifnull",
     [[
         SELECT ifnull(null, 1) = 'qqq2';
-    ]], { false } )
+    ]], {
+        1, "Type mismatch: can not convert string('qqq2') to number"
+    })
 
 box.func.COUNTER1:drop()
 box.func.COUNTER2:drop()

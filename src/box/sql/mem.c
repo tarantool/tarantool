@@ -162,6 +162,30 @@ mem_str(const struct Mem *mem)
 	}
 }
 
+static const char *
+mem_type_class_to_str(const struct Mem *mem)
+{
+	switch (mem->type) {
+	case MEM_TYPE_NULL:
+		return "NULL";
+	case MEM_TYPE_UINT:
+	case MEM_TYPE_INT:
+	case MEM_TYPE_DOUBLE:
+		return "number";
+	case MEM_TYPE_STR:
+		return "string";
+	case MEM_TYPE_BIN:
+		return "varbinary";
+	case MEM_TYPE_BOOL:
+		return "boolean";
+	case MEM_TYPE_UUID:
+		return "uuid";
+	default:
+		break;
+	}
+	return "unknown";
+}
+
 void
 mem_create(struct Mem *mem)
 {
@@ -1508,56 +1532,6 @@ mem_concat(struct Mem *a, struct Mem *b, struct Mem *result)
 	return 0;
 }
 
-struct sql_num {
-	union {
-		int64_t i;
-		uint64_t u;
-		double d;
-	};
-	enum mem_type type;
-	bool is_neg;
-};
-
-static int
-get_number(const struct Mem *mem, struct sql_num *number)
-{
-	if (mem->type == MEM_TYPE_DOUBLE) {
-		number->d = mem->u.r;
-		number->type = MEM_TYPE_DOUBLE;
-		return 0;
-	}
-	if (mem->type == MEM_TYPE_INT) {
-		number->i = mem->u.i;
-		number->type = MEM_TYPE_INT;
-		number->is_neg = true;
-		return 0;
-	}
-	if (mem->type == MEM_TYPE_UINT) {
-		number->u = mem->u.u;
-		number->type = MEM_TYPE_UINT;
-		number->is_neg = false;
-		return 0;
-	}
-	if ((mem->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) == 0)
-		return -1;
-	if (sql_atoi64(mem->z, &number->i, &number->is_neg, mem->n) == 0) {
-		number->type = number->is_neg ? MEM_TYPE_INT : MEM_TYPE_UINT;
-		/*
-		 * The next line should be removed along with the is_neg field
-		 * of struct sql_num. The integer type tells us about the sign.
-		 * However, if it is removed, the behavior of arithmetic
-		 * operations will change.
-		 */
-		number->is_neg = false;
-		return 0;
-	}
-	if (sqlAtoF(mem->z, &number->d, mem->n) != 0) {
-		number->type = MEM_TYPE_DOUBLE;
-		return 0;
-	}
-	return -1;
-}
-
 int
 mem_add(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
@@ -1855,25 +1829,17 @@ mem_bit_not(const struct Mem *mem, struct Mem *result)
 	return 0;
 }
 
-int
-mem_cmp_bool(const struct Mem *a, const struct Mem *b, int *result)
+static int
+mem_cmp_bool(const struct Mem *a, const struct Mem *b)
 {
-	if ((a->type & b->type & MEM_TYPE_BOOL) == 0)
-		return -1;
-	if (a->u.b == b->u.b)
-		*result = 0;
-	else if (a->u.b)
-		*result = 1;
-	else
-		*result = -1;
-	return 0;
+	assert((a->type & b->type & MEM_TYPE_BOOL) != 0);
+	return a->u.b - b->u.b;
 }
 
-int
-mem_cmp_bin(const struct Mem *a, const struct Mem *b, int *result)
+static int
+mem_cmp_bin(const struct Mem *a, const struct Mem *b)
 {
-	if ((a->type & b->type & MEM_TYPE_BIN) == 0)
-		return -1;
+	assert((a->type & b->type & MEM_TYPE_BIN) != 0);
 	int an = a->n;
 	int bn = b->n;
 	int minlen = MIN(an, bn);
@@ -1887,181 +1853,105 @@ mem_cmp_bin(const struct Mem *a, const struct Mem *b, int *result)
 	assert((a->flags & MEM_Zero) == 0 || an == 0);
 	assert((b->flags & MEM_Zero) == 0 || bn == 0);
 
-	if ((a->flags & b->flags & MEM_Zero) != 0) {
-		*result = a->u.nZero - b->u.nZero;
-		return 0;
-	}
+	if ((a->flags & b->flags & MEM_Zero) != 0)
+		return a->u.nZero - b->u.nZero;
 	if ((a->flags & MEM_Zero) != 0) {
 		for (int i = 0; i < minlen; ++i) {
-			if (b->z[i] != 0) {
-				*result = -1;
-				return 0;
-			}
+			if (b->z[i] != 0)
+				return -1;
 		}
-		*result = a->u.nZero - bn;
-		return 0;
+		return a->u.nZero - bn;
 	}
 	if ((b->flags & MEM_Zero) != 0) {
 		for (int i = 0; i < minlen; ++i) {
-			if (a->z[i] != 0){
-				*result = 1;
-				return 0;
-			}
+			if (a->z[i] != 0)
+				return 1;
 		}
-		*result = b->u.nZero - an;
-		return 0;
+		return b->u.nZero - an;
 	}
-	*result = memcmp(a->z, b->z, minlen);
-	if (*result != 0)
-		return 0;
-	*result = an - bn;
-	return 0;
+	int res = memcmp(a->z, b->z, minlen);
+	return res != 0 ? res : an - bn;
 }
 
-int
-mem_cmp_num(const struct Mem *left, const struct Mem *right, int *result)
+static int
+mem_cmp_num(const struct Mem *a, const struct Mem *b)
 {
-	struct sql_num a, b;
-	/* TODO: Here should be check for right value type. */
-	if (get_number(right, &b) != 0) {
-		*result = -1;
+	assert(mem_is_num(a) && mem_is_num(b));
+	if ((a->type & b->type & MEM_TYPE_DOUBLE) != 0) {
+		if (a->u.r > b->u.r)
+			return 1;
+		if (a->u.r < b->u.r)
+			return -1;
 		return 0;
 	}
-	if (get_number(left, &a) != 0)
+	if ((a->type & b->type & MEM_TYPE_INT) != 0) {
+		if (a->u.i > b->u.i)
+			return 1;
+		if (a->u.i < b->u.i)
+			return -1;
+		return 0;
+	}
+	if ((a->type & b->type & MEM_TYPE_UINT) != 0) {
+		if (a->u.u > b->u.u)
+			return 1;
+		if (a->u.u < b->u.u)
+			return -1;
+		return 0;
+	}
+	if (a->type == MEM_TYPE_DOUBLE) {
+		if (b->type == MEM_TYPE_INT)
+			return double_compare_nint64(a->u.r, b->u.i, 1);
+		return double_compare_uint64(a->u.r, b->u.u, 1);
+	}
+	if (b->type == MEM_TYPE_DOUBLE) {
+		if (a->type == MEM_TYPE_INT)
+			return double_compare_nint64(b->u.r, a->u.i, -1);
+		return double_compare_uint64(b->u.r, a->u.u, -1);
+	}
+	if (a->type == MEM_TYPE_INT)
 		return -1;
-	if (a.type == MEM_TYPE_DOUBLE) {
-		if (b.type == MEM_TYPE_DOUBLE) {
-			if (a.d > b.d)
-				*result = 1;
-			else if (a.d < b.d)
-				*result = -1;
-			else
-				*result = 0;
-			return 0;
-		}
-		if (b.type == MEM_TYPE_INT)
-			*result = double_compare_nint64(a.d, b.i, 1);
-		else
-			*result = double_compare_uint64(a.d, b.u, 1);
-		return 0;
-	}
-	if (a.type == MEM_TYPE_INT) {
-		if (b.type == MEM_TYPE_INT) {
-			if (a.i > b.i)
-				*result = 1;
-			else if (a.i < b.i)
-				*result = -1;
-			else
-				*result = 0;
-			return 0;
-		}
-		if (b.type == MEM_TYPE_UINT)
-			*result = -1;
-		else
-			*result = double_compare_nint64(b.d, a.i, -1);
-		return 0;
-	}
-	assert(a.type == MEM_TYPE_UINT);
-	if (b.type == MEM_TYPE_UINT) {
-		if (a.u > b.u)
-			*result = 1;
-		else if (a.u < b.u)
-			*result = -1;
-		else
-			*result = 0;
-		return 0;
-	}
-	if (b.type == MEM_TYPE_INT)
-		*result = 1;
-	else
-		*result = double_compare_uint64(b.d, a.u, -1);
-	return 0;
+	assert(a->type == MEM_TYPE_UINT && b->type == MEM_TYPE_INT);
+	return 1;
 }
 
-int
-mem_cmp_str(const struct Mem *left, const struct Mem *right, int *result,
-	    const struct coll *coll)
+static int
+mem_cmp_str(const struct Mem *a, const struct Mem *b, const struct coll *coll)
 {
-	char *a;
-	uint32_t an;
-	char bufl[BUF_SIZE];
-	if (left->type == MEM_TYPE_STR) {
-		a = left->z;
-		an = left->n;
-	} else {
-		assert(mem_is_num(left));
-		a = &bufl[0];
-		if (left->type == MEM_TYPE_INT)
-			sql_snprintf(BUF_SIZE, a, "%lld", left->u.i);
-		else if (left->type == MEM_TYPE_UINT)
-			sql_snprintf(BUF_SIZE, a, "%llu", left->u.u);
-		else
-			sql_snprintf(BUF_SIZE, a, "%!.15g", left->u.r);
-		an = strlen(a);
-	}
-
-	char *b;
-	uint32_t bn;
-	char bufr[BUF_SIZE];
-	if (right->type == MEM_TYPE_STR) {
-		b = right->z;
-		bn = right->n;
-	} else {
-		assert(mem_is_num(right));
-		b = &bufr[0];
-		if (right->type == MEM_TYPE_INT)
-			sql_snprintf(BUF_SIZE, b, "%lld", right->u.i);
-		else if (right->type == MEM_TYPE_UINT)
-			sql_snprintf(BUF_SIZE, b, "%llu", right->u.u);
-		else
-			sql_snprintf(BUF_SIZE, b, "%!.15g", right->u.r);
-		bn = strlen(b);
-	}
-	if (coll != NULL) {
-		*result = coll->cmp(a, an, b, bn, coll);
-		return 0;
-	}
-	uint32_t minlen = MIN(an, bn);
-	*result = memcmp(a, b, minlen);
-	if (*result != 0)
-		return 0;
-	*result = an - bn;
-	return 0;
+	assert((a->type & b->type & MEM_TYPE_STR) != 0);
+	if (coll != NULL)
+		return coll->cmp(a->z, a->n, b->z, b->n, coll);
+	int res = memcmp(a->z, b->z, MIN(a->n, b->n));
+	return res != 0 ? res : a->n - b->n;
 }
 
-int
-mem_cmp_uuid(const struct Mem *a, const struct Mem *b, int *result)
+static int
+mem_cmp_uuid(const struct Mem *a, const struct Mem *b)
 {
-	if ((a->type & b->type & MEM_TYPE_UUID) == 0)
-		return -1;
-	*result = memcmp(&a->u.uuid, &b->u.uuid, UUID_LEN);
-	return 0;
+	assert((a->type & b->type & MEM_TYPE_UUID) != 0);
+	return memcmp(&a->u.uuid, &b->u.uuid, UUID_LEN);
 }
 
 int
-mem_cmp_scalar(const struct Mem *a, const struct Mem *b, int *result,
+mem_cmp_scalar(const struct Mem *a, const struct Mem *b,
 	       const struct coll *coll)
 {
 	enum mem_class class_a = mem_type_class(a->type);
 	enum mem_class class_b = mem_type_class(b->type);
-	if (class_a != class_b) {
-		*result = class_a - class_b;
-		return 0;
-	}
+	if (class_a != class_b)
+		return class_a - class_b;
 	switch (class_a) {
 	case MEM_CLASS_NULL:
-		*result = 0;
 		return 0;
 	case MEM_CLASS_BOOL:
-		return mem_cmp_bool(a, b, result);
+		return mem_cmp_bool(a, b);
 	case MEM_CLASS_NUMBER:
-		return mem_cmp_num(a, b, result);
+		return mem_cmp_num(a, b);
 	case MEM_CLASS_STR:
-		return mem_cmp_str(a, b, result, coll);
+		return mem_cmp_str(a, b, coll);
 	case MEM_CLASS_BIN:
-		return mem_cmp_bin(a, b, result);
+		return mem_cmp_bin(a, b);
 	case MEM_CLASS_UUID:
-		return mem_cmp_uuid(a, b, result);
+		return mem_cmp_uuid(a, b);
 	default:
 		unreachable();
 	}
@@ -2138,7 +2028,47 @@ mem_cmp_msgpack(const struct Mem *a, const char **b, int *result,
 	default:
 		unreachable();
 	}
-	return mem_cmp_scalar(a, &mem, result, coll);
+	*result = mem_cmp_scalar(a, &mem, coll);
+	return 0;
+}
+
+int
+mem_cmp(const struct Mem *a, const struct Mem *b, int *result,
+	const struct coll *coll)
+{
+	enum mem_class class_a = mem_type_class(a->type);
+	enum mem_class class_b = mem_type_class(b->type);
+	if (mem_is_any_null(a, b)) {
+		*result = class_a - class_b;
+		if ((a->flags & b->flags & MEM_Cleared) != 0)
+			*result = 1;
+		return 0;
+	}
+	if (class_a != class_b) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(b),
+			 mem_type_class_to_str(a));
+		return -1;
+	}
+	switch (class_a) {
+	case MEM_CLASS_BOOL:
+		*result =  mem_cmp_bool(a, b);
+		break;
+	case MEM_CLASS_NUMBER:
+		*result = mem_cmp_num(a, b);
+		break;
+	case MEM_CLASS_STR:
+		*result = mem_cmp_str(a, b, coll);
+		break;
+	case MEM_CLASS_BIN:
+		*result = mem_cmp_bin(a, b);
+		break;
+	case MEM_CLASS_UUID:
+		*result = mem_cmp_uuid(a, b);
+		break;
+	default:
+		unreachable();
+	}
+	return 0;
 }
 
 char *

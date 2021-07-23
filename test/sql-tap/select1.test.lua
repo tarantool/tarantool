@@ -320,7 +320,7 @@ test:do_catchsql_test(
         SELECT count(*),count(a),count(b) FROM t4 WHERE b=5
     ]], {
         -- <select1-2.5.3>
-        1, "Type mismatch: can not convert string('This is a string that is too big to fit inside a NBFS buffer') to number"
+        1, "Type mismatch: can not convert integer(5) to string"
         -- </select1-2.5.3>
     })
 
@@ -1916,7 +1916,7 @@ test:do_execsql_test(
 test:do_execsql_test(
         "select1-12.7",
         [[
-            SELECT * FROM t3 WHERE a=(SELECT 1);
+            SELECT * FROM t3 WHERE a = (SELECT '1');
         ]], {
             -- <select1-12.7>
             0, "1", "2"
@@ -1926,7 +1926,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select1-12.8",
     [[
-        SELECT * FROM t3 WHERE a=(SELECT 2);
+        SELECT * FROM t3 WHERE a = (SELECT '2');
     ]], {
         -- <select1-12.8>
 

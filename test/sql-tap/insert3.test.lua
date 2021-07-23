@@ -59,7 +59,7 @@ test:do_execsql_test(
     [[
             CREATE TABLE log2(rowid INTEGER PRIMARY KEY AUTOINCREMENT, x TEXT UNIQUE,y INT );
             CREATE TRIGGER r2 BEFORE INSERT ON t1 FOR EACH ROW BEGIN
-              UPDATE log2 SET y=y+1 WHERE x=new.b;
+              UPDATE log2 SET y = y+1 WHERE x = CAST(new.b AS STRING);
               INSERT OR IGNORE INTO log2(x, y) VALUES(CAST(new.b AS STRING),1);
             END;
             INSERT INTO t1(a, b) VALUES('hi', 453);

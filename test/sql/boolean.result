@@ -138,12 +138,12 @@ INSERT INTO ts(s) VALUES ('abc'), (12.5);
 SELECT s FROM ts WHERE s = true;
  | ---
  | - null
- | - 'Type mismatch: can not convert string(''abc'') to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to string'
  | ...
 SELECT s FROM ts WHERE s < true;
  | ---
  | - null
- | - 'Type mismatch: can not convert string(''abc'') to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to string'
  | ...
 SELECT s FROM ts WHERE s IN (true, 1, 'abcd');
  | ---
@@ -3394,22 +3394,22 @@ SELECT false < 2;
 SELECT 2 > true;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT 2 > false;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT 2 < true;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT 2 < false;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 
 SELECT a1, a1 > 2 FROM t6
@@ -3425,12 +3425,12 @@ SELECT a1, a1 < 2 FROM t6
 SELECT a1, 2 > a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a1, 2 < a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a2, a2 > 2 FROM t6
  | ---
@@ -3445,12 +3445,12 @@ SELECT a2, a2 < 2 FROM t6
 SELECT a2, 2 > a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT a2, 2 < a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 
 SELECT b, true > b FROM t7;
@@ -3476,22 +3476,22 @@ SELECT b, false < b FROM t7;
 SELECT b, b > true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT b, b > false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT b, b < true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT b, b < false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 
 SELECT a1, b, a1 > b FROM t6, t7;
@@ -3507,12 +3507,12 @@ SELECT a1, b, a1 < b FROM t6, t7;
 SELECT a1, b, b > a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a1, b, b < a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a2, b, a2 > b FROM t6, t7;
  | ---
@@ -3527,12 +3527,12 @@ SELECT a2, b, a2 < b FROM t6, t7;
 SELECT a2, b, b > a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT a2, b, b < a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 
 SELECT true >= 2;
@@ -3558,22 +3558,22 @@ SELECT false <= 2;
 SELECT 2 >= true;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT 2 >= false;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT 2 <= true;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT 2 <= false;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 
 SELECT a1, a1 >= 2 FROM t6
@@ -3589,12 +3589,12 @@ SELECT a1, a1 <= 2 FROM t6
 SELECT a1, 2 >= a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a1, 2 <= a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a2, a2 >= 2 FROM t6
  | ---
@@ -3609,12 +3609,12 @@ SELECT a2, a2 <= 2 FROM t6
 SELECT a2, 2 >= a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT a2, 2 <= a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 
 SELECT b, true >= b FROM t7;
@@ -3640,22 +3640,22 @@ SELECT b, false <= b FROM t7;
 SELECT b, b >= true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT b, b >= false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT b, b <= true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT b, b <= false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 
 SELECT a1, b, a1 >= b FROM t6, t7;
@@ -3671,12 +3671,12 @@ SELECT a1, b, a1 <= b FROM t6, t7;
 SELECT a1, b, b >= a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a1, b, b <= a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a2, b, a2 >= b FROM t6, t7;
  | ---
@@ -3691,12 +3691,12 @@ SELECT a2, b, a2 <= b FROM t6, t7;
 SELECT a2, b, b >= a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT a2, b, b <= a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 
 SELECT true == 2;
@@ -3722,22 +3722,22 @@ SELECT false != 2;
 SELECT 2 == true;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT 2 == false;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT 2 != true;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT 2 != false;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 
 SELECT a1, a1 == 2 FROM t6
@@ -3753,12 +3753,12 @@ SELECT a1, a1 != 2 FROM t6
 SELECT a1, 2 == a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a1, 2 != a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a2, a2 == 2 FROM t6
  | ---
@@ -3773,12 +3773,12 @@ SELECT a2, a2 != 2 FROM t6
 SELECT a2, 2 == a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT a2, 2 != a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(2) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 
 SELECT b, true == b FROM t7;
@@ -3804,22 +3804,22 @@ SELECT b, false != b FROM t7;
 SELECT b, b == true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT b, b == false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT b, b != true FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT b, b != false FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 
 SELECT a1, b, a1 == b FROM t6, t7;
@@ -3835,12 +3835,12 @@ SELECT a1, b, a1 != b FROM t6, t7;
 SELECT a1, b, b == a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a1, b, b != a1 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a2, b, a2 == b FROM t6, t7;
  | ---
@@ -3855,12 +3855,12 @@ SELECT a2, b, a2 != b FROM t6, t7;
 SELECT a2, b, b == a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT a2, b, b != a2 FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert integer(123) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 
 SELECT true IN (0, 1, 2, 3);
@@ -4539,22 +4539,22 @@ SELECT false < 2.3;
 SELECT 2.3 > true;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT 2.3 > false;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT 2.3 < true;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT 2.3 < false;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 
 SELECT a1, a1 > 2.3 FROM t6
@@ -4570,12 +4570,12 @@ SELECT a1, a1 < 2.3 FROM t6
 SELECT a1, 2.3 > a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a1, 2.3 < a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a2, a2 > 2.3 FROM t6
  | ---
@@ -4590,12 +4590,12 @@ SELECT a2, a2 < 2.3 FROM t6
 SELECT a2, 2.3 > a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT a2, 2.3 < a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 
 SELECT c, true > c FROM t8;
@@ -4621,22 +4621,22 @@ SELECT c, false < c FROM t8;
 SELECT c, c > true FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT c, c > false FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT c, c < true FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT c, c < false FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 
 SELECT a1, c, a1 > c FROM t6, t8;
@@ -4652,12 +4652,12 @@ SELECT a1, c, a1 < c FROM t6, t8;
 SELECT a1, c, c > a1 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a1, c, c < a1 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a2, c, a2 > c FROM t6, t8;
  | ---
@@ -4672,12 +4672,12 @@ SELECT a2, c, a2 < c FROM t6, t8;
 SELECT a2, c, c > a2 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT a2, c, c < a2 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 
 SELECT true >= 2.3;
@@ -4703,22 +4703,22 @@ SELECT false <= 2.3;
 SELECT 2.3 >= true;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT 2.3 >= false;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT 2.3 <= true;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT 2.3 <= false;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 
 SELECT a1, a1 >= 2.3 FROM t6
@@ -4734,12 +4734,12 @@ SELECT a1, a1 <= 2.3 FROM t6
 SELECT a1, 2.3 >= a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a1, 2.3 <= a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a2, a2 >= 2.3 FROM t6
  | ---
@@ -4754,12 +4754,12 @@ SELECT a2, a2 <= 2.3 FROM t6
 SELECT a2, 2.3 >= a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT a2, 2.3 <= a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 
 SELECT c, true >= c FROM t8;
@@ -4785,22 +4785,22 @@ SELECT c, false <= c FROM t8;
 SELECT c, c >= true FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT c, c >= false FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT c, c <= true FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT c, c <= false FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 
 SELECT a1, c, a1 >= c FROM t6, t8;
@@ -4816,12 +4816,12 @@ SELECT a1, c, a1 <= c FROM t6, t8;
 SELECT a1, c, c >= a1 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a1, c, c <= a1 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a2, c, a2 >= c FROM t6, t8;
  | ---
@@ -4836,12 +4836,12 @@ SELECT a2, c, a2 <= c FROM t6, t8;
 SELECT a2, c, c >= a2 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT a2, c, c <= a2 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 
 SELECT true == 2.3;
@@ -4867,22 +4867,22 @@ SELECT false != 2.3;
 SELECT 2.3 == true;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT 2.3 == false;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT 2.3 != true;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT 2.3 != false;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 
 SELECT a1, a1 == 2.3 FROM t6
@@ -4898,12 +4898,12 @@ SELECT a1, a1 != 2.3 FROM t6
 SELECT a1, 2.3 == a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a1, 2.3 != a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a2, a2 == 2.3 FROM t6
  | ---
@@ -4918,12 +4918,12 @@ SELECT a2, a2 != 2.3 FROM t6
 SELECT a2, 2.3 == a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT a2, 2.3 != a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 
 SELECT c, true == c FROM t8;
@@ -4949,22 +4949,22 @@ SELECT c, false != c FROM t8;
 SELECT c, c == true FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT c, c == false FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT c, c != true FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT c, c != false FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 
 SELECT a1, c, a1 == c FROM t6, t8;
@@ -4980,12 +4980,12 @@ SELECT a1, c, a1 != c FROM t6, t8;
 SELECT a1, c, c == a1 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a1, c, c != a1 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to number'
  | ...
 SELECT a2, c, a2 == c FROM t6, t8;
  | ---
@@ -5000,12 +5000,12 @@ SELECT a2, c, a2 != c FROM t6, t8;
 SELECT a2, c, c == a2 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 SELECT a2, c, c != a2 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to number'
  | ...
 
 SELECT true IN (0.1, 1.2, 2.3, 3.4);
@@ -5295,22 +5295,22 @@ SELECT false < 'abc';
 SELECT 'abc' > true;
  | ---
  | - null
- | - 'Type mismatch: can not convert string(''abc'') to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to string'
  | ...
 SELECT 'abc' > false;
  | ---
  | - null
- | - 'Type mismatch: can not convert string(''abc'') to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to string'
  | ...
 SELECT 'abc' < true;
  | ---
  | - null
- | - 'Type mismatch: can not convert string(''abc'') to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to string'
  | ...
 SELECT 'abc' < false;
  | ---
  | - null
- | - 'Type mismatch: can not convert string(''abc'') to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to string'
  | ...
 
 SELECT d, true > d FROM t9;
@@ -5336,22 +5336,22 @@ SELECT d, false < d FROM t9;
 SELECT d, d > true FROM t9;
  | ---
  | - null
- | - 'Type mismatch: can not convert string(''AsdF'') to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to string'
  | ...
 SELECT d, d > false FROM t9;
  | ---
  | - null
- | - 'Type mismatch: can not convert string(''AsdF'') to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to string'
  | ...
 SELECT d, d < true FROM t9;
  | ---
  | - null
- | - 'Type mismatch: can not convert string(''AsdF'') to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to string'
  | ...
 SELECT d, d < false FROM t9;
  | ---
  | - null
- | - 'Type mismatch: can not convert string(''AsdF'') to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to string'
  | ...
 
 SELECT a1, d, a1 > d FROM t6, t9;
@@ -5367,12 +5367,12 @@ SELECT a1, d, a1 < d FROM t6, t9;
 SELECT a1, d, d > a1 FROM t6, t9;
  | ---
  | - null
- | - 'Type mismatch: can not convert string(''AsdF'') to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to string'
  | ...
 SELECT a1, d, d < a1 FROM t6, t9;
  | ---
  | - null
- | - 'Type mismatch: can not convert string(''AsdF'') to boolean'
+ | - 'Type mismatch: can not convert boolean(FALSE) to string'
  | ...
 SELECT a2, d, a2 > d FROM t6, t9;
  | ---
@@ -5387,12 +5387,12 @@ SELECT a2, d, a2 < d FROM t6, t9;
 SELECT a2, d, d > a2 FROM t6, t9;
  | ---
  | - null
- | - 'Type mismatch: can not convert string(''AsdF'') to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to string'
  | ...
 SELECT a2, d, d < a2 FROM t6, t9;
  | ---
  | - null
- | - 'Type mismatch: can not convert string(''AsdF'') to boolean'
+ | - 'Type mismatch: can not convert boolean(TRUE) to string'
  | ...
 
 SELECT true || 'abc';
