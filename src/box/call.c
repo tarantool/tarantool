@@ -141,8 +141,6 @@ box_process_call(struct call_request *request, struct port *port)
 	const char *name = request->name;
 	assert(name != NULL);
 	uint32_t name_len = mp_decode_strl(&name);
-	/* Transaction is not started. */
-	assert(!in_txn());
 
 	int rc;
 	struct port args;
@@ -157,11 +155,6 @@ box_process_call(struct call_request *request, struct port *port)
 	}
 	if (rc != 0)
 		return -1;
-	if (in_txn() != NULL) {
-		diag_set(ClientError, ER_FUNCTION_TX_ACTIVE);
-		port_destroy(port);
-		return -1;
-	}
 	return 0;
 }
 
@@ -179,10 +172,5 @@ box_process_eval(struct call_request *request, struct port *port)
 	uint32_t expr_len = mp_decode_strl(&expr);
 	if (box_lua_eval(expr, expr_len, &args, port) != 0)
 		return -1;
-	if (in_txn() != 0) {
-		diag_set(ClientError, ER_FUNCTION_TX_ACTIVE);
-		port_destroy(port);
-		return -1;
-	}
 	return 0;
 }
