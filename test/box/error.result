@@ -448,6 +448,7 @@ t;
  |   227: box.error.SYNC_QUEUE_UNCLAIMED
  |   228: box.error.SYNC_QUEUE_FOREIGN
  |   229: box.error.UNABLE_TO_PROCESS_IN_STREAM
+ |   230: box.error.UNABLE_TO_PROCESS_OUT_OF_STREAM
  | ...
 
 test_run:cmd("setopt delimiter ''");

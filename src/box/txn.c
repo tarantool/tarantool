@@ -1255,3 +1255,26 @@ txn_on_yield(struct trigger *trigger, void *event)
 	txn_set_flags(txn, TXN_IS_ABORTED_BY_YIELD);
 	return 0;
 }
+
+struct txn *
+txn_detach(void)
+{
+	struct txn *txn = in_txn();
+	if (txn == NULL)
+		return NULL;
+	if (!txn_has_flag(txn, TXN_CAN_YIELD)) {
+		txn_on_yield(NULL, NULL);
+		trigger_clear(&txn->fiber_on_yield);
+	}
+	trigger_clear(&txn->fiber_on_stop);
+	fiber_set_txn(fiber(), NULL);
+	return txn;
+}
+
+void
+txn_attach(struct txn *txn)
+{
+	assert(txn != NULL);
+	assert(!in_txn());
+	fiber_set_txn(fiber(), txn);
+}

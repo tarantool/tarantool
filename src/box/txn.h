@@ -458,6 +458,25 @@ fiber_set_txn(struct fiber *fiber, struct txn *txn)
 }
 
 /**
+ * Detach transaction from fiber.
+ * By default if the fiber is stopped the transaction started
+ * in this fiber is rollback. This function detaches transaction
+ * from fiber - detached transaction does not rollback in case
+ * when fiber stopped, but can be aborted in case it does not
+ * support yeild.
+ */
+struct txn *
+txn_detach(void);
+
+/**
+ * Attach transaction to fiber.
+ * Attach @a txn that has been detached previously and saved
+ * somewhere to a new fiber.
+ */
+void
+txn_attach(struct txn *txn);
+
+/**
  * Start a transaction explicitly.
  * @pre no transaction is active
  */

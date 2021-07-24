@@ -237,6 +237,12 @@ enum iproto_type {
 	IPROTO_NOP = 12,
 	/** Prepare SQL statement. */
 	IPROTO_PREPARE = 13,
+	/* Begin transaction */
+	IPROTO_BEGIN = 14,
+	/* Commit transaction */
+	IPROTO_COMMIT = 15,
+	/* Rollback transaction */
+	IPROTO_ROLLBACK = 16,
 	/** The maximum typecode used for box.stat() */
 	IPROTO_TYPE_STAT_MAX,
 
