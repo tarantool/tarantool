@@ -75,7 +75,10 @@ enum netbox_method {
 	NETBOX_MIN         = 14,
 	NETBOX_MAX         = 15,
 	NETBOX_COUNT       = 16,
-	NETBOX_INJECT      = 17,
+	NETBOX_BEGIN       = 17,
+	NETBOX_COMMIT      = 18,
+	NETBOX_ROLLBACK    = 19,
+	NETBOX_INJECT      = 20,
 	netbox_method_MAX
 };
 
@@ -916,6 +919,44 @@ netbox_encode_unprepare(lua_State *L, int idx, struct mpstream *stream,
 	netbox_encode_prepare(L, idx, stream, sync, stream_id);
 }
 
+static inline void
+netbox_encode_txn(lua_State *L, enum iproto_type type, int idx,
+		  struct mpstream *stream, uint64_t sync,
+		  uint64_t stream_id)
+{
+	(void)L;
+	(void) idx;
+	assert(type == IPROTO_BEGIN ||
+	       type == IPROTO_COMMIT ||
+	       type == IPROTO_ROLLBACK);
+	size_t svp = netbox_begin_encode(stream, sync, type, stream_id);
+	netbox_end_encode(stream, svp);
+}
+
+static void
+netbox_encode_begin(struct lua_State *L, int idx, struct mpstream *stream,
+		    uint64_t sync, uint64_t stream_id)
+{
+	return netbox_encode_txn(L, IPROTO_BEGIN, idx, stream,
+				 sync, stream_id);
+}
+
+static void
+netbox_encode_commit(struct lua_State *L, int idx, struct mpstream *stream,
+		     uint64_t sync, uint64_t stream_id)
+{
+	return netbox_encode_txn(L, IPROTO_COMMIT, idx, stream,
+				 sync, stream_id);
+}
+
+static void
+netbox_encode_rollback(struct lua_State *L, int idx, struct mpstream *stream,
+		       uint64_t sync, uint64_t stream_id)
+{
+	return netbox_encode_txn(L, IPROTO_ROLLBACK, idx, stream,
+				 sync, stream_id);
+}
+
 static void
 netbox_encode_inject(struct lua_State *L, int idx, struct mpstream *stream,
 		     uint64_t sync, uint64_t stream_id)
@@ -959,6 +1000,9 @@ netbox_encode_method(struct lua_State *L, int idx, enum netbox_method method,
 		[NETBOX_MIN]		= netbox_encode_select,
 		[NETBOX_MAX]		= netbox_encode_select,
 		[NETBOX_COUNT]		= netbox_encode_call,
+		[NETBOX_BEGIN]          = netbox_encode_begin,
+		[NETBOX_COMMIT]         = netbox_encode_commit,
+		[NETBOX_ROLLBACK]       = netbox_encode_rollback,
 		[NETBOX_INJECT]		= netbox_encode_inject,
 	};
 	struct mpstream stream;
@@ -1330,6 +1374,9 @@ netbox_decode_method(struct lua_State *L, enum netbox_method method,
 		[NETBOX_MIN]		= netbox_decode_tuple,
 		[NETBOX_MAX]		= netbox_decode_tuple,
 		[NETBOX_COUNT]		= netbox_decode_value,
+		[NETBOX_BEGIN]          = netbox_decode_nil,
+		[NETBOX_COMMIT]         = netbox_decode_nil,
+		[NETBOX_ROLLBACK]       = netbox_decode_nil,
 		[NETBOX_INJECT]		= netbox_decode_table,
 	};
 	method_decoder[method](L, data, data_end, format);
