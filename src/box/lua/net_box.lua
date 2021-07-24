@@ -51,8 +51,11 @@ local M_GET         = 13
 local M_MIN         = 14
 local M_MAX         = 15
 local M_COUNT       = 16
+local M_BEGIN       = 17
+local M_COMMIT      = 18
+local M_ROLLBACK    = 19
 -- Injects raw data into connection. Used by console and tests.
-local M_INJECT      = 17
+local M_INJECT      = 20
 
 -- utility tables
 local is_final_state         = {closed = 1, error = 1}
@@ -754,11 +757,38 @@ local function stream_new_stream(stream)
     return stream._conn:new_stream()
 end
 
+local function stream_begin(stream, opts)
+    check_remote_arg(stream, 'begin')
+    local res = stream:_request(M_BEGIN, opts, nil, stream._stream_id)
+    if opts and opts.is_async then
+        return res
+    end
+end
+
+local function stream_commit(stream, opts)
+    check_remote_arg(stream, 'commit')
+    local res = stream:_request(M_COMMIT, opts, nil, stream._stream_id)
+    if opts and opts.is_async then
+        return res
+    end
+end
+
+local function stream_rollback(stream, opts)
+    check_remote_arg(stream, 'rollback')
+    local res = stream:_request(M_ROLLBACK, opts, nil, stream._stream_id)
+    if opts and opts.is_async then
+        return res
+    end
+end
+
 function remote_methods:new_stream()
     check_remote_arg(self, 'new_stream')
     self._last_stream_id = self._last_stream_id + 1
     local stream = setmetatable({
         new_stream = stream_new_stream,
+        begin = stream_begin,
+        commit = stream_commit,
+        rollback = stream_rollback,
         _stream_id = self._last_stream_id,
         space = setmetatable({
             _stream_space_cache = {},
@@ -1243,6 +1273,9 @@ local this_module = {
         min         = M_MIN,
         max         = M_MAX,
         count       = M_COUNT,
+        begin       = M_BEGIN,
+        commit      = M_COMMIT,
+        rollback    = M_ROLLBACK,
         inject      = M_INJECT,
     }
 }
