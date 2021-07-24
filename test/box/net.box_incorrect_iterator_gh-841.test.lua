@@ -5,13 +5,13 @@ test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
 
 test_run:cmd("setopt delimiter ';'")
 function x_select(cn, space_id, index_id, iterator, offset, limit, key, opts)
-    local ret = cn:_request(remote._method.select, opts, nil, space_id,
+    local ret = cn:_request(remote._method.select, opts, nil, nil, space_id,
                             index_id, iterator, offset, limit, key)
     return ret
 end
 function x_fatal(cn)
     cn._transport.perform_request(nil, nil, false, remote._method.inject,
-                                  nil, nil, nil, '\x80')
+                                  nil, nil, nil, nil, '\x80')
 end
 test_run:cmd("setopt delimiter ''");
 
