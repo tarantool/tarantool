@@ -281,6 +281,7 @@ struct errcode_record {
 	/*226 */_(ER_NOT_LEADER,		"The instance is not a leader. New leader is %u")\
 	/*227 */_(ER_SYNC_QUEUE_UNCLAIMED,	"The synchronous transaction queue doesn't belong to any instance")\
 	/*228 */_(ER_SYNC_QUEUE_FOREIGN,	"The synchronous transaction queue belongs to other instance with id %u")\
+	/*226 */_(ER_UNABLE_TO_PROCESS_IN_STREAM, "Unable to process %s request in stream") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
