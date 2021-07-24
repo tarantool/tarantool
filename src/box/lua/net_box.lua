@@ -275,14 +275,14 @@ local function create_transport(host, port, user, password, callback,
     -- @retval not nil Future object.
     --
     local function perform_async_request(buffer, skip_header, method, on_push,
-                                         on_push_ctx, format, ...)
+                                         on_push_ctx, format, stream_id, ...)
         local err = prepare_perform_request()
         if err then
             return nil, err
         end
         return perform_async_request_impl(requests, send_buf, buffer,
                                           skip_header, method, on_push,
-                                          on_push_ctx, format, ...)
+                                          on_push_ctx, format, stream_id, ...)
     end
 
     --
@@ -291,14 +291,15 @@ local function create_transport(host, port, user, password, callback,
     -- @retval not nil Response object.
     --
     local function perform_request(timeout, buffer, skip_header, method,
-                                   on_push, on_push_ctx, format, ...)
+                                   on_push, on_push_ctx, format,
+                                   stream_id, ...)
         local err = prepare_perform_request()
         if err then
             return nil, err
         end
         return perform_request_impl(timeout, requests, send_buf, buffer,
                                     skip_header, method, on_push, on_push_ctx,
-                                    format, ...)
+                                    format, stream_id, ...)
     end
 
     -- PROTOCOL STATE MACHINE (WORKER FIBER) --
@@ -487,6 +488,37 @@ local function remote_serialize(self)
     }
 end
 
+local function stream_serialize(self)
+    return {
+        host = self._conn.host,
+        port = self._conn.port,
+        opts = next(self._conn.opts) and self._conn.opts,
+        state = self._conn.state,
+        error = self._conn.error,
+        protocol = self._conn.protocol,
+        schema_version = self._conn.schema_version,
+        peer_uuid = self._conn.peer_uuid,
+        peer_version_id = self._conn.peer_version_id,
+        stream_id = self._stream_id
+    }
+end
+
+local function stream_spaces_serialize(self)
+    return self._stream._conn.space
+end
+
+local function stream_space_serialize(self)
+    return self._src
+end
+
+local function stream_indexes_serialize(self)
+    return self._space._src.index
+end
+
+local function stream_index_serialize(self)
+    return self._src
+end
+
 local remote_methods = {}
 local remote_mt = {
     __index = remote_methods, __serialize = remote_serialize,
@@ -497,6 +529,86 @@ local console_methods = {}
 local console_mt = {
     __index = console_methods, __serialize = remote_serialize,
     __metatable = false
+}
+
+-- Create stream space index, which is same as connection space
+-- index, but have non zero stream ID.
+local function stream_wrap_index(stream_id, src)
+    return setmetatable({
+        _stream_id = stream_id,
+        _src = src,
+    }, {
+        __index = src,
+        __serialize = stream_index_serialize
+    })
+end
+
+-- Metatable for stream space indexes. When stream space being
+-- created there are no indexes in it. When accessing the space
+-- index, we look for corresponding space index in corresponding
+-- connection space. If it is found we create same index for the
+-- stream space but with corresponding stream ID. We do not need
+-- to compare stream _schema_version and connection schema_version,
+-- because all access to index  is carried out through it's space.
+-- So we update schema_version when we access space.
+local stream_indexes_mt = {
+    __index = function(self, key)
+        local _space = self._space
+        local src = _space._src.index[key]
+        if not src then
+            return nil
+        end
+        local res = stream_wrap_index(_space._stream_id, src)
+        self[key] = res
+        return res
+    end,
+    __serialize = stream_indexes_serialize
+}
+
+-- Create stream space, which is same as connection space,
+-- but have non zero stream ID.
+local function stream_wrap_space(stream, src)
+    local res = setmetatable({
+        _stream_id = stream._stream_id,
+        _src = src,
+        index = setmetatable({
+            _space = nil,
+        }, stream_indexes_mt)
+    }, {
+        __index = src,
+        __serialize = stream_space_serialize
+    })
+    res.index._space = res
+    return res
+end
+
+-- Metatable for stream spaces. When stream being created there
+-- are no spaces in it. When user try to access some space in
+-- stream, we first of all compare _schema_version of stream with
+-- schema_version from connection and if they are not equal, we
+-- clear stream space cache and update it's schema_version. Then
+-- we look for corresponding space in the connection. If it is
+-- found we create same space for the stream but with corresponding
+-- stream ID.
+local stream_spaces_mt = {
+    __index = function(self, key)
+        local stream = self._stream
+        if stream._schema_version ~= stream._conn.schema_version then
+            stream._schema_version = stream._conn.schema_version
+            self._stream_space_cache = {}
+        end
+        if self._stream_space_cache[key] then
+            return self._stream_space_cache[key]
+        end
+        local src = stream._conn.space[key]
+        if not src then
+            return nil
+        end
+        local res = stream_wrap_space(stream, src)
+        self._stream_space_cache[key] = res
+        return res
+    end,
+    __serialize = stream_spaces_serialize
 }
 
 local space_metatable, index_metatable
@@ -578,6 +690,8 @@ local function new_sm(host, port, opts, connection, greeting)
     if opts.wait_connected ~= false then
         remote._transport.wait_state('active', tonumber(opts.wait_connected))
     end
+    -- Last stream ID used for this connection
+    remote._last_stream_id = 0
     return remote
 end
 
@@ -635,6 +749,28 @@ local function check_eval_args(args)
     end
 end
 
+local function stream_new_stream(stream)
+    check_remote_arg(stream, 'new_stream')
+    return stream._conn:new_stream()
+end
+
+function remote_methods:new_stream()
+    check_remote_arg(self, 'new_stream')
+    self._last_stream_id = self._last_stream_id + 1
+    local stream = setmetatable({
+        new_stream = stream_new_stream,
+        _stream_id = self._last_stream_id,
+        space = setmetatable({
+            _stream_space_cache = {},
+            _stream = nil,
+        }, stream_spaces_mt),
+        _conn = self,
+        _schema_version = self.schema_version,
+    }, { __index = self, __serialize = stream_serialize })
+    stream.space._stream = stream
+    return stream
+end
+
 function remote_methods:close()
     check_remote_arg(self, 'close')
     self._transport.stop()
@@ -665,7 +801,7 @@ function remote_methods:wait_connected(timeout)
     return self._transport.wait_state('active', timeout)
 end
 
-function remote_methods:_request(method, opts, format, ...)
+function remote_methods:_request(method, opts, format, stream_id, ...)
     local transport = self._transport
     local on_push, on_push_ctx, buffer, skip_header, deadline
     -- Extract options, set defaults, check if the request is
@@ -680,7 +816,7 @@ function remote_methods:_request(method, opts, format, ...)
             local res, err =
                 transport.perform_async_request(buffer, skip_header, method,
                                                 table.insert, {}, format,
-                                                ...)
+                                                stream_id, ...)
             if err then
                 box.error(err)
             end
@@ -702,7 +838,7 @@ function remote_methods:_request(method, opts, format, ...)
     end
     local res, err = transport.perform_request(timeout, buffer, skip_header,
                                                method, on_push, on_push_ctx,
-                                               format, ...)
+                                               format, stream_id, ...)
     if err then
         box.error(err)
     end
@@ -718,7 +854,7 @@ end
 
 function remote_methods:ping(opts)
     check_remote_arg(self, 'ping')
-    return (pcall(self._request, self, M_PING, opts))
+    return (pcall(self._request, self, M_PING, opts, nil, self._stream_id))
 end
 
 function remote_methods:reload_schema()
@@ -729,14 +865,16 @@ end
 -- @deprecated since 1.7.4
 function remote_methods:call_16(func_name, ...)
     check_remote_arg(self, 'call')
-    return (self:_request(M_CALL_16, nil, nil, tostring(func_name), {...}))
+    return (self:_request(M_CALL_16, nil, nil, self._stream_id,
+                          tostring(func_name), {...}))
 end
 
 function remote_methods:call(func_name, args, opts)
     check_remote_arg(self, 'call')
     check_call_args(args)
     args = args or {}
-    local res = self:_request(M_CALL_17, opts, nil, tostring(func_name), args)
+    local res = self:_request(M_CALL_17, opts, nil, self._stream_id,
+                              tostring(func_name), args)
     if type(res) ~= 'table' or opts and opts.is_async then
         return res
     end
@@ -746,14 +884,15 @@ end
 -- @deprecated since 1.7.4
 function remote_methods:eval_16(code, ...)
     check_remote_arg(self, 'eval')
-    return unpack((self:_request(M_EVAL, nil, nil, code, {...})))
+    return unpack((self:_request(M_EVAL, nil, nil, self._stream_id,
+                                 code, {...})))
 end
 
 function remote_methods:eval(code, args, opts)
     check_remote_arg(self, 'eval')
     check_eval_args(args)
     args = args or {}
-    local res = self:_request(M_EVAL, opts, nil, code, args)
+    local res = self:_request(M_EVAL, opts, nil, self._stream_id, code, args)
     if type(res) ~= 'table' or opts and opts.is_async then
         return res
     end
@@ -765,8 +904,8 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "execute", "options")
     end
-    return self:_request(M_EXECUTE, netbox_opts, nil, query, parameters or {},
-                         sql_opts or {})
+    return self:_request(M_EXECUTE, netbox_opts, nil, self._stream_id,
+                         query, parameters or {}, sql_opts or {})
 end
 
 function remote_methods:prepare(query, parameters, sql_opts, netbox_opts) -- luacheck: no unused args
@@ -777,7 +916,7 @@ function remote_methods:prepare(query, parameters, sql_opts, netbox_opts) -- lua
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "prepare", "options")
     end
-    return self:_request(M_PREPARE, netbox_opts, nil, query)
+    return self:_request(M_PREPARE, netbox_opts, nil, self._stream_id, query)
 end
 
 function remote_methods:unprepare(query, parameters, sql_opts, netbox_opts)
@@ -788,8 +927,8 @@ function remote_methods:unprepare(query, parameters, sql_opts, netbox_opts)
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "unprepare", "options")
     end
-    return self:_request(M_UNPREPARE, netbox_opts, nil, query, parameters or {},
-                         sql_opts or {})
+    return self:_request(M_UNPREPARE, netbox_opts, nil, self._stream_id,
+                         query, parameters or {}, sql_opts or {})
 end
 
 function remote_methods:wait_state(state, timeout)
@@ -927,11 +1066,11 @@ function console_methods:eval(line, timeout)
     end
     if self.protocol == 'Binary' then
         local loader = 'return require("console").eval(...)'
-        res, err = pr(timeout, nil, false, M_EVAL, nil, nil, nil, loader,
+        res, err = pr(timeout, nil, false, M_EVAL, nil, nil, nil, nil, loader,
                       {line})
     else
         assert(self.protocol == 'Lua console')
-        res, err = pr(timeout, nil, false, M_INJECT, nil, nil, nil,
+        res, err = pr(timeout, nil, false, M_INJECT, nil, nil, nil, nil,
                       line..'$EOF$\n')
     end
     if err then
@@ -951,14 +1090,14 @@ space_metatable = function(remote)
 
     function methods:insert(tuple, opts)
         check_space_arg(self, 'insert')
-        return remote:_request(M_INSERT, opts, self._format_cdata, self.id,
-                               tuple)
+        return remote:_request(M_INSERT, opts, self._format_cdata,
+                               self._stream_id, self.id, tuple)
     end
 
     function methods:replace(tuple, opts)
         check_space_arg(self, 'replace')
-        return remote:_request(M_REPLACE, opts, self._format_cdata, self.id,
-                               tuple)
+        return remote:_request(M_REPLACE, opts, self._format_cdata,
+                               self._stream_id, self.id, tuple)
     end
 
     function methods:select(key, opts)
@@ -978,7 +1117,8 @@ space_metatable = function(remote)
 
     function methods:upsert(key, oplist, opts)
         check_space_arg(self, 'upsert')
-        return nothing_or_data(remote:_request(M_UPSERT, opts, nil, self.id,
+        return nothing_or_data(remote:_request(M_UPSERT, opts, nil,
+                                               self._stream_id, self.id,
                                                key, oplist))
     end
 
@@ -1009,8 +1149,8 @@ index_metatable = function(remote)
         local offset = tonumber(opts and opts.offset) or 0
         local limit = tonumber(opts and opts.limit) or 0xFFFFFFFF
         return (remote:_request(M_SELECT, opts, self.space._format_cdata,
-                                self.space.id, self.id, iterator, offset,
-                                limit, key))
+                                self._stream_id, self.space.id, self.id,
+                                iterator, offset, limit, key))
     end
 
     function methods:get(key, opts)
@@ -1020,6 +1160,7 @@ index_metatable = function(remote)
         end
         return nothing_or_data(remote:_request(M_GET, opts,
                                                self.space._format_cdata,
+                                               self._stream_id,
                                                self.space.id, self.id,
                                                box.index.EQ, 0, 2, key))
     end
@@ -1031,6 +1172,7 @@ index_metatable = function(remote)
         end
         return nothing_or_data(remote:_request(M_MIN, opts,
                                                self.space._format_cdata,
+                                               self._stream_id,
                                                self.space.id, self.id,
                                                box.index.GE, 0, 1, key))
     end
@@ -1042,6 +1184,7 @@ index_metatable = function(remote)
         end
         return nothing_or_data(remote:_request(M_MAX, opts,
                                                self.space._format_cdata,
+                                               self._stream_id,
                                                self.space.id, self.id,
                                                box.index.LE, 0, 1, key))
     end
@@ -1053,22 +1196,24 @@ index_metatable = function(remote)
         end
         local code = string.format('box.space.%s.index.%s:count',
                                    self.space.name, self.name)
-        return remote:_request(M_COUNT, opts, nil, code, { key, opts })
+        return remote:_request(M_COUNT, opts, nil, self._stream_id,
+                               code, { key, opts })
     end
 
     function methods:delete(key, opts)
         check_index_arg(self, 'delete')
         return nothing_or_data(remote:_request(M_DELETE, opts,
                                                self.space._format_cdata,
-                                               self.space.id, self.id, key))
+                                               self._stream_id, self.space.id,
+                                               self.id, key))
     end
 
     function methods:update(key, oplist, opts)
         check_index_arg(self, 'update')
         return nothing_or_data(remote:_request(M_UPDATE, opts,
                                                self.space._format_cdata,
-                                               self.space.id, self.id, key,
-                                               oplist))
+                                               self._stream_id, self.space.id,
+                                               self.id, key, oplist))
     end
 
     return { __index = methods, __metatable = false }
