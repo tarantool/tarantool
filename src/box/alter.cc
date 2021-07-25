@@ -4178,47 +4178,11 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 	return 0;
 }
 
-/**
- * A record with id of the new instance has been synced to the
- * write ahead log. Update the cluster configuration cache
- * with it.
- */
+/** Unregister the replica affected by the change. */
 static int
-register_replica(struct trigger *trigger, void * /* event */)
+on_replace_cluster_clear_id(struct trigger *trigger, void * /* event */)
 {
-	struct tuple *new_tuple = (struct tuple *)trigger->data;
-	uint32_t id;
-	if (tuple_field_u32(new_tuple, BOX_CLUSTER_FIELD_ID, &id) != 0)
-		return -1;
-	tt_uuid uuid;
-	if (tuple_field_uuid(new_tuple, BOX_CLUSTER_FIELD_UUID, &uuid) != 0)
-		return -1;
-	struct replica *replica = replica_by_uuid(&uuid);
-	if (replica != NULL) {
-		replica_set_id(replica, id);
-	} else {
-		try {
-			replica = replicaset_add(id, &uuid);
-			/* Can't throw exceptions from on_commit trigger */
-		} catch(Exception *e) {
-			panic("Can't register replica: %s", e->errmsg);
-		}
-	}
-	return 0;
-}
-
-static int
-unregister_replica(struct trigger *trigger, void * /* event */)
-{
-	struct tuple *old_tuple = (struct tuple *)trigger->data;
-
-	struct tt_uuid old_uuid;
-	if (tuple_field_uuid(old_tuple, BOX_CLUSTER_FIELD_UUID, &old_uuid) != 0)
-		return -1;
-
-	struct replica *replica = replica_by_uuid(&old_uuid);
-	assert(replica != NULL);
-	replica_clear_id(replica);
+	replica_clear_id((struct replica *)trigger->data);
 	return 0;
 }
 
@@ -4280,14 +4244,39 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 					  "updates of instance uuid");
 				return -1;
 			}
-		} else {
-			struct trigger *on_commit;
-			on_commit = txn_alter_trigger_new(register_replica,
-							  new_tuple);
-			if (on_commit == NULL)
-				return -1;
-			txn_stmt_on_commit(stmt, on_commit);
+			return 0;
 		}
+		/*
+		 * With read-views enabled there might be already a replica
+		 * whose registration is in progress in another transaction.
+		 * With the same replica ID.
+		 */
+		struct replica *replica = replica_by_id(replica_id);
+		if (replica != NULL) {
+			const char *msg = tt_sprintf(
+				"more than 1 replica with the same ID %u: new "
+				"uuid - %s, old uuid - %s", replica_id,
+				tt_uuid_str(&replica_uuid),
+				tt_uuid_str(&replica->uuid));
+			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool", msg);
+			return -1;
+		}
+		struct trigger *on_rollback = txn_alter_trigger_new(
+			on_replace_cluster_clear_id, NULL);
+		if (on_rollback == NULL)
+			return -1;
+		/*
+		 * Register the replica before commit so as to occupy the
+		 * replica ID now. While WAL write is in progress, new replicas
+		 * might come, they should see the ID is already in use.
+		 */
+		replica = replica_by_uuid(&replica_uuid);
+		if (replica != NULL)
+			replica_set_id(replica, replica_id);
+		else
+			replica = replicaset_add(replica_id, &replica_uuid);
+		on_rollback->data = replica;
+		txn_stmt_on_rollback(stmt, on_rollback);
 	} else {
 		/*
 		 * Don't allow deletion of the record for this instance
@@ -4299,10 +4288,36 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 			return -1;
 		if (replica_check_id(replica_id) != 0)
 			return -1;
+		tt_uuid replica_uuid;
+		if (tuple_field_uuid(old_tuple, BOX_CLUSTER_FIELD_UUID,
+				    &replica_uuid) != 0)
+			return -1;
 
-		struct trigger *on_commit;
-		on_commit = txn_alter_trigger_new(unregister_replica,
-						  old_tuple);
+		struct replica *replica = replica_by_id(replica_id);
+		if (replica == NULL) {
+			/*
+			 * Impossible, but it is important not to leave
+			 * undefined behaviour if there is a bug. Too sensitive
+			 * subsystem is affected.
+			 */
+			panic("Tried to unregister a replica not stored in "
+			      "replica_by_id map, id is %u, uuid is %s",
+			      replica_id, tt_uuid_str(&replica_uuid));
+		}
+		if (!tt_uuid_is_equal(&replica->uuid, &replica_uuid)) {
+			panic("Tried to unregister a replica with id %u, but "
+			      "its uuid is different from stored internally: "
+			      "in space - %s, internally - %s", replica_id,
+			      tt_uuid_str(&replica_uuid),
+			      tt_uuid_str(&replica->uuid));
+		}
+		/*
+		 * Unregister only after commit. Otherwise if the transaction
+		 * would be rolled back, there might be already another replica
+		 * taken the freed ID.
+		 */
+		struct trigger *on_commit = txn_alter_trigger_new(
+			on_replace_cluster_clear_id, replica);
 		if (on_commit == NULL)
 			return -1;
 		txn_stmt_on_commit(stmt, on_commit);

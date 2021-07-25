@@ -1,0 +1,146 @@
+-- test-run result file version 2
+--
+-- gh-5430: when MVCC was enabled for memtx, new replica registration attempt
+-- could fail with 'duplicate error' in _cluster space. This was happening,
+-- because _cluster is memtx. Changes to it were not visible for newer requests
+-- until commit.
+-- New replica ID was looked up in the space by its full scan. The scan used a
+-- plain iterator and didn't see replicas, whose registration was in progress of
+-- being written to WAL.
+-- As a result, if 2 replicas came to register at the same time, they got the
+-- same replica ID because didn't see each other in _cluster. One of them would
+-- fail to register in the end due to the conflict.
+--
+-- The test reproduces it by doing anon replica registration. Because during
+-- normal join there are more than one access to WAL, the ID assignment is the
+-- last one. It makes hard to block the ID assignment only. With anon replica
+-- ID assignment the join is already done, the only WAL write is the ID
+-- assignment, easy to block and yet not block new replicas registration
+-- attempts.
+--
+test_run = require('test_run').new()
+ | ---
+ | ...
+
+test_run:cmd('create server master with '..                                     \
+             'script="replication/gh-5430-mvcc-master.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server master')
+ | ---
+ | - true
+ | ...
+
+test_run:cmd('create server replica1 with '..                                   \
+             'script="replication/gh-5430-mvcc-replica1.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server replica1')
+ | ---
+ | - true
+ | ...
+
+test_run:cmd('create server replica2 with '..                                   \
+             'script="replication/gh-5430-mvcc-replica2.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server replica2')
+ | ---
+ | - true
+ | ...
+
+test_run:switch('master')
+ | ---
+ | - true
+ | ...
+box.error.injection.set('ERRINJ_WAL_DELAY', true)
+ | ---
+ | - ok
+ | ...
+
+test_run:switch('replica1')
+ | ---
+ | - true
+ | ...
+_ = require('fiber').create(function() box.cfg{replication_anon = false} end)
+ | ---
+ | ...
+str = string.format('registering replica %s', box.info.uuid):gsub('-', '%%-')
+ | ---
+ | ...
+_ = test_run:wait_log('master', str)
+ | ---
+ | ...
+
+test_run:switch('replica2')
+ | ---
+ | - true
+ | ...
+_ = require('fiber').create(function() box.cfg{replication_anon = false} end)
+ | ---
+ | ...
+str = string.format('registering replica %s', box.info.uuid):gsub('-', '%%-')
+ | ---
+ | ...
+_ = test_run:wait_log('master', str)
+ | ---
+ | ...
+
+test_run:switch('master')
+ | ---
+ | - true
+ | ...
+box.error.injection.set('ERRINJ_WAL_DELAY', false)
+ | ---
+ | - ok
+ | ...
+
+test_run:switch('replica1')
+ | ---
+ | - true
+ | ...
+test_run:wait_cond(function() return box.info.id > 1 end)
+ | ---
+ | - true
+ | ...
+
+test_run:switch('replica2')
+ | ---
+ | - true
+ | ...
+test_run:wait_cond(function() return box.info.id > 1 end)
+ | ---
+ | - true
+ | ...
+
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server replica2')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server replica2')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server replica1')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server replica1')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server master')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server master')
+ | ---
+ | - true
+ | ...

@@ -360,6 +360,10 @@ replica_by_uuid(const struct tt_uuid *uuid);
 struct replica *
 replica_by_id(uint32_t replica_id);
 
+/** Find the smallest empty replica ID in the available range. */
+int
+replica_find_new_id(uint32_t *replica_id);
+
 /**
  * Find a node in the replicaset on which the instance can try to register to
  * join the replicaset.

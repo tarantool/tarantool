@@ -1032,3 +1032,16 @@ replica_by_id(uint32_t replica_id)
 {
 	return replicaset.replica_by_id[replica_id];
 }
+
+int
+replica_find_new_id(uint32_t *replica_id)
+{
+	for (uint32_t i = 1; i < VCLOCK_MAX; ++i) {
+		if (replicaset.replica_by_id[i] == NULL) {
+			*replica_id = i;
+			return 0;
+		}
+	}
+	diag_set(ClientError, ER_REPLICA_MAX, VCLOCK_MAX);
+	return -1;
+}
