@@ -1055,7 +1055,6 @@ memtx_tx_handle_gap_write(struct txn *txn, struct space *space,
 			if (memtx_tx_cause_conflict(txn, item->txn) != 0)
 				return -1;
 			is_split = true;
-			continue;
 		} else {
 			struct key_def *def = index->def->key_def;
 			hint_t oh = def->key_hint(item->key, item->part_count, def);
