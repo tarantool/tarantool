@@ -1756,6 +1756,10 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
 	return res;
 }
 
+static int
+memtx_tx_track_read_story(struct txn *txn, struct space *space,
+			  struct memtx_story *story);
+
 struct tuple *
 memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 			    struct tuple *tuple, struct index *index,
@@ -1781,8 +1785,8 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 		if (story == NULL)
 			break;
 	}
-	if (!own_change && result != NULL)
-		memtx_tx_track_read(txn, space, result);
+	if (!own_change && story != NULL)
+		memtx_tx_track_read_story(txn, space, story);
 	if (mk_index != 0) {
 		assert(false); /* TODO: multiindex */
 		panic("multikey indexes are not supported int TX manager");

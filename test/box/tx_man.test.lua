@@ -967,6 +967,26 @@ tx1:commit();
 tx2:rollback()
 s:drop()
 
+--https://github.com/tarantool/tarantool/issues/6206
+spc = box.schema.space.create('test')
+_ = spc:create_index('test', {type='tree'})
+
+tx1:begin()
+tx1('spc:select{}')
+spc:replace{1, 1}
+tx1('spc:select{}')
+tx1:commit()
+
+spc:delete{1}
+tx2 = txn_proxy.new()
+tx2:begin()
+tx2('spc:select{}')
+spc:replace{1, 1}
+tx2('spc:select{}')
+tx2:commit()
+
+spc:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
