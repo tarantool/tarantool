@@ -155,26 +155,6 @@ cn:call('ret_after', {1.00}, { timeout = 1e-9 })
 cn:eval('return ret_after(...)', {0.01}, { timeout = 1.00 })
 cn:eval('return ret_after(...)', {1.00}, { timeout = 1e-9 })
 
---
--- :timeout()
--- @deprecated since 1.7.4
---
-
-cn:timeout(1).space.net_box_test_space.index.primary:select{234}
-cn:call('ret_after', {.01})
-cn:timeout(1):call('ret_after', {.01})
-cn:timeout(.01):call('ret_after', {1})
-
-cn = remote:timeout(0.0000000001):connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
-cn:close()
-cn = remote:timeout(1):connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
-
-remote.self:ping()
-remote.self.space.net_box_test_space:select{234}
-remote.self:timeout(123).space.net_box_test_space:select{234}
-remote.self:is_connected()
-remote.self:wait_connected()
-
 cn:close()
 -- cleanup database after tests
 space:drop()

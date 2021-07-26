@@ -1047,9 +1047,6 @@ local function new_sm(host, port, opts, connection, greeting)
         setmetatable(remote, console_mt)
     else
         setmetatable(remote, remote_mt)
-        -- @deprecated since 1.7.4
-        remote._deadlines = setmetatable({}, {__mode = 'k'})
-
         remote._space_mt = space_metatable(remote)
         remote._index_mt = index_metatable(remote)
         if opts.call_16 then
@@ -1176,17 +1173,11 @@ function remote_methods:_request(method, opts, request_ctx, ...)
             return res
         end
         if opts.timeout then
-            -- conn.space:request(, { timeout = timeout })
             deadline = fiber_clock() + opts.timeout
-        else
-            -- conn:timeout(timeout).space:request()
-            -- @deprecated since 1.7.4
-            deadline = self._deadlines[fiber_self()]
         end
         on_push = opts.on_push or on_push_sync_default
         on_push_ctx = opts.on_push_ctx
     else
-        deadline = self._deadlines[fiber_self()]
         on_push = on_push_sync_default
     end
     -- Execute synchronous request.
@@ -1289,26 +1280,7 @@ end
 
 function remote_methods:wait_state(state, timeout)
     check_remote_arg(self, 'wait_state')
-    if timeout == nil then
-        local deadline = self._deadlines[fiber_self()]
-        timeout = deadline and max(0, deadline - fiber_clock())
-    end
     return self._transport.wait_state(state, timeout)
-end
-
-local compat_warning_said = false
-
--- @deprecated since 1.7.4
-function remote_methods:timeout(timeout)
-    check_remote_arg(self, 'timeout')
-    if not compat_warning_said then
-        compat_warning_said = true
-        log.warn("netbox:timeout(timeout) is deprecated since 1.7.4, "..
-                 "please use space:<request>(..., {timeout = t}) instead.")
-    end
-    -- Sic: this is broken by design
-    self._deadlines[fiber_self()] = (timeout and fiber_clock() + timeout)
-    return self
 end
 
 function remote_methods:_install_schema(schema_version, spaces, indices,
