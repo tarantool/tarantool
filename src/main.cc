@@ -584,9 +584,6 @@ print_help(const char *program)
 	puts("to see online documentation, submit bugs or contribute a patch.");
 }
 
-extern "C" void **
-export_syms(void);
-
 int
 main(int argc, char **argv)
 {
@@ -685,7 +682,6 @@ main(int argc, char **argv)
 	}
 
 	crash_init(tarantool_bin);
-	export_syms();
 
 	random_init();
 

@@ -192,16 +192,14 @@ target_link_libraries(server core coll http_parser bit uri uuid swim swim_udp
 # Rule of thumb: if exporting a symbol from a static library, list the
 # library here.
 set (reexport_libraries server core misc bitset csv swim swim_udp swim_ev
-     shutdown ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES})
+     shutdown ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES} ${CURL_LIBRARIES} ${XXHASH_LIBRARIES})
 
 set (common_libraries
     ${reexport_libraries}
     ${LIBYAML_LIBRARIES}
     ${READLINE_LIBRARIES}
-    ${CURL_LIBRARIES}
     ${ICONV_LIBRARIES}
     ${OPENSSL_LIBRARIES}
-    ${XXHASH_LIBRARIES}
 )
 
 if (TARGET_OS_LINUX OR TARGET_OS_DEBIAN_FREEBSD)
@@ -262,32 +260,70 @@ if(BUILD_STATIC)
     endif()
 endif()
 
-if (ENABLE_LTO)
-    # Exports compilation unit is entirely a hack. It references
-    # symbols among static libraries and object files declaring
-    # them all as functions. To avoid header dependencies. This is
-    # not detected by the compilers, since they never see
-    # conflicting definitions in one compilation unit. But this
-    # makes LTO mad, because the linker sees all the definitions,
-    # and is especially angry when a variable is declared as a
-    # function. To get rid of these false positive errors the
-    # exports file is not link-time optimized.
-    set_source_files_properties(exports.c PROPERTIES COMPILE_FLAGS -fno-lto)
+set(exports_file_sources ${CMAKE_SOURCE_DIR}/extra/exports)
+if (EXPORT_LIBCURL_SYMBOLS)
+    set(exports_file_sources ${exports_file_sources}
+        ${CMAKE_SOURCE_DIR}/extra/exports_libcurl)
 endif()
+string(REPLACE ";" " " exports_file_sources_str "${exports_file_sources}")
+
+# Exports syntax is toolchain-dependent, preprocessing is necessary
+set(exports_file ${CMAKE_BINARY_DIR}/extra/exports.${CMAKE_SYSTEM_NAME})
+add_custom_target(preprocess_exports
+                  DEPENDS ${exports_file})
+add_custom_command(
+    OUTPUT  ${exports_file}
+    DEPENDS ${exports_file_sources}
+    COMMAND ${CMAKE_SOURCE_DIR}/extra/mkexports
+            ${exports_file_sources_str}
+            ${exports_file} ${CMAKE_SYSTEM_NAME}
+            ${EXPORT_LIST}
+)
 
 add_executable(
-    tarantool main.cc exports.c
+    tarantool main.cc
     ${LIBUTIL_FREEBSD_SRC}/flopen.c
     ${LIBUTIL_FREEBSD_SRC}/pidfile.c)
 
-add_dependencies(tarantool build_bundled_libs)
-target_link_libraries(tarantool box ${common_libraries})
+add_dependencies(tarantool build_bundled_libs preprocess_exports)
 
-if (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD)
-    # Without rdynamic FreeBSD does not export some symbols even
-    # when they are used in the final executable and their
-    # addresses are accessed explicitly.
-    set_target_properties(tarantool PROPERTIES LINK_FLAGS "-rdynamic")
+# Re-link if exports changed
+set_target_properties(tarantool PROPERTIES LINK_DEPENDS ${exports_file})
+
+# A note about linkers:
+# [GNU linker] When linking an *executable* visibility is ignored, and
+#              either nothing is exported (default), or any non-static
+#              symbol is exported (-rdynamic), or explicitly listed
+#              symbols are exported (--dynamic-list).
+#
+#              However, if a symbol listed lives in a static library it
+#              won't be automatically pulled, hence --whole-archive
+#              option.
+#
+# [Apple linker] One can provide an explicit export list; pulls symbols
+#                from static libraries.
+#
+if (TARGET_OS_DARWIN)
+    target_link_libraries(tarantool box ${common_libraries})
+    set_target_properties(tarantool PROPERTIES
+        LINK_FLAGS "-Wl,-exported_symbols_list,${exports_file}")
+else ()
+    target_link_libraries(tarantool
+                          -Wl,--whole-archive box ${reexport_libraries}
+                          salad -Wl,--no-whole-archive
+                          ${common_libraries}
+                          ${generic_libraries})
+    set_target_properties(tarantool PROPERTIES
+        LINK_FLAGS "-Wl,--dynamic-list,${exports_file}")
+    # CMake 3.3 and below, for historical reasons, always linked
+    # executables on some platforms with flags like -rdynamic to
+    # export symbols from the executables for use by any plugins
+    # they may load via dlopen.
+    # https://cmake.org/cmake/help/latest/policy/CMP0065.html
+    #
+    # So, while we are using CMake versions below 3.4, we need
+    # to get rid of the "rdynamic" flag.
+    set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 endif()
 
 install (TARGETS tarantool DESTINATION bin)
