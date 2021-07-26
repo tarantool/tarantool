@@ -1900,40 +1900,18 @@ memtx_tx_on_space_delete(struct space *space)
 	}
 }
 
-int
-memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
+static int
+memtx_tx_track_read_story(struct txn *txn, struct space *space,
+			  struct memtx_story *story)
 {
-	if (tuple == NULL)
-		return 0;
 	if (txn == NULL)
 		return 0;
 	if (space == NULL)
 		return 0;
 	if (space->def->opts.is_ephemeral)
 		return 0;
-
-	struct memtx_story *story;
+	assert(story != NULL);
 	struct tx_read_tracker *tracker = NULL;
-
-	if (!tuple->is_dirty) {
-		story = memtx_tx_story_new(space, tuple);
-		if (story == NULL)
-			return -1;
-		size_t sz;
-		tracker = region_alloc_object(&txn->region,
-					      struct tx_read_tracker, &sz);
-		if (tracker == NULL) {
-			diag_set(OutOfMemory, sz, "tx region", "read_tracker");
-			memtx_tx_story_delete(story);
-			return -1;
-		}
-		tracker->reader = txn;
-		tracker->story = story;
-		rlist_add(&story->reader_list, &tracker->in_reader_list);
-		rlist_add(&txn->read_set, &tracker->in_read_set);
-		return 0;
-	}
-	story = memtx_tx_story_get(tuple);
 
 	struct rlist *r1 = story->reader_list.next;
 	struct rlist *r2 = txn->read_set.next;
@@ -1971,6 +1949,42 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 	rlist_add(&txn->read_set, &tracker->in_read_set);
 	memtx_tx_story_gc();
 	return 0;
+}
+
+int
+memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
+{
+	if (tuple == NULL)
+		return 0;
+	if (txn == NULL)
+		return 0;
+	if (space == NULL)
+		return 0;
+	if (space->def->opts.is_ephemeral)
+		return 0;
+
+	if (tuple->is_dirty) {
+		struct memtx_story *story = memtx_tx_story_get(tuple);
+		return memtx_tx_track_read_story(txn, space, story);
+	} else {
+		struct memtx_story *story = memtx_tx_story_new(space, tuple);
+		if (story == NULL)
+			return -1;
+		size_t sz;
+		struct tx_read_tracker *tracker;
+		tracker = region_alloc_object(&txn->region,
+					      struct tx_read_tracker, &sz);
+		if (tracker == NULL) {
+			diag_set(OutOfMemory, sz, "tx region", "read_tracker");
+			memtx_tx_story_delete(story);
+			return -1;
+		}
+		tracker->reader = txn;
+		tracker->story = story;
+		rlist_add(&story->reader_list, &tracker->in_reader_list);
+		rlist_add(&txn->read_set, &tracker->in_read_set);
+		return 0;
+	}
 }
 
 /**
