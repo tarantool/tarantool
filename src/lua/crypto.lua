@@ -7,8 +7,8 @@ local cord_ibuf_put = buffer.internal.cord_ibuf_put
 
 ffi.cdef[[
     /* from openssl/err.h */
-    unsigned long ERR_get_error(void);
-    char *ERR_error_string(unsigned long e, char *buf);
+    unsigned long crypto_ERR_get_error(void);
+    char *crypto_ERR_error_string(unsigned long e, char *buf);
 
     /* from openssl/evp.h */
     typedef void ENGINE;
@@ -17,18 +17,21 @@ ffi.cdef[[
     typedef struct {} EVP_MD;
     EVP_MD_CTX *crypto_EVP_MD_CTX_new(void);
     void crypto_EVP_MD_CTX_free(EVP_MD_CTX *ctx);
-    int EVP_DigestInit_ex(EVP_MD_CTX *ctx, const EVP_MD *type, ENGINE *impl);
-    int EVP_DigestUpdate(EVP_MD_CTX *ctx, const void *d, size_t cnt);
-    int EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s);
-    const EVP_MD *EVP_get_digestbyname(const char *name);
+    int crypto_EVP_DigestInit_ex(EVP_MD_CTX *ctx, const EVP_MD *type,
+                                 ENGINE *impl);
+    int crypto_EVP_DigestUpdate(EVP_MD_CTX *ctx, const void *d, size_t cnt);
+    int crypto_EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md,
+                                  unsigned int *s);
+    const EVP_MD *crypto_EVP_get_digestbyname(const char *name);
 
     typedef struct {} HMAC_CTX;
     HMAC_CTX *crypto_HMAC_CTX_new(void);
     void crypto_HMAC_CTX_free(HMAC_CTX *ctx);
-    int HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int len,
-                 const EVP_MD *md, ENGINE *impl);
-    int HMAC_Update(HMAC_CTX *ctx, const unsigned char *data, size_t len);
-    int HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len);
+    int crypto_HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int len,
+                            const EVP_MD *md, ENGINE *impl);
+    int crypto_HMAC_Update(HMAC_CTX *ctx, const unsigned char *data,
+                           size_t len);
+    int crypto_HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len);
 
     enum crypto_algo {
         CRYPTO_ALGO_NONE,
@@ -72,7 +75,7 @@ ffi.cdef[[
 ]]
 
 local function openssl_err_str()
-  return ffi.string(ffi.C.ERR_error_string(ffi.C.ERR_get_error(), nil))
+  return ffi.string(ffi.crypto_ERR_error_string(ffi.C.crypto_ERR_get_error(), nil))
 end
 
 local digests = {}
@@ -81,7 +84,7 @@ for class, _ in pairs({
     sha1 = 'SHA1', sha224 = 'SHA224',
     sha256 = 'SHA256', sha384 = 'SHA384', sha512 = 'SHA512',
     dss = 'DSS', dss1 = 'DSS1', mdc2 = 'MDC2', ripemd160 = 'RIPEMD160'}) do
-    local digest = ffi.C.EVP_get_digestbyname(class)
+    local digest = ffi.C.crypto_EVP_get_digestbyname(class)
     if digest ~= nil then
         digests[class] = digest
     end
@@ -113,7 +116,7 @@ local function digest_init(self)
     if self.ctx == nil then
         return error('Digest context isn\'t usable')
     end
-    if ffi.C.EVP_DigestInit_ex(self.ctx, self.digest, nil) ~= 1 then
+    if ffi.C.crypto_EVP_DigestInit_ex(self.ctx, self.digest, nil) ~= 1 then
         return error('Can\'t init digest: ' .. openssl_err_str())
     end
     self.initialized = true
@@ -123,7 +126,7 @@ local function digest_update(self, input)
     if not self.initialized then
         return error('Digest not initialized')
     end
-    if ffi.C.EVP_DigestUpdate(self.ctx, input, input:len()) ~= 1 then
+    if ffi.C.crypto_EVP_DigestUpdate(self.ctx, input, input:len()) ~= 1 then
         return error('Can\'t update digest: ' .. openssl_err_str())
     end
 end
@@ -134,7 +137,7 @@ local function digest_final(self)
     end
     self.initialized = false
     local ai = ffi.new('int[1]')
-    if ffi.C.EVP_DigestFinal_ex(self.ctx, self.buf.wpos, ai) ~= 1 then
+    if ffi.C.crypto_EVP_DigestFinal_ex(self.ctx, self.buf.wpos, ai) ~= 1 then
         return error('Can\'t finalize digest: ' .. openssl_err_str())
     end
     return ffi.string(self.buf.wpos, ai[0])
@@ -186,7 +189,7 @@ local function hmac_init(self, key)
     if self.ctx == nil then
         return error('HMAC context isn\'t usable')
     end
-    if ffi.C.HMAC_Init_ex(self.ctx, key, key:len(), self.digest, nil) ~= 1 then
+    if ffi.C.crypto_HMAC_Init_ex(self.ctx, key, key:len(), self.digest, nil) ~= 1 then
         return error('Can\'t init HMAC: ' .. openssl_err_str())
     end
     self.initialized = true
@@ -196,7 +199,7 @@ local function hmac_update(self, input)
     if not self.initialized then
         return error('HMAC not initialized')
     end
-    if ffi.C.HMAC_Update(self.ctx, input, input:len()) ~= 1 then
+    if ffi.C.crypto_HMAC_Update(self.ctx, input, input:len()) ~= 1 then
         return error('Can\'t update HMAC: ' .. openssl_err_str())
     end
 end
@@ -209,7 +212,7 @@ local function hmac_final(self)
     local ibuf = cord_ibuf_take()
     local buf = ibuf:alloc(64)
     local ai = ffi.new('int[1]')
-    if ffi.C.HMAC_Final(self.ctx, buf, ai) ~= 1 then
+    if ffi.C.crypto_HMAC_Final(self.ctx, buf, ai) ~= 1 then
         cord_ibuf_put(ibuf)
         return error('Can\'t finalize HMAC: ' .. openssl_err_str())
     end

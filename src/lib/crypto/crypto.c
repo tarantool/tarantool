@@ -390,3 +390,57 @@ crypto_HMAC_CTX_free(HMAC_CTX *ctx)
 	HMAC_CTX_free(ctx);
 #endif
 }
+
+unsigned long
+crypto_ERR_get_error(void)
+{
+	return ERR_get_error();
+}
+
+char *
+crypto_ERR_error_string(unsigned long e, char *buf)
+{
+	return ERR_error_string(e, buf);
+}
+int
+crypto_EVP_DigestInit_ex(EVP_MD_CTX *ctx, const EVP_MD *type, ENGINE *impl)
+{
+	return EVP_DigestInit_ex(ctx, type, impl);
+}
+
+int
+crypto_EVP_DigestUpdate(EVP_MD_CTX *ctx, const void *d, size_t cnt)
+{
+	return EVP_DigestUpdate(ctx, d, cnt);
+}
+
+int
+crypto_EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s)
+{
+	return EVP_DigestFinal_ex(ctx, md, s);
+}
+
+const EVP_MD *
+crypto_EVP_get_digestbyname(const char *name)
+{
+	return EVP_get_digestbyname(name);
+}
+
+int
+crypto_HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int len, const EVP_MD *md,
+		    ENGINE *impl)
+{
+	return HMAC_Init_ex(ctx, key, len, md, impl);
+}
+
+int
+crypto_HMAC_Update(HMAC_CTX *ctx, const unsigned char *data, size_t len)
+{
+	return HMAC_Update(ctx, data, len);
+}
+
+int
+crypto_HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len)
+{
+	return HMAC_Final(ctx, md, len);
+}

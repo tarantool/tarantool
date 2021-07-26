@@ -4,6 +4,7 @@
 #include "fiber.h"
 #include "lua/utils.h"
 #include "box/merger.h"
+#include "box/error.h"
 
 /**
  * Verify whether a temporary fiber-local Lua state has the same
@@ -82,7 +83,7 @@ lbox_check_merge_source_call_next(struct lua_State *L)
 	int rc = merge_source_next(source, NULL, &tuple);
 	(void) tuple;
 	bool is_stack_even = lua_gettop(temporary_L) == top;
-	struct error *e = diag_last_error(diag_get());
+	box_error_t *e = box_error_last();
 
 	lua_pushboolean(L, rc == 0);
 	if (rc == 0)

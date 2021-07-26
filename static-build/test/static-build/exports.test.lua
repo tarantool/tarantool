@@ -47,11 +47,11 @@ local check_symbols = {
 
     'uuid_nil',
     'tt_uuid_create',
-    'tt_uuid_str',
     'tt_uuid_is_equal',
     'tt_uuid_is_nil',
     'tt_uuid_bswap',
     'tt_uuid_from_string',
+    'tt_uuid_to_string',
     'log_level',
     'log_format',
     'uri_parse',
@@ -81,10 +81,19 @@ local check_symbols = {
     'space_bsize',
     'box_schema_version',
 
+    'crypto_ERR_error_string',
+    'crypto_ERR_get_error',
+    'crypto_EVP_DigestInit_ex',
+    'crypto_EVP_DigestUpdate',
+    'crypto_EVP_DigestFinal_ex',
+    'crypto_EVP_get_digestbyname',
     'crypto_EVP_MD_CTX_new',
     'crypto_EVP_MD_CTX_free',
     'crypto_HMAC_CTX_new',
     'crypto_HMAC_CTX_free',
+    'crypto_HMAC_Init_ex',
+    'crypto_HMAC_Update',
+    'crypto_HMAC_Final',
     'crypto_stream_new',
     'crypto_stream_begin',
     'crypto_stream_append',
@@ -116,22 +125,6 @@ local check_symbols = {
     'luaJIT_profile_start',
     'luaJIT_profile_stop',
     'luaJIT_profile_dumpstack',
-
-    'ERR_error_string',
-    'ERR_get_error',
-
-    'EVP_get_digestbyname',
-    'EVP_get_cipherbyname',
-    'EVP_CIPHER_CTX_new',
-    'EVP_CIPHER_CTX_free',
-    'EVP_CIPHER_block_size',
-    'HMAC_Init_ex',
-    'HMAC_Update',
-    'HMAC_Final',
-
-    'ZSTD_compress',
-    'ZSTD_decompress',
-    'ZSTD_versionString',
 }
 
 test:plan(#check_symbols)
