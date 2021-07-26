@@ -772,6 +772,20 @@ end
 for _,fib in pairs(fibers) do fib:join() end
 s:drop()
 
+s = box.schema.create_space('test')
+_ = s:create_index('pk')
+tx1:begin()
+tx1('s:select{}')
+tx2:begin()
+tx2('s:replace{2, 2, 2}')
+tx3:begin()
+tx3('s:replace{1, 1, 1}')
+tx3:commit()
+tx1('s:select{}')
+tx1:commit();
+tx2:rollback()
+s:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
