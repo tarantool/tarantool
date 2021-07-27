@@ -55,6 +55,7 @@ extern "C" {
 struct lua_State;
 struct ibuf;
 struct error;
+struct tt_uuid;
 typedef struct ibuf box_ibuf_t;
 
 /**
@@ -64,6 +65,9 @@ typedef struct ibuf box_ibuf_t;
  * snprintf(m_errmsg, sizeof(m_errmsg), "%s", msg ? msg : "");
  */
 extern struct lua_State *tarantool_L;
+
+void
+luaL_pushuuidstr(struct lua_State *L, const struct tt_uuid *uuid);
 
 /** \cond public */
 

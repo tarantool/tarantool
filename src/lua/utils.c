@@ -37,6 +37,7 @@
 #include <trivia/util.h>
 #include <diag.h>
 #include <fiber.h>
+#include "tt_uuid.h"
 
 int luaL_nil_ref = LUA_REFNIL;
 static int CTID_CONST_STRUCT_ERROR_REF = 0;
@@ -99,6 +100,18 @@ luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
 
 	lj_gc_check(L);
 	return cdataptr(cd);
+}
+
+void
+luaL_pushuuidstr(struct lua_State *L, const struct tt_uuid *uuid)
+{
+	/*
+	 * Do not use a global buffer. It might be overwritten if GC starts
+	 * working.
+	 */
+	char str[UUID_STR_LEN + 1];
+	tt_uuid_to_string(uuid, str);
+	lua_pushlstring(L, str, UUID_STR_LEN);
 }
 
 int
