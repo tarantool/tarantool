@@ -376,7 +376,7 @@ ldecimal_tostring(struct lua_State *L)
 	if (lua_gettop(L) < 1)
 		return luaL_error(L, "usage: decimal.tostring(decimal)");
 	decimal_t *lhs = lua_checkdecimal(L, 1);
-	lua_pushstring(L, decimal_to_string(lhs));
+	lua_pushstring(L, decimal_str(lhs));
 	return 1;
 }
 

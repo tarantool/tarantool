@@ -420,7 +420,7 @@ static void json_append_data(lua_State *l, struct luaL_serializer *cfg,
         switch (field.ext_type) {
         case MP_DECIMAL:
         {
-            const char *str = decimal_to_string(field.decval);
+            const char *str = decimal_str(field.decval);
             return json_append_string(cfg, json, str, strlen(str));
         }
         case MP_UUID:
