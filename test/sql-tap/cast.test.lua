@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(108)
+test:plan(109)
 
 --!./tcltestrunner.lua
 -- 2005 June 25
@@ -1154,6 +1154,15 @@ test:do_execsql_test(
         DROP TABLE t6;
     ]], {
         10000000000000000
+    })
+
+-- Make sure that there is no unnecessary implicit casts in IN operator.
+test:do_catchsql_test(
+    "cast-12",
+    [[
+        SELECT 1 IN (SELECT '1');
+    ]], {
+        1, "Type mismatch: can not convert integer(1) to string"
     })
 
 test:finish_test()

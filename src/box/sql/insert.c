@@ -42,20 +42,6 @@
 #include "box/box.h"
 #include "box/schema.h"
 
-enum field_type *
-sql_index_type_str(struct sql *db, const struct index_def *idx_def)
-{
-	uint32_t column_count = idx_def->key_def->part_count;
-	uint32_t sz = (column_count + 1) * sizeof(enum field_type);
-	enum field_type *types = (enum field_type *) sqlDbMallocRaw(db, sz);
-	if (types == NULL)
-		return NULL;
-	for (uint32_t i = 0; i < column_count; i++)
-		types[i] = idx_def->key_def->parts[i].type;
-	types[column_count] = field_type_MAX;
-	return types;
-}
-
 void
 sql_emit_table_types(struct Vdbe *v, struct space_def *def, int reg)
 {

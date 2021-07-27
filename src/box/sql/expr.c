@@ -2829,8 +2829,6 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 				struct ExprList_item *pItem;
 				int r1, r2, r3;
 
-				enum field_type lhs_type =
-					sql_expr_type(pLeft);
 				bool unused;
 				struct coll *unused_coll;
 				if (sql_expr_coll(pParse, pExpr->pLeft, &unused,
@@ -2856,11 +2854,8 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 						jmpIfDynamic = -1;
 					}
 					r3 = sqlExprCodeTarget(pParse, pE2, r1);
-					enum field_type types[2] =
-						{ lhs_type, field_type_MAX };
-	 				sqlVdbeAddOp4(v, OP_MakeRecord, r3,
-							  1, r2, (char *)types,
-							  sizeof(types));
+					sqlVdbeAddOp3(v, OP_MakeRecord, r3, 1,
+						      r2);
 					sql_expr_type_cache_change(pParse,
 								   r3, 1);
 					sqlVdbeAddOp2(v, OP_IdxInsert, r2,

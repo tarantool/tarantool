@@ -2049,24 +2049,17 @@ case OP_ApplyType: {
 	break;
 }
 
-/* Opcode: MakeRecord P1 P2 P3 P4 P5
+/* Opcode: MakeRecord P1 P2 P3 * P5
  * Synopsis: r[P3]=mkrec(r[P1@P2])
  *
  * Convert P2 registers beginning with P1 into the [record format]
  * use as a data record in a database table or as a key
  * in an index.  The OP_Column opcode can decode the record later.
  *
- * P4 may be a string that is P2 characters long.  The nth character of the
- * string indicates the column type that should be used for the nth
- * field of the index key.
- *
- * If P4 is NULL then all index fields have type SCALAR.
- *
  * If P5 is not NULL then record under construction is intended to be inserted
  * into ephemeral space. Thus, sort of memory optimization can be performed.
  */
 case OP_MakeRecord: {
-	Mem *pRec;             /* The new record */
 	Mem *pData0;           /* First field to be combined into the record */
 	Mem MAYBE_UNUSED *pLast;  /* Last field of the record */
 	int nField;            /* Number of fields in the record */
@@ -2087,7 +2080,6 @@ case OP_MakeRecord: {
 	 * is the offset from the beginning of the record to data0.
 	 */
 	nField = pOp->p1;
-	enum field_type *types = pOp->p4.types;
 	bIsEphemeral = pOp->p5;
 	assert(nField>0 && pOp->p2>0 && pOp->p2+nField<=(p->nMem+1 - p->nCursor)+1);
 	pData0 = &aMem[nField];
@@ -2097,15 +2089,6 @@ case OP_MakeRecord: {
 	/* Identify the output register */
 	assert(pOp->p3<pOp->p1 || pOp->p3>=pOp->p1+pOp->p2);
 	pOut = vdbe_prepare_null_out(p, pOp->p3);
-
-	/* Apply the requested types to all inputs */
-	assert(pData0<=pLast);
-	if (types != NULL) {
-		pRec = pData0;
-		do {
-			mem_cast_implicit_old(pRec++, *(types++));
-		} while(types[0] != field_type_MAX);
-	}
 
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);

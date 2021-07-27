@@ -3771,10 +3771,6 @@ int sqlVarintLen(u64 v);
 #define getVarint    sqlGetVarint
 #define putVarint    sqlPutVarint
 
-/** Return string consisting of fields types of given index. */
-enum field_type *
-sql_index_type_str(struct sql *db, const struct index_def *idx_def);
-
 /**
  * Code an OP_ApplyType opcode that will force types
  * for given range of register starting from @reg.

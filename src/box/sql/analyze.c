@@ -968,12 +968,7 @@ vdbe_emit_analyze_space(struct Parse *parse, struct space *space)
 		sqlVdbeAddOp2(v, OP_Next, idx_cursor, next_row_addr);
 		/* Add the entry to the stat1 table. */
 		callStatGet(v, stat4_reg, STAT_GET_STAT1, stat1_reg);
-		enum field_type types[4] = { FIELD_TYPE_STRING,
-					     FIELD_TYPE_STRING,
-					     FIELD_TYPE_STRING,
-					     field_type_MAX };
-		sqlVdbeAddOp4(v, OP_MakeRecord, tab_name_reg, 4, tmp_reg,
-				  (char *)types, sizeof(types));
+		sqlVdbeAddOp3(v, OP_MakeRecord, tab_name_reg, 4, tmp_reg);
 		sqlVdbeAddOp4(v, OP_IdxInsert, tmp_reg, 0, 0,
 				  (char *)stat1, P4_SPACEPTR);
 		/* Add the entries to the stat4 table. */

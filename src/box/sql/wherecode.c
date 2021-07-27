@@ -602,9 +602,6 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 	nReg = pLoop->nEq + nExtraReg;
 	pParse->nMem += nReg;
 
-	enum field_type *type = sql_index_type_str(pParse->db, idx_def);
-	assert(type != NULL || pParse->db->mallocFailed);
-
 	if (nSkip) {
 		int iIdxCur = pLevel->iIdxCur;
 		sqlVdbeAddOp1(v, (bRev ? OP_Last : OP_Rewind), iIdxCur);
@@ -647,17 +644,7 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 				sqlVdbeAddOp2(v, OP_SCopy, r1, regBase + j);
 			}
 		}
-		if (pTerm->eOperator & WO_IN) {
-			if (pTerm->pExpr->flags & EP_xIsSelect) {
-				/* No type ever needs to be (or should be) applied to a value
-				 * from the RHS of an "? IN (SELECT ...)" expression. The
-				 * sqlFindInIndex() routine has already ensured that the
-				 * type of the comparison has been applied to the value.
-				 */
-				if (type != NULL)
-					type[j] = FIELD_TYPE_SCALAR;
-			}
-		} else if ((pTerm->eOperator & WO_ISNULL) == 0) {
+		if ((pTerm->eOperator & (WO_IN | WO_ISNULL)) == 0) {
 			Expr *pRight = pTerm->pExpr->pRight;
 			if (sqlExprCanBeNull(pRight)) {
 				sqlVdbeAddOp2(v, OP_IsNull, regBase + j,
