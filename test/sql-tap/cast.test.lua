@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(107)
+test:plan(108)
 
 --!./tcltestrunner.lua
 -- 2005 June 25
@@ -1142,6 +1142,18 @@ test:do_catchsql_test(
         SELECT '1' < 2.5;
     ]], {
         1, "Type mismatch: can not convert double(2.5) to string"
+    })
+
+-- Make sure that search using index in field type number work right.
+test:do_execsql_test(
+    "cast-11",
+    [[
+        CREATE TABLE t6(d DOUBLE PRIMARY KEY);
+        INSERT INTO t6 VALUES(10000000000000000);
+        SELECT d FROM t6 WHERE d < 10000000000000001 and d > 9999999999999999;
+        DROP TABLE t6;
+    ]], {
+        10000000000000000
     })
 
 test:finish_test()

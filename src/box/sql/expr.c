@@ -2246,36 +2246,6 @@ sqlExprCanBeNull(const Expr * p)
 	}
 }
 
-bool
-sql_expr_needs_no_type_change(const struct Expr *p, enum field_type type)
-{
-	u8 op;
-	if (type == FIELD_TYPE_SCALAR)
-		return true;
-	while (p->op == TK_UPLUS || p->op == TK_UMINUS) {
-		p = p->pLeft;
-	}
-	op = p->op;
-	if (op == TK_REGISTER)
-		op = p->op2;
-	switch (op) {
-	case TK_INTEGER:
-		return type == FIELD_TYPE_INTEGER;
-	case TK_FLOAT:
-		return type == FIELD_TYPE_DOUBLE;
-	case TK_STRING:
-		return type == FIELD_TYPE_STRING;
-	case TK_BLOB:
-		return type == FIELD_TYPE_VARBINARY;
-	case TK_COLUMN_REF:
-		/* p cannot be part of a CHECK constraint. */
-		assert(p->iTable >= 0);
-		return p->iColumn < 0 && sql_type_is_numeric(type);
-	default:
-		return false;
-	}
-}
-
 /*
  * pX is the RHS of an IN operator.  If pX is a SELECT statement
  * that can be simplified to a direct table access, then return

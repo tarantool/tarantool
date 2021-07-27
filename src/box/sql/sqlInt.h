@@ -3183,19 +3183,6 @@ int sqlExprIsInteger(Expr *, int *);
 int sqlExprCanBeNull(const Expr *);
 
 /**
- * Return TRUE if the given expression is a constant which would
- * be unchanged by OP_ApplyType with the type given in the second
- * argument.
- *
- * This routine is used to determine if the OP_ApplyType operation
- * can be omitted.  When in doubt return FALSE.  A false negative
- * is harmless. A false positive, however, can result in the wrong
- * answer.
- */
-bool
-sql_expr_needs_no_type_change(const struct Expr *expr, enum field_type type);
-
-/**
  * This routine generates VDBE code that causes a single row of a
  * single table to be deleted.  Both the original table entry and
  * all indices are removed.

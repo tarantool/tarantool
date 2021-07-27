@@ -2504,7 +2504,7 @@ case OP_Close: {
 	break;
 }
 
-/* Opcode: SeekLT P1 P2 P3 P4 P5
+/* Opcode: SeekLT P1 P2 P3 P4 *
  * Synopsis: key=r[P3@P4]
  *
  * If cursor P1 refers to an SQL table (B-Tree that uses integer keys),
@@ -2520,11 +2520,9 @@ case OP_Close: {
  * from the end toward the beginning.  In other words, the cursor is
  * configured to use Prev, not Next.
  *
- * P5 has the same meaning as for SeekGE.
- *
  * See also: Found, NotFound, SeekGt, SeekGe, SeekLe
  */
-/* Opcode: SeekGT P1 P2 P3 P4 P5
+/* Opcode: SeekGT P1 P2 P3 P4 *
  * Synopsis: key=r[P3@P4]
  *
  * If cursor P1 refers to an SQL table (B-Tree that uses integer keys),
@@ -2539,11 +2537,6 @@ case OP_Close: {
  * This opcode leaves the cursor configured to move in forward order,
  * from the beginning toward the end.  In other words, the cursor is
  * configured to use Next, not Prev.
- *
- * If P5 is not zero, than it is offset of integer fields in input
- * vector. Force corresponding value to be INTEGER.
- *
- * P5 has the same meaning as for SeekGE.
  */
 case OP_SeekLT:         /* jump, in3 */
 case OP_SeekGT: {       /* jump, in3 */
@@ -2592,7 +2585,7 @@ case OP_SeekGT: {       /* jump, in3 */
 	break;
 }
 
-/* Opcode: SeekLE P1 P2 P3 P4 P5
+/* Opcode: SeekLE P1 P2 P3 P4 *
  * Synopsis: key=r[P3@P4]
  *
  * If cursor P1 refers to an SQL table (B-Tree that uses integer keys),
@@ -2615,11 +2608,9 @@ case OP_SeekGT: {       /* jump, in3 */
  * The IdxGE opcode will be skipped if this opcode succeeds, but the
  * IdxGE opcode will be used on subsequent loop iterations.
  *
- * P5 has the same meaning as for SeekGE.
- *
  * See also: Found, NotFound, SeekGt, SeekGe, SeekLt
  */
-/* Opcode: SeekGE P1 P2 P3 P4 P5
+/* Opcode: SeekGE P1 P2 P3 P4 *
  * Synopsis: key=r[P3@P4]
  *
  * If cursor P1 refers to an SQL table (B-Tree that uses integer keys),
@@ -2641,11 +2632,6 @@ case OP_SeekGT: {       /* jump, in3 */
  * This opcode leaves the cursor configured to move in forward order,
  * from the beginning toward the end.  In other words, the cursor is
  * configured to use Next, not Prev.
- *
- * If P5 is not zero, than it is offset of integer fields in input
- * vector. Force corresponding value to be INTEGER, in case it
- * is floating point value. Alongside with that, type of
- * iterator may be changed: a > 1.5 -> a >= 2.
  *
  * See also: Found, NotFound, SeekLt, SeekGt, SeekLe
  */
