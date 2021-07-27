@@ -42,6 +42,14 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+enum {
+	/*
+	 * The documentation in the decnumber sources says the string needs to
+	 * be >= digit count + 14.
+	 */
+	DECIMAL_MAX_STR_LEN = DECIMAL_MAX_DIGITS + 14,
+};
+
 typedef decNumber decimal_t;
 
 /**
@@ -127,6 +135,10 @@ decimal_from_uint64(decimal_t *dec, uint64_t num);
  */
 const char *
 decimal_str(const decimal_t *dec);
+
+/** Write the decimal as a string into the passed buffer. */
+void
+decimal_to_string(const decimal_t *dec, char *str);
 
 /**
  * Convert a given decimal to int64_t
