@@ -309,9 +309,7 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 	if (op == TK_VARIABLE) {
 		Vdbe *pReprepare = pParse->pReprepare;
 		int iCol = pRight->iColumn;
-		pVal =
-		    sqlVdbeGetBoundValue(pReprepare, iCol,
-					     FIELD_TYPE_SCALAR);
+		pVal = sqlVdbeGetBoundValue(pReprepare, iCol);
 		if (pVal != NULL && mem_is_str(pVal)) {
 			if (mem_as_str0(pVal) == NULL)
 				return -1;

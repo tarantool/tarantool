@@ -2323,17 +2323,15 @@ sqlVdbeDb(Vdbe * v)
  * The returned value must be freed by the caller using sqlValueFree().
  */
 sql_value *
-sqlVdbeGetBoundValue(Vdbe * v, int iVar, u8 aff)
+sqlVdbeGetBoundValue(struct Vdbe *v, int iVar)
 {
 	assert(iVar > 0);
 	if (v) {
 		Mem *pMem = &v->aVar[iVar - 1];
 		if (!mem_is_null(pMem)) {
 			sql_value *pRet = sqlValueNew(v->db);
-			if (pRet) {
+			if (pRet != NULL)
 				mem_copy(pRet, pMem);
-				mem_cast_implicit_old(pRet, aff);
-			}
 			return pRet;
 		}
 	}
