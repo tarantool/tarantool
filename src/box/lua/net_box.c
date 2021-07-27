@@ -422,7 +422,6 @@ netbox_decode_greeting(lua_State *L)
 	struct greeting greeting;
 	size_t len;
 	const char *buf = NULL;
-	char uuid_buf[UUID_STR_LEN + 1];
 
 	if (lua_isstring(L, 1))
 		buf = lua_tolstring(L, 1, &len);
@@ -443,8 +442,7 @@ netbox_decode_greeting(lua_State *L)
 	lua_pushlstring(L, greeting.salt, greeting.salt_len);
 	lua_setfield(L, -2, "salt");
 
-	tt_uuid_to_string(&greeting.uuid, uuid_buf);
-	lua_pushstring(L, uuid_buf);
+	luaL_pushuuidstr(L, &greeting.uuid);
 	lua_setfield(L, -2, "uuid");
 
 	return 1;
