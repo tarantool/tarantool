@@ -126,7 +126,7 @@ decimal_from_uint64(decimal_t *dec, uint64_t num);
  * the decimal representation.
  */
 const char *
-decimal_to_string(const decimal_t *dec);
+decimal_str(const decimal_t *dec);
 
 /**
  * Convert a given decimal to int64_t

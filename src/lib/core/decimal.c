@@ -165,7 +165,7 @@ decimal_from_uint64(decimal_t *dec, uint64_t num)
 }
 
 const char *
-decimal_to_string(const decimal_t *dec)
+decimal_str(const decimal_t *dec)
 {
 	char *buf = tt_static_buf();
 	/* No errors are possible. */

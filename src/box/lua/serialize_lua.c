@@ -853,7 +853,7 @@ dump_node(struct lua_dumper *d, struct node *nd, int indent)
 		switch (field->ext_type) {
 		case MP_DECIMAL:
 			nd->mask |= NODE_QUOTE;
-			str = decimal_to_string(field->decval);
+			str = decimal_str(field->decval);
 			len = strlen(str);
 			break;
 		case MP_UUID:
