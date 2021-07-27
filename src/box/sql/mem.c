@@ -625,6 +625,34 @@ int_to_double(struct Mem *mem)
 }
 
 static inline int
+int_to_double_precise(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_INT);
+	double d;
+	d = (double)mem->u.i;
+	if (mem->u.i != (int64_t)d)
+		return -1;
+	mem->u.r = d;
+	mem->type = MEM_TYPE_DOUBLE;
+	mem->field_type = FIELD_TYPE_DOUBLE;
+	return 0;
+}
+
+static inline int
+uint_to_double_precise(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_UINT);
+	double d;
+	d = (double)mem->u.u;
+	if (mem->u.u != (uint64_t)d)
+		return -1;
+	mem->u.r = d;
+	mem->type = MEM_TYPE_DOUBLE;
+	mem->field_type = FIELD_TYPE_DOUBLE;
+	return 0;
+}
+
+static inline int
 int_to_str0(struct Mem *mem)
 {
 	assert((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0);
@@ -1083,25 +1111,25 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		if (mem->type == MEM_TYPE_UINT)
 			return 0;
 		if (mem->type == MEM_TYPE_DOUBLE)
-			return double_to_uint(mem);
+			return double_to_uint_precise(mem);
 		return -1;
 	case FIELD_TYPE_STRING:
 		if (mem->type == MEM_TYPE_STR)
 			return 0;
-		if (mem->type == MEM_TYPE_UUID)
-			return uuid_to_str0(mem);
 		return -1;
 	case FIELD_TYPE_DOUBLE:
 		if (mem->type == MEM_TYPE_DOUBLE)
 			return 0;
-		if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0)
-			return int_to_double(mem);
+		if (mem->type == MEM_TYPE_INT)
+			return int_to_double_precise(mem);
+		if (mem->type == MEM_TYPE_UINT)
+			return uint_to_double_precise(mem);
 		return -1;
 	case FIELD_TYPE_INTEGER:
 		if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0)
 			return 0;
 		if (mem->type == MEM_TYPE_DOUBLE)
-			return double_to_int(mem);
+			return double_to_int_precise(mem);
 		return -1;
 	case FIELD_TYPE_BOOLEAN:
 		if (mem->type == MEM_TYPE_BOOL)
@@ -1111,8 +1139,6 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		if ((mem->type & (MEM_TYPE_BIN | MEM_TYPE_MAP |
 				  MEM_TYPE_ARRAY)) != 0)
 			return 0;
-		if (mem->type == MEM_TYPE_UUID)
-			return uuid_to_bin(mem);
 		return -1;
 	case FIELD_TYPE_NUMBER:
 		if (mem_is_num(mem))
@@ -1133,10 +1159,6 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 	case FIELD_TYPE_UUID:
 		if (mem->type == MEM_TYPE_UUID)
 			return 0;
-		if (mem->type == MEM_TYPE_STR)
-			return str_to_uuid(mem);
-		if (mem->type == MEM_TYPE_BIN)
-			return bin_to_uuid(mem);
 		return -1;
 	case FIELD_TYPE_ANY:
 		return 0;

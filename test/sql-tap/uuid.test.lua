@@ -3,7 +3,7 @@ local build_path = os.getenv("BUILDDIR")
 package.cpath = build_path..'/test/sql-tap/?.so;'..build_path..'/test/sql-tap/?.dylib;'..package.cpath
 
 local test = require("sqltester")
-test:plan(147)
+test:plan(146)
 
 local uuid = require("uuid")
 local uuid1 = uuid.fromstr("11111111-1111-1111-1111-111111111111")
@@ -722,15 +722,12 @@ test:do_catchsql_test(
         1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to unsigned"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-8.1.2",
     [[
         INSERT INTO ts(s) SELECT u FROM t2;
-        SELECT * FROM ts;
     ]], {
-        1, "11111111-1111-1111-1111-111111111111",
-        2, "11111111-3333-1111-1111-111111111111",
-        3, "22222222-1111-1111-1111-111111111111"
+        1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to string"
     })
 
 test:do_catchsql_test(
@@ -765,15 +762,12 @@ test:do_catchsql_test(
         1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to boolean"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-8.1.7",
     [[
         INSERT INTO tv(v) SELECT u FROM t2;
-        SELECT id, hex(v) FROM tv;
     ]], {
-        1, "11111111111111111111111111111111",
-        2, "11111111333311111111111111111111",
-        3, "22222222111111111111111111111111"
+        1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to varbinary"
     })
 
 test:do_execsql_test(
@@ -803,13 +797,12 @@ test:do_catchsql_test(
         1, "Type mismatch: can not convert integer(1) to uuid"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-8.2.2",
     [[
         INSERT INTO tsu VALUES ('2_string_right', '11111111-1111-1111-1111-111111111111');
-        SELECT * FROM tsu ORDER BY s DESC LIMIT 1;
     ]], {
-        '2_string_right', uuid1
+        1, "Type mismatch: can not convert string('11111111-1111-1111-1111-111111111111') to uuid"
     })
 
 test:do_catchsql_test(
@@ -844,13 +837,12 @@ test:do_catchsql_test(
         1, "Type mismatch: can not convert boolean(TRUE) to uuid"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-8.2.7",
     [[
         INSERT INTO tsu SELECT '7_varbinary', x'11111111111111111111111111111111' FROM t2 LIMIT 1;
-        SELECT * FROM tsu ORDER BY s DESC LIMIT 1;
     ]], {
-        '7_varbinary', uuid1
+        1, "Type mismatch: can not convert varbinary(x'11111111111111111111111111111111') to uuid"
     })
 
 test:do_catchsql_test(
@@ -877,24 +869,27 @@ test:do_execsql_test(
         uuid1, uuid3, uuid2
     })
 
-test:execsql([[
-    CREATE TABLE t10 (i INT PRIMARY KEY AUTOINCREMENT, u UUID DEFAULT '11111111-1111-1111-1111-111111111111');
-]])
+local default = "DEFAULT(CAST('11111111-1111-1111-1111-111111111111' AS UUID))"
+test:execsql(
+    "CREATE TABLE t10 (i INT PRIMARY KEY AUTOINCREMENT, u UUID "..default..");"
+)
 
 -- Check that INSERT into UUID field works.
+local uuid2_str = "'22222222-1111-1111-1111-111111111111'";
 test:do_execsql_test(
     "uuid-10.1.1",
     [[
-        INSERT INTO t10 VALUES (1, '22222222-1111-1111-1111-111111111111');
+        INSERT INTO t10 VALUES (1, CAST(]]..uuid2_str..[[ AS UUID));
         SELECT * FROM t10 WHERE i = 1;
     ]], {
         1, uuid2
     })
 
+local uuid2_bin = "x'22222222111111111111111111111111'";
 test:do_execsql_test(
     "uuid-10.1.2",
     [[
-        INSERT INTO t10 VALUES (2, x'22222222111111111111111111111111');
+        INSERT INTO t10 VALUES (2, CAST(]]..uuid2_bin..[[ AS UUID));
         SELECT * FROM t10 WHERE i = 2;
     ]], {
         2, uuid2
@@ -920,21 +915,12 @@ test:do_execsql_test(
 
 -- Check that UPDATE of UUID field works.
 test:do_execsql_test(
-    "uuid-10.2.1",
+    "uuid-10",
     [[
-        UPDATE t10 SET u = '11111111-3333-1111-1111-111111111111' WHERE i = 1;
-        SELECT * FROM t10 WHERE i = 1;
+        UPDATE t10 SET u = CAST(]]..uuid2_str..[[ AS UUID) WHERE i = 3;
+        SELECT * FROM t10 WHERE i = 3;
     ]], {
-        1, uuid3
-    })
-
-test:do_execsql_test(
-    "uuid-10.2.2",
-    [[
-        UPDATE t10 SET u = x'11111111333311111111111111111111' WHERE i = 2;
-        SELECT * FROM t10 WHERE i = 2;
-    ]], {
-        2, uuid3
+        3, uuid2
     })
 
 -- Check that JOIN by UUID field works.

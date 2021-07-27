@@ -58,7 +58,7 @@ static const void *
 mem_as_bin(struct Mem *mem)
 {
 	const char *s;
-	if (mem_cast_implicit(mem, FIELD_TYPE_VARBINARY) != 0 &&
+	if (mem_cast_explicit(mem, FIELD_TYPE_VARBINARY) != 0 &&
 	    mem_to_str(mem) != 0)
 		return NULL;
 	if (mem_get_bin(mem, &s) != 0)

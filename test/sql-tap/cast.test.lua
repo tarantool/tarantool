@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(95)
+test:plan(103)
 
 --!./tcltestrunner.lua
 -- 2005 June 25
@@ -875,7 +875,7 @@ test:do_test(
         -- </cast-4.4>
     })
 
--- gh-4470: Make explicit casts work according to our rules.
+-- gh-4470: Make explicit and implicit casts work according to our rules.
 
 -- Make sure that explicit cast from BOOLEAN to numeric types throws an error.
 test:do_catchsql_test(
@@ -1016,5 +1016,95 @@ test:do_execsql_test(
     ]], {
         true
     })
+
+-- Make sure that implicit conversion of numeric values is precise.
+test:execsql([[
+    CREATE TABLE t2 (i INTEGER PRIMARY KEY AUTOINCREMENT, a INTEGER, b DOUBLE);
+    CREATE TABLE t3 (i INTEGER PRIMARY KEY AUTOINCREMENT, s STRING);
+    CREATE TABLE t4 (i INTEGER PRIMARY KEY AUTOINCREMENT, v VARBINARY);
+    CREATE TABLE t5 (i INTEGER PRIMARY KEY AUTOINCREMENT, u UUID);
+]])
+
+test:do_execsql_test(
+    "cast-9.1.1",
+    [[
+        INSERT INTO t2(a) VALUES(1.0e0);
+        SELECT a FROM t2 WHERE i = 1;
+    ]], {
+        1
+    })
+
+test:do_catchsql_test(
+    "cast-9.1.2",
+    [[
+        INSERT INTO t2(a) VALUES(1.5e0);
+    ]], {
+        1, "Type mismatch: can not convert double(1.5) to integer"
+    })
+
+test:do_execsql_test(
+    "cast-9.1.3",
+    [[
+        INSERT INTO t2(b) VALUES(10000000000000000);
+        SELECT b FROM t2 WHERE i = 2;
+    ]], {
+        10000000000000000
+    })
+
+test:do_catchsql_test(
+    "cast-9.1.4",
+    [[
+        INSERT INTO t2(b) VALUES(10000000000000001);
+    ]], {
+        1, "Type mismatch: can not convert integer(10000000000000001) to double"
+    })
+
+-- Make sure that UUID cannot be implicitly cast to STRING.
+local uuid = "CAST('11111111-1111-1111-1111-111111111111' AS UUID)";
+test:do_catchsql_test(
+    "cast-9.2",
+    [[
+        INSERT INTO t3(s) VALUES(]]..uuid..[[);
+    ]], {
+        1, "Type mismatch: can not convert "..
+           "uuid('11111111-1111-1111-1111-111111111111') to string"
+    })
+
+-- Make sure that UUID cannot be implicitly cast to VARBINARY.
+test:do_catchsql_test(
+    "cast-9.3",
+    [[
+        INSERT INTO t4(v) VALUES(]]..uuid..[[);
+    ]], {
+        1, "Type mismatch: can not convert "..
+           "uuid('11111111-1111-1111-1111-111111111111') to varbinary"
+    })
+
+-- Make sure that STRING and VARBINARY cannot be implicitly cast to UUID.
+test:do_catchsql_test(
+    "cast-9.4.1",
+    [[
+        INSERT INTO t5(u) VALUES('11111111-1111-1111-1111-111111111111');
+    ]], {
+        1, "Type mismatch: can not convert "..
+           "string('11111111-1111-1111-1111-111111111111') to uuid"
+    })
+
+test:do_catchsql_test(
+    "cast-9.4.2",
+    [[
+        INSERT INTO t5(u) VALUES(x'11111111111111111111111111111111');
+    ]], {
+        1, "Type mismatch: can not convert "..
+           "varbinary(x'11111111111111111111111111111111') to uuid"
+    })
+
+test:execsql([[
+    DROP TABLE t1;
+    DROP TABLE t2;
+    DROP TABLE t3;
+    DROP TABLE t4;
+    DROP TABLE t5;
+]])
 
 test:finish_test()

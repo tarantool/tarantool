@@ -136,13 +136,12 @@ test:do_catchsql_test(
         1,"Type mismatch: can not convert double(2.0e+19) to integer"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "cast-2.9",
     [[
         INSERT INTO t VALUES(2.1);
-        SELECT * FROM t;
     ]], {
-        2, 9223372036854775808ULL, 18000000000000000000ULL
+        1, "Type mismatch: can not convert double(2.1) to integer"
     })
 
 --
