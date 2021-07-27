@@ -28,6 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <ctype.h>
+
 #include "sqlInt.h"
 #include "mem.h"
 #include "vdbeInt.h"
@@ -600,24 +602,23 @@ str_to_bool(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_STR);
 	char *str = mem->z;
+	uint32_t len = mem->n;
 	bool b;
 	const char *str_true = "TRUE";
 	const char *str_false = "FALSE";
 	uint32_t len_true = strlen(str_true);
 	uint32_t len_false = strlen(str_false);
 
-	for (; str[0] == ' '; str++);
-	if (strncasecmp(str, str_true, len_true) == 0) {
-		b = true;
-		str += len_true;
-	} else if (strncasecmp(str, str_false, len_false) == 0) {
-		b = false;
-		str += len_false;
-	} else {
+	for (; isspace(str[0]); str++, len--);
+	for (; isspace(str[len - 1]); len--);
+	if (len != len_true && len != len_false)
 		return -1;
-	}
-	for (; str[0] == ' '; str++);
-	if (str[0] != '\0')
+
+	if (len == len_true && strncasecmp(str, str_true, len) == 0)
+		b = true;
+	else if (len == len_false && strncasecmp(str, str_false, len) == 0)
+		b = false;
+	else
 		return -1;
 	mem_set_bool(mem, b);
 	return 0;
