@@ -1,5 +1,4 @@
 SystemError fiber mprotect failed: Cannot allocate memory
-fiber: Can't put guard page to slab. Leak 57344 bytes: Cannot allocate memory
 	*** main_f ***
 1..6
 ok 1 - mprotect: failed to setup fiber guard page

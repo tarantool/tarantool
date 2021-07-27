@@ -81,9 +81,17 @@ main_f(va_list ap)
 	inj = errinj(ERRINJ_FIBER_MPROTECT, ERRINJ_INT);
 	inj->iparam = PROT_READ | PROT_WRITE;
 
+	/* On fiber_mprotect() fail we are logging number of bytes to be
+	 * leaked. However, it depends on system page_size (_SC_PAGESIZE).
+	 * On different OS's this parameter may vary. So let's temporary
+	 * redirect stderr to dev/null to make this test stable regardless
+	 * of OS.
+	 */
+	freopen("/dev/null", "w", stderr);
 	fiber_start(fiber);
 	fiber_join(fiber);
 	inj->iparam = -1;
+	freopen("/dev/stderr", "w", stderr);
 
 	used_after = slabc->allocated.stats.used;
 	ok(used_after > used_before, "expected leak detected");
