@@ -204,75 +204,20 @@ int tarantoolsqlPrevious(BtCursor *pCur, int *pRes)
 	return cursor_advance(pCur, pRes);
 }
 
-int tarantoolsqlMovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
-				   int *pRes)
+int
+sql_cursor_seek(struct BtCursor *cur, struct Mem *mems, uint32_t len, int *res)
 {
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
-	uint32_t tuple_size;
-	const char *tuple =
-		sql_vdbe_mem_encode_tuple(pIdxKey->aMem, pIdxKey->nField,
-					  &tuple_size, region);
+	uint32_t size;
+	const char *tuple = sql_vdbe_mem_encode_tuple(mems, len, &size, region);
 	if (tuple == NULL)
 		return -1;
-	if (key_alloc(pCur, tuple_size) != 0)
+	if (key_alloc(cur, size) != 0)
 		return -1;
-	memcpy(pCur->key, tuple, tuple_size);
+	memcpy(cur->key, tuple, size);
 	region_truncate(region, used);
-
-	int rc, res_success;
-	switch (pIdxKey->opcode) {
-	default:
-	  /*  "Unexpected opcode" */
-		assert(0);
-	case 255:
-	/* Restore saved state. Just re-seek cursor.
-	   TODO: replace w/ named constant.  */
-		res_success = 0;
-		break;
-	case OP_SeekLT:
-		pCur->iter_type = ITER_LT;
-		res_success = -1; /* item<key */
-		break;
-	case OP_SeekLE:
-		pCur->iter_type = (pCur->hints & OPFLAG_SEEKEQ) != 0 ?
-				  ITER_REQ : ITER_LE;
-		res_success = 0; /* item==key */
-		break;
-	case OP_SeekGE:
-		pCur->iter_type = (pCur->hints & OPFLAG_SEEKEQ) != 0 ?
-				  ITER_EQ : ITER_GE;
-		res_success = 0; /* item==key */
-		break;
-	case OP_SeekGT:
-		pCur->iter_type = ITER_GT;
-		res_success = 1; /* item>key */
-		break;
-	case OP_NoConflict:
-	case OP_NotFound:
-	case OP_Found:
-	case OP_IdxDelete:
-		pCur->iter_type = ITER_EQ;
-		res_success = 0;
-		break;
-	}
-	rc = cursor_seek(pCur, pRes);
-	if (*pRes == 0) {
-		*pRes = res_success;
-		/*
-		 * To select the first item in a row of equal items
-		 * (last item), sql comparator is configured to
-		 * return +1 (-1) if an item equals the key making it
-		 * impossible to distinguish from an item>key (item<key)
-		 * from comparator output alone.
-		 * To make it possible to learn if the current item
-		 * equals the key, the comparator sets eqSeen.
-		 */
-		pIdxKey->eqSeen = 1;
-	} else {
-		*pRes = -1; /* -1 also means EOF */
-	}
-	return rc;
+	return cursor_seek(cur, res);
 }
 
 /*

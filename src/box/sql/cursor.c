@@ -133,20 +133,6 @@ sqlCursorPayload(BtCursor *pCur, u32 offset, u32 amt, void *pBuf)
  */
 
 int
-sqlCursorMovetoUnpacked(BtCursor * pCur,	/* The cursor to be moved */
-			   UnpackedRecord * pIdxKey,	/* Unpacked index key */
-			   int *pRes	/* Write search results here */
-    )
-{
-	assert(pRes);
-	assert(pIdxKey);
-	assert((pCur->curFlags & BTCF_TaCursor) ||
-	       (pCur->curFlags & BTCF_TEphemCursor));
-
-	return tarantoolsqlMovetoUnpacked(pCur, pIdxKey, pRes);
-}
-
-int
 sqlCursorNext(BtCursor *pCur, int *pRes)
 {
 	assert(pRes != 0);

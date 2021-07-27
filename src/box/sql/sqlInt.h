@@ -1312,13 +1312,6 @@ sql_space_tuple_log_count(struct space *space);
  * at the first key_def->part_count) then default_rc can be set to -1 to
  * cause the search to find the last match, or +1 to cause the search to
  * find the first match.
- *
- * The key comparison functions will set eqSeen to true if they ever
- * get and equal results when comparing this structure to a b-tree record.
- * When default_rc!=0, the search might end up on the record immediately
- * before the first match or immediately after the last match.  The
- * eqSeen field will indicate whether or not an exact match exists in the
- * b-tree.
  */
 struct UnpackedRecord {
 	/** Collation and sort-order information. */
@@ -1328,7 +1321,6 @@ struct UnpackedRecord {
 	i8 default_rc;		/* Comparison result if keys are equal */
 	i8 r1;			/* Value to return if (lhs > rhs) */
 	i8 r2;			/* Value to return if (rhs < lhs) */
-	u8 eqSeen;		/* True if an equality comparison has been seen */
 	u8 opcode;		/* Currently executing opcode that invoked
 				 * movetoUnpacked, used by Tarantool storage layer.
 				 */

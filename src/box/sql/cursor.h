@@ -60,7 +60,6 @@ void sqlCursorZero(BtCursor *);
  */
 void
 sql_cursor_close(struct BtCursor *cursor);
-int sqlCursorMovetoUnpacked(BtCursor *, UnpackedRecord * pUnKey, int *pRes);
 
 int sqlCursorNext(BtCursor *, int *pRes);
 int sqlCursorPrevious(BtCursor *, int *pRes);

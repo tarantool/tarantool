@@ -747,6 +747,14 @@ int
 mem_cast_implicit_old(struct Mem *mem, enum field_type type);
 
 /**
+ * Cast MEM with numeric value to given numeric type. Doesn't fail. The return
+ * value is < 0 if the original value is less than the result, > 0 if the
+ * original value is greater than the result, and 0 if the cast is precise.
+ */
+int
+mem_cast_implicit_number(struct Mem *mem, enum field_type type);
+
+/**
  * Return value for MEM of INTEGER type. For MEM of all other types convert
  * value of the MEM to INTEGER if possible and return converted value. Original
  * MEM is not changed.

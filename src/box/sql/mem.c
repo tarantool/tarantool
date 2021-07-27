@@ -45,6 +45,8 @@
 #include "uuid/mp_uuid.h"
 #include "mp_decimal.h"
 
+#define CMP_OLD_NEW(a, b, type) (((a) > (type)(b)) - ((a) < (type)(b)))
+
 /*
  * Make sure pMem->z points to a writable allocation of at least
  * min(n,32) bytes.
@@ -662,6 +664,23 @@ int_to_double_precise(struct Mem *mem)
 	return 0;
 }
 
+/**
+ * Cast MEM with negative INTEGER to DOUBLE. Doesn't fail. The return value
+ * is < 0 if the original value is less than the result, > 0 if the original
+ * value is greater than the result, and 0 if the cast is precise.
+ */
+static inline int
+int_to_double_forced(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_INT);
+	int64_t i = mem->u.i;
+	double d = (double)i;
+	mem->u.r = d;
+	mem->type = MEM_TYPE_DOUBLE;
+	mem->field_type = FIELD_TYPE_DOUBLE;
+	return CMP_OLD_NEW(i, d, int64_t);
+}
+
 static inline int
 uint_to_double_precise(struct Mem *mem)
 {
@@ -674,6 +693,23 @@ uint_to_double_precise(struct Mem *mem)
 	mem->type = MEM_TYPE_DOUBLE;
 	mem->field_type = FIELD_TYPE_DOUBLE;
 	return 0;
+}
+
+/**
+ * Cast MEM with positive INTEGER to DOUBLE. Doesn't fail. The return value
+ * is < 0 if the original value is less than the result, > 0 if the original
+ * value is greater than the result, and 0 if the cast is precise.
+ */
+static inline int
+uint_to_double_forced(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_UINT);
+	uint64_t u = mem->u.u;
+	double d = (double)u;
+	mem->u.r = d;
+	mem->type = MEM_TYPE_DOUBLE;
+	mem->field_type = FIELD_TYPE_DOUBLE;
+	return CMP_OLD_NEW(u, d, uint64_t);
 }
 
 static inline int
@@ -868,6 +904,43 @@ double_to_int_precise(struct Mem *mem)
 	return -1;
 }
 
+/**
+ * Cast MEM with DOUBLE to INTEGER. Doesn't fail. The return value is < 0 if the
+ * original value is less than the result, > 0 if the original value is greater
+ * than the result, and 0 if the cast is precise.
+ */
+static inline int
+double_to_int_forced(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DOUBLE);
+	double d = mem->u.r;
+	int64_t i;
+	enum mem_type type;
+	int res;
+	if (d < (double)INT64_MIN) {
+		i = INT64_MIN;
+		type = MEM_TYPE_INT;
+		res = -1;
+	} else if (d >= (double)UINT64_MAX) {
+		i = (int64_t)UINT64_MAX;
+		type = MEM_TYPE_UINT;
+		res = 1;
+	} else if (d <= -1.0) {
+		i = (int64_t)d;
+		type = MEM_TYPE_INT;
+		res = CMP_OLD_NEW(d, i, double);
+	} else {
+		uint64_t u = (uint64_t)d;
+		i = (int64_t)u;
+		type = MEM_TYPE_UINT;
+		res = CMP_OLD_NEW(d, u, double);
+	}
+	mem->u.i = i;
+	mem->type = type;
+	mem->field_type = FIELD_TYPE_INTEGER;
+	return res;
+}
+
 static inline int
 double_to_uint(struct Mem *mem)
 {
@@ -896,6 +969,34 @@ double_to_uint_precise(struct Mem *mem)
 		return 0;
 	}
 	return -1;
+}
+
+/**
+ * Cast MEM with DOUBLE to UNSIGNED. Doesn't fail. The return value is < 0 if
+ * the original value is less than the result, > 0 if the original value is
+ * greater than the result, and 0 if the cast is precise.
+ */
+static inline int
+double_to_uint_forced(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DOUBLE);
+	double d = mem->u.r;
+	uint64_t u;
+	int res;
+	if (d < 0.0) {
+		u = 0;
+		res = -1;
+	} else if (d >= (double)UINT64_MAX) {
+		u = UINT64_MAX;
+		res = 1;
+	} else {
+		u = (uint64_t)d;
+		res = CMP_OLD_NEW(d, u, double);
+	}
+	mem->u.u = u;
+	mem->type = MEM_TYPE_UINT;
+	mem->field_type = FIELD_TYPE_UNSIGNED;
+	return res;
 }
 
 static inline int
@@ -1272,6 +1373,57 @@ mem_cast_implicit_old(struct Mem *mem, enum field_type type)
 		break;
 	}
 	return -1;
+}
+
+int
+mem_cast_implicit_number(struct Mem *mem, enum field_type type)
+{
+	assert(mem_is_num(mem) && sql_type_is_numeric(type));
+	switch (type) {
+	case FIELD_TYPE_UNSIGNED:
+		switch (mem->type) {
+		case MEM_TYPE_UINT:
+			mem->field_type = FIELD_TYPE_UNSIGNED;
+			return 0;
+		case MEM_TYPE_INT:
+			mem->u.u = 0;
+			mem->type = MEM_TYPE_UINT;
+			mem->field_type = FIELD_TYPE_UNSIGNED;
+			return -1;
+		case MEM_TYPE_DOUBLE:
+			return double_to_uint_forced(mem);
+		default:
+			unreachable();
+		}
+		break;
+	case FIELD_TYPE_DOUBLE:
+		switch (mem->type) {
+		case MEM_TYPE_INT:
+			return int_to_double_forced(mem);
+		case MEM_TYPE_UINT:
+			return uint_to_double_forced(mem);
+		case MEM_TYPE_DOUBLE:
+			return 0;
+		default:
+			unreachable();
+		}
+		break;
+	case FIELD_TYPE_INTEGER:
+		switch (mem->type) {
+		case MEM_TYPE_UINT:
+		case MEM_TYPE_INT:
+			mem->field_type = FIELD_TYPE_INTEGER;
+			return 0;
+		case MEM_TYPE_DOUBLE:
+			return double_to_int_forced(mem);
+		default:
+			unreachable();
+		}
+		break;
+	default:
+		unreachable();
+	}
+	return 0;
 }
 
 int
@@ -2520,8 +2672,6 @@ sqlVdbeRecordCompareMsgpack(const void *key1,
 			return -rc;
 		}
 	}
-
-	key2->eqSeen = 1;
 	return key2->default_rc;
 }
 
