@@ -13,6 +13,7 @@ local uuid = require('uuid')
 local uri = require('uri')
 local json = require('json')
 local msgpackffi = require('msgpackffi')
+local decimal = require('decimal')
 
 local function test_uuid(test)
     test:plan(1)
@@ -221,14 +222,49 @@ local function test_info_uuid(test)
     test:ok(is_success, 'info uuid in gc')
 end
 
+local function test_decimal(test)
+    test:plan(1)
+
+    local gc_count = 100
+    local iter_count = 1000
+    local is_success = true
+
+    local d1 = decimal.new(1111111111111111111)
+    local d2 = decimal.new(2222222222222222222)
+
+    local function decimal_to_str()
+        local str1 = tostring(d1)
+        local str2 = tostring(d2)
+        local str3 = tostring(d1)
+        local str4 = tostring(d2)
+        if str1 ~= str3 or str2 ~= str4 then
+            is_success = false
+        end
+    end
+
+    local function create_gc()
+        for _ = 1, gc_count do
+            ffi.gc(ffi.new('char[1]'), function() decimal_to_str() end)
+        end
+    end
+
+    for _ = 1, iter_count do
+        create_gc()
+        decimal_to_str()
+    end
+
+    test:ok(is_success, 'decimal str in gc')
+end
+
 box.cfg{}
 
 local test = tap.test('gh-5632-6050-6259-gc-buf-reuse')
-test:plan(5)
+test:plan(6)
 test:test('uuid in __gc', test_uuid)
 test:test('uri in __gc', test_uri)
 test:test('msgpackffi in __gc', test_msgpackffi)
 test:test('json in __gc', test_json)
 test:test('info uuid in __gc', test_info_uuid)
+test:test('decimal str in __gc', test_decimal)
 
 os.exit(test:check() and 0 or 1)

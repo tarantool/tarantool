@@ -89,6 +89,18 @@ lua_pushdecimal(struct lua_State *L)
 	return res;
 }
 
+void
+lua_pushdecimalstr(struct lua_State *L, const decimal_t *dec)
+{
+	/*
+	 * Do not use a global buffer. It might be overwritten if GC starts
+	 * working.
+	 */
+	char str[DECIMAL_MAX_STR_LEN + 1];
+	decimal_to_string(dec, str);
+	lua_pushstring(L, str);
+}
+
 /**
  * Returns true if a value at a given index is a decimal
  * and false otherwise
@@ -376,7 +388,7 @@ ldecimal_tostring(struct lua_State *L)
 	if (lua_gettop(L) < 1)
 		return luaL_error(L, "usage: decimal.tostring(decimal)");
 	decimal_t *lhs = lua_checkdecimal(L, 1);
-	lua_pushstring(L, decimal_str(lhs));
+	lua_pushdecimalstr(L, lhs);
 	return 1;
 }
 
