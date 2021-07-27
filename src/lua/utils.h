@@ -75,6 +75,9 @@ extern uint32_t CTID_UUID;
 struct tt_uuid *
 luaL_pushuuid(struct lua_State *L);
 
+void
+luaL_pushuuidstr(struct lua_State *L, const struct tt_uuid *uuid);
+
 /** \cond public */
 
 /**
