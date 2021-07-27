@@ -108,6 +108,9 @@ char buf[32];
 	is(decimal_compare(&dec, &d2), 0, "mp_decode(mp_encode("str")) value");\
 	is(decimal_scale(&dec), decimal_scale(&d2), "mp_decode(mp_encode("str")) scale");\
 	is(strcmp(decimal_str(&d2), str), 0, "str(mp_decode(mp_encode("str"))) == "str);\
+	char strbuf[DECIMAL_MAX_STR_LEN + 1];\
+	decimal_to_string(&dec, strbuf);\
+	is(strcmp(strbuf, decimal_str(&dec)), 0, "stack str == static str for "str);\
 	b2 = buf;\
 	int8_t type;\
 	uint32_t l2 = mp_decode_extl(&b2, &type);\
@@ -194,7 +197,7 @@ test_pack_unpack(void)
 static int
 test_mp_decimal(void)
 {
-	plan(198);
+	plan(216);
 
 	test_mpdec("0");
 	test_mpdec("-0");

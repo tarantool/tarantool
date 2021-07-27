@@ -175,6 +175,14 @@ decimal_str(const decimal_t *dec)
 	return buf;
 }
 
+void
+decimal_to_string(const decimal_t *dec, char *str)
+{
+	char *tmp = decNumberToString(dec, str);
+	assert(str == tmp);
+	(void)tmp;
+}
+
 static decimal_t *
 decimal_to_integer(decimal_t *dec)
 {
