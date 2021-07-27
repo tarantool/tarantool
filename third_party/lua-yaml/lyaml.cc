@@ -700,7 +700,7 @@ static int dump_node(struct lua_yaml_dumper *dumper)
    case MP_EXT:
       switch (field.ext_type) {
       case MP_DECIMAL:
-         str = decimal_to_string(field.decval);
+         str = decimal_str(field.decval);
          len = strlen(str);
          break;
       case MP_UUID:

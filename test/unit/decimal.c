@@ -107,7 +107,7 @@ char buf[32];
 	is(b1, b2, "mp_decode(mp_encode("str") len");\
 	is(decimal_compare(&dec, &d2), 0, "mp_decode(mp_encode("str")) value");\
 	is(decimal_scale(&dec), decimal_scale(&d2), "mp_decode(mp_encode("str")) scale");\
-	is(strcmp(decimal_to_string(&d2), str), 0, "str(mp_decode(mp_encode("str"))) == "str);\
+	is(strcmp(decimal_str(&d2), str), 0, "str(mp_decode(mp_encode("str"))) == "str);\
 	b2 = buf;\
 	int8_t type;\
 	uint32_t l2 = mp_decode_extl(&b2, &type);\
@@ -131,7 +131,7 @@ char buf[32];
 	is(decimal_compare(&dec, &d2), 0, "decimal_unpack(decimal_pack("str")) value");\
 	is(decimal_scale(&dec), decimal_scale(&d2), "decimal_unpack(decimal_pack("str")) scale");\
 	is(decimal_precision(&dec), decimal_precision(&d2), "decimal_unpack(decimal_pack("str")) precision");\
-	is(strcmp(decimal_to_string(&d2), str), 0, "str(decimal_unpack(decimal_pack("str")) == "str);\
+	is(strcmp(decimal_str(&d2), str), 0, "str(decimal_unpack(decimal_pack("str")) == "str);\
 })
 
 #define test_toint(type, num, out_fmt) ({\

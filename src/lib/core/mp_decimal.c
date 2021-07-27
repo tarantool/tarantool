@@ -77,7 +77,7 @@ mp_snprint_decimal(char *buf, int size, const char **data, uint32_t len)
 	decimal_t d;
 	if (decimal_unpack(data, len, &d) == NULL)
 		return -1;
-	return snprintf(buf, size, "%s", decimal_to_string(&d));
+	return snprintf(buf, size, "%s", decimal_str(&d));
 }
 
 int
@@ -86,5 +86,5 @@ mp_fprint_decimal(FILE *file, const char **data, uint32_t len)
 	decimal_t d;
 	if (decimal_unpack(data, len, &d) == NULL)
 		return -1;
-	return fprintf(file, "%s", decimal_to_string(&d));
+	return fprintf(file, "%s", decimal_str(&d));
 }
