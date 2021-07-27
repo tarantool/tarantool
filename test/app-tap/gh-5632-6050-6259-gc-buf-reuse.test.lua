@@ -1,10 +1,10 @@
 #!/usr/bin/env tarantool
 
 --
--- gh-5632, gh-6050: Lua code should not use any global buffers or objects
--- without proper ownership protection. Otherwise these items might be suddenly
--- reused during Lua GC which happens almost at any moment. That might lead to
--- data corruption.
+-- gh-5632, gh-6050, gh-6259: Lua code should not use any global buffers or
+-- objects without proper ownership protection. Otherwise these items might be
+-- suddenly reused during Lua GC which happens almost at any moment. That might
+-- lead to data corruption.
 --
 
 local tap = require('tap')
@@ -190,11 +190,45 @@ local function test_json(test)
    test:ok(is_success, 'json in gc')
 end
 
-local test = tap.test('gh-5632-6050-gc-buf-reuse')
-test:plan(4)
+local function test_info_uuid(test)
+    test:plan(1)
+
+    local gc_count = 100
+    local iter_count = 1000
+    local is_success = true
+
+    local function uuid_to_str()
+        local str1 = box.info.uuid
+        local str2 = box.info.cluster.uuid
+        local str3 = box.info.uuid
+        local str4 = box.info.cluster.uuid
+        if str1 ~= str3 or str2 ~= str4 then
+            is_success = false
+        end
+    end
+
+    local function create_gc()
+        for _ = 1, gc_count do
+            ffi.gc(ffi.new('char[1]'), function() uuid_to_str() end)
+        end
+    end
+
+    for _ = 1, iter_count do
+        create_gc()
+        uuid_to_str()
+    end
+
+    test:ok(is_success, 'info uuid in gc')
+end
+
+box.cfg{}
+
+local test = tap.test('gh-5632-6050-6259-gc-buf-reuse')
+test:plan(5)
 test:test('uuid in __gc', test_uuid)
 test:test('uri in __gc', test_uri)
 test:test('msgpackffi in __gc', test_msgpackffi)
 test:test('json in __gc', test_json)
+test:test('info uuid in __gc', test_info_uuid)
 
 os.exit(test:check() and 0 or 1)
