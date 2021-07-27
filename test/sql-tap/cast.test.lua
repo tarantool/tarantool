@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(94)
+test:plan(95)
 
 --!./tcltestrunner.lua
 -- 2005 June 25
@@ -1006,6 +1006,15 @@ test:do_catchsql_test(
         SELECT CAST(x'31' AS NUMBER);
     ]], {
         1, "Type mismatch: can not convert varbinary(x'31') to number"
+    })
+
+-- Make sure that not NULL-terminated can be cast to BOOLEAN.
+test:do_execsql_test(
+    "cast-8",
+    [[
+        SELECT CAST(substr('true       ', 0, 6) AS BOOLEAN);
+    ]], {
+        true
     })
 
 test:finish_test()
