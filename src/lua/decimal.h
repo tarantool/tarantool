@@ -45,6 +45,9 @@ decimal_t *
 lua_pushdecimal(struct lua_State *L);
 
 void
+lua_pushdecimalstr(struct lua_State *L, const decimal_t *dec);
+
+void
 tarantool_lua_decimal_init(struct lua_State *L);
 
 #if defined(__cplusplus)
