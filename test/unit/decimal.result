@@ -498,7 +498,7 @@ ok 279 - subtests
     ok 150 - unpack malformed decimal fails
     ok 151 - decode malformed decimal preserves buffer position
 ok 280 - subtests
-    1..198
+    1..216
     ok 1 - mp_sizeof_decimal(0)
     ok 2 - mp_sizeof_decimal(0) == len(mp_encode_decimal(0))
     ok 3 - mp_next(mp_encode(0))
@@ -506,197 +506,215 @@ ok 280 - subtests
     ok 5 - mp_decode(mp_encode(0)) value
     ok 6 - mp_decode(mp_encode(0)) scale
     ok 7 - str(mp_decode(mp_encode(0))) == 0
-    ok 8 - mp_ext_type is MP_DECIMAL
-    ok 9 - decimal_unpack() after mp_decode_extl()
-    ok 10 - decimal_unpack() after mp_decode_extl() value
-    ok 11 - decimal_unpack() after mp_decode_extl() len
-    ok 12 - mp_sizeof_decimal(-0)
-    ok 13 - mp_sizeof_decimal(-0) == len(mp_encode_decimal(-0))
-    ok 14 - mp_next(mp_encode(-0))
-    ok 15 - mp_decode(mp_encode(-0) len
-    ok 16 - mp_decode(mp_encode(-0)) value
-    ok 17 - mp_decode(mp_encode(-0)) scale
-    ok 18 - str(mp_decode(mp_encode(-0))) == -0
-    ok 19 - mp_ext_type is MP_DECIMAL
-    ok 20 - decimal_unpack() after mp_decode_extl()
-    ok 21 - decimal_unpack() after mp_decode_extl() value
-    ok 22 - decimal_unpack() after mp_decode_extl() len
-    ok 23 - mp_sizeof_decimal(1)
-    ok 24 - mp_sizeof_decimal(1) == len(mp_encode_decimal(1))
-    ok 25 - mp_next(mp_encode(1))
-    ok 26 - mp_decode(mp_encode(1) len
-    ok 27 - mp_decode(mp_encode(1)) value
-    ok 28 - mp_decode(mp_encode(1)) scale
-    ok 29 - str(mp_decode(mp_encode(1))) == 1
-    ok 30 - mp_ext_type is MP_DECIMAL
-    ok 31 - decimal_unpack() after mp_decode_extl()
-    ok 32 - decimal_unpack() after mp_decode_extl() value
-    ok 33 - decimal_unpack() after mp_decode_extl() len
-    ok 34 - mp_sizeof_decimal(-1)
-    ok 35 - mp_sizeof_decimal(-1) == len(mp_encode_decimal(-1))
-    ok 36 - mp_next(mp_encode(-1))
-    ok 37 - mp_decode(mp_encode(-1) len
-    ok 38 - mp_decode(mp_encode(-1)) value
-    ok 39 - mp_decode(mp_encode(-1)) scale
-    ok 40 - str(mp_decode(mp_encode(-1))) == -1
-    ok 41 - mp_ext_type is MP_DECIMAL
-    ok 42 - decimal_unpack() after mp_decode_extl()
-    ok 43 - decimal_unpack() after mp_decode_extl() value
-    ok 44 - decimal_unpack() after mp_decode_extl() len
-    ok 45 - mp_sizeof_decimal(0.1)
-    ok 46 - mp_sizeof_decimal(0.1) == len(mp_encode_decimal(0.1))
-    ok 47 - mp_next(mp_encode(0.1))
-    ok 48 - mp_decode(mp_encode(0.1) len
-    ok 49 - mp_decode(mp_encode(0.1)) value
-    ok 50 - mp_decode(mp_encode(0.1)) scale
-    ok 51 - str(mp_decode(mp_encode(0.1))) == 0.1
-    ok 52 - mp_ext_type is MP_DECIMAL
-    ok 53 - decimal_unpack() after mp_decode_extl()
-    ok 54 - decimal_unpack() after mp_decode_extl() value
-    ok 55 - decimal_unpack() after mp_decode_extl() len
-    ok 56 - mp_sizeof_decimal(-0.1)
-    ok 57 - mp_sizeof_decimal(-0.1) == len(mp_encode_decimal(-0.1))
-    ok 58 - mp_next(mp_encode(-0.1))
-    ok 59 - mp_decode(mp_encode(-0.1) len
-    ok 60 - mp_decode(mp_encode(-0.1)) value
-    ok 61 - mp_decode(mp_encode(-0.1)) scale
-    ok 62 - str(mp_decode(mp_encode(-0.1))) == -0.1
-    ok 63 - mp_ext_type is MP_DECIMAL
-    ok 64 - decimal_unpack() after mp_decode_extl()
-    ok 65 - decimal_unpack() after mp_decode_extl() value
-    ok 66 - decimal_unpack() after mp_decode_extl() len
-    ok 67 - mp_sizeof_decimal(2.718281828459045)
-    ok 68 - mp_sizeof_decimal(2.718281828459045) == len(mp_encode_decimal(2.718281828459045))
-    ok 69 - mp_next(mp_encode(2.718281828459045))
-    ok 70 - mp_decode(mp_encode(2.718281828459045) len
-    ok 71 - mp_decode(mp_encode(2.718281828459045)) value
-    ok 72 - mp_decode(mp_encode(2.718281828459045)) scale
-    ok 73 - str(mp_decode(mp_encode(2.718281828459045))) == 2.718281828459045
-    ok 74 - mp_ext_type is MP_DECIMAL
-    ok 75 - decimal_unpack() after mp_decode_extl()
-    ok 76 - decimal_unpack() after mp_decode_extl() value
-    ok 77 - decimal_unpack() after mp_decode_extl() len
-    ok 78 - mp_sizeof_decimal(-2.718281828459045)
-    ok 79 - mp_sizeof_decimal(-2.718281828459045) == len(mp_encode_decimal(-2.718281828459045))
-    ok 80 - mp_next(mp_encode(-2.718281828459045))
-    ok 81 - mp_decode(mp_encode(-2.718281828459045) len
-    ok 82 - mp_decode(mp_encode(-2.718281828459045)) value
-    ok 83 - mp_decode(mp_encode(-2.718281828459045)) scale
-    ok 84 - str(mp_decode(mp_encode(-2.718281828459045))) == -2.718281828459045
-    ok 85 - mp_ext_type is MP_DECIMAL
-    ok 86 - decimal_unpack() after mp_decode_extl()
-    ok 87 - decimal_unpack() after mp_decode_extl() value
-    ok 88 - decimal_unpack() after mp_decode_extl() len
-    ok 89 - mp_sizeof_decimal(3.141592653589793)
-    ok 90 - mp_sizeof_decimal(3.141592653589793) == len(mp_encode_decimal(3.141592653589793))
-    ok 91 - mp_next(mp_encode(3.141592653589793))
-    ok 92 - mp_decode(mp_encode(3.141592653589793) len
-    ok 93 - mp_decode(mp_encode(3.141592653589793)) value
-    ok 94 - mp_decode(mp_encode(3.141592653589793)) scale
-    ok 95 - str(mp_decode(mp_encode(3.141592653589793))) == 3.141592653589793
-    ok 96 - mp_ext_type is MP_DECIMAL
-    ok 97 - decimal_unpack() after mp_decode_extl()
-    ok 98 - decimal_unpack() after mp_decode_extl() value
-    ok 99 - decimal_unpack() after mp_decode_extl() len
-    ok 100 - mp_sizeof_decimal(-3.141592653589793)
-    ok 101 - mp_sizeof_decimal(-3.141592653589793) == len(mp_encode_decimal(-3.141592653589793))
-    ok 102 - mp_next(mp_encode(-3.141592653589793))
-    ok 103 - mp_decode(mp_encode(-3.141592653589793) len
-    ok 104 - mp_decode(mp_encode(-3.141592653589793)) value
-    ok 105 - mp_decode(mp_encode(-3.141592653589793)) scale
-    ok 106 - str(mp_decode(mp_encode(-3.141592653589793))) == -3.141592653589793
-    ok 107 - mp_ext_type is MP_DECIMAL
-    ok 108 - decimal_unpack() after mp_decode_extl()
-    ok 109 - decimal_unpack() after mp_decode_extl() value
-    ok 110 - decimal_unpack() after mp_decode_extl() len
-    ok 111 - mp_sizeof_decimal(1234567891234567890.0987654321987654321)
-    ok 112 - mp_sizeof_decimal(1234567891234567890.0987654321987654321) == len(mp_encode_decimal(1234567891234567890.0987654321987654321))
-    ok 113 - mp_next(mp_encode(1234567891234567890.0987654321987654321))
-    ok 114 - mp_decode(mp_encode(1234567891234567890.0987654321987654321) len
-    ok 115 - mp_decode(mp_encode(1234567891234567890.0987654321987654321)) value
-    ok 116 - mp_decode(mp_encode(1234567891234567890.0987654321987654321)) scale
-    ok 117 - str(mp_decode(mp_encode(1234567891234567890.0987654321987654321))) == 1234567891234567890.0987654321987654321
-    ok 118 - mp_ext_type is MP_DECIMAL
-    ok 119 - decimal_unpack() after mp_decode_extl()
-    ok 120 - decimal_unpack() after mp_decode_extl() value
-    ok 121 - decimal_unpack() after mp_decode_extl() len
-    ok 122 - mp_sizeof_decimal(-1234567891234567890.0987654321987654321)
-    ok 123 - mp_sizeof_decimal(-1234567891234567890.0987654321987654321) == len(mp_encode_decimal(-1234567891234567890.0987654321987654321))
-    ok 124 - mp_next(mp_encode(-1234567891234567890.0987654321987654321))
-    ok 125 - mp_decode(mp_encode(-1234567891234567890.0987654321987654321) len
-    ok 126 - mp_decode(mp_encode(-1234567891234567890.0987654321987654321)) value
-    ok 127 - mp_decode(mp_encode(-1234567891234567890.0987654321987654321)) scale
-    ok 128 - str(mp_decode(mp_encode(-1234567891234567890.0987654321987654321))) == -1234567891234567890.0987654321987654321
+    ok 8 - stack str == static str for 0
+    ok 9 - mp_ext_type is MP_DECIMAL
+    ok 10 - decimal_unpack() after mp_decode_extl()
+    ok 11 - decimal_unpack() after mp_decode_extl() value
+    ok 12 - decimal_unpack() after mp_decode_extl() len
+    ok 13 - mp_sizeof_decimal(-0)
+    ok 14 - mp_sizeof_decimal(-0) == len(mp_encode_decimal(-0))
+    ok 15 - mp_next(mp_encode(-0))
+    ok 16 - mp_decode(mp_encode(-0) len
+    ok 17 - mp_decode(mp_encode(-0)) value
+    ok 18 - mp_decode(mp_encode(-0)) scale
+    ok 19 - str(mp_decode(mp_encode(-0))) == -0
+    ok 20 - stack str == static str for -0
+    ok 21 - mp_ext_type is MP_DECIMAL
+    ok 22 - decimal_unpack() after mp_decode_extl()
+    ok 23 - decimal_unpack() after mp_decode_extl() value
+    ok 24 - decimal_unpack() after mp_decode_extl() len
+    ok 25 - mp_sizeof_decimal(1)
+    ok 26 - mp_sizeof_decimal(1) == len(mp_encode_decimal(1))
+    ok 27 - mp_next(mp_encode(1))
+    ok 28 - mp_decode(mp_encode(1) len
+    ok 29 - mp_decode(mp_encode(1)) value
+    ok 30 - mp_decode(mp_encode(1)) scale
+    ok 31 - str(mp_decode(mp_encode(1))) == 1
+    ok 32 - stack str == static str for 1
+    ok 33 - mp_ext_type is MP_DECIMAL
+    ok 34 - decimal_unpack() after mp_decode_extl()
+    ok 35 - decimal_unpack() after mp_decode_extl() value
+    ok 36 - decimal_unpack() after mp_decode_extl() len
+    ok 37 - mp_sizeof_decimal(-1)
+    ok 38 - mp_sizeof_decimal(-1) == len(mp_encode_decimal(-1))
+    ok 39 - mp_next(mp_encode(-1))
+    ok 40 - mp_decode(mp_encode(-1) len
+    ok 41 - mp_decode(mp_encode(-1)) value
+    ok 42 - mp_decode(mp_encode(-1)) scale
+    ok 43 - str(mp_decode(mp_encode(-1))) == -1
+    ok 44 - stack str == static str for -1
+    ok 45 - mp_ext_type is MP_DECIMAL
+    ok 46 - decimal_unpack() after mp_decode_extl()
+    ok 47 - decimal_unpack() after mp_decode_extl() value
+    ok 48 - decimal_unpack() after mp_decode_extl() len
+    ok 49 - mp_sizeof_decimal(0.1)
+    ok 50 - mp_sizeof_decimal(0.1) == len(mp_encode_decimal(0.1))
+    ok 51 - mp_next(mp_encode(0.1))
+    ok 52 - mp_decode(mp_encode(0.1) len
+    ok 53 - mp_decode(mp_encode(0.1)) value
+    ok 54 - mp_decode(mp_encode(0.1)) scale
+    ok 55 - str(mp_decode(mp_encode(0.1))) == 0.1
+    ok 56 - stack str == static str for 0.1
+    ok 57 - mp_ext_type is MP_DECIMAL
+    ok 58 - decimal_unpack() after mp_decode_extl()
+    ok 59 - decimal_unpack() after mp_decode_extl() value
+    ok 60 - decimal_unpack() after mp_decode_extl() len
+    ok 61 - mp_sizeof_decimal(-0.1)
+    ok 62 - mp_sizeof_decimal(-0.1) == len(mp_encode_decimal(-0.1))
+    ok 63 - mp_next(mp_encode(-0.1))
+    ok 64 - mp_decode(mp_encode(-0.1) len
+    ok 65 - mp_decode(mp_encode(-0.1)) value
+    ok 66 - mp_decode(mp_encode(-0.1)) scale
+    ok 67 - str(mp_decode(mp_encode(-0.1))) == -0.1
+    ok 68 - stack str == static str for -0.1
+    ok 69 - mp_ext_type is MP_DECIMAL
+    ok 70 - decimal_unpack() after mp_decode_extl()
+    ok 71 - decimal_unpack() after mp_decode_extl() value
+    ok 72 - decimal_unpack() after mp_decode_extl() len
+    ok 73 - mp_sizeof_decimal(2.718281828459045)
+    ok 74 - mp_sizeof_decimal(2.718281828459045) == len(mp_encode_decimal(2.718281828459045))
+    ok 75 - mp_next(mp_encode(2.718281828459045))
+    ok 76 - mp_decode(mp_encode(2.718281828459045) len
+    ok 77 - mp_decode(mp_encode(2.718281828459045)) value
+    ok 78 - mp_decode(mp_encode(2.718281828459045)) scale
+    ok 79 - str(mp_decode(mp_encode(2.718281828459045))) == 2.718281828459045
+    ok 80 - stack str == static str for 2.718281828459045
+    ok 81 - mp_ext_type is MP_DECIMAL
+    ok 82 - decimal_unpack() after mp_decode_extl()
+    ok 83 - decimal_unpack() after mp_decode_extl() value
+    ok 84 - decimal_unpack() after mp_decode_extl() len
+    ok 85 - mp_sizeof_decimal(-2.718281828459045)
+    ok 86 - mp_sizeof_decimal(-2.718281828459045) == len(mp_encode_decimal(-2.718281828459045))
+    ok 87 - mp_next(mp_encode(-2.718281828459045))
+    ok 88 - mp_decode(mp_encode(-2.718281828459045) len
+    ok 89 - mp_decode(mp_encode(-2.718281828459045)) value
+    ok 90 - mp_decode(mp_encode(-2.718281828459045)) scale
+    ok 91 - str(mp_decode(mp_encode(-2.718281828459045))) == -2.718281828459045
+    ok 92 - stack str == static str for -2.718281828459045
+    ok 93 - mp_ext_type is MP_DECIMAL
+    ok 94 - decimal_unpack() after mp_decode_extl()
+    ok 95 - decimal_unpack() after mp_decode_extl() value
+    ok 96 - decimal_unpack() after mp_decode_extl() len
+    ok 97 - mp_sizeof_decimal(3.141592653589793)
+    ok 98 - mp_sizeof_decimal(3.141592653589793) == len(mp_encode_decimal(3.141592653589793))
+    ok 99 - mp_next(mp_encode(3.141592653589793))
+    ok 100 - mp_decode(mp_encode(3.141592653589793) len
+    ok 101 - mp_decode(mp_encode(3.141592653589793)) value
+    ok 102 - mp_decode(mp_encode(3.141592653589793)) scale
+    ok 103 - str(mp_decode(mp_encode(3.141592653589793))) == 3.141592653589793
+    ok 104 - stack str == static str for 3.141592653589793
+    ok 105 - mp_ext_type is MP_DECIMAL
+    ok 106 - decimal_unpack() after mp_decode_extl()
+    ok 107 - decimal_unpack() after mp_decode_extl() value
+    ok 108 - decimal_unpack() after mp_decode_extl() len
+    ok 109 - mp_sizeof_decimal(-3.141592653589793)
+    ok 110 - mp_sizeof_decimal(-3.141592653589793) == len(mp_encode_decimal(-3.141592653589793))
+    ok 111 - mp_next(mp_encode(-3.141592653589793))
+    ok 112 - mp_decode(mp_encode(-3.141592653589793) len
+    ok 113 - mp_decode(mp_encode(-3.141592653589793)) value
+    ok 114 - mp_decode(mp_encode(-3.141592653589793)) scale
+    ok 115 - str(mp_decode(mp_encode(-3.141592653589793))) == -3.141592653589793
+    ok 116 - stack str == static str for -3.141592653589793
+    ok 117 - mp_ext_type is MP_DECIMAL
+    ok 118 - decimal_unpack() after mp_decode_extl()
+    ok 119 - decimal_unpack() after mp_decode_extl() value
+    ok 120 - decimal_unpack() after mp_decode_extl() len
+    ok 121 - mp_sizeof_decimal(1234567891234567890.0987654321987654321)
+    ok 122 - mp_sizeof_decimal(1234567891234567890.0987654321987654321) == len(mp_encode_decimal(1234567891234567890.0987654321987654321))
+    ok 123 - mp_next(mp_encode(1234567891234567890.0987654321987654321))
+    ok 124 - mp_decode(mp_encode(1234567891234567890.0987654321987654321) len
+    ok 125 - mp_decode(mp_encode(1234567891234567890.0987654321987654321)) value
+    ok 126 - mp_decode(mp_encode(1234567891234567890.0987654321987654321)) scale
+    ok 127 - str(mp_decode(mp_encode(1234567891234567890.0987654321987654321))) == 1234567891234567890.0987654321987654321
+    ok 128 - stack str == static str for 1234567891234567890.0987654321987654321
     ok 129 - mp_ext_type is MP_DECIMAL
     ok 130 - decimal_unpack() after mp_decode_extl()
     ok 131 - decimal_unpack() after mp_decode_extl() value
     ok 132 - decimal_unpack() after mp_decode_extl() len
-    ok 133 - mp_sizeof_decimal(0.0000000000000000000000000000000000001)
-    ok 134 - mp_sizeof_decimal(0.0000000000000000000000000000000000001) == len(mp_encode_decimal(0.0000000000000000000000000000000000001))
-    ok 135 - mp_next(mp_encode(0.0000000000000000000000000000000000001))
-    ok 136 - mp_decode(mp_encode(0.0000000000000000000000000000000000001) len
-    ok 137 - mp_decode(mp_encode(0.0000000000000000000000000000000000001)) value
-    ok 138 - mp_decode(mp_encode(0.0000000000000000000000000000000000001)) scale
-    ok 139 - str(mp_decode(mp_encode(0.0000000000000000000000000000000000001))) == 0.0000000000000000000000000000000000001
-    ok 140 - mp_ext_type is MP_DECIMAL
-    ok 141 - decimal_unpack() after mp_decode_extl()
-    ok 142 - decimal_unpack() after mp_decode_extl() value
-    ok 143 - decimal_unpack() after mp_decode_extl() len
-    ok 144 - mp_sizeof_decimal(-0.0000000000000000000000000000000000001)
-    ok 145 - mp_sizeof_decimal(-0.0000000000000000000000000000000000001) == len(mp_encode_decimal(-0.0000000000000000000000000000000000001))
-    ok 146 - mp_next(mp_encode(-0.0000000000000000000000000000000000001))
-    ok 147 - mp_decode(mp_encode(-0.0000000000000000000000000000000000001) len
-    ok 148 - mp_decode(mp_encode(-0.0000000000000000000000000000000000001)) value
-    ok 149 - mp_decode(mp_encode(-0.0000000000000000000000000000000000001)) scale
-    ok 150 - str(mp_decode(mp_encode(-0.0000000000000000000000000000000000001))) == -0.0000000000000000000000000000000000001
-    ok 151 - mp_ext_type is MP_DECIMAL
-    ok 152 - decimal_unpack() after mp_decode_extl()
-    ok 153 - decimal_unpack() after mp_decode_extl() value
-    ok 154 - decimal_unpack() after mp_decode_extl() len
-    ok 155 - mp_sizeof_decimal(0.00000000000000000000000000000000000001)
-    ok 156 - mp_sizeof_decimal(0.00000000000000000000000000000000000001) == len(mp_encode_decimal(0.00000000000000000000000000000000000001))
-    ok 157 - mp_next(mp_encode(0.00000000000000000000000000000000000001))
-    ok 158 - mp_decode(mp_encode(0.00000000000000000000000000000000000001) len
-    ok 159 - mp_decode(mp_encode(0.00000000000000000000000000000000000001)) value
-    ok 160 - mp_decode(mp_encode(0.00000000000000000000000000000000000001)) scale
-    ok 161 - str(mp_decode(mp_encode(0.00000000000000000000000000000000000001))) == 0.00000000000000000000000000000000000001
-    ok 162 - mp_ext_type is MP_DECIMAL
-    ok 163 - decimal_unpack() after mp_decode_extl()
-    ok 164 - decimal_unpack() after mp_decode_extl() value
-    ok 165 - decimal_unpack() after mp_decode_extl() len
-    ok 166 - mp_sizeof_decimal(-0.00000000000000000000000000000000000001)
-    ok 167 - mp_sizeof_decimal(-0.00000000000000000000000000000000000001) == len(mp_encode_decimal(-0.00000000000000000000000000000000000001))
-    ok 168 - mp_next(mp_encode(-0.00000000000000000000000000000000000001))
-    ok 169 - mp_decode(mp_encode(-0.00000000000000000000000000000000000001) len
-    ok 170 - mp_decode(mp_encode(-0.00000000000000000000000000000000000001)) value
-    ok 171 - mp_decode(mp_encode(-0.00000000000000000000000000000000000001)) scale
-    ok 172 - str(mp_decode(mp_encode(-0.00000000000000000000000000000000000001))) == -0.00000000000000000000000000000000000001
-    ok 173 - mp_ext_type is MP_DECIMAL
-    ok 174 - decimal_unpack() after mp_decode_extl()
-    ok 175 - decimal_unpack() after mp_decode_extl() value
-    ok 176 - decimal_unpack() after mp_decode_extl() len
-    ok 177 - mp_sizeof_decimal(99999999999999999999999999999999999999)
-    ok 178 - mp_sizeof_decimal(99999999999999999999999999999999999999) == len(mp_encode_decimal(99999999999999999999999999999999999999))
-    ok 179 - mp_next(mp_encode(99999999999999999999999999999999999999))
-    ok 180 - mp_decode(mp_encode(99999999999999999999999999999999999999) len
-    ok 181 - mp_decode(mp_encode(99999999999999999999999999999999999999)) value
-    ok 182 - mp_decode(mp_encode(99999999999999999999999999999999999999)) scale
-    ok 183 - str(mp_decode(mp_encode(99999999999999999999999999999999999999))) == 99999999999999999999999999999999999999
-    ok 184 - mp_ext_type is MP_DECIMAL
-    ok 185 - decimal_unpack() after mp_decode_extl()
-    ok 186 - decimal_unpack() after mp_decode_extl() value
-    ok 187 - decimal_unpack() after mp_decode_extl() len
-    ok 188 - mp_sizeof_decimal(-99999999999999999999999999999999999999)
-    ok 189 - mp_sizeof_decimal(-99999999999999999999999999999999999999) == len(mp_encode_decimal(-99999999999999999999999999999999999999))
-    ok 190 - mp_next(mp_encode(-99999999999999999999999999999999999999))
-    ok 191 - mp_decode(mp_encode(-99999999999999999999999999999999999999) len
-    ok 192 - mp_decode(mp_encode(-99999999999999999999999999999999999999)) value
-    ok 193 - mp_decode(mp_encode(-99999999999999999999999999999999999999)) scale
-    ok 194 - str(mp_decode(mp_encode(-99999999999999999999999999999999999999))) == -99999999999999999999999999999999999999
-    ok 195 - mp_ext_type is MP_DECIMAL
-    ok 196 - decimal_unpack() after mp_decode_extl()
-    ok 197 - decimal_unpack() after mp_decode_extl() value
-    ok 198 - decimal_unpack() after mp_decode_extl() len
+    ok 133 - mp_sizeof_decimal(-1234567891234567890.0987654321987654321)
+    ok 134 - mp_sizeof_decimal(-1234567891234567890.0987654321987654321) == len(mp_encode_decimal(-1234567891234567890.0987654321987654321))
+    ok 135 - mp_next(mp_encode(-1234567891234567890.0987654321987654321))
+    ok 136 - mp_decode(mp_encode(-1234567891234567890.0987654321987654321) len
+    ok 137 - mp_decode(mp_encode(-1234567891234567890.0987654321987654321)) value
+    ok 138 - mp_decode(mp_encode(-1234567891234567890.0987654321987654321)) scale
+    ok 139 - str(mp_decode(mp_encode(-1234567891234567890.0987654321987654321))) == -1234567891234567890.0987654321987654321
+    ok 140 - stack str == static str for -1234567891234567890.0987654321987654321
+    ok 141 - mp_ext_type is MP_DECIMAL
+    ok 142 - decimal_unpack() after mp_decode_extl()
+    ok 143 - decimal_unpack() after mp_decode_extl() value
+    ok 144 - decimal_unpack() after mp_decode_extl() len
+    ok 145 - mp_sizeof_decimal(0.0000000000000000000000000000000000001)
+    ok 146 - mp_sizeof_decimal(0.0000000000000000000000000000000000001) == len(mp_encode_decimal(0.0000000000000000000000000000000000001))
+    ok 147 - mp_next(mp_encode(0.0000000000000000000000000000000000001))
+    ok 148 - mp_decode(mp_encode(0.0000000000000000000000000000000000001) len
+    ok 149 - mp_decode(mp_encode(0.0000000000000000000000000000000000001)) value
+    ok 150 - mp_decode(mp_encode(0.0000000000000000000000000000000000001)) scale
+    ok 151 - str(mp_decode(mp_encode(0.0000000000000000000000000000000000001))) == 0.0000000000000000000000000000000000001
+    ok 152 - stack str == static str for 0.0000000000000000000000000000000000001
+    ok 153 - mp_ext_type is MP_DECIMAL
+    ok 154 - decimal_unpack() after mp_decode_extl()
+    ok 155 - decimal_unpack() after mp_decode_extl() value
+    ok 156 - decimal_unpack() after mp_decode_extl() len
+    ok 157 - mp_sizeof_decimal(-0.0000000000000000000000000000000000001)
+    ok 158 - mp_sizeof_decimal(-0.0000000000000000000000000000000000001) == len(mp_encode_decimal(-0.0000000000000000000000000000000000001))
+    ok 159 - mp_next(mp_encode(-0.0000000000000000000000000000000000001))
+    ok 160 - mp_decode(mp_encode(-0.0000000000000000000000000000000000001) len
+    ok 161 - mp_decode(mp_encode(-0.0000000000000000000000000000000000001)) value
+    ok 162 - mp_decode(mp_encode(-0.0000000000000000000000000000000000001)) scale
+    ok 163 - str(mp_decode(mp_encode(-0.0000000000000000000000000000000000001))) == -0.0000000000000000000000000000000000001
+    ok 164 - stack str == static str for -0.0000000000000000000000000000000000001
+    ok 165 - mp_ext_type is MP_DECIMAL
+    ok 166 - decimal_unpack() after mp_decode_extl()
+    ok 167 - decimal_unpack() after mp_decode_extl() value
+    ok 168 - decimal_unpack() after mp_decode_extl() len
+    ok 169 - mp_sizeof_decimal(0.00000000000000000000000000000000000001)
+    ok 170 - mp_sizeof_decimal(0.00000000000000000000000000000000000001) == len(mp_encode_decimal(0.00000000000000000000000000000000000001))
+    ok 171 - mp_next(mp_encode(0.00000000000000000000000000000000000001))
+    ok 172 - mp_decode(mp_encode(0.00000000000000000000000000000000000001) len
+    ok 173 - mp_decode(mp_encode(0.00000000000000000000000000000000000001)) value
+    ok 174 - mp_decode(mp_encode(0.00000000000000000000000000000000000001)) scale
+    ok 175 - str(mp_decode(mp_encode(0.00000000000000000000000000000000000001))) == 0.00000000000000000000000000000000000001
+    ok 176 - stack str == static str for 0.00000000000000000000000000000000000001
+    ok 177 - mp_ext_type is MP_DECIMAL
+    ok 178 - decimal_unpack() after mp_decode_extl()
+    ok 179 - decimal_unpack() after mp_decode_extl() value
+    ok 180 - decimal_unpack() after mp_decode_extl() len
+    ok 181 - mp_sizeof_decimal(-0.00000000000000000000000000000000000001)
+    ok 182 - mp_sizeof_decimal(-0.00000000000000000000000000000000000001) == len(mp_encode_decimal(-0.00000000000000000000000000000000000001))
+    ok 183 - mp_next(mp_encode(-0.00000000000000000000000000000000000001))
+    ok 184 - mp_decode(mp_encode(-0.00000000000000000000000000000000000001) len
+    ok 185 - mp_decode(mp_encode(-0.00000000000000000000000000000000000001)) value
+    ok 186 - mp_decode(mp_encode(-0.00000000000000000000000000000000000001)) scale
+    ok 187 - str(mp_decode(mp_encode(-0.00000000000000000000000000000000000001))) == -0.00000000000000000000000000000000000001
+    ok 188 - stack str == static str for -0.00000000000000000000000000000000000001
+    ok 189 - mp_ext_type is MP_DECIMAL
+    ok 190 - decimal_unpack() after mp_decode_extl()
+    ok 191 - decimal_unpack() after mp_decode_extl() value
+    ok 192 - decimal_unpack() after mp_decode_extl() len
+    ok 193 - mp_sizeof_decimal(99999999999999999999999999999999999999)
+    ok 194 - mp_sizeof_decimal(99999999999999999999999999999999999999) == len(mp_encode_decimal(99999999999999999999999999999999999999))
+    ok 195 - mp_next(mp_encode(99999999999999999999999999999999999999))
+    ok 196 - mp_decode(mp_encode(99999999999999999999999999999999999999) len
+    ok 197 - mp_decode(mp_encode(99999999999999999999999999999999999999)) value
+    ok 198 - mp_decode(mp_encode(99999999999999999999999999999999999999)) scale
+    ok 199 - str(mp_decode(mp_encode(99999999999999999999999999999999999999))) == 99999999999999999999999999999999999999
+    ok 200 - stack str == static str for 99999999999999999999999999999999999999
+    ok 201 - mp_ext_type is MP_DECIMAL
+    ok 202 - decimal_unpack() after mp_decode_extl()
+    ok 203 - decimal_unpack() after mp_decode_extl() value
+    ok 204 - decimal_unpack() after mp_decode_extl() len
+    ok 205 - mp_sizeof_decimal(-99999999999999999999999999999999999999)
+    ok 206 - mp_sizeof_decimal(-99999999999999999999999999999999999999) == len(mp_encode_decimal(-99999999999999999999999999999999999999))
+    ok 207 - mp_next(mp_encode(-99999999999999999999999999999999999999))
+    ok 208 - mp_decode(mp_encode(-99999999999999999999999999999999999999) len
+    ok 209 - mp_decode(mp_encode(-99999999999999999999999999999999999999)) value
+    ok 210 - mp_decode(mp_encode(-99999999999999999999999999999999999999)) scale
+    ok 211 - str(mp_decode(mp_encode(-99999999999999999999999999999999999999))) == -99999999999999999999999999999999999999
+    ok 212 - stack str == static str for -99999999999999999999999999999999999999
+    ok 213 - mp_ext_type is MP_DECIMAL
+    ok 214 - decimal_unpack() after mp_decode_extl()
+    ok 215 - decimal_unpack() after mp_decode_extl() value
+    ok 216 - decimal_unpack() after mp_decode_extl() len
 ok 281 - subtests
     1..5
 	*** test_mp_print ***
