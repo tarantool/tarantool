@@ -242,7 +242,7 @@ for _, kw in ipairs(bannedkws) do
     local query = 'CREATE TABLE '..kw..'(a INT PRIMARY KEY);'
     if kw == 'end' or kw == 'match' or kw == 'release' or kw == 'rename' or
        kw == 'replace' or kw == 'binary' or kw == 'character' or
-       kw == 'smallint' then
+       kw == 'smallint' or kw == 'date' then
         test:do_catchsql_test(
         "bannedkw1-"..kw..".1",
         query, {
