@@ -133,6 +133,10 @@ deploy: export LD_LIBRARY_PATH=/usr/local/lib
 deploy:
 	echo ${GPG_SECRET_KEY} | base64 -d | gpg --batch --import || true
 	case "${GITHUB_REF}" in                                       \
+	refs/tags/*-alpha*|refs/tags/*-beta*|refs/tags/*-rc*) \
+	    ./tools/update_repo.sh -o=${OS} -d=${DIST}            \
+			-b="${PRERELEASE_REPO_S3_DIR}/${BUCKET}" build ; \
+	        ;;
 	refs/tags/*)                                                  \
 		./tools/update_repo.sh -o=${OS} -d=${DIST}            \
 			-b="${RELEASE_REPO_S3_DIR}/${BUCKET}" build ; \
