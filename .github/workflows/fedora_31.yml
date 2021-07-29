@@ -37,8 +37,8 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_S3_ENDPOINT_URL: ${{ secrets.AWS_S3_ENDPOINT_URL }}
-          LIVE_REPO_S3_DIR: ${{ secrets.LIVE_REPO_S3_DIR }}
           RELEASE_REPO_S3_DIR: ${{ secrets.RELEASE_REPO_S3_DIR }}
+          PRERELEASE_REPO_S3_DIR: ${{ secrets.PRERELEASE_REPO_S3_DIR }}
           GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
           GPG_SIGN_KEY: ${{ secrets.GPG_SIGN_KEY }}
           OS: 'fedora'
