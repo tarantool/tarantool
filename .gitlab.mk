@@ -116,9 +116,8 @@ vms_shutdown:
 
 GIT_DESCRIBE=$(shell git describe HEAD)
 MAJOR_VERSION=$(word 1,$(subst ., ,$(GIT_DESCRIBE)))
-MINOR_VERSION=$(word 2,$(subst ., ,$(GIT_DESCRIBE)))
-BUCKET="$(MAJOR_VERSION).$(MINOR_VERSION)"
-S3_BUCKET_URL="s3://tarantool_repo/sources/$(BUCKET)"
+BUCKET="series-$(MAJOR_VERSION)"
+S3_BUCKET_URL="s3://tarantool_repo/sources"
 
 deploy_prepare:
 	[ -d packpack ] || \
