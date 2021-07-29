@@ -786,6 +786,23 @@ tx1:commit();
 tx2:rollback()
 s:drop()
 
+--https://github.com/tarantool/tarantool/issues/6247
+s = box.schema.create_space('test')
+pk = s:create_index('pk', {parts={1, 'uint'}})
+sk = s:create_index('sk', {parts={2, 'uint'}})
+
+-- Make lots of changes to ensure that GC make the first tuple {1, 1,1} clean.
+collectgarbage('collect')
+for i = 1,10 do s:replace{i, i, i} end
+collectgarbage('collect')
+for i = 11,100 do s:replace{i, i, i} end
+-- Make a new tuple that is definitely dirty now.
+s:replace{0, 0, 0}
+-- Hit dirty {0, 0, 0} in pk and conflict clean {1, 1, 1}.
+s:replace{0, 1, 0}
+
+s:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")

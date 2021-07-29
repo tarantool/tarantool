@@ -997,7 +997,9 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 			 */
 			diag_set(ClientError, ER_TUPLE_FOUND,
 				 space->index[i]->def->name,
-				 space_name(space));
+				 space_name(space),
+				 tuple_str(replaced[i]),
+				 tuple_str(new_tuple));
 			return -1;
 		}
 
