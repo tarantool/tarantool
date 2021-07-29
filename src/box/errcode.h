@@ -278,6 +278,7 @@ struct errcode_record {
 	/*223 */_(ER_INTERFERING_PROMOTE,	"Instance with replica id %u was promoted first") \
 	/*224 */_(ER_ELECTION_DISABLED,		"Elections were turned off")\
 	/*225 */_(ER_TXN_ROLLBACK,		"Transaction was rolled back") \
+	/*226 */_(ER_NOT_LEADER,		"The instance is not a leader. New leader is %u")\
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
