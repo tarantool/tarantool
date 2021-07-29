@@ -276,6 +276,9 @@ typedef struct tuple box_tuple_t;
 int
 box_promote(void);
 
+int
+box_promote_qsync(void);
+
 /* box_select is private and used only by FFI */
 API_EXPORT int
 box_select(uint32_t space_id, uint32_t index_id,

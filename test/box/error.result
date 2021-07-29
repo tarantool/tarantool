@@ -444,6 +444,7 @@ t;
  |   223: box.error.INTERFERING_PROMOTE
  |   224: box.error.ELECTION_DISABLED
  |   225: box.error.TXN_ROLLBACK
+ |   226: box.error.NOT_LEADER
  | ...
 
 test_run:cmd("setopt delimiter ''");
