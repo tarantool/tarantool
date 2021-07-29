@@ -1679,20 +1679,45 @@ box_issue_promote(uint32_t prev_leader_id, int64_t promote_lsn)
 	assert(txn_limbo_is_empty(&txn_limbo));
 }
 
+/** A guard to block multiple simultaneous box_promote() invocations. */
+static bool is_in_box_promote = false;
+
+int
+box_promote_qsync(void)
+{
+	assert(!is_in_box_promote);
+	assert(is_box_configured);
+	struct raft *raft = box_raft();
+	is_in_box_promote = true;
+	auto promote_guard = make_scoped_guard([&] {
+		is_in_box_promote = false;
+	});
+	assert(raft->state == RAFT_STATE_LEADER);
+	if (txn_limbo_replica_term(&txn_limbo, instance_id) == raft->term)
+		return 0;
+	int64_t wait_lsn = box_wait_limbo_acked(TIMEOUT_INFINITY);
+	if (wait_lsn < 0)
+		return -1;
+	if (raft->state != RAFT_STATE_LEADER) {
+		diag_set(ClientError, ER_NOT_LEADER, raft->leader);
+		return -1;
+	}
+	box_issue_promote(txn_limbo.owner_id, wait_lsn);
+	return 0;
+}
+
 int
 box_promote(void)
 {
-	/* A guard to block multiple simultaneous function invocations. */
-	static bool in_promote = false;
-	if (in_promote) {
+	if (is_in_box_promote) {
 		diag_set(ClientError, ER_UNSUPPORTED, "box.ctl.promote",
 			 "simultaneous invocations");
 		return -1;
 	}
 	struct raft *raft = box_raft();
-	in_promote = true;
+	is_in_box_promote = true;
 	auto promote_guard = make_scoped_guard([&] {
-		in_promote = false;
+		is_in_box_promote = false;
 	});
 	/*
 	 * Do nothing when box isn't configured and when PROMOTE was already
@@ -1718,9 +1743,8 @@ box_promote(void)
 	case ELECTION_MODE_MANUAL:
 		if (raft->state == RAFT_STATE_LEADER)
 			return 0;
-		if (box_run_elections() != 0)
-			return -1;
-		break;
+		is_in_box_promote = false;
+		return box_run_elections();
 	case ELECTION_MODE_CANDIDATE:
 		/*
 		 * Leader elections are enabled, and this instance is allowed to
