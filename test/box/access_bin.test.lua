@@ -111,8 +111,8 @@ test:drop()
 --
 -- notice that guest can execute stuff, but can't read space _func
 box.schema.user.grant('guest', 'execute', 'universe')
-function f1() return box.space._func:get(1)[4] end
-function f2() return box.space._func:get(69)[4] end
+function f1() return box.space._func.index[2]:get({'f1'})[4] end
+function f2() return box.space._func.index[2]:get({'f1'})[4] end
 box.schema.func.create('f1')
 box.schema.func.create('f2',{setuid=true})
 c = net.connect(box.cfg.listen)

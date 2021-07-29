@@ -1003,19 +1003,19 @@ end
 --------------------------------------------------------------------------------
 -- Tarantool 2.9.1
 --------------------------------------------------------------------------------
-local function sql_builtin_function_uuid()
+local function remove_sql_builtin_functions_from_func()
     local _func = box.space._func
     local _priv = box.space._priv
-    local datetime = os.date("%Y-%m-%d %H:%M:%S")
-    local t = _func:auto_increment({ADMIN, 'UUID', 1, 'SQL_BUILTIN', '',
-                                    'function', {}, 'any', 'none', 'none',
-                                    false, false, true, {}, setmap({}), '',
-                                    datetime, datetime})
-    _priv:replace{ADMIN, PUBLIC, 'function', t.id, box.priv.X}
+    for _, v in _func:pairs() do
+        if v.language == "SQL_BUILTIN" then
+            _priv:delete({2, 'function', v.id})
+            _func:delete({v.id})
+        end
+    end
 end
 
 local function upgrade_to_2_9_1()
-    sql_builtin_function_uuid()
+    remove_sql_builtin_functions_from_func()
 end
 
 --------------------------------------------------------------------------------

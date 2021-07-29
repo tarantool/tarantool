@@ -56,6 +56,15 @@ sql_init(void);
 struct sql *
 sql_get(void);
 
+/** Initialize global cache for built-in functions. */
+void
+sql_built_in_functions_cache_init(void);
+
+/** Free global cache for built-in functions. */
+void
+sql_built_in_functions_cache_free(void);
+
+
 struct Expr;
 struct Parse;
 struct Select;

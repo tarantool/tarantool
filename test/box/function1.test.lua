@@ -363,7 +363,7 @@ f == nil
 box.func.test ~= nil
 box.func.test:drop()
 
--- Check SQL builtins
+-- Make sure there is no SQL built-in functions in _func.
 test_run:cmd("setopt delimiter ';'")
 sql_builtin_list = {
 	"TRIM", "TYPEOF", "PRINTF", "UNICODE", "CHAR", "HEX", "VERSION",
@@ -376,21 +376,14 @@ sql_builtin_list = {
 	"RANDOMBLOB", "NULLIF", "ZEROBLOB", "MIN", "MAX", "COALESCE", "EVERY",
 	"EXISTS", "EXTRACT", "SOME", "GREATER", "LESSER", "SOUNDEX",
 	"LIKELIHOOD", "LIKELY", "UNLIKELY", "_sql_stat_get", "_sql_stat_push",
-	"_sql_stat_init", "GREATEST", "LEAST"
+	"_sql_stat_init", "GREATEST", "LEAST", "UUID"
 }
 test_run:cmd("setopt delimiter ''");
 ok = true
-for _, v in pairs(sql_builtin_list) do ok = ok and (box.space._func.index.name:get(v) ~= nil) end
+for _, v in pairs(sql_builtin_list) do ok = ok and (box.space._func.index.name:get(v) == nil) end
 ok == true
 
 box.func.LUA:call({"return 1 + 1"})
-
-box.schema.user.grant('guest', 'execute', 'function', 'SUM')
-c = net.connect(box.cfg.listen)
-c:call("SUM")
-c:close()
-box.schema.user.revoke('guest', 'execute', 'function', 'SUM')
-box.schema.func.drop("SUM")
 
 -- Introduce function options
 box.schema.func.create('test', {body = "function(tuple) return tuple end", is_deterministic = true, opts = {is_multikey = true}})

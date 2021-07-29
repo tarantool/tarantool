@@ -97,7 +97,7 @@ box.func["function1.args"]
   exports:
     lua: true
     sql: false
-  id: 69
+  id: 66
   setuid: false
   is_multikey: false
   is_deterministic: false
@@ -593,7 +593,7 @@ func
   exports:
     lua: true
     sql: false
-  id: 69
+  id: 66
   setuid: false
   is_multikey: false
   is_deterministic: false
@@ -665,7 +665,7 @@ func
   exports:
     lua: true
     sql: false
-  id: 69
+  id: 66
   setuid: false
   is_multikey: false
   is_deterministic: false
@@ -1032,7 +1032,7 @@ box.func.test ~= nil
 box.func.test:drop()
 ---
 ...
--- Check SQL builtins
+-- Make sure there is no SQL built-in functions in _func.
 test_run:cmd("setopt delimiter ';'")
 ---
 - true
@@ -1048,7 +1048,7 @@ sql_builtin_list = {
 	"RANDOMBLOB", "NULLIF", "ZEROBLOB", "MIN", "MAX", "COALESCE", "EVERY",
 	"EXISTS", "EXTRACT", "SOME", "GREATER", "LESSER", "SOUNDEX",
 	"LIKELIHOOD", "LIKELY", "UNLIKELY", "_sql_stat_get", "_sql_stat_push",
-	"_sql_stat_init", "GREATEST", "LEAST"
+	"_sql_stat_init", "GREATEST", "LEAST", "UUID"
 }
 test_run:cmd("setopt delimiter ''");
 ---
@@ -1056,7 +1056,7 @@ test_run:cmd("setopt delimiter ''");
 ok = true
 ---
 ...
-for _, v in pairs(sql_builtin_list) do ok = ok and (box.space._func.index.name:get(v) ~= nil) end
+for _, v in pairs(sql_builtin_list) do ok = ok and (box.space._func.index.name:get(v) == nil) end
 ---
 ...
 ok == true
@@ -1066,26 +1066,6 @@ ok == true
 box.func.LUA:call({"return 1 + 1"})
 ---
 - 2
-...
-box.schema.user.grant('guest', 'execute', 'function', 'SUM')
----
-...
-c = net.connect(box.cfg.listen)
----
-...
-c:call("SUM")
----
-- error: sql builtin function does not support Lua frontend
-...
-c:close()
----
-...
-box.schema.user.revoke('guest', 'execute', 'function', 'SUM')
----
-...
-box.schema.func.drop("SUM")
----
-- error: 'Can''t drop function 1: function is SQL built-in'
 ...
 -- Introduce function options
 box.schema.func.create('test', {body = "function(tuple) return tuple end", is_deterministic = true, opts = {is_multikey = true}})

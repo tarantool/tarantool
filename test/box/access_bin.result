@@ -295,10 +295,10 @@ test:drop()
 box.schema.user.grant('guest', 'execute', 'universe')
 ---
 ...
-function f1() return box.space._func:get(1)[4] end
+function f1() return box.space._func.index[2]:get({'f1'})[4] end
 ---
 ...
-function f2() return box.space._func:get(69)[4] end
+function f2() return box.space._func.index[2]:get({'f1'})[4] end
 ---
 ...
 box.schema.func.create('f1')

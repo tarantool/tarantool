@@ -47,6 +47,10 @@
 #include <unicode/ucol.h>
 #include "box/coll_id_cache.h"
 #include "box/schema.h"
+#include "box/user.h"
+#include "assoc.h"
+
+static struct mh_strnptr_t *built_in_functions = NULL;
 
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
@@ -2622,11 +2626,49 @@ static struct {
 	},
 };
 
+static struct func *
+built_in_func_get(const char *name)
+{
+	uint32_t len = strlen(name);
+	mh_int_t k = mh_strnptr_find_inp(built_in_functions, name, len);
+	if (k == mh_end(built_in_functions))
+		return NULL;
+	return mh_strnptr_node(built_in_functions, k)->val;
+}
+
+static void
+built_in_func_put(struct func *func)
+{
+	const char *name = func->def->name;
+	uint32_t len = strlen(name);
+	assert(built_in_func_get(name) == NULL);
+
+	uint32_t hash = mh_strn_hash(name, len);
+	const struct mh_strnptr_node_t strnode = {name, len, hash, func};
+	mh_int_t k = mh_strnptr_put(built_in_functions, &strnode, NULL, NULL);
+	if (k == mh_end(built_in_functions)) {
+		panic("Out of memory on insertion into SQL built-in functions "
+		      "hash");
+	}
+}
+
 struct func *
 sql_func_find(struct Expr *expr)
 {
 	const char *name = expr->u.zToken;
-	struct func *func = func_by_name(name, strlen(name));
+	int n = expr->x.pList ? expr->x.pList->nExpr : 0;
+	struct func *func = built_in_func_get(name);
+	if (func != NULL) {
+		assert(func->def->exports.sql);
+		int param_count = func->def->param_count;
+		if (param_count != -1 && param_count != n) {
+			diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, name,
+				 tt_sprintf("%d", func->def->param_count), n);
+			return NULL;
+		}
+		return func;
+	}
+	func = func_by_name(name, strlen(name));
 	if (func == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_FUNCTION, name);
 		return NULL;
@@ -2637,8 +2679,7 @@ sql_func_find(struct Expr *expr)
 				     name));
 		return NULL;
 	}
-	int n = expr->x.pList != NULL ? expr->x.pList->nExpr : 0;
-	if (func->def->param_count != -1 && func->def->param_count != n) {
+	if (func->def->param_count != n) {
 		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, name,
 			 tt_sprintf("%d", func->def->param_count), n);
 		return NULL;
@@ -2649,9 +2690,10 @@ sql_func_find(struct Expr *expr)
 uint32_t
 sql_func_flags(const char *name)
 {
-	struct func *func = func_by_name(name, strlen(name));
-	if (func == NULL || func->def->language != FUNC_LANGUAGE_SQL_BUILTIN)
+	struct func *func = built_in_func_get(name);
+	if (func == NULL)
 		return 0;
+	assert(func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
 	uint32_t flags = ((struct func_sql_builtin *)func)->flags;
 	if (func->def->aggregate == FUNC_AGGREGATE_GROUP)
 		flags |= SQL_FUNC_AGG;
@@ -2659,6 +2701,72 @@ sql_func_flags(const char *name)
 }
 
 static struct func_vtab func_sql_builtin_vtab;
+
+void
+sql_built_in_functions_cache_init(void)
+{
+	built_in_functions = mh_strnptr_new();
+	if (built_in_functions == NULL)
+		panic("Out of memory on creating SQL built-in functions hash");
+	for (uint32_t i = 0; i < nelem(sql_builtins); ++i) {
+		const char *name = sql_builtins[i].name;
+		if (!sql_builtins[i].export_to_sql)
+			continue;
+		uint32_t len = strlen(name);
+		uint32_t size = sizeof(struct func_def) + len + 1;
+		struct func_def *def = malloc(size);
+		if (def == NULL)
+			panic("Out of memory on creating SQL built-in");
+		def->fid = i;
+		def->uid = 1;
+		def->body = NULL;
+		def->comment = NULL;
+		def->setuid = true;
+		def->is_deterministic = sql_builtins[i].is_deterministic;
+		def->is_sandboxed = false;
+		def->param_count = sql_builtins[i].param_count;
+		def->returns = sql_builtins[i].returns;
+		def->aggregate = sql_builtins[i].aggregate;
+		def->language = FUNC_LANGUAGE_SQL_BUILTIN;
+		def->name_len = len;
+		def->exports.sql = sql_builtins[i].export_to_sql;
+		func_opts_create(&def->opts);
+		memcpy(def->name, name, len + 1);
+
+		struct func_sql_builtin *func = malloc(sizeof(*func));
+		if (func == NULL)
+			panic("Out of memory on creating SQL built-in");
+
+		func->base.def = def;
+		func->base.vtab = &func_sql_builtin_vtab;
+		credentials_create_empty(&func->base.owner_credentials);
+		memset(func->base.access, 0, sizeof(func->base.access));
+
+		func->flags = sql_builtins[i].flags;
+		func->call = sql_builtins[i].call;
+		func->finalize = sql_builtins[i].finalize;
+		built_in_func_put(&func->base);
+	}
+}
+
+void
+sql_built_in_functions_cache_free(void)
+{
+	if (built_in_functions == NULL)
+		return;
+	for (uint32_t i = 0; i < nelem(sql_builtins); ++i) {
+		const char *name = sql_builtins[i].name;
+		uint32_t len = strlen(name);
+		mh_int_t k = mh_strnptr_find_inp(built_in_functions, name, len);
+		if (k == mh_end(built_in_functions))
+			continue;
+		struct func *func = mh_strnptr_node(built_in_functions, k)->val;
+		mh_strnptr_del(built_in_functions, k, NULL);
+		func_delete(func);
+	}
+	assert(mh_size(built_in_functions) == 0);
+	mh_strnptr_delete(built_in_functions);
+}
 
 struct func *
 func_sql_builtin_new(struct func_def *def)

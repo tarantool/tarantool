@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(27)
+test:plan(29)
 
 --!./tcltestrunner.lua
 -- 2010 August 27
@@ -347,5 +347,28 @@ box.func.F1:drop()
 box.func.F2:drop()
 box.space.T01:drop()
 box.space.T02:drop()
+
+--
+-- gh-6105:  Make sure that functions that were described in _func but were not
+-- implemented are now removed.
+--
+test:do_catchsql_test(
+    "func-7.3",
+    [[
+        SELECT SQRT();
+    ]], {
+        1, "Function 'SQRT' does not exist"
+    })
+
+-- Make sure that functions are looked up in built-in functions first.
+box.schema.func.create('ABS', {language = 'Lua', param_list = {"INTEGER"},
+                       body = body, returns = 'number', exports = {'LUA'}});
+test:do_execsql_test(
+    "func-7.4",
+    [[
+        SELECT ABS(-111);
+    ]], {
+        111
+    })
 
 test:finish_test()

@@ -3548,13 +3548,6 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 				  "function has references");
 			return -1;
 		}
-		/* Can't' drop a builtin function. */
-		if (old_func->def->language == FUNC_LANGUAGE_SQL_BUILTIN) {
-			diag_set(ClientError, ER_DROP_FUNCTION,
-				  (unsigned) old_func->def->uid,
-				  "function is SQL built-in");
-			return -1;
-		}
 		struct trigger *on_commit =
 			txn_alter_trigger_new(on_drop_func_commit, old_func);
 		struct trigger *on_rollback =

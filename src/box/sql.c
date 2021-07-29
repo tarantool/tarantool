@@ -75,6 +75,7 @@ sql_init(void)
 		panic("failed to initialize SQL subsystem");
 
 	sql_stmt_cache_init();
+	sql_built_in_functions_cache_init();
 
 	assert(db != NULL);
 }
