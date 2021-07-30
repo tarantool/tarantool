@@ -75,6 +75,8 @@ struct tx_read_tracker {
 	struct rlist in_reader_list;
 	/** Link in reader->read_set. */
 	struct rlist in_read_set;
+	/** Bit field of indexes in which the data was tread by reader. */
+	uint64_t index_mask;
 };
 
 /**
