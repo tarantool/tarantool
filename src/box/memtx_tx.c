@@ -31,6 +31,7 @@
 #include "memtx_tx.h"
 
 #include <assert.h>
+#include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -1676,6 +1677,9 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 				    in_reader_list) {
 			if (tracker->reader == stmt->txn)
 				continue;
+			uint64_t index_mask = 1ull << (i & 63);
+			if ((tracker->index_mask & index_mask) == 0)
+				continue;
 			memtx_tx_handle_conflict(stmt->txn, tracker->reader);
 		}
 	}
@@ -1758,7 +1762,7 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
 
 static int
 memtx_tx_track_read_story(struct txn *txn, struct space *space,
-			  struct memtx_story *story);
+			  struct memtx_story *story, uint64_t index_max);
 
 struct tuple *
 memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
@@ -1785,8 +1789,17 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 		if (story == NULL)
 			break;
 	}
-	if (!own_change && story != NULL)
-		memtx_tx_track_read_story(txn, space, story);
+	if (!own_change && story != NULL) {
+		/*
+		 * If the result tuple exists (is visible) - it is visible in
+		 * every index. But if we found a story of deleted tuple - we
+		 * should record that only in the given index this transaction
+		 * have found nothing by this key.
+		 */
+		int shift = index->dense_id & 63;
+		uint64_t mask = result == NULL ? 1ull << shift : UINT64_MAX;
+		memtx_tx_track_read_story(txn, space, story, mask);
+	}
 	if (mk_index != 0) {
 		assert(false); /* TODO: multiindex */
 		panic("multikey indexes are not supported int TX manager");
@@ -1880,7 +1893,8 @@ memtx_tx_on_space_delete(struct space *space)
  * (diag is set). Links in lists are not initialized though.
  */
 static struct tx_read_tracker *
-tx_read_tracker_new(struct txn *reader, struct memtx_story *story)
+tx_read_tracker_new(struct txn *reader, struct memtx_story *story,
+		    uint64_t index_mask)
 {
 	size_t sz;
 	struct tx_read_tracker *tracker;
@@ -1892,12 +1906,13 @@ tx_read_tracker_new(struct txn *reader, struct memtx_story *story)
 	}
 	tracker->reader = reader;
 	tracker->story = story;
+	tracker->index_mask = index_mask;
 	return tracker;
 }
 
 static int
 memtx_tx_track_read_story(struct txn *txn, struct space *space,
-			  struct memtx_story *story)
+			  struct memtx_story *story, uint64_t index_mask)
 {
 	if (txn == NULL)
 		return 0;
@@ -1929,8 +1944,9 @@ memtx_tx_track_read_story(struct txn *txn, struct space *space,
 		/* Move to the beginning of a list for faster further lookups.*/
 		rlist_del(&tracker->in_reader_list);
 		rlist_del(&tracker->in_read_set);
+		tracker->index_mask |= index_mask;
 	} else {
-		tracker = tx_read_tracker_new(txn, story);
+		tracker = tx_read_tracker_new(txn, story, index_mask);
 		if (tracker == NULL)
 			return -1;
 	}
@@ -1954,13 +1970,13 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 
 	if (tuple->is_dirty) {
 		struct memtx_story *story = memtx_tx_story_get(tuple);
-		return memtx_tx_track_read_story(txn, space, story);
+		return memtx_tx_track_read_story(txn, space, story, UINT64_MAX);
 	} else {
 		struct memtx_story *story = memtx_tx_story_new(space, tuple);
 		if (story == NULL)
 			return -1;
 		struct tx_read_tracker *tracker;
-		tracker = tx_read_tracker_new(txn, story);
+		tracker = tx_read_tracker_new(txn, story, UINT64_MAX);
 		if (tracker == NULL) {
 			memtx_tx_story_delete(story);
 			return -1;

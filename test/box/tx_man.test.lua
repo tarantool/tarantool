@@ -987,6 +987,32 @@ tx2:commit()
 
 spc:drop()
 
+-- Check possible excess conflict: reference test
+s = box.schema.create_space('test')
+primary = s:create_index('pk', {parts={1, 'uint'}})
+secondary = s:create_index('sk', {parts={2, 'uint'}})
+tx1:begin()
+tx1('secondary:select{1}')
+s:replace{1, 2}
+tx1('primary:select{1}')
+tx1('s:replace{3, 3}')
+tx1:commit()
+s:drop()
+
+-- Check possible excess conflict: test with deleted story
+s = box.schema.create_space('test')
+primary = s:create_index('pk', {parts={1, 'uint'}})
+secondary = s:create_index('sk', {parts={2, 'uint'}})
+s:replace{1, 1} -- The difference from the test above is that the tuple
+s:delete{1}     -- is inserted and immediately deleted.
+tx1:begin()
+tx1('secondary:select{1}')
+s:replace{1, 2}
+tx1('primary:select{1}')
+tx1('s:replace{3, 3}')
+tx1:commit()
+s:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
